@@ -1,0 +1,37 @@
+work/
+mti_lib/
+transcript
+modelsim.ini
+*.log
+*.jou
+*.wlf
+*.vcd
+*.vpd
+*.wdb
+*.pb
+*.vvp
+*.ucdb
+simv*
+csrc/
+.Xil/
+xsim.dir/
+DVEfiles/
+ucli.key
+*.out
+
+# Vivado non-project build artefacts (reports and checkpoints remain local).
+fpga/**/build/
+
+# Public repository hygiene
+docs/*.pdf
+docs/Interview/
+*.tar
+*.tar.gz
+*.zip
+
+# Local credentials and machine-specific settings
+.env
+.env.*
+*.pem
+*.key
+!.gitignore

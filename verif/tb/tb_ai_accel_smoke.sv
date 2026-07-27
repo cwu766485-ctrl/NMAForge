@@ -1,0 +1,1942 @@
+`timescale 1ns / 1ps
+
+module tb_ai_accel_smoke;
+
+    localparam FPGA_AXI_BASE     = 32'ha000_0000;
+    localparam REG_CTRL          = 32'h0000_0000;
+    localparam REG_STATUS        = 32'h0000_0004;
+    localparam REG_OP_MODE       = 32'h0000_0008;
+    localparam REG_SRC0_BASE     = 32'h0000_000c;
+    localparam REG_SRC1_BASE     = 32'h0000_0010;
+    localparam REG_DST_BASE      = 32'h0000_0014;
+    localparam REG_LENGTH        = 32'h0000_0018;
+    localparam REG_M_SIZE        = 32'h0000_001c;
+    localparam REG_N_SIZE        = 32'h0000_0020;
+    localparam REG_K_WORDS       = 32'h0000_0024;
+    localparam REG_QUANT_ACT     = 32'h0000_0028;
+    localparam REG_RESULT        = 32'h0000_002c;
+    localparam REG_ERROR_CODE    = 32'h0000_0030;
+    localparam REG_IRQ_STATUS    = 32'h0000_003c;
+    localparam REG_IRQ_ENABLE    = 32'h0000_0040;
+    localparam REG_VERSION       = 32'h0000_0044;
+    localparam REG_CMDQ_BASE_LO   = 32'h0000_0080;
+    localparam REG_CMDQ_SIZE      = 32'h0000_0088;
+    localparam REG_CMDQ_HEAD      = 32'h0000_008c;
+    localparam REG_CMDQ_TAIL      = 32'h0000_00c8;
+    localparam REG_CPLQ_BASE_LO   = 32'h0000_0090;
+    localparam REG_CPLQ_SIZE      = 32'h0000_0098;
+    localparam REG_CPLQ_TAIL      = 32'h0000_009c;
+    localparam REG_CPLQ_HEAD      = 32'h0000_00cc;
+    localparam REG_QUEUE_STATUS   = 32'h0000_00d0;
+    localparam REG_REGION0_BASE   = 32'h0000_00d4;
+    localparam REG_REGION0_LIMIT  = 32'h0000_00d8;
+    localparam REG_REGION0_PERM   = 32'h0000_00dc;
+    localparam REG_DOORBELL      = 32'h0000_00a0;
+    localparam REG_ABORT         = 32'h0000_00a4;
+    localparam REG_CMDQ_CTRL      = 32'h0000_00ac;
+    localparam REG_DMA_CTRL       = 32'h0000_00b0;
+    localparam REG_DMA_STATUS     = 32'h0000_00b4;
+    localparam REG_DMA_EXT_ADDR   = 32'h0000_00b8;
+    localparam REG_DMA_SPAD_ADDR  = 32'h0000_00bc;
+    localparam REG_DMA_LENGTH     = 32'h0000_00c0;
+    localparam REG_DMA_ERROR_CODE = 32'h0000_00c4;
+    localparam REG_DMA_ROW_WORDS  = 32'h0000_0104;
+    localparam REG_DMA_ROW_COUNT  = 32'h0000_0108;
+    localparam REG_DMA_EXT_STRIDE = 32'h0000_010c;
+    localparam REG_DMA_SPAD_STRIDE = 32'h0000_0110;
+    localparam REG_DMA_CFG         = 32'h0000_016c;
+    localparam REG_DMA_GATHER_INDEX = 32'h0000_0170;
+    localparam REG_PERF_CTRL       = 32'h0000_0174;
+    localparam REG_PERF_MATRIX_CYCLES = 32'h0000_0178;
+    localparam REG_PERF_MATRIX_MAC_CYCLES = 32'h0000_017c;
+    localparam REG_PERF_DMA_READ_BYTES = 32'h0000_0184;
+    localparam REG_BIAS_BASE       = 32'h0000_0114;
+    localparam REG_POST_CTRL       = 32'h0000_0118;
+    localparam REG_TILE_CTRL       = 32'h0000_0120;
+    localparam REG_TILE_COUNT      = 32'h0000_0124;
+    localparam REG_TILE_EXT_IN     = 32'h0000_0128;
+    localparam REG_TILE_EXT_OUT    = 32'h0000_012c;
+    localparam REG_TILE_EXT_IN_STRIDE  = 32'h0000_0130;
+    localparam REG_TILE_EXT_OUT_STRIDE = 32'h0000_0134;
+    localparam REG_TILE_BUF0       = 32'h0000_0138;
+    localparam REG_TILE_BUF1       = 32'h0000_013c;
+    localparam REG_TILE_IN_WORDS   = 32'h0000_0140;
+    localparam REG_TILE_OUT_WORDS  = 32'h0000_0144;
+    localparam REG_TILE_OUT_OFFSET = 32'h0000_0148;
+    localparam REG_PERF_TOTAL      = 32'h0000_014c;
+    localparam REG_PERF_DMA        = 32'h0000_0150;
+    localparam REG_PERF_COMPUTE    = 32'h0000_0154;
+    localparam REG_PERF_OVERLAP    = 32'h0000_0158;
+    localparam REG_PERF_STALL      = 32'h0000_015c;
+    localparam REG_TILE_COMPLETED  = 32'h0000_0160;
+    localparam REG_SPAD_INFO       = 32'h0000_0164;
+    localparam REG_EVENT_STATUS    = 32'h0000_0168;
+    localparam SPAD_BASE         = 32'h0001_0000;
+    localparam SPAD_BYTES        = 32'h0008_0000;
+
+    localparam OP_VDOT_INT8      = 8'h10;
+    localparam OP_GEMV_INT8      = 8'h11;
+    localparam OP_GEMM_INT8_TILE = 8'h12;
+    localparam OP_CONV1X1_INT8   = 8'h13;
+    localparam OP_CONV3X3_INT8   = 8'h14;
+    localparam OP_DWCONV3X3_INT8 = 8'h15;
+    localparam OP_BANKED_VDOT    = 8'h20;
+    localparam OP_BANKED_GEMV    = 8'h21;
+    localparam OP_TENSOR_GEMM    = 8'h30;
+    localparam OP_BATCH_GEMM     = 8'h31;
+    localparam OP_SOFTMAX_Q15    = 8'h32;
+    localparam OP_RMSNORM_Q15    = 8'h33;
+    localparam OP_RESIDUAL_I32   = 8'h34;
+    localparam OP_GELU_Q8_8      = 8'h35;
+    localparam OP_REQUANT_I8     = 8'h36;
+    localparam OP_SILU_Q8_8      = 8'h37;
+    localparam OP_LAYERNORM_Q15  = 8'h38;
+    localparam OP_CAUSAL_SOFTMAX_Q15 = 8'h39;
+    localparam OP_QKV_PROJ       = 8'h40;
+    localparam OP_MHA            = 8'h41;
+    localparam OP_FFN            = 8'h42;
+    localparam ERR_DESC_INVALID  = 4'd7;
+    localparam ERR_CMDQ_EMPTY    = 4'd8;
+    localparam ERR_CPLQ_FULL     = 4'd9;
+    localparam ERR_PROTECTION    = 4'd6;
+
+    reg         aclk;
+    reg         aresetn;
+    reg  [31:0] s_axi_awaddr;
+    reg         s_axi_awvalid;
+    wire        s_axi_awready;
+    reg  [31:0] s_axi_wdata;
+    reg  [3:0]  s_axi_wstrb;
+    reg         s_axi_wvalid;
+    wire        s_axi_wready;
+    wire [1:0]  s_axi_bresp;
+    wire        s_axi_bvalid;
+    reg         s_axi_bready;
+    reg  [31:0] s_axi_araddr;
+    reg         s_axi_arvalid;
+    wire        s_axi_arready;
+    wire [31:0] s_axi_rdata;
+    wire [1:0]  s_axi_rresp;
+    wire        s_axi_rvalid;
+    reg         s_axi_rready;
+    wire        irq;
+
+    wire        m_axi_arvalid;
+    wire [3:0]  m_axi_arid;
+    wire [31:0] m_axi_araddr;
+    wire [7:0]  m_axi_arlen;
+    wire [2:0]  m_axi_arsize;
+    wire [1:0]  m_axi_arburst;
+    wire        m_axi_arready;
+    wire [3:0]  m_axi_rid;
+    wire [127:0] m_axi_rdata;
+    wire [1:0]  m_axi_rresp;
+    wire        m_axi_rvalid;
+    wire        m_axi_rlast;
+    wire        m_axi_rready;
+    wire        m_axi_awvalid;
+    wire [3:0]  m_axi_awid;
+    wire [31:0] m_axi_awaddr;
+    wire [7:0]  m_axi_awlen;
+    wire [2:0]  m_axi_awsize;
+    wire [1:0]  m_axi_awburst;
+    wire        m_axi_awready;
+    wire        m_axi_wvalid;
+    wire [127:0] m_axi_wdata;
+    wire [15:0]  m_axi_wstrb;
+    wire        m_axi_wlast;
+    wire        m_axi_wready;
+    wire [3:0]  m_axi_bid;
+    wire [1:0]  m_axi_bresp;
+    wire        m_axi_bvalid;
+    wire        m_axi_bready;
+
+    // The retained A5 memory model is a lane-0, ID-0 compatibility slave.
+    // A6 out-of-order traffic is covered by tb_ai_axi128_dma_ooo until the
+    // unified model below replaces it in the VCS gate.
+    assign m_axi_rid = 4'd0;
+    assign m_axi_bid = 4'd0;
+
+    reg [31:0] rd;
+    reg        allow_m_axi_error;
+    integer errors;
+    integer random_cases;
+    integer seed_arg;
+    integer seed_dummy;
+
+    ai_accel_top dut(
+        .aclk          (aclk),
+        .aresetn       (aresetn),
+        .s_axi_awaddr  (s_axi_awaddr),
+        .s_axi_awvalid (s_axi_awvalid),
+        .s_axi_awready (s_axi_awready),
+        .s_axi_wdata   (s_axi_wdata),
+        .s_axi_wstrb   (s_axi_wstrb),
+        .s_axi_wvalid  (s_axi_wvalid),
+        .s_axi_wready  (s_axi_wready),
+        .s_axi_bresp   (s_axi_bresp),
+        .s_axi_bvalid  (s_axi_bvalid),
+        .s_axi_bready  (s_axi_bready),
+        .s_axi_araddr  (s_axi_araddr),
+        .s_axi_arvalid (s_axi_arvalid),
+        .s_axi_arready (s_axi_arready),
+        .s_axi_rdata   (s_axi_rdata),
+        .s_axi_rresp   (s_axi_rresp),
+        .s_axi_rvalid  (s_axi_rvalid),
+        .s_axi_rready  (s_axi_rready),
+        .irq           (irq),
+        .m_axi_arvalid (m_axi_arvalid),
+        .m_axi_arid    (m_axi_arid),
+        .m_axi_araddr  (m_axi_araddr),
+        .m_axi_arlen   (m_axi_arlen),
+        .m_axi_arsize  (m_axi_arsize),
+        .m_axi_arburst (m_axi_arburst),
+        .m_axi_arready (m_axi_arready),
+        .m_axi_rid     (m_axi_rid),
+        .m_axi_rdata   (m_axi_rdata),
+        .m_axi_rresp   (m_axi_rresp),
+        .m_axi_rvalid  (m_axi_rvalid),
+        .m_axi_rlast   (m_axi_rlast),
+        .m_axi_rready  (m_axi_rready),
+        .m_axi_awvalid (m_axi_awvalid),
+        .m_axi_awid    (m_axi_awid),
+        .m_axi_awaddr  (m_axi_awaddr),
+        .m_axi_awlen   (m_axi_awlen),
+        .m_axi_awsize  (m_axi_awsize),
+        .m_axi_awburst (m_axi_awburst),
+        .m_axi_awready (m_axi_awready),
+        .m_axi_wvalid  (m_axi_wvalid),
+        .m_axi_wdata   (m_axi_wdata),
+        .m_axi_wstrb   (m_axi_wstrb),
+        .m_axi_wlast   (m_axi_wlast),
+        .m_axi_wready  (m_axi_wready),
+        .m_axi_bid     (m_axi_bid),
+        .m_axi_bresp   (m_axi_bresp),
+        .m_axi_bvalid  (m_axi_bvalid),
+        .m_axi_bready  (m_axi_bready)
+    );
+
+    axi_memory_model axi_mem_u(
+        .clk     (aclk),
+        .resetn  (aresetn),
+        .arvalid (m_axi_arvalid),
+        .araddr  (m_axi_araddr),
+        .arlen   (m_axi_arlen),
+        .arsize  (m_axi_arsize),
+        .arburst (m_axi_arburst),
+        .arready (m_axi_arready),
+        .rdata   (m_axi_rdata),
+        .rresp   (m_axi_rresp),
+        .rvalid  (m_axi_rvalid),
+        .rlast   (m_axi_rlast),
+        .rready  (m_axi_rready),
+        .awvalid (m_axi_awvalid),
+        .awaddr  (m_axi_awaddr),
+        .awlen   (m_axi_awlen),
+        .awsize  (m_axi_awsize),
+        .awburst (m_axi_awburst),
+        .awready (m_axi_awready),
+        .wvalid  (m_axi_wvalid),
+        .wdata   (m_axi_wdata),
+        .wstrb   (m_axi_wstrb),
+        .wlast   (m_axi_wlast),
+        .wready  (m_axi_wready),
+        .bresp   (m_axi_bresp),
+        .bvalid  (m_axi_bvalid),
+        .bready  (m_axi_bready)
+    );
+
+    ai_accel_sva sva_u(
+        .clk            (aclk),
+        .resetn         (aresetn),
+        .s_axi_awaddr   (s_axi_awaddr),
+        .s_axi_awvalid  (s_axi_awvalid),
+        .s_axi_awready  (s_axi_awready),
+        .s_axi_wdata    (s_axi_wdata),
+        .s_axi_wstrb    (s_axi_wstrb),
+        .s_axi_wvalid   (s_axi_wvalid),
+        .s_axi_wready   (s_axi_wready),
+        .s_axi_bresp    (s_axi_bresp),
+        .s_axi_bvalid   (s_axi_bvalid),
+        .s_axi_bready   (s_axi_bready),
+        .s_axi_araddr   (s_axi_araddr),
+        .s_axi_arvalid  (s_axi_arvalid),
+        .s_axi_arready  (s_axi_arready),
+        .s_axi_rdata    (s_axi_rdata),
+        .s_axi_rresp    (s_axi_rresp),
+        .s_axi_rvalid   (s_axi_rvalid),
+        .s_axi_rready   (s_axi_rready),
+        .m_axi_araddr   (m_axi_araddr),
+        .m_axi_arlen    (m_axi_arlen),
+        .m_axi_arsize   (m_axi_arsize),
+        .m_axi_arburst  (m_axi_arburst),
+        .m_axi_arvalid  (m_axi_arvalid),
+        .m_axi_arready  (m_axi_arready),
+        .m_axi_rresp    (m_axi_rresp),
+        .m_axi_rvalid   (m_axi_rvalid),
+        .m_axi_rlast    (m_axi_rlast),
+        .m_axi_rready   (m_axi_rready),
+        .m_axi_awaddr   (m_axi_awaddr),
+        .m_axi_awlen    (m_axi_awlen),
+        .m_axi_awvalid  (m_axi_awvalid),
+        .m_axi_awready  (m_axi_awready),
+        .m_axi_wdata    (m_axi_wdata),
+        .m_axi_wstrb    (m_axi_wstrb),
+        .m_axi_wlast    (m_axi_wlast),
+        .m_axi_wvalid   (m_axi_wvalid),
+        .m_axi_wready   (m_axi_wready),
+        .m_axi_bresp    (m_axi_bresp),
+        .m_axi_bvalid   (m_axi_bvalid),
+        .m_axi_bready   (m_axi_bready),
+        .dma_read_outstanding_cfg(dut.dma_read_outstanding_mux),
+        .allow_m_axi_error (allow_m_axi_error),
+        .doorbell_pulse (dut.doorbell_pulse),
+        .desc_busy      (dut.spad_desc_busy),
+        .desc_base      (dut.cmdq_desc_base),
+        .host_valid     (dut.spad_req_valid),
+        .host_write     (dut.reg_req_write_raw),
+        .host_addr      (dut.reg_req_addr_raw - dut.SPAD_BASE),
+        .core_busy      (dut.core_busy),
+        // Feed pulse-level core state into protocol assertions.  Sticky
+        // software STATUS.done/error may legally remain set while a queued
+        // successor command is executing.
+        .core_done      (dut.core_done),
+        .core_error     (dut.core_error)
+    );
+
+    initial begin
+        aclk = 1'b0;
+        forever #5 aclk = ~aclk;
+    end
+
+    `include "axi_lite_tasks.svh"
+
+    task wait_done;
+        begin
+            integer i;
+            integer found;
+            found = 0;
+            // Scratchpad reads are native synchronous BRAM reads.  Scalar
+            // operations now include request/response wait cycles and banked
+            // operations fetch A then B, so retain ample polling headroom.
+            for (i = 0; i < 400; i = i + 1) begin
+                if (!found) begin
+                    axi_read(REG_STATUS, rd);
+                    if (rd[1])
+                        found = 1;
+                end
+            end
+            if (!found) begin
+                $display("%0t ERROR: timeout waiting done", $time);
+                errors = errors + 1;
+            end
+            if (rd[2]) begin
+                axi_read(REG_ERROR_CODE, rd);
+                $display("%0t ERROR: core error_code=%0d", $time, rd);
+                errors = errors + 1;
+            end
+        end
+    endtask
+
+    task wait_done_expect_error;
+        input [3:0] expected_error_code;
+        begin
+            integer i;
+            integer found;
+            reg [31:0] status;
+            found = 0;
+            status = 32'd0;
+            for (i = 0; i < 200; i = i + 1) begin
+                if (!found) begin
+                    axi_read(REG_STATUS, status);
+                    if (status[1])
+                        found = 1;
+                end
+            end
+            if (!found) begin
+                $display("%0t ERROR: timeout waiting expected error done", $time);
+                errors = errors + 1;
+            end else if (!status[2]) begin
+                $display("%0t ERROR: expected STATUS.error for descriptor error", $time);
+                errors = errors + 1;
+            end
+            axi_read(REG_ERROR_CODE, rd);
+            if (rd[3:0] !== expected_error_code) begin
+                $display("%0t ERROR: expected error_code=%0d actual=%0d",
+                         $time, expected_error_code, rd[3:0]);
+                errors = errors + 1;
+            end else begin
+                $display("%0t PASS: expected core error_code = %0d/%08h", $time, rd[3:0], rd);
+            end
+        end
+    endtask
+
+    task clear_done_irq;
+        begin
+            axi_write(REG_IRQ_STATUS, 32'd1);
+            axi_write(REG_STATUS, 32'd2);
+        end
+    endtask
+
+    `include "ai_dma_tasks.svh"
+
+    task write_spad_desc;
+        input [31:0] base;
+        input [7:0]  op;
+        input [15:0] task_id;
+        input [31:0] src0;
+        input [31:0] src1;
+        input [31:0] dst;
+        input [15:0] m;
+        input [15:0] n;
+        input [15:0] k;
+        begin
+            axi_write(SPAD_BASE + base + 32'h00, {task_id, 8'd0, op});
+            axi_write(SPAD_BASE + base + 32'h04, src0);
+            axi_write(SPAD_BASE + base + 32'h08, src1);
+            axi_write(SPAD_BASE + base + 32'h0c, 32'd0);
+            axi_write(SPAD_BASE + base + 32'h10, dst);
+            axi_write(SPAD_BASE + base + 32'h14, {n, m});
+            axi_write(SPAD_BASE + base + 32'h18, {16'd0, k});
+            axi_write(SPAD_BASE + base + 32'h1c, 32'd0);
+            axi_write(SPAD_BASE + base + 32'h20, 32'd0);
+            axi_write(SPAD_BASE + base + 32'h24, 32'd0);
+            axi_write(SPAD_BASE + base + 32'h28, 32'd0);
+            axi_write(SPAD_BASE + base + 32'h2c, 32'd0);
+            axi_write(SPAD_BASE + base + 32'h30, 32'd0);
+            axi_write(SPAD_BASE + base + 32'h34, 32'd0);
+            axi_write(SPAD_BASE + base + 32'h38, 32'd0);
+            axi_write(SPAD_BASE + base + 32'h3c, 32'd0);
+        end
+    endtask
+
+    task write_axi_desc;
+        input [31:0] base;
+        input [7:0]  op;
+        input [15:0] task_id;
+        input [31:0] src0;
+        input [31:0] src1;
+        input [31:0] dst;
+        input [15:0] m;
+        input [15:0] n;
+        input [15:0] k;
+        integer word_idx;
+        begin
+            word_idx = base[31:2];
+            axi_mem_u.mem[word_idx + 0]  = {task_id, 8'd0, op};
+            axi_mem_u.mem[word_idx + 1]  = src0;
+            axi_mem_u.mem[word_idx + 2]  = src1;
+            axi_mem_u.mem[word_idx + 3]  = 32'd0;
+            axi_mem_u.mem[word_idx + 4]  = dst;
+            axi_mem_u.mem[word_idx + 5]  = {n, m};
+            axi_mem_u.mem[word_idx + 6]  = {16'd0, k};
+            axi_mem_u.mem[word_idx + 7]  = 32'd0;
+            axi_mem_u.mem[word_idx + 8]  = 32'd0;
+            axi_mem_u.mem[word_idx + 9]  = 32'd0;
+            axi_mem_u.mem[word_idx + 10] = 32'd0;
+            axi_mem_u.mem[word_idx + 11] = 32'd0;
+            axi_mem_u.mem[word_idx + 12] = 32'd0;
+            axi_mem_u.mem[word_idx + 13] = 32'd0;
+            axi_mem_u.mem[word_idx + 14] = 32'd0;
+            axi_mem_u.mem[word_idx + 15] = 32'd0;
+        end
+    endtask
+
+    task write_spad_desc_v3;
+        input [31:0] base;
+        input [7:0]  op;
+        input [15:0] task_id;
+        input [31:0] src0;
+        input [31:0] src1;
+        input [31:0] bias_base_i;
+        input [31:0] dst;
+        input [15:0] m;
+        input [15:0] n;
+        input [15:0] k_or_length;
+        input [7:0]  flags;
+        input [31:0] aux0;
+        input [4:0]  shift;
+        input [1:0]  activation;
+        input [31:0] src0_stride;
+        input [31:0] src1_stride;
+        input [31:0] dst_stride;
+        input [15:0] batch_count;
+        input [15:0] head_count;
+        input [15:0] wait_mask;
+        input [15:0] signal_mask;
+        input [15:0] clear_mask;
+        begin
+            axi_write(SPAD_BASE + base + 32'h00, {task_id, 8'd0, op});
+            axi_write(SPAD_BASE + base + 32'h04, src0);
+            axi_write(SPAD_BASE + base + 32'h08, src1);
+            axi_write(SPAD_BASE + base + 32'h0c, bias_base_i);
+            axi_write(SPAD_BASE + base + 32'h10, dst);
+            axi_write(SPAD_BASE + base + 32'h14, {n, m});
+            axi_write(SPAD_BASE + base + 32'h18, {16'd0, k_or_length});
+            axi_write(SPAD_BASE + base + 32'h1c, {24'd0, flags});
+            axi_write(SPAD_BASE + base + 32'h20, aux0);
+            axi_write(SPAD_BASE + base + 32'h24, {25'd0, activation, shift});
+            axi_write(SPAD_BASE + base + 32'h28, src0_stride);
+            axi_write(SPAD_BASE + base + 32'h2c, src1_stride);
+            axi_write(SPAD_BASE + base + 32'h30, dst_stride);
+            axi_write(SPAD_BASE + base + 32'h34, {head_count, batch_count});
+            axi_write(SPAD_BASE + base + 32'h38, {signal_mask, wait_mask});
+            axi_write(SPAD_BASE + base + 32'h3c, {clear_mask, 8'd0, 8'd3});
+        end
+    endtask
+
+    task write_spad_desc_v4_macro;
+        input [31:0] base;
+        input [7:0]  op;
+        input [15:0] task_id;
+        input [31:0] child_base;
+        input [15:0] child_count;
+        input        child_external;
+        input [15:0] wait_mask;
+        input [15:0] signal_mask;
+        input [15:0] clear_mask;
+        integer i;
+        begin
+            for (i = 0; i < 16; i = i + 1)
+                axi_write(SPAD_BASE + base + (i << 2), 32'd0);
+            axi_write(SPAD_BASE + base + 32'h00, {task_id, 8'd0, op});
+            axi_write(SPAD_BASE + base + 32'h04, child_base);
+            axi_write(SPAD_BASE + base + 32'h18, {16'd0, child_count});
+            axi_write(SPAD_BASE + base + 32'h1c, {28'd0, child_external, 3'd0});
+            axi_write(SPAD_BASE + base + 32'h38, {signal_mask, wait_mask});
+            axi_write(SPAD_BASE + base + 32'h3c, {clear_mask, 8'd0, 8'd4});
+        end
+    endtask
+
+    task expect_completion;
+        input [31:0] base;
+        input [15:0] task_id;
+        input [3:0]  status;
+        input [3:0]  error_code;
+        input [31:0] result;
+        input [31:0] elements;
+        input [511:0] name;
+        begin
+            expect_read(SPAD_BASE + base + 32'h00, {16'd0, task_id}, name);
+            expect_read(SPAD_BASE + base + 32'h04, {24'd0, error_code, status}, name);
+            expect_read(SPAD_BASE + base + 32'h08, result, name);
+            expect_read(SPAD_BASE + base + 32'h0c, elements, name);
+        end
+    endtask
+
+    task wait_cpl_tail;
+        input [31:0] expected_tail;
+        input [511:0] name;
+        begin
+            integer i;
+            integer found;
+            found = 0;
+            for (i = 0; i < 500; i = i + 1) begin
+                if (!found) begin
+                    axi_read(REG_CPLQ_TAIL, rd);
+                    if (rd === expected_tail)
+                        found = 1;
+                end
+            end
+            if (!found) begin
+                $display("%0t ERROR: %0s expected tail=%0d actual=%0d/%08h",
+                         $time, name, expected_tail, rd, rd);
+                errors = errors + 1;
+            end else begin
+                $display("%0t PASS: %0s tail=%0d/%08h", $time, name, rd, rd);
+            end
+        end
+    endtask
+
+    function signed [31:0] dot4_i8_sv;
+        input [31:0] a;
+        input [31:0] b;
+        reg signed [7:0] a0;
+        reg signed [7:0] a1;
+        reg signed [7:0] a2;
+        reg signed [7:0] a3;
+        reg signed [7:0] b0;
+        reg signed [7:0] b1;
+        reg signed [7:0] b2;
+        reg signed [7:0] b3;
+        begin
+            a0 = a[7:0];
+            a1 = a[15:8];
+            a2 = a[23:16];
+            a3 = a[31:24];
+            b0 = b[7:0];
+            b1 = b[15:8];
+            b2 = b[23:16];
+            b3 = b[31:24];
+            dot4_i8_sv = (a0 * b0) + (a1 * b1) + (a2 * b2) + (a3 * b3);
+        end
+    endfunction
+
+    task gen_random_word;
+        output [31:0] word_data;
+        begin
+            word_data[7:0]   = $urandom_range(0, 15) - 8;
+            word_data[15:8]  = $urandom_range(0, 15) - 8;
+            word_data[23:16] = $urandom_range(0, 15) - 8;
+            word_data[31:24] = $urandom_range(0, 15) - 8;
+        end
+    endtask
+
+    task run_random_gemv;
+        input integer case_idx;
+        integer m;
+        integer k_words_i;
+        integer row;
+        integer k;
+        reg [31:0] input_word [0:3];
+        reg [31:0] weight_word [0:15];
+        reg signed [31:0] expected;
+        reg [31:0] base_input;
+        reg [31:0] base_weight;
+        reg [31:0] base_output;
+        begin
+            m = $urandom_range(1, 4);
+            k_words_i = $urandom_range(1, 3);
+            base_input  = 32'h1000 + (case_idx * 32'h400);
+            base_weight = base_input + 32'h80;
+            base_output = base_input + 32'h200;
+
+            for (k = 0; k < k_words_i; k = k + 1) begin
+                gen_random_word(input_word[k]);
+                axi_write_delayed(SPAD_BASE + base_input + (k * 4), input_word[k],
+                                  $urandom_range(0, 2), $urandom_range(0, 2), $urandom_range(0, 2));
+            end
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (k = 0; k < k_words_i; k = k + 1) begin
+                    gen_random_word(weight_word[(row * k_words_i) + k]);
+                    axi_write_delayed(SPAD_BASE + base_weight + (((row * k_words_i) + k) * 4),
+                                      weight_word[(row * k_words_i) + k],
+                                      $urandom_range(0, 2), $urandom_range(0, 2), $urandom_range(0, 2));
+                end
+            end
+
+            axi_write(REG_OP_MODE, OP_GEMV_INT8);
+            axi_write(REG_SRC0_BASE, base_input);
+            axi_write(REG_SRC1_BASE, base_weight);
+            axi_write(REG_DST_BASE,  base_output);
+            axi_write(REG_M_SIZE,    m);
+            axi_write(REG_K_WORDS,   k_words_i);
+            axi_write(REG_POST_CTRL, 32'd0);
+            axi_write(REG_QUANT_ACT, 32'd0);
+            axi_write(REG_CTRL,      32'h0000_0003);
+            wait_done();
+
+            for (row = 0; row < m; row = row + 1) begin
+                expected = 0;
+                for (k = 0; k < k_words_i; k = k + 1)
+                    expected = expected + dot4_i8_sv(input_word[k], weight_word[(row * k_words_i) + k]);
+                expect_read(SPAD_BASE + base_output + (row * 4), expected, "random gemv");
+            end
+            clear_done_irq();
+        end
+    endtask
+
+    task run_random_gemm;
+        input integer case_idx;
+        integer m;
+        integer n;
+        integer k_words_i;
+        integer row;
+        integer col;
+        integer k;
+        reg [31:0] a_word [0:15];
+        reg [31:0] b_word [0:15];
+        reg signed [31:0] expected;
+        reg [31:0] base_a;
+        reg [31:0] base_b;
+        reg [31:0] base_out;
+        begin
+            m = $urandom_range(1, 3);
+            n = $urandom_range(1, 3);
+            k_words_i = $urandom_range(1, 2);
+            base_a   = 32'h3000 + (case_idx * 32'h500);
+            base_b   = base_a + 32'h100;
+            base_out = base_a + 32'h300;
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (k = 0; k < k_words_i; k = k + 1) begin
+                    gen_random_word(a_word[(row * k_words_i) + k]);
+                    axi_write_delayed(SPAD_BASE + base_a + (((row * k_words_i) + k) * 4),
+                                      a_word[(row * k_words_i) + k],
+                                      $urandom_range(0, 2), $urandom_range(0, 2), $urandom_range(0, 2));
+                end
+            end
+
+            for (col = 0; col < n; col = col + 1) begin
+                for (k = 0; k < k_words_i; k = k + 1) begin
+                    gen_random_word(b_word[(col * k_words_i) + k]);
+                    axi_write_delayed(SPAD_BASE + base_b + (((col * k_words_i) + k) * 4),
+                                      b_word[(col * k_words_i) + k],
+                                      $urandom_range(0, 2), $urandom_range(0, 2), $urandom_range(0, 2));
+                end
+            end
+
+            axi_write(REG_OP_MODE, OP_GEMM_INT8_TILE);
+            axi_write(REG_SRC0_BASE, base_a);
+            axi_write(REG_SRC1_BASE, base_b);
+            axi_write(REG_DST_BASE,  base_out);
+            axi_write(REG_M_SIZE,    m);
+            axi_write(REG_N_SIZE,    n);
+            axi_write(REG_K_WORDS,   k_words_i);
+            axi_write(REG_POST_CTRL, 32'd0);
+            axi_write(REG_QUANT_ACT, 32'd0);
+            axi_write(REG_CTRL,      32'h0000_0003);
+            wait_done();
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (col = 0; col < n; col = col + 1) begin
+                    expected = 0;
+                    for (k = 0; k < k_words_i; k = k + 1)
+                        expected = expected + dot4_i8_sv(a_word[(row * k_words_i) + k],
+                                                         b_word[(col * k_words_i) + k]);
+                    expect_read(SPAD_BASE + base_out + (((row * n) + col) * 4), expected, "random gemm");
+                end
+            end
+            clear_done_irq();
+        end
+    endtask
+
+    function automatic [31:0] model_postprocess;
+        input signed [63:0] accumulator;
+        input [4:0] shift;
+        input [1:0] activation;
+        reg signed [63:0] value;
+        begin
+            value = accumulator >>> shift;
+            if ((activation == 2'd1) || (activation == 2'd2)) begin
+                if (value < 0)
+                    value = 0;
+            end
+            if ((activation == 2'd2) && (value > 64'sd6))
+                value = 64'sd6;
+            if (value > 64'sd2147483647)
+                model_postprocess = 32'h7fff_ffff;
+            else if (value < -64'sd2147483648)
+                model_postprocess = 32'h8000_0000;
+            else
+                model_postprocess = value[31:0];
+        end
+    endfunction
+
+    task gen_random_3x3_word;
+        input integer word_index;
+        output [31:0] word_data;
+        begin
+            gen_random_word(word_data);
+            // A 3x3 kernel has nine valid lanes; lanes 9..11 are padding.
+            if (word_index == 2)
+                word_data[31:8] = 24'd0;
+        end
+    endtask
+
+    task run_random_conv3x3;
+        input integer case_idx;
+        integer m;
+        integer n;
+        integer row;
+        integer col;
+        integer k;
+        integer activation_i;
+        integer shift_i;
+        integer bias_enable_i;
+        reg [31:0] patch_word [0:5];
+        reg [31:0] weight_word [0:8];
+        reg signed [31:0] bias_word [0:2];
+        reg signed [63:0] accumulator;
+        reg [31:0] expected;
+        reg [31:0] base_patch;
+        reg [31:0] base_weight;
+        reg [31:0] base_bias;
+        reg [31:0] base_output;
+        begin
+            m = $urandom_range(1, 2);
+            n = $urandom_range(1, 3);
+            activation_i = case_idx % 3;
+            shift_i = case_idx % 4;
+            bias_enable_i = case_idx % 2;
+            base_patch  = 32'h0000_a000;
+            base_weight = 32'h0000_a100;
+            base_bias   = 32'h0000_a200;
+            base_output = 32'h0000_a300;
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (k = 0; k < 3; k = k + 1) begin
+                    gen_random_3x3_word(k, patch_word[(row * 3) + k]);
+                    axi_write_delayed(SPAD_BASE + base_patch + (((row * 3) + k) * 4),
+                                      patch_word[(row * 3) + k],
+                                      $urandom_range(0, 2), $urandom_range(0, 2),
+                                      $urandom_range(0, 2));
+                end
+            end
+            for (col = 0; col < n; col = col + 1) begin
+                for (k = 0; k < 3; k = k + 1) begin
+                    gen_random_3x3_word(k, weight_word[(col * 3) + k]);
+                    axi_write_delayed(SPAD_BASE + base_weight + (((col * 3) + k) * 4),
+                                      weight_word[(col * 3) + k],
+                                      $urandom_range(0, 2), $urandom_range(0, 2),
+                                      $urandom_range(0, 2));
+                end
+                bias_word[col] = $urandom_range(0, 127) - 64;
+                axi_write(SPAD_BASE + base_bias + (col * 4), bias_word[col]);
+            end
+
+            axi_write(REG_OP_MODE, OP_CONV3X3_INT8);
+            axi_write(REG_SRC0_BASE, base_patch);
+            axi_write(REG_SRC1_BASE, base_weight);
+            axi_write(REG_DST_BASE, base_output);
+            axi_write(REG_M_SIZE, m);
+            axi_write(REG_N_SIZE, n);
+            axi_write(REG_K_WORDS, 32'd3);
+            axi_write(REG_BIAS_BASE, base_bias);
+            axi_write(REG_POST_CTRL, bias_enable_i);
+            axi_write(REG_QUANT_ACT, (activation_i << 5) | shift_i);
+            axi_write(REG_CTRL, 32'h0000_0003);
+            wait_done();
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (col = 0; col < n; col = col + 1) begin
+                    accumulator = bias_enable_i ? bias_word[col] : 0;
+                    for (k = 0; k < 3; k = k + 1)
+                        accumulator = accumulator +
+                            dot4_i8_sv(patch_word[(row * 3) + k],
+                                      weight_word[(col * 3) + k]);
+                    expected = model_postprocess(accumulator, shift_i[4:0],
+                                                 activation_i[1:0]);
+                    expect_read(SPAD_BASE + base_output + (((row * n) + col) * 4),
+                                expected, "random conv3x3 post-op");
+                end
+            end
+            clear_done_irq();
+        end
+    endtask
+
+    task run_random_dwconv3x3;
+        input integer case_idx;
+        integer m;
+        integer n;
+        integer row;
+        integer col;
+        integer k;
+        integer activation_i;
+        integer shift_i;
+        integer bias_enable_i;
+        reg [31:0] patch_word [0:17];
+        reg [31:0] weight_word [0:8];
+        reg signed [31:0] bias_word [0:2];
+        reg signed [63:0] accumulator;
+        reg [31:0] expected;
+        reg [31:0] base_patch;
+        reg [31:0] base_weight;
+        reg [31:0] base_bias;
+        reg [31:0] base_output;
+        begin
+            m = $urandom_range(1, 2);
+            n = $urandom_range(1, 3);
+            activation_i = (case_idx + 1) % 3;
+            shift_i = (case_idx + 2) % 4;
+            bias_enable_i = (case_idx + 1) % 2;
+            base_patch  = 32'h0000_b000;
+            base_weight = 32'h0000_b100;
+            base_bias   = 32'h0000_b200;
+            base_output = 32'h0000_b300;
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (col = 0; col < n; col = col + 1) begin
+                    for (k = 0; k < 3; k = k + 1) begin
+                        gen_random_3x3_word(k,
+                            patch_word[(((row * n) + col) * 3) + k]);
+                        axi_write_delayed(
+                            SPAD_BASE + base_patch +
+                            (((((row * n) + col) * 3) + k) * 4),
+                            patch_word[(((row * n) + col) * 3) + k],
+                            $urandom_range(0, 2), $urandom_range(0, 2),
+                            $urandom_range(0, 2));
+                    end
+                end
+            end
+            for (col = 0; col < n; col = col + 1) begin
+                for (k = 0; k < 3; k = k + 1) begin
+                    gen_random_3x3_word(k, weight_word[(col * 3) + k]);
+                    axi_write_delayed(SPAD_BASE + base_weight + (((col * 3) + k) * 4),
+                                      weight_word[(col * 3) + k],
+                                      $urandom_range(0, 2), $urandom_range(0, 2),
+                                      $urandom_range(0, 2));
+                end
+                bias_word[col] = $urandom_range(0, 127) - 64;
+                axi_write(SPAD_BASE + base_bias + (col * 4), bias_word[col]);
+            end
+
+            axi_write(REG_OP_MODE, OP_DWCONV3X3_INT8);
+            axi_write(REG_SRC0_BASE, base_patch);
+            axi_write(REG_SRC1_BASE, base_weight);
+            axi_write(REG_DST_BASE, base_output);
+            axi_write(REG_M_SIZE, m);
+            axi_write(REG_N_SIZE, n);
+            axi_write(REG_K_WORDS, 32'd3);
+            axi_write(REG_BIAS_BASE, base_bias);
+            axi_write(REG_POST_CTRL, bias_enable_i);
+            axi_write(REG_QUANT_ACT, (activation_i << 5) | shift_i);
+            axi_write(REG_CTRL, 32'h0000_0003);
+            wait_done();
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (col = 0; col < n; col = col + 1) begin
+                    accumulator = bias_enable_i ? bias_word[col] : 0;
+                    for (k = 0; k < 3; k = k + 1)
+                        accumulator = accumulator + dot4_i8_sv(
+                            patch_word[(((row * n) + col) * 3) + k],
+                            weight_word[(col * 3) + k]);
+                    expected = model_postprocess(accumulator, shift_i[4:0],
+                                                 activation_i[1:0]);
+                    expect_read(SPAD_BASE + base_output + (((row * n) + col) * 4),
+                                expected, "random dwconv3x3 post-op");
+                end
+            end
+            clear_done_irq();
+        end
+    endtask
+
+    initial begin
+        errors = 0;
+        allow_m_axi_error = 1'b0;
+        aresetn = 1'b0;
+        axi_idle();
+        repeat (8) @(posedge aclk);
+        aresetn = 1'b1;
+        repeat (4) @(posedge aclk);
+
+        expect_read(REG_VERSION, 32'h1000_0005, "version");
+        expect_read(FPGA_AXI_BASE + REG_VERSION, 32'h1000_0005,
+                    "mapped AXI aperture version");
+        expect_read(REG_SPAD_INFO, SPAD_BYTES, "512 KiB scratchpad capability");
+        axi_write(FPGA_AXI_BASE + SPAD_BASE + 32'h0008, 32'hface_5120);
+        expect_read(FPGA_AXI_BASE + SPAD_BASE + 32'h0008, 32'hface_5120,
+                    "mapped AXI aperture scratchpad");
+        axi_write_bready_preasserted(REG_IRQ_ENABLE, 32'd1);
+        expect_read(REG_IRQ_ENABLE, 32'd1, "preasserted-BREADY AXI write");
+        axi_write_delayed(SPAD_BASE + 32'h000c, 32'h1234_5678, 3, 0, 2);
+        expect_read(SPAD_BASE + 32'h000c, 32'h1234_5678, "split aw/w write");
+        expect_slverr_write(REG_VERSION, 32'hdead_beef);
+        axi_write(SPAD_BASE + SPAD_BYTES - 32'd4, 32'h5120_cafe);
+        expect_read(SPAD_BASE + SPAD_BYTES - 32'd4, 32'h5120_cafe,
+                    "scratchpad highest legal word");
+        expect_slverr_write(SPAD_BASE + SPAD_BYTES, 32'hdead_beef);
+        expect_slverr_read(SPAD_BASE + SPAD_BYTES);
+
+        // VDOT: [1,2,3,4] dot [5,6,7,8] = 70.
+        axi_write(SPAD_BASE + 32'h0000, 32'h0403_0201);
+        axi_write(SPAD_BASE + 32'h0100, 32'h0807_0605);
+        axi_write(REG_OP_MODE, OP_VDOT_INT8);
+        axi_write(REG_SRC0_BASE, 32'h0000);
+        axi_write(REG_SRC1_BASE, 32'h0100);
+        axi_write(REG_DST_BASE,  32'h0200);
+        axi_write(REG_LENGTH,    32'd1);
+        axi_write(REG_QUANT_ACT, 32'd0);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h0200, 32'd70, "vdot output");
+        expect_read(REG_RESULT, 32'd70, "vdot result");
+        expect_read(REG_CPLQ_TAIL, 32'd0, "direct command does not publish completion");
+        if (!irq) begin
+            $display("%0t ERROR: irq not asserted after VDOT", $time);
+            errors = errors + 1;
+        end
+        clear_done_irq();
+
+        // GEMV: two rows, one packed INT8 word per row.
+        // row0 dot input = 70, row1 dot input = 1+0-3+8 = 6.
+        axi_write(SPAD_BASE + 32'h0300, 32'h0403_0201);
+        axi_write(SPAD_BASE + 32'h0400, 32'h0807_0605);
+        axi_write(SPAD_BASE + 32'h0404, 32'h02ff_0001);
+        write_spad_desc(32'h0c00, OP_GEMV_INT8, 16'h0001, 32'h0300, 32'h0400, 32'h0500,
+                        16'd2, 16'd0, 16'd1);
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CMDQ_BASE_LO, 32'h0c00);
+        axi_write(REG_DOORBELL,  32'd1);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h0500, 32'd70, "gemv row0");
+        expect_read(SPAD_BASE + 32'h0504, 32'd6,  "gemv row1");
+        expect_read(REG_CMDQ_HEAD, 32'd1, "cmdq head");
+        expect_read(REG_CPLQ_TAIL, 32'd0, "disabled completion queue tail after gemv");
+        clear_done_irq();
+
+        // Scratchpad command queue ring: size=2, start from entry1, then wrap to entry0.
+        write_spad_desc(32'h1000, OP_VDOT_INT8, 16'h0100, 32'h0000, 32'h0100, 32'h1010,
+                        16'd0, 16'd0, 16'd1);
+        write_spad_desc(32'h1040, OP_VDOT_INT8, 16'h0101, 32'h0000, 32'h0100, 32'h1020,
+                        16'd0, 16'd0, 16'd1);
+        axi_write(REG_CMDQ_CTRL, 32'd0);
+        axi_write(REG_CMDQ_BASE_LO, 32'h1000);
+        axi_write(REG_CMDQ_SIZE, 32'd2);
+        axi_write(REG_CMDQ_HEAD, 32'd1);
+        axi_write(REG_CMDQ_TAIL, 32'd0);
+        axi_write(REG_CPLQ_BASE_LO, 32'h1100);
+        axi_write(REG_CPLQ_SIZE, 32'd2);
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        axi_write(REG_CPLQ_TAIL, 32'd0);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h1020, 32'd70, "ring entry1 vdot");
+        expect_read(REG_CMDQ_HEAD, 32'd0, "cmdq head wrap");
+        wait_cpl_tail(32'd1, "cplq tail entry1");
+        expect_completion(32'h1100, 16'h0101, 4'h1, 4'h0, 32'd70, 32'd1, "cpl entry1");
+        // Software consumes completion entry1 before hardware may write the
+        // wrapped entry0; otherwise a size-2 ring is intentionally full.
+        axi_write(REG_CPLQ_HEAD, 32'd1);
+        clear_done_irq();
+
+        // Publish descriptor entry0, then ring once for this submitted work.
+        axi_write(REG_CMDQ_TAIL, 32'd1);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h1010, 32'd70, "ring entry0 vdot");
+        expect_read(REG_CMDQ_HEAD, 32'd1, "cmdq head next");
+        wait_cpl_tail(32'd0, "cplq tail wrap");
+        expect_completion(32'h1110, 16'h0100, 4'h1, 4'h0, 32'd70, 32'd1, "cpl entry0");
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        clear_done_irq();
+
+        // Empty command queue must be observable and must not issue a fetch.
+        axi_read(REG_QUEUE_STATUS, rd);
+        if (rd[0] !== 1'b1) begin
+            $display("%0t ERROR: expected CMDQ_EMPTY in QUEUE_STATUS", $time);
+            errors = errors + 1;
+        end
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done_expect_error(ERR_CMDQ_EMPTY);
+        clear_done_irq();
+
+        // A full completion ring blocks a newly submitted command before its
+        // descriptor is fetched, preserving unread completion data.
+        axi_write(REG_CMDQ_HEAD, 32'd0);
+        axi_write(REG_CMDQ_TAIL, 32'd1);
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        axi_write(REG_CPLQ_TAIL, 32'd1);
+        axi_read(REG_QUEUE_STATUS, rd);
+        if (rd[2] !== 1'b1) begin
+            $display("%0t ERROR: expected CPLQ_FULL in QUEUE_STATUS", $time);
+            errors = errors + 1;
+        end
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done_expect_error(ERR_CPLQ_FULL);
+        clear_done_irq();
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CPLQ_SIZE, 32'd0);
+
+        // GEMM tile: M=2, N=2, K=1 packed word.
+        // A row0 [1,2,3,4], row1 [2,0,1,1]
+        // B col0 [1,1,1,1], col1 [1,-1,2,0]
+        axi_write(SPAD_BASE + 32'h0600, 32'h0403_0201);
+        axi_write(SPAD_BASE + 32'h0604, 32'h0101_0002);
+        axi_write(SPAD_BASE + 32'h0700, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0704, 32'h0002_ff01);
+        axi_write(REG_OP_MODE, OP_GEMM_INT8_TILE);
+        axi_write(REG_SRC0_BASE, 32'h0600);
+        axi_write(REG_SRC1_BASE, 32'h0700);
+        axi_write(REG_DST_BASE,  32'h0800);
+        axi_write(REG_M_SIZE,    32'd2);
+        axi_write(REG_N_SIZE,    32'd2);
+        axi_write(REG_K_WORDS,   32'd1);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h0800, 32'd10, "gemm row0 col0");
+        expect_read(SPAD_BASE + 32'h0804, 32'd5,  "gemm row0 col1");
+        expect_read(SPAD_BASE + 32'h0808, 32'd4,  "gemm row1 col0");
+        expect_read(SPAD_BASE + 32'h080c, 32'd4,  "gemm row1 col1");
+        clear_done_irq();
+
+        // NHWC 1x1 convolution: two spatial positions (M=H*W=2), four
+        // input channels (K_WORDS=1), and two output channels (N=2).  The
+        // packed input/weight layout is the same matrix data flow as GEMM.
+        axi_write(REG_OP_MODE, OP_CONV1X1_INT8);
+        axi_write(REG_SRC0_BASE, 32'h0600);
+        axi_write(REG_SRC1_BASE, 32'h0700);
+        axi_write(REG_DST_BASE,  32'h0900);
+        axi_write(REG_M_SIZE,    32'd2);
+        axi_write(REG_N_SIZE,    32'd2);
+        axi_write(REG_K_WORDS,   32'd1);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h0900, 32'd10, "conv1x1 pixel0 channel0");
+        expect_read(SPAD_BASE + 32'h0904, 32'd5,  "conv1x1 pixel0 channel1");
+        expect_read(SPAD_BASE + 32'h0908, 32'd4,  "conv1x1 pixel1 channel0");
+        expect_read(SPAD_BASE + 32'h090c, 32'd4,  "conv1x1 pixel1 channel1");
+        clear_done_irq();
+
+        // A2 CONV3x3: one im2col patch (9 valid lanes, padded to three
+        // words). Channel0 uses +1 weights and bias +5; channel1 uses -1
+        // weights and bias +40. ReLU6 clamps the results to 6 and zero.
+        axi_write(SPAD_BASE + 32'h3a00, 32'h0403_0201);
+        axi_write(SPAD_BASE + 32'h3a04, 32'h0807_0605);
+        axi_write(SPAD_BASE + 32'h3a08, 32'h0000_0009);
+        axi_write(SPAD_BASE + 32'h3b00, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3b04, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3b08, 32'h0000_0001);
+        axi_write(SPAD_BASE + 32'h3b0c, 32'hffff_ffff);
+        axi_write(SPAD_BASE + 32'h3b10, 32'hffff_ffff);
+        axi_write(SPAD_BASE + 32'h3b14, 32'h0000_00ff);
+        axi_write(SPAD_BASE + 32'h3c00, 32'd5);
+        axi_write(SPAD_BASE + 32'h3c04, 32'd40);
+        axi_write(REG_OP_MODE, OP_CONV3X3_INT8);
+        axi_write(REG_SRC0_BASE, 32'h3a00);
+        axi_write(REG_SRC1_BASE, 32'h3b00);
+        axi_write(REG_DST_BASE,  32'h3d00);
+        axi_write(REG_M_SIZE,    32'd1);
+        axi_write(REG_N_SIZE,    32'd2);
+        axi_write(REG_K_WORDS,   32'd3);
+        axi_write(REG_BIAS_BASE, 32'h3c00);
+        axi_write(REG_POST_CTRL, 32'd1);
+        axi_write(REG_QUANT_ACT, 32'h0000_0040);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h3d00, 32'd6, "conv3x3 bias relu6 ch0");
+        expect_read(SPAD_BASE + 32'h3d04, 32'd0, "conv3x3 bias relu6 ch1");
+        clear_done_irq();
+
+        // DWConv3x3 input patches are laid out per {pixel,channel}; each
+        // channel consumes only its own packed kernel vector.
+        axi_write(SPAD_BASE + 32'h3e00, 32'h0403_0201);
+        axi_write(SPAD_BASE + 32'h3e04, 32'h0807_0605);
+        axi_write(SPAD_BASE + 32'h3e08, 32'h0000_0009);
+        axi_write(SPAD_BASE + 32'h3e0c, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3e10, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3e14, 32'h0000_0002);
+        axi_write(SPAD_BASE + 32'h3b0c, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3b10, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3b14, 32'h0000_0001);
+        axi_write(REG_OP_MODE, OP_DWCONV3X3_INT8);
+        axi_write(REG_SRC0_BASE, 32'h3e00);
+        axi_write(REG_SRC1_BASE, 32'h3b00);
+        axi_write(REG_DST_BASE,  32'h3f00);
+        axi_write(REG_M_SIZE,    32'd1);
+        axi_write(REG_N_SIZE,    32'd2);
+        axi_write(REG_K_WORDS,   32'd3);
+        axi_write(REG_POST_CTRL, 32'd0);
+        axi_write(REG_PERF_CTRL, 32'd1);
+        axi_write(REG_QUANT_ACT, 32'd0);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h3f00, 32'd45, "dwconv3x3 ch0");
+        expect_read(SPAD_BASE + 32'h3f04, 32'd18, "dwconv3x3 ch1");
+        clear_done_irq();
+
+        // Bank-striped layout: one K group is 16 bytes.  The four words at
+        // offsets +0/+4/+8/+c map to bank0..bank3 and are processed in
+        // parallel by BANKED_VDOT/BANKED_GEMV.
+        axi_write(SPAD_BASE + 32'h3000, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3004, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3008, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h300c, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3100, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3104, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3108, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h310c, 32'h0101_0101);
+        axi_write(REG_OP_MODE, OP_BANKED_VDOT);
+        axi_write(REG_SRC0_BASE, 32'h3000);
+        axi_write(REG_SRC1_BASE, 32'h3100);
+        axi_write(REG_DST_BASE,  32'h3200);
+        axi_write(REG_LENGTH,    32'd1);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h3200, 32'd16, "banked vdot");
+        expect_read(REG_RESULT, 32'd16, "banked vdot result");
+        clear_done_irq();
+
+        // Exercise address bit 18 through the banked datapath.  This catches
+        // any accidental retention of the former 12-bit/64 KiB row index.
+        axi_write(SPAD_BASE + 32'h0007_ffe0, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_ffe4, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_ffe8, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_ffec, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_fff0, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_fff4, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_fff8, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_fffc, 32'h0101_0101);
+        axi_write(REG_OP_MODE, OP_BANKED_VDOT);
+        axi_write(REG_SRC0_BASE, 32'h0007_ffe0);
+        axi_write(REG_SRC1_BASE, 32'h0007_fff0);
+        axi_write(REG_DST_BASE,  32'h0000_3400);
+        axi_write(REG_LENGTH,    32'd1);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h0000_3400, 32'd16,
+                    "banked vdot at 512 KiB boundary");
+        clear_done_irq();
+
+        // Two GEMV rows share the bank-striped input; each weight row occupies
+        // LENGTH*16 bytes.  Row0 uses all ones, row1 uses all twos.
+        axi_write(SPAD_BASE + 32'h3110, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3114, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3118, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h311c, 32'h0202_0202);
+        axi_write(REG_OP_MODE, OP_BANKED_GEMV);
+        axi_write(REG_SRC0_BASE, 32'h3000);
+        axi_write(REG_SRC1_BASE, 32'h3100);
+        axi_write(REG_DST_BASE,  32'h3300);
+        axi_write(REG_LENGTH,    32'd1);
+        axi_write(REG_M_SIZE,    32'd2);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h3300, 32'd16, "banked gemv row0");
+        expect_read(SPAD_BASE + 32'h3304, 32'd32, "banked gemv row1");
+        clear_done_irq();
+
+        // DMA load external input/weight into scratchpad, compute VDOT, then DMA store result out.
+        axi_mem_u.mem[10'h100] = 32'h0403_0201;
+        axi_mem_u.mem[10'h101] = 32'h0807_0605;
+        dma_load(32'h0000_0400, 32'h2000, 16'd2);
+        expect_read(SPAD_BASE + 32'h2000, 32'h0403_0201, "dma load input");
+        expect_read(SPAD_BASE + 32'h2004, 32'h0807_0605, "dma load weight");
+        axi_write(REG_OP_MODE, OP_VDOT_INT8);
+        axi_write(REG_SRC0_BASE, 32'h2000);
+        axi_write(REG_SRC1_BASE, 32'h2004);
+        axi_write(REG_DST_BASE,  32'h2010);
+        axi_write(REG_LENGTH,    32'd1);
+        axi_write(REG_QUANT_ACT, 32'd0);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h2010, 32'd70, "dma vdot output");
+        dma_store(32'h0000_0500, 32'h2010, 16'd1);
+        if (axi_mem_u.mem[10'h140] !== 32'd70) begin
+            $display("%0t ERROR: dma store expected=%08h actual=%08h",
+                     $time, 32'd70, axi_mem_u.mem[10'h140]);
+            errors = errors + 1;
+        end else begin
+            $display("%0t PASS: dma store output = %0d/%08h", $time,
+                     axi_mem_u.mem[10'h140], axi_mem_u.mem[10'h140]);
+        end
+
+        // A2 ping-pong pipeline with an odd tile count.  This exercises both
+        // buffer contexts, context reuse, and incremental external strides.
+        axi_mem_u.mem[11'h600] = 32'h0403_0201;
+        axi_mem_u.mem[11'h601] = 32'h0202_0202;
+        axi_mem_u.mem[11'h602] = 32'h0303_0303;
+        axi_mem_u.mem[11'h680] = 32'd0;
+        axi_mem_u.mem[11'h681] = 32'd0;
+        axi_mem_u.mem[11'h682] = 32'd0;
+        axi_write(SPAD_BASE + 32'h4400, 32'h0101_0101);
+        axi_write(REG_OP_MODE, OP_VDOT_INT8);
+        axi_write(REG_SRC1_BASE, 32'h4400);
+        axi_write(REG_LENGTH, 32'd1);
+        axi_write(REG_POST_CTRL, 32'd0);
+        axi_write(REG_QUANT_ACT, 32'd0);
+        axi_write(REG_TILE_COUNT, 32'd3);
+        axi_write(REG_TILE_EXT_IN, 32'h0000_1800);
+        axi_write(REG_TILE_EXT_OUT, 32'h0000_1a00);
+        axi_write(REG_TILE_EXT_IN_STRIDE, 32'd4);
+        axi_write(REG_TILE_EXT_OUT_STRIDE, 32'd4);
+        axi_write(REG_TILE_BUF0, 32'h0000_4000);
+        axi_write(REG_TILE_BUF1, 32'h0000_4200);
+        axi_write(REG_TILE_IN_WORDS, 32'd1);
+        axi_write(REG_TILE_OUT_WORDS, 32'd1);
+        axi_write(REG_TILE_OUT_OFFSET, 32'h0000_0040);
+        axi_write(REG_TILE_CTRL, 32'd1);
+        wait_done();
+        if ((axi_mem_u.mem[11'h680] !== 32'd10) ||
+            (axi_mem_u.mem[11'h681] !== 32'd8) ||
+            (axi_mem_u.mem[11'h682] !== 32'd12)) begin
+            $display("%0t ERROR: A2 tile outputs expected=10,8,12 actual=%0d,%0d,%0d",
+                     $time, axi_mem_u.mem[11'h680], axi_mem_u.mem[11'h681],
+                     axi_mem_u.mem[11'h682]);
+            errors = errors + 1;
+        end else begin
+            $display("%0t PASS: A2 ping-pong tile outputs", $time);
+        end
+        expect_read(REG_TILE_COMPLETED, 32'd3, "A2 completed tiles");
+        axi_read(REG_PERF_TOTAL, rd);
+        if (rd == 0) begin
+            $display("%0t ERROR: A2 total cycle counter is zero", $time);
+            errors = errors + 1;
+        end
+        axi_read(REG_PERF_DMA, rd);
+        if (rd == 0) begin
+            $display("%0t ERROR: A2 DMA cycle counter is zero", $time);
+            errors = errors + 1;
+        end
+        axi_read(REG_PERF_COMPUTE, rd);
+        if (rd == 0) begin
+            $display("%0t ERROR: A2 compute cycle counter is zero", $time);
+            errors = errors + 1;
+        end
+        axi_read(REG_PERF_OVERLAP, rd);
+        if (rd == 0) begin
+            $display("%0t ERROR: A2 pipeline recorded no DMA/compute overlap", $time);
+            errors = errors + 1;
+        end else begin
+            $display("%0t PASS: A2 overlap cycles = %0d", $time, rd);
+        end
+        clear_done_irq();
+
+        // Multi-burst DMA load with random-ish write back-pressure.
+        axi_mem_u.ready_gap_cfg = 1;
+        begin : multi_burst_load
+            integer i;
+            for (i = 0; i < 80; i = i + 1)
+                axi_mem_u.mem[11'h200 + i] = 32'ha500_0000 + i;
+            fork
+                begin : check_dma64
+                    @(posedge aclk);
+                    while (!(m_axi_arvalid && m_axi_arready)) @(posedge aclk);
+                    if (m_axi_arlen !== 8'd63) begin
+                        $display("%0t ERROR: expected 64-beat DMA burst, ARLEN=%0d",
+                                 $time, m_axi_arlen);
+                        errors = errors + 1;
+                    end else begin
+                        $display("%0t PASS: DMA issued 64-beat burst", $time);
+                    end
+                end
+                begin : check_dma_read_outstanding
+                    integer accepted_ar;
+                    accepted_ar = 0;
+                    while (!(m_axi_rvalid && m_axi_rready && m_axi_rlast)) begin
+                        @(posedge aclk);
+                        if (m_axi_arvalid && m_axi_arready)
+                            accepted_ar = accepted_ar + 1;
+                    end
+                    if (accepted_ar < 2) begin
+                        $display("%0t ERROR: expected multiple outstanding AR, accepted=%0d",
+                                 $time, accepted_ar);
+                        errors = errors + 1;
+                    end else begin
+                        $display("%0t PASS: DMA read outstanding accepted=%0d",
+                                 $time, accepted_ar);
+                    end
+                end
+                begin
+                    dma_load(32'h0000_0800, 32'h2400, 16'd80);
+                end
+            join
+            for (i = 0; i < 80; i = i + 1)
+                expect_read(SPAD_BASE + 32'h2400 + (i * 4), 32'ha500_0000 + i, "dma multi load");
+        end
+
+        // A4 read-DMA depth-four saturation.  Four 64-beat bursts must be
+        // accepted before the first response burst completes.  This checks
+        // the actual register-programmed window rather than merely proving
+        // that a second AR can coexist with the first response.
+        axi_mem_u.ready_gap_cfg = 0;
+        begin : dma_read_outstanding_depth4
+            integer i;
+            integer accepted_ar;
+            integer first_rlast_seen;
+            accepted_ar = 0;
+            first_rlast_seen = 0;
+            for (i = 0; i < 256; i = i + 1)
+                axi_mem_u.mem[11'h500 + i] = 32'hd400_0000 + i;
+            axi_write(REG_DMA_CFG, 32'h0000_0400);
+            axi_write(REG_DMA_EXT_ADDR, 32'h0000_1400);
+            axi_write(REG_DMA_SPAD_ADDR, 32'h0000_3600);
+            axi_write(REG_DMA_LENGTH, 16'd256);
+            fork
+                begin : observe_depth4_window
+                    while (!first_rlast_seen) begin
+                        @(posedge aclk);
+                        if (m_axi_arvalid && m_axi_arready)
+                            accepted_ar = accepted_ar + 1;
+                        if (m_axi_rvalid && m_axi_rready && m_axi_rlast)
+                            first_rlast_seen = 1;
+                    end
+                    if (accepted_ar < 4) begin
+                        $display("%0t ERROR: A4 expected four AR before first RLAST, accepted=%0d",
+                                 $time, accepted_ar);
+                        errors = errors + 1;
+                    end else begin
+                        $display("%0t PASS: A4 DMA read outstanding saturated at %0d", $time,
+                                 accepted_ar);
+                    end
+                end
+                begin : issue_depth4_load
+                    axi_write(REG_DMA_CTRL, 32'h0000_0001);
+                    wait_dma_done();
+                    clear_dma_done();
+                end
+            join
+            expect_read(SPAD_BASE + 32'h3600, 32'hd400_0000,
+                        "A4 depth4 dma first word");
+            expect_read(SPAD_BASE + 32'h36fc, 32'hd400_003f,
+                        "A4 depth4 dma burst0 last word");
+            expect_read(SPAD_BASE + 32'h3700, 32'hd400_0040,
+                        "A4 depth4 dma burst1 first word");
+            expect_read(SPAD_BASE + 32'h39fc, 32'hd400_00ff,
+                        "A4 depth4 dma final word");
+        end
+
+        // 4KB boundary split: starts at 0x0ff8 and transfers across the page.
+        axi_mem_u.mem[11'h3fe] = 32'h1111_0000;
+        axi_mem_u.mem[11'h3ff] = 32'h2222_0000;
+        axi_mem_u.mem[11'h400] = 32'h3333_0000;
+        axi_mem_u.mem[11'h401] = 32'h4444_0000;
+        dma_load(32'h0000_0ff8, 32'h2600, 16'd4);
+        expect_read(SPAD_BASE + 32'h2600, 32'h1111_0000, "dma 4kb split0");
+        expect_read(SPAD_BASE + 32'h2604, 32'h2222_0000, "dma 4kb split1");
+        expect_read(SPAD_BASE + 32'h2608, 32'h3333_0000, "dma 4kb split2");
+        expect_read(SPAD_BASE + 32'h260c, 32'h4444_0000, "dma 4kb split3");
+
+        // 2D DMA load: two 2-word rows, with a 2-word gap in both source and
+        // destination.  Each row still uses the normal burst engine.
+        axi_mem_u.mem[11'h300] = 32'h1000_0001;
+        axi_mem_u.mem[11'h301] = 32'h1000_0002;
+        axi_mem_u.mem[11'h304] = 32'h2000_0001;
+        axi_mem_u.mem[11'h305] = 32'h2000_0002;
+        axi_write(REG_DMA_EXT_ADDR, 32'h0000_0c00);
+        axi_write(REG_DMA_SPAD_ADDR, 32'h0000_2c00);
+        axi_write(REG_DMA_LENGTH, 32'd0);
+        axi_write(REG_DMA_ROW_WORDS, 32'd2);
+        axi_write(REG_DMA_ROW_COUNT, 32'd2);
+        axi_write(REG_DMA_EXT_STRIDE, 32'd16);
+        axi_write(REG_DMA_SPAD_STRIDE, 32'd16);
+        axi_write(REG_DMA_CTRL, 32'h0000_0001);
+        wait_dma_done();
+        clear_dma_done();
+        expect_read(SPAD_BASE + 32'h2c00, 32'h1000_0001, "dma 2d row0 word0");
+        expect_read(SPAD_BASE + 32'h2c04, 32'h1000_0002, "dma 2d row0 word1");
+        expect_read(SPAD_BASE + 32'h2c10, 32'h2000_0001, "dma 2d row1 word0");
+        expect_read(SPAD_BASE + 32'h2c14, 32'h2000_0002, "dma 2d row1 word1");
+        axi_write(REG_DMA_EXT_ADDR, 32'h0000_0d00);
+        axi_write(REG_DMA_SPAD_ADDR, 32'h0000_2c00);
+        axi_write(REG_DMA_CTRL, 32'h0000_0003);
+        wait_dma_done();
+        clear_dma_done();
+        if ((axi_mem_u.mem[11'h340] !== 32'h1000_0001) ||
+            (axi_mem_u.mem[11'h341] !== 32'h1000_0002) ||
+            (axi_mem_u.mem[11'h344] !== 32'h2000_0001) ||
+            (axi_mem_u.mem[11'h345] !== 32'h2000_0002)) begin
+            $display("%0t ERROR: dma 2d store mismatch", $time);
+            errors = errors + 1;
+        end else begin
+            $display("%0t PASS: dma 2d store", $time);
+        end
+
+        // A4 KV-cache gather: the scratchpad index table contains absolute
+        // DDR byte addresses.  Rows are gathered into consecutive destination
+        // tiles while the configured read window permits four accepted ARs.
+        axi_mem_u.mem[11'h440] = 32'h4b56_0001;
+        axi_mem_u.mem[11'h441] = 32'h4b56_0002;
+        axi_mem_u.mem[11'h480] = 32'h4b56_0011;
+        axi_mem_u.mem[11'h481] = 32'h4b56_0012;
+        axi_write(SPAD_BASE + 32'h2d00, 32'h0000_1100);
+        axi_write(SPAD_BASE + 32'h2d04, 32'h0000_1200);
+        axi_write(REG_DMA_SPAD_ADDR, 32'h0000_2d20);
+        axi_write(REG_DMA_ROW_WORDS, 32'd2);
+        axi_write(REG_DMA_ROW_COUNT, 32'd2);
+        axi_write(REG_DMA_SPAD_STRIDE, 32'd16);
+        axi_write(REG_DMA_GATHER_INDEX, 32'h0000_2d00);
+        axi_write(REG_DMA_CFG, 32'h0000_0401);
+        axi_write(REG_DMA_CTRL, 32'h0000_0001);
+        wait_dma_done();
+        clear_dma_done();
+        expect_read(SPAD_BASE + 32'h2d20, 32'h4b56_0001, "A4 KV gather row0 word0");
+        expect_read(SPAD_BASE + 32'h2d24, 32'h4b56_0002, "A4 KV gather row0 word1");
+        expect_read(SPAD_BASE + 32'h2d30, 32'h4b56_0011, "A4 KV gather row1 word0");
+        expect_read(SPAD_BASE + 32'h2d34, 32'h4b56_0012, "A4 KV gather row1 word1");
+        axi_write(REG_DMA_CFG, 32'h0000_0400);
+        axi_write(REG_DMA_ROW_COUNT, 32'd0);
+        axi_write(REG_DMA_ROW_WORDS, 32'd0);
+        axi_write(REG_DMA_EXT_STRIDE, 32'd0);
+        axi_write(REG_DMA_SPAD_STRIDE, 32'd0);
+
+        // Write response error injection.
+        axi_mem_u.inject_write_error_word = 32'h0000_0180;
+        dma_store_expect_error(32'h0000_0600, 32'h2010, 16'd1, 4'd3);
+        axi_mem_u.inject_write_error_word = -1;
+
+        // Read response error injection.
+        axi_mem_u.inject_read_error_word = 32'h0000_0184;
+        dma_load_expect_error(32'h0000_0610, 32'h2800, 16'd1, 4'd2);
+        axi_mem_u.inject_read_error_word = -1;
+
+        // Abort an accepted read burst.  The DMA must drain through RLAST,
+        // report ERR_ABORT, and leave no external read transaction active.
+        begin : dma_load_abort
+            integer i;
+            integer accepted;
+            for (i = 0; i < 20; i = i + 1)
+                axi_mem_u.mem[11'h380 + i] = 32'hab00_0000 + i;
+            axi_mem_u.ready_gap_cfg = 2;
+            axi_write(REG_DMA_EXT_ADDR, 32'h0000_0e00);
+            axi_write(REG_DMA_SPAD_ADDR, 32'h0000_2e00);
+            axi_write(REG_DMA_LENGTH, 32'd20);
+            axi_write(REG_DMA_CTRL, 32'h0000_0001);
+            repeat (4) @(posedge aclk);
+            accepted = axi_mem_u.read_active_r;
+            if (!accepted) begin
+                $display("%0t ERROR: DMA load abort test observed no accepted AR", $time);
+                errors = errors + 1;
+            end
+            axi_write(REG_ABORT, 32'd1);
+            expect_dma_done(1'b1, 4'd5);
+            if (axi_mem_u.read_active_r || m_axi_rvalid) begin
+                $display("%0t ERROR: DMA load abort left an AXI read active", $time);
+                errors = errors + 1;
+            end else begin
+                $display("%0t PASS: DMA load abort drained accepted AXI burst", $time);
+            end
+        end
+
+        // Abort an accepted write burst.  AXI4 does not permit truncating an
+        // accepted burst, so the DMA must finish WLAST/B before reporting.
+        begin : dma_store_abort
+            integer i;
+            integer accepted;
+            for (i = 0; i < 20; i = i + 1)
+                axi_write(SPAD_BASE + 32'h3000 + (i * 4), 32'hcd00_0000 + i);
+            axi_mem_u.ready_gap_cfg = 2;
+            axi_write(REG_DMA_EXT_ADDR, 32'h0000_1000);
+            axi_write(REG_DMA_SPAD_ADDR, 32'h0000_3000);
+            axi_write(REG_DMA_LENGTH, 32'd20);
+            axi_write(REG_DMA_CTRL, 32'h0000_0003);
+            repeat (4) @(posedge aclk);
+            accepted = axi_mem_u.write_active_r;
+            if (!accepted) begin
+                $display("%0t ERROR: DMA store abort test observed no accepted AW", $time);
+                errors = errors + 1;
+            end
+            @(posedge aclk);
+            axi_write(REG_ABORT, 32'd1);
+            expect_dma_done(1'b1, 4'd5);
+            if (axi_mem_u.write_active_r || m_axi_bvalid || m_axi_wvalid) begin
+                $display("%0t ERROR: DMA store abort left an AXI write active", $time);
+                errors = errors + 1;
+            end else begin
+                $display("%0t PASS: DMA store abort completed accepted AXI burst", $time);
+            end
+        end
+        axi_mem_u.ready_gap_cfg = 0;
+
+        // External-memory descriptor v2 fetch through AXI read channel.  Word
+        // 3 carries bias_base and word 7 enables per-output bias.
+        axi_write(SPAD_BASE + 32'h2b00, 32'd5);
+        axi_write(SPAD_BASE + 32'h2b04, 32'hffff_fffa);
+        write_axi_desc(32'h0000_0c00, OP_GEMV_INT8, 16'h0200, 32'h0300, 32'h0400, 32'h2900,
+                       16'd2, 16'd0, 16'd1);
+        axi_mem_u.mem[11'h303] = 32'h0000_2b00;
+        axi_mem_u.mem[11'h307] = 32'd1;
+        axi_write(REG_CMDQ_CTRL, 32'd1);
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CMDQ_BASE_LO, 32'h0000_0c00);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h2900, 32'd75, "external desc v2 bias row0");
+        expect_read(SPAD_BASE + 32'h2904, 32'd0, "external desc v2 bias row1");
+        axi_write(REG_CMDQ_CTRL, 32'd0);
+        clear_done_irq();
+
+        // External-memory command queue ring plus invalid descriptor completion.
+        write_axi_desc(32'h0000_0d00, OP_VDOT_INT8, 16'h0201, 32'h0000, 32'h0100, 32'h2a00,
+                       16'd0, 16'd0, 16'd1);
+        write_axi_desc(32'h0000_0d40, 8'hff, 16'h02ff, 32'h0000, 32'h0100, 32'h2a10,
+                       16'd0, 16'd0, 16'd1);
+        axi_write(REG_CMDQ_CTRL, 32'd1);
+        axi_write(REG_CMDQ_BASE_LO, 32'h0000_0d00);
+        axi_write(REG_CMDQ_SIZE, 32'd2);
+        axi_write(REG_CMDQ_HEAD, 32'd0);
+        axi_write(REG_CMDQ_TAIL, 32'd1);
+        axi_write(REG_CPLQ_BASE_LO, 32'h1200);
+        axi_write(REG_CPLQ_SIZE, 32'd2);
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        axi_write(REG_CPLQ_TAIL, 32'd0);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h2a00, 32'd70, "external ring vdot");
+        expect_read(REG_CMDQ_HEAD, 32'd1, "external cmdq head");
+        wait_cpl_tail(32'd1, "external cplq tail ok");
+        expect_completion(32'h1200, 16'h0201, 4'h1, 4'h0, 32'd70, 32'd1, "external cpl ok");
+        axi_write(REG_CPLQ_HEAD, 32'd1);
+        clear_done_irq();
+
+        axi_write(REG_CMDQ_TAIL, 32'd0);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done_expect_error(ERR_DESC_INVALID);
+        expect_read(REG_CMDQ_HEAD, 32'd0, "external cmdq wrap after bad desc");
+        wait_cpl_tail(32'd0, "external cplq wrap after bad desc");
+        expect_completion(32'h1210, 16'h02ff, 4'h2, ERR_DESC_INVALID, 32'd0, 32'd0, "external cpl bad");
+        axi_write(REG_CMDQ_CTRL, 32'd0);
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CPLQ_SIZE, 32'd0);
+        clear_done_irq();
+
+        // A3 4x4 tensor GEMM.  A is multiplied by an identity matrix stored
+        // in column-vector tile layout, so the INT32 output must equal A.
+        axi_write(SPAD_BASE + 32'h4800, 32'h0403_0201);
+        axi_write(SPAD_BASE + 32'h4804, 32'h0807_0605);
+        axi_write(SPAD_BASE + 32'h4808, 32'h0000_0001);
+        axi_write(SPAD_BASE + 32'h480c, 32'h01ff_01ff);
+        axi_write(SPAD_BASE + 32'h4900, 32'h0000_0001);
+        axi_write(SPAD_BASE + 32'h4904, 32'h0000_0100);
+        axi_write(SPAD_BASE + 32'h4908, 32'h0001_0000);
+        axi_write(SPAD_BASE + 32'h490c, 32'h0100_0000);
+        axi_write(REG_POST_CTRL, 32'd0);
+        axi_write(REG_PERF_CTRL, 32'd1);
+        axi_write(REG_QUANT_ACT, 32'd0);
+        axi_write(REG_OP_MODE, OP_TENSOR_GEMM);
+        axi_write(REG_SRC0_BASE, 32'h4800);
+        axi_write(REG_SRC1_BASE, 32'h4900);
+        axi_write(REG_DST_BASE,  32'h4a00);
+        axi_write(REG_M_SIZE, 32'd4);
+        axi_write(REG_N_SIZE, 32'd4);
+        axi_write(REG_K_WORDS, 32'd1);
+        axi_write(REG_CTRL, 32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h4a00, 32'd1, "A3 GEMM c00");
+        expect_read(SPAD_BASE + 32'h4a0c, 32'd4, "A3 GEMM c03");
+        expect_read(SPAD_BASE + 32'h4a10, 32'd5, "A3 GEMM c10");
+        expect_read(SPAD_BASE + 32'h4a1c, 32'd8, "A3 GEMM c13");
+        expect_read(SPAD_BASE + 32'h4a20, 32'd1, "A3 GEMM c20");
+        expect_read(SPAD_BASE + 32'h4a30, 32'hffff_ffff, "A3 GEMM c30");
+        expect_read(SPAD_BASE + 32'h4a3c, 32'd1, "A3 GEMM c33");
+        axi_read(REG_PERF_MATRIX_CYCLES, rd);
+        if (rd == 0) begin
+            $display("%0t ERROR: A5 matrix cycle counter is zero", $time);
+            errors = errors + 1;
+        end
+        axi_read(REG_PERF_MATRIX_MAC_CYCLES, rd);
+        if (rd == 0) begin
+            $display("%0t ERROR: A5 matrix MAC-active counter is zero", $time);
+            errors = errors + 1;
+        end
+        clear_done_irq();
+
+        // Numerically defined SFU primitives used by a Transformer chain.
+        // Equal Q8.8 log2 scores produce four exact Q0.15 probabilities.
+        axi_write(SPAD_BASE + 32'h4b00, 32'd0);
+        axi_write(SPAD_BASE + 32'h4b04, 32'd0);
+        axi_write(SPAD_BASE + 32'h4b08, 32'd0);
+        axi_write(SPAD_BASE + 32'h4b0c, 32'd0);
+        axi_write(REG_OP_MODE, OP_SOFTMAX_Q15);
+        axi_write(REG_SRC0_BASE, 32'h4b00);
+        axi_write(REG_SRC1_BASE, 32'd0);
+        axi_write(REG_DST_BASE, 32'h4c00);
+        axi_write(REG_LENGTH, 32'd4);
+        axi_write(REG_CTRL, 32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h4c00, 32'd8192, "A3 softmax p0");
+        expect_read(SPAD_BASE + 32'h4c0c, 32'd8192, "A3 softmax p3");
+        clear_done_irq();
+
+        // The direct path supplies aux0=1, therefore columns 2 and 3 are
+        // masked.  The two visible equal scores each receive Q0.15 0.5.
+        axi_write(REG_OP_MODE, OP_CAUSAL_SOFTMAX_Q15);
+        axi_write(REG_DST_BASE, 32'h4c40);
+        axi_write(REG_CTRL, 32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h4c40, 32'd16384, "A5 causal softmax p0");
+        expect_read(SPAD_BASE + 32'h4c44, 32'd16384, "A5 causal softmax p1");
+        expect_read(SPAD_BASE + 32'h4c48, 32'd0, "A5 causal softmax masked p2");
+        expect_read(SPAD_BASE + 32'h4c4c, 32'd0, "A5 causal softmax masked p3");
+        clear_done_irq();
+
+        axi_write(SPAD_BASE + 32'h4d00, 32'd7);
+        axi_write(SPAD_BASE + 32'h4d04, -32'sd3);
+        axi_write(SPAD_BASE + 32'h4d40, 32'd5);
+        axi_write(SPAD_BASE + 32'h4d44, 32'd3);
+        axi_write(REG_OP_MODE, OP_RESIDUAL_I32);
+        axi_write(REG_SRC0_BASE, 32'h4d00);
+        axi_write(REG_SRC1_BASE, 32'h4d40);
+        axi_write(REG_DST_BASE, 32'h4d80);
+        axi_write(REG_LENGTH, 32'd2);
+        axi_write(REG_QUANT_ACT, 32'd0);
+        axi_write(REG_CTRL, 32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h4d80, 32'd12, "A3 residual positive");
+        expect_read(SPAD_BASE + 32'h4d84, 32'd0, "A3 residual cancellation");
+        clear_done_irq();
+
+        axi_write(SPAD_BASE + 32'h4e00, 32'd1);
+        axi_write(SPAD_BASE + 32'h4e04, 32'd1);
+        axi_write(SPAD_BASE + 32'h4e08, 32'd1);
+        axi_write(SPAD_BASE + 32'h4e0c, 32'd1);
+        axi_write(REG_OP_MODE, OP_RMSNORM_Q15);
+        axi_write(REG_SRC0_BASE, 32'h4e00);
+        axi_write(REG_SRC1_BASE, 32'd0);
+        axi_write(REG_DST_BASE, 32'h4e40);
+        axi_write(REG_LENGTH, 32'd4);
+        axi_write(REG_CTRL, 32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h4e40, 32'd1, "A3 RMSNorm x0");
+        expect_read(SPAD_BASE + 32'h4e4c, 32'd1, "A3 RMSNorm x3");
+        clear_done_irq();
+
+        axi_write(SPAD_BASE + 32'h5000, 32'd1);
+        axi_write(SPAD_BASE + 32'h5004, 32'd2);
+        axi_write(SPAD_BASE + 32'h5008, 32'd3);
+        axi_write(SPAD_BASE + 32'h500c, 32'd4);
+        axi_write(SPAD_BASE + 32'h5040, 32'd10);
+        axi_write(SPAD_BASE + 32'h5044, 32'd10);
+        axi_write(SPAD_BASE + 32'h5048, 32'd10);
+        axi_write(SPAD_BASE + 32'h504c, 32'd10);
+        axi_write(REG_OP_MODE, OP_LAYERNORM_Q15);
+        axi_write(REG_SRC0_BASE, 32'h5000);
+        axi_write(REG_SRC1_BASE, 32'd0);
+        axi_write(REG_BIAS_BASE, 32'h5040);
+        axi_write(REG_POST_CTRL, 32'd1);
+        axi_write(REG_DST_BASE, 32'h5080);
+        axi_write(REG_LENGTH, 32'd4);
+        axi_write(REG_CTRL, 32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h5080, 32'd9, "A4 LayerNorm x0");
+        expect_read(SPAD_BASE + 32'h508c, 32'd12, "A4 LayerNorm x3");
+        clear_done_irq();
+        axi_write(REG_POST_CTRL, 32'd0);
+
+        axi_write(SPAD_BASE + 32'h4f00, -32'sd256);
+        axi_write(SPAD_BASE + 32'h4f04, 32'd0);
+        axi_write(SPAD_BASE + 32'h4f08, 32'd256);
+        axi_write(SPAD_BASE + 32'h4f0c, 32'd1024);
+        axi_write(REG_OP_MODE, OP_GELU_Q8_8);
+        axi_write(REG_SRC0_BASE, 32'h4f00);
+        axi_write(REG_DST_BASE, 32'h4f40);
+        axi_write(REG_LENGTH, 32'd4);
+        axi_write(REG_CTRL, 32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h4f40, -32'sd64, "A3 GELU negative");
+        expect_read(SPAD_BASE + 32'h4f48, 32'd192, "A3 GELU positive");
+        clear_done_irq();
+
+        axi_write(REG_OP_MODE, OP_SILU_Q8_8);
+        axi_write(REG_DST_BASE, 32'h4f80);
+        axi_write(REG_CTRL, 32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h4f80, -32'sd85, "A3 SiLU negative");
+        expect_read(SPAD_BASE + 32'h4f88, 32'd170, "A3 SiLU positive");
+        clear_done_irq();
+
+        axi_write(REG_OP_MODE, OP_REQUANT_I8);
+        axi_write(REG_DST_BASE, 32'h4fc0);
+        axi_write(REG_QUANT_ACT, 32'd2);
+        axi_write(REG_CTRL, 32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h4fc0, -32'sd64, "A3 requant negative");
+        expect_read(SPAD_BASE + 32'h4fcc, 32'd127, "A3 requant saturation");
+        clear_done_irq();
+
+        // Descriptor v3 drives transpose, batch strides and event-token
+        // chaining.  The first command produces event0; the dependent
+        // requant command waits for it, clears it and produces event1.
+        axi_write(SPAD_BASE + 32'h6000, 32'h0000_0001);
+        axi_write(SPAD_BASE + 32'h6004, 32'h0000_0100);
+        axi_write(SPAD_BASE + 32'h6008, 32'h0001_0000);
+        axi_write(SPAD_BASE + 32'h600c, 32'h0100_0000);
+        axi_write(SPAD_BASE + 32'h6010, 32'h0000_0002);
+        axi_write(SPAD_BASE + 32'h6014, 32'h0000_0200);
+        axi_write(SPAD_BASE + 32'h6018, 32'h0002_0000);
+        axi_write(SPAD_BASE + 32'h601c, 32'h0200_0000);
+        axi_write(SPAD_BASE + 32'h6100, 32'h0000_0001);
+        axi_write(SPAD_BASE + 32'h6104, 32'h0000_0100);
+        axi_write(SPAD_BASE + 32'h6108, 32'h0001_0000);
+        axi_write(SPAD_BASE + 32'h610c, 32'h0100_0000);
+        axi_write(SPAD_BASE + 32'h6110, 32'h0000_0001);
+        axi_write(SPAD_BASE + 32'h6114, 32'h0000_0100);
+        axi_write(SPAD_BASE + 32'h6118, 32'h0001_0000);
+        axi_write(SPAD_BASE + 32'h611c, 32'h0100_0000);
+        axi_write(SPAD_BASE + 32'h6300, 32'd100);
+        write_spad_desc_v3(32'h6400, OP_BATCH_GEMM, 16'h0300,
+                           32'h6000, 32'h6100, 32'd0, 32'h6200,
+                           16'd4, 16'd4, 16'd1, 8'h06, 32'd1,
+                           5'd0, 2'd0, 32'd16, 32'd16, 32'd64,
+                           16'd1, 16'd2, 16'd0, 16'h0001, 16'd0);
+        write_spad_desc_v3(32'h6440, OP_REQUANT_I8, 16'h0301,
+                           32'h6300, 32'd0, 32'd0, 32'h6304,
+                           16'd0, 16'd0, 16'd1, 8'd0, 32'd0,
+                           5'd2, 2'd0, 32'd0, 32'd0, 32'd0,
+                           16'd1, 16'd1, 16'h0001, 16'h0002, 16'h0001);
+        axi_write(REG_CMDQ_CTRL, 32'd0);
+        axi_write(REG_CMDQ_BASE_LO, 32'h6400);
+        axi_write(REG_CMDQ_SIZE, 32'd3);
+        axi_write(REG_CMDQ_HEAD, 32'd0);
+        axi_write(REG_CMDQ_TAIL, 32'd2);
+        axi_write(REG_CPLQ_BASE_LO, 32'h6500);
+        axi_write(REG_CPLQ_SIZE, 32'd4);
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        axi_write(REG_CPLQ_TAIL, 32'd0);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd2, "A3 v3 command chain");
+        expect_read(SPAD_BASE + 32'h6200, 32'd1, "A3 head0 transpose c00");
+        expect_read(SPAD_BASE + 32'h623c, 32'd1, "A3 head0 transpose c33");
+        expect_read(SPAD_BASE + 32'h6240, 32'd2, "A3 head1 transpose c00");
+        expect_read(SPAD_BASE + 32'h627c, 32'd2, "A3 head1 transpose c33");
+        expect_read(SPAD_BASE + 32'h6304, 32'd25, "A3 dependency requant");
+        expect_completion(32'h6500, 16'h0300, 4'h1, 4'd0, 32'd2, 32'd32,
+                          "A3 matrix completion");
+        expect_completion(32'h6510, 16'h0301, 4'h1, 4'd0, 32'd25, 32'd1,
+                          "A3 dependent completion");
+        expect_read(REG_EVENT_STATUS, 32'h0000_0002, "A3 dependency events");
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CPLQ_SIZE, 32'd0);
+        clear_done_irq();
+
+        // A4 macro-fusion: one v4 QKV parent expands three v3 matrix
+        // primitives, executes them in order and publishes one aggregated
+        // completion.  Intermediate child completions must remain invisible.
+        write_spad_desc_v4_macro(32'h6700, OP_QKV_PROJ, 16'h0400,
+                                 32'h6800, 16'd3, 1'b0,
+                                 16'h0002, 16'h0004, 16'h0002);
+        write_spad_desc_v4_macro(32'h6740, OP_MHA, 16'h0401,
+                                 32'h6800, 16'd3, 1'b0,
+                                 16'h0004, 16'h0008, 16'h0004);
+        write_spad_desc_v4_macro(32'h6780, OP_FFN, 16'h0402,
+                                 32'h6800, 16'd3, 1'b0,
+                                 16'h0008, 16'h0010, 16'h0008);
+        write_spad_desc_v3(32'h6800, OP_TENSOR_GEMM, 16'h0410,
+                           32'h6000, 32'h6100, 32'd0, 32'h6a00,
+                           16'd4, 16'd4, 16'd1, 8'd0, 32'd1,
+                           5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                           16'd1, 16'd1, 16'd0, 16'd0, 16'd0);
+        write_spad_desc_v3(32'h6840, OP_TENSOR_GEMM, 16'h0411,
+                           32'h6000, 32'h6100, 32'd0, 32'h6a40,
+                           16'd4, 16'd4, 16'd1, 8'd0, 32'd1,
+                           5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                           16'd1, 16'd1, 16'd0, 16'd0, 16'd0);
+        write_spad_desc_v3(32'h6880, OP_TENSOR_GEMM, 16'h0412,
+                           32'h6000, 32'h6100, 32'd0, 32'h6a80,
+                           16'd4, 16'd4, 16'd1, 8'd0, 32'd1,
+                           5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                           16'd1, 16'd1, 16'd0, 16'd0, 16'd0);
+        axi_write(REG_CMDQ_CTRL, 32'd0);
+        axi_write(REG_CMDQ_BASE_LO, 32'h6700);
+        axi_write(REG_CMDQ_SIZE, 32'd4);
+        axi_write(REG_CMDQ_HEAD, 32'd0);
+        axi_write(REG_CMDQ_TAIL, 32'd3);
+        axi_write(REG_CPLQ_BASE_LO, 32'h6900);
+        axi_write(REG_CPLQ_SIZE, 32'd4);
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        axi_write(REG_CPLQ_TAIL, 32'd0);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd3, "A4 fused macro completions");
+        expect_read(SPAD_BASE + 32'h6a00, 32'd1, "A4 Q child output");
+        expect_read(SPAD_BASE + 32'h6a40, 32'd1, "A4 K child output");
+        expect_read(SPAD_BASE + 32'h6a80, 32'd1, "A4 V child output");
+        expect_completion(32'h6900, 16'h0400, 4'h1, 4'd0, 32'd1, 32'd48,
+                          "A4 QKV aggregated completion");
+        expect_completion(32'h6910, 16'h0401, 4'h1, 4'd0, 32'd1, 32'd48,
+                          "A4 MHA aggregated completion");
+        expect_completion(32'h6920, 16'h0402, 4'h1, 4'd0, 32'd1, 32'd48,
+                          "A4 FFN aggregated completion");
+        expect_read(REG_EVENT_STATUS, 32'h0000_0010, "A4 macro parent event");
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CPLQ_SIZE, 32'd0);
+        clear_done_irq();
+
+        // A malformed child fails the macro under the parent task ID, does
+        // not fetch/launch later children and never publishes the parent
+        // success event.
+        write_spad_desc_v4_macro(32'h6b00, OP_QKV_PROJ, 16'h04ff,
+                                 32'h6b40, 16'd3, 1'b0,
+                                 16'h0010, 16'h0020, 16'h0010);
+        write_spad_desc_v3(32'h6b40, 8'h7f, 16'h04f0,
+                           32'h6000, 32'h6100, 32'd0, 32'h6d00,
+                           16'd4, 16'd4, 16'd1, 8'd0, 32'd1,
+                           5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                           16'd1, 16'd1, 16'd0, 16'd0, 16'd0);
+        axi_write(REG_CMDQ_BASE_LO, 32'h6b00);
+        axi_write(REG_CMDQ_SIZE, 32'd2);
+        axi_write(REG_CMDQ_HEAD, 32'd0);
+        axi_write(REG_CMDQ_TAIL, 32'd1);
+        axi_write(REG_CPLQ_BASE_LO, 32'h6c00);
+        axi_write(REG_CPLQ_SIZE, 32'd2);
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        axi_write(REG_CPLQ_TAIL, 32'd0);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd1, "A4 macro fail-stop completion");
+        expect_completion(32'h6c00, 16'h04ff, 4'h2, 4'd7, 32'd0, 32'd0,
+                          "A4 macro child error aggregation");
+        expect_read(REG_EVENT_STATUS, 32'd0, "A4 failed macro no event");
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CPLQ_SIZE, 32'd0);
+        clear_done_irq();
+
+        if (m_axi_arvalid || m_axi_awvalid || m_axi_wvalid) begin
+            $display("%0t ERROR: DMA master boundary should be idle in smoke mode", $time);
+            errors = errors + 1;
+        end
+
+        random_cases = 20;
+        if ($value$plusargs("AI_RANDOM_CASES=%d", random_cases))
+            $display("%0t INFO: AI_RANDOM_CASES=%0d", $time, random_cases);
+        if ($value$plusargs("AI_SEED=%d", seed_arg)) begin
+            seed_dummy = $urandom(seed_arg);
+            $display("%0t INFO: AI_SEED=%0d", $time, seed_arg);
+        end
+
+        begin : random_loop
+            integer case_idx;
+            for (case_idx = 0; case_idx < random_cases; case_idx = case_idx + 1) begin
+                run_random_gemv(case_idx);
+                run_random_gemm(case_idx);
+                run_random_conv3x3(case_idx);
+                run_random_dwconv3x3(case_idx);
+            end
+        end
+
+        // Region protection is disabled after reset.  A read/execute-only
+        // region allows compute inputs but rejects its result write, which
+        // must report through the normal core error path.
+        axi_write(SPAD_BASE + 32'h0000_0000, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0000_0004, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0000_0008, 32'd0);
+        axi_write(REG_REGION0_BASE,  32'h0000_0000);
+        axi_write(REG_REGION0_LIMIT, 32'h0000_0100);
+        axi_write(REG_REGION0_PERM,  32'h0000_000d); // enable + read + execute
+        axi_write(REG_OP_MODE, OP_VDOT_INT8);
+        axi_write(REG_SRC0_BASE, 32'h0000_0000);
+        axi_write(REG_SRC1_BASE, 32'h0000_0004);
+        axi_write(REG_DST_BASE,  32'h0000_0008);
+        axi_write(REG_LENGTH,    32'd1);
+        axi_write(REG_CTRL,      32'h0000_0001);
+        wait_done_expect_error(ERR_PROTECTION);
+        axi_write(REG_STATUS, 32'h0000_0006);
+        axi_write(REG_IRQ_STATUS, 32'd1);
+
+        // The same policy also rejects host writes at AXI-Lite without
+        // touching scratchpad storage; disable it again for compatibility.
+        expect_slverr_write(SPAD_BASE + 32'h0000_0000, 32'hdead_beef);
+        axi_write(REG_REGION0_PERM, 32'h0000_0000);
+        axi_write(SPAD_BASE + 32'h0000_0000, 32'hcafe_babe);
+        expect_read(SPAD_BASE + 32'h0000_0000, 32'hcafe_babe, "region protection disabled");
+
+        // System reset while a read burst is in flight.  In the board design
+        // the same synchronized reset reaches the accelerator and PS AXI
+        // fabric, so both endpoints discard the transaction together.
+        axi_mem_u.ready_gap_cfg = 2;
+        axi_write(REG_DMA_EXT_ADDR, 32'h0000_1400);
+        axi_write(REG_DMA_SPAD_ADDR, 32'h0000_3400);
+        axi_write(REG_DMA_LENGTH, 32'd20);
+        axi_write(REG_DMA_CTRL, 32'h0000_0001);
+        begin : reset_wait_for_read
+            integer i;
+            integer accepted;
+            repeat (4) @(posedge aclk);
+            accepted = axi_mem_u.read_active_r;
+            if (!accepted) begin
+                $display("%0t ERROR: reset test observed no accepted AR", $time);
+                errors = errors + 1;
+            end
+        end
+        @(posedge aclk);
+        aresetn = 1'b0;
+        repeat (8) @(posedge aclk);
+        aresetn = 1'b1;
+        repeat (6) @(posedge aclk);
+        axi_mem_u.ready_gap_cfg = 0;
+        expect_read(REG_VERSION, 32'h1000_0005, "reset recovery version");
+        axi_read(REG_DMA_STATUS, rd);
+        if (rd[0] || axi_mem_u.read_active_r || m_axi_arvalid || m_axi_rvalid) begin
+            $display("%0t ERROR: reset recovery left DMA/AXI read active", $time);
+            errors = errors + 1;
+        end else begin
+            $display("%0t PASS: reset recovery returned DMA and AXI to idle", $time);
+        end
+
+        if (errors == 0)
+            $display("TEST PASS");
+        else
+            $display("TEST FAIL errors=%0d", errors);
+        $finish;
+    end
+
+endmodule

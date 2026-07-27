@@ -1,0 +1,90 @@
+# CIMForge TSMC28 HPC+ DC profile with real SRAM macro timing/area.
+# Required environment: TSMC28_STDCELL_DB and TSMC28_SRAM_DB_TT.
+
+set TOP ai_accel_top
+set ROOT [file normalize [file join [file dirname [info script]] ..]]
+set RTL_DIR "$ROOT/rtl"
+set SYN_DIR "$ROOT/syn"
+set PERIOD [expr {[info exists ::env(CIMFORGE_DC_PERIOD_NS)] ? $::env(CIMFORGE_DC_PERIOD_NS) : 4.0}]
+set RUN_DIR [expr {[info exists ::env(CIMFORGE_DC_RUN_DIR)] ? $::env(CIMFORGE_DC_RUN_DIR) : "$ROOT/syn/out/tsmc28_[string map {. _} $PERIOD]ns"}]
+
+foreach required_var {TSMC28_STDCELL_DB TSMC28_SRAM_DB_TT} {
+    if {![info exists ::env($required_var)] || ![file exists $::env($required_var)]} {
+        error "Set $required_var to a matching TSMC28 nominal-PVT library view before running DC"
+    }
+}
+file mkdir "$RUN_DIR/reports"
+file mkdir "$RUN_DIR/netlist"
+set_app_var search_path [list $SYN_DIR $RTL_DIR]
+set_app_var target_library [list $::env(TSMC28_STDCELL_DB)]
+set_app_var link_library [list "*" $::env(TSMC28_STDCELL_DB) $::env(TSMC28_SRAM_DB_TT)]
+
+puts "CIMForge DC TSMC28: TOP=$TOP PERIOD_NS=$PERIOD"
+puts "CIMForge DC TSMC28: STDCELL_DB=$::env(TSMC28_STDCELL_DB)"
+puts "CIMForge DC TSMC28: SRAM_DB=$::env(TSMC28_SRAM_DB_TT)"
+puts "CIMForge DC TSMC28: SRAM=32x TS1N28HPCPL2SVTB4096X32M4MWBASO"
+
+remove_design -all
+analyze -format sverilog [list \
+  $RTL_DIR/axi_lite_reg_if.v \
+  $RTL_DIR/axi_dma_master.v \
+  $RTL_DIR/ai_axi128_dma_ooo.v \
+  $RTL_DIR/ai_spad_protection.v \
+  $RTL_DIR/ai_spad_arbiter.v \
+  $RTL_DIR/ai_tile_pipeline.v \
+  $RTL_DIR/ai_perf_monitor.v \
+  $RTL_DIR/ai_command_processor.v \
+  $RTL_DIR/ai_bank_pe.v \
+  $RTL_DIR/ai_reduction_tree.v \
+  $RTL_DIR/ai_banked_compute_core.v \
+  $RTL_DIR/ai_unsigned_divider.v \
+  $RTL_DIR/ai_integer_sqrt.v \
+  $RTL_DIR/ai_tensor_matrix_core.v \
+  $RTL_DIR/ai_tensor_sfu_core.v \
+  $RTL_DIR/ai_conv3x3_linebuffer_core.v \
+  $RTL_DIR/ai_kv_cache_engine.v \
+  $SYN_DIR/ai_scratchpad_28nm_macro.v \
+  $RTL_DIR/ai_desc_fetch.v \
+  $RTL_DIR/axi_desc_fetch.v \
+  $RTL_DIR/ai_completion_writer.v \
+  $RTL_DIR/ai_accel_regs.v \
+  $RTL_DIR/ai_int8_compute_core.v \
+  $RTL_DIR/ai_accel_top.v \
+]
+if {[catch {elaborate $TOP} elaboration_error]} {
+    puts stderr "CIMForge TSMC28 DC elaboration failed: $elaboration_error"
+    exit 2
+}
+current_design $TOP
+if {[catch {link} link_error]} {
+    puts stderr "CIMForge TSMC28 DC link failed: $link_error"
+    exit 3
+}
+redirect -file "$RUN_DIR/reports/check_design.rpt" { check_design }
+
+create_clock -name aclk -period $PERIOD [get_ports aclk]
+set_clock_uncertainty 0.10 [get_clocks aclk]
+set reset_ports [get_ports aresetn]
+set data_inputs [remove_from_collection [all_inputs] [add_to_collection [get_ports aclk] $reset_ports]]
+set_input_delay 0.20 -clock aclk $data_inputs
+set_output_delay 0.20 -clock aclk [all_outputs]
+set_false_path -from $reset_ports
+set_fix_multiple_port_nets -all -buffer_constants
+set_fix_hold [get_clocks aclk]
+# The macro wrapper carries a synthesizer dont_touch attribute on each hard
+# SRAM instance.  Do not use a broad hierarchical name match here: it can
+# accidentally freeze surrounding glue logic and corrupt the PPA estimate.
+
+compile_ultra
+compile -incremental -only_hold_time
+
+redirect -file "$RUN_DIR/reports/qor.rpt" { report_qor }
+redirect -file "$RUN_DIR/reports/area.rpt" { report_area -hierarchy }
+redirect -file "$RUN_DIR/reports/timing.rpt" { report_timing -max_paths 20 }
+redirect -file "$RUN_DIR/reports/hold_timing.rpt" { report_timing -delay min -max_paths 20 }
+redirect -file "$RUN_DIR/reports/reference.rpt" { report_reference }
+redirect -file "$RUN_DIR/reports/power.rpt" { report_power }
+write -format ddc -hierarchy -output "$RUN_DIR/netlist/$TOP.ddc"
+write_file -format verilog -hierarchy -output "$RUN_DIR/netlist/${TOP}_syn.v"
+puts "CIMForge TSMC28 DC completed: $RUN_DIR"
+exit

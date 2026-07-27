@@ -1,0 +1,9 @@
+../../rtl/RA1SH.v
+../../rtl/sram_bist_8kx8.v
+../../rtl/sram_bist.v
+../../rtl/sram_core.v
+../../rtl/ahb_slave_if.v
+../../rtl/sramc_top.v
+../../rtl/vec_accel_regs.v
+../../rtl/vec_accel_core.v
+../../rtl/vec_accel_top.v
