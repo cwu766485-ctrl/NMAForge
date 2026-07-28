@@ -19,6 +19,17 @@ set_app_var search_path [list $SYN_DIR $RTL_DIR]
 set_app_var target_library [list $::env(TSMC28_STDCELL_DB)]
 set_app_var link_library [list "*" $::env(TSMC28_STDCELL_DB) $::env(TSMC28_SRAM_DB_TT)]
 
+# A readable .db can still be a broken/partial conversion.  Fail before
+# compile if the target library cannot map the basic cells needed by DC.
+set inv_cells [get_lib_cells -quiet */INVD1BWP7T40P140]
+if {[sizeof_collection $inv_cells] == 0} {
+    error "TSMC28_STDCELL_DB does not contain INVD1BWP7T40P140; use the complete TSMC28 RVT standard-cell .db"
+}
+set seq_cells [get_lib_cells -quiet */DFCNQD1BWP7T40P140]
+if {[sizeof_collection $seq_cells] == 0} {
+    error "TSMC28_STDCELL_DB does not contain DFCNQD1BWP7T40P140; use the complete TSMC28 RVT standard-cell .db"
+}
+
 puts "CIMForge DC TSMC28: TOP=$TOP PERIOD_NS=$PERIOD"
 puts "CIMForge DC TSMC28: STDCELL_DB=$::env(TSMC28_STDCELL_DB)"
 puts "CIMForge DC TSMC28: SRAM_DB=$::env(TSMC28_SRAM_DB_TT)"
@@ -26,30 +37,30 @@ puts "CIMForge DC TSMC28: SRAM=32x TS1N28HPCPL2SVTB4096X32M4MWBASO"
 
 remove_design -all
 analyze -format sverilog [list \
-  $RTL_DIR/axi_lite_reg_if.v \
-  $RTL_DIR/axi_dma_master.v \
-  $RTL_DIR/ai_axi128_dma_ooo.v \
-  $RTL_DIR/ai_spad_protection.v \
-  $RTL_DIR/ai_spad_arbiter.v \
-  $RTL_DIR/ai_tile_pipeline.v \
-  $RTL_DIR/ai_perf_monitor.v \
-  $RTL_DIR/ai_command_processor.v \
-  $RTL_DIR/ai_bank_pe.v \
-  $RTL_DIR/ai_reduction_tree.v \
-  $RTL_DIR/ai_banked_compute_core.v \
-  $RTL_DIR/ai_unsigned_divider.v \
-  $RTL_DIR/ai_integer_sqrt.v \
-  $RTL_DIR/ai_tensor_matrix_core.v \
-  $RTL_DIR/ai_tensor_sfu_core.v \
-  $RTL_DIR/ai_conv3x3_linebuffer_core.v \
-  $RTL_DIR/ai_kv_cache_engine.v \
+  $RTL_DIR/control/axi_lite_reg_if.v \
+  $RTL_DIR/dma/axi_dma_master.v \
+  $RTL_DIR/dma/ai_axi128_dma_ooo.v \
+  $RTL_DIR/memory/ai_spad_protection.v \
+  $RTL_DIR/memory/ai_spad_arbiter.v \
+  $RTL_DIR/compute/ai_tile_pipeline.v \
+  $RTL_DIR/control/ai_perf_monitor.v \
+  $RTL_DIR/control/ai_command_processor.v \
+  $RTL_DIR/compute/ai_bank_pe.v \
+  $RTL_DIR/compute/ai_reduction_tree.v \
+  $RTL_DIR/compute/ai_banked_compute_core.v \
+  $RTL_DIR/compute/ai_unsigned_divider.v \
+  $RTL_DIR/compute/ai_integer_sqrt.v \
+  $RTL_DIR/compute/ai_tensor_matrix_core.v \
+  $RTL_DIR/compute/ai_tensor_sfu_core.v \
+  $RTL_DIR/compute/ai_conv3x3_linebuffer_core.v \
+  $RTL_DIR/compute/ai_kv_cache_engine.v \
   $SYN_DIR/ai_scratchpad_28nm_macro.v \
-  $RTL_DIR/ai_desc_fetch.v \
-  $RTL_DIR/axi_desc_fetch.v \
-  $RTL_DIR/ai_completion_writer.v \
-  $RTL_DIR/ai_accel_regs.v \
-  $RTL_DIR/ai_int8_compute_core.v \
-  $RTL_DIR/ai_accel_top.v \
+  $RTL_DIR/control/ai_desc_fetch.v \
+  $RTL_DIR/control/axi_desc_fetch.v \
+  $RTL_DIR/control/ai_completion_writer.v \
+  $RTL_DIR/control/ai_accel_regs.v \
+  $RTL_DIR/compute/ai_int8_compute_core.v \
+  $RTL_DIR/top/ai_accel_top.v \
 ]
 if {[catch {elaborate $TOP} elaboration_error]} {
     puts stderr "CIMForge TSMC28 DC elaboration failed: $elaboration_error"
@@ -63,7 +74,11 @@ if {[catch {link} link_error]} {
 redirect -file "$RUN_DIR/reports/check_design.rpt" { check_design }
 
 create_clock -name aclk -period $PERIOD [get_ports aclk]
-set_clock_uncertainty 0.10 [get_clocks aclk]
+# Keep the 100 ps setup guard band, but do not apply it wholesale to hold.
+# Before CTS there is no extracted skew; retain a small 20 ps min-delay guard
+# and defer final hold closure to post-layout OCV/RC STA.
+set_clock_uncertainty -setup 0.10 [get_clocks aclk]
+set_clock_uncertainty -hold  0.02 [get_clocks aclk]
 set reset_ports [get_ports aresetn]
 set data_inputs [remove_from_collection [all_inputs] [add_to_collection [get_ports aclk] $reset_ports]]
 set_input_delay 0.20 -clock aclk $data_inputs

@@ -26,7 +26,6 @@ bash syn/run_ai_accel_28nm_dc.sh 4.0
 The default characterization point is TT, 0.9 V, 25 C. SRAM `lib` and
 standard-cell `db` must use the same PVT. The run consumes the locally
 converted SRAM `db`; the source `lib` remains the foundry timing source.
-Unlike the 40nm study, macro area,
-leakage and timing are included through `link_library`; extracted RC, CTS,
-physical macro placement and signoff STA are still required before claiming
-final Fmax.
+Macro area, leakage and timing are included through `link_library`; extracted
+RC, CTS, physical macro placement and signoff STA are still required before
+claiming final Fmax.

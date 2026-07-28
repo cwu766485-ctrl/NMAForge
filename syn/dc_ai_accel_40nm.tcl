@@ -30,30 +30,30 @@ puts "CIMForge DC: SRAM=4x32Kx32 blackbox macro boundary"
 
 remove_design -all
 analyze -format sverilog [list \
-  $RTL_DIR/axi_lite_reg_if.v \
-  $RTL_DIR/axi_dma_master.v \
-  $RTL_DIR/ai_axi128_dma_ooo.v \
-  $RTL_DIR/ai_spad_protection.v \
-  $RTL_DIR/ai_spad_arbiter.v \
-  $RTL_DIR/ai_tile_pipeline.v \
-  $RTL_DIR/ai_perf_monitor.v \
-  $RTL_DIR/ai_command_processor.v \
-  $RTL_DIR/ai_bank_pe.v \
-  $RTL_DIR/ai_reduction_tree.v \
-  $RTL_DIR/ai_banked_compute_core.v \
-  $RTL_DIR/ai_unsigned_divider.v \
-  $RTL_DIR/ai_integer_sqrt.v \
-  $RTL_DIR/ai_tensor_matrix_core.v \
-  $RTL_DIR/ai_tensor_sfu_core.v \
-  $RTL_DIR/ai_conv3x3_linebuffer_core.v \
-  $RTL_DIR/ai_kv_cache_engine.v \
+  $RTL_DIR/control/axi_lite_reg_if.v \
+  $RTL_DIR/dma/axi_dma_master.v \
+  $RTL_DIR/dma/ai_axi128_dma_ooo.v \
+  $RTL_DIR/memory/ai_spad_protection.v \
+  $RTL_DIR/memory/ai_spad_arbiter.v \
+  $RTL_DIR/compute/ai_tile_pipeline.v \
+  $RTL_DIR/control/ai_perf_monitor.v \
+  $RTL_DIR/control/ai_command_processor.v \
+  $RTL_DIR/compute/ai_bank_pe.v \
+  $RTL_DIR/compute/ai_reduction_tree.v \
+  $RTL_DIR/compute/ai_banked_compute_core.v \
+  $RTL_DIR/compute/ai_unsigned_divider.v \
+  $RTL_DIR/compute/ai_integer_sqrt.v \
+  $RTL_DIR/compute/ai_tensor_matrix_core.v \
+  $RTL_DIR/compute/ai_tensor_sfu_core.v \
+  $RTL_DIR/compute/ai_conv3x3_linebuffer_core.v \
+  $RTL_DIR/compute/ai_kv_cache_engine.v \
   $SYN_DIR/ai_scratchpad_asic_macro.v \
-  $RTL_DIR/ai_desc_fetch.v \
-  $RTL_DIR/axi_desc_fetch.v \
-  $RTL_DIR/ai_completion_writer.v \
-  $RTL_DIR/ai_accel_regs.v \
-  $RTL_DIR/ai_int8_compute_core.v \
-  $RTL_DIR/ai_accel_top.v \
+  $RTL_DIR/control/ai_desc_fetch.v \
+  $RTL_DIR/control/axi_desc_fetch.v \
+  $RTL_DIR/control/ai_completion_writer.v \
+  $RTL_DIR/control/ai_accel_regs.v \
+  $RTL_DIR/compute/ai_int8_compute_core.v \
+  $RTL_DIR/top/ai_accel_top.v \
 ]
 if {[catch {elaborate $TOP} elaboration_error]} {
     puts stderr "CIMForge DC elaboration failed: $elaboration_error"

@@ -16,11 +16,11 @@ set_app_var synthetic_library [list standard.sldb]
 remove_design -all
 
 analyze -format verilog [list \
-  $RTL_DIR/ahb_slave_if.v \
+  $RTL_DIR/legacy/ahb_slave_if.v \
   $SYN_DIR/sram_core_blackbox.v \
-  $RTL_DIR/vec_accel_regs.v \
-  $RTL_DIR/vec_accel_core.v \
-  $RTL_DIR/vec_accel_top.v \
+  $RTL_DIR/legacy/vec_accel_regs.v \
+  $RTL_DIR/legacy/vec_accel_core.v \
+  $RTL_DIR/legacy/vec_accel_top.v \
 ]
 
 elaborate $TOP

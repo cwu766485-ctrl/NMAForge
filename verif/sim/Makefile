@@ -100,9 +100,9 @@ ai_precheck: ai_a4_ref ai_quick
 # Portable directed A6 checks. These complement, but do not replace, VCS
 # `ai_smoke`; the tests intentionally exercise RID/BID reordering.
 ai_a6_iverilog:
-	iverilog -g2012 -o /tmp/cimforge_a6_dma.vvp ../../rtl/ai_axi128_dma_ooo.v ../tb/tb_ai_axi128_dma_ooo.sv
+	iverilog -g2012 -o /tmp/cimforge_a6_dma.vvp ../../rtl/dma/ai_axi128_dma_ooo.v ../tb/tb_ai_axi128_dma_ooo.sv
 	vvp /tmp/cimforge_a6_dma.vvp
-	iverilog -g2012 -o /tmp/cimforge_a6_datapaths.vvp ../../rtl/ai_conv3x3_linebuffer_core.v ../../rtl/ai_kv_cache_engine.v ../tb/tb_ai_a6_datapaths.sv
+	iverilog -g2012 -o /tmp/cimforge_a6_datapaths.vvp ../../rtl/compute/ai_conv3x3_linebuffer_core.v ../../rtl/compute/ai_kv_cache_engine.v ../tb/tb_ai_a6_datapaths.sv
 	vvp /tmp/cimforge_a6_datapaths.vvp
 
 clean:

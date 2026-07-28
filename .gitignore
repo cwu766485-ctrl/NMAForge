@@ -22,6 +22,19 @@ ucli.key
 # Vivado non-project build artefacts (reports and checkpoints remain local).
 fpga/**/build/
 
+# Local EDA generated artifacts and vendor example projects.
+.srcs/
+*.mr
+*.pvl
+*.syn
+alib-*/
+cksum_dir/
+default.svf
+lc_output.txt
+syn/out/
+tmp/
+docs/hardware/
+
 # Public repository hygiene
 docs/*.pdf
 docs/Interview/

@@ -5,11 +5,11 @@
 The active product track is the AXI-Lite/AXI4 AI accelerator.  The repository
 also retains one legacy teaching track:
 
-- The AXI-Lite AI accelerator: `rtl/ai_accel_top.v`, its scratchpad, DMA,
+- The AXI-Lite AI accelerator: `rtl/top/ai_accel_top.v`, its scratchpad, DMA,
   command queue, descriptor path, compute engines, and FPGA wrappers.  All new
   accelerator design work belongs here.
-- The original AHB SRAM/vector accelerator: `rtl/sramc_top.v` and
-  `rtl/vec_accel_top.v`, retained only for history and verification-study
+- The original AHB SRAM/vector accelerator: `rtl/legacy/sramc_top.v` and
+  `rtl/legacy/vec_accel_top.v`, retained only for history and verification-study
   reference.  Do not connect new AI features to it or use its regression as AI
   sign-off unless the task explicitly names the legacy track.
 
@@ -27,7 +27,7 @@ renaming a synthesizable AI RTL module, update every applicable source list:
 
 ## AI accelerator architecture
 
-`rtl/ai_accel_top.v` is the integration point.  Its intended ownership model
+`rtl/top/ai_accel_top.v` is the integration point.  Its intended ownership model
 is important:
 
 - `ai_accel_regs` is only the AXI-Lite register file: software configuration,
