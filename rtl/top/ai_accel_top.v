@@ -24,7 +24,8 @@
 module ai_accel_top #(
     // Four fixed banks are retained for the bank-local INT8 datapath.  Depth
     // is configurable; 32768 words/bank gives the XCZU15EG default of 512 KiB.
-    parameter integer SPAD_WORDS_PER_BANK = 32768
+    parameter integer SPAD_WORDS_PER_BANK = 32768,
+    parameter integer M_AXI_ADDR_WIDTH = 64
 )(
     (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 ACLK CLK" *)
     (* X_INTERFACE_PARAMETER = "XIL_INTERFACENAME ACLK, ASSOCIATED_BUSIF S_AXI:M_AXI, ASSOCIATED_RESET aresetn" *)
@@ -75,18 +76,26 @@ module ai_accel_top #(
     output wire        irq,
 
     (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARVALID" *)
-    (* X_INTERFACE_PARAMETER = "XIL_INTERFACENAME M_AXI, PROTOCOL AXI4, DATA_WIDTH 128, ADDR_WIDTH 32, ID_WIDTH 4, HAS_BURST 1, MAX_BURST_LENGTH 64, NUM_READ_OUTSTANDING 4, NUM_WRITE_OUTSTANDING 4, SUPPORTS_NARROW_BURST 1" *)
+    (* X_INTERFACE_PARAMETER = "XIL_INTERFACENAME M_AXI, PROTOCOL AXI4, DATA_WIDTH 128, ADDR_WIDTH 64, ID_WIDTH 4, HAS_BURST 1, MAX_BURST_LENGTH 16, NUM_READ_OUTSTANDING 4, NUM_WRITE_OUTSTANDING 4, SUPPORTS_NARROW_BURST 1" *)
     output wire        m_axi_arvalid,
     (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARID" *)
     output wire [3:0]  m_axi_arid,
     (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARADDR" *)
-    output wire [31:0] m_axi_araddr,
+    output wire [M_AXI_ADDR_WIDTH-1:0] m_axi_araddr,
     (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARLEN" *)
     output wire [7:0]  m_axi_arlen,
     (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARSIZE" *)
     output wire [2:0]  m_axi_arsize,
     (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARBURST" *)
     output wire [1:0]  m_axi_arburst,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARCACHE" *)
+    output wire [3:0]  m_axi_arcache,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARPROT" *)
+    output wire [2:0]  m_axi_arprot,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARQOS" *)
+    output wire [3:0]  m_axi_arqos,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARLOCK" *)
+    output wire        m_axi_arlock,
     (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARREADY" *)
     input  wire        m_axi_arready,
     (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI RID" *)
@@ -106,13 +115,21 @@ module ai_accel_top #(
     (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWID" *)
     output wire [3:0]  m_axi_awid,
     (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWADDR" *)
-    output wire [31:0] m_axi_awaddr,
+    output wire [M_AXI_ADDR_WIDTH-1:0] m_axi_awaddr,
     (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWLEN" *)
     output wire [7:0]  m_axi_awlen,
     (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWSIZE" *)
     output wire [2:0]  m_axi_awsize,
     (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWBURST" *)
     output wire [1:0]  m_axi_awburst,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWCACHE" *)
+    output wire [3:0]  m_axi_awcache,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWPROT" *)
+    output wire [2:0]  m_axi_awprot,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWQOS" *)
+    output wire [3:0]  m_axi_awqos,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWLOCK" *)
+    output wire        m_axi_awlock,
     (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWREADY" *)
     input  wire        m_axi_awready,
     (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI WVALID" *)
@@ -188,7 +205,7 @@ module ai_accel_top #(
     wire [3:0]  region0_perm, region1_perm, region2_perm, region3_perm;
     wire        direct_start;
     wire        submit;
-    wire [31:0] cmdq_base_lo;
+    wire [63:0] cmdq_base;
     // Compatibility observability aliases used by the existing SVA/testbench.
     wire [31:0] cmdq_desc_base;
     wire        doorbell_pulse;
@@ -204,7 +221,7 @@ module ai_accel_top #(
     wire [31:0] cplq_tail_seed;
     wire        dma_start;
     wire        dma_store;
-    wire [31:0] dma_ext_addr;
+    wire [63:0] dma_ext_addr;
     wire [31:0] dma_spad_addr;
     wire [15:0] dma_length_words;
     wire [15:0] dma_row_words;
@@ -214,15 +231,15 @@ module ai_accel_top #(
     wire        dma_gather_enable;
     wire [31:0] dma_gather_index_base;
     wire [2:0]  dma_read_outstanding;
-    wire        dma_wide_enable;
     wire        tile_start;
     wire [15:0] tile_count;
-    wire [31:0] tile_ext_input_base, tile_ext_output_base;
+    wire [63:0] tile_ext_input_base, tile_ext_output_base;
     wire [31:0] tile_ext_input_stride, tile_ext_output_stride;
     wire [31:0] tile_buffer0_base, tile_buffer1_base, tile_output_offset;
     wire [15:0] tile_input_words, tile_output_words;
     wire        tile_dma_start, tile_dma_store, tile_active;
-    wire [31:0] tile_dma_ext_addr, tile_dma_spad_addr;
+    wire [63:0] tile_dma_ext_addr;
+    wire [31:0] tile_dma_spad_addr;
     wire [15:0] tile_dma_length_words;
     wire [31:0] tile_perf_total, tile_perf_dma, tile_perf_compute;
     wire [31:0] tile_perf_overlap, tile_perf_stall;
@@ -233,14 +250,14 @@ module ai_accel_top #(
     wire [31:0] perf_dma_r_stall;
     wire [2:0] perf_dma_rd_outstanding, perf_dma_rd_highwater;
     wire        dma_start_mux, dma_store_mux;
-    wire [31:0] dma_ext_addr_mux, dma_spad_addr_mux;
+    wire [63:0] dma_ext_addr_mux;
+    wire [31:0] dma_spad_addr_mux;
     wire [15:0] dma_length_words_mux;
     wire [15:0] dma_row_words_mux, dma_row_count_mux;
     wire [31:0] dma_ext_stride_mux, dma_spad_stride_mux;
     wire dma_gather_enable_mux;
     wire [31:0] dma_gather_index_base_mux;
     wire [2:0] dma_read_outstanding_mux;
-    wire dma_wide_enable_mux;
 
     wire        scalar_spad_valid;
     wire        scalar_spad_write;
@@ -350,7 +367,7 @@ module ai_accel_top #(
     wire [31:0] processor_event_cycles;
     wire [31:0] processor_event_elements;
     wire        fetch_start;
-    wire [31:0] fetch_base;
+    wire [63:0] fetch_base;
     wire        fetch_external;
     wire        launch_valid;
     wire [7:0]  launch_op;
@@ -367,24 +384,39 @@ module ai_accel_top #(
     wire [31:0] launch_instance_count = launch_batch_count * launch_head_count;
     wire [15:0] dependency_events;
     wire        arb_desc_ready, arb_cpl_ready, arb_core_ready, arb_banked_ready, arb_dma_ready;
-    wire        arb_rsp_valid, arb_rsp_error;
+    wire        arb_rsp_valid, arb_rsp_error, arb_rsp_is_line;
     wire [2:0]  arb_rsp_client;
+    wire [2:0]  arb_request_client;
     wire [31:0] arb_rsp_rdata;
     wire        desc_rsp_valid, core_rsp_valid, banked_rsp_valid, dma_rsp_valid;
     wire        desc_rsp_error, core_rsp_error, dma_rsp_error;
     wire        arb_banked_valid;
     wire [31:0] arb_banked_addr;
-    wire        dma_legacy_spad_valid, dma_wide_spad_valid;
-    wire        dma_legacy_spad_write, dma_wide_spad_write;
-    wire [31:0] dma_legacy_spad_addr_o, dma_wide_spad_addr_o;
-    wire [31:0] dma_legacy_spad_wdata, dma_wide_spad_wdata;
-    wire dma_spad_valid = dma_wide_enable_mux ? dma_wide_spad_valid : dma_legacy_spad_valid;
-    wire dma_spad_write = dma_wide_enable_mux ? dma_wide_spad_write : dma_legacy_spad_write;
-    wire [31:0] dma_spad_addr_o = dma_wide_enable_mux ? dma_wide_spad_addr_o : dma_legacy_spad_addr_o;
-    wire [31:0] dma_spad_wdata = dma_wide_enable_mux ? dma_wide_spad_wdata : dma_legacy_spad_wdata;
+    wire        dma_spad_valid;
+    wire        dma_spad_write;
+    wire [31:0] dma_spad_addr_o;
+    wire [31:0] dma_spad_wdata;
+    wire        dma_spad_line_valid, dma_spad_line_write;
+    wire [31:0] dma_spad_line_addr;
+    wire [127:0] dma_spad_line_wdata;
+    wire [15:0] dma_spad_line_wstrb;
+    wire        arb_dma_line_ready, dma_line_rsp_valid;
+    wire        matrix_line_valid, matrix_line_write;
+    wire [31:0] matrix_line_addr;
+    wire [127:0] matrix_line_wdata;
+    wire [15:0] matrix_line_wstrb;
+    wire        arb_core_line_ready;
+    wire        spad_line_valid, spad_line_write;
+    wire [31:0] spad_line_addr;
+    wire [127:0] spad_line_wdata, spad_line_rdata;
+    wire [15:0] spad_line_wstrb;
+    wire [3:0] spad_line_parity_error;
+    wire        spad_line_raw_error, spad_line_error;
     wire        host_prot_allow;
     wire        compute_prot_allow;
     wire        compute_prot_error;
+    wire        line_prot_allow;
+    wire        line_prot_error;
     wire        banked_prot_allow;
     wire        banked_protection_error;
     wire        core_spad_error;
@@ -437,43 +469,22 @@ module ai_accel_top #(
     wire        kv_busy, kv_done, kv_error;
     wire [3:0]  kv_error_code;
     wire [31:0] kv_result, kv_cycle_count, kv_element_count;
-    wire dma_legacy_busy, dma_legacy_done, dma_legacy_error;
-    wire [3:0] dma_legacy_error_code;
-    wire dma_wide_busy, dma_wide_done, dma_wide_error;
-    wire [3:0] dma_wide_error_code;
-    wire dma_busy = dma_wide_enable_mux ? dma_wide_busy : dma_legacy_busy;
-    wire dma_done = dma_wide_enable_mux ? dma_wide_done : dma_legacy_done;
-    wire dma_error = dma_wide_enable_mux ? dma_wide_error : dma_legacy_error;
-    wire [3:0] dma_error_code = dma_wide_enable_mux ? dma_wide_error_code : dma_legacy_error_code;
-    wire        dma_m_axi_arvalid;
-    wire [31:0] dma_m_axi_araddr;
-    wire [7:0]  dma_m_axi_arlen;
-    wire [2:0]  dma_m_axi_arsize;
-    wire [1:0]  dma_m_axi_arburst;
-    wire        dma_m_axi_arready;
-    wire        dma_m_axi_rready;
-    wire [3:0]  wide_m_axi_arid, wide_m_axi_awid;
-    wire        wide_m_axi_arvalid, wide_m_axi_rready, wide_m_axi_awvalid, wide_m_axi_wvalid, wide_m_axi_bready;
-    wire [31:0] wide_m_axi_araddr, wide_m_axi_awaddr;
-    wire [7:0] wide_m_axi_arlen, wide_m_axi_awlen;
-    wire [2:0] wide_m_axi_arsize, wide_m_axi_awsize;
-    wire [1:0] wide_m_axi_arburst, wide_m_axi_awburst;
-    wire [127:0] wide_m_axi_wdata;
-    wire [15:0] wide_m_axi_wstrb;
-    wire wide_m_axi_wlast;
-    wire        legacy_m_axi_awvalid;
-    wire [31:0] legacy_m_axi_awaddr;
-    wire [7:0]  legacy_m_axi_awlen;
-    wire [2:0]  legacy_m_axi_awsize;
-    wire [1:0]  legacy_m_axi_awburst;
-    wire        legacy_m_axi_wvalid;
-    wire [31:0] legacy_m_axi_wdata;
-    wire [3:0]  legacy_m_axi_wstrb;
-    wire        legacy_m_axi_wlast;
-    wire        legacy_m_axi_bready;
+    wire dma_busy, dma_done, dma_error;
+    wire [3:0] dma_error_code;
+    wire [3:0]  dma_m_axi_arid, dma_m_axi_awid;
+    wire        dma_m_axi_arvalid, dma_m_axi_rready;
+    wire        dma_m_axi_awvalid, dma_m_axi_wvalid, dma_m_axi_bready;
+    wire [M_AXI_ADDR_WIDTH-1:0] dma_m_axi_araddr, dma_m_axi_awaddr;
+    wire [7:0] dma_m_axi_arlen, dma_m_axi_awlen;
+    wire [2:0] dma_m_axi_arsize, dma_m_axi_awsize;
+    wire [1:0] dma_m_axi_arburst, dma_m_axi_awburst;
+    wire [127:0] dma_m_axi_wdata;
+    wire [15:0] dma_m_axi_wstrb;
+    wire dma_m_axi_wlast;
+    wire [4:0] dma_r_beat_bytes, dma_w_beat_bytes;
     wire        axi_desc_m_axi_arvalid;
     wire [3:0]  axi_desc_m_axi_arid;
-    wire [31:0] axi_desc_m_axi_araddr;
+    wire [M_AXI_ADDR_WIDTH-1:0] axi_desc_m_axi_araddr;
     wire [7:0]  axi_desc_m_axi_arlen;
     wire [2:0]  axi_desc_m_axi_arsize;
     wire [1:0]  axi_desc_m_axi_arburst;
@@ -482,12 +493,14 @@ module ai_accel_top #(
 
     // DMA-only handshake events are kept separate from the descriptor AXI
     // fetch mux, making bandwidth measurements attributable to payload DMA.
-    wire perf_dma_ar_fire = dma_m_axi_arvalid && dma_m_axi_arready;
+    wire perf_dma_ar_fire = dma_m_axi_arvalid && !axi_desc_busy &&
+                            m_axi_arready;
     wire perf_dma_r_fire = m_axi_rvalid && dma_m_axi_rready;
     wire perf_dma_rlast_fire = perf_dma_r_fire && m_axi_rlast;
     wire perf_dma_aw_fire = m_axi_awvalid && m_axi_awready;
     wire perf_dma_w_fire = m_axi_wvalid && m_axi_wready;
-    wire perf_dma_r_wait = m_axi_rvalid && !dma_m_axi_rready && dma_busy;
+    wire perf_dma_r_wait = m_axi_rvalid && (m_axi_rid != 4'd0) &&
+                           !dma_m_axi_rready && dma_busy;
 
     // 地址译码：同一个 AXI-Lite slave 入口，内部拆成寄存器访问和 SRAM 访问。
     assign regs_req_valid = reg_req_valid_raw &&
@@ -498,34 +511,52 @@ module ai_accel_top #(
                             (reg_req_addr_local < SPAD_LIMIT);
 
     // scratchpad 的内部 compute 端口只有一套，因此 DMA、descriptor fetch、
-    // completion writer、compute core 不能同时直接驱动它。这里用一个简单优先级
-    // mux 做仲裁：
-    //   descriptor fetch > completion writer > compute core > DMA
+    // completion writer、compute core 不能同时直接驱动它。控制面保留严格优先级，
+    // 数据面采用轮转仲裁：
+    //   descriptor fetch > completion writer > round-robin(core/banked/DMA)
     //
     // 这个优先级保证：
     //   - doorbell 后先取任务描述；
     //   - 任务完成后优先写 completion；
-    //   - 正常计算期间 compute core 访问 scratchpad；
-    //   - 空闲时 DMA 可以搬数据。
+    //   - 连续计算流量下 DMA 仍能获得有界的数据面服务机会。
     ai_spad_arbiter spad_arbiter_u(
         .clk(aclk), .resetn(aresetn),
         .desc_valid(desc_spad_valid), .desc_write(1'b0), .desc_addr(desc_spad_addr), .desc_wdata(32'd0), .desc_ready(arb_desc_ready),
         .cpl_valid(cpl_spad_valid), .cpl_write(cpl_spad_write), .cpl_addr(cpl_spad_addr), .cpl_wdata(cpl_spad_wdata), .cpl_ready(arb_cpl_ready),
         .core_valid(core_spad_valid), .core_write(core_spad_write), .core_addr(core_spad_addr), .core_wdata(core_spad_wdata), .core_ready(arb_core_ready),
+        .core_line_valid(matrix_line_valid), .core_line_write(matrix_line_write),
+        .core_line_addr(matrix_line_addr), .core_line_wdata(matrix_line_wdata),
+        .core_line_wstrb(matrix_line_wstrb), .core_line_ready(arb_core_line_ready),
         .banked_valid(banked_read_valid), .banked_addr(banked_read_addr), .banked_ready(arb_banked_ready),
         .dma_valid(dma_spad_valid), .dma_write(dma_spad_write), .dma_addr(dma_spad_addr_o), .dma_wdata(dma_spad_wdata), .dma_ready(arb_dma_ready),
+        .dma_line_valid(dma_spad_line_valid), .dma_line_write(dma_spad_line_write),
+        .dma_line_addr(dma_spad_line_addr), .dma_line_wdata(dma_spad_line_wdata),
+        .dma_line_wstrb(dma_spad_line_wstrb), .dma_line_ready(arb_dma_line_ready),
         .spad_valid(spad_compute_valid_mux), .spad_write(spad_compute_write_mux), .spad_addr(spad_compute_addr_mux), .spad_wdata(spad_compute_wdata_mux),
+        .spad_line_valid(spad_line_valid), .spad_line_write(spad_line_write),
+        .spad_line_addr(spad_line_addr), .spad_line_wdata(spad_line_wdata),
+        .spad_line_wstrb(spad_line_wstrb),
         .spad_banked_valid(arb_banked_valid), .spad_banked_addr(arb_banked_addr),
-        .spad_rdata(core_spad_rdata), .spad_error(core_spad_error), .rsp_valid(arb_rsp_valid), .rsp_client(arb_rsp_client), .rsp_rdata(arb_rsp_rdata), .rsp_error(arb_rsp_error)
+        .spad_rdata(core_spad_rdata), .spad_error(core_spad_error),
+        .spad_parity_error(core_spad_parity_error),
+        .spad_line_error(spad_line_error),
+        .spad_line_parity_error(spad_line_parity_error),
+        .rsp_valid(arb_rsp_valid), .rsp_client(arb_rsp_client),
+        .rsp_is_line(arb_rsp_is_line), .request_client(arb_request_client),
+        .rsp_rdata(arb_rsp_rdata), .rsp_error(arb_rsp_error)
     );
     assign desc_rsp_valid = arb_rsp_valid && (arb_rsp_client == 3'd0);
-    assign core_rsp_valid = arb_rsp_valid && (arb_rsp_client == 3'd2);
+    assign core_rsp_valid = arb_rsp_valid && (arb_rsp_client == 3'd2) &&
+                            !arb_rsp_is_line;
     assign banked_rsp_valid = arb_rsp_valid && (arb_rsp_client == 3'd3);
-    assign dma_rsp_valid = arb_rsp_valid && (arb_rsp_client == 3'd4);
-    assign desc_rsp_error = arb_rsp_error;
-    assign core_rsp_error = arb_rsp_error;
-    assign dma_rsp_error = arb_rsp_error;
-    assign cmdq_desc_base = fetch_base;
+    assign dma_rsp_valid = arb_rsp_valid && (arb_rsp_client == 3'd4) &&
+                           !arb_rsp_is_line;
+    assign dma_line_rsp_valid = arb_rsp_valid && (arb_rsp_client == 3'd4) &&
+                                arb_rsp_is_line;
+    assign desc_rsp_error = desc_rsp_valid && arb_rsp_error;
+    assign core_rsp_error = core_rsp_valid && arb_rsp_error;
+    assign dma_rsp_error = dma_rsp_valid && arb_rsp_error;
+    assign cmdq_desc_base = fetch_base[31:0];
     assign doorbell_pulse = submit;
     assign banked_op = (launch_op == 8'h20) || (launch_op == 8'h21);
     assign tensor_matrix_op = (launch_op == 8'h30) || (launch_op == 8'h31);
@@ -564,14 +595,16 @@ module ai_accel_top #(
     assign banked_read_valid = matrix_busy ? matrix_banked_read_valid :
                                banked_busy ? banked_read_valid_legacy : 1'b0;
     assign banked_read_addr = matrix_busy ? matrix_banked_read_addr : banked_read_addr_legacy;
-    assign compute_req_execute = core_busy;
+    assign compute_req_execute = (arb_request_client == 3'd2) ||
+                                 (arb_request_client == 3'd3);
     assign compute_prot_error = spad_compute_valid_mux &&
                                 (!compute_prot_allow ||
                                  (spad_compute_addr_mux > SPAD_BYTES - 32'd4));
     assign banked_protection_error = arb_banked_valid &&
                                      (!banked_prot_allow ||
                                       (arb_banked_addr > SPAD_BYTES - 32'd16));
-    assign core_spad_error = core_spad_parity_error || compute_prot_error;
+    assign core_spad_error = compute_prot_error;
+    assign spad_line_error = spad_line_raw_error || line_prot_error;
     assign cpl_protection_error = !cpl_prot_allow ||
                                   ((cpl_base + (cpl_index << 4)) >
                                    SPAD_BYTES - 32'd16);
@@ -593,6 +626,19 @@ module ai_accel_top #(
         .req_valid(spad_compute_valid_mux), .req_addr(spad_compute_addr_mux), .req_bytes(32'd4),
         .req_write(spad_compute_write_mux), .req_execute(compute_req_execute), .allow(compute_prot_allow)
     );
+
+    ai_spad_protection line_protection_u(
+        .region0_base(region0_base), .region0_limit(region0_limit), .region0_perm(region0_perm),
+        .region1_base(region1_base), .region1_limit(region1_limit), .region1_perm(region1_perm),
+        .region2_base(region2_base), .region2_limit(region2_limit), .region2_perm(region2_perm),
+        .region3_base(region3_base), .region3_limit(region3_limit), .region3_perm(region3_perm),
+        .req_valid(spad_line_valid), .req_addr(spad_line_addr), .req_bytes(32'd16),
+        .req_write(spad_line_write),
+        .req_execute(arb_request_client == 3'd2), .allow(line_prot_allow)
+    );
+    assign line_prot_error = spad_line_valid &&
+                             (!line_prot_allow ||
+                              (spad_line_addr > SPAD_BYTES - 32'd16));
 
     // A banked row is four 32-bit words at one 16-byte tile address.  It is
     // admitted by the same arbiter and must satisfy the complete-region and
@@ -666,39 +712,49 @@ module ai_accel_top #(
     assign dma_gather_enable_mux = tile_active ? 1'b0 : dma_gather_enable;
     assign dma_gather_index_base_mux = tile_active ? 32'd0 : dma_gather_index_base;
     assign dma_read_outstanding_mux = tile_active ? 3'd1 : dma_read_outstanding;
-    // Wide DMA intentionally excludes legacy 2D/gather/tile requests; those
-    // retain the proven narrow backend while direct contiguous transfers use
-    // the tagged 128-bit path.
-    assign dma_wide_enable_mux = !tile_active && dma_wide_enable && !dma_gather_enable &&
-                                 dma_row_count == 16'd0;
+    // DMA_CFG[1] used to select a second, narrow DMA backend.  It remains a
+    // readable compatibility bit in the register file, but all payload modes
+    // now use the unified 128-bit tagged DMA.
 
-    // AXI master read channel 也被两个模块复用：
+    // AXI master read channel is shared by two clients:
     //   - axi_desc_fetch 需要从 DDR 读取 descriptor；
-    //   - axi_dma_master 需要从 DDR 读取 input/weight。
+    //   - ai_axi128_dma 需要从 DDR 读取 input/weight。
     // 写通道目前只由 DMA 使用。这里读通道优先给 axi_desc_fetch。
     assign m_axi_arvalid = axi_desc_busy ? axi_desc_m_axi_arvalid :
-                           (dma_wide_enable_mux ? wide_m_axi_arvalid : dma_m_axi_arvalid);
-    // A5 legacy DMA uses ID 0 until the A6 profile selects the tagged engine;
-    // descriptor fetch also reserves ID 0 and cannot overlap legacy traffic.
-    assign m_axi_arid    = axi_desc_busy ? axi_desc_m_axi_arid : (dma_wide_enable_mux ? wide_m_axi_arid : 4'd0);
-    assign m_axi_araddr  = axi_desc_busy ? axi_desc_m_axi_araddr  : (dma_wide_enable_mux ? wide_m_axi_araddr : dma_m_axi_araddr);
-    assign m_axi_arlen   = axi_desc_busy ? axi_desc_m_axi_arlen   : (dma_wide_enable_mux ? wide_m_axi_arlen : dma_m_axi_arlen);
-    assign m_axi_arsize  = axi_desc_busy ? axi_desc_m_axi_arsize  : (dma_wide_enable_mux ? wide_m_axi_arsize : dma_m_axi_arsize);
-    assign m_axi_arburst = axi_desc_busy ? axi_desc_m_axi_arburst : (dma_wide_enable_mux ? wide_m_axi_arburst : dma_m_axi_arburst);
+                           dma_m_axi_arvalid;
+    // Descriptor fetch reserves ID 0; payload DMA uses IDs 1..4.
+    assign m_axi_arid    = axi_desc_busy ? axi_desc_m_axi_arid :
+                           dma_m_axi_arid;
+    assign m_axi_araddr  = axi_desc_busy ? axi_desc_m_axi_araddr :
+                           dma_m_axi_araddr;
+    assign m_axi_arlen   = axi_desc_busy ? axi_desc_m_axi_arlen :
+                           dma_m_axi_arlen;
+    assign m_axi_arsize  = axi_desc_busy ? axi_desc_m_axi_arsize :
+                           dma_m_axi_arsize;
+    assign m_axi_arburst = axi_desc_busy ? axi_desc_m_axi_arburst :
+                           dma_m_axi_arburst;
+    assign m_axi_arcache = 4'b0011;
+    assign m_axi_arprot  = 3'b000;
+    assign m_axi_arqos   = 4'b0000;
+    assign m_axi_arlock  = 1'b0;
     assign axi_desc_m_axi_arready = axi_desc_busy ? m_axi_arready : 1'b0;
-    assign dma_m_axi_arready = (axi_desc_busy || dma_wide_enable_mux) ? 1'b0 : m_axi_arready;
-    assign m_axi_rready = (m_axi_rid == 4'd0) ? (axi_desc_busy ? axi_desc_m_axi_rready : dma_m_axi_rready) : wide_m_axi_rready;
-    assign m_axi_awid = dma_wide_enable_mux ? wide_m_axi_awid : 4'd0;
-    assign m_axi_awvalid = dma_wide_enable_mux ? wide_m_axi_awvalid : legacy_m_axi_awvalid;
-    assign m_axi_awaddr  = dma_wide_enable_mux ? wide_m_axi_awaddr : legacy_m_axi_awaddr;
-    assign m_axi_awlen   = dma_wide_enable_mux ? wide_m_axi_awlen : legacy_m_axi_awlen;
-    assign m_axi_awsize  = dma_wide_enable_mux ? wide_m_axi_awsize : legacy_m_axi_awsize;
-    assign m_axi_awburst = dma_wide_enable_mux ? wide_m_axi_awburst : legacy_m_axi_awburst;
-    assign m_axi_wvalid  = dma_wide_enable_mux ? wide_m_axi_wvalid : legacy_m_axi_wvalid;
-    assign m_axi_wdata   = dma_wide_enable_mux ? wide_m_axi_wdata : {96'd0, legacy_m_axi_wdata};
-    assign m_axi_wstrb   = dma_wide_enable_mux ? wide_m_axi_wstrb : {12'd0, legacy_m_axi_wstrb};
-    assign m_axi_wlast   = dma_wide_enable_mux ? wide_m_axi_wlast : legacy_m_axi_wlast;
-    assign m_axi_bready  = dma_wide_enable_mux ? wide_m_axi_bready : legacy_m_axi_bready;
+    assign m_axi_rready = (m_axi_rid == 4'd0) ?
+                          axi_desc_m_axi_rready : dma_m_axi_rready;
+    assign m_axi_awid = dma_m_axi_awid;
+    assign m_axi_awvalid = dma_m_axi_awvalid;
+    assign m_axi_awaddr  = dma_m_axi_awaddr;
+    assign m_axi_awlen   = dma_m_axi_awlen;
+    assign m_axi_awsize  = dma_m_axi_awsize;
+    assign m_axi_awburst = dma_m_axi_awburst;
+    assign m_axi_awcache = 4'b0011;
+    assign m_axi_awprot  = 3'b000;
+    assign m_axi_awqos   = 4'b0000;
+    assign m_axi_awlock  = 1'b0;
+    assign m_axi_wvalid  = dma_m_axi_wvalid;
+    assign m_axi_wdata   = dma_m_axi_wdata;
+    assign m_axi_wstrb   = dma_m_axi_wstrb;
+    assign m_axi_wlast   = dma_m_axi_wlast;
+    assign m_axi_bready  = dma_m_axi_bready;
 
     // AXI-Lite 读响应 mux：
     //   访问 scratchpad window 时返回 SRAM host port 数据；
@@ -786,7 +842,6 @@ module ai_accel_top #(
         .dma_gather_enable  (dma_gather_enable),
         .dma_gather_index_base(dma_gather_index_base),
         .dma_read_outstanding(dma_read_outstanding),
-        .dma_wide_enable   (dma_wide_enable),
         .op_mode            (op_mode),
         .src0_base          (src0_base),
         .src1_base          (src1_base),
@@ -840,7 +895,7 @@ module ai_accel_top #(
         .region3_base       (region3_base),
         .region3_limit      (region3_limit),
         .region3_perm       (region3_perm),
-        .cmdq_base_lo       (cmdq_base_lo),
+        .cmdq_base          (cmdq_base),
         .cmdq_size          (cmdq_size),
         .cmdq_tail          (cmdq_tail),
         .cmdq_external      (cmdq_external),
@@ -879,7 +934,7 @@ module ai_accel_top #(
 
     ai_command_processor command_processor_u(
         .clk(aclk), .resetn(aresetn), .abort(core_abort), .submit(submit), .direct_start(direct_start), .tile_start(tile_start),
-        .cmdq_base(cmdq_base_lo), .cmdq_size(cmdq_size), .cmdq_tail(cmdq_tail), .desc_external(cmdq_external), .cmdq_head_load(cmdq_head_load), .cmdq_head_seed(cmdq_head_seed),
+        .cmdq_base(cmdq_base), .cmdq_size(cmdq_size), .cmdq_tail(cmdq_tail), .desc_external(cmdq_external), .cmdq_head_load(cmdq_head_load), .cmdq_head_seed(cmdq_head_seed),
         .cplq_base(cplq_base_cfg), .cplq_size(cplq_size), .cplq_head(cplq_head), .completion_protected(cpl_protection_error), .cplq_tail_load(cplq_tail_load), .cplq_tail_seed(cplq_tail_seed),
         .cfg_op(op_mode), .cfg_src0(src0_base), .cfg_src1(src1_base), .cfg_dst(dst_base),
         .cfg_length(length), .cfg_m(m_size), .cfg_n(n_size), .cfg_k(k_words), .cfg_shift(scale_shift), .cfg_activation(activation), .cfg_bias_base(bias_base), .cfg_bias_enable(bias_enable),
@@ -919,6 +974,8 @@ module ai_accel_top #(
         .dma_ar_fire(perf_dma_ar_fire), .dma_r_fire(perf_dma_r_fire),
         .dma_rlast_fire(perf_dma_rlast_fire), .dma_aw_fire(perf_dma_aw_fire),
         .dma_w_fire(perf_dma_w_fire), .dma_r_stall(perf_dma_r_wait),
+        .dma_r_beat_bytes(dma_r_beat_bytes),
+        .dma_w_beat_bytes(dma_w_beat_bytes),
         .matrix_cycles(perf_matrix_cycles), .matrix_mac_cycles(perf_matrix_mac_cycles),
         .matrix_banked_stall_cycles(perf_matrix_banked_stall),
         .dma_read_bytes(perf_dma_read_bytes), .dma_write_bytes(perf_dma_write_bytes),
@@ -928,85 +985,49 @@ module ai_accel_top #(
         .dma_rd_outstanding_highwater(perf_dma_rd_highwater)
     );
 
-    // 私有 AXI DMA：
-    //   store=0：DDR -> scratchpad，用于加载 input/weight/descriptor 等；
-    //   store=1：scratchpad -> DDR，用于回写 output。
-    // 它通过 AXI master 访问外部 memory，通过 scratchpad compute 端口访问片上 SRAM。
-    axi_dma_master dma_u(
-        .clk            (aclk),
-        .resetn         (aresetn),
-        .start          (dma_start_mux && !dma_wide_enable_mux),
-        .abort          (core_abort),
-        .store          (dma_store_mux),
-        .ext_addr       (dma_ext_addr_mux),
-        .spad_addr      (dma_spad_addr_mux),
-        .length_words   (dma_length_words_mux),
-        .row_words      (dma_row_words_mux),
-        .row_count      (dma_row_count_mux),
-        .ext_stride     (dma_ext_stride_mux),
-        .spad_stride    (dma_spad_stride_mux),
-        .gather_enable  (dma_gather_enable_mux),
-        .gather_index_base(dma_gather_index_base_mux),
-        .read_outstanding(dma_read_outstanding_mux),
-        .busy           (dma_legacy_busy),
-        .done           (dma_legacy_done),
-        .error          (dma_legacy_error),
-        .error_code     (dma_legacy_error_code),
-        .spad_valid     (dma_legacy_spad_valid),
-        .spad_write     (dma_legacy_spad_write),
-        .spad_addr_o    (dma_legacy_spad_addr_o),
-        .spad_wdata     (dma_legacy_spad_wdata),
-        .spad_ready     (arb_dma_ready),
-        .spad_rsp_valid (dma_rsp_valid),
-        .spad_rdata     (arb_rsp_rdata),
-        .spad_req_error (compute_prot_error),
-        .spad_rsp_error (dma_rsp_error),
-        .m_axi_arvalid  (dma_m_axi_arvalid),
-        .m_axi_araddr   (dma_m_axi_araddr),
-        .m_axi_arlen    (dma_m_axi_arlen),
-        .m_axi_arsize   (dma_m_axi_arsize),
-        .m_axi_arburst  (dma_m_axi_arburst),
-        .m_axi_arready  (dma_m_axi_arready),
-        .m_axi_rdata    (m_axi_rdata[31:0]),
-        .m_axi_rresp    (m_axi_rresp),
-        .m_axi_rvalid   (m_axi_rvalid),
-        .m_axi_rlast    (m_axi_rlast),
-        .m_axi_rready   (dma_m_axi_rready),
-        .m_axi_awvalid  (legacy_m_axi_awvalid),
-        .m_axi_awaddr   (legacy_m_axi_awaddr),
-        .m_axi_awlen    (legacy_m_axi_awlen),
-        .m_axi_awsize   (legacy_m_axi_awsize),
-        .m_axi_awburst  (legacy_m_axi_awburst),
-        .m_axi_awready  (m_axi_awready),
-        .m_axi_wvalid   (legacy_m_axi_wvalid),
-        .m_axi_wdata    (legacy_m_axi_wdata),
-        .m_axi_wstrb    (legacy_m_axi_wstrb),
-        .m_axi_wlast    (legacy_m_axi_wlast),
-        .m_axi_wready   (m_axi_wready),
-        .m_axi_bresp    (m_axi_bresp),
-        .m_axi_bvalid   (m_axi_bvalid),
-        .m_axi_bready   (legacy_m_axi_bready)
-    );
-
-    ai_axi128_dma_ooo dma_wide_u(
-        .clk(aclk), .resetn(aresetn), .start(dma_start_mux && dma_wide_enable_mux),
+    // Unified payload DMA:
+    //   store=0: DDR -> scratchpad for inputs and weights;
+    //   store=1: scratchpad -> DDR for results.
+    // Direct, 2D, gather, and tile requests share this 128-bit tagged backend.
+    ai_axi128_dma #(.AXI_ADDR_WIDTH(M_AXI_ADDR_WIDTH)) dma_u(
+        .clk(aclk), .resetn(aresetn), .start(dma_start_mux),
         .abort(core_abort), .store(dma_store_mux), .ext_addr(dma_ext_addr_mux),
         .spad_addr(dma_spad_addr_mux), .length_words(dma_length_words_mux),
-        .read_outstanding(dma_read_outstanding_mux), .busy(dma_wide_busy),
-        .done(dma_wide_done), .error(dma_wide_error), .error_code(dma_wide_error_code),
-        .spad_valid(dma_wide_spad_valid), .spad_write(dma_wide_spad_write),
-        .spad_addr_o(dma_wide_spad_addr_o), .spad_wdata(dma_wide_spad_wdata),
+        .row_words(dma_row_words_mux), .row_count(dma_row_count_mux),
+        .ext_stride(dma_ext_stride_mux), .spad_stride(dma_spad_stride_mux),
+        .gather_enable(dma_gather_enable_mux),
+        .gather_index_base(dma_gather_index_base_mux),
+        .read_outstanding(dma_read_outstanding_mux), .busy(dma_busy),
+        .done(dma_done), .error(dma_error), .error_code(dma_error_code),
+        .spad_valid(dma_spad_valid), .spad_write(dma_spad_write),
+        .spad_addr_o(dma_spad_addr_o), .spad_wdata(dma_spad_wdata),
         .spad_ready(arb_dma_ready), .spad_rsp_valid(dma_rsp_valid), .spad_rdata(arb_rsp_rdata),
-        .spad_req_error(compute_prot_error), .spad_rsp_error(dma_rsp_error),
-        .m_axi_arid(wide_m_axi_arid), .m_axi_arvalid(wide_m_axi_arvalid), .m_axi_araddr(wide_m_axi_araddr),
-        .m_axi_arlen(wide_m_axi_arlen), .m_axi_arsize(wide_m_axi_arsize), .m_axi_arburst(wide_m_axi_arburst),
+        .spad_req_error(compute_prot_error &&
+                        (arb_request_client == 3'd4)),
+        .spad_rsp_error(dma_rsp_error),
+        .spad_line_valid(dma_spad_line_valid),
+        .spad_line_write(dma_spad_line_write),
+        .spad_line_addr(dma_spad_line_addr),
+        .spad_line_wdata(dma_spad_line_wdata),
+        .spad_line_wstrb(dma_spad_line_wstrb),
+        .spad_line_ready(arb_dma_line_ready),
+        .spad_line_rsp_valid(dma_line_rsp_valid),
+        .spad_line_rdata(spad_line_rdata),
+        .spad_line_req_error((line_prot_error || spad_line_raw_error) &&
+                             (arb_request_client == 3'd4)),
+        .spad_line_rsp_error(dma_line_rsp_valid && arb_rsp_error),
+        .spad_line_parity_error(spad_line_parity_error),
+        .m_axi_arid(dma_m_axi_arid), .m_axi_arvalid(dma_m_axi_arvalid), .m_axi_araddr(dma_m_axi_araddr),
+        .m_axi_arlen(dma_m_axi_arlen), .m_axi_arsize(dma_m_axi_arsize), .m_axi_arburst(dma_m_axi_arburst),
         // The top-level AR mux gives descriptor ID0 priority.  Do not expose
         // that unrelated handshake to a tagged DMA request.
         .m_axi_arready(m_axi_arready && !axi_desc_busy),
-        .m_axi_rid(m_axi_rid), .m_axi_rdata(m_axi_rdata), .m_axi_rresp(m_axi_rresp), .m_axi_rvalid(m_axi_rvalid), .m_axi_rlast(m_axi_rlast), .m_axi_rready(wide_m_axi_rready),
-        .m_axi_awid(wide_m_axi_awid), .m_axi_awvalid(wide_m_axi_awvalid), .m_axi_awaddr(wide_m_axi_awaddr), .m_axi_awlen(wide_m_axi_awlen), .m_axi_awsize(wide_m_axi_awsize), .m_axi_awburst(wide_m_axi_awburst), .m_axi_awready(m_axi_awready),
-        .m_axi_wvalid(wide_m_axi_wvalid), .m_axi_wdata(wide_m_axi_wdata), .m_axi_wstrb(wide_m_axi_wstrb), .m_axi_wlast(wide_m_axi_wlast), .m_axi_wready(m_axi_wready),
-        .m_axi_bid(m_axi_bid), .m_axi_bresp(m_axi_bresp), .m_axi_bvalid(m_axi_bvalid), .m_axi_bready(wide_m_axi_bready), .rd_outstanding(), .rd_highwater()
+        .m_axi_rid(m_axi_rid), .m_axi_rdata(m_axi_rdata), .m_axi_rresp(m_axi_rresp), .m_axi_rvalid(m_axi_rvalid), .m_axi_rlast(m_axi_rlast), .m_axi_rready(dma_m_axi_rready),
+        .m_axi_awid(dma_m_axi_awid), .m_axi_awvalid(dma_m_axi_awvalid), .m_axi_awaddr(dma_m_axi_awaddr), .m_axi_awlen(dma_m_axi_awlen), .m_axi_awsize(dma_m_axi_awsize), .m_axi_awburst(dma_m_axi_awburst), .m_axi_awready(m_axi_awready),
+        .m_axi_wvalid(dma_m_axi_wvalid), .m_axi_wdata(dma_m_axi_wdata), .m_axi_wstrb(dma_m_axi_wstrb), .m_axi_wlast(dma_m_axi_wlast), .m_axi_wready(m_axi_wready),
+        .m_axi_bid(m_axi_bid), .m_axi_bresp(m_axi_bresp), .m_axi_bvalid(m_axi_bvalid), .m_axi_bready(dma_m_axi_bready),
+        .rd_outstanding(), .rd_highwater(),
+        .r_beat_bytes(dma_r_beat_bytes), .w_beat_bytes(dma_w_beat_bytes)
     );
 
     // 片上 scratchpad SRAM：
@@ -1033,6 +1054,14 @@ module ai_accel_top #(
         .compute_wdata        (spad_compute_wdata_mux),
         .compute_rdata        (core_spad_rdata),
         .compute_parity_error (core_spad_parity_error),
+        .line_valid           (spad_line_valid && line_prot_allow),
+        .line_write           (spad_line_write),
+        .line_addr            (spad_line_addr),
+        .line_wdata           (spad_line_wdata),
+        .line_wstrb           (spad_line_wstrb),
+        .line_rdata           (spad_line_rdata),
+        .line_parity_error    (spad_line_parity_error),
+        .line_error           (spad_line_raw_error),
         .banked_read_valid    (arb_banked_valid),
         .banked_addr          (arb_banked_addr),
         .banked_data0         (banked_data0),
@@ -1048,7 +1077,7 @@ module ai_accel_top #(
         .clk              (aclk),
         .resetn           (aresetn),
         .start            (fetch_start && !fetch_external),
-        .desc_base        (fetch_base),
+        .desc_base        (fetch_base[31:0]),
         .spad_ready       (arb_desc_ready),
         .spad_rsp_valid   (desc_rsp_valid),
         .spad_rdata       (arb_rsp_rdata),
@@ -1086,7 +1115,7 @@ module ai_accel_top #(
 
     // 从外部 DDR/AXI memory 取 descriptor。适合软件把命令队列放在外部 memory
     // 的场景；该模块只使用 AXI read channel。
-    axi_desc_fetch axi_desc_fetch_u(
+    axi_desc_fetch #(.AXI_ADDR_WIDTH(M_AXI_ADDR_WIDTH)) axi_desc_fetch_u(
         .clk              (aclk),
         .resetn           (aresetn),
         .start            (fetch_start && fetch_external),
@@ -1153,8 +1182,8 @@ module ai_accel_top #(
         .result(banked_result), .cycle_count(banked_cycle_count), .element_count(banked_element_count)
     );
 
-    // A3 matrix path: a 4x4 INT8 PE tile consumes both banked-read ports and
-    // commits INT32 results through the arbiter's scalar scheduler port.
+    // A3 matrix path: a 4x4 INT8 PE tile consumes the banked-read path and
+    // commits each four-word INT32 result row through the 128-bit line port.
     ai_tensor_matrix_core tensor_matrix_u(
         .clk(aclk), .resetn(aresetn),
         .start(core_start && tensor_matrix_op), .abort(core_abort), .op_mode(launch_op),
@@ -1182,6 +1211,10 @@ module ai_accel_top #(
         .spad_rdata(arb_rsp_rdata),
         .spad_parity_error(core_rsp_error || core_spad_parity_error),
         .spad_protection_error(compute_prot_error),
+        .line_valid(matrix_line_valid), .line_write(matrix_line_write),
+        .line_addr(matrix_line_addr), .line_wdata(matrix_line_wdata),
+        .line_wstrb(matrix_line_wstrb), .line_ready(arb_core_line_ready),
+        .line_protection_error(line_prot_error || spad_line_raw_error),
         .busy(matrix_busy), .done(matrix_done), .error(matrix_error),
         .error_code(matrix_error_code), .result(matrix_result),
         .cycle_count(matrix_cycle_count), .element_count(matrix_element_count),
@@ -1195,7 +1228,8 @@ module ai_accel_top #(
         .clk(aclk), .resetn(aresetn),
         .start(core_start && tensor_sfu_op), .abort(core_abort), .op_mode(launch_op),
         .src0_base(launch_src0), .src1_base(launch_src1),
-        .beta_base(launch_bias_base), .beta_enable(launch_bias_enable), .dst_base(launch_dst),
+        .beta_base(launch_bias_base), .beta_enable(launch_bias_enable),
+        .pack_enable(launch_flags[4]), .dst_base(launch_dst),
         .length(launch_length), .scale_shift(launch_shift),
         .epsilon(launch_aux0), .watchdog_limit(watchdog_limit),
         .spad_valid(sfu_spad_valid), .spad_write(sfu_spad_write),

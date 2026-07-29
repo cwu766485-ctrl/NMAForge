@@ -1,39 +1,16 @@
 
 SEED = $(shell date +%s)
 
-all: create_lib compile simulate
+all: ai_smoke
 
 create_lib:
 	vlib work
-
-compile:
-	vlog -l comp.log -sv -mfcu -f rtl.f  \
-		+incdir+../agent/ahb \
-		+incdir+../env \
-		+incdir+../tests \
-		+incdir+../tb \
-		../agent/ahb/ahb_slv_if.sv \
-		../agent/ahb/ahb_slv_pkt.sv \
-		../agent/ahb/ahb_slv_generator.sv \
-		../agent/ahb/ahb_slv_driver_base.sv \
-		../agent/ahb/ahb_slv_driver.sv \
-		../agent/ahb/ahb_slv_monitor.sv \
-		../agent/ahb/ahb_slv_scoreboard.sv \
-		../env/ahb_slv_fcoverage.sv \
-		../env/vec_accel_sva.sv \
-		../tests/ahb_sramc_base_test.sv \
-		../tests/ahb_sramc_test.sv \
-		../tb/ahb_sramc_svtb_top.sv
-
-
-simulate:
-	vsim -coverage -assertdebug -sv_seed $(SEED) ahb_sramc_svtb_top -l sim.log -voptargs=+acc -do "log -r *; assertion enable -on; coverage save ./test.ucdb; add wave /ahb_sramc_svtb_top/u_vec_accel_top/*; run -all"
 
 ai_compile:
 	vlog -l ai_comp.log -sv -mfcu \
 		+incdir+../agents/axi_lite \
 		+incdir+../agents/ai_dma \
-		-f ai_accel.f ../tb/tb_ai_accel_smoke.sv
+		-f ai_accel.f ../env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv
 
 ai_simulate:
 	vsim tb_ai_accel_smoke -l ai_accel_smoke.log -voptargs=+acc -do "run -all"
@@ -41,4 +18,4 @@ ai_simulate:
 ai_smoke: create_lib ai_compile ai_simulate
 
 clean: 
-	rm -rf work mti_lib transcript modelsim.ini *.log *.wlf test.ucdb
+	rm -rf work mti_lib transcript modelsim.ini *.log *.wlf

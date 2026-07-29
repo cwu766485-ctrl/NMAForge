@@ -18,17 +18,18 @@ module ai_accel_regs #(
     input wire [15:0] processor_dependency_events,
     input wire dma_busy, input wire dma_done, input wire dma_error, input wire [3:0] dma_error_code,
     output reg direct_start, output reg submit, output reg core_abort,
-    output reg dma_start, output reg dma_store, output reg [31:0] dma_ext_addr, output reg [31:0] dma_spad_addr,
+    output reg dma_start, output reg dma_store,
+    output reg [63:0] dma_ext_addr, output reg [31:0] dma_spad_addr,
     output reg [15:0] dma_length_words, output reg [15:0] dma_row_words, output reg [15:0] dma_row_count,
     output reg [31:0] dma_ext_stride, output reg [31:0] dma_spad_stride,
     output reg dma_gather_enable, output reg [31:0] dma_gather_index_base,
-    output reg [2:0] dma_read_outstanding, output reg dma_wide_enable,
+    output reg [2:0] dma_read_outstanding,
     output reg [7:0] op_mode, output reg [31:0] src0_base, output reg [31:0] src1_base, output reg [31:0] dst_base,
     output reg [15:0] length, output reg [15:0] m_size, output reg [15:0] n_size, output reg [15:0] k_words,
     output reg [4:0] scale_shift, output reg [1:0] activation, output reg [31:0] watchdog_limit,
     output reg [31:0] bias_base, output reg bias_enable,
     output reg tile_start, output reg [15:0] tile_count,
-    output reg [31:0] tile_ext_input_base, output reg [31:0] tile_ext_output_base,
+    output reg [63:0] tile_ext_input_base, output reg [63:0] tile_ext_output_base,
     output reg [31:0] tile_ext_input_stride, output reg [31:0] tile_ext_output_stride,
     output reg [31:0] tile_buffer0_base, output reg [31:0] tile_buffer1_base,
     output reg [31:0] tile_output_offset,
@@ -46,7 +47,8 @@ module ai_accel_regs #(
     output wire [31:0] region1_base, output wire [31:0] region1_limit, output wire [3:0] region1_perm,
     output wire [31:0] region2_base, output wire [31:0] region2_limit, output wire [3:0] region2_perm,
     output wire [31:0] region3_base, output wire [31:0] region3_limit, output wire [3:0] region3_perm,
-    output wire [31:0] cmdq_base_lo, output wire [31:0] cmdq_size, output wire [31:0] cmdq_tail, output reg cmdq_external,
+    output wire [63:0] cmdq_base, output wire [31:0] cmdq_size,
+    output wire [31:0] cmdq_tail, output reg cmdq_external,
     output reg cmdq_head_load, output reg [31:0] cmdq_head_seed,
     output wire [31:0] cplq_base, output wire [31:0] cplq_size, output wire [31:0] cplq_head,
     output reg cplq_tail_load, output reg [31:0] cplq_tail_seed,
@@ -75,9 +77,11 @@ module ai_accel_regs #(
                      PERF_MATRIX_BANKED_STALL=9'h180, PERF_DMA_READ_BYTES=9'h184,
                      PERF_DMA_WRITE_BYTES=9'h188, PERF_DMA_AR_COUNT=9'h18c,
                      PERF_DMA_AW_COUNT=9'h190, PERF_DMA_RD_STATE=9'h194,
-                     PERF_DMA_R_STALL=9'h198;
+                     PERF_DMA_R_STALL=9'h198, DMA_EXT_HI=9'h19c,
+                     ABI_INFO=9'h1a0, ERROR_INFO=9'h1a4, CAP2=9'h1a8,
+                     TILE_EXT_IN_HI=9'h1ac, TILE_EXT_OUT_HI=9'h1b0;
     reg done_r, error_r, irq_status_r, irq_enable_r;
-    reg [3:0] error_code_r, dma_error_code_r;
+    reg [3:0] error_code_r, dma_error_code_r, error_source_r;
     reg [31:0] result_r, cycles_r, elements_r;
     reg dma_done_r, dma_error_r;
     reg [31:0] cmd_base_r, cmd_hi_r, cmd_size_r, cmd_tail_r;
@@ -92,10 +96,10 @@ module ai_accel_regs #(
     wire cpl_empty = cpl_size_r != 0 && cpl_head_r == processor_cplq_tail;
     wire [31:0] cpl_next = processor_cplq_tail >= cpl_size_r-1 ? 0 : processor_cplq_tail+1;
     wire cpl_full = cpl_size_r != 0 && cpl_next == cpl_head_r;
-    wire known = a==CTRL || a==STATUS || a==OP || a==SRC0 || a==SRC1 || a==DST || a==LENGTH || a==M || a==N || a==K || a==QUANT || a==RESULT || a==ERROR || a==CYCLES || a==ELEMENTS || a==IRQ_STATUS || a==IRQ_ENABLE || a==VERSION || a==CAP || a==CMD_BASE || a==CMD_HI || a==CMD_SIZE || a==CMD_HEAD || a==CMD_TAIL || a==CMD_CTRL || a==CPL_BASE || a==CPL_HI || a==CPL_SIZE || a==CPL_TAIL || a==CPL_HEAD || a==QUEUE_STATUS || a==DOORBELL || a==ABORT || a==WATCHDOG || a==DMA_CTRL || a==DMA_STATUS || a==DMA_EXT || a==DMA_SPAD || a==DMA_LEN || a==DMA_ERROR || a==R0_BASE || a==R0_LIMIT || a==R0_PERM || a==R1_BASE || a==R1_LIMIT || a==R1_PERM || a==R2_BASE || a==R2_LIMIT || a==R2_PERM || a==R3_BASE || a==R3_LIMIT || a==R3_PERM || a==DMA_ROW_WORDS || a==DMA_ROW_COUNT || a==DMA_EXT_STRIDE || a==DMA_SPAD_STRIDE || a==BIAS_BASE || a==POST_CTRL || a==TILE_CTRL || a==TILE_COUNT || a==TILE_EXT_IN || a==TILE_EXT_OUT || a==TILE_EXT_IN_STRIDE || a==TILE_EXT_OUT_STRIDE || a==TILE_BUF0 || a==TILE_BUF1 || a==TILE_IN_WORDS || a==TILE_OUT_WORDS || a==TILE_OUT_OFFSET || a==PERF_TOTAL || a==PERF_DMA || a==PERF_COMPUTE || a==PERF_OVERLAP || a==PERF_STALL || a==TILE_COMPLETED || a==SPAD_INFO || a==EVENT_STATUS || a==DMA_CFG || a==DMA_GATHER_INDEX || a==PERF_CTRL || a==PERF_MATRIX_CYCLES || a==PERF_MATRIX_MAC_CYCLES || a==PERF_MATRIX_BANKED_STALL || a==PERF_DMA_READ_BYTES || a==PERF_DMA_WRITE_BYTES || a==PERF_DMA_AR_COUNT || a==PERF_DMA_AW_COUNT || a==PERF_DMA_RD_STATE || a==PERF_DMA_R_STALL;
-    wire readonly = a==RESULT || a==ERROR || a==CYCLES || a==ELEMENTS || a==VERSION || a==CAP || a==QUEUE_STATUS || a==DMA_ERROR || a==PERF_TOTAL || a==PERF_DMA || a==PERF_COMPUTE || a==PERF_OVERLAP || a==PERF_STALL || a==TILE_COMPLETED || a==SPAD_INFO || a==EVENT_STATUS || a==PERF_MATRIX_CYCLES || a==PERF_MATRIX_MAC_CYCLES || a==PERF_MATRIX_BANKED_STALL || a==PERF_DMA_READ_BYTES || a==PERF_DMA_WRITE_BYTES || a==PERF_DMA_AR_COUNT || a==PERF_DMA_AW_COUNT || a==PERF_DMA_RD_STATE || a==PERF_DMA_R_STALL;
+    wire known = a==CTRL || a==STATUS || a==OP || a==SRC0 || a==SRC1 || a==DST || a==LENGTH || a==M || a==N || a==K || a==QUANT || a==RESULT || a==ERROR || a==CYCLES || a==ELEMENTS || a==IRQ_STATUS || a==IRQ_ENABLE || a==VERSION || a==CAP || a==CMD_BASE || a==CMD_HI || a==CMD_SIZE || a==CMD_HEAD || a==CMD_TAIL || a==CMD_CTRL || a==CPL_BASE || a==CPL_HI || a==CPL_SIZE || a==CPL_TAIL || a==CPL_HEAD || a==QUEUE_STATUS || a==DOORBELL || a==ABORT || a==WATCHDOG || a==DMA_CTRL || a==DMA_STATUS || a==DMA_EXT || a==DMA_EXT_HI || a==DMA_SPAD || a==DMA_LEN || a==DMA_ERROR || a==R0_BASE || a==R0_LIMIT || a==R0_PERM || a==R1_BASE || a==R1_LIMIT || a==R1_PERM || a==R2_BASE || a==R2_LIMIT || a==R2_PERM || a==R3_BASE || a==R3_LIMIT || a==R3_PERM || a==DMA_ROW_WORDS || a==DMA_ROW_COUNT || a==DMA_EXT_STRIDE || a==DMA_SPAD_STRIDE || a==BIAS_BASE || a==POST_CTRL || a==TILE_CTRL || a==TILE_COUNT || a==TILE_EXT_IN || a==TILE_EXT_OUT || a==TILE_EXT_IN_HI || a==TILE_EXT_OUT_HI || a==TILE_EXT_IN_STRIDE || a==TILE_EXT_OUT_STRIDE || a==TILE_BUF0 || a==TILE_BUF1 || a==TILE_IN_WORDS || a==TILE_OUT_WORDS || a==TILE_OUT_OFFSET || a==PERF_TOTAL || a==PERF_DMA || a==PERF_COMPUTE || a==PERF_OVERLAP || a==PERF_STALL || a==TILE_COMPLETED || a==SPAD_INFO || a==EVENT_STATUS || a==DMA_CFG || a==DMA_GATHER_INDEX || a==PERF_CTRL || a==PERF_MATRIX_CYCLES || a==PERF_MATRIX_MAC_CYCLES || a==PERF_MATRIX_BANKED_STALL || a==PERF_DMA_READ_BYTES || a==PERF_DMA_WRITE_BYTES || a==PERF_DMA_AR_COUNT || a==PERF_DMA_AW_COUNT || a==PERF_DMA_RD_STATE || a==PERF_DMA_R_STALL || a==ABI_INFO || a==ERROR_INFO || a==CAP2;
+    wire readonly = a==RESULT || a==ERROR || a==CYCLES || a==ELEMENTS || a==VERSION || a==CAP || a==QUEUE_STATUS || a==DMA_ERROR || a==PERF_TOTAL || a==PERF_DMA || a==PERF_COMPUTE || a==PERF_OVERLAP || a==PERF_STALL || a==TILE_COMPLETED || a==SPAD_INFO || a==EVENT_STATUS || a==PERF_MATRIX_CYCLES || a==PERF_MATRIX_MAC_CYCLES || a==PERF_MATRIX_BANKED_STALL || a==PERF_DMA_READ_BYTES || a==PERF_DMA_WRITE_BYTES || a==PERF_DMA_AR_COUNT || a==PERF_DMA_AW_COUNT || a==PERF_DMA_RD_STATE || a==PERF_DMA_R_STALL || a==ABI_INFO || a==ERROR_INFO || a==CAP2;
     wire cfg_locked = (processor_busy || dma_busy) && reg_req_write && !(a==STATUS || a==IRQ_STATUS || a==DMA_STATUS || a==ABORT);
-    assign cmdq_base_lo=cmd_base_r; assign cmdq_size=cmd_size_r; assign cmdq_tail=cmd_tail_r;
+    assign cmdq_base={cmd_hi_r,cmd_base_r}; assign cmdq_size=cmd_size_r; assign cmdq_tail=cmd_tail_r;
     assign cplq_base=cpl_base_r; assign cplq_size=cpl_size_r; assign cplq_head=cpl_head_r;
     assign region0_base=r0b; assign region0_limit=r0l; assign region0_perm=r0p;
     assign region1_base=r1b; assign region1_limit=r1l; assign region1_perm=r1p;
@@ -114,15 +118,17 @@ module ai_accel_regs #(
         OP: reg_rsp_rdata={24'd0,op_mode}; SRC0: reg_rsp_rdata=src0_base; SRC1: reg_rsp_rdata=src1_base; DST: reg_rsp_rdata=dst_base;
         LENGTH: reg_rsp_rdata={16'd0,length}; M: reg_rsp_rdata={16'd0,m_size}; N: reg_rsp_rdata={16'd0,n_size}; K: reg_rsp_rdata={16'd0,k_words}; QUANT: reg_rsp_rdata={25'd0,activation,scale_shift};
         RESULT: reg_rsp_rdata=result_r; ERROR: reg_rsp_rdata={28'd0,error_code_r}; CYCLES: reg_rsp_rdata=cycles_r; ELEMENTS: reg_rsp_rdata=elements_r;
-        IRQ_STATUS: reg_rsp_rdata={31'd0,irq_status_r}; IRQ_ENABLE: reg_rsp_rdata={31'd0,irq_enable_r}; VERSION: reg_rsp_rdata=32'h1000_0005; CAP: reg_rsp_rdata=32'h001f_ff17;
+        IRQ_STATUS: reg_rsp_rdata={31'd0,irq_status_r}; IRQ_ENABLE: reg_rsp_rdata={31'd0,irq_enable_r}; VERSION: reg_rsp_rdata=32'h1000_0008; CAP: reg_rsp_rdata=32'h001f_ff17;
         CMD_BASE: reg_rsp_rdata=cmd_base_r; CMD_HI: reg_rsp_rdata=cmd_hi_r; CMD_SIZE: reg_rsp_rdata=cmd_size_r; CMD_HEAD: reg_rsp_rdata=processor_cmdq_head; CMD_TAIL: reg_rsp_rdata=cmd_tail_r; CMD_CTRL: reg_rsp_rdata={31'd0,cmdq_external};
         CPL_BASE: reg_rsp_rdata=cpl_base_r; CPL_HI: reg_rsp_rdata=cpl_hi_r; CPL_SIZE: reg_rsp_rdata=cpl_size_r; CPL_TAIL: reg_rsp_rdata=processor_cplq_tail; CPL_HEAD: reg_rsp_rdata=cpl_head_r; QUEUE_STATUS: reg_rsp_rdata={28'd0,processor_busy,cpl_full,cpl_empty,cmd_empty};
-        WATCHDOG: reg_rsp_rdata=watchdog_limit; DMA_CTRL: reg_rsp_rdata={30'd0,dma_store,1'b0}; DMA_STATUS: reg_rsp_rdata={29'd0,dma_error_r,dma_done_r,dma_busy}; DMA_EXT: reg_rsp_rdata=dma_ext_addr; DMA_SPAD: reg_rsp_rdata=dma_spad_addr; DMA_LEN: reg_rsp_rdata={16'd0,dma_length_words}; DMA_ERROR: reg_rsp_rdata={28'd0,dma_error_code_r};
+        WATCHDOG: reg_rsp_rdata=watchdog_limit; DMA_CTRL: reg_rsp_rdata={30'd0,dma_store,1'b0}; DMA_STATUS: reg_rsp_rdata={29'd0,dma_error_r,dma_done_r,dma_busy}; DMA_EXT: reg_rsp_rdata=dma_ext_addr[31:0]; DMA_EXT_HI: reg_rsp_rdata=dma_ext_addr[63:32]; DMA_SPAD: reg_rsp_rdata=dma_spad_addr; DMA_LEN: reg_rsp_rdata={16'd0,dma_length_words}; DMA_ERROR: reg_rsp_rdata={28'd0,dma_error_code_r};
         R0_BASE:reg_rsp_rdata=r0b; R0_LIMIT:reg_rsp_rdata=r0l; R0_PERM:reg_rsp_rdata={28'd0,r0p}; R1_BASE:reg_rsp_rdata=r1b; R1_LIMIT:reg_rsp_rdata=r1l; R1_PERM:reg_rsp_rdata={28'd0,r1p}; R2_BASE:reg_rsp_rdata=r2b; R2_LIMIT:reg_rsp_rdata=r2l; R2_PERM:reg_rsp_rdata={28'd0,r2p}; R3_BASE:reg_rsp_rdata=r3b; R3_LIMIT:reg_rsp_rdata=r3l; R3_PERM:reg_rsp_rdata={28'd0,r3p};
         DMA_ROW_WORDS:reg_rsp_rdata={16'd0,dma_row_words}; DMA_ROW_COUNT:reg_rsp_rdata={16'd0,dma_row_count}; DMA_EXT_STRIDE:reg_rsp_rdata=dma_ext_stride; DMA_SPAD_STRIDE:reg_rsp_rdata=dma_spad_stride;
         BIAS_BASE:reg_rsp_rdata=bias_base; POST_CTRL:reg_rsp_rdata={31'd0,bias_enable};
         TILE_CTRL:reg_rsp_rdata=32'd0; TILE_COUNT:reg_rsp_rdata={16'd0,tile_count};
-        TILE_EXT_IN:reg_rsp_rdata=tile_ext_input_base; TILE_EXT_OUT:reg_rsp_rdata=tile_ext_output_base;
+        TILE_EXT_IN:reg_rsp_rdata=tile_ext_input_base[31:0]; TILE_EXT_OUT:reg_rsp_rdata=tile_ext_output_base[31:0];
+        TILE_EXT_IN_HI:reg_rsp_rdata=tile_ext_input_base[63:32];
+        TILE_EXT_OUT_HI:reg_rsp_rdata=tile_ext_output_base[63:32];
         TILE_EXT_IN_STRIDE:reg_rsp_rdata=tile_ext_input_stride; TILE_EXT_OUT_STRIDE:reg_rsp_rdata=tile_ext_output_stride;
         TILE_BUF0:reg_rsp_rdata=tile_buffer0_base; TILE_BUF1:reg_rsp_rdata=tile_buffer1_base;
         TILE_IN_WORDS:reg_rsp_rdata={16'd0,tile_input_words}; TILE_OUT_WORDS:reg_rsp_rdata={16'd0,tile_output_words};
@@ -132,7 +138,9 @@ module ai_accel_regs #(
         PERF_STALL:reg_rsp_rdata=tile_perf_stall; TILE_COMPLETED:reg_rsp_rdata={16'd0,tile_completed};
         SPAD_INFO:reg_rsp_rdata=SPAD_BYTES;
         EVENT_STATUS:reg_rsp_rdata={16'd0,processor_dependency_events};
-        DMA_CFG:reg_rsp_rdata={21'd0,dma_read_outstanding,6'd0,dma_wide_enable,dma_gather_enable};
+        // Bit 1 used to select the wide backend.  The unified DMA is always
+        // 128-bit, so the bit is now a read-only capability indication.
+        DMA_CFG:reg_rsp_rdata={21'd0,dma_read_outstanding,6'd0,1'b1,dma_gather_enable};
         DMA_GATHER_INDEX:reg_rsp_rdata=dma_gather_index_base;
         PERF_CTRL:reg_rsp_rdata=32'd0;
         PERF_MATRIX_CYCLES:reg_rsp_rdata=perf_matrix_cycles;
@@ -144,37 +152,45 @@ module ai_accel_regs #(
         PERF_DMA_AW_COUNT:reg_rsp_rdata=perf_dma_aw_count;
         PERF_DMA_RD_STATE:reg_rsp_rdata={26'd0,perf_dma_rd_highwater,perf_dma_rd_outstanding};
         PERF_DMA_R_STALL:reg_rsp_rdata=perf_dma_r_stall;
+        // ABI 7.1: 64-byte descriptor, 16-byte completion, 64-bit external
+        // address path.  CAP2 names the post-unification architectural
+        // features without repurposing legacy CAP bits.
+        ABI_INFO:reg_rsp_rdata={8'd16,8'd64,8'd2,8'd7};
+        ERROR_INFO:reg_rsp_rdata={24'd0,error_source_r,error_code_r};
+        CAP2:reg_rsp_rdata=32'h0000_003f;
       endcase
     end
     always @(posedge clk or negedge resetn) begin
       if(!resetn) begin
-        done_r<=0; error_r<=0; irq_status_r<=0; irq_enable_r<=0; error_code_r<=0; result_r<=0; cycles_r<=0; elements_r<=0;
-        direct_start<=0; submit<=0; core_abort<=0; dma_start<=0; tile_start<=0; perf_clear<=0; cmdq_head_load<=0; cmdq_head_seed<=0; cplq_tail_load<=0; cplq_tail_seed<=0; dma_store<=0; dma_ext_addr<=0; dma_spad_addr<=0; dma_length_words<=0; dma_row_words<=0; dma_row_count<=0; dma_ext_stride<=0; dma_spad_stride<=0; dma_gather_enable<=0; dma_gather_index_base<=0; dma_read_outstanding<=3'd4; dma_wide_enable<=0;
+        done_r<=0; error_r<=0; irq_status_r<=0; irq_enable_r<=0; error_code_r<=0; error_source_r<=0; result_r<=0; cycles_r<=0; elements_r<=0;
+        direct_start<=0; submit<=0; core_abort<=0; dma_start<=0; tile_start<=0; perf_clear<=0; cmdq_head_load<=0; cmdq_head_seed<=0; cplq_tail_load<=0; cplq_tail_seed<=0; dma_store<=0; dma_ext_addr<=0; dma_spad_addr<=0; dma_length_words<=0; dma_row_words<=0; dma_row_count<=0; dma_ext_stride<=0; dma_spad_stride<=0; dma_gather_enable<=0; dma_gather_index_base<=0; dma_read_outstanding<=3'd4;
         op_mode<=0; src0_base<=0; src1_base<=0; dst_base<=0; length<=0; m_size<=0; n_size<=0; k_words<=0; scale_shift<=0; activation<=0; watchdog_limit<=0; bias_base<=0; bias_enable<=0;
         tile_count<=0; tile_ext_input_base<=0; tile_ext_output_base<=0; tile_ext_input_stride<=0; tile_ext_output_stride<=0; tile_buffer0_base<=0; tile_buffer1_base<=0; tile_output_offset<=0; tile_input_words<=0; tile_output_words<=0;
         cmd_base_r<=0; cmd_hi_r<=0; cmd_size_r<=0; cmd_tail_r<=0; cmdq_external<=0; cpl_base_r<=0; cpl_hi_r<=0; cpl_size_r<=0; cpl_head_r<=0; dma_done_r<=0; dma_error_r<=0; dma_error_code_r<=0;
         r0b<=0;r0l<=0;r0p<=0;r1b<=0;r1l<=0;r1p<=0;r2b<=0;r2l<=0;r2p<=0;r3b<=0;r3l<=0;r3p<=0;
       end else begin
         direct_start<=0; submit<=0; core_abort<=0; dma_start<=0; tile_start<=0; perf_clear<=0; cmdq_head_load<=0; cplq_tail_load<=0;
-        if(processor_event_valid) begin done_r<=1; error_r<=processor_event_error; error_code_r<=processor_event_error_code; result_r<=processor_event_result; cycles_r<=processor_event_cycles; elements_r<=processor_event_elements; irq_status_r<=1; end
-        if(dma_done) begin dma_done_r<=1; dma_error_r<=dma_error; dma_error_code_r<=dma_error_code; if(dma_error) begin error_r<=1; error_code_r<=dma_error_code; irq_status_r<=1; end end
+        if(processor_event_valid) begin done_r<=1; error_r<=processor_event_error; error_code_r<=processor_event_error_code; error_source_r<=processor_event_error ? 4'd1 : 4'd0; result_r<=processor_event_result; cycles_r<=processor_event_cycles; elements_r<=processor_event_elements; irq_status_r<=1; end
+        if(dma_done) begin dma_done_r<=1; dma_error_r<=dma_error; dma_error_code_r<=dma_error_code; if(dma_error) begin error_r<=1; error_code_r<=dma_error_code; error_source_r<=4'd2; irq_status_r<=1; end end
         if(reg_req_valid && reg_req_write && !reg_rsp_error) case(a)
-          CTRL: begin irq_enable_r<=reg_req_wdata[1]; if(reg_req_wdata[0] && !processor_busy && !dma_busy) begin direct_start<=1; done_r<=0; error_r<=0; irq_status_r<=0; error_code_r<=0; end end
-          STATUS: begin if(reg_req_wdata[1]) done_r<=0; if(reg_req_wdata[2]) begin error_r<=0; error_code_r<=0; end end
+          CTRL: begin irq_enable_r<=reg_req_wdata[1]; if(reg_req_wdata[0] && !processor_busy && !dma_busy) begin direct_start<=1; done_r<=0; error_r<=0; irq_status_r<=0; error_code_r<=0; error_source_r<=0; end end
+          STATUS: begin if(reg_req_wdata[1]) done_r<=0; if(reg_req_wdata[2]) begin error_r<=0; error_code_r<=0; error_source_r<=0; end end
           OP:op_mode<=reg_req_wdata[7:0]; SRC0:src0_base<=reg_req_wdata; SRC1:src1_base<=reg_req_wdata; DST:dst_base<=reg_req_wdata; LENGTH:length<=reg_req_wdata[15:0]; M:m_size<=reg_req_wdata[15:0]; N:n_size<=reg_req_wdata[15:0]; K:k_words<=reg_req_wdata[15:0]; QUANT:begin scale_shift<=reg_req_wdata[4:0]; activation<=reg_req_wdata[6:5]; end
           IRQ_STATUS:if(reg_req_wdata[0]) irq_status_r<=0; IRQ_ENABLE:irq_enable_r<=reg_req_wdata[0];
           CMD_BASE:cmd_base_r<=reg_req_wdata; CMD_HI:cmd_hi_r<=reg_req_wdata; CMD_SIZE:cmd_size_r<=reg_req_wdata; CMD_HEAD:begin cmdq_head_load<=1; cmdq_head_seed<=reg_req_wdata; end CMD_TAIL:cmd_tail_r<=reg_req_wdata; CMD_CTRL:cmdq_external<=reg_req_wdata[0]; CPL_BASE:cpl_base_r<=reg_req_wdata; CPL_HI:cpl_hi_r<=reg_req_wdata; CPL_SIZE:cpl_size_r<=reg_req_wdata; CPL_TAIL:begin cplq_tail_load<=1; cplq_tail_seed<=reg_req_wdata; end CPL_HEAD:cpl_head_r<=reg_req_wdata;
-          DOORBELL:if(!processor_busy && !dma_busy) begin submit<=1; done_r<=0; error_r<=0; irq_status_r<=0; error_code_r<=0; end
+          DOORBELL:if(!processor_busy && !dma_busy) begin submit<=1; done_r<=0; error_r<=0; irq_status_r<=0; error_code_r<=0; error_source_r<=0; end
           ABORT:if(reg_req_wdata[0]) core_abort<=1; WATCHDOG:watchdog_limit<=reg_req_wdata;
           DMA_CTRL:begin dma_store<=reg_req_wdata[1]; if(reg_req_wdata[0] && !processor_busy && !dma_busy) begin dma_start<=1; dma_done_r<=0; dma_error_r<=0; dma_error_code_r<=0; end end
           DMA_STATUS:begin if(reg_req_wdata[1]) dma_done_r<=0; if(reg_req_wdata[2]) begin dma_error_r<=0; dma_error_code_r<=0; end end
-          DMA_EXT:dma_ext_addr<=reg_req_wdata; DMA_SPAD:dma_spad_addr<=reg_req_wdata; DMA_LEN:dma_length_words<=reg_req_wdata[15:0]; DMA_ROW_WORDS:dma_row_words<=reg_req_wdata[15:0]; DMA_ROW_COUNT:dma_row_count<=reg_req_wdata[15:0]; DMA_EXT_STRIDE:dma_ext_stride<=reg_req_wdata; DMA_SPAD_STRIDE:dma_spad_stride<=reg_req_wdata;
-          DMA_CFG:begin dma_gather_enable<=reg_req_wdata[0]; dma_wide_enable<=reg_req_wdata[1]; dma_read_outstanding<=reg_req_wdata[10:8]; end
+          DMA_EXT:dma_ext_addr[31:0]<=reg_req_wdata; DMA_EXT_HI:dma_ext_addr[63:32]<=reg_req_wdata; DMA_SPAD:dma_spad_addr<=reg_req_wdata; DMA_LEN:dma_length_words<=reg_req_wdata[15:0]; DMA_ROW_WORDS:dma_row_words<=reg_req_wdata[15:0]; DMA_ROW_COUNT:dma_row_count<=reg_req_wdata[15:0]; DMA_EXT_STRIDE:dma_ext_stride<=reg_req_wdata; DMA_SPAD_STRIDE:dma_spad_stride<=reg_req_wdata;
+          DMA_CFG:begin dma_gather_enable<=reg_req_wdata[0]; dma_read_outstanding<=reg_req_wdata[10:8]; end
           DMA_GATHER_INDEX:dma_gather_index_base<=reg_req_wdata;
           PERF_CTRL:if(reg_req_wdata[0]) perf_clear<=1'b1;
           BIAS_BASE:bias_base<=reg_req_wdata; POST_CTRL:bias_enable<=reg_req_wdata[0];
-          TILE_CTRL:if(reg_req_wdata[0] && !processor_busy && !dma_busy) begin tile_start<=1; done_r<=0; error_r<=0; irq_status_r<=0; error_code_r<=0; end
-          TILE_COUNT:tile_count<=reg_req_wdata[15:0]; TILE_EXT_IN:tile_ext_input_base<=reg_req_wdata; TILE_EXT_OUT:tile_ext_output_base<=reg_req_wdata;
+          TILE_CTRL:if(reg_req_wdata[0] && !processor_busy && !dma_busy) begin tile_start<=1; done_r<=0; error_r<=0; irq_status_r<=0; error_code_r<=0; error_source_r<=0; end
+          TILE_COUNT:tile_count<=reg_req_wdata[15:0]; TILE_EXT_IN:tile_ext_input_base[31:0]<=reg_req_wdata; TILE_EXT_OUT:tile_ext_output_base[31:0]<=reg_req_wdata;
+          TILE_EXT_IN_HI:tile_ext_input_base[63:32]<=reg_req_wdata;
+          TILE_EXT_OUT_HI:tile_ext_output_base[63:32]<=reg_req_wdata;
           TILE_EXT_IN_STRIDE:tile_ext_input_stride<=reg_req_wdata; TILE_EXT_OUT_STRIDE:tile_ext_output_stride<=reg_req_wdata;
           TILE_BUF0:tile_buffer0_base<=reg_req_wdata; TILE_BUF1:tile_buffer1_base<=reg_req_wdata;
           TILE_IN_WORDS:tile_input_words<=reg_req_wdata[15:0]; TILE_OUT_WORDS:tile_output_words<=reg_req_wdata[15:0]; TILE_OUT_OFFSET:tile_output_offset<=reg_req_wdata;

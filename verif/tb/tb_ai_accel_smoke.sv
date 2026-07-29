@@ -20,6 +20,7 @@ module tb_ai_accel_smoke;
     localparam REG_IRQ_ENABLE    = 32'h0000_0040;
     localparam REG_VERSION       = 32'h0000_0044;
     localparam REG_CMDQ_BASE_LO   = 32'h0000_0080;
+    localparam REG_CMDQ_BASE_HI   = 32'h0000_0084;
     localparam REG_CMDQ_SIZE      = 32'h0000_0088;
     localparam REG_CMDQ_HEAD      = 32'h0000_008c;
     localparam REG_CMDQ_TAIL      = 32'h0000_00c8;
@@ -50,6 +51,12 @@ module tb_ai_accel_smoke;
     localparam REG_PERF_MATRIX_CYCLES = 32'h0000_0178;
     localparam REG_PERF_MATRIX_MAC_CYCLES = 32'h0000_017c;
     localparam REG_PERF_DMA_READ_BYTES = 32'h0000_0184;
+    localparam REG_DMA_EXT_HI      = 32'h0000_019c;
+    localparam REG_ABI_INFO        = 32'h0000_01a0;
+    localparam REG_ERROR_INFO      = 32'h0000_01a4;
+    localparam REG_CAP2            = 32'h0000_01a8;
+    localparam REG_TILE_EXT_IN_HI  = 32'h0000_01ac;
+    localparam REG_TILE_EXT_OUT_HI = 32'h0000_01b0;
     localparam REG_BIAS_BASE       = 32'h0000_0114;
     localparam REG_POST_CTRL       = 32'h0000_0118;
     localparam REG_TILE_CTRL       = 32'h0000_0120;
@@ -123,10 +130,14 @@ module tb_ai_accel_smoke;
 
     wire        m_axi_arvalid;
     wire [3:0]  m_axi_arid;
-    wire [31:0] m_axi_araddr;
+    wire [63:0] m_axi_araddr;
     wire [7:0]  m_axi_arlen;
     wire [2:0]  m_axi_arsize;
     wire [1:0]  m_axi_arburst;
+    wire [3:0]  m_axi_arcache;
+    wire [2:0]  m_axi_arprot;
+    wire [3:0]  m_axi_arqos;
+    wire        m_axi_arlock;
     wire        m_axi_arready;
     wire [3:0]  m_axi_rid;
     wire [127:0] m_axi_rdata;
@@ -136,10 +147,14 @@ module tb_ai_accel_smoke;
     wire        m_axi_rready;
     wire        m_axi_awvalid;
     wire [3:0]  m_axi_awid;
-    wire [31:0] m_axi_awaddr;
+    wire [63:0] m_axi_awaddr;
     wire [7:0]  m_axi_awlen;
     wire [2:0]  m_axi_awsize;
     wire [1:0]  m_axi_awburst;
+    wire [3:0]  m_axi_awcache;
+    wire [2:0]  m_axi_awprot;
+    wire [3:0]  m_axi_awqos;
+    wire        m_axi_awlock;
     wire        m_axi_awready;
     wire        m_axi_wvalid;
     wire [127:0] m_axi_wdata;
@@ -151,18 +166,22 @@ module tb_ai_accel_smoke;
     wire        m_axi_bvalid;
     wire        m_axi_bready;
 
-    // The retained A5 memory model is a lane-0, ID-0 compatibility slave.
-    // A6 out-of-order traffic is covered by tb_ai_axi128_dma_ooo until the
-    // unified model below replaces it in the VCS gate.
-    assign m_axi_rid = 4'd0;
-    assign m_axi_bid = 4'd0;
-
     reg [31:0] rd;
     reg        allow_m_axi_error;
     integer errors;
     integer random_cases;
     integer seed_arg;
     integer seed_dummy;
+    integer matrix_line_write_count;
+    reg [63:0] last_dma_araddr;
+
+    always @(posedge aclk) begin
+        if (aresetn && dut.matrix_line_valid && dut.arb_core_line_ready)
+            matrix_line_write_count <= matrix_line_write_count + 1;
+        if (aresetn && m_axi_arvalid && m_axi_arready &&
+            m_axi_arid != 4'd0)
+            last_dma_araddr <= m_axi_araddr;
+    end
 
     ai_accel_top dut(
         .aclk          (aclk),
@@ -191,6 +210,10 @@ module tb_ai_accel_smoke;
         .m_axi_arlen   (m_axi_arlen),
         .m_axi_arsize  (m_axi_arsize),
         .m_axi_arburst (m_axi_arburst),
+        .m_axi_arcache (m_axi_arcache),
+        .m_axi_arprot  (m_axi_arprot),
+        .m_axi_arqos   (m_axi_arqos),
+        .m_axi_arlock  (m_axi_arlock),
         .m_axi_arready (m_axi_arready),
         .m_axi_rid     (m_axi_rid),
         .m_axi_rdata   (m_axi_rdata),
@@ -204,6 +227,10 @@ module tb_ai_accel_smoke;
         .m_axi_awlen   (m_axi_awlen),
         .m_axi_awsize  (m_axi_awsize),
         .m_axi_awburst (m_axi_awburst),
+        .m_axi_awcache (m_axi_awcache),
+        .m_axi_awprot  (m_axi_awprot),
+        .m_axi_awqos   (m_axi_awqos),
+        .m_axi_awlock  (m_axi_awlock),
         .m_axi_awready (m_axi_awready),
         .m_axi_wvalid  (m_axi_wvalid),
         .m_axi_wdata   (m_axi_wdata),
@@ -220,17 +247,20 @@ module tb_ai_accel_smoke;
         .clk     (aclk),
         .resetn  (aresetn),
         .arvalid (m_axi_arvalid),
+        .arid    (m_axi_arid),
         .araddr  (m_axi_araddr),
         .arlen   (m_axi_arlen),
         .arsize  (m_axi_arsize),
         .arburst (m_axi_arburst),
         .arready (m_axi_arready),
+        .rid     (m_axi_rid),
         .rdata   (m_axi_rdata),
         .rresp   (m_axi_rresp),
         .rvalid  (m_axi_rvalid),
         .rlast   (m_axi_rlast),
         .rready  (m_axi_rready),
         .awvalid (m_axi_awvalid),
+        .awid    (m_axi_awid),
         .awaddr  (m_axi_awaddr),
         .awlen   (m_axi_awlen),
         .awsize  (m_axi_awsize),
@@ -242,6 +272,7 @@ module tb_ai_accel_smoke;
         .wlast   (m_axi_wlast),
         .wready  (m_axi_wready),
         .bresp   (m_axi_bresp),
+        .bid     (m_axi_bid),
         .bvalid  (m_axi_bvalid),
         .bready  (m_axi_bready)
     );
@@ -301,7 +332,8 @@ module tb_ai_accel_smoke;
         // software STATUS.done/error may legally remain set while a queued
         // successor command is executing.
         .core_done      (dut.core_done),
-        .core_error     (dut.core_error)
+        .core_error     (dut.core_error),
+        .processor_event_valid(dut.processor_event_valid)
     );
 
     initial begin
@@ -531,7 +563,7 @@ module tb_ai_accel_smoke;
             integer i;
             integer found;
             found = 0;
-            for (i = 0; i < 500; i = i + 1) begin
+            for (i = 0; i < 5000; i = i + 1) begin
                 if (!found) begin
                     axi_read(REG_CPLQ_TAIL, rd);
                     if (rd === expected_tail)
@@ -547,6 +579,8 @@ module tb_ai_accel_smoke;
             end
         end
     endtask
+
+    `include "ai_transformer_workload.svh"
 
     function signed [31:0] dot4_i8_sv;
         input [31:0] a;
@@ -904,6 +938,8 @@ module tb_ai_accel_smoke;
 
     initial begin
         errors = 0;
+        matrix_line_write_count = 0;
+        last_dma_araddr = 0;
         allow_m_axi_error = 1'b0;
         aresetn = 1'b0;
         axi_idle();
@@ -911,9 +947,25 @@ module tb_ai_accel_smoke;
         aresetn = 1'b1;
         repeat (4) @(posedge aclk);
 
-        expect_read(REG_VERSION, 32'h1000_0005, "version");
-        expect_read(FPGA_AXI_BASE + REG_VERSION, 32'h1000_0005,
+        expect_read(REG_VERSION, 32'h1000_0008, "version");
+        expect_read(FPGA_AXI_BASE + REG_VERSION, 32'h1000_0008,
                     "mapped AXI aperture version");
+        expect_read(REG_ABI_INFO, 32'h1040_0207, "ABI v7.2 sizes");
+        expect_read(REG_CAP2, 32'h0000_003f, "architectural capabilities");
+        expect_read(REG_ERROR_INFO, 32'h0000_0000, "reset error source");
+        axi_write(REG_DMA_EXT_HI, 32'h0000_0001);
+        expect_read(REG_DMA_EXT_HI, 32'h0000_0001, "DMA 64-bit address high");
+        axi_write(REG_DMA_EXT_HI, 32'd0);
+        axi_write(REG_CMDQ_BASE_HI, 32'h0000_0004);
+        expect_read(REG_CMDQ_BASE_HI, 32'h0000_0004,
+                    "external CMDQ 64-bit address high");
+        axi_write(REG_CMDQ_BASE_HI, 32'd0);
+        axi_write(REG_TILE_EXT_IN_HI, 32'h0000_0002);
+        axi_write(REG_TILE_EXT_OUT_HI, 32'h0000_0003);
+        expect_read(REG_TILE_EXT_IN_HI, 32'h0000_0002, "tile input high");
+        expect_read(REG_TILE_EXT_OUT_HI, 32'h0000_0003, "tile output high");
+        axi_write(REG_TILE_EXT_IN_HI, 32'd0);
+        axi_write(REG_TILE_EXT_OUT_HI, 32'd0);
         expect_read(REG_SPAD_INFO, SPAD_BYTES, "512 KiB scratchpad capability");
         axi_write(FPGA_AXI_BASE + SPAD_BASE + 32'h0008, 32'hface_5120);
         expect_read(FPGA_AXI_BASE + SPAD_BASE + 32'h0008, 32'hface_5120,
@@ -1283,12 +1335,12 @@ module tb_ai_accel_smoke;
                 begin : check_dma64
                     @(posedge aclk);
                     while (!(m_axi_arvalid && m_axi_arready)) @(posedge aclk);
-                    if (m_axi_arlen !== 8'd63) begin
-                        $display("%0t ERROR: expected 64-beat DMA burst, ARLEN=%0d",
+                    if (m_axi_arlen !== 8'd15) begin
+                        $display("%0t ERROR: expected 16-beat DMA burst, ARLEN=%0d",
                                  $time, m_axi_arlen);
                         errors = errors + 1;
                     end else begin
-                        $display("%0t PASS: DMA issued 64-beat burst", $time);
+                        $display("%0t PASS: DMA issued 16-beat burst", $time);
                     end
                 end
                 begin : check_dma_read_outstanding
@@ -1316,7 +1368,7 @@ module tb_ai_accel_smoke;
                 expect_read(SPAD_BASE + 32'h2400 + (i * 4), 32'ha500_0000 + i, "dma multi load");
         end
 
-        // A4 read-DMA depth-four saturation.  Four 64-beat bursts must be
+        // Unified read-DMA depth-four saturation.  Four 16-beat bursts must be
         // accepted before the first response burst completes.  This checks
         // the actual register-programmed window rather than merely proving
         // that a second AR can coexist with the first response.
@@ -1449,7 +1501,20 @@ module tb_ai_accel_smoke;
         // Read response error injection.
         axi_mem_u.inject_read_error_word = 32'h0000_0184;
         dma_load_expect_error(32'h0000_0610, 32'h2800, 16'd1, 4'd2);
+        expect_read(REG_ERROR_INFO, 32'h0000_0022,
+                    "ABI error source DMA/read");
         axi_mem_u.inject_read_error_word = -1;
+
+        // A7 external address path: a non-zero high dword must reach ARADDR.
+        // The compact memory model intentionally rejects addresses above 4 GiB.
+        axi_write(REG_DMA_EXT_HI, 32'h0000_0001);
+        dma_load_expect_error(32'h0000_0620, 32'h2820, 16'd1, 4'd2);
+        if (last_dma_araddr != 64'h0000_0001_0000_0620) begin
+            $display("%0t ERROR: 64-bit DMA ARADDR truncated to %h",
+                     $time, last_dma_araddr);
+            errors = errors + 1;
+        end
+        axi_write(REG_DMA_EXT_HI, 32'd0);
 
         // Abort an accepted read burst.  The DMA must drain through RLAST,
         // report ERR_ABORT, and leave no external read transaction active.
@@ -1463,8 +1528,11 @@ module tb_ai_accel_smoke;
             axi_write(REG_DMA_SPAD_ADDR, 32'h0000_2e00);
             axi_write(REG_DMA_LENGTH, 32'd20);
             axi_write(REG_DMA_CTRL, 32'h0000_0001);
-            repeat (4) @(posedge aclk);
-            accepted = axi_mem_u.read_active_r;
+            accepted = 0;
+            for (i = 0; i < 100 && !accepted; i = i + 1) begin
+                @(posedge aclk);
+                accepted = axi_mem_u.read_active_r;
+            end
             if (!accepted) begin
                 $display("%0t ERROR: DMA load abort test observed no accepted AR", $time);
                 errors = errors + 1;
@@ -1491,8 +1559,11 @@ module tb_ai_accel_smoke;
             axi_write(REG_DMA_SPAD_ADDR, 32'h0000_3000);
             axi_write(REG_DMA_LENGTH, 32'd20);
             axi_write(REG_DMA_CTRL, 32'h0000_0003);
-            repeat (4) @(posedge aclk);
-            accepted = axi_mem_u.write_active_r;
+            accepted = 0;
+            for (i = 0; i < 100 && !accepted; i = i + 1) begin
+                @(posedge aclk);
+                accepted = axi_mem_u.write_active_r;
+            end
             if (!accepted) begin
                 $display("%0t ERROR: DMA store abort test observed no accepted AW", $time);
                 errors = errors + 1;
@@ -1553,6 +1624,8 @@ module tb_ai_accel_smoke;
         axi_write(REG_CMDQ_TAIL, 32'd0);
         axi_write(REG_DOORBELL, 32'd1);
         wait_done_expect_error(ERR_DESC_INVALID);
+        expect_read(REG_ERROR_INFO, 32'h0000_0017,
+                    "ABI error source command/descriptor");
         expect_read(REG_CMDQ_HEAD, 32'd0, "external cmdq wrap after bad desc");
         wait_cpl_tail(32'd0, "external cplq wrap after bad desc");
         expect_completion(32'h1210, 16'h02ff, 4'h2, ERR_DESC_INVALID, 32'd0, 32'd0, "external cpl bad");
@@ -1581,8 +1654,14 @@ module tb_ai_accel_smoke;
         axi_write(REG_M_SIZE, 32'd4);
         axi_write(REG_N_SIZE, 32'd4);
         axi_write(REG_K_WORDS, 32'd1);
+        matrix_line_write_count = 0;
         axi_write(REG_CTRL, 32'h0000_0003);
         wait_done();
+        if (matrix_line_write_count != 4) begin
+            $display("%0t ERROR: A7 matrix expected 4 line writes, got %0d",
+                     $time, matrix_line_write_count);
+            errors = errors + 1;
+        end
         expect_read(SPAD_BASE + 32'h4a00, 32'd1, "A3 GEMM c00");
         expect_read(SPAD_BASE + 32'h4a0c, 32'd4, "A3 GEMM c03");
         expect_read(SPAD_BASE + 32'h4a10, 32'd5, "A3 GEMM c10");
@@ -1740,6 +1819,8 @@ module tb_ai_accel_smoke;
                            16'd4, 16'd4, 16'd1, 8'h06, 32'd1,
                            5'd0, 2'd0, 32'd16, 32'd16, 32'd64,
                            16'd1, 16'd2, 16'd0, 16'h0001, 16'd0);
+        // The unified ABI version is valid for every primitive opcode.
+        axi_write(SPAD_BASE + 32'h643c, 32'd7);
         write_spad_desc_v3(32'h6440, OP_REQUANT_I8, 16'h0301,
                            32'h6300, 32'd0, 32'd0, 32'h6304,
                            16'd0, 16'd0, 16'd1, 8'd0, 32'd0,
@@ -1850,6 +1931,45 @@ module tb_ai_accel_smoke;
         axi_write(REG_CPLQ_SIZE, 32'd0);
         clear_done_irq();
 
+        // ABI-v7 end-to-end Transformer micro-workload generated by the
+        // software mapper.  Unlike the macro smoke above, every intermediate
+        // tensor is consumed by the following RTL command.  PACK_I8 closes
+        // the INT32-to-packed-INT8 layout boundary between matrix stages.
+        load_transformer_workload();
+        axi_write(REG_PERF_CTRL, 32'd1);
+        axi_write(REG_CMDQ_CTRL, 32'd0);
+        axi_write(REG_CMDQ_BASE_LO, TRANSFORMER_DESC_BASE);
+        axi_write(REG_CMDQ_BASE_HI, 32'd0);
+        axi_write(REG_CMDQ_SIZE, 32'd64);
+        axi_write(REG_CMDQ_HEAD, 32'd0);
+        axi_write(REG_CMDQ_TAIL, TRANSFORMER_DESC_COUNT);
+        axi_write(REG_CPLQ_BASE_LO, TRANSFORMER_CPL_BASE);
+        axi_write(REG_CPLQ_SIZE, 32'd64);
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        axi_write(REG_CPLQ_TAIL, 32'd0);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(TRANSFORMER_DESC_COUNT,
+                      "A8 end-to-end Transformer descriptor chain");
+        check_transformer_workload();
+        expect_read(REG_CMDQ_HEAD, TRANSFORMER_DESC_COUNT,
+                    "A8 Transformer command count");
+        expect_completion(TRANSFORMER_CPL_BASE +
+                          ((TRANSFORMER_DESC_COUNT-1) * 16),
+                          16'h701d, 4'h1, 4'd0, 32'd1, 32'd4,
+                          "A8 Transformer final completion");
+        axi_read(REG_PERF_MATRIX_MAC_CYCLES, rd);
+        if (rd == 0) begin
+            $display("%0t ERROR: Transformer recorded no matrix MAC cycles",
+                     $time);
+            errors = errors + 1;
+        end else begin
+            $display("%0t PASS: Transformer matrix MAC cycles=%0d",
+                     $time, rd);
+        end
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CPLQ_SIZE, 32'd0);
+        clear_done_irq();
+
         if (m_axi_arvalid || m_axi_awvalid || m_axi_wvalid) begin
             $display("%0t ERROR: DMA master boundary should be idle in smoke mode", $time);
             errors = errors + 1;
@@ -1923,7 +2043,7 @@ module tb_ai_accel_smoke;
         aresetn = 1'b1;
         repeat (6) @(posedge aclk);
         axi_mem_u.ready_gap_cfg = 0;
-        expect_read(REG_VERSION, 32'h1000_0005, "reset recovery version");
+        expect_read(REG_VERSION, 32'h1000_0008, "reset recovery version");
         axi_read(REG_DMA_STATUS, rd);
         if (rd[0] || axi_mem_u.read_active_r || m_axi_arvalid || m_axi_rvalid) begin
             $display("%0t ERROR: reset recovery left DMA/AXI read active", $time);

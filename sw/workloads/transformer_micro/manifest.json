@@ -1,0 +1,382 @@
+{
+  "name": "transformer_micro_4x4",
+  "abi_version": 7,
+  "abi_minor": 2,
+  "tokens": 4,
+  "hidden": 4,
+  "descriptor_base": 69632,
+  "descriptor_count": 30,
+  "pipeline": [
+    "q_projection",
+    "q_pack",
+    "k_projection",
+    "k_pack",
+    "v_projection",
+    "v_pack",
+    "qk_transpose",
+    "softmax_row0",
+    "softmax_row1",
+    "softmax_row2",
+    "softmax_row3",
+    "prob_pack",
+    "attention_value",
+    "attention_pack",
+    "output_projection",
+    "residual1",
+    "layernorm1_row0",
+    "layernorm1_row1",
+    "layernorm1_row2",
+    "layernorm1_row3",
+    "norm1_pack",
+    "ffn_up",
+    "gelu",
+    "gelu_pack",
+    "ffn_down",
+    "residual2",
+    "layernorm2_row0",
+    "layernorm2_row1",
+    "layernorm2_row2",
+    "layernorm2_row3"
+  ],
+  "tensors": {
+    "x_i8": {
+      "address": 65536,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "row-major",
+      "initialized": true
+    },
+    "x_i32": {
+      "address": 65600,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": true
+    },
+    "wq": {
+      "address": 65664,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "column-major",
+      "initialized": true
+    },
+    "wk": {
+      "address": 65728,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "column-major",
+      "initialized": true
+    },
+    "wv": {
+      "address": 65792,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "column-major",
+      "initialized": true
+    },
+    "wo": {
+      "address": 65856,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "column-major",
+      "initialized": true
+    },
+    "wup": {
+      "address": 65920,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "column-major",
+      "initialized": true
+    },
+    "wdown": {
+      "address": 65984,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "column-major",
+      "initialized": true
+    },
+    "gamma": {
+      "address": 66048,
+      "shape": [
+        4
+      ],
+      "dtype": "i32",
+      "layout": "vector",
+      "initialized": true
+    },
+    "beta": {
+      "address": 66112,
+      "shape": [
+        4
+      ],
+      "dtype": "i32",
+      "layout": "vector",
+      "initialized": true
+    },
+    "q_i32": {
+      "address": 66176,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "q_i8": {
+      "address": 66240,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "k_i32": {
+      "address": 66304,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "k_i8": {
+      "address": 66368,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "v_i32": {
+      "address": 66432,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "v_i8": {
+      "address": 66496,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "scores": {
+      "address": 66560,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "prob_q15": {
+      "address": 66624,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "prob_i8": {
+      "address": 66688,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "attention_i32": {
+      "address": 66752,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "attention_i8": {
+      "address": 66816,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "projected": {
+      "address": 66880,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "residual1": {
+      "address": 66944,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "norm1": {
+      "address": 67008,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "norm1_i8": {
+      "address": 67072,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "ffn_up": {
+      "address": 67136,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "gelu": {
+      "address": 67200,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "gelu_i8": {
+      "address": 67264,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "ffn_down": {
+      "address": 67328,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "residual2": {
+      "address": 67392,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "norm2": {
+      "address": 67456,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    }
+  },
+  "expected_final": [
+    [
+      0,
+      1,
+      -1,
+      -2
+    ],
+    [
+      -2,
+      -1,
+      1,
+      -1
+    ],
+    [
+      1,
+      -2,
+      -1,
+      -1
+    ],
+    [
+      0,
+      -2,
+      -1,
+      1
+    ]
+  ],
+  "limitations": [
+    "One attention head and one 4x4 tile are used to keep RTL runtime bounded.",
+    "Softmax Q0.15 probabilities are requantized to INT8 before AV GEMM.",
+    "The workload validates accelerator composition, not model accuracy."
+  ]
+}

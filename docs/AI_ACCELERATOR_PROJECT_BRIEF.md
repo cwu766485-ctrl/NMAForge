@@ -9,9 +9,6 @@ CIMForge 是一个可综合的 AI 加速器 RTL 项目。当前主线是一个�
 本项目覆盖数字前端设计的完整链路：架构定义、RTL 集成、总线协议、仿真验证、
 断言检查，以及基于 TSMC 28 nm 标准单元和 SRAM 宏的 pre-layout 综合。
 
-仓库仍保留早期 AHB SRAM/vector 加速器作为教学与验证参考，位于
-`rtl/legacy/`，不属于当前 AI 加速器的验收或综合路径。
-
 ## 2. 顶层架构
 
 当前顶层模块为 `rtl/top/ai_accel_top.v`。
@@ -50,14 +47,16 @@ AXI4 DMA <--> ai_spad_arbiter <--> banked scratchpad SRAM
 - `ai_accel_regs` 仅负责软件可见寄存器、控制脉冲、状态与中断；不推进硬件队列指针。
 - `ai_command_processor` 拥有命令生命周期，包括 `CMDQ_HEAD`、`CPLQ_TAIL`、描述符源选择、
   校验、计算发射及 in-order completion。
-- `ai_spad_arbiter` 是 scratchpad 标量调度端口的唯一所有者；固定优先级为
-  descriptor fetch、completion writer、compute、DMA。
+- `ai_spad_arbiter` 是 scratchpad scheduler 端口的唯一所有者；descriptor fetch 和
+  completion writer 保留控制面优先级，scalar/line compute、banked compute 与
+  scalar/line DMA 使用数据面 round-robin。
 - `ai_desc_fetch` 从 scratchpad 读取描述符；`axi_desc_fetch` 从外部内存读取描述符。
   command processor 会为一个 in-flight command 固定选择的来源。
 - `ai_completion_writer` 必须写完 completion entry 的四个 word 后，才推进 `CPLQ_TAIL`，
   因而软件不会看到不完整的完成项。
-- `ai_scratchpad` 有 host/debug 端口、仲裁后的 scheduler 端口和 banked-read 路径。仿真使用
-  行为级 RAM；28 nm 综合使用 32 个单端口 SRAM 宏。
+- `ai_scratchpad` 有 host/debug 端口，以及支持 scalar、banked 和 128-bit line
+  transaction 的 scheduler Port-B。仿真使用行为级 RAM；28 nm 综合使用
+  32 个单端口 SRAM 宏。
 
 ## 3. 软件队列协议
 
@@ -77,9 +76,9 @@ AXI4 DMA <--> ai_spad_arbiter <--> banked scratchpad SRAM
 | 控制 | `axi_lite_reg_if`、`ai_accel_regs` | AXI-Lite 请求处理、配置、状态、错误和中断。 |
 | 调度 | `ai_command_processor`、`ai_completion_writer` | 队列、描述符、依赖、发射与 completion 排序。 |
 | 描述符 | `ai_desc_fetch`、`axi_desc_fetch` | scratchpad 或外部内存的描述符读取。 |
-| DMA | `axi_dma_master`、`ai_axi128_dma_ooo` | AXI burst、4 KB boundary、错误响应及宽数据/OOO 传输。 |
-| 存储 | `ai_scratchpad`、`ai_spad_arbiter`、`ai_spad_protection` | 512 KiB scratchpad、请求仲裁和访问保护。 |
-| 计算 | INT8、banked、matrix、SFU、Conv line-buffer、KV-cache 核 | INT8 算子和张量数据通路。 |
+| DMA | `ai_axi128_dma` | 统一 128-bit multi-beat AXI DMA；支持 1D/2D/gather/tile、4 KB boundary、最多四笔 tagged read burst、OoO response 和 128-bit SPAD line。 |
+| 存储 | `ai_scratchpad`、`ai_spad_arbiter`、`ai_spad_protection` | 512 KiB 四 bank scratchpad、scalar/banked/line 请求仲裁和访问保护。 |
+| 计算 | INT8、banked、matrix、SFU、Conv line-buffer、KV-cache 核 | INT8 算子、矩阵 operand 预取和 128-bit row 写回。 |
 | 观测 | `ai_perf_monitor` | DMA、计算核心和调度活动的性能计数。 |
 
 ## 5. 验证策略
@@ -94,6 +93,7 @@ AI smoke test 是 `verif/tb/tb_ai_accel_smoke.sv`，由 `verif/sim/ai_accel.f`
 - command queue 发布、wrap、描述符读取及 completion entry 排序；
 - INT8 VDOT、GEMV、GEMM 的结果检查；
 - DMA load/store、多 burst、4 KB split 与 AXI response error injection；
+- 128-bit scratchpad line 搬运、矩阵 row 写回、64-bit external address 和 ABI v7；
 - 描述符校验、错误码、状态和中断行为；
 - directed 与随机化 datapath 用例，并通过参考模型对拍。
 
@@ -101,16 +101,29 @@ AI smoke test 是 `verif/tb/tb_ai_accel_smoke.sv`，由 `verif/sim/ai_accel.f`
 
 ```bash
 cd verif/sim
+make ai_upgrade_vcs
 make ai_smoke
 make ai_comp
 make ai_run AI_RANDOM_CASES=20 AI_SEED=12345
 ```
 
-旧 `make regress` 属于 AHB legacy track，不能用作 AI 主线 sign-off。
+2026-07-29 的 A8 RTL 已实际通过 `make ai_transformer` 和 `make ai_smoke`。
+前者检查 mapper 生成的 30-command Transformer 链、completion、最终 16 个输出
+word 和 matrix MAC cycle；后者在此基础上覆盖 directed test 与默认随机计算用例。
+
+### 5.1 XCZU15EG Standalone OOC 实现结果
+
+Vivado 2024.1 在 `xczu15eg-ffvb1156-2-i`、10.0 ns 约束下完成 A8 RTL 的
+synth/place/route。routed setup WNS/TNS 为 +0.187/0.000 ns，hold WNS/TNS 为
++0.032/0.000 ns，100 MHz 闭合；资源为 30,506 LUT、25,238 FF、128 BRAM36 与
+46 DSP。vectorless 功耗估计为 0.923 W（dynamic 0.212 W、static 0.710 W）。
+
+该结果是无完整板级 pin/clock wrapper 的 OOC IP 实现。因 `HD.CLK_SRC` 和
+`HD.PARTPIN_LOCS` 未定义，不能把它等同于完整 Zynq block design 或实板时序。
 
 ## 6. TSMC 28 nm Pre-Layout 综合结果
 
-当前综合基线使用 TSMC28 HPC+、TT/0.9 V/25 C。时钟周期为 4.0 ns，setup uncertainty
+最近一次已完成的 A7 综合基线使用 TSMC28 HPC+、TT/0.9 V/25 C。时钟周期为 4.0 ns，setup uncertainty
 为 100 ps，pre-CTS hold uncertainty 为 20 ps。512 KiB scratchpad 映射为 32 个
 `TS1N28HPCPL2SVTB4096X32M4MWBASO` 4K x 32 单端口 SRAM 宏。
 
@@ -130,7 +143,9 @@ make ai_run AI_RANDOM_CASES=20 AI_SEED=12345
 
 setup 关键路径位于 `ai_tensor_sfu_core`，从 `vector_product_r_reg` 到
 `output_word_r_reg`，arrival 与 required time 均为 3.89 ns。因此，250 MHz
-是当前已经证明的 pre-layout 收敛点，而不是 post-layout Fmax 声明。
+是 A7 RTL 已经证明的 pre-layout 收敛点，而不是 post-layout Fmax 声明。加入
+PACK_I8 layout bridge 与 Transformer workload 后的 A8 RTL 尚未取得新的 DC PPA，
+不能直接沿用该结果声称 A8 已闭合。
 
 ### 结果边界
 

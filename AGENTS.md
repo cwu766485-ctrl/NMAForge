@@ -2,16 +2,9 @@
 
 ## Scope and working style
 
-The active product track is the AXI-Lite/AXI4 AI accelerator.  The repository
-also retains one legacy teaching track:
-
-- The AXI-Lite AI accelerator: `rtl/top/ai_accel_top.v`, its scratchpad, DMA,
-  command queue, descriptor path, compute engines, and FPGA wrappers.  All new
-  accelerator design work belongs here.
-- The original AHB SRAM/vector accelerator: `rtl/legacy/sramc_top.v` and
-  `rtl/legacy/vec_accel_top.v`, retained only for history and verification-study
-  reference.  Do not connect new AI features to it or use its regression as AI
-  sign-off unless the task explicitly names the legacy track.
+The active and only product track is the AXI-Lite/AXI4 AI accelerator:
+`rtl/top/ai_accel_top.v`, its scratchpad, DMA, command queue, descriptor path,
+compute engines, and FPGA wrappers.  All accelerator design work belongs here.
 
 Before changing RTL, inspect `git status --short`.  The workspace is commonly
 used for FPGA experiments and may contain unrelated local edits or generated
@@ -22,8 +15,8 @@ Use `rg`/`rg --files` to locate RTL and test references.  When adding or
 renaming a synthesizable AI RTL module, update every applicable source list:
 
 - `verif/sim/ai_accel.f` for the AI smoke simulation;
-- `fpga/xilinx_a7_100t/filelists/ai_accel_rtl.tcl` for Artix-7 builds;
-- `fpga/xczu15eg/filelists/ai_accel_rtl.tcl` for Zynq UltraScale+ builds.
+- `fpga/xilinx_a7_100t/ai_accel_rtl.tcl` for Artix-7 builds;
+- `fpga/xczu15eg/ai_accel_rtl.tcl` for Zynq UltraScale+ builds.
 
 ## AI accelerator architecture
 
@@ -35,9 +28,11 @@ is important:
 - `ai_command_processor` owns command lifecycle scheduling: command/completion
   queue pointers, descriptor dispatch and validation, compute launch, and
   completion ordering.
-- `ai_spad_arbiter` is the sole owner of the scalar scratchpad scheduler port.
-  Its fixed admission priority is descriptor, completion writer, compute core,
-  then DMA.  Do not reintroduce an independent mux in `ai_accel_top`.
+- `ai_spad_arbiter` is the sole owner of the scratchpad scheduler port.
+  Descriptor and completion traffic retain control-plane priority; scalar/line
+  compute, banked compute, and scalar/line DMA use data-plane round-robin
+  arbitration.
+  Do not reintroduce an independent mux in `ai_accel_top`.
 - `ai_desc_fetch` reads scratchpad descriptors; `axi_desc_fetch` reads external
   descriptors.  The command processor selects and holds the source for a
   command.
@@ -60,13 +55,11 @@ Run VCS commands from `verif/sim` on the team Linux/VNC EDA environment:
 make ai_smoke
 make ai_comp
 make ai_run AI_RANDOM_CASES=20 AI_SEED=12345
-make regress
 ```
 
 `make ai_smoke` compiles `tb_ai_accel_smoke` using `ai_accel.f`.  It requires
 the Synopsys VCS environment and uses `+define+VCS` to select behavioural
-scratchpad RAM.  The legacy AHB regression is `make regress`; do not substitute
-it for AI smoke coverage after touching `ai_*` RTL.
+scratchpad RAM.
 
 For a focused RTL change, at minimum run the matching compile target and test.
 For scheduler, queue, descriptor, DMA, scratchpad, or top-level changes, run

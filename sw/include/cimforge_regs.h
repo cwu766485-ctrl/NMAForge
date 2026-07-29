@@ -11,7 +11,10 @@
 #define CIMFORGE_SPAD_BYTES_DEFAULT 0x00080000u
 #define CIMFORGE_VERSION_A4        0x10000004u
 #define CIMFORGE_VERSION_A5        0x10000005u
-#define CIMFORGE_VERSION_512K      CIMFORGE_VERSION_A5
+#define CIMFORGE_VERSION_A6        0x10000006u
+#define CIMFORGE_VERSION_A7        0x10000007u
+#define CIMFORGE_VERSION_A8        0x10000008u
+#define CIMFORGE_VERSION_512K      CIMFORGE_VERSION_A8
 
 #define CIMFORGE_REG_CTRL          0x000u
 #define CIMFORGE_REG_STATUS        0x004u
@@ -59,6 +62,17 @@
 #define CIMFORGE_REG_DMA_SPAD_STRIDE 0x110u
 #define CIMFORGE_REG_BIAS_BASE     0x114u
 #define CIMFORGE_REG_POST_CTRL     0x118u
+#define CIMFORGE_REG_TILE_CTRL     0x120u
+#define CIMFORGE_REG_TILE_COUNT    0x124u
+#define CIMFORGE_REG_TILE_EXT_IN   0x128u
+#define CIMFORGE_REG_TILE_EXT_OUT  0x12cu
+#define CIMFORGE_REG_TILE_EXT_IN_STRIDE 0x130u
+#define CIMFORGE_REG_TILE_EXT_OUT_STRIDE 0x134u
+#define CIMFORGE_REG_TILE_BUF0     0x138u
+#define CIMFORGE_REG_TILE_BUF1     0x13cu
+#define CIMFORGE_REG_TILE_IN_WORDS 0x140u
+#define CIMFORGE_REG_TILE_OUT_WORDS 0x144u
+#define CIMFORGE_REG_TILE_OUT_OFFSET 0x148u
 #define CIMFORGE_REG_SPAD_INFO     0x164u
 #define CIMFORGE_REG_EVENT_STATUS  0x168u
 #define CIMFORGE_REG_DMA_CFG       0x16cu
@@ -73,6 +87,28 @@
 #define CIMFORGE_REG_PERF_DMA_AW_COUNT 0x190u
 #define CIMFORGE_REG_PERF_DMA_RD_STATE 0x194u
 #define CIMFORGE_REG_PERF_DMA_R_STALL 0x198u
+#define CIMFORGE_REG_DMA_EXT_HI     0x19cu
+#define CIMFORGE_REG_ABI_INFO       0x1a0u
+#define CIMFORGE_REG_ERROR_INFO     0x1a4u
+#define CIMFORGE_REG_CAP2           0x1a8u
+#define CIMFORGE_REG_TILE_EXT_IN_HI 0x1acu
+#define CIMFORGE_REG_TILE_EXT_OUT_HI 0x1b0u
+
+#define CIMFORGE_ABI_MAJOR          7u
+#define CIMFORGE_ABI_MINOR          2u
+#define CIMFORGE_DESC_BYTES         64u
+#define CIMFORGE_COMPLETION_BYTES   16u
+
+#define CIMFORGE_CAP2_UNIFIED_DMA   (1u << 0)
+#define CIMFORGE_CAP2_SPAD_LINE128  (1u << 1)
+#define CIMFORGE_CAP2_MATRIX_LINE_STORE (1u << 2)
+#define CIMFORGE_CAP2_ADDR64        (1u << 3)
+#define CIMFORGE_CAP2_DESC_V7       (1u << 4)
+#define CIMFORGE_CAP2_PACK_I8       (1u << 5)
+
+#define CIMFORGE_ERROR_SOURCE_NONE  0u
+#define CIMFORGE_ERROR_SOURCE_COMMAND 1u
+#define CIMFORGE_ERROR_SOURCE_DMA   2u
 
 #define CIMFORGE_CAP_TENSOR_MATRIX (1u << 12)
 #define CIMFORGE_CAP_TENSOR_SFU    (1u << 13)
@@ -93,7 +129,8 @@
 #define CIMFORGE_DMA_DONE          (1u << 1)
 #define CIMFORGE_DMA_ERROR         (1u << 2)
 #define CIMFORGE_DMA_CFG_GATHER    (1u << 0)
-#define CIMFORGE_DMA_CFG_WIDE128    (1u << 1)
+#define CIMFORGE_DMA_CFG_UNIFIED128 (1u << 1) /* read-only capability */
+#define CIMFORGE_DMA_CFG_WIDE128    CIMFORGE_DMA_CFG_UNIFIED128
 #define CIMFORGE_DMA_CFG_RD_OUTSTANDING(n) (((uint32_t)(n) & 7u) << 8)
 #define CIMFORGE_PERF_CLEAR         (1u << 0)
 
@@ -128,8 +165,10 @@
 #define CIMFORGE_DESC_F_TRANSPOSE_A (1u << 1)
 #define CIMFORGE_DESC_F_TRANSPOSE_B (1u << 2)
 #define CIMFORGE_DESC_F_MACRO_EXTERNAL (1u << 3)
+#define CIMFORGE_DESC_F_PACK_I8     (1u << 4)
 #define CIMFORGE_DESC_V4_VERSION   4u
 #define CIMFORGE_DESC_V5_VERSION   5u
+#define CIMFORGE_DESC_V7_VERSION   7u
 
 #define CIMFORGE_ACT_NONE          0u
 #define CIMFORGE_ACT_RELU          1u
@@ -146,6 +185,10 @@ typedef struct __attribute__((aligned(64))) {
 typedef struct __attribute__((aligned(64))) {
     uint32_t word[16];
 } cimforge_desc_v4_t;
+
+typedef struct __attribute__((aligned(64))) {
+    uint32_t word[16];
+} cimforge_desc_v7_t;
 
 typedef struct {
     uint32_t task_id;
@@ -175,6 +218,27 @@ static inline void cimforge_spad_write(uint32_t byte_addr, uint32_t value)
 static inline uint32_t cimforge_spad_read(uint32_t byte_addr)
 {
     return cimforge_read(CIMFORGE_SPAD_WINDOW + byte_addr);
+}
+
+static inline void cimforge_set_cmdq_external_base(uint64_t address)
+{
+    cimforge_write(CIMFORGE_REG_CMD_BASE, (uint32_t)address);
+    cimforge_write(CIMFORGE_REG_CMD_HI, (uint32_t)(address >> 32));
+}
+
+static inline void cimforge_set_dma_external_address(uint64_t address)
+{
+    cimforge_write(CIMFORGE_REG_DMA_EXT, (uint32_t)address);
+    cimforge_write(CIMFORGE_REG_DMA_EXT_HI, (uint32_t)(address >> 32));
+}
+
+static inline void cimforge_set_tile_external_addresses(uint64_t input,
+                                                         uint64_t output)
+{
+    cimforge_write(CIMFORGE_REG_TILE_EXT_IN, (uint32_t)input);
+    cimforge_write(CIMFORGE_REG_TILE_EXT_IN_HI, (uint32_t)(input >> 32));
+    cimforge_write(CIMFORGE_REG_TILE_EXT_OUT, (uint32_t)output);
+    cimforge_write(CIMFORGE_REG_TILE_EXT_OUT_HI, (uint32_t)(output >> 32));
 }
 
 static inline void cimforge_desc_init(cimforge_desc_v2_t *desc, uint8_t op,
@@ -228,6 +292,36 @@ static inline void cimforge_desc_v3_init(
     desc->word[15] = ((uint32_t)clear_mask << 16) | CIMFORGE_DESC_V3_VERSION;
 }
 
+static inline void cimforge_desc_v7_init(
+    cimforge_desc_v7_t *desc, uint8_t op, uint16_t task_id,
+    uint32_t src0, uint32_t src1, uint32_t bias_base, uint32_t dst,
+    uint16_t m, uint16_t n, uint16_t k_or_length, uint8_t flags,
+    uint8_t shift, uint8_t activation, uint32_t aux0, uint32_t src0_stride,
+    uint32_t src1_stride, uint32_t dst_stride, uint16_t batch_count,
+    uint16_t head_count, uint16_t wait_mask, uint16_t signal_mask,
+    uint16_t clear_mask)
+{
+    unsigned i;
+    for (i = 0; i < 16; ++i)
+        desc->word[i] = 0;
+    desc->word[0] = ((uint32_t)task_id << 16) | op;
+    desc->word[1] = src0;
+    desc->word[2] = src1;
+    desc->word[3] = bias_base;
+    desc->word[4] = dst;
+    desc->word[5] = ((uint32_t)n << 16) | m;
+    desc->word[6] = k_or_length;
+    desc->word[7] = flags;
+    desc->word[8] = aux0;
+    desc->word[9] = ((uint32_t)(activation & 3u) << 5) | (shift & 31u);
+    desc->word[10] = src0_stride;
+    desc->word[11] = src1_stride;
+    desc->word[12] = dst_stride;
+    desc->word[13] = ((uint32_t)head_count << 16) | batch_count;
+    desc->word[14] = ((uint32_t)signal_mask << 16) | wait_mask;
+    desc->word[15] = ((uint32_t)clear_mask << 16) | CIMFORGE_DESC_V7_VERSION;
+}
+
 static inline void cimforge_desc_v4_macro_init(
     cimforge_desc_v4_t *desc, uint8_t op, uint16_t task_id,
     uint32_t child_desc_base, uint16_t child_count, int child_external,
@@ -242,6 +336,23 @@ static inline void cimforge_desc_v4_macro_init(
     desc->word[7] = child_external ? CIMFORGE_DESC_F_MACRO_EXTERNAL : 0u;
     desc->word[14] = ((uint32_t)signal_mask << 16) | wait_mask;
     desc->word[15] = ((uint32_t)clear_mask << 16) | CIMFORGE_DESC_V4_VERSION;
+}
+
+static inline void cimforge_desc_v7_macro_init(
+    cimforge_desc_v7_t *desc, uint8_t op, uint16_t task_id,
+    uint64_t child_desc_base, uint16_t child_count, int child_external,
+    uint16_t wait_mask, uint16_t signal_mask, uint16_t clear_mask)
+{
+    unsigned i;
+    for (i = 0; i < 16; ++i)
+        desc->word[i] = 0;
+    desc->word[0] = ((uint32_t)task_id << 16) | op;
+    desc->word[1] = (uint32_t)child_desc_base;
+    desc->word[2] = (uint32_t)(child_desc_base >> 32);
+    desc->word[6] = child_count;
+    desc->word[7] = child_external ? CIMFORGE_DESC_F_MACRO_EXTERNAL : 0u;
+    desc->word[14] = ((uint32_t)signal_mask << 16) | wait_mask;
+    desc->word[15] = ((uint32_t)clear_mask << 16) | CIMFORGE_DESC_V7_VERSION;
 }
 
 #endif

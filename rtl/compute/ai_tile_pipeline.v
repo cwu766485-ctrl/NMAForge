@@ -16,8 +16,8 @@ module ai_tile_pipeline(
     input  wire        abort,
 
     input  wire [15:0] tile_count,
-    input  wire [31:0] ext_input_base,
-    input  wire [31:0] ext_output_base,
+    input  wire [63:0] ext_input_base,
+    input  wire [63:0] ext_output_base,
     input  wire [31:0] ext_input_stride,
     input  wire [31:0] ext_output_stride,
     input  wire [31:0] buffer0_base,
@@ -43,7 +43,7 @@ module ai_tile_pipeline(
     input  wire [3:0]  dma_error_code,
     output reg         dma_start,
     output reg         dma_store,
-    output reg  [31:0] dma_ext_addr,
+    output reg  [63:0] dma_ext_addr,
     output reg  [31:0] dma_spad_addr,
     output reg  [15:0] dma_length_words,
 
@@ -93,7 +93,7 @@ module ai_tile_pipeline(
     reg [2:0] ctx0_state_r, ctx1_state_r;
     reg [15:0] ctx0_tile_r, ctx1_tile_r;
     reg [15:0] next_load_tile_r, next_compute_tile_r, next_store_tile_r;
-    reg [31:0] next_load_ext_addr_r, next_store_ext_addr_r;
+    reg [63:0] next_load_ext_addr_r, next_store_ext_addr_r;
     reg dma_inflight_r, dma_owner_r, dma_is_store_r;
     reg compute_inflight_r, compute_owner_r;
 
@@ -115,8 +115,8 @@ module ai_tile_pipeline(
             next_load_tile_r <= 16'd0;
             next_compute_tile_r <= 16'd0;
             next_store_tile_r <= 16'd0;
-            next_load_ext_addr_r <= 32'd0;
-            next_store_ext_addr_r <= 32'd0;
+            next_load_ext_addr_r <= 64'd0;
+            next_store_ext_addr_r <= 64'd0;
             dma_inflight_r <= 1'b0;
             dma_owner_r <= 1'b0;
             dma_is_store_r <= 1'b0;
@@ -124,7 +124,7 @@ module ai_tile_pipeline(
             compute_owner_r <= 1'b0;
             dma_start <= 1'b0;
             dma_store <= 1'b0;
-            dma_ext_addr <= 32'd0;
+            dma_ext_addr <= 64'd0;
             dma_spad_addr <= 32'd0;
             dma_length_words <= 16'd0;
             compute_start <= 1'b0;

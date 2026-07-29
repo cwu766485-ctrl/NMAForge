@@ -2,10 +2,14 @@
 
 // A6 external descriptor fetch. A descriptor remains 64 bytes in software
 // ABI, but is fetched as four 128-bit beats. ID 0 is reserved exclusively for
-// this client; the top-level response demux sends RID 1..4 to wide DMA.
-module axi_desc_fetch(
-    input wire clk, input wire resetn, input wire start, input wire [31:0] desc_base,
-    output wire [3:0] m_axi_arid, output reg m_axi_arvalid, output reg [31:0] m_axi_araddr,
+// this client; the top-level response demux sends RID 1..4 to payload DMA.
+module axi_desc_fetch #(
+    parameter integer AXI_ADDR_WIDTH = 64
+)(
+    input wire clk, input wire resetn, input wire start,
+    input wire [AXI_ADDR_WIDTH-1:0] desc_base,
+    output wire [3:0] m_axi_arid, output reg m_axi_arvalid,
+    output reg [AXI_ADDR_WIDTH-1:0] m_axi_araddr,
     output wire [7:0] m_axi_arlen, output wire [2:0] m_axi_arsize, output wire [1:0] m_axi_arburst,
     input wire m_axi_arready, input wire [3:0] m_axi_rid, input wire [127:0] m_axi_rdata,
     input wire [1:0] m_axi_rresp, input wire m_axi_rvalid, input wire m_axi_rlast, output wire m_axi_rready,

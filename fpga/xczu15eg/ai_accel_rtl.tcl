@@ -1,8 +1,7 @@
 # CIMForge AI accelerator RTL for XCZU15EG IP synthesis.
 set AI_ACCEL_RTL_FILES [list \
     "$REPO_ROOT/rtl/control/axi_lite_reg_if.v" \
-    "$REPO_ROOT/rtl/dma/axi_dma_master.v" \
-    "$REPO_ROOT/rtl/dma/ai_axi128_dma_ooo.v" \
+    "$REPO_ROOT/rtl/dma/ai_axi128_dma.v" \
     "$REPO_ROOT/rtl/memory/ai_spad_protection.v" \
     "$REPO_ROOT/rtl/memory/ai_spad_arbiter.v" \
     "$REPO_ROOT/rtl/compute/ai_tile_pipeline.v" \

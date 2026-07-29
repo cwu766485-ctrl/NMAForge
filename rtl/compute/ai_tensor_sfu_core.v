@@ -8,8 +8,9 @@
 //   RMSNORM input  : signed integer/Q8.8 values; gamma is signed Q0.15.
 //   RMSNORM output : same numeric scale as gamma-normalized input, int32.
 //   GELU/SILU      : signed Q8.8 input/output using bounded piecewise models.
-//   REQUANT        : arithmetic right shift and signed INT8 saturation, sign
-//                    extended in a 32-bit scratchpad word.
+//   REQUANT        : arithmetic right shift and signed INT8 saturation.  The
+//                    default output is sign-extended to one 32-bit word;
+//                    descriptor flag[4] packs four INT8 outputs per word.
 //
 // Softmax is numerically stable (subtract max) and uses a piecewise-linear
 // exp2 approximation.  Division and reciprocal-square-root are iterative so
@@ -24,6 +25,9 @@ module ai_tensor_sfu_core(
     input  wire [31:0] src1_base,
     input  wire [31:0] beta_base,
     input  wire        beta_enable,
+    // Descriptor flag[4] turns REQUANT into a layout bridge: four saturated
+    // INT8 results are packed into one word for a following matrix command.
+    input  wire        pack_enable,
     input  wire [31:0] dst_base,
     input  wire [15:0] length,
     input  wire [4:0]  scale_shift,
@@ -95,7 +99,8 @@ module ai_tensor_sfu_core(
     reg signed [63:0] sum_x_r;
     reg signed [63:0] vector_product_r;
     reg [31:0] rms_root_r, inv_rms_r;
-    reg rms_normalize_phase_r, beta_enable_r;
+    reg rms_normalize_phase_r, beta_enable_r, pack_enable_r;
+    reg [31:0] pack_word_r;
 
     reg div_start_r, sqrt_start_r;
     reg [63:0] div_dividend_r, div_divisor_r;
@@ -107,7 +112,11 @@ module ai_tensor_sfu_core(
     wire [31:0] src0_addr = src0_r + ({16'd0,index_r}<<2);
     wire [31:0] src1_addr = src1_r + ({16'd0,index_r}<<2);
     wire [31:0] beta_addr = beta_base_r + ({16'd0,index_r}<<2);
-    wire [31:0] dst_addr  = dst_r  + ({16'd0,index_r}<<2);
+    wire packed_requant = (op_r == OP_REQUANT_I8) && pack_enable_r;
+    wire [31:0] dst_addr = dst_r +
+                           (packed_requant ?
+                            ({18'd0,index_r[15:2]} << 2) :
+                            ({16'd0,index_r} << 2));
     wire signed [31:0] spad_signed = spad_rdata;
     wire causal_masked = (op_r == OP_CAUSAL_SOFTMAX_Q15) &&
                          (index_r > epsilon_r[15:0]);
@@ -195,6 +204,7 @@ module ai_tensor_sfu_core(
         end
     endfunction
 
+    wire [31:0] requant_spad = requant_i8(spad_signed);
     wire signed [63:0] residual_sum = $signed(x_r)+$signed(gamma_r);
     wire signed [63:0] residual_shifted = residual_sum>>>scale_shift_r;
     wire signed [63:0] rms_scaled = ($signed(x_r)*$signed(inv_rms_r))>>>30;
@@ -223,6 +233,7 @@ module ai_tensor_sfu_core(
             exp_r<=0; output_word_r<=0; sum_exp_r<=0; sum_sq_r<=0;
             mean_sq_r<=0; vector_product_r<=0; rms_root_r<=0; inv_rms_r<=0;
             sum_x_r<=0; rms_normalize_phase_r<=0; beta_enable_r<=0;
+            pack_enable_r<=0; pack_word_r<=0;
             div_start_r<=0; sqrt_start_r<=0; div_dividend_r<=0; div_divisor_r<=0;
             busy<=0; done<=0; error<=0; error_code<=0; result<=0;
             cycle_count<=0; element_count<=0;
@@ -238,13 +249,14 @@ module ai_tensor_sfu_core(
                     busy<=0; error<=0; error_code<=0;
                     if (start) begin
                         op_r<=op_mode; src0_r<=src0_base; src1_r<=src1_base;
-                        beta_base_r<=beta_base; beta_enable_r<=beta_enable; dst_r<=dst_base;
+                        beta_base_r<=beta_base; beta_enable_r<=beta_enable;
+                        pack_enable_r<=pack_enable; dst_r<=dst_base;
                         length_r<=length; scale_shift_r<=scale_shift;
                         epsilon_r<=epsilon==0 ? 32'd1 : epsilon;
                         watchdog_limit_r<=watchdog_limit; index_r<=0;
                         cycle_count<=0; element_count<=0; busy<=1;
                         max_r<=32'sh8000_0000; sum_exp_r<=0; sum_sq_r<=0; sum_x_r<=0;
-                        mean_r<=0; beta_r<=0;
+                        mean_r<=0; beta_r<=0; pack_word_r<=0;
                         rms_normalize_phase_r<=0;
                         if (length==0 || |src0_base[1:0] || |dst_base[1:0] ||
                             ((op_mode==OP_RESIDUAL_I32 || op_mode==OP_RMSNORM_Q15 ||
@@ -408,8 +420,39 @@ module ai_tensor_sfu_core(
                         x_r<=spad_signed;
                         if (op_r==OP_RESIDUAL_I32) state_r<=ST_VEC_B_REQ;
                         else if (op_r==OP_REQUANT_I8) begin
-                            output_word_r<=requant_i8(spad_signed);
-                            state_r<=ST_VEC_WRITE;
+                            if (!pack_enable_r) begin
+                                output_word_r<=requant_spad;
+                                state_r<=ST_VEC_WRITE;
+                            end else begin
+                                case (index_r[1:0])
+                                  2'd0: begin
+                                    pack_word_r[7:0]<=requant_spad[7:0];
+                                    output_word_r<={24'd0,requant_spad[7:0]};
+                                  end
+                                  2'd1: begin
+                                    pack_word_r[15:8]<=requant_spad[7:0];
+                                    output_word_r<={16'd0,requant_spad[7:0],
+                                                   pack_word_r[7:0]};
+                                  end
+                                  2'd2: begin
+                                    pack_word_r[23:16]<=requant_spad[7:0];
+                                    output_word_r<={8'd0,requant_spad[7:0],
+                                                   pack_word_r[15:0]};
+                                  end
+                                  default: begin
+                                    pack_word_r[31:24]<=requant_spad[7:0];
+                                    output_word_r<={requant_spad[7:0],
+                                                   pack_word_r[23:0]};
+                                  end
+                                endcase
+                                if (index_r[1:0]==2'd3 ||
+                                    index_r==length_r-1'b1)
+                                    state_r<=ST_VEC_WRITE;
+                                else begin
+                                    index_r<=index_r+1'b1;
+                                    state_r<=ST_VEC_A_REQ;
+                                end
+                            end
                         end else begin
                             state_r<=ST_VEC_PREP;
                         end
@@ -455,7 +498,12 @@ module ai_tensor_sfu_core(
                 ST_VEC_WRITE: if (spad_ready) begin
                     if (spad_protection_error) begin error_code<=ERR_PROTECTION; state_r<=ST_ERROR; end
                     else begin
-                        result<=output_word_r; element_count<=element_count+1'b1;
+                        result<=output_word_r;
+                        element_count<=element_count+
+                            (packed_requant ?
+                             ({30'd0,index_r[1:0]} + 32'd1) : 32'd1);
+                        if (packed_requant)
+                            pack_word_r<=0;
                         if (index_r==length_r-1'b1) state_r<=ST_DONE;
                         else begin index_r<=index_r+1'b1;
                             state_r<=((op_r==OP_RMSNORM_Q15) ||

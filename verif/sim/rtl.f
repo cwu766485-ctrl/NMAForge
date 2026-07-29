@@ -1,9 +1,0 @@
-../../rtl/legacy/RA1SH.v
-../../rtl/legacy/sram_bist_8kx8.v
-../../rtl/legacy/sram_bist.v
-../../rtl/legacy/sram_core.v
-../../rtl/legacy/ahb_slave_if.v
-../../rtl/legacy/sramc_top.v
-../../rtl/legacy/vec_accel_regs.v
-../../rtl/legacy/vec_accel_core.v
-../../rtl/legacy/vec_accel_top.v

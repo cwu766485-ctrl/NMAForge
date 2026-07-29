@@ -38,8 +38,7 @@ puts "CIMForge DC TSMC28: SRAM=32x TS1N28HPCPL2SVTB4096X32M4MWBASO"
 remove_design -all
 analyze -format sverilog [list \
   $RTL_DIR/control/axi_lite_reg_if.v \
-  $RTL_DIR/dma/axi_dma_master.v \
-  $RTL_DIR/dma/ai_axi128_dma_ooo.v \
+  $RTL_DIR/dma/ai_axi128_dma.v \
   $RTL_DIR/memory/ai_spad_protection.v \
   $RTL_DIR/memory/ai_spad_arbiter.v \
   $RTL_DIR/compute/ai_tile_pipeline.v \

@@ -1,7 +1,8 @@
 `timescale 1ns / 1ps
 
 module ai_accel_sva #(
-    parameter integer MAX_TASK_CYCLES = 2000
+    parameter integer MAX_TASK_CYCLES = 2000,
+    parameter integer M_AXI_ADDR_WIDTH = 64
 )(
     input wire        clk,
     input wire        resetn,
@@ -24,7 +25,7 @@ module ai_accel_sva #(
     input wire        s_axi_rvalid,
     input wire        s_axi_rready,
 
-    input wire [31:0] m_axi_araddr,
+    input wire [M_AXI_ADDR_WIDTH-1:0] m_axi_araddr,
     input wire [7:0]  m_axi_arlen,
     input wire [2:0]  m_axi_arsize,
     input wire [1:0]  m_axi_arburst,
@@ -34,7 +35,7 @@ module ai_accel_sva #(
     input wire        m_axi_rvalid,
     input wire        m_axi_rlast,
     input wire        m_axi_rready,
-    input wire [31:0] m_axi_awaddr,
+    input wire [M_AXI_ADDR_WIDTH-1:0] m_axi_awaddr,
     input wire [7:0]  m_axi_awlen,
     input wire        m_axi_awvalid,
     input wire        m_axi_awready,
@@ -59,7 +60,11 @@ module ai_accel_sva #(
     input wire [31:0] host_addr,
     input wire        core_busy,
     input wire        core_done,
-    input wire        core_error
+    input wire        core_error,
+    // A doorbell may launch a descriptor, DMA-only, or macro command that
+    // never raises a compute-core pulse.  The command processor's event is
+    // therefore the architectural completion point for the task watchdog.
+    input wire        processor_event_valid
 );
 
     reg [31:0] awaddr_hold_r;
@@ -69,9 +74,9 @@ module ai_accel_sva #(
     reg [31:0] rdata_hold_r;
     reg [1:0]  rresp_hold_r;
     reg [1:0]  bresp_hold_r;
-    reg [31:0] m_araddr_hold_r;
+    reg [M_AXI_ADDR_WIDTH-1:0] m_araddr_hold_r;
     reg [7:0]  m_arlen_hold_r;
-    reg [31:0] m_awaddr_hold_r;
+    reg [M_AXI_ADDR_WIDTH-1:0] m_awaddr_hold_r;
     reg [7:0]  m_awlen_hold_r;
     reg [127:0] m_wdata_hold_r;
     reg [15:0]  m_wstrb_hold_r;
@@ -103,9 +108,9 @@ module ai_accel_sva #(
             rdata_hold_r  <= 32'd0;
             rresp_hold_r  <= 2'd0;
             bresp_hold_r  <= 2'd0;
-            m_araddr_hold_r <= 32'd0;
+            m_araddr_hold_r <= {M_AXI_ADDR_WIDTH{1'b0}};
             m_arlen_hold_r <= 8'd0;
-            m_awaddr_hold_r <= 32'd0;
+            m_awaddr_hold_r <= {M_AXI_ADDR_WIDTH{1'b0}};
             m_awlen_hold_r <= 8'd0;
             m_wdata_hold_r <= 128'd0;
             m_wstrb_hold_r <= 16'd0;
@@ -271,7 +276,8 @@ module ai_accel_sva #(
             if (doorbell_pulse) begin
                 task_pending_r <= 1'b1;
                 task_timer_r   <= 32'd0;
-            end else if (task_pending_r && (core_done || core_error)) begin
+            end else if (task_pending_r &&
+                         (processor_event_valid || core_done || core_error)) begin
                 task_pending_r <= 1'b0;
             end else if (task_pending_r) begin
                 task_timer_r <= task_timer_r + 32'd1;

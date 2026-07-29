@@ -1,6 +1,5 @@
 ../../rtl/control/axi_lite_reg_if.v
-../../rtl/dma/axi_dma_master.v
-../../rtl/dma/ai_axi128_dma_ooo.v
+../../rtl/dma/ai_axi128_dma.v
 ../../rtl/memory/ai_spad_protection.v
 ../../rtl/memory/ai_spad_arbiter.v
 ../../rtl/compute/ai_tile_pipeline.v

@@ -8,7 +8,7 @@ module ai_command_processor(
     input wire clk, input wire resetn,
     input wire abort,
     input wire submit, input wire direct_start, input wire tile_start,
-    input wire [31:0] cmdq_base, input wire [31:0] cmdq_size,
+    input wire [63:0] cmdq_base, input wire [31:0] cmdq_size,
     input wire [31:0] cmdq_tail, input wire desc_external,
     input wire cmdq_head_load, input wire [31:0] cmdq_head_seed,
     input wire [31:0] cplq_base, input wire [31:0] cplq_size,
@@ -22,7 +22,7 @@ module ai_command_processor(
     input wire [31:0] cfg_bias_base, input wire cfg_bias_enable,
 
     input wire [15:0] tile_count,
-    input wire [31:0] tile_ext_input_base, input wire [31:0] tile_ext_output_base,
+    input wire [63:0] tile_ext_input_base, input wire [63:0] tile_ext_output_base,
     input wire [31:0] tile_ext_input_stride, input wire [31:0] tile_ext_output_stride,
     input wire [31:0] tile_buffer0_base, input wire [31:0] tile_buffer1_base,
     input wire [31:0] tile_output_offset,
@@ -49,7 +49,7 @@ module ai_command_processor(
     input wire [3:0] dma_error_code,
     input wire completion_busy, input wire completion_done,
 
-    output reg fetch_start, output reg [31:0] fetch_base, output reg fetch_external,
+    output reg fetch_start, output reg [63:0] fetch_base, output reg fetch_external,
     output reg launch_valid, output reg [7:0] launch_op, output reg [15:0] launch_task_id,
     output reg [31:0] launch_src0, output reg [31:0] launch_src1, output reg [31:0] launch_dst,
     output reg [15:0] launch_length, output reg [15:0] launch_m, output reg [15:0] launch_n, output reg [15:0] launch_k,
@@ -61,7 +61,8 @@ module ai_command_processor(
     output reg [15:0] launch_batch_count, output reg [15:0] launch_head_count,
 
     output wire tile_dma_start, output wire tile_dma_store,
-    output wire [31:0] tile_dma_ext_addr, output wire [31:0] tile_dma_spad_addr,
+    output wire [63:0] tile_dma_ext_addr,
+    output wire [31:0] tile_dma_spad_addr,
     output wire [15:0] tile_dma_length_words, output wire tile_active,
     output wire [31:0] tile_perf_total, output wire [31:0] tile_perf_dma,
     output wire [31:0] tile_perf_compute, output wire [31:0] tile_perf_overlap,
@@ -100,7 +101,7 @@ module ai_command_processor(
     reg [15:0] macro_parent_signal_mask_r;
     reg [15:0] macro_child_count_r;
     reg [15:0] macro_child_index_r;
-    reg [31:0] macro_child_base_r;
+    reg [63:0] macro_child_base_r;
     reg [31:0] macro_cycles_r;
     reg [31:0] macro_elements_r;
     reg [31:0] macro_result_r;
@@ -122,7 +123,11 @@ module ai_command_processor(
                  desc_op == 8'h43 || desc_op == 8'h44 || macro_op;
     wire tensor_matrix_op = desc_op == 8'h30 || desc_op == 8'h31;
     wire tensor_sfu_op = desc_op >= 8'h32 && desc_op <= 8'h39;
-    wire desc_version_ok = macro_op ? desc_version == 8'd4 :
+    // ABI v7 is the unified descriptor contract for every opcode.  Older
+    // per-engine versions remain accepted so existing test images and
+    // software can migrate without an all-at-once flag day.
+    wire desc_version_ok = desc_version == 8'd7 ? 1'b1 :
+                           macro_op ? desc_version == 8'd4 :
                            ((desc_op == 8'h16 || desc_op == 8'h17 ||
                              desc_op == 8'h43 || desc_op == 8'h44) ? desc_version == 8'd5 :
                            (!(tensor_matrix_op || tensor_sfu_op) || desc_version == 8'd3));
@@ -223,7 +228,7 @@ module ai_command_processor(
       input [15:0] child_index;
       begin
         macro_child_fetch_r <= 1'b1;
-        fetch_base <= macro_child_base_r + ({16'd0, child_index} << 6);
+        fetch_base <= macro_child_base_r + ({48'd0, child_index} << 6);
         fetch_external <= macro_child_external_r;
         fetch_start <= 1'b1;
         dependency_wait_cycles_r <= 16'd0;
@@ -261,7 +266,7 @@ module ai_command_processor(
         fetch_start <= 1'b0;
         launch_valid <= 1'b0;
         completion_start <= 1'b0;
-        fetch_base <= 32'd0;
+        fetch_base <= 64'd0;
         fetch_external <= 1'b0;
         cmdq_head <= 32'd0;
         cplq_tail <= 32'd0;
@@ -475,7 +480,9 @@ module ai_command_processor(
               macro_parent_signal_mask_r <= desc_signal_mask;
               macro_child_count_r <= desc_length;
               macro_child_index_r <= 16'd0;
-              macro_child_base_r <= desc_src0;
+              macro_child_base_r <= desc_version == 8'd7 ?
+                                    {desc_src1, desc_src0} :
+                                    {32'd0, desc_src0};
               macro_child_external_r <= desc_flags[3];
               macro_cycles_r <= 32'd0;
               macro_elements_r <= 32'd0;
@@ -483,7 +490,9 @@ module ai_command_processor(
               dependency_events <= dependency_events & ~desc_clear_mask;
               completion_task_id <= desc_task_id;
               macro_child_fetch_r <= 1'b1;
-              fetch_base <= desc_src0;
+              fetch_base <= desc_version == 8'd7 ?
+                            {desc_src1, desc_src0} :
+                            {32'd0, desc_src0};
               fetch_external <= desc_flags[3];
               fetch_start <= 1'b1;
               dependency_wait_cycles_r <= 16'd0;

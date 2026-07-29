@@ -18,6 +18,8 @@ xsim.dir/
 DVEfiles/
 ucli.key
 *.out
+__pycache__/
+*.pyc
 
 # Vivado non-project build artefacts (reports and checkpoints remain local).
 fpga/**/build/

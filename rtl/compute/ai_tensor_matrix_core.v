@@ -57,6 +57,13 @@ module ai_tensor_matrix_core(
     input  wire [31:0] spad_rdata,
     input  wire        spad_parity_error,
     input  wire        spad_protection_error,
+    output reg         line_valid,
+    output wire        line_write,
+    output reg  [31:0] line_addr,
+    output reg  [127:0] line_wdata,
+    output wire [15:0] line_wstrb,
+    input  wire        line_ready,
+    input  wire        line_protection_error,
 
     output reg         busy,
     output reg         done,
@@ -125,11 +132,13 @@ module ai_tensor_matrix_core(
                                    (write_idx_r[3:2] == 2'd1) ? dst_row_stride_r :
                                    (write_idx_r[3:2] == 2'd2) ? (dst_row_stride_r << 1) :
                                                                 ((dst_row_stride_r << 1) + dst_row_stride_r);
-    wire [31:0] write_addr = dst_tile_base_r + write_row_offset +
-                             ({28'd0, write_idx_r[1:0]} << 2);
+    wire [31:0] write_row_addr = dst_tile_base_r + write_row_offset;
+    wire line_store_eligible = write_row_addr[3:0] == 4'd0;
     assign perf_mac_active = state_r == ST_MAC;
     assign perf_banked_wait = (state_r == ST_A_WAIT) || (state_r == ST_B_WAIT) ||
                               (state_r == ST_PREFETCH_WAIT);
+    assign line_write = 1'b1;
+    assign line_wstrb = 16'hffff;
 
     function signed [7:0] byte_at;
         input [31:0] word;
@@ -243,12 +252,29 @@ module ai_tensor_matrix_core(
                 banked_addr = next_b_read_addr;
             end
         end
-        spad_valid = (state_r == ST_BIAS_REQ) || (state_r == ST_WRITE);
-        spad_write = (state_r == ST_WRITE);
+        spad_valid = (state_r == ST_BIAS_REQ) ||
+                     ((state_r == ST_WRITE) && !line_store_eligible);
+        spad_write = (state_r == ST_WRITE) && !line_store_eligible;
         spad_addr = (state_r == ST_BIAS_REQ) ?
-                    (bias_tile_base_r + ({30'd0,bias_idx_r} << 2)) : write_addr;
+                    (bias_tile_base_r + ({30'd0,bias_idx_r} << 2)) :
+                    (write_row_addr + ({30'd0,write_idx_r[1:0]} << 2));
         spad_wdata = post_process(acc_r[write_idx_r],
-                                  bias_enable_r ? bias_for_index(write_idx_r[1:0]) : 32'sd0);
+                                  bias_enable_r ?
+                                  bias_for_index(write_idx_r[1:0]) : 32'sd0);
+        // One complete output row is committed per scratchpad transaction.
+        // The former scalar path required sixteen grants per 4x4 tile.
+        line_valid = (state_r == ST_WRITE) && line_store_eligible;
+        line_addr = write_row_addr;
+        line_wdata = {
+            post_process(acc_r[write_idx_r+3],
+                         bias_enable_r ? bias3_r : 32'sd0),
+            post_process(acc_r[write_idx_r+2],
+                         bias_enable_r ? bias2_r : 32'sd0),
+            post_process(acc_r[write_idx_r+1],
+                         bias_enable_r ? bias1_r : 32'sd0),
+            post_process(acc_r[write_idx_r],
+                         bias_enable_r ? bias0_r : 32'sd0)
+        };
     end
 
     always @(posedge clk or negedge resetn) begin
@@ -436,12 +462,24 @@ module ai_tensor_matrix_core(
                         k_group_r<=k_group_r+1'b1; lane_r<=0; state_r<=ST_MAC;
                     end
                 end
-                ST_WRITE: if (spad_ready) begin
-                    if (spad_protection_error) begin error_code<=ERR_PROTECTION; state_r<=ST_ERROR; end
+                ST_WRITE: if ((line_store_eligible && line_ready) ||
+                              (!line_store_eligible && spad_ready)) begin
+                    if ((line_store_eligible && line_protection_error) ||
+                        (!line_store_eligible && spad_protection_error)) begin
+                        error_code<=ERR_PROTECTION; state_r<=ST_ERROR;
+                    end
                     else begin
-                        result<=spad_wdata; element_count<=element_count+1'b1;
-                        if (write_idx_r==4'd15) state_r<=ST_NEXT;
-                        else write_idx_r<=write_idx_r+1'b1;
+                        result<=line_store_eligible ? line_wdata[127:96] :
+                                                     spad_wdata;
+                        element_count<=element_count+
+                                       (line_store_eligible ? 4 : 1);
+                        if (line_store_eligible) begin
+                            if (write_idx_r==4'd12) state_r<=ST_NEXT;
+                            else write_idx_r<=write_idx_r+4;
+                        end else begin
+                            if (write_idx_r==4'd15) state_r<=ST_NEXT;
+                            else write_idx_r<=write_idx_r+1'b1;
+                        end
                     end
                 end
                 ST_NEXT: begin

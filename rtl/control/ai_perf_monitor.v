@@ -16,6 +16,8 @@ module ai_perf_monitor(
     input  wire        dma_aw_fire,
     input  wire        dma_w_fire,
     input  wire        dma_r_stall,
+    input  wire [4:0]  dma_r_beat_bytes,
+    input  wire [4:0]  dma_w_beat_bytes,
     output reg [31:0] matrix_cycles,
     output reg [31:0] matrix_mac_cycles,
     output reg [31:0] matrix_banked_stall_cycles,
@@ -58,9 +60,11 @@ module ai_perf_monitor(
             if (matrix_banked_wait)
                 matrix_banked_stall_cycles <= matrix_banked_stall_cycles + 1'b1;
             if (dma_r_fire)
-                dma_read_bytes <= dma_read_bytes + 32'd4;
+                dma_read_bytes <= dma_read_bytes +
+                                  {27'd0, dma_r_beat_bytes};
             if (dma_w_fire)
-                dma_write_bytes <= dma_write_bytes + 32'd4;
+                dma_write_bytes <= dma_write_bytes +
+                                   {27'd0, dma_w_beat_bytes};
             if (dma_ar_fire)
                 dma_ar_count <= dma_ar_count + 1'b1;
             if (dma_aw_fire)
