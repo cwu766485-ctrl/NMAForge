@@ -1,0 +1,6 @@
+# SpyGlass clock/reset intent for the A8 IP boundary.
+# A8 is currently a single-clock IP.  Do not waive a newly introduced clock
+# domain: add its clock, reset and an explicit synchronisation architecture.
+current_design ai_accel_top
+clock -name aclk -domain aclk
+reset -name aresetn -value 0 -async

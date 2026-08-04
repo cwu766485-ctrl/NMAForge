@@ -214,15 +214,17 @@ module ai_tensor_matrix_core(
     function [31:0] post_process;
         input signed [63:0] accumulated;
         input signed [31:0] bias_value;
+        input [4:0] scale_shift;
+        input [1:0] activation;
         reg signed [63:0] biased;
         reg signed [63:0] shifted;
         reg signed [63:0] activated;
         begin
             biased = accumulated + {{32{bias_value[31]}},bias_value};
-            shifted = biased >>> scale_shift_r;
-            if (activation_r == 2'd1)
+            shifted = biased >>> scale_shift;
+            if (activation == 2'd1)
                 activated = shifted < 0 ? 64'sd0 : shifted;
-            else if (activation_r == 2'd2)
+            else if (activation == 2'd2)
                 activated = shifted < 0 ? 64'sd0 :
                             (shifted > 64'sd6 ? 64'sd6 : shifted);
             else
@@ -260,20 +262,25 @@ module ai_tensor_matrix_core(
                     (write_row_addr + ({30'd0,write_idx_r[1:0]} << 2));
         spad_wdata = post_process(acc_r[write_idx_r],
                                   bias_enable_r ?
-                                  bias_for_index(write_idx_r[1:0]) : 32'sd0);
+                                  bias_for_index(write_idx_r[1:0]) : 32'sd0,
+                                  scale_shift_r, activation_r);
         // One complete output row is committed per scratchpad transaction.
         // The former scalar path required sixteen grants per 4x4 tile.
         line_valid = (state_r == ST_WRITE) && line_store_eligible;
         line_addr = write_row_addr;
         line_wdata = {
             post_process(acc_r[write_idx_r+3],
-                         bias_enable_r ? bias3_r : 32'sd0),
+                         bias_enable_r ? bias3_r : 32'sd0,
+                         scale_shift_r, activation_r),
             post_process(acc_r[write_idx_r+2],
-                         bias_enable_r ? bias2_r : 32'sd0),
+                         bias_enable_r ? bias2_r : 32'sd0,
+                         scale_shift_r, activation_r),
             post_process(acc_r[write_idx_r+1],
-                         bias_enable_r ? bias1_r : 32'sd0),
+                         bias_enable_r ? bias1_r : 32'sd0,
+                         scale_shift_r, activation_r),
             post_process(acc_r[write_idx_r],
-                         bias_enable_r ? bias0_r : 32'sd0)
+                         bias_enable_r ? bias0_r : 32'sd0,
+                         scale_shift_r, activation_r)
         };
     end
 

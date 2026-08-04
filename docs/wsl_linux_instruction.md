@@ -1,4 +1,4 @@
-# Codex 访问 WSL Linux 系统指南
+# CIMForge 访问 WSL Linux / EDA 环境指南
 
 本文说明在 Windows + WSL 环境中，如何让 Codex 协助检查、修改并运行 WSL 内的项目。
 
@@ -54,11 +54,11 @@ F:\                  -> /mnt/f
 ### 3.1 目录约定
 
 ```text
-F:\tsmc40_bridge\command.sh     # Codex 下发的单次命令
-F:\tsmc40_bridge\result.log     # Linux 执行输出
-F:\tsmc40_bridge\status.txt     # bridge 状态
-F:\tsmc40_bridge\STOP           # 停止标记
-F:\tsmc40_bridge.sh              # bridge 程序
+F:\cimforge_eda_bridge\command.sh     # Codex 下发的单次命令
+F:\cimforge_eda_bridge\result.log     # Linux 执行输出
+F:\cimforge_eda_bridge\status.txt     # bridge 状态
+F:\cimforge_eda_bridge\STOP           # 停止标记
+F:\cimforge_eda_bridge.sh              # bridge 程序
 ```
 
 ### 3.2 启动 bridge
@@ -66,13 +66,15 @@ F:\tsmc40_bridge.sh              # bridge 程序
 在目标 WSL 终端中启动一次：
 
 ```bash
-nohup bash /mnt/f/tsmc40_bridge.sh > /mnt/f/tsmc40_bridge_host.log 2>&1 &
+CIMFORGE_PROJECT_DIR="$HOME/ic/CIMForge" \
+  nohup bash /mnt/f/cimforge_eda_bridge.sh \
+  > /mnt/f/cimforge_eda_bridge_host.log 2>&1 &
 ```
 
 确认状态：
 
 ```bash
-cat /mnt/f/tsmc40_bridge/status.txt
+cat /mnt/f/cimforge_eda_bridge/status.txt
 ```
 
 正常状态应包含：
@@ -90,13 +92,13 @@ pid=<pid>
 完成工作后，在 WSL 中运行：
 
 ```bash
-touch /mnt/f/tsmc40_bridge/STOP
+touch /mnt/f/cimforge_eda_bridge/STOP
 ```
 
 确认：
 
 ```bash
-cat /mnt/f/tsmc40_bridge/status.txt
+cat /mnt/f/cimforge_eda_bridge/status.txt
 ```
 
 应显示 `stopped`。下次需要时重新执行启动命令即可。
@@ -141,7 +143,7 @@ find . -maxdepth 2 -type f | sort
 | `WSL_E_DISTRO_NOT_FOUND` | Codex 所在执行上下文看不到用户的 WSL 发行版；使用 bridge。 |
 | `ERROR_ALREADY_EXISTS` | 发行版已注册；不要重复导入。 |
 | `WSL_E_WSL2_NEEDED` | Windows 尚未启用 WSL2/Virtual Machine Platform，需管理员启用并重启。 |
-| `command.sh` 长时间未被处理 | bridge 已退出；查看 `status.txt` 和 `/mnt/f/tsmc40_bridge_host.log`，然后重新启动。 |
+| `command.sh` 长时间未被处理 | bridge 已退出；查看 `status.txt` 和 `/mnt/f/cimforge_eda_bridge_host.log`，然后重新启动。 |
 | 同时启动多个 bridge | 可能重复执行同一任务；保留一个进程即可。 |
 | EDA 工具在用户终端可用、bridge 中不可用 | 检查 `.bashrc`、module setup、许可证变量和工具 PATH；bridge 的 `nohup` 环境可能较精简。 |
 
@@ -153,4 +155,3 @@ find . -maxdepth 2 -type f | sort
 4. 告知 Codex 项目绝对路径与目标。
 5. Codex 先做只读诊断，再修改脚本并逐阶段运行。
 6. 完成后检查 `results/`、`reports/` 和日志；停止 bridge。
-

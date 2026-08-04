@@ -125,13 +125,86 @@ SRAM/vector 教学轨道已从仓库移除；A2-A6 阶段草案和已过期 FPGA
   - `16efb67 Organize AI accelerator project`
 - 当前未配置 Git remote，未向 GitHub 或其他外部服务推送。
 
+## 2026-08-02 - A8 单一主线清理与 UVM 入口冻结
+
+- 阅读 `CODEX_CONVERSATION_EXPORT.md` 后，以实际 A8 VCS、Vivado OOC 和
+  `A8_TSMC28_SYNTHESIS_REPORT.md` 报告为准，明确早期 AHB/A2/40 nm 的叙述仅为历史记录，
+  不再作为当前验收证据。
+- 已移除旧 AHB SRAM/vector RTL、对应 class-based verification、旧 40 nm 综合脚本、
+  旧 FPGA filelist，以及未被 A8 source list 使用的平铺 A7/A6 RTL 副本；所有当前
+  VCS、FPGA 与 DC source list 均只保留 A8 模块。
+- 根 README、文档索引和 architecture 已改为 A8 事实源；当前顶层固定为
+  `rtl/top/ai_accel_top.v`，统一 DMA 为 `rtl/dma/ai_axi128_dma.v`。
+- 已验证证据边界：VCS directed/smoke 与 30-command Transformer micro-workload 已通过；
+  XCZU15EG standalone OOC 于 100 MHz setup/hold 闭合；TSMC28 HPC+ 真实 SRAM macro 的
+  250 MHz pre-layout DC setup/hold 闭合。它们不等同于 UVM coverage、CDC/formal、
+  post-layout sign-off 或实板 workload 验收。
+
+## 2026-08-02 - SpyGlass 静态验证入口
+
+- 新增 `verif/spyglass/`：独立 A8 RTL filelist、单时钟/异步低有效复位的 SGDC intent、
+  Lint/CDC/RDC project、Linux 运行封装和 waiver 原则。静态项目明确排除 testbench/SVA，
+  并以 `VCS` macro 选择 scratchpad 行为模型，避免 Xilinx XPM 作为未解析库单元。
+- 当前架构只定义 `aclk` 与 `aresetn`；CDC 目标是证明没有意外 clock crossing，RDC 不预先
+  waiver 异步 reset release。若 SpyGlass 报告 reset deassertion，需明确上游同步释放假设
+  或补 reset synchronizer。
+- 未在本次操作中执行 SpyGlass：Windows 无可见 WSL distribution，现有 F 盘 bridge 指向
+  `/home/ray/ic/dsm_ip` 而非 CIMForge，不能把命令发送到其他项目。待 bridge 以
+  `/home/ray/ic/CIMForge` 启动并确认 SpyGlass module/PATH 后运行并归档真实报告。
+
 ## 当前项目状态
 
-- 主线：AXI-Lite/AXI4 AI 加速器。
-- 功能重点：command/completion queue、描述符读取、DMA、512 KiB scratchpad、INT8
-  计算核心和性能监控。
-- ASIC 历史基线：A7 RTL 在 TSMC28 HPC+、250 MHz pre-layout setup/hold 均闭合；
-  A8 PACK_I8/Transformer 改版尚待复跑。
-- 下一步：在许可环境运行 `make ai_transformer`、复跑 A8 28 nm DC 与 XCZU15EG
-  timing；如进入后端流程，则执行 floorplan、CTS、P&R、
-  提取 RC 及多角 STA，获得最终 Fmax 和 hold sign-off 结论。
+- 主线：A8 AXI-Lite/128-bit AXI4 INT8 tensor accelerator，512 KiB 四 bank scratchpad。
+- 功能重点：command/completion queue、descriptor ABI v7.2、统一 tagged multi-outstanding
+  DMA、matrix/SFU/CNN/KV-cache primitives、性能监控和 mapper 驱动的 Transformer 命令链。
+- ASIC 依据：TSMC28 HPC+ TT/0.9 V/25 C、32 个真实 SRAM macro 的 A8 版本在 250 MHz
+  pre-layout DC setup/hold 均闭合；详见 `A8_TSMC28_SYNTHESIS_REPORT.md`。
+- 下一步：冻结当前 RTL/ABI 后开始 UVM。先建立 AXI-Lite/AXI4 agent、RAL、scoreboard、
+  reference-model adapter 和 coverage plan；重点覆盖 queue/descriptor、DMA ID/4 KiB/
+  abort、scratchpad arbitration 和端到端 Transformer 命令序列。并行清点 DC 的 869 条
+  lint-style `check_design` 项，形成可审计的修复/waiver 清单。
+
+## 2026-08-02 - 28 nm 静态验证配置与 A8 SPEC 刷新
+
+- 经 Linux SpyGlass V-2023.12-SP1 实际初跑确认，使用行为 `ai_scratchpad` 的静态工程会因
+  4 个 32K x 32 Verilog 数组触发大 memory/blackbox 报错；提高 memory threshold 会使
+  工具在行为 SRAM 上长时间展开，并非合理 ASIC lint 方案。此前被手动终止的两次 run
+  退出码均为 143，不计为通过。
+- `verif/spyglass/a8_static.prj` 改为与 28 nm DC 一致的
+  `syn/ai_scratchpad_28nm_macro.v`；新增 `tsmc28_sram_macro_stub.v` 只声明真实
+  4Kx32 SRAM 的端口，避免静态检查伪造 512 KiB 行为存储，同时保留 macro wrapper、
+  宏使能和地址选择逻辑的可检查性。
+- 新建项目中性的 `scripts/cimforge_eda_bridge.sh`，并将 WSL 指南改用
+  `cimforge_eda_bridge` / `CIMFORGE_PROJECT_DIR` 命名；旧 `tsmc40_bridge` 仅作
+  兼容入口，待新 bridge 就绪后停止，不删除任何旧目录。
+- `docs/SPEC.md` 更新为 A8 ABI v7.2 的当前规格：明确 512 KiB/32 macro SPAD、
+  128-bit RID/BID-aware DMA、四 outstanding read、opcode/descriptor/completion ABI、
+  28 nm 与 XCZU15EG 的真实证据边界，以及 UVM/CDC/RDC/实板仍待完成的验收项。
+- 新 bridge 上实际执行 `make ai_smoke`，退出码 0、`TEST PASS`。该回归包含 30-command
+  Transformer 链、随机 GEMV/GEMM/Conv、DMA/region-protection error 路径和 reset recovery，
+  证明本次 matrix-core 函数显式参数化未破坏端到端功能。
+- macro-aware SpyGlass lint 实际完成（V-2023.12-SP1）；行为 SPAD 的四个大数组错误已消失。
+  报告剩余的 `SYNTH_5273` 指向 DMA 内实际存在的 4-entry x 128-bit x 16-beat reorder
+  buffer（8192 bit），因此将 `mthresh` 精确设为 8193；这不是对 SRAM 或 lint 规则的 waiver。
+- 重新运行后 lint 为 **0 error / 393 warning**。CDC structural run 识别 1 个 clock、1 个
+  reset，报告 0 个 scalar/vector crossing；但服务器缺少 `Advanced_CDC` feature，部分高级
+  CDC rule 未执行，且 `Reset_sync04` 对 `ai_spad_arbiter` 的内部双级采样提出 1 条 warning，
+  因此该结果只可标记为“基础结构检查完成”，不可标记为完整 CDC sign-off。
+- 初版 RDC launcher 调用了该服务器 methodology 中不存在的 `rdc_setup`，退出码 7；已按
+  SpyGlass 返回的可用 goal 改为 `rdc/rdc_verify_struct`，随后重新运行。
+- `rdc/rdc_verify_struct` 已完成。其两个 error 分别为 `Ar_resetcross01` 缺少
+  `Advanced_CDC` feature、`Ar_resetcross_matrix01` 缺少 `rdc_adv_checker` feature；
+  它们是 license coverage 缺口而非设计路径 violation。当前可用结构报告未给出实际
+  reset-crossing 错误。CDC/RDC 的正式结论均为“基础结构检查已运行，advanced sign-off
+  受服务器 license 阻断”，不得写成完整 sign-off pass。
+- 已启动新的 `F:\cimforge_eda_bridge`（WSL 项目固定为 `/home/ray/ic/CIMForge`），并在
+  确认其状态为 ready 后干净停止旧 `tsmc40_bridge`；旧 bridge 的文件和日志未删除。
+- 使用真实 TSMC28 HPC+ TT/0.9V/25C 标准单元 `.db` 与真实 4Kx32 SRAM macro `.db` 对
+  **当前 RTL** 独立执行 `bash syn/run_ai_accel_28nm_dc.sh 4.0`，输出为
+  `syn/out/tsmc28_a8_4_0ns_20260802/`，退出码 0。最终 QoR：setup/hold WNS/TNS
+  均为 0.00ns、0 条违例、critical path 3.87ns（SRAM Q 到 tensor SFU `sum_exp`）；
+  32 macro、133,642 leaf cells、总 area 1,242,475.50 library area units、
+  vectorless power 24.16mW。此为 pre-layout 单角结果，不是 post-route/sign-off。
+- 当前 DC `check_design` 有 256 条 lint-style potential problems；其中高扇出 net、
+  常量 AXI sideband/保留位和 macro 输出活动率未注释是已观察到的类别。它们未产生 timing
+  或 max-transition/max-capacitance 违例，但必须在 UVM/后端前形成可审计分类，不可忽略。
