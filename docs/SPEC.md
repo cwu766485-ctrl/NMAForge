@@ -10,6 +10,21 @@ specification. The complete, detailed specification is maintained in
 INT8/matrix/SFU/CNN/KV operators, protection, performance counters, verification
 evidence, and TSMC28 pre-layout limitations.
 
+## Digital CNM datapath
+
+For banked VDOT/GEMV opcodes `0x20/0x21`, CIMForge implements a digital
+compute-near-memory (CNM) datapath. `ai_banked_cnm_core` instantiates four
+`ai_bank_local_controller` blocks. Each controller owns its bank-local address
+generation, A/B request, ready/response-valid lane, ping-pong operand buffer,
+64-bit local accumulator and event counters. Only the four completed local
+sums cross to the output-level Global Reducer.
+
+`ai_spad_arbiter` remains the only scheduler-side scratchpad admission point.
+A CNM admission carries four independent bank-lane addresses/masks; it does
+not bypass the arbiter. Fine-grained simultaneous accesses by distinct clients
+to different banks are not implemented and must not be inferred from this
+interface. This is a digital near-memory architecture, not analog in-SRAM CIM.
+
 Source-of-truth files are `rtl/top/ai_accel_top.v`,
 `rtl/control/ai_accel_regs.v`, `rtl/control/ai_command_processor.v`,
 `rtl/dma/ai_axi128_dma.v`, `rtl/memory/ai_spad_arbiter.v`,

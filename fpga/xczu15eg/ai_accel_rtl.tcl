@@ -10,6 +10,8 @@ set AI_ACCEL_RTL_FILES [list \
     "$REPO_ROOT/rtl/compute/ai_bank_pe.v" \
     "$REPO_ROOT/rtl/compute/ai_reduction_tree.v" \
     "$REPO_ROOT/rtl/compute/ai_banked_compute_core.v" \
+    "$REPO_ROOT/rtl/compute/ai_bank_local_controller.v" \
+    "$REPO_ROOT/rtl/compute/ai_banked_cnm_core.v" \
     "$REPO_ROOT/rtl/compute/ai_unsigned_divider.v" \
     "$REPO_ROOT/rtl/compute/ai_integer_sqrt.v" \
     "$REPO_ROOT/rtl/compute/ai_tensor_matrix_core.v" \

@@ -174,6 +174,17 @@ module tb_ai_accel_smoke;
     integer seed_dummy;
     integer matrix_line_write_count;
     reg [63:0] last_dma_araddr;
+    reg [1023:0] vcd_file;
+
+    // Optional switching-activity capture.  It is disabled in the ordinary
+    // smoke regression because a whole-chip VCD is large; pass
+    // +VCD_FILE=<path> to enable it, then convert the VCD to SAIF for DC.
+    initial begin
+        if ($value$plusargs("VCD_FILE=%s", vcd_file)) begin
+            $dumpfile(vcd_file);
+            $dumpvars(0, tb_ai_accel_smoke);
+        end
+    end
 
     always @(posedge aclk) begin
         if (aresetn && dut.matrix_line_valid && dut.arb_core_line_ready)
@@ -1237,6 +1248,45 @@ module tb_ai_accel_smoke;
         wait_done();
         expect_read(SPAD_BASE + 32'h3300, 32'd16, "banked gemv row0");
         expect_read(SPAD_BASE + 32'h3304, 32'd32, "banked gemv row1");
+        clear_done_irq();
+
+        // CNM integration case: three K-groups use bank-distinct words.  A
+        // is +1 throughout; B group values are +1, +2 and -1, giving
+        // 16 + 32 - 16 = 32.  Unlike the focused A2.2 unit test, this runs
+        // through AXI-Lite, command processor, SPAD arbiter and writeback.
+        axi_write(SPAD_BASE + 32'h3500, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3504, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3508, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h350c, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3510, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3514, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3518, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h351c, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3520, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3524, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3528, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h352c, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3600, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3604, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3608, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h360c, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3610, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3614, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3618, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h361c, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3620, 32'hffff_ffff);
+        axi_write(SPAD_BASE + 32'h3624, 32'hffff_ffff);
+        axi_write(SPAD_BASE + 32'h3628, 32'hffff_ffff);
+        axi_write(SPAD_BASE + 32'h362c, 32'hffff_ffff);
+        axi_write(REG_OP_MODE, OP_BANKED_VDOT);
+        axi_write(REG_SRC0_BASE, 32'h3500);
+        axi_write(REG_SRC1_BASE, 32'h3600);
+        axi_write(REG_DST_BASE,  32'h3700);
+        axi_write(REG_LENGTH,    32'd3);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h3700, 32'd32, "CNM A2 multi-group vdot");
+        expect_read(REG_RESULT, 32'd32, "CNM A2 multi-group result");
         clear_done_irq();
 
         // DMA load external input/weight into scratchpad, compute VDOT, then DMA store result out.

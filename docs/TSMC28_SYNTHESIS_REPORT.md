@@ -15,12 +15,12 @@ A8 AXI-Lite/AXI4 AI 加速器已在 TSMC28 HPC+ 工艺库、TT/0.9 V/25 C 条件
 
 ### 2026-08-03 当前 RTL 复跑确认
 
-在 matrix-core 后处理函数改为显式参数、并完成 28nm macro-aware SpyGlass 配置后，使用同一
-TT/0.9 V/25 C 标准单元和真实 SRAM `.db` 对当前 RTL 进行了独立重跑，输出目录为
-`syn/out/tsmc28_a8_4_0ns_20260802/`。该 run 退出码为 0，4.0 ns 下 setup/hold
-WNS/TNS 仍为 `0.00/0.00 ns`，32 个 SRAM macro、133,642 leaf cell、
-1,242,475.50 library area units 与本报告主结论一致。因而本报告的 250 MHz pre-layout
-证据适用于当前 RTL，而非仅适用于历史快照。
+在 matrix-core 后处理函数改为显式参数、完成 28nm macro-aware SpyGlass 配置并加入
+CNM A2/A3 RTL 后，使用同一 TT/0.9 V/25 C 标准单元和真实 SRAM `.db` 对当前 RTL
+进行了重新综合。最新输出目录为 `syn/out/tsmc28_4_0ns/`，DC 退出码为 0。
+4.0 ns 下 setup/hold WNS/TNS 仍为 `0.00/0.00 ns`，32 个 SRAM macro、
+138,332 leaf cell、1,245,378.649905 library area units。该结果是当前 CNM RTL
+的权威 pre-layout 面积/时序结果。
 
 ## 2. 运行配置
 
@@ -36,7 +36,7 @@ WNS/TNS 仍为 `0.00/0.00 ns`，32 个 SRAM macro、133,642 leaf cell、
 | 时钟频率 | 250 MHz |
 | Setup uncertainty | 0.10 ns |
 | Pre-CTS hold uncertainty | 0.02 ns |
-| 输出目录 | `syn/out/tsmc28_a8_4_0ns/` |
+| 输出目录 | `syn/out/tsmc28_4_0ns/` |
 
 ## 3. 时序结果
 
@@ -62,16 +62,16 @@ SFU 指数和累加数据通路，是下一轮提高频率时应优先优化的�
 
 | 指标 | 结果 |
 |---|---:|
-| 总 cell area | 1,242,475.50 library area units |
-| 组合逻辑面积 | 70,937.40 |
-| 时序逻辑面积 | 43,862.35 |
-| Buffer/INV 面积 | 17,531.91 |
+| 总 cell area | 1,245,378.649905 library area units |
+| 组合逻辑面积 | 72,476.095923 |
+| 时序逻辑面积 | 45,226.803982 |
+| Buffer/INV 面积 | 16,721.249571 |
 | SRAM macro 面积 | 1,127,675.75 |
-| SRAM 面积占比 | 约 90.8% |
-| Leaf cell 数 | 133,642 |
-| 组合 cell 数 | 108,609 |
-| 时序 cell 数 | 25,033 |
-| Buffer/INV cell 数 | 17,455 |
+| SRAM 面积占比 | 约 90.5% |
+| Leaf cell 数 | 138,332 |
+| 组合 cell 数 | 112,562 |
+| 时序 cell 数 | 25,770 |
+| Buffer/INV cell 数 | 17,433 |
 
 除 scratchpad 外，面积最大的主要逻辑模块为统一 128-bit AXI DMA
 `ai_axi128_dma_AXI_ADDR_WIDTH64`（38,318.69 units），其次为
@@ -82,16 +82,17 @@ SFU 指数和累加数据通路，是下一轮提高频率时应优先优化的�
 
 | 指标 | 结果 |
 |---|---:|
-| Cell internal power | 21.96 mW |
-| Net switching power | 0.23 mW |
-| Dynamic power | 22.18 mW |
-| Cell leakage power | 1.97 mW |
-| 总功耗估计 | 24.16 mW |
+| Cell internal power | 22.5908 mW |
+| Net switching power | 0.2382 mW |
+| Dynamic power | 22.8290 mW |
+| Cell leakage power | 1.9733 mW |
+| 总功耗估计 | 24.8063 mW |
 
-该功耗报告使用 DC low-effort、zero-delay switching activity propagation，且主输入、
-时序单元输出和黑盒输出没有真实活动率标注。因此它仅适合作为静态/vectorless 参考，
-不能作为 workload 实测功耗或最终功耗签核结论。报告显示 clock network internal power
-占动态功耗的大部分，后续应使用 VCD/SAIF 或 workload 仿真活动率重新估算。
+该功耗报告使用真实 TSMC28 TT/0.9 V/25°C 功耗库，单位有效，但 DC 仍报告
+`PWR-414/PWR-415/PWR-428`（primary input、sequential output 和 SRAM black-box
+output 未完全注释）。本次 `saif_activity.rpt` 还显示 `report_switching_activity`
+命令在当前 DC 版本不存在，不能用该文件证明 SAIF 覆盖率。因此 24.8063 mW 仍是
+默认/部分活动率估计，不是 workload 实测或最终 sign-off 功耗。
 
 ## 6. 映射与检查结果
 
@@ -100,7 +101,7 @@ SFU 指数和累加数据通路，是下一轮提高频率时应优先优化的�
 - QoR 报告中的宏数量为 32，标准单元 leaf 数为 133,642，说明该 run 不是仅逻辑或
   SRAM black-box 的伪 PPA 结果。
 - DC QoR 报告显示 max transition 和 max capacitance 均无违例。
-- 2026-08-03 当前 RTL 复跑的 `check_design.rpt` 报告 256 项 potential problem，主要是
+- 2026-08-06 当前 RTL 复跑的 `check_design.rpt` 报告 256 项 potential problem，主要是
   LINT-1/LINT-2、constant output、feedthrough 和 shorted output 等 lint-style 提示。
   它们不阻止综合和时序闭合，但应在下一阶段按
   “预期常量/未用功能端口”与“可能的集成遗漏”分类，形成 waiver 或 RTL 清理记录。

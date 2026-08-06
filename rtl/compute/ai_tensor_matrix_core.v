@@ -434,7 +434,27 @@ module ai_tensor_matrix_core(
                     if (lane_r==2'd3) begin
                         lane_r<=0;
                         if (k_group_r==k_words_r-1'b1) begin write_idx_r<=0; state_r<=ST_WRITE; end
-                        else state_r<=ST_PREFETCH_WAIT;
+                        // A3.1: with the registered one-cycle SRAM model,
+                        // the B prefetch response for K+1 arrives on this
+                        // final MAC lane.  Consume it immediately with the
+                        // already-captured A prefetch rather than spending a
+                        // full ST_PREFETCH_WAIT bubble before K+1 can start.
+                        else if (prefetch_a_valid_r && banked_rsp_valid &&
+                                 prefetch_b_pending_r) begin
+                            if (|bank_parity_error) begin
+                                error_code<=ERR_PARITY; state_r<=ST_ERROR;
+                            end else begin
+                                a0_r<=pre_a0_r; a1_r<=pre_a1_r;
+                                a2_r<=pre_a2_r; a3_r<=pre_a3_r;
+                                b0_r<=bank0_data; b1_r<=bank1_data;
+                                b2_r<=bank2_data; b3_r<=bank3_data;
+                                prefetch_a_valid_r<=0;
+                                prefetch_b_pending_r<=0;
+                                prefetch_b_valid_r<=0;
+                                k_group_r<=k_group_r+1'b1;
+                                state_r<=ST_MAC;
+                            end
+                        end else state_r<=ST_PREFETCH_WAIT;
                     end else lane_r<=lane_r+1'b1;
                 end
                 ST_PREFETCH_WAIT: begin

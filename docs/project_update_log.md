@@ -208,3 +208,20 @@ SRAM/vector 教学轨道已从仓库移除；A2-A6 阶段草案和已过期 FPGA
 - 当前 DC `check_design` 有 256 条 lint-style potential problems；其中高扇出 net、
   常量 AXI sideband/保留位和 macro 输出活动率未注释是已观察到的类别。它们未产生 timing
   或 max-transition/max-capacitance 违例，但必须在 UVM/后端前形成可审计分类，不可忽略。
+
+## 2026-08-07 - SpyGlass 结果复核与验证计划冻结
+
+- 复核最新 SpyGlass V-2023.12-SP1 结果：`lint/lint_rtl` 为 0 error、414 warnings、4 info；
+  `cdc/cdc_setup` 为 0 error、12 warnings；CDC structural report 显示 0 个
+  unsynchronized crossing、0 个 convergence。
+- `cdc/cdc_verify_struct` 的 1 条 error 是 `Advanced_CDC` license 缺失；
+  `rdc/rdc_verify_struct` 的 2 条 error 是 `Advanced_CDC` 与 `rdc_adv_checker`
+  license 缺失。它们是工具覆盖限制，不是 RTL crossing 结论；当前不能称 CDC/RDC sign-off。
+- 另一次 SpyGlass 运行出现 `SIGSEGV`（signal 11），且 GDB 因 WSL `ptrace` 限制无法生成
+  stack trace；该次工具异常不覆盖此前成功的 lint/CDC/RDC 结果。dashboard/datasheet 报告
+  还因对应 license 缺失失败，未作为设计结果记录。
+- 修正 `docs/SPEC_ZH.md` 的验证证据段，删除过期的 393 warning 数字，明确 license 和
+  tool-crash 边界；新增 `docs/VPLAN.md`，冻结 UVM、Formal、LEC、DFT、PPA 的分阶段计划、
+  回归矩阵、退出条件和每日学习节奏。
+- 下一阶段从 SPEC 学习和 UVM 基础环境开始：先做 AXI-Lite agent/RAL、CMDQ/CPLQ scoreboard，
+  再接入 AXI4 DMA、scratchpad arbiter、CNM 四 lane 和 Transformer reference model。

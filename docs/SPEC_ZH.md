@@ -6,7 +6,7 @@
 
 ## 1. 产品定位
 
-CIMForge 是可综合、面向 SoC 集成的全数字 AI 近存加速器 IP。软件通过 DMA 将 tile、权重、激活和 KV-cache 搬进邻近计算引擎的本地 SRAM，再在片上完成 INT8/定点计算，以减少外部 DDR 往返。它不是模拟 Compute-in-Memory：不修改 SRAM bit-cell、bit-line 或 sense amplifier，不在存储阵列内以模拟方式执行 MAC；也不是包含 CPU、NoC、CXL/LPDDR/HBM-PIM、DDR 控制器和 LLM serving 软件栈的完整系统。
+CIMForge 是可综合、面向 SoC 集成的全数字 AI 近存加速器 IP。软件通过 DMA 将 tile、权重、激活和 KV-cache 搬进邻近计算引擎的本地 SRAM，再在片上完成 INT8/定点计算，以减少外部 DDR 往返。其 banked VDOT/GEMV 路径实现了数字 CNM（Compute-Near-Memory）：四个 SRAM bank 各自邻接一个 Local Controller 和 Local PE，本 bank 内完成地址推进、A/B 读请求、operand 双缓冲、dot4 本地累加；仅在 output 边界传递四个 local sum 到 Global Reducer。它不是模拟 Compute-in-Memory：不修改 SRAM bit-cell、bit-line 或 sense amplifier，不在存储阵列内以模拟方式执行 MAC；也不是包含 CPU、NoC、CXL/LPDDR/HBM-PIM、DDR 控制器和 LLM serving 软件栈的完整系统。
 
 当前重点是 INT8 VDOT/GEMV/GEMM、1x1/3x3/Depthwise 卷积、Q15 Softmax（含 causal）、RMSNorm、LayerNorm、残差、GELU、SiLU、requant，以及 Transformer 的 QKV/MHA/FFN 宏编排与 KV-cache 读写。典型 decoder 数据流为：`Q/K/V 投影 → Q×K^T → causal softmax → attention×V → 输出投影 → residual+RMSNorm → FFN → residual+RMSNorm`。
 
@@ -30,6 +30,23 @@ CPU -- 32-bit AXI4-Lite --> 寄存器/IRQ --> 命令处理器(CMDQ/CPLQ)
 - `ai_spad_arbiter` 是 scratchpad 调度端口的唯一拥有者。描述符和完成写入为高优先级控制流；标量、line、banked 计算和 DMA 在数据面轮询。顶层不得另加 scratchpad mux。
 - `ai_desc_fetch` 读取片上描述符，`axi_desc_fetch` 读取外部描述符；处理器在一条命令期间保持来源不变。
 - `ai_completion_writer` 先提交完成项的四个 32-bit word，才发布新的 `CPLQ_TAIL`。
+
+### 2.1 数字 CNM bank-local 数据路径
+
+对 opcode `0x20/0x21`，`ai_banked_cnm_core` 实例化四个 `ai_bank_local_controller`。每个 controller 独立拥有本 bank 的地址发生器、A/B request、`ready/response-valid` lane、A ping-pong buffer、64-bit local accumulator 和事件计数器。接口关系如下：
+
+```text
+SRAM bank0 <-> LC0 + PE0 <--- cnm_addr0 / cnm_ready[0] / cnm_rsp_valid[0]
+SRAM bank1 <-> LC1 + PE1 <--- cnm_addr1 / cnm_ready[1] / cnm_rsp_valid[1]
+SRAM bank2 <-> LC2 + PE2 <--- cnm_addr2 / cnm_ready[2] / cnm_rsp_valid[2]
+SRAM bank3 <-> LC3 + PE3 <--- cnm_addr3 / cnm_ready[3] / cnm_rsp_valid[3]
+                                          |
+                                   output-level Global Reducer
+                                          |
+                                  quantize / scratchpad writeback
+```
+
+`ai_spad_arbiter` 仍是唯一 scheduler-side scratchpad admission point；CNM 不得绕过它在顶层新增 mux。当前 CNM 一次 admission 可携带四个独立 bank lane 地址和 mask，但不同 client 同时访问不同 bank 的细粒度 bank-level arbitration 尚未实现，不能宣称该能力。
 
 ## 3. Scratchpad 和工艺视图
 
@@ -93,9 +110,9 @@ VCS 通过 `+define+VCS` 使用 `rtl/memory/ai_scratchpad.v` 的行为 RAM；Viv
 
 ## 7. 验证证据与边界
 
-VCS `make ai_smoke` 已覆盖 Transformer 30-command 链、随机 GEMV/GEMM/Conv、错误/保护和 reset recovery；扩展回归是 `make ai_comp`、`make ai_run AI_RANDOM_CASES=20 AI_SEED=12345`。SpyGlass macro-aware lint 记录为 0 error、393 warnings（仍需分类）；CDC 是单时钟、单复位、0 个实际 crossing，但 Advanced_CDC license 缺失，不能称 sign-off；RDC 基础检查无实际 reset-crossing 违规，但 advanced license 也缺失。
+VCS `make ai_smoke` 已覆盖 Transformer 30-command 链、随机 GEMV/GEMM/Conv、错误/保护和 reset recovery；扩展回归是 `make ai_comp`、`make ai_run AI_RANDOM_CASES=20 AI_SEED=12345`。2026-08-06 的 SpyGlass macro-aware lint 记录为 **0 error、414 warnings、4 info**（共 418 条信息，仍需分类）；CDC setup 为 0 error、12 warnings，CDC structural verify 显示 0 个 unsynchronized crossing、0 个 convergence，但因缺少 Advanced_CDC license 而有 1 条工具/许可证 error，不能称 sign-off；RDC structural verify 的 2 条 error 同样仅为 Advanced_CDC / `rdc_adv_checker` license 缺失，不能作为 RTL reset-crossing 违规解读，也不能称 RDC sign-off。
 
-TSMC28 HPC+ TT/0.9V/25°C 的当前 RTL、真实 32 个 SRAM macro、4.0 ns pre-layout DC：setup/hold WNS、TNS 均 0.00 ns、0 条违例；area 为 1,242,475.50 library units，vectorless power 24.16 mW，关键路径 SRAM Q→SFU sum_exp 约 3.87 ns。XCZU15EG 100 MHz OOC 记录为 setup WNS +0.187 ns、hold WNS +0.032 ns，约 30,506 LUT、25,238 FF、128 RAMB36、46 DSP，尚非整板验收。
+TSMC28 HPC+ TT/0.9V/25°C 的当前 CNM RTL、真实 32 个 SRAM macro、4.0 ns pre-layout DC：setup/hold WNS、TNS 均 0.00 ns、0 条违例；关键路径为 3.89 ns；area 为 1,245,378.649905 library units，其中 SRAM macro area 为 1,127,675.750000。DC power 报告为 dynamic 22.8290 mW、leakage 1.9733 mW、total 24.8063 mW，但由于 PWR-414/PWR-415/PWR-428，仍属于默认/部分活动率估计，不是 SAIF workload sign-off 功耗。XCZU15EG 100 MHz OOC 记录为 setup WNS +0.187 ns、hold WNS +0.032 ns，约 30,506 LUT、25,238 FF、128 RAMB36、46 DSP，尚非整板验收。
 
 可信表述是“TSMC28、250 MHz pre-layout setup/hold closure”。400 MHz 需要 2.5 ns，当前关键路径仍差约 1.37 ns；需要在 SRAM→SFU、exp/sum 和 tile 边界流水化后，重新完成 DC sweep、P&R、多角 STA、功耗和板级验证，才可作进一步频率/PPA 结论。
 

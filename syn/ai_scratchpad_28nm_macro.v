@@ -39,7 +39,13 @@ module ai_scratchpad #(
     input wire banked_read_valid, input wire [31:0] banked_addr,
     output reg [31:0] banked_data0, output reg [31:0] banked_data1,
     output reg [31:0] banked_data2, output reg [31:0] banked_data3,
-    output reg [3:0] banked_parity_error
+    output reg [3:0] banked_parity_error,
+    input wire [3:0] cnm_read_valid,
+    input wire [31:0] cnm_addr0, input wire [31:0] cnm_addr1,
+    input wire [31:0] cnm_addr2, input wire [31:0] cnm_addr3,
+    output reg [31:0] cnm_data0, output reg [31:0] cnm_data1,
+    output reg [31:0] cnm_data2, output reg [31:0] cnm_data3,
+    output reg [3:0] cnm_parity_error
 );
     localparam integer BANK_BITS = 2;
     localparam integer MACROS_PER_BANK = 8;
@@ -71,12 +77,20 @@ module ai_scratchpad #(
     wire compute_range_error = (compute_word_addr >= BANKS * WORDS_PER_BANK);
     wire line_range_error = (line_addr > (BANKS * WORDS_PER_BANK * 4) - 16);
     wire banked_range_error = (banked_addr > (BANKS * WORDS_PER_BANK * 4) - 16);
+    wire cnm_align_error = |cnm_addr0[1:0] || |cnm_addr1[1:0] || |cnm_addr2[1:0] || |cnm_addr3[1:0];
+    wire cnm_range_error = (cnm_addr0 > (BANKS * WORDS_PER_BANK * 4) - 4) ||
+                           (cnm_addr1 > (BANKS * WORDS_PER_BANK * 4) - 4) ||
+                           (cnm_addr2 > (BANKS * WORDS_PER_BANK * 4) - 4) ||
+                           (cnm_addr3 > (BANKS * WORDS_PER_BANK * 4) - 4);
     wire host_conflict = host_valid && (compute_valid || line_valid ||
-                                        banked_read_valid);
+                                        banked_read_valid || (|cnm_read_valid));
     wire host_access_ok = host_valid && !host_align_error && !host_range_error && !host_conflict;
     wire compute_access_ok = compute_valid && !compute_align_error && !compute_range_error;
     wire line_access_ok = line_valid && !line_align_error && !line_range_error;
     wire banked_access_ok = banked_read_valid && !banked_align_error && !banked_range_error;
+    wire cnm_access_ok = (|cnm_read_valid) && !cnm_align_error && !cnm_range_error;
+    wire [2:0] cnm_slice0 = cnm_addr0[18:16], cnm_slice1 = cnm_addr1[18:16];
+    wire [2:0] cnm_slice2 = cnm_addr2[18:16], cnm_slice3 = cnm_addr3[18:16];
     wire [31:0] host_byte_mask = {{8{host_wstrb[3]}}, {8{host_wstrb[2]}},
                                   {8{host_wstrb[1]}}, {8{host_wstrb[0]}}};
 
@@ -87,6 +101,8 @@ module ai_scratchpad #(
     reg [4:0] host_read_idx_d0, host_read_idx_d1;
     reg [4:0] compute_read_idx_d0, compute_read_idx_d1;
     reg [2:0] banked_slice_d0, banked_slice_d1;
+    reg [2:0] cnm_slice0_d0, cnm_slice0_d1, cnm_slice1_d0, cnm_slice1_d1;
+    reg [2:0] cnm_slice2_d0, cnm_slice2_d1, cnm_slice3_d0, cnm_slice3_d1;
     reg [2:0] line_slice_d0, line_slice_d1;
 
     genvar bank_i, slice_i;
@@ -101,11 +117,15 @@ module ai_scratchpad #(
                 // never both. Keep banked priority here as a defensive match
                 // to rtl/ai_scratchpad.v's scheduler-port selection.
                 wire banked_select = banked_access_ok && (banked_slice == SLICE_ID);
+                wire cnm_select = cnm_access_ok && ((bank_i==0 && cnm_slice0==SLICE_ID) ||
+                                  (bank_i==1 && cnm_slice1==SLICE_ID) ||
+                                  (bank_i==2 && cnm_slice2==SLICE_ID) ||
+                                  (bank_i==3 && cnm_slice3==SLICE_ID));
                 wire line_select = line_access_ok && (line_slice == SLICE_ID);
                 wire compute_select = compute_access_ok && !line_access_ok &&
                                       !banked_access_ok &&
                                       (compute_bank == BANK_ID) && (compute_slice == SLICE_ID);
-                wire macro_enable = host_select || line_select || banked_select ||
+                wire macro_enable = host_select || line_select || banked_select || cnm_select ||
                                     compute_select;
                 wire macro_write = host_select ? host_write :
                                    (line_select ? line_write :
@@ -117,8 +137,12 @@ module ai_scratchpad #(
                 wire [31:0] macro_wmask = host_select ? host_byte_mask :
                                          (line_select ? line_byte_mask :
                                           32'hffff_ffff);
+                wire [31:0] cnm_macro_addr = bank_i==0 ? {20'd0,cnm_addr0[15:4]} :
+                                             bank_i==1 ? {20'd0,cnm_addr1[15:4]} :
+                                             bank_i==2 ? {20'd0,cnm_addr2[15:4]} : {20'd0,cnm_addr3[15:4]};
                 wire [31:0] macro_addr = host_select ? {{(32-MACRO_ROW_BITS){1'b0}}, host_macro_addr} :
                                         line_select ? {{(32-MACRO_ROW_BITS){1'b0}}, line_macro_addr} :
+                                        cnm_select ? cnm_macro_addr :
                                         banked_select ? {{(32-MACRO_ROW_BITS){1'b0}}, banked_macro_addr} :
                                                         {{(32-MACRO_ROW_BITS){1'b0}}, compute_macro_addr};
                 wire [31:0] macro_wdata = host_select ? host_wdata :
@@ -153,6 +177,12 @@ module ai_scratchpad #(
             compute_read_idx_d1 <= compute_read_idx_d0;
             if (banked_access_ok) banked_slice_d0 <= banked_slice;
             banked_slice_d1 <= banked_slice_d0;
+            if (cnm_read_valid[0]) cnm_slice0_d0 <= cnm_slice0;
+            if (cnm_read_valid[1]) cnm_slice1_d0 <= cnm_slice1;
+            if (cnm_read_valid[2]) cnm_slice2_d0 <= cnm_slice2;
+            if (cnm_read_valid[3]) cnm_slice3_d0 <= cnm_slice3;
+            cnm_slice0_d1 <= cnm_slice0_d0; cnm_slice1_d1 <= cnm_slice1_d0;
+            cnm_slice2_d1 <= cnm_slice2_d0; cnm_slice3_d1 <= cnm_slice3_d0;
             if (line_access_ok && !line_write) line_slice_d0 <= line_slice;
             line_slice_d1 <= line_slice_d0;
         end
@@ -167,6 +197,10 @@ module ai_scratchpad #(
         banked_data1 = macro_q[{2'd1, banked_slice_d1}];
         banked_data2 = macro_q[{2'd2, banked_slice_d1}];
         banked_data3 = macro_q[{2'd3, banked_slice_d1}];
+        cnm_data0 = macro_q[{2'd0, cnm_slice0_d1}];
+        cnm_data1 = macro_q[{2'd1, cnm_slice1_d1}];
+        cnm_data2 = macro_q[{2'd2, cnm_slice2_d1}];
+        cnm_data3 = macro_q[{2'd3, cnm_slice3_d1}];
         line_rdata = {macro_q[{2'd3, line_slice_d1}],
                       macro_q[{2'd2, line_slice_d1}],
                       macro_q[{2'd1, line_slice_d1}],
@@ -174,6 +208,7 @@ module ai_scratchpad #(
         host_parity_error = 1'b0;
         compute_parity_error = 1'b0;
         banked_parity_error = 4'b0;
+        cnm_parity_error = 4'b0;
         line_parity_error = 4'b0;
     end
 endmodule

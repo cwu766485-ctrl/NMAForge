@@ -11,6 +11,9 @@
 | [A8_TSMC28_SYNTHESIS_REPORT.md](A8_TSMC28_SYNTHESIS_REPORT.md) | TSMC28 TT/0.9V/25°C、250MHz pre-layout 综合证据和适用边界。 |
 | [XCZU15EG_BRINGUP.md](XCZU15EG_BRINGUP.md) | XCZU15EG 构建、下载与板级 bring-up 步骤。 |
 | [CNM_BANK_LOCAL_PE_RESEARCH_ZH.md](CNM_BANK_LOCAL_PE_RESEARCH_ZH.md) | Bank-local PE/CNM 演进的量化研究、目标与实验方案。 |
+| [CNM_EVALUATION_ZH.md](CNM_EVALUATION_ZH.md) | 已实现的 A1 本地累加器改动、可量化归约下降和验证边界。 |
+| [CNM_A2_EVALUATION_ZH.md](CNM_A2_EVALUATION_ZH.md) | A2 读算流水/双缓冲的实现范围、测试条件与性能评估边界。 |
+| [CNM_A2_A3_COMPARISON_ZH.md](CNM_A2_A3_COMPARISON_ZH.md) | A2 GEMV 与 A3 GEMM 的同 MAC 数 VCS 对比方法和结果。 |
 | [wsl_linux_instruction.md](wsl_linux_instruction.md) | WSL/Linux EDA 环境与运行说明。 |
 | [project_update_log.md](project_update_log.md) | 项目更新记录；不替代规格或验证报告。 |
 

@@ -26,6 +26,19 @@ ai_run:
 
 ai_smoke: ai_comp ai_run
 
+# Activity-aware smoke: uses exactly the same top-level regression as
+# ai_smoke, but writes a VCD only when explicitly requested.  Convert it on
+# the Synopsys Linux environment with `make ai_smoke_saif` before DC power.
+VCD_FILE ?= ai_accel_smoke.vcd
+SAIF_FILE ?= ai_accel_smoke.saif
+SAIF_INSTANCE ?= tb_ai_accel_smoke/dut
+
+ai_smoke_vcd: ai_comp
+	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=$(AI_RANDOM_CASES) +AI_SEED=$(AI_SEED) +VCD_FILE=$(VCD_FILE) -l ai_accel_smoke_vcd.log
+
+ai_smoke_saif: ai_smoke_vcd
+	vcd2saif -input $(VCD_FILE) -output $(SAIF_FILE) -instance $(SAIF_INSTANCE)
+
 ai_transformer: ai_comp
 	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=0 +AI_SEED=$(AI_SEED) -l ai_transformer.log
 
@@ -61,17 +74,110 @@ ai_spad_arb_run: ai_spad_arb_comp
 
 ai_upgrade_vcs: ai_dma_run ai_spad_arb_run ai_quick
 
-# Portable directed A7 checks. These complement, but do not replace, VCS
-# `ai_smoke`; the tests intentionally exercise RID/BID reordering.
-ai_a6_iverilog:
-	iverilog -g2012 -o /tmp/cimforge_a6_dma.vvp ../../rtl/dma/ai_axi128_dma.v ../tb/tb_ai_axi128_dma.sv
-	vvp /tmp/cimforge_a6_dma.vvp
-	iverilog -g2012 -o /tmp/cimforge_a6_datapaths.vvp ../../rtl/compute/ai_conv3x3_linebuffer_core.v ../../rtl/compute/ai_kv_cache_engine.v ../tb/tb_ai_a6_datapaths.sv
-	vvp /tmp/cimforge_a6_datapaths.vvp
-	iverilog -g2012 -o /tmp/cimforge_spad_rr.vvp ../../rtl/memory/ai_spad_arbiter.v ../tb/tb_ai_spad_arbiter_rr.sv
-	vvp /tmp/cimforge_spad_rr.vvp
+# Focused VCS tests.  Each target creates a separate executable, KDB and log,
+# so a directed failure can be inspected in Verdi without rebuilding ai_smoke.
+VCS_FOCUSED = vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ns +define+VCS
 
-ai_a7_iverilog: ai_a6_iverilog
+ai_a6_dma_comp:
+	$(VCS_FOCUSED) -top tb_ai_axi128_dma ../../rtl/dma/ai_axi128_dma.v \
+		../tb/tb_ai_axi128_dma.sv -o simv_a6_dma -l ai_a6_dma_comp.log
+
+ai_a6_dma_run: ai_a6_dma_comp
+	./simv_a6_dma -l ai_a6_dma_run.log
+
+ai_a6_datapaths_comp:
+	$(VCS_FOCUSED) -top tb_ai_a6_datapaths \
+		../../rtl/compute/ai_conv3x3_linebuffer_core.v \
+		../../rtl/compute/ai_kv_cache_engine.v \
+		../tb/tb_ai_a6_datapaths.sv -o simv_a6_datapaths -l ai_a6_datapaths_comp.log
+
+ai_a6_datapaths_run: ai_a6_datapaths_comp
+	./simv_a6_datapaths -l ai_a6_datapaths_run.log
+
+ai_a7_vcs: ai_a6_dma_run ai_a6_datapaths_run ai_spad_arb_run
+
+# Focused A2 CNM test: verifies a bit-exact three-K-group VDOT, local
+# accumulation, output-level reduction and two successful A prefetches.
+ai_cnm_a2_comp:
+	$(VCS_FOCUSED) -top tb_ai_banked_cnm_a1 \
+		../../rtl/compute/ai_bank_pe.v \
+		../../rtl/compute/ai_banked_compute_core.v \
+		../tb/tb_ai_banked_cnm_a1.v -o simv_cnm_a2 -l ai_cnm_a2_comp.log
+
+# A2.2 unit gate for the four independent bank-local controllers.
+# This focused executable has occasionally been removed while its VCS .daidir
+# cache remains (for example after a WSL/Windows file sync).  In that state VCS
+# says the design is unchanged but does not recreate simv_cnm_a22.  Clear only
+# this target's generated cache before compile; it does not touch ai_smoke.
+ai_cnm_a22_comp:
+	rm -rf simv_cnm_a22 simv_cnm_a22.daidir
+	$(VCS_FOCUSED) -top tb_ai_banked_cnm_a22 \
+		../../rtl/compute/ai_bank_pe.v \
+		../../rtl/compute/ai_bank_local_controller.v \
+		../../rtl/compute/ai_banked_cnm_core.v \
+		../tb/tb_ai_banked_cnm_a22.sv -o simv_cnm_a22 -l ai_cnm_a22_comp.log
+
+ai_cnm_a22_run: ai_cnm_a22_comp
+	./simv_cnm_a22 -l ai_cnm_a22_run.log
+
+ai_cnm_a22: ai_cnm_a22_run
+
+# Comparable VCS microbenchmarks: each A2/A3 case performs 64*L INT8 MACs.
+ai_cnm_a2_gemv_bench_comp:
+	rm -rf simv_cnm_a2_gemv_bench simv_cnm_a2_gemv_bench.daidir
+	$(VCS_FOCUSED) -top tb_ai_cnm_a2_gemv_bench \
+		../../rtl/compute/ai_bank_pe.v \
+		../../rtl/compute/ai_bank_local_controller.v \
+		../../rtl/compute/ai_banked_cnm_core.v \
+		../tb/tb_ai_cnm_a2_gemv_bench.sv -o simv_cnm_a2_gemv_bench -l ai_cnm_a2_gemv_bench_comp.log
+
+ai_cnm_a2_gemv_bench_run: ai_cnm_a2_gemv_bench_comp
+	./simv_cnm_a2_gemv_bench -l ai_cnm_a2_gemv_bench_run.log
+
+ai_cnm_a2_gemv_bench: ai_cnm_a2_gemv_bench_run
+
+ai_tensor_a3_gemm_bench_comp:
+	rm -rf simv_tensor_a3_gemm_bench simv_tensor_a3_gemm_bench.daidir
+	$(VCS_FOCUSED) -top tb_ai_tensor_a3_gemm_bench \
+		../../rtl/compute/ai_tensor_matrix_core.v \
+		../tb/tb_ai_tensor_a3_gemm_bench.sv -o simv_tensor_a3_gemm_bench -l ai_tensor_a3_gemm_bench_comp.log
+
+ai_tensor_a3_gemm_bench_run: ai_tensor_a3_gemm_bench_comp
+	./simv_tensor_a3_gemm_bench -l ai_tensor_a3_gemm_bench_run.log
+
+ai_tensor_a3_gemm_bench: ai_tensor_a3_gemm_bench_run
+
+ai_cnm_compare: ai_cnm_a2_gemv_bench ai_tensor_a3_gemm_bench
+
+# A1 historical baseline (central per-K global reduction) and all final
+# CNM comparison gates.  The baseline is compiled separately from the current
+# A2/A3 RTL so no performance number is inferred from a spreadsheet model.
+ai_cnm_a1_baseline_comp:
+	rm -rf simv_cnm_a1_baseline simv_cnm_a1_baseline.daidir
+	$(VCS_FOCUSED) -top tb_ai_cnm_a1_baseline_bench \
+		../../rtl/compute/ai_bank_pe.v \
+		../../rtl/compute/ai_reduction_tree.v \
+		../ref/ai_banked_compute_core_original.v \
+		../tb/tb_ai_cnm_a1_baseline_bench.sv -o simv_cnm_a1_baseline -l ai_cnm_a1_baseline_comp.log
+
+ai_cnm_a1_baseline_run: ai_cnm_a1_baseline_comp
+	./simv_cnm_a1_baseline -l ai_cnm_a1_baseline_run.log
+
+ai_cnm_a1_baseline: ai_cnm_a1_baseline_run
+
+ai_cnm_final_compare: ai_cnm_a1_baseline ai_cnm_a2_gemv_bench ai_tensor_a3_gemm_bench
+
+# CNM signoff gate: microarchitecture throughput, SPAD arbitration under
+# CNM/DMA contention, then the full AXI/DMA/compute smoke regression.
+ai_cnm_signoff: ai_cnm_final_compare ai_spad_arb_run ai_smoke
+
+ai_cnm_a2_run: ai_cnm_a2_comp
+	./simv_cnm_a2 -l ai_cnm_a2_run.log
+
+ai_cnm_a2: ai_cnm_a2_run
+
+# Compatibility alias for the pre-A2 focused command.
+ai_cnm_a1: ai_cnm_a2
 
 clean:
 	rm -rf csrc simv* *.log ucli.key *.vpd vc_hdrs.h DVE* novas* *.daidir *.vdb *.key

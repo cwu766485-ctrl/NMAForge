@@ -37,6 +37,10 @@ syn/out/
 tmp/
 docs/hardware/
 
+# SpyGlass local databases/reports and simulation activity dumps.
+verif/spyglass/a8_static/
+verif/sim/*.saif
+
 # Public repository hygiene
 docs/*.pdf
 docs/Interview/
