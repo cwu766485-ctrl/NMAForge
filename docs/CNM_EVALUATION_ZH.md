@@ -271,7 +271,7 @@ RTL/架构冻结一部分
 UVM 全部完成才综合。
 
 需要注意：项目早期 A8 run 确实使用过真实 TSMC28 库，证据见
-`docs/A8_TSMC28_SYNTHESIS_REPORT.md` 和历史输出目录
+`docs/TSMC28_SYNTHESIS_REPORT.md` 和历史输出目录
 `syn/out/tsmc28_a8_4_0ns_20260802/`。本节描述的是 2026-08-06 在新
 `/mnt/e` 路径下因环境变量未恢复而产生的无效 run，不否定早期 A8 的真实
 250 MHz pre-layout 结果。

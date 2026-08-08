@@ -51,8 +51,8 @@ fpga/xczu15eg/build/baremetal/cimforge_bringup.elf
 ```
 
 不要混用其他 XSA 生成的 FSBL/BSP；PS DDR、MIO、时钟和 fabric interrupt ID 必须
-与当前 block design 一致。A2 的 DMA/descriptor 地址仍是 32 bit，裸机链接脚本因此
-把程序和静态测试缓冲放在低 4 GiB 的 PS DDR 中。
+与当前 block design 一致。当前 ABI v7.2 和统一 DMA 已使用 64-bit 外部地址，裸机链接脚本
+仍建议把程序和静态测试缓冲放在低 4 GiB 的 PS DDR 中，以便兼容当前板级软件和调试工具。
 
 ## 3. 连接和快速自检
 
@@ -95,10 +95,10 @@ fpga\xczu15eg\scripts\run_baremetal.ps1 -Port COM11
 
 裸机测试覆盖：
 
-- AXI-Lite `VERSION=0x10000002` 和 `SPAD_INFO=0x00080000`；
+- AXI-Lite `VERSION=0x10000008` 和 `SPAD_INFO=0x00080000`；
 - cache-maintained PS DDR -> scratchpad DMA load；
 - 位于 PS DDR 的 descriptor ring 和 command queue doorbell；
-- INT8 VDOT，期望结果 `70`；
+- INT8 VDOT/基础命令链，期望结果由当前 ABI v7.2 workload manifest 和 golden model 给出；
 - 四字 completion entry 及发布顺序；
 - PL level interrupt 经 GIC 到 A53 ISR，并由 ISR W1C 清除 sticky status；
 - scratchpad -> PS DDR DMA store。

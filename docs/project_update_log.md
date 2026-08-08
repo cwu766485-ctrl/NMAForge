@@ -225,3 +225,15 @@ SRAM/vector 教学轨道已从仓库移除；A2-A6 阶段草案和已过期 FPGA
   回归矩阵、退出条件和每日学习节奏。
 - 下一阶段从 SPEC 学习和 UVM 基础环境开始：先做 AXI-Lite agent/RAL、CMDQ/CPLQ scoreboard，
   再接入 AXI4 DMA、scratchpad arbiter、CNM 四 lane 和 Transformer reference model。
+
+## 2026-08-08 - 文档事实源同步
+
+- 将 `docs/architecture.md` 从英文旧版更新为中文 A8 架构说明，补充当前模块所有权、唯一
+  scratchpad 仲裁入口、A2.2 四 bank-local controller/PE、A3.1 4×4 GEMM 数据路径，以及
+  最新 VCS、TSMC28、XCZU15EG 和 SpyGlass 证据边界。
+- 更新 `docs/README.md` 文档索引，移除已合并删除的 `CNM_A2_EVALUATION_ZH.md`、
+  `CNM_A2_A3_COMPARISON_ZH.md` 和旧综合报告链接，新增 `VPLAN.md` 入口。
+- 将 `CNM_BANK_LOCAL_PE_RESEARCH_ZH.md` 的 A1/A2/A3 内容改为“已实现结果 + 后续研究边界”，
+  并把最新性能数字和源码路径指向统一 CNM 评估报告。
+- 同步 `SPEC.md`、`CNM_EVALUATION_ZH.md`、`XCZU15EG_BRINGUP.md` 的报告路径、版本号和
+  ABI v7.2/64-bit 地址描述；未改写历史日志中的历史结果。

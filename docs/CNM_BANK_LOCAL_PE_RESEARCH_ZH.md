@@ -1,21 +1,17 @@
 # CIMForge 的 CNM（Bank-Local PE）升级说明
 
-**状态：** 架构研究与实验计划，不是已实现的性能结论。  
+**状态：** A1、A2.2、A3.1 已实现并完成定向 benchmark；本文保留设计动机、演进逻辑与后续研究边界。实测结果以 `CNM_EVALUATION_ZH.md` 为准。
 **对象：** CIMForge A8，512 KiB、4-bank scratchpad。  
 **一句话：** 把四个 SRAM bank 旁边的计算、累加和控制做得更独立，减少中央调度与跨 bank 的中间结果搬运。
 
 ## 1. 先说结论
 
-CIMForge 现在已经有 4 个 SRAM bank 和 4 个并行 INT8 PE，因此它不是从零开始做
-CNM；它已经是 **bank-parallel、near-memory-friendly** 的加速器。
+CIMForge 当前已经是 **数字 CNM**：4 个 SRAM bank 旁各有一个 Local Controller 和
+Local PE。A2.2 让每个 bank 独立进行地址推进、A/B request、ready/response-valid、
+A ping-pong buffer 和本地累加；四个 local sum 仅在输出边界进入 Global Reducer。
 
-但目前“谁读 SRAM、何时计算、何时累加”主要由一个中央控制器决定。CNM 升级的目标是：
-让每个 bank 附近拥有自己的小控制器和本地累加器，四个 bank 各自连续工作，最后才把
-四个小结果相加。
-
-这样做**可能**提高 banked VDOT/GEMV 的吞吐、减少全局数据切换，并改善局部功耗；但它
-不会自动提高整个芯片的最高频率。当前 A8 的全芯片关键路径在 scratchpad 到 Softmax SFU
-的 `sum_exp` 累加，不在 banked VDOT。
+实测表明它提高了 banked GEMV/GEMM 的受控 workload 吞吐，但不会自动提高全芯片最高频率。
+当前 A8 的全芯片关键路径约为 3.89 ns，位于 SRAM 到 Softmax SFU 的路径，不在 banked VDOT。
 
 ## 2. 当前结构在做什么
 
@@ -27,7 +23,7 @@ CNM；它已经是 **bank-parallel、near-memory-friendly** 的加速器。
 - **GEMV**：矩阵乘向量，本质上是连续做很多个 VDOT。
 - **partial sum**：一个 bank 算出的局部结果，最后还要与其他 bank 的结果相加。
 
-当前每次从四个 bank 各取一个 32-bit word，四个 PE 同时执行：
+原始基线每次从四个 bank 各取一个 32-bit word，四个 PE 同时执行：
 
 ```text
 Bank0 数据 -> PE0 -- partial0 --\
@@ -36,18 +32,17 @@ Bank2 数据 -> PE2 -- partial2 ---+
 Bank3 数据 -> PE3 -- partial3 --/
 ```
 
-四个 PE 每次合计完成 16 个 INT8 MAC。问题在于，当前由中央 FSM 依次完成：
+四个 PE 每次合计完成 16 个 INT8 MAC。原始版本由中央 FSM 依次完成：
 
 ```text
 申请读 A -> 等 A 返回 -> 申请读 B -> 等 B 返回 -> 四 PE 计算/归约
 ```
 
-所以当前架构是“**四路并行计算 + 中央读控制 + 中央归约**”。它已经有 bank 并行，但
-还不是完全分布式的 bank-local CNM。
+这是 A1/A2 改造前的“**四路并行计算 + 中央读控制 + 中央归约**”基线，而不是当前实现。
 
 ## 3. 想改成什么样
 
-最小 CNM 架构如下：
+当前已实现的最小 CNM 架构如下：
 
 ```text
 Bank0 <-> Local Controller0 <-> PE0 <-> local_acc0
@@ -58,12 +53,12 @@ Bank3 <-> Local Controller3 <-> PE3 <-> local_acc3
                                   每个输出结束时才 Global Reduce
 ```
 
-关键不是改 SRAM cell，也不需要模拟计算或 ADC。真正要改的是：
+关键不是改 SRAM cell，也不需要模拟计算或 ADC。已经完成的关键改动是：
 
 1. 每个 bank 有本地地址/读控制和本地累加器；
 2. PE 计算一组又一组数据时，结果先留在自己的 `local_acc`；
 3. 一个 VDOT 或一个 GEMV 输出完成后，才把四个 `local_acc` 送给 Global Reducer；
-4. 进一步版本再加入 A/B 操作数预取、双缓冲，以及按输出通道/head/token 的 bank 分片。
+4. A2.1 已加入 A/B 读算流水、A 预取和双缓冲；A3.1 已加入 4×4 GEMM tile 数据复用与 B response 预取。
 
 ## 4. 能得到什么好处
 
@@ -85,8 +80,8 @@ CNM：4 个 local_acc，在输出结束时交一次 = 4 次传输/归约输入
 自己的流水控制器，就可以在计算第 n 组时准备第 n+1 组，减少等待空泡。
 
 每个 bank 是单端口 SRAM，读 A 和读 B 至少仍要两次访问，因此不带数据复用时的理论
-下界是约 2 cycle/组，而不是 1 cycle/组。针对大 GEMV、相同频率、没有 DMA 干扰，
-可把 **1.5--2.0× 周期加速**作为实验目标；这是待验证目标，不是当前实测结果。
+下界是约 2 cycle/组，而不是 1 cycle/组。在固定 64L INT8 MAC、单周期 SRAM response、
+无 DMA 竞争的 benchmark 中，A2 对 L=16/64/256 GEMV 相对原始基线实测为 **1.73×/1.92×/1.98×**。
 
 ### 4.3 特定数据布局下可能降低 SRAM 动态功耗
 
@@ -131,7 +126,8 @@ SRAM 输出 -> scratchpad 数据选择 -> Softmax SFU 的 sum_exp 累加寄存�
 
 ## 7. 推荐做法
 
-不要一次重写整个 A8。最合适的第一步是只改 opcode `0x20` 的 banked VDOT：
+演进采用了不重写整个 A8 的方式：保持 CMDQ、DMA、描述符、完成项和寄存器 ABI，先改 opcode
+`0x20/0x21` 的 banked VDOT/GEMV，再扩展到 A3.1 GEMM tile：
 
 1. 保持 CMDQ、DMA、描述符、完成项和寄存器 ABI 不变；
 2. 加四个 local accumulator；
@@ -142,30 +138,27 @@ SRAM 输出 -> scratchpad 数据选择 -> Softmax SFU 的 sum_exp 累加寄存�
 
 | 阶段 | 改什么 | 预期价值 |
 |---|---|---|
-| A1 | 每个 bank 加 local accumulator | 降低归约频率；功能亮点强，但吞吐未必明显增加 |
-| A2 | 每 bank 加 Local Controller、地址发生器、读/算流水、双缓冲 | 大 GEMV 争取 1.5–2.0× 同频提速 |
-| A3 | 让输出通道/head/token 按 bank 分片，并复用 activation | 特定工作负载下 2–4× 是可研究目标 |
+| A1 | 每个 bank 加 local accumulator | 已实现；L=256 的全局归约输入事件由 1024 降至 4 |
+| A2.2 | 每 bank 独立 Local Controller、地址发生器、读/算流水、双缓冲 | 已实现；大 GEMV 实测 1.98× 同频周期加速 |
+| A3.1 | 4×4 GEMM tile、activation/operand 复用与预取 | 已实现；L=256 受控 GEMM 实测 3.97× 相对原始、约 2× 相对 A2 |
 
-这一版即使没有巨大的 speedup，也已经能清楚展示“bank-local accumulation”的 CNM
-思想。真正可能达到 1.5--2.0× 的下一步，才是每 bank 独立流水控制和预取。
+当前实现已同时展示 bank-local accumulation、独立流水控制和 GEMM tile 数据复用；后续 A3.2
+只应在 UVM/DMA 竞争/SAIF 数据揭示新瓶颈后再定义。
 
 ## 8. 项目表述
 
-现在可写：
+当前可写：
 
-> CIMForge 是带 4-bank 并行 PE 数据通路的 scratchpad-based、near-memory-friendly
-> AI accelerator。
-
-完成并验证 bank-local controller/accumulator 后可写：
-
-> CIMForge 的 CNM datapath 将 Local PE/accumulator 绑定到各 SRAM bank，以输出级
-> 归约减少中央调度和跨 bank partial-sum 数据移动；性能提升以对应 A/B workload 的
-> 实测周期、带宽和活动率为准。
+> CIMForge 是全数字 Compute-Near-Memory 加速器：四个 SRAM bank 分别邻接 Local Controller
+> 和 Local PE，在 bank 内完成读请求、预取和累加，仅在输出边界做 Global Reduce。受控 VCS
+> benchmark 中，A2 大 GEMV 相对原始版本最高 1.98×，A3.1 GEMM tile 最高 3.97×；功耗收益
+> 仍需正确 SAIF 映射和同 workload 的 PPA 对比证明。
 
 ## 9. 源码依据
 
-- 当前 4 PE、中央 A/B 读控制和 reduction：`rtl/compute/ai_banked_compute_core.v`
+- 原始 4 PE、中央 A/B 读控制和 reduction 基线：`verif/ref/ai_banked_compute_core_original.v`
+- 当前 CNM core 与 local controller：`rtl/compute/ai_banked_cnm_core.v`、`rtl/compute/ai_bank_local_controller.v`
 - 单个 INT8 dot4 PE：`rtl/compute/ai_bank_pe.v`
 - 四 bank 同行读取：`rtl/memory/ai_scratchpad.v`
 - 统一仲裁：`rtl/memory/ai_spad_arbiter.v`
-- 当前关键路径证据：`docs/A8_TSMC28_SYNTHESIS_REPORT.md`
+- 当前关键路径证据：`docs/TSMC28_SYNTHESIS_REPORT.md`
