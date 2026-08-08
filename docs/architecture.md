@@ -35,6 +35,80 @@ DDR <== 128-bit AXI4 ==> ai_axi128_dma <==> ai_spad_arbiter <==> ai_scratchpad
 - `ai_completion_writer` 必须先提交四个 32-bit completion word，才能发布新的 `CPLQ_TAIL`。
 - `ai_desc_fetch` 读取片上描述符，`axi_desc_fetch` 读取外部描述符；命令期间来源固定。
 
+### 2.1 完整系统级数据流图
+
+下面这张图把控制面、数据面、scratchpad 仲裁、四 bank CNM 和其他计算引擎放在同一张图中：
+
+```text
+                                      ┌──────────────────────────────┐
+                                      │             CPU/SoC            │
+                                      │  AXI-Lite 配置 / DMA 描述符 / IRQ │
+                                      └──────────────┬───────────────┘
+                                                     │
+                                      ┌──────────────▼───────────────┐
+                                      │       AXI-Lite Register IF     │
+                                      │ ai_accel_regs: CTRL/STATUS/IRQ │
+                                      │ CMDQ/CPLQ/DMA/PERF/PROTECTION │
+                                      └──────────────┬───────────────┘
+                                                     │ doorbell / status
+                                      ┌──────────────▼───────────────┐
+                                      │      ai_command_processor      │
+                                      │ queue owner / descriptor check │
+                                      │ dependency / launch / abort    │
+                                      └───────┬──────────┬─────────────┘
+                                              │          │
+                         ┌────────────────────▼──┐  ┌──▼──────────────────┐
+                         │ ai_desc_fetch          │  │ ai_completion_writer │
+                         │ SPAD descriptor source │  │ 4 words then tail    │
+                         └────────────┬───────────┘  └──────────┬───────────┘
+                                      │                          │
+┌──────────────────────┐     ┌───────▼──────────────────────────▼───────┐     ┌──────────────────┐
+│ DDR / external memory│◄───►│          ai_axi128_dma (AXI4 master)       │◄───►│ axi_desc_fetch   │
+│ 1D/2D/gather/tile    │     │ 64-bit addr / 16-beat / 4KiB split / RID  │     │ external desc     │
+└──────────────────────┘     └───────────────────────┬──────────────────┘     └──────────────────┘
+                                                      │ DMA SPAD requests
+                                      ┌───────────────▼────────────────┐
+                                      │       ai_spad_arbiter           │
+                                      │ sole scheduler admission point │
+                                      │ control priority + data RR     │
+                                      └──────┬──────────┬───────────────┘
+                                             │ scheduler │ banked lane path
+                                             │ port      │ valid/ready/mask
+                              ┌──────────────▼───┐  ┌──▼──────────────────────────────┐
+                              │  ai_scratchpad    │  │      ai_banked_cnm_core         │
+                              │ host/debug port   │  │ 4 × Local Controller + Local PE │
+                              │ 128-bit line path │  └──┬──────────┬──────────┬────────┘
+                              └──┬──────┬──────┬──┘     │          │          │
+                                 │      │      │        │          │          │
+                         ┌───────▼┐ ┌──▼────┐ ┌▼───────┐ ┌▼───────┐ ┌▼───────┐ ┌▼───────┐
+                         │ SRAM B0│ │SRAM B1│ │SRAM B2 │ │SRAM B3 │ │ LC/PE0 │ │ LC/PE1 │ ...
+                         │128 KiB │ │128 KiB│ │128 KiB │ │128 KiB │ │local_acc│ │local_acc│
+                         └───────┬┘ └──┬────┘ └──┬─────┘ └──┬─────┘ └────────┘ └────────┘
+                                 └─────┴─────────┴─────────┴──────────────┐
+                                                                         │ 4 partial sums
+                                                            ┌────────────▼───────────┐
+                                                            │       Global Reducer    │
+                                                            │ sum/quantize/writeback  │
+                                                            └────────────┬───────────┘
+                                                                         │
+             ┌───────────────────────────────┬───────────────────────────┼────────────────────┐
+             │                               │                           │                    │
+      ┌──────▼──────┐                 ┌──────▼──────┐               ┌────▼─────┐      ┌─────▼─────┐
+      │ INT8 VDOT/  │                 │ 4×4 Matrix  │               │ SFU      │      │ Conv/KV   │
+      │ GEMV / CNM  │                 │ GEMM / A3.1 │               │ Softmax/ │      │ linebuffer│
+      │ A1/A2.2     │                 │ QKV/FFN      │               │ Norm     │      │ cache     │
+      └─────────────┘                 └─────────────┘               └──────────┘      └───────────┘
+                                                                         │
+                                                            ┌────────────▼───────────┐
+                                                            │ SPAD writeback / CPLQ   │
+                                                            │ result + events + error  │
+                                                            └────────────────────────┘
+```
+
+图中需要特别区分两条路径：DMA/标量/line 计算走 `ai_spad_arbiter` 的 scheduler port；
+CNM 使用同一个 scratchpad 资源和唯一 admission 规则，但在被接纳后保留四条 bank lane 的
+地址、请求和响应状态。Global Reducer 只接收输出边界的 local sum，不接收每个 K-group 的全部中间 partial sum。
+
 ## 3. 数字 CNM bank-local 数据路径
 
 对 opcode `0x20/0x21`，`ai_banked_cnm_core` 实例化四个独立的
