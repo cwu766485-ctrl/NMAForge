@@ -1,6 +1,9 @@
 # CIMForge 访问 WSL Linux / EDA 环境指南
 
 本文说明在 Windows + WSL 环境中，如何让 Codex 协助检查、修改并运行 WSL 内的项目。
+当前 CIMForge 的 Linux 工作副本通常位于 `/home/ray/ic/CIMForge`，Windows 主副本位于
+`E:\workspace\chip\CIMForge`；两者可只同步 RTL、验证、软件、综合脚本和文档等有效源，
+不要求复制 `.git` 对象、Vivado 缓存、波形或构建工件。
 
 ## 1. 先判断能否直接访问
 
@@ -149,7 +152,7 @@ find . -maxdepth 2 -type f | sort
 
 ## 7. 最小工作流
 
-1. 将项目放在 WSL 的 Linux 文件系统中，例如 `/home/ray/ic/project`。
+1. 将项目放在 WSL 的 Linux 文件系统中，例如 `/home/ray/ic/CIMForge`。
 2. 确认 Windows 共享盘在 WSL 中为 `/mnt/f`。
 3. 在 WSL 启动 bridge。
 4. 告知 Codex 项目绝对路径与目标。

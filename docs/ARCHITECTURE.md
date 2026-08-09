@@ -1,5 +1,8 @@
 # CIMForge A8 架构说明
 
+**状态：2026-08-09 的 RTL 功能基线。** 本文描述已接入 `ai_accel_top` 的结构；
+不把规划中的 UVM、后布局签核或实板验收写成已完成能力。
+
 ## 1. 项目范围
 
 CIMForge A8 是单时钟、可综合的全数字 AI 近存加速器 IP：控制面为 AXI-Lite，
@@ -169,6 +172,36 @@ Q/K/V -> QK^T -> causal/row Softmax -> AV -> projection
 
 当前可信表述是“TSMC28、250 MHz pre-layout setup/hold closure”。Formal、LEC、DFT、UVM、
 后布局 STA/功耗和实板长期压力测试仍未完成，详见 [`VPLAN.md`](VPLAN.md)。
+
+## 8. 全部电路模块
+| 分类 | 模块 | 是否在主功能路径 | 作用 |
+|---|---|---:|---|
+| 顶层 | `ai_accel_top` | 是 | 把 AXI、寄存器、命令、DMA、SRAM、计算核和 IRQ 接起来。 |
+| AXI-Lite | `axi_lite_reg_if` | 是 | AXI4-Lite 五通道协议适配，转换成内部寄存器读写请求。 |
+| 寄存器 | `ai_accel_regs` | 是 | 保存软件配置，生成 `submit`、`abort`、DMA start 等脉冲，回报状态、性能计数器和 IRQ。 |
+| 调度 | `ai_command_processor` | 是 | CMDQ/CPLQ 指针所有者；取 descriptor、检查合法性/依赖、选择计算核、等待结束并安排 completion。 |
+| 片上 descriptor | `ai_desc_fetch` | 是 | 从 scratchpad 读取 64B descriptor。 |
+| 外部 descriptor | `axi_desc_fetch` | 是 | 从 DDR 读取外部 descriptor，使用 AXI4 读通道。 |
+| completion | `ai_completion_writer` | 是 | 向 CPLQ 连续写 4 个 32-bit word，写完后才能推进 `CPLQ_TAIL`。 |
+| 计数器 | `ai_perf_monitor` | 是 | 统计 DMA 字节数、AR/AW 数、stall、outstanding 高水位、矩阵 MAC 周期等。 |
+| tile 调度 | `ai_tile_pipeline` | 是，作为命令处理器子模块 | 管理 ping-pong tile 的 load / compute / store 重叠流程。 |
+| DMA | `ai_axi128_dma` | 是 | 128-bit AXI4 主机 DMA；支持 1D、2D、gather、最大 16-beat burst、4 KiB 切分、最多 4 笔 tagged read outstanding。 |
+| 仲裁 | `ai_spad_arbiter` | 是 | scratchpad 的唯一调度入口；descriptor/completion 高优先级，计算/DMA 数据面轮询。 |
+| SRAM | `ai_scratchpad` | 是 | 512 KiB、4 bank SRAM；支持 32-bit 单字、128-bit line、四 lane banked/CNM 读取。 |
+| 保护 | `ai_spad_protection` | 是，实例化多次 | 检查 host、compute、line、banked、completion 的地址是否越界或权限冲突。 |
+| 标量 INT8 核 | `ai_int8_compute_core` | 是 | 普通 INT8 VDOT、GEMV、GEMM tile、Conv1x1 等标量/基础计算控制。 |
+| banked 基线核 | `ai_banked_compute_core` | 编译保留 | 中央控制式 banked 计算基线，主要用于兼容/对比，不是当前 CNM 主路径。 |
+| CNM 核 | `ai_banked_cnm_core` | 是 | opcode `0x20/0x21` 的四 bank CNM VDOT/GEMV 顶层。 |
+| Local Controller | `ai_bank_local_controller` | 是，CNM 内 4 个实例 | 每个 bank 自己产生地址、等待读响应、预取、双缓冲、局部累加。 |
+| Local PE | `ai_bank_pe` | 是，CNM/基线核子模块 | 一个 32-bit packed INT8 dot4 乘加单元。 |
+| 归约树 | `ai_reduction_tree` | 编译保留/辅助 | 合并多个局部 partial sum 的归约逻辑。 |
+| 矩阵核 | `ai_tensor_matrix_core` | 是 | 4×4 INT8 matrix tile，支持 GEMM、Batch GEMM、转置、bias、激活、量化与 line 写回。 |
+| SFU | `ai_tensor_sfu_core` | 是 | Softmax、causal Softmax、RMSNorm、LayerNorm、Residual、GELU、SiLU、requant。 |
+| 除法器 | `ai_unsigned_divider` | 是，SFU 子模块 | 用于 Softmax 归一化等定点除法。 |
+| 整数开方 | `ai_integer_sqrt` | 是，SFU 子模块 | 用于 RMSNorm/LayerNorm 的均方根或方差相关计算。 |
+| 卷积核 | `ai_conv3x3_linebuffer_core` | 是 | Conv3x3 与 Depthwise Conv3x3 的 line-buffer 路径。 |
+| KV 核 | `ai_kv_cache_engine` | 是 | KV-cache 的写入、按 head/token/stride 读取等 primitive。 |
+
 
 ## 7. 下一步
 

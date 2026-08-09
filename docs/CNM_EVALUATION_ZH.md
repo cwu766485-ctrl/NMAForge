@@ -158,13 +158,14 @@ A3.1 的 `MAC-active` 在 L=16/64/256 分别为 64/256/1024，`banked_wait`
 | N=1 VDOT/GEMV、向量归约 | A2 | bank-local 控制和预取更贴合一维数据形状 |
 | GEMM、Q/K/V projection、attention 矩阵乘、FFN | A3.1 | 4×4 输出复用可提高 MAC 利用率 |
 
-推进顺序：
+已经完成的收口动作是：A3.1 已纳入系统 smoke，CNM/DMA scratchpad 竞争单测已通过，
+并已对当前 RTL 完成 28nm DC 和 XCZU15EG OOC 的实现检查。下一阶段不是继续堆叠
+微架构，而是用 UVM/scoreboard、SAIF 和板级压力测试确认收益在真实接口压力下仍成立：
 
-1. 将 A3.1 纳入 `make ai_smoke` 的系统回归并补矩阵结果覆盖；
-2. 加入 DMA 竞争测试，统计 A2/A3 在仲裁压力下的周期；
-3. 生成 VCD/SAIF，做功耗分析；
-4. 用 DC/Vivado 得到面积、WNS/Fmax，确认 4×4 阵列的频率代价；
-5. 只有上述数据揭示新的瓶颈时，再定义 A3.2（例如更大 tile、双缓冲或更细粒度 bank arbitration）。
+1. 迁移现有 A2/A3 directed case 到 UVM，并补充随机 shape、back-pressure 与 error recovery；
+2. 统计 A2/A3 在 DMA 竞争下的周期、stall、outstanding 高水位和有效 MAC/cycle；
+3. 修复 SAIF 层次映射后，在同 workload 下对比 CNM 与基线功耗；
+4. 仅当上述数据揭示新瓶颈时，再定义 A3.2（例如更大 tile、双缓冲或更细粒度 bank arbitration）。
 
 这样不会把已经通过、且已消除主要 wait 气泡的 A3.1 重新推倒；同时能把“RTL
 周期收益”提升为可信的 PPA 结论。
@@ -178,7 +179,7 @@ A3.1 的 `MAC-active` 在 L=16/64/256 分别为 64/256/1024，`banked_wait`
 - `make ai_smoke`：已记录配置 `AI_RANDOM_CASES=4`、`AI_SEED=12345`，日志为 `TEST PASS`；
 - `make ai_cnm_final_compare`：原始/A1/A2/A3.1 的 benchmark PASS。
 
-已补充、待在 Synopsys 环境运行：
+已接入并已有定向结果：
 
 - `make ai_spad_arb_run` 现包含 12 个周期的持续 CNM read 与 DMA line
   请求竞争，检查二者 grant 差不超过一个周期，并输出双方 grant 数。这是
@@ -190,9 +191,9 @@ A3.1 的 `MAC-active` 在 L=16/64/256 分别为 64/256/1024，`banked_wait`
   `CIMFORGE_SAIF` 指向该 SAIF 时将其作为活动率注入 `report_power`；未提供
   SAIF 的 power.rpt 必须标记为默认活动率估计，而不是实测功耗。
 
-待完成：上述新增测试的 VCS PASS、SAIF 功耗、DC/Vivado 时序/面积及后布局
-PPA。这些完成前，不应把本报告的周期结果表述为已测 Fmax 提升或芯片总功耗
-降低。
+仍待完成的是 SAIF workload 功耗、UVM coverage/formal、后布局 PPA 和实板压力验证。
+因此本报告中的 cycle speedup 只能表述为受控 RTL benchmark 的同频周期收益，不能表述为
+已测芯片 Fmax 提升或系统总功耗降低。
 
 ### 5.1 DC 运行结果（2026-08-06）
 
@@ -213,8 +214,8 @@ CIMForge TSMC28 DC completed: /mnt/e/workspace/chip/CIMForge/syn/out/tsmc28_4_0n
   为 `0.00/0.00 ns`，setup 违例为 0；hold WNS/TNS 为 `0.00/0.00 ns`，
   hold 违例为 0；
 - `power.rpt` 的库、电压和单位已经有效（TT/0.9 V/25°C、mW/nW），但明确
-  报告 `PWR-362: No switching activity has been annotated`，并提示未标注
-  primary input、sequential output 和 SRAM black-box output。因此当前
+  报告 `PWR-414/PWR-415/PWR-428`，即 primary input、sequential output 和
+  SRAM black-box output 未完全注释。因此当前
   `22.8290 mW` dynamic、`1.9733 mW` leakage、`24.8063 mW` total 只能作为
   DC 默认/部分活动率估计，不能称为 SAIF 实测功耗；
 - `OPT-1207` 的 local accumulator、response wait counter 等寄存器删除信息
@@ -234,11 +235,11 @@ CIMForge TSMC28 DC completed: /mnt/e/workspace/chip/CIMForge/syn/out/tsmc28_4_0n
 可以闭合，但不是很宽松；后续若增加阵列、改 SFU 或换 PVT，必须重新跑时序。
 
 `22.8290 mW` dynamic / `1.9733 mW` leakage 的数量级暂时可作参考，但由于
-`PWR-362` 表示 SAIF 没有成功注释，且 SRAM black-box 输出没有活动率，这两个
+`PWR-414/PWR-415/PWR-428` 表示活动率覆盖不完整，且 SRAM black-box 输出没有活动率，这两个
 数字不能用于 CNM 与 baseline 的功耗对比。特别是 clock network 占比很高，通常
 说明活动率覆盖不足或时钟树模型仍是 pre-layout 估计。
 
-## 7. 功耗修正方法与开发流程
+## 6. 功耗修正方法与开发流程
 
 功耗修正按以下顺序进行：
 
@@ -265,18 +266,14 @@ RTL/架构冻结一部分
         RTL 修正后重新 DC/功耗/STA
 ```
 
-对本项目，当前 RTL 和接口已经稳定，先完成 SAIF 映射修正，再搭建 UVM 是合理
-顺序。UVM 优先覆盖 AXI-Lite、AXI4 DMA、CMDQ/CPLQ、SPAD arbiter、A2 CNM
-四 lane 和 A3 GEMM scoreboard；DC/PPA 则在 UVM 回归期间持续增量运行，不必等
-UVM 全部完成才综合。
+对本项目，当前 RTL 和接口已形成稳定基线，UVM 与 SAIF 映射应并行推进：UVM 优先
+覆盖 AXI-Lite、AXI4 DMA、CMDQ/CPLQ、SPAD arbiter、A2 CNM 四 lane 和 A3 GEMM
+scoreboard；DC/PPA 则在 UVM 回归期间持续增量运行，不必等 UVM 全部完成才综合。
 
-需要注意：项目早期 A8 run 确实使用过真实 TSMC28 库，证据见
-`docs/TSMC28_SYNTHESIS_REPORT.md` 和历史输出目录
-`syn/out/tsmc28_a8_4_0ns_20260802/`。本节描述的是 2026-08-06 在新
-`/mnt/e` 路径下因环境变量未恢复而产生的无效 run，不否定早期 A8 的真实
-250 MHz pre-layout 结果。
+本报告引用的唯一当前 PPA 事实源是 `syn/out/tsmc28_4_0ns/` 及
+`docs/TSMC28_SYNTHESIS_REPORT.md`；历史输出只用于复现追溯，不应用于覆盖当前数字。
 
-## 6. DC/PPA 问题的解决顺序
+## 7. DC/PPA 后续检查顺序
 
 1. **先修库环境**：获取同一 PVT 的完整 TSMC28 RVT 标准单元 `.db`、SRAM
    macro `.db`，并确认包含 `INVD1BWP7T40P140`、`DFCNQD1BWP7T40P140` 和
@@ -287,10 +284,9 @@ UVM 全部完成才综合。
    占位库或缺少 SRAM macro 时直接报错，避免生成 0 面积假报告。
 3. **再看面积/功耗**：真实库加载后，`area.rpt` 应有非零 cell/macro area，
    `power.rpt` 应有 V、C、T 和 mW/uW 单位；SAIF 只提供活动率，不能替代工艺库。
-4. **最后修时序**：setup 通过后再处理 hold。当前 `-0.02 ns` hold 来自
-   pre-CTS min-delay guard 和理想时钟模型；真实库下用 `set_fix_hold` 重新综合。
-   仍有 violation 时，根据最短路径插入 hold buffer 或交给 CTS/PD 修复，不能靠
-   降低频率解决 hold。
+4. **最后修时序**：当前 4.0 ns run 的 setup/hold 均为 0 违例。未来若更严 PVT
+   或更短周期出现 hold violation，应根据最短路径插入 hold buffer 或交给 CTS/PD 修复，
+   不能靠降低频率解决 hold。
 5. **分类处理 tri-state/常量告警**：AXI 常量输出和可选端口可在 lint 中豁免；
    SRAM 宏 A/D 总线告警应由正确的宏 Liberty/Verilog black-box 模型消除。只有
    影响功能或存在 unresolved driver 的告警才需要改 RTL。

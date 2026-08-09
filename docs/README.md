@@ -1,15 +1,30 @@
 # CIMForge 文档索引
 
 仓库只保留以 `rtl/top/ai_accel_top.v` 为核心的 A8 AXI-Lite/AXI4 INT8 AI
-加速器文档。历史阶段笔记、聊天导出、第三方板卡示例和工具生成物不是项目交付。
+加速器文档。当前项目是**数字 Compute-Near-Memory（CNM）IP**：四 bank SRAM
+旁放置数字 Local PE，而不是模拟 SRAM compute-in-memory。历史阶段笔记、聊天导出、
+第三方板卡示例和工具生成物不是项目交付。
+
+## 当前快照（2026-08-09）
+
+- RTL/ABI：A8、ABI v7.2；32-bit AXI4-Lite 控制面、128-bit AXI4 数据主口、
+  512 KiB 四 bank scratchpad、CMDQ/CPLQ、带 ID 的最多四笔读 outstanding DMA。
+- 计算：INT8 VDOT/GEMV/GEMM、bank-local CNM（A1/A2.2）、4×4 matrix tile（A3.1）、
+  Conv、KV-cache primitive 和定点 SFU；Transformer 是由 primitive 组合的微工作负载，
+  不是生产级 LLM serving 系统。
+- 已有证据：动态 smoke/随机与 CNM 定向 benchmark 通过；TSMC28 TT/0.9 V/25°C、
+  4.0 ns pre-layout DC 的 setup/hold 均无违例。SpyGlass lint 为 0 error，CDC/RDC
+  仅完成基础结构检查，受 Advanced_CDC 许可证限制，均不是 sign-off。
+- 尚未完成：UVM coverage closure、formal/LEC/DFT、后布局 ASIC sign-off、SAIF
+  workload 功耗签核，以及 XCZU15EG 实板端到端验收。
 
 | 文档 | 用途 |
 |---|---|
 | [SPEC_ZH.md](SPEC_ZH.md) | A8/ABI v7.2 中文详细规格：接口、寄存器、队列、DMA、算子与边界。 |
 | [SPEC.md](SPEC.md) | 英文兼容规格；内容与 RTL/软件 ABI 对齐。 |
-| [architecture.md](architecture.md) | 最新中文顶层架构、数字 CNM 数据路径、模块所有权和实现状态摘要。 |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | 最新中文顶层架构、数字 CNM 数据路径、模块所有权和实现状态摘要。 |
 | [TSMC28_SYNTHESIS_REPORT.md](TSMC28_SYNTHESIS_REPORT.md) | TSMC28 TT/0.9V/25°C、250MHz pre-layout 综合证据和适用边界。 |
-| [XCZU15EG_BRINGUP.md](XCZU15EG_BRINGUP.md) | XCZU15EG 构建、下载与板级 bring-up 步骤。 |
+| [XCZU15EG_BRINGUP.md](XCZU15EG_BRINGUP.md) | XCZU15EG 构建、下载与板级 bring-up 操作手册；不是已完成的板级验收报告。 |
 | [CNM_BANK_LOCAL_PE_RESEARCH_ZH.md](CNM_BANK_LOCAL_PE_RESEARCH_ZH.md) | Bank-local PE/CNM 的设计动机、实现事实和后续研究边界。 |
 | [CNM_EVALUATION_ZH.md](CNM_EVALUATION_ZH.md) | A1/A2/A3.1 实测性能、PPA 边界和 CNM 验证证据。 |
 | [VPLAN.md](VPLAN.md) | UVM、Formal、LEC、DFT、PPA 的详细验证计划与回归矩阵。 |
@@ -25,7 +40,8 @@ RTL compilation source lists are authoritative:
 ## 文档维护规则
 
 - 架构/ABI 改动同步更新 `SPEC_ZH.md`、`SPEC.md` 和软件头文件。
-- 当前事实以 `SPEC_ZH.md`、`architecture.md`、`CNM_EVALUATION_ZH.md` 和 `VPLAN.md` 为准；
+- 当前事实以 `SPEC_ZH.md`、`ARCHITECTURE.md`、`CNM_EVALUATION_ZH.md`、
+  `TSMC28_SYNTHESIS_REPORT.md` 和 `VPLAN.md` 为准；
   已合并删除的 CNM 子报告不再作为链接或验收依据。
 - PPA、SpyGlass、FPGA 结果只在真实工具运行后写入相应报告；必须写清 PVT、
   约束和 pre-layout/post-layout 边界。

@@ -1,8 +1,12 @@
 # CIMForge A8 AI 加速器详细规格（中文）
 
-**RTL：A8；软件 ABI：v7.2；版本寄存器：`0x1000_0008`；顶层：`rtl/top/ai_accel_top.v`。**
+**RTL：A8；软件 ABI：v7.2；版本寄存器：`0x1000_0008`；顶层：`rtl/top/ai_accel_top.v`；事实日期：2026-08-09。**
 
 > 本文按当前 RTL 及 `sw/include/cimforge_regs.h` 编写；发生冲突时，RTL 和头文件优先。本文只陈述已实现的全数字 RTL，规划项不会被写作已交付能力。
+
+> 当前阶段是“RTL 功能基线已建立、进入系统化验证前的冻结点”。动态回归、28nm
+> pre-layout DC、SpyGlass lint/基础 CDC/RDC 都已有证据；UVM coverage、formal/LEC/DFT、
+> 后布局签核和 XCZU15EG 实板端到端验收仍未完成。
 
 ## 1. 产品定位
 

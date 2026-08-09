@@ -158,7 +158,7 @@ SRAM/vector 教学轨道已从仓库移除；A2-A6 阶段草案和已过期 FPGA
 - 功能重点：command/completion queue、descriptor ABI v7.2、统一 tagged multi-outstanding
   DMA、matrix/SFU/CNN/KV-cache primitives、性能监控和 mapper 驱动的 Transformer 命令链。
 - ASIC 依据：TSMC28 HPC+ TT/0.9 V/25 C、32 个真实 SRAM macro 的 A8 版本在 250 MHz
-  pre-layout DC setup/hold 均闭合；详见 `A8_TSMC28_SYNTHESIS_REPORT.md`。
+  pre-layout DC setup/hold 均闭合；详见 `TSMC28_SYNTHESIS_REPORT.md`。
 - 下一步：冻结当前 RTL/ABI 后开始 UVM。先建立 AXI-Lite/AXI4 agent、RAL、scoreboard、
   reference-model adapter 和 coverage plan；重点覆盖 queue/descriptor、DMA ID/4 KiB/
   abort、scratchpad arbitration 和端到端 Transformer 命令序列。并行清点 DC 的 869 条
@@ -237,3 +237,18 @@ SRAM/vector 教学轨道已从仓库移除；A2-A6 阶段草案和已过期 FPGA
   并把最新性能数字和源码路径指向统一 CNM 评估报告。
 - 同步 `SPEC.md`、`CNM_EVALUATION_ZH.md`、`XCZU15EG_BRINGUP.md` 的报告路径、版本号和
   ABI v7.2/64-bit 地址描述；未改写历史日志中的历史结果。
+
+## 2026-08-09 - 当前 RTL 状态与文档收口
+
+- 以 `rtl/top/ai_accel_top.v`、`verif/sim/ai_accel.f`、当前动态回归日志及
+  `syn/out/tsmc28_4_0ns/reports/` 为准，重新核对 A8 的唯一产品线：AXI4-Lite
+  控制、128-bit AXI4 DMA、512 KiB 四 bank scratchpad、CMDQ/CPLQ、数字 CNM A1/A2.2、
+  4×4 A3.1 matrix tile、SFU、Conv 和 KV primitive 均已接入顶层。
+- 修复文档索引中的 `architecture.md` 大小写/重命名链接，统一为
+  `ARCHITECTURE.md`；TSMC28 当前报告路径统一为 `syn/out/tsmc28_4_0ns/`，并修正
+  当前 run 的日期、leaf cell 数（138,332）及关键路径口径（QoR 3.89 ns）。
+- 将 CNM 报告中过期的“等待 VCS/DC/Vivado”描述改为已存在的定向/系统证据，保留
+  SAIF workload、UVM coverage、formal/LEC/DFT、后布局和实板压力为未完成门项。
+- 明确 XCZU15EG 文档是 bring-up runbook：100 MHz OOC 是现有实现证据；只有出现与
+  当前提交/XSA 对应的 JTAG、UART 和 ILA PASS 日志后，才能宣布实板端到端验收。
+- 本次仅更新事实文档和日志，不修改 RTL/ABI，也不重新执行仿真、DC、SpyGlass 或板卡。

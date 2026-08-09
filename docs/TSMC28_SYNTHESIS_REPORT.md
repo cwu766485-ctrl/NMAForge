@@ -13,7 +13,7 @@ A8 AXI-Lite/AXI4 AI 加速器已在 TSMC28 HPC+ 工艺库、TT/0.9 V/25 C 条件
 
 该结论不是布局布线后签核，也不是最终 ASIC Fmax。
 
-### 2026-08-03 当前 RTL 复跑确认
+### 2026-08-06 当前 RTL 复跑确认
 
 在 matrix-core 后处理函数改为显式参数、完成 28nm macro-aware SpyGlass 配置并加入
 CNM A2/A3 RTL 后，使用同一 TT/0.9 V/25 C 标准单元和真实 SRAM `.db` 对当前 RTL
@@ -50,10 +50,11 @@ CNM A2/A3 RTL 后，使用同一 TT/0.9 V/25 C 标准单元和真实 SRAM `.db` 
 | Hold 违例路径 | 0 |
 | 最大 transition/capacitance 违例 | 0 / 0 |
 
-Setup 关键路径从 scratchpad 的 `spad_macro/Q[0]` 到
-`tensor_sfu_u/sum_exp_r_reg[63]`。数据到达时间为 3.87 ns，required time 为
-3.87 ns，因而 slack 为 0.00 ns。该路径包含 SRAM 读出延迟、scratchpad 数据选择和
-SFU 指数和累加数据通路，是下一轮提高频率时应优先优化的路径。
+QoR 的关键路径长度为 3.89 ns。最差 setup 路径从 scratchpad 的
+`spad_macro/Q[0]` 到 `tensor_sfu_u/sum_exp_r_reg[63]`；详细 timing report 中数据
+到达时间和带 uncertainty 后的 required time 均为 3.87 ns，因此 slack 为 0.00 ns。
+该路径包含 SRAM 读出延迟、scratchpad 数据选择和 SFU 指数和累加数据通路，是下一轮
+提高频率时应优先优化的路径。
 
 最差 hold 路径位于 `ai_spad_arbiter` 的 accept 到 response 寄存器路径；数据到达
 0.05 ns，required time 0.03 ns，hold slack 为 +0.03 ns。
@@ -98,7 +99,7 @@ output 未完全注释）。本次 `saif_activity.rpt` 还显示 `report_switchi
 
 - `reference.rpt` 显示标准单元映射完整，包含 TSMC28 inverter、flip-flop、组合门和
   32 个 SRAM macro；未发现 GTECH 或未映射逻辑引用。
-- QoR 报告中的宏数量为 32，标准单元 leaf 数为 133,642，说明该 run 不是仅逻辑或
+- QoR 报告中的宏数量为 32，leaf cell 数为 138,332，说明该 run 不是仅逻辑或
   SRAM black-box 的伪 PPA 结果。
 - DC QoR 报告显示 max transition 和 max capacitance 均无违例。
 - 2026-08-06 当前 RTL 复跑的 `check_design.rpt` 报告 256 项 potential problem，主要是
@@ -123,10 +124,10 @@ sign-off Fmax。若需要提高频率，应从 scratchpad-to-SFU 累加关键路
 
 ## 8. 证据文件
 
-- `syn/out/tsmc28_a8_4_0ns/reports/qor.rpt`
-- `syn/out/tsmc28_a8_4_0ns/reports/timing.rpt`
-- `syn/out/tsmc28_a8_4_0ns/reports/hold_timing.rpt`
-- `syn/out/tsmc28_a8_4_0ns/reports/area.rpt`
-- `syn/out/tsmc28_a8_4_0ns/reports/power.rpt`
-- `syn/out/tsmc28_a8_4_0ns/reports/reference.rpt`
-- `syn/out/tsmc28_a8_4_0ns/reports/check_design.rpt`
+- `syn/out/tsmc28_4_0ns/reports/qor.rpt`
+- `syn/out/tsmc28_4_0ns/reports/timing.rpt`
+- `syn/out/tsmc28_4_0ns/reports/hold_timing.rpt`
+- `syn/out/tsmc28_4_0ns/reports/area.rpt`
+- `syn/out/tsmc28_4_0ns/reports/power.rpt`
+- `syn/out/tsmc28_4_0ns/reports/reference.rpt`
+- `syn/out/tsmc28_4_0ns/reports/check_design.rpt`

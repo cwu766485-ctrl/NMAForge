@@ -1,6 +1,6 @@
 # CIMForge 的 CNM（Bank-Local PE）升级说明
 
-**状态：** A1、A2.2、A3.1 已实现并完成定向 benchmark；本文保留设计动机、演进逻辑与后续研究边界。实测结果以 `CNM_EVALUATION_ZH.md` 为准。
+**状态（2026-08-09）：** A1、A2.2、A3.1 已实现并完成定向 benchmark；本文保留设计动机、演进逻辑与后续研究边界。实测结果以 `CNM_EVALUATION_ZH.md` 为准，PPA 以 `TSMC28_SYNTHESIS_REPORT.md` 为准。
 **对象：** CIMForge A8，512 KiB、4-bank scratchpad。  
 **一句话：** 把四个 SRAM bank 旁边的计算、累加和控制做得更独立，减少中央调度与跨 bank 的中间结果搬运。
 

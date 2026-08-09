@@ -1,7 +1,7 @@
 # CIMForge 验证计划（VPLAN）
 
 版本：A8 / ABI v7.2  
-日期：2026-08-07  
+日期：2026-08-09
 顶层：`rtl/top/ai_accel_top.v`
 
 ## 1. 验证目标
@@ -19,12 +19,12 @@
 | 项目 | 当前证据 | 状态 |
 |---|---|---|
 | VCS smoke/随机回归 | `make ai_smoke`、`make ai_comp`、`make ai_run AI_RANDOM_CASES=20 AI_SEED=12345` | 已通过的回归基线 |
-| CNM A1/A2/A3 | A2 四 lane PASS；A3 4×4 GEMM benchmark 已有周期数据 | 功能基线已建立 |
+| CNM A1/A2/A3.1 | A2 四 lane PASS；A3.1 4×4 GEMM benchmark PASS，已接入 smoke | 功能基线已建立 |
 | TSMC28 DC | TT/0.9 V/25 °C，4 ns，setup/hold 0 violation，关键路径 3.89 ns | pre-layout 闭合 |
 | SpyGlass lint | 0 error、414 warning、4 info | lint 通过，warning 待分类 |
 | SpyGlass CDC | 0 unsynchronized crossing、0 convergence | Advanced_CDC license 缺失，非 sign-off |
 | SpyGlass RDC | 2 条 license error | 缺少 Advanced_CDC/`rdc_adv_checker`，非 RTL 结论 |
-| SAIF 功耗 | 有 SAIF 文件，但 DC 仍有 PWR-414/PWR-415/PWR-428 | 只能作为活动率估计 |
+| SAIF 功耗 | 已有生成入口，但 DC 仍有 PWR-414/PWR-415/PWR-428 | 只能作为默认/部分活动率估计 |
 | Formal/LEC/DFT/UVM | 尚未形成完整环境 | 本计划后续阶段 |
 
 ## 3. 验证环境分层
@@ -120,7 +120,7 @@ Formal 采用分层约束：先 block-level，再 top-level；对 AXI 外部接�
 | 快速 smoke | `make ai_smoke` | 每次 RTL 提交 | `TEST PASS`、无 fatal |
 | 编译/波形 | `make ai_comp` | 接口或源列表变化 | VCS 编译 0 error |
 | 随机回归 | `make ai_run AI_RANDOM_CASES=20 AI_SEED=12345` | 每日/夜间 | 全 case PASS、seed 可复现 |
-| DMA/仲裁定向 | 对应 Makefile target | DMA、arbiter 修改后 | scoreboard/断言全通过 |
+| DMA/仲裁定向 | `make ai_spad_arb_run` 等 target | DMA、arbiter 修改后 | directed checker/断言全通过 |
 | SpyGlass lint | `./run_spyglass_a8.sh lint` | RTL 合入前 | 0 error；warning 有分类 |
 | CDC/RDC | `./run_spyglass_a8.sh cdc/rdc` | 时钟/复位变化 | 无真实 crossing；license 限制单列 |
 | Formal | VC Formal batch | 控制逻辑变化后 | 关键性质 proven/covered |

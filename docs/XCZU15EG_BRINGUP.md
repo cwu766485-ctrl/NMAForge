@@ -1,16 +1,18 @@
 # CIMForge XCZU15EG bring-up 与 FPGA 部署
 
 本文面向仓库当前的 XCZU15EG AXI AI 主线，覆盖从板卡连接、生成部署文件到
-DDR DMA、命令队列、计算、completion 和 PL-to-PS IRQ 的实板验收。所有流程均为
-JTAG 临时加载，不会写入 QSPI 或 eMMC。
+DDR DMA、命令队列、计算、completion 和 PL-to-PS IRQ 的**实板验收流程**。所有流程均为
+JTAG 临时加载，不会写入 QSPI 或 eMMC。本文是操作手册；截至 2026-08-09，仓库的可信
+硬件证据仍是 100 MHz standalone-IP OOC，实现和完整板级端到端验收必须以本手册产生的
+JTAG/UART/ILA 日志为准，不能因脚本存在而视为已通过。
 
 ## 1. 板卡连接
 
 1. 关闭板卡主电源，将启动拨码 `SW1` 置为 `0000`（PS JTAG）。
 2. 连接板载 USB Type-C/JTAG 口与电脑，再接通板卡主电源。
 3. Windows 设备管理器应出现板载 FTDI 设备。原理图中 FTDI channel A 是
-   Zynq JTAG，channel B 连接 PS UART 的 MIO38/MIO39；当前电脑枚举出的 PS UART
-   经实板并行监听确认是 `COM11`。
+   Zynq JTAG，channel B 连接 PS UART 的 MIO38/MIO39；PS UART 的 COM 号由本机
+   当前枚举结果决定，以下 `COM11` 仅为示例。
 4. 串口参数为 `115200, 8 data bits, no parity, 1 stop bit, no flow control`。
 5. `SW2` 是 PS reset。JTAG 出现持续的 `AXI AP transaction error` 时，先停止脚本，
    将板卡主电源断开至少 5 秒后重新上电；仅重启 Vivado `hw_server` 通常不能清除
