@@ -1,5 +1,140 @@
 # CIMForge 项目更新日志
 
+## 2026-08-13 — DMA block UVM verification-plan implementation
+
+- Extended `verif/block/dma` from a one-test bring-up into a standards-shaped
+  DMA block suite. The shared environment now has a configurable AXI4 slave
+  BFM for independent AR/R and AW/W/B behavior, a scratchpad model with
+  programmable deterministic stalls, load/store scoreboards, local SVA and a
+  command functional-covergroup.
+- Added focused UVM tests for strided 2-D load/store, gather-load via SPAD
+  index table, narrow 32-bit alignment then 128-bit line loading, out-of-order
+  BID store completion, 4-KiB boundary splitting, read abort-drain and
+  deterministic AXI/SPAD back-pressure. Each test has an explicit oracle in
+  `verif/block/dma/README.md`.
+- Added `make uvm_regress` to run the complete suite in isolated simulations
+  and `make coverage` to merge VCS coverage databases. These are executable
+  planned tests, not yet claimed as runtime evidence; the previously logged
+  1-D four-outstanding out-of-order load remains the only passed block-UVM
+  test until the new regression is run in WSL/VCS.
+- Added `dma_random_stress_test`: 20 constrained-random, legal 1-D load/store
+  commands with deterministic AXI/SPAD back-pressure. Its VCS random seed is
+  exposed as Makefile variable `SEED`, so a failure is reproducible rather
+  than an unrepeatable one-off regression result.
+- Separated active and passive UVM roles: `dma_axi_monitor` and
+  `dma_spad_monitor` now feed the scoreboard from observed DUT handshakes,
+  rather than trusting transactions emitted by the active DDR/SPAD models.
+
+## 2026-08-11 — DMA block UVM first runtime and outstanding-depth correction
+
+- Ran `make uvm_smoke` in the team's WSL/VCS environment.  After the local
+  license manager (`lmg`) restored license connectivity, VCS parsed all 16
+  modules, elaborated and executed `dma_load_ooo_smoke_test` with zero UVM
+  warnings, errors and fatals; the DDR-to-SPAD scoreboard reported `SB_PASS`.
+- Review of the same runtime evidence found an important test-quality gap:
+  the responder returned data before all requests were issued, so the observed
+  `rd_highwater` was only 3 and AR IDs were `1,2,3,1`.  The DUT data test
+  passed, but that version did **not** prove the promised four-outstanding
+  out-of-order case.
+- Corrected the BFM: it now holds read responses until four ARs have been
+  accepted, returns newest-first thereafter, requires DMA `rd_highwater >= 4`,
+  and checks that the first completed burst is not FIFO.  The corrected
+  version was rerun successfully: AR IDs were `1,2,3,4`, DMA reported
+  `highwater=4`, and the responder reported `accepted first ID=1, completed
+  first ID=4`.  The 32-word DDR-to-SPAD scoreboard reported `SB_PASS`; VCS
+  recorded 0 UVM warnings, errors and fatals.  This closes the directed
+  1-D, 128-bit, four-outstanding, out-of-order DMA read milestone only.
+
+## 2026-08-10 — DMA block UVM first executable milestone
+
+- Added a self-contained UVM harness under `verif/block/dma/`; its DUT is
+  `rtl/dma/ai_axi128_dma.v`, rather than the top-level accelerator.
+- `dma_load_ooo_smoke_test` issues one 32-word 1-D load with a two-beat burst
+  limit. This forces four read IDs in flight; the AXI4 slave responder returns
+  the newest accepted AR first, deliberately exercising tagged out-of-order
+  response handling.
+- The environment contains an address-pattern DDR responder, a scratchpad
+  model that publishes every accepted write, and a scoreboarding check of each
+  destination word. Initial SVA checks AR payload stability under
+  back-pressure and the DMA-owned RID/ARID range (1..4).
+- The new harness has been structurally reviewed locally; it still requires
+  `make uvm_smoke` in the team's WSL/VCS environment before this milestone can
+  be recorded as a runtime pass. Follow-on scope is 2-D/gather/store/BID,
+  4-KiB/abort, randomized latency and coverage.
+
+## 2026-08-10 — First UVM runtime smoke pass
+
+- Ran `make uvm_smoke UVM_TEST=ai_version_smoke_test` from
+  `uvm_verif/sim` in the Linux/VCS environment.  The AXI-Lite active agent
+  read `VERSION=0x1000_0008`; the scoreboard reported `AXIL=1 AXI4=0`.
+- UVM report summary: 0 warnings, 0 errors and 0 fatals at 130000 ps.  This
+  closes framework bring-up only: AXI4 is still passive and no DMA payload,
+  queue or compute-data scoreboard has run yet.
+- Next dynamic verification item is `verif/block/dma`: introduce an active
+  AXI4 memory responder, byte-accurate DDR/SPAD reference model and assertions
+  for RID/RLAST/BID, 4 KiB boundaries and abort drain.
+
+## 2026-08-10 — Post-migration regression repair and UVM compile evidence
+
+- Fixed the Transformer mapper import path after reference-model ownership
+  moved from `verif/ref` to `verif/block/compute/matrix/ref`.  The previous
+  `make ai_smoke` stopped in `ai_transformer_gen` with
+  `ModuleNotFoundError: ai_a3_reference`; VCS had not yet been invoked.
+- The Linux VCS run `make uvm_compile` completed successfully after the same
+  migration: all 32 modules/packages compiled, linked `simv_uvm`, and Verdi
+  KDB elaboration reported 0 errors and 0 warnings.  This is a compile/elab
+  pass only; it is not yet a UVM runtime-test pass.
+- VCS still reports one `TFIPC` warning for intentionally unconnected detailed
+  CNM counter ports at the `ai_banked_cnm_core` top-level instance.  It does
+  not block compile; perf-map integration or a narrow reviewed waiver remains
+  future cleanup.
+
+## 2026-08-10 — Verification source ownership migration
+
+- Moved the legacy directed/smoke sources from the flat `verif/{agents,env,
+  generated,ref,sim,tb}` layout into the verification hierarchy: AXI-Lite and
+  DMA task headers into their control/DMA blocks; memory model into DMA;
+  CNM/matrix goldens and focused TBs into their compute blocks; and the full
+  directed top smoke, SVA, fixture and Makefiles into
+  `verif/subsystem/top_smoke/`.
+- Added `subsystem/top_smoke` to the verification matrix.  It is the bridge
+  between existing directed evidence and the future UVM end-to-end testbench;
+  it is not a duplicate UVM environment.
+- Updated VCS filelists, Makefile targets, UVM filelist, documentation,
+  software workload instructions, mapper fixture default and ignore rules to
+  the new paths.  The old six flat directories contain no source-of-truth
+  after this migration and are removed as explicitly requested.
+
+## 2026-08-10 — SpyGlass lint first run and verification triage
+
+- Ran `verif/spyglass/run_spyglass_a8.sh lint` on the Linux SpyGlass
+  environment against the active A8 `ai_accel_top` source list.  It completed
+  with exit code 0, 0 errors, 414 policy warnings and 4 infos; no finding has
+  been waived.
+- Consolidated triage shows 214 report rows: 180 `InitValUsingNBA`, 20
+  `SepStateNextLogic`, 11 signed-cast notices, one expected SRAM blackbox,
+  one reset-policy warning, and one SFU function-argument width warning.
+  The SFU width item is P0; reset classification is P1; broad FSM rewrites are
+  intentionally deferred to avoid destabilizing verified behavior.
+- Added `verif/spyglass/LINT_TRIAGE.md` and `verif/VERIFICATION_MATRIX.md` to
+  define lint disposition and the planned block/subsystem test/scoreboard/
+  acceptance matrix.
+
+## 2026-08-09 — Block/subsystem verification partition and static-check refresh
+
+- Added `verif/block/` for focused `ai_axi128_dma`, scratchpad-arbiter,
+  command-processor, control, and compute verification.  Its leaf directories
+  reserve testbench, tests, reference model, assertions, and simulation inputs.
+- Added `verif/subsystem/` for `dma_spad`, `queue_completion`, and
+  `tensor_datapath`.  Reusable AXI UVM agents stay in `uvm_verif/` so protocol
+  components are defined only once.
+- Refreshed `verif/spyglass/a8_rtl.f` and `a8_static.prj` to remove the deleted
+  A1 banked-compute/reduction baseline; all current SpyGlass filelist paths
+  resolve in the worktree.
+- Static-validation order is lint first, then CDC and RDC.  This entry does not
+  claim a new SpyGlass pass: the current host cannot access the team Rocky WSL
+  distribution, so lint must be launched in the user's existing Linux shell.
+
 本文档记录当前 AXI-Lite/AXI4 AI 加速器主线的重要变更与可复核结果。早期 AHB
 SRAM/vector 教学轨道已从仓库移除；A2-A6 阶段草案和已过期 FPGA bring-up 记录
 不再作为当前项目状态依据。
@@ -252,3 +387,103 @@ SRAM/vector 教学轨道已从仓库移除；A2-A6 阶段草案和已过期 FPGA
 - 明确 XCZU15EG 文档是 bring-up runbook：100 MHz OOC 是现有实现证据；只有出现与
   当前提交/XSA 对应的 JTAG、UART 和 ILA PASS 日志后，才能宣布实板端到端验收。
 - 本次仅更新事实文档和日志，不修改 RTL/ABI，也不重新执行仿真、DC、SpyGlass 或板卡。
+
+## 2026-08-09 - A8 UVM 基础框架
+
+- 初版在后续目录隔离前曾建立当前 A8 / ABI v7.2 的 UVM 起点：`ai_axil_if`、`ai_axi4_if`、
+  active AXI4-Lite agent、passive 128-bit AXI4 monitor、scoreboard、AXI-Lite/AXI4
+  coverage、ABI v7.2 descriptor/completion object、轻量 reference-model 入口和
+  `ai_version_smoke_test`。
+- `tb_ai_accel_uvm` 实例化真实 `ai_accel_top`，并复用 `verif/env/axi_memory_model.sv`。
+  因此第一版 UVM 不会另起一个与 smoke 行为不一致的 DDR 模型；AXI4 agent 下一步再扩展为
+  可配置 ready、RID reorder 和 error injection 的 active memory responder。
+- 初版曾在 `verif/sim/Makefile` 建立 UVM Make target；目录隔离后该入口已迁移到
+  `uvm_verif/sim/Makefile`。本机没有可调用的 VCS/Verilator，因此本次只完成源码/文件列表/
+  `git diff --check` 静态检查；
+  **未声称 UVM 已在 VCS 编译或通过**。首个 Linux/VCS 命令为
+  `cd uvm_verif/sim && make uvm_smoke UVM_TEST=ai_version_smoke_test`。
+
+## 2026-08-09 - UVM 验证工程目录隔离
+
+- 按验证资产所有权将 UVM 从 `verif/` 迁出：`verif/` 只保留既有 directed/smoke、reference
+  model、SpyGlass 和当前 AI smoke 的 source list；移除了其中的 UVM Make target 和临时
+  `verif/uvm/` 源码，避免快速回归与 UVM 环境相互污染。
+- 新建根目录 `uvm_verif/`，并按 `agent/`、`env/`、`formal/`、`sim/`、`tb/`、`tests/`
+  分层。AXI-Lite active agent、AXI4 passive monitor、ABI v7.2 transaction object、协议
+  scoreboard/coverage、version smoke sequence/test、真实 top + 128-bit behavioural DDR
+  integration 均已迁入对应目录。
+- `uvm_verif/sim/ai_accel_uvm.f` 是独立 source list，完整引用当前 A8 RTL、SVA、DDR model
+  与 UVM 分层文件；`uvm_verif/sim/Makefile` 是唯一 UVM 编译/运行入口。
+- 新增 `formal/` 的第一版 AXI valid-stability/4 KiB property template。它尚未绑定或在 VC
+  Formal 中证明，不能作为 formal pass 证据。
+- 本次为目录与源码组织变更；当前 Windows 工作区没有可调用 VCS，**未运行 UVM 编译或
+  仿真**。后续必须在 Linux/VCS 环境执行 `cd uvm_verif/sim && make uvm_smoke`，并把真实
+  command、seed、log 和结果补入本日志。
+
+## 2026-08-09 - 移除未接入 A8 主路径的 CNM 基线 RTL
+
+- 经 `rtl/top/ai_accel_top.v` 例化关系和全仓引用核查，`ai_banked_compute_core.v` 与
+  `ai_reduction_tree.v` 不属于当前产品数据路径；A8 的 `OP_VDOT/OP_GEMV` 主路径为
+  `ai_banked_cnm_core + ai_bank_local_controller + ai_bank_pe`，并直接使用 arbiter 的四 lane
+  CNM bank-read 接口。
+- 删除旧中央控制式 banked/reduction RTL、其 historical reference model、两个专用 A1 TB，
+  以及过时的 `ai_cnm_a1`/`ai_cnm_a2`/baseline Make target。历史 benchmark 数字仍可在文档中
+  作为已发生的比较记录，但已不再可由当前仓库重新构建。
+- 同步从 VCS smoke/UVM filelist、两套 FPGA RTL Tcl 和 TSMC28 DC analyze list 删除旧模块；
+  `ai_cnm_signoff` 现只运行当前 A2.2 CNM 与 A3 matrix benchmark、arbiter 以及全系统 smoke。
+- 本次为移除未接入产品 RTL 的收口，不改变 ABI 或顶层功能。`git diff --check` 已执行；未在
+  当前 Windows 环境执行 VCS/DC/Vivado，后续 Linux 回归需重新运行当前 source list。
+
+## 2026-08-09 - UVM 首次 VCS 编译：coverage 语法修复
+
+- 在 Linux VCS V-2023.12-SP1 环境、Windows 挂载工作目录
+  `/mnt/e/workspace/chip/CIMForge/uvm_verif/sim` 实际执行 `make uvm_compile`。VCS 已成功解析
+  UVM-1.2、当前 A8 RTL、128-bit behavioural DDR model、两条 interface 和前三个 UVM package。
+- 首个真实编译错误位于 `ai_accel_env_pkg.sv` 的 AXI4 coverage：`illegal` 是 SystemVerilog
+  关键字，不能作为 coverpoint bin 标识符。已改为 `bins invalid=default`；功能意图不变，仍覆盖
+  非 32-bit/128-bit 的 AXI size。
+- 此记录仅表明已定位并修复第一个 VCS syntax error；修复后的编译和 `ai_version_smoke_test`
+  尚需在同一 Linux 环境重新执行，不能在此记录中标记为通过。
+
+## 2026-08-09 - UVM 首次 VCS 编译通过与 warning 收口
+
+- 修复 coverage bin 标识符后，在 `/mnt/e/workspace/chip/CIMForge/uvm_verif/sim` 重新执行
+  `make uvm_compile`。VCS V-2023.12-SP1 成功完成 32 个 module/package 的编译、elaboration 和
+  link，生成 `simv_uvm`；Verdi KDB elaboration 报告为 `0 error(s), 0 warning(s)`。
+- VCS 前端仍报告两类源级 warning，已同步修复：UVM coverage subscriber 的 override 形参由
+  `tr` 改为与 UVM base class 一致的 `t`；顶层 CNM 实例此前未连接六个暂未纳入软件 perf-map
+  的详细统计输出，现显式标注为空连接。该改动不改变 CNM 运算或 ABI。
+- 仍未运行 runtime test；下一门槛是在同一目录执行
+  `make uvm_smoke UVM_TEST=ai_version_smoke_test`，检查 VERSION read、scoreboard 统计和
+  `UVM_ERROR/UVM_FATAL` 摘要。
+
+## 2026-08-09 - UVM 通电测试通过与验证架构重构
+
+- `make uvm_smoke UVM_TEST=ai_version_smoke_test` 在 Linux VCS 环境实际通过：仿真结束于
+  130000 ps，UVM summary 为 `UVM_WARNING=0`、`UVM_ERROR=0`、`UVM_FATAL=0`；VERSION sequence、
+  scoreboard summary 和 test completion 均出现。它是 UVM 框架/真实顶层/AXI-Lite agent 的通电测试，
+  **不是** DMA、队列或 Transformer 的功能验收。
+- 撤回了为压制 VCS `TFIPC` warning 而对 `ai_accel_top.v` 添加的六个 CNM counter 空连接。
+  该顶层修改与 UVM 功能无关，当前应保持 RTL 收口边界；未导出的 detailed counter 保留为后续
+  perf-map 设计项。
+- 重构 `uvm_verif/`：transaction item、AXI-Lite/AXI4 agent class、environment model/
+  scoreboard/coverage 和 test/sequence class 现在均各自位于独立 `.svh` 文件；对应 `.sv` package
+  只负责 import、namespace 与确定的 include 顺序。新增 `+incdir`，`.svh` 不得被单独加入 VCS
+  filelist。
+- 下一步从 block-level `ai_axi128_dma` 开始，而不是继续扩充顶层 version smoke：建立 AXI4
+  slave responder 和 scratchpad BFM，先测 1D，再逐步加入 2D/gather、4 KiB、abort 与 read-ID
+  out-of-order。
+
+## 2026-08-13 - DMA block UVM full regression
+
+- 在 Linux VCS V-2023.12-SP1 环境中，`verif/block/dma/sim` 实际完成了
+  `make uvm_regress` 的全部十一项 DMA 测试：1-D 四笔 outstanding 的乱序读、2-D 读、gather
+  读、乱序 BID 写、2-D 写、narrow 读、4 KiB 边界读、abort-drain、配置错误、确定性
+  back-pressure 与 20-case constrained-random stress。
+- 每项测试均到达 `TEST_DONE`，且 UVM summary 为 `UVM_ERROR=0`、`UVM_FATAL=0`。读测试
+  证明四个 AR ID 并发，最早接收 ID=1、最早完成 ID=4；写测试证明 newest-first BID 完成。
+  所有搬运数据都由 byte-accurate DDR↔SPAD scoreboard 匹配；随机压力测试完成 20 条命令。
+- `make coverage` 已合并十一份 VCS VDB，并生成
+  `verif/block/dma/sim/coverage/report/`。随机压力测试的 command covergroup 为 67.86%；
+  这只是 coverage collection 证据。多 seed 扩展、bin review 和 code/assertion coverage
+  closure 仍是 DMA 的后续门槛。

@@ -156,7 +156,8 @@ SRAM 输出 -> scratchpad 数据选择 -> Softmax SFU 的 sum_exp 累加寄存�
 
 ## 9. 源码依据
 
-- 原始 4 PE、中央 A/B 读控制和 reduction 基线：`verif/ref/ai_banked_compute_core_original.v`
+- 原始中央控制/reduction 基线仅保留其历史 benchmark 结论；相应 RTL/TB 已从当前仓库移除，
+  不再作为主线回归或实现输入。
 - 当前 CNM core 与 local controller：`rtl/compute/ai_banked_cnm_core.v`、`rtl/compute/ai_bank_local_controller.v`
 - 单个 INT8 dot4 PE：`rtl/compute/ai_bank_pe.v`
 - 四 bank 同行读取：`rtl/memory/ai_scratchpad.v`

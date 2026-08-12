@@ -25,7 +25,8 @@
 | SpyGlass CDC | 0 unsynchronized crossing、0 convergence | Advanced_CDC license 缺失，非 sign-off |
 | SpyGlass RDC | 2 条 license error | 缺少 Advanced_CDC/`rdc_adv_checker`，非 RTL 结论 |
 | SAIF 功耗 | 已有生成入口，但 DC 仍有 PWR-414/PWR-415/PWR-428 | 只能作为默认/部分活动率估计 |
-| Formal/LEC/DFT/UVM | 尚未形成完整环境 | 本计划后续阶段 |
+| UVM | `uvm_verif/` 已独立为 agent/env/formal/sim/tb/tests 六层：AXI-Lite active agent、AXI4 passive monitor、scoreboard/coverage、ABI object 与 version smoke | `ai_version_smoke_test` 已在 Linux/VCS 运行通过；尚无 block 数据通路验证与 coverage closure |
+| Formal/LEC/DFT | 尚未形成完整环境 | 本计划后续阶段 |
 
 ## 3. 验证环境分层
 
@@ -57,13 +58,13 @@ UVM agents/sequence ──> DUT ──> scoreboard/reference model
 建议目录：
 
 ```text
-verif/uvm/
-  env/       axi_lite_agent、axi4_agent、spad_agent、cnm_agent
-  seq/       smoke、random、error、reset、stress sequences
-  model/     descriptor、DMA、scratchpad、CNM、Transformer reference model
-  sb/        AXI protocol、queue、DMA、CNM、end-to-end scoreboards
-  cov/       covergroup 和 cross coverage
-  test/      base、smoke、random、stress、error、reset tests
+uvm_verif/
+  agent/     AXI-Lite/AXI4 agents、transaction types、virtual interfaces
+  env/       environment、scoreboard、coverage、reference-model adapters
+  formal/    properties、assumptions、harness 与 proof logs
+  sim/       independent VCS filelist 与 Makefile
+  tb/        DUT 与 behavioural DDR integration
+  tests/     base/smoke/random/stress/error/reset sequences and tests
 ```
 
 实施顺序：
@@ -137,4 +138,8 @@ Formal 采用分层约束：先 block-level，再 top-level；对 AXI 外部接�
 
 ## 8. 当前起始任务
 
-下一次工作从 V0/V1 开始：冻结 SPEC 的寄存器和 descriptor 表，建立 AXI-Lite agent + RAL，完成 CMDQ/CPLQ scoreboard，再接入 AXI4 DMA agent。UVM 环境搭好后，逐步迁移现有 directed test，保留原有 VCS smoke 作为快速回归基线。
+当前优先级是先执行与最新 RTL/source list 对齐的 SpyGlass lint，并逐项处理真实
+error；CDC/RDC 在 lint 输入干净后分别运行。已经通过的 `uvm_verif` version smoke
+只是 framework bring-up，下一项动态验证从 `verif/block/dma` 的 `ai_axi128_dma`
+block 环境开始，随后进入 `verif/subsystem/dma_spad`、队列/完成和最终 top-level
+随机回归。原有 VCS smoke 始终保留为快速回归基线。

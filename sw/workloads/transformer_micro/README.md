@@ -21,13 +21,13 @@ Q/K/V GEMM
 防止预填 golden 导致假通过。它会生成：
 
 - `manifest.json`：软件可读的 tensor/descriptor 映射；
-- `verif/generated/ai_transformer_workload.svh`：VCS smoke 使用的确定性 fixture。
+- `verif/subsystem/top_smoke/fixtures/ai_transformer_workload.svh`：VCS smoke 使用的确定性 fixture。
 
 生成并运行：
 
 ```bash
-make -C verif/sim ai_transformer_gen
-cd verif/sim
+make -C verif/subsystem/top_smoke/sim ai_transformer_gen
+cd verif/subsystem/top_smoke/sim
 make ai_transformer
 ```
 

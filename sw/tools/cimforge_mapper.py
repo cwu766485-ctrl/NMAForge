@@ -17,7 +17,10 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO_ROOT / "verif" / "ref"))
+sys.path.insert(
+    0,
+    str(REPO_ROOT / "verif" / "block" / "compute" / "matrix" / "ref"),
+)
 from ai_a3_reference import (  # noqa: E402
     ffn_i8,
     gelu_q8_8,
@@ -463,7 +466,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--svh", type=Path,
-        default=REPO_ROOT / "verif" / "generated" / "ai_transformer_workload.svh",
+        default=(REPO_ROOT / "verif" / "subsystem" / "top_smoke" /
+                 "fixtures" / "ai_transformer_workload.svh"),
     )
     parser.add_argument(
         "--manifest", type=Path,

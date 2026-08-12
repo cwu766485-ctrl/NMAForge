@@ -190,11 +190,9 @@ Q/K/V -> QK^T -> causal/row Softmax -> AV -> projection
 | SRAM | `ai_scratchpad` | 是 | 512 KiB、4 bank SRAM；支持 32-bit 单字、128-bit line、四 lane banked/CNM 读取。 |
 | 保护 | `ai_spad_protection` | 是，实例化多次 | 检查 host、compute、line、banked、completion 的地址是否越界或权限冲突。 |
 | 标量 INT8 核 | `ai_int8_compute_core` | 是 | 普通 INT8 VDOT、GEMV、GEMM tile、Conv1x1 等标量/基础计算控制。 |
-| banked 基线核 | `ai_banked_compute_core` | 编译保留 | 中央控制式 banked 计算基线，主要用于兼容/对比，不是当前 CNM 主路径。 |
 | CNM 核 | `ai_banked_cnm_core` | 是 | opcode `0x20/0x21` 的四 bank CNM VDOT/GEMV 顶层。 |
 | Local Controller | `ai_bank_local_controller` | 是，CNM 内 4 个实例 | 每个 bank 自己产生地址、等待读响应、预取、双缓冲、局部累加。 |
 | Local PE | `ai_bank_pe` | 是，CNM/基线核子模块 | 一个 32-bit packed INT8 dot4 乘加单元。 |
-| 归约树 | `ai_reduction_tree` | 编译保留/辅助 | 合并多个局部 partial sum 的归约逻辑。 |
 | 矩阵核 | `ai_tensor_matrix_core` | 是 | 4×4 INT8 matrix tile，支持 GEMM、Batch GEMM、转置、bias、激活、量化与 line 写回。 |
 | SFU | `ai_tensor_sfu_core` | 是 | Softmax、causal Softmax、RMSNorm、LayerNorm、Residual、GELU、SiLU、requant。 |
 | 除法器 | `ai_unsigned_divider` | 是，SFU 子模块 | 用于 Softmax 归一化等定点除法。 |

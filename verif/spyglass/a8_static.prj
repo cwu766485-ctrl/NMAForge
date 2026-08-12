@@ -24,8 +24,6 @@ read_file -type verilog ../../rtl/compute/ai_tile_pipeline.v
 read_file -type verilog ../../rtl/control/ai_perf_monitor.v
 read_file -type verilog ../../rtl/control/ai_command_processor.v
 read_file -type verilog ../../rtl/compute/ai_bank_pe.v
-read_file -type verilog ../../rtl/compute/ai_reduction_tree.v
-read_file -type verilog ../../rtl/compute/ai_banked_compute_core.v
 read_file -type verilog ../../rtl/compute/ai_bank_local_controller.v
 read_file -type verilog ../../rtl/compute/ai_banked_cnm_core.v
 read_file -type verilog ../../rtl/compute/ai_unsigned_divider.v

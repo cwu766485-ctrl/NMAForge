@@ -7,8 +7,8 @@ scratchpad layout, simulation fixture and bit-accurate golden result for the
 4-token Transformer micro-workload under `workloads/transformer_micro/`.
 
 ```bash
-make -C ../verif/sim ai_transformer_gen
-make -C ../verif/sim ai_transformer
+make -C ../verif/subsystem/top_smoke/sim ai_transformer_gen
+make -C ../verif/subsystem/top_smoke/sim ai_transformer
 ```
 
 The chain exercises Q/K/V projection, attention, residual/LayerNorm and FFN

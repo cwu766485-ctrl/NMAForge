@@ -33,7 +33,7 @@
 
 RTL compilation source lists are authoritative:
 
-- `verif/sim/ai_accel.f`
+- `verif/subsystem/top_smoke/sim/ai_accel.f`
 - `fpga/xilinx_a7_100t/ai_accel_rtl.tcl`
 - `fpga/xczu15eg/ai_accel_rtl.tcl`
 

@@ -122,4 +122,66 @@ TSMC28 HPC+ TT/0.9V/25°C 的当前 CNM RTL、真实 32 个 SRAM macro、4.0 ns 
 
 ## 8. 权威文件
 
-`rtl/top/ai_accel_top.v`（集成）、`rtl/control/ai_accel_regs.v` 与 `sw/include/cimforge_regs.h`（ABI）、`rtl/control/ai_command_processor.v`（命令）、`rtl/control/ai_completion_writer.v`（完成原子性）、`rtl/dma/ai_axi128_dma.v`（DMA）、`rtl/memory/ai_spad_arbiter.v`/`ai_scratchpad.v`（SRAM）、`syn/ai_scratchpad_28nm_macro.v`（28nm wrapper）、`verif/sim/ai_accel.f`（VCS）和 `verif/spyglass/a8_static.prj`（SpyGlass）。
+`rtl/top/ai_accel_top.v`（集成）、`rtl/control/ai_accel_regs.v` 与 `sw/include/cimforge_regs.h`（ABI）、`rtl/control/ai_command_processor.v`（命令）、`rtl/control/ai_completion_writer.v`（完成原子性）、`rtl/dma/ai_axi128_dma.v`（DMA）、`rtl/memory/ai_spad_arbiter.v`/`ai_scratchpad.v`（SRAM）、`syn/ai_scratchpad_28nm_macro.v`（28nm wrapper）、`verif/subsystem/top_smoke/sim/ai_accel.f`（VCS）和 `verif/spyglass/a8_static.prj`（SpyGlass）。
+
+## 9. 电路模块与信号交互
+| 模块 A | 模块 B | 主要信号 | 用零基础语言解释 |
+|---|---|---|---|
+| CPU | `axi_lite_reg_if` | `aw* / w* / b*`、`ar* / r*` | CPU 通过 AXI-Lite 写配置、读状态。比如“做 GEMM”“CMDQ 在哪”“中断开不开”。 |
+| `axi_lite_reg_if` | `ai_accel_regs` | `reg_req_valid/write/addr/wdata`、`reg_rsp_rdata/error` | AXI-Lite 翻译员把复杂总线语言翻成内部“读/写寄存器”。 |
+| `ai_accel_regs` | `ai_command_processor` | `submit`、`direct_start`、`core_abort`、`cmdq_*`、`cplq_*` | 前台把 CPU 配置交给主任：有新任务、队列在哪、是否中止。 |
+| `ai_command_processor` | `ai_desc_fetch` | `fetch_start`、`fetch_base`、`desc_*` | 主任让片上 descriptor 读取器拿到任务说明书。 |
+| `ai_command_processor` | `axi_desc_fetch` | `fetch_start`、`fetch_external`、`fetch_base`、AXI `AR/R` | 若任务说明书在 DDR，主任改叫外部读取器去 DDR 拿。 |
+| `ai_desc_fetch` / `axi_desc_fetch` | `ai_command_processor` | `desc_op`、`desc_src0/src1/dst`、`desc_m/n/k`、`desc_flags`、`fetch_done/error` | 读取器把任务说明书交回主任：做什么、数据在哪、矩阵多大、是否转置、有没有错误。 |
+| `ai_command_processor` | 各计算核 | `launch_valid`、`launch_op`、`launch_src0/src1/dst`、`launch_m/n/k` | 主任把任务单发给正确的工人。`launch_op` 决定交给谁。 |
+| `ai_command_processor` | `ai_completion_writer` | `completion_start`、`task_id`、`status`、`result`、`element_count` | 任务结束后，主任要求质检员写一条完成记录。 |
+| `ai_completion_writer` | `ai_spad_arbiter` | `cpl_spad_valid/write/addr/wdata`、`cpl_ready` | 质检员申请往 completion queue 写四个 word。 |
+| `ai_axi128_dma` | DDR | `m_axi_ar* / r*`、`m_axi_aw* / w* / b*` | 搬运车从 DDR 读数据或把结果写回 DDR。 |
+| `ai_axi128_dma` | `ai_spad_arbiter` | `dma_spad_*`、`dma_spad_line_*` | DMA 说：“我要往 SRAM 搬一行数据”或“我要从 SRAM 取一行数据”。 |
+| 所有计算核 | `ai_spad_arbiter` | `spad_valid/write/addr/wdata`、`spad_ready` | 每个计算核想读写 SRAM，都先向交通警察申请。 |
+| `ai_spad_arbiter` | `ai_scratchpad` | `spad_*`、`spad_line_*`、`spad_banked_*`、`spad_cnm_*` | 仲裁器决定这拍让谁访问 SRAM，再把请求真正发给 SRAM。 |
+| `ai_scratchpad` | `ai_spad_arbiter` | `spad_rdata`、`rsp_valid`、`error`、`parity_error` | SRAM 返回读到的数据，或告诉仲裁器访问失败/校验错误。 |
+| `ai_spad_arbiter` | 请求它的模块 | `rsp_valid`、`rsp_client`、`rsp_rdata`、`rsp_error` | 仲裁器把读结果准确还给最初申请的模块。 |
+| `ai_banked_cnm_core` | 四个 `ai_bank_local_controller` | 四组 bank-lane 请求/响应 | CNM 总管启动四个本地小工人，每人负责一个 SRAM bank。 |
+| `ai_bank_local_controller` | `ai_bank_pe` | `a_word`、`rsp_data`、`partial_sum` | 本地控制器给 PE 两个 INT8 数据块；PE 做 dot4 乘加，返回局部结果。 |
+| `ai_banked_cnm_core` | `ai_spad_arbiter` | `cnm_req_valid[3:0]`、`cnm_addr0..3`、`cnm_rsp_valid[3:0]`、`cnm_data0..3` | CNM 一次可对四个 bank 分别发读请求。`[3:0]` 的每一位对应一个 bank。 |
+| `ai_tensor_matrix_core` | `ai_spad_arbiter` | `banked_read_*`、`spad_*`、`line_*` | 4×4 矩阵核读取矩阵块、做乘加，再用 128-bit line 写回结果。 |
+| `ai_tensor_sfu_core` | `ai_spad_arbiter` | `spad_*`、`busy/done/error` | SFU 从 SRAM 取向量，做 Softmax、Norm、激活、量化，再写回。 |
+| `ai_conv3x3_linebuffer_core` | `ai_spad_arbiter` | `spad_*`、`busy/done/error` | 卷积核按滑窗读取数据、计算 Conv3x3 或 DWConv3x3。 |
+| `ai_kv_cache_engine` | `ai_spad_arbiter` | `spad_*`、`src0_stride`、`aux0` | KV 单元根据 head、token、stride 读写 KV-cache。 |
+| `ai_spad_protection` | host / compute / line / CNM / completion 请求方 | `region*_base/limit/perm`、`*_protection_error` | 保安。检查地址是否越界、是否有读写权限；不合法就报错。 |
+| `ai_perf_monitor` | DMA / matrix / tile pipeline / regs | `perf_dma_*`、`perf_matrix_*`、`perf_clear` | 计时员。统计搬了多少数据、停顿多少周期、矩阵核真正干活多少周期。 |
+| `ai_accel_regs` | CPU/GIC | `irq` | 任务完成或出错时，按下“通知 CPU”的铃。 |
+
+### 10. 项目功能点
+| 你想做的事 | 谁来做 | 模块间怎么配合 | 最终得到什么 |
+|---|---|---|---|
+| CPU 配置加速器 | CPU、`axi_lite_reg_if`、`ai_accel_regs` | CPU 写 AXI-Lite 寄存器 | 设置任务、DMA 地址、队列、保护区、中断。 |
+| 提交 AI 任务 | `ai_accel_regs`、`ai_command_processor` | `submit` + `CMDQ_TAIL` | 主任知道有新任务。 |
+| 读取任务说明书 | command processor、`ai_desc_fetch` / `axi_desc_fetch` | `fetch_start`、`desc_*` | 获得算子、地址、矩阵尺寸、stride、依赖关系。 |
+| 检查任务是否合法 | `ai_command_processor`、protection | descriptor 字段、地址区间、依赖 event | 不合法任务不会启动，会生成错误 completion。 |
+| 从 DDR 搬数据 | `ai_axi128_dma`、arbiter、scratchpad | AXI `AR/R`、`AW/W/B`；`dma_spad_line_*` | 权重、激活、tile、KV 数据搬进片上 SRAM。 |
+| 进行普通 INT8 计算 | `ai_int8_compute_core` | `launch_*`、`spad_*` | 支持 VDOT、GEMV、基础 GEMM、Conv1x1 等。 |
+| 做 CNM GEMV/VDOT | `ai_banked_cnm_core`、4 个 local controller/PE | `cnm_req_valid[3:0]`、四路地址和数据 | 四个 SRAM bank 各做局部计算，最后合并结果。 |
+| 做矩阵乘法 | `ai_tensor_matrix_core` | `banked_read_*`、`line_*` | 4×4 INT8 GEMM、Batch GEMM、转置、bias、激活、量化。 |
+| 做 Attention 的特殊步骤 | `ai_tensor_sfu_core` | `spad_*`、`op_mode` | Softmax、causal mask、RMSNorm、LayerNorm、GELU、SiLU、requant。 |
+| 做卷积 | `ai_conv3x3_linebuffer_core` | `spad_*`、高度/宽度参数 | Conv3x3、Depthwise Conv3x3。 |
+| 读写 KV-cache | `ai_kv_cache_engine` | 地址、stride、head/token 参数 | KV 写入和按布局读取。 |
+| 让多个模块别抢 SRAM | `ai_spad_arbiter` | `valid/ready`、`rsp_client` | 控制面优先，计算/DMA 轮询，读结果返回正确客户。 |
+| 让 load/compute/store 重叠 | `ai_tile_pipeline`、DMA、计算核 | tile start、buffer0/1、DMA/compute 状态 | 为双缓冲流水提供控制骨架。 |
+| 收尾并通知软件 | command processor、completion writer、regs | completion 四 word、`CPLQ_TAIL`、`irq` | 软件可确认任务成功/失败、读结果、继续下一任务。 |
+| 测性能瓶颈 | `ai_perf_monitor` | `perf_dma_*`、`perf_matrix_*` | 得到 DMA 字节数、stall、outstanding、MAC 周期等。 |
+| 中止或恢复 | command processor、DMA、全部计算核 | `abort`、`watchdog`、`resetn` | 错误时停止任务，等待已发 AXI 事务收尾，恢复空闲状态。 |
+
+最简单的一次任务流程是：
+```
+1. CPU 写寄存器：任务和数据在哪里？
+2. CPU 发布 CMDQ_TAIL：有新任务。
+3. command processor 读取 descriptor：任务是否合法？
+4. DMA 从 DDR 把输入搬到 SRAM。
+5. arbiter 决定谁能访问 SRAM。
+6. 计算核从 SRAM 读数据并计算。
+7. 结果写回 SRAM，必要时 DMA 写回 DDR。
+8. completion writer 写完成项。
+9. irq 通知 CPU：这单做完了。
+```

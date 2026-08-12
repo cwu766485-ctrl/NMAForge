@@ -37,7 +37,7 @@ formal, post-layout sign-off and real-board workload measurements remain open.
 ## Source-of-truth files
 
 - RTL: `rtl/top`, `rtl/control`, `rtl/dma`, `rtl/memory`, `rtl/compute`.
-- VCS file list: `verif/sim/ai_accel.f`.
+- VCS smoke file list: `verif/subsystem/top_smoke/sim/ai_accel.f`.
 - FPGA RTL lists: `fpga/xilinx_a7_100t/ai_accel_rtl.tcl` and
   `fpga/xczu15eg/ai_accel_rtl.tcl`.
 - Architecture: `docs/architecture.md`.

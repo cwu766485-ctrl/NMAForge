@@ -13,6 +13,8 @@ modelsim.ini
 *.ucdb
 simv*
 csrc/
+vc_hdrs.h
+*.sch.verilog.xml
 .Xil/
 xsim.dir/
 DVEfiles/
@@ -39,7 +41,8 @@ docs/hardware/
 
 # SpyGlass local databases/reports and simulation activity dumps.
 verif/spyglass/a8_static/
-verif/sim/*.saif
+verif/subsystem/top_smoke/sim/*.saif
+verif/block/**/sim/coverage/
 
 # Public repository hygiene
 docs/*.pdf

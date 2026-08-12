@@ -55,8 +55,6 @@ analyze -format sverilog [list \
   $RTL_DIR/control/ai_perf_monitor.v \
   $RTL_DIR/control/ai_command_processor.v \
   $RTL_DIR/compute/ai_bank_pe.v \
-  $RTL_DIR/compute/ai_reduction_tree.v \
-  $RTL_DIR/compute/ai_banked_compute_core.v \
   $RTL_DIR/compute/ai_bank_local_controller.v \
   $RTL_DIR/compute/ai_banked_cnm_core.v \
   $RTL_DIR/compute/ai_unsigned_divider.v \

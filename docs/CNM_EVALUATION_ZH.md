@@ -307,7 +307,7 @@ check_library
 cd /mnt/e/workspace/chip/CIMForge
 export TSMC28_STDCELL_DB=/home/ray/pdk/TSMC28/standard_cell_rvt/TSMCHOME/digital/Front_End/timing_power_noise/NLDM/tcbn28hpcplusbwp7t40p140_180a/tcbn28hpcplusbwp7t40p140tt0p9v25c.db
 export TSMC28_SRAM_DB_TT=/home/ray/ic/CIMForge/syn/out/pdk_cache/TS1N28HPCPL2SVTB4096X32M4MWBASO_tt0p9v25c.db
-export CIMFORGE_SAIF=$PWD/verif/sim/ai_accel_smoke.saif
+export CIMFORGE_SAIF=$PWD/verif/subsystem/top_smoke/sim/ai_accel_smoke.saif
 export CIMFORGE_SAIF_INSTANCE=ai_accel_top
 dc_shell -f syn/dc_ai_accel_28nm.tcl
 ```
@@ -317,7 +317,7 @@ dc_shell -f syn/dc_ai_accel_28nm.tcl
 常用命令：
 
 ```bash
-cd verif/sim
+cd verif/subsystem/top_smoke/sim
 make ai_cnm_a22
 make ai_spad_arb_run
 make ai_cnm_final_compare

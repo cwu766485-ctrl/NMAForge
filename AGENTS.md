@@ -14,7 +14,7 @@ outside the requested scope.
 Use `rg`/`rg --files` to locate RTL and test references.  When adding or
 renaming a synthesizable AI RTL module, update every applicable source list:
 
-- `verif/sim/ai_accel.f` for the AI smoke simulation;
+- `verif/subsystem/top_smoke/sim/ai_accel.f` for the AI smoke simulation;
 - `fpga/xilinx_a7_100t/ai_accel_rtl.tcl` for Artix-7 builds;
 - `fpga/xczu15eg/ai_accel_rtl.tcl` for Zynq UltraScale+ builds.
 
@@ -49,7 +49,8 @@ advancement must remain in `ai_command_processor`.
 
 ## Verification
 
-Run VCS commands from `verif/sim` on the team Linux/VNC EDA environment:
+Run legacy directed/smoke VCS commands from `verif/subsystem/top_smoke/sim`
+on the team Linux/VNC EDA environment:
 
 ```bash
 make ai_smoke

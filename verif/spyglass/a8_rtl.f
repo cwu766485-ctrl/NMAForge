@@ -8,8 +8,6 @@
 ../../rtl/control/ai_perf_monitor.v
 ../../rtl/control/ai_command_processor.v
 ../../rtl/compute/ai_bank_pe.v
-../../rtl/compute/ai_reduction_tree.v
-../../rtl/compute/ai_banked_compute_core.v
 ../../rtl/compute/ai_bank_local_controller.v
 ../../rtl/compute/ai_banked_cnm_core.v
 ../../rtl/compute/ai_unsigned_divider.v
