@@ -1,0 +1,22 @@
+
+SEED = $(shell date +%s)
+
+all: ai_smoke
+
+create_lib:
+	vlib work
+
+ai_compile:
+	vlog -l ai_comp.log -sv -mfcu \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-f ai_accel.f ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv
+
+ai_simulate:
+	vsim tb_ai_accel_smoke -l ai_accel_smoke.log -voptargs=+acc -do "run -all"
+
+ai_smoke: create_lib ai_compile ai_simulate
+
+clean:
+	rm -rf work mti_lib transcript modelsim.ini *.log *.wlf

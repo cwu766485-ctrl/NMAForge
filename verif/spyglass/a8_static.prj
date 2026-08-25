@@ -1,0 +1,39 @@
+# NMAForge public SpyGlass project.
+#
+# The public profile uses the behavioural scratchpad model and a structural
+# memory threshold. Private foundry macro adapters and timing libraries are
+# intentionally excluded; they may be added from a local, ignored overlay.
+
+set_option top ai_accel_top
+set_option enableSV yes
+set_option allow_module_override yes
+# Keep bounded RTL data arrays analysable while preventing static tools from
+# expanding the 512-KiB behavioural scratchpad into a synthesized array.
+set_option mthresh 8193
+# This server has versioned GuideWare but no GuideWare/latest symlink.  Pin the
+# installed methodology so CLI batch runs do not silently select a missing one.
+set_option active_methodology "$SPYGLASS_HOME/GuideWare/2023.12/block/rtl_handoff"
+read_file -type verilog ../../rtl/control/axi_lite_reg_if.v
+read_file -type verilog ../../rtl/dma/ai_axi128_dma.v
+read_file -type verilog ../../rtl/memory/ai_spad_protection.v
+read_file -type verilog ../../rtl/memory/ai_spad_arbiter.v
+read_file -type verilog ../../rtl/compute/ai_tile_pipeline.v
+read_file -type verilog ../../rtl/control/ai_perf_monitor.v
+read_file -type verilog ../../rtl/control/ai_command_processor.v
+read_file -type verilog ../../rtl/compute/ai_bank_pe.v
+read_file -type verilog ../../rtl/compute/ai_bank_local_controller.v
+read_file -type verilog ../../rtl/compute/ai_banked_cnm_core.v
+read_file -type verilog ../../rtl/compute/ai_unsigned_divider.v
+read_file -type verilog ../../rtl/compute/ai_integer_sqrt.v
+read_file -type verilog ../../rtl/compute/ai_tensor_matrix_core.v
+read_file -type verilog ../../rtl/compute/ai_tensor_sfu_core.v
+read_file -type verilog ../../rtl/compute/ai_conv3x3_linebuffer_core.v
+read_file -type verilog ../../rtl/compute/ai_kv_cache_engine.v
+read_file -type verilog ../../rtl/memory/ai_scratchpad.v
+read_file -type verilog ../../rtl/control/ai_desc_fetch.v
+read_file -type verilog ../../rtl/control/axi_desc_fetch.v
+read_file -type verilog ../../rtl/control/ai_completion_writer.v
+read_file -type verilog ../../rtl/control/ai_accel_regs.v
+read_file -type verilog ../../rtl/compute/ai_int8_compute_core.v
+read_file -type verilog ../../rtl/top/ai_accel_top.v
+read_file -type sgdc a8_constraints.sgdc

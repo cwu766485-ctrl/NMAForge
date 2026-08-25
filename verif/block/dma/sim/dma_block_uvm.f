@@ -1,0 +1,15 @@
++incdir+../agent
++incdir+../agent/interfaces
++incdir+../env
++incdir+../tests
+
+../agent/interfaces/ai_dma_ctrl_if.sv
+../agent/interfaces/ai_dma_axi_if.sv
+../agent/interfaces/ai_dma_spad_if.sv
+../../../../rtl/dma/ai_axi128_dma.v
+../agent/dma_block_types_pkg.sv
+../agent/dma_block_agent_pkg.sv
+../env/dma_block_env_pkg.sv
+../tests/dma_block_tests_pkg.sv
+../assertions/ai_axi128_dma_sva.sv
+../tb/tb_ai_axi128_dma_uvm.sv
