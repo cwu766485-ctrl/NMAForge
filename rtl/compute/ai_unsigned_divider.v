@@ -21,6 +21,8 @@ module ai_unsigned_divider #(
     reg [WIDTH-1:0] dividend_r, divisor_r, quotient_r;
     reg [WIDTH:0] remainder_r;
     reg [COUNT_BITS-1:0] count_r;
+    wire division_by_zero = (divisor == {WIDTH{1'b0}});
+    wire final_iteration = (count_r == {{(COUNT_BITS-1){1'b0}}, 1'b1});
     wire [WIDTH:0] shifted_remainder = {remainder_r[WIDTH-1:0],dividend_r[WIDTH-1]};
     wire subtract_ok = shifted_remainder >= {1'b0,divisor_r};
     wire [WIDTH:0] next_remainder = subtract_ok ?
@@ -34,8 +36,8 @@ module ai_unsigned_divider #(
         end else begin
             done <= 1'b0;
             if (start && !busy) begin
-                error <= (divisor==0);
-                if (divisor==0) begin
+                error <= division_by_zero;
+                if (division_by_zero) begin
                     quotient<=0; remainder<=dividend; done<=1;
                 end else begin
                     busy<=1; dividend_r<=dividend; divisor_r<=divisor;
@@ -46,7 +48,7 @@ module ai_unsigned_divider #(
                 remainder_r <= next_remainder;
                 quotient_r <= next_quotient;
                 count_r <= count_r-1'b1;
-                if (count_r==1) begin
+                if (final_iteration) begin
                     busy<=0; done<=1; error<=0;
                     quotient<=next_quotient; remainder<=next_remainder[WIDTH-1:0];
                 end

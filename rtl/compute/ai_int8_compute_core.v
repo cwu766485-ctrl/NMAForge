@@ -58,6 +58,9 @@ module ai_int8_compute_core(
 );
 
     // op 编码要和 ai_accel_regs/descriptor 定义保持一致。
+    // This core performs one packed INT8 dot4 per accumulator iteration.
+    // Registered scratchpad timing is explicit in the READ_* / READ_*_WAIT
+    // state pairs; do not collapse those pairs during refactoring.
     localparam [7:0] OP_VDOT_INT8      = 8'h10;
     localparam [7:0] OP_GEMV_INT8      = 8'h11;
     localparam [7:0] OP_GEMM_INT8_TILE = 8'h12;
@@ -73,18 +76,21 @@ module ai_int8_compute_core(
     localparam [3:0] ERR_PARITY    = 4'd5;
     localparam [3:0] ERR_PROTECTION = 4'd6;
 
-    localparam ST_IDLE   = 4'd0;
-    localparam ST_READ_A = 4'd1;
-    localparam ST_READ_B = 4'd2;
-    localparam ST_CALC   = 4'd3;
-    localparam ST_WRITE  = 4'd4;
-    localparam ST_NEXT   = 4'd5;
-    localparam ST_DONE   = 4'd6;
-    localparam ST_ERROR  = 4'd7;
-    localparam ST_READ_A_WAIT = 4'd8;
-    localparam ST_READ_B_WAIT = 4'd9;
-    localparam ST_READ_BIAS = 4'd10;
-    localparam ST_READ_BIAS_WAIT = 4'd11;
+    localparam [3:0] ST_IDLE           = 4'd0;
+    localparam [3:0] ST_READ_A         = 4'd1;
+    localparam [3:0] ST_READ_B         = 4'd2;
+    localparam [3:0] ST_CALC           = 4'd3;
+    localparam [3:0] ST_WRITE          = 4'd4;
+    localparam [3:0] ST_NEXT           = 4'd5;
+    localparam [3:0] ST_DONE           = 4'd6;
+    localparam [3:0] ST_ERROR          = 4'd7;
+    localparam [3:0] ST_READ_A_WAIT    = 4'd8;
+    localparam [3:0] ST_READ_B_WAIT    = 4'd9;
+    localparam [3:0] ST_READ_BIAS      = 4'd10;
+    localparam [3:0] ST_READ_BIAS_WAIT = 4'd11;
+
+    localparam [1:0] ACT_RELU  = 2'd1;
+    localparam [1:0] ACT_RELU6 = 2'd2;
 
     // 启动时把外部配置锁存到 *_r。这样任务执行期间即使软件改寄存器，
     // 当前任务也不会被中途影响，同时降低配置总线扇出。
@@ -126,10 +132,10 @@ module ai_int8_compute_core(
     wire [31:0] bias_addr;
     wire signed [31:0] dot_term;
     wire signed [63:0] acc_sum;
-    wire signed [63:0] shifted_sum;
-    wire signed [63:0] activated_sum;
+    wire [31:0] quantized_result;
     wire valid_op;
     wire valid_dims;
+    wire input_alignment_error;
     wire use_length_as_k;
     wire last_k;
     wire last_output;
@@ -137,6 +143,8 @@ module ai_int8_compute_core(
     wire depthwise_mode;
     wire [31:0] k_byte_offset;
     wire [31:0] k_vector_bytes;
+    wire read_response_error;
+    wire watchdog_expired;
 
     // 地址生成：
     //   VDOT: A/B 都按 k 线性递增；
@@ -158,16 +166,13 @@ module ai_int8_compute_core(
     assign out_addr = output_addr_r;
     assign bias_addr = bias_addr_r;
     // packed INT8 dot4 datapath：每个 word 有 4 个 int8 lane。
-    assign dot_term = dot4_i8(a_word_r, b_word_r);
-    assign acc_sum = acc_r + dot_term;
+    ai_int8_datapath int8_datapath_u(
+        .a_word(a_word_r), .b_word(b_word_r), .accumulator(acc_r),
+        .scale_shift(scale_shift_r), .activation(activation_r),
+        .dot_term(dot_term), .accumulator_sum(acc_sum),
+        .quantized_result(quantized_result)
+    );
     // 后处理：先算术右移做简化量化，再可选 ReLU，再饱和到 signed int32。
-    assign shifted_sum = $signed(acc_sum) >>> scale_shift_r;
-    assign activated_sum = (activation_r == 2'd1) ?
-                           ((shifted_sum < 0) ? 64'sd0 : shifted_sum) :
-                           ((activation_r == 2'd2) ?
-                            ((shifted_sum < 0) ? 64'sd0 :
-                             ((shifted_sum > 64'sd6) ? 64'sd6 : shifted_sum)) :
-                            shifted_sum);
     assign valid_op = (op_mode == OP_VDOT_INT8) ||
                       (op_mode == OP_GEMV_INT8) ||
                       (op_mode == OP_GEMM_INT8_TILE) ||
@@ -179,15 +184,25 @@ module ai_int8_compute_core(
                         (((op_mode == OP_GEMM_INT8_TILE) || (op_mode == OP_CONV1X1_INT8) ||
                           (op_mode == OP_CONV3X3_INT8) || (op_mode == OP_DWCONV3X3_INT8)) && (m_size != 16'd0) &&
                          (n_size != 16'd0) && (k_words != 16'd0));
+    assign input_alignment_error = (src0_base[1:0] != 2'b00) ||
+                                   (src1_base[1:0] != 2'b00) ||
+                                   (dst_base[1:0] != 2'b00) ||
+                                   (bias_enable && (bias_base[1:0] != 2'b00));
     assign last_k = use_length_as_k ? (k_r == (length_r - 16'd1)) :
                                      (k_r == (k_words_r - 16'd1));
     assign last_output = (op_r == OP_VDOT_INT8) ? 1'b1 :
                          ((op_r == OP_GEMV_INT8) ? (row_r == (m_size_r - 16'd1)) :
                           ((row_r == (m_size_r - 16'd1)) && (col_r == (n_size_r - 16'd1))));
+    assign read_response_error = spad_parity_error || read_protection_error_r;
+    assign watchdog_expired = busy && (watchdog_limit_r != 32'd0) &&
+                              (cycle_count >= watchdog_limit_r);
 
     // 4-lane INT8 乘加函数。综合后对应 4 个 8x8 signed multiplier
     // 加一个小加法树。为了防止溢出，输出扩展到 signed 32-bit。
-    function signed [31:0] dot4_i8;
+    // Packed little-endian INT8 dot product: byte lane i is multiplied only
+    // by the corresponding byte lane i.  The 32-bit result prevents a
+    // four-product overflow before it is accumulated into acc_r.
+    /* function signed [31:0] dot4_i8;
         input [31:0] a;
         input [31:0] b;
         reg signed [7:0] a0;
@@ -217,19 +232,18 @@ module ai_int8_compute_core(
             p3 = a3 * b3;
             dot4_i8 = p0 + p1 + p2 + p3;
         end
-    endfunction
+    endfunction */
 
     // 启动前配置检查。非法 op、尺寸为 0、地址非 32-bit 对齐都会直接进入 ERROR，
     // 避免错误请求继续访问 scratchpad。
+    // Validate a command before issuing any scratchpad transaction.
     always @(*) begin
         start_error_code = ERR_NONE;
         if (!valid_op)
             start_error_code = ERR_OP;
         else if (!valid_dims)
             start_error_code = ERR_CONFIG;
-        else if ((src0_base[1:0] != 2'b00) || (src1_base[1:0] != 2'b00) ||
-                 (dst_base[1:0] != 2'b00) ||
-                 (bias_enable && (bias_base[1:0] != 2'b00)))
+        else if (input_alignment_error)
             start_error_code = ERR_CONFIG;
     end
 
@@ -239,6 +253,8 @@ module ai_int8_compute_core(
     //   READ_B  -> 读 B 地址；
     //   WRITE   -> 写输出地址；
     //   其他状态不访问 scratchpad。
+    // The registered scratchpad interface is driven only for a request or a
+    // write state; wait states deliberately issue no second transaction.
     always @(*) begin
         spad_valid = 1'b0;
         spad_write = 1'b0;
@@ -272,6 +288,8 @@ module ai_int8_compute_core(
     // 主状态机。
     // 每个输出元素都经历：读 A word -> 读 B word -> dot4+累加 -> 最后一个 k 后写结果。
     // VDOT 输出 1 个元素；GEMV 输出 M 个元素；GEMM_TILE 输出 M*N 个元素。
+    // Per-output execution: optional bias, A read, B read, dot4/accumulate,
+    // result write, then row/column advancement.  `done` remains a pulse.
     always @(posedge clk or negedge resetn) begin
         if (!resetn) begin
             state_r          <= ST_IDLE;
@@ -317,8 +335,7 @@ module ai_int8_compute_core(
             if (busy && abort) begin
                 error_code <= ERR_ABORT;
                 state_r    <= ST_ERROR;
-            end else if (busy && (watchdog_limit_r != 32'd0) &&
-                         (cycle_count >= watchdog_limit_r)) begin
+            end else if (watchdog_expired) begin
                 error_code <= ERR_WATCHDOG;
                 state_r    <= ST_ERROR;
             end else begin
@@ -368,7 +385,7 @@ module ai_int8_compute_core(
                         state_r <= ST_READ_BIAS_WAIT;
                     end
                     ST_READ_BIAS_WAIT: if (spad_rsp_valid) begin
-                        if (spad_parity_error || read_protection_error_r) begin
+                        if (read_response_error) begin
                             error_code <= read_protection_error_r ? ERR_PROTECTION : ERR_PARITY;
                             state_r <= ST_ERROR;
                         end else begin
@@ -382,7 +399,7 @@ module ai_int8_compute_core(
                     end
                     ST_READ_A_WAIT: if (spad_rsp_valid) begin
                         a_word_r <= spad_rdata;
-                        if (spad_parity_error || read_protection_error_r) begin
+                        if (read_response_error) begin
                             error_code <= read_protection_error_r ? ERR_PROTECTION : ERR_PARITY;
                             state_r    <= ST_ERROR;
                         end else begin
@@ -395,7 +412,7 @@ module ai_int8_compute_core(
                     end
                     ST_READ_B_WAIT: if (spad_rsp_valid) begin
                         b_word_r <= spad_rdata;
-                        if (spad_parity_error || read_protection_error_r) begin
+                        if (read_response_error) begin
                             error_code <= read_protection_error_r ? ERR_PROTECTION : ERR_PARITY;
                             state_r    <= ST_ERROR;
                         end else begin
@@ -408,18 +425,8 @@ module ai_int8_compute_core(
                         // 否则 k++，继续读取下一组 A/B word。
                         acc_next_r <= acc_sum;
                         if (last_k) begin
-                            if (activated_sum > 64'sd2147483647)
-                                output_word_r <= 32'h7fff_ffff;
-                            else if (activated_sum < -64'sd2147483648)
-                                output_word_r <= 32'h8000_0000;
-                            else
-                                output_word_r <= activated_sum[31:0];
-                            if (activated_sum > 64'sd2147483647)
-                                result <= 32'h7fff_ffff;
-                            else if (activated_sum < -64'sd2147483648)
-                                result <= 32'h8000_0000;
-                            else
-                                result <= activated_sum[31:0];
+                            output_word_r <= quantized_result;
+                            result <= quantized_result;
                             state_r <= ST_WRITE;
                         end else begin
                             acc_r <= acc_sum;

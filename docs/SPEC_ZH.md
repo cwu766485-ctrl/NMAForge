@@ -1,6 +1,6 @@
-# CIMForge A8 AI 加速器详细规格（中文）
+# NMAForge AXI4 近存张量加速器详细规格（中文）
 
-**RTL：A8；软件 ABI：v7.2；版本寄存器：`0x1000_0008`；顶层：`rtl/top/ai_accel_top.v`；事实日期：2026-08-09。**
+**RTL：A8；软件 ABI：v7.2；版本寄存器：`0x1000_0008`；顶层：`rtl/top/ai_accel_top.v`；事实日期：2026-08-26。**
 
 > 本文按当前 RTL 及 `sw/include/cimforge_regs.h` 编写；发生冲突时，RTL 和头文件优先。本文只陈述已实现的全数字 RTL，规划项不会被写作已交付能力。
 
@@ -10,7 +10,7 @@
 
 ## 1. 产品定位
 
-CIMForge 是可综合、面向 SoC 集成的全数字 AI 近存加速器 IP。软件通过 DMA 将 tile、权重、激活和 KV-cache 搬进邻近计算引擎的本地 SRAM，再在片上完成 INT8/定点计算，以减少外部 DDR 往返。其 banked VDOT/GEMV 路径实现了数字 CNM（Compute-Near-Memory）：四个 SRAM bank 各自邻接一个 Local Controller 和 Local PE，本 bank 内完成地址推进、A/B 读请求、operand 双缓冲、dot4 本地累加；仅在 output 边界传递四个 local sum 到 Global Reducer。它不是模拟 Compute-in-Memory：不修改 SRAM bit-cell、bit-line 或 sense amplifier，不在存储阵列内以模拟方式执行 MAC；也不是包含 CPU、NoC、CXL/LPDDR/HBM-PIM、DDR 控制器和 LLM serving 软件栈的完整系统。
+NMAForge 是可综合、面向 SoC 集成的全数字 AI 近存加速器 IP。软件通过 DMA 将 tile、权重、激活和 KV-cache 搬进邻近计算引擎的本地 SRAM，再在片上完成 INT8/定点计算，以减少外部 DDR 往返。其 banked VDOT/GEMV 路径实现了数字 CNM（Compute-Near-Memory）：四个 SRAM bank 各自邻接一个 Local Controller 和 Local PE，本 bank 内完成地址推进、A/B 读请求、operand 双缓冲、dot4 本地累加；仅在 output 边界传递四个 local sum 到 Global Reducer。它不是模拟 Compute-in-Memory：不修改 SRAM bit-cell、bit-line 或 sense amplifier，不在存储阵列内以模拟方式执行 MAC；也不是包含 CPU、NoC、CXL/LPDDR/HBM-PIM、DDR 控制器和 LLM serving 软件栈的完整系统。
 
 当前重点是 INT8 VDOT/GEMV/GEMM、1x1/3x3/Depthwise 卷积、Q15 Softmax（含 causal）、RMSNorm、LayerNorm、残差、GELU、SiLU、requant，以及 Transformer 的 QKV/MHA/FFN 宏编排与 KV-cache 读写。典型 decoder 数据流为：`Q/K/V 投影 → Q×K^T → causal softmax → attention×V → 输出投影 → residual+RMSNorm → FFN → residual+RMSNorm`。
 
@@ -63,7 +63,7 @@ SRAM bank3 <-> LC3 + PE3 <--- cnm_addr3 / cnm_ready[3] / cnm_rsp_valid[3]
 | 主机窗口 | `0x00010000` 起的 AXI-Lite scratchpad aperture |
 | 读时序 | 注册读，响应在后续周期有效 |
 
-VCS 通过 `+define+VCS` 使用 `rtl/memory/ai_scratchpad.v` 的行为 RAM；Vivado 使用 XPM 分支。TSMC28 DC/SpyGlass 使用 `syn/ai_scratchpad_28nm_macro.v`：每个逻辑 bank 由 8 个 `TS1N28HPCPL2SVTB4096X32M4MWBASO` 4K×32 1RW macro 实现，共 32 个。SpyGlass 仅检查 macro wrapper/控制逻辑，不展开 512 KiB 行为数组；foundry `.db/.lib` 才是综合和 STA 的存储权威视图。未对齐、越界、无权限或保护冲突访问必须报错。
+VCS 通过 `+define+VCS` 使用 `rtl/memory/ai_scratchpad.v` 的行为 RAM；Vivado 使用 XPM 分支。私有 ASIC overlay 将每个逻辑 bank 映射为 8 个 4K×32 单端口 macro，共 32 个 macro；具体 wrapper、库 view 和 macro 名称均不进入公开仓库。公开 SpyGlass profile 不展开 512 KiB 行为数组；实际综合和 STA 以私有、受许可的 `.db/.lib` 为权威。未对齐、越界、无权限或保护冲突访问必须报错。
 
 ## 4. 队列、描述符与完成项
 
@@ -116,13 +116,13 @@ VCS 通过 `+define+VCS` 使用 `rtl/memory/ai_scratchpad.v` 的行为 RAM；Viv
 
 VCS `make ai_smoke` 已覆盖 Transformer 30-command 链、随机 GEMV/GEMM/Conv、错误/保护和 reset recovery；扩展回归是 `make ai_comp`、`make ai_run AI_RANDOM_CASES=20 AI_SEED=12345`。2026-08-06 的 SpyGlass macro-aware lint 记录为 **0 error、414 warnings、4 info**（共 418 条信息，仍需分类）；CDC setup 为 0 error、12 warnings，CDC structural verify 显示 0 个 unsynchronized crossing、0 个 convergence，但因缺少 Advanced_CDC license 而有 1 条工具/许可证 error，不能称 sign-off；RDC structural verify 的 2 条 error 同样仅为 Advanced_CDC / `rdc_adv_checker` license 缺失，不能作为 RTL reset-crossing 违规解读，也不能称 RDC sign-off。
 
-TSMC28 HPC+ TT/0.9V/25°C 的当前 CNM RTL、真实 32 个 SRAM macro、4.0 ns pre-layout DC：setup/hold WNS、TNS 均 0.00 ns、0 条违例；关键路径为 3.89 ns；area 为 1,245,378.649905 library units，其中 SRAM macro area 为 1,127,675.750000。DC power 报告为 dynamic 22.8290 mW、leakage 1.9733 mW、total 24.8063 mW，但由于 PWR-414/PWR-415/PWR-428，仍属于默认/部分活动率估计，不是 SAIF workload sign-off 功耗。XCZU15EG 100 MHz OOC 记录为 setup WNS +0.187 ns、hold WNS +0.032 ns，约 30,506 LUT、25,238 FF、128 RAMB36、46 DSP，尚非整板验收。
+商用 28 nm、TT/0.9V/25°C 的当前 CNM RTL 在 4.0 ns pre-layout DC 中 setup/hold 均无违例；关键路径约 3.89 ns。功耗仅有默认/部分活动率估计，不是 SAIF workload sign-off 功耗。XCZU15EG 100 MHz OOC 已有实现证据，但尚非整板验收。公开报告见 `TSMC28_SYNTHESIS_REPORT.md`。
 
 可信表述是“TSMC28、250 MHz pre-layout setup/hold closure”。400 MHz 需要 2.5 ns，当前关键路径仍差约 1.37 ns；需要在 SRAM→SFU、exp/sum 和 tile 边界流水化后，重新完成 DC sweep、P&R、多角 STA、功耗和板级验证，才可作进一步频率/PPA 结论。
 
 ## 8. 权威文件
 
-`rtl/top/ai_accel_top.v`（集成）、`rtl/control/ai_accel_regs.v` 与 `sw/include/cimforge_regs.h`（ABI）、`rtl/control/ai_command_processor.v`（命令）、`rtl/control/ai_completion_writer.v`（完成原子性）、`rtl/dma/ai_axi128_dma.v`（DMA）、`rtl/memory/ai_spad_arbiter.v`/`ai_scratchpad.v`（SRAM）、`syn/ai_scratchpad_28nm_macro.v`（28nm wrapper）、`verif/subsystem/top_smoke/sim/ai_accel.f`（VCS）和 `verif/spyglass/a8_static.prj`（SpyGlass）。
+`rtl/top/ai_accel_top.v`（集成）、`rtl/control/ai_accel_regs.v` 与 `sw/include/cimforge_regs.h`（ABI）、`rtl/control/ai_command_processor.v`（命令）、`rtl/control/ai_completion_writer.v`（完成原子性）、`rtl/dma/ai_axi128_dma.v`（DMA）、`rtl/memory/ai_spad_arbiter.v`/`ai_scratchpad.v`（SRAM）、`verif/subsystem/top_smoke/sim/ai_accel.f`（VCS）和 `verif/spyglass/a8_static.prj`（SpyGlass）。ASIC macro adapter 位于私有 overlay。
 
 ## 9. 电路模块与信号交互
 | 模块 A | 模块 B | 主要信号 | 用零基础语言解释 |

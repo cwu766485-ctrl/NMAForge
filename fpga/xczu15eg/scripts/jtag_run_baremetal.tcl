@@ -1,4 +1,4 @@
-# Program the board, run the XSA-matched FSBL, download the CIMForge A53
+# Program the board, run the XSA-matched FSBL, download the NMAForge A53
 # bring-up ELF, and independently check its exit status/register aftermath.
 
 set SCRIPT_DIR [file normalize [file dirname [info script]]]
@@ -10,21 +10,24 @@ set FSBL_FILE "$BUILD_DIR/baremetal/cimforge_fsbl.elf"
 set APP_FILE "$BUILD_DIR/baremetal/cimforge_bringup.elf"
 set LOG_FILE "$BUILD_DIR/board/baremetal_jtag.log"
 set PSU_INIT "$BUILD_DIR/board/cimforge_board.gen/sources_1/bd/cimforge_system/ip/cimforge_system_ps8_0/psu_init.tcl"
-set NM_TOOL "D:/Xilinx/Vitis/2024.1/gnu/aarch64/nt/aarch64-none/bin/aarch64-none-elf-nm.exe"
+set NM_TOOL ""
 
 foreach {env_name variable_name} {
-    CIMFORGE_BIT BIT_FILE
-    CIMFORGE_XSA XSA_FILE
-    CIMFORGE_FSBL FSBL_FILE
-    CIMFORGE_APP APP_FILE
-    CIMFORGE_JTAG_LOG LOG_FILE
-    CIMFORGE_NM NM_TOOL
+    NMAFORGE_BIT BIT_FILE
+    NMAFORGE_XSA XSA_FILE
+    NMAFORGE_FSBL FSBL_FILE
+    NMAFORGE_APP APP_FILE
+    NMAFORGE_JTAG_LOG LOG_FILE
+    NMAFORGE_NM NM_TOOL
 } {
     if {[info exists ::env($env_name)]} {
         set $variable_name [file normalize $::env($env_name)]
     }
 }
 foreach required [list $BIT_FILE $XSA_FILE $FSBL_FILE $APP_FILE $PSU_INIT $NM_TOOL] {
+if {$NM_TOOL eq ""} {
+    error "Set NMAFORGE_NM to the local aarch64-none-elf-nm executable"
+}
     if {![file exists $required]} {
         error "Required deployment file not found: $required"
     }

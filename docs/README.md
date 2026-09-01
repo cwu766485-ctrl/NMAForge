@@ -1,49 +1,32 @@
-# CIMForge 文档索引
+# NMAForge documentation
 
-仓库只保留以 `rtl/top/ai_accel_top.v` 为核心的 A8 AXI-Lite/AXI4 INT8 AI
-加速器文档。当前项目是**数字 Compute-Near-Memory（CNM）IP**：四 bank SRAM
-旁放置数字 Local PE，而不是模拟 SRAM compute-in-memory。历史阶段笔记、聊天导出、
-第三方板卡示例和工具生成物不是项目交付。
+[中文文档索引](README_ZH.md) · [Repository README](../README.md)
 
-## 当前快照（2026-08-09）
+The public documentation describes the current all-digital near-memory tensor
+accelerator. It deliberately excludes licensed PDK collateral, vendor board
+files, credentials, generated reports and personal environment instructions.
 
-- RTL/ABI：A8、ABI v7.2；32-bit AXI4-Lite 控制面、128-bit AXI4 数据主口、
-  512 KiB 四 bank scratchpad、CMDQ/CPLQ、带 ID 的最多四笔读 outstanding DMA。
-- 计算：INT8 VDOT/GEMV/GEMM、bank-local CNM（A1/A2.2）、4×4 matrix tile（A3.1）、
-  Conv、KV-cache primitive 和定点 SFU；Transformer 是由 primitive 组合的微工作负载，
-  不是生产级 LLM serving 系统。
-- 已有证据：动态 smoke/随机与 CNM 定向 benchmark 通过；TSMC28 TT/0.9 V/25°C、
-  4.0 ns pre-layout DC 的 setup/hold 均无违例。SpyGlass lint 为 0 error，CDC/RDC
-  仅完成基础结构检查，受 Advanced_CDC 许可证限制，均不是 sign-off。
-- 尚未完成：UVM coverage closure、formal/LEC/DFT、后布局 ASIC sign-off、SAIF
-  workload 功耗签核，以及 XCZU15EG 实板端到端验收。
-
-| 文档 | 用途 |
+| Document | Purpose |
 |---|---|
-| [SPEC_ZH.md](SPEC_ZH.md) | A8/ABI v7.2 中文详细规格：接口、寄存器、队列、DMA、算子与边界。 |
-| [SPEC.md](SPEC.md) | 英文兼容规格；内容与 RTL/软件 ABI 对齐。 |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | 最新中文顶层架构、数字 CNM 数据路径、模块所有权和实现状态摘要。 |
-| [TSMC28_SYNTHESIS_REPORT.md](TSMC28_SYNTHESIS_REPORT.md) | TSMC28 TT/0.9V/25°C、250MHz pre-layout 综合证据和适用边界。 |
-| [XCZU15EG_BRINGUP.md](XCZU15EG_BRINGUP.md) | XCZU15EG 构建、下载与板级 bring-up 操作手册；不是已完成的板级验收报告。 |
-| [CNM_BANK_LOCAL_PE_RESEARCH_ZH.md](CNM_BANK_LOCAL_PE_RESEARCH_ZH.md) | Bank-local PE/CNM 的设计动机、实现事实和后续研究边界。 |
-| [CNM_EVALUATION_ZH.md](CNM_EVALUATION_ZH.md) | A1/A2/A3.1 实测性能、PPA 边界和 CNM 验证证据。 |
-| [VPLAN.md](VPLAN.md) | UVM、Formal、LEC、DFT、PPA 的详细验证计划与回归矩阵。 |
-| [wsl_linux_instruction.md](wsl_linux_instruction.md) | WSL/Linux EDA 环境与运行说明。 |
-| [project_update_log.md](project_update_log.md) | 项目更新记录；不替代规格或验证报告。 |
+| [SPEC.md](SPEC.md) / [SPEC_ZH.md](SPEC_ZH.md) | English/Chinese ABI v7.2 specification: interfaces, queues, DMA, operators and boundaries. |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Module ownership, control/data flow and digital CNM datapath. |
+| [RTL_GUIDE.md](RTL_GUIDE.md) | Learning-oriented guide to the RTL hierarchy, transaction boundaries and safe refactoring rules. |
+| [VPLAN.md](VPLAN.md) | Verification plan, evidence and remaining closure gates. |
+| [TSMC28_SYNTHESIS_REPORT.md](TSMC28_SYNTHESIS_REPORT.md) | Sanitized commercial-28-nm pre-layout synthesis evidence and its limits. |
+| [XCZU15EG_BRINGUP.md](XCZU15EG_BRINGUP.md) | Board-owner bring-up procedure; vendor collateral is intentionally external. |
+| [CNM_BANK_LOCAL_PE_RESEARCH_ZH.md](CNM_BANK_LOCAL_PE_RESEARCH_ZH.md) | Chinese design rationale for bank-local digital CNM. |
+| [CNM_EVALUATION.md](CNM_EVALUATION.md) | Public benchmark/evaluation summary and limitations. |
+| [PUBLIC_RELEASE.md](PUBLIC_RELEASE.md) | What may be published and the safe GitHub-release workflow. |
 
-RTL compilation source lists are authoritative:
+| [NAMING_COMPATIBILITY.md](NAMING_COMPATIBILITY.md) | Public NMAForge naming and the retained ABI compatibility identifiers. |
+## Documentation rules
 
-- `verif/subsystem/top_smoke/sim/ai_accel.f`
-- `fpga/xilinx_a7_100t/ai_accel_rtl.tcl`
-- `fpga/xczu15eg/ai_accel_rtl.tcl`
-
-## 文档维护规则
-
-- 架构/ABI 改动同步更新 `SPEC_ZH.md`、`SPEC.md` 和软件头文件。
-- 当前事实以 `SPEC_ZH.md`、`ARCHITECTURE.md`、`CNM_EVALUATION_ZH.md`、
-  `TSMC28_SYNTHESIS_REPORT.md` 和 `VPLAN.md` 为准；
-  已合并删除的 CNM 子报告不再作为链接或验收依据。
-- PPA、SpyGlass、FPGA 结果只在真实工具运行后写入相应报告；必须写清 PVT、
-  约束和 pre-layout/post-layout 边界。
-- 中间日志、聊天导出、工具缓存、bitstream、checkpoint、第三方 demo 不进入 `docs/`。
-- 新内容应优先并入上述主题文档；只有独立、长期维护的研究结论才新增文档。
+- Change the specification and ABI header before changing an ABI-visible RTL
+  contract.
+- Record only tool runs that actually occurred, including PVT/constraints and
+  whether a result is pre-layout, post-route or board-measured.
+- Keep documents focused: long-lived architecture/evidence belongs in the
+  documents above; private change logs, chat exports and tool caches do not
+  belong in Git.
+- The supported public project name is **NMAForge**. Historical `CIMFORGE_*`
+  ABI identifiers are retained only for source compatibility.

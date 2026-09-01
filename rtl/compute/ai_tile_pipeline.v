@@ -106,6 +106,34 @@ module ai_tile_pipeline(
                           (|output_offset[1:0]) ||
                           (|ext_input_base[1:0]) || (|ext_output_base[1:0]);
 
+    // Arbitration is deliberately based only on registered context state.
+    // A completion retires in this cycle; its context can be issued again on
+    // the following cycle.  This preserves the one-cycle ownership hand-off
+    // between the DMA/compute engines and their scratchpad buffers.
+    wire ctx0_store_ready = (ctx0_state_r == CTX_PRODUCED) &&
+                            (ctx0_tile_r == next_store_tile_r);
+    wire ctx1_store_ready = (ctx1_state_r == CTX_PRODUCED) &&
+                            (ctx1_tile_r == next_store_tile_r);
+    wire store_issue = ctx0_store_ready || ctx1_store_ready;
+    wire store_ctx1 = !ctx0_store_ready && ctx1_store_ready;
+
+    wire ctx0_load_ready = (ctx0_state_r == CTX_EMPTY);
+    wire ctx1_load_ready = (ctx1_state_r == CTX_EMPTY);
+    wire load_issue = (next_load_tile_r < tile_count) &&
+                      (ctx0_load_ready || ctx1_load_ready);
+    wire load_ctx1 = !ctx0_load_ready && ctx1_load_ready;
+
+    wire ctx0_compute_ready = (ctx0_state_r == CTX_READY) &&
+                              (ctx0_tile_r == next_compute_tile_r);
+    wire ctx1_compute_ready = (ctx1_state_r == CTX_READY) &&
+                              (ctx1_tile_r == next_compute_tile_r);
+    wire compute_issue = ctx0_compute_ready || ctx1_compute_ready;
+    wire compute_ctx1 = !ctx0_compute_ready && ctx1_compute_ready;
+
+    wire [31:0] dma_buffer_base = (store_issue ? store_ctx1 : load_ctx1) ?
+                                  buffer1_base : buffer0_base;
+    wire [31:0] compute_buffer_base = compute_ctx1 ? buffer1_base : buffer0_base;
+
     always @(posedge clk or negedge resetn) begin
         if (!resetn) begin
             ctx0_state_r <= CTX_EMPTY;
@@ -245,73 +273,51 @@ module ai_tile_pipeline(
                     // a load into an empty context.  This prevents output
                     // back-pressure from being hidden behind unlimited loads.
                     if (!dma_inflight_r && !dma_busy && !dma_done) begin
-                        if ((ctx0_state_r == CTX_PRODUCED) &&
-                            (ctx0_tile_r == next_store_tile_r)) begin
+                        if (store_issue) begin
                             dma_start <= 1'b1;
                             dma_store <= 1'b1;
-                            dma_owner_r <= 1'b0;
+                            dma_owner_r <= store_ctx1;
                             dma_is_store_r <= 1'b1;
                             dma_inflight_r <= 1'b1;
                             dma_ext_addr <= next_store_ext_addr_r;
-                            dma_spad_addr <= buffer0_base + output_offset;
+                            dma_spad_addr <= dma_buffer_base + output_offset;
                             dma_length_words <= output_words;
-                            ctx0_state_r <= CTX_STORING;
+                            if (store_ctx1)
+                                ctx1_state_r <= CTX_STORING;
+                            else
+                                ctx0_state_r <= CTX_STORING;
                             next_store_tile_r <= next_store_tile_r + 16'd1;
                             next_store_ext_addr_r <= next_store_ext_addr_r + ext_output_stride;
-                        end else if ((ctx1_state_r == CTX_PRODUCED) &&
-                                     (ctx1_tile_r == next_store_tile_r)) begin
-                            dma_start <= 1'b1;
-                            dma_store <= 1'b1;
-                            dma_owner_r <= 1'b1;
-                            dma_is_store_r <= 1'b1;
-                            dma_inflight_r <= 1'b1;
-                            dma_ext_addr <= next_store_ext_addr_r;
-                            dma_spad_addr <= buffer1_base + output_offset;
-                            dma_length_words <= output_words;
-                            ctx1_state_r <= CTX_STORING;
-                            next_store_tile_r <= next_store_tile_r + 16'd1;
-                            next_store_ext_addr_r <= next_store_ext_addr_r + ext_output_stride;
-                        end else if ((next_load_tile_r < tile_count) &&
-                                     (ctx0_state_r == CTX_EMPTY)) begin
+                        end else if (load_issue) begin
                             dma_start <= 1'b1;
                             dma_store <= 1'b0;
-                            dma_owner_r <= 1'b0;
+                            dma_owner_r <= load_ctx1;
                             dma_is_store_r <= 1'b0;
                             dma_inflight_r <= 1'b1;
                             dma_ext_addr <= next_load_ext_addr_r;
-                            dma_spad_addr <= buffer0_base;
+                            dma_spad_addr <= dma_buffer_base;
                             dma_length_words <= input_words;
-                            ctx0_tile_r <= next_load_tile_r;
-                            ctx0_state_r <= CTX_LOADING;
-                            next_load_tile_r <= next_load_tile_r + 16'd1;
-                            next_load_ext_addr_r <= next_load_ext_addr_r + ext_input_stride;
-                        end else if ((next_load_tile_r < tile_count) &&
-                                     (ctx1_state_r == CTX_EMPTY)) begin
-                            dma_start <= 1'b1;
-                            dma_store <= 1'b0;
-                            dma_owner_r <= 1'b1;
-                            dma_is_store_r <= 1'b0;
-                            dma_inflight_r <= 1'b1;
-                            dma_ext_addr <= next_load_ext_addr_r;
-                            dma_spad_addr <= buffer1_base;
-                            dma_length_words <= input_words;
-                            ctx1_tile_r <= next_load_tile_r;
-                            ctx1_state_r <= CTX_LOADING;
+                            if (load_ctx1) begin
+                                ctx1_tile_r <= next_load_tile_r;
+                                ctx1_state_r <= CTX_LOADING;
+                            end else begin
+                                ctx0_tile_r <= next_load_tile_r;
+                                ctx0_state_r <= CTX_LOADING;
+                            end
                             next_load_tile_r <= next_load_tile_r + 16'd1;
                             next_load_ext_addr_r <= next_load_ext_addr_r + ext_input_stride;
                         end
                     end
 
                     if (!compute_inflight_r && !compute_busy && !compute_done) begin
-                        if ((ctx0_state_r == CTX_READY) &&
-                            (ctx0_tile_r == next_compute_tile_r)) begin
+                        if (compute_issue) begin
                             compute_start <= 1'b1;
-                            compute_owner_r <= 1'b0;
+                            compute_owner_r <= compute_ctx1;
                             compute_inflight_r <= 1'b1;
                             launch_op <= compute_op;
-                            launch_src0 <= buffer0_base;
+                            launch_src0 <= compute_buffer_base;
                             launch_src1 <= weight_base;
-                            launch_dst <= buffer0_base + output_offset;
+                            launch_dst <= compute_buffer_base + output_offset;
                             launch_length <= compute_length;
                             launch_m <= compute_m;
                             launch_n <= compute_n;
@@ -320,26 +326,10 @@ module ai_tile_pipeline(
                             launch_activation <= compute_activation;
                             launch_bias_base <= compute_bias_base;
                             launch_bias_enable <= compute_bias_enable;
-                            ctx0_state_r <= CTX_COMPUTING;
-                            next_compute_tile_r <= next_compute_tile_r + 16'd1;
-                        end else if ((ctx1_state_r == CTX_READY) &&
-                                     (ctx1_tile_r == next_compute_tile_r)) begin
-                            compute_start <= 1'b1;
-                            compute_owner_r <= 1'b1;
-                            compute_inflight_r <= 1'b1;
-                            launch_op <= compute_op;
-                            launch_src0 <= buffer1_base;
-                            launch_src1 <= weight_base;
-                            launch_dst <= buffer1_base + output_offset;
-                            launch_length <= compute_length;
-                            launch_m <= compute_m;
-                            launch_n <= compute_n;
-                            launch_k <= compute_k;
-                            launch_shift <= compute_shift;
-                            launch_activation <= compute_activation;
-                            launch_bias_base <= compute_bias_base;
-                            launch_bias_enable <= compute_bias_enable;
-                            ctx1_state_r <= CTX_COMPUTING;
+                            if (compute_ctx1)
+                                ctx1_state_r <= CTX_COMPUTING;
+                            else
+                                ctx0_state_r <= CTX_COMPUTING;
                             next_compute_tile_r <= next_compute_tile_r + 16'd1;
                         end
                     end

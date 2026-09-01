@@ -167,7 +167,7 @@ module ai_accel_top #(
     wire        reg_req_write_raw;
     wire [31:0] reg_req_addr_raw;
     // AXI interconnects preserve the system address on the slave interface.
-    // CIMForge occupies a 1 MiB aperture, so internal register/scratchpad
+    // NMAForge occupies a 1 MiB aperture, so internal register/scratchpad
     // decoding must use the aperture-relative low 20 bits.  Zero-based RTL
     // simulations remain equivalent while mapped FPGA accesses (for example
     // 0xA000_0044) no longer turn a valid read into SLVERR.
@@ -431,25 +431,17 @@ module ai_accel_top #(
     wire        core_spad_error;
     wire        compute_req_execute;
 
-    wire        scalar_busy, scalar_done, scalar_error;
-    wire [3:0]  scalar_error_code;
-    wire [31:0] scalar_result, scalar_cycle_count, scalar_element_count;
-    wire        banked_busy, banked_done, banked_error;
-    wire [3:0]  banked_error_code;
-    wire [31:0] banked_result, banked_cycle_count, banked_element_count;
+    wire        scalar_busy;
+    wire        banked_busy;
     wire        matrix_spad_valid, matrix_spad_write;
     wire [31:0] matrix_spad_addr, matrix_spad_wdata;
     wire        matrix_banked_read_valid;
     wire [31:0] matrix_banked_read_addr;
-    wire        matrix_busy, matrix_done, matrix_error;
-    wire [3:0]  matrix_error_code;
-    wire [31:0] matrix_result, matrix_cycle_count, matrix_element_count;
+    wire        matrix_busy;
     wire        matrix_perf_mac_active, matrix_perf_banked_wait;
     wire        sfu_spad_valid, sfu_spad_write;
     wire [31:0] sfu_spad_addr, sfu_spad_wdata;
-    wire        sfu_busy, sfu_done, sfu_error;
-    wire [3:0]  sfu_error_code;
-    wire [31:0] sfu_result, sfu_cycle_count, sfu_element_count;
+    wire        sfu_busy;
     wire        core_busy;
     wire        core_done;
     wire        core_error;
@@ -470,18 +462,14 @@ module ai_accel_top #(
     wire        kv_cache_op;
     wire        conv_spad_valid, conv_spad_write;
     wire [31:0] conv_spad_addr, conv_spad_wdata;
-    wire        conv_busy, conv_done, conv_error;
-    wire [3:0]  conv_error_code;
-    wire [31:0] conv_result, conv_cycle_count, conv_element_count;
+    wire        conv_busy;
     wire        kv_spad_valid, kv_spad_write;
     wire [31:0] kv_spad_addr, kv_spad_wdata;
-    wire        kv_busy, kv_done, kv_error;
-    wire [3:0]  kv_error_code;
-    wire [31:0] kv_result, kv_cycle_count, kv_element_count;
+    wire        kv_busy;
     wire dma_busy, dma_done, dma_error;
     wire [3:0] dma_error_code;
     wire [3:0]  dma_m_axi_arid, dma_m_axi_awid;
-    wire        dma_m_axi_arvalid, dma_m_axi_rready;
+    wire        dma_m_axi_arvalid, dma_m_axi_arready, dma_m_axi_rready;
     wire        dma_m_axi_awvalid, dma_m_axi_wvalid, dma_m_axi_bready;
     wire [M_AXI_ADDR_WIDTH-1:0] dma_m_axi_araddr, dma_m_axi_awaddr;
     wire [7:0] dma_m_axi_arlen, dma_m_axi_awlen;
@@ -528,6 +516,7 @@ module ai_accel_top #(
     //   - doorbell 后先取任务描述；
     //   - 任务完成后优先写 completion；
     //   - 连续计算流量下 DMA 仍能获得有界的数据面服务机会。
+`ifndef NMAFORGE_ENABLE_MEMORY_FABRIC
     ai_spad_arbiter spad_arbiter_u(
         .clk(aclk), .resetn(aresetn),
         .desc_valid(desc_spad_valid), .desc_write(1'b0), .desc_addr(desc_spad_addr), .desc_wdata(32'd0), .desc_ready(arb_desc_ready),
@@ -559,44 +548,26 @@ module ai_accel_top #(
         .rsp_rdata(arb_rsp_rdata), .rsp_error(arb_rsp_error),
         .cnm_rsp_valid(cnm_rsp_valid)
     );
-    assign desc_rsp_valid = arb_rsp_valid && (arb_rsp_client == 3'd0);
-    assign core_rsp_valid = arb_rsp_valid && (arb_rsp_client == 3'd2) &&
-                            !arb_rsp_is_line;
-    assign banked_rsp_valid = arb_rsp_valid && (arb_rsp_client == 3'd3);
-    // The arbiter delays the admitted CNM lane mask by the scratchpad read
-    // latency; a stalled/idle lane therefore cannot consume another lane's
-    // response.
-    assign dma_rsp_valid = arb_rsp_valid && (arb_rsp_client == 3'd4) &&
-                           !arb_rsp_is_line;
-    assign dma_line_rsp_valid = arb_rsp_valid && (arb_rsp_client == 3'd4) &&
-                                arb_rsp_is_line;
-    assign desc_rsp_error = desc_rsp_valid && arb_rsp_error;
-    assign core_rsp_error = core_rsp_valid && arb_rsp_error;
-    assign dma_rsp_error = dma_rsp_valid && arb_rsp_error;
+    // Response tags are emitted by the sole scheduler owner, ai_spad_arbiter.
+    // This stateless demux preserves the registered-response routing.
+    ai_spad_response_demux response_demux_u(
+        .arb_rsp_valid(arb_rsp_valid), .arb_rsp_error(arb_rsp_error),
+        .arb_rsp_is_line(arb_rsp_is_line), .arb_rsp_client(arb_rsp_client),
+        .desc_rsp_valid(desc_rsp_valid), .core_rsp_valid(core_rsp_valid),
+        .banked_rsp_valid(banked_rsp_valid), .dma_rsp_valid(dma_rsp_valid),
+        .dma_line_rsp_valid(dma_line_rsp_valid), .desc_rsp_error(desc_rsp_error),
+        .core_rsp_error(core_rsp_error), .dma_rsp_error(dma_rsp_error)
+    );
     assign cmdq_desc_base = fetch_base[31:0];
     assign doorbell_pulse = submit;
-    assign banked_op = (launch_op == 8'h20) || (launch_op == 8'h21);
-    assign tensor_matrix_op = (launch_op == 8'h30) || (launch_op == 8'h31);
-    assign tensor_sfu_op = (launch_op >= 8'h32) && (launch_op <= 8'h39);
+    // Keep all launch-path opcode classifications in one stateless decoder.
+    // The individual outputs retain the original direct combinational cones.
+    ai_accel_opcode_decode launch_opcode_decode_u(
+        .op(launch_op), .op_valid(), .is_int8(), .is_banked(banked_op),
+        .is_tensor_matrix(tensor_matrix_op), .is_tensor_sfu(tensor_sfu_op),
+        .is_cnn_kv(kv_cache_op), .is_macro()
+    );
     assign conv_linebuffer_op = (launch_op == 8'h16) || (launch_op == 8'h17);
-    assign kv_cache_op = (launch_op == 8'h43) || (launch_op == 8'h44);
-    assign core_busy = scalar_busy || banked_busy || matrix_busy || sfu_busy || conv_busy || kv_busy;
-    assign core_done = scalar_done || banked_done || matrix_done || sfu_done || conv_done || kv_done;
-    assign core_error = conv_done ? conv_error : kv_done ? kv_error : matrix_done ? matrix_error :
-                        sfu_done ? sfu_error :
-                        banked_done ? banked_error : scalar_error;
-    assign core_error_code = conv_done ? conv_error_code : kv_done ? kv_error_code : matrix_done ? matrix_error_code :
-                             sfu_done ? sfu_error_code :
-                             banked_done ? banked_error_code : scalar_error_code;
-    assign core_result = conv_done ? conv_result : kv_done ? kv_result : matrix_done ? matrix_result :
-                         sfu_done ? sfu_result :
-                         banked_done ? banked_result : scalar_result;
-    assign core_cycle_count = conv_done ? conv_cycle_count : kv_done ? kv_cycle_count : matrix_done ? matrix_cycle_count :
-                              sfu_done ? sfu_cycle_count :
-                              banked_done ? banked_cycle_count : scalar_cycle_count;
-    assign core_element_count = conv_done ? conv_element_count : kv_done ? kv_element_count : matrix_done ? matrix_element_count :
-                                sfu_done ? sfu_element_count :
-                                banked_done ? banked_element_count : scalar_element_count;
     assign core_spad_valid = conv_busy ? conv_spad_valid : kv_busy ? kv_spad_valid : matrix_busy ? matrix_spad_valid :
                              sfu_busy ? sfu_spad_valid :
                              banked_busy ? banked_spad_valid : scalar_spad_valid;
@@ -636,109 +607,154 @@ module ai_accel_top #(
                                   ((cpl_base + (cpl_index << 4)) >
                                    SPAD_BYTES - 32'd16);
 
-    ai_spad_protection host_protection_u(
+    // This wrapper contains storage and all protection checks.  The arbiter
+    // remains outside and is still the only scheduler-port owner.
+    ai_accel_spad_subsystem #(
+        .BANKS          (SPAD_BANKS),
+        .WORDS_PER_BANK (SPAD_WORDS_PER_BANK),
+        .ROW_BITS       (SPAD_ROW_BITS),
+        .SPAD_BYTES     (SPAD_BYTES)
+    ) spad_subsystem_u (
+        .clk(aclk), .resetn(aresetn),
         .region0_base(region0_base), .region0_limit(region0_limit), .region0_perm(region0_perm),
         .region1_base(region1_base), .region1_limit(region1_limit), .region1_perm(region1_perm),
         .region2_base(region2_base), .region2_limit(region2_limit), .region2_perm(region2_perm),
         .region3_base(region3_base), .region3_limit(region3_limit), .region3_perm(region3_perm),
-        .req_valid(spad_req_valid), .req_addr(reg_req_addr_local - SPAD_BASE), .req_bytes(32'd4),
-        .req_write(reg_req_write_raw), .req_execute(1'b0), .allow(host_prot_allow)
-    );
-
-    ai_spad_protection compute_protection_u(
-        .region0_base(region0_base), .region0_limit(region0_limit), .region0_perm(region0_perm),
-        .region1_base(region1_base), .region1_limit(region1_limit), .region1_perm(region1_perm),
-        .region2_base(region2_base), .region2_limit(region2_limit), .region2_perm(region2_perm),
-        .region3_base(region3_base), .region3_limit(region3_limit), .region3_perm(region3_perm),
-        .req_valid(spad_compute_valid_mux), .req_addr(spad_compute_addr_mux), .req_bytes(32'd4),
-        .req_write(spad_compute_write_mux), .req_execute(compute_req_execute), .allow(compute_prot_allow)
-    );
-
-    ai_spad_protection line_protection_u(
-        .region0_base(region0_base), .region0_limit(region0_limit), .region0_perm(region0_perm),
-        .region1_base(region1_base), .region1_limit(region1_limit), .region1_perm(region1_perm),
-        .region2_base(region2_base), .region2_limit(region2_limit), .region2_perm(region2_perm),
-        .region3_base(region3_base), .region3_limit(region3_limit), .region3_perm(region3_perm),
-        .req_valid(spad_line_valid), .req_addr(spad_line_addr), .req_bytes(32'd16),
-        .req_write(spad_line_write),
-        .req_execute(arb_request_client == 3'd2), .allow(line_prot_allow)
+        .host_valid(spad_req_valid), .host_write(reg_req_write_raw),
+        .host_addr(reg_req_addr_local - SPAD_BASE), .host_wdata(reg_req_wdata_raw),
+        .host_wstrb(reg_req_wstrb_raw),
+        .compute_valid(spad_compute_valid_mux), .compute_write(spad_compute_write_mux),
+        .compute_addr(spad_compute_addr_mux), .compute_wdata(spad_compute_wdata_mux),
+        .compute_req_execute(compute_req_execute),
+        .line_valid(spad_line_valid), .line_write(spad_line_write),
+        .line_addr(spad_line_addr), .line_wdata(spad_line_wdata), .line_wstrb(spad_line_wstrb),
+        .line_req_execute(arb_request_client == 3'd2),
+        .banked_valid(arb_banked_valid), .banked_addr(arb_banked_addr),
+        .cnm_valid(arb_cnm_valid), .cnm_addr0(arb_cnm_addr0), .cnm_addr1(arb_cnm_addr1),
+        .cnm_addr2(arb_cnm_addr2), .cnm_addr3(arb_cnm_addr3),
+        .cpl_base(cpl_base), .cpl_index(cpl_index),
+        .host_rdata(spad_host_rdata), .host_error(spad_host_error),
+        .host_parity_error(spad_host_parity_error), .compute_rdata(core_spad_rdata),
+        .compute_parity_error(core_spad_parity_error), .line_rdata(spad_line_rdata),
+        .line_parity_error(spad_line_parity_error), .line_raw_error(spad_line_raw_error),
+        .banked_data0(banked_data0), .banked_data1(banked_data1),
+        .banked_data2(banked_data2), .banked_data3(banked_data3),
+        .banked_parity_error(banked_parity), .cnm_data0(cnm_data0), .cnm_data1(cnm_data1),
+        .cnm_data2(cnm_data2), .cnm_data3(cnm_data3), .cnm_parity_error(cnm_parity),
+        .host_prot_allow(host_prot_allow), .compute_prot_allow(compute_prot_allow),
+        .line_prot_allow(line_prot_allow), .banked_prot_allow(banked_prot_allow),
+        .cpl_prot_allow(cpl_prot_allow)
     );
     assign line_prot_error = spad_line_valid &&
                              (!line_prot_allow ||
                               (spad_line_addr > SPAD_BYTES - 32'd16));
-
-    // A banked row is four 32-bit words at one 16-byte tile address.  It is
-    // admitted by the same arbiter and must satisfy the complete-region and
-    // execute permission checks before any bank is observed by the engine.
-    ai_spad_protection banked_protection_u(
+`else
+    // The memory fabric preserves the arbiter as the only scheduler-port
+    // owner while moving storage/protection wiring out of this integration top.
+    ai_accel_memory_fabric #(
+        .WORDS_PER_BANK(SPAD_WORDS_PER_BANK), .ROW_BITS(SPAD_ROW_BITS),
+        .SPAD_BYTES(SPAD_BYTES)
+    ) memory_fabric_u(
+        .clk(aclk), .resetn(aresetn),
         .region0_base(region0_base), .region0_limit(region0_limit), .region0_perm(region0_perm),
         .region1_base(region1_base), .region1_limit(region1_limit), .region1_perm(region1_perm),
         .region2_base(region2_base), .region2_limit(region2_limit), .region2_perm(region2_perm),
         .region3_base(region3_base), .region3_limit(region3_limit), .region3_perm(region3_perm),
-        .req_valid(arb_banked_valid),
-        .req_addr(arb_banked_addr),
-        .req_bytes(32'd16),
-        .req_write(1'b0), .req_execute(1'b1), .allow(banked_prot_allow)
+        .host_valid(spad_req_valid), .host_write(reg_req_write_raw),
+        .host_addr(reg_req_addr_local - SPAD_BASE), .host_wdata(reg_req_wdata_raw), .host_wstrb(reg_req_wstrb_raw),
+        .host_rdata(spad_host_rdata), .host_error(spad_host_error), .host_parity_error(spad_host_parity_error), .host_prot_allow(host_prot_allow),
+        .desc_valid(desc_spad_valid), .desc_addr(desc_spad_addr), .desc_ready(arb_desc_ready),
+        .cpl_valid(cpl_spad_valid), .cpl_write(cpl_spad_write), .cpl_addr(cpl_spad_addr), .cpl_wdata(cpl_spad_wdata), .cpl_ready(arb_cpl_ready),
+        .core_valid(core_spad_valid), .core_write(core_spad_write), .core_addr(core_spad_addr), .core_wdata(core_spad_wdata), .core_ready(arb_core_ready),
+        .core_line_valid(matrix_line_valid), .core_line_write(matrix_line_write), .core_line_addr(matrix_line_addr), .core_line_wdata(matrix_line_wdata), .core_line_wstrb(matrix_line_wstrb), .core_line_ready(arb_core_line_ready),
+        .banked_valid(banked_read_valid), .banked_addr(banked_read_addr), .banked_ready(arb_banked_ready),
+        .cnm_valid(cnm_read_valid), .cnm_addr0(cnm_read_addr0), .cnm_addr1(cnm_read_addr1), .cnm_addr2(cnm_read_addr2), .cnm_addr3(cnm_read_addr3), .cnm_ready(arb_cnm_ready),
+        .dma_valid(dma_spad_valid), .dma_write(dma_spad_write), .dma_addr(dma_spad_addr_o), .dma_wdata(dma_spad_wdata), .dma_ready(arb_dma_ready),
+        .dma_line_valid(dma_spad_line_valid), .dma_line_write(dma_spad_line_write), .dma_line_addr(dma_spad_line_addr), .dma_line_wdata(dma_spad_line_wdata), .dma_line_wstrb(dma_spad_line_wstrb), .dma_line_ready(arb_dma_line_ready),
+        .cpl_base(cpl_base), .cpl_index(cpl_index), .scheduler_rdata(core_spad_rdata), .scheduler_parity_error(core_spad_parity_error),
+        .line_rdata(spad_line_rdata), .line_parity_error(spad_line_parity_error), .line_raw_error(spad_line_raw_error),
+        .banked_data0(banked_data0), .banked_data1(banked_data1), .banked_data2(banked_data2), .banked_data3(banked_data3), .banked_parity(banked_parity),
+        .cnm_data0(cnm_data0), .cnm_data1(cnm_data1), .cnm_data2(cnm_data2), .cnm_data3(cnm_data3), .cnm_parity(cnm_parity),
+        .desc_rsp_valid(desc_rsp_valid), .core_rsp_valid(core_rsp_valid), .banked_rsp_valid(banked_rsp_valid), .dma_rsp_valid(dma_rsp_valid), .dma_line_rsp_valid(dma_line_rsp_valid),
+        .desc_rsp_error(desc_rsp_error), .core_rsp_error(core_rsp_error), .dma_rsp_error(dma_rsp_error),
+        .request_client(arb_request_client), .rsp_client(arb_rsp_client), .rsp_valid(arb_rsp_valid), .rsp_error(arb_rsp_error), .rsp_is_line(arb_rsp_is_line), .rsp_rdata(arb_rsp_rdata), .cnm_rsp_valid(cnm_rsp_valid),
+        .compute_protection_error(compute_prot_error), .banked_protection_error(banked_protection_error), .cnm_protection_error(cnm_protection_error), .line_protection_error(line_prot_error), .cpl_protection_error(cpl_protection_error)
     );
+    assign core_spad_error = compute_prot_error;
+`endif
 
-    // Completion records are generated internally.  Validate their complete
-    // 16-byte destination before the writer is started, so an unread/data
-    // region can never be overwritten by a completion entry.
-    ai_spad_protection completion_protection_u(
-        .region0_base(region0_base), .region0_limit(region0_limit), .region0_perm(region0_perm),
-        .region1_base(region1_base), .region1_limit(region1_limit), .region1_perm(region1_perm),
-        .region2_base(region2_base), .region2_limit(region2_limit), .region2_perm(region2_perm),
-        .region3_base(region3_base), .region3_limit(region3_limit), .region3_perm(region3_perm),
-        .req_valid(1'b1), .req_addr(cpl_base + (cpl_index << 4)), .req_bytes(32'd16),
-        .req_write(1'b1), .req_execute(1'b0), .allow(cpl_prot_allow)
-    );
     // descriptor 可以来自两个地方：
     //   cmdq_external = 0：descriptor 放在 scratchpad，由 ai_desc_fetch 读取；
     //   cmdq_external = 1：descriptor 放在外部 DDR，由 axi_desc_fetch 经 AXI 读取。
     // 下面这些 mux 把两种来源统一成一套 desc_* 信号送给寄存器控制块。
-    assign desc_done = fetch_external ? axi_desc_done : spad_desc_done;
-    assign desc_error = fetch_external ? axi_desc_error : spad_desc_error;
-    assign desc_op = fetch_external ? axi_desc_op : spad_desc_op;
-    assign desc_task_id = fetch_external ? axi_desc_task_id : spad_desc_task_id;
-    assign desc_src0_base = fetch_external ? axi_desc_src0_base : spad_desc_src0_base;
-    assign desc_src1_base = fetch_external ? axi_desc_src1_base : spad_desc_src1_base;
-    assign desc_dst_base = fetch_external ? axi_desc_dst_base : spad_desc_dst_base;
-    assign desc_length = fetch_external ? axi_desc_length : spad_desc_length;
-    assign desc_m_size = fetch_external ? axi_desc_m_size : spad_desc_m_size;
-    assign desc_n_size = fetch_external ? axi_desc_n_size : spad_desc_n_size;
-    assign desc_k_words = fetch_external ? axi_desc_k_words : spad_desc_k_words;
-    assign desc_scale_shift = fetch_external ? axi_desc_scale_shift : spad_desc_scale_shift;
-    assign desc_activation = fetch_external ? axi_desc_activation : spad_desc_activation;
-    assign desc_bias_base = fetch_external ? axi_desc_bias_base : spad_desc_bias_base;
-    assign desc_bias_enable = fetch_external ? axi_desc_bias_enable : spad_desc_bias_enable;
-    assign desc_flags = fetch_external ? axi_desc_flags : spad_desc_flags;
-    assign desc_aux0 = fetch_external ? axi_desc_aux0 : spad_desc_aux0;
-    assign desc_src0_stride = fetch_external ? axi_desc_src0_stride : spad_desc_src0_stride;
-    assign desc_src1_stride = fetch_external ? axi_desc_src1_stride : spad_desc_src1_stride;
-    assign desc_dst_stride = fetch_external ? axi_desc_dst_stride : spad_desc_dst_stride;
-    assign desc_batch_count = fetch_external ? axi_desc_batch_count : spad_desc_batch_count;
-    assign desc_head_count = fetch_external ? axi_desc_head_count : spad_desc_head_count;
-    assign desc_wait_mask = fetch_external ? axi_desc_wait_mask : spad_desc_wait_mask;
-    assign desc_signal_mask = fetch_external ? axi_desc_signal_mask : spad_desc_signal_mask;
-    assign desc_clear_mask = fetch_external ? axi_desc_clear_mask : spad_desc_clear_mask;
-    assign desc_version = fetch_external ? axi_desc_version : spad_desc_version;
+    // Normalize both descriptor fetch sources before they reach the command
+    // processor; source selection ownership remains in that processor.
+    ai_descriptor_source_mux descriptor_source_mux_u(
+        .select_external(fetch_external),
+        .spad_done(spad_desc_done), .spad_error(spad_desc_error),
+        .spad_op(spad_desc_op), .spad_task_id(spad_desc_task_id),
+        .spad_src0_base(spad_desc_src0_base), .spad_src1_base(spad_desc_src1_base),
+        .spad_dst_base(spad_desc_dst_base), .spad_length(spad_desc_length),
+        .spad_m_size(spad_desc_m_size), .spad_n_size(spad_desc_n_size),
+        .spad_k_words(spad_desc_k_words), .spad_scale_shift(spad_desc_scale_shift),
+        .spad_activation(spad_desc_activation), .spad_bias_base(spad_desc_bias_base),
+        .spad_bias_enable(spad_desc_bias_enable), .spad_flags(spad_desc_flags),
+        .spad_aux0(spad_desc_aux0), .spad_src0_stride(spad_desc_src0_stride),
+        .spad_src1_stride(spad_desc_src1_stride), .spad_dst_stride(spad_desc_dst_stride),
+        .spad_batch_count(spad_desc_batch_count), .spad_head_count(spad_desc_head_count),
+        .spad_wait_mask(spad_desc_wait_mask), .spad_signal_mask(spad_desc_signal_mask),
+        .spad_clear_mask(spad_desc_clear_mask), .spad_version(spad_desc_version),
+        .axi_done(axi_desc_done), .axi_error(axi_desc_error), .axi_op(axi_desc_op),
+        .axi_task_id(axi_desc_task_id), .axi_src0_base(axi_desc_src0_base),
+        .axi_src1_base(axi_desc_src1_base), .axi_dst_base(axi_desc_dst_base),
+        .axi_length(axi_desc_length), .axi_m_size(axi_desc_m_size),
+        .axi_n_size(axi_desc_n_size), .axi_k_words(axi_desc_k_words),
+        .axi_scale_shift(axi_desc_scale_shift), .axi_activation(axi_desc_activation),
+        .axi_bias_base(axi_desc_bias_base), .axi_bias_enable(axi_desc_bias_enable),
+        .axi_flags(axi_desc_flags), .axi_aux0(axi_desc_aux0),
+        .axi_src0_stride(axi_desc_src0_stride), .axi_src1_stride(axi_desc_src1_stride),
+        .axi_dst_stride(axi_desc_dst_stride), .axi_batch_count(axi_desc_batch_count),
+        .axi_head_count(axi_desc_head_count), .axi_wait_mask(axi_desc_wait_mask),
+        .axi_signal_mask(axi_desc_signal_mask), .axi_clear_mask(axi_desc_clear_mask),
+        .axi_version(axi_desc_version),
+        .desc_done(desc_done), .desc_error(desc_error), .desc_op(desc_op),
+        .desc_task_id(desc_task_id), .desc_src0_base(desc_src0_base),
+        .desc_src1_base(desc_src1_base), .desc_dst_base(desc_dst_base),
+        .desc_length(desc_length), .desc_m_size(desc_m_size), .desc_n_size(desc_n_size),
+        .desc_k_words(desc_k_words), .desc_scale_shift(desc_scale_shift),
+        .desc_activation(desc_activation), .desc_bias_base(desc_bias_base),
+        .desc_bias_enable(desc_bias_enable), .desc_flags(desc_flags),
+        .desc_aux0(desc_aux0), .desc_src0_stride(desc_src0_stride),
+        .desc_src1_stride(desc_src1_stride), .desc_dst_stride(desc_dst_stride),
+        .desc_batch_count(desc_batch_count), .desc_head_count(desc_head_count),
+        .desc_wait_mask(desc_wait_mask), .desc_signal_mask(desc_signal_mask),
+        .desc_clear_mask(desc_clear_mask), .desc_version(desc_version)
+    );
 
     // A2 tile jobs reuse the existing DMA datapath.  While tile_active, DMA
     // ownership belongs to the command processor's ping-pong sub-scheduler;
     // legacy software-triggered DMA retains the same register interface when
     // no tile job is active.
-    assign dma_start_mux = tile_active ? tile_dma_start : dma_start;
-    assign dma_store_mux = tile_active ? tile_dma_store : dma_store;
-    assign dma_ext_addr_mux = tile_active ? tile_dma_ext_addr : dma_ext_addr;
-    assign dma_spad_addr_mux = tile_active ? tile_dma_spad_addr : dma_spad_addr;
-    assign dma_length_words_mux = tile_active ? tile_dma_length_words : dma_length_words;
-    assign dma_row_words_mux = tile_active ? 16'd0 : dma_row_words;
-    assign dma_row_count_mux = tile_active ? 16'd0 : dma_row_count;
-    assign dma_ext_stride_mux = tile_active ? 32'd0 : dma_ext_stride;
-    assign dma_spad_stride_mux = tile_active ? 32'd0 : dma_spad_stride;
-    assign dma_gather_enable_mux = tile_active ? 1'b0 : dma_gather_enable;
-    assign dma_gather_index_base_mux = tile_active ? 32'd0 : dma_gather_index_base;
-    assign dma_read_outstanding_mux = tile_active ? 3'd1 : dma_read_outstanding;
+    ai_accel_dma_request_mux dma_request_mux_u(
+        .tile_active(tile_active), .dma_start(dma_start), .dma_store(dma_store),
+        .dma_ext_addr(dma_ext_addr), .dma_spad_addr(dma_spad_addr),
+        .dma_length_words(dma_length_words), .dma_row_words(dma_row_words),
+        .dma_row_count(dma_row_count), .dma_ext_stride(dma_ext_stride),
+        .dma_spad_stride(dma_spad_stride), .dma_gather_enable(dma_gather_enable),
+        .dma_gather_index_base(dma_gather_index_base),
+        .dma_read_outstanding(dma_read_outstanding),
+        .tile_dma_start(tile_dma_start), .tile_dma_store(tile_dma_store),
+        .tile_dma_ext_addr(tile_dma_ext_addr), .tile_dma_spad_addr(tile_dma_spad_addr),
+        .tile_dma_length_words(tile_dma_length_words),
+        .dma_start_mux(dma_start_mux), .dma_store_mux(dma_store_mux),
+        .dma_ext_addr_mux(dma_ext_addr_mux), .dma_spad_addr_mux(dma_spad_addr_mux),
+        .dma_length_words_mux(dma_length_words_mux), .dma_row_words_mux(dma_row_words_mux),
+        .dma_row_count_mux(dma_row_count_mux), .dma_ext_stride_mux(dma_ext_stride_mux),
+        .dma_spad_stride_mux(dma_spad_stride_mux),
+        .dma_gather_enable_mux(dma_gather_enable_mux),
+        .dma_gather_index_base_mux(dma_gather_index_base_mux),
+        .dma_read_outstanding_mux(dma_read_outstanding_mux)
+    );
     // DMA_CFG[1] used to select a second, narrow DMA backend.  It remains a
     // readable compatibility bit in the register file, but all payload modes
     // now use the unified 128-bit tagged DMA.
@@ -747,45 +763,20 @@ module ai_accel_top #(
     //   - axi_desc_fetch 需要从 DDR 读取 descriptor；
     //   - ai_axi128_dma 需要从 DDR 读取 input/weight。
     // 写通道目前只由 DMA 使用。这里读通道优先给 axi_desc_fetch。
-    assign m_axi_arvalid = axi_desc_busy ? axi_desc_m_axi_arvalid :
-                           dma_m_axi_arvalid;
-    // Descriptor fetch reserves ID 0; payload DMA uses IDs 1..4.
-    assign m_axi_arid    = axi_desc_busy ? axi_desc_m_axi_arid :
-                           dma_m_axi_arid;
-    assign m_axi_araddr  = axi_desc_busy ? axi_desc_m_axi_araddr :
-                           dma_m_axi_araddr;
-    assign m_axi_arlen   = axi_desc_busy ? axi_desc_m_axi_arlen :
-                           dma_m_axi_arlen;
-    assign m_axi_arsize  = axi_desc_busy ? axi_desc_m_axi_arsize :
-                           dma_m_axi_arsize;
-    assign m_axi_arburst = axi_desc_busy ? axi_desc_m_axi_arburst :
-                           dma_m_axi_arburst;
-    assign m_axi_arcache = 4'b0011;
-    assign m_axi_arprot  = 3'b000;
-    assign m_axi_arqos   = 4'b0000;
-    assign m_axi_arlock  = 1'b0;
-    assign axi_desc_m_axi_arready = axi_desc_busy ? m_axi_arready : 1'b0;
-    assign m_axi_rready = (m_axi_rid == 4'd0) ?
-                          axi_desc_m_axi_rready : dma_m_axi_rready;
-    assign m_axi_awid = dma_m_axi_awid;
-    assign m_axi_awvalid = dma_m_axi_awvalid;
-    assign m_axi_awaddr  = dma_m_axi_awaddr;
-    assign m_axi_awlen   = dma_m_axi_awlen;
-    assign m_axi_awsize  = dma_m_axi_awsize;
-    assign m_axi_awburst = dma_m_axi_awburst;
-    assign m_axi_awcache = 4'b0011;
-    assign m_axi_awprot  = 3'b000;
-    assign m_axi_awqos   = 4'b0000;
-    assign m_axi_awlock  = 1'b0;
-    assign m_axi_wvalid  = dma_m_axi_wvalid;
-    assign m_axi_wdata   = dma_m_axi_wdata;
-    assign m_axi_wstrb   = dma_m_axi_wstrb;
-    assign m_axi_wlast   = dma_m_axi_wlast;
-    assign m_axi_bready  = dma_m_axi_bready;
+    // Descriptor fetch reserves ID 0; payload DMA uses IDs 1..4.  The router
+    // retains descriptor-first AR arbitration and DMA-only write ownership.
+    ai_accel_axi_fabric #(.AXI_ADDR_WIDTH(M_AXI_ADDR_WIDTH)) axi_fabric_u(
+        .desc_busy(axi_desc_busy), .desc_arvalid(axi_desc_m_axi_arvalid), .desc_arid(axi_desc_m_axi_arid), .desc_araddr(axi_desc_m_axi_araddr), .desc_arlen(axi_desc_m_axi_arlen), .desc_arsize(axi_desc_m_axi_arsize), .desc_arburst(axi_desc_m_axi_arburst), .desc_arready(axi_desc_m_axi_arready), .desc_rready(axi_desc_m_axi_rready),
+        .dma_arvalid(dma_m_axi_arvalid), .dma_arid(dma_m_axi_arid), .dma_araddr(dma_m_axi_araddr), .dma_arlen(dma_m_axi_arlen), .dma_arsize(dma_m_axi_arsize), .dma_arburst(dma_m_axi_arburst), .dma_arready(dma_m_axi_arready), .dma_rready(dma_m_axi_rready),
+        .m_axi_arready(m_axi_arready), .m_axi_rid(m_axi_rid), .m_axi_arvalid(m_axi_arvalid), .m_axi_arid(m_axi_arid), .m_axi_araddr(m_axi_araddr), .m_axi_arlen(m_axi_arlen), .m_axi_arsize(m_axi_arsize), .m_axi_arburst(m_axi_arburst), .m_axi_arcache(m_axi_arcache), .m_axi_arprot(m_axi_arprot), .m_axi_arqos(m_axi_arqos), .m_axi_arlock(m_axi_arlock), .m_axi_rready(m_axi_rready),
+        .dma_awid(dma_m_axi_awid), .dma_awvalid(dma_m_axi_awvalid), .dma_awaddr(dma_m_axi_awaddr), .dma_awlen(dma_m_axi_awlen), .dma_awsize(dma_m_axi_awsize), .dma_awburst(dma_m_axi_awburst), .dma_wvalid(dma_m_axi_wvalid), .dma_wdata(dma_m_axi_wdata), .dma_wstrb(dma_m_axi_wstrb), .dma_wlast(dma_m_axi_wlast), .dma_bready(dma_m_axi_bready),
+        .m_axi_awid(m_axi_awid), .m_axi_awvalid(m_axi_awvalid), .m_axi_awaddr(m_axi_awaddr), .m_axi_awlen(m_axi_awlen), .m_axi_awsize(m_axi_awsize), .m_axi_awburst(m_axi_awburst), .m_axi_awcache(m_axi_awcache), .m_axi_awprot(m_axi_awprot), .m_axi_awqos(m_axi_awqos), .m_axi_awlock(m_axi_awlock), .m_axi_wvalid(m_axi_wvalid), .m_axi_wdata(m_axi_wdata), .m_axi_wstrb(m_axi_wstrb), .m_axi_wlast(m_axi_wlast), .m_axi_bready(m_axi_bready)
+    );
 
     // AXI-Lite 读响应 mux：
     //   访问 scratchpad window 时返回 SRAM host port 数据；
     //   访问寄存器窗口时返回 ai_accel_regs 数据。
+    /* Legacy AXI-Lite wiring retained only as historical reference.
     always @(*) begin
         if (spad_req_valid) begin
             reg_rsp_rdata_mux = spad_host_rdata;
@@ -825,6 +816,19 @@ module ai_accel_top #(
         .reg_req_wstrb (reg_req_wstrb_raw),
         .reg_rsp_rdata (reg_rsp_rdata_mux),
         .reg_rsp_error (reg_rsp_error_mux)
+    ); */
+    ai_accel_control_fabric control_fabric_u(
+        .aclk(aclk), .aresetn(aresetn),
+        .s_axi_awaddr(s_axi_awaddr), .s_axi_awvalid(s_axi_awvalid), .s_axi_awready(s_axi_awready),
+        .s_axi_wdata(s_axi_wdata), .s_axi_wstrb(s_axi_wstrb), .s_axi_wvalid(s_axi_wvalid), .s_axi_wready(s_axi_wready),
+        .s_axi_bresp(s_axi_bresp), .s_axi_bvalid(s_axi_bvalid), .s_axi_bready(s_axi_bready),
+        .s_axi_araddr(s_axi_araddr), .s_axi_arvalid(s_axi_arvalid), .s_axi_arready(s_axi_arready),
+        .s_axi_rdata(s_axi_rdata), .s_axi_rresp(s_axi_rresp), .s_axi_rvalid(s_axi_rvalid), .s_axi_rready(s_axi_rready),
+        .reg_req_valid(reg_req_valid_raw), .reg_req_write(reg_req_write_raw), .reg_req_addr(reg_req_addr_raw),
+        .reg_req_wdata(reg_req_wdata_raw), .reg_req_wstrb(reg_req_wstrb_raw),
+        .spad_window_selected(spad_req_valid), .spad_rdata(spad_host_rdata),
+        .spad_error(spad_host_error), .spad_parity_error(spad_host_parity_error), .spad_prot_allow(host_prot_allow),
+        .regs_rdata(regs_rsp_rdata), .regs_error(regs_rsp_error)
     );
 
     // 控制/状态寄存器块：
@@ -1046,9 +1050,8 @@ module ai_accel_top #(
         .spad_line_parity_error(spad_line_parity_error),
         .m_axi_arid(dma_m_axi_arid), .m_axi_arvalid(dma_m_axi_arvalid), .m_axi_araddr(dma_m_axi_araddr),
         .m_axi_arlen(dma_m_axi_arlen), .m_axi_arsize(dma_m_axi_arsize), .m_axi_arburst(dma_m_axi_arburst),
-        // The top-level AR mux gives descriptor ID0 priority.  Do not expose
-        // that unrelated handshake to a tagged DMA request.
-        .m_axi_arready(m_axi_arready && !axi_desc_busy),
+        // The router masks ARREADY while descriptor ID0 owns the read path.
+        .m_axi_arready(dma_m_axi_arready),
         .m_axi_rid(m_axi_rid), .m_axi_rdata(m_axi_rdata), .m_axi_rresp(m_axi_rresp), .m_axi_rvalid(m_axi_rvalid), .m_axi_rlast(m_axi_rlast), .m_axi_rready(dma_m_axi_rready),
         .m_axi_awid(dma_m_axi_awid), .m_axi_awvalid(dma_m_axi_awvalid), .m_axi_awaddr(dma_m_axi_awaddr), .m_axi_awlen(dma_m_axi_awlen), .m_axi_awsize(dma_m_axi_awsize), .m_axi_awburst(dma_m_axi_awburst), .m_axi_awready(m_axi_awready),
         .m_axi_wvalid(dma_m_axi_wvalid), .m_axi_wdata(dma_m_axi_wdata), .m_axi_wstrb(dma_m_axi_wstrb), .m_axi_wlast(dma_m_axi_wlast), .m_axi_wready(m_axi_wready),
@@ -1060,53 +1063,6 @@ module ai_accel_top #(
     // 片上 scratchpad SRAM：
     // host 端口给 CPU/AXI-Lite 直接调试或填数据；
     // compute 端口给 DMA、descriptor fetch、completion writer、compute core 复用。
-    ai_scratchpad #(
-        .BANKS          (SPAD_BANKS),
-        .WORDS_PER_BANK (SPAD_WORDS_PER_BANK),
-        .ROW_BITS       (SPAD_ROW_BITS)
-    ) scratchpad_u(
-        .clk                  (aclk),
-        .resetn               (aresetn),
-        .host_valid           (spad_req_valid && host_prot_allow),
-        .host_write           (reg_req_write_raw),
-        .host_addr            (reg_req_addr_local - SPAD_BASE),
-        .host_wdata           (reg_req_wdata_raw),
-        .host_wstrb           (reg_req_wstrb_raw),
-        .host_rdata           (spad_host_rdata),
-        .host_error           (spad_host_error),
-        .host_parity_error    (spad_host_parity_error),
-        .compute_valid        (spad_compute_valid_mux && compute_prot_allow),
-        .compute_write        (spad_compute_write_mux),
-        .compute_addr         (spad_compute_addr_mux),
-        .compute_wdata        (spad_compute_wdata_mux),
-        .compute_rdata        (core_spad_rdata),
-        .compute_parity_error (core_spad_parity_error),
-        .line_valid           (spad_line_valid && line_prot_allow),
-        .line_write           (spad_line_write),
-        .line_addr            (spad_line_addr),
-        .line_wdata           (spad_line_wdata),
-        .line_wstrb           (spad_line_wstrb),
-        .line_rdata           (spad_line_rdata),
-        .line_parity_error    (spad_line_parity_error),
-        .line_error           (spad_line_raw_error),
-        .banked_read_valid    (arb_banked_valid),
-        .banked_addr          (arb_banked_addr),
-        .banked_data0         (banked_data0),
-        .banked_data1         (banked_data1),
-        .banked_data2         (banked_data2),
-        .banked_data3         (banked_data3),
-        .banked_parity_error  (banked_parity)
-        ,.cnm_read_valid      (arb_cnm_valid)
-        ,.cnm_addr0           (arb_cnm_addr0)
-        ,.cnm_addr1           (arb_cnm_addr1)
-        ,.cnm_addr2           (arb_cnm_addr2)
-        ,.cnm_addr3           (arb_cnm_addr3)
-        ,.cnm_data0           (cnm_data0)
-        ,.cnm_data1           (cnm_data1)
-        ,.cnm_data2           (cnm_data2)
-        ,.cnm_data3           (cnm_data3)
-        ,.cnm_parity_error    (cnm_parity)
-    );
 
     // 从 scratchpad 取 descriptor。descriptor 本质是一条 64-byte 任务描述，
     // 包含 op/src/dst/length/M/N/K/quant/task_id 等字段。
@@ -1202,151 +1158,60 @@ module ai_accel_top #(
     // INT8 计算核心：
     // 根据寄存器或 descriptor 解码后的配置，从 scratchpad 读取 packed INT8 数据，
     // 执行 VDOT/GEMV/GEMM_TILE，并把结果写回 scratchpad。
-    ai_banked_cnm_core banked_core_u(
-        .clk(aclk), .resetn(aresetn), .start(core_start && banked_op), .abort(core_abort), .op_mode(launch_op),
-        .src0_base(launch_src0), .src1_base(launch_src1), .dst_base(launch_dst),
-        .length(launch_length), .m_size(launch_m), .scale_shift(launch_shift), .activation(launch_activation),
-        .watchdog_limit(watchdog_limit),
-        .cnm_req_valid(cnm_read_valid), .cnm_addr0(cnm_read_addr0), .cnm_addr1(cnm_read_addr1),
-        .cnm_addr2(cnm_read_addr2), .cnm_addr3(cnm_read_addr3), .cnm_req_ready(arb_cnm_ready),
-        .cnm_rsp_valid(cnm_rsp_valid), .cnm_data0(cnm_data0), .cnm_data1(cnm_data1),
-        .cnm_data2(cnm_data2), .cnm_data3(cnm_data3), .cnm_parity_error(cnm_parity),
-        .cnm_protection_error(cnm_protection_error),
-        .spad_valid(banked_spad_valid), .spad_write(banked_spad_write), .spad_addr(banked_spad_addr), .spad_wdata(banked_spad_wdata),
-        .spad_ready(arb_core_ready),
-        .spad_protection_error(compute_prot_error),
-        .busy(banked_busy), .done(banked_done), .error(banked_error), .error_code(banked_error_code),
-        .result(banked_result), .cycle_count(banked_cycle_count), .element_count(banked_element_count)
-    );
-
-    // A3 matrix path: a 4x4 INT8 PE tile consumes the banked-read path and
-    // commits each four-word INT32 result row through the 128-bit line port.
-    ai_tensor_matrix_core tensor_matrix_u(
-        .clk(aclk), .resetn(aresetn),
-        .start(core_start && tensor_matrix_op), .abort(core_abort), .op_mode(launch_op),
-        .src0_base(launch_src0), .src1_base(launch_src1),
-        .bias_base(launch_bias_base), .dst_base(launch_dst),
-        .m_size(launch_m), .n_size(launch_n), .k_words(launch_k),
-        // Batch and attention-head dimensions are flattened into consecutive
-        // tensor instances.  The three descriptor strides advance one
-        // flattened instance, avoiding a second set of head-stride fields.
-        .instance_count(launch_instance_count),
-        .src0_batch_stride(launch_src0_stride), .src1_batch_stride(launch_src1_stride),
-        .dst_batch_stride(launch_dst_stride),
-        .transpose_a(launch_flags[1]), .transpose_b(launch_flags[2]),
-        .bias_enable(launch_bias_enable), .scale_shift(launch_shift),
-        .activation(launch_activation), .watchdog_limit(watchdog_limit),
-        .bank0_data(banked_data0), .bank1_data(banked_data1),
-        .bank2_data(banked_data2), .bank3_data(banked_data3),
-        .bank_parity_error(banked_parity),
-        .banked_read_valid(matrix_banked_read_valid), .banked_addr(matrix_banked_read_addr),
-        .banked_ready(arb_banked_ready), .banked_rsp_valid(banked_rsp_valid),
+    // Compute engines are grouped structurally; this top retains launch
+    // decoding, scratchpad arbitration and all external integration.
+    ai_accel_compute_cluster compute_cluster_u(
+        .aclk(aclk), .aresetn(aresetn), .core_start(core_start),
+        .core_abort(core_abort), .banked_op(banked_op),
+        .tensor_matrix_op(tensor_matrix_op), .tensor_sfu_op(tensor_sfu_op),
+        .conv_linebuffer_op(conv_linebuffer_op), .kv_cache_op(kv_cache_op),
+        .launch_op(launch_op), .launch_src0(launch_src0), .launch_src1(launch_src1),
+        .launch_dst(launch_dst), .launch_length(launch_length), .launch_m(launch_m),
+        .launch_n(launch_n), .launch_k(launch_k), .launch_shift(launch_shift),
+        .launch_activation(launch_activation), .launch_bias_base(launch_bias_base),
+        .launch_bias_enable(launch_bias_enable), .launch_flags(launch_flags),
+        .launch_aux0(launch_aux0), .launch_src0_stride(launch_src0_stride),
+        .launch_src1_stride(launch_src1_stride), .launch_dst_stride(launch_dst_stride),
+        .launch_instance_count(launch_instance_count), .watchdog_limit(watchdog_limit),
+        .arb_cnm_ready(arb_cnm_ready), .cnm_rsp_valid(cnm_rsp_valid),
+        .cnm_data0(cnm_data0), .cnm_data1(cnm_data1), .cnm_data2(cnm_data2),
+        .cnm_data3(cnm_data3), .cnm_parity(cnm_parity),
+        .cnm_protection_error(cnm_protection_error), .banked_data0(banked_data0),
+        .banked_data1(banked_data1), .banked_data2(banked_data2),
+        .banked_data3(banked_data3), .banked_parity(banked_parity),
+        .arb_banked_ready(arb_banked_ready), .banked_rsp_valid(banked_rsp_valid),
         .banked_protection_error(banked_protection_error),
-        .spad_valid(matrix_spad_valid), .spad_write(matrix_spad_write),
-        .spad_addr(matrix_spad_addr), .spad_wdata(matrix_spad_wdata),
-        .spad_ready(arb_core_ready), .spad_rsp_valid(core_rsp_valid),
-        .spad_rdata(arb_rsp_rdata),
-        .spad_parity_error(core_rsp_error || core_spad_parity_error),
-        .spad_protection_error(compute_prot_error),
-        .line_valid(matrix_line_valid), .line_write(matrix_line_write),
-        .line_addr(matrix_line_addr), .line_wdata(matrix_line_wdata),
-        .line_wstrb(matrix_line_wstrb), .line_ready(arb_core_line_ready),
-        .line_protection_error(line_prot_error || spad_line_raw_error),
-        .busy(matrix_busy), .done(matrix_done), .error(matrix_error),
-        .error_code(matrix_error_code), .result(matrix_result),
-        .cycle_count(matrix_cycle_count), .element_count(matrix_element_count),
-        .perf_mac_active(matrix_perf_mac_active),
-        .perf_banked_wait(matrix_perf_banked_wait)
+        .arb_core_ready(arb_core_ready), .core_rsp_valid(core_rsp_valid),
+        .arb_rsp_rdata(arb_rsp_rdata), .core_rsp_error(core_rsp_error),
+        .core_spad_parity_error(core_spad_parity_error),
+        .compute_prot_error(compute_prot_error), .arb_core_line_ready(arb_core_line_ready),
+        .line_prot_error(line_prot_error), .spad_line_raw_error(spad_line_raw_error),
+        .cnm_read_valid(cnm_read_valid), .cnm_read_addr0(cnm_read_addr0),
+        .cnm_read_addr1(cnm_read_addr1), .cnm_read_addr2(cnm_read_addr2),
+        .cnm_read_addr3(cnm_read_addr3), .banked_spad_valid(banked_spad_valid),
+        .banked_spad_write(banked_spad_write), .banked_spad_addr(banked_spad_addr),
+        .banked_spad_wdata(banked_spad_wdata),
+        .matrix_banked_read_valid(matrix_banked_read_valid),
+        .matrix_banked_read_addr(matrix_banked_read_addr),
+        .matrix_spad_valid(matrix_spad_valid), .matrix_spad_write(matrix_spad_write),
+        .matrix_spad_addr(matrix_spad_addr), .matrix_spad_wdata(matrix_spad_wdata),
+        .matrix_line_valid(matrix_line_valid), .matrix_line_write(matrix_line_write),
+        .matrix_line_addr(matrix_line_addr), .matrix_line_wdata(matrix_line_wdata),
+        .matrix_line_wstrb(matrix_line_wstrb), .sfu_spad_valid(sfu_spad_valid),
+        .sfu_spad_write(sfu_spad_write), .sfu_spad_addr(sfu_spad_addr),
+        .sfu_spad_wdata(sfu_spad_wdata), .conv_spad_valid(conv_spad_valid),
+        .conv_spad_write(conv_spad_write), .conv_spad_addr(conv_spad_addr),
+        .conv_spad_wdata(conv_spad_wdata), .kv_spad_valid(kv_spad_valid),
+        .kv_spad_write(kv_spad_write), .kv_spad_addr(kv_spad_addr),
+        .kv_spad_wdata(kv_spad_wdata), .scalar_spad_valid(scalar_spad_valid),
+        .scalar_spad_write(scalar_spad_write), .scalar_spad_addr(scalar_spad_addr),
+        .scalar_spad_wdata(scalar_spad_wdata), .scalar_busy(scalar_busy),
+        .banked_busy(banked_busy), .matrix_busy(matrix_busy), .sfu_busy(sfu_busy),
+        .conv_busy(conv_busy), .kv_busy(kv_busy), .core_busy(core_busy),
+        .core_done(core_done), .core_error(core_error),
+        .core_error_code(core_error_code), .core_result(core_result),
+        .core_cycle_count(core_cycle_count), .core_element_count(core_element_count),
+        .matrix_perf_mac_active(matrix_perf_mac_active),
+        .matrix_perf_banked_wait(matrix_perf_banked_wait)
     );
-
-    // A3 vector/SFU path executes numerically defined tensor primitives used
-    // to assemble attention and FFN command chains.
-    ai_tensor_sfu_core tensor_sfu_u(
-        .clk(aclk), .resetn(aresetn),
-        .start(core_start && tensor_sfu_op), .abort(core_abort), .op_mode(launch_op),
-        .src0_base(launch_src0), .src1_base(launch_src1),
-        .beta_base(launch_bias_base), .beta_enable(launch_bias_enable),
-        .pack_enable(launch_flags[4]), .dst_base(launch_dst),
-        .length(launch_length), .scale_shift(launch_shift),
-        .epsilon(launch_aux0), .watchdog_limit(watchdog_limit),
-        .spad_valid(sfu_spad_valid), .spad_write(sfu_spad_write),
-        .spad_addr(sfu_spad_addr), .spad_wdata(sfu_spad_wdata),
-        .spad_ready(arb_core_ready), .spad_rsp_valid(core_rsp_valid),
-        .spad_rdata(arb_rsp_rdata),
-        .spad_parity_error(core_rsp_error || core_spad_parity_error),
-        .spad_protection_error(compute_prot_error),
-        .busy(sfu_busy), .done(sfu_done), .error(sfu_error),
-        .error_code(sfu_error_code), .result(sfu_result),
-        .cycle_count(sfu_cycle_count), .element_count(sfu_element_count)
-    );
-
-    // A6 raster CNN frontend (0x16/0x17).  Legacy 0x14/0x15 remain the
-    // im2col-compatible path; this engine constructs windows in hardware.
-    ai_conv3x3_linebuffer_core conv_linebuffer_u(
-        .clk(aclk), .resetn(aresetn), .start(core_start && conv_linebuffer_op),
-        .abort(core_abort), .op_mode(launch_op), .src0_base(launch_src0),
-        .src1_base(launch_src1), .dst_base(launch_dst), .height(launch_m),
-        .width(launch_n), .watchdog_limit(watchdog_limit),
-        .spad_valid(conv_spad_valid), .spad_write(conv_spad_write),
-        .spad_addr(conv_spad_addr), .spad_wdata(conv_spad_wdata),
-        .spad_ready(arb_core_ready), .spad_rsp_valid(core_rsp_valid),
-        .spad_rdata(arb_rsp_rdata),
-        .spad_error(core_rsp_error || core_spad_parity_error || compute_prot_error),
-        .busy(conv_busy), .done(conv_done), .error(conv_error), .error_code(conv_error_code),
-        .result(conv_result), .cycle_count(conv_cycle_count), .element_count(conv_element_count)
-    );
-
-    // A6 KV-cache read/write primitive.  aux0 selects {head,token}; the
-    // descriptor's two source stride fields define the cache layout.
-    ai_kv_cache_engine kv_cache_u(
-        .clk(aclk), .resetn(aresetn), .start(core_start && kv_cache_op),
-        .abort(core_abort), .op_mode(launch_op), .src0_base(launch_src0),
-        .dst_base(launch_dst), .length(launch_length),
-        .src0_stride(launch_src0_stride), .src1_stride(launch_src1_stride),
-        .aux0(launch_aux0), .watchdog_limit(watchdog_limit),
-        .spad_valid(kv_spad_valid), .spad_write(kv_spad_write),
-        .spad_addr(kv_spad_addr), .spad_wdata(kv_spad_wdata),
-        .spad_ready(arb_core_ready), .spad_rsp_valid(core_rsp_valid),
-        .spad_rdata(arb_rsp_rdata),
-        .spad_error(core_rsp_error || core_spad_parity_error || compute_prot_error),
-        .busy(kv_busy), .done(kv_done), .error(kv_error), .error_code(kv_error_code),
-        .result(kv_result), .cycle_count(kv_cycle_count), .element_count(kv_element_count)
-    );
-
-    ai_int8_compute_core core_u(
-        .clk                (aclk),
-        .resetn             (aresetn),
-        .start              (core_start && !banked_op && !tensor_matrix_op && !tensor_sfu_op && !conv_linebuffer_op && !kv_cache_op),
-        .abort              (core_abort),
-        .op_mode            (launch_op),
-        .src0_base          (launch_src0),
-        .src1_base          (launch_src1),
-        .dst_base           (launch_dst),
-        .length             (launch_length),
-        .m_size             (launch_m),
-        .n_size             (launch_n),
-        .k_words            (launch_k),
-        .scale_shift        (launch_shift),
-        .activation         (launch_activation),
-        .bias_base          (launch_bias_base),
-        .bias_enable        (launch_bias_enable),
-        .watchdog_limit     (watchdog_limit),
-        .spad_ready         (arb_core_ready),
-        .spad_rsp_valid     (core_rsp_valid),
-        .spad_parity_error  (core_rsp_error || core_spad_parity_error),
-        .spad_protection_error(compute_prot_error),
-        .spad_rdata         (arb_rsp_rdata),
-        .spad_valid         (scalar_spad_valid),
-        .spad_write         (scalar_spad_write),
-        .spad_addr          (scalar_spad_addr),
-        .spad_wdata         (scalar_spad_wdata),
-        .busy               (scalar_busy),
-        .done               (scalar_done),
-        .error              (scalar_error),
-        .error_code         (scalar_error_code),
-        .result             (scalar_result),
-        .cycle_count        (scalar_cycle_count),
-        .element_count      (scalar_element_count)
-    );
-
 endmodule

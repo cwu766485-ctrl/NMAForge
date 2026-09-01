@@ -20,6 +20,7 @@ module ai_integer_sqrt(
     wire [63:0] mid_square = mid*mid;
     wire fits = mid_square<=radicand_r;
     wire [31:0] next_answer = fits ? mid : answer_r;
+    wire final_iteration = (count_r == 6'd31) || (low_r > high_r);
 
     always @(posedge clk or negedge resetn) begin
         if (!resetn) begin
@@ -39,7 +40,7 @@ module ai_integer_sqrt(
                 else
                     high_r<={1'b0,mid}-33'd1;
                 count_r<=count_r+1'b1;
-                if (count_r==6'd31 || low_r>high_r) begin
+                if (final_iteration) begin
                     busy<=0; done<=1; root<=next_answer;
                 end
             end

@@ -1,14 +1,14 @@
-# A8 SpyGlass static verification
+# NMAForge SpyGlass static verification
 
-`a8_static.prj` analyzes only active A8 synthesizable RTL and excludes
-testbench/SVA sources.  It uses the TSMC28 scratchpad macro wrapper plus a
-port-only declaration of the foundry SRAM, so static analysis checks the
-wrapper/control path without synthesizing behavioural simulation arrays.
+`a8_static.prj` analyzes active synthesizable RTL and excludes testbench/SVA
+sources. The public profile uses the behavioural scratchpad with a structural
+memory threshold; a foundry macro adapter belongs only in an ignored private
+overlay.
 
 From a Linux EDA environment with SpyGlass loaded:
 
 ```bash
-cd <CIMForge>/verif/spyglass
+cd <NMAForge>/verif/spyglass
 chmod +x run_spyglass_a8.sh
 ./run_spyglass_a8.sh lint
 ./run_spyglass_a8.sh cdc

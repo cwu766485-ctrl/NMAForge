@@ -1,4 +1,4 @@
-# CIMForge software bring-up
+# NMAForge software bring-up
 
 ## Transformer descriptor mapper
 

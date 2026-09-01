@@ -1,4 +1,4 @@
-# CIMForge subsystem-level verification
+# NMAForge subsystem-level verification
 
 Subsystem tests verify real interactions among several RTL blocks.  They reuse
 block BFMs/reference models and later reuse the UVM agents under `uvm_verif/`.

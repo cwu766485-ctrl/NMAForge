@@ -1,6 +1,6 @@
 # DMA block UVM
 
-This is the first true block-level UVM environment for CIMForge.  The DUT is
+This is the first true block-level UVM environment for NMAForge. The DUT is
 `rtl/dma/ai_axi128_dma.v`, not `ai_accel_top`.
 
 ## Architecture
@@ -44,7 +44,7 @@ The already executed initial test is `dma_load_ooo_smoke_test`:
 Run one focused test in the WSL/VCS environment:
 
 ```bash
-cd /mnt/e/workspace/chip/CIMForge/verif/block/dma/sim
+cd <repo>/verif/block/dma/sim
 make uvm_smoke
 ```
 

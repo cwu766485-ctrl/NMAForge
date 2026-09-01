@@ -43,12 +43,11 @@ From a Vivado-enabled PowerShell:
 .\fpga\xilinx_a7_100t\scripts\run_vivado_synth.ps1 -Target program
 ```
 
-The script finds `vivado.bat` from `PATH`, `VIVADO_HOME`, or the standard
-`D:\Xilinx\Vivado\2024.1` / `C:\Xilinx\Vivado\2024.1` locations. For any
-other installation, pass the executable explicitly:
+The script finds `vivado` from `PATH` or `VIVADO_HOME`. For another
+installation, pass the executable explicitly:
 
 ```powershell
-.\fpga\xilinx_a7_100t\scripts\run_vivado_synth.ps1 -Target bitstream -VivadoPath 'D:\Xilinx\Vivado\2024.1\bin\vivado.bat'
+.\fpga\xilinx_a7_100t\scripts\run_vivado_synth.ps1 -Target bitstream -VivadoPath '<vivado-install>\bin\vivado.bat'
 ```
 
 Override the device if your board is populated differently:
@@ -59,10 +58,10 @@ Override the device if your board is populated differently:
 
 `program` programs the generated bitstream through the single FPGA visible to
 Vivado Hardware Manager. It refuses to choose a device when multiple JTAG
-devices are present. For a remote hardware server, pass its endpoint:
+devices are present. For a remote hardware server, pass your local endpoint:
 
 ```powershell
-.\fpga\xilinx_a7_100t\scripts\run_vivado_synth.ps1 -Target program -HwServerUrl 192.168.1.10:3121
+.\fpga\xilinx_a7_100t\scripts\run_vivado_synth.ps1 -Target program -HwServerUrl <host>:3121
 ```
 
 Reports are written under:

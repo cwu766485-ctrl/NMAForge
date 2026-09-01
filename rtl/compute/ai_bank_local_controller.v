@@ -10,9 +10,12 @@
 module ai_bank_local_controller #(
     parameter [1:0] LANE_ID = 2'd0
 )(
-    input wire clk, input wire resetn,
-    input wire start, input wire abort,
-    input wire [31:0] src0_base, input wire [31:0] src1_base,
+    input wire clk,
+    input wire resetn,
+    input wire start,
+    input wire abort,
+    input wire [31:0] src0_base,
+    input wire [31:0] src1_base,
     input wire [15:0] length,
     output reg req_valid, output reg [31:0] req_addr, input wire req_ready,
     input wire rsp_valid, input wire [31:0] rsp_data, input wire rsp_parity_error,
@@ -21,20 +24,34 @@ module ai_bank_local_controller #(
     output reg [31:0] read_issue_events, output reg [31:0] prefetch_events,
     output reg [31:0] compute_events, output reg [31:0] response_wait_cycles
 );
-    localparam [2:0] ST_IDLE=0, ST_A_REQ=1, ST_B_REQ=2, ST_WAIT_A=3,
-                     ST_WAIT_B=4, ST_DONE=5, ST_ERROR=6;
+    localparam [2:0] ST_IDLE   = 3'd0;
+    localparam [2:0] ST_A_REQ  = 3'd1;
+    localparam [2:0] ST_B_REQ  = 3'd2;
+    localparam [2:0] ST_WAIT_A = 3'd3;
+    localparam [2:0] ST_WAIT_B = 3'd4;
+    localparam [2:0] ST_DONE   = 3'd5;
+    localparam [2:0] ST_ERROR  = 3'd6;
+
     reg [2:0] state_r;
     reg [31:0] src0_r, src1_r;
     reg [15:0] length_r, k_r;
     reg [31:0] a_buf0_r, a_buf1_r;
-    wire [31:0] a_word = k_r[0] ? a_buf1_r : a_buf0_r;
+
+    // The alternating buffers retain A[k] while the matching B[k] response
+    // is received.  A's low K bit is therefore the ping-pong selector.
+    wire       select_a_buffer1 = k_r[0];
+    wire [31:0] a_word = select_a_buffer1 ? a_buf1_r : a_buf0_r;
     wire signed [31:0] partial_sum;
     wire signed [63:0] sum_next = local_sum + {{32{partial_sum[31]}},partial_sum};
-    wire last_k = k_r == length_r-1'b1;
+
+    wire last_k = (k_r == length_r - 1'b1);
     wire [31:0] lane_offset = {28'd0,LANE_ID,2'b00};
-    wire [31:0] a_addr = src0_r + ({16'd0,k_r} << 4) + lane_offset;
-    wire [31:0] b_addr = src1_r + ({16'd0,k_r} << 4) + lane_offset;
-    wire [31:0] next_a_addr = src0_r + ({16'd0,k_r+1'b1} << 4) + lane_offset;
+    wire [31:0] k_byte_offset = ({16'd0,k_r} << 4);
+    wire [31:0] next_k_byte_offset = ({16'd0,k_r + 1'b1} << 4);
+    wire [31:0] a_addr = src0_r + k_byte_offset + lane_offset;
+    wire [31:0] b_addr = src1_r + k_byte_offset + lane_offset;
+    wire [31:0] next_a_addr = src0_r + next_k_byte_offset + lane_offset;
+    wire waiting_for_response = (state_r == ST_WAIT_A) || (state_r == ST_WAIT_B);
 
     ai_bank_pe local_pe(.act_word(a_word), .weight_word(rsp_data), .partial_sum(partial_sum));
 
@@ -60,7 +77,7 @@ module ai_bank_local_controller #(
             read_issue_events<=0; prefetch_events<=0; compute_events<=0; response_wait_cycles<=0;
         end else begin
             done<=0;
-            if (busy && (state_r==ST_WAIT_A || state_r==ST_WAIT_B) && !rsp_valid)
+            if (busy && waiting_for_response && !rsp_valid)
                 response_wait_cycles<=response_wait_cycles+1'b1;
             if (busy && abort) state_r<=ST_ERROR;
             else case (state_r)
@@ -81,7 +98,7 @@ module ai_bank_local_controller #(
                     if (rsp_valid) begin
                         if (rsp_parity_error) state_r<=ST_ERROR;
                         else begin
-                            if (k_r[0]) a_buf1_r<=rsp_data; else a_buf0_r<=rsp_data;
+                            if (select_a_buffer1) a_buf1_r<=rsp_data; else a_buf0_r<=rsp_data;
                             state_r<=ST_WAIT_B;
                         end
                     end else state_r<=ST_WAIT_A;
@@ -89,7 +106,7 @@ module ai_bank_local_controller #(
                 ST_WAIT_A: if (rsp_valid) begin
                     if (rsp_parity_error) state_r<=ST_ERROR;
                     else begin
-                        if (k_r[0]) a_buf1_r<=rsp_data; else a_buf0_r<=rsp_data;
+                        if (select_a_buffer1) a_buf1_r<=rsp_data; else a_buf0_r<=rsp_data;
                         state_r<=ST_WAIT_B;
                     end
                 end

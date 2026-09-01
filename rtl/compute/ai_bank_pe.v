@@ -8,18 +8,22 @@ module ai_bank_pe(
     input  wire [31:0] weight_word,
     output wire signed [31:0] partial_sum
 );
-    reg signed [7:0] a0, a1, a2, a3;
-    reg signed [7:0] w0, w1, w2, w3;
-    reg signed [31:0] p0, p1, p2, p3;
+    // Keep every product 32-bit signed before summation.  This preserves the
+    // original accumulation width and avoids a lane expression silently
+    // narrowing before it reaches the bank-local accumulator.
+    wire signed [7:0] act_lane0 = act_word[7:0];
+    wire signed [7:0] act_lane1 = act_word[15:8];
+    wire signed [7:0] act_lane2 = act_word[23:16];
+    wire signed [7:0] act_lane3 = act_word[31:24];
+    wire signed [7:0] weight_lane0 = weight_word[7:0];
+    wire signed [7:0] weight_lane1 = weight_word[15:8];
+    wire signed [7:0] weight_lane2 = weight_word[23:16];
+    wire signed [7:0] weight_lane3 = weight_word[31:24];
 
-    always @(*) begin
-        a0 = act_word[7:0];   a1 = act_word[15:8];
-        a2 = act_word[23:16]; a3 = act_word[31:24];
-        w0 = weight_word[7:0];   w1 = weight_word[15:8];
-        w2 = weight_word[23:16]; w3 = weight_word[31:24];
-        p0 = a0 * w0; p1 = a1 * w1;
-        p2 = a2 * w2; p3 = a3 * w3;
-    end
+    wire signed [31:0] product0 = act_lane0 * weight_lane0;
+    wire signed [31:0] product1 = act_lane1 * weight_lane1;
+    wire signed [31:0] product2 = act_lane2 * weight_lane2;
+    wire signed [31:0] product3 = act_lane3 * weight_lane3;
 
-    assign partial_sum = p0 + p1 + p2 + p3;
+    assign partial_sum = product0 + product1 + product2 + product3;
 endmodule

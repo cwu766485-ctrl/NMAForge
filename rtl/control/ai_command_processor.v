@@ -79,11 +79,23 @@ module ai_command_processor(
     output reg [31:0] event_cycles, output reg [31:0] event_elements,
     output reg [15:0] dependency_events
 );
-    localparam [3:0] ST_IDLE=0, ST_FETCH=1, ST_DECODE=2, ST_RUN=3,
-                     ST_CPL=4, ST_TILE=5;
-    localparam [3:0] ERR_ABORT=4'd3, ERR_FETCH=4'd6, ERR_DESC=4'd7, ERR_EMPTY=4'd8,
-                     ERR_CPL=4'd9, ERR_PROT=4'd10, ERR_DEPENDENCY=4'd12;
-    localparam [3:0] CPL_DONE=4'd1, CPL_ERROR=4'd2;
+    localparam [3:0] ST_IDLE   = 4'd0;
+    localparam [3:0] ST_FETCH  = 4'd1;
+    localparam [3:0] ST_DECODE = 4'd2;
+    localparam [3:0] ST_RUN    = 4'd3;
+    localparam [3:0] ST_CPL    = 4'd4;
+    localparam [3:0] ST_TILE   = 4'd5;
+
+    localparam [3:0] ERR_ABORT      = 4'd3;
+    localparam [3:0] ERR_FETCH      = 4'd6;
+    localparam [3:0] ERR_DESC       = 4'd7;
+    localparam [3:0] ERR_EMPTY      = 4'd8;
+    localparam [3:0] ERR_CPL        = 4'd9;
+    localparam [3:0] ERR_PROT       = 4'd10;
+    localparam [3:0] ERR_DEPENDENCY = 4'd12;
+
+    localparam [3:0] CPL_DONE  = 4'd1;
+    localparam [3:0] CPL_ERROR = 4'd2;
 
     reg [3:0] state_r;
     reg queue_run_r, completion_required_r;
@@ -106,47 +118,39 @@ module ai_command_processor(
     reg [31:0] macro_elements_r;
     reg [31:0] macro_result_r;
 
-    wire [31:0] cmdq_head_index = (cmdq_size != 0 && cmdq_head >= cmdq_size) ? 0 : cmdq_head;
-    wire [31:0] cmdq_head_next = (cmdq_size == 0) ? cmdq_head + 1 :
-                                  (cmdq_head_index >= cmdq_size - 1 ? 0 : cmdq_head_index + 1);
-    wire [31:0] cplq_tail_index = (cplq_size != 0 && cplq_tail >= cplq_size) ? 0 : cplq_tail;
-    wire [31:0] cplq_tail_next = (cplq_size == 0) ? cplq_tail + 1 :
-                                  (cplq_tail_index >= cplq_size - 1 ? 0 : cplq_tail_index + 1);
+    // Ring pointer arithmetic is shared by command and completion queues;
+    // this module remains the sole owner of both pointer registers.
+    wire [31:0] cmdq_head_index, cmdq_head_next;
+    wire [31:0] cplq_tail_index, cplq_tail_next;
+    ai_ring_pointer_next cmdq_pointer_u(
+        .pointer(cmdq_head), .queue_size(cmdq_size),
+        .index(cmdq_head_index), .next_pointer(cmdq_head_next)
+    );
+    ai_ring_pointer_next cplq_pointer_u(
+        .pointer(cplq_tail), .queue_size(cplq_size),
+        .index(cplq_tail_index), .next_pointer(cplq_tail_next)
+    );
+
     wire cmdq_empty = cmdq_size != 0 && cmdq_head_index == cmdq_tail;
     wire cplq_full = cplq_size != 0 && cplq_tail_next == cplq_head;
     wire completion_available = cplq_size != 0 && !cplq_full && !completion_protected;
     wire scheduler_resources_idle = !fetch_busy && !compute_busy && !completion_busy && !dma_busy;
-    wire macro_op = desc_op >= 8'h40 && desc_op <= 8'h42;
-    wire op_ok = (desc_op >= 8'h10 && desc_op <= 8'h17) ||
-                 desc_op == 8'h20 || desc_op == 8'h21 ||
-                 (desc_op >= 8'h30 && desc_op <= 8'h39) ||
-                 desc_op == 8'h43 || desc_op == 8'h44 || macro_op;
-    wire tensor_matrix_op = desc_op == 8'h30 || desc_op == 8'h31;
-    wire tensor_sfu_op = desc_op >= 8'h32 && desc_op <= 8'h39;
-    // ABI v7 is the unified descriptor contract for every opcode.  Older
-    // per-engine versions remain accepted so existing test images and
-    // software can migrate without an all-at-once flag day.
-    wire desc_version_ok = desc_version == 8'd7 ? 1'b1 :
-                           macro_op ? desc_version == 8'd4 :
-                           ((desc_op == 8'h16 || desc_op == 8'h17 ||
-                             desc_op == 8'h43 || desc_op == 8'h44) ? desc_version == 8'd5 :
-                           (!(tensor_matrix_op || tensor_sfu_op) || desc_version == 8'd3));
     wire dependencies_ready = (dependency_events & desc_wait_mask) == desc_wait_mask;
-    wire dims_ok = (desc_op == 8'h10 && desc_length != 0) ||
-                   ((desc_op == 8'h11 || desc_op == 8'h21) && desc_m != 0 &&
-                    (desc_op == 8'h21 ? desc_length != 0 : desc_k != 0)) ||
-                   ((desc_op >= 8'h12 && desc_op <= 8'h15) &&
-                    desc_m != 0 && desc_n != 0 && desc_k != 0) ||
-                   (desc_op == 8'h20 && desc_length != 0) ||
-                   (tensor_matrix_op && desc_m != 0 && desc_n != 0 &&
-                    desc_k != 0 && desc_m[1:0] == 0 && desc_n[1:0] == 0) ||
-                   (tensor_sfu_op && desc_length != 0) ||
-                   ((desc_op == 8'h16 || desc_op == 8'h17) &&
-                    desc_m >= 16'd3 && desc_n >= 16'd3) ||
-                   ((desc_op == 8'h43 || desc_op == 8'h44) && desc_length != 0) ||
-                   (desc_op == 8'h40 && desc_length == 16'd3) ||
-                   ((desc_op == 8'h41 || desc_op == 8'h42) &&
-                    desc_length >= 16'd3 && desc_length <= 16'd256);
+    wire macro_op, descriptor_invalid;
+    // Descriptor ABI validation is deliberately stateless.  Launch, queue
+    // advancement and error-completion ownership remain in this FSM.
+    ai_descriptor_validator descriptor_validator_u(
+        .op(desc_op), .version(desc_version),
+        .src0(desc_src0), .src1(desc_src1), .dst(desc_dst),
+        .bias_base(desc_bias_base), .length(desc_length),
+        .m_size(desc_m), .n_size(desc_n), .k_words(desc_k),
+        .bias_enable(desc_bias_enable), .macro_child_fetch(macro_child_fetch_r),
+        .op_valid(), .is_macro(macro_op), .is_tensor_matrix(),
+        .is_tensor_sfu(), .version_valid(), .dimensions_valid(),
+        .alignment_error(),
+        .descriptor_invalid(descriptor_invalid)
+    );
+    wire dependency_wait_timed_out = (dependency_wait_cycles_r == 16'hffff);
 
     wire tile_compute_start;
     wire [7:0] tile_launch_op;
@@ -258,6 +262,55 @@ module ai_command_processor(
       end
     endtask
 
+    // All compute entry paths use the same registered launch ABI.  Keeping
+    // this mapping in one synthesizable task prevents direct, descriptor and
+    // tile paths from silently drifting in field defaults or batch semantics.
+    task load_launch;
+      input [7:0]  op;
+      input [15:0] task_id;
+      input [31:0] src0;
+      input [31:0] src1;
+      input [31:0] dst;
+      input [15:0] length;
+      input [15:0] m_size;
+      input [15:0] n_size;
+      input [15:0] k_words;
+      input [4:0]  scale_shift;
+      input [1:0]  activation;
+      input [31:0] bias_base;
+      input        bias_enable;
+      input [7:0]  flags;
+      input [31:0] aux0;
+      input [31:0] src0_stride;
+      input [31:0] src1_stride;
+      input [31:0] dst_stride;
+      input [15:0] batch_count;
+      input [15:0] head_count;
+      begin
+        launch_valid       <= 1'b1;
+        launch_op          <= op;
+        launch_task_id     <= task_id;
+        launch_src0        <= src0;
+        launch_src1        <= src1;
+        launch_dst         <= dst;
+        launch_length      <= length;
+        launch_m           <= m_size;
+        launch_n           <= n_size;
+        launch_k           <= k_words;
+        launch_shift       <= scale_shift;
+        launch_activation  <= activation;
+        launch_bias_base   <= bias_base;
+        launch_bias_enable <= bias_enable;
+        launch_flags       <= flags;
+        launch_aux0        <= aux0;
+        launch_src0_stride <= src0_stride;
+        launch_src1_stride <= src1_stride;
+        launch_dst_stride  <= dst_stride;
+        launch_batch_count <= batch_count == 0 ? 16'd1 : batch_count;
+        launch_head_count  <= head_count == 0 ? 16'd1 : head_count;
+      end
+    endtask
+
     always @(posedge clk or negedge resetn) begin
       if (!resetn) begin
         state_r <= ST_IDLE;
@@ -350,27 +403,11 @@ module ai_command_processor(
             end else if (direct_start && scheduler_resources_idle) begin
               busy <= 1'b1;
               completion_required_r <= 1'b0;
-              launch_valid <= 1'b1;
-              launch_task_id <= 16'd0;
-              launch_op <= cfg_op;
-              launch_src0 <= cfg_src0;
-              launch_src1 <= cfg_src1;
-              launch_dst <= cfg_dst;
-              launch_length <= cfg_length;
-              launch_m <= cfg_m;
-              launch_n <= cfg_n;
-              launch_k <= cfg_k;
-              launch_shift <= cfg_shift;
-              launch_activation <= cfg_activation;
-              launch_bias_base <= cfg_bias_base;
-              launch_bias_enable <= cfg_bias_enable;
-              launch_flags <= {7'd0, cfg_bias_enable};
-              launch_aux0 <= 32'd1;
-              launch_src0_stride <= 32'd0;
-              launch_src1_stride <= 32'd0;
-              launch_dst_stride <= 32'd0;
-              launch_batch_count <= 16'd1;
-              launch_head_count <= 16'd1;
+              load_launch(cfg_op, 16'd0, cfg_src0, cfg_src1, cfg_dst,
+                          cfg_length, cfg_m, cfg_n, cfg_k, cfg_shift,
+                          cfg_activation, cfg_bias_base, cfg_bias_enable,
+                          {7'd0, cfg_bias_enable}, 32'd1, 32'd0, 32'd0,
+                          32'd0, 16'd1, 16'd1);
               pending_signal_mask_r <= 16'd0;
               state_r <= ST_RUN;
             end else if (submit && scheduler_resources_idle) begin
@@ -437,11 +474,7 @@ module ai_command_processor(
                 busy <= 1'b0;
                 state_r <= ST_IDLE;
               end
-            end else if (!op_ok || !dims_ok || !desc_version_ok ||
-                (macro_child_fetch_r && macro_op) ||
-                |desc_src0[1:0] || |desc_src1[1:0] ||
-                |desc_dst[1:0] || (desc_bias_enable && |desc_bias_base[1:0]) ||
-                (macro_op && |desc_src0[5:0])) begin
+            end else if (descriptor_invalid) begin
               completion_task_id <= macro_active_r ? macro_parent_task_id_r : desc_task_id;
               macro_active_r <= 1'b0;
               if (completion_required_r && completion_available)
@@ -454,7 +487,7 @@ module ai_command_processor(
                 state_r <= ST_IDLE;
               end
             end else if (!dependencies_ready) begin
-              if (dependency_wait_cycles_r == 16'hffff) begin
+              if (dependency_wait_timed_out) begin
                 completion_task_id <= macro_active_r ? macro_parent_task_id_r : desc_task_id;
                 macro_active_r <= 1'b0;
                 if (completion_required_r && completion_available)
@@ -498,27 +531,12 @@ module ai_command_processor(
               dependency_wait_cycles_r <= 16'd0;
               state_r <= ST_FETCH;
             end else if (!compute_busy) begin
-              launch_valid <= 1'b1;
-              launch_op <= desc_op;
-              launch_task_id <= desc_task_id;
-              launch_src0 <= desc_src0;
-              launch_src1 <= desc_src1;
-              launch_dst <= desc_dst;
-              launch_length <= desc_length;
-              launch_m <= desc_m;
-              launch_n <= desc_n;
-              launch_k <= desc_k;
-              launch_shift <= desc_shift;
-              launch_activation <= desc_activation;
-              launch_bias_base <= desc_bias_base;
-              launch_bias_enable <= desc_bias_enable;
-              launch_flags <= desc_flags;
-              launch_aux0 <= desc_aux0;
-              launch_src0_stride <= desc_src0_stride;
-              launch_src1_stride <= desc_src1_stride;
-              launch_dst_stride <= desc_dst_stride;
-              launch_batch_count <= desc_batch_count == 0 ? 16'd1 : desc_batch_count;
-              launch_head_count <= desc_head_count == 0 ? 16'd1 : desc_head_count;
+              load_launch(desc_op, desc_task_id, desc_src0, desc_src1, desc_dst,
+                          desc_length, desc_m, desc_n, desc_k, desc_shift,
+                          desc_activation, desc_bias_base, desc_bias_enable,
+                          desc_flags, desc_aux0, desc_src0_stride,
+                          desc_src1_stride, desc_dst_stride, desc_batch_count,
+                          desc_head_count);
               pending_signal_mask_r <= desc_signal_mask;
               dependency_events <= dependency_events & ~desc_clear_mask;
               completion_task_id <= desc_task_id;
@@ -619,27 +637,13 @@ module ai_command_processor(
         // The tile pipeline is a sub-scheduler of this command processor.
         // Its compute pulse uses the same launch interface as direct/CMDQ work.
         if (tile_compute_start) begin
-          launch_valid <= 1'b1;
-          launch_task_id <= 16'd0;
-          launch_op <= tile_launch_op;
-          launch_src0 <= tile_launch_src0;
-          launch_src1 <= tile_launch_src1;
-          launch_dst <= tile_launch_dst;
-          launch_length <= tile_launch_length;
-          launch_m <= tile_launch_m;
-          launch_n <= tile_launch_n;
-          launch_k <= tile_launch_k;
-          launch_shift <= tile_launch_shift;
-          launch_activation <= tile_launch_activation;
-          launch_bias_base <= tile_launch_bias_base;
-          launch_bias_enable <= tile_launch_bias_enable;
-          launch_flags <= {7'd0, tile_launch_bias_enable};
-          launch_aux0 <= 32'd1;
-          launch_src0_stride <= 32'd0;
-          launch_src1_stride <= 32'd0;
-          launch_dst_stride <= 32'd0;
-          launch_batch_count <= 16'd1;
-          launch_head_count <= 16'd1;
+          load_launch(tile_launch_op, 16'd0, tile_launch_src0,
+                      tile_launch_src1, tile_launch_dst, tile_launch_length,
+                      tile_launch_m, tile_launch_n, tile_launch_k,
+                      tile_launch_shift, tile_launch_activation,
+                      tile_launch_bias_base, tile_launch_bias_enable,
+                      {7'd0, tile_launch_bias_enable}, 32'd1, 32'd0, 32'd0,
+                      32'd0, 16'd1, 16'd1);
           pending_signal_mask_r <= 16'd0;
         end
       end

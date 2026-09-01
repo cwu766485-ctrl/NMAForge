@@ -1,4 +1,4 @@
-# CIMForge block-level verification
+# NMAForge block-level verification
 
 This tree owns block-scope test plans, lightweight BFMs, reference models,
 assertions and run recipes.  It does not duplicate reusable UVM classes:

@@ -45,6 +45,12 @@ module ai_spad_arbiter(
 );
     localparam [2:0] CLIENT_DESC=3'd0, CLIENT_CPL=3'd1, CLIENT_CORE=3'd2,
                      CLIENT_BANKED=3'd3, CLIENT_DMA=3'd4;
+    // data_rr_r names the first data-plane client considered after the two
+    // control-plane clients.  The selected client moves the cursor to its
+    // successor, giving Core -> Banked -> DMA round-robin arbitration.
+    localparam [1:0] RR_CORE   = 2'd0;
+    localparam [1:0] RR_BANKED = 2'd1;
+    localparam [1:0] RR_DMA    = 2'd2;
     reg accept_valid;
     reg accept_response;
     reg accept_is_line;
@@ -71,7 +77,7 @@ module ai_spad_arbiter(
             spad_valid=1'b1; spad_write=cpl_write; spad_addr=cpl_addr; spad_wdata=cpl_wdata; accept_valid=1'b1; accept_response=!cpl_write; accept_client=CLIENT_CPL;
         end else begin
             case (data_rr_r)
-              2'd0: begin
+              RR_CORE: begin
                 if (core_line_valid) begin
                     spad_line_valid=1'b1; spad_line_write=core_line_write; spad_line_addr=core_line_addr; spad_line_wdata=core_line_wdata; spad_line_wstrb=core_line_wstrb; accept_valid=1'b1; accept_response=!core_line_write; accept_is_line=1'b1; accept_client=CLIENT_CORE;
                 end else if (core_valid) begin
@@ -86,7 +92,7 @@ module ai_spad_arbiter(
                     spad_valid=1'b1; spad_write=dma_write; spad_addr=dma_addr; spad_wdata=dma_wdata; accept_valid=1'b1; accept_response=!dma_write; accept_client=CLIENT_DMA;
                 end
               end
-              2'd1: begin
+              RR_BANKED: begin
                 if (|cnm_valid) begin
                     spad_cnm_valid=cnm_valid; spad_cnm_addr0=cnm_addr0; spad_cnm_addr1=cnm_addr1; spad_cnm_addr2=cnm_addr2; spad_cnm_addr3=cnm_addr3; accept_valid=1'b1; accept_response=1'b1; accept_client=CLIENT_BANKED;
                 end else if (banked_valid) begin
@@ -101,7 +107,7 @@ module ai_spad_arbiter(
                     spad_valid=1'b1; spad_write=core_write; spad_addr=core_addr; spad_wdata=core_wdata; accept_valid=1'b1; accept_response=!core_write; accept_client=CLIENT_CORE;
                 end
               end
-              default: begin
+              default: begin // RR_DMA
                 if (dma_line_valid) begin
                     spad_line_valid=1'b1; spad_line_write=dma_line_write; spad_line_addr=dma_line_addr; spad_line_wdata=dma_line_wdata; spad_line_wstrb=dma_line_wstrb; accept_valid=1'b1; accept_response=!dma_line_write; accept_is_line=1'b1; accept_client=CLIENT_DMA;
                 end else if (dma_valid) begin
@@ -163,9 +169,9 @@ module ai_spad_arbiter(
                                            spad_parity_error);
             if (accept_valid) begin
                 case (accept_client)
-                  CLIENT_CORE:   data_rr_r<=2'd1;
-                  CLIENT_BANKED: data_rr_r<=2'd2;
-                  CLIENT_DMA:    data_rr_r<=2'd0;
+                  CLIENT_CORE:   data_rr_r<=RR_BANKED;
+                  CLIENT_BANKED: data_rr_r<=RR_DMA;
+                  CLIENT_DMA:    data_rr_r<=RR_CORE;
                   default:       data_rr_r<=data_rr_r;
                 endcase
             end

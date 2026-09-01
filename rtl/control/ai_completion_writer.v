@@ -1,19 +1,11 @@
 `timescale 1ns / 1ps
 
-// ============================================================================
-// ai_completion_writer
-// ----------------------------------------------------------------------------
-// 向 scratchpad 中的 completion queue 写一条完成记录。
-//
-// completion entry 当前为 16 byte / 4 word：
-//   word0 = task_id
-//   word1 = {error_code, status}
-//   word2 = result
-//   word3 = element_count
-//
-// ai_accel_regs 在 core_done 或 descriptor error 后启动本模块，并在 cpl_done 后
-// 推进 CPLQ_TAIL。当前 completion queue 位于 scratchpad，不直接写 DDR。
-// ============================================================================
+// Completion queue writer protocol:
+// - captures one immutable 16-byte record at `start`;
+// - waits for all four scratchpad write handshakes;
+// - asserts `done` only after the final word is accepted.
+// The command processor relies on this contract before advancing CPLQ_TAIL.
+
 module ai_completion_writer(
     input  wire        clk,
     input  wire        resetn,
@@ -35,9 +27,10 @@ module ai_completion_writer(
     output reg         done
 );
 
-    localparam ST_IDLE  = 2'd0;
-    localparam ST_WRITE = 2'd1;
-    localparam ST_DONE  = 2'd2;
+    localparam [1:0] ST_IDLE  = 2'd0;
+    localparam [1:0] ST_WRITE = 2'd1;
+    localparam [1:0] ST_DONE  = 2'd2;
+    localparam [1:0] LAST_COMPLETION_WORD = 2'd3;
 
     reg [1:0] state_r;
     reg [1:0] word_idx_r;
@@ -48,10 +41,11 @@ module ai_completion_writer(
     reg [31:0] result_r;
     reg [31:0] element_count_r;
 
-    // completion writer 只写 scratchpad，因此 spad_write 与 spad_valid 同步拉高。
+    // This client only issues writes, so request valid also defines write
+    // intent for the scratchpad arbiter.
     assign spad_write = spad_valid;
 
-    // 根据 word_idx 选择当前要写入 completion entry 的哪个 word。
+    // Select the current completion-entry word.
     always @(*) begin
         spad_valid = (state_r == ST_WRITE);
         spad_addr  = base_addr_r + ({30'd0, word_idx_r} << 2);
@@ -63,10 +57,10 @@ module ai_completion_writer(
         endcase
     end
 
-    // FSM：
-    //   IDLE  锁存 completion 字段和 base address；
-    //   WRITE 连续写 4 个 word；
-    //   DONE  给上层一拍完成脉冲。
+    // FSM:
+    //   IDLE  : capture one immutable completion record.
+    //   WRITE : wait for four scratchpad write acceptances.
+    //   DONE  : return a one-cycle completion pulse to the owner.
     always @(posedge clk or negedge resetn) begin
         if (!resetn) begin
             state_r         <= ST_IDLE;
@@ -84,7 +78,7 @@ module ai_completion_writer(
 
             case (state_r)
                 ST_IDLE: begin
-                    // 每条 entry 16 byte，所以地址 = cplq_base + cplq_index * 16。
+                    // Each entry is 16 bytes: cplq_base + cplq_index * 16.
                     busy <= 1'b0;
                     if (start) begin
                         base_addr_r     <= cplq_base + (cplq_index << 4);
@@ -99,7 +93,7 @@ module ai_completion_writer(
                     end
                 end
                 ST_WRITE: if (spad_ready) begin
-                    if (word_idx_r == 2'd3) begin
+                    if (word_idx_r == LAST_COMPLETION_WORD) begin
                         state_r <= ST_DONE;
                     end else begin
                         word_idx_r <= word_idx_r + 2'd1;

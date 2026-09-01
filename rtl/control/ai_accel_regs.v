@@ -96,9 +96,75 @@ module ai_accel_regs #(
     wire cpl_empty = cpl_size_r != 0 && cpl_head_r == processor_cplq_tail;
     wire [31:0] cpl_next = processor_cplq_tail >= cpl_size_r-1 ? 0 : processor_cplq_tail+1;
     wire cpl_full = cpl_size_r != 0 && cpl_next == cpl_head_r;
-    wire known = a==CTRL || a==STATUS || a==OP || a==SRC0 || a==SRC1 || a==DST || a==LENGTH || a==M || a==N || a==K || a==QUANT || a==RESULT || a==ERROR || a==CYCLES || a==ELEMENTS || a==IRQ_STATUS || a==IRQ_ENABLE || a==VERSION || a==CAP || a==CMD_BASE || a==CMD_HI || a==CMD_SIZE || a==CMD_HEAD || a==CMD_TAIL || a==CMD_CTRL || a==CPL_BASE || a==CPL_HI || a==CPL_SIZE || a==CPL_TAIL || a==CPL_HEAD || a==QUEUE_STATUS || a==DOORBELL || a==ABORT || a==WATCHDOG || a==DMA_CTRL || a==DMA_STATUS || a==DMA_EXT || a==DMA_EXT_HI || a==DMA_SPAD || a==DMA_LEN || a==DMA_ERROR || a==R0_BASE || a==R0_LIMIT || a==R0_PERM || a==R1_BASE || a==R1_LIMIT || a==R1_PERM || a==R2_BASE || a==R2_LIMIT || a==R2_PERM || a==R3_BASE || a==R3_LIMIT || a==R3_PERM || a==DMA_ROW_WORDS || a==DMA_ROW_COUNT || a==DMA_EXT_STRIDE || a==DMA_SPAD_STRIDE || a==BIAS_BASE || a==POST_CTRL || a==TILE_CTRL || a==TILE_COUNT || a==TILE_EXT_IN || a==TILE_EXT_OUT || a==TILE_EXT_IN_HI || a==TILE_EXT_OUT_HI || a==TILE_EXT_IN_STRIDE || a==TILE_EXT_OUT_STRIDE || a==TILE_BUF0 || a==TILE_BUF1 || a==TILE_IN_WORDS || a==TILE_OUT_WORDS || a==TILE_OUT_OFFSET || a==PERF_TOTAL || a==PERF_DMA || a==PERF_COMPUTE || a==PERF_OVERLAP || a==PERF_STALL || a==TILE_COMPLETED || a==SPAD_INFO || a==EVENT_STATUS || a==DMA_CFG || a==DMA_GATHER_INDEX || a==PERF_CTRL || a==PERF_MATRIX_CYCLES || a==PERF_MATRIX_MAC_CYCLES || a==PERF_MATRIX_BANKED_STALL || a==PERF_DMA_READ_BYTES || a==PERF_DMA_WRITE_BYTES || a==PERF_DMA_AR_COUNT || a==PERF_DMA_AW_COUNT || a==PERF_DMA_RD_STATE || a==PERF_DMA_R_STALL || a==ABI_INFO || a==ERROR_INFO || a==CAP2;
-    wire readonly = a==RESULT || a==ERROR || a==CYCLES || a==ELEMENTS || a==VERSION || a==CAP || a==QUEUE_STATUS || a==DMA_ERROR || a==PERF_TOTAL || a==PERF_DMA || a==PERF_COMPUTE || a==PERF_OVERLAP || a==PERF_STALL || a==TILE_COMPLETED || a==SPAD_INFO || a==EVENT_STATUS || a==PERF_MATRIX_CYCLES || a==PERF_MATRIX_MAC_CYCLES || a==PERF_MATRIX_BANKED_STALL || a==PERF_DMA_READ_BYTES || a==PERF_DMA_WRITE_BYTES || a==PERF_DMA_AR_COUNT || a==PERF_DMA_AW_COUNT || a==PERF_DMA_RD_STATE || a==PERF_DMA_R_STALL || a==ABI_INFO || a==ERROR_INFO || a==CAP2;
-    wire cfg_locked = (processor_busy || dma_busy) && reg_req_write && !(a==STATUS || a==IRQ_STATUS || a==DMA_STATUS || a==ABORT);
+    // Keep the legal-address and write-protection policies in one place.
+    // The read and write muxes below remain the ABI source of truth.
+    function is_known_address;
+        input [8:0] address;
+        begin
+            case (address)
+                // Direct-compute control and completion status.
+                CTRL, STATUS, OP, SRC0, SRC1, DST, LENGTH, M, N, K, QUANT,
+                RESULT, ERROR, CYCLES, ELEMENTS, IRQ_STATUS, IRQ_ENABLE,
+                VERSION, CAP, WATCHDOG, DOORBELL, ABORT,
+
+                // Command and completion queues.
+                CMD_BASE, CMD_HI, CMD_SIZE, CMD_HEAD, CMD_TAIL, CMD_CTRL,
+                CPL_BASE, CPL_HI, CPL_SIZE, CPL_TAIL, CPL_HEAD, QUEUE_STATUS,
+
+                // Scalar/2D/gather DMA configuration and status.
+                DMA_CTRL, DMA_STATUS, DMA_EXT, DMA_EXT_HI, DMA_SPAD, DMA_LEN,
+                DMA_ERROR, DMA_ROW_WORDS, DMA_ROW_COUNT, DMA_EXT_STRIDE,
+                DMA_SPAD_STRIDE, DMA_CFG, DMA_GATHER_INDEX,
+
+                // Scratchpad protection regions and post-processing.
+                R0_BASE, R0_LIMIT, R0_PERM, R1_BASE, R1_LIMIT, R1_PERM,
+                R2_BASE, R2_LIMIT, R2_PERM, R3_BASE, R3_LIMIT, R3_PERM,
+                BIAS_BASE, POST_CTRL,
+
+                // Tile-pipeline configuration and observability.
+                TILE_CTRL, TILE_COUNT, TILE_EXT_IN, TILE_EXT_OUT,
+                TILE_EXT_IN_HI, TILE_EXT_OUT_HI, TILE_EXT_IN_STRIDE,
+                TILE_EXT_OUT_STRIDE, TILE_BUF0, TILE_BUF1, TILE_IN_WORDS,
+                TILE_OUT_WORDS, TILE_OUT_OFFSET, PERF_TOTAL, PERF_DMA,
+                PERF_COMPUTE, PERF_OVERLAP, PERF_STALL, TILE_COMPLETED,
+
+                // Global performance counters and ABI capability reporting.
+                SPAD_INFO, EVENT_STATUS, PERF_CTRL, PERF_MATRIX_CYCLES,
+                PERF_MATRIX_MAC_CYCLES, PERF_MATRIX_BANKED_STALL,
+                PERF_DMA_READ_BYTES, PERF_DMA_WRITE_BYTES, PERF_DMA_AR_COUNT,
+                PERF_DMA_AW_COUNT, PERF_DMA_RD_STATE, PERF_DMA_R_STALL,
+                ABI_INFO, ERROR_INFO, CAP2:
+                    is_known_address = 1'b1;
+                default:
+                    is_known_address = 1'b0;
+            endcase
+        end
+    endfunction
+
+    function is_read_only_address;
+        input [8:0] address;
+        begin
+            case (address)
+                RESULT, ERROR, CYCLES, ELEMENTS, VERSION, CAP, QUEUE_STATUS,
+                DMA_ERROR, PERF_TOTAL, PERF_DMA, PERF_COMPUTE, PERF_OVERLAP,
+                PERF_STALL, TILE_COMPLETED, SPAD_INFO, EVENT_STATUS,
+                PERF_MATRIX_CYCLES, PERF_MATRIX_MAC_CYCLES,
+                PERF_MATRIX_BANKED_STALL, PERF_DMA_READ_BYTES,
+                PERF_DMA_WRITE_BYTES, PERF_DMA_AR_COUNT, PERF_DMA_AW_COUNT,
+                PERF_DMA_RD_STATE, PERF_DMA_R_STALL, ABI_INFO, ERROR_INFO,
+                CAP2:
+                    is_read_only_address = 1'b1;
+                default:
+                    is_read_only_address = 1'b0;
+            endcase
+        end
+    endfunction
+
+    wire known = is_known_address(a);
+    wire readonly = is_read_only_address(a);
+    wire cfg_locked = (processor_busy || dma_busy) && reg_req_write &&
+                      !(a == STATUS || a == IRQ_STATUS ||
+                        a == DMA_STATUS || a == ABORT);
     assign cmdq_base={cmd_hi_r,cmd_base_r}; assign cmdq_size=cmd_size_r; assign cmdq_tail=cmd_tail_r;
     assign cplq_base=cpl_base_r; assign cplq_size=cpl_size_r; assign cplq_head=cpl_head_r;
     assign region0_base=r0b; assign region0_limit=r0l; assign region0_perm=r0p;

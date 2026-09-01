@@ -1,43 +1,58 @@
-# CIMForge A8 SpyGlass project, ASIC static-analysis profile.
+# NMAForge public SpyGlass project.
 #
-# The functional VCS profile intentionally uses rtl/memory/ai_scratchpad.v.
-# This SpyGlass profile instead uses the TSMC28 512-KiB macro wrapper and a
-# port-only SRAM declaration.  Static RTL analysis consequently checks the
-# integration logic without attempting to synthesize four huge behavioural
-# Verilog arrays.  The actual macro .db/.lib remains the authority for DC/STA.
+# The public profile uses the behavioural scratchpad model and a structural
+# memory threshold. Private foundry macro adapters and timing libraries are
+# intentionally excluded; they may be added from a local, ignored overlay.
 
 set_option top ai_accel_top
 set_option enableSV yes
 set_option allow_module_override yes
-# The 4-entry 128-bit DMA reorder buffer is 8192 bits.  This is a bounded
-# control/data array, unlike the old 512-KiB behavioural scratchpad, so raise
-# the structural threshold only above this real RTL object.
+# Keep bounded RTL data arrays analysable while preventing static tools from
+# expanding the 512-KiB behavioural scratchpad into a synthesized array.
 set_option mthresh 8193
 # This server has versioned GuideWare but no GuideWare/latest symlink.  Pin the
 # installed methodology so CLI batch runs do not silently select a missing one.
 set_option active_methodology "$SPYGLASS_HOME/GuideWare/2023.12/block/rtl_handoff"
 read_file -type verilog ../../rtl/control/axi_lite_reg_if.v
+read_file -type verilog ../../rtl/dma/ai_dma_burst_planner.v
+read_file -type verilog ../../rtl/dma/ai_dma_read_slot_tracker.v
+read_file -type verilog ../../rtl/dma/ai_dma_write_response_tracker.v
+read_file -type verilog ../../rtl/dma/ai_dma_spad_transfer_adapter.v
 read_file -type verilog ../../rtl/dma/ai_axi128_dma.v
 read_file -type verilog ../../rtl/memory/ai_spad_protection.v
 read_file -type verilog ../../rtl/memory/ai_spad_arbiter.v
 read_file -type verilog ../../rtl/compute/ai_tile_pipeline.v
 read_file -type verilog ../../rtl/control/ai_perf_monitor.v
+read_file -type verilog ../../rtl/control/ai_accel_opcode_decode.v
+read_file -type verilog ../../rtl/control/ai_descriptor_validator.v
+read_file -type verilog ../../rtl/control/ai_ring_pointer_next.v
 read_file -type verilog ../../rtl/control/ai_command_processor.v
 read_file -type verilog ../../rtl/compute/ai_bank_pe.v
 read_file -type verilog ../../rtl/compute/ai_bank_local_controller.v
 read_file -type verilog ../../rtl/compute/ai_banked_cnm_core.v
 read_file -type verilog ../../rtl/compute/ai_unsigned_divider.v
 read_file -type verilog ../../rtl/compute/ai_integer_sqrt.v
+read_file -type verilog ../../rtl/compute/ai_tensor_matrix_datapath.v
 read_file -type verilog ../../rtl/compute/ai_tensor_matrix_core.v
+read_file -type verilog ../../rtl/compute/ai_tensor_sfu_math.v
 read_file -type verilog ../../rtl/compute/ai_tensor_sfu_core.v
 read_file -type verilog ../../rtl/compute/ai_conv3x3_linebuffer_core.v
 read_file -type verilog ../../rtl/compute/ai_kv_cache_engine.v
-read_file -type verilog tsmc28_sram_macro_stub.v
-read_file -type verilog ../../syn/ai_scratchpad_28nm_macro.v
+read_file -type verilog ../../rtl/memory/ai_scratchpad.v
 read_file -type verilog ../../rtl/control/ai_desc_fetch.v
 read_file -type verilog ../../rtl/control/axi_desc_fetch.v
 read_file -type verilog ../../rtl/control/ai_completion_writer.v
 read_file -type verilog ../../rtl/control/ai_accel_regs.v
+read_file -type verilog ../../rtl/compute/ai_int8_datapath.v
 read_file -type verilog ../../rtl/compute/ai_int8_compute_core.v
+read_file -type verilog ../../rtl/top/ai_descriptor_source_mux.v
+read_file -type verilog ../../rtl/top/ai_accel_dma_request_mux.v
+read_file -type verilog ../../rtl/top/ai_accel_axi_master_router.v
+read_file -type verilog ../../rtl/top/ai_accel_axi_fabric.v
+read_file -type verilog ../../rtl/top/ai_spad_response_demux.v
+read_file -type verilog ../../rtl/top/ai_accel_spad_subsystem.v
+read_file -type verilog ../../rtl/top/ai_accel_memory_fabric.v
+read_file -type verilog ../../rtl/top/ai_accel_control_fabric.v
+read_file -type verilog ../../rtl/top/ai_accel_compute_cluster.v
 read_file -type verilog ../../rtl/top/ai_accel_top.v
 read_file -type sgdc a8_constraints.sgdc

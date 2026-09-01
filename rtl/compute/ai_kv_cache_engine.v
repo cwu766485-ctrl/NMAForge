@@ -19,42 +19,60 @@ module ai_kv_cache_engine(
     output reg [3:0] error_code, output reg [31:0] result,
     output reg [31:0] cycle_count, output reg [31:0] element_count
 );
-  localparam [7:0] OP_KV_WRITE=8'h43, OP_KV_READ=8'h44;
-  localparam [3:0] ERR_CONFIG=1, ERR_ABORT=3, ERR_SPAD=4, ERR_WATCHDOG=4;
-  localparam [2:0] IDLE=0, READ_REQ=1, READ_WAIT=2, WRITE=3, DONE=4, ERROR=5;
-  reg [2:0] state_r; reg write_r; reg [31:0] src_r,dst_r,cache_offset_r,watchdog_r;
-  reg [15:0] length_r,index_r; reg [31:0] data_r;
+  localparam [7:0] OP_KV_WRITE = 8'h43;
+  localparam [7:0] OP_KV_READ  = 8'h44;
+  localparam [3:0] ERR_CONFIG   = 4'd1;
+  localparam [3:0] ERR_ABORT    = 4'd3;
+  localparam [3:0] ERR_SPAD     = 4'd4;
+  localparam [3:0] ERR_WATCHDOG = 4'd4;
+
+  localparam [2:0] ST_IDLE      = 3'd0;
+  localparam [2:0] ST_READ_REQ  = 3'd1;
+  localparam [2:0] ST_READ_WAIT = 3'd2;
+  localparam [2:0] ST_WRITE     = 3'd3;
+  localparam [2:0] ST_DONE      = 3'd4;
+  localparam [2:0] ST_ERROR     = 3'd5;
+
+  reg [2:0] state_r;
+  reg write_r;
+  reg [31:0] src_r, dst_r, cache_offset_r, watchdog_r;
+  reg [15:0] length_r, index_r;
+  reg [31:0] data_r;
+  wire valid_operation = (op_mode == OP_KV_WRITE) || (op_mode == OP_KV_READ);
+  wire starts_kv_write = (op_mode == OP_KV_WRITE);
+  wire watchdog_expired = busy && watchdog_r != 0 &&
+                          cycle_count >= watchdog_r;
   wire [31:0] cache_addr = cache_offset_r + ({16'd0,index_r}<<2);
   wire [31:0] read_addr = write_r ? (src_r + ({16'd0,index_r}<<2)) : (src_r + cache_addr);
   wire [31:0] write_addr = write_r ? (dst_r + cache_addr) : (dst_r + ({16'd0,index_r}<<2));
   always @(*) begin
     spad_valid=0; spad_write=0; spad_addr=0; spad_wdata=data_r;
-    if(state_r==READ_REQ) begin spad_valid=1; spad_addr=read_addr; end
-    else if(state_r==WRITE) begin spad_valid=1; spad_write=1; spad_addr=write_addr; end
+    if(state_r==ST_READ_REQ) begin spad_valid=1; spad_addr=read_addr; end
+    else if(state_r==ST_WRITE) begin spad_valid=1; spad_write=1; spad_addr=write_addr; end
   end
   always @(posedge clk or negedge resetn) begin
-    if(!resetn) begin state_r<=IDLE; busy<=0; done<=0; error<=0; error_code<=0; result<=0; cycle_count<=0; element_count<=0; index_r<=0; end
+    if(!resetn) begin state_r<=ST_IDLE; busy<=0; done<=0; error<=0; error_code<=0; result<=0; cycle_count<=0; element_count<=0; index_r<=0; end
     else begin
       done<=0;
       if(busy) cycle_count<=cycle_count+1;
-      if((spad_error && busy) || (abort && busy)) begin error<=1; error_code<=abort?ERR_ABORT:ERR_SPAD; state_r<=ERROR; end
+      if((spad_error && busy) || (abort && busy)) begin error<=1; error_code<=abort?ERR_ABORT:ERR_SPAD; state_r<=ST_ERROR; end
       else case(state_r)
-        IDLE: begin busy<=0; error<=0; error_code<=0; if(start) begin
-          if(length==0 || (op_mode!=OP_KV_WRITE && op_mode!=OP_KV_READ)) begin error<=1; error_code<=ERR_CONFIG; state_r<=ERROR; end
-          else begin busy<=1; write_r<=op_mode==OP_KV_WRITE; src_r<=src0_base; dst_r<=dst_base;
+        ST_IDLE: begin busy<=0; error<=0; error_code<=0; if(start) begin
+          if(length==0 || !valid_operation) begin error<=1; error_code<=ERR_CONFIG; state_r<=ST_ERROR; end
+          else begin busy<=1; write_r<=starts_kv_write; src_r<=src0_base; dst_r<=dst_base;
             cache_offset_r <= (aux0[15:0]*src0_stride) + (aux0[31:16]*src1_stride);
-            length_r<=length; index_r<=0; result<=0; cycle_count<=0; element_count<=0; watchdog_r<=watchdog_limit; state_r<=READ_REQ; end
+            length_r<=length; index_r<=0; result<=0; cycle_count<=0; element_count<=0; watchdog_r<=watchdog_limit; state_r<=ST_READ_REQ; end
         end end
-        READ_REQ: if(spad_ready) state_r<=READ_WAIT;
-        READ_WAIT: if(spad_rsp_valid) begin data_r<=spad_rdata; state_r<=WRITE; end
-        WRITE: if(spad_ready) begin
+        ST_READ_REQ: if(spad_ready) state_r<=ST_READ_WAIT;
+        ST_READ_WAIT: if(spad_rsp_valid) begin data_r<=spad_rdata; state_r<=ST_WRITE; end
+        ST_WRITE: if(spad_ready) begin
           result<=data_r; element_count<=element_count+1;
-          if(index_r+1>=length_r) state_r<=DONE; else begin index_r<=index_r+1; state_r<=READ_REQ; end
+          if(index_r+1>=length_r) state_r<=ST_DONE; else begin index_r<=index_r+1; state_r<=ST_READ_REQ; end
         end
-        DONE: begin busy<=0; done<=1; state_r<=IDLE; end
-        ERROR: begin busy<=0; done<=1; state_r<=IDLE; end
+        ST_DONE: begin busy<=0; done<=1; state_r<=ST_IDLE; end
+        ST_ERROR: begin busy<=0; done<=1; state_r<=ST_IDLE; end
       endcase
-      if(busy && watchdog_r!=0 && cycle_count>=watchdog_r) begin error<=1; error_code<=ERR_WATCHDOG; state_r<=ERROR; end
+      if(watchdog_expired) begin error<=1; error_code<=ERR_WATCHDOG; state_r<=ST_ERROR; end
     end
   end
 endmodule

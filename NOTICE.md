@@ -1,43 +1,17 @@
-# Source and Copyright Notice
+# NMAForge public-distribution notice
 
-## Project name
+The public NMAForge snapshot contains project RTL, verification source,
+software and documentation authored for this accelerator project. It does not
+include foundry PDK content, SRAM macro implementation models, vendor board
+schematics/projects, tool licenses, credentials or generated EDA deliverables.
 
-AHB-Lite SRAM Vector Accelerator
+The historical AHB teaching baseline that preceded this accelerator is not part
+of the active NMAForge source tree and must not be used as evidence of current
+product ownership or functionality.
 
-## Upstream source
+No open-source license is granted by this notice. Until the project owner adds
+an explicit `LICENSE`, public viewers may inspect the repository but may not
+assume redistribution, modification or commercial-use permission.
 
-This repository is an educational derivative of:
-
-- `wbbbbbb123/Sram-controller-design-based-on-AHB-bus`
-- https://github.com/wbbbbbb123/Sram-controller-design-based-on-AHB-bus
-
-The upstream repository did not declare an open-source license when this notice
-was prepared. This repository therefore does not claim ownership of, or grant a
-license for, upstream material.
-
-## Third-party notices
-
-The following verification files retain explicit copyright notices belonging to
-`www.eecourse.com Ltd`:
-
-- `verif/agent/ahb/ahb_slv_driver.sv`
-- `verif/agent/ahb/ahb_slv_driver_base.sv`
-- `verif/agent/ahb/ahb_slv_if.sv`
-
-Do not remove those notices. Permission from the corresponding rights holder may
-be required before redistribution outside the GitHub fork/educational context.
-
-## Repository additions
-
-The vector accelerator RTL, additional protocol handling, verification
-extensions, SVA, regression scripts, synthesis sanity scripts, and project
-documentation were developed as educational extensions in this repository.
-
-No license is granted for third-party or upstream material by this notice.
-
-## Excluded material
-
-Third-party PDF specifications, course documents, memory datasheets, private
-interview notes, credentials, and machine-specific paths are intentionally
-excluded from the public repository.
-
+If a third-party component is introduced in the future, retain its copyright
+notice and add its license/attribution before publishing it.

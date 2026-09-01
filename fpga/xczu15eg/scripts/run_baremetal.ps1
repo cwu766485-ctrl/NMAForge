@@ -1,9 +1,13 @@
 param(
-    [string]$Xsct = 'D:\Xilinx\Vitis\2024.1\bin\xsct.bat',
+    [string]$Xsct = $env:XSCT,
     [string]$Port = 'COM11',
     [int]$Baud = 115200,
     [int]$TimeoutSeconds = 90
 )
+
+if (!$Xsct) {
+    $Xsct = (Get-Command xsct -ErrorAction Stop).Source
+}
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $fpgaDir = Split-Path -Parent $scriptDir

@@ -63,30 +63,58 @@ module ai_tensor_sfu_core(
     // index; score columns greater than that index are causally masked.
     localparam [7:0] OP_CAUSAL_SOFTMAX_Q15 = 8'h39;
 
-    localparam [3:0] ERR_CONFIG=4'd1, ERR_OP=4'd2, ERR_ABORT=4'd3,
-                     ERR_WATCHDOG=4'd4, ERR_PARITY=4'd5,
-                     ERR_PROTECTION=4'd6, ERR_NUMERIC=4'd11;
+    localparam [3:0] ERR_CONFIG     = 4'd1;
+    localparam [3:0] ERR_OP         = 4'd2;
+    localparam [3:0] ERR_ABORT      = 4'd3;
+    localparam [3:0] ERR_WATCHDOG   = 4'd4;
+    localparam [3:0] ERR_PARITY     = 4'd5;
+    localparam [3:0] ERR_PROTECTION = 4'd6;
+    localparam [3:0] ERR_NUMERIC    = 4'd11;
 
-    localparam [5:0] ST_IDLE=6'd0,
-        ST_SM_MAX_REQ=6'd1, ST_SM_MAX_WAIT=6'd2,
-        ST_SM_SUM_REQ=6'd3, ST_SM_SUM_WAIT=6'd4,
-        ST_SM_OUT_REQ=6'd5, ST_SM_OUT_WAIT=6'd6,
-        ST_SM_DIV_START=6'd7, ST_SM_DIV_WAIT=6'd8, ST_SM_WRITE=6'd9,
-        ST_RMS_SUM_REQ=6'd10, ST_RMS_SUM_WAIT=6'd11,
-        ST_RMS_MEAN_DIV_START=6'd12, ST_RMS_MEAN_DIV_WAIT=6'd13,
-        ST_RMS_SQRT_START=6'd14, ST_RMS_SQRT_WAIT=6'd15,
-        ST_RMS_INV_START=6'd16, ST_RMS_INV_WAIT=6'd17,
-        ST_RMS_X_REQ=6'd18, ST_RMS_X_WAIT=6'd19,
-        ST_RMS_G_REQ=6'd20, ST_RMS_G_WAIT=6'd21, ST_RMS_WRITE=6'd22,
-        ST_VEC_A_REQ=6'd23, ST_VEC_A_WAIT=6'd24,
-        ST_VEC_B_REQ=6'd25, ST_VEC_B_WAIT=6'd26, ST_VEC_WRITE=6'd27,
-        ST_DONE=6'd28, ST_ERROR=6'd29,
-        ST_VEC_PREP=6'd30, ST_VEC_POST=6'd31,
-        ST_LN_SUM_REQ=6'd32, ST_LN_SUM_WAIT=6'd33,
-        ST_LN_MEAN_START=6'd34, ST_LN_MEAN_WAIT=6'd35,
-        ST_LN_VAR_REQ=6'd36, ST_LN_VAR_WAIT=6'd37,
-        ST_LN_VAR_ACC=6'd38, ST_LN_B_REQ=6'd39,
-        ST_LN_B_WAIT=6'd40;
+    // Each memory request state has an explicit response wait state.  The
+    // divider and square-root start/wait pairs keep their iterative latency
+    // outside the scratchpad request path.
+    localparam [5:0] ST_IDLE               = 6'd0;
+    localparam [5:0] ST_SM_MAX_REQ         = 6'd1;
+    localparam [5:0] ST_SM_MAX_WAIT        = 6'd2;
+    localparam [5:0] ST_SM_SUM_REQ         = 6'd3;
+    localparam [5:0] ST_SM_SUM_WAIT        = 6'd4;
+    localparam [5:0] ST_SM_OUT_REQ         = 6'd5;
+    localparam [5:0] ST_SM_OUT_WAIT        = 6'd6;
+    localparam [5:0] ST_SM_DIV_START       = 6'd7;
+    localparam [5:0] ST_SM_DIV_WAIT        = 6'd8;
+    localparam [5:0] ST_SM_WRITE           = 6'd9;
+    localparam [5:0] ST_RMS_SUM_REQ        = 6'd10;
+    localparam [5:0] ST_RMS_SUM_WAIT       = 6'd11;
+    localparam [5:0] ST_RMS_MEAN_DIV_START = 6'd12;
+    localparam [5:0] ST_RMS_MEAN_DIV_WAIT  = 6'd13;
+    localparam [5:0] ST_RMS_SQRT_START     = 6'd14;
+    localparam [5:0] ST_RMS_SQRT_WAIT      = 6'd15;
+    localparam [5:0] ST_RMS_INV_START      = 6'd16;
+    localparam [5:0] ST_RMS_INV_WAIT       = 6'd17;
+    localparam [5:0] ST_RMS_X_REQ          = 6'd18;
+    localparam [5:0] ST_RMS_X_WAIT         = 6'd19;
+    localparam [5:0] ST_RMS_G_REQ          = 6'd20;
+    localparam [5:0] ST_RMS_G_WAIT         = 6'd21;
+    localparam [5:0] ST_RMS_WRITE          = 6'd22;
+    localparam [5:0] ST_VEC_A_REQ          = 6'd23;
+    localparam [5:0] ST_VEC_A_WAIT         = 6'd24;
+    localparam [5:0] ST_VEC_B_REQ          = 6'd25;
+    localparam [5:0] ST_VEC_B_WAIT         = 6'd26;
+    localparam [5:0] ST_VEC_WRITE          = 6'd27;
+    localparam [5:0] ST_DONE               = 6'd28;
+    localparam [5:0] ST_ERROR              = 6'd29;
+    localparam [5:0] ST_VEC_PREP           = 6'd30;
+    localparam [5:0] ST_VEC_POST           = 6'd31;
+    localparam [5:0] ST_LN_SUM_REQ         = 6'd32;
+    localparam [5:0] ST_LN_SUM_WAIT        = 6'd33;
+    localparam [5:0] ST_LN_MEAN_START      = 6'd34;
+    localparam [5:0] ST_LN_MEAN_WAIT       = 6'd35;
+    localparam [5:0] ST_LN_VAR_REQ         = 6'd36;
+    localparam [5:0] ST_LN_VAR_WAIT        = 6'd37;
+    localparam [5:0] ST_LN_VAR_ACC         = 6'd38;
+    localparam [5:0] ST_LN_B_REQ           = 6'd39;
+    localparam [5:0] ST_LN_B_WAIT          = 6'd40;
 
     reg [5:0] state_r;
     reg [7:0] op_r;
@@ -120,6 +148,28 @@ module ai_tensor_sfu_core(
     wire signed [31:0] spad_signed = spad_rdata;
     wire causal_masked = (op_r == OP_CAUSAL_SOFTMAX_Q15) &&
                          (index_r > epsilon_r[15:0]);
+    wire valid_operation = (op_mode == OP_SOFTMAX_Q15) ||
+                           (op_mode == OP_CAUSAL_SOFTMAX_Q15) ||
+                           (op_mode == OP_RMSNORM_Q15) ||
+                           (op_mode == OP_LAYERNORM_Q15) ||
+                           (op_mode == OP_RESIDUAL_I32) ||
+                           (op_mode == OP_GELU_Q8_8) ||
+                           (op_mode == OP_REQUANT_I8) ||
+                           (op_mode == OP_SILU_Q8_8);
+    // Admission-time checks deliberately use live inputs; all execution-time
+    // decisions below use the latched *_r command snapshot.
+    wire input_alignment_error = (|src0_base[1:0]) || (|dst_base[1:0]) ||
+                                 (((op_mode == OP_RESIDUAL_I32) ||
+                                   (op_mode == OP_RMSNORM_Q15) ||
+                                   (op_mode == OP_LAYERNORM_Q15)) &&
+                                  (src1_base != 0) && (|src1_base[1:0])) ||
+                                 ((op_mode == OP_LAYERNORM_Q15) && beta_enable &&
+                                  (|beta_base[1:0]));
+    wire last_element = (index_r == length_r - 1'b1);
+    wire is_layernorm = (op_r == OP_LAYERNORM_Q15);
+    wire is_normalization = (op_r == OP_RMSNORM_Q15) || is_layernorm;
+    wire watchdog_expired = busy && (watchdog_limit_r != 0) &&
+                              (cycle_count >= watchdog_limit_r);
 
     ai_unsigned_divider #(.WIDTH(64)) divider_u(
         .clk(clk), .resetn(resetn), .start(div_start_r),
@@ -134,81 +184,29 @@ module ai_tensor_sfu_core(
         .done(sqrt_done), .root(sqrt_root)
     );
 
-    function [31:0] exp2_q15;
-        input signed [31:0] delta_q8_8;
-        reg [31:0] magnitude;
-        reg [7:0] fraction;
-        reg [7:0] integer_part;
-        reg [31:0] base_value, next_value;
-        begin
-            if (delta_q8_8>=0)
-                exp2_q15=32'd32768;
-            else begin
-                magnitude=-delta_q8_8;
-                integer_part=magnitude[15:8];
-                fraction=magnitude[7:0];
-                if (integer_part>=8'd15)
-                    exp2_q15=0;
-                else begin
-                    base_value=32'd32768>>integer_part;
-                    next_value=base_value>>1;
-                    exp2_q15=base_value-(((base_value-next_value)*fraction)>>8);
-                end
-            end
-        end
-    endfunction
+    // All fixed-point arithmetic remains combinational.  The surrounding
+    // FSM still samples these results at the original SPAD/divider boundaries.
+    wire [31:0] softmax_exp_q15;
+    wire [31:0] requant_spad;
+    wire [31:0] residual_output;
+    wire [31:0] gamma_scaled_output;
+    wire [31:0] normalization_output;
+    wire [31:0] gelu_output;
+    wire [31:0] silu_output;
 
-    function [31:0] clamp_i32;
-        input signed [63:0] value;
-        begin
-            if (value>64'sh0000_0000_7fff_ffff) clamp_i32=32'h7fff_ffff;
-            else if (value<-64'sd2147483648) clamp_i32=32'h8000_0000;
-            else clamp_i32=value[31:0];
-        end
-    endfunction
-
-    function [31:0] gelu_piecewise_q8_8;
-        input signed [31:0] value;
-        reg signed [63:0] product_value;
-        begin
-            if (value<=-32'sd512) gelu_piecewise_q8_8=0;
-            else if (value>=32'sd512) gelu_piecewise_q8_8=value;
-            else begin
-                product_value=value*(value+32'sd512);
-                gelu_piecewise_q8_8=clamp_i32(product_value>>>10);
-            end
-        end
-    endfunction
-
-    function [31:0] silu_piecewise_q8_8;
-        input signed [31:0] value;
-        reg signed [63:0] product_value;
-        begin
-            if (value<=-32'sd768) silu_piecewise_q8_8=0;
-            else if (value>=32'sd768) silu_piecewise_q8_8=value;
-            else begin
-                product_value=value*(value+32'sd768);
-                silu_piecewise_q8_8=clamp_i32(product_value/64'sd1536);
-            end
-        end
-    endfunction
-
-    function [31:0] requant_i8;
-        input signed [31:0] value;
-        reg signed [31:0] shifted;
-        begin
-            shifted=value>>>scale_shift_r;
-            if (shifted>127) requant_i8=32'h0000_007f;
-            else if (shifted<-128) requant_i8=32'hffff_ff80;
-            else requant_i8={{24{shifted[7]}},shifted[7:0]};
-        end
-    endfunction
-
-    wire [31:0] requant_spad = requant_i8(spad_signed);
-    wire signed [63:0] residual_sum = $signed(x_r)+$signed(gamma_r);
-    wire signed [63:0] residual_shifted = residual_sum>>>scale_shift_r;
-    wire signed [63:0] rms_scaled = ($signed(x_r)*$signed(inv_rms_r))>>>30;
-    wire signed [63:0] norm_with_beta = rms_scaled + $signed(beta_r);
+    ai_tensor_sfu_math math_u(
+        .softmax_delta_q8_8(spad_signed - max_r),
+        .requant_value(spad_signed), .requant_shift(scale_shift_r),
+        .residual_x(x_r), .residual_y(gamma_r), .residual_shift(scale_shift_r),
+        .gamma_x(x_r), .gamma(gamma_r), .norm_x(x_r),
+        .norm_inv_rms(inv_rms_r), .norm_beta(beta_r),
+        .norm_add_beta(is_layernorm), .gelu_product(vector_product_r),
+        .silu_product(vector_product_r), .softmax_exp_q15(softmax_exp_q15),
+        .requant_i8_value(requant_spad), .residual_value(residual_output),
+        .gamma_scaled_value(gamma_scaled_output),
+        .normalization_value(normalization_output),
+        .gelu_q8_8_value(gelu_output), .silu_q8_8_value(silu_output)
+    );
 
     always @(*) begin
         spad_valid=1'b0; spad_write=1'b0; spad_addr=0; spad_wdata=output_word_r;
@@ -242,7 +240,7 @@ module ai_tensor_sfu_core(
             if (busy) cycle_count<=cycle_count+1'b1;
 
             if (busy && abort) begin error_code<=ERR_ABORT; state_r<=ST_ERROR; end
-            else if (busy && watchdog_limit_r!=0 && cycle_count>=watchdog_limit_r) begin
+            else if (watchdog_expired) begin
                 error_code<=ERR_WATCHDOG; state_r<=ST_ERROR;
             end else case (state_r)
                 ST_IDLE: begin
@@ -258,11 +256,10 @@ module ai_tensor_sfu_core(
                         max_r<=32'sh8000_0000; sum_exp_r<=0; sum_sq_r<=0; sum_x_r<=0;
                         mean_r<=0; beta_r<=0; pack_word_r<=0;
                         rms_normalize_phase_r<=0;
-                        if (length==0 || |src0_base[1:0] || |dst_base[1:0] ||
-                            ((op_mode==OP_RESIDUAL_I32 || op_mode==OP_RMSNORM_Q15 ||
-                              op_mode==OP_LAYERNORM_Q15) && src1_base!=0 && |src1_base[1:0]) ||
-                            (op_mode==OP_LAYERNORM_Q15 && beta_enable && |beta_base[1:0])) begin
+                        if (length==0 || input_alignment_error) begin
                             error_code<=ERR_CONFIG; state_r<=ST_ERROR;
+                        end else if (!valid_operation) begin
+                            error_code<=ERR_OP; state_r<=ST_ERROR;
                         end else case (op_mode)
                             OP_SOFTMAX_Q15,OP_CAUSAL_SOFTMAX_Q15: state_r<=ST_SM_MAX_REQ;
                             OP_RMSNORM_Q15: state_r<=ST_RMS_SUM_REQ;
@@ -282,7 +279,7 @@ module ai_tensor_sfu_core(
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end
                     else begin
                         if (!causal_masked && spad_signed>max_r) max_r<=spad_signed;
-                        if (index_r==length_r-1'b1) begin index_r<=0; sum_exp_r<=0; state_r<=ST_SM_SUM_REQ; end
+                        if (last_element) begin index_r<=0; sum_exp_r<=0; state_r<=ST_SM_SUM_REQ; end
                         else begin index_r<=index_r+1'b1; state_r<=ST_SM_MAX_REQ; end
                     end
                 end
@@ -294,8 +291,8 @@ module ai_tensor_sfu_core(
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end
                     else begin
                         if (!causal_masked)
-                            sum_exp_r<=sum_exp_r+exp2_q15(spad_signed-max_r);
-                        if (index_r==length_r-1'b1) begin index_r<=0; state_r<=ST_SM_OUT_REQ; end
+                            sum_exp_r <= sum_exp_r + softmax_exp_q15;
+                        if (last_element) begin index_r<=0; state_r<=ST_SM_OUT_REQ; end
                         else begin index_r<=index_r+1'b1; state_r<=ST_SM_SUM_REQ; end
                     end
                 end
@@ -306,7 +303,7 @@ module ai_tensor_sfu_core(
                 ST_SM_OUT_WAIT: if (spad_rsp_valid) begin
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end
                     else if (causal_masked) begin output_word_r<=32'd0; state_r<=ST_SM_WRITE; end
-                    else begin exp_r<=exp2_q15(spad_signed-max_r); state_r<=ST_SM_DIV_START; end
+                    else begin exp_r <= softmax_exp_q15; state_r <= ST_SM_DIV_START; end
                 end
                 ST_SM_DIV_START: begin
                     if (sum_exp_r==0) begin error_code<=ERR_NUMERIC; state_r<=ST_ERROR; end
@@ -326,7 +323,7 @@ module ai_tensor_sfu_core(
                     if (spad_protection_error) begin error_code<=ERR_PROTECTION; state_r<=ST_ERROR; end
                     else begin
                         result<=output_word_r; element_count<=element_count+1'b1;
-                        if (index_r==length_r-1'b1) state_r<=ST_DONE;
+                        if (last_element) state_r<=ST_DONE;
                         else begin index_r<=index_r+1'b1; state_r<=ST_SM_OUT_REQ; end
                     end
                 end
@@ -373,10 +370,10 @@ module ai_tensor_sfu_core(
                 ST_RMS_X_WAIT: if (spad_rsp_valid) begin
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end
                     else begin
-                        x_r<=(op_r==OP_LAYERNORM_Q15) ? spad_signed-mean_r : spad_signed;
+                        x_r<=is_layernorm ? spad_signed-mean_r : spad_signed;
                         if (src1_r==0) begin
                             gamma_r<=32'sd32768;
-                            state_r<=(op_r==OP_LAYERNORM_Q15 && beta_enable_r) ?
+                            state_r<=(is_layernorm && beta_enable_r) ?
                                     ST_LN_B_REQ : ST_RMS_WRITE;
                         end
                         else state_r<=ST_RMS_G_REQ;
@@ -390,13 +387,13 @@ module ai_tensor_sfu_core(
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end
                     else begin
                         gamma_r<=spad_signed;
-                        state_r<=(op_r==OP_LAYERNORM_Q15 && beta_enable_r) ?
+                        state_r<=(is_layernorm && beta_enable_r) ?
                                 ST_LN_B_REQ : ST_RMS_WRITE;
                     end
                 end
                 ST_RMS_WRITE: begin
                     if (op_r==OP_RESIDUAL_I32) begin
-                        output_word_r<=clamp_i32(residual_shifted);
+                        output_word_r <= residual_output;
                         state_r<=ST_VEC_WRITE;
                     end else if (!rms_normalize_phase_r) begin
                         vector_product_r<=$signed(x_r)*$signed(x_r);
@@ -405,7 +402,7 @@ module ai_tensor_sfu_core(
                         // Saturating the post-gamma intermediate to INT32 is
                         // both the A3 numeric contract and a clean pipeline
                         // cut before reciprocal scaling.
-                        x_r<=clamp_i32(($signed(x_r)*$signed(gamma_r))>>>15);
+                        x_r <= gamma_scaled_output;
                         state_r<=ST_VEC_POST;
                     end
                 end
@@ -446,7 +443,7 @@ module ai_tensor_sfu_core(
                                   end
                                 endcase
                                 if (index_r[1:0]==2'd3 ||
-                                    index_r==length_r-1'b1)
+                                    last_element)
                                     state_r<=ST_VEC_WRITE;
                                 else begin
                                     index_r<=index_r+1'b1;
@@ -473,25 +470,23 @@ module ai_tensor_sfu_core(
                     state_r<=ST_VEC_POST;
                 end
                 ST_VEC_POST: begin
-                    if (op_r==OP_RMSNORM_Q15 || op_r==OP_LAYERNORM_Q15) begin
+                    if (is_normalization) begin
                         if (!rms_normalize_phase_r) begin
                             sum_sq_r<=sum_sq_r+vector_product_r;
-                            if (index_r==length_r-1'b1) begin
+                            if (last_element) begin
                                 index_r<=0; state_r<=ST_RMS_MEAN_DIV_START;
                             end else begin
                                 index_r<=index_r+1'b1;
-                                state_r<=(op_r==OP_LAYERNORM_Q15) ?
+                                state_r<=is_layernorm ?
                                         ST_LN_VAR_REQ : ST_RMS_SUM_REQ;
                             end
                         end else begin
-                            output_word_r<=clamp_i32(op_r==OP_LAYERNORM_Q15 ?
-                                                   norm_with_beta : rms_scaled);
+                            output_word_r <= normalization_output;
                             state_r<=ST_VEC_WRITE;
                         end
                     end else begin
-                        output_word_r <= (op_r==OP_GELU_Q8_8) ?
-                            clamp_i32(vector_product_r>>>10) :
-                            clamp_i32(vector_product_r/64'sd1536);
+                        output_word_r <= (op_r == OP_GELU_Q8_8) ?
+                                         gelu_output : silu_output;
                         state_r<=ST_VEC_WRITE;
                     end
                 end
@@ -504,10 +499,9 @@ module ai_tensor_sfu_core(
                              ({30'd0,index_r[1:0]} + 32'd1) : 32'd1);
                         if (packed_requant)
                             pack_word_r<=0;
-                        if (index_r==length_r-1'b1) state_r<=ST_DONE;
+                        if (last_element) state_r<=ST_DONE;
                         else begin index_r<=index_r+1'b1;
-                            state_r<=((op_r==OP_RMSNORM_Q15) ||
-                                      (op_r==OP_LAYERNORM_Q15)) ? ST_RMS_X_REQ : ST_VEC_A_REQ;
+                            state_r<=is_normalization ? ST_RMS_X_REQ : ST_VEC_A_REQ;
                         end
                     end
                 end
@@ -520,7 +514,7 @@ module ai_tensor_sfu_core(
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end
                     else begin
                         sum_x_r<=sum_x_r+{{32{spad_signed[31]}},spad_signed};
-                        if (index_r==length_r-1'b1) begin index_r<=0; state_r<=ST_LN_MEAN_START; end
+                        if (last_element) begin index_r<=0; state_r<=ST_LN_MEAN_START; end
                         else begin index_r<=index_r+1'b1; state_r<=ST_LN_SUM_REQ; end
                     end
                 end

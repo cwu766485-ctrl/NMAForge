@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 
-// Unified payload DMA for the CIMForge AI accelerator.
+// Unified payload DMA for the NMAForge AI accelerator.
 //
 // The external data path is 128-bit AXI4.  Reads use IDs 1..4 and a per-ID
 // burst buffer, so completed bursts may return out of order.  Writes use IDs
@@ -38,20 +38,20 @@ module ai_axi128_dma #(
     output reg          error,
     output reg  [3:0]   error_code,
 
-    output reg          spad_valid,
-    output reg          spad_write,
-    output reg  [31:0]  spad_addr_o,
-    output reg  [31:0]  spad_wdata,
+    output wire         spad_valid,
+    output wire         spad_write,
+    output wire [31:0]  spad_addr_o,
+    output wire [31:0]  spad_wdata,
     input  wire         spad_ready,
     input  wire         spad_rsp_valid,
     input  wire [31:0]  spad_rdata,
     input  wire         spad_req_error,
     input  wire         spad_rsp_error,
-    output reg          spad_line_valid,
-    output reg          spad_line_write,
-    output reg  [31:0]  spad_line_addr,
-    output reg  [127:0] spad_line_wdata,
-    output reg  [15:0]  spad_line_wstrb,
+    output wire         spad_line_valid,
+    output wire         spad_line_write,
+    output wire [31:0]  spad_line_addr,
+    output wire [127:0] spad_line_wdata,
+    output wire [15:0]  spad_line_wstrb,
     input  wire         spad_line_ready,
     input  wire         spad_line_rsp_valid,
     input  wire [127:0] spad_line_rdata,
@@ -99,6 +99,13 @@ module ai_axi128_dma #(
     localparam [2:0] AXI_SIZE_128 = 3'd4;
     localparam [1:0] AXI_BURST_INCR = 2'b01;
     localparam [1:0] AXI_RESP_OKAY = 2'b00;
+    // Read and write IDs use separate four-entry windows.  Keep the windows
+    // named because response-ID decoding is part of the DMA correctness
+    // contract, especially while abort drains accepted transactions.
+    localparam [3:0] READ_ID_FIRST  = 4'd1;
+    localparam [3:0] READ_ID_LAST   = 4'd4;
+    localparam [3:0] WRITE_ID_FIRST = 4'd8;
+    localparam [3:0] WRITE_ID_LAST  = 4'd11;
     localparam [3:0] ERR_NONE=0, ERR_CONFIG=1, ERR_AXI_RD=2,
                      ERR_AXI_WR=3, ERR_SPAD=4, ERR_ABORT=5;
     localparam [3:0] ST_IDLE=0, ST_READ=1, ST_WRITE_PLAN=2,
@@ -152,30 +159,22 @@ module ai_axi128_dma #(
     reg [1:0]  wr_active_tag_r;
 
     integer i;
-    reg [2:0] rd_count_comb;
-    reg [1:0] rd_free_slot_comb, rd_drain_slot_comb;
-    reg rd_free_found_comb, rd_drain_found_comb;
-    reg [1:0] rd_rid_index_comb;
-    reg rid_is_dma_comb;
-    reg [1:0] wr_bid_index_comb, wr_free_tag_comb;
-    reg bid_is_dma_comb, wr_free_found_comb;
-    reg [8:0] boundary_beats_comb;
-    reg [15:0] remaining_beats_comb;
-    reg [4:0] plan_beats_comb;
-    reg [15:0] plan_words_comb;
-    reg [31:0] plan_bytes_comb;
-    reg plan_wide_comb;
-    reg [15:0] rd_drain_word_comb;
-    reg [4:0] rd_drain_beat_comb;
-    reg [1:0] rd_drain_lane_comb;
-    reg [127:0] rd_drain_data_comb;
+    wire [2:0] rd_count_comb;
+    wire [1:0] rd_free_slot_comb, rd_drain_slot_comb;
+    wire rd_free_found_comb, rd_drain_found_comb;
+    wire [1:0] rd_rid_index_comb;
+    wire rid_is_dma_comb;
+    wire [1:0] wr_bid_index_comb, wr_free_tag_comb;
+    wire bid_is_dma_comb, wr_free_found_comb;
+    wire        plan_wide_comb;
+    wire [4:0]  plan_beats_comb;
+    wire [15:0] plan_words_comb;
+    wire [31:0] plan_bytes_comb;
+    wire [4:0]  rd_drain_beat_comb;
+    wire [127:0] rd_drain_data_comb;
     reg [15:0] final_write_strobe_comb;
-    reg [15:0] rd_drain_words_left_comb;
-    reg [31:0] rd_drain_spad_addr_comb;
-    reg rd_drain_line_comb;
-    reg [15:0] wr_gather_words_left_comb;
-    reg [31:0] wr_gather_spad_addr_comb;
-    reg wr_gather_line_comb;
+    wire rd_drain_line_comb;
+    wire wr_gather_line_comb;
 
     wire ar_fire = m_axi_arvalid && m_axi_arready;
     wire r_fire = m_axi_rvalid && m_axi_rready;
@@ -184,88 +183,63 @@ module ai_axi128_dma #(
     wire b_fire = m_axi_bvalid && m_axi_bready;
     wire wlast_fire = w_fire && m_axi_wlast;
 
+    // Keep 4-KiB, narrow-beat and 128-bit burst planning separate from the
+    // DMA lifecycle FSM.  This instance is purely combinational.
+    ai_dma_burst_planner #(
+        .MAX_BURST_BEATS(MAX_BURST_BEATS),
+        .AXI_ADDR_WIDTH(AXI_ADDR_WIDTH)
+    ) burst_planner_u(
+        .ext_addr(plan_ext_r), .remaining_words(plan_remaining_r),
+        .plan_wide(plan_wide_comb), .plan_beats(plan_beats_comb),
+        .plan_words(plan_words_comb), .plan_bytes(plan_bytes_comb)
+    );
+
+    // Slot ownership and response-tag selection are purely combinational.
+    // The state machine below remains the only writer of slot metadata.
+    ai_dma_read_slot_tracker #(
+        .MAX_OUTSTANDING(MAX_OUTSTANDING),
+        .READ_ID_FIRST(READ_ID_FIRST), .READ_ID_LAST(READ_ID_LAST)
+    ) read_slot_tracker_u(
+        .rd_slot_valid(rd_slot_valid_r), .rd_slot_complete(rd_slot_complete_r),
+        .m_axi_rid(m_axi_rid), .rd_count(rd_count_comb),
+        .rd_free_slot(rd_free_slot_comb), .rd_free_found(rd_free_found_comb),
+        .rd_drain_slot(rd_drain_slot_comb), .rd_drain_found(rd_drain_found_comb),
+        .rd_rid_index(rd_rid_index_comb), .rid_is_dma(rid_is_dma_comb)
+    );
+    ai_dma_write_response_tracker #(
+        .WRITE_ID_FIRST(WRITE_ID_FIRST), .WRITE_ID_LAST(WRITE_ID_LAST)
+    ) write_response_tracker_u(
+        .wr_pending_b(wr_pending_b_r), .m_axi_bid(m_axi_bid),
+        .wr_bid_index(wr_bid_index_comb), .bid_is_dma(bid_is_dma_comb),
+        .wr_free_tag(wr_free_tag_comb), .wr_free_found(wr_free_found_comb)
+    );
+
+    // Scratchpad request selection is stateless.  It is kept out of the
+    // lifecycle FSM so line/scalar transfer eligibility is locally visible.
+    assign rd_drain_data_comb = rd_data_r[
+        (rd_drain_slot_comb * MAX_BURST_BEATS) + rd_drain_beat_comb];
+    ai_dma_spad_transfer_adapter spad_transfer_adapter_u(
+        .read_active(state_r == ST_READ), .rd_drain_found(rd_drain_found_comb),
+        .rd_word_index(rd_slot_word_index_r[rd_drain_slot_comb]),
+        .rd_words(rd_slot_words_r[rd_drain_slot_comb]),
+        .rd_spad_base(rd_slot_spad_r[rd_drain_slot_comb]),
+        .rd_wide(rd_slot_wide_r[rd_drain_slot_comb]),
+        .rd_narrow_lane(rd_slot_narrow_lane_r[rd_drain_slot_comb]),
+        .rd_data(rd_drain_data_comb), .gather_need_index(gather_need_index_r),
+        .gather_wait_rsp(gather_wait_rsp_r), .gather_index_base(gather_index_base_r),
+        .gather_row_index(gather_row_index_r),
+        .write_gather_active(state_r == ST_WRITE_GATHER),
+        .wr_read_pending(wr_read_pending_r), .wr_burst_words(wr_burst_words_r),
+        .wr_word_index(wr_word_index_r), .wr_spad_base(plan_spad_r),
+        .rd_beat_index(rd_drain_beat_comb), .rd_line_eligible(rd_drain_line_comb),
+        .wr_line_eligible(wr_gather_line_comb),
+        .spad_valid(spad_valid), .spad_write(spad_write), .spad_addr(spad_addr_o),
+        .spad_wdata(spad_wdata), .spad_line_valid(spad_line_valid),
+        .spad_line_write(spad_line_write), .spad_line_addr(spad_line_addr),
+        .spad_line_wdata(spad_line_wdata), .spad_line_wstrb(spad_line_wstrb)
+    );
+
     always @(*) begin
-        rd_count_comb = 0;
-        rd_free_slot_comb = 0;
-        rd_free_found_comb = 0;
-        rd_drain_slot_comb = 0;
-        rd_drain_found_comb = 0;
-        for (i=0; i<4; i=i+1) begin
-            if (rd_slot_valid_r[i])
-                rd_count_comb = rd_count_comb + 1'b1;
-            if (!rd_slot_valid_r[i] && !rd_free_found_comb &&
-                i < MAX_OUTSTANDING) begin
-                rd_free_found_comb = 1'b1;
-                rd_free_slot_comb = i[1:0];
-            end
-            if (rd_slot_complete_r[i] && !rd_drain_found_comb) begin
-                rd_drain_found_comb = 1'b1;
-                rd_drain_slot_comb = i[1:0];
-            end
-        end
-
-        rid_is_dma_comb = (m_axi_rid >= 4'd1) && (m_axi_rid <= 4'd4);
-        rd_rid_index_comb = m_axi_rid - 4'd1;
-        bid_is_dma_comb = (m_axi_bid >= 4'd8) && (m_axi_bid <= 4'd11);
-        wr_bid_index_comb = m_axi_bid - 4'd8;
-
-        wr_free_tag_comb = 0;
-        wr_free_found_comb = 0;
-        for (i=0; i<4; i=i+1) begin
-            if (!wr_pending_b_r[i] && !wr_free_found_comb) begin
-                wr_free_found_comb = 1'b1;
-                wr_free_tag_comb = i[1:0];
-            end
-        end
-
-        // Word-aligned but non-line-aligned rows use short 32-bit alignment
-        // beats.  Once aligned, the planner switches to 128-bit bursts.
-        plan_wide_comb = (plan_ext_r[3:0] == 0);
-        boundary_beats_comb = (13'd4096 - {1'b0, plan_ext_r[11:0]}) >> 4;
-        remaining_beats_comb = (plan_remaining_r + 16'd3) >> 2;
-        if (!plan_wide_comb) begin
-            plan_beats_comb = 1;
-            plan_words_comb = 1;
-            plan_bytes_comb = 4;
-        end else begin
-            if (remaining_beats_comb > MAX_BURST_BEATS)
-                plan_beats_comb = MAX_BURST_BEATS;
-            else
-                plan_beats_comb = remaining_beats_comb[4:0];
-            if (boundary_beats_comb < plan_beats_comb)
-                plan_beats_comb = boundary_beats_comb[4:0];
-            if (plan_remaining_r < ({11'd0, plan_beats_comb} << 2))
-                plan_words_comb = plan_remaining_r;
-            else
-                plan_words_comb = ({11'd0, plan_beats_comb} << 2);
-            plan_bytes_comb = {27'd0, plan_beats_comb} << 4;
-        end
-
-        rd_drain_word_comb = rd_slot_word_index_r[rd_drain_slot_comb];
-        rd_drain_beat_comb = rd_drain_word_comb[15:2];
-        rd_drain_lane_comb = rd_slot_wide_r[rd_drain_slot_comb] ?
-                             rd_drain_word_comb[1:0] :
-                             rd_slot_narrow_lane_r[rd_drain_slot_comb];
-        rd_drain_data_comb =
-            rd_data_r[(rd_drain_slot_comb * MAX_BURST_BEATS) +
-                      rd_drain_beat_comb];
-        rd_drain_words_left_comb =
-            rd_slot_words_r[rd_drain_slot_comb] - rd_drain_word_comb;
-        rd_drain_spad_addr_comb =
-            rd_slot_spad_r[rd_drain_slot_comb] +
-            ({16'd0, rd_drain_word_comb} << 2);
-        rd_drain_line_comb = rd_drain_found_comb &&
-                             rd_drain_spad_addr_comb[3:0] == 0 &&
-                             rd_drain_word_comb[1:0] == 0 &&
-                             rd_drain_words_left_comb >= 4;
-        wr_gather_words_left_comb = wr_burst_words_r - wr_word_index_r;
-        wr_gather_spad_addr_comb =
-            plan_spad_r + ({16'd0, wr_word_index_r} << 2);
-        wr_gather_line_comb = state_r == ST_WRITE_GATHER &&
-                              wr_gather_spad_addr_comb[3:0] == 0 &&
-                              wr_word_index_r[1:0] == 0 &&
-                              wr_gather_words_left_comb >= 4;
-
         case (wr_burst_words_r[1:0])
           2'd1: final_write_strobe_comb = 16'h000f;
           2'd2: final_write_strobe_comb = 16'h00ff;
@@ -287,52 +261,6 @@ module ai_axi128_dma #(
                           wr_pending_b_r[wr_bid_index_comb];
     assign rd_outstanding = rd_count_comb;
     assign rd_highwater = rd_highwater_r;
-
-    always @(*) begin
-        spad_valid = 1'b0;
-        spad_write = 1'b0;
-        spad_addr_o = 0;
-        spad_wdata = 0;
-        spad_line_valid = 1'b0;
-        spad_line_write = 1'b0;
-        spad_line_addr = 0;
-        spad_line_wdata = 0;
-        spad_line_wstrb = 0;
-        if (state_r == ST_READ && rd_drain_line_comb) begin
-            spad_line_valid = 1'b1;
-            spad_line_write = 1'b1;
-            spad_line_addr = rd_drain_spad_addr_comb;
-            spad_line_wdata = rd_drain_data_comb;
-            spad_line_wstrb = 16'hffff;
-        end else if (state_r == ST_READ && rd_drain_found_comb) begin
-            spad_valid = 1'b1;
-            spad_write = 1'b1;
-            spad_addr_o = rd_slot_spad_r[rd_drain_slot_comb] +
-                          ({16'd0, rd_drain_word_comb} << 2);
-            case (rd_drain_lane_comb)
-              2'd0: spad_wdata = rd_drain_data_comb[31:0];
-              2'd1: spad_wdata = rd_drain_data_comb[63:32];
-              2'd2: spad_wdata = rd_drain_data_comb[95:64];
-              default: spad_wdata = rd_drain_data_comb[127:96];
-            endcase
-        end else if (state_r == ST_READ && gather_need_index_r &&
-                     !gather_wait_rsp_r) begin
-            spad_valid = 1'b1;
-            spad_write = 1'b0;
-            spad_addr_o = gather_index_base_r +
-                          ({16'd0, gather_row_index_r} << 2);
-        end else if (state_r == ST_WRITE_GATHER && !wr_read_pending_r) begin
-            if (wr_gather_line_comb) begin
-                spad_line_valid = 1'b1;
-                spad_line_write = 1'b0;
-                spad_line_addr = wr_gather_spad_addr_comb;
-            end else begin
-                spad_valid = 1'b1;
-                spad_write = 1'b0;
-                spad_addr_o = wr_gather_spad_addr_comb;
-            end
-        end
-    end
 
     always @(*) begin
         r_beat_bytes = 5'd16;
@@ -522,7 +450,7 @@ module ai_axi128_dma #(
               if (!m_axi_arvalid && !planner_done_r &&
                   !gather_need_index_r && !gather_wait_rsp_r &&
                   rd_free_found_comb && rd_count_comb < read_limit_r) begin
-                m_axi_arid <= 4'd1 + {2'd0, rd_free_slot_comb};
+                m_axi_arid <= READ_ID_FIRST + {2'd0, rd_free_slot_comb};
                 m_axi_araddr <= plan_ext_r;
                 m_axi_arlen <= plan_beats_comb - 1'b1;
                 m_axi_arsize <= plan_wide_comb ?
@@ -531,16 +459,16 @@ module ai_axi128_dma #(
               end
 
               if (ar_fire) begin
-                rd_slot_valid_r[m_axi_arid-1'b1] <= 1'b1;
-                rd_slot_complete_r[m_axi_arid-1'b1] <= 1'b0;
-                rd_slot_expected_r[m_axi_arid-1'b1] <= m_axi_arlen + 1'b1;
-                rd_slot_received_r[m_axi_arid-1'b1] <= 0;
-                rd_slot_words_r[m_axi_arid-1'b1] <= plan_words_comb;
-                rd_slot_word_index_r[m_axi_arid-1'b1] <= 0;
-                rd_slot_spad_r[m_axi_arid-1'b1] <= plan_spad_r;
-                rd_slot_wide_r[m_axi_arid-1'b1] <=
+                rd_slot_valid_r[m_axi_arid-READ_ID_FIRST] <= 1'b1;
+                rd_slot_complete_r[m_axi_arid-READ_ID_FIRST] <= 1'b0;
+                rd_slot_expected_r[m_axi_arid-READ_ID_FIRST] <= m_axi_arlen + 1'b1;
+                rd_slot_received_r[m_axi_arid-READ_ID_FIRST] <= 0;
+                rd_slot_words_r[m_axi_arid-READ_ID_FIRST] <= plan_words_comb;
+                rd_slot_word_index_r[m_axi_arid-READ_ID_FIRST] <= 0;
+                rd_slot_spad_r[m_axi_arid-READ_ID_FIRST] <= plan_spad_r;
+                rd_slot_wide_r[m_axi_arid-READ_ID_FIRST] <=
                     (m_axi_arsize == AXI_SIZE_128);
-                rd_slot_narrow_lane_r[m_axi_arid-1'b1] <=
+                rd_slot_narrow_lane_r[m_axi_arid-READ_ID_FIRST] <=
                     m_axi_araddr[3:2];
                 m_axi_arvalid <= 1'b0;
                 if (rd_count_comb + 1'b1 > rd_highwater_r)
@@ -707,12 +635,12 @@ module ai_axi128_dma #(
                 state_r <= ST_ERROR;
               end else begin
               if (!m_axi_awvalid && wr_free_found_comb) begin
-                m_axi_awid <= 4'd8 + {2'd0, wr_free_tag_comb};
+                m_axi_awid <= WRITE_ID_FIRST + {2'd0, wr_free_tag_comb};
                 m_axi_awaddr <= plan_ext_r;
                 m_axi_awvalid <= 1'b1;
               end
               if (aw_fire) begin
-                wr_active_tag_r <= m_axi_awid - 4'd8;
+                wr_active_tag_r <= m_axi_awid - WRITE_ID_FIRST;
                 m_axi_awvalid <= 1'b0;
                 wr_beat_index_r <= 0;
                 if (m_axi_awsize == AXI_SIZE_32) begin

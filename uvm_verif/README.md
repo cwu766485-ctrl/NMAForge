@@ -1,9 +1,9 @@
-# CIMForge UVM verification environment
+# NMAForge reusable UVM infrastructure
 
-`uvm_verif/` is the independent, scalable verification project for the A8
-AXI-Lite/128-bit-AXI4 CIMForge accelerator.  Existing `verif/` remains the
-fast directed/smoke regression and reference-model area; it does not contain
-UVM sources or UVM build targets.
+`uvm_verif/` owns reusable UVM transaction types, AXI agents, interfaces and
+the original top-level ABI smoke bring-up for the A8 AXI-Lite/128-bit-AXI4
+NMAForge accelerator. `verif/` owns the active block/subsystem verification
+tree and reuses these common protocol assets where appropriate.
 
 ## Directory ownership
 
@@ -16,7 +16,7 @@ UVM sources or UVM build targets.
 | `tests/` | `base/`、`sequences/`、`smoke/` and later `block/` tests | Version ABI smoke implemented |
 | `tb/` | DUT + behavioural DDR integration only; no checking policy | Implemented |
 | `formal/` | VC Formal harnesses, assumptions, properties and proof logs | Property template only; not proven |
-| `sim/` | VCS file list and build entry points | Implemented; not executed in this workspace |
+| `sim/` | VCS file list and build entry points | Version smoke passed in the Linux/VCS environment |
 
 ## Current testbench wiring
 
@@ -44,14 +44,15 @@ then includes its owned classes in a defined dependency order.
 ## Run on the Linux/VCS EDA environment
 
 ```bash
-cd /home/ray/ic/CIMForge/uvm_verif/sim
+cd <repo>/uvm_verif/sim
 make uvm_compile
 make uvm_smoke
 ```
 
-The default test is `ai_version_smoke_test`.  This command has not been run by
-this source-only reorganisation, so compilation/pass evidence must be recorded
-in `docs/project_update_log.md` after it is run on the licensed VCS host.
+The default `ai_version_smoke_test` passed in the Linux/VCS environment. The
+active UVM work is now under `verif/block/`: DMA has 11 passing directed/random
+tests and AXI-Lite control has six passing tests. See `verif/VERIFICATION_MATRIX.md`
+for the current evidence boundary.
 
 ## Next additions, in order
 

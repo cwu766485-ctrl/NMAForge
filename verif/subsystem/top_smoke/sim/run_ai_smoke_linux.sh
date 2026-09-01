@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run inside the Linux-resident CIMForge checkout.  It is intentionally small:
+# Run inside the Linux-resident NMAForge checkout. It is intentionally small:
 # environment/module setup stays with the owner of the licensed WSL image.
 set -euo pipefail
 
@@ -51,4 +51,4 @@ make ai_comp | tee "${results_dir}/ai_comp.log"
     +AI_SEED="${seed}" -l "${results_dir}/ai_quick.log"
 
 grep -q "TEST PASS" "${results_dir}/ai_quick.log"
-echo "CIMFORGE_A4_VCS_QUICK_PASS seed=${seed} random_cases=${random_cases}"
+echo "NMAFORGE_A4_VCS_QUICK_PASS seed=${seed} random_cases=${random_cases}"

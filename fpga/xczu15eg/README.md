@@ -1,28 +1,28 @@
-# XCZU15EG FPGA integration
+# NMAForge XCZU15EG FPGA integration
 
 This flow targets `xczu15eg-ffvb1156-2-i` with a single 100 MHz PL clock.
-CIMForge is connected as an AXI system component, not as a pin-level naked
+NMAForge is connected as an AXI system component, not as a pin-level naked
 RTL top:
 
 ```text
-PS M_AXI_HPM0_FPD -> SmartConnect -> CIMForge S_AXI (AXI4-Lite control)
-CIMForge M_AXI    -> SmartConnect -> PS S_AXI_HP0_FPD -> PS DDR4
-CIMForge irq      -> pl_ps_irq0
+PS M_AXI_HPM0_FPD -> SmartConnect -> NMAForge S_AXI (AXI4-Lite control)
+NMAForge M_AXI    -> SmartConnect -> PS S_AXI_HP0_FPD -> PS DDR4
+NMAForge irq      -> pl_ps_irq0
 PS pl_clk0/reset  -> proc_sys_reset -> all PL AXI logic
 ```
 
-The PS DDR/MIO configuration is cloned from the board vendor's known-good
-`mem_test.xpr` under `docs/hardware/xczu15eg`. This avoids guessing custom
-DDR4, QSPI, eMMC, USB, Ethernet, MIO and clock parameters.
+The PS DDR/MIO configuration is cloned from a board-owner supplied, known-good
+Vivado reference project. That project is private and is not shipped in this
+repository; see [BOARD_REFERENCE.md](BOARD_REFERENCE.md).
 
 ## Standalone IP closure
 
-Run from the repository root with Vivado 2024.1:
+Run from the repository root with Vivado 2024.1 (or set `VIVADO_HOME`):
 
 ```powershell
-& 'D:\Xilinx\Vivado\2024.1\bin\vivado.bat' -mode batch `
+vivado -mode batch `
   -source fpga\xczu15eg\scripts\synth_ai_accel_ip.tcl
-& 'D:\Xilinx\Vivado\2024.1\bin\vivado.bat' -mode batch `
+vivado -mode batch `
   -source fpga\xczu15eg\scripts\implement_ai_accel_ip.tcl
 ```
 
@@ -53,21 +53,15 @@ LTX under the ignored `build/board` directory.
 For a fast PS/interface/address-map check without synthesis:
 
 ```powershell
-$env:CIMFORGE_VALIDATE_ONLY = '1'
+$env:NMAFORGE_VALIDATE_ONLY = '1'
 fpga\xczu15eg\scripts\run_board_build.ps1
-Remove-Item Env:CIMFORGE_VALIDATE_ONLY
+Remove-Item Env:NMAFORGE_VALIDATE_ONLY
 ```
 
-The script expects this reference by default:
-
-```text
-docs/hardware/xczu15eg/15eg_demo/1.mem_test/prj/mem_test/mem_test.xpr
-```
-
-Override it without editing tracked files:
+Set the private reference without editing tracked files:
 
 ```powershell
-$env:CIMFORGE_VENDOR_XPR = 'D:\board\mem_test\mem_test.xpr'
+$env:NMAFORGE_VENDOR_XPR = '<path-to-private-board-reference.xpr>'
 fpga\xczu15eg\scripts\run_board_build.ps1
 ```
 
@@ -103,8 +97,9 @@ recovery steps.
 
 ## Memory and reset rules
 
-- Current AXI address/data ports are 32 bit. Allocate descriptor/data buffers
-  below 4 GiB or add a future 64-bit address extension before using high DDR.
+- The core AXI master has a 64-bit address ABI. The current PS board profile
+  uses a 32-bit-addressable DDR allocation contract, so allocate descriptor and
+  data buffers below 4 GiB unless the board integration is upgraded and tested.
 - `ai_scratchpad` uses registered XPM true-dual-port RAM in Vivado synthesis;
   `+define+VCS` selects the behavioral simulation model. The XCZU15EG/default
   profile is 4 banks x 32768 words x 32 bits = 512 KiB; the depth is controlled

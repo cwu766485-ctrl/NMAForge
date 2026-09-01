@@ -1,4 +1,4 @@
-# CIMForge contributor guide
+# NMAForge contributor guide
 
 ## Scope and working style
 
@@ -10,6 +10,21 @@ Before changing RTL, inspect `git status --short`.  The workspace is commonly
 used for FPGA experiments and may contain unrelated local edits or generated
 Vivado content.  Preserve those changes; do not reset, clean, or edit files
 outside the requested scope.
+
+## Agent collaboration
+
+- Terra is the orchestrator: it owns architecture decisions, task breakdown,
+  integration, review, ambiguous debugging, and the final handoff.
+- When GPT-5.6 Luna is available, delegate only clear, low-risk, bounded
+  implementation or mechanical tasks to Luna.  Give it the minimum files and
+  context needed for that task; do not fork the full conversation by default.
+- Keep subagent work on disjoint files.  Terra must inspect every result,
+  resolve integration issues, and run or request the relevant verification
+  before claiming success.
+- If Luna fails twice on the same issue, stop delegating that issue and return
+  it to Terra for diagnosis and resolution.
+- Do not use a subagent to make an architecture decision or to bypass the RTL
+  ownership, verification, safety, or public-release rules in this guide.
 
 Use `rg`/`rg --files` to locate RTL and test references.  When adding or
 renaming a synthesizable AI RTL module, update every applicable source list:
@@ -49,7 +64,7 @@ advancement must remain in `ai_command_processor`.
 
 ## Verification
 
-Run legacy directed/smoke VCS commands from `verif/subsystem/top_smoke/sim`
+Run the current directed/smoke VCS commands from `verif/subsystem/top_smoke/sim`
 on the team Linux/VNC EDA environment:
 
 ```bash
@@ -69,24 +84,24 @@ your handoff.  Use `git diff --check` before declaring work complete.
 
 ## FPGA implementation
 
-Vivado 2024.1 is installed locally at:
+Invoke Vivado 2024.1 from `PATH`, `VIVADO_HOME`, or an explicit local path:
 
 ```powershell
-& 'D:\Xilinx\Vivado\2024.1\bin\vivado.bat' -mode batch -source <script>
+vivado -mode batch -source <script>
 ```
 
 Run these from the repository root:
 
 ```powershell
 # Artix-7 AI IP synthesis (default part xc7a100tfgg484-2)
-& 'D:\Xilinx\Vivado\2024.1\bin\vivado.bat' -mode batch -source fpga\xilinx_a7_100t\scripts\synth_ai_accel_ip.tcl
+vivado -mode batch -source fpga\xilinx_a7_100t\scripts\synth_ai_accel_ip.tcl
 
 # Artix-7 smoke top synthesis / implementation and bitstream
-& 'D:\Xilinx\Vivado\2024.1\bin\vivado.bat' -mode batch -source fpga\xilinx_a7_100t\scripts\synth_smoke_top.tcl
-& 'D:\Xilinx\Vivado\2024.1\bin\vivado.bat' -mode batch -source fpga\xilinx_a7_100t\scripts\build_smoke_bitstream.tcl
+vivado -mode batch -source fpga\xilinx_a7_100t\scripts\synth_smoke_top.tcl
+vivado -mode batch -source fpga\xilinx_a7_100t\scripts\build_smoke_bitstream.tcl
 
 # XCZU15EG standalone AI IP synthesis
-& 'D:\Xilinx\Vivado\2024.1\bin\vivado.bat' -mode batch -source fpga\xczu15eg\scripts\synth_ai_accel_ip.tcl
+vivado -mode batch -source fpga\xczu15eg\scripts\synth_ai_accel_ip.tcl
 ```
 
 Artix scripts accept `FPGA_PART` as an environment override.  Check generated
@@ -96,9 +111,9 @@ committed.
 
 ## Synopsys/VNC environment and secrets
 
-The team VNC server provides the Synopsys tools (including VCS and Verdi).
-Use the access details supplied out-of-band by the project owner, and follow
-the server's environment setup instructions before running commands.
+The team EDA environment provides the Synopsys tools (including VCS and Verdi).
+Use access details supplied out-of-band by the project owner and follow the
+site environment setup instructions before running commands.
 
 Never add server addresses, usernames, passwords, tokens, license strings,
 or other credentials to Git, waveforms, logs, TCL scripts, source lists, or

@@ -1,17 +1,26 @@
 set AI_ACCEL_RTL_FILES [list \
     "$REPO_ROOT/rtl/control/axi_lite_reg_if.v" \
+    "$REPO_ROOT/rtl/dma/ai_dma_burst_planner.v" \
+    "$REPO_ROOT/rtl/dma/ai_dma_read_slot_tracker.v" \
+    "$REPO_ROOT/rtl/dma/ai_dma_write_response_tracker.v" \
+    "$REPO_ROOT/rtl/dma/ai_dma_spad_transfer_adapter.v" \
     "$REPO_ROOT/rtl/dma/ai_axi128_dma.v" \
     "$REPO_ROOT/rtl/memory/ai_spad_protection.v" \
     "$REPO_ROOT/rtl/memory/ai_spad_arbiter.v" \
     "$REPO_ROOT/rtl/compute/ai_tile_pipeline.v" \
     "$REPO_ROOT/rtl/control/ai_perf_monitor.v" \
+    "$REPO_ROOT/rtl/control/ai_accel_opcode_decode.v" \
+    "$REPO_ROOT/rtl/control/ai_descriptor_validator.v" \
+    "$REPO_ROOT/rtl/control/ai_ring_pointer_next.v" \
     "$REPO_ROOT/rtl/control/ai_command_processor.v" \
     "$REPO_ROOT/rtl/compute/ai_bank_pe.v" \
     "$REPO_ROOT/rtl/compute/ai_bank_local_controller.v" \
     "$REPO_ROOT/rtl/compute/ai_banked_cnm_core.v" \
     "$REPO_ROOT/rtl/compute/ai_unsigned_divider.v" \
     "$REPO_ROOT/rtl/compute/ai_integer_sqrt.v" \
+    "$REPO_ROOT/rtl/compute/ai_tensor_matrix_datapath.v" \
     "$REPO_ROOT/rtl/compute/ai_tensor_matrix_core.v" \
+    "$REPO_ROOT/rtl/compute/ai_tensor_sfu_math.v" \
     "$REPO_ROOT/rtl/compute/ai_tensor_sfu_core.v" \
     "$REPO_ROOT/rtl/compute/ai_conv3x3_linebuffer_core.v" \
     "$REPO_ROOT/rtl/compute/ai_kv_cache_engine.v" \
@@ -20,6 +29,16 @@ set AI_ACCEL_RTL_FILES [list \
     "$REPO_ROOT/rtl/control/axi_desc_fetch.v" \
     "$REPO_ROOT/rtl/control/ai_completion_writer.v" \
     "$REPO_ROOT/rtl/control/ai_accel_regs.v" \
+    "$REPO_ROOT/rtl/compute/ai_int8_datapath.v" \
     "$REPO_ROOT/rtl/compute/ai_int8_compute_core.v" \
+    "$REPO_ROOT/rtl/top/ai_descriptor_source_mux.v" \
+    "$REPO_ROOT/rtl/top/ai_accel_dma_request_mux.v" \
+    "$REPO_ROOT/rtl/top/ai_accel_axi_master_router.v" \
+    "$REPO_ROOT/rtl/top/ai_accel_axi_fabric.v" \
+    "$REPO_ROOT/rtl/top/ai_spad_response_demux.v" \
+    "$REPO_ROOT/rtl/top/ai_accel_spad_subsystem.v" \
+    "$REPO_ROOT/rtl/top/ai_accel_memory_fabric.v" \
+    "$REPO_ROOT/rtl/top/ai_accel_control_fabric.v" \
+    "$REPO_ROOT/rtl/top/ai_accel_compute_cluster.v" \
     "$REPO_ROOT/rtl/top/ai_accel_top.v" \
 ]

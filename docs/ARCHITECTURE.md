@@ -1,11 +1,11 @@
-# CIMForge A8 架构说明
+# NMAForge 架构说明
 
-**状态：2026-08-09 的 RTL 功能基线。** 本文描述已接入 `ai_accel_top` 的结构；
+**状态：2026-08-27 的 RTL/验证基线。** 本文描述已接入 `ai_accel_top` 的结构；
 不把规划中的 UVM、后布局签核或实板验收写成已完成能力。
 
 ## 1. 项目范围
 
-CIMForge A8 是单时钟、可综合的全数字 AI 近存加速器 IP：控制面为 AXI-Lite，
+NMAForge 是单时钟、可综合的全数字 AI 近存加速器 IP：控制面为 AXI-Lite，
 数据主接口为 128-bit AXI4。权威顶层为 `rtl/top/ai_accel_top.v`；可综合 RTL
 分别位于 `rtl/control`、`rtl/dma`、`rtl/memory` 与 `rtl/compute`。
 
@@ -31,6 +31,9 @@ DDR <== 128-bit AXI4 ==> ai_axi128_dma <==> ai_spad_arbiter <==> ai_scratchpad
 ```
 
 - `ai_accel_regs` 只保存配置、产生控制脉冲、记录 sticky status/IRQ；不推进队列指针。
+- `axi_lite_reg_if` 是纯协议适配层：它分别锁存 AXI-Lite AW 与 W，只有两个 sticky flag
+  均已置位的**下一时钟周期**才向 `ai_accel_regs` 发内部写请求。这个额外控制周期避免
+  AW/W 同拍或不同拍到达时的压缩状态转移，不改变软件 ABI 或数据面性能。
 - `ai_command_processor` 独占命令生命周期：`CMDQ_HEAD`、`CPLQ_TAIL`、描述符来源选择、
   校验、计算启动和完成排序。软件发布 `CMDQ_TAIL`，并消费后推进 `CPLQ_HEAD`。
 - `ai_spad_arbiter` 是 scheduler-side scratchpad 的唯一拥有者。descriptor/completion
@@ -162,6 +165,7 @@ Q/K/V -> QK^T -> causal/row Softmax -> AV -> projection
 | 项目 | 最新结果 | 边界 |
 |---|---|---|
 | VCS smoke/随机 | `make ai_smoke`、`ai_comp`、`ai_run` 基线通过 | 尚非 UVM coverage closure |
+| Control block UVM | 2026-08-27：6 项回归均为 `UVM_ERROR=0`、`UVM_FATAL=0` | 已覆盖 reset/version、协议、IRQ/error、busy/abort、随机 RW、RAL；尚非 coverage closure |
 | CNM A1/A2/A3.1 | A2 四 lane PASS；A3.1 benchmark PASS | 受控 workload，需继续 UVM 对拍 |
 | XCZU15EG OOC | 100 MHz，setup/hold WNS `+0.187/+0.032 ns` | standalone IP，非整板 sign-off |
 | TSMC28 DC | TT/0.9 V/25 °C，4 ns；setup/hold 0 violation，关键路径 3.89 ns | 单角 pre-layout |
@@ -173,7 +177,7 @@ Q/K/V -> QK^T -> causal/row Softmax -> AV -> projection
 当前可信表述是“TSMC28、250 MHz pre-layout setup/hold closure”。Formal、LEC、DFT、UVM、
 后布局 STA/功耗和实板长期压力测试仍未完成，详见 [`VPLAN.md`](VPLAN.md)。
 
-## 8. 全部电路模块
+## 7. 全部电路模块
 | 分类 | 模块 | 是否在主功能路径 | 作用 |
 |---|---|---:|---|
 | 顶层 | `ai_accel_top` | 是 | 把 AXI、寄存器、命令、DMA、SRAM、计算核和 IRQ 接起来。 |
@@ -201,8 +205,9 @@ Q/K/V -> QK^T -> causal/row Softmax -> AV -> projection
 | KV 核 | `ai_kv_cache_engine` | 是 | KV-cache 的写入、按 head/token/stride 读取等 primitive。 |
 
 
-## 7. 下一步
+## 8. 下一步
 
-当前 RTL 是完整的 pre-verification baseline。下一步冻结 SPEC/ABI 后开始 UVM：先实现 AXI-Lite
-agent + RAL、CMDQ/CPLQ scoreboard，再接入 AXI4 DMA、scratchpad arbiter、CNM 四 lane 和
-Transformer reference model；Formal、LEC、DFT 与增量 DC/SpyGlass 并行推进。
+当前 RTL 是已通过 directed/smoke 和已执行 block-UVM 基础回归的 pre-sign-off baseline；
+它不是 UVM coverage、formal、LEC、后布局或实板签核完成的设计。下一步优先补
+CMDQ/CPLQ、scratchpad arbiter、tensor datapath 的 UVM scoreboard/coverage，再做
+多 seed 回归、Formal、LEC、DFT 与增量 DC/SpyGlass。

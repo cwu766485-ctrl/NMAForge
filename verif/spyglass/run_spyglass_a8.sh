@@ -14,7 +14,7 @@ fi
 
 run_goal() {
   local sg_goal="$1"
-  echo "[CIMForge] SpyGlass goal: $sg_goal"
+  echo "[NMAForge] SpyGlass goal: $sg_goal"
   # `-batch` is required for bridge/nohup execution; without it SpyGlass can
   # wait for an interactive session after printing only its banner.
   spyglass -batch -project a8_static.prj -goal "$sg_goal"

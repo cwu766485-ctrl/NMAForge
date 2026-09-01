@@ -6,6 +6,10 @@
 ../agent/interfaces/ai_dma_ctrl_if.sv
 ../agent/interfaces/ai_dma_axi_if.sv
 ../agent/interfaces/ai_dma_spad_if.sv
+../../../../rtl/dma/ai_dma_burst_planner.v
+../../../../rtl/dma/ai_dma_read_slot_tracker.v
+../../../../rtl/dma/ai_dma_write_response_tracker.v
+../../../../rtl/dma/ai_dma_spad_transfer_adapter.v
 ../../../../rtl/dma/ai_axi128_dma.v
 ../agent/dma_block_types_pkg.sv
 ../agent/dma_block_agent_pkg.sv

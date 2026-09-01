@@ -18,5 +18,5 @@ ai_simulate:
 
 ai_smoke: create_lib ai_compile ai_simulate
 
-clean: 
+clean:
 	rm -rf work mti_lib transcript modelsim.ini *.log *.wlf

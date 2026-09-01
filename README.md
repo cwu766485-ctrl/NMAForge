@@ -1,47 +1,68 @@
-# CIMForge — AXI4 INT8 Tensor Accelerator
+# NMAForge — AXI4 Near-Memory Tensor Accelerator
 
-CIMForge is a synthesizable, scratchpad-based AI accelerator RTL project.  The
-active product is an AXI-Lite control plane plus a 128-bit AXI4 memory-master
-data plane; the historical AHB SRAM/vector teaching track has been removed.
+[中文 README](README_ZH.md) · [Architecture](docs/ARCHITECTURE.md) ·
+[Specification](docs/SPEC.md) · [Verification plan](docs/VPLAN.md) ·
+[Documentation index](docs/README.md)
 
-## Current A8 baseline
+> **Short description:** A synthesizable AXI4 near-memory tensor accelerator
+> with a banked scratchpad, queued DMA and INT8/Transformer primitives.
 
-- Canonical top: `rtl/top/ai_accel_top.v`.
-- 32-bit AXI-Lite register/control interface and 128-bit, 64-bit-address AXI4
-  DMA interface.
-- 512 KiB four-bank scratchpad, with scalar, banked and 128-bit line accesses.
-- Command/completion queues, scratchpad/external descriptors, in-order
-  completion publishing and IRQ/status reporting.
-- One unified `ai_axi128_dma`: 1D/2D/gather/tile transfer planning, 4 KiB
-  boundary splitting, up to four tagged read bursts and ID-aware read-response
-  handling.
-- INT8 VDOT/GEMV/GEMM, 4x4 tensor GEMM/batched GEMM, requantization, GELU,
-  SiLU, residual, LayerNorm/RMSNorm, Softmax/causal Softmax, Conv3x3
-  line-buffer and KV-cache primitives.
-- ABI v7.2 mapper support, including PACK_I8 layout conversion, for a real
-  descriptor chain rather than isolated operator demos.
+NMAForge is a synthesizable, all-digital near-memory tensor-accelerator IP.
+It is **not** analog compute-in-memory: arithmetic remains digital, while a
+four-bank scratchpad keeps tiles close to bank-local compute and reduces
+external-memory traffic.
 
-## Verified evidence and its boundary
+## Architecture at a glance
 
-The A8 baseline has passed VCS directed/smoke regressions, including the
-30-command Transformer micro-workload (Q/K/V, QK^T, row Softmax, AV,
-projection, residual/norm and FFN).  It has also closed a standalone XCZU15EG
-OOC implementation at 100 MHz (setup WNS +0.187 ns; hold WNS +0.032 ns), and
-TSMC28 HPC+ pre-layout DC at 250 MHz (4.0 ns, TT/0.9 V/25 C, zero setup/hold
-violations using 32 real SRAM macros).
+- 32-bit AXI4-Lite control plane and 128-bit AXI4 memory-master interface.
+- 512 KiB four-bank scratchpad with a single arbitration point and control-plane
+  priority.
+- Command/completion queues, scratchpad or external descriptors, dependency
+  events, atomic four-word completion publishing, status and IRQ.
+- 1D/2D/gather DDR↔scratchpad DMA with 4 KiB boundary splitting, up to four
+  tagged read requests, RID/BID-aware response handling, narrow-transfer
+  alignment support and abort drain.
+- INT8 VDOT/GEMV/GEMM, a 4×4 matrix tile engine, quantized SFU primitives,
+  Conv3x3/depthwise-convolution primitives and KV-cache addressing.
+- Transformer micro-workloads assembled from descriptor primitives, including
+  QKV projection, QKᵀ, causal Softmax, AV, residual/norm and FFN.
 
-These are substantial RTL and pre-layout implementation milestones, not ASIC
-sign-off or board-level throughput proof.  UVM coverage closure, CDC/RDC,
-formal, post-layout sign-off and real-board workload measurements remain open.
+## Evidence and current boundary
 
-## Source-of-truth files
+- VCS directed top-level smoke and Transformer micro-workload regressions have
+  passed.
+- DMA block UVM: 11 directed/random tests passed, covering 1D/2D/gather,
+  RID/BID out-of-order responses, 4 KiB, abort and back-pressure.
+- AXI-Lite control block UVM: six tests passed for reset/ABI, split AW/W,
+  WSTRB/errors, IRQ/W1C, busy/abort, randomized accesses and RAL frontdoor.
+- A commercial 28 nm pre-layout synthesis study met a 250 MHz constraint under
+  its documented single-corner assumptions; details are sanitized in
+  [`docs/TSMC28_SYNTHESIS_REPORT.md`](docs/TSMC28_SYNTHESIS_REPORT.md).
+- XCZU15EG FPGA synthesis/implementation and bring-up scripts are included,
+  but a clean-clone board deployment still needs the board owner’s private
+  reference project and hardware access.
 
-- RTL: `rtl/top`, `rtl/control`, `rtl/dma`, `rtl/memory`, `rtl/compute`.
-- VCS smoke file list: `verif/subsystem/top_smoke/sim/ai_accel.f`.
-- FPGA RTL lists: `fpga/xilinx_a7_100t/ai_accel_rtl.tcl` and
-  `fpga/xczu15eg/ai_accel_rtl.tcl`.
-- Architecture: `docs/architecture.md`.
-- Current PPA evidence: `docs/A8_TSMC28_SYNTHESIS_REPORT.md`.
-- Project status/change record: `docs/project_update_log.md`.
+This is not ASIC sign-off or a production LLM-serving claim. Coverage closure,
+full CDC/RDC/formal, post-layout ASIC sign-off, and real-board workload
+measurements remain open.
 
-See `AGENTS.md` for contribution, verification and tool-flow requirements.
+## Repository layout
+
+```text
+rtl/       Synthesizable accelerator RTL
+verif/     Smoke, block UVM, subsystem tests and static-analysis collateral
+uvm_verif/ Reusable UVM agents and top-level UVM bring-up
+sw/        ABI header, mapper and bare-metal bring-up source
+fpga/      Public Vivado flows and board integration scripts
+docs/      Architecture, specification, verification and public-release notes
+```
+
+## Public-release policy
+
+No PDK files, SRAM macro models, timing libraries, vendor board schematics,
+vendor reference projects, generated bitstreams, waveforms, credentials or
+machine-specific EDA settings are included. See
+[`docs/PUBLIC_RELEASE.md`](docs/PUBLIC_RELEASE.md) before publishing a fork.
+
+Historical ABI/software identifiers may still use the `CIMFORGE_*` prefix for
+compatibility. The public project name is **NMAForge**.

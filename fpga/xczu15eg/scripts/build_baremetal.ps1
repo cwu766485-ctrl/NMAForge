@@ -1,7 +1,14 @@
 param(
-    [string]$Xsct = 'D:\Xilinx\Vitis\2024.1\bin\xsct.bat',
-    [string]$VitisRoot = 'D:\Xilinx\Vitis\2024.1'
+    [string]$Xsct = $env:XSCT,
+    [string]$VitisRoot = $env:VITIS_ROOT
 )
+
+if (!$Xsct) {
+    $Xsct = (Get-Command xsct -ErrorAction Stop).Source
+}
+if (!$VitisRoot) {
+    $VitisRoot = Split-Path (Split-Path $Xsct -Parent) -Parent
+}
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $fpgaDir = Split-Path -Parent $scriptDir

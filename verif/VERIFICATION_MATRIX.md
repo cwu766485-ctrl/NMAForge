@@ -1,4 +1,4 @@
-# CIMForge block and subsystem verification matrix
+# NMAForge block and subsystem verification matrix
 
 `verif/subsystem/top_smoke/sim/` remains the legacy directed/smoke regression.
 `uvm_verif/` owns
@@ -13,7 +13,7 @@ tests are planned work, not evidence of completion.
 | DMA | `ai_axi128_dma` | UVM suite contains 1-D/2-D load, gather, narrow 32→128-bit transition, 1-D/2-D store, BID/RID newest-first responses, 4 KiB, abort and deterministic back-pressure tests. | Load/store address-data scoreboard, AXI4 slave BFM, SPAD model, command covergroup; SVA for AR/AW/W stability, ID ranges and 4 KiB boundary. | **Runtime regression passed in VCS on 2026-08-13:** all 11 directed/random tests, with zero UVM errors/fatals; VDBs merged. Current random-stress command coverage is 67.86%, so multi-seed expansion, bin review and code/assertion coverage closure remain. |
 | Scratchpad arbiter | `ai_spad_arbiter` | Synthetic descriptor, completion, scalar, line, banked and DMA clients issue overlapping reads/writes with randomized ready. | Reference grant scheduler and per-client response scoreboard; priority and bounded-fairness assertions. | Control-plane priority preserved; data-plane requests are neither lost nor duplicated; every eligible client eventually progresses. |
 | Command processor | `ai_command_processor` | Publish legal/illegal descriptors, dependency events, internal/external descriptor sources, queue-full/empty and abort cases. | Command lifecycle model for CMDQ head, event bits and expected completion order; four-word completion property. | Invalid descriptors do not launch; dependency blocks then releases correctly; head/tail advance exactly once; completion becomes visible only after word 3. |
-| Control | `axi_lite_reg_if` + `ai_accel_regs` | AXI-Lite read/write sequences vary address, WSTRB, response back-pressure, reset and IRQ/error conditions. | RAL/register mirror plus AXI protocol assertions. | Readback and byte strobes match ABI; illegal accesses return defined response; sticky error/IRQ clear only through defined ABI; reset state is specified. |
+| Control | `axi_lite_reg_if` + `ai_accel_regs` | Dedicated block UVM drives independent AW/W timing, B/R back-pressure, reset/identity, WSTRB, RO/unaligned/out-of-page error, busy-lock/abort, IRQ/W1C and randomized register traffic. | P0 RAL map, active agent plus passive monitor, scoreboard/coverage and valid-stability/abort/IRQ SVA. | 2026-08-13: six VCS tests passed with `UVM_ERROR=0`/`UVM_FATAL=0`, including frontdoor RAL access; a real AW/W dispatch bug was fixed. Functional/code-coverage closure and multi-seed review remain open. |
 | CNM | `ai_banked_cnm_core` + local controllers | Random lane masks, bank addresses, partial tail groups and ping-pong/pre-fetch timing. | Python/SystemVerilog dot-product model and lane ownership assertions. | Per-lane data and final reduction match; no bank response is consumed twice; `busy/done/error` contract holds. |
 | Matrix | `ai_tensor_matrix_core` | Random INT8 4x4 GEMM/batch-GEMM shapes, transpose/stride, bias, activation and requantization. | Bit-aware matrix golden model and output-tile scoreboard. | Every output tile matches golden including saturation/layout; no premature done; coverage hits transpose and tail cases. |
 | SFU | `ai_tensor_sfu_core` | Directed extremes plus constrained-random Softmax, RMSNorm/LayerNorm, residual, GELU/SiLU and requant inputs. | Fixed-point golden with declared tolerance/bit contract; range and divide-by-zero assertions. | Result matches the chosen integer contract; no overflow/wrap beyond spec; all states exit. |
@@ -38,7 +38,7 @@ scoreboards, constrained-random tests, coverage and assertion closure above.
 | 阶段 | 验证层级 | 验证对象 | 主要内容 | 通过标准 |
 |---|---|---|---|---|
 | 0 | 基线 | 全项目 | 固化 RTL/filelist/ABI、整理 test plan、lint triage | 顶层 smoke 可复现、路径唯一 |
-| 1 | Block | AXI-Lite control | RAL、寄存器读写、WSTRB、IRQ、reset、sticky error | 寄存器镜像一致，协议/SVA 通过 |
+| 1 | Block | AXI-Lite control | RAL、寄存器读写、WSTRB、IRQ、reset、sticky error | 2026-08-13 六项 VCS 回归通过；寄存器镜像、协议与本地 SVA 均通过。coverage closure 与多 seed 仍待完成。 |
 | 2 | Block | DMA | 1D、2D、gather、32/128-bit、store/BID、4 KiB、abort、随机 back-pressure | DDR↔SPAD scoreboard 正确；ID/RLAST/BID/abort SVA 通过；DMA coverage 达标 |
 | 3 | Block | SPAD arbiter | descriptor/completion/DMA/compute 多客户端争用、优先级、round-robin | 无丢包/重复；控制面优先；无饥饿 |
 | 4 | Block | Command processor | descriptor 合法性、CMDQ/CPLQ 指针、event dependency、error/abort | 不合法任务不启动；head/tail 所有权正确；completion 原子提交 |

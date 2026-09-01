@@ -52,19 +52,19 @@ module axi_lite_reg_if #(
     input  wire                  reg_rsp_error
 );
 
-    localparam AXI_RESP_OKAY  = 2'b00;
-    localparam AXI_RESP_SLVERR = 2'b10;
+    localparam [1:0] AXI_RESP_OKAY   = 2'b00;
+    localparam [1:0] AXI_RESP_SLVERR = 2'b10;
 
-    localparam WR_COLLECT  = 2'd0;
-    localparam WR_REQ      = 2'd1;
-    localparam WR_RESP_ARM = 2'd2;
-    localparam WR_RESP     = 2'd3;
+    localparam [1:0] WR_COLLECT  = 2'd0;
+    localparam [1:0] WR_REQ      = 2'd1;
+    localparam [1:0] WR_RESP_ARM = 2'd2;
+    localparam [1:0] WR_RESP     = 2'd3;
 
-    localparam RD_IDLE    = 3'd0;
-    localparam RD_REQ     = 3'd1;
-    localparam RD_WAIT    = 3'd2;
-    localparam RD_WAIT2   = 3'd3;
-    localparam RD_RESP    = 3'd4;
+    localparam [2:0] RD_IDLE  = 3'd0;
+    localparam [2:0] RD_REQ   = 3'd1;
+    localparam [2:0] RD_WAIT  = 3'd2;
+    localparam [2:0] RD_WAIT2 = 3'd3;
+    localparam [2:0] RD_RESP  = 3'd4;
 
     reg [1:0] wr_state_r;
     reg [2:0] rd_state_r;
@@ -80,6 +80,16 @@ module axi_lite_reg_if #(
     assign s_axi_awready = (wr_state_r == WR_COLLECT) && !aw_seen_r;
     assign s_axi_wready  = (wr_state_r == WR_COLLECT) && !w_seen_r;
     assign s_axi_arready = (rd_state_r == RD_IDLE);
+
+    // Name every AXI handshake once.  In particular, write_dispatch_ready
+    // deliberately observes only the registered sticky flags: AW and W are
+    // captured first, then the internal request is issued next cycle.
+    wire aw_accept = s_axi_awvalid && s_axi_awready;
+    wire w_accept  = s_axi_wvalid  && s_axi_wready;
+    wire ar_accept = s_axi_arvalid && s_axi_arready;
+    wire b_accept  = s_axi_bvalid  && s_axi_bready;
+    wire r_accept  = s_axi_rvalid  && s_axi_rready;
+    wire write_dispatch_ready = aw_seen_r && w_seen_r;
 
     // 写状态机：
     //   WR_COLLECT 收齐 AW 和 W；
@@ -116,22 +126,28 @@ module axi_lite_reg_if #(
             case (wr_state_r)
                 WR_COLLECT: begin
                     // AXI-Lite 允许 AW 和 W 分离到达，所以用 aw_seen_r/w_seen_r 暂存。
-                    if (s_axi_awvalid && s_axi_awready) begin
+                    if (aw_accept) begin
                         awaddr_r      <= s_axi_awaddr;
                         aw_seen_r     <= 1'b1;
                     end
-                    if (s_axi_wvalid && s_axi_wready) begin
+                    if (w_accept) begin
                         wdata_r       <= s_axi_wdata;
                         wstrb_r       <= s_axi_wstrb;
                         w_seen_r      <= 1'b1;
                     end
-                    if ((aw_seen_r || (s_axi_awvalid && s_axi_awready)) &&
-                        (w_seen_r  || (s_axi_wvalid && s_axi_wready))) begin
+                    // Do not consume and dispatch a same-cycle AW/W pair in
+                    // one compressed state transition.  First latch both
+                    // independent AXI-Lite channels; once both sticky flags
+                    // are set, issue the internal request on the following
+                    // clock.  Besides making the request timing unambiguous,
+                    // this keeps AW/W same-cycle traffic safe after a
+                    // back-to-back read or write response.
+                    if (write_dispatch_ready) begin
                         reg_req_valid <= 1'b1;
                         reg_req_write <= 1'b1;
-                        reg_req_addr  <= aw_seen_r ? awaddr_r : s_axi_awaddr;
-                        reg_req_wdata <= w_seen_r  ? wdata_r  : s_axi_wdata;
-                        reg_req_wstrb <= w_seen_r  ? wstrb_r  : s_axi_wstrb;
+                        reg_req_addr  <= awaddr_r;
+                        reg_req_wdata <= wdata_r;
+                        reg_req_wstrb <= wstrb_r;
                         wr_state_r    <= WR_REQ;
                     end
                 end
@@ -149,7 +165,7 @@ module axi_lite_reg_if #(
                 end
                 WR_RESP: begin
                     // Hold VALID until a sampled VALID/READY handshake.
-                    if (s_axi_bvalid && s_axi_bready) begin
+                    if (b_accept) begin
                         s_axi_bvalid <= 1'b0;
                         aw_seen_r    <= 1'b0;
                         w_seen_r     <= 1'b0;
@@ -164,7 +180,7 @@ module axi_lite_reg_if #(
             case (rd_state_r)
                 RD_IDLE: begin
                     // AR 握手后立即产生内部读请求。
-                    if (s_axi_arvalid) begin
+                    if (ar_accept) begin
                         araddr_r      <= s_axi_araddr;
                         reg_req_valid <= 1'b1;
                         reg_req_write <= 1'b0;
@@ -207,7 +223,7 @@ module axi_lite_reg_if #(
                     rd_state_r   <= RD_RESP;
                 end
                 RD_RESP: begin
-                    if (s_axi_rready) begin
+                    if (r_accept) begin
                         s_axi_rvalid <= 1'b0;
                         rd_state_r   <= RD_IDLE;
                     end

@@ -1,21 +1,24 @@
-# CIMForge XCZU15EG PS/PL integration and bitstream flow.
+# NMAForge XCZU15EG PS/PL integration and bitstream flow.
 #
 # The board has a custom ZynqMP PS DDR/MIO layout.  Rather than guessing that
-# configuration, this script clones the configured PS cell from the vendor
-# mem_test project under docs/hardware/xczu15eg, then enables only the PL
-# interfaces needed by CIMForge.
+# configuration, this script clones the configured PS cell from a private
+# board-owner reference project, then enables only the PL interfaces needed by
+# NMAForge. The reference project is deliberately not part of this repository.
 set SCRIPT_DIR [file normalize [file dirname [info script]]]
 set FPGA_DIR [file normalize "$SCRIPT_DIR/.."]
 set REPO_ROOT [file normalize "$FPGA_DIR/../.."]
 set PART_NAME "xczu15eg-ffvb1156-2-i"
 set BUILD_DIR "$FPGA_DIR/build/board"
 set REPORT_DIR "$BUILD_DIR/reports"
-set VENDOR_XPR "$REPO_ROOT/docs/hardware/xczu15eg/15eg_demo/1.mem_test/prj/mem_test/mem_test.xpr"
-if {[info exists ::env(CIMFORGE_VENDOR_XPR)]} {
+set VENDOR_XPR ""
+if {[info exists ::env(NMAFORGE_VENDOR_XPR)]} {
+    set VENDOR_XPR [file normalize $::env(NMAFORGE_VENDOR_XPR)]
+} elseif {[info exists ::env(CIMFORGE_VENDOR_XPR)]} {
+    # Temporary compatibility alias for existing private automation.
     set VENDOR_XPR [file normalize $::env(CIMFORGE_VENDOR_XPR)]
 }
 if {![file exists $VENDOR_XPR]} {
-    error "Vendor PS reference project not found: $VENDOR_XPR"
+    error "Set NMAFORGE_VENDOR_XPR to the private board PS reference .xpr"
 }
 
 # Capture every configured PS property from the board-vendor reference.
@@ -159,9 +162,9 @@ add_files -norecurse $wrapper_files
 set_property top cimforge_system_wrapper [current_fileset]
 update_compile_order -fileset sources_1
 
-if {[info exists ::env(CIMFORGE_VALIDATE_ONLY)] &&
-    $::env(CIMFORGE_VALIDATE_ONLY) ne "0"} {
-    puts "CIMForge board block design validation completed."
+if {[info exists ::env(NMAFORGE_VALIDATE_ONLY)] &&
+    $::env(NMAFORGE_VALIDATE_ONLY) ne "0"} {
+    puts "NMAForge board block design validation completed."
     exit
 }
 

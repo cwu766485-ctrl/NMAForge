@@ -62,7 +62,7 @@ Closure should not be called until:
 ## Regression commands
 
 ```bash
-cd /mnt/e/workspace/chip/CIMForge/verif/block/dma/sim
+cd <repo>/verif/block/dma/sim
 make uvm_smoke
 make uvm_regress 2>&1 | tee dma_block_regress.log
 make coverage

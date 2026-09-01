@@ -1,8 +1,8 @@
-# CIMForge XCZU15EG bring-up 与 FPGA 部署
+# NMAForge XCZU15EG bring-up 与 FPGA 部署
 
 本文面向仓库当前的 XCZU15EG AXI AI 主线，覆盖从板卡连接、生成部署文件到
 DDR DMA、命令队列、计算、completion 和 PL-to-PS IRQ 的**实板验收流程**。所有流程均为
-JTAG 临时加载，不会写入 QSPI 或 eMMC。本文是操作手册；截至 2026-08-09，仓库的可信
+JTAG 临时加载，不会写入 QSPI 或 eMMC。本文是操作手册；截至 2026-08-26，仓库的可信
 硬件证据仍是 100 MHz standalone-IP OOC，实现和完整板级端到端验收必须以本手册产生的
 JTAG/UART/ILA 日志为准，不能因脚本存在而视为已通过。
 
@@ -18,16 +18,16 @@ JTAG/UART/ILA 日志为准，不能因脚本存在而视为已通过。
    将板卡主电源断开至少 5 秒后重新上电；仅重启 Vivado `hw_server` 通常不能清除
    DAP 的 sticky error。
 
-硬件依据是 `docs/hardware/xczu15eg/XCZU15EG_SCH_0515.pdf`。不要把电脑上的 COM
+硬件依据应由板卡拥有者在本地提供；厂商原理图和参考工程不随公开仓库分发。不要把电脑上的 COM
 编号写死到 RTL 或 bitstream；换 USB 端口后 Windows 可能重新分配编号。
 
 ## 2. 工具和产物
 
-本流程使用 Vivado/Vitis 2024.1：
+本流程使用 Vivado/Vitis 2024.1，并要求它们已在 `PATH` 或通过脚本参数显式指定：
 
 ```text
-D:\Xilinx\Vivado\2024.1\bin\vivado.bat
-D:\Xilinx\Vitis\2024.1\bin\xsct.bat
+vivado
+xsct
 ```
 
 在仓库根目录生成整板 bitstream、XSA 和 ILA probes：
@@ -36,7 +36,7 @@ D:\Xilinx\Vitis\2024.1\bin\xsct.bat
 fpga\xczu15eg\scripts\run_board_build.ps1
 ```
 
-生成与该 XSA 匹配的 A53 FSBL 和 CIMForge 裸机自检 ELF：
+生成与该 XSA 匹配的 A53 FSBL 和 NMAForge 裸机自检 ELF：
 
 ```powershell
 fpga\xczu15eg\scripts\build_baremetal.ps1

@@ -30,8 +30,8 @@ module ai_scratchpad #(
     input wire banked_read_valid, input wire [31:0] banked_addr,
     output reg [31:0] banked_data0, output reg [31:0] banked_data1,
     output reg [31:0] banked_data2, output reg [31:0] banked_data3,
-    output reg [3:0] banked_parity_error
-    ,input wire [3:0] cnm_read_valid,
+    output reg [3:0] banked_parity_error,
+    input wire [3:0] cnm_read_valid,
     input wire [31:0] cnm_addr0, input wire [31:0] cnm_addr1,
     input wire [31:0] cnm_addr2, input wire [31:0] cnm_addr3,
     output reg [31:0] cnm_data0, output reg [31:0] cnm_data1,
@@ -40,6 +40,8 @@ module ai_scratchpad #(
 );
     localparam integer BANK_BITS = 2;
     localparam integer BANK_MEMORY_BITS = WORDS_PER_BANK * 32;
+    localparam integer TOTAL_WORDS = BANKS * WORDS_PER_BANK;
+    localparam integer TOTAL_BYTES = TOTAL_WORDS * 4;
     wire [31:0] host_word_addr = host_addr[31:2];
     wire [31:0] compute_word_addr = compute_addr[31:2];
     wire [31:0] line_word_addr = line_addr[31:2];
@@ -60,13 +62,15 @@ module ai_scratchpad #(
     wire compute_align_error = |compute_addr[1:0];
     wire line_align_error = |line_addr[3:0];
     wire banked_align_error = |banked_addr[3:0];
-    wire host_range_error = (host_word_addr >= BANKS * WORDS_PER_BANK);
-    wire compute_range_error = (compute_word_addr >= BANKS * WORDS_PER_BANK);
-    wire line_range_error = (line_addr > (BANKS * WORDS_PER_BANK * 4) - 16);
-    wire banked_range_error = (banked_addr > (BANKS * WORDS_PER_BANK * 4) - 16);
+    wire host_range_error = (host_word_addr >= TOTAL_WORDS);
+    wire compute_range_error = (compute_word_addr >= TOTAL_WORDS);
+    wire line_range_error = (line_addr > TOTAL_BYTES - 16);
+    wire banked_range_error = (banked_addr > TOTAL_BYTES - 16);
     wire cnm_align_error = |cnm_addr0[1:0] || |cnm_addr1[1:0] || |cnm_addr2[1:0] || |cnm_addr3[1:0];
-    wire cnm_range_error = (cnm_word_addr0 >= BANKS*WORDS_PER_BANK) || (cnm_word_addr1 >= BANKS*WORDS_PER_BANK) ||
-                           (cnm_word_addr2 >= BANKS*WORDS_PER_BANK) || (cnm_word_addr3 >= BANKS*WORDS_PER_BANK);
+    wire cnm_range_error = (cnm_word_addr0 >= TOTAL_WORDS) ||
+                           (cnm_word_addr1 >= TOTAL_WORDS) ||
+                           (cnm_word_addr2 >= TOTAL_WORDS) ||
+                           (cnm_word_addr3 >= TOTAL_WORDS);
     wire host_conflict = host_valid && (compute_valid || line_valid ||
                                         banked_read_valid || (|cnm_read_valid));
     wire host_access_ok = host_valid && !host_align_error && !host_range_error && !host_conflict;
@@ -75,10 +79,14 @@ module ai_scratchpad #(
     wire banked_access_ok = banked_read_valid && !banked_align_error && !banked_range_error;
     // A2.2 permits each lane to be valid independently.  An inactive lane
     // does not consume its bank port and its response bit remains clear.
-    wire cnm_lane_access0 = cnm_read_valid[0] && !|cnm_addr0[1:0] && (cnm_word_addr0 < BANKS*WORDS_PER_BANK);
-    wire cnm_lane_access1 = cnm_read_valid[1] && !|cnm_addr1[1:0] && (cnm_word_addr1 < BANKS*WORDS_PER_BANK);
-    wire cnm_lane_access2 = cnm_read_valid[2] && !|cnm_addr2[1:0] && (cnm_word_addr2 < BANKS*WORDS_PER_BANK);
-    wire cnm_lane_access3 = cnm_read_valid[3] && !|cnm_addr3[1:0] && (cnm_word_addr3 < BANKS*WORDS_PER_BANK);
+    wire cnm_lane_access0 = cnm_read_valid[0] && !|cnm_addr0[1:0] &&
+                            (cnm_word_addr0 < TOTAL_WORDS);
+    wire cnm_lane_access1 = cnm_read_valid[1] && !|cnm_addr1[1:0] &&
+                            (cnm_word_addr1 < TOTAL_WORDS);
+    wire cnm_lane_access2 = cnm_read_valid[2] && !|cnm_addr2[1:0] &&
+                            (cnm_word_addr2 < TOTAL_WORDS);
+    wire cnm_lane_access3 = cnm_read_valid[3] && !|cnm_addr3[1:0] &&
+                            (cnm_word_addr3 < TOTAL_WORDS);
     wire cnm_access_ok = cnm_lane_access0 || cnm_lane_access1 || cnm_lane_access2 || cnm_lane_access3;
 
     always @(*) begin

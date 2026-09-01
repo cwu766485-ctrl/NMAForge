@@ -1,4 +1,4 @@
-# CIMForge A8 SpyGlass lint triage
+# NMAForge SpyGlass lint triage
 
 ## Run record
 
@@ -21,7 +21,7 @@ No waiver has been applied.
 | `InitValUsingNBA` | 180 | P2 review/targeted cleanup | Mostly emitted because state/register defaults and updates share sequential processes.  Audit DMA, command processor and register file first; only refactor a signal if two assignments can occur in one functional path. |
 | `SepStateNextLogic` | 20 | Coding-style waiver candidate | Existing one-process FSMs are synthesizable.  Do not mass-convert them during verification bring-up; document the project coding rule or refactor one block at a time with regression. |
 | `WRN_1024` on `$signed` of already signed values | 11 | P2 cleanup | Remove redundant casts only when accompanied by fixed-point reference and directed regression; no intended arithmetic change. |
-| `WarnAnalyzeBBox` on TSMC28 SRAM macro stub | 1 | Expected | The SpyGlass project deliberately uses a port-only foundry macro declaration.  Keep the wrapper/macro model and record a narrow waiver after review. |
+| `WarnAnalyzeBBox` on private SRAM macro adapter | 1 | Expected in private flow | The public profile does not include the adapter. In a licensed private flow, keep the waiver narrow and tied to the adapter instance. |
 
 ## Lint acceptance gate
 

@@ -1,7 +1,7 @@
-# CIMForge 验证计划（VPLAN）
+# NMAForge 验证计划（VPLAN）
 
-版本：A8 / ABI v7.2  
-日期：2026-08-09
+版本：A8 / ABI v7.2
+日期：2026-08-27
 顶层：`rtl/top/ai_accel_top.v`
 
 ## 1. 验证目标
@@ -25,7 +25,7 @@
 | SpyGlass CDC | 0 unsynchronized crossing、0 convergence | Advanced_CDC license 缺失，非 sign-off |
 | SpyGlass RDC | 2 条 license error | 缺少 Advanced_CDC/`rdc_adv_checker`，非 RTL 结论 |
 | SAIF 功耗 | 已有生成入口，但 DC 仍有 PWR-414/PWR-415/PWR-428 | 只能作为默认/部分活动率估计 |
-| UVM | `uvm_verif/` 已独立为 agent/env/formal/sim/tb/tests 六层：AXI-Lite active agent、AXI4 passive monitor、scoreboard/coverage、ABI object 与 version smoke | `ai_version_smoke_test` 已在 Linux/VCS 运行通过；尚无 block 数据通路验证与 coverage closure |
+| UVM | `uvm_verif/` 提供可复用 AXI agent；`verif/block/dma` 与 `verif/block/control` 是当前 block UVM 主线 | DMA 11 项、control 6 项 VCS 回归均通过；2026-08-27 control 回归的每项 `UVM_ERROR=0`、`UVM_FATAL=0`；functional/code coverage closure 和多 seed 仍未完成 |
 | Formal/LEC/DFT | 尚未形成完整环境 | 本计划后续阶段 |
 
 ## 3. 验证环境分层
@@ -53,9 +53,9 @@ UVM agents/sequence ──> DUT ──> scoreboard/reference model
 
 退出条件：无未解释的 ABI 字段；所有 opcode、错误码、队列指针所有权均有唯一描述。
 
-### V1：UVM 基础环境（第一优先级）
+### V1：UVM 基础环境与已完成 block 回归
 
-建议目录：
+目录职责：
 
 ```text
 uvm_verif/
@@ -67,7 +67,11 @@ uvm_verif/
   tests/     base/smoke/random/stress/error/reset sequences and tests
 ```
 
-实施顺序：
+已完成：AXI-Lite control block 的 RAL/寄存器/IRQ/abort 回归，以及 DMA block 的
+1D/2D/gather、RID/BID 乱序、4 KiB、abort 和 back-pressure 回归。两者均采用真实
+DUT、active responder/driver、scoreboard、functional coverage 和局部 SVA。
+
+后续实施顺序：
 
 1. AXI-Lite agent：寄存器读写、WSTRB、非法地址、控制脉冲、sticky status/IRQ。
 2. AXI4 agent：AR/AW/W/R/B 独立通道、back-pressure、乱序 RID、RLAST、4 KiB boundary。
@@ -134,12 +138,11 @@ Formal 采用分层约束：先 block-level，再 top-level；对 AXI 外部接�
 
 ## 7. 每日学习与执行节奏
 
-每天先学习一小节 SPEC（寄存器、descriptor、DMA、CNM 或队列），随后为该章节补一个 UVM sequence、一个 checker/断言和至少一个 coverage 点。当天结束运行快速 smoke，并在 `docs/project_update_log.md` 记录学习章节、代码变更、命令和结果。
+每天先学习一小节 SPEC（寄存器、descriptor、DMA、CNM 或队列），随后为该章节补一个 UVM sequence、一个 checker/断言和至少一个 coverage 点。当天结束运行快速 smoke，并把可公开复现的命令与结果更新到相应验证 README、测试计划或提交说明；不要把私有聊天记录、机器路径或工具缓存放入公开仓库。
 
 ## 8. 当前起始任务
 
-当前优先级是先执行与最新 RTL/source list 对齐的 SpyGlass lint，并逐项处理真实
-error；CDC/RDC 在 lint 输入干净后分别运行。已经通过的 `uvm_verif` version smoke
-只是 framework bring-up，下一项动态验证从 `verif/block/dma` 的 `ai_axi128_dma`
-block 环境开始，随后进入 `verif/subsystem/dma_spad`、队列/完成和最终 top-level
-随机回归。原有 VCS smoke 始终保留为快速回归基线。
+当前优先级是扩大已经可运行的 block UVM：先补 CMDQ/CPLQ completion、scratchpad
+arbiter 与 tensor datapath 的 reference model、scoreboard 和 coverage；随后做多 seed
+top-level random/coverage。SpyGlass lint 继续逐项处理真实 error；CDC/RDC 的许可证限制
+单独记录。原有 VCS smoke 始终保留为每次 RTL 修改后的快速回归基线。

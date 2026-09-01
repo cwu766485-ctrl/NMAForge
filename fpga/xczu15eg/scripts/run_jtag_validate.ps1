@@ -1,6 +1,8 @@
-param(
-    [string]$Xsct = 'D:\Xilinx\Vitis\2024.1\bin\xsct.bat'
-)
+param([string]$Xsct = $env:XSCT)
+
+if (!$Xsct) {
+    $Xsct = (Get-Command xsct -ErrorAction Stop).Source
+}
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 & $Xsct (Join-Path $scriptDir 'jtag_validate.tcl')

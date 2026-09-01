@@ -1,12 +1,12 @@
-# CIMForge 的 CNM（Bank-Local PE）升级说明
+# NMAForge 的 CNM（Bank-Local PE）升级说明
 
-**状态（2026-08-09）：** A1、A2.2、A3.1 已实现并完成定向 benchmark；本文保留设计动机、演进逻辑与后续研究边界。实测结果以 `CNM_EVALUATION_ZH.md` 为准，PPA 以 `TSMC28_SYNTHESIS_REPORT.md` 为准。
-**对象：** CIMForge A8，512 KiB、4-bank scratchpad。  
+**状态（2026-08-26）：** A1、A2.2、A3.1 已实现并完成定向 benchmark；本文保留设计动机、演进逻辑与后续研究边界。可公开评估以 `CNM_EVALUATION.md` 为准，PPA 以 `TSMC28_SYNTHESIS_REPORT.md` 为准。
+**对象：** NMAForge A8，512 KiB、4-bank scratchpad。
 **一句话：** 把四个 SRAM bank 旁边的计算、累加和控制做得更独立，减少中央调度与跨 bank 的中间结果搬运。
 
 ## 1. 先说结论
 
-CIMForge 当前已经是 **数字 CNM**：4 个 SRAM bank 旁各有一个 Local Controller 和
+NMAForge 当前已经是 **数字 CNM**：4 个 SRAM bank 旁各有一个 Local Controller 和
 Local PE。A2.2 让每个 bank 独立进行地址推进、A/B request、ready/response-valid、
 A ping-pong buffer 和本地累加；四个 local sum 仅在输出边界进入 Global Reducer。
 
@@ -149,7 +149,7 @@ SRAM 输出 -> scratchpad 数据选择 -> Softmax SFU 的 sum_exp 累加寄存�
 
 当前可写：
 
-> CIMForge 是全数字 Compute-Near-Memory 加速器：四个 SRAM bank 分别邻接 Local Controller
+> NMAForge 是全数字 Compute-Near-Memory 加速器：四个 SRAM bank 分别邻接 Local Controller
 > 和 Local PE，在 bank 内完成读请求、预取和累加，仅在输出边界做 Global Reduce。受控 VCS
 > benchmark 中，A2 大 GEMV 相对原始版本最高 1.98×，A3.1 GEMM tile 最高 3.97×；功耗收益
 > 仍需正确 SAIF 映射和同 workload 的 PPA 对比证明。

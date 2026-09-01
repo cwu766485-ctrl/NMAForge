@@ -32,11 +32,26 @@ module ai_banked_cnm_core(
     output reg [31:0] pipeline_compute_events,
     output reg [31:0] response_wait_cycles
 );
-    localparam [7:0] OP_BANKED_VDOT=8'h20, OP_BANKED_GEMV=8'h21;
-    localparam [3:0] ERR_CONFIG=4'd1, ERR_OP=4'd2, ERR_ABORT=4'd3,
-                     ERR_WATCHDOG=4'd4, ERR_PARITY=4'd5, ERR_PROTECTION=4'd6;
-    localparam [2:0] ST_IDLE=0, ST_LAUNCH=1, ST_WAIT_LOCAL=2,
-                     ST_WRITE=3, ST_NEXT=4, ST_DONE=5, ST_ERROR=6;
+    // Command encodings are shared with the command processor ABI.
+    localparam [7:0] OP_BANKED_VDOT = 8'h20;
+    localparam [7:0] OP_BANKED_GEMV = 8'h21;
+
+    localparam [3:0] ERR_CONFIG     = 4'd1;
+    localparam [3:0] ERR_OP         = 4'd2;
+    localparam [3:0] ERR_ABORT      = 4'd3;
+    localparam [3:0] ERR_WATCHDOG   = 4'd4;
+    localparam [3:0] ERR_PARITY     = 4'd5;
+    localparam [3:0] ERR_PROTECTION = 4'd6;
+
+    localparam [2:0] ST_IDLE       = 3'd0;
+    localparam [2:0] ST_LAUNCH     = 3'd1;
+    localparam [2:0] ST_WAIT_LOCAL = 3'd2;
+    localparam [2:0] ST_WRITE      = 3'd3;
+    localparam [2:0] ST_NEXT       = 3'd4;
+    localparam [2:0] ST_DONE       = 3'd5;
+    localparam [2:0] ST_ERROR      = 3'd6;
+
+    localparam [1:0] ACT_RELU = 2'd1;
     reg [2:0] state_r;
     reg [7:0] op_r;
     reg [31:0] src0_r, src1_r, dst_r, b_row_base_r, output_addr_r;
@@ -44,27 +59,71 @@ module ai_banked_cnm_core(
     reg [4:0] scale_shift_r;
     reg [1:0] activation_r;
     reg [31:0] watchdog_limit_r;
-    wire local_start = state_r==ST_LAUNCH;
+    wire local_start = (state_r == ST_LAUNCH);
     wire [3:0] local_busy, local_done, local_error;
     wire signed [63:0] sum0, sum1, sum2, sum3;
     wire signed [63:0] global_sum = sum0 + sum1 + sum2 + sum3;
     wire signed [63:0] shifted_sum = global_sum >>> scale_shift_r;
-    wire signed [63:0] activated_sum = (activation_r==2'd1 && shifted_sum<0) ? 64'sd0 : shifted_sum;
+    wire signed [63:0] activated_sum =
+        (activation_r == ACT_RELU && shifted_sum < 0) ? 64'sd0 : shifted_sum;
     wire [31:0] quantized_result = (activated_sum > 64'sh0000_0000_7fff_ffff) ? 32'h7fff_ffff :
                                     (activated_sum < -64'sd2147483648) ? 32'h8000_0000 : activated_sum[31:0];
     wire locals_complete = &local_done;
     wire any_local_error = |local_error;
-    wire last_row = (op_r==OP_BANKED_VDOT) || (row_r==m_r-1'b1);
+    wire valid_operation = (op_mode == OP_BANKED_VDOT) || (op_mode == OP_BANKED_GEMV);
+    wire invalid_alignment = (src0_base[3:0] != 0) || (src1_base[3:0] != 0) ||
+                             (dst_base[1:0] != 0);
+    wire invalid_dimensions = (length == 0) ||
+                              ((op_mode == OP_BANKED_GEMV) && (m_size == 0));
+    wire last_row = (op_r == OP_BANKED_VDOT) || (row_r == m_r - 1'b1);
     wire [31:0] vector_bytes = {12'd0,length_r,4'b0000};
     wire [31:0] l0_reads,l1_reads,l2_reads,l3_reads;
     wire [31:0] l0_prefetch,l1_prefetch,l2_prefetch,l3_prefetch;
     wire [31:0] l0_compute,l1_compute,l2_compute,l3_compute;
     wire [31:0] l0_wait,l1_wait,l2_wait,l3_wait;
 
-    ai_bank_local_controller #(.LANE_ID(0)) lc0(.clk(clk),.resetn(resetn),.start(local_start),.abort(abort),.src0_base(src0_r),.src1_base(b_row_base_r),.length(length_r),.req_valid(cnm_req_valid[0]),.req_addr(cnm_addr0),.req_ready(cnm_req_ready[0]),.rsp_valid(cnm_rsp_valid[0]),.rsp_data(cnm_data0),.rsp_parity_error(cnm_parity_error[0]|cnm_protection_error),.busy(local_busy[0]),.done(local_done[0]),.error(local_error[0]),.local_sum(sum0),.read_issue_events(l0_reads),.prefetch_events(l0_prefetch),.compute_events(l0_compute),.response_wait_cycles(l0_wait));
-    ai_bank_local_controller #(.LANE_ID(1)) lc1(.clk(clk),.resetn(resetn),.start(local_start),.abort(abort),.src0_base(src0_r),.src1_base(b_row_base_r),.length(length_r),.req_valid(cnm_req_valid[1]),.req_addr(cnm_addr1),.req_ready(cnm_req_ready[1]),.rsp_valid(cnm_rsp_valid[1]),.rsp_data(cnm_data1),.rsp_parity_error(cnm_parity_error[1]|cnm_protection_error),.busy(local_busy[1]),.done(local_done[1]),.error(local_error[1]),.local_sum(sum1),.read_issue_events(l1_reads),.prefetch_events(l1_prefetch),.compute_events(l1_compute),.response_wait_cycles(l1_wait));
-    ai_bank_local_controller #(.LANE_ID(2)) lc2(.clk(clk),.resetn(resetn),.start(local_start),.abort(abort),.src0_base(src0_r),.src1_base(b_row_base_r),.length(length_r),.req_valid(cnm_req_valid[2]),.req_addr(cnm_addr2),.req_ready(cnm_req_ready[2]),.rsp_valid(cnm_rsp_valid[2]),.rsp_data(cnm_data2),.rsp_parity_error(cnm_parity_error[2]|cnm_protection_error),.busy(local_busy[2]),.done(local_done[2]),.error(local_error[2]),.local_sum(sum2),.read_issue_events(l2_reads),.prefetch_events(l2_prefetch),.compute_events(l2_compute),.response_wait_cycles(l2_wait));
-    ai_bank_local_controller #(.LANE_ID(3)) lc3(.clk(clk),.resetn(resetn),.start(local_start),.abort(abort),.src0_base(src0_r),.src1_base(b_row_base_r),.length(length_r),.req_valid(cnm_req_valid[3]),.req_addr(cnm_addr3),.req_ready(cnm_req_ready[3]),.rsp_valid(cnm_rsp_valid[3]),.rsp_data(cnm_data3),.rsp_parity_error(cnm_parity_error[3]|cnm_protection_error),.busy(local_busy[3]),.done(local_done[3]),.error(local_error[3]),.local_sum(sum3),.read_issue_events(l3_reads),.prefetch_events(l3_prefetch),.compute_events(l3_compute),.response_wait_cycles(l3_wait));
+    // Four independent controllers intentionally retain four independent
+    // request/response channels; no central broadcast datapath is inserted.
+    ai_bank_local_controller #(.LANE_ID(2'd0)) lc0(
+        .clk(clk), .resetn(resetn), .start(local_start), .abort(abort),
+        .src0_base(src0_r), .src1_base(b_row_base_r), .length(length_r),
+        .req_valid(cnm_req_valid[0]), .req_addr(cnm_addr0), .req_ready(cnm_req_ready[0]),
+        .rsp_valid(cnm_rsp_valid[0]), .rsp_data(cnm_data0),
+        .rsp_parity_error(cnm_parity_error[0] | cnm_protection_error),
+        .busy(local_busy[0]), .done(local_done[0]), .error(local_error[0]),
+        .local_sum(sum0), .read_issue_events(l0_reads), .prefetch_events(l0_prefetch),
+        .compute_events(l0_compute), .response_wait_cycles(l0_wait)
+    );
+    ai_bank_local_controller #(.LANE_ID(2'd1)) lc1(
+        .clk(clk), .resetn(resetn), .start(local_start), .abort(abort),
+        .src0_base(src0_r), .src1_base(b_row_base_r), .length(length_r),
+        .req_valid(cnm_req_valid[1]), .req_addr(cnm_addr1), .req_ready(cnm_req_ready[1]),
+        .rsp_valid(cnm_rsp_valid[1]), .rsp_data(cnm_data1),
+        .rsp_parity_error(cnm_parity_error[1] | cnm_protection_error),
+        .busy(local_busy[1]), .done(local_done[1]), .error(local_error[1]),
+        .local_sum(sum1), .read_issue_events(l1_reads), .prefetch_events(l1_prefetch),
+        .compute_events(l1_compute), .response_wait_cycles(l1_wait)
+    );
+    ai_bank_local_controller #(.LANE_ID(2'd2)) lc2(
+        .clk(clk), .resetn(resetn), .start(local_start), .abort(abort),
+        .src0_base(src0_r), .src1_base(b_row_base_r), .length(length_r),
+        .req_valid(cnm_req_valid[2]), .req_addr(cnm_addr2), .req_ready(cnm_req_ready[2]),
+        .rsp_valid(cnm_rsp_valid[2]), .rsp_data(cnm_data2),
+        .rsp_parity_error(cnm_parity_error[2] | cnm_protection_error),
+        .busy(local_busy[2]), .done(local_done[2]), .error(local_error[2]),
+        .local_sum(sum2), .read_issue_events(l2_reads), .prefetch_events(l2_prefetch),
+        .compute_events(l2_compute), .response_wait_cycles(l2_wait)
+    );
+    ai_bank_local_controller #(.LANE_ID(2'd3)) lc3(
+        .clk(clk), .resetn(resetn), .start(local_start), .abort(abort),
+        .src0_base(src0_r), .src1_base(b_row_base_r), .length(length_r),
+        .req_valid(cnm_req_valid[3]), .req_addr(cnm_addr3), .req_ready(cnm_req_ready[3]),
+        .rsp_valid(cnm_rsp_valid[3]), .rsp_data(cnm_data3),
+        .rsp_parity_error(cnm_parity_error[3] | cnm_protection_error),
+        .busy(local_busy[3]), .done(local_done[3]), .error(local_error[3]),
+        .local_sum(sum3), .read_issue_events(l3_reads), .prefetch_events(l3_prefetch),
+        .compute_events(l3_compute), .response_wait_cycles(l3_wait)
+    );
 
     always @(*) begin
         spad_valid = state_r==ST_WRITE;
@@ -94,8 +153,8 @@ module ai_banked_cnm_core(
                     cycle_count<=0; element_count<=0; local_accumulate_events<=0; global_reduce_events<=0;
                     banked_read_issue_events<=0; prefetch_events<=0; pipeline_compute_events<=0; response_wait_cycles<=0;
                     busy<=1; error<=0; error_code<=0;
-                    if (op_mode!=OP_BANKED_VDOT && op_mode!=OP_BANKED_GEMV) begin error_code<=ERR_OP; state_r<=ST_ERROR; end
-                    else if (length==0 || (op_mode==OP_BANKED_GEMV && m_size==0) || src0_base[3:0]!=0 || src1_base[3:0]!=0 || dst_base[1:0]!=0) begin error_code<=ERR_CONFIG; state_r<=ST_ERROR; end
+                    if (!valid_operation) begin error_code<=ERR_OP; state_r<=ST_ERROR; end
+                    else if (invalid_dimensions || invalid_alignment) begin error_code<=ERR_CONFIG; state_r<=ST_ERROR; end
                     else state_r<=ST_LAUNCH;
                 end
                 ST_LAUNCH: state_r<=ST_WAIT_LOCAL;

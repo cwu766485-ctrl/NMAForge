@@ -1,19 +1,19 @@
-# CIMForge A8 AI Accelerator Specification
+# NMAForge AXI4 Near-Memory Tensor Accelerator Specification
 
 **RTL release:** A8　**Software ABI:** v7.2　**Version register:** `0x1000_0008`
-**Canonical top:** `rtl/top/ai_accel_top.v`　**Scope date:** 2026-08-09
+**Canonical top:** `rtl/top/ai_accel_top.v`　**Scope date:** 2026-08-26
 
 This file is the English compatibility entry point for the current A8
 specification. The complete, detailed specification is maintained in
 [SPEC_ZH.md](SPEC_ZH.md). It covers the same RTL contract: AXI4-Lite control,
 128-bit AXI4 DMA, 512 KiB four-bank scratchpad, CMDQ/CPLQ, ABI v7.2 descriptors,
 INT8/matrix/SFU/CNN/KV operators, protection, performance counters, verification
-evidence, and TSMC28 pre-layout limitations. It is the English companion of the
+evidence, and commercial-28-nm pre-layout limitations. It is the English companion of the
 Chinese source-of-truth document, not a second ABI definition.
 
 ## What the IP is—and is not
 
-CIMForge is a synthesizable, **digital compute-near-memory (CNM)** accelerator.
+NMAForge is a synthesizable, **digital compute-near-memory (CNM)** accelerator.
 It moves tiles between external memory and a four-bank scratchpad, then keeps
 bank-local address generation, operand buffering and partial accumulation close
 to each SRAM bank. It is not analog in-SRAM compute: the SRAM bit-cell, bit-line
@@ -28,7 +28,7 @@ LLM-serving stack.
 
 ## Digital CNM datapath
 
-For banked VDOT/GEMV opcodes `0x20/0x21`, CIMForge implements a digital
+For banked VDOT/GEMV opcodes `0x20/0x21`, NMAForge implements a digital
 compute-near-memory (CNM) datapath. `ai_banked_cnm_core` instantiates four
 `ai_bank_local_controller` blocks. Each controller owns its bank-local address
 generation, A/B request, ready/response-valid lane, ping-pong operand buffer,
@@ -50,8 +50,8 @@ Source-of-truth files are `rtl/top/ai_accel_top.v`,
 
 - Dynamic regression and directed CNM benchmarks are a functional baseline; they
   are not UVM coverage closure.
-- TSMC28 TT/0.9 V/25 C, 4.0 ns (250 MHz) pre-layout DC closed setup and hold
-  with 32 real SRAM macros. This is not post-route ASIC sign-off or proof of
+- A commercial 28 nm TT/0.9 V/25 C, 4.0 ns (250 MHz) pre-layout DC study met
+  setup and hold with 32 SRAM macros. This is not post-route ASIC sign-off or proof of
   400 MHz.
 - SpyGlass lint has 0 errors; CDC/RDC are structural-only checks blocked from
   advanced sign-off by missing licenses.

@@ -18,16 +18,10 @@ if (-not [string]::IsNullOrWhiteSpace($VivadoPath)) {
     $vivadoExe = (Get-Command vivado -ErrorAction Stop).Source
 } elseif ($env:VIVADO_HOME -and (Test-Path (Join-Path $env:VIVADO_HOME "bin\vivado.bat"))) {
     $vivadoExe = Join-Path $env:VIVADO_HOME "bin\vivado.bat"
-} else {
-    $knownVivadoPaths = @(
-        "D:\Xilinx\Vivado\2024.1\bin\vivado.bat",
-        "C:\Xilinx\Vivado\2024.1\bin\vivado.bat"
-    )
-    $vivadoExe = $knownVivadoPaths | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 }
 
 if (-not $vivadoExe -or -not (Test-Path -LiteralPath $vivadoExe)) {
-    throw "Vivado executable was not found. Use -VivadoPath 'D:\Xilinx\Vivado\2024.1\bin\vivado.bat' or start a Vivado-enabled shell (settings64.bat)."
+    throw "Vivado executable was not found. Set VIVADO_HOME, use a Vivado-enabled shell, or pass -VivadoPath."
 }
 
 function Invoke-VivadoBatch([string]$TclScript) {

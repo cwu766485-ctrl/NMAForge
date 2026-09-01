@@ -25,6 +25,15 @@ __pycache__/
 
 # Vivado non-project build artefacts (reports and checkpoints remain local).
 fpga/**/build/
+*.xpr
+*.xpr.user
+*.dcp
+*.bit
+*.bin
+*.ltx
+*.hw
+.cache/
+.ip_user_files/
 
 # Local EDA generated artifacts and vendor example projects.
 .srcs/
@@ -50,6 +59,50 @@ docs/Interview/
 *.tar
 *.tar.gz
 *.zip
+
+# Private board collateral and vendor reference projects.  Public FPGA scripts
+# require an explicit local NMAFORGE_VENDOR_XPR instead of shipping these files.
+fpga/xczu15eg/BOT.dxf
+fpga/xczu15eg/TOP.dxf
+fpga/xczu15eg/XCZU15EG_SCH_0515.pdf
+fpga/xczu15eg/xczu9eg-2ffvb1156.ucf
+fpga/xczu15eg/xczu9eg-2ffvb1156.v
+fpga/xczu15eg/vendor/
+docs/wsl_linux_instruction.md
+docs/project_update_log.md
+docs/CNM_EVALUATION_ZH.md
+docs/CODEX_CONVERSATION_EXPORT.md
+scripts/export_codex_cimforge.py
+scripts/sync_cimforge_to_windows.ps1
+scripts/cimforge_eda_bridge.sh
+
+# Foundry and licensed EDA collateral stay in a private local overlay.  The
+# public repository includes only sanitized PPA evidence and integration notes.
+syn/ai_scratchpad_28nm_macro.v
+syn/convert_tsmc28_sram_lib.tcl
+syn/convert_tsmc28_stdcell_lib.tcl
+syn/dc_ai_accel_28nm.tcl
+syn/probe_tsmc28_libraries.tcl
+syn/run_ai_accel_28nm_dc.sh
+syn/out/
+verif/spyglass/tsmc28_sram_macro_stub.v
+
+# Proprietary physical-design and timing-library deliverables.
+*.db
+*.lib
+*.lef
+*.tf
+*.tluplus
+*.ndm
+*.mw
+*.gds
+*.gdsii
+*.cdl
+*.spi
+*.spef
+*.sdf
+*.saif
+*.fsdb
 
 # Local credentials and machine-specific settings
 .env
