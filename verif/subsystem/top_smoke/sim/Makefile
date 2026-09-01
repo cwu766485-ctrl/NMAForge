@@ -87,8 +87,8 @@ ai_a6_dma_run: ai_a6_dma_comp
 
 ai_a6_datapaths_comp:
 	$(VCS_FOCUSED) -top tb_ai_a6_datapaths \
-		../../../../rtl/compute/ai_conv3x3_linebuffer_core.v \
-		../../../../rtl/compute/ai_kv_cache_engine.v \
+		../../../../rtl/compute/cnn/ai_conv3x3_linebuffer_core.v \
+		../../../../rtl/compute/kv/ai_kv_cache_engine.v \
 		../../../block/compute/cnn_kv/tb/tb_ai_a6_datapaths.sv -o simv_a6_datapaths -l ai_a6_datapaths_comp.log
 
 ai_a6_datapaths_run: ai_a6_datapaths_comp
@@ -104,9 +104,9 @@ ai_a7_vcs: ai_a6_dma_run ai_a6_datapaths_run ai_spad_arb_run
 ai_cnm_a22_comp:
 	rm -rf simv_cnm_a22 simv_cnm_a22.daidir
 	$(VCS_FOCUSED) -top tb_ai_banked_cnm_a22 \
-		../../../../rtl/compute/ai_bank_pe.v \
-		../../../../rtl/compute/ai_bank_local_controller.v \
-		../../../../rtl/compute/ai_banked_cnm_core.v \
+		../../../../rtl/compute/cnm/ai_bank_pe.v \
+		../../../../rtl/compute/cnm/ai_bank_local_controller.v \
+		../../../../rtl/compute/cnm/ai_banked_cnm_core.v \
 		../../../block/compute/cnm/tb/tb_ai_banked_cnm_a22.sv -o simv_cnm_a22 -l ai_cnm_a22_comp.log
 
 ai_cnm_a22_run: ai_cnm_a22_comp
@@ -118,9 +118,9 @@ ai_cnm_a22: ai_cnm_a22_run
 ai_cnm_a2_gemv_bench_comp:
 	rm -rf simv_cnm_a2_gemv_bench simv_cnm_a2_gemv_bench.daidir
 	$(VCS_FOCUSED) -top tb_ai_cnm_a2_gemv_bench \
-		../../../../rtl/compute/ai_bank_pe.v \
-		../../../../rtl/compute/ai_bank_local_controller.v \
-		../../../../rtl/compute/ai_banked_cnm_core.v \
+		../../../../rtl/compute/cnm/ai_bank_pe.v \
+		../../../../rtl/compute/cnm/ai_bank_local_controller.v \
+		../../../../rtl/compute/cnm/ai_banked_cnm_core.v \
 		../../../block/compute/cnm/tb/tb_ai_cnm_a2_gemv_bench.sv -o simv_cnm_a2_gemv_bench -l ai_cnm_a2_gemv_bench_comp.log
 
 ai_cnm_a2_gemv_bench_run: ai_cnm_a2_gemv_bench_comp
@@ -131,7 +131,7 @@ ai_cnm_a2_gemv_bench: ai_cnm_a2_gemv_bench_run
 ai_tensor_a3_gemm_bench_comp:
 	rm -rf simv_tensor_a3_gemm_bench simv_tensor_a3_gemm_bench.daidir
 	$(VCS_FOCUSED) -top tb_ai_tensor_a3_gemm_bench \
-		../../../../rtl/compute/ai_tensor_matrix_core.v \
+		../../../../rtl/compute/matrix/ai_tensor_matrix_core.v \
 		../../../block/compute/matrix/tb/tb_ai_tensor_a3_gemm_bench.sv -o simv_tensor_a3_gemm_bench -l ai_tensor_a3_gemm_bench_comp.log
 
 ai_tensor_a3_gemm_bench_run: ai_tensor_a3_gemm_bench_comp

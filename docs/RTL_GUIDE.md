@@ -26,11 +26,11 @@ advance `CPLQ_TAIL`.
 | Step | Files | Question answered |
 |---|---|---|
 | 1 | `rtl/top/ai_accel_top.v` | Which block owns each external interface and how are engine results selected? |
-| 2 | `rtl/control/axi_lite_reg_if.v`, `ai_accel_regs.v` | How does software issue a register access and observe status? |
-| 3 | `rtl/control/ai_command_processor.v`, `ai_desc_fetch.v`, `axi_desc_fetch.v`, `ai_completion_writer.v` | How is a command fetched, validated, launched and completed? |
+| 2 | `rtl/control/axi_lite/axi_lite_reg_if.v`, `rtl/control/axi_lite/ai_accel_regs.v` | How does software issue a register access and observe status? |
+| 3 | `rtl/control/queue/ai_command_processor.v`, `rtl/control/descriptor/ai_desc_fetch.v`, `rtl/control/descriptor/axi_desc_fetch.v`, `rtl/control/queue/ai_completion_writer.v` | How is a command fetched, validated, launched and completed? |
 | 4 | `rtl/memory/ai_spad_arbiter.v`, `ai_scratchpad.v`, `ai_spad_protection.v` | Who can access scratchpad memory and with which priority? |
 | 5 | `rtl/dma/ai_axi128_dma.v` | How do external-memory transfers cross 4 KiB and outstanding-read boundaries? |
-| 6 | `rtl/compute/ai_int8_compute_core.v`, `ai_banked_cnm_core.v`, `ai_tensor_matrix_core.v`, `ai_tensor_sfu_core.v` | Which engine implements an opcode and what data path does it use? |
+| 6 | `rtl/compute/int8/ai_int8_compute_core.v`, `rtl/compute/cnm/ai_banked_cnm_core.v`, `rtl/compute/matrix/ai_tensor_matrix_core.v`, `rtl/compute/sfu/ai_tensor_sfu_core.v` | Which engine implements an opcode and what data path does it use? |
 
 ## 3. Integration wrappers and acceptance state
 

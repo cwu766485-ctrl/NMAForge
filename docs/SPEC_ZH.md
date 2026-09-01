@@ -122,7 +122,7 @@ VCS `make ai_smoke` 已覆盖 Transformer 30-command 链、随机 GEMV/GEMM/Conv
 
 ## 8. 权威文件
 
-`rtl/top/ai_accel_top.v`（集成）、`rtl/control/ai_accel_regs.v` 与 `sw/include/cimforge_regs.h`（ABI）、`rtl/control/ai_command_processor.v`（命令）、`rtl/control/ai_completion_writer.v`（完成原子性）、`rtl/dma/ai_axi128_dma.v`（DMA）、`rtl/memory/ai_spad_arbiter.v`/`ai_scratchpad.v`（SRAM）、`verif/subsystem/top_smoke/sim/ai_accel.f`（VCS）和 `verif/spyglass/a8_static.prj`（SpyGlass）。ASIC macro adapter 位于私有 overlay。
+`rtl/top/ai_accel_top.v`（集成）、`rtl/control/axi_lite/ai_accel_regs.v` 与 `sw/include/cimforge_regs.h`（ABI）、`rtl/control/queue/ai_command_processor.v`（命令）、`rtl/control/queue/ai_completion_writer.v`（完成原子性）、`rtl/dma/ai_axi128_dma.v`（DMA）、`rtl/memory/ai_spad_arbiter.v`/`ai_scratchpad.v`（SRAM）、`verif/subsystem/top_smoke/sim/ai_accel.f`（VCS）和 `verif/spyglass/a8_static.prj`（SpyGlass）。ASIC macro adapter 位于私有 overlay。
 
 ## 9. 电路模块与信号交互
 | 模块 A | 模块 B | 主要信号 | 用零基础语言解释 |

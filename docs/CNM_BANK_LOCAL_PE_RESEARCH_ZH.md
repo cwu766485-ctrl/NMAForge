@@ -158,8 +158,8 @@ SRAM 输出 -> scratchpad 数据选择 -> Softmax SFU 的 sum_exp 累加寄存�
 
 - 原始中央控制/reduction 基线仅保留其历史 benchmark 结论；相应 RTL/TB 已从当前仓库移除，
   不再作为主线回归或实现输入。
-- 当前 CNM core 与 local controller：`rtl/compute/ai_banked_cnm_core.v`、`rtl/compute/ai_bank_local_controller.v`
-- 单个 INT8 dot4 PE：`rtl/compute/ai_bank_pe.v`
+- 当前 CNM core 与 local controller：`rtl/compute/cnm/ai_banked_cnm_core.v`、`rtl/compute/cnm/ai_bank_local_controller.v`
+- 单个 INT8 dot4 PE：`rtl/compute/cnm/ai_bank_pe.v`
 - 四 bank 同行读取：`rtl/memory/ai_scratchpad.v`
 - 统一仲裁：`rtl/memory/ai_spad_arbiter.v`
 - 当前关键路径证据：`docs/TSMC28_SYNTHESIS_REPORT.md`

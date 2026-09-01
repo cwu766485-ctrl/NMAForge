@@ -42,7 +42,7 @@ to different banks are not implemented and must not be inferred from this
 interface. This is a digital near-memory architecture, not analog in-SRAM CIM.
 
 Source-of-truth files are `rtl/top/ai_accel_top.v`,
-`rtl/control/ai_accel_regs.v`, `rtl/control/ai_command_processor.v`,
+`rtl/control/axi_lite/ai_accel_regs.v`, `rtl/control/queue/ai_command_processor.v`,
 `rtl/dma/ai_axi128_dma.v`, `rtl/memory/ai_spad_arbiter.v`,
 `rtl/memory/ai_scratchpad.v`, and `sw/include/cimforge_regs.h`.
 
