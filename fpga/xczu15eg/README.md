@@ -92,7 +92,7 @@ load/store, external descriptor execution, scratchpad completion, VDOT result
 and the real PL-to-PS GIC interrupt path. A CPU-independent DAP diagnostic is
 also available as `scripts/run_jtag_validate.ps1`; `scripts/run_verify_ila.ps1`
 checks the LTX/debug-core match without accessing the PS/DAP. See
-`docs/XCZU15EG_BRINGUP.md` and `sw/README.md` for acceptance evidence and
+`docs/verification/XCZU15EG_BRINGUP.md` and `sw/README.md` for acceptance evidence and
 recovery steps.
 
 ## Memory and reset rules

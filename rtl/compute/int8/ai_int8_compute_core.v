@@ -96,9 +96,7 @@ module ai_int8_compute_core(
     // 当前任务也不会被中途影响，同时降低配置总线扇出。
     reg [3:0]  state_r;
     reg [7:0]  op_r;
-    reg [31:0] src0_base_r;
     reg [31:0] src1_base_r;
-    reg [31:0] dst_base_r;
     reg [15:0] length_r;
     reg [15:0] m_size_r;
     reg [15:0] n_size_r;
@@ -121,7 +119,6 @@ module ai_int8_compute_core(
     reg [31:0] a_word_r;
     reg [31:0] b_word_r;
     reg signed [63:0] acc_r;
-    reg signed [63:0] acc_next_r;
     reg [31:0] output_word_r;
     reg [3:0]  start_error_code;
     reg        read_protection_error_r;
@@ -130,7 +127,6 @@ module ai_int8_compute_core(
     wire [31:0] b_addr;
     wire [31:0] out_addr;
     wire [31:0] bias_addr;
-    wire signed [31:0] dot_term;
     wire signed [63:0] acc_sum;
     wire [31:0] quantized_result;
     wire valid_op;
@@ -169,7 +165,7 @@ module ai_int8_compute_core(
     ai_int8_datapath int8_datapath_u(
         .a_word(a_word_r), .b_word(b_word_r), .accumulator(acc_r),
         .scale_shift(scale_shift_r), .activation(activation_r),
-        .dot_term(dot_term), .accumulator_sum(acc_sum),
+        .accumulator_sum(acc_sum),
         .quantized_result(quantized_result)
     );
     // 后处理：先算术右移做简化量化，再可选 ReLU，再饱和到 signed int32。
@@ -294,9 +290,7 @@ module ai_int8_compute_core(
         if (!resetn) begin
             state_r          <= ST_IDLE;
             op_r             <= OP_VDOT_INT8;
-            src0_base_r      <= 32'd0;
             src1_base_r      <= 32'd0;
-            dst_base_r       <= 32'd0;
             length_r         <= 16'd0;
             m_size_r         <= 16'd0;
             n_size_r         <= 16'd0;
@@ -316,7 +310,6 @@ module ai_int8_compute_core(
             a_word_r         <= 32'd0;
             b_word_r         <= 32'd0;
             acc_r            <= 64'sd0;
-            acc_next_r       <= 64'sd0;
             output_word_r    <= 32'd0;
             read_protection_error_r <= 1'b0;
             busy             <= 1'b0;
@@ -329,7 +322,9 @@ module ai_int8_compute_core(
         end else begin
             done <= 1'b0;
 
-            if (busy)
+            if (state_r==ST_IDLE && start)
+                cycle_count <= 32'd0;
+            else if (busy)
                 cycle_count <= cycle_count + 32'd1;
 
             if (busy && abort) begin
@@ -347,9 +342,7 @@ module ai_int8_compute_core(
                         error <= 1'b0;
                         if (start) begin
                             op_r             <= op_mode;
-                            src0_base_r      <= src0_base;
                             src1_base_r      <= src1_base;
-                            dst_base_r       <= dst_base;
                             length_r         <= length;
                             m_size_r         <= m_size;
                             n_size_r         <= n_size;
@@ -367,8 +360,6 @@ module ai_int8_compute_core(
                             col_r            <= 16'd0;
                             k_r              <= 16'd0;
                             acc_r            <= 64'sd0;
-                            acc_next_r       <= 64'sd0;
-                            cycle_count      <= 32'd0;
                             element_count    <= 32'd0;
                             error_code       <= start_error_code;
                             busy             <= 1'b1;
@@ -423,7 +414,6 @@ module ai_int8_compute_core(
                         // 计算一个 packed word 的 dot4，并加到 accumulator。
                         // 如果已经是最后一个 k，则做量化/激活/饱和并准备写回；
                         // 否则 k++，继续读取下一组 A/B word。
-                        acc_next_r <= acc_sum;
                         if (last_k) begin
                             output_word_r <= quantized_result;
                             result <= quantized_result;
@@ -451,7 +441,6 @@ module ai_int8_compute_core(
                             state_r <= ST_DONE;
                         end else begin
                             acc_r      <= 64'sd0;
-                            acc_next_r <= 64'sd0;
                             k_r        <= 16'd0;
                             if (matrix_mode) begin
                                 if (col_r == (n_size_r - 16'd1)) begin

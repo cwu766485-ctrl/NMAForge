@@ -1,7 +1,7 @@
 # NMAForge — AXI4 Near-Memory Tensor Accelerator
 
-[中文 README](README_ZH.md) · [Architecture](docs/ARCHITECTURE.md) ·
-[Specification](docs/SPEC.md) · [Verification plan](docs/VPLAN.md) ·
+[中文 README](README_ZH.md) · [Architecture](docs/architecture/ARCHITECTURE.md) ·
+[Specification](docs/spec/SPEC.md) · [Verification plan](docs/verification/VPLAN.md) ·
 [Documentation index](docs/README.md)
 
 > **Short description:** A synthesizable AXI4 near-memory tensor accelerator
@@ -37,7 +37,7 @@ external-memory traffic.
   WSTRB/errors, IRQ/W1C, busy/abort, randomized accesses and RAL frontdoor.
 - A commercial 28 nm pre-layout synthesis study met a 250 MHz constraint under
   its documented single-corner assumptions; details are sanitized in
-  [`docs/TSMC28_SYNTHESIS_REPORT.md`](docs/TSMC28_SYNTHESIS_REPORT.md).
+  [`docs/verification/TSMC28_SYNTHESIS_REPORT.md`](docs/verification/TSMC28_SYNTHESIS_REPORT.md).
 - XCZU15EG FPGA synthesis/implementation and bring-up scripts are included,
   but a clean-clone board deployment still needs the board owner’s private
   reference project and hardware access.
@@ -50,8 +50,8 @@ measurements remain open.
 
 ```text
 rtl/       Synthesizable accelerator RTL
-verif/     Smoke, block UVM, subsystem tests and static-analysis collateral
-uvm_verif/ Reusable UVM agents and top-level UVM bring-up
+dv/     Smoke, block UVM, subsystem tests and static-analysis collateral
+dv/uvm/ Reusable UVM agents and top-level UVM bring-up
 sw/        ABI header, mapper and bare-metal bring-up source
 fpga/      Public Vivado flows and board integration scripts
 docs/      Architecture, specification, verification and public-release notes

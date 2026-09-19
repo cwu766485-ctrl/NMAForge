@@ -24,7 +24,7 @@ module axi_desc_fetch #(
     output reg [15:0] desc_wait_mask, output reg [15:0] desc_signal_mask, output reg [15:0] desc_clear_mask, output reg [7:0] desc_version
 );
   localparam [1:0] OKAY=2'b00; localparam [1:0] INCR=2'b01;
-  localparam IDLE=0, ADDR=1, DATA=2, DONE=3;
+  localparam [1:0] IDLE=2'd0, ADDR=2'd1, DATA=2'd2, DONE=2'd3;
   reg [1:0] state_r; reg [1:0] beat_r;
   wire [31:0] d0=m_axi_rdata[31:0], d1=m_axi_rdata[63:32], d2=m_axi_rdata[95:64], d3=m_axi_rdata[127:96];
   assign m_axi_arid=4'd0; assign m_axi_arlen=8'd3; assign m_axi_arsize=3'd4; assign m_axi_arburst=INCR;

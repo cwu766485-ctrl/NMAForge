@@ -1,0 +1,37 @@
+name: NMAForge
+top: ai_accel_top
+rtl:
+  - rtl/**/*.v
+  - rtl/**/*.sv
+filelists:
+  - dv/subsystem/top_smoke/sim/ai_accel.f
+include_dirs:
+  - dv/block/control/agent
+  - dv/block/dma/agent
+  - dv/subsystem/top_smoke/fixtures
+defines:
+  - VCS
+
+# Canonical project-specific flows remain the checked-in Makefiles and scripts.
+# The generic EDA API is safe for doctor/plan/dry-run, but its current sim
+# adapter does not yet model the generated fixture and complete VCS invocation.
+sim_tb: dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv
+
+pdk:
+  root: external/private
+  target_library: external/private/tsmc28_stdcell.db
+constraints: external/private/nmaforge_250mhz.sdc
+
+flows:
+  sim: {simulator: vcs, canonical: tools/hw smoke}
+  lint: {tool: spyglass, canonical: tools/hw lint}
+  cdc: {tool: spyglass, canonical: tools/hw cdc}
+  rdc: {tool: spyglass, canonical: tools/hw rdc}
+  synth: {tool: dc, canonical: bash syn/run_ai_accel_28nm_dc.sh 4.0}
+
+dft:
+  enabled: false
+  scan: {chains: 1, compression: false}
+  mbist: {enabled: false, controller: vendor_ip}
+  lbist: {enabled: false, controller: vendor_ip}
+  atpg: {faults: [stuck_at, transition], tool: tmax}

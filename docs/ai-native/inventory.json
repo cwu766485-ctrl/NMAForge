@@ -1,0 +1,790 @@
+{
+  "generator": "organize-chip-project",
+  "root": ".",
+  "file_count": 312,
+  "top_directories": [
+    "docs",
+    "dv",
+    "fpga",
+    "rtl",
+    "sw",
+    "syn",
+    "tools"
+  ],
+  "top_files": [
+    ".gitignore",
+    "AGENTS.md",
+    "NOTICE.md",
+    "README.md",
+    "README_ZH.md"
+  ],
+  "evidence_files": [
+    "README.md",
+    "docs/README.md",
+    "dv/block/README.md",
+    "dv/block/compute/cnm/README.md",
+    "dv/block/compute/cnn_kv/README.md",
+    "dv/block/compute/matrix/README.md",
+    "dv/block/compute/sfu/README.md",
+    "dv/block/control/README.md",
+    "dv/block/control/sim/Makefile",
+    "dv/block/dma/README.md",
+    "dv/block/dma/sim/Makefile",
+    "dv/spyglass/README.md",
+    "dv/subsystem/README.md",
+    "dv/subsystem/tensor_datapath/README.md",
+    "dv/subsystem/top_smoke/README.md",
+    "dv/subsystem/top_smoke/sim/Makefile",
+    "dv/uvm/README.md",
+    "dv/uvm/formal/README.md",
+    "dv/uvm/sim/Makefile",
+    "fpga/xczu15eg/README.md",
+    "fpga/xilinx_a7_100t/README.md",
+    "rtl/README.md",
+    "sw/README.md",
+    "sw/workloads/transformer_micro/README.md",
+    "syn/README.md"
+  ],
+  "purpose": "NMAForge is a synthesizable, all-digital near-memory tensor-accelerator IP. It is **not** analog compute-in-memory: arithmetic remains digital, while a four-bank scratchpad keeps tiles close to bank-local compute and reduces external-memory traffic.",
+  "role_paths": {
+    "project artifact": [
+      ".gitignore",
+      "NOTICE.md",
+      "README_ZH.md",
+      "docs/exec-plans/active/physical-migration-map.json",
+      "dv/VERIFICATION_MATRIX.md",
+      "dv/block/command_processor/.gitkeep",
+      "dv/block/command_processor/assertions/.gitkeep",
+      "dv/block/command_processor/ref/.gitkeep",
+      "dv/block/command_processor/sim/.gitkeep",
+      "dv/block/compute/cnm/.gitkeep",
+      "dv/block/compute/cnn_kv/.gitkeep",
+      "dv/block/compute/matrix/.gitkeep",
+      "dv/block/compute/sfu/.gitkeep",
+      "dv/block/control/.gitkeep",
+      "dv/block/control/assertions/.gitkeep",
+      "dv/block/control/ref/.gitkeep",
+      "dv/block/control/sim/.gitkeep",
+      "dv/block/control/sim/cm.log",
+      "dv/block/control/sim/control_block_regress.log",
+      "dv/block/control/sim/control_block_urg.log",
+      "dv/block/control/sim/control_random_debug.log",
+      "dv/block/control/sim/control_random_fixed.log",
+      "dv/block/control/sim/tr_db.log",
+      "dv/block/dma/.gitkeep",
+      "dv/block/dma/agent/.gitkeep",
+      "dv/block/dma/assertions/.gitkeep",
+      "dv/block/dma/env/.gitkeep",
+      "dv/block/dma/ref/.gitkeep",
+      "dv/block/dma/sim/.gitkeep",
+      "dv/block/dma/sim/dma_block_regress.log",
+      "dv/block/dma/sim/dma_load_ooo_smoke.log",
+      "dv/block/dma/sim/tr_db.log",
+      "dv/block/spad_arbiter/.gitkeep",
+      "dv/block/spad_arbiter/assertions/.gitkeep",
+      "dv/block/spad_arbiter/ref/.gitkeep",
+      "dv/block/spad_arbiter/sim/.gitkeep",
+      "dv/spyglass/LINT_TRIAGE.md",
+      "dv/spyglass/a8_static.prj",
+      "dv/spyglass/dashboard.log",
+      "dv/spyglass/datasheet.log",
+      "dv/spyglass/goals_summary.log",
+      "dv/spyglass/lint_a8_current.console.log",
+      "dv/subsystem/dma_spad/.gitkeep",
+      "dv/subsystem/dma_spad/assertions/.gitkeep",
+      "dv/subsystem/dma_spad/ref/.gitkeep",
+      "dv/subsystem/dma_spad/sim/.gitkeep",
+      "dv/subsystem/queue_completion/.gitkeep",
+      "dv/subsystem/queue_completion/assertions/.gitkeep",
+      "dv/subsystem/queue_completion/ref/.gitkeep",
+      "dv/subsystem/queue_completion/sim/.gitkeep",
+      "dv/subsystem/tensor_datapath/assertions/.gitkeep",
+      "dv/subsystem/tensor_datapath/ref/.gitkeep",
+      "dv/subsystem/tensor_datapath/sim/.gitkeep",
+      "dv/subsystem/top_smoke/sim/Makefile.questasim",
+      "dv/subsystem/top_smoke/sim/ai_a6_datapaths_comp.log",
+      "dv/subsystem/top_smoke/sim/ai_a6_datapaths_run.log",
+      "dv/subsystem/top_smoke/sim/ai_accel_smoke.log",
+      "dv/subsystem/top_smoke/sim/ai_cnm_a22_comp.log",
+      "dv/subsystem/top_smoke/sim/ai_cnm_a22_run.log",
+      "dv/subsystem/top_smoke/sim/ai_cnm_a2_gemv_bench_comp.log",
+      "dv/subsystem/top_smoke/sim/ai_cnm_a2_gemv_bench_run.log",
+      "dv/subsystem/top_smoke/sim/ai_comp.log",
+      "dv/subsystem/top_smoke/sim/ai_dma_comp.log",
+      "dv/subsystem/top_smoke/sim/ai_dma_run.log",
+      "dv/subsystem/top_smoke/sim/ai_spad_arb_comp.log",
+      "dv/subsystem/top_smoke/sim/ai_spad_arb_run.log",
+      "dv/subsystem/top_smoke/sim/ai_tensor_a3_gemm_bench_comp.log",
+      "dv/subsystem/top_smoke/sim/ai_tensor_a3_gemm_bench_run.log",
+      "dv/subsystem/top_smoke/sim/ai_transformer.log",
+      "dv/subsystem/top_smoke/sim/verdi_config_file",
+      "fpga/xczu15eg/BOARD_REFERENCE.md",
+      "fpga/xczu15eg/BOT.dxf",
+      "fpga/xczu15eg/XCZU15EG_SCH_0515.pdf",
+      "fpga/xczu15eg/xczu9eg-2ffvb1156.ucf",
+      "fpga/xczu15eg/scripts/build_baremetal.ps1",
+      "fpga/xczu15eg/scripts/run_baremetal.ps1",
+      "fpga/xczu15eg/scripts/run_board_build.ps1",
+      "fpga/xczu15eg/scripts/run_jtag_validate.ps1",
+      "fpga/xczu15eg/scripts/run_verify_ila.ps1",
+      "fpga/xczu15eg/scripts/run_vivado_impl.ps1"
+    ],
+    "agent instructions": [
+      "AGENTS.md"
+    ],
+    "project guidance / source of truth": [
+      "README.md",
+      "docs/README.md",
+      "dv/block/README.md",
+      "dv/block/compute/cnm/README.md",
+      "dv/block/compute/cnn_kv/README.md",
+      "dv/block/compute/matrix/README.md",
+      "dv/block/compute/sfu/README.md",
+      "dv/block/control/README.md",
+      "dv/block/dma/README.md",
+      "dv/spyglass/README.md",
+      "dv/subsystem/README.md",
+      "dv/subsystem/tensor_datapath/README.md",
+      "dv/subsystem/top_smoke/README.md",
+      "dv/uvm/README.md",
+      "dv/uvm/formal/README.md",
+      "fpga/xczu15eg/README.md",
+      "fpga/xilinx_a7_100t/README.md",
+      "rtl/README.md",
+      "sw/README.md",
+      "sw/workloads/transformer_micro/README.md",
+      "syn/README.md"
+    ],
+    "design / verification documentation": [
+      "docs/PUBLIC_RELEASE.md",
+      "docs/README_ZH.md",
+      "docs/RTL_GUIDE.md",
+      "docs/project_update_log.md",
+      "docs/wsl_linux_instruction.md",
+      "docs/architecture/ARCHITECTURE.md",
+      "docs/architecture/CNM_BANK_LOCAL_PE_RESEARCH_ZH.md",
+      "docs/architecture/CNM_EVALUATION.md",
+      "docs/architecture/CNM_EVALUATION_ZH.md",
+      "docs/architecture/Literature_Review.md",
+      "docs/architecture/PROJECT_EXPERIENCE_ZH.md",
+      "docs/exec-plans/active/execution-frontier.md",
+      "docs/spec/NAMING_COMPATIBILITY.md",
+      "docs/spec/SPEC.md",
+      "docs/spec/SPEC_ZH.md",
+      "docs/verification/STATIC_ANALYSIS_REPORT.md",
+      "docs/verification/TSMC28_SYNTHESIS_REPORT.md",
+      "docs/verification/VPLAN.md",
+      "docs/verification/XCZU15EG_BRINGUP.md"
+    ],
+    "verification source": [
+      "dv/block/command_processor/tb/.gitkeep",
+      "dv/block/command_processor/tests/.gitkeep",
+      "dv/block/compute/cnm/tb/tb_ai_banked_cnm_a22.sv",
+      "dv/block/compute/cnm/tb/tb_ai_cnm_a2_gemv_bench.sv",
+      "dv/block/compute/cnn_kv/tb/tb_ai_a6_datapaths.sv",
+      "dv/block/compute/matrix/tb/tb_ai_tensor_a3_gemm_bench.sv",
+      "dv/block/control/sim/control_uvm.f",
+      "dv/block/control/sim/logs/control_busy_abort_test.log",
+      "dv/block/control/sim/logs/control_irq_error_test.log",
+      "dv/block/control/sim/logs/control_protocol_test.log",
+      "dv/block/control/sim/logs/control_ral_access_test.log",
+      "dv/block/control/sim/logs/control_random_rw_test.log",
+      "dv/block/control/sim/logs/control_reset_version_test.log",
+      "dv/block/control/tb/.gitkeep",
+      "dv/block/control/tb/tb_ai_control_uvm.sv",
+      "dv/block/control/tests/.gitkeep",
+      "dv/block/control/tests/control_base_test.svh",
+      "dv/block/control/tests/control_sequences.svh",
+      "dv/block/control/tests/control_tests_pkg.sv",
+      "dv/block/dma/DMA_UVM_TESTPLAN.md",
+      "dv/block/dma/sim/dma_block_uvm.f",
+      "dv/block/dma/tb/.gitkeep",
+      "dv/block/dma/tb/tb_ai_axi128_dma.sv",
+      "dv/block/dma/tb/tb_ai_axi128_dma_uvm.sv",
+      "dv/block/dma/tests/.gitkeep",
+      "dv/block/dma/tests/dma_block_base_test.svh",
+      "dv/block/dma/tests/dma_block_tests_pkg.sv",
+      "dv/block/dma/tests/dma_functional_tests.svh",
+      "dv/block/dma/tests/dma_load_ooo_smoke_test.svh",
+      "dv/block/spad_arbiter/tb/.gitkeep",
+      "dv/block/spad_arbiter/tb/tb_ai_spad_arbiter_rr.sv",
+      "dv/block/spad_arbiter/tests/.gitkeep",
+      "dv/subsystem/dma_spad/tb/.gitkeep",
+      "dv/subsystem/dma_spad/tests/.gitkeep",
+      "dv/subsystem/queue_completion/tb/.gitkeep",
+      "dv/subsystem/queue_completion/tests/.gitkeep",
+      "dv/subsystem/tensor_datapath/tb/.gitkeep",
+      "dv/subsystem/tensor_datapath/tests/.gitkeep",
+      "dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv",
+      "dv/uvm/agent/ai_accel_uvm_types_pkg.sv",
+      "dv/uvm/agent/ai_axi4_agent_pkg.sv",
+      "dv/uvm/agent/ai_axil_agent_pkg.sv",
+      "dv/uvm/agent/axi4/ai_axi4_agent.svh",
+      "dv/uvm/agent/axi4/ai_axi4_monitor.svh",
+      "dv/uvm/agent/axil/ai_axil_agent.svh",
+      "dv/uvm/agent/axil/ai_axil_driver.svh",
+      "dv/uvm/agent/axil/ai_axil_monitor.svh",
+      "dv/uvm/agent/axil/ai_axil_sequencer.svh",
+      "dv/uvm/agent/interfaces/ai_axi4_if.sv",
+      "dv/uvm/agent/interfaces/ai_axil_if.sv",
+      "dv/uvm/agent/items/ai_axi4_observed_item.svh",
+      "dv/uvm/agent/items/ai_axil_item.svh",
+      "dv/uvm/agent/items/ai_completion.svh",
+      "dv/uvm/agent/items/ai_descriptor.svh",
+      "dv/uvm/env/ai_accel_env.svh",
+      "dv/uvm/env/ai_accel_env_pkg.sv",
+      "dv/uvm/env/coverage/ai_axi4_coverage.svh",
+      "dv/uvm/env/coverage/ai_axil_coverage.svh",
+      "dv/uvm/env/model/ai_accel_reference_model.svh",
+      "dv/uvm/env/scoreboard/ai_accel_scoreboard.svh",
+      "dv/uvm/formal/ai_accel_formal_properties.sv",
+      "dv/uvm/sim/Makefile",
+      "dv/uvm/sim/ai_accel_uvm.f",
+      "dv/uvm/sim/tr_db.log",
+      "dv/uvm/sim/uvm_compile.console.log",
+      "dv/uvm/sim/uvm_compile.log",
+      "dv/uvm/sim/uvm_run.log",
+      "dv/uvm/sim/uvm_smoke.console.log",
+      "dv/uvm/sim/verdi_config_file",
+      "dv/uvm/tb/tb_ai_accel_uvm.sv",
+      "dv/uvm/tests/ai_accel_tests_pkg.sv",
+      "dv/uvm/tests/base/ai_base_test.svh",
+      "dv/uvm/tests/sequences/ai_version_smoke_seq.svh",
+      "dv/uvm/tests/smoke/ai_version_smoke_test.svh"
+    ],
+    "tool / automation script": [
+      "dv/block/compute/cnm/ref/ai_a2_reference.py",
+      "dv/block/compute/matrix/ref/ai_a3_reference.py",
+      "dv/spyglass/run_spyglass_a8.sh",
+      "dv/subsystem/top_smoke/sim/run_ai_smoke_linux.sh",
+      "sw/tools/cimforge_mapper.py",
+      "syn/run_ai_accel_28nm_dc.sh"
+    ],
+    "RTL / HDL source": [
+      "dv/block/control/agent/axi_lite_tasks.svh",
+      "dv/block/control/agent/control_axil_agent.svh",
+      "dv/block/control/agent/control_axil_agent_pkg.sv",
+      "dv/block/control/agent/control_axil_driver.svh",
+      "dv/block/control/agent/control_axil_monitor.svh",
+      "dv/block/control/agent/control_axil_sequencer.svh",
+      "dv/block/control/agent/control_axil_types_pkg.sv",
+      "dv/block/control/agent/interfaces/ai_control_status_if.sv",
+      "dv/block/control/assertions/ai_axil_control_sva.sv",
+      "dv/block/control/env/control_coverage.svh",
+      "dv/block/control/env/control_env.svh",
+      "dv/block/control/env/control_env_pkg.sv",
+      "dv/block/control/env/control_reg_model.svh",
+      "dv/block/control/env/control_scoreboard.svh",
+      "dv/block/dma/agent/ai_dma_tasks.svh",
+      "dv/block/dma/agent/dma_axi_monitor.svh",
+      "dv/block/dma/agent/dma_axi_read_responder.svh",
+      "dv/block/dma/agent/dma_block_agent_pkg.sv",
+      "dv/block/dma/agent/dma_block_types_pkg.sv",
+      "dv/block/dma/agent/dma_cmd_driver.svh",
+      "dv/block/dma/agent/dma_cmd_sequencer.svh",
+      "dv/block/dma/agent/dma_spad_model.svh",
+      "dv/block/dma/agent/dma_spad_monitor.svh",
+      "dv/block/dma/agent/interfaces/ai_dma_axi_if.sv",
+      "dv/block/dma/agent/interfaces/ai_dma_ctrl_if.sv",
+      "dv/block/dma/agent/interfaces/ai_dma_spad_if.sv",
+      "dv/block/dma/assertions/ai_axi128_dma_sva.sv",
+      "dv/block/dma/env/axi_memory_model.sv",
+      "dv/block/dma/env/dma_block_env.svh",
+      "dv/block/dma/env/dma_block_env_pkg.sv",
+      "dv/block/dma/env/dma_block_scoreboard.svh",
+      "dv/spyglass/tsmc28_sram_macro_stub.v",
+      "dv/subsystem/top_smoke/env/ai_accel_sva.sv",
+      "dv/subsystem/top_smoke/fixtures/ai_transformer_workload.svh",
+      "fpga/xczu15eg/xczu9eg-2ffvb1156.v",
+      "fpga/xilinx_a7_100t/rtl/axi_lite_bringup_master.v",
+      "fpga/xilinx_a7_100t/rtl/fpga_ai_accel_smoke_top.v",
+      "rtl/compute/cnm/ai_bank_local_controller.v",
+      "rtl/compute/cnm/ai_bank_pe.v",
+      "rtl/compute/cnm/ai_banked_cnm_core.v",
+      "rtl/compute/cnn/ai_conv3x3_linebuffer_core.v",
+      "rtl/compute/common/ai_integer_sqrt.v",
+      "rtl/compute/common/ai_unsigned_divider.v",
+      "rtl/compute/int8/ai_int8_compute_core.v",
+      "rtl/compute/int8/ai_int8_datapath.v",
+      "rtl/compute/kv/ai_kv_cache_engine.v",
+      "rtl/compute/matrix/ai_tensor_matrix_core.v",
+      "rtl/compute/matrix/ai_tensor_matrix_datapath.v",
+      "rtl/compute/pipeline/ai_tile_pipeline.v",
+      "rtl/compute/sfu/ai_tensor_sfu_core.v",
+      "rtl/compute/sfu/ai_tensor_sfu_math.v",
+      "rtl/control/axi_lite/ai_accel_regs.v",
+      "rtl/control/axi_lite/axi_lite_reg_if.v",
+      "rtl/control/descriptor/ai_accel_opcode_decode.v",
+      "rtl/control/descriptor/ai_desc_fetch.v",
+      "rtl/control/descriptor/ai_descriptor_validator.v",
+      "rtl/control/descriptor/axi_desc_fetch.v",
+      "rtl/control/queue/ai_command_processor.v",
+      "rtl/control/queue/ai_completion_writer.v",
+      "rtl/control/queue/ai_perf_monitor.v",
+      "rtl/control/queue/ai_ring_pointer_next.v",
+      "rtl/dma/ai_axi128_dma.v",
+      "rtl/dma/ai_dma_burst_planner.v",
+      "rtl/dma/ai_dma_read_slot_tracker.v",
+      "rtl/dma/ai_dma_spad_transfer_adapter.v",
+      "rtl/dma/ai_dma_write_response_tracker.v",
+      "rtl/memory/ai_scratchpad.v",
+      "rtl/memory/ai_spad_arbiter.v",
+      "rtl/memory/ai_spad_protection.v",
+      "rtl/top/ai_accel_top.v",
+      "rtl/top/fabric/axi/ai_accel_axi_fabric.v",
+      "rtl/top/fabric/axi/ai_accel_axi_master_router.v",
+      "rtl/top/fabric/axi/ai_accel_dma_request_mux.v",
+      "rtl/top/fabric/axi/ai_descriptor_source_mux.v",
+      "rtl/top/fabric/compute/ai_accel_compute_cluster.v",
+      "rtl/top/fabric/control/ai_accel_control_fabric.v",
+      "rtl/top/fabric/memory/ai_accel_memory_fabric.v",
+      "rtl/top/fabric/memory/ai_accel_spad_subsystem.v",
+      "rtl/top/fabric/memory/ai_spad_response_demux.v",
+      "syn/ai_scratchpad_28nm_macro.v"
+    ],
+    "build / EDA flow input": [
+      "dv/block/control/sim/Makefile",
+      "dv/block/dma/sim/Makefile",
+      "dv/spyglass/a8_rtl.f",
+      "dv/subsystem/top_smoke/sim/Makefile",
+      "dv/subsystem/top_smoke/sim/ai_accel.f",
+      "fpga/xczu15eg/ai_accel_rtl.tcl",
+      "fpga/xczu15eg/scripts/build_board.tcl",
+      "fpga/xczu15eg/scripts/finalize_board_build.tcl",
+      "fpga/xczu15eg/scripts/generate_baremetal.tcl",
+      "fpga/xczu15eg/scripts/implement_ai_accel_ip.tcl",
+      "fpga/xczu15eg/scripts/jtag_run_baremetal.tcl",
+      "fpga/xczu15eg/scripts/jtag_validate.tcl",
+      "fpga/xczu15eg/scripts/synth_ai_accel_ip.tcl",
+      "fpga/xczu15eg/scripts/verify_ila.tcl",
+      "fpga/xilinx_a7_100t/ai_accel_rtl.tcl",
+      "fpga/xilinx_a7_100t/scripts/build_smoke_bitstream.tcl",
+      "fpga/xilinx_a7_100t/scripts/program_smoke_bitstream.tcl",
+      "fpga/xilinx_a7_100t/scripts/synth_ai_accel_ip.tcl",
+      "fpga/xilinx_a7_100t/scripts/synth_smoke_top.tcl",
+      "syn/convert_tsmc28_sram_lib.tcl",
+      "syn/convert_tsmc28_stdcell_lib.tcl",
+      "syn/dc_ai_accel_28nm.tcl",
+      "syn/probe_tsmc28_libraries.tcl"
+    ],
+    "constraints / power intent": [
+      "dv/spyglass/a8_constraints.sgdc",
+      "fpga/xilinx_a7_100t/constraints/a7_100t_smoke.xdc"
+    ]
+  },
+  "flow_targets": {
+    "dv/block/control/sim/Makefile": [
+      "uvm_compile",
+      "run_sim",
+      "uvm_run",
+      "uvm_smoke",
+      "uvm_regress",
+      "coverage"
+    ],
+    "dv/block/dma/sim/Makefile": [
+      "uvm_compile",
+      "uvm_run",
+      "uvm_smoke",
+      "uvm_regress",
+      "coverage",
+      "clean"
+    ],
+    "dv/subsystem/top_smoke/sim/Makefile": [
+      "all",
+      "ai_transformer_gen",
+      "ai_comp",
+      "ai_run",
+      "ai_smoke",
+      "ai_smoke_vcd",
+      "ai_smoke_saif",
+      "ai_transformer",
+      "ai_quick",
+      "ai_a4_ref",
+      "ai_precheck",
+      "ai_dma_comp",
+      "ai_dma_run",
+      "ai_spad_arb_comp",
+      "ai_spad_arb_run",
+      "ai_upgrade_vcs",
+      "ai_a6_dma_comp",
+      "ai_a6_dma_run",
+      "ai_a6_datapaths_comp",
+      "ai_a6_datapaths_run",
+      "ai_a7_vcs",
+      "ai_cnm_a22_comp",
+      "ai_cnm_a22_run",
+      "ai_cnm_a22",
+      "ai_cnm_a2_gemv_bench_comp",
+      "ai_cnm_a2_gemv_bench_run",
+      "ai_cnm_a2_gemv_bench",
+      "ai_tensor_a3_gemm_bench_comp",
+      "ai_tensor_a3_gemm_bench_run",
+      "ai_tensor_a3_gemm_bench",
+      "ai_cnm_compare",
+      "ai_cnm_signoff",
+      "clean"
+    ],
+    "dv/uvm/sim/Makefile": [
+      "uvm_compile",
+      "uvm_run",
+      "uvm_smoke",
+      "clean"
+    ]
+  },
+  "commands": [
+    "make uvm_smoke",
+    "make uvm_regress 2>&1 | tee control_block_regress.log",
+    "make coverage",
+    "VCS collected line/condition/FSM/branch/toggle/assertion coverage during the",
+    "make uvm_regress 2>&1 | tee dma_block_regress.log",
+    "make uvm_compile",
+    "make -C ../dv/subsystem/top_smoke/sim ai_transformer_gen",
+    "make -C ../dv/subsystem/top_smoke/sim ai_transformer",
+    "make -C dv/subsystem/top_smoke/sim ai_transformer_gen",
+    "make ai_transformer",
+    "make -f dv/block/control/sim/Makefile uvm_compile",
+    "make -f dv/block/control/sim/Makefile run_sim",
+    "make -f dv/block/control/sim/Makefile uvm_run",
+    "make -f dv/block/control/sim/Makefile uvm_smoke",
+    "make -f dv/block/control/sim/Makefile uvm_regress",
+    "make -f dv/block/control/sim/Makefile coverage",
+    "make -f dv/block/dma/sim/Makefile uvm_compile",
+    "make -f dv/block/dma/sim/Makefile uvm_run",
+    "make -f dv/block/dma/sim/Makefile uvm_smoke",
+    "make -f dv/block/dma/sim/Makefile uvm_regress",
+    "make -f dv/block/dma/sim/Makefile coverage",
+    "make -f dv/block/dma/sim/Makefile clean",
+    "make -f dv/subsystem/top_smoke/sim/Makefile all",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_transformer_gen",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_comp",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_run",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_smoke",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_smoke_vcd",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_smoke_saif",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_transformer",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_quick",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_a4_ref",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_precheck",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_dma_comp",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_dma_run",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_spad_arb_comp",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_spad_arb_run",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_upgrade_vcs",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_a6_dma_comp",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_a6_dma_run",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_a6_datapaths_comp",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_a6_datapaths_run",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_a7_vcs",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_cnm_a22_comp",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_cnm_a22_run",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_cnm_a22",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_cnm_a2_gemv_bench_comp",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_cnm_a2_gemv_bench_run",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_cnm_a2_gemv_bench",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_tensor_a3_gemm_bench_comp",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_tensor_a3_gemm_bench_run",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_tensor_a3_gemm_bench",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_cnm_compare",
+    "make -f dv/subsystem/top_smoke/sim/Makefile ai_cnm_signoff",
+    "make -f dv/subsystem/top_smoke/sim/Makefile clean",
+    "make -f dv/uvm/sim/Makefile uvm_compile",
+    "make -f dv/uvm/sim/Makefile uvm_run",
+    "make -f dv/uvm/sim/Makefile uvm_smoke",
+    "make -f dv/uvm/sim/Makefile clean"
+  ],
+  "hdl_modules": [
+    {
+      "name": "tb_ai_banked_cnm_a22",
+      "file": "dv/block/compute/cnm/tb/tb_ai_banked_cnm_a22.sv"
+    },
+    {
+      "name": "tb_ai_cnm_a2_gemv_bench",
+      "file": "dv/block/compute/cnm/tb/tb_ai_cnm_a2_gemv_bench.sv"
+    },
+    {
+      "name": "tb_ai_a6_datapaths",
+      "file": "dv/block/compute/cnn_kv/tb/tb_ai_a6_datapaths.sv"
+    },
+    {
+      "name": "tb_ai_tensor_a3_gemm_bench",
+      "file": "dv/block/compute/matrix/tb/tb_ai_tensor_a3_gemm_bench.sv"
+    },
+    {
+      "name": "ai_axil_control_sva",
+      "file": "dv/block/control/assertions/ai_axil_control_sva.sv"
+    },
+    {
+      "name": "tb_ai_control_uvm",
+      "file": "dv/block/control/tb/tb_ai_control_uvm.sv"
+    },
+    {
+      "name": "ai_axi128_dma_sva",
+      "file": "dv/block/dma/assertions/ai_axi128_dma_sva.sv"
+    },
+    {
+      "name": "axi_memory_model",
+      "file": "dv/block/dma/env/axi_memory_model.sv"
+    },
+    {
+      "name": "tb_ai_axi128_dma",
+      "file": "dv/block/dma/tb/tb_ai_axi128_dma.sv"
+    },
+    {
+      "name": "tb_ai_axi128_dma_uvm",
+      "file": "dv/block/dma/tb/tb_ai_axi128_dma_uvm.sv"
+    },
+    {
+      "name": "tb_ai_spad_arbiter_rr",
+      "file": "dv/block/spad_arbiter/tb/tb_ai_spad_arbiter_rr.sv"
+    },
+    {
+      "name": "TS1N28HPCPL2SVTB4096X32M4MWBASO",
+      "file": "dv/spyglass/tsmc28_sram_macro_stub.v"
+    },
+    {
+      "name": "ai_accel_sva",
+      "file": "dv/subsystem/top_smoke/env/ai_accel_sva.sv"
+    },
+    {
+      "name": "tb_ai_accel_smoke",
+      "file": "dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv"
+    },
+    {
+      "name": "ai_accel_formal_axi_properties",
+      "file": "dv/uvm/formal/ai_accel_formal_properties.sv"
+    },
+    {
+      "name": "tb_ai_accel_uvm",
+      "file": "dv/uvm/tb/tb_ai_accel_uvm.sv"
+    },
+    {
+      "name": "axi_lite_bringup_master",
+      "file": "fpga/xilinx_a7_100t/rtl/axi_lite_bringup_master.v"
+    },
+    {
+      "name": "fpga_ai_accel_smoke_top",
+      "file": "fpga/xilinx_a7_100t/rtl/fpga_ai_accel_smoke_top.v"
+    },
+    {
+      "name": "ai_bank_local_controller",
+      "file": "rtl/compute/cnm/ai_bank_local_controller.v"
+    },
+    {
+      "name": "ai_bank_pe",
+      "file": "rtl/compute/cnm/ai_bank_pe.v"
+    },
+    {
+      "name": "ai_banked_cnm_core",
+      "file": "rtl/compute/cnm/ai_banked_cnm_core.v"
+    },
+    {
+      "name": "ai_conv3x3_linebuffer_core",
+      "file": "rtl/compute/cnn/ai_conv3x3_linebuffer_core.v"
+    },
+    {
+      "name": "ai_integer_sqrt",
+      "file": "rtl/compute/common/ai_integer_sqrt.v"
+    },
+    {
+      "name": "ai_unsigned_divider",
+      "file": "rtl/compute/common/ai_unsigned_divider.v"
+    },
+    {
+      "name": "ai_int8_compute_core",
+      "file": "rtl/compute/int8/ai_int8_compute_core.v"
+    },
+    {
+      "name": "ai_int8_datapath",
+      "file": "rtl/compute/int8/ai_int8_datapath.v"
+    },
+    {
+      "name": "ai_kv_cache_engine",
+      "file": "rtl/compute/kv/ai_kv_cache_engine.v"
+    },
+    {
+      "name": "ai_tensor_matrix_core",
+      "file": "rtl/compute/matrix/ai_tensor_matrix_core.v"
+    },
+    {
+      "name": "ai_tensor_matrix_datapath",
+      "file": "rtl/compute/matrix/ai_tensor_matrix_datapath.v"
+    },
+    {
+      "name": "ai_tile_pipeline",
+      "file": "rtl/compute/pipeline/ai_tile_pipeline.v"
+    },
+    {
+      "name": "ai_tensor_sfu_core",
+      "file": "rtl/compute/sfu/ai_tensor_sfu_core.v"
+    },
+    {
+      "name": "contains",
+      "file": "rtl/compute/sfu/ai_tensor_sfu_math.v"
+    },
+    {
+      "name": "ai_tensor_sfu_math",
+      "file": "rtl/compute/sfu/ai_tensor_sfu_math.v"
+    },
+    {
+      "name": "ai_accel_regs",
+      "file": "rtl/control/axi_lite/ai_accel_regs.v"
+    },
+    {
+      "name": "axi_lite_reg_if",
+      "file": "rtl/control/axi_lite/axi_lite_reg_if.v"
+    },
+    {
+      "name": "ai_accel_opcode_decode",
+      "file": "rtl/control/descriptor/ai_accel_opcode_decode.v"
+    },
+    {
+      "name": "ai_desc_fetch",
+      "file": "rtl/control/descriptor/ai_desc_fetch.v"
+    },
+    {
+      "name": "ai_descriptor_validator",
+      "file": "rtl/control/descriptor/ai_descriptor_validator.v"
+    },
+    {
+      "name": "axi_desc_fetch",
+      "file": "rtl/control/descriptor/axi_desc_fetch.v"
+    },
+    {
+      "name": "owns",
+      "file": "rtl/control/queue/ai_command_processor.v"
+    },
+    {
+      "name": "ai_command_processor",
+      "file": "rtl/control/queue/ai_command_processor.v"
+    },
+    {
+      "name": "remains",
+      "file": "rtl/control/queue/ai_command_processor.v"
+    },
+    {
+      "name": "ai_completion_writer",
+      "file": "rtl/control/queue/ai_completion_writer.v"
+    },
+    {
+      "name": "ai_perf_monitor",
+      "file": "rtl/control/queue/ai_perf_monitor.v"
+    },
+    {
+      "name": "ai_ring_pointer_next",
+      "file": "rtl/control/queue/ai_ring_pointer_next.v"
+    },
+    {
+      "name": "ai_axi128_dma",
+      "file": "rtl/dma/ai_axi128_dma.v"
+    },
+    {
+      "name": "ai_dma_burst_planner",
+      "file": "rtl/dma/ai_dma_burst_planner.v"
+    },
+    {
+      "name": "ai_dma_read_slot_tracker",
+      "file": "rtl/dma/ai_dma_read_slot_tracker.v"
+    },
+    {
+      "name": "ai_dma_spad_transfer_adapter",
+      "file": "rtl/dma/ai_dma_spad_transfer_adapter.v"
+    },
+    {
+      "name": "ai_dma_write_response_tracker",
+      "file": "rtl/dma/ai_dma_write_response_tracker.v"
+    },
+    {
+      "name": "ai_scratchpad",
+      "file": "rtl/memory/ai_scratchpad.v"
+    },
+    {
+      "name": "ai_spad_arbiter",
+      "file": "rtl/memory/ai_spad_arbiter.v"
+    },
+    {
+      "name": "ai_spad_protection",
+      "file": "rtl/memory/ai_spad_protection.v"
+    },
+    {
+      "name": "ai_accel_top",
+      "file": "rtl/top/ai_accel_top.v"
+    },
+    {
+      "name": "ai_accel_axi_fabric",
+      "file": "rtl/top/fabric/axi/ai_accel_axi_fabric.v"
+    },
+    {
+      "name": "ai_accel_axi_master_router",
+      "file": "rtl/top/fabric/axi/ai_accel_axi_master_router.v"
+    },
+    {
+      "name": "ai_accel_dma_request_mux",
+      "file": "rtl/top/fabric/axi/ai_accel_dma_request_mux.v"
+    },
+    {
+      "name": "ai_descriptor_source_mux",
+      "file": "rtl/top/fabric/axi/ai_descriptor_source_mux.v"
+    },
+    {
+      "name": "ai_accel_compute_cluster",
+      "file": "rtl/top/fabric/compute/ai_accel_compute_cluster.v"
+    },
+    {
+      "name": "only",
+      "file": "rtl/top/fabric/control/ai_accel_control_fabric.v"
+    },
+    {
+      "name": "ai_accel_control_fabric",
+      "file": "rtl/top/fabric/control/ai_accel_control_fabric.v"
+    },
+    {
+      "name": "ai_accel_memory_fabric",
+      "file": "rtl/top/fabric/memory/ai_accel_memory_fabric.v"
+    },
+    {
+      "name": "ai_accel_spad_subsystem",
+      "file": "rtl/top/fabric/memory/ai_accel_spad_subsystem.v"
+    },
+    {
+      "name": "ai_spad_response_demux",
+      "file": "rtl/top/fabric/memory/ai_spad_response_demux.v"
+    },
+    {
+      "name": "ai_scratchpad",
+      "file": "syn/ai_scratchpad_28nm_macro.v"
+    }
+  ],
+  "probable_tops": [
+    "ai_axil_control_sva",
+    "ai_axi128_dma_sva",
+    "axi_memory_model",
+    "TS1N28HPCPL2SVTB4096X32M4MWBASO",
+    "ai_accel_sva",
+    "ai_accel_formal_axi_properties",
+    "axi_lite_bringup_master",
+    "fpga_ai_accel_smoke_top",
+    "ai_bank_local_controller",
+    "ai_bank_pe",
+    "ai_banked_cnm_core",
+    "ai_conv3x3_linebuffer_core",
+    "ai_integer_sqrt",
+    "ai_unsigned_divider",
+    "ai_int8_compute_core",
+    "ai_int8_datapath",
+    "ai_kv_cache_engine",
+    "ai_tensor_matrix_core",
+    "ai_tensor_matrix_datapath",
+    "ai_tile_pipeline",
+    "ai_tensor_sfu_core",
+    "contains",
+    "ai_tensor_sfu_math",
+    "ai_accel_regs",
+    "axi_lite_reg_if",
+    "ai_accel_opcode_decode",
+    "ai_desc_fetch",
+    "ai_descriptor_validator",
+    "axi_desc_fetch",
+    "owns"
+  ],
+  "eda_config": {}
+}

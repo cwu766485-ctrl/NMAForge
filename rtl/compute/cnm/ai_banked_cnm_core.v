@@ -54,7 +54,7 @@ module ai_banked_cnm_core(
     localparam [1:0] ACT_RELU = 2'd1;
     reg [2:0] state_r;
     reg [7:0] op_r;
-    reg [31:0] src0_r, src1_r, dst_r, b_row_base_r, output_addr_r;
+    reg [31:0] src0_r, b_row_base_r, output_addr_r;
     reg [15:0] length_r, m_r, row_r;
     reg [4:0] scale_shift_r;
     reg [1:0] activation_r;
@@ -134,23 +134,25 @@ module ai_banked_cnm_core(
     always @(posedge clk or negedge resetn) begin
         if (!resetn) begin
             state_r<=ST_IDLE; busy<=0; done<=0; error<=0; error_code<=0; result<=0;
-            cycle_count<=0; element_count<=0; op_r<=0; src0_r<=0; src1_r<=0; dst_r<=0;
+            cycle_count<=0; element_count<=0; op_r<=0; src0_r<=0;
             b_row_base_r<=0; output_addr_r<=0; length_r<=0; m_r<=0; row_r<=0;
             scale_shift_r<=0; activation_r<=0; watchdog_limit_r<=0;
             local_accumulate_events<=0; global_reduce_events<=0; banked_read_issue_events<=0;
             prefetch_events<=0; pipeline_compute_events<=0; response_wait_cycles<=0;
         end else begin
             done<=0;
-            if (busy)
+            if (state_r==ST_IDLE && start)
+                cycle_count<=0;
+            else if (busy)
                 cycle_count<=cycle_count+1'b1;
             if (busy && abort) begin error_code<=ERR_ABORT; state_r<=ST_ERROR; end
             else if (busy && watchdog_limit_r!=0 && cycle_count>=watchdog_limit_r) begin error_code<=ERR_WATCHDOG; state_r<=ST_ERROR; end
             else case (state_r)
                 ST_IDLE: if (start) begin
-                    op_r<=op_mode; src0_r<=src0_base; src1_r<=src1_base; dst_r<=dst_base;
+                    op_r<=op_mode; src0_r<=src0_base;
                     b_row_base_r<=src1_base; output_addr_r<=dst_base; length_r<=length; m_r<=m_size; row_r<=0;
                     scale_shift_r<=scale_shift; activation_r<=activation; watchdog_limit_r<=watchdog_limit;
-                    cycle_count<=0; element_count<=0; local_accumulate_events<=0; global_reduce_events<=0;
+                    element_count<=0; local_accumulate_events<=0; global_reduce_events<=0;
                     banked_read_issue_events<=0; prefetch_events<=0; pipeline_compute_events<=0; response_wait_cycles<=0;
                     busy<=1; error<=0; error_code<=0;
                     if (!valid_operation) begin error_code<=ERR_OP; state_r<=ST_ERROR; end

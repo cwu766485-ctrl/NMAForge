@@ -1,0 +1,4 @@
+interface:
+  display_name: "Write AGENTS.md"
+  short_description: "Create concise, repo-specific AGENTS.md guidance"
+  default_prompt: "Inspect this repository and create or update a concise AGENTS.md (under 150 lines) with actionable project rules, sources of truth, commands, modification boundaries, debugging policy, and definition of done."

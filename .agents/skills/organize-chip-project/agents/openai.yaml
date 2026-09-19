@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI-Native 芯片项目整理"
+  short_description: "安全盘点和整理芯片设计验证项目，保持内容及功能一致"
+  default_prompt: "Use $organize-chip-project to inspect and safely organize this chip design and verification project into an AI-native structure without losing content or behavior."

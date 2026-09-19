@@ -1,0 +1,61 @@
+# NMAForge public SpyGlass project.
+#
+# The public profile uses the behavioural scratchpad model and a structural
+# memory threshold. Private foundry macro adapters and timing libraries are
+# intentionally excluded; they may be added from a local, ignored overlay.
+
+set_option top ai_accel_top
+set_option enableSV yes
+set_option define VCS
+set_option allow_module_override yes
+# Lint-only depth scaling: preserve the scratchpad ports, addressing, arbitration
+# and registered-read control while keeping each behavioural bank below the
+# structural-memory threshold.  Product RTL retains its 32768-word default.
+set_option param ai_accel_top.SPAD_WORDS_PER_BANK=256
+set_option mthresh 8193
+# This server has versioned GuideWare but no GuideWare/latest symlink.  Pin the
+# installed methodology so CLI batch runs do not silently select a missing one.
+set_option active_methodology "$SPYGLASS_HOME/GuideWare/2023.12/block/rtl_handoff"
+read_file -type verilog ../../rtl/control/axi_lite/axi_lite_reg_if.v
+read_file -type verilog ../../rtl/dma/ai_dma_burst_planner.v
+read_file -type verilog ../../rtl/dma/ai_dma_read_slot_tracker.v
+read_file -type verilog ../../rtl/dma/ai_dma_write_response_tracker.v
+read_file -type verilog ../../rtl/dma/ai_dma_spad_transfer_adapter.v
+read_file -type verilog ../../rtl/dma/ai_axi128_dma.v
+read_file -type verilog ../../rtl/memory/ai_spad_protection.v
+read_file -type verilog ../../rtl/memory/ai_spad_arbiter.v
+read_file -type verilog ../../rtl/compute/pipeline/ai_tile_pipeline.v
+read_file -type verilog ../../rtl/control/queue/ai_perf_monitor.v
+read_file -type verilog ../../rtl/control/descriptor/ai_accel_opcode_decode.v
+read_file -type verilog ../../rtl/control/descriptor/ai_descriptor_validator.v
+read_file -type verilog ../../rtl/control/queue/ai_ring_pointer_next.v
+read_file -type verilog ../../rtl/control/queue/ai_command_processor.v
+read_file -type verilog ../../rtl/compute/cnm/ai_bank_pe.v
+read_file -type verilog ../../rtl/compute/cnm/ai_bank_local_controller.v
+read_file -type verilog ../../rtl/compute/cnm/ai_banked_cnm_core.v
+read_file -type verilog ../../rtl/compute/common/ai_unsigned_divider.v
+read_file -type verilog ../../rtl/compute/common/ai_integer_sqrt.v
+read_file -type verilog ../../rtl/compute/matrix/ai_tensor_matrix_datapath.v
+read_file -type verilog ../../rtl/compute/matrix/ai_tensor_matrix_core.v
+read_file -type verilog ../../rtl/compute/sfu/ai_tensor_sfu_math.v
+read_file -type verilog ../../rtl/compute/sfu/ai_tensor_sfu_core.v
+read_file -type verilog ../../rtl/compute/cnn/ai_conv3x3_linebuffer_core.v
+read_file -type verilog ../../rtl/compute/kv/ai_kv_cache_engine.v
+read_file -type verilog ../../rtl/memory/ai_scratchpad.v
+read_file -type verilog ../../rtl/control/descriptor/ai_desc_fetch.v
+read_file -type verilog ../../rtl/control/descriptor/axi_desc_fetch.v
+read_file -type verilog ../../rtl/control/queue/ai_completion_writer.v
+read_file -type verilog ../../rtl/control/axi_lite/ai_accel_regs.v
+read_file -type verilog ../../rtl/compute/int8/ai_int8_datapath.v
+read_file -type verilog ../../rtl/compute/int8/ai_int8_compute_core.v
+read_file -type verilog ../../rtl/top/fabric/axi/ai_descriptor_source_mux.v
+read_file -type verilog ../../rtl/top/fabric/axi/ai_accel_dma_request_mux.v
+read_file -type verilog ../../rtl/top/fabric/axi/ai_accel_axi_master_router.v
+read_file -type verilog ../../rtl/top/fabric/axi/ai_accel_axi_fabric.v
+read_file -type verilog ../../rtl/top/fabric/memory/ai_spad_response_demux.v
+read_file -type verilog ../../rtl/top/fabric/memory/ai_accel_spad_subsystem.v
+read_file -type verilog ../../rtl/top/fabric/memory/ai_accel_memory_fabric.v
+read_file -type verilog ../../rtl/top/fabric/control/ai_accel_control_fabric.v
+read_file -type verilog ../../rtl/top/fabric/compute/ai_accel_compute_cluster.v
+read_file -type verilog ../../rtl/top/ai_accel_top.v
+read_file -type sgdc a8_constraints.sgdc

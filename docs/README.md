@@ -8,17 +8,19 @@ files, credentials, generated reports and personal environment instructions.
 
 | Document | Purpose |
 |---|---|
-| [SPEC.md](SPEC.md) / [SPEC_ZH.md](SPEC_ZH.md) | English/Chinese ABI v7.2 specification: interfaces, queues, DMA, operators and boundaries. |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Module ownership, control/data flow and digital CNM datapath. |
+| [SPEC.md](spec/SPEC.md) / [SPEC_ZH.md](spec/SPEC_ZH.md) | English/Chinese ABI v7.2 specification: interfaces, queues, DMA, operators and boundaries. |
+| [ARCHITECTURE.md](architecture/ARCHITECTURE.md) | Module ownership, control/data flow and digital CNM datapath. |
+| [Literature_Review.md](architecture/Literature_Review.md) | Literature-derived ideas, implementation candidates and evidence gates. |
 | [RTL_GUIDE.md](RTL_GUIDE.md) | Learning-oriented guide to the RTL hierarchy, transaction boundaries and safe refactoring rules. |
-| [VPLAN.md](VPLAN.md) | Verification plan, evidence and remaining closure gates. |
-| [TSMC28_SYNTHESIS_REPORT.md](TSMC28_SYNTHESIS_REPORT.md) | Sanitized commercial-28-nm pre-layout synthesis evidence and its limits. |
-| [XCZU15EG_BRINGUP.md](XCZU15EG_BRINGUP.md) | Board-owner bring-up procedure; vendor collateral is intentionally external. |
-| [CNM_BANK_LOCAL_PE_RESEARCH_ZH.md](CNM_BANK_LOCAL_PE_RESEARCH_ZH.md) | Chinese design rationale for bank-local digital CNM. |
-| [CNM_EVALUATION.md](CNM_EVALUATION.md) | Public benchmark/evaluation summary and limitations. |
+| [VPLAN.md](verification/VPLAN.md) | Verification plan, evidence and remaining closure gates. |
+| [TSMC28_SYNTHESIS_REPORT.md](verification/TSMC28_SYNTHESIS_REPORT.md) | Sanitized commercial-28-nm pre-layout synthesis evidence and its limits. |
+| [XCZU15EG_BRINGUP.md](verification/XCZU15EG_BRINGUP.md) | Board-owner bring-up procedure; vendor collateral is intentionally external. |
+| [CNM_EVALUATION_ZH.md](architecture/CNM_EVALUATION_ZH.md) | Chinese CNM architecture evolution, benchmark and research boundaries. |
+| [CNM_EVALUATION.md](architecture/CNM_EVALUATION.md) | Public benchmark/evaluation summary and limitations. |
+| [PROJECT_EXPERIENCE_ZH.md](architecture/PROJECT_EXPERIENCE_ZH.md) | Evidence-bounded project experience summary. |
 | [PUBLIC_RELEASE.md](PUBLIC_RELEASE.md) | What may be published and the safe GitHub-release workflow. |
 
-| [NAMING_COMPATIBILITY.md](NAMING_COMPATIBILITY.md) | Public NMAForge naming and the retained ABI compatibility identifiers. |
+| [NAMING_COMPATIBILITY.md](spec/NAMING_COMPATIBILITY.md) | Public NMAForge naming and the retained ABI compatibility identifiers. |
 ## Documentation rules
 
 - Change the specification and ABI header before changing an ABI-visible RTL

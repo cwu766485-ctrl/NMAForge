@@ -237,7 +237,8 @@ module ai_tensor_sfu_core(
             cycle_count<=0; element_count<=0;
         end else begin
             done<=0; div_start_r<=0; sqrt_start_r<=0;
-            if (busy) cycle_count<=cycle_count+1'b1;
+            if (state_r==ST_IDLE && start) cycle_count<=0;
+            else if (busy) cycle_count<=cycle_count+1'b1;
 
             if (busy && abort) begin error_code<=ERR_ABORT; state_r<=ST_ERROR; end
             else if (watchdog_expired) begin
@@ -252,7 +253,7 @@ module ai_tensor_sfu_core(
                         length_r<=length; scale_shift_r<=scale_shift;
                         epsilon_r<=epsilon==0 ? 32'd1 : epsilon;
                         watchdog_limit_r<=watchdog_limit; index_r<=0;
-                        cycle_count<=0; element_count<=0; busy<=1;
+                        element_count<=0; busy<=1;
                         max_r<=32'sh8000_0000; sum_exp_r<=0; sum_sq_r<=0; sum_x_r<=0;
                         mean_r<=0; beta_r<=0; pack_word_r<=0;
                         rms_normalize_phase_r<=0;
@@ -396,7 +397,7 @@ module ai_tensor_sfu_core(
                         output_word_r <= residual_output;
                         state_r<=ST_VEC_WRITE;
                     end else if (!rms_normalize_phase_r) begin
-                        vector_product_r<=$signed(x_r)*$signed(x_r);
+                        vector_product_r<=x_r*x_r;
                         state_r<=ST_VEC_POST;
                     end else begin
                         // Saturating the post-gamma intermediate to INT32 is
@@ -465,8 +466,8 @@ module ai_tensor_sfu_core(
                 end
                 ST_VEC_PREP: begin
                     vector_product_r <= (op_r==OP_GELU_Q8_8) ?
-                        ($signed(x_r)*($signed(x_r)+32'sd512)) :
-                        ($signed(x_r)*($signed(x_r)+32'sd768));
+                        (x_r*(x_r+32'sd512)) :
+                        (x_r*(x_r+32'sd768));
                     state_r<=ST_VEC_POST;
                 end
                 ST_VEC_POST: begin
@@ -541,7 +542,7 @@ module ai_tensor_sfu_core(
                     else begin x_r<=spad_signed-mean_r; state_r<=ST_LN_VAR_ACC; end
                 end
                 ST_LN_VAR_ACC: begin
-                    vector_product_r<=$signed(x_r)*$signed(x_r);
+                    vector_product_r<=x_r*x_r;
                     state_r<=ST_VEC_POST;
                 end
                 ST_LN_B_REQ: if (spad_ready) begin

@@ -10,8 +10,6 @@ module ai_dma_write_response_tracker #(
     output reg        wr_free_found
 );
 
-    integer i;
-
     always @* begin
         bid_is_dma = (m_axi_bid >= WRITE_ID_FIRST) &&
                      (m_axi_bid <= WRITE_ID_LAST);
@@ -19,11 +17,18 @@ module ai_dma_write_response_tracker #(
 
         wr_free_tag   = 2'd0;
         wr_free_found = 1'b0;
-        for (i = 0; i < 4; i = i + 1) begin
-            if (!wr_pending_b[i] && !wr_free_found) begin
-                wr_free_found = 1'b1;
-                wr_free_tag   = i[1:0];
-            end
+        if (!wr_pending_b[0]) begin
+            wr_free_found = 1'b1;
+            wr_free_tag   = 2'd0;
+        end else if (!wr_pending_b[1]) begin
+            wr_free_found = 1'b1;
+            wr_free_tag   = 2'd1;
+        end else if (!wr_pending_b[2]) begin
+            wr_free_found = 1'b1;
+            wr_free_tag   = 2'd2;
+        end else if (!wr_pending_b[3]) begin
+            wr_free_found = 1'b1;
+            wr_free_tag   = 2'd3;
         end
     end
 

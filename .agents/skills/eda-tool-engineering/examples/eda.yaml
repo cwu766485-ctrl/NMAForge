@@ -1,0 +1,25 @@
+name: my_chip
+top: chip_top
+rtl:
+  - rtl/chip_top.sv
+  - rtl/**/*.sv
+filelists:
+  - sim/rtl.f
+include_dirs:
+  - rtl/include
+defines: [SYNTHESIS]
+pdk:
+  root: /path/to/pdk/TSMC28
+  target_library: lib/slow.db
+constraints: constraints/chip.sdc
+flows:
+  sim: {simulator: vcs, tb: sim/tb_top.sv}
+  synth: {tool: dc, script: scripts/run_dc.tcl}
+  apr: {tool: icc2, script: scripts/run_icc2.tcl}
+  sta: {tool: pt, script: scripts/run_pt.tcl}
+dft:
+  enabled: true
+  scan: {chains: 8, compression: true}
+  mbist: {enabled: true, controller: vendor_ip, config: dft/mbist.yml}
+  lbist: {enabled: false, controller: vendor_ip}
+  atpg: {faults: [stuck_at, transition], tool: tmax}

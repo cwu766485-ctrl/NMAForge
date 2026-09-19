@@ -1,4 +1,5 @@
 work/
+runs/
 mti_lib/
 transcript
 modelsim.ini
@@ -49,9 +50,9 @@ tmp/
 docs/hardware/
 
 # SpyGlass local databases/reports and simulation activity dumps.
-verif/spyglass/a8_static/
-verif/subsystem/top_smoke/sim/*.saif
-verif/block/**/sim/coverage/
+dv/spyglass/a8_static/
+dv/subsystem/top_smoke/sim/*.saif
+dv/block/**/sim/coverage/
 
 # Public repository hygiene
 docs/*.pdf
@@ -70,7 +71,7 @@ fpga/xczu15eg/xczu9eg-2ffvb1156.v
 fpga/xczu15eg/vendor/
 docs/wsl_linux_instruction.md
 docs/project_update_log.md
-docs/CNM_EVALUATION_ZH.md
+docs/architecture/CNM_EVALUATION_ZH.md
 docs/CODEX_CONVERSATION_EXPORT.md
 scripts/export_codex_cimforge.py
 scripts/sync_cimforge_to_windows.ps1
@@ -85,7 +86,7 @@ syn/dc_ai_accel_28nm.tcl
 syn/probe_tsmc28_libraries.tcl
 syn/run_ai_accel_28nm_dc.sh
 syn/out/
-verif/spyglass/tsmc28_sram_macro_stub.v
+dv/spyglass/tsmc28_sram_macro_stub.v
 
 # Proprietary physical-design and timing-library deliverables.
 *.db

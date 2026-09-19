@@ -84,12 +84,12 @@ module ai_tensor_sfu_math (
         end
     endfunction
 
-    wire signed [63:0] residual_sum = $signed(residual_x) + $signed(residual_y);
+    wire signed [63:0] residual_sum = residual_x + residual_y;
     wire signed [63:0] residual_shifted = residual_sum >>> residual_shift;
-    wire signed [63:0] gamma_product = $signed(gamma_x) * $signed(gamma);
+    wire signed [63:0] gamma_product = gamma_x * gamma;
     wire signed [63:0] norm_scaled =
-        ($signed(norm_x) * $signed(norm_inv_rms)) >>> 30;
-    wire signed [63:0] norm_with_beta = norm_scaled + $signed(norm_beta);
+        (norm_x * $signed(norm_inv_rms)) >>> 30;
+    wire signed [63:0] norm_with_beta = norm_scaled + norm_beta;
 
     assign softmax_exp_q15 = exp2_q15(softmax_delta_q8_8);
     assign requant_i8_value = requant_i8(requant_value, requant_shift);

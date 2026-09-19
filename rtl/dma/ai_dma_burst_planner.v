@@ -26,12 +26,13 @@ module ai_dma_burst_planner #(
             plan_words_comb = 1;
             plan_bytes_comb = 4;
         end else begin
-            if (remaining_beats_comb > MAX_BURST_BEATS)
+            if (boundary_beats_comb < MAX_BURST_BEATS &&
+                {7'd0, boundary_beats_comb} < remaining_beats_comb)
+                plan_beats_comb = boundary_beats_comb[4:0];
+            else if (remaining_beats_comb > MAX_BURST_BEATS)
                 plan_beats_comb = MAX_BURST_BEATS;
             else
                 plan_beats_comb = remaining_beats_comb[4:0];
-            if (boundary_beats_comb < plan_beats_comb)
-                plan_beats_comb = boundary_beats_comb[4:0];
             if (remaining_words < ({11'd0, plan_beats_comb} << 2))
                 plan_words_comb = remaining_words;
             else

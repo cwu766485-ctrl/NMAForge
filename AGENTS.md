@@ -1,134 +1,106 @@
-# NMAForge contributor guide
+# Project
 
-## Scope and working style
+NMAForge is a synthesizable AXI-Lite/AXI4 digital compute-near-memory AI
+accelerator RTL prototype. The active product path is `rtl/top/ai_accel_top.v`
+with a 4-bank scratchpad, DMA, command/completion queues, CNM, matrix, CNN,
+SFU, KV-cache, and Transformer-style datapaths.
 
-The active and only product track is the AXI-Lite/AXI4 AI accelerator:
-`rtl/top/ai_accel_top.v`, its scratchpad, DMA, command queue, descriptor path,
-compute engines, and FPGA wrappers.  All accelerator design work belongs here.
+# Sources of Truth
 
-Before changing RTL, inspect `git status --short`.  The workspace is commonly
-used for FPGA experiments and may contain unrelated local edits or generated
-Vivado content.  Preserve those changes; do not reset, clean, or edit files
-outside the requested scope.
+- `docs/spec/SPEC_ZH.md` / `docs/spec/SPEC.md` — register ABI, descriptors, queues,
+  opcodes, errors, and fixed-point contracts.
+- `docs/architecture/ARCHITECTURE.md` — hierarchy, ownership, and dataflow.
+- `dv/VERIFICATION_MATRIX.md` — block/subsystem verification scope and
+  acceptance criteria.
+- `docs/verification/VPLAN.md` — planned UVM, formal, LEC, DFT, and PPA closure work.
+- `docs/verification/TSMC28_SYNTHESIS_REPORT.md` — pre-layout synthesis evidence and limits.
+- `docs/verification/STATIC_ANALYSIS_REPORT.md` and `dv/spyglass/LINT_TRIAGE.md` — static
+  analysis evidence, warnings, and license limitations.
 
-## Agent collaboration
+# Important Paths
 
-- Terra is the orchestrator: it owns architecture decisions, task breakdown,
-  integration, review, ambiguous debugging, and the final handoff.
-- When GPT-5.6 Luna is available, delegate only clear, low-risk, bounded
-  implementation or mechanical tasks to Luna.  Give it the minimum files and
-  context needed for that task; do not fork the full conversation by default.
-- Keep subagent work on disjoint files.  Terra must inspect every result,
-  resolve integration issues, and run or request the relevant verification
-  before claiming success.
-- If Luna fails twice on the same issue, stop delegating that issue and return
-  it to Terra for diagnosis and resolution.
-- Do not use a subagent to make an architecture decision or to bypass the RTL
-  ownership, verification, safety, or public-release rules in this guide.
+- `rtl/top/ai_accel_top.v` — only chip-IP integration top.
+- `rtl/control/` — AXI-Lite, queues, descriptors, and command lifecycle.
+- `rtl/dma/` — AXI4 DMA lifecycle, IDs, burst planning, and abort drain.
+- `rtl/memory/` — scratchpad, protection, and the sole scheduler arbiter.
+- `rtl/compute/` — `cnm/`, `matrix/`, `sfu/`, `cnn/`, `kv/`, `int8/`, and
+  `pipeline/` compute subsystems.
+- `dv/subsystem/top_smoke/sim/` — top-level VCS smoke and microbenchmarks.
+- `dv/block/control/` and `dv/block/dma/` — block-level UVM environments.
+- `dv/spyglass/` — SpyGlass project and lint/CDC/RDC entry script.
+- `syn/` — Synopsys DC scripts; foundry libraries and SRAM macros stay outside
+  the public repository.
 
-Use `rg`/`rg --files` to locate RTL and test references.  When adding or
-renaming a synthesizable AI RTL module, update every applicable source list:
+# Before Work
 
-- `verif/subsystem/top_smoke/sim/ai_accel.f` for the AI smoke simulation;
-- `fpga/xilinx_a7_100t/ai_accel_rtl.tcl` for Artix-7 builds;
-- `fpga/xczu15eg/ai_accel_rtl.tcl` for Zynq UltraScale+ builds.
+1. Run `git status --short` and preserve unrelated user changes.
+2. Read the applicable sections of `docs/spec/SPEC_ZH.md`, `docs/architecture/ARCHITECTURE.md`,
+   and `dv/VERIFICATION_MATRIX.md`.
+3. Inspect the relevant source list before moving or adding RTL.
+4. Reproduce a failure with the existing command before editing its cause.
 
-## AI accelerator architecture
+# Tool Entry Points
 
-`rtl/top/ai_accel_top.v` is the integration point.  Its intended ownership model
-is important:
+Run commands from the indicated directory in the Linux/VCS or EDA environment.
 
-- `ai_accel_regs` is only the AXI-Lite register file: software configuration,
-  control pulses, and sticky status/IRQ reporting.
-- `ai_command_processor` owns command lifecycle scheduling: command/completion
-  queue pointers, descriptor dispatch and validation, compute launch, and
-  completion ordering.
-- `ai_spad_arbiter` is the sole owner of the scratchpad scheduler port.
-  Descriptor and completion traffic retain control-plane priority; scalar/line
-  compute, banked compute, and scalar/line DMA use data-plane round-robin
-  arbitration.
-  Do not reintroduce an independent mux in `ai_accel_top`.
-- `ai_desc_fetch` reads scratchpad descriptors; `axi_desc_fetch` reads external
-  descriptors.  The command processor selects and holds the source for a
-  command.
-- `ai_completion_writer` commits all four words of a completion entry before
-  `CPLQ_TAIL` advances.
-- `ai_scratchpad` has a host/debug port, one arbiter-driven scheduler port, and
-  a banked-read path.  The behavioural RAM implementation is selected by
-  `+define+VCS`; normal Vivado synthesis uses the XPM branch.
+- Top smoke: `cd dv/subsystem/top_smoke/sim && make ai_smoke`
+- Seeded top regression: `make ai_run AI_RANDOM_CASES=20 AI_SEED=12345`
+- Reference precheck: `make ai_precheck`
+- CNM/matrix focused gates: `make ai_cnm_signoff`
+- Control UVM: `cd dv/block/control/sim && make uvm_regress`
+- DMA UVM: `cd dv/block/dma/sim && make uvm_regress`
+- Shared top UVM bring-up: `cd dv/uvm/sim && make uvm_compile`;
+  run only a named test after checking its current environment.
+- SpyGlass: `cd dv/spyglass && ./run_spyglass_a8.sh {lint|cdc|rdc|all}`
+- TSMC28 DC: configure private `TSMC28_STDCELL_DB`/SRAM variables and run
+  `bash syn/run_ai_accel_28nm_dc.sh 4.0` from the repository root.
 
-Keep queue ownership intact: software publishes `CMDQ_TAIL` and consumes via
-`CPLQ_HEAD`; hardware reports `CMDQ_HEAD` and `CPLQ_TAIL`.  The register map
-retains pointer-load writes for reset/debug compatibility, but pointer
-advancement must remain in `ai_command_processor`.
+For RTL changes, run the focused target plus `make ai_smoke`; for queue, DMA,
+scratchpad, top, or source-list changes, also run the seeded regression when
+the EDA environment is available. Record exact commands and PASS evidence.
 
-## Verification
+# Architecture Invariants
 
-Run the current directed/smoke VCS commands from `verif/subsystem/top_smoke/sim`
-on the team Linux/VNC EDA environment:
+- `ai_spad_arbiter` is the only scheduler-side scratchpad admission point.
+- Descriptor/completion traffic has control-plane priority; data-plane clients
+  use the defined round-robin policy.
+- `ai_command_processor` owns command lifecycle and queue-pointer advancement.
+- Software publishes `CMDQ_TAIL` and consumes `CPLQ_HEAD`; hardware reports
+  `CMDQ_HEAD` and `CPLQ_TAIL`.
+- `ai_completion_writer` commits all four completion words before advancing the
+  completion tail.
+- Scratchpad reads are registered; AXI `valid/ready`, ID, LAST, back-pressure,
+  reset, and abort behavior must remain protocol-correct.
+- `+define+VCS` selects behavioral scratchpad RAM; normal Vivado uses XPM.
 
-```bash
-make ai_smoke
-make ai_comp
-make ai_run AI_RANDOM_CASES=20 AI_SEED=12345
-```
+# Modification Policy
 
-`make ai_smoke` compiles `tb_ai_accel_smoke` using `ai_accel.f`.  It requires
-the Synopsys VCS environment and uses `+define+VCS` to select behavioural
-scratchpad RAM.
+Allowed: synthesizable RTL, checked-in tests, source lists, scripts, and docs
+within this repository when the SPEC and ownership rules are preserved.
 
-For a focused RTL change, at minimum run the matching compile target and test.
-For scheduler, queue, descriptor, DMA, scratchpad, or top-level changes, run
-`make ai_smoke`; capture the command and the relevant pass/fail evidence in
-your handoff.  Use `git diff --check` before declaring work complete.
+Do not modify or commit without explicit scope/approval: PDK and foundry
+libraries, SRAM macro/timing models, credentials, private server settings,
+third-party assets, generated VCS/Vivado/SpyGlass/DC directories, waveforms,
+coverage databases, and signoff reports copied from private environments.
+When adding or moving RTL, update all applicable lists:
+`dv/subsystem/top_smoke/sim/ai_accel.f`, `dv/uvm/sim/ai_accel_uvm.f`,
+`dv/spyglass/a8_rtl.f`, and both FPGA `ai_accel_rtl.tcl` files.
 
-## FPGA implementation
+# Debug and Review Policy
 
-Invoke Vivado 2024.1 from `PATH`, `VIVADO_HOME`, or an explicit local path:
+- Find the root cause; do not delete tests, assertions, scoreboards, lint
+  rules, or expected checks to hide a failure.
+- Check the SPEC before changing externally visible behavior.
+- Treat lint warnings and missing SpyGlass advanced licenses as explicit
+  disposition items, not automatic passes.
+- Keep generated output out of commits and run `git diff --check` before handoff.
 
-```powershell
-vivado -mode batch -source <script>
-```
+# Definition of Done
 
-Run these from the repository root:
-
-```powershell
-# Artix-7 AI IP synthesis (default part xc7a100tfgg484-2)
-vivado -mode batch -source fpga\xilinx_a7_100t\scripts\synth_ai_accel_ip.tcl
-
-# Artix-7 smoke top synthesis / implementation and bitstream
-vivado -mode batch -source fpga\xilinx_a7_100t\scripts\synth_smoke_top.tcl
-vivado -mode batch -source fpga\xilinx_a7_100t\scripts\build_smoke_bitstream.tcl
-
-# XCZU15EG standalone AI IP synthesis
-vivado -mode batch -source fpga\xczu15eg\scripts\synth_ai_accel_ip.tcl
-```
-
-Artix scripts accept `FPGA_PART` as an environment override.  Check generated
-timing, utilization, and DRC reports under `fpga/**/build/**/reports/`; build
-directories and Vivado journals/logs are local artefacts and must not be
-committed.
-
-## Synopsys/VNC environment and secrets
-
-The team EDA environment provides the Synopsys tools (including VCS and Verdi).
-Use access details supplied out-of-band by the project owner and follow the
-site environment setup instructions before running commands.
-
-Never add server addresses, usernames, passwords, tokens, license strings,
-or other credentials to Git, waveforms, logs, TCL scripts, source lists, or
-this file.  Keep machine-specific values in ignored local configuration such
-as `.env` if they are needed by automation.
-
-## RTL and deliverable hygiene
-
-- Use non-destructive Git commands.  Never run `git reset --hard` or remove
-  generated directories unless explicitly requested.
-- Preserve protocol timing: scratchpad reads are registered, completion queue
-  tail moves only after the four-word write, and AXI/AXI-Lite valid/ready rules
-  must remain intact.
-- Add or update smoke-test coverage when a register-visible behavior, queue
-  behavior, descriptor format, DMA transfer mode, or error code changes.
-- Do not claim a synthesis or simulation pass unless it was actually run in
-  the appropriate tool environment.  If the local host lacks the tool, state
-  the exact command a maintainer should run.
+- The requested focused test passes with no new prohibited errors or warnings.
+- Related smoke/regression checks pass when practical.
+- Any RTL move/addition has synchronized source lists and documentation.
+- Static-analysis, synthesis, or coverage claims include tool, constraints,
+  environment, and whether they are pre-layout or signoff evidence.
+- Update the relevant status/frontier note (`docs/project_update_log.md` or
+  the owning report) with reproducible command and result.

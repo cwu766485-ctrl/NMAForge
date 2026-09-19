@@ -15,29 +15,42 @@ module ai_dma_read_slot_tracker #(
     output reg        rid_is_dma
 );
 
-    integer i;
-
     always @* begin
-        rd_count       = 3'd0;
+        rd_count       = {2'd0, rd_slot_valid[0]} +
+                         {2'd0, rd_slot_valid[1]} +
+                         {2'd0, rd_slot_valid[2]} +
+                         {2'd0, rd_slot_valid[3]};
         rd_free_slot   = 2'd0;
         rd_free_found  = 1'b0;
         rd_drain_slot  = 2'd0;
         rd_drain_found = 1'b0;
 
-        for (i = 0; i < 4; i = i + 1) begin
-            if (rd_slot_valid[i])
-                rd_count = rd_count + 3'd1;
+        if ((MAX_OUTSTANDING > 0) && !rd_slot_valid[0]) begin
+            rd_free_found = 1'b1;
+            rd_free_slot  = 2'd0;
+        end else if ((MAX_OUTSTANDING > 1) && !rd_slot_valid[1]) begin
+            rd_free_found = 1'b1;
+            rd_free_slot  = 2'd1;
+        end else if ((MAX_OUTSTANDING > 2) && !rd_slot_valid[2]) begin
+            rd_free_found = 1'b1;
+            rd_free_slot  = 2'd2;
+        end else if ((MAX_OUTSTANDING > 3) && !rd_slot_valid[3]) begin
+            rd_free_found = 1'b1;
+            rd_free_slot  = 2'd3;
+        end
 
-            if (!rd_slot_valid[i] && !rd_free_found &&
-                (i < MAX_OUTSTANDING)) begin
-                rd_free_found = 1'b1;
-                rd_free_slot  = i[1:0];
-            end
-
-            if (rd_slot_complete[i] && !rd_drain_found) begin
-                rd_drain_found = 1'b1;
-                rd_drain_slot  = i[1:0];
-            end
+        if (rd_slot_complete[0]) begin
+            rd_drain_found = 1'b1;
+            rd_drain_slot  = 2'd0;
+        end else if (rd_slot_complete[1]) begin
+            rd_drain_found = 1'b1;
+            rd_drain_slot  = 2'd1;
+        end else if (rd_slot_complete[2]) begin
+            rd_drain_found = 1'b1;
+            rd_drain_slot  = 2'd2;
+        end else if (rd_slot_complete[3]) begin
+            rd_drain_found = 1'b1;
+            rd_drain_slot  = 2'd3;
         end
 
         rid_is_dma  = (m_axi_rid >= READ_ID_FIRST) &&

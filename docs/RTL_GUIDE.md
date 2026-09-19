@@ -2,7 +2,7 @@
 
 Status: 2026-09-01. This guide describes the synthesizable RTL currently used
 by `rtl/top/ai_accel_top.v`. It is a reading guide, not a replacement for the
-ABI contract in [SPEC.md](SPEC.md) / [SPEC_ZH.md](SPEC_ZH.md).
+ABI contract in [SPEC.md](spec/SPEC.md) / [SPEC_ZH.md](spec/SPEC_ZH.md).
 
 ## 1. Start from transactions, not from files
 
@@ -110,7 +110,7 @@ or using a stylistic cleanup to alter reset or response timing.
 The following runs are recorded for the current public baseline:
 
 ```bash
-cd verif/block/control/sim
+cd dv/block/control/sim
 make uvm_regress
 
 cd ../../subsystem/top_smoke/sim
@@ -123,4 +123,4 @@ run (`AI_SEED=12345`); the maintainer reported every requested target passing.
 These are strong regression checks, not coverage, formal, post-layout, power
 or board sign-off.
 
-For the full verification closure strategy, see [VPLAN.md](VPLAN.md).
+For the full verification closure strategy, see [VPLAN.md](verification/VPLAN.md).

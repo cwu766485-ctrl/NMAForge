@@ -9,7 +9,6 @@ module ai_int8_datapath(
     input  wire signed [63:0] accumulator,
     input  wire [4:0]         scale_shift,
     input  wire [1:0]         activation,
-    output wire signed [31:0] dot_term,
     output wire signed [63:0] accumulator_sum,
     output wire [31:0]        quantized_result
 );
@@ -31,8 +30,8 @@ module ai_int8_datapath(
     wire signed [63:0] shifted_sum;
     wire signed [63:0] activated_sum;
 
-    assign dot_term        = product0 + product1 + product2 + product3;
-    assign accumulator_sum = accumulator + dot_term;
+    assign accumulator_sum = accumulator + product0 + product1 +
+                             product2 + product3;
     assign shifted_sum     = accumulator_sum >>> scale_shift;
     assign activated_sum   = (activation == ACT_RELU) ?
                            ((shifted_sum < 0) ? 64'sd0 : shifted_sum) :

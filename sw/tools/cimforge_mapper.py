@@ -19,7 +19,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(
     0,
-    str(REPO_ROOT / "verif" / "block" / "compute" / "matrix" / "ref"),
+    str(REPO_ROOT / "dv" / "block" / "compute" / "matrix" / "ref"),
 )
 from ai_a3_reference import (  # noqa: E402
     ffn_i8,

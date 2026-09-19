@@ -1,0 +1,15 @@
+{
+  "format": 1,
+  "project_root": ".",
+  "entries": [
+    {"from":"docs/SPEC.md","to":"docs/spec/SPEC.md","role":"normative specification","action":"move","consumers":["README.md","AGENTS.md"],"validation":["reference scan","git diff --check"],"status":"completed"},
+    {"from":"docs/SPEC_ZH.md","to":"docs/spec/SPEC_ZH.md","role":"normative specification","action":"move","consumers":["README_ZH.md","AGENTS.md"],"validation":["reference scan","git diff --check"],"status":"completed"},
+    {"from":"docs/ARCHITECTURE.md","to":"docs/architecture/ARCHITECTURE.md","role":"architecture","action":"move","consumers":["README.md","README_ZH.md","AGENTS.md"],"validation":["reference scan","git diff --check"],"status":"completed"},
+    {"from":"docs/VPLAN.md","to":"docs/verification/VPLAN.md","role":"verification plan","action":"move","consumers":["README.md","README_ZH.md","AGENTS.md"],"validation":["reference scan","git diff --check"],"status":"completed"},
+    {"from":"verif","to":"dv","role":"design verification","action":"move","consumers":["Makefiles","filelists","SpyGlass","docs"],"validation":["all filelist entries resolve","Linux VCS rerun required"],"status":"completed"},
+    {"from":"uvm_verif","to":"dv/uvm","role":"shared UVM","action":"move","consumers":["UVM filelists","block UVM filelists","docs"],"validation":["all filelist entries resolve","Linux VCS rerun required"],"status":"completed"},
+    {"from":"syn","role":"ASIC flow and private foundry overlay boundary","action":"retain_protected","reason":"existing DC entry paths and private PDK/SRAM variables require EDA validation before relocation","status":"completed"},
+    {"from":"fpga","role":"Vivado and board flow","action":"retain_protected","reason":"tool-constrained Tcl hierarchy and external board collateral","status":"completed"},
+    {"from":"generated simulator and EDA caches","to":"runs/legacy","role":"generated artifacts","action":"retain_protected","reason":"preserved outside canonical source paths; runs is ignored and outputs are reproducible","status":"completed"}
+  ]
+}

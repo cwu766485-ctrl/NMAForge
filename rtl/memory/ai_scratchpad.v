@@ -66,11 +66,6 @@ module ai_scratchpad #(
     wire compute_range_error = (compute_word_addr >= TOTAL_WORDS);
     wire line_range_error = (line_addr > TOTAL_BYTES - 16);
     wire banked_range_error = (banked_addr > TOTAL_BYTES - 16);
-    wire cnm_align_error = |cnm_addr0[1:0] || |cnm_addr1[1:0] || |cnm_addr2[1:0] || |cnm_addr3[1:0];
-    wire cnm_range_error = (cnm_word_addr0 >= TOTAL_WORDS) ||
-                           (cnm_word_addr1 >= TOTAL_WORDS) ||
-                           (cnm_word_addr2 >= TOTAL_WORDS) ||
-                           (cnm_word_addr3 >= TOTAL_WORDS);
     wire host_conflict = host_valid && (compute_valid || line_valid ||
                                         banked_read_valid || (|cnm_read_valid));
     wire host_access_ok = host_valid && !host_align_error && !host_range_error && !host_conflict;
@@ -79,13 +74,13 @@ module ai_scratchpad #(
     wire banked_access_ok = banked_read_valid && !banked_align_error && !banked_range_error;
     // A2.2 permits each lane to be valid independently.  An inactive lane
     // does not consume its bank port and its response bit remains clear.
-    wire cnm_lane_access0 = cnm_read_valid[0] && !|cnm_addr0[1:0] &&
+    wire cnm_lane_access0 = cnm_read_valid[0] && !(|cnm_addr0[1:0]) &&
                             (cnm_word_addr0 < TOTAL_WORDS);
-    wire cnm_lane_access1 = cnm_read_valid[1] && !|cnm_addr1[1:0] &&
+    wire cnm_lane_access1 = cnm_read_valid[1] && !(|cnm_addr1[1:0]) &&
                             (cnm_word_addr1 < TOTAL_WORDS);
-    wire cnm_lane_access2 = cnm_read_valid[2] && !|cnm_addr2[1:0] &&
+    wire cnm_lane_access2 = cnm_read_valid[2] && !(|cnm_addr2[1:0]) &&
                             (cnm_word_addr2 < TOTAL_WORDS);
-    wire cnm_lane_access3 = cnm_read_valid[3] && !|cnm_addr3[1:0] &&
+    wire cnm_lane_access3 = cnm_read_valid[3] && !(|cnm_addr3[1:0]) &&
                             (cnm_word_addr3 < TOTAL_WORDS);
     wire cnm_access_ok = cnm_lane_access0 || cnm_lane_access1 || cnm_lane_access2 || cnm_lane_access3;
 

@@ -41,7 +41,18 @@ module ai_perf_monitor(
                                         dma_rd_outstanding;
 
     always @(posedge clk or negedge resetn) begin
-        if (!resetn || clear) begin
+        if (!resetn) begin
+            matrix_cycles <= 0;
+            matrix_mac_cycles <= 0;
+            matrix_banked_stall_cycles <= 0;
+            dma_read_bytes <= 0;
+            dma_write_bytes <= 0;
+            dma_ar_count <= 0;
+            dma_aw_count <= 0;
+            dma_r_stall_cycles <= 0;
+            dma_rd_outstanding <= 0;
+            dma_rd_outstanding_highwater <= 0;
+        end else if (clear) begin
             matrix_cycles <= 0;
             matrix_mac_cycles <= 0;
             matrix_banked_stall_cycles <= 0;

@@ -1,7 +1,7 @@
 # NMAForge —— AXI4 近存张量加速器
 
-[English README](README.md) · [架构说明](docs/ARCHITECTURE.md) ·
-[中文规格](docs/SPEC_ZH.md) · [验证计划](docs/VPLAN.md) ·
+[English README](README.md) · [架构说明](docs/architecture/ARCHITECTURE.md) ·
+[中文规格](docs/spec/SPEC_ZH.md) · [验证计划](docs/verification/VPLAN.md) ·
 [文档索引](docs/README_ZH.md)
 
 > **简短描述：** 基于 AXI4、banked scratchpad 与命令队列的可综合数字近存张量加速器 IP。
@@ -30,7 +30,7 @@ NMAForge 是一个可综合的、全数字近存张量加速器 IP。它**不是
 - AXI-Lite control block UVM 已通过 6 项测试：reset/ABI、AW/W 分离、WSTRB/error、
   IRQ/W1C、busy/abort、随机寄存器访问和 RAL frontdoor。
 - 商用 28 nm 库的 pre-layout 综合研究在文档约束下满足 250 MHz；公开报告已经脱敏，
-  见 [`docs/TSMC28_SYNTHESIS_REPORT.md`](docs/TSMC28_SYNTHESIS_REPORT.md)。
+  见 [`docs/verification/TSMC28_SYNTHESIS_REPORT.md`](docs/verification/TSMC28_SYNTHESIS_REPORT.md)。
 - XCZU15EG 的 Vivado 与 bring-up 脚本在仓库中；完整上板仍依赖板卡拥有者私有的
   参考工程和实际硬件。
 
@@ -41,8 +41,8 @@ CDC/RDC/formal、后布局 ASIC 签核和实板 workload 性能测量仍待完�
 
 ```text
 rtl/       可综合加速器 RTL
-verif/     smoke、block UVM、subsystem 测试和静态检查资料
-uvm_verif/ 可复用 UVM agent 与顶层 UVM bring-up
+dv/     smoke、block UVM、subsystem 测试和静态检查资料
+dv/uvm/ 可复用 UVM agent 与顶层 UVM bring-up
 sw/        ABI 头文件、mapper 与裸机 bring-up 源码
 fpga/      公开 Vivado flow 与板级集成脚本
 docs/      架构、规格、验证和公开发布说明

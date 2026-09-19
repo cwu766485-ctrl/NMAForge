@@ -77,14 +77,16 @@ module ai_bank_local_controller #(
             read_issue_events<=0; prefetch_events<=0; compute_events<=0; response_wait_cycles<=0;
         end else begin
             done<=0;
-            if (busy && waiting_for_response && !rsp_valid)
+            if (state_r==ST_IDLE && start)
+                response_wait_cycles<=0;
+            else if (busy && waiting_for_response && !rsp_valid)
                 response_wait_cycles<=response_wait_cycles+1'b1;
             if (busy && abort) state_r<=ST_ERROR;
             else case (state_r)
                 ST_IDLE: if (start) begin
                     src0_r<=src0_base; src1_r<=src1_base; length_r<=length; k_r<=0;
                     local_sum<=0; busy<=1; error<=0;
-                    read_issue_events<=0; prefetch_events<=0; compute_events<=0; response_wait_cycles<=0;
+                    read_issue_events<=0; prefetch_events<=0; compute_events<=0;
                     if (length==0) state_r<=ST_ERROR; else state_r<=ST_A_REQ;
                 end
                 ST_A_REQ: if (req_ready) begin

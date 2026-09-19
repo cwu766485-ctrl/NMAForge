@@ -7,13 +7,15 @@
 
 | 文档 | 用途 |
 |---|---|
-| [SPEC_ZH.md](SPEC_ZH.md) / [SPEC.md](SPEC.md) | 中英文 ABI v7.2 规格：接口、队列、DMA、算子与边界。 |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | 模块所有权、控制/数据流与数字 CNM 数据通路。 |
-| [VPLAN.md](VPLAN.md) | 验证计划、已有证据和待收口项。 |
-| [TSMC28_SYNTHESIS_REPORT.md](TSMC28_SYNTHESIS_REPORT.md) | 脱敏后的商用 28nm pre-layout 综合证据及边界。 |
-| [XCZU15EG_BRINGUP.md](XCZU15EG_BRINGUP.md) | 板卡拥有者使用的 bring-up 流程；厂商资料在仓库外。 |
-| [CNM_BANK_LOCAL_PE_RESEARCH_ZH.md](CNM_BANK_LOCAL_PE_RESEARCH_ZH.md) | bank-local 数字 CNM 的设计动机。 |
-| [CNM_EVALUATION.md](CNM_EVALUATION.md) | 可公开的 CNM benchmark/评估摘要和适用边界。 |
+| [SPEC_ZH.md](spec/SPEC_ZH.md) / [SPEC.md](spec/SPEC.md) | 中英文 ABI v7.2 规格：接口、队列、DMA、算子与边界。 |
+| [ARCHITECTURE.md](architecture/ARCHITECTURE.md) | 模块所有权、控制/数据流与数字 CNM 数据通路。 |
+| [RTL_GUIDE.md](RTL_GUIDE.md) | 按事务边界学习 RTL 层次、状态所有权和安全重构规则。 |
+| [VPLAN.md](verification/VPLAN.md) | 验证计划、已有证据和待收口项。 |
+| [TSMC28_SYNTHESIS_REPORT.md](verification/TSMC28_SYNTHESIS_REPORT.md) | 脱敏后的商用 28nm pre-layout 综合证据及边界。 |
+| [XCZU15EG_BRINGUP.md](verification/XCZU15EG_BRINGUP.md) | 板卡拥有者使用的 bring-up 流程；厂商资料在仓库外。 |
+| [CNM_EVALUATION_ZH.md](architecture/CNM_EVALUATION_ZH.md) | 中文 CNM 架构演进、benchmark、PPA 边界和后续研究；唯一中文主文档。 |
+| [CNM_EVALUATION.md](architecture/CNM_EVALUATION.md) | 可公开的 CNM benchmark/评估摘要和适用边界。 |
+| [Literature_Review.md](architecture/Literature_Review.md) | 文献借鉴、可实施创新候选及其验收证据。 |
 | [PUBLIC_RELEASE.md](PUBLIC_RELEASE.md) | 可公开内容与安全 GitHub 发布流程。 |
 
 ## 文档规则

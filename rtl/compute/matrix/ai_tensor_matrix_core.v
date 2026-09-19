@@ -103,7 +103,6 @@ module ai_tensor_matrix_core(
     localparam [4:0] ST_PREFETCH_WAIT = 5'd12;
 
     reg [4:0] state_r;
-    reg [7:0] op_r;
     reg [15:0] m_r, n_r, k_words_r;
     reg [31:0] instance_count_r, instance_r;
     reg [15:0] row_tile_r, col_tile_r, k_group_r;
@@ -232,7 +231,7 @@ module ai_tensor_matrix_core(
 
     always @(posedge clk or negedge resetn) begin
         if (!resetn) begin
-            state_r<=ST_IDLE; op_r<=0; busy<=0; done<=0; error<=0; error_code<=0;
+            state_r<=ST_IDLE; busy<=0; done<=0; error<=0; error_code<=0;
             result<=0; cycle_count<=0; element_count<=0; m_r<=0; n_r<=0;
             k_words_r<=0; instance_count_r<=0; instance_r<=0; row_tile_r<=0;
             col_tile_r<=0; k_group_r<=0; lane_r<=0; bias_idx_r<=0;
@@ -253,7 +252,9 @@ module ai_tensor_matrix_core(
             for (i=0;i<16;i=i+1) acc_r[i]<=0;
         end else begin
             done <= 1'b0;
-            if (busy)
+            if (state_r==ST_IDLE && start)
+                cycle_count <= 0;
+            else if (busy)
                 cycle_count <= cycle_count + 1'b1;
 
             if (busy && abort) begin
@@ -266,7 +267,7 @@ module ai_tensor_matrix_core(
                 ST_IDLE: begin
                     busy<=0; error<=0; error_code<=0;
                     if (start) begin
-                        op_r<=op_mode; m_r<=m_size; n_r<=n_size; k_words_r<=k_words;
+                        m_r<=m_size; n_r<=n_size; k_words_r<=k_words;
                         instance_count_r<=instance_count==0 ? 32'd1 : instance_count;
                         transpose_a_r<=transpose_a; transpose_b_r<=transpose_b;
                         bias_enable_r<=bias_enable; scale_shift_r<=scale_shift;
@@ -284,7 +285,7 @@ module ai_tensor_matrix_core(
                         dst_row_stride_r<={14'd0,n_size,2'b00};
                         instance_r<=0; row_tile_r<=0; col_tile_r<=0; k_group_r<=0;
                         lane_r<=0; bias_idx_r<=0; write_idx_r<=0;
-                        bias_loaded_r<=0; cycle_count<=0; element_count<=0;
+                        bias_loaded_r<=0; element_count<=0;
                         prefetch_a_pending_r<=0; prefetch_b_pending_r<=0;
                         prefetch_a_valid_r<=0; prefetch_b_valid_r<=0;
                         for (i=0;i<16;i=i+1) acc_r[i]<=0;

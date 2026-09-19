@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cmd="${1:-help}"
+shift || true
+
+case "$cmd" in
+  smoke)      make -C "$root/dv/subsystem/top_smoke/sim" ai_smoke "$@" ;;
+  regress)    make -C "$root/dv/subsystem/top_smoke/sim" ai_run AI_RANDOM_CASES=20 AI_SEED=12345 "$@" ;;
+  control)    make -C "$root/dv/block/control/sim" uvm_regress "$@" ;;
+  dma)        make -C "$root/dv/block/dma/sim" uvm_regress "$@" ;;
+  lint)       "$root/dv/spyglass/run_spyglass_a8.sh" lint "$@" ;;
+  cdc)        "$root/dv/spyglass/run_spyglass_a8.sh" cdc "$@" ;;
+  rdc)        "$root/dv/spyglass/run_spyglass_a8.sh" rdc "$@" ;;
+  static)     "$root/dv/spyglass/run_spyglass_a8.sh" all "$@" ;;
+  help|*)
+    echo "usage: tools/hw {smoke|regress|control|dma|lint|cdc|rdc|static}"
+    ;;
+esac

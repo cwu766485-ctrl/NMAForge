@@ -54,14 +54,16 @@ module ai_kv_cache_engine(
     if(!resetn) begin state_r<=ST_IDLE; busy<=0; done<=0; error<=0; error_code<=0; result<=0; cycle_count<=0; element_count<=0; index_r<=0; end
     else begin
       done<=0;
-      if(busy) cycle_count<=cycle_count+1;
-      if((spad_error && busy) || (abort && busy)) begin error<=1; error_code<=abort?ERR_ABORT:ERR_SPAD; state_r<=ST_ERROR; end
+      if(state_r==ST_IDLE && start && length!=0 && valid_operation) cycle_count<=0;
+      else if(busy) cycle_count<=cycle_count+1;
+      if(watchdog_expired) begin error<=1; error_code<=ERR_WATCHDOG; state_r<=ST_ERROR; end
+      else if((spad_error && busy) || (abort && busy)) begin error<=1; error_code<=abort?ERR_ABORT:ERR_SPAD; state_r<=ST_ERROR; end
       else case(state_r)
         ST_IDLE: begin busy<=0; error<=0; error_code<=0; if(start) begin
           if(length==0 || !valid_operation) begin error<=1; error_code<=ERR_CONFIG; state_r<=ST_ERROR; end
           else begin busy<=1; write_r<=starts_kv_write; src_r<=src0_base; dst_r<=dst_base;
             cache_offset_r <= (aux0[15:0]*src0_stride) + (aux0[31:16]*src1_stride);
-            length_r<=length; index_r<=0; result<=0; cycle_count<=0; element_count<=0; watchdog_r<=watchdog_limit; state_r<=ST_READ_REQ; end
+            length_r<=length; index_r<=0; result<=0; element_count<=0; watchdog_r<=watchdog_limit; state_r<=ST_READ_REQ; end
         end end
         ST_READ_REQ: if(spad_ready) state_r<=ST_READ_WAIT;
         ST_READ_WAIT: if(spad_rsp_valid) begin data_r<=spad_rdata; state_r<=ST_WRITE; end
@@ -72,7 +74,6 @@ module ai_kv_cache_engine(
         ST_DONE: begin busy<=0; done<=1; state_r<=ST_IDLE; end
         ST_ERROR: begin busy<=0; done<=1; state_r<=ST_IDLE; end
       endcase
-      if(watchdog_expired) begin error<=1; error_code<=ERR_WATCHDOG; state_r<=ST_ERROR; end
     end
   end
 endmodule

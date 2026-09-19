@@ -96,6 +96,59 @@ module ai_accel_regs #(
     wire cpl_empty = cpl_size_r != 0 && cpl_head_r == processor_cplq_tail;
     wire [31:0] cpl_next = processor_cplq_tail >= cpl_size_r-1 ? 0 : processor_cplq_tail+1;
     wire cpl_full = cpl_size_r != 0 && cpl_next == cpl_head_r;
+    wire status_write = reg_req_valid && reg_req_write && !reg_rsp_error;
+    reg done_n, error_n, irq_status_n, dma_done_n, dma_error_n;
+    reg [3:0] error_code_n, error_source_n, dma_error_code_n;
+    reg [31:0] result_n, cycles_n, elements_n;
+
+    always @(*) begin
+      done_n=done_r; error_n=error_r; irq_status_n=irq_status_r;
+      error_code_n=error_code_r; error_source_n=error_source_r;
+      result_n=result_r; cycles_n=cycles_r; elements_n=elements_r;
+      dma_done_n=dma_done_r; dma_error_n=dma_error_r;
+      dma_error_code_n=dma_error_code_r;
+      if(processor_event_valid) begin
+        done_n=1; error_n=processor_event_error;
+        error_code_n=processor_event_error_code;
+        error_source_n=processor_event_error ? 4'd1 : 4'd0;
+        result_n=processor_event_result; cycles_n=processor_event_cycles;
+        elements_n=processor_event_elements; irq_status_n=1;
+      end
+      if(dma_done) begin
+        dma_done_n=1; dma_error_n=dma_error; dma_error_code_n=dma_error_code;
+        if(dma_error) begin
+          error_n=1; error_code_n=dma_error_code;
+          error_source_n=4'd2; irq_status_n=1;
+        end
+      end
+      if(status_write) case(a)
+        CTRL: if(reg_req_wdata[0] && !processor_busy && !dma_busy) begin
+          done_n=0; error_n=0; irq_status_n=0;
+          error_code_n=0; error_source_n=0;
+        end
+        STATUS: begin
+          if(reg_req_wdata[1]) done_n=0;
+          if(reg_req_wdata[2]) begin error_n=0; error_code_n=0; error_source_n=0; end
+        end
+        IRQ_STATUS: if(reg_req_wdata[0]) irq_status_n=0;
+        DOORBELL: if(!processor_busy && !dma_busy) begin
+          done_n=0; error_n=0; irq_status_n=0;
+          error_code_n=0; error_source_n=0;
+        end
+        DMA_CTRL: if(reg_req_wdata[0] && !processor_busy && !dma_busy) begin
+          dma_done_n=0; dma_error_n=0; dma_error_code_n=0;
+        end
+        DMA_STATUS: begin
+          if(reg_req_wdata[1]) dma_done_n=0;
+          if(reg_req_wdata[2]) begin dma_error_n=0; dma_error_code_n=0; end
+        end
+        TILE_CTRL: if(reg_req_wdata[0] && !processor_busy && !dma_busy) begin
+          done_n=0; error_n=0; irq_status_n=0;
+          error_code_n=0; error_source_n=0;
+        end
+        default: begin end
+      endcase
+    end
     // Keep the legal-address and write-protection policies in one place.
     // The read and write muxes below remain the ABI source of truth.
     function is_known_address;
@@ -236,24 +289,27 @@ module ai_accel_regs #(
         r0b<=0;r0l<=0;r0p<=0;r1b<=0;r1l<=0;r1p<=0;r2b<=0;r2l<=0;r2p<=0;r3b<=0;r3l<=0;r3p<=0;
       end else begin
         direct_start<=0; submit<=0; core_abort<=0; dma_start<=0; tile_start<=0; perf_clear<=0; cmdq_head_load<=0; cplq_tail_load<=0;
-        if(processor_event_valid) begin done_r<=1; error_r<=processor_event_error; error_code_r<=processor_event_error_code; error_source_r<=processor_event_error ? 4'd1 : 4'd0; result_r<=processor_event_result; cycles_r<=processor_event_cycles; elements_r<=processor_event_elements; irq_status_r<=1; end
-        if(dma_done) begin dma_done_r<=1; dma_error_r<=dma_error; dma_error_code_r<=dma_error_code; if(dma_error) begin error_r<=1; error_code_r<=dma_error_code; error_source_r<=4'd2; irq_status_r<=1; end end
+        done_r<=done_n; error_r<=error_n; irq_status_r<=irq_status_n;
+        error_code_r<=error_code_n; error_source_r<=error_source_n;
+        result_r<=result_n; cycles_r<=cycles_n; elements_r<=elements_n;
+        dma_done_r<=dma_done_n; dma_error_r<=dma_error_n;
+        dma_error_code_r<=dma_error_code_n;
         if(reg_req_valid && reg_req_write && !reg_rsp_error) case(a)
-          CTRL: begin irq_enable_r<=reg_req_wdata[1]; if(reg_req_wdata[0] && !processor_busy && !dma_busy) begin direct_start<=1; done_r<=0; error_r<=0; irq_status_r<=0; error_code_r<=0; error_source_r<=0; end end
-          STATUS: begin if(reg_req_wdata[1]) done_r<=0; if(reg_req_wdata[2]) begin error_r<=0; error_code_r<=0; error_source_r<=0; end end
+          CTRL: begin irq_enable_r<=reg_req_wdata[1]; if(reg_req_wdata[0] && !processor_busy && !dma_busy) direct_start<=1; end
+          STATUS: begin end
           OP:op_mode<=reg_req_wdata[7:0]; SRC0:src0_base<=reg_req_wdata; SRC1:src1_base<=reg_req_wdata; DST:dst_base<=reg_req_wdata; LENGTH:length<=reg_req_wdata[15:0]; M:m_size<=reg_req_wdata[15:0]; N:n_size<=reg_req_wdata[15:0]; K:k_words<=reg_req_wdata[15:0]; QUANT:begin scale_shift<=reg_req_wdata[4:0]; activation<=reg_req_wdata[6:5]; end
-          IRQ_STATUS:if(reg_req_wdata[0]) irq_status_r<=0; IRQ_ENABLE:irq_enable_r<=reg_req_wdata[0];
+          IRQ_STATUS:begin end IRQ_ENABLE:irq_enable_r<=reg_req_wdata[0];
           CMD_BASE:cmd_base_r<=reg_req_wdata; CMD_HI:cmd_hi_r<=reg_req_wdata; CMD_SIZE:cmd_size_r<=reg_req_wdata; CMD_HEAD:begin cmdq_head_load<=1; cmdq_head_seed<=reg_req_wdata; end CMD_TAIL:cmd_tail_r<=reg_req_wdata; CMD_CTRL:cmdq_external<=reg_req_wdata[0]; CPL_BASE:cpl_base_r<=reg_req_wdata; CPL_HI:cpl_hi_r<=reg_req_wdata; CPL_SIZE:cpl_size_r<=reg_req_wdata; CPL_TAIL:begin cplq_tail_load<=1; cplq_tail_seed<=reg_req_wdata; end CPL_HEAD:cpl_head_r<=reg_req_wdata;
-          DOORBELL:if(!processor_busy && !dma_busy) begin submit<=1; done_r<=0; error_r<=0; irq_status_r<=0; error_code_r<=0; error_source_r<=0; end
+          DOORBELL:if(!processor_busy && !dma_busy) submit<=1;
           ABORT:if(reg_req_wdata[0]) core_abort<=1; WATCHDOG:watchdog_limit<=reg_req_wdata;
-          DMA_CTRL:begin dma_store<=reg_req_wdata[1]; if(reg_req_wdata[0] && !processor_busy && !dma_busy) begin dma_start<=1; dma_done_r<=0; dma_error_r<=0; dma_error_code_r<=0; end end
-          DMA_STATUS:begin if(reg_req_wdata[1]) dma_done_r<=0; if(reg_req_wdata[2]) begin dma_error_r<=0; dma_error_code_r<=0; end end
+          DMA_CTRL:begin dma_store<=reg_req_wdata[1]; if(reg_req_wdata[0] && !processor_busy && !dma_busy) dma_start<=1; end
+          DMA_STATUS:begin end
           DMA_EXT:dma_ext_addr[31:0]<=reg_req_wdata; DMA_EXT_HI:dma_ext_addr[63:32]<=reg_req_wdata; DMA_SPAD:dma_spad_addr<=reg_req_wdata; DMA_LEN:dma_length_words<=reg_req_wdata[15:0]; DMA_ROW_WORDS:dma_row_words<=reg_req_wdata[15:0]; DMA_ROW_COUNT:dma_row_count<=reg_req_wdata[15:0]; DMA_EXT_STRIDE:dma_ext_stride<=reg_req_wdata; DMA_SPAD_STRIDE:dma_spad_stride<=reg_req_wdata;
           DMA_CFG:begin dma_gather_enable<=reg_req_wdata[0]; dma_read_outstanding<=reg_req_wdata[10:8]; end
           DMA_GATHER_INDEX:dma_gather_index_base<=reg_req_wdata;
           PERF_CTRL:if(reg_req_wdata[0]) perf_clear<=1'b1;
           BIAS_BASE:bias_base<=reg_req_wdata; POST_CTRL:bias_enable<=reg_req_wdata[0];
-          TILE_CTRL:if(reg_req_wdata[0] && !processor_busy && !dma_busy) begin tile_start<=1; done_r<=0; error_r<=0; irq_status_r<=0; error_code_r<=0; error_source_r<=0; end
+          TILE_CTRL:if(reg_req_wdata[0] && !processor_busy && !dma_busy) tile_start<=1;
           TILE_COUNT:tile_count<=reg_req_wdata[15:0]; TILE_EXT_IN:tile_ext_input_base[31:0]<=reg_req_wdata; TILE_EXT_OUT:tile_ext_output_base[31:0]<=reg_req_wdata;
           TILE_EXT_IN_HI:tile_ext_input_base[63:32]<=reg_req_wdata;
           TILE_EXT_OUT_HI:tile_ext_output_base[63:32]<=reg_req_wdata;

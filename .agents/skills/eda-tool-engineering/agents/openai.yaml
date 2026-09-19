@@ -1,0 +1,6 @@
+interface:
+  display_name: "Synopsys EDA Engineering"
+  short_description: "统一调用 Synopsys 全流程 EDA 工具"
+  default_prompt: "Use $eda-tool-engineering to run or plan a reproducible Synopsys EDA flow from the project eda.yaml."
+policy:
+  allow_implicit_invocation: true
