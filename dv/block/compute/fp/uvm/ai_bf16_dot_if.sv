@@ -31,8 +31,9 @@ interface ai_bf16_dot_if(input logic clk, input logic resetn,
 
     property p_spad_request_stable_while_stalled;
         @(posedge clk) disable iff (!resetn)
-            (spad_valid && !spad_ready) |=>
-                (spad_valid && $stable({spad_write,spad_addr,spad_wdata}));
+            (spad_valid && !spad_ready && !abort) |=>
+                (abort ||
+                 (spad_valid && $stable({spad_write,spad_addr,spad_wdata})));
     endproperty
     a_spad_request_stable_while_stalled:
         assert property (p_spad_request_stable_while_stalled)

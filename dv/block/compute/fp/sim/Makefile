@@ -143,6 +143,30 @@ dot-core-compile:
 dot-core-run: dot-core-compile
 	$(DOT_CORE_SIMV) -l $(DOT_CORE_OUT_DIR)/run.log
 
+# Deterministic mixed-format dot throughput baseline (fixed two-cycle SPAD reads).
+DOT_BENCH_OUT_DIR ?= /tmp/nmaforge_mixed_dot_throughput
+DOT_BENCH_SIMV := $(DOT_BENCH_OUT_DIR)/simv_mixed_dot_throughput
+DOT_BENCH_SEED ?= 20261013
+DOT_BENCH_BP_PCT ?= 0
+
+.PHONY: dot-throughput-bench dot-throughput-compile dot-throughput-run
+dot-throughput-bench: dot-throughput-run
+
+dot-throughput-compile:
+	mkdir -p $(DOT_BENCH_OUT_DIR)
+	$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+		-top tb_ai_mixed_dot_throughput $(REPO_ROOT)rtl/compute/fp/ai_bf16_mul_fp32.v \
+		$(REPO_ROOT)rtl/compute/fp/ai_fp16_mul_fp32.v \
+		$(REPO_ROOT)rtl/compute/fp/ai_fp32_add.v \
+		$(REPO_ROOT)rtl/compute/fp/ai_fp32_accumulator.v \
+		$(REPO_ROOT)rtl/compute/fp/ai_mixed_precision_dot_fp32_core.v \
+		../tb/tb_ai_mixed_dot_throughput.sv -o $(DOT_BENCH_SIMV) \
+		-l $(DOT_BENCH_OUT_DIR)/compile.log
+
+dot-throughput-run: dot-throughput-compile
+	$(DOT_BENCH_SIMV) +SEED=$(DOT_BENCH_SEED) +BP_PCT=$(DOT_BENCH_BP_PCT) \
+		-l $(DOT_BENCH_OUT_DIR)/run.log
+
 dot-core-random-vectors:
 	mkdir -p $(DOT_CORE_OUT_DIR)
 	$(PYTHON) ../model/generate_bf16_dot_vectors.py --seed $(DOT_RANDOM_SEED) \

@@ -41,7 +41,7 @@ module ai_spad_arbiter(
     output reg rsp_valid, output reg [2:0] rsp_client, output reg rsp_is_line,
     output reg [3:0] cnm_rsp_valid,
     output wire [2:0] request_client,
-    output wire [31:0] rsp_rdata, output reg rsp_error
+    output wire [31:0] rsp_rdata, output wire rsp_error
 );
     localparam [2:0] CLIENT_DESC=3'd0, CLIENT_CPL=3'd1, CLIENT_CORE=3'd2,
                      CLIENT_BANKED=3'd3, CLIENT_DMA=3'd4;
@@ -59,6 +59,7 @@ module ai_spad_arbiter(
     reg [2:0] accept_client_d;
     reg accept_error_d;
     reg accept_is_line_d;
+    reg rsp_protection_error_r;
     reg [1:0] data_rr_r;
     reg [3:0] accept_cnm_mask_d;
 
@@ -142,12 +143,20 @@ module ai_spad_arbiter(
     // rsp_valid/rsp_client identify which request produced them.
     assign rsp_rdata = spad_rdata;
     assign request_client = accept_client;
+    // Scratchpad parity is registered with the read data.  Select it in the
+    // tagged response cycle instead of sampling it one edge early; preserve
+    // the request-time protection error in a matching response-stage flop.
+    assign rsp_error = rsp_valid &&
+                       (rsp_protection_error_r ||
+                        (rsp_is_line ? (|spad_line_parity_error) :
+                                       spad_parity_error));
 
     always @(posedge clk or negedge resetn) begin
         if (!resetn) begin
             accept_valid_d<=0; accept_client_d<=0; accept_error_d<=0;
             accept_is_line_d<=0;
-            rsp_valid<=0; rsp_client<=0; rsp_is_line<=0; rsp_error<=0;
+            rsp_valid<=0; rsp_client<=0; rsp_is_line<=0;
+            rsp_protection_error_r<=0;
             cnm_rsp_valid<=0; accept_cnm_mask_d<=0;
             data_rr_r<=0;
         end else begin
@@ -164,9 +173,7 @@ module ai_spad_arbiter(
             cnm_rsp_valid<= (accept_valid_d && accept_client_d==CLIENT_BANKED) ? accept_cnm_mask_d : 4'd0;
             rsp_client<=accept_client_d;
             rsp_is_line<=accept_is_line_d;
-            rsp_error<=accept_error_d |
-                       (accept_is_line_d ? |spad_line_parity_error :
-                                           spad_parity_error);
+            rsp_protection_error_r<=accept_error_d;
             if (accept_valid) begin
                 case (accept_client)
                   CLIENT_CORE:   data_rr_r<=RR_BANKED;

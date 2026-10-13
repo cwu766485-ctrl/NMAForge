@@ -26,6 +26,16 @@ ai_run:
 
 ai_smoke: ai_comp ai_run
 
+# Full top-level mixed-dot throughput sweep.  The single-tile baseline avoids
+# DMA/compute overlap; three-tile runs use the production ping-pong pipeline to
+# overlap actual DMA and FP traffic at the shared SPAD arbiter.  External DDR is
+# modeled behaviorally, with seeded AXI WREADY back-pressure in overlap runs.
+FP_BENCH_SEED ?= 20261013
+ai_fp_dot_dma_benchmark: ai_comp
+	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=0 +AI_SEED=$(AI_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +FP_DOT_DMA_BENCH \
+		+FP_BENCH_SEED=$(FP_BENCH_SEED) -l ai_fp_dot_dma_benchmark.log
+
 # Activity-aware smoke: uses exactly the same top-level regression as
 # ai_smoke, but writes a VCD only when explicitly requested.  Convert it on
 # the Synopsys Linux environment with `make ai_smoke_saif` before DC power.

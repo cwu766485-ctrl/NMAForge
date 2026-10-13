@@ -59,7 +59,7 @@ package control_tests_pkg;
             uvm_reg_data_t value;
             phase.raise_objection(this);
             env.ral.version.read(status, value, UVM_FRONTDOOR, env.ral.default_map);
-            if (status != UVM_IS_OK || value != 32'h1000_0008)
+            if (status != UVM_IS_OK || value != 32'h1000_000a)
                 `uvm_error("RAL", $sformatf("VERSION read status=%s value=%08h", status.name(), value))
             env.ral.op.write(status, 32'h0000_005a, UVM_FRONTDOOR, env.ral.default_map);
             if (status != UVM_IS_OK)

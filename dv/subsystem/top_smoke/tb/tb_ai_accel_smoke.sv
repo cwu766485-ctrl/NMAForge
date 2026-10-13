@@ -175,6 +175,73 @@ module tb_ai_accel_smoke;
     integer matrix_line_write_count;
     reg [63:0] last_dma_araddr;
     reg [1023:0] vcd_file;
+    reg fp_perf_measure = 1'b0;
+    reg fp_perf_random_wready = 1'b0;
+    integer fp_perf_seed = 20261013;
+    reg [31:0] fp_perf_rng = 32'h20261013;
+    integer fp_perf_tile_job_cycles = 0;
+    integer fp_perf_active_cycles = 0;
+    integer fp_perf_compute_cycles = 0;
+    integer fp_perf_fetch_stall_cycles = 0;
+    integer fp_perf_response_wait_cycles = 0;
+    integer fp_perf_write_wait_cycles = 0;
+    integer fp_perf_dma_wait_cycles = 0;
+    integer fp_perf_dma_grants = 0;
+
+    // During the dedicated FP benchmark, randomize the AXI write-data
+    // back-pressure used by the existing memory model.  This is deliberately
+    // testbench-only and is disabled for the ordinary smoke regression.
+    initial begin
+        void'($value$plusargs("FP_BENCH_SEED=%d", fp_perf_seed));
+        fp_perf_rng = fp_perf_seed;
+    end
+
+    always @(negedge aclk) begin
+        if (aresetn && fp_perf_random_wready) begin
+            fp_perf_rng = fp_perf_rng * 32'd1664525 + 32'd1013904223;
+            axi_mem_u.ready_gap_cfg = fp_perf_rng[17:16];
+        end
+    end
+
+    // These counters look only at the actual top-level FP core, DMA client,
+    // and their shared scratchpad arbiter.  No synthetic ready/response model
+    // is inserted on this system-level benchmark path.
+    always @(posedge aclk) begin
+        if (!aresetn) begin
+            fp_perf_tile_job_cycles <= 0;
+            fp_perf_active_cycles <= 0;
+            fp_perf_compute_cycles <= 0;
+            fp_perf_fetch_stall_cycles <= 0;
+            fp_perf_response_wait_cycles <= 0;
+            fp_perf_write_wait_cycles <= 0;
+            fp_perf_dma_wait_cycles <= 0;
+            fp_perf_dma_grants <= 0;
+        end else if (fp_perf_measure) begin
+            if (dut.tile_active)
+                fp_perf_tile_job_cycles <= fp_perf_tile_job_cycles + 1;
+            if (dut.fp_busy) begin
+                fp_perf_active_cycles <= fp_perf_active_cycles + 1;
+                if (dut.compute_cluster_u.mixed_precision_dot_core_u.compute_fire)
+                    fp_perf_compute_cycles <= fp_perf_compute_cycles + 1;
+                if (dut.fp_spad_valid && !dut.arb_core_ready)
+                    fp_perf_fetch_stall_cycles <= fp_perf_fetch_stall_cycles + 1;
+                if ((dut.compute_cluster_u.mixed_precision_dot_core_u.state_r == 4'd1) &&
+                    (dut.compute_cluster_u.mixed_precision_dot_core_u.outstanding_reads_r != 0) &&
+                    !dut.core_rsp_valid &&
+                    !dut.compute_cluster_u.mixed_precision_dot_core_u.compute_fire)
+                    fp_perf_response_wait_cycles <= fp_perf_response_wait_cycles + 1;
+                if ((dut.compute_cluster_u.mixed_precision_dot_core_u.state_r == 4'd6) &&
+                    dut.fp_spad_valid && !dut.arb_core_ready)
+                    fp_perf_write_wait_cycles <= fp_perf_write_wait_cycles + 1;
+                if ((dut.dma_spad_valid && !dut.arb_dma_ready) ||
+                    (dut.dma_spad_line_valid && !dut.arb_dma_line_ready))
+                    fp_perf_dma_wait_cycles <= fp_perf_dma_wait_cycles + 1;
+                if ((dut.dma_spad_valid && dut.arb_dma_ready) ||
+                    (dut.dma_spad_line_valid && dut.arb_dma_line_ready))
+                    fp_perf_dma_grants <= fp_perf_dma_grants + 1;
+            end
+        end
+    end
 
     // Optional switching-activity capture.  It is disabled in the ordinary
     // smoke regression because a whole-chip VCD is large; pass
@@ -611,6 +678,206 @@ module tb_ai_accel_smoke;
         end
     endtask
 
+    function [31:0] fp_perf_expected_sum;
+        input integer n;
+        begin
+            case (n)
+                1: fp_perf_expected_sum = 32'h3f80_0000;
+                2: fp_perf_expected_sum = 32'h4000_0000;
+                3: fp_perf_expected_sum = 32'h4040_0000;
+                4: fp_perf_expected_sum = 32'h4080_0000;
+                16: fp_perf_expected_sum = 32'h4180_0000;
+                64: fp_perf_expected_sum = 32'h4280_0000;
+                128: fp_perf_expected_sum = 32'h4300_0000;
+                256: fp_perf_expected_sum = 32'h4380_0000;
+                1024: fp_perf_expected_sum = 32'h4480_0000;
+                default: fp_perf_expected_sum = 32'hxxxx_xxxx;
+            endcase
+        end
+    endfunction
+
+    task fp_perf_seed_input_vectors;
+        input format_fp16;
+        input integer vector_length;
+        input integer tile_count;
+        integer word_index;
+        integer tile_index;
+        integer words_per_tile;
+        reg [31:0] packed_one;
+        begin
+            packed_one = format_fp16 ? 32'h3c00_3c00 : 32'h3f80_3f80;
+            words_per_tile = (vector_length + 1) >> 1;
+            for (tile_index = 0; tile_index < tile_count; tile_index = tile_index + 1)
+                for (word_index = 0; word_index < words_per_tile; word_index = word_index + 1)
+                    axi_mem_u.mem[12'h400 + tile_index * words_per_tile + word_index] = packed_one;
+        end
+    endtask
+
+    task fp_perf_load_weights;
+        input format_fp16;
+        input integer words;
+        integer word_index;
+        reg [31:0] packed_one;
+        begin
+            packed_one = format_fp16 ? 32'h3c00_3c00 : 32'h3f80_3f80;
+            for (word_index = 0; word_index < words; word_index = word_index + 1)
+                axi_mem_u.mem[12'hc00 + word_index] = packed_one;
+            axi_mem_u.ready_gap_cfg = 0;
+            // The weight vector is loaded once through the real DMA path;
+            // tile inputs and outputs then use the existing ping-pong engine.
+            fp_perf_dma_load(32'h0000_3000, 32'h0000_3000, words);
+        end
+    endtask
+
+    task fp_perf_dma_load;
+        input [31:0] ext_addr;
+        input [31:0] spad_addr;
+        input [15:0] words;
+        integer poll;
+        reg [31:0] status;
+        begin
+            axi_write(REG_DMA_EXT_ADDR, ext_addr);
+            axi_write(REG_DMA_SPAD_ADDR, spad_addr);
+            axi_write(REG_DMA_LENGTH, {16'd0, words});
+            axi_write(REG_DMA_CTRL, 32'h0000_0001);
+            for (poll = 0; poll < 20000 && !dut.dma_done && !dut.dma_error;
+                 poll = poll + 1)
+                @(posedge aclk);
+            if (poll == 20000)
+                $fatal(1, "FP benchmark setup DMA cycle timeout ext=%08h spad=%08h words=%0d busy=%b state=%0d",
+                       ext_addr, spad_addr, words, dut.dma_busy, dut.dma_u.state_r);
+            axi_read(REG_DMA_STATUS, status);
+            if (!(dut.dma_done || status[1]) || dut.dma_error || status[2])
+                $fatal(1, "FP benchmark setup DMA failed ext=%08h spad=%08h words=%0d status=%08h",
+                       ext_addr, spad_addr, words, status);
+            axi_write(REG_DMA_STATUS, 32'd2);
+        end
+    endtask
+
+    task fp_perf_wait_tile_done;
+        integer poll;
+        integer found;
+        reg [31:0] status;
+        begin
+            found = 0;
+            status = 32'd0;
+            for (poll = 0; poll < 10000 && !found; poll = poll + 1) begin
+                axi_read(REG_STATUS, status);
+                if (status[1]) found = 1;
+            end
+            if (!found || status[2])
+                $fatal(1, "FP tile benchmark did not complete cleanly status=%08h processor_busy=%b tile_active=%b dma_busy=%b fp_busy=%b",
+                       status, dut.processor_busy, dut.tile_active, dut.dma_busy, dut.fp_busy);
+        end
+    endtask
+
+    task fp_perf_run_case;
+        input format_fp16;
+        input integer vector_length;
+        // A one-tile job is the no-overlap baseline; three ping-pong tiles
+        // create real DMA/compute overlap through the production scheduler.
+        input integer tile_count;
+        reg [31:0] expected;
+        reg [31:0] tile_overlap_cycles;
+        reg [31:0] tile_stall_cycles;
+        integer seed_for_case;
+        integer words_per_tile;
+        integer tile_index;
+        integer output_word_index;
+        begin
+            expected = fp_perf_expected_sum(vector_length);
+            words_per_tile = (vector_length + 1) >> 1;
+            fp_perf_seed_input_vectors(format_fp16, vector_length, tile_count);
+            fp_perf_load_weights(format_fp16, words_per_tile);
+            axi_write(REG_OP_MODE, format_fp16 ? 32'h51 : 32'h50);
+            axi_write(REG_SRC1_BASE, 32'h0000_3000);
+            axi_write(REG_LENGTH, vector_length);
+            axi_write(REG_M_SIZE, 32'd1);
+            axi_write(REG_N_SIZE, 32'd1);
+            axi_write(REG_K_WORDS, vector_length);
+            axi_write(REG_BIAS_BASE, 32'd0);
+            axi_write(REG_POST_CTRL, 32'd0);
+            axi_write(REG_QUANT_ACT, 32'd0);
+            axi_write(REG_TILE_COUNT, tile_count);
+            axi_write(REG_TILE_EXT_IN, 32'h0000_1000);
+            axi_write(REG_TILE_EXT_OUT, 32'h0000_3800);
+            axi_write(REG_TILE_EXT_IN_STRIDE, words_per_tile * 4);
+            axi_write(REG_TILE_EXT_OUT_STRIDE, 32'd4);
+            axi_write(REG_TILE_BUF0, 32'h0001_0000);
+            axi_write(REG_TILE_BUF1, 32'h0001_3000);
+            axi_write(REG_TILE_IN_WORDS, words_per_tile);
+            axi_write(REG_TILE_OUT_WORDS, 32'd1);
+            axi_write(REG_TILE_OUT_OFFSET, 32'h0000_1000);
+
+            fp_perf_tile_job_cycles = 0;
+            fp_perf_active_cycles = 0;
+            fp_perf_compute_cycles = 0;
+            fp_perf_fetch_stall_cycles = 0;
+            fp_perf_response_wait_cycles = 0;
+            fp_perf_write_wait_cycles = 0;
+            fp_perf_dma_wait_cycles = 0;
+            fp_perf_dma_grants = 0;
+            seed_for_case = fp_perf_seed ^ vector_length ^ (format_fp16 ? 32'h16 : 32'h50) ^ tile_count;
+            fp_perf_rng = seed_for_case;
+            fp_perf_random_wready = (tile_count > 1);
+            fp_perf_measure = 1'b1;
+            clear_done_irq();
+            axi_write(REG_TILE_CTRL, 32'd1);
+            fp_perf_wait_tile_done();
+            @(negedge aclk);
+            fp_perf_measure = 1'b0;
+            fp_perf_random_wready = 1'b0;
+            axi_read(REG_PERF_OVERLAP, tile_overlap_cycles);
+            axi_read(REG_PERF_STALL, tile_stall_cycles);
+            expect_read(REG_RESULT, expected, "FP throughput benchmark result register");
+            expect_read(REG_TILE_COMPLETED, tile_count, "FP tile benchmark completed tile count");
+            for (tile_index = 0; tile_index < tile_count; tile_index = tile_index + 1) begin
+                output_word_index = 12'hE00 + tile_index;
+                if (axi_mem_u.mem[output_word_index] !== expected)
+                    $fatal(1, "FP tile DDR result mismatch fmt=%0d len=%0d tile=%0d expected=%08h actual=%08h",
+                           format_fp16, vector_length, tile_index, expected,
+                           axi_mem_u.mem[output_word_index]);
+            end
+            if (tile_count > 1 && fp_perf_dma_grants == 0)
+                $fatal(1, "FP tile ping-pong job showed no actual DMA SPAD grant during compute fmt=%0d len=%0d overlap=%0d",
+                       format_fp16, vector_length, tile_overlap_cycles);
+            $display("FP_SYSTEM_BENCH,actual_tile_pipeline,%s,%s,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0.5f,%0.5f,%0d",
+                     (tile_count == 1) ? "single_tile" : "pingpong_random_wready",
+                     format_fp16 ? "FP16" : "BF16", vector_length, tile_count,
+                     fp_perf_tile_job_cycles, fp_perf_active_cycles,
+                     fp_perf_compute_cycles, fp_perf_fetch_stall_cycles,
+                     fp_perf_response_wait_cycles, fp_perf_write_wait_cycles,
+                     fp_perf_dma_wait_cycles, fp_perf_dma_grants,
+                     tile_overlap_cycles, tile_stall_cycles,
+                     (1.0 * tile_count * vector_length) / fp_perf_tile_job_cycles,
+                     (1.0 * tile_count * vector_length) / fp_perf_active_cycles,
+                     seed_for_case);
+            clear_done_irq();
+        end
+    endtask
+
+    task run_fp_dot_dma_benchmark;
+        integer format_index;
+        integer length_index;
+        integer lengths [0:8];
+        begin
+            lengths[0]=1; lengths[1]=2; lengths[2]=3; lengths[3]=4;
+            lengths[4]=16; lengths[5]=64; lengths[6]=128;
+            lengths[7]=256; lengths[8]=1024;
+            $display("FP_SYSTEM_BENCH_HEADER,source,mode,format,length,tiles,tile_job_cycles,fp_active_cycles,compute_macs,fp_request_wait_cycles,response_wait_cycles,result_write_wait_cycles,dma_spad_wait_cycles,dma_spad_grants,tile_overlap_cycles,tile_stall_cycles,mac_per_tile_job_cycle,mac_per_fp_active_cycle,seed");
+            for (format_index=0; format_index<2; format_index=format_index+1) begin
+                for (length_index=0; length_index<9; length_index=length_index+1)
+                    fp_perf_run_case(format_index != 0, lengths[length_index], 1);
+                // Larger jobs expose DMA/SPAD contention through the real
+                // two-context ping-pong pipeline; WREADY uses a seeded LCG.
+                fp_perf_run_case(format_index != 0, 64, 3);
+                fp_perf_run_case(format_index != 0, 256, 3);
+                fp_perf_run_case(format_index != 0, 1024, 3);
+            end
+            $display("PASS: real ai_tile_pipeline + ai_axi128_dma + ai_spad_arbiter FP benchmark (behavioral AXI memory model)");
+        end
+    endtask
+
     task write_spad_desc_v4_macro;
         input [31:0] base;
         input [7:0]  op;
@@ -1040,6 +1307,13 @@ module tb_ai_accel_smoke;
         repeat (8) @(posedge aclk);
         aresetn = 1'b1;
         repeat (4) @(posedge aclk);
+
+        if ($test$plusargs("FP_DOT_DMA_BENCH")) begin
+            run_fp_dot_dma_benchmark();
+            if (errors != 0)
+                $fatal(1, "FP benchmark reported %0d errors", errors);
+            $finish;
+        end
 
         expect_read(REG_VERSION, 32'h1000_000a, "version");
         expect_read(FPGA_AXI_BASE + REG_VERSION, 32'h1000_000a,

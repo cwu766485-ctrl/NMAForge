@@ -7,6 +7,7 @@
         int unsigned format_sign_hits[2][2];
         int unsigned format_stall_hits[2][2];
         int unsigned transactions_sampled;
+        int unsigned max_outstanding_reads_seen;
 
         covergroup dot_cg with function sample(int unsigned format,
                                                 int unsigned length,
@@ -45,6 +46,7 @@
                 end
             end
             transactions_sampled = 0;
+            max_outstanding_reads_seen = 0;
         endfunction
 
         virtual function void write(bf16_dot_cov_item t);
@@ -55,6 +57,8 @@
             format = t.format_fp16 ? 1 : 0;
             stalled = (t.stall_cycles != 0);
             transactions_sampled++;
+            if (t.max_outstanding_reads > max_outstanding_reads_seen)
+                max_outstanding_reads_seen = t.max_outstanding_reads;
             format_hits[format]++;
             format_length_hits[format][t.length]++;
             format_stall_hits[format][stalled]++;
@@ -80,6 +84,9 @@
             super.check_phase(phase);
             if (transactions_sampled == 0)
                 `uvm_error("FP/COV", "No passing transactions reached coverage")
+            if (max_outstanding_reads_seen < 2)
+                `uvm_error("FP/COV", $sformatf("Read overlap not covered: peak outstanding=%0d",
+                                                 max_outstanding_reads_seen))
             for (int f = 0; f < 2; f++) begin
                 if (format_hits[f] == 0)
                     `uvm_error("FP/COV", $sformatf("Format bin %0d was not covered", f))
@@ -98,8 +105,9 @@
                         `uvm_error("FP/COV", $sformatf("Format %0d backpressure bin %0d was not covered", f, i))
                 end
             end
-            `uvm_info("FP/COV", $sformatf("Mixed dot coverage: transactions=%0d BF16=%0d FP16=%0d covergroup=%0.1f%%",
+            `uvm_info("FP/COV", $sformatf("Mixed dot coverage: transactions=%0d BF16=%0d FP16=%0d peak_outstanding_reads=%0d covergroup=%0.1f%%",
                                              transactions_sampled, format_hits[0],
-                                             format_hits[1], dot_cg.get_coverage()), UVM_LOW)
+                                             format_hits[1], max_outstanding_reads_seen,
+                                             dot_cg.get_coverage()), UVM_LOW)
         endfunction
     endclass

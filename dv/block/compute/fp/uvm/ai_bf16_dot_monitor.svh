@@ -2,6 +2,7 @@
         virtual ai_bf16_dot_if vif;
         uvm_analysis_port #(bf16_dot_observed_item) observed_ap;
         int unsigned next_transaction_id;
+        int unsigned outstanding_reads;
         bf16_dot_observed_item current;
 
         `uvm_component_utils(bf16_dot_monitor)
@@ -9,6 +10,7 @@
             super.new(name, parent);
             observed_ap = new("observed_ap", this);
             next_transaction_id = 0;
+            outstanding_reads = 0;
         endfunction
 
         virtual function void build_phase(uvm_phase phase);
@@ -31,6 +33,7 @@
                                                        current.transaction_id, current.read_count,
                                                        current.write_count), UVM_HIGH)
                         current = null;
+                        outstanding_reads = 0;
                     end
                 end else begin
                 if (vif.start) begin
@@ -40,6 +43,7 @@
                     current.format_fp16 = vif.format_fp16;
                     current.length = vif.length;
                     current.read_count = 0;
+                    current.max_outstanding_reads = 0;
                     current.write_count = 0;
                     current.element_count = 0;
                     current.stall_cycles = 0;
@@ -50,10 +54,19 @@
                     current.error_code = 0;
                     current.protocol_error = 0;
                     current.reset_abort = 0;
+                    outstanding_reads = 0;
                 end
 
                 if ((current != null) && vif.spad_valid && !vif.spad_ready)
                     current.stall_cycles++;
+
+                if ((current != null) && vif.spad_rsp_valid) begin
+                    if (outstanding_reads == 0) begin
+                        current.protocol_error = 1;
+                        `uvm_error("BF16/MON", $sformatf("tx%0d response without accepted read",
+                                                         current.transaction_id))
+                    end else outstanding_reads--;
+                end
 
                 if ((current != null) && vif.spad_valid && vif.spad_ready) begin
                     if (vif.spad_write) begin
@@ -73,6 +86,9 @@
                                                              vif.spad_addr, expected_address))
                         end
                         current.read_count++;
+                        outstanding_reads++;
+                        if (outstanding_reads > current.max_outstanding_reads)
+                            current.max_outstanding_reads = outstanding_reads;
                     end
                 end
 

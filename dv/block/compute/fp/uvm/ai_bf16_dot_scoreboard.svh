@@ -110,7 +110,6 @@
                     if (obs.element_count != exp.length)
                         `uvm_error("BF16/SB", $sformatf("tx%0d element_count=%0d expected=%0d",
                                                          exp.transaction_id, obs.element_count, exp.length))
-
                     if (!obs.error && (obs.error_code == 0) && !obs.protocol_error &&
                         (obs.format_fp16 == exp.format_fp16) &&
                         (obs.read_count == required_reads) && (obs.write_count == 1) &&
@@ -122,6 +121,7 @@
                         cov.format_fp16 = exp.format_fp16;
                         cov.length = exp.length;
                         cov.stall_cycles = obs.stall_cycles;
+                        cov.max_outstanding_reads = obs.max_outstanding_reads;
                         foreach (exp.a_bits[i]) begin
                             cov.a_bits[i] = exp.a_bits[i];
                             cov.b_bits[i] = exp.b_bits[i];

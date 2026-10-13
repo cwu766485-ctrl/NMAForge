@@ -1,6 +1,6 @@
 # NMAForge Mixed-Precision Extension — Design & Verification Execution Plan
 
-> **版本**：v1.2 · 2026-10-13
+> **版本**：v1.3 · 2026-10-13
 > **项目**：NMAForge — AXI4 Near-Memory Tensor Accelerator
 > **目标定位**：可集成至 RISC-V/通用 CPU SoC 的独立 AI Accelerator IP；同时形成可审查的 **Digital IC Design** 和 **Design Verification (DV)** 项目成果。
 > **本文性质**：执行计划与状态记录。G0/G1/G2 的完成项均附可复现证据；G3 已开始，但仍未闭合。所有性能、覆盖率、PPA 均须用运行证据证明。
@@ -11,8 +11,8 @@
 
 **唯一主线：在现有 NMAForge 上新增自研 BF16/FP16 混合精度计算能力，并完成 Block → Subsystem → Top-level 的可复现验证闭环。** 不新开第二个重复的 AI 加速器项目，也不将 NMAForge 强行改为 CPU 内部 ALU，更不以独立芯片 Tapeout 作为本轮目标。
 
-- **P0 / 当前已实现**：A8/A9 兼容行为保留；`0x50 BF16_DOT_ACC_FP32` 不变，A10 新增 `0x51 FP16_DOT_ACC_FP32`，两者共用混合精度 dot 核、command/SPAD/completion 路径。FP16 top smoke 已完成 DDR→SPAD→FP→SPAD→DDR；mixed-dot UVM 两 seed 各 162/162 transaction（142 数值、14 期望错误、6 个活跃状态复位），成功数值 covergroup 100%，`state_r` 23/23 transitions 命中。`pending_error_r` 与部分 condition/branch coverage 仍待 disposition；FP PPA 仍开放。
-- **P1 / 建议完成**：向 2/4 路参数化计算扩展，评估带宽瓶颈；补足 BF16 GEMV/小块 GEMM；形成一致约束下的 DC/Vivado PPA 数据和多 seed 回归；对错误注入开展可复现的 RTL mutation testing。
+- **P0 / 当前已实现**：A8/A9 兼容行为保留；`0x50 BF16_DOT_ACC_FP32` 不变，A10 新增 `0x51 FP16_DOT_ACC_FP32`，两者共用混合精度 dot 核、command/SPAD/completion 路径。mixed-dot UVM 已重跑 4 seed、每格式 256 个随机向量，URG merge 成功且 UVM error/fatal 为 0；top smoke 包含 DDR→SPAD→FP→SPAD→DDR。2026-10-13 加入双 pair-slot/最多两笔 outstanding 预取，64-element core microbench 259→101 cycles；另有同一 `ai_tile_pipeline` 下单 tile 与三 tile DMA/FP 争用的端到端吞吐和等待统计。初步显示 1024-element 三 tile 吞吐为 0.577 MAC/job-cycle，存在 DMA/SPAD 等待但多数搬运与计算重叠，因此暂缓多输出 lane；详细数据见 [`MIXED_PRECISION_THROUGHPUT_PPA_ZH.md`](../../verification/MIXED_PRECISION_THROUGHPUT_PPA_ZH.md)。coverage disposition、随机 DDR read latency/error 压力、2.5 ns/400 MHz 和更真实 power 注释仍开放；4.0 ns PPA 的约束和限制见同报告。
+- **P1 / 建议完成**：先扩展 DMA read-response/backpressure profile 和 FP UVM coverage disposition，再以实测决定是否做 2/4 输出并行；只有确认供数/算力瓶颈后才投入 lane 扩展。随后补足 BF16 GEMV/小块 GEMM、同约束 DC/Vivado PPA 及可复现错误注入/mutation testing。
 - **P2 / 可选展示**：RISC-V SoC 上 AXI-Lite 裸机控制 + DMA 端到端 Demo；FP32 更完整的运算/异常标志；FMA 融合舍入；FPGA 板级实测；更大规模 CNN/Transformer workload。
 - **停止增加功能的硬条件**：只要 P0 Block DV 仍有未解释失败，或旧 INT8/AXI 回归被破坏，不新增 Lane、算子和 CPU 集成。
 
@@ -24,7 +24,7 @@ RACE LaneFAdd 仅作为**架构、接口和浮点 corner-case 验证思路的参
 
 ## 1. 当前 NMAForge 基线与缺口
 
-**2026-10-13 执行状态**：G0–G2 及 A10 FP16 dot RTL 集成已完成；G3 的 mixed-precision UVM 与 DDR top smoke 已有实测进展，但 coverage closure 仍开放。A10 `VERSION=0x1000000a`、ABI 7.4、`CAP2=0xff`；`0x50` 仍为 BF16 dot，`0x51` 为 FP16 dot。UVM 两 seed 各完成 162/162 scoreboard transaction：142 数值向量、14 期望错误、6 个状态内异步复位；错误/生命周期模式覆盖 A/B operand parity、A/B read 未握手前 abort 等，URG merge PASS，成功数值 covergroup 100%，`state_r` 23/23 transitions 命中。当前 smoke/seeded 回归证据见下方“A10 FP16 实现与验证记录”。所有结果限定为 Rocky-8.10 WSL / VCS V-2023.12-SP1 的本工作区运行，不代表 clean checkout。
+**2026-10-13 执行状态**：G0–G2 及 A10 FP16 dot RTL 集成已完成；G3 的 block UVM、top smoke、seeded regression 与初版 DMA/SPAD contention profiling 已有 PASS 证据，但 coverage closure 仍开放。A10 `VERSION=0x1000000a`、ABI 7.4、`CAP2=0xff`；`0x50` 仍为 BF16 dot，`0x51` 为 FP16 dot。最新 mixed-dot UVM 为 4 seed × 每格式 256 个随机向量，UVM error/fatal 为 0、URG merge 成功；完整门槛与争用数据见下方“真实 DMA/SPAD 争用 profiling 增补”。所有结果限定为 Rocky-8.10 WSL / VCS V-2023.12-SP1 的本工作区运行，不代表 clean checkout。
 
 **审查快照**：GitHub `main` commit `fbaa525512b527e4d8c87bbdda683208f9f757b0`（2026-10-12 查询）；冻结施工分支时需再次核实该 commit 是否仍为基线。
 
@@ -34,11 +34,11 @@ RACE LaneFAdd 仅作为**架构、接口和浮点 corner-case 验证思路的参
 |---|---|---|
 | 架构 | AXI4-Lite/AXI4、512 KiB SPAD、CMDQ/CPLQ、INT8/CNM/matrix/SFU、BF16 `0x50` 与 FP16 `0x51` dot queue/direct 路径 | 更广泛的 FP subsystem stress 和 FP PPA |
 | 设计语言 | G0/G1 FP arithmetic blocks 与 G2 command-to-SPAD integration RTL | 后续扩展算子/lane 需另立范围 |
-| Block / command-path DV | BF16/FP16 arithmetic block、mixed-dot two-seed UVM/URG（每 seed 162/162，含 14 个错误和六状态 reset-in-flight）与 CDC command-path regression已运行 PASS | 复合错误优先级及部分 condition/branch coverage disposition、更广泛 FP subsystem stress（G3） |
-| Top-level DV | A10 `ai_smoke` 与 20-case seeded run；含 BF16/FP16 result、invalid command、Transformer/random；FP16 DDR→SPAD→FP→SPAD→DDR PASS | compact AXI memory model 的 directed evidence，不代表 DDR PHY/board 或 UVM coverage closure |
-| 实现 | 有既有 A8 pre-layout 记录 | 没有新增 FP PPA；G3 需同约束重测，不沿用旧版 250 MHz 结论 |
+| Block / command-path DV | BF16/FP16 arithmetic block、mixed-dot 4-seed UVM/URG（256 随机向量/格式/seed）、DMA UVM 11 项、control UVM 6 项与 CDC command-path regression已运行 PASS | 复合错误优先级及部分 condition/branch coverage disposition、更广泛 FP subsystem stress（G3） |
+| Top-level DV | A10 `ai_smoke`、20-case seeded run、FP16 DDR→SPAD→FP→SPAD→DDR，以及三 tile randomized-WREADY DMA/FP contention benchmark 均 PASS | compact AXI memory model 不代表 DDR PHY/board；尚缺 randomized AXI read-response latency/error stress 和 top-level UVM coverage closure |
+| 实现 | 4.0 ns pre-layout DC 已有基线/候选同约束比较 | 2.5 ns/400 MHz 与 2.4 ns sweep 未运行；不能沿用旧版结果宣称达标 |
 
-**G3 未闭合边界**：FP16 的 directed top-smoke 已验证 DDR→DMA→SPAD→queued FP16 dot→SPAD→DMA→DDR；UVM/URG 双 seed 各 162/162，包含 142 数值向量、14 期望错误事务和 READ_A/WAIT_A/READ_B/WAIT_B/CALC/WRITE 六状态异步复位；成功数值 covergroup 100%。`ai_mixed_precision_dot_fp32_core` module coverage line/condition/FSM/branch 为 `98.32%/63.50%/87.80%/83.33%`；`state_r` 9/9 状态、23/23 转移均命中。`pending_error_r` 状态全命中、转移 13/18；未命中的 `ERR_ABORT/ERR_CONFIG/ERR_PARITY→ERR_PROTECTION`、`ERR_WATCHDOG→ERR_NONE/ERR_PROTECTION` 暂不做不可达假设，需结合状态优先级契约逐项 disposition。部分条件/分支 coverage 仍待审查。Top transaction 尚未覆盖随机 DDR 延迟/错误注入，也没有新增 FP PPA。旧 DMA 文档中的 **67.86%** command functional coverage 不是 FP closure 证据。
+**G3 未闭合边界**：FP16 的 directed top-smoke 已验证 DDR→DMA→SPAD→queued FP16 dot→SPAD→DMA→DDR；最新 mixed UVM 已运行 4 seed × 每格式 256 个随机向量；DUT line/condition/FSM/branch coverage、复合错误优先级和 `pending_error_r` 未命中转移仍待 disposition（此前 coverage 数字见历史 A10 记录）。新增 top benchmark 在行为级 DDR 模型下随机化 AXI WREADY，测量 1/2/3/4/16/64/128/256/1024 向量长度及 64/256/1024 三 tile ping-pong 争用；尚不含随机 AXI read-response latency、DDR error、PHY/板级带宽验证。4.0 ns 新 FP PPA 为 pre-layout 对比且 SAIF 有未注释对象，2.5 ns/400 MHz sweep 仍未完成。旧 DMA 文档中的 **67.86%** command functional coverage 不是 FP closure 证据。
 
 **现有关键路径与约束**：`rtl/top/ai_accel_top.v` 是源事实；`ai_spad_arbiter` 是 scratchpad 调度侧**唯一仲裁入口**。新模块不得绕过其规则在顶层新增直连 SRAM 的私有旁路。
 
@@ -96,7 +96,7 @@ RACE LaneFAdd 仅作为**架构、接口和浮点 corner-case 验证思路的参
 | 异常标志 | P0 明确记录不支持/不输出哪些 IEEE 754 flags | 切忌默认沿用 RACE 的宽松 NaN/fflags 验证约定而称“IEEE 完整符合” |
 | 数据布局 | 32-bit SRAM word 存 2×BF16/FP16，FP32 acc 独占 32-bit | 端序、mask、tail、stride、base alignment 全部明文规定 |
 
-**初始性能策略**：先保证可串行消费 A/B 两路数据，明确 pipeline latency、一次接受的计算粒度和最大 outstanding；通过实测再决定 2/4 Lane。已有 SRAM 为单端口 macro 的物理映射，不可假设同一 Bank 每周期可自由提供两次独立读取。
+**性能策略与当前状态**：当前单输出 dot 保持逐元素顺序乘积/累加，但用两个 A/B word-pair 缓冲槽预取，最多两笔 outstanding read 与计算重叠；64 元素固定双周期 SPAD 响应微基准从 259 降到 101 cycles。此结果不是 DDR/arbiter 下的系统吞吐；先跑 2.5 ns 时序与真实 DMA/SPAD contention profiling，再决定是否做多输出/多 lane。单个 dot 的严格累加顺序不能拆成 parallel partial sums；已有 SRAM 为单端口 macro 的物理映射，也不可假设同一 Bank 每周期可自由提供两次独立读取。
 
 ### 3.2 ABI / Opcode 策略
 
@@ -244,6 +244,8 @@ cd ../../../subsystem/top_smoke/sim && make ai_smoke
 
 ### A10 FP16 Dot 实现与验证记录（2026-10-13；mixed UVM/top smoke PASS，coverage disposition 开放）
 
+> 本节记录 A10 初始交付时的状态；UVM seed 数、争用 profiling 与当前 arbiter 修正后的 gate 状态，以下方“真实 DMA/SPAD 争用 profiling 增补”为准。
+
 - RTL 保持 `0x50` 为 BF16 点积；新增 `0x51` FP16 点积。`ai_mixed_precision_dot_fp32_core` 锁存输入格式，共用 FP16/BF16 乘法选择、顺序 FP32 累加、现有 arbiter-owned SPAD 端口和单一结果写回。兼容 BF16 wrapper 保留原接口。
 - 命令路径已接入 `ai_accel_opcode_decode`、descriptor validator、command processor、compute cluster 与共享 completion writer；寄存器/软件 ABI 同步为 A10、ABI 7.4、`CAP2=0xff`（bit 6 BF16、bit 7 FP16）。
 - Block 定向验证：`fp16-mul-test` 的 10,015 个向量 PASS；旧 BF16 `dot-core-test` PASS；Python golden model 19 tests PASS。
@@ -251,6 +253,31 @@ cd ../../../subsystem/top_smoke/sim && make ai_smoke
 - URG 中 `ai_mixed_precision_dot_fp32_core` line/condition/FSM/branch 为 `98.32%/63.50%/87.80%/83.33%`；所有 9 个 `state_r` 状态与 23 个转移均命中。`pending_error_r` 6 个状态均命中、18 个转移命中 13 个；未命中的五条转移为 ABORT/CONFIG/PARITY→PROTECTION 与 WATCHDOG→NONE/PROTECTION，暂留 review/disposition。condition/branch 仍非 100%，功能 covergroup 100%不等于 DUT 全覆盖 closure。
 - top smoke 已通过旧 BF16 命令、FP16 queued/direct 命令及新增 DDR 闭环：DDR 两个 packed FP16 操数经 DMA 读入 SPAD，`0x51` queued descriptor 经 shared completion，结果再由 DMA 写回 DDR，逐字期望 `0x41300000`。本轮重新运行 `make -C dv/subsystem/top_smoke/sim ai_smoke` 为 `TEST PASS`；20-case seeded top run 为前序证据。VCS compile 留有 CNM perf telemetry 输出未接线的 TFIPC warning，属独立清理项。
 - 边界：top 端到端为 directed smoke + compact AXI memory model，不代表 DDR PHY、FPGA 板级或随机 DDR error/back-pressure stress；无 FP PPA 数据。下一步先冻结复合错误优先级规格并处理剩余 condition/branch coverage，再扩展 top FP16 DDR 错误、back-pressure 和 descriptor fetch 场景；最后测量 FP 扩展 PPA。
+
+### 真实 DMA/SPAD 争用 profiling 增补（2026-10-13）
+
+- 为按向量长度衡量端到端吞吐，top smoke 新增 `ai_fp_dot_dma_benchmark`：单 tile 无重叠扫描
+  1/2/3/4/16/64/128/256/1024 元素；并以 production `ai_tile_pipeline` 做 3-tile ping-pong，
+  随机化 AXI WREADY，扫描 64/256/1024 元素。记录 tile job cycles、FP-active cycles、MAC、FP
+  request/response waits、DMA SPAD waits/grants 和 tile DMA/compute overlap，并检查每 tile DDR 写回。
+- 长度 1024 的 BF16 三 tile 结果：5322 tile-job cycles、3072 MAC、FP 请求等待 242 cycles、
+  FP response wait 124、DMA SPAD wait 232、258 grants、1343 overlap；端到端为 0.57723 MAC/job-cycle。
+  FP16 为 5318 cycles、0.57766 MAC/job-cycle。无争用单 tile 同长度为 2100 job cycles/1024 MAC，
+  0.48762 MAC/job-cycle。64/256 结果和完整吞吐曲线见
+  [`MIXED_PRECISION_THROUGHPUT_PPA_ZH.md`](../../verification/MIXED_PRECISION_THROUGHPUT_PPA_ZH.md)。
+- 初步结论：ping-pong DMA overlap 提升了 tile-job 吞吐；共享 SPAD 的等待可观测，但当前证据不支持
+  直接复制多输出 MAC lane。先提高 DMA read-response/backpressure 压力并完善真实流量模型，再决定
+  是否做并行输出微架构。
+- 实测调试中发现 registered scratchpad parity/error 与 tagged response 的对齐问题；更新
+  `ai_spad_arbiter.rsp_error` 为与 `rsp_valid`/read data 对齐，并保留 request-time protection error。
+  `ai_spad_arb_run` 新增响应周期 parity 检查；CNM/DMA contention 和 parity 对齐均 PASS。AXI/SPAD
+  ready/valid/request 路径不变。
+- 本轮 VCS gates：FP `dot-core-test`；mixed-dot UVM 四 seed（每格式 256 个随机向量/seed，URG merge，
+  每 seed UVM_ERROR/FATAL=0）；DMA UVM 11 项；control UVM 6 项；`ai_spad_arb_run`；`ai_smoke`；
+  `ai_run AI_RANDOM_CASES=20 AI_SEED=12345`；`ai_fp_dot_dma_benchmark`，均 PASS。完整命令见吞吐/PPA 报告。
+- 限制：AXI memory model 是行为级，不代表 DDR PHY/板卡。随机化当前覆盖 WREADY，不覆盖 AXI RVALID
+  latency/error。已有 4.0 ns PPA 数据对应本次 arbiter parity 修复之前的 RTL，后续 PPA 阶段须先对最新 RTL
+  重跑 4.0 ns，再做目标频率 sweep。此阶段完成了截图中的验证冻结和多长度/真实 tile-pipeline profiling。
 
 ### G3 前一 BF16-only 快照（2026-10-13；已由上方 A10 记录 supersede）
 
@@ -393,6 +420,6 @@ cd ../../../subsystem/top_smoke/sim && make ai_smoke
 - **G0 通过**：当前记录的 dirty worktree 上基线回归 + spec/ABI/资源/数值契约冻结；允许进入 G1 算术 RTL。clean `main` checkout 的独立复测仍未声称完成。
 - **G1 通过**：独立 FP 算术 RTL 与数值参考一致，控制 SVA 及独立 block lint 已检查并 disposition → 允许进入 G2 opcode/生命周期集成；URG/code coverage 仍属于 G3。
 - **G2 已通过（历史范围）**：预加载 SPAD 的 `0x50` command→SPAD→FP→SPAD→completion 通过；该阶段记录不含 DDR 端到端。
-- **G3 部分通过但未闭合**：当前 A10 已通过 FP16 directed DDR→SPAD→FP→SPAD→DDR、mixed-dot UVM 双 seed 和 URG merge；DUT FSM/code coverage disposition、随机 DDR 延迟/错误压力、UVM reset/abort/error 场景与新增 FP 同约束 PPA 仍需完成。完成前不声称 G3 通过，也不据此声称 2/4 Lane 扩展结论。
+- **G3 部分通过但未闭合**：当前 A10 已通过 FP16 directed DDR→SPAD→FP→SPAD→DDR、mixed-dot UVM 四 seed（每格式 256 random/seed）、DMA/control 回归、top smoke 和初版 DMA/SPAD contention profiling；仍需完成 DUT FSM/code coverage disposition、随机 DDR read-response/error 压力以及包含本次 arbiter parity 修正的同约束 FP PPA。完成前不声称 G3 通过，也不据此声称 2/4 Lane 扩展结论。
 
 **一句话**：这轮项目的目标不是再堆一个“支持 AI 的浮点模块”，而是打造一个**有自研微架构、有独立数值模型、有 UVM 验证闭环、有 PPA 与失败分析的可交付 AI Accelerator IP**。

@@ -157,6 +157,29 @@ module tb_ai_spad_arbiter_rr;
     if(cnm_rsp_valid!==4'b1011 || !rsp_valid || rsp_client!=3'd3)
       $fatal(1,"CNM response lane mask was not preserved");
     $display("Scratchpad round-robin arbiter PASS");
+
+    // Scratchpad parity arrives registered with the read-data response.  A
+    // parity error asserted in that response cycle must not be sampled one
+    // edge early or shifted onto the following request.
+    cnm_valid=0;
+    core_valid=1;
+    core_write=0;
+    core_addr=32'h0500;
+    spad_parity_error=0;
+    @(posedge clk);
+    core_valid=0;
+    @(posedge clk);
+    spad_parity_error=1;
+    #1;
+    if (rsp_valid!==1'b1 || rsp_client!==3'd2 || rsp_error!==1'b1)
+      $fatal(1,"core parity error was not aligned with response valid=%b client=%0d error=%b",
+             rsp_valid,rsp_client,rsp_error);
+    spad_parity_error=0;
+    @(posedge clk);
+    #1;
+    if (rsp_valid!==1'b0)
+      $fatal(1,"core parity response valid did not retire");
+    $display("Scratchpad response parity alignment PASS");
     $finish;
   end
 endmodule

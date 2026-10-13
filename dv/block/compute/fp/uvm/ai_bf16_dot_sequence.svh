@@ -120,7 +120,9 @@
             // numeric vectors; they are checked by the same passive monitor
             // and scoreboard, but are excluded from successful-result bins.
             send_fault_case(FP_FAULT_CONFIG, 1'b0, 0, 4'd1, 0, 0);
-            send_fault_case(FP_FAULT_READ_PARITY, 1'b1, 1, 4'd5, 1, 0);
+            // A and B are both already admitted by the time A's fixed-latency
+            // parity response arrives; the core must drain both responses.
+            send_fault_case(FP_FAULT_READ_PARITY, 1'b1, 1, 4'd5, 2, 0);
             send_fault_case(FP_FAULT_CONFIG, 1'b0, 0, 4'd1, 0, 0);
             send_fault_case(FP_FAULT_READ_B_PARITY, 1'b0, 1, 4'd5, 2, 0);
             send_fault_case(FP_FAULT_READ_PROTECTION, 1'b0, 1, 4'd6, 1, 0);

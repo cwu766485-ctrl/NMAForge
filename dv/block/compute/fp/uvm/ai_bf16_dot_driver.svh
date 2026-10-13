@@ -21,10 +21,13 @@
 
         task automatic drive_spad_transaction(bf16_dot_item req);
             int unsigned stall_left;
-            int unsigned rsp_delay;
+            int unsigned bfm_cycle;
+            int unsigned rsp_count;
+            int unsigned rsp_head;
+            int unsigned rsp_tail;
+            int unsigned rsp_due [0:3];
+            bit [31:0] rsp_data [0:3];
             bit request_seen;
-            bit response_pending;
-            bit [31:0] response_data;
             int unsigned word_index;
             int unsigned accepted_reads;
             int unsigned responses_delivered;
@@ -36,9 +39,10 @@
             bit reset_condition;
 
             request_seen = 0;
-            response_pending = 0;
-            rsp_delay = 0;
-            response_data = '0;
+            bfm_cycle = 0;
+            rsp_count = 0;
+            rsp_head = 0;
+            rsp_tail = 0;
             stall_left = 0;
             accepted_reads = 0;
             responses_delivered = 0;
@@ -55,6 +59,7 @@
                 vif.spad_rsp_valid = 1'b0;
                 vif.spad_parity_error = 1'b0;
                 vif.spad_protection_error = 1'b0;
+                bfm_cycle++;
 
                 if (((req.fault_mode == FP_FAULT_ABORT_WAIT_A) &&
                      (accepted_reads == 1) && !abort_injected) ||
@@ -102,13 +107,15 @@
                     @(posedge vif.clk);
                     @(negedge vif.clk);
                     vif.reset_force = 1'b0;
+                    rsp_count = 0;
+                    rsp_head = 0;
+                    rsp_tail = 0;
                     break;
                 end
 
-                if (response_pending) begin
-                    if (rsp_delay == 0) begin
-                        vif.spad_rsp_valid = 1'b1;
-                        vif.spad_rdata = response_data;
+                if ((rsp_count != 0) && (bfm_cycle >= rsp_due[rsp_head])) begin
+                    vif.spad_rsp_valid = 1'b1;
+                    vif.spad_rdata = rsp_data[rsp_head];
                         if ((((req.fault_mode == FP_FAULT_READ_PARITY) &&
                               (responses_delivered == 0)) ||
                              ((req.fault_mode == FP_FAULT_READ_B_PARITY) &&
@@ -117,10 +124,8 @@
                             vif.spad_parity_error = 1'b1;
                             parity_injected = 1;
                         end
-                        response_pending = 0;
-                    end else begin
-                        rsp_delay--;
-                    end
+                    rsp_head = (rsp_head == 3) ? 0 : rsp_head + 1;
+                    rsp_count--;
                 end
 
                 if (vif.spad_valid) begin
@@ -130,6 +135,14 @@
                                      $urandom_range(1, 3);
                         if (req.fault_mode == FP_FAULT_WATCHDOG)
                             stall_left = 0;
+                        if ((req.fault_mode == FP_FAULT_READ_PARITY) ||
+                            (req.fault_mode == FP_FAULT_READ_B_PARITY) ||
+                            (req.fault_mode == FP_FAULT_READ_PROTECTION))
+                            stall_left = 0;
+                        if ((req.fault_mode == FP_FAULT_RESET_READ_B) &&
+                            (accepted_reads == 1) &&
+                            (responses_delivered == 0))
+                            stall_left = 4;
                         if ((req.fault_mode == FP_FAULT_ABORT_UNACCEPTED_A) ||
                             (req.fault_mode == FP_FAULT_ABORT_UNACCEPTED_B))
                             stall_left = 2;
@@ -162,12 +175,14 @@
                             spad_mem[word_index] = vif.spad_wdata;
                     end else begin
                         accepted_reads++;
-                        if (response_pending)
-                            `uvm_fatal("BF16/DRV", "Core issued a read with a response already pending")
-                        response_data = spad_mem[word_index];
-                        rsp_delay = $urandom_range(1, 3);
-                        response_pending = 1;
+                        if (rsp_count >= 4)
+                            `uvm_fatal("BF16/DRV", "Ordered response queue overflow")
+                        rsp_data[rsp_tail] = spad_mem[word_index];
+                        rsp_due[rsp_tail] = bfm_cycle + 2;
+                        rsp_tail = (rsp_tail == 3) ? 0 : rsp_tail + 1;
+                        rsp_count++;
                     end
+                    request_seen = 0;
                 end
                 if (vif.spad_rsp_valid)
                     responses_delivered++;

@@ -39,6 +39,7 @@
         bit format_fp16;
         int unsigned length;
         int unsigned read_count;
+        int unsigned max_outstanding_reads;
         int unsigned write_count;
         int unsigned element_count;
         int unsigned stall_cycles;
@@ -59,6 +60,7 @@
             format_fp16 = rhs.format_fp16;
             length = rhs.length;
             read_count = rhs.read_count;
+            max_outstanding_reads = rhs.max_outstanding_reads;
             write_count = rhs.write_count;
             element_count = rhs.element_count;
             stall_cycles = rhs.stall_cycles;
@@ -78,6 +80,7 @@
         bit [15:0] a_bits[4];
         bit [15:0] b_bits[4];
         int unsigned stall_cycles;
+        int unsigned max_outstanding_reads;
 
         `uvm_object_utils(bf16_dot_cov_item)
         function new(string name = "bf16_dot_cov_item");

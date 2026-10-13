@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 460" role="img" aria-labelledby="chart-title chart-desc">
+  <title id="chart-title">BF16/FP16 tile job throughput versus vector length</title>
+  <desc id="chart-desc">Effective completed MACs per complete tile-job cycle. Single-tile baseline rises from 0.026 MAC per cycle at length 1 to 0.488 at length 1024. Three-tile ping-pong with randomized AXI WREADY reaches about 0.507 at length 64, 0.562 at 256, and 0.577 at 1024. BF16 and FP16 curves nearly overlap.</desc>
+  <g fill="currentColor" font-family="Arial, sans-serif">
+    <text x="420" y="24" text-anchor="middle" font-size="17">End-to-end tile-job throughput</text>
+    <text x="420" y="44" text-anchor="middle" font-size="12">VCS top RTL · tile pipeline + DMA + shared SPAD arbiter</text>
+  </g>
+
+  <g stroke="currentColor" stroke-opacity="0.16" stroke-width="1">
+    <line x1="100" y1="350" x2="700" y2="350" />
+    <line x1="100" y1="310" x2="700" y2="310" />
+    <line x1="100" y1="270" x2="700" y2="270" />
+    <line x1="100" y1="230" x2="700" y2="230" />
+    <line x1="100" y1="190" x2="700" y2="190" />
+    <line x1="100" y1="150" x2="700" y2="150" />
+    <line x1="100" y1="110" x2="700" y2="110" />
+    <line x1="100" y1="70" x2="700" y2="70" />
+  </g>
+
+  <g stroke="currentColor" stroke-width="1.4" fill="none">
+    <line x1="100" y1="70" x2="100" y2="350" />
+    <line x1="100" y1="350" x2="700" y2="350" />
+  </g>
+
+  <g fill="currentColor" font-family="Arial, sans-serif" font-size="11">
+    <text x="87" y="354" text-anchor="end">0.0</text>
+    <text x="87" y="314" text-anchor="end">0.1</text>
+    <text x="87" y="274" text-anchor="end">0.2</text>
+    <text x="87" y="234" text-anchor="end">0.3</text>
+    <text x="87" y="194" text-anchor="end">0.4</text>
+    <text x="87" y="154" text-anchor="end">0.5</text>
+    <text x="87" y="114" text-anchor="end">0.6</text>
+    <text x="87" y="74" text-anchor="end">0.7</text>
+    <text x="100" y="370" text-anchor="middle">1</text>
+    <text x="160" y="370" text-anchor="middle">2</text>
+    <text x="195" y="370" text-anchor="middle">3</text>
+    <text x="220" y="370" text-anchor="middle">4</text>
+    <text x="340" y="370" text-anchor="middle">16</text>
+    <text x="460" y="370" text-anchor="middle">64</text>
+    <text x="520" y="370" text-anchor="middle">128</text>
+    <text x="580" y="370" text-anchor="middle">256</text>
+    <text x="700" y="370" text-anchor="middle">1024</text>
+    <text x="400" y="394" text-anchor="middle" font-size="12">Vector length per tile (elements, log₂ scale)</text>
+    <text x="22" y="210" text-anchor="middle" font-size="12" transform="rotate(-90 22 210)">Completed MAC / tile-job cycle</text>
+  </g>
+
+  <g fill="none" stroke="currentColor" stroke-width="2.2">
+    <polyline points="100,339.47 160,329.49 195,320.73 220,311.90 340,248.41 460,189.00 520,171.60 580,162.46 700,155.00" />
+    <polyline points="460,147.36 580,125.27 700,119.02" stroke-dasharray="7 4" />
+  </g>
+
+  <g fill="currentColor">
+    <circle cx="100" cy="339.47" r="3.5" /><circle cx="160" cy="329.49" r="3.5" />
+    <circle cx="195" cy="320.73" r="3.5" /><circle cx="220" cy="311.90" r="3.5" />
+    <circle cx="340" cy="248.41" r="3.5" /><circle cx="460" cy="189.00" r="3.5" />
+    <circle cx="520" cy="171.60" r="3.5" /><circle cx="580" cy="162.46" r="3.5" />
+    <circle cx="700" cy="155.00" r="3.5" />
+    <rect x="456.5" y="143.86" width="7" height="7" />
+    <rect x="576.5" y="121.77" width="7" height="7" />
+    <rect x="696.5" y="115.52" width="7" height="7" />
+  </g>
+
+  <g fill="currentColor" font-family="Arial, sans-serif" font-size="11">
+    <line x1="160" y1="430" x2="190" y2="430" stroke="currentColor" stroke-width="2.2" />
+    <circle cx="175" cy="430" r="3.5" />
+    <text x="197" y="434">Single tile</text>
+    <line x1="330" y1="430" x2="360" y2="430" stroke="currentColor" stroke-width="2.2" stroke-dasharray="7 4" />
+    <rect x="342" y="426.5" width="7" height="7" />
+    <text x="367" y="434">3-tile ping-pong (BF16/FP16)</text>
+  </g>
+</svg>

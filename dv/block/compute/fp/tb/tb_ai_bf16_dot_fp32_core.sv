@@ -17,14 +17,19 @@ module tb_ai_bf16_dot_fp32_core;
     ai_bf16_dot_fp32_core dut(.*);
 
     reg [31:0] mem [0:255];
-    integer accept_count=0, write_count=0, rsp_delay=0;
+    integer accept_count=0, write_count=0, response_count=0;
+    integer peak_outstanding_reads=0;
     integer stall_cycles=0, cycles=0;
     integer random_stalls=0, random_transactions=0;
     integer cov_len_1=0, cov_len_2=0, cov_len_3=0, cov_len_4=0;
     integer cov_zero=0, cov_subnormal=0, cov_normal=0, cov_inf=0, cov_nan=0;
     integer cov_positive=0, cov_negative=0, cov_stalled=0;
-    reg pending=0, pending_parity=0;
-    reg [31:0] pending_data=0;
+    integer pending_count=0, pending_head=0, pending_tail=0;
+    integer pending_due [0:3];
+    reg pending_parity [0:3];
+    reg [31:0] pending_data [0:3];
+    integer parity_accept_index=-1;
+    wire pending = (pending_count != 0);
     reg [31:0] held_addr=0, held_data=0;
     reg held_valid=0, held_write=0;
     reg inject_parity=0, inject_protection=0;
@@ -33,26 +38,43 @@ module tb_ai_bf16_dot_fp32_core;
     property p_spad_request_stable_while_stalled;
         @(posedge clk) disable iff (!resetn)
             (spad_valid && !spad_ready) |=>
-                (spad_valid && $stable({spad_write, spad_addr, spad_wdata}));
+                ((abort || dut.mixed_core_u.watchdog_expired) ||
+                 (spad_valid && $stable({spad_write, spad_addr, spad_wdata})));
     endproperty
     assert property (p_spad_request_stable_while_stalled)
         else $fatal(1, "SPAD request changed while ready was low");
 
+    always @(posedge clk) begin
+        if (resetn) begin
+            if (spad_rsp_valid && (dut.mixed_core_u.outstanding_reads_r == 0))
+                $fatal(1,"response outstanding counter underflow state=%0d accepted=%0d delivered=%0d addr=%h",
+                       dut.mixed_core_u.state_r,accept_count,response_count,spad_addr);
+            if (spad_valid && spad_ready && !spad_write && !spad_rsp_valid &&
+                (dut.mixed_core_u.outstanding_reads_r >= 2))
+                $fatal(1,"read outstanding counter overflow");
+        end
+    end
+
     always @(negedge clk) begin
         if (!resetn) begin
-            spad_ready=0; spad_rsp_valid=0; pending=0; rsp_delay=0;
+            spad_ready=0; spad_rsp_valid=0;
+            pending_count=0; pending_head=0; pending_tail=0;
         end else begin
             cycles=cycles+1;
+            if (dut.mixed_core_u.outstanding_reads_r > 2)
+                $fatal(1,"core exceeded legal two-read outstanding limit");
+            if (dut.mixed_core_u.outstanding_reads_r > peak_outstanding_reads)
+                peak_outstanding_reads=dut.mixed_core_u.outstanding_reads_r;
             spad_rsp_valid=0;
             spad_parity_error=0;
             spad_protection_error=0;
-            if (pending) begin
-                if (rsp_delay==0) begin
+            if (pending_count>0 && pending_due[pending_head]<=cycles) begin
                     spad_rsp_valid=1;
-                    spad_rdata=pending_data;
-                    spad_parity_error=pending_parity;
-                    pending=0;
-                end else rsp_delay=rsp_delay-1;
+                    spad_rdata=pending_data[pending_head];
+                    spad_parity_error=pending_parity[pending_head];
+                    response_count=response_count+1;
+                pending_head=(pending_head==3) ? 0 : pending_head+1;
+                pending_count=pending_count-1;
             end
             if (stall_write && spad_valid && spad_write) begin
                 spad_ready=0;
@@ -63,6 +85,8 @@ module tb_ai_bf16_dot_fp32_core;
                 if (random_stalls && ($urandom_range(0,2)==0))
                     stall_cycles=$urandom_range(1,2);
             end
+            if (spad_valid && spad_ready && inject_protection)
+                spad_protection_error=1;
             if (spad_valid && !spad_ready) begin
                 if (!held_valid) begin
                     if (random_stalls) cov_stalled=cov_stalled+1;
@@ -71,30 +95,42 @@ module tb_ai_bf16_dot_fp32_core;
                 end else if (held_addr!==spad_addr || held_data!==spad_wdata ||
                              held_write!==spad_write)
                     $fatal(1,"request changed under ready stall");
-            end else if (spad_valid && spad_ready) begin
+            end else if (held_valid && !spad_valid &&
+                         (abort || dut.mixed_core_u.watchdog_expired)) begin
+                // This local request interface permits canceling an unaccepted
+                // read on abort/watchdog. Accepted reads still drain in WAIT.
                 held_valid=0;
-                if (spad_write) begin
-                    write_count=write_count+1;
-                    if (spad_addr!==dst_base) $fatal(1,"bad write address %h",spad_addr);
-                    if (inject_protection) spad_protection_error=1;
-                    else mem[spad_addr>>2]=spad_wdata;
-                end else begin
-                    if (pending) $fatal(1,"more than one outstanding read");
-                    if ((accept_count & 1)==0) begin
-                        if (spad_addr !== (src0_base + ((accept_count/2)*4)))
-                            $fatal(1,"A read order/address mismatch idx=%0d addr=%h",
-                                   accept_count,spad_addr);
-                    end else if (spad_addr !== (src1_base + (((accept_count-1)/2)*4)))
-                        $fatal(1,"B read order/address mismatch idx=%0d addr=%h",
+            end
+        end
+    end
+
+    // Sample valid/ready at the DUT's active edge, not a half-cycle later.
+    always @(posedge clk) begin
+        if (resetn && spad_valid && spad_ready) begin
+            held_valid=0;
+            if (spad_write) begin
+                write_count=write_count+1;
+                if (spad_addr!==dst_base) $fatal(1,"bad write address %h",spad_addr);
+                if (!spad_protection_error) mem[spad_addr>>2]=spad_wdata;
+            end else begin
+                if (pending_count>=4) $fatal(1,"response queue overflow");
+                if ((accept_count & 1)==0) begin
+                    if (spad_addr !== (src0_base + ((accept_count/2)*4)))
+                        $fatal(1,"A read order/address mismatch idx=%0d addr=%h",
                                accept_count,spad_addr);
-                    accept_count=accept_count+1;
-                    if (inject_protection) spad_protection_error=1;
-                    if ((spad_addr >> 2) >= 256)
-                        $fatal(1,"SPAD read outside test memory: %h",spad_addr);
-                    pending_data=mem[spad_addr>>2];
-                    pending_parity=inject_parity;
-                    pending=1; rsp_delay=1;
-                end
+                end else if (spad_addr !== (src1_base + (((accept_count-1)/2)*4)) )
+                    $fatal(1,"B read order/address mismatch idx=%0d addr=%h",
+                           accept_count,spad_addr);
+                accept_count=accept_count+1;
+                if ((spad_addr >> 2) >= 256)
+                    $fatal(1,"SPAD read outside test memory: %h",spad_addr);
+                pending_data[pending_tail]=mem[spad_addr>>2];
+                pending_parity[pending_tail]=inject_parity &&
+                    ((parity_accept_index < 0) ||
+                     ((accept_count-1) == parity_accept_index));
+                pending_due[pending_tail]=cycles+2;
+                pending_tail=(pending_tail==3) ? 0 : pending_tail+1;
+                pending_count=pending_count+1;
             end
         end
     end
@@ -103,7 +139,10 @@ module tb_ai_bf16_dot_fp32_core;
         begin
             @(negedge clk); resetn=0; start=0; abort=0;
             inject_parity=0; inject_protection=0;
-            accept_count=0; write_count=0; pending=0; held_valid=0;
+            parity_accept_index=-1;
+            accept_count=0; write_count=0; response_count=0;
+            peak_outstanding_reads=0;
+            pending_count=0; pending_head=0; pending_tail=0; held_valid=0;
             stall_cycles=0; stall_write=0; spad_ready=0;
             repeat(2) @(negedge clk);
             resetn=1; @(negedge clk);
@@ -236,21 +275,25 @@ module tb_ai_bf16_dot_fp32_core;
         reset_case(); stall_cycles=3; launch(1); check_success(32'h40400000,2,1);
         // length 2 checks both lanes and the specification's bit-exact 11.
         reset_case(); launch(2); check_success(32'h41300000,2,2);
+        if (peak_outstanding_reads<2)
+            $fatal(1,"two accepted outstanding reads were not observed: peak=%0d",
+                   peak_outstanding_reads);
         // length 3 consumes one high lane from second word; high tail is poison.
         mem['h104>>2]=32'h7f800000; mem['h204>>2]=32'h7f803f80;
         reset_case(); launch(3); check_success(32'h41300000,4,3);
 
         // Reset with an accepted read drops the operation and clears outputs.
         reset_case(); launch(2);
-        wait (dut.mixed_core_u.state_r==dut.mixed_core_u.ST_WAIT_A);
+        wait (accept_count>0 && accept_count>response_count);
         @(negedge clk); resetn=0; #1;
         if (busy || done || error) $fatal(1,"reset did not clear engine");
+        repeat(2) @(negedge clk);
         resetn=1; repeat(3) @(negedge clk);
         if (write_count!=0) $fatal(1,"reset transaction wrote output");
 
         // Abort while a read is outstanding: wait for/drain response, then fail.
         reset_case(); launch(2);
-        wait (dut.mixed_core_u.state_r==dut.mixed_core_u.ST_WAIT_A);
+        wait (accept_count>0 && accept_count>response_count);
         @(negedge clk); abort=1; @(negedge clk); abort=0;
         wait_done(30);
         if (!error || error_code!=3 || pending || write_count!=0)
@@ -261,7 +304,7 @@ module tb_ai_bf16_dot_fp32_core;
         // accept the write, and report success rather than a failed completion
         // with an already-modified destination.
         reset_case(); launch(1);
-        wait (dut.mixed_core_u.state_r==dut.mixed_core_u.ST_WRITE);
+        wait (spad_valid && spad_write);
         stall_write=1; abort=1; repeat(3) @(negedge clk);
         if (!spad_valid || !spad_write || spad_addr!==dst_base)
             $fatal(1,"writeback request was not held during abort/back-pressure");
@@ -279,6 +322,16 @@ module tb_ai_bf16_dot_fp32_core;
         reset_case(); inject_parity=1; launch(1); wait_done(30);
         if (!error || error_code!=5 || pending || write_count!=0)
             $fatal(1,"parity handling failed code=%0d",error_code);
+
+        // A parity error in word 1 must preserve the two valid prefix
+        // elements from word 0, while draining accepted reads and suppressing
+        // the final writeback.
+        reset_case(); inject_parity=1; parity_accept_index=2;
+        launch(4); wait_done(40);
+        if (!error || error_code!=5 || element_count!=2 || pending ||
+            write_count!=0 || accept_count!=4)
+            $fatal(1,"word-1 parity cutoff failed code=%0d elements=%0d reads=%0d pending=%0d writes=%0d",
+                   error_code,element_count,accept_count,pending,write_count);
 
         reset_case(); watchdog_limit=3; stall_cycles=10; launch(1); wait_done(40);
         watchdog_limit=0;
