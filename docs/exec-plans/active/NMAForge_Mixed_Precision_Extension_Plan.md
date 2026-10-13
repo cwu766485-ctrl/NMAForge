@@ -423,3 +423,21 @@ cd ../../../subsystem/top_smoke/sim && make ai_smoke
 - **G3 部分通过但未闭合**：当前 A10 已通过 FP16 directed DDR→SPAD→FP→SPAD→DDR、mixed-dot UVM 四 seed（每格式 256 random/seed）、DMA/control 回归、top smoke 和初版 DMA/SPAD contention profiling；仍需完成 DUT FSM/code coverage disposition、随机 DDR read-response/error 压力以及包含本次 arbiter parity 修正的同约束 FP PPA。完成前不声称 G3 通过，也不据此声称 2/4 Lane 扩展结论。
 
 **一句话**：这轮项目的目标不是再堆一个“支持 AI 的浮点模块”，而是打造一个**有自研微架构、有独立数值模型、有 UVM 验证闭环、有 PPA 与失败分析的可交付 AI Accelerator IP**。
+
+## 12. Ordered SPAD-response jitter regression（2026-10-14）
+
+- 将 `review/fp-dot-response-jitter` 的两个提交快进合入 `main`：新增 `dot-throughput-stress` 和可复现的 SPAD response jitter；固定双周期基准保持默认行为。
+- 初跑 stress target 发现 Makefile recipe 的 shell 变量未用 `$$` 转义，GNU make 将 `$seed` 等提前展开，导致 VCS 收到非法 plusarg 并触发 timeout。已修正配方转义；并在每个 profile 后检查 PASS 标记，避免 VCS `$fatal` 未传播为非零 shell 状态时误报成功。
+- Rocky-8.10 WSL / VCS V-2023.12-SP1 验收：`dot-throughput-bench` PASS；`dot-throughput-stress` 在 2 seeds × 3 组 backpressure/jitter（0/0、30/3、60/11）下 BF16/FP16 各 9 个长度全部 PASS；`dot-core-test` PASS；默认 `dot-uvm-regress` 两个 seed 均 scoreboard 162/162、UVM error/warning/fatal 为 0，URG merge 成功；`ai_smoke` TEST PASS（随机用例 4、seed 12345）。
+- Smoke 编译仍有 `ai_accel_compute_cluster` 中 `ai_banked_cnm_core` instance `Too few instance port connections` warning；不影响该 smoke 的 TEST PASS，但应另行核实其是否预期未连接端口。
+- 本轮命令均从仓库根目录启动；`make -C` 的路径相对当前工作目录，而不是自动相对仓库根目录。仿真日志、VCS 数据库保留在 WSL `/tmp` 或忽略的本地输出目录，不纳入版本控制。
+
+可复现命令（Rocky-8.10 WSL，仓库根目录）：
+
+```bash
+make -C dv/block/compute/fp/sim dot-throughput-bench
+make -C dv/block/compute/fp/sim dot-throughput-stress
+make -C dv/block/compute/fp/sim dot-core-test
+make -C dv/block/compute/fp/sim dot-uvm-regress
+make -C dv/subsystem/top_smoke/sim ai_smoke
+```

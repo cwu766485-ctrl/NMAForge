@@ -176,11 +176,13 @@ dot-throughput-stress: dot-throughput-compile
 	@set -eu; \
 	for seed in 20261013 712345; do \
 		for profile in 0:0 30:3 60:11; do \
-			bp=${profile%%:*}; jitter=${profile##*:}; \
-			echo "SPAD stress seed=$seed BP_PCT=$bp RSP_JITTER_MAX=$jitter"; \
-			$(DOT_BENCH_SIMV) +SEED=$seed +BP_PCT=$bp \
-				+RSP_JITTER_MAX=$jitter \
-				-l $(DOT_BENCH_OUT_DIR)/stress_seed_${seed}_bp_${bp}_jitter_${jitter}.log; \
+			bp=$${profile%%:*}; jitter=$${profile##*:}; \
+			echo "SPAD stress seed=$$seed BP_PCT=$$bp RSP_JITTER_MAX=$$jitter"; \
+			log=$(DOT_BENCH_OUT_DIR)/stress_seed_$${seed}_bp_$${bp}_jitter_$${jitter}.log; \
+			$(DOT_BENCH_SIMV) +SEED=$$seed +BP_PCT=$$bp \
+				+RSP_JITTER_MAX=$$jitter \
+				-l $$log; \
+			grep -q '^PASS: mixed BF16/FP16 dot unit throughput benchmark' $$log; \
 		done; \
 	done
 
