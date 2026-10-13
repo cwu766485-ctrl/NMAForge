@@ -24,7 +24,7 @@ module tb_ai_mixed_dot_throughput;
     wire response_pending = (rsp_count != 0);
     integer core_cycles=0, compute_cycles=0, admission_stall_cycles=0;
     integer response_wait_cycles=0, write_wait_cycles=0;
-    integer seed=20261013, bp_percent=0;
+    integer seed=20261013, bp_percent=0, rsp_jitter_max=0;
     reg [31:0] rng=32'h9e3779b9;
     reg measuring=0;
     real throughput;
@@ -58,8 +58,10 @@ module tb_ai_mixed_dot_throughput;
         end
     end
 
-    // Ordered A/B responses. Each accepted read receives a fixed two-cycle
-    // response; random request backpressure is independently controlled above.
+    // Ordered A/B responses. Each accepted read has at least a two-cycle
+    // response delay with optional reproducible per-request jitter.
+    // Responses are retired in request order even when a later request's due
+    // time is earlier. Admission backpressure is independently randomized.
     always @(posedge clk) begin
         if (!resetn) begin
             reads <= 0; writes <= 0;
@@ -96,7 +98,9 @@ module tb_ai_mixed_dot_throughput;
                     end else if (spad_addr !== src1_base + (((reads-1)/2)*4))
                         $fatal(1,"B read order/address mismatch read=%0d addr=%h",reads,spad_addr);
                     rsp_data[rsp_tail] = format_fp16 ? 32'h3c003c00 : 32'h3f803f80;
-                    rsp_due[rsp_tail] = model_cycle + 2;
+                    rsp_due[rsp_tail] = model_cycle + 2 +
+                        ((lcg_next(seed ^ reads) & 32'h7fff_ffff) %
+                         (rsp_jitter_max + 1));
                     rsp_tail = (rsp_tail == 3) ? 0 : rsp_tail + 1;
                     rsp_count = rsp_count + 1;
                     reads <= reads + 1;
@@ -115,7 +119,16 @@ module tb_ai_mixed_dot_throughput;
             admission_stall_cycles=0; response_wait_cycles=0; write_wait_cycles=0;
             start=1; measuring=1;
             @(negedge clk); start=0;
-            wait(done);
+            fork : wait_for_completion
+                begin
+                    wait (done);
+                end
+                begin
+                    repeat (1000000) @(posedge clk);
+                    $fatal(1, "dot bench timeout format=%0d length=%0d bp=%0d jitter=%0d", fp16, n, bp_percent, rsp_jitter_max);
+                end
+            join_any
+            disable wait_for_completion;
             measuring=0;
             expected_reads=2*((n+1)/2);
             expected=expected_sum(n);
@@ -126,10 +139,10 @@ module tb_ai_mixed_dot_throughput;
             if (writes!==1) $fatal(1,"expected one accepted write, got %0d",writes);
             if (response_pending) $fatal(1,"response left pending");
             throughput=(1.0*compute_cycles)/core_cycles;
-            $display("DOT_BENCH,unit_spad_model,seed=%0d,bp_pct=%0d,format=%s,length=%0d,core_cycles=%0d,compute_fire_cycles=%0d,spad_admission_stall_cycles=%0d,response_wait_cycles=%0d,result_write_wait_cycles=%0d,reads=%0d,writes=%0d,elements=%0d,compute_elements_per_core_cycle=%0.5f",
+            $display("DOT_BENCH,unit_spad_model,seed=%0d,bp_pct=%0d,format=%s,length=%0d,core_cycles=%0d,compute_fire_cycles=%0d,spad_admission_stall_cycles=%0d,response_wait_cycles=%0d,result_write_wait_cycles=%0d,reads=%0d,writes=%0d,elements=%0d,compute_elements_per_core_cycle=%0.5f,rsp_jitter_max=%0d",
                 seed,bp_percent,fp16?"FP16":"BF16",n,core_cycles,compute_cycles,
                 admission_stall_cycles,response_wait_cycles,write_wait_cycles,
-                reads,writes,element_count,throughput);
+                reads,writes,element_count,throughput,rsp_jitter_max);
             @(negedge clk);
         end
     endtask
@@ -142,9 +155,11 @@ module tb_ai_mixed_dot_throughput;
         lengths[7]=256; lengths[8]=1024;
         if ($value$plusargs("SEED=%d",seed)) begin end
         if ($value$plusargs("BP_PCT=%d",bp_percent)) begin end
+        if ($value$plusargs("RSP_JITTER_MAX=%d",rsp_jitter_max)) begin end
         if (bp_percent<0 || bp_percent>99) $fatal(1,"BP_PCT must be 0..99");
+        if (rsp_jitter_max<0 || rsp_jitter_max>31) $fatal(1,"RSP_JITTER_MAX must be 0..31");
         rng=seed;
-        $display("DOT_BENCH_HEADER,unit_spad_model,seed,bp_pct,format,length,core_cycles,compute_fire_cycles,spad_admission_stall_cycles,response_wait_cycles,result_write_wait_cycles,reads,writes,elements,compute_elements_per_core_cycle");
+        $display("DOT_BENCH_HEADER,unit_spad_model,seed,bp_pct,format,length,core_cycles,compute_fire_cycles,spad_admission_stall_cycles,response_wait_cycles,result_write_wait_cycles,reads,writes,elements,compute_elements_per_core_cycle,rsp_jitter_max");
         repeat(3) @(negedge clk);
         resetn=1;
         for (i=0;i<9;i=i+1) run_case(0,lengths[i]);
