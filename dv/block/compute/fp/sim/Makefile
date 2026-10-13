@@ -143,13 +143,14 @@ dot-core-compile:
 dot-core-run: dot-core-compile
 	$(DOT_CORE_SIMV) -l $(DOT_CORE_OUT_DIR)/run.log
 
-# Deterministic mixed-format dot throughput baseline (fixed two-cycle SPAD reads).
+# Deterministic mixed-format dot throughput baseline plus optional ordered-response latency stress.
 DOT_BENCH_OUT_DIR ?= /tmp/nmaforge_mixed_dot_throughput
 DOT_BENCH_SIMV := $(DOT_BENCH_OUT_DIR)/simv_mixed_dot_throughput
 DOT_BENCH_SEED ?= 20261013
 DOT_BENCH_BP_PCT ?= 0
+DOT_BENCH_RSP_JITTER_MAX ?= 0
 
-.PHONY: dot-throughput-bench dot-throughput-compile dot-throughput-run
+.PHONY: dot-throughput-bench dot-throughput-compile dot-throughput-run dot-throughput-stress
 dot-throughput-bench: dot-throughput-run
 
 dot-throughput-compile:
@@ -165,7 +166,23 @@ dot-throughput-compile:
 
 dot-throughput-run: dot-throughput-compile
 	$(DOT_BENCH_SIMV) +SEED=$(DOT_BENCH_SEED) +BP_PCT=$(DOT_BENCH_BP_PCT) \
+		+RSP_JITTER_MAX=$(DOT_BENCH_RSP_JITTER_MAX) \
 		-l $(DOT_BENCH_OUT_DIR)/run.log
+
+# Self-checking BF16/FP16 sweeps: both independent read-response latency
+# variation and admission backpressure; original fixed-delay mode stays default.
+# Requires VCS on the host. No RTL sign-off is implied by these microbenchmarks.
+dot-throughput-stress: dot-throughput-compile
+	@set -eu; \
+	for seed in 20261013 712345; do \
+		for profile in 0:0 30:3 60:11; do \
+			bp=${profile%%:*}; jitter=${profile##*:}; \
+			echo "SPAD stress seed=$seed BP_PCT=$bp RSP_JITTER_MAX=$jitter"; \
+			$(DOT_BENCH_SIMV) +SEED=$seed +BP_PCT=$bp \
+				+RSP_JITTER_MAX=$jitter \
+				-l $(DOT_BENCH_OUT_DIR)/stress_seed_${seed}_bp_${bp}_jitter_${jitter}.log; \
+		done; \
+	done
 
 dot-core-random-vectors:
 	mkdir -p $(DOT_CORE_OUT_DIR)
