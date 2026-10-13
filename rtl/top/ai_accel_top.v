@@ -263,6 +263,10 @@ module ai_accel_top #(
     wire        scalar_spad_write;
     wire [31:0] scalar_spad_addr;
     wire [31:0] scalar_spad_wdata;
+    wire        fp_spad_valid;
+    wire        fp_spad_write;
+    wire [31:0] fp_spad_addr;
+    wire [31:0] fp_spad_wdata;
     wire        banked_spad_valid;
     wire        banked_spad_write;
     wire [31:0] banked_spad_addr;
@@ -432,6 +436,7 @@ module ai_accel_top #(
     wire        compute_req_execute;
 
     wire        scalar_busy;
+    wire        fp_busy;
     wire        banked_busy;
     wire        matrix_spad_valid, matrix_spad_write;
     wire [31:0] matrix_spad_addr, matrix_spad_wdata;
@@ -565,19 +570,20 @@ module ai_accel_top #(
     ai_accel_opcode_decode launch_opcode_decode_u(
         .op(launch_op), .op_valid(), .is_int8(), .is_banked(banked_op),
         .is_tensor_matrix(tensor_matrix_op), .is_tensor_sfu(tensor_sfu_op),
-        .is_cnn_kv(kv_cache_op), .is_macro()
+        .is_cnn_kv(kv_cache_op), .is_macro(), .is_bf16_dot(),
+        .is_fp16_dot()
     );
     assign conv_linebuffer_op = (launch_op == 8'h16) || (launch_op == 8'h17);
-    assign core_spad_valid = conv_busy ? conv_spad_valid : kv_busy ? kv_spad_valid : matrix_busy ? matrix_spad_valid :
+    assign core_spad_valid = fp_busy ? fp_spad_valid : conv_busy ? conv_spad_valid : kv_busy ? kv_spad_valid : matrix_busy ? matrix_spad_valid :
                              sfu_busy ? sfu_spad_valid :
                              banked_busy ? banked_spad_valid : scalar_spad_valid;
-    assign core_spad_write = conv_busy ? conv_spad_write : kv_busy ? kv_spad_write : matrix_busy ? matrix_spad_write :
+    assign core_spad_write = fp_busy ? fp_spad_write : conv_busy ? conv_spad_write : kv_busy ? kv_spad_write : matrix_busy ? matrix_spad_write :
                              sfu_busy ? sfu_spad_write :
                              banked_busy ? banked_spad_write : scalar_spad_write;
-    assign core_spad_addr = conv_busy ? conv_spad_addr : kv_busy ? kv_spad_addr : matrix_busy ? matrix_spad_addr :
+    assign core_spad_addr = fp_busy ? fp_spad_addr : conv_busy ? conv_spad_addr : kv_busy ? kv_spad_addr : matrix_busy ? matrix_spad_addr :
                             sfu_busy ? sfu_spad_addr :
                             banked_busy ? banked_spad_addr : scalar_spad_addr;
-    assign core_spad_wdata = conv_busy ? conv_spad_wdata : kv_busy ? kv_spad_wdata : matrix_busy ? matrix_spad_wdata :
+    assign core_spad_wdata = fp_busy ? fp_spad_wdata : conv_busy ? conv_spad_wdata : kv_busy ? kv_spad_wdata : matrix_busy ? matrix_spad_wdata :
                              sfu_busy ? sfu_spad_wdata :
                              banked_busy ? banked_spad_wdata : scalar_spad_wdata;
     // 0x20/0x21 now use the independent four-lane CNM port.  The legacy
@@ -1205,7 +1211,10 @@ module ai_accel_top #(
         .kv_spad_write(kv_spad_write), .kv_spad_addr(kv_spad_addr),
         .kv_spad_wdata(kv_spad_wdata), .scalar_spad_valid(scalar_spad_valid),
         .scalar_spad_write(scalar_spad_write), .scalar_spad_addr(scalar_spad_addr),
-        .scalar_spad_wdata(scalar_spad_wdata), .scalar_busy(scalar_busy),
+        .scalar_spad_wdata(scalar_spad_wdata),
+        .fp_spad_valid(fp_spad_valid), .fp_spad_write(fp_spad_write),
+        .fp_spad_addr(fp_spad_addr), .fp_spad_wdata(fp_spad_wdata),
+        .scalar_busy(scalar_busy), .fp_busy(fp_busy),
         .banked_busy(banked_busy), .matrix_busy(matrix_busy), .sfu_busy(sfu_busy),
         .conv_busy(conv_busy), .kv_busy(kv_busy), .core_busy(core_busy),
         .core_done(core_done), .core_error(core_error),

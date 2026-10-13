@@ -17,6 +17,11 @@ set_option mthresh 8193
 # installed methodology so CLI batch runs do not silently select a missing one.
 set_option active_methodology "$SPYGLASS_HOME/GuideWare/2023.12/block/rtl_handoff"
 read_file -type verilog ../../rtl/control/axi_lite/axi_lite_reg_if.v
+read_file -type verilog ../../rtl/control/cdc/ai_async_fifo.v
+read_file -type verilog ../../rtl/control/cdc/ai_ctrl_compute_cdc.v
+read_file -type verilog ../../rtl/control/cdc/ai_accel_dual_clock_shell.v
+read_file -type verilog ../../rtl/control/cdc/ai_cdc_event_buffer.v
+read_file -type verilog ../../rtl/control/cdc/ai_accel_dual_clock_command_path.v
 read_file -type verilog ../../rtl/dma/ai_dma_burst_planner.v
 read_file -type verilog ../../rtl/dma/ai_dma_read_slot_tracker.v
 read_file -type verilog ../../rtl/dma/ai_dma_write_response_tracker.v
@@ -47,6 +52,13 @@ read_file -type verilog ../../rtl/control/descriptor/axi_desc_fetch.v
 read_file -type verilog ../../rtl/control/queue/ai_completion_writer.v
 read_file -type verilog ../../rtl/control/axi_lite/ai_accel_regs.v
 read_file -type verilog ../../rtl/compute/int8/ai_int8_datapath.v
+read_file -type verilog ../../rtl/compute/fp/ai_bf16_mul_fp32.v
+read_file -type verilog ../../rtl/compute/fp/ai_fp16_mul_fp32.v
+read_file -type verilog ../../rtl/compute/fp/ai_fp32_add.v
+read_file -type verilog ../../rtl/compute/fp/ai_fp32_accumulator.v
+read_file -type verilog ../../rtl/compute/fp/ai_mixed_precision_dot_fp32_core.v
+read_file -type verilog ../../rtl/compute/fp/ai_bf16_dot_fp32_core.v
+read_file -type verilog ../../rtl/compute/fp/ai_fp16_bf16_addsub.v
 read_file -type verilog ../../rtl/compute/int8/ai_int8_compute_core.v
 read_file -type verilog ../../rtl/top/fabric/axi/ai_descriptor_source_mux.v
 read_file -type verilog ../../rtl/top/fabric/axi/ai_accel_dma_request_mux.v

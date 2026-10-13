@@ -10,6 +10,15 @@ module ai_descriptor_validator (
     input  wire [15:0] n_size,
     input  wire [15:0] k_words,
     input  wire        bias_enable,
+    input  wire [7:0]  flags,
+    input  wire [4:0]  scale_shift,
+    input  wire [1:0]  activation,
+    input  wire [31:0] aux0,
+    input  wire [31:0] src0_stride,
+    input  wire [31:0] src1_stride,
+    input  wire [31:0] dst_stride,
+    input  wire [15:0] batch_count,
+    input  wire [15:0] head_count,
     input  wire        macro_child_fetch,
 
     output wire        op_valid,
@@ -28,12 +37,16 @@ module ai_descriptor_validator (
                       (op == 8'h20) || (op == 8'h21) ||
                       ((op >= 8'h30) && (op <= 8'h39)) ||
                       ((op >= 8'h43) && (op <= 8'h44)) ||
-                      is_macro;
+                      is_macro || (op == 8'h50) || (op == 8'h51);
 
     assign is_tensor_matrix = (op == 8'h30) || (op == 8'h31);
     assign is_tensor_sfu = (op >= 8'h32) && (op <= 8'h39);
+    wire is_bf16_dot = (op == 8'h50);
+    wire is_fp16_dot = (op == 8'h51);
+    wire is_fp_dot = is_bf16_dot || is_fp16_dot;
 
-    assign version_valid = (version == 8'd7) ? 1'b1 :
+    assign version_valid = is_fp_dot ? (version == 8'd7) :
+                           (version == 8'd7) ? 1'b1 :
                            is_macro ? (version == 8'd4) :
                            ((op == 8'h16 || op == 8'h17 ||
                              op == 8'h43 || op == 8'h44) ?
@@ -55,6 +68,8 @@ module ai_descriptor_validator (
                               ((op == 8'h16 || op == 8'h17) &&
                                m_size >= 16'd3 && n_size >= 16'd3) ||
                               ((op == 8'h43 || op == 8'h44) && length != 0) ||
+                              (is_fp_dot && length != 0 &&
+                               m_size == 16'd1 && n_size == 16'd1) ||
                               (op == 8'h40 && length == 16'd3) ||
                               ((op == 8'h41 || op == 8'h42) &&
                                length >= 16'd3 && length <= 16'd256);
@@ -63,10 +78,18 @@ module ai_descriptor_validator (
                              (|dst[1:0]) ||
                              (bias_enable && (|bias_base[1:0]));
 
+    wire fp_dot_fields_valid =
+        (bias_base == 32'd0) && !bias_enable && (flags == 8'd0) &&
+        (scale_shift == 5'd0) && (activation == 2'd0) &&
+        (aux0 == 32'd0) && (src0_stride == 32'd0) &&
+        (src1_stride == 32'd0) && (dst_stride == 32'd0) &&
+        (batch_count == 16'd0) && (head_count == 16'd0);
+
     assign descriptor_invalid = !op_valid || !dimensions_valid ||
                                 !version_valid ||
                                 (macro_child_fetch && is_macro) ||
                                 alignment_error ||
-                                (is_macro && (|src0[5:0]));
+                                (is_macro && (|src0[5:0])) ||
+                                (is_fp_dot && !fp_dot_fields_valid);
 
 endmodule

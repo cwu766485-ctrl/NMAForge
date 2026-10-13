@@ -1,0 +1,9 @@
+# SpyGlass CDC/RDC intent for the experimental dual-clock command path.
+# This file deliberately does not replace a8_constraints.sgdc: the shipping
+# ai_accel_top remains a single-clock IP until the dual-clock path is fully
+# integrated and verified.
+current_design ai_accel_dual_clock_command_path
+clock -name ctrl_clk -domain ctrl_clk
+clock -name compute_clk -domain compute_clk
+reset -name ctrl_resetn -value 0 -async
+reset -name compute_resetn -value 0 -async

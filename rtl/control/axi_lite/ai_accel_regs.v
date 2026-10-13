@@ -237,7 +237,7 @@ module ai_accel_regs #(
         OP: reg_rsp_rdata={24'd0,op_mode}; SRC0: reg_rsp_rdata=src0_base; SRC1: reg_rsp_rdata=src1_base; DST: reg_rsp_rdata=dst_base;
         LENGTH: reg_rsp_rdata={16'd0,length}; M: reg_rsp_rdata={16'd0,m_size}; N: reg_rsp_rdata={16'd0,n_size}; K: reg_rsp_rdata={16'd0,k_words}; QUANT: reg_rsp_rdata={25'd0,activation,scale_shift};
         RESULT: reg_rsp_rdata=result_r; ERROR: reg_rsp_rdata={28'd0,error_code_r}; CYCLES: reg_rsp_rdata=cycles_r; ELEMENTS: reg_rsp_rdata=elements_r;
-        IRQ_STATUS: reg_rsp_rdata={31'd0,irq_status_r}; IRQ_ENABLE: reg_rsp_rdata={31'd0,irq_enable_r}; VERSION: reg_rsp_rdata=32'h1000_0008; CAP: reg_rsp_rdata=32'h001f_ff17;
+        IRQ_STATUS: reg_rsp_rdata={31'd0,irq_status_r}; IRQ_ENABLE: reg_rsp_rdata={31'd0,irq_enable_r}; VERSION: reg_rsp_rdata=32'h1000_000a; CAP: reg_rsp_rdata=32'h001f_ff17;
         CMD_BASE: reg_rsp_rdata=cmd_base_r; CMD_HI: reg_rsp_rdata=cmd_hi_r; CMD_SIZE: reg_rsp_rdata=cmd_size_r; CMD_HEAD: reg_rsp_rdata=processor_cmdq_head; CMD_TAIL: reg_rsp_rdata=cmd_tail_r; CMD_CTRL: reg_rsp_rdata={31'd0,cmdq_external};
         CPL_BASE: reg_rsp_rdata=cpl_base_r; CPL_HI: reg_rsp_rdata=cpl_hi_r; CPL_SIZE: reg_rsp_rdata=cpl_size_r; CPL_TAIL: reg_rsp_rdata=processor_cplq_tail; CPL_HEAD: reg_rsp_rdata=cpl_head_r; QUEUE_STATUS: reg_rsp_rdata={28'd0,processor_busy,cpl_full,cpl_empty,cmd_empty};
         WATCHDOG: reg_rsp_rdata=watchdog_limit; DMA_CTRL: reg_rsp_rdata={30'd0,dma_store,1'b0}; DMA_STATUS: reg_rsp_rdata={29'd0,dma_error_r,dma_done_r,dma_busy}; DMA_EXT: reg_rsp_rdata=dma_ext_addr[31:0]; DMA_EXT_HI: reg_rsp_rdata=dma_ext_addr[63:32]; DMA_SPAD: reg_rsp_rdata=dma_spad_addr; DMA_LEN: reg_rsp_rdata={16'd0,dma_length_words}; DMA_ERROR: reg_rsp_rdata={28'd0,dma_error_code_r};
@@ -271,12 +271,11 @@ module ai_accel_regs #(
         PERF_DMA_AW_COUNT:reg_rsp_rdata=perf_dma_aw_count;
         PERF_DMA_RD_STATE:reg_rsp_rdata={26'd0,perf_dma_rd_highwater,perf_dma_rd_outstanding};
         PERF_DMA_R_STALL:reg_rsp_rdata=perf_dma_r_stall;
-        // ABI 7.1: 64-byte descriptor, 16-byte completion, 64-bit external
-        // address path.  CAP2 names the post-unification architectural
-        // features without repurposing legacy CAP bits.
-        ABI_INFO:reg_rsp_rdata={8'd16,8'd64,8'd2,8'd7};
+        // ABI 7.4: preserve v7 descriptor/completion sizes and 64-bit
+        // addressing; CAP2 bits 6/7 advertise BF16/FP16 dot-to-FP32.
+        ABI_INFO:reg_rsp_rdata={8'd16,8'd64,8'd4,8'd7};
         ERROR_INFO:reg_rsp_rdata={24'd0,error_source_r,error_code_r};
-        CAP2:reg_rsp_rdata=32'h0000_003f;
+        CAP2:reg_rsp_rdata=32'h0000_00ff;
       endcase
     end
     always @(posedge clk or negedge resetn) begin

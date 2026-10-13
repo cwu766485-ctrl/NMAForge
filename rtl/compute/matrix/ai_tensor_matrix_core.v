@@ -179,6 +179,7 @@ module ai_tensor_matrix_core(
         .a0(a0_r), .a1(a1_r), .a2(a2_r), .a3(a3_r),
         .b0(b0_r), .b1(b1_r), .b2(b2_r), .b3(b3_r), .lane(lane_r),
         .transpose_a(transpose_a_r), .transpose_b(transpose_b_r),
+        .mac_enable(state_r == ST_MAC),
         .a_lane0(), .a_lane1(), .a_lane2(), .a_lane3(),
         .b_lane0(), .b_lane1(), .b_lane2(), .b_lane3(),
         .product0(product[0]), .product1(product[1]),

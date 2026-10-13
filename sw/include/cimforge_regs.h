@@ -3,8 +3,19 @@
 
 #include <stdint.h>
 
+/*
+ * Public product name is NMAForge.  Keep the historical CIMForge spelling as
+ * an ABI-compatible alias: register offsets, descriptor layout, and the
+ * 0xA0000000 mapping do not change when software is migrated incrementally.
+ */
+#ifndef NMAFORGE_BASE_ADDR
+#define NMAFORGE_BASE_ADDR 0xA0000000u
+#endif
+#ifndef NMA_BASE_ADDR
+#define NMA_BASE_ADDR NMAFORGE_BASE_ADDR
+#endif
 #ifndef CIMFORGE_BASE_ADDR
-#define CIMFORGE_BASE_ADDR 0xA0000000u
+#define CIMFORGE_BASE_ADDR NMAFORGE_BASE_ADDR
 #endif
 
 #define CIMFORGE_SPAD_WINDOW       0x00010000u
@@ -14,7 +25,12 @@
 #define CIMFORGE_VERSION_A6        0x10000006u
 #define CIMFORGE_VERSION_A7        0x10000007u
 #define CIMFORGE_VERSION_A8        0x10000008u
-#define CIMFORGE_VERSION_512K      CIMFORGE_VERSION_A8
+#define CIMFORGE_VERSION_A9        0x10000009u
+#define CIMFORGE_VERSION_A10       0x1000000au
+#define CIMFORGE_VERSION_512K      CIMFORGE_VERSION_A10
+
+#define CIMFORGE_OP_BF16_DOT_ACC_FP32 0x50u
+#define CIMFORGE_OP_FP16_DOT_ACC_FP32 0x51u
 
 #define CIMFORGE_REG_CTRL          0x000u
 #define CIMFORGE_REG_STATUS        0x004u
@@ -95,7 +111,7 @@
 #define CIMFORGE_REG_TILE_EXT_OUT_HI 0x1b0u
 
 #define CIMFORGE_ABI_MAJOR          7u
-#define CIMFORGE_ABI_MINOR          2u
+#define CIMFORGE_ABI_MINOR          4u
 #define CIMFORGE_DESC_BYTES         64u
 #define CIMFORGE_COMPLETION_BYTES   16u
 
@@ -105,6 +121,8 @@
 #define CIMFORGE_CAP2_ADDR64        (1u << 3)
 #define CIMFORGE_CAP2_DESC_V7       (1u << 4)
 #define CIMFORGE_CAP2_PACK_I8       (1u << 5)
+#define CIMFORGE_CAP2_BF16_DOT_ACC_FP32 (1u << 6)
+#define CIMFORGE_CAP2_FP16_DOT_ACC_FP32 (1u << 7)
 
 #define CIMFORGE_ERROR_SOURCE_NONE  0u
 #define CIMFORGE_ERROR_SOURCE_COMMAND 1u

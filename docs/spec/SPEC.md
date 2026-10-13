@@ -1,15 +1,24 @@
 # NMAForge AXI4 Near-Memory Tensor Accelerator Specification
 
-**RTL release:** A8　**Software ABI:** v7.2　**Version register:** `0x1000_0008`
-**Canonical top:** `rtl/top/ai_accel_top.v`　**Scope date:** 2026-08-26
+**RTL release:** A10　**Software ABI:** v7.4　**Version register:** `0x1000_000a`
+**Canonical top:** `rtl/top/ai_accel_top.v`　**Scope date:** 2026-10-13
 
-This file is the English compatibility entry point for the current A8
+This file is the English compatibility entry point for the current A10
 specification. The complete, detailed specification is maintained in
 [SPEC_ZH.md](SPEC_ZH.md). It covers the same RTL contract: AXI4-Lite control,
-128-bit AXI4 DMA, 512 KiB four-bank scratchpad, CMDQ/CPLQ, ABI v7.2 descriptors,
-INT8/matrix/SFU/CNN/KV operators, protection, performance counters, verification
+128-bit AXI4 DMA, 512 KiB four-bank scratchpad, CMDQ/CPLQ, ABI v7.4 descriptors,
+INT8/BF16/FP16/matrix/SFU/CNN/KV operators, protection, performance counters, verification
 evidence, and commercial-28-nm pre-layout limitations. It is the English companion of the
 Chinese source-of-truth document, not a second ABI definition.
+
+Opcode `0x50` (`BF16_DOT_ACC_FP32`) remains unchanged. A10 adds opcode `0x51`
+(`FP16_DOT_ACC_FP32`); both use the existing command lifecycle, scratchpad
+arbiter and completion writer, with sequential non-fused FP32 accumulation.
+They are advertised by `CAP2[6]` and `CAP2[7]`, respectively. ABI major remains
+7; descriptors remain 64 bytes and completions 16 bytes. A8 remains identifiable
+as version `0x1000_0008` / ABI v7.2 with `CAP2=0x3f`; A9 is `0x1000_0009` /
+ABI v7.3 with `CAP2=0x7f`; A10 reports `0x1000_000a` / ABI v7.4 with
+`CAP2=0xff`.
 
 ## What the IP is—and is not
 

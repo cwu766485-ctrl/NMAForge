@@ -1,18 +1,20 @@
 # NMAForge AXI4 近存张量加速器详细规格（中文）
 
-**RTL：A8；软件 ABI：v7.2；版本寄存器：`0x1000_0008`；顶层：`rtl/top/ai_accel_top.v`；事实日期：2026-08-26。**
+**RTL：A10；软件 ABI：v7.4；版本寄存器：`0x1000_000a`；顶层：`rtl/top/ai_accel_top.v`；事实日期：2026-10-13。**
 
 > 本文按当前 RTL 及 `sw/include/cimforge_regs.h` 编写；发生冲突时，RTL 和头文件优先。本文只陈述已实现的全数字 RTL，规划项不会被写作已交付能力。
 
-> 当前阶段是“RTL 功能基线已建立、进入系统化验证前的冻结点”。动态回归、28nm
-> pre-layout DC、SpyGlass lint/基础 CDC/RDC 都已有证据；UVM coverage、formal/LEC/DFT、
-> 后布局签核和 XCZU15EG 实板端到端验收仍未完成。
+> 当前 A10 保留 `0x50 BF16_DOT_ACC_FP32`，新增 `0x51 FP16_DOT_ACC_FP32`；top smoke 已验证
+> FP16 的 DDR→DMA→SPAD→命令/共享 completion→FP→SPAD→DMA→DDR 闭环，结果为 FP32 `0x41300000`。
+> 混合精度 dot UVM 双 seed 与 URG 合并已运行，功能 covergroup 为 100%，但 DUT code/FSM coverage
+> 尚未 closure；没有新增 FP PPA。全芯片 SpyGlass lint 当前为 0 errors、285 warnings、4 infos，尚非 warning
+> closure/signoff。formal/LEC/DFT、后布局签核和 XCZU15EG 实板端到端验收仍未完成。
 
 ## 1. 产品定位
 
 NMAForge 是可综合、面向 SoC 集成的全数字 AI 近存加速器 IP。软件通过 DMA 将 tile、权重、激活和 KV-cache 搬进邻近计算引擎的本地 SRAM，再在片上完成 INT8/定点计算，以减少外部 DDR 往返。其 banked VDOT/GEMV 路径实现了数字 CNM（Compute-Near-Memory）：四个 SRAM bank 各自邻接一个 Local Controller 和 Local PE，本 bank 内完成地址推进、A/B 读请求、operand 双缓冲、dot4 本地累加；仅在 output 边界传递四个 local sum 到 Global Reducer。它不是模拟 Compute-in-Memory：不修改 SRAM bit-cell、bit-line 或 sense amplifier，不在存储阵列内以模拟方式执行 MAC；也不是包含 CPU、NoC、CXL/LPDDR/HBM-PIM、DDR 控制器和 LLM serving 软件栈的完整系统。
 
-当前重点是 INT8 VDOT/GEMV/GEMM、1x1/3x3/Depthwise 卷积、Q15 Softmax（含 causal）、RMSNorm、LayerNorm、残差、GELU、SiLU、requant，以及 Transformer 的 QKV/MHA/FFN 宏编排与 KV-cache 读写。典型 decoder 数据流为：`Q/K/V 投影 → Q×K^T → causal softmax → attention×V → 输出投影 → residual+RMSNorm → FFN → residual+RMSNorm`。
+当前重点是 INT8 VDOT/GEMV/GEMM、BF16/FP16 dot-to-FP32、1x1/3x3/Depthwise 卷积、Q15 Softmax（含 causal）、RMSNorm、LayerNorm、残差、GELU、SiLU、requant，以及 Transformer 的 QKV/MHA/FFN 宏编排与 KV-cache 读写。典型 decoder 数据流为：`Q/K/V 投影 → Q×K^T → causal softmax → attention×V → 输出投影 → residual+RMSNorm → FFN → residual+RMSNorm`。
 
 ## 2. 架构、时钟和所有权
 
@@ -69,7 +71,7 @@ VCS 通过 `+define+VCS` 使用 `rtl/memory/ai_scratchpad.v` 的行为 RAM；Viv
 
 软件写 CMDQ 描述符并发布 `CMDQ_TAIL`，硬件消费并报告 `CMDQ_HEAD`；硬件写 CPLQ 完成项并发布 `CPLQ_TAIL`，软件消费后发布 `CPLQ_HEAD`。CMDQ/CPLQ 可放在 scratchpad 或外部内存，`CMD_CTRL[0]` 选择外部描述符。CMD_HEAD/CPL_TAIL 的写仅用于复位/调试种子，不是正常运行时的软件推进方式。
 
-一条 ABI v7.2 描述符固定 64 字节、64 字节对齐、16 个 little-endian 32-bit word：
+一条 ABI v7 描述符固定 64 字节、64 字节对齐、16 个 little-endian 32-bit word；A9/ABI v7.3 加入 `0x50 BF16_DOT_ACC_FP32`，A10/ABI v7.4 增加 `0x51 FP16_DOT_ACC_FP32`，均不改变描述符字节布局：
 
 | Word | 字段 | 定义 |
 |---:|---|---|
@@ -101,6 +103,10 @@ VCS 通过 `+define+VCS` 使用 `rtl/memory/ai_scratchpad.v` 的行为 RAM；Viv
 | 34/35/36/37 | Residual、GELU、requant、SiLU |
 | 40/41/42 | QKV/MHA/FFN 描述符宏编排 |
 | 43/44 | KV write/KV read |
+| 50 (`0x50`) | BF16 点积、FP32 累加与结果（`BF16_DOT_ACC_FP32`） |
+| 51 (`0x51`) | FP16 点积、FP32 累加与结果（`FP16_DOT_ACC_FP32`） |
+
+`0x50` 与 `0x51` 均使用 ABI v7 descriptor 和现有 32-bit core-SPAD 口；分别解释输入为 BF16 与 IEEE binary16，乘积以 FP32 精度参与按元素顺序的非融合 FP32 累加，最终输出一个 FP32 word。专用 descriptor 字段约束仍由 RTL validator 执行。`CAP2[6]`（掩码 `0x40`）表示 BF16 dot，`CAP2[7]`（掩码 `0x80`）表示 FP16 dot。A8 (`VERSION=0x1000_0008`) 保持 ABI v7.2 与 `CAP2=0x3f`；A9 为 ABI v7.3、`CAP2=0x7f`；A10 为 ABI v7.4、`CAP2=0xff`。三者 descriptor/completion 大小均为 64/16 字节，软件可据版本与 capability 位区分新增能力。
 
 统一 DMA 支持 DDR↔SPAD 1D、二维 row/stride、indexed gather、tile load/compute/store。burst 最多 16 beats，且在每个 4 KiB AXI 边界拆分；最多四个 tagged read outstanding，RID 选槽位并由匹配 RLAST 释放，BID 归因写响应。传输层允许读响应乱序，但命令派发和完成发布仍按序。`DMA_CFG[0]` 为 gather，`[1]` 是只读 128-bit 能力，`[10:8]` 请求读并发且不得大于 4。
 
@@ -110,9 +116,19 @@ VCS 通过 `+define+VCS` 使用 `rtl/memory/ai_scratchpad.v` 的行为 RAM；Viv
 
 全部寄存器为 32-bit、相对 AXI-Lite base 的字节偏移。`0x000~0x048` 为 CTRL/STATUS/直接模式配置/IRQ/VERSION/CAP；`0x080~0x0D0` 为 CMDQ/CPLQ、doorbell、abort、watchdog、DMA 和 queue status；`0x0D4~0x100` 是 R0~R3 保护区；`0x104~0x118` 为 DMA 二维/后处理；`0x120~0x148` 为 tile 外部地址、双缓冲和尺寸；`0x14C~0x1B0` 为性能、事件、64-bit 地址高字、ABI、错误来源和 CAP2。
 
-核心编码：STATUS bit0/1/2=busy/done/error；DMA_CTRL bit0/1=start/store；`ABI_INFO={16,64,2,7}`；`CAP2=0x3f` 代表 unified DMA、SPAD line128、matrix line store、64-bit address、DESC_V7、packed INT8。
+核心编码：STATUS bit0/1/2=busy/done/error；DMA_CTRL bit0/1=start/store；`ABI_INFO={16,64,4,7}`（completion bytes、descriptor bytes、minor、major）；`CAP2=0xff` 代表原有六项能力以及 BF16、FP16 dot-to-FP32。
 
 ## 7. 验证证据与边界
+
+**A10 / 混合精度最新证据（2026-10-13）**：FP16 multiplier 10,015 向量通过；
+BF16 legacy dot-core gate 通过；mixed BF16/FP16 UVM 两个 seed 各 162/162 scoreboard
+transaction（142 笔数值、14 笔期望错误、6 笔状态内 reset），UVM warning/error/fatal
+均为 0，成功数值 covergroup 为 100%，URG merge 成功；本轮 `ai_smoke`
+和 20-case seeded top run 均 PASS。Top smoke 还核对 FP16 两路 DDR DMA load、queued
+command/shared completion、FP32 result 与 DMA 写回 DDR，结果 word 为 `0x41300000`。
+这仍是 compact AXI memory model 上的仿真，不是 DDR PHY/板级验证；`state_r` 的全部
+`state_r` 的 23 个 FSM 转移已命中；`pending_error_r` 为 13/18，且部分 DUT condition/branch coverage 尚未
+disposition，新增 FP PPA 也尚未完成。
 
 VCS `make ai_smoke` 已覆盖 Transformer 30-command 链、随机 GEMV/GEMM/Conv、错误/保护和 reset recovery；扩展回归是 `make ai_comp`、`make ai_run AI_RANDOM_CASES=20 AI_SEED=12345`。2026-08-06 的 SpyGlass macro-aware lint 记录为 **0 error、414 warnings、4 info**（共 418 条信息，仍需分类）；CDC setup 为 0 error、12 warnings，CDC structural verify 显示 0 个 unsynchronized crossing、0 个 convergence，但因缺少 Advanced_CDC license 而有 1 条工具/许可证 error，不能称 sign-off；RDC structural verify 的 2 条 error 同样仅为 Advanced_CDC / `rdc_adv_checker` license 缺失，不能作为 RTL reset-crossing 违规解读，也不能称 RDC sign-off。
 

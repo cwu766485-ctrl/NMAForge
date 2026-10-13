@@ -6,19 +6,23 @@
 module ai_bank_pe(
     input  wire [31:0] act_word,
     input  wire [31:0] weight_word,
+    input  wire        compute_enable,
     output wire signed [31:0] partial_sum
 );
     // Keep every product 32-bit signed before summation.  This preserves the
     // original accumulation width and avoids a lane expression silently
     // narrowing before it reaches the bank-local accumulator.
-    wire signed [7:0] act_lane0 = act_word[7:0];
-    wire signed [7:0] act_lane1 = act_word[15:8];
-    wire signed [7:0] act_lane2 = act_word[23:16];
-    wire signed [7:0] act_lane3 = act_word[31:24];
-    wire signed [7:0] weight_lane0 = weight_word[7:0];
-    wire signed [7:0] weight_lane1 = weight_word[15:8];
-    wire signed [7:0] weight_lane2 = weight_word[23:16];
-    wire signed [7:0] weight_lane3 = weight_word[31:24];
+    // Isolate both operands while the PE result is not consumed.  This keeps
+    // the multiplier inputs at zero during all non-compute cycles without
+    // changing the enabled lane mapping or arithmetic expression.
+    wire signed [7:0] act_lane0 = compute_enable ? act_word[7:0]   : 8'sd0;
+    wire signed [7:0] act_lane1 = compute_enable ? act_word[15:8]  : 8'sd0;
+    wire signed [7:0] act_lane2 = compute_enable ? act_word[23:16] : 8'sd0;
+    wire signed [7:0] act_lane3 = compute_enable ? act_word[31:24] : 8'sd0;
+    wire signed [7:0] weight_lane0 = compute_enable ? weight_word[7:0]   : 8'sd0;
+    wire signed [7:0] weight_lane1 = compute_enable ? weight_word[15:8]  : 8'sd0;
+    wire signed [7:0] weight_lane2 = compute_enable ? weight_word[23:16] : 8'sd0;
+    wire signed [7:0] weight_lane3 = compute_enable ? weight_word[31:24] : 8'sd0;
 
     wire signed [31:0] product0 = act_lane0 * weight_lane0;
     wire signed [31:0] product1 = act_lane1 * weight_lane1;

@@ -137,6 +137,11 @@ module ai_command_processor(
     wire scheduler_resources_idle = !fetch_busy && !compute_busy && !completion_busy && !dma_busy;
     wire dependencies_ready = (dependency_events & desc_wait_mask) == desc_wait_mask;
     wire macro_op, descriptor_invalid;
+    wire direct_fp_dot_invalid =
+        (cfg_length == 16'd0) || (cfg_m != 16'd1) || (cfg_n != 16'd1) ||
+        (|cfg_src0[1:0]) || (|cfg_src1[1:0]) || (|cfg_dst[1:0]) ||
+        (cfg_bias_base != 32'd0) || cfg_bias_enable ||
+        (cfg_shift != 5'd0) || (cfg_activation != 2'd0);
     // Descriptor ABI validation is deliberately stateless.  Launch, queue
     // advancement and error-completion ownership remain in this FSM.
     ai_descriptor_validator descriptor_validator_u(
@@ -144,7 +149,12 @@ module ai_command_processor(
         .src0(desc_src0), .src1(desc_src1), .dst(desc_dst),
         .bias_base(desc_bias_base), .length(desc_length),
         .m_size(desc_m), .n_size(desc_n), .k_words(desc_k),
-        .bias_enable(desc_bias_enable), .macro_child_fetch(macro_child_fetch_r),
+        .bias_enable(desc_bias_enable), .flags(desc_flags),
+        .scale_shift(desc_shift), .activation(desc_activation),
+        .aux0(desc_aux0), .src0_stride(desc_src0_stride),
+        .src1_stride(desc_src1_stride), .dst_stride(desc_dst_stride),
+        .batch_count(desc_batch_count), .head_count(desc_head_count),
+        .macro_child_fetch(macro_child_fetch_r),
         .op_valid(), .is_macro(macro_op), .is_tensor_matrix(),
         .is_tensor_sfu(), .version_valid(), .dimensions_valid(),
         .alignment_error(),
@@ -373,6 +383,15 @@ module ai_command_processor(
               busy <= 1'b1;
               completion_required_r <= 1'b0;
               state_r <= ST_TILE;
+            end else if (direct_start && scheduler_resources_idle &&
+                         (cfg_op == 8'h50 || cfg_op == 8'h51) &&
+                         direct_fp_dot_invalid) begin
+              // Direct-register FP dot has no descriptor word to validate.
+              // Reject unsupported dimensions/configuration through the same
+              // legacy descriptor/configuration error event path.
+              completion_required_r <= 1'b0;
+              `REPORT_EVENT(1'b1, ERR_DESC, 0, 0, 0);
+              busy <= 1'b0;
             end else if (direct_start && scheduler_resources_idle) begin
               busy <= 1'b1;
               completion_required_r <= 1'b0;

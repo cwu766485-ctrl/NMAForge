@@ -36,10 +36,10 @@ class control_reset_version_seq extends control_base_seq;
     function new(string name = "control_reset_version_seq"); super.new(name); endfunction
     task body();
         bit [31:0] data;
-        read32(VERSION, data); expect_eq("VERSION", data, 32'h1000_0008);
+        read32(VERSION, data); expect_eq("VERSION", data, 32'h1000_000a);
         read32(CAP, data); expect_eq("CAP", data, 32'h001f_ff17);
-        read32(ABI_INFO, data); expect_eq("ABI_INFO", data, 32'h1040_0207);
-        read32(CAP2, data); expect_eq("CAP2", data, 32'h0000_003f);
+        read32(ABI_INFO, data); expect_eq("ABI_INFO", data, 32'h1040_0407);
+        read32(CAP2, data); expect_eq("CAP2", data, 32'h0000_00ff);
         read32(OP, data); expect_eq("reset OP", data, 0);
         read32(IRQ_ENABLE, data); expect_eq("reset IRQ_ENABLE", data, 0);
         read32(STATUS, data); expect_eq("reset STATUS", data, 0);

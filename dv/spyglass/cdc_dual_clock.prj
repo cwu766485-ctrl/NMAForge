@@ -1,0 +1,25 @@
+# Dedicated structural CDC/RDC project for the dual-clock command path.
+set_option top ai_accel_dual_clock_command_path
+set_option enableSV yes
+set_option define VCS
+# The 1024-bit command FIFO at depth 16 is a 16,384-bit behavioural memory.
+# Keep it elaborated for structural CDC instead of applying SpyGlass's small
+# default memory threshold and black-boxing the synchronizer implementation.
+set_option mthresh 32768
+# Enable structural recognition of the gray-pointer async FIFOs in this
+# dedicated CDC project; without it SpyGlass treats the dual-port payload RAM
+# as unrelated cross-clock combinational logic.
+set_parameter enable_fifo yes
+set_option active_methodology "$SPYGLASS_HOME/GuideWare/2023.12/block/rtl_handoff"
+
+read_file -type verilog ../../rtl/control/cdc/ai_async_fifo.v
+read_file -type verilog ../../rtl/control/cdc/ai_ctrl_compute_cdc.v
+read_file -type verilog ../../rtl/control/cdc/ai_accel_dual_clock_shell.v
+read_file -type verilog ../../rtl/control/cdc/ai_cdc_event_buffer.v
+read_file -type verilog ../../rtl/control/queue/ai_ring_pointer_next.v
+read_file -type verilog ../../rtl/control/descriptor/ai_descriptor_validator.v
+read_file -type verilog ../../rtl/compute/pipeline/ai_tile_pipeline.v
+read_file -type verilog ../../rtl/control/queue/ai_command_processor.v
+read_file -type verilog ../../rtl/control/queue/ai_completion_writer.v
+read_file -type verilog ../../rtl/control/cdc/ai_accel_dual_clock_command_path.v
+read_file -type sgdc cdc_dual_clock_constraints.sgdc

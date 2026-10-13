@@ -1,0 +1,45 @@
+# Experimental UPF intent for the future two-clock/power-aware study.
+# This file is intentionally not included in the current single-clock product
+# build.  Supply mapping and library-specific power switches must be completed
+# with the target SoC/PDK before synthesis or sign-off.
+
+upf_version 3.0
+set_design_top ai_accel_top
+
+create_power_domain PD_AON -include_scope
+create_power_domain PD_COMPUTE \
+    -elements {ai_accel_top.compute_cluster_u}
+create_power_domain PD_SRAM \
+    -elements {ai_accel_top.spad_subsystem_u}
+
+create_supply_net VDD_AON
+create_supply_net VSS
+create_supply_net VDD_COMPUTE
+create_supply_net VDD_SRAM
+create_supply_set SS_AON -function {power VDD_AON} -function {ground VSS}
+create_supply_set SS_COMPUTE -function {power VDD_COMPUTE} -function {ground VSS}
+create_supply_set SS_SRAM -function {power VDD_SRAM} -function {ground VSS}
+
+set_domain_supply_net PD_AON -primary_power_net VDD_AON -primary_ground_net VSS
+set_domain_supply_net PD_COMPUTE -primary_power_net VDD_COMPUTE -primary_ground_net VSS
+set_domain_supply_net PD_SRAM -primary_power_net VDD_SRAM -primary_ground_net VSS
+
+# Isolation is controlled from the always-on side.  Exact boundary ports and
+# clamp values must be confirmed after the experimental wrapper is integrated.
+set_isolation ISO_COMPUTE \
+    -domain PD_COMPUTE -applies_to outputs \
+    -clamp_value 0 -isolation_signal iso_compute_n \
+    -isolation_sense low -location parent
+
+# Scratchpad retention is an intent placeholder; retention cells and save/
+# restore controls are technology-specific and are not inferred by this file.
+set_retention RET_SRAM -domain PD_SRAM \
+    -retention_power_net VDD_SRAM -retention_ground_net VSS
+
+add_power_state PD_AON.primary -state ON {-supply_expr {power == {FULL_ON 1.0}}}
+add_power_state PD_COMPUTE.primary \
+    -state ON  {-supply_expr {power == {FULL_ON 1.0}}} \
+    -state OFF {-supply_expr {power == {OFF}}}
+add_power_state PD_SRAM.primary \
+    -state ON {-supply_expr {power == {FULL_ON 1.0}}} \
+    -state OFF {-supply_expr {power == {OFF}}}

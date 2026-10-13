@@ -17,6 +17,7 @@ tests are planned work, not evidence of completion.
 | CNM | `ai_banked_cnm_core` + local controllers | Random lane masks, bank addresses, partial tail groups and ping-pong/pre-fetch timing. | Python/SystemVerilog dot-product model and lane ownership assertions. | Per-lane data and final reduction match; no bank response is consumed twice; `busy/done/error` contract holds. |
 | Matrix | `ai_tensor_matrix_core` | Random INT8 4x4 GEMM/batch-GEMM shapes, transpose/stride, bias, activation and requantization. | Bit-aware matrix golden model and output-tile scoreboard. | Every output tile matches golden including saturation/layout; no premature done; coverage hits transpose and tail cases. |
 | SFU | `ai_tensor_sfu_core` | Directed extremes plus constrained-random Softmax, RMSNorm/LayerNorm, residual, GELU/SiLU and requant inputs. | Fixed-point golden with declared tolerance/bit contract; range and divide-by-zero assertions. | Result matches the chosen integer contract; no overflow/wrap beyond spec; all states exit. |
+| Mixed-precision FP dot | `ai_mixed_precision_dot_fp32_core` + BF16/FP16 multipliers and FP32 accumulator | Directed special values plus seeded BF16/FP16 vectors; randomized SPAD response/back-pressure, 14 expected-error and 6 reset-in-flight cases in UVM, including abort before read acceptance on A/B. | Independent raw-bit Python oracle, bus-observing scoreboard, request/writeback SVA and format/length/class/sign/stall coverage. | Two-seed VCS/URG: 162/162 scoreboard transactions per seed (142 numeric + 14 expected-error + 6 reset), UVM errors/warnings/fatals 0, successful-result covergroup 100%. `ai_mixed_precision_dot_fp32_core` line/condition/FSM/branch 98.32/63.50/87.80/83.33%; all `state_r` states/transitions hit (23/23). `pending_error_r` transitions 13/18; remaining bins and partial condition/branch coverage await disposition. |
 | CNN/KV | line-buffer core and `ai_kv_cache_engine` | Random convolution window/boundary and KV head/token/stride addressing. | Feature-map/KV address reference model. | Correct window/address generation, no out-of-range SPAD request, and expected output/handshake. |
 
 ## Subsystem level
@@ -26,13 +27,18 @@ tests are planned work, not evidence of completion.
 | DMA–SPAD | `ai_axi128_dma` ↔ `ai_spad_arbiter` ↔ `ai_scratchpad` | Interleave DMA traffic with compute-like clients; inject DDR reordering, SPAD contention and protection errors. | End-to-end byte scoreboard plus arbiter/DMA assertions.  Accept only if data is correct, control traffic retains priority and all error paths terminate cleanly. |
 | Queue–completion | register ABI ↔ command processor ↔ descriptor fetch ↔ completion writer | Software-like CMDQ/CPLQ producer/consumer sequences with dependency waits, bad descriptors, reset and abort. | Queue model checks pointer ownership and completion ordering.  Accept only if no overwrite/underflow occurs and CPLQ tail moves after all four completion words. |
 | Tensor datapath | tile pipeline ↔ DMA/SPAD ↔ CNM/matrix/SFU/KV | Run multi-command tensor fragments with ping-pong buffers and randomized memory latency. | Golden tensor results, buffer-ownership scoreboard, overlap/stall counters.  Accept only if results match, buffer handoff is safe, and no deadlock/starvation occurs. |
-| Top smoke | `ai_accel_top` ↔ AXI-Lite tasks ↔ AXI4 memory model | Existing directed register/DMA/queue/compute and Transformer micro-workload sequences. | `TEST PASS`, SVA clean, expected completion/result checks and fixed-point reference gate pass.  This is regression evidence, not UVM coverage closure. |
+| FP16 DDR-to-compute | `ai_axi128_dma` ↔ scratchpad ↔ queued `0x51` FP16 dot ↔ completion writer ↔ DMA | Directed top smoke loads two packed FP16 words from the AXI memory model, computes the dot, then stores FP32 result back to the model. | Checks both SPAD operands, FP32 result, shared completion and external-memory result (`0x41300000`). Passed in current `ai_smoke`; does not model DDR PHY or randomized DDR errors. |
+| Top smoke | `ai_accel_top` ↔ AXI-Lite tasks ↔ AXI4 memory model | Directed register/DMA/queue/compute, BF16/FP16 command tests, FP16 DDR path and Transformer micro-workload. | `TEST PASS`, SVA clean, expected completion/result checks and fixed-point reference gate pass.  This is regression evidence, not UVM coverage closure. |
 
 ## Evidence status
 
-Existing VCS smoke/directed tests and the initial UVM version smoke are useful
-bring-up evidence.  They are not substitutes for the planned block/subsystem
-scoreboards, constrained-random tests, coverage and assertion closure above.
+VCS smoke/directed tests, the current mixed BF16/FP16 block UVM regression and
+the FP16 DDR directed top path provide bring-up evidence. Mixed-dot successful-
+result functional coverage reports 100%. UVM includes configuration,
+operand-parity, read/write-protection, abort, watchdog, and active-state reset
+cases. All `state_r` transitions are covered; composite pending-error priority
+and some condition/branch coverage still need disposition. These results are
+not substitutes for randomized DDR/error-path stress.
 
 ## 下一步
 | 阶段 | 验证层级 | 验证对象 | 主要内容 | 通过标准 |

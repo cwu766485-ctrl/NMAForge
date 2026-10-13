@@ -15,37 +15,41 @@ ai_transformer_gen:
 	$(PYTHON) ../../../../sw/tools/cimforge_mapper.py
 
 ai_comp: ai_transformer_gen
-	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ns +define+VCS \
+	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
 		+incdir+../../../block/control/agent \
 		+incdir+../../../block/dma/agent \
 		+incdir+../fixtures \
 		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv -l ai_comp.log
 
 ai_run:
-	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=$(AI_RANDOM_CASES) +AI_SEED=$(AI_SEED) -l ai_accel_smoke.log
+	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=$(AI_RANDOM_CASES) +AI_SEED=$(AI_SEED) +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) -l ai_accel_smoke.log
 
 ai_smoke: ai_comp ai_run
 
 # Activity-aware smoke: uses exactly the same top-level regression as
 # ai_smoke, but writes a VCD only when explicitly requested.  Convert it on
 # the Synopsys Linux environment with `make ai_smoke_saif` before DC power.
-VCD_FILE ?= ai_accel_smoke.vcd
-SAIF_FILE ?= ai_accel_smoke.saif
+ACLK_PERIOD_NS ?= 10.0
+ACLK_PERIOD_TAG := $(subst .,_,$(ACLK_PERIOD_NS))ns
+VCD_FILE ?= ai_accel_smoke_$(ACLK_PERIOD_TAG).vcd
+SAIF_FILE ?= ai_accel_smoke_$(ACLK_PERIOD_TAG).saif
+SAIF_DC_FILE ?= $(basename $(SAIF_FILE))_dc.saif
 SAIF_INSTANCE ?= tb_ai_accel_smoke/dut
 
 ai_smoke_vcd: ai_comp
-	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=$(AI_RANDOM_CASES) +AI_SEED=$(AI_SEED) +VCD_FILE=$(VCD_FILE) -l ai_accel_smoke_vcd.log
+	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=$(AI_RANDOM_CASES) +AI_SEED=$(AI_SEED) +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +VCD_FILE=$(VCD_FILE) -l ai_accel_smoke_vcd.log
 
 ai_smoke_saif: ai_smoke_vcd
 	vcd2saif -input $(VCD_FILE) -output $(SAIF_FILE) -instance $(SAIF_INSTANCE)
+	$(PYTHON) ../../../../syn/normalize_saif_root.py --input $(SAIF_FILE) --output $(SAIF_DC_FILE) --testbench tb_ai_accel_smoke --dut dut --top ai_accel_top
 
 ai_transformer: ai_comp
-	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=0 +AI_SEED=$(AI_SEED) -l ai_transformer.log
+	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=0 +AI_SEED=$(AI_SEED) +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) -l ai_transformer.log
 
 # Short Linux/VCS gate: all directed AXI/DMA/A4 tests with random compute
 # cases disabled. Use this after an RTL edit before the seeded regression.
 ai_quick: ai_comp
-	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=0 +AI_SEED=$(AI_SEED) -l ai_quick.log
+	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=0 +AI_SEED=$(AI_SEED) +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) -l ai_quick.log
 
 # Integer reference model is intentionally a separate gate: it validates the
 # documented A3/A4 fixed-point contract without claiming RTL coverage.
@@ -131,6 +135,7 @@ ai_cnm_a2_gemv_bench: ai_cnm_a2_gemv_bench_run
 ai_tensor_a3_gemm_bench_comp:
 	rm -rf simv_tensor_a3_gemm_bench simv_tensor_a3_gemm_bench.daidir
 	$(VCS_FOCUSED) -top tb_ai_tensor_a3_gemm_bench \
+		../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v \
 		../../../../rtl/compute/matrix/ai_tensor_matrix_core.v \
 		../../../block/compute/matrix/tb/tb_ai_tensor_a3_gemm_bench.sv -o simv_tensor_a3_gemm_bench -l ai_tensor_a3_gemm_bench_comp.log
 
@@ -144,6 +149,47 @@ ai_cnm_compare: ai_cnm_a2_gemv_bench ai_tensor_a3_gemm_bench
 # CNM signoff gate: microarchitecture throughput, SPAD arbitration under
 # CNM/DMA contention, then the full AXI/DMA/compute smoke regression.
 ai_cnm_signoff: ai_cnm_compare ai_spad_arb_run ai_smoke
+
+ai_async_fifo_comp:
+	$(VCS_FOCUSED) -top tb_ai_async_fifo \
+		../../../../rtl/control/cdc/ai_async_fifo.v \
+		../../../block/cdc/tb/tb_ai_async_fifo.sv -o simv_async_fifo -l ai_async_fifo_comp.log
+
+ai_async_fifo_run: ai_async_fifo_comp
+	./simv_async_fifo -l ai_async_fifo_run.log
+
+ai_async_fifo: ai_async_fifo_run
+
+ai_async_fifo_random_comp:
+	$(VCS_FOCUSED) -top tb_ai_async_fifo_random \
+		../../../../rtl/control/cdc/ai_async_fifo.v \
+		../../../block/cdc/tb/tb_ai_async_fifo_random.sv -o simv_async_fifo_random -l ai_async_fifo_random_comp.log
+
+ai_async_fifo_random_run: ai_async_fifo_random_comp
+	./simv_async_fifo_random +SEED=$(AI_SEED) -l ai_async_fifo_random_run.log
+
+ai_async_fifo_random: ai_async_fifo_random_run
+
+ai_async_fifo_reset_comp:
+	$(VCS_FOCUSED) -top tb_ai_async_fifo_reset \
+		../../../../rtl/control/cdc/ai_async_fifo.v \
+		../../../block/cdc/tb/tb_ai_async_fifo_reset.sv -o simv_async_fifo_reset -l ai_async_fifo_reset_comp.log
+
+ai_async_fifo_reset_run: ai_async_fifo_reset_comp
+	./simv_async_fifo_reset -l ai_async_fifo_reset_run.log
+
+ai_async_fifo_reset: ai_async_fifo_reset_run
+
+ai_ctrl_compute_cdc_comp:
+	$(VCS_FOCUSED) -top tb_ai_ctrl_compute_cdc \
+		../../../../rtl/control/cdc/ai_async_fifo.v \
+		../../../../rtl/control/cdc/ai_ctrl_compute_cdc.v \
+		../../../block/cdc/tb/tb_ai_ctrl_compute_cdc.sv -o simv_ctrl_compute_cdc -l ai_ctrl_compute_cdc_comp.log
+
+ai_ctrl_compute_cdc_run: ai_ctrl_compute_cdc_comp
+	./simv_ctrl_compute_cdc -l ai_ctrl_compute_cdc_run.log
+
+ai_ctrl_compute_cdc: ai_ctrl_compute_cdc_run
 
 clean:
 	rm -rf csrc simv* *.log ucli.key *.vpd vc_hdrs.h DVE* novas* *.daidir *.vdb *.key

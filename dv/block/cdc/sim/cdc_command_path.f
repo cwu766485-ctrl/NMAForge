@@ -1,0 +1,12 @@
+../../../../rtl/control/cdc/ai_async_fifo.v
+../assertions/ai_async_fifo_sva.sv
+../../../../rtl/control/cdc/ai_ctrl_compute_cdc.v
+../../../../rtl/control/cdc/ai_accel_dual_clock_shell.v
+../../../../rtl/control/cdc/ai_cdc_event_buffer.v
+../../../../rtl/control/queue/ai_ring_pointer_next.v
+../../../../rtl/control/descriptor/ai_descriptor_validator.v
+../../../../rtl/compute/pipeline/ai_tile_pipeline.v
+../../../../rtl/control/queue/ai_command_processor.v
+../../../../rtl/control/queue/ai_completion_writer.v
+../../../../rtl/control/cdc/ai_accel_dual_clock_command_path.v
+../tb/tb_ai_accel_dual_clock_command_path.sv

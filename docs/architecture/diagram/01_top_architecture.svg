@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 760" role="img" aria-labelledby="title desc">
+  <title id="title">NMAForge 顶层架构</title>
+  <desc id="desc">以控制面和数据面两条直线路径展示主机、命令处理、DMA、SPAD 和计算集群。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#111827"/></marker>
+    <marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#5278B9"/></marker>
+    <style><![CDATA[
+      text{font-family:"Segoe UI","Microsoft YaHei",Arial,sans-serif;fill:#111827}
+      .title{font-size:30px;font-weight:750}.sub{font-size:14px;fill:#64748B}
+      .box{fill:#FFF2CC;stroke:#D6A43B;stroke-width:1.5}.ext{fill:#F8FAFC;stroke:#64748B;stroke-width:1.5}
+      .mem{fill:#F4CCCC;stroke:#C96B6B;stroke-width:1.4}.name{font-size:18px;font-weight:650}
+      .note{font-size:13px;fill:#475569}.label{font-size:13px}.stage{font-size:17px;font-weight:700}
+      .main{stroke:#111827;stroke-width:1.8;fill:none;marker-end:url(#arrow)}
+      .bi{stroke:#111827;stroke-width:1.8;fill:none;marker-start:url(#arrow);marker-end:url(#arrow)}
+      .ctl{stroke:#5278B9;stroke-width:2;stroke-dasharray:8 6;fill:none;marker-end:url(#arrowBlue)}
+      .boundary{fill:none;stroke:#111827;stroke-width:1.6;stroke-dasharray:6 5}
+      .sep{stroke:#6B8BC3;stroke-width:3;stroke-dasharray:10 8}
+    ]]></style>
+  </defs>
+  <rect width="1500" height="760" fill="#FFFFFF"/>
+  <text x="48" y="48" class="title">NMAForge 顶层架构</text>
+  <text x="48" y="75" class="sub">主流程只保留控制、搬运、存储和计算；详细模块见后续分图</text>
+
+  <rect x="65" y="110" width="1370" height="575" rx="4" class="boundary"/>
+  <line x1="375" y1="110" x2="375" y2="685" class="sep"/>
+  <line x1="705" y1="110" x2="705" y2="685" class="sep"/>
+  <line x1="1040" y1="110" x2="1040" y2="685" class="sep"/>
+
+  <!-- top control path -->
+  <rect x="95" y="165" width="210" height="105" rx="3" class="ext"/>
+  <text x="200" y="205" text-anchor="middle" class="name">CPU / Driver</text>
+  <text x="200" y="234" text-anchor="middle" class="note">CMDQ · CPLQ · IRQ</text>
+
+  <rect x="435" y="165" width="210" height="105" rx="3" class="box"/>
+  <text x="540" y="201" text-anchor="middle" class="name">寄存器组</text>
+  <text x="540" y="227" text-anchor="middle" class="note">配置 · Doorbell · 状态</text>
+  <text x="540" y="249" text-anchor="middle" class="note">ai_accel_regs</text>
+
+  <rect x="765" y="150" width="220" height="135" rx="3" class="box"/>
+  <text x="875" y="189" text-anchor="middle" class="name">命令处理器</text>
+  <text x="875" y="217" text-anchor="middle" class="note">Fetch · Decode · Launch</text>
+  <text x="875" y="240" text-anchor="middle" class="note">Completion · Queue Pointer</text>
+  <text x="875" y="263" text-anchor="middle" class="note">ai_command_processor</text>
+
+  <rect x="1100" y="165" width="270" height="105" rx="3" class="box"/>
+  <text x="1235" y="201" text-anchor="middle" class="name">计算集群</text>
+  <text x="1235" y="228" text-anchor="middle" class="note">INT8 · CNM · Matrix · SFU · CNN · KV</text>
+  <text x="1235" y="250" text-anchor="middle" class="note">ai_accel_compute_cluster</text>
+
+  <path d="M305 217H435" class="bi"/><text x="370" y="201" text-anchor="middle" class="label">AXI4-Lite</text>
+  <path d="M645 217H765" class="bi"/><text x="705" y="201" text-anchor="middle" class="label">配置 / 状态</text>
+  <path d="M985 217H1100" class="bi"/><text x="1042" y="201" text-anchor="middle" class="label">launch / done</text>
+
+  <!-- bottom data path -->
+  <rect x="95" y="445" width="210" height="115" rx="3" class="ext"/>
+  <text x="200" y="486" text-anchor="middle" class="name">外部 DDR</text>
+  <text x="200" y="516" text-anchor="middle" class="note">Descriptor · Tensor · Result</text>
+  <text x="200" y="539" text-anchor="middle" class="note">AXI4 Target</text>
+
+  <rect x="430" y="430" width="220" height="145" rx="3" class="box"/>
+  <text x="540" y="469" text-anchor="middle" class="name">AXI Fabric + DMA</text>
+  <text x="540" y="498" text-anchor="middle" class="note">128-bit · Burst · 4 KiB Split</text>
+  <text x="540" y="522" text-anchor="middle" class="note">Descriptor ID0 · DMA ID1–4</text>
+  <text x="540" y="546" text-anchor="middle" class="note">ai_accel_axi_fabric / ai_axi128_dma</text>
+
+  <rect x="765" y="430" width="220" height="145" rx="3" class="box"/>
+  <text x="875" y="469" text-anchor="middle" class="name">SPAD 仲裁器</text>
+  <text x="875" y="498" text-anchor="middle" class="note">唯一 Scheduler 准入点</text>
+  <text x="875" y="522" text-anchor="middle" class="note">控制优先 · 数据面轮询</text>
+  <text x="875" y="546" text-anchor="middle" class="note">ai_spad_arbiter</text>
+
+  <rect x="1100" y="430" width="270" height="145" rx="3" class="box"/>
+  <text x="1235" y="469" text-anchor="middle" class="name">四 Bank Scratchpad</text>
+  <text x="1235" y="498" text-anchor="middle" class="note">512 KiB · Registered Read</text>
+  <text x="1235" y="522" text-anchor="middle" class="note">Protection · Parity</text>
+  <text x="1235" y="546" text-anchor="middle" class="note">ai_accel_spad_subsystem</text>
+
+  <path d="M305 502H430" class="bi"/><text x="368" y="486" text-anchor="middle" class="label">AXI4 128-bit</text>
+  <path d="M650 502H765" class="bi"/><text x="707" y="486" text-anchor="middle" class="label">DMA req/rsp</text>
+  <path d="M985 502H1100" class="bi"/><text x="1042" y="486" text-anchor="middle" class="label">SPAD port</text>
+
+  <!-- short vertical relationships -->
+  <path d="M875 285V430" class="ctl"/><text x="889" y="362" class="label">descriptor / completion</text>
+  <path d="M1235 270V430" class="bi"/><text x="1249" y="356" class="label">operand / result</text>
+  <path d="M765 255H695V405H540V430" class="ctl"/><text x="616" y="392" class="label">DMA control</text>
+
+  <text x="220" y="655" text-anchor="middle" class="stage">Stage 1 · 软件提交</text>
+  <text x="540" y="655" text-anchor="middle" class="stage">Stage 2 · 数据搬运</text>
+  <text x="875" y="655" text-anchor="middle" class="stage">Stage 3 · 仲裁访问</text>
+  <text x="1235" y="655" text-anchor="middle" class="stage">Stage 4 · 片上计算</text>
+</svg>

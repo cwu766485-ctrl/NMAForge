@@ -1,0 +1,13 @@
+# Isolated public SpyGlass profile for G1 FP arithmetic blocks.
+# No product top, SRAM model, A8 constraints, or private macro dependencies.
+
+set_option top ai_fp_blocks_lint_top
+set_option enableSV yes
+set_option active_methodology "$SPYGLASS_HOME/GuideWare/2023.12/block/rtl_handoff"
+
+read_file -type verilog ../../rtl/compute/fp/ai_bf16_mul_fp32.v
+read_file -type verilog ../../rtl/compute/fp/ai_fp16_mul_fp32.v
+read_file -type verilog ../../rtl/compute/fp/ai_fp32_add.v
+read_file -type verilog ../../rtl/compute/fp/ai_fp32_accumulator.v
+read_file -type verilog ../../rtl/compute/fp/ai_fp16_bf16_addsub.v
+read_file -type verilog ../../dv/block/compute/fp/lint/ai_fp_blocks_lint_top.sv

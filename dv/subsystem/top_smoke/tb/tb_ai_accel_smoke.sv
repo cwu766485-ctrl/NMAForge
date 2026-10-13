@@ -347,9 +347,92 @@ module tb_ai_accel_smoke;
         .processor_event_valid(dut.processor_event_valid)
     );
 
+    // Per-engine activity checks.  These hierarchical references terminate
+    // at the registered engine ports in compute_cluster_u; no DUT logic is
+    // modified for observability.
+    ai_compute_activity_sva scalar_activity_sva(
+        .clk          (aclk),
+        .resetn       (aresetn),
+        .wake         (dut.core_start && !dut.banked_op && !dut.tensor_matrix_op &&
+                       !dut.tensor_sfu_op && !dut.conv_linebuffer_op && !dut.kv_cache_op),
+        .busy         (dut.scalar_busy),
+        .done         (dut.compute_cluster_u.core_u.done),
+        .error        (dut.compute_cluster_u.core_u.error),
+        .spad_valid   (dut.scalar_spad_valid),
+        .cycle_count  (dut.compute_cluster_u.core_u.cycle_count),
+        .element_count(dut.compute_cluster_u.core_u.element_count)
+    );
+
+    ai_compute_activity_sva banked_cnm_activity_sva(
+        .clk          (aclk),
+        .resetn       (aresetn),
+        .wake         (dut.core_start && dut.banked_op),
+        .busy         (dut.banked_busy),
+        .done         (dut.compute_cluster_u.banked_core_u.done),
+        .error        (dut.compute_cluster_u.banked_core_u.error),
+        .spad_valid   (dut.banked_spad_valid || (|dut.cnm_read_valid)),
+        .cycle_count  (dut.compute_cluster_u.banked_core_u.cycle_count),
+        .element_count(dut.compute_cluster_u.banked_core_u.element_count)
+    );
+
+    ai_compute_activity_sva matrix_activity_sva(
+        .clk          (aclk),
+        .resetn       (aresetn),
+        .wake         (dut.core_start && dut.tensor_matrix_op),
+        .busy         (dut.matrix_busy),
+        .done         (dut.compute_cluster_u.tensor_matrix_u.done),
+        .error        (dut.compute_cluster_u.tensor_matrix_u.error),
+        .spad_valid   (dut.matrix_spad_valid || dut.matrix_banked_read_valid || dut.matrix_line_valid),
+        .cycle_count  (dut.compute_cluster_u.tensor_matrix_u.cycle_count),
+        .element_count(dut.compute_cluster_u.tensor_matrix_u.element_count)
+    );
+
+    ai_compute_activity_sva sfu_activity_sva(
+        .clk          (aclk),
+        .resetn       (aresetn),
+        .wake         (dut.core_start && dut.tensor_sfu_op),
+        .busy         (dut.sfu_busy),
+        .done         (dut.compute_cluster_u.tensor_sfu_u.done),
+        .error        (dut.compute_cluster_u.tensor_sfu_u.error),
+        .spad_valid   (dut.sfu_spad_valid),
+        .cycle_count  (dut.compute_cluster_u.tensor_sfu_u.cycle_count),
+        .element_count(dut.compute_cluster_u.tensor_sfu_u.element_count)
+    );
+
+    ai_compute_activity_sva cnn_activity_sva(
+        .clk          (aclk),
+        .resetn       (aresetn),
+        .wake         (dut.core_start && dut.conv_linebuffer_op),
+        .busy         (dut.conv_busy),
+        .done         (dut.compute_cluster_u.conv_linebuffer_u.done),
+        .error        (dut.compute_cluster_u.conv_linebuffer_u.error),
+        .spad_valid   (dut.conv_spad_valid),
+        .cycle_count  (dut.compute_cluster_u.conv_linebuffer_u.cycle_count),
+        .element_count(dut.compute_cluster_u.conv_linebuffer_u.element_count)
+    );
+
+    ai_compute_activity_sva kv_activity_sva(
+        .clk          (aclk),
+        .resetn       (aresetn),
+        .wake         (dut.core_start && dut.kv_cache_op),
+        .busy         (dut.kv_busy),
+        .done         (dut.compute_cluster_u.kv_cache_u.done),
+        .error        (dut.compute_cluster_u.kv_cache_u.error),
+        .spad_valid   (dut.kv_spad_valid),
+        .cycle_count  (dut.compute_cluster_u.kv_cache_u.cycle_count),
+        .element_count(dut.compute_cluster_u.kv_cache_u.element_count)
+    );
+
     initial begin
         aclk = 1'b0;
-        forever #5 aclk = ~aclk;
+        begin : clock_setup
+            real aclk_period_ns;
+            aclk_period_ns = 10.0;
+            void'($value$plusargs("ACLK_PERIOD_NS=%f", aclk_period_ns));
+            if (aclk_period_ns <= 0.0)
+                $fatal(1, "ACLK_PERIOD_NS must be > 0, got %f", aclk_period_ns);
+            forever #(aclk_period_ns / 2.0) aclk = ~aclk;
+        end
     end
 
     `include "axi_lite_tasks.svh"
@@ -958,11 +1041,11 @@ module tb_ai_accel_smoke;
         aresetn = 1'b1;
         repeat (4) @(posedge aclk);
 
-        expect_read(REG_VERSION, 32'h1000_0008, "version");
-        expect_read(FPGA_AXI_BASE + REG_VERSION, 32'h1000_0008,
+        expect_read(REG_VERSION, 32'h1000_000a, "version");
+        expect_read(FPGA_AXI_BASE + REG_VERSION, 32'h1000_000a,
                     "mapped AXI aperture version");
-        expect_read(REG_ABI_INFO, 32'h1040_0207, "ABI v7.2 sizes");
-        expect_read(REG_CAP2, 32'h0000_003f, "architectural capabilities");
+        expect_read(REG_ABI_INFO, 32'h1040_0407, "ABI v7.4 sizes");
+        expect_read(REG_CAP2, 32'h0000_00ff, "architectural capabilities");
         expect_read(REG_ERROR_INFO, 32'h0000_0000, "reset error source");
         axi_write(REG_DMA_EXT_HI, 32'h0000_0001);
         expect_read(REG_DMA_EXT_HI, 32'h0000_0001, "DMA 64-bit address high");
@@ -1981,6 +2064,186 @@ module tb_ai_accel_smoke;
         axi_write(REG_CPLQ_SIZE, 32'd0);
         clear_done_irq();
 
+        // G2 BF16 dot product: packed BF16 inputs share one 32-bit SPAD port,
+        // then the FP32 result and completion traverse the existing command
+        // and completion lifecycle.  The second descriptor has one unsupported
+        // flag set and must fail validation without touching its output word.
+        axi_write(SPAD_BASE + 32'h7f00, 32'h40003f80); // A = {2.0, 1.0}
+        axi_write(SPAD_BASE + 32'h7f04, 32'h40804040); // B = {4.0, 3.0}
+        axi_write(SPAD_BASE + 32'h7f08, 32'hdead_c0de);
+        axi_write(SPAD_BASE + 32'h7f0c, 32'hbad0_f00d);
+        write_spad_desc_v3(32'h7e00, 8'h50, 16'h0500,
+                           32'h7f00, 32'h7f04, 32'd0, 32'h7f08,
+                           16'd1, 16'd1, 16'd2, 8'd0, 32'd0,
+                           5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                           16'd0, 16'd0, 16'd0, 16'd0, 16'd0);
+        axi_write(SPAD_BASE + 32'h7e3c, 32'd7);
+        write_spad_desc_v3(32'h7e40, 8'h50, 16'h0501,
+                           32'h7f00, 32'h7f04, 32'd0, 32'h7f0c,
+                           16'd1, 16'd1, 16'd1, 8'h01, 32'd0,
+                           5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                           16'd0, 16'd0, 16'd0, 16'd0, 16'd0);
+        axi_write(SPAD_BASE + 32'h7e7c, 32'd7);
+        axi_write(REG_CMDQ_CTRL, 32'd0);
+        axi_write(REG_CMDQ_BASE_LO, 32'h7e00);
+        axi_write(REG_CMDQ_SIZE, 32'd3);
+        axi_write(REG_CMDQ_HEAD, 32'd0);
+        axi_write(REG_CMDQ_TAIL, 32'd2);
+        axi_write(REG_CPLQ_BASE_LO, 32'h7e80);
+        axi_write(REG_CPLQ_SIZE, 32'd4);
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        axi_write(REG_CPLQ_TAIL, 32'd0);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd2, "G2 BF16 dot plus invalid descriptor");
+        expect_read(SPAD_BASE + 32'h7f08, 32'h4130_0000,
+                    "G2 BF16 dot FP32 result");
+        expect_read(SPAD_BASE + 32'h7f0c, 32'hbad0_f00d,
+                    "G2 invalid BF16 descriptor no write");
+        expect_completion(32'h7e80, 16'h0500, 4'h1, 4'd0,
+                          32'h4130_0000, 32'd2,
+                          "G2 BF16 dot completion");
+        expect_completion(32'h7e90, 16'h0501, 4'h2, 4'd7,
+                          32'd0, 32'd0,
+                          "G2 invalid BF16 descriptor completion");
+        expect_read(REG_CMDQ_HEAD, 32'd2, "G2 BF16 command head");
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CPLQ_SIZE, 32'd0);
+        clear_done_irq();
+
+        // A10 FP16 dot uses the same queued descriptor, scheduler-owned
+        // scratchpad port and shared completion writer as BF16. Packed FP16
+        // lanes compute 1*3 + 2*4 = 11.0 (0x41300000).
+        axi_write(SPAD_BASE + 32'h7f20, 32'h4000_3c00); // A = {2.0, 1.0}
+        axi_write(SPAD_BASE + 32'h7f24, 32'h4400_4200); // B = {4.0, 3.0}
+        axi_write(SPAD_BASE + 32'h7f28, 32'hface_f16d);
+        write_spad_desc_v3(32'h7e80, 8'h51, 16'h0502,
+                           32'h7f20, 32'h7f24, 32'd0, 32'h7f28,
+                           16'd1, 16'd1, 16'd2, 8'd0, 32'd0,
+                           5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                           16'd0, 16'd0, 16'd0, 16'd0, 16'd0);
+        axi_write(SPAD_BASE + 32'h7ebc, 32'd7);
+        axi_write(REG_CMDQ_BASE_LO, 32'h7e80);
+        axi_write(REG_CMDQ_SIZE, 32'd2);
+        axi_write(REG_CMDQ_HEAD, 32'd0);
+        axi_write(REG_CMDQ_TAIL, 32'd1);
+        axi_write(REG_CPLQ_BASE_LO, 32'h7ec0);
+        axi_write(REG_CPLQ_SIZE, 32'd2);
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        axi_write(REG_CPLQ_TAIL, 32'd0);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd1, "A10 FP16 dot descriptor");
+        expect_read(SPAD_BASE + 32'h7f28, 32'h4130_0000,
+                    "A10 FP16 dot FP32 result");
+        expect_completion(32'h7ec0, 16'h0502, 4'h1, 4'd0,
+                          32'h4130_0000, 32'd2,
+                          "A10 FP16 dot shared completion");
+        expect_read(REG_CMDQ_HEAD, 32'd1, "A10 FP16 command head");
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CPLQ_SIZE, 32'd0);
+        clear_done_irq();
+
+        // DDR -> DMA -> SPAD -> queued FP16 dot -> SPAD -> DMA -> DDR.
+        // Keep the command and shared completion path in the same transaction
+        // so this checks the full data path, not only the standalone engine.
+        axi_mem_u.mem[11'h680] = 32'h4000_3c00; // A = {2.0, 1.0}
+        axi_mem_u.mem[11'h684] = 32'h4400_4200; // B = {4.0, 3.0}
+        dma_load(32'h0000_1a00, 32'h0000_7f20, 16'd1);
+        dma_load(32'h0000_1a10, 32'h0000_7f24, 16'd1);
+        expect_read(SPAD_BASE + 32'h7f20, 32'h4000_3c00,
+                    "A10 DDR FP16 operand A load");
+        expect_read(SPAD_BASE + 32'h7f24, 32'h4400_4200,
+                    "A10 DDR FP16 operand B load");
+        axi_write(SPAD_BASE + 32'h7f28, 32'hface_f16d);
+        write_spad_desc_v3(32'h7e80, 8'h51, 16'h0503,
+                           32'h7f20, 32'h7f24, 32'd0, 32'h7f28,
+                           16'd1, 16'd1, 16'd2, 8'd0, 32'd0,
+                           5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                           16'd0, 16'd0, 16'd0, 16'd0, 16'd0);
+        axi_write(SPAD_BASE + 32'h7ebc, 32'd7);
+        axi_write(REG_CMDQ_BASE_LO, 32'h7e80);
+        axi_write(REG_CMDQ_SIZE, 32'd2);
+        axi_write(REG_CMDQ_HEAD, 32'd0);
+        axi_write(REG_CMDQ_TAIL, 32'd1);
+        axi_write(REG_CPLQ_BASE_LO, 32'h7ec0);
+        axi_write(REG_CPLQ_SIZE, 32'd2);
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        axi_write(REG_CPLQ_TAIL, 32'd0);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd1, "A10 DDR FP16 command completion");
+        expect_read(SPAD_BASE + 32'h7f28, 32'h4130_0000,
+                    "A10 DDR FP16 scratchpad result");
+        expect_completion(32'h7ec0, 16'h0503, 4'h1, 4'd0,
+                          32'h4130_0000, 32'd2,
+                          "A10 DDR FP16 shared completion");
+        dma_store(32'h0000_1a20, 32'h0000_7f28, 16'd1);
+        if (axi_mem_u.mem[11'h688] !== 32'h4130_0000) begin
+            $display("%0t ERROR: A10 DDR FP16 result store expected=41300000 actual=%08h",
+                     $time, axi_mem_u.mem[11'h688]);
+            errors = errors + 1;
+        end else begin
+            $display("%0t PASS: A10 DDR->SPAD->FP16->SPAD->DDR result=41300000", $time);
+        end
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CPLQ_SIZE, 32'd0);
+        clear_done_irq();
+
+        // Direct-register mode is also supported for the first FP opcode.
+        // Its configuration has no descriptor word, so unsupported fields
+        // must be rejected by the command processor before the engine starts.
+        axi_write(SPAD_BASE + 32'h7f10, 32'hface_b00c);
+        axi_write(REG_OP_MODE, 8'h50);
+        axi_write(REG_SRC0_BASE, 32'h7f00);
+        axi_write(REG_SRC1_BASE, 32'h7f04);
+        axi_write(REG_DST_BASE, 32'h7f10);
+        axi_write(REG_LENGTH, 32'd2);
+        axi_write(REG_M_SIZE, 32'd1);
+        axi_write(REG_N_SIZE, 32'd1);
+        axi_write(REG_K_WORDS, 32'd2);
+        axi_write(REG_BIAS_BASE, 32'd0);
+        axi_write(REG_POST_CTRL, 32'd0);
+        axi_write(REG_QUANT_ACT, 32'd0);
+        axi_write(REG_CTRL, 32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h7f10, 32'h4130_0000,
+                    "G2 direct BF16 dot output");
+        expect_read(REG_RESULT, 32'h4130_0000,
+                    "G2 direct BF16 dot result register");
+        expect_read(REG_CPLQ_TAIL, 32'd1,
+                    "G2 direct BF16 dot has no queue completion");
+        clear_done_irq();
+
+        // Direct-register mode also selects the shared FP16 engine.
+        axi_write(SPAD_BASE + 32'h7f30, 32'h0bad_f16d);
+        axi_write(REG_OP_MODE, 8'h51);
+        axi_write(REG_SRC0_BASE, 32'h7f20);
+        axi_write(REG_SRC1_BASE, 32'h7f24);
+        axi_write(REG_DST_BASE, 32'h7f30);
+        axi_write(REG_LENGTH, 32'd2);
+        axi_write(REG_M_SIZE, 32'd1);
+        axi_write(REG_N_SIZE, 32'd1);
+        axi_write(REG_K_WORDS, 32'd2);
+        axi_write(REG_BIAS_BASE, 32'd0);
+        axi_write(REG_POST_CTRL, 32'd0);
+        axi_write(REG_QUANT_ACT, 32'd0);
+        axi_write(REG_CTRL, 32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h7f30, 32'h4130_0000,
+                    "A10 direct FP16 dot output");
+        expect_read(REG_RESULT, 32'h4130_0000,
+                    "A10 direct FP16 dot result register");
+        clear_done_irq();
+
+        axi_write(SPAD_BASE + 32'h7f14, 32'hface_f00d);
+        axi_write(REG_OP_MODE, 8'h50);
+        axi_write(REG_DST_BASE, 32'h7f14);
+        axi_write(REG_POST_CTRL, 32'd1);
+        axi_write(REG_CTRL, 32'h0000_0003);
+        wait_done_expect_error(4'd7);
+        expect_read(SPAD_BASE + 32'h7f14, 32'hface_f00d,
+                    "G2 invalid direct BF16 config no write");
+        clear_done_irq();
+        axi_write(REG_POST_CTRL, 32'd0);
+
         // ABI-v7 end-to-end Transformer micro-workload generated by the
         // software mapper.  Unlike the macro smoke above, every intermediate
         // tensor is consumed by the following RTL command.  PACK_I8 closes
@@ -2093,7 +2356,7 @@ module tb_ai_accel_smoke;
         aresetn = 1'b1;
         repeat (6) @(posedge aclk);
         axi_mem_u.ready_gap_cfg = 0;
-        expect_read(REG_VERSION, 32'h1000_0008, "reset recovery version");
+        expect_read(REG_VERSION, 32'h1000_000a, "reset recovery version");
         axi_read(REG_DMA_STATUS, rd);
         if (rd[0] || axi_mem_u.read_active_r || m_axi_arvalid || m_axi_rvalid) begin
             $display("%0t ERROR: reset recovery left DMA/AXI read active", $time);

@@ -294,3 +294,43 @@ module ai_accel_sva #(
     end
 
 endmodule
+
+// Testbench-only activity checks for the individual compute engines.  The
+// counters are sampled every clock so that two adjacent quiescent samples
+// must retain the same values.  No check is made while reset is asserted.
+module ai_compute_activity_sva #(
+    parameter integer COUNT_WIDTH = 32
+)(
+    input wire                   clk,
+    input wire                   resetn,
+    input wire                   wake,
+    input wire                   busy,
+    input wire                   done,
+    input wire                   error,
+    input wire                   spad_valid,
+    input wire [COUNT_WIDTH-1:0] cycle_count,
+    input wire [COUNT_WIDTH-1:0] element_count
+);
+    wire active = wake || busy || done || error;
+    wire quiescent = !active;
+
+    // Concurrent checks are disabled throughout reset.  The reset guard in
+    // the antecedent also avoids using an uninitialized $past sample on the
+    // first cycle after reset release.
+    property p_quiescent_no_spad;
+        @(posedge clk) disable iff (!resetn)
+            quiescent |-> !spad_valid;
+    endproperty
+
+    property p_quiescent_counters_stable;
+        @(posedge clk) disable iff (!resetn)
+            (quiescent && $past(quiescent && resetn)) |->
+            ((cycle_count == $past(cycle_count)) &&
+             (element_count == $past(element_count)));
+    endproperty
+
+    assert property (p_quiescent_no_spad)
+        else $fatal(1, "SVA FAIL: compute activity spad_valid asserted while quiescent");
+    assert property (p_quiescent_counters_stable)
+        else $fatal(1, "SVA FAIL: compute counters changed across quiescent cycles");
+endmodule

@@ -1,4 +1,9 @@
 ../../../rtl/control/axi_lite/axi_lite_reg_if.v
+../../../rtl/control/cdc/ai_async_fifo.v
+../../../rtl/control/cdc/ai_ctrl_compute_cdc.v
+../../../rtl/control/cdc/ai_accel_dual_clock_shell.v
+../../../rtl/control/cdc/ai_cdc_event_buffer.v
+../../../rtl/control/cdc/ai_accel_dual_clock_command_path.v
 ../../../rtl/dma/ai_dma_burst_planner.v
 ../../../rtl/dma/ai_dma_read_slot_tracker.v
 ../../../rtl/dma/ai_dma_write_response_tracker.v
@@ -29,6 +34,13 @@
 ../../../rtl/control/queue/ai_completion_writer.v
 ../../../rtl/control/axi_lite/ai_accel_regs.v
 ../../../rtl/compute/int8/ai_int8_datapath.v
+../../../rtl/compute/fp/ai_bf16_mul_fp32.v
+../../../rtl/compute/fp/ai_fp16_mul_fp32.v
+../../../rtl/compute/fp/ai_fp32_add.v
+../../../rtl/compute/fp/ai_fp32_accumulator.v
+../../../rtl/compute/fp/ai_mixed_precision_dot_fp32_core.v
+../../../rtl/compute/fp/ai_bf16_dot_fp32_core.v
+../../../rtl/compute/fp/ai_fp16_bf16_addsub.v
 ../../../rtl/compute/int8/ai_int8_compute_core.v
 ../../../rtl/top/fabric/axi/ai_descriptor_source_mux.v
 ../../../rtl/top/fabric/axi/ai_accel_dma_request_mux.v

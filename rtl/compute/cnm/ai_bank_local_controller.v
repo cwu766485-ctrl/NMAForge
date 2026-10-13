@@ -41,6 +41,9 @@ module ai_bank_local_controller #(
     // is received.  A's low K bit is therefore the ping-pong selector.
     wire       select_a_buffer1 = k_r[0];
     wire [31:0] a_word = select_a_buffer1 ? a_buf1_r : a_buf0_r;
+    // Enable the PE only on the same B-response beat that updates the local
+    // accumulator and compute-event counter.  All other cycles are isolated.
+    wire compute_enable = (state_r == ST_WAIT_B) && rsp_valid && !rsp_parity_error;
     wire signed [31:0] partial_sum;
     wire signed [63:0] sum_next = local_sum + {{32{partial_sum[31]}},partial_sum};
 
@@ -53,7 +56,8 @@ module ai_bank_local_controller #(
     wire [31:0] next_a_addr = src0_r + next_k_byte_offset + lane_offset;
     wire waiting_for_response = (state_r == ST_WAIT_A) || (state_r == ST_WAIT_B);
 
-    ai_bank_pe local_pe(.act_word(a_word), .weight_word(rsp_data), .partial_sum(partial_sum));
+    ai_bank_pe local_pe(.act_word(a_word), .weight_word(rsp_data),
+                        .compute_enable(compute_enable), .partial_sum(partial_sum));
 
     always @(*) begin
         req_valid = 1'b0;

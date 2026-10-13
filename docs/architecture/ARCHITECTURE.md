@@ -1,6 +1,6 @@
 # NMAForge 架构说明
 
-**状态：2026-08-27 的 RTL/验证基线。** 本文描述已接入 `ai_accel_top` 的结构；
+**状态：2026-10-13 的 RTL/验证基线。** 本文描述已接入 `ai_accel_top` 的结构；
 不把规划中的 UVM、后布局签核或实板验收写成已完成能力。
 
 ## 1. 项目范围
@@ -38,6 +38,7 @@ DDR <== 128-bit AXI4 ==> ai_axi128_dma <==> ai_spad_arbiter <==> ai_scratchpad
   校验、计算启动和完成排序。软件发布 `CMDQ_TAIL`，并消费后推进 `CPLQ_HEAD`。
 - `ai_spad_arbiter` 是 scheduler-side scratchpad 的唯一拥有者。descriptor/completion
   保持控制面优先；scalar/line/banked compute 与 DMA 在数据面 round-robin；禁止顶层 bypass mux。
+  BF16/FP16 dot 共用现有 arbiter-owned 32-bit core SPAD 口，不增加 scratchpad bypass。
 - `ai_completion_writer` 必须先提交四个 32-bit completion word，才能发布新的 `CPLQ_TAIL`。
 - `ai_desc_fetch` 读取片上描述符，`axi_desc_fetch` 读取外部描述符；命令期间来源固定。
 
@@ -149,9 +150,18 @@ arbiter-owned scheduler port，以及 scalar/banked/128-bit line 操作。VCS �
 ## 5. 计算和 ABI
 
 描述符 ABI 支持 scalar/banked INT8 VDOT、GEMV、GEMM、4×4 tensor GEMM/batched GEMM、
-requant、GELU、SiLU、residual、LayerNorm/RMSNorm、Softmax/causal Softmax、Conv3x3
-line-buffer 和 KV-cache primitive。ABI v7.2 增加了 PACK_I8 layout bridge，供
-`sw/tools/cimforge_mapper.py` 形成真实的 Transformer 微型命令链：
+`0x50 BF16_DOT_ACC_FP32`、`0x51 FP16_DOT_ACC_FP32`、requant、GELU、SiLU、residual、LayerNorm/RMSNorm、
+Softmax/causal Softmax、Conv3x3 line-buffer 和 KV-cache primitive。A9/ABI v7.3
+定义 `0x50` BF16 点积；A10/ABI v7.4 保留 `0x50` 并增加 `0x51` FP16 点积，均沿用
+既有 64-byte descriptor 布局，validator 检查命令字段约束。两个格式经唯一
+arbiter-owned 32-bit core SPAD 口按 A word、B word 顺序读取 packed operands，每次最多
+保留一个未完成的 scratchpad 读请求；每个有效元素的 FP32 乘积按递增序号进入
+非融合 FP32 累加，最后将一个 32-bit FP32 word 写回 descriptor 指定的目的地址。
+它们复用既有 `ai_command_processor` 命令生命周期和 `ai_completion_writer` 完成提交
+路径，不新增 scratchpad bypass，也不改变 completion ABI。
+
+ABI v7.2 曾增加 PACK_I8 layout bridge，现有 `sw/tools/cimforge_mapper.py` 可用它形成
+Transformer 微型命令链：
 
 ```text
 Q/K/V -> QK^T -> causal/row Softmax -> AV -> projection
@@ -164,6 +174,8 @@ Q/K/V -> QK^T -> causal/row Softmax -> AV -> projection
 
 | 项目 | 最新结果 | 边界 |
 |---|---|---|
+| Mixed-precision dot | `0x50` BF16 与 `0x51` FP16 共用 dot core；VCS top smoke 检查结果与 shared completion | 双 seed UVM/URG：每 seed 162/162（142 数值、14 期望错误、6 reset），成功数值 covergroup 100%，`state_r` 23/23 转移命中；`pending_error_r` 13/18、部分 condition/branch coverage disposition 与 FP PPA 仍开放 |
+| FP16 DDR end-to-end | top smoke 经 DMA load、queued descriptor、FP16 result/completion、DMA store；结果为 `0x41300000` | compact AXI memory model 的 directed smoke，不等价于 DDR PHY/board validation |
 | VCS smoke/随机 | `make ai_smoke`、`ai_comp`、`ai_run` 基线通过 | 尚非 UVM coverage closure |
 | Control block UVM | 2026-08-27：6 项回归均为 `UVM_ERROR=0`、`UVM_FATAL=0` | 已覆盖 reset/version、协议、IRQ/error、busy/abort、随机 RW、RAL；尚非 coverage closure |
 | CNM A1/A2/A3.1 | A2 四 lane PASS；A3.1 benchmark PASS | 受控 workload，需继续 UVM 对拍 |
@@ -197,6 +209,8 @@ Q/K/V -> QK^T -> causal/row Softmax -> AV -> projection
 | CNM 核 | `ai_banked_cnm_core` | 是 | opcode `0x20/0x21` 的四 bank CNM VDOT/GEMV 顶层。 |
 | Local Controller | `ai_bank_local_controller` | 是，CNM 内 4 个实例 | 每个 bank 自己产生地址、等待读响应、预取、双缓冲、局部累加。 |
 | Local PE | `ai_bank_pe` | 是，CNM/基线核子模块 | 一个 32-bit packed INT8 dot4 乘加单元。 |
+| 混合精度点积核 | `ai_mixed_precision_dot_fp32_core` | 是 | `0x50` BF16 与 `0x51` FP16 共享控制、arbiter-owned 32-bit core SPAD 口和 FP32 顺序累加；按序读 A/B 并写回一个结果 word。 |
+| BF16 兼容包装器 | `ai_bf16_dot_fp32_core` | 否（兼容/独立验证） | 固定选择 BF16 格式的旧接口包装器；顶层产品路径使用混合精度核心。 |
 | 矩阵核 | `ai_tensor_matrix_core` | 是 | 4×4 INT8 matrix tile，支持 GEMM、Batch GEMM、转置、bias、激活、量化与 line 写回。 |
 | SFU | `ai_tensor_sfu_core` | 是 | Softmax、causal Softmax、RMSNorm、LayerNorm、Residual、GELU、SiLU、requant。 |
 | 除法器 | `ai_unsigned_divider` | 是，SFU 子模块 | 用于 Softmax 归一化等定点除法。 |

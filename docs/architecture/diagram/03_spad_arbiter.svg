@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 760" role="img" aria-labelledby="title desc">
+ <title id="title">SPAD 仲裁器</title><desc id="desc">控制面严格优先，数据面三类客户轮询，响应按客户标签返回。</desc>
+ <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#111827"/></marker><style><![CDATA[
+ text{font-family:"Segoe UI","Microsoft YaHei",Arial,sans-serif;fill:#111827}.title{font-size:30px;font-weight:750}.sub{font-size:14px;fill:#64748B}.box{fill:#FFF2CC;stroke:#D6A43B;stroke-width:1.5}.client{fill:#F8FAFC;stroke:#64748B;stroke-width:1.4}.mem{fill:#F4CCCC;stroke:#C96B6B;stroke-width:1.4}.name{font-size:18px;font-weight:650}.note{font-size:13px;fill:#475569}.stage{font-size:17px;font-weight:700}.line{stroke:#111827;stroke-width:1.7;fill:none;marker-end:url(#a)}.bi{stroke:#111827;stroke-width:1.7;fill:none;marker-start:url(#a);marker-end:url(#a)}.boundary{fill:none;stroke:#111827;stroke-width:1.5;stroke-dasharray:6 5}.sep{stroke:#6B8BC3;stroke-width:3;stroke-dasharray:10 8}
+ ]]></style></defs><rect width="1500" height="760" fill="#FFF"/>
+ <text x="48" y="48" class="title">SPAD Arbiter：谁能访问片上存储</text><text x="48" y="75" class="sub">控制面 Descriptor / Completion 严格优先；数据面 Core / Banked / DMA 轮询</text>
+ <rect x="65" y="110" width="1370" height="575" class="boundary"/><line x1="390" y1="110" x2="390" y2="685" class="sep"/><line x1="745" y1="110" x2="745" y2="685" class="sep"/><line x1="1085" y1="110" x2="1085" y2="685" class="sep"/>
+
+ <rect x="95" y="150" width="230" height="75" rx="3" class="client"/><text x="210" y="181" text-anchor="middle" class="name">Descriptor Fetch</text><text x="210" y="206" text-anchor="middle" class="note">最高优先级</text>
+ <rect x="95" y="245" width="230" height="75" rx="3" class="client"/><text x="210" y="276" text-anchor="middle" class="name">Completion Writer</text><text x="210" y="301" text-anchor="middle" class="note">第二优先级</text>
+ <rect x="95" y="365" width="230" height="75" rx="3" class="client"/><text x="210" y="396" text-anchor="middle" class="name">Core / Line</text><text x="210" y="421" text-anchor="middle" class="note">Scalar · Matrix · SFU · CNN · KV</text>
+ <rect x="95" y="460" width="230" height="75" rx="3" class="client"/><text x="210" y="491" text-anchor="middle" class="name">Banked / CNM</text><text x="210" y="516" text-anchor="middle" class="note">4-lane 请求</text>
+ <rect x="95" y="555" width="230" height="75" rx="3" class="client"/><text x="210" y="586" text-anchor="middle" class="name">DMA</text><text x="210" y="611" text-anchor="middle" class="note">32-bit / 128-bit line</text>
+
+ <path d="M325 187H420V260H445" class="line"/><path d="M325 282H445" class="line"/><path d="M325 402H445V335" class="line"/><path d="M325 497H470V355" class="line"/><path d="M325 592H495V375" class="line"/>
+ <rect x="445" y="230" width="235" height="165" rx="3" class="box"/><text x="562" y="271" text-anchor="middle" class="name">优先级选择</text><text x="562" y="303" text-anchor="middle" class="note">1. Descriptor</text><text x="562" y="329" text-anchor="middle" class="note">2. Completion</text><text x="562" y="355" text-anchor="middle" class="note">3. 数据面 RR 候选</text><text x="562" y="378" text-anchor="middle" class="note">组合选择 · valid &amp;&amp; ready 提交</text>
+
+ <rect x="795" y="230" width="235" height="165" rx="3" class="box"/><text x="912" y="271" text-anchor="middle" class="name">请求格式选择</text><text x="912" y="303" text-anchor="middle" class="note">Scalar 32-bit</text><text x="912" y="329" text-anchor="middle" class="note">Line 128-bit</text><text x="912" y="355" text-anchor="middle" class="note">Banked / CNM 4-lane</text><text x="912" y="378" text-anchor="middle" class="note">记录 client tag</text>
+ <path d="M680 312H795" class="line"/><text x="737" y="297" text-anchor="middle" class="note">grant</text>
+
+ <rect x="1140" y="225" width="235" height="180" rx="3" class="mem"/><text x="1257" y="266" text-anchor="middle" class="name">4-bank Scratchpad</text><text x="1257" y="296" text-anchor="middle" class="note">registered read</text><text x="1257" y="322" text-anchor="middle" class="note">scalar / line / banked port</text><text x="1257" y="348" text-anchor="middle" class="note">protection + parity</text><text x="1257" y="378" text-anchor="middle" class="note">512 KiB</text>
+ <path d="M1030 312H1140" class="bi"/><text x="1085" y="297" text-anchor="middle" class="note">request / response</text>
+
+ <rect x="795" y="470" width="235" height="95" rx="3" class="box"/><text x="912" y="506" text-anchor="middle" class="name">响应标签流水</text><text x="912" y="535" text-anchor="middle" class="note">两周期后返回对应客户</text>
+ <path d="M1257 405V517H1030" class="line"/><path d="M795 517H650V630H325" class="line"/><text x="560" y="615" text-anchor="middle" class="note">rsp_valid · data · error · client tag</text>
+ <text x="227" y="660" text-anchor="middle" class="stage">Stage 1 · 客户请求</text><text x="562" y="660" text-anchor="middle" class="stage">Stage 2 · 优先级 / RR</text><text x="912" y="660" text-anchor="middle" class="stage">Stage 3 · 端口与标签</text><text x="1257" y="660" text-anchor="middle" class="stage">Stage 4 · SRAM</text>
+</svg>

@@ -13,6 +13,7 @@ module ai_tensor_matrix_datapath(
     input  wire [1:0]  lane,
     input  wire        transpose_a,
     input  wire        transpose_b,
+    input  wire        mac_enable,
 
     output wire signed [7:0] a_lane0,
     output wire signed [7:0] a_lane1,
@@ -136,22 +137,33 @@ module ai_tensor_matrix_datapath(
     assign b_lane2 = tile_elem(b0, b1, b2, b3, 2'd2, lane, transpose_b);
     assign b_lane3 = tile_elem(b0, b1, b2, b3, 2'd3, lane, transpose_b);
 
-    assign product0  = a_lane0 * b_lane0;
-    assign product1  = a_lane0 * b_lane1;
-    assign product2  = a_lane0 * b_lane2;
-    assign product3  = a_lane0 * b_lane3;
-    assign product4  = a_lane1 * b_lane0;
-    assign product5  = a_lane1 * b_lane1;
-    assign product6  = a_lane1 * b_lane2;
-    assign product7  = a_lane1 * b_lane3;
-    assign product8  = a_lane2 * b_lane0;
-    assign product9  = a_lane2 * b_lane1;
-    assign product10 = a_lane2 * b_lane2;
-    assign product11 = a_lane2 * b_lane3;
-    assign product12 = a_lane3 * b_lane0;
-    assign product13 = a_lane3 * b_lane1;
-    assign product14 = a_lane3 * b_lane2;
-    assign product15 = a_lane3 * b_lane3;
+    // Isolate the multiplier inputs outside MAC cycles.  Post-processing below
+    // remains active for writeback and therefore is intentionally ungated.
+    wire signed [7:0] a_mul_lane0 = mac_enable ? a_lane0 : 8'sd0;
+    wire signed [7:0] a_mul_lane1 = mac_enable ? a_lane1 : 8'sd0;
+    wire signed [7:0] a_mul_lane2 = mac_enable ? a_lane2 : 8'sd0;
+    wire signed [7:0] a_mul_lane3 = mac_enable ? a_lane3 : 8'sd0;
+    wire signed [7:0] b_mul_lane0 = mac_enable ? b_lane0 : 8'sd0;
+    wire signed [7:0] b_mul_lane1 = mac_enable ? b_lane1 : 8'sd0;
+    wire signed [7:0] b_mul_lane2 = mac_enable ? b_lane2 : 8'sd0;
+    wire signed [7:0] b_mul_lane3 = mac_enable ? b_lane3 : 8'sd0;
+
+    assign product0  = a_mul_lane0 * b_mul_lane0;
+    assign product1  = a_mul_lane0 * b_mul_lane1;
+    assign product2  = a_mul_lane0 * b_mul_lane2;
+    assign product3  = a_mul_lane0 * b_mul_lane3;
+    assign product4  = a_mul_lane1 * b_mul_lane0;
+    assign product5  = a_mul_lane1 * b_mul_lane1;
+    assign product6  = a_mul_lane1 * b_mul_lane2;
+    assign product7  = a_mul_lane1 * b_mul_lane3;
+    assign product8  = a_mul_lane2 * b_mul_lane0;
+    assign product9  = a_mul_lane2 * b_mul_lane1;
+    assign product10 = a_mul_lane2 * b_mul_lane2;
+    assign product11 = a_mul_lane2 * b_mul_lane3;
+    assign product12 = a_mul_lane3 * b_mul_lane0;
+    assign product13 = a_mul_lane3 * b_mul_lane1;
+    assign product14 = a_mul_lane3 * b_mul_lane2;
+    assign product15 = a_mul_lane3 * b_mul_lane3;
 
     assign post_scalar = post_process(scalar_acc, scalar_bias,
                                       scale_shift, activation);

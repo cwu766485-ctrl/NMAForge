@@ -12,7 +12,9 @@ module ai_accel_opcode_decode (
     output wire       is_tensor_matrix,
     output wire       is_tensor_sfu,
     output wire       is_cnn_kv,
-    output wire       is_macro
+    output wire       is_macro,
+    output wire       is_bf16_dot,
+    output wire       is_fp16_dot
 );
 
     assign is_int8         = (op >= 8'h10) && (op <= 8'h17);
@@ -21,8 +23,11 @@ module ai_accel_opcode_decode (
     assign is_tensor_sfu   = (op >= 8'h32) && (op <= 8'h39);
     assign is_cnn_kv       = (op == 8'h43) || (op == 8'h44);
     assign is_macro        = (op >= 8'h40) && (op <= 8'h42);
+    assign is_bf16_dot     = (op == 8'h50);
+    assign is_fp16_dot     = (op == 8'h51);
 
     assign op_valid = is_int8 || is_banked || is_tensor_matrix ||
-                      is_tensor_sfu || is_cnn_kv || is_macro;
+                      is_tensor_sfu || is_cnn_kv || is_macro ||
+                      is_bf16_dot || is_fp16_dot;
 
 endmodule

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 720" role="img" aria-labelledby="title desc">
+  <title id="title">NMAForge 命令生命周期</title>
+  <desc id="desc">命令从提交、取描述符、执行到完成提交的顺序流程。</desc>
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#111827"/></marker>
+    <style><![CDATA[
+      text{font-family:"Segoe UI","Microsoft YaHei",Arial,sans-serif;fill:#111827}.title{font-size:30px;font-weight:750}.sub{font-size:14px;fill:#64748B}
+      .box{fill:#FFF2CC;stroke:#D6A43B;stroke-width:1.5}.side{fill:#F4CCCC;stroke:#C96B6B;stroke-width:1.4}
+      .name{font-size:18px;font-weight:650}.note{font-size:13px;fill:#475569}.stage{font-size:17px;font-weight:700}
+      .line{stroke:#111827;stroke-width:1.7;fill:none;marker-end:url(#a)}.bi{stroke:#111827;stroke-width:1.7;fill:none;marker-start:url(#a);marker-end:url(#a)}
+      .boundary{fill:none;stroke:#111827;stroke-width:1.5;stroke-dasharray:6 5}.sep{stroke:#6B8BC3;stroke-width:3;stroke-dasharray:10 8}
+    ]]></style>
+  </defs>
+  <rect width="1500" height="720" fill="#FFF"/>
+  <text x="48" y="48" class="title">命令生命周期：一条任务怎样跑完</text>
+  <text x="48" y="75" class="sub">队列指针只由 Command Processor 推进；Completion Writer 只负责写满四个 word</text>
+  <rect x="65" y="110" width="1370" height="535" class="boundary"/>
+  <line x1="345" y1="110" x2="345" y2="645" class="sep"/><line x1="625" y1="110" x2="625" y2="645" class="sep"/>
+  <line x1="905" y1="110" x2="905" y2="645" class="sep"/><line x1="1185" y1="110" x2="1185" y2="645" class="sep"/>
+
+  <rect x="95" y="235" width="210" height="115" rx="3" class="box"/>
+  <text x="200" y="276" text-anchor="middle" class="name">CMDQ 检查</text><text x="200" y="305" text-anchor="middle" class="note">tail ≠ head · CPLQ 有空间</text><text x="200" y="330" text-anchor="middle" class="note">Doorbell / Submit</text>
+  <rect x="375" y="225" width="220" height="135" rx="3" class="box"/>
+  <text x="485" y="264" text-anchor="middle" class="name">Descriptor Fetch</text><text x="485" y="293" text-anchor="middle" class="note">片上 SPAD 或外部 DDR</text><text x="485" y="318" text-anchor="middle" class="note">统一返回 64-byte 字段</text><text x="485" y="342" text-anchor="middle" class="note">ai_desc_fetch / axi_desc_fetch</text>
+  <rect x="655" y="225" width="220" height="135" rx="3" class="box"/>
+  <text x="765" y="264" text-anchor="middle" class="name">Decode + Validate</text><text x="765" y="293" text-anchor="middle" class="note">opcode · dimensions · alignment</text><text x="765" y="318" text-anchor="middle" class="note">dependency · protection · abort</text><text x="765" y="342" text-anchor="middle" class="note">descriptor_validator</text>
+  <rect x="935" y="225" width="220" height="135" rx="3" class="box"/>
+  <text x="1045" y="264" text-anchor="middle" class="name">Launch + Wait</text><text x="1045" y="293" text-anchor="middle" class="note">选择一个计算引擎</text><text x="1045" y="318" text-anchor="middle" class="note">等待 done / error / abort</text><text x="1045" y="342" text-anchor="middle" class="note">ST_RUN / ST_TILE</text>
+  <rect x="1215" y="225" width="190" height="135" rx="3" class="box"/>
+  <text x="1310" y="264" text-anchor="middle" class="name">Commit</text><text x="1310" y="293" text-anchor="middle" class="note">写 4-word CPLQ Entry</text><text x="1310" y="318" text-anchor="middle" class="note">writer done 后推进 tail</text><text x="1310" y="342" text-anchor="middle" class="note">IRQ / Event</text>
+
+  <path d="M305 292H375" class="line"/><path d="M595 292H655" class="line"/><path d="M875 292H935" class="line"/><path d="M1155 292H1215" class="line"/>
+  <text x="340" y="278" text-anchor="middle" class="note">start</text><text x="625" y="278" text-anchor="middle" class="note">fields</text><text x="905" y="278" text-anchor="middle" class="note">valid</text><text x="1185" y="278" text-anchor="middle" class="note">result</text>
+
+  <rect x="390" y="435" width="190" height="85" rx="3" class="side"/><text x="485" y="468" text-anchor="middle" class="name">描述符来源</text><text x="485" y="496" text-anchor="middle" class="note">SPAD / DDR 二选一</text>
+  <path d="M485 435V360" class="bi"/>
+  <rect x="950" y="435" width="190" height="85" rx="3" class="side"/><text x="1045" y="468" text-anchor="middle" class="name">Tile Pipeline</text><text x="1045" y="496" text-anchor="middle" class="note">Load / Compute / Store</text>
+  <path d="M1045 435V360" class="bi"/>
+  <rect x="1215" y="435" width="190" height="85" rx="3" class="side"/><text x="1310" y="468" text-anchor="middle" class="name">Completion Writer</text><text x="1310" y="496" text-anchor="middle" class="note">只写数据，不拥有 tail</text>
+  <path d="M1310 435V360" class="bi"/>
+
+  <text x="200" y="612" text-anchor="middle" class="stage">Stage 1 · Submit</text><text x="485" y="612" text-anchor="middle" class="stage">Stage 2 · Fetch</text>
+  <text x="765" y="612" text-anchor="middle" class="stage">Stage 3 · Decode</text><text x="1045" y="612" text-anchor="middle" class="stage">Stage 4 · Execute</text>
+  <text x="1310" y="612" text-anchor="middle" class="stage">Stage 5 · Complete</text>
+</svg>

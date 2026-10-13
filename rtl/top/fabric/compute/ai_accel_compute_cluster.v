@@ -105,7 +105,13 @@ module ai_accel_compute_cluster (
     output wire [31:0] scalar_spad_addr,
     output wire [31:0] scalar_spad_wdata,
 
+    output wire        fp_spad_valid,
+    output wire        fp_spad_write,
+    output wire [31:0] fp_spad_addr,
+    output wire [31:0] fp_spad_wdata,
+
     output wire        scalar_busy,
+    output wire        fp_busy,
     output wire        banked_busy,
     output wire        matrix_busy,
     output wire        sfu_busy,
@@ -126,6 +132,9 @@ module ai_accel_compute_cluster (
     wire        scalar_done, scalar_error;
     wire [3:0]  scalar_error_code;
     wire [31:0] scalar_result, scalar_cycle_count, scalar_element_count;
+    wire        fp_done, fp_error;
+    wire [3:0]  fp_error_code;
+    wire [31:0] fp_result, fp_cycle_count, fp_element_count;
     wire        banked_done, banked_error;
     wire [3:0]  banked_error_code;
     wire [31:0] banked_result, banked_cycle_count, banked_element_count;
@@ -142,21 +151,21 @@ module ai_accel_compute_cluster (
     wire [3:0]  kv_error_code;
     wire [31:0] kv_result, kv_cycle_count, kv_element_count;
 
-    assign core_busy = scalar_busy || banked_busy || matrix_busy || sfu_busy || conv_busy || kv_busy;
-    assign core_done = scalar_done || banked_done || matrix_done || sfu_done || conv_done || kv_done;
-    assign core_error = conv_done ? conv_error : kv_done ? kv_error : matrix_done ? matrix_error :
+    assign core_busy = scalar_busy || fp_busy || banked_busy || matrix_busy || sfu_busy || conv_busy || kv_busy;
+    assign core_done = scalar_done || fp_done || banked_done || matrix_done || sfu_done || conv_done || kv_done;
+    assign core_error = fp_done ? fp_error : conv_done ? conv_error : kv_done ? kv_error : matrix_done ? matrix_error :
                         sfu_done ? sfu_error :
                         banked_done ? banked_error : scalar_error;
-    assign core_error_code = conv_done ? conv_error_code : kv_done ? kv_error_code : matrix_done ? matrix_error_code :
+    assign core_error_code = fp_done ? fp_error_code : conv_done ? conv_error_code : kv_done ? kv_error_code : matrix_done ? matrix_error_code :
                              sfu_done ? sfu_error_code :
                              banked_done ? banked_error_code : scalar_error_code;
-    assign core_result = conv_done ? conv_result : kv_done ? kv_result : matrix_done ? matrix_result :
+    assign core_result = fp_done ? fp_result : conv_done ? conv_result : kv_done ? kv_result : matrix_done ? matrix_result :
                          sfu_done ? sfu_result :
                          banked_done ? banked_result : scalar_result;
-    assign core_cycle_count = conv_done ? conv_cycle_count : kv_done ? kv_cycle_count : matrix_done ? matrix_cycle_count :
+    assign core_cycle_count = fp_done ? fp_cycle_count : conv_done ? conv_cycle_count : kv_done ? kv_cycle_count : matrix_done ? matrix_cycle_count :
                               sfu_done ? sfu_cycle_count :
                               banked_done ? banked_cycle_count : scalar_cycle_count;
-    assign core_element_count = conv_done ? conv_element_count : kv_done ? kv_element_count : matrix_done ? matrix_element_count :
+    assign core_element_count = fp_done ? fp_element_count : conv_done ? conv_element_count : kv_done ? kv_element_count : matrix_done ? matrix_element_count :
                                 sfu_done ? sfu_element_count :
                                 banked_done ? banked_element_count : scalar_element_count;
 
@@ -260,10 +269,30 @@ module ai_accel_compute_cluster (
         .result(kv_result), .cycle_count(kv_cycle_count), .element_count(kv_element_count)
     );
 
+    // First mixed-precision product engine.  It shares the scheduler-side
+    // 32-bit core SPAD port and never bypasses ai_spad_arbiter.
+    ai_mixed_precision_dot_fp32_core mixed_precision_dot_core_u(
+        .clk(aclk), .resetn(aresetn),
+        .start(core_start && ((launch_op == 8'h50) ||
+                              (launch_op == 8'h51))),
+        .format_fp16(launch_op == 8'h51), .abort(core_abort),
+        .src0_base(launch_src0), .src1_base(launch_src1), .dst_base(launch_dst),
+        .length(launch_length), .watchdog_limit(watchdog_limit),
+        .spad_valid(fp_spad_valid), .spad_write(fp_spad_write),
+        .spad_addr(fp_spad_addr), .spad_wdata(fp_spad_wdata),
+        .spad_ready(arb_core_ready), .spad_rsp_valid(core_rsp_valid),
+        .spad_rdata(arb_rsp_rdata),
+        .spad_parity_error(core_rsp_error || core_spad_parity_error),
+        .spad_protection_error(compute_prot_error),
+        .busy(fp_busy), .done(fp_done), .error(fp_error),
+        .error_code(fp_error_code), .result(fp_result),
+        .cycle_count(fp_cycle_count), .element_count(fp_element_count)
+    );
+
     ai_int8_compute_core core_u(
         .clk                (aclk),
         .resetn             (aresetn),
-        .start              (core_start && !banked_op && !tensor_matrix_op && !tensor_sfu_op && !conv_linebuffer_op && !kv_cache_op),
+        .start              (core_start && !banked_op && !tensor_matrix_op && !tensor_sfu_op && !conv_linebuffer_op && !kv_cache_op && (launch_op != 8'h50) && (launch_op != 8'h51)),
         .abort              (core_abort),
         .op_mode            (launch_op),
         .src0_base          (launch_src0),

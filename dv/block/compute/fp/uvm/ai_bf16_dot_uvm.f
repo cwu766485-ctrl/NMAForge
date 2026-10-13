@@ -1,0 +1,10 @@
++incdir+../uvm
+../../../../../rtl/compute/fp/ai_bf16_mul_fp32.v
+../../../../../rtl/compute/fp/ai_fp16_mul_fp32.v
+../../../../../rtl/compute/fp/ai_fp32_add.v
+../../../../../rtl/compute/fp/ai_fp32_accumulator.v
+../../../../../rtl/compute/fp/ai_mixed_precision_dot_fp32_core.v
+../../../../../rtl/compute/fp/ai_bf16_dot_fp32_core.v
+../uvm/ai_bf16_dot_if.sv
+../uvm/ai_bf16_dot_uvm_pkg.sv
+../uvm/tb_ai_bf16_dot_uvm.sv

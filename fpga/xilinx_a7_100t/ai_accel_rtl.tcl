@@ -1,5 +1,10 @@
 set AI_ACCEL_RTL_FILES [list \
     "$REPO_ROOT/rtl/control/axi_lite/axi_lite_reg_if.v" \
+    "$REPO_ROOT/rtl/control/cdc/ai_async_fifo.v" \
+    "$REPO_ROOT/rtl/control/cdc/ai_ctrl_compute_cdc.v" \
+    "$REPO_ROOT/rtl/control/cdc/ai_accel_dual_clock_shell.v" \
+    "$REPO_ROOT/rtl/control/cdc/ai_cdc_event_buffer.v" \
+    "$REPO_ROOT/rtl/control/cdc/ai_accel_dual_clock_command_path.v" \
     "$REPO_ROOT/rtl/dma/ai_dma_burst_planner.v" \
     "$REPO_ROOT/rtl/dma/ai_dma_read_slot_tracker.v" \
     "$REPO_ROOT/rtl/dma/ai_dma_write_response_tracker.v" \
@@ -30,6 +35,13 @@ set AI_ACCEL_RTL_FILES [list \
     "$REPO_ROOT/rtl/control/queue/ai_completion_writer.v" \
     "$REPO_ROOT/rtl/control/axi_lite/ai_accel_regs.v" \
     "$REPO_ROOT/rtl/compute/int8/ai_int8_datapath.v" \
+    "$REPO_ROOT/rtl/compute/fp/ai_bf16_mul_fp32.v" \
+    "$REPO_ROOT/rtl/compute/fp/ai_fp16_mul_fp32.v" \
+    "$REPO_ROOT/rtl/compute/fp/ai_fp32_add.v" \
+    "$REPO_ROOT/rtl/compute/fp/ai_fp32_accumulator.v" \
+    "$REPO_ROOT/rtl/compute/fp/ai_mixed_precision_dot_fp32_core.v" \
+    "$REPO_ROOT/rtl/compute/fp/ai_bf16_dot_fp32_core.v" \
+    "$REPO_ROOT/rtl/compute/fp/ai_fp16_bf16_addsub.v" \
     "$REPO_ROOT/rtl/compute/int8/ai_int8_compute_core.v" \
     "$REPO_ROOT/rtl/top/fabric/axi/ai_descriptor_source_mux.v" \
     "$REPO_ROOT/rtl/top/fabric/axi/ai_accel_dma_request_mux.v" \

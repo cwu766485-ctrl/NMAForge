@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Usage: ./run_spyglass_a8.sh {lint|cdc|rdc|all}
+# Usage: ./run_spyglass_a8.sh {lint|cdc|rdc|all|dual_cdc|dual_rdc}
 set -euo pipefail
 
 goal="${1:-all}"
@@ -20,13 +20,21 @@ run_goal() {
   spyglass -batch -project a8_static.prj -goal "$sg_goal"
 }
 
+run_dual_goal() {
+  local sg_goal="$1"
+  echo "[NMAForge] SpyGlass dual-clock goal: $sg_goal"
+  spyglass -batch -project cdc_dual_clock.prj -goal "$sg_goal"
+}
+
 case "$goal" in
   lint) run_goal lint/lint_rtl ;;
   cdc)  run_goal cdc/cdc_setup; run_goal cdc/cdc_verify_struct ;;
   rdc)  run_goal rdc/rdc_verify_struct ;;
+  dual_cdc) run_dual_goal cdc/cdc_setup; run_dual_goal cdc/cdc_verify_struct ;;
+  dual_rdc) run_dual_goal rdc/rdc_verify_struct ;;
   all)  run_goal lint/lint_rtl; run_goal cdc/cdc_setup; run_goal cdc/cdc_verify_struct; run_goal rdc/rdc_verify_struct ;;
   *)
-    echo "Usage: $0 {lint|cdc|rdc|all}" >&2
+    echo "Usage: $0 {lint|cdc|rdc|all|dual_cdc|dual_rdc}" >&2
     exit 2
     ;;
 esac
