@@ -8,6 +8,8 @@
 
 > **Latest V1 FP parity increment (2026-10-17):** Explicit odd-tail final-word parity tests were added for both BF16 and FP16 at length 3. Three seeds passed 484/484 scoreboard transactions each with zero UVM severity; the odd-tail format cross and parity-at-two-outstanding group both reached 100%. A fresh 360 s bounded formal run proved 5/5 non-vacuous assertions and hit 2/2 covers at depth 5; a fresh canonical run proved 12/12 assertions and hit 2/2 selected covers. Full 16-bit parity/writeback disposition and V1 residual coverage review remain open. Details are in [A10 DV run evidence](../docs/verification/A10_DV_RUN_2026-10-17.md).
 
+> **2026-10-18 V1 FP formal increment:** A focused full-domain local assertion proved non-vacuously that an already-pending parity error blocks final-element `compute_fire` (VC Formal `V-2023.12-SP2`, clean setup, safe depth 122). It does not prove the full writeback exclusion or parity-to-protection transition; V1-FP-04 remains open. Exact command and artifact path: [A10 run record](../docs/verification/A10_DV_RUN_2026-10-17.md).
+
 `dv/subsystem/top_smoke/sim/` remains the legacy directed/smoke regression.
 `dv/uvm/` owns
 shared AXI agents, the top-level environment and final end-to-end tests. The

@@ -5,7 +5,7 @@ VCF ?= vcf
 FORMAL_PROBE_TIMEOUT ?= 150
 FORMAL_TCL := $(abspath run_vcf.tcl)
 
-.PHONY: run parity-probe parity-reach parity-exclusion parity-cutoff-bound parity-frontier parity-bounded check-parity-bounded parity-full-domain parity-full-cutoff parity-full-accounting check-parity-full-accounting parity-full-index-bound parity-full-response-bound parity-full-accepted-count-bound parity-full-response-assume parity-full-cutoff-assume parity-full-lifecycle-assume parity-full-progress-assume parity-full-writeback-assume parity-full-frontier-assume parity-full-ready-frontier-assume parity-full-pair-tag-match parity-full-current-pair-tag parity-full-tag-response-bound parity-full-current-pair-tag-control-abstract parity-full-writeback-control-abstract parity-full-static-slot-tags parity-full-transition-lemmas parity-full-local-transition-lemmas parity-full-last-compute-write-transition parity-full-last-compute-write-state
+.PHONY: run parity-probe parity-reach parity-exclusion parity-cutoff-bound parity-frontier parity-bounded check-parity-bounded parity-full-domain parity-full-cutoff parity-full-accounting check-parity-full-accounting parity-full-index-bound parity-full-response-bound parity-full-accepted-count-bound parity-full-response-assume parity-full-cutoff-assume parity-full-lifecycle-assume parity-full-progress-assume parity-full-writeback-assume parity-full-frontier-assume parity-full-ready-frontier-assume parity-full-pair-tag-match parity-full-current-pair-tag parity-full-tag-response-bound parity-full-current-pair-tag-control-abstract parity-full-writeback-control-abstract parity-full-static-slot-tags parity-full-transition-lemmas parity-full-local-transition-lemmas parity-full-pending-last-compute parity-full-last-compute-write-transition parity-full-last-compute-write-state
 run:
 	mkdir -p "$(OUT)"
 	cd "$(OUT)" && $(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
@@ -227,6 +227,21 @@ parity-full-local-transition-lemmas:
 		{ echo "Full-domain local transition-lemma setup gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
 	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
 		{ echo "Full-domain local transition-lemma formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
+
+parity-full-pending-last-compute:
+	mkdir -p "$(OUT)"
+	cd "$(OUT)" && PARITY_FORMAL_PROPERTIES=ap_pending_parity_blocks_last_compute \
+		timeout --kill-after=5s "$(FORMAL_PROBE_TIMEOUT)s" \
+		$(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
+		-f "$(abspath run_parity_full_lifecycle_assume.tcl)" -output_log_file vc_formal.log
+	@grep -Fq -- "- # proven       : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Pending-parity final-compute proof gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq -- "- # non_vacuous  : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Pending-parity final-compute vacuity gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq "No setup issues found" "$(OUT)/vc_formal.log" || \
+		{ echo "Pending-parity final-compute setup gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
+		{ echo "Pending-parity final-compute formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
 
 parity-full-last-compute-write-transition:
 	mkdir -p "$(OUT)"

@@ -16,9 +16,12 @@ unpaired read, zero outstanding reads imply no response, and the active-failure
 OR has at least one asserted source. Three additional properties separately
 prove that `ERR_ABORT`, `ERR_CONFIG`, and `ERR_WATCHDOG` are not pending while
 the FSM is in `ST_WRITE`; these disposition the corresponding prior-error to
-`ERR_PROTECTION` transitions as unreachable in this formal model. The
-parity-error case remains open because its focused proof did not converge
-within the bounded exploratory run. Response-related checks use the explicit
+`ERR_PROTECTION` transitions as unreachable in this formal model. The full
+parity-error-to-writeback disposition remains open because its focused
+lifecycle proof did not converge within the bounded exploratory run. A
+narrower property now proves that an already-pending parity error blocks a
+final-element compute; this does not establish the upstream parity transition
+or the full writeback exclusion. Response-related checks use the explicit
 registered-SPAD environment assumption (`spad_rsp_valid` only when an
 accepted read is outstanding). The flow also covers the legal operand-wait
 state. A second cover checks whether an operand pair can already be ready after
@@ -494,3 +497,29 @@ were not executed and have no coverage conclusion. This control abstraction
 does not establish arithmetic/data correctness. Linux bridge PID audit found
 no VCF child remaining from this target. V1-FP-04 remains OPEN; no product RTL,
 SPEC, or ABI changed.
+
+### 2026-10-18 isolated pending-parity final-compute guard
+
+To test a smaller local boundary without repeating the full writeback query,
+the existing lifecycle wrapper selected only
+`ap_pending_parity_blocks_last_compute`. The property checks that when parity
+is already pending and the current element is the final element, the core
+does not assert `compute_fire` on that sample. It uses the existing documented
+SPAD/reset environment and full-domain cutoff-validity assumption; it does not
+assume parity or `ST_WRITE` unreachable.
+
+```sh
+make -C dv/block/compute/fp/formal parity-full-pending-last-compute \
+  VCF=vcf OUT=/tmp/nmaforge_a10_fp_pending_parity_last_compute_20261018 \
+  FORMAL_PROBE_TIMEOUT=180
+```
+
+Rocky Linux 8.10 / VC Formal `V-2023.12-SP2`: exit 0; setup reported
+`No setup issues found`; the selected assertion was proven and non-vacuous
+(safe depth 122, vacuity depth 4). The target also checked its formal-log
+error gate. This establishes only the local pending-parity/final-element
+compute suppression guard. The full `ST_WRITE -> pending_error_r !=
+ERR_PARITY` relation, parity-to-protection disposition, and V1-FP-04 remain
+OPEN; no URG exclusion or assumption was added. Product RTL, SPEC, and ABI
+were unchanged. Output:
+`/tmp/nmaforge_a10_fp_pending_parity_last_compute_20261018/vc_formal.log`.
