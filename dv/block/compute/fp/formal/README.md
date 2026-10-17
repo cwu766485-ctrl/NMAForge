@@ -523,3 +523,57 @@ ERR_PARITY` relation, parity-to-protection disposition, and V1-FP-04 remain
 OPEN; no URG exclusion or assumption was added. Product RTL, SPEC, and ABI
 were unchanged. Output:
 `/tmp/nmaforge_a10_fp_pending_parity_last_compute_20261018/vc_formal.log`.
+
+### 2026-10-18 same-cycle parity/final-compute probe
+
+The adjacent transition-local property `ap_new_parity_blocks_last_compute`
+checks whether a parity failure arriving on the current cycle can coincide
+with final-element `compute_fire`. It was selected alone with the same
+full-domain lifecycle wrapper and a 90-second cap:
+
+```sh
+make -C dv/block/compute/fp/formal parity-full-new-parity-last-compute \
+  VCF=vcf OUT=/tmp/nmaforge_a10_fp_new_parity_last_compute_20261018 \
+  FORMAL_PROBE_TIMEOUT=90
+```
+
+VC Formal `V-2023.12-SP2` reported clean setup and the assertion's antecedent
+was non-vacuous, but the proof remained in `checking` until the external
+timeout (Make exit 124). The log contains neither a proof result nor a
+counterexample. This is inconclusive, not PASS or RTL failure; do not use it
+as an assumption or coverage waiver. Do not rerun the same query with a larger
+budget absent a changed proof strategy. Log:
+`/tmp/nmaforge_a10_fp_new_parity_last_compute_20261018/vc_formal.log`.
+
+The supporting arithmetic boundary was isolated separately as
+`ap_parity_cutoff_not_after_last_element`: under the existing full-domain
+response-index assumption, a legal parity response while at the final element
+must yield `memory_error_cutoff_now <= element_index_r`. This property is
+purely a local cutoff/length relation; it does not assert or assume the compute
+suppression result.
+
+```sh
+make -C dv/block/compute/fp/formal parity-full-parity-cutoff-last-element \
+  VCF=vcf OUT=/tmp/nmaforge_a10_fp_parity_cutoff_last_element_20261018 \
+  FORMAL_PROBE_TIMEOUT=90
+```
+
+It proved non-vacuously with clean setup (safe depth 128, vacuity depth 3).
+Using the bounded length-1..4 wrapper did not make the same-cycle compute
+property converge:
+
+```sh
+make -C dv/block/compute/fp/formal parity-bounded-new-parity-last-compute \
+  VCF=vcf OUT=/tmp/nmaforge_a10_fp_bounded_new_parity_last_compute_20261018 \
+  FORMAL_PROBE_TIMEOUT=90
+```
+
+This attempt also remained non-vacuous/checking through 90 seconds with no
+counterexample or proof, so it is inconclusive. Its log is
+`/tmp/nmaforge_a10_fp_bounded_new_parity_last_compute_20261018/vc_formal.log`.
+The original bounded
+parity acceptance target was also rerun after making the Tcl property selector
+optional; its default property set was unchanged and passed 5/5 non-vacuous
+assertions plus 2/2 covers (depths 4 and 5) in 158.20 seconds. This baseline
+does not include the new same-cycle property. Do not retry that property with
+an unchanged proof strategy.

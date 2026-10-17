@@ -21,6 +21,17 @@ sim_save_reset
 check_fv_setup -verbose
 formal_setup_config -period 10 -initial 1 -apply true
 
+if {[info exists ::env(PARITY_FORMAL_PROPERTIES)]} {
+    set CHECK_PROPERTIES {}
+    foreach PROPERTY_NAME [split $::env(PARITY_FORMAL_PROPERTIES) ","] {
+        lappend CHECK_PROPERTIES \
+            "ai_fp_core_parity_bounded_formal_top.${PROPERTY_NAME}"
+    }
+    check_fv -property $CHECK_PROPERTIES
+    report_fv -usage assert -verbose
+    exit
+}
+
 check_fv -property {
     ai_fp_core_parity_bounded_formal_top.ap_parity_has_valid_cutoff
     ai_fp_core_parity_bounded_formal_top.ap_parity_progress_stays_before_cutoff

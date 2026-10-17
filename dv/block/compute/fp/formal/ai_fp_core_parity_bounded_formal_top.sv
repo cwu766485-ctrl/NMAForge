@@ -88,6 +88,14 @@ module ai_fp_core_parity_bounded_formal_top #(
         ((dut.pending_error_r == ERR_PARITY) &&
          (dut.element_index_r >= dut.memory_error_cutoff_r)) |->
           !dut.compute_fire);
+    ap_parity_cutoff_not_after_last_element: assert property (
+        @(posedge clk) disable iff (!resetn)
+        (dut.response_parity_failure && dut.last_element) |->
+          (dut.memory_error_cutoff_now <= dut.element_index_r));
+    ap_new_parity_blocks_last_compute: assert property (
+        @(posedge clk) disable iff (!resetn)
+        (dut.response_parity_failure && dut.last_element) |->
+          !dut.compute_fire);
     ap_parity_drain_transitions_to_error: assert property (
         @(posedge clk) disable iff (!resetn)
         ((dut.state_r == ST_RUN) &&
@@ -488,6 +496,10 @@ module ai_fp_core_parity_full_lifecycle_assume_top (
         @(posedge clk) disable iff (!resetn)
         ((dut.pending_error_r == ERR_PARITY) && dut.last_element) |->
           !dut.compute_fire);
+    ap_parity_cutoff_not_after_last_element: assert property (
+        @(posedge clk) disable iff (!resetn)
+        (dut.response_parity_failure && dut.last_element) |->
+          (dut.memory_error_cutoff_now <= dut.element_index_r));
     ap_new_parity_blocks_last_compute: assert property (
         @(posedge clk) disable iff (!resetn)
         (dut.response_parity_failure && dut.last_element) |->
