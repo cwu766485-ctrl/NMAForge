@@ -42,6 +42,10 @@ interface ai_cp_if(input logic clk);
   logic [1:0] debug_writer_state_r;
   logic cplq_tail_load; logic [31:0] cplq_tail_seed;
   logic fetch_busy,fetch_done,fetch_error;
+  // TB endpoint scheduling hook and functional abort-route tag. 1 requests
+  // an abort on the exact response cycle; coverage samples the retired owner.
+  logic fetch_abort_at_done;
+  logic [1:0] abort_cov_path;
   logic [7:0] desc_op; logic [15:0] desc_task_id;
   logic [31:0] desc_src0,desc_src1,desc_dst; logic [15:0] desc_length,desc_m,desc_n,desc_k;
   logic [4:0] desc_shift; logic [1:0] desc_activation; logic [31:0] desc_bias_base;

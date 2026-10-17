@@ -156,7 +156,7 @@ module tb_ai_cp_uvm;
     descriptor_t d;
     int slot,delay_cycles,failure_index;
     logic [1:0] failure_kind;
-    vif.fetch_done=0; vif.fetch_error=0;
+    vif.fetch_done=0; vif.fetch_error=0; vif.fetch_busy=0;
     vif.compute_done=0; vif.compute_error=0; vif.compute_error_code=0;
     vif.force_stale_abort_code_once=0;
     vif.compute_busy=0;
@@ -169,7 +169,8 @@ module tb_ai_cp_uvm;
     forever begin
       @(negedge clk);
       if(!vif.resetn) begin
-        vif.fetch_done=0; vif.fetch_error=0;
+        vif.fetch_done=0; vif.fetch_error=0; vif.fetch_busy=0;
+        vif.fetch_abort_at_done=0;
         vif.compute_done=0; vif.compute_error=0; vif.compute_error_code=0;
         vif.force_stale_abort_code_once=0;
         vif.compute_busy=0;
@@ -195,6 +196,10 @@ module tb_ai_cp_uvm;
         else
           vif.cpl_spad_ready=($urandom_range(0,3)!=0);
         if(vif.fetch_start) begin
+          // fetch_start is the request-acceptance point for this behavioral
+          // endpoint. The state and response are all driven on negedges so
+          // the CP samples a stable busy/done/abort tuple at the next posedge.
+          vif.fetch_busy=1;
           slot=(vif.fetch_base-vif.cmdq_base)>>6;
           if(slot<0 || slot>3) slot=0;
           d=vif.desc_mem[slot];
@@ -222,7 +227,13 @@ module tb_ai_cp_uvm;
                               ((vif.test_case==CP_MIXED_ERROR_ABORT_RESET) &&
                                (d.task_id==16'h1400) && (failure_kind==2'd2));
               vif.fetch_done=1;
+              if(vif.fetch_abort_at_done) vif.abort=1;
               @(negedge clk); vif.fetch_done=0; vif.fetch_error=0;
+              vif.fetch_busy=0;
+              if(vif.fetch_abort_at_done) begin
+                vif.abort=0;
+                vif.fetch_abort_at_done=0;
+              end
             end
           end join_none
         end

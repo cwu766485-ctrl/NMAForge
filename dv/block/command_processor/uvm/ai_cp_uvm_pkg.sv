@@ -154,6 +154,8 @@ package ai_cp_uvm_pkg;
       vif.inject_illegal_fsm_state=0;
       vif.illegal_fsm_state_recovered=0;
       vif.fetch_busy=0;
+      vif.fetch_abort_at_done=0;
+      vif.abort_cov_path=0;
       vif.compute_busy=0;
       vif.random_queue_count=0;
       vif.random_queue_error_mask=0;
@@ -233,6 +235,17 @@ package ai_cp_uvm_pkg;
             wait_idle();
             if(vif.cmdq_head!==1 || vif.launch_valid)
               `uvm_error("CP/DRV","fetch-stage abort launched compute or advanced CMDQ incorrectly")
+            // Same-cycle completion abort: the endpoint raises abort together
+            // with fetch_done. This must take the ST_FETCH completion branch
+            // with abort_pending still clear (not merely the sticky path above).
+            reset_cp(); descriptor(0,0,0,0,1,16'h1702);
+            vif.cmdq_tail=1; vif.cplq_head=0;
+            vif.abort_cov_path=2'd1; vif.fetch_abort_at_done=1;
+            pulse_submit(); wait_idle();
+            if(vif.cmdq_head!==1 || vif.cplq_tail!==1 || vif.launch_valid ||
+               vif.cpl_writer_busy || vif.abort_cov_path!==2'd1)
+              `uvm_error("CP/DRV","same-cycle fetch-completion abort did not retire once without launch")
+            vif.abort_cov_path=0;
             // Legacy cplq_size==0 route: abort is reported as an event only.
             reset_cp(); descriptor(0); vif.cmdq_size=0; vif.cplq_size=0; vif.cmdq_tail=1;
             pulse_submit(); wait(vif.fetch_start);
@@ -594,6 +607,45 @@ package ai_cp_uvm_pkg;
                vif.cpl_writer_busy || vif.launch_valid)
               `uvm_error("CP/MACRO","child-fetch-error macro did not retire one parent completion")
 
+            // Abort while fetching the first macro child descriptor. The
+            // error record remains owned by the macro parent task, not child.
+            reset_cp(); descriptor(0,0,0,0,1,16'h1560);
+            vif.desc_mem[0].op=8'h40; vif.desc_mem[0].version=8'd4;
+            vif.desc_mem[0].length=16'd3; vif.desc_mem[0].src0=32'h1040;
+            descriptor(1,0,0,0,1,16'h1561);
+            descriptor(2,0,0,0,1,16'h1562);
+            descriptor(3,0,0,0,1,16'h1563);
+            vif.cmdq_tail=1; vif.cplq_head=0; vif.abort_cov_path=2'd2;
+            pulse_submit();
+            wait(vif.fetch_done===1'b1);
+            wait(vif.fetch_start===1'b1);
+            @(negedge vif.clk); vif.abort=1;
+            @(negedge vif.clk); vif.abort=0;
+            wait_idle();
+            if(vif.cmdq_head!==1 || vif.cplq_tail!==1 || vif.launch_valid ||
+               vif.cpl_writer_busy)
+              `uvm_error("CP/MACRO","macro child-fetch abort launched a child or failed parent retirement")
+            vif.abort_cov_path=0;
+
+            // Abort in ST_DECODE after the first macro child fetch response.
+            reset_cp(); descriptor(0,0,0,0,1,16'h1570);
+            vif.desc_mem[0].op=8'h40; vif.desc_mem[0].version=8'd4;
+            vif.desc_mem[0].length=16'd3; vif.desc_mem[0].src0=32'h1040;
+            descriptor(1,0,0,0,1,16'h1571);
+            descriptor(2,0,0,0,1,16'h1572);
+            descriptor(3,0,0,0,1,16'h1573);
+            vif.cmdq_tail=1; vif.cplq_head=0; vif.abort_cov_path=2'd3;
+            pulse_submit();
+            wait(vif.fetch_done===1'b1);
+            @(posedge vif.clk);
+            @(negedge vif.clk); vif.abort=1;
+            @(negedge vif.clk); vif.abort=0;
+            wait_idle();
+            if(vif.cmdq_head!==1 || vif.cplq_tail!==1 || vif.launch_valid ||
+               vif.cpl_writer_busy)
+              `uvm_error("CP/MACRO","macro child-decode abort launched a child or failed parent retirement")
+            vif.abort_cov_path=0;
+
             // Legacy no-CPLQ event path: a successful macro aggregates its
             // ordered children into one event without completion writeback.
             reset_cp();
@@ -641,7 +693,7 @@ package ai_cp_uvm_pkg;
             if(vif.force_compute_error_once)
               `uvm_error("CP/NO_CPLQ","macro compute-error injection was not consumed")
             vif.cmdq_size=4; vif.cplq_size=4;
-            `uvm_info("CP/MACRO","children=3 parent_completion=3 compute_error_child_launches=1 fetch_error_child_launches=1 fetch_error_parent_completion=1 no_cplq_success_children=3 no_cplq_error_stop=1",UVM_LOW)
+            `uvm_info("CP/MACRO","children=3 parent_completion=5 compute_error_child_launches=1 fetch_error_child_launches=1 fetch_error_parent_completion=1 child_fetch_abort_parent=1 child_decode_abort_parent=1 no_cplq_success_children=3 no_cplq_error_stop=1",UVM_LOW)
           end
           CP_FETCH_ERROR_NO_CPL: begin
             reset_cp();
@@ -1618,7 +1670,9 @@ package ai_cp_uvm_pkg;
                 CP_ABORT_RESET_PARTIAL: expected_task_id=16'h1300;
                 CP_MACRO_CHILDREN: expected_task_id=
                   (macro_completions==0) ? 16'h1500 :
-                  (macro_completions==1) ? 16'h1540 : 16'h1550;
+                  (macro_completions==1) ? 16'h1540 :
+                  (macro_completions==2) ? 16'h1550 :
+                  (macro_completions==3) ? 16'h1560 : 16'h1570;
                 CP_CPLQ_PRESSURE: begin
                   expected_task_id=16'h3000+cplq_pressure_completions;
                   cplq_pressure_completions++;
@@ -1647,9 +1701,11 @@ package ai_cp_uvm_pkg;
                   cplq_last_slot_completions++;
                 end
                 CP_VALID,CP_INVALID,CP_RANDOM_STALL,CP_DEP_ABORT,CP_RESET,
-                CP_FETCH_ERROR,CP_FETCH_ABORT,CP_COMPUTE_ERROR,CP_PARTIAL_RESET,CP_EXTERNAL_DESC,
+                CP_FETCH_ERROR,CP_COMPUTE_ERROR,CP_PARTIAL_RESET,CP_EXTERNAL_DESC,
                 CP_DEP_TIMEOUT:
                   expected_task_id=16'h1000;
+                CP_FETCH_ABORT: expected_task_id=
+                  (fetch_abort_records==0) ? 16'h1000 : 16'h1702;
                 default: expected_task_id=16'hffff;
               endcase
               if(vif.test_case==CP_CONCURRENT_RING) concurrent_completion_index++;
@@ -1680,6 +1736,9 @@ package ai_cp_uvm_pkg;
                   if(vif.completion_error!==4'd6 || vif.completion_status!==4'd2)
                     `uvm_error("CP/MACRO","child-fetch-error macro parent did not commit ERR_FETCH")
                   else macro_fetch_error_completions++;
+                end else if(macro_completions==3 || macro_completions==4) begin
+                  if(vif.completion_error!==4'd3 || vif.completion_status!==4'd2)
+                    `uvm_error("CP/MACRO","macro child abort did not commit parent ERR_ABORT")
                 end else
                   `uvm_error("CP/MACRO","unexpected extra macro parent completion")
               end
@@ -1803,7 +1862,7 @@ package ai_cp_uvm_pkg;
       if(launches<6) `uvm_error("CP/SB","too few valid launches observed")
       if(completions<7) `uvm_error("CP/SB","expected queued success/error completion records were not observed")
       if(dep_abort_records!=1) `uvm_error("CP/SB","expected exactly one dependency-wait abort completion")
-      if(fetch_abort_records!=1 || fetch_abort_launches!=0)
+      if(fetch_abort_records!=2 || fetch_abort_launches!=0)
         `uvm_error("CP/SB","fetch-stage abort must retire exactly once without compute launch")
       if(compute_abort_records!=2 || compute_abort_launches!=2 || compute_abort_inputs!=1)
         `uvm_error("CP/ABORT","compute abort and resumed command must each launch/retire exactly once")
@@ -1828,7 +1887,7 @@ package ai_cp_uvm_pkg;
          direct_compute_error_events!=1 || direct_stale_abort_code_events!=1)
         `uvm_error("CP/DIRECT","direct-start must reject invalid FP configurations, complete valid INT8/BF16/FP16, report one compute error, and ignore stale ERR_ABORT when compute_error=0")
       if(macro_launches!=3 || macro_error_launches!=1 ||
-         macro_fetch_error_launches!=1 || macro_completions!=3 ||
+         macro_fetch_error_launches!=1 || macro_completions!=5 ||
          macro_error_completions!=1 || macro_fetch_error_completions!=1)
         `uvm_error("CP/MACRO","success, compute-error, and child-fetch-error macros did not produce expected child launches and parent completions")
       if(macro_no_cplq_launches!=4 || macro_no_cplq_success_events!=1 ||
@@ -1896,6 +1955,19 @@ package ai_cp_uvm_pkg;
     int unsigned scenario_hits[31]; int unsigned stall_hits[2]; int unsigned word_hits[4];
     int unsigned dep_wait_cycles, dep_timeout_wait_cycles;
     virtual ai_cp_if vif; int last_scenario; bit scenario_seen;
+    covergroup abort_timing_cg with function sample(int unsigned path,
+                                                     int unsigned owner,
+                                                     int unsigned error_code);
+      cp_abort_timing_path: coverpoint path {
+        bins direct_fetch_done_abort={1};
+        bins macro_child_fetch_abort={2};
+        bins macro_child_decode_abort={3};
+      }
+      cp_abort_owner: coverpoint owner {
+        bins direct_task={1}; bins macro_fetch_parent={2}; bins macro_decode_parent={3};
+      }
+      cp_abort_error: coverpoint error_code { bins err_abort={3}; }
+    endgroup
     covergroup cp_cg with function sample(int unsigned scenario,int unsigned launched,
                                          int unsigned err,int unsigned req_stall,int unsigned word_index,
                                          int unsigned mixed_kind,int unsigned mixed_delay,
@@ -1966,7 +2038,7 @@ package ai_cp_uvm_pkg;
       cp_word: coverpoint word_index {bins words[]={[0:3]};}
     endgroup
     function new(string n,uvm_component p);
-      super.new(n,p); cp_cg=new();
+      super.new(n,p); cp_cg=new(); abort_timing_cg=new();
       foreach(scenario_hits[i]) scenario_hits[i]=0;
       foreach(stall_hits[i]) stall_hits[i]=0;
       foreach(word_hits[i]) word_hits[i]=0;
@@ -1992,6 +2064,13 @@ package ai_cp_uvm_pkg;
                         vif.event_error && vif.event_error_code==4'd5,
                        vif.test_case==CP_DIRECT_START && vif.force_stale_abort_code_once &&
                         vif.event_valid && !vif.event_error && vif.event_error_code==4'd0);
+          if(vif.cpl_writer_done && vif.abort_cov_path!=0)
+            abort_timing_cg.sample(
+              vif.abort_cov_path,
+              (vif.completion_task_id==16'h1702) ? 1 :
+              ((vif.completion_task_id==16'h1560) ? 2 :
+               ((vif.completion_task_id==16'h1570) ? 3 : 0)),
+              vif.completion_error);
           if((vif.test_case<31) && (!scenario_seen || (vif.test_case!=last_scenario))) begin
             scenario_hits[vif.test_case]++;
             last_scenario=vif.test_case;
@@ -2025,6 +2104,8 @@ package ai_cp_uvm_pkg;
       if(dep_wait_cycles<4) `uvm_error("CP/COV","dependency wait was not held for the expected cycles")
       if(dep_timeout_wait_cycles<65535)
         `uvm_error("CP/COV","dependency timeout did not exercise the full wait counter range")
+      if(abort_timing_cg.get_coverage()<100.0)
+        `uvm_error("CP/COV","fetch/macro abort timing functional bins did not all hit")
       foreach(stall_hits[i]) if(!stall_hits[i]) `uvm_error("CP/COV",$sformatf("backpressure bin %0d not hit",i))
       foreach(word_hits[i]) if(!word_hits[i]) `uvm_error("CP/COV",$sformatf("completion word bin %0d not hit",i))
       `uvm_info("CP/COV",$sformatf("scenario_bins=%0d/31 scenario_visits=%0d dep_wait_cycles=%0d dep_timeout_cycles=%0d stall_cycles=%0d/%0d words=%0d/%0d/%0d/%0d",
@@ -2032,6 +2113,7 @@ package ai_cp_uvm_pkg;
         dep_wait_cycles,
         dep_timeout_wait_cycles,
         stall_hits[1],stall_hits[0]+stall_hits[1],word_hits[0],word_hits[1],word_hits[2],word_hits[3]),UVM_LOW)
+      `uvm_info("CP/ABORT_COV","route_bins=3/3 direct_fetch_done=1 macro_child_fetch_parent=1 macro_child_decode_parent=1 ERR_ABORT=3",UVM_LOW)
     endfunction
   endclass
   class ai_cp_env extends uvm_env;
