@@ -1,5 +1,18 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-18 pushed `98675d08` replay gate:** GitHub `main` and the detached
+> clean worktree resolve to `98675d08f44856d2023a6840cb117d1f47d8daf2`.
+> Current FP Python reference tests pass 19/19, and no product RTL differs from
+> the previously replayed `43dbbbc` baseline. The selected exact-SHA VCS replay
+> stopped before any simulation: the default wrapper selected the absent
+> `linux/bin/vcs1`; the installed compiler is under `linux64/`, and its
+> `VCS_ARCH_OVERRIDE=linux64` startup probe rejects WSL2 kernel
+> `6.6.87.2-microsoft-standard-WSL2`. No VCS regression on this SHA is claimed;
+> this is an environment/tool-compatibility stop, not a design test failure.
+> The latest SHA still requires exact-commit FP/DMA/Control/top replay and V5
+> coverage disposition when a Synopsys-supported execution environment is
+> available. Details: [2026-10-18 run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-98675d08-replay-attempt).
+
 > **2026-10-18 V3 downstream AXI backpressure increment:** Added bounded
 > DMA R-channel `RREADY` stall coverage: hold the DUT-side ready low for 16
 > cycles during valid response, check stable response payload, release, and
