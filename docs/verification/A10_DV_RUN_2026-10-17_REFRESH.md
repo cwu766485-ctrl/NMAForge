@@ -53,6 +53,17 @@ make -C dv/uvm/sim uvm_mixed_precision_ddr_e2e_regress MIXED_E2E_SEEDS='20261080
 
 See [A10_DV_RTM.md](A10_DV_RTM.md), requirement V4-UVM-01.
 
+## V5-SEED-01: clean replay at pushed SHA `43dbbbc`
+
+An isolated detached worktree at `43dbbbc498377d852667c4e3eb5880ecf4aaf8f7`
+replayed FP dot, DMA, Control, DMA–SPAD subsystem, top smoke, and the 20-case
+seeded top run under Rocky Linux 8.10 / VCS+URG `V-2023.12-SP1_Full64`. Every
+listed suite passed; details, exact commands, coverage/assertion summaries,
+artifact paths, and limitations are recorded in
+[A10_DV_CLEAN_SHA_REPLAY_43DBBBC.md](A10_DV_CLEAN_SHA_REPLAY_43DBBBC.md).
+This closes the fixed-SHA reproducibility check for those committed suites only;
+it does not close V1–V5 or overall A10.
+
 ## DMA AW-stall directed gate and 16-test block regression (run date: 2026-10-17)
 
 **Environment:** Rocky Linux 8.10, Synopsys VCS/URG `V-2023.12-SP1_Full64`; current dirty worktree. The `20261017` seed/artifact tag matches the run date in Asia/Singapore.
