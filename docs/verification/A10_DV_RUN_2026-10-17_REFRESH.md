@@ -64,6 +64,27 @@ artifact paths, and limitations are recorded in
 This closes the fixed-SHA reproducibility check for those committed suites only;
 it does not close V1–V5 or overall A10.
 
+## V4-RAND-02: clean-SHA top E2E replay interrupted by license outage
+
+**Baseline:** detached worktree at `43dbbbc498377d852667c4e3eb5880ecf4aaf8f7`.
+
+**Command:**
+
+```sh
+make -C dv/uvm/sim uvm_mixed_precision_ddr_e2e_random_cov_regress \
+  MIXED_E2E_RANDOM_OUT=/tmp/nmaforge_clean43_v4_random_20261017
+```
+
+VCS compiled successfully. Seeds `20261101..20261191` passed their per-run
+`MIXED_E2E_PASS`, functional-coverage, UVM summary, and zero-severity checks
+(91/91). Seed `20261192` did not complete, the VCS/URG aggregate target did not
+finish, and no merged URG report exists. Retrying seed `20261192` failed before
+simulation because VCS could not obtain a license; `SNPSLMD_LICENSE_FILE` and
+`LM_LICENSE_FILE` were set, but `lmutil lmstat` returned 241 with an
+unreachable-server result. This is an environment/tool interruption, not an
+RTL/UVM functional failure. The clean-SHA V4 UVM campaign is **OPEN** and none
+of these 91 seeds alone satisfy its 192-seed aggregate coverage acceptance.
+
 ## DMA AW-stall directed gate and 16-test block regression (run date: 2026-10-17)
 
 **Environment:** Rocky Linux 8.10, Synopsys VCS/URG `V-2023.12-SP1_Full64`; current dirty worktree. The `20261017` seed/artifact tag matches the run date in Asia/Singapore.
