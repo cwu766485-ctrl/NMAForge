@@ -7,7 +7,7 @@ VECTOR_FILE := $(OUT_DIR)/bf16_mul_fp32_vectors.hex
 SIMV := $(OUT_DIR)/simv_bf16_mul_fp32
 REPO_ROOT := ../../../../../
 
-.PHONY: test vectors compile run fp16-mul-test fp16-mul-vectors fp16-mul-compile fp16-mul-run add-test add-vectors add-compile add-run accum-test accum-vectors accum-compile accum-run add16-test add16-vectors add16-compile add16-run dot-core-test dot-core-compile dot-core-run dot-core-random-test dot-core-random-vectors dot-uvm-test dot-uvm-vectors dot-uvm-compile dot-uvm-run dot-uvm-coverage
+.PHONY: test vectors compile run fp16-mul-test fp16-mul-vectors fp16-mul-compile fp16-mul-run add-test add-vectors add-compile add-run accum-test accum-vectors accum-compile accum-run add16-test add16-vectors add16-compile add16-run dot-core-test dot-core-compile dot-core-run dot-core-random-test dot-core-random-vectors dot-uvm-test dot-uvm-vectors dot-uvm-compile dot-uvm-run dot-uvm-coverage dot-core-parity-max-test dot-core-parity-max-compile dot-core-parity-max-run
 .PHONY: dot-uvm-regress
 
 test: run
@@ -126,6 +126,7 @@ DOT_UVM_COV_DB := $(DOT_UVM_SEED_DIR)/coverage.vdb
 DOT_UVM_COV_REPORT := $(DOT_UVM_SEED_DIR)/urg_report
 
 dot-core-test: dot-core-run
+	$(MAKE) dot-core-parity-max-run
 
 dot-core-compile:
 	mkdir -p $(DOT_CORE_OUT_DIR)
@@ -142,6 +143,28 @@ dot-core-compile:
 
 dot-core-run: dot-core-compile
 	$(DOT_CORE_SIMV) -l $(DOT_CORE_OUT_DIR)/run.log
+
+# Maximum 16-bit length final-A and final-B parity cutoffs with no-reset recovery stress.
+DOT_CORE_PARITY_MAX_OUT_DIR ?= /tmp/nmaforge_mixed_dot_fp32_long_parity
+DOT_CORE_PARITY_MAX_SIMV := $(DOT_CORE_PARITY_MAX_OUT_DIR)/simv_mixed_dot_fp32_long_parity
+
+dot-core-parity-max-test: dot-core-parity-max-run
+
+dot-core-parity-max-compile:
+	mkdir -p $(DOT_CORE_PARITY_MAX_OUT_DIR)
+	$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+		-top tb_ai_mixed_precision_dot_fp32_max_parity \
+		$(REPO_ROOT)rtl/compute/fp/ai_bf16_mul_fp32.v \
+		$(REPO_ROOT)rtl/compute/fp/ai_fp16_mul_fp32.v \
+		$(REPO_ROOT)rtl/compute/fp/ai_fp32_add.v \
+		$(REPO_ROOT)rtl/compute/fp/ai_fp32_accumulator.v \
+		$(REPO_ROOT)rtl/compute/fp/ai_mixed_precision_dot_fp32_core.v \
+		../tb/tb_ai_mixed_precision_dot_fp32_max_parity.sv \
+		-o $(DOT_CORE_PARITY_MAX_SIMV) \
+		-l $(DOT_CORE_PARITY_MAX_OUT_DIR)/compile.log
+
+dot-core-parity-max-run: dot-core-parity-max-compile
+	$(DOT_CORE_PARITY_MAX_SIMV) -l $(DOT_CORE_PARITY_MAX_OUT_DIR)/run.log
 
 # Deterministic mixed-format dot throughput baseline plus optional ordered-response latency stress.
 DOT_BENCH_OUT_DIR ?= /tmp/nmaforge_mixed_dot_throughput
