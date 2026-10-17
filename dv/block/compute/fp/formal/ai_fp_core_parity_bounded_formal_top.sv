@@ -500,6 +500,13 @@ module ai_fp_core_parity_full_lifecycle_assume_top (
         @(posedge clk) disable iff (!resetn)
         (dut.response_parity_failure && dut.last_element) |->
           (dut.memory_error_cutoff_now <= dut.element_index_r));
+    // Under in-order responses, the final packed word cannot already be
+    // resident in both operand slots while a parity response is still due.
+    // This isolates pair ownership from the compute/state transition proof.
+    ap_final_pair_not_ready_on_parity_response: assert property (
+        @(posedge clk) disable iff (!resetn)
+        (dut.response_parity_failure && dut.last_element) |->
+          !dut.pair_ready);
     ap_new_parity_blocks_last_compute: assert property (
         @(posedge clk) disable iff (!resetn)
         (dut.response_parity_failure && dut.last_element) |->

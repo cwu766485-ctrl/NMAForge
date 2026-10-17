@@ -603,3 +603,37 @@ query unchanged; a next attempt needs a materially different inductive
 decomposition or a separately proved abstraction. Log:
 `/tmp/nmaforge_a10_parity_full_ready_frontier_rerun_20261018/vc_formal.log`.
 No product RTL, SPEC, or ABI changed.
+
+### 2026-10-18 final-pair ownership probe
+
+Added the verification-only property `ap_final_pair_not_ready_on_parity_response`
+to isolate the remaining same-cycle question: with the full-domain lifecycle
+assumptions (ordered SPAD responses, no response without an outstanding read,
+and response index in range), a parity response while the current element is
+the final element must not coincide with `pair_ready`. The property was selected
+alone using:
+
+```sh
+make -C dv/block/compute/fp/formal \
+  parity-full-final-pair-not-ready-on-parity-response VCF=vcf \
+  OUT=/tmp/nmaforge_a10_fp_final_pair_not_ready_20261018 \
+  FORMAL_PROBE_TIMEOUT=180
+```
+
+VC Formal `V-2023.12-SP2` reported `No setup issues found` and a non-vacuous
+antecedent, but remained in `checking` through the 180-second timeout (Make
+exit 124). There was no proof result or counterexample. The post-timeout audit
+found no remaining VCF/VC Static/Simon process. This is inconclusive and does
+not close V1-FP-04; do not rerun the identical query without a materially
+different proof decomposition.
+
+An earlier diagnostic assertion in this investigation attempted to require
+`!compute_allowed` for a same-cycle final parity response while
+`pending_error_r==ERR_NONE`. VC Formal falsified that assertion at depth 3.
+Review showed the assertion was stronger than the RTL contract: `compute_allowed`
+intentionally remains true until the current-cycle error is registered, while
+the actual same-cycle compute question depends on whether the final operand
+pair can already be ready under ordered responses. The diagnostic assertion
+was removed; this result is not evidence of an RTL defect. Its output is kept
+locally at `/tmp/nmaforge_a10_fp_parity_compute_admission_20261018/`.
+Production RTL, SPEC, and ABI were unchanged.
