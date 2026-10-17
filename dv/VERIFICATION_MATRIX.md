@@ -228,3 +228,28 @@ The successful new runs supersede the prior same-day license-connectivity failur
 
 Additional license-restored runs: `make -C dv/block/control/sim uvm_regress VCS='vcs -licwait 1'` passed 9/9 tests with per-test UVM warning/error/fatal=0/0/0; `make -C dv/block/dma/sim uvm_regress VCS='vcs -licwait 1'` exited 0 for the current 15-test suite (the pre-existing aggregate log was stale, so no aggregate severity count is claimed); and the three-seed `dv/subsystem/dma_spad/sim subsystem_regress` plus URG merge exited 0. The DMA–SPAD run reused one `RUN_LOG` path across seeds, so only the final-seed transcript remains; see the A10 run record for the exact command and VDB paths.
 > **2026-10-17 V4 top smoke and seeded replay:** Re-ran Rocky 8.10 / VCS top-level ai_smoke and ai_run AI_RANDOM_CASES=20 AI_SEED=12345; both exited 0 and printed TEST PASS. Exact commands and isolated log paths are in [2026-10-17 run evidence](A10_DV_RUN_2026-10-17.md). This is dirty-worktree replay evidence for the top smoke/random slice only; it does not close V4/V5 or replace the broader E2E UVM coverage review.
+
+### A10 V4 clean-SHA top DDR E2E UVM completion (2026-10-17)
+
+Completed the 192-seed mixed-precision DDR E2E UVM campaign against detached
+RTL baseline `43dbbbc498377d852667c4e3eb5880ecf4aaf8f7`. The first invocation
+had been interrupted after 91 seeds by an unreachable license server; after
+`lmutil lmstat -a` returned exit 0 and VCS feature status, seeds
+`20261192..20261292` were resumed with the already compiled simulator. All
+192/192 logs passed the exact per-seed functional marker and zero-severity gates
+from `dv/uvm/sim/Makefile`.
+
+The shard auditor/URG merger `tools/verify_a10_mixed_e2e_shards.sh` exited 0.
+Merged URG `/tmp/nmaforge_clean43_v4_random_20261017/urg_merged/` reports the
+E2E covergroup, four per-transaction AXI AR/AW/R-gap/W-gap groups, and all 19
+required functional points at 100%. Assertion summary: 22 total, 20 success, 0
+failure, 0 incomplete, and two UVM RAL internal `do_read`/`do_write`
+no-attempts; all three AXI stall-to-accept cover properties matched. Commands,
+seed partition, and limits are in
+[the A10 clean-SHA replay record](../docs/verification/A10_DV_CLEAN_SHA_REPLAY_43DBBBC.md)
+and [run refresh](../docs/verification/A10_DV_RUN_2026-10-17_REFRESH.md).
+
+This closes the clean-SHA randomized E2E slice only. It does not close all V4
+interactions (including accelerator reset during an in-flight AXI transaction),
+global DUT code/assertion coverage, or A10/V5. No product RTL, SPEC, or ABI was
+changed by this verification increment.

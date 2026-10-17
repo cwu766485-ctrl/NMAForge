@@ -9,9 +9,10 @@ worktree. The tested baseline was `43dbbbc498377d852667c4e3eb5880ecf4aaf8f7`
 worktree before running the tests.
 
 **Environment:** Rocky Linux 8.10, Synopsys VCS/URG
-`V-2023.12-SP1_Full64`. The license was available for the suites listed below;
-a later V4 top-UVM replay attempt is separately recorded as incomplete because
-the license server became unreachable. Test outputs are under `/tmp`.
+`V-2023.12-SP1_Full64`. The V4 top-UVM replay was briefly interrupted when the
+license server became unreachable, then resumed after connectivity returned.
+The final 192-seed replay and aggregate URG gates are complete; the interruption
+is retained in the run history below. Test outputs are under `/tmp`.
 
 ## Results
 
@@ -23,7 +24,7 @@ the license server became unreachable. Test outputs are under `/tmp`.
 | V3 DMA–SPAD subsystem | `dma_spad_subsystem_test`, seeds `20261110..20261119`; URG merged | 10/10 passed with UVM warning/error/fatal=`0/0/0`; all selected functional groups=100%. The labeled `ap_dma_aw_payload_stable` assertion had 50 real successes, zero failures. URG total: 31 assertions, 29 successes, zero failure/incomplete, two UVM RAL internal no-attempts. |
 | V4 top smoke | `make -C dv/subsystem/top_smoke/sim ai_smoke SEED=20261018 AI_RANDOM_CASES=4 AI_SEED=12345` | `TEST PASS`; make exited 0. |
 | V4 seeded top run | `make -C dv/subsystem/top_smoke/sim ai_run SEED=20261018 AI_RANDOM_CASES=20 AI_SEED=12345` | `TEST PASS`; make exited 0 for 20 seeded random cases. |
-| V4 top mixed-precision DDR E2E UVM | `make -C dv/uvm/sim uvm_mixed_precision_ddr_e2e_random_cov_regress MIXED_E2E_RANDOM_OUT=/tmp/nmaforge_clean43_v4_random_20261017` | **Incomplete; not a pass.** VCS compile succeeded and seeds `20261101..20261191` have 91/91 E2E, coverage and UVM severity gates. Seed `20261192` did not complete; no URG merge or aggregate 100% coverage gate was produced. A retry could not obtain a VCS license; `lmstat` returned 241 and reported the server unreachable. |
+| V4 top mixed-precision DDR E2E UVM | Initial full target, resumed seeds, then `bash tools/verify_a10_mixed_e2e_shards.sh /tmp/nmaforge_clean43_v4_random_20261017 /tmp/nmaforge_clean43_v4_random_remaining` | **192/192 PASS** on the exact detached baseline. All 192 logs passed the Makefile marker and zero-severity checks; URG `e2e_cg`, four transaction-level AXI groups, and all 19 required functional points=100%. URG assertions: 20 successes, 0 failures/incomplete, 2 UVM RAL internal no-attempts; cover properties=3/3. The former 91/192 interruption was recovered, not counted as a functional failure. |
 
 The isolated output directories are `/tmp/nmaforge_clean43_fp`,
 `/tmp/nmaforge_clean43_dma`, `/tmp/nmaforge_clean43_control_retry`,
@@ -103,8 +104,9 @@ simv_dma_spad +UVM_TESTNAME=dma_spad_subsystem_test \
 Use fresh `/tmp` output paths when repeating these commands; paths above name
 the original recorded run.
 
-The incomplete clean-SHA top-UVM attempt used this target from the detached
-worktree:
+The clean-SHA top-UVM campaign was started with this target from the detached
+worktree; the first invocation stopped after 91 seeds when license connectivity
+failed:
 
 ```sh
 make -C dv/uvm/sim uvm_mixed_precision_ddr_e2e_random_cov_regress \
@@ -112,11 +114,27 @@ make -C dv/uvm/sim uvm_mixed_precision_ddr_e2e_random_cov_regress \
 ```
 
 The Makefile's default random seed range is `20261101..20261292` (192 runs).
-The first 91 logs were independently checked for `[MIXED_E2E_PASS]`,
-`[MIXED_E2E_COVERAGE]`, UVM report summaries, and zero nonzero UVM
-warning/error/fatal counts. The target stopped before its URG merge and its
-full-run coverage gate; the partial 91-seed result must not be used as V4
-acceptance evidence.
+The remaining 101 seeds were replayed using the compiled simulator, with each
+seed's own log and VDB under
+`/tmp/nmaforge_clean43_v4_random_remaining/seed_<seed>/`. The checked-in
+aggregator then rechecked every per-seed marker and severity gate, merged the
+compile database plus all 192 seed VDBs, and applied the Makefile's aggregate
+functional coverage gates:
+
+```sh
+bash tools/verify_a10_mixed_e2e_shards.sh \
+  /tmp/nmaforge_clean43_v4_random_20261017 \
+  /tmp/nmaforge_clean43_v4_random_remaining
+```
+
+Result: `A10_MIXED_E2E_PER_SEED_GATES_PASS seeds=192`,
+`MIXED_E2E_RANDOM_COVERAGE_PASS seeds=192`, and URG merge PASS. The merged
+`e2e_cg`, AXI AR/AW stall and R/W gap groups are each 100%; all 19 Makefile
+functional-point checks are 100%. There are 22 assertions: 20 succeeded, none
+failed or remained incomplete, and two UVM RAL `do_read`/`do_write` internals
+had no attempts. All three AXI backpressure cover properties matched. The
+aggregate report is
+`/tmp/nmaforge_clean43_v4_random_20261017/urg_merged/`.
 
 DMA test names: `dma_load_ooo_smoke_test`, `dma_2d_load_test`,
 `dma_gather_load_test`, `dma_store_booo_test`, `dma_2d_store_test`,
@@ -137,7 +155,9 @@ This is reproducibility evidence for the listed committed subset, not A10
 verification closure. It does not replace the expanded, post-commit V1–V5
 campaigns, close the remaining FP parity/writeback formal question, disposition
 all CP or DUT code-coverage residuals, or prove complete V3/V4 fault × abort ×
-reset behavior. The top smoke flow generated changes to three tracked
+reset behavior. The V4 campaign covers its specified randomized mixed-precision
+DDR E2E slice, but does not cover accelerator reset during an in-flight AXI
+transaction or complete the global V5 coverage review. The top smoke flow generated changes to three tracked
 workload/Verdi files in the temporary detached worktree; those changes were not
 copied to the main worktree or committed. No product RTL was changed by this
 replay.
