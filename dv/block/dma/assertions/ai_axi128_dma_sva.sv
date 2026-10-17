@@ -27,57 +27,68 @@ module ai_axi128_dma_sva (
         @(posedge clk) disable iff (!resetn)
         arvalid && !arready |=> arvalid && $stable({arid, araddr, arlen, arsize, arburst});
     endproperty
-    assert property (p_ar_payload_stable) else $error("DMA AXI AR payload changed while stalled");
+    ap_dma_ar_payload_stable: assert property (p_ar_payload_stable)
+        else $error("DMA AXI AR payload changed while stalled");
 
     property p_aw_payload_stable;
         @(posedge clk) disable iff (!resetn)
         awvalid && !awready |=> awvalid && $stable({awid, awaddr, awlen, awsize, awburst});
     endproperty
-    assert property (p_aw_payload_stable) else $error("DMA AXI AW payload changed while stalled");
+    ap_dma_aw_payload_stable: assert property (p_aw_payload_stable)
+        else $error("DMA AXI AW payload changed while stalled");
 
     property p_w_payload_stable;
         @(posedge clk) disable iff (!resetn)
         wvalid && !wready |=> wvalid && $stable({wdata, wstrb, wlast});
     endproperty
-    assert property (p_w_payload_stable) else $error("DMA AXI W payload changed while stalled");
+    ap_dma_w_payload_stable: assert property (p_w_payload_stable)
+        else $error("DMA AXI W payload changed while stalled");
 
     property p_dma_arid_range;
         @(posedge clk) disable iff (!resetn) arvalid |-> (arid >= 4'd1 && arid <= 4'd4);
     endproperty
-    assert property (p_dma_arid_range) else $error("DMA issued unsupported ARID");
+    ap_dma_arid_range: assert property (p_dma_arid_range)
+        else $error("DMA issued unsupported ARID");
 
     property p_dma_rid_range;
         @(posedge clk) disable iff (!resetn) rvalid |-> (rid >= 4'd1 && rid <= 4'd4);
     endproperty
-    assert property (p_dma_rid_range) else $error("DMA responder returned unsupported RID");
+    ap_dma_rid_range: assert property (p_dma_rid_range)
+        else $error("DMA responder returned unsupported RID");
 
     property p_dma_awid_range;
         @(posedge clk) disable iff (!resetn) awvalid |-> (awid >= 4'd8 && awid <= 4'd11);
     endproperty
-    assert property (p_dma_awid_range) else $error("DMA issued unsupported AWID");
+    ap_dma_awid_range: assert property (p_dma_awid_range)
+        else $error("DMA issued unsupported AWID");
 
     property p_dma_bid_range;
         @(posedge clk) disable iff (!resetn) bvalid |-> (bid >= 4'd8 && bid <= 4'd11);
     endproperty
-    assert property (p_dma_bid_range) else $error("DMA responder returned unsupported BID");
+    ap_dma_bid_range: assert property (p_dma_bid_range)
+        else $error("DMA responder returned unsupported BID");
 
     property p_ar_4k;
         @(posedge clk) disable iff (!resetn) arvalid && arready |-> stays_in_4k(araddr, arlen, arsize);
     endproperty
-    assert property (p_ar_4k) else $error("DMA AR burst crosses a 4-KiB boundary");
+    ap_dma_ar_4k: assert property (p_ar_4k)
+        else $error("DMA AR burst crosses a 4-KiB boundary");
 
     property p_aw_4k;
         @(posedge clk) disable iff (!resetn) awvalid && awready |-> stays_in_4k(awaddr, awlen, awsize);
     endproperty
-    assert property (p_aw_4k) else $error("DMA AW burst crosses a 4-KiB boundary");
+    ap_dma_aw_4k: assert property (p_aw_4k)
+        else $error("DMA AW burst crosses a 4-KiB boundary");
 
     property p_r_channel_known;
         @(posedge clk) disable iff (!resetn) rvalid |-> !$isunknown({rid, rlast, rready});
     endproperty
-    assert property (p_r_channel_known) else $error("DMA R channel contains X");
+    ap_dma_r_channel_known: assert property (p_r_channel_known)
+        else $error("DMA R channel contains X");
 
     property p_b_channel_known;
         @(posedge clk) disable iff (!resetn) bvalid |-> !$isunknown({bid, bresp, bready});
     endproperty
-    assert property (p_b_channel_known) else $error("DMA B channel contains X");
+    ap_dma_b_channel_known: assert property (p_b_channel_known)
+        else $error("DMA B channel contains X");
 endmodule

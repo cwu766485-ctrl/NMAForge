@@ -91,6 +91,31 @@ make -C dv/subsystem/dma_spad/sim subsystem_regress COV_TAG=a10_v3_refresh_20261
 
 **Scope and limits:** This is bounded subsystem evidence from a dirty-worktree snapshot, not a frozen-SHA replay. The unresolved DMA assertion, prolonged/downstream-backpressure fairness, broader fault/abort/reset combinations, residual DUT code coverage, and overall V3/A10 closure remain open.
 
+## V3 DMA–SPAD–CNM AW-payload assertion closure increment (2026-10-17)
+
+**Environment:** Rocky Linux 8.10, Synopsys VCS/URG `V-2023.12-SP1_Full64`; dirty worktree after commit `3414955`.
+
+**Change:** Added explicit labels to the existing DMA SVA properties without changing their conditions. Added a subsystem DMA-store case that holds the responder's AWREADY low for four complete cycles and checks `{AWID, AWADDR, AWLEN, AWSIZE, AWBURST}` remains stable. The backpressure is applied through the responder's clocked configuration, not a testbench `force`; the case runs after the CNM/DMA contention checks so it does not perturb their existing grant assumptions. No product RTL, SPEC, or ABI was changed.
+
+**Commands:**
+
+```sh
+make -C dv/subsystem/dma_spad/sim subsystem_compile \
+  SIMV=/tmp/nmaforge_a10_v3_aw_stall_subsystem_20261017c/simv_dma_spad \
+  COV_DIR=/tmp/nmaforge_a10_v3_aw_stall_subsystem_20261017c/compile.vdb \
+  COMPILE_LOG=/tmp/nmaforge_a10_v3_aw_stall_subsystem_20261017c/compile.log \
+  VCS='vcs -licwait 1 -Mdir=/tmp/nmaforge_a10_v3_aw_stall_subsystem_20261017c/csrc'
+# Run dma_spad_subsystem_test with VCS coverage enabled for seeds
+# 20261110 through 20261119; merge compile and ten run VDBs with URG.
+make -C dv/subsystem/top_smoke/sim ai_smoke
+```
+
+**Result:** Compile PASS; 10/10 subsystem seeds PASS, each with UVM warning/error/fatal=`0/0/0`, `[DMA_AW_STALL_PASS]`, `[SPAD_CNM_DMA_PASS]`, and `[DMA_SPAD_ERR_DRAIN_PASS]`. The new AW stability property recorded 50 real successes and zero failures. Merged URG `/tmp/nmaforge_a10_v3_aw_stall_subsystem_20261017c/urg_merged`: 31 assertions, 29 success, 0 failure/incomplete; the only two without attempts are UVM RAL internal `do_read`/`do_write`. All 13 selected functional groups are 100%. Top `ai_smoke` printed `TEST PASS` and exited 0.
+
+**Debug note:** An initial draft used a virtual-interface force and raced the responder's clocked NBA update; seed `20261111` exposed this as 15 test/protocol errors. Replacing it with the existing responder config hook removed the race. A second draft placed the stall inside the CNM contention window and changed the randomized overlap coverage assumptions; moving the directed stall after contention restored the original test's intent. Neither draft changed the DUT. The final 10-seed result above is from the corrected version.
+
+**Scope and limits:** This closes the previously unmapped subsystem DMA AW-stability assertion slice; it is not V3 signoff. Long/downstream-backpressure fairness, broader randomized fault×abort×reset combinations, DUT-only residual code coverage, full command/completion lifecycle, and frozen-SHA replay of the new test remain open. This is dirty-worktree verification evidence.
+
 ## V1 floating-point dot UVM/URG refresh (run date: 2026-10-17)
 
 **Environment:** Rocky Linux 8.10, Synopsys VCS/URG `V-2023.12-SP1_Full64`; current dirty worktree.

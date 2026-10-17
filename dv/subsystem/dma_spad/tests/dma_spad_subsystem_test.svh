@@ -1337,6 +1337,60 @@ class dma_spad_subsystem_test extends dma_block_base_test;
             env.axi_rsp.check_out_of_order();
     endtask
 
+    task run_dma_store_with_aw_stall(bit [63:0] ext_addr, bit [31:0] spad_addr);
+        logic [80:0] stalled_aw_payload;
+        int unsigned checked_stall_cycles;
+        int unsigned timeout_cycles;
+
+        checked_stall_cycles = 0;
+        timeout_cycles = 0;
+        // Use the responder's clocked configuration hook instead of forcing
+        // the interface signal; this avoids racing its AWREADY NBA driver.
+        @(negedge sys_vif.clk);
+        env.axi_rsp.cfg.force_awready_low = 1'b1;
+        fork
+            run_dma_command(1'b1, ext_addr, spad_addr);
+            begin : check_aw_stall_window
+                while (env.axi_rsp.vif.awvalid !== 1'b1 && timeout_cycles < 10000) begin
+                    @(negedge sys_vif.clk);
+                    timeout_cycles++;
+                end
+                if (timeout_cycles == 10000) begin
+                    `uvm_error("DMA_AW_STALL", "AWVALID did not assert during the forced AWREADY-low window")
+                end else begin
+                    if (env.axi_rsp.vif.awready !== 1'b0)
+                        `uvm_error("DMA_AW_STALL", "AWREADY was not held low when AWVALID asserted")
+                    stalled_aw_payload = {
+                        env.axi_rsp.vif.awid, env.axi_rsp.vif.awaddr,
+                        env.axi_rsp.vif.awlen, env.axi_rsp.vif.awsize,
+                        env.axi_rsp.vif.awburst
+                    };
+                    // Sample away from the responder/DUT active clock edge.
+                    repeat (4) begin
+                        @(negedge sys_vif.clk);
+                        checked_stall_cycles++;
+                        if (env.axi_rsp.vif.awready !== 1'b0 ||
+                            env.axi_rsp.vif.awvalid !== 1'b1 ||
+                            {env.axi_rsp.vif.awid, env.axi_rsp.vif.awaddr,
+                             env.axi_rsp.vif.awlen, env.axi_rsp.vif.awsize,
+                             env.axi_rsp.vif.awburst} !== stalled_aw_payload)
+                            `uvm_error("DMA_AW_STALL", $sformatf(
+                                "AW payload changed during responder-held stall cycle %0d",
+                                checked_stall_cycles))
+                    end
+                end
+                env.axi_rsp.cfg.force_awready_low = 1'b0;
+            end
+        join
+
+        if (checked_stall_cycles == 4)
+            `uvm_info("DMA_AW_STALL_PASS",
+                "AW payload remained stable for four subsystem-level stalled cycles; store completed", UVM_LOW)
+        else
+            `uvm_error("DMA_AW_STALL", $sformatf(
+                "observed %0d forced AW stall cycles; expected four", checked_stall_cycles))
+    endtask
+
     task run_dma_expected_read_error();
         dma_cmd_item req;
         dma_one_command_sequence seq;
@@ -3806,6 +3860,10 @@ class dma_spad_subsystem_test extends dma_block_base_test;
                 result_readback, expected_cnm_result[31:0]))
         else
             `uvm_info("SPAD_CNM_DMA_STORE_PASS", "CNM writeback and DMA SPAD-to-DDR store both completed with shared-SPAD checking", UVM_LOW)
+
+        // Keep the legacy contention phase deterministic with respect to its
+        // grant-coverage checks, then exercise AW backpressure in isolation.
+        run_dma_store_with_aw_stall(64'h0000_f400, 32'h0600);
 
         run_cnm_abort_after_read_response();
         run_cnm_recovery_after_abort(expected_cnm_result);
