@@ -1,7 +1,8 @@
 # NMAForge 混合精度扩展规格（BF16/FP16 Dot）
 
 > 当前产品基线为 A10 / ABI v7.4：`0x50` 保留 BF16 点积，`0x51` 新增 FP16 点积；共用 FP32 累加、scratchpad 访问与 completion 路径。
-> 已有 VCS 证据：FP16 乘法 10,015 向量 PASS；mixed-dot UVM 两个 seed 各 162/162 scoreboard transaction（142 数值、14 期望错误、6 个状态内 reset），成功数值 covergroup 100%，URG merge 成功；本轮 `ai_smoke` PASS，前序 20-case seeded top regression PASS，DDR→SPAD→FP16→SPAD→DDR 结果为 `0x41300000`。`state_r` 23/23 转移命中；`pending_error_r` 13/18 转移命中，部分 condition/branch coverage disposition 和新增 FP PPA 尚未完成。
+> 完整 VCS 基线证据（2026-10-14）：FP16 乘法 10,015 向量 PASS；mixed BF16/FP16 UVM seeds `712345/987654/20261014` 各 582/582 scoreboard PASS（每 seed 536 numeric + 46 fault/reset），总计 1,746 笔；numeric、fault/reset、busy-start、response-latency functional coverage 均 100%，peak outstanding read=2；request-under-stall SVA 34,928 attempts、10,761 real successes、0 failures/incomplete。DUT line/condition/branch/FSM coverage 为 97.96%/96.50%/92.86%/71.43%；主 `state_r` 5/5 states、10/10 transitions。非法状态 default 注入通过；7 个 condition、4 个 branch outcomes 与 8 个 pending-error FSM transitions 已逐项 disposition（未做形式不可达证明）。`ai_smoke` 与 20-case seeded top regression PASS，DDR→SPAD→FP16→SPAD→DDR 结果为 `0x41300000`。无新增 FP PPA。详见 [A10 固定快照验证记录](../verification/A10_DV_BASELINE_2026-10-14.md) 与 [A10 RTM](../verification/A10_DV_RTM.md)。
+> 补充复跑（2026-10-15）：`dot-core-test` 通过；BF16/FP16 mixed UVM seeds `712345/987654/20261014` 各 200/200 bit-exact scoreboard，peak outstanding read=2，所选数值、response-latency、fault/reset、busy-start functional coverage 均 100%，UVM warning/error/fatal=`0/0/0`。这次 64-random-vector-per-format 回归是对上述更大基线的增量复核，不替代 584/584-per-seed 证据；运行记录见 [A10 当前复跑](../verification/A10_DV_RUN_2026-10-15.md)。
 > A8 / ABI v7.2 与 A9 / ABI v7.3 均为历史兼容版本，其能力以 `SPEC_ZH.md` 为准。
 
 ## 1. 产品点积功能
@@ -99,8 +100,10 @@ NaN/零符号/溢出/取消抵消等完整 corner-case 集合。
   activation、transpose、batch/head 扩展字段均视为非法，不能静默忽略。
 - 所有 SPAD 请求仍经 `ai_spad_arbiter` 的现有 32-bit `core_*` 计算端口。
   当前 `ai_scratchpad` 的 scheduler 读数据为两级寄存路径，仲裁器也按
-  两周期对齐 response。FP 适配器必须等待 `ready` 接收，再按对应
-  `rsp_valid/rsp_client` 消费响应。A/B word 顺序读取并缓冲；仲裁等待会
+  两周期对齐 response。FP 适配器每周期至多提出一个新请求，使用两个
+  operand-pair buffer 保持最多两笔已接受但未返回的读请求，并依请求顺序消费
+  `rsp_valid/rsp_client` 响应；该接口没有可用于重排的 read ID。适配器必须等待
+  `ready` 接收。A/B word 顺序读取并缓冲；仲裁等待会
   延长实际间隔，因此不可预设每周期双操作数吞吐。新引擎只接入现有
   arbiter，不另加 SRAM 旁路；该 core 端口由当前被派发的唯一计算引擎使用。
 
@@ -181,9 +184,12 @@ G0、G1、G2 均已关闭。G2 的当前验收证据：
    `commands=2 launches=2 events=2 completion_words=8 errors=0 overflow=0`。
 4. A10 增加 directed DDR→DMA→SPAD→queued FP16→SPAD→DMA→DDR 闭环，结果 word 与
    completion 均为 `0x41300000`；`ai_run AI_RANDOM_CASES=20 AI_SEED=12345` 同样 PASS。
-   Mixed UVM 双 seed 与 URG merge 已通过：每 seed 162/162，含 14 笔期望错误和六个
-   active-state reset 场景；`state_r` 23/23 transitions 覆盖。`pending_error_r` 13/18
-   transitions；未命中 bin 及部分 condition/branch coverage 尚未 disposition。UVM
-   已验证 abort 在 SPAD read 握手前取消请求，不把取消的请求记作已接受访问。
+   Mixed UVM 三 seed 与 URG merge 已通过：每 seed 582/582，包括 536 数值和 46 fault/reset
+   事务；覆盖忙时忽略第二次 start、随机有序 response latency、watchdog 边界、两笔 outstanding
+   read、late protection prefix、late protection/abort 优先级及握手前 abort。request-stall SVA 为
+   34,928 attempts/10,761 real successes/0 failures。`state_r` 5/5 states、10/10 transitions；
+   `pending_error_r` 10/18 transitions。DUT line/condition/branch/FSM 为
+   97.96%/96.50%/92.86%/71.43%；非法状态注入通过，剩余 branch/condition/error-FSM outcomes 均已
+   逐项 disposition，无 URG exclusion（未做形式不可达证明）。详细数字见 A10 baseline 与 RTM。
 5. 运行环境为 Rocky-8.10 WSL / VCS V-2023.12-SP1，工作区 dirty。无新增 FP PPA；
    本页不声称 G3 已闭合或 sign-off。

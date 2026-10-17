@@ -59,6 +59,7 @@ module ai_banked_cnm_core(
     reg [4:0] scale_shift_r;
     reg [1:0] activation_r;
     reg [31:0] watchdog_limit_r;
+    reg cnm_protection_error_seen_r;
     wire local_start = (state_r == ST_LAUNCH);
     wire [3:0] local_busy, local_done, local_error;
     wire signed [63:0] sum0, sum1, sum2, sum3;
@@ -137,10 +138,15 @@ module ai_banked_cnm_core(
             cycle_count<=0; element_count<=0; op_r<=0; src0_r<=0;
             b_row_base_r<=0; output_addr_r<=0; length_r<=0; m_r<=0; row_r<=0;
             scale_shift_r<=0; activation_r<=0; watchdog_limit_r<=0;
+            cnm_protection_error_seen_r<=0;
             local_accumulate_events<=0; global_reduce_events<=0; banked_read_issue_events<=0;
             prefetch_events<=0; pipeline_compute_events<=0; response_wait_cycles<=0;
         end else begin
             done<=0;
+            if (state_r==ST_IDLE && start)
+                cnm_protection_error_seen_r<=1'b0;
+            else if ((|cnm_rsp_valid) && cnm_protection_error)
+                cnm_protection_error_seen_r<=1'b1;
             if (state_r==ST_IDLE && start)
                 cycle_count<=0;
             else if (busy)
@@ -160,7 +166,10 @@ module ai_banked_cnm_core(
                     else state_r<=ST_LAUNCH;
                 end
                 ST_LAUNCH: state_r<=ST_WAIT_LOCAL;
-                ST_WAIT_LOCAL: if (any_local_error) begin error_code<=cnm_protection_error ? ERR_PROTECTION : ERR_PARITY; state_r<=ST_ERROR; end
+                ST_WAIT_LOCAL: if (any_local_error) begin
+                                   error_code<=cnm_protection_error_seen_r ? ERR_PROTECTION : ERR_PARITY;
+                                   state_r<=ST_ERROR;
+                               end
                                else if (locals_complete) begin
                                    // Local-controller counters restart for each
                                    // GEMV output row.  Retire their completed

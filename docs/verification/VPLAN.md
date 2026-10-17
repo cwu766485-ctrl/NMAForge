@@ -1,8 +1,14 @@
 # NMAForge 验证计划（VPLAN）
 
-版本：A8 / ABI v7.2
-日期：2026-08-27
+版本：A10 / ABI v7.4
+更新：2026-10-16
 顶层：`rtl/top/ai_accel_top.v`
+
+> 本文最初按 A8 / ABI v7.2 编写，后续阶段描述仍可作为验证路线图；其中带日期的旧 PASS、工具和 coverage 数值是历史记录，不代表 A10 固定快照已在本轮复跑。A10 的逐项需求追踪见 [`A10_DV_RTM.md`](A10_DV_RTM.md)，本轮固定 SHA 的执行结果见 [`A10_DV_BASELINE_2026-10-14.md`](A10_DV_BASELINE_2026-10-14.md)。
+
+> **较早的 A10 快照（2026-10-16；DMA 数字已由下一条更新）：** 当时 DMA UVM 14-test regression 为 14/14 PASS、UVM severity 0、`dma_cmd_cg` 14/14 variables + 5/5 crosses、11/11 DMA DUT SVA attempted/success；DUT-only line/condition/toggle/FSM/branch 为 89.44/68.73/36.94/53.57/85.98%。真实 DMA/SPAD/CNM 3-seed compatibility replay 也通过：8/8 选定功能组 100%，31 assertions 中 29 success、0 failure/incomplete、2 个 UVM RAL no-attempt。Command Processor 最新 direct-config/busy-guard campaign 为 18/18 runs、28/28 scenario bins、`cp_cg` 48/48 variables + 10/10 crosses；CP RTL condition/toggle residual 与全局 disposition 仍 open。顶层 mixed-precision UVM active-reset、watchdog/software-abort 与随机 DDR E2E campaign 有通过证据，latest targeted `e2e_cg` 为 54/54 variables + 16/16 crosses。以上均为当前 dirty worktree 的选定回归证据，不代表 A10 V1–V5 总体验收、固定 SHA clean replay 或全设计 code/assertion sign-off。准确证据边界与复跑命令见 [A10 RTM](A10_DV_RTM.md) 和 [A10 baseline](A10_DV_BASELINE_2026-10-14.md)。
+
+> **DMA 最新复跑（2026-10-16，覆盖上一条中的 14-test 数据）：** SPAD request-error drain 用例 focused rerun 与 DMA UVM 全回归 **15/15 PASS**，UVM warning/error/fatal=`0/0/0`，随机压力 20/20；`dma_cmd_cg` 14/14 variables + 5/5 crosses，11/11 DMA DUT SVA attempted/success、0 failure/incomplete，2 个 UVM RAL no-attempt。DUT-only `ai_axi128_dma` line/condition/toggle/FSM/branch=`93.48/71.04/37.11/53.57/86.92%`。更新后的共享 agent 又通过真实 DMA/SPAD/CNM 三 seed 兼容复跑（3/3、8/8 selected groups 100%、29/31 assertions success）；随后 top `ai_smoke` 和 `ai_run AI_RANDOM_CASES=20 AI_SEED=12345` 也 PASS。此为 dirty worktree 增量结果；A10 V1–V5、frozen-SHA replay 和全设计 code/assertion sign-off 仍未完成。详见 [A10 RTM](A10_DV_RTM.md) 与 [A10 run record](A10_DV_RUN_2026-10-16.md)。
 
 ## 1. 验证目标
 
@@ -142,7 +148,26 @@ Formal 采用分层约束：先 block-level，再 top-level；对 AXI 外部接�
 
 ## 8. 当前起始任务
 
-当前优先级是扩大已经可运行的 block UVM：先补 CMDQ/CPLQ completion、scratchpad
-arbiter 与 tensor datapath 的 reference model、scoreboard 和 coverage；随后做多 seed
-top-level random/coverage。SpyGlass lint 继续逐项处理真实 error；CDC/RDC 的许可证限制
-单独记录。原有 VCS smoke 始终保留为每次 RTL 修改后的快速回归基线。
+当前 A10 验证按 `docs/verification/A10_DV_RTM.md` 的 V1–V5 状态推进，五阶段均未 overall
+complete。V1 FP dot 有强 block 证据：三 seed 各 200 random，另加 fault/reset/error-transition，
+每 seed 476/476 bit-exact checks、severity 0、peak outstanding=2；fault-format/mode coverage 48/48，
+late-B protection 前缀行为通过。RTL coverage
+残余已按结构与 SPAD 协议逐项 disposition（非形式不可达证明），冻结 SHA clean replay 仍待执行。V2 command/completion 与
+V3 DMA/SPAD 已有多 seed block/subsystem 证据，统一 closure 仍开。VCS compile、`ai_smoke`、
+20-case top random、Control UVM、DMA UVM 15/15 tests（14/14 `dma_cmd_cg` variables、5/5 crosses、11/11 DMA DUT SVA；最新 DUT-only line/condition/toggle/FSM/branch=`93.48/71.04/37.11/53.57/86.92%`）、DMA 更新后 3-seed DMA/SPAD compatibility replay（8/8 selected groups 100%，29/31 assertions success，0 failure/incomplete）及 Command Processor 最新 3-seed × 6-profile coverage campaign（18/18 runs、28/28 scenarios、48/48 functional variables、10/10 crosses）均有通过证据。Command Processor 最新 line/condition/toggle/FSM/branch=`100.00/83.67/10.10/100.00/88.06%`；其 residual condition/branch/toggle 仍待逐项 disposition。以上不是 A10 V1–V5 总体验收或全设计 code/assertion sign-off。
+
+V4 普通 `uvm_mixed_precision_ddr_e2e_regress` 六次 order/layout 回归均 PASS；16-run mixed-FP DDR E2E
+K sweep 与 AXI-gap coverage regression 也 PASS。最新 192-seed
+`make -C dv/uvm/sim uvm_mixed_precision_ddr_e2e_random_cov_regress` 使用确定性 seeds `20261101..20261292`，不设置
+order/layout/FP16 K/BF16 K override，由 seeded UVM 随机化合法 descriptor 顺序、SPAD layout、K=1..4
+长度、operands 和有界 AXI gap 配置。每次运行包含 queued INT8/BF16/FP16、invalid-descriptor validator、DMA
+RRESP SLVERR 的首拍/末拍位置、compute-active reset、DMA response outstanding 时协调式系统 reset、FP watchdog
+与软件 abort。192/192 seed 日志 PASS，UVM_WARNING/ERROR/FATAL 均为 0；每个 seed 均核对 AXI burst sentinel、
+completion、reset/recovery 与 abort drain。最新 URG `/tmp/nmaforge_a10_20261016_e2e_independent_reset_final/urg_merged`
+中的 `e2e_cg` 为 54/54 variable bins、16/16 cross bins（100%）；`dma_error_position_cg` 首拍/末拍位置各命中
+192 次，compute-active 且 AXI idle 时的 accelerator-only reset / DDR-live bin 也每 seed 命中。Whole-design raw
+dashboard 为 43.05%，混合 DUT、TB 与 UVM，不作为 DUT-only 覆盖结论。AXI gap 配置每次 run 固定，并非逐事务
+独立随机；reset 只覆盖总线 idle 边界，不验证 AXI transaction 在途时保持 DDR responder 工作。更广
+descriptor/error 随机、随机 reset phase、global code/assertion review、mutation 与最终固定提交 replay 仍未完成；
+targeted 100% 不代表 V4/V5 或 overall A10 closure。Campaign artifacts
+留在 `/tmp`，SpyGlass 工具/许可证边界继续单独记录；`ai_smoke` 保留为相关 RTL 修改后的基线。

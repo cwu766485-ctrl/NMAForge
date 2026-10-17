@@ -2,6 +2,7 @@
 
 interface ai_bf16_dot_if(input logic clk, input logic resetn,
                           output logic reset_force);
+    logic illegal_state_test_done;
     logic start;
     logic format_fp16;
     logic abort;

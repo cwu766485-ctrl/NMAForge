@@ -1,0 +1,40 @@
+VCS ?= vcs
+UVM_TEST ?= dma_spad_subsystem_test
+SIMV ?= simv_dma_spad_uvm
+SEED ?= 20261014
+SEEDS ?= 12345 987654 20261014
+COV_TAG ?=
+COV_SUFFIX = $(if $(strip $(COV_TAG)),_$(COV_TAG),)
+COV_DIR ?= coverage/$(UVM_TEST)$(COV_SUFFIX)_seed$(SEED).vdb
+RUN_LOG ?= $(UVM_TEST)$(COV_SUFFIX)_seed$(SEED).log
+COMPILE_LOG ?= compile_$(UVM_TEST)$(COV_SUFFIX)_seed$(SEED).log
+URG ?= urg
+URG_REPORT ?= coverage/urg_$(UVM_TEST)$(COV_SUFFIX)_3seed
+
+.PHONY: subsystem_compile subsystem_run subsystem_regress subsystem_coverage subsystem_clean
+
+subsystem_compile:
+	mkdir -p $(dir $(COV_DIR))
+	$(VCS) -full64 -sverilog -ntb_opts uvm-1.2 -debug_access+all -assert svaext \
+		-cm line+cond+fsm+tgl+branch+assert -cm_dir $(COV_DIR) \
+		-timescale=1ns/1ps +define+VCS -top tb_ai_dma_spad_subsystem_uvm \
+		-f dma_spad_subsystem_uvm.f -o $(SIMV) -l $(COMPILE_LOG)
+
+subsystem_run: subsystem_compile
+	./$(SIMV) +UVM_TESTNAME=$(UVM_TEST) +ntb_random_seed=$(SEED) +UVM_VERBOSITY=UVM_MEDIUM \
+		-cm line+cond+fsm+tgl+branch+assert -cm_dir $(COV_DIR) -l $(RUN_LOG)
+	@grep -q '\*\* Report counts by severity' $(RUN_LOG) || { echo "ERROR: UVM report summary missing"; exit 1; }
+	@! grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' $(RUN_LOG) || { echo "ERROR: UVM warning/error/fatal count is nonzero"; exit 1; }
+
+subsystem_regress:
+	@set -e; for seed in $(SEEDS); do \
+		$(MAKE) --no-print-directory subsystem_run SEED=$$seed COV_TAG=$(COV_TAG); \
+	done
+	$(MAKE) --no-print-directory subsystem_coverage COV_TAG=$(COV_TAG)
+
+subsystem_coverage:
+	$(URG) -full64 $(foreach seed,$(SEEDS),-dir coverage/$(UVM_TEST)$(COV_SUFFIX)_seed$(seed).vdb) -report $(URG_REPORT)
+	@test -f $(URG_REPORT)/dashboard.html || { echo "ERROR: URG dashboard missing"; exit 1; }
+
+subsystem_clean:
+	rm -rf csrc $(SIMV) $(SIMV).daidir ucli.key vc_hdrs.h *.log simv* verdiLog DVEfiles *.vdb

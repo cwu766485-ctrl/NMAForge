@@ -56,6 +56,7 @@ dv/spyglass/a8_static/
 dv/spyglass/cdc_dual_clock/
 dv/subsystem/top_smoke/sim/*.saif
 dv/block/**/sim/coverage/
+dv/subsystem/**/sim/coverage/
 
 # Public repository hygiene
 docs/*.pdf
@@ -118,3 +119,10 @@ dv/spyglass/tsmc28_sram_macro_stub.v
 # Local tool UI artefacts and installed Codex skills are not project sources.
 /verdiLog/
 /.agents/skills/chip-architecture-diagram/
+
+# Synopsys VCS/VCST local session and environment metadata.
+/.dw_map_file
+/.vc_env_*.txt
+/.vcstPref
+/vcst_rtdb/
+/vcst_session.log*

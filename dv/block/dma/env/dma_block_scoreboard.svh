@@ -20,7 +20,13 @@ class dma_block_scoreboard extends uvm_component;
         }
         cp_outstanding: coverpoint cov_outstanding { bins one = {1}; bins many = {[2:3]}; bins four = {4}; }
         cp_4k: coverpoint cov_crosses_4k { bins no = {0}; bins yes = {1}; }
-        x_load_modes: cross cp_direction, cp_shape, cp_gather;
+        x_transfer_modes: cross cp_direction, cp_shape, cp_gather {
+            // ai_axi128_dma rejects gather when the command is a store or is
+            // not 2-D; do not count those ERR_CONFIG combinations as holes.
+            ignore_bins unsupported_gather_modes =
+                binsof(cp_gather.enabled) &&
+                (binsof(cp_direction.store) || binsof(cp_shape.linear));
+        }
     endgroup
 
     `uvm_component_utils(dma_block_scoreboard)

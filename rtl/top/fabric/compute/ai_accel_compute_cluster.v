@@ -183,7 +183,11 @@ module ai_accel_compute_cluster (
         .spad_ready(arb_core_ready),
         .spad_protection_error(compute_prot_error),
         .busy(banked_busy), .done(banked_done), .error(banked_error), .error_code(banked_error_code),
-        .result(banked_result), .cycle_count(banked_cycle_count), .element_count(banked_element_count)
+        .result(banked_result), .cycle_count(banked_cycle_count), .element_count(banked_element_count),
+        // Optional CNM benchmark counters are not part of the top-level ABI.
+        .local_accumulate_events(), .global_reduce_events(),
+        .banked_read_issue_events(), .prefetch_events(),
+        .pipeline_compute_events(), .response_wait_cycles()
     );
 
     ai_tensor_matrix_core tensor_matrix_u(

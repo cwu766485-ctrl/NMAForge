@@ -46,14 +46,26 @@ class control_axil_driver extends uvm_driver #(control_axil_item);
                 end
                 @(negedge vif.aclk); vif.wvalid <= 0;
             end
-            begin
-                repeat (req.bready_delay + 1) @(negedge vif.aclk);
-                vif.bready <= 1;
-                while (!(vif.bvalid && vif.bready)) begin
-                    @(negedge vif.aclk); cycles++;
-                    if (cycles >= MAX_HANDSHAKE_WAIT)
-                        `uvm_fatal("AXIL_TIMEOUT", $sformatf("B timeout addr=%08h aw_delay=%0d w_delay=%0d awvalid/ready=%0b/%0b wvalid/ready=%0b/%0b bvalid/ready=%0b/%0b", req.addr, req.aw_delay, req.w_delay, vif.awvalid, vif.awready, vif.wvalid, vif.wready, vif.bvalid, vif.bready))
+            begin : b_response_thread
+                int unsigned response_cycles;
+                response_cycles = 0;
+                // Apply response back-pressure relative to BVALID, not to
+                // request launch; otherwise a long AW/W skew can consume the
+                // delay before the response exists and leave p_b_stable
+                // vacuous.
+                while (vif.bvalid !== 1'b1) begin
+                    @(posedge vif.aclk); response_cycles++;
+                    if (response_cycles >= MAX_HANDSHAKE_WAIT)
+                        `uvm_fatal("AXIL_TIMEOUT", $sformatf("BVALID timeout addr=%08h", req.addr))
                 end
+                repeat (req.bready_delay) @(negedge vif.aclk);
+                vif.bready <= 1;
+                do begin
+                    @(posedge vif.aclk);
+                    response_cycles++;
+                    if (response_cycles >= MAX_HANDSHAKE_WAIT)
+                        `uvm_fatal("AXIL_TIMEOUT", $sformatf("B timeout addr=%08h aw_delay=%0d w_delay=%0d awvalid/ready=%0b/%0b wvalid/ready=%0b/%0b bvalid/ready=%0b/%0b", req.addr, req.aw_delay, req.w_delay, vif.awvalid, vif.awready, vif.wvalid, vif.wready, vif.bvalid, vif.bready))
+                end while (!(vif.bvalid && vif.bready));
                 req.resp = vif.bresp; b_seen = 1;
             end
         join
@@ -79,14 +91,24 @@ class control_axil_driver extends uvm_driver #(control_axil_item);
                 end
                 @(negedge vif.aclk); vif.arvalid <= 0;
             end
-            begin
-                repeat (req.rready_delay + 1) @(negedge vif.aclk);
-                vif.rready <= 1;
-                while (!(vif.rvalid && vif.rready)) begin
-                    @(negedge vif.aclk); cycles++;
-                    if (cycles >= MAX_HANDSHAKE_WAIT)
-                        `uvm_fatal("AXIL_TIMEOUT", $sformatf("R timeout addr=%08h rready_delay=%0d", req.addr, req.rready_delay))
+            begin : r_response_thread
+                int unsigned response_cycles;
+                response_cycles = 0;
+                // Hold RREADY low for the requested number of cycles after
+                // RVALID arrives so the DUT response-stability SVA is exercised.
+                while (vif.rvalid !== 1'b1) begin
+                    @(posedge vif.aclk); response_cycles++;
+                    if (response_cycles >= MAX_HANDSHAKE_WAIT)
+                        `uvm_fatal("AXIL_TIMEOUT", $sformatf("RVALID timeout addr=%08h", req.addr))
                 end
+                repeat (req.rready_delay) @(negedge vif.aclk);
+                vif.rready <= 1;
+                do begin
+                    @(posedge vif.aclk);
+                    response_cycles++;
+                    if (response_cycles >= MAX_HANDSHAKE_WAIT)
+                        `uvm_fatal("AXIL_TIMEOUT", $sformatf("R timeout addr=%08h rready_delay=%0d", req.addr, req.rready_delay))
+                end while (!(vif.rvalid && vif.rready));
                 req.rdata = vif.rdata; req.resp = vif.rresp; r_seen = 1;
             end
         join

@@ -1,13 +1,21 @@
 # NMAForge AXI4 近存张量加速器详细规格（中文）
 
-**RTL：A10；软件 ABI：v7.4；版本寄存器：`0x1000_000a`；顶层：`rtl/top/ai_accel_top.v`；事实日期：2026-10-13。**
+**RTL：A10；软件 ABI：v7.4；版本寄存器：`0x1000_000a`；顶层：`rtl/top/ai_accel_top.v`；事实日期：2026-10-17。**
 
 > 本文按当前 RTL 及 `sw/include/cimforge_regs.h` 编写；发生冲突时，RTL 和头文件优先。本文只陈述已实现的全数字 RTL，规划项不会被写作已交付能力。
 
 > 当前 A10 保留 `0x50 BF16_DOT_ACC_FP32`，新增 `0x51 FP16_DOT_ACC_FP32`；top smoke 已验证
 > FP16 的 DDR→DMA→SPAD→命令/共享 completion→FP→SPAD→DMA→DDR 闭环，结果为 FP32 `0x41300000`。
-> 混合精度 dot UVM 双 seed 与 URG 合并已运行，功能 covergroup 为 100%，但 DUT code/FSM coverage
-> 尚未 closure；没有新增 FP PPA。全芯片 SpyGlass lint 当前为 0 errors、285 warnings、4 infos，尚非 warning
+> 顶层 UVM 现以六个可复现运行穷举同一 CMDQ 中 FP16 `0x51`、BF16 `0x50` 和 INT8 VDOT `0x10` 的全部 6 种提交顺序；每次均由独立参考模型检查三条成功 completion、SPAD 结果和 DDR 回写，随后在 CMDQ slot 3 提交一类非法 FP16 descriptor，六次分别覆盖 opcode、version、dimension、alignment、stride 与 flags 错误，并检查 `ERR_DESC` completion、CMDQ/CPLQ 环绕及错误 IRQ sticky/W1C。FP16/BF16 K=1/2 与有符号 INT8 lane 随 seed 变化。该六类是定向 validator 场景，不等于广泛随机 descriptor、AXI 错误或 reset recovery 闭环。
+> 混合精度 dot UVM 最新工作树复跑的 seeds `712345/987654/20261015` 各有 484/484 scoreboard PASS
+>（430 numeric + 54 fault/reset/error-transition），合计 1,452 笔，UVM warning/error/fatal 均为 0；
+> 每个 seed 峰值 outstanding read=2，selected numeric/fault/reset 与 odd-tail parity coverage 均为 100%。DUT
+> line/condition/FSM/branch 为 97.96%/97.00%/85.71%/92.86%。主 `state_r` 为 5/5 states、10/10
+> transitions；`pending_error_r` 为 6/6 states、14/18 transitions；`ERR_ABORT`、`ERR_CONFIG`、`ERR_WATCHDOG` 在 `ST_WRITE` 的 prior-error 条件已形式证明排除，parity prior-error 转移仍未闭环。2026-10-17 新增 B 侧 NaN、`0×Inf` 与 B 侧 Inf 定向向量后，Python `unittest` 19/19 PASS；odd-length final-word parity 测试覆盖 BF16/FP16；late-B protection 用 1-cycle registered response 命中 ready-pair/error-cutoff cover，每 seed 两次；合并 request-stability SVA 为 28,290 attempts、8,610 real successes、0 failure/incomplete。
+> 最新 `ai_smoke` 与 seed `12345` 的 20-case top run 均 PASS（2026-10-17 当前工作树）；完整命令、coverage 与限制见 A10 RTM / run record。
+> 2026-10-17 VC Formal 证据：reset-initialized canonical harness 的 12/12 选定断言 proven、2/2 covers 命中且 setup clean；最新长度 1–4 parity harness 在 360 s 预算下通过 5/5 non-vacuous assertions、2/2 covers（depth 5）。扩展到全部非零 16-bit 长度后，read accounting、请求 word index 边界、cutoff 禁止 compute、drain 后进入 `ST_ERROR` 均已 proven；全长 cutoff/progress/writeback parity 属性仍未收敛且无反例。全长 parity disposition 仍未闭环；reset-release/RDC 也不属于本次形式证明范围。
+> 没有新增 FP PPA。
+> 全芯片 SpyGlass lint 当前为 0 errors、285 warnings、4 infos，尚非 warning
 > closure/signoff。formal/LEC/DFT、后布局签核和 XCZU15EG 实板端到端验收仍未完成。
 
 ## 1. 产品定位
@@ -67,6 +75,8 @@ SRAM bank3 <-> LC3 + PE3 <--- cnm_addr3 / cnm_ready[3] / cnm_rsp_valid[3]
 
 VCS 通过 `+define+VCS` 使用 `rtl/memory/ai_scratchpad.v` 的行为 RAM；Vivado 使用 XPM 分支。私有 ASIC overlay 将每个逻辑 bank 映射为 8 个 4K×32 单端口 macro，共 32 个 macro；具体 wrapper、库 view 和 macro 名称均不进入公开仓库。公开 SpyGlass profile 不展开 512 KiB 行为数组；实际综合和 STA 以私有、受许可的 `.db/.lib` 为权威。未对齐、越界、无权限或保护冲突访问必须报错。
 
+SPAD 保护寄存器配置四个区域 R0–R3；每区的 `BASE` 是包含的起始字节地址，`LIMIT` 是不包含的结束字节地址。`PERM[0..3]` 依次表示 read、write、execute、enable；只有 enable 置位的区域参与匹配。有效请求必须在单个区域内完整结束（`addr + bytes <= LIMIT`），不能把相邻区域拼接；区域之间按 OR 匹配，任一完整匹配即可允许。若四区均禁用，保护检查为兼容模式并允许请求；启用任一区域后，零字节请求拒绝。无效请求不构成访问并通过保护检查。请求结束地址以 33 位计算，越过 32 位 SPAD 地址空间的访问不能匹配任何区域。该模块只产生 allow/deny；集成 fabric 负责把拒绝转换为对应客户端的保护错误与事务恢复行为。
+
 ## 4. 队列、描述符与完成项
 
 软件写 CMDQ 描述符并发布 `CMDQ_TAIL`，硬件消费并报告 `CMDQ_HEAD`；硬件写 CPLQ 完成项并发布 `CPLQ_TAIL`，软件消费后发布 `CPLQ_HEAD`。CMDQ/CPLQ 可放在 scratchpad 或外部内存，`CMD_CTRL[0]` 选择外部描述符。CMD_HEAD/CPL_TAIL 的写仅用于复位/调试种子，不是正常运行时的软件推进方式。
@@ -89,6 +99,8 @@ VCS 通过 `+define+VCS` 使用 `rtl/memory/ai_scratchpad.v` 的行为 RAM；Viv
 
 描述符版本、opcode、必要尺寸、宏子描述符或依赖不合法时必须拒绝。转置通过地址/布局产生，不要求整矩阵复制。完成项固定 16 字节：word0=task ID、word1=状态和 error[7:4]、word2=result、word3=element count。关键错误：abort=3、fetch=6、validation=7、empty queue=8、completion=9、protection=10、dependency=12；`ERROR_INFO` 的 source=1/2 分别代表命令/DMA 来源。
 
+宏 opcode `0x40`–`0x42` 支持 v4 兼容地址与 ABI v7 地址：v4 从 `src0` 取 32-bit 子描述符列表基址；v7 从 `{src1,src0}` 取 64-bit 基址。列表基址需 64-byte 对齐，`length` 是子描述符数量，`flags[3]` 选择外部内存 fetch（1）或 scratchpad fetch（0）。v7 的 `src1` 是地址高 32 位，不作为独立数据指针做字节对齐检查；完整 64-bit 基址的低位对齐由 `src0` 检查。宏父命令只提交一个 completion，子命令顺序执行且失败时停止后续子命令。
+
 ## 5. 算子、DMA 和性能
 
 | Opcode | 算子 |
@@ -106,7 +118,7 @@ VCS 通过 `+define+VCS` 使用 `rtl/memory/ai_scratchpad.v` 的行为 RAM；Viv
 | 50 (`0x50`) | BF16 点积、FP32 累加与结果（`BF16_DOT_ACC_FP32`） |
 | 51 (`0x51`) | FP16 点积、FP32 累加与结果（`FP16_DOT_ACC_FP32`） |
 
-`0x50` 与 `0x51` 均使用 ABI v7 descriptor 和现有 32-bit core-SPAD 口；分别解释输入为 BF16 与 IEEE binary16，乘积以 FP32 精度参与按元素顺序的非融合 FP32 累加，最终输出一个 FP32 word。专用 descriptor 字段约束仍由 RTL validator 执行。`CAP2[6]`（掩码 `0x40`）表示 BF16 dot，`CAP2[7]`（掩码 `0x80`）表示 FP16 dot。A8 (`VERSION=0x1000_0008`) 保持 ABI v7.2 与 `CAP2=0x3f`；A9 为 ABI v7.3、`CAP2=0x7f`；A10 为 ABI v7.4、`CAP2=0xff`。三者 descriptor/completion 大小均为 64/16 字节，软件可据版本与 capability 位区分新增能力。
+`0x50` 与 `0x51` 均使用 ABI v7 descriptor 和现有 32-bit core-SPAD 口；分别解释输入为 BF16 与 IEEE binary16，乘积以 FP32 精度参与按元素顺序的非融合 FP32 累加，最终输出一个 FP32 word。SPAD 端口每周期至多发出一个新请求；两个 operand-pair buffer 允许最多两笔已接受但尚未返回的读请求，SPAD 响应必须按请求顺序返回（该端口不携带独立 read ID）。专用 descriptor 字段约束仍由 RTL validator 执行。`CAP2[6]`（掩码 `0x40`）表示 BF16 dot，`CAP2[7]`（掩码 `0x80`）表示 FP16 dot。A8 (`VERSION=0x1000_0008`) 保持 ABI v7.2 与 `CAP2=0x3f`；A9 为 ABI v7.3、`CAP2=0x7f`；A10 为 ABI v7.4、`CAP2=0xff`。三者 descriptor/completion 大小均为 64/16 字节，软件可据版本与 capability 位区分新增能力。
 
 统一 DMA 支持 DDR↔SPAD 1D、二维 row/stride、indexed gather、tile load/compute/store。burst 最多 16 beats，且在每个 4 KiB AXI 边界拆分；最多四个 tagged read outstanding，RID 选槽位并由匹配 RLAST 释放，BID 归因写响应。传输层允许读响应乱序，但命令派发和完成发布仍按序。`DMA_CFG[0]` 为 gather，`[1]` 是只读 128-bit 能力，`[10:8]` 请求读并发且不得大于 4。
 
@@ -120,15 +132,23 @@ VCS 通过 `+define+VCS` 使用 `rtl/memory/ai_scratchpad.v` 的行为 RAM；Viv
 
 ## 7. 验证证据与边界
 
-**A10 / 混合精度最新证据（2026-10-13）**：FP16 multiplier 10,015 向量通过；
-BF16 legacy dot-core gate 通过；mixed BF16/FP16 UVM 两个 seed 各 162/162 scoreboard
-transaction（142 笔数值、14 笔期望错误、6 笔状态内 reset），UVM warning/error/fatal
-均为 0，成功数值 covergroup 为 100%，URG merge 成功；本轮 `ai_smoke`
-和 20-case seeded top run 均 PASS。Top smoke 还核对 FP16 两路 DDR DMA load、queued
-command/shared completion、FP32 result 与 DMA 写回 DDR，结果 word 为 `0x41300000`。
-这仍是 compact AXI memory model 上的仿真，不是 DDR PHY/板级验证；`state_r` 的全部
-`state_r` 的 23 个 FSM 转移已命中；`pending_error_r` 为 13/18，且部分 DUT condition/branch coverage 尚未
-disposition，新增 FP PPA 也尚未完成。
+**A10 / 混合精度最新证据（2026-10-17 当前工作树）**：BF16 legacy dot-core gate 与 FP16 multiplier
+向量测试有通过记录；mixed BF16/FP16 UVM seeds `712345`、`987654`、`20261015` 各 484/484
+scoreboard PASS（430 numeric + 54 fault/reset/error-transition），合计 1,452 transactions，UVM
+warning/error/fatal 均为 0；每 seed peak outstanding read=2，selected numeric/fault/reset 与 odd-tail parity coverage=100%。
+最新三 seed run 将两个格式的随机数值长度覆盖扩展到 1..16：每 seed 420 行、每行 35 fields，BF16/FP16 各 215 numeric transactions；merged URG `cp_length` 16/16、`format_length_cross` 32/32，均 100%。该证据来自 dirty worktree，不是 frozen-SHA replay；只证明长度 1..16 的随机数值仿真，不改变 RTL/ABI，也不证明全长 parity lifecycle/writeback。短 formal 仍约束长度 1..4；V1/A10 总体仍开放。命令及结果目录 `/tmp/nmaforge_a10_fp_length16_20261017/` 见 A10 运行记录。
+DUT line/condition/FSM/branch 为 97.96%/97.00%/85.71%/92.86%。`state_r` 5/5 states、10/10
+transitions；`pending_error_r` 6/6 states、14/18 transitions；`ERR_ABORT`、`ERR_CONFIG`、`ERR_WATCHDOG` 在 `ST_WRITE` 的 prior-error 条件已形式证明排除，parity prior-error 转移仍未闭环。
+late-B protection 的 ready-pair/error-cutoff cover 每 seed 命中 2 次；合并
+request-stability SVA 为 28,290 attempts、8,610 real successes、0 failure/incomplete。canonical VC
+Formal 对 12 条选定属性 proven、两个 cover 命中且 reset setup clean；长度 1–4 parity proof 为
+5/5 assertions、2/2 covers（360 s bounded run）；全长 parity 证明仍有属性未收敛（无反例），不得称 parity closure。最新成功 `ai_smoke` 与
+`ai_run AI_RANDOM_CASES=20 AI_SEED=12345` 为 2026-10-17 当前工作树；历史 license 连接失败已由成功
+重跑取代。
+FP16 queued DDR→DMA→SPAD→FP→SPAD→DMA→DDR 的仿真结果为 `0x41300000`，使用 compact AXI memory
+model，不是 DDR PHY/板级验证；也没有新增 FP PPA。完整 transaction、assertion、code-coverage、
+命令、环境和 dirty-worktree 边界见 [A10 DV RTM](../verification/A10_DV_RTM.md) 与
+[A10 运行记录](../verification/A10_DV_RUN_2026-10-17.md)。
 
 VCS `make ai_smoke` 已覆盖 Transformer 30-command 链、随机 GEMV/GEMM/Conv、错误/保护和 reset recovery；扩展回归是 `make ai_comp`、`make ai_run AI_RANDOM_CASES=20 AI_SEED=12345`。2026-08-06 的 SpyGlass macro-aware lint 记录为 **0 error、414 warnings、4 info**（共 418 条信息，仍需分类）；CDC setup 为 0 error、12 warnings，CDC structural verify 显示 0 个 unsynchronized crossing、0 个 convergence，但因缺少 Advanced_CDC license 而有 1 条工具/许可证 error，不能称 sign-off；RDC structural verify 的 2 条 error 同样仅为 Advanced_CDC / `rdc_adv_checker` license 缺失，不能作为 RTL reset-crossing 违规解读，也不能称 RDC sign-off。
 

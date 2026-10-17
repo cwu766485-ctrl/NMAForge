@@ -15,11 +15,35 @@ package control_tests_pkg;
             phase.raise_objection(this); seq.start(env.agent.sequencer); phase.drop_objection(this);
         endtask
     endclass
+    class control_register_file_test extends control_base_test;
+        `uvm_component_utils(control_register_file_test)
+        function new(string name="control_register_file_test", uvm_component parent=null); super.new(name,parent); endfunction
+        task run_phase(uvm_phase phase);
+            control_register_file_seq seq = control_register_file_seq::type_id::create("seq");
+            phase.raise_objection(this); seq.start(env.agent.sequencer); phase.drop_objection(this);
+        endtask
+    endclass
     class control_protocol_test extends control_base_test;
         `uvm_component_utils(control_protocol_test)
         function new(string name="control_protocol_test", uvm_component parent=null); super.new(name,parent); endfunction
         task run_phase(uvm_phase phase);
             control_protocol_seq seq = control_protocol_seq::type_id::create("seq");
+            phase.raise_objection(this); seq.start(env.agent.sequencer); phase.drop_objection(this);
+        endtask
+    endclass
+    class control_channel_backpressure_test extends control_base_test;
+        `uvm_component_utils(control_channel_backpressure_test)
+        function new(string name="control_channel_backpressure_test", uvm_component parent=null); super.new(name,parent); endfunction
+        task run_phase(uvm_phase phase);
+            control_channel_backpressure_seq seq = control_channel_backpressure_seq::type_id::create("seq");
+            phase.raise_objection(this); seq.start(env.agent.sequencer); phase.drop_objection(this);
+        endtask
+    endclass
+    class control_inflight_reset_test extends control_base_test;
+        `uvm_component_utils(control_inflight_reset_test)
+        function new(string name="control_inflight_reset_test", uvm_component parent=null); super.new(name,parent); endfunction
+        task run_phase(uvm_phase phase);
+            control_inflight_reset_seq seq = control_inflight_reset_seq::type_id::create("seq");
             phase.raise_objection(this); seq.start(env.agent.sequencer); phase.drop_objection(this);
         endtask
     endclass

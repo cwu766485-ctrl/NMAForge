@@ -6,7 +6,12 @@ class control_coverage extends uvm_component;
     covergroup cg;
         cp_dir: coverpoint sample_write;
         cp_window: coverpoint sample_addr[8:5] { bins control[] = {[0:13]}; bins invalid = default; }
-        cp_strb: coverpoint sample_strb { bins full = {4'hf}; bins partial[] = {[0:14]}; }
+        // WSTRB exists only for write transactions. The passive monitor leaves
+        // read-item strb at its default value, so sampling reads here would
+        // create false coverage for partial_0.
+        cp_strb: coverpoint sample_strb iff (sample_write) {
+            bins full = {4'hf}; bins partial[] = {[0:14]};
+        }
         cp_resp: coverpoint sample_resp { bins okay = {2'b00}; bins slverr = {2'b10}; }
         cross_dir_resp: cross cp_dir, cp_resp;
     endgroup

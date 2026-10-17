@@ -6,7 +6,7 @@ COV_DIR ?= simv_control_uvm.vdb
 RUN_LOG ?= logs/$(UVM_TEST).log
 CM_METRICS ?= line+cond+fsm+tgl+branch+assert
 SEED ?= 20260813
-TESTS := control_reset_version_test control_protocol_test control_irq_error_test \
+TESTS := control_reset_version_test control_register_file_test control_protocol_test control_channel_backpressure_test control_inflight_reset_test control_irq_error_test \
 	control_busy_abort_test control_random_rw_test control_ral_access_test
 
 .PHONY: uvm_compile run_sim uvm_run uvm_smoke uvm_regress coverage

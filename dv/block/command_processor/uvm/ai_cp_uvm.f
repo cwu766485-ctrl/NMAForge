@@ -1,0 +1,12 @@
++incdir+../../../../rtl/control/queue
++incdir+../../../../rtl/control/descriptor
++incdir+../../../../rtl/compute/pipeline
++incdir+.
+../../../../rtl/control/queue/ai_ring_pointer_next.v
+../../../../rtl/control/descriptor/ai_descriptor_validator.v
+../../../../rtl/compute/pipeline/ai_tile_pipeline.v
+../../../../rtl/control/queue/ai_completion_writer.v
+../../../../rtl/control/queue/ai_command_processor.v
+ai_cp_if.sv
+ai_cp_uvm_pkg.sv
+tb_ai_cp_uvm.sv

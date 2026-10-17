@@ -4,12 +4,13 @@ module tb_ai_control_uvm;
     import control_tests_pkg::*;
 
     logic aclk = 0;
-    logic aresetn = 0;
     always #5 aclk = ~aclk;
-    initial begin repeat (5) @(posedge aclk); aresetn = 1; end
 
-    ai_axil_if axil(aclk, aresetn);
     ai_control_status_if status(aclk);
+    wire aresetn = status.resetn;
+    ai_axil_if axil(aclk, aresetn);
+
+    initial begin repeat (5) @(posedge aclk); status.resetn = 1; end
 
     wire reg_req_valid, reg_req_write;
     wire [31:0] reg_req_addr, reg_req_wdata, reg_rsp_rdata;
@@ -51,8 +52,10 @@ module tb_ai_control_uvm;
         .tile_buffer0_base(), .tile_buffer1_base(), .tile_output_offset(), .tile_input_words(), .tile_output_words(),
         .region0_base(), .region0_limit(), .region0_perm(), .region1_base(), .region1_limit(), .region1_perm(),
         .region2_base(), .region2_limit(), .region2_perm(), .region3_base(), .region3_limit(), .region3_perm(),
-        .cmdq_base(), .cmdq_size(), .cmdq_tail(), .cmdq_external(), .cmdq_head_load(), .cmdq_head_seed(),
-        .cplq_base(), .cplq_size(), .cplq_head(), .cplq_tail_load(), .cplq_tail_seed(),
+        .cmdq_base(), .cmdq_size(), .cmdq_tail(), .cmdq_external(),
+        .cmdq_head_load(status.cmdq_head_load), .cmdq_head_seed(status.cmdq_head_seed),
+        .cplq_base(), .cplq_size(), .cplq_head(),
+        .cplq_tail_load(status.cplq_tail_load), .cplq_tail_seed(status.cplq_tail_seed),
         .tile_perf_total(status.tile_perf_total), .tile_perf_dma(status.tile_perf_dma), .tile_perf_compute(status.tile_perf_compute),
         .tile_perf_overlap(status.tile_perf_overlap), .tile_perf_stall(status.tile_perf_stall), .tile_completed(status.tile_completed),
         .perf_matrix_cycles(status.perf_matrix_cycles), .perf_matrix_mac_cycles(status.perf_matrix_mac_cycles),

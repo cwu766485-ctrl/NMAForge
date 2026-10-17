@@ -31,6 +31,7 @@ module ai_bank_local_controller #(
     localparam [2:0] ST_WAIT_B = 3'd4;
     localparam [2:0] ST_DONE   = 3'd5;
     localparam [2:0] ST_ERROR  = 3'd6;
+    localparam [2:0] ST_PREFETCH_A = 3'd7;
 
     reg [2:0] state_r;
     reg [31:0] src0_r, src1_r;
@@ -70,6 +71,9 @@ module ai_bank_local_controller #(
             ST_WAIT_B: if (rsp_valid && !last_k) begin
                 req_valid=1'b1; req_addr=next_a_addr;
             end
+            // If the next-A request is denied on the B-response cycle, retain
+            // it as an ordinary held request until the arbiter accepts it.
+            ST_PREFETCH_A: begin req_valid=1'b1; req_addr=next_a_addr; end
             default: begin end
         endcase
     end
@@ -127,8 +131,14 @@ module ai_bank_local_controller #(
                             prefetch_events<=prefetch_events+1'b1;
                             k_r<=k_r+1'b1;
                             state_r<=ST_B_REQ;
-                        end
+                        end else state_r<=ST_PREFETCH_A;
                     end
+                end
+                ST_PREFETCH_A: if (req_ready) begin
+                    read_issue_events<=read_issue_events+1'b1;
+                    prefetch_events<=prefetch_events+1'b1;
+                    k_r<=k_r+1'b1;
+                    state_r<=ST_B_REQ;
                 end
                 ST_DONE: begin busy<=0; done<=1; state_r<=ST_IDLE; end
                 ST_ERROR: begin busy<=0; done<=1; error<=1; state_r<=ST_IDLE; end

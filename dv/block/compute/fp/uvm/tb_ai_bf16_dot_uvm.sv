@@ -48,13 +48,50 @@ module tb_ai_bf16_dot_uvm;
         .element_count(dot_if.element_count)
     );
 
+    // This state is intentionally reached by the late-B protection case:
+    // the prefetched pair is ready, but the memory-error cutoff forbids MAC.
+    cp_ready_pair_suppressed_after_error: cover property (
+        @(posedge clk) disable iff (!resetn)
+        (dut.state_r == 4'd1) && dut.pair_ready && !dut.compute_allowed &&
+        !dut.immediate_cancel && !dut.write_protection_failure);
+
+    // A read-side protection response must qualify as a read error, never as
+    // a write-protection failure. This explicitly samples the operands of the
+    // write_protection_failure predicate in its non-write context.
+    cp_read_protection_not_write_failure: cover property (
+        @(posedge clk) disable iff (!resetn)
+        (dut.state_r != 4'd6) && !dut.spad_write && dut.spad_valid &&
+        dut.spad_ready && dut.spad_protection_error &&
+        dut.read_protection_failure && !dut.write_protection_failure);
+
     initial begin
         uvm_config_db #(virtual ai_bf16_dot_if)::set(null, "*", "vif", dot_if);
         run_test();
     end
 
     initial begin
-        #100000;
+        dot_if.illegal_state_test_done = 1'b0;
+        // Fault-inject one unused state encoding before UVM traffic starts.
+        // The RTL default arm must recover to IDLE without launching a
+        // request or manufacturing a completion/error pulse.
+        wait (resetn === 1'b1);
+        @(negedge clk);
+        dut.state_r = 4'hf;
+        @(posedge clk);
+        #1;
+        if ((dut.state_r !== 4'd0) || dut.busy || dut.done || dut.error ||
+            dot_if.spad_valid) begin
+            $fatal(1, "Invalid-state recovery failed: state=%0h busy=%b done=%b error=%b spad_valid=%b",
+                   dut.state_r, dut.busy, dut.done, dut.error, dot_if.spad_valid);
+        end
+        $display("PASS: invalid FSM encoding recovered to IDLE without side effects");
+        dot_if.illegal_state_test_done = 1'b1;
+    end
+
+    initial begin
+        // Randomized ordered-response latency extends the mixed-format run;
+        // leave margin beyond the prior fixed-latency 100 us budget.
+        #300000;
         $fatal(1, "BF16 dot UVM testbench global timeout");
     end
 endmodule

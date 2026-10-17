@@ -7,4 +7,15 @@ interface ai_dma_axi_if(input logic clk, input logic resetn);
     logic [2:0] awsize; logic [1:0] awburst; logic awready;
     logic [127:0] wdata; logic [15:0] wstrb; logic wvalid; logic wlast; logic wready;
     logic [3:0] bid; logic [1:0] bresp; logic bvalid; logic bready;
+
+    // Test-only control for directed reset-under-backpressure scenarios.
+    // Encapsulating force/release here keeps virtual-interface users from
+    // applying force to a virtual interface member, which simulators reject.
+    task automatic hold_rready_low();
+        force rready = 1'b0;
+    endtask
+
+    task automatic release_rready();
+        release rready;
+    endtask
 endinterface

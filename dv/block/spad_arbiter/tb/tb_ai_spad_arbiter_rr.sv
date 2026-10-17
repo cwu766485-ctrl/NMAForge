@@ -54,9 +54,111 @@ module tb_ai_spad_arbiter_rr;
   wire [3:0] cnm_rsp_valid;
   integer i;
   integer cnm_grants, dma_line_grants;
+  integer core_rr_grants, banked_rr_grants, dma_rr_grants;
+  integer core_wait_cycles, banked_wait_cycles, dma_wait_cycles;
+  integer rr_mode_cycle, rr_mode_drain;
+  integer rr_mode_core_grants, rr_mode_banked_grants, rr_mode_dma_grants;
+  integer rr_mode_core_wait, rr_mode_banked_wait, rr_mode_dma_wait;
+  integer rr_mode_core_max_wait, rr_mode_banked_max_wait, rr_mode_dma_max_wait;
+  integer rr_mode_core_scalar, rr_mode_core_line;
+  integer rr_mode_banked_single, rr_mode_banked_cnm;
+  integer rr_mode_dma_scalar, rr_mode_dma_line;
+  reg [31:0] rr_mode_seed;
+  reg rr_mode_core_fire, rr_mode_banked_fire, rr_mode_dma_fire;
 
   always #5 clk=~clk;
   ai_spad_arbiter dut(.*);
+
+  function [31:0] xorshift32;
+    input [31:0] value;
+    reg [31:0] next_value;
+    begin
+      next_value = value ^ (value << 13);
+      next_value = next_value ^ (next_value >> 17);
+      next_value = next_value ^ (next_value << 5);
+      xorshift32 = next_value;
+    end
+  endfunction
+
+  task check_rr_mode_cycle;
+    integer active_grants;
+    begin
+      rr_mode_core_fire = (core_ready || core_line_ready) &&
+                          (core_valid || core_line_valid);
+      rr_mode_banked_fire = (banked_ready || (|cnm_ready)) &&
+                            (banked_valid || (|cnm_valid));
+      rr_mode_dma_fire = (dma_ready || dma_line_ready) &&
+                         (dma_valid || dma_line_valid);
+      active_grants = (rr_mode_core_fire ? 1 : 0) +
+                      (rr_mode_banked_fire ? 1 : 0) +
+                      (rr_mode_dma_fire ? 1 : 0);
+      if (active_grants > 1)
+        $fatal(1,"multiple data-plane clients granted in one scheduler cycle");
+
+      if (core_valid || core_line_valid) begin
+        if (rr_mode_core_fire) begin
+          if (rr_mode_core_wait > 2)
+            $fatal(1,"random-mode core wait exceeded RR bound: %0d",rr_mode_core_wait);
+          if (rr_mode_core_wait > rr_mode_core_max_wait)
+            rr_mode_core_max_wait = rr_mode_core_wait;
+          rr_mode_core_grants = rr_mode_core_grants + 1;
+          if (core_line_valid) rr_mode_core_line = rr_mode_core_line + 1;
+          else rr_mode_core_scalar = rr_mode_core_scalar + 1;
+          rr_mode_core_wait = 0;
+          if (request_client != 3'd2)
+            $fatal(1,"random-mode core grant has client tag %0d",request_client);
+        end else begin
+          rr_mode_core_wait = rr_mode_core_wait + 1;
+          if (rr_mode_core_wait > 2)
+            $fatal(1,"random-mode core starvation exceeded two cycles");
+        end
+      end else begin
+        rr_mode_core_wait = 0;
+      end
+
+      if (banked_valid || (|cnm_valid)) begin
+        if (rr_mode_banked_fire) begin
+          if (rr_mode_banked_wait > 2)
+            $fatal(1,"random-mode banked wait exceeded RR bound: %0d",rr_mode_banked_wait);
+          if (rr_mode_banked_wait > rr_mode_banked_max_wait)
+            rr_mode_banked_max_wait = rr_mode_banked_wait;
+          rr_mode_banked_grants = rr_mode_banked_grants + 1;
+          if (|cnm_valid) rr_mode_banked_cnm = rr_mode_banked_cnm + 1;
+          else rr_mode_banked_single = rr_mode_banked_single + 1;
+          rr_mode_banked_wait = 0;
+          if (request_client != 3'd3)
+            $fatal(1,"random-mode banked grant has client tag %0d",request_client);
+        end else begin
+          rr_mode_banked_wait = rr_mode_banked_wait + 1;
+          if (rr_mode_banked_wait > 2)
+            $fatal(1,"random-mode banked starvation exceeded two cycles");
+        end
+      end else begin
+        rr_mode_banked_wait = 0;
+      end
+
+      if (dma_valid || dma_line_valid) begin
+        if (rr_mode_dma_fire) begin
+          if (rr_mode_dma_wait > 2)
+            $fatal(1,"random-mode DMA wait exceeded RR bound: %0d",rr_mode_dma_wait);
+          if (rr_mode_dma_wait > rr_mode_dma_max_wait)
+            rr_mode_dma_max_wait = rr_mode_dma_wait;
+          rr_mode_dma_grants = rr_mode_dma_grants + 1;
+          if (dma_line_valid) rr_mode_dma_line = rr_mode_dma_line + 1;
+          else rr_mode_dma_scalar = rr_mode_dma_scalar + 1;
+          rr_mode_dma_wait = 0;
+          if (request_client != 3'd4)
+            $fatal(1,"random-mode DMA grant has client tag %0d",request_client);
+        end else begin
+          rr_mode_dma_wait = rr_mode_dma_wait + 1;
+          if (rr_mode_dma_wait > 2)
+            $fatal(1,"random-mode DMA starvation exceeded two cycles");
+        end
+      end else begin
+        rr_mode_dma_wait = 0;
+      end
+    end
+  endtask
 
   initial begin
     repeat(3) @(posedge clk);
@@ -132,6 +234,146 @@ module tb_ai_spad_arbiter_rr;
              cnm_grants,dma_line_grants);
     $display("CNM/DMA SPAD contention PASS cnm_grants=%0d dma_line_grants=%0d",
              cnm_grants,dma_line_grants);
+
+    // Keep all three data-plane clients continuously requesting. The RR
+    // cursor must bound each client's wait to at most the two grants owed to
+    // the other clients, not merely produce nonzero aggregate grant counts.
+    core_valid=1;
+    banked_valid=1;
+    dma_line_valid=1;
+    core_rr_grants=0;
+    banked_rr_grants=0;
+    dma_rr_grants=0;
+    core_wait_cycles=0;
+    banked_wait_cycles=0;
+    dma_wait_cycles=0;
+    for(i=0;i<30;i=i+1) begin
+      @(negedge clk);
+      if(core_ready) begin
+        if(core_wait_cycles>2)
+          $fatal(1,"core RR wait exceeded bound: %0d",core_wait_cycles);
+        core_rr_grants=core_rr_grants+1;
+        core_wait_cycles=0;
+      end else begin
+        core_wait_cycles=core_wait_cycles+1;
+      end
+      if(banked_ready) begin
+        if(banked_wait_cycles>2)
+          $fatal(1,"banked RR wait exceeded bound: %0d",banked_wait_cycles);
+        banked_rr_grants=banked_rr_grants+1;
+        banked_wait_cycles=0;
+      end else begin
+        banked_wait_cycles=banked_wait_cycles+1;
+      end
+      if(dma_line_ready) begin
+        if(dma_wait_cycles>2)
+          $fatal(1,"DMA RR wait exceeded bound: %0d",dma_wait_cycles);
+        dma_rr_grants=dma_rr_grants+1;
+        dma_wait_cycles=0;
+      end else begin
+        dma_wait_cycles=dma_wait_cycles+1;
+      end
+      @(posedge clk);
+    end
+    @(negedge clk);
+    core_valid=0;
+    banked_valid=0;
+    dma_line_valid=0;
+    if(core_rr_grants!=10 || banked_rr_grants!=10 || dma_rr_grants!=10)
+      $fatal(1,"3-client RR grant distribution mismatch core=%0d banked=%0d dma=%0d",
+             core_rr_grants,banked_rr_grants,dma_rr_grants);
+    $display("3-client sustained SPAD round-robin PASS grants=%0d/%0d/%0d max_wait=2",
+             core_rr_grants,banked_rr_grants,dma_rr_grants);
+
+    // Sustain all three data-plane clients while changing each request form
+    // after its handshake. This exercises scalar/line and banked/CNM paths
+    // under repeated arbitration stalls without inventing downstream memory
+    // back-pressure (the scheduler-side SPAD port has no ready input).
+    rr_mode_seed=32'hA10D2026;
+    rr_mode_core_grants=0; rr_mode_banked_grants=0; rr_mode_dma_grants=0;
+    rr_mode_core_wait=0; rr_mode_banked_wait=0; rr_mode_dma_wait=0;
+    rr_mode_core_max_wait=0; rr_mode_banked_max_wait=0; rr_mode_dma_max_wait=0;
+    rr_mode_core_scalar=0; rr_mode_core_line=0;
+    rr_mode_banked_single=0; rr_mode_banked_cnm=0;
+    rr_mode_dma_scalar=0; rr_mode_dma_line=0;
+    core_valid=0; core_line_valid=0; core_line_addr=32'h0100;
+    banked_valid=0; cnm_valid=0;
+    dma_valid=0; dma_line_valid=0; dma_line_addr=32'h0800;
+    rr_mode_seed=xorshift32(rr_mode_seed);
+    if (rr_mode_seed[0]) core_line_valid=1; else core_valid=1;
+    rr_mode_seed=xorshift32(rr_mode_seed);
+    if (rr_mode_seed[0]) cnm_valid=4'hf; else banked_valid=1;
+    rr_mode_seed=xorshift32(rr_mode_seed);
+    if (rr_mode_seed[0]) dma_line_valid=1; else dma_valid=1;
+
+    for (rr_mode_cycle=0; rr_mode_cycle<300; rr_mode_cycle=rr_mode_cycle+1) begin
+      @(negedge clk);
+      check_rr_mode_cycle();
+      if (!(rr_mode_core_fire || rr_mode_banked_fire || rr_mode_dma_fire))
+        $fatal(1,"random-mode sustained traffic had no grant");
+      @(posedge clk);
+      #1;
+      if (rr_mode_core_fire) begin
+        if (rr_mode_cycle==299) begin
+          core_valid=0; core_line_valid=0;
+        end else begin
+          rr_mode_seed=xorshift32(rr_mode_seed);
+          if (rr_mode_seed[0]) begin core_line_valid=1; core_valid=0; end
+          else begin core_line_valid=0; core_valid=1; end
+        end
+      end
+      if (rr_mode_banked_fire) begin
+        if (rr_mode_cycle==299) begin
+          banked_valid=0; cnm_valid=0;
+        end else begin
+          rr_mode_seed=xorshift32(rr_mode_seed);
+          if (rr_mode_seed[0]) begin cnm_valid=4'hf; banked_valid=0; end
+          else begin cnm_valid=0; banked_valid=1; end
+        end
+      end
+      if (rr_mode_dma_fire) begin
+        if (rr_mode_cycle==299) begin
+          dma_valid=0; dma_line_valid=0;
+        end else begin
+          rr_mode_seed=xorshift32(rr_mode_seed);
+          if (rr_mode_seed[0]) begin dma_line_valid=1; dma_valid=0; end
+          else begin dma_line_valid=0; dma_valid=1; end
+        end
+      end
+    end
+
+    // Retire the two requests left by the last randomized cycle without
+    // issuing replacements; requests must remain asserted until accepted.
+    rr_mode_drain=0;
+    while ((core_valid || core_line_valid || banked_valid || (|cnm_valid) ||
+            dma_valid || dma_line_valid) && rr_mode_drain<3) begin
+      @(negedge clk);
+      check_rr_mode_cycle();
+      @(posedge clk);
+      #1;
+      if (rr_mode_core_fire) begin core_valid=0; core_line_valid=0; end
+      if (rr_mode_banked_fire) begin banked_valid=0; cnm_valid=0; end
+      if (rr_mode_dma_fire) begin dma_valid=0; dma_line_valid=0; end
+      rr_mode_drain=rr_mode_drain+1;
+    end
+    if (core_valid || core_line_valid || banked_valid || (|cnm_valid) ||
+        dma_valid || dma_line_valid)
+      $fatal(1,"random-mode RR drain failed to retire pending requests");
+    if (rr_mode_core_grants<100 || rr_mode_banked_grants<100 ||
+        rr_mode_dma_grants<100 || rr_mode_core_scalar==0 || rr_mode_core_line==0 ||
+        rr_mode_banked_single==0 || rr_mode_banked_cnm==0 ||
+        rr_mode_dma_scalar==0 || rr_mode_dma_line==0 ||
+        rr_mode_core_max_wait>2 || rr_mode_banked_max_wait>2 || rr_mode_dma_max_wait>2)
+      $fatal(1,"random-mode RR coverage incomplete grants=%0d/%0d/%0d modes=%0d/%0d,%0d/%0d,%0d/%0d",
+             rr_mode_core_grants,rr_mode_banked_grants,rr_mode_dma_grants,
+             rr_mode_core_scalar,rr_mode_core_line,rr_mode_banked_single,
+             rr_mode_banked_cnm,rr_mode_dma_scalar,rr_mode_dma_line);
+    $display("Seeded request-mode SPAD RR PASS grants=%0d/%0d/%0d max_wait=%0d/%0d/%0d modes core=%0d/%0d banked=%0d/%0d dma=%0d/%0d",
+             rr_mode_core_grants,rr_mode_banked_grants,rr_mode_dma_grants,
+             rr_mode_core_max_wait,rr_mode_banked_max_wait,rr_mode_dma_max_wait,
+             rr_mode_core_scalar,rr_mode_core_line,rr_mode_banked_single,
+             rr_mode_banked_cnm,rr_mode_dma_scalar,rr_mode_dma_line);
+
     // CNM carries four independent lane addresses through the same unique
     // scheduler admission point.  Verify the lane mask and addresses are
     // preserved, and that the delayed response identifies the same lanes.

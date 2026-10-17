@@ -29,12 +29,20 @@ ai_smoke: ai_comp ai_run
 # Full top-level mixed-dot throughput sweep.  The single-tile baseline avoids
 # DMA/compute overlap; three-tile runs use the production ping-pong pipeline to
 # overlap actual DMA and FP traffic at the shared SPAD arbiter.  External DDR is
-# modeled behaviorally, with seeded AXI WREADY back-pressure in overlap runs.
+# modeled behaviorally, with seeded AXI RVALID latency and WREADY
+# back-pressure in overlap runs.
 FP_BENCH_SEED ?= 20261013
 ai_fp_dot_dma_benchmark: ai_comp
 	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=0 +AI_SEED=$(AI_SEED) \
 		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +FP_DOT_DMA_BENCH \
 		+FP_BENCH_SEED=$(FP_BENCH_SEED) -l ai_fp_dot_dma_benchmark.log
+
+# Optional V3 subsystem stress: inject seeded read/write SLVERR at a random
+# beat of multi-beat DMA bursts and check completion plus AXI drain-to-idle.
+ai_dma_error_stress: ai_comp
+	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=0 +AI_SEED=$(AI_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_DMA_ERROR_STRESS \
+		-l ai_dma_error_stress.log
 
 # Activity-aware smoke: uses exactly the same top-level regression as
 # ai_smoke, but writes a VCD only when explicitly requested.  Convert it on
@@ -85,6 +93,14 @@ ai_spad_arb_comp:
 
 ai_spad_arb_run: ai_spad_arb_comp
 	./simv_spad_arb -l ai_spad_arb_run.log
+	@grep -q '3-client sustained SPAD round-robin PASS grants=10/10/10 max_wait=2' ai_spad_arb_run.log || \
+		{ echo "SPAD arbiter 3-client fairness marker missing"; exit 1; }
+	@grep -q 'Seeded request-mode SPAD RR PASS' ai_spad_arb_run.log || \
+		{ echo "SPAD arbiter seeded request-mode fairness marker missing"; exit 1; }
+	@grep -q 'CNM/DMA SPAD contention PASS cnm_grants=6 dma_line_grants=6' ai_spad_arb_run.log || \
+		{ echo "SPAD arbiter CNM/DMA contention marker missing"; exit 1; }
+	@grep -q 'Scratchpad response parity alignment PASS' ai_spad_arb_run.log || \
+		{ echo "SPAD arbiter response/parity marker missing"; exit 1; }
 
 ai_upgrade_vcs: ai_dma_run ai_spad_arb_run ai_quick
 

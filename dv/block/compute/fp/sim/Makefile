@@ -216,6 +216,13 @@ dot-uvm-run: dot-uvm-vectors dot-uvm-compile
 		+RANDOM_VECTORS=$(DOT_UVM_VECTOR_FILE) \
 		+ntb_random_seed=$(DOT_RANDOM_SEED) -cm line+cond+branch+fsm+assert \
 		-cm_dir $(DOT_UVM_COV_DB) -l $(DOT_UVM_SEED_DIR)/run.log
+	@grep -q 'Scoreboard PASS:' $(DOT_UVM_SEED_DIR)/run.log || { \
+		echo "ERROR: missing UVM scoreboard PASS marker in $(DOT_UVM_SEED_DIR)/run.log"; \
+		exit 1; \
+	}
+	@grep -Eq 'UVM_WARNING[[:space:]]*:[[:space:]]+0' $(DOT_UVM_SEED_DIR)/run.log
+	@grep -Eq 'UVM_ERROR[[:space:]]*:[[:space:]]+0' $(DOT_UVM_SEED_DIR)/run.log
+	@grep -Eq 'UVM_FATAL[[:space:]]*:[[:space:]]+0' $(DOT_UVM_SEED_DIR)/run.log
 
 dot-uvm-coverage: dot-uvm-run
 	$(URG) -full64 -dir $(DOT_UVM_COV_DB) -format text \

@@ -177,6 +177,7 @@ module tb_ai_accel_smoke;
     reg [1023:0] vcd_file;
     reg fp_perf_measure = 1'b0;
     reg fp_perf_random_wready = 1'b0;
+    reg fp_perf_random_rvalid_latency = 1'b0;
     integer fp_perf_seed = 20261013;
     reg [31:0] fp_perf_rng = 32'h20261013;
     integer fp_perf_tile_job_cycles = 0;
@@ -188,18 +189,21 @@ module tb_ai_accel_smoke;
     integer fp_perf_dma_wait_cycles = 0;
     integer fp_perf_dma_grants = 0;
 
-    // During the dedicated FP benchmark, randomize the AXI write-data
-    // back-pressure used by the existing memory model.  This is deliberately
-    // testbench-only and is disabled for the ordinary smoke regression.
+    // During the dedicated FP benchmark, randomize seeded AXI RVALID latency
+    // and write-data back-pressure. This is testbench-only and disabled for
+    // the ordinary smoke regression.
     initial begin
         void'($value$plusargs("FP_BENCH_SEED=%d", fp_perf_seed));
         fp_perf_rng = fp_perf_seed;
     end
 
     always @(negedge aclk) begin
-        if (aresetn && fp_perf_random_wready) begin
+        if (aresetn && (fp_perf_random_wready || fp_perf_random_rvalid_latency)) begin
             fp_perf_rng = fp_perf_rng * 32'd1664525 + 32'd1013904223;
-            axi_mem_u.ready_gap_cfg = fp_perf_rng[17:16];
+            if (fp_perf_random_wready)
+                axi_mem_u.ready_gap_cfg = fp_perf_rng[17:16];
+            if (fp_perf_random_rvalid_latency)
+                axi_mem_u.read_gap_cfg = fp_perf_rng[20:19];
         end
     end
 
@@ -490,6 +494,18 @@ module tb_ai_accel_smoke;
         .element_count(dut.compute_cluster_u.kv_cache_u.element_count)
     );
 
+    ai_compute_activity_sva fp_activity_sva(
+        .clk          (aclk),
+        .resetn       (aresetn),
+        .wake         (dut.core_start && ((dut.launch_op == 8'h50) || (dut.launch_op == 8'h51))),
+        .busy         (dut.fp_busy),
+        .done         (dut.compute_cluster_u.fp_done),
+        .error        (dut.compute_cluster_u.fp_error),
+        .spad_valid   (dut.fp_spad_valid),
+        .cycle_count  (dut.compute_cluster_u.fp_cycle_count),
+        .element_count(dut.compute_cluster_u.fp_element_count)
+    );
+
     initial begin
         aclk = 1'b0;
         begin : clock_setup
@@ -572,6 +588,68 @@ module tb_ai_accel_smoke;
     endtask
 
     `include "ai_dma_tasks.svh"
+
+    // Optional subsystem-level DMA error stress. Each transaction uses the
+    // production top DMA/SPAD path and a seeded error location inside a
+    // multi-beat AXI burst. The regular smoke stays deterministic and does
+    // not enable this additional randomized campaign.
+    task run_dma_error_injection_stress;
+        input integer seed;
+        integer iteration;
+        integer beat_index;
+        integer word_index;
+        reg [31:0] rng;
+        reg [31:0] ext_addr;
+        reg [31:0] spad_addr;
+        begin
+            rng = seed;
+            for (iteration = 0; iteration < 8; iteration = iteration + 1) begin
+                rng = rng * 32'd1664525 + 32'd1013904223;
+                beat_index = rng[1:0];
+                ext_addr = 32'h0000_1000 + (iteration * 32'h100);
+                spad_addr = 32'h0000_3000 + (iteration * 32'h40);
+                axi_mem_u.read_gap_cfg = rng[20:19];
+                axi_mem_u.ready_gap_cfg = rng[17:16];
+                for (word_index = 0; word_index < 16; word_index = word_index + 1)
+                    axi_mem_u.mem[(ext_addr >> 2) + word_index] =
+                        rng ^ (32'h5a00_0000 + (iteration * 32) + word_index);
+                axi_mem_u.inject_read_error_word = (ext_addr >> 2) + (beat_index * 4);
+                dma_load_expect_error(ext_addr, spad_addr, 16'd16, 4'd2);
+                axi_mem_u.inject_read_error_word = -1;
+                if (axi_mem_u.read_active_r || (axi_mem_u.read_q_count_r != 0) ||
+                    m_axi_rvalid || m_axi_arvalid) begin
+                    $display("%0t ERROR: randomized DMA read error left AXI read traffic active iter=%0d",
+                             $time, iteration);
+                    errors = errors + 1;
+                end
+
+                rng = rng * 32'd1664525 + 32'd1013904223;
+                beat_index = rng[1:0];
+                ext_addr = 32'h0000_3000 + (iteration * 32'h100);
+                spad_addr = 32'h0000_4000 + (iteration * 32'h40);
+                axi_mem_u.ready_gap_cfg = rng[17:16];
+                for (word_index = 0; word_index < 16; word_index = word_index + 1) begin
+                    axi_write(SPAD_BASE + spad_addr + (word_index * 4),
+                              rng ^ (32'ha500_0000 + (iteration * 32) + word_index));
+                end
+                axi_mem_u.inject_write_error_word = (ext_addr >> 2) + (beat_index * 4);
+                dma_store_expect_error(ext_addr, spad_addr, 16'd16, 4'd3);
+                axi_mem_u.inject_write_error_word = -1;
+                if (axi_mem_u.write_active_r || axi_mem_u.bvalid ||
+                    m_axi_awvalid || m_axi_wvalid) begin
+                    $display("%0t ERROR: randomized DMA write error left AXI write traffic active iter=%0d",
+                             $time, iteration);
+                    errors = errors + 1;
+                end
+            end
+            axi_mem_u.inject_read_error_word = -1;
+            axi_mem_u.inject_write_error_word = -1;
+            axi_mem_u.read_gap_cfg = 1;
+            axi_mem_u.ready_gap_cfg = 0;
+            $display("%0t PASS: DMA randomized burst-error stress seed=%0d cases=8 read=8 write=8",
+                     $time, seed);
+        end
+    endtask
 
     task write_spad_desc;
         input [31:0] base;
@@ -820,6 +898,11 @@ module tb_ai_accel_smoke;
             seed_for_case = fp_perf_seed ^ vector_length ^ (format_fp16 ? 32'h16 : 32'h50) ^ tile_count;
             fp_perf_rng = seed_for_case;
             fp_perf_random_wready = (tile_count > 1);
+            fp_perf_random_rvalid_latency = (tile_count > 1);
+            if (tile_count == 1) begin
+                axi_mem_u.ready_gap_cfg = 0;
+                axi_mem_u.read_gap_cfg = 1;
+            end
             fp_perf_measure = 1'b1;
             clear_done_irq();
             axi_write(REG_TILE_CTRL, 32'd1);
@@ -827,6 +910,9 @@ module tb_ai_accel_smoke;
             @(negedge aclk);
             fp_perf_measure = 1'b0;
             fp_perf_random_wready = 1'b0;
+            fp_perf_random_rvalid_latency = 1'b0;
+            axi_mem_u.ready_gap_cfg = 0;
+            axi_mem_u.read_gap_cfg = 1;
             axi_read(REG_PERF_OVERLAP, tile_overlap_cycles);
             axi_read(REG_PERF_STALL, tile_stall_cycles);
             expect_read(REG_RESULT, expected, "FP throughput benchmark result register");
@@ -842,7 +928,7 @@ module tb_ai_accel_smoke;
                 $fatal(1, "FP tile ping-pong job showed no actual DMA SPAD grant during compute fmt=%0d len=%0d overlap=%0d",
                        format_fp16, vector_length, tile_overlap_cycles);
             $display("FP_SYSTEM_BENCH,actual_tile_pipeline,%s,%s,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0.5f,%0.5f,%0d",
-                     (tile_count == 1) ? "single_tile" : "pingpong_random_wready",
+                     (tile_count == 1) ? "single_tile" : "pingpong_random_rvalid_wready",
                      format_fp16 ? "FP16" : "BF16", vector_length, tile_count,
                      fp_perf_tile_job_cycles, fp_perf_active_cycles,
                      fp_perf_compute_cycles, fp_perf_fetch_stall_cycles,
@@ -1299,6 +1385,7 @@ module tb_ai_accel_smoke;
 
     initial begin
         errors = 0;
+        seed_arg = 20261014;
         matrix_line_write_count = 0;
         last_dma_araddr = 0;
         allow_m_axi_error = 1'b0;
@@ -2579,6 +2666,9 @@ module tb_ai_accel_smoke;
                 run_random_dwconv3x3(case_idx);
             end
         end
+
+        if ($test$plusargs("AI_DMA_ERROR_STRESS"))
+            run_dma_error_injection_stress(seed_arg);
 
         // Region protection is disabled after reset.  A read/execute-only
         // region allows compute inputs but rejects its result write, which

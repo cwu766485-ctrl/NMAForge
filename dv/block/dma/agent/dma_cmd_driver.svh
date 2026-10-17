@@ -1,5 +1,6 @@
 class dma_cmd_driver extends uvm_driver #(dma_cmd_item);
     virtual ai_dma_ctrl_if vif;
+    virtual ai_dma_axi_if axi_vif;
     uvm_analysis_port #(dma_cmd_item) cmd_ap;
     `uvm_component_utils(dma_cmd_driver)
 
@@ -12,6 +13,8 @@ class dma_cmd_driver extends uvm_driver #(dma_cmd_item);
         super.build_phase(phase);
         if (!uvm_config_db#(virtual ai_dma_ctrl_if)::get(this, "", "ctrl_vif", vif))
             `uvm_fatal("NOVIF", "dma_cmd_driver needs ctrl_vif")
+        if (!uvm_config_db#(virtual ai_dma_axi_if)::get(this, "", "axi_vif", axi_vif))
+            `uvm_fatal("NOVIF", "dma_cmd_driver needs axi_vif")
     endfunction
 
     task run_phase(uvm_phase phase);
@@ -45,6 +48,7 @@ class dma_cmd_driver extends uvm_driver #(dma_cmd_item);
         int unsigned timeout;
         int unsigned active_cycles;
         bit abort_sent;
+        bit reset_cancelled;
         // A UVM sequence may start at time zero.  Do not consume its one-cycle
         // start pulse while the DUT is still held in reset.
         wait (vif.resetn === 1'b1);
@@ -67,13 +71,20 @@ class dma_cmd_driver extends uvm_driver #(dma_cmd_item);
         timeout = 0;
         active_cycles = 0;
         abort_sent = 0;
+        reset_cancelled = 0;
         // Error is not terminal for an abort: the RTL must still drain every
         // already accepted AXI response before it raises done.
-        while (!vif.done && timeout < 4000) begin
+        while (!vif.done && vif.resetn === 1'b1 && timeout < 4000) begin
             @(posedge vif.clk);
             timeout++;
             if (vif.busy) active_cycles++;
-            if (!abort_sent && req.abort_after_cycles != 0 &&
+            if (!abort_sent && req.abort_after_aw &&
+                axi_vif.awvalid && axi_vif.awready) begin
+                // The DUT samples this pulse on the next edge, after AW has
+                // been accepted. This targets the accepted-write drain path.
+                vif.abort <= 1'b1;
+                abort_sent = 1'b1;
+            end else if (!abort_sent && req.abort_after_cycles != 0 &&
                 active_cycles >= req.abort_after_cycles) begin
                 vif.abort <= 1'b1;
                 abort_sent = 1'b1;
@@ -81,8 +92,11 @@ class dma_cmd_driver extends uvm_driver #(dma_cmd_item);
                 vif.abort <= 1'b0;
             end
         end
+        reset_cancelled = (vif.resetn !== 1'b1);
         vif.abort <= 1'b0;
-        if (timeout == 4000)
+        if (reset_cancelled) begin
+            `uvm_info("DMA_RESET_CANCEL", "in-flight DMA command ended cleanly on subsystem reset", UVM_LOW)
+        end else if (timeout == 4000)
             `uvm_error("DMA_TIMEOUT", "DMA did not finish within 4000 clocks")
         else if (req.expect_error && (!vif.error || vif.error_code != req.expected_error_code))
             `uvm_error("DMA_EXPECTED_ERROR", $sformatf("expected error=1 code=0x%0h; got error=%0b code=0x%0h",

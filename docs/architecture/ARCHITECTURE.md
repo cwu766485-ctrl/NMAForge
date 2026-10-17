@@ -1,6 +1,6 @@
 # NMAForge 架构说明
 
-**状态：2026-10-13 的 RTL/验证基线。** 本文描述已接入 `ai_accel_top` 的结构；
+**状态：2026-10-17 的 RTL/验证基线。** 本文描述已接入 `ai_accel_top` 的结构；
 不把规划中的 UVM、后布局签核或实板验收写成已完成能力。
 
 ## 1. 项目范围
@@ -154,8 +154,9 @@ arbiter-owned scheduler port，以及 scalar/banked/128-bit line 操作。VCS �
 Softmax/causal Softmax、Conv3x3 line-buffer 和 KV-cache primitive。A9/ABI v7.3
 定义 `0x50` BF16 点积；A10/ABI v7.4 保留 `0x50` 并增加 `0x51` FP16 点积，均沿用
 既有 64-byte descriptor 布局，validator 检查命令字段约束。两个格式经唯一
-arbiter-owned 32-bit core SPAD 口按 A word、B word 顺序读取 packed operands，每次最多
-保留一个未完成的 scratchpad 读请求；每个有效元素的 FP32 乘积按递增序号进入
+arbiter-owned 32-bit core SPAD 口按 A word、B word 顺序读取 packed operands。端口每周期
+至多呈现一个新请求，但利用两个 operand-pair buffer 可保持最多两笔已接受且尚未返回的
+scratchpad 读请求；响应按请求顺序归属，不支持无序响应。每个有效元素的 FP32 乘积按递增序号进入
 非融合 FP32 累加，最后将一个 32-bit FP32 word 写回 descriptor 指定的目的地址。
 它们复用既有 `ai_command_processor` 命令生命周期和 `ai_completion_writer` 完成提交
 路径，不新增 scratchpad bypass，也不改变 completion ABI。
@@ -174,7 +175,7 @@ Q/K/V -> QK^T -> causal/row Softmax -> AV -> projection
 
 | 项目 | 最新结果 | 边界 |
 |---|---|---|
-| Mixed-precision dot | `0x50` BF16 与 `0x51` FP16 共用 dot core；VCS top smoke 检查结果与 shared completion | 双 seed UVM/URG：每 seed 162/162（142 数值、14 期望错误、6 reset），成功数值 covergroup 100%，`state_r` 23/23 转移命中；`pending_error_r` 13/18、部分 condition/branch coverage disposition 与 FP PPA 仍开放 |
+| Mixed-precision dot | `0x50` BF16 与 `0x51` FP16 共用 dot core；最新 dirty-worktree seeds `712345`、`987654`、`20261015` 各 484/484 PASS，peak outstanding=2；odd-tail parity 与 selected functional coverage 100%；DUT line/condition/FSM/branch=`97.96/97.00/85.71/92.86%` | 长度 1–4 parity formal 5/5 assertions、2/2 covers；full 16-bit parity disposition、残余 coverage 与 frozen-SHA replay 仍开放；固定快照历史证据见 [A10 基线](../verification/A10_DV_BASELINE_2026-10-14.md)，最新证据见 [A10 RTM](../verification/A10_DV_RTM.md) |
 | FP16 DDR end-to-end | top smoke 经 DMA load、queued descriptor、FP16 result/completion、DMA store；结果为 `0x41300000` | compact AXI memory model 的 directed smoke，不等价于 DDR PHY/board validation |
 | VCS smoke/随机 | `make ai_smoke`、`ai_comp`、`ai_run` 基线通过 | 尚非 UVM coverage closure |
 | Control block UVM | 2026-08-27：6 项回归均为 `UVM_ERROR=0`、`UVM_FATAL=0` | 已覆盖 reset/version、协议、IRQ/error、busy/abort、随机 RW、RAL；尚非 coverage closure |

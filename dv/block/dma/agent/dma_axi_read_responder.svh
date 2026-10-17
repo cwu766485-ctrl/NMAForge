@@ -37,6 +37,7 @@ class dma_axi_read_responder extends uvm_component;
     int unsigned cycle_count;
     int unsigned read_delay_count;
     int unsigned write_delay_count;
+    bit hold_read_responses;
     bit read_window_primed;
     bit write_window_primed;
     `uvm_component_utils(dma_axi_read_responder)
@@ -78,9 +79,12 @@ class dma_axi_read_responder extends uvm_component;
     endfunction
 
     task drive_active_read();
+        bit [63:0] beat_addr;
+        beat_addr = active_read.addr + (active_read.beat_index << active_read.size);
         vif.rid    <= active_read.id;
         vif.rdata  <= make_rdata(active_read);
-        vif.rresp  <= 2'b00;
+        vif.rresp  <= (cfg.inject_read_error &&
+                       (beat_addr == cfg.inject_read_error_addr)) ? 2'b10 : 2'b00;
         vif.rlast  <= (active_read.beat_index == active_read.len);
         vif.rvalid <= 1'b1;
     endtask
@@ -145,7 +149,7 @@ class dma_axi_read_responder extends uvm_component;
             end else begin
                 cycle_count++;
                 vif.arready <= allow_ready(0);
-                vif.awready <= allow_ready(1);
+                vif.awready <= cfg.force_awready_low ? 1'b0 : allow_ready(1);
                 vif.wready  <= allow_ready(2);
 
                 if (vif.arvalid && vif.arready) begin
@@ -184,6 +188,13 @@ class dma_axi_read_responder extends uvm_component;
                 end
 
                 if (vif.rvalid && vif.rready) begin
+                    if (cfg.inject_read_error &&
+                        (active_read.addr + (active_read.beat_index << active_read.size) ==
+                         cfg.inject_read_error_addr)) begin
+                        if (vif.rresp !== 2'b10)
+                            `uvm_error("AXI_RRESP_INJECT", "injected read beat did not carry SLVERR")
+                        cfg.injected_read_error_responses++;
+                    end
                     if (vif.rlast) begin
                         completed_ids.push_back(active_read.id);
                         vif.rvalid <= 0; vif.rlast <= 0; active_read = null;
@@ -193,11 +204,17 @@ class dma_axi_read_responder extends uvm_component;
                     end
                 end
                 if (vif.bvalid && vif.bready) begin
+                    if (cfg.inject_write_error) begin
+                        if (vif.bresp !== 2'b10)
+                            `uvm_error("AXI_BRESP_INJECT", "injected write response did not carry SLVERR")
+                        cfg.injected_write_error_responses++;
+                    end
                     completed_bids.push_back(active_b.id);
                     vif.bvalid <= 0; active_b = null;
                 end
 
                 if (!vif.rvalid && active_read == null && pending_reads.size() != 0 &&
+                    !hold_read_responses &&
                     (read_window_primed || pending_reads.size() >= cfg.min_accepted_reads_before_response)) begin
                     if (read_delay_count < cfg.read_response_delay_cycles)
                         read_delay_count++;
@@ -216,7 +233,9 @@ class dma_axi_read_responder extends uvm_component;
                         write_window_primed = 1;
                         write_delay_count = 0;
                         active_b = cfg.ooo_write_responses ? pending_b.pop_back() : pending_b.pop_front();
-                        vif.bid <= active_b.id; vif.bresp <= 2'b00; vif.bvalid <= 1'b1;
+                        vif.bid <= active_b.id;
+                        vif.bresp <= cfg.inject_write_error ? 2'b10 : 2'b00;
+                        vif.bvalid <= 1'b1;
                     end
                 end
             end

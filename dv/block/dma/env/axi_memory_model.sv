@@ -2,7 +2,12 @@
 
 module axi_memory_model #(
     parameter integer WORDS = 4096,
-    parameter integer ADDR_WIDTH = 64
+    parameter integer ADDR_WIDTH = 64,
+    // Optional testbench mapping for exercising 64-bit AXI addresses while
+    // keeping the model's small backing array indexed by the low 32 bits.
+    // Disabled by default so standalone DMA tests retain high-address errors.
+    parameter bit ALLOW_HIGH_ADDR_ALIAS = 1'b0,
+    parameter [31:0] HIGH_ADDR_ALIAS_TAG = 32'd1
 )(
     input  wire        clk,
     input  wire        resetn,
@@ -13,7 +18,7 @@ module axi_memory_model #(
     input  wire [7:0]  arlen,
     input  wire [2:0]  arsize,
     input  wire [1:0]  arburst,
-    output reg         arready,
+    output wire        arready,
     output reg  [3:0]  rid,
     output reg  [127:0] rdata,
     output reg  [1:0]  rresp,
@@ -27,7 +32,7 @@ module axi_memory_model #(
     input  wire [7:0]  awlen,
     input  wire [2:0]  awsize,
     input  wire [1:0]  awburst,
-    output reg         awready,
+    output wire        awready,
     input  wire        wvalid,
     input  wire [127:0] wdata,
     input  wire [15:0]  wstrb,
@@ -53,6 +58,11 @@ module axi_memory_model #(
     reg [7:0]  read_idx_r;
     reg        read_error_r;
     reg [1:0]  read_gap_r;
+    reg [1:0]  arready_gap_target_r;
+    reg [1:0]  awready_gap_target_r;
+    reg        arready_gap_target_valid_r;
+    reg        awready_gap_target_valid_r;
+    reg [1:0]  gap_pick;
     reg [ADDR_WIDTH-1:0] read_addr_fifo [0:3];
     reg [7:0]  read_len_fifo [0:3];
     reg [2:0]  read_size_fifo [0:3];
@@ -72,7 +82,34 @@ module axi_memory_model #(
     reg [3:0]  write_id_r;
     reg [1:0]  wready_gap_r;
 
+    // Keep the historical ready timing when the opt-in address-gap knobs are
+    // zero.  The base registers below retain the original registered-ready
+    // behavior; the combinational gates only affect explicitly configured
+    // E2E backpressure runs.
+    reg        arready_base_r;
+    reg        awready_base_r;
+    reg        ar_hold_active_r;
+    reg        aw_hold_active_r;
+    reg [ADDR_WIDTH-1:0] ar_hold_addr_r;
+    reg [3:0]  ar_hold_id_r;
+    reg [7:0]  ar_hold_len_r;
+    reg [2:0]  ar_hold_size_r;
+    reg [1:0]  ar_hold_burst_r;
+    reg [ADDR_WIDTH-1:0] aw_hold_addr_r;
+    reg [3:0]  aw_hold_id_r;
+    reg [7:0]  aw_hold_len_r;
+    reg [2:0]  aw_hold_size_r;
+    reg [1:0]  aw_hold_burst_r;
+    reg [1:0]  arready_gap_count_r;
+    reg [1:0]  awready_gap_count_r;
+    integer    ar_stall_cycles_r;
+    integer    aw_stall_cycles_r;
+
     integer ready_gap_cfg;
+    integer read_gap_cfg;
+    integer arready_gap_cfg;
+    integer awready_gap_cfg;
+    integer transaction_jitter_enable;
     integer inject_read_error_word;
     integer inject_write_error_word;
 
@@ -83,7 +120,71 @@ module axi_memory_model #(
     wire read_inject_error;
     wire write_inject_error;
     wire ar_fire = arvalid && arready;
+    wire aw_fire = awvalid && awready;
     wire read_dequeue = !read_active_r && !rvalid && read_q_count_r != 0;
+
+    // Nonzero address-gap settings select periodic READY-low windows.  The
+    // phase counters are free-running and independent of VALID, avoiding an
+    // artificial VALID-to-READY combinational path in the memory responder.
+    // With a zero gap these outputs retain the historical registered timing.
+    assign arready = resetn &&
+                     ((arready_gap_cfg == 0) ? arready_base_r :
+                      ((read_q_count_r < 3'd4) &&
+                       (!transaction_jitter_enable || arready_gap_target_valid_r) &&
+                       (arready_gap_count_r >=
+                        (transaction_jitter_enable ? arready_gap_target_r :
+                                                     arready_gap_cfg[1:0]))));
+    assign awready = resetn &&
+                     ((awready_gap_cfg == 0) ? awready_base_r :
+                      (!write_active_r && !bvalid &&
+                       (!transaction_jitter_enable || awready_gap_target_valid_r) &&
+                       (awready_gap_count_r >=
+                        (transaction_jitter_enable ? awready_gap_target_r :
+                                                     awready_gap_cfg[1:0]))));
+
+    // Per-transaction gap sampling is opt-in. Keeping it disabled preserves
+    // the existing deterministic responder timing for all legacy tests.
+    covergroup axi_arready_stall_cg with function sample(input integer stall_cycles);
+        option.per_instance = 1;
+        cp_stall_cycles: coverpoint stall_cycles {
+            bins cycles[] = {[0:3]};
+        }
+    endgroup
+    covergroup axi_awready_stall_cg with function sample(input integer stall_cycles);
+        option.per_instance = 1;
+        cp_stall_cycles: coverpoint stall_cycles {
+            bins cycles[] = {[0:3]};
+        }
+    endgroup
+    covergroup axi_read_response_gap_cg with function sample(input integer gap_cycles);
+        option.per_instance = 1;
+        cp_gap_cycles: coverpoint gap_cycles {
+            bins cycles[] = {[0:3]};
+        }
+    endgroup
+    covergroup axi_write_data_gap_cg with function sample(input integer gap_cycles);
+        option.per_instance = 1;
+        cp_gap_cycles: coverpoint gap_cycles {
+            bins cycles[] = {[0:3]};
+        }
+    endgroup
+
+    axi_arready_stall_cg arready_stall_cg = new();
+    axi_awready_stall_cg awready_stall_cg = new();
+    axi_read_response_gap_cg read_response_gap_cg = new();
+    axi_write_data_gap_cg write_data_gap_cg = new();
+
+    function automatic [1:0] choose_gap(input integer max_gap);
+        integer bounded_max;
+        begin
+            if (max_gap <= 0) begin
+                choose_gap = 2'd0;
+            end else begin
+                bounded_max = (max_gap > 3) ? 3 : max_gap;
+                choose_gap = $urandom_range(bounded_max, 0);
+            end
+        end
+    endfunction
 
     assign read_word_addr = read_addr_r[31:2] +
                             (read_size_r == AXI_SIZE_128B ? {22'd0,read_idx_r,2'b00} : {24'd0,read_idx_r});
@@ -91,9 +192,13 @@ module axi_memory_model #(
                              (write_size_r == AXI_SIZE_128B ?
                               {22'd0,write_idx_r,2'b00} :
                               {24'd0,write_idx_r});
-    assign read_addr_error = ((read_addr_r >> 32) != 0) ||
+    assign read_addr_error = (((read_addr_r >> 32) != 0) &&
+                              !(ALLOW_HIGH_ADDR_ALIAS &&
+                                ((read_addr_r >> 32) == HIGH_ADDR_ALIAS_TAG))) ||
                              (read_word_addr >= WORDS);
-    assign write_addr_error = ((write_addr_r >> 32) != 0) ||
+    assign write_addr_error = (((write_addr_r >> 32) != 0) &&
+                               !(ALLOW_HIGH_ADDR_ALIAS &&
+                                 ((write_addr_r >> 32) == HIGH_ADDR_ALIAS_TAG))) ||
                               (write_word_addr >= WORDS);
     assign read_inject_error = (inject_read_error_word >= 0) &&
                                (read_word_addr == inject_read_error_word[31:0]);
@@ -115,13 +220,13 @@ module axi_memory_model #(
 
     always @(posedge clk or negedge resetn) begin
         if (!resetn) begin
-            arready        <= 1'b0;
+            arready_base_r <= 1'b0;
             rid            <= 4'd0;
             rdata          <= 128'd0;
             rresp          <= AXI_RESP_OKAY;
             rvalid         <= 1'b0;
             rlast          <= 1'b0;
-            awready        <= 1'b0;
+            awready_base_r <= 1'b0;
             wready         <= 1'b0;
             bresp          <= AXI_RESP_OKAY;
             bid            <= 4'd0;
@@ -132,6 +237,10 @@ module axi_memory_model #(
             read_idx_r     <= 8'd0;
             read_error_r   <= 1'b0;
             read_gap_r     <= 2'd0;
+            arready_gap_target_r <= 2'd0;
+            awready_gap_target_r <= 2'd0;
+            arready_gap_target_valid_r <= 1'b0;
+            awready_gap_target_valid_r <= 1'b0;
             read_q_head_r  <= 2'd0;
             read_q_tail_r  <= 2'd0;
             read_q_count_r <= 3'd0;
@@ -145,15 +254,123 @@ module axi_memory_model #(
             write_size_r <= AXI_SIZE_32B;
             write_id_r <= 4'd0;
             wready_gap_r   <= 2'd0;
+            ar_hold_active_r <= 1'b0;
+            aw_hold_active_r <= 1'b0;
+            ar_hold_addr_r <= {ADDR_WIDTH{1'b0}};
+            ar_hold_id_r <= 4'd0;
+            ar_hold_len_r <= 8'd0;
+            ar_hold_size_r <= 3'd0;
+            ar_hold_burst_r <= 2'd0;
+            aw_hold_addr_r <= {ADDR_WIDTH{1'b0}};
+            aw_hold_id_r <= 4'd0;
+            aw_hold_len_r <= 8'd0;
+            aw_hold_size_r <= 3'd0;
+            aw_hold_burst_r <= 2'd0;
+            arready_gap_count_r <= 2'd0;
+            awready_gap_count_r <= 2'd0;
+            ar_stall_cycles_r <= 0;
+            aw_stall_cycles_r <= 0;
             ready_gap_cfg <= 0;
+            read_gap_cfg  <= 1;
+            arready_gap_cfg <= 0;
+            awready_gap_cfg <= 0;
+            transaction_jitter_enable <= 0;
             inject_read_error_word <= -1;
             inject_write_error_word <= -1;
         end else begin
-            arready <= read_q_count_r < 3'd4;
-            awready <= !write_active_r && !bvalid;
+            arready_base_r <= read_q_count_r < 3'd4;
+            awready_base_r <= !write_active_r && !bvalid;
             wready  <= write_active_r && !bvalid && (wready_gap_r == 2'd0);
 
+            // Check the AXI master side of VALID/READY: once an address is
+            // presented and stalled, VALID and the complete payload must stay
+            // stable through the accepting edge.
+            if (ar_hold_active_r &&
+                (!arvalid || ({arid, araddr, arlen, arsize, arburst} !==
+                              {ar_hold_id_r, ar_hold_addr_r, ar_hold_len_r,
+                               ar_hold_size_r, ar_hold_burst_r})))
+                $fatal(1, "AXI AR payload changed before ARREADY handshake");
+            if (aw_hold_active_r &&
+                (!awvalid || ({awid, awaddr, awlen, awsize, awburst} !==
+                              {aw_hold_id_r, aw_hold_addr_r, aw_hold_len_r,
+                               aw_hold_size_r, aw_hold_burst_r})))
+                $fatal(1, "AXI AW payload changed before AWREADY handshake");
+
+            if (arvalid && !arready) begin
+                if (!ar_hold_active_r) begin
+                    ar_hold_id_r <= arid;
+                    ar_hold_addr_r <= araddr;
+                    ar_hold_len_r <= arlen;
+                    ar_hold_size_r <= arsize;
+                    ar_hold_burst_r <= arburst;
+                end
+                ar_hold_active_r <= 1'b1;
+            end else if (ar_fire) begin
+                ar_hold_active_r <= 1'b0;
+            end
+
+            if (awvalid && !awready) begin
+                if (!aw_hold_active_r) begin
+                    aw_hold_id_r <= awid;
+                    aw_hold_addr_r <= awaddr;
+                    aw_hold_len_r <= awlen;
+                    aw_hold_size_r <= awsize;
+                    aw_hold_burst_r <= awburst;
+                end
+                aw_hold_active_r <= 1'b1;
+            end else if (aw_fire) begin
+                aw_hold_active_r <= 1'b0;
+            end
+
+            // Four-cycle period: cfg=1/2/3 creates 1/2/3 consecutive
+            // READY-low cycles followed by the remaining high cycles.
+            // Natural two-bit overflow wraps phase 3 back to 0.
+            arready_gap_count_r <= arready_gap_count_r + 2'd1;
+            awready_gap_count_r <= awready_gap_count_r + 2'd1;
+
+            // Select the address-channel threshold once per newly presented
+            // request. The target is then held while VALID is stalled.
+            if (transaction_jitter_enable && arvalid &&
+                !ar_hold_active_r && !arready_gap_target_valid_r) begin
+                arready_gap_target_r <= choose_gap(arready_gap_cfg);
+                arready_gap_target_valid_r <= 1'b1;
+            end else if (!transaction_jitter_enable) begin
+                arready_gap_target_valid_r <= 1'b0;
+            end
+            if (transaction_jitter_enable && awvalid &&
+                !aw_hold_active_r && !awready_gap_target_valid_r) begin
+                awready_gap_target_r <= choose_gap(awready_gap_cfg);
+                awready_gap_target_valid_r <= 1'b1;
+            end else if (!transaction_jitter_enable) begin
+                awready_gap_target_valid_r <= 1'b0;
+            end
+
+            if (!arvalid || ar_fire) begin
+                if (ar_fire && (arready_gap_cfg != 0) && (ar_stall_cycles_r != 0)) begin
+                    $display("[AXI_MEM_ADDR_STALL] channel=AR configured=%0d observed=%0d", arready_gap_cfg, ar_stall_cycles_r);
+                end
+                if (transaction_jitter_enable)
+                    arready_stall_cg.sample(ar_stall_cycles_r);
+                ar_stall_cycles_r <= 0;
+            end else if (!arready && (ar_stall_cycles_r < 32'h7fff_ffff) &&
+                         (arready_gap_cfg != 0)) begin
+                ar_stall_cycles_r <= ar_stall_cycles_r + 1;
+            end
+
+            if (!awvalid || aw_fire) begin
+                if (aw_fire && (awready_gap_cfg != 0) && (aw_stall_cycles_r != 0)) begin
+                    $display("[AXI_MEM_ADDR_STALL] channel=AW configured=%0d observed=%0d", awready_gap_cfg, aw_stall_cycles_r);
+                end
+                if (transaction_jitter_enable)
+                    awready_stall_cg.sample(aw_stall_cycles_r);
+                aw_stall_cycles_r <= 0;
+            end else if (!awready && (aw_stall_cycles_r < 32'h7fff_ffff) &&
+                         (awready_gap_cfg != 0)) begin
+                aw_stall_cycles_r <= aw_stall_cycles_r + 1;
+            end
+
             if (ar_fire) begin
+                arready_gap_target_valid_r <= 1'b0;
                 read_addr_fifo[read_q_tail_r] <= araddr;
                 read_len_fifo[read_q_tail_r] <= arlen;
                 read_size_fifo[read_q_tail_r] <= arsize;
@@ -175,7 +392,10 @@ module axi_memory_model #(
                 read_id_r     <= read_id_fifo[read_q_head_r];
                 rid           <= read_id_fifo[read_q_head_r];
                 read_q_head_r <= read_q_head_r + 1'b1;
-                read_gap_r    <= 2'd1;
+                gap_pick = transaction_jitter_enable ? choose_gap(read_gap_cfg) : read_gap_cfg[1:0];
+                read_gap_r <= gap_pick;
+                if (transaction_jitter_enable)
+                    read_response_gap_cg.sample(gap_pick);
             end
 
 
@@ -214,11 +434,15 @@ module axi_memory_model #(
                     rlast <= 1'b0;
                 end else begin
                     read_idx_r <= read_idx_r + 8'd1;
-                    read_gap_r <= 2'd1;
+                    gap_pick = transaction_jitter_enable ? choose_gap(read_gap_cfg) : read_gap_cfg[1:0];
+                    read_gap_r <= gap_pick;
+                    if (transaction_jitter_enable)
+                        read_response_gap_cg.sample(gap_pick);
                 end
             end
 
-            if (awvalid && awready) begin
+            if (aw_fire) begin
+                awready_gap_target_valid_r <= 1'b0;
                 write_active_r <= 1'b1;
                 write_addr_r   <= awaddr;
                 write_len_r    <= awlen;
@@ -232,7 +456,10 @@ module axi_memory_model #(
                     ((awsize == AXI_SIZE_128B) ?
                      (awaddr[3:0] != 4'b0) :
                      (awaddr[1:0] != 2'b00));
-                wready_gap_r   <= ready_gap_cfg[1:0];
+                gap_pick = transaction_jitter_enable ? choose_gap(ready_gap_cfg) : ready_gap_cfg[1:0];
+                wready_gap_r <= gap_pick;
+                if (transaction_jitter_enable)
+                    write_data_gap_cg.sample(gap_pick);
             end
 
             if (write_active_r && wvalid && wready) begin
@@ -269,7 +496,10 @@ module axi_memory_model #(
                         endcase
                     end
                 end
-                wready_gap_r <= ready_gap_cfg[1:0];
+                gap_pick = transaction_jitter_enable ? choose_gap(ready_gap_cfg) : ready_gap_cfg[1:0];
+                wready_gap_r <= gap_pick;
+                if (transaction_jitter_enable)
+                    write_data_gap_cg.sample(gap_pick);
 
                 if ((write_idx_r == write_len_r) || wlast) begin
                     bresp <= (write_error_r || write_addr_error || write_inject_error ||

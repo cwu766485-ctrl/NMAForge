@@ -52,6 +52,31 @@ class dma_spad_model extends uvm_component;
         write_ap.write(item);
     endtask
 
+    // Observe the request half a cycle before its sampling edge. The injected
+    // request error is held through that edge, and the model suppresses the
+    // corresponding memory write even though line_ready is high.
+    task inject_line_request_error();
+        bit injected;
+        injected = 0;
+        forever begin
+            @(negedge vif.clk);
+            if (!vif.resetn) begin
+                vif.line_req_error = 1'b0;
+            end else if (cfg.inject_spad_line_req_error && !injected &&
+                         vif.line_valid && vif.line_write && vif.line_ready) begin
+                vif.line_req_error = 1'b1;
+                injected = 1;
+                cfg.injected_spad_line_req_errors++;
+                cfg.injected_spad_line_req_addr = vif.line_addr;
+                `uvm_info("SPAD_REQ_ERROR", $sformatf(
+                    "injected protection error before line-write handshake addr=0x%08h",
+                    vif.line_addr), UVM_LOW)
+            end else begin
+                vif.line_req_error = 1'b0;
+            end
+        end
+    endtask
+
     task run_phase(uvm_phase phase);
         int lane;
         bit [31:0] lane_addr;
@@ -66,6 +91,9 @@ class dma_spad_model extends uvm_component;
         vif.line_req_error      <= 1'b0;
         vif.line_rsp_error      <= 1'b0;
         vif.line_parity_error   <= '0;
+        fork
+            inject_line_request_error();
+        join_none
         forever begin
             @(posedge vif.clk);
             vif.spad_rsp_valid <= 1'b0;
@@ -89,11 +117,12 @@ class dma_spad_model extends uvm_component;
                 end
                 if (vif.line_valid && vif.line_ready) begin
                     if (vif.line_write) begin
-                        for (lane = 0; lane < 4; lane++) begin
-                            lane_addr = vif.line_addr + (lane * 4);
-                            if (vif.line_wstrb[lane*4 +: 4] != 4'b0)
-                                record_word(lane_addr, vif.line_wdata[lane*32 +: 32]);
-                        end
+                        if (!vif.line_req_error)
+                            for (lane = 0; lane < 4; lane++) begin
+                                lane_addr = vif.line_addr + (lane * 4);
+                                if (vif.line_wstrb[lane*4 +: 4] != 4'b0)
+                                    record_word(lane_addr, vif.line_wdata[lane*32 +: 32]);
+                            end
                     end else begin
                         vif.line_rdata <= {read_word(vif.line_addr + 12), read_word(vif.line_addr + 8),
                                            read_word(vif.line_addr + 4), read_word(vif.line_addr)};

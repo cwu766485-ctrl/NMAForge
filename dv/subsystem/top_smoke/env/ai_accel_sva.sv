@@ -334,3 +334,94 @@ module ai_compute_activity_sva #(
     assert property (p_quiescent_counters_stable)
         else $fatal(1, "SVA FAIL: compute counters changed across quiescent cycles");
 endmodule
+
+// Concurrent AXI4 master-output properties for URG-visible protocol evidence
+// in the top-level UVM environment. The procedural checker above remains
+// useful for richer diagnostics. R/B payload stability is a slave-side
+// responsibility and is not sampled here because legal matching responses
+// are accepted without master-side backpressure in this workload.
+module ai_axi_master_protocol_sva (
+    input wire        clk,
+    input wire        resetn,
+    input wire [3:0]  arid,
+    input wire [63:0] araddr,
+    input wire [7:0]  arlen,
+    input wire [2:0]  arsize,
+    input wire [1:0]  arburst,
+    input wire [3:0]  arcache,
+    input wire [2:0]  arprot,
+    input wire [3:0]  arqos,
+    input wire        arlock,
+    input wire        arvalid,
+    input wire        arready,
+    input wire [3:0]  awid,
+    input wire [63:0] awaddr,
+    input wire [7:0]  awlen,
+    input wire [2:0]  awsize,
+    input wire [1:0]  awburst,
+    input wire [3:0]  awcache,
+    input wire [2:0]  awprot,
+    input wire [3:0]  awqos,
+    input wire        awlock,
+    input wire        awvalid,
+    input wire        awready,
+    input wire [127:0] wdata,
+    input wire [15:0]  wstrb,
+    input wire         wlast,
+    input wire         wvalid,
+    input wire         wready
+);
+    default clocking cb @(posedge clk); endclocking
+    default disable iff (!resetn);
+
+    property p_ar_payload_stable_until_accept;
+        arvalid && !arready |=> arvalid &&
+            $stable({arid, araddr, arlen, arsize, arburst,
+                     arcache, arprot, arqos, arlock});
+    endproperty
+
+    property p_aw_payload_stable_until_accept;
+        awvalid && !awready |=> awvalid &&
+            $stable({awid, awaddr, awlen, awsize, awburst,
+                     awcache, awprot, awqos, awlock});
+    endproperty
+
+    property p_w_payload_stable_until_accept;
+        wvalid && !wready |=> wvalid && $stable({wdata, wstrb, wlast});
+    endproperty
+
+    property p_ar_burst_stays_within_4k;
+        arvalid && arready |->
+            ({1'b0, araddr[11:0]} +
+             (({4'd0, arlen} + 13'd1) << arsize)) <= 13'd4096;
+    endproperty
+
+    property p_aw_burst_stays_within_4k;
+        awvalid && awready |->
+            ({1'b0, awaddr[11:0]} +
+             (({4'd0, awlen} + 13'd1) << awsize)) <= 13'd4096;
+    endproperty
+
+    a_ar_payload_stable_until_accept:
+        assert property (p_ar_payload_stable_until_accept)
+        else $fatal(1, "SVA FAIL: AXI AR payload changed before handshake");
+    a_aw_payload_stable_until_accept:
+        assert property (p_aw_payload_stable_until_accept)
+        else $fatal(1, "SVA FAIL: AXI AW payload changed before handshake");
+    a_w_payload_stable_until_accept:
+        assert property (p_w_payload_stable_until_accept)
+        else $fatal(1, "SVA FAIL: AXI W payload changed before handshake");
+    a_ar_burst_stays_within_4k:
+        assert property (p_ar_burst_stays_within_4k)
+        else $fatal(1, "SVA FAIL: AXI AR burst crosses 4 KiB boundary");
+    a_aw_burst_stays_within_4k:
+        assert property (p_aw_burst_stays_within_4k)
+        else $fatal(1, "SVA FAIL: AXI AW burst crosses 4 KiB boundary");
+
+    c_ar_stall_then_accept: cover property
+        (arvalid && !arready ##[1:8] arvalid && arready);
+    c_aw_stall_then_accept: cover property
+        (awvalid && !awready ##[1:8] awvalid && awready);
+    c_w_stall_then_accept: cover property
+        (wvalid && !wready ##[1:8] wvalid && wready);
+endmodule

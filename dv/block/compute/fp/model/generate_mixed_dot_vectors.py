@@ -38,7 +38,10 @@ def directed_cases(fmt: fp.FPFormat) -> list[tuple[list[int], list[int]]]:
         ([infinity, one, two, 0xBC00], [one, 0xBF80 if fmt == fp.BF16 else 0xBC00,
                                        two, one]),
         ([nan], [one]),
+        ([one], [nan]),  # NaN in the B operand
         ([infinity], [zero]),
+        ([zero], [infinity]),  # invalid 0 x Inf with operands reversed
+        ([one], [infinity]),  # Inf in the B operand
         ([one, two], [three, four]),
     ]
 
@@ -63,8 +66,9 @@ def main() -> None:
     transactions: list[tuple[int, list[int], list[int]]] = []
     for format_code, fmt in enumerate((fp.BF16, fp.FP16)):
         transactions.extend((format_code, a, b) for a, b in directed_cases(fmt))
-        for _ in range(args.count):
-            length = rng.randint(1, 4)
+        lengths = list(range(1, 17)) if args.count >= 16 else []
+        lengths.extend(rng.randint(1, 16) for _ in range(args.count - len(lengths)))
+        for length in lengths:
             transactions.append((format_code,
                                  [random_finite(rng, fmt) for _ in range(length)],
                                  [random_finite(rng, fmt) for _ in range(length)]))
@@ -75,8 +79,8 @@ def main() -> None:
             fmt = fp.FP16 if format_code else fp.BF16
             pad_a = 0x7C00 if format_code else 0x7F80
             pad_b = 0x0000
-            a_padded = a_values + [pad_a] * (4 - len(a_values))
-            b_padded = b_values + [pad_b] * (4 - len(b_values))
+            a_padded = a_values + [pad_a] * (16 - len(a_values))
+            b_padded = b_values + [pad_b] * (16 - len(b_values))
             expected = dot_result(fmt, a_values, b_values)
             fields = [str(format_code), str(len(a_values))]
             fields.extend(f"{value:04x}" for value in a_padded)
@@ -85,7 +89,8 @@ def main() -> None:
             vectors.write(" ".join(fields) + "\n")
 
     print(f"MIXED_DOT_VECTOR_GEN seed={args.seed} per_format_random={args.count} "
-          f"directed_per_format=7 total={len(transactions)} output={args.output}")
+          f"directed_per_format={len(directed_cases(fp.BF16))} "
+          f"total={len(transactions)} output={args.output}")
 
 
 if __name__ == "__main__":

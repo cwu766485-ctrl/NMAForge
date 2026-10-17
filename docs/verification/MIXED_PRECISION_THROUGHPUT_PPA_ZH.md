@@ -25,12 +25,13 @@ Scratchpad 访问使用两个 A/B word-pair 缓冲槽，发起/跟踪最多两�
 | BF16 / FP16 | 16 | 67 | 29 | 56.7% | 0.2388 | 0.5517 |
 | BF16 / FP16 | 64 | 259 | 101 | 61.0% | 0.2471 | 0.6337 |
 
-## 真实 tile-pipeline DMA/SPAD 争用基准（2026-10-13）
+## 真实 tile-pipeline DMA/SPAD 争用基准（2026-10-14 更新）
 
 为判断多输出并行是否值得，新增 top-level benchmark，直接使用生产 RTL 的
 `ai_tile_pipeline → ai_axi128_dma → ai_spad_arbiter → ai_scratchpad → mixed-precision dot core`
 路径。每个争用用例处理 3 个 ping-pong tiles；权重先经 DMA 装入，计时窗口内 tile input DMA、FP
-计算及结果 DMA 写回并发运行，并对 AXI WREADY 施加 seed 驱动的随机 backpressure。外部 DDR
+计算及结果 DMA 写回并发运行。专用 benchmark 使用 seed 驱动的伪随机 AXI RVALID 响应间隔
+（0–3 个周期）和 WREADY backpressure；普通 smoke 的 memory model 默认延迟不变。外部 DDR
 由 testbench 行为模型模拟，因此这是 RTL 系统级争用数据，不是 DDR PHY/板级带宽数据。每个
 tile 使用确定性的 1.0 输入/权重；逐 tile 检查 completion 与 DDR 结果。
 
@@ -44,16 +45,16 @@ tile 使用确定性的 1.0 输入/权重；逐 tile 检查 completion 与 DDR �
 | MAC / tile-job cycle | 0.0263 | 0.0513 | 0.0732 | 0.0952 | 0.2540 | 0.4025 | 0.4460 | 0.4689 | 0.4876 |
 | MAC / FP-active cycle | 0.1429 | 0.2500 | 0.3333 | 0.4000 | 0.5714 | 0.6400 | 0.6531 | 0.6598 | 0.6649 |
 
-### 三 tile ping-pong、随机 WREADY 争用
+### 三 tile ping-pong、随机 RVALID 延迟与 WREADY 争用
 
 | 格式 | 元素数/tile | 总 tile job cycles | FP active cycles | MAC | FP 请求等待 | FP 响应等待 | DMA SPAD 等待 | DMA grant | DMA/FP overlap | MAC/job cycle | MAC/FP-active cycle |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| BF16 | 64 | 378 | 310 | 192 | 16 | 10 | 13 | 18 | 120 | 0.50794 | 0.61935 |
-| FP16 | 64 | 380 | 311 | 192 | 17 | 11 | 14 | 18 | 123 | 0.50526 | 0.61736 |
-| BF16 | 256 | 1368 | 1199 | 768 | 63 | 33 | 59 | 66 | 362 | 0.56140 | 0.64053 |
-| FP16 | 256 | 1366 | 1199 | 768 | 62 | 33 | 58 | 66 | 362 | 0.56223 | 0.64053 |
-| BF16 | 1024 | 5322 | 4751 | 3072 | 242 | 124 | 232 | 258 | 1343 | 0.57723 | 0.64660 |
-| FP16 | 1024 | 5318 | 4750 | 3072 | 242 | 123 | 232 | 258 | 1340 | 0.57766 | 0.64674 |
+| BF16 | 64 | 386 | 312 | 192 | 17 | 11 | 14 | 18 | 122 | 0.49741 | 0.61538 |
+| FP16 | 64 | 386 | 314 | 192 | 18 | 13 | 14 | 18 | 134 | 0.49741 | 0.61146 |
+| BF16 | 256 | 1399 | 1201 | 768 | 65 | 35 | 60 | 66 | 408 | 0.54896 | 0.63947 |
+| FP16 | 256 | 1380 | 1199 | 768 | 65 | 36 | 60 | 66 | 384 | 0.55652 | 0.64053 |
+| BF16 | 1024 | 5384 | 4752 | 3072 | 249 | 129 | 238 | 258 | 1483 | 0.57058 | 0.64646 |
+| FP16 | 1024 | 5374 | 4755 | 3072 | 255 | 131 | 239 | 258 | 1499 | 0.57164 | 0.64606 |
 
 系统吞吐曲线（`MAC/job cycle`；X 轴按 log2 长度显示）：
 
@@ -69,23 +70,29 @@ tile 任务端到端吞吐。`MAC/FP-active cycle` 只看 `fp_busy` 窗口，用
 计算重叠的周期计数。这些计数彼此可能重叠，不能直接相加当作总 latency。每个用例另观察到
 tile stall counter 为 3（单 tile）或 5（三 tile）。
 
-结果判断：长度 1024 时，FP busy 窗口内有效 MAC/cycle 从无争用的 0.6649 降至争用的
-0.6466–0.6467，约下降 2.7%；但现有 ping-pong tile pipeline 把多数 DMA 与计算重叠，三 tile
-任务的端到端吞吐达到 0.5772–0.5777 MAC/job-cycle，高于单 tile 顺序任务的 0.4876；长度 64、
+结果判断：长度 1024 时，FP busy 窗口内有效 MAC/cycle 从无争用的 0.66494 降至争用的
+0.64606–0.64646，约下降 2.8%；但现有 ping-pong tile pipeline 把多数 DMA 与计算重叠，三 tile
+任务的端到端吞吐达到 0.57058–0.57164 MAC/job-cycle，高于单 tile 顺序任务的 0.48762；长度 64、
 256 也观察到类似的端到端提升。可见共享 SPAD 争用真实存在（例如 1024 长度下 FP 请求等待
-242 周期、DMA 等待 232 周期），但当前 pipeline 已能隐藏相当部分搬运开销。综合这些数据，
-**暂不建议直接复制多路输出 MAC lane**：先加大 AXI read-response/backpressure 压力并用更贴近
-目标系统的数据复用模型复测；若增加压力后 FP 端仍持续因供数空转，再开展多输出结构对比。
+249–255 周期、DMA 等待 238–239 周期），但当前 pipeline 已能隐藏相当部分搬运开销。综合这些数据，
+**暂不建议直接复制多路输出 MAC lane**：本轮已加入 seed 驱动的 RVALID 延迟与 WREADY backpressure；
+下一步应在更贴近目标系统的数据复用模型下复测，并构建可随机化多客户端的 DMA/SPAD subsystem
+UVM 环境。若增加压力后 FP 端仍持续因供数空转，再开展多输出结构对比。
 新增 lane 仍须保持各输出独立的逐元素 FP32 RNE 累加顺序，不可改成树归约或 FMA。
 
 复现命令（Rocky-8.10 WSL / VCS V-2023.12-SP1）：
 
 ```bash
-make -C dv/subsystem/top_smoke/sim ai_fp_dot_dma_benchmark
+make -C dv/subsystem/top_smoke/sim ai_fp_dot_dma_benchmark FP_BENCH_SEED=20261013
+make -C dv/subsystem/top_smoke/sim ai_smoke
+make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=12345
+make -C dv/block/dma/sim uvm_regress
 ```
 
-本次 `FP_BENCH_SEED=20261013` 全部 24 个 BF16/FP16 测点 PASS；DDR BFM 结果、tile 数及结果
-写回逐项检查通过。原始 CSV 行保存在 `dv/subsystem/top_smoke/sim/ai_fp_dot_dma_benchmark.log`
+本次 `FP_BENCH_SEED=20261013` 全部 24 个 BF16/FP16 测点 PASS；ping-pong 测点采用随机 RVALID
+响应间隔和 WREADY backpressure，DDR BFM 结果、tile 数及结果写回逐项检查通过。DMA UVM 11/11、
+普通 `ai_smoke` 与 20-case seeded top regression 也 PASS。原始 CSV 行保存在
+`dv/subsystem/top_smoke/sim/ai_fp_dot_dma_benchmark.log`
 （为忽略的生成日志，不纳入 Git）。
 
 ## Bank 数和 AXI 带宽的设计理由
@@ -113,13 +120,13 @@ AXI4 原始上限为 128 bit = 16 byte/beat，即 4.0 ns（250 MHz）时 4 GB/s�
 ```bash
 make -C dv/block/compute/fp/sim dot-throughput-bench
 make -C dv/block/compute/fp/sim dot-core-test
-make -C dv/block/compute/fp/sim dot-uvm-regress DOT_RANDOM_COUNT=256 'DOT_UVM_SEEDS=712345 987654 20261013 42'
+make -C dv/block/compute/fp/sim dot-uvm-regress DOT_RANDOM_COUNT=256 'DOT_UVM_SEEDS=712345 987654 20261014'
 make -C dv/block/dma/sim uvm_regress
 make -C dv/block/control/sim uvm_regress
 make -C dv/subsystem/top_smoke/sim ai_spad_arb_run
 make -C dv/subsystem/top_smoke/sim ai_smoke
 make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=12345
-make -C dv/subsystem/top_smoke/sim ai_fp_dot_dma_benchmark
+make -C dv/subsystem/top_smoke/sim ai_fp_dot_dma_benchmark FP_BENCH_SEED=20261013
 ```
 
 以上 gate 本轮均通过：FP block test；mixed-dot UVM 四个 seed、每格式 256 个随机向量且

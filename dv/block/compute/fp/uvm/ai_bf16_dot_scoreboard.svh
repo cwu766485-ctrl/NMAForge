@@ -34,6 +34,22 @@
             compare_available();
         endfunction
 
+        function void publish_fault_coverage(bf16_dot_item exp,
+                                             bf16_dot_observed_item obs);
+            bf16_dot_cov_item cov;
+            cov = bf16_dot_cov_item::type_id::create("fault_coverage_sample");
+            cov.format_fp16 = exp.format_fp16;
+            cov.length = exp.length;
+            cov.expect_error = exp.expect_error;
+            cov.expect_reset = exp.expect_reset;
+            cov.fault_mode = exp.fault_mode;
+            cov.max_outstanding_reads = obs.max_outstanding_reads;
+            cov.parity_response_outstanding_reads =
+                obs.parity_response_outstanding_reads;
+            cov.max_response_latency = obs.max_response_latency;
+            coverage_ap.write(cov);
+        endfunction
+
         function void compare_available();
             bf16_dot_item exp;
             bf16_dot_observed_item obs;
@@ -54,6 +70,10 @@
                                                    obs.format_fp16))
                 if (obs.protocol_error)
                     `uvm_error("BF16/SB", $sformatf("tx%0d SPAD address protocol check failed", exp.transaction_id))
+                if (obs.busy_start_count != (exp.inject_busy_start ? 1 : 0))
+                    `uvm_error("FP/SB", $sformatf("tx%0d ignored busy-start count=%0d expected=%0d",
+                                                   exp.transaction_id, obs.busy_start_count,
+                                                   exp.inject_busy_start ? 1 : 0))
                 if (exp.expect_reset) begin
                     if (!obs.reset_abort || obs.error || (obs.error_code != 0) ||
                         (obs.read_count != exp.expected_read_count) ||
@@ -65,6 +85,7 @@
                                                        obs.read_count, obs.write_count,
                                                        obs.protocol_error))
                     else begin
+                        publish_fault_coverage(exp, obs);
                         compared++;
                         `uvm_info("FP/SB", $sformatf("PASS in-flight reset tx%0d reads=%0d writes=%0d",
                                                       exp.transaction_id, obs.read_count,
@@ -81,10 +102,18 @@
                                                        exp.transaction_id, obs.read_count,
                                                        exp.expected_read_count, obs.write_count,
                                                        exp.expected_write_count))
+                    if (exp.check_element_count &&
+                        (obs.element_count != exp.expected_element_count))
+                        `uvm_error("FP/SB", $sformatf("tx%0d partial-compute count mismatch observed=%0d expected=%0d",
+                                                       exp.transaction_id, obs.element_count,
+                                                       exp.expected_element_count))
                     if (obs.error && (obs.error_code == exp.expected_error_code) &&
                         !obs.protocol_error &&
                         (obs.read_count == exp.expected_read_count) &&
-                        (obs.write_count == exp.expected_write_count)) begin
+                        (obs.write_count == exp.expected_write_count) &&
+                        (!exp.check_element_count ||
+                         (obs.element_count == exp.expected_element_count))) begin
+                        publish_fault_coverage(exp, obs);
                         compared++;
                         `uvm_info("FP/SB", $sformatf("PASS expected error tx%0d code=%0d reads=%0d writes=%0d",
                                                       exp.transaction_id, obs.error_code,
@@ -110,6 +139,17 @@
                     if (obs.element_count != exp.length)
                         `uvm_error("BF16/SB", $sformatf("tx%0d element_count=%0d expected=%0d",
                                                          exp.transaction_id, obs.element_count, exp.length))
+                    if ((exp.spad_write_stall_cycles != 0) &&
+                        (obs.write_stall_cycles != exp.spad_write_stall_cycles))
+                        `uvm_error("FP/SB", $sformatf("tx%0d write stall cycles=%0d expected=%0d",
+                                                       exp.transaction_id, obs.write_stall_cycles,
+                                                       exp.spad_write_stall_cycles))
+                    if ((exp.write_protection_stall_cycles != 0) &&
+                        (obs.write_protection_stall_cycles != exp.write_protection_stall_cycles))
+                        `uvm_error("FP/SB", $sformatf("tx%0d write protection during stall cycles=%0d expected=%0d",
+                                                       exp.transaction_id,
+                                                       obs.write_protection_stall_cycles,
+                                                       exp.write_protection_stall_cycles))
                     if (!obs.error && (obs.error_code == 0) && !obs.protocol_error &&
                         (obs.format_fp16 == exp.format_fp16) &&
                         (obs.read_count == required_reads) && (obs.write_count == 1) &&
@@ -120,8 +160,16 @@
                         cov = bf16_dot_cov_item::type_id::create("coverage_sample");
                         cov.format_fp16 = exp.format_fp16;
                         cov.length = exp.length;
+                        cov.expect_error = 0;
+                        cov.expect_reset = 0;
+                        cov.fault_mode = exp.fault_mode;
+                        cov.busy_start_count = obs.busy_start_count;
                         cov.stall_cycles = obs.stall_cycles;
                         cov.max_outstanding_reads = obs.max_outstanding_reads;
+                        cov.max_response_latency = obs.max_response_latency;
+                        cov.watchdog_limit = exp.watchdog_limit;
+                        cov.expected_write_stall_cycles = exp.spad_write_stall_cycles;
+                        cov.observed_write_stall_cycles = obs.write_stall_cycles;
                         foreach (exp.a_bits[i]) begin
                             cov.a_bits[i] = exp.a_bits[i];
                             cov.b_bits[i] = exp.b_bits[i];

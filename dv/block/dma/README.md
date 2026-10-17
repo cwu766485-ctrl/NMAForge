@@ -25,9 +25,14 @@ verification roles:
 | `dma_gather_load_test` | SPAD index table selects three non-contiguous DDR rows | index read/address generation and output rows match |
 | `dma_store_booo_test` | two write bursts and newest-first BID response | AW/W/WLAST plus every DDR word match; BID response is out of order |
 | `dma_2d_store_test` | strided 2-D SPAD-to-DDR store | all source/destination row strides match |
+| `dma_aw_stall_stability_test` | force AWREADY low before publishing a four-word store, then hold it low for four complete AWVALID cycles | testbench checks AWVALID and `{AWID, AWADDR, AWLEN, AWSIZE, AWBURST}` remain stable while stalled; releases AWREADY, checks one AW/W/B completion, and scores every stored word; intended directed gate for DUT `p_aw_payload_stable` |
 | `dma_narrow_load_test` | non-16-byte-aligned address | 32-bit alignment transfers then 128-bit line transfer match |
 | `dma_4k_load_test` | transfer crosses a 4-KiB page | SVA proves no individual AR crosses the page; data matches |
 | `dma_abort_read_test` | abort with accepted reads held in the responder | error code is `ERR_ABORT`; accepted R traffic drains before `done` |
+| `dma_read_slverr_test` | SLVERR on the first newest-first burst after four ARs are accepted | all four read responses drain, destination sentinels do not change, no-reset recovery scores cleanly |
+| `dma_spad_error_drain_test` | one-shot protection error on first newest-first destination line write (`0x1200 + 24×4 = 0x1260`) after four ARs are accepted | reports DMA-local `ERR_SPAD` code 4; all four RLASTs drain, destination sentinels stay unchanged, no response remains, no-reset recovery load scores cleanly; focused rerun and 15-test regression PASS |
+| `dma_write_slverr_test` | AXI BRESP SLVERR on one accepted store burst | reports `ERR_AXI_WR`; matching BID completes exactly once, no B remains pending, recovery load scores cleanly |
+| `dma_abort_write_test` | abort after an accepted AW; delay B and then issue a recovery read | full accepted W burst and B drain before `done`; recovery command scores cleanly |
 | `dma_config_error_test` | unaligned DDR address | `ERR_CONFIG`; absolutely no AXI transaction is accepted |
 | `dma_backpressure_test` | deterministic AR/AW/W/SPAD stalls and RID reordering | no deadlock; scoreboard and SVA clean |
 | `dma_random_stress_test` | 20 constrained-random legal 1-D load/store commands | each command scores cleanly; failing seed is replayable |

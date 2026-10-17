@@ -6,6 +6,11 @@ package dma_block_types_pkg;
         bit ooo_read_responses = 1;
         bit ooo_write_responses = 1;
         bit enable_backpressure = 0;
+        // Directed block test holds AWREADY low before publishing its store.
+        bit force_awready_low = 0;
+        // Subsystem tests connect the DUT to the real arbiter/scratchpad and
+        // therefore disable the block-level behavioral SPAD responder.
+        bit external_spad_model = 0;
         int unsigned ar_stall_cycles = 0;
         // Keep the first responses back until this many ARs are accepted.
         // The default deliberately fills the DMA's four tagged read slots.
@@ -13,6 +18,20 @@ package dma_block_types_pkg;
         int unsigned min_accepted_writes_before_response = 1;
         int unsigned read_response_delay_cycles = 0;
         int unsigned write_response_delay_cycles = 0;
+        // Optional deterministic AXI RRESP fault injection used by subsystem
+        // stress tests. The address is the byte address of an AXI read beat.
+        bit inject_read_error;
+        bit [63:0] inject_read_error_addr;
+        int unsigned injected_read_error_responses;
+        // Assert a one-shot SPAD line-request protection error on the first
+        // valid destination write, before its accepting clock edge.
+        bit inject_spad_line_req_error;
+        int unsigned injected_spad_line_req_errors;
+        bit [31:0] injected_spad_line_req_addr;
+        // Optional deterministic AXI BRESP fault injection. The block-level
+        // write-SLVERR test uses a single-burst store and checks one response.
+        bit inject_write_error;
+        int unsigned injected_write_error_responses;
         `uvm_object_utils(dma_block_cfg)
         function new(string name = "dma_block_cfg"); super.new(name); endfunction
     endclass
@@ -35,6 +54,8 @@ package dma_block_types_pkg;
         bit expect_error;
         bit [3:0] expected_error_code;
         int unsigned abort_after_cycles;
+        // Assert abort on the cycle after the first accepted AXI write address.
+        bit abort_after_aw;
         int unsigned minimum_rd_highwater;
         `uvm_object_utils_begin(dma_cmd_item)
             `uvm_field_int(ext_addr, UVM_DEFAULT)
@@ -51,6 +72,7 @@ package dma_block_types_pkg;
             `uvm_field_int(expect_error, UVM_DEFAULT)
             `uvm_field_int(expected_error_code, UVM_DEFAULT)
             `uvm_field_int(abort_after_cycles, UVM_DEFAULT)
+            `uvm_field_int(abort_after_aw, UVM_DEFAULT)
             `uvm_field_int(minimum_rd_highwater, UVM_DEFAULT)
         `uvm_object_utils_end
         function new(string name = "dma_cmd_item"); super.new(name); endfunction

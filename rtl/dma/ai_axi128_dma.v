@@ -373,7 +373,23 @@ module ai_axi128_dma #(
           m_axi_arvalid <= 1'b0;
           m_axi_awvalid <= 1'b0;
           m_axi_wvalid <= 1'b0;
-          state_r <= ST_ERROR;
+          if ((state_r == ST_READ) || (state_r == ST_ABORT_READ)) begin
+            // A scratchpad-side failure must not abandon AXI reads that have
+            // already been accepted. Discard completed slots and drain every
+            // remaining response through RLAST before reporting done.
+            if (state_r == ST_READ) begin
+              for (i=0; i<4; i=i+1) begin
+                if (rd_slot_complete_r[i])
+                  rd_slot_valid_r[i] <= 1'b0;
+                rd_slot_complete_r[i] <= 1'b0;
+              end
+              if (r_fire && m_axi_rlast)
+                rd_slot_valid_r[rd_rid_index_comb] <= 1'b0;
+            end
+            state_r <= ST_ABORT_READ;
+          end else begin
+            state_r <= ST_ERROR;
+          end
         end else begin
           case (state_r)
             ST_IDLE: begin
@@ -508,7 +524,18 @@ module ai_axi128_dma #(
                      rd_slot_expected_r[rd_rid_index_comb])) begin
                   error <= 1'b1;
                   error_code <= ERR_AXI_RD;
-                  state_r <= ST_ERROR;
+                  state_r <= ST_ABORT_READ;
+                  m_axi_arvalid <= 1'b0;
+                  // A failed response invalidates any completed-but-not-yet-
+                  // committed read data. The failing burst and all other
+                  // accepted bursts remain live until their RLAST is drained.
+                  for (i=0; i<4; i=i+1) begin
+                    if (rd_slot_complete_r[i])
+                      rd_slot_valid_r[i] <= 1'b0;
+                    rd_slot_complete_r[i] <= 1'b0;
+                  end
+                  if (m_axi_rlast)
+                    rd_slot_valid_r[rd_rid_index_comb] <= 1'b0;
                 end else if (m_axi_rlast) begin
                   rd_slot_complete_r[rd_rid_index_comb] <= 1'b1;
                 end else begin

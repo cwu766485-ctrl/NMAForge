@@ -3,6 +3,8 @@
         uvm_analysis_port #(bf16_dot_observed_item) observed_ap;
         int unsigned next_transaction_id;
         int unsigned outstanding_reads;
+        int unsigned monitor_cycle;
+        int unsigned read_accept_cycle_q[$];
         bf16_dot_observed_item current;
 
         `uvm_component_utils(bf16_dot_monitor)
@@ -11,6 +13,7 @@
             observed_ap = new("observed_ap", this);
             next_transaction_id = 0;
             outstanding_reads = 0;
+            monitor_cycle = 0;
         endfunction
 
         virtual function void build_phase(uvm_phase phase);
@@ -33,10 +36,24 @@
                                                        current.transaction_id, current.read_count,
                                                        current.write_count), UVM_HIGH)
                         current = null;
-                        outstanding_reads = 0;
                     end
+                    outstanding_reads = 0;
+                    monitor_cycle = 0;
+                    read_accept_cycle_q.delete();
                 end else begin
-                if (vif.start) begin
+                // A start sampled while busy is intentionally ignored by the
+                // DUT. Attribute it to the current command instead of
+                // replacing the in-flight observation with a phantom txn.
+                if (vif.start && vif.busy) begin
+                    if (current == null)
+                        `uvm_error("FP/MON", "Busy start pulse observed without an active transaction")
+                    else begin
+                        current.busy_start_count++;
+                        `uvm_info("FP/MON", $sformatf("Observed ignored busy-start pulse tx%0d count=%0d",
+                                                       current.transaction_id,
+                                                       current.busy_start_count), UVM_HIGH)
+                    end
+                end else if (vif.start) begin
                     current = bf16_dot_observed_item::type_id::create(
                         $sformatf("observed_%0d", next_transaction_id));
                     current.transaction_id = next_transaction_id++;
@@ -44,8 +61,13 @@
                     current.length = vif.length;
                     current.read_count = 0;
                     current.max_outstanding_reads = 0;
+                    current.parity_response_outstanding_reads = 0;
+                    current.max_response_latency = 0;
                     current.write_count = 0;
+                    current.write_stall_cycles = 0;
+                    current.write_protection_stall_cycles = 0;
                     current.element_count = 0;
+                    current.busy_start_count = 0;
                     current.stall_cycles = 0;
                     current.result = 0;
                     current.write_address = 0;
@@ -55,17 +77,36 @@
                     current.protocol_error = 0;
                     current.reset_abort = 0;
                     outstanding_reads = 0;
+                    monitor_cycle = 0;
+                    read_accept_cycle_q.delete();
                 end
+
+                if (current != null)
+                    monitor_cycle++;
 
                 if ((current != null) && vif.spad_valid && !vif.spad_ready)
                     current.stall_cycles++;
+                if ((current != null) && vif.spad_valid && vif.spad_write &&
+                    !vif.spad_ready)
+                    current.write_stall_cycles++;
+                if ((current != null) && vif.spad_valid && vif.spad_write &&
+                    !vif.spad_ready && vif.spad_protection_error)
+                    current.write_protection_stall_cycles++;
 
                 if ((current != null) && vif.spad_rsp_valid) begin
+                    if (vif.spad_parity_error)
+                        current.parity_response_outstanding_reads = outstanding_reads;
                     if (outstanding_reads == 0) begin
                         current.protocol_error = 1;
                         `uvm_error("BF16/MON", $sformatf("tx%0d response without accepted read",
                                                          current.transaction_id))
-                    end else outstanding_reads--;
+                    end else begin
+                        int unsigned response_latency;
+                        outstanding_reads--;
+                        response_latency = monitor_cycle - read_accept_cycle_q.pop_front();
+                        if (response_latency > current.max_response_latency)
+                            current.max_response_latency = response_latency;
+                    end
                 end
 
                 if ((current != null) && vif.spad_valid && vif.spad_ready) begin
@@ -87,12 +128,19 @@
                         end
                         current.read_count++;
                         outstanding_reads++;
+                        read_accept_cycle_q.push_back(monitor_cycle);
                         if (outstanding_reads > current.max_outstanding_reads)
                             current.max_outstanding_reads = outstanding_reads;
                     end
                 end
 
                 if ((current != null) && vif.done) begin
+                    if ((outstanding_reads != 0) || (read_accept_cycle_q.size() != 0)) begin
+                        current.protocol_error = 1;
+                        `uvm_error("BF16/MON", $sformatf("tx%0d completed with outstanding=%0d timestamp_q=%0d",
+                                                         current.transaction_id, outstanding_reads,
+                                                         read_accept_cycle_q.size()))
+                    end
                     current.result = vif.result;
                     current.element_count = vif.element_count;
                     current.error = vif.error;
@@ -103,6 +151,7 @@
                                                      current.read_count, current.write_count,
                                                      current.result, current.error), UVM_HIGH)
                     current = null;
+                    read_accept_cycle_q.delete();
                 end
                 end
             end

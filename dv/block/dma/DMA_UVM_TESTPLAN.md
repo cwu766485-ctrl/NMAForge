@@ -22,7 +22,7 @@ by response arrival order.
 
 ## Executable test list
 
-| Test | Stimulus | Checkers | Status on 2026-08-13 |
+| Test | Stimulus | Checkers | Latest status |
 |---|---|---|---|
 | `dma_load_ooo_smoke_test` | 32 words, four read IDs, newest-first R | highwater=4, OOO order, DDR→SPAD data, SVA | **PASS** in VCS |
 | `dma_2d_load_test` | 3×6, DDR/SPAD stride | row-address and data scoreboard | **PASS** in VCS |
@@ -32,6 +32,10 @@ by response arrival order.
 | `dma_narrow_load_test` | address offset 4, 7 words | narrow bus lane then line data | **PASS** in VCS |
 | `dma_4k_load_test` | address `0x1fc0`, 40 words | no AR 4 KiB crossing, data | **PASS** in VCS |
 | `dma_abort_read_test` | abort after accepted read work | `ERR_ABORT`, response drain, completion | **PASS** in VCS |
+| `dma_read_slverr_test` | inject `SLVERR` into the first newest-first response after four accepted reads | `ERR_AXI_RD`, all four RLASTs drain, SPAD sentinels stay unchanged, clean recovery read | **PASS** in VCS, 2026-10-16 |
+| `dma_spad_error_drain_test` | 32-word load, hold R until four ARs accepted, inject on first newest-first destination line write (`0x1200 + 24×4 = 0x1260`) | `ERR_SPAD` (DMA-local code 4), 4/4 RLASTs drain, all destination sentinels unchanged, no pending response, clean no-reset recovery read | **PASS** in focused VCS rerun and 15-test regression, 2026-10-16 |
+| `dma_write_slverr_test` | inject AXI BRESP `SLVERR` for one accepted store burst | `ERR_AXI_WR`, one matching BID completes, no pending B, clean recovery read | **PASS** in VCS, 2026-10-16 |
+| `dma_abort_write_test` | abort immediately after accepted AW, with delayed B response | complete accepted W burst, drain B before `done`, then run a clean recovery read | **PASS** in VCS, 2026-10-16 |
 | `dma_config_error_test` | unaligned DDR source address | `ERR_CONFIG`, zero accepted AXI traffic | **PASS** in VCS |
 | `dma_backpressure_test` | deterministic stalls + OOO R | no timeout, data/SVA clean | **PASS** in VCS |
 | `dma_random_stress_test` | 20 constrained-random legal 1-D load/store commands | every command scores cleanly; replay through `SEED` | **PASS** in VCS |
@@ -50,9 +54,22 @@ by the BFM because they depend on the per-ID/per-burst history.
 
 The command covergroup samples direction, 1-D/2-D shape, gather enable,
 transfer size class, read outstanding depth and 4 KiB-crossing scenario, plus
-a load-mode cross. The 2026-08-13 random-stress run reported 67.86% command
-functional coverage; this confirms collection is live, not coverage closure.
-Closure should not be called until:
+a load-mode cross. The 2026-08-13 random-stress run reported 67.86%, and an
+individual random-stress test may print 70%; neither is the regression aggregate.
+The 2026-10-16 latest 15-test run reported 14/14 command
+coverpoint bins and 5/5 transfer-mode cross bins. This closes only the bins
+currently modeled by `dma_cmd_cg`, not DMA RTL code coverage. The corrected run
+also collected all 11 DMA SVA with non-empty real successes and zero
+failure/incomplete. See the
+[A10 run record](../../../docs/verification/A10_DV_RUN_2026-10-16.md) for the
+merged URG path and updated DUT-only code-coverage values.
+The first focused `dma_spad_error_drain_test` attempt exposed a stale checker
+expectation (`0x1200`); newest-first response ordering makes the first
+destination line `0x1260`. The checker was corrected to derive that address
+from the transfer geometry. The focused rerun and the full 15-test regression
+both pass; the run record retains the first checker-only failure for traceability.
+
+Broader closure should not be called until:
 
 - every executable test passes with zero UVM errors/fatals;
 - constrained-random variants add multiple seeds for each transfer mode;
@@ -64,9 +81,12 @@ Closure should not be called until:
 ```bash
 cd <repo>/dv/block/dma/sim
 make uvm_smoke
-make uvm_regress 2>&1 | tee dma_block_regress.log
-make coverage
+make uvm_regress COV_ROOT=coverage/<run-tag>
+make coverage COV_ROOT=coverage/<run-tag>
 ```
 
-Do not treat a clean compile, an empty log, or a single smoke as closure. The
-pass condition is the per-test UVM summary plus scoreboard/SVA evidence.
+Both compile and simv must receive the same VCS `-cm` metrics. The regression
+target passes `CM_METRICS` and `COV_DIR` to runtime and allows `COV_ROOT` to keep
+each coverage campaign isolated. Do not treat a clean compile, an empty log, or
+a single smoke as closure. The pass condition is the per-test UVM summary plus
+scoreboard/SVA evidence and reviewed aggregate URG.

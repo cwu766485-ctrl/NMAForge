@@ -74,7 +74,12 @@ module ai_descriptor_validator (
                               ((op == 8'h41 || op == 8'h42) &&
                                length >= 16'd3 && length <= 16'd256);
 
-    assign alignment_error = (|src0[1:0]) || (|src1[1:0]) ||
+    // For an ABI-v7 macro parent, src1 is the high word of the 64-bit child
+    // list pointer {src1,src0}. Check alignment on the complete address via
+    // src0's low bits; src1 is not an independently aligned data pointer.
+    wire macro_v7_uses_64b_child_base = is_macro && (version == 8'd7);
+    assign alignment_error = (|src0[1:0]) ||
+                             ((|src1[1:0]) && !macro_v7_uses_64b_child_base) ||
                              (|dst[1:0]) ||
                              (bias_enable && (|bias_base[1:0]));
 

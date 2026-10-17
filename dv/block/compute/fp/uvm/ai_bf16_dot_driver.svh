@@ -29,14 +29,17 @@
             bit [31:0] rsp_data [0:3];
             bit request_seen;
             int unsigned word_index;
+            int unsigned write_stall_age;
             int unsigned accepted_reads;
             int unsigned responses_delivered;
+            int unsigned response_delay_cycles;
             bit parity_injected;
             bit read_protection_injected;
             bit write_protection_injected;
             bit abort_injected;
             bit reset_injected;
             bit reset_condition;
+            bit unqualified_parity_injected;
 
             request_seen = 0;
             bfm_cycle = 0;
@@ -46,11 +49,13 @@
             stall_left = 0;
             accepted_reads = 0;
             responses_delivered = 0;
+            write_stall_age = 0;
             parity_injected = 0;
             read_protection_injected = 0;
             write_protection_injected = 0;
             abort_injected = 0;
             reset_injected = 0;
+            unqualified_parity_injected = 0;
             wait (vif.start === 1'b1);
             while ((vif.done !== 1'b1) && !reset_injected) begin
                 @(negedge vif.clk);
@@ -65,6 +70,9 @@
                      (accepted_reads == 1) && !abort_injected) ||
                     ((req.fault_mode == FP_FAULT_ABORT_CALC) &&
                      (responses_delivered == 2) && !abort_injected) ||
+                    ((req.fault_mode == FP_FAULT_READ_LATE_PROTECTION_ABORT) &&
+                     (responses_delivered == 2) && (rsp_count != 0) &&
+                     (bfm_cycle >= rsp_due[rsp_head]) && !abort_injected) ||
                     ((req.fault_mode == FP_FAULT_ABORT_UNACCEPTED_A) &&
                      (accepted_reads == 0) && vif.spad_valid &&
                      !vif.spad_write && !abort_injected) ||
@@ -119,13 +127,22 @@
                         if ((((req.fault_mode == FP_FAULT_READ_PARITY) &&
                               (responses_delivered == 0)) ||
                              ((req.fault_mode == FP_FAULT_READ_B_PARITY) &&
-                              (responses_delivered == 1))) &&
+                              (responses_delivered == 1)) ||
+                             ((req.fault_mode == FP_FAULT_READ_PARITY_LATE) &&
+                              (responses_delivered == 2))) &&
                             !parity_injected) begin
                             vif.spad_parity_error = 1'b1;
                             parity_injected = 1;
                         end
                     rsp_head = (rsp_head == 3) ? 0 : rsp_head + 1;
                     rsp_count--;
+                end
+
+                if (req.inject_unqualified_parity_error &&
+                    !unqualified_parity_injected && vif.spad_valid &&
+                    !vif.spad_write && !vif.spad_rsp_valid) begin
+                    vif.spad_parity_error = 1'b1;
+                    unqualified_parity_injected = 1;
                 end
 
                 if (vif.spad_valid) begin
@@ -135,9 +152,19 @@
                                      $urandom_range(1, 3);
                         if (req.fault_mode == FP_FAULT_WATCHDOG)
                             stall_left = 0;
+                        if ((req.spad_write_stall_cycles != 0) &&
+                            !vif.spad_write)
+                            stall_left = 0;
                         if ((req.fault_mode == FP_FAULT_READ_PARITY) ||
                             (req.fault_mode == FP_FAULT_READ_B_PARITY) ||
+                            (req.fault_mode == FP_FAULT_READ_PARITY_LATE) ||
                             (req.fault_mode == FP_FAULT_READ_PROTECTION))
+                            stall_left = 0;
+                        if (req.fault_mode == FP_FAULT_READ_B_PROTECTION)
+                            stall_left = 0;
+                        if ((req.fault_mode == FP_FAULT_READ_LATE_PROTECTION) ||
+                            (req.fault_mode == FP_FAULT_READ_LATE_B_PROTECTION) ||
+                            (req.fault_mode == FP_FAULT_READ_LATE_PROTECTION_ABORT))
                             stall_left = 0;
                         if ((req.fault_mode == FP_FAULT_RESET_READ_B) &&
                             (accepted_reads == 1) &&
@@ -146,11 +173,35 @@
                         if ((req.fault_mode == FP_FAULT_ABORT_UNACCEPTED_A) ||
                             (req.fault_mode == FP_FAULT_ABORT_UNACCEPTED_B))
                             stall_left = 2;
+                        if (vif.spad_write &&
+                            (req.spad_write_stall_cycles != 0))
+                            stall_left = req.spad_write_stall_cycles;
+                        if (req.force_zero_request_stall)
+                            stall_left = 0;
                     end
                     if (stall_left == 0) begin
                         vif.spad_ready = 1'b1;
                         if ((req.fault_mode == FP_FAULT_READ_PROTECTION) &&
                             !vif.spad_write && !read_protection_injected) begin
+                            vif.spad_protection_error = 1'b1;
+                            read_protection_injected = 1;
+                        end
+                        if ((req.fault_mode == FP_FAULT_READ_B_PROTECTION) &&
+                            !vif.spad_write && (accepted_reads == 1) &&
+                            !read_protection_injected) begin
+                            vif.spad_protection_error = 1'b1;
+                            read_protection_injected = 1;
+                        end
+                        if (((req.fault_mode == FP_FAULT_READ_LATE_PROTECTION) ||
+                             (req.fault_mode == FP_FAULT_READ_LATE_PROTECTION_ABORT)) &&
+                            !vif.spad_write && (accepted_reads == 2) &&
+                            !read_protection_injected) begin
+                            vif.spad_protection_error = 1'b1;
+                            read_protection_injected = 1;
+                        end
+                        if ((req.fault_mode == FP_FAULT_READ_LATE_B_PROTECTION) &&
+                            !vif.spad_write && (accepted_reads == 3) &&
+                            !read_protection_injected) begin
                             vif.spad_protection_error = 1'b1;
                             read_protection_injected = 1;
                         end
@@ -163,6 +214,15 @@
                         stall_left--;
                 end else begin
                     request_seen = 0;
+                end
+
+                // Protection is sampled by the DUT only on an accepted
+                // write. Deliberately assert it during an unaccepted stalled
+                // write, then remove it before ready, to test qualification.
+                if (vif.spad_valid && vif.spad_write && !vif.spad_ready &&
+                    (write_stall_age < req.write_protection_stall_cycles)) begin
+                    vif.spad_protection_error = 1'b1;
+                    write_stall_age++;
                 end
 
                 @(posedge vif.clk);
@@ -178,7 +238,18 @@
                         if (rsp_count >= 4)
                             `uvm_fatal("BF16/DRV", "Ordered response queue overflow")
                         rsp_data[rsp_tail] = spad_mem[word_index];
-                        rsp_due[rsp_tail] = bfm_cycle + 2;
+                        if ((req.fault_mode == FP_FAULT_READ_B_PARITY) &&
+                            (accepted_reads == 2) &&
+                            (req.response_latency_second_read_override_cycles != 0))
+                            response_delay_cycles =
+                                req.response_latency_second_read_override_cycles;
+                        else if (req.response_latency_override_cycles != 0)
+                            response_delay_cycles = req.response_latency_override_cycles;
+                        else
+                            response_delay_cycles =
+                                (req.fault_mode == FP_FAULT_READ_LATE_B_PROTECTION) ? 1 : 2;
+                        rsp_due[rsp_tail] = bfm_cycle + response_delay_cycles +
+                            $urandom_range(req.response_jitter_max, 0);
                         rsp_tail = (rsp_tail == 3) ? 0 : rsp_tail + 1;
                         rsp_count++;
                     end
@@ -199,6 +270,7 @@
             bf16_dot_item expected;
             int unsigned i;
             int unsigned timeout_cycles;
+            int unsigned vector_word;
 
             vif.start = 0;
             vif.reset_force = 0;
@@ -217,24 +289,38 @@
             foreach (spad_mem[i]) spad_mem[i] = 0;
 
             wait (vif.resetn === 1'b1);
+            wait (vif.illegal_state_test_done === 1'b1);
             forever begin
                 seq_item_port.get_next_item(req);
                 expected = bf16_dot_item::type_id::create("expected_copy");
                 expected.copy_fields(req);
                 expected_ap.write(expected);
 
-                spad_mem[BF16_DOT_SRC0_BASE[9:2]] = {req.a_bits[1], req.a_bits[0]};
-                spad_mem[BF16_DOT_SRC0_BASE[9:2] + 1] = {req.a_bits[3], req.a_bits[2]};
-                spad_mem[BF16_DOT_SRC1_BASE[9:2]] = {req.b_bits[1], req.b_bits[0]};
-                spad_mem[BF16_DOT_SRC1_BASE[9:2] + 1] = {req.b_bits[3], req.b_bits[2]};
+                for (int unsigned elem = 0; elem < req.length; elem += 2) begin
+                    vector_word = elem / 2;
+                    spad_mem[BF16_DOT_SRC0_BASE[9:2] + vector_word] = {
+                        ((elem + 1) < req.length) ? req.a_bits[elem + 1] : 16'b0,
+                        req.a_bits[elem]};
+                    spad_mem[BF16_DOT_SRC1_BASE[9:2] + vector_word] = {
+                        ((elem + 1) < req.length) ? req.b_bits[elem + 1] : 16'b0,
+                        req.b_bits[elem]};
+                end
 
                 vif.src0_base = BF16_DOT_SRC0_BASE;
                 vif.src1_base = BF16_DOT_SRC1_BASE;
                 vif.dst_base = BF16_DOT_DST_BASE;
+                case (req.fault_mode)
+                    FP_FAULT_CONFIG_SRC0_ALIGN:
+                        vif.src0_base = BF16_DOT_SRC0_BASE + 32'd2;
+                    FP_FAULT_CONFIG_SRC1_ALIGN:
+                        vif.src1_base = BF16_DOT_SRC1_BASE + 32'd2;
+                    FP_FAULT_CONFIG_DST_ALIGN:
+                        vif.dst_base = BF16_DOT_DST_BASE + 32'd2;
+                    default: begin end
+                endcase
                 vif.length = req.length[15:0];
                 vif.format_fp16 = req.format_fp16;
-                vif.watchdog_limit = (req.fault_mode == FP_FAULT_WATCHDOG) ?
-                                     32'd1 : 32'd256;
+                vif.watchdog_limit = req.watchdog_limit;
                 vif.abort = 0;
 
                 fork
@@ -244,6 +330,28 @@
                         vif.start = 1;
                         @(negedge vif.clk);
                         vif.start = 0;
+                        if (req.inject_busy_start) begin
+                            @(negedge vif.clk);
+                            if (vif.busy !== 1'b1)
+                                `uvm_fatal("FP/DRV", "Directed busy-start transaction did not reach busy state")
+                            // Present a deliberately invalid, distinct
+                            // configuration during the second start pulse.
+                            // The active command's held request/result must
+                            // remain unaffected because start is ignored.
+                            vif.src0_base = BF16_DOT_SRC0_BASE + 32'd2;
+                            vif.src1_base = BF16_DOT_SRC1_BASE;
+                            vif.dst_base = BF16_DOT_DST_BASE;
+                            vif.length = 0;
+                            vif.format_fp16 = !req.format_fp16;
+                            vif.start = 1;
+                            @(negedge vif.clk);
+                            vif.start = 0;
+                            vif.src0_base = BF16_DOT_SRC0_BASE;
+                            vif.src1_base = BF16_DOT_SRC1_BASE;
+                            vif.dst_base = BF16_DOT_DST_BASE;
+                            vif.length = req.length[15:0];
+                            vif.format_fp16 = req.format_fp16;
+                        end
                         timeout_cycles = 0;
                         while ((vif.done !== 1'b1) &&
                                !(req.expect_reset && (vif.resetn === 1'b0)) &&

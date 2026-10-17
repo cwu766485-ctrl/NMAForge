@@ -179,7 +179,8 @@ module ai_command_processor(
     assign tile_active = (state_r == ST_TILE) || tile_busy;
 
     ai_tile_pipeline tile_pipeline_u(
-        .clk(clk), .resetn(resetn), .start(tile_start && state_r == ST_IDLE),
+        .clk(clk), .resetn(resetn),
+        .start(tile_start && state_r == ST_IDLE && scheduler_resources_idle),
         .abort(abort), .tile_count(tile_count),
         .ext_input_base(tile_ext_input_base), .ext_output_base(tile_ext_output_base),
         .ext_input_stride(tile_ext_input_stride), .ext_output_stride(tile_ext_output_stride),
@@ -503,9 +504,10 @@ module ai_command_processor(
                 dependency_wait_cycles_r <= dependency_wait_cycles_r + 1'b1;
               end
             end else if (macro_op) begin
-              // Descriptor v4 macro: src0 points at a 64-byte-aligned list of
-              // primitive v2/v3 descriptors, length is the child count and
-              // flag[3] selects external-memory versus scratchpad children.
+              // Descriptor v4 uses src0 as the child-list base; ABI v7 uses
+              // {src1,src0} as a 64-bit base. The list is 64-byte aligned,
+              // length is the child count, and flag[3] selects external-memory
+              // versus scratchpad children.
               // The parent owns one completion; children execute in order and
               // fail-stop without publishing intermediate completions.
               macro_active_r <= 1'b1;
