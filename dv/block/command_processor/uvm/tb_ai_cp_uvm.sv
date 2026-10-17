@@ -189,7 +189,8 @@ module tb_ai_cp_uvm;
           vif.cpl_spad_ready=0;
         else if(vif.test_case==CP_MIXED_ERROR_ABORT_RESET &&
                 vif.mixed_hold_abort_completion &&
-                vif.cpl_spad_addr[3:2]==2'd1 && vif.completion_error==4'd3)
+                vif.cpl_spad_addr[3:2]==vif.mixed_reset_target_words &&
+                vif.completion_error==4'd3)
           vif.cpl_spad_ready=0;
         else
           vif.cpl_spad_ready=($urandom_range(0,3)!=0);

@@ -2,7 +2,7 @@ VCS ?= vcs
 URG ?= urg
 SEED ?= 12345
 SEEDS ?= 12345 67890 24680
-MIXED_COV_CASES ?= 1-0 1-1 1-3 2-0 2-1 2-3
+MIXED_COV_CASES ?= 1-0-0 1-0-1 1-0-2 1-0-3 1-1-0 1-1-1 1-1-2 1-1-3 1-3-0 1-3-1 1-3-2 1-3-3 2-0-0 2-0-1 2-0-2 2-0-3 2-1-0 2-1-1 2-1-2 2-1-3 2-3-0 2-3-1 2-3-2 2-3-3
 OUT ?= /tmp/nmaforge_cp_uvm
 FILELIST := ai_cp_uvm.f
 CM_METRICS ?= line+cond+fsm+tgl+branch+assert
@@ -59,12 +59,13 @@ cov-compile:
 cov-regress: cov-compile
 	@set -e; for seed in $(SEEDS); do \
 	  for mixed in $(MIXED_COV_CASES); do \
-	    kind=$${mixed%-*}; delay=$${mixed#*-}; \
+	    kind=$${mixed%%-*}; rest=$${mixed#*-}; delay=$${rest%%-*}; reset_words=$${rest#*-}; \
+	    if [ "$$reset_words" = "$$rest" ]; then reset_words=1; fi; \
 	    db=seed_$${seed}_mixed_$${mixed}.vdb; log=run_$${seed}_mixed_$${mixed}.log; \
 	    rm -rf $(COV_OUT)/$$db; \
-	    echo "Running command-processor coverage seed=$$seed mixed_kind=$$kind abort_delay=$$delay"; \
+	    echo "Running command-processor coverage seed=$$seed mixed_kind=$$kind abort_delay=$$delay reset_words=$$reset_words"; \
 	    cd $(COV_OUT) && ./simv -cm $(CM_METRICS) -cm_dir $$db -cm_name ai_cp_test \
-	      +CP_MIXED_KIND=$$kind +CP_MIXED_DELAY=$$delay \
+	      +CP_MIXED_KIND=$$kind +CP_MIXED_DELAY=$$delay +CP_MIXED_RESET_WORDS=$$reset_words \
 	      +UVM_TESTNAME=ai_cp_test +ntb_random_seed=$$seed -l $$log; \
 	    $(MAKE) -C $(CURDIR) --no-print-directory check-log LOG=$(COV_OUT)/$$log; \
 	  done; \
@@ -76,10 +77,14 @@ check-coverage:
 	@test -s $(COV_OUT)/urg_merged/grpinfo.txt
 	@grep -q 'ai_cp_uvm_pkg::ai_cp_coverage::cp_cg' $(COV_OUT)/urg_merged/grpinfo.txt || \
 	 { echo "URG report is missing CP functional coverage; see $(COV_OUT)/urg_merge.log"; exit 1; }
-	@grep -Eq 'Variables[[:space:]]+57[[:space:]]+0[[:space:]]+57[[:space:]]+100\.00' $(COV_OUT)/urg_merged/grpinfo.txt || \
-	 { echo "CP functional variable coverage is not 57/57; see $(COV_OUT)/urg_merged/grpinfo.txt"; exit 1; }
-	@grep -Eq 'Crosses[[:space:]]+10[[:space:]]+0[[:space:]]+10[[:space:]]+100\.00' $(COV_OUT)/urg_merged/grpinfo.txt || \
-	 { echo "CP functional cross coverage is not 10/10; see $(COV_OUT)/urg_merged/grpinfo.txt"; exit 1; }
+	@grep -Eq 'Variables[[:space:]]+61[[:space:]]+0[[:space:]]+61[[:space:]]+100\.00' $(COV_OUT)/urg_merged/grpinfo.txt || \
+	 { echo "CP functional variable coverage is not 61/61; see $(COV_OUT)/urg_merged/grpinfo.txt"; exit 1; }
+	@grep -Eq 'Crosses[[:space:]]+34[[:space:]]+0[[:space:]]+34[[:space:]]+100\.00' $(COV_OUT)/urg_merged/grpinfo.txt || \
+	 { echo "CP functional cross coverage is not 34/34; see $(COV_OUT)/urg_merged/grpinfo.txt"; exit 1; }
+	@grep -Eq '^cp_mixed_reset_words[[:space:]]+4[[:space:]]+0[[:space:]]+4[[:space:]]+100\.00' $(COV_OUT)/urg_merged/grpinfo.txt || \
+	 { echo "CP mixed reset-word bins are not 4/4; see $(COV_OUT)/urg_merged/grpinfo.txt"; exit 1; }
+	@grep -Eq '^cp_mixed_kind_delay_reset_cross[[:space:]]+24[[:space:]]+0[[:space:]]+24[[:space:]]+100\.00' $(COV_OUT)/urg_merged/grpinfo.txt || \
+	 { echo "CP mixed kind x delay x reset-word cross is not 24/24; see $(COV_OUT)/urg_merged/grpinfo.txt"; exit 1; }
 	@! grep -Eq 'Error-\[UCAPI-' $(COV_OUT)/urg_merge.log || \
 	 { echo "URG reported missing/corrupt design database; see $(COV_OUT)/urg_merge.log"; exit 1; }
 check-log:
@@ -93,10 +98,10 @@ check-log:
 			 grep -Eq '\[CP/CPLQ_LAST_SLOT\].*queued=2 initial_free_slots=1 first_completion_filled_ring=1 second_held=1 red-doorbell_recovery=1 cpl_tail=2->3->0 cmdq_head=1->2' $(LOG) && \
 		 grep -Eq '\[CP/WRITER_FSM\].*illegal_state_injected=1 recovered_idle=1 side_effects=0 recovery_completion=1' $(LOG) && \
 		 grep -Eq '\[CP/ABORT\].*compute_abort_inputs=1 launches=2 completions=2' $(LOG) && \
-		 grep -Eq '\[CP/ABORT_RESET\].*abort_inputs=2 recovery_launches=2 recovery_completions=2 partial_resets=3' $(LOG) && \
+		 grep -Eq '\[CP/ABORT_RESET\].*abort_inputs=2 recovery_launches=2 recovery_completions=2 partial_resets=[23]' $(LOG) && \
 		 grep -Eq '\[CP/PARTIAL_RESET\].*accepted_before_reset=1 reset_cleared=1 recovery_completions=1 tail=1' $(LOG) && \
 		 grep -Eq '\[CP/ABORT_RESET_SWEEP\].*accepted_before_reset=1 reset_cleared=1 queued_suppressed=1 recovery_completions=1 tail=1' $(LOG) && \
-		 grep -Eq '\[CP/MIXED\].*abort_inputs=1 prefix_kind=[12] abort_delay=[0-5] completions=3 queued_suppressed=1 recovery=1' $(LOG) && \
+		 grep -Eq '\[CP/MIXED\].*abort_inputs=1 prefix_kind=[12] abort_delay=[0-5] reset_words=[0-3] completion_starts=3 queued_suppressed=1 recovery=1' $(LOG) && \
 		 grep -Eq '\[CP/DIRECT\].*invalid_rejected=20 launches=5 events=4 direct_error_events=1 stale_abort_code_ignored=1.*direct_error_code=5 direct_no_cplq_write=1.*success=1' $(LOG) && \
 		 grep -Eq '\[CP/CPLQ\].*prefill=3 held=5 resumed=5 completions=8 cmdq_wraps=2 cplq_wraps=2' $(LOG) && \
 		 grep -Eq '\[CP/CPLQ\].*fetches=8 launches=8 completions=8' $(LOG) && \

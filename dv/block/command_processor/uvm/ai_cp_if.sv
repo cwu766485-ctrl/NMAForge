@@ -22,6 +22,8 @@ interface ai_cp_if(input logic clk);
   logic partial_reset_done;
   logic [1:0] mixed_prefix_failure_kind;
   logic [2:0] mixed_abort_delay_cycles;
+  logic [1:0] mixed_reset_target_words;
+  logic mixed_reset_check_pending;
   logic mixed_hold_abort_completion;
   logic force_completion_backpressure;
   logic tile_start;

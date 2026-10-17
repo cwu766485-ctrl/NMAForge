@@ -162,6 +162,8 @@ package ai_cp_uvm_pkg;
       vif.abort_reset_recovery=0;
       vif.mixed_prefix_failure_kind=0;
       vif.mixed_abort_delay_cycles=0;
+      vif.mixed_reset_target_words=0;
+      vif.mixed_reset_check_pending=0;
       vif.mixed_hold_abort_completion=0;
       vif.compute_result=32'hc0de0001; vif.compute_cycles=32'd17; vif.compute_elements=32'd4;
       vif.cfg_op=8'h50;
@@ -349,7 +351,7 @@ package ai_cp_uvm_pkg;
             vif.partial_reset_sweep_active=1'b0;
           end
           CP_MIXED_ERROR_ABORT_RESET: begin
-            int prefix_kind, abort_delay;
+            int prefix_kind, abort_delay, reset_words_target;
             reset_cp();
             // Normal runs stay randomized. The coverage regression may force
             // representative values so all kind x delay-class bins are hit.
@@ -357,10 +359,14 @@ package ai_cp_uvm_pkg;
               prefix_kind=$urandom_range(1,2); // invalid descriptor or fetch error
             if(!$value$plusargs("CP_MIXED_DELAY=%d",abort_delay))
               abort_delay=$urandom_range(0,5);
-            if(prefix_kind<1 || prefix_kind>2 || abort_delay<0 || abort_delay>5)
-              `uvm_fatal("CP/MIXED_CFG",$sformatf("invalid kind=%0d delay=%0d",prefix_kind,abort_delay))
+            if(!$value$plusargs("CP_MIXED_RESET_WORDS=%d",reset_words_target))
+              reset_words_target=$urandom_range(0,3);
+            if(prefix_kind<1 || prefix_kind>2 || abort_delay<0 || abort_delay>5 ||
+               reset_words_target<0 || reset_words_target>3)
+              `uvm_fatal("CP/MIXED_CFG",$sformatf("invalid kind=%0d delay=%0d reset_words=%0d",prefix_kind,abort_delay,reset_words_target))
             vif.mixed_prefix_failure_kind=prefix_kind[1:0];
             vif.mixed_abort_delay_cycles=abort_delay[2:0];
+            vif.mixed_reset_target_words=reset_words_target[1:0];
             vif.mixed_hold_abort_completion=0;
             descriptor(0,(prefix_kind==1),0,0,1,16'h1400);
             descriptor(1,0,0,0,1,16'h1401);
@@ -383,16 +389,18 @@ package ai_cp_uvm_pkg;
             @(negedge vif.clk); vif.abort=1;
             @(negedge vif.clk); vif.abort=0;
             wait(vif.cpl_spad_valid && !vif.cpl_spad_ready &&
-                 vif.cpl_spad_addr[3:2]==2'd1);
+                 vif.cpl_spad_addr[3:2]==reset_words_target[1:0]);
             @(negedge vif.clk);
+            vif.mixed_reset_check_pending=1;
             if(vif.completion_error!==4'd3 || vif.completion_status!==4'd2 ||
                vif.cplq_tail!==1 || vif.cmdq_head!==2 || vif.launch_valid)
-              `uvm_error("CP/MIXED","abort completion did not stall before commit or queued command advanced")
+              `uvm_error("CP/MIXED","abort completion did not stall at configured reset word or queued command advanced")
 
             reset_cp();
             if(vif.busy || vif.cpl_writer_busy || vif.cpl_writer_done ||
                vif.cmdq_head!==0 || vif.cplq_tail!==0)
               `uvm_error("CP/MIXED","reset did not clear partial completion and queue pointers")
+            vif.mixed_reset_check_pending=0;
             vif.mixed_hold_abort_completion=0;
             vif.compute_abort_once=0;
             vif.abort_reset_recovery=1;
@@ -403,8 +411,8 @@ package ai_cp_uvm_pkg;
                vif.cpl_writer_busy || vif.launch_valid)
               `uvm_error("CP/MIXED","post-reset recovery command did not retire exactly once")
             vif.abort_reset_recovery=0;
-            `uvm_info("CP/MIXED",$sformatf("prefix_kind=%0d abort_delay=%0d queued_suppressed=1 recovery=1",
-              prefix_kind,abort_delay),UVM_LOW)
+            `uvm_info("CP/MIXED",$sformatf("prefix_kind=%0d abort_delay=%0d reset_words=%0d queued_suppressed=1 recovery=1",
+              prefix_kind,abort_delay,reset_words_target),UVM_LOW)
           end
           CP_DIRECT_START: begin
             int fmt, invalid_case;
@@ -1151,7 +1159,8 @@ package ai_cp_uvm_pkg;
     int abort_reset_inputs, abort_reset_recovery_launches, abort_reset_recovery_records;
     int compute_abort_records, compute_abort_launches, compute_abort_inputs;
     int fetch_error_records, compute_error_records, partial_reset_records;
-    int mixed_completion_index, mixed_abort_inputs;
+    int mixed_completion_starts, mixed_abort_inputs;
+    int mixed_abort_words_accepted, mixed_reset_checks, mixed_recovery_records;
     int submit_guard_completion_index;
     int dependency_timeout_records, external_fetches;
     int concurrent_launches, concurrent_records, concurrent_completion_index;
@@ -1191,8 +1200,9 @@ package ai_cp_uvm_pkg;
       tail_at_record_start=0; expected_tail_after_done=0; tail_commit_pending=0;
       concurrent_launches=0; concurrent_records=0; concurrent_completion_index=0;
       compute_abort_records=0; compute_abort_launches=0; compute_abort_inputs=0;
-      mixed_completion_index=0; submit_guard_completion_index=0;
+      mixed_completion_starts=0; submit_guard_completion_index=0;
       mixed_abort_inputs=0;
+      mixed_abort_words_accepted=0; mixed_reset_checks=0; mixed_recovery_records=0;
       direct_launches=0; direct_events=0; direct_invalid_events=0;
       direct_compute_error_events=0;
       direct_stale_abort_code_events=0;
@@ -1232,6 +1242,38 @@ package ai_cp_uvm_pkg;
         if(vif.test_case==CP_MIXED_ERROR_ABORT_RESET && vif.compute_done &&
            vif.compute_error && vif.compute_error_code==4'd3)
           mixed_abort_inputs++;
+        if(vif.test_case==CP_MIXED_ERROR_ABORT_RESET && vif.completion_start) begin
+          logic [15:0] expected_task_id;
+          case(mixed_completion_starts)
+            0: begin
+              expected_task_id=16'h1400;
+              if(vif.mixed_prefix_failure_kind==2'd1 &&
+                 (vif.completion_error!==4'd7 || vif.completion_status!==4'd2))
+                `uvm_error("CP/MIXED","invalid-descriptor prefix start has wrong status/error")
+              if(vif.mixed_prefix_failure_kind==2'd2 &&
+                 (vif.completion_error!==4'd6 || vif.completion_status!==4'd2))
+                `uvm_error("CP/MIXED","fetch-error prefix start has wrong status/error")
+            end
+            1: begin
+              expected_task_id=16'h1401;
+              if(vif.completion_error!==4'd3 || vif.completion_status!==4'd2)
+                `uvm_error("CP/MIXED","compute-abort completion start has wrong status/error")
+            end
+            2: begin
+              expected_task_id=16'h1403;
+              if(vif.completion_error!==4'd0 || vif.completion_status!==4'd1)
+                `uvm_error("CP/MIXED","post-reset recovery completion start has wrong status/error")
+            end
+            default: begin
+              expected_task_id=16'hffff;
+              `uvm_error("CP/MIXED","unexpected extra completion start")
+            end
+          endcase
+          if(vif.completion_task_id!==expected_task_id)
+            `uvm_error("CP/MIXED",$sformatf("completion start task ID got=%04x expected=%04x",
+              vif.completion_task_id,expected_task_id))
+          mixed_completion_starts++;
+        end
         if(tail_commit_pending) begin
           if(vif.cplq_tail!==expected_tail_after_done)
             `uvm_error("CP/MON","CPLQ tail did not advance exactly once after four accepted words")
@@ -1582,13 +1624,12 @@ package ai_cp_uvm_pkg;
                   cplq_pressure_completions++;
                 end
                 CP_MIXED_ERROR_ABORT_RESET: begin
-                  case(mixed_completion_index)
-                    0: expected_task_id=16'h1400;
-                    1: expected_task_id=16'h1401;
-                    2: expected_task_id=16'h1403;
+                  case(mixed_completion_starts)
+                    1: expected_task_id=16'h1400;
+                    2: expected_task_id=16'h1401;
+                    3: expected_task_id=16'h1403;
                     default: expected_task_id=16'hffff;
                   endcase
-                  mixed_completion_index++;
                 end
                 CP_RANDOM_QUEUE: expected_task_id=16'h2000+random_retire_count-1;
                 CP_SUBMIT_GUARD: begin
@@ -1620,7 +1661,7 @@ package ai_cp_uvm_pkg;
                 `uvm_error("CP/MON","word0 task ID data mismatch")
               if((vif.test_case==CP_ABORT_RESET_PARTIAL ||
                   (vif.test_case==CP_MIXED_ERROR_ABORT_RESET &&
-                   mixed_completion_index==2)) &&
+                   mixed_completion_starts==2)) &&
                  (vif.completion_error!==4'd3 || vif.completion_status!==4'd2))
                 `uvm_error("CP/ABORT_RESET","partial completion word0 was not an ERR_ABORT record")
             end
@@ -1654,7 +1695,7 @@ package ai_cp_uvm_pkg;
                     `uvm_error("CP/RING","random compute failure did not retire ERR_COMPUTE")
                 endcase
               end else if(vif.test_case==CP_MIXED_ERROR_ABORT_RESET) begin
-                case(mixed_completion_index-1)
+                case(mixed_completion_starts-1)
                   0: begin
                     if(vif.mixed_prefix_failure_kind==2'd1 &&
                        (vif.completion_error!==4'd7 || vif.completion_status!==4'd2))
@@ -1720,12 +1761,17 @@ package ai_cp_uvm_pkg;
             3: if(vif.cpl_spad_wdata !== vif.completion_elements) `uvm_error("CP/MON","word3 element count mismatch")
           endcase
           word_index=(word_index+1)%4; writes_in_record++;
+          if(vif.test_case==CP_MIXED_ERROR_ABORT_RESET &&
+             vif.completion_task_id==16'h1401 && vif.completion_error==4'd3)
+            mixed_abort_words_accepted++;
           if(writes_in_record==4) writes_in_record=0;
           addr_q.push_back(vif.cpl_spad_addr); data_q.push_back(vif.cpl_spad_wdata); writes++;
         end
         if(vif.cpl_writer_done) begin
           if(writes_in_record!=0) `uvm_error("CP/MON","writer done without four accepted words")
           if(vif.abort_reset_recovery) abort_reset_recovery_records++;
+          if(vif.test_case==CP_MIXED_ERROR_ABORT_RESET && vif.abort_reset_recovery)
+            mixed_recovery_records++;
           expected_tail_after_done=(tail_at_record_start>=vif.cplq_size-1) ?
                                    0 : tail_at_record_start+1;
           tail_commit_pending=1;
@@ -1733,6 +1779,14 @@ package ai_cp_uvm_pkg;
           completions++;
         end
       end else begin
+        if(vif.test_case==CP_MIXED_ERROR_ABORT_RESET && vif.mixed_reset_check_pending) begin
+          if(mixed_abort_words_accepted!=vif.mixed_reset_target_words)
+            `uvm_error("CP/MIXED",$sformatf("scoreboard accepted %0d abort words before reset; expected %0d",
+              mixed_abort_words_accepted,vif.mixed_reset_target_words))
+          mixed_reset_checks++;
+          mixed_abort_words_accepted=0;
+          vif.mixed_reset_check_pending=0;
+        end
         if(writes_in_record!=0) partial_reset_records++;
         word_index=0; writes_in_record=0; tail_at_record_start=0;
         tail_commit_pending=0;
@@ -1755,14 +1809,17 @@ package ai_cp_uvm_pkg;
         `uvm_error("CP/ABORT","compute abort and resumed command must each launch/retire exactly once")
       if(fetch_error_records!=1) `uvm_error("CP/SB","expected exactly one fetch-error completion")
       if(compute_error_records!=1) `uvm_error("CP/SB","expected exactly one compute-error completion")
-      if(partial_reset_records!=3) `uvm_error("CP/SB","expected three partial-completion resets across directed and mixed scenarios")
+      if(partial_reset_records!=(vif.mixed_reset_target_words==0 ? 2 : 3))
+        `uvm_error("CP/SB","partial-completion reset count did not match the configured mixed reset word index")
       if(abort_reset_inputs!=2 || abort_reset_recovery_launches!=2 ||
          abort_reset_recovery_records!=2)
         `uvm_error("CP/ABORT_RESET","directed and mixed abort/reset scenarios must each produce one abort and one recovery")
-      if(mixed_completion_index!=3)
+      if(mixed_completion_starts!=3)
         `uvm_error("CP/MIXED","randomized error/abort/reset sequence did not observe all three completion attempts")
       if(mixed_abort_inputs!=1)
         `uvm_error("CP/MIXED","randomized scenario did not exercise exactly one compute-abort event")
+      if(mixed_reset_checks!=1 || mixed_recovery_records!=1 || mixed_abort_words_accepted!=0)
+        `uvm_error("CP/MIXED","reset word count or exactly-once recovery completion did not match")
       if(dependency_timeout_records!=1) `uvm_error("CP/SB","expected exactly one dependency-timeout completion")
       if(external_fetches!=1) `uvm_error("CP/SB","expected one external descriptor fetch request")
       if(concurrent_launches!=2 || concurrent_records!=2)
@@ -1827,9 +1884,9 @@ package ai_cp_uvm_pkg;
       `uvm_info("CP/ABORT_RESET",$sformatf("abort_inputs=%0d recovery_launches=%0d recovery_completions=%0d partial_resets=%0d",
         abort_reset_inputs,abort_reset_recovery_launches,abort_reset_recovery_records,
         partial_reset_records),UVM_LOW)
-      `uvm_info("CP/MIXED",$sformatf("abort_inputs=%0d prefix_kind=%0d abort_delay=%0d completions=%0d queued_suppressed=1 recovery=1",
+      `uvm_info("CP/MIXED",$sformatf("abort_inputs=%0d prefix_kind=%0d abort_delay=%0d reset_words=%0d completion_starts=%0d queued_suppressed=1 recovery=1",
         mixed_abort_inputs,vif.mixed_prefix_failure_kind,vif.mixed_abort_delay_cycles,
-        mixed_completion_index),UVM_LOW)
+        vif.mixed_reset_target_words,mixed_completion_starts),UVM_LOW)
       `uvm_info("CP/SB",$sformatf("launches=%0d completion_writes=%0d completions=%0d dep_abort=%0d empty=%0d cpl_full=%0d",
         launches,writes,completions,dep_abort_records,empty_rejects,cpl_full_rejects),UVM_LOW)
     endfunction
@@ -1842,6 +1899,7 @@ package ai_cp_uvm_pkg;
     covergroup cp_cg with function sample(int unsigned scenario,int unsigned launched,
                                          int unsigned err,int unsigned req_stall,int unsigned word_index,
                                          int unsigned mixed_kind,int unsigned mixed_delay,
+                                         int unsigned mixed_reset_words,
                                          int unsigned direct_fp_invalid_rejected,
                                          int unsigned direct_fp_format,int unsigned direct_opcode,
                                          int unsigned direct_fp_validation_event,
@@ -1878,7 +1936,12 @@ package ai_cp_uvm_pkg;
       cp_mixed_delay: coverpoint mixed_delay iff (scenario==20) {
         bins same_cycle={0}; bins short_delay={[1:2]}; bins long_delay={[3:5]};
       }
+      cp_mixed_reset_words: coverpoint mixed_reset_words iff (scenario==20) {
+        bins zero_words={0}; bins one_word={1}; bins two_words={2}; bins three_words={3};
+      }
       cp_mixed_error_abort_cross: cross cp_mixed_kind,cp_mixed_delay iff (scenario==20);
+      cp_mixed_kind_delay_reset_cross: cross cp_mixed_kind,cp_mixed_delay,cp_mixed_reset_words
+        iff (scenario==20);
       cp_direct_fp_format: coverpoint direct_fp_format iff (direct_fp_validation_event) {
         bins bf16={0}; bins fp16={1};
       }
@@ -1918,6 +1981,7 @@ package ai_cp_uvm_pkg;
                        vif.cpl_spad_valid&&!vif.cpl_spad_ready,
                        vif.cpl_spad_valid&&vif.cpl_spad_ready?vif.cpl_spad_addr[3:2]:0,
                        vif.mixed_prefix_failure_kind,vif.mixed_abort_delay_cycles,
+                       vif.mixed_reset_target_words,
                        vif.test_case==CP_DIRECT_START && vif.event_valid &&
                         vif.event_error && vif.event_error_code==4'd7,
                         vif.cfg_op==8'h51,
