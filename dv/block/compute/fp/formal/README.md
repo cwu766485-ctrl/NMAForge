@@ -577,3 +577,29 @@ optional; its default property set was unchanged and passed 5/5 non-vacuous
 assertions plus 2/2 covers (depths 4 and 5) in 158.20 seconds. This baseline
 does not include the new same-cycle property. Do not retry that property with
 an unchanged proof strategy.
+
+### 2026-10-18 ready-pair response-frontier lemma
+
+To isolate the ownership/order relation needed to reason about a parity
+response coinciding with the final element, ran the existing
+`ap_ready_pair_within_returned_frontier` property in a fresh output directory:
+
+```sh
+make -C dv/block/compute/fp/formal parity-full-ready-frontier-assume \
+  VCF=vcf OUT=/tmp/nmaforge_a10_parity_full_ready_frontier_rerun_20261018 \
+  FORMAL_PROBE_TIMEOUT=180
+```
+
+VC Formal `V-2023.12-SP2` reported clean setup and a non-vacuous property, but
+remained `checking` until the 180-second external timeout (Make exit 124),
+without a proof result or counterexample. The initial run directory had a
+stale session lock whose recorded PID was absent; that old artifact was left
+untouched and the proof was rerun in a fresh directory. A post-timeout audit
+found no active VCF/VC Static/Simon process. This is inconclusive, not PASS or
+DUT failure. It does not prove that a parity response at the final element
+cannot coincide with a ready operand pair, so it cannot be composed with the
+cutoff lemma to claim same-cycle compute suppression. Avoid retrying the same
+query unchanged; a next attempt needs a materially different inductive
+decomposition or a separately proved abstraction. Log:
+`/tmp/nmaforge_a10_parity_full_ready_frontier_rerun_20261018/vc_formal.log`.
+No product RTL, SPEC, or ABI changed.
