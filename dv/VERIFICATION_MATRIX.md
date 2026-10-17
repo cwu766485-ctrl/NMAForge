@@ -268,3 +268,20 @@ This closes the clean-SHA randomized E2E slice only. It does not close all V4
 interactions (including accelerator reset during an in-flight AXI transaction),
 global DUT code/assertion coverage, or A10/V5. No product RTL, SPEC, or ABI was
 changed by this verification increment.
+
+### A10 V4 current-main mixed-precision DDR E2E replay (2026-10-18)
+
+Fresh `uvm_mixed_precision_ddr_e2e_random_cov_regress` at GitHub `main`
+`0578dde3a72ad8f9f89ef5c6a870f83d76de24d7` passed all 192 default seeds
+(`20261101..20261292`): 192/192 E2E pass markers, all per-seed Makefile gates,
+and zero nonzero UVM WARNING/ERROR/FATAL summaries. Merged URG reports `e2e_cg`
+and all four per-transaction AXI AR/AW/R-gap/W-gap groups at 100%, plus all 20
+Makefile-gated functional points at 100%. Assertions: 20 success, 0
+failure/incomplete, 2 no-attempt UVM RAL internals; all three AXI
+stall-to-accept cover properties matched. The five AXI-master protocol
+assertions are DUT-owned; compute-activity properties are testbench monitors.
+Artifacts are under `/tmp/nmaforge_a10_main0578dde_top_e2e_random_20261018/`.
+This is a current-main selected-slice replay, not full V4/V5 closure; broader
+top interactions and DUT-only residual coverage disposition remain open. See
+the [A10 run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md)
+and [RTM](../docs/verification/A10_DV_RTM.md).
