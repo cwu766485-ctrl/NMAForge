@@ -150,9 +150,9 @@ make -C dv/block/dma/sim uvm_regress SEED=20261017 VCS='vcs -licwait 1'
 make -C dv/subsystem/dma_spad/sim subsystem_regress COV_TAG=a10_v3_refresh_20261017_b SEEDS='20261110 20261111 20261112 20261113 20261114 20261115 20261116 20261117 20261118 20261119' URG_REPORT=/tmp/nmaforge_a10_v3_refresh_20261017_b/urg_merged VCS='vcs -licwait 1' URG=urg
 ```
 
-**Result:** PASS for all ten seeds. Every seed had UVM warning/error/fatal=`0/0/0` and emitted `[SPAD_CNM_DMA_PASS]` and `[DMA_SPAD_ERR_DRAIN_PASS]`; GEMV and parity coverage checks passed. Merged URG `/tmp/nmaforge_a10_v3_refresh_20261017_b/urg_merged` has 13 functional groups at 100%. Of 31 assertions, 28 succeeded with zero failures/incomplete; three have no success: two UVM RAL `do_read`/`do_write` no-attempts and one unresolved DUT DMA instance `unnamed$$_1` (119,882 attempts, zero successes, zero failures). No identity mapping or waiver is claimed for that instance.
+**Result:** PASS for all ten seeds. Every seed had UVM warning/error/fatal=`0/0/0` and emitted `[SPAD_CNM_DMA_PASS]` and `[DMA_SPAD_ERR_DRAIN_PASS]`; GEMV and parity coverage checks passed. Merged URG `/tmp/nmaforge_a10_v3_refresh_20261017_b/urg_merged` has 13 functional groups at 100%. Of 31 assertions, 28 succeeded with zero failures/incomplete; three had no success: two UVM RAL `do_read`/`do_write` no-attempts and one then-unresolved DUT DMA instance `unnamed$$_1` (119,882 attempts, zero successes, zero failures). The follow-up [AW-stability assertion closure increment](#v3-dma--spad--cnm-aw-payload-assertion-closure-increment-run-date-2026-10-17) resolved this item for its new replay; this historical URG remains unchanged and is not retroactively relabeled.
 
-**Scope and limits:** This is bounded subsystem evidence from a dirty-worktree snapshot, not a frozen-SHA replay. The unresolved DMA assertion, prolonged/downstream-backpressure fairness, broader fault/abort/reset combinations, residual DUT code coverage, and overall V3/A10 closure remain open.
+**Scope and limits:** This initial run is bounded subsystem evidence from a dirty-worktree snapshot, not a frozen-SHA replay. Its then-unresolved DMA assertion was resolved in the follow-up AW-stall increment below and reproduced at frozen SHA `43dbbbc` (see [clean-SHA replay](A10_DV_CLEAN_SHA_REPLAY_43DBBBC.md)). Prolonged/downstream-backpressure fairness, broader fault/abort/reset combinations, residual DUT code coverage, and overall V3/A10 closure remain open.
 
 ## V3 DMA–SPAD–CNM AW-payload assertion closure increment (2026-10-17)
 
@@ -177,7 +177,7 @@ make -C dv/subsystem/top_smoke/sim ai_smoke
 
 **Debug note:** An initial draft used a virtual-interface force and raced the responder's clocked NBA update; seed `20261111` exposed this as 15 test/protocol errors. Replacing it with the existing responder config hook removed the race. A second draft placed the stall inside the CNM contention window and changed the randomized overlap coverage assumptions; moving the directed stall after contention restored the original test's intent. Neither draft changed the DUT. The final 10-seed result above is from the corrected version.
 
-**Scope and limits:** This closes the previously unmapped subsystem DMA AW-stability assertion slice; it is not V3 signoff. Long/downstream-backpressure fairness, broader randomized fault×abort×reset combinations, DUT-only residual code coverage, full command/completion lifecycle, and frozen-SHA replay of the new test remain open. This is dirty-worktree verification evidence.
+**Scope and limits:** This closes the previously unmapped subsystem DMA AW-stability assertion slice; it is not V3 signoff. The follow-up [clean-SHA replay at `43dbbbc`](A10_DV_CLEAN_SHA_REPLAY_43DBBBC.md) reproduced this ten-seed test. Long/downstream-backpressure fairness, broader randomized fault×abort×reset combinations, DUT-only residual code coverage, full command/completion lifecycle, and overall V3/A10 closure remain open.
 
 ## V1 floating-point dot UVM/URG refresh (run date: 2026-10-17)
 

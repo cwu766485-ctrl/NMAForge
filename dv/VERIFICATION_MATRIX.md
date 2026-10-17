@@ -154,7 +154,8 @@ classification/disposition of outstanding coverage. Previous full-design raw
 dashboard values are historical and this watchdog increment does not recalculate
 them; they are not a closure claim.
 
-2026-10-17 latest V3 refresh: the current dirty worktree passed a fresh
+2026-10-17 initial V3 refresh (historical; its AW-stability assertion disposition
+was superseded by the follow-up below): the dirty worktree passed a fresh
 10-seed `dma_spad_subsystem_test` regression (`20261110..20261119`) on Rocky
 8.10 / VCS `V-2023.12-SP1_Full64`. All seeds had UVM warning/error/fatal
 `0/0/0` and emitted `[SPAD_CNM_DMA_PASS]` and `[DMA_SPAD_ERR_DRAIN_PASS]`;
@@ -162,9 +163,19 @@ GEMV and parity coverage checks passed. URG
 `/tmp/nmaforge_a10_v3_refresh_20261017_b/urg_merged` reports 13 functional
 groups at 100%; assertion totals are `31/28/0/0/3` (total/success/failure/
 incomplete/uncovered). Two uncovered assertions are UVM RAL `do_read` and
-`do_write` no-attempts; one is unresolved DUT DMA instance `unnamed$$_1`
-(119,882 attempts, 0 successes, 0 failures). Its source identity is not
-assigned. This is bounded dirty-worktree evidence, not frozen-SHA replay.
+`do_write` no-attempts; one was then-unresolved DUT DMA instance `unnamed$$_1`
+(119,882 attempts, 0 successes, 0 failures). This is bounded dirty-worktree
+evidence, not frozen-SHA replay.
+
+The follow-up V3 AW-stability replay labels that property as
+`ap_dma_aw_payload_stable`, applies four real responder-controlled AW stall
+cycles, and records 50 real assertion successes across ten seeds with zero
+failures/incomplete. The same result was reproduced in the detached clean-SHA
+replay at `43dbbbc`. This dispositions the AW-stability assertion slice only;
+it does not close V3 fairness, broader fault/abort/reset, residual DUT code
+coverage, or full command/completion lifecycle. See the
+[AW-stability addendum](../docs/verification/A10_DV_RUN_2026-10-17_REFRESH.md)
+and [clean-SHA replay](../docs/verification/A10_DV_CLEAN_SHA_REPLAY_43DBBBC.md).
 Additional prolonged/downstream-backpressure fairness (the separate 300-cycle
 admission test reaches max wait=2 but has no downstream response backpressure),
 broad fault×abort×reset, residual DUT code coverage, and V3/A10 closure remain
