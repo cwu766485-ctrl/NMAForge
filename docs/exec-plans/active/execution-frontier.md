@@ -11,6 +11,8 @@ CNM、4x4 matrix、CNN、SFU、KV-cache、Transformer 命令链、保护/异常�
 
 ## 已完成与当前证据
 
+- **2026-10-17 已推送提交的干净 SHA 复跑：** GitHub `main` 当前提交 `279f7b697342df7b90172c2c3ac4cc33dd8d6498` 已在独立 detached clean worktree 上复跑。FP dot：3 seeds × 484/484 bit-exact，URG selected functional groups 100%；DMA block 16/16、Control 9/9，逐测试 UVM warning/error/fatal 均为 0，二者 URG selected group 均 100%；top `ai_smoke` 与 20-case `ai_run` 均 `TEST PASS`。具体命令、环境、日志位置和限制见 [A10 clean-SHA replay record](../../verification/A10_DV_CLEAN_SHA_REPLAY_279F7B6.md)。这只关闭上述已复跑子集的固定提交可复现性；不是完整 A10 clean replay，也不关闭 V1–V5。旧的 dirty-worktree 记录保留为历史证据。
+
 - **2026-10-17 license 恢复后的 A10 最新验证增量（覆盖下方较早快照）：** FP 混合精度 UVM seeds
   `712345/987654/20261015` 各 482/482 scoreboard PASS（430 numeric + 52 fault/reset/error-transition），
   共 1,446 笔；peak outstanding=2，UVM warning/error/fatal=0/0/0。late-B protection

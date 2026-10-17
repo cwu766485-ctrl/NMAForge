@@ -1,5 +1,7 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-17 pushed-SHA clean replay (latest reproducibility status):** GitHub `main` commit `279f7b697342df7b90172c2c3ac4cc33dd8d6498` was checked out into an isolated detached worktree and replayed on Rocky Linux 8.10 / VCS+URG `V-2023.12-SP1_Full64`. FP mixed-dot UVM passed 3 seeds × 484/484 bit-exact, DMA UVM passed 16/16 tests, Control UVM passed 9/9 tests, and top `ai_smoke` plus 20-case `ai_run` both printed `TEST PASS`; UVM warning/error/fatal were 0/0/0 for the block runs. Selected URG functional groups were 100% for FP, DMA, and Control. Exact invocations, artifact locations, and assertion limits are in the [clean-SHA replay record](A10_DV_CLEAN_SHA_REPLAY_279F7B6.md). This supersedes “clean replay pending” only for these named suites: it does **not** establish complete A10/V1–V5 closure. The earlier evidence below remains valid historical dirty-worktree evidence unless explicitly superseded.
+
 > **2026-10-17 Control/DMA coverage refresh:** Separate Control and DMA UVM runs passed 9/9 and 16/16 respectively, all per-test UVM warning/error/fatal=`0/0/0`; Control `control_env_pkg::control_coverage::cg` and DMA `dma_cmd_cg` were 100%. Control assertions were 8 success/0 failure/0 incomplete/2 UVM RAL no-attempt. DMA assertions were 12 success/0 failure/0 incomplete/2 UVM RAL no-attempts. The directed AW-stall suite recorded six real successes for `tb_ai_axi128_dma_uvm.dma_sva.unnamed$$_1`; this anonymous instance is not mapped to a property name. A separate V3 10-seed refresh on seeds `20261110..20261119` passed with 13/13 selected URG functional groups at 100%, 28/31 assertion successes, zero failure/incomplete, two UVM RAL no-attempts, and one unresolved anonymous DMA instance with 119,882 attempts/0 success/0 failure. Exact commands, artifacts and limits are in the [2026-10-17 refresh run record](A10_DV_RUN_2026-10-17_REFRESH.md); dirty-worktree evidence only, not overall closure.
 
 
@@ -60,8 +62,8 @@
 
 **基线目标：** A10 / ABI v7.4
 
-**冻结快照：** `1b4b61fdb84ecbe0f7e57ab9627b2e772216fc7f` (`1b4b61f`)
-**状态口径：** 2026-10-17。`HEAD` 指向所列 commit，但本轮仿真时工作树有 RTL/DV/spec 在研改动；记录的是当前工作树结果，不是 clean checkout 的固定 commit replay。`历史 PASS` 不等于本轮复跑；每条证据均应链接到具体运行记录。
+**A10 原始 dirty-worktree 基线：** `1b4b61fdb84ecbe0f7e57ab9627b2e772216fc7f` (`1b4b61f`)；此处保留为早期扩展验证的历史基线。
+**当前已推送验证快照：** `279f7b697342df7b90172c2c3ac4cc33dd8d6498` (`279f7b6`)。该提交上的 FP/DMA/Control/top smoke 选定套件已做 clean-checkout replay，详见本文顶部及 [clean-SHA run record](A10_DV_CLEAN_SHA_REPLAY_279F7B6.md)。其余没有在该干净工作树重跑的证据仍按各自记录标注为 dirty-worktree；历史 PASS 不等于当前提交复跑，A10 全面验收仍开放。
 
 本矩阵把需求连接到刺激、checker、coverage 和运行证据。`BLOCKED` 表示验证工具/需求冲突阻止验收，不代表 DUT 已失败；`OPEN` 表示尚无足够验收证据。
 
@@ -127,7 +129,7 @@
 
 | Req ID | 需求 | Stimulus / test | Checker / coverage | 当前证据与状态 |
 |---|---|---|---|---|
-| G0-01 | 固定 RTL、filelist、工具版本和 commit | 固定 Git SHA；保存工作树差异、VCS 版本及命令 | 可重放运行记录 | 记录的 `HEAD=1b4b61fdb84ecbe0f7e57ab9627b2e772216fc7f`；Rocky 8.10 / WSL、VCS/URG V-2023.12-SP1_Full64。交互式 shell 中最新 CP 300-run compile/sim/URG 成功，license 不再是当前阻塞；但工作树 dirty，尚无冻结 SHA 的 clean-checkout 完整重放。**部分完成 / clean replay OPEN** |
+| G0-01 | 固定 RTL、filelist、工具版本和 commit | 固定 Git SHA；保存工作树差异、VCS 版本及命令 | 可重放运行记录 | 当前 GitHub `main`=`279f7b697342df7b90172c2c3ac4cc33dd8d6498`；Rocky 8.10 / WSL、VCS/URG `V-2023.12-SP1_Full64`。该 SHA 在 detached clean worktree 上完成 FP/DMA/Control/top smoke 选定套件复跑，命令与产物路径见 [clean replay record](A10_DV_CLEAN_SHA_REPLAY_279F7B6.md)。其余 A10 全量 suite 未在此 SHA clean replay，故本项**部分完成**，不是 full-plan reproducibility closure。 |
 | G0-02 | 对齐 A10 ABI、opcode、descriptor、completion 与 RTL | SPEC、software ABI、opcode decode/validator、FP top smoke | descriptor field/ABI review；结果及 completion readback | `0x50` BF16、`0x51` FP16、A10 ABI v7.4；本轮 Rocky 8.10 / VCS `V-2023.12-SP1_Full64` 重跑 `make -C dv/subsystem/top_smoke/sim ai_smoke` 和 `make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=12345` 均 PASS；FP16 DDR→DMA→SPAD→FP→SPAD→DMA→DDR 结果 `0x41300000`，随机 smoke 20 case 全通过。范围限本 IP 仿真，不代表 DDR PHY/板级。**完成（本 IP 仿真范围）** |
 | G0-03 | 每项功能可追到 testcase、checker、coverage 和 evidence | 本矩阵 | review 映射；明确空缺 | RTM 已建立并记录 testcase/checker/coverage/evidence 及开放缺口；随 V2–V5 推进继续维护。**进行中** |
 | G0-04 | 规范准确描述 FP core 的 SPAD request/response 并发契约 | 对照 RTL、FP UVM sequence 与 SPAD arbiter | 最多两笔 outstanding、response in-order、无独立 read ID | 用户于 2026-10-15、10-16、10-17 确认保留 2-entry outstanding 契约；RTL/UVM 为最多两笔已接受未返回读、顺序响应；SPEC、architecture、FP extension spec 均已同步。历史 3-seed UVM peak=2；VCS V-2023.12-SP1 seed `20261015` 复核 198/198 bit-exact transactions、peak=2、functional coverage 100%、UVM warning/error/fatal=0。**完成** |
