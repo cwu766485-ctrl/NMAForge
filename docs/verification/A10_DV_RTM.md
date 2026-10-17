@@ -1,5 +1,14 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-18 V3 downstream AXI backpressure increment:** Added bounded
+> DMA R-channel `RREADY` stall coverage: hold the DUT-side ready low for 16
+> cycles during valid response, check stable response payload, release, and
+> scoreboard all four bursts/32 words. Focused test and three-seed DMA–SPAD
+> subsystem regression passed with zero UVM warning/error/fatal; URG merge and
+> top `ai_smoke` also passed. This closes only the bounded downstream AXI
+> backpressure scenario, not multi-client fairness or V3 overall. Exact commands,
+> root-cause notes, and artifact paths: [2026-10-18 run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-v3-axi-rready-downstream-backpressure-increment).
+
 > **2026-10-18 baseline replay at `edf115cd`:** Control UVM passed 9/9 and DMA UVM passed 16/16 (the current DMA Makefile has 16 entries; an older summary of 15 is stale), each with per-test UVM warning/error/fatal `0/0/0`; Control logs contain `[TEST_DONE]`, DMA logs contain `[SB_PASS]`/`[SB_ABORT_PASS]`. Top `ai_smoke` exited 0 with `TEST PASS`. Rocky 8.10, VCS script `V-2023.12` with V-2023.12-SP1 linked libraries. Compile had non-fatal clock-skew warnings. URG was not run; its version probe failed, so no coverage merge/claim. This is a scoped replay, not clean-worktree or full A10 closure. See the [detailed run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-edf115cd-controldmatop-baseline-replay).
 
 > **2026-10-18 `edf115cd` FP dot UVM/URG replay:** Rocky 8.10 / VCS+URG `V-2023.12-SP1_Full64`; three BF16/FP16 mixed-dot seeds (`712345`, `987654`, `20261015`) passed 484/484 bit-exact transactions each, with UVM warning/error/fatal=`0/0/0` and peak outstanding reads=2. Merged URG scored 100%; six functional groups (`fault_cg`, `parity_odd_tail_cg`, `parity_overlap_cg`, `response_latency_cg`, `dot_cg`, `busy_start_cg`) were each 100%. Two DUT-facing assertions succeeded, zero failed/incomplete; two UVM RAL `do_read`/`do_write` internals had no attempts; both selected covers matched. Python reference-model tests passed 19/19 when launched from `dv/block/compute/fp/model`. This closes the repeated mixed-dot simulation/selected coverage slice only; V1 full-domain parity-to-writeback proof and residual code-coverage disposition remain open. See the [run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-edf115cd-fp-dot-uvmurg-replay).

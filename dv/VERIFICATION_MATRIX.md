@@ -1,5 +1,13 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 V3 DMA RREADY-backpressure increment:** A new subsystem test
+> holds the DUT-side AXI `RREADY` low for 16 cycles, checks response tuple
+> stability, then checks all four bursts and 32 SPAD words. Focused run and
+> three-seed `subsystem_regress` passed with UVM warning/error/fatal=`0/0/0`;
+> URG merge and top `ai_smoke` passed. This is a bounded AXI response-stall
+> scenario only; system fairness and V3/A10 closure remain open. See the
+> [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-v3-axi-rready-downstream-backpressure-increment).
+
 > **2026-10-18 baseline replay at `edf115cd`:** Control UVM passed 9/9 and DMA UVM passed 16/16 (current DMA Makefile count; older 15-test note is stale), with per-test severity 0/0/0 and `[TEST_DONE]` / scoreboard pass markers. Top `ai_smoke` exited 0 (`TEST PASS`). Non-fatal compile clock-skew warnings were present. URG and seeded top 20-case `ai_run` were not run; this does not represent clean-worktree or full A10 closure. See the [A10 run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-edf115cd-controldmatop-baseline-replay).
 
 > **2026-10-18 `edf115cd` FP dot UVM/URG replay:** Three seeds (`712345`, `987654`, `20261015`) each passed 484/484 mixed BF16/FP16 bit-exact transactions, UVM warning/error/fatal=`0/0/0`, peak outstanding=2. URG merged at 100%; all six selected functional groups were 100%. Two DUT-facing assertions succeeded with no failures/incomplete; two UVM RAL internal no-attempts are not counted as DUT passes, and both selected covers matched. Python reference-model tests passed 19/19 from the model directory. This is focused V1 evidence, not full parity/writeback formal or A10 closure. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-edf115cd-fp-dot-uvmurg-replay).

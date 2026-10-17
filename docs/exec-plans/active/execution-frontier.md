@@ -1,6 +1,6 @@
 # NMAForge 执行前沿与学习交接
 
-更新时间：2026-10-17
+更新时间：2026-10-18
 
 ## 项目定位
 
@@ -10,6 +10,8 @@ CNM、4x4 matrix、CNN、SFU、KV-cache、Transformer 命令链、保护/异常�
 当前目录迁移及用户修改必须保留；禁止 `git reset --hard` 和 `git clean`。
 
 ## 已完成与当前证据
+
+- **2026-10-18 V3 下游 AXI RREADY 背压边界新增验证：** 新增 DMA–SPAD subsystem test，真实拉低 DUT 侧 `m_axi_rready` 16 周期，检查 R 通道 payload 稳定后释放，并核对 4 个 burst / 32 个 SPAD word。Focused test、`20261018/19/20` 三 seed subsystem regression、URG merge 与 top `ai_smoke` 均 PASS，所有该回归 UVM warning/error/fatal=0/0/0。首轮失败根因为测试 force 到接口输出边界而非 DUT 内部 ready，另有 destination `0x1000` 超出 4 KiB SPAD；已修正，非 RTL bug。仅关闭 bounded AXI response-backpressure 场景，长时多客户端公平性、随机 fault×abort×reset、完整 command/completion lifecycle 交互、DUT-only coverage disposition 与 A10 V1–V5 仍开放。详见 [2026-10-18 run record](../../verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-v3-axi-rready-downstream-backpressure-increment)。本次记录基于 `0db79af` dirty worktree；push 后更新为准确 SHA。
 
 - **2026-10-17 已推送提交的干净 SHA 复跑：** GitHub `main` 当前提交 `279f7b697342df7b90172c2c3ac4cc33dd8d6498` 已在独立 detached clean worktree 上复跑。FP dot：3 seeds × 484/484 bit-exact，URG selected functional groups 100%；DMA block 16/16、Control 9/9，逐测试 UVM warning/error/fatal 均为 0，二者 URG selected group 均 100%；top `ai_smoke` 与 20-case `ai_run` 均 `TEST PASS`。具体命令、环境、日志位置和限制见 [A10 clean-SHA replay record](../../verification/A10_DV_CLEAN_SHA_REPLAY_279F7B6.md)。这只关闭上述已复跑子集的固定提交可复现性；不是完整 A10 clean replay，也不关闭 V1–V5。旧的 dirty-worktree 记录保留为历史证据。
 

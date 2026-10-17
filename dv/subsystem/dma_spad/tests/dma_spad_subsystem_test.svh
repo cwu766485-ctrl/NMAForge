@@ -860,12 +860,167 @@ class dma_spad_subsystem_test extends dma_block_base_test;
     localparam int unsigned CORE_READS_PER_PHASE = 96;
     bit saw_axi_read_before_subsystem_reset;
     bit saw_axi_write_before_subsystem_reset;
+    int unsigned cov_rready_stall_cycles;
+    bit cov_rready_stall_completed;
+    bit rready_stall_only;
+
+    covergroup dma_rready_stall_cg;
+        option.per_instance = 1;
+        cp_stall_cycles: coverpoint cov_rready_stall_cycles {
+            bins sixteen_cycles = {16};
+        }
+        cp_completed: coverpoint cov_rready_stall_completed {
+            bins completed_after_release = {1};
+        }
+        stall_x_completion: cross cp_stall_cycles, cp_completed;
+    endgroup
 
     `uvm_component_utils(dma_spad_subsystem_test)
 
     function new(string name = "dma_spad_subsystem_test", uvm_component parent = null);
         super.new(name, parent);
+        dma_rready_stall_cg = new;
     endfunction
+
+    task run_dma_rready_stall();
+        dma_cmd_item req;
+        dma_one_command_sequence seq;
+        int unsigned accepted_base, completed_base, wait_cycles, stall_cycles;
+        int unsigned errors_before;
+        bit seq_done, found_rvalid, released;
+        logic [3:0] held_rid;
+        logic [127:0] held_rdata;
+        logic [1:0] held_rresp;
+        logic held_rlast;
+
+        released = 0;
+        seq_done = 0;
+        found_rvalid = 0;
+        errors_before = uvm_report_server::get_server().get_severity_count(UVM_ERROR);
+        stall_cycles = 0;
+        cov_rready_stall_cycles = 0;
+        cov_rready_stall_completed = 0;
+        req = dma_cmd_item::type_id::create("dma_rready_stall_req");
+        req.ext_addr = 64'h0000_fa00;
+        req.spad_addr = 32'h0800;
+        req.length_words = 16'd32;
+        req.row_words = 16'd32;
+        req.row_count = 0;
+        req.ext_stride = 0;
+        req.spad_stride = 0;
+        req.read_outstanding = 3'd4;
+        req.store = 0;
+        req.gather_enable = 0;
+        req.gather_index_base = 0;
+        req.expect_error = 0;
+        req.expected_error_code = 0;
+        req.abort_after_cycles = 0;
+        req.minimum_rd_highwater = 4;
+        seq = dma_one_command_sequence::type_id::create("dma_rready_stall_seq");
+        seq.item = req;
+        accepted_base = env.axi_rsp.accepted_ids.size();
+        completed_base = env.axi_rsp.completed_ids.size();
+        cfg.min_accepted_reads_before_response = 4;
+        cfg.inject_read_error = 0;
+        cfg.inject_write_error = 0;
+        // Arm the stall before the responder can assert its first RVALID.
+        // Waiting for RVALID and only then forcing RREADY races the first
+        // accepting edge in VCS and can duplicate beat zero on release.
+        if (!uvm_hdl_force("tb_ai_dma_spad_subsystem_uvm.dma_dut.m_axi_rready", 1'b0))
+            `uvm_fatal("DMA_RREADY_STALL", "failed to force the DUT-side RREADY net low")
+
+        fork
+            begin
+                fork : bounded_rready_sequence
+                    begin
+                        seq.start(env.cmd_sqr);
+                        seq_done = 1;
+                    end
+                    begin
+                        repeat (20000) @(posedge sys_vif.clk);
+                        if (!seq_done)
+                            `uvm_error("DMA_RREADY_STALL", "DMA sequence exceeded 20000-cycle watchdog")
+                    end
+                join_any
+                disable bounded_rready_sequence;
+            end
+            begin : find_and_hold_rvalid
+                wait_cycles = 0;
+                while (!found_rvalid && wait_cycles < 10000) begin
+                    @(negedge sys_vif.clk);
+                    wait_cycles++;
+                    if (env.axi_rsp.vif.rvalid === 1'b1) begin
+                        found_rvalid = 1;
+                        held_rid = env.axi_rsp.vif.rid;
+                        held_rdata = env.axi_rsp.vif.rdata;
+                        held_rresp = env.axi_rsp.vif.rresp;
+                        held_rlast = env.axi_rsp.vif.rlast;
+                    end
+                end
+                if (!found_rvalid) begin
+                    `uvm_error("DMA_RREADY_STALL", "RVALID did not assert within 10000 cycles")
+                end else begin
+                    for (int unsigned cycle = 0; cycle < 16; cycle++) begin
+                        @(posedge sys_vif.clk);
+                        #1;
+                        stall_cycles++;
+                        if (env.axi_rsp.vif.rready !== 1'b0 ||
+                            env.axi_rsp.vif.rvalid !== 1'b1 ||
+                            {env.axi_rsp.vif.rid, env.axi_rsp.vif.rdata,
+                             env.axi_rsp.vif.rresp, env.axi_rsp.vif.rlast} !==
+                            {held_rid, held_rdata, held_rresp, held_rlast})
+                            `uvm_error("DMA_RREADY_STALL", $sformatf(
+                                "R channel changed during stall cycle %0d", cycle + 1))
+                    end
+                end
+                if (!uvm_hdl_release("tb_ai_dma_spad_subsystem_uvm.dma_dut.m_axi_rready"))
+                    `uvm_fatal("DMA_RREADY_STALL", "failed to release the DUT-side RREADY net")
+                released = 1;
+            end
+        join
+        if (!released &&
+            !uvm_hdl_release("tb_ai_dma_spad_subsystem_uvm.dma_dut.m_axi_rready"))
+            `uvm_fatal("DMA_RREADY_STALL", "failed to clean up the DUT-side RREADY force")
+        cfg.min_accepted_reads_before_response = 2;
+        if (found_rvalid) begin
+            cov_rready_stall_cycles = stall_cycles;
+            wait_cycles = 0;
+            while (!seq_done && wait_cycles < 10000) begin
+                @(posedge sys_vif.clk);
+                wait_cycles++;
+            end
+            if (!seq_done)
+                `uvm_error("DMA_RREADY_STALL", "DMA sequence did not complete within 10000 cycles after release")
+            repeat (2) @(posedge sys_vif.clk);
+            if (env.axi_rsp.active_read != null || env.axi_rsp.pending_reads.size() != 0 ||
+                (env.axi_rsp.completed_ids.size() - completed_base) != 4 ||
+                (env.axi_rsp.accepted_ids.size() - accepted_base) != 4 ||
+                env.cmd_drv.vif.busy || env.cmd_drv.vif.rd_outstanding != 0)
+                `uvm_error("DMA_RREADY_STALL", $sformatf(
+                    "post-release drain incomplete accepted/completed=%0d/%0d live=%0b pending=%0d busy/outstanding=%0b/%0d",
+                    env.axi_rsp.accepted_ids.size() - accepted_base,
+                    env.axi_rsp.completed_ids.size() - completed_base,
+                    env.axi_rsp.active_read != null, env.axi_rsp.pending_reads.size(),
+                    env.cmd_drv.vif.busy, env.cmd_drv.vif.rd_outstanding))
+            env.sb.check_complete();
+            for (int unsigned word = 0; word < 32; word++) begin
+                bit [31:0] value;
+                host_read_word(req.spad_addr + word * 4, value);
+                if (value !== dma_memory_word(req.ext_addr + word * 4))
+                    `uvm_error("DMA_RREADY_STALL", $sformatf(
+                        "SPAD word %0d=0x%08h expected=0x%08h", word, value,
+                        dma_memory_word(req.ext_addr + word * 4)))
+            end
+            cov_rready_stall_completed = 1;
+            dma_rready_stall_cg.sample();
+            if (uvm_report_server::get_server().get_severity_count(UVM_ERROR) == errors_before)
+                `uvm_info("DMA_RREADY_STALL_PASS",
+                    "16-cycle AXI RREADY stall held R payload stable; DMA drained and 32 SPAD words matched the memory oracle",
+                    UVM_LOW)
+            else
+                `uvm_error("DMA_RREADY_STALL", "scenario failed; PASS marker suppressed")
+        end
+    endtask
 
     function void build_phase(uvm_phase phase);
         super.build_phase(phase);
@@ -3888,9 +4043,16 @@ class dma_spad_subsystem_test extends dma_block_base_test;
     task run_phase(uvm_phase phase);
         bit [31:0] readback;
         int unsigned cnm_reset_phase_first;
+        rready_stall_only = $test$plusargs("A10_RREADY_STALL_ONLY");
         phase.raise_objection(this);
         wait (sys_vif.resetn === 1'b1);
         preload_scratchpad();
+
+        if (rready_stall_only) begin
+            run_dma_rready_stall();
+            phase.drop_objection(this);
+            return;
+        end
 
         `uvm_info("DMA_SPAD", "starting DDR-to-real-SPAD load under scalar compute contention", UVM_LOW)
         fork
@@ -3955,6 +4117,8 @@ class dma_spad_subsystem_test extends dma_block_base_test;
         `uvm_info("DMA_SPAD", "starting shared-reset phase pair in randomized order while four DMA reads remain outstanding", UVM_LOW)
         run_dma_reset_recovery(1'b0, 1'b1, cnm_reset_phase_first);
         run_dma_reset_recovery(1'b0, 1'b1, cnm_reset_phase_first ^ 1);
+        `uvm_info("DMA_SPAD", "starting independent AXI RREADY backpressure completion check", UVM_LOW)
+        run_dma_rready_stall();
         `uvm_info("DMA_SPAD", "DMA/SPAD subsystem scoreboard and contention checks completed", UVM_LOW)
         phase.drop_objection(this);
     endtask
