@@ -176,6 +176,14 @@ module cp_completion_ownership_formal_top (
         @(posedge clk) disable iff (!resetn)
         writer_done |-> (u_cp.state_r == 4'd4));
 
+    // The sticky abort latch is only needed while a FETCH response is
+    // outstanding. A decode-stage abort is consumed directly by the FSM, so
+    // the raw condition tuple {abort_pending_r, abort} == {1'b1, 1'b0} is
+    // unreachable while state_r is ST_DECODE.
+    ap_decode_abort_pending_requires_live_abort: assert property (
+        @(posedge clk) disable iff (!resetn)
+        (u_cp.state_r == 4'd2) |-> !(u_cp.abort_pending_r && !abort));
+
     cp_completion_done_owned_by_cpl: cover property (
         @(posedge clk) disable iff (!resetn)
         writer_done && (u_cp.state_r == 4'd4));

@@ -23,7 +23,8 @@ formal_setup_config -period 10 -initial 1 -apply true
 
 check_fv -property {
     cp_completion_ownership_formal_top.ap_completion_start_owned_by_cpl
-    cp_completion_ownership_formal_top.ap_completion_done_owned_by_cpl}
+    cp_completion_ownership_formal_top.ap_completion_done_owned_by_cpl
+    cp_completion_ownership_formal_top.ap_decode_abort_pending_requires_live_abort}
 report_fv -usage assert -verbose
 check_fv -property {
     cp_completion_ownership_formal_top.cp_completion_done_owned_by_cpl
