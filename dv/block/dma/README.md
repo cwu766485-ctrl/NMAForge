@@ -30,7 +30,7 @@ verification roles:
 | `dma_4k_load_test` | transfer crosses a 4-KiB page | SVA proves no individual AR crosses the page; data matches |
 | `dma_abort_read_test` | abort with accepted reads held in the responder | error code is `ERR_ABORT`; accepted R traffic drains before `done` |
 | `dma_read_slverr_test` | SLVERR on the first newest-first burst after four ARs are accepted | all four read responses drain, destination sentinels do not change, no-reset recovery scores cleanly |
-| `dma_spad_error_drain_test` | one-shot protection error on first newest-first destination line write (`0x1200 + 24×4 = 0x1260`) after four ARs are accepted | reports DMA-local `ERR_SPAD` code 4; all four RLASTs drain, destination sentinels stay unchanged, no response remains, no-reset recovery load scores cleanly; focused rerun and 15-test regression PASS |
+| `dma_spad_error_drain_test` | one-shot protection error on first newest-first destination line write (`0x1200 + 24×4 = 0x1260`) after four ARs are accepted | reports DMA-local `ERR_SPAD` code 4; all four RLASTs drain, destination sentinels stay unchanged, no response remains, no-reset recovery load scores cleanly; included in the 16-test exact-main regression PASS |
 | `dma_write_slverr_test` | AXI BRESP SLVERR on one accepted store burst | reports `ERR_AXI_WR`; matching BID completes exactly once, no B remains pending, recovery load scores cleanly |
 | `dma_abort_write_test` | abort after an accepted AW; delay B and then issue a recovery read | full accepted W burst and B drain before `done`; recovery command scores cleanly |
 | `dma_config_error_test` | unaligned DDR address | `ERR_CONFIG`; absolutely no AXI transaction is accepted |
@@ -66,3 +66,24 @@ make coverage
 An empty `grep` result, zero errors/fatals in every test, and a generated
 `coverage/report/dashboard.html` are regression evidence.  Coverage numbers
 are a closure input, not a substitute for the individual acceptance checks.
+
+## Exact-current-main replay (2026-10-18)
+
+At GitHub `main` SHA `3310d3d45cd9ed0168f7855eb253984c2a38387b`, Rocky 8.10
+with VCS/URG `V-2023.12-SP1_Full64` passed all 16 tests and URG merge:
+
+```bash
+make -C dv/block/dma/sim uvm_regress \
+  SIMV=simv_dma_a10_3310d3d \
+  COV_ROOT=/tmp/nmaforge_a10_main3310d3d_dma_block_20261018/vdb
+make -C dv/block/dma/sim coverage \
+  COV_ROOT=/tmp/nmaforge_a10_main3310d3d_dma_block_20261018/vdb URG=urg
+```
+
+Each test had UVM warning/error/fatal=`0/0/0`; the random-stress test matched
+all 20 commands. `dma_cmd_cg` reached 14/14 variables + 5/5 crosses. The
+DUT-only `ai_axi128_dma` line/condition/toggle/FSM/branch coverage was
+`93.48/71.04/36.69/53.57/86.92%`. These values are specific to the cited
+RTL revision and are not a signoff claim. The exact log and assertion
+disposition are recorded in
+[`A10_DV_RUN_2026-10-18_MAIN452.md`](../../../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md).

@@ -1,5 +1,14 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 exact-current-main DMA block replay at `3310d3d`:** VCS/URG
+> passed all 16 DMA UVM tests with per-test UVM warning/error/fatal=`0/0/0`;
+> random stress scored 20/20 transfers. `dma_cmd_cg` reached 14/14 variables
+> and 5/5 crosses. All 11 named DMA DUT SVA had real successes, with 0
+> failure/incomplete; two UVM RAL assertions were unattempted. DUT-only
+> `ai_axi128_dma` line/condition/toggle/FSM/branch=`93.48/71.04/36.69/53.57/86.92%`.
+> The same SHA passed top `ai_smoke`. Residual RTL bins and full V3/A10 closure
+> remain open. See the [exact-main run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-dma-block-uvmurg-replay-at-3310d3d).
+
 > **2026-10-18 V3 prolonged AXI RREADY stress increment (candidate based on `0da26d4`):** Focused 16/64/300-cycle backpressure profiles each held `RVALID` and its payload stable, drained four accepted read responses, and matched all 32 SPAD words; UVM warning/error/fatal=`0/0/0` for each. URG stall-length bins and stall×completion crosses were 3/3 (100%); 8 DUT-facing assertions plus one UVM check succeeded, 0 failed/incomplete, with two UVM RAL no-attempts. The default three-seed DMA-SPAD regression and `ai_smoke` passed. This is prolonged response-channel evidence, not complete arbiter fairness or V3/A10 closure. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-v3-prolonged-axi-rready-backpressure-profiles).
 
 > **2026-10-18 exact-current-main V3 DMA-SPAD replay at `188e523`:** The

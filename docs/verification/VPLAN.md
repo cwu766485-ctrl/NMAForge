@@ -1,14 +1,14 @@
 # NMAForge 验证计划（VPLAN）
 
 版本：A10 / ABI v7.4
-更新：2026-10-16
+更新：2026-10-18
 顶层：`rtl/top/ai_accel_top.v`
 
-> 本文最初按 A8 / ABI v7.2 编写，后续阶段描述仍可作为验证路线图；其中带日期的旧 PASS、工具和 coverage 数值是历史记录，不代表 A10 固定快照已在本轮复跑。A10 的逐项需求追踪见 [`A10_DV_RTM.md`](A10_DV_RTM.md)，本轮固定 SHA 的执行结果见 [`A10_DV_BASELINE_2026-10-14.md`](A10_DV_BASELINE_2026-10-14.md)。
+> 本文最初按 A8 / ABI v7.2 编写，后续阶段描述仍可作为验证路线图；其中带日期的旧 PASS、工具和 coverage 数值是历史记录，不代表 A10 全量验收。A10 的逐项需求追踪见 [`A10_DV_RTM.md`](A10_DV_RTM.md)，近期固定 SHA 的选定复跑见 [`A10_DV_RUN_2026-10-18_MAIN452.md`](A10_DV_RUN_2026-10-18_MAIN452.md)；较早的验证快照见 [`A10_DV_BASELINE_2026-10-14.md`](A10_DV_BASELINE_2026-10-14.md)。
 
 > **较早的 A10 快照（2026-10-16；DMA 数字已由下一条更新）：** 当时 DMA UVM 14-test regression 为 14/14 PASS、UVM severity 0、`dma_cmd_cg` 14/14 variables + 5/5 crosses、11/11 DMA DUT SVA attempted/success；DUT-only line/condition/toggle/FSM/branch 为 89.44/68.73/36.94/53.57/85.98%。真实 DMA/SPAD/CNM 3-seed compatibility replay 也通过：8/8 选定功能组 100%，31 assertions 中 29 success、0 failure/incomplete、2 个 UVM RAL no-attempt。Command Processor 最新 direct-config/busy-guard campaign 为 18/18 runs、28/28 scenario bins、`cp_cg` 48/48 variables + 10/10 crosses；CP RTL condition/toggle residual 与全局 disposition 仍 open。顶层 mixed-precision UVM active-reset、watchdog/software-abort 与随机 DDR E2E campaign 有通过证据，latest targeted `e2e_cg` 为 54/54 variables + 16/16 crosses。以上均为当前 dirty worktree 的选定回归证据，不代表 A10 V1–V5 总体验收、固定 SHA clean replay 或全设计 code/assertion sign-off。准确证据边界与复跑命令见 [A10 RTM](A10_DV_RTM.md) 和 [A10 baseline](A10_DV_BASELINE_2026-10-14.md)。
 
-> **DMA 最新复跑（2026-10-16，覆盖上一条中的 14-test 数据）：** SPAD request-error drain 用例 focused rerun 与 DMA UVM 全回归 **15/15 PASS**，UVM warning/error/fatal=`0/0/0`，随机压力 20/20；`dma_cmd_cg` 14/14 variables + 5/5 crosses，11/11 DMA DUT SVA attempted/success、0 failure/incomplete，2 个 UVM RAL no-attempt。DUT-only `ai_axi128_dma` line/condition/toggle/FSM/branch=`93.48/71.04/37.11/53.57/86.92%`。更新后的共享 agent 又通过真实 DMA/SPAD/CNM 三 seed 兼容复跑（3/3、8/8 selected groups 100%、29/31 assertions success）；随后 top `ai_smoke` 和 `ai_run AI_RANDOM_CASES=20 AI_SEED=12345` 也 PASS。此为 dirty worktree 增量结果；A10 V1–V5、frozen-SHA replay 和全设计 code/assertion sign-off 仍未完成。详见 [A10 RTM](A10_DV_RTM.md) 与 [A10 run record](A10_DV_RUN_2026-10-16.md)。
+> **DMA 最新复跑（2026-10-18 exact-current-main）：** GitHub `main` SHA `3310d3d45cd9ed0168f7855eb253984c2a38387b` 上，DMA block UVM **16/16 PASS**，每项 warning/error/fatal=`0/0/0`，随机压力 20/20；URG `dma_cmd_cg` 14/14 variables + 5/5 crosses，11/11 named DMA DUT SVA 有真实成功、0 failure/incomplete，另有一个 UVM component-name check 成功、两个 UVM RAL no-attempt。DUT-only `ai_axi128_dma` line/condition/toggle/FSM/branch=`93.48/71.04/36.69/53.57/86.92%`。同一 SHA 的 top `ai_smoke` 通过。DMA RTL 残余覆盖、完整 V3 fault/abort/reset 与 fairness 及 A10/V5 总体验收仍未关闭；详见 [A10 RTM](A10_DV_RTM.md) 与 [2026-10-18 run record](A10_DV_RUN_2026-10-18_MAIN452.md)。
 
 ## 1. 验证目标
 
@@ -154,7 +154,7 @@ complete。V1 FP dot 有强 block 证据：三 seed 各 200 random，另加 faul
 late-B protection 前缀行为通过。RTL coverage
 残余已按结构与 SPAD 协议逐项 disposition（非形式不可达证明），冻结 SHA clean replay 仍待执行。V2 command/completion 与
 V3 DMA/SPAD 已有多 seed block/subsystem 证据，统一 closure 仍开。VCS compile、`ai_smoke`、
-20-case top random、Control UVM、DMA UVM 15/15 tests（14/14 `dma_cmd_cg` variables、5/5 crosses、11/11 DMA DUT SVA；最新 DUT-only line/condition/toggle/FSM/branch=`93.48/71.04/37.11/53.57/86.92%`）、DMA 更新后 3-seed DMA/SPAD compatibility replay（8/8 selected groups 100%，29/31 assertions success，0 failure/incomplete）及 Command Processor 最新 3-seed × 6-profile coverage campaign（18/18 runs、28/28 scenarios、48/48 functional variables、10/10 crosses）均有通过证据。Command Processor 最新 line/condition/toggle/FSM/branch=`100.00/83.67/10.10/100.00/88.06%`；其 residual condition/branch/toggle 仍待逐项 disposition。以上不是 A10 V1–V5 总体验收或全设计 code/assertion sign-off。
+20-case top random、Control UVM、DMA UVM 16/16 tests（14/14 `dma_cmd_cg` variables、5/5 crosses、11/11 named DMA DUT SVA；最新 DUT-only line/condition/toggle/FSM/branch=`93.48/71.04/36.69/53.57/86.92%`）、DMA 更新后 DMA/SPAD subsystem replay（selected groups 100%，含 prolonged RREADY response stalls）及 Command Processor 最新 3-seed × 6-profile coverage campaign（18/18 runs、28/28 scenarios、48/48 functional variables、10/10 crosses）均有通过证据。Command Processor 最新 line/condition/toggle/FSM/branch=`100.00/83.67/10.10/100.00/88.06%`；其 residual condition/branch/toggle 仍待逐项 disposition。以上不是 A10 V1–V5 总体验收或全设计 code/assertion sign-off。
 
 V4 普通 `uvm_mixed_precision_ddr_e2e_regress` 六次 order/layout 回归均 PASS；16-run mixed-FP DDR E2E
 K sweep 与 AXI-gap coverage regression 也 PASS。最新 192-seed
