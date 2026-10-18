@@ -1,5 +1,7 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-18 clean selected-subset replay at pushed `ad88b39`:** A detached clean worktree on Rocky 8.10 / VCS+URG V-2023.12-SP1 passed FP dot UVM (3 seeds × 200 random vectors; 484/484 bit-exact checks per seed), CP/Completion UVM coverage (72/72 profiles; 61/61 functional variables, 34/34 crosses, reset words 4/4, kind×delay×reset cross 24/24, abort timing 7/7), DMA UVM (19/19 tests; 55 scoreboard-pass markers), Control UVM (9/9 tests), and top `ai_smoke`. All audited runs had zero nonzero UVM severity, and the worktree remained clean. This closes reproducibility for these selected test sets only; full V1–V5 closure remains OPEN, including FP parity-to-writeback formal, CP raw RTL coverage disposition, DMA/SPAD fairness/broader interactions, top coverage disposition, and overall V5 review. Details: [clean-SHA run record](A10_DV_RUN_2026-10-18_CLEAN_AD88B39.md).
+
 > **2026-10-18 V5 AXI4 coverage-model correction (exact replay at `9e05dfc`):**
 > The AXI4 event coverpoint is now typed to its five-value protocol enum, and
 > address-only size/length fields are sampled only on AR/AW. The 192-seed DDR
