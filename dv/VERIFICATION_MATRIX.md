@@ -159,6 +159,22 @@ states the dirty-worktree caveat and lists reproducible runs.
 
 ## Evidence status
 
+### 2026-10-18 exact pushed SHA `622ecc7` replay
+
+At exact `main` SHA `622ecc7`, Rocky 8.10 / VCS `V-2023.12-SP1_Full64` and
+URG `V-2023.12-SP1`, selected frozen-baseline replay passed: FP directed test,
+three FP UVM seeds (484/484 bit-exact each, UVM severity 0/0/0, selected
+functional groups 100%), FP model 19/19, DMA UVM 16/16, Control UVM 9/9, top
+`ai_smoke`, and seeded `ai_run` 20/20. DMA `dma_cmd_cg` and Control coverage
+groups were 100%; DMA/Control URG had 0 assertion failures/incomplete, with
+two unattempted UVM RAL internals in each. Canonical FP formal passed 12/12
+assertions and both selected covers. Three short-vector parity lifecycle
+properties under the fixed two-cycle core-facing SPAD model re-proved
+non-vacuously at depths 224/27/206. This is selected exact-SHA evidence only;
+full 16-bit parity proof, remaining subsystem/top coverage disposition, and
+V1–V5 overall closure remain open. Full commands and limits are in the
+[exact-SHA run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-pushed-sha-622ecc7-replay).
+
 VCS compile, top smoke, historical 20-case top random, FP block (three seeds × 256 random,
 584 checks/seed, severity zero, peak outstanding=2), Control UVM, DMA UVM
 (current 14 tests), Command Processor UVM (latest 25/25 scenario bins per seed across

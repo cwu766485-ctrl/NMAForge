@@ -1,5 +1,7 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-18 exact pushed SHA `622ecc7` replay:** On Rocky 8.10, the current pushed commit passed the FP directed block test, FP mixed-dot UVM/URG (three seeds, 484/484 bit-exact transactions per seed), Python model (19/19), DMA UVM (16/16), Control UVM (9/9), top `ai_smoke`, seeded top `ai_run` (20 cases), and canonical FP formal (12/12 assertions, both selected covers). The three length-1..4 FP parity lifecycle properties under the two-cycle SPAD timing model also re-proved non-vacuously at safe depths 224/27/206. DMA and Control selected functional groups were 100%; their URG summaries had 0 failures/incomplete and two unattempted UVM RAL internals each. This is an exact-commit selected replay, not overall A10/V1–V5 closure; full-16-bit parity proof and V5 global coverage disposition remain open. Detailed commands, versions, tool caveats, and logs: [622ecc7 run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-pushed-sha-622ecc7-replay).
+
 > **2026-10-18 `98675d08` replay gate (latest previously pushed docs snapshot `9ddbb32`):** The
 > detached clean validation worktree was at
 > `98675d08f44856d2023a6840cb117d1f47d8daf2`; GitHub `main` is now
@@ -20,9 +22,10 @@
 > both depth-5 covers. This closes only the bounded length-1..4 property set,
 > not the full 16-bit parity/writeback relation. Details are in the [run
 > record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-sha-bounded-parity-formal-rerun-after-license-recovery).
-> The latest SHA still requires exact-commit FP/DMA/Control/top replay and V5
-> coverage disposition when a Synopsys-supported execution environment is
-> available. Details: [2026-10-18 run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-98675d08-replay-attempt).
+> At `98675d08`, exact-commit FP/DMA/Control/top replay and V5 disposition were
+> still pending. The selected FP/DMA/Control/top replay is now complete at
+> `622ecc7` as recorded above; V5 global coverage disposition remains open.
+> Details of the historical attempt: [2026-10-18 run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-98675d08-replay-attempt).
 
 > **2026-10-18 current-main canonical V1 formal at `c9b80f8`:** A clean
 > detached worktree at the pushed `main` commit passed VC Formal setup and all
