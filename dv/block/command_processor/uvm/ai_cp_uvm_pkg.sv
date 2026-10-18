@@ -714,6 +714,11 @@ package ai_cp_uvm_pkg;
             descriptor(3,0,0,0,1,16'h1573);
             vif.cmdq_tail=1; vif.cplq_head=0; vif.abort_cov_path=2'd3;
             pulse_submit();
+            // Consume the parent response, then synchronize on the first
+            // child's request and response before entering child ST_DECODE.
+            wait(vif.fetch_done===1'b1);
+            @(posedge vif.clk);
+            wait(vif.fetch_start===1'b1);
             wait(vif.fetch_done===1'b1);
             @(posedge vif.clk);
             @(negedge vif.clk); vif.abort=1;
@@ -990,6 +995,37 @@ package ai_cp_uvm_pkg;
             if(vif.cmdq_head!==2)
               `uvm_error("CP/SUBMIT_GUARD","guarded fetch did not drain both queued commands")
 
+            // Hold compute_busy high after descriptor fetch has completed and
+            // the CP has entered ST_DECODE. The decode FSM must wait without
+            // relaunching the descriptor or producing completion side effects.
+            reset_cp();
+            descriptor(0,0,0,0,1,16'h27c0); vif.cmdq_tail=1; vif.cplq_head=0;
+            pulse_submit();
+            wait(vif.fetch_done===1'b1);
+            wait(vif.debug_state_r===4'd2);
+            @(negedge vif.clk);
+            if(vif.debug_state_r!==4'd2 || !vif.busy || vif.fetch_busy)
+              `uvm_fatal("CP/SUBMIT_GUARD","descriptor did not settle in ST_DECODE before compute-busy hold")
+            head_before=vif.cmdq_head; tail_before=vif.cplq_tail;
+            vif.compute_busy=1;
+            repeat(2) begin
+              @(posedge vif.clk); #1ps;
+              if(vif.debug_state_r!==4'd2 || !vif.busy ||
+                 vif.fetch_start || vif.launch_valid || vif.completion_start ||
+                 vif.cpl_spad_valid || vif.event_valid ||
+                 vif.cmdq_head!==head_before || vif.cplq_tail!==tail_before)
+                `uvm_error("CP/SUBMIT_GUARD","compute_busy did not hold ST_DECODE without side effects")
+            end
+            @(negedge vif.clk); vif.compute_busy=0;
+            wait(vif.launch_valid===1'b1);
+            if(vif.launch_task_id!==16'h27c0 || vif.launch_op!==8'h10)
+              `uvm_error("CP/SUBMIT_GUARD","released decode did not launch the held descriptor")
+            wait_idle();
+            if(vif.cmdq_head!==1 || vif.cplq_tail!==1 || vif.busy ||
+               vif.fetch_start || vif.launch_valid || vif.completion_start ||
+               vif.cpl_writer_busy || vif.cpl_spad_valid)
+              `uvm_error("CP/SUBMIT_GUARD","released decode did not complete once and recover idle")
+
             // Fourth tuple: keep the active descriptor blocked in ST_DECODE
             // with the next ring entry still queued. Resources are idle here,
             // so a fresh doorbell must still be ignored outside ST_IDLE.
@@ -1080,7 +1116,7 @@ package ai_cp_uvm_pkg;
             if(vif.cmdq_head!==1 || vif.cplq_tail!==1 || vif.busy ||
                vif.cpl_writer_busy || vif.launch_valid)
               `uvm_error("CP/SUBMIT_GUARD","completion did not retire exactly once after ignored abort")
-            `uvm_info("CP/SUBMIT_GUARD","fetch_resubmit_ignored=1 decode_resubmit_ignored=1 scheduler_busy_ignored=1 tile_busy_ignored=1 completion_abort_ignored=1 recovery=1",UVM_LOW)
+            `uvm_info("CP/SUBMIT_GUARD","fetch_resubmit_ignored=1 decode_resubmit_ignored=1 decode_compute_busy_wait=1 held_cycles=2 resume_launch=1 completion=1 queue_drained=1 scheduler_busy_ignored=1 tile_busy_ignored=1 completion_abort_ignored=1 recovery=1",UVM_LOW)
           end
           CP_WRITER_FSM_FAULT_RECOVERY: begin
             reset_cp();
@@ -1882,15 +1918,15 @@ package ai_cp_uvm_pkg;
                 end
                 CP_RANDOM_QUEUE: expected_task_id=16'h2000+random_retire_count-1;
                 CP_SUBMIT_GUARD: begin
-                  // The dependency-wait tuple is deliberately aborted after
-                  // the ignored re-submit; give it a unique ID so it cannot
-                  // be confused with either two-command queue-drain tuple.
+                  // Include the successful compute-busy decode hold before
+                  // the dependency-wait abort, followed by scheduler recovery.
                   case(submit_guard_completion_index)
                     0: expected_task_id=16'h1000;
                     1: expected_task_id=16'h1001;
-                    2: expected_task_id=16'h27d0;
-                    3: expected_task_id=16'h1000;
-                    4: expected_task_id=16'h1001;
+                    2: expected_task_id=16'h27c0;
+                    3: expected_task_id=16'h27d0;
+                    4: expected_task_id=16'h1000;
+                    5: expected_task_id=16'h1001;
                     default: expected_task_id=16'h1000;
                   endcase
                   submit_guard_completion_index++;
@@ -2017,7 +2053,7 @@ package ai_cp_uvm_pkg;
                 end
                 compute_abort_records++;
               end else if(vif.test_case==CP_SUBMIT_GUARD &&
-                          submit_guard_completion_index==3) begin
+                          submit_guard_completion_index==4) begin
                 if(vif.completion_error!==4'd3 || vif.completion_status!==4'd2)
                   `uvm_error("CP/SUBMIT_GUARD","decode re-submit cleanup did not retire ERR_ABORT")
               end else if(vif.test_case==CP_DEP_TIMEOUT) begin

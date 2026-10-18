@@ -1,5 +1,7 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 working-tree CP decode busy-hold increment (based on pushed `2317abb`):** The macro-child decode-abort sequence now synchronizes to the child request/response, and `CP_SUBMIT_GUARD` verifies two cycles of `ST_DECODE` hold while `compute_busy=1`, then exactly one launch/completion after release. Focused/full CP UVM, 72/72 coverage profiles, and top `ai_smoke` passed with UVM severity `0/0/0`; every full-suite run had scenario bins `31/31`. URG CP line/FSM/branch=`100/100/100%`, condition=`229/252` (90.87%, 23 outcomes still open); assertions 13 success, 0 failure/incomplete, 2 UVM RAL no-attempts. Testbench-only change; shared worktree, not clean-SHA evidence. V2/A10 remain open. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_CP_DECODE_BUSY.md).
+
 > **2026-10-18 current-worktree AXI-Lite SLVERR response follow-up (HEAD `bd3a7cd`):**
 > Added top-E2E checks for unmapped register `0x1fc`: writes and reads return
 > SLVERR and reads return zero. Focused run, the 16-seed FP-length matrix,
