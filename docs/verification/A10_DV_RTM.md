@@ -1,9 +1,9 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
-> **2026-10-18 `98675d08` replay gate (current docs commit `1fd42fc`):** The
+> **2026-10-18 `98675d08` replay gate (latest previously pushed docs snapshot `9ddbb32`):** The
 > detached clean validation worktree was at
 > `98675d08f44856d2023a6840cb117d1f47d8daf2`; GitHub `main` is now
-> `1fd42fc549391ee5a1b512680c3b5edc89e36130`, a documentation-only descendant.
+> `9ddbb327bc0e0e5c14ce0a160e77f75dbef69315`, a documentation-only descendant.
 > RTL, test, and formal inputs match the tested `98675d08` snapshot.
 > Current FP Python reference tests pass 19/19, and no product RTL differs from
 > the previously replayed `43dbbbc` baseline. The selected exact-SHA VCS replay
