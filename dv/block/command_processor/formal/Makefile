@@ -15,9 +15,9 @@ completion-ownership:
 	$(MAKE) --no-print-directory check OUT="$(OUT)"
 
 check:
-	@grep -Fq -- "- # proven       : 6" "$(FORMAL_LOG)" || \
+	@grep -Fq -- "- # proven       : 7" "$(FORMAL_LOG)" || \
 		{ echo "CP completion ownership proof gate failed; inspect $(FORMAL_LOG)"; exit 1; }
-	@grep -Fq -- "- # non_vacuous  : 6" "$(FORMAL_LOG)" || \
+	@grep -Fq -- "- # non_vacuous  : 7" "$(FORMAL_LOG)" || \
 		{ echo "CP completion ownership vacuity gate failed; inspect $(FORMAL_LOG)"; exit 1; }
 	@grep -Fq -- "- # covered      : 3" "$(FORMAL_LOG)" || \
 		{ echo "CP completion ownership cover gate failed; inspect $(FORMAL_LOG)"; exit 1; }
@@ -31,6 +31,8 @@ check:
 		{ echo "CP tile activity ownership proof missing; inspect $(FORMAL_LOG)"; exit 1; }
 	@grep -Fq "cp_completion_ownership_formal_top.ap_active_available_completion_was_reserved" "$(FORMAL_LOG)" || \
 		{ echo "CP active available-completion reservation proof missing; inspect $(FORMAL_LOG)"; exit 1; }
+	@grep -Fq "cp_completion_ownership_formal_top.ap_fetch_done_owned_by_fetch_state" "$(FORMAL_LOG)" || \
+		{ echo "CP fetch-done state ownership proof missing; inspect $(FORMAL_LOG)"; exit 1; }
 	@grep -Fq "cp_completion_ownership_formal_top.cp_decode_compute_busy_release_launch" "$(FORMAL_LOG)" || \
 		{ echo "CP decode compute-busy release/launch cover missing; inspect $(FORMAL_LOG)"; exit 1; }
 	@grep -Fq "No setup issues found" "$(FORMAL_LOG)" || \

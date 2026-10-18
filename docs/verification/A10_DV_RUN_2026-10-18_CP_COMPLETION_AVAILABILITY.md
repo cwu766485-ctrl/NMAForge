@@ -104,7 +104,38 @@ the tested busy-time configuration lock and the non-vacuously proven CP
 reservation invariant. Raw URG still records those seven condition outcomes
 as unhit, which is retained transparently for coverage accounting.
 
-This closes only the targeted completion-availability condition disposition.
-Other CP raw condition/toggle misses, broader fault×abort×reset interactions,
-full V2 lifecycle closure, global coverage disposition, fixed-SHA clean
-replay, and A10/V5 remain open.
+### Follow-up: descriptor fetch response ownership
+
+The CP raw condition report contained one additional miss:
+`fetch_done=1` with the abort condition true while `state_r != ST_FETCH` at
+the abort-pending clear expression. The formal harness now models the producer
+protocol with a one-request outstanding bit and assumes `fetch_done` only for
+an outstanding request (or a same-cycle `fetch_start`). It then asserts that
+every such response is consumed in `ST_FETCH`.
+
+```sh
+make -C dv/block/command_processor/formal completion-ownership \
+  VCF=vcf \
+  OUT=/tmp/nmaforge_a10_cp_fetch_done_ownership_formal_20261018
+```
+
+VC Formal `V-2023.12-SP2` passed with clean setup, 7/7 assertions proven and
+non-vacuous, and 3/3 covers reached. The new
+`ap_fetch_done_owned_by_fetch_state` property was non-vacuous and safe through
+depth 79. The target printed `CP_COMPLETION_OWNERSHIP_FORMAL_PASS`; artifacts
+are under `/tmp/nmaforge_a10_cp_fetch_done_ownership_formal_20261018/`.
+This is an assume-guarantee proof of the CP consumer under the fetch producer's
+request/response contract, not a formal proof of the real descriptor fetch
+implementation. The prior top-smoke integration monitor observed 56 real
+`desc_done` pulses, all while the CP was in `ST_FETCH`.
+
+The 15 CP raw condition outcomes remaining unhit in URG are now classified:
+two `cmdq_size != 0 && cmdq_empty` tuples are impossible by the definition of
+`cmdq_empty`; two completion-done ownership tuples, two tile busy/done
+ownership tuples, one decode abort-pending tuple, seven completion-reservation
+tuples, and one fetch-done ownership tuple are covered by the non-vacuous
+formal properties under their stated producer/configuration contracts. The
+raw CP condition score remains 237/252 (94.05%); no bin is rewritten or
+excluded. CP toggle residuals, broader fault×abort×reset interactions, full
+V2 lifecycle closure, global coverage disposition, fixed-SHA clean replay,
+and A10/V5 remain open.

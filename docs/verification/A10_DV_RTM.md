@@ -652,11 +652,20 @@ Control UVM now verifies that a busy-time `CPL_SIZE` write returns SLVERR and
 leaves the value unchanged. VC Formal `V-2023.12-SP2` then proves, under the
 explicit assumption that `cplq_size` is stable while CP `busy` is asserted,
 that an active queued FETCH/DECODE or macro RUN state with
-`completion_available=1` necessarily has `completion_required_r=1`. The CP +
-real completion-writer harness reports 6/6 assertions proven and non-vacuous,
-3/3 covers reached, and clean setup. This is compositional evidence, not a
-whole-top formal proof; the seven URG raw outcomes remain reported as unhit.
+`completion_available=1` necessarily has `completion_required_r=1`.
+
+A subsequent fetch-response ownership proof modeled a one-request outstanding
+protocol (`fetch_done` only for a pending request or same-cycle `fetch_start`)
+and proved every response is consumed in `ST_FETCH`. The formal suite now has
+7/7 assertions proven and non-vacuous, 3/3 covers reached, and clean setup.
+Together with the prior top-smoke monitor observing 56/56 integrated
+descriptor-done pulses in `ST_FETCH`, this classifies the final raw CP
+condition miss under the producer contract. All 15 remaining CP raw condition
+outcomes are classified by definition or these formal ownership/reservation
+properties; the URG score remains 237/252 (94.05%), with no exclusions or
+rewritten bins. This is assume-guarantee evidence, not a whole-top formal proof.
+
 Control regression passed all 9 tests with UVM severity `0/0/0`, and top
-`ai_smoke` passed. No product RTL/SPEC/ABI changed. Other CP raw condition and
-toggle misses, broader V2/V5 closure, and frozen-SHA clean replay remain open.
-See the [detailed run record](A10_DV_RUN_2026-10-18_CP_COMPLETION_AVAILABILITY.md).
+`ai_smoke` passed. No product RTL/SPEC/ABI changed. CP toggle residuals,
+broader V2/V5 closure, and frozen-SHA clean replay remain open. See the
+[detailed run record](A10_DV_RUN_2026-10-18_CP_COMPLETION_AVAILABILITY.md).

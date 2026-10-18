@@ -531,3 +531,7 @@ the [exact-main run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.m
 ### A10 最新增量：CP completion availability 与 CPLQ busy-lock disposition（2026-10-18）
 
 CP UVM/URG 三 seed × 24-profile campaign 为 72/72 PASS，scenario bins 每次 31/31、UVM warning/error/fatal=`0/0/0`，`cp_cg` 61/61 variables + 34/34 crosses；CP condition 为 237/252（94.05%）。七个 `completion_required_r && completion_available` 点的 `(1,0)` 现已命中，`(0,1)` 仍保留为 URG raw Not Covered，并由 busy-time `CPL_SIZE` SLVERR/readback Control UVM 检查及 CP+completion-writer VC Formal 6/6 non-vacuous proof 作组合式不可达 disposition。Control UVM 全 9 项通过，top `ai_smoke` PASS。没有产品 RTL/SPEC/ABI 变更。该证据只关闭目标条件组合的 disposition；其它 CP raw coverage、完整 V2/V5 与 frozen-SHA clean replay 仍开放。详见 [A10 CP completion availability run record](../docs/verification/A10_DV_RUN_2026-10-18_CP_COMPLETION_AVAILABILITY.md)。
+
+### CP raw condition audit follow-up (2026-10-18)
+
+VC Formal is now 7/7 proven, 7/7 non-vacuous, and 3/3 covers. Under the explicit one-outstanding descriptor-fetch response contract, the new `fetch_done -> ST_FETCH` proof classifies the final raw condition miss; the existing ownership/reservation properties and `cmdq_empty` definition classify the other 14. CP raw condition remains 237/252 (94.05%) in URG by design—no exclusions or synthetic coverage claims. CP toggle residuals, broader lifecycle interactions, V2/V5 closure, and clean-SHA replay remain open. Details: [A10 CP completion availability run record](../docs/verification/A10_DV_RUN_2026-10-18_CP_COMPLETION_AVAILABILITY.md).

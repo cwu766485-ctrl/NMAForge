@@ -115,6 +115,7 @@ module cp_completion_ownership_formal_top (
     logic [31:0] tile_dma_spad_addr;
     logic [15:0] tile_dma_length_words;
     logic tile_active;
+    logic fetch_response_outstanding;
     logic [31:0] tile_perf_total;
     logic [31:0] tile_perf_dma;
     logic [31:0] tile_perf_compute;
@@ -149,6 +150,22 @@ module cp_completion_ownership_formal_top (
     assign completion_busy = writer_busy;
     assign completion_done = writer_done;
     ai_command_processor u_cp (.*);
+
+    // Model the descriptor-fetch producer protocol: done is a one-shot
+    // response to a previously issued fetch_start. The real top-level smoke
+    // monitor separately checks this ownership on the integrated mux path.
+    always @(posedge clk) begin
+        if (!resetn)
+            fetch_response_outstanding <= 1'b0;
+        else if (fetch_done)
+            fetch_response_outstanding <= 1'b0;
+        else if (fetch_start)
+            fetch_response_outstanding <= 1'b1;
+    end
+
+    as_fetch_done_requires_outstanding_request: assume property (
+        @(posedge clk) disable iff (!resetn)
+        fetch_done |-> (fetch_response_outstanding || fetch_start));
 
     // The register block rejects CPL_SIZE writes while processor_busy is high.
     // This keeps the size sampled at queued submit stable throughout the CP
@@ -211,6 +228,13 @@ module cp_completion_ownership_formal_top (
         (((u_cp.state_r == 4'd1) || (u_cp.state_r == 4'd2) ||
           ((u_cp.state_r == 4'd3) && u_cp.macro_active_r)) &&
          u_cp.completion_available) |-> u_cp.completion_required_r);
+
+    // A response from the descriptor-fetch producer may only be consumed by
+    // the CP while its fetch lifecycle is active. Aborts wait for that response
+    // before leaving ST_FETCH, so they cannot create a late off-state done.
+    ap_fetch_done_owned_by_fetch_state: assert property (
+        @(posedge clk) disable iff (!resetn)
+        fetch_done |-> (u_cp.state_r == 4'd1));
 
     cp_completion_done_owned_by_cpl: cover property (
         @(posedge clk) disable iff (!resetn)
