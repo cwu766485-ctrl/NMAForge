@@ -433,6 +433,25 @@ improves reproducibility only; the V3 row above remains open for broader
 fairness, fault×abort×reset, and full coverage disposition. See the
 [run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-v3-dma-spad-cnm-10-seed-replay-at-4c4738a).
 
+### V3-CUR-04 exact-main reset-timing coverage follow-up (2026-10-18)
+
+At pushed `main` baseline `ae925bd0ab497f278cdef2c5431438b3a1c08a50`, the
+focused run plus 20 randomized seeds passed with zero UVM warning/error/fatal.
+Random reset delays covered 1/2/3 cycles but did not hit same-cycle reset.
+The testbench-only `+SPAD_PARITY_ABORT_RESET_DELAY=0..3` override preserves
+the existing 0..3 random behavior by default and enables deterministic replay
+of that bin. Directed seed `20261111` forced zero cycles and passed. Merging
+the 21 focused/random VDBs with this directed VDB yielded 4/4 variables and
+2/2 crosses in `cnm_parity_abort_reset_cg`; `cp_reset_timing` and
+`fault_abort_reset_x_timing` were each 2/2 (100%). URG assertions were 29/31
+success, zero failure/incomplete, with two unattempted UVM RAL internals.
+`ai_smoke` passed.
+
+This closes only the bounded parity-error × DMA abort-drain × shared-reset
+timing slice. Broad random fault×abort×reset combinations, V3 fairness,
+DUT-only residual coverage, and A10/V5 acceptance remain open. Exact commands,
+seed histogram, and report path are in the [2026-10-18 run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-v3-parityabortreset-timing-coverage-addendum-ae925bd).
+
 ## V4 — Top-Level AI Accelerator UVM
 
 > **2026-10-18 fresh current-main V4 random E2E replay:** At GitHub `main` SHA `0578dde3a72ad8f9f89ef5c6a870f83d76de24d7`, VCS/URG `V-2023.12-SP1_Full64` ran `make -C dv/uvm/sim uvm_mixed_precision_ddr_e2e_random_cov_regress MIXED_E2E_RANDOM_OUT=/tmp/nmaforge_a10_main0578dde_top_e2e_random_20261018`. All 192 seeds (`20261101..20261292`) passed: 192/192 E2E markers, zero nonzero UVM WARNING/ERROR/FATAL logs, `e2e_cg` and all four per-transaction AXI AR/AW/R-gap/W-gap groups at 100%, all 20 Makefile-gated functional points at 100%. URG assertions: 20 success, 0 failure/incomplete, 2 no-attempt UVM RAL `do_read`/`do_write`; all 3 AXI stall-to-accept covers matched. The 14 compute-activity properties are testbench monitors; five AXI master protocol properties are DUT-owned and each had real successes. Artifact and exact command are in [the 2026-10-18 current-main replay record](A10_DV_RUN_2026-10-18_MAIN452.md). This closes the selected randomized V4 E2E slice at the cited commit only; broader V4 interaction coverage, DUT-only code coverage review, and V5 remain open.

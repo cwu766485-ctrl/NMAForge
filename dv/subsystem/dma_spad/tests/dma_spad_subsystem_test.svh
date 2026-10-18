@@ -3273,10 +3273,12 @@ class dma_spad_subsystem_test extends dma_block_base_test;
         int unsigned saved_fp_contended, saved_fp_dma_contended;
         int unsigned saved_fp_peak_outstanding;
         int unsigned abort_after_cycles, cnm_launch_skew, reset_delay_cycles;
+        int signed reset_delay_override;
         int unsigned wait_cycles, reset_timing_class, drain_cycles;
         bit dma_seq_done, abort_seen, all_dma_reads_accepted;
         bit cnm_done_seen, reset_assert_ack, reset_release_ack;
         bit fault_abort_reset_observed;
+        bit reset_delay_override_used;
 
         // Preserve pre-reset monitor evidence: the shared reset also resets
         // the monitor's cumulative counters along with the DUT and responder.
@@ -3319,7 +3321,21 @@ class dma_spad_subsystem_test extends dma_block_base_test;
         // CNM launch skew, and reset delay vary the cross-layer timing.
         abort_after_cycles = $urandom_range(16, 28);
         cnm_launch_skew = $urandom_range(0, 3);
-        reset_delay_cycles = $urandom_range(0, 3);
+        reset_delay_override_used = $test$plusargs("SPAD_PARITY_ABORT_RESET_DELAY");
+        if (reset_delay_override_used) begin
+            if (!$value$plusargs("SPAD_PARITY_ABORT_RESET_DELAY=%d", reset_delay_override))
+                `uvm_fatal("SPAD_PARITY_ABORT_RESET_DELAY",
+                    "plusarg must be +SPAD_PARITY_ABORT_RESET_DELAY=<integer 0..3>")
+            if (reset_delay_override < 0 || reset_delay_override > 3)
+                `uvm_fatal("SPAD_PARITY_ABORT_RESET_DELAY",
+                    $sformatf("delay cycles %0d is out of range; legal range is 0..3", reset_delay_override))
+            reset_delay_cycles = reset_delay_override;
+        end else begin
+            reset_delay_cycles = $urandom_range(0, 3);
+        end
+        `uvm_info("SPAD_PARITY_ABORT_RESET_DELAY",
+            $sformatf("reset delay=%0d cycles (override=%0b)",
+                reset_delay_cycles, reset_delay_override_used), UVM_LOW)
         reset_timing_class = (reset_delay_cycles == 0) ? 0 : 1;
         cfg.inject_read_error = 1'b0;
         cfg.min_accepted_reads_before_response = 4;
