@@ -29,6 +29,13 @@ package ai_accel_uvm_types_pkg;
     localparam bit [31:0] CIMFORGE_REG_DMA_SPAD_ADDR= 32'h0000_00bc;
     localparam bit [31:0] CIMFORGE_REG_DMA_LENGTH   = 32'h0000_00c0;
 
+    // Dedicated V4 E2E lane check: 32-bit AXI transfers at non-128-bit-aligned
+    // addresses, while keeping the external address 32-bit aligned.
+    localparam bit [31:0] MIXED_E2E_NARROW_DDR_READ_ADDR  = 32'h0000_1ae4;
+    localparam bit [31:0] MIXED_E2E_NARROW_DDR_WRITE_ADDR = 32'h0000_1afc;
+    localparam bit [31:0] MIXED_E2E_NARROW_SPAD_ADDR      = 32'h0000_7c00;
+    localparam bit [31:0] MIXED_E2E_NARROW_DATA           = 32'h1357_9bdf;
+
     typedef enum int { AXI_AR, AXI_R, AXI_AW, AXI_W, AXI_B } ai_axi_event_e;
 
     // Keep a single package namespace, but one transaction class per source

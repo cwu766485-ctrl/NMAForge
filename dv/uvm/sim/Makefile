@@ -113,6 +113,7 @@ uvm_mixed_precision_ddr_e2e_cov_regress:
 				+MIXED_E2E_AW_GAP=$$(((run / 4) % 4)) \
 				+ntb_random_seed=$$seed -cm $(UVM_COV_METRICS) -cm_dir "$$db" -l "$$log"; \
 			grep -q '\[MIXED_E2E_PASS\]' "$$log" || { echo "ERROR: E2E pass marker missing in $$log"; exit 1; }; \
+			grep -q '\[MIXED_E2E_NARROW_AXI_PASS\]' "$$log" || { echo "ERROR: narrow-32 AXI read/write lane check missing in $$log"; exit 1; }; \
 			grep -q '\[MIXED_E2E_COVERAGE\]' "$$log" || { echo "ERROR: functional coverage report missing in $$log"; exit 1; }; \
 			grep -q "\[MIXED_E2E_VECTOR\].*SPAD_LAYOUT=$$order " "$$log" || { echo "ERROR: scratchpad layout $$order missing in $$log"; exit 1; }; \
 			grep -q "\[MIXED_E2E_INVALID_DESC_PASS\].*case=$$order " "$$log" || { echo "ERROR: invalid-descriptor case $$order missing in $$log"; exit 1; }; \
@@ -177,6 +178,7 @@ uvm_mixed_precision_ddr_e2e_random_cov_regress:
 				+MIXED_E2E_AXI_STALLS=1 +MIXED_E2E_AXI_TXN_JITTER=1 \
 				-cm $(UVM_COV_METRICS) -cm_dir "$$db" -l "$$log"; \
 			grep -q '\[MIXED_E2E_PASS\]' "$$log" || { echo "ERROR: E2E pass marker missing in $$log"; exit 1; }; \
+			grep -q '\[MIXED_E2E_NARROW_AXI_PASS\]' "$$log" || { echo "ERROR: narrow-32 AXI read/write lane check missing in $$log"; exit 1; }; \
 			grep -q '\[MIXED_E2E_COVERAGE\]' "$$log" || { echo "ERROR: functional coverage report missing in $$log"; exit 1; }; \
 			grep -Eq '\[MIXED_E2E_ORDER\].*permutation=[0-5]' "$$log" || { echo "ERROR: randomized descriptor order missing in $$log"; exit 1; }; \
 			grep -Eq '\[MIXED_E2E_VECTOR\].*SPAD_LAYOUT=[0-5] .*FP16 K=[1-4].*BF16 K=[1-4]' "$$log" || { echo "ERROR: randomized layout/FP lengths missing in $$log"; exit 1; }; \

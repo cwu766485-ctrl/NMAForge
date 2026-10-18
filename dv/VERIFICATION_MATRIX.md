@@ -1,5 +1,13 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 current-worktree V4 narrow-32 AXI E2E follow-up (HEAD `77b2ceb`):**
+> Added a scoreboard-checked 32-bit DMA read/write round-trip at non-128-bit-
+> aligned addresses. The 192-seed mixed-precision DDR E2E campaign passed
+> 192/192 with UVM warning/error/fatal=`0/0/0`; merged URG AXI4 and E2E groups
+> are both 64/64 (100%), and `ai_smoke` passed. This was run on a shared dirty
+> worktree, not a clean commit replay; raw RTL code coverage and the broader
+> V4/V5/A10 closure remain open. See the [narrow-32 run record](../docs/verification/A10_DV_RUN_2026-10-18_NARROW32_AXI.md).
+
 > **2026-10-18 exact-main V4 mixed-precision DDR E2E replay (`968c8bc`):**
 > The top-level 192-seed UVM campaign passed 192/192 with UVM
 > warning/error/fatal=`0/0/0`; selected E2E functional points and all four

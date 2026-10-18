@@ -286,6 +286,71 @@ class ai_fp16_ddr_e2e_seq extends uvm_sequence #(ai_axil_item);
             axil_write(CIMFORGE_REG_DMA_STATUS, 32'd2);
     endtask
 
+    task automatic run_narrow_axi32_roundtrip();
+        bit ok;
+        bit pass;
+        bit [31:0] value;
+        bit [31:0] expected_word;
+        int lane;
+        string mem_path;
+        uvm_hdl_data_t backdoor_value;
+
+        pass = 1'b1;
+        backdoor_value = '0;
+        backdoor_value[31:0] = MIXED_E2E_NARROW_DATA;
+        mem_path = $sformatf("tb_ai_accel_uvm.axi_mem_u.mem[%0d]",
+                             MIXED_E2E_NARROW_DDR_READ_ADDR >> 2);
+        ok = uvm_hdl_deposit(mem_path, backdoor_value);
+        if (!ok)
+            `uvm_fatal("MIXED_E2E_NARROW_AXI", $sformatf("failed to seed narrow-read word at %s", mem_path))
+
+        // Give the destination line distinct lane values so the narrow write
+        // check proves the selected WSTRB does not modify neighboring words.
+        for (lane = 0; lane < 4; lane++) begin
+            backdoor_value = '0;
+            backdoor_value[31:0] = 32'hbeef_0000 + lane;
+            mem_path = $sformatf("tb_ai_accel_uvm.axi_mem_u.mem[%0d]",
+                ((MIXED_E2E_NARROW_DDR_WRITE_ADDR & 32'hffff_fff0) >> 2) + lane);
+            ok = uvm_hdl_deposit(mem_path, backdoor_value);
+            if (!ok)
+                `uvm_fatal("MIXED_E2E_NARROW_AXI", $sformatf("failed to seed narrow-write lane at %s", mem_path))
+        end
+
+        dma_transfer(MIXED_E2E_NARROW_DDR_READ_ADDR,
+                     MIXED_E2E_NARROW_SPAD_ADDR, 1, 1'b0);
+        axil_read(CIMFORGE_SPAD_BASE + MIXED_E2E_NARROW_SPAD_ADDR, value);
+        if (value !== MIXED_E2E_NARROW_DATA) begin
+            pass = 1'b0;
+            `uvm_error("MIXED_E2E_NARROW_AXI",
+                $sformatf("narrow AXI read expected SPAD=0x%08h actual=0x%08h",
+                          MIXED_E2E_NARROW_DATA, value))
+        end
+
+        dma_transfer(MIXED_E2E_NARROW_DDR_WRITE_ADDR,
+                     MIXED_E2E_NARROW_SPAD_ADDR, 1, 1'b1);
+        for (lane = 0; lane < 4; lane++) begin
+            mem_path = $sformatf("tb_ai_accel_uvm.axi_mem_u.mem[%0d]",
+                ((MIXED_E2E_NARROW_DDR_WRITE_ADDR & 32'hffff_fff0) >> 2) + lane);
+            backdoor_value = '0;
+            ok = uvm_hdl_read(mem_path, backdoor_value);
+            if (!ok)
+                `uvm_fatal("MIXED_E2E_NARROW_AXI", $sformatf("failed to read narrow-write lane at %s", mem_path))
+            expected_word = (lane == 3) ? MIXED_E2E_NARROW_DATA :
+                                         (32'hbeef_0000 + lane);
+            if (backdoor_value[31:0] !== expected_word) begin
+                pass = 1'b0;
+                `uvm_error("MIXED_E2E_NARROW_AXI",
+                    $sformatf("narrow write lane %0d expected=0x%08h actual=0x%08h",
+                              lane, expected_word, backdoor_value[31:0]))
+            end
+        end
+
+        if (pass)
+            `uvm_info("MIXED_E2E_NARROW_AXI_PASS",
+                "AXI SIZE=32 read selected lane 1 into SPAD; SIZE=32 write updated lane 3 only",
+                UVM_LOW)
+    endtask
+
     task automatic write_dot_descriptor(
         input bit [31:0] desc_addr,
         input bit [15:0] task_id,
@@ -1091,6 +1156,7 @@ class ai_fp16_ddr_e2e_seq extends uvm_sequence #(ai_axil_item);
         dma_transfer(DDR_BF16_B_ADDR, layout_spad_addr(SPAD_BF16_B_ADDR), (vector_plan.bf16_length + 1) / 2, 1'b0);
         dma_transfer(DDR_INT8_A_ADDR, layout_spad_addr(SPAD_INT8_A_ADDR), 1, 1'b0);
         dma_transfer(DDR_INT8_B_ADDR, layout_spad_addr(SPAD_INT8_B_ADDR), 1, 1'b0);
+        run_narrow_axi32_roundtrip();
         enqueue_dot_command_batch();
         dma_transfer(DDR_Y_ADDR, layout_spad_addr(SPAD_Y_ADDR), 1, 1'b1);
         dma_transfer(DDR_BF16_Y_ADDR, layout_spad_addr(SPAD_BF16_Y_ADDR), 1, 1'b1);

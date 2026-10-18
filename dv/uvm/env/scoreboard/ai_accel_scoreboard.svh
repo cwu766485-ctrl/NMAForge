@@ -21,6 +21,7 @@ class ai_accel_scoreboard extends uvm_component;
     bit bf16_a_ar_seen, bf16_b_ar_seen;
     bit int8_a_ar_seen, int8_b_ar_seen;
     bit fp16_y_aw_seen, bf16_y_aw_seen, int8_y_aw_seen;
+    bit narrow_axi_read_ar_seen, narrow_axi_write_aw_seen;
     int unsigned dot_r_count, dot_w_count, dot_b_count;
     bit expect_dma_read_error;
     bit dma_error_ar_pending;
@@ -44,6 +45,7 @@ class ai_accel_scoreboard extends uvm_component;
     bit [3:0] dot_expected_rid_q[$];
     bit [3:0] dot_expected_bid_q[$];
     bit [31:0] dot_expected_wdata_q[$];
+    bit [1:0] dot_expected_wlane_q[$];
 
     function new(string name,uvm_component parent);
         super.new(name,parent);
@@ -73,6 +75,7 @@ class ai_accel_scoreboard extends uvm_component;
         bit [127:0] expected_rdata;
         bit [127:0] expected_rmask;
         bit [31:0] expected_wdata;
+        bit [1:0] expected_wlane;
         bit [3:0] expected_rid;
         bit [3:0] expected_bid;
         bit dma_error_transfer_ar;
@@ -122,10 +125,21 @@ class ai_accel_scoreboard extends uvm_component;
                     dma_error_transfer_ar = expect_dma_read_error &&
                         ((tr.addr == 64'h0000_0000_0000_1a90) ||
                          (tr.addr == 64'h0000_0000_0000_1ab0));
-                    if ((tr.size != 3'd4) || (tr.burst != 2'b01) ||
-                        (dma_error_transfer_ar ? (tr.len != 1) : (tr.len != 0)))
-                        `uvm_error("MIXED_E2E_AXI_AR", $sformatf("unexpected 128-bit INCR read shape, addr=0x%h size=%0d len=%0d burst=%0d", tr.addr, tr.size, tr.len, tr.burst))
-                    case (tr.addr)
+                    if (tr.addr == MIXED_E2E_NARROW_DDR_READ_ADDR) begin
+                        if ((tr.size != 3'd2) || (tr.len != 0) ||
+                            (tr.burst != 2'b01))
+                            `uvm_error("MIXED_E2E_AXI_AR", $sformatf("unexpected narrow-32 INCR read shape, addr=0x%h size=%0d len=%0d burst=%0d", tr.addr, tr.size, tr.len, tr.burst))
+                        if (narrow_axi_read_ar_seen)
+                            `uvm_error("MIXED_E2E_AXI_AR", "duplicate narrow-32 read")
+                        narrow_axi_read_ar_seen = 1'b1;
+                        dot_expected_rdata_q.push_back({64'd0, MIXED_E2E_NARROW_DATA, 32'd0});
+                        dot_expected_rmask_q.push_back({64'd0, 32'hffff_ffff, 32'd0});
+                        dot_expected_rid_q.push_back(tr.id);
+                    end else begin
+                        if ((tr.size != 3'd4) || (tr.burst != 2'b01) ||
+                            (dma_error_transfer_ar ? (tr.len != 1) : (tr.len != 0)))
+                            `uvm_error("MIXED_E2E_AXI_AR", $sformatf("unexpected 128-bit INCR read shape, addr=0x%h size=%0d len=%0d burst=%0d", tr.addr, tr.size, tr.len, tr.burst))
+                        case (tr.addr)
                         64'h0000_0000_0000_1a00: begin
                             if (fp16_a_ar_seen) `uvm_error("MIXED_E2E_AXI_AR", "duplicate FP16 operand-A DDR read")
                             fp16_a_ar_seen = 1'b1;
@@ -195,8 +209,9 @@ class ai_accel_scoreboard extends uvm_component;
                             dot_expected_rmask_q.push_back({96'd0, 32'hffff_ffff});
                             dot_expected_rid_q.push_back(tr.id);
                         end
-                        default: `uvm_error("MIXED_E2E_AXI_AR", $sformatf("unexpected DDR read address 0x%h", tr.addr))
-                    endcase
+                            default: `uvm_error("MIXED_E2E_AXI_AR", $sformatf("unexpected DDR read address 0x%h", tr.addr))
+                        endcase
+                    end
                 end
                 AXI_R: begin
                     if (dma_error_ar_pending && (tr.id == dma_error_expected_rid)) begin
@@ -234,9 +249,20 @@ class ai_accel_scoreboard extends uvm_component;
                     end
                 end
                 AXI_AW: begin
-                    if ((tr.size != 3'd4) || (tr.len != 0) ||
-                        (tr.burst != 2'b01))
-                        `uvm_error("MIXED_E2E_AXI_AW", $sformatf("expected single 128-bit INCR write, addr=0x%h size=%0d len=%0d burst=%0d", tr.addr, tr.size, tr.len, tr.burst))
+                    if (tr.addr == MIXED_E2E_NARROW_DDR_WRITE_ADDR) begin
+                        if ((tr.size != 3'd2) || (tr.len != 0) ||
+                            (tr.burst != 2'b01))
+                            `uvm_error("MIXED_E2E_AXI_AW", $sformatf("expected single narrow-32 INCR write, addr=0x%h size=%0d len=%0d burst=%0d", tr.addr, tr.size, tr.len, tr.burst))
+                        if (narrow_axi_write_aw_seen)
+                            `uvm_error("MIXED_E2E_AXI_AW", "duplicate narrow-32 write")
+                        narrow_axi_write_aw_seen = 1'b1;
+                        dot_expected_bid_q.push_back(tr.id);
+                        dot_expected_wdata_q.push_back(MIXED_E2E_NARROW_DATA);
+                        dot_expected_wlane_q.push_back(tr.addr[3:2]);
+                    end else begin
+                        if ((tr.size != 3'd4) || (tr.len != 0) ||
+                            (tr.burst != 2'b01))
+                            `uvm_error("MIXED_E2E_AXI_AW", $sformatf("expected single 128-bit INCR write, addr=0x%h size=%0d len=%0d burst=%0d", tr.addr, tr.size, tr.len, tr.burst))
                     case (tr.addr)
                         64'h0000_0000_0000_1a20: begin
                             if (fp16_y_aw_seen) `uvm_error("MIXED_E2E_AXI_AW", "duplicate FP16 result DDR write")
@@ -248,6 +274,7 @@ class ai_accel_scoreboard extends uvm_component;
                                 mixed_vector_plan.fp16_b0, mixed_vector_plan.fp16_b1,
                                 mixed_vector_plan.fp16_b2, mixed_vector_plan.fp16_b3,
                                 mixed_vector_plan.fp16_length));
+                            dot_expected_wlane_q.push_back(tr.addr[3:2]);
                         end
                         64'h0000_0000_0000_1a50: begin
                             if (bf16_y_aw_seen) `uvm_error("MIXED_E2E_AXI_AW", "duplicate BF16 result DDR write")
@@ -259,6 +286,7 @@ class ai_accel_scoreboard extends uvm_component;
                                 mixed_vector_plan.bf16_b0, mixed_vector_plan.bf16_b1,
                                 mixed_vector_plan.bf16_b2, mixed_vector_plan.bf16_b3,
                                 mixed_vector_plan.bf16_length));
+                            dot_expected_wlane_q.push_back(tr.addr[3:2]);
                         end
                         64'h0000_0000_0000_1a80: begin
                             if (int8_y_aw_seen) `uvm_error("MIXED_E2E_AXI_AW", "duplicate INT8 result DDR write")
@@ -269,9 +297,11 @@ class ai_accel_scoreboard extends uvm_component;
                                 mixed_vector_plan.int8_a2, mixed_vector_plan.int8_a3,
                                 mixed_vector_plan.int8_b0, mixed_vector_plan.int8_b1,
                                 mixed_vector_plan.int8_b2, mixed_vector_plan.int8_b3));
+                            dot_expected_wlane_q.push_back(tr.addr[3:2]);
                         end
                         default: `uvm_error("MIXED_E2E_AXI_AW", $sformatf("unexpected result DDR address 0x%h", tr.addr))
                     endcase
+                    end
                 end
                 AXI_W: begin
                     dot_w_count++;
@@ -279,9 +309,23 @@ class ai_accel_scoreboard extends uvm_component;
                         `uvm_error("MIXED_E2E_AXI_W", "write data observed without a predicted AW transaction")
                     end else begin
                         expected_wdata = dot_expected_wdata_q.pop_front();
-                        if ((tr.data[31:0] !== expected_wdata) ||
-                            (tr.strb[3:0] != 4'hf) || !tr.last)
-                            `uvm_error("MIXED_E2E_AXI_W", $sformatf("expected result 0x%08h with full low word strobe/last, got data=0x%08h strb=%04h last=%0b", expected_wdata, tr.data[31:0], tr.strb, tr.last))
+                        if (dot_expected_wlane_q.size() == 0) begin
+                            `uvm_error("MIXED_E2E_AXI_W", "write data observed without an expected byte lane")
+                        end else begin
+                            expected_wlane = dot_expected_wlane_q.pop_front();
+                            case (expected_wlane)
+                                2'd0: if ((tr.data[31:0] !== expected_wdata) || (tr.strb[3:0] != 4'hf))
+                                    `uvm_error("MIXED_E2E_AXI_W", $sformatf("lane0 expected=0x%08h strb=f actual data=0x%08h strb=%04h", expected_wdata, tr.data[31:0], tr.strb))
+                                2'd1: if ((tr.data[63:32] !== expected_wdata) || (tr.strb[7:4] != 4'hf))
+                                    `uvm_error("MIXED_E2E_AXI_W", $sformatf("lane1 expected=0x%08h strb=f actual data=0x%08h strb=%04h", expected_wdata, tr.data[63:32], tr.strb))
+                                2'd2: if ((tr.data[95:64] !== expected_wdata) || (tr.strb[11:8] != 4'hf))
+                                    `uvm_error("MIXED_E2E_AXI_W", $sformatf("lane2 expected=0x%08h strb=f actual data=0x%08h strb=%04h", expected_wdata, tr.data[95:64], tr.strb))
+                                default: if ((tr.data[127:96] !== expected_wdata) || (tr.strb[15:12] != 4'hf))
+                                    `uvm_error("MIXED_E2E_AXI_W", $sformatf("lane3 expected=0x%08h strb=f actual data=0x%08h strb=%04h", expected_wdata, tr.data[127:96], tr.strb))
+                            endcase
+                            if (!tr.last)
+                                `uvm_error("MIXED_E2E_AXI_W", "single-beat result write did not assert WLAST")
+                        end
                     end
                 end
                 AXI_B: begin
@@ -308,18 +352,20 @@ class ai_accel_scoreboard extends uvm_component;
             if (!fp16_a_ar_seen || !fp16_b_ar_seen ||
                 !bf16_a_ar_seen || !bf16_b_ar_seen ||
                 !int8_a_ar_seen || !int8_b_ar_seen ||
-                (dot_r_count != 7) || (dot_expected_rdata_q.size() != 0) ||
+                (dot_r_count != 8) || (dot_expected_rdata_q.size() != 0) ||
                 (dot_expected_rmask_q.size() != 0) ||
                 (dot_expected_rid_q.size() != 0) || !fp16_y_aw_seen ||
-                !bf16_y_aw_seen || !int8_y_aw_seen || (dot_w_count != 3) || (dot_b_count != 3) ||
+                !bf16_y_aw_seen || !int8_y_aw_seen || !narrow_axi_read_ar_seen ||
+                !narrow_axi_write_aw_seen || (dot_w_count != 4) || (dot_b_count != 4) ||
                 (dot_expected_bid_q.size() != 0) || (dot_expected_wdata_q.size() != 0) ||
+                (dot_expected_wlane_q.size() != 0) ||
                 (expect_dma_read_error &&
                  (dma_error_ar_count != 2 || dma_error_r_count != 2 || dma_error_ar_pending ||
                   dma_error_position_cg.get_coverage() != 100.0)) ||
                 !dma_reset_probe_ar_seen || !ddr_reset_recovery_ar_seen)
                 `uvm_error("MIXED_E2E_AXI_SUMMARY", $sformatf("incomplete mixed DDR path FP16_AR=%0b/%0b BF16_AR=%0b/%0b INT8_AR=%0b/%0b R=%0d W=%0d B=%0d pending_R=%0d pending_B=%0d AW=%0b/%0b/%0b DMA_ERR_R=%0d pending_err=%0b DMA_RESET_AR=%0b DDR_RESET_RECOVERY_AR=%0b", fp16_a_ar_seen, fp16_b_ar_seen, bf16_a_ar_seen, bf16_b_ar_seen, int8_a_ar_seen, int8_b_ar_seen, dot_r_count, dot_w_count, dot_b_count, dot_expected_rdata_q.size(), dot_expected_bid_q.size(), fp16_y_aw_seen, bf16_y_aw_seen, int8_y_aw_seen, dma_error_r_count, dma_error_ar_pending, dma_reset_probe_ar_seen, ddr_reset_recovery_ar_seen))
             else
-                `uvm_info("MIXED_E2E_AXI_SUMMARY", $sformatf("checked six DDR operand reads, one post-reset recovery read, three result writes, two two-beat DMA SLVERR bursts count=%0d, and one reset-interrupted DMA AR", dma_error_r_count), UVM_LOW)
+                `uvm_info("MIXED_E2E_AXI_SUMMARY", $sformatf("checked six operand reads, one post-reset recovery read, one narrow-32 read, three result writes, one narrow-32 write, two two-beat DMA SLVERR bursts count=%0d, and one reset-interrupted DMA AR", dma_error_r_count), UVM_LOW)
         end
         if (check_external_macro_fetch) begin
             if ((external_macro_fetch_count != expected_external_macro_fetch_count) ||
