@@ -683,3 +683,48 @@ without proof/counterexample. Post-timeout audit found no remaining formal
 processes. Both are inconclusive; do not compose this unproven lemma into a
 full-domain parity disposition. Artifacts and exact commands are in the
 [2026-10-18 run record](../../../../../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md).
+
+### Two-cycle SPAD response contract probes (2026-10-18)
+
+The top-level memory fabric documents a fixed two-cycle scalar read response:
+the scratchpad has two registered read stages and the shared arbiter carries
+the client response tag through a two-stage pipeline. A separate core-level
+harness generates `spad_rsp_valid` two sampled clocks after accepted
+`read_fire`; request back-pressure remains unconstrained. Abort/watchdog and
+read-protection errors are disabled to isolate parity; response data and the
+parity sideband are otherwise abstract. This models the core-facing timing
+contract, not the complete arbiter/SRAM fabric.
+
+Each of the following VC Formal V-2023.12-SP2 runs had a 180 s limit:
+
+```sh
+make -C dv/block/compute/fp/formal parity-2cycle-spad-final-pair VCF=vcf \
+  OUT=/tmp/nmaforge_a10_fp_2cycle_spad_final_pair_20261018 FORMAL_PROBE_TIMEOUT=180
+make -C dv/block/compute/fp/formal parity-2cycle-spad-writeback VCF=vcf \
+  OUT=/tmp/nmaforge_a10_fp_2cycle_spad_writeback_20261018 FORMAL_PROBE_TIMEOUT=180
+make -C dv/block/compute/fp/formal parity-2cycle-spad-last-compute VCF=vcf \
+  OUT=/tmp/nmaforge_a10_fp_2cycle_spad_last_compute_20261018 FORMAL_PROBE_TIMEOUT=180
+```
+
+All three had clean setup and non-vacuous properties, but remained `checking`
+until timeout with no proof or counterexample. A process audit found no
+leftover VCF/VC Static/Simon processes. Fixed two-cycle timing did not close
+the final-pair, final-compute, or `ST_WRITE` parity properties. These are
+inconclusive results and do not waive or close V1-FP-04; latency-randomized
+block UVM remains necessary.
+
+The length-1..4 wrapper adds `start -> length <= 4` and reuses the same
+two-cycle response model. Under its stated no-abort/no-watchdog/no-protection
+fault assumptions, the three selected properties each proved non-vacuously
+with clean setup:
+
+| Property | Result | Safe depth |
+| --- | --- | ---: |
+| `ap_final_pair_not_ready_on_parity_response` | Proven | 189 |
+| `ap_writeback_excludes_pending_parity` | Proven | 27 |
+| `ap_new_parity_blocks_last_compute` | Proven | 194 |
+
+This is short-vector evidence only. It does not establish these properties
+for all legal 16-bit lengths or under the unconstrained response-latency model,
+and it does not close V1-FP-04. Exact commands and logs are in the
+[2026-10-18 run record](../../../../../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-fp-parity-probes-with-two-cycle-spad-response-model).

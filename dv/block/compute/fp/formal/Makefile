@@ -5,7 +5,7 @@ VCF ?= vcf
 FORMAL_PROBE_TIMEOUT ?= 150
 FORMAL_TCL := $(abspath run_vcf.tcl)
 
-.PHONY: run parity-probe parity-reach parity-exclusion parity-cutoff-bound parity-frontier parity-bounded parity-bounded-new-parity-last-compute parity-bounded-final-ready-pair-frontier check-parity-bounded parity-full-domain parity-full-cutoff parity-full-accounting check-parity-full-accounting parity-full-index-bound parity-full-response-bound parity-full-accepted-count-bound parity-full-response-assume parity-full-cutoff-assume parity-full-lifecycle-assume parity-full-progress-assume parity-full-writeback-assume parity-full-frontier-assume parity-full-ready-frontier-assume parity-full-pair-tag-match parity-full-current-pair-tag parity-full-tag-response-bound parity-full-current-pair-tag-control-abstract parity-full-writeback-control-abstract parity-full-static-slot-tags parity-full-transition-lemmas parity-full-local-transition-lemmas parity-full-pending-last-compute parity-full-new-parity-last-compute parity-full-final-pair-not-ready-on-parity-response parity-full-final-pair-cover parity-full-final-ready-pair-frontier parity-full-parity-cutoff-last-element parity-full-last-compute-write-transition parity-full-last-compute-write-state
+.PHONY: run parity-probe parity-reach parity-exclusion parity-cutoff-bound parity-frontier parity-bounded parity-bounded-new-parity-last-compute parity-bounded-final-ready-pair-frontier check-parity-bounded parity-full-domain parity-full-cutoff parity-full-accounting check-parity-full-accounting parity-full-index-bound parity-full-response-bound parity-full-accepted-count-bound parity-full-response-assume parity-full-cutoff-assume parity-full-lifecycle-assume parity-full-progress-assume parity-full-writeback-assume parity-full-frontier-assume parity-full-ready-frontier-assume parity-full-pair-tag-match parity-full-current-pair-tag parity-full-tag-response-bound parity-full-current-pair-tag-control-abstract parity-full-writeback-control-abstract parity-full-static-slot-tags parity-full-transition-lemmas parity-full-local-transition-lemmas parity-full-pending-last-compute parity-full-new-parity-last-compute parity-full-final-pair-not-ready-on-parity-response parity-full-final-pair-cover parity-full-final-ready-pair-frontier parity-full-parity-cutoff-last-element parity-full-last-compute-write-transition parity-full-last-compute-write-state parity-2cycle-spad-final-pair parity-2cycle-spad-writeback parity-2cycle-spad-last-compute parity-2cycle-spad-small-final-pair parity-2cycle-spad-small-writeback parity-2cycle-spad-small-last-compute
 run:
 	mkdir -p "$(OUT)"
 	cd "$(OUT)" && $(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
@@ -343,6 +343,100 @@ parity-full-final-ready-pair-frontier:
 		{ echo "Final ready-pair frontier setup gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
 	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
 		{ echo "Final ready-pair frontier formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
+
+# The real top-level SPAD returns each accepted scalar read exactly two clocks
+# later. This focused proof uses that integration contract rather than the
+# block harness's arbitrary response delay; it does not replace latency-random
+# simulation or the unconstrained-latency formal target.
+parity-2cycle-spad-final-pair:
+	mkdir -p "$(OUT)"
+	cd "$(OUT)" && PARITY_FORMAL_PROPERTIES=ap_final_pair_not_ready_on_parity_response \
+		timeout --kill-after=5s "$(FORMAL_PROBE_TIMEOUT)s" \
+		$(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
+		-f "$(abspath run_parity_2cycle_spad.tcl)" -output_log_file vc_formal.log
+	@grep -Fq -- "- # proven       : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "2-cycle-SPAD final-pair parity proof gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq -- "- # non_vacuous  : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "2-cycle-SPAD final-pair parity vacuity gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq "No setup issues found" "$(OUT)/vc_formal.log" || \
+		{ echo "2-cycle-SPAD final-pair parity setup gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
+		{ echo "2-cycle-SPAD final-pair parity formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
+
+parity-2cycle-spad-writeback:
+	mkdir -p "$(OUT)"
+	cd "$(OUT)" && PARITY_FORMAL_PROPERTIES=ap_writeback_excludes_pending_parity \
+		timeout --kill-after=5s "$(FORMAL_PROBE_TIMEOUT)s" \
+		$(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
+		-f "$(abspath run_parity_2cycle_spad.tcl)" -output_log_file vc_formal.log
+	@grep -Fq -- "- # proven       : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "2-cycle-SPAD parity writeback proof gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq -- "- # non_vacuous  : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "2-cycle-SPAD parity writeback vacuity gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq "No setup issues found" "$(OUT)/vc_formal.log" || \
+		{ echo "2-cycle-SPAD parity writeback setup gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
+		{ echo "2-cycle-SPAD parity writeback formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
+
+parity-2cycle-spad-last-compute:
+	mkdir -p "$(OUT)"
+	cd "$(OUT)" && PARITY_FORMAL_PROPERTIES=ap_new_parity_blocks_last_compute \
+		timeout --kill-after=5s "$(FORMAL_PROBE_TIMEOUT)s" \
+		$(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
+		-f "$(abspath run_parity_2cycle_spad.tcl)" -output_log_file vc_formal.log
+	@grep -Fq -- "- # proven       : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "2-cycle-SPAD last-compute parity proof gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq -- "- # non_vacuous  : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "2-cycle-SPAD last-compute parity vacuity gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq "No setup issues found" "$(OUT)/vc_formal.log" || \
+		{ echo "2-cycle-SPAD last-compute parity setup gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
+		{ echo "2-cycle-SPAD last-compute parity formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
+
+parity-2cycle-spad-small-final-pair:
+	mkdir -p "$(OUT)"
+	cd "$(OUT)" && PARITY_FORMAL_PROPERTIES=ap_final_pair_not_ready_on_parity_response \
+		timeout --kill-after=5s "$(FORMAL_PROBE_TIMEOUT)s" \
+		$(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
+		-f "$(abspath run_parity_2cycle_spad_small.tcl)" -output_log_file vc_formal.log
+	@grep -Fq -- "- # proven       : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Bounded 2-cycle-SPAD final-pair proof gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq -- "- # non_vacuous  : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Bounded 2-cycle-SPAD final-pair vacuity gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq "No setup issues found" "$(OUT)/vc_formal.log" || \
+		{ echo "Bounded 2-cycle-SPAD final-pair setup gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
+		{ echo "Bounded 2-cycle-SPAD final-pair formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
+
+parity-2cycle-spad-small-writeback:
+	mkdir -p "$(OUT)"
+	cd "$(OUT)" && PARITY_FORMAL_PROPERTIES=ap_writeback_excludes_pending_parity \
+		timeout --kill-after=5s "$(FORMAL_PROBE_TIMEOUT)s" \
+		$(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
+		-f "$(abspath run_parity_2cycle_spad_small.tcl)" -output_log_file vc_formal.log
+	@grep -Fq -- "- # proven       : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Bounded 2-cycle-SPAD parity writeback proof gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq -- "- # non_vacuous  : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Bounded 2-cycle-SPAD parity writeback vacuity gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq "No setup issues found" "$(OUT)/vc_formal.log" || \
+		{ echo "Bounded 2-cycle-SPAD parity writeback setup gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
+		{ echo "Bounded 2-cycle-SPAD parity writeback formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
+
+parity-2cycle-spad-small-last-compute:
+	mkdir -p "$(OUT)"
+	cd "$(OUT)" && PARITY_FORMAL_PROPERTIES=ap_new_parity_blocks_last_compute \
+		timeout --kill-after=5s "$(FORMAL_PROBE_TIMEOUT)s" \
+		$(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
+		-f "$(abspath run_parity_2cycle_spad_small.tcl)" -output_log_file vc_formal.log
+	@grep -Fq -- "- # proven       : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Bounded 2-cycle-SPAD last-compute parity proof gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq -- "- # non_vacuous  : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Bounded 2-cycle-SPAD last-compute parity vacuity gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq "No setup issues found" "$(OUT)/vc_formal.log" || \
+		{ echo "Bounded 2-cycle-SPAD last-compute parity setup gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
+		{ echo "Bounded 2-cycle-SPAD last-compute parity formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
 
 parity-full-parity-cutoff-last-element:
 	mkdir -p "$(OUT)"
