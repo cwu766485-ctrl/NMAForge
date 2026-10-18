@@ -35,6 +35,8 @@
 
 > **2026-10-18 final-pair parity reachability follow-up (working source based on `decb969`):** Added diagnostic covers for a parity response coinciding with `pair_ready` at the final element. VC Formal `V-2023.12-SP2` classified that overlap as `uncoverable` for lengths ≤4 (safe depth 41), but the unrestricted 16-bit cover remained `checking` through 180 s and timed out. This is not full-domain unreachability and does not close V1-FP-04. The canonical focused FP target still passed 12/12 assertions and 2/2 covers after Tcl selector changes. VCS/UVM current-commit replay and A10 closure remain open. See the [run record](A10_DV_RUN_2026-10-18_MAIN452.md#final-pair-parity-reachability-cover-2026-10-18).
 
+> **2026-10-18 final-ready-pair frontier lemma:** A verification-only cutpoint asserting `last_element && pair_ready -> response_word_index >= words_needed` was non-vacuous but timed out in both full-domain (180 s) and bounded length-1..4 (180 s, then 360 s) VC Formal runs. It has no counterexample, but no proof either; do not rely on it for parity disposition. V1-FP-04 remains open. Exact probes and process audit are in the [run record](A10_DV_RUN_2026-10-18_MAIN452.md#final-ready-pair-response-frontier-lemma-probes-2026-10-18).
+
 > **2026-10-18 V3 downstream AXI backpressure increment:** Added bounded
 > DMA R-channel `RREADY` stall coverage: hold the DUT-side ready low for 16
 > cycles during valid response, check stable response payload, release, and

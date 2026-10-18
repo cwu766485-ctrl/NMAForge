@@ -92,6 +92,10 @@ module ai_fp_core_parity_bounded_formal_top #(
         @(posedge clk) disable iff (!resetn)
         (dut.response_parity_failure && dut.last_element) |->
           (dut.memory_error_cutoff_now <= dut.element_index_r));
+    ap_final_ready_pair_requires_response_frontier: assert property (
+        @(posedge clk) disable iff (!resetn)
+        ((dut.state_r == ST_RUN) && dut.last_element && dut.pair_ready) |->
+        ({1'b0, dut.response_word_index_r} >= words_needed));
     ap_new_parity_blocks_last_compute: assert property (
         @(posedge clk) disable iff (!resetn)
         (dut.response_parity_failure && dut.last_element) |->
@@ -481,6 +485,13 @@ module ai_fp_core_parity_full_lifecycle_assume_top (
         ((dut.state_r == 4'd1) && dut.pair_ready) |->
         (dut.response_word_index_r >
          pair_a_word_tag_r[dut.compute_slot]));
+    // At the final element the selected packed word is the last requested
+    // word, so a ready pair implies both operand responses for the complete
+    // descriptor have already retired and advanced the response cursor.
+    ap_final_ready_pair_requires_response_frontier: assert property (
+        @(posedge clk) disable iff (!resetn)
+        ((dut.state_r == ST_RUN) && dut.last_element && dut.pair_ready) |->
+        ({1'b0, dut.response_word_index_r} >= words_needed));
     ap_parity_progress_stays_before_cutoff: assert property (
         @(posedge clk) disable iff (!resetn)
         (dut.pending_error_r == ERR_PARITY) |->

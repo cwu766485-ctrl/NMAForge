@@ -5,7 +5,7 @@ VCF ?= vcf
 FORMAL_PROBE_TIMEOUT ?= 150
 FORMAL_TCL := $(abspath run_vcf.tcl)
 
-.PHONY: run parity-probe parity-reach parity-exclusion parity-cutoff-bound parity-frontier parity-bounded parity-bounded-new-parity-last-compute check-parity-bounded parity-full-domain parity-full-cutoff parity-full-accounting check-parity-full-accounting parity-full-index-bound parity-full-response-bound parity-full-accepted-count-bound parity-full-response-assume parity-full-cutoff-assume parity-full-lifecycle-assume parity-full-progress-assume parity-full-writeback-assume parity-full-frontier-assume parity-full-ready-frontier-assume parity-full-pair-tag-match parity-full-current-pair-tag parity-full-tag-response-bound parity-full-current-pair-tag-control-abstract parity-full-writeback-control-abstract parity-full-static-slot-tags parity-full-transition-lemmas parity-full-local-transition-lemmas parity-full-pending-last-compute parity-full-new-parity-last-compute parity-full-final-pair-not-ready-on-parity-response parity-full-final-pair-cover parity-full-parity-cutoff-last-element parity-full-last-compute-write-transition parity-full-last-compute-write-state
+.PHONY: run parity-probe parity-reach parity-exclusion parity-cutoff-bound parity-frontier parity-bounded parity-bounded-new-parity-last-compute parity-bounded-final-ready-pair-frontier check-parity-bounded parity-full-domain parity-full-cutoff parity-full-accounting check-parity-full-accounting parity-full-index-bound parity-full-response-bound parity-full-accepted-count-bound parity-full-response-assume parity-full-cutoff-assume parity-full-lifecycle-assume parity-full-progress-assume parity-full-writeback-assume parity-full-frontier-assume parity-full-ready-frontier-assume parity-full-pair-tag-match parity-full-current-pair-tag parity-full-tag-response-bound parity-full-current-pair-tag-control-abstract parity-full-writeback-control-abstract parity-full-static-slot-tags parity-full-transition-lemmas parity-full-local-transition-lemmas parity-full-pending-last-compute parity-full-new-parity-last-compute parity-full-final-pair-not-ready-on-parity-response parity-full-final-pair-cover parity-full-final-ready-pair-frontier parity-full-parity-cutoff-last-element parity-full-last-compute-write-transition parity-full-last-compute-write-state
 run:
 	mkdir -p "$(OUT)"
 	cd "$(OUT)" && $(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
@@ -273,6 +273,21 @@ parity-full-new-parity-last-compute:
 	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
 		{ echo "New-parity final-compute formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
 
+parity-bounded-final-ready-pair-frontier:
+	mkdir -p "$(OUT)"
+	cd "$(OUT)" && PARITY_FORMAL_PROPERTIES=ap_final_ready_pair_requires_response_frontier \
+		timeout --kill-after=5s "$(FORMAL_PROBE_TIMEOUT)s" \
+		$(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
+		-f "$(abspath run_parity_bounded.tcl)" -output_log_file vc_formal.log
+	@grep -Fq -- "- # proven       : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Bounded final ready-pair frontier proof gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq -- "- # non_vacuous  : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Bounded final ready-pair frontier vacuity gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq "No setup issues found" "$(OUT)/vc_formal.log" || \
+		{ echo "Bounded final ready-pair frontier setup gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
+		{ echo "Bounded final ready-pair frontier formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
+
 parity-full-final-pair-not-ready-on-parity-response:
 	mkdir -p "$(OUT)"
 	cd "$(OUT)" && PARITY_FORMAL_PROPERTIES=ap_final_pair_not_ready_on_parity_response \
@@ -311,6 +326,23 @@ parity-full-final-pair-cover:
 	else \
 		echo "FINAL_PAIR_PARITY_COVER_NOT_CLASSIFIED; inspect $(OUT)/vc_formal.log"; exit 1; \
 	fi
+
+# A final ready pair can only exist after both operands' last packed words
+# have retired; prove this local frontier fact before composing parity safety.
+parity-full-final-ready-pair-frontier:
+	mkdir -p "$(OUT)"
+	cd "$(OUT)" && PARITY_FORMAL_PROPERTIES=ap_final_ready_pair_requires_response_frontier \
+		timeout --kill-after=5s "$(FORMAL_PROBE_TIMEOUT)s" \
+		$(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
+		-f "$(abspath run_parity_full_lifecycle_assume.tcl)" -output_log_file vc_formal.log
+	@grep -Fq -- "- # proven       : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Final ready-pair frontier proof gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq -- "- # non_vacuous  : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Final ready-pair frontier vacuity gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq "No setup issues found" "$(OUT)/vc_formal.log" || \
+		{ echo "Final ready-pair frontier setup gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
+		{ echo "Final ready-pair frontier formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
 
 parity-full-parity-cutoff-last-element:
 	mkdir -p "$(OUT)"

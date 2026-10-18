@@ -666,3 +666,20 @@ Make target now exits successfully while explicitly printing
 second full-domain proof. The canonical FP target was also rerun after Tcl
 selector changes and passed its unchanged 12 assertions and 2 covers. Details:
 [2026-10-18 current-main run record](../../../../../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md).
+
+### Final-ready-pair response-frontier lemma
+
+Added `ap_final_ready_pair_requires_response_frontier` to both the full-domain
+lifecycle wrapper and the existing length-1..4 bounded wrapper. The intended
+lemma is: while in `ST_RUN`, if the current element is the last one and its
+operand pair is ready, then `response_word_index_r >= words_needed`. This is a
+candidate cutpoint for ruling out a parity response on that same final pair;
+it is not assumed by the proof.
+
+The full-domain target had clean setup and a non-vacuous antecedent, but no
+proof/counterexample by 180 s. The bounded target likewise had clean setup and
+a non-vacuous antecedent, but timed out first at 180 s and again at 360 s,
+without proof/counterexample. Post-timeout audit found no remaining formal
+processes. Both are inconclusive; do not compose this unproven lemma into a
+full-domain parity disposition. Artifacts and exact commands are in the
+[2026-10-18 run record](../../../../../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md).
