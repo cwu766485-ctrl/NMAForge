@@ -1,5 +1,15 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-18 V5 AXI4 coverage-model correction (exact replay at `9e05dfc`):**
+> The AXI4 event coverpoint is now typed to its five-value protocol enum, and
+> address-only size/length fields are sampled only on AR/AW. The 192-seed DDR
+> E2E campaign and top smoke passed on an isolated exact-main snapshot. URG
+> aggregate coverage is 95.57%; all five AXI4 event bins and selected E2E and
+> transaction-level stall/latency groups hit 100%. Narrow-32 transfers and
+> non-OKAY AXI-Lite responses remain unexercised; this is a coverage-model
+> correction and selected V4 evidence, not V5/A10 closure. See the [coverage
+> correction run record](A10_DV_RUN_2026-10-18_AXI_COVFIX.md).
+
 > **2026-10-18 exact-main V4 DDR E2E replay (`968c8bc`):** The 192-seed
 > top-level campaign passed 192/192 at pushed `main`; all logs had UVM
 > warning/error/fatal=`0/0/0`, and the selected E2E functional points and four
