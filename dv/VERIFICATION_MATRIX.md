@@ -1,5 +1,14 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 exact-current-main V2 CP replay at `e24b770`:** The full CP
+> scenario suite passed across 72/72 mixed error/abort/reset profiles (three
+> seeds × 24 profiles), each with 31/31 scenario bins and UVM severity
+> `0/0/0`. URG: `cp_cg` 61/61 variables + 34/34 crosses, reset cutpoints
+> 4/4, kind×delay×reset cross 24/24, abort timing 7/7; 11 assertions
+> succeeded, none failed/incomplete, two UVM RAL internals had no attempts,
+> and 2/2 covers matched. This closes only the exercised mixed-reset slice,
+> not full V2/A10. See the [exact-main run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v2-command-processor-mixed-reset-replay-at-e24b770).
+
 > **2026-10-18 exact-current-main V4 randomized DDR E2E at `3345286`:** The
 > 192-seed campaign passed 192/192 at the exact pushed SHA with zero nonzero
 > UVM warning/error/fatal logs. URG `e2e_cg`, four per-transaction AXI gap/

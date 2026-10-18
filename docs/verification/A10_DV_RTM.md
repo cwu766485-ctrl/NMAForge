@@ -1,5 +1,14 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-18 V2 exact-main CP mixed-reset replay (`e24b770`):** Current
+> pushed main passed 72/72 complete CP-suite profiles (3 seeds × 24 error,
+> abort-delay, and completion-reset combinations), each with all 31 scenario
+> bins and UVM warning/error/fatal=`0/0/0`. URG `cp_cg` was 61/61 variables
+> + 34/34 crosses; reset bins 4/4, kind×delay×reset 24/24, abort timing
+> 7/7. Eleven assertions succeeded, none failed/incomplete, two UVM RAL
+> internals had no attempts, and both covers matched. This is a selected V2
+> slice, not full command-lifecycle or A10 closure. See the [run evidence](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v2-command-processor-mixed-reset-replay-at-e24b770).
+
 > **2026-10-18 V4 exact-main randomized E2E update (`3345286`):** The
 > requirements exercised by `uvm_mixed_precision_ddr_e2e_random_cov_regress`
 > were replayed at the exact pushed SHA: 192/192 seeds passed with zero
