@@ -24,6 +24,8 @@
 
 > **DMA 最新复跑（2026-10-18 exact-current-main）：** GitHub `main` SHA `3310d3d45cd9ed0168f7855eb253984c2a38387b` 上，DMA block UVM **16/16 PASS**，每项 warning/error/fatal=`0/0/0`，随机压力 20/20；URG `dma_cmd_cg` 14/14 variables + 5/5 crosses，11/11 named DMA DUT SVA 有真实成功、0 failure/incomplete，另有一个 UVM component-name check 成功、两个 UVM RAL no-attempt。DUT-only `ai_axi128_dma` line/condition/toggle/FSM/branch=`93.48/71.04/36.69/53.57/86.92%`。同一 SHA 的 top `ai_smoke` 通过。DMA RTL 残余覆盖、完整 V3 fault/abort/reset 与 fairness 及 A10/V5 总体验收仍未关闭；详见 [A10 RTM](A10_DV_RTM.md) 与 [2026-10-18 run record](A10_DV_RUN_2026-10-18_MAIN452.md)。
 
+> **2026-10-18 clean pushed-SHA replay (`ad88b39`):** On Rocky 8.10 / VCS+URG V-2023.12-SP1, a detached clean worktree passed FP dot UVM (3 seeds × 200 random vectors; 484/484 bit-exact checks per seed), CP/Completion coverage (72/72 profiles; 61/61 variables, 34/34 crosses, reset 4/4, reset cross 24/24, abort timing 7/7), DMA UVM (19/19 tests; 55 scoreboard-pass markers), Control UVM (9/9 tests), and top `ai_smoke` (`TEST PASS`). Nonzero UVM severity was zero in the audited runs, and the worktree remained clean. This closes selected-subset reproducibility at `ad88b39`, not A10 V1–V5: residual FP formal, CP raw RTL coverage, DMA/SPAD fairness and broader interactions, top-level coverage disposition, and V5 review remain open. See [clean-SHA replay record](A10_DV_RUN_2026-10-18_CLEAN_AD88B39.md).
+
 ## 1. 验证目标
 
 本计划用于把当前已经完成的 RTL、数字 CNM 数据路径、统一 DMA、队列和 Transformer 微工作负载，推进到可审计、可回归、可交付的验证状态。验证必须同时证明：
