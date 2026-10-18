@@ -637,3 +637,26 @@ Fresh `dot-core-test` and three-seed `dot-uvm-regress` passed; each seed scored 
 After the user confirmed the current implementation's two-entry contract, rechecked the synchronized SPEC/architecture statements against the mixed BF16/FP16 dot UVM. Command: `make -C dv/block/compute/fp/sim dot-uvm-run DOT_RANDOM_SEED=20261015 DOT_RANDOM_COUNT=64 DOT_UVM_OUT_DIR=/tmp/nmaforge_a10_outstanding2_verify_20261016`. VCS `V-2023.12-SP1_Full64`; scoreboard passed 204/204 bit-exact transactions with UVM warning/error/fatal=`0/0/0`. The coverage check explicitly errors unless the observed peak is at least two outstanding reads; simulation passed that gate. This confirms the testbench exercised the documented 2-entry contract. The endpoint remains ordered responses without an independent read ID.
 
 > **2026-10-18 V1-FP-04 follow-up:** A verification-only final-pair ownership assertion was selected alone under the full-domain lifecycle assumptions. VC Formal `V-2023.12-SP2` setup was clean and its antecedent non-vacuous, but the proof remained checking through 180 s (Make exit 124), without proof or counterexample; post-timeout audit found no residual VCF process. V1-FP-04 remains open. An earlier overly strong diagnostic assertion that `compute_allowed` must be low on the parity-response cycle was falsified at depth 3 and removed after review: the RTL intentionally leaves this combinational signal permissive while `pending_error_r` is still `ERR_NONE`; this was an invalid assertion contract, not an RTL bug. No product RTL, SPEC, or ABI changed. Exact run and disposition: [2026-10-18 main run record](A10_DV_RUN_2026-10-18_MAIN452.md#v1-fp-04-final-pair-formal-probe-2026-10-18); formal details: [FP formal README](../../dv/block/compute/fp/formal/README.md).
+
+## 2026-10-18 CP completion-availability condition disposition
+
+The latest CP three-seed × 24-profile UVM/URG campaign passed 72/72 profiles
+with scenario bins 31/31 and UVM warning/error/fatal=`0/0/0`; `cp_cg` reached
+61/61 variables + 34/34 crosses. CP raw condition coverage is 237/252
+(94.05%). At all seven `completion_required_r && completion_available` sites,
+the `(1,0)` outcome is now exercised by full-CPLQ compatibility-event tests;
+the `(0,1)` outcome remains raw `Not Covered` in URG.
+
+The latter is dispositioned under the integrated configuration contract:
+Control UVM now verifies that a busy-time `CPL_SIZE` write returns SLVERR and
+leaves the value unchanged. VC Formal `V-2023.12-SP2` then proves, under the
+explicit assumption that `cplq_size` is stable while CP `busy` is asserted,
+that an active queued FETCH/DECODE or macro RUN state with
+`completion_available=1` necessarily has `completion_required_r=1`. The CP +
+real completion-writer harness reports 6/6 assertions proven and non-vacuous,
+3/3 covers reached, and clean setup. This is compositional evidence, not a
+whole-top formal proof; the seven URG raw outcomes remain reported as unhit.
+Control regression passed all 9 tests with UVM severity `0/0/0`, and top
+`ai_smoke` passed. No product RTL/SPEC/ABI changed. Other CP raw condition and
+toggle misses, broader V2/V5 closure, and frozen-SHA clean replay remain open.
+See the [detailed run record](A10_DV_RUN_2026-10-18_CP_COMPLETION_AVAILABILITY.md).

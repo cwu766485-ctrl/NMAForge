@@ -26,7 +26,8 @@ check_fv -property {
     cp_completion_ownership_formal_top.ap_completion_done_owned_by_cpl
     cp_completion_ownership_formal_top.ap_decode_abort_pending_requires_live_abort
     cp_completion_ownership_formal_top.ap_decode_compute_busy_blocks_launch
-    cp_completion_ownership_formal_top.ap_tile_activity_owned_by_tile_state}
+    cp_completion_ownership_formal_top.ap_tile_activity_owned_by_tile_state
+    cp_completion_ownership_formal_top.ap_active_available_completion_was_reserved}
 report_fv -usage assert -verbose
 check_fv -property {
     cp_completion_ownership_formal_top.cp_completion_done_owned_by_cpl

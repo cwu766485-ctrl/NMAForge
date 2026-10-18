@@ -142,11 +142,20 @@ module cp_completion_ownership_formal_top (
     logic [15:0] launch_batch_count;
     logic [15:0] launch_head_count;
 
-    // Only reset is constrained by the formal setup. Every CP input remains a
-    // free primary input; completion_busy/done are fed solely by this writer.
+    // All functional CP inputs remain free except for the integration contract
+    // that software-visible CPLQ configuration is locked while the processor
+    // is busy (verified by control_busy_abort_test). completion_busy/done are
+    // fed solely by this writer.
     assign completion_busy = writer_busy;
     assign completion_done = writer_done;
     ai_command_processor u_cp (.*);
+
+    // The register block rejects CPL_SIZE writes while processor_busy is high.
+    // This keeps the size sampled at queued submit stable throughout the CP
+    // lifecycle, matching the integrated AXI-Lite configuration contract.
+    as_cplq_size_stable_while_processor_busy: assume property (
+        @(posedge clk) disable iff (!resetn)
+        u_cp.busy |-> $stable(cplq_size));
 
     ai_completion_writer u_writer (
         .clk(clk),
@@ -193,6 +202,15 @@ module cp_completion_ownership_formal_top (
     ap_tile_activity_owned_by_tile_state: assert property (
         @(posedge clk) disable iff (!resetn)
         (u_cp.tile_busy || u_cp.tile_done) |-> (u_cp.state_r == 4'd5));
+
+    // Queued FETCH/DECODE and macro RUN states were admitted using the CPLQ
+    // size latched into completion_required_r. With CPLQ configuration locked
+    // while busy, an available queue entry can never exist without ownership.
+    ap_active_available_completion_was_reserved: assert property (
+        @(posedge clk) disable iff (!resetn)
+        (((u_cp.state_r == 4'd1) || (u_cp.state_r == 4'd2) ||
+          ((u_cp.state_r == 4'd3) && u_cp.macro_active_r)) &&
+         u_cp.completion_available) |-> u_cp.completion_required_r);
 
     cp_completion_done_owned_by_cpl: cover property (
         @(posedge clk) disable iff (!resetn)

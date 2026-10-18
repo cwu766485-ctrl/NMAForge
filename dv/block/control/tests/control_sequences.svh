@@ -558,11 +558,14 @@ class control_busy_abort_seq extends control_base_seq;
         bit [31:0] data;
         if (!uvm_config_db#(virtual ai_control_status_if)::get(null, "*", "status_vif", status_vif))
             `uvm_fatal("NOVIF", "control_busy_abort_seq requires status_vif")
+        write32(CPL_SIZE, 32'd4);
         status_vif.processor_busy = 1;
         write32(OP, 32'h7, 4'hf, 2'b10);
+        write32(CPL_SIZE, 32'd8, 4'hf, 2'b10);
         write32(ABORT, 32'h1, 4'hf, 2'b00);
         status_vif.processor_busy = 0;
         read32(OP, data); expect_eq("locked OP remains reset", data, 0);
+        read32(CPL_SIZE, data); expect_eq("busy CPL_SIZE remains configured", data, 4);
     endtask
 endclass
 

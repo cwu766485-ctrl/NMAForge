@@ -159,6 +159,10 @@ package ai_cp_uvm_pkg;
       if(previous_head!==32'd0)
         `uvm_error("CP/NO_CPLQ",
           $sformatf("macro %s path did not start from CMDQ head zero",path_name))
+      if(vif.cplq_size!==32'd4 ||
+         ((vif.cplq_tail+1)%vif.cplq_size)!==vif.cplq_head)
+        `uvm_error("CP/NO_CPLQ",
+          $sformatf("macro %s path did not start with the configured CPLQ full",path_name))
       fork
         begin : monitor_event_only_path
           forever begin
@@ -210,7 +214,7 @@ package ai_cp_uvm_pkg;
                     completion_write_count,head_advance_count,fetch_count,
                     vif.cmdq_head,vif.cplq_tail))
       `uvm_info("CP/NO_CPLQ",
-        $sformatf("macro_%s_event=1 parent_task_id=%04x error_code=%0d completion_write=0 cplq_tail_advance=0 child_launch=0 later_child_fetch=0 head_advance=1",
+        $sformatf("macro_%s_event=1 parent_task_id=%04x error_code=%0d completion_write=0 cplq_tail_advance=0 child_launch=0 later_child_fetch=0 head_advance=1 cplq_full=1 completion_required=1 completion_available=0",
                   path_name,expected_parent_id,expected_error_code),UVM_LOW)
     endtask
     task automatic run_phase(uvm_phase phase);
@@ -316,23 +320,28 @@ package ai_cp_uvm_pkg;
                vif.cpl_writer_busy || vif.abort_cov_path!==2'd1)
               `uvm_error("CP/DRV","same-cycle fetch-completion abort did not retire once without launch")
             vif.abort_cov_path=0;
-            // Legacy cplq_size==0 route: abort is reported as an event only.
-            reset_cp(); descriptor(0); vif.cmdq_size=0; vif.cplq_size=0; vif.cmdq_tail=1;
+            // Size-zero CMDQ compatibility accepts the request even though
+            // the configured CPLQ is full; abort must retire as an event only.
+            reset_cp(); descriptor(0); vif.cmdq_size=0; vif.cplq_size=4;
+            vif.cplq_head=1; vif.cmdq_tail=1;
             pulse_submit(); wait(vif.fetch_start);
             @(negedge vif.clk); vif.abort=1; @(negedge vif.clk); vif.abort=0;
             wait(vif.event_valid===1'b1);
             if(!vif.event_valid || !vif.event_error || vif.event_error_code!==4'd3 ||
+               vif.cplq_size!==32'd4 ||
+               ((vif.cplq_tail+1)%vif.cplq_size)!==vif.cplq_head ||
                vif.cpl_spad_valid || vif.cpl_writer_busy || vif.launch_valid)
-              `uvm_error("CP/NO_CPLQ","fetch abort without CPLQ did not produce only ERR_ABORT event")
-            `uvm_info("CP/NO_CPLQ","fetch_abort_event=1 completion_write=0 launch=0",UVM_LOW)
+              `uvm_error("CP/NO_CPLQ","fetch abort with full CPLQ did not produce only ERR_ABORT event")
+            `uvm_info("CP/NO_CPLQ","fetch_abort_event=1 completion_write=0 launch=0 cplq_full=1 completion_required=1 completion_available=0",UVM_LOW)
             wait_idle();
             vif.cmdq_size=4; vif.cplq_size=4;
 
             // Exercise the separate ST_DECODE abort branch after the fetch
             // response has already advanced the processor out of ST_FETCH.
-            // Zero-sized queues select the legacy event-only path.
+            // A full CPLQ on the size-zero CMDQ compatibility path selects
+            // the same event-only fallback with completion_required asserted.
             reset_cp(); descriptor(0,0,0,0,1,16'h1701);
-            vif.cmdq_size=0; vif.cplq_size=0; vif.cmdq_tail=1;
+            vif.cmdq_size=0; vif.cplq_size=4; vif.cplq_head=1; vif.cmdq_tail=1;
             pulse_submit();
             wait(vif.fetch_done===1'b1);
             @(negedge vif.clk); vif.abort=1;
@@ -342,11 +351,13 @@ package ai_cp_uvm_pkg;
                vif.event_result!==32'd0 || vif.event_cycles!==32'd0 ||
                vif.event_elements!==32'd0 || vif.cmdq_head!==32'd1 ||
                vif.cplq_tail!==32'd0 || vif.cpl_spad_valid ||
+               vif.cplq_size!==32'd4 ||
+               ((vif.cplq_tail+1)%vif.cplq_size)!==vif.cplq_head ||
                vif.cpl_writer_busy || vif.launch_valid)
-              `uvm_error("CP/NO_CPLQ","decode-stage abort did not report only ERR_ABORT event")
+              `uvm_error("CP/NO_CPLQ","decode-stage abort with full CPLQ did not report only ERR_ABORT event")
             wait_idle();
             vif.cmdq_size=4; vif.cplq_size=4;
-            `uvm_info("CP/NO_CPLQ","decode_abort_event=1 completion_write=0 launch=0 head_advance=1",UVM_LOW)
+            `uvm_info("CP/NO_CPLQ","decode_abort_event=1 completion_write=0 launch=0 head_advance=1 cplq_full=1 completion_required=1 completion_available=0",UVM_LOW)
           end
           CP_COMPUTE_ABORT: begin
             reset_cp();
@@ -758,8 +769,9 @@ package ai_cp_uvm_pkg;
                vif.cpl_writer_busy)
               `uvm_error("CP/MACRO","macro child dependency timeout launched work or failed parent retirement")
 
-            // Legacy no-CPLQ event path: a successful macro aggregates its
-            // ordered children into one event without completion writeback.
+            // A size-zero CMDQ compatibility submit may run while a configured
+            // CPLQ is full. A successful macro then aggregates its ordered
+            // children into one event without completion writeback.
             reset_cp();
             descriptor(0,0,0,0,1,16'h1520);
             vif.desc_mem[0].op=8'h40;
@@ -769,15 +781,17 @@ package ai_cp_uvm_pkg;
             descriptor(1,0,0,0,1,16'h1521);
             descriptor(2,0,0,0,1,16'h1522);
             descriptor(3,0,0,0,1,16'h1523);
-            vif.cmdq_size=0; vif.cplq_size=0; vif.cmdq_tail=1; vif.cplq_head=0;
+            vif.cmdq_size=0; vif.cplq_size=4; vif.cmdq_tail=1; vif.cplq_head=1;
             pulse_submit();
             wait(vif.event_valid===1'b1);
             if(vif.event_error || vif.event_error_code!==4'd0 ||
                vif.event_result!==32'hc0de0001 || vif.event_cycles!==32'd51 ||
                vif.event_elements!==32'd12 || vif.cmdq_head!==32'd1 ||
-               vif.cplq_tail!==32'd0 || vif.cpl_spad_valid ||
+               vif.cplq_tail!==32'd0 ||
+               ((vif.cplq_tail+1)%vif.cplq_size)!==vif.cplq_head ||
+               vif.cpl_spad_valid ||
                vif.cpl_writer_busy || vif.launch_valid)
-            `uvm_error("CP/NO_CPLQ","successful three-child macro without CPLQ did not emit one aggregate event")
+            `uvm_error("CP/NO_CPLQ","successful three-child macro with full CPLQ did not emit one aggregate event")
             wait_idle();
 
             // The first child fails. The parent must report that error and
@@ -791,7 +805,7 @@ package ai_cp_uvm_pkg;
             descriptor(1,0,0,0,1,16'h1531);
             descriptor(2,0,0,0,1,16'h1532);
             descriptor(3,0,0,0,1,16'h1533);
-            vif.cmdq_size=0; vif.cplq_size=0; vif.cmdq_tail=1; vif.cplq_head=0;
+            vif.cmdq_size=0; vif.cplq_size=4; vif.cmdq_tail=1; vif.cplq_head=1;
             vif.force_compute_error_once=1;
             pulse_submit();
             wait(vif.event_valid===1'b1);
@@ -800,13 +814,13 @@ package ai_cp_uvm_pkg;
                vif.event_elements!==32'd4 || vif.cmdq_head!==32'd1 ||
                vif.cplq_tail!==32'd0 || vif.cpl_spad_valid ||
                vif.cpl_writer_busy || vif.launch_valid)
-              `uvm_error("CP/NO_CPLQ","macro child error without CPLQ did not fail-stop with one event")
+              `uvm_error("CP/NO_CPLQ","macro child error with full CPLQ did not fail-stop with one event")
             wait_idle();
             if(vif.force_compute_error_once)
               `uvm_error("CP/NO_CPLQ","macro compute-error injection was not consumed")
 
             // A first-child validation failure uses the same parent-owned,
-            // fail-stop lifecycle when the completion queue is disabled.
+            // fail-stop lifecycle when the completion queue is full.
             reset_cp();
             descriptor(0,0,0,0,1,16'h15a0);
             vif.desc_mem[0].op=8'h40;
@@ -816,7 +830,7 @@ package ai_cp_uvm_pkg;
             descriptor(1,1,0,0,1,16'h15a1);
             descriptor(2,0,0,0,1,16'h15a2);
             descriptor(3,0,0,0,1,16'h15a3);
-            vif.cmdq_size=0; vif.cplq_size=0; vif.cmdq_tail=1; vif.cplq_head=0;
+            vif.cmdq_size=0; vif.cplq_size=4; vif.cmdq_tail=1; vif.cplq_head=1;
             check_no_cplq_macro_frontend_error(16'h15a0,4'd7,"invalid_desc");
 
             // An unmet first-child dependency must likewise time out as one
@@ -830,7 +844,7 @@ package ai_cp_uvm_pkg;
             descriptor(1,0,16'h0002,0,1,16'h15b1);
             descriptor(2,0,0,0,1,16'h15b2);
             descriptor(3,0,0,0,1,16'h15b3);
-            vif.cmdq_size=0; vif.cplq_size=0; vif.cmdq_tail=1; vif.cplq_head=0;
+            vif.cmdq_size=0; vif.cplq_size=4; vif.cmdq_tail=1; vif.cplq_head=1;
             check_no_cplq_macro_frontend_error(16'h15b0,4'd12,"dependency_timeout");
 
             vif.cmdq_size=4; vif.cplq_size=4;
@@ -839,21 +853,29 @@ package ai_cp_uvm_pkg;
           CP_FETCH_ERROR_NO_CPL: begin
             reset_cp();
             descriptor(0,0,0,0,1,16'h1601);
-            // Size-zero queues exercise the legacy pointer behavior preserved
-            // by the RTL helper. This test does not declare it a new ABI rule.
-            vif.cmdq_size=0; vif.cmdq_tail=1; vif.cplq_head=0; vif.cplq_size=0;
+            // The size-zero CMDQ compatibility entry bypasses the normal
+            // submit-time full-CPLQ rejection. Keep the CPLQ configured but
+            // full to exercise the event-only fetch-error fallback with
+            // completion_required=1 and completion_available=0.
+            vif.cmdq_size=0; vif.cmdq_tail=1; vif.cplq_head=1; vif.cplq_size=4;
             @(negedge vif.clk); vif.cmdq_head_seed=0; vif.cmdq_head_load=1;
             @(negedge vif.clk); vif.cmdq_head_load=0;
+            if (((vif.cplq_tail+1)%vif.cplq_size)!==vif.cplq_head)
+              `uvm_error("CP/NO_CPLQ","compatibility fetch-error setup did not make CPLQ full")
             pulse_submit();
             wait(vif.event_valid===1'b1);
             if(!vif.event_error || vif.event_error_code!==4'd6 ||
                vif.event_result!==32'd0 || vif.event_elements!==32'd0 ||
                vif.cmdq_head!==32'd1 || vif.cplq_tail!==32'd0 ||
+               vif.cplq_size!==32'd4 ||
+               ((vif.cplq_tail+1)%vif.cplq_size)!==vif.cplq_head ||
                vif.launch_valid || vif.cpl_spad_valid || vif.cpl_writer_busy)
-              `uvm_error("CP/NO_CPLQ","disabled-CPLQ fetch error did not report one event without launch/writeback")
+              `uvm_error("CP/NO_CPLQ","full-CPLQ compatibility fetch error did not report one event without launch/writeback")
             wait_idle();
+            if (vif.cplq_tail!==32'd0 || vif.cpl_spad_valid || vif.cpl_writer_busy)
+              `uvm_error("CP/NO_CPLQ","event-only full-CPLQ fallback changed tail or wrote a completion")
             vif.cmdq_size=4; vif.cplq_size=4;
-            `uvm_info("CP/NO_CPLQ","fetch_error_event=1 launch=0 completion_write=0 head_advance=1",UVM_LOW)
+            `uvm_info("CP/NO_CPLQ","fetch_error_event=1 launch=0 completion_write=0 head_advance=1 compat_cmdq_size_zero=1 cplq_full=1 completion_required=1 completion_available=0",UVM_LOW)
             // Second legacy route: a fetched invalid descriptor reports ERR_DESC.
             reset_cp(); descriptor(0,1); vif.cmdq_size=0; vif.cplq_size=0; vif.cmdq_tail=1;
             // The fetch responder injects ERR_FETCH for CP_FETCH_ERROR_NO_CPL;
@@ -1582,7 +1604,10 @@ package ai_cp_uvm_pkg;
             direct_events++;
           end
         end
-        if(vif.test_case==CP_MACRO_CHILDREN && vif.cplq_size==0 && vif.event_valid) begin
+        if(vif.test_case==CP_MACRO_CHILDREN && vif.event_valid &&
+           ((vif.cplq_size==0) ||
+            (vif.cplq_size!=0 &&
+             (((vif.cplq_tail+1)%vif.cplq_size)==vif.cplq_head)))) begin
           if(vif.cplq_tail!==32'd0 || vif.cpl_spad_valid ||
              vif.cpl_writer_busy || vif.completion_start)
             `uvm_error("CP/NO_CPLQ","macro event changed queue state or attempted completion writeback")
