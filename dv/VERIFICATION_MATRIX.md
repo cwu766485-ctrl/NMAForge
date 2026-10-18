@@ -1,5 +1,14 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 current-worktree AXI-Lite SLVERR response follow-up (HEAD `bd3a7cd`):**
+> Added top-E2E checks for unmapped register `0x1fc`: writes and reads return
+> SLVERR and reads return zero. Focused run, the 16-seed FP-length matrix,
+> the 192-seed E2E campaign, and `ai_smoke` passed; UVM warning/error/fatal
+> counts were `0/0/0`, and URG AXI-Lite response plus E2E groups were 100%.
+> DECERR is legal AXI but excluded from this direct-IP coverage boundary,
+> which has no interconnect decoder. Shared dirty worktree; not a clean-SHA
+> replay and not full A10/V5 closure. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_AXILITE_SLVERR.md).
+
 > **2026-10-18 current-worktree V4 narrow-32 AXI E2E follow-up (HEAD `77b2ceb`):**
 > Added a scoreboard-checked 32-bit DMA read/write round-trip at non-128-bit-
 > aligned addresses. The 192-seed mixed-precision DDR E2E campaign passed

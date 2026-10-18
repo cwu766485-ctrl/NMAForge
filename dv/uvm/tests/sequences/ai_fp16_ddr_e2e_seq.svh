@@ -102,6 +102,36 @@ class ai_fp16_ddr_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_error("FP16_E2E_AXIL", $sformatf("read addr=0x%08h resp=%0h", addr, req.resp))
     endtask
 
+    task automatic check_invalid_axil_register_accesses();
+        localparam bit [31:0] INVALID_REG_ADDR = 32'h0000_01fc;
+        ai_axil_item write_req, read_req;
+
+        write_req = ai_axil_item::type_id::create("invalid_reg_write_req");
+        start_item(write_req);
+        write_req.is_write = 1'b1;
+        write_req.addr = INVALID_REG_ADDR;
+        write_req.data = 32'h5a5a_a5a5;
+        write_req.strb = 4'hf;
+        finish_item(write_req);
+        if (write_req.resp !== 2'b10)
+            `uvm_fatal("MIXED_E2E_INVALID_REG", $sformatf("write addr=0x%08h expected SLVERR (2'b10), got %b", INVALID_REG_ADDR, write_req.resp))
+
+        read_req = ai_axil_item::type_id::create("invalid_reg_read_req");
+        start_item(read_req);
+        read_req.is_write = 1'b0;
+        read_req.addr = INVALID_REG_ADDR;
+        read_req.data = '0;
+        read_req.strb = '0;
+        finish_item(read_req);
+        if (read_req.resp !== 2'b10)
+            `uvm_fatal("MIXED_E2E_INVALID_REG", $sformatf("read addr=0x%08h expected SLVERR (2'b10), got %b", INVALID_REG_ADDR, read_req.resp))
+        if (read_req.rdata !== 32'd0)
+            `uvm_fatal("MIXED_E2E_INVALID_REG", $sformatf("read addr=0x%08h expected default data 0, got 0x%08h", INVALID_REG_ADDR, read_req.rdata))
+
+        `uvm_info("MIXED_E2E_INVALID_REG_SLVERR_PASS",
+            "unmapped register 0x000001fc returned SLVERR on AXI-Lite write and read", UVM_LOW)
+    endtask
+
     task automatic require_hdl_zero(input string path, input string description);
         uvm_hdl_data_t hdl_value;
         bit ok;
@@ -1094,6 +1124,8 @@ class ai_fp16_ddr_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_error("FP16_E2E_VERSION", $sformatf("expected A10 version 0x%08h got 0x%08h", CIMFORGE_VERSION_A10, version))
             return;
         end
+
+        check_invalid_axil_register_accesses();
 
         // Initial reset may still be active at time zero; configure the
         // external responder only after VERSION reads valid.
