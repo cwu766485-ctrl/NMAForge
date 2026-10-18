@@ -1,5 +1,12 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 current-main FP stall/latency stress:** At pushed `main` SHA
+> `90ddbbd`, six seeded unit-SPAD profiles passed with BF16/FP16 lengths
+> 1..1024 and request back-pressure / ordered response jitter settings
+> `0/0`, `30/3`, and `60/11`; read-only audit checked all 108 format/length
+> rows. This is not DMA contention, UVM/URG coverage, or full-domain formal
+> closure. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-current-main-fp-spad-latencybackpressure-stress).
+
 > **2026-10-18 V3 DMA RREADY-backpressure increment:** A new subsystem test
 > holds the DUT-side AXI `RREADY` low for 16 cycles, checks response tuple
 > stability, then checks all four bursts and 32 SPAD words. Focused run and

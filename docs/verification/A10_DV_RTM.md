@@ -1,5 +1,14 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-18 current-main FP SPAD stall/latency stress at `90ddbbd`:** The
+> mixed BF16/FP16 dot throughput target passed six seeded profiles covering
+> request back-pressure at 0/30/60% and ordered-response jitter up to 11 cycles;
+> all lengths 1..1024 produced 108 checked format/length rows. This uses the
+> unit SPAD model (not DMA contention) and supplements, but does not replace,
+> the existing three-seed UVM/URG evidence. Full-domain parity/writeback formal
+> and V1-FP-04 remain open. Exact data and the corrected marker-count audit are
+> in the [2026-10-18 run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-current-main-fp-spad-latencybackpressure-stress).
+
 > **2026-10-18 exact pushed SHA `622ecc7` replay:** On Rocky 8.10, the current pushed commit passed the FP directed block test, FP mixed-dot UVM/URG (three seeds, 484/484 bit-exact transactions per seed), Python model (19/19), DMA UVM (16/16), Control UVM (9/9), top `ai_smoke`, seeded top `ai_run` (20 cases), and canonical FP formal (12/12 assertions, both selected covers). The three length-1..4 FP parity lifecycle properties under the two-cycle SPAD timing model also re-proved non-vacuously at safe depths 224/27/206. DMA and Control selected functional groups were 100%; their URG summaries had 0 failures/incomplete and two unattempted UVM RAL internals each. This is an exact-commit selected replay, not overall A10/V1–V5 closure; full-16-bit parity proof and V5 global coverage disposition remain open. Detailed commands, versions, tool caveats, and logs: [622ecc7 run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-pushed-sha-622ecc7-replay).
 
 > **2026-10-18 V1 maximum-length FP parity at current `main` `e06f49c`:** A fresh Rocky 8.10 / VCS `V-2023.12-SP1_Full64` run passed all four `length=16'hffff` cutoffs (BF16/FP16 × final A/B word). Every case accepted and drained 65,536 ordered reads, retired `ERR_PARITY=5` after a 65,534-element prefix, reached peak outstanding=2 in 98,306 cycles, emitted exactly one error/done completion, and issued zero destination writes. Each was followed without reset by a clean length-1 recovery writing FP32 `1.0` (`0x3f800000`; two reads, one write). Fresh output: `/tmp/nmaforge_e06f49c_fp_max_parity_20261018/`; compile/run logs had no `Warning-`, `Error-`, or clock-skew diagnostics (the VCS ASLR notice was informational). This supersedes the prior dirty-worktree-only qualification for these four simulation scenarios; it is directed simulation, not URG coverage or a full-domain formal proof. V1-FP-04 and overall A10 remain open. See the [exact-current-main run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-maximum-length-fp-parity-replay).
