@@ -173,6 +173,7 @@ module tb_ai_accel_smoke;
     integer seed_arg;
     integer seed_dummy;
     integer matrix_line_write_count;
+    integer cp_fetch_done_count;
     reg [63:0] last_dma_araddr;
     reg [1023:0] vcd_file;
     reg fp_perf_measure = 1'b0;
@@ -254,6 +255,17 @@ module tb_ai_accel_smoke;
         if ($value$plusargs("VCD_FILE=%s", vcd_file)) begin
             $dumpfile(vcd_file);
             $dumpvars(0, tb_ai_accel_smoke);
+        end
+    end
+
+    always @(posedge aclk) begin
+        // Keep an aggregate count across the reset-recovery test near the
+        // end of this smoke; initialization is owned by the main initial block.
+        if (aresetn && dut.desc_done) begin
+            if (dut.command_processor_u.state_r !== 4'd1)
+                $fatal(1, "descriptor fetch done outside CP ST_FETCH: state=%0d",
+                       dut.command_processor_u.state_r);
+            cp_fetch_done_count <= cp_fetch_done_count + 1;
         end
     end
 
@@ -1387,6 +1399,7 @@ module tb_ai_accel_smoke;
         errors = 0;
         seed_arg = 20261014;
         matrix_line_write_count = 0;
+        cp_fetch_done_count = 0;
         last_dma_araddr = 0;
         allow_m_axi_error = 1'b0;
         aresetn = 1'b0;
@@ -2728,6 +2741,10 @@ module tb_ai_accel_smoke;
         end else begin
             $display("%0t PASS: reset recovery returned DMA and AXI to idle", $time);
         end
+
+        if (cp_fetch_done_count == 0)
+            $fatal(1, "top smoke observed no descriptor fetch done pulse");
+        $display("[CP_FETCH_DONE_OWNED] responses=%0d state=ST_FETCH", cp_fetch_done_count);
 
         if (errors == 0)
             $display("TEST PASS");

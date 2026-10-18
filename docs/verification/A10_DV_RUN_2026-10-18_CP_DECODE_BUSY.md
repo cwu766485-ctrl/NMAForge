@@ -126,6 +126,23 @@ impossible, 1 is a semantically masked operand combination, and 15 remain for
 cross-layer review. This is a partial disposition, not CP/V2/V5 code-coverage
 closure.
 
+## Integrated descriptor-fetch done ownership smoke check
+
+To check the real producer/consumer relationship that the CP-only formal
+harness abstracts away, the top smoke testbench now counts the top-level
+descriptor-source mux `desc_done` pulse and asserts on every observed pulse
+that the command processor is in `ST_FETCH`. The count is cumulative across
+the smoke's reset-recovery sequence. This is a testbench-only monitor; it
+does not alter the DUT, raw URG coverage, or the formal disposition.
+
+Command: `make -C dv/subsystem/top_smoke/sim ai_smoke VCS='vcs -licwait 1'`
+through `invoke-rocky.ps1`, Rocky Linux 8.10 / VCS
+`V-2023.12-SP1_Full64`. Result: `TEST PASS`, monitor marker
+`[CP_FETCH_DONE_OWNED] responses=56 state=ST_FETCH`; no completion pulse was
+observed outside `ST_FETCH` during this workload. The raw `fetch_done` outcome
+remains open pending broader producer/consumer and formal assumptions review;
+one smoke run is exercised integration evidence, not an all-input proof.
+
 ## Limits and next work
 
 The 23 remaining raw condition outcomes have not been fully classified as
