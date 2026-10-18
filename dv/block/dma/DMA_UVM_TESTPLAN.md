@@ -32,6 +32,8 @@ by response arrival order.
 | `dma_2d_store_test` | 3×5 strided store | row-address and data scoreboard | **PASS** in VCS |
 | `dma_narrow_load_test` | address offset 4, 7 words | narrow bus lane then line data | **PASS** in VCS |
 | `dma_4k_load_test` | address `0x1fc0`, 40 words | no AR 4 KiB crossing, data | **PASS** in VCS |
+| `dma_4k_edge_load_test` | 12-word load from `0x1ff0`, one beat before the 4-KiB boundary | accepted ARs are exactly `0x1ff0/LEN0` then `0x2000/LEN1`; scoreboard checks all data | **PASS**, focused + 19-test regression, 2026-10-18 |
+| `dma_short_tail_store_test` | 1-, 2-, and 3-word single-beat stores | exact WSTRB `000f/00ff/0fff`, B-response drain and scoreboard data | **PASS**, focused + 19-test regression, 2026-10-18 |
 | `dma_abort_read_test` | abort after accepted read work | `ERR_ABORT`, response drain, completion | **PASS** in VCS |
 | `dma_read_slverr_test` | inject `SLVERR` into the first newest-first response after four accepted reads | `ERR_AXI_RD`, all four RLASTs drain, SPAD sentinels stay unchanged, clean recovery read | **PASS** in VCS, 2026-10-16 |
 | `dma_spad_error_drain_test` | 32-word load, hold R until four ARs accepted, inject on first newest-first destination line write (`0x1200 + 24×4 = 0x1260`) | `ERR_SPAD` (DMA-local code 4), 4/4 RLASTs drain, all destination sentinels unchanged, no pending response, clean no-reset recovery read | **PASS** in focused VCS rerun and 15-test regression, 2026-10-16 |
@@ -95,3 +97,18 @@ target passes `CM_METRICS` and `COV_DIR` to runtime and allows `COV_ROOT` to kee
 each coverage campaign isolated. Do not treat a clean compile, an empty log, or
 a single smoke as closure. The pass condition is the per-test UVM summary plus
 scoreboard/SVA evidence and reviewed aggregate URG.
+
+## Latest DMA planner-edge increment (2026-10-18)
+
+The full DMA block regression now has 19 named tests. Both new directed tests
+(`dma_4k_edge_load_test`, `dma_short_tail_store_test`) and the 19-test
+regression passed with UVM warning/error/fatal=`0/0/0`; 20/20 randomized
+transfers scored, URG merged, and top `ai_smoke` printed `TEST PASS`. The
+planner boundary test proves the exact 4-KiB split from `0x1ff0`; the tail
+test checks 1/2/3-word WSTRB masks and response drain. A first tail-test
+attempt exposed an incorrect expected-mask formula in the testbench; after
+correction, DUT data/masks and all regression checks passed. Exact coverage,
+commands, and the failure disposition are in the
+[A10 run record](../../../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-dma-burst-planner-4-kib-split-and-partial-tail-coverage-increment).
+This is candidate dirty-worktree evidence; it does not close all DMA RTL
+coverage or V3/A10/V5.

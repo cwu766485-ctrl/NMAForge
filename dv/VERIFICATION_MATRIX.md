@@ -434,3 +434,16 @@ This is a current-main selected-slice replay, not full V4/V5 closure; broader
 top interactions and DUT-only residual coverage disposition remain open. See
 the [A10 run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md)
 and [RTM](../docs/verification/A10_DV_RTM.md).
+
+### A10 V3 DMA burst-planner edge checks (2026-10-18)
+
+Added two DMA UVM tests without changing product RTL: an exact 4-KiB boundary
+read split (`0x1ff0/LEN0`, followed by `0x2000/LEN1`) and 1/2/3-word stores
+checking WSTRB=`000f/00ff/0fff` plus B-response drain. Focused tests and the
+full 19-test DMA regression passed with per-test UVM warning/error/fatal
+`0/0/0`; the random test scored 20/20 transfers, URG merged, all 11 named DMA
+DUT SVA had real successes, and top `ai_smoke` printed `TEST PASS`. A first
+tail-test attempt caught a testbench expected-mask formula error; it was fixed
+before the passing rerun. This is candidate dirty-worktree evidence based on
+parent SHA `d6fa711`, not a clean-SHA replay. DMA raw coverage and V3/A10/V5
+closure remain open; see the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-dma-burst-planner-4-kib-split-and-partial-tail-coverage-increment).

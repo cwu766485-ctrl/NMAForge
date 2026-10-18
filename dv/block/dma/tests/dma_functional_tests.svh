@@ -153,6 +153,43 @@ class dma_4k_load_sequence extends uvm_sequence #(dma_cmd_item);
     endtask
 endclass
 
+class dma_4k_edge_load_sequence extends uvm_sequence #(dma_cmd_item);
+    `uvm_object_utils(dma_4k_edge_load_sequence)
+    function new(string name = "dma_4k_edge_load_sequence"); super.new(name); endfunction
+    task body();
+        dma_cmd_item req = dma_cmd_item::type_id::create("req");
+        start_item(req);
+        // At 0x1ff0 only one 128-bit beat remains before the 4-KiB boundary.
+        // Twelve words force a one-beat split followed by a two-beat burst.
+        req.ext_addr = 64'h1ff0; req.spad_addr = 32'h1d00;
+        req.length_words = 12; req.row_words = 12; req.row_count = 0;
+        req.ext_stride = 0; req.spad_stride = 0;
+        req.read_outstanding = 1; req.store = 0; req.gather_enable = 0;
+        req.gather_index_base = 0; req.expect_error = 0; req.expected_error_code = 0;
+        req.abort_after_cycles = 0; req.minimum_rd_highwater = 1;
+        finish_item(req);
+    endtask
+endclass
+
+class dma_short_tail_store_sequence extends uvm_sequence #(dma_cmd_item);
+    int unsigned word_count;
+    bit [63:0] ext_addr;
+    bit [31:0] spad_addr;
+    `uvm_object_utils(dma_short_tail_store_sequence)
+    function new(string name = "dma_short_tail_store_sequence"); super.new(name); endfunction
+    task body();
+        dma_cmd_item req = dma_cmd_item::type_id::create("req");
+        start_item(req);
+        req.ext_addr = ext_addr; req.spad_addr = spad_addr;
+        req.length_words = word_count; req.row_words = word_count; req.row_count = 0;
+        req.ext_stride = 0; req.spad_stride = 0;
+        req.read_outstanding = 1; req.store = 1; req.gather_enable = 0;
+        req.gather_index_base = 0; req.expect_error = 0; req.expected_error_code = 0;
+        req.abort_after_cycles = 0; req.minimum_rd_highwater = 0;
+        finish_item(req);
+    endtask
+endclass
+
 class dma_abort_read_sequence extends uvm_sequence #(dma_cmd_item);
     `uvm_object_utils(dma_abort_read_sequence)
     function new(string name = "dma_abort_read_sequence"); super.new(name); endfunction
@@ -342,6 +379,117 @@ class dma_4k_load_test extends dma_block_base_test;
         dma_4k_load_sequence seq = dma_4k_load_sequence::type_id::create("seq");
         phase.raise_objection(this); cfg.min_accepted_reads_before_response = 1;
         seq.start(env.cmd_sqr); repeat(3) @(posedge env.cmd_drv.vif.clk); env.sb.check_complete();
+        phase.drop_objection(this);
+    endtask
+endclass
+
+class dma_4k_edge_load_test extends dma_block_base_test;
+    `uvm_component_utils(dma_4k_edge_load_test)
+    function new(string name = "dma_4k_edge_load_test", uvm_component parent = null); super.new(name,parent); endfunction
+    task run_phase(uvm_phase phase);
+        dma_4k_edge_load_sequence seq = dma_4k_edge_load_sequence::type_id::create("seq");
+        bit monitor_done;
+        bit [63:0] observed_addr[$];
+        bit [7:0] observed_len[$];
+        bit [2:0] observed_size[$];
+        phase.raise_objection(this);
+        cfg.min_accepted_reads_before_response = 1;
+        monitor_done = 0;
+        fork : edge_test_threads
+            begin
+                while (!monitor_done) begin
+                    @(posedge env.axi_rsp.vif.clk);
+                    if (env.axi_rsp.vif.arvalid && env.axi_rsp.vif.arready) begin
+                        observed_addr.push_back(env.axi_rsp.vif.araddr);
+                        observed_len.push_back(env.axi_rsp.vif.arlen);
+                        observed_size.push_back(env.axi_rsp.vif.arsize);
+                    end
+                end
+            end
+            begin
+                seq.start(env.cmd_sqr);
+                @(negedge env.axi_rsp.vif.clk);
+                monitor_done = 1;
+            end
+        join
+        env.sb.check_complete();
+        if (observed_addr.size() != 2 || observed_len.size() != 2 || observed_size.size() != 2) begin
+            `uvm_error("DMA_4K_EDGE_COUNT", $sformatf(
+                "expected two AR bursts at 4-KiB edge, observed %0d", observed_addr.size()))
+        end else begin
+            if (observed_addr[0] != 64'h1ff0 || observed_len[0] != 0 || observed_size[0] != 3'd4)
+                `uvm_error("DMA_4K_EDGE_FIRST", $sformatf(
+                    "first AR addr/len/size=%h/%0d/%0d expected 1ff0/0/4",
+                    observed_addr[0], observed_len[0], observed_size[0]))
+            if (observed_addr[1] != 64'h2000 || observed_len[1] != 1 || observed_size[1] != 3'd4)
+                `uvm_error("DMA_4K_EDGE_NEXT", $sformatf(
+                    "next AR addr/len/size=%h/%0d/%0d expected 2000/1/4",
+                    observed_addr[1], observed_len[1], observed_size[1]))
+            `uvm_info("DMA_4K_EDGE_PASS", "4-KiB edge split was one beat at 0x1ff0 followed by two beats at 0x2000", UVM_LOW)
+        end
+        phase.drop_objection(this);
+    endtask
+endclass
+
+class dma_short_tail_store_test extends dma_block_base_test;
+    `uvm_component_utils(dma_short_tail_store_test)
+    function new(string name = "dma_short_tail_store_test", uvm_component parent = null); super.new(name,parent); endfunction
+    task run_phase(uvm_phase phase);
+        dma_short_tail_store_sequence seq;
+        bit monitor_done;
+        bit [15:0] observed_wstrb[$];
+        int unsigned tail_words;
+        int unsigned index;
+        phase.raise_objection(this);
+        cfg.min_accepted_writes_before_response = 1;
+        monitor_done = 0;
+        fork : tail_test_threads
+            begin
+                while (!monitor_done) begin
+                    @(posedge env.axi_rsp.vif.clk);
+                    if (env.axi_rsp.vif.wvalid && env.axi_rsp.vif.wready)
+                        observed_wstrb.push_back(env.axi_rsp.vif.wstrb);
+                end
+            end
+            begin
+                wait (env.cmd_drv.vif.resetn === 1'b1);
+                @(posedge env.cmd_drv.vif.clk);
+                for (tail_words = 1; tail_words <= 3; tail_words++) begin
+                    seq = dma_short_tail_store_sequence::type_id::create(
+                        $sformatf("tail_%0d_seq", tail_words));
+                    seq.word_count = tail_words;
+                    seq.ext_addr = 64'h7000 + ((tail_words - 1) * 16);
+                    seq.spad_addr = 32'h1e00 + ((tail_words - 1) * 16);
+                    env.spad_model.preload_source_pattern(seq.spad_addr, tail_words);
+                    seq.start(env.cmd_sqr);
+                    env.sb.check_complete();
+                end
+                @(negedge env.cmd_drv.vif.clk);
+                monitor_done = 1;
+            end
+        join
+        if (observed_wstrb.size() != 3) begin
+            `uvm_error("DMA_TAIL_STROBE_COUNT", $sformatf(
+                "expected three one-beat W transfers, observed %0d", observed_wstrb.size()))
+        end else begin
+            for (index = 0; index < 3; index++) begin
+                if (observed_wstrb[index] != ((16'h0001 << ((index + 1) * 4)) - 1'b1))
+                    `uvm_error("DMA_TAIL_STROBE", $sformatf(
+                        "tail words=%0d WSTRB=%04h expected=%04h",
+                        index + 1, observed_wstrb[index],
+                        ((16'h0001 << ((index + 1) * 4)) - 1'b1)))
+            end
+        end
+        if (env.axi_rsp.accepted_bids.size() != 3 ||
+            env.axi_rsp.completed_bids.size() != 3 ||
+            env.axi_rsp.pending_b.size() != 0 || env.axi_rsp.active_b != null ||
+            env.axi_rsp.active_write != null)
+            `uvm_error("DMA_TAIL_DRAIN", $sformatf(
+                "expected 3 completed single-burst stores and no pending B; accepted=%0d completed=%0d pending=%0d",
+                env.axi_rsp.accepted_bids.size(), env.axi_rsp.completed_bids.size(),
+                env.axi_rsp.pending_b.size()))
+        else
+            `uvm_info("DMA_TAIL_STROBE_PASS", "1/2/3-word tails emitted WSTRB 000f/00ff/0fff and drained all B responses", UVM_LOW)
         phase.drop_objection(this);
     endtask
 endclass

@@ -401,6 +401,23 @@
 
 > **V3-CUR-05 AW-stability assertion addendum (2026-10-17):** Follow-up subsystem replay `/tmp/nmaforge_a10_v3_aw_stall_subsystem_20261017c` ran seeds `20261110..20261119` after giving the existing DMA SVA properties explicit labels and adding four cycles of real responder-controlled AW backpressure outside the CNM contention window. All 10 seeds passed with UVM warning/error/fatal=`0/0/0`; the AW payload stability property has 50 real successes and zero failures. URG has 31 assertions: 29 successes, 0 failures/incomplete, and two framework-only UVM RAL `do_read`/`do_write` no-attempts. All 13 selected functional groups are 100%; `ai_smoke` also passes. This supersedes the prior unresolved anonymous DMA property for the new replay only; it does not retroactively relabel older URG databases. V3 remains OPEN for long/downstream-backpressure fairness, broader fault×abort×reset combinations, DUT-only residual code coverage, and complete queue/completion lifecycle. Exact result and the testbench-race debug trail are in [A10_DV_RUN_2026-10-17_REFRESH.md](A10_DV_RUN_2026-10-17_REFRESH.md).
 
+### V3-DMA-07 — Burst-planner boundary and partial-beat tail
+
+**Requirement:** A read starting one 128-bit beat before a 4-KiB boundary
+must split into legal AXI bursts; 1/2/3-word stores must assert only the
+corresponding low byte strobes and retire all responses.
+
+**Tests/checkers:** `dma_4k_edge_load_test` monitors accepted AR address/LEN/SIZE
+and scoreboard data for a 12-word load from `0x1ff0`; `dma_short_tail_store_test`
+monitors WSTRB for 1/2/3-word stores and checks B drain plus scoreboard data.
+
+**Evidence/status:** Both focused tests, full DMA UVM 19/19, URG merge, and top
+`ai_smoke` passed on the 2026-10-18 candidate worktree based on parent `d6fa711`;
+all per-test UVM warning/error/fatal=`0/0/0`. The exact AXI split was
+`0x1ff0/LEN0` then `0x2000/LEN1`; masks were `000f/00ff/0fff`. This is a
+directed slice only, not complete DMA coverage or V3/A10/V5 closure. See the
+[run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-dma-burst-planner-4-kib-split-and-partial-tail-coverage-increment).
+
 ## V4 — Top-Level AI Accelerator UVM
 
 > **2026-10-18 fresh current-main V4 random E2E replay:** At GitHub `main` SHA `0578dde3a72ad8f9f89ef5c6a870f83d76de24d7`, VCS/URG `V-2023.12-SP1_Full64` ran `make -C dv/uvm/sim uvm_mixed_precision_ddr_e2e_random_cov_regress MIXED_E2E_RANDOM_OUT=/tmp/nmaforge_a10_main0578dde_top_e2e_random_20261018`. All 192 seeds (`20261101..20261292`) passed: 192/192 E2E markers, zero nonzero UVM WARNING/ERROR/FATAL logs, `e2e_cg` and all four per-transaction AXI AR/AW/R-gap/W-gap groups at 100%, all 20 Makefile-gated functional points at 100%. URG assertions: 20 success, 0 failure/incomplete, 2 no-attempt UVM RAL `do_read`/`do_write`; all 3 AXI stall-to-accept covers matched. The 14 compute-activity properties are testbench monitors; five AXI master protocol properties are DUT-owned and each had real successes. Artifact and exact command are in [the 2026-10-18 current-main replay record](A10_DV_RUN_2026-10-18_MAIN452.md). This closes the selected randomized V4 E2E slice at the cited commit only; broader V4 interaction coverage, DUT-only code coverage review, and V5 remain open.
