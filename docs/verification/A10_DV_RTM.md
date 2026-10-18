@@ -542,8 +542,21 @@ timing slice. Broad random fault×abort×reset combinations, V3 fairness,
 DUT-only residual coverage, and A10/V5 acceptance remain open. Exact commands,
 seed histogram, and report path are in the [2026-10-18 run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-v3-parityabortreset-timing-coverage-addendum-ae925bd).
 
-## V4 — Top-Level AI Accelerator UVM
+### V3-CUR-07 exact-SHA parity/abort/reset replay at `c500b3d` (2026-10-19)
 
+At exact pushed `main` SHA `c500b3daba529d3123ffe250644f3297ae8c16f3`, a detached
+clean-worktree replay ran 20 randomized seeds plus four deterministic reset
+cutpoints (`SPAD_PARITY_ABORT_RESET_DELAY=0..3`). All 24 logs reached the
+scenario pass and test-done markers with UVM warning/error/fatal=`0/0/0`.
+Merged URG reports `cnm_parity_abort_reset_cg` at 4/4 variables and 2/2
+crosses; 31 assertions had 29 successes, 0 failures/incomplete, and two
+unattempted UVM RAL internals. Top `ai_smoke` passed. This closes only the
+modeled CNM parity-error during DMA abort-drain followed by shared-reset
+timing slice; broader fault/abort/reset combinations, DUT-only residual
+coverage, and full V3/A10/V5 remain open. Exact commands and local artifact
+paths are in the [run record](A10_DV_RUN_2026-10-19_V3_FAULT_ABORT_RESET.md).
+
+## V4 — Top-Level AI Accelerator UVM
 > **2026-10-18 fresh current-main V4 random E2E replay:** At GitHub `main` SHA `0578dde3a72ad8f9f89ef5c6a870f83d76de24d7`, VCS/URG `V-2023.12-SP1_Full64` ran `make -C dv/uvm/sim uvm_mixed_precision_ddr_e2e_random_cov_regress MIXED_E2E_RANDOM_OUT=/tmp/nmaforge_a10_main0578dde_top_e2e_random_20261018`. All 192 seeds (`20261101..20261292`) passed: 192/192 E2E markers, zero nonzero UVM WARNING/ERROR/FATAL logs, `e2e_cg` and all four per-transaction AXI AR/AW/R-gap/W-gap groups at 100%, all 20 Makefile-gated functional points at 100%. URG assertions: 20 success, 0 failure/incomplete, 2 no-attempt UVM RAL `do_read`/`do_write`; all 3 AXI stall-to-accept covers matched. The 14 compute-activity properties are testbench monitors; five AXI master protocol properties are DUT-owned and each had real successes. Artifact and exact command are in [the 2026-10-18 current-main replay record](A10_DV_RUN_2026-10-18_MAIN452.md). This closes the selected randomized V4 E2E slice at the cited commit only; broader V4 interaction coverage, DUT-only code coverage review, and V5 remain open.
 
 > **2026-10-15 watchdog/abort 生命周期与 drain 增量：** top-level UVM 经 AXI-Lite `WATCHDOG=1` 和 `ABORT=1` 分别触发真实 FP16 CMDQ 命令，completion task ID=`0x0702/0x0703`、word1=`0x42/0x32`，目的哨兵分别保持 `0xface0702/0xface0703`，CPLQ tail 均只推进一次。软件 abort 检查确认 `dut.core_abort` 脉冲时有 1 笔 FP SPAD read outstanding，completion 前读计数 drain 到 0。Focused `uvm_mixed_precision_ddr_e2e`、`ai_smoke`、16-run URG sweep 与 192-seed random coverage campaign 全 PASS。最新 192-run URG `e2e_cg` 为 53/53 variable bins + 16/16 cross bins（100%），`cp_fp_watchdog_completion` 与 `cp_fp_abort_completion` 均为 1/1，报告 `/tmp/nmaforge_a10_abort_drain_random_20261015/urg_merged`；192/192 seed 均有两类生命周期 marker，UVM warning/error/fatal 均为 0。V4/V5 仍未关闭。
@@ -669,8 +682,8 @@ Control regression passed all 9 tests with UVM severity `0/0/0`, and top
 `ai_smoke` passed. No product RTL/SPEC/ABI changed. The pushed `de51846`
 state has since passed a detached clean-SHA replay (CP 72 profiles, formal
 7/7 assertions, and top smoke). CP toggle residuals and broader V2/V5 closure
-remain open; the newer tile-error recovery delta still needs its own clean
-replay. See the
+remain open. The newer tile-error recovery delta has a separate clean-SHA
+replay recorded below. See the
 [detailed run record](A10_DV_RUN_2026-10-18_CP_COMPLETION_AVAILABILITY.md).
 
 ## 2026-10-18 CP tile load-DMA error follow-up
