@@ -289,6 +289,15 @@
 
 > **2026-10-16 V4 per-transaction AXI jitter addendum:** 已补上 top-level responder 对 AR/AW 地址停顿、每拍 R-response 与 WREADY gap 的 seeded transaction-level jitter；focused E2E、16-run length/coverage sweep、192-seed random campaign、`ai_smoke`、20-case `ai_run`、六种默认 descriptor 顺序 E2E、DMA 15-test UVM 均通过。URG 中四个新增 AXI gap covergroup 为 100%。这是 testbench stimulus/coverage 增量，不改产品 RTL/SPEC/ABI；不能据此宣称 V4/V5 整体完成。详情见 [2026-10-16 run record](A10_DV_RUN_2026-10-16.md)。
 
+> **2026-10-18 exact-main V3 refresh (`575f1ae`):** Three subsystem seeds
+> passed with UVM severity `0/0/0`, followed by 16/64/300-cycle AXI RREADY
+> stress cases. URG merged six VDBs and all 14 modeled groups scored 100%; 29
+> of 31 assertions had successful attempts, with 0 failures/incomplete and two
+> UVM RAL no-attempts. Exact-SHA `ai_smoke` passed. This closes the selected
+> subsystem/back-pressure slice only; broader fairness, fault×abort×reset,
+> DUT-only residuals, V3 lifecycle, and A10/V5 remain open. See
+> [exact-main run evidence](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-pushed-main-v3-dma-spad-cnm-and-rready-replay-at-575f1ae).
+
 | 阶段 | 当前状态 | 主要剩余项 |
 |---|---|---|
 | G0 基线与规范核对 | 部分完成 | FP core 的 2 笔 accepted/unreturned SPAD read 契约已同步到 SPEC/架构；A10 RTM 和 `43dbbbc` detached clean replay 已记录，后续提交为文档/验证记录，不改变该 RTL 验证基线。尚缺覆盖全 A10 证据的单一最终 run manifest 与最终 release-SHA replay |
@@ -441,6 +450,17 @@
 > **V3-CUR-05 latest row update (2026-10-17):** The prior `20261030..39` / `a10_v3_current_20261017` entry above is superseded by the independent fresh rerun `20261040..49` / `a10_v3_refresh_20261017` (old logs are retained in the historical run record). Command: `make -C dv/subsystem/dma_spad/sim subsystem_regress COV_TAG=a10_v3_refresh_20261017 SEEDS='20261040 ... 20261049' URG_REPORT=/tmp/nmaforge_a10_v3_refresh_20261017/urg VCS='vcs -licwait 1' URG=urg`. Measured: 13 groups; 31 assertions, 29 success/0 failure/0 incomplete/2 UVM RAL no-attempt; 10/10 severity=`0/0/0` and `TEST_DONE` pass; per-seed GEMV K×M and parity lane×DMA cross=100%. Markers: DMA=100, GEMV=130, parity=50, DMA-error/recovery=50, DMA abort/write-abort/recovery=20 each, protection=20, reset-recovery=30, writeback=20. A non-fatal `make` clock-skew warning occurred, so this is not build-warning-free. Long-duration downstream backpressure fairness, randomized fault×abort×reset, DUT-only residual closure, and frozen-SHA replay remain open.
 
 > **V3-CUR-05 AW-stability assertion addendum (2026-10-17):** Follow-up subsystem replay `/tmp/nmaforge_a10_v3_aw_stall_subsystem_20261017c` ran seeds `20261110..20261119` after giving the existing DMA SVA properties explicit labels and adding four cycles of real responder-controlled AW backpressure outside the CNM contention window. All 10 seeds passed with UVM warning/error/fatal=`0/0/0`; the AW payload stability property has 50 real successes and zero failures. URG has 31 assertions: 29 successes, 0 failures/incomplete, and two framework-only UVM RAL `do_read`/`do_write` no-attempts. All 13 selected functional groups are 100%; `ai_smoke` also passes. This supersedes the prior unresolved anonymous DMA property for the new replay only; it does not retroactively relabel older URG databases. V3 remains OPEN for long/downstream-backpressure fairness, broader fault×abort×reset combinations, DUT-only residual code coverage, and complete queue/completion lifecycle. Exact result and the testbench-race debug trail are in [A10_DV_RUN_2026-10-17_REFRESH.md](A10_DV_RUN_2026-10-17_REFRESH.md).
+
+#### V3-CUR-06 — Exact pushed-main DMA–SPAD–CNM and RREADY replay (`575f1ae`)
+
+| Item | Evidence |
+|---|---|
+| Commit / tools | GitHub `main` `575f1ae55d4b474ec95baf0a9a2bb78eaf76ae34`; Rocky Linux 8.10; VCS/URG `V-2023.12-SP1_Full64`. |
+| Subsystem seeds | `12345`, `987654`, `20261014`; each `TEST_DONE`, 9 `SPAD_CNM_DMA_PASS` checks, UVM warning/error/fatal=`0/0/0`. |
+| Downstream AXI back-pressure | Focused `RREADY` holds of 16/64/300 cycles; all three passed payload-stability, DMA-drain and 32-word SPAD scoreboard checks; UVM severity=`0/0/0`. |
+| Selected merged coverage | Six VDBs merged by URG; all 14 modeled functional groups at 100%. Of 31 assertions, 29 successful, 0 failed/incomplete, and 2 UVM RAL internal no-attempts (`do_read`/`do_write`). |
+| Top-level regression | Detached exact-SHA `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=12345` printed `TEST PASS`; logs at `/tmp/nmaforge_a10_current575f1ae_top_smoke_20261018_evidence/`. |
+| Limits | No RTL/SPEC/ABI change. This does not close long arbiter fairness, general fault×abort×reset, DUT-only residual code coverage, complete queue/completion lifecycle, or V3/A10/V5. Detailed commands and local URG/log locations: [exact-main run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-pushed-main-v3-dma-spad-cnm-and-rready-replay-at-575f1ae). |
 
 ### V3-DMA-07 — Burst-planner boundary and partial-beat tail
 

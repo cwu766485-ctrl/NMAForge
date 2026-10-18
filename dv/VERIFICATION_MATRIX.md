@@ -1,5 +1,14 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 exact-main V3 DMA–SPAD–CNM/RREADY replay (`575f1ae`):**
+> Three subsystem seeds and the dedicated 16/64/300-cycle AXI RREADY stress
+> passed with UVM severity `0/0/0`. The merged URG covered all 14 selected
+> functional groups at 100%; 29/31 assertions had successful attempts, with
+> 0 failures/incomplete and two UVM RAL no-attempts. Exact-SHA top `ai_smoke`
+> passed. This is selected subsystem evidence, not V3/A10 closure; fairness,
+> broad fault×abort×reset, DUT-only residual coverage, and full queue/completion
+> lifecycle remain open. See the [run evidence](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-pushed-main-v3-dma-spad-cnm-and-rready-replay-at-575f1ae).
+
 > **2026-10-18 exact-main CP/Completion replay (`b4c9f8b`):** Three seeds ×
 > 24 mixed profiles passed 72/72, each with 31/31 scenario bins and UVM
 > severity `0/0/0`. URG `cp_cg` was 61/61 variables + 34/34 crosses; the
