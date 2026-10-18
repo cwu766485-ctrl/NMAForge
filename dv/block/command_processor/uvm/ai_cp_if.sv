@@ -151,6 +151,20 @@ interface ai_cp_if(input logic clk);
     cover property(@(posedge clk) disable iff(!resetn)
       test_case==5'd27 && debug_state_r==4'd2 && submit);
 
+  // Tile-pipeline compute work is owned by the CP's ST_TILE lifecycle. URG
+  // reports a few state/branch crosses for this common launch interface;
+  // a decode-state tile launch is not a legal request and must never occur.
+  property p_tile_compute_launch_owned_by_tile_state;
+    @(posedge clk) disable iff(!resetn)
+      (test_case==5'd15 && launch_valid) |-> debug_state_r==4'd5;
+  endproperty
+  a_tile_compute_launch_owned_by_tile_state:
+    assert property(p_tile_compute_launch_owned_by_tile_state)
+      else $error("tile compute launch escaped the CP ST_TILE lifecycle");
+  c_tile_compute_launch_owned_by_tile_state:
+    cover property(@(posedge clk) disable iff(!resetn)
+      test_case==5'd15 && launch_valid && debug_state_r==4'd5);
+
   property p_compute_abort_stops_automatic_queue_advance;
     @(posedge clk) disable iff(!resetn)
       ((test_case==5'd18 || test_case==5'd19 || test_case==5'd20) &&
