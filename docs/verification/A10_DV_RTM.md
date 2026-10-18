@@ -24,6 +24,17 @@
 > internals had no attempts, and both covers matched. This is a selected V2
 > slice, not full command-lifecycle or A10 closure. See the [run evidence](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v2-command-processor-mixed-reset-replay-at-e24b770).
 
+> **2026-10-18 exact-current-main V2 CP/completion suite (`1655db9`):** The
+> full `cov-regress` matrix passed 72/72 profiles (3 seeds × 24 mixed
+> error/abort-delay/completion-reset combinations), with 31/31 scenario bins
+> and UVM severity `0/0/0` in every log. URG `cp_cg` reached 61/61 variables
+> + 34/34 crosses, reset words 4/4, kind × delay × reset cross 24/24, and
+> abort timing 7/7. Eleven assertions succeeded, none failed/incomplete; two
+> UVM RAL internals had no attempts and both covers matched. The real CP,
+> completion writer, and tile scheduler are under test; descriptor fetch/DMA
+> are behavioral endpoints, so this does not close external descriptor-fetch
+> integration or V3 concurrency. See the [exact-main run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v2-cpcompletion-full-suite-replay-at-1655db9).
+
 > **2026-10-18 V4 exact-main randomized E2E update (`3345286`):** The
 > requirements exercised by `uvm_mixed_precision_ddr_e2e_random_cov_regress`
 > were replayed at the exact pushed SHA: 192/192 seeds passed with zero

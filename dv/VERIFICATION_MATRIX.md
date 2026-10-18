@@ -1,5 +1,16 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 exact-current-main V2 CP/completion matrix at `1655db9`:**
+> UVM `cov-regress` passed 72/72 mixed-error/abort/reset profiles, each with
+> 31/31 scenario bins and severity `0/0/0`. URG `cp_cg` was 61/61 variables +
+> 34/34 crosses; reset-word coverage 4/4, kind × delay × reset cross 24/24,
+> and abort timing 7/7. Eleven assertions succeeded; 0 failed/incomplete, two
+> UVM RAL no-attempts, and 2/2 covers matched. The real CP, completion writer,
+> and tile scheduler were exercised, while descriptor-fetch/DMA endpoints are
+> behavioral models. This closes the tested CP lifecycle matrix, not external
+> descriptor-fetch integration, V3 DMA/SPAD concurrency, raw DUT coverage, or
+> full A10. See the [run evidence](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v2-cpcompletion-full-suite-replay-at-1655db9).
+
 > **2026-10-18 exact-current-main V1 FP replay at `08f398e`:** Directed core
 > and all four maximum-length BF16/FP16 A/B parity drain/recovery scenarios
 > passed. Three UVM seeds passed 484/484 bit-exact transactions each with
