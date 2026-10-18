@@ -863,11 +863,14 @@ class dma_spad_subsystem_test extends dma_block_base_test;
     int unsigned cov_rready_stall_cycles;
     bit cov_rready_stall_completed;
     bit rready_stall_only;
+    int unsigned rready_stall_cycles_requested;
 
     covergroup dma_rready_stall_cg;
         option.per_instance = 1;
         cp_stall_cycles: coverpoint cov_rready_stall_cycles {
             bins sixteen_cycles = {16};
+            bins sixty_four_cycles = {64};
+            bins three_hundred_cycles = {300};
         }
         cp_completed: coverpoint cov_rready_stall_completed {
             bins completed_after_release = {1};
@@ -898,6 +901,12 @@ class dma_spad_subsystem_test extends dma_block_base_test;
         found_rvalid = 0;
         errors_before = uvm_report_server::get_server().get_severity_count(UVM_ERROR);
         stall_cycles = 0;
+        rready_stall_cycles_requested = 16;
+        void'($value$plusargs("A10_RREADY_STALL_CYCLES=%d", rready_stall_cycles_requested));
+        if (!(rready_stall_cycles_requested inside {16, 64, 300}))
+            `uvm_fatal("DMA_RREADY_STALL", $sformatf(
+                "unsupported stall length %0d; supported profiles are 16, 64, and 300 cycles",
+                rready_stall_cycles_requested))
         cov_rready_stall_cycles = 0;
         cov_rready_stall_completed = 0;
         req = dma_cmd_item::type_id::create("dma_rready_stall_req");
@@ -960,7 +969,7 @@ class dma_spad_subsystem_test extends dma_block_base_test;
                 if (!found_rvalid) begin
                     `uvm_error("DMA_RREADY_STALL", "RVALID did not assert within 10000 cycles")
                 end else begin
-                    for (int unsigned cycle = 0; cycle < 16; cycle++) begin
+                    for (int unsigned cycle = 0; cycle < rready_stall_cycles_requested; cycle++) begin
                         @(posedge sys_vif.clk);
                         #1;
                         stall_cycles++;
@@ -1014,9 +1023,9 @@ class dma_spad_subsystem_test extends dma_block_base_test;
             cov_rready_stall_completed = 1;
             dma_rready_stall_cg.sample();
             if (uvm_report_server::get_server().get_severity_count(UVM_ERROR) == errors_before)
-                `uvm_info("DMA_RREADY_STALL_PASS",
-                    "16-cycle AXI RREADY stall held R payload stable; DMA drained and 32 SPAD words matched the memory oracle",
-                    UVM_LOW)
+                `uvm_info("DMA_RREADY_STALL_PASS", $sformatf(
+                    "%0d-cycle AXI RREADY stall held R payload stable; DMA drained and 32 SPAD words matched the memory oracle",
+                    rready_stall_cycles_requested), UVM_LOW)
             else
                 `uvm_error("DMA_RREADY_STALL", "scenario failed; PASS marker suppressed")
         end

@@ -1,5 +1,7 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 V3 prolonged AXI RREADY stress increment (candidate based on `0da26d4`):** Focused 16/64/300-cycle backpressure profiles each held `RVALID` and its payload stable, drained four accepted read responses, and matched all 32 SPAD words; UVM warning/error/fatal=`0/0/0` for each. URG stall-length bins and stall×completion crosses were 3/3 (100%); 8 DUT-facing assertions plus one UVM check succeeded, 0 failed/incomplete, with two UVM RAL no-attempts. The default three-seed DMA-SPAD regression and `ai_smoke` passed. This is prolonged response-channel evidence, not complete arbiter fairness or V3/A10 closure. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-v3-prolonged-axi-rready-backpressure-profiles).
+
 > **2026-10-18 exact-current-main V3 DMA-SPAD replay at `188e523`:** The
 > three-seed subsystem regression passed with `[TEST_DONE]`, nine runtime
 > pass markers per seed, and UVM warning/error/fatal=`0/0/0`. The focused

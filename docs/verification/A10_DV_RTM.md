@@ -1,5 +1,7 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-18 V3 prolonged DMA R-channel backpressure increment (candidate based on `0da26d4`):** The DMA-SPAD UVM test now supports explicit 16/64/300-cycle `RREADY` stalls, with UVM checks for stable AXI R payload, response drain, and all 32 SPAD words. All three profiles passed with severity `0/0/0`; URG covered all three stall bins and completion crosses (3/3 each). Assertion summary: 8 DUT-facing successes plus one UVM framework check, 0 failures/incomplete, and two UVM RAL no-attempts. The default three-seed DMA-SPAD regression and top `ai_smoke` also passed. Product RTL/SPEC/ABI are unchanged. This closes only prolonged response-channel backpressure; scheduler admission fairness and broad fault×abort×reset remain open. See the [run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-v3-prolonged-axi-rready-backpressure-profiles).
+
 > **2026-10-18 exact-current-main V3 DMA-SPAD replay (`188e523`):** On
 > Rocky Linux 8.10 / VCS+URG `V-2023.12-SP1`, three subsystem seeds each
 > emitted `[TEST_DONE]`, all nine runtime pass markers, and UVM severity

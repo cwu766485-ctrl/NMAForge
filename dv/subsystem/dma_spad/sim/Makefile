@@ -14,8 +14,10 @@ RREADY_SIMV ?= simv_dma_spad_rready_stall
 RREADY_COV_DIR ?= coverage/$(UVM_TEST)_rready_stall_seed$(SEED).vdb
 RREADY_RUN_LOG ?= $(UVM_TEST)_rready_stall_seed$(SEED).log
 RREADY_COMPILE_LOG ?= compile_$(UVM_TEST)_rready_stall_seed$(SEED).log
+RREADY_STALL_CYCLES ?= 16
+RREADY_STRESS_TAG ?= a10_rready_stress
 
-.PHONY: subsystem_compile subsystem_run subsystem_regress subsystem_coverage subsystem_rready_stall_run subsystem_clean
+.PHONY: subsystem_compile subsystem_run subsystem_regress subsystem_coverage subsystem_rready_stall_run subsystem_rready_stress subsystem_clean
 
 subsystem_compile:
 	mkdir -p $(dir $(COV_DIR))
@@ -33,11 +35,34 @@ subsystem_run: subsystem_compile
 subsystem_rready_stall_run:
 	$(MAKE) --no-print-directory subsystem_compile UVM_TEST=$(UVM_TEST)_rready_stall SIMV=$(RREADY_SIMV) COV_DIR=$(RREADY_COV_DIR) COMPILE_LOG=$(RREADY_COMPILE_LOG)
 	$(RREADY_SIMV) +UVM_TESTNAME=$(UVM_TEST) +ntb_random_seed=$(SEED) +UVM_VERBOSITY=UVM_MEDIUM \
-		+A10_RREADY_STALL_ONLY -cm line+cond+fsm+tgl+branch+assert \
+		+A10_RREADY_STALL_ONLY +A10_RREADY_STALL_CYCLES=$(RREADY_STALL_CYCLES) \
+		-cm line+cond+fsm+tgl+branch+assert \
 		-cm_dir $(RREADY_COV_DIR) -l $(RREADY_RUN_LOG)
 	@grep -q 'DMA_RREADY_STALL_PASS' $(RREADY_RUN_LOG) || { echo "ERROR: RREADY stall pass marker missing"; exit 1; }
 	@grep -q '\*\* Report counts by severity' $(RREADY_RUN_LOG) || { echo "ERROR: UVM report summary missing"; exit 1; }
 	@! grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' $(RREADY_RUN_LOG) || { echo "ERROR: UVM warning/error/fatal count is nonzero"; exit 1; }
+
+subsystem_rready_stress:
+	$(MAKE) --no-print-directory subsystem_rready_stall_run SEED=20261097 RREADY_STALL_CYCLES=16 \
+		RREADY_SIMV=./simv_$(RREADY_STRESS_TAG)_16 \
+		RREADY_COV_DIR=coverage/$(RREADY_STRESS_TAG)_16.vdb \
+		RREADY_RUN_LOG=$(RREADY_STRESS_TAG)_16.log \
+		RREADY_COMPILE_LOG=compile_$(RREADY_STRESS_TAG)_16.log
+	$(MAKE) --no-print-directory subsystem_rready_stall_run SEED=20261098 RREADY_STALL_CYCLES=64 \
+		RREADY_SIMV=./simv_$(RREADY_STRESS_TAG)_64 \
+		RREADY_COV_DIR=coverage/$(RREADY_STRESS_TAG)_64.vdb \
+		RREADY_RUN_LOG=$(RREADY_STRESS_TAG)_64.log \
+		RREADY_COMPILE_LOG=compile_$(RREADY_STRESS_TAG)_64.log
+	$(MAKE) --no-print-directory subsystem_rready_stall_run SEED=20261099 RREADY_STALL_CYCLES=300 \
+		RREADY_SIMV=./simv_$(RREADY_STRESS_TAG)_300 \
+		RREADY_COV_DIR=coverage/$(RREADY_STRESS_TAG)_300.vdb \
+		RREADY_RUN_LOG=$(RREADY_STRESS_TAG)_300.log \
+		RREADY_COMPILE_LOG=compile_$(RREADY_STRESS_TAG)_300.log
+	$(URG) -full64 -dir coverage/$(RREADY_STRESS_TAG)_16.vdb \
+		-dir coverage/$(RREADY_STRESS_TAG)_64.vdb \
+		-dir coverage/$(RREADY_STRESS_TAG)_300.vdb \
+		-report coverage/urg_$(RREADY_STRESS_TAG)
+	@test -f coverage/urg_$(RREADY_STRESS_TAG)/dashboard.html || { echo "ERROR: RREADY stress URG dashboard missing"; exit 1; }
 
 subsystem_regress:
 	@set -e; for seed in $(SEEDS); do \
