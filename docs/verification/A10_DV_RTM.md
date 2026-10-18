@@ -1,5 +1,15 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-18 exact-current-main V3 DMA-SPAD replay (`188e523`):** On
+> Rocky Linux 8.10 / VCS+URG `V-2023.12-SP1`, three subsystem seeds each
+> emitted `[TEST_DONE]`, all nine runtime pass markers, and UVM severity
+> `0/0/0`. The focused 16-cycle AXI RREADY-stall test held the response
+> payload stable and matched all 32 SPAD words. Selected URG groups were
+> 100%; 29 assertions succeeded, 0 failed/incomplete, two UVM RAL internals
+> were unattempted, and both selected covers matched. This closes only the
+> exercised V3 subsystem/backpressure slice, not all V3 or A10. See the
+> [exact-main run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v3-dma-spad-subsystem-replay-at-188e523).
+
 > **2026-10-18 exact-current-main V1 FP replay (`08f398e`):** On Rocky 8.10 /
 > VCS+URG `V-2023.12-SP1_Full64`, the selected directed core and four
 > maximum-length BF16/FP16 A/B parity-drain/no-reset-recovery cases passed.
