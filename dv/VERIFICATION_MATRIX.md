@@ -1,5 +1,15 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 exact-current-main V1 FP replay at `08f398e`:** Directed core
+> and all four maximum-length BF16/FP16 A/B parity drain/recovery scenarios
+> passed. Three UVM seeds passed 484/484 bit-exact transactions each with
+> UVM warning/error/fatal=`0/0/0`; URG selected FP groups were 100%, with
+> 22,676 successes on the DUT stalled-request stability assertion and both
+> selected covers matched. Python model passed 19/19. DUT line/condition/FSM/
+> branch coverage was 97.96/97.00/85.71/92.86%; residual coverage disposition
+> and full-domain parity-to-writeback proof remain open. This is a scoped V1
+> slice, not V1/A10 closure. See the [run evidence](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v1-fp-replay-at-08f398e).
+
 > **2026-10-18 exact-current-main V2 CP replay at `e24b770`:** The full CP
 > scenario suite passed across 72/72 mixed error/abort/reset profiles (three
 > seeds × 24 profiles), each with 31/31 scenario bins and UVM severity

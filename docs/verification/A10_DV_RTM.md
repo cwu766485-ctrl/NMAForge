@@ -1,5 +1,15 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-18 exact-current-main V1 FP replay (`08f398e`):** On Rocky 8.10 /
+> VCS+URG `V-2023.12-SP1_Full64`, the selected directed core and four
+> maximum-length BF16/FP16 A/B parity-drain/no-reset-recovery cases passed.
+> Three UVM seeds passed 484/484 bit-exact transactions each with severity
+> `0/0/0`; all six selected functional groups were 100%, and Python reference
+> tests passed 19/19. The DUT core measured line/condition/FSM/branch
+> `97.96/97.00/85.71/92.86%`; residual code coverage and full-domain
+> parity-to-writeback proof remain open. This is a focused V1 slice, not V1 or
+> A10 closure. See the [exact-main run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v1-fp-replay-at-08f398e).
+
 > **2026-10-18 V2 exact-main CP mixed-reset replay (`e24b770`):** Current
 > pushed main passed 72/72 complete CP-suite profiles (3 seeds × 24 error,
 > abort-delay, and completion-reset combinations), each with all 31 scenario
