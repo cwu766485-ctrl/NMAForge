@@ -20,17 +20,27 @@ sim_run 2
 sim_save_reset
 check_fv_setup -verbose
 formal_setup_config -period 10 -initial 1 -apply true
-if {[info exists ::env(PARITY_FORMAL_PROPERTIES)]} {
-    set CHECK_PROPERTIES {}
-    foreach PROPERTY_NAME [split $::env(PARITY_FORMAL_PROPERTIES) ","] {
-        lappend CHECK_PROPERTIES \
-            "ai_fp_core_parity_full_lifecycle_assume_top.${PROPERTY_NAME}"
+if {[info exists ::env(PARITY_FORMAL_COVERS)]} {
+    set CHECK_COVERS {}
+    foreach COVER_NAME [split $::env(PARITY_FORMAL_COVERS) ","] {
+        lappend CHECK_COVERS \
+            "ai_fp_core_parity_full_lifecycle_assume_top.${COVER_NAME}"
     }
+    check_fv -property $CHECK_COVERS
+    report_fv -usage cover -verbose
 } else {
-    set CHECK_PROPERTIES [list \
-        ai_fp_core_parity_full_lifecycle_assume_top.ap_parity_progress_stays_before_cutoff \
-        ai_fp_core_parity_full_lifecycle_assume_top.ap_writeback_excludes_pending_parity]
+    if {[info exists ::env(PARITY_FORMAL_PROPERTIES)]} {
+        set CHECK_PROPERTIES {}
+        foreach PROPERTY_NAME [split $::env(PARITY_FORMAL_PROPERTIES) ","] {
+            lappend CHECK_PROPERTIES \
+                "ai_fp_core_parity_full_lifecycle_assume_top.${PROPERTY_NAME}"
+        }
+    } else {
+        set CHECK_PROPERTIES [list \
+            ai_fp_core_parity_full_lifecycle_assume_top.ap_parity_progress_stays_before_cutoff \
+            ai_fp_core_parity_full_lifecycle_assume_top.ap_writeback_excludes_pending_parity]
+    }
+    check_fv -property $CHECK_PROPERTIES
+    report_fv -usage assert -verbose
 }
-check_fv -property $CHECK_PROPERTIES
-report_fv -usage assert -verbose
 exit

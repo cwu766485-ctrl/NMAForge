@@ -33,6 +33,8 @@
 > parity-to-writeback, V1-FP-04, VCS/URG replay, and A10 remain open. See the
 > [run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-current-main-canonical-v1-fp-formal-at-c9b80f8).
 
+> **2026-10-18 final-pair parity reachability follow-up (working source based on `decb969`):** Added diagnostic covers for a parity response coinciding with `pair_ready` at the final element. VC Formal `V-2023.12-SP2` classified that overlap as `uncoverable` for lengths ≤4 (safe depth 41), but the unrestricted 16-bit cover remained `checking` through 180 s and timed out. This is not full-domain unreachability and does not close V1-FP-04. The canonical focused FP target still passed 12/12 assertions and 2/2 covers after Tcl selector changes. VCS/UVM current-commit replay and A10 closure remain open. See the [run record](A10_DV_RUN_2026-10-18_MAIN452.md#final-pair-parity-reachability-cover-2026-10-18).
+
 > **2026-10-18 V3 downstream AXI backpressure increment:** Added bounded
 > DMA R-channel `RREADY` stall coverage: hold the DUT-side ready low for 16
 > cycles during valid response, check stable response payload, release, and

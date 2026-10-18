@@ -5,7 +5,7 @@ VCF ?= vcf
 FORMAL_PROBE_TIMEOUT ?= 150
 FORMAL_TCL := $(abspath run_vcf.tcl)
 
-.PHONY: run parity-probe parity-reach parity-exclusion parity-cutoff-bound parity-frontier parity-bounded parity-bounded-new-parity-last-compute check-parity-bounded parity-full-domain parity-full-cutoff parity-full-accounting check-parity-full-accounting parity-full-index-bound parity-full-response-bound parity-full-accepted-count-bound parity-full-response-assume parity-full-cutoff-assume parity-full-lifecycle-assume parity-full-progress-assume parity-full-writeback-assume parity-full-frontier-assume parity-full-ready-frontier-assume parity-full-pair-tag-match parity-full-current-pair-tag parity-full-tag-response-bound parity-full-current-pair-tag-control-abstract parity-full-writeback-control-abstract parity-full-static-slot-tags parity-full-transition-lemmas parity-full-local-transition-lemmas parity-full-pending-last-compute parity-full-new-parity-last-compute parity-full-final-pair-not-ready-on-parity-response parity-full-parity-cutoff-last-element parity-full-last-compute-write-transition parity-full-last-compute-write-state
+.PHONY: run parity-probe parity-reach parity-exclusion parity-cutoff-bound parity-frontier parity-bounded parity-bounded-new-parity-last-compute check-parity-bounded parity-full-domain parity-full-cutoff parity-full-accounting check-parity-full-accounting parity-full-index-bound parity-full-response-bound parity-full-accepted-count-bound parity-full-response-assume parity-full-cutoff-assume parity-full-lifecycle-assume parity-full-progress-assume parity-full-writeback-assume parity-full-frontier-assume parity-full-ready-frontier-assume parity-full-pair-tag-match parity-full-current-pair-tag parity-full-tag-response-bound parity-full-current-pair-tag-control-abstract parity-full-writeback-control-abstract parity-full-static-slot-tags parity-full-transition-lemmas parity-full-local-transition-lemmas parity-full-pending-last-compute parity-full-new-parity-last-compute parity-full-final-pair-not-ready-on-parity-response parity-full-final-pair-cover parity-full-parity-cutoff-last-element parity-full-last-compute-write-transition parity-full-last-compute-write-state
 run:
 	mkdir -p "$(OUT)"
 	cd "$(OUT)" && $(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
@@ -287,6 +287,30 @@ parity-full-final-pair-not-ready-on-parity-response:
 		{ echo "Final-pair ownership setup gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
 	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
 		{ echo "Final-pair ownership formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
+
+# Diagnostic cover only: a miss or timeout is inconclusive and must not be
+# reported as an unreachability proof.
+parity-full-final-pair-cover:
+	mkdir -p "$(OUT)"
+	cd "$(OUT)" && PARITY_FORMAL_COVERS=cp_final_pair_ready_on_parity_response_small_length,cp_final_pair_ready_on_parity_response_all_lengths \
+		timeout --kill-after=5s "$(FORMAL_PROBE_TIMEOUT)s" \
+		$(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
+		-f "$(abspath run_parity_full_lifecycle_assume.tcl)" -output_log_file vc_formal.log; \
+		rc=$$?; echo $$rc > vcf_exit_code; \
+		if [ $$rc -ne 0 ] && [ $$rc -ne 124 ]; then exit $$rc; fi
+	@grep -Fq "No setup issues found" "$(OUT)/vc_formal.log" || \
+		{ echo "Final-pair reachability cover setup gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
+		{ echo "Final-pair reachability cover formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@if grep -Fq "cp_final_pair_ready_on_parity_response_all_lengths  uncoverable" "$(OUT)/vc_formal.log"; then \
+		echo "FINAL_PAIR_PARITY_OVERLAP_PROVEN_UNCOVERABLE_UNDER_HARNESS_ASSUMPTIONS; inspect $(OUT)/vc_formal.log"; \
+	elif grep -Fq "cp_final_pair_ready_on_parity_response_all_lengths  covered:" "$(OUT)/vc_formal.log"; then \
+		echo "FINAL_PAIR_PARITY_OVERLAP_REACHED; inspect trace/report in $(OUT)/vc_formal.log"; \
+	elif [ -f "$(OUT)/vcf_exit_code" ] && [ "$$(cat "$(OUT)/vcf_exit_code")" -eq 124 ]; then \
+		echo "FINAL_PAIR_ALL_LENGTHS_COVER_TIMED_OUT; inconclusive, not unreachability proof"; \
+	else \
+		echo "FINAL_PAIR_PARITY_COVER_NOT_CLASSIFIED; inspect $(OUT)/vc_formal.log"; exit 1; \
+	fi
 
 parity-full-parity-cutoff-last-element:
 	mkdir -p "$(OUT)"

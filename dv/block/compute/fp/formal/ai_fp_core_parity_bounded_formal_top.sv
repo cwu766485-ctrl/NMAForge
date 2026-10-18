@@ -528,6 +528,19 @@ module ai_fp_core_parity_full_lifecycle_assume_top (
     cp_parity_response_at_two_outstanding: cover property (
         @(posedge clk) disable iff (!resetn)
         dut.response_parity_failure && (dut.outstanding_reads_r == 2));
+    // Diagnostic reachability probe for the unresolved final-pair question.
+    // The length bound keeps the witness search focused on the smallest
+    // packed-word boundary cases; failure to reach this cover is not a proof
+    // that the event is unreachable for the full 16-bit length domain.
+    cp_final_pair_ready_on_parity_response_small_length: cover property (
+        @(posedge clk) disable iff (!resetn)
+        (dut.length_r <= 16'd4) &&
+        (dut.state_r == ST_RUN) && dut.response_parity_failure &&
+        dut.last_element && dut.pair_ready);
+    cp_final_pair_ready_on_parity_response_all_lengths: cover property (
+        @(posedge clk) disable iff (!resetn)
+        (dut.state_r == ST_RUN) && dut.response_parity_failure &&
+        dut.last_element && dut.pair_ready);
     cp_parity_error_retires: cover property (
         @(posedge clk) disable iff (!resetn)
         dut.done && dut.error && (dut.error_code == ERR_PARITY));

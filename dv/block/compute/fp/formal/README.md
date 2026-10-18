@@ -637,3 +637,32 @@ pair can already be ready under ordered responses. The diagnostic assertion
 was removed; this result is not evidence of an RTL defect. Its output is kept
 locally at `/tmp/nmaforge_a10_fp_parity_compute_admission_20261018/`.
 Production RTL, SPEC, and ABI were unchanged.
+
+### 2026-10-18 final-pair reachability cover
+
+Added `cp_final_pair_ready_on_parity_response_small_length` (length ≤ 4) and
+`cp_final_pair_ready_on_parity_response_all_lengths` to distinguish a concrete
+same-cycle overlap from a difficult assertion proof. Both use the existing
+full-lifecycle harness assumptions: legal nonzero length/aligned bases,
+no abort/watchdog, ordered in-range SPAD responses, and no response without
+an outstanding read. The cover does not constrain parity itself.
+
+Command:
+
+```sh
+make -C dv/block/compute/fp/formal parity-full-final-pair-cover VCF=vcf \
+  OUT=/tmp/nmaforge_a10_fp_final_pair_reach_cover_retry_20261018 \
+  FORMAL_PROBE_TIMEOUT=180
+```
+
+VC Formal `V-2023.12-SP2` had clean setup and classified the bounded
+length-≤4 overlap as `uncoverable` at safe depth 41. The unrestricted
+16-bit-length cover remained `checking` until the 180 s timeout (exit 124),
+with no witness or unreachability result; no formal process remained afterward.
+Therefore the result supports only the length-≤4 subset and does not close the
+full-domain same-cycle question or V1-FP-04. A 30 s runner smoke confirmed the
+Make target now exits successfully while explicitly printing
+`FINAL_PAIR_ALL_LENGTHS_COVER_TIMED_OUT`; this is an orchestration check, not a
+second full-domain proof. The canonical FP target was also rerun after Tcl
+selector changes and passed its unchanged 12 assertions and 2 covers. Details:
+[2026-10-18 current-main run record](../../../../../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md).
