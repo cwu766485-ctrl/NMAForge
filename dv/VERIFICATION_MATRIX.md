@@ -1,5 +1,13 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 exact-main CP/Completion replay (`b4c9f8b`):** Three seeds ×
+> 24 mixed profiles passed 72/72, each with 31/31 scenario bins and UVM
+> severity `0/0/0`. URG `cp_cg` was 61/61 variables + 34/34 crosses; the
+> mixed reset and abort-timing groups passed their gates. Thirteen assertions
+> succeeded, zero failed/incomplete, two UVM RAL no-attempts; four covers
+> matched. CP raw condition/branch coverage remains 90.48%/97.01%, so this is
+> not full CP/V2 closure. See the [run evidence](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-cpcompletion-coverage-replay-at-b4c9f8b).
+
 > **2026-10-18 exact-main FP directed increment (`bcc1fba`):** `dot-core-test`
 > passed the directed core suite and four maximum-length final-word parity
 > cases (BF16/FP16 × A/B); all 65,536 accepted reads drained, failed jobs made

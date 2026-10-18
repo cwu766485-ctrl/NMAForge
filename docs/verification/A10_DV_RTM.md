@@ -1,5 +1,15 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-18 exact-main V2 CP/Completion matrix replay (`b4c9f8b`):** The
+> three-seed × 24-profile campaign passed 72/72 profiles with 31/31 scenario
+> bins and UVM severity `0/0/0`. URG: `cp_cg` 61/61 variables + 34/34 crosses,
+> mixed reset words 4/4, kind × delay × reset 24/24, abort timing 7/7; 13
+> assertions succeeded, 0 failed/incomplete, two UVM RAL no-attempts, and four
+> covers matched. CP raw coverage remains 250/250 lines, 228/252 conditions,
+> 6/6 states + 13/13 transitions, 65/67 branches; completion writer remains
+> 100% on line/condition/FSM/branch. This closes only the exercised profile
+> matrix, not all V2/A10. See the [run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-cpcompletion-coverage-replay-at-b4c9f8b).
+
 > **2026-10-18 exact-main V1 directed-core refresh (`bcc1fba`):** `dot-core-test`
 > passed the BF16 dot-core directed suite and all four maximum-length parity
 > combinations (BF16/FP16 × final A/B word). Each failed operation drained
