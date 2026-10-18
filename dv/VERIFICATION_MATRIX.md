@@ -444,6 +444,8 @@ full 19-test DMA regression passed with per-test UVM warning/error/fatal
 `0/0/0`; the random test scored 20/20 transfers, URG merged, all 11 named DMA
 DUT SVA had real successes, and top `ai_smoke` printed `TEST PASS`. A first
 tail-test attempt caught a testbench expected-mask formula error; it was fixed
-before the passing rerun. This is candidate dirty-worktree evidence based on
-parent SHA `d6fa711`, not a clean-SHA replay. DMA raw coverage and V3/A10/V5
-closure remain open; see the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-dma-burst-planner-4-kib-split-and-partial-tail-coverage-increment).
+before the passing rerun. The full 19-test suite, URG merge, and top smoke were
+then replayed at pushed SHA `264230a75bd5d4cba97b88dc592290e0f8892ef5` with
+per-test warning/error/fatal=`0/0/0`, 20/20 random transfers scored, and
+`TEST PASS`. DMA raw residual coverage and V3/A10/V5 closure remain open; see
+the [exact-main run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-dma-planner-edge-replay-at-264230a).

@@ -98,7 +98,7 @@ each coverage campaign isolated. Do not treat a clean compile, an empty log, or
 a single smoke as closure. The pass condition is the per-test UVM summary plus
 scoreboard/SVA evidence and reviewed aggregate URG.
 
-## Latest DMA planner-edge increment (2026-10-18)
+## Exact-main DMA planner-edge increment (2026-10-18)
 
 The full DMA block regression now has 19 named tests. Both new directed tests
 (`dma_4k_edge_load_test`, `dma_short_tail_store_test`) and the 19-test
@@ -107,8 +107,10 @@ transfers scored, URG merged, and top `ai_smoke` printed `TEST PASS`. The
 planner boundary test proves the exact 4-KiB split from `0x1ff0`; the tail
 test checks 1/2/3-word WSTRB masks and response drain. A first tail-test
 attempt exposed an incorrect expected-mask formula in the testbench; after
-correction, DUT data/masks and all regression checks passed. Exact coverage,
-commands, and the failure disposition are in the
-[A10 run record](../../../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-dma-burst-planner-4-kib-split-and-partial-tail-coverage-increment).
-This is candidate dirty-worktree evidence; it does not close all DMA RTL
-coverage or V3/A10/V5.
+correction, DUT data/masks and all regression checks passed. The pushed SHA
+`264230a75bd5d4cba97b88dc592290e0f8892ef5` was then replayed with the 19-test
+DMA suite, URG, and top smoke. That replay also passed and printed `TEST PASS`;
+the evidence is exact-SHA reproducibility for this directed increment, not
+closure of all DMA RTL coverage or V3/A10/V5. Commands, exact coverage, and
+the failure disposition are in the
+[A10 run record](../../../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-dma-planner-edge-replay-at-264230a).

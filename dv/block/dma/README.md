@@ -93,7 +93,7 @@ RTL revision and are not a signoff claim. The exact log and assertion
 disposition are recorded in
 [`A10_DV_RUN_2026-10-18_MAIN452.md`](../../../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md).
 
-## Latest planner-edge result (2026-10-18)
+## Exact-main planner-edge result (2026-10-18)
 
 The DMA block suite now contains 19 tests. `dma_4k_edge_load_test` verified a
 12-word transfer beginning at `0x1ff0` splits into AR bursts at `0x1ff0`
@@ -102,7 +102,10 @@ WSTRB masks for 1/2/3-word writes and drained all three B responses. The two
 focused tests and full 19-test UVM regression passed with per-test severity
 `0/0/0`; 20/20 random transfers scored, URG merged, and top `ai_smoke` passed.
 All 11 named DMA DUT SVA had real successes; two of 14 aggregate assertion
-entries were unattempted UVM RAL internals, with no failures/incomplete. This
-candidate includes no RTL change and is not a clean-SHA replay. Exact details
-and residual limits are in the
-[A10 run record](../../../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-dma-burst-planner-4-kib-split-and-partial-tail-coverage-increment).
+entries were unattempted UVM RAL internals, with no failures/incomplete. The
+same 19-test suite, URG merge, and smoke were replayed at pushed SHA
+`264230a75bd5d4cba97b88dc592290e0f8892ef5`: all 19 per-test severities were
+`0/0/0`, random stress scored 20/20, and top `ai_smoke` printed `TEST PASS`.
+This remains a directed slice, not complete DMA coverage or V3/A10/V5 closure.
+Exact commands, assertion disposition, and coverage metrics are in the
+[A10 run record](../../../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-dma-planner-edge-replay-at-264230a).

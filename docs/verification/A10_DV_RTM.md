@@ -411,12 +411,15 @@ corresponding low byte strobes and retire all responses.
 and scoreboard data for a 12-word load from `0x1ff0`; `dma_short_tail_store_test`
 monitors WSTRB for 1/2/3-word stores and checks B drain plus scoreboard data.
 
-**Evidence/status:** Both focused tests, full DMA UVM 19/19, URG merge, and top
-`ai_smoke` passed on the 2026-10-18 candidate worktree based on parent `d6fa711`;
-all per-test UVM warning/error/fatal=`0/0/0`. The exact AXI split was
-`0x1ff0/LEN0` then `0x2000/LEN1`; masks were `000f/00ff/0fff`. This is a
+**Evidence/status:** Both new directed tests were included in the full DMA UVM
+regression (19/19); URG merge and top `ai_smoke` were also replayed at exact
+pushed `main` SHA `264230a75bd5d4cba97b88dc592290e0f8892ef5`; all per-test UVM
+warning/error/fatal=`0/0/0`. The exact AXI split was `0x1ff0/LEN0` then
+`0x2000/LEN1`; masks were `000f/00ff/0fff`. The random DMA test scored 20/20
+transfers; URG `dma_cmd_cg` variables/crosses were 100%, and all 11 named DMA
+DUT SVA properties had real successes with no failures/incomplete. This is a
 directed slice only, not complete DMA coverage or V3/A10/V5 closure. See the
-[run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-dma-burst-planner-4-kib-split-and-partial-tail-coverage-increment).
+[exact-main run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-dma-planner-edge-replay-at-264230a).
 
 ## V4 — Top-Level AI Accelerator UVM
 
