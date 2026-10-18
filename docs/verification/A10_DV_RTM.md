@@ -1,5 +1,13 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-18 exact-main V1 directed-core refresh (`bcc1fba`):** `dot-core-test`
+> passed the BF16 dot-core directed suite and all four maximum-length parity
+> combinations (BF16/FP16 × final A/B word). Each failed operation drained
+> 65,536 accepted reads, maintained peak outstanding=2, suppressed writeback,
+> then recovered with result `0x3f800000`. This strengthens the V1 directed
+> simulation slice but does not close V1-FP-04: the full-domain formal
+> parity-to-writeback property remains inconclusive. See the [run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-fp-directed-core-and-maximum-parity-replay-at-bcc1fba).
+
 > **2026-10-18 exact pushed-main G0 replay (`1fe66f0`):** On Rocky Linux
 > 8.10 / VCS+URG `V-2023.12-SP1_Full64`, FP UVM passed 3 seeds × 200 random
 > vectors per format (484/484 bit-exact transactions per seed, severity

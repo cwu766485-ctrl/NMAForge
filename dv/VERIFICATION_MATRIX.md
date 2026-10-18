@@ -1,5 +1,12 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 exact-main FP directed increment (`bcc1fba`):** `dot-core-test`
+> passed the directed core suite and four maximum-length final-word parity
+> cases (BF16/FP16 × A/B); all 65,536 accepted reads drained, failed jobs made
+> no result write, peak outstanding was 2, and each post-error recovery passed.
+> This is a V1 simulation increment; full-domain formal parity disposition
+> remains open. See the [run evidence](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-fp-directed-core-and-maximum-parity-replay-at-bcc1fba).
+
 > **2026-10-18 exact pushed-main selected baseline (`1fe66f0`):** FP UVM
 > passed 3 seeds × 200 random vectors per format with 484/484 bit-exact
 > transactions per seed; Python FP model tests passed 19/19; Control UVM
