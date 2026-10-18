@@ -24,6 +24,15 @@
 > coverage disposition when a Synopsys-supported execution environment is
 > available. Details: [2026-10-18 run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-98675d08-replay-attempt).
 
+> **2026-10-18 current-main canonical V1 formal at `c9b80f8`:** A clean
+> detached worktree at the pushed `main` commit passed VC Formal setup and all
+> 12 selected canonical assertions; ten implication properties were reported
+> non-vacuous, while the two direct Boolean invariants have no antecedent-based
+> vacuity metric. Both selected covers were reached (depths 2 and 7). This is
+> exact-commit evidence for the canonical focused invariants only; full-domain
+> parity-to-writeback, V1-FP-04, VCS/URG replay, and A10 remain open. See the
+> [run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-current-main-canonical-v1-fp-formal-at-c9b80f8).
+
 > **2026-10-18 V3 downstream AXI backpressure increment:** Added bounded
 > DMA R-channel `RREADY` stall coverage: hold the DUT-side ready low for 16
 > cycles during valid response, check stable response payload, release, and
