@@ -184,6 +184,10 @@ module cp_completion_ownership_formal_top (
         @(posedge clk) disable iff (!resetn)
         (u_cp.state_r == 4'd2) |-> !(u_cp.abort_pending_r && !abort));
 
+    ap_decode_compute_busy_blocks_launch: assert property (
+        @(posedge clk) disable iff (!resetn)
+        ((u_cp.state_r == 4'd2) && compute_busy) |=> !launch_valid);
+
     cp_completion_done_owned_by_cpl: cover property (
         @(posedge clk) disable iff (!resetn)
         writer_done && (u_cp.state_r == 4'd4));
@@ -192,4 +196,11 @@ module cp_completion_ownership_formal_top (
         @(posedge clk) disable iff (!resetn)
         writer_done && (u_cp.state_r == 4'd4) && u_cp.queue_run_r &&
         (u_cp.cmdq_head_index != cmdq_tail));
+
+    cp_decode_compute_busy_release_launch: cover property (
+        @(posedge clk) disable iff (!resetn)
+        ((u_cp.state_r == 4'd2) && compute_busy && !launch_valid)
+        ##1 ((u_cp.state_r == 4'd2) && compute_busy && !launch_valid)
+        ##1 ((u_cp.state_r == 4'd2) && !compute_busy && !launch_valid)
+        ##1 ((u_cp.state_r == 4'd3) && launch_valid));
 endmodule

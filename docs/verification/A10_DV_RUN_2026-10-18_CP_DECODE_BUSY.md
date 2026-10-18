@@ -81,6 +81,25 @@ Top-level smoke passed and printed `TEST PASS`:
 make -C dv/subsystem/top_smoke/sim ai_smoke
 ```
 
+## Formal follow-up: decode compute-busy launch guard
+
+On the pushed baseline `b924bb0` plus the local formal-harness update, VC Formal
+`V-2023.12-SP2` completed with clean setup. Four assertions were proven and
+all four were non-vacuous; all three covers were reached. The new property
+proves that a decode-state cycle with `compute_busy=1` cannot produce a launch
+in the following cycle. Its cover reaches two busy decode cycles, a release
+cycle, then the expected launch. No DUT RTL, SPEC, or ABI changed.
+
+```sh
+make -C dv/block/command_processor/formal completion-ownership \
+  OUT=/tmp/nmaforge_cp_completion_ownership_decodebusy_20261018 VCF=vcf
+```
+
+The gated target printed `CP_COMPLETION_OWNERSHIP_FORMAL_PASS`; setup reported
+`No setup issues found`. The run took 34.42 s wall time (5.59 s formal-engine
+wall time; 1,297 MB peak process memory). Artifacts are under the `/tmp` output
+directory above.
+
 ## Limits and next work
 
 The 23 remaining raw condition outcomes have not been fully classified as
