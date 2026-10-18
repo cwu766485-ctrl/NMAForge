@@ -101,6 +101,9 @@ ai_spad_arb_run: ai_spad_arb_comp
 		{ echo "SPAD arbiter CNM/DMA contention marker missing"; exit 1; }
 	@grep -q 'Scratchpad response parity alignment PASS' ai_spad_arb_run.log || \
 		{ echo "SPAD arbiter response/parity marker missing"; exit 1; }
+	./simv_spad_arb +SPAD_RR_MODE_CYCLES=10000 -l ai_spad_arb_10k_run.log
+	@grep -q 'Seeded request-mode SPAD RR PASS cycles=10000' ai_spad_arb_10k_run.log || \
+		{ echo "SPAD arbiter 10000-cycle seeded request-mode marker missing"; exit 1; }
 
 ai_upgrade_vcs: ai_dma_run ai_spad_arb_run ai_quick
 

@@ -56,7 +56,7 @@ module tb_ai_spad_arbiter_rr;
   integer cnm_grants, dma_line_grants;
   integer core_rr_grants, banked_rr_grants, dma_rr_grants;
   integer core_wait_cycles, banked_wait_cycles, dma_wait_cycles;
-  integer rr_mode_cycle, rr_mode_drain;
+  integer rr_mode_cycle, rr_mode_drain, rr_mode_cycles;
   integer rr_mode_core_grants, rr_mode_banked_grants, rr_mode_dma_grants;
   integer rr_mode_core_wait, rr_mode_banked_wait, rr_mode_dma_wait;
   integer rr_mode_core_max_wait, rr_mode_banked_max_wait, rr_mode_dma_max_wait;
@@ -289,6 +289,12 @@ module tb_ai_spad_arbiter_rr;
     // after its handshake. This exercises scalar/line and banked/CNM paths
     // under repeated arbitration stalls without inventing downstream memory
     // back-pressure (the scheduler-side SPAD port has no ready input).
+    rr_mode_cycles=300;
+    if ($value$plusargs("SPAD_RR_MODE_CYCLES=%d", rr_mode_cycles)) begin
+      if (rr_mode_cycles<300 || rr_mode_cycles>1000000)
+        $fatal(1,"SPAD_RR_MODE_CYCLES must be in 300..1000000, got %0d",
+               rr_mode_cycles);
+    end
     rr_mode_seed=32'hA10D2026;
     rr_mode_core_grants=0; rr_mode_banked_grants=0; rr_mode_dma_grants=0;
     rr_mode_core_wait=0; rr_mode_banked_wait=0; rr_mode_dma_wait=0;
@@ -306,7 +312,7 @@ module tb_ai_spad_arbiter_rr;
     rr_mode_seed=xorshift32(rr_mode_seed);
     if (rr_mode_seed[0]) dma_line_valid=1; else dma_valid=1;
 
-    for (rr_mode_cycle=0; rr_mode_cycle<300; rr_mode_cycle=rr_mode_cycle+1) begin
+    for (rr_mode_cycle=0; rr_mode_cycle<rr_mode_cycles; rr_mode_cycle=rr_mode_cycle+1) begin
       @(negedge clk);
       check_rr_mode_cycle();
       if (!(rr_mode_core_fire || rr_mode_banked_fire || rr_mode_dma_fire))
@@ -314,7 +320,7 @@ module tb_ai_spad_arbiter_rr;
       @(posedge clk);
       #1;
       if (rr_mode_core_fire) begin
-        if (rr_mode_cycle==299) begin
+        if (rr_mode_cycle==rr_mode_cycles-1) begin
           core_valid=0; core_line_valid=0;
         end else begin
           rr_mode_seed=xorshift32(rr_mode_seed);
@@ -323,7 +329,7 @@ module tb_ai_spad_arbiter_rr;
         end
       end
       if (rr_mode_banked_fire) begin
-        if (rr_mode_cycle==299) begin
+        if (rr_mode_cycle==rr_mode_cycles-1) begin
           banked_valid=0; cnm_valid=0;
         end else begin
           rr_mode_seed=xorshift32(rr_mode_seed);
@@ -332,7 +338,7 @@ module tb_ai_spad_arbiter_rr;
         end
       end
       if (rr_mode_dma_fire) begin
-        if (rr_mode_cycle==299) begin
+        if (rr_mode_cycle==rr_mode_cycles-1) begin
           dma_valid=0; dma_line_valid=0;
         end else begin
           rr_mode_seed=xorshift32(rr_mode_seed);
@@ -368,8 +374,9 @@ module tb_ai_spad_arbiter_rr;
              rr_mode_core_grants,rr_mode_banked_grants,rr_mode_dma_grants,
              rr_mode_core_scalar,rr_mode_core_line,rr_mode_banked_single,
              rr_mode_banked_cnm,rr_mode_dma_scalar,rr_mode_dma_line);
-    $display("Seeded request-mode SPAD RR PASS grants=%0d/%0d/%0d max_wait=%0d/%0d/%0d modes core=%0d/%0d banked=%0d/%0d dma=%0d/%0d",
-             rr_mode_core_grants,rr_mode_banked_grants,rr_mode_dma_grants,
+    $display("Seeded request-mode SPAD RR PASS cycles=%0d grants=%0d/%0d/%0d max_wait=%0d/%0d/%0d modes core=%0d/%0d banked=%0d/%0d dma=%0d/%0d",
+             rr_mode_cycles,rr_mode_core_grants,rr_mode_banked_grants,
+             rr_mode_dma_grants,
              rr_mode_core_max_wait,rr_mode_banked_max_wait,rr_mode_dma_max_wait,
              rr_mode_core_scalar,rr_mode_core_line,rr_mode_banked_single,
              rr_mode_banked_cnm,rr_mode_dma_scalar,rr_mode_dma_line);
