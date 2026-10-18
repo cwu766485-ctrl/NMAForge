@@ -28,6 +28,7 @@ by response arrival order.
 | `dma_2d_load_test` | 3×6, DDR/SPAD stride | row-address and data scoreboard | **PASS** in VCS |
 | `dma_gather_load_test` | 3×4, SPAD-held DDR row pointers | index addressing and data scoreboard | **PASS** in VCS |
 | `dma_store_booo_test` | 16 words, two write bursts, newest-first B | AW/W/WLAST, BID order, SPAD→DDR data | **PASS** in VCS |
+| `dma_store_four_booo_test` | 32 words, four tagged write bursts held until four B responses are pending, newest-first B | exercises IDs 8–11, exact reverse completion order, empty response window, SPAD→DDR data | **PASS**, focused and full 17-test VCS regression, 2026-10-18 |
 | `dma_2d_store_test` | 3×5 strided store | row-address and data scoreboard | **PASS** in VCS |
 | `dma_narrow_load_test` | address offset 4, 7 words | narrow bus lane then line data | **PASS** in VCS |
 | `dma_4k_load_test` | address `0x1fc0`, 40 words | no AR 4 KiB crossing, data | **PASS** in VCS |
@@ -39,6 +40,10 @@ by response arrival order.
 | `dma_config_error_test` | unaligned DDR source address | `ERR_CONFIG`, zero accepted AXI traffic | **PASS** in VCS |
 | `dma_backpressure_test` | deterministic stalls + OOO R | no timeout, data/SVA clean | **PASS** in VCS |
 | `dma_random_stress_test` | 20 constrained-random legal 1-D load/store commands | every command scores cleanly; replay through `SEED` | **PASS** in VCS |
+
+## Four write-ID slot coverage increment (2026-10-18)
+
+On the candidate based on parent `3014be4`, the focused `dma_store_four_booo_test` and full 17-test DMA UVM regression passed on Rocky 8.10 / VCS+URG `V-2023.12-SP1_Full64`; all tests reported warning/error/fatal=`0/0/0`. The test holds four write responses pending, checks IDs `8..11` accepted and `11..8` completed, verifies all 32 DDR words, and requires the B-response window to drain. `ai_smoke` also passed. The write-response tracker now has 100% line and branch coverage in this suite; residual planner conditions and full DMA/V3 coverage disposition remain open. Exact commands, coverage metrics, and limits are in the [run record](../../../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-dma-four-write-id-slot-coverage-increment).
 
 ## Assertions
 

@@ -16,6 +16,10 @@ verification roles:
 - `dma_block_scoreboard`: checks every transfer word and owns functional
   coverage.  It does not assume that AXI responses are FIFO.
 
+## Latest write-response slot result (2026-10-18)
+
+`dma_store_four_booo_test` holds all four write responses pending, then returns IDs newest-first (`11,10,9,8`) after accepting `8,9,10,11`. The scoreboard checks all 32 DDR words and confirms the response window drains. The focused test, all 17 DMA UVM tests, URG merge, and top `ai_smoke` passed on Rocky 8.10 / VCS+URG `V-2023.12-SP1_Full64`; per-test UVM warning/error/fatal was `0/0/0`. URG gives `ai_dma_write_response_tracker` 100% line and branch coverage, while condition coverage remains 66.67%; reachable burst-planner edge cases and broader V3 closure remain open. Artifacts are local under `/tmp/nmaforge_a10_dma_write4_3014be4_20261018/`. See the [A10 run record](../../../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-dma-four-write-id-slot-coverage-increment).
+
 ## Test matrix
 
 | Test | Feature / intentional stress | Oracle / acceptance |
@@ -24,6 +28,7 @@ verification roles:
 | `dma_2d_load_test` | 3 rows, independent DDR/SPAD strides | all row addresses and words match |
 | `dma_gather_load_test` | SPAD index table selects three non-contiguous DDR rows | index read/address generation and output rows match |
 | `dma_store_booo_test` | two write bursts and newest-first BID response | AW/W/WLAST plus every DDR word match; BID response is out of order |
+| `dma_store_four_booo_test` | four tagged write bursts held until all four B responses are pending, then newest-first completion | exercises IDs 8–11, checks exact reverse BID order, drains the response window, and matches all 32 DDR words |
 | `dma_2d_store_test` | strided 2-D SPAD-to-DDR store | all source/destination row strides match |
 | `dma_aw_stall_stability_test` | force AWREADY low before publishing a four-word store, then hold it low for four complete AWVALID cycles | testbench checks AWVALID and `{AWID, AWADDR, AWLEN, AWSIZE, AWBURST}` remain stable while stalled; releases AWREADY, checks one AW/W/B completion, and scores every stored word; intended directed gate for DUT `p_aw_payload_stable` |
 | `dma_narrow_load_test` | non-16-byte-aligned address | 32-bit alignment transfers then 128-bit line transfer match |

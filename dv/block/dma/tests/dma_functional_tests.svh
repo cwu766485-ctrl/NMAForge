@@ -52,6 +52,24 @@ class dma_store_booo_sequence extends uvm_sequence #(dma_cmd_item);
     endtask
 endclass
 
+class dma_store_four_booo_sequence extends uvm_sequence #(dma_cmd_item);
+    `uvm_object_utils(dma_store_four_booo_sequence)
+    function new(string name = "dma_store_four_booo_sequence"); super.new(name); endfunction
+    task body();
+        dma_cmd_item req = dma_cmd_item::type_id::create("req");
+        start_item(req);
+        // The block testbench caps each burst at two 128-bit beats (8 words),
+        // so this command creates four tagged writes before any B response.
+        req.ext_addr = 64'h6400; req.spad_addr = 32'h1c00;
+        req.length_words = 32; req.row_words = 32; req.row_count = 0;
+        req.ext_stride = 0; req.spad_stride = 0;
+        req.read_outstanding = 1; req.store = 1; req.gather_enable = 0;
+        req.gather_index_base = 0; req.expect_error = 0; req.expected_error_code = 0;
+        req.abort_after_cycles = 0; req.minimum_rd_highwater = 0;
+        finish_item(req);
+    endtask
+endclass
+
 class dma_2d_store_sequence extends uvm_sequence #(dma_cmd_item);
     `uvm_object_utils(dma_2d_store_sequence)
     function new(string name = "dma_2d_store_sequence"); super.new(name); endfunction
@@ -272,6 +290,47 @@ class dma_store_booo_test extends dma_block_base_test;
         env.spad_model.preload_source_pattern(32'ha00, 16);
         seq.start(env.cmd_sqr); repeat(3) @(posedge env.cmd_drv.vif.clk);
         env.sb.check_complete(); env.axi_rsp.check_write_out_of_order();
+        phase.drop_objection(this);
+    endtask
+endclass
+
+class dma_store_four_booo_test extends dma_block_base_test;
+    `uvm_component_utils(dma_store_four_booo_test)
+    function new(string name = "dma_store_four_booo_test", uvm_component parent = null); super.new(name,parent); endfunction
+    task run_phase(uvm_phase phase);
+        dma_store_four_booo_sequence seq = dma_store_four_booo_sequence::type_id::create("seq");
+        int unsigned index;
+        phase.raise_objection(this);
+        cfg.min_accepted_writes_before_response = 4;
+        cfg.ooo_write_responses = 1;
+        wait (env.cmd_drv.vif.resetn === 1'b1);
+        @(posedge env.cmd_drv.vif.clk);
+        env.spad_model.preload_source_pattern(32'h1c00, 32);
+
+        seq.start(env.cmd_sqr);
+        env.sb.check_complete();
+        if (env.axi_rsp.accepted_bids.size() != 4 ||
+            env.axi_rsp.completed_bids.size() != 4 ||
+            env.axi_rsp.pending_b.size() != 0 ||
+            env.axi_rsp.active_b != null || env.axi_rsp.active_write != null) begin
+            `uvm_error("DMA_B4_DRAIN", $sformatf(
+                "expected four accepted/completed BIDs and an empty response window; AW/WLAST=%0d B=%0d pending_B=%0d",
+                env.axi_rsp.accepted_bids.size(), env.axi_rsp.completed_bids.size(),
+                env.axi_rsp.pending_b.size()))
+        end else begin
+            for (index = 0; index < 4; index++) begin
+                if (env.axi_rsp.accepted_bids[index] != (8 + index))
+                    `uvm_error("DMA_B4_IDS", $sformatf(
+                        "accepted BID[%0d]=%0d, expected %0d", index,
+                        env.axi_rsp.accepted_bids[index], 8 + index))
+                if (env.axi_rsp.completed_bids[index] != (11 - index))
+                    `uvm_error("DMA_B4_ORDER", $sformatf(
+                        "completed BID[%0d]=%0d, expected newest-first ID %0d", index,
+                        env.axi_rsp.completed_bids[index], 11 - index))
+            end
+            `uvm_info("DMA_B4_DRAIN", "all four write-ID slots drained newest-first with no response left pending", UVM_LOW)
+        end
+        env.axi_rsp.check_write_out_of_order();
         phase.drop_objection(this);
     endtask
 endclass

@@ -171,3 +171,4 @@ dashboard 为 43.05%，混合 DUT、TB 与 UVM，不作为 DUT-only 覆盖结论
 descriptor/error 随机、随机 reset phase、global code/assertion review、mutation 与最终固定提交 replay 仍未完成；
 targeted 100% 不代表 V4/V5 或 overall A10 closure。Campaign artifacts
 留在 `/tmp`，SpyGlass 工具/许可证边界继续单独记录；`ai_smoke` 保留为相关 RTL 修改后的基线。
+> **2026-10-18 DMA write-response slot increment (candidate based on `3014be4`):** The new four-write-ID UVM test and full DMA suite passed 17/17 with per-test UVM warning/error/fatal=`0/0/0`; 20/20 random transfers scored, URG completed, and top `ai_smoke` passed. `ai_dma_write_response_tracker` line/branch coverage reached 100%; residual planner edge bins, full V3, and A10/V5 remain open. This evidence is from a dirty worktree based on parent SHA `3014be4`, not a clean-SHA replay. See the [A10 run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-dma-four-write-id-slot-coverage-increment).

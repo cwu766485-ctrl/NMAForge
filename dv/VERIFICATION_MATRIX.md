@@ -1,5 +1,7 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 DMA write-ID slot coverage increment (candidate based on `3014be4`):** Added `dma_store_four_booo_test`, which accepts all four write IDs (`8..11`), returns B responses newest-first (`11..8`), checks 32 DDR words, and confirms no pending response. Focused and full 17-test DMA UVM regressions passed with per-test warning/error/fatal=`0/0/0`; random stress passed 20/20 and top `ai_smoke` printed `TEST PASS`. URG reports `ai_dma_write_response_tracker` line/condition/toggle/branch=`100.00/66.67/85.71/100.00%`; all 11 named DMA DUT SVA had nonzero successes, with no failure/incomplete. This closes only the write-slot slice; reachable burst-planner edge bins, full V3 and A10/V5 remain open. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-dma-four-write-id-slot-coverage-increment).
+
 > **2026-10-18 exact-current-main DMA block replay at `3310d3d`:** VCS/URG
 > passed all 16 DMA UVM tests with per-test UVM warning/error/fatal=`0/0/0`;
 > random stress scored 20/20 transfers. `dma_cmd_cg` reached 14/14 variables

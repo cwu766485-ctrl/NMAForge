@@ -7,7 +7,7 @@ COV_ROOT ?= coverage
 SEED ?= 20260813
 CM_METRICS ?= line+cond+fsm+tgl+branch+assert
 TESTS := dma_load_ooo_smoke_test dma_2d_load_test dma_gather_load_test \
-	dma_store_booo_test dma_2d_store_test dma_aw_stall_stability_test dma_narrow_load_test \
+	dma_store_booo_test dma_store_four_booo_test dma_2d_store_test dma_aw_stall_stability_test dma_narrow_load_test \
 	dma_4k_load_test dma_abort_read_test dma_read_slverr_test dma_spad_error_drain_test dma_write_slverr_test dma_abort_write_test dma_config_error_test dma_backpressure_test dma_random_stress_test
 
 .PHONY: uvm_compile uvm_run uvm_smoke uvm_regress coverage clean
