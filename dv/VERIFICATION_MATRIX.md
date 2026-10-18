@@ -1,5 +1,14 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 exact-current-main V3 DMA-SPAD replay at `b1257fb`:** The
+> focused 16-cycle AXI RREADY-stall case and three-seed subsystem regression
+> passed at the exact pushed SHA; each seed had `[TEST_DONE]`, nine runtime
+> pass markers, and UVM warning/error/fatal=`0/0/0`. URG selected functional
+> groups were 100%, with 29 assertions successful, 0 failed/incomplete, and
+> two UVM RAL internals unattempted. This closes only the exercised response-
+> backpressure/subsystem slice; broader V3 and A10/V5 remain open. See the
+> [exact-main run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v3-dma-spad-replay-at-b1257fb).
+
 > **2026-10-18 exact-current-main CP/completion replay at `9dce04d`:** The
 > 3-seed × 24-profile mixed prefix-error/abort/reset campaign passed 72/72;
 > every run hit 31/31 scenario bins and UVM warning/error/fatal=`0/0/0`.
