@@ -136,6 +136,21 @@ interface ai_cp_if(input logic clk);
   a_fetch_stage_abort_suppresses_launch: assert property(p_fetch_stage_abort_suppresses_launch)
     else $error("descriptor-fetch abort was followed by a compute launch");
 
+  // A doorbell outside ST_IDLE is ignored even when all shared resources are
+  // idle; a dependency wait leaves the CP busy in ST_DECODE for this check.
+  property p_decode_submit_does_not_re_admit_command;
+    @(posedge clk) disable iff(!resetn)
+      (test_case==5'd27 && debug_state_r==4'd2 && submit) |=>
+        (debug_state_r==4'd2 && busy && !fetch_start && !launch_valid &&
+         $stable(cmdq_head));
+  endproperty
+  a_decode_submit_does_not_re_admit_command:
+    assert property(p_decode_submit_does_not_re_admit_command)
+      else $error("submit in idle-resource ST_DECODE re-admitted a command");
+  c_decode_submit_does_not_re_admit_command:
+    cover property(@(posedge clk) disable iff(!resetn)
+      test_case==5'd27 && debug_state_r==4'd2 && submit);
+
   property p_compute_abort_stops_automatic_queue_advance;
     @(posedge clk) disable iff(!resetn)
       ((test_case==5'd18 || test_case==5'd19 || test_case==5'd20) &&

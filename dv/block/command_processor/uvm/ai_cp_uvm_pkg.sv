@@ -401,6 +401,14 @@ package ai_cp_uvm_pkg;
             repeat(abort_delay) @(negedge vif.clk);
             @(negedge vif.clk); vif.abort=1;
             @(negedge vif.clk); vif.abort=0;
+            // Exclude the previous completion's last-word request from the
+            // wait; its valid/address may overlap the new writer start delta.
+            wait(vif.cpl_writer_busy===1'b1 &&
+                 vif.completion_task_id===16'h1401 &&
+                 vif.completion_error===4'd3);
+            // Sample after a full stable clock beat; the busy transition and
+            // stale final-word address can otherwise coincide in one delta.
+            @(posedge vif.clk); #1ps;
             wait(vif.cpl_spad_valid && !vif.cpl_spad_ready &&
                  vif.cpl_spad_addr[3:2]==reset_words_target[1:0]);
             @(negedge vif.clk);
@@ -854,6 +862,36 @@ package ai_cp_uvm_pkg;
             if(vif.cmdq_head!==2)
               `uvm_error("CP/SUBMIT_GUARD","guarded fetch did not drain both queued commands")
 
+            // Fourth tuple: keep the active descriptor blocked in ST_DECODE
+            // with the next ring entry still queued. Resources are idle here,
+            // so a fresh doorbell must still be ignored outside ST_IDLE.
+            reset_cp();
+            descriptor(0,0,16'h0002,0,1,16'h27d0); descriptor(1);
+            vif.cmdq_tail=2; vif.cplq_head=0;
+            pulse_submit();
+            wait_cycles=0;
+            while(vif.debug_state_r!==4'd2 && wait_cycles<100) begin
+              @(posedge vif.clk); wait_cycles++;
+            end
+            if(wait_cycles>=100 || !vif.busy || vif.fetch_busy ||
+               vif.compute_busy || vif.dma_busy)
+              `uvm_fatal("CP/SUBMIT_GUARD","command did not reach idle-resource dependency wait")
+            head_before=vif.cmdq_head; tail_before=vif.cplq_tail;
+            pulse_submit();
+            repeat(2) begin
+              @(posedge vif.clk);
+              if(vif.debug_state_r!==4'd2 || !vif.busy || vif.fetch_start ||
+                 vif.launch_valid || vif.cmdq_head!==head_before ||
+                 vif.cplq_tail!==tail_before)
+                `uvm_error("CP/SUBMIT_GUARD","submit in idle-resource ST_DECODE caused re-admission")
+            end
+            @(negedge vif.clk); vif.abort=1;
+            @(negedge vif.clk); vif.abort=0;
+            wait_idle();
+            if(vif.cmdq_head!==1 || vif.cplq_tail!==1 || vif.fetch_start ||
+               vif.launch_valid || vif.cpl_writer_busy)
+              `uvm_error("CP/SUBMIT_GUARD","decode submit-guard cleanup did not retire once")
+
             // Second tuple: force scheduler_resources_idle low at ST_IDLE.
             // The doorbell is ignored until the externally busy resource is
             // released, then a fresh submit must process normally.
@@ -914,7 +952,7 @@ package ai_cp_uvm_pkg;
             if(vif.cmdq_head!==1 || vif.cplq_tail!==1 || vif.busy ||
                vif.cpl_writer_busy || vif.launch_valid)
               `uvm_error("CP/SUBMIT_GUARD","completion did not retire exactly once after ignored abort")
-            `uvm_info("CP/SUBMIT_GUARD","fetch_resubmit_ignored=1 scheduler_busy_ignored=1 tile_busy_ignored=1 completion_abort_ignored=1 recovery=1",UVM_LOW)
+            `uvm_info("CP/SUBMIT_GUARD","fetch_resubmit_ignored=1 decode_resubmit_ignored=1 scheduler_busy_ignored=1 tile_busy_ignored=1 completion_abort_ignored=1 recovery=1",UVM_LOW)
           end
           CP_WRITER_FSM_FAULT_RECOVERY: begin
             reset_cp();
@@ -1687,7 +1725,17 @@ package ai_cp_uvm_pkg;
                 end
                 CP_RANDOM_QUEUE: expected_task_id=16'h2000+random_retire_count-1;
                 CP_SUBMIT_GUARD: begin
-                  expected_task_id=(submit_guard_completion_index%2==0) ? 16'h1000 : 16'h1001;
+                  // The dependency-wait tuple is deliberately aborted after
+                  // the ignored re-submit; give it a unique ID so it cannot
+                  // be confused with either two-command queue-drain tuple.
+                  case(submit_guard_completion_index)
+                    0: expected_task_id=16'h1000;
+                    1: expected_task_id=16'h1001;
+                    2: expected_task_id=16'h27d0;
+                    3: expected_task_id=16'h1000;
+                    4: expected_task_id=16'h1001;
+                    default: expected_task_id=16'h1000;
+                  endcase
                   submit_guard_completion_index++;
                 end
                 CP_WRITER_FSM_FAULT_RECOVERY: expected_task_id=16'h1000;
@@ -1803,6 +1851,10 @@ package ai_cp_uvm_pkg;
                   `uvm_error("CP/ABORT","unexpected extra completion after abort recovery")
                 end
                 compute_abort_records++;
+              end else if(vif.test_case==CP_SUBMIT_GUARD &&
+                          submit_guard_completion_index==3) begin
+                if(vif.completion_error!==4'd3 || vif.completion_status!==4'd2)
+                  `uvm_error("CP/SUBMIT_GUARD","decode re-submit cleanup did not retire ERR_ABORT")
               end else if(vif.test_case==CP_DEP_TIMEOUT) begin
                 if(vif.completion_error!==4'd12 || vif.completion_status!==4'd2)
                   `uvm_error("CP/MON","dependency timeout did not retire ERR_DEPENDENCY completion")

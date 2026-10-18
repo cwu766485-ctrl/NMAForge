@@ -109,7 +109,7 @@ check-log:
 		 grep -Eq '\[CP/CPLQ\].*fetches=8 launches=8 completions=8' $(LOG) && \
 		 grep -Eq '\[CP/CPL_PROTECTION\].*late_protection_abort=1 err_prot=1 completion_write=0 tail_unchanged=1' $(LOG) && \
 		 grep -Eq '\[CP/FSM\].*illegal_state_injected=1 recovered_idle=1 side_effects=0' $(LOG) && \
-		 grep -Eq '\[CP/SUBMIT_GUARD\].*fetch_resubmit_ignored=1 scheduler_busy_ignored=1 tile_busy_ignored=1 completion_abort_ignored=1 recovery=1' $(LOG) && \
+		 grep -Eq '\[CP/SUBMIT_GUARD\].*fetch_resubmit_ignored=1 decode_resubmit_ignored=1 scheduler_busy_ignored=1 tile_busy_ignored=1 completion_abort_ignored=1 recovery=1' $(LOG) && \
 		 grep -Eq '\[CP/MACRO_ADDR\].*v7 parent fetch \+ three external child fetches used 64-bit aligned addresses' $(LOG) && \
 		 grep -Eq '\[CP/MACRO\].*children=3 parent_completion=5 compute_error_child_launches=1 fetch_error_child_launches=1 fetch_error_parent_completion=1 child_fetch_abort_parent=1 child_decode_abort_parent=1' $(LOG) && \
 		   grep -Eq '\[CP/NO_CPLQ\].*fetch_error_event=1 launch=0 completion_write=0 head_advance=1' $(LOG) && \
