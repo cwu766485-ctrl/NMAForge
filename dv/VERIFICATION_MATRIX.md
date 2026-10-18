@@ -1,5 +1,14 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 exact-main FP replay at `880c697`:** FP directed core and
+> maximum-length parity tests passed; three UVM seeds passed 484/484 each with
+> UVM severity `0/0/0`, peak outstanding=2, and six selected FP functional
+> groups at 100%; Python model passed 19/19. URG reports one DUT request-
+> stability SVA with 22,676 real successes, one UVM component-name check, two
+> UVM RAL no-attempts, and both covers matched. DUT line/condition/FSM/branch
+> was `97.96/97.00/85.71/92.86%`; code-coverage disposition and full-domain
+> parity formal remain open. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-fp-baseline-at-880c697).
+
 > **2026-10-18 current-main FP stall/latency stress:** At pushed `main` SHA
 > `90ddbbd`, six seeded unit-SPAD profiles passed with BF16/FP16 lengths
 > 1..1024 and request back-pressure / ordered response jitter settings
@@ -17,7 +26,7 @@
 
 > **2026-10-18 baseline replay at `edf115cd`:** Control UVM passed 9/9 and DMA UVM passed 16/16 (current DMA Makefile count; older 15-test note is stale), with per-test severity 0/0/0 and `[TEST_DONE]` / scoreboard pass markers. Top `ai_smoke` exited 0 (`TEST PASS`). Non-fatal compile clock-skew warnings were present. URG and seeded top 20-case `ai_run` were not run; this does not represent clean-worktree or full A10 closure. See the [A10 run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-edf115cd-controldmatop-baseline-replay).
 
-> **2026-10-18 `edf115cd` FP dot UVM/URG replay:** Three seeds (`712345`, `987654`, `20261015`) each passed 484/484 mixed BF16/FP16 bit-exact transactions, UVM warning/error/fatal=`0/0/0`, peak outstanding=2. URG merged at 100%; all six selected functional groups were 100%. Two DUT-facing assertions succeeded with no failures/incomplete; two UVM RAL internal no-attempts are not counted as DUT passes, and both selected covers matched. Python reference-model tests passed 19/19 from the model directory. This is focused V1 evidence, not full parity/writeback formal or A10 closure. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-edf115cd-fp-dot-uvmurg-replay).
+> **2026-10-18 `edf115cd` FP dot UVM/URG replay:** Three seeds (`712345`, `987654`, `20261015`) each passed 484/484 mixed BF16/FP16 bit-exact transactions, UVM warning/error/fatal=`0/0/0`, peak outstanding=2. URG merged at 100%; all six selected functional groups were 100%. One DUT-facing request-stability assertion succeeded (22,676 real successes), one UVM component-name check succeeded, two UVM RAL internal no-attempts are not counted as DUT passes, and both selected covers matched. Python reference-model tests passed 19/19 from the model directory. This is focused V1 evidence, not full parity/writeback formal or A10 closure. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-edf115cd-fp-dot-uvmurg-replay).
 
 > **2026-10-18 V2 command-processor reset sweep:** On the dirty worktree based on `d1ed485`, CP UVM mixed prefix-error/abort/reset coverage passed 72/72 runs (3 seeds × 24 combinations), each with 31/31 scenario bins and UVM severity `0/0/0`. Reset was injected at completion word cut points 0, 1, 2, and 3; URG covered all 4 reset bins and all 24 kind × abort-delay-class × reset-word cross bins. `cp_cg` aggregate is 61/61 variables + 34/34 crosses, 100%. Eleven assertions succeeded, 0 failed/incomplete, two UVM RAL internals had no attempts; both cover properties matched. This is a focused V2 interaction closure, not full command-processor or A10 closure. Exact evidence and repro command: [2026-10-18 A10 run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md).
 
