@@ -14,9 +14,12 @@
 > this is an environment/tool-compatibility stop, not a design test failure.
 > The canonical VC Formal target did run at this clean SHA: setup clean,
 > 12/12 selected assertions proven, and 2/2 covers reached. This is a focused
-> baseline only; full-domain parity/writeback remains open. The separate
-> bounded parity replay did not complete because its follow-up run hit a
-> transient license-server outage.
+> baseline only; full-domain parity/writeback remains open. The first exact-SHA
+> bounded replay was interrupted by a transient license-server outage; after
+> connectivity returned, a fresh isolated replay passed all 5 assertions and
+> both depth-5 covers. This closes only the bounded length-1..4 property set,
+> not the full 16-bit parity/writeback relation. Details are in the [run
+> record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-sha-bounded-parity-formal-rerun-after-license-recovery).
 > The latest SHA still requires exact-commit FP/DMA/Control/top replay and V5
 > coverage disposition when a Synopsys-supported execution environment is
 > available. Details: [2026-10-18 run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-98675d08-replay-attempt).
@@ -195,6 +198,17 @@
 | V1-FP-03 | Abort、reset、parity、protection、watchdog 正确退出且无遗留事务 | 三个独立地址错位（src0/src1/dst）、A/B/late-word parity、奇数长度最终 packed-word parity（BF16/FP16）、read/write protection、late-A protection 与 abort 竞争、late-B protection 边界、六个 active-state reset 及未接受请求 abort；另含 watchdog-disabled/masked-write-stall 成功边界 | error-code/read/write/element-count scoreboard、reset recovery、request/writeback SVA；fault-mode × format、odd-tail 与 parity-event-overlap cover | 固定 commit `43dbbbc498377d852667c4e3eb5880ecf4aaf8f7` 的 clean replay及 2026-10-17 refresh：三 seed 各完成 54 项 fault/reset checker 事务；错误码、traffic、element count 和 reset recovery 检查通过；fault-format、odd-tail 与 parity-two-outstanding groups 100%。Merged read-protection-not-write-failure cover hit 30，ready-pair-suppressed-after-error hit 6。当前 main 至 `3b30402` 的 FP RTL/model/simulation 文件与该 clean replay 相同。**定向 fault slice 通过（FP scope clean replay）；full-domain parity-to-writeback formal 仍未证明** |
 | V1-FP-04 | Condition、branch、FSM 缺口逐项解释或补测 | 三 seed URG DUT module report；VC Formal focused SVA；非法状态注入；连续跨任务 fault stimulus；RTL predicate/ownership review | 分开看状态/转移与 RTL condition/branch；可达 bin 必须有实际激励证据；不加 exclusion | 最新 URG DUT line/condition/FSM/branch=`97.96/97.00/85.71/92.86%`；`state_r` 5/5 states、10/10 transitions；`pending_error_r` 6/6 states、14/18 transitions。B1 protection 的 1-cycle registered-response directed case 使 ready-pair/error-cutoff condition 真实命中，新增 TB cover 三 seed 各命中 2 次。VC Formal 最新 canonical 12/12 assertions + 2/2 covers；长度 1–4 parity harness 在 360 s 下 5/5 non-vacuous assertions + 2/2 depth-5 covers，均 clean setup。三条独立 non-vacuous properties 证明在 `ST_WRITE` 中不会携带 `ERR_ABORT`、`ERR_CONFIG` 或 `ERR_WATCHDOG`，据此 disposition 相应三条 prior-error→`ERR_PROTECTION` transitions。六个未命中 condition、四个未命中 branch outcomes 已在 [FP formal residual map](../../dv/block/compute/fp/formal/README.md) 中逐项关联到 RTL invariant 或有明确前提的 SPAD protocol assumption；该 assumption 约束的非法零-outstanding response bin 不被称为独立 DUT 保证。2026-10-18 `ap_ready_pair_within_returned_frontier` 在 full-domain setup clean、non-vacuous，但 180 s 内未收敛且无反例；same-cycle parity compute 与 writeback 关系仍未证明。另有最大长度 `16'hffff` BF16/FP16 四例定向仿真（final-A/final-B 两种 parity response）：每例 65,536/65,536 读排空、65,534 元素前缀、峰值 outstanding=2、零写回及无复位 recovery PASS；动态结果不代替未收敛的 full-domain formal，且本次 VCS run 有非致命 Make clock-skew warning。无 URG exclusions。**部分完成；full-domain parity transition 仍开放（既有 FP simulation scope fixed-SHA replay 已通过；新增四例为 dirty-worktree 证据）** |
 | V1-FP-05 | 随机种子可复现，合并 coverage 可审计 | 三个独立 `dot-uvm-run` + VCS URG merge | per-seed logs/VDB、URG merged report | 历史固定 commit `43dbbbc498377d852667c4e3eb5880ecf4aaf8f7` clean replay：相同三 seed、每 seed 484/484；2026-10-17 refresh 的 URG merge 记录 numeric、response-latency、fault-format、odd-tail、parity-two-outstanding groups 100%，format × length cross 32/32，路径 `/tmp/nmaforge_a10_fp_refresh_20261018/urg_report_merged`（`20261018` 是 artifact tag，非运行日期）。GitHub `main` 当前以 `72a5da0` 为基线；本地未提交工作树新增最大长度 parity testbench/Makefile target。该新增只做了 focused VCS 验证，尚未纳入 frozen-SHA replay；产品 RTL、SPEC、ABI 和 Python model 未改。**既有 FP scope fixed-SHA replay 通过；新增 stress 的当前树完整回归与 full A10/current-commit 复现仍开放** |
+
+> **2026-10-18 exact-SHA bounded parity recheck:** After license connectivity
+> was restored, `parity-bounded` passed on the clean detached source snapshot
+> `98675d08f44856d2023a6840cb117d1f47d8daf2`: clean setup, 5/5 assertions
+> proven and non-vacuous, and 2/2 covers reached at depth 5. This is an exact
+> source-SHA formal result for lengths 1–4 under the harness's documented
+> ordered registered-SPAD response assumptions. It does not close the
+> full-16-bit parity-to-writeback relation or V1-FP-04 overall. The latest
+> current-main VCS replay is still unavailable because the installed VCS
+> rejects WSL2 kernel `6.6.87.2-microsoft-standard-WSL2`. See the [run
+> record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-sha-bounded-parity-formal-rerun-after-license-recovery).
 
 > **2026-10-17 V1-FP-04 full-domain transition probe:** Added a verification-only property that a real final-element `compute_fire` transitions to `ST_WRITE` with no pending parity error on the next sample; no new environment assumption was introduced. VC Formal setup was clean and activation non-vacuous, but the 120 s proof timed out in `checking` with no counterexample or result. V1-FP-04 remains open; see the [2026-10-17 run record](A10_DV_RUN_2026-10-17.md).
 
