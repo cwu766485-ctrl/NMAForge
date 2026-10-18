@@ -7,8 +7,13 @@
 > 22,676 successes on the DUT stalled-request stability assertion and both
 > selected covers matched. Python model passed 19/19. DUT line/condition/FSM/
 > branch coverage was 97.96/97.00/85.71/92.86%; residual coverage disposition
-> and full-domain parity-to-writeback proof remain open. This is a scoped V1
-> slice, not V1/A10 closure. See the [run evidence](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v1-fp-replay-at-08f398e).
+> is explicit: the main FSM is 5/5 states and 10/10 transitions, while
+> `pending_error_r` is 6/6 states and 14/18 transitions. Three prior-error to
+> protection transitions have canonical formal dispositions; parity to
+> protection and full-domain parity-to-writeback remain open. Three raw RTL
+> lines/four branches remain unhit, with legal-interface invariant mappings
+> documented separately. This is a scoped V1 slice, not V1/A10 closure. See
+> the [run evidence](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v1-fp-replay-at-08f398e).
 
 > **2026-10-18 exact-current-main V2 CP replay at `e24b770`:** The full CP
 > scenario suite passed across 72/72 mixed error/abort/reset profiles (three
