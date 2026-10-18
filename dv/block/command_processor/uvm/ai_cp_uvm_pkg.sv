@@ -76,7 +76,8 @@ package ai_cp_uvm_pkg;
     endtask
     task automatic wait_idle();
       int limit=0, max_wait_cycles;
-      max_wait_cycles=(vif.test_case==CP_DEP_TIMEOUT) ? 70000 : 1000;
+      max_wait_cycles=(vif.test_case==CP_DEP_TIMEOUT ||
+                       vif.test_case==CP_MACRO_CHILDREN) ? 70000 : 1000;
       while((vif.busy || vif.cpl_writer_busy) && limit<max_wait_cycles) begin
         @(posedge vif.clk); limit++;
       end
@@ -654,6 +655,35 @@ package ai_cp_uvm_pkg;
               `uvm_error("CP/MACRO","macro child-decode abort launched a child or failed parent retirement")
             vif.abort_cov_path=0;
 
+            // An invalid fetched child descriptor must fail-stop under the
+            // macro parent: ERR_DESC is attributed to the parent task and no
+            // child compute launch or later child fetch may escape.
+            reset_cp(); descriptor(0,0,0,0,1,16'h1580);
+            vif.desc_mem[0].op=8'h40; vif.desc_mem[0].version=8'd4;
+            vif.desc_mem[0].length=16'd3; vif.desc_mem[0].src0=32'h1040;
+            descriptor(1,1,0,0,1,16'h1581);
+            descriptor(2,0,0,0,1,16'h1582);
+            descriptor(3,0,0,0,1,16'h1583);
+            vif.cmdq_tail=1; vif.cplq_head=0;
+            pulse_submit(); wait_idle();
+            if(vif.cmdq_head!==1 || vif.cplq_tail!==1 || vif.launch_valid ||
+               vif.cpl_writer_busy)
+              `uvm_error("CP/MACRO","invalid macro child was launched or failed parent retirement")
+
+            // A child that waits on an event no command can produce must
+            // time out through the same parent-owned completion path.
+            reset_cp(); descriptor(0,0,0,0,1,16'h1590);
+            vif.desc_mem[0].op=8'h40; vif.desc_mem[0].version=8'd4;
+            vif.desc_mem[0].length=16'd3; vif.desc_mem[0].src0=32'h1040;
+            descriptor(1,0,16'h0002,0,1,16'h1591);
+            descriptor(2,0,0,0,1,16'h1592);
+            descriptor(3,0,0,0,1,16'h1593);
+            vif.cmdq_tail=1; vif.cplq_head=0;
+            pulse_submit(); wait_idle();
+            if(vif.cmdq_head!==1 || vif.cplq_tail!==1 || vif.launch_valid ||
+               vif.cpl_writer_busy)
+              `uvm_error("CP/MACRO","macro child dependency timeout launched work or failed parent retirement")
+
             // Legacy no-CPLQ event path: a successful macro aggregates its
             // ordered children into one event without completion writeback.
             reset_cp();
@@ -701,7 +731,7 @@ package ai_cp_uvm_pkg;
             if(vif.force_compute_error_once)
               `uvm_error("CP/NO_CPLQ","macro compute-error injection was not consumed")
             vif.cmdq_size=4; vif.cplq_size=4;
-            `uvm_info("CP/MACRO","children=3 parent_completion=5 compute_error_child_launches=1 fetch_error_child_launches=1 fetch_error_parent_completion=1 child_fetch_abort_parent=1 child_decode_abort_parent=1 no_cplq_success_children=3 no_cplq_error_stop=1",UVM_LOW)
+            `uvm_info("CP/MACRO","children=3 parent_completion=7 compute_error_child_launches=1 fetch_error_child_launches=1 fetch_error_parent_completion=1 child_fetch_abort_parent=1 child_decode_abort_parent=1 child_decode_error_parent=1 child_dependency_timeout_parent=1 no_cplq_success_children=3 no_cplq_error_stop=1",UVM_LOW)
           end
           CP_FETCH_ERROR_NO_CPL: begin
             reset_cp();
@@ -1259,6 +1289,7 @@ package ai_cp_uvm_pkg;
     int direct_stale_abort_code_events;
     int macro_launches, macro_error_launches, macro_fetch_error_launches;
     int macro_completions, macro_error_completions, macro_fetch_error_completions;
+    int macro_desc_error_completions, macro_dep_timeout_completions;
     int macro_no_cplq_launches, macro_no_cplq_success_events, macro_no_cplq_error_events;
     int no_cplq_fetch_events, late_completion_protection_events;
     int tile_ctx_state[2], tile_ctx_tile[2];
@@ -1299,6 +1330,7 @@ package ai_cp_uvm_pkg;
       macro_launches=0; macro_error_launches=0; macro_fetch_error_launches=0;
       macro_completions=0; macro_error_completions=0;
       macro_fetch_error_completions=0;
+      macro_desc_error_completions=0; macro_dep_timeout_completions=0;
       macro_no_cplq_launches=0; macro_no_cplq_success_events=0;
       macro_no_cplq_error_events=0;
       no_cplq_fetch_events=0;
@@ -1444,6 +1476,10 @@ package ai_cp_uvm_pkg;
             macro_fetch_error_launches++;
           end else if(vif.launch_task_id==16'h1552 || vif.launch_task_id==16'h1553) begin
             `uvm_error("CP/MACRO","child-fetch-error macro launched a child after the failed descriptor fetch")
+          end else if(vif.launch_task_id==16'h1581 || vif.launch_task_id==16'h1582 ||
+                      vif.launch_task_id==16'h1583 || vif.launch_task_id==16'h1591 ||
+                      vif.launch_task_id==16'h1592 || vif.launch_task_id==16'h1593) begin
+            `uvm_error("CP/MACRO","macro launched a child after descriptor/dependency failure")
           end else begin
             case(macro_no_cplq_launches)
               0: if(vif.launch_task_id!==16'h1521)
@@ -1710,7 +1746,9 @@ package ai_cp_uvm_pkg;
                   (macro_completions==0) ? 16'h1500 :
                   (macro_completions==1) ? 16'h1540 :
                   (macro_completions==2) ? 16'h1550 :
-                  (macro_completions==3) ? 16'h1560 : 16'h1570;
+                  (macro_completions==3) ? 16'h1560 :
+                  (macro_completions==4) ? 16'h1570 :
+                  (macro_completions==5) ? 16'h1580 : 16'h1590;
                 CP_CPLQ_PRESSURE: begin
                   expected_task_id=16'h3000+cplq_pressure_completions;
                   cplq_pressure_completions++;
@@ -1787,6 +1825,14 @@ package ai_cp_uvm_pkg;
                 end else if(macro_completions==3 || macro_completions==4) begin
                   if(vif.completion_error!==4'd3 || vif.completion_status!==4'd2)
                     `uvm_error("CP/MACRO","macro child abort did not commit parent ERR_ABORT")
+                end else if(macro_completions==5) begin
+                  if(vif.completion_error!==4'd7 || vif.completion_status!==4'd2)
+                    `uvm_error("CP/MACRO","invalid child descriptor did not commit parent ERR_DESC")
+                  else macro_desc_error_completions++;
+                end else if(macro_completions==6) begin
+                  if(vif.completion_error!==4'd12 || vif.completion_status!==4'd2)
+                    `uvm_error("CP/MACRO","child dependency timeout did not commit parent ERR_DEPENDENCY")
+                  else macro_dep_timeout_completions++;
                 end else
                   `uvm_error("CP/MACRO","unexpected extra macro parent completion")
               end
@@ -1939,9 +1985,10 @@ package ai_cp_uvm_pkg;
          direct_compute_error_events!=1 || direct_stale_abort_code_events!=1)
         `uvm_error("CP/DIRECT","direct-start must reject invalid FP configurations, complete valid INT8/BF16/FP16, report one compute error, and ignore stale ERR_ABORT when compute_error=0")
       if(macro_launches!=3 || macro_error_launches!=1 ||
-         macro_fetch_error_launches!=1 || macro_completions!=5 ||
-         macro_error_completions!=1 || macro_fetch_error_completions!=1)
-        `uvm_error("CP/MACRO","success, compute-error, and child-fetch-error macros did not produce expected child launches and parent completions")
+         macro_fetch_error_launches!=1 || macro_completions!=7 ||
+         macro_error_completions!=1 || macro_fetch_error_completions!=1 ||
+         macro_desc_error_completions!=1 || macro_dep_timeout_completions!=1)
+        `uvm_error("CP/MACRO","macro success/error/abort/validation/dependency cases did not produce expected launches and parent completions")
       if(macro_no_cplq_launches!=4 || macro_no_cplq_success_events!=1 ||
          macro_no_cplq_error_events!=1)
         `uvm_error("CP/NO_CPLQ","macro event-only paths must launch 3 success children, stop after 1 error child, and report one event each")
