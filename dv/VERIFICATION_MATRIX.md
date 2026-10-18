@@ -1,5 +1,13 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 exact pushed-main selected baseline (`1fe66f0`):** FP UVM
+> passed 3 seeds × 200 random vectors per format with 484/484 bit-exact
+> transactions per seed; Python FP model tests passed 19/19; Control UVM
+> passed 9/9 tests; DMA UVM passed 16/16 tests; and top `ai_smoke` passed
+> from an isolated worktree at the exact SHA. UVM severity was `0/0/0` for
+> FP/Control/DMA. This is selected G0 reproducibility, not A10 closure. See
+> the [run evidence](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-pushed-main-baseline-replay-at-1fe66f0).
+
 > **2026-10-18 CP macro event-only frontend-error increment (tree based on pushed `651b7a7`):** Added two `CPLQ_SIZE=0` macro-child cases for invalid descriptor (`0x15a0`, `ERR_DESC`) and dependency timeout (`0x15b0`, `ERR_DEPENDENCY`). Each checks one parent event/head advance and no child launch/later fetch/completion write/CPLQ tail advance. Focused/full CP UVM, 72/72 three-seed × 24-profile coverage runs, URG gates, and top `ai_smoke` passed with UVM severity `0/0/0`. CP raw line/condition/FSM/branch=`100/90.48/100/97.01%`; remaining CP bins, V2, and A10 remain open. This tests the existing no-CPLQ compatibility path only; no RTL/SPEC/ABI changed. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-cp-macro-child-event-only-frontend-errors-with-cplq-disabled).
 
 > **2026-10-18 CP macro-child error ownership increment (candidate based on pushed `1c1ab96`):** Added UVM checks for invalid child-descriptor and dependency-timeout failures under an active macro parent. Both paths return the parent task ID with the expected error and suppress child launches. Focused case, full CP UVM, 72/72 coverage profiles, and top `ai_smoke` passed; UVM severity=`0/0/0`; CP raw coverage improved to 228/252 conditions and 65/67 branches. Remaining raw bins and V2/A10 are still open. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-cp-macro-child-error-ownership-increment).

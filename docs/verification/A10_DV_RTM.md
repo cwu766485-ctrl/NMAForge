@@ -1,5 +1,15 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-18 exact pushed-main G0 replay (`1fe66f0`):** On Rocky Linux
+> 8.10 / VCS+URG `V-2023.12-SP1_Full64`, FP UVM passed 3 seeds × 200 random
+> vectors per format (484/484 bit-exact transactions per seed, severity
+> `0/0/0`, peak outstanding reads=2), Python reference tests passed 19/19,
+> Control UVM passed 9/9, DMA UVM passed 16/16, and exact-SHA top `ai_smoke`
+> passed. URG databases were generated for FP/Control/DMA. This is selected
+> baseline reproducibility only: formal FP parity/writeback disposition, CP
+> residuals/lifecycle, broader V3, full V4, and V5 remain open. Details and
+> exact artifact paths are in the [run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-pushed-main-baseline-replay-at-1fe66f0).
+
 > **2026-10-18 CP macro event-only frontend-error increment (tree based on pushed `651b7a7`):** Added two `CPLQ_SIZE=0` macro-child cases for invalid child descriptor (`0x15a0`, `ERR_DESC`) and dependency timeout (`0x15b0`, `ERR_DEPENDENCY`). Both verify one parent event, one CMDQ-head advance, no child launch/later-child fetch, no completion write, and no CPLQ-tail advance. Focused and full CP UVM, 72/72 three-seed × 24-profile runs, URG/gates, and top `ai_smoke` passed; UVM severity=`0/0/0`. CP raw coverage is 250/250 lines, 228/252 conditions, 6/6 states + 13/13 transitions, and 65/67 branches; remaining condition/branch bins and V2/A10 stay open. This checks the existing zero-CPLQ compatibility path; no RTL/SPEC/ABI changed and no new normative ABI rule is asserted. See [run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-cp-macro-child-event-only-frontend-errors-with-cplq-disabled).
 
 > **2026-10-18 CP macro-child error ownership increment (candidate based on pushed `1c1ab96`):** `CP_MACRO_CHILDREN` now checks that an invalid fetched child and an unpublished dependency timeout each retire exactly one parent-owned error completion, without launching later children. Focused CP, full UVM, 72/72 coverage profiles, and top `ai_smoke` passed with UVM severity `0/0/0`. Raw CP coverage is now 250/250 lines, 228/252 conditions (90.48%), 6/6 states and 13/13 transitions, 65/67 branches (97.01%); 24 condition tuples and two branch bins remain open. This adds V2 evidence but does not close V2/A10. See [run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-cp-macro-child-error-ownership-increment).
