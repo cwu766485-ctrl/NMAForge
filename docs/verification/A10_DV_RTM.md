@@ -9,6 +9,11 @@
 > `VCS_ARCH_OVERRIDE=linux64` startup probe rejects WSL2 kernel
 > `6.6.87.2-microsoft-standard-WSL2`. No VCS regression on this SHA is claimed;
 > this is an environment/tool-compatibility stop, not a design test failure.
+> The canonical VC Formal target did run at this clean SHA: setup clean,
+> 12/12 selected assertions proven, and 2/2 covers reached. This is a focused
+> baseline only; full-domain parity/writeback remains open. The separate
+> bounded parity replay did not complete because its follow-up run hit a
+> transient license-server outage.
 > The latest SHA still requires exact-commit FP/DMA/Control/top replay and V5
 > coverage disposition when a Synopsys-supported execution environment is
 > available. Details: [2026-10-18 run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-98675d08-replay-attempt).
