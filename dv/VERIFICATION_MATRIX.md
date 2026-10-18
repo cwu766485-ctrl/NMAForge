@@ -1,5 +1,15 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 exact-current-main CP/completion replay at `9dce04d`:** The
+> 3-seed × 24-profile mixed prefix-error/abort/reset campaign passed 72/72;
+> every run hit 31/31 scenario bins and UVM warning/error/fatal=`0/0/0`.
+> URG `cp_cg` was 61/61 variables + 34/34 crosses, reset cutpoints 4/4,
+> kind×delay×reset cross 24/24, abort timing 7/7. Ten testbench/DUT-facing
+> assertions plus one UVM framework check succeeded; two UVM RAL internals
+> were unattempted, with 0 failures/incomplete and 2/2 covers matched. This
+> closes only the exercised mixed-reset interaction, not all CP/V2/A10 work.
+> See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v2-command-processor-mixed-reset-replay-at-9dce04d).
+
 > **2026-10-18 exact-main FP replay at `880c697`:** FP directed core and
 > maximum-length parity tests passed; three UVM seeds passed 484/484 each with
 > UVM severity `0/0/0`, peak outstanding=2, and six selected FP functional

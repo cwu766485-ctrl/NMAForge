@@ -1,5 +1,15 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-18 exact-current-main CP/completion replay at `9dce04d`:** The
+> 3-seed × 24-profile mixed prefix-error/abort/reset campaign passed 72/72;
+> every profile hit 31/31 scenario bins with UVM severity 0/0/0. URG reports
+> `cp_cg` 61/61 variables + 34/34 crosses, reset bins 4/4, kind×delay×reset
+> crosses 24/24, and abort timing 7/7. Ten testbench/DUT-facing assertions and
+> one UVM framework assertion succeeded; two UVM RAL internals had no attempts;
+> no assertion failed or was incomplete, and both cover properties matched.
+> This closes only the exercised CP mixed-reset interaction, not all V2 or
+> A10. Exact commands and artifacts are in the [run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v2-command-processor-mixed-reset-replay-at-9dce04d).
+
 > **2026-10-18 exact-main FP replay at `880c697`:** FP directed core and
 > maximum-length parity stress passed; three UVM seeds passed 484/484 each
 > with UVM severity 0/0/0, peak outstanding=2, and all six selected FP
