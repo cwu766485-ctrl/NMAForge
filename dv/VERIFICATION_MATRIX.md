@@ -1,5 +1,14 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 exact-current-main V4 randomized DDR E2E at `3345286`:** The
+> 192-seed campaign passed 192/192 at the exact pushed SHA with zero nonzero
+> UVM warning/error/fatal logs. URG `e2e_cg`, four per-transaction AXI gap/
+> back-pressure groups, and every Makefile-gated functional point were 100%;
+> assertions had 20 successes, 0 failures/incomplete, 2 UVM RAL no-attempts,
+> and all 3 AXI stall covers matched. This closes only the selected randomized
+> E2E slice, not broad V4, global DUT-only coverage review, or A10/V5. See the
+> [exact-main run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v4-randomized-ddr-e2e-at-3345286).
+
 > **2026-10-18 exact-current-main V3 DMA-SPAD replay at `b1257fb`:** The
 > focused 16-cycle AXI RREADY-stall case and three-seed subsystem regression
 > passed at the exact pushed SHA; each seed had `[TEST_DONE]`, nine runtime

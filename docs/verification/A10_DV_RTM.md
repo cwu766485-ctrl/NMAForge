@@ -1,5 +1,14 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-18 V4 exact-main randomized E2E update (`3345286`):** The
+> requirements exercised by `uvm_mixed_precision_ddr_e2e_random_cov_regress`
+> were replayed at the exact pushed SHA: 192/192 seeds passed with zero
+> nonzero UVM severity summaries. URG `e2e_cg`, four AXI per-transaction
+> back-pressure/latency groups, and all Makefile-gated functional points were
+> 100%; 20 assertions succeeded, none failed/incomplete, two UVM RAL internals
+> had no attempts, and 3/3 AXI stall covers matched. This is a selected V4
+> slice, not full V4 or A10 closure. See the [run evidence](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v4-randomized-ddr-e2e-at-3345286).
+
 > **2026-10-18 exact-current-main CP/completion replay at `9dce04d`:** The
 > 3-seed × 24-profile mixed prefix-error/abort/reset campaign passed 72/72;
 > every profile hit 31/31 scenario bins with UVM severity 0/0/0. URG reports
