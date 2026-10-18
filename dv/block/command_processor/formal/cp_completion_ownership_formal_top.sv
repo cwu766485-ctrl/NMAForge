@@ -188,6 +188,12 @@ module cp_completion_ownership_formal_top (
         @(posedge clk) disable iff (!resetn)
         ((u_cp.state_r == 4'd2) && compute_busy) |=> !launch_valid);
 
+    // The CP owns the lifecycle of its tile-pipeline instance. Tile activity
+    // must remain within ST_TILE, including the registered done pulse.
+    ap_tile_activity_owned_by_tile_state: assert property (
+        @(posedge clk) disable iff (!resetn)
+        (u_cp.tile_busy || u_cp.tile_done) |-> (u_cp.state_r == 4'd5));
+
     cp_completion_done_owned_by_cpl: cover property (
         @(posedge clk) disable iff (!resetn)
         writer_done && (u_cp.state_r == 4'd4));

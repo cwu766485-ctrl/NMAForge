@@ -83,22 +83,48 @@ make -C dv/subsystem/top_smoke/sim ai_smoke
 
 ## Formal follow-up: decode compute-busy launch guard
 
-On the pushed baseline `b924bb0` plus the local formal-harness update, VC Formal
-`V-2023.12-SP2` completed with clean setup. Four assertions were proven and
-all four were non-vacuous; all three covers were reached. The new property
-proves that a decode-state cycle with `compute_busy=1` cannot produce a launch
-in the following cycle. Its cover reaches two busy decode cycles, a release
-cycle, then the expected launch. No DUT RTL, SPEC, or ABI changed.
+On pushed `5439cb7` plus the local tile-ownership formal-harness update, VC
+Formal `V-2023.12-SP2` completed; its setup check reported `No setup issues
+found`. Five assertions were proven and all five were non-vacuous; all three
+covers were reached. The new properties
+prove that a decode-state cycle with `compute_busy=1` cannot produce a launch
+in the following cycle, and that the owned tile pipeline's `busy/done` signals
+cannot assert outside `ST_TILE`. The busy-hold cover reaches two busy decode
+cycles, a release cycle, then the expected launch. No DUT RTL, SPEC, or ABI
+changed.
 
 ```sh
 make -C dv/block/command_processor/formal completion-ownership \
-  OUT=/tmp/nmaforge_cp_completion_ownership_decodebusy_20261018 VCF=vcf
+  OUT=/tmp/nmaforge_cp_completion_ownership_tile_20261018_r2 VCF=vcf
 ```
 
 The gated target printed `CP_COMPLETION_OWNERSHIP_FORMAL_PASS`; setup reported
-`No setup issues found`. The run took 34.42 s wall time (5.59 s formal-engine
-wall time; 1,297 MB peak process memory). Artifacts are under the `/tmp` output
-directory above.
+`No setup issues found`. VC Formal emitted non-fatal `COM_OPT009/COM_OPT010`
+warnings because this RTL-only run does not configure a cell-library
+`search_path`/`link_library`; this is not a library-mapped synthesis result.
+The run took 34.49 s wall time (5.56 s formal-engine wall time; 1,298 MB peak
+process memory). Artifacts are under
+`/tmp/nmaforge_cp_completion_ownership_tile_20261018_r2/`.
+
+## Initial disposition of the 23 CP raw condition outcomes
+
+The URG raw condition score remains `229/252`; a formal disposition does not
+rewrite that score. The audited outcomes are grouped as follows:
+
+| Count | Condition pattern | Disposition |
+|---:|---|---|
+| 2 | `cmdq_size == 0` while the derived `cmdq_empty` is true | Structurally impossible: `cmdq_empty` itself includes `cmdq_size != 0`. These are two uses of the same redundant guard. |
+| 2 | `completion_done` while CP is not in `ST_CPL` | Proven unreachable in the current CP + real completion-writer formal harness by `ap_completion_done_owned_by_cpl`. |
+| 1 | `abort_pending_r=1, abort=0` in `ST_DECODE` | Proven unreachable by `ap_decode_abort_pending_requires_live_abort`; decode consumes abort directly rather than retaining it. |
+| 2 | `tile_busy` or `tile_done` while CP is not in `ST_TILE` | Proven unreachable by `ap_tile_activity_owned_by_tile_state` with the real tile-pipeline instance. |
+| 1 | `cplq_size == 0` while `cplq_tail_next == cplq_head` inside `cplq_full` | The pointer equality may be true, but is masked by the disabled-queue size guard and cannot make `cplq_full` true. The raw operand tuple remains unhit. |
+| 1 | `fetch_done` and `(abort_pending_r || abort)` true while CP is not in `ST_FETCH` | Still open: the CP-only formal harness treats fetch responses as unconstrained inputs. Disposition requires checking the real descriptor-fetch producer/lifecycle. |
+| 14 | The two raw outcomes of `completion_required_r && completion_available` at seven lifecycle sites | Still open for A10 disposition: the CP-only harness permits arbitrary queue/config changes. The normal queued path has submit-time admission and locked CSR configuration, while the legacy `cmdq_size==0` compatibility path can bypass the completion-space admission check. Verify the integrated contract before calling either tuple unreachable or adding tests. |
+
+Thus 5 outcomes have formal unreachable proofs, 2 are definitionally
+impossible, 1 is a semantically masked operand combination, and 15 remain for
+cross-layer review. This is a partial disposition, not CP/V2/V5 code-coverage
+closure.
 
 ## Limits and next work
 
