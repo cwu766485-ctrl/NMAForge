@@ -92,7 +92,7 @@ check-coverage:
 check-log:
 	@! grep -Eq '^Error:|^Error-' $(LOG) && \
 	 grep -Eq '\[CP/SB\].*launches=' $(LOG) && \
-	 grep -Eq '\[CP/TILE\].*tiles=3/3/3 events=1' $(LOG) && \
+	 grep -Eq '\[CP/TILE\].*tiles=7/6/6 events=3 dma_errors=1 recovery_events=1 error_completion_starts=0' $(LOG) && \
 		 grep -Eq '\[CP/RING\].*expected=(1[2-9]|2[0-4]) accepted=[0-9]+ launches=[0-9]+ retired=[0-9]+ valid=[0-9]+ errors=[1-9][0-9]* launch_pending=0 retire_pending=0' $(LOG) && \
 		 grep -Eq '\[CP/RING\].*random_outcomes desc=[1-9][0-9]* fetch=[1-9][0-9]* compute=[1-9][0-9]* success=[1-9][0-9]*' $(LOG) && \
 			 grep -Eq 'scenario_bins=31/31' $(LOG) && \

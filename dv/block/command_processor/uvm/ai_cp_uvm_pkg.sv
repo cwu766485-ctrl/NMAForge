@@ -97,6 +97,8 @@ package ai_cp_uvm_pkg;
       vif.submit=0; vif.abort=0; vif.direct_start=0;
       vif.tile_start=0;
       vif.force_compute_error_once=0;
+      vif.force_tile_dma_error_once=0;
+      vif.tile_dma_error_case=0;
       vif.force_stale_abort_code_once=0;
       vif.force_completion_backpressure=0;
       vif.cfg_op=8'h50;
@@ -1347,6 +1349,27 @@ package ai_cp_uvm_pkg;
               `uvm_error("CP/DRV","three-tile ping-pong job did not retire cleanly")
             if(vif.tile_perf_overlap==0)
               `uvm_error("CP/DRV","tile ping-pong job showed no DMA/compute overlap")
+            // Reuse this scenario for a second job whose first load fails.
+            // The endpoint asserts dma_error on the same cycle as dma_done.
+            vif.tile_count=2;
+            vif.tile_dma_error_case=1;
+            vif.force_tile_dma_error_once=1;
+            @(negedge vif.clk); vif.tile_start=1;
+            @(negedge vif.clk); vif.tile_start=0;
+            wait_idle();
+            if(vif.tile_active || vif.tile_completed!==0 || vif.launch_valid ||
+               vif.tile_dma_start || vif.completion_start)
+              `uvm_error("CP/DRV","DMA-error tile job did not return idle without launch/store/completion")
+            // Starting a fresh job must clear the failed job's internal
+            // context and error state before normal ping-pong work resumes.
+            vif.tile_dma_error_case=0;
+            vif.tile_count=3;
+            @(negedge vif.clk); vif.tile_start=1;
+            @(negedge vif.clk); vif.tile_start=0;
+            wait_idle();
+            if(vif.tile_completed!==3 || vif.tile_active || vif.event_error ||
+               vif.event_error_code!==0)
+              `uvm_error("CP/DRV","tile scheduler did not recover cleanly after load-DMA error")
           end
           CP_RANDOM_QUEUE: begin
             int observed_cpl_tail, retired_count, delay_cycles;
@@ -1452,6 +1475,7 @@ package ai_cp_uvm_pkg;
     int tile_ctx_state[2], tile_ctx_tile[2];
     int tile_next_load, tile_next_compute, tile_next_store;
     int tile_loads, tile_computes, tile_stores, tile_overlap_cycles, tile_events;
+    int tile_dma_error_events, tile_recovery_events, tile_error_completion_starts;
     int tile_load_buffer_hits[2], tile_compute_buffer_hits[2], tile_store_buffer_hits[2];
     int tile_dma_owner, tile_compute_owner;
     bit tile_dma_pending, tile_dma_store_pending, tile_compute_pending, tile_model_started;
@@ -1497,6 +1521,7 @@ package ai_cp_uvm_pkg;
       abort_reset_recovery_records=0;
       tile_next_load=0; tile_next_compute=0; tile_next_store=0;
       tile_loads=0; tile_computes=0; tile_stores=0; tile_overlap_cycles=0; tile_events=0;
+      tile_dma_error_events=0; tile_recovery_events=0; tile_error_completion_starts=0;
       foreach(tile_ctx_state[i]) begin
         tile_ctx_state[i]=0; tile_ctx_tile[i]=-1;
         tile_load_buffer_hits[i]=0; tile_compute_buffer_hits[i]=0; tile_store_buffer_hits[i]=0;
@@ -1694,6 +1719,9 @@ package ai_cp_uvm_pkg;
           end
           tile_dma_pending=0; tile_compute_pending=0;
         end
+        if(vif.test_case==CP_TILE_PINGPONG && vif.tile_start) begin
+          tile_next_load=0; tile_next_compute=0; tile_next_store=0;
+        end
         if(vif.test_case!=CP_TILE_PINGPONG) tile_model_started=0;
         if(vif.test_case==CP_RANDOM_QUEUE && !random_model_started) begin
           random_model_started=1;
@@ -1769,7 +1797,12 @@ package ai_cp_uvm_pkg;
         if(vif.test_case==CP_TILE_PINGPONG && vif.dma_busy && vif.compute_busy)
           tile_overlap_cycles++;
         if(vif.test_case==CP_TILE_PINGPONG && vif.dma_done && tile_dma_pending) begin
-          if(tile_dma_store_pending) begin
+          if(vif.dma_error && !tile_dma_store_pending) begin
+            if(vif.tile_dma_error_case && vif.dma_error_code==4'hA)
+              tile_dma_error_events++;
+            tile_ctx_state[tile_dma_owner]=0;
+            tile_ctx_tile[tile_dma_owner]=-1;
+          end else if(tile_dma_store_pending) begin
             if(tile_ctx_state[tile_dma_owner]!=5)
               `uvm_error("CP/TILE","store completion did not own a STORING context")
             tile_ctx_state[tile_dma_owner]=0;
@@ -1839,10 +1872,21 @@ package ai_cp_uvm_pkg;
           tile_compute_pending=1; tile_next_compute++; tile_computes++;
         end
         if(vif.test_case==CP_TILE_PINGPONG && vif.event_valid) begin
-          if(vif.event_error || vif.event_elements!==32'd12)
-            `uvm_error("CP/TILE","tile completion event reported an error or incorrect element total")
+          if(vif.event_error) begin
+            if(!vif.tile_dma_error_case || vif.event_error_code!==4'hA || vif.event_elements!==0 || tile_computes!=3 ||
+               tile_stores!=3 || tile_dma_error_events!=1)
+              `uvm_error("CP/TILE","load-DMA error event/code or no-launch/no-store checks failed")
+          end else begin
+            if(vif.event_elements!==32'd12)
+              `uvm_error("CP/TILE","successful tile event reported incorrect element total")
+            if(tile_dma_error_events!=0)
+              tile_recovery_events++;
+          end
           tile_events++;
         end
+        if(vif.test_case==CP_TILE_PINGPONG && vif.tile_dma_error_case &&
+           vif.completion_start)
+          tile_error_completion_starts++;
         if(vif.test_case==CP_CONCURRENT_RING && vif.launch_valid)
           concurrent_launches++;
         if(vif.fetch_start && vif.test_case==CP_EXTERNAL_DESC) begin
@@ -2185,17 +2229,21 @@ package ai_cp_uvm_pkg;
       `uvm_info("CP/CPLQ",$sformatf("fetches=%0d launches=%0d completions=%0d",
         cplq_pressure_fetches,cplq_pressure_launches,cplq_pressure_completions),UVM_LOW)
       `uvm_info("CP/CPLQ_LAST_SLOT","one-free-slot batch passed; second descriptor remained queued until CPLQ consume and re-doorbell",UVM_LOW)
-      if(tile_loads!=3 || tile_computes!=3 || tile_stores!=3 || tile_events!=1 || tile_next_load!=3 ||
+      if(tile_loads!=7 || tile_computes!=6 || tile_stores!=6 || tile_events!=3 ||
+         tile_dma_error_events!=1 || tile_recovery_events!=1 ||
+         tile_error_completion_starts!=0 || tile_next_load!=3 ||
          tile_next_compute!=3 || tile_next_store!=3)
-        `uvm_error("CP/TILE","three-tile load/compute/store lifecycle did not complete exactly once")
+        `uvm_error("CP/TILE","ping-pong, DMA-error, or post-error recovery lifecycle counts mismatch")
       foreach(tile_ctx_state[i]) begin
         if(tile_ctx_state[i]!=0) `uvm_error("CP/TILE","tile context was not returned to EMPTY")
-        if(tile_load_buffer_hits[i]==0 || tile_compute_buffer_hits[i]==0 || tile_store_buffer_hits[i]==0)
+        if(tile_load_buffer_hits[i]==0 || tile_compute_buffer_hits[i]==0 ||
+           tile_store_buffer_hits[i]==0)
           `uvm_error("CP/TILE","ping-pong did not exercise load/compute/store ownership on both buffers")
       end
       if(tile_overlap_cycles==0) `uvm_error("CP/TILE","checker observed no simultaneous DMA/compute activity")
-      `uvm_info("CP/TILE",$sformatf("tiles=%0d/%0d/%0d events=%0d overlap=%0d load_buf=%0d/%0d compute_buf=%0d/%0d store_buf=%0d/%0d",
-        tile_loads,tile_computes,tile_stores,tile_events,tile_overlap_cycles,
+      `uvm_info("CP/TILE",$sformatf("tiles=%0d/%0d/%0d events=%0d dma_errors=%0d recovery_events=%0d error_completion_starts=%0d overlap=%0d load_buf=%0d/%0d compute_buf=%0d/%0d store_buf=%0d/%0d",
+        tile_loads,tile_computes,tile_stores,tile_events,tile_dma_error_events,
+        tile_recovery_events,tile_error_completion_starts,tile_overlap_cycles,
         tile_load_buffer_hits[0],tile_load_buffer_hits[1],
         tile_compute_buffer_hits[0],tile_compute_buffer_hits[1],
         tile_store_buffer_hits[0],tile_store_buffer_hits[1]),UVM_LOW)

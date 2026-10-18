@@ -303,15 +303,22 @@ module tb_ai_cp_uvm;
         vif.dma_busy=0; vif.dma_done=0; vif.dma_error=0; vif.dma_error_code=0;
       end else if(vif.tile_dma_start) begin
         delay_cycles=$urandom_range(2,6);
+        begin : tile_dma_response
+          bit inject_error;
+          inject_error=(!vif.tile_dma_store && vif.force_tile_dma_error_once);
+          if(inject_error) vif.force_tile_dma_error_once=0;
         fork begin
           vif.dma_busy=1;
           repeat(delay_cycles) @(negedge clk);
           if(vif.resetn) begin
             vif.dma_busy=0; vif.dma_done=1;
+            vif.dma_error=inject_error;
+            vif.dma_error_code=inject_error ? 4'hA : 4'd0;
             @(negedge clk);
-            vif.dma_done=0;
+            vif.dma_done=0; vif.dma_error=0; vif.dma_error_code=0;
           end
         end join_none
+        end
       end
     end
   end

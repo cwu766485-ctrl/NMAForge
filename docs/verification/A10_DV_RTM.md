@@ -666,6 +666,27 @@ properties; the URG score remains 237/252 (94.05%), with no exclusions or
 rewritten bins. This is assume-guarantee evidence, not a whole-top formal proof.
 
 Control regression passed all 9 tests with UVM severity `0/0/0`, and top
-`ai_smoke` passed. No product RTL/SPEC/ABI changed. CP toggle residuals,
-broader V2/V5 closure, and frozen-SHA clean replay remain open. See the
+`ai_smoke` passed. No product RTL/SPEC/ABI changed. The pushed `de51846`
+state has since passed a detached clean-SHA replay (CP 72 profiles, formal
+7/7 assertions, and top smoke). CP toggle residuals and broader V2/V5 closure
+remain open; the newer tile-error recovery delta still needs its own clean
+replay. See the
 [detailed run record](A10_DV_RUN_2026-10-18_CP_COMPLETION_AVAILABILITY.md).
+
+## 2026-10-18 CP tile load-DMA error follow-up
+
+`CP_TILE_PINGPONG` now runs a normal three-tile job, an injected first-load
+DMA error (`dma_done` and `dma_error` together, code `0xA`), then a normal
+three-tile restart. The checker verifies the error event/code and zero
+elements, no compute/store or completion-writer start during the error job,
+then a successful post-error recovery event. Focused and full CP, the 3-seed
+regression, 72-profile UVM/URG matrix, and top `ai_smoke` passed. All 72 logs
+reported `tiles=7/6/6 events=3 dma_errors=1 recovery_events=1
+error_completion_starts=0`; every full-suite run had scenario bins `31/31`
+and UVM warning/error/fatal=`0/0/0`. Merged `cp_cg` was 61/61 variables +
+34/34 crosses, reset-word bins 4/4, mixed kind×delay×reset cross 24/24, and
+abort timing 7/7. This changes only the CP testbench and its run gate, not
+product RTL/SPEC/ABI. It closes one directed tile-DMA error/recovery slice,
+not V2 or A10; broad CP lifecycle, raw DUT coverage, and clean-SHA replay of
+this delta remain open. Exact commands/results:
+[run record](A10_DV_RUN_2026-10-18_CP_COMPLETION_AVAILABILITY.md#follow-up-tile-load-dma-error-propagation).

@@ -137,5 +137,87 @@ tuples, and one fetch-done ownership tuple are covered by the non-vacuous
 formal properties under their stated producer/configuration contracts. The
 raw CP condition score remains 237/252 (94.05%); no bin is rewritten or
 excluded. CP toggle residuals, broader fault×abort×reset interactions, full
-V2 lifecycle closure, global coverage disposition, fixed-SHA clean replay,
-and A10/V5 remain open.
+V2 lifecycle closure, global coverage disposition, and A10/V5 remain open.
+The pushed `de51846` state was subsequently replayed in a clean detached
+worktree: its 72-profile CP campaign, seven formal ownership assertions, and
+top `ai_smoke` passed. The pinned full SHA was
+`de518464a8669776073b907692908c385c8f04df`; the detached worktree was clean
+before running. The exact commands were:
+
+```sh
+make -C dv/block/command_processor/uvm cov-regress \
+  OUT=/tmp/nmaforge_a10_de51846_cp_replay_20261018/cp \
+  COV_OUT=/tmp/nmaforge_a10_de51846_cp_replay_20261018/cp/coverage \
+  SEEDS='20261083 20261084 20261085' VCS='vcs -licwait 1' URG=urg
+
+make -C dv/block/command_processor/formal completion-ownership \
+  VCF=vcf OUT=/tmp/nmaforge_a10_de51846_cp_replay_20261018/formal
+
+make -C dv/subsystem/top_smoke/sim ai_smoke VCS='vcs -licwait 1'
+```
+
+Coverage was 61/61 variables + 34/34 crosses, formal was 7/7 assertions
+proven/non-vacuous and 3/3 covers reached, and top smoke printed `TEST PASS`.
+Artifacts: `/tmp/nmaforge_a10_de51846_cp_replay_20261018/`; clean worktree:
+`/tmp/nmaforge_clean_de51846_20261018/`. This replay does not include the
+later tile-error recovery delta below, which still needs its own clean-SHA
+replay.
+
+### Follow-up: tile load-DMA error propagation
+
+Based on pushed `de51846`, the existing `CP_TILE_PINGPONG` scenario now runs
+three jobs: a successful three-tile ping-pong, a two-tile job whose first load
+response asserts `dma_done` and `dma_error` together with code `0xA`, then a
+successful three-tile recovery job. The checker requires the failure event to
+preserve code `0xA` and zero result elements, no compute launch/store or
+completion-writer start during the failed job, and a subsequent successful
+job after the tile scheduler is restarted. The normal ping-pong checks retain
+ordered load/compute/store ownership on both buffers. Only UVM interface,
+sequence/scoreboard, behavioral DMA endpoint, and Makefile acceptance checks
+changed; product RTL, SPEC, register ABI, and clock behavior did not change.
+
+The focused `CP_ONLY_CASE=15` run compiled and reported UVM
+warning/error/fatal=`0/0/0`; this mode intentionally skips full-suite aggregate
+markers, so final acceptance used full-suite runs:
+
+```sh
+make -C dv/block/command_processor/uvm compile \
+  OUT=/tmp/nmaforge_a10_cp_tile_error_recovery_focused_20261018/build \
+  VCS='vcs -licwait 1'
+
+(cd /tmp/nmaforge_a10_cp_tile_error_recovery_focused_20261018/build && \
+  ./simv +UVM_TESTNAME=ai_cp_test +CP_ONLY_CASE=15 \
+    +ntb_random_seed=20261018 -l focused.log && \
+  ./simv +UVM_TESTNAME=ai_cp_test +ntb_random_seed=20261018 -l full.log)
+make -C /mnt/e/workspace/chip/NMAForge/dv/block/command_processor/uvm \
+  check-log LOG=/tmp/nmaforge_a10_cp_tile_error_recovery_focused_20261018/build/full.log
+
+make -C dv/block/command_processor/uvm regress \
+  OUT=/tmp/nmaforge_a10_cp_tile_error_recovery_regress_20261018/cp \
+  SEEDS='20261018 20261019 20261020' VCS='vcs -licwait 1'
+
+make -C dv/block/command_processor/uvm cov-regress \
+  OUT=/tmp/nmaforge_a10_cp_tile_error_recovery_cov_20261018/build \
+  COV_OUT=/tmp/nmaforge_a10_cp_tile_error_recovery_cov_20261018/coverage \
+  SEEDS='20261018 20261019 20261020' VCS='vcs -licwait 1' URG=urg
+
+make -C dv/subsystem/top_smoke/sim ai_smoke VCS='vcs -licwait 1'
+```
+
+Environment: Rocky Linux 8.10, VCS/URG `V-2023.12-SP1_Full64`.
+
+Results: focused case and the single-seed full-suite run passed; the full-suite
+log had scenario bins `31/31` and UVM warning/error/fatal=`0/0/0`. The 3-seed
+CP regression also passed with those same zero severities in each run. Each of
+the three full runs reported
+`tiles=7/6/6 events=3 dma_errors=1 recovery_events=1 error_completion_starts=0`.
+The 72-profile campaign (3 seeds × 24 mixed abort/reset profiles) passed every
+Makefile and URG gate; all 72 logs contained that tile/recovery marker. Merged
+URG `cp_cg` reached 61/61 variables and 34/34 crosses; reset-word bins were
+4/4, the mixed kind×delay×reset cross was 24/24, and abort-timing coverage was
+7/7. Top `ai_smoke` printed `TEST PASS`.
+
+This closes the directed tile load-DMA error and restart-recovery slice only.
+It is shared-worktree evidence based on `de51846`; a clean detached replay of
+the new follow-up commit remains pending. CP residual code coverage, broader
+V2 command/completion lifecycle closure, and A10/V5 acceptance remain open.

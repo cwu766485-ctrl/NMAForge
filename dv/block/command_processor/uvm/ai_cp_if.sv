@@ -13,6 +13,8 @@ interface ai_cp_if(input logic clk);
   logic [63:0] random_queue_failure_kind;
   logic compute_abort_once;
   logic force_compute_error_once;
+  logic force_tile_dma_error_once;
+  logic tile_dma_error_case;
   logic force_stale_abort_code_once;
   logic abort_reset_recovery;
   // Testbench-only controls/counters for reset-at-each-completion-word sweep.
