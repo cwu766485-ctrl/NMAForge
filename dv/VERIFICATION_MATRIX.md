@@ -1,5 +1,16 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-18 exact-main V4 mixed-precision DDR E2E replay (`968c8bc`):**
+> The top-level 192-seed UVM campaign passed 192/192 with UVM
+> warning/error/fatal=`0/0/0`; selected E2E functional points and all four
+> transaction-level AXI gap/backpressure groups reached 100%. The aggregate
+> URG score was 90.63%, with a malformed generic AXI4 `kind` coverpoint
+> (32-bit `int` auto-binned into 64 ranges for a five-value enum) and unhit
+> narrow-32 / >16-beat / non-OKAY AXI-Lite scenarios. These are recorded as
+> coverage-model or scenario-scope follow-ups, not silently waived. V4
+> selected end-to-end behavior is reproduced; V4/V5/A10 remain open. See the
+> [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-v4-mixed-precision-ddr-e2e-replay-at-968c8bc).
+
 > **2026-10-18 exact-main V3 DMA–SPAD–CNM/RREADY replay (`575f1ae`):**
 > Three subsystem seeds and the dedicated 16/64/300-cycle AXI RREADY stress
 > passed with UVM severity `0/0/0`. The merged URG covered all 14 selected

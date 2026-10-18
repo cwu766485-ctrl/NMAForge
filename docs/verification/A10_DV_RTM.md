@@ -1,5 +1,17 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-18 exact-main V4 DDR E2E replay (`968c8bc`):** The 192-seed
+> top-level campaign passed 192/192 at pushed `main`; all logs had UVM
+> warning/error/fatal=`0/0/0`, and the selected E2E functional points and four
+> transaction-level AXI gap/backpressure groups were 100%. The aggregate URG
+> score was 90.63%: detailed review identified a malformed generic AXI4 `kind`
+> coverpoint (`int` auto-binned as 64 ranges for a five-value enum), while
+> narrow-32 transfer, oversized burst, and non-OKAY AXI-Lite responses were
+> not exercised by this aligned success-path workload. This is scoped V4
+> evidence—not V4/V5/A10 closure. The AXI coverage model and all remaining
+> bins require explicit V5 repair/disposition. See the [exact-main run
+> record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-v4-mixed-precision-ddr-e2e-replay-at-968c8bc).
+
 > **2026-10-18 exact-main V2 CP/Completion matrix replay (`b4c9f8b`):** The
 > three-seed × 24-profile campaign passed 72/72 profiles with 31/31 scenario
 > bins and UVM severity `0/0/0`. URG: `cp_cg` 61/61 variables + 34/34 crosses,
