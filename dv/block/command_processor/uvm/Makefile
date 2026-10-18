@@ -117,8 +117,10 @@ check-log:
 		   grep -Eq '\[CP/NO_CPLQ\].*decode_abort_event=1 completion_write=0 launch=0 head_advance=1' $(LOG) && \
 		   grep -Eq '\[CP/NO_CPLQ\].*invalid_desc_event=1 completion_write=0 launch=0' $(LOG) && \
 		   grep -Eq '\[CP/NO_CPLQ\].*dep_timeout_event=1 completion_write=0 launch=0' $(LOG) && \
-		   grep -Eq '\[CP/NO_CPLQ\].*macro_success_events=1 macro_error_events=1 macro_child_launches=4' $(LOG) && \
-			 grep -Eq '\[CP/MACRO\].*children=3 parent_completion=7 compute_error_child_launches=1 fetch_error_child_launches=1 fetch_error_parent_completion=1 child_fetch_abort_parent=1 child_decode_abort_parent=1 child_decode_error_parent=1 child_dependency_timeout_parent=1 no_cplq_success_children=3 no_cplq_error_stop=1' $(LOG) && \
+		   grep -Eq '\[CP/NO_CPLQ\].*macro_invalid_desc_event=1 parent_task_id=15a0 error_code=7 completion_write=0 cplq_tail_advance=0 child_launch=0 later_child_fetch=0 head_advance=1' $(LOG) && \
+		   grep -Eq '\[CP/NO_CPLQ\].*macro_dependency_timeout_event=1 parent_task_id=15b0 error_code=12 completion_write=0 cplq_tail_advance=0 child_launch=0 later_child_fetch=0 head_advance=1' $(LOG) && \
+		   grep -Eq '\[CP/NO_CPLQ\].*macro_success_events=1 macro_error_events=3 macro_desc_error_events=1 macro_dep_timeout_events=1 macro_child_launches=4' $(LOG) && \
+			 grep -Eq '\[CP/MACRO\].*children=3 parent_completion=7 compute_error_child_launches=1 fetch_error_child_launches=1 fetch_error_parent_completion=1 child_fetch_abort_parent=1 child_decode_abort_parent=1 child_decode_error_parent=1 child_dependency_timeout_parent=1 no_cplq_success_children=3 no_cplq_error_stop=1 no_cplq_desc_error=1 no_cplq_dependency_timeout=1' $(LOG) && \
 		 grep -Eq '\[CP/ABORT_COV\].*route_bins=3/3 direct_fetch_done=1 macro_child_fetch_parent=1 macro_child_decode_parent=1 ERR_ABORT=3' $(LOG) && \
 	 grep -Eq 'UVM_WARNING[[:space:]]*:[[:space:]]+0' $(LOG) && \
 	 grep -Eq 'UVM_ERROR[[:space:]]*:[[:space:]]+0' $(LOG) && \

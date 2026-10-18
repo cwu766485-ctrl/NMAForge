@@ -144,6 +144,75 @@ package ai_cp_uvm_pkg;
         "v7 parent fetch + three external child fetches used 64-bit aligned addresses",
         UVM_LOW)
     endtask
+    task automatic check_no_cplq_macro_frontend_error(
+      input logic [15:0] expected_parent_id,
+      input logic [3:0] expected_error_code,
+      input string path_name
+    );
+      int event_count, launch_count, completion_start_count;
+      int completion_write_count, head_advance_count, fetch_count;
+      logic [31:0] previous_head;
+      bit monitor_done;
+      event_count=0; launch_count=0; completion_start_count=0;
+      completion_write_count=0; head_advance_count=0; fetch_count=0;
+      previous_head=vif.cmdq_head; monitor_done=0;
+      if(previous_head!==32'd0)
+        `uvm_error("CP/NO_CPLQ",
+          $sformatf("macro %s path did not start from CMDQ head zero",path_name))
+      fork
+        begin : monitor_event_only_path
+          forever begin
+            @(posedge vif.clk);
+            if(monitor_done) break;
+            if(vif.fetch_start) fetch_count++;
+            if(vif.launch_valid) launch_count++;
+            if(vif.completion_start) completion_start_count++;
+            if(vif.cpl_spad_valid) completion_write_count++;
+            if(vif.cmdq_head!==previous_head) begin
+              head_advance_count++;
+              if(previous_head!==32'd0 || vif.cmdq_head!==32'd1)
+                `uvm_error("CP/NO_CPLQ",
+                  $sformatf("macro %s path changed CMDQ head %0d->%0d",
+                            path_name,previous_head,vif.cmdq_head))
+              previous_head=vif.cmdq_head;
+            end
+            if(vif.cplq_tail!==32'd0)
+              `uvm_error("CP/NO_CPLQ",
+                $sformatf("macro %s path advanced CPLQ tail",path_name))
+            if(vif.event_valid) begin
+              event_count++;
+              if(!vif.event_error ||
+                 vif.event_error_code!==expected_error_code ||
+                 vif.completion_task_id!==expected_parent_id ||
+                 vif.event_result!==32'd0 || vif.event_cycles!==32'd0 ||
+                 vif.event_elements!==32'd0)
+                `uvm_error("CP/NO_CPLQ",
+                  $sformatf("macro %s event mismatch parent=%04x code=%0d result=%08x cycles=%0d elements=%0d",
+                            path_name,vif.completion_task_id,vif.event_error_code,
+                            vif.event_result,vif.event_cycles,vif.event_elements))
+            end
+          end
+        end
+        begin : drive_event_only_path
+          pulse_submit();
+          wait(vif.event_valid===1'b1);
+          wait_idle();
+          @(negedge vif.clk); monitor_done=1;
+        end
+      join
+      if(event_count!=1 || launch_count!=0 || completion_start_count!=0 ||
+         completion_write_count!=0 || head_advance_count!=1 || fetch_count!=2 ||
+         vif.cmdq_head!==32'd1 || vif.cplq_tail!==32'd0 || vif.busy ||
+         vif.cpl_writer_busy || vif.launch_valid)
+        `uvm_error("CP/NO_CPLQ",
+          $sformatf("macro %s event-only lifecycle mismatch events=%0d launches=%0d completion_starts=%0d completion_writes=%0d head_advances=%0d fetches=%0d head=%0d tail=%0d",
+                    path_name,event_count,launch_count,completion_start_count,
+                    completion_write_count,head_advance_count,fetch_count,
+                    vif.cmdq_head,vif.cplq_tail))
+      `uvm_info("CP/NO_CPLQ",
+        $sformatf("macro_%s_event=1 parent_task_id=%04x error_code=%0d completion_write=0 cplq_tail_advance=0 child_launch=0 later_child_fetch=0 head_advance=1",
+                  path_name,expected_parent_id,expected_error_code),UVM_LOW)
+    endtask
     task automatic run_phase(uvm_phase phase);
       ai_cp_item req;
       vif.resetn=0; vif.submit=0; vif.abort=0; vif.direct_start=0;
@@ -730,8 +799,37 @@ package ai_cp_uvm_pkg;
             wait_idle();
             if(vif.force_compute_error_once)
               `uvm_error("CP/NO_CPLQ","macro compute-error injection was not consumed")
+
+            // A first-child validation failure uses the same parent-owned,
+            // fail-stop lifecycle when the completion queue is disabled.
+            reset_cp();
+            descriptor(0,0,0,0,1,16'h15a0);
+            vif.desc_mem[0].op=8'h40;
+            vif.desc_mem[0].version=8'd4;
+            vif.desc_mem[0].length=16'd3;
+            vif.desc_mem[0].src0=32'h1040;
+            descriptor(1,1,0,0,1,16'h15a1);
+            descriptor(2,0,0,0,1,16'h15a2);
+            descriptor(3,0,0,0,1,16'h15a3);
+            vif.cmdq_size=0; vif.cplq_size=0; vif.cmdq_tail=1; vif.cplq_head=0;
+            check_no_cplq_macro_frontend_error(16'h15a0,4'd7,"invalid_desc");
+
+            // An unmet first-child dependency must likewise time out as one
+            // parent event, without launching or fetching a later child.
+            reset_cp();
+            descriptor(0,0,0,0,1,16'h15b0);
+            vif.desc_mem[0].op=8'h40;
+            vif.desc_mem[0].version=8'd4;
+            vif.desc_mem[0].length=16'd3;
+            vif.desc_mem[0].src0=32'h1040;
+            descriptor(1,0,16'h0002,0,1,16'h15b1);
+            descriptor(2,0,0,0,1,16'h15b2);
+            descriptor(3,0,0,0,1,16'h15b3);
+            vif.cmdq_size=0; vif.cplq_size=0; vif.cmdq_tail=1; vif.cplq_head=0;
+            check_no_cplq_macro_frontend_error(16'h15b0,4'd12,"dependency_timeout");
+
             vif.cmdq_size=4; vif.cplq_size=4;
-            `uvm_info("CP/MACRO","children=3 parent_completion=7 compute_error_child_launches=1 fetch_error_child_launches=1 fetch_error_parent_completion=1 child_fetch_abort_parent=1 child_decode_abort_parent=1 child_decode_error_parent=1 child_dependency_timeout_parent=1 no_cplq_success_children=3 no_cplq_error_stop=1",UVM_LOW)
+            `uvm_info("CP/MACRO","children=3 parent_completion=7 compute_error_child_launches=1 fetch_error_child_launches=1 fetch_error_parent_completion=1 child_fetch_abort_parent=1 child_decode_abort_parent=1 child_decode_error_parent=1 child_dependency_timeout_parent=1 no_cplq_success_children=3 no_cplq_error_stop=1 no_cplq_desc_error=1 no_cplq_dependency_timeout=1",UVM_LOW)
           end
           CP_FETCH_ERROR_NO_CPL: begin
             reset_cp();
@@ -1291,6 +1389,7 @@ package ai_cp_uvm_pkg;
     int macro_completions, macro_error_completions, macro_fetch_error_completions;
     int macro_desc_error_completions, macro_dep_timeout_completions;
     int macro_no_cplq_launches, macro_no_cplq_success_events, macro_no_cplq_error_events;
+    int macro_no_cplq_desc_error_events, macro_no_cplq_dep_timeout_events;
     int no_cplq_fetch_events, late_completion_protection_events;
     int tile_ctx_state[2], tile_ctx_tile[2];
     int tile_next_load, tile_next_compute, tile_next_store;
@@ -1333,6 +1432,7 @@ package ai_cp_uvm_pkg;
       macro_desc_error_completions=0; macro_dep_timeout_completions=0;
       macro_no_cplq_launches=0; macro_no_cplq_success_events=0;
       macro_no_cplq_error_events=0;
+      macro_no_cplq_desc_error_events=0; macro_no_cplq_dep_timeout_events=0;
       no_cplq_fetch_events=0;
       late_completion_protection_events=0;
       abort_reset_inputs=0; abort_reset_recovery_launches=0;
@@ -1447,15 +1547,32 @@ package ai_cp_uvm_pkg;
           end
         end
         if(vif.test_case==CP_MACRO_CHILDREN && vif.cplq_size==0 && vif.event_valid) begin
-          if(vif.event_result!==32'hc0de0001 || vif.cplq_tail!==32'd0 ||
-             vif.cpl_spad_valid || vif.cpl_writer_busy)
-            `uvm_error("CP/NO_CPLQ","macro event changed result/queue state or attempted completion writeback")
+          if(vif.cplq_tail!==32'd0 || vif.cpl_spad_valid ||
+             vif.cpl_writer_busy || vif.completion_start)
+            `uvm_error("CP/NO_CPLQ","macro event changed queue state or attempted completion writeback")
           if(!vif.event_error && vif.event_error_code===4'd0 &&
-             vif.event_cycles===32'd51 && vif.event_elements===32'd12)
+              vif.completion_task_id===16'h1520 &&
+              vif.event_result===32'hc0de0001 &&
+              vif.event_cycles===32'd51 && vif.event_elements===32'd12)
             macro_no_cplq_success_events++;
           else if(vif.event_error && vif.event_error_code===4'd5 &&
+                   vif.completion_task_id===16'h1530 &&
+                   vif.event_result===32'hc0de0001 &&
                   vif.event_cycles===32'd17 && vif.event_elements===32'd4)
             macro_no_cplq_error_events++;
+          else if(vif.event_error && vif.event_error_code===4'd7 &&
+                  vif.completion_task_id===16'h15a0 &&
+                  vif.event_result===32'd0 && vif.event_cycles===32'd0 &&
+                  vif.event_elements===32'd0) begin
+            macro_no_cplq_error_events++;
+            macro_no_cplq_desc_error_events++;
+          end else if(vif.event_error && vif.event_error_code===4'd12 &&
+                      vif.completion_task_id===16'h15b0 &&
+                      vif.event_result===32'd0 && vif.event_cycles===32'd0 &&
+                      vif.event_elements===32'd0) begin
+            macro_no_cplq_error_events++;
+            macro_no_cplq_dep_timeout_events++;
+          end
           else
             `uvm_error("CP/NO_CPLQ","macro no-CPLQ event status or accumulated counters mismatch")
         end
@@ -1478,7 +1595,9 @@ package ai_cp_uvm_pkg;
             `uvm_error("CP/MACRO","child-fetch-error macro launched a child after the failed descriptor fetch")
           end else if(vif.launch_task_id==16'h1581 || vif.launch_task_id==16'h1582 ||
                       vif.launch_task_id==16'h1583 || vif.launch_task_id==16'h1591 ||
-                      vif.launch_task_id==16'h1592 || vif.launch_task_id==16'h1593) begin
+                      vif.launch_task_id==16'h1592 || vif.launch_task_id==16'h1593 ||
+                      (vif.launch_task_id>=16'h15a1 && vif.launch_task_id<=16'h15a3) ||
+                      (vif.launch_task_id>=16'h15b1 && vif.launch_task_id<=16'h15b3)) begin
             `uvm_error("CP/MACRO","macro launched a child after descriptor/dependency failure")
           end else begin
             case(macro_no_cplq_launches)
@@ -1990,8 +2109,9 @@ package ai_cp_uvm_pkg;
          macro_desc_error_completions!=1 || macro_dep_timeout_completions!=1)
         `uvm_error("CP/MACRO","macro success/error/abort/validation/dependency cases did not produce expected launches and parent completions")
       if(macro_no_cplq_launches!=4 || macro_no_cplq_success_events!=1 ||
-         macro_no_cplq_error_events!=1)
-        `uvm_error("CP/NO_CPLQ","macro event-only paths must launch 3 success children, stop after 1 error child, and report one event each")
+         macro_no_cplq_error_events!=3 || macro_no_cplq_desc_error_events!=1 ||
+         macro_no_cplq_dep_timeout_events!=1)
+        `uvm_error("CP/NO_CPLQ","macro event-only paths must report one success and three distinct fail-stop events with no front-end-error child launch")
       if(no_cplq_fetch_events!=1)
         `uvm_error("CP/NO_CPLQ","expected exactly one fetch-error event with completion queue disabled")
       if(late_completion_protection_events!=1)
@@ -2018,8 +2138,10 @@ package ai_cp_uvm_pkg;
         tile_load_buffer_hits[0],tile_load_buffer_hits[1],
         tile_compute_buffer_hits[0],tile_compute_buffer_hits[1],
         tile_store_buffer_hits[0],tile_store_buffer_hits[1]),UVM_LOW)
-      `uvm_info("CP/NO_CPLQ",$sformatf("macro_success_events=%0d macro_error_events=%0d macro_child_launches=%0d",
-        macro_no_cplq_success_events,macro_no_cplq_error_events,macro_no_cplq_launches),UVM_LOW)
+      `uvm_info("CP/NO_CPLQ",$sformatf("macro_success_events=%0d macro_error_events=%0d macro_desc_error_events=%0d macro_dep_timeout_events=%0d macro_child_launches=%0d",
+        macro_no_cplq_success_events,macro_no_cplq_error_events,
+        macro_no_cplq_desc_error_events,macro_no_cplq_dep_timeout_events,
+        macro_no_cplq_launches),UVM_LOW)
       if(random_fetch_index!=vif.random_queue_count ||
          (random_valid_count+random_compute_fail_count)!=random_launch_count ||
          (random_valid_count+random_error_count)!=vif.random_queue_count ||
