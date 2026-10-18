@@ -175,6 +175,16 @@ full 16-bit parity proof, remaining subsystem/top coverage disposition, and
 V1–V5 overall closure remain open. Full commands and limits are in the
 [exact-SHA run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-pushed-sha-622ecc7-replay).
 
+### 2026-10-18 exact current-main `e06f49c` maximum-length FP parity replay
+
+Fresh Rocky 8.10 / VCS `V-2023.12-SP1_Full64` `dot-core-parity-max-test`
+passed all BF16/FP16 × final-A/final-B parity cases at length `16'hffff`;
+each drained 65,536 reads, stopped at a 65,534-element prefix with one
+`ERR_PARITY`, emitted zero destination writes, and recovered without reset
+with one exact FP32 `1.0` write. This updates the maximum-length parity
+simulation evidence from dirty-worktree to an exact current-main run, but does
+not close full-domain formal, V1-FP-04, or A10. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-maximum-length-fp-parity-replay).
+
 VCS compile, top smoke, historical 20-case top random, FP block (three seeds × 256 random,
 584 checks/seed, severity zero, peak outstanding=2), Control UVM, DMA UVM
 (current 14 tests), Command Processor UVM (latest 25/25 scenario bins per seed across
