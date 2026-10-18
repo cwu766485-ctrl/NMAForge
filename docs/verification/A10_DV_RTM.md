@@ -687,6 +687,8 @@ and UVM warning/error/fatal=`0/0/0`. Merged `cp_cg` was 61/61 variables +
 34/34 crosses, reset-word bins 4/4, mixed kind×delay×reset cross 24/24, and
 abort timing 7/7. This changes only the CP testbench and its run gate, not
 product RTL/SPEC/ABI. It closes one directed tile-DMA error/recovery slice,
-not V2 or A10; broad CP lifecycle, raw DUT coverage, and clean-SHA replay of
-this delta remain open. Exact commands/results:
+not V2 or A10; broad CP lifecycle and raw DUT coverage remain open. The pushed
+commit `c500b3daba529d3123ffe250644f3297ae8c16f3` passed a clean detached
+72-profile replay and top `ai_smoke` with the worktree clean before/after.
+Exact commands/results:
 [run record](A10_DV_RUN_2026-10-18_CP_COMPLETION_AVAILABILITY.md#follow-up-tile-load-dma-error-propagation).

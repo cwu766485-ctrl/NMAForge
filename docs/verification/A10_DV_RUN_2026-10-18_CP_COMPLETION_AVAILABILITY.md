@@ -160,8 +160,8 @@ Coverage was 61/61 variables + 34/34 crosses, formal was 7/7 assertions
 proven/non-vacuous and 3/3 covers reached, and top smoke printed `TEST PASS`.
 Artifacts: `/tmp/nmaforge_a10_de51846_cp_replay_20261018/`; clean worktree:
 `/tmp/nmaforge_clean_de51846_20261018/`. This replay does not include the
-later tile-error recovery delta below, which still needs its own clean-SHA
-replay.
+later tile-error recovery delta below; that delta has now been independently
+replayed at its own pushed SHA.
 
 ### Follow-up: tile load-DMA error propagation
 
@@ -218,6 +218,15 @@ URG `cp_cg` reached 61/61 variables and 34/34 crosses; reset-word bins were
 7/7. Top `ai_smoke` printed `TEST PASS`.
 
 This closes the directed tile load-DMA error and restart-recovery slice only.
-It is shared-worktree evidence based on `de51846`; a clean detached replay of
-the new follow-up commit remains pending. CP residual code coverage, broader
-V2 command/completion lifecycle closure, and A10/V5 acceptance remain open.
+The change was pushed as `c500b3daba529d3123ffe250644f3297ae8c16f3` and then
+replayed from that exact SHA in detached clean worktree
+`/tmp/nmaforge_clean_c500b3d_20261018/`. The worktree was clean before and
+after the replay. The replay used the 72-profile campaign with seeds
+`20261021 20261022 20261023` and top smoke; all 72 profile logs contained the
+tile recovery marker, `cp_cg` reached 61/61 variables + 34/34 crosses, reset
+word bins were 4/4, mixed kind×delay×reset was 24/24, and abort timing was
+7/7. Top `ai_smoke` printed `TEST PASS`. Artifacts:
+`/tmp/nmaforge_a10_c500b3d_tile_recovery_replay_20261018/`.
+
+CP residual code coverage, broader V2 command/completion lifecycle closure,
+and A10/V5 acceptance remain open.
