@@ -62,3 +62,26 @@ AXI-Lite unmapped-register response slice only; it does not close A10 V1–V5,
 all top-level functional/code coverage, or interconnect DECERR behavior. Raw
 coverage databases and simulator outputs remain in `/tmp` and are not checked
 into the public repository.
+
+## Clean pushed-commit replay
+
+After the initial push, all checks were replayed from a detached clean worktree
+at commit `438532ce56c149362469832c0221c6a16b231762` (`test(dv): cover AXI-Lite
+SLVERR in mixed E2E`) using the same Rocky Linux 8.10 and VCS/URG
+V-2023.12-SP1 environment. The worktree was clean before and after simulation.
+
+| Clean-SHA check | Result |
+|---|---|
+| FP16/BF16 length cross | PASS `16/16`; 16/16 SLVERR markers and E2E PASS markers; nonzero UVM severity `0` |
+| Random mixed-precision DDR E2E | PASS `192/192`; 192/192 SLVERR markers and E2E PASS markers; nonzero UVM severity `0` |
+| URG AXI-Lite response covergroup | `100%`; `cp_response` has 2/2 bins covered |
+| URG mixed-precision E2E covergroup | `100%` in both merged reports |
+| Top smoke | PASS (`TEST PASS`) |
+| Post-test clean worktree | PASS; no tracked or untracked changes |
+
+Clean replay artifacts are retained outside the repository under
+`/tmp/nmaforge_a10_438532c_clean_16cov`,
+`/tmp/nmaforge_a10_438532c_clean_random192`, and
+`/tmp/nmaforge_a10_438532c_clean`. This replay verifies the pushed commit
+reproducibly; it still closes only the AXI-Lite unmapped-register response
+slice, not the overall A10 V1-V5 plan.
