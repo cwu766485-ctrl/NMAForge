@@ -1,5 +1,13 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-19 exact pushed-main selected replay (`649c6c0`):** On a clean
+> detached worktree at SHA `649c6c00dd22dc10910f1cc795df25fdff636b32`, FP
+> directed/max-parity tests, three-seed FP UVM (1,452/1,452 bit-exact checks),
+> Python model (19/19), DMA UVM (19/19), Control UVM (9/9), top smoke, and a
+> 20-case seeded top run passed. All tested UVM severity counts were zero.
+> URG merges included compile VDBs and had no design-load errors. This is a
+> selected replay, not A10/V5 closure. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN649C6C0_SELECTED_REPLAY.md).
+
 > **2026-10-19 exact-main CP high-payload replay (`35c7670`):** Clean
 > detached worktree at pushed SHA
 > `35c7670594c85d471bad1e5a975df7f16369c78f`; seven seeds × 24 profiles

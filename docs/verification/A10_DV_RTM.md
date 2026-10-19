@@ -1,5 +1,14 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-19 exact-main selected replay (`649c6c0`):** Clean detached worktree
+> at pushed SHA `649c6c00dd22dc10910f1cc795df25fdff636b32` passed directed FP
+> dot-core and maximum-length parity tests; three FP UVM seeds passed
+> 1,452/1,452 bit-exact checks with severity 0/0/0; Python reference 19/19;
+> DMA UVM 19/19, Control UVM 9/9, top smoke, and 20-case seeded top simulation
+> passed. Corrected URG merges included compile plus run VDBs and loaded design
+> without errors. This is selected reproducibility evidence only; V1-FP-04 and
+> overall A10/V5 remain open. [Run record](A10_DV_RUN_2026-10-19_MAIN649C6C0_SELECTED_REPLAY.md).
+
 > **2026-10-19 V1-FP-04 proof-effort follow-up:** VC Formal `high` and
 > `discovery` effort both had clean setup and non-vacuous assertion activation,
 > but each timed out after 300 s without proof/counterexample; follow-on covers
