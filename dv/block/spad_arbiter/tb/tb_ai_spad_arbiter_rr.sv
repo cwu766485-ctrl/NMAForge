@@ -69,6 +69,30 @@ module tb_ai_spad_arbiter_rr;
   always #5 clk=~clk;
   ai_spad_arbiter dut(.*);
 
+  // These invariants explain the residual raw-condition tuples: the decoder
+  // leaves CLIENT_DMA as its default when no request is selected, and a
+  // banked/CNM client always requests a response. They are simulation checks,
+  // not a substitute for a formal proof of the combinational decode.
+  ap_idle_decode_uses_default_client: assert property (
+    @(posedge clk) disable iff (!resetn)
+    !dut.accept_valid |-> dut.accept_client == 3'd4
+  ) else $fatal(1,"idle SPAD decode selected a non-default client");
+
+  ap_banked_response_metadata_is_valid: assert property (
+    @(posedge clk) disable iff (!resetn)
+    dut.accept_client_d == 3'd3 |-> dut.accept_valid_d
+  ) else $fatal(1,"banked response metadata was marked invalid");
+
+  cp_descriptor_selected: cover property (
+    @(posedge clk) disable iff (!resetn)
+    dut.accept_valid && dut.accept_client == 3'd0
+  );
+
+  cp_completion_selected: cover property (
+    @(posedge clk) disable iff (!resetn)
+    dut.accept_valid && dut.accept_client == 3'd1
+  );
+
   function [31:0] xorshift32;
     input [31:0] value;
     reg [31:0] next_value;
@@ -503,6 +527,75 @@ module tb_ai_spad_arbiter_rr;
     accept_rr_coverage_request(3);
     accept_rr_coverage_request(2);
     $display("SPAD arbiter cursor fallback request forms PASS cases=12");
+
+    // Control requests are ordered ahead of every data-plane client. A legal
+    // descriptor read must win over a pending completion write; once the
+    // descriptor is accepted, that completion write must win over data traffic.
+    resetn=0;
+    desc_valid=0; cpl_valid=0;
+    core_valid=0; core_line_valid=0;
+    banked_valid=0; cnm_valid=0;
+    dma_valid=0; dma_line_valid=0;
+    repeat(2) @(posedge clk);
+    @(negedge clk);
+    resetn=1;
+    desc_valid=1; desc_write=0; desc_addr=32'h0010_0040; desc_wdata=0;
+    cpl_valid=1; cpl_write=1; cpl_addr=32'h0010_1000; cpl_wdata=32'hcafe_0001;
+    core_valid=1; core_write=1; core_addr=32'h0000_0200; core_wdata=32'h1111_2222;
+    banked_valid=1; banked_addr=32'h0000_0300;
+    dma_line_valid=1; dma_line_write=1; dma_line_addr=32'h0000_0400;
+    spad_rdata=32'hd35c_0001;
+    #1;
+    if (!desc_ready || cpl_ready || core_ready || banked_ready || dma_line_ready ||
+        !spad_valid || spad_write || spad_addr!=desc_addr ||
+        spad_wdata!=desc_wdata || request_client!=3'd0)
+      $fatal(1,"descriptor did not win over completion and data-plane requests");
+    @(posedge clk);
+
+    @(negedge clk);
+    desc_valid=0;
+    #1;
+    if (desc_ready || !cpl_ready || core_ready || banked_ready || dma_line_ready ||
+        !spad_valid || !spad_write || spad_addr!=cpl_addr ||
+        spad_wdata!=cpl_wdata || request_client!=3'd1)
+      $fatal(1,"completion write did not win over data-plane requests");
+    @(posedge clk);
+    #1;
+    if (!rsp_valid || rsp_client!=3'd0 || rsp_rdata!=32'hd35c_0001 || rsp_error)
+      $fatal(1,"descriptor read response was not returned to descriptor client");
+
+    @(negedge clk);
+    cpl_valid=0;
+    #1;
+    if (!core_ready || banked_ready || dma_line_ready || request_client!=3'd2)
+      $fatal(1,"data-plane request did not resume after control-plane traffic");
+    @(posedge clk);
+    #1;
+    if (rsp_valid)
+      $fatal(1,"completion write incorrectly generated a read response");
+    @(negedge clk);
+    core_valid=0; banked_valid=0; dma_line_valid=0;
+    $display("SPAD arbiter descriptor/completion priority and response PASS");
+
+    // A protection failure is registered with an accepted read and returned
+    // on the matching response, without requiring a parity indication.
+    core_valid=1; core_write=0; core_addr=32'h0000_0500;
+    spad_error=1; spad_parity_error=0;
+    #1;
+    if (!core_ready || request_client!=3'd2)
+      $fatal(1,"protected core read was not admitted for error-alignment check");
+    @(posedge clk);
+    @(negedge clk);
+    core_valid=0; spad_error=0;
+    @(posedge clk);
+    #1;
+    if (!rsp_valid || rsp_client!=3'd2 || !rsp_error)
+      $fatal(1,"SPAD protection error was not aligned with the core response");
+    @(posedge clk);
+    #1;
+    if (rsp_valid)
+      $fatal(1,"SPAD protection-error response did not retire");
+    $display("SPAD arbiter protection-error response alignment PASS");
     $finish;
   end
 endmodule

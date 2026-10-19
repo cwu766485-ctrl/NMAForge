@@ -129,10 +129,19 @@ ai_spad_arb_cov:
 	grep -q 'CNM/DMA SPAD contention PASS cnm_grants=6 dma_line_grants=6' "$(SPAD_ARB_COV_RUN)/run.log"
 	grep -q 'Scratchpad response parity alignment PASS' "$(SPAD_ARB_COV_RUN)/run.log"
 	grep -q 'SPAD arbiter cursor fallback request forms PASS cases=12' "$(SPAD_ARB_COV_RUN)/run.log"
+	grep -q 'SPAD arbiter descriptor/completion priority and response PASS' "$(SPAD_ARB_COV_RUN)/run.log"
+	grep -q 'SPAD arbiter protection-error response alignment PASS' "$(SPAD_ARB_COV_RUN)/run.log"
 	$(URG) -full64 -dir "$(SPAD_ARB_COV_RUN)/coverage.vdb" -format text \
 		-report "$(SPAD_ARB_COV_RUN)/urg" -log "$(SPAD_ARB_COV_RUN)/urg.log"
 	! grep -Eq 'UCAPI-DNYL|Design not loaded' "$(SPAD_ARB_COV_RUN)/urg.log"
 	test -s "$(SPAD_ARB_COV_RUN)/urg/modinfo.txt"
+	grep -Fq 'Failure               0' "$(SPAD_ARB_COV_RUN)/urg/asserts.txt"
+	grep -Fq 'Incomplete            0' "$(SPAD_ARB_COV_RUN)/urg/asserts.txt"
+	grep -Fq 'Without Attempts      0' "$(SPAD_ARB_COV_RUN)/urg/asserts.txt"
+	grep -Fq 'Uncovered         0' "$(SPAD_ARB_COV_RUN)/urg/asserts.txt"
+	grep -Fq 'Matches           2' "$(SPAD_ARB_COV_RUN)/urg/asserts.txt"
+	grep -Fq 'ap_idle_decode_uses_default_client' "$(SPAD_ARB_COV_RUN)/urg/asserts.txt"
+	grep -Fq 'ap_banked_response_metadata_is_valid' "$(SPAD_ARB_COV_RUN)/urg/asserts.txt"
 	echo "SPAD_ARBITER_COVERAGE_PASS report=$(SPAD_ARB_COV_RUN)/urg"
 
 ai_upgrade_vcs: ai_dma_run ai_spad_arb_run ai_quick
