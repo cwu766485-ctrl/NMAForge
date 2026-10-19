@@ -6,6 +6,8 @@
 
 > **2026-10-19 当前 `main` 的 V1 FP 更新（`1956f36`）：** 在精确 SHA 的 clean detached worktree 上新增复跑 8 个 FP dot UVM seeds，每 seed 200 个随机向量；8/8 通过，每 seed scoreboard 484/484、UVM severity `0/0/0`，峰值 outstanding read=2，合并 URG 的 6 个 FP 功能覆盖组均为 100%。该结果补强 V1 block 级随机回归可复现性，但不等于关闭 V1：full-domain parity→writeback formal 仍 inconclusive，DUT code coverage residual 与 V1/V2–V5 总体验收仍 open。详见[运行记录](A10_DV_RUN_2026-10-19_MAIN1956F36_V1_FP.md)及[A10 RTM](A10_DV_RTM.md)。
 
+> **2026-10-19 最新 `main` 的 V1 定向补充（`9e497a5`）：** FP dot directed/max-parity regression 通过：BF16/FP16 × final A/B 四种最大长度 cutoff 均 drain 65,536 笔 ordered reads、peak outstanding=2、抑制目的写回；每种错误后无复位 recovery 均正确写回 `0x3f800000`。独立 Python FP reference model 19/19 通过。该证据补强 V1 directed/model slice，不替代 V1-FP-04 full-domain formal（仍 open）。见[精确 SHA 运行记录](A10_DV_RUN_2026-10-19_MAIN9E497A5_V1_FP_DIRECTED.md)。
+
 > **2026-10-19 固定 SHA 的 V4 更新：** 已推送 `main` 的 `2b18b5ffe99674a908fe47d83d44c993e99ccbf2` 上，顶层混合精度 DDR E2E 官方回归 192/192 seeds 通过。URG 中 E2E 组、四个逐事务 AXI 组及 Makefile 要求的 19 个功能点均为 100%；assertion 汇总为 20 项成功、0 失败/未完成、2 项 UVM RAL 内部属性未触发。这只关闭选定 V4 切片，不代表整体 V4/A10/V5 完成。见[运行记录](A10_DV_RUN_2026-10-19_MAIN2B18B5F_V4_E2E.md)和[RTM](A10_DV_RTM.md)。
 
 > 本文最初按 A8 / ABI v7.2 编写，后续阶段描述仍可作为验证路线图；其中带日期的旧 PASS、工具和 coverage 数值是历史记录，不代表 A10 全量验收。A10 的逐项需求追踪见 [`A10_DV_RTM.md`](A10_DV_RTM.md)，近期固定 SHA 的选定复跑见 [`A10_DV_RUN_2026-10-18_MAIN452.md`](A10_DV_RUN_2026-10-18_MAIN452.md)；较早的验证快照见 [`A10_DV_BASELINE_2026-10-14.md`](A10_DV_BASELINE_2026-10-14.md)。

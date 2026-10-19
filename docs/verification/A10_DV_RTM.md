@@ -2,6 +2,8 @@
 
 > **2026-10-19 当前 `main` 的 V1 FP block 随机回归（`1956f36`）：** exact-SHA clean worktree 中 8 seeds × 200 random vectors 均通过；每 seed bit-exact scoreboard 为 484/484、UVM warning/error/fatal=`0/0/0`，peak outstanding reads=2；URG 六个 FP 功能覆盖组均 100%。这只关闭所选 block-UVM 可复现性切片；V1-FP-04 parity→writeback formal、DUT residual coverage 及 A10/V1–V5 仍未闭环。见[运行记录](A10_DV_RUN_2026-10-19_MAIN1956F36_V1_FP.md)。
 
+> **2026-10-19 V1 FP directed/max-parity 更新（`9e497a5`）：** 最新 pushed `main` 的 clean detached worktree 通过 `dot-core-test` 与 Python reference tests 19/19。BF16/FP16 × final A/B 四个最大长度 parity cases 均接受/排空 65,536 笔有序 reads、peak outstanding=2、parity 后禁止目的写回，并在不复位下 recovery 成功、写回 `0x3f800000`。这是 directed simulation 与软件模型证据；V1-FP-04 full-domain formal 仍未关闭。见[运行记录](A10_DV_RUN_2026-10-19_MAIN9E497A5_V1_FP_DIRECTED.md)。
+
 > **2026-10-19 固定 SHA 的 V4 混合精度 DDR E2E（`2b18b5f`）：** 在已推送 `main` 的 `2b18b5ffe99674a908fe47d83d44c993e99ccbf2` detached clean worktree 上，Rocky 8.10 / VCS+URG `V-2023.12-SP1_Full64` 的官方 192-seed 顶层回归（`20261101..20261292`）通过。192 个 seed 均有 `[MIXED_E2E_PASS]`，非零 UVM severity 为 0，运行前后 worktree clean。Makefile 要求的 E2E 组、四个逐事务 AXI 组及 19 个功能点均为 100%；额外 `cp_error_position` 为 2/2。URG assertions：20 项成功、0 失败/未完成、2 项 UVM RAL 内部属性未触发；3/3 AXI stall cover 命中。该结果只关闭选定的 V4 随机 E2E 切片；全设计 DUT-only coverage disposition 与 A10/V1–V5 仍未闭环。详见[运行记录](A10_DV_RUN_2026-10-19_MAIN2B18B5F_V4_E2E.md)。
 
 > **2026-10-19 exact-SHA selected baseline replay (`2166334`):** A detached
