@@ -3,7 +3,11 @@
 ## Scope and source identity
 
 - Repository: NMAForge, branch `main`.
-- Tested source commit: `a1e87d9652ae84ed98ffcfcacc1a396064544f3b`.
+- Priority/response simulation source commit:
+  `a1e87d9652ae84ed98ffcfcacc1a396064544f3b`.
+- Formal-harness and top-regression source commit:
+  `d0ae9b5907ae7465a4462340511e868e8b1f1218`; no product RTL changed between
+  these commits.
 - Product RTL, SPEC, and ABI were not changed. This increment extends the
   standalone arbiter testbench and its coverage target with control-priority,
   response-alignment, and simulation-assertion checks.
@@ -82,12 +86,63 @@ make -C dv/subsystem/top_smoke/sim ai_run \
 VCS exited 0 and printed `TEST PASS`; all 20 requested random cases completed.
 The log is `/tmp/nmaforge_a10_spad_rr_top_a1e87d9/ai_run_20_seed20261019.log`.
 
+## Formal disposition of raw condition tuples
+
+An independent RTL-only VC Formal harness was added under
+`dv/block/spad_arbiter/formal/`. It instantiates the production arbiter, leaves
+all request-valid and write controls unconstrained, and proves local decode and
+registered-response invariants. The only setup is deterministic reset
+initialization; no request-protocol assumptions are applied.
+
+Exact committed-source command:
+
+```sh
+make -C dv/block/spad_arbiter/formal decode-invariants \
+  OUT=/tmp/nmaforge_spad_arbiter_decode_formal_d0ae9b5 \
+  VCF=vcf TIMEOUT=120
+```
+
+VC Formal `V-2023.12-SP2` exited 0. Setup reported `No setup issues found`;
+the acceptance gate passed with 8/8 assertions proven, all 8 non-vacuous, and
+4/4 covers reached. The assertions establish:
+
+- Idle decode selects the documented default DMA client; descriptor,
+  completion, core, and banked client tags cannot appear without an accepted
+  request.
+- A banked/CNM selection always creates response metadata, including through
+  the registered response stage.
+- Line metadata and response qualifiers cannot be asserted without an accepted
+  request.
+
+These invariants formally disposition the eight `Not Covered` raw condition
+tuples in the exact `a1e87d9` URG report: impossible `accept_valid=0` paired
+with descriptor/completion/core/banked client tags; invalid delayed banked
+metadata; invalid line metadata for core/DMA; and the duplicate banked/CNM
+ready decode. The raw URG condition percentage remains 86.89%—formal results
+do not synthesize coverage hits or waivers. This is a proof of the stated
+local invariants, not of end-to-end memory fairness, downstream response
+back-pressure, or all V3 behavior.
+
+After committing the formal harness at `d0ae9b5`, both top-level checks were
+rerun on that source:
+
+```sh
+make -C dv/subsystem/top_smoke/sim ai_smoke
+make -C dv/subsystem/top_smoke/sim ai_run \
+  SEED=20261019 AI_RANDOM_CASES=20 AI_SEED=12345
+```
+
+Both exited 0 and printed `TEST PASS`; the seeded run requested 20 cases.
+Archived logs are under `/tmp/nmaforge_spad_arbiter_top_d0ae9b5/`.
+
 ## Verification status and limits
 
 This closes the tested standalone arbiter line and branch bins and adds
-simulation evidence for control-plane priority and response alignment. It does
-not close raw condition coverage, prove the residual tuples unreachable, or
-close V3/A10/V5. `ai_spad_arbiter` has no downstream `spad_ready` input, so the
-tests do not model memory-response back-pressure or establish end-to-end
-system fairness. Broader randomized DMA/SPAD/compute fault, abort, and reset
-interactions remain separate requirements.
+simulation evidence for control-plane priority/response alignment plus a
+formal disposition of all eight observed raw condition tuples. Raw condition
+coverage remains 86.89% and toggle coverage is 10.73%; neither is presented
+as 100% raw coverage. `ai_spad_arbiter` has no downstream `spad_ready` input,
+so the tests do not model memory-response back-pressure or establish
+end-to-end system fairness. Broader randomized DMA/SPAD/compute fault, abort,
+and reset interactions remain separate requirements; overall V3/A10/V5 remain
+open.

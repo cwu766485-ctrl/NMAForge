@@ -6,7 +6,8 @@
 > seeded 20-case top regression were added. Latest raw coverage is
 > line/condition/branch/toggle=`100.00/86.89/100.00/10.73%`. See the
 > [priority/response follow-up](A10_DV_RUN_2026-10-19_SPAD_ARB_PRIORITY.md);
-> raw condition coverage and V3/A10/V5 remain open.
+> its raw condition percentage remains 86.89%, while the observed residual
+> tuples are formally dispositioned there. Overall V3/A10/V5 remain open.
 
 ## Scope and source identity
 
