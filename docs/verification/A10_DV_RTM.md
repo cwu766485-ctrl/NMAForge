@@ -556,6 +556,21 @@ timing slice; broader fault/abort/reset combinations, DUT-only residual
 coverage, and full V3/A10/V5 remain open. Exact commands and local artifact
 paths are in the [run record](A10_DV_RUN_2026-10-19_V3_FAULT_ABORT_RESET.md).
 
+### V3-CUR-08 exact-SHA DMA-SPAD-CNM clean replay (`7271c54`, 2026-10-19)
+
+At pushed SHA `7271c548d7ba30457c0b1ce2e11de88358cc54c2`, a detached clean
+worktree passed the full DMA-SPAD-CNM subsystem test on 10 seeds, the 16/64/300
+cycle DMA RREADY stress profiles, and forced shared-reset delays 0/1/2/3. All
+17 runtime logs reached their required pass markers with UVM
+warning/error/fatal=`0/0/0`; the VCS compile log had no `Warning-`/`Error-`
+diagnostics. Combined URG `dma_rready_stall_cg` was 4/4 variables and 3/3
+crosses, and `cnm_parity_abort_reset_cg` was 4/4 variables and 2/2 crosses.
+Assertions: 29 successes, 0 failures/incomplete, and 2 unattempted UVM RAL
+internals. Top `ai_smoke` printed `TEST PASS`; the detached worktree remained
+semantically clean. This closes selected, reproducible subsystem scenarios,
+not broad scheduler fairness, all fault/abort/reset combinations, DUT-only
+residual code coverage, V3 overall, or A10/V5. See the [exact-SHA run record](A10_DV_RUN_2026-10-19_V3_CLEAN_REPLAY.md).
+
 ## V4 — Top-Level AI Accelerator UVM
 > **2026-10-18 fresh current-main V4 random E2E replay:** At GitHub `main` SHA `0578dde3a72ad8f9f89ef5c6a870f83d76de24d7`, VCS/URG `V-2023.12-SP1_Full64` ran `make -C dv/uvm/sim uvm_mixed_precision_ddr_e2e_random_cov_regress MIXED_E2E_RANDOM_OUT=/tmp/nmaforge_a10_main0578dde_top_e2e_random_20261018`. All 192 seeds (`20261101..20261292`) passed: 192/192 E2E markers, zero nonzero UVM WARNING/ERROR/FATAL logs, `e2e_cg` and all four per-transaction AXI AR/AW/R-gap/W-gap groups at 100%, all 20 Makefile-gated functional points at 100%. URG assertions: 20 success, 0 failure/incomplete, 2 no-attempt UVM RAL `do_read`/`do_write`; all 3 AXI stall-to-accept covers matched. The 14 compute-activity properties are testbench monitors; five AXI master protocol properties are DUT-owned and each had real successes. Artifact and exact command are in [the 2026-10-18 current-main replay record](A10_DV_RUN_2026-10-18_MAIN452.md). This closes the selected randomized V4 E2E slice at the cited commit only; broader V4 interaction coverage, DUT-only code coverage review, and V5 remain open.
 
