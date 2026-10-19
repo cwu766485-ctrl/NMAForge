@@ -77,10 +77,12 @@ check-coverage:
 	@test -s $(COV_OUT)/urg_merged/grpinfo.txt
 	@grep -q 'ai_cp_uvm_pkg::ai_cp_coverage::cp_cg' $(COV_OUT)/urg_merged/grpinfo.txt || \
 	 { echo "URG report is missing CP functional coverage; see $(COV_OUT)/urg_merge.log"; exit 1; }
-	@grep -Eq 'Variables[[:space:]]+61[[:space:]]+0[[:space:]]+61[[:space:]]+100\.00' $(COV_OUT)/urg_merged/grpinfo.txt || \
-	 { echo "CP functional variable coverage is not 61/61; see $(COV_OUT)/urg_merged/grpinfo.txt"; exit 1; }
+	@grep -Eq 'Variables[[:space:]]+63[[:space:]]+0[[:space:]]+63[[:space:]]+100\.00' $(COV_OUT)/urg_merged/grpinfo.txt || \
+	 { echo "CP functional variable coverage is not 63/63; see $(COV_OUT)/urg_merged/grpinfo.txt"; exit 1; }
 	@grep -Eq 'Crosses[[:space:]]+34[[:space:]]+0[[:space:]]+34[[:space:]]+100\.00' $(COV_OUT)/urg_merged/grpinfo.txt || \
 	 { echo "CP functional cross coverage is not 34/34; see $(COV_OUT)/urg_merged/grpinfo.txt"; exit 1; }
+	@grep -Eq '^cp_high_payload[[:space:]]+1[[:space:]]+0[[:space:]]+1[[:space:]]+100\.00' $(COV_OUT)/urg_merged/grpinfo.txt || \
+	 { echo "CP high-payload functional bin is not 1/1; see $(COV_OUT)/urg_merged/grpinfo.txt"; exit 1; }
 	@grep -Eq '^cp_mixed_reset_words[[:space:]]+4[[:space:]]+0[[:space:]]+4[[:space:]]+100\.00' $(COV_OUT)/urg_merged/grpinfo.txt || \
 	 { echo "CP mixed reset-word bins are not 4/4; see $(COV_OUT)/urg_merged/grpinfo.txt"; exit 1; }
 	@grep -Eq '^cp_mixed_kind_delay_reset_cross[[:space:]]+24[[:space:]]+0[[:space:]]+24[[:space:]]+100\.00' $(COV_OUT)/urg_merged/grpinfo.txt || \
@@ -95,7 +97,8 @@ check-log:
 	 grep -Eq '\[CP/TILE\].*tiles=7/6/6 events=3 dma_errors=1 recovery_events=1 error_completion_starts=0' $(LOG) && \
 		 grep -Eq '\[CP/RING\].*expected=(1[2-9]|2[0-4]) accepted=[0-9]+ launches=[0-9]+ retired=[0-9]+ valid=[0-9]+ errors=[1-9][0-9]* launch_pending=0 retire_pending=0' $(LOG) && \
 		 grep -Eq '\[CP/RING\].*random_outcomes desc=[1-9][0-9]* fetch=[1-9][0-9]* compute=[1-9][0-9]* success=[1-9][0-9]*' $(LOG) && \
-			 grep -Eq 'scenario_bins=31/31' $(LOG) && \
+			 grep -Eq 'scenario_bins=32/32' $(LOG) && \
+			 grep -Eq '\[CP/HIGH_PAYLOAD\].*task_id=c3a5 result=3e123456 cycles=00010023 elements=ffff cplq_base=00078000 tail=1' $(LOG) && \
 			 grep -Eq '\[CP/ZERO_SIZE_EMPTY\].*cmdq_size=0 equal_pointers=1 compatibility_fetch=1 completion_task_id=1900 CPLQ_tail=1' $(LOG) && \
 			 grep -Eq '\[CP/CPLQ_LAST_SLOT\].*queued=2 initial_free_slots=1 first_completion_filled_ring=1 second_held=1 red-doorbell_recovery=1 cpl_tail=2->3->0 cmdq_head=1->2' $(LOG) && \
 		 grep -Eq '\[CP/WRITER_FSM\].*illegal_state_injected=1 recovered_idle=1 side_effects=0 recovery_completion=1' $(LOG) && \

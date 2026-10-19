@@ -1,5 +1,20 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-19 CP high-payload slice (`90757f5b` dirty-worktree evidence):**
+> The seven-seed × 24-profile CP campaign completed 168/168 profiles. Each
+> profile reached `scenario_bins=32/32`, the `CP_HIGH_PAYLOAD` marker, and UVM
+> warning/error/fatal=`0/0/0`. URG measured `cp_cg` 63/63 variables and 34/34
+> crosses, `cp_high_payload` 1/1, mixed reset 4/4, kind×delay×reset 24/24,
+> abort timing 7/7; assertions were 13 success, 0 failure/incomplete, and two
+> UVM RAL no-attempts, with 4/4 covers matched. The initial final gate had a
+> stale 62/62 variable expectation; the corrected `check-coverage` passed.
+> `ai_smoke` printed `TEST PASS`. The case checks v7 INT8 VDOT `length=ffff`,
+> task ID `c3a5`, CPLQ base `0x78000` inside the 512 KiB SPAD, result
+> `3e123456`, cycles `00010023`, elements `ffff`, four completion words, and
+> exactly-once tail advancement. This is dirty-worktree evidence, not a
+> fixed-SHA replay or V2/A10/V5 closure; endpoint compute/fetch/DMA behavior is
+> still block-level modeled. See the [run record](../docs/verification/A10_DV_RUN_2026-10-19_CP_HIGH_PAYLOAD.md).
+
 > **2026-10-19 exact-main V5 FP result-path mutation replay (`3cdb6cc`):**
 > Detached baseline and restore passed FP dot UVM seeds `712345` and `987654`,
 > each with 484/484 bit-exact scoreboard checks and UVM severity `0/0/0`.

@@ -1,5 +1,21 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-19 CP high-payload slice (`90757f5b` dirty-worktree evidence):**
+> Based on pushed HEAD `90757f5b75e3642c0f0e0bac3efc21ad4825f972`, not a
+> fixed-SHA replay. Rocky 8.10 / VCS+URG `V-2023.12-SP1_Full64` completed
+> 168/168 seven-seed × 24-profile CP runs. Every profile reached
+> `scenario_bins=32/32`, the high-payload marker, and UVM severity `0/0/0`.
+> URG measured `cp_cg` 63/63 variables + 34/34 crosses,
+> `cp_high_payload` 1/1, mixed reset 4/4, kind×delay×reset 24/24, and abort
+> timing 7/7. Assertions: 13 success, 0 failure/incomplete, two UVM RAL
+> no-attempts; 4/4 covers matched. The corrected existing-report gate passed,
+> and top `ai_smoke` printed `TEST PASS`. The v7 INT8 VDOT case checks
+> `length=ffff`, task ID `c3a5`, CPLQ base `0x78000`, result `3e123456`,
+> cycles `00010023`, elements `ffff`, all four completion words, and
+> exactly-once tail advancement. This is a scoped CP block-level slice only;
+> it does not close V2/A10/V5 or full top-level lifecycle integration. See the
+> [run record](A10_DV_RUN_2026-10-19_CP_HIGH_PAYLOAD.md).
+
 > **2026-10-19 exact-main V5 FP result-path mutation replay (`3cdb6cc`):** On
 > a detached clean worktree at pushed SHA
 > `3cdb6cc8913d773b1a7d2bb899796ad53437e88f`, the two-seed FP dot UVM baseline

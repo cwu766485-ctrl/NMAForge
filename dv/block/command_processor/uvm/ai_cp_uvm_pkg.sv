@@ -12,7 +12,13 @@ package ai_cp_uvm_pkg;
                     CP_FETCH_ERROR_NO_CPL,CP_CPLQ_PRESSURE,
                     CP_COMPLETION_PROT_LATE,CP_FSM_FAULT_RECOVERY,
                     CP_SUBMIT_GUARD,CP_WRITER_FSM_FAULT_RECOVERY,
-                    CP_ZERO_SIZE_EMPTY_FETCH,CP_CPLQ_LAST_SLOT_QUEUE} cp_case_e;
+                    CP_ZERO_SIZE_EMPTY_FETCH,CP_CPLQ_LAST_SLOT_QUEUE,
+                    CP_HIGH_PAYLOAD} cp_case_e;
+  localparam logic [15:0] CP_HIGH_PAYLOAD_TASK_ID=16'hc3a5;
+  localparam logic [31:0] CP_HIGH_PAYLOAD_CPLQ_BASE=32'h0007_8000;
+  localparam logic [31:0] CP_HIGH_PAYLOAD_RESULT=32'h3e12_3456;
+  localparam logic [31:0] CP_HIGH_PAYLOAD_CYCLES=32'h0001_0023;
+  localparam logic [31:0] CP_HIGH_PAYLOAD_ELEMENTS=32'h0000_ffff;
   class ai_cp_item extends uvm_sequence_item;
     rand cp_case_e scenario;
     `uvm_object_utils_begin(ai_cp_item)
@@ -36,13 +42,14 @@ package ai_cp_uvm_pkg;
                            CP_CPLQ_PRESSURE,CP_COMPLETION_PROT_LATE,
                            CP_FSM_FAULT_RECOVERY,CP_SUBMIT_GUARD,
                            CP_WRITER_FSM_FAULT_RECOVERY,
-                            CP_ZERO_SIZE_EMPTY_FETCH,CP_CPLQ_LAST_SLOT_QUEUE};
+                           CP_ZERO_SIZE_EMPTY_FETCH,CP_CPLQ_LAST_SLOT_QUEUE,
+                           CP_HIGH_PAYLOAD};
       int only_case;
       bit only_case_valid;
       only_case_valid = $value$plusargs("CP_ONLY_CASE=%d", only_case);
       if (only_case_valid) begin
-        if (only_case < 0 || only_case > 30)
-          `uvm_fatal("CP/SEQ",$sformatf("CP_ONLY_CASE=%0d is outside scenario range 0..30",only_case))
+        if (only_case < 0 || only_case > 31)
+          `uvm_fatal("CP/SEQ",$sformatf("CP_ONLY_CASE=%0d is outside scenario range 0..31",only_case))
         r=ai_cp_item::type_id::create($sformatf("only_case_%0d",only_case));
         start_item(r); r.scenario=cp_case_e'(only_case); finish_item(r);
         `uvm_info("CP/SEQ",$sformatf("CP_ONLY_CASE=%0d dispatched; full-suite aggregate gates are skipped",only_case),UVM_LOW)
@@ -1224,6 +1231,20 @@ package ai_cp_uvm_pkg;
               `uvm_error("CP/CPLQ_LAST_SLOT","re-doorbell did not retire the held command exactly once")
             `uvm_info("CP/CPLQ_LAST_SLOT","queued=2 initial_free_slots=1 first_completion_filled_ring=1 second_held=1 red-doorbell_recovery=1 cpl_tail=2->3->0 cmdq_head=1->2",UVM_LOW)
           end
+          CP_HIGH_PAYLOAD: begin
+            reset_cp();
+            descriptor(0,0,0,0,1,CP_HIGH_PAYLOAD_TASK_ID);
+            vif.desc_mem[0].length=16'hffff;
+            vif.cplq_base=CP_HIGH_PAYLOAD_CPLQ_BASE;
+            vif.cplq_size=4; vif.cplq_head=0; vif.cmdq_tail=1;
+            vif.compute_result=CP_HIGH_PAYLOAD_RESULT;
+            vif.compute_cycles=CP_HIGH_PAYLOAD_CYCLES;
+            vif.compute_elements=CP_HIGH_PAYLOAD_ELEMENTS;
+            launch_queue(0,1);
+            if(vif.cmdq_head!==32'd1 || vif.cplq_tail!==32'd1 || vif.cpl_writer_busy)
+              `uvm_error("CP/HIGH_PAYLOAD","high-payload command did not retire exactly once")
+            `uvm_info("CP/HIGH_PAYLOAD","task_id=c3a5 result=3e123456 cycles=00010023 elements=ffff cplq_base=00078000 tail=1",UVM_LOW)
+          end
           CP_FETCH_ERROR: begin
             descriptor(0); vif.cmdq_tail=1; vif.cplq_head=0;
             launch_queue(0,1);
@@ -1488,6 +1509,7 @@ package ai_cp_uvm_pkg;
     int cplq_pressure_fetches, cplq_pressure_launches, cplq_pressure_completions;
     bit cplq_pressure_model_started;
     int cplq_last_slot_launches, cplq_last_slot_completions;
+    int high_payload_launches, high_payload_events, high_payload_completions;
     int empty_rejects, cpl_full_rejects;
     int word_index; int writes_in_record; int dependency_completion_index;
     logic [31:0] tail_at_record_start, expected_tail_after_done;
@@ -1536,7 +1558,31 @@ package ai_cp_uvm_pkg;
       cplq_pressure_fetches=0; cplq_pressure_launches=0;
       cplq_pressure_completions=0; cplq_pressure_model_started=0;
       cplq_last_slot_launches=0; cplq_last_slot_completions=0;
+      high_payload_launches=0; high_payload_events=0; high_payload_completions=0;
       forever begin @(posedge vif.clk); if(vif.resetn) begin
+        if(vif.test_case==CP_HIGH_PAYLOAD) begin
+          if(vif.launch_valid) begin
+            high_payload_launches++;
+            if(vif.launch_task_id!==CP_HIGH_PAYLOAD_TASK_ID || vif.launch_op!==8'h10 ||
+               vif.launch_length!==16'hffff)
+              `uvm_error("CP/HIGH_PAYLOAD","descriptor launch lost task ID/opcode/length")
+          end
+          if(vif.event_valid) begin
+            high_payload_events++;
+            if(vif.event_error || vif.event_error_code!==4'd0 ||
+               vif.event_result!==CP_HIGH_PAYLOAD_RESULT ||
+               vif.event_cycles!==CP_HIGH_PAYLOAD_CYCLES ||
+               vif.event_elements!==CP_HIGH_PAYLOAD_ELEMENTS)
+              `uvm_error("CP/HIGH_PAYLOAD","compute endpoint event lost high payload")
+          end
+          if(vif.completion_start &&
+             (vif.completion_task_id!==CP_HIGH_PAYLOAD_TASK_ID ||
+              vif.completion_status!==4'd1 || vif.completion_error!==4'd0 ||
+              vif.completion_result!==CP_HIGH_PAYLOAD_RESULT ||
+              vif.completion_elements!==CP_HIGH_PAYLOAD_ELEMENTS))
+            `uvm_error("CP/HIGH_PAYLOAD","completion start lost high payload")
+          if(vif.cpl_writer_done) high_payload_completions++;
+        end
         if(vif.test_case==CP_COMPUTE_ABORT && vif.compute_done &&
            vif.compute_error && vif.compute_error_code==4'd3)
           compute_abort_inputs++;
@@ -1941,6 +1987,10 @@ package ai_cp_uvm_pkg;
             `uvm_error("CP/MON","CPLQ tail advanced before all four word handshakes")
           if(vif.cpl_spad_addr !== vif.cplq_base + (vif.cplq_tail<<4) + (word_index<<2))
             `uvm_error("CP/MON",$sformatf("completion address word %0d got=%08x",word_index,vif.cpl_spad_addr))
+          if(vif.test_case==CP_HIGH_PAYLOAD &&
+             vif.cpl_spad_addr !== CP_HIGH_PAYLOAD_CPLQ_BASE + (word_index<<2))
+            `uvm_error("CP/HIGH_PAYLOAD",$sformatf("word %0d address got=%08x expected=%08x",
+              word_index,vif.cpl_spad_addr,CP_HIGH_PAYLOAD_CPLQ_BASE+(word_index<<2)))
           case(word_index)
             0: begin
               logic [15:0] expected_task_id;
@@ -2002,6 +2052,7 @@ package ai_cp_uvm_pkg;
                 end
                 CP_WRITER_FSM_FAULT_RECOVERY: expected_task_id=16'h1000;
                 CP_ZERO_SIZE_EMPTY_FETCH: expected_task_id=16'h1900;
+                CP_HIGH_PAYLOAD: expected_task_id=CP_HIGH_PAYLOAD_TASK_ID;
                 CP_CPLQ_LAST_SLOT_QUEUE: begin
                   case(cplq_last_slot_completions)
                     0: expected_task_id=16'h1910;
@@ -2025,6 +2076,10 @@ package ai_cp_uvm_pkg;
               if(vif.test_case==CP_DEPENDENCY) dependency_completion_index++;
               if(vif.cpl_spad_wdata !== {16'd0,vif.completion_task_id})
                 `uvm_error("CP/MON","word0 task ID data mismatch")
+              if(vif.test_case==CP_HIGH_PAYLOAD &&
+                 (vif.completion_task_id!==CP_HIGH_PAYLOAD_TASK_ID ||
+                  vif.cpl_spad_wdata!=={16'd0,CP_HIGH_PAYLOAD_TASK_ID}))
+                `uvm_error("CP/HIGH_PAYLOAD","word0 task ID was not preserved")
               if((vif.test_case==CP_ABORT_RESET_PARTIAL ||
                   (vif.test_case==CP_MIXED_ERROR_ABORT_RESET &&
                    mixed_completion_starts==2)) &&
@@ -2034,6 +2089,9 @@ package ai_cp_uvm_pkg;
             1: begin
               if(vif.cpl_spad_wdata !== {24'd0,vif.completion_error,vif.completion_status})
                 `uvm_error("CP/MON","word1 status/error mismatch")
+              if(vif.test_case==CP_HIGH_PAYLOAD &&
+                 vif.cpl_spad_wdata !== 32'h0000_0001)
+                `uvm_error("CP/HIGH_PAYLOAD","word1 status/event fields mismatch")
               if(vif.test_case==CP_MACRO_CHILDREN) begin
                 if(macro_completions==0) begin
                   if(vif.completion_error!==4'd0 || vif.completion_status!==4'd1)
@@ -2138,8 +2196,19 @@ package ai_cp_uvm_pkg;
               end else if(vif.completion_error!==4'd0 || vif.completion_status!==4'd1)
                 `uvm_error("CP/MON","successful command did not retire a success completion")
             end
-            2: if(vif.cpl_spad_wdata !== vif.completion_result) `uvm_error("CP/MON","word2 result mismatch")
-            3: if(vif.cpl_spad_wdata !== vif.completion_elements) `uvm_error("CP/MON","word3 element count mismatch")
+            2: begin
+              if(vif.cpl_spad_wdata !== vif.completion_result) `uvm_error("CP/MON","word2 result mismatch")
+              if(vif.test_case==CP_HIGH_PAYLOAD &&
+                 (vif.completion_result!==CP_HIGH_PAYLOAD_RESULT ||
+                  vif.cpl_spad_wdata!==CP_HIGH_PAYLOAD_RESULT))
+                `uvm_error("CP/HIGH_PAYLOAD","word2 high result was not preserved")
+            end
+            3: begin
+              if(vif.cpl_spad_wdata !== vif.completion_elements) `uvm_error("CP/MON","word3 element count mismatch")
+              if(vif.test_case==CP_HIGH_PAYLOAD &&
+                 vif.cpl_spad_wdata!==CP_HIGH_PAYLOAD_ELEMENTS)
+                `uvm_error("CP/HIGH_PAYLOAD","word3 element count mismatch")
+            end
           endcase
           word_index=(word_index+1)%4; writes_in_record++;
           if(vif.test_case==CP_MIXED_ERROR_ABORT_RESET &&
@@ -2175,8 +2244,14 @@ package ai_cp_uvm_pkg;
     endtask
     function void check_phase(uvm_phase phase);
       int only_case;
+      bit only_case_valid;
       super.check_phase(phase);
-      if ($value$plusargs("CP_ONLY_CASE=%d", only_case)) begin
+      only_case_valid=$value$plusargs("CP_ONLY_CASE=%d", only_case);
+      if((!only_case_valid || only_case==31) &&
+         (high_payload_launches!=1 || high_payload_events!=1 || high_payload_completions!=1))
+        `uvm_error("CP/HIGH_PAYLOAD",$sformatf("expected one high-payload launch/event/completion, got %0d/%0d/%0d",
+          high_payload_launches,high_payload_events,high_payload_completions))
+      if (only_case_valid) begin
         `uvm_info("CP/SB",$sformatf("CP_ONLY_CASE=%0d: skipping full-suite aggregate gates; per-case checks remained active",only_case),UVM_LOW)
         return;
       end
@@ -2282,7 +2357,7 @@ package ai_cp_uvm_pkg;
   endclass
   class ai_cp_coverage extends uvm_component;
     `uvm_component_utils(ai_cp_coverage)
-    int unsigned scenario_hits[31]; int unsigned stall_hits[2]; int unsigned word_hits[4];
+    int unsigned scenario_hits[32]; int unsigned stall_hits[2]; int unsigned word_hits[4];
     int unsigned dep_wait_cycles, dep_timeout_wait_cycles;
     virtual ai_cp_if vif; int last_scenario; bit scenario_seen;
     covergroup abort_timing_cg with function sample(int unsigned path,
@@ -2306,7 +2381,8 @@ package ai_cp_uvm_pkg;
                                          int unsigned direct_fp_format,int unsigned direct_opcode,
                                          int unsigned direct_fp_validation_event,
                                          int unsigned direct_compute_error_event,
-                                         int unsigned direct_stale_abort_code_ignored);
+                                         int unsigned direct_stale_abort_code_ignored,
+                                         int unsigned high_payload_marker);
       cp_scenario: coverpoint scenario {
         bins valid={0}; bins invalid={1}; bins wrap={2}; bins dependency={3};
         bins reset={4}; bins random_stall={5}; bins dependency_abort={6};
@@ -2331,6 +2407,7 @@ package ai_cp_uvm_pkg;
         bins completion_writer_illegal_state_recovery={28};
         bins zero_size_empty_cmdq_compat_fetch={29};
         bins queued_batch_holds_at_last_cplq_slot={30};
+        bins high_payload_end_to_end={31};
       }
       cp_mixed_kind: coverpoint mixed_kind iff (scenario==20) {
         bins invalid_descriptor={1}; bins fetch_error={2};
@@ -2366,6 +2443,9 @@ package ai_cp_uvm_pkg;
       cp_error: coverpoint err {bins success={0};bins descriptor={7};bins other={[1:6],[8:15]};}
       cp_stall: coverpoint req_stall {bins none={0};bins stalled={1};}
       cp_word: coverpoint word_index {bins words[]={[0:3]};}
+      cp_high_payload: coverpoint high_payload_marker iff (scenario==31) {
+        bins high_payload_preserved={1};
+      }
     endgroup
     function new(string n,uvm_component p);
       super.new(n,p); cp_cg=new(); abort_timing_cg=new();
@@ -2393,7 +2473,10 @@ package ai_cp_uvm_pkg;
                        vif.test_case==CP_DIRECT_START && vif.event_valid &&
                         vif.event_error && vif.event_error_code==4'd5,
                        vif.test_case==CP_DIRECT_START && vif.force_stale_abort_code_once &&
-                        vif.event_valid && !vif.event_error && vif.event_error_code==4'd0);
+                        vif.event_valid && !vif.event_error && vif.event_error_code==4'd0,
+                       vif.test_case==CP_HIGH_PAYLOAD && vif.launch_valid &&
+                        vif.launch_task_id==CP_HIGH_PAYLOAD_TASK_ID &&
+                        vif.launch_op==8'h10 && vif.launch_length==16'hffff);
           if(vif.cpl_writer_done && vif.abort_cov_path!=0)
             abort_timing_cg.sample(
               vif.abort_cov_path,
@@ -2401,7 +2484,7 @@ package ai_cp_uvm_pkg;
               ((vif.completion_task_id==16'h1560) ? 2 :
                ((vif.completion_task_id==16'h1570) ? 3 : 0)),
               vif.completion_error);
-          if((vif.test_case<31) && (!scenario_seen || (vif.test_case!=last_scenario))) begin
+          if((vif.test_case<32) && (!scenario_seen || (vif.test_case!=last_scenario))) begin
             scenario_hits[vif.test_case]++;
             last_scenario=vif.test_case;
             scenario_seen=1;
@@ -2438,7 +2521,7 @@ package ai_cp_uvm_pkg;
         `uvm_error("CP/COV","fetch/macro abort timing functional bins did not all hit")
       foreach(stall_hits[i]) if(!stall_hits[i]) `uvm_error("CP/COV",$sformatf("backpressure bin %0d not hit",i))
       foreach(word_hits[i]) if(!word_hits[i]) `uvm_error("CP/COV",$sformatf("completion word bin %0d not hit",i))
-      `uvm_info("CP/COV",$sformatf("scenario_bins=%0d/31 scenario_visits=%0d dep_wait_cycles=%0d dep_timeout_cycles=%0d stall_cycles=%0d/%0d words=%0d/%0d/%0d/%0d",
+      `uvm_info("CP/COV",$sformatf("scenario_bins=%0d/32 scenario_visits=%0d dep_wait_cycles=%0d dep_timeout_cycles=%0d stall_cycles=%0d/%0d words=%0d/%0d/%0d/%0d",
         scenario_bins_hit,scenario_visits,
         dep_wait_cycles,
         dep_timeout_wait_cycles,
