@@ -1,5 +1,15 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-19 exact-SHA V5 CNM backpressure mutation replay (`200448c`):**
+> On a detached clean worktree, `dma_spad_subsystem_test` seed `20261014`
+> passed on baseline and post-restore with UVM severity `0/0/0`. The one-line
+> denied-prefetch fallback mutant was detected by two
+> `ap_cnm_request_stable_when_stalled` failures and CNM timeout/drain/result
+> checker errors before the 150,000,000 ps testbench timeout. VCS returned RC 0,
+> so classification uses the explicit checker evidence. This is one targeted
+> checker-sensitivity replay—not full V5 mutation closure; the original
+> historical failure artifact/fix SHA remain missing. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN200448C_CNM_MUTATION.md).
+
 > **2026-10-19 exact-main V2 CP seed expansion (`3855d51`):** Detached clean
 > replay on pushed SHA `3855d513614782b14163e4a59c2be266b1c65998` passed
 > 168/168 mixed profiles across seven seeds; every run had 31/31 scenario

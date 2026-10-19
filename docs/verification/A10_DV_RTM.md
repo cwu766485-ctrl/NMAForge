@@ -754,6 +754,17 @@ see the run record for the detailed raw-coverage audit.
 > validates current checker sensitivity but does not recover the original bug
 > artifact or fix SHA. See the [exact-SHA replay record](A10_DV_RUN_2026-10-19_MAIN7F346DD_RRESP_MUTATION.md).
 
+> **2026-10-19 exact-SHA CNM prefetch mutation replay:** At source commit
+> `200448cabf7801fdb1c858b4e3de1ee545a6d790`, `dma_spad_subsystem_test`
+> seed `20261014` passed on baseline and post-restore with UVM severity
+> `0/0/0`. The denied-prefetch fallback mutant caused two
+> `ap_cnm_request_stable_when_stalled` assertion failures, followed by CNM
+> timeout/drain/result errors and the testbench timeout at `150000000 ps`.
+> VCS returned RC 0; the mutant is classified from explicit checker signatures,
+> not process status. Source hash matched after restore; the detached worktree
+> was clean. This is a fresh sensitivity replay, not recovery of the historical
+> failing artifact/fix SHA. See the [exact-SHA replay record](A10_DV_RUN_2026-10-19_MAIN200448C_CNM_MUTATION.md).
+
 > **2026-10-16 top-level AXI master SVA refresh:** A final 16-seed
 > `uvm_mixed_precision_ddr_e2e_cov_regress` was rerun after adding five
 > DUT-owned AXI master assertions and URG non-vacuity gates. The five AR/AW/W
