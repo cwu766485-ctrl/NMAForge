@@ -1,5 +1,17 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-19 exact-current-main V2 CP seed expansion (`3855d51`):** On
+> pushed `main` SHA `3855d513614782b14163e4a59c2be266b1c65998`, a detached clean
+> worktree passed seven seeds × 24 mixed profiles (168/168); each profile had
+> 31/31 scenario bins and UVM warning/error/fatal=`0/0/0`. URG gates were
+> `cp_cg` 61/61 variables + 34/34 crosses, reset words 4/4, kind×delay×reset
+> 24/24, and abort timing 7/7. Assertions: 13 success, 0 failure/incomplete,
+> two UVM RAL no-attempts; 4/4 covers matched. Exact-SHA top `ai_smoke` passed.
+> This strengthens repeatability of the existing CP suite, not full V2 closure.
+> The 15 raw CP condition outcomes remain raw-uncovered but have the existing
+> formal/assume-guarantee disposition (no waiver); raw toggle and broader
+> lifecycle closure remain open. [Run record](A10_DV_RUN_2026-10-19_MAIN3855D513_V2_CP_SEED_EXPANSION.md).
+
 > **2026-10-19 exact-current-main V3 replay (`76cde0f`):** Clean detached
 > worktree on pushed SHA `76cde0f4f14912226f9eff2b5bcf86222d326ac9` passed the
 > 10-seed DMA–SPAD–CNM regression, 16/64/300-cycle RREADY stress, reset-delay
@@ -19,9 +31,12 @@
 > reset-word 4/4, mixed-kind×abort-delay×reset cross 24/24, abort timing 7/7;
 > 13 assertions succeeded, 0 failed/incomplete, 2 UVM RAL internals unattempted,
 > and 4/4 covers matched. CP raw line/FSM-transition/branch coverage is
-> 100/100/100%; condition is 237/252 (94.05%). Completion-writer line,
-> condition, FSM-transition, and branch coverage are all 100%. Raw toggle and
-> remaining CP condition outcomes are still open. Exact-source top `ai_smoke`
+> 100/100/100%; condition is 237/252 (94.05%). The 15 raw-uncovered condition
+> outcomes have the existing formal/assume-guarantee disposition recorded in
+> the RTM condition-disposition section; they are not waived or rewritten.
+> Completion-writer line, condition, FSM-transition, and branch coverage are
+> all 100%. Raw toggle and broader lifecycle requirements remain open.
+> Exact-source top `ai_smoke`
 > passed. This closes only the exercised CP slice, not all V2/A10/V5. See the
 > [run record](A10_DV_RUN_2026-10-19_MAINAEE74EF_V2_CP.md).
 

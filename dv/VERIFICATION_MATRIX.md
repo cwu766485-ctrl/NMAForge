@@ -1,5 +1,15 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-19 exact-main V2 CP seed expansion (`3855d51`):** Detached clean
+> replay on pushed SHA `3855d513614782b14163e4a59c2be266b1c65998` passed
+> 168/168 mixed profiles across seven seeds; every run had 31/31 scenario
+> bins and UVM severity `0/0/0`. URG: CP 61/61 variables + 34/34 crosses,
+> reset 4/4, kind×delay×reset 24/24, abort timing 7/7; 13 assertions
+> succeeded, none failed/incomplete, two UVM RAL no-attempts; all four covers
+> matched. Top `ai_smoke` passed. The 15 raw CP condition outcomes remain
+> uncovered but retain the prior formal/assume-guarantee disposition; raw
+> toggle and broader V2/A10/V5 closure remain open. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN3855D513_V2_CP_SEED_EXPANSION.md).
+
 > **2026-10-19 exact-current-main V3 replay (`76cde0f`):** Clean exact-SHA
 > replay passed 10 DMA–SPAD–CNM seeds, 16/64/300-cycle AXI RREADY stress,
 > reset-delay cutpoints 0/1/2/3, standalone SPAD arbiter fairness/coverage,
@@ -16,8 +26,9 @@
 > timing 7/7. Assertions: 13 success, 0 failure/incomplete, two UVM RAL
 > no-attempts; all four covers matched. CP raw condition=`237/252` (94.05%),
 > line/FSM transitions/branch=100%; completion-writer line/condition/FSM
-> transitions/branch=100%. Top `ai_smoke` passed. CP toggle and remaining raw
-> condition outcomes remain open; this is not full V2/A10/V5 closure.
+> transitions/branch=100%. Top `ai_smoke` passed. CP toggle remains open;
+> the 15 raw-uncovered condition outcomes have existing formal/assume-guarantee
+> disposition recorded in the RTM. This is not full V2/A10/V5 closure.
 > [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAINAEE74EF_V2_CP.md).
 
 > **2026-10-19 当前 `main` 的 V1 FP exact-SHA recheck（`1956f36`）：** clean detached worktree 中新跑 8 seeds × 200 vectors；8/8 PASS、每 seed 484/484 bit-exact、UVM severity 0/0/0、peak outstanding reads=2；六个 FP 功能 coverage groups 均 100%。这仅代表 FP block UVM 选定功能切片，不表示 full-domain parity/writeback formal 或 A10 coverage closure。详见[运行记录](../docs/verification/A10_DV_RUN_2026-10-19_MAIN1956F36_V1_FP.md)。

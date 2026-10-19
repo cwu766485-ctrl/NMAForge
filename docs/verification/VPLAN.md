@@ -4,6 +4,17 @@
 更新：2026-10-19
 顶层：`rtl/top/ai_accel_top.v`
 
+> **2026-10-19 V2 CP seed expansion (`3855d51`):** At pushed `main` SHA
+> `3855d513614782b14163e4a59c2be266b1c65998`, a detached clean worktree passed
+> seven seeds × 24 mixed profiles (168/168), with 31/31 scenario bins and UVM
+> severity `0/0/0` per profile. URG gates: `cp_cg` 61/61 variables + 34/34
+> crosses, reset words 4/4, kind×delay×reset 24/24, abort timing 7/7; 13
+> assertions succeeded, 0 failed/incomplete, two UVM RAL no-attempts, and all
+> four covers matched. Top `ai_smoke` passed. This is stronger repeatability
+> evidence, not full V2 closure. The 15 raw condition outcomes remain
+> uncovered but have existing formal/assume-guarantee disposition; raw toggle
+> and broader CP lifecycle remain open. [Run record](A10_DV_RUN_2026-10-19_MAIN3855D513_V2_CP_SEED_EXPANSION.md).
+
 > **2026-10-19 exact-current-main V3 replay (`76cde0f`):** On a clean detached
 > worktree at pushed SHA `76cde0f4f14912226f9eff2b5bcf86222d326ac9`, ten
 > DMA–SPAD–CNM subsystem seeds, 16/64/300-cycle RREADY stress, shared reset
@@ -22,8 +33,9 @@
 > `237/252` (94.05%); completion-writer line/condition/FSM-transition/branch
 > all 100%. Thirteen assertions succeeded, no failures/incomplete, two UVM RAL
 > internals had no attempts, and all four cover properties matched. CP raw
-> condition/toggle residuals and broader V2 lifecycle requirements remain
-> open. [Exact-SHA run record](A10_DV_RUN_2026-10-19_MAINAEE74EF_V2_CP.md).
+> condition remains 237/252 (94.05%); its 15 uncovered outcomes have existing
+> formal/assume-guarantee disposition. Raw toggle residuals and broader V2
+> lifecycle requirements remain open. [Exact-SHA run record](A10_DV_RUN_2026-10-19_MAINAEE74EF_V2_CP.md).
 
 > **2026-10-19 当前 `main` 的 V1 FP 更新（`1956f36`）：** 在精确 SHA 的 clean detached worktree 上新增复跑 8 个 FP dot UVM seeds，每 seed 200 个随机向量；8/8 通过，每 seed scoreboard 484/484、UVM severity `0/0/0`，峰值 outstanding read=2，合并 URG 的 6 个 FP 功能覆盖组均为 100%。该结果补强 V1 block 级随机回归可复现性，但不等于关闭 V1：full-domain parity→writeback formal 仍 inconclusive，DUT code coverage residual 与 V1/V2–V5 总体验收仍 open。详见[运行记录](A10_DV_RUN_2026-10-19_MAIN1956F36_V1_FP.md)及[A10 RTM](A10_DV_RTM.md)。
 
@@ -43,7 +55,7 @@
 
 > **2026-10-18 CP submit-guard follow-up (tested tree based on `7aafb72`):** Dependency-wait `ST_DECODE` re-submit assertion/cover, full CP suite, 72/72 three-seed × 24-profile coverage matrix, and top `ai_smoke` passed. UVM severity=`0/0/0`; all three CP covers matched, with zero assertion failures/incomplete. A mixed abort/reset testbench sampling race was fixed. This remains a bounded CP increment, not raw DUT code-coverage, V2, or A10 closure. See the [run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-cp-submit-guard-and-mixed-reset-synchronization-follow-up).
 
-> **2026-10-19 V2 source-current replay/status:** CP RTL, UVM, and formal sources at current `main` are byte-identical to the exact clean replay at `c500b3d`. Its 72/72 CP mixed-reset/tile-recovery profiles and top `ai_smoke` passed; each profile had 31/31 scenario bins and UVM severity 0/0/0. `cp_cg` was 61/61 variables + 34/34 crosses; reset-word bins 4/4, kind×delay×reset 24/24, abort timing 7/7. CP raw conditions are 237/252 (94.05%); the 15 remaining raw-uncovered outcomes have an assume-guarantee/formal disposition, without waiving or rewriting URG bins. Raw toggle residuals and broader V2 lifecycle closure remain open. The current Rocky license probe cannot reach the license server, so no fresh EDA run was attempted during this status audit. See the [source-identity audit](A10_DV_RUN_2026-10-19_CP_SOURCE_AUDIT.md) and [clean replay record](A10_DV_RUN_2026-10-18_CP_COMPLETION_AVAILABILITY.md#follow-up-tile-load-dma-error-propagation).
+> **2026-10-19 V2 source-current replay/status:** CP RTL, UVM, and formal sources at current `main` are byte-identical to the exact clean replay at `c500b3d`. Its 72/72 CP mixed-reset/tile-recovery profiles and top `ai_smoke` passed; each profile had 31/31 scenario bins and UVM severity 0/0/0. `cp_cg` was 61/61 variables + 34/34 crosses; reset-word bins 4/4, kind×delay×reset 24/24, abort timing 7/7. CP raw conditions are 237/252 (94.05%); the 15 remaining raw-uncovered outcomes have an assume-guarantee/formal disposition, without waiving or rewriting URG bins. Raw toggle residuals and broader V2 lifecycle closure remain open. At that audit point, the Rocky license probe could not reach the server, so no fresh EDA run was attempted; this limitation was superseded by the later exact-main seven-seed replay at `3855d51`. See the [source-identity audit](A10_DV_RUN_2026-10-19_CP_SOURCE_AUDIT.md) and [clean replay record](A10_DV_RUN_2026-10-18_CP_COMPLETION_AVAILABILITY.md#follow-up-tile-load-dma-error-propagation).
 
 > **2026-10-18 exact-main V3-CUR-04 parity/abort/reset slice (`ae925bd`):** The 20-seed replay at pushed main SHA `ae925bd0ab497f278cdef2c5431438b3a1c08a50` passed with UVM warning/error/fatal=`0/0/0`; a directed `+SPAD_PARITY_ABORT_RESET_DELAY=0` follow-up passed and completed the merged reset-timing coverage: `cp_reset_timing` 2/2 and `fault_abort_reset_x_timing` 2/2 (100%). The merged URG has 31 assertions: 29 successful, zero failures/incomplete, and two unattempted UVM RAL internals. `ai_smoke` passed. This closes only this bounded parity-error × DMA-abort-drain × shared-reset slice; broad fault/abort/reset combinations, V3 fairness and full V3/A10/V5 closure remain open. Evidence and commands are in the [2026-10-18 run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-v3-parityabortreset-timing-coverage-addendum-ae925bd).
 

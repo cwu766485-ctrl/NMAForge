@@ -52,8 +52,10 @@ make -C dv/subsystem/top_smoke/sim ai_smoke
 
 ## Closure boundary
 
-The 15 uncovered `ai_command_processor` condition outcomes and raw toggle
-residuals remain visible for disposition. The run does not establish complete
+The 15 `ai_command_processor` condition outcomes remain raw-uncovered in URG,
+but have the assume/guarantee and formal disposition now recorded in the
+[A10 RTM](A10_DV_RTM.md#2026-10-18-cp-completion-availability-condition-disposition),
+without waivers or rewritten bins. Raw toggle residuals remain open. The run does not establish complete
 CMDQ/CPLQ lifecycle, all descriptor/dependency/error combinations, full V2
 coverage closure, or V5 closure. No RTL, testbench, SPEC, or ABI changes were
 made for this replay.
