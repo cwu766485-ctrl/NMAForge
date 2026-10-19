@@ -16,9 +16,6 @@ package ai_cp_uvm_pkg;
                     CP_HIGH_PAYLOAD} cp_case_e;
   localparam logic [15:0] CP_HIGH_PAYLOAD_TASK_ID=16'hc3a5;
   localparam logic [31:0] CP_HIGH_PAYLOAD_CPLQ_BASE=32'h0007_8000;
-  localparam logic [31:0] CP_HIGH_PAYLOAD_RESULT=32'h3e12_3456;
-  localparam logic [31:0] CP_HIGH_PAYLOAD_CYCLES=32'h0001_0023;
-  localparam logic [31:0] CP_HIGH_PAYLOAD_ELEMENTS=32'h0000_ffff;
   class ai_cp_item extends uvm_sequence_item;
     rand cp_case_e scenario;
     `uvm_object_utils_begin(ai_cp_item)
@@ -1237,13 +1234,19 @@ package ai_cp_uvm_pkg;
             vif.desc_mem[0].length=16'hffff;
             vif.cplq_base=CP_HIGH_PAYLOAD_CPLQ_BASE;
             vif.cplq_size=4; vif.cplq_head=0; vif.cmdq_tail=1;
-            vif.compute_result=CP_HIGH_PAYLOAD_RESULT;
-            vif.compute_cycles=CP_HIGH_PAYLOAD_CYCLES;
-            vif.compute_elements=CP_HIGH_PAYLOAD_ELEMENTS;
+            // Use the simulator seed to vary the full-width result payload.
+            // These inputs remain stable through event and completion retirement.
+            vif.compute_result=$urandom();
+            vif.compute_cycles=$urandom();
+            vif.compute_elements=$urandom();
             launch_queue(0,1);
             if(vif.cmdq_head!==32'd1 || vif.cplq_tail!==32'd1 || vif.cpl_writer_busy)
               `uvm_error("CP/HIGH_PAYLOAD","high-payload command did not retire exactly once")
-            `uvm_info("CP/HIGH_PAYLOAD","task_id=c3a5 result=3e123456 cycles=00010023 elements=ffff cplq_base=00078000 tail=1",UVM_LOW)
+            `uvm_info("CP/HIGH_PAYLOAD",
+              $sformatf("task_id=%04x result=%08x cycles=%08x elements=%08x cplq_base=%08x tail=1",
+                        CP_HIGH_PAYLOAD_TASK_ID,vif.compute_result,
+                        vif.compute_cycles,vif.compute_elements,
+                        CP_HIGH_PAYLOAD_CPLQ_BASE),UVM_LOW)
           end
           CP_FETCH_ERROR: begin
             descriptor(0); vif.cmdq_tail=1; vif.cplq_head=0;
@@ -1570,16 +1573,16 @@ package ai_cp_uvm_pkg;
           if(vif.event_valid) begin
             high_payload_events++;
             if(vif.event_error || vif.event_error_code!==4'd0 ||
-               vif.event_result!==CP_HIGH_PAYLOAD_RESULT ||
-               vif.event_cycles!==CP_HIGH_PAYLOAD_CYCLES ||
-               vif.event_elements!==CP_HIGH_PAYLOAD_ELEMENTS)
+               vif.event_result!==vif.compute_result ||
+               vif.event_cycles!==vif.compute_cycles ||
+               vif.event_elements!==vif.compute_elements)
               `uvm_error("CP/HIGH_PAYLOAD","compute endpoint event lost high payload")
           end
           if(vif.completion_start &&
              (vif.completion_task_id!==CP_HIGH_PAYLOAD_TASK_ID ||
               vif.completion_status!==4'd1 || vif.completion_error!==4'd0 ||
-              vif.completion_result!==CP_HIGH_PAYLOAD_RESULT ||
-              vif.completion_elements!==CP_HIGH_PAYLOAD_ELEMENTS))
+              vif.completion_result!==vif.compute_result ||
+              vif.completion_elements!==vif.compute_elements))
             `uvm_error("CP/HIGH_PAYLOAD","completion start lost high payload")
           if(vif.cpl_writer_done) high_payload_completions++;
         end
@@ -2199,14 +2202,14 @@ package ai_cp_uvm_pkg;
             2: begin
               if(vif.cpl_spad_wdata !== vif.completion_result) `uvm_error("CP/MON","word2 result mismatch")
               if(vif.test_case==CP_HIGH_PAYLOAD &&
-                 (vif.completion_result!==CP_HIGH_PAYLOAD_RESULT ||
-                  vif.cpl_spad_wdata!==CP_HIGH_PAYLOAD_RESULT))
+                 (vif.completion_result!==vif.compute_result ||
+                  vif.cpl_spad_wdata!==vif.compute_result))
                 `uvm_error("CP/HIGH_PAYLOAD","word2 high result was not preserved")
             end
             3: begin
               if(vif.cpl_spad_wdata !== vif.completion_elements) `uvm_error("CP/MON","word3 element count mismatch")
               if(vif.test_case==CP_HIGH_PAYLOAD &&
-                 vif.cpl_spad_wdata!==CP_HIGH_PAYLOAD_ELEMENTS)
+                 vif.cpl_spad_wdata!==vif.compute_elements)
                 `uvm_error("CP/HIGH_PAYLOAD","word3 element count mismatch")
             end
           endcase

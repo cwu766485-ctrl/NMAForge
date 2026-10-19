@@ -144,7 +144,7 @@ check-log:
 		 grep -Eq '\[CP/RING\].*expected=(1[2-9]|2[0-4]) accepted=[0-9]+ launches=[0-9]+ retired=[0-9]+ valid=[0-9]+ errors=[1-9][0-9]* launch_pending=0 retire_pending=0' $(LOG) && \
 		 grep -Eq '\[CP/RING\].*random_outcomes desc=[1-9][0-9]* fetch=[1-9][0-9]* compute=[1-9][0-9]* success=[1-9][0-9]*' $(LOG) && \
 			 grep -Eq 'scenario_bins=32/32' $(LOG) && \
-			 grep -Eq '\[CP/HIGH_PAYLOAD\].*task_id=c3a5 result=3e123456 cycles=00010023 elements=ffff cplq_base=00078000 tail=1' $(LOG) && \
+				 grep -Eq '\[CP/HIGH_PAYLOAD\].*task_id=c3a5 result=[0-9a-f]{8} cycles=[0-9a-f]{8} elements=[0-9a-f]{8} cplq_base=00078000 tail=1' $(LOG) && \
 			 grep -Eq '\[CP/ZERO_SIZE_EMPTY\].*cmdq_size=0 equal_pointers=1 compatibility_fetch=1 completion_task_id=1900 CPLQ_tail=1' $(LOG) && \
 			 grep -Eq '\[CP/CPLQ_LAST_SLOT\].*queued=2 initial_free_slots=1 first_completion_filled_ring=1 second_held=1 red-doorbell_recovery=1 cpl_tail=2->3->0 cmdq_head=1->2' $(LOG) && \
 		 grep -Eq '\[CP/WRITER_FSM\].*illegal_state_injected=1 recovered_idle=1 side_effects=0 recovery_completion=1' $(LOG) && \
