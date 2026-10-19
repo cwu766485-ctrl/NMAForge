@@ -1,5 +1,16 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-19 exact-SHA selected baseline replay (`2166334`):** A detached
+> initially clean worktree at pushed SHA
+> `21663348789175ad7dc74bc2934302255b25bb4b` passed selected FP directed and
+> three-seed bit-exact UVM (1,452 scoreboard transactions total), FP reference
+> model 19/19, DMA UVM 19/19, Control UVM 9/9, top `ai_smoke`, and 20/20
+> seeded top cases. DMA/Control per-test UVM warning/error/fatal were `0/0/0`;
+> URG reports were generated. This establishes reproducibility for the listed
+> slice only: V1-FP-04 parity-to-writeback formal remains inconclusive, and
+> CP lifecycle, broad V3/V4 coverage disposition, and V5 remain open. See the
+> [run record](A10_DV_RUN_2026-10-19_MAIN2166334.md).
+
 > **2026-10-19 V1 FP parity/writeback composition attempt:** On the current
 > worktree, two separately checked full-domain helper lemmas passed with clean
 > setup and non-vacuous activation: pending-parity blocks final-element compute;

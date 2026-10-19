@@ -1,5 +1,14 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-19 exact-SHA baseline replay (`2166334`):** A detached clean
+> worktree at pushed SHA `21663348789175ad7dc74bc2934302255b25bb4b` passed
+> selected FP directed/3-seed UVM and reference-model tests, DMA UVM 19/19,
+> Control UVM 9/9, top `ai_smoke`, and 20/20 seeded top cases. DMA/Control
+> severity summaries were zero and official URG reports were generated. This
+> is a frozen-SHA reproducibility checkpoint, not complete A10 acceptance:
+> FP parity-to-writeback formal remains open, as do CP lifecycle, broad V3/V4
+> coverage disposition, and V5 review. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN2166334.md).
+
 > **2026-10-19 latest SPAD arbiter coverage/formal follow-up (`d0ae9b5`):**
 > Exact-source VCS/URG passed scheduler fairness, fallback, control priority,
 > and response checks. Raw line/condition/branch/toggle=`100.00/86.89/100.00/10.73%`.
