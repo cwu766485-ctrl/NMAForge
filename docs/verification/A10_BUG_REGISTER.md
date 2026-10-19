@@ -81,4 +81,6 @@ from a fixed commit.
   subsystem test passed with UVM warning/error/fatal `0/0/0`. These are four
   targeted checks, not a complete mutation campaign. V5-BUG-01 and V5 release
   closure remain **OPEN**; the historical RTL defects still lack original
-  failure artifacts and immutable fix SHAs.
+  failure artifacts and immutable fix SHAs. The exact-SHA DMA baseline/mutant/
+restore hashes, commands, logs, and return-code disposition are recorded in
+[`A10_DV_RUN_2026-10-19_MAIN9A8FDE0_DMA_WRITE_ABORT_MUTATION.md`](A10_DV_RUN_2026-10-19_MAIN9A8FDE0_DMA_WRITE_ABORT_MUTATION.md).

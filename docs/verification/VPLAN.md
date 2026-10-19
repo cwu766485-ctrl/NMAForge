@@ -4,6 +4,14 @@
 更新：2026-10-19
 顶层：`rtl/top/ai_accel_top.v`
 
+> **2026-10-19 exact-SHA V5 DMA write-abort mutation replay (`9a8fde0`):**
+> On a detached clean worktree, baseline and post-restore
+> `dma_spad_subsystem_test` seed `20261016` passed with UVM severity `0/0/0`.
+> The premature `ST_WRITE_DRAIN` retirement mutant was detected by the accepted/
+> completed B-response checker and drain-coverage gate (`0/2/0` UVM errors);
+> restored RTL hash matched baseline. This is one targeted mutation replay,
+> not full V5 closure. [Run record](A10_DV_RUN_2026-10-19_MAIN9A8FDE0_DMA_WRITE_ABORT_MUTATION.md).
+
 > **2026-10-19 V2 CP seed expansion (`3855d51`):** At pushed `main` SHA
 > `3855d513614782b14163e4a59c2be266b1c65998`, a detached clean worktree passed
 > seven seeds × 24 mixed profiles (168/168), with 31/31 scenario bins and UVM

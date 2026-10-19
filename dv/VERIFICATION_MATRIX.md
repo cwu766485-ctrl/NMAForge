@@ -1,5 +1,13 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-19 exact-SHA V5 DMA accepted-write abort/drain mutation replay (`9a8fde0`):**
+> Detached baseline and post-restore focused subsystem runs passed with UVM
+> severity `0/0/0`. The premature-retirement mutant was caught by
+> `accepted/completed=1/0 pending=1` and a drain-coverage miss (UVM `0/2/0`).
+> Baseline/restored RTL SHA-256 matched and the worktree was clean. This is
+> targeted checker-sensitivity evidence only; full V5 remains open. [Run
+> record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN9A8FDE0_DMA_WRITE_ABORT_MUTATION.md).
+
 > **2026-10-19 exact-SHA V5 CNM backpressure mutation replay (`200448c`):**
 > On a detached clean worktree, `dma_spad_subsystem_test` seed `20261014`
 > passed on baseline and post-restore with UVM severity `0/0/0`. The one-line
