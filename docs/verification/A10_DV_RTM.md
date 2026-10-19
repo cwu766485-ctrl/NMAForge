@@ -1,5 +1,12 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-19 source-identity reconciliation:** At comparison endpoint
+> `c256522`, the currently relevant V1–V4 RTL/verification scopes were
+> compared with their recorded passing baselines. The selected evidence remains
+> current only for the paths explicitly checked; follow-up Control/top-smoke
+> worktree runs are distinguished from clean detached-SHA replays. No single
+> current-HEAD full A10 regression is claimed. See the [source identity audit](A10_DV_SOURCE_IDENTITY_2026-10-19.md).
+
 > **2026-10-18 CP decode busy-hold formal follow-up (based on pushed `5439cb7`):** VC Formal `V-2023.12-SP2` setup check reported no setup issues; 5/5 assertions were proven non-vacuously and 3/3 covers were reached. New properties prove the `compute_busy` decode launch guard and that tile-pipeline `busy/done` remain owned by `ST_TILE`. Five of the 23 CP raw condition misses now have non-vacuous formal disposition; two more are structurally impossible by the `cmdq_empty` definition. One disabled-queue operand combination is semantically masked; 15 outcomes still require endpoint/queue integration review. This is a formal-harness update only, with no product RTL/SPEC/ABI change; V2/A10 remain open. See the [run record](A10_DV_RUN_2026-10-18_CP_DECODE_BUSY.md#formal-follow-up-decode-compute-busy-launch-guard).
 
 > **2026-10-18 working-tree V2 CP decode busy-hold increment (based on pushed `2317abb`):** Corrected the macro-child decode-abort synchronization in the UVM sequence and extended `CP_SUBMIT_GUARD` to hold `compute_busy` for two cycles in `ST_DECODE`, verify no side effects/pointer movement, then verify one launch and completion after release. Focused CP cases, full CP UVM (`31/31` scenario bins), 72/72 three-seed × 24-profile URG campaign, and top `ai_smoke` passed; UVM severity was `0/0/0`. CP raw line/FSM/branch=`250/250`, `6/6` states + `13/13` transitions, and `67/67` branches; condition coverage=`229/252` (90.87%), with 23 outcomes still requiring disposition. Thirteen assertions succeeded, zero failed/incomplete, two UVM RAL no-attempts; four covers matched. This is shared-worktree evidence, not a clean-SHA replay, and does not close V2/A10. No RTL/SPEC/ABI change. See the [run record](A10_DV_RUN_2026-10-18_CP_DECODE_BUSY.md).
