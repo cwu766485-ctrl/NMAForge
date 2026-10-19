@@ -392,6 +392,15 @@ independent numerical-model unit-test result; it does not replace RTL-vs-model
 UVM and leaves V1-FP-04's full-domain parity-to-writeback proof open. See the
 [run record](A10_DV_RUN_2026-10-19_FP_MODEL.md).
 
+### V1 source identity at current main (`59bee4b`, 2026-10-19)
+
+`git diff --quiet 08f398e43703673eb145cb4a75160f425141109b..59bee4b7b4010bc56a8dea5b2558aa604ff3300a -- rtl/compute/fp dv/block/compute/fp`
+returned exit 0. The exact-main FP RTL/UVM/model/formal replay at `08f398e`
+therefore uses the same FP source files as current `main`; this is source
+identity evidence, not a new simulation or formal pass. The full-domain
+parity-to-writeback proof and V1-FP-04 remain open. See the [exact-main FP run
+record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v1-fp-replay-at-08f398e).
+
 > **2026-10-18 exact-SHA bounded parity recheck:** After license connectivity
 > was restored, `parity-bounded` passed on the clean detached source snapshot
 > `98675d08f44856d2023a6840cb117d1f47d8daf2`: clean setup, 5/5 assertions
