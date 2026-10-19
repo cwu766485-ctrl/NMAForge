@@ -1229,24 +1229,39 @@ package ai_cp_uvm_pkg;
             `uvm_info("CP/CPLQ_LAST_SLOT","queued=2 initial_free_slots=1 first_completion_filled_ring=1 second_held=1 red-doorbell_recovery=1 cpl_tail=2->3->0 cmdq_head=1->2",UVM_LOW)
           end
           CP_HIGH_PAYLOAD: begin
+            int payload_idx;
             reset_cp();
-            descriptor(0,0,0,0,1,CP_HIGH_PAYLOAD_TASK_ID);
-            vif.desc_mem[0].length=16'hffff;
             vif.cplq_base=CP_HIGH_PAYLOAD_CPLQ_BASE;
-            vif.cplq_size=4; vif.cplq_head=0; vif.cmdq_tail=1;
-            // Use the simulator seed to vary the full-width result payload.
-            // These inputs remain stable through event and completion retirement.
-            vif.compute_result=$urandom();
-            vif.compute_cycles=$urandom();
-            vif.compute_elements=$urandom();
-            launch_queue(0,1);
-            if(vif.cmdq_head!==32'd1 || vif.cplq_tail!==32'd1 || vif.cpl_writer_busy)
-              `uvm_error("CP/HIGH_PAYLOAD","high-payload command did not retire exactly once")
-            `uvm_info("CP/HIGH_PAYLOAD",
-              $sformatf("task_id=%04x result=%08x cycles=%08x elements=%08x cplq_base=%08x tail=1",
-                        CP_HIGH_PAYLOAD_TASK_ID,vif.compute_result,
-                        vif.compute_cycles,vif.compute_elements,
-                        CP_HIGH_PAYLOAD_CPLQ_BASE),UVM_LOW)
+            vif.cplq_size=4; vif.cplq_head=0; vif.cmdq_tail=0;
+            vif.cmdq_size=4;
+            @(negedge vif.clk); vif.cmdq_head_seed=0; vif.cmdq_head_load=1;
+            vif.cplq_tail_seed=0; vif.cplq_tail_load=1;
+            @(negedge vif.clk); vif.cmdq_head_load=0; vif.cplq_tail_load=0;
+            for(payload_idx=0;payload_idx<4;payload_idx++) begin
+              descriptor(payload_idx,0,0,0,1,CP_HIGH_PAYLOAD_TASK_ID);
+              vif.desc_mem[payload_idx].length=16'hffff;
+              // Re-randomize each full-width payload; hold it stable through
+              // this command's event and completion retirement.
+              vif.compute_result=$urandom();
+              vif.compute_cycles=$urandom();
+              vif.compute_elements=$urandom();
+              @(negedge vif.clk); vif.cmdq_tail=(payload_idx+1)%4;
+              pulse_submit(); wait_idle();
+              if(vif.cmdq_head!==((payload_idx+1)%4) ||
+                 vif.cplq_tail!==((payload_idx+1)%4) || vif.cpl_writer_busy)
+                `uvm_error("CP/HIGH_PAYLOAD","high-payload command did not retire exactly once")
+              `uvm_info("CP/HIGH_PAYLOAD",
+                $sformatf("slot=%0d task_id=%04x result=%08x cycles=%08x elements=%08x cplq_base=%08x tail=%0d",
+                          payload_idx,CP_HIGH_PAYLOAD_TASK_ID,vif.compute_result,
+                          vif.compute_cycles,vif.compute_elements,
+                          CP_HIGH_PAYLOAD_CPLQ_BASE,vif.cplq_tail),UVM_LOW)
+              // Consume the just-written record before the next doorbell.
+              @(negedge vif.clk); vif.cplq_head=vif.cplq_tail;
+            end
+            if(vif.cmdq_head!==32'd0 || vif.cmdq_tail!==32'd0 ||
+               vif.cplq_tail!==32'd0 || vif.cplq_head!==32'd0 ||
+               vif.busy || vif.cpl_writer_busy)
+              `uvm_error("CP/HIGH_PAYLOAD","four-record payload sequence did not wrap both queue pointers")
           end
           CP_FETCH_ERROR: begin
             descriptor(0); vif.cmdq_tail=1; vif.cplq_head=0;
@@ -1991,9 +2006,10 @@ package ai_cp_uvm_pkg;
           if(vif.cpl_spad_addr !== vif.cplq_base + (vif.cplq_tail<<4) + (word_index<<2))
             `uvm_error("CP/MON",$sformatf("completion address word %0d got=%08x",word_index,vif.cpl_spad_addr))
           if(vif.test_case==CP_HIGH_PAYLOAD &&
-             vif.cpl_spad_addr !== CP_HIGH_PAYLOAD_CPLQ_BASE + (word_index<<2))
-            `uvm_error("CP/HIGH_PAYLOAD",$sformatf("word %0d address got=%08x expected=%08x",
-              word_index,vif.cpl_spad_addr,CP_HIGH_PAYLOAD_CPLQ_BASE+(word_index<<2)))
+             vif.cpl_spad_addr !== CP_HIGH_PAYLOAD_CPLQ_BASE + (vif.cplq_tail<<4) + (word_index<<2))
+            `uvm_error("CP/HIGH_PAYLOAD",$sformatf("tail=%0d word %0d address got=%08x expected=%08x",
+              vif.cplq_tail,word_index,vif.cpl_spad_addr,
+              CP_HIGH_PAYLOAD_CPLQ_BASE+(vif.cplq_tail<<4)+(word_index<<2)))
           case(word_index)
             0: begin
               logic [15:0] expected_task_id;
@@ -2251,9 +2267,12 @@ package ai_cp_uvm_pkg;
       super.check_phase(phase);
       only_case_valid=$value$plusargs("CP_ONLY_CASE=%d", only_case);
       if((!only_case_valid || only_case==31) &&
-         (high_payload_launches!=1 || high_payload_events!=1 || high_payload_completions!=1))
-        `uvm_error("CP/HIGH_PAYLOAD",$sformatf("expected one high-payload launch/event/completion, got %0d/%0d/%0d",
+         (high_payload_launches!=4 || high_payload_events!=4 || high_payload_completions!=4))
+        `uvm_error("CP/HIGH_PAYLOAD",$sformatf("expected four high-payload launches/events/completions, got %0d/%0d/%0d",
           high_payload_launches,high_payload_events,high_payload_completions))
+      if(!only_case_valid || only_case==31)
+        `uvm_info("CP/HIGH_PAYLOAD",$sformatf("exactly_once launches=%0d events=%0d completions=%0d",
+          high_payload_launches,high_payload_events,high_payload_completions),UVM_LOW)
       if (only_case_valid) begin
         `uvm_info("CP/SB",$sformatf("CP_ONLY_CASE=%0d: skipping full-suite aggregate gates; per-case checks remained active",only_case),UVM_LOW)
         return;
