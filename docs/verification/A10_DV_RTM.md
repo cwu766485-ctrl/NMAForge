@@ -801,3 +801,19 @@ commit `c500b3daba529d3123ffe250644f3297ae8c16f3` passed a clean detached
 72-profile replay and top `ai_smoke` with the worktree clean before/after.
 Exact commands/results:
 [run record](A10_DV_RUN_2026-10-18_CP_COMPLETION_AVAILABILITY.md#follow-up-tile-load-dma-error-propagation).
+
+## 2026-10-19 V1-FP-04 `ST_WRITE` entry-owner proof and composition retry
+
+A verification-only `ST_WRITE` entry-edge ownership assertion was proven
+non-vacuously at safe depth 145, with a reachable-state cover at depth 6 and
+clean VC Formal setup. This classifies the controller transition into the
+write phase, but does not establish parity behavior across the full lifecycle.
+Using the lemma as a formal cutpoint, the lean full-domain
+`ap_writeback_excludes_pending_parity` property was non-vacuous but timed out
+at 150 s without proof or counterexample; its covers were not reached. The
+initial owner checker had incorrectly required every stalled `ST_WRITE` cycle
+to be preceded by a final compute; it was corrected to check only the entry
+edge. This was a verification checker issue, not an RTL failure. Product RTL,
+SPEC, ABI, and timing are unchanged. **V1-FP-04 remains OPEN.** See the [formal
+run record](A10_DV_RUN_2026-10-19_FP_PARITY_WRITEBACK_OWNER.md) and [FP formal
+notes](../../dv/block/compute/fp/formal/README.md).

@@ -294,6 +294,9 @@ module ai_fp_core_parity_full_writeback_lean_top (
     assume property (@(posedge clk) disable iff (!resetn)
         (dut.response_parity_failure && dut.last_element) |->
           (dut.memory_error_cutoff_now <= dut.element_index_r));
+    assume property (@(posedge clk) disable iff (!resetn)
+        $rose(dut.state_r == ST_WRITE) |-> $past(
+          (dut.state_r == 4'd1) && dut.compute_fire && dut.last_element));
 
     ap_writeback_excludes_pending_parity: assert property (
         @(posedge clk) disable iff (!resetn)
@@ -306,6 +309,65 @@ module ai_fp_core_parity_full_writeback_lean_top (
     cp_parity_error_retires: cover property (
         @(posedge clk) disable iff (!resetn)
         done && error && (error_code == ERR_PARITY));
+endmodule
+
+// Prove the FSM ownership fact used by the lean writeback composition. This
+// wrapper has no parity-unreachability assumptions; ST_WRITE must be reached
+// at least once so the assertion cannot pass vacuously.
+module ai_fp_core_parity_full_writeback_owner_top (
+    input logic        clk,
+    input logic        resetn,
+    input logic        start,
+    input logic        format_fp16,
+    input logic        abort,
+    input logic [31:0] src0_base,
+    input logic [31:0] src1_base,
+    input logic [31:0] dst_base,
+    input logic [15:0] length,
+    input logic [31:0] watchdog_limit,
+    input logic        spad_ready,
+    input logic        spad_rsp_valid,
+    input logic [31:0] spad_rdata,
+    input logic        spad_parity_error,
+    input logic        spad_protection_error
+);
+    localparam [3:0] ST_RUN = 4'd1;
+    localparam [3:0] ST_WRITE = 4'd6;
+
+    logic        spad_valid;
+    logic        spad_write;
+    logic [31:0] spad_addr;
+    logic [31:0] spad_wdata;
+    logic        busy;
+    logic        done;
+    logic        error;
+    logic [3:0]  error_code;
+    logic [31:0] result;
+    logic [31:0] cycle_count;
+    logic [31:0] element_count;
+
+    ai_mixed_precision_dot_fp32_core dut (.*);
+
+    assume property (@(posedge clk) !resetn |=> resetn);
+    assume property (@(posedge clk) resetn |=> resetn);
+    assume property (@(posedge clk) disable iff (!resetn)
+        start |-> ((length != 16'd0) &&
+                   (src0_base[1:0] == 2'b00) &&
+                   (src1_base[1:0] == 2'b00) &&
+                   (dst_base[1:0] == 2'b00) &&
+                   (watchdog_limit == 0)));
+    assume property (@(posedge clk) !abort);
+    assume property (@(posedge clk) disable iff (!resetn)
+        spad_rsp_valid |-> (dut.outstanding_reads_r != 0));
+
+    ap_write_state_has_final_compute_owner: assert property (
+        @(posedge clk) disable iff (!resetn)
+        $rose(dut.state_r == ST_WRITE) |-> $past(
+          (dut.state_r == ST_RUN) && dut.compute_fire && dut.last_element));
+
+    cp_write_state_reachable: cover property (
+        @(posedge clk) disable iff (!resetn)
+        dut.state_r == ST_WRITE);
 endmodule
 
 // Assume-guarantee refinement for the response cursor. The two assumptions

@@ -765,3 +765,31 @@ This is short-vector evidence only. It does not establish these properties
 for all legal 16-bit lengths or under the unconstrained response-latency model,
 and it does not close V1-FP-04. Exact commands and logs are in the
 [2026-10-18 run record](../../../../../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-fp-parity-probes-with-two-cycle-spad-response-model).
+
+### 2026-10-19 `ST_WRITE` entry ownership composition
+
+Added a verification-only owner lemma for the state transition into `ST_WRITE`:
+on the entry edge, the preceding sampled cycle must be `ST_RUN` with
+`compute_fire && last_element`. The wrapper uses legal nonzero lengths and
+aligned bases, disables abort/watchdog, and accepts a SPAD response only when
+there is an outstanding read. The arithmetic datapath is stubbed because this
+lemma concerns controller state ownership, not numeric results. A cover reaches
+`ST_WRITE`, so the assertion is not vacuous.
+
+VC Formal `V-2023.12-SP2` reported clean setup, `ap_write_state_has_final_compute_owner`
+proven and non-vacuous (safe depth 145), and the `ST_WRITE` cover reached at
+depth 6. The proven lemma was then used as an entry-edge assumption in the lean
+full-domain parity/writeback control-cone proof. That proof had clean setup and
+a non-vacuous `ap_writeback_excludes_pending_parity` antecedent, but remained
+checking until its 150 s timeout (Make exit 124), with no proof or
+counterexample; the subsequent cover queries did not run. A post-timeout audit
+found no remaining VCF/VC Static/Simon process.
+
+The first diagnostic version accidentally asserted that *every* sampled
+`ST_WRITE` cycle must immediately follow the final compute. It falsified while
+the FSM correctly held `ST_WRITE` during write-response back-pressure. The
+checker was corrected to constrain only the rising edge into `ST_WRITE`; the
+corrected property proves. This was a checker overconstraint, not an RTL bug.
+The entry lemma does not close the parity-to-writeback lifecycle property or
+V1-FP-04. No product RTL, SPEC, ABI, or timing changed. Exact commands and
+results: [2026-10-19 run record](../../../../../docs/verification/A10_DV_RUN_2026-10-19_FP_PARITY_WRITEBACK_OWNER.md).
