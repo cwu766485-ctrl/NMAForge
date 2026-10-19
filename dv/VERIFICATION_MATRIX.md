@@ -1,5 +1,13 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-19 exact-SHA V5 completion-tail mutation replay (`0490a7f`):**
+> CP UVM baseline and restore (`ai_cp_test`, seed `20261019`) passed with
+> 31/31 scenario bins and UVM severity `0/0/0`. The final-word-index mutant
+> omitted word 3 and advanced the tail early; the existing monitor/scoreboard
+> reported 314 UVM errors. Compile logs were clean, and logs/VDBs are retained
+> outside the repository. This is targeted checker-sensitivity evidence, not
+> V2/V5 closure. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN0490A7F_COMPLETION_TAIL_MUTATION.md).
+
 > **2026-10-19 exact-SHA V5 DMA accepted-write abort/drain mutation replay (`9a8fde0`):**
 > Detached baseline and post-restore focused subsystem runs passed with UVM
 > severity `0/0/0`. The premature-retirement mutant was caught by

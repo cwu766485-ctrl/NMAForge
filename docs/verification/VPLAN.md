@@ -4,6 +4,15 @@
 更新：2026-10-19
 顶层：`rtl/top/ai_accel_top.v`
 
+> **2026-10-19 exact-SHA V5 completion-tail mutation replay (`0490a7f`):**
+> The CP UVM baseline and restore passed at pushed SHA
+> `0490a7f33534eada08870a36302e4fef200721ec` (seed `20261019`, scenario
+> bins `31/31`, UVM severity `0/0/0`). A mutant ending the writer after word 2
+> was detected by early-tail, four-word handshake, word-3 scoreboard, and
+> coverage checks (314 UVM errors). The full logs and VDBs are retained under
+> `E:\tmp\nmaforge_v5_completion_0490a7f_evidence\`; this is a targeted V5
+> sensitivity replay, not closure. [Run record](A10_DV_RUN_2026-10-19_MAIN0490A7F_COMPLETION_TAIL_MUTATION.md).
+
 > **2026-10-19 exact-SHA V5 DMA write-abort mutation replay (`9a8fde0`):**
 > On a detached clean worktree, baseline and post-restore
 > `dma_spad_subsystem_test` seed `20261016` passed with UVM severity `0/0/0`.

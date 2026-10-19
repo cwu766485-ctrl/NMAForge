@@ -56,7 +56,7 @@ from a fixed commit.
   closure; it was a stimulus/coverage gap, not a DUT defect. Original failing
   artifacts and immutable fix commits are still missing for historical RTL
   defects, so this is not yet a complete auditable bug lifecycle.
-- Four targeted RTL mutations were detected on 2026-10-16. For A10-BUG-001, inverting
+- Four historical targeted RTL mutations were detected on 2026-10-16. For A10-BUG-001, inverting
   `m_axi_rresp != AXI_RESP_OKAY` to `==` caused `dma_read_slverr_test`'s
   recovery-read scoreboard to report nine UVM errors (seven missing words).
   For A10-BUG-002, changing the denied-prefetch transition from
@@ -78,8 +78,12 @@ from a fixed commit.
   the new CNM/DMA subsystem checker caught `accepted/completed=1/0`, `pending=1`,
   `busy=0` and missed-coverage errors (2 UVM errors total). The mutant run
   reached `TEST_DONE`; after restoring the original guard, the same focused
-  subsystem test passed with UVM warning/error/fatal `0/0/0`. These are four
-  targeted checks, not a complete mutation campaign. V5-BUG-01 and V5 release
+  subsystem test passed with UVM warning/error/fatal `0/0/0`. A fifth targeted
+  mutation changed the completion writer's final word index from 3 to 2; the
+  CP monitor detected early `CPLQ_TAIL`, missing word 3, and failure to accept
+  all four words (314 UVM errors); baseline and restore passed. The exact-SHA
+  evidence is in the [completion-tail mutation run record](A10_DV_RUN_2026-10-19_MAIN0490A7F_COMPLETION_TAIL_MUTATION.md).
+  These five targeted checks are not a complete mutation campaign. V5-BUG-01 and V5 release
   closure remain **OPEN**; the historical RTL defects still lack original
   failure artifacts and immutable fix SHAs. The exact-SHA DMA baseline/mutant/
 restore hashes, commands, logs, and return-code disposition are recorded in
