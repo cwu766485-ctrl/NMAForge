@@ -4,6 +4,15 @@
 更新：2026-10-19
 顶层：`rtl/top/ai_accel_top.v`
 
+> **2026-10-19 exact-current-main V3 replay (`76cde0f`):** On a clean detached
+> worktree at pushed SHA `76cde0f4f14912226f9eff2b5bcf86222d326ac9`, ten
+> DMA–SPAD–CNM subsystem seeds, 16/64/300-cycle RREADY stress, shared reset
+> cutpoints 0/1/2/3, standalone SPAD arbiter fairness/code coverage, and top
+> `ai_smoke` passed. URG closed the selected RREADY and parity×abort×reset
+> groups; assertions were 29 success, zero failure/incomplete, two UVM RAL
+> no-attempts. Subsystem raw module coverage and broader V3 interactions remain
+> open; this is not full V3/A10/V5 closure. [Run record](A10_DV_RUN_2026-10-19_MAIN76CDE0F_V3.md).
+
 > **2026-10-19 exact-SHA V2 CP replay (`aee74ef`):** On pushed `main`
 > `aee74ef95463705724a34ed48feeeb70dcbb25cc`, a clean detached worktree passed
 > 72/72 Command Processor mixed reset/error/abort profiles (31/31 scenario

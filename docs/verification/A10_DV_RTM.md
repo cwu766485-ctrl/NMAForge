@@ -1,5 +1,18 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-19 exact-current-main V3 replay (`76cde0f`):** Clean detached
+> worktree on pushed SHA `76cde0f4f14912226f9eff2b5bcf86222d326ac9` passed the
+> 10-seed DMA–SPAD–CNM regression, 16/64/300-cycle RREADY stress, reset-delay
+> cutpoints 0/1/2/3, standalone 10k-cycle SPAD arbiter fairness/coverage, and
+> top `ai_smoke`. All 10 subsystem seeds and four reset runs had UVM severity
+> 0/0/0. Combined URG: RREADY 4/4 variables + 3/3 crosses; parity×abort×reset
+> 4/4 + 2/2; assertions 29 success, 0 failure/incomplete, 2 UVM RAL
+> no-attempts. Standalone arbiter: line/condition/branch/toggle
+> `100/86.89/100/10.73%`; its 8 raw condition residuals retain the separate
+> non-vacuous formal disposition at `d0ae9b5`. DMA/SPAD/CNM subsystem raw DUT
+> coverage residuals, broader combinations, and full V3/A10/V5 closure remain
+> open. See the [exact-current-main run record](A10_DV_RUN_2026-10-19_MAIN76CDE0F_V3.md).
+
 > **2026-10-19 exact-SHA V2 CP replay (`aee74ef`):** Clean detached worktree;
 > CP 72/72 mixed reset/error/abort profiles passed, each with scenario bins
 > 31/31 and UVM severity 0/0/0. URG gates: 61/61 variables, 34/34 crosses,

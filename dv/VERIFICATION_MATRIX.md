@@ -1,5 +1,14 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-19 exact-current-main V3 replay (`76cde0f`):** Clean exact-SHA
+> replay passed 10 DMA–SPAD–CNM seeds, 16/64/300-cycle AXI RREADY stress,
+> reset-delay cutpoints 0/1/2/3, standalone SPAD arbiter fairness/coverage,
+> and top `ai_smoke`. The merged RREADY group reached 4/4 variables + 3/3
+> crosses; parity×abort×reset reached 4/4 + 2/2. Assertions were 29 success,
+> zero failure/incomplete, and two UVM RAL no-attempts. Standalone arbiter
+> raw line/condition/branch/toggle=`100/86.89/100/10.73%`; subsystem raw DUT
+> coverage and broader V3/A10/V5 requirements remain open. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN76CDE0F_V3.md).
+
 > **2026-10-19 exact-SHA V2 CP replay (`aee74ef`):** Clean detached worktree;
 > 72/72 configured mixed reset/error/abort profiles passed, each with 31/31
 > scenario bins and UVM severity 0/0/0. URG CP functional coverage was 61/61
