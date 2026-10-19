@@ -1,5 +1,7 @@
 
 SEED = $(shell date +%s)
+VCS ?= vcs
+URG ?= urg
 AI_RANDOM_CASES ?= 4
 AI_SEED ?= 12345
 AI_REF_CASES ?= 1000
@@ -104,6 +106,34 @@ ai_spad_arb_run: ai_spad_arb_comp
 	./simv_spad_arb +SPAD_RR_MODE_CYCLES=10000 -l ai_spad_arb_10k_run.log
 	@grep -q 'Seeded request-mode SPAD RR PASS cycles=10000' ai_spad_arb_10k_run.log || \
 		{ echo "SPAD arbiter 10000-cycle seeded request-mode marker missing"; exit 1; }
+
+# Standalone arbiter code-coverage capture.  Keep all generated artifacts in
+# an isolated run directory so this gate does not overwrite the functional
+# smoke executable or its logs.
+SPAD_ARB_COV_RUN ?= /tmp/nmaforge_spad_arbiter_cov_$(shell date +%Y%m%d_%H%M%S)
+SPAD_ARB_COV_METRICS := line+cond+tgl+branch+assert
+
+.PHONY: ai_spad_arb_cov
+ai_spad_arb_cov:
+	test ! -e "$(SPAD_ARB_COV_RUN)"
+	mkdir -p "$(SPAD_ARB_COV_RUN)"
+	cd "$(SPAD_ARB_COV_RUN)" && $(VCS) -full64 -sverilog -timescale=1ns/1ns +define+VCS \
+		-cm $(SPAD_ARB_COV_METRICS) -cm_dir coverage.vdb \
+		-top tb_ai_spad_arbiter_rr $(CURDIR)/../../../../rtl/memory/ai_spad_arbiter.v \
+		$(CURDIR)/../../../block/spad_arbiter/tb/tb_ai_spad_arbiter_rr.sv \
+		-o simv -l compile.log
+	cd "$(SPAD_ARB_COV_RUN)" && ./simv +SPAD_RR_MODE_CYCLES=10000 \
+		-cm $(SPAD_ARB_COV_METRICS) -cm_dir coverage.vdb -l run.log
+	grep -q '3-client sustained SPAD round-robin PASS grants=10/10/10 max_wait=2' "$(SPAD_ARB_COV_RUN)/run.log"
+	grep -q 'Seeded request-mode SPAD RR PASS cycles=10000' "$(SPAD_ARB_COV_RUN)/run.log"
+	grep -q 'CNM/DMA SPAD contention PASS cnm_grants=6 dma_line_grants=6' "$(SPAD_ARB_COV_RUN)/run.log"
+	grep -q 'Scratchpad response parity alignment PASS' "$(SPAD_ARB_COV_RUN)/run.log"
+	grep -q 'SPAD arbiter cursor fallback request forms PASS cases=12' "$(SPAD_ARB_COV_RUN)/run.log"
+	$(URG) -full64 -dir "$(SPAD_ARB_COV_RUN)/coverage.vdb" -format text \
+		-report "$(SPAD_ARB_COV_RUN)/urg" -log "$(SPAD_ARB_COV_RUN)/urg.log"
+	! grep -Eq 'UCAPI-DNYL|Design not loaded' "$(SPAD_ARB_COV_RUN)/urg.log"
+	test -s "$(SPAD_ARB_COV_RUN)/urg/modinfo.txt"
+	echo "SPAD_ARBITER_COVERAGE_PASS report=$(SPAD_ARB_COV_RUN)/urg"
 
 ai_upgrade_vcs: ai_dma_run ai_spad_arb_run ai_quick
 

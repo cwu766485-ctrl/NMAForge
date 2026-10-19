@@ -160,6 +160,52 @@ module tb_ai_spad_arbiter_rr;
     end
   endtask
 
+  // Exercise legal fallback request forms at each round-robin cursor. The
+  // long all-client stress above is intentionally fair, so earlier clients
+  // are usually present whenever their cursor is selected; these directed
+  // singles make the fallback mux choices observable without peeking at DUT
+  // state or forcing internal signals.
+  task accept_rr_coverage_request;
+    input integer request_form;
+    begin
+      @(negedge clk);
+      desc_valid=0; cpl_valid=0;
+      core_valid=0; core_line_valid=0;
+      banked_valid=0; cnm_valid=0;
+      dma_valid=0; dma_line_valid=0;
+      case (request_form)
+        0: core_valid=1;
+        1: core_line_valid=1;
+        2: banked_valid=1;
+        3: cnm_valid=4'hf;
+        4: dma_valid=1;
+        5: dma_line_valid=1;
+        default: $fatal(1,"invalid RR coverage request form %0d",request_form);
+      endcase
+      #1;
+      case (request_form)
+        0: if (!core_ready || core_line_ready || !spad_valid || spad_line_valid || request_client!=3'd2)
+             $fatal(1,"core scalar fallback selection mismatch");
+        1: if (!core_line_ready || core_ready || !spad_line_valid || spad_valid || request_client!=3'd2)
+             $fatal(1,"core line fallback selection mismatch");
+        2: if (!banked_ready || spad_banked_valid!=1'b1 || request_client!=3'd3)
+             $fatal(1,"single-banked fallback selection mismatch");
+        3: if (cnm_ready!==4'hf || spad_cnm_valid!==4'hf || request_client!=3'd3)
+             $fatal(1,"CNM fallback selection mismatch");
+        4: if (!dma_ready || dma_line_ready || !spad_valid || spad_line_valid || request_client!=3'd4)
+             $fatal(1,"DMA scalar fallback selection mismatch");
+        5: if (!dma_line_ready || dma_ready || !spad_line_valid || spad_valid || request_client!=3'd4)
+             $fatal(1,"DMA line fallback selection mismatch");
+      endcase
+      @(posedge clk);
+      @(negedge clk);
+      desc_valid=0; cpl_valid=0;
+      core_valid=0; core_line_valid=0;
+      banked_valid=0; cnm_valid=0;
+      dma_valid=0; dma_line_valid=0;
+    end
+  endtask
+
   initial begin
     repeat(3) @(posedge clk);
     resetn=1;
@@ -429,6 +475,34 @@ module tb_ai_spad_arbiter_rr;
     if (rsp_valid!==1'b0)
       $fatal(1,"core parity response valid did not retire");
     $display("Scratchpad response parity alignment PASS");
+
+    // Reset the arbiter to its documented initial cursor, then walk legal
+    // single-requester combinations so each RR fallback source is selected.
+    resetn=0;
+    desc_valid=0; cpl_valid=0;
+    core_valid=0; core_line_valid=0;
+    banked_valid=0; cnm_valid=0;
+    dma_valid=0; dma_line_valid=0;
+    repeat(2) @(posedge clk);
+    @(negedge clk);
+    resetn=1;
+    // RR_CORE -> banked fallback; RR_DMA -> core-line fallback;
+    // RR_BANKED -> DMA scalar fallback; RR_CORE -> DMA scalar fallback.
+    accept_rr_coverage_request(2);
+    accept_rr_coverage_request(1);
+    accept_rr_coverage_request(4);
+    accept_rr_coverage_request(4);
+    // Move to RR_BANKED, then exercise its core line/scalar fallbacks.
+    accept_rr_coverage_request(0);
+    accept_rr_coverage_request(1);
+    accept_rr_coverage_request(0);
+    // RR_BANKED advances to RR_DMA; exercise RR_DMA core/CNM/banked fallbacks.
+    accept_rr_coverage_request(2);
+    accept_rr_coverage_request(0);
+    accept_rr_coverage_request(2);
+    accept_rr_coverage_request(3);
+    accept_rr_coverage_request(2);
+    $display("SPAD arbiter cursor fallback request forms PASS cases=12");
     $finish;
   end
 endmodule
