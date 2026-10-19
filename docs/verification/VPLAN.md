@@ -4,6 +4,8 @@
 更新：2026-10-19
 顶层：`rtl/top/ai_accel_top.v`
 
+> **2026-10-19 固定 SHA 的 V4 更新：** 已推送 `main` 的 `2b18b5ffe99674a908fe47d83d44c993e99ccbf2` 上，顶层混合精度 DDR E2E 官方回归 192/192 seeds 通过。URG 中 E2E 组、四个逐事务 AXI 组及 Makefile 要求的 19 个功能点均为 100%；assertion 汇总为 20 项成功、0 失败/未完成、2 项 UVM RAL 内部属性未触发。这只关闭选定 V4 切片，不代表整体 V4/A10/V5 完成。见[运行记录](A10_DV_RUN_2026-10-19_MAIN2B18B5F_V4_E2E.md)和[RTM](A10_DV_RTM.md)。
+
 > 本文最初按 A8 / ABI v7.2 编写，后续阶段描述仍可作为验证路线图；其中带日期的旧 PASS、工具和 coverage 数值是历史记录，不代表 A10 全量验收。A10 的逐项需求追踪见 [`A10_DV_RTM.md`](A10_DV_RTM.md)，近期固定 SHA 的选定复跑见 [`A10_DV_RUN_2026-10-18_MAIN452.md`](A10_DV_RUN_2026-10-18_MAIN452.md)；较早的验证快照见 [`A10_DV_BASELINE_2026-10-14.md`](A10_DV_BASELINE_2026-10-14.md)。
 
 > **2026-10-19 最新固定 SHA 复跑：** pushed main `21663348789175ad7dc74bc2934302255b25bb4b` 的 detached clean worktree 已复跑选定 FP、DMA、Control 与 top 子集：FP 三 seed 共 1,452 笔 bit-exact scoreboard 检查、FP 模型 19/19、DMA UVM 19/19、Control UVM 9/9、top smoke 与 20-case seeded regression 均通过。此结果仅确认选定回归可复现；A10/V1–V5 不等于完成，尤其 V1-FP-04 parity-to-writeback formal 仍 inconclusive。见 [运行记录](A10_DV_RUN_2026-10-19_MAIN2166334.md) 与 [RTM](A10_DV_RTM.md)。

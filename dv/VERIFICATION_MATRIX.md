@@ -1,5 +1,7 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-19 固定 SHA 的 V4 混合精度 DDR E2E（`2b18b5f`）：** 已推送 `main` 的 detached clean worktree 中，官方顶层 UVM 192-seed 回归全部通过；192 个日志均有 E2E PASS marker，非零 UVM severity 为 0。URG 的 E2E 组、四个逐事务 AXI 组和 Makefile 要求的 19 个功能点均为 100%。Assertions：20 项成功、0 失败/未完成、2 项 UVM RAL 内部属性未触发；3/3 AXI stall covers 命中。这是固定 SHA 的选定 V4 复跑，不代表 V4/A10/V5 全部闭环。[运行记录](../docs/verification/A10_DV_RUN_2026-10-19_MAIN2B18B5F_V4_E2E.md)。
+
 > **2026-10-19 exact-SHA baseline replay (`2166334`):** A detached clean
 > worktree at pushed SHA `21663348789175ad7dc74bc2934302255b25bb4b` passed
 > selected FP directed/3-seed UVM and reference-model tests, DMA UVM 19/19,

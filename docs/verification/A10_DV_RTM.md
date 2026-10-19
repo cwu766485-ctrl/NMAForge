@@ -1,5 +1,7 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-19 固定 SHA 的 V4 混合精度 DDR E2E（`2b18b5f`）：** 在已推送 `main` 的 `2b18b5ffe99674a908fe47d83d44c993e99ccbf2` detached clean worktree 上，Rocky 8.10 / VCS+URG `V-2023.12-SP1_Full64` 的官方 192-seed 顶层回归（`20261101..20261292`）通过。192 个 seed 均有 `[MIXED_E2E_PASS]`，非零 UVM severity 为 0，运行前后 worktree clean。Makefile 要求的 E2E 组、四个逐事务 AXI 组及 19 个功能点均为 100%；额外 `cp_error_position` 为 2/2。URG assertions：20 项成功、0 失败/未完成、2 项 UVM RAL 内部属性未触发；3/3 AXI stall cover 命中。该结果只关闭选定的 V4 随机 E2E 切片；全设计 DUT-only coverage disposition 与 A10/V1–V5 仍未闭环。详见[运行记录](A10_DV_RUN_2026-10-19_MAIN2B18B5F_V4_E2E.md)。
+
 > **2026-10-19 exact-SHA selected baseline replay (`2166334`):** A detached
 > initially clean worktree at pushed SHA
 > `21663348789175ad7dc74bc2934302255b25bb4b` passed selected FP directed and
