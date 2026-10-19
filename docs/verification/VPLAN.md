@@ -1,8 +1,20 @@
 # NMAForge 验证计划（VPLAN）
 
 版本：A10 / ABI v7.4
-更新：2026-10-19
+更新：2026-10-20
 顶层：`rtl/top/ai_accel_top.v`
+
+> **2026-10-20 CP randomized payload queue-wrap replay (`eae3848`):** The CP
+> high-payload UVM scenario now sends four full-width result/cycles/elements
+> records per run through both 4-entry queue wraps. Focused and full CP tests
+> passed; matched 200-seed UVM/URG passed with 32/32 scenarios per seed,
+> severity `0/0/0`, 800 records and 800 unique values per payload field.
+> `cp_cg` was 63/63 variables + 34/34 crosses; assertions 13 success, 0
+> failure/incomplete, 2 UVM RAL no-attempts; covers 4/4. Matched-seed VCS RTL
+> toggle coverage moved from 16.10% to 20.77% for CP and 50.43% to 65.66% for
+> completion writer. This is toggle-coverage stimulus evidence, not power/PPA;
+> `ai_smoke` passed. CP raw condition residuals and V2/V5/A10 closure remain
+> open. [Run record](A10_DV_RUN_2026-10-20_MAINEAE3848_CP_PAYLOAD_WRAP.md).
 
 > **2026-10-19 exact-SHA CP payload-forwarding update (`cd50605`):** The
 > focused same-seed check reproduced all 32-bit completion payload fields;
