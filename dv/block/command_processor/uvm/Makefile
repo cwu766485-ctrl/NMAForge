@@ -9,8 +9,12 @@ CM_METRICS ?= line+cond+fsm+tgl+branch+assert
 COV_OUT ?= $(OUT)/coverage
 COV_SIMV := $(COV_OUT)/simv
 COV_DBS := $(foreach seed,$(SEEDS),$(foreach mixed,$(MIXED_COV_CASES),$(COV_OUT)/seed_$(seed)_mixed_$(mixed).vdb))
+RANDOM_SEED_START ?= 20262021
+RANDOM_SEED_COUNT ?= 200
+URG_REPORT ?= urg_merged
+URG_LOG ?= urg_merge.log
 
-.PHONY: compile run regress partial-reset-sweep abort-reset-sweep cov-compile cov-regress check-coverage clean
+.PHONY: compile run regress partial-reset-sweep abort-reset-sweep cov-compile cov-regress cov-random-regress check-coverage clean
 compile:
 	mkdir -p $(OUT)
 	$(VCS) -full64 -sverilog -ntb_opts uvm-1.2 -timescale=1ns/1ps -f $(FILELIST) -top tb_ai_cp_uvm -l $(OUT)/compile.log -o $(OUT)/simv
@@ -73,24 +77,66 @@ cov-regress: cov-compile
 	$(URG) -full64 -dir $(COV_OUT)/compile.vdb $(COV_DBS) -format text \
 		-report $(COV_OUT)/urg_merged -log $(COV_OUT)/urg_merge.log
 	$(MAKE) --no-print-directory check-coverage COV_OUT=$(COV_OUT)
+cov-random-regress: cov-compile
+	@set -e; \
+	case "$(RANDOM_SEED_START)" in ''|*[!0-9]*) echo "RANDOM_SEED_START must be a non-negative integer"; exit 1;; esac; \
+	case "$(RANDOM_SEED_COUNT)" in ''|*[!0-9]*) echo "RANDOM_SEED_COUNT must be a non-negative integer"; exit 1;; esac; \
+	test "$(RANDOM_SEED_COUNT)" -gt 0 || { echo "RANDOM_SEED_COUNT must be greater than zero"; exit 1; }; \
+	rm -f $(COV_OUT)/random_seed_*.log; \
+	rm -rf $(COV_OUT)/random_seed_*.vdb $(COV_OUT)/urg_random_merged; \
+	rm -f $(COV_OUT)/urg_random_merge.log; \
+	profile_count=0; \
+	severity_count=0; \
+	while [ $$profile_count -lt $(RANDOM_SEED_COUNT) ]; do \
+	  seed=$$(( $(RANDOM_SEED_START) + profile_count )); \
+	  db=random_seed_$${seed}.vdb; log=random_seed_$${seed}.log; \
+	  rm -rf $(COV_OUT)/$$db; \
+	  echo "Running command-processor random coverage seed=$$seed"; \
+	  cd $(COV_OUT) && ./simv -cm $(CM_METRICS) -cm_dir $$db -cm_name ai_cp_test \
+	    +UVM_TESTNAME=ai_cp_test +ntb_random_seed=$$seed -l $$log; \
+	  $(MAKE) -C $(CURDIR) --no-print-directory check-log LOG=$(COV_OUT)/$$log; \
+	  test -d $(COV_OUT)/$$db; \
+	  if grep -Eq 'UVM_WARNING[[:space:]]*:[[:space:]]+0' $(COV_OUT)/$$log && \
+	     grep -Eq 'UVM_ERROR[[:space:]]*:[[:space:]]+0' $(COV_OUT)/$$log && \
+	     grep -Eq 'UVM_FATAL[[:space:]]*:[[:space:]]+0' $(COV_OUT)/$$log; then \
+	    severity_count=$$((severity_count + 1)); \
+	  fi; \
+	  profile_count=$$((profile_count + 1)); \
+	done; \
+	actual_logs=$$(find "$(COV_OUT)" -type f -name 'random_seed_*.log' | wc -l | tr -d ' '); \
+	actual_vdbs=$$(find "$(COV_OUT)" -type d -name 'random_seed_*.vdb' | wc -l | tr -d ' '); \
+	test "$$actual_logs" -eq "$(RANDOM_SEED_COUNT)" || { echo "random coverage log count $$actual_logs != $(RANDOM_SEED_COUNT)"; exit 1; }; \
+	test "$$actual_vdbs" -eq "$(RANDOM_SEED_COUNT)" || { echo "random coverage VDB count $$actual_vdbs != $(RANDOM_SEED_COUNT)"; exit 1; }; \
+	test "$$severity_count" -eq "$(RANDOM_SEED_COUNT)" || { echo "random coverage UVM severity gate matched $$severity_count/$(RANDOM_SEED_COUNT) logs"; exit 1; }; \
+	db_args="$(COV_OUT)/compile.vdb"; \
+	seed_index=0; \
+	while [ $$seed_index -lt $(RANDOM_SEED_COUNT) ]; do \
+	  seed=$$(( $(RANDOM_SEED_START) + seed_index )); \
+	  db_args="$$db_args $(COV_OUT)/random_seed_$${seed}.vdb"; \
+	  seed_index=$$((seed_index + 1)); \
+	done; \
+	$(URG) -full64 -dir $$db_args -format text \
+	  -report $(COV_OUT)/urg_random_merged -log $(COV_OUT)/urg_random_merge.log
+	$(MAKE) --no-print-directory check-coverage COV_OUT=$(COV_OUT) \
+		URG_REPORT=urg_random_merged URG_LOG=urg_random_merge.log
 check-coverage:
-	@test -s $(COV_OUT)/urg_merged/grpinfo.txt
-	@grep -q 'ai_cp_uvm_pkg::ai_cp_coverage::cp_cg' $(COV_OUT)/urg_merged/grpinfo.txt || \
-	 { echo "URG report is missing CP functional coverage; see $(COV_OUT)/urg_merge.log"; exit 1; }
-	@grep -Eq 'Variables[[:space:]]+63[[:space:]]+0[[:space:]]+63[[:space:]]+100\.00' $(COV_OUT)/urg_merged/grpinfo.txt || \
-	 { echo "CP functional variable coverage is not 63/63; see $(COV_OUT)/urg_merged/grpinfo.txt"; exit 1; }
-	@grep -Eq 'Crosses[[:space:]]+34[[:space:]]+0[[:space:]]+34[[:space:]]+100\.00' $(COV_OUT)/urg_merged/grpinfo.txt || \
-	 { echo "CP functional cross coverage is not 34/34; see $(COV_OUT)/urg_merged/grpinfo.txt"; exit 1; }
-	@grep -Eq '^cp_high_payload[[:space:]]+1[[:space:]]+0[[:space:]]+1[[:space:]]+100\.00' $(COV_OUT)/urg_merged/grpinfo.txt || \
-	 { echo "CP high-payload functional bin is not 1/1; see $(COV_OUT)/urg_merged/grpinfo.txt"; exit 1; }
-	@grep -Eq '^cp_mixed_reset_words[[:space:]]+4[[:space:]]+0[[:space:]]+4[[:space:]]+100\.00' $(COV_OUT)/urg_merged/grpinfo.txt || \
-	 { echo "CP mixed reset-word bins are not 4/4; see $(COV_OUT)/urg_merged/grpinfo.txt"; exit 1; }
-	@grep -Eq '^cp_mixed_kind_delay_reset_cross[[:space:]]+24[[:space:]]+0[[:space:]]+24[[:space:]]+100\.00' $(COV_OUT)/urg_merged/grpinfo.txt || \
-	 { echo "CP mixed kind x delay x reset-word cross is not 24/24; see $(COV_OUT)/urg_merged/grpinfo.txt"; exit 1; }
-	@awk '/^Group : ai_cp_uvm_pkg::ai_cp_coverage::abort_timing_cg$$/ { in_group=1; seen=1; next } /^Group :/ && in_group { in_group=0 } in_group && /^Variables[[:space:]]+7[[:space:]]+0[[:space:]]+7[[:space:]]+100\.00/ { hit=1 } END { exit !(seen && hit) }' $(COV_OUT)/urg_merged/grpinfo.txt || \
-	 { echo "CP abort-timing functional coverage is not 7/7; see $(COV_OUT)/urg_merged/grpinfo.txt"; exit 1; }
-	@! grep -Eq 'Error-\[UCAPI-' $(COV_OUT)/urg_merge.log || \
-	 { echo "URG reported missing/corrupt design database; see $(COV_OUT)/urg_merge.log"; exit 1; }
+	@test -s $(COV_OUT)/$(URG_REPORT)/grpinfo.txt
+	@grep -q 'ai_cp_uvm_pkg::ai_cp_coverage::cp_cg' $(COV_OUT)/$(URG_REPORT)/grpinfo.txt || \
+	 { echo "URG report is missing CP functional coverage; see $(COV_OUT)/$(URG_LOG)"; exit 1; }
+	@grep -Eq 'Variables[[:space:]]+63[[:space:]]+0[[:space:]]+63[[:space:]]+100\.00' $(COV_OUT)/$(URG_REPORT)/grpinfo.txt || \
+	 { echo "CP functional variable coverage is not 63/63; see $(COV_OUT)/$(URG_REPORT)/grpinfo.txt"; exit 1; }
+	@grep -Eq 'Crosses[[:space:]]+34[[:space:]]+0[[:space:]]+34[[:space:]]+100\.00' $(COV_OUT)/$(URG_REPORT)/grpinfo.txt || \
+	 { echo "CP functional cross coverage is not 34/34; see $(COV_OUT)/$(URG_REPORT)/grpinfo.txt"; exit 1; }
+	@grep -Eq '^cp_high_payload[[:space:]]+1[[:space:]]+0[[:space:]]+1[[:space:]]+100\.00' $(COV_OUT)/$(URG_REPORT)/grpinfo.txt || \
+	 { echo "CP high-payload functional bin is not 1/1; see $(COV_OUT)/$(URG_REPORT)/grpinfo.txt"; exit 1; }
+	@grep -Eq '^cp_mixed_reset_words[[:space:]]+4[[:space:]]+0[[:space:]]+4[[:space:]]+100\.00' $(COV_OUT)/$(URG_REPORT)/grpinfo.txt || \
+	 { echo "CP mixed reset-word bins are not 4/4; see $(COV_OUT)/$(URG_REPORT)/grpinfo.txt"; exit 1; }
+	@grep -Eq '^cp_mixed_kind_delay_reset_cross[[:space:]]+24[[:space:]]+0[[:space:]]+24[[:space:]]+100\.00' $(COV_OUT)/$(URG_REPORT)/grpinfo.txt || \
+	 { echo "CP mixed kind x delay x reset-word cross is not 24/24; see $(COV_OUT)/$(URG_REPORT)/grpinfo.txt"; exit 1; }
+	@awk '/^Group : ai_cp_uvm_pkg::ai_cp_coverage::abort_timing_cg$$/ { in_group=1; seen=1; next } /^Group :/ && in_group { in_group=0 } in_group && /^Variables[[:space:]]+7[[:space:]]+0[[:space:]]+7[[:space:]]+100\.00/ { hit=1 } END { exit !(seen && hit) }' $(COV_OUT)/$(URG_REPORT)/grpinfo.txt || \
+	 { echo "CP abort-timing functional coverage is not 7/7; see $(COV_OUT)/$(URG_REPORT)/grpinfo.txt"; exit 1; }
+	@! grep -Eq 'Error-\[UCAPI-' $(COV_OUT)/$(URG_LOG) || \
+	 { echo "URG reported missing/corrupt design database; see $(COV_OUT)/$(URG_LOG)"; exit 1; }
 check-log:
 	@! grep -Eq '^Error:|^Error-' $(LOG) && \
 	 grep -Eq '\[CP/SB\].*launches=' $(LOG) && \

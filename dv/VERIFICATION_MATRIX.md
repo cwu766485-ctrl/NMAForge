@@ -1,5 +1,28 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-19 exact-main CP high-payload replay (`35c7670`):** Clean
+> detached worktree at pushed SHA
+> `35c7670594c85d471bad1e5a975df7f16369c78f`; seven seeds × 24 profiles
+> passed (168/168), each with 32/32 scenarios and UVM severity `0/0/0`.
+> URG passed at 63/63 functional variables, 34/34 crosses, high-payload 1/1,
+> mixed reset 4/4, kind×delay×reset 24/24, abort timing 7/7; assertions
+> 13 success, 0 failure/incomplete, 2 UVM RAL no-attempts; covers 4/4.
+> `ai_smoke` printed `TEST PASS`. Raw CP/writer toggle coverage remains
+> 13.21%/41.81%; no waiver is claimed. Testbench models the compute/fetch/DMA
+> endpoints, so this is CP-block evidence only, not V2/A10/V5 closure. See the
+> [exact-SHA run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN35C7670_V2_CP_HIGH_PAYLOAD.md).
+
+> **2026-10-19 CP seeded-random mixed-interaction follow-up:** Based on
+> `35c7670` with the additive random target in the working tree, 200 seeds
+> (`20262021..20262220`) passed the full CP UVM test: 200/200 logs, 32/32
+> scenario bins each, UVM warning/error/fatal=`0/0/0`. URG passed 63/63
+> variables, 34/34 crosses, mixed reset 4/4, kind×delay×reset 24/24, and
+> abort timing 7/7; 13 assertions succeeded, 0 failed/incomplete, 2 UVM RAL
+> no-attempts; covers 4/4. `ai_smoke` printed `TEST PASS`. Raw CP/writer
+> toggle coverage remains 13.21%/41.81%. This closes only the selected
+> randomized CP mixed error→abort→partial-reset→recovery slice, not V2/A10/V5.
+> See [run record](../docs/verification/A10_DV_RUN_2026-10-19_CP_RANDOM_200.md).
+
 > **2026-10-19 CP high-payload slice (`90757f5b` dirty-worktree evidence):**
 > The seven-seed × 24-profile CP campaign completed 168/168 profiles. Each
 > profile reached `scenario_bins=32/32`, the `CP_HIGH_PAYLOAD` marker, and UVM
