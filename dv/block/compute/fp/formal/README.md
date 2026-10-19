@@ -793,3 +793,14 @@ corrected property proves. This was a checker overconstraint, not an RTL bug.
 The entry lemma does not close the parity-to-writeback lifecycle property or
 V1-FP-04. No product RTL, SPEC, ABI, or timing changed. Exact commands and
 results: [2026-10-19 run record](../../../../../docs/verification/A10_DV_RUN_2026-10-19_FP_PARITY_WRITEBACK_OWNER.md).
+
+### 2026-10-19 high/discovery proof-effort experiments
+
+With the lean control-cone harness, unchanged constraints, and arithmetic
+stubs, both VC Formal `high` and `discovery` effort reached a clean setup and
+non-vacuous activation of `ap_writeback_excludes_pending_parity`, but timed out
+at 300 s without proof or counterexample. The follow-on covers did not run.
+The installed `V-2023.12-SP2` executable rejects the quick-reference's
+`no_decompose_expensive` value; this stopped before property checking and is
+not a design result. Both timeout runs had no residual formal processes.
+V1-FP-04 remains open. See the [effort experiment run record](../../../../../docs/verification/A10_DV_RUN_2026-10-19_FP_PARITY_WRITEBACK_EFFORTS.md).

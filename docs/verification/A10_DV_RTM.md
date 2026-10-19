@@ -1,5 +1,12 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-19 V1-FP-04 proof-effort follow-up:** VC Formal `high` and
+> `discovery` effort both had clean setup and non-vacuous assertion activation,
+> but each timed out after 300 s without proof/counterexample; follow-on covers
+> did not run. `no_decompose_expensive` is rejected by the installed
+> V-2023.12-SP2 executable before checking. V1-FP-04 remains open, not waived.
+> [Run record](A10_DV_RUN_2026-10-19_FP_PARITY_WRITEBACK_EFFORTS.md).
+
 > **2026-10-19 exact-main V2 CP high-payload replay (`35c7670`):** A clean
 > detached worktree at pushed SHA
 > `35c7670594c85d471bad1e5a975df7f16369c78f` passed seven seeds × 24 mixed
