@@ -1,5 +1,12 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-19 exact-main V5 FP result-path mutation replay (`3cdb6cc`):**
+> Detached baseline and restore passed FP dot UVM seeds `712345` and `987654`,
+> each with 484/484 bit-exact scoreboard checks and UVM severity `0/0/0`.
+> A one-bit product-path mutant produced real scoreboard mismatches (`0/424/0`)
+> and failed the Makefile pass gate. This checks FP scoreboard sensitivity only;
+> it does not close V1/A10/V5. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN3CDB6CC_FP_MUTATION.md).
+
 > **2026-10-19 exact-SHA V5 completion-tail mutation replay (`0490a7f`):**
 > CP UVM baseline and restore (`ai_cp_test`, seed `20261019`) passed with
 > 31/31 scenario bins and UVM severity `0/0/0`. The final-word-index mutant

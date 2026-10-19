@@ -4,6 +4,13 @@
 更新：2026-10-19
 顶层：`rtl/top/ai_accel_top.v`
 
+> **2026-10-19 exact-main V5 FP result-path mutation replay (`3cdb6cc`):**
+> The FP UVM baseline and restore passed two seeds, each with 484/484 bit-exact
+> transactions and UVM severity `0/0/0`. A temporary product bit-0 mutation
+> was detected by the real scoreboard (`0/424/0` UVM severity). Logs/VDBs are
+> retained outside Git. This is targeted sensitivity evidence, not full V1,
+> A10, or V5 closure. [Run record](A10_DV_RUN_2026-10-19_MAIN3CDB6CC_FP_MUTATION.md).
+
 > **2026-10-19 exact-SHA V5 completion-tail mutation replay (`0490a7f`):**
 > The CP UVM baseline and restore passed at pushed SHA
 > `0490a7f33534eada08870a36302e4fef200721ec` (seed `20261019`, scenario

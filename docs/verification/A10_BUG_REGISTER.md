@@ -83,7 +83,14 @@ from a fixed commit.
   CP monitor detected early `CPLQ_TAIL`, missing word 3, and failure to accept
   all four words (314 UVM errors); baseline and restore passed. The exact-SHA
   evidence is in the [completion-tail mutation run record](A10_DV_RUN_2026-10-19_MAIN0490A7F_COMPLETION_TAIL_MUTATION.md).
-  These five targeted checks are not a complete mutation campaign. V5-BUG-01 and V5 release
+  A sixth exact-SHA sensitivity replay flipped product bit 0 at the mixed-FP
+  accumulator input. Baseline and restore each passed two FP UVM seeds with
+  484/484 bit-exact transactions per seed and severity `0/0/0`; the mutant was
+  caught on the first seed by result mismatches beginning at transaction 0
+  (`expected=00000000`, `observed=00000001`), with UVM severity `0/424/0`.
+  The original RTL hash was restored and the detached worktree was clean. See
+  [the FP mutation run record](A10_DV_RUN_2026-10-19_MAIN3CDB6CC_FP_MUTATION.md).
+  These six targeted checks are not a complete mutation campaign. V5-BUG-01 and V5 release
   closure remain **OPEN**; the historical RTL defects still lack original
   failure artifacts and immutable fix SHAs. The exact-SHA DMA baseline/mutant/
 restore hashes, commands, logs, and return-code disposition are recorded in

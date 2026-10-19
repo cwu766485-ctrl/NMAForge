@@ -1,5 +1,15 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-19 exact-main V5 FP result-path mutation replay (`3cdb6cc`):** On
+> a detached clean worktree at pushed SHA
+> `3cdb6cc8913d773b1a7d2bb899796ad53437e88f`, the two-seed FP dot UVM baseline
+> and restore passed 484/484 bit-exact checks per seed with severity `0/0/0`.
+> A temporary one-bit product-path mutant was detected by the independent
+> scoreboard (`0/424/0` UVM severity; first result mismatch at transaction 0).
+> The restored RTL SHA-256 matched baseline and the worktree was clean. This
+> adds targeted V5 sensitivity evidence; it does not close V1/A10/V5. Details:
+> [run record](A10_DV_RUN_2026-10-19_MAIN3CDB6CC_FP_MUTATION.md).
+
 > **2026-10-19 exact-current-main V2 CP seed expansion (`3855d51`):** On
 > pushed `main` SHA `3855d513614782b14163e4a59c2be266b1c65998`, a detached clean
 > worktree passed seven seeds × 24 mixed profiles (168/168); each profile had
