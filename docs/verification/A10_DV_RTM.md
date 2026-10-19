@@ -392,6 +392,14 @@ independent numerical-model unit-test result; it does not replace RTL-vs-model
 UVM and leaves V1-FP-04's full-domain parity-to-writeback proof open. See the
 [run record](A10_DV_RUN_2026-10-19_FP_MODEL.md).
 
+### 2026-10-19 current-main Python model replay
+
+At repository SHA `7fd70d871a64a858dcdf424024602c50624cfaa6`, Python 3.12.10
+reran `python -m unittest test_fp_reference -v`: 19/19 passed. The FP model
+directory is byte-identical to the previously tested model source SHA
+`2f7b82d448acf3616081407a8261ad4c359582db`. This remains model-only evidence;
+it does not close V1-FP-04. See the [run record](A10_DV_RUN_2026-10-19_FP_MODEL.md).
+
 ### V1 source identity at current main (`59bee4b`, 2026-10-19)
 
 `git diff --quiet 08f398e43703673eb145cb4a75160f425141109b..59bee4b7b4010bc56a8dea5b2558aa604ff3300a -- rtl/compute/fp dv/block/compute/fp`
