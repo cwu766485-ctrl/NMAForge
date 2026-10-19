@@ -97,6 +97,34 @@ make -C dv/subsystem/top_smoke/sim ai_smoke
 - VCS compile log had no `Warning-`/`Error-` diagnostics; top `ai_smoke`
   printed `TEST PASS`. Detached worktree remained semantically clean.
 
+## Raw DUT coverage audit
+
+The merged URG `modlist.txt` contains 28 module definitions, including UVM and
+testbench infrastructure. Its aggregate line/condition/toggle/FSM/branch/assert
+percentages (`67.27/57.46/42.45/47.42/53.83/93.55`) are therefore not a
+DUT-only closure metric. Selected DUT module results from this V3-only database
+were:
+
+| DUT module | Line | Condition | Toggle | FSM | Branch |
+|---|---:|---:|---:|---:|---:|
+| `ai_spad_arbiter` | 80.73% | 78.69% | 37.79% | n/a | 81.82% |
+| `ai_accel_memory_fabric` | 100.00% | 58.49% | 39.49% | n/a | 100.00% |
+| `ai_axi128_dma` | 81.06% | 60.23% | 37.69% | 57.14% | 70.09% |
+| `ai_banked_cnm_core` | 93.52% | 73.91% | 46.57% | 61.11% | 74.19% |
+| `ai_scratchpad` | 92.45% | 50.74% | 54.92% | n/a | 86.49% |
+
+In this subsystem-only database, arbiter data-selection statements at source
+lines 83, 89, 100, 106, 117, and 123 were not hit. These correspond to valid
+`core-line`/single-banked request forms at particular round-robin cursor
+positions. They are not classified unreachable and no coverage exclusion was
+added. The separate directed arbiter test exercises these request forms, but
+its coverage database was not part of this exact-SHA subsystem merge. A new
+coverage-instrumented standalone run was attempted on 2026-10-19; VCS could not
+connect to the license server before simulation/elaboration evidence was
+produced. Thus these raw bins remain OPEN pending a successful standalone
+coverage run and a reviewed merge/disposition. This does not invalidate the
+previously passing functional regressions or their 100% named scenario groups.
+
 This is reproducible evidence for selected DMA-SPAD-CNM scenarios, not full
 V3 acceptance. AXI RREADY stress does not demonstrate scheduler fairness under
 a scratchpad response-ready stall; `ai_spad_arbiter` has no downstream response-
