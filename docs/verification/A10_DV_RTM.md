@@ -1,5 +1,15 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-19 exact-pushed-main V4 192-seed DDR E2E (`5dd6ed4`):** A clean
+> detached worktree at SHA `5dd6ed49e577f56ff86b9730fc74d3a8167b62cf` passed
+> all 192 mixed-precision DDR E2E seeds. Per-seed markers and UVM severity
+> gates passed 192/192 and 0/0/0; compile diagnostics had no `Warning-` or
+> `Error-` lines. The E2E and four per-transaction AXI URG groups plus all 19
+> checked functional points reached 100%; assertions 20 success / 0 failure /
+> 0 incomplete, 2 UVM RAL internal no-attempts; covers 3/3. This is V4
+> reproducibility evidence only: raw DUT coverage and V5/A10 disposition remain
+> open. [Run record](A10_DV_RUN_2026-10-19_MAIN5DD6ED4_V4_E2E.md).
+
 > **2026-10-19 exact-main selected replay (`649c6c0`):** Clean detached worktree
 > at pushed SHA `649c6c00dd22dc10910f1cc795df25fdff636b32` passed directed FP
 > dot-core and maximum-length parity tests; three FP UVM seeds passed

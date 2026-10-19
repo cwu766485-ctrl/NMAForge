@@ -4,6 +4,15 @@
 更新：2026-10-19
 顶层：`rtl/top/ai_accel_top.v`
 
+> **2026-10-19 exact-pushed-main V4 192-seed DDR E2E (`5dd6ed4`):** On a clean
+> detached worktree at `5dd6ed49e577f56ff86b9730fc74d3a8167b62cf`, all 192
+> mixed-precision DDR E2E seeds passed with zero nonzero UVM severities and no
+> compile `Warning-`/`Error-` lines. The E2E group, four per-transaction AXI
+> groups, and 19 checked functional points were 100%; URG assertions were
+> 20 success / 0 failure / 0 incomplete (two UVM RAL no-attempts), with 3/3
+> covers matched. Raw per-DUT coverage remains workload-specific/partial, so
+> this does not close V4, V5, or A10. [Exact-SHA run record](A10_DV_RUN_2026-10-19_MAIN5DD6ED4_V4_E2E.md).
+
 > **2026-10-19 exact-main V5 FP result-path mutation replay (`3cdb6cc`):**
 > The FP UVM baseline and restore passed two seeds, each with 484/484 bit-exact
 > transactions and UVM severity `0/0/0`. A temporary product bit-0 mutation

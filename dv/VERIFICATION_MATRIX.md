@@ -1,5 +1,13 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-19 exact-pushed-main V4 192-seed DDR E2E (`5dd6ed4`):** A clean
+> detached worktree passed 192/192 seeds with UVM severity 0/0/0 and no compile
+> `Warning-`/`Error-` lines. The E2E covergroup, four per-transaction AXI
+> groups and all 19 checked functional points reached 100%; URG assertions
+> were 20 success, 0 failure/incomplete and 2 UVM RAL no-attempts; covers 3/3.
+> Raw DUT code coverage remains partial and workload-specific; this is not V4,
+> V5, or A10 closure. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN5DD6ED4_V4_E2E.md).
+
 > **2026-10-19 exact pushed-main selected replay (`649c6c0`):** On a clean
 > detached worktree at SHA `649c6c00dd22dc10910f1cc795df25fdff636b32`, FP
 > directed/max-parity tests, three-seed FP UVM (1,452/1,452 bit-exact checks),
