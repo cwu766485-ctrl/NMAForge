@@ -19,6 +19,16 @@ from a fixed commit.
 
 ## V5 closure status
 
+- **2026-10-19 exact-SHA replay:** the A10-BUG-001 RRESP comparator mutation
+  was rerun at `7f346dd7cf75c97de660c8750f5d7833362fc25a` with
+  `dma_read_slverr_test`, seed `20261016`. Baseline and post-restore passed
+  with UVM severity `0/0/0` and seven recovery words matched; the inverted
+  comparator was killed by seven `SB_LOAD_MISSING` errors (UVM `0/9/0`). The
+  restored source hash matches the baseline and the detached worktree is clean.
+  Exact commands, hashes, and artifact paths are in the
+  [replay record](A10_DV_RUN_2026-10-19_MAIN7F346DD_RRESP_MUTATION.md). This
+  is fresh checker-sensitivity evidence, not the missing historical failure
+  artifact/fix-SHA provenance; V5-BUG-01 remains **OPEN**.
 - Five RTL defects, one coverage-collection flow defect, and one CP
   verification-stimulus gap are indexed with symptom, root cause, fix, and
   regression evidence where available. The DMA block instance of the same

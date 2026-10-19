@@ -745,6 +745,15 @@ see the run record for the detailed raw-coverage audit.
 
 ## V5 — Coverage & Regression Closure
 
+> **2026-10-19 exact-SHA DMA RRESP mutation replay:** At source commit
+> `7f346dd7cf75c97de660c8750f5d7833362fc25a`, `dma_read_slverr_test` seed
+> `20261016` passed on the clean baseline and after restore; the comparator
+> inversion mutant was detected by seven `SB_LOAD_MISSING` errors and UVM
+> severity `0/9/0`. Baseline/post-restore severity was `0/0/0`; source
+> SHA-256 matched after restore and the detached worktree was clean. This
+> validates current checker sensitivity but does not recover the original bug
+> artifact or fix SHA. See the [exact-SHA replay record](A10_DV_RUN_2026-10-19_MAIN7F346DD_RRESP_MUTATION.md).
+
 > **2026-10-16 top-level AXI master SVA refresh:** A final 16-seed
 > `uvm_mixed_precision_ddr_e2e_cov_regress` was rerun after adding five
 > DUT-owned AXI master assertions and URG non-vacuity gates. The five AR/AW/W
