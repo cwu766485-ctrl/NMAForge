@@ -1,5 +1,16 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-19 exact-SHA V2 CP replay (`aee74ef`):** Clean detached worktree;
+> 72/72 configured mixed reset/error/abort profiles passed, each with 31/31
+> scenario bins and UVM severity 0/0/0. URG CP functional coverage was 61/61
+> variables + 34/34 crosses; reset words 4/4, mixed reset cross 24/24, abort
+> timing 7/7. Assertions: 13 success, 0 failure/incomplete, two UVM RAL
+> no-attempts; all four covers matched. CP raw condition=`237/252` (94.05%),
+> line/FSM transitions/branch=100%; completion-writer line/condition/FSM
+> transitions/branch=100%. Top `ai_smoke` passed. CP toggle and remaining raw
+> condition outcomes remain open; this is not full V2/A10/V5 closure.
+> [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAINAEE74EF_V2_CP.md).
+
 > **2026-10-19 当前 `main` 的 V1 FP exact-SHA recheck（`1956f36`）：** clean detached worktree 中新跑 8 seeds × 200 vectors；8/8 PASS、每 seed 484/484 bit-exact、UVM severity 0/0/0、peak outstanding reads=2；六个 FP 功能 coverage groups 均 100%。这仅代表 FP block UVM 选定功能切片，不表示 full-domain parity/writeback formal 或 A10 coverage closure。详见[运行记录](../docs/verification/A10_DV_RUN_2026-10-19_MAIN1956F36_V1_FP.md)。
 
 > **2026-10-19 最新 `main` 的 V1 FP directed 切片（`9e497a5`）：** FP dot core 与最大长度 parity 定向测试通过；四种 BF16/FP16 × A/B cutoff 均 drain 65,536 笔 reads 并完成无复位 recovery，Python FP model 19/19。仍不代表 full-domain formal 或 A10/V1–V5 sign-off。[运行记录](../docs/verification/A10_DV_RUN_2026-10-19_MAIN9E497A5_V1_FP_DIRECTED.md)。

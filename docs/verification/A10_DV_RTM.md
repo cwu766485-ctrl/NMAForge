@@ -1,5 +1,17 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-19 exact-SHA V2 CP replay (`aee74ef`):** Clean detached worktree;
+> CP 72/72 mixed reset/error/abort profiles passed, each with scenario bins
+> 31/31 and UVM severity 0/0/0. URG gates: 61/61 variables, 34/34 crosses,
+> reset-word 4/4, mixed-kind×abort-delay×reset cross 24/24, abort timing 7/7;
+> 13 assertions succeeded, 0 failed/incomplete, 2 UVM RAL internals unattempted,
+> and 4/4 covers matched. CP raw line/FSM-transition/branch coverage is
+> 100/100/100%; condition is 237/252 (94.05%). Completion-writer line,
+> condition, FSM-transition, and branch coverage are all 100%. Raw toggle and
+> remaining CP condition outcomes are still open. Exact-source top `ai_smoke`
+> passed. This closes only the exercised CP slice, not all V2/A10/V5. See the
+> [run record](A10_DV_RUN_2026-10-19_MAINAEE74EF_V2_CP.md).
+
 > **2026-10-19 当前 `main` 的 V1 FP block 随机回归（`1956f36`）：** exact-SHA clean worktree 中 8 seeds × 200 random vectors 均通过；每 seed bit-exact scoreboard 为 484/484、UVM warning/error/fatal=`0/0/0`，peak outstanding reads=2；URG 六个 FP 功能覆盖组均 100%。这只关闭所选 block-UVM 可复现性切片；V1-FP-04 parity→writeback formal、DUT residual coverage 及 A10/V1–V5 仍未闭环。见[运行记录](A10_DV_RUN_2026-10-19_MAIN1956F36_V1_FP.md)。
 
 > **2026-10-19 V1 FP directed/max-parity 更新（`9e497a5`）：** 最新 pushed `main` 的 clean detached worktree 通过 `dot-core-test` 与 Python reference tests 19/19。BF16/FP16 × final A/B 四个最大长度 parity cases 均接受/排空 65,536 笔有序 reads、peak outstanding=2、parity 后禁止目的写回，并在不复位下 recovery 成功、写回 `0x3f800000`。这是 directed simulation 与软件模型证据；V1-FP-04 full-domain formal 仍未关闭。见[运行记录](A10_DV_RUN_2026-10-19_MAIN9E497A5_V1_FP_DIRECTED.md)。

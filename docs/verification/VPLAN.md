@@ -4,6 +4,18 @@
 更新：2026-10-19
 顶层：`rtl/top/ai_accel_top.v`
 
+> **2026-10-19 exact-SHA V2 CP replay (`aee74ef`):** On pushed `main`
+> `aee74ef95463705724a34ed48feeeb70dcbb25cc`, a clean detached worktree passed
+> 72/72 Command Processor mixed reset/error/abort profiles (31/31 scenario
+> bins each; UVM severity 0/0/0), the URG functional gates (61/61 variables,
+> 34/34 crosses, reset 4/4, reset cross 24/24, abort timing 7/7), and top
+> `ai_smoke`. CP raw line/FSM-transition/branch=`100/100/100%`, condition
+> `237/252` (94.05%); completion-writer line/condition/FSM-transition/branch
+> all 100%. Thirteen assertions succeeded, no failures/incomplete, two UVM RAL
+> internals had no attempts, and all four cover properties matched. CP raw
+> condition/toggle residuals and broader V2 lifecycle requirements remain
+> open. [Exact-SHA run record](A10_DV_RUN_2026-10-19_MAINAEE74EF_V2_CP.md).
+
 > **2026-10-19 当前 `main` 的 V1 FP 更新（`1956f36`）：** 在精确 SHA 的 clean detached worktree 上新增复跑 8 个 FP dot UVM seeds，每 seed 200 个随机向量；8/8 通过，每 seed scoreboard 484/484、UVM severity `0/0/0`，峰值 outstanding read=2，合并 URG 的 6 个 FP 功能覆盖组均为 100%。该结果补强 V1 block 级随机回归可复现性，但不等于关闭 V1：full-domain parity→writeback formal 仍 inconclusive，DUT code coverage residual 与 V1/V2–V5 总体验收仍 open。详见[运行记录](A10_DV_RUN_2026-10-19_MAIN1956F36_V1_FP.md)及[A10 RTM](A10_DV_RTM.md)。
 
 > **2026-10-19 最新 `main` 的 V1 定向补充（`9e497a5`）：** FP dot directed/max-parity regression 通过：BF16/FP16 × final A/B 四种最大长度 cutoff 均 drain 65,536 笔 ordered reads、peak outstanding=2、抑制目的写回；每种错误后无复位 recovery 均正确写回 `0x3f800000`。独立 Python FP reference model 19/19 通过。该证据补强 V1 directed/model slice，不替代 V1-FP-04 full-domain formal（仍 open）。见[精确 SHA 运行记录](A10_DV_RUN_2026-10-19_MAIN9E497A5_V1_FP_DIRECTED.md)。
