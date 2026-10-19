@@ -1,5 +1,13 @@
 # A10 SPAD Arbiter Coverage Follow-up — 2026-10-19
 
+> **Superseded latest status:** This first coverage increment was extended at
+> exact source commit `a1e87d9652ae84ed98ffcfcacc1a396064544f3b`: control-plane
+> priority and response-alignment tests, two simulation assertions, and a
+> seeded 20-case top regression were added. Latest raw coverage is
+> line/condition/branch/toggle=`100.00/86.89/100.00/10.73%`. See the
+> [priority/response follow-up](A10_DV_RUN_2026-10-19_SPAD_ARB_PRIORITY.md);
+> raw condition coverage and V3/A10/V5 remain open.
+
 ## Scope and source identity
 
 - Repository: NMAForge, branch `main`.
