@@ -10,6 +10,15 @@
 > checker-sensitivity replay—not full V5 mutation closure; the original
 > historical failure artifact/fix SHA remain missing. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN200448C_CNM_MUTATION.md).
 
+> **2026-10-19 exact-SHA V5 CNM protection-tag mutation replay (`6d97d65`):**
+> At pushed source SHA `6d97d6511db78f3a177b72decb715505fdaadc7f`, the
+> DMA/SPAD/CNM subsystem test passed baseline and post-restore with the
+> protection marker, `TEST_DONE`, and UVM severity `0/0/0`. The one-line
+> current-request-tag mutant was detected by 15 UVM errors, including
+> response-tag/status mismatches and unauthorized protected writes. The mutant
+> reached `TEST_DONE`, but UVM severity was `0/15/0`; it is not a pass. This is
+> targeted sensitivity evidence, not full V5 mutation closure. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN6D97D65_CNM_PROTECTION_MUTATION.md).
+
 > **2026-10-19 exact-main V2 CP seed expansion (`3855d51`):** Detached clean
 > replay on pushed SHA `3855d513614782b14163e4a59c2be266b1c65998` passed
 > 168/168 mixed profiles across seven seeds; every run had 31/31 scenario

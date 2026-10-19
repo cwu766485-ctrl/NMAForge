@@ -765,6 +765,17 @@ see the run record for the detailed raw-coverage audit.
 > was clean. This is a fresh sensitivity replay, not recovery of the historical
 > failing artifact/fix SHA. See the [exact-SHA replay record](A10_DV_RUN_2026-10-19_MAIN200448C_CNM_MUTATION.md).
 
+> **2026-10-19 exact-SHA CNM protection-tag mutation replay:** At source
+> commit `6d97d6511db78f3a177b72decb715505fdaadc7f`,
+> `dma_spad_subsystem_test` seed `20261014` passed on baseline and post-restore
+> with `SPAD_CNM_PROTECTION_PASS`, `TEST_DONE`, and UVM severity `0/0/0`.
+> Replacing the registered protection response tag with the current
+> combinational request caused 15 UVM checker errors: response-tag mismatches,
+> OOB source status failures, and unauthorized protected writes/destination
+> corruption. Mutant run completed UVM phases with `0/15/0`; the marker alone
+> does not indicate pass. This is fresh sensitivity evidence, not the historical
+> failing artifact/fix SHA. See the [exact-SHA replay record](A10_DV_RUN_2026-10-19_MAIN6D97D65_CNM_PROTECTION_MUTATION.md).
+
 > **2026-10-16 top-level AXI master SVA refresh:** A final 16-seed
 > `uvm_mixed_precision_ddr_e2e_cov_regress` was rerun after adding five
 > DUT-owned AXI master assertions and URG non-vacuity gates. The five AR/AW/W
