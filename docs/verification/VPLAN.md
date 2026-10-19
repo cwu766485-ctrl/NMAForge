@@ -4,6 +4,16 @@
 更新：2026-10-19
 顶层：`rtl/top/ai_accel_top.v`
 
+> **2026-10-19 exact-pushed-main V2 CP replay (`2f991dd`):** Current CP
+> UVM sources on a clean detached worktree passed 72 mixed error/abort/reset
+> profiles and 200 random seeds, every run with 32/32 scenario bins and UVM
+> severity 0/0/0. URG: `cp_cg` 63/63 variables + 34/34 crosses; reset 4/4,
+> kind×delay×reset 24/24, abort timing 7/7; assertions 13 success, 0
+> failure/incomplete, 2 UVM RAL no-attempts, covers 4/4. CP DUT line/condition/
+> toggle/FSM-transition/branch=`100/94.05/13.21/100/100%`; writer
+> `100/100/41.81/100/100%`. Raw toggle and condition disposition remain open;
+> this does not close V2/V5/A10. [Exact-SHA run record](A10_DV_RUN_2026-10-19_MAIN2F991DD_V2_CP.md).
+
 > **2026-10-19 exact-pushed-main V4 192-seed DDR E2E (`5dd6ed4`):** On a clean
 > detached worktree at `5dd6ed49e577f56ff86b9730fc74d3a8167b62cf`, all 192
 > mixed-precision DDR E2E seeds passed with zero nonzero UVM severities and no

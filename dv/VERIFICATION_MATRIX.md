@@ -1,5 +1,14 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-19 exact-pushed-main V2 Command Processor (`2f991dd`):** Clean
+> detached worktree: 72/72 mixed error/abort/reset profiles plus 200/200
+> random seeds, each with scenario bins 32/32 and UVM severity 0/0/0. URG
+> functional `cp_cg` 63/63 variables + 34/34 crosses; assertions 13 success,
+> 0 failure/incomplete, 2 UVM RAL no-attempts; covers 4/4. CP/writer line/FSM/
+> branch were 100%; raw CP condition 94.05% and CP/writer toggle 13.21%/41.81%
+> remain open. Top `ai_smoke` and 20-case `ai_run` passed. This is selected V2
+> evidence, not V2/V5/A10 closure. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN2F991DD_V2_CP.md).
+
 > **2026-10-19 exact-pushed-main V4 192-seed DDR E2E (`5dd6ed4`):** A clean
 > detached worktree passed 192/192 seeds with UVM severity 0/0/0 and no compile
 > `Warning-`/`Error-` lines. The E2E covergroup, four per-transaction AXI
