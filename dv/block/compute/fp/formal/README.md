@@ -498,6 +498,43 @@ does not establish arithmetic/data correctness. Linux bridge PID audit found
 no VCF child remaining from this target. V1-FP-04 remains OPEN; no product RTL,
 SPEC, or ABI changed.
 
+### 2026-10-19 compositional full-domain writeback proof attempt
+
+Added a lean verification-only wrapper that removes the unrelated ghost
+packed-word tag state and uses constant-output arithmetic stubs. It carries
+the same legal-start, no-abort, watchdog-disabled, outstanding-response,
+response-index, and parity-cutoff assumptions used by the established
+full-domain helper proofs. Two additional assumptions are backed by separate
+non-vacuous proofs in this exact run: pending parity suppresses compute at the
+final element, and a parity response at the final element yields a cutoff no
+later than that element.
+
+The reviewed Rocky Linux bridge task ran these three targets sequentially:
+
+```sh
+make -C dv/block/compute/fp/formal parity-full-pending-last-compute \
+  VCF=vcf OUT=/tmp/nmaforge_a10_fp_parity_writeback_composition_20261019/pending_parity \
+  FORMAL_PROBE_TIMEOUT=180
+make -C dv/block/compute/fp/formal parity-full-parity-cutoff-last-element \
+  VCF=vcf OUT=/tmp/nmaforge_a10_fp_parity_writeback_composition_20261019/same_cycle_cutoff \
+  FORMAL_PROBE_TIMEOUT=90
+make -C dv/block/compute/fp/formal parity-full-writeback-control-lean \
+  VCF=vcf OUT=/tmp/nmaforge_a10_fp_parity_writeback_composition_20261019/writeback \
+  FORMAL_PROBE_TIMEOUT=150
+```
+
+On Rocky Linux 8.10 / VC Formal `V-2023.12-SP2`, both helper assertions proved
+non-vacuously with clean setup. The composed
+`ap_writeback_excludes_pending_parity` assertion also activated non-vacuously
+and had clean setup, but remained in `checking` through 150 seconds (Make exit
+124); it produced neither a proof nor a counterexample. Because the assertion
+query timed out first, the following two covers did not run. A post-run process
+audit found no remaining VCF/VC Static/Simon process. This is inconclusive, not
+PASS; it does not close full-domain parity-to-writeback or V1-FP-04. The
+arithmetic stubs mean no arithmetic/result-data claim is made. Product RTL,
+SPEC, and ABI are unchanged. Full evidence is in the
+[2026-10-19 run record](../../../../../docs/verification/A10_DV_RUN_2026-10-19_FP_PARITY_WRITEBACK_COMPOSITION.md).
+
 ### 2026-10-18 isolated pending-parity final-compute guard
 
 To test a smaller local boundary without repeating the full writeback query,

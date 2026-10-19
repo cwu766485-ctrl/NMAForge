@@ -226,6 +226,88 @@ module ai_fp_core_parity_full_formal_top (
         done && error && (error_code == ERR_PARITY));
 endmodule
 
+// Lean assume-guarantee wrapper for the full-domain parity/writeback check.
+// It preserves the same legal-input and independently-proven boundary
+// assumptions as the lifecycle wrapper but deliberately omits its ghost
+// packed-word tag state, which is not needed by the writeback property.
+module ai_fp_core_parity_full_writeback_lean_top (
+    input logic        clk,
+    input logic        resetn,
+    input logic        start,
+    input logic        format_fp16,
+    input logic        abort,
+    input logic [31:0] src0_base,
+    input logic [31:0] src1_base,
+    input logic [31:0] dst_base,
+    input logic [15:0] length,
+    input logic [31:0] watchdog_limit,
+    input logic        spad_ready,
+    input logic        spad_rsp_valid,
+    input logic [31:0] spad_rdata,
+    input logic        spad_parity_error,
+    input logic        spad_protection_error
+);
+    localparam [3:0] ERR_PARITY = 4'd5;
+    localparam [3:0] ST_WRITE = 4'd6;
+
+    logic        spad_valid;
+    logic        spad_write;
+    logic [31:0] spad_addr;
+    logic [31:0] spad_wdata;
+    logic        busy;
+    logic        done;
+    logic        error;
+    logic [3:0]  error_code;
+    logic [31:0] result;
+    logic [31:0] cycle_count;
+    logic [31:0] element_count;
+
+    ai_mixed_precision_dot_fp32_core dut (.*);
+
+    wire [16:0] words_needed = ({1'b0, dut.length_r} + 17'd1) >> 1;
+
+    assume property (@(posedge clk) !resetn |=> resetn);
+    assume property (@(posedge clk) resetn |=> resetn);
+    assume property (@(posedge clk) disable iff (!resetn)
+        start |-> ((length != 16'd0) &&
+                   (src0_base[1:0] == 2'b00) &&
+                   (src1_base[1:0] == 2'b00) &&
+                   (dst_base[1:0] == 2'b00) &&
+                   (watchdog_limit == 0)));
+    assume property (@(posedge clk) !abort);
+    assume property (@(posedge clk) disable iff (!resetn)
+        spad_rsp_valid |-> (dut.outstanding_reads_r != 0));
+
+    // These assumptions correspond to independently proven helper lemmas:
+    // response-index range, parity-cutoff validity/in-range, pending-parity
+    // suppression at the final element, and same-cycle cutoff ordering there.
+    assume property (@(posedge clk) disable iff (!resetn)
+        dut.response_fire |->
+          ({1'b0, dut.response_word_index_r} < words_needed));
+    assume property (@(posedge clk) disable iff (!resetn)
+        (dut.pending_error_r == ERR_PARITY) |->
+          (dut.memory_error_cutoff_valid_r &&
+           (dut.memory_error_cutoff_r < dut.length_r)));
+    assume property (@(posedge clk) disable iff (!resetn)
+        ((dut.pending_error_r == ERR_PARITY) && dut.last_element) |->
+          !dut.compute_fire);
+    assume property (@(posedge clk) disable iff (!resetn)
+        (dut.response_parity_failure && dut.last_element) |->
+          (dut.memory_error_cutoff_now <= dut.element_index_r));
+
+    ap_writeback_excludes_pending_parity: assert property (
+        @(posedge clk) disable iff (!resetn)
+        (dut.state_r == ST_WRITE) |->
+          (dut.pending_error_r != ERR_PARITY));
+
+    cp_parity_response_at_two_outstanding: cover property (
+        @(posedge clk) disable iff (!resetn)
+        dut.response_parity_failure && (dut.outstanding_reads_r == 2));
+    cp_parity_error_retires: cover property (
+        @(posedge clk) disable iff (!resetn)
+        done && error && (error_code == ERR_PARITY));
+endmodule
+
 // Assume-guarantee refinement for the response cursor. The two assumptions
 // below are proved independently by the full-domain accounting and
 // accepted-count targets under the identical reset/SPAD contract. Keeping
