@@ -4,6 +4,16 @@
 更新：2026-10-19
 顶层：`rtl/top/ai_accel_top.v`
 
+> **2026-10-19 exact-SHA CP payload-forwarding update (`cd50605`):** The
+> focused same-seed check reproduced all 32-bit completion payload fields;
+> exact-SHA 200-seed CP UVM/URG passed 200/200, with scenario markers 32/32
+> and UVM severity `0/0/0` per seed. Result/cycles/elements each had 200
+> unique values; `cp_cg` 63/63 variables + 34/34 crosses, high-payload 1/1,
+> reset 4/4, kind×delay×reset 24/24, abort 7/7; assertions 13/0/0, two RAL
+> no-attempts, covers 4/4. CP/writer raw toggle is now 16.10%/50.43%
+> (coverage stimulus only, not PPA). `ai_smoke` and 20-case `ai_run` passed.
+> Raw condition/toggle and V2/V5/A10 closure remain open. [Run record](A10_DV_RUN_2026-10-19_MAINCD50605_CP_PAYLOAD.md).
+
 > **2026-10-19 exact-pushed-main V2 CP replay (`2f991dd`):** Current CP
 > UVM sources on a clean detached worktree passed 72 mixed error/abort/reset
 > profiles and 200 random seeds, every run with 32/32 scenario bins and UVM

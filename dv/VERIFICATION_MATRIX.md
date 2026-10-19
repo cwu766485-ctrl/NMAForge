@@ -1,5 +1,16 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-19 exact-SHA CP randomized full-width payload replay (`cd50605`):**
+> Clean detached worktree passed focused reproducibility plus 200/200 CP UVM/
+> URG seeds, each with 32/32 scenario markers and UVM severity `0/0/0`.
+> Result/cycles/elements each had 200 unique 32-bit values. `cp_cg` 63/63
+> variables + 34/34 crosses; payload 1/1; reset 4/4; kind×delay×reset 24/24;
+> abort timing 7/7; assertions 13 success, 0 failure/incomplete, two RAL
+> no-attempts; covers 4/4. CP/writer toggle coverage is 16.10%/50.43% versus
+> 13.21%/41.81% under the matched fixed-payload stimulus; this is activity
+> coverage, not PPA. `ai_smoke` and 20-case `ai_run` passed. Raw condition/
+> toggle residuals and V2/V5/A10 closure remain open. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAINCD50605_CP_PAYLOAD.md).
+
 > **2026-10-19 exact-pushed-main V2 Command Processor (`2f991dd`):** Clean
 > detached worktree: 72/72 mixed error/abort/reset profiles plus 200/200
 > random seeds, each with scenario bins 32/32 and UVM severity 0/0/0. URG
