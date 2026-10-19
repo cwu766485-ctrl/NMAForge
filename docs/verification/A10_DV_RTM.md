@@ -383,6 +383,15 @@
 | V1-FP-04 | Condition、branch、FSM 缺口逐项解释或补测 | 三 seed URG DUT module report；VC Formal focused SVA；非法状态注入；连续跨任务 fault stimulus；RTL predicate/ownership review | 分开看状态/转移与 RTL condition/branch；可达 bin 必须有实际激励证据；不加 exclusion | 最新 URG DUT line/condition/FSM/branch=`97.96/97.00/85.71/92.86%`；`state_r` 5/5 states、10/10 transitions；`pending_error_r` 6/6 states、14/18 transitions。B1 protection 的 1-cycle registered-response directed case 使 ready-pair/error-cutoff condition 真实命中，新增 TB cover 三 seed 各命中 2 次。VC Formal 最新 canonical 12/12 assertions + 2/2 covers；长度 1–4 parity harness 在 360 s 下 5/5 non-vacuous assertions + 2/2 depth-5 covers，均 clean setup。三条独立 non-vacuous properties 证明在 `ST_WRITE` 中不会携带 `ERR_ABORT`、`ERR_CONFIG` 或 `ERR_WATCHDOG`，据此 disposition 相应三条 prior-error→`ERR_PROTECTION` transitions。六个未命中 condition、四个未命中 branch outcomes 已在 [FP formal residual map](../../dv/block/compute/fp/formal/README.md) 中逐项关联到 RTL invariant 或有明确前提的 SPAD protocol assumption；该 assumption 约束的非法零-outstanding response bin 不被称为独立 DUT 保证。2026-10-18 `ap_ready_pair_within_returned_frontier` 在 full-domain setup clean、non-vacuous，但 180 s 内未收敛且无反例；same-cycle parity compute 与 writeback 关系仍未证明。另有最大长度 `16'hffff` BF16/FP16 四例定向仿真（final-A/final-B 两种 parity response）：每例 65,536/65,536 读排空、65,534 元素前缀、峰值 outstanding=2、零写回及无复位 recovery PASS；动态结果不代替未收敛的 full-domain formal，且本次 VCS run 有非致命 Make clock-skew warning。无 URG exclusions。**部分完成；full-domain parity transition 仍开放（既有 FP simulation scope fixed-SHA replay 已通过；新增四例为 dirty-worktree 证据）** |
 | V1-FP-05 | 随机种子可复现，合并 coverage 可审计 | 三个独立 `dot-uvm-run` + VCS URG merge | per-seed logs/VDB、URG merged report | exact-main `880c697` replay：三个固定 seed (`712345`, `987654`, `20261015`) 均 484/484 bit-exact，UVM severity 0/0/0；三份 VDB 成功合并，六个选定 FP 功能组 100%，两个 cover 均命中。DUT request-stability SVA 有 22,676 个真实成功，另有一项 UVM component-name check 成功，两项 UVM RAL no-attempt 不计为 DUT 断言。日志与 URG：`/tmp/nmaforge_a10_main880c697_fp_baseline_20261018/uvm/`。**所要求的选定 FP 随机回归和 coverage merge 已在固定 SHA 复现；残余 RTL code coverage 与 full-domain parity 生命周期仍由 V1-FP-04 跟踪** |
 
+### 2026-10-19 reference-model recheck
+
+At tested SHA `2f7b82d448acf3616081407a8261ad4c359582db`, Python 3.12.10
+ran `python -m unittest test_fp_reference -v` from
+`dv/block/compute/fp/model`: 19/19 tests passed. This refreshes only the
+independent numerical-model unit-test result; it does not replace RTL-vs-model
+UVM and leaves V1-FP-04's full-domain parity-to-writeback proof open. See the
+[run record](A10_DV_RUN_2026-10-19_FP_MODEL.md).
+
 > **2026-10-18 exact-SHA bounded parity recheck:** After license connectivity
 > was restored, `parity-bounded` passed on the clean detached source snapshot
 > `98675d08f44856d2023a6840cb117d1f47d8daf2`: clean setup, 5/5 assertions
