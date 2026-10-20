@@ -14,13 +14,13 @@
 ## Current A10 workstream status (2026-10-20)
 
 The table below is the current A10 workstream rollup, anchored to pushed
-`main` at `9f2f6704db84ad4d004c01f5221bffa0d4f3710a`. This is a documentation-
+`main` at `585854b6de85cd92efbbfdf681462d8d73b2c7c0`. This is a documentation-
 only successor to CP replay target `2d8050fcbc4f08accddb92f51dcfd8ec884812c9`;
 the RTL, filelists, and checked-in test sources are unchanged between them.
-The CP clean replay is environment-blocked as described above; the latest
-license preflight, run at `a596ab7` immediately before the documentation-only
-follow-up to `9f2f670`, returned FlexNet 241 / TCP timeout, so no new
-simulation or coverage result was produced. Statuses below are
+The CP clean replay is environment-blocked as described above. A fresh
+read-only license preflight through the reviewed Rocky bridge on 2026-10-20
+again returned FlexNet 241 / TCP timeout for both configured license
+variables, so no new simulation or coverage result was produced. Statuses below are
 conservative summaries, not sign-off declarations. These A10 workstream labels G0 and V1–V5 are specific
 to this RTM and are distinct from the older V1–V5 verification phase taxonomy
 in [VPLAN §4](VPLAN.md#4-阶段计划).
@@ -29,9 +29,9 @@ in [VPLAN §4](VPLAN.md#4-阶段计划).
 |---|---|---|---|
 | G0 — baseline/specification | **Partial / in progress** | [Clean-SHA replay record](A10_DV_CLEAN_SHA_REPLAY_43DBBBC.md); see G0 rows below for ABI and traceability detail. | Reproduce the full required suite on one fixed SHA and complete requirement-to-test/checker/coverage/evidence mapping. |
 | V1 — FP dot block | **Partial / open** | [Exact-main FP replay](A10_DV_RUN_2026-10-19_MAIN1956F36_V1_FP.md); [parity/writeback proof-effort record](A10_DV_RUN_2026-10-19_FP_PARITY_WRITEBACK_EFFORTS.md). | Close or disposition residual DUT coverage and prove the full-domain parity-to-writeback property; proof remains inconclusive. |
-| V2 — command processor/completion | **Partial / open; latest clean replay environment-blocked** | [2026-10-20 clean replay blocker](A10_DV_RUN_2026-10-20_MAIN2D8050F_CP_CLEAN_REPLAY_BLOCKED.md); earlier [exact-main CP replay](A10_DV_RUN_2026-10-19_MAIN2F991DD_V2_CP.md). | Restore VCS license connectivity and rerun the 200-seed campaign at current `main` `9f2f670` (RTL/DV sources are identical to blocked target `2d8050f`); resolve residual raw coverage and broader lifecycle integration. |
+| V2 — command processor/completion | **Partial / open; latest clean replay environment-blocked** | [2026-10-20 clean replay blocker](A10_DV_RUN_2026-10-20_MAIN2D8050F_CP_CLEAN_REPLAY_BLOCKED.md); earlier [exact-main CP replay](A10_DV_RUN_2026-10-19_MAIN2F991DD_V2_CP.md). | Restore VCS license connectivity and rerun the 200-seed campaign at current `main` `585854b` (same product/test sources as blocked target `2d8050f`); resolve residual raw coverage and broader lifecycle integration. |
 | V3 — DMA/SPAD/subsystem | **Partial / open** | [Exact-current-main V3 replay](A10_DV_RUN_2026-10-19_MAIN76CDE0F_V3.md). | Disposition subsystem raw DUT coverage and close broader fairness, fault/abort/reset, and cross-layer combinations. |
-| V4 — DDR end-to-end | **Partial / open** | [Latest exact-pushed-main 192-seed E2E replay and raw-code audit](A10_DV_RUN_2026-10-19_MAIN2B18B5F_V4_E2E.md). | Close the workload-specific DUT raw coverage gaps with the corresponding block/subsystem evidence; broaden reset/backpressure combinations. Selected E2E functional coverage does not close the workstream. |
+| V4 — DDR end-to-end | **Partial / open** | [Latest archived exact-pushed-SHA 192-seed E2E replay and selected raw-DUT snapshot (`5dd6ed4`)](A10_DV_RUN_2026-10-19_MAIN5DD6ED4_V4_E2E.md); [earlier detailed raw-code audit (`2b18b5f`)](A10_DV_RUN_2026-10-19_MAIN2B18B5F_V4_E2E.md). | Close the workload-specific DUT raw coverage gaps with the corresponding block/subsystem evidence; broaden reset/backpressure combinations. Selected E2E functional coverage does not close the workstream. |
 | V5 — coverage/regression closure | **Open** | [FP result-path mutation replay](A10_DV_RUN_2026-10-19_MAIN3CDB6CC_FP_MUTATION.md); see V5 rows below for CP, SVA, and other mutation evidence. | Complete fixed-SHA manifest/replay, project-wide P0 and code/assertion review, residual disposition, and final verification summary. |
 
 > **2026-10-19 exact-SHA CP payload-forwarding update (`cd50605`):** A clean
@@ -148,17 +148,21 @@ in [VPLAN §4](VPLAN.md#4-阶段计划).
 > formal/assume-guarantee disposition (no waiver); raw toggle and broader
 > lifecycle closure remain open. [Run record](A10_DV_RUN_2026-10-19_MAIN3855D513_V2_CP_SEED_EXPANSION.md).
 
-> **2026-10-20 current-main V2 source-identity audit (`9f2f670`):** A
+> **2026-10-20 V2 source-identity scope correction (`585854b`):** A
 > read-only audit reconfirmed the archived `3855d513` campaign's 168/168
 > logs, 31/31 scenario bins per profile, zero UVM warning/error/fatal,
 > functional coverage 61/61 variables + 34/34 crosses, 13 assertion
 > successes with zero failures/incomplete, 4/4 cover matches, and top
-> `ai_smoke` PASS. The source comparison
-> `git diff --name-status 3855d513..9f2f670 -- rtl/control dv/block/control dv/uvm dv/subsystem/top_smoke/sim`
-> listed no changes. Thus the archived CP RTL/DV/smoke inputs are identical
-> to current `main`; this is not a fresh simulation at `9f2f670` and does not
-> close the clean-current-SHA replay gate. The latest license preflight timed
-> out from Rocky, so no VCS rerun was attempted.
+> `ai_smoke` PASS. The earlier source comparison omitted
+> `dv/block/command_processor/uvm`; the corrected comparison
+> `git diff --name-status 3855d513..585854b -- rtl/control dv/block/command_processor/uvm dv/uvm dv/subsystem/top_smoke/sim`
+> finds changes in that block-UVM Makefile and package. Product RTL, shared
+> top UVM, and top-smoke inputs are unchanged, but the CP block test sources
+> are not identical. Therefore the archived 168/168 results remain valid for
+> SHA `3855d513` only and must not be represented as a current-main replay.
+> This is not a fresh simulation at `585854b`; the clean-current-SHA replay
+> remains open. A fresh Rocky license probe returned FlexNet 241 / TCP timeout,
+> so no VCS rerun was attempted.
 
 > **2026-10-19 exact-current-main V3 replay (`76cde0f`):** Clean detached
 > worktree on pushed SHA `76cde0f4f14912226f9eff2b5bcf86222d326ac9` passed the
