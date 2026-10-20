@@ -4,6 +4,18 @@
 更新：2026-10-20
 顶层：`rtl/top/ai_accel_top.v`
 
+> **2026-10-20 exact-pushed-main CP clean replay blocked (`2d8050f`):** A
+> detached clean worktree matched pushed `main` exactly, but the CP 200-seed
+> VCS/URG replay stopped during VCS compile because the Rocky license server
+> was unreachable (`Cannot connect to the license server`, waiting for
+> `VCS-BASE-COMPILE/VCSCompiler_Net`). No seed, VDB, URG merge, or top smoke
+> ran; classify this as an environment-blocked replay, not an RTL failure or
+> pass. A sanitized `lmutil lmstat` probe found both license variables set but
+> ending in TCP timeout/pending (FlexNet 241). The prior working-tree CP
+> campaign remains valid only for its tested
+> tree. Retry the exact-SHA campaign after license connectivity is restored.
+> [Run record](A10_DV_RUN_2026-10-20_MAIN2D8050F_CP_CLEAN_REPLAY_BLOCKED.md).
+
 > **2026-10-20 CP randomized payload queue-wrap replay (`eae3848`):** The CP
 > high-payload UVM scenario now sends four full-width result/cycles/elements
 > records per run through both 4-entry queue wraps. Focused and full CP tests
@@ -269,6 +281,19 @@ Formal 采用分层约束：先 block-level，再 top-level；对 AXI 外部接�
 每天先学习一小节 SPEC（寄存器、descriptor、DMA、CNM 或队列），随后为该章节补一个 UVM sequence、一个 checker/断言和至少一个 coverage 点。当天结束运行快速 smoke，并把可公开复现的命令与结果更新到相应验证 README、测试计划或提交说明；不要把私有聊天记录、机器路径或工具缓存放入公开仓库。
 
 ## 8. 当前起始任务
+
+> **Current A10 status authority (2026-10-20):** For current G0 and A10
+> workstream V1–V5 status, evidence links, and closure gaps, use the
+> [A10 Design Verification RTM](A10_DV_RTM.md#current-a10-workstream-status-2026-10-20).
+> The A10 RTM's G0/V1–V5 labels are A10-specific workstreams. They are distinct
+> from the older V1–V5 verification phases in this document's §4 (UVM,
+> Formal, LEC, DFT, and PPA/implementation), and the two numbering schemes
+> must not be treated as equivalent.
+
+The material below this notice is a **legacy status snapshot**, retained for
+historical context; it is not the current A10 status source. Its metrics and
+run references may be superseded by later RTM entries. The legacy phase plan
+in §4 remains a separate planning taxonomy.
 
 当前 A10 验证按 `docs/verification/A10_DV_RTM.md` 的 V1–V5 状态推进，五阶段均未 overall
 complete。V1 FP dot 有强 block 证据：三 seed 各 200 random，另加 fault/reset/error-transition，

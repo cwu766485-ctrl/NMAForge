@@ -1,5 +1,35 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
+> **2026-10-20 exact-pushed-main CP replay status (`2d8050f`):** A fresh
+> detached clean-worktree replay was attempted for the 200-seed CP campaign.
+> VCS compile could not acquire its license (`Cannot connect to the license
+> server`); therefore this attempt produced no simulation, coverage, URG, or
+> smoke evidence. Follow-up sanitized `lmutil` checks found both license
+> variables set but returning FlexNet 241 / TCP timeout-pending. This does not
+> invalidate earlier passing results on their
+> recorded source trees, but current pushed-main clean replay reproducibility
+> remains **OPEN / environment blocked**. See the
+> [run record](A10_DV_RUN_2026-10-20_MAIN2D8050F_CP_CLEAN_REPLAY_BLOCKED.md).
+
+## Current A10 workstream status (2026-10-20)
+
+The table below is the current A10 workstream rollup, anchored to the exact
+pushed-main replay target `2d8050fcbc4f08accddb92f51dcfd8ec884812c9`. The CP
+clean replay is environment-blocked as described above; it produced no new
+simulation or coverage result. Statuses below are conservative summaries, not
+sign-off declarations. These A10 workstream labels G0 and V1–V5 are specific
+to this RTM and are distinct from the older V1–V5 verification phase taxonomy
+in [VPLAN §4](VPLAN.md#4-阶段计划).
+
+| A10 workstream | Current status | Strongest linked evidence | Next closure gap |
+|---|---|---|---|
+| G0 — baseline/specification | **Partial / in progress** | [Clean-SHA replay record](A10_DV_CLEAN_SHA_REPLAY_43DBBBC.md); see G0 rows below for ABI and traceability detail. | Reproduce the full required suite on one fixed SHA and complete requirement-to-test/checker/coverage/evidence mapping. |
+| V1 — FP dot block | **Partial / open** | [Exact-main FP replay](A10_DV_RUN_2026-10-19_MAIN1956F36_V1_FP.md); [parity/writeback proof-effort record](A10_DV_RUN_2026-10-19_FP_PARITY_WRITEBACK_EFFORTS.md). | Close or disposition residual DUT coverage and prove the full-domain parity-to-writeback property; proof remains inconclusive. |
+| V2 — command processor/completion | **Partial / open; latest clean replay environment-blocked** | [2026-10-20 clean replay blocker](A10_DV_RUN_2026-10-20_MAIN2D8050F_CP_CLEAN_REPLAY_BLOCKED.md); earlier [exact-main CP replay](A10_DV_RUN_2026-10-19_MAIN2F991DD_V2_CP.md). | Restore VCS license connectivity and rerun the 200-seed campaign at `2d8050f`; resolve residual raw coverage and broader lifecycle integration. |
+| V3 — DMA/SPAD/subsystem | **Partial / open** | [Exact-current-main V3 replay](A10_DV_RUN_2026-10-19_MAIN76CDE0F_V3.md). | Disposition subsystem raw DUT coverage and close broader fairness, fault/abort/reset, and cross-layer combinations. |
+| V4 — DDR end-to-end | **Partial / open** | [Exact-pushed-main 192-seed E2E replay](A10_DV_RUN_2026-10-19_MAIN5DD6ED4_V4_E2E.md). | Complete DUT-only coverage/assertion disposition and broader reset/backpressure scenarios; selected E2E coverage does not close the workstream. |
+| V5 — coverage/regression closure | **Open** | [FP result-path mutation replay](A10_DV_RUN_2026-10-19_MAIN3CDB6CC_FP_MUTATION.md); see V5 rows below for CP, SVA, and other mutation evidence. | Complete fixed-SHA manifest/replay, project-wide P0 and code/assertion review, residual disposition, and final verification summary. |
+
 > **2026-10-19 exact-SHA CP payload-forwarding update (`cd50605`):** A clean
 > detached worktree passed the focused seed-reproducibility check and 200/200
 > CP UVM/URG seeds. Each seed reached 32/32 scenario markers with UVM
@@ -519,6 +549,12 @@
 > **V2 completion-writer recovery 最新增量（2026-10-16；覆盖上方 CP coverage 数字）：** 新增 testbench fault-injection scenario `CP_WRITER_FSM_FAULT_RECOVERY`，将 writer 内部状态短暂置为非法编码 `2'b11`，检查 default 分支回到 IDLE、没有 SPAD 写/完成脉冲或 queue-pointer 副作用，再提交一个合法命令确认 completion 恢复。该注入是健壮性测试，不是合法软件事务；未改产品 RTL、SPEC、ABI。focused case 通过；3 seeds × 6 profiles 的 18/18 完整 CP coverage runs 均有 `scenario_bins=29/29`、writer recovery marker 和 UVM warning/error/fatal=`0/0/0`。URG `cp_cg` 为 49/49 variables + 10/10 crosses；DUT-only CP line/condition/toggle/FSM/branch=`100.00/83.67/10.10/100.00/88.06%`，writer=`100.00/100.00/28.74/100.00/100.00%`，writer 分支为 12/12，default 状态 recovery 行已命中。覆盖 gate `make check-coverage` 通过。dirty-worktree 证据不等于 frozen-SHA clean replay，CP condition/toggle residual disposition、跨层 fault×abort×reset 与 V2/V5 仍 open；完整命令和报告见 [运行记录](A10_DV_RUN_2026-10-16.md)。
 
 > **V5-COV-01 CP status supersession:** 该需求行及上方较早快照中 CP 的 `28/28` scenario、`48/48` variables 与 writer `91.67%` branch 数字均为历史结果；以本页顶部的 submit/completion guard update 与 V2-DV-02 当前增量为准。全项目 P0/code/assertion closure 仍未完成。
+
+> **Historical status snapshot:** The status table immediately below is a
+> legacy snapshot. Its metrics and conclusions are superseded by the current
+> [A10 workstream rollup above](#current-a10-workstream-status-2026-10-20)
+> together with the newer dated requirement addenda in this RTM; use those as
+> the current status/evidence source.
 
 ## 状态摘要
 
