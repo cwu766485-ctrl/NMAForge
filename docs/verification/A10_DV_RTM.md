@@ -955,13 +955,15 @@ see the run record for the detailed raw-coverage audit.
 > zero-length / `src0` / `src1` / destination-alignment terms in the core
 > configuration guard, or one `failure_active` / no-pending-error row outside
 > `ST_RUN`. Cross-correlation against the exact-SHA `08f398e` focused FP block
-> run is on identical core RTL: its `busy_start_cg` reached 100%, and its raw
-> condition report does not list the corresponding start/config-guard lines
-> as uncovered. Those are therefore uncovered in this E2E workload but have
-> separate focused-block evidence. The V1 report still has a residual on
-> line 219; its exact relationship to the E2E failure-active row is not yet
-> established, so that item remains OPEN. No unreachable classification,
-> exclusion, or waiver is applied. See the [focused V1 run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v1-fp-replay-at-08f398e).
+> run is on identical core RTL: `busy_start_cg` reached 100%, the start/config
+> guard outcomes are covered, and the raw line-219 condition report covers all
+> four tuples, including `(state_r==ST_RUN, failure_active,
+> pending_error_r==ERR_NONE)=(0,1,1)`, which is the E2E workload's missed row.
+> These are therefore workload-specific E2E raw misses with separate focused-
+> block evidence, not project-wide untested behavior. Other V1 raw coverage
+> residuals remain governed by the V1 run record and formal invariant table.
+> No unreachable classification, exclusion, or waiver is applied. See the
+> [focused V1 run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v1-fp-replay-at-08f398e).
 
 > **2026-10-19 exact-SHA completion-word/tail mutation replay (`0490a7f`):**
 > At pushed `main` SHA `0490a7f33534eada08870a36302e4fef200721ec`, the
