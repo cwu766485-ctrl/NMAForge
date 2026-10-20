@@ -674,6 +674,14 @@ directory is byte-identical to the previously tested model source SHA
 `2f7b82d448acf3616081407a8261ad4c359582db`. This remains model-only evidence;
 it does not close V1-FP-04. See the [run record](A10_DV_RUN_2026-10-19_FP_MODEL.md).
 
+### 2026-10-20 current-main Python model recheck
+
+At repository SHA `31eb3e3f59ab866c69a98b399cb619c6181db844`, Python 3.12.10
+reran `python -m unittest test_fp_reference -v` from
+`dv/block/compute/fp/model`: 19/19 tests passed. This is a fresh current-main
+model-only check; it does not replace RTL/UVM equivalence evidence or close
+the full-domain parity-to-writeback proof (V1-FP-04).
+
 ### V1 source identity at current main (`59bee4b`, 2026-10-19)
 
 `git diff --quiet 08f398e43703673eb145cb4a75160f425141109b..59bee4b7b4010bc56a8dea5b2558aa604ff3300a -- rtl/compute/fp dv/block/compute/fp`
