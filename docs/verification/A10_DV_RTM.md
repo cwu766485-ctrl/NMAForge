@@ -954,9 +954,14 @@ see the run record for the detailed raw-coverage audit.
 > busy-start combination (`state_r != ST_IDLE` with `start=1`), the individual
 > zero-length / `src0` / `src1` / destination-alignment terms in the core
 > configuration guard, or one `failure_active` / no-pending-error row outside
-> `ST_RUN`. These are workload-specific raw-condition misses, not unreachable
-> classifications. They remain open until correlated against focused FP block
-> URG/formal evidence on the same RTL; no exclusion or waiver is applied.
+> `ST_RUN`. Cross-correlation against the exact-SHA `08f398e` focused FP block
+> run is on identical core RTL: its `busy_start_cg` reached 100%, and its raw
+> condition report does not list the corresponding start/config-guard lines
+> as uncovered. Those are therefore uncovered in this E2E workload but have
+> separate focused-block evidence. The V1 report still has a residual on
+> line 219; its exact relationship to the E2E failure-active row is not yet
+> established, so that item remains OPEN. No unreachable classification,
+> exclusion, or waiver is applied. See the [focused V1 run record](A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v1-fp-replay-at-08f398e).
 
 > **2026-10-19 exact-SHA completion-word/tail mutation replay (`0490a7f`):**
 > At pushed `main` SHA `0490a7f33534eada08870a36302e4fef200721ec`, the
