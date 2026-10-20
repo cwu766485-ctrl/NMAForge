@@ -949,6 +949,15 @@ see the run record for the detailed raw-coverage audit.
 > undispositioned project-wide coverage items and are not waived. See the
 > [V4 run-record audit](A10_DV_RUN_2026-10-19_MAIN2B18B5F_V4_E2E.md#2026-10-20-read-only-dut-code-coverage-audit).
 
+> **2026-10-20 V4 FP raw-condition detail:** A read-only preview of the exact
+> `5dd6ed4` E2E URG module report shows this workload did not hit the FP core's
+> busy-start combination (`state_r != ST_IDLE` with `start=1`), the individual
+> zero-length / `src0` / `src1` / destination-alignment terms in the core
+> configuration guard, or one `failure_active` / no-pending-error row outside
+> `ST_RUN`. These are workload-specific raw-condition misses, not unreachable
+> classifications. They remain open until correlated against focused FP block
+> URG/formal evidence on the same RTL; no exclusion or waiver is applied.
+
 > **2026-10-19 exact-SHA completion-word/tail mutation replay (`0490a7f`):**
 > At pushed `main` SHA `0490a7f33534eada08870a36302e4fef200721ec`, the
 > detached CP UVM baseline and restore runs passed (`ai_cp_test`, seed
