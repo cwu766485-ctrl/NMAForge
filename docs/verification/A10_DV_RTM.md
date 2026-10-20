@@ -13,8 +13,10 @@
 
 ## Current A10 workstream status (2026-10-20)
 
-The table below is the current A10 workstream rollup, anchored to pushed
-`main` at `585854b6de85cd92efbbfdf681462d8d73b2c7c0`. This is a documentation-
+The table below is the current A10 workstream rollup. Its latest audited
+design/verification source snapshot is pushed `main` at
+`585854b6de85cd92efbbfdf681462d8d73b2c7c0`; subsequent commits through this
+RTM update are documentation-only. That source snapshot is a documentation-
 only successor to CP replay target `2d8050fcbc4f08accddb92f51dcfd8ec884812c9`;
 the RTL, filelists, and checked-in test sources are unchanged between them.
 The CP clean replay is environment-blocked as described above. A fresh
@@ -29,7 +31,7 @@ in [VPLAN §4](VPLAN.md#4-阶段计划).
 |---|---|---|---|
 | G0 — baseline/specification | **Partial / in progress** | [Clean-SHA replay record](A10_DV_CLEAN_SHA_REPLAY_43DBBBC.md); see G0 rows below for ABI and traceability detail. | Reproduce the full required suite on one fixed SHA and complete requirement-to-test/checker/coverage/evidence mapping. |
 | V1 — FP dot block | **Partial / open** | [Exact-main FP replay](A10_DV_RUN_2026-10-19_MAIN1956F36_V1_FP.md); [parity/writeback proof-effort record](A10_DV_RUN_2026-10-19_FP_PARITY_WRITEBACK_EFFORTS.md). | Close or disposition residual DUT coverage and prove the full-domain parity-to-writeback property; proof remains inconclusive. |
-| V2 — command processor/completion | **Partial / open; latest clean replay environment-blocked** | [2026-10-20 clean replay blocker](A10_DV_RUN_2026-10-20_MAIN2D8050F_CP_CLEAN_REPLAY_BLOCKED.md); earlier [exact-main CP replay](A10_DV_RUN_2026-10-19_MAIN2F991DD_V2_CP.md). | Restore VCS license connectivity and rerun the 200-seed campaign at current `main` `585854b` (same product/test sources as blocked target `2d8050f`); resolve residual raw coverage and broader lifecycle integration. |
+| V2 — command processor/completion | **Partial / open; latest clean replay environment-blocked** | [2026-10-20 clean replay blocker](A10_DV_RUN_2026-10-20_MAIN2D8050F_CP_CLEAN_REPLAY_BLOCKED.md); earlier [exact-main CP replay](A10_DV_RUN_2026-10-19_MAIN2F991DD_V2_CP.md). | Restore VCS license connectivity and rerun the 200-seed campaign on current `main` (design/verification source snapshot `585854b`, followed only by docs updates; same inputs as blocked target `2d8050f`); resolve residual raw coverage and broader lifecycle integration. |
 | V3 — DMA/SPAD/subsystem | **Partial / open** | [Exact-current-main V3 replay](A10_DV_RUN_2026-10-19_MAIN76CDE0F_V3.md). | Disposition subsystem raw DUT coverage and close broader fairness, fault/abort/reset, and cross-layer combinations. |
 | V4 — DDR end-to-end | **Partial / open** | [Latest archived exact-pushed-SHA 192-seed E2E replay and selected raw-DUT snapshot (`5dd6ed4`)](A10_DV_RUN_2026-10-19_MAIN5DD6ED4_V4_E2E.md); [earlier detailed raw-code audit (`2b18b5f`)](A10_DV_RUN_2026-10-19_MAIN2B18B5F_V4_E2E.md). | Close the workload-specific DUT raw coverage gaps with the corresponding block/subsystem evidence; broaden reset/backpressure combinations. Selected E2E functional coverage does not close the workstream. |
 | V5 — coverage/regression closure | **Open** | [FP result-path mutation replay](A10_DV_RUN_2026-10-19_MAIN3CDB6CC_FP_MUTATION.md); see V5 rows below for CP, SVA, and other mutation evidence. | Complete fixed-SHA manifest/replay, project-wide P0 and code/assertion review, residual disposition, and final verification summary. |
