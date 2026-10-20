@@ -13,11 +13,14 @@
 
 ## Current A10 workstream status (2026-10-20)
 
-The table below is the current A10 workstream rollup, anchored to the exact
-pushed-main replay target `2d8050fcbc4f08accddb92f51dcfd8ec884812c9`. The CP
-clean replay is environment-blocked as described above; it produced no new
-simulation or coverage result. Statuses below are conservative summaries, not
-sign-off declarations. These A10 workstream labels G0 and V1–V5 are specific
+The table below is the current A10 workstream rollup, anchored to pushed
+`main` at `a596ab70af20f71a952cbca2826d51db28707975`. This is a documentation-
+only successor to CP replay target `2d8050fcbc4f08accddb92f51dcfd8ec884812c9`;
+the RTL, filelists, and checked-in test sources are unchanged between them.
+The CP clean replay is environment-blocked as described above; a fresh
+license preflight on `a596ab7` again returned FlexNet 241 / server unreachable,
+so no new simulation or coverage result was produced. Statuses below are
+conservative summaries, not sign-off declarations. These A10 workstream labels G0 and V1–V5 are specific
 to this RTM and are distinct from the older V1–V5 verification phase taxonomy
 in [VPLAN §4](VPLAN.md#4-阶段计划).
 
@@ -25,9 +28,9 @@ in [VPLAN §4](VPLAN.md#4-阶段计划).
 |---|---|---|---|
 | G0 — baseline/specification | **Partial / in progress** | [Clean-SHA replay record](A10_DV_CLEAN_SHA_REPLAY_43DBBBC.md); see G0 rows below for ABI and traceability detail. | Reproduce the full required suite on one fixed SHA and complete requirement-to-test/checker/coverage/evidence mapping. |
 | V1 — FP dot block | **Partial / open** | [Exact-main FP replay](A10_DV_RUN_2026-10-19_MAIN1956F36_V1_FP.md); [parity/writeback proof-effort record](A10_DV_RUN_2026-10-19_FP_PARITY_WRITEBACK_EFFORTS.md). | Close or disposition residual DUT coverage and prove the full-domain parity-to-writeback property; proof remains inconclusive. |
-| V2 — command processor/completion | **Partial / open; latest clean replay environment-blocked** | [2026-10-20 clean replay blocker](A10_DV_RUN_2026-10-20_MAIN2D8050F_CP_CLEAN_REPLAY_BLOCKED.md); earlier [exact-main CP replay](A10_DV_RUN_2026-10-19_MAIN2F991DD_V2_CP.md). | Restore VCS license connectivity and rerun the 200-seed campaign at `2d8050f`; resolve residual raw coverage and broader lifecycle integration. |
+| V2 — command processor/completion | **Partial / open; latest clean replay environment-blocked** | [2026-10-20 clean replay blocker](A10_DV_RUN_2026-10-20_MAIN2D8050F_CP_CLEAN_REPLAY_BLOCKED.md); earlier [exact-main CP replay](A10_DV_RUN_2026-10-19_MAIN2F991DD_V2_CP.md). | Restore VCS license connectivity and rerun the 200-seed campaign at current `main` `a596ab7` (RTL/DV sources are identical to blocked target `2d8050f`); resolve residual raw coverage and broader lifecycle integration. |
 | V3 — DMA/SPAD/subsystem | **Partial / open** | [Exact-current-main V3 replay](A10_DV_RUN_2026-10-19_MAIN76CDE0F_V3.md). | Disposition subsystem raw DUT coverage and close broader fairness, fault/abort/reset, and cross-layer combinations. |
-| V4 — DDR end-to-end | **Partial / open** | [Exact-pushed-main 192-seed E2E replay](A10_DV_RUN_2026-10-19_MAIN5DD6ED4_V4_E2E.md). | Complete DUT-only coverage/assertion disposition and broader reset/backpressure scenarios; selected E2E coverage does not close the workstream. |
+| V4 — DDR end-to-end | **Partial / open** | [Latest exact-pushed-main 192-seed E2E replay and raw-code audit](A10_DV_RUN_2026-10-19_MAIN2B18B5F_V4_E2E.md). | Close the workload-specific DUT raw coverage gaps with the corresponding block/subsystem evidence; broaden reset/backpressure combinations. Selected E2E functional coverage does not close the workstream. |
 | V5 — coverage/regression closure | **Open** | [FP result-path mutation replay](A10_DV_RUN_2026-10-19_MAIN3CDB6CC_FP_MUTATION.md); see V5 rows below for CP, SVA, and other mutation evidence. | Complete fixed-SHA manifest/replay, project-wide P0 and code/assertion review, residual disposition, and final verification summary. |
 
 > **2026-10-19 exact-SHA CP payload-forwarding update (`cd50605`):** A clean
@@ -618,6 +621,15 @@ in [VPLAN §4](VPLAN.md#4-阶段计划).
 
 ## V1 — FP Dot Block Closure
 
+> **2026-10-20 current-source identity check:** Comparing `1956f36` with
+> current pushed `main` `a596ab7` over the FP RTL, FP model/block testbench and
+> simulation, top UVM, and top-smoke paths found no changes to those V1 run
+> inputs; the listed changes were confined to FP formal collateral
+> (`formal/Makefile`, `formal/README.md`, and two TCL scripts). Thus the
+> archived eight-seed V1 UVM evidence is source-identical for its RTL/test
+> inputs, but it is not a newly launched full-main replay. Full-domain
+> parity-to-writeback proof remains open.
+
 | Req ID | 需求 | Stimulus / test | Checker / coverage | 当前证据与状态 |
 |---|---|---|---|---|
 | V1-FP-01 | BF16/FP16 特殊值、RNE、subnormal、signed zero、非融合 FP32 顺序累加 bit-exact | FP UVM sequence；独立 Python 向量生成 | `fp_reference.py` + UVM scoreboard；format/class/sign/length bins | 固定 commit `43dbbbc498377d852667c4e3eb5880ecf4aaf8f7` 的 clean replay：Python `unittest` 19/19 PASS；三 seed 各含 430 个 numeric bit-exact checks（BF16/FP16 各 215），合计 1,290，所选 numeric groups 100%。B 侧 NaN、`0×Inf` 与 B 侧 Inf 对称向量包含在该次回放中。当前 main 至 `3b30402` 的 FP RTL/model/simulation 文件与此 SHA 相同。**通过（FP scope clean replay）** |
@@ -882,6 +894,15 @@ see the run record for the detailed raw-coverage audit.
 > **V4 active-compute reset 增量（2026-10-15）：** 对 FP16 K=4 命令在观测到 `dut.fp_busy=1` 后立即断言顶层 reset；释放后核对 `CPLQ_TAIL=0`、目标哨兵 `0xface0701` 未变化，延迟 100 ns 后仍无 completion，再验证新 FP16 command bit-exact 恢复。Focused AXI-stall run、16-run mixed-FP/AXI-gap sweep、192-seed campaign 均通过，所有 UVM warning/error/fatal=0。新增 `cp_reset_inflight_compute` 达到 1/1；该 reset 增量当时的 URG `e2e_cg` 为 42/42 variable bins、16/16 cross bins（100%），报告 `/tmp/nmaforge_mixed_precision_e2e_random_20261015_141427_961815941/urg_merged`，harness log `/tmp/nmaforge_a10_active_reset_random_20261015.log`。whole-design raw dashboard line 48.25%、condition 43.60%、FSM 9.48%、branch 36.39%、assertion 33.33%、score 40.64；top hierarchy line 52.65%、condition 44.74%、branch 40.02%。AXI gap 仍是每 run 固定配置；AXI address-channel backpressure、AXI/DMA outstanding 中 reset 及 V4/V5 overall closure 仍开放。
 
 ## V5 — Coverage & Regression Closure
+
+> **2026-10-20 V4 DUT raw-code coverage disposition input:** A read-only audit
+> of the exact-SHA `2b18b5f` merged V4 URG report now records per-module line,
+> condition, FSM-transition, and branch counts. The mixed-dot core is at
+> 91.16/64.50/70.00/76.79%; CP is 56.80/54.37/46.15/40.30%; DMA is
+> 67.08/46.33/46.43/57.94%. SFU, matrix, CNN, and KV have very low raw counts
+> because this workload does not exercise those compute modes; these remain
+> undispositioned project-wide coverage items and are not waived. See the
+> [V4 run-record audit](A10_DV_RUN_2026-10-19_MAIN2B18B5F_V4_E2E.md#2026-10-20-read-only-dut-code-coverage-audit).
 
 > **2026-10-19 exact-SHA completion-word/tail mutation replay (`0490a7f`):**
 > At pushed `main` SHA `0490a7f33534eada08870a36302e4fef200721ec`, the
