@@ -81,8 +81,8 @@ module ai_conv3x3_linebuffer_core #(
       else if(state_r==IDLE && start && op_mode==OP_DWCONV3X3 && height>=3 && width>=3 && width<=MAX_WIDTH)
         cycle_count<=0;
       else if(busy) cycle_count<=cycle_count+1;
-      if(busy&&watchdog_r!=0&&cycle_count>=watchdog_r) begin error<=1; error_code<=ERR_WATCHDOG; state_r<=ERROR; end
-      else if((spad_error&&busy)||(abort&&busy)) begin error<=1; error_code<=abort?ERR_ABORT:ERR_SPAD; state_r<=ERROR; end
+      if(state_r!=ERROR && busy&&watchdog_r!=0&&cycle_count>=watchdog_r) begin error<=1; error_code<=ERR_WATCHDOG; state_r<=ERROR; end
+      else if(state_r!=ERROR && ((spad_error&&busy)||(abort&&busy))) begin error<=1; error_code<=abort?ERR_ABORT:ERR_SPAD; state_r<=ERROR; end
       else case(state_r)
         IDLE: begin busy<=0; error<=0; error_code<=0; if(start) begin
           if((op_mode!=OP_CONV3X3 && op_mode!=OP_DWCONV3X3)||height<3||width<3||width>MAX_WIDTH) begin error<=1; error_code<=ERR_CONFIG; state_r<=ERROR; end

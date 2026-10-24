@@ -1,6 +1,35 @@
 # NMAForge SpyGlass lint 分类
 
-## 运行记录
+## 最新运行（2026-10-20）
+
+- 环境：Rocky Linux 8.10，SpyGlass V-2023.12-SP1
+- 命令：`cd dv/spyglass && PATH=/opt/Synopsys/spyglass/V-2023.12-SP1/SPYGLASS_HOME/bin:$PATH bash ./run_spyglass_a8.sh lint`
+- 顶层：`ai_accel_top`；lint-only 覆盖 `ai_accel_top.SPAD_WORDS_PER_BANK=256`
+- 结果：exit 0；0 Fatal、0 Error、305 Warning、4 Info；waiver 0
+- 报告：`dv/spyglass/a8_static/ai_accel_top/lint/lint_rtl/spyglass_reports/moresimple.rpt`
+
+此轮在 `ai_command_processor` 的 dependency-timeout 结果参数处显式零扩展
+16-bit event mask，消除了两条 `MatchFuncArgWidth` 告警；对应 CP 单 seed、top
+smoke、20-case seeded top 均通过。剩余 warning 分类如下：
+
+| 规则 | 数量 | 当前处置 |
+|---|---:|---|
+| `STARC05-2.2.3.3 InitValUsingNBA` | 124 | 默认赋值与条件更新共存；需逐块确认优先级和互斥关系，不批量改写。 |
+| `W415a` | 124 | 同一 always 块多次赋值；优先审查 DMA、命令处理和寄存器接口。 |
+| `W287b` | 27 | 实例输出未连接；逐项确认有意丢弃、预留接口或真实漏接。 |
+| `STARC05-2.11.3.1 SepStateNextLogic` | 20 | 单进程 FSM 风格告警；需要编码政策 disposition 或逐项处理。 |
+| `W528` | 8 | 赋值但未读取；确认死逻辑或保留接口后处置。 |
+| `STARC05-1.3.1.3 AsyncResetOtherUse` | 1 | DMA reset 用途分类；结合 reset contract 与 CDC/RDC 结果审查。 |
+| `W240` | 1 | 行为级 Scratchpad `resetn` 未使用；存储阵列不依赖 reset。 |
+
+合计 305。另有 4 条 Info。`MatchFuncArgWidth` 在本轮报告中为 0。
+该运行仍是 lint 工具执行证据，不代表 warning closure 或 sign-off。CDC 同日结果为
+setup 0 error/0 warning/9 infos；结构检查 0 error/1 `Reset_sync04` warning/37 infos，
+unsynchronized crossing 与 convergence 均为 0。RDC 在 clean pushed SHA `ff1e3bb`
+停于 `Ar_resetcross01` 约 3:49 后终止，没有 RDC 结果。完整记录见
+[`A10_DV_RUN_2026-10-20_CURRENT_SNAPSHOT_REFRESH.md`](../../docs/verification/A10_DV_RUN_2026-10-20_CURRENT_SNAPSHOT_REFRESH.md)。
+
+## 历史运行记录（2026-09-17）
 
 - 日期：2026-09-17
 - 环境：Rocky Linux 8.10，SpyGlass V-2023.12-SP1
@@ -15,7 +44,7 @@
 数组而 OOM 的分析配置；产品 RTL 默认 32768 words/bank 未改变，不可将该结果解释为
 完整容量 SRAM 的功能或综合验证。
 
-## warning 分类
+## 历史 warning 分类（2026-09-17）
 
 | 规则 | 数量 | 含义与处置 |
 |---|---:|---|

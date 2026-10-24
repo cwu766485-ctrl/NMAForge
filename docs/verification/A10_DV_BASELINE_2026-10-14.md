@@ -1,5 +1,9 @@
 # A10 DV 基线与当前工作树验证记录 — 2026-10-14
 
+> **历史快照。** 本页保留 2026-10-14/15 的逐项运行证据，不代表当前状态。
+> 最新 A10 workstream 状态见 [A10 RTM](A10_DV_RTM.md)；五个 compute 验证组
+> 状态见 [compute-engine status](COMPUTE_ENGINE_STATUS.md)。
+
 ## 快照与环境
 
 - RTL 冻结基线 commit：`1b4b61fdb84ecbe0f7e57ab9627b2e772216fc7f` (`1b4b61f`)。

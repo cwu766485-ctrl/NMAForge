@@ -174,6 +174,9 @@ module tb_ai_accel_smoke;
     integer seed_dummy;
     integer matrix_line_write_count;
     integer cp_fetch_done_count;
+    reg parallel_engine_overlap_seen = 1'b0;
+    reg parallel_same_engine_overlap_violation = 1'b0;
+    reg [20:0] parallel_engine_pair_seen = 21'd0;
     reg [63:0] last_dma_araddr;
     reg [1023:0] vcd_file;
     reg fp_perf_measure = 1'b0;
@@ -262,9 +265,18 @@ module tb_ai_accel_smoke;
         // Keep an aggregate count across the reset-recovery test near the
         // end of this smoke; initialization is owned by the main initial block.
         if (aresetn && dut.desc_done) begin
-            if (dut.command_processor_u.state_r !== 4'd1)
+            if (dut.legacy_queue_active_r) begin
+                if (dut.command_processor_u.state_r !== 4'd1)
+                    $fatal(1, "legacy descriptor fetch done outside CP ST_FETCH: state=%0d",
+                           dut.command_processor_u.state_r);
+            end else if (dut.parallel_queue_mode_r) begin
+                if (dut.parallel_compute_dispatcher_u.issue_state_r !== 2'd1)
+                    $fatal(1, "parallel descriptor fetch done outside ISSUE_FETCH: state=%0d",
+                           dut.parallel_compute_dispatcher_u.issue_state_r);
+            end else if (dut.command_processor_u.state_r !== 4'd1) begin
                 $fatal(1, "descriptor fetch done outside CP ST_FETCH: state=%0d",
                        dut.command_processor_u.state_r);
+            end
             cp_fetch_done_count <= cp_fetch_done_count + 1;
         end
     end
@@ -275,6 +287,16 @@ module tb_ai_accel_smoke;
         if (aresetn && m_axi_arvalid && m_axi_arready &&
             m_axi_arid != 4'd0)
             last_dma_araddr <= m_axi_araddr;
+    end
+
+    always @(posedge aclk) begin
+        if (aresetn && dut.parallel_queue_mode_r &&
+            dut.engine_busy[3] && dut.engine_busy[4])
+            parallel_engine_overlap_seen <= 1'b1;
+        if (aresetn && dut.parallel_queue_mode_r && dut.launch_valid &&
+            (dut.launch_op >= 8'h32) && (dut.launch_op <= 8'h39) &&
+            dut.engine_busy[4])
+            parallel_same_engine_overlap_violation <= 1'b1;
     end
 
     ai_accel_top dut(
@@ -427,6 +449,8 @@ module tb_ai_accel_smoke;
         // successor command is executing.
         .core_done      (dut.core_done),
         .core_error     (dut.core_error),
+        .engine_busy    (dut.engine_busy),
+        .engine_done    (dut.engine_done),
         .processor_event_valid(dut.processor_event_valid)
     );
 
@@ -765,6 +789,148 @@ module tb_ai_accel_smoke;
             axi_write(SPAD_BASE + base + 32'h34, {head_count, batch_count});
             axi_write(SPAD_BASE + base + 32'h38, {signal_mask, wait_mask});
             axi_write(SPAD_BASE + base + 32'h3c, {clear_mask, 8'd0, 8'd3});
+        end
+    endtask
+
+    task write_parallel_pair_descriptor;
+        input [31:0] desc_base;
+        input integer engine_id;
+        input [15:0] task_id;
+        reg [7:0] op;
+        reg [7:0] version;
+        reg [15:0] m_size;
+        reg [15:0] n_size;
+        reg [15:0] length_or_k;
+        reg [31:0] src0;
+        reg [31:0] src1;
+        reg [31:0] dst;
+        reg [31:0] src0_stride;
+        reg [31:0] src1_stride;
+        reg [15:0] batch_count;
+        reg [15:0] head_count;
+        begin
+            op = OP_VDOT_INT8;
+            version = 8'd3;
+            m_size = 16'd1;
+            n_size = 16'd1;
+            length_or_k = 16'd64;
+            // Read-only inputs are shared by all engines.  Outputs use a
+            // private page so concurrent descriptors cannot conflict.
+            src0 = 32'h0001_0000;
+            src1 = 32'h0001_1000;
+            dst = 32'h0003_0000 + (engine_id * 32'h1000);
+            src0_stride = 32'd0;
+            src1_stride = 32'd0;
+            batch_count = 16'd1;
+            head_count = 16'd1;
+            case (engine_id)
+                0: op = OP_VDOT_INT8;
+                1: begin
+                    op = 8'h51;
+                    version = 8'd7;
+                    m_size = 16'd1;
+                    n_size = 16'd1;
+                    batch_count = 16'd0;
+                    head_count = 16'd0;
+                end
+                2: op = OP_BANKED_VDOT;
+                3: begin
+                    op = OP_TENSOR_GEMM;
+                    m_size = 16'd4;
+                    n_size = 16'd4;
+                    length_or_k = 16'd16;
+                end
+                4: op = OP_GELU_Q8_8;
+                5: begin
+                    op = 8'h16;
+                    version = 8'd5;
+                    m_size = 16'd16;
+                    n_size = 16'd16;
+                    length_or_k = 16'd0;
+                end
+                6: begin
+                    op = 8'h43;
+                    version = 8'd5;
+                    src0_stride = 32'd64;
+                    src1_stride = 32'd16;
+                end
+                default: $fatal(1, "invalid parallel engine id %0d", engine_id);
+            endcase
+
+            write_spad_desc_v3(desc_base, op, task_id, src0, src1, 32'd0, dst,
+                               m_size, n_size, length_or_k, 8'd0, 32'd0,
+                               5'd0, 2'd0, src0_stride, src1_stride, 32'd0,
+                               batch_count, head_count, 16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + desc_base + 32'h3c,
+                      {16'd0, 8'd0, version});
+        end
+    endtask
+
+    task run_parallel_engine_pair;
+        input integer engine_a;
+        input integer engine_b;
+        input integer pair_index;
+        reg overlap_found;
+        integer poll;
+        begin
+            write_parallel_pair_descriptor(32'h7d00, engine_a,
+                                           16'h7000 + (pair_index * 2));
+            write_parallel_pair_descriptor(32'h7d40, engine_b,
+                                           16'h7001 + (pair_index * 2));
+
+            axi_write(REG_CMDQ_BASE_LO, 32'h7d00);
+            axi_write(REG_CMDQ_SIZE, 32'd4);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd2);
+            axi_write(REG_CPLQ_BASE_LO, 32'h7d80);
+            axi_write(REG_CPLQ_SIZE, 32'd4);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+
+            axi_write(REG_DOORBELL, 32'd1);
+            overlap_found = 1'b0;
+            for (poll = 0; poll < 2000 && !overlap_found; poll = poll + 1) begin
+                @(posedge aclk);
+                if (dut.engine_busy[engine_a] && dut.engine_busy[engine_b])
+                    overlap_found = 1'b1;
+            end
+            if (!overlap_found) begin
+                $display("%0t ERROR: engine pair %0d/%0d did not overlap",
+                         $time, engine_a, engine_b);
+                errors = errors + 1;
+            end else begin
+                parallel_engine_pair_seen[pair_index] = 1'b1;
+                $display("%0t PASS: engine pair %0d/%0d overlapped",
+                         $time, engine_a, engine_b);
+                axi_write(REG_ABORT, 32'd1);
+            end
+            wait_cpl_tail(32'd2, "all-engine-pair ordered abort drain");
+            expect_read(SPAD_BASE + 32'h7d80,
+                        {16'd0, (16'h7000 + (pair_index * 2))},
+                        "all-engine-pair completion first task");
+            axi_read(SPAD_BASE + 32'h7d84, rd);
+            if ((rd !== 32'h0000_0001) && (rd !== 32'h0000_0032)) begin
+                $display("%0t ERROR: all-engine-pair first completion status=%08h",
+                         $time, rd);
+                errors = errors + 1;
+            end
+            expect_read(SPAD_BASE + 32'h7d90,
+                        {16'd0, (16'h7001 + (pair_index * 2))},
+                        "all-engine-pair completion second task");
+            axi_read(SPAD_BASE + 32'h7d94, rd);
+            if ((rd !== 32'h0000_0001) && (rd !== 32'h0000_0032)) begin
+                $display("%0t ERROR: all-engine-pair second completion status=%08h",
+                         $time, rd);
+                errors = errors + 1;
+            end
+            if ((dut.engine_busy != 7'd0) || dut.parallel_compute_dispatcher_u.busy) begin
+                $display("%0t ERROR: engine pair %0d/%0d abort returned before drain",
+                         $time, engine_a, engine_b);
+                errors = errors + 1;
+            end
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
         end
     endtask
 
@@ -1396,6 +1562,10 @@ module tb_ai_accel_smoke;
     endtask
 
     initial begin
+        integer pair_engine_a;
+        integer pair_engine_b;
+        integer pair_index;
+        integer pair_setup_i;
         errors = 0;
         seed_arg = 20261014;
         matrix_line_write_count = 0;
@@ -2357,6 +2527,175 @@ module tb_ai_accel_smoke;
         axi_write(REG_CMDQ_SIZE, 32'd0);
         axi_write(REG_CPLQ_SIZE, 32'd0);
         clear_done_irq();
+
+        // Two independent descriptors target different engines and disjoint
+        // SPAD regions. Matrix must stay active while SFU begins; completions
+        // still publish in CMDQ order.
+        axi_write(SPAD_BASE + 32'h7800, 32'd16);
+        axi_write(SPAD_BASE + 32'h7804, -32'sd16);
+        axi_write(SPAD_BASE + 32'h7808, 32'd32);
+        axi_write(SPAD_BASE + 32'h780c, -32'sd32);
+        axi_write(SPAD_BASE + 32'h7860, 32'd16);
+        axi_write(SPAD_BASE + 32'h7864, -32'sd16);
+        axi_write(SPAD_BASE + 32'h7868, 32'd32);
+        axi_write(SPAD_BASE + 32'h786c, -32'sd32);
+        write_spad_desc_v3(32'h7900, OP_TENSOR_GEMM, 16'h0600,
+                           32'h6000, 32'h6100, 32'd0, 32'h30000,
+                           16'd16, 16'd16, 16'd16, 8'd0, 32'd1,
+                           5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                           16'd1, 16'd1, 16'd0, 16'd0, 16'd0);
+        write_spad_desc_v3(32'h7940, OP_GELU_Q8_8, 16'h0601,
+                           32'h7800, 32'd0, 32'd0, 32'h7840,
+                           16'd0, 16'd0, 16'd4, 8'd0, 32'd1,
+                           5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                           16'd1, 16'd1, 16'd0, 16'd0, 16'd0);
+        write_spad_desc_v3(32'h7980, OP_GELU_Q8_8, 16'h0602,
+                           32'h7860, 32'd0, 32'd0, 32'h78a0,
+                           16'd0, 16'd0, 16'd4, 8'd0, 32'd1,
+                           5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                           16'd1, 16'd1, 16'd0, 16'd0, 16'd0);
+        axi_write(REG_CMDQ_BASE_LO, 32'h7900);
+        axi_write(REG_CMDQ_SIZE, 32'd4);
+        axi_write(REG_CMDQ_HEAD, 32'd0);
+        axi_write(REG_CMDQ_TAIL, 32'd3);
+        axi_write(REG_CPLQ_BASE_LO, 32'h7a00);
+        axi_write(REG_CPLQ_SIZE, 32'd4);
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        axi_write(REG_CPLQ_TAIL, 32'd0);
+        parallel_engine_overlap_seen = 1'b0;
+        parallel_same_engine_overlap_violation = 1'b0;
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd3, "parallel matrix + SFU dispatch");
+        if (!parallel_engine_overlap_seen) begin
+            $display("%0t ERROR: matrix and SFU did not overlap", $time);
+            errors = errors + 1;
+        end else begin
+            $display("%0t PASS: matrix and SFU compute overlapped", $time);
+        end
+        expect_read(SPAD_BASE + 32'h7a00, 32'h0000_0600,
+                    "parallel completion FIFO head task");
+        expect_read(SPAD_BASE + 32'h7a04, 32'h0000_0001,
+                    "parallel completion FIFO head status");
+        expect_read(SPAD_BASE + 32'h7a10, 32'h0000_0601,
+                    "parallel completion FIFO next task");
+        expect_read(SPAD_BASE + 32'h7a14, 32'h0000_0001,
+                    "parallel completion FIFO next status");
+        expect_read(SPAD_BASE + 32'h7a1c, 32'd4,
+                    "parallel SFU completion element count");
+        expect_read(SPAD_BASE + 32'h7a20, 32'h0000_0602,
+                    "parallel same-engine queued task");
+        expect_read(SPAD_BASE + 32'h7a24, 32'h0000_0001,
+                    "parallel same-engine queued status");
+        expect_read(SPAD_BASE + 32'h7840, 32'd8,
+                    "parallel SFU response-owner output0");
+        expect_read(SPAD_BASE + 32'h7844, -32'sd8,
+                    "parallel SFU response-owner output1");
+        expect_read(SPAD_BASE + 32'h7848, 32'd17,
+                    "parallel SFU response-owner output2");
+        expect_read(SPAD_BASE + 32'h784c, -32'sd15,
+                    "parallel SFU response-owner output3");
+        expect_read(SPAD_BASE + 32'h78a0, 32'd8,
+                    "parallel second SFU output0");
+        expect_read(SPAD_BASE + 32'h78a4, -32'sd8,
+                    "parallel second SFU output1");
+        expect_read(SPAD_BASE + 32'h78a8, 32'd17,
+                    "parallel second SFU output2");
+        expect_read(SPAD_BASE + 32'h78ac, -32'sd15,
+                    "parallel second SFU output3");
+        if (parallel_same_engine_overlap_violation) begin
+            $display("%0t ERROR: dispatcher launched two SFU tasks concurrently", $time);
+            errors = errors + 1;
+        end else begin
+            $display("%0t PASS: same-engine descriptor waited for SFU availability", $time);
+        end
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CPLQ_SIZE, 32'd0);
+        clear_done_irq();
+
+        // Abort two concurrently active engines. Both accepted tasks must
+        // receive ERR_ABORT, drain their local SPAD traffic, and retire in
+        // the original CMDQ order before the dispatcher goes idle.
+        begin : parallel_compute_abort
+            integer poll;
+            reg overlap_found;
+            axi_write(SPAD_BASE + 32'h8000, 32'd7);
+            axi_write(SPAD_BASE + 32'h8004, -32'sd7);
+            write_spad_desc_v3(32'h7b00, OP_TENSOR_GEMM, 16'h0610,
+                               32'h6000, 32'h6100, 32'd0, 32'h30000,
+                               16'd16, 16'd16, 16'd16, 8'd0, 32'd1,
+                               5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                               16'd1, 16'd1, 16'd0, 16'd0, 16'd0);
+            write_spad_desc_v3(32'h7b40, OP_GELU_Q8_8, 16'h0611,
+                               32'h8000, 32'd0, 32'd0, 32'ha000,
+                               16'd0, 16'd0, 16'd1024, 8'd0, 32'd1,
+                               5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                               16'd1, 16'd1, 16'd0, 16'd0, 16'd0);
+            axi_write(REG_CMDQ_BASE_LO, 32'h7b00);
+            axi_write(REG_CMDQ_SIZE, 32'd4);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd2);
+            axi_write(REG_CPLQ_BASE_LO, 32'h7c00);
+            axi_write(REG_CPLQ_SIZE, 32'd4);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+            parallel_engine_overlap_seen = 1'b0;
+            axi_write(REG_DOORBELL, 32'd1);
+            overlap_found = 1'b0;
+            for (poll = 0; poll < 2000 && !overlap_found; poll = poll + 1) begin
+                @(posedge aclk);
+                if (dut.engine_busy[3] && dut.engine_busy[4])
+                    overlap_found = 1'b1;
+            end
+            if (!overlap_found) begin
+                $display("%0t ERROR: parallel abort did not observe both engines busy", $time);
+                errors = errors + 1;
+            end else begin
+                axi_write(REG_ABORT, 32'd1);
+                wait_cpl_tail(32'd2, "parallel abort ordered drain");
+                expect_read(SPAD_BASE + 32'h7c00, 32'h0000_0610,
+                            "parallel abort first task id");
+                expect_read(SPAD_BASE + 32'h7c04, 32'h0000_0032,
+                            "parallel abort first ERR_ABORT");
+                expect_read(SPAD_BASE + 32'h7c10, 32'h0000_0611,
+                            "parallel abort second task id");
+                expect_read(SPAD_BASE + 32'h7c14, 32'h0000_0032,
+                            "parallel abort second ERR_ABORT");
+                if (dut.engine_busy != 7'd0 || dut.parallel_compute_dispatcher_u.busy) begin
+                    $display("%0t ERROR: parallel abort returned before all engines drained", $time);
+                    errors = errors + 1;
+                end else begin
+                    $display("%0t PASS: parallel abort drained all engines in CMDQ order", $time);
+                end
+            end
+        end
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CPLQ_SIZE, 32'd0);
+        clear_done_irq();
+
+        // Exercise every unordered pair of the seven production compute
+        // engines.  SPAD grants are stalled during pair observation so the
+        // test measures dispatcher overlap, then abort checks ordered drain.
+        for (pair_setup_i = 0; pair_setup_i < 256; pair_setup_i = pair_setup_i + 1)
+            axi_write(SPAD_BASE + 32'h0001_0000 + (pair_setup_i * 4), 32'd0);
+        for (pair_setup_i = 0; pair_setup_i < 16; pair_setup_i = pair_setup_i + 1)
+            axi_write(SPAD_BASE + 32'h0001_1000 + (pair_setup_i * 4), 32'd0);
+        parallel_engine_pair_seen = 21'd0;
+        pair_index = 0;
+        for (pair_engine_a = 0; pair_engine_a < 7; pair_engine_a = pair_engine_a + 1) begin
+            for (pair_engine_b = pair_engine_a + 1;
+                 pair_engine_b < 7; pair_engine_b = pair_engine_b + 1) begin
+                run_parallel_engine_pair(pair_engine_a, pair_engine_b, pair_index);
+                pair_index = pair_index + 1;
+            end
+        end
+        if ((pair_index != 21) || (parallel_engine_pair_seen !== 21'h1fffff)) begin
+            $display("%0t ERROR: parallel engine-pair coverage %0d/21 mask=%h",
+                     $time, $countones(parallel_engine_pair_seen), parallel_engine_pair_seen);
+            errors = errors + 1;
+        end else begin
+            $display("%0t PASS: parallel engine-pair overlap coverage 21/21 mask=%h",
+                     $time, parallel_engine_pair_seen);
+        end
 
         // A4 macro-fusion: one v4 QKV parent expands three v3 matrix
         // primitives, executes them in order and publishes one aggregated

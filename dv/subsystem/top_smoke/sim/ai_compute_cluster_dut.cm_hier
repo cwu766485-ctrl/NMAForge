@@ -1,0 +1,8 @@
+// VCS coverage scopes for production compute RTL. The tile scheduler is owned
+// by the command processor, so include its compute pipeline plus the seven-
+// engine cluster. Include the dispatcher and shared compute-SPAD mux so the
+// engine-pair smoke also measures the newly added parallel fabric.
++tree tb_ai_accel_smoke.dut.compute_cluster_u
++tree tb_ai_accel_smoke.dut.command_processor_u.tile_pipeline_u
++tree tb_ai_accel_smoke.dut.parallel_compute_dispatcher_u
++tree tb_ai_accel_smoke.dut.compute_spad_mux_u

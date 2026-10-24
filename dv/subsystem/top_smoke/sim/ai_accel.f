@@ -17,6 +17,7 @@
 ../../../../rtl/control/descriptor/ai_descriptor_validator.v
 ../../../../rtl/control/queue/ai_ring_pointer_next.v
 ../../../../rtl/control/queue/ai_command_processor.v
+../../../../rtl/control/queue/ai_parallel_compute_dispatcher.v
 ../../../../rtl/compute/cnm/ai_bank_pe.v
 ../../../../rtl/compute/cnm/ai_bank_local_controller.v
 ../../../../rtl/compute/cnm/ai_banked_cnm_core.v
@@ -51,5 +52,6 @@
 ../../../../rtl/top/fabric/memory/ai_accel_memory_fabric.v
 ../../../../rtl/top/fabric/control/ai_accel_control_fabric.v
 ../../../../rtl/top/fabric/compute/ai_accel_compute_cluster.v
+../../../../rtl/top/fabric/compute/ai_compute_spad_mux.v
 ../../../../rtl/top/ai_accel_top.v
 ../env/ai_accel_sva.sv

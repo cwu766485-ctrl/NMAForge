@@ -1,7 +1,8 @@
 
 SEED = $(shell date +%s)
 VCS ?= vcs
-URG ?= urg
+URG ?= /opt/Synopsys/vcs/V-2023.12-SP1/bin/urg
+VCS_HOME ?= /opt/Synopsys/vcs/V-2023.12-SP1
 AI_RANDOM_CASES ?= 4
 AI_SEED ?= 12345
 AI_REF_CASES ?= 1000
@@ -14,7 +15,8 @@ PYTHON ?= $(shell for p in python3.12 python3.11 python3.10 python3.9 python3.8 
 all: ai_smoke
 
 ai_transformer_gen:
-	$(PYTHON) ../../../../sw/tools/cimforge_mapper.py
+	$(PYTHON) ../../../../sw/tools/cimforge_mapper.py \
+		--svh ../fixtures/ai_transformer_workload.svh
 
 ai_comp: ai_transformer_gen
 	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
@@ -27,6 +29,54 @@ ai_run:
 	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=$(AI_RANDOM_CASES) +AI_SEED=$(AI_SEED) +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) -l ai_accel_smoke.log
 
 ai_smoke: ai_comp ai_run
+
+# Integrated compute DUT-only code-coverage capture. The cm_hier scope selects
+# ai_accel_compute_cluster and the command processor's tile-pipeline instance;
+# unrelated control, DMA, and scratchpad modules are excluded. All generated
+# artifacts are isolated under /tmp.
+AI_CLUSTER_COV_RUN ?= /tmp/nmaforge_compute_cluster_dut_cov_$(shell date +%Y%m%d_%H%M%S)
+AI_CLUSTER_COV_METRICS := line+cond+fsm+branch
+AI_CLUSTER_COV_SEEDS ?= 20261021 20261022 20261023 20261024 20261025
+AI_CLUSTER_EXTRA_COV_DBS ?=
+.PHONY: ai_compute_cluster_cov
+ai_compute_cluster_cov:
+	test ! -e "$(AI_CLUSTER_COV_RUN)"
+	mkdir -p "$(AI_CLUSTER_COV_RUN)"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-cm $(AI_CLUSTER_COV_METRICS) \
+		-cm_hier $(CURDIR)/ai_compute_cluster_dut.cm_hier \
+		-cm_dir $(AI_CLUSTER_COV_RUN)/coverage.vdb \
+		-Mdir=$(AI_CLUSTER_COV_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_CLUSTER_COV_RUN)/simv -l $(AI_CLUSTER_COV_RUN)/compile.log
+	@set -e; for ai_cov_seed in $(AI_CLUSTER_COV_SEEDS); do \
+		echo "=== Compute-cluster DUT coverage seed=$$ai_cov_seed ==="; \
+		$(AI_CLUSTER_COV_RUN)/simv +ntb_random_seed=$$ai_cov_seed \
+			+AI_RANDOM_CASES=$(AI_RANDOM_CASES) +AI_SEED=$$ai_cov_seed \
+			+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) \
+			-cm $(AI_CLUSTER_COV_METRICS) -cm_dir $(AI_CLUSTER_COV_RUN)/coverage.vdb \
+			-cm_name compute_seed_$$ai_cov_seed \
+			-l $(AI_CLUSTER_COV_RUN)/run_seed_$$ai_cov_seed.log; \
+		grep -q 'TEST PASS' $(AI_CLUSTER_COV_RUN)/run_seed_$$ai_cov_seed.log; \
+	done
+	VCS_HOME=$(VCS_HOME) $(URG) -full64 -lca \
+		-dir $(AI_CLUSTER_COV_RUN)/coverage.vdb $(AI_CLUSTER_EXTRA_COV_DBS) \
+		-flex_merge modules \
+		-format text -report $(AI_CLUSTER_COV_RUN)/urg \
+		-log $(AI_CLUSTER_COV_RUN)/urg.log
+	! grep -Eq 'UCAPI-DNYL|Design not loaded' $(AI_CLUSTER_COV_RUN)/urg.log
+	test -s $(AI_CLUSTER_COV_RUN)/urg/modinfo.txt
+	VCS_HOME=$(VCS_HOME) $(URG) -full64 -lca \
+		-dir $(AI_CLUSTER_COV_RUN)/coverage.vdb \
+		-format text -report $(AI_CLUSTER_COV_RUN)/top_only_urg \
+		-log $(AI_CLUSTER_COV_RUN)/top_only_urg.log
+	! grep -Eq 'UCAPI-DNYL|Design not loaded' $(AI_CLUSTER_COV_RUN)/top_only_urg.log
+	test -s $(AI_CLUSTER_COV_RUN)/top_only_urg/modinfo.txt
+	echo "COMPUTE_CLUSTER_DUT_COVERAGE_PASS report=$(AI_CLUSTER_COV_RUN)/urg"
 
 # Full top-level mixed-dot throughput sweep.  The single-tile baseline avoids
 # DMA/compute overlap; three-tile runs use the production ping-pong pipeline to
@@ -152,6 +202,10 @@ VCS_FOCUSED = vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ns +d
 
 ai_a6_dma_comp:
 	$(VCS_FOCUSED) -top tb_ai_axi128_dma ../../../../rtl/dma/ai_axi128_dma.v \
+		../../../../rtl/dma/ai_dma_burst_planner.v \
+		../../../../rtl/dma/ai_dma_read_slot_tracker.v \
+		../../../../rtl/dma/ai_dma_write_response_tracker.v \
+		../../../../rtl/dma/ai_dma_spad_transfer_adapter.v \
 		../../../block/dma/tb/tb_ai_axi128_dma.sv -o simv_a6_dma -l ai_a6_dma_comp.log
 
 ai_a6_dma_run: ai_a6_dma_comp
@@ -199,6 +253,31 @@ ai_cnm_a2_gemv_bench_run: ai_cnm_a2_gemv_bench_comp
 	./simv_cnm_a2_gemv_bench -l ai_cnm_a2_gemv_bench_run.log
 
 ai_cnm_a2_gemv_bench: ai_cnm_a2_gemv_bench_run
+
+# Seeded CNM oracle regression. Random signed bytes are generated from the
+# address and seed, then independently reduced by the testbench reference.
+CNM_RANDOM_SEEDS ?= 20261021 20261022 20261023
+CNM_RANDOM_OUT_DIR ?= /tmp/nmaforge_cnm_random_$(shell date +%Y%m%d_%H%M%S)
+ai_cnm_random_compile:
+	mkdir -p $(CNM_RANDOM_OUT_DIR)
+	$(VCS_FOCUSED) -Mdir=$(CNM_RANDOM_OUT_DIR)/csrc -top tb_ai_banked_cnm_random \
+		-cm line+cond+fsm+branch \
+		-cm_hier $(CURDIR)/../../../block/compute/cnm/tb/cnm_random.cm_hier \
+		-cm_dir $(CNM_RANDOM_OUT_DIR)/coverage.vdb \
+		../../../../rtl/compute/cnm/ai_bank_pe.v \
+		../../../../rtl/compute/cnm/ai_bank_local_controller.v \
+		../../../../rtl/compute/cnm/ai_banked_cnm_core.v \
+		../../../block/compute/cnm/tb/tb_ai_banked_cnm_random.sv \
+		-o $(CNM_RANDOM_OUT_DIR)/simv -l $(CNM_RANDOM_OUT_DIR)/compile.log
+
+.PHONY: ai_cnm_random_compile ai_cnm_random_regress
+ai_cnm_random_regress: ai_cnm_random_compile
+	@set -e; for seed in $(CNM_RANDOM_SEEDS); do \
+		$(CNM_RANDOM_OUT_DIR)/simv +SEED=$$seed -cm line+cond+fsm+branch \
+			-cm_dir $(CNM_RANDOM_OUT_DIR)/coverage.vdb -cm_name cnm_seed_$$seed \
+			-l $(CNM_RANDOM_OUT_DIR)/run_seed_$$seed.log; \
+		grep -q "^CNM_RANDOM_PASS cases=10 faults=8 late_faults=1 reset_fault_combo=1 reset_recovery=1 seed=$$seed$$" $(CNM_RANDOM_OUT_DIR)/run_seed_$$seed.log; \
+	done
 
 ai_tensor_a3_gemm_bench_comp:
 	rm -rf simv_tensor_a3_gemm_bench simv_tensor_a3_gemm_bench.daidir

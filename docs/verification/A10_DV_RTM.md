@@ -1,39 +1,45 @@
 # NMAForge A10 Design Verification Requirement Traceability Matrix
 
-> **2026-10-20 exact-pushed-main CP replay status (`2d8050f`):** A fresh
-> detached clean-worktree replay was attempted for the 200-seed CP campaign.
-> VCS compile could not acquire its license (`Cannot connect to the license
-> server`); therefore this attempt produced no simulation, coverage, URG, or
-> smoke evidence. Follow-up sanitized `lmutil` checks found both license
-> variables set but returning FlexNet 241 / TCP timeout-pending. This does not
-> invalidate earlier passing results on their
-> recorded source trees, but current pushed-main clean replay reproducibility
-> remains **OPEN / environment blocked**. See the
-> [run record](A10_DV_RUN_2026-10-20_MAIN2D8050F_CP_CLEAN_REPLAY_BLOCKED.md).
+> **Compute-engine update (2026-10-21):** CNM, CNN/KV, mixed-precision FP,
+> Matrix, and SFU selected regression results and raw DUT coverage are summarized
+> in [compute-engine status](COMPUTE_ENGINE_STATUS.md) and the
+> [2026-10-21 run record](COMPUTE_ENGINE_BLOCK_VALIDATION_2026-10-21.md).
+> This update does not close the broader A10 V1–V5 workstreams below.
+
+> **2026-10-20 earlier CP replay attempt (`2d8050f`; superseded):** The clean
+> detached replay initially stopped at VCS compile because the license server
+> timed out. A later clean replay at pushed SHA `ff1e3bb` completed the 200-seed
+> CP campaign, URG merge/coverage gate, top smoke, and 20-case top run. The
+> current worktree also has a narrow width-warning correction with focused CP,
+> smoke, seeded top, lint, and CDC rechecks. This supersedes the environment
+> blocker as the current V2 reproducibility status; see the
+> [current snapshot refresh](A10_DV_RUN_2026-10-20_CURRENT_SNAPSHOT_REFRESH.md)
+> and retain the [original blocked attempt](A10_DV_RUN_2026-10-20_MAIN2D8050F_CP_CLEAN_REPLAY_BLOCKED.md)
+> as history.
 
 ## Current A10 workstream status (2026-10-20)
 
-The table below is the current A10 workstream rollup. Its latest audited
-design/verification source snapshot is pushed `main` at
-`585854b6de85cd92efbbfdf681462d8d73b2c7c0`; subsequent commits through this
-RTM update are documentation-only. That source snapshot is a documentation-
-only successor to CP replay target `2d8050fcbc4f08accddb92f51dcfd8ec884812c9`;
-the RTL, filelists, and checked-in test sources are unchanged between them.
-The CP clean replay is environment-blocked as described above. A fresh
-read-only license preflight through the reviewed Rocky bridge on 2026-10-20
-again returned FlexNet 241 / TCP timeout for both configured license
-variables, so no new simulation or coverage result was produced. Statuses below are
-conservative summaries, not sign-off declarations. These A10 workstream labels G0 and V1–V5 are specific
-to this RTM and are distinct from the older V1–V5 verification phase taxonomy
-in [VPLAN §4](VPLAN.md#4-阶段计划).
+The table below is the current A10 workstream rollup. The latest pushed
+design/verification source snapshot exercised is
+`ff1e3bb1b8d11b8db637ac6b25f3fb3f973b01bc`; its RTL, filelists, and checked-in
+test sources match the audited `585854b` snapshot. After those clean-SHA runs,
+the current worktree received one behavior-preserving explicit zero-extension
+in the dependency-timeout result path. That change passed a focused full CP
+test, top smoke, 20-case seeded top run, lint, and CDC. The 192-seed E2E run
+below predates that one-line correction; the 200-seed CP campaign has since
+passed again on the corrected worktree, including URG coverage gates. The
+worktree change is uncommitted. Statuses below are
+conservative summaries, not sign-off declarations. These A10 workstream labels
+G0 and V1–V5 are specific to this RTM and distinct from the older V1–V5
+verification phase taxonomy in [VPLAN §4](VPLAN.md#4-阶段计划).
 
 | A10 workstream | Current status | Strongest linked evidence | Next closure gap |
 |---|---|---|---|
-| G0 — baseline/specification | **Partial / in progress** | [Clean-SHA replay record](A10_DV_CLEAN_SHA_REPLAY_43DBBBC.md); see G0 rows below for ABI and traceability detail. | Reproduce the full required suite on one fixed SHA and complete requirement-to-test/checker/coverage/evidence mapping. |
+| G0 — baseline/specification | **Partial / in progress** | [2026-10-20 pushed-SHA refresh](A10_DV_RUN_2026-10-20_CURRENT_SNAPSHOT_REFRESH.md); [clean-SHA replay record](A10_DV_CLEAN_SHA_REPLAY_43DBBBC.md); see G0 rows below for ABI and traceability detail. | Reproduce the full required suite on one fixed SHA and complete requirement-to-test/checker/coverage/evidence mapping. |
 | V1 — FP dot block | **Partial / open** | [Exact-main FP replay](A10_DV_RUN_2026-10-19_MAIN1956F36_V1_FP.md); [parity/writeback proof-effort record](A10_DV_RUN_2026-10-19_FP_PARITY_WRITEBACK_EFFORTS.md). | Close or disposition residual DUT coverage and prove the full-domain parity-to-writeback property; proof remains inconclusive. |
-| V2 — command processor/completion | **Partial / open; latest clean replay environment-blocked** | [2026-10-20 clean replay blocker](A10_DV_RUN_2026-10-20_MAIN2D8050F_CP_CLEAN_REPLAY_BLOCKED.md); earlier [exact-main CP replay](A10_DV_RUN_2026-10-19_MAIN2F991DD_V2_CP.md). | Restore VCS license connectivity and rerun the 200-seed campaign on current `main` (design/verification source snapshot `585854b`, followed only by docs updates; same inputs as blocked target `2d8050f`); resolve residual raw coverage and broader lifecycle integration. |
-| V3 — DMA/SPAD/subsystem | **Partial / open** | [Exact-SHA V3 replay (`76cde0f`), with current-source identity audit](A10_DV_RUN_2026-10-19_MAIN76CDE0F_V3.md). | Disposition subsystem raw DUT coverage and close broader fairness, fault/abort/reset, and cross-layer combinations. |
-| V4 — DDR end-to-end | **Partial / open** | [192-seed E2E replay (`5dd6ed4`) with current-source identity audit and selected raw-DUT snapshot](A10_DV_RUN_2026-10-19_MAIN5DD6ED4_V4_E2E.md); [earlier detailed raw-code audit (`2b18b5f`)](A10_DV_RUN_2026-10-19_MAIN2B18B5F_V4_E2E.md). | Close the workload-specific DUT raw coverage gaps with the corresponding block/subsystem evidence; broaden reset/backpressure combinations. Selected E2E functional coverage does not close the workstream. |
+| V2 — command processor/completion | **Partial / open; 200-seed pushed-SHA and corrected-worktree replays passed** | [2026-10-20 pushed-SHA and post-correction refresh](A10_DV_RUN_2026-10-20_CURRENT_SNAPSHOT_REFRESH.md); [earlier clean replay attempt (superseded blocker)](A10_DV_RUN_2026-10-20_MAIN2D8050F_CP_CLEAN_REPLAY_BLOCKED.md); [exact-main CP replay](A10_DV_RUN_2026-10-19_MAIN2F991DD_V2_CP.md). | Resolve residual raw condition/toggle coverage and broader lifecycle integration; capture the corrected RTL in a fixed pushed SHA for the final manifest. |
+| V3 — DMA/SPAD/subsystem | **Partial / open** | [2026-10-20 pushed-SHA refresh](A10_DV_RUN_2026-10-20_CURRENT_SNAPSHOT_REFRESH.md); [Exact-SHA V3 replay (`76cde0f`), with current-source identity audit](A10_DV_RUN_2026-10-19_MAIN76CDE0F_V3.md). | Disposition subsystem raw DUT coverage and close broader fairness, fault/abort/reset, and cross-layer combinations. |
+| V4 — DDR end-to-end | **Partial / open** | [2026-10-20 pushed-SHA refresh](A10_DV_RUN_2026-10-20_CURRENT_SNAPSHOT_REFRESH.md); [192-seed E2E replay (`5dd6ed4`) with current-source identity audit and selected raw-DUT snapshot](A10_DV_RUN_2026-10-19_MAIN5DD6ED4_V4_E2E.md); [earlier detailed raw-code audit (`2b18b5f`)](A10_DV_RUN_2026-10-19_MAIN2B18B5F_V4_E2E.md). | Close the workload-specific DUT raw coverage gaps with the corresponding block/subsystem evidence; broaden reset/backpressure combinations. Selected E2E functional coverage does not close the workstream. |
 | V5 — coverage/regression closure | **Open** | [FP result-path mutation replay](A10_DV_RUN_2026-10-19_MAIN3CDB6CC_FP_MUTATION.md); see V5 rows below for CP, SVA, and other mutation evidence. | Complete fixed-SHA manifest/replay, project-wide P0 and code/assertion review, residual disposition, and final verification summary. |
 
 > **2026-10-19 exact-SHA CP payload-forwarding update (`cd50605`):** A clean

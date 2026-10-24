@@ -1,7 +1,7 @@
 # NMAForge AXI4 Near-Memory Tensor Accelerator Specification
 
 **RTL release:** A10　**Software ABI:** v7.4　**Version register:** `0x1000_000a`
-**Canonical top:** `rtl/top/ai_accel_top.v`　**Scope date:** 2026-10-17
+**Canonical top:** `rtl/top/ai_accel_top.v`　**Scope date:** 2026-10-23
 
 This file is the English compatibility entry point for the current A10
 specification. The complete, detailed specification is maintained in
@@ -44,6 +44,29 @@ independent data pointer, so byte alignment is checked on the full address via
 the low bits in `src0`, not on `src1` separately. A macro parent emits one
 completion; children execute in order and stop on the first failure.
 
+### Parallel compute CMDQ dispatch
+
+Normal compute descriptors are fetched, validated, and issued in CMDQ order.
+Commands assigned to different compute engines may overlap, with at most one
+in-flight command per engine. If an engine is busy, its next descriptor remains
+queued. `CMDQ_HEAD` advances when a descriptor is issued or rejected. Results
+may finish out of order, but completion entries retire in descriptor order;
+`CPLQ_TAIL` advances only after all four completion words are committed.
+
+Dependency events become visible only when the successful command retires in
+order. Macro descriptors are handed to the serial command processor after
+earlier parallel work drains; direct and tile modes do not overlap CMDQ work.
+The round-robin core-SPAD sub-arbiter preserves request/response ownership but
+does not provide inter-command data dependencies or address locks. Software
+must prevent conflicting SPAD reads and writes among commands that can overlap;
+read-only inputs may be shared if no active command writes those locations.
+
+Writing `ABORT` stops new dispatch, aborts all issued compute engines, and
+drains their accepted SPAD operations. An in-progress descriptor fetch is
+completed and classified as `ERR_ABORT`; an issued task retains the error code
+reported by its engine. When CPLQ is enabled, all records still retire in CMDQ
+order. Descriptors not yet fetched remain in CMDQ for software recovery.
+
 The current top-level UVM slice runs queued FP16 `0x51`, BF16 `0x50`, and INT8
 VDOT `0x10` through DDR-model DMA loads, SPAD compute, shared completion, and
 DMA stores. Six reproducible runs exhaust all six legal operation-order
@@ -70,6 +93,19 @@ QKV/MHA/FFN are descriptor-composed micro-workloads. They are valuable end-to-en
 RTL integration tests, but are not a claim of a production fused Transformer or
 LLM-serving stack.
 
+SFU `GELU_Q8_8` (`0x35`) and `SILU_Q8_8` (`0x37`) consume and produce signed
+32-bit Q8.8 integers. GELU is defined piecewise as `x<=-512: 0`, `x>=512: x`,
+and otherwise `(x*(x+512)) >>> 10`. SiLU is `x<=-768: 0`, `x>=768: x`, and
+otherwise `trunc_toward_zero(x*(x+768)/1536)`. Boundary comparisons use the raw
+Q8.8 integer encoding.
+
+`CAUSAL_SOFTMAX_Q15` (`0x39`) interprets descriptor `aux0` (or the direct-mode
+SFU epsilon input) as a zero-based query-token index. It is inclusive: score
+indices greater than the query index are masked before Q15 Softmax. Thus query
+token zero keeps only score 0 and produces `[32768, 0, ...]`; normalization's
+nonzero epsilon default does not apply to this opcode. Software must provide a
+query index smaller than the vector length.
+
 ## Digital CNM datapath
 
 For banked VDOT/GEMV opcodes `0x20/0x21`, NMAForge implements a digital
@@ -86,7 +122,10 @@ to different banks are not implemented and must not be inferred from this
 interface. This is a digital near-memory architecture, not analog in-SRAM CIM.
 
 Source-of-truth files are `rtl/top/ai_accel_top.v`,
-`rtl/control/axi_lite/ai_accel_regs.v`, `rtl/control/queue/ai_command_processor.v`,
+`rtl/control/axi_lite/ai_accel_regs.v`,
+`rtl/control/queue/ai_parallel_compute_dispatcher.v`,
+`rtl/control/queue/ai_command_processor.v`,
+`rtl/top/fabric/compute/ai_compute_spad_mux.v`,
 `rtl/dma/ai_axi128_dma.v`, `rtl/memory/ai_spad_arbiter.v`,
 `rtl/memory/ai_scratchpad.v`, and `sw/include/cimforge_regs.h`.
 
@@ -127,14 +166,29 @@ Source-of-truth files are `rtl/top/ai_accel_top.v`,
   testbench-only vector/stimulus/formal-harness updates did not change production
   RTL. Exact commands, coverage limits, and dirty-worktree caveat are in the
   [A10 DV RTM](../verification/A10_DV_RTM.md) and
-  [A10 run record](../verification/A10_DV_RUN_2026-10-17.md).
+  [A10 RTM](../verification/A10_DV_RTM.md).
 - A commercial 28 nm TT/0.9 V/25 C, 4.0 ns (250 MHz) pre-layout DC study met
   setup and hold with 32 SRAM macros. This is not post-route ASIC sign-off or proof of
   400 MHz.
+
 - SpyGlass lint has 0 errors; CDC/RDC are structural-only checks blocked from
   advanced sign-off by missing licenses.
 - XCZU15EG has an OOC implementation result and a bring-up runbook, but no
   board-level end-to-end acceptance claim.
+
+## 2026-10-23 compute verification update
+
+The full 16-bit-length `ap_writeback_excludes_pending_parity` property now
+proves non-vacuously on the production FP core and arithmetic RTL, with 2/2
+parity reachability covers. BF16/FP16 length-65535 final-word parity and
+recovery simulations also pass. Cutoff validity separately proves under the
+response-index bound; the unassisted six-property aggregate remains partial
+(3/6), with progress-bound proof open. Normal CMDQ compute dispatch
+now permits one in-flight command per engine while preserving completion
+order; directed Matrix+SFU overlap, same-engine queueing, SPAD response
+ownership, and abort/drain pass. Coverage and formal boundaries are tracked in
+the [compute-engine status page](../verification/COMPUTE_ENGINE_STATUS.md) and
+[interaction run record](../verification/COMPUTE_ENGINE_INTERACTION_FOLLOWUP_2026-10-23.md).
 
 See [TSMC28_SYNTHESIS_REPORT.md](../verification/TSMC28_SYNTHESIS_REPORT.md),
 [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) and [VPLAN.md](../verification/VPLAN.md) for conditions,

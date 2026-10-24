@@ -387,6 +387,62 @@ module ai_accel_top #(
     wire [15:0] launch_batch_count, launch_head_count;
     wire [31:0] launch_instance_count = launch_batch_count * launch_head_count;
     wire [15:0] dependency_events;
+    reg parallel_queue_mode_r, legacy_queue_active_r;
+    wire parallel_scheduler_ready;
+    wire parallel_submit = submit && cmdq_size != 0;
+    wire pd_busy, pd_event_valid, pd_event_error, pd_legacy_handoff;
+    wire cp_submit = pd_legacy_handoff ||
+                     (legacy_queue_active_r ? submit :
+                      ((cmdq_size == 0) ? submit : 1'b0));
+    wire cp_direct_start = direct_start && !parallel_queue_mode_r &&
+                           !legacy_queue_active_r;
+    wire cp_tile_start = tile_start && !parallel_queue_mode_r &&
+                         !legacy_queue_active_r;
+    wire [31:0] cp_cmdq_head, cp_cplq_tail;
+    wire cp_busy, cp_event_valid, cp_event_error;
+    wire [3:0] cp_event_error_code;
+    wire [31:0] cp_event_result, cp_event_cycles, cp_event_elements;
+    wire cp_fetch_start, cp_fetch_external, cp_launch_valid, cp_completion_start;
+    wire [63:0] cp_fetch_base;
+    wire [7:0] cp_launch_op;
+    wire [15:0] cp_launch_task_id;
+    wire [31:0] cp_launch_src0, cp_launch_src1, cp_launch_dst;
+    wire [15:0] cp_launch_length, cp_launch_m, cp_launch_n, cp_launch_k;
+    wire [4:0] cp_launch_shift;
+    wire [1:0] cp_launch_activation;
+    wire [31:0] cp_launch_bias_base;
+    wire cp_launch_bias_enable;
+    wire [7:0] cp_launch_flags;
+    wire [31:0] cp_launch_aux0, cp_launch_src0_stride;
+    wire [31:0] cp_launch_src1_stride, cp_launch_dst_stride;
+    wire [15:0] cp_launch_batch_count, cp_launch_head_count;
+    wire [31:0] cp_completion_base, cp_completion_index;
+    wire [15:0] cp_completion_task_id;
+    wire [3:0] cp_completion_status, cp_completion_error;
+    wire [31:0] cp_completion_result, cp_completion_elements;
+    wire [15:0] cp_dependency_events;
+    wire [3:0] pd_event_error_code;
+    wire [31:0] pd_event_result, pd_event_cycles, pd_event_elements;
+    wire [15:0] pd_dependency_events;
+    wire [31:0] pd_cmdq_head, pd_cplq_tail;
+    wire pd_fetch_start, pd_fetch_external, pd_launch_valid, pd_completion_start;
+    wire [63:0] pd_fetch_base;
+    wire [7:0] pd_launch_op;
+    wire [15:0] pd_launch_task_id;
+    wire [31:0] pd_launch_src0, pd_launch_src1, pd_launch_dst;
+    wire [15:0] pd_launch_length, pd_launch_m, pd_launch_n, pd_launch_k;
+    wire [4:0] pd_launch_shift;
+    wire [1:0] pd_launch_activation;
+    wire [31:0] pd_launch_bias_base;
+    wire pd_launch_bias_enable;
+    wire [7:0] pd_launch_flags;
+    wire [31:0] pd_launch_aux0, pd_launch_src0_stride;
+    wire [31:0] pd_launch_src1_stride, pd_launch_dst_stride;
+    wire [15:0] pd_launch_batch_count, pd_launch_head_count;
+    wire [31:0] pd_completion_base, pd_completion_index;
+    wire [15:0] pd_completion_task_id;
+    wire [3:0] pd_completion_status, pd_completion_error;
+    wire [31:0] pd_completion_result, pd_completion_elements;
     wire        arb_desc_ready, arb_cpl_ready, arb_core_ready, arb_banked_ready, arb_dma_ready;
     wire        arb_rsp_valid, arb_rsp_error, arb_rsp_is_line;
     wire [2:0]  arb_rsp_client;
@@ -454,6 +510,16 @@ module ai_accel_top #(
     wire [31:0] core_result;
     wire [31:0] core_cycle_count;
     wire [31:0] core_element_count;
+    assign parallel_scheduler_ready = !processor_busy && !core_busy &&
+                                      !cpl_busy && !legacy_queue_active_r;
+    wire [6:0]  engine_busy, engine_done, engine_error;
+    wire [27:0] engine_error_code;
+    wire [223:0] engine_result, engine_cycle_count, engine_element_count;
+    wire [6:0] compute_engine_req_valid, compute_engine_req_write;
+    wire [223:0] compute_engine_req_addr, compute_engine_req_wdata;
+    wire [6:0] compute_engine_ready, compute_engine_rsp_valid;
+    wire [6:0] compute_engine_rsp_error, compute_engine_protection_error;
+    wire [223:0] compute_engine_rsp_rdata;
     wire        banked_read_valid;
     wire [31:0] banked_read_addr;
     wire        banked_read_valid_legacy;
@@ -574,18 +640,37 @@ module ai_accel_top #(
         .is_fp16_dot()
     );
     assign conv_linebuffer_op = (launch_op == 8'h16) || (launch_op == 8'h17);
-    assign core_spad_valid = fp_busy ? fp_spad_valid : conv_busy ? conv_spad_valid : kv_busy ? kv_spad_valid : matrix_busy ? matrix_spad_valid :
-                             sfu_busy ? sfu_spad_valid :
-                             banked_busy ? banked_spad_valid : scalar_spad_valid;
-    assign core_spad_write = fp_busy ? fp_spad_write : conv_busy ? conv_spad_write : kv_busy ? kv_spad_write : matrix_busy ? matrix_spad_write :
-                             sfu_busy ? sfu_spad_write :
-                             banked_busy ? banked_spad_write : scalar_spad_write;
-    assign core_spad_addr = fp_busy ? fp_spad_addr : conv_busy ? conv_spad_addr : kv_busy ? kv_spad_addr : matrix_busy ? matrix_spad_addr :
-                            sfu_busy ? sfu_spad_addr :
-                            banked_busy ? banked_spad_addr : scalar_spad_addr;
-    assign core_spad_wdata = fp_busy ? fp_spad_wdata : conv_busy ? conv_spad_wdata : kv_busy ? kv_spad_wdata : matrix_busy ? matrix_spad_wdata :
-                             sfu_busy ? sfu_spad_wdata :
-                             banked_busy ? banked_spad_wdata : scalar_spad_wdata;
+    assign compute_engine_req_valid = {kv_spad_valid, conv_spad_valid,
+                                       sfu_spad_valid, matrix_spad_valid,
+                                       banked_spad_valid, fp_spad_valid,
+                                       scalar_spad_valid};
+    assign compute_engine_req_write = {kv_spad_write, conv_spad_write,
+                                       sfu_spad_write, matrix_spad_write,
+                                       banked_spad_write, fp_spad_write,
+                                       scalar_spad_write};
+    assign compute_engine_req_addr = {kv_spad_addr, conv_spad_addr,
+                                      sfu_spad_addr, matrix_spad_addr,
+                                      banked_spad_addr, fp_spad_addr,
+                                      scalar_spad_addr};
+    assign compute_engine_req_wdata = {kv_spad_wdata, conv_spad_wdata,
+                                       sfu_spad_wdata, matrix_spad_wdata,
+                                       banked_spad_wdata, fp_spad_wdata,
+                                       scalar_spad_wdata};
+    ai_compute_spad_mux compute_spad_mux_u(
+        .clk(aclk), .resetn(aresetn), .req_valid(compute_engine_req_valid),
+        .req_write(compute_engine_req_write), .req_addr(compute_engine_req_addr),
+        .req_wdata(compute_engine_req_wdata), .req_ready(compute_engine_ready),
+        .spad_valid(core_spad_valid), .spad_write(core_spad_write),
+        .spad_addr(core_spad_addr), .spad_wdata(core_spad_wdata),
+        .spad_ready(arb_core_ready),
+        .spad_protection_error(compute_prot_error && (arb_request_client == 3'd2)),
+        .req_protection_error(compute_engine_protection_error),
+        .rsp_valid(core_rsp_valid), .rsp_rdata(arb_rsp_rdata),
+        .rsp_error(core_rsp_error), .rsp_parity_error(core_spad_parity_error),
+        .engine_rsp_valid(compute_engine_rsp_valid),
+        .engine_rsp_rdata(compute_engine_rsp_rdata),
+        .engine_rsp_error(compute_engine_rsp_error)
+    );
     // 0x20/0x21 now use the independent four-lane CNM port.  The legacy
     // common-row banked port remains exclusively for the matrix engine.
     assign banked_read_valid = matrix_busy ? matrix_banked_read_valid : 1'b0;
@@ -946,6 +1031,100 @@ module ai_accel_top #(
         .irq                (irq)
     );
 
+    always @(posedge aclk or negedge aresetn) begin
+        if (!aresetn) begin
+            parallel_queue_mode_r <= 1'b0;
+            legacy_queue_active_r <= 1'b0;
+        end else begin
+            if (submit && cmdq_size != 0 && parallel_scheduler_ready)
+                parallel_queue_mode_r <= 1'b1;
+            if (pd_legacy_handoff) begin
+                parallel_queue_mode_r <= 1'b0;
+                legacy_queue_active_r <= 1'b1;
+            end else if (parallel_queue_mode_r && !pd_busy && !pd_event_valid) begin
+                parallel_queue_mode_r <= 1'b0;
+            end
+            if (legacy_queue_active_r && !cp_busy && !cpl_busy &&
+                cp_cmdq_head == cmdq_tail)
+                legacy_queue_active_r <= 1'b0;
+        end
+    end
+
+    assign fetch_start = legacy_queue_active_r ? cp_fetch_start :
+                         parallel_queue_mode_r ? pd_fetch_start : cp_fetch_start;
+    assign fetch_base = legacy_queue_active_r ? cp_fetch_base :
+                        parallel_queue_mode_r ? pd_fetch_base : cp_fetch_base;
+    assign fetch_external = legacy_queue_active_r ? cp_fetch_external :
+                            parallel_queue_mode_r ? pd_fetch_external : cp_fetch_external;
+    assign launch_valid = legacy_queue_active_r ? cp_launch_valid :
+                          parallel_queue_mode_r ? pd_launch_valid : cp_launch_valid;
+    assign launch_op = legacy_queue_active_r ? cp_launch_op :
+                       parallel_queue_mode_r ? pd_launch_op : cp_launch_op;
+    assign launch_task_id = legacy_queue_active_r ? cp_launch_task_id :
+                            parallel_queue_mode_r ? pd_launch_task_id : cp_launch_task_id;
+    assign launch_src0 = legacy_queue_active_r ? cp_launch_src0 :
+                         parallel_queue_mode_r ? pd_launch_src0 : cp_launch_src0;
+    assign launch_src1 = legacy_queue_active_r ? cp_launch_src1 :
+                         parallel_queue_mode_r ? pd_launch_src1 : cp_launch_src1;
+    assign launch_dst = legacy_queue_active_r ? cp_launch_dst :
+                        parallel_queue_mode_r ? pd_launch_dst : cp_launch_dst;
+    assign launch_length = legacy_queue_active_r ? cp_launch_length :
+                           parallel_queue_mode_r ? pd_launch_length : cp_launch_length;
+    assign launch_m = legacy_queue_active_r ? cp_launch_m :
+                      parallel_queue_mode_r ? pd_launch_m : cp_launch_m;
+    assign launch_n = legacy_queue_active_r ? cp_launch_n :
+                      parallel_queue_mode_r ? pd_launch_n : cp_launch_n;
+    assign launch_k = legacy_queue_active_r ? cp_launch_k :
+                      parallel_queue_mode_r ? pd_launch_k : cp_launch_k;
+    assign launch_shift = legacy_queue_active_r ? cp_launch_shift :
+                          parallel_queue_mode_r ? pd_launch_shift : cp_launch_shift;
+    assign launch_activation = legacy_queue_active_r ? cp_launch_activation :
+                               parallel_queue_mode_r ? pd_launch_activation : cp_launch_activation;
+    assign launch_bias_base = legacy_queue_active_r ? cp_launch_bias_base :
+                              parallel_queue_mode_r ? pd_launch_bias_base : cp_launch_bias_base;
+    assign launch_bias_enable = legacy_queue_active_r ? cp_launch_bias_enable :
+                                parallel_queue_mode_r ? pd_launch_bias_enable : cp_launch_bias_enable;
+    assign launch_flags = legacy_queue_active_r ? cp_launch_flags :
+                         parallel_queue_mode_r ? pd_launch_flags : cp_launch_flags;
+    assign launch_aux0 = legacy_queue_active_r ? cp_launch_aux0 :
+                         parallel_queue_mode_r ? pd_launch_aux0 : cp_launch_aux0;
+    assign launch_src0_stride = legacy_queue_active_r ? cp_launch_src0_stride :
+                                parallel_queue_mode_r ? pd_launch_src0_stride : cp_launch_src0_stride;
+    assign launch_src1_stride = legacy_queue_active_r ? cp_launch_src1_stride :
+                                parallel_queue_mode_r ? pd_launch_src1_stride : cp_launch_src1_stride;
+    assign launch_dst_stride = legacy_queue_active_r ? cp_launch_dst_stride :
+                               parallel_queue_mode_r ? pd_launch_dst_stride : cp_launch_dst_stride;
+    assign launch_batch_count = legacy_queue_active_r ? cp_launch_batch_count :
+                                parallel_queue_mode_r ? pd_launch_batch_count : cp_launch_batch_count;
+    assign launch_head_count = legacy_queue_active_r ? cp_launch_head_count :
+                               parallel_queue_mode_r ? pd_launch_head_count : cp_launch_head_count;
+    assign cpl_start = legacy_queue_active_r ? cp_completion_start :
+                       parallel_queue_mode_r ? pd_completion_start : cp_completion_start;
+    assign cpl_base = legacy_queue_active_r ? cp_completion_base :
+                      parallel_queue_mode_r ? pd_completion_base : cp_completion_base;
+    assign cpl_index = legacy_queue_active_r ? cp_completion_index :
+                       parallel_queue_mode_r ? pd_completion_index : cp_completion_index;
+    assign cpl_task_id = legacy_queue_active_r ? cp_completion_task_id :
+                         parallel_queue_mode_r ? pd_completion_task_id : cp_completion_task_id;
+    assign cpl_status = legacy_queue_active_r ? cp_completion_status :
+                        parallel_queue_mode_r ? pd_completion_status : cp_completion_status;
+    assign cpl_error_code = legacy_queue_active_r ? cp_completion_error :
+                            parallel_queue_mode_r ? pd_completion_error : cp_completion_error;
+    assign cpl_result = legacy_queue_active_r ? cp_completion_result :
+                        parallel_queue_mode_r ? pd_completion_result : cp_completion_result;
+    assign cpl_element_count = legacy_queue_active_r ? cp_completion_elements :
+                               parallel_queue_mode_r ? pd_completion_elements : cp_completion_elements;
+    assign processor_cmdq_head = legacy_queue_active_r ? cp_cmdq_head : pd_cmdq_head;
+    assign processor_cplq_tail = legacy_queue_active_r ? cp_cplq_tail : pd_cplq_tail;
+    assign processor_busy = cp_busy || pd_busy;
+    assign processor_event_valid = pd_event_valid || cp_event_valid;
+    assign processor_event_error = pd_event_valid ? pd_event_error : cp_event_error;
+    assign processor_event_error_code = pd_event_valid ? pd_event_error_code : cp_event_error_code;
+    assign processor_event_result = pd_event_valid ? pd_event_result : cp_event_result;
+    assign processor_event_cycles = pd_event_valid ? pd_event_cycles : cp_event_cycles;
+    assign processor_event_elements = pd_event_valid ? pd_event_elements : cp_event_elements;
+    assign dependency_events = legacy_queue_active_r ? cp_dependency_events : pd_dependency_events;
+
     // completion writer：
     // 一次任务结束后，把 task_id/status/error/result/element_count
     // 写成 4 个 word 的 completion entry，放到 scratchpad 的 completion queue。
@@ -970,16 +1149,25 @@ module ai_accel_top #(
     );
 
     ai_command_processor command_processor_u(
-        .clk(aclk), .resetn(aresetn), .abort(core_abort), .submit(submit), .direct_start(direct_start), .tile_start(tile_start),
-        .cmdq_base(cmdq_base), .cmdq_size(cmdq_size), .cmdq_tail(cmdq_tail), .desc_external(cmdq_external), .cmdq_head_load(cmdq_head_load), .cmdq_head_seed(cmdq_head_seed),
-        .cplq_base(cplq_base_cfg), .cplq_size(cplq_size), .cplq_head(cplq_head), .completion_protected(cpl_protection_error), .cplq_tail_load(cplq_tail_load), .cplq_tail_seed(cplq_tail_seed),
+        .clk(aclk), .resetn(aresetn), .abort(core_abort), .submit(cp_submit), .direct_start(cp_direct_start), .tile_start(cp_tile_start),
+        .cmdq_base(cmdq_base), .cmdq_size((legacy_queue_active_r || pd_legacy_handoff) ? cmdq_size : 32'd0),
+        .cmdq_tail(cmdq_tail), .desc_external(cmdq_external),
+        .cmdq_head_load(cmdq_head_load ||
+                        (parallel_queue_mode_r && !pd_legacy_handoff)),
+        .cmdq_head_seed(cmdq_head_load ? cmdq_head_seed : pd_cmdq_head),
+        .cplq_base(cplq_base_cfg), .cplq_size(cplq_size), .cplq_head(cplq_head), .completion_protected(cpl_protection_error),
+        .cplq_tail_load(cplq_tail_load ||
+                        (parallel_queue_mode_r && !pd_legacy_handoff)),
+        .cplq_tail_seed(cplq_tail_load ? cplq_tail_seed : pd_cplq_tail),
+        .dependency_events_load(parallel_queue_mode_r || pd_legacy_handoff),
+        .dependency_events_seed(pd_dependency_events),
         .cfg_op(op_mode), .cfg_src0(src0_base), .cfg_src1(src1_base), .cfg_dst(dst_base),
         .cfg_length(length), .cfg_m(m_size), .cfg_n(n_size), .cfg_k(k_words), .cfg_shift(scale_shift), .cfg_activation(activation), .cfg_bias_base(bias_base), .cfg_bias_enable(bias_enable),
         .tile_count(tile_count), .tile_ext_input_base(tile_ext_input_base), .tile_ext_output_base(tile_ext_output_base),
         .tile_ext_input_stride(tile_ext_input_stride), .tile_ext_output_stride(tile_ext_output_stride),
         .tile_buffer0_base(tile_buffer0_base), .tile_buffer1_base(tile_buffer1_base), .tile_output_offset(tile_output_offset),
         .tile_input_words(tile_input_words), .tile_output_words(tile_output_words),
-        .fetch_busy(fetch_external ? axi_desc_busy : spad_desc_busy), .fetch_done(desc_done), .fetch_error(desc_error),
+        .fetch_busy(cp_fetch_external ? axi_desc_busy : spad_desc_busy), .fetch_done(desc_done), .fetch_error(desc_error),
         .desc_op(desc_op), .desc_task_id(desc_task_id), .desc_src0(desc_src0_base), .desc_src1(desc_src1_base), .desc_dst(desc_dst_base),
         .desc_length(desc_length), .desc_m(desc_m_size), .desc_n(desc_n_size), .desc_k(desc_k_words), .desc_shift(desc_scale_shift), .desc_activation(desc_activation), .desc_bias_base(desc_bias_base), .desc_bias_enable(desc_bias_enable),
         .desc_flags(desc_flags), .desc_aux0(desc_aux0),
@@ -990,17 +1178,66 @@ module ai_accel_top #(
         .compute_busy(core_busy), .compute_done(core_done), .compute_error(core_error), .compute_error_code(core_error_code),
         .compute_result(core_result), .compute_cycles(core_cycle_count), .compute_elements(core_element_count),
         .dma_busy(dma_busy), .dma_done(dma_done), .dma_error(dma_error), .dma_error_code(dma_error_code),
-        .completion_busy(cpl_busy), .completion_done(cpl_done), .fetch_start(fetch_start), .fetch_base(fetch_base), .fetch_external(fetch_external),
-        .launch_valid(launch_valid), .launch_op(launch_op), .launch_task_id(launch_task_id), .launch_src0(launch_src0), .launch_src1(launch_src1), .launch_dst(launch_dst),
-        .launch_length(launch_length), .launch_m(launch_m), .launch_n(launch_n), .launch_k(launch_k), .launch_shift(launch_shift), .launch_activation(launch_activation), .launch_bias_base(launch_bias_base), .launch_bias_enable(launch_bias_enable),
-        .launch_flags(launch_flags), .launch_aux0(launch_aux0),
-        .launch_src0_stride(launch_src0_stride), .launch_src1_stride(launch_src1_stride), .launch_dst_stride(launch_dst_stride),
-        .launch_batch_count(launch_batch_count), .launch_head_count(launch_head_count),
+        .completion_busy(cpl_busy), .completion_done(cpl_done), .fetch_start(cp_fetch_start), .fetch_base(cp_fetch_base), .fetch_external(cp_fetch_external),
+        .launch_valid(cp_launch_valid), .launch_op(cp_launch_op), .launch_task_id(cp_launch_task_id), .launch_src0(cp_launch_src0), .launch_src1(cp_launch_src1), .launch_dst(cp_launch_dst),
+        .launch_length(cp_launch_length), .launch_m(cp_launch_m), .launch_n(cp_launch_n), .launch_k(cp_launch_k), .launch_shift(cp_launch_shift), .launch_activation(cp_launch_activation), .launch_bias_base(cp_launch_bias_base), .launch_bias_enable(cp_launch_bias_enable),
+        .launch_flags(cp_launch_flags), .launch_aux0(cp_launch_aux0),
+        .launch_src0_stride(cp_launch_src0_stride), .launch_src1_stride(cp_launch_src1_stride), .launch_dst_stride(cp_launch_dst_stride),
+        .launch_batch_count(cp_launch_batch_count), .launch_head_count(cp_launch_head_count),
         .tile_dma_start(tile_dma_start), .tile_dma_store(tile_dma_store), .tile_dma_ext_addr(tile_dma_ext_addr), .tile_dma_spad_addr(tile_dma_spad_addr), .tile_dma_length_words(tile_dma_length_words), .tile_active(tile_active),
         .tile_perf_total(tile_perf_total), .tile_perf_dma(tile_perf_dma), .tile_perf_compute(tile_perf_compute), .tile_perf_overlap(tile_perf_overlap), .tile_perf_stall(tile_perf_stall), .tile_completed(tile_completed),
-        .completion_start(cpl_start), .completion_base(cpl_base), .completion_index(cpl_index), .completion_task_id(cpl_task_id), .completion_status(cpl_status), .completion_error(cpl_error_code), .completion_result(cpl_result), .completion_elements(cpl_element_count),
-        .cmdq_head(processor_cmdq_head), .cplq_tail(processor_cplq_tail), .busy(processor_busy), .event_valid(processor_event_valid), .event_error(processor_event_error), .event_error_code(processor_event_error_code), .event_result(processor_event_result), .event_cycles(processor_event_cycles), .event_elements(processor_event_elements),
-        .dependency_events(dependency_events)
+        .completion_start(cp_completion_start), .completion_base(cp_completion_base), .completion_index(cp_completion_index), .completion_task_id(cp_completion_task_id), .completion_status(cp_completion_status), .completion_error(cp_completion_error), .completion_result(cp_completion_result), .completion_elements(cp_completion_elements),
+        .cmdq_head(cp_cmdq_head), .cplq_tail(cp_cplq_tail), .busy(cp_busy), .event_valid(cp_event_valid), .event_error(cp_event_error), .event_error_code(cp_event_error_code), .event_result(cp_event_result), .event_cycles(cp_event_cycles), .event_elements(cp_event_elements),
+        .dependency_events(cp_dependency_events)
+    );
+
+    ai_parallel_compute_dispatcher parallel_compute_dispatcher_u(
+        .clk(aclk), .resetn(aresetn), .submit(parallel_submit), .abort(core_abort),
+        .scheduler_ready(parallel_scheduler_ready), .cmdq_base(cmdq_base),
+        .cmdq_size(cmdq_size), .cmdq_tail(cmdq_tail), .desc_external(cmdq_external),
+        .cmdq_head_load(cmdq_head_load), .cmdq_head_seed(cmdq_head_seed),
+        .cplq_tail_load(cplq_tail_load), .cplq_tail_seed(cplq_tail_seed),
+        .cplq_base(cplq_base_cfg), .cplq_size(cplq_size), .cplq_head(cplq_head),
+        .completion_protected(cpl_protection_error),
+        .sync_legacy_state(!parallel_queue_mode_r && !legacy_queue_active_r),
+        .legacy_cmdq_head(cp_cmdq_head), .legacy_cplq_tail(cp_cplq_tail),
+        .legacy_dependency_events(cp_dependency_events),
+        .fetch_done(desc_done), .fetch_error(desc_error),
+        .desc_op(desc_op), .desc_task_id(desc_task_id), .desc_src0(desc_src0_base),
+        .desc_src1(desc_src1_base), .desc_dst(desc_dst_base), .desc_length(desc_length),
+        .desc_m(desc_m_size), .desc_n(desc_n_size), .desc_k(desc_k_words),
+        .desc_shift(desc_scale_shift), .desc_activation(desc_activation),
+        .desc_bias_base(desc_bias_base), .desc_bias_enable(desc_bias_enable),
+        .desc_flags(desc_flags), .desc_aux0(desc_aux0),
+        .desc_src0_stride(desc_src0_stride), .desc_src1_stride(desc_src1_stride),
+        .desc_dst_stride(desc_dst_stride), .desc_batch_count(desc_batch_count),
+        .desc_head_count(desc_head_count), .desc_wait_mask(desc_wait_mask),
+        .desc_signal_mask(desc_signal_mask), .desc_clear_mask(desc_clear_mask),
+        .desc_version(desc_version), .engine_busy(engine_busy), .engine_done(engine_done),
+        .engine_error(engine_error), .engine_error_code(engine_error_code),
+        .engine_result(engine_result), .engine_cycles(engine_cycle_count),
+        .engine_elements(engine_element_count), .completion_busy(cpl_busy),
+        .completion_done(cpl_done), .fetch_start(pd_fetch_start),
+        .fetch_base(pd_fetch_base), .fetch_external(pd_fetch_external),
+        .launch_valid(pd_launch_valid), .launch_op(pd_launch_op),
+        .launch_task_id(pd_launch_task_id), .launch_src0(pd_launch_src0),
+        .launch_src1(pd_launch_src1), .launch_dst(pd_launch_dst),
+        .launch_length(pd_launch_length), .launch_m(pd_launch_m),
+        .launch_n(pd_launch_n), .launch_k(pd_launch_k), .launch_shift(pd_launch_shift),
+        .launch_activation(pd_launch_activation), .launch_bias_base(pd_launch_bias_base),
+        .launch_bias_enable(pd_launch_bias_enable), .launch_flags(pd_launch_flags),
+        .launch_aux0(pd_launch_aux0), .launch_src0_stride(pd_launch_src0_stride),
+        .launch_src1_stride(pd_launch_src1_stride), .launch_dst_stride(pd_launch_dst_stride),
+        .launch_batch_count(pd_launch_batch_count), .launch_head_count(pd_launch_head_count),
+        .completion_start(pd_completion_start), .completion_base(pd_completion_base),
+        .completion_index(pd_completion_index), .completion_task_id(pd_completion_task_id),
+        .completion_status(pd_completion_status), .completion_error_code(pd_completion_error),
+        .completion_result(pd_completion_result), .completion_elements(pd_completion_elements),
+        .cmdq_head(pd_cmdq_head), .cplq_tail(pd_cplq_tail), .busy(pd_busy),
+        .event_valid(pd_event_valid), .event_error(pd_event_error),
+        .event_error_code(pd_event_error_code), .event_result(pd_event_result),
+        .event_cycles(pd_event_cycles), .event_elements(pd_event_elements),
+        .dependency_events(pd_dependency_events), .legacy_handoff(pd_legacy_handoff)
     );
     assign core_start = launch_valid;
 
@@ -1190,6 +1427,11 @@ module ai_accel_top #(
         .arb_core_ready(arb_core_ready), .core_rsp_valid(core_rsp_valid),
         .arb_rsp_rdata(arb_rsp_rdata), .core_rsp_error(core_rsp_error),
         .core_spad_parity_error(core_spad_parity_error),
+        .engine_core_ready(compute_engine_ready),
+        .engine_core_rsp_valid(compute_engine_rsp_valid),
+        .engine_core_rsp_rdata(compute_engine_rsp_rdata),
+        .engine_core_rsp_error(compute_engine_rsp_error),
+        .engine_core_protection_error(compute_engine_protection_error),
         .compute_prot_error(compute_prot_error), .arb_core_line_ready(arb_core_line_ready),
         .line_prot_error(line_prot_error), .spad_line_raw_error(spad_line_raw_error),
         .cnm_read_valid(cnm_read_valid), .cnm_read_addr0(cnm_read_addr0),
@@ -1220,6 +1462,10 @@ module ai_accel_top #(
         .core_done(core_done), .core_error(core_error),
         .core_error_code(core_error_code), .core_result(core_result),
         .core_cycle_count(core_cycle_count), .core_element_count(core_element_count),
+        .engine_busy(engine_busy), .engine_done(engine_done),
+        .engine_error(engine_error), .engine_error_code(engine_error_code),
+        .engine_result(engine_result), .engine_cycle_count(engine_cycle_count),
+        .engine_element_count(engine_element_count),
         .matrix_perf_mac_active(matrix_perf_mac_active),
         .matrix_perf_banked_wait(matrix_perf_banked_wait)
     );

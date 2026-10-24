@@ -1,0 +1,2 @@
+// Capture the compatibility wrapper and its instantiated shared mixed core.
++tree tb_ai_bf16_dot_fp32_core.dut

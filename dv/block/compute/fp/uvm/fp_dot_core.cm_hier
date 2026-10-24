@@ -1,0 +1,2 @@
+// Collect code coverage only beneath the mixed-precision dot RTL instance.
++tree tb_ai_bf16_dot_uvm.dut

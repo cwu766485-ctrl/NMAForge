@@ -1,7 +1,7 @@
 # NMAForge 架构说明
 
-**状态：2026-10-17 的 RTL/验证基线。** 本文描述已接入 `ai_accel_top` 的结构；
-不把规划中的 UVM、后布局签核或实板验收写成已完成能力。
+**状态：按 2026-10-23 RTL 层次核对。** 本文说明已接入 `ai_accel_top` 的模块所有权与数据流；
+验证收敛、PPA、后布局和板级状态分别以文末链接的专题报告为准。
 
 ## 1. 项目范围
 
@@ -19,10 +19,11 @@ bit-line 或 sense amplifier，不是模拟 CIM/PIM。
 CPU -- AXI-Lite --> axi_lite_reg_if --> ai_accel_regs
                                         │配置/doorbell/status/IRQ
                                         ▼
-                                ai_command_processor
-                              描述符校验/派发/完成排序
+                       ai_parallel_compute_dispatcher
+                        普通 CMDQ 多引擎派发/有序退休
                            ┌────────────┴────────────┐
-                       desc fetch              completion writer
+                ai_command_processor          completion writer
+                direct/tile/宏子任务
                            │                         │
 DDR <== 128-bit AXI4 ==> ai_axi128_dma <==> ai_spad_arbiter <==> ai_scratchpad
                                                   │唯一调度入口       │4 bank/512 KiB
@@ -34,8 +35,12 @@ DDR <== 128-bit AXI4 ==> ai_axi128_dma <==> ai_spad_arbiter <==> ai_scratchpad
 - `axi_lite_reg_if` 是纯协议适配层：它分别锁存 AXI-Lite AW 与 W，只有两个 sticky flag
   均已置位的**下一时钟周期**才向 `ai_accel_regs` 发内部写请求。这个额外控制周期避免
   AW/W 同拍或不同拍到达时的压缩状态转移，不改变软件 ABI 或数据面性能。
-- `ai_command_processor` 独占命令生命周期：`CMDQ_HEAD`、`CPLQ_TAIL`、描述符来源选择、
-  校验、计算启动和完成排序。软件发布 `CMDQ_TAIL`，并消费后推进 `CPLQ_HEAD`。
+- 普通 compute CMDQ 由 `ai_parallel_compute_dispatcher` 管理 `CMDQ_HEAD`、描述符校验、
+  跨引擎派发及按提交顺序退休；每个引擎最多一个在途任务。`ai_command_processor` 仍管理
+  direct/tile 模式，并在普通任务排空后接管宏 descriptor 的串行子任务。软件发布 `CMDQ_TAIL`，
+  消费 completion 后推进 `CPLQ_HEAD`。
+- 多引擎通过 `ai_compute_spad_mux` 汇入 `ai_spad_arbiter` 的单一 core 客户端。仲裁保持
+  请求和响应归属，但不建立跨 descriptor 的数据依赖；软件要避免可能并发任务的 SPAD 读写冲突。
 - `ai_spad_arbiter` 是 scheduler-side scratchpad 的唯一拥有者。descriptor/completion
   保持控制面优先；scalar/line/banked compute 与 DMA 在数据面 round-robin；禁止顶层 bypass mux。
   BF16/FP16 dot 共用现有 arbiter-owned 32-bit core SPAD 口，不增加 scratchpad bypass。
@@ -59,9 +64,9 @@ DDR <== 128-bit AXI4 ==> ai_axi128_dma <==> ai_spad_arbiter <==> ai_scratchpad
                                       └──────────────┬───────────────┘
                                                      │ doorbell / status
                                       ┌──────────────▼───────────────┐
-                                      │      ai_command_processor      │
-                                      │ queue owner / descriptor check │
-                                      │ dependency / launch / abort    │
+                                      │ ai_parallel_compute_dispatcher │
+                                      │ CMDQ issue / per-engine slots  │
+                                      │ ordered retirement / abort     │
                                       └───────┬──────────┬─────────────┘
                                               │          │
                          ┌────────────────────▼──┐  ┌──▼──────────────────┐
@@ -171,24 +176,17 @@ Q/K/V -> QK^T -> causal/row Softmax -> AV -> projection
 
 这是 primitive-composed 的 Transformer 微型命令链，不是生产级融合 MHA/decoder 或完整软件框架。
 
-## 6. 当前实测证据与开放门项
+## 6. 验证与实现状态入口
 
-| 项目 | 最新结果 | 边界 |
-|---|---|---|
-| Mixed-precision dot | `0x50` BF16 与 `0x51` FP16 共用 dot core；最新 dirty-worktree seeds `712345`、`987654`、`20261015` 各 484/484 PASS，peak outstanding=2；odd-tail parity 与 selected functional coverage 100%；DUT line/condition/FSM/branch=`97.96/97.00/85.71/92.86%` | 长度 1–4 parity formal 5/5 assertions、2/2 covers；full 16-bit parity disposition、残余 coverage 与 frozen-SHA replay 仍开放；固定快照历史证据见 [A10 基线](../verification/A10_DV_BASELINE_2026-10-14.md)，最新证据见 [A10 RTM](../verification/A10_DV_RTM.md) |
-| FP16 DDR end-to-end | top smoke 经 DMA load、queued descriptor、FP16 result/completion、DMA store；结果为 `0x41300000` | compact AXI memory model 的 directed smoke，不等价于 DDR PHY/board validation |
-| VCS smoke/随机 | `make ai_smoke`、`ai_comp`、`ai_run` 基线通过 | 尚非 UVM coverage closure |
-| Control block UVM | 2026-08-27：6 项回归均为 `UVM_ERROR=0`、`UVM_FATAL=0` | 已覆盖 reset/version、协议、IRQ/error、busy/abort、随机 RW、RAL；尚非 coverage closure |
-| CNM A1/A2/A3.1 | A2 四 lane PASS；A3.1 benchmark PASS | 受控 workload，需继续 UVM 对拍 |
-| XCZU15EG OOC | 100 MHz，setup/hold WNS `+0.187/+0.032 ns` | standalone IP，非整板 sign-off |
-| TSMC28 DC | TT/0.9 V/25 °C，4 ns；setup/hold 0 violation，关键路径 3.89 ns | 单角 pre-layout |
-| 面积 | `1,245,378.649905` library units；SRAM `1,127,675.75` | 非物理版图面积 |
-| 功耗 | dynamic 22.829 mW、leakage 1.9733 mW | PWR-414/415/428，非 SAIF sign-off |
-| SpyGlass lint | 0 error、414 warnings、4 info | warning 待分类 |
-| SpyGlass CDC/RDC | 0 unsync crossing/0 convergence；CDC 1、RDC 2 license errors | 缺 Advanced_CDC/rdc_adv_checker |
+模块实例关系、接口所有权和数据流以本文及当前 RTL 为准。各计算引擎的
+功能测试、形式结果和原始 DUT 覆盖率见[compute-engine 状态页](../verification/COMPUTE_ENGINE_STATUS.md)；
+A10 需求追踪与剩余验证项见 [A10 RTM](../verification/A10_DV_RTM.md)。
 
-当前可信表述是“TSMC28、250 MHz pre-layout setup/hold closure”。Formal、LEC、DFT、UVM、
-后布局 STA/功耗和实板长期压力测试仍未完成，详见 [`VPLAN.md`](../verification/VPLAN.md)。
+静态分析限制见 [STATIC_ANALYSIS_REPORT.md](../verification/STATIC_ANALYSIS_REPORT.md)
+和 [`dv/spyglass/LINT_TRIAGE.md`](../../dv/spyglass/LINT_TRIAGE.md)。商用 28 nm
+pre-layout 结果见 [TSMC28_SYNTHESIS_REPORT.md](../verification/TSMC28_SYNTHESIS_REPORT.md)。
+这些报告分别说明工具版本、约束、结果边界和未闭合项；架构说明不复制易过期的
+逐次 coverage、seed 或 PPA 数字。
 
 ## 7. 全部电路模块
 | 分类 | 模块 | 是否在主功能路径 | 作用 |
@@ -196,7 +194,9 @@ Q/K/V -> QK^T -> causal/row Softmax -> AV -> projection
 | 顶层 | `ai_accel_top` | 是 | 把 AXI、寄存器、命令、DMA、SRAM、计算核和 IRQ 接起来。 |
 | AXI-Lite | `axi_lite_reg_if` | 是 | AXI4-Lite 五通道协议适配，转换成内部寄存器读写请求。 |
 | 寄存器 | `ai_accel_regs` | 是 | 保存软件配置，生成 `submit`、`abort`、DMA start 等脉冲，回报状态、性能计数器和 IRQ。 |
-| 调度 | `ai_command_processor` | 是 | CMDQ/CPLQ 指针所有者；取 descriptor、检查合法性/依赖、选择计算核、等待结束并安排 completion。 |
+| 调度 | `ai_parallel_compute_dispatcher` | 是 | 普通 compute CMDQ 指针所有者；最多每引擎一个在途任务，维护任务归属并按 CMDQ 顺序退休。 |
+| 串行命令控制 | `ai_command_processor` | 是 | 管理 direct/tile 命令，接收普通队列排空后的宏 descriptor handoff，并串行执行宏子任务。 |
+| Compute SPAD 子仲裁 | `ai_compute_spad_mux` | 是 | 将七个计算引擎的请求轮转映射到唯一 scheduler core-SPAD 客户端，并归还各自响应。 |
 | 片上 descriptor | `ai_desc_fetch` | 是 | 从 scratchpad 读取 64B descriptor。 |
 | 外部 descriptor | `axi_desc_fetch` | 是 | 从 DDR 读取外部 descriptor，使用 AXI4 读通道。 |
 | completion | `ai_completion_writer` | 是 | 向 CPLQ 连续写 4 个 32-bit word，写完后才能推进 `CPLQ_TAIL`。 |

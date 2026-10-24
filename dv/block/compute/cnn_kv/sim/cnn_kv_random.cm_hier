@@ -1,0 +1,3 @@
+// Collect only the two production CNN/KV engines instantiated by this bench.
++tree tb_ai_cnn_kv_random_latency.conv
++tree tb_ai_cnn_kv_random_latency.kv

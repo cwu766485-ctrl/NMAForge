@@ -1,0 +1,2 @@
+// Collect only the production SFU core and its arithmetic helper instances.
++tree tb_ai_tensor_sfu_random.dut

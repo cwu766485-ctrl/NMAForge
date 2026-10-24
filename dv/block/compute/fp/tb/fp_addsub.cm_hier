@@ -1,0 +1,3 @@
+// Capture only the two DUT instances, excluding testbench bookkeeping code.
++tree tb_ai_fp16_bf16_addsub.u_bf16
++tree tb_ai_fp16_bf16_addsub.u_fp16

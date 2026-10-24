@@ -56,8 +56,8 @@ module ai_kv_cache_engine(
       done<=0;
       if(state_r==ST_IDLE && start && length!=0 && valid_operation) cycle_count<=0;
       else if(busy) cycle_count<=cycle_count+1;
-      if(watchdog_expired) begin error<=1; error_code<=ERR_WATCHDOG; state_r<=ST_ERROR; end
-      else if((spad_error && busy) || (abort && busy)) begin error<=1; error_code<=abort?ERR_ABORT:ERR_SPAD; state_r<=ST_ERROR; end
+      if(state_r!=ST_ERROR && watchdog_expired) begin error<=1; error_code<=ERR_WATCHDOG; state_r<=ST_ERROR; end
+      else if(state_r!=ST_ERROR && ((spad_error && busy) || (abort && busy))) begin error<=1; error_code<=abort?ERR_ABORT:ERR_SPAD; state_r<=ST_ERROR; end
       else case(state_r)
         ST_IDLE: begin busy<=0; error<=0; error_code<=0; if(start) begin
           if(length==0 || !valid_operation) begin error<=1; error_code<=ERR_CONFIG; state_r<=ST_ERROR; end

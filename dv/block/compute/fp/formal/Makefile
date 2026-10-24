@@ -5,7 +5,7 @@ VCF ?= vcf
 FORMAL_PROBE_TIMEOUT ?= 150
 FORMAL_TCL := $(abspath run_vcf.tcl)
 
-.PHONY: run parity-probe parity-reach parity-exclusion parity-cutoff-bound parity-frontier parity-bounded parity-bounded-new-parity-last-compute parity-bounded-final-ready-pair-frontier check-parity-bounded parity-full-domain parity-full-cutoff parity-full-accounting check-parity-full-accounting parity-full-index-bound parity-full-response-bound parity-full-accepted-count-bound parity-full-response-assume parity-full-cutoff-assume parity-full-lifecycle-assume parity-full-progress-assume parity-full-writeback-assume parity-full-frontier-assume parity-full-ready-frontier-assume parity-full-pair-tag-match parity-full-current-pair-tag parity-full-tag-response-bound parity-full-current-pair-tag-control-abstract parity-full-writeback-control-abstract parity-full-writeback-control-lean parity-full-writeback-control-lean-high parity-full-writeback-control-lean-discovery parity-full-writeback-owner parity-full-static-slot-tags parity-full-transition-lemmas parity-full-local-transition-lemmas parity-full-pending-last-compute parity-full-new-parity-last-compute parity-full-final-pair-not-ready-on-parity-response parity-full-final-pair-cover parity-full-final-ready-pair-frontier parity-full-parity-cutoff-last-element parity-full-last-compute-write-transition parity-full-last-compute-write-state parity-2cycle-spad-final-pair parity-2cycle-spad-writeback parity-2cycle-spad-last-compute parity-2cycle-spad-small-final-pair parity-2cycle-spad-small-writeback parity-2cycle-spad-small-last-compute
+.PHONY: run parity-probe parity-reach parity-exclusion parity-cutoff-bound parity-frontier parity-bounded parity-bounded-new-parity-last-compute parity-bounded-final-ready-pair-frontier check-parity-bounded parity-full-domain parity-full-writeback-domain parity-full-cutoff parity-full-accounting check-parity-full-accounting parity-full-index-bound parity-full-response-bound parity-full-accepted-count-bound parity-full-response-assume parity-full-cutoff-assume parity-full-lifecycle-assume parity-full-progress-assume parity-full-progress-control-abstract parity-full-event-cutoff-control-abstract parity-full-progress-compositional-control parity-full-writeback-assume parity-full-frontier-assume parity-full-ready-frontier-assume parity-full-pair-tag-match parity-full-current-pair-tag parity-full-tag-response-bound parity-full-current-pair-tag-control-abstract parity-full-writeback-control-abstract parity-full-writeback-control-lean parity-full-writeback-control-lean-high parity-full-writeback-control-lean-discovery parity-full-writeback-owner parity-full-static-slot-tags parity-full-transition-lemmas parity-full-local-transition-lemmas parity-full-pending-last-compute parity-full-new-parity-last-compute parity-full-final-pair-not-ready-on-parity-response parity-full-final-pair-cover parity-full-final-ready-pair-frontier parity-full-parity-cutoff-last-element parity-full-last-compute-write-transition parity-full-last-compute-write-state parity-2cycle-spad-final-pair parity-2cycle-spad-writeback parity-2cycle-spad-last-compute parity-2cycle-spad-small-final-pair parity-2cycle-spad-small-writeback parity-2cycle-spad-small-last-compute
 run:
 	mkdir -p "$(OUT)"
 	cd "$(OUT)" && $(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
@@ -91,6 +91,24 @@ parity-full-domain:
 	cd "$(OUT)" && timeout --kill-after=5s "$(FORMAL_PROBE_TIMEOUT)s" \
 		$(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
 		-f "$(abspath run_parity_full_domain.tcl)" -output_log_file vc_formal.log
+
+# Isolate the parity-to-ST_WRITE safety property over the full 16-bit length
+# domain while retaining the production arithmetic and the legal-input
+# assumptions in ai_fp_core_parity_full_formal_top.
+parity-full-writeback-domain:
+	mkdir -p "$(OUT)"
+	cd "$(OUT)" && PARITY_FORMAL_PROPERTIES=ap_writeback_excludes_pending_parity \
+		timeout --kill-after=5s "$(FORMAL_PROBE_TIMEOUT)s" \
+		$(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
+		-f "$(abspath run_parity_full_domain.tcl)" -output_log_file vc_formal.log
+	@grep -Fq -- "- # proven       : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Full-domain parity/writeback proof failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq -- "- # non_vacuous  : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Full-domain parity/writeback vacuity gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq "No setup issues found" "$(OUT)/vc_formal.log" || \
+		{ echo "Full-domain parity/writeback setup gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
+		{ echo "Full-domain parity/writeback formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
 
 parity-full-cutoff:
 	mkdir -p "$(OUT)"
@@ -197,6 +215,54 @@ parity-full-progress-assume:
 		{ echo "Full-domain parity-progress setup gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
 	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
 		{ echo "Full-domain parity-progress formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
+
+# Prove the full-domain progress invariant with arithmetic replaced by constant
+# results. Arithmetic outputs are outside the core's request/response, slot,
+# cutoff, and FSM control cones; the lifecycle boundary assumptions remain the
+# independently-proven constraints in the control-only harness.
+parity-full-progress-control-abstract:
+	mkdir -p "$(OUT)"
+	cd "$(OUT)" && PARITY_FORMAL_PROPERTIES=ap_parity_progress_stays_before_cutoff \
+		timeout --kill-after=5s "$(FORMAL_PROBE_TIMEOUT)s" \
+		$(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
+		-f "$(abspath run_parity_full_lifecycle_control_abstract.tcl)" -output_log_file vc_formal.log
+	@grep -Fq -- "- # proven       : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Control-abstract full-domain parity-progress proof failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq -- "- # non_vacuous  : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Control-abstract full-domain parity-progress proof was vacuous; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq "No setup issues found" "$(OUT)/vc_formal.log" || \
+		{ echo "Control-abstract full-domain parity-progress setup gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
+		{ echo "Control-abstract full-domain parity-progress formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
+
+parity-full-event-cutoff-control-abstract:
+	mkdir -p "$(OUT)"
+	cd "$(OUT)" && PARITY_FORMAL_PROPERTIES=ap_parity_event_cutoff_not_behind_progress \
+		timeout --kill-after=5s "$(FORMAL_PROBE_TIMEOUT)s" \
+		$(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
+		-f "$(abspath run_parity_full_lifecycle_control_abstract.tcl)" -output_log_file vc_formal.log
+	@grep -Fq -- "- # proven       : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Control-abstract full-domain parity-event cutoff proof failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq -- "- # non_vacuous  : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Control-abstract full-domain parity-event cutoff proof was vacuous; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq "No setup issues found" "$(OUT)/vc_formal.log" || \
+		{ echo "Control-abstract full-domain parity-event cutoff setup gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
+		{ echo "Control-abstract full-domain parity-event cutoff formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
+
+parity-full-progress-compositional-control:
+	mkdir -p "$(OUT)"
+	cd "$(OUT)" && timeout --kill-after=5s "$(FORMAL_PROBE_TIMEOUT)s" \
+		$(VCF) -fmode FPV -batch -no_restore -lic_wait 1 \
+		-f "$(abspath run_parity_progress_compose_control.tcl)" -output_log_file vc_formal.log
+	@grep -Fq -- "- # proven       : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Compositional control-only full-domain progress proof failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq -- "- # non_vacuous  : 1" "$(OUT)/vc_formal.log" || \
+		{ echo "Compositional control-only full-domain progress proof was vacuous; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@grep -Fq "No setup issues found" "$(OUT)/vc_formal.log" || \
+		{ echo "Compositional control-only full-domain progress setup gate failed; inspect $(OUT)/vc_formal.log"; exit 1; }
+	@! grep -Eq "Cross-module reference resolution error|Error-\\[|ERROR" "$(OUT)/vc_formal.log" || \
+		{ echo "Compositional control-only full-domain progress formal error found; inspect $(OUT)/vc_formal.log"; exit 1; }
 
 parity-full-writeback-assume:
 	mkdir -p "$(OUT)"

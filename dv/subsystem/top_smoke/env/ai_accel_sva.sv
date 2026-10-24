@@ -61,6 +61,8 @@ module ai_accel_sva #(
     input wire        core_busy,
     input wire        core_done,
     input wire        core_error,
+    input wire [6:0]  engine_busy,
+    input wire [6:0]  engine_done,
     // A doorbell may launch a descriptor, DMA-only, or macro command that
     // never raises a compute-core pulse.  The command processor's event is
     // therefore the architectural completion point for the task watchdog.
@@ -285,8 +287,8 @@ module ai_accel_sva #(
                     $fatal(1, "SVA FAIL: doorbell task did not complete before timeout");
             end
 
-            if (core_busy && core_done)
-                $fatal(1, "SVA FAIL: core_busy and core_done asserted together");
+            if (|(engine_busy & engine_done))
+                $fatal(1, "SVA FAIL: one engine asserted busy and done together");
 
             if (host_desc_conflict)
                 $fatal(1, "SVA FAIL: host write conflicts with descriptor fetch window");

@@ -14,6 +14,8 @@ module ai_command_processor(
     input wire [31:0] cplq_base, input wire [31:0] cplq_size,
     input wire [31:0] cplq_head, input wire completion_protected,
     input wire cplq_tail_load, input wire [31:0] cplq_tail_seed,
+    input wire dependency_events_load,
+    input wire [15:0] dependency_events_seed,
 
     input wire [7:0] cfg_op,
     input wire [31:0] cfg_src0, input wire [31:0] cfg_src1, input wire [31:0] cfg_dst,
@@ -361,6 +363,8 @@ module ai_command_processor(
                   cmdq_head_index != cmdq_tail &&
                   !((cplq_tail_next >= cplq_size-1 ? 0 : cplq_tail_next+1) == cplq_head)))
           cmdq_head <= cmdq_head_next;
+        if (dependency_events_load)
+          dependency_events <= dependency_events_seed;
         if (cplq_tail_load)
           cplq_tail <= cplq_tail_seed;
         else if (state_r == ST_CPL && completion_done)
@@ -492,10 +496,12 @@ module ai_command_processor(
                 completion_task_id <= macro_active_r ? macro_parent_task_id_r : desc_task_id;
                 macro_active_r <= 1'b0;
                 if (completion_required_r && completion_available)
-                  `START_COMPLETION(1'b1, ERR_DEPENDENCY, dependency_events,
+                  `START_COMPLETION(1'b1, ERR_DEPENDENCY,
+                                   {16'd0, dependency_events},
                                    macro_cycles_r, macro_elements_r);
                 else begin
-                  `REPORT_EVENT(1'b1, ERR_DEPENDENCY, dependency_events,
+                  `REPORT_EVENT(1'b1, ERR_DEPENDENCY,
+                         {16'd0, dependency_events},
                          macro_cycles_r, macro_elements_r);
                   busy <= 1'b0;
                   state_r <= ST_IDLE;

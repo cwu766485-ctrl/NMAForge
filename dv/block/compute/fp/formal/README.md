@@ -16,12 +16,12 @@ unpaired read, zero outstanding reads imply no response, and the active-failure
 OR has at least one asserted source. Three additional properties separately
 prove that `ERR_ABORT`, `ERR_CONFIG`, and `ERR_WATCHDOG` are not pending while
 the FSM is in `ST_WRITE`; these disposition the corresponding prior-error to
-`ERR_PROTECTION` transitions as unreachable in this formal model. The full
-parity-error-to-writeback disposition remains open because its focused
-lifecycle proof did not converge within the bounded exploratory run. A
-narrower property now proves that an already-pending parity error blocks a
-final-element compute; this does not establish the upstream parity transition
-or the full writeback exclusion. Response-related checks use the explicit
+`ERR_PROTECTION` transitions as unreachable in this formal model. Full-domain
+`ST_WRITE` exclusion is now proven by the isolated
+`parity-full-writeback-domain` target described at the end of this file. The
+unassisted combined six-property lifecycle run remains partial (3/6 proven).
+Cutoff validity is separately proven under the response-index bound; the
+progress-bound property still needs closure. Response-related checks use the explicit
 registered-SPAD environment assumption (`spad_rsp_valid` only when an
 accepted read is outstanding). The flow also covers the legal operand-wait
 state. A second cover checks whether an operand pair can already be ready after
@@ -33,20 +33,21 @@ edges with deterministic default inputs, and saves the resulting asynchronous
 reset state before proving post-reset invariants. Reset is released for formal
 analysis; the proof does not establish reset-release behavior or RDC signoff.
 The setup gate requires zero reset and clock violations. The harness does not
-prove all URG residuals or the prior-error-to-writeback lifecycle. A separate
-writeback/error assertion experiment did not converge within the exploratory
-runtime budget and was stopped; it is neither a pass nor a DUT failure.
+prove all URG residuals or the full prior-error lifecycle. A historical
+writeback/error assertion experiment did not converge within its exploratory
+runtime budget; the later isolated full-domain parity exclusion passes without
+arithmetic stubs.
 
 Validated on VC Formal V-2023.12-SP2, Rocky Linux 8.10. The latest run proved
 12/12 assertions and reached both covers; its exact command and log path are
 recorded in the A10 verification run log. The ready-pair/error-cutoff condition
 is also exercised in the late-B protection UVM case, twice per format/seed
-(six hits after the three-seed URG merge). A broad `ST_WRITE ->
-pending_error_r == ERR_NONE` property did not converge; a parity-only exclusion
-also failed to converge within the exploratory time budget. Neither result is
-a counterexample. The corresponding parity-to-protection transition and other
-URG condition/branch residuals remain open. The reset-initialized proof does
-not establish reset-release behavior or RDC signoff.
+(six hits after the three-seed URG merge). Historical broad `ST_WRITE ->
+pending_error_r == ERR_NONE` and parity-only probes did not converge and
+produced no counterexample. The later isolated full-domain parity exclusion
+passes; the unassisted aggregate and progress-bound proof, parity-to-protection,
+and other URG condition/branch residuals remain open. The reset-initialized proof does not establish
+reset-release behavior or RDC signoff.
 
 ## URG residuals mapped to proof or protocol
 
@@ -64,7 +65,7 @@ each residual class to the relevant proof or interface constraint:
 | Write-protection failure in `ST_RUN` (line 110 and the failure-source priority branch) | The write-protection state/exclusivity assertions are proven. |
 | Read issue while both outstanding slots are full and no response retires (the `2'b10` / full-count branch) | `ap_full_outstanding_blocks_unpaired_read` is non-vacuously proven. |
 | Failure-active condition with no recognized error source (missing `else` in the priority chain) | `ap_failure_active_has_a_source` is non-vacuously proven. |
-| RTL line 78 raw condition tuples | In the dedicated single-seed report `(0,1,1,1)` was `Not Covered`; the current three-seed merged `modinfo.txt` shows `(0,1,1,1)` is `Covered` and `(1,0,1,1)` is raw `Not Covered`. The latter has a formal disposition: `ap_write_state_has_valid_write_request` in `ai_fp_core_formal_top.sv` asserts `(state_r==ST_WRITE) |-> (spad_valid && spad_write)` and was non-vacuously proven in the canonical 12/12 assertion run. This dispositions the raw bin via the proven write-state invariant; it does not change the URG bin to covered and depends on that formal proof. The read-side `cp_read_protection_not_write_failure` cover is not the basis for either tuple's status. V1-FP-04 remains open for other raw/formal residuals, including the inconclusive full-domain parity-to-protection/writeback lifecycle proof. See the [2026-10-17 run record](../../../../../docs/verification/A10_DV_RUN_2026-10-17.md). |
+| RTL line 78 raw condition tuples | In the dedicated single-seed report `(0,1,1,1)` was `Not Covered`; the current three-seed merged `modinfo.txt` shows `(0,1,1,1)` is `Covered` and `(1,0,1,1)` is raw `Not Covered`. The latter has a formal disposition: `ap_write_state_has_valid_write_request` in `ai_fp_core_formal_top.sv` asserts `(state_r==ST_WRITE) |-> (spad_valid && spad_write)` and was non-vacuously proven in the canonical 12/12 assertion run. This dispositions the raw bin via the proven write-state invariant; it does not change the URG bin to covered and depends on that formal proof. The read-side `cp_read_protection_not_write_failure` cover is not the basis for either tuple's status. V1-FP-04 remains open for other raw/formal residuals, including cutoff/progress and parity-to-protection; isolated full-domain parity-to-writeback exclusion is now proven. See the [2026-10-17 run record](../../../../../docs/verification/A10_DV_RUN_2026-10-17.md) and [2026-10-23 writeback proof](#2026-10-23-isolated-full-domain-parity-to-writeback-proof). |
 
 The `pending_error_r` transition bins are separate from these condition/branch
 outcomes. The `ERR_ABORT`, `ERR_CONFIG`, and `ERR_WATCHDOG`
@@ -804,3 +805,70 @@ The installed `V-2023.12-SP2` executable rejects the quick-reference's
 `no_decompose_expensive` value; this stopped before property checking and is
 not a design result. Both timeout runs had no residual formal processes.
 V1-FP-04 remains open. See the [effort experiment run record](../../../../../docs/verification/A10_DV_RUN_2026-10-19_FP_PARITY_WRITEBACK_EFFORTS.md).
+
+### 2026-10-23 full 16-bit length parity lifecycle probe
+
+```sh
+make -C dv/block/compute/fp/formal parity-full-domain \
+  VCF=/opt/Synopsys/vc_formal/V-2023.12-SP2/bin/vcf \
+  OUT=/tmp/nmaforge_fp_parity_full_20261023 FORMAL_PROBE_TIMEOUT=150
+```
+
+VC Formal `V-2023.12-SP2` setup is clean. Under legal nonzero 16-bit lengths,
+aligned bases, `watchdog_limit=0`, `abort=0`, responses only for outstanding
+reads, and separately proven read-accounting/count-bound lemmas, three of six
+combined-harness assertions prove: request/response accounting, compute
+blocking at the parity cutoff, and drain-to-error. Cutoff validity, progress
+before cutoff, and writeback exclusion remain `checking` when the full-domain
+external 150-second timeout fires (Make exit 124); no counterexample is
+reported and no VCF process remains.
+
+Compositional runs separately prove cutoff validity under the response-index
+bound (1/1 non-vacuous, safe depth 335) and `pending parity blocks last
+compute` (1/1 non-vacuous, 3 seconds). The separate full-domain progress-bound
+proof times out at 150 seconds. The helper proofs do not establish `ST_WRITE`
+exclusion, so parity-to-writeback closure and V1-FP-04 remained open at this
+stage. The exact
+runs and compute-group interactions are also summarized in the
+[2026-10-23 interaction follow-up](../../../../../docs/verification/COMPUTE_ENGINE_INTERACTION_FOLLOWUP_2026-10-23.md).
+
+### 2026-10-23 isolated full-domain parity-to-writeback proof
+
+To make the final-compute decision local, the core now enters `ST_WRITE` only
+when no error is pending and no new failure is visible on that cycle. Existing
+drain/error handling owns a final-cycle fault until accepted reads retire.
+BF16/FP16 maximum-length parity simulation was rerun after the guard and passed
+all four final-word A/B combinations, each accepting/draining 65,536 reads,
+preserving the 65,534-element prefix, and recovering with result
+`0x3f800000`:
+
+```sh
+make -C dv/block/compute/fp/sim dot-core-test \
+  DOT_CORE_OUT_DIR=/tmp/nmaforge_fp_dispatch_guard_20261023 \
+  DOT_CORE_PARITY_MAX_OUT_DIR=/tmp/nmaforge_fp_dispatch_guard_20261023/max_parity \
+  VCS='vcs -licwait 1'
+```
+
+`run_parity_full_domain.tcl` now accepts `PARITY_FORMAL_PROPERTIES` to isolate
+one property without changing the default six-property aggregate. The new
+target proves `ap_writeback_excludes_pending_parity` over the actual FP core,
+including its production arithmetic modules:
+
+```sh
+make -C dv/block/compute/fp/formal parity-full-writeback-domain \
+  VCF=/opt/Synopsys/vc_formal/V-2023.12-SP2/bin/vcf \
+  OUT=/tmp/nmaforge_fp_parity_writeback_domain_guard_20261023 \
+  FORMAL_PROBE_TIMEOUT=300
+```
+
+VC Formal `V-2023.12-SP2` reported `No setup issues found`; the property was
+proven and non-vacuous (1/1) in 2 seconds at safe depth 156. Both parity
+reachability covers were reached (2/2, depths 4 and 5), and the target exited
+0. Assumptions are legal nonzero 16-bit `length`, word-aligned bases, disabled
+watchdog and abort, and `spad_rsp_valid` only when a read is outstanding;
+SPAD request backpressure is unconstrained. This closes full-domain
+parity-to-`ST_WRITE` exclusion under that contract. Cutoff validity also has a
+separate compositional proof under the response-index bound; the progress
+bound and six-property combined lifecycle aggregate remain partial. Numeric
+arithmetic correctness is covered by simulation, not this state-transition
+property.

@@ -285,10 +285,10 @@ module tb_ai_bf16_dot_fp32_core;
         // Reset with an accepted read drops the operation and clears outputs.
         reset_case(); launch(2);
         wait (accept_count>0 && accept_count>response_count);
-        @(negedge clk); resetn=0; #1;
+        @(negedge clk); inject_parity=1; abort=1; resetn=0; #1;
         if (busy || done || error) $fatal(1,"reset did not clear engine");
         repeat(2) @(negedge clk);
-        resetn=1; repeat(3) @(negedge clk);
+        resetn=1; abort=0; inject_parity=0; repeat(3) @(negedge clk);
         if (write_count!=0) $fatal(1,"reset transaction wrote output");
 
         // Abort while a read is outstanding: wait for/drain response, then fail.
@@ -322,6 +322,17 @@ module tb_ai_bf16_dot_fp32_core;
         reset_case(); inject_parity=1; launch(1); wait_done(30);
         if (!error || error_code!=5 || pending || write_count!=0)
             $fatal(1,"parity handling failed code=%0d",error_code);
+
+        // Inject parity and abort on the same returned-read cycle. The
+        // memory-fault classification is retained while accepted reads drain.
+        reset_case(); inject_parity=1; launch(2);
+        wait (spad_rsp_valid);
+        @(negedge clk); abort=1;
+        @(negedge clk); abort=0;
+        wait_done(30);
+        if (!error || error_code!=5 || pending || write_count!=0)
+            $fatal(1,"parity+abort interaction failed code=%0d pending=%0d writes=%0d",
+                   error_code,pending,write_count);
 
         // A parity error in word 1 must preserve the two valid prefix
         // elements from word 0, while draining accepted reads and suppressing

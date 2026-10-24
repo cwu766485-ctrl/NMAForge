@@ -288,6 +288,17 @@ def build_workload() -> tuple[Mapper, list[list[int]]]:
 
     # Cross-check the standalone FFN composition helper on the same tensors.
     assert ffn_i8(norm_1_i8, w_up, identity, 0) == down
+    # The generated chain reuses destinations and crosses engines.  Publish a
+    # two-token dependency chain so its reference result remains deterministic
+    # with parallel dispatch enabled.  Independent software workloads can
+    # leave these masks clear and use separate engine slots concurrently.
+    for index, descriptor in enumerate(mapper.descriptors):
+        if index:
+            wait_token = 1 << ((index - 1) & 1)
+            descriptor.wait_mask |= wait_token
+            descriptor.clear_mask |= wait_token
+        if index + 1 < len(mapper.descriptors):
+            descriptor.signal_mask |= 1 << (index & 1)
     validate_descriptor_chain(mapper)
     return mapper, norm_2
 

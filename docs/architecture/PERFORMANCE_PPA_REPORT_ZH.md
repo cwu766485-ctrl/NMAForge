@@ -1,6 +1,6 @@
 # NMAForge 性能、带宽、流水与 PPA 基线报告
 
-> 版本：2026-09-24。本文只使用仓库内可追溯的 VCS 日志、RTL benchmark 输出和 TSMC28 DC 报告。`实测`、`推导`、`未测`严格区分；不能把推导峰值写成端到端吞吐。
+> 状态汇总：2026-10-21。性能数字保留各自测量日期与约束；`实测`、`推导`、`未测`严格区分。不能把算子级峰值写成端到端吞吐，也不能把历史 pre-layout 结果当成当前 RTL 的 sign-off。
 
 ## 1. 测试与证据边界
 
@@ -11,7 +11,7 @@
 | SPAD 仲裁 | `ai_spad_arb_run.log`，CNM/DMA contention PASS，`cnm_grants=6`、`dma_line_grants=6` |
 | 顶层 smoke | `ai_accel_smoke.log`，`TEST PASS`；覆盖 AXI-Lite、DMA、计算和错误恢复 |
 | PPA | `syn/out/tsmc28_4_0ns/reports/{qor,area,power}.rpt`，TSMC28 TT/0.9 V/25°C，pre-layout |
-| 重跑限制 | 本轮 WSL 启动返回 `E_ACCESSDENIED`，未声称重新编译成功 |
+| 当前边界 | 下列算子和 FP tile 数据是指定 workload 的历史 VCS 测量；当前 source/RTL identity 与 PPA 适用范围以各自验证记录为准 |
 
 ## 2. 算子级性能基线
 
@@ -36,6 +36,24 @@
 | 256 | 16,384 | 1,034 | 1,024 | 15.845 | 2 |
 
 相对冻结基线的加速比分别为 **3.58×、3.88×、3.97×**；相对 A2 的有效吞吐约为 **2.0×**。
+
+### 2.3 BF16/FP16 dot 与 tile-pipeline 争用（2026-10-14 测量）
+
+双 pair-slot 读预取在固定两周期 SPAD 响应下，将 64-element dot 从 259
+周期降到 101 周期。三 tile ping-pong workload 同时运行输入 DMA、FP 计算和
+结果 DMA，并对 RVALID 延迟与 WREADY back-pressure 做 seeded 扰动：
+
+| Elements/tile | BF16 job cycles / MAC per job cycle | FP16 job cycles / MAC per job cycle | DMA/FP overlap cycles |
+|---:|---:|---:|---:|
+| 64 | 386 / 0.49741 | 386 / 0.49741 | 122 / 134 |
+| 256 | 1,399 / 0.54896 | 1,380 / 0.55652 | 408 / 384 |
+| 1,024 | 5,384 / 0.57058 | 5,374 / 0.57164 | 1,483 / 1,499 |
+
+FP busy 窗口内的 MAC/cycle 在 1,024-element workload 中约为 0.646；
+实际 tile-job 吞吐低于此值，因为它还包含 DMA、SPAD 仲裁和 tile 生命周期。
+这是 RTL/testbench workload 结果，不包含 DDR PHY。趋势图保留在
+[`mixed-precision-throughput.svg`](../verification/mixed-precision-throughput.svg)。
+完整计数定义和复现配置曾单列在混合精度吞吐报告中；现已合并到本报告。
 
 ## 3. 性能指标（对应 1.1）
 
@@ -141,7 +159,9 @@ Q/K/V projection → QKᵀ → Causal Softmax → score×V → RMSNorm
 每输出元素周期（CNN）或每 token 周期（Transformer）。
 ```
 
-当前仓库已有算子 smoke（Conv3x3、DWConv3x3、GEMV、GEMM、DMA、CMDQ）并显示 `TEST PASS`，但还没有固定 CNN/Transformer 子图的统一 cycle/byte 表。因此第三层目前是 **功能覆盖已有，性能统计未闭环**。
+当前仓库已有 Conv3x3、DWConv3x3、GEMV、GEMM、DMA、CMDQ 和 FP ping-pong
+功能/性能 slice。尚无覆盖完整 CNN 或 Transformer 子图的统一 cycle/byte 表，
+第三层仍是**选定功能通过、端到端性能统计未闭环**。
 
 ## 8. 结论与下一步
 
@@ -150,6 +170,17 @@ Q/K/V projection → QKᵀ → Causal Softmax → score×V → RMSNorm
 1. A2 bank-local GEMV 在受控 RTL benchmark 中最高约 1.98× 周期收益。
 2. A3.1 4×4 GEMM tile 最高约 3.97× 周期收益，达到约 15.845 MAC/cycle。
 3. 250 MHz TSMC28 pre-layout setup/hold closure 已有证据；面积由 512 KiB SRAM 主导。
-4. DMA/compute overlap、端到端 DDR 带宽、CNN/Transformer 子图吞吐仍需固定 workload 统计。
+4. 完整 CNN/Transformer 子图的 DMA bytes、端到端 DDR 带宽和 tokens/s 仍需固定 workload 统计。
 
-推荐下一步：为 CNN 和 Transformer 各写一个固定 shape 的 VCS benchmark，读取 `ai_perf_monitor` 的 DMA/compute/overlap/stall 快照，再用同一 workload 做直接、CMDQ、Tile 三组对比；之后才决定是否增加 pipeline、outstanding 或多核。
+### 尚未完成的 sweep
+
+| 实验 | 范围 | 当前状态 |
+|---|---|---|
+| Scratchpad 容量 | 128/256/512 KiB | 目前仅 512 KiB 基线有证据 |
+| Bank 数量 | 2/4/8 | 目前仅 4-bank；尚无同约束比较 |
+| DC 周期 | 4.0/3.5/3.0/2.5 ns | 4.0 ns pre-layout 有报告；更紧周期需相同工艺库和约束复跑 |
+| CNN/Transformer 子图 | 固定 shape，直接/CMDQ/tile 三模式 | 有功能链；完整统一 cycle/byte 表未闭环 |
+
+推荐下一步：为 CNN 和 Transformer 各建立固定 shape 的 VCS benchmark，读取
+`ai_perf_monitor` 的 DMA/compute/overlap/stall 快照，再用同一 workload 做直接、
+CMDQ、tile 三组对比；之后再决定是否增加 pipeline、outstanding 或并行 lane。

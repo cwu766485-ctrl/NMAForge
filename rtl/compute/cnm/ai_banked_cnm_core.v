@@ -151,8 +151,8 @@ module ai_banked_cnm_core(
                 cycle_count<=0;
             else if (busy)
                 cycle_count<=cycle_count+1'b1;
-            if (busy && abort) begin error_code<=ERR_ABORT; state_r<=ST_ERROR; end
-            else if (busy && watchdog_limit_r!=0 && cycle_count>=watchdog_limit_r) begin error_code<=ERR_WATCHDOG; state_r<=ST_ERROR; end
+            if (state_r!=ST_ERROR && busy && abort) begin error_code<=ERR_ABORT; state_r<=ST_ERROR; end
+            else if (state_r!=ST_ERROR && busy && watchdog_limit_r!=0 && cycle_count>=watchdog_limit_r) begin error_code<=ERR_WATCHDOG; state_r<=ST_ERROR; end
             else case (state_r)
                 ST_IDLE: if (start) begin
                     op_r<=op_mode; src0_r<=src0_base;

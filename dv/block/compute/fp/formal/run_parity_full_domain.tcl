@@ -25,13 +25,22 @@ sim_save_reset
 check_fv_setup -verbose
 formal_setup_config -period 10 -initial 1 -apply true
 
-check_fv -property {
-    ai_fp_core_parity_full_formal_top.ap_read_request_response_accounting
-    ai_fp_core_parity_full_formal_top.ap_parity_has_valid_cutoff
-    ai_fp_core_parity_full_formal_top.ap_parity_progress_stays_before_cutoff
-    ai_fp_core_parity_full_formal_top.ap_parity_blocks_compute_at_cutoff
-    ai_fp_core_parity_full_formal_top.ap_parity_drain_transitions_to_error
-    ai_fp_core_parity_full_formal_top.ap_writeback_excludes_pending_parity}
+if {[info exists ::env(PARITY_FORMAL_PROPERTIES)]} {
+    set CHECK_PROPERTIES {}
+    foreach PROPERTY_NAME [split $::env(PARITY_FORMAL_PROPERTIES) ","] {
+        lappend CHECK_PROPERTIES \
+            "ai_fp_core_parity_full_formal_top.${PROPERTY_NAME}"
+    }
+} else {
+    set CHECK_PROPERTIES [list \
+        ai_fp_core_parity_full_formal_top.ap_read_request_response_accounting \
+        ai_fp_core_parity_full_formal_top.ap_parity_has_valid_cutoff \
+        ai_fp_core_parity_full_formal_top.ap_parity_progress_stays_before_cutoff \
+        ai_fp_core_parity_full_formal_top.ap_parity_blocks_compute_at_cutoff \
+        ai_fp_core_parity_full_formal_top.ap_parity_drain_transitions_to_error \
+        ai_fp_core_parity_full_formal_top.ap_writeback_excludes_pending_parity]
+}
+check_fv -property $CHECK_PROPERTIES
 report_fv -usage assert -verbose
 
 check_fv -property {

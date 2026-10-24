@@ -1,0 +1,522 @@
+`timescale 1ns/1ps
+
+// Full-core A3 transaction test. Operand words are returned through a
+// registered four-bank model; bias/scalar traffic uses a separate registered
+// SPAD model and aligned output rows use the line-write port.
+module tb_ai_tensor_matrix_core_random;
+  localparam [31:0] SRC0_BASE = 32'h0000_0100;
+  localparam [31:0] SRC1_BASE = 32'h0000_4000;
+  localparam [31:0] BIAS_BASE = 32'h0000_8000;
+  localparam [31:0] DST_BASE  = 32'h0001_0000;
+  localparam [3:0] ERR_CONFIG=1, ERR_OP=2, ERR_ABORT=3, ERR_WATCHDOG=4,
+                   ERR_PARITY=5, ERR_PROTECTION=6;
+
+  reg clk=0, resetn=0, start=0, abort=0;
+  reg [7:0] op_mode=8'h30;
+  reg [31:0] src0_base=SRC0_BASE, src1_base=SRC1_BASE;
+  reg [31:0] bias_base=BIAS_BASE, dst_base=DST_BASE;
+  reg [15:0] m_size=4, n_size=4, k_words=1;
+  reg [31:0] instance_count=1;
+  reg [31:0] src0_batch_stride=0,src1_batch_stride=0,dst_batch_stride=0;
+  reg transpose_a=0,transpose_b=0,bias_enable=0;
+  reg [4:0] scale_shift=0;
+  reg [1:0] activation=0;
+  reg [31:0] watchdog_limit=0;
+
+  wire [31:0] bank0_data,bank1_data,bank2_data,bank3_data;
+  wire [3:0] bank_parity_error;
+  wire banked_read_valid;
+  wire [31:0] banked_addr;
+  reg banked_ready=0,banked_rsp_valid=0;
+  wire banked_protection_error;
+  wire spad_valid,spad_write;
+  wire [31:0] spad_addr,spad_wdata;
+  reg spad_ready=0,spad_rsp_valid=0;
+  wire [31:0] spad_rdata;
+  wire spad_parity_error,spad_protection_error;
+  wire line_valid,line_write;
+  wire [31:0] line_addr;
+  wire [127:0] line_wdata;
+  wire [15:0] line_wstrb;
+  reg line_ready=0;
+  wire line_protection_error;
+  wire busy,done,error;
+  wire [3:0] error_code;
+  wire [31:0] result,cycle_count,element_count;
+  wire perf_mac_active,perf_banked_wait;
+
+  reg [31:0] bank_mem [0:3][0:8191];
+  reg [31:0] bias_mem [0:65535];
+  reg [31:0] output_mem [0:65535];
+  reg [31:0] expected_mem [0:65535];
+  reg signed [7:0] logical_a [0:3][0:15][0:31];
+  reg signed [7:0] logical_b [0:3][0:31][0:15];
+  reg signed [31:0] logical_bias [0:15];
+
+  reg [31:0] pending_bank_data [0:3];
+  reg [31:0] pending_spad_data;
+  integer bank_delay=0,spad_delay=0;
+  integer pending_bank_issue=0;
+  integer bank_parity_target_issue=0;
+  reg pending_bank=0,pending_spad=0;
+  reg [31:0] rng=32'h7ac4_01d3;
+  integer bank_read_count=0,bank_response_count=0;
+  integer spad_read_count=0,spad_response_count=0;
+  integer bank_stall_count=0,spad_stall_count=0,line_stall_count=0;
+  integer line_write_count=0,scalar_write_count=0;
+  integer seed=20261021,initial_seed;
+
+  reg inject_bank_parity=0,inject_spad_parity=0;
+  reg inject_bank_protection=0,inject_spad_protection=0;
+  reg inject_line_protection=0;
+  reg [31:0] bank_protection_addr=0,spad_protection_addr=0;
+  reg [31:0] line_protection_addr=0;
+
+  integer cfg_m,cfg_n,cfg_kw,cfg_instances,cfg_ta,cfg_tb,cfg_bias;
+  integer cfg_shift,cfg_act,cfg_pad_a,cfg_pad_b,cfg_pad_dst,cfg_unaligned;
+  integer rand_state=20261021;
+  integer inst,row,col,k,tile_row,tile_col,kg,lane,byte_index;
+  integer a_stride,b_stride,d_stride,addr,line_index,word_index;
+  integer signed accum,post_value;
+  integer timeout_cycles,case_count=0,fault_count=0;
+  reg [31:0] packed_word;
+
+  always #5 clk=~clk;
+
+  assign banked_protection_error = inject_bank_protection &&
+      banked_read_valid && (banked_addr==bank_protection_addr);
+  assign spad_protection_error = inject_spad_protection && spad_valid &&
+      (spad_addr==spad_protection_addr);
+  assign line_protection_error = inject_line_protection && line_valid &&
+      (line_addr==line_protection_addr);
+  assign spad_rdata = pending_spad_data;
+  assign spad_parity_error = inject_spad_parity && spad_rsp_valid;
+  assign bank0_data = pending_bank_data[0];
+  assign bank1_data = pending_bank_data[1];
+  assign bank2_data = pending_bank_data[2];
+  assign bank3_data = pending_bank_data[3];
+  assign bank_parity_error = (inject_bank_parity && banked_rsp_valid &&
+                               pending_bank_issue==bank_parity_target_issue) ?
+                               4'b0001 : 4'b0000;
+
+  ai_tensor_matrix_core dut(
+    .clk(clk),.resetn(resetn),.start(start),.abort(abort),.op_mode(op_mode),
+    .src0_base(src0_base),.src1_base(src1_base),.bias_base(bias_base),.dst_base(dst_base),
+    .m_size(m_size),.n_size(n_size),.k_words(k_words),.instance_count(instance_count),
+    .src0_batch_stride(src0_batch_stride),.src1_batch_stride(src1_batch_stride),
+    .dst_batch_stride(dst_batch_stride),.transpose_a(transpose_a),.transpose_b(transpose_b),
+    .bias_enable(bias_enable),.scale_shift(scale_shift),.activation(activation),
+    .watchdog_limit(watchdog_limit),
+    .bank0_data(bank0_data),.bank1_data(bank1_data),.bank2_data(bank2_data),.bank3_data(bank3_data),
+    .bank_parity_error(bank_parity_error),.banked_read_valid(banked_read_valid),
+    .banked_addr(banked_addr),.banked_ready(banked_ready),.banked_rsp_valid(banked_rsp_valid),
+    .banked_protection_error(banked_protection_error),
+    .spad_valid(spad_valid),.spad_write(spad_write),.spad_addr(spad_addr),.spad_wdata(spad_wdata),
+    .spad_ready(spad_ready),.spad_rsp_valid(spad_rsp_valid),.spad_rdata(spad_rdata),
+    .spad_parity_error(spad_parity_error),.spad_protection_error(spad_protection_error),
+    .line_valid(line_valid),.line_write(line_write),.line_addr(line_addr),.line_wdata(line_wdata),
+    .line_wstrb(line_wstrb),.line_ready(line_ready),.line_protection_error(line_protection_error),
+    .busy(busy),.done(done),.error(error),.error_code(error_code),.result(result),
+    .cycle_count(cycle_count),.element_count(element_count),
+    .perf_mac_active(perf_mac_active),.perf_banked_wait(perf_banked_wait));
+
+  // Registered scratchpad response models. Ready and response latency vary
+  // independently; the core observes the response and data on the next edge.
+  always @(posedge clk or negedge resetn) begin
+    if(!resetn) begin
+      rng<=32'h7ac4_01d3;
+      banked_ready<=0;banked_rsp_valid<=0;pending_bank<=0;bank_delay<=0;
+      pending_bank_issue<=0;bank_read_count<=0;bank_response_count<=0;
+      pending_bank_data[0]<=0;pending_bank_data[1]<=0;
+      pending_bank_data[2]<=0;pending_bank_data[3]<=0;
+      spad_ready<=0;spad_rsp_valid<=0;pending_spad<=0;spad_delay<=0;
+      pending_spad_data<=0;spad_read_count<=0;spad_response_count<=0;
+      line_ready<=0;
+      line_write_count<=0;scalar_write_count<=0;
+    end else begin
+      rng<={rng[30:0],rng[31]^rng[21]^rng[1]^rng[0]};
+      banked_ready<=rng[0]|rng[3];
+      spad_ready<=rng[2]|rng[5];
+      line_ready<=rng[1]|rng[4];
+      banked_rsp_valid<=0;spad_rsp_valid<=0;
+
+      if(banked_read_valid && !banked_ready) bank_stall_count<=bank_stall_count+1;
+      if(spad_valid && !spad_ready) spad_stall_count<=spad_stall_count+1;
+      if(line_valid && !line_ready) line_stall_count<=line_stall_count+1;
+
+      if(pending_bank) begin
+        if(bank_delay==0) begin
+          banked_rsp_valid<=1;
+          pending_bank<=0;bank_response_count<=bank_response_count+1;
+        end else bank_delay<=bank_delay-1;
+      end
+      if(banked_read_valid && banked_ready && !banked_protection_error) begin
+        if(pending_bank) $fatal(1,"banked request overlapped an undelivered response state=%0d addr=%08x new_addr=%08x delay=%0d",
+                                dut.state_r,banked_addr,banked_addr,bank_delay);
+        pending_bank_data[0]<=bank_mem[0][(banked_addr>>4)&13'h1fff];
+        pending_bank_data[1]<=bank_mem[1][(banked_addr>>4)&13'h1fff];
+        pending_bank_data[2]<=bank_mem[2][(banked_addr>>4)&13'h1fff];
+        pending_bank_data[3]<=bank_mem[3][(banked_addr>>4)&13'h1fff];
+        pending_bank<=1;bank_delay<=rng[6:5];pending_bank_issue<=bank_read_count;
+        bank_read_count<=bank_read_count+1;
+      end
+
+      if(pending_spad) begin
+        if(spad_delay==0) begin
+          spad_rsp_valid<=1;pending_spad<=0;
+          spad_response_count<=spad_response_count+1;
+        end else spad_delay<=spad_delay-1;
+      end
+      if(spad_valid && spad_ready && !spad_write && !spad_protection_error) begin
+        if(pending_spad) $fatal(1,"SPAD read overlapped an undelivered response");
+        pending_spad_data<=bias_mem[spad_addr>>2];
+        pending_spad<=1;spad_delay<=rng[8:7];spad_read_count<=spad_read_count+1;
+      end
+      if(spad_valid && spad_ready && spad_write && !spad_protection_error) begin
+        output_mem[spad_addr>>2]<=spad_wdata;
+        scalar_write_count<=scalar_write_count+1;
+      end
+      if(line_valid && line_ready && !line_protection_error) begin
+        if(line_wstrb!==16'hffff) $fatal(1,"matrix line write strobe mismatch %h",line_wstrb);
+        output_mem[line_addr>>2]<=line_wdata[31:0];
+        output_mem[(line_addr>>2)+1]<=line_wdata[63:32];
+        output_mem[(line_addr>>2)+2]<=line_wdata[95:64];
+        output_mem[(line_addr>>2)+3]<=line_wdata[127:96];
+        line_write_count<=line_write_count+1;
+      end
+    end
+  end
+
+  function automatic [31:0] pack4(input integer b0,b1,b2,b3);
+    begin pack4={b3[7:0],b2[7:0],b1[7:0],b0[7:0]}; end
+  endfunction
+
+  task automatic prepare_case(
+      input integer m,input integer n,input integer kw,input integer batches,
+      input integer ta,input integer tb,input integer use_bias,
+      input integer shift,input integer act,input integer padded,input integer unaligned);
+    integer local_a_stride,local_b_stride,local_dst_stride;
+    integer local_addr,local_index,local_word;
+    integer rr,cc,ll,tt,ii,kk;
+    integer signed value;
+    integer signed result_value;
+    begin
+      cfg_m=m;cfg_n=n;cfg_kw=kw;cfg_instances=batches;cfg_ta=ta;cfg_tb=tb;
+      cfg_bias=use_bias;cfg_shift=shift;cfg_act=act;cfg_pad_a=padded;
+      cfg_pad_b=padded;cfg_pad_dst=padded;cfg_unaligned=unaligned;
+      m_size=m;n_size=n;k_words=kw;instance_count=batches;
+      op_mode=(batches>1)?8'h31:8'h30;
+      src0_base=SRC0_BASE;src1_base=SRC1_BASE;bias_base=BIAS_BASE;
+      dst_base=DST_BASE+(unaligned?4:0);
+      transpose_a=ta;transpose_b=tb;bias_enable=use_bias;
+      scale_shift=shift;activation=act;watchdog_limit=0;
+      local_a_stride=(m/4)*kw*16+(padded?32:0);
+      local_b_stride=(n/4)*kw*16+(padded?48:0);
+      local_dst_stride=m*n*4+(padded?32:0);
+      src0_batch_stride=(padded?local_a_stride:0);
+      src1_batch_stride=(padded?local_b_stride:0);
+      dst_batch_stride=(padded?local_dst_stride:0);
+      if(!padded) begin
+        local_a_stride=(m/4)*kw*16;
+        local_b_stride=(n/4)*kw*16;
+        local_dst_stride=m*n*4;
+      end
+
+      for(ii=0;ii<batches;ii=ii+1)
+        for(rr=0;rr<m;rr=rr+1)
+          for(kk=0;kk<kw*4;kk=kk+1) begin
+            value=($random(rand_state)%13)-6;
+            logical_a[ii][rr][kk]=value;
+          end
+      for(ii=0;ii<batches;ii=ii+1)
+        for(kk=0;kk<kw*4;kk=kk+1)
+          for(cc=0;cc<n;cc=cc+1) begin
+            value=($random(rand_state)%13)-6;
+            logical_b[ii][kk][cc]=value;
+          end
+      for(cc=0;cc<n;cc=cc+1) begin
+        logical_bias[cc]=($random(rand_state)%17)-8;
+        bias_mem[(BIAS_BASE>>2)+cc]=logical_bias[cc];
+      end
+
+      // Arrange each banked line so the core's optional local 4x4 transpose
+      // selects the requested logical A/B elements for every MAC lane.
+      for(ii=0;ii<batches;ii=ii+1) begin
+        for(tt=0;tt<m/4;tt=tt+1)
+          for(kk=0;kk<kw;kk=kk+1) begin
+            local_addr=SRC0_BASE+ii*local_a_stride+(tt*kw+kk)*16;
+            local_index=(local_addr>>4)&13'h1fff;
+            if(!ta) begin
+              for(rr=0;rr<4;rr=rr+1) begin
+                packed_word=0;
+                for(ll=0;ll<4;ll=ll+1)
+                  packed_word[ll*8+:8]=logical_a[ii][tt*4+rr][kk*4+ll];
+                bank_mem[rr][local_index]=packed_word;
+              end
+            end else begin
+              for(ll=0;ll<4;ll=ll+1) begin
+                packed_word=0;
+                for(rr=0;rr<4;rr=rr+1)
+                  packed_word[rr*8+:8]=logical_a[ii][tt*4+rr][kk*4+ll];
+                bank_mem[ll][local_index]=packed_word;
+              end
+            end
+          end
+        for(tt=0;tt<n/4;tt=tt+1)
+          for(kk=0;kk<kw;kk=kk+1) begin
+            local_addr=SRC1_BASE+ii*local_b_stride+(tt*kw+kk)*16;
+            local_index=(local_addr>>4)&13'h1fff;
+            if(!tb) begin
+              for(cc=0;cc<4;cc=cc+1) begin
+                packed_word=0;
+                for(ll=0;ll<4;ll=ll+1)
+                  packed_word[ll*8+:8]=logical_b[ii][kk*4+ll][tt*4+cc];
+                bank_mem[cc][local_index]=packed_word;
+              end
+            end else begin
+              for(ll=0;ll<4;ll=ll+1) begin
+                packed_word=0;
+                for(cc=0;cc<4;cc=cc+1)
+                  packed_word[cc*8+:8]=logical_b[ii][kk*4+ll][tt*4+cc];
+                bank_mem[ll][local_index]=packed_word;
+              end
+            end
+          end
+      end
+
+      for(ii=0;ii<batches;ii=ii+1)
+        for(rr=0;rr<m;rr=rr+1)
+          for(cc=0;cc<n;cc=cc+1) begin
+            accum=0;
+            for(kk=0;kk<kw*4;kk=kk+1)
+              accum=accum+$signed(logical_a[ii][rr][kk])*$signed(logical_b[ii][kk][cc]);
+            if(use_bias) accum=accum+logical_bias[cc];
+            result_value=accum >>> shift;
+            if(act==1 && result_value<0) result_value=0;
+            else if(act==2) begin
+              if(result_value<0) result_value=0;
+              else if(result_value>6) result_value=6;
+            end
+            local_addr=dst_base+ii*local_dst_stride+rr*n*4+cc*4;
+            local_word=local_addr>>2;
+            expected_mem[local_word]=result_value;
+            output_mem[local_word]=32'hbad0_0000+local_word;
+          end
+      line_write_count=0;scalar_write_count=0;
+    end
+  endtask
+
+  task automatic launch_and_wait;
+    begin
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      timeout_cycles=0;
+      while(!done && timeout_cycles<200000) begin
+        @(negedge clk);timeout_cycles=timeout_cycles+1;
+      end
+      if(!done) $fatal(1,"matrix core timeout m=%0d n=%0d kw=%0d state=%0d busy=%b cycle=%0d wdog=%0d pending=%b/%b",
+                       m_size,n_size,k_words,dut.state_r,busy,cycle_count,
+                       dut.watchdog_limit_r,pending_bank,pending_spad);
+    end
+  endtask
+
+  task automatic check_valid_case(input integer case_id);
+    integer expected_line_writes,expected_scalar_writes;
+    integer ii,rr,cc,local_word;
+    begin
+      launch_and_wait();
+      if(error || error_code!==0)
+        $fatal(1,"matrix case %0d unexpected error=%b code=%0d",case_id,error,error_code);
+      if(busy || element_count!==(cfg_m*cfg_n*cfg_instances))
+        $fatal(1,"matrix case %0d completion elements=%0d expected=%0d busy=%b",
+               case_id,element_count,cfg_m*cfg_n*cfg_instances,busy);
+      expected_line_writes=cfg_unaligned?0:(cfg_m*cfg_instances*(cfg_n/4));
+      expected_scalar_writes=cfg_unaligned?(cfg_m*cfg_n*cfg_instances):0;
+      if(line_write_count!==expected_line_writes || scalar_write_count!==expected_scalar_writes)
+        $fatal(1,"matrix case %0d writes line=%0d/%0d scalar=%0d/%0d",case_id,
+               line_write_count,expected_line_writes,scalar_write_count,expected_scalar_writes);
+      for(ii=0;ii<cfg_instances;ii=ii+1)
+        for(rr=0;rr<cfg_m;rr=rr+1)
+          for(cc=0;cc<cfg_n;cc=cc+1) begin
+            local_word=(dst_base+ii*(cfg_m*cfg_n*4+(cfg_pad_dst?32:0))+rr*cfg_n*4+cc*4)>>2;
+            if(output_mem[local_word]!==expected_mem[local_word])
+              $fatal(1,"matrix case %0d batch=%0d row=%0d col=%0d got=%08x exp=%08x",
+                     case_id,ii,rr,cc,output_mem[local_word],expected_mem[local_word]);
+          end
+      local_word=(dst_base+(cfg_instances-1)*(cfg_m*cfg_n*4+(cfg_pad_dst?32:0))+
+                  cfg_m*cfg_n*4-4)>>2;
+      if(result!==expected_mem[local_word])
+        $fatal(1,"matrix case %0d result=%08x expected-last=%08x",case_id,result,expected_mem[local_word]);
+      if(bank_read_count!=bank_response_count || pending_bank ||
+         spad_read_count!=spad_response_count || pending_spad)
+        $fatal(1,"matrix case %0d read drain bank=%0d/%0d pending=%b spad=%0d/%0d pending=%b",
+               case_id,bank_read_count,bank_response_count,pending_bank,
+               spad_read_count,spad_response_count,pending_spad);
+      case_count=case_count+1;
+      $display("MATRIX_CORE_CASE_PASS id=%0d shape=%0dx%dx%0d batches=%0d transpose=%b%b bias=%b writes=%0d/%0d",
+               case_id,cfg_m,cfg_n,cfg_kw*4,cfg_instances,cfg_ta,cfg_tb,cfg_bias,
+               line_write_count,scalar_write_count);
+    end
+  endtask
+
+  task automatic finish_fault(input integer expected_code,input integer fault_id);
+    integer observed_code;
+    begin
+      timeout_cycles=0;
+      while(!done && timeout_cycles<200000) begin
+        @(negedge clk);timeout_cycles=timeout_cycles+1;
+      end
+      if(!done) $fatal(1,"matrix fault %0d timed out",fault_id);
+      if(!error || error_code!==expected_code || busy)
+        $fatal(1,"matrix fault %0d got error=%b code=%0d expected=%0d busy=%b",
+               fault_id,error,error_code,expected_code,busy);
+      observed_code=error_code;
+      if(line_write_count!=0 || scalar_write_count!=0)
+        $fatal(1,"matrix fault %0d committed output before error",fault_id);
+      while(pending_bank || pending_spad) @(negedge clk);
+      repeat(2) @(negedge clk);
+      fault_count=fault_count+1;
+      $display("MATRIX_CORE_FAULT_PASS id=%0d code=%0d",fault_id,observed_code);
+    end
+  endtask
+
+  task automatic check_fault(input integer expected_code,input integer fault_id);
+    begin launch_and_wait();finish_fault(expected_code,fault_id);end
+  endtask
+
+  task automatic simple_fault_setup;
+    begin
+      prepare_case(4,4,2,1,0,0,0,0,0,0,0);
+      inject_bank_parity=0;inject_spad_parity=0;
+      inject_bank_protection=0;inject_spad_protection=0;inject_line_protection=0;
+      watchdog_limit=0;
+    end
+  endtask
+
+  task automatic check_inflight_reset_recovery;
+    begin
+      simple_fault_setup();
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      if(!busy) $fatal(1,"matrix reset probe did not enter busy");
+      // Reset concurrently with abort plus bank/SPAD/line protection and
+      // parity requests; reset must clear lifecycle status and pending work.
+      abort=1;inject_bank_parity=1;inject_spad_parity=1;
+      inject_bank_protection=1;inject_spad_protection=1;
+      inject_line_protection=1;
+      resetn=0;#1;
+      if(busy || done || error || error_code!=0)
+        $fatal(1,"matrix reset did not clear command status");
+      repeat(3) @(negedge clk);resetn=1;abort=0;
+      repeat(2) @(negedge clk);
+      simple_fault_setup();
+      check_valid_case(11);
+    end
+  endtask
+
+  task automatic run_late_tile_parity_fault;
+    integer target_issue,lines_before,scalars_before,lines_at_fault,scalars_at_fault;
+    begin
+      simple_fault_setup();
+      prepare_case(16,16,8,1,0,0,0,0,0,0,0);
+      target_issue=bank_read_count+80;
+      bank_parity_target_issue=target_issue;
+      inject_bank_parity=1;
+      lines_before=line_write_count;scalars_before=scalar_write_count;
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      timeout_cycles=0;
+      while(bank_read_count<=target_issue && timeout_cycles<200000) begin
+        @(negedge clk);timeout_cycles=timeout_cycles+1;
+      end
+      if(bank_read_count<=target_issue)
+        $fatal(1,"matrix late parity did not reach bank request %0d (count=%0d)",
+               target_issue,bank_read_count);
+      timeout_cycles=0;
+      while(!done && timeout_cycles<200000) begin
+        @(negedge clk);timeout_cycles=timeout_cycles+1;
+      end
+      if(!done || !error || error_code!=ERR_PARITY || busy)
+        $fatal(1,"matrix late-tile parity done/error/code/busy=%b/%b/%0d/%b",
+               done,error,error_code,busy);
+      lines_at_fault=line_write_count;scalars_at_fault=scalar_write_count;
+      if(lines_at_fault<=lines_before || scalars_at_fault!=scalars_before)
+        $fatal(1,"matrix late fault missed prior tile writeback line=%0d scalar=%0d",
+               lines_at_fault-lines_before,scalars_at_fault-scalars_before);
+      repeat(4) @(negedge clk);
+      if(line_write_count!=lines_at_fault || scalar_write_count!=scalars_at_fault)
+        $fatal(1,"matrix wrote output after late parity error line=%0d->%0d scalar=%0d->%0d",
+               lines_at_fault,line_write_count,scalars_at_fault,scalar_write_count);
+      inject_bank_parity=0;
+      while(pending_bank || pending_spad) @(negedge clk);
+      fault_count=fault_count+1;
+      $display("MATRIX_CORE_LATE_FAULT_PASS issue=%0d completed_lines=%0d",target_issue,
+               lines_at_fault-lines_before);
+    end
+  endtask
+
+  initial begin
+    if($value$plusargs("SEED=%d",seed)) begin end
+    initial_seed=seed;rand_state=seed;
+    for(inst=0;inst<4;inst=inst+1)
+      for(row=0;row<8192;row=row+1)
+        for(col=0;col<4;col=col+1) bank_mem[col][row]=0;
+    for(row=0;row<65536;row=row+1) begin
+      bias_mem[row]=0;output_mem[row]=0;expected_mem[row]=0;
+    end
+    repeat(4) @(negedge clk);resetn=1;
+
+    prepare_case(8,8,2,2,0,0,1,1,1,1,0);
+    check_valid_case(0);
+    prepare_case(8,4,2,1,1,0,0,0,0,0,0);
+    check_valid_case(1);
+    prepare_case(4,8,1,2,0,1,1,0,2,1,0);
+    check_valid_case(2);
+    prepare_case(4,4,1,1,1,1,0,3,0,0,1);
+    check_valid_case(3);
+
+    simple_fault_setup();m_size=0;check_fault(ERR_CONFIG,0);
+    prepare_case(4,4,1,1,0,0,0,0,0,0,0);op_mode=8'h7f;check_fault(ERR_OP,1);
+    simple_fault_setup();inject_bank_protection=1;bank_protection_addr=SRC0_BASE;
+    check_fault(ERR_PROTECTION,2);inject_bank_protection=0;
+    prepare_case(4,4,2,1,0,0,0,0,0,0,0);
+    bank_parity_target_issue=bank_read_count;inject_bank_parity=1;
+    check_fault(ERR_PARITY,3);inject_bank_parity=0;
+    prepare_case(4,4,1,1,0,0,1,0,0,0,0);inject_spad_parity=1;
+    check_fault(ERR_PARITY,4);inject_spad_parity=0;
+    prepare_case(4,4,1,1,0,0,1,0,0,0,0);inject_spad_protection=1;
+    spad_protection_addr=BIAS_BASE;check_fault(ERR_PROTECTION,5);inject_spad_protection=0;
+    prepare_case(4,4,1,1,0,0,0,0,0,0,0);inject_line_protection=1;
+    line_protection_addr=DST_BASE;check_fault(ERR_PROTECTION,6);inject_line_protection=0;
+    prepare_case(4,4,1,1,0,0,0,0,0,0,1);inject_spad_protection=1;
+    spad_protection_addr=DST_BASE+4;check_fault(ERR_PROTECTION,7);inject_spad_protection=0;
+
+    simple_fault_setup();watchdog_limit=3;check_fault(ERR_WATCHDOG,8);
+    simple_fault_setup();
+    @(negedge clk);start=1;@(negedge clk);start=0;
+    while(!busy) @(negedge clk);
+    repeat(5) @(negedge clk);abort=1;@(negedge clk);abort=0;
+    finish_fault(ERR_ABORT,9);
+
+    // Abort wins over a same-cycle bank parity/protection fault and watchdog.
+    simple_fault_setup();prepare_case(4,4,2,1,0,0,0,0,0,0,0);
+    watchdog_limit=1;bank_parity_target_issue=bank_read_count;
+    inject_bank_parity=1;inject_bank_protection=1;
+    bank_protection_addr=SRC0_BASE;
+    @(negedge clk);start=1;@(negedge clk);start=0;abort=1;
+    finish_fault(ERR_ABORT,10);
+    abort=0;inject_bank_parity=0;inject_bank_protection=0;
+    run_late_tile_parity_fault();
+
+    prepare_case(4,4,1,1,0,0,0,0,0,0,0);
+    check_valid_case(10);
+    check_inflight_reset_recovery();
+    if(bank_stall_count==0 || spad_stall_count==0 || line_stall_count==0)
+      $fatal(1,"matrix randomized ready profile missed stalls bank/spad/line=%0d/%0d/%0d",
+             bank_stall_count,spad_stall_count,line_stall_count);
+    $display("MATRIX_CORE_RANDOM_PASS cases=%0d faults=%0d late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 seed=%0d bank_reads=%0d responses=%0d spad_reads=%0d responses=%0d stalls=%0d/%0d/%0d",
+             case_count,fault_count,initial_seed,bank_read_count,bank_response_count,
+             spad_read_count,spad_response_count,bank_stall_count,spad_stall_count,line_stall_count);
+    $finish;
+  end
+endmodule

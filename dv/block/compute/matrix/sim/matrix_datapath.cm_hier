@@ -1,0 +1,2 @@
+// Collect only the production matrix datapath instance.
++tree tb_ai_tensor_matrix_datapath_random.dut

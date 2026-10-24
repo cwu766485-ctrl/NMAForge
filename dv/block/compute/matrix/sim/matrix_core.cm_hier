@@ -1,0 +1,2 @@
+// Collect only the production matrix core and its datapath child.
++tree tb_ai_tensor_matrix_core_random.dut

@@ -540,6 +540,10 @@ module ai_fp_core_parity_full_lifecycle_assume_top (
     ai_mixed_precision_dot_fp32_core dut (.*);
 
     wire [16:0] words_needed = ({1'b0, dut.length_r} + 17'd1) >> 1;
+    wire [17:0] accepted_read_count =
+        {1'b0, dut.request_word_index_r, 1'b0} + dut.request_is_b_r;
+    wire [17:0] returned_read_count =
+        {1'b0, dut.response_word_index_r, 1'b0} + dut.response_is_b_r;
 
     // Harness-only ghost tags record which packed SPAD word populated each
     // A/B pair slot. They do not constrain DUT behavior; they expose the
@@ -582,6 +586,17 @@ module ai_fp_core_parity_full_lifecycle_assume_top (
     assume property (@(posedge clk) disable iff (!resetn)
         dut.response_fire |->
           ({1'b0, dut.response_word_index_r} < words_needed));
+    // These independently proven request-frontier lemmas make the response
+    // cursor and accepted-read window explicit in this assume-guarantee proof.
+    assume property (@(posedge clk) disable iff (!resetn)
+        (accepted_read_count >= returned_read_count) &&
+        ({16'd0, dut.outstanding_reads_r} ==
+         (accepted_read_count - returned_read_count)));
+    assume property (@(posedge clk) disable iff (!resetn)
+        (dut.state_r != ST_RUN) ||
+        ({1'b0, dut.request_word_index_r} <= words_needed));
+    assume property (@(posedge clk) disable iff (!resetn)
+        accepted_read_count <= {words_needed, 1'b0});
     assume property (@(posedge clk) disable iff (!resetn)
         (dut.pending_error_r == ERR_PARITY) |->
           (dut.memory_error_cutoff_valid_r &&
@@ -640,6 +655,10 @@ module ai_fp_core_parity_full_lifecycle_assume_top (
         @(posedge clk) disable iff (!resetn)
         (dut.pending_error_r == ERR_PARITY) |->
           (dut.element_index_r <= dut.memory_error_cutoff_r));
+    ap_parity_event_cutoff_not_behind_progress: assert property (
+        @(posedge clk) disable iff (!resetn)
+        dut.response_parity_failure |->
+          (dut.element_index_r <= dut.memory_error_cutoff_now));
     ap_writeback_excludes_pending_parity: assert property (
         @(posedge clk) disable iff (!resetn)
         (dut.state_r == ST_WRITE) |->
@@ -699,4 +718,90 @@ module ai_fp_core_parity_full_lifecycle_assume_top (
     cp_parity_error_retires: cover property (
         @(posedge clk) disable iff (!resetn)
         dut.done && dut.error && (dut.error_code == ERR_PARITY));
+endmodule
+
+// Progress proof by composition: the event-cutoff relation and the
+// no-compute-at/after-cutoff guard are proved separately in the full-domain
+// control harnesses. Arithmetic is irrelevant to this control-only invariant.
+module ai_fp_core_parity_progress_compose_top (
+    input logic        clk,
+    input logic        resetn,
+    input logic        start,
+    input logic        format_fp16,
+    input logic        abort,
+    input logic [31:0] src0_base,
+    input logic [31:0] src1_base,
+    input logic [31:0] dst_base,
+    input logic [15:0] length,
+    input logic [31:0] watchdog_limit,
+    input logic        spad_ready,
+    input logic        spad_rsp_valid,
+    input logic [31:0] spad_rdata,
+    input logic        spad_parity_error,
+    input logic        spad_protection_error
+);
+    localparam [3:0] ERR_PARITY = 4'd5;
+
+    logic        spad_valid;
+    logic        spad_write;
+    logic [31:0] spad_addr;
+    logic [31:0] spad_wdata;
+    logic        busy;
+    logic        done;
+    logic        error;
+    logic [3:0]  error_code;
+    logic [31:0] result;
+    logic [31:0] cycle_count;
+    logic [31:0] element_count;
+
+    ai_mixed_precision_dot_fp32_core dut (.*);
+
+    wire [16:0] words_needed = ({1'b0, dut.length_r} + 17'd1) >> 1;
+    wire [17:0] accepted_read_count =
+        {1'b0, dut.request_word_index_r, 1'b0} + dut.request_is_b_r;
+    wire [17:0] returned_read_count =
+        {1'b0, dut.response_word_index_r, 1'b0} + dut.response_is_b_r;
+
+    assume property (@(posedge clk) !resetn |=> resetn);
+    assume property (@(posedge clk) resetn |=> resetn);
+    assume property (@(posedge clk) disable iff (!resetn)
+        start |-> ((length != 16'd0) &&
+                   (src0_base[1:0] == 2'b00) &&
+                   (src1_base[1:0] == 2'b00) &&
+                   (dst_base[1:0] == 2'b00) &&
+                   (watchdog_limit == 0)));
+    assume property (@(posedge clk) !abort);
+    assume property (@(posedge clk) disable iff (!resetn)
+        spad_rsp_valid |-> (dut.outstanding_reads_r != 0));
+    assume property (@(posedge clk) disable iff (!resetn)
+        dut.response_fire |->
+          ({1'b0, dut.response_word_index_r} < words_needed));
+    assume property (@(posedge clk) disable iff (!resetn)
+        (accepted_read_count >= returned_read_count) &&
+        ({16'd0, dut.outstanding_reads_r} ==
+         (accepted_read_count - returned_read_count)));
+    assume property (@(posedge clk) disable iff (!resetn)
+        (dut.state_r != 4'd1) ||
+        ({1'b0, dut.request_word_index_r} <= words_needed));
+    assume property (@(posedge clk) disable iff (!resetn)
+        accepted_read_count <= {words_needed, 1'b0});
+    assume property (@(posedge clk) disable iff (!resetn)
+        (dut.pending_error_r == ERR_PARITY) |->
+          (dut.memory_error_cutoff_valid_r &&
+           (dut.memory_error_cutoff_r < dut.length_r)));
+
+    // Independently-proven full-domain control lemmas used as composition
+    // boundaries for this progress property.
+    assume property (@(posedge clk) disable iff (!resetn)
+        dut.response_parity_failure |->
+          (dut.element_index_r <= dut.memory_error_cutoff_now));
+    assume property (@(posedge clk) disable iff (!resetn)
+        ((dut.pending_error_r == ERR_PARITY) &&
+         (dut.element_index_r >= dut.memory_error_cutoff_r)) |->
+          !dut.compute_fire);
+
+    ap_parity_progress_stays_before_cutoff: assert property (
+        @(posedge clk) disable iff (!resetn)
+        (dut.pending_error_r == ERR_PARITY) |->
+          (dut.element_index_r <= dut.memory_error_cutoff_r));
 endmodule

@@ -1,5 +1,8 @@
 # NMAForge digital-CNM evaluation summary
 
+Status summary: 2026-10-21. For per-engine functional and code-coverage
+convergence, see the [compute-engine status page](../verification/COMPUTE_ENGINE_STATUS.md).
+
 ## Scope
 
 This public summary covers the bank-local digital compute-near-memory (CNM)
@@ -14,7 +17,7 @@ LLM-serving performance.
 - Directed VCS regressions and a controlled GEMV benchmark against the prior
   scalar baseline.
 - Interaction with the active DMA/scratchpad/command-completion architecture is
-  covered separately by top-level smoke and block verification.
+  exercised by top-level smoke and the selected DMA–SPAD–CNM campaign.
 
 ## Results boundary
 
@@ -38,7 +41,8 @@ libraries, macro adapters and reports are private.
 ## Next measurements
 
 1. Board-level effective GB/s, MAC/s, DMA-stall and overlap counters.
-2. Load/compute/store overlap on ping-pong tiles.
-3. Multi-seed UVM coverage closure for DMA, control, arbitration and queue
-   subsystems.
-4. Post-layout PPA with licensed physical-design collateral.
+2. Fixed-shape CNN/Transformer end-to-end cycle and byte counts; existing
+   overlap data covers selected FP ping-pong workloads only.
+3. Residual DUT coverage and cross-layer fault/reset closure; selected groups
+   are not global coverage closure.
+4. Post-layout multi-corner PPA with licensed physical-design collateral.

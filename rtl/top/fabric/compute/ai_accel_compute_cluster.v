@@ -56,6 +56,11 @@ module ai_accel_compute_cluster (
     input  wire        core_rsp_valid,
     input  wire [31:0] arb_rsp_rdata,
     input  wire        core_rsp_error,
+    input  wire [6:0]  engine_core_ready,
+    input  wire [6:0]  engine_core_rsp_valid,
+    input  wire [223:0] engine_core_rsp_rdata,
+    input  wire [6:0]  engine_core_rsp_error,
+    input  wire [6:0]  engine_core_protection_error,
     input  wire        core_spad_parity_error,
     input  wire        compute_prot_error,
     input  wire        arb_core_line_ready,
@@ -125,6 +130,13 @@ module ai_accel_compute_cluster (
     output wire [31:0] core_result,
     output wire [31:0] core_cycle_count,
     output wire [31:0] core_element_count,
+    output wire [6:0]  engine_busy,
+    output wire [6:0]  engine_done,
+    output wire [6:0]  engine_error,
+    output wire [27:0] engine_error_code,
+    output wire [223:0] engine_result,
+    output wire [223:0] engine_cycle_count,
+    output wire [223:0] engine_element_count,
     output wire        matrix_perf_mac_active,
     output wire        matrix_perf_banked_wait
 );
@@ -169,6 +181,28 @@ module ai_accel_compute_cluster (
                                 sfu_done ? sfu_element_count :
                                 banked_done ? banked_element_count : scalar_element_count;
 
+    // Packed status vectors form the per-engine completion interface used by
+    // the parallel command dispatcher. Bit 0 is scalar INT8; bit 6 is KV.
+    assign engine_busy = {kv_busy, conv_busy, sfu_busy, matrix_busy,
+                          banked_busy, fp_busy, scalar_busy};
+    assign engine_done = {kv_done, conv_done, sfu_done, matrix_done,
+                          banked_done, fp_done, scalar_done};
+    assign engine_error = {kv_error, conv_error, sfu_error, matrix_error,
+                           banked_error, fp_error, scalar_error};
+    assign engine_error_code = {kv_error_code, conv_error_code, sfu_error_code,
+                                matrix_error_code, banked_error_code,
+                                fp_error_code, scalar_error_code};
+    assign engine_result = {kv_result, conv_result, sfu_result, matrix_result,
+                            banked_result, fp_result, scalar_result};
+    assign engine_cycle_count = {kv_cycle_count, conv_cycle_count,
+                                 sfu_cycle_count, matrix_cycle_count,
+                                 banked_cycle_count, fp_cycle_count,
+                                 scalar_cycle_count};
+    assign engine_element_count = {kv_element_count, conv_element_count,
+                                   sfu_element_count, matrix_element_count,
+                                   banked_element_count, fp_element_count,
+                                   scalar_element_count};
+
     ai_banked_cnm_core banked_core_u(
         .clk(aclk), .resetn(aresetn), .start(core_start && banked_op), .abort(core_abort), .op_mode(launch_op),
         .src0_base(launch_src0), .src1_base(launch_src1), .dst_base(launch_dst),
@@ -180,8 +214,8 @@ module ai_accel_compute_cluster (
         .cnm_data2(cnm_data2), .cnm_data3(cnm_data3), .cnm_parity_error(cnm_parity),
         .cnm_protection_error(cnm_protection_error),
         .spad_valid(banked_spad_valid), .spad_write(banked_spad_write), .spad_addr(banked_spad_addr), .spad_wdata(banked_spad_wdata),
-        .spad_ready(arb_core_ready),
-        .spad_protection_error(compute_prot_error),
+        .spad_ready(engine_core_ready[2]),
+        .spad_protection_error(engine_core_protection_error[2]),
         .busy(banked_busy), .done(banked_done), .error(banked_error), .error_code(banked_error_code),
         .result(banked_result), .cycle_count(banked_cycle_count), .element_count(banked_element_count),
         // Optional CNM benchmark counters are not part of the top-level ABI.
@@ -210,10 +244,10 @@ module ai_accel_compute_cluster (
         .banked_protection_error(banked_protection_error),
         .spad_valid(matrix_spad_valid), .spad_write(matrix_spad_write),
         .spad_addr(matrix_spad_addr), .spad_wdata(matrix_spad_wdata),
-        .spad_ready(arb_core_ready), .spad_rsp_valid(core_rsp_valid),
-        .spad_rdata(arb_rsp_rdata),
-        .spad_parity_error(core_rsp_error || core_spad_parity_error),
-        .spad_protection_error(compute_prot_error),
+        .spad_ready(engine_core_ready[3]), .spad_rsp_valid(engine_core_rsp_valid[3]),
+        .spad_rdata(engine_core_rsp_rdata[3*32 +: 32]),
+        .spad_parity_error(engine_core_rsp_error[3]),
+        .spad_protection_error(engine_core_protection_error[3]),
         .line_valid(matrix_line_valid), .line_write(matrix_line_write),
         .line_addr(matrix_line_addr), .line_wdata(matrix_line_wdata),
         .line_wstrb(matrix_line_wstrb), .line_ready(arb_core_line_ready),
@@ -235,10 +269,10 @@ module ai_accel_compute_cluster (
         .epsilon(launch_aux0), .watchdog_limit(watchdog_limit),
         .spad_valid(sfu_spad_valid), .spad_write(sfu_spad_write),
         .spad_addr(sfu_spad_addr), .spad_wdata(sfu_spad_wdata),
-        .spad_ready(arb_core_ready), .spad_rsp_valid(core_rsp_valid),
-        .spad_rdata(arb_rsp_rdata),
-        .spad_parity_error(core_rsp_error || core_spad_parity_error),
-        .spad_protection_error(compute_prot_error),
+        .spad_ready(engine_core_ready[4]), .spad_rsp_valid(engine_core_rsp_valid[4]),
+        .spad_rdata(engine_core_rsp_rdata[4*32 +: 32]),
+        .spad_parity_error(engine_core_rsp_error[4]),
+        .spad_protection_error(engine_core_protection_error[4]),
         .busy(sfu_busy), .done(sfu_done), .error(sfu_error),
         .error_code(sfu_error_code), .result(sfu_result),
         .cycle_count(sfu_cycle_count), .element_count(sfu_element_count)
@@ -251,9 +285,9 @@ module ai_accel_compute_cluster (
         .width(launch_n), .watchdog_limit(watchdog_limit),
         .spad_valid(conv_spad_valid), .spad_write(conv_spad_write),
         .spad_addr(conv_spad_addr), .spad_wdata(conv_spad_wdata),
-        .spad_ready(arb_core_ready), .spad_rsp_valid(core_rsp_valid),
-        .spad_rdata(arb_rsp_rdata),
-        .spad_error(core_rsp_error || core_spad_parity_error || compute_prot_error),
+        .spad_ready(engine_core_ready[5]), .spad_rsp_valid(engine_core_rsp_valid[5]),
+        .spad_rdata(engine_core_rsp_rdata[5*32 +: 32]),
+        .spad_error(engine_core_rsp_error[5] || engine_core_protection_error[5]),
         .busy(conv_busy), .done(conv_done), .error(conv_error), .error_code(conv_error_code),
         .result(conv_result), .cycle_count(conv_cycle_count), .element_count(conv_element_count)
     );
@@ -266,9 +300,9 @@ module ai_accel_compute_cluster (
         .aux0(launch_aux0), .watchdog_limit(watchdog_limit),
         .spad_valid(kv_spad_valid), .spad_write(kv_spad_write),
         .spad_addr(kv_spad_addr), .spad_wdata(kv_spad_wdata),
-        .spad_ready(arb_core_ready), .spad_rsp_valid(core_rsp_valid),
-        .spad_rdata(arb_rsp_rdata),
-        .spad_error(core_rsp_error || core_spad_parity_error || compute_prot_error),
+        .spad_ready(engine_core_ready[6]), .spad_rsp_valid(engine_core_rsp_valid[6]),
+        .spad_rdata(engine_core_rsp_rdata[6*32 +: 32]),
+        .spad_error(engine_core_rsp_error[6] || engine_core_protection_error[6]),
         .busy(kv_busy), .done(kv_done), .error(kv_error), .error_code(kv_error_code),
         .result(kv_result), .cycle_count(kv_cycle_count), .element_count(kv_element_count)
     );
@@ -284,10 +318,10 @@ module ai_accel_compute_cluster (
         .length(launch_length), .watchdog_limit(watchdog_limit),
         .spad_valid(fp_spad_valid), .spad_write(fp_spad_write),
         .spad_addr(fp_spad_addr), .spad_wdata(fp_spad_wdata),
-        .spad_ready(arb_core_ready), .spad_rsp_valid(core_rsp_valid),
-        .spad_rdata(arb_rsp_rdata),
-        .spad_parity_error(core_rsp_error || core_spad_parity_error),
-        .spad_protection_error(compute_prot_error),
+        .spad_ready(engine_core_ready[1]), .spad_rsp_valid(engine_core_rsp_valid[1]),
+        .spad_rdata(engine_core_rsp_rdata[1*32 +: 32]),
+        .spad_parity_error(engine_core_rsp_error[1]),
+        .spad_protection_error(engine_core_protection_error[1]),
         .busy(fp_busy), .done(fp_done), .error(fp_error),
         .error_code(fp_error_code), .result(fp_result),
         .cycle_count(fp_cycle_count), .element_count(fp_element_count)
@@ -311,11 +345,11 @@ module ai_accel_compute_cluster (
         .bias_base          (launch_bias_base),
         .bias_enable        (launch_bias_enable),
         .watchdog_limit     (watchdog_limit),
-        .spad_ready         (arb_core_ready),
-        .spad_rsp_valid     (core_rsp_valid),
-        .spad_parity_error  (core_rsp_error || core_spad_parity_error),
-        .spad_protection_error(compute_prot_error),
-        .spad_rdata         (arb_rsp_rdata),
+        .spad_ready         (engine_core_ready[0]),
+        .spad_rsp_valid     (engine_core_rsp_valid[0]),
+        .spad_parity_error  (engine_core_rsp_error[0]),
+        .spad_protection_error(engine_core_protection_error[0]),
+        .spad_rdata         (engine_core_rsp_rdata[0*32 +: 32]),
         .spad_valid         (scalar_spad_valid),
         .spad_write         (scalar_spad_write),
         .spad_addr          (scalar_spad_addr),

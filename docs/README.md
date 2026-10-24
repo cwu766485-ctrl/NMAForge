@@ -1,38 +1,38 @@
 # NMAForge documentation
 
-[中文文档索引](README_ZH.md) · [Repository README](../README.md)
+[中文索引](README_ZH.md) · [Repository README](../README.md)
 
-The public documentation describes the current all-digital near-memory tensor
-accelerator. It deliberately excludes licensed PDK collateral, vendor board
-files, credentials, generated reports and personal environment instructions.
+## Current design and verification sources
 
-| Document | Purpose |
+| Topic | Source |
 |---|---|
-| [SPEC.md](spec/SPEC.md) / [SPEC_ZH.md](spec/SPEC_ZH.md) | English/Chinese A10, ABI v7.4 specification: interfaces, queues, DMA, operators and boundaries. |
-| [ARCHITECTURE.md](architecture/ARCHITECTURE.md) | Module ownership, control/data flow and digital CNM datapath. |
-| [Literature_Review.md](architecture/Literature_Review.md) | Literature-derived ideas, implementation candidates and evidence gates. |
-| [RTL_GUIDE.md](RTL_GUIDE.md) | Learning-oriented guide to the RTL hierarchy, transaction boundaries and safe refactoring rules. |
-| [VPLAN.md](verification/VPLAN.md) | Verification plan, evidence and remaining closure gates. |
-| [A10_DV_RTM.md](verification/A10_DV_RTM.md) | A10 requirement-to-test/checker/coverage/evidence traceability matrix. |
-| [A10_DV_BASELINE_2026-10-14.md](verification/A10_DV_BASELINE_2026-10-14.md) | Fixed-commit baseline run results and current tool blockers. |
-| [A10_DV_RUN_2026-10-15.md](verification/A10_DV_RUN_2026-10-15.md) | Latest A10 current-worktree VCS/UVM reruns, seeds, URG evidence and remaining closure limits. |
-| [A10_BUG_REGISTER.md](verification/A10_BUG_REGISTER.md) | Confirmed A10 RTL/verification-flow defects, root causes, fixes, and evidence gaps. |
-| [TSMC28_SYNTHESIS_REPORT.md](verification/TSMC28_SYNTHESIS_REPORT.md) | Sanitized commercial-28-nm pre-layout synthesis evidence and its limits. |
-| [XCZU15EG_BRINGUP.md](verification/XCZU15EG_BRINGUP.md) | Board-owner bring-up procedure; vendor collateral is intentionally external. |
-| [CNM_EVALUATION_ZH.md](architecture/CNM_EVALUATION_ZH.md) | Chinese CNM architecture evolution, benchmark and research boundaries. |
-| [CNM_EVALUATION.md](architecture/CNM_EVALUATION.md) | Public benchmark/evaluation summary and limitations. |
-| [PROJECT_EXPERIENCE_ZH.md](architecture/PROJECT_EXPERIENCE_ZH.md) | Evidence-bounded project experience summary. |
-| [PUBLIC_RELEASE.md](PUBLIC_RELEASE.md) | What may be published and the safe GitHub-release workflow. |
+| Product behavior, register ABI and numerical contracts | [English spec](spec/SPEC.md) · [中文规格](spec/SPEC_ZH.md) · [FP extension spec](spec/FP_EXTENSION_SPEC_ZH.md) · [Naming compatibility](spec/NAMING_COMPATIBILITY.md) |
+| RTL ownership and dataflow | [Architecture](architecture/ARCHITECTURE.md) |
+| Compute-engine verification status | [Five-engine status](verification/COMPUTE_ENGINE_STATUS.md) · [2026-10-21 run evidence](verification/COMPUTE_ENGINE_BLOCK_VALIDATION_2026-10-21.md) |
+| A10 requirement traceability and remaining closure | [A10 RTM](verification/A10_DV_RTM.md) · [Bug register](verification/A10_BUG_REGISTER.md) · [Verification plan](verification/VPLAN.md) |
+| Lint, CDC/RDC and synthesis evidence | [Static analysis](verification/STATIC_ANALYSIS_REPORT.md) · [CDC disposition](verification/CDC_DUAL_CLOCK_DISPOSITION_ZH.md) · [RDC status](verification/RDC_STATUS_ZH.md) · [SpyGlass triage](../dv/spyglass/LINT_TRIAGE.md) · [TSMC28 synthesis](verification/TSMC28_SYNTHESIS_REPORT.md) |
+| Board bring-up | [XCZU15EG procedure](verification/XCZU15EG_BRINGUP.md) |
+| CNM evaluation and research | [CNM evaluation](architecture/CNM_EVALUATION.md) · [中文评估](architecture/CNM_EVALUATION_ZH.md) · [Literature review](architecture/Literature_Review.md) |
+| Performance, project experience and release | [Performance/PPA report](architecture/PERFORMANCE_PPA_REPORT_ZH.md) · [Project experience](architecture/PROJECT_EXPERIENCE_ZH.md) · [Public release guide](PUBLIC_RELEASE.md) |
+| RTL learning and safe refactoring | [RTL guide](RTL_GUIDE.md) |
 
-| [NAMING_COMPATIBILITY.md](spec/NAMING_COMPATIBILITY.md) | Public NMAForge naming and the retained ABI compatibility identifiers. |
-## Documentation rules
+Detailed dated A10 run records remain under `verification/` as historical
+evidence. Use the RTM for current workstream status instead of treating an old
+run snapshot as the latest result.
 
-- Change the specification and ABI header before changing an ABI-visible RTL
-  contract.
-- Record only tool runs that actually occurred, including PVT/constraints and
-  whether a result is pre-layout, post-route or board-measured.
-- Keep documents focused: long-lived architecture/evidence belongs in the
-  documents above; private change logs, chat exports and tool caches do not
-  belong in Git.
-- The supported public project name is **NMAForge**. Historical `CIMFORGE_*`
-  ABI identifiers are retained only for source compatibility.
+## Common verification entry points
+
+Run from the repository root unless the command specifies another directory.
+
+| Scope | Command |
+|---|---|
+| Five compute verification groups | `make -C dv/subsystem/tensor_datapath/sim cluster_regress` |
+| Top smoke | `make -C dv/subsystem/top_smoke/sim ai_smoke` |
+| Seeded top regression | `make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=12345` |
+| Control UVM | `make -C dv/block/control/sim uvm_regress` |
+| DMA UVM | `make -C dv/block/dma/sim uvm_regress` |
+| SpyGlass | `cd dv/spyglass && ./run_spyglass_a8.sh all` |
+
+Check tool availability and use the command's recorded output directory before
+starting a long run. Keep generated simulator, coverage, and EDA output outside
+the source tree.

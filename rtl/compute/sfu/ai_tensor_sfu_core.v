@@ -193,6 +193,12 @@ module ai_tensor_sfu_core(
     wire [31:0] normalization_output;
     wire [31:0] gelu_output;
     wire [31:0] silu_output;
+    wire [31:0] gelu_piecewise_output =
+        (x_r <= -32'sd512) ? 32'd0 :
+        (x_r >= 32'sd512) ? x_r : gelu_output;
+    wire [31:0] silu_piecewise_output =
+        (x_r <= -32'sd768) ? 32'd0 :
+        (x_r >= 32'sd768) ? x_r : silu_output;
 
     ai_tensor_sfu_math math_u(
         .softmax_delta_q8_8(spad_signed - max_r),
@@ -240,8 +246,8 @@ module ai_tensor_sfu_core(
             if (state_r==ST_IDLE && start) cycle_count<=0;
             else if (busy) cycle_count<=cycle_count+1'b1;
 
-            if (busy && abort) begin error_code<=ERR_ABORT; state_r<=ST_ERROR; end
-            else if (watchdog_expired) begin
+            if (state_r != ST_ERROR && busy && abort) begin error_code<=ERR_ABORT; state_r<=ST_ERROR; end
+            else if (state_r != ST_ERROR && watchdog_expired) begin
                 error_code<=ERR_WATCHDOG; state_r<=ST_ERROR;
             end else case (state_r)
                 ST_IDLE: begin
@@ -251,7 +257,12 @@ module ai_tensor_sfu_core(
                         beta_base_r<=beta_base; beta_enable_r<=beta_enable;
                         pack_enable_r<=pack_enable; dst_r<=dst_base;
                         length_r<=length; scale_shift_r<=scale_shift;
-                        epsilon_r<=epsilon==0 ? 32'd1 : epsilon;
+                        // For causal Softmax this field is a zero-based query
+                        // token index, so zero must remain a valid boundary.
+                        // Other SFU operators retain the nonzero epsilon
+                        // default used by their normalization arithmetic.
+                        epsilon_r <= (op_mode == OP_CAUSAL_SOFTMAX_Q15) ? epsilon :
+                                     (epsilon == 0 ? 32'd1 : epsilon);
                         watchdog_limit_r<=watchdog_limit; index_r<=0;
                         element_count<=0; busy<=1;
                         max_r<=32'sh8000_0000; sum_exp_r<=0; sum_sq_r<=0; sum_x_r<=0;
@@ -487,7 +498,8 @@ module ai_tensor_sfu_core(
                         end
                     end else begin
                         output_word_r <= (op_r == OP_GELU_Q8_8) ?
-                                         gelu_output : silu_output;
+                                         gelu_piecewise_output :
+                                         silu_piecewise_output;
                         state_r<=ST_VEC_WRITE;
                     end
                 end

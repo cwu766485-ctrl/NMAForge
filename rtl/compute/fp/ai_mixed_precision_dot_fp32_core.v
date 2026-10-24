@@ -258,8 +258,16 @@ module ai_mixed_precision_dot_fp32_core (
                 ST_RUN: begin
                     if (compute_fire) begin
                         element_count <= element_count + 1'b1;
-                        if (last_element) state_r <= ST_WRITE;
-                        else element_index_r <= element_index_r + 1'b1;
+                        // Keep the final writeback transition explicitly
+                        // disjoint from a fault/cancel observed on this
+                        // cycle.  The drain/error transition below then owns
+                        // the command until accepted reads have retired.
+                        if (last_element) begin
+                            if ((pending_error_r == ERR_NONE) && !failure_active)
+                                state_r <= ST_WRITE;
+                        end else begin
+                            element_index_r <= element_index_r + 1'b1;
+                        end
                     end
                     if (failure_active && (outstanding_after == 0) &&
                         (immediate_cancel ||

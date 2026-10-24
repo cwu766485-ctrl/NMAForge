@@ -9,6 +9,8 @@ REPO_ROOT := ../../../../../
 
 .PHONY: test vectors compile run fp16-mul-test fp16-mul-vectors fp16-mul-compile fp16-mul-run add-test add-vectors add-compile add-run accum-test accum-vectors accum-compile accum-run add16-test add16-vectors add16-compile add16-run dot-core-test dot-core-compile dot-core-run dot-core-random-test dot-core-random-vectors dot-uvm-test dot-uvm-vectors dot-uvm-compile dot-uvm-run dot-uvm-coverage dot-core-parity-max-test dot-core-parity-max-compile dot-core-parity-max-run
 .PHONY: dot-uvm-regress
+.PHONY: dot-core-codecov-regress dot-core-codecov-compile
+.PHONY: add16-codecov-regress add16-codecov-compile
 
 test: run
 
@@ -95,6 +97,10 @@ accum-run: accum-compile
 ADD16_OUT_DIR ?= /tmp/nmaforge_fp16_bf16_addsub
 ADD16_VECTOR_FILE := $(ADD16_OUT_DIR)/fp16_bf16_addsub_vectors.hex
 ADD16_SIMV := $(ADD16_OUT_DIR)/simv_fp16_bf16_addsub
+ADD16_CODECOV_OUT ?= /tmp/nmaforge_fp16_bf16_addsub_codecov_$(shell date +%Y%m%d_%H%M%S)
+ADD16_CODECOV_SEEDS ?= 20261021 20261022 20261023
+ADD16_CODECOV_SIMV := $(ADD16_CODECOV_OUT)/simv_fp16_bf16_addsub
+ADD16_CODECOV_METRICS := line+cond+fsm+branch
 
 add16-test: add16-run
 
@@ -111,12 +117,39 @@ add16-compile: add16-vectors
 add16-run: add16-compile
 	$(ADD16_SIMV) +VECTORS=$(ADD16_VECTOR_FILE) -l $(ADD16_OUT_DIR)/run.log
 
+# Seeded reference-model coverage for the standalone BF16/FP16 add/sub units.
+add16-codecov-compile:
+	mkdir -p $(ADD16_CODECOV_OUT)/csrc
+	$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+		-cm $(ADD16_CODECOV_METRICS) -cm_hier ../tb/fp_addsub.cm_hier \
+		-cm_dir $(ADD16_CODECOV_OUT)/coverage.vdb \
+		-Mdir=$(ADD16_CODECOV_OUT)/csrc -top tb_ai_fp16_bf16_addsub \
+		$(REPO_ROOT)rtl/compute/fp/ai_fp16_bf16_addsub.v \
+		../tb/tb_ai_fp16_bf16_addsub.sv -o $(ADD16_CODECOV_SIMV) \
+		-l $(ADD16_CODECOV_OUT)/compile.log
+
+add16-codecov-regress: add16-codecov-compile
+	@set -e; for seed in $(ADD16_CODECOV_SEEDS); do \
+		seed_out=$(ADD16_CODECOV_OUT)/seed_$$seed; \
+		mkdir -p $$seed_out; \
+		$(PYTHON) ../model/generate_add16_vectors.py --seed $$seed \
+			--random-cases $(RANDOM_CASES) --output $$seed_out/vectors.hex; \
+		$(ADD16_CODECOV_SIMV) +VECTORS=$$seed_out/vectors.hex \
+			-cm $(ADD16_CODECOV_METRICS) -cm_dir $(ADD16_CODECOV_OUT)/coverage.vdb \
+			-cm_name addsub_seed_$$seed -l $$seed_out/run.log; \
+		grep -q '^FP16_BF16_ADDSUB_PASS ' $$seed_out/run.log; \
+	done
+
 # Standalone single-channel BF16 dot engine and SPAD transaction model.
 DOT_CORE_OUT_DIR ?= /tmp/nmaforge_bf16_dot_fp32_core
 DOT_CORE_SIMV := $(DOT_CORE_OUT_DIR)/simv_bf16_dot_fp32_core
 DOT_RANDOM_VECTOR_FILE := $(DOT_CORE_OUT_DIR)/bf16_dot_random_vectors.txt
 DOT_RANDOM_COUNT ?= 64
 DOT_RANDOM_SEED ?= $(SEED)
+DOT_CORE_CODECOV_OUT ?= /tmp/nmaforge_bf16_dot_core_codecov_$(shell date +%Y%m%d_%H%M%S)
+DOT_CORE_CODECOV_SEEDS ?= 20261021 20261022 20261023
+DOT_CORE_CODECOV_SIMV := $(DOT_CORE_CODECOV_OUT)/simv_bf16_dot_core
+DOT_CORE_CODECOV_METRICS := line+cond+fsm+branch
 URG ?= $(shell if command -v urg >/dev/null 2>&1; then command -v urg; elif [ -n "$$VCS_HOME" ] && [ -x "$$VCS_HOME/bin/urg" ]; then printf '%s\n' "$$VCS_HOME/bin/urg"; else printf '%s\n' urg; fi)
 DOT_UVM_OUT_DIR ?= /tmp/nmaforge_bf16_dot_uvm
 DOT_UVM_SEED_DIR := $(DOT_UVM_OUT_DIR)/seed_$(DOT_RANDOM_SEED)
@@ -218,6 +251,37 @@ dot-core-random-test: dot-core-random-vectors dot-core-compile
 	$(DOT_CORE_SIMV) +RANDOM_VECTORS=$(DOT_RANDOM_VECTOR_FILE) \
 		+SEED=$(DOT_RANDOM_SEED) -l $(DOT_CORE_OUT_DIR)/random_run.log
 
+# Multi-seed coverage for the backward-compatible BF16 wrapper, in addition
+# to the mixed-format core already collected by the UVM environment.
+dot-core-codecov-compile:
+	mkdir -p $(DOT_CORE_CODECOV_OUT)/csrc
+	$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+		-cm $(DOT_CORE_CODECOV_METRICS) \
+		-cm_hier ../tb/bf16_dot_core.cm_hier \
+		-cm_dir $(DOT_CORE_CODECOV_OUT)/coverage.vdb \
+		-Mdir=$(DOT_CORE_CODECOV_OUT)/csrc \
+		-top tb_ai_bf16_dot_fp32_core $(REPO_ROOT)rtl/compute/fp/ai_bf16_mul_fp32.v \
+		$(REPO_ROOT)rtl/compute/fp/ai_fp16_mul_fp32.v \
+		$(REPO_ROOT)rtl/compute/fp/ai_fp32_add.v \
+		$(REPO_ROOT)rtl/compute/fp/ai_fp32_accumulator.v \
+		$(REPO_ROOT)rtl/compute/fp/ai_mixed_precision_dot_fp32_core.v \
+		$(REPO_ROOT)rtl/compute/fp/ai_bf16_dot_fp32_core.v \
+		../tb/tb_ai_bf16_dot_fp32_core.sv -o $(DOT_CORE_CODECOV_SIMV) \
+		-l $(DOT_CORE_CODECOV_OUT)/compile.log
+
+dot-core-codecov-regress: dot-core-codecov-compile
+	@set -e; for seed in $(DOT_CORE_CODECOV_SEEDS); do \
+		seed_out=$(DOT_CORE_CODECOV_OUT)/seed_$$seed; \
+		mkdir -p $$seed_out; \
+		$(PYTHON) ../model/generate_bf16_dot_vectors.py --seed $$seed \
+			--count $(DOT_RANDOM_COUNT) --output $$seed_out/vectors.txt; \
+		$(DOT_CORE_CODECOV_SIMV) +RANDOM_VECTORS=$$seed_out/vectors.txt \
+			+SEED=$$seed -cm $(DOT_CORE_CODECOV_METRICS) \
+			-cm_dir $(DOT_CORE_CODECOV_OUT)/coverage.vdb -cm_name bf16_wrapper_seed_$$seed \
+			-l $$seed_out/run.log; \
+		grep -q 'PASS: BF16 dot core block test' $$seed_out/run.log; \
+	done
+
 dot-uvm-test: dot-uvm-coverage
 
 dot-uvm-vectors:
@@ -229,6 +293,7 @@ dot-uvm-compile:
 	mkdir -p $(DOT_UVM_SEED_DIR)/csrc
 	$(VCS) -full64 -sverilog -ntb_opts uvm-1.2 -debug_access+all \
 		-timescale=1ns/1ps -assert svaext -cm line+cond+branch+fsm+assert \
+		-cm_hier $(CURDIR)/../uvm/fp_dot_core.cm_hier \
 		-cm_dir $(DOT_UVM_COV_DB) \
 		-Mdir=$(DOT_UVM_SEED_DIR)/csrc -top tb_ai_bf16_dot_uvm \
 		-f ../uvm/ai_bf16_dot_uvm.f -o $(DOT_UVM_SIMV) \

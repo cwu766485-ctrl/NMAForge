@@ -211,7 +211,8 @@ module ai_tensor_matrix_core(
             if (!prefetch_a_valid_r && !prefetch_a_pending_r) begin
                 banked_read_valid = 1'b1;
                 banked_addr = next_a_read_addr;
-            end else if (!prefetch_b_valid_r && !prefetch_b_pending_r) begin
+            end else if (prefetch_a_valid_r && !prefetch_b_valid_r &&
+                         !prefetch_b_pending_r) begin
                 banked_read_valid = 1'b1;
                 banked_addr = next_b_read_addr;
             end
@@ -258,10 +259,10 @@ module ai_tensor_matrix_core(
             else if (busy)
                 cycle_count <= cycle_count + 1'b1;
 
-            if (busy && abort) begin
+            if (busy && abort && state_r != ST_ERROR) begin
                 error_code <= ERR_ABORT;
                 state_r <= ST_ERROR;
-            end else if (watchdog_expired) begin
+            end else if (watchdog_expired && state_r != ST_ERROR) begin
                 error_code <= ERR_WATCHDOG;
                 state_r <= ST_ERROR;
             end else case (state_r)

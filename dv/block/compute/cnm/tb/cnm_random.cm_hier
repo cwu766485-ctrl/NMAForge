@@ -1,0 +1,2 @@
+// Collect only the production CNM core and its bank-local PE/controller tree.
++tree tb_ai_banked_cnm_random.dut

@@ -323,7 +323,7 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h0001102c, 32'h00000000); // q_projection.word11
     axi_write(SPAD_BASE + 32'h00011030, 32'h00000000); // q_projection.word12
     axi_write(SPAD_BASE + 32'h00011034, 32'h00010001); // q_projection.word13
-    axi_write(SPAD_BASE + 32'h00011038, 32'h00000000); // q_projection.word14
+    axi_write(SPAD_BASE + 32'h00011038, 32'h00010000); // q_projection.word14
     axi_write(SPAD_BASE + 32'h0001103c, 32'h00000007); // q_projection.word15
     axi_write(SPAD_BASE + 32'h00011040, 32'h70010036); // q_pack.word0
     axi_write(SPAD_BASE + 32'h00011044, 32'h00010280); // q_pack.word1
@@ -339,8 +339,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h0001106c, 32'h00000000); // q_pack.word11
     axi_write(SPAD_BASE + 32'h00011070, 32'h00000000); // q_pack.word12
     axi_write(SPAD_BASE + 32'h00011074, 32'h00010001); // q_pack.word13
-    axi_write(SPAD_BASE + 32'h00011078, 32'h00000000); // q_pack.word14
-    axi_write(SPAD_BASE + 32'h0001107c, 32'h00000007); // q_pack.word15
+    axi_write(SPAD_BASE + 32'h00011078, 32'h00020001); // q_pack.word14
+    axi_write(SPAD_BASE + 32'h0001107c, 32'h00010007); // q_pack.word15
     axi_write(SPAD_BASE + 32'h00011080, 32'h70020030); // k_projection.word0
     axi_write(SPAD_BASE + 32'h00011084, 32'h00010000); // k_projection.word1
     axi_write(SPAD_BASE + 32'h00011088, 32'h000100c0); // k_projection.word2
@@ -355,8 +355,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h000110ac, 32'h00000000); // k_projection.word11
     axi_write(SPAD_BASE + 32'h000110b0, 32'h00000000); // k_projection.word12
     axi_write(SPAD_BASE + 32'h000110b4, 32'h00010001); // k_projection.word13
-    axi_write(SPAD_BASE + 32'h000110b8, 32'h00000000); // k_projection.word14
-    axi_write(SPAD_BASE + 32'h000110bc, 32'h00000007); // k_projection.word15
+    axi_write(SPAD_BASE + 32'h000110b8, 32'h00010002); // k_projection.word14
+    axi_write(SPAD_BASE + 32'h000110bc, 32'h00020007); // k_projection.word15
     axi_write(SPAD_BASE + 32'h000110c0, 32'h70030036); // k_pack.word0
     axi_write(SPAD_BASE + 32'h000110c4, 32'h00010300); // k_pack.word1
     axi_write(SPAD_BASE + 32'h000110c8, 32'h00000000); // k_pack.word2
@@ -371,8 +371,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h000110ec, 32'h00000000); // k_pack.word11
     axi_write(SPAD_BASE + 32'h000110f0, 32'h00000000); // k_pack.word12
     axi_write(SPAD_BASE + 32'h000110f4, 32'h00010001); // k_pack.word13
-    axi_write(SPAD_BASE + 32'h000110f8, 32'h00000000); // k_pack.word14
-    axi_write(SPAD_BASE + 32'h000110fc, 32'h00000007); // k_pack.word15
+    axi_write(SPAD_BASE + 32'h000110f8, 32'h00020001); // k_pack.word14
+    axi_write(SPAD_BASE + 32'h000110fc, 32'h00010007); // k_pack.word15
     axi_write(SPAD_BASE + 32'h00011100, 32'h70040030); // v_projection.word0
     axi_write(SPAD_BASE + 32'h00011104, 32'h00010000); // v_projection.word1
     axi_write(SPAD_BASE + 32'h00011108, 32'h00010100); // v_projection.word2
@@ -387,8 +387,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h0001112c, 32'h00000000); // v_projection.word11
     axi_write(SPAD_BASE + 32'h00011130, 32'h00000000); // v_projection.word12
     axi_write(SPAD_BASE + 32'h00011134, 32'h00010001); // v_projection.word13
-    axi_write(SPAD_BASE + 32'h00011138, 32'h00000000); // v_projection.word14
-    axi_write(SPAD_BASE + 32'h0001113c, 32'h00000007); // v_projection.word15
+    axi_write(SPAD_BASE + 32'h00011138, 32'h00010002); // v_projection.word14
+    axi_write(SPAD_BASE + 32'h0001113c, 32'h00020007); // v_projection.word15
     axi_write(SPAD_BASE + 32'h00011140, 32'h70050036); // v_pack.word0
     axi_write(SPAD_BASE + 32'h00011144, 32'h00010380); // v_pack.word1
     axi_write(SPAD_BASE + 32'h00011148, 32'h00000000); // v_pack.word2
@@ -403,8 +403,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h0001116c, 32'h00000000); // v_pack.word11
     axi_write(SPAD_BASE + 32'h00011170, 32'h00000000); // v_pack.word12
     axi_write(SPAD_BASE + 32'h00011174, 32'h00010001); // v_pack.word13
-    axi_write(SPAD_BASE + 32'h00011178, 32'h00000000); // v_pack.word14
-    axi_write(SPAD_BASE + 32'h0001117c, 32'h00000007); // v_pack.word15
+    axi_write(SPAD_BASE + 32'h00011178, 32'h00020001); // v_pack.word14
+    axi_write(SPAD_BASE + 32'h0001117c, 32'h00010007); // v_pack.word15
     axi_write(SPAD_BASE + 32'h00011180, 32'h70060030); // qk_transpose.word0
     axi_write(SPAD_BASE + 32'h00011184, 32'h000102c0); // qk_transpose.word1
     axi_write(SPAD_BASE + 32'h00011188, 32'h00010340); // qk_transpose.word2
@@ -419,8 +419,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h000111ac, 32'h00000000); // qk_transpose.word11
     axi_write(SPAD_BASE + 32'h000111b0, 32'h00000000); // qk_transpose.word12
     axi_write(SPAD_BASE + 32'h000111b4, 32'h00010001); // qk_transpose.word13
-    axi_write(SPAD_BASE + 32'h000111b8, 32'h00000000); // qk_transpose.word14
-    axi_write(SPAD_BASE + 32'h000111bc, 32'h00000007); // qk_transpose.word15
+    axi_write(SPAD_BASE + 32'h000111b8, 32'h00010002); // qk_transpose.word14
+    axi_write(SPAD_BASE + 32'h000111bc, 32'h00020007); // qk_transpose.word15
     axi_write(SPAD_BASE + 32'h000111c0, 32'h70070032); // softmax_row0.word0
     axi_write(SPAD_BASE + 32'h000111c4, 32'h00010400); // softmax_row0.word1
     axi_write(SPAD_BASE + 32'h000111c8, 32'h00000000); // softmax_row0.word2
@@ -435,8 +435,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h000111ec, 32'h00000000); // softmax_row0.word11
     axi_write(SPAD_BASE + 32'h000111f0, 32'h00000000); // softmax_row0.word12
     axi_write(SPAD_BASE + 32'h000111f4, 32'h00010001); // softmax_row0.word13
-    axi_write(SPAD_BASE + 32'h000111f8, 32'h00000000); // softmax_row0.word14
-    axi_write(SPAD_BASE + 32'h000111fc, 32'h00000007); // softmax_row0.word15
+    axi_write(SPAD_BASE + 32'h000111f8, 32'h00020001); // softmax_row0.word14
+    axi_write(SPAD_BASE + 32'h000111fc, 32'h00010007); // softmax_row0.word15
     axi_write(SPAD_BASE + 32'h00011200, 32'h70080032); // softmax_row1.word0
     axi_write(SPAD_BASE + 32'h00011204, 32'h00010410); // softmax_row1.word1
     axi_write(SPAD_BASE + 32'h00011208, 32'h00000000); // softmax_row1.word2
@@ -451,8 +451,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h0001122c, 32'h00000000); // softmax_row1.word11
     axi_write(SPAD_BASE + 32'h00011230, 32'h00000000); // softmax_row1.word12
     axi_write(SPAD_BASE + 32'h00011234, 32'h00010001); // softmax_row1.word13
-    axi_write(SPAD_BASE + 32'h00011238, 32'h00000000); // softmax_row1.word14
-    axi_write(SPAD_BASE + 32'h0001123c, 32'h00000007); // softmax_row1.word15
+    axi_write(SPAD_BASE + 32'h00011238, 32'h00010002); // softmax_row1.word14
+    axi_write(SPAD_BASE + 32'h0001123c, 32'h00020007); // softmax_row1.word15
     axi_write(SPAD_BASE + 32'h00011240, 32'h70090032); // softmax_row2.word0
     axi_write(SPAD_BASE + 32'h00011244, 32'h00010420); // softmax_row2.word1
     axi_write(SPAD_BASE + 32'h00011248, 32'h00000000); // softmax_row2.word2
@@ -467,8 +467,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h0001126c, 32'h00000000); // softmax_row2.word11
     axi_write(SPAD_BASE + 32'h00011270, 32'h00000000); // softmax_row2.word12
     axi_write(SPAD_BASE + 32'h00011274, 32'h00010001); // softmax_row2.word13
-    axi_write(SPAD_BASE + 32'h00011278, 32'h00000000); // softmax_row2.word14
-    axi_write(SPAD_BASE + 32'h0001127c, 32'h00000007); // softmax_row2.word15
+    axi_write(SPAD_BASE + 32'h00011278, 32'h00020001); // softmax_row2.word14
+    axi_write(SPAD_BASE + 32'h0001127c, 32'h00010007); // softmax_row2.word15
     axi_write(SPAD_BASE + 32'h00011280, 32'h700a0032); // softmax_row3.word0
     axi_write(SPAD_BASE + 32'h00011284, 32'h00010430); // softmax_row3.word1
     axi_write(SPAD_BASE + 32'h00011288, 32'h00000000); // softmax_row3.word2
@@ -483,8 +483,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h000112ac, 32'h00000000); // softmax_row3.word11
     axi_write(SPAD_BASE + 32'h000112b0, 32'h00000000); // softmax_row3.word12
     axi_write(SPAD_BASE + 32'h000112b4, 32'h00010001); // softmax_row3.word13
-    axi_write(SPAD_BASE + 32'h000112b8, 32'h00000000); // softmax_row3.word14
-    axi_write(SPAD_BASE + 32'h000112bc, 32'h00000007); // softmax_row3.word15
+    axi_write(SPAD_BASE + 32'h000112b8, 32'h00010002); // softmax_row3.word14
+    axi_write(SPAD_BASE + 32'h000112bc, 32'h00020007); // softmax_row3.word15
     axi_write(SPAD_BASE + 32'h000112c0, 32'h700b0036); // prob_pack.word0
     axi_write(SPAD_BASE + 32'h000112c4, 32'h00010440); // prob_pack.word1
     axi_write(SPAD_BASE + 32'h000112c8, 32'h00000000); // prob_pack.word2
@@ -499,8 +499,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h000112ec, 32'h00000000); // prob_pack.word11
     axi_write(SPAD_BASE + 32'h000112f0, 32'h00000000); // prob_pack.word12
     axi_write(SPAD_BASE + 32'h000112f4, 32'h00010001); // prob_pack.word13
-    axi_write(SPAD_BASE + 32'h000112f8, 32'h00000000); // prob_pack.word14
-    axi_write(SPAD_BASE + 32'h000112fc, 32'h00000007); // prob_pack.word15
+    axi_write(SPAD_BASE + 32'h000112f8, 32'h00020001); // prob_pack.word14
+    axi_write(SPAD_BASE + 32'h000112fc, 32'h00010007); // prob_pack.word15
     axi_write(SPAD_BASE + 32'h00011300, 32'h700c0030); // attention_value.word0
     axi_write(SPAD_BASE + 32'h00011304, 32'h00010480); // attention_value.word1
     axi_write(SPAD_BASE + 32'h00011308, 32'h000103c0); // attention_value.word2
@@ -515,8 +515,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h0001132c, 32'h00000000); // attention_value.word11
     axi_write(SPAD_BASE + 32'h00011330, 32'h00000000); // attention_value.word12
     axi_write(SPAD_BASE + 32'h00011334, 32'h00010001); // attention_value.word13
-    axi_write(SPAD_BASE + 32'h00011338, 32'h00000000); // attention_value.word14
-    axi_write(SPAD_BASE + 32'h0001133c, 32'h00000007); // attention_value.word15
+    axi_write(SPAD_BASE + 32'h00011338, 32'h00010002); // attention_value.word14
+    axi_write(SPAD_BASE + 32'h0001133c, 32'h00020007); // attention_value.word15
     axi_write(SPAD_BASE + 32'h00011340, 32'h700d0036); // attention_pack.word0
     axi_write(SPAD_BASE + 32'h00011344, 32'h000104c0); // attention_pack.word1
     axi_write(SPAD_BASE + 32'h00011348, 32'h00000000); // attention_pack.word2
@@ -531,8 +531,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h0001136c, 32'h00000000); // attention_pack.word11
     axi_write(SPAD_BASE + 32'h00011370, 32'h00000000); // attention_pack.word12
     axi_write(SPAD_BASE + 32'h00011374, 32'h00010001); // attention_pack.word13
-    axi_write(SPAD_BASE + 32'h00011378, 32'h00000000); // attention_pack.word14
-    axi_write(SPAD_BASE + 32'h0001137c, 32'h00000007); // attention_pack.word15
+    axi_write(SPAD_BASE + 32'h00011378, 32'h00020001); // attention_pack.word14
+    axi_write(SPAD_BASE + 32'h0001137c, 32'h00010007); // attention_pack.word15
     axi_write(SPAD_BASE + 32'h00011380, 32'h700e0030); // output_projection.word0
     axi_write(SPAD_BASE + 32'h00011384, 32'h00010500); // output_projection.word1
     axi_write(SPAD_BASE + 32'h00011388, 32'h00010140); // output_projection.word2
@@ -547,8 +547,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h000113ac, 32'h00000000); // output_projection.word11
     axi_write(SPAD_BASE + 32'h000113b0, 32'h00000000); // output_projection.word12
     axi_write(SPAD_BASE + 32'h000113b4, 32'h00010001); // output_projection.word13
-    axi_write(SPAD_BASE + 32'h000113b8, 32'h00000000); // output_projection.word14
-    axi_write(SPAD_BASE + 32'h000113bc, 32'h00000007); // output_projection.word15
+    axi_write(SPAD_BASE + 32'h000113b8, 32'h00010002); // output_projection.word14
+    axi_write(SPAD_BASE + 32'h000113bc, 32'h00020007); // output_projection.word15
     axi_write(SPAD_BASE + 32'h000113c0, 32'h700f0034); // residual1.word0
     axi_write(SPAD_BASE + 32'h000113c4, 32'h00010540); // residual1.word1
     axi_write(SPAD_BASE + 32'h000113c8, 32'h00010040); // residual1.word2
@@ -563,8 +563,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h000113ec, 32'h00000000); // residual1.word11
     axi_write(SPAD_BASE + 32'h000113f0, 32'h00000000); // residual1.word12
     axi_write(SPAD_BASE + 32'h000113f4, 32'h00010001); // residual1.word13
-    axi_write(SPAD_BASE + 32'h000113f8, 32'h00000000); // residual1.word14
-    axi_write(SPAD_BASE + 32'h000113fc, 32'h00000007); // residual1.word15
+    axi_write(SPAD_BASE + 32'h000113f8, 32'h00020001); // residual1.word14
+    axi_write(SPAD_BASE + 32'h000113fc, 32'h00010007); // residual1.word15
     axi_write(SPAD_BASE + 32'h00011400, 32'h70100038); // layernorm1_row0.word0
     axi_write(SPAD_BASE + 32'h00011404, 32'h00010580); // layernorm1_row0.word1
     axi_write(SPAD_BASE + 32'h00011408, 32'h00010200); // layernorm1_row0.word2
@@ -579,8 +579,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h0001142c, 32'h00000000); // layernorm1_row0.word11
     axi_write(SPAD_BASE + 32'h00011430, 32'h00000000); // layernorm1_row0.word12
     axi_write(SPAD_BASE + 32'h00011434, 32'h00010001); // layernorm1_row0.word13
-    axi_write(SPAD_BASE + 32'h00011438, 32'h00000000); // layernorm1_row0.word14
-    axi_write(SPAD_BASE + 32'h0001143c, 32'h00000007); // layernorm1_row0.word15
+    axi_write(SPAD_BASE + 32'h00011438, 32'h00010002); // layernorm1_row0.word14
+    axi_write(SPAD_BASE + 32'h0001143c, 32'h00020007); // layernorm1_row0.word15
     axi_write(SPAD_BASE + 32'h00011440, 32'h70110038); // layernorm1_row1.word0
     axi_write(SPAD_BASE + 32'h00011444, 32'h00010590); // layernorm1_row1.word1
     axi_write(SPAD_BASE + 32'h00011448, 32'h00010200); // layernorm1_row1.word2
@@ -595,8 +595,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h0001146c, 32'h00000000); // layernorm1_row1.word11
     axi_write(SPAD_BASE + 32'h00011470, 32'h00000000); // layernorm1_row1.word12
     axi_write(SPAD_BASE + 32'h00011474, 32'h00010001); // layernorm1_row1.word13
-    axi_write(SPAD_BASE + 32'h00011478, 32'h00000000); // layernorm1_row1.word14
-    axi_write(SPAD_BASE + 32'h0001147c, 32'h00000007); // layernorm1_row1.word15
+    axi_write(SPAD_BASE + 32'h00011478, 32'h00020001); // layernorm1_row1.word14
+    axi_write(SPAD_BASE + 32'h0001147c, 32'h00010007); // layernorm1_row1.word15
     axi_write(SPAD_BASE + 32'h00011480, 32'h70120038); // layernorm1_row2.word0
     axi_write(SPAD_BASE + 32'h00011484, 32'h000105a0); // layernorm1_row2.word1
     axi_write(SPAD_BASE + 32'h00011488, 32'h00010200); // layernorm1_row2.word2
@@ -611,8 +611,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h000114ac, 32'h00000000); // layernorm1_row2.word11
     axi_write(SPAD_BASE + 32'h000114b0, 32'h00000000); // layernorm1_row2.word12
     axi_write(SPAD_BASE + 32'h000114b4, 32'h00010001); // layernorm1_row2.word13
-    axi_write(SPAD_BASE + 32'h000114b8, 32'h00000000); // layernorm1_row2.word14
-    axi_write(SPAD_BASE + 32'h000114bc, 32'h00000007); // layernorm1_row2.word15
+    axi_write(SPAD_BASE + 32'h000114b8, 32'h00010002); // layernorm1_row2.word14
+    axi_write(SPAD_BASE + 32'h000114bc, 32'h00020007); // layernorm1_row2.word15
     axi_write(SPAD_BASE + 32'h000114c0, 32'h70130038); // layernorm1_row3.word0
     axi_write(SPAD_BASE + 32'h000114c4, 32'h000105b0); // layernorm1_row3.word1
     axi_write(SPAD_BASE + 32'h000114c8, 32'h00010200); // layernorm1_row3.word2
@@ -627,8 +627,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h000114ec, 32'h00000000); // layernorm1_row3.word11
     axi_write(SPAD_BASE + 32'h000114f0, 32'h00000000); // layernorm1_row3.word12
     axi_write(SPAD_BASE + 32'h000114f4, 32'h00010001); // layernorm1_row3.word13
-    axi_write(SPAD_BASE + 32'h000114f8, 32'h00000000); // layernorm1_row3.word14
-    axi_write(SPAD_BASE + 32'h000114fc, 32'h00000007); // layernorm1_row3.word15
+    axi_write(SPAD_BASE + 32'h000114f8, 32'h00020001); // layernorm1_row3.word14
+    axi_write(SPAD_BASE + 32'h000114fc, 32'h00010007); // layernorm1_row3.word15
     axi_write(SPAD_BASE + 32'h00011500, 32'h70140036); // norm1_pack.word0
     axi_write(SPAD_BASE + 32'h00011504, 32'h000105c0); // norm1_pack.word1
     axi_write(SPAD_BASE + 32'h00011508, 32'h00000000); // norm1_pack.word2
@@ -643,8 +643,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h0001152c, 32'h00000000); // norm1_pack.word11
     axi_write(SPAD_BASE + 32'h00011530, 32'h00000000); // norm1_pack.word12
     axi_write(SPAD_BASE + 32'h00011534, 32'h00010001); // norm1_pack.word13
-    axi_write(SPAD_BASE + 32'h00011538, 32'h00000000); // norm1_pack.word14
-    axi_write(SPAD_BASE + 32'h0001153c, 32'h00000007); // norm1_pack.word15
+    axi_write(SPAD_BASE + 32'h00011538, 32'h00010002); // norm1_pack.word14
+    axi_write(SPAD_BASE + 32'h0001153c, 32'h00020007); // norm1_pack.word15
     axi_write(SPAD_BASE + 32'h00011540, 32'h70150030); // ffn_up.word0
     axi_write(SPAD_BASE + 32'h00011544, 32'h00010600); // ffn_up.word1
     axi_write(SPAD_BASE + 32'h00011548, 32'h00010180); // ffn_up.word2
@@ -659,8 +659,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h0001156c, 32'h00000000); // ffn_up.word11
     axi_write(SPAD_BASE + 32'h00011570, 32'h00000000); // ffn_up.word12
     axi_write(SPAD_BASE + 32'h00011574, 32'h00010001); // ffn_up.word13
-    axi_write(SPAD_BASE + 32'h00011578, 32'h00000000); // ffn_up.word14
-    axi_write(SPAD_BASE + 32'h0001157c, 32'h00000007); // ffn_up.word15
+    axi_write(SPAD_BASE + 32'h00011578, 32'h00020001); // ffn_up.word14
+    axi_write(SPAD_BASE + 32'h0001157c, 32'h00010007); // ffn_up.word15
     axi_write(SPAD_BASE + 32'h00011580, 32'h70160035); // gelu.word0
     axi_write(SPAD_BASE + 32'h00011584, 32'h00010640); // gelu.word1
     axi_write(SPAD_BASE + 32'h00011588, 32'h00000000); // gelu.word2
@@ -675,8 +675,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h000115ac, 32'h00000000); // gelu.word11
     axi_write(SPAD_BASE + 32'h000115b0, 32'h00000000); // gelu.word12
     axi_write(SPAD_BASE + 32'h000115b4, 32'h00010001); // gelu.word13
-    axi_write(SPAD_BASE + 32'h000115b8, 32'h00000000); // gelu.word14
-    axi_write(SPAD_BASE + 32'h000115bc, 32'h00000007); // gelu.word15
+    axi_write(SPAD_BASE + 32'h000115b8, 32'h00010002); // gelu.word14
+    axi_write(SPAD_BASE + 32'h000115bc, 32'h00020007); // gelu.word15
     axi_write(SPAD_BASE + 32'h000115c0, 32'h70170036); // gelu_pack.word0
     axi_write(SPAD_BASE + 32'h000115c4, 32'h00010680); // gelu_pack.word1
     axi_write(SPAD_BASE + 32'h000115c8, 32'h00000000); // gelu_pack.word2
@@ -691,8 +691,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h000115ec, 32'h00000000); // gelu_pack.word11
     axi_write(SPAD_BASE + 32'h000115f0, 32'h00000000); // gelu_pack.word12
     axi_write(SPAD_BASE + 32'h000115f4, 32'h00010001); // gelu_pack.word13
-    axi_write(SPAD_BASE + 32'h000115f8, 32'h00000000); // gelu_pack.word14
-    axi_write(SPAD_BASE + 32'h000115fc, 32'h00000007); // gelu_pack.word15
+    axi_write(SPAD_BASE + 32'h000115f8, 32'h00020001); // gelu_pack.word14
+    axi_write(SPAD_BASE + 32'h000115fc, 32'h00010007); // gelu_pack.word15
     axi_write(SPAD_BASE + 32'h00011600, 32'h70180030); // ffn_down.word0
     axi_write(SPAD_BASE + 32'h00011604, 32'h000106c0); // ffn_down.word1
     axi_write(SPAD_BASE + 32'h00011608, 32'h000101c0); // ffn_down.word2
@@ -707,8 +707,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h0001162c, 32'h00000000); // ffn_down.word11
     axi_write(SPAD_BASE + 32'h00011630, 32'h00000000); // ffn_down.word12
     axi_write(SPAD_BASE + 32'h00011634, 32'h00010001); // ffn_down.word13
-    axi_write(SPAD_BASE + 32'h00011638, 32'h00000000); // ffn_down.word14
-    axi_write(SPAD_BASE + 32'h0001163c, 32'h00000007); // ffn_down.word15
+    axi_write(SPAD_BASE + 32'h00011638, 32'h00010002); // ffn_down.word14
+    axi_write(SPAD_BASE + 32'h0001163c, 32'h00020007); // ffn_down.word15
     axi_write(SPAD_BASE + 32'h00011640, 32'h70190034); // residual2.word0
     axi_write(SPAD_BASE + 32'h00011644, 32'h00010700); // residual2.word1
     axi_write(SPAD_BASE + 32'h00011648, 32'h000105c0); // residual2.word2
@@ -723,8 +723,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h0001166c, 32'h00000000); // residual2.word11
     axi_write(SPAD_BASE + 32'h00011670, 32'h00000000); // residual2.word12
     axi_write(SPAD_BASE + 32'h00011674, 32'h00010001); // residual2.word13
-    axi_write(SPAD_BASE + 32'h00011678, 32'h00000000); // residual2.word14
-    axi_write(SPAD_BASE + 32'h0001167c, 32'h00000007); // residual2.word15
+    axi_write(SPAD_BASE + 32'h00011678, 32'h00020001); // residual2.word14
+    axi_write(SPAD_BASE + 32'h0001167c, 32'h00010007); // residual2.word15
     axi_write(SPAD_BASE + 32'h00011680, 32'h701a0038); // layernorm2_row0.word0
     axi_write(SPAD_BASE + 32'h00011684, 32'h00010740); // layernorm2_row0.word1
     axi_write(SPAD_BASE + 32'h00011688, 32'h00010200); // layernorm2_row0.word2
@@ -739,8 +739,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h000116ac, 32'h00000000); // layernorm2_row0.word11
     axi_write(SPAD_BASE + 32'h000116b0, 32'h00000000); // layernorm2_row0.word12
     axi_write(SPAD_BASE + 32'h000116b4, 32'h00010001); // layernorm2_row0.word13
-    axi_write(SPAD_BASE + 32'h000116b8, 32'h00000000); // layernorm2_row0.word14
-    axi_write(SPAD_BASE + 32'h000116bc, 32'h00000007); // layernorm2_row0.word15
+    axi_write(SPAD_BASE + 32'h000116b8, 32'h00010002); // layernorm2_row0.word14
+    axi_write(SPAD_BASE + 32'h000116bc, 32'h00020007); // layernorm2_row0.word15
     axi_write(SPAD_BASE + 32'h000116c0, 32'h701b0038); // layernorm2_row1.word0
     axi_write(SPAD_BASE + 32'h000116c4, 32'h00010750); // layernorm2_row1.word1
     axi_write(SPAD_BASE + 32'h000116c8, 32'h00010200); // layernorm2_row1.word2
@@ -755,8 +755,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h000116ec, 32'h00000000); // layernorm2_row1.word11
     axi_write(SPAD_BASE + 32'h000116f0, 32'h00000000); // layernorm2_row1.word12
     axi_write(SPAD_BASE + 32'h000116f4, 32'h00010001); // layernorm2_row1.word13
-    axi_write(SPAD_BASE + 32'h000116f8, 32'h00000000); // layernorm2_row1.word14
-    axi_write(SPAD_BASE + 32'h000116fc, 32'h00000007); // layernorm2_row1.word15
+    axi_write(SPAD_BASE + 32'h000116f8, 32'h00020001); // layernorm2_row1.word14
+    axi_write(SPAD_BASE + 32'h000116fc, 32'h00010007); // layernorm2_row1.word15
     axi_write(SPAD_BASE + 32'h00011700, 32'h701c0038); // layernorm2_row2.word0
     axi_write(SPAD_BASE + 32'h00011704, 32'h00010760); // layernorm2_row2.word1
     axi_write(SPAD_BASE + 32'h00011708, 32'h00010200); // layernorm2_row2.word2
@@ -771,8 +771,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h0001172c, 32'h00000000); // layernorm2_row2.word11
     axi_write(SPAD_BASE + 32'h00011730, 32'h00000000); // layernorm2_row2.word12
     axi_write(SPAD_BASE + 32'h00011734, 32'h00010001); // layernorm2_row2.word13
-    axi_write(SPAD_BASE + 32'h00011738, 32'h00000000); // layernorm2_row2.word14
-    axi_write(SPAD_BASE + 32'h0001173c, 32'h00000007); // layernorm2_row2.word15
+    axi_write(SPAD_BASE + 32'h00011738, 32'h00010002); // layernorm2_row2.word14
+    axi_write(SPAD_BASE + 32'h0001173c, 32'h00020007); // layernorm2_row2.word15
     axi_write(SPAD_BASE + 32'h00011740, 32'h701d0038); // layernorm2_row3.word0
     axi_write(SPAD_BASE + 32'h00011744, 32'h00010770); // layernorm2_row3.word1
     axi_write(SPAD_BASE + 32'h00011748, 32'h00010200); // layernorm2_row3.word2
@@ -787,8 +787,8 @@ task load_transformer_workload;
     axi_write(SPAD_BASE + 32'h0001176c, 32'h00000000); // layernorm2_row3.word11
     axi_write(SPAD_BASE + 32'h00011770, 32'h00000000); // layernorm2_row3.word12
     axi_write(SPAD_BASE + 32'h00011774, 32'h00010001); // layernorm2_row3.word13
-    axi_write(SPAD_BASE + 32'h00011778, 32'h00000000); // layernorm2_row3.word14
-    axi_write(SPAD_BASE + 32'h0001177c, 32'h00000007); // layernorm2_row3.word15
+    axi_write(SPAD_BASE + 32'h00011778, 32'h00000001); // layernorm2_row3.word14
+    axi_write(SPAD_BASE + 32'h0001177c, 32'h00010007); // layernorm2_row3.word15
   end
 endtask
 

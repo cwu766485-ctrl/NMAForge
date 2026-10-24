@@ -1,8 +1,6 @@
 # NMAForge 混合精度扩展规格（BF16/FP16 Dot）
 
-> 当前产品基线为 A10 / ABI v7.4：`0x50` 保留 BF16 点积，`0x51` 新增 FP16 点积；共用 FP32 累加、scratchpad 访问与 completion 路径。
-> 完整 VCS 基线证据（2026-10-14）：FP16 乘法 10,015 向量 PASS；mixed BF16/FP16 UVM seeds `712345/987654/20261014` 各 582/582 scoreboard PASS（每 seed 536 numeric + 46 fault/reset），总计 1,746 笔；numeric、fault/reset、busy-start、response-latency functional coverage 均 100%，peak outstanding read=2；request-under-stall SVA 34,928 attempts、10,761 real successes、0 failures/incomplete。DUT line/condition/branch/FSM coverage 为 97.96%/96.50%/92.86%/71.43%；主 `state_r` 5/5 states、10/10 transitions。非法状态 default 注入通过；7 个 condition、4 个 branch outcomes 与 8 个 pending-error FSM transitions 已逐项 disposition（未做形式不可达证明）。`ai_smoke` 与 20-case seeded top regression PASS，DDR→SPAD→FP16→SPAD→DDR 结果为 `0x41300000`。无新增 FP PPA。详见 [A10 固定快照验证记录](../verification/A10_DV_BASELINE_2026-10-14.md) 与 [A10 RTM](../verification/A10_DV_RTM.md)。
-> 补充复跑（2026-10-15）：`dot-core-test` 通过；BF16/FP16 mixed UVM seeds `712345/987654/20261014` 各 200/200 bit-exact scoreboard，peak outstanding read=2，所选数值、response-latency、fault/reset、busy-start functional coverage 均 100%，UVM warning/error/fatal=`0/0/0`。这次 64-random-vector-per-format 回归是对上述更大基线的增量复核，不替代 584/584-per-seed 证据；运行记录见 [A10 当前复跑](../verification/A10_DV_RUN_2026-10-15.md)。
+> 本文冻结 BF16/FP16 点积的数值与 ABI 契约。当前功能、形式与覆盖率状态见[混合精度验证状态](../verification/COMPUTE_ENGINE_STATUS.md)及 [A10 RTM](../verification/A10_DV_RTM.md)；历史精确运行数据保留在对应的 dated run record。
 > A8 / ABI v7.2 与 A9 / ABI v7.3 均为历史兼容版本，其能力以 `SPEC_ZH.md` 为准。
 
 ## 1. 产品点积功能
@@ -162,7 +160,7 @@ cluster、寄存器 capability/version、测试和文档。`8'h51/8'h52` 仍仅�
 ## 6. 阶段验收记录
 
 1. DMA UVM 11/11、Control UVM 6/6、top smoke `TEST PASS`；运行环境、
-   worktree 状态和日志路径见 `docs/exec-plans/active/FP_G0_BASELINE.md`。
+1. 基线与当前验证缺口见[混合精度验证状态](../verification/COMPUTE_ENGINE_STATUS.md)和 [A10 RTM](../verification/A10_DV_RTM.md)。
 2. 历史 A9 冻结 `0x50 BF16_DOT_ACC_FP32` 与 ABI 7.3；当前 A10 保留 `0x50`，
    新增 `0x51 FP16_DOT_ACC_FP32`、ABI 7.4 和 `CAP2[7]`；descriptor 字节布局不变。
 3. 独立 Python raw-bit model 使用 `Fraction`/整数 RNE，不依赖 Python float；

@@ -19,6 +19,7 @@ set AI_ACCEL_RTL_FILES [list \
     "$REPO_ROOT/rtl/control/descriptor/ai_descriptor_validator.v" \
     "$REPO_ROOT/rtl/control/queue/ai_ring_pointer_next.v" \
     "$REPO_ROOT/rtl/control/queue/ai_command_processor.v" \
+    "$REPO_ROOT/rtl/control/queue/ai_parallel_compute_dispatcher.v" \
     "$REPO_ROOT/rtl/compute/cnm/ai_bank_pe.v" \
     "$REPO_ROOT/rtl/compute/cnm/ai_bank_local_controller.v" \
     "$REPO_ROOT/rtl/compute/cnm/ai_banked_cnm_core.v" \
@@ -53,5 +54,6 @@ set AI_ACCEL_RTL_FILES [list \
     "$REPO_ROOT/rtl/top/fabric/memory/ai_accel_memory_fabric.v" \
     "$REPO_ROOT/rtl/top/fabric/control/ai_accel_control_fabric.v" \
     "$REPO_ROOT/rtl/top/fabric/compute/ai_accel_compute_cluster.v" \
+    "$REPO_ROOT/rtl/top/fabric/compute/ai_compute_spad_mux.v" \
     "$REPO_ROOT/rtl/top/ai_accel_top.v" \
 ]
