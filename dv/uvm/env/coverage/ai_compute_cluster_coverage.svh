@@ -9,6 +9,8 @@ class ai_compute_cluster_coverage extends uvm_component;
     bit simultaneous_engine_requests;
     bit banked_request;
     bit cnm_request;
+    bit matrix_prefetch_active;
+    bit matrix_a_cache_hit;
 
     covergroup cluster_cg;
         option.per_instance = 1;
@@ -23,6 +25,8 @@ class ai_compute_cluster_coverage extends uvm_component;
         cp_simultaneous_engine_requests: coverpoint simultaneous_engine_requests { bins hit = {1}; }
         cp_banked_request: coverpoint banked_request { bins hit = {1}; }
         cp_cnm_request: coverpoint cnm_request { bins hit = {1}; }
+        cp_matrix_prefetch_active: coverpoint matrix_prefetch_active { bins hit = {1}; }
+        cp_matrix_a_cache_hit: coverpoint matrix_a_cache_hit { bins hit = {1}; }
         cp_response_client: coverpoint response_client iff (response_client >= 0) {
             bins descriptor = {0}; bins completion = {1}; bins core = {2};
             bins banked = {3}; bins dma = {4};
@@ -53,9 +57,12 @@ class ai_compute_cluster_coverage extends uvm_component;
         simultaneous_engine_requests = $countones(obs.engine_req_valid) > 1;
         banked_request = obs.banked_valid;
         cnm_request = |obs.cnm_valid;
+        matrix_prefetch_active = obs.matrix_prefetch_active;
+        matrix_a_cache_hit = obs.matrix_a_cache_hit;
         response_client = obs.rsp_valid ? obs.rsp_client : -1;
         if (obs.launch_valid || active_count > 0 || simultaneous_engine_requests ||
-            banked_request || cnm_request || obs.rsp_valid)
+            banked_request || cnm_request || obs.rsp_valid ||
+            matrix_prefetch_active || matrix_a_cache_hit)
             cluster_cg.sample();
     endfunction
 

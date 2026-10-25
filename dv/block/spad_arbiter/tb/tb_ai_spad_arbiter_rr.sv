@@ -80,7 +80,7 @@ module tb_ai_spad_arbiter_rr;
 
   ap_banked_response_metadata_is_valid: assert property (
     @(posedge clk) disable iff (!resetn)
-    dut.accept_client_d == 3'd3 |-> dut.accept_valid_d
+    (dut.accept_client_d == 3'd3 || dut.accept_client_d == 3'd5) |-> dut.accept_valid_d
   ) else $fatal(1,"banked response metadata was marked invalid");
 
   cp_descriptor_selected: cover property (
@@ -150,8 +150,10 @@ module tb_ai_spad_arbiter_rr;
           if (|cnm_valid) rr_mode_banked_cnm = rr_mode_banked_cnm + 1;
           else rr_mode_banked_single = rr_mode_banked_single + 1;
           rr_mode_banked_wait = 0;
-          if (request_client != 3'd3)
-            $fatal(1,"random-mode banked grant has client tag %0d",request_client);
+          if ((|cnm_valid) && request_client != 3'd5)
+            $fatal(1,"random-mode CNM grant has client tag %0d",request_client);
+          if (!(|cnm_valid) && request_client != 3'd3)
+            $fatal(1,"random-mode matrix banked grant has client tag %0d",request_client);
         end else begin
           rr_mode_banked_wait = rr_mode_banked_wait + 1;
           if (rr_mode_banked_wait > 2)
@@ -214,7 +216,7 @@ module tb_ai_spad_arbiter_rr;
              $fatal(1,"core line fallback selection mismatch");
         2: if (!banked_ready || spad_banked_valid!=1'b1 || request_client!=3'd3)
              $fatal(1,"single-banked fallback selection mismatch");
-        3: if (cnm_ready!==4'hf || spad_cnm_valid!==4'hf || request_client!=3'd3)
+        3: if (cnm_ready!==4'hf || spad_cnm_valid!==4'hf || request_client!=3'd5)
              $fatal(1,"CNM fallback selection mismatch");
         4: if (!dma_ready || dma_line_ready || !spad_valid || spad_line_valid || request_client!=3'd4)
              $fatal(1,"DMA scalar fallback selection mismatch");
@@ -461,7 +463,7 @@ module tb_ai_spad_arbiter_rr;
     if(cnm_ready!==4'hf || spad_cnm_valid!==4'b1011 ||
        spad_cnm_addr0!==32'h0100 || spad_cnm_addr1!==32'h0204 ||
        spad_cnm_addr2!==32'h0308 || spad_cnm_addr3!==32'h040c ||
-       request_client!=3'd3)
+       request_client!=3'd5)
       $fatal(1,"CNM lane request was not admitted intact");
     // Keep valid asserted across the sampling posedge.  Deasserting it at
     // that same posedge races the arbiter's sequential block in simulation:
@@ -473,9 +475,53 @@ module tb_ai_spad_arbiter_rr;
     // emits its tagged response at the following posedge.
     @(posedge clk);
     @(negedge clk);
-    if(cnm_rsp_valid!==4'b1011 || !rsp_valid || rsp_client!=3'd3)
+    if(cnm_rsp_valid!==4'b1011 || !rsp_valid || rsp_client!=3'd5)
       $fatal(1,"CNM response lane mask was not preserved");
     $display("Scratchpad round-robin arbiter PASS");
+
+    // Matrix and CNM share the scheduler's banked port class, but their
+    // engines have independent response consumers. Keep both requesting so
+    // the arbiter accepts a CNM transaction followed by a Matrix transaction
+    // on adjacent cycles; each delayed response must retain its own owner.
+    resetn=0;
+    desc_valid=0; cpl_valid=0;
+    core_valid=0; core_line_valid=0;
+    banked_valid=0; cnm_valid=0;
+    dma_valid=0; dma_line_valid=0;
+    repeat(2) @(posedge clk);
+    @(negedge clk);
+    resetn=1;
+    banked_valid=1;
+    banked_addr=32'h0000_0300;
+    cnm_valid=4'b1011;
+    cnm_addr0=32'h0000_0100; cnm_addr1=32'h0000_0204;
+    cnm_addr2=32'h0000_0308; cnm_addr3=32'h0000_040c;
+    #1;
+    if (cnm_ready!==4'hf || banked_ready || request_client!=3'd5)
+      $fatal(1,"simultaneous Matrix/CNM arbitration did not select CNM first");
+    @(posedge clk);
+    @(negedge clk);
+    cnm_valid=0;
+    #1;
+    if (!banked_ready || cnm_ready!=0 || request_client!=3'd3)
+      $fatal(1,"Matrix banked read did not become independently admissible");
+    @(posedge clk);
+    @(negedge clk);
+    banked_valid=0;
+    #1;
+    if (!rsp_valid || rsp_client!=3'd5 || cnm_rsp_valid!==4'b1011)
+      $fatal(1,"CNM response owner/lane mismatch during Matrix overlap client=%0d lanes=%b",
+             rsp_client,cnm_rsp_valid);
+    @(posedge clk);
+    #1;
+    if (!rsp_valid || rsp_client!=3'd3 || cnm_rsp_valid!==4'b0000)
+      $fatal(1,"Matrix response owner was aliased with CNM client=%0d lanes=%b",
+             rsp_client,cnm_rsp_valid);
+    @(posedge clk);
+    #1;
+    if (rsp_valid || cnm_rsp_valid!=0)
+      $fatal(1,"Matrix/CNM response ownership pipeline did not drain");
+    $display("Matrix/CNM concurrent banked response ownership PASS");
 
     // Scratchpad parity arrives registered with the read-data response.  A
     // parity error asserted in that response cycle must not be sampled one

@@ -38,7 +38,7 @@ module ai_dma_spad_subsystem_sva (
         (!desc_valid && cpl_valid) |-> (cpl_ready && !core_ready && !dma_ready && !dma_line_ready));
     ap_core_grant_owner: assert property (core_ready |-> core_valid && request_client == 3'd2);
     ap_cnm_grant_owner: assert property ((|cnm_ready) |-> (|cnm_valid) &&
-                                         (cnm_ready == 4'hf) && request_client == 3'd3);
+                                         (cnm_ready == 4'hf) && request_client == 3'd5);
     ap_cnm_grant_exclusive: assert property ((|cnm_ready) |->
         !desc_ready && !cpl_ready && !core_ready && !dma_ready && !dma_line_ready);
     ap_cnm_request_stable_when_stalled: assert property (
@@ -58,13 +58,14 @@ module ai_dma_spad_subsystem_sva (
     ap_banked_response_tag: assert property (
         banked_rsp_valid |-> rsp_valid && rsp_client == 3'd3);
     ap_cnm_response_tag: assert property (
-        (|cnm_rsp_valid) |-> rsp_valid && rsp_client == 3'd3);
+        (|cnm_rsp_valid) |-> rsp_valid && rsp_client == 3'd5);
     ap_cnm_protection_error_response_tag: assert property (
-        cnm_protection_error |-> (|cnm_rsp_valid) && rsp_valid && rsp_client == 3'd3);
+        cnm_protection_error |-> (|cnm_rsp_valid) && rsp_valid && rsp_client == 3'd5);
     ap_dma_scalar_response_tag: assert property (
         dma_rsp_valid |-> rsp_valid && rsp_client == 3'd4 && !rsp_is_line);
     ap_dma_line_response_tag: assert property (
         dma_line_rsp_valid |-> rsp_valid && rsp_client == 3'd4 && rsp_is_line);
     ap_single_response_owner: assert property (
-        $onehot0({desc_rsp_valid, core_rsp_valid, banked_rsp_valid, dma_rsp_valid, dma_line_rsp_valid}));
+        $onehot0({desc_rsp_valid, core_rsp_valid, banked_rsp_valid,
+                  (|cnm_rsp_valid), dma_rsp_valid, dma_line_rsp_valid}));
 endmodule

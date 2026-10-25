@@ -5,7 +5,9 @@
 // unchanged. A 16x16 array gathers four 4x4 row/column groups per K-word
 // slice, accumulates one 16x16 macro-tile, then writes four results per line.
 module ai_tensor_matrix_core #(
-    parameter integer ARRAY_SIZE = 16
+    parameter integer ARRAY_SIZE = 16,
+    parameter integer MAX_OUTSTANDING_READS = 4,
+    parameter integer ENABLE_A_TILE_CACHE = 1
 )(
     input  wire        clk,
     input  wire        resetn,
@@ -69,6 +71,9 @@ module ai_tensor_matrix_core #(
     output wire        perf_banked_wait
 );
     localparam integer ARRAY_GROUPS = ARRAY_SIZE / 4;
+    // Keep one A macro-tile's K groups for reuse across adjacent N tiles.
+    // Larger K commands remain legal and bypass this bounded local cache.
+    localparam integer A_TILE_CACHE_K_WORDS = 16;
     localparam integer TILE_INDEX_WIDTH =
         (ARRAY_SIZE <= 2) ? 1 : $clog2(ARRAY_SIZE);
     localparam integer ARRAY_INDEX_WIDTH =
@@ -97,8 +102,54 @@ module ai_tensor_matrix_core #(
     localparam [3:0] ST_NEXT      = 4'd10;
     localparam [3:0] ST_DONE      = 4'd11;
     localparam [3:0] ST_ERROR     = 4'd12;
+    localparam [3:0] ST_ERROR_DRAIN = 4'd13;
+    localparam [3:0] ST_PREFETCH_WAIT = 4'd14;
+    localparam [2:0] PF_IDLE      = 3'd0;
+    localparam [2:0] PF_A_REQ     = 3'd1;
+    localparam [2:0] PF_A_DRAIN   = 3'd2;
+    localparam [2:0] PF_B_REQ     = 3'd3;
+    localparam [2:0] PF_B_DRAIN   = 3'd4;
+    localparam integer READ_FIFO_PTR_WIDTH =
+        (MAX_OUTSTANDING_READS <= 2) ? 1 : $clog2(MAX_OUTSTANDING_READS);
+    localparam integer READ_FIFO_COUNT_WIDTH = READ_FIFO_PTR_WIDTH + 1;
+    localparam [READ_FIFO_PTR_WIDTH-1:0] READ_FIFO_LAST =
+        MAX_OUTSTANDING_READS - 1;
 
     reg [3:0] state_r;
+    // Passive per-command profile used by VCS regressions. Indexes follow the
+    // ST_* encoding below; the aggregate stalls split request arbitration,
+    // response latency, and output writeback backpressure without changing
+    // the command interface or FSM decisions.
+    reg [31:0] perf_state_cycles [0:14];
+    reg [31:0] perf_arbiter_stall_cycles;
+    reg [31:0] perf_response_wait_cycles;
+    reg [31:0] perf_writeback_wait_cycles;
+    reg [31:0] perf_prefetch_a_req_cycles;
+    reg [31:0] perf_prefetch_a_drain_cycles;
+    reg [31:0] perf_prefetch_b_req_cycles;
+    reg [31:0] perf_prefetch_b_drain_cycles;
+    reg [31:0] perf_prefetch_overlap_cycles;
+    reg [31:0] perf_prefetch_wait_cycles;
+    reg [31:0] perf_prefetch_completed;
+    reg [31:0] perf_a_tile_cache_hits;
+    reg [2:0] prefetch_state_r;
+    reg [2:0] prefetch_group_r;
+    reg [15:0] prefetch_k_group_r;
+    reg prefetch_buffer_r;
+    reg [1:0] prefetch_valid_r;
+    reg compute_buffer_r;
+    reg prefetch_kick;
+    reg [15:0] prefetch_kick_k_group;
+    reg prefetch_kick_buffer;
+    reg prefetch_consume;
+    reg prefetch_consume_buffer;
+    reg [READ_FIFO_COUNT_WIDTH-1:0] read_outstanding_count;
+    reg [READ_FIFO_PTR_WIDTH-1:0] read_fifo_wr_ptr, read_fifo_rd_ptr;
+    // {operand B, 4x4 group, K group, full bank-word address}. The fixed-latency
+    // response path has no ID, so accepted request ownership is retained here.
+    reg [52:0] read_response_meta_fifo [0:MAX_OUTSTANDING_READS-1];
+    reg [READ_FIFO_COUNT_WIDTH-1:0] perf_outstanding_highwater;
+    reg [31:0] perf_fifo_full_cycles;
     reg [15:0] m_r, n_r, k_words_r;
     reg [31:0] instance_count_r, instance_r;
     reg [15:0] row_tile_r, col_tile_r, k_group_r;
@@ -120,8 +171,12 @@ module ai_tensor_matrix_core #(
     reg [31:0] src0_batch_stride_r, src1_batch_stride_r, dst_batch_stride_r;
     reg [31:0] dst_row_stride_r;
 
-    reg [31:0] a_tile_words_r [0:ARRAY_SIZE-1];
-    reg [31:0] b_tile_words_r [0:ARRAY_SIZE-1];
+    reg [31:0] a_tile_words_r [0:1][0:ARRAY_SIZE-1];
+    reg [31:0] b_tile_words_r [0:1][0:ARRAY_SIZE-1];
+    reg [31:0] a_tile_cache_words_r [0:A_TILE_CACHE_K_WORDS-1][0:ARRAY_SIZE-1];
+    reg [ARRAY_GROUPS-1:0] a_cache_group_seen_r [0:A_TILE_CACHE_K_WORDS-1];
+    reg [A_TILE_CACHE_K_WORDS-1:0] a_cache_valid_r;
+    reg [31:0] a_cache_base_r;
     reg signed [31:0] bias_words_r [0:ARRAY_SIZE-1];
 
     wire [ARRAY_SIZE*ARRAY_SIZE*64-1:0] array_accumulator_vector;
@@ -137,6 +192,8 @@ module ai_tensor_matrix_core #(
 
     integer vector_i;
     integer reset_i;
+    integer perf_i;
+    integer cache_i;
 
     wire [31:0] row_tile_origin =
         {16'd0,row_tile_r} * ARRAY_SIZE;
@@ -162,6 +219,87 @@ module ai_tensor_matrix_core #(
           {16'd0,k_group_r}) << 4;
     wire [31:0] a_read_addr = a_tile_base_r + banked_word_offset;
     wire [31:0] b_read_addr = b_tile_base_r + banked_word_offset;
+    wire prefetch_active = (prefetch_state_r != PF_IDLE);
+    wire prefetch_is_b_req = (prefetch_state_r == PF_B_REQ);
+    wire prefetch_request_pending =
+        ((prefetch_state_r == PF_A_REQ) && (prefetch_group_r < a_group_count)) ||
+        ((prefetch_state_r == PF_B_REQ) && (prefetch_group_r < b_group_count));
+    wire [31:0] prefetch_word_offset =
+        (({29'd0,prefetch_group_r} * {16'd0,k_words_r}) +
+         {16'd0,prefetch_k_group_r}) << 4;
+    wire [31:0] prefetch_a_addr = a_tile_base_r + prefetch_word_offset;
+    wire [31:0] prefetch_b_addr = b_tile_base_r + prefetch_word_offset;
+    wire [31:0] prefetch_read_addr = prefetch_is_b_req ?
+                                     prefetch_b_addr : prefetch_a_addr;
+    wire banked_request_is_prefetch = prefetch_active;
+    wire banked_request_is_b = prefetch_active ? prefetch_is_b_req :
+                               (state_r == ST_B_REQ);
+    wire [2:0] banked_request_group = prefetch_active ? prefetch_group_r :
+                                      read_group_r;
+    wire [15:0] banked_request_k_group = prefetch_active ?
+                                         prefetch_k_group_r : k_group_r;
+    wire banked_request_buffer = prefetch_active ? prefetch_buffer_r : 1'b0;
+    wire a_cache_tag_match = ENABLE_A_TILE_CACHE &&
+                             (k_words_r <= A_TILE_CACHE_K_WORDS) &&
+                             (a_cache_base_r == a_tile_base_r);
+    wire a_cache_initial_hit = a_cache_tag_match &&
+                               a_cache_valid_r[k_group_r[3:0]];
+    wire a_cache_prefetch_hit = ENABLE_A_TILE_CACHE &&
+        (k_words_r <= A_TILE_CACHE_K_WORDS) &&
+        (a_cache_base_r == a_tile_base_r) &&
+        (prefetch_kick_k_group < A_TILE_CACHE_K_WORDS) &&
+        a_cache_valid_r[prefetch_kick_k_group[3:0]];
+    wire a_cache_initial_copy = (state_r == ST_A_REQ) &&
+                                (read_group_r == 0) && a_cache_initial_hit;
+    wire a_cache_prefetch_copy = prefetch_kick &&
+                                 (prefetch_state_r == PF_IDLE) &&
+                                 a_cache_prefetch_hit;
+    wire bank_response_has_parity_error = |bank_parity_error;
+    wire banked_read_accept = banked_read_valid && banked_ready;
+    wire read_request_pending = prefetch_active ? prefetch_request_pending :
+        (((state_r == ST_A_REQ) && !a_cache_initial_copy &&
+          (read_group_r < a_group_count)) ||
+         ((state_r == ST_B_REQ) && (read_group_r < b_group_count)));
+    wire banked_response_accept = banked_rsp_valid &&
+                                  (read_outstanding_count != 0);
+    wire banked_response_fault = banked_response_accept &&
+                                 bank_response_has_parity_error;
+    wire banked_request_fault = banked_read_accept &&
+                                banked_protection_error;
+    wire read_fifo_push = banked_read_accept;
+    wire read_fifo_pop = banked_response_accept;
+    wire [READ_FIFO_COUNT_WIDTH-1:0] read_outstanding_next =
+        read_outstanding_count +
+        (read_fifo_push && !read_fifo_pop) -
+        (read_fifo_pop && !read_fifo_push);
+    wire prefetch_complete = (prefetch_state_r == PF_B_DRAIN) &&
+                             (read_outstanding_next == 0);
+    wire [READ_FIFO_PTR_WIDTH-1:0] read_fifo_wr_next =
+        (read_fifo_wr_ptr == READ_FIFO_LAST) ?
+        {READ_FIFO_PTR_WIDTH{1'b0}} : read_fifo_wr_ptr + 1'b1;
+    wire [READ_FIFO_PTR_WIDTH-1:0] read_fifo_rd_next =
+        (read_fifo_rd_ptr == READ_FIFO_LAST) ?
+        {READ_FIFO_PTR_WIDTH{1'b0}} : read_fifo_rd_ptr + 1'b1;
+    wire [52:0] response_meta = read_response_meta_fifo[read_fifo_rd_ptr];
+    wire response_buffer = response_meta[52];
+    wire response_operand_b = response_meta[51];
+    wire [2:0] response_group = response_meta[50:48];
+    wire [15:0] response_k_group = response_meta[47:32];
+    wire [31:0] response_request_addr = response_meta[31:0];
+    wire [ARRAY_GROUPS-1:0] a_cache_response_group_mask =
+        {{(ARRAY_GROUPS-1){1'b0}},1'b1} << response_group;
+    wire [ARRAY_GROUPS-1:0] a_cache_required_group_mask =
+        {ARRAY_GROUPS{1'b1}} >> (ARRAY_GROUPS - a_group_count);
+    wire [31:0] response_group_offset =
+        (({29'd0,response_group} * {16'd0,k_words_r}) +
+         {16'd0,response_k_group}) << 4;
+    wire [31:0] response_expected_addr = response_operand_b ?
+        (b_tile_base_r + response_group_offset) :
+        (a_tile_base_r + response_group_offset);
+    wire banked_response_context_fault = banked_response_accept &&
+        (state_r != ST_ERROR_DRAIN) &&
+        ((response_k_group >= k_words_r) ||
+         (response_request_addr != response_expected_addr));
     wire [31:0] bias_read_addr =
         bias_tile_base_r + ({{(32-TILE_INDEX_WIDTH-1){1'b0}},bias_index_r} << 2);
 
@@ -180,7 +318,6 @@ module ai_tensor_matrix_core #(
     wire invalid_alignment = |src0_base[3:0] || |src1_base[3:0] ||
                              |dst_base[1:0] || (bias_enable && |bias_base[1:0]);
     wire last_k_group = (k_group_r == k_words_r - 1'b1);
-    wire bank_response_has_parity_error = |bank_parity_error;
     wire watchdog_expired = busy && (watchdog_limit_r != 0) &&
                             (cycle_count >= watchdog_limit_r);
     wire output_write_accepted = (line_store_eligible && line_ready) ||
@@ -225,8 +362,10 @@ module ai_tensor_matrix_core #(
         (write_lane_r == 2'd2) ? write_result2 : write_result3;
 
     assign perf_mac_active = (state_r == ST_MAC);
-    assign perf_banked_wait = (state_r == ST_A_WAIT) ||
-                              (state_r == ST_B_WAIT);
+    assign perf_banked_wait =
+        (((state_r == ST_A_WAIT) || (state_r == ST_B_WAIT) ||
+          (state_r == ST_PREFETCH_WAIT)) &&
+         (read_outstanding_count != 0) && !banked_rsp_valid);
     assign line_write = 1'b1;
     assign line_wstrb = 16'hffff;
 
@@ -290,10 +429,26 @@ module ai_tensor_matrix_core #(
     always @* begin
         banked_read_valid = 1'b0;
         banked_addr = 32'd0;
-        if (state_r == ST_A_REQ) begin
+        if (prefetch_active && prefetch_request_pending &&
+            (read_outstanding_count < MAX_OUTSTANDING_READS) &&
+            (state_r != ST_ERROR_DRAIN) && (state_r != ST_ERROR) &&
+            !abort && !watchdog_expired && !banked_response_fault &&
+            !banked_response_context_fault) begin
+            banked_read_valid = 1'b1;
+            banked_addr = prefetch_read_addr;
+        end else if (!prefetch_active && (state_r == ST_A_REQ) &&
+            !a_cache_initial_copy &&
+            (read_group_r < a_group_count) &&
+            (read_outstanding_count < MAX_OUTSTANDING_READS) &&
+            !abort && !watchdog_expired && !banked_response_fault &&
+            !banked_response_context_fault) begin
             banked_read_valid = 1'b1;
             banked_addr = a_read_addr;
-        end else if (state_r == ST_B_REQ) begin
+        end else if (!prefetch_active && (state_r == ST_B_REQ) &&
+                     (read_group_r < b_group_count) &&
+                     (read_outstanding_count < MAX_OUTSTANDING_READS) &&
+                     !abort && !watchdog_expired && !banked_response_fault &&
+                     !banked_response_context_fault) begin
             banked_read_valid = 1'b1;
             banked_addr = b_read_addr;
         end
@@ -318,16 +473,16 @@ module ai_tensor_matrix_core #(
 
         for (vector_i = 0; vector_i < ARRAY_SIZE; vector_i = vector_i + 1) begin
             array_load_a[vector_i*8 +: 8] = matrix_tile_element(
-                a_tile_words_r[(vector_i/4)*4+0],
-                a_tile_words_r[(vector_i/4)*4+1],
-                a_tile_words_r[(vector_i/4)*4+2],
-                a_tile_words_r[(vector_i/4)*4+3],
+                a_tile_words_r[compute_buffer_r][(vector_i/4)*4+0],
+                a_tile_words_r[compute_buffer_r][(vector_i/4)*4+1],
+                a_tile_words_r[compute_buffer_r][(vector_i/4)*4+2],
+                a_tile_words_r[compute_buffer_r][(vector_i/4)*4+3],
                 vector_i%4,array_load_lane,transpose_a_r);
             array_load_b[vector_i*8 +: 8] = matrix_tile_element(
-                b_tile_words_r[(vector_i/4)*4+0],
-                b_tile_words_r[(vector_i/4)*4+1],
-                b_tile_words_r[(vector_i/4)*4+2],
-                b_tile_words_r[(vector_i/4)*4+3],
+                b_tile_words_r[compute_buffer_r][(vector_i/4)*4+0],
+                b_tile_words_r[compute_buffer_r][(vector_i/4)*4+1],
+                b_tile_words_r[compute_buffer_r][(vector_i/4)*4+2],
+                b_tile_words_r[compute_buffer_r][(vector_i/4)*4+3],
                 vector_i%4,array_load_lane,transpose_b_r);
         end
     end
@@ -365,6 +520,67 @@ module ai_tensor_matrix_core #(
         .selected_overflow(array_selected_overflow)
     );
 
+    // Background K-group fetch. It writes only the inactive operand buffer;
+    // the response FIFO still provides the accepted-request ownership for
+    // both initial reads and prefetch reads.
+    always @(posedge clk or negedge resetn) begin
+        if (!resetn) begin
+            prefetch_state_r <= PF_IDLE;
+            prefetch_group_r <= 3'd0;
+            prefetch_k_group_r <= 16'd0;
+            prefetch_buffer_r <= 1'b0;
+            prefetch_valid_r <= 2'b00;
+        end else begin
+            if (prefetch_consume)
+                prefetch_valid_r[prefetch_consume_buffer] <= 1'b0;
+
+            if (abort || watchdog_expired || banked_request_fault ||
+                banked_response_fault || banked_response_context_fault ||
+                (state_r == ST_ERROR_DRAIN) || (state_r == ST_ERROR)) begin
+                prefetch_state_r <= PF_IDLE;
+                prefetch_valid_r <= 2'b00;
+            end else if (prefetch_kick && (prefetch_state_r == PF_IDLE)) begin
+                prefetch_group_r <= 3'd0;
+                prefetch_k_group_r <= prefetch_kick_k_group;
+                prefetch_buffer_r <= prefetch_kick_buffer;
+                prefetch_valid_r[prefetch_kick_buffer] <= 1'b0;
+                prefetch_state_r <= a_cache_prefetch_hit ? PF_B_REQ : PF_A_REQ;
+            end else begin
+                case (prefetch_state_r)
+                    PF_A_REQ: begin
+                        if (banked_request_is_prefetch && banked_read_accept) begin
+                            if (({29'd0,prefetch_group_r} + 32'd1) >= a_group_count)
+                                prefetch_state_r <= PF_A_DRAIN;
+                            else
+                                prefetch_group_r <= prefetch_group_r + 1'b1;
+                        end
+                    end
+                    PF_A_DRAIN: begin
+                        if (read_outstanding_next == 0) begin
+                            prefetch_group_r <= 3'd0;
+                            prefetch_state_r <= PF_B_REQ;
+                        end
+                    end
+                    PF_B_REQ: begin
+                        if (banked_request_is_prefetch && banked_read_accept) begin
+                            if (({29'd0,prefetch_group_r} + 32'd1) >= b_group_count)
+                                prefetch_state_r <= PF_B_DRAIN;
+                            else
+                                prefetch_group_r <= prefetch_group_r + 1'b1;
+                        end
+                    end
+                    PF_B_DRAIN: begin
+                        if (read_outstanding_next == 0) begin
+                            prefetch_valid_r[prefetch_buffer_r] <= 1'b1;
+                            prefetch_state_r <= PF_IDLE;
+                        end
+                    end
+                    default: prefetch_state_r <= PF_IDLE;
+                endcase
+            end
+        end
+    end
+
     always @(posedge clk or negedge resetn) begin
         if (!resetn) begin
             state_r <= ST_IDLE;
@@ -375,6 +591,30 @@ module ai_tensor_matrix_core #(
             result <= 32'd0;
             cycle_count <= 32'd0;
             element_count <= 32'd0;
+            perf_arbiter_stall_cycles <= 32'd0;
+            perf_response_wait_cycles <= 32'd0;
+            perf_writeback_wait_cycles <= 32'd0;
+            perf_prefetch_a_req_cycles <= 32'd0;
+            perf_prefetch_a_drain_cycles <= 32'd0;
+            perf_prefetch_b_req_cycles <= 32'd0;
+            perf_prefetch_b_drain_cycles <= 32'd0;
+            perf_prefetch_overlap_cycles <= 32'd0;
+            perf_prefetch_wait_cycles <= 32'd0;
+            perf_prefetch_completed <= 32'd0;
+            perf_a_tile_cache_hits <= 32'd0;
+            compute_buffer_r <= 1'b0;
+            prefetch_kick <= 1'b0;
+            prefetch_kick_k_group <= 16'd0;
+            prefetch_kick_buffer <= 1'b0;
+            prefetch_consume <= 1'b0;
+            prefetch_consume_buffer <= 1'b0;
+            read_outstanding_count <= {READ_FIFO_COUNT_WIDTH{1'b0}};
+            read_fifo_wr_ptr <= {READ_FIFO_PTR_WIDTH{1'b0}};
+            read_fifo_rd_ptr <= {READ_FIFO_PTR_WIDTH{1'b0}};
+            perf_outstanding_highwater <= {READ_FIFO_COUNT_WIDTH{1'b0}};
+            perf_fifo_full_cycles <= 32'd0;
+            for (perf_i = 0; perf_i <= ST_PREFETCH_WAIT; perf_i = perf_i + 1)
+                perf_state_cycles[perf_i] <= 32'd0;
             m_r <= 16'd0;
             n_r <= 16'd0;
             k_words_r <= 16'd0;
@@ -411,23 +651,170 @@ module ai_tensor_matrix_core #(
             dst_batch_stride_r <= 32'd0;
             dst_row_stride_r <= 32'd0;
             for (reset_i = 0; reset_i < ARRAY_SIZE; reset_i = reset_i + 1) begin
-                a_tile_words_r[reset_i] <= 32'd0;
-                b_tile_words_r[reset_i] <= 32'd0;
+                a_tile_words_r[0][reset_i] <= 32'd0;
+                a_tile_words_r[1][reset_i] <= 32'd0;
+                b_tile_words_r[0][reset_i] <= 32'd0;
+                b_tile_words_r[1][reset_i] <= 32'd0;
                 bias_words_r[reset_i] <= 32'sd0;
+            end
+            a_cache_base_r <= 32'd0;
+            a_cache_valid_r <= {A_TILE_CACHE_K_WORDS{1'b0}};
+            for (cache_i = 0; cache_i < A_TILE_CACHE_K_WORDS; cache_i = cache_i + 1) begin
+                a_cache_group_seen_r[cache_i] <= {ARRAY_GROUPS{1'b0}};
+                for (reset_i = 0; reset_i < ARRAY_SIZE; reset_i = reset_i + 1)
+                    a_tile_cache_words_r[cache_i][reset_i] <= 32'd0;
             end
         end else begin
             done <= 1'b0;
+            prefetch_kick <= 1'b0;
+            prefetch_consume <= 1'b0;
+
+            // The banked SPAD has no response ready or transaction ID. Keep
+            // accepted Matrix metadata in order until each registered
+            // response arrives. A response can coincide with a new accept.
+            if (read_fifo_push) begin
+                read_response_meta_fifo[read_fifo_wr_ptr] <= {
+                    banked_request_buffer, banked_request_is_b,
+                    banked_request_group, banked_request_k_group, banked_addr
+                };
+                read_fifo_wr_ptr <= read_fifo_wr_next;
+            end
+            if (read_fifo_pop)
+                read_fifo_rd_ptr <= read_fifo_rd_next;
+            case ({read_fifo_push, read_fifo_pop})
+                2'b10: read_outstanding_count <= read_outstanding_count + 1'b1;
+                2'b01: read_outstanding_count <= read_outstanding_count - 1'b1;
+                default: read_outstanding_count <= read_outstanding_count;
+            endcase
+
+            if (read_fifo_pop && !bank_response_has_parity_error &&
+                !banked_response_context_fault &&
+                (state_r != ST_ERROR_DRAIN) && !abort &&
+                !watchdog_expired) begin
+                if (response_operand_b) begin
+                    b_tile_words_r[response_buffer][response_group*4+0] <= bank0_data;
+                    b_tile_words_r[response_buffer][response_group*4+1] <= bank1_data;
+                    b_tile_words_r[response_buffer][response_group*4+2] <= bank2_data;
+                    b_tile_words_r[response_buffer][response_group*4+3] <= bank3_data;
+                end else begin
+                    a_tile_words_r[response_buffer][response_group*4+0] <= bank0_data;
+                    a_tile_words_r[response_buffer][response_group*4+1] <= bank1_data;
+                    a_tile_words_r[response_buffer][response_group*4+2] <= bank2_data;
+                    a_tile_words_r[response_buffer][response_group*4+3] <= bank3_data;
+                    if (a_cache_tag_match &&
+                        (response_k_group < A_TILE_CACHE_K_WORDS)) begin
+                        a_tile_cache_words_r[response_k_group[3:0]][response_group*4+0] <= bank0_data;
+                        a_tile_cache_words_r[response_k_group[3:0]][response_group*4+1] <= bank1_data;
+                        a_tile_cache_words_r[response_k_group[3:0]][response_group*4+2] <= bank2_data;
+                        a_tile_cache_words_r[response_k_group[3:0]][response_group*4+3] <= bank3_data;
+                        a_cache_group_seen_r[response_k_group[3:0]][response_group] <= 1'b1;
+                        if (((a_cache_group_seen_r[response_k_group[3:0]] |
+                              a_cache_response_group_mask) ==
+                             a_cache_required_group_mask) &&
+                            (response_group + 1'b1 >= a_group_count))
+                            a_cache_valid_r[response_k_group[3:0]] <= 1'b1;
+                    end
+                end
+            end
+            if (a_cache_initial_copy) begin
+                for (cache_i = 0; cache_i < ARRAY_SIZE; cache_i = cache_i + 1)
+                    a_tile_words_r[compute_buffer_r][cache_i] <=
+                        a_tile_cache_words_r[k_group_r[3:0]][cache_i];
+            end
+            if (a_cache_prefetch_copy) begin
+                for (cache_i = 0; cache_i < ARRAY_SIZE; cache_i = cache_i + 1)
+                    a_tile_words_r[prefetch_kick_buffer][cache_i] <=
+                        a_tile_cache_words_r[prefetch_kick_k_group[3:0]][cache_i];
+            end
+
             if ((state_r == ST_IDLE) && start)
                 cycle_count <= 32'd0;
             else if (busy)
                 cycle_count <= cycle_count + 1'b1;
 
-            if (busy && abort && (state_r != ST_ERROR)) begin
+            // Profile only while a command owns the controller. These
+            // counters are observational: no counter feeds a ready, valid,
+            // state transition, or arithmetic control signal.
+            if ((state_r == ST_IDLE) && start) begin
+                perf_arbiter_stall_cycles <= 32'd0;
+                perf_response_wait_cycles <= 32'd0;
+                perf_writeback_wait_cycles <= 32'd0;
+                perf_prefetch_a_req_cycles <= 32'd0;
+                perf_prefetch_a_drain_cycles <= 32'd0;
+                perf_prefetch_b_req_cycles <= 32'd0;
+                perf_prefetch_b_drain_cycles <= 32'd0;
+                perf_prefetch_overlap_cycles <= 32'd0;
+                perf_prefetch_wait_cycles <= 32'd0;
+                perf_prefetch_completed <= 32'd0;
+                perf_a_tile_cache_hits <= 32'd0;
+                perf_outstanding_highwater <= {READ_FIFO_COUNT_WIDTH{1'b0}};
+                perf_fifo_full_cycles <= 32'd0;
+                for (perf_i = 0; perf_i <= ST_PREFETCH_WAIT; perf_i = perf_i + 1)
+                    perf_state_cycles[perf_i] <= 32'd0;
+            end else if (busy) begin
+                if (state_r <= ST_PREFETCH_WAIT)
+                    perf_state_cycles[state_r] <=
+                        perf_state_cycles[state_r] + 1'b1;
+                if (prefetch_state_r == PF_A_REQ)
+                    perf_prefetch_a_req_cycles <=
+                        perf_prefetch_a_req_cycles + 1'b1;
+                if (prefetch_state_r == PF_A_DRAIN)
+                    perf_prefetch_a_drain_cycles <=
+                        perf_prefetch_a_drain_cycles + 1'b1;
+                if (prefetch_state_r == PF_B_REQ)
+                    perf_prefetch_b_req_cycles <=
+                        perf_prefetch_b_req_cycles + 1'b1;
+                if (prefetch_state_r == PF_B_DRAIN)
+                    perf_prefetch_b_drain_cycles <=
+                        perf_prefetch_b_drain_cycles + 1'b1;
+                if ((state_r == ST_MAC) && prefetch_active)
+                    perf_prefetch_overlap_cycles <=
+                        perf_prefetch_overlap_cycles + 1'b1;
+                if (state_r == ST_PREFETCH_WAIT)
+                    perf_prefetch_wait_cycles <=
+                        perf_prefetch_wait_cycles + 1'b1;
+                if (prefetch_complete)
+                    perf_prefetch_completed <= perf_prefetch_completed + 1'b1;
+                if (a_cache_initial_copy || a_cache_prefetch_copy)
+                    perf_a_tile_cache_hits <= perf_a_tile_cache_hits + 1'b1;
+                if (read_outstanding_next > perf_outstanding_highwater)
+                    perf_outstanding_highwater <= read_outstanding_next;
+                if (read_request_pending &&
+                    (read_outstanding_count == MAX_OUTSTANDING_READS))
+                    perf_fifo_full_cycles <= perf_fifo_full_cycles + 1'b1;
+                if ((banked_read_valid && !banked_ready) ||
+                    (spad_valid && !spad_ready) ||
+                    (line_valid && !line_ready))
+                    perf_arbiter_stall_cycles <=
+                        perf_arbiter_stall_cycles + 1'b1;
+                if ((((state_r == ST_A_REQ) || (state_r == ST_A_WAIT) ||
+                      (state_r == ST_B_REQ) || (state_r == ST_B_WAIT)) &&
+                     (read_outstanding_count != 0) && !banked_rsp_valid) ||
+                    ((state_r == ST_BIAS_WAIT) && !spad_rsp_valid))
+                    perf_response_wait_cycles <=
+                        perf_response_wait_cycles + 1'b1;
+                if ((state_r == ST_WRITE) && !output_write_accepted)
+                    perf_writeback_wait_cycles <=
+                        perf_writeback_wait_cycles + 1'b1;
+            end
+
+            if (busy && abort && (state_r != ST_ERROR) &&
+                (state_r != ST_ERROR_DRAIN)) begin
                 error_code <= ERR_ABORT;
-                state_r <= ST_ERROR;
-            end else if (watchdog_expired && (state_r != ST_ERROR)) begin
+                state_r <= ST_ERROR_DRAIN;
+            end else if (watchdog_expired && (state_r != ST_ERROR) &&
+                         (state_r != ST_ERROR_DRAIN)) begin
                 error_code <= ERR_WATCHDOG;
-                state_r <= ST_ERROR;
+                state_r <= ST_ERROR_DRAIN;
+            end else if (banked_request_fault) begin
+                error_code <= ERR_PROTECTION;
+                state_r <= ST_ERROR_DRAIN;
+            end else if (banked_response_fault) begin
+                error_code <= ERR_PARITY;
+                state_r <= ST_ERROR_DRAIN;
+            end else if (banked_response_context_fault) begin
+                error_code <= ERR_CONFIG;
+                state_r <= ST_ERROR_DRAIN;
             end else begin
                 case (state_r)
                     ST_IDLE: begin
@@ -456,6 +843,10 @@ module ai_tensor_matrix_core #(
                             dst_tile_base_r <= dst_base;
                             dst_row_addr_r <= dst_base;
                             bias_tile_base_r <= bias_base;
+                            a_cache_base_r <= src0_base;
+                            a_cache_valid_r <= {A_TILE_CACHE_K_WORDS{1'b0}};
+                            for (cache_i = 0; cache_i < A_TILE_CACHE_K_WORDS; cache_i = cache_i + 1)
+                                a_cache_group_seen_r[cache_i] <= {ARRAY_GROUPS{1'b0}};
                             src0_batch_stride_r <= (src0_batch_stride == 0) ?
                                 (({16'd0,m_size} >> 2) * {16'd0,k_words} * 32'd16) :
                                 src0_batch_stride;
@@ -471,6 +862,7 @@ module ai_tensor_matrix_core #(
                             col_tile_r <= 16'd0;
                             k_group_r <= 16'd0;
                             read_group_r <= 3'd0;
+                            compute_buffer_r <= 1'b0;
                             write_row_r <= {TILE_INDEX_WIDTH{1'b0}};
                             write_col_r <= {TILE_INDEX_WIDTH{1'b0}};
                             write_lane_r <= 2'd0;
@@ -491,69 +883,48 @@ module ai_tensor_matrix_core #(
                     end
 
                     ST_A_REQ: begin
-                        if (banked_ready) begin
-                            if (banked_protection_error) begin
-                                error_code <= ERR_PROTECTION;
-                                state_r <= ST_ERROR;
-                            end else begin
+                        if (a_cache_initial_copy) begin
+                            read_group_r <= 3'd0;
+                            state_r <= ST_B_REQ;
+                        end else if (banked_read_accept) begin
+                            if (({29'd0,read_group_r} + 32'd1) >= a_group_count) begin
                                 state_r <= ST_A_WAIT;
+                            end else begin
+                                read_group_r <= read_group_r + 1'b1;
                             end
                         end
                     end
 
                     ST_A_WAIT: begin
-                        if (banked_rsp_valid) begin
-                            if (bank_response_has_parity_error) begin
-                                error_code <= ERR_PARITY;
-                                state_r <= ST_ERROR;
-                            end else begin
-                                a_tile_words_r[read_group_r*4+0] <= bank0_data;
-                                a_tile_words_r[read_group_r*4+1] <= bank1_data;
-                                a_tile_words_r[read_group_r*4+2] <= bank2_data;
-                                a_tile_words_r[read_group_r*4+3] <= bank3_data;
-                                if (({29'd0,read_group_r} + 32'd1) < a_group_count) begin
-                                    read_group_r <= read_group_r + 1'b1;
-                                    state_r <= ST_A_REQ;
-                                end else begin
-                                    read_group_r <= 3'd0;
-                                    state_r <= ST_B_REQ;
-                                end
-                            end
+                        if (read_outstanding_next == 0) begin
+                            read_group_r <= 3'd0;
+                            state_r <= ST_B_REQ;
                         end
                     end
 
                     ST_B_REQ: begin
-                        if (banked_ready) begin
-                            if (banked_protection_error) begin
-                                error_code <= ERR_PROTECTION;
-                                state_r <= ST_ERROR;
-                            end else begin
+                        if (banked_read_accept) begin
+                            if (({29'd0,read_group_r} + 32'd1) >= b_group_count) begin
                                 state_r <= ST_B_WAIT;
+                            end else begin
+                                read_group_r <= read_group_r + 1'b1;
                             end
                         end
                     end
 
                     ST_B_WAIT: begin
-                        if (banked_rsp_valid) begin
-                            if (bank_response_has_parity_error) begin
-                                error_code <= ERR_PARITY;
-                                state_r <= ST_ERROR;
+                        if (read_outstanding_next == 0) begin
+                            read_group_r <= 3'd0;
+                            if (bias_enable_r && !bias_loaded_r) begin
+                                bias_index_r <= {(TILE_INDEX_WIDTH+1){1'b0}};
+                                state_r <= ST_BIAS_REQ;
                             end else begin
-                                b_tile_words_r[read_group_r*4+0] <= bank0_data;
-                                b_tile_words_r[read_group_r*4+1] <= bank1_data;
-                                b_tile_words_r[read_group_r*4+2] <= bank2_data;
-                                b_tile_words_r[read_group_r*4+3] <= bank3_data;
-                                if (({29'd0,read_group_r} + 32'd1) < b_group_count) begin
-                                    read_group_r <= read_group_r + 1'b1;
-                                    state_r <= ST_B_REQ;
-                                end else if (bias_enable_r && !bias_loaded_r) begin
-                                    read_group_r <= 3'd0;
-                                    bias_index_r <= {(TILE_INDEX_WIDTH+1){1'b0}};
-                                    state_r <= ST_BIAS_REQ;
-                                end else begin
-                                    read_group_r <= 3'd0;
-                                    state_r <= ST_PREP_MAC;
+                                if (k_words_r > 1) begin
+                                    prefetch_kick <= 1'b1;
+                                    prefetch_kick_k_group <= 16'd1;
+                                    prefetch_kick_buffer <= 1'b1;
                                 end
+                                state_r <= ST_PREP_MAC;
                             end
                         end
                     end
@@ -581,6 +952,11 @@ module ai_tensor_matrix_core #(
                                     state_r <= ST_BIAS_REQ;
                                 end else begin
                                     bias_loaded_r <= 1'b1;
+                                    if ((k_group_r == 0) && (k_words_r > 1)) begin
+                                        prefetch_kick <= 1'b1;
+                                        prefetch_kick_k_group <= 16'd1;
+                                        prefetch_kick_buffer <= 1'b1;
+                                    end
                                     state_r <= ST_PREP_MAC;
                                 end
                             end
@@ -601,13 +977,40 @@ module ai_tensor_matrix_core #(
                                 write_lane_r <= 2'd0;
                                 dst_row_addr_r <= dst_tile_base_r;
                                 state_r <= ST_WRITE;
-                            end else begin
+                            end else if (prefetch_valid_r[~compute_buffer_r]) begin
                                 k_group_r <= k_group_r + 1'b1;
+                                compute_buffer_r <= ~compute_buffer_r;
+                                prefetch_consume <= 1'b1;
+                                prefetch_consume_buffer <= ~compute_buffer_r;
                                 read_group_r <= 3'd0;
-                                state_r <= ST_A_REQ;
+                                if (({16'd0,k_group_r} + 32'd2) < {16'd0,k_words_r}) begin
+                                    prefetch_kick <= 1'b1;
+                                    prefetch_kick_k_group <= k_group_r + 2'd2;
+                                    prefetch_kick_buffer <= compute_buffer_r;
+                                end
+                                state_r <= ST_PREP_MAC;
+                            end else begin
+                                read_group_r <= 3'd0;
+                                state_r <= ST_PREFETCH_WAIT;
                             end
                         end else begin
                             lane_r <= lane_r + 1'b1;
+                        end
+                    end
+
+                    ST_PREFETCH_WAIT: begin
+                        if (prefetch_valid_r[~compute_buffer_r]) begin
+                            k_group_r <= k_group_r + 1'b1;
+                            compute_buffer_r <= ~compute_buffer_r;
+                            prefetch_consume <= 1'b1;
+                            prefetch_consume_buffer <= ~compute_buffer_r;
+                            read_group_r <= 3'd0;
+                            if (({16'd0,k_group_r} + 32'd2) < {16'd0,k_words_r}) begin
+                                prefetch_kick <= 1'b1;
+                                prefetch_kick_k_group <= k_group_r + 2'd2;
+                                prefetch_kick_buffer <= compute_buffer_r;
+                            end
+                            state_r <= ST_PREP_MAC;
                         end
                     end
 
@@ -646,6 +1049,7 @@ module ai_tensor_matrix_core #(
                         k_group_r <= 16'd0;
                         read_group_r <= 3'd0;
                         lane_r <= 2'd0;
+                        compute_buffer_r <= 1'b0;
                         write_lane_r <= 2'd0;
                         bias_loaded_r <= 1'b0;
                         if (({16'd0,col_tile_r} + 32'd1) < n_tile_count) begin
@@ -659,6 +1063,10 @@ module ai_tensor_matrix_core #(
                             row_tile_r <= row_tile_r + 1'b1;
                             col_tile_r <= 16'd0;
                             a_tile_base_r <= a_tile_base_r + matrix_tile_span_bytes;
+                            a_cache_base_r <= a_tile_base_r + matrix_tile_span_bytes;
+                            a_cache_valid_r <= {A_TILE_CACHE_K_WORDS{1'b0}};
+                            for (cache_i = 0; cache_i < A_TILE_CACHE_K_WORDS; cache_i = cache_i + 1)
+                                a_cache_group_seen_r[cache_i] <= {ARRAY_GROUPS{1'b0}};
                             b_tile_base_r <= b_batch_base_r;
                             dst_row_tile_base_r <= dst_row_tile_base_r +
                                                    (dst_row_stride_r * ARRAY_SIZE);
@@ -676,6 +1084,10 @@ module ai_tensor_matrix_core #(
                             b_batch_base_r <= b_batch_base_r + src1_batch_stride_r;
                             dst_batch_base_r <= dst_batch_base_r + dst_batch_stride_r;
                             a_tile_base_r <= a_batch_base_r + src0_batch_stride_r;
+                            a_cache_base_r <= a_batch_base_r + src0_batch_stride_r;
+                            a_cache_valid_r <= {A_TILE_CACHE_K_WORDS{1'b0}};
+                            for (cache_i = 0; cache_i < A_TILE_CACHE_K_WORDS; cache_i = cache_i + 1)
+                                a_cache_group_seen_r[cache_i] <= {ARRAY_GROUPS{1'b0}};
                             b_tile_base_r <= b_batch_base_r + src1_batch_stride_r;
                             dst_row_tile_base_r <= dst_batch_base_r + dst_batch_stride_r;
                             dst_tile_base_r <= dst_batch_base_r + dst_batch_stride_r;
@@ -699,6 +1111,11 @@ module ai_tensor_matrix_core #(
                         done <= 1'b1;
                         error <= 1'b1;
                         state_r <= ST_IDLE;
+                    end
+
+                    ST_ERROR_DRAIN: begin
+                        if (read_outstanding_next == 0)
+                            state_r <= ST_ERROR;
                     end
 
                     default: state_r <= ST_IDLE;

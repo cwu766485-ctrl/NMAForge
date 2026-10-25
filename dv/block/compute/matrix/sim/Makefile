@@ -6,6 +6,8 @@ CORE_OUT_DIR ?= /tmp/nmaforge_matrix_core_$(SEED)
 ARRAY_OUT_DIR ?= /tmp/nmaforge_matrix_array_20261025
 ARRAY_SEEDS ?= 20261025 20261026 20261027
 ARRAY_SIZES ?= 8 16
+OUTSTANDING_DEPTH ?= 4
+A_TILE_CACHE_ENABLE ?= 1
 COV_METRICS := line+cond+fsm+branch
 
 .PHONY: datapath-random-test datapath-random-compile datapath-random-run \
@@ -48,6 +50,8 @@ core-random-test: core-random-run
 core-random-compile:
 	mkdir -p $(CORE_OUT_DIR)
 	$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+		+define+MATRIX_MAX_OUTSTANDING_READS=$(OUTSTANDING_DEPTH) \
+		+define+MATRIX_A_TILE_CACHE_ENABLE=$(A_TILE_CACHE_ENABLE) \
 		-cm $(COV_METRICS) -cm_hier $(CURDIR)/matrix_core.cm_hier \
 		-cm_dir $(CORE_OUT_DIR)/coverage.vdb \
 		-Mdir=$(CORE_OUT_DIR)/csrc \
@@ -61,14 +65,14 @@ core-random-compile:
 core-random-run: core-random-compile
 	$(CORE_OUT_DIR)/simv +SEED=$(SEED) -cm $(COV_METRICS) \
 		-cm_dir $(CORE_OUT_DIR)/coverage.vdb -cm_name matrix_core_seed_$(SEED) -l $(CORE_OUT_DIR)/run.log
-	grep -q '^MATRIX_CORE_RANDOM_PASS cases=8 faults=12 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 ' $(CORE_OUT_DIR)/run.log
+	grep -q '^MATRIX_CORE_RANDOM_PASS cases=17 faults=17 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 ' $(CORE_OUT_DIR)/run.log
 
 core-random-regress: core-random-compile
 	@set -e; for seed in $(SEEDS); do \
 		$(CORE_OUT_DIR)/simv +SEED=$$seed -cm $(COV_METRICS) \
 			-cm_dir $(CORE_OUT_DIR)/coverage.vdb -cm_name matrix_core_seed_$$seed \
 			-l $(CORE_OUT_DIR)/run_seed_$$seed.log; \
-		grep -q "^MATRIX_CORE_RANDOM_PASS cases=8 faults=12 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 seed=$$seed " $(CORE_OUT_DIR)/run_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_RANDOM_PASS cases=17 faults=17 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 seed=$$seed " $(CORE_OUT_DIR)/run_seed_$$seed.log; \
 	done
 
 array-random-regress:
@@ -96,6 +100,8 @@ matrix-size-benchmark:
 	@set -e; for size in 4 8 16; do \
 		out=$(BENCH_OUT_DIR)/array_$$size; mkdir -p $$out; \
 		$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+			+define+MATRIX_MAX_OUTSTANDING_READS=$(OUTSTANDING_DEPTH) \
+			+define+MATRIX_A_TILE_CACHE_ENABLE=$(A_TILE_CACHE_ENABLE) \
 			-cm $(COV_METRICS) -cm_hier $(CURDIR)/matrix_core.cm_hier \
 			-cm_dir $$out/coverage.vdb -Mdir=$$out/csrc \
 			+define+MATRIX_ARRAY_SIZE=$$size -top tb_ai_tensor_matrix_core_random \
@@ -107,7 +113,7 @@ matrix-size-benchmark:
 		$$out/simv +SEED=$(SEED) +MATRIX_BENCHMARK_ONLY \
 			-cm $(COV_METRICS) -cm_dir $$out/coverage.vdb \
 			-cm_name matrix_size_array_$${size}_seed_$(SEED) -l $$out/run.log; \
-		for case_id in 100 101 102; do \
+		for case_id in 100 101 102 103 104; do \
 			grep -q "^MATRIX_CORE_CASE_PASS id=$$case_id .*physical_array=$${size}x$${size}$$" $$out/run.log; \
 		done; \
 		grep -q '^MATRIX_SIZE_BENCHMARK_PASS ' $$out/run.log; \

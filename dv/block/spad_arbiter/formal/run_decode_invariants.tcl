@@ -33,6 +33,7 @@ check_fv -property {
     ai_spad_arbiter_decode_formal_top.cp_descriptor_selection
     ai_spad_arbiter_decode_formal_top.cp_completion_selection
     ai_spad_arbiter_decode_formal_top.cp_banked_response_selection
+    ai_spad_arbiter_decode_formal_top.cp_cnm_response_selection
 }
 report_fv -usage cover -verbose
 exit

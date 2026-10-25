@@ -53,6 +53,15 @@ module tb_ai_accel_uvm;
     assign compute_obs.matrix_line_valid = dut.matrix_line_valid;
     assign compute_obs.matrix_line_write = dut.matrix_line_write;
     assign compute_obs.matrix_line_ready = dut.arb_core_line_ready;
+    assign compute_obs.matrix_prefetch_active =
+        dut.compute_cluster_u.tensor_matrix_u.prefetch_active;
+    assign compute_obs.matrix_a_cache_hit =
+        dut.compute_cluster_u.tensor_matrix_u.a_cache_initial_copy ||
+        dut.compute_cluster_u.tensor_matrix_u.a_cache_prefetch_copy;
+    assign compute_obs.matrix_a_cache_hits =
+        dut.compute_cluster_u.tensor_matrix_u.perf_a_tile_cache_hits;
+    assign compute_obs.matrix_prefetch_overlap_cycles =
+        dut.compute_cluster_u.tensor_matrix_u.perf_prefetch_overlap_cycles;
     assign compute_obs.dma_valid = dut.dma_spad_valid;
     assign compute_obs.dma_write = dut.dma_spad_write;
     assign compute_obs.dma_ready = dut.arb_dma_ready;

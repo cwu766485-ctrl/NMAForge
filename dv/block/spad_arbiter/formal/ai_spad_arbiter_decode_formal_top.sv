@@ -72,12 +72,14 @@ module ai_spad_arbiter_decode_formal_top (
 
     ap_banked_selection_requires_response: assert property (
         disable iff (!resetn)
-        dut.accept_client == 3'd3 |-> (dut.accept_valid && dut.accept_response)
+        (dut.accept_client == 3'd3 || dut.accept_client == 3'd5) |->
+        (dut.accept_valid && dut.accept_response)
     );
 
     ap_delayed_banked_metadata_has_response: assert property (
         disable iff (!resetn)
-        dut.accept_client_d == 3'd3 |-> dut.accept_valid_d
+        (dut.accept_client_d == 3'd3 || dut.accept_client_d == 3'd5) |->
+        dut.accept_valid_d
     );
 
     ap_line_metadata_requires_accept: assert property (
@@ -108,5 +110,10 @@ module ai_spad_arbiter_decode_formal_top (
     cp_banked_response_selection: cover property (
         disable iff (!resetn)
         dut.accept_valid && dut.accept_response && dut.accept_client == 3'd3
+    );
+
+    cp_cnm_response_selection: cover property (
+        disable iff (!resetn)
+        dut.accept_valid && dut.accept_response && dut.accept_client == 3'd5
     );
 endmodule

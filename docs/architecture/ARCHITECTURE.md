@@ -44,6 +44,12 @@ DDR <== 128-bit AXI4 ==> ai_axi128_dma <==> ai_spad_arbiter <==> ai_scratchpad
 - `ai_spad_arbiter` 是 scheduler-side scratchpad 的唯一拥有者。descriptor/completion
   保持控制面优先；scalar/line/banked compute 与 DMA 在数据面 round-robin；禁止顶层 bypass mux。
   BF16/FP16 dot 共用现有 arbiter-owned 32-bit core SPAD 口，不增加 scratchpad bypass。
+- Matrix 单行 banked read 与 CNM 四 lane 请求共用 banked 轮询时隙，但 response tag 分别为
+  `3` / `5`；`banked_rsp_valid` 只送 Matrix，`cnm_rsp_valid[3:0]` 只送 CNM。该分离避免两个
+  Engine 并发时 Matrix 把 CNM 响应误认为自己的读数据，不增加 SPAD 端口或改变 ABI。
+- Matrix controller 按序最多保留 4 笔已接受的 banked read metadata；每个 response 依据 A/B、
+  K group、4×4 group 和地址回写到对应 operand buffer。无 response ready/ID，故该路径依赖 SPAD
+  response 保序；fault 时停止新请求并 drain 已接受响应。
 - `ai_completion_writer` 必须先提交四个 32-bit completion word，才能发布新的 `CPLQ_TAIL`。
 - `ai_desc_fetch` 读取片上描述符，`axi_desc_fetch` 读取外部描述符；命令期间来源固定。
 
@@ -170,8 +176,14 @@ Matrix descriptor 仍使用 4×4 tile-major SPAD 布局和原有 ABI；`ai_tenso
 默认实例化 `ai_tensor_matrix_array` 的 `ARRAY_SIZE=16` 配置。controller 从真实 banked SPAD
 接口收集 4×4 子块，组成最多 16×16 的宏 tile，超过宏 tile 尺寸时遍历 M/N tile；16×16 和
 32×16（跨宏 tile）已通过 block-level 独立 Golden。4×4/8×8/16×16 物理 array 参数也有统一
-VCS benchmark。SPAD 读取当前仍按 request/response 串行推进，尚无 tile 预取或与 MAC 重叠；
-Compute Cluster 完整 UVM 和 DC/PPA 仍开放。实现与证据见[Compute Cluster 升级路线](../verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md)。
+VCS benchmark。Matrix banked reader 以最多 4 笔有序 metadata FIFO 记录 A/B、tile group、K group
+和完整请求地址；fault 时停发并排空响应。Inactive operand buffer 可在当前 K group MAC 期间接收
+下一 K group 的 A/B 预取，只有全部响应收齐才允许切换消费。当前配置还可将 K≤64 的 A tile
+缓存在 Matrix core 内，并在相邻 N macro tile 复用；更长 K 绕过缓存。固定一拍 behavioral SPAD
+的 16×16×K32 从 357 降到 242 cycles（有序读流水）；启用 A-tile cache 后，16×32×K32 为
+417 cycles、32×32×K64 为 1187 cycles。上述是 VCS behavioral memory 数据，不是 macro 时序或 PPA。
+完整 Cluster UVM、FSM/code-coverage closure 和 DC/PPA 仍开放。实现与证据见[Compute Cluster
+升级路线](../verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md)。
 
 ABI v7.2 曾增加 PACK_I8 layout bridge，现有 `sw/tools/cimforge_mapper.py` 可用它形成
 Transformer 微型命令链：
@@ -219,7 +231,7 @@ pre-layout 结果见 [TSMC28_SYNTHESIS_REPORT.md](../verification/TSMC28_SYNTHES
 | Local PE | `ai_bank_pe` | 是，CNM/基线核子模块 | 一个 32-bit packed INT8 dot4 乘加单元。 |
 | 混合精度点积核 | `ai_mixed_precision_dot_fp32_core` | 是 | `0x50` BF16 与 `0x51` FP16 共享控制、arbiter-owned 32-bit core SPAD 口和 FP32 顺序累加；按序读 A/B 并写回一个结果 word。 |
 | BF16 兼容包装器 | `ai_bf16_dot_fp32_core` | 否（兼容/独立验证） | 固定选择 BF16 格式的旧接口包装器；顶层产品路径使用混合精度核心。 |
-| 矩阵核 | `ai_tensor_matrix_core` + `ai_tensor_matrix_array` | 是 | ABI/SPAD 仍按 4×4 tile-major；top 默认 16×16 INT8 array，支持宏 tile 和跨 tile 执行，三 seed Golden 回归通过；SPAD 预取/overlap、完整 Cluster UVM 与 PPA 未收敛。 |
+| 矩阵核 | `ai_tensor_matrix_core` + `ai_tensor_matrix_array` | 是 | ABI/SPAD 仍按 4×4 tile-major；top 默认 16×16 INT8 array；Banked Read 支持最多 4 笔有序 outstanding 和 fault drain，depth 2/4 各三 seed Golden/fault regression；next-K ping-pong prefetch/MAC overlap 已实现；K≤64 时相邻 N tile 可复用 A-tile，K>64 bypass；完整 Cluster UVM、FSM/code coverage 和 PPA 仍开放。 |
 | SFU | `ai_tensor_sfu_core` | 是 | Softmax、causal Softmax、RMSNorm、LayerNorm、Residual、GELU、SiLU、requant。 |
 | 除法器 | `ai_unsigned_divider` | 是，SFU 子模块 | 用于 Softmax 归一化等定点除法。 |
 | 整数开方 | `ai_integer_sqrt` | 是，SFU 子模块 | 用于 RMSNorm/LayerNorm 的均方根或方差相关计算。 |

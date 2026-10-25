@@ -2,8 +2,9 @@
 
 // Single admission point for every scheduler-side scratchpad transaction.
 // A request is committed only on valid && ready.  Scalar read responses are
-// returned two cycles later and tagged with the requesting client; banked reads
-// use the same request/response timing but carry a four-bank row response.
+// returned two cycles later and tagged with the requesting client. Matrix's
+// single-row banked port and CNM's four-lane port share a round-robin class,
+// but retain distinct response tags so each engine consumes only its own data.
 //
 // Descriptor fetch and completion commit are short control-plane operations
 // and retain strict priority.  Core, banked-core, and DMA data-plane clients
@@ -44,10 +45,10 @@ module ai_spad_arbiter(
     output wire [31:0] rsp_rdata, output wire rsp_error
 );
     localparam [2:0] CLIENT_DESC=3'd0, CLIENT_CPL=3'd1, CLIENT_CORE=3'd2,
-                     CLIENT_BANKED=3'd3, CLIENT_DMA=3'd4;
-    // data_rr_r names the first data-plane client considered after the two
-    // control-plane clients.  The selected client moves the cursor to its
-    // successor, giving Core -> Banked -> DMA round-robin arbitration.
+                     CLIENT_BANKED=3'd3, CLIENT_DMA=3'd4, CLIENT_CNM=3'd5;
+    // data_rr_r names the first data-plane class considered after the two
+    // control-plane clients. Matrix and CNM share the banked class's turn but
+    // keep different accept_client tags for response ownership.
     localparam [1:0] RR_CORE   = 2'd0;
     localparam [1:0] RR_BANKED = 2'd1;
     localparam [1:0] RR_DMA    = 2'd2;
@@ -84,7 +85,7 @@ module ai_spad_arbiter(
                 end else if (core_valid) begin
                     spad_valid=1'b1; spad_write=core_write; spad_addr=core_addr; spad_wdata=core_wdata; accept_valid=1'b1; accept_response=!core_write; accept_client=CLIENT_CORE;
                 end else if (|cnm_valid) begin
-                    spad_cnm_valid=cnm_valid; spad_cnm_addr0=cnm_addr0; spad_cnm_addr1=cnm_addr1; spad_cnm_addr2=cnm_addr2; spad_cnm_addr3=cnm_addr3; accept_valid=1'b1; accept_response=1'b1; accept_client=CLIENT_BANKED;
+                    spad_cnm_valid=cnm_valid; spad_cnm_addr0=cnm_addr0; spad_cnm_addr1=cnm_addr1; spad_cnm_addr2=cnm_addr2; spad_cnm_addr3=cnm_addr3; accept_valid=1'b1; accept_response=1'b1; accept_client=CLIENT_CNM;
                 end else if (banked_valid) begin
                     spad_banked_valid=1'b1; spad_banked_addr=banked_addr; accept_valid=1'b1; accept_response=1'b1; accept_client=CLIENT_BANKED;
                 end else if (dma_line_valid) begin
@@ -95,7 +96,7 @@ module ai_spad_arbiter(
               end
               RR_BANKED: begin
                 if (|cnm_valid) begin
-                    spad_cnm_valid=cnm_valid; spad_cnm_addr0=cnm_addr0; spad_cnm_addr1=cnm_addr1; spad_cnm_addr2=cnm_addr2; spad_cnm_addr3=cnm_addr3; accept_valid=1'b1; accept_response=1'b1; accept_client=CLIENT_BANKED;
+                    spad_cnm_valid=cnm_valid; spad_cnm_addr0=cnm_addr0; spad_cnm_addr1=cnm_addr1; spad_cnm_addr2=cnm_addr2; spad_cnm_addr3=cnm_addr3; accept_valid=1'b1; accept_response=1'b1; accept_client=CLIENT_CNM;
                 end else if (banked_valid) begin
                     spad_banked_valid=1'b1; spad_banked_addr=banked_addr; accept_valid=1'b1; accept_response=1'b1; accept_client=CLIENT_BANKED;
                 end else if (dma_line_valid) begin
@@ -118,7 +119,7 @@ module ai_spad_arbiter(
                 end else if (core_valid) begin
                     spad_valid=1'b1; spad_write=core_write; spad_addr=core_addr; spad_wdata=core_wdata; accept_valid=1'b1; accept_response=!core_write; accept_client=CLIENT_CORE;
                 end else if (|cnm_valid) begin
-                    spad_cnm_valid=cnm_valid; spad_cnm_addr0=cnm_addr0; spad_cnm_addr1=cnm_addr1; spad_cnm_addr2=cnm_addr2; spad_cnm_addr3=cnm_addr3; accept_valid=1'b1; accept_response=1'b1; accept_client=CLIENT_BANKED;
+                    spad_cnm_valid=cnm_valid; spad_cnm_addr0=cnm_addr0; spad_cnm_addr1=cnm_addr1; spad_cnm_addr2=cnm_addr2; spad_cnm_addr3=cnm_addr3; accept_valid=1'b1; accept_response=1'b1; accept_client=CLIENT_CNM;
                 end else if (banked_valid) begin
                     spad_banked_valid=1'b1; spad_banked_addr=banked_addr; accept_valid=1'b1; accept_response=1'b1; accept_client=CLIENT_BANKED;
                 end
@@ -134,7 +135,7 @@ module ai_spad_arbiter(
     assign core_line_ready = accept_valid && accept_client==CLIENT_CORE &&
                              accept_is_line;
     assign banked_ready = accept_valid && accept_client==CLIENT_BANKED;
-    assign cnm_ready    = {4{accept_valid && accept_client==CLIENT_BANKED}};
+    assign cnm_ready    = {4{accept_valid && accept_client==CLIENT_CNM}};
     assign dma_ready    = accept_valid && accept_client==CLIENT_DMA &&
                           !accept_is_line;
     assign dma_line_ready = accept_valid && accept_client==CLIENT_DMA &&
@@ -170,14 +171,14 @@ module ai_spad_arbiter(
             accept_is_line_d<=accept_is_line;
             accept_error_d<=accept_is_line ? spad_line_error : spad_error;
             rsp_valid<=accept_valid_d;
-            cnm_rsp_valid<= (accept_valid_d && accept_client_d==CLIENT_BANKED) ? accept_cnm_mask_d : 4'd0;
+            cnm_rsp_valid<= (accept_valid_d && accept_client_d==CLIENT_CNM) ? accept_cnm_mask_d : 4'd0;
             rsp_client<=accept_client_d;
             rsp_is_line<=accept_is_line_d;
             rsp_protection_error_r<=accept_error_d;
             if (accept_valid) begin
                 case (accept_client)
                   CLIENT_CORE:   data_rr_r<=RR_BANKED;
-                  CLIENT_BANKED: data_rr_r<=RR_DMA;
+                  CLIENT_BANKED, CLIENT_CNM: data_rr_r<=RR_DMA;
                   CLIENT_DMA:    data_rr_r<=RR_CORE;
                   default:       data_rr_r<=data_rr_r;
                 endcase

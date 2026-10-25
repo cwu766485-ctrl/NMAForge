@@ -29,6 +29,10 @@ interface ai_compute_cluster_if(input logic aclk);
     logic matrix_line_valid, matrix_line_write, matrix_line_ready;
     logic dma_valid, dma_write, dma_ready;
     logic dma_line_valid, dma_line_write, dma_line_ready;
+    logic matrix_prefetch_active;
+    logic matrix_a_cache_hit;
+    logic [31:0] matrix_a_cache_hits;
+    logic [31:0] matrix_prefetch_overlap_cycles;
     logic [4:0] read_accept_mask;
 
     integer overlap_cycles;

@@ -176,6 +176,11 @@ module tb_ai_accel_smoke;
     integer cp_fetch_done_count;
     reg parallel_engine_overlap_seen = 1'b0;
     reg parallel_same_engine_overlap_violation = 1'b0;
+    reg matrix_cnm_case_active = 1'b0;
+    reg matrix_cnm_overlap_seen = 1'b0;
+    reg matrix_cnm_response_alias_seen = 1'b0;
+    integer matrix_cnm_matrix_responses = 0;
+    integer matrix_cnm_cnm_responses = 0;
     reg [20:0] parallel_engine_pair_seen = 21'd0;
     reg [63:0] last_dma_araddr;
     reg [1023:0] vcd_file;
@@ -297,6 +302,19 @@ module tb_ai_accel_smoke;
             (dut.launch_op >= 8'h32) && (dut.launch_op <= 8'h39) &&
             dut.engine_busy[4])
             parallel_same_engine_overlap_violation <= 1'b1;
+    end
+
+    always @(posedge aclk) begin
+        if (aresetn && matrix_cnm_case_active) begin
+            if (dut.parallel_queue_mode_r && dut.engine_busy[2] && dut.engine_busy[3])
+                matrix_cnm_overlap_seen <= 1'b1;
+            if (dut.banked_rsp_valid && dut.arb_rsp_client == 3'd3)
+                matrix_cnm_matrix_responses <= matrix_cnm_matrix_responses + 1;
+            if ((|dut.cnm_rsp_valid) && dut.arb_rsp_client == 3'd5)
+                matrix_cnm_cnm_responses <= matrix_cnm_cnm_responses + 1;
+            if ((|dut.cnm_rsp_valid) && dut.banked_rsp_valid)
+                matrix_cnm_response_alias_seen <= 1'b1;
+        end
     end
 
     ai_accel_top dut(
@@ -2611,6 +2629,93 @@ module tb_ai_accel_smoke;
         axi_write(REG_CMDQ_SIZE, 32'd0);
         axi_write(REG_CPLQ_SIZE, 32'd0);
         clear_done_irq();
+
+        // Run a long CNM GEMV together with a real Matrix GEMM through the
+        // product dispatcher, shared arbiter, and four-bank scratchpad. The
+        // operands and output regions are disjoint so this checks response
+        // ownership without introducing a software SPAD hazard.
+        begin : parallel_matrix_cnm_owner
+            integer lane;
+            integer row;
+            axi_write(SPAD_BASE + 32'h4800, 32'h0403_0201);
+            axi_write(SPAD_BASE + 32'h4804, 32'h0807_0605);
+            axi_write(SPAD_BASE + 32'h4808, 32'h0000_0001);
+            axi_write(SPAD_BASE + 32'h480c, 32'h01ff_01ff);
+            axi_write(SPAD_BASE + 32'h4900, 32'h0000_0001);
+            axi_write(SPAD_BASE + 32'h4904, 32'h0000_0100);
+            axi_write(SPAD_BASE + 32'h4908, 32'h0001_0000);
+            axi_write(SPAD_BASE + 32'h490c, 32'h0100_0000);
+            for (lane=0; lane<4; lane=lane+1)
+                axi_write(SPAD_BASE + 32'h5000 + (lane * 4), 32'h0202_0202);
+            for (row=0; row<16; row=row+1)
+                for (lane=0; lane<4; lane=lane+1)
+                    axi_write(SPAD_BASE + 32'h5100 + (row * 16) + (lane * 4),
+                              32'h0303_0303);
+
+            write_spad_desc_v3(32'h7d00, OP_BANKED_GEMV, 16'h0620,
+                               32'h5000, 32'h5100, 32'd0, 32'h3400,
+                               16'd16, 16'd1, 16'd1, 8'd0, 32'd0,
+                               5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                               16'd1, 16'd1, 16'd0, 16'd0, 16'd0);
+            write_spad_desc_v3(32'h7d40, OP_TENSOR_GEMM, 16'h0621,
+                               32'h4800, 32'h4900, 32'd0, 32'h4a00,
+                               16'd4, 16'd4, 16'd1, 8'd0, 32'd1,
+                               5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                               16'd1, 16'd1, 16'd0, 16'd0, 16'd0);
+
+            axi_write(REG_CMDQ_BASE_LO, 32'h7d00);
+            axi_write(REG_CMDQ_SIZE, 32'd4);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd2);
+            axi_write(REG_CPLQ_BASE_LO, 32'h7d80);
+            axi_write(REG_CPLQ_SIZE, 32'd4);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+            matrix_cnm_case_active = 1'b1;
+            matrix_cnm_overlap_seen = 1'b0;
+            matrix_cnm_response_alias_seen = 1'b0;
+            matrix_cnm_matrix_responses = 0;
+            matrix_cnm_cnm_responses = 0;
+            matrix_line_write_count = 0;
+            axi_write(REG_DOORBELL, 32'd1);
+            wait_cpl_tail(32'd2, "parallel CNM + Matrix ordered completion");
+            matrix_cnm_case_active = 1'b0;
+
+            if (!matrix_cnm_overlap_seen || matrix_cnm_matrix_responses < 2 ||
+                matrix_cnm_cnm_responses == 0 || matrix_cnm_response_alias_seen) begin
+                $display("%0t ERROR: Matrix/CNM owner coverage overlap=%b matrix_rsp=%0d cnm_rsp=%0d alias=%b",
+                         $time, matrix_cnm_overlap_seen, matrix_cnm_matrix_responses,
+                         matrix_cnm_cnm_responses, matrix_cnm_response_alias_seen);
+                errors = errors + 1;
+            end else begin
+                $display("%0t PASS: Matrix/CNM concurrent response ownership matrix_rsp=%0d cnm_rsp=%0d",
+                         $time, matrix_cnm_matrix_responses, matrix_cnm_cnm_responses);
+            end
+            expect_completion(32'h7d80, 16'h0620, 4'h1, 4'h0, 32'd96, 32'd16,
+                              "parallel CNM GEMV completion");
+            expect_completion(32'h7d90, 16'h0621, 4'h1, 4'h0, 32'd1, 32'd16,
+                              "parallel Matrix GEMM completion");
+            expect_read(SPAD_BASE + 32'h3400, 32'd96,
+                        "parallel CNM GEMV row0");
+            expect_read(SPAD_BASE + 32'h343c, 32'd96,
+                        "parallel CNM GEMV row15");
+            expect_read(SPAD_BASE + 32'h4a00, 32'd1,
+                        "parallel Matrix GEMM row0 col0");
+            expect_read(SPAD_BASE + 32'h4a0c, 32'd4,
+                        "parallel Matrix GEMM row0 col3");
+            expect_read(SPAD_BASE + 32'h4a10, 32'd5,
+                        "parallel Matrix GEMM row1 col0");
+            expect_read(SPAD_BASE + 32'h4a3c, 32'd1,
+                        "parallel Matrix GEMM row3 col3");
+            if (matrix_line_write_count != 4) begin
+                $display("%0t ERROR: parallel Matrix GEMM line writes=%0d expected=4",
+                         $time, matrix_line_write_count);
+                errors = errors + 1;
+            end
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+        end
 
         // Abort two concurrently active engines. Both accepted tasks must
         // receive ERR_ABORT, drain their local SPAD traffic, and retire in

@@ -3,12 +3,21 @@
 `ifndef MATRIX_ARRAY_SIZE
 `define MATRIX_ARRAY_SIZE 16
 `endif
+`ifndef MATRIX_MAX_OUTSTANDING_READS
+`define MATRIX_MAX_OUTSTANDING_READS 4
+`endif
+`ifndef MATRIX_A_TILE_CACHE_ENABLE
+`define MATRIX_A_TILE_CACHE_ENABLE 1
+`endif
 
 // Full-core A3 transaction test. Operand words are returned through a
 // registered four-bank model; bias/scalar traffic uses a separate registered
 // SPAD model and aligned output rows use the line-write port.
 module tb_ai_tensor_matrix_core_random;
   localparam integer PHYSICAL_ARRAY_SIZE = `MATRIX_ARRAY_SIZE;
+  localparam integer MAX_OUTSTANDING_READS = `MATRIX_MAX_OUTSTANDING_READS;
+  localparam integer A_TILE_CACHE_ENABLE = `MATRIX_A_TILE_CACHE_ENABLE;
+  localparam integer BANK_RESPONSE_QUEUE_DEPTH = 4;
   localparam [31:0] SRC0_BASE = 32'h0000_0100;
   localparam [31:0] SRC1_BASE = 32'h0000_4000;
   localparam [31:0] BIAS_BASE = 32'h0000_8000;
@@ -54,16 +63,31 @@ module tb_ai_tensor_matrix_core_random;
   reg [31:0] bias_mem [0:65535];
   reg [31:0] output_mem [0:65535];
   reg [31:0] expected_mem [0:65535];
-  reg signed [7:0] logical_a [0:3][0:31][0:31];
-  reg signed [7:0] logical_b [0:3][0:31][0:15];
-  reg signed [31:0] logical_bias [0:15];
+  reg signed [7:0] logical_a [0:3][0:31][0:127];
+  reg signed [7:0] logical_b [0:3][0:127][0:31];
+  reg signed [31:0] logical_bias [0:31];
 
   reg [31:0] pending_bank_data [0:3];
+  reg [31:0] bank_response_data_fifo [0:BANK_RESPONSE_QUEUE_DEPTH-1][0:3];
+  integer bank_response_delay_fifo [0:BANK_RESPONSE_QUEUE_DEPTH-1];
+  integer bank_response_issue_fifo [0:BANK_RESPONSE_QUEUE_DEPTH-1];
   reg [31:0] pending_spad_data;
-  integer bank_delay=0,spad_delay=0;
+  integer bank_response_queue_count=0;
+  integer bank_response_wr_ptr=0,bank_response_rd_ptr=0;
+  integer bank_outstanding_highwater=0;
+  integer bank_latency_idx,bank_latency_slot;
+  reg force_banked_ready=0,force_bank_response_delay=0;
+  integer spad_delay=0;
   integer pending_bank_issue=0;
   integer bank_parity_target_issue=0;
-  reg pending_bank=0,pending_spad=0;
+  reg prefetch_parity_response_seen=0;
+  reg watchdog_during_prefetch_seen=0;
+  integer prefetch_buffer_seen_mask=0;
+  reg pending_spad=0;
+  wire pending_bank = (bank_response_queue_count != 0);
+  wire bank_response_due = (bank_response_queue_count != 0) &&
+                           (bank_response_delay_fifo[bank_response_rd_ptr] == 0);
+  wire bank_request_accept = banked_read_valid && banked_ready;
   reg [31:0] rng=32'h7ac4_01d3;
   integer bank_read_count=0,bank_response_count=0;
   integer spad_read_count=0,spad_response_count=0;
@@ -85,6 +109,7 @@ module tb_ai_tensor_matrix_core_random;
   integer a_stride,b_stride,d_stride,addr,line_index,word_index;
   integer signed accum,post_value;
   integer timeout_cycles,case_count=0,fault_count=0;
+  integer expected_prefetch_count;
   integer mac_cycle_count=0,case_mac_snapshot=0;
   integer case_bank_snapshot=0,case_bank_stall_snapshot=0;
   integer case_line_stall_snapshot=0;
@@ -108,7 +133,11 @@ module tb_ai_tensor_matrix_core_random;
                                pending_bank_issue==bank_parity_target_issue) ?
                                4'b0001 : 4'b0000;
 
-  ai_tensor_matrix_core #(.ARRAY_SIZE(PHYSICAL_ARRAY_SIZE)) dut(
+  ai_tensor_matrix_core #(
+    .ARRAY_SIZE(PHYSICAL_ARRAY_SIZE),
+    .MAX_OUTSTANDING_READS(MAX_OUTSTANDING_READS),
+    .ENABLE_A_TILE_CACHE(A_TILE_CACHE_ENABLE)
+  ) dut(
     .clk(clk),.resetn(resetn),.start(start),.abort(abort),.op_mode(op_mode),
     .src0_base(src0_base),.src1_base(src1_base),.bias_base(bias_base),.dst_base(dst_base),
     .m_size(m_size),.n_size(n_size),.k_words(k_words),.instance_count(instance_count),
@@ -135,7 +164,9 @@ module tb_ai_tensor_matrix_core_random;
     if(!resetn) begin
       rng<=32'h7ac4_01d3;
       mac_cycle_count<=0;
-      banked_ready<=0;banked_rsp_valid<=0;pending_bank<=0;bank_delay<=0;
+      banked_ready<=0;banked_rsp_valid<=0;bank_response_queue_count<=0;
+      bank_response_wr_ptr<=0;bank_response_rd_ptr<=0;
+      bank_outstanding_highwater<=0;
       pending_bank_issue<=0;bank_read_count<=0;bank_response_count<=0;
       pending_bank_data[0]<=0;pending_bank_data[1]<=0;
       pending_bank_data[2]<=0;pending_bank_data[3]<=0;
@@ -145,8 +176,20 @@ module tb_ai_tensor_matrix_core_random;
       line_write_count<=0;scalar_write_count<=0;
     end else begin
       if(perf_mac_active) mac_cycle_count<=mac_cycle_count+1;
+      if(dut.prefetch_active &&
+         (dut.prefetch_buffer_r==dut.compute_buffer_r))
+        $fatal(1,"Matrix prefetch overwrote active compute buffer k=%0d buffer=%0d",
+               dut.prefetch_k_group_r,dut.prefetch_buffer_r);
+      if(dut.prefetch_kick)
+        prefetch_buffer_seen_mask[dut.prefetch_kick_buffer] <= 1'b1;
+      if(banked_rsp_valid && inject_bank_parity &&
+         (pending_bank_issue==bank_parity_target_issue) &&
+         dut.prefetch_active && dut.response_buffer)
+        prefetch_parity_response_seen<=1'b1;
+      if(dut.watchdog_expired && dut.prefetch_active)
+        watchdog_during_prefetch_seen<=1'b1;
       rng<={rng[30:0],rng[31]^rng[21]^rng[1]^rng[0]};
-      banked_ready<=rng[0]|rng[3];
+      banked_ready<=force_banked_ready ? 1'b1 : (rng[0]|rng[3]);
       spad_ready<=rng[2]|rng[5];
       line_ready<=rng[1]|rng[4];
       banked_rsp_valid<=0;spad_rsp_valid<=0;
@@ -155,22 +198,63 @@ module tb_ai_tensor_matrix_core_random;
       if(spad_valid && !spad_ready) spad_stall_count<=spad_stall_count+1;
       if(line_valid && !line_ready) line_stall_count<=line_stall_count+1;
 
-      if(pending_bank) begin
-        if(bank_delay==0) begin
+      if(bank_response_queue_count>0) begin
+        if(bank_response_due) begin
           banked_rsp_valid<=1;
-          pending_bank<=0;bank_response_count<=bank_response_count+1;
-        end else bank_delay<=bank_delay-1;
+          pending_bank_issue<=bank_response_issue_fifo[bank_response_rd_ptr];
+          pending_bank_data[0]<=bank_response_data_fifo[bank_response_rd_ptr][0];
+          pending_bank_data[1]<=bank_response_data_fifo[bank_response_rd_ptr][1];
+          pending_bank_data[2]<=bank_response_data_fifo[bank_response_rd_ptr][2];
+          pending_bank_data[3]<=bank_response_data_fifo[bank_response_rd_ptr][3];
+          if(bank_response_rd_ptr==BANK_RESPONSE_QUEUE_DEPTH-1)
+            bank_response_rd_ptr<=0;
+          else bank_response_rd_ptr<=bank_response_rd_ptr+1;
+          bank_response_count<=bank_response_count+1;
+        end
       end
-      if(banked_read_valid && banked_ready && !banked_protection_error) begin
-        if(pending_bank) $fatal(1,"banked request overlapped an undelivered response state=%0d addr=%08x new_addr=%08x delay=%0d",
-                                dut.state_r,banked_addr,banked_addr,bank_delay);
-        pending_bank_data[0]<=bank_mem[0][(banked_addr>>4)&13'h1fff];
-        pending_bank_data[1]<=bank_mem[1][(banked_addr>>4)&13'h1fff];
-        pending_bank_data[2]<=bank_mem[2][(banked_addr>>4)&13'h1fff];
-        pending_bank_data[3]<=bank_mem[3][(banked_addr>>4)&13'h1fff];
-        pending_bank<=1;bank_delay<=benchmark_mode ? 0 : rng[6:5];pending_bank_issue<=bank_read_count;
+      // Age all accepted requests in parallel. Responses remain in request
+      // order even if a younger entry's fixed latency expires first.
+      for(bank_latency_idx=0;bank_latency_idx<BANK_RESPONSE_QUEUE_DEPTH;
+          bank_latency_idx=bank_latency_idx+1) begin
+        if(bank_latency_idx<bank_response_queue_count) begin
+          bank_latency_slot=bank_response_rd_ptr+bank_latency_idx;
+          if(bank_latency_slot>=BANK_RESPONSE_QUEUE_DEPTH)
+            bank_latency_slot=bank_latency_slot-BANK_RESPONSE_QUEUE_DEPTH;
+          if(bank_response_delay_fifo[bank_latency_slot]>0)
+            bank_response_delay_fifo[bank_latency_slot]<=
+                bank_response_delay_fifo[bank_latency_slot]-1;
+        end
+      end
+      if(bank_request_accept) begin
+        if((bank_response_queue_count==BANK_RESPONSE_QUEUE_DEPTH) &&
+           !bank_response_due)
+          $fatal(1,"banked responder queue overflow state=%0d addr=%08x",
+                 dut.state_r,banked_addr);
+        bank_response_data_fifo[bank_response_wr_ptr][0]<=
+            bank_mem[0][(banked_addr>>4)&13'h1fff];
+        bank_response_data_fifo[bank_response_wr_ptr][1]<=
+            bank_mem[1][(banked_addr>>4)&13'h1fff];
+        bank_response_data_fifo[bank_response_wr_ptr][2]<=
+            bank_mem[2][(banked_addr>>4)&13'h1fff];
+        bank_response_data_fifo[bank_response_wr_ptr][3]<=
+            bank_mem[3][(banked_addr>>4)&13'h1fff];
+        bank_response_issue_fifo[bank_response_wr_ptr]<=bank_read_count;
+        bank_response_delay_fifo[bank_response_wr_ptr]<=benchmark_mode ? 0 :
+            (force_bank_response_delay ? 3 : rng[6:5]);
+        if(bank_response_wr_ptr==BANK_RESPONSE_QUEUE_DEPTH-1)
+          bank_response_wr_ptr<=0;
+        else bank_response_wr_ptr<=bank_response_wr_ptr+1;
         bank_read_count<=bank_read_count+1;
       end
+      case ({bank_request_accept,bank_response_due})
+        2'b10: bank_response_queue_count<=bank_response_queue_count+1;
+        2'b01: bank_response_queue_count<=bank_response_queue_count-1;
+        default: bank_response_queue_count<=bank_response_queue_count;
+      endcase
+      if(bank_response_queue_count + bank_request_accept - bank_response_due >
+         bank_outstanding_highwater)
+        bank_outstanding_highwater<=bank_response_queue_count +
+                                    bank_request_accept - bank_response_due;
 
       if(pending_spad) begin
         if(spad_delay==0) begin
@@ -215,6 +299,7 @@ module tb_ai_tensor_matrix_core_random;
       cfg_m=m;cfg_n=n;cfg_kw=kw;cfg_instances=batches;cfg_ta=ta;cfg_tb=tb;
       cfg_bias=use_bias;cfg_shift=shift;cfg_act=act;cfg_pad_a=padded;
       cfg_pad_b=padded;cfg_pad_dst=padded;cfg_unaligned=unaligned;
+      prefetch_buffer_seen_mask=0;
       m_size=m;n_size=n;k_words=kw;instance_count=batches;
       op_mode=(batches>1)?8'h31:8'h30;
       src0_base=SRC0_BASE;src1_base=SRC1_BASE;bias_base=BIAS_BASE;
@@ -338,7 +423,9 @@ module tb_ai_tensor_matrix_core_random;
   task automatic check_valid_case(input integer case_id);
     integer expected_line_writes,expected_scalar_writes;
     integer ii,rr,cc,local_word;
-    integer useful_mac_ops,case_mac_cycles;
+    integer useful_mac_ops,case_mac_cycles,expected_cache_hits;
+    integer m_macro_tiles,n_macro_tiles;
+    integer profile_i,profile_state_sum;
     real macs_per_cycle,array_utilization,effective_gops_250;
     begin
       launch_and_wait();
@@ -369,6 +456,45 @@ module tb_ai_tensor_matrix_core_random;
         $fatal(1,"matrix case %0d read drain bank=%0d/%0d pending=%b spad=%0d/%0d pending=%b",
                case_id,bank_read_count,bank_response_count,pending_bank,
                spad_read_count,spad_response_count,pending_spad);
+      profile_state_sum=0;
+      for(profile_i=0;profile_i<=14;profile_i=profile_i+1)
+        profile_state_sum=profile_state_sum+dut.perf_state_cycles[profile_i];
+      if(profile_state_sum!==cycle_count)
+        $fatal(1,"matrix case %0d profile states=%0d do not account for total cycles=%0d",
+               case_id,profile_state_sum,cycle_count);
+      if((((cfg_m<PHYSICAL_ARRAY_SIZE)?cfg_m:PHYSICAL_ARRAY_SIZE)>4 ||
+          ((cfg_n<PHYSICAL_ARRAY_SIZE)?cfg_n:PHYSICAL_ARRAY_SIZE)>4) &&
+         (dut.perf_outstanding_highwater<2))
+        $fatal(1,"matrix case %0d did not exercise multiple outstanding reads highwater=%0d",
+               case_id,dut.perf_outstanding_highwater);
+      expected_prefetch_count=(cfg_kw-1)*
+          (((cfg_m+PHYSICAL_ARRAY_SIZE-1)/PHYSICAL_ARRAY_SIZE) *
+           ((cfg_n+PHYSICAL_ARRAY_SIZE-1)/PHYSICAL_ARRAY_SIZE) *
+           cfg_instances);
+      if(dut.perf_prefetch_completed!=expected_prefetch_count)
+        $fatal(1,"matrix case %0d prefetch groups=%0d expected=%0d",
+               case_id,dut.perf_prefetch_completed,expected_prefetch_count);
+      if((cfg_kw>1) && (dut.perf_prefetch_overlap_cycles==0))
+        $fatal(1,"matrix case %0d did not overlap prefetch with MAC",case_id);
+      m_macro_tiles=(cfg_m+PHYSICAL_ARRAY_SIZE-1)/PHYSICAL_ARRAY_SIZE;
+      n_macro_tiles=(cfg_n+PHYSICAL_ARRAY_SIZE-1)/PHYSICAL_ARRAY_SIZE;
+      expected_cache_hits=0;
+      if(A_TILE_CACHE_ENABLE && (cfg_kw<=16) && (n_macro_tiles>1))
+        expected_cache_hits=(n_macro_tiles-1)*m_macro_tiles*cfg_kw*cfg_instances;
+      if(dut.perf_a_tile_cache_hits!=expected_cache_hits)
+        $fatal(1,"matrix case %0d A-tile cache hits=%0d expected=%0d",
+               case_id,dut.perf_a_tile_cache_hits,expected_cache_hits);
+      if((cfg_kw>2) && (prefetch_buffer_seen_mask!=3))
+        $fatal(1,"matrix case %0d did not use both ping-pong buffers mask=%0d",
+               case_id,prefetch_buffer_seen_mask);
+      if((MAX_OUTSTANDING_READS==2) &&
+         (((cfg_m<PHYSICAL_ARRAY_SIZE)?cfg_m:PHYSICAL_ARRAY_SIZE)>
+            MAX_OUTSTANDING_READS*4 ||
+          ((cfg_n<PHYSICAL_ARRAY_SIZE)?cfg_n:PHYSICAL_ARRAY_SIZE)>
+            MAX_OUTSTANDING_READS*4) &&
+         (dut.perf_fifo_full_cycles==0))
+        $fatal(1,"matrix case %0d did not exercise depth-2 request backpressure",
+               case_id);
       useful_mac_ops=cfg_m*cfg_n*cfg_kw*4*cfg_instances;
       case_mac_cycles=mac_cycle_count-case_mac_snapshot;
       macs_per_cycle=(useful_mac_ops*1.0)/cycle_count;
@@ -384,6 +510,22 @@ module tb_ai_tensor_matrix_core_random;
                line_write_count*16,
                line_stall_count-case_line_stall_snapshot,macs_per_cycle,
                array_utilization*100.0,effective_gops_250,PHYSICAL_ARRAY_SIZE,PHYSICAL_ARRAY_SIZE);
+      $display("MATRIX_CORE_PROFILE id=%0d max_outstanding=%0d a_req=%0d a_wait=%0d b_req=%0d b_wait=%0d bias_req=%0d bias_wait=%0d prep_mac=%0d mac=%0d write=%0d next=%0d done=%0d error=%0d error_drain=%0d prefetch_wait=%0d arbiter_stall=%0d response_wait=%0d writeback_wait=%0d outstanding_highwater=%0d fifo_full=%0d prefetch_a_req=%0d prefetch_a_drain=%0d prefetch_b_req=%0d prefetch_b_drain=%0d prefetch_overlap=%0d prefetch_completed=%0d a_tile_cache_hits=%0d total=%0d",
+               case_id,MAX_OUTSTANDING_READS,
+               dut.perf_state_cycles[1],dut.perf_state_cycles[2],
+               dut.perf_state_cycles[3],dut.perf_state_cycles[4],
+               dut.perf_state_cycles[5],dut.perf_state_cycles[6],
+               dut.perf_state_cycles[7],dut.perf_state_cycles[8],
+               dut.perf_state_cycles[9],dut.perf_state_cycles[10],
+               dut.perf_state_cycles[11],dut.perf_state_cycles[12],
+               dut.perf_state_cycles[13],
+               dut.perf_state_cycles[14],
+               dut.perf_arbiter_stall_cycles,dut.perf_response_wait_cycles,
+               dut.perf_writeback_wait_cycles,dut.perf_outstanding_highwater,
+               dut.perf_fifo_full_cycles,dut.perf_prefetch_a_req_cycles,
+               dut.perf_prefetch_a_drain_cycles,dut.perf_prefetch_b_req_cycles,
+               dut.perf_prefetch_b_drain_cycles,dut.perf_prefetch_overlap_cycles,
+               dut.perf_prefetch_completed,dut.perf_a_tile_cache_hits,cycle_count);
     end
   endtask
 
@@ -485,6 +627,224 @@ module tb_ai_tensor_matrix_core_random;
     end
   endtask
 
+  task automatic run_outstanding_abort;
+    integer accepted_at_abort;
+    integer timeout;
+    begin
+      simple_fault_setup();
+      prepare_case(16,16,1,1,0,0,0,0,0,0,0);
+      force_banked_ready=1;
+      force_bank_response_delay=1;
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      timeout=0;
+      while((dut.read_outstanding_count<MAX_OUTSTANDING_READS) &&
+            (timeout<2000)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(dut.read_outstanding_count<MAX_OUTSTANDING_READS)
+        $fatal(1,"depth-%0d Matrix reads did not reach full occupancy",
+               MAX_OUTSTANDING_READS);
+      accepted_at_abort=bank_read_count;
+      abort=1;
+      @(negedge clk);abort=0;
+      finish_fault(ERR_ABORT,11);
+      if(bank_read_count!=accepted_at_abort ||
+         bank_response_count<accepted_at_abort)
+        $fatal(1,"Matrix abort failed to stop and drain reads accepted=%0d now=%0d responses=%0d",
+               accepted_at_abort,bank_read_count,bank_response_count);
+      force_banked_ready=0;force_bank_response_delay=0;
+      prepare_case(4,4,1,1,0,0,0,0,0,0,0);
+      check_valid_case(12);
+      $display("MATRIX_CORE_OUTSTANDING_ABORT_PASS depth=%0d drained=%0d",
+               MAX_OUTSTANDING_READS,bank_response_count);
+    end
+  endtask
+
+  task automatic run_outstanding_parity_fault;
+    integer issue_target;
+    integer timeout;
+    begin
+      simple_fault_setup();
+      prepare_case(16,16,1,1,0,0,0,0,0,0,0);
+      force_banked_ready=1;
+      force_bank_response_delay=1;
+      issue_target=bank_read_count;
+      bank_parity_target_issue=issue_target;
+      inject_bank_parity=1;
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      timeout=0;
+      while((dut.read_outstanding_count<MAX_OUTSTANDING_READS) &&
+            (timeout<2000)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(dut.read_outstanding_count<MAX_OUTSTANDING_READS)
+        $fatal(1,"depth-%0d Matrix reads did not reach full occupancy before parity",
+               MAX_OUTSTANDING_READS);
+      timeout=0;
+      while((dut.state_r!=13) && (timeout<2000)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if((dut.state_r!=13) || (error_code!=ERR_PARITY))
+        $fatal(1,"Matrix parity response did not enter drain state=%0d code=%0d",
+               dut.state_r,error_code);
+      inject_bank_parity=0;
+      finish_fault(ERR_PARITY,12);
+      force_banked_ready=0;force_bank_response_delay=0;
+      prepare_case(4,4,1,1,0,0,0,0,0,0,0);
+      check_valid_case(13);
+      $display("MATRIX_CORE_OUTSTANDING_PARITY_PASS depth=%0d issue=%0d drained=%0d",
+               MAX_OUTSTANDING_READS,issue_target,bank_response_count);
+    end
+  endtask
+
+  task automatic run_prefetch_parity_fault;
+    integer issue_base,target_issue,accepted_at_error,timeout;
+    begin
+      simple_fault_setup();
+      prepare_case(16,16,2,1,0,0,0,0,0,0,0);
+      force_banked_ready=1;
+      force_bank_response_delay=1;
+      issue_base=bank_read_count;
+      target_issue=issue_base+8; // four A and four B words precede K-group 1.
+      bank_parity_target_issue=target_issue;
+      prefetch_parity_response_seen=0;
+      inject_bank_parity=1;
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      timeout=0;
+      while((bank_read_count<=target_issue) && (timeout<2000)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(bank_read_count<=target_issue)
+        $fatal(1,"Matrix K-group prefetch did not issue parity target %0d",target_issue);
+      timeout=0;
+      while((dut.state_r!=13) && (timeout<2000)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if((dut.state_r!=13) || !prefetch_parity_response_seen ||
+         (error_code!=ERR_PARITY))
+        $fatal(1,"prefetch parity did not fault the background buffer state=%0d seen=%b code=%0d",
+               dut.state_r,prefetch_parity_response_seen,error_code);
+      accepted_at_error=bank_read_count;
+      inject_bank_parity=0;
+      finish_fault(ERR_PARITY,13);
+      if(bank_read_count!=accepted_at_error || bank_response_count<accepted_at_error)
+        $fatal(1,"prefetch parity failed to stop/drain requests accepted=%0d issued=%0d returned=%0d",
+               accepted_at_error,bank_read_count,bank_response_count);
+      force_banked_ready=0;force_bank_response_delay=0;
+      prepare_case(4,4,1,1,0,0,0,0,0,0,0);
+      check_valid_case(14);
+      $display("MATRIX_CORE_PREFETCH_PARITY_PASS issue=%0d drained=%0d",
+               target_issue,bank_response_count);
+    end
+  endtask
+
+  task automatic run_prefetch_abort;
+    integer accepted_at_abort,timeout;
+    begin
+      simple_fault_setup();
+      prepare_case(16,16,2,1,0,0,0,0,0,0,0);
+      force_banked_ready=1;
+      force_bank_response_delay=1;
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      timeout=0;
+      while((!dut.prefetch_active || (dut.read_outstanding_count<2)) &&
+            (timeout<2000)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(!dut.prefetch_active || (dut.read_outstanding_count<2) ||
+         !dut.prefetch_buffer_r || dut.prefetch_buffer_r==dut.compute_buffer_r)
+        $fatal(1,"Matrix abort did not reach inactive-buffer prefetch state=%0d outstanding=%0d buffers=%b/%b",
+               dut.prefetch_state_r,dut.read_outstanding_count,
+               dut.prefetch_buffer_r,dut.compute_buffer_r);
+      accepted_at_abort=bank_read_count;
+      abort=1;
+      @(negedge clk);abort=0;
+      finish_fault(ERR_ABORT,14);
+      if((bank_read_count!=accepted_at_abort) ||
+         (bank_response_count<accepted_at_abort) || dut.prefetch_valid_r!=0)
+        $fatal(1,"Matrix prefetch abort failed stop/drain/clear accepted=%0d issued=%0d returned=%0d valid=%b",
+               accepted_at_abort,bank_read_count,bank_response_count,
+               dut.prefetch_valid_r);
+      force_banked_ready=0;force_bank_response_delay=0;
+      prepare_case(4,4,1,1,0,0,0,0,0,0,0);
+      check_valid_case(15);
+      $display("MATRIX_CORE_PREFETCH_ABORT_PASS depth=%0d drained=%0d",
+               MAX_OUTSTANDING_READS,bank_response_count);
+    end
+  endtask
+
+  task automatic run_prefetch_watchdog;
+    integer timeout;
+    begin
+      simple_fault_setup();
+      prepare_case(4,4,2,1,0,0,0,0,0,0,0);
+      watchdog_limit=20;
+      force_banked_ready=1;
+      force_bank_response_delay=1;
+      watchdog_during_prefetch_seen=0;
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      timeout=0;
+      while((!dut.prefetch_active || (dut.read_outstanding_count==0)) &&
+            !done && (timeout<2000)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(!dut.prefetch_active || (dut.read_outstanding_count==0))
+        $fatal(1,"Matrix watchdog test never reached outstanding prefetch");
+      timeout=0;
+      while(!done && (timeout<2000)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(!done || !error || error_code!=ERR_WATCHDOG ||
+         !watchdog_during_prefetch_seen)
+        $fatal(1,"Matrix watchdog did not expire during prefetch done/error/code/seen=%b/%b/%0d/%b",
+               done,error,error_code,watchdog_during_prefetch_seen);
+      finish_fault(ERR_WATCHDOG,15);
+      force_banked_ready=0;force_bank_response_delay=0;
+      prepare_case(4,4,1,1,0,0,0,0,0,0,0);
+      check_valid_case(16);
+      $display("MATRIX_CORE_PREFETCH_WATCHDOG_PASS limit=20 drained=%0d",
+               bank_response_count);
+    end
+  endtask
+
+  task automatic run_prefetch_reset_recovery;
+    integer timeout;
+    begin
+      simple_fault_setup();
+      prepare_case(16,16,2,1,0,0,0,0,0,0,0);
+      force_banked_ready=1;
+      force_bank_response_delay=1;
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      timeout=0;
+      while((!dut.prefetch_active || (dut.read_outstanding_count==0)) &&
+            (timeout<2000)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(!dut.prefetch_active || (dut.read_outstanding_count==0))
+        $fatal(1,"Matrix reset test never reached outstanding prefetch");
+      resetn=0;#1;
+      if(busy || done || error || error_code!=0 ||
+         dut.read_outstanding_count!=0 || dut.prefetch_state_r!=0 ||
+         dut.prefetch_valid_r!=0 || pending_bank)
+        $fatal(1,"Matrix reset failed to clear in-flight prefetch state");
+      repeat(3) @(negedge clk);
+      resetn=1;
+      force_banked_ready=0;force_bank_response_delay=0;
+      repeat(2) @(negedge clk);
+      if(line_write_count!=0 || scalar_write_count!=0 || pending_bank)
+        $fatal(1,"Matrix reset leaked pre-reset prefetch work");
+      prepare_case(4,4,1,1,0,0,0,0,0,0,0);
+      check_valid_case(17);
+      $display("MATRIX_CORE_PREFETCH_RESET_PASS recovery=1");
+    end
+  endtask
+
   initial begin
     if($value$plusargs("SEED=%d",seed)) begin end
     benchmark_mode=$test$plusargs("MATRIX_BENCHMARK_ONLY");
@@ -504,7 +864,11 @@ module tb_ai_tensor_matrix_core_random;
       check_valid_case(101);
       prepare_case(16,16,8,1,0,0,0,0,0,0,0);
       check_valid_case(102);
-      $display("MATRIX_SIZE_BENCHMARK_PASS seed=%0d sizes=4,8,16 k=32 physical_array=%0dx%0d bank_response_latency=1 cycle gops_reference_mhz=250 sim_period_ns=10",initial_seed,PHYSICAL_ARRAY_SIZE,PHYSICAL_ARRAY_SIZE);
+      prepare_case(16,32,8,1,0,0,0,0,0,0,0);
+      check_valid_case(103);
+      prepare_case(32,32,16,1,0,0,0,0,0,0,0);
+      check_valid_case(104);
+      $display("MATRIX_SIZE_BENCHMARK_PASS seed=%0d sizes=4,8,16 workloads=4x4x32,8x8x32,16x16x32,16x32x32,32x32x64 physical_array=%0dx%0d a_tile_cache=%0d bank_response_latency=1 cycle gops_reference_mhz=250 sim_period_ns=10",initial_seed,PHYSICAL_ARRAY_SIZE,PHYSICAL_ARRAY_SIZE,A_TILE_CACHE_ENABLE);
       $finish;
     end
 
@@ -520,6 +884,14 @@ module tb_ai_tensor_matrix_core_random;
     check_valid_case(4);
     prepare_case(32,16,2,1,1,1,1,1,0,0,0);
     check_valid_case(5);
+    prepare_case(16,32,8,1,0,0,0,0,0,0,0);
+    check_valid_case(18);
+    prepare_case(32,32,16,1,0,0,0,0,0,0,0);
+    check_valid_case(19);
+    // The bounded A cache supports K<=64 elements (16 K words); larger K
+    // remains legal and follows the banked-read path without cache hits.
+    prepare_case(16,32,17,1,0,0,0,0,0,0,0);
+    check_valid_case(20);
 
     simple_fault_setup();m_size=0;check_fault(ERR_CONFIG,0);
     prepare_case(4,4,1,1,0,0,0,0,0,0,0);op_mode=8'h7f;check_fault(ERR_OP,1);
@@ -552,6 +924,12 @@ module tb_ai_tensor_matrix_core_random;
     @(negedge clk);start=1;@(negedge clk);start=0;abort=1;
     finish_fault(ERR_ABORT,10);
     abort=0;inject_bank_parity=0;inject_bank_protection=0;
+    run_outstanding_abort();
+    run_outstanding_parity_fault();
+    run_prefetch_parity_fault();
+    run_prefetch_abort();
+    run_prefetch_watchdog();
+    run_prefetch_reset_recovery();
     run_late_tile_parity_fault();
 
     prepare_case(4,4,1,1,0,0,0,0,0,0,0);
@@ -560,7 +938,7 @@ module tb_ai_tensor_matrix_core_random;
     if(bank_stall_count==0 || spad_stall_count==0 || line_stall_count==0)
       $fatal(1,"matrix randomized ready profile missed stalls bank/spad/line=%0d/%0d/%0d",
              bank_stall_count,spad_stall_count,line_stall_count);
-    $display("MATRIX_CORE_RANDOM_PASS cases=%0d faults=%0d late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 seed=%0d bank_reads=%0d responses=%0d spad_reads=%0d responses=%0d stalls=%0d/%0d/%0d",
+    $display("MATRIX_CORE_RANDOM_PASS cases=%0d faults=%0d late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 seed=%0d bank_reads=%0d responses=%0d spad_reads=%0d responses=%0d stalls=%0d/%0d/%0d",
              case_count,fault_count,initial_seed,bank_read_count,bank_response_count,
              spad_read_count,spad_response_count,bank_stall_count,spad_stall_count,line_stall_count);
     $finish;

@@ -151,6 +151,8 @@ write_fire   = request_fire &&  selected_spad_write
 
 **[REQ-CL-009]** 四个 Bank 的请求接受、响应和 Parity 归属必须对应各自 Lane；不能以单个总 ready/rsp_valid 代替。CNM 计算完毕后经普通 Banked Result SPAD 输出写回。
 
+**[v1.1 实现约束，2026-10-26]** Matrix 单行 Banked Read 与 CNM 四 lane 请求共享 `ai_spad_arbiter` 的 Banked 轮询时隙，但响应 owner 必须区分：内部 Matrix client tag=`3`，CNM client tag=`5`。`banked_rsp_valid` 只代表 Matrix；`cnm_rsp_valid[3:0]` 只代表 CNM 并保留各 lane mask。两者同拍竞争时一次只接受一个请求；不得把 CNM 响应同时广播给 Matrix。
+
 ### 2.5 Matrix Banked 与 Line 接口
 
 | 功能 | 真实端口 |
@@ -160,6 +162,12 @@ write_fire   = request_fire &&  selected_spad_write
 
 **[REQ-CL-010]** Banked 读取、普通 32-bit 请求、128-bit Line 写回分别使用其对应握手规则、保护判断和数据比对；Line Byte Strobe 为独立的 16-bit 检查对象。\
 **[OPEN-CL-004]** Line 接口有效 strobe、地址对齐及部分写入的精确规则，待 Matrix + SPAD 集成 Review 后冻结。
+
+**[Matrix P0-B 实现约束，2026-10-26]** Matrix 默认最多允许 4 笔已接受的 Banked Read 在途，可用 `MAX_OUTSTANDING_READS=2` 配置两笔模式。请求端只在 `valid && ready` 时推进地址；Response 无 ready/ID，必须按接受顺序返回。Controller 的本地 response metadata FIFO 保存 A/B、4×4 group、K group 和完整地址，按该 metadata 写入对应 operand buffer。Abort、watchdog、保护或 parity fault 会停止后续发读，并在报告 completion/error 前排空所有已接受 response。该实现把读请求和 response latency 流水化；它不表示下一 K group 已与当前 MAC 重叠，后者仍属 ping-pong prefetch 计划。
+
+**[Matrix P0-C / P1 dataflow 实现约束，2026-10-26]** Controller 在当前 K group 执行 MAC 时，可向 inactive A/B operand buffer 预取下一 K group；buffer 只有在该组所有已接受 response 收齐后才置 valid，MAC 仅消费有效 buffer。Response metadata 必须保留目标 buffer、A/B operand 与 group 归属。Abort、watchdog、parity、protection 会停止新请求并按 P0-B 规则 drain 已接受响应；reset 清除本地预取状态，top reset 检查须确认无旧任务写回/完成并验证 recovery。对相邻 N macro tile，A-tile cache 复用同一 A 行；当前配置容量为 16 个 K group（K≤64 个 INT8 元素），新 A row/batch tag 清除 cache valid；K>64 自动绕过 cache。Cache 是 RTL 内部优化，不改变 descriptor、opcode、SPAD 布局或软件 ABI。验收使用独立 Golden、inactive-buffer-valid checker、prefetch/MAC overlap、cache-hit/跨 N tile 检查，以及 parity/abort/watchdog/reset 恢复用例。
+
+Matrix/CNM 同时运行时，回归须分别检查 accepted read response 的 owner、lane mask、Matrix Golden 输出及 CNM Golden 输出；共享只读输入和互不重叠输出符合并发 SPAD 合同。
 
 ### 2.6 状态、结果和性能接口
 
@@ -172,6 +180,8 @@ write_fire   = request_fire &&  selected_spad_write
 | core_result | 32 | 结果汇总 |
 | core_cycle_count / core_element_count | 32 各 | 任务统计 |
 | matrix_perf_mac_active / matrix_perf_banked_wait | 1 各 | Matrix 的活动/等待观测 |
+
+VCS Matrix controller 另保留每任务 FSM state-cycle、Arbiter stall、响应等待和写回等待计数，供 benchmark 逐任务读取；这些诊断计数不增加软件 CSR 或 descriptor ABI。接受范围和基准结果见[Compute Cluster 升级路线](../verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md)。
 
 **[AS-IS]** 完成属性 MUX 的选择优先级：
 

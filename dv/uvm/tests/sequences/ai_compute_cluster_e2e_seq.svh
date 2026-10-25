@@ -148,6 +148,15 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         `uvm_fatal("CLUSTER_RESET", "Matrix did not receive a banked-SPAD grant before reset")
     endtask
 
+    task automatic wait_matrix_prefetch_active();
+        int unsigned poll;
+        for (poll = 0; poll < 3000; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.matrix_prefetch_active) return;
+        end
+        `uvm_fatal("CLUSTER_PREFETCH", "Matrix did not enter next-K prefetch before abort/reset")
+    endtask
+
     task body();
         bit [31:0] value;
         bit [31:0] packed_word;
@@ -162,13 +171,14 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned col_idx;
         int unsigned k_idx;
         int signed matrix_a[0:15][0:63];
-        int signed matrix_b[0:63][0:15];
-        int signed matrix_golden[0:15][0:15];
+        int signed matrix_b[0:63][0:31];
+        int signed matrix_golden[0:15][0:31];
         int signed gelu_values[0:3];
         int signed gelu_results[0:3];
         int signed accumulator;
         int unsigned word_idx;
         int unsigned overlap_total;
+        int unsigned matrix_prefetch_overlap_total;
         int unsigned contention_total;
         int unsigned banked_grants_total;
         int unsigned core_grants_total;
@@ -186,7 +196,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             for (k_idx = 0; k_idx < 64; k_idx++)
                 matrix_a[row_idx][k_idx] = next_small_signed();
         for (k_idx = 0; k_idx < 64; k_idx++)
-            for (col_idx = 0; col_idx < 16; col_idx++)
+            for (col_idx = 0; col_idx < 32; col_idx++)
                 matrix_b[k_idx][col_idx] = next_small_signed();
 
         // The matrix controller consumes 4x4 tile-major operands: each K
@@ -204,7 +214,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 end
             end
         end
-        for (tile_col = 0; tile_col < 4; tile_col++) begin
+        for (tile_col = 0; tile_col < 8; tile_col++) begin
             for (k_word = 0; k_word < 16; k_word++) begin
                 for (col_lane = 0; col_lane < 4; col_lane++) begin
                     packed_word = '0;
@@ -218,7 +228,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             end
         end
         for (row_idx = 0; row_idx < 16; row_idx++) begin
-            for (col_idx = 0; col_idx < 16; col_idx++) begin
+            for (col_idx = 0; col_idx < 32; col_idx++) begin
                 accumulator = 0;
                 for (k_idx = 0; k_idx < 64; k_idx++)
                     accumulator += matrix_a[row_idx][k_idx] * matrix_b[k_idx][col_idx];
@@ -241,7 +251,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         write_v3_desc(CMDQ_LOCAL + 32'h00, 8'h30, 16'h0600,
                       MATRIX_A_LOCAL, MATRIX_B_LOCAL, MATRIX_Y_LOCAL,
-                      16'd16, 16'd16, 16'd16);
+                      16'd16, 16'd32, 16'd16);
         write_v3_desc(CMDQ_LOCAL + 32'h40, 8'h35, 16'h0601,
                       GELU_A_LOCAL, 32'd0, GELU_Y0_LOCAL,
                       16'd0, 16'd0, 16'd64);
@@ -269,13 +279,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_fatal("CLUSTER_SPAD_TRAFFIC", "expected both banked and core SPAD grants")
         if (compute_vif.same_engine_launch_while_busy != 0)
             `uvm_fatal("CLUSTER_OWNER", $sformatf("same-engine launch while busy count=%0d", compute_vif.same_engine_launch_while_busy))
+        if (compute_vif.matrix_a_cache_hits != 16)
+            `uvm_fatal("CLUSTER_A_CACHE", $sformatf("16x32x64 GEMM expected 16 A-tile cache hits, observed %0d", compute_vif.matrix_a_cache_hits))
+        if (compute_vif.matrix_prefetch_overlap_cycles == 0)
+            `uvm_fatal("CLUSTER_PREFETCH", "next-K prefetch did not overlap Matrix MAC")
+        matrix_prefetch_overlap_total = compute_vif.matrix_prefetch_overlap_cycles;
         overlap_total = compute_vif.overlap_cycles;
         contention_total = compute_vif.shared_spad_contention_cycles;
         banked_grants_total = compute_vif.arb_banked_grants;
         core_grants_total = compute_vif.arb_core_grants;
 
-        for (word_idx = 0; word_idx < 256; word_idx++)
-            expect_spad(MATRIX_Y_LOCAL + (word_idx << 2), matrix_golden[word_idx / 16][word_idx % 16], $sformatf("16x16x64 GEMM[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 512; word_idx++)
+            expect_spad(MATRIX_Y_LOCAL + (word_idx << 2), matrix_golden[word_idx / 32][word_idx % 32], $sformatf("16x32x64 GEMM[%0d]", word_idx));
         for (word_idx = 0; word_idx < 64; word_idx++) begin
             expect_spad(GELU_Y0_LOCAL + (word_idx << 2), gelu_results[word_idx % 4],
                         $sformatf("GELU0 output[%0d]", word_idx));
@@ -283,7 +298,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                         $sformatf("GELU1 output[%0d]", word_idx));
         end
 
-        expect_completion(CPLQ_LOCAL + 32'h00, 16'h0600, matrix_golden[15][15], 32'd256, "Matrix");
+        expect_completion(CPLQ_LOCAL + 32'h00, 16'h0600, matrix_golden[15][31], 32'd512, "Matrix");
         expect_completion(CPLQ_LOCAL + 32'h10, 16'h0601, -32'sd15, 32'd64, "SFU first");
         expect_completion(CPLQ_LOCAL + 32'h20, 16'h0602, -32'sd15, 32'd64, "SFU queued");
         axil_read(REG_CMDQ_HEAD, value);
@@ -313,6 +328,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_TAIL, 32'd0);
         axil_write(REG_DOORBELL, 32'd1);
         wait_matrix_sfu_overlap();
+        wait_matrix_prefetch_active();
         axil_write(REG_ABORT, 32'd1);
         wait_cpl_tail(32'd2);
         expect_spad(CPLQ_LOCAL + 32'h100, 32'h0000_0610, "abort Matrix task ID");
@@ -350,6 +366,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_DOORBELL, 32'd1);
         wait_matrix_sfu_overlap();
         wait_matrix_read_accept();
+        wait_matrix_prefetch_active();
         #1ns;
         reset_value = 1'b0;
         reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
@@ -401,8 +418,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         `uvm_info("CLUSTER_RESET_RECOVERY_PASS", "active Matrix/SFU reset discarded both in-flight tasks, preserved SRAM sentinels, and accepted a fresh post-reset SFU task", UVM_LOW)
 
         `uvm_info("COMPUTE_CLUSTER_REAL_UVM_PASS", $sformatf(
-            "real Matrix16x16x64 + queued SFU tasks + concurrent abort/reset/recovery seed=%0d; overlap=%0d arbiter_contention=%0d banked_grants=%0d core_grants=%0d",
-            seed, overlap_total, contention_total,
+            "real Matrix16x32x64 with next-K prefetch and 16 A-tile reuse hits + queued SFU tasks + concurrent abort/reset/recovery seed=%0d; prefetch_overlap=%0d overlap=%0d arbiter_contention=%0d banked_grants=%0d core_grants=%0d",
+            seed, matrix_prefetch_overlap_total,
+            overlap_total, contention_total,
             banked_grants_total, core_grants_total), UVM_LOW)
     endtask
 endclass

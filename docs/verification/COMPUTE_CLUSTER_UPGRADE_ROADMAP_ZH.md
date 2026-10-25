@@ -1,18 +1,18 @@
 # Compute Cluster 升级路线与验证追踪
 
-**状态日期：2026-10-25。** 本文把升级目标拆成硬件 requirement、testpoint 和 coverage evidence。路线图中的目标值不是已达成的产品指标；每个阶段只在对应 DUT、testbench 和 coverage 口径下报告结果。
+**状态日期：2026-10-26。** 本文把升级目标拆成硬件 requirement、testpoint 和 coverage evidence。路线图中的目标值不是已达成的产品指标；每个阶段只在对应 DUT、testbench 和 coverage 口径下报告结果。
 
 ## 1. 当前阶段
 
 | 路线图步骤 | 目标 | 状态 |
 |---|---|---|
 | 1. 冻结现有验证基线 | 保留 4×4 Matrix、FP Dot、CNM、SFU 和 top smoke 回归作为改版对照 | **完成**。Matrix/top 变更前有重跑记录；CNM、FP Dot 本次重放三 seed；SFU 使用前一轮已通过的三 seed 日志。证据及 dirty-worktree 边界见第 2 节。 |
-| 2. P0 Tensor Engine | 参数化 4×4/8×8/16×16 INT8 MAC；本地累加和双 operand buffer | **16×16 controller 集成已完成，双缓冲尚未实现，验证未 signoff**。top 默认 `ARRAY_SIZE=16`；独立 A/B tile registers 收集原有 4×4 tile-major SPAD 数据并驱动 16×16 宏 tile。16×16 与 32×16 跨宏 tile 通过真实 core banked/SPAD 接口和独立 Golden 的三 seed 回归。 |
-| 3. P0 Memory Dataflow | Weight/Activation Buffer、预取、双缓冲、数据复用与 bank/backpressure 管理 | **部分完成**。真实 SPAD 地址生成、A/B tile holding registers、写回和 ready stall 已实现；没有 A/B ping-pong buffer、SPAD 预取或读响应与 MAC 重叠，K-group 请求仍串行，跨宏 tile 无驻留复用。固定响应 VCS benchmark 可复现，但有效阵列利用率仍低。 |
+| 2. P0 Tensor Engine | 参数化 4×4/8×8/16×16 INT8 MAC；本地累加和双 operand buffer | **RTL 集成及定向验证完成，整体 signoff 未完成**。top 默认 `ARRAY_SIZE=16`；16×16 与跨宏 tile GEMM 通过独立 Golden。VCS 有逐状态/等待周期 profiler；A/B operand ping-pong buffer 在 K-group 预取路径中启用。Matrix/CNM response tag 已拆分并有真实 top 并发数值回归。 |
+| 3. P0 Memory Dataflow | Weight/Activation Buffer、预取、双缓冲、数据复用与 bank/backpressure 管理 | **P0-A/B/C 已实现并完成定向回归**。2/4 深度有序读流水在 abort/parity/protection/watchdog 后停止发新请求并 drain；next-K A/B 预取与当前 MAC 重叠；跨 N tile 的 A-tile 缓存在 K≤64 时复用，K>64 自动绕过。真实性能/完整 cluster signoff 仍未完成。 |
 | 4. P1 Transformer 算子和 KV | 用现有 SFU/Matrix/KV 构成真实 Tiny Decoder workload，并验证多 Head/Token 管理 | **已有 primitives，端到端目标未完成**。当前 30-command workload smoke 不是完整 Tiny Qwen/GPT Decoder golden 对拍。 |
 | 5. P2 计算融合 | GEMM→SFU streaming，减少 SPAD 中间写回 | **未实现**。当前仍由独立命令和 scratchpad 写回连接算子。 |
-| 6. Compute Cluster UVM | 实际 Cluster、全部 Engine、共享 SPAD、跨 Engine 并发、Abort/Reset 与 feature→testpoint→coverage 闭环 | **真实 top Matrix/SFU 定向切片已三 seed 通过；完整 C1 未完成**。新 sequence 使用真实 Matrix 16×16 GEMM、排队 SFU、跨引擎 overlap、`ai_spad_arbiter`/四 Bank memory traffic、按序 CPLQ、并发 Abort、活动 Reset 与恢复自检。UVM warning/error/fatal=`0/0/0`，focused covergroup=`55.5%`；whole-top URG 不是 DUT-only 或全 cluster coverage。其余引擎、广泛错误/背压场景和完整 REQ closure 仍待覆盖。 |
-| 7. Benchmark 与 PPA | Effective GOPS、MAC 利用率、SPAD traffic、cycles/token、面积、频率和功耗 | **仿真 benchmark 已补，PPA 未完成**。固定一拍 bank response 的 3×3 阵列/尺寸 sweep 记录 cycle、MAC/cycle、模型 SPAD traffic/stall 和归一化 GOPS；DC V-2023.12-SP1 已安装，但启动综合时报 `Design Compiler is not enabled (DCSH-1)`；私有 TSMC standard-cell/SRAM 库未配置，不能报告目标工艺面积/Fmax/功耗。 |
+| 6. Compute Cluster UVM | 实际 Cluster、全部 Engine、共享 SPAD、跨 Engine 并发、Abort/Reset 与 feature→testpoint→coverage 闭环 | **真实 top Matrix/SFU 定向切片已三 seed 通过；完整 C1 未完成**。新增真实 Matrix 16×32×64 GEMM，逐项核对 512 Golden 输出、16 次 A-tile cache hit、next-K prefetch/MAC overlap；Abort/reset 测试等待真实预取活动后触发。UVM warning/error/fatal=`0/0/0`，focused covergroup=`65.4%`。merged whole-top URG=`47.54/41.38/10.52/37.70/60.00/19.11%`（line/condition/FSM/branch/assert/group，含 DUT/SVA/TB/UVM）。其余引擎、广泛错误/背压场景和完整 REQ closure 仍待覆盖。 |
+| 7. Benchmark 与 PPA | Effective GOPS、MAC 利用率、SPAD traffic、cycles/token、面积、频率和功耗 | **仿真 benchmark 已补，PPA 未完成**。固定一拍 bank response 的 3×3 阵列/5 种尺寸 sweep 记录周期、MAC/cycle、SPAD traffic/stall 与归一化 GOPS。16×16 array 的 A-cache 对 16×32×K32 / 32×32×K64 分别减少 11.1%/17.7% cycles、25% reads。DC V-2023.12-SP1 综合被 `DCSH-1` 拒绝，且私有 TSMC standard-cell/SRAM 库未配置，不能报告目标工艺面积/Fmax/功耗。 |
 
 ## 2. 冻结基线
 
@@ -21,7 +21,7 @@
 | 检查 | 命令 / artifacts | 结果 |
 |---|---|---|
 | Matrix core | `make -C dv/block/compute/matrix/sim core-random-regress SEEDS='20261021 20261022 20261023' CORE_OUT_DIR=/tmp/nmaforge_matrix_core_baseline_20261025` | 三 seed 均 PASS；每 seed 6 个算术/布局 case、12 个 fault/interactions、late-tile parity、fault+abort、fault+reset 与 recovery。VCS `V-2023.12-SP1`。 |
-| Matrix controller follow-up | `make -C dv/block/compute/matrix/sim core-random-regress SEEDS='20261021 20261022 20261023' CORE_OUT_DIR=/tmp/nmaforge_matrix16_core_regress_20261025` | 三 seed 各 8 个 Golden case + 12 fault cases PASS；16×16 与 32×16 跨 tile；URG `/tmp/nmaforge_matrix16_core_regress_20261025/urg`。 |
+| Matrix controller follow-up (pre-P0-B baseline) | `make -C dv/block/compute/matrix/sim core-random-regress SEEDS='20261021 20261022 20261023' CORE_OUT_DIR=/tmp/nmaforge_matrix16_core_regress_20261025` | 改动前基线：三 seed 各 8 个 Golden case + 12 fault cases PASS；16×16 与 32×16 跨 tile；URG `/tmp/nmaforge_matrix16_core_regress_20261025/urg`。 |
 | Matrix size benchmark | `make -C dv/block/compute/matrix/sim matrix-size-benchmark SEED=20261025 BENCH_OUT_DIR=/tmp/nmaforge_matrix_size_benchmark_final_20261025` | 4×4/8×8/16×16 physical array × workload size 共 9 组 PASS；固定 1-cycle bank response，日志在每个 `array_{4,8,16}/run.log`。 |
 | CNM | `ai_cnm_a22`、`ai_cnm_a2_gemv_bench`，及 `ai_cnm_random_regress CNM_RANDOM_SEEDS='20261021 20261022 20261023' CNM_RANDOM_OUT_DIR=/tmp/nmaforge_cnm_random_baseline_20261025`，从 `dv/subsystem/top_smoke/sim` 运行 | A2.2、GEMV benchmark 与三个 random seed PASS；每 seed 10 cases、8 faults、late fault、reset/fault combo 和 recovery。 |
 | FP Dot | `make -C dv/block/compute/fp/sim dot-uvm-regress DOT_UVM_SEEDS='712345 987654 20261015' DOT_UVM_OUT_DIR=/tmp/nmaforge_fp_dot_baseline_20261025 URG=/opt/Synopsys/vcs/V-2023.12-SP1/bin/urg` | 三 seed 每个 212/212 bit-exact；UVM warning/error/fatal `0/0/0`；merged URG 生成。 |
@@ -44,9 +44,8 @@ make -C dv/uvm/sim uvm_compute_cluster_regress \
 
 seeds `20261025/20261026/20261027` 全部通过，Matrix/SFU GEMM、overlap、共享
 arbiter 流量、completion order、双 Engine Abort、活动 Reset 和 recovery 均有
-PASS 检查。每 seed scoreboard 为 1217 observations、509 overlap、5 done、
-422 accepted reads、420 responses、0 orphan、2 reset-dropped reads，pending
-ledger 清零。旧 license queue 失败仅作为运行历史保留。全引擎数值、
+PASS 检查。初始三 seed 数据记录在此；2026-10-26 P0-C 扩展回归和最新
+coverage 见第 3.4 节。旧 license queue 失败仅作为运行历史保留。全引擎数值、
 parity/fault matrix、独立全引擎 memory scoreboard、全功能 coverage、mutation
 和 clean-SHA replay 仍未完成。
 
@@ -87,14 +86,162 @@ make -C dv/block/compute/matrix/sim matrix-size-benchmark \
 
 The 16×16 configuration cuts the 16×16×K32 command from 1600 cycles on the 4×4 configuration to 357 cycles, but serialized bank requests, response waits and line writeback still limit end-to-end utilization to 8.96%. The arithmetic peak at 256 MAC/cycle and 250 MHz is 128 GOPS; the VCS number above is workload throughput normalized to that assumed clock. Response latency and readiness are behavioral models, not SRAM macro timing.
 
+### 3.2 P0-A Cycle Breakdown Profiler + Matrix/CNM response ownership
+
+`ai_tensor_matrix_core` now counts each busy FSM state per command, aggregate request-Arbiter stalls, response-wait cycles, and output writeback waits. The state bins sum exactly to `cycle_count`; counters are read hierarchically by the VCS core regression and do not add software-visible CSRs. With the fixed one-cycle bank-response model, `ARRAY_SIZE=16`, seed `20261026`, shape 16×16×K32:
+
+| State / wait class | Cycles |
+|---|---:|
+| A_REQ / A_WAIT | 43 / 64 |
+| B_REQ / B_WAIT | 50 / 64 |
+| PREP_MAC / MAC | 8 / 32 |
+| WRITE / NEXT / DONE | 94 / 1 / 1 |
+| Aggregate request Arbiter stalls | 59 |
+| Response wait (A/B) | 64 |
+| Writeback wait (subset of Arbiter stalls) | 30 |
+| Total | 357 |
+
+Red/green response-owner reproduction: after adding an expected distinct CNM tag, the original RTL made `make ai_spad_arb_run` fail at the seeded CNM grant (`client tag 3`). The fix keeps Matrix tag 3 and assigns CNM tag 5 while both retain the same round-robin slot. The focused test now runs 10,000 cycles and checks adjacent CNM→Matrix accepts/responses. The real top smoke adds a CNM GEMV + Matrix GEMM run with shared arbiter and disjoint outputs; it observes Matrix/CNM overlap, 2 Matrix responses, 32 CNM lane-response cycles, no aliased response, and both independent Goldens/completions pass.
+
+Reproduction commands and results (Rocky Linux / VCS V-2023.12-SP1):
+
+```sh
+make -C dv/subsystem/top_smoke/sim ai_spad_arb_run
+make -C dv/block/compute/matrix/sim core-random-regress \
+  SEEDS='20261021 20261022 20261023' \
+  CORE_OUT_DIR=/tmp/nmaforge_matrix_commit_a_20261026
+make -C dv/subsystem/top_smoke/sim ai_smoke
+make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=12345
+make -C dv/block/compute/matrix/sim matrix-size-benchmark \
+  SEED=20261026 BENCH_OUT_DIR=/tmp/nmaforge_matrix_profile_20261026
+```
+
+All five commands passed after the fix. `ai_smoke` and the 20-case seeded top run both ended with `TEST PASS`; all three Matrix core seeds retained 8 bit-exact cases and 12 fault/recovery cases. Formal replay was attempted but unavailable in this image because `vcf` is not installed; no new formal proof is claimed. These runs are current-worktree evidence, not a clean fixed-SHA replay.
+
+### 3.3 P0-B Ordered multi-outstanding Matrix reads
+
+The Matrix controller now accepts up to `MAX_OUTSTANDING_READS` banked reads (default 4). A local FIFO records operand A/B, 4×4 group, K group and full request address for each grant; each in-order registered response writes only to its recorded destination. The request source holds its address until grant. On abort, watchdog, protection or parity error, issue stops and the controller drains every accepted response before reporting completion. No descriptor, opcode, external port or software ABI changed. This is ordered-response pipelining; it does not yet fetch the next K slice while the current slice computes.
+
+The full-core VCS regression ran three seeds at both depth 2 and depth 4. Each of six runs passed 10 bit-exact/layout cases and 14 error/recovery cases, including high-water occupancy at the configured depth, depth-2 FIFO-full request stalls, abort at full outstanding occupancy, parity on the oldest response while other reads remain pending, drain with no post-fault requests, and a clean GEMM immediately afterward. Depth-2 16×16 cases recorded high-water 2 and 17–25 FIFO-full cycles. Depth-4 cases reached high-water 4 under randomized response delays.
+
+The fixed one-cycle behavioral-SPAD benchmark with depth 4 gives:
+
+| Physical array | Workload | Cycles | MAC/cycle | Array utilization | Normalized GOPS @ 250 MHz | Read high-water |
+|---|---:|---:|---:|---:|---:|---:|
+| 4×4 | 16×16×K32 | 1600 | 5.120 | 32.00% | 2.560 | 1 |
+| 8×8 | 16×16×K32 | 562 | 14.577 | 22.78% | 7.288 | 2 |
+| 16×16 | 16×16×K32 | 242 | 33.851 | 13.22% | 16.926 | 2 |
+
+Against the same 16×16 configuration's previous 357-cycle run, this is 115 fewer cycles (32.2%) and 47.5% higher normalized workload throughput. It remains VCS behavioral memory evidence; it does not model macro timing or establish DC/PPA.
+
+Reproduction commands and current results (VCS `V-2023.12-SP1_Full64`):
+
+```sh
+make -C dv/block/compute/matrix/sim core-random-regress \
+  SEEDS='20261021 20261022 20261023' OUTSTANDING_DEPTH=2 \
+  CORE_OUT_DIR=/tmp/nmaforge_matrix_p0b_depth2_regress_20261026
+make -C dv/block/compute/matrix/sim core-random-regress \
+  SEEDS='20261021 20261022 20261023' OUTSTANDING_DEPTH=4 \
+  CORE_OUT_DIR=/tmp/nmaforge_matrix_p0b_depth4_regress_20261026
+make -C dv/block/compute/matrix/sim matrix-size-benchmark \
+  SEED=20261026 OUTSTANDING_DEPTH=4 \
+  BENCH_OUT_DIR=/tmp/nmaforge_matrix_p0b_benchmark_20261026
+make -C dv/subsystem/top_smoke/sim ai_smoke
+make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=12345
+```
+
+All passed. `ai_smoke` included real top Matrix/CNM concurrency plus the existing 30-command workload; seeded `ai_run` ended `TEST PASS`. The next-K compute/prefetch overlap was added in P0-C below; these earlier P0-B results remain historical. Full top UVM coverage of outstanding-depth cross bins and complete cluster requirements remains open.
+
+### 3.4 P0-C ping-pong prefetch + P1 bounded A-tile reuse
+
+`ai_tensor_matrix_core` now prefetches the next K group's A/B words into the inactive
+operand buffer while the current K group is in MAC. A buffer is marked valid only
+after its accepted responses drain; compute switches to it only when valid. The
+ordered response FIFO retains the target buffer/group metadata. Abort, watchdog,
+parity and protection stop new requests and drain accepted responses before
+error retirement. Reset clears local prefetch/FIFO state; top-level reset checks
+verify no stale writeback/completion and successful recovery. No descriptor,
+opcode, port or software ABI changed.
+
+The optional-by-parameter A-tile cache holds the A tile for up to 16 K groups
+(K≤64 INT8 elements for the current 16×16 configuration). It reuses A across
+neighboring N macro tiles; a new A-row/batch tag invalidates the cached groups.
+Shapes with K>64 bypass the cache and use the normal SPAD read path. Golden tests
+cover cache hits, neighboring tiles and the K=68 fallback.
+
+VCS `V-2023.12-SP1_Full64` regressions passed three seeds at both outstanding
+depths. Every seed ran 17 numerical/layout cases and 17 fault/recovery cases,
+including prefetch parity, abort, watchdog and reset with post-fault recovery:
+
+```sh
+make -C dv/block/compute/matrix/sim core-random-regress \
+  SEEDS='20261021 20261022 20261023' OUTSTANDING_DEPTH=2 \
+  A_TILE_CACHE_ENABLE=1 \
+  CORE_OUT_DIR=/tmp/nmaforge_matrix_p0c_cache_depth2_20261026
+make -C dv/block/compute/matrix/sim core-random-regress \
+  SEEDS='20261021 20261022 20261023' OUTSTANDING_DEPTH=4 \
+  A_TILE_CACHE_ENABLE=1 \
+  CORE_OUT_DIR=/tmp/nmaforge_matrix_p0c_cache_depth4_20261026
+```
+
+The latest depth-4 block VDB was freshly summarized with URG. For
+`ai_tensor_matrix_core` DUT-only, line/condition/FSM/branch coverage is
+`96.59/88.48/66.67/95.48%`; the aggregate FSM transition coverage remains partial
+(40/60 transitions), so no FSM or code-coverage closure is claimed. This report
+does not include the array child as part of the core-module percentage.
+
+The real-top UVM sequence also ran three seeds (`20261025/20261026/20261027`)
+on the 16×32×64 GEMM. Each seed checked 512 outputs against the UVM Golden,
+observed 16 A-cache hits and 120 prefetch/MAC overlap cycles, then exercised
+queued SFU work, active prefetch abort/reset and recovery. Each seed reported
+UVM warning/error/fatal `0/0/0`; focused functional coverage is `65.4%`. The
+merged whole-top URG is line/condition/FSM/branch/assert/group
+`47.54/41.38/10.52/37.70/60.00/19.11%`; it includes DUT, SVA, testbench and UVM,
+and must not be read as DUT-only or full-cluster coverage.
+
+The benchmark compared cache disabled/enabled at depth 4, with fixed one-cycle
+behavioral bank responses and a 10 ns simulation period (GOPS normalized to an
+assumed 250 MHz):
+
+| 16×16 physical array | Cache OFF cycles / reads | Cache ON cycles / reads | Change | Cache hits |
+|---|---:|---:|---:|---:|
+| 16×32×K32 | 469 / 128 | 417 / 96 | cycles −11.1%, reads −25% | 8 |
+| 32×32×K64 | 1443 / 512 | 1187 / 384 | cycles −17.7%, reads −25% | 32 |
+
+The 16×16×K32 single-N-tile case remains 233 cycles with cache either enabled
+or disabled. These are behavioral VCS measurements, not SRAM timing, silicon
+throughput or PPA evidence. Cache-on/off benchmark logs are under
+`/tmp/nmaforge_matrix_p0c_cache_{on,off}_20261026/`; top UVM logs and merged URG
+are under `/tmp/nmaforge_real_compute_cluster_uvm_p0c_expanded_20261026/`.
+
+Benchmark/cache comparison and real-top rerun commands:
+
+```sh
+make -C dv/block/compute/matrix/sim matrix-size-benchmark \
+  SEED=20261026 OUTSTANDING_DEPTH=4 A_TILE_CACHE_ENABLE=1 \
+  BENCH_OUT_DIR=/tmp/nmaforge_matrix_p0c_cache_on_20261026
+make -C dv/block/compute/matrix/sim matrix-size-benchmark \
+  SEED=20261026 OUTSTANDING_DEPTH=4 A_TILE_CACHE_ENABLE=0 \
+  BENCH_OUT_DIR=/tmp/nmaforge_matrix_p0c_cache_off_20261026
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027' \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_real_compute_cluster_uvm_p0c_expanded_20261026
+make -C dv/subsystem/top_smoke/sim ai_smoke
+make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=12345
+/opt/Synopsys/vcs/V-2023.12-SP1/bin/urg -full64 \
+  -dir /tmp/nmaforge_matrix_p0c_cache_depth4_20261026/coverage.vdb \
+  -format text -report /tmp/nmaforge_matrix_p0c_cache_depth4_20261026/urg \
+  -log /tmp/nmaforge_matrix_p0c_cache_depth4_20261026/urg.log
+```
+
 ## 4. 尚未收敛的 P0/P1 项
 
-- **Memory dataflow optimization**：把 banked read response 做有序多笔 outstanding/prefetch，与当前 K-slice MAC overlap；定义 parity/protection/abort 下的 in-flight drain。现有 controller 串行等待每个响应，benchmark 的 16×16 utilization 8.96% 显示这是当前瓶颈。
-- **完整 Compute Cluster UVM**：top-level C1 Matrix/SFU 定向切片已用真实 cluster、arbiter 和四 Bank SRAM 三 seed 通过，包含并发、Abort/Reset 与恢复。现有 21 engine-pair/5 场景 C0-P regression 仍使用行为 Engine/SPAD。剩余全引擎场景、CNM parity/bank-lane、request backpressure、独立全引擎 owner/memory scoreboard 与覆盖闭环尚未完成。
+- **Memory dataflow optimization**：P0-A profiling、P0-B 2/4 深度有序 read FIFO、P0-C next-K ping-pong prefetch 和 K≤64 的 A-tile reuse 已实现并有 block/top UVM 证据。剩余工作是扩大 shape/fault/backpressure 交叉覆盖、继续收敛 FSM transition bins，并完成 SRAM-aware timing/PPA；不得把 behavioral memory 数据当 macro 性能。
+- **完整 Compute Cluster UVM**：top smoke 现在增加真实 Matrix/CNM 同时运行及独立 Golden/response owner 检查；top-level C1 Matrix/SFU 定向切片仍有三 seed 通过记录，完整 C1 尚未完成。现有 21 engine-pair/5 场景 C0-P regression 仍使用行为 Engine/SPAD。剩余全引擎场景、CNM parity/bank-lane、request backpressure、独立全引擎 owner/memory scoreboard 与覆盖闭环尚未完成。
 - **DC/PPA**：固定工艺角、SRAM latency/timing model 和 250 MHz SDC；DC V-2023.12-SP1 可执行文件已安装，但综合被许可证错误 `DCSH-1: Design Compiler is not enabled` 拒绝；私有 TSMC standard-cell/SRAM 库也未配置，因此面积、Fmax、功耗和目标工艺 PPA 暂无证据。
 - **Transformer/KV**：已有 operator primitive 和映射 smoke；还需独立 Tiny Decoder Golden、Head/Token/Prefill/Decode 数据布局及端到端对拍。
 - **P2 fusion**：定义 GEMM 到 SFU 的流接口、背压、Abort、结果顺序与 SPAD ownership 后再实现 streaming path。
 
 ## 5. 规格和产品边界
 
-本次没有改变 descriptor ABI、opcode 或软件接口。top Matrix path 已默认使用 16×16 MAC array，并由实际 Matrix controller 完成 SPAD→array→SPAD 的 16×16 与跨宏 tile GEMM；这不等于 Compute Cluster UVM、预取/overlap、DC/PPA 或整体 signoff 完成。
+本次没有改变 descriptor ABI、opcode 或软件接口。top Matrix path 默认使用 16×16 MAC array，实际完成 SPAD→array→SPAD GEMM；Banked Read 支持 2/4 深度，next-K ping-pong 预取与 MAC 重叠、K≤64 A-tile reuse 均有 block/top 定向验证。这不等于完整 Compute Cluster UVM、FSM/code-coverage closure、DC/PPA 或整体 signoff 完成。

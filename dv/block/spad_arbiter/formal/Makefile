@@ -18,7 +18,7 @@ check:
 		{ echo "SPAD arbiter invariant proof gate failed; inspect $(FORMAL_LOG)"; exit 1; }
 	@grep -Fq -- "- # non_vacuous  : 8" "$(FORMAL_LOG)" || \
 		{ echo "SPAD arbiter invariant vacuity gate failed; inspect $(FORMAL_LOG)"; exit 1; }
-	@grep -Fq -- "- # covered      : 4" "$(FORMAL_LOG)" || \
+	@grep -Fq -- "- # covered      : 5" "$(FORMAL_LOG)" || \
 		{ echo "SPAD arbiter invariant cover gate failed; inspect $(FORMAL_LOG)"; exit 1; }
 	@grep -Fq "No setup issues found" "$(FORMAL_LOG)" || \
 		{ echo "SPAD arbiter formal setup gate failed; inspect $(FORMAL_LOG)"; exit 1; }

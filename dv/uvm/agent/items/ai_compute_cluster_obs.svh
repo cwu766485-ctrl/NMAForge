@@ -10,6 +10,8 @@ class ai_compute_cluster_obs extends uvm_sequence_item;
     bit core_spad_valid;
     bit banked_valid;
     bit [3:0] cnm_valid;
+    bit matrix_prefetch_active;
+    bit matrix_a_cache_hit;
     bit rsp_valid;
     bit [2:0] rsp_client;
     bit [2:0] request_client;
