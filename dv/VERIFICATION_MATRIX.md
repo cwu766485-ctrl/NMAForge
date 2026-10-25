@@ -25,6 +25,27 @@
 > [validation history](../docs/verification/COMPUTE_ENGINE_BLOCK_VALIDATION_2026-10-23.md),
 > and [per-module status](../docs/verification/COMPUTE_ENGINE_STATUS.md).
 
+> **2026-10-24 FSM and parallel-dispatch follow-up:** SFU random-latency
+> regression passed seeds `20261024/20261025/20261026`; every seed visited all
+> 39 encoded states through asynchronous reset and all 39 through Abort, plus
+> the RMSNorm gamma-bypass transition. VCS V-2023.12-SP1 / URG reports
+> `ai_tensor_sfu_core.state_r` transitions 139/139 (100%). Re-merging the
+> existing compute block/top VDBs with the refreshed SFU database gives
+> 258/339 (76.11%) weighted transitions across the nine FSM-bearing
+> `rtl/compute` modules, up from 185/339 (54.57%) on the same parsed baseline.
+> Remaining transition bins are in Tile Pipeline 6/30, INT8 19/36, Matrix
+> 26/39, bank-local controller 15/23, CNM 13/18, Conv line buffer 18/29,
+> Mixed-FP 12/14, and KV 12/15; this is targeted FSM closure, not full code or
+> functional closure. New Dispatcher/SPAD-MUX UVM regression passed seeds
+> `20261024/20261025/20261026`: 21/21 engine-pair overlaps and 5/5 scenario
+> bins each seed, UVM warning/error/fatal `0/0/0`. It instantiates the real
+> dispatcher and real 32-bit compute SPAD mux with behavioral Engine/SPAD
+> models; it does not cover `ai_spad_arbiter`, four-bank SRAM, CNM/Matrix side
+> channels, or concurrent memory-image conflicts. The following top `ai_smoke`
+> also passed. Exact commands and artifacts are recorded in the Compute
+> Cluster UVM Testplan and `/tmp/nmaforge_{sfu_fsm_converge_multi_20261024,
+> parallel_compute_uvm_20261024}`.
+
 > **2026-10-19 exact-SHA CP randomized full-width payload replay (`cd50605`):**
 > Clean detached worktree passed focused reproducibility plus 200/200 CP UVM/
 > URG seeds, each with 32/32 scenario markers and UVM severity `0/0/0`.
@@ -636,7 +657,7 @@ and [`A10_DV_RTM.md`](../docs/verification/A10_DV_RTM.md).
 | 5 | Block | CNM / Matrix / SFU / CNN-KV | INT8 算法正确性、边界值、transpose、量化、Softmax/Norm、卷积窗口、KV 地址 | 与 Python bit-aware golden 匹配；无死锁、无越界 |
 | 6 | Subsystem | DMA–SPAD | DMA 通过 arbiter 访问真实 scratchpad，同时叠加 compute-like client | 数据正确、仲裁正确、protection/error 可恢复 |
 | 7 | Subsystem | Queue–completion | AXI-Lite 配置 → CMDQ → processor → completion writer | completion 四个 word 完成后才推进 tail；reset/abort 正确 |
-| 8 | Subsystem | Multi-Engine NPU Compute Cluster Verification | Five compute groups through real top dispatch; shared-SPAD concurrency; per-engine slot and ordered-completion checks; all `rtl/compute` module coverage | Latest 2026-10-23 `cluster_regress` (`parallel_final_20261023`) generated the merged multi-seed URG report. Direct seeded compute tests, 10-seed DMA–SPAD–CNM UVM, five-seed top smoke, serial formal, and merged URG passed. All 23 `rtl/compute` module definitions are reported; 20 have executable bins and 3 wiring wrappers are N/A. Weighted line/condition/FSM/branch=`92.69/90.00/54.67/87.31%`; five-seed top-only compute slice=`83.79/66.39/41.60/69.19%`. Each of the 21 unordered engine pairs overlaps and passes ordered abort drain in top smoke. Dispatcher formal proves 5/5 assertions and reaches 23/23 covers (4 antecedent properties non-vacuous). Full-domain FP writeback exclusion is proven; the FP six-property unassisted lifecycle remains 3/6 and project-wide closure remains partial. [Status](../docs/verification/COMPUTE_ENGINE_STATUS.md) / [Interaction run record](../docs/verification/COMPUTE_ENGINE_INTERACTION_FOLLOWUP_2026-10-23.md) |
+| 8 | Subsystem | Multi-Engine NPU Compute Cluster Verification | Five compute groups through real top dispatch; shared-SPAD concurrency; per-engine slot and ordered-completion checks; all `rtl/compute` module coverage | The 2026-10-23 full `cluster_regress` VDB merge remains the source for the listed line/condition/branch numbers. It reports 23 `rtl/compute` module definitions, 20 executable and 3 wiring wrappers N/A; weighted line/condition/FSM/branch=`92.69/90.00/54.67/87.31%`; five-seed top-only compute slice=`83.79/66.39/41.60/69.19%`. The targeted 2026-10-24 SFU-refresh re-merge updates the compute FSM weighted value to 76.11% (258/339; nine FSM-bearing modules), and the new three-seed Dispatcher/SPAD-MUX UVM reaches 21/21 overlap pairs + 5/5 scenario bins per seed. The 2026-10-25 parameterized Matrix array milestone is tracked separately: 8×8/16×16 direct DUT-only coverage is 100.00% line/100.00% condition/94.12% branch with 100% functional coverage, while descriptor/SPAD integration remains open. These additions do not recalculate the older full-merge line/condition/branch values and do not close full C0/C1. Each engine pair also overlaps and passes ordered abort drain in top smoke. Dispatcher formal proves 5/5 assertions and reaches 23/23 covers (4 antecedent properties non-vacuous). Full-domain FP writeback exclusion is proven; the FP six-property unassisted lifecycle remains 3/6 and project-wide closure remains partial. [Status](../docs/verification/COMPUTE_ENGINE_STATUS.md) / [Interaction run record](../docs/verification/COMPUTE_ENGINE_INTERACTION_FOLLOWUP_2026-10-23.md) / [Compute Cluster Testplan](../docs/verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md) / [Upgrade roadmap](../docs/verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md) |
 | 9 | Top UVM | `ai_accel_top` | 软件可见 ABI、随机 CMDQ、乱序 DDR、IRQ、reset、Transformer command-chain | 端到端结果、completion、错误恢复、性能计数器一致 |
 | 10 | 静态/形式/覆盖率 | 全 RTL | SpyGlass lint/CDC/RDC、关键 SVA formal、functional/code coverage closure | P0 lint 清零或有 waiver；CDC/RDC 收口；coverage 达标 |
 | 11 | FPGA/板级 | XCZU15EG | bitstream、DDR DMA、IRQ、ILA、性能计数器、长时间稳定性 | 实测数据与仿真一致，日志与性能报告归档 |

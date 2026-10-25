@@ -1,12 +1,16 @@
 VCS ?= vcs -licwait 1
+URG ?= /opt/Synopsys/vcs/V-2023.12-SP1/bin/urg
 SEED ?= 20261021
 OUT_DIR ?= /tmp/nmaforge_matrix_datapath_$(SEED)
 CORE_OUT_DIR ?= /tmp/nmaforge_matrix_core_$(SEED)
+ARRAY_OUT_DIR ?= /tmp/nmaforge_matrix_array_20261025
+ARRAY_SEEDS ?= 20261025 20261026 20261027
+ARRAY_SIZES ?= 8 16
 COV_METRICS := line+cond+fsm+branch
 
 .PHONY: datapath-random-test datapath-random-compile datapath-random-run \
 	core-random-test core-random-compile core-random-run a3-core-test \
-	datapath-random-regress core-random-regress
+	datapath-random-regress core-random-regress array-random-regress
 
 datapath-random-test: datapath-random-run
 
@@ -48,6 +52,7 @@ core-random-compile:
 		-Mdir=$(CORE_OUT_DIR)/csrc \
 		-top tb_ai_tensor_matrix_core_random \
 		../../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v \
+		../../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv \
 		../../../../../rtl/compute/matrix/ai_tensor_matrix_core.v \
 		../tb/tb_ai_tensor_matrix_core_random.sv \
 		-o $(CORE_OUT_DIR)/simv -l $(CORE_OUT_DIR)/compile.log
@@ -63,4 +68,23 @@ core-random-regress: core-random-compile
 			-cm_dir $(CORE_OUT_DIR)/coverage.vdb -cm_name matrix_core_seed_$$seed \
 			-l $(CORE_OUT_DIR)/run_seed_$$seed.log; \
 		grep -q "^MATRIX_CORE_RANDOM_PASS cases=6 faults=12 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 seed=$$seed " $(CORE_OUT_DIR)/run_seed_$$seed.log; \
+	done
+
+array-random-regress:
+	@set -e; for size in $(ARRAY_SIZES); do \
+		out=$(ARRAY_OUT_DIR)/size_$$size; mkdir -p $$out; \
+		$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+			-cm $(COV_METRICS) -cm_hier $(CURDIR)/matrix_array.cm_hier \
+			-cm_dir $$out/coverage.vdb -Mdir=$$out/csrc \
+			+define+ARRAY_SIZE=$$size -top tb_ai_tensor_matrix_array \
+			../../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv \
+			../tb/tb_ai_tensor_matrix_array.sv \
+			-o $$out/simv -l $$out/compile.log; \
+		for seed in $(ARRAY_SEEDS); do \
+			$$out/simv +SEED=$$seed -cm $(COV_METRICS) \
+				-cm_dir $$out/coverage.vdb -cm_name matrix_array_$${size}_seed_$$seed \
+				-l $$out/run_seed_$$seed.log; \
+			grep -q "^MATRIX_ARRAY_PASS size=$$size cases=4 saturation=2 overlapped_loads=25 functional_coverage=100.00 seed=$$seed$$" $$out/run_seed_$$seed.log; \
+		done; \
+		$(URG) -full64 -dir $$out/coverage.vdb -format text -report $$out/urg -log $$out/urg.log; \
 	done

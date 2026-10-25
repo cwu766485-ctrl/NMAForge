@@ -1,18 +1,45 @@
 # Compute-engine verification status
 
-Status date: 2026-10-24. The current worktree completed the expanded
-multi-engine regression. This is targeted functional and raw DUT code-coverage
-evidence; it is not full signoff.
+Status date: 2026-10-25. The current worktree completed the expanded
+multi-engine regression, an SFU transition-closure sweep, a focused
+Dispatcher/SPAD-MUX UVM test, and the first parameterized Matrix MAC-array
+milestone. This is targeted functional and raw DUT code-coverage evidence;
+it is not full signoff.
+
+The group/compute aggregate figures below remain the 2026-10-23/24 merge and
+were not recomputed with the new Matrix array RTL. Current Matrix 4×4
+integration and standalone 8×8/16×16 evidence are reported separately here:
+[Compute Cluster upgrade roadmap](COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md).
+
+## 2026-10-25 P0 Matrix array milestone
+
+`ai_tensor_matrix_core` now uses `ai_tensor_matrix_array` at `ARRAY_SIZE=4`;
+the existing descriptor-facing 4×4 data layout remains in place. Three core
+seeds (`20261021/20261022/20261023`) pass the existing six arithmetic/layout
+cases, twelve faults/interactions, late-tile parity, abort/reset combinations,
+and recovery. The current core-scoped URG report is
+88.05% line / 87.30% condition / 64.10% FSM transitions / 87.50% branch for
+`ai_tensor_matrix_core`; the embedded array's exercised 4×4 code bins are
+82.35% line / 20.00% condition / 58.82% branch.
+
+Direct array tests elaborate the same RTL at 8×8 and 16×16, with seeds
+`20261025/20261026/20261027` for each size. Every seed passes four K lengths,
+four pre-packed A/B transpose layouts, all N×N accumulator checks, 25
+ping-pong load/MAC overlaps, and positive/negative INT32 saturation. Each
+size reports 100.00% line, 100.00% condition, 94.12% branch, FSM N/A, and
+100.00% functional group coverage. This is an array-block result: 8×8/16×16
+address generation, SPAD prefetch/arbitration, descriptor control and top
+integration are still open. Exact source-to-test trace is in the roadmap.
 
 ## Five compute groups
 
-| Group | Multi-seed functional evidence | Group aggregate line / condition / FSM / branch | Current disposition |
+| Group | Multi-seed functional evidence | Historical group aggregate line / condition / FSM / branch | Current disposition |
 |---|---|---|---|
 | **CNM** | Per seed: 8 signed INT8 oracle lengths plus recovery; 6 isolated fault exits. Follow-up adds parity/protection + abort priority, reset with faults asserted, and parity after 128 accepted request slots in a length-256 task. A2.2/GEMV and 10-seed DMA–SPAD–CNM UVM also pass. | **97.06% / 90.54% / 68.29% / 85.71%** across core, controllers, and bank PE | Selected interaction paths pass. Other multi-fault/abort/reset orders and independent per-bank ready stalls remain open. |
 | **CNN/KV** | Per seed: 25 convolution cases across 3–6 row/column shapes, including 12 depthwise opcodes; 27 KV round-trip/address cases. Full 512 KiB model, KV lengths 1–128, aligned strides 0–1020, address-boundary placement, late faults, abort+SPAD error, and reset under active fault inputs. | **100.00% / 90.37% / 68.18% / 97.10%** across convolution and KV engines | Selected address/lifecycle combinations pass. Exhaustive stride/configuration cross-products and every long-transaction error/reset case remain open. |
 | **FP** | Three mixed-format UVM seeds: 212/212 bit-exact transactions each; parity+abort same-response and reset while abort/parity active pass in direct tests. BF16 wrapper and FP16/BF16 add/sub reference sweeps pass. Full-length BF16/FP16 max-parity simulation passes; isolated full-domain `ST_WRITE` exclusion proves non-vacuously with 2/2 parity covers. | **96.90% / 95.13% / 85.71% / 92.51%** across FP arithmetic and both add/sub parameterizations | Full-domain parity-to-writeback exclusion is proven for every nonzero 16-bit length under the documented legal-input contract. The full-domain progress-bound property remains open. |
 | **Matrix** | Each of 3 seeds: 10,072 datapath vectors, 6 core arithmetic/layout cases, and 12 fault/interaction checks. Multi-fault + abort priority, reset with faults active, and late parity after 20 completed output lines pass. A3 core benchmark passes. | **88.02% / 89.39% / 66.67% / 88.49%** across matrix core and datapath | Selected combinations pass. Other fault permutations and late faults at every tile boundary remain open. |
-| **SFU** | Per seed: 64 vectors across all 8 opcodes and lengths 1/2/3/4/7/8/15/16; 8 error/interactions. Late parity after response 8/16, watchdog+parity+protection+abort priority, and reset with fault inputs active pass. Causal query token zero remains covered at lengths 1 and 7. | **86.45% / 88.30% / 47.48% / 82.81%** across SFU core, math, divider, and square root | Selected arithmetic, interaction, drain, and reset paths pass. Numeric-error reachability and other fault/reset combinations remain open. |
+| **SFU** | Per seed: 64 vectors across all 8 opcodes and lengths 1/2/3/4/7/8/15/16; 8 error/interactions. The 2026-10-24 sweep adds all 39 encoded state reset probes, all 39 state-to-ERR_ABORT probes, and RMSNorm gamma bypass. Late parity after response 8/16 and existing fault/reset interactions pass. | **86.45% / 88.30% / 100.00% / 82.81%** group line/condition/FSM/branch; only FSM is refreshed in the new merge. Core `state_r` is **139/139 transitions**. | All SFU FSM transitions reached in the three-seed updated regression. Other line/condition/branch bins, numeric-error reachability, and fault/reset combinations remain open. |
 
 The group percentages are weighted by hit/total bins over each group's RTL
 modules and elaborated parameter variants. They are VCS/URG code-bin coverage,
@@ -62,8 +89,16 @@ average of module percentages.
 
 | Coverage view | Line | Condition | FSM transitions | Branch |
 |---|---:|---:|---:|---:|
-| **All `rtl/compute` bins, focused tests plus five top seeds** | **92.69%** | **90.00%** | **54.67%** | **87.31%** |
+| **All `rtl/compute` bins, focused tests plus five top seeds (2026-10-23 merge)** | **92.69%** | **90.00%** | **54.67%** | **87.31%** |
 | Five-seed top DUT-only `rtl/compute` slice | 83.79% | 66.39% | 41.60% | 69.19% |
+
+The 2026-10-24 overlay replaces the SFU input database with three refreshed
+seeds and recomputes the transition total over the nine stateful
+`rtl/compute` module definitions: 258/339 = **76.11%**, up from 185/339 =
+54.57% on the same parsed scope. This compute-only FSM value is a targeted
+overlay and does not recalculate line/condition/branch or the historical
+five-seed top-only slice above. The two FSM views differ in module scope and
+weighting; do not mix them as one dashboard.
 
 Merged totals are 2,002/2,160 line bins, 1,449/1,610 condition bins,
 205/375 FSM transitions, and 681/780 branch bins. Top-only totals are
@@ -90,7 +125,7 @@ Per-module raw coverage:
 | FP | `ai_fp16_addsub` | N/A | N/A | N/A | N/A |
 | Matrix | `ai_tensor_matrix_core` | 87.19% | 88.03% | 66.67% | 84.31% |
 | Matrix | `ai_tensor_matrix_datapath` | 100.00% | 100.00% | N/A | 100.00% |
-| SFU | `ai_tensor_sfu_core` | 84.47% | 88.62% | 47.48% | 81.21% |
+| SFU | `ai_tensor_sfu_core` | 84.47% | 88.62% | 100.00% | 81.21% |
 | SFU | `ai_tensor_sfu_math` | 100.00% | 100.00% | N/A | 100.00% |
 | SFU helper | `ai_unsigned_divider` | 91.43% | 88.89% | N/A | 87.50% |
 | SFU helper | `ai_integer_sqrt` | 96.55% | 83.33% | N/A | 90.00% |

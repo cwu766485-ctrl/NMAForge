@@ -1,6 +1,6 @@
 # NMAForge 架构说明
 
-**状态：按 2026-10-23 RTL 层次核对。** 本文说明已接入 `ai_accel_top` 的模块所有权与数据流；
+**状态：按 2026-10-25 RTL 层次核对。** 本文说明已接入 `ai_accel_top` 的模块所有权与数据流；
 验证收敛、PPA、后布局和板级状态分别以文末链接的专题报告为准。
 
 ## 1. 项目范围
@@ -166,6 +166,12 @@ scratchpad 读请求；响应按请求顺序归属，不支持无序响应。每
 它们复用既有 `ai_command_processor` 命令生命周期和 `ai_completion_writer` 完成提交
 路径，不新增 scratchpad bypass，也不改变 completion ABI。
 
+Matrix 产品命令路径仍按 4×4 tile 工作。`ai_tensor_matrix_core` 已复用
+`ai_tensor_matrix_array` 的 `ARRAY_SIZE=4` 配置；同一模块的 8×8、16×16 参数实例已有
+block-level bit-exact 回归，但尚未接入 Matrix controller 的地址生成和实际 SPAD 数据流，
+不能把它们写成 top 已支持的 descriptor 尺寸。实现与覆盖边界见
+[Compute Cluster 升级路线](../verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md)。
+
 ABI v7.2 曾增加 PACK_I8 layout bridge，现有 `sw/tools/cimforge_mapper.py` 可用它形成
 Transformer 微型命令链：
 
@@ -212,7 +218,7 @@ pre-layout 结果见 [TSMC28_SYNTHESIS_REPORT.md](../verification/TSMC28_SYNTHES
 | Local PE | `ai_bank_pe` | 是，CNM/基线核子模块 | 一个 32-bit packed INT8 dot4 乘加单元。 |
 | 混合精度点积核 | `ai_mixed_precision_dot_fp32_core` | 是 | `0x50` BF16 与 `0x51` FP16 共享控制、arbiter-owned 32-bit core SPAD 口和 FP32 顺序累加；按序读 A/B 并写回一个结果 word。 |
 | BF16 兼容包装器 | `ai_bf16_dot_fp32_core` | 否（兼容/独立验证） | 固定选择 BF16 格式的旧接口包装器；顶层产品路径使用混合精度核心。 |
-| 矩阵核 | `ai_tensor_matrix_core` | 是 | 4×4 INT8 matrix tile，支持 GEMM、Batch GEMM、转置、bias、激活、量化与 line 写回。 |
+| 矩阵核 | `ai_tensor_matrix_core` + `ai_tensor_matrix_array` | 是 | 命令路径使用 4×4 INT8 tile；阵列模块参数支持 8×8/16×16，direct block 验证已过，较大配置尚未接入 SPAD controller。 |
 | SFU | `ai_tensor_sfu_core` | 是 | Softmax、causal Softmax、RMSNorm、LayerNorm、Residual、GELU、SiLU、requant。 |
 | 除法器 | `ai_unsigned_divider` | 是，SFU 子模块 | 用于 Softmax 归一化等定点除法。 |
 | 整数开方 | `ai_integer_sqrt` | 是，SFU 子模块 | 用于 RMSNorm/LayerNorm 的均方根或方差相关计算。 |
@@ -225,4 +231,5 @@ pre-layout 结果见 [TSMC28_SYNTHESIS_REPORT.md](../verification/TSMC28_SYNTHES
 当前 RTL 是已通过 directed/smoke 和已执行 block-UVM 基础回归的 pre-sign-off baseline；
 它不是 UVM coverage、formal、LEC、后布局或实板签核完成的设计。下一步优先补
 CMDQ/CPLQ、scratchpad arbiter、tensor datapath 的 UVM scoreboard/coverage，再做
-多 seed 回归、Formal、LEC、DFT 与增量 DC/SpyGlass。
+多 seed 回归、Formal、LEC、DFT 与增量 DC/SpyGlass。Matrix 8×8/16×16 controller 接入、
+真实 Weight/Activation SPAD dataflow 与 PPA 目标见[升级路线](../verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md)。

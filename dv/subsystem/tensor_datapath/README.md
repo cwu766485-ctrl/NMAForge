@@ -32,8 +32,8 @@ The aggregate runs:
 6. Three seeded BF16 compatibility-wrapper runs, three seeded FP16/BF16 add/sub
    runs with 20,032 reference vectors each, three 212-transaction mixed-format
    FP UVM runs, FP parity checks, and FP reference tests.
-7. A4 reference tests, top smoke with 20 seeded INT8 cases, and formal proof of
-   serial dispatch across the seven-engine cluster.
+7. A4 reference tests, top smoke with 20 seeded INT8 cases, and the legacy
+   compute-cluster engine-selection/onehot formal harness.
 8. Five top DUT coverage seeds plus three-seed code coverage for each direct
    compute block. URG merges matching module definitions and includes the
    command processor's `ai_tile_pipeline` instance in the top scope.
@@ -45,20 +45,24 @@ per-seed artifacts are moved there after the regression.
 
 ## Current result
 
-The 2026-10-23 multi-seed run completed with
+The 2026-10-23 multi-seed aggregate completed with
 `MULTI_ENGINE_COMPUTE_CLUSTER_PASS`. DUT-only merged VCS/URG coverage covers
 all 23 definitions in `rtl/compute`; the report also includes
 `ai_accel_compute_cluster`. Merged module-definition line/condition/FSM/branch
-coverage is 92.17% / 88.59% / 52.00% / 86.00%; the top-only five-seed view is
-74.99% / 64.87% / 30.93% / 61.36%. This is raw partial code coverage, not
-closure or signoff. Detailed per-module metrics, functional counts, command,
-and residual work are in the
+coverage is recorded in the current status report. This is raw partial code
+coverage, not closure or signoff. Detailed per-module metrics, functional
+counts, command, and residual work are in the
 [compute-engine status](../../../docs/verification/COMPUTE_ENGINE_STATUS.md)
 and [2026-10-23 validation record](../../../docs/verification/COMPUTE_ENGINE_BLOCK_VALIDATION_2026-10-23.md).
 
-The command processor dispatches one compute command at a time. Formal proves
-the selected serial-dispatch and onehot ownership properties and reaches all
-seven engine covers; it does not prove arithmetic or full-top behavior.
-Simultaneous engine starts remain unsupported. Multi-fault × abort × reset
-combinations, residual raw bins, full-domain FP parity proof, and project-wide
-UVM/formal/LEC/DFT closure remain open.
+At the top level, `ai_parallel_compute_dispatcher` keeps one active command per
+engine: different engines overlap, while CMDQ issue and CPLQ retirement remain
+ordered. Formal `dispatcher-pairs` proves five properties and reaches 23/23
+engine-pair/abort covers. The 2026-10-24 Dispatcher/SPAD-MUX UVM run passes
+three seeds with 21/21 engine pairs and all five focused scenarios per seed;
+it uses behavioral engines/SPAD and does not replace full Compute Cluster,
+SPAD Arbiter, or four-bank SRAM verification. Same-cycle Done is supported for
+different engines. Multi-fault × abort × reset combinations, residual raw bins,
+full-domain FP progress proof, and project-wide UVM/formal/LEC/DFT closure
+remain open. See [Compute Cluster SPEC v1.1](../../../docs/spec/COMPUTE_CLUSTER_SPEC_ZH.md)
+and its [UVM Testplan](../../../docs/verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md).

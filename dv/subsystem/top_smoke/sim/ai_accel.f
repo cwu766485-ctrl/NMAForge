@@ -25,6 +25,7 @@
 ../../../../rtl/compute/common/ai_integer_sqrt.v
 ../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v
 ../../../../rtl/compute/matrix/ai_tensor_matrix_core.v
+../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv
 ../../../../rtl/compute/sfu/ai_tensor_sfu_math.v
 ../../../../rtl/compute/sfu/ai_tensor_sfu_core.v
 ../../../../rtl/compute/cnn/ai_conv3x3_linebuffer_core.v

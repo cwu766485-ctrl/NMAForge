@@ -1,4 +1,5 @@
 VCS ?= vcs -licwait 1
+VCS_BIN ?= /opt/Synopsys/vcs/V-2023.12-SP1/bin/vcs
 URG ?= /opt/Synopsys/vcs/V-2023.12-SP1/bin/urg
 CLUSTER_TAG ?= multi_engine_$(shell date +%Y%m%d_%H%M%S)
 CLUSTER_OUT ?= /tmp/nmaforge_compute_cluster_$(CLUSTER_TAG)
@@ -30,11 +31,51 @@ CLUSTER_EXTRA_COV_DBS := $(CLUSTER_OUT)/cnm/random/coverage.vdb \
 	$(CLUSTER_OUT)/fp/addsub_dut_codecov/coverage.vdb \
 	$(foreach seed,$(FP_SEEDS),$(CLUSTER_OUT)/fp/seed_$(seed)/coverage.vdb)
 
-.PHONY: cluster_regress
+.PHONY: cluster_regress parallel-uvm parallel-uvm-compile parallel-uvm-regress
 
-# Multi-Engine NPU Compute Cluster Verification. The command processor
-# dispatches one compute engine at a time; the DMA/SPAD subsystem phase adds
-# real DMA overlap with FP/CNM traffic at the shared memory fabric.
+PARALLEL_SEED ?= 20261024
+PARALLEL_SEEDS ?= 20261024 20261025 20261026
+PARALLEL_OUT ?= /tmp/nmaforge_parallel_compute_uvm
+PARALLEL_COV_METRICS ?= line+cond+fsm+branch
+
+parallel-uvm-compile:
+	mkdir -p $(PARALLEL_OUT)
+	$(VCS_BIN) -full64 -sverilog -ntb_opts uvm-1.2 -debug_access+all \
+		-timescale=1ns/1ps +define+VCS -cm $(PARALLEL_COV_METRICS) \
+		-cm_dir $(PARALLEL_OUT)/coverage.vdb -Mdir=$(PARALLEL_OUT)/csrc \
+		-top tb_ai_parallel_compute_uvm -f ../uvm/ai_parallel_compute_uvm.f \
+		-o $(PARALLEL_OUT)/simv_parallel_uvm -l $(PARALLEL_OUT)/compile.log
+
+parallel-uvm: parallel-uvm-compile
+	$(PARALLEL_OUT)/simv_parallel_uvm +UVM_TESTNAME=ai_parallel_compute_uvm_test \
+		+PARALLEL_SEED=$(PARALLEL_SEED) +ntb_random_seed=$(PARALLEL_SEED) \
+		-cm $(PARALLEL_COV_METRICS) -cm_dir $(PARALLEL_OUT)/coverage.vdb \
+		-cm_name parallel_seed_$(PARALLEL_SEED) -l $(PARALLEL_OUT)/run_$(PARALLEL_SEED).log
+	@grep -q '\[PARALLEL_UVM_COVERAGE_PASS\].*engine_pairs=100.0% scenarios=100.0%' $(PARALLEL_OUT)/run_$(PARALLEL_SEED).log || { echo "ERROR: parallel functional coverage did not reach 100%"; exit 1; }
+	@grep -q '\[PARALLEL_DISPATCH_SPAD_UVM_PASS\]' $(PARALLEL_OUT)/run_$(PARALLEL_SEED).log || { echo "ERROR: parallel compute UVM campaign marker missing"; exit 1; }
+	@grep -q '\[PARALLEL_UVM_ALL_ENGINE_PAIR_PASS\].*unordered_pairs=21/21' $(PARALLEL_OUT)/run_$(PARALLEL_SEED).log || { echo "ERROR: all 21 engine-pair overlaps were not observed"; exit 1; }
+	@! grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' $(PARALLEL_OUT)/run_$(PARALLEL_SEED).log || { echo "ERROR: UVM warning/error/fatal count is nonzero"; exit 1; }
+	$(URG) -full64 -dir $(PARALLEL_OUT)/coverage.vdb -format text \
+		-report $(PARALLEL_OUT)/urg -log $(PARALLEL_OUT)/urg.log
+
+parallel-uvm-regress: parallel-uvm-compile
+	@set -e; for seed in $(PARALLEL_SEEDS); do \
+		log=$(PARALLEL_OUT)/run_$$seed.log; \
+		$(PARALLEL_OUT)/simv_parallel_uvm +UVM_TESTNAME=ai_parallel_compute_uvm_test \
+			+PARALLEL_SEED=$$seed +ntb_random_seed=$$seed \
+			-cm $(PARALLEL_COV_METRICS) -cm_dir $(PARALLEL_OUT)/coverage.vdb \
+			-cm_name parallel_seed_$$seed -l $$log; \
+		grep -q '\[PARALLEL_DISPATCH_SPAD_UVM_PASS\]' $$log; \
+		grep -q '\[PARALLEL_UVM_COVERAGE_PASS\].*engine_pairs=100.0% scenarios=100.0%' $$log; \
+		grep -q '\[PARALLEL_UVM_ALL_ENGINE_PAIR_PASS\].*unordered_pairs=21/21' $$log; \
+		! grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' $$log; \
+	done
+	$(URG) -full64 -dir $(PARALLEL_OUT)/coverage.vdb -format text \
+		-report $(PARALLEL_OUT)/urg -log $(PARALLEL_OUT)/urg.log
+
+# Multi-Engine NPU Compute Cluster Verification. CMDQ descriptors issue in
+# order while distinct engines may be active concurrently; the DMA/SPAD phase
+# adds real DMA overlap with FP/CNM traffic at the shared memory fabric.
 cluster_regress:
 	$(MAKE) -C $(TOP_SMOKE) ai_a7_vcs
 	$(MAKE) -C $(TOP_SMOKE) ai_cnm_a22 ai_cnm_a2_gemv_bench ai_cnm_random_regress \

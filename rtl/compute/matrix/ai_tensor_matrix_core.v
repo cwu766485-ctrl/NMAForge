@@ -129,8 +129,20 @@ module ai_tensor_matrix_core(
     reg prefetch_a_pending_r, prefetch_b_pending_r;
     reg prefetch_a_valid_r, prefetch_b_valid_r;
     reg signed [31:0] bias0_r, bias1_r, bias2_r, bias3_r;
-    reg signed [63:0] acc_r [0:15];
-    integer i;
+    wire [4*4*64-1:0] array_accumulator_vector;
+    wire signed [63:0] array_accumulator0 =
+        array_accumulator_vector[write_idx_r*64 +: 64];
+    wire signed [63:0] array_accumulator1 =
+        array_accumulator_vector[(write_idx_r+1)*64 +: 64];
+    wire signed [63:0] array_accumulator2 =
+        array_accumulator_vector[(write_idx_r+2)*64 +: 64];
+    wire signed [63:0] array_accumulator3 =
+        array_accumulator_vector[(write_idx_r+3)*64 +: 64];
+    reg [31:0] array_load_a;
+    reg [31:0] array_load_b;
+    reg [1:0] array_load_lane;
+    reg [31:0] array_load_b0, array_load_b1, array_load_b2, array_load_b3;
+    integer vector_i;
 
     wire [15:0] m_tiles = m_r >> 2;
     wire [15:0] n_tiles = n_r >> 2;
@@ -139,6 +151,34 @@ module ai_tensor_matrix_core(
     wire [31:0] b_read_addr = b_tile_base_r + ({16'd0, k_group_r} << 4);
     wire [31:0] next_a_read_addr = a_tile_base_r + ({16'd0, k_group_r + 1'b1} << 4);
     wire [31:0] next_b_read_addr = b_tile_base_r + ({16'd0, k_group_r + 1'b1} << 4);
+    function [7:0] matrix_tile_element;
+        input [31:0] w0;
+        input [31:0] w1;
+        input [31:0] w2;
+        input [31:0] w3;
+        input [1:0] major;
+        input [1:0] k_lane;
+        input transpose;
+        reg [31:0] selected_word;
+        reg [1:0] word_index;
+        reg [1:0] byte_index;
+        begin
+            word_index = transpose ? k_lane : major;
+            byte_index = transpose ? major : k_lane;
+            case (word_index)
+                2'd0: selected_word = w0;
+                2'd1: selected_word = w1;
+                2'd2: selected_word = w2;
+                default: selected_word = w3;
+            endcase
+            case (byte_index)
+                2'd0: matrix_tile_element = selected_word[7:0];
+                2'd1: matrix_tile_element = selected_word[15:8];
+                2'd2: matrix_tile_element = selected_word[23:16];
+                default: matrix_tile_element = selected_word[31:24];
+            endcase
+        end
+    endfunction
     wire [31:0] write_row_offset = (write_idx_r[3:2] == 2'd0) ? 32'd0 :
                                    (write_idx_r[3:2] == 2'd1) ? dst_row_stride_r :
                                    (write_idx_r[3:2] == 2'd2) ? (dst_row_stride_r << 1) :
@@ -167,34 +207,133 @@ module ai_tensor_matrix_core(
     assign line_write = 1'b1;
     assign line_wstrb = 16'hffff;
 
-    // Arithmetic is stateless and isolated from the request/response FSM.
-    // Keep the local product array so the existing accumulator update loop
-    // retains its exact cycle and index behavior.
-    wire signed [15:0] product [0:15];
+    // The production 4x4 command core and the scalable 8x8/16x16 block share
+    // the same output-stationary MAC-array implementation.
     wire [31:0] post_scalar, post0, post1, post2, post3;
     wire signed [31:0] scalar_bias = (write_idx_r[1:0] == 2'd0) ? bias0_r :
                                      (write_idx_r[1:0] == 2'd1) ? bias1_r :
                                      (write_idx_r[1:0] == 2'd2) ? bias2_r : bias3_r;
+    wire array_buffer_write_valid =
+        (((state_r == ST_B_WAIT) && banked_rsp_valid &&
+          !bank_response_has_parity_error) ||
+         ((state_r == ST_PREFETCH_WAIT) && prefetch_a_valid_r &&
+          prefetch_b_valid_r) ||
+         ((state_r == ST_MAC) && (lane_r != 2'd3))) &&
+        !abort && !watchdog_expired;
+    wire array_mac_enable = (state_r == ST_MAC) && !abort && !watchdog_expired;
+    wire array_clear_accumulators = ((state_r == ST_IDLE) && start) ||
+                                    (state_r == ST_NEXT);
+    wire array_buffer_write_bank =
+        ((state_r == ST_B_WAIT) || (state_r == ST_PREFETCH_WAIT)) ?
+        1'b0 : ~lane_r[0];
+    wire signed [63:0] array_selected_accumulator;
+    wire [31:0] array_selected_result;
+    wire array_selected_overflow;
+
+    always @* begin
+        array_load_lane = ((state_r == ST_B_WAIT) ||
+                           (state_r == ST_PREFETCH_WAIT)) ? 2'd0 : lane_r + 1'b1;
+        array_load_b0 = (state_r == ST_B_WAIT) ? bank0_data : b0_r;
+        array_load_b1 = (state_r == ST_B_WAIT) ? bank1_data : b1_r;
+        array_load_b2 = (state_r == ST_B_WAIT) ? bank2_data : b2_r;
+        array_load_b3 = (state_r == ST_B_WAIT) ? bank3_data : b3_r;
+        if (state_r == ST_PREFETCH_WAIT) begin
+            array_load_b0 = pre_b0_r;
+            array_load_b1 = pre_b1_r;
+            array_load_b2 = pre_b2_r;
+            array_load_b3 = pre_b3_r;
+        end
+        array_load_a = 32'd0;
+        array_load_b = 32'd0;
+        for (vector_i = 0; vector_i < 4; vector_i = vector_i + 1) begin
+            case (vector_i)
+                0: begin
+                    array_load_a[7:0] = matrix_tile_element(
+                        (state_r == ST_PREFETCH_WAIT) ? pre_a0_r : a0_r,
+                        (state_r == ST_PREFETCH_WAIT) ? pre_a1_r : a1_r,
+                        (state_r == ST_PREFETCH_WAIT) ? pre_a2_r : a2_r,
+                        (state_r == ST_PREFETCH_WAIT) ? pre_a3_r : a3_r,
+                        2'd0,array_load_lane,transpose_a_r);
+                    array_load_b[7:0] = matrix_tile_element(
+                        array_load_b0,array_load_b1,array_load_b2,array_load_b3,
+                        2'd0,array_load_lane,transpose_b_r);
+                end
+                1: begin
+                    array_load_a[15:8] = matrix_tile_element(
+                        (state_r == ST_PREFETCH_WAIT) ? pre_a0_r : a0_r,
+                        (state_r == ST_PREFETCH_WAIT) ? pre_a1_r : a1_r,
+                        (state_r == ST_PREFETCH_WAIT) ? pre_a2_r : a2_r,
+                        (state_r == ST_PREFETCH_WAIT) ? pre_a3_r : a3_r,
+                        2'd1,array_load_lane,transpose_a_r);
+                    array_load_b[15:8] = matrix_tile_element(
+                        array_load_b0,array_load_b1,array_load_b2,array_load_b3,
+                        2'd1,array_load_lane,transpose_b_r);
+                end
+                2: begin
+                    array_load_a[23:16] = matrix_tile_element(
+                        (state_r == ST_PREFETCH_WAIT) ? pre_a0_r : a0_r,
+                        (state_r == ST_PREFETCH_WAIT) ? pre_a1_r : a1_r,
+                        (state_r == ST_PREFETCH_WAIT) ? pre_a2_r : a2_r,
+                        (state_r == ST_PREFETCH_WAIT) ? pre_a3_r : a3_r,
+                        2'd2,array_load_lane,transpose_a_r);
+                    array_load_b[23:16] = matrix_tile_element(
+                        array_load_b0,array_load_b1,array_load_b2,array_load_b3,
+                        2'd2,array_load_lane,transpose_b_r);
+                end
+                default: begin
+                    array_load_a[31:24] = matrix_tile_element(
+                        (state_r == ST_PREFETCH_WAIT) ? pre_a0_r : a0_r,
+                        (state_r == ST_PREFETCH_WAIT) ? pre_a1_r : a1_r,
+                        (state_r == ST_PREFETCH_WAIT) ? pre_a2_r : a2_r,
+                        (state_r == ST_PREFETCH_WAIT) ? pre_a3_r : a3_r,
+                        2'd3,array_load_lane,transpose_a_r);
+                    array_load_b[31:24] = matrix_tile_element(
+                        array_load_b0,array_load_b1,array_load_b2,array_load_b3,
+                        2'd3,array_load_lane,transpose_b_r);
+                end
+            endcase
+        end
+    end
+
+    ai_tensor_matrix_array #(
+        .ARRAY_SIZE(4),
+        .RESULT_INDEX_WIDTH(4)
+    ) mac_array_u (
+        .clk(clk),
+        .resetn(resetn),
+        .clear_accumulators(array_clear_accumulators),
+        .buffer_write_valid(array_buffer_write_valid),
+        .buffer_write_bank(array_buffer_write_bank),
+        .buffer_write_a(array_load_a),
+        .buffer_write_b(array_load_b),
+        .mac_enable(array_mac_enable),
+        .mac_bank(lane_r[0]),
+        .result_index(write_idx_r),
+        .result_bias(32'sd0),
+        .result_shift(5'd0),
+        .result_activation(2'd0),
+        .accumulator_vector(array_accumulator_vector),
+        .selected_accumulator(array_selected_accumulator),
+        .selected_result(array_selected_result),
+        .selected_overflow(array_selected_overflow)
+    );
+
     ai_tensor_matrix_datapath datapath_u(
         .a0(a0_r), .a1(a1_r), .a2(a2_r), .a3(a3_r),
         .b0(b0_r), .b1(b1_r), .b2(b2_r), .b3(b3_r), .lane(lane_r),
         .transpose_a(transpose_a_r), .transpose_b(transpose_b_r),
-        .mac_enable(state_r == ST_MAC),
+        .mac_enable(1'b0),
         .a_lane0(), .a_lane1(), .a_lane2(), .a_lane3(),
         .b_lane0(), .b_lane1(), .b_lane2(), .b_lane3(),
-        .product0(product[0]), .product1(product[1]),
-        .product2(product[2]), .product3(product[3]),
-        .product4(product[4]), .product5(product[5]),
-        .product6(product[6]), .product7(product[7]),
-        .product8(product[8]), .product9(product[9]),
-        .product10(product[10]), .product11(product[11]),
-        .product12(product[12]), .product13(product[13]),
-        .product14(product[14]), .product15(product[15]),
-        .acc0(acc_r[write_idx_r]), .acc1(acc_r[write_idx_r+1]),
-        .acc2(acc_r[write_idx_r+2]), .acc3(acc_r[write_idx_r+3]),
+        .product0(), .product1(), .product2(), .product3(),
+        .product4(), .product5(), .product6(), .product7(),
+        .product8(), .product9(), .product10(), .product11(),
+        .product12(), .product13(), .product14(), .product15(),
+        .acc0(array_accumulator0), .acc1(array_accumulator1),
+        .acc2(array_accumulator2), .acc3(array_accumulator3),
         .bias0(bias0_r), .bias1(bias1_r), .bias2(bias2_r), .bias3(bias3_r),
         .bias_enable(bias_enable_r), .scale_shift(scale_shift_r),
-        .activation(activation_r), .scalar_acc(acc_r[write_idx_r]),
+        .activation(activation_r), .scalar_acc(array_accumulator0),
         .scalar_bias(bias_enable_r ? scalar_bias : 32'sd0),
         .post_scalar(post_scalar), .post0(post0), .post1(post1),
         .post2(post2), .post3(post3)
@@ -251,7 +390,6 @@ module ai_tensor_matrix_core(
             prefetch_a_pending_r<=0; prefetch_b_pending_r<=0;
             prefetch_a_valid_r<=0; prefetch_b_valid_r<=0;
             bias0_r<=0; bias1_r<=0; bias2_r<=0; bias3_r<=0;
-            for (i=0;i<16;i=i+1) acc_r[i]<=0;
         end else begin
             done <= 1'b0;
             if (state_r==ST_IDLE && start)
@@ -290,7 +428,6 @@ module ai_tensor_matrix_core(
                         bias_loaded_r<=0; element_count<=0;
                         prefetch_a_pending_r<=0; prefetch_b_pending_r<=0;
                         prefetch_a_valid_r<=0; prefetch_b_valid_r<=0;
-                        for (i=0;i<16;i=i+1) acc_r[i]<=0;
                         busy<=1;
                         if (!valid_operation) begin
                             error_code<=ERR_OP; state_r<=ST_ERROR;
@@ -375,8 +512,6 @@ module ai_tensor_matrix_core(
                             prefetch_b_pending_r<=0; prefetch_b_valid_r<=1;
                         end
                     end
-                    for (i=0;i<16;i=i+1)
-                        acc_r[i] <= acc_r[i] + {{48{product[i][15]}},product[i]};
                     if (lane_r==2'd3) begin
                         lane_r<=0;
                         if (last_k_group) begin write_idx_r<=0; state_r<=ST_WRITE; end
@@ -457,7 +592,6 @@ module ai_tensor_matrix_core(
                     k_group_r<=0; lane_r<=0; write_idx_r<=0; bias_loaded_r<=0;
                     prefetch_a_pending_r<=0; prefetch_b_pending_r<=0;
                     prefetch_a_valid_r<=0; prefetch_b_valid_r<=0;
-                    for (i=0;i<16;i=i+1) acc_r[i]<=0;
                     if (col_tile_r+1'b1 < n_tiles) begin
                         col_tile_r<=col_tile_r+1'b1;
                         b_tile_base_r<=b_tile_base_r+k_tile_bytes;

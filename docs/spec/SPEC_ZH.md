@@ -1,6 +1,6 @@
 # NMAForge AXI4 近存张量加速器详细规格（中文）
 
-**RTL：A10；软件 ABI：v7.4；版本寄存器：`0x1000_000a`；顶层：`rtl/top/ai_accel_top.v`；事实日期：2026-10-23。**
+**RTL：A10；软件 ABI：v7.4；版本寄存器：`0x1000_000a`；顶层：`rtl/top/ai_accel_top.v`；事实日期：2026-10-25。**
 
 > 本文按当前 RTL 及 `sw/include/cimforge_regs.h` 编写；发生冲突时，RTL 和头文件优先。本文只陈述已实现的全数字 RTL，规划项不会被写作已交付能力。
 
@@ -39,7 +39,7 @@ CPU -- 32-bit AXI4-Lite --> 寄存器/IRQ --> 命令处理器(CMDQ/CPLQ)
 下列职责是强制架构边界：
 
 - `ai_accel_regs` 只保存软件配置、产生控制脉冲、记录 sticky 状态和 IRQ，不能推进队列或调度描述符。
-- `ai_command_processor` 独占取/校验描述符、依赖事件、派发引擎、watchdog/abort、CMDQ_HEAD 和 CPLQ_TAIL 推进。
+- 普通 compute CMDQ 由 `ai_parallel_compute_dispatcher` 按序取/校验并派发，维护每引擎活动槽、依赖事件、abort/drain、CMDQ_HEAD 和按序 CPLQ_TAIL；宏/direct 等串行兼容路径仍由 `ai_command_processor` 协调。两者的具体边界与 REQ-PC 验收条款见 [Compute Cluster SPEC v1.1](COMPUTE_CLUSTER_SPEC_ZH.md)。
 - `ai_spad_arbiter` 是 scratchpad 调度端口的唯一拥有者。描述符和完成写入为高优先级控制流；标量、line、banked 计算和 DMA 在数据面轮询。顶层不得另加 scratchpad mux。
 - `ai_desc_fetch` 读取片上描述符，`axi_desc_fetch` 读取外部描述符；处理器在一条命令期间保持来源不变。
 - `ai_completion_writer` 先提交完成项的四个 32-bit word，才发布新的 `CPLQ_TAIL`。
@@ -102,7 +102,7 @@ SPAD 保护寄存器配置四个区域 R0–R3；每区的 `BASE` 是包含的�
 
 ### 4.1 Compute CMDQ 并行派发
 
-普通 compute descriptor 按 CMDQ 顺序逐个读取、校验和派发；不同计算引擎的任务允许重叠，每个引擎最多有一个未完成任务。一个引擎仍忙时，属于该引擎的后续 descriptor 留在队列中，不能覆盖它的活动上下文。普通 descriptor 的 `CMDQ_HEAD` 在被派发或被判定为错误时推进；完成记录严格按 descriptor 的 CMDQ 顺序写入 CPLQ，且每项四个 word 全部提交后才推进 `CPLQ_TAIL`。因此任务执行完成顺序可以不同，软件观察到的完成顺序不变。
+普通 compute descriptor 按 CMDQ 顺序逐个读取、校验和派发；不同计算引擎的任务允许重叠，每个引擎最多有一个未完成任务。一个引擎仍忙时，属于该引擎的后续 descriptor 留在队列中，不能覆盖它的活动上下文。普通 descriptor 的 `CMDQ_HEAD` 在被派发或被判定为错误时推进；完成记录严格按 descriptor 的 CMDQ 顺序写入 CPLQ，且每项四个 word 全部提交后才推进 `CPLQ_TAIL`。因此任务执行完成顺序可以不同，软件观察到的完成顺序不变。Requirement 编号、测试台架边界和验证证据见 [Compute Cluster SPEC v1.1](COMPUTE_CLUSTER_SPEC_ZH.md) 与 [Compute Cluster UVM Testplan](../verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md)。
 
 事件依赖仍按顺序提交语义处理：依赖事件在对应任务成功完成并轮到它按序退休后才生效；`wait`、`clear` 和 `signal` 不改变 CPLQ 顺序。宏 descriptor 在此前并行任务排空后移交串行命令处理器，宏内部仍按子 descriptor 顺序执行并只产生一个父 completion。direct/tile 模式也不与 CMDQ 并行任务混跑。
 
@@ -169,6 +169,8 @@ model，不是 DDR PHY/板级验证；也没有新增 FP PPA。完整 transactio
 [A10 RTM](../verification/A10_DV_RTM.md)。
 
 **2026-10-23 compute 验证追补：** FP core 在最终计算进入 `ST_WRITE` 前显式检查无 pending error、且本拍无新 failure。VC Formal 使用实际 FP core/算术 RTL，在所有非零 16-bit length、对齐地址、禁用 abort/watchdog 和合法 outstanding-response 约束下，证明 `ap_writeback_excludes_pending_parity`（非 vacuous，safe depth 156），并命中 2/2 parity covers。BF16/FP16 长度 `65535` 的 final-A/final-B parity 仿真和 clean recovery 也通过。cutoff validity 在 response-index bound 假设下另有 compositional proof；无辅助假设的六项 lifecycle aggregate 仍为 3/6，progress-bound proof 未收敛。顶层 CMDQ 已支持跨引擎最多每引擎一个在途任务、按提交顺序退休；Matrix+SFU overlap、同引擎排队、SPAD response 归属和并行 abort/drain 通过 directed smoke。覆盖率和 formal 边界见[compute 验证状态](../verification/COMPUTE_ENGINE_STATUS.md)及[交互验证记录](../verification/COMPUTE_ENGINE_INTERACTION_FOLLOWUP_2026-10-23.md)。
+
+**2026-10-25 Matrix 阵列升级追补：** `ai_tensor_matrix_core` 现复用参数化 `ai_tensor_matrix_array` 的 `ARRAY_SIZE=4` 实例，保留原 4×4 descriptor/SPAD 行为；现有 core 三 seed fault/reset regression 与 top `ai_smoke` PASS。该阵列的 8×8、16×16 参数配置分别通过三 seed direct bit-exact test，DUT-only URG line/condition/branch 为 100%/100%/94.12%，功能覆盖组 100%。较大阵列尚未接入真实地址生成、SPAD 预取和 descriptor 路径，不能视为 top 已支持 8×8/16×16，也没有新 PPA 结果。详细 requirement→testpoint→coverage 与剩余项见[Compute Cluster 升级路线](../verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md)。
 
 VCS `make ai_smoke` 已覆盖 Transformer 30-command 链、随机 GEMV/GEMM/Conv、错误/保护和 reset recovery；扩展回归是 `make ai_comp`、`make ai_run AI_RANDOM_CASES=20 AI_SEED=12345`。2026-08-06 的 SpyGlass macro-aware lint 记录为 **0 error、414 warnings、4 info**（共 418 条信息，仍需分类）；CDC setup 为 0 error、12 warnings，CDC structural verify 显示 0 个 unsynchronized crossing、0 个 convergence，但因缺少 Advanced_CDC license 而有 1 条工具/许可证 error，不能称 sign-off；RDC structural verify 的 2 条 error 同样仅为 Advanced_CDC / `rdc_adv_checker` license 缺失，不能作为 RTL reset-crossing 违规解读，也不能称 RDC sign-off。
 

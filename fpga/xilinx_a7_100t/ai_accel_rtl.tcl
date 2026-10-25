@@ -26,6 +26,7 @@ set AI_ACCEL_RTL_FILES [list \
     "$REPO_ROOT/rtl/compute/common/ai_integer_sqrt.v" \
     "$REPO_ROOT/rtl/compute/matrix/ai_tensor_matrix_datapath.v" \
     "$REPO_ROOT/rtl/compute/matrix/ai_tensor_matrix_core.v" \
+    "$REPO_ROOT/rtl/compute/matrix/ai_tensor_matrix_array.sv" \
     "$REPO_ROOT/rtl/compute/sfu/ai_tensor_sfu_math.v" \
     "$REPO_ROOT/rtl/compute/sfu/ai_tensor_sfu_core.v" \
     "$REPO_ROOT/rtl/compute/cnn/ai_conv3x3_linebuffer_core.v" \

@@ -253,6 +253,138 @@ module tb_ai_tensor_sfu_random;
     end
   endtask
 
+  // Choose a real opcode whose normal execution reaches each encoded SFU
+  // state.  These probes observe state_r; they do not force or deposit state
+  // values into the DUT.
+  function automatic [7:0] probe_opcode(input integer target_state);
+    begin
+      if(target_state>=1 && target_state<=9) probe_opcode=8'h32;
+      else if(target_state>=10 && target_state<=22) probe_opcode=8'h33;
+      else if(target_state==25 || target_state==26) probe_opcode=8'h34;
+      else if(target_state==30 || target_state==31) probe_opcode=8'h35;
+      else if(target_state>=32 && target_state<=40) probe_opcode=8'h38;
+      else probe_opcode=8'h36;
+    end
+  endfunction
+
+  task automatic reset_for_fsm_probe;
+    begin
+      @(negedge clk);resetn=0;#1;
+      abort=0;start=0;inject_parity=0;inject_protection=0;
+      if(busy || done || error || error_code!=0)
+        $fatal(1,"SFU FSM probe reset did not clear status");
+      repeat(2) @(negedge clk);resetn=1;
+      repeat(2) @(negedge clk);
+    end
+  endtask
+
+  task automatic prepare_fsm_probe(input integer target_state);
+    integer j;
+    begin
+      op_mode=probe_opcode(target_state);
+      length=(target_state==28)?16'd1:16'd2;
+      src0_base=32'h100;
+      src1_base=((op_mode==8'h34) ||
+                 (op_mode==8'h33 && target_state>=20 && target_state<=21)) ?
+                32'h200:32'd0;
+      beta_base=32'h300;beta_enable=(op_mode==8'h38);pack_enable=0;
+      dst_base=32'h400;scale_shift=0;epsilon=1;watchdog_limit=0;
+      for(j=0;j<32;j=j+1) begin
+        memory[(src0_base>>2)+j]=j+1;
+        memory[(32'h200>>2)+j]=32'd32768;
+        memory[(beta_base>>2)+j]=j+2;
+      end
+    end
+  endtask
+
+  task automatic reset_from_fsm_state(input integer target_state);
+    integer spins;
+    begin
+      reset_for_fsm_probe();
+      prepare_fsm_probe(target_state);
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      spins=0;
+      while(dut.state_r!==target_state[5:0] && spins<20000) begin
+        @(negedge clk);spins=spins+1;
+      end
+      if(dut.state_r!==target_state[5:0])
+        $fatal(1,"SFU reset-coverage probe could not reach state %0d op=%02x current=%0d",
+               target_state,op_mode,dut.state_r);
+      // Asynchronous reset is asserted while the observed state is active.
+      // The transition therefore exercises the RTL reset edge from this
+      // actual state, including request, response, arithmetic, and writeback.
+      resetn=0;#1;
+      if(dut.state_r!==6'd0 || busy || done || error)
+        $fatal(1,"SFU reset-coverage probe failed state=%0d",target_state);
+      repeat(2) @(negedge clk);resetn=1;
+      repeat(2) @(negedge clk);
+    end
+  endtask
+
+  task automatic abort_from_fsm_state(input integer target_state);
+    integer spins;
+    begin
+      reset_for_fsm_probe();
+      prepare_fsm_probe(target_state);
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      spins=0;
+      while(dut.state_r!==target_state[5:0] && spins<20000) begin
+        @(negedge clk);spins=spins+1;
+      end
+      if(dut.state_r!==target_state[5:0])
+        $fatal(1,"SFU abort-coverage probe could not reach state %0d op=%02x current=%0d",
+               target_state,op_mode,dut.state_r);
+      if(!busy)
+        $fatal(1,"SFU abort-coverage probe reached non-busy state %0d",target_state);
+      abort=1;
+      @(negedge clk);abort=0;
+      timeout=0;
+      while(!done && timeout<1000) begin @(negedge clk);timeout=timeout+1;end
+      if(!done || !error || error_code!==4'd3 || busy)
+        $fatal(1,"SFU abort-coverage state=%0d did not drain code=%0d busy=%b",
+               target_state,error_code,busy);
+      reset_for_fsm_probe();
+    end
+  endtask
+
+  task automatic converge_fsm_transitions;
+    integer state_id;
+    begin
+      // The production FSM contains 41 states.  Exercise reset-to-IDLE and
+      // abort-to-ERROR from each reachable active state using valid operation
+      // paths.  IDLE is the launch point; ERROR already returns to IDLE in the
+      // ordinary fault scenarios above.
+      for(state_id=1;state_id<=28;state_id=state_id+1)
+        reset_from_fsm_state(state_id);
+      for(state_id=30;state_id<=40;state_id=state_id+1)
+        reset_from_fsm_state(state_id);
+
+      for(state_id=1;state_id<=28;state_id=state_id+1)
+        abort_from_fsm_state(state_id);
+      for(state_id=30;state_id<=40;state_id=state_id+1)
+        abort_from_fsm_state(state_id);
+    end
+  endtask
+
+  task automatic run_rms_without_gamma;
+    begin
+      op_mode=8'h33;length=1;src0_base=32'h100;src1_base=0;
+      beta_enable=0;pack_enable=0;dst_base=32'h400;watchdog_limit=0;
+      memory[src0_base>>2]=32'd1;memory[dst_base>>2]=32'hface_cafe;
+      write_count=0;
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      timeout=0;
+      while(!done && timeout<10000) begin @(negedge clk);timeout=timeout+1;end
+      if(!done || error || busy || element_count!=1 || write_count!=1 ||
+         memory[dst_base>>2]===32'hface_cafe)
+        $fatal(1,"SFU RMSNorm gamma-bypass path did not complete cleanly");
+      expected_total_writes=expected_total_writes+1;
+    end
+  endtask
+
   initial begin
     if($value$plusargs("SEED=%d",seed)) begin end
     initial_seed=seed;
@@ -268,6 +400,7 @@ module tb_ai_tensor_sfu_random;
     // Exercise command validation and lifecycle/error exits that numeric
     // vectors do not hit. The first valid vector after reset is the recovery
     // check and also verifies the ordinary data path still runs.
+    converge_fsm_transitions();
     op_mode=8'h36;length=0;src0_base=32'h100;dst_base=32'h400;
     expect_sfu_error(4'd1,0);
     op_mode=8'hff;length=1;expect_sfu_error(4'd2,1);
@@ -283,6 +416,7 @@ module tb_ai_tensor_sfu_random;
     expect_sfu_error(4'd3,7);
     run_late_parity_fault();
     check_reset_and_recovery();
+    run_rms_without_gamma();
     op_mode=8'h36;length=1;src0_base=32'h100;dst_base=32'h400;
 
     case_id=0;
@@ -296,7 +430,7 @@ module tb_ai_tensor_sfu_random;
              total_write_count,expected_total_writes);
     if(ready_stall_count==0 || max_response_delay==0)
       $fatal(1,"SFU random memory profile missed ready or response stalls");
-    $display("SFU_RANDOM_LATENCY_PASS cases=%0d error_cases=8 late_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 seed=%0d reads=%0d responses=%0d writes=%0d max_rsp_delay=%0d ready_stalls=%0d",
+    $display("SFU_RANDOM_LATENCY_PASS cases=%0d error_cases=8 late_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 fsm_reset_states=39 fsm_abort_states=39 rms_gamma_bypass=1 seed=%0d reads=%0d responses=%0d writes=%0d max_rsp_delay=%0d ready_stalls=%0d",
              case_count,initial_seed,read_count,response_count,total_write_count,max_response_delay,ready_stall_count);
     $finish;
   end

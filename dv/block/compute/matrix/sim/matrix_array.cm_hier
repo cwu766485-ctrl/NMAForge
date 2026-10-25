@@ -1,0 +1,2 @@
+// Report RTL coverage for the production parameterized array only.
++tree tb_ai_tensor_matrix_array.dut

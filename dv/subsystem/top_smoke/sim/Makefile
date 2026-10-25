@@ -257,7 +257,9 @@ ai_cnm_a2_gemv_bench: ai_cnm_a2_gemv_bench_run
 # Seeded CNM oracle regression. Random signed bytes are generated from the
 # address and seed, then independently reduced by the testbench reference.
 CNM_RANDOM_SEEDS ?= 20261021 20261022 20261023
-CNM_RANDOM_OUT_DIR ?= /tmp/nmaforge_cnm_random_$(shell date +%Y%m%d_%H%M%S)
+ifndef CNM_RANDOM_OUT_DIR
+CNM_RANDOM_OUT_DIR := /tmp/nmaforge_cnm_random_$(shell date +%Y%m%d_%H%M%S)
+endif
 ai_cnm_random_compile:
 	mkdir -p $(CNM_RANDOM_OUT_DIR)
 	$(VCS_FOCUSED) -Mdir=$(CNM_RANDOM_OUT_DIR)/csrc -top tb_ai_banked_cnm_random \
