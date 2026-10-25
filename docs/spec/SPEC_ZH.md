@@ -118,7 +118,7 @@ SPAD 保护寄存器配置四个区域 R0–R3；每区的 `BASE` 是包含的�
 | 13/14/15 | Conv1x1、im2col Conv3x3、Depthwise |
 | 16/17 | Conv3x3/Depthwise line-buffer |
 | 20/21 | Banked VDOT/GEMV |
-| 30/31 | Tensor GEMM/Batch GEMM（4×4 INT8 PE） |
+| 30/31 | Tensor GEMM/Batch GEMM（4×4 tile-major SPAD；top 默认 16×16 INT8 PE） |
 | 32/39 | Softmax/Causal Softmax Q15 |
 | 33/38 | RMSNorm/LayerNorm Q15 |
 | 34/35/36/37 | Residual、GELU、requant、SiLU |
@@ -126,6 +126,8 @@ SPAD 保护寄存器配置四个区域 R0–R3；每区的 `BASE` 是包含的�
 | 43/44 | KV write/KV read |
 | 50 (`0x50`) | BF16 点积、FP32 累加与结果（`BF16_DOT_ACC_FP32`） |
 | 51 (`0x51`) | FP16 点积、FP32 累加与结果（`FP16_DOT_ACC_FP32`） |
+
+Tensor GEMM descriptor ABI 与 4×4 tile-major SPAD operand 布局保持不变，M/N 仍须为 4 的倍数。Matrix controller 默认以 16×16 MAC array 执行宏 tile：每个 K word 从 SPAD 收集最多四组 4×4 A/B 数据，送入本地 operand buffer；尺寸大于 16 时按宏 tile 遍历，边缘 tile 只写有效元素。`ARRAY_SIZE=4/8/16` 参数配置均保留。
 
 SFU `GELU_Q8_8` (`0x35`) 与 `SILU_Q8_8` (`0x37`) 输入、输出均为 32-bit
 signed Q8.8 整数。GELU 分段定义为 `x<=-512: 0`、`x>=512: x`、其余为
@@ -170,7 +172,7 @@ model，不是 DDR PHY/板级验证；也没有新增 FP PPA。完整 transactio
 
 **2026-10-23 compute 验证追补：** FP core 在最终计算进入 `ST_WRITE` 前显式检查无 pending error、且本拍无新 failure。VC Formal 使用实际 FP core/算术 RTL，在所有非零 16-bit length、对齐地址、禁用 abort/watchdog 和合法 outstanding-response 约束下，证明 `ap_writeback_excludes_pending_parity`（非 vacuous，safe depth 156），并命中 2/2 parity covers。BF16/FP16 长度 `65535` 的 final-A/final-B parity 仿真和 clean recovery 也通过。cutoff validity 在 response-index bound 假设下另有 compositional proof；无辅助假设的六项 lifecycle aggregate 仍为 3/6，progress-bound proof 未收敛。顶层 CMDQ 已支持跨引擎最多每引擎一个在途任务、按提交顺序退休；Matrix+SFU overlap、同引擎排队、SPAD response 归属和并行 abort/drain 通过 directed smoke。覆盖率和 formal 边界见[compute 验证状态](../verification/COMPUTE_ENGINE_STATUS.md)及[交互验证记录](../verification/COMPUTE_ENGINE_INTERACTION_FOLLOWUP_2026-10-23.md)。
 
-**2026-10-25 Matrix 阵列升级追补：** `ai_tensor_matrix_core` 现复用参数化 `ai_tensor_matrix_array` 的 `ARRAY_SIZE=4` 实例，保留原 4×4 descriptor/SPAD 行为；现有 core 三 seed fault/reset regression 与 top `ai_smoke` PASS。该阵列的 8×8、16×16 参数配置分别通过三 seed direct bit-exact test，DUT-only URG line/condition/branch 为 100%/100%/94.12%，功能覆盖组 100%。较大阵列尚未接入真实地址生成、SPAD 预取和 descriptor 路径，不能视为 top 已支持 8×8/16×16，也没有新 PPA 结果。详细 requirement→testpoint→coverage 与剩余项见[Compute Cluster 升级路线](../verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md)。
+**2026-10-25 Matrix 16×16 controller 追补：** `ai_tensor_matrix_core` 默认实例化 `ARRAY_SIZE=16`，descriptor ABI 与 4×4 tile-major SPAD 数据布局不变；controller 已实际完成 16×16 GEMM 与 32×16 跨宏 tile GEMM 的 SPAD 读、MAC 和写回。VCS 三 seed core regression 每 seed 8 个 bit-exact 数值/布局 case、12 个 fault/recovery case PASS；顶层 `ai_smoke` 和 A3 benchmark PASS。合并 DUT 范围 URG 为 Matrix core line/condition/FSM-transition/branch=`96.17/90.83/65.85/93.52%`，阵列 child=`82.35/20.00/N/A/58.82%`；仍是部分代码覆盖。VCS 固定一拍 bank response benchmark 的 16×16×K32 在 16×16 配置下为 357 cycles、22.95 MAC/cycle、8.96% end-to-end array utilization、11.47 GOPS@250MHz（归一化）；不含 DC 面积/Fmax，DC V-2023.12-SP1 已安装但因 `DCSH-1: Design Compiler is not enabled` 无法综合，且私有 TSMC 库未配置。真实 top Matrix/SFU Cluster UVM 切片现已通过三 seed，覆盖 GEMM Golden、跨引擎 overlap、SPAD 仲裁、按序 completion、Abort/Reset 和 recovery；focused covergroup 为 55.5%，whole-top URG 不代表 DUT-only/full-cluster coverage。其他 Engine、parity/backpressure、全功能 signoff 与 SPAD 预取/重叠仍未完成。详细 requirement→testpoint→coverage 与剩余项见[Compute Cluster 升级路线](../verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md)。
 
 VCS `make ai_smoke` 已覆盖 Transformer 30-command 链、随机 GEMV/GEMM/Conv、错误/保护和 reset recovery；扩展回归是 `make ai_comp`、`make ai_run AI_RANDOM_CASES=20 AI_SEED=12345`。2026-08-06 的 SpyGlass macro-aware lint 记录为 **0 error、414 warnings、4 info**（共 418 条信息，仍需分类）；CDC setup 为 0 error、12 warnings，CDC structural verify 显示 0 个 unsynchronized crossing、0 个 convergence，但因缺少 Advanced_CDC license 而有 1 条工具/许可证 error，不能称 sign-off；RDC structural verify 的 2 条 error 同样仅为 Advanced_CDC / `rdc_adv_checker` license 缺失，不能作为 RTL reset-crossing 违规解读，也不能称 RDC sign-off。
 

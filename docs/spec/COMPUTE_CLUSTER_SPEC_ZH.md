@@ -198,11 +198,11 @@ write_fire   = request_fire &&  selected_spad_write
 - **length 的单位是完整 packed dot4 word**，并非单字节元素；该接口没有 byte-tail/lane-mask。
 - 重点检查四路 Bank 地址、Prefetch、每路 Response/Parity、局部/全局累加、背压与恢复。
 
-### 3.3 Matrix：4×4 INT8 Engine
+### 3.3 Matrix：4×4 存储 tile 与 16×16 INT8 Tensor Engine
 
-- 16 路 MAC 计算；M、N 以 4 为 tile 粒度，launch_k 是 K/4 的 **word 数**。
-- 输入采用 Matrix 特有 Tile-major 布局；支持 Transpose A/B、Batch Stride、Bias、Requant、Activation。
-- 检查行列索引、Batch、极值饱和、SPAD Banked/Line 通路、Partial Sum、尾 Tile 合法性。
+- M/N 仍以 4 为最小存储 tile，launch_k 是 K/4 的 **word 数**。top 的 Matrix controller 默认使用 16×16/256-MAC array，每个 K word 从原有 tile-major 布局收集最多四组 A/B tile；尺寸大于 16 时遍历 M/N 宏 tile。
+- Descriptor、opcode 和 A/B tile-major SPAD 布局保持兼容；支持 Transpose A/B、Batch Stride、Bias、Requant、Activation。
+- `ARRAY_SIZE=4/8/16` 均可参数化；检查行列索引、Batch、极值饱和、SPAD Banked/Line 通路、Partial Sum、尾 Tile 合法性。16×16 与 32×16 已有三 seed block Golden evidence；完整 Cluster UVM 仍由 C1 testplan 追踪。
 
 ### 3.4 Tensor SFU：0x32–0x39
 
@@ -269,7 +269,7 @@ write_fire   = request_fire &&  selected_spad_write
 | CL-017~019 | 错误/恢复 | Error × State × Recovery，已提交前缀与无幽灵写 | engine × fault_kind × phase |
 | Numeric | 算子数值 | Scalar/CNM/Matrix/SFU/Conv/KV/FP 独立 Golden 与结果 Memory Image | engine × opcode × numeric_class |
 
-**注意**：上述是新 Compute Cluster DV 的**规划**，并不是仓库中已完成的 UVM Testcase 名称。正式 Testplan 必须将每个已冻结 Requirement 映射到 **Sequence → Monitor/Scoreboard/SVA → Coverpoint → Test Log**。
+**注意**：上述多数条目仍是规划。2026-10-25 在 `dv/uvm` 新增了真实 top Matrix/SFU 并发 GEMM、SPAD 仲裁、Abort/Reset 的定向 test source，但 VCS compile 被 license 阻塞，尚无运行证据；它不覆盖全 Engine、parity、backpressure 及完整 Requirement 集。正式 Testplan 仍须将每个已冻结 Requirement 映射到 **Sequence → Monitor/Scoreboard/SVA → Coverpoint → Test Log**。
 
 ### 5.1 推荐验证平台边界
 
@@ -295,7 +295,7 @@ Owner + Memory Image + Numerical Scoreboard
 Functional Coverage / SVA / URG
 ~~~
 
-应优先复用已有 **dv/block/compute/fp/** 的 UVM 和 Python 数值模型、**dv/subsystem/dma_spad/** 中的 CNM/SPAD 检查，以及 Matrix/CNN-KV Directed Bench；当前 **dv/subsystem/tensor_datapath/** 仍主要是结构骨架，不能说已具有完整 Compute Cluster UVM。
+应优先复用已有 **dv/block/compute/fp/** 的 UVM 和 Python 数值模型、**dv/subsystem/dma_spad/** 中的 CNM/SPAD 检查，以及 Matrix/CNN-KV Directed Bench；**dv/subsystem/tensor_datapath/** 仍是 task-based BFM。`dv/uvm` 新增的 top-level test 也只是尚未运行的 Matrix/SFU 定向切片，不能说已具有完整 Compute Cluster UVM。
 
 ### 5.2 建议退出条件（Exit Criteria）
 
@@ -329,7 +329,7 @@ Functional Coverage / SVA / URG
 |---|---|---|
 | REQ-CL-020 | Scalar INT8：0x10～0x15 的有符号 packed INT8、VDOT/GEMV/GEMM/legacy Conv 结果及 Memory Image 正确 | K word 单位、Shift/Activation/Saturation 按精确独立模型 |
 | REQ-CL-021 | CNM：0x20/0x21 四 Bank 请求/回应归属、局部乘加/归约和最终写回正确 | K 为完整 packed dot4 word；支持 Bank 响应错拍 |
-| REQ-CL-022 | Matrix：0x30/0x31 4×4 tiled GEMM、batch、transpose、bias、requant、Line WSTRB 结果正确 | M/N 为 4 的整数倍；未确认的部分 WSTRB 情况 BLOCKED_SPEC |
+| REQ-CL-022 | Matrix：0x30/0x31 保持 4×4 tile-major ABI，并执行 16×16 宏 tile/跨 tile GEMM；batch、transpose、bias、requant、Line WSTRB 结果正确 | M/N 为 4 的整数倍；16×16/32×16 block Golden 三 seed 通过；UVM C1 与未确认的部分 WSTRB 情况仍开放 |
 | REQ-CL-023 | SFU：0x32～0x39 定点 Q 格式、近似函数、输出饱和/舍入/打包与规定的数值合同一致 | 近似分段/误差阈值未审定的子项 BLOCKED_SPEC，禁止对比 Python double 直接判 bit-exact |
 | REQ-CL-024 | Conv：0x16/0x17 的有符号 3×3 窗口、stride=1、valid/no-padding、INT32 输出和地址正确 | height/width 至少 3，MAX_WIDTH 参数默认 128 |
 | REQ-CL-025 | KV：0x43/0x44 token/head/stride 地址、方向、Memory Image 和异常边界正确 | aux0 高 16=Head、低 16=Token，检查地址计算溢出 |

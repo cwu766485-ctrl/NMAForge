@@ -285,6 +285,7 @@ ai_tensor_a3_gemm_bench_comp:
 	rm -rf simv_tensor_a3_gemm_bench simv_tensor_a3_gemm_bench.daidir
 	$(VCS_FOCUSED) -top tb_ai_tensor_a3_gemm_bench \
 		../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v \
+		../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv \
 		../../../../rtl/compute/matrix/ai_tensor_matrix_core.v \
 		../../../block/compute/matrix/tb/tb_ai_tensor_a3_gemm_bench.sv -o simv_tensor_a3_gemm_bench -l ai_tensor_a3_gemm_bench_comp.log
 

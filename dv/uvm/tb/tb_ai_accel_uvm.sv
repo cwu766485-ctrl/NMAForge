@@ -7,6 +7,7 @@ module tb_ai_accel_uvm;
     logic allow_m_axi_error;
     ai_axil_if axil(aclk, aresetn);
     ai_axi4_if axi4(aclk, aresetn);
+    ai_compute_cluster_if compute_obs(aclk);
 
     ai_accel_top dut (
         .aclk(aclk), .aresetn(aresetn),
@@ -23,6 +24,41 @@ module tb_ai_accel_uvm;
         .m_axi_wdata(axi4.wdata), .m_axi_wstrb(axi4.wstrb), .m_axi_wlast(axi4.wlast), .m_axi_wvalid(axi4.wvalid), .m_axi_wready(axi4.wready),
         .m_axi_bid(axi4.bid), .m_axi_bresp(axi4.bresp), .m_axi_bvalid(axi4.bvalid), .m_axi_bready(axi4.bready)
     );
+
+    assign compute_obs.aresetn = aresetn;
+    assign compute_obs.core_busy = dut.core_busy;
+    assign compute_obs.launch_valid = dut.launch_valid;
+    assign compute_obs.launch_op = dut.launch_op;
+    assign compute_obs.engine_busy = dut.engine_busy;
+    assign compute_obs.engine_done = dut.engine_done;
+    assign compute_obs.engine_error = dut.engine_error;
+    assign compute_obs.engine_req_valid = dut.compute_engine_req_valid;
+    assign compute_obs.engine_req_ready = dut.compute_engine_ready;
+    assign compute_obs.core_spad_valid = dut.core_spad_valid;
+    assign compute_obs.banked_valid = dut.arb_banked_valid;
+    assign compute_obs.cnm_valid = dut.arb_cnm_valid;
+    assign compute_obs.core_ready = dut.arb_core_ready;
+    assign compute_obs.banked_ready = dut.arb_banked_ready;
+    assign compute_obs.cnm_ready = dut.arb_cnm_ready;
+    assign compute_obs.rsp_valid = dut.arb_rsp_valid;
+    assign compute_obs.rsp_client = dut.arb_rsp_client;
+    assign compute_obs.request_client = dut.arb_request_client;
+    assign compute_obs.parallel_queue_mode = dut.parallel_queue_mode_r;
+    assign compute_obs.desc_valid = dut.desc_spad_valid;
+    assign compute_obs.desc_ready = dut.arb_desc_ready;
+    assign compute_obs.cpl_valid = dut.cpl_spad_valid;
+    assign compute_obs.cpl_write = dut.cpl_spad_write;
+    assign compute_obs.cpl_ready = dut.arb_cpl_ready;
+    assign compute_obs.core_spad_write = dut.core_spad_write;
+    assign compute_obs.matrix_line_valid = dut.matrix_line_valid;
+    assign compute_obs.matrix_line_write = dut.matrix_line_write;
+    assign compute_obs.matrix_line_ready = dut.arb_core_line_ready;
+    assign compute_obs.dma_valid = dut.dma_spad_valid;
+    assign compute_obs.dma_write = dut.dma_spad_write;
+    assign compute_obs.dma_ready = dut.arb_dma_ready;
+    assign compute_obs.dma_line_valid = dut.dma_spad_line_valid;
+    assign compute_obs.dma_line_write = dut.dma_spad_line_write;
+    assign compute_obs.dma_line_ready = dut.arb_dma_line_ready;
 
     // The small top-level DDR model can alias a high 64-bit address window
     // onto the same low-word backing array. This is enabled only here to test
@@ -151,6 +187,7 @@ module tb_ai_accel_uvm;
     initial begin
         uvm_config_db#(virtual ai_axil_if)::set(null, "*", "axil_vif", axil);
         uvm_config_db#(virtual ai_axi4_if)::set(null, "*", "axi4_vif", axi4);
+        uvm_config_db#(virtual ai_compute_cluster_if)::set(null, "*", "compute_vif", compute_obs);
         run_test();
     end
 endmodule

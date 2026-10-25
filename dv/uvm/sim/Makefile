@@ -12,8 +12,10 @@ MIXED_E2E_RANDOM_SEEDS ?= $(shell seq 20261101 20261292)
 MIXED_E2E_RANDOM_OUT ?= /tmp/nmaforge_mixed_precision_e2e_random_$(shell date +%Y%m%d_%H%M%S_%N)
 URG ?= $(VCS_HOME)/bin/urg
 UVM_COV_METRICS ?= line+cond+branch+fsm+assert
+COMPUTE_CLUSTER_UVM_OUT ?= /tmp/nmaforge_real_compute_cluster_uvm_$(shell date +%Y%m%d_%H%M%S)
+COMPUTE_CLUSTER_UVM_SEEDS ?= 20261025 20261026 20261027
 
-.PHONY: uvm_compile uvm_run uvm_smoke uvm_fp16_ddr_e2e uvm_mixed_precision_ddr_e2e uvm_external_macro_ddr_e2e uvm_mixed_precision_ddr_e2e_axi_stalls uvm_mixed_precision_ddr_e2e_regress uvm_mixed_precision_ddr_e2e_cov_regress uvm_mixed_precision_ddr_e2e_random_cov_regress clean
+.PHONY: uvm_compile uvm_run uvm_smoke uvm_fp16_ddr_e2e uvm_mixed_precision_ddr_e2e uvm_external_macro_ddr_e2e uvm_mixed_precision_ddr_e2e_axi_stalls uvm_mixed_precision_ddr_e2e_regress uvm_mixed_precision_ddr_e2e_cov_regress uvm_mixed_precision_ddr_e2e_random_cov_regress uvm_compute_cluster_compile uvm_compute_cluster_regress clean
 uvm_compile:
 	rm -rf simv_uvm simv_uvm.daidir csrc
 	$(VCS_UVM) -top tb_ai_accel_uvm -f ai_accel_uvm.f -o simv_uvm -l uvm_compile.log
@@ -34,6 +36,36 @@ uvm_external_macro_ddr_e2e:
 	$(MAKE) uvm_run UVM_TEST=ai_external_macro_ddr_e2e_test
 	@grep -q '\[MACRO_EXTERNAL_DDR_E2E_PASS\]' uvm_run_ai_external_macro_ddr_e2e_test.log || { echo "ERROR: external macro DDR E2E completion check missing"; exit 1; }
 	@grep -q '\[MACRO_AXI_DESC_FETCH_PASS\]' uvm_run_ai_external_macro_ddr_e2e_test.log || { echo "ERROR: external macro AXI descriptor-fetch scoreboard check missing"; exit 1; }
+
+# Real Compute Cluster UVM: the production top, dispatcher, all seven engines,
+# compute SPAD mux, scheduler arbiter, protection, and four-bank SRAM are active.
+# Coverage and generated files stay outside the source tree.
+uvm_compute_cluster_compile:
+	mkdir -p $(COMPUTE_CLUSTER_UVM_OUT)/csrc
+	$(VCS_UVM) -cm $(UVM_COV_METRICS) -cm_dir $(COMPUTE_CLUSTER_UVM_OUT)/compile.vdb \
+		-Mdir=$(COMPUTE_CLUSTER_UVM_OUT)/csrc -top tb_ai_accel_uvm -f ai_accel_uvm.f \
+		-o $(COMPUTE_CLUSTER_UVM_OUT)/simv_uvm -l $(COMPUTE_CLUSTER_UVM_OUT)/compile.log
+
+uvm_compute_cluster_regress: uvm_compute_cluster_compile
+	@set -e; out='$(COMPUTE_CLUSTER_UVM_OUT)'; logs=''; cov_dbs=''; \
+	for seed in $(COMPUTE_CLUSTER_UVM_SEEDS); do \
+		seed_dir="$$out/seed_$$seed"; mkdir -p "$$seed_dir"; \
+		log="$$seed_dir/run.log"; db="$$seed_dir/coverage.vdb"; \
+		logs="$$logs $$log"; cov_dbs="$$cov_dbs $$db"; \
+		"$$out/simv_uvm" +UVM_TESTNAME=ai_compute_cluster_e2e_test \
+			+COMPUTE_CLUSTER_SEED=$$seed +ntb_random_seed=$$seed \
+			-cm $(UVM_COV_METRICS) -cm_dir "$$db" -l "$$log"; \
+		grep -q '\[COMPUTE_CLUSTER_REAL_UVM_PASS\]' "$$log" || { echo "ERROR: real Compute Cluster pass marker missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_RESET_RECOVERY_PASS\]' "$$log" || { echo "ERROR: real compute-cluster active-reset/recovery check missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_SCOREBOARD\]' "$$log" || { echo "ERROR: compute-cluster scoreboard report missing in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_SCOREBOARD\].*reset_dropped=[1-9][0-9]*' "$$log" || { echo "ERROR: reset did not discard a tracked in-flight SPAD response"; exit 1; }; \
+		grep -q '\[CLUSTER_COVERAGE\]' "$$log" || { echo "ERROR: compute-cluster coverage report missing in $$log"; exit 1; }; \
+		! grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$$log" || { echo "ERROR: UVM warning/error/fatal count is nonzero in $$log"; exit 1; }; \
+	done; \
+	$(URG) -full64 -dir "$$out/compile.vdb" $$cov_dbs -format text \
+		-report "$$out/urg_merged" -log "$$out/urg_merged.log"; \
+	test -d "$$out/urg_merged" || { echo "ERROR: merged compute-cluster URG report missing"; exit 1; }; \
+	echo "COMPUTE_CLUSTER_REAL_UVM_REGRESS_PASS: seeds=$(COMPUTE_CLUSTER_UVM_SEEDS) artifacts=$$out"
 
 # Opt-in AXI address/data/response gaps are seeded per vector plan and sampled
 # per transaction. The focused target requires configuration and stall markers.

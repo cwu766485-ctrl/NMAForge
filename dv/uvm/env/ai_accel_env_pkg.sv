@@ -7,8 +7,11 @@ package ai_accel_env_pkg;
 
     `include "model/ai_accel_reference_model.svh"
     `include "scoreboard/ai_accel_scoreboard.svh"
+    `include "monitor/ai_compute_cluster_monitor.svh"
+    `include "scoreboard/ai_compute_cluster_scoreboard.svh"
     `include "coverage/ai_axil_coverage.svh"
     `include "coverage/ai_axi4_coverage.svh"
     `include "coverage/ai_mixed_precision_e2e_coverage.svh"
+    `include "coverage/ai_compute_cluster_coverage.svh"
     `include "ai_accel_env.svh"
 endpackage

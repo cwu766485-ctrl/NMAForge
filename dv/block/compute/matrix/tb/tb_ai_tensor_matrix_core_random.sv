@@ -1,9 +1,14 @@
 `timescale 1ns/1ps
 
+`ifndef MATRIX_ARRAY_SIZE
+`define MATRIX_ARRAY_SIZE 16
+`endif
+
 // Full-core A3 transaction test. Operand words are returned through a
 // registered four-bank model; bias/scalar traffic uses a separate registered
 // SPAD model and aligned output rows use the line-write port.
 module tb_ai_tensor_matrix_core_random;
+  localparam integer PHYSICAL_ARRAY_SIZE = `MATRIX_ARRAY_SIZE;
   localparam [31:0] SRC0_BASE = 32'h0000_0100;
   localparam [31:0] SRC1_BASE = 32'h0000_4000;
   localparam [31:0] BIAS_BASE = 32'h0000_8000;
@@ -49,7 +54,7 @@ module tb_ai_tensor_matrix_core_random;
   reg [31:0] bias_mem [0:65535];
   reg [31:0] output_mem [0:65535];
   reg [31:0] expected_mem [0:65535];
-  reg signed [7:0] logical_a [0:3][0:15][0:31];
+  reg signed [7:0] logical_a [0:3][0:31][0:31];
   reg signed [7:0] logical_b [0:3][0:31][0:15];
   reg signed [31:0] logical_bias [0:15];
 
@@ -65,6 +70,7 @@ module tb_ai_tensor_matrix_core_random;
   integer bank_stall_count=0,spad_stall_count=0,line_stall_count=0;
   integer line_write_count=0,scalar_write_count=0;
   integer seed=20261021,initial_seed;
+  integer benchmark_mode=0;
 
   reg inject_bank_parity=0,inject_spad_parity=0;
   reg inject_bank_protection=0,inject_spad_protection=0;
@@ -79,6 +85,9 @@ module tb_ai_tensor_matrix_core_random;
   integer a_stride,b_stride,d_stride,addr,line_index,word_index;
   integer signed accum,post_value;
   integer timeout_cycles,case_count=0,fault_count=0;
+  integer mac_cycle_count=0,case_mac_snapshot=0;
+  integer case_bank_snapshot=0,case_bank_stall_snapshot=0;
+  integer case_line_stall_snapshot=0;
   reg [31:0] packed_word;
 
   always #5 clk=~clk;
@@ -99,7 +108,7 @@ module tb_ai_tensor_matrix_core_random;
                                pending_bank_issue==bank_parity_target_issue) ?
                                4'b0001 : 4'b0000;
 
-  ai_tensor_matrix_core dut(
+  ai_tensor_matrix_core #(.ARRAY_SIZE(PHYSICAL_ARRAY_SIZE)) dut(
     .clk(clk),.resetn(resetn),.start(start),.abort(abort),.op_mode(op_mode),
     .src0_base(src0_base),.src1_base(src1_base),.bias_base(bias_base),.dst_base(dst_base),
     .m_size(m_size),.n_size(n_size),.k_words(k_words),.instance_count(instance_count),
@@ -125,6 +134,7 @@ module tb_ai_tensor_matrix_core_random;
   always @(posedge clk or negedge resetn) begin
     if(!resetn) begin
       rng<=32'h7ac4_01d3;
+      mac_cycle_count<=0;
       banked_ready<=0;banked_rsp_valid<=0;pending_bank<=0;bank_delay<=0;
       pending_bank_issue<=0;bank_read_count<=0;bank_response_count<=0;
       pending_bank_data[0]<=0;pending_bank_data[1]<=0;
@@ -134,6 +144,7 @@ module tb_ai_tensor_matrix_core_random;
       line_ready<=0;
       line_write_count<=0;scalar_write_count<=0;
     end else begin
+      if(perf_mac_active) mac_cycle_count<=mac_cycle_count+1;
       rng<={rng[30:0],rng[31]^rng[21]^rng[1]^rng[0]};
       banked_ready<=rng[0]|rng[3];
       spad_ready<=rng[2]|rng[5];
@@ -157,7 +168,7 @@ module tb_ai_tensor_matrix_core_random;
         pending_bank_data[1]<=bank_mem[1][(banked_addr>>4)&13'h1fff];
         pending_bank_data[2]<=bank_mem[2][(banked_addr>>4)&13'h1fff];
         pending_bank_data[3]<=bank_mem[3][(banked_addr>>4)&13'h1fff];
-        pending_bank<=1;bank_delay<=rng[6:5];pending_bank_issue<=bank_read_count;
+        pending_bank<=1;bank_delay<=benchmark_mode ? 0 : rng[6:5];pending_bank_issue<=bank_read_count;
         bank_read_count<=bank_read_count+1;
       end
 
@@ -303,6 +314,10 @@ module tb_ai_tensor_matrix_core_random;
             output_mem[local_word]=32'hbad0_0000+local_word;
           end
       line_write_count=0;scalar_write_count=0;
+      case_mac_snapshot=mac_cycle_count;
+      case_bank_snapshot=bank_read_count;
+      case_bank_stall_snapshot=bank_stall_count;
+      case_line_stall_snapshot=line_stall_count;
     end
   endtask
 
@@ -323,6 +338,8 @@ module tb_ai_tensor_matrix_core_random;
   task automatic check_valid_case(input integer case_id);
     integer expected_line_writes,expected_scalar_writes;
     integer ii,rr,cc,local_word;
+    integer useful_mac_ops,case_mac_cycles;
+    real macs_per_cycle,array_utilization,effective_gops_250;
     begin
       launch_and_wait();
       if(error || error_code!==0)
@@ -352,10 +369,21 @@ module tb_ai_tensor_matrix_core_random;
         $fatal(1,"matrix case %0d read drain bank=%0d/%0d pending=%b spad=%0d/%0d pending=%b",
                case_id,bank_read_count,bank_response_count,pending_bank,
                spad_read_count,spad_response_count,pending_spad);
+      useful_mac_ops=cfg_m*cfg_n*cfg_kw*4*cfg_instances;
+      case_mac_cycles=mac_cycle_count-case_mac_snapshot;
+      macs_per_cycle=(useful_mac_ops*1.0)/cycle_count;
+      array_utilization=(useful_mac_ops*1.0)/(PHYSICAL_ARRAY_SIZE*PHYSICAL_ARRAY_SIZE*cycle_count);
+      effective_gops_250=macs_per_cycle*0.5;
       case_count=case_count+1;
-      $display("MATRIX_CORE_CASE_PASS id=%0d shape=%0dx%dx%0d batches=%0d transpose=%b%b bias=%b writes=%0d/%0d",
+      $display("MATRIX_CORE_CASE_PASS id=%0d shape_mnk=%0d,%0d,%0d batches=%0d transpose_ab=%0d%0d bias=%0d writes=%0d/%0d cycles=%0d mac_cycles=%0d bank_reads=%0d bank_read_bytes=%0d bank_stalls=%0d line_write_bytes=%0d line_stalls=%0d macs_per_cycle=%0.3f array_utilization_pct=%0.2f effective_gops_250mhz=%0.3f physical_array=%0dx%0d",
                case_id,cfg_m,cfg_n,cfg_kw*4,cfg_instances,cfg_ta,cfg_tb,cfg_bias,
-               line_write_count,scalar_write_count);
+               line_write_count,scalar_write_count,cycle_count,case_mac_cycles,
+               bank_read_count-case_bank_snapshot,
+               (bank_read_count-case_bank_snapshot)*16,
+               bank_stall_count-case_bank_stall_snapshot,
+               line_write_count*16,
+               line_stall_count-case_line_stall_snapshot,macs_per_cycle,
+               array_utilization*100.0,effective_gops_250,PHYSICAL_ARRAY_SIZE,PHYSICAL_ARRAY_SIZE);
     end
   endtask
 
@@ -418,8 +446,10 @@ module tb_ai_tensor_matrix_core_random;
     integer target_issue,lines_before,scalars_before,lines_at_fault,scalars_at_fault;
     begin
       simple_fault_setup();
-      prepare_case(16,16,8,1,0,0,0,0,0,0,0);
-      target_issue=bank_read_count+80;
+      // Complete the first 16x16 macro tile, then fail while reading the
+      // second row tile of a 32x16 GEMM.
+      prepare_case(32,16,8,1,0,0,0,0,0,0,0);
+      target_issue=bank_read_count+70;
       bank_parity_target_issue=target_issue;
       inject_bank_parity=1;
       lines_before=line_write_count;scalars_before=scalar_write_count;
@@ -457,6 +487,7 @@ module tb_ai_tensor_matrix_core_random;
 
   initial begin
     if($value$plusargs("SEED=%d",seed)) begin end
+    benchmark_mode=$test$plusargs("MATRIX_BENCHMARK_ONLY");
     initial_seed=seed;rand_state=seed;
     for(inst=0;inst<4;inst=inst+1)
       for(row=0;row<8192;row=row+1)
@@ -466,6 +497,17 @@ module tb_ai_tensor_matrix_core_random;
     end
     repeat(4) @(negedge clk);resetn=1;
 
+    if($test$plusargs("MATRIX_BENCHMARK_ONLY")) begin
+      prepare_case(4,4,8,1,0,0,0,0,0,0,0);
+      check_valid_case(100);
+      prepare_case(8,8,8,1,0,0,0,0,0,0,0);
+      check_valid_case(101);
+      prepare_case(16,16,8,1,0,0,0,0,0,0,0);
+      check_valid_case(102);
+      $display("MATRIX_SIZE_BENCHMARK_PASS seed=%0d sizes=4,8,16 k=32 physical_array=%0dx%0d bank_response_latency=1 cycle gops_reference_mhz=250 sim_period_ns=10",initial_seed,PHYSICAL_ARRAY_SIZE,PHYSICAL_ARRAY_SIZE);
+      $finish;
+    end
+
     prepare_case(8,8,2,2,0,0,1,1,1,1,0);
     check_valid_case(0);
     prepare_case(8,4,2,1,1,0,0,0,0,0,0);
@@ -474,6 +516,10 @@ module tb_ai_tensor_matrix_core_random;
     check_valid_case(2);
     prepare_case(4,4,1,1,1,1,0,3,0,0,1);
     check_valid_case(3);
+    prepare_case(16,16,4,1,0,0,0,0,0,0,0);
+    check_valid_case(4);
+    prepare_case(32,16,2,1,1,1,1,1,0,0,0);
+    check_valid_case(5);
 
     simple_fault_setup();m_size=0;check_fault(ERR_CONFIG,0);
     prepare_case(4,4,1,1,0,0,0,0,0,0,0);op_mode=8'h7f;check_fault(ERR_OP,1);

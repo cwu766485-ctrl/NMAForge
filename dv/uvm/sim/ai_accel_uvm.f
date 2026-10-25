@@ -62,6 +62,7 @@
 +incdir+../tests
 ../agent/interfaces/ai_axil_if.sv
 ../agent/interfaces/ai_axi4_if.sv
+../agent/interfaces/ai_compute_cluster_if.sv
 ../agent/ai_accel_uvm_types_pkg.sv
 ../agent/ai_axil_agent_pkg.sv
 ../agent/ai_axi4_agent_pkg.sv

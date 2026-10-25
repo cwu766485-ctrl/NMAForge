@@ -1,5 +1,15 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-25 real Compute Cluster top-UVM status:** The production-top
+> Matrix/SFU slice passed three VCS seeds after license recovery. Each seed
+> checked real 16×16×64 GEMM, SFU queueing, cross-engine overlap, arbiter/four-bank
+> SPAD traffic, ordered completions, concurrent abort, active reset and recovery.
+> UVM warning/error/fatal=`0/0/0`; focused covergroup=`55.5%`. The merged
+> whole-top URG is not DUT-only coverage. CNM/FP/Conv/KV/scalar numerics,
+> CNM/parity faults, broad backpressure, and complete cluster closure remain
+> open. Exact results are recorded at the end of this matrix and in the
+> [testplan](../docs/verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md).
+
 > **2026-10-23 Multi-Engine NPU Compute Cluster interaction follow-up:** The
 > three-seed direct regressions now include CNM late parity after 128 accepted
 > request slots and parity/protection+abort/reset combinations; full-range CNN/KV
@@ -657,7 +667,7 @@ and [`A10_DV_RTM.md`](../docs/verification/A10_DV_RTM.md).
 | 5 | Block | CNM / Matrix / SFU / CNN-KV | INT8 算法正确性、边界值、transpose、量化、Softmax/Norm、卷积窗口、KV 地址 | 与 Python bit-aware golden 匹配；无死锁、无越界 |
 | 6 | Subsystem | DMA–SPAD | DMA 通过 arbiter 访问真实 scratchpad，同时叠加 compute-like client | 数据正确、仲裁正确、protection/error 可恢复 |
 | 7 | Subsystem | Queue–completion | AXI-Lite 配置 → CMDQ → processor → completion writer | completion 四个 word 完成后才推进 tail；reset/abort 正确 |
-| 8 | Subsystem | Multi-Engine NPU Compute Cluster Verification | Five compute groups through real top dispatch; shared-SPAD concurrency; per-engine slot and ordered-completion checks; all `rtl/compute` module coverage | The 2026-10-23 full `cluster_regress` VDB merge remains the source for the listed line/condition/branch numbers. It reports 23 `rtl/compute` module definitions, 20 executable and 3 wiring wrappers N/A; weighted line/condition/FSM/branch=`92.69/90.00/54.67/87.31%`; five-seed top-only compute slice=`83.79/66.39/41.60/69.19%`. The targeted 2026-10-24 SFU-refresh re-merge updates the compute FSM weighted value to 76.11% (258/339; nine FSM-bearing modules), and the new three-seed Dispatcher/SPAD-MUX UVM reaches 21/21 overlap pairs + 5/5 scenario bins per seed. The 2026-10-25 parameterized Matrix array milestone is tracked separately: 8×8/16×16 direct DUT-only coverage is 100.00% line/100.00% condition/94.12% branch with 100% functional coverage, while descriptor/SPAD integration remains open. These additions do not recalculate the older full-merge line/condition/branch values and do not close full C0/C1. Each engine pair also overlaps and passes ordered abort drain in top smoke. Dispatcher formal proves 5/5 assertions and reaches 23/23 covers (4 antecedent properties non-vacuous). Full-domain FP writeback exclusion is proven; the FP six-property unassisted lifecycle remains 3/6 and project-wide closure remains partial. [Status](../docs/verification/COMPUTE_ENGINE_STATUS.md) / [Interaction run record](../docs/verification/COMPUTE_ENGINE_INTERACTION_FOLLOWUP_2026-10-23.md) / [Compute Cluster Testplan](../docs/verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md) / [Upgrade roadmap](../docs/verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md) |
+| 8 | Subsystem | Multi-Engine NPU Compute Cluster Verification | Five compute groups through real top dispatch; shared-SPAD concurrency; per-engine slot and ordered-completion checks; all `rtl/compute` module coverage | The 2026-10-23 full `cluster_regress` VDB merge remains the source for the listed line/condition/branch numbers. It reports 23 `rtl/compute` module definitions, 20 executable and 3 wiring wrappers N/A; weighted line/condition/FSM/branch=`92.69/90.00/54.67/87.31%`; five-seed top-only compute slice=`83.79/66.39/41.60/69.19%`. The targeted 2026-10-24 SFU-refresh re-merge updates the compute FSM weighted value to 76.11% (258/339; nine FSM-bearing modules), and the new three-seed Dispatcher/SPAD-MUX UVM reaches 21/21 overlap pairs + 5/5 scenario bins per seed. The 2026-10-25 Matrix controller integration follow-up is tracked separately: default `ARRAY_SIZE=16` now executes real descriptor-facing SPAD GEMM; three seeds each pass 8 numeric/layout cases including 16×16 and 32×16 multi-macro-tile GEMM, plus 12 fault/recovery cases. Matrix core DUT-scoped URG is line/condition/FSM-transition/branch=`96.17/90.83/65.85/93.52%`; array child=`82.35/20.00/N/A/58.82%`. A fixed-response VCS 4×4/8×8/16×16 physical-array × workload-size benchmark is recorded separately; it is not DC/PPA. These additions do not recalculate older full-merge compute line/condition/branch values and do not close full C0/C1. Each engine pair also overlaps and passes ordered abort drain in top smoke. Dispatcher formal proves 5/5 assertions and reaches 23/23 covers (4 antecedent properties non-vacuous). Full-domain FP writeback exclusion is proven; the FP six-property unassisted lifecycle remains 3/6 and project-wide closure remains partial. [Status](../docs/verification/COMPUTE_ENGINE_STATUS.md) / [Interaction run record](../docs/verification/COMPUTE_ENGINE_INTERACTION_FOLLOWUP_2026-10-23.md) / [Compute Cluster Testplan](../docs/verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md) / [Upgrade roadmap](../docs/verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md) |
 | 9 | Top UVM | `ai_accel_top` | 软件可见 ABI、随机 CMDQ、乱序 DDR、IRQ、reset、Transformer command-chain | 端到端结果、completion、错误恢复、性能计数器一致 |
 | 10 | 静态/形式/覆盖率 | 全 RTL | SpyGlass lint/CDC/RDC、关键 SVA formal、functional/code coverage closure | P0 lint 清零或有 waiver；CDC/RDC 收口；coverage 达标 |
 | 11 | FPGA/板级 | XCZU15EG | bitstream、DDR DMA、IRQ、ILA、性能计数器、长时间稳定性 | 实测数据与仿真一致，日志与性能报告归档 |
@@ -767,3 +777,34 @@ CP UVM/URG 三 seed × 24-profile campaign 为 72/72 PASS，scenario bins 每次
 ### CP raw condition audit follow-up (2026-10-18)
 
 VC Formal is now 7/7 proven, 7/7 non-vacuous, and 3/3 covers. Under the explicit one-outstanding descriptor-fetch response contract, the new `fetch_done -> ST_FETCH` proof classifies the final raw condition miss; the existing ownership/reservation properties and `cmdq_empty` definition classify the other 14. CP raw condition remains 237/252 (94.05%) in URG by design—no exclusions or synthetic coverage claims. CP toggle residuals, broader lifecycle interactions, V2/V5 closure, and clean-SHA replay remain open. Details: [A10 CP completion availability run record](../docs/verification/A10_DV_RUN_2026-10-18_CP_COMPLETION_AVAILABILITY.md).
+
+### Real-top Compute Cluster Matrix/SFU UVM replay (2026-10-25)
+
+After VCS license recovery, the new real-top Cluster UVM test passed three
+seeds:
+`make -C dv/uvm/sim uvm_compute_cluster_regress COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_real_compute_cluster_uvm_final_20261025`
+with VCS `V-2023.12-SP1_Full64`, seeds `20261025/20261026/20261027`. Each seed
+checked real 16×16×64 Matrix GEMM against the golden model, queued SFU work,
+Matrix/SFU overlap, banked/core arbiter traffic, completion order, two-engine
+abort, reset-dropped in-flight reads, no stale writeback/completion, and
+post-reset recovery. All three printed the test and reset-recovery PASS markers;
+UVM warning/error/fatal was `0/0/0`, orphan responses were zero, and pending
+reads drained to zero. The expected abort completion contributes one observed
+engine error per seed. Focused functional coverage was 55.5%. The three-test
+whole-top URG dashboard reports line/condition/FSM/branch/assertion/group
+`45.93/39.46/8.99/35.46/60.00/17.88%`; this includes DUT, checker, testbench,
+and UVM and is not a DUT-only or full-cluster coverage claim. VCS elaborated with
+zero errors; one `Warning-[TFIPC]` reports omitted inputs on the top protocol
+SVA instance.
+
+Also reran `make -C dv/subsystem/top_smoke/sim ai_smoke` (`TEST PASS`) and
+`make -C dv/block/compute/matrix/sim core-random-regress
+SEEDS='20261021 20261022 20261023'
+CORE_OUT_DIR=/tmp/nmaforge_matrix16_core_regress_vcs_20261025` (all three seeds
+passed 8 numerical/layout and 12 fault cases, late tile fault, and recovery).
+Merged Matrix core/array URG is respectively
+`96.17/90.83/65.85/93.52%` and `82.35/20.00/N/A/58.82%`
+(line/condition/FSM/branch). Detailed logs and reports are in the two `/tmp`
+directories named above. These are dirty-worktree replay results, not a
+clean-SHA run; broader engine, feature-coverage, mutation, and signoff closure
+remain open.

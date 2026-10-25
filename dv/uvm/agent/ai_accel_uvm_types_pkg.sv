@@ -46,4 +46,5 @@ package ai_accel_uvm_types_pkg;
     `include "items/ai_completion.svh"
     `include "items/ai_axil_item.svh"
     `include "items/ai_axi4_observed_item.svh"
+    `include "items/ai_compute_cluster_obs.svh"
 endpackage
