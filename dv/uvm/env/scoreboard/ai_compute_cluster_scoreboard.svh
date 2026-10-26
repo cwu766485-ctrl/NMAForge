@@ -250,6 +250,9 @@ class ai_compute_cluster_scoreboard extends uvm_component;
             `uvm_error("CLUSTER_MISSING_DONE", $sformatf(
                 "active engines stopped without done/error: engines=%07b",
                 missing_done_mask))
+            // Retire the bad observation after reporting it so one missing
+            // pulse does not cascade into an error on every later sample.
+            active_engine_seen &= ~missing_done_mask;
         end
         active_engine_seen |= obs.engine_busy;
         active_engine_seen &= ~(obs.engine_done | obs.engine_error);

@@ -6,6 +6,7 @@ class ai_compute_cluster_monitor extends uvm_component;
     bit mutation_injected;
     bit [6:0] missing_done_pending;
     bit [6:0] duplicate_done_pending;
+    int mutation_engine;
 
     function new(string name, uvm_component parent);
         super.new(name, parent);
@@ -20,7 +21,9 @@ class ai_compute_cluster_monitor extends uvm_component;
         mutation_injected = 1'b0;
         missing_done_pending = '0;
         duplicate_done_pending = '0;
+        mutation_engine = 0;
         void'($value$plusargs("CL_MUTATION=%s", mutation_kind));
+        void'($value$plusargs("CL_MUTATION_ENGINE=%d", mutation_engine));
     endfunction
 
     task run_phase(uvm_phase phase);
@@ -128,12 +131,12 @@ class ai_compute_cluster_monitor extends uvm_component;
                         "done": if ((obs.engine_busy == 7'd0) &&
                                     (obs.engine_done == 7'd0) &&
                                     (obs.engine_error == 7'd0) && !obs.reset_active) begin
-                            obs.engine_done[0] = 1'b1;
+                            obs.engine_done[mutation_engine] = 1'b1;
                             mutation_injected = 1'b1;
                         end
-                        "missing_done": if ((obs.engine_done != 0) && !obs.reset_active) begin
-                            missing_done_pending = obs.engine_done;
-                            obs.engine_done = '0;
+                        "missing_done": if (obs.engine_done[mutation_engine] && !obs.reset_active) begin
+                            missing_done_pending[mutation_engine] = 1'b1;
+                            obs.engine_done[mutation_engine] = 1'b0;
                             mutation_injected = 1'b1;
                         end
                         "duplicate_done": if ((duplicate_done_pending != 0) &&
@@ -147,12 +150,13 @@ class ai_compute_cluster_monitor extends uvm_component;
                     endcase
                     if (mutation_injected)
                         `uvm_info("CLUSTER_MUTATION_INJECTED", $sformatf(
-                            "testbench observation mutation=%s", mutation_kind), UVM_LOW)
+                            "testbench observation mutation=%s engine=%0d",
+                            mutation_kind, mutation_engine), UVM_LOW)
                 end
                 ap.write(obs);
                 if ((mutation_kind == "duplicate_done") && !mutation_injected &&
-                    (sampled_engine_done != 0) && vif.aresetn)
-                    duplicate_done_pending = duplicate_done_pending | sampled_engine_done;
+                    sampled_engine_done[mutation_engine] && vif.aresetn)
+                    duplicate_done_pending[mutation_engine] = 1'b1;
                 if (flush_missing_done)
                     missing_done_pending = '0;
             end
