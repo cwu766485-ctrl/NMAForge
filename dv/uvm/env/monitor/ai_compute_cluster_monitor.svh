@@ -2,6 +2,8 @@ class ai_compute_cluster_monitor extends uvm_component;
     `uvm_component_utils(ai_compute_cluster_monitor)
     virtual ai_compute_cluster_if vif;
     uvm_analysis_port #(ai_compute_cluster_obs) ap;
+    string mutation_kind;
+    bit mutation_injected;
 
     function new(string name, uvm_component parent);
         super.new(name, parent);
@@ -12,6 +14,9 @@ class ai_compute_cluster_monitor extends uvm_component;
         super.build_phase(phase);
         if (!uvm_config_db#(virtual ai_compute_cluster_if)::get(this, "", "compute_vif", vif))
             `uvm_fatal("NOCOMPUTEVIF", "compute-cluster monitor requires compute_vif")
+        mutation_kind = "";
+        mutation_injected = 1'b0;
+        void'($value$plusargs("CL_MUTATION=%s", mutation_kind));
     endfunction
 
     task run_phase(uvm_phase phase);
@@ -36,6 +41,7 @@ class ai_compute_cluster_monitor extends uvm_component;
                 obs.engine_done = vif.engine_done;
                 obs.engine_error = vif.engine_error;
                 obs.engine_req_valid = vif.engine_req_valid;
+                obs.engine_req_ready = vif.engine_req_ready;
                 obs.engine_backpressure = |(vif.engine_req_valid & ~vif.engine_req_ready);
                 obs.multi_engine_abort = (vif.dut_abort_active &&
                                           ($countones(vif.engine_busy) > 1));
@@ -86,6 +92,41 @@ class ai_compute_cluster_monitor extends uvm_component;
                 obs.selected_rsp_is_line = vif.selected_rsp_is_line;
                 obs.selected_rsp_error = vif.selected_rsp_error;
                 obs.selected_rsp_rdata = vif.selected_rsp_rdata;
+
+                // Checker-sensitivity mutations alter only the passive
+                // transaction copy. The DUT, memory, and sequence drivers are
+                // never changed. Each campaign run injects one mutation.
+                if (!mutation_injected) begin
+                    case (mutation_kind)
+                        "address": if (obs.selected_banked_valid && obs.selected_banked_ready) begin
+                            obs.selected_banked_addr = obs.selected_banked_addr + 32'd4;
+                            mutation_injected = 1'b1;
+                        end
+                        "data": if (obs.rsp_valid && obs.rsp_client == 3'd3) begin
+                            obs.banked_rdata[0] = obs.banked_rdata[0] ^ 32'd1;
+                            mutation_injected = 1'b1;
+                        end
+                        "owner": if (obs.rsp_valid && obs.rsp_client == 3'd3) begin
+                            obs.rsp_client = 3'd5;
+                            mutation_injected = 1'b1;
+                        end
+                        "wstrb": if (obs.selected_line_valid && obs.selected_line_ready &&
+                                     obs.selected_line_write && obs.request_client == 3'd2) begin
+                            obs.selected_line_wstrb[0] = ~obs.selected_line_wstrb[0];
+                            mutation_injected = 1'b1;
+                        end
+                        "done": if ((obs.engine_busy == 7'd0) &&
+                                    (obs.engine_done == 7'd0) &&
+                                    (obs.engine_error == 7'd0) && !obs.reset_active) begin
+                            obs.engine_done[0] = 1'b1;
+                            mutation_injected = 1'b1;
+                        end
+                        default: begin end
+                    endcase
+                    if (mutation_injected)
+                        `uvm_info("CLUSTER_MUTATION_INJECTED", $sformatf(
+                            "testbench observation mutation=%s", mutation_kind), UVM_LOW)
+                end
                 ap.write(obs);
             end
         end

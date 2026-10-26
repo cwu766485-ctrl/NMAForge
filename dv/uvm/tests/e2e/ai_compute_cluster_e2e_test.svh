@@ -18,6 +18,20 @@ class ai_compute_cluster_e2e_test extends ai_base_test;
         seq = ai_compute_cluster_e2e_seq::type_id::create("compute_cluster_e2e_seq");
         seq.compute_vif = compute_vif;
         seq.start(env.axil_agent.sequencer);
+        if (env.compute_coverage.response_client_hits[4] == 0)
+            `uvm_fatal("CLUSTER_DMA_RESPONSE", "real DMA SPAD-read response-client bin was not hit")
+        if (env.compute_coverage.response_client_hits[1] != 0)
+            `uvm_fatal("CLUSTER_CPL_RESPONSE_WAIVER", $sformatf(
+                "completion writer unexpectedly issued %0d scratchpad reads; review the write-only waiver",
+                env.compute_coverage.response_client_hits[1]))
+        `uvm_info("CLUSTER_RESPONSE_CLIENT_DISPOSITION", $sformatf(
+            "DMA read-response bin=%0d PASS; completion read-response bin=%0d WAIVED (completion writer is write-only)",
+            env.compute_coverage.response_client_hits[4],
+            env.compute_coverage.response_client_hits[1]), UVM_LOW)
+        `uvm_info("CLUSTER_RECOVERY_DISPOSITION", $sformatf(
+            "reset_dropped_accepted_reads=%0d stale_responses=%0d",
+            env.compute_scoreboard.reset_dropped_reads,
+            env.compute_scoreboard.stale_epoch_responses), UVM_LOW)
         phase.drop_objection(this, "real compute cluster checks completed");
     endtask
 endclass

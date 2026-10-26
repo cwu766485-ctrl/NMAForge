@@ -89,6 +89,13 @@ interface ai_compute_cluster_if(input logic aclk);
     logic [6:0] engine_backpressure_seen;
     integer multi_engine_abort_cycles;
     integer engine_launch_count[0:6];
+    integer unsigned sim_cycles;
+
+    // Monotonic testbench clock counter for comparable wall-cycle timing.
+    // It intentionally survives accelerator reset so recovery intervals remain
+    // measurable in the same run.
+    initial sim_cycles = 0;
+    always @(posedge aclk) sim_cycles = sim_cycles + 1;
 
     always_comb begin
         read_accept_mask[0] = desc_valid && desc_ready;

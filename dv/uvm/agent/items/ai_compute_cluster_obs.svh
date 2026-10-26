@@ -7,6 +7,7 @@ class ai_compute_cluster_obs extends uvm_sequence_item;
     bit [6:0] engine_done;
     bit [6:0] engine_error;
     bit [6:0] engine_req_valid;
+    bit [6:0] engine_req_ready;
     bit engine_backpressure;
     bit multi_engine_abort;
     bit core_spad_valid;

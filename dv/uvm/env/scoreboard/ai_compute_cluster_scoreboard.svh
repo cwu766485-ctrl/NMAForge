@@ -7,6 +7,10 @@ class ai_compute_cluster_scoreboard extends uvm_component;
         bit [31:0] addr;
         bit [127:0] expected;
         bit [3:0] check_words;
+        bit [3:0] banks;
+        bit [6:0] engines;
+        bit [2:0] client;
+        bit [15:0] epoch;
         bit check_data;
         bit is_line;
     } pending_memory_read_t;
@@ -37,6 +41,19 @@ class ai_compute_cluster_scoreboard extends uvm_component;
     int unsigned memory_data_checks;
     int unsigned memory_data_mismatches;
     int unsigned memory_unknown_reads;
+    int unsigned full_line_write_masks;
+    int unsigned partial_line_write_masks;
+    int unsigned zero_line_write_masks;
+    int unsigned read_bank_hits[0:3];
+    int unsigned read_engine_hits[0:6];
+    int unsigned write_engine_hits[0:6];
+    int unsigned memory_epoch;
+    int unsigned stale_epoch_responses;
+    int unsigned invalid_engine_done;
+    bit [6:0] active_engine_seen;
+    bit reset_active_previous;
+    string mutation_kind;
+    bit mutation_caught;
 
     function new(string name, uvm_component parent);
         int client;
@@ -48,6 +65,21 @@ class ai_compute_cluster_scoreboard extends uvm_component;
             cnm_pending_lane_reads[lane] = 0;
             cnm_lane_accepts[lane] = 0;
             cnm_lane_responses[lane] = 0;
+        end
+    endfunction
+
+    function void build_phase(uvm_phase phase);
+        super.build_phase(phase);
+        mutation_kind = "";
+        mutation_caught = 1'b0;
+        void'($value$plusargs("CL_MUTATION=%s", mutation_kind));
+    endfunction
+
+    function void note_mutation_caught(input string checker_name);
+        if ((mutation_kind != "") && !mutation_caught) begin
+            mutation_caught = 1'b1;
+            `uvm_info("CLUSTER_MUTATION_CAUGHT", $sformatf(
+                "mutation=%s checker=%s", mutation_kind, checker_name), UVM_LOW)
         end
     endfunction
 
@@ -122,6 +154,37 @@ class ai_compute_cluster_scoreboard extends uvm_component;
         return item;
     endfunction
 
+    function automatic pending_memory_read_t annotate_snapshot(
+        input pending_memory_read_t source,
+        input int client,
+        input bit [6:0] engines,
+        input int lane_id
+    );
+        pending_memory_read_t item;
+        int word_lane;
+        int bank_id;
+        item = source;
+        item.client = client[2:0];
+        item.engines = engines;
+        item.epoch = memory_epoch[15:0];
+        for (word_lane = 0; word_lane < 4; word_lane++) begin
+            if (item.check_words[word_lane]) begin
+                bank_id = ((item.addr >> 2) + word_lane) & 3;
+                item.banks[bank_id] = 1'b1;
+            end
+        end
+        if (client == 5 && lane_id >= 0 &&
+            item.banks != (4'b0001 << lane_id))
+            `uvm_error("CLUSTER_MEMORY_BANK", $sformatf(
+                "CNM lane=%0d accepted address=0x%08h maps to bank mask=%b",
+                lane_id, item.addr, item.banks))
+        for (bank_id = 0; bank_id < 4; bank_id++)
+            if (item.banks[bank_id]) read_bank_hits[bank_id]++;
+        for (bank_id = 0; bank_id < 7; bank_id++)
+            if (engines[bank_id]) read_engine_hits[bank_id]++;
+        return item;
+    endfunction
+
     function void compare_snapshot(
         input pending_memory_read_t item,
         input bit [127:0] actual,
@@ -135,6 +198,7 @@ class ai_compute_cluster_scoreboard extends uvm_component;
                 memory_data_checks++;
                 if (actual[lane*32 +: 32] !== item.expected[lane*32 +: 32]) begin
                     memory_data_mismatches++;
+                    note_mutation_caught("memory_data");
                     `uvm_error("CLUSTER_MEMORY_MISMATCH", $sformatf(
                         "client=%0d lane=%0d word_lane=%0d addr=0x%08h expected=0x%08h actual=0x%08h",
                         client, lane_id, lane, item.addr + (lane * 4),
@@ -147,10 +211,15 @@ class ai_compute_cluster_scoreboard extends uvm_component;
     function void write_compute_cluster(ai_compute_cluster_obs obs);
         int client;
         int lane;
+        bit [6:0] invalid_done_mask;
+        bit [6:0] accepted_engine_mask;
         pending_memory_read_t item;
         bit [127:0] actual;
         observations++;
         if (obs.reset_active) begin
+            if (!reset_active_previous) memory_epoch++;
+            reset_active_previous = 1'b1;
+            active_engine_seen = 7'd0;
             for (client = 0; client < 6; client++) begin
                 if (pending_reads[client] != 0)
                     reset_dropped_reads += pending_reads[client];
@@ -163,6 +232,19 @@ class ai_compute_cluster_scoreboard extends uvm_component;
             end
             return;
         end
+        reset_active_previous = 1'b0;
+
+        invalid_done_mask = obs.engine_done & ~(active_engine_seen | obs.engine_busy);
+        if (invalid_done_mask != 0) begin
+            invalid_engine_done++;
+            note_mutation_caught("engine_done_lifecycle");
+            `uvm_error("CLUSTER_DONE_WITHOUT_ACTIVE", $sformatf(
+                "engine_done=%07b has no active transaction; busy=%07b previously_active=%07b",
+                obs.engine_done, obs.engine_busy, active_engine_seen))
+        end
+        active_engine_seen |= obs.engine_busy;
+        active_engine_seen &= ~(obs.engine_done | obs.engine_error);
+        if (obs.multi_engine_abort) active_engine_seen = 7'd0;
 
         if (obs.core_busy !== (|obs.engine_busy))
             `uvm_error("CLUSTER_BUSY", $sformatf("core_busy=%b engine_busy=%07b", obs.core_busy, obs.engine_busy))
@@ -191,19 +273,33 @@ class ai_compute_cluster_scoreboard extends uvm_component;
                         `uvm_error("CLUSTER_MEMORY_ORPHAN", "banked response has no memory snapshot")
                     else begin
                         item = pending_memory_reads[3].pop_front();
+                        if (item.epoch != memory_epoch[15:0]) begin
+                            stale_epoch_responses++;
+                            `uvm_error("CLUSTER_MEMORY_EPOCH", $sformatf(
+                                "client=%0d accepted_epoch=%0d current_epoch=%0d addr=0x%08h",
+                                item.client, item.epoch, memory_epoch, item.addr))
+                        end
                         actual = {obs.banked_rdata[3], obs.banked_rdata[2],
                                   obs.banked_rdata[1], obs.banked_rdata[0]};
                         compare_snapshot(item, actual, 3, -1);
                     end
                 end else if (obs.rsp_client == 3'd5) begin
                     cnm_tag_responses++;
-                    if (!(|obs.cnm_rsp_valid) || obs.matrix_rsp_valid)
+                    if (!(|obs.cnm_rsp_valid) || obs.matrix_rsp_valid) begin
+                        note_mutation_caught("response_owner_route");
                         `uvm_error("CLUSTER_CNM_RSP_ROUTE", $sformatf("CNM tag routed incorrectly: matrix_valid=%b cnm_valid=%b", obs.matrix_rsp_valid, obs.cnm_rsp_valid))
+                    end
                 end else begin
                     if (pending_memory_reads[obs.rsp_client].size() == 0)
                         `uvm_error("CLUSTER_MEMORY_ORPHAN", $sformatf("client=%0d response has no memory snapshot", obs.rsp_client))
                     else begin
                         item = pending_memory_reads[obs.rsp_client].pop_front();
+                        if (item.epoch != memory_epoch[15:0]) begin
+                            stale_epoch_responses++;
+                            `uvm_error("CLUSTER_MEMORY_EPOCH", $sformatf(
+                                "client=%0d accepted_epoch=%0d current_epoch=%0d addr=0x%08h",
+                                item.client, item.epoch, memory_epoch, item.addr))
+                        end
                         actual = item.is_line ? obs.selected_line_rdata : {96'd0, obs.selected_rsp_rdata};
                         compare_snapshot(item, actual, obs.rsp_client, -1);
                     end
@@ -226,6 +322,12 @@ class ai_compute_cluster_scoreboard extends uvm_component;
                         `uvm_error("CLUSTER_MEMORY_ORPHAN", $sformatf("CNM lane=%0d response has no memory snapshot", lane))
                     else begin
                         item = pending_cnm_lane_reads[lane].pop_front();
+                        if (item.epoch != memory_epoch[15:0]) begin
+                            stale_epoch_responses++;
+                            `uvm_error("CLUSTER_MEMORY_EPOCH", $sformatf(
+                                "CNM lane=%0d accepted_epoch=%0d current_epoch=%0d addr=0x%08h",
+                                lane, item.epoch, memory_epoch, item.addr))
+                        end
                         actual = {96'd0, obs.cnm_rdata[lane]};
                         compare_snapshot(item, actual, 5, lane);
                     end
@@ -241,10 +343,35 @@ class ai_compute_cluster_scoreboard extends uvm_component;
         // request bus. Their ready lines differ but the address/data owner is
         // captured by the arbiter tag in the same cycle.
         if (obs.selected_spad_valid && obs.selected_spad_ready &&
-            obs.selected_spad_write && obs.selected_spad_access_ok)
+            obs.selected_spad_write && obs.selected_spad_access_ok) begin
             write_model_word(obs.selected_spad_addr, obs.selected_spad_wdata, 4'hf);
+            if (obs.request_client == 3'd2) begin
+                accepted_engine_mask = obs.engine_req_valid & obs.engine_req_ready;
+                if ($countones(accepted_engine_mask) != 1)
+                    `uvm_error("CLUSTER_MEMORY_OWNER", $sformatf(
+                        "accepted core write must have one engine owner: valid=%07b ready=%07b addr=0x%08h",
+                        obs.engine_req_valid, obs.engine_req_ready, obs.selected_spad_addr))
+                for (lane = 0; lane < 7; lane++)
+                    if (accepted_engine_mask[lane]) write_engine_hits[lane]++;
+            end
+        end
         if (obs.selected_line_valid && obs.selected_line_ready &&
             obs.selected_line_write && obs.selected_line_access_ok) begin
+            if (obs.selected_line_wstrb == 16'hffff)
+                full_line_write_masks++;
+            else if (obs.selected_line_wstrb == 16'h0000)
+                zero_line_write_masks++;
+            else
+                partial_line_write_masks++;
+            if ((obs.request_client == 3'd2) && obs.engine_busy[3] &&
+                (obs.selected_line_wstrb != 16'hffff)) begin
+                note_mutation_caught("matrix_write_mask");
+                `uvm_error("CLUSTER_MATRIX_WSTRB", $sformatf(
+                    "Matrix line write mask expected=ffff actual=%04h addr=0x%08h",
+                    obs.selected_line_wstrb, obs.selected_line_addr))
+            end
+            if ((obs.request_client == 3'd2) && obs.engine_busy[3])
+                write_engine_hits[3]++;
             for (lane = 0; lane < 4; lane++)
                 write_model_word(obs.selected_line_addr + (lane * 4),
                                  obs.selected_line_wdata[lane*32 +: 32],
@@ -260,22 +387,34 @@ class ai_compute_cluster_scoreboard extends uvm_component;
                 accepted_reads++;
                 case (client)
                     0, 1: pending_memory_reads[client].push_back(
-                        make_read_snapshot(obs.selected_spad_addr, 4'b0001,
-                                           1'b0, obs.selected_spad_access_ok));
+                        annotate_snapshot(make_read_snapshot(obs.selected_spad_addr,
+                            4'b0001, 1'b0, obs.selected_spad_access_ok),
+                            client, 7'd0, -1));
                     2, 4: begin
+                        accepted_engine_mask = (client == 2) ?
+                            (obs.engine_req_valid & obs.engine_req_ready) : 7'd0;
+                        if ((client == 2) &&
+                            ($countones(accepted_engine_mask) != 1))
+                            `uvm_error("CLUSTER_MEMORY_OWNER", $sformatf(
+                                "accepted core read must have one engine owner: valid=%07b ready=%07b addr=0x%08h",
+                                obs.engine_req_valid, obs.engine_req_ready,
+                                obs.selected_spad_addr))
                         if (obs.selected_line_valid && obs.selected_line_ready &&
                             !obs.selected_line_write)
                             pending_memory_reads[client].push_back(
-                                make_read_snapshot(obs.selected_line_addr, 4'b1111,
-                                                   1'b1, obs.selected_line_access_ok));
+                                annotate_snapshot(make_read_snapshot(obs.selected_line_addr,
+                                    4'b1111, 1'b1, obs.selected_line_access_ok),
+                                    client, accepted_engine_mask, -1));
                         else
                             pending_memory_reads[client].push_back(
-                                make_read_snapshot(obs.selected_spad_addr, 4'b0001,
-                                                   1'b0, obs.selected_spad_access_ok));
+                                annotate_snapshot(make_read_snapshot(obs.selected_spad_addr,
+                                    4'b0001, 1'b0, obs.selected_spad_access_ok),
+                                    client, accepted_engine_mask, -1));
                     end
                     3: pending_memory_reads[client].push_back(
-                        make_read_snapshot(obs.selected_banked_addr, 4'b1111,
-                                           1'b0, obs.selected_banked_access_ok));
+                        annotate_snapshot(make_read_snapshot(obs.selected_banked_addr,
+                            4'b1111, 1'b0, obs.selected_banked_access_ok),
+                            client, 7'b0001000, -1));
                     default: ;
                 endcase
             end
@@ -285,8 +424,9 @@ class ai_compute_cluster_scoreboard extends uvm_component;
                 cnm_pending_lane_reads[lane]++;
                 cnm_lane_accepts[lane]++;
                 pending_cnm_lane_reads[lane].push_back(
-                    make_read_snapshot(obs.selected_cnm_addr[lane], 4'b0001,
-                                       1'b0, obs.selected_cnm_access_ok[lane]));
+                    annotate_snapshot(make_read_snapshot(obs.selected_cnm_addr[lane],
+                        4'b0001, 1'b0, obs.selected_cnm_access_ok[lane]),
+                        5, 7'b0000100, lane));
             end
         end
     endfunction
@@ -312,9 +452,17 @@ class ai_compute_cluster_scoreboard extends uvm_component;
         if (memory_data_mismatches != 0 || memory_unknown_reads != 0)
             `uvm_error("CLUSTER_MEMORY_SUMMARY", $sformatf("mismatches=%0d unknown_reads=%0d", memory_data_mismatches, memory_unknown_reads))
         `uvm_info("CLUSTER_MEMORY_SCOREBOARD", $sformatf(
-            "writes=%0d checked_words=%0d mismatches=%0d unknown_reads=%0d",
+            "writes=%0d checked_words=%0d mismatches=%0d unknown_reads=%0d epoch=%0d stale_epoch=%0d line_wstrb={full:%0d,partial:%0d,zero:%0d} bank_hits={%0d,%0d,%0d,%0d} engine_read_hits={%0d,%0d,%0d,%0d,%0d,%0d,%0d} engine_write_hits={%0d,%0d,%0d,%0d,%0d,%0d,%0d}",
             memory_model_writes, memory_data_checks,
-            memory_data_mismatches, memory_unknown_reads), UVM_LOW)
+            memory_data_mismatches, memory_unknown_reads, memory_epoch,
+            stale_epoch_responses, full_line_write_masks,
+            partial_line_write_masks, zero_line_write_masks,
+            read_bank_hits[0], read_bank_hits[1], read_bank_hits[2], read_bank_hits[3],
+            read_engine_hits[0], read_engine_hits[1], read_engine_hits[2],
+            read_engine_hits[3], read_engine_hits[4], read_engine_hits[5], read_engine_hits[6],
+            write_engine_hits[0], write_engine_hits[1], write_engine_hits[2],
+            write_engine_hits[3], write_engine_hits[4], write_engine_hits[5],
+            write_engine_hits[6]), UVM_LOW)
         `uvm_info("CLUSTER_SCOREBOARD", $sformatf(
             "observations=%0d busy=%0d overlap=%0d done=%0d errors=%0d reads=%0d responses=%0d orphan=%0d reset_dropped=%0d matrix_rsp=%0d cnm_rsp=%0d cnm_lane_accepts={%0d,%0d,%0d,%0d} cnm_lane_responses={%0d,%0d,%0d,%0d} pending={%0d,%0d,%0d,%0d,%0d,%0d}",
             observations, busy_observations, overlap_observations,

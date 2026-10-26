@@ -12,6 +12,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] REG_CPLQ_HEAD = 32'h0000_00cc;
     localparam bit [31:0] REG_DOORBELL = 32'h0000_00a0;
     localparam bit [31:0] REG_ABORT = 32'h0000_00a4;
+    localparam bit [31:0] REG_DMA_CTRL = 32'h0000_00b0;
+    localparam bit [31:0] REG_DMA_STATUS = 32'h0000_00b4;
+    localparam bit [31:0] REG_DMA_EXT = 32'h0000_00b8;
+    localparam bit [31:0] REG_DMA_SPAD = 32'h0000_00bc;
+    localparam bit [31:0] REG_DMA_LEN = 32'h0000_00c0;
 
     localparam bit [31:0] CMDQ_LOCAL = 32'h0000_4000;
     localparam bit [31:0] CPLQ_LOCAL = 32'h0000_5000;
@@ -357,6 +362,38 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         `uvm_fatal("CLUSTER_TIMEOUT", $sformatf("CPLQ_TAIL expected %0d got %0d", expected, value))
     endtask
 
+    task automatic run_serial_descriptor(
+        input bit [31:0] descriptor_base,
+        input bit [31:0] completion_base,
+        input bit [15:0] task_id,
+        input bit [31:0] result,
+        input bit [31:0] elements,
+        input string tag,
+        output int unsigned elapsed_cycles
+    );
+        int unsigned start_cycle;
+        int unsigned end_cycle;
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, descriptor_base);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd1);
+        axil_write(REG_CPLQ_BASE, completion_base);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+        start_cycle = compute_vif.sim_cycles;
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd1);
+        end_cycle = compute_vif.sim_cycles;
+        elapsed_cycles = end_cycle - start_cycle;
+        wait_spad_idle();
+        expect_completion(completion_base, task_id, result, elements, tag);
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
     task automatic wait_spad_idle();
         int unsigned poll;
         int unsigned quiet_cycles;
@@ -387,6 +424,57 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             compute_vif.cnm_valid, compute_vif.matrix_line_valid,
             compute_vif.dma_valid, compute_vif.dma_line_valid,
             compute_vif.desc_valid, compute_vif.cpl_valid))
+    endtask
+
+    task automatic run_dma_store_response_test();
+        localparam bit [31:0] DMA_SOURCE_SPAD = 32'h0005_8000;
+        localparam bit [31:0] DMA_DEST_DDR = 32'h0000_1800;
+        bit [31:0] expected[0:3];
+        bit [31:0] dma_status;
+        uvm_hdl_data_t ddr_word;
+        string ddr_path;
+        bit hdl_ok;
+        bit completed;
+        int unsigned word_idx;
+        int unsigned poll;
+
+        for (word_idx = 0; word_idx < 4; word_idx++) begin
+            expected[word_idx] = 32'hd00d_1000 ^ (word_idx * 32'h0101_0101);
+            spad_write(DMA_SOURCE_SPAD + (word_idx << 2), expected[word_idx]);
+        end
+        axil_write(REG_DMA_EXT, DMA_DEST_DDR);
+        axil_write(REG_DMA_SPAD, DMA_SOURCE_SPAD);
+        axil_write(REG_DMA_LEN, 32'd4);
+        axil_write(REG_DMA_CTRL, 32'd3); // SPAD -> DDR store
+
+        completed = 1'b0;
+        for (poll = 0; poll < 3000; poll++) begin
+            axil_read(REG_DMA_STATUS, dma_status);
+            if (dma_status[2])
+                `uvm_fatal("CLUSTER_DMA_RESPONSE", $sformatf(
+                    "DMA store error status=0x%08h", dma_status))
+            if (dma_status[1]) begin
+                completed = 1'b1;
+                break;
+            end
+        end
+        if (!completed)
+            `uvm_fatal("CLUSTER_DMA_RESPONSE", "DMA store timed out")
+        axil_write(REG_DMA_STATUS, 32'd2);
+
+        for (word_idx = 0; word_idx < 4; word_idx++) begin
+            ddr_path = $sformatf("tb_ai_accel_uvm.axi_mem_u.mem[%0d]",
+                                 (DMA_DEST_DDR >> 2) + word_idx);
+            ddr_word = '0;
+            hdl_ok = uvm_hdl_read(ddr_path, ddr_word);
+            if (!hdl_ok || ddr_word[31:0] !== expected[word_idx])
+                `uvm_fatal("CLUSTER_DMA_RESPONSE", $sformatf(
+                    "DMA store word%0d expected=0x%08h actual=0x%08h path=%s",
+                    word_idx, expected[word_idx], ddr_word[31:0], ddr_path))
+        end
+        `uvm_info("CLUSTER_DMA_RESPONSE_PASS",
+            "real top SPAD-to-DDR DMA store returned tagged client-4 reads and matched all four DDR words",
+            UVM_LOW)
     endtask
 
     task automatic wait_matrix_sfu_overlap();
@@ -518,6 +606,26 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned contention_total;
         int unsigned banked_grants_total;
         int unsigned core_grants_total;
+        int unsigned serial_matrix_cycles;
+        int unsigned serial_cnm_cycles;
+        int unsigned serial_sfu0_cycles;
+        int unsigned serial_sfu1_cycles;
+        int unsigned serial_total_cycles;
+        int unsigned serial_matrix_cnm_sfu_cycles;
+        int unsigned staged_pair_start_cycle;
+        int unsigned staged_pair_cycles;
+        int unsigned staged_sfu_start_cycle;
+        int unsigned staged_sfu_cycles;
+        int unsigned staged_total_cycles;
+        int unsigned staged_contention_start;
+        int unsigned staged_contention_cycles;
+        int unsigned parallel_start_cycle;
+        int unsigned parallel_cycles;
+        int unsigned parallel_contention_start;
+        int unsigned parallel_contention_cycles;
+        int unsigned recovery_start_cycle;
+        int unsigned recovery_cycles;
+        real measured_speedup;
         bit reset_value;
         bit reset_ok;
 
@@ -528,6 +636,16 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         void'($value$plusargs("COMPUTE_CLUSTER_SEED=%d", seed));
         rng_state = seed ^ 32'h7ac4_01d3;
         if (rng_state == 0) rng_state = 32'h1;
+        serial_total_cycles = 0;
+        serial_matrix_cnm_sfu_cycles = 0;
+        staged_pair_cycles = 0;
+        staged_sfu_cycles = 0;
+        staged_total_cycles = 0;
+        staged_contention_cycles = 0;
+        parallel_cycles = 0;
+        parallel_contention_cycles = 0;
+        recovery_cycles = 0;
+        measured_speedup = 0.0;
         for (row_idx = 0; row_idx < 16; row_idx++)
             for (k_idx = 0; k_idx < 64; k_idx++)
                 matrix_a[row_idx][k_idx] = next_small_signed();
@@ -620,9 +738,13 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd4);
         axil_write(REG_CPLQ_HEAD, 32'd0);
         axil_write(REG_CPLQ_TAIL, 32'd0);
+        parallel_start_cycle = compute_vif.sim_cycles;
         axil_write(REG_DOORBELL, 32'd1);
         wait_cpl_tail(32'd1);
+        serial_matrix_cycles = compute_vif.sim_cycles - parallel_start_cycle;
         wait_spad_idle();
+        expect_completion(CPLQ_LOCAL, 16'h05ff, matrix_golden[15][31],
+                          32'd512, "serial Matrix baseline");
         if (compute_vif.matrix_a_cache_hits != 16)
             `uvm_fatal("CLUSTER_A_CACHE_BASELINE", $sformatf(
                 "standalone 16x32x64 GEMM expected 16 A-tile cache hits, observed %0d",
@@ -634,6 +756,103 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         `uvm_info("CLUSTER_A_CACHE_BASELINE_PASS",
                   "standalone 16x32x64 Matrix Golden and all 16 A-tile reuse hits passed",
                   UVM_LOW)
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+
+        // Same four operations as the parallel run, deliberately submitted
+        // and retired one at a time. Capture only doorbell-to-completion-tail
+        // cycles; descriptor programming is excluded from both measurements.
+        write_cnm_v3_desc(CMDQ_LOCAL, 16'h0601,
+                          CNM_A_LOCAL, CNM_B_LOCAL, CNM_Y_LOCAL);
+        run_serial_descriptor(CMDQ_LOCAL, CPLQ_LOCAL, 16'h0601,
+                              32'd736, 32'd16, "serial CNM", serial_cnm_cycles);
+        write_v3_desc(CMDQ_LOCAL, 8'h35, 16'h0602,
+                      GELU_A_LOCAL, 32'd0, GELU_Y0_LOCAL,
+                      16'd0, 16'd0, 16'd64);
+        run_serial_descriptor(CMDQ_LOCAL, CPLQ_LOCAL, 16'h0602,
+                              -32'sd15, 32'd64, "serial SFU0", serial_sfu0_cycles);
+        write_v3_desc(CMDQ_LOCAL, 8'h35, 16'h0603,
+                      GELU_B_LOCAL, 32'd0, GELU_Y1_LOCAL,
+                      16'd0, 16'd0, 16'd64);
+        run_serial_descriptor(CMDQ_LOCAL, CPLQ_LOCAL, 16'h0603,
+                              -32'sd15, 32'd64, "serial SFU1", serial_sfu1_cycles);
+        serial_total_cycles = serial_matrix_cycles + serial_cnm_cycles +
+                              serial_sfu0_cycles + serial_sfu1_cycles;
+        serial_matrix_cnm_sfu_cycles = serial_matrix_cycles + serial_cnm_cycles +
+                                        serial_sfu0_cycles;
+        `uvm_info("CLUSTER_SERIAL_BENCH_PASS", $sformatf(
+            "serial Matrix/CNM/SFU cycles=%0d/%0d/%0d total=%0d; extra queued SFU=%0d four-task total=%0d",
+            serial_matrix_cycles, serial_cnm_cycles, serial_sfu0_cycles,
+            serial_matrix_cnm_sfu_cycles, serial_sfu1_cycles,
+            serial_total_cycles), UVM_LOW)
+
+        // Benchmark the requested staged mode: Matrix and CNM share the
+        // scratchpad concurrently, then SFU starts after both retire. Sum the
+        // two doorbell-to-tail intervals so descriptor-programming time stays
+        // outside both the serial and staged measurements.
+        write_v3_desc(CMDQ_LOCAL + 32'h00, 8'h30, 16'h0700,
+                      MATRIX_A_LOCAL, MATRIX_B_LOCAL, MATRIX_Y_LOCAL,
+                      16'd16, 16'd32, 16'd16);
+        write_cnm_v3_desc(CMDQ_LOCAL + 32'h40, 16'h0701,
+                          CNM_A_LOCAL, CNM_B_LOCAL, CNM_Y_LOCAL);
+        write_v3_desc(CMDQ_LOCAL + 32'h80, 8'h35, 16'h0702,
+                      GELU_A_LOCAL, 32'd0, GELU_Y0_LOCAL,
+                      16'd0, 16'd0, 16'd64);
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, CMDQ_LOCAL);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd2);
+        axil_write(REG_CPLQ_BASE, CPLQ_LOCAL);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+        staged_contention_start = compute_vif.matrix_cnm_shared_accept_cycles;
+        staged_pair_start_cycle = compute_vif.sim_cycles;
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd2);
+        staged_pair_cycles = compute_vif.sim_cycles - staged_pair_start_cycle;
+        staged_contention_cycles = compute_vif.matrix_cnm_shared_accept_cycles -
+                                   staged_contention_start;
+        if (staged_contention_cycles == 0)
+            `uvm_fatal("CLUSTER_STAGED_CONTENTION",
+                "Matrix and CNM never contended for a shared banked-SPAD admission during the staged pair")
+        wait_spad_idle();
+        expect_completion(CPLQ_LOCAL + 32'h00, 16'h0700,
+                          matrix_golden[15][31], 32'd512,
+                          "staged Matrix completion");
+        expect_completion(CPLQ_LOCAL + 32'h10, 16'h0701, 32'd736, 32'd16,
+                          "staged CNM completion");
+        for (word_idx = 0; word_idx < 512; word_idx++)
+            expect_spad(MATRIX_Y_LOCAL + (word_idx << 2),
+                        matrix_golden[word_idx / 32][word_idx % 32],
+                        $sformatf("staged Matrix Golden[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            expect_spad(CNM_Y_LOCAL + (word_idx << 2), 32'd736,
+                        $sformatf("staged CNM Golden[%0d]", word_idx));
+        axil_write(REG_CPLQ_HEAD, 32'd2);
+        axil_write(REG_CMDQ_TAIL, 32'd3);
+        staged_sfu_start_cycle = compute_vif.sim_cycles;
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd3);
+        staged_sfu_cycles = compute_vif.sim_cycles - staged_sfu_start_cycle;
+        staged_total_cycles = staged_pair_cycles + staged_sfu_cycles;
+        wait_spad_idle();
+        expect_completion(CPLQ_LOCAL + 32'h20, 16'h0702, -32'sd15, 32'd64,
+                          "staged SFU completion");
+        for (word_idx = 0; word_idx < 64; word_idx++)
+            expect_spad(GELU_Y0_LOCAL + (word_idx << 2),
+                        gelu_results[word_idx % 4],
+                        $sformatf("staged SFU Golden[%0d]", word_idx));
+        measured_speedup = real'(serial_matrix_cnm_sfu_cycles) /
+                           real'(staged_total_cycles);
+        `uvm_info("CLUSTER_STAGED_BENCH_PASS", $sformatf(
+            "serial Matrix/CNM/SFU=%0d cycles; staged Matrix+CNM=%0d then SFU=%0d total=%0d speedup=%.3f pair_contention_cycles=%0d completion_order=0700,0701,0702",
+            serial_matrix_cnm_sfu_cycles, staged_pair_cycles,
+            staged_sfu_cycles, staged_total_cycles, measured_speedup,
+            staged_contention_cycles), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd3);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
 
@@ -662,10 +881,21 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd8);
         axil_write(REG_CPLQ_HEAD, 32'd0);
         axil_write(REG_CPLQ_TAIL, 32'd0);
+        parallel_contention_start = compute_vif.shared_spad_contention_cycles;
+        parallel_start_cycle = compute_vif.sim_cycles;
         axil_write(REG_DOORBELL, 32'd1);
         check_cnm_address_stream();
         wait_cpl_tail(32'd4);
+        parallel_cycles = compute_vif.sim_cycles - parallel_start_cycle;
+        parallel_contention_cycles = compute_vif.shared_spad_contention_cycles -
+                                     parallel_contention_start;
         wait_spad_idle();
+        if (parallel_cycles != 0)
+            measured_speedup = real'(serial_total_cycles) / real'(parallel_cycles);
+        `uvm_info("CLUSTER_PARALLEL_BENCH_PASS", $sformatf(
+            "same Matrix/CNM/SFU/SFU work parallel cycles=%0d serial_cycles=%0d speedup=%.3f completion_order=0600,0601,0602,0603 shared_spad_contention_cycles=%0d",
+            parallel_cycles, serial_total_cycles, measured_speedup,
+            parallel_contention_cycles), UVM_LOW)
 
         if (compute_vif.overlap_cycles == 0)
             `uvm_fatal("CLUSTER_OVERLAP", "real Matrix and SFU never overlapped")
@@ -958,6 +1188,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         wait_matrix_sfu_overlap();
         wait_matrix_read_accept();
         wait_matrix_prefetch_active();
+        recovery_start_cycle = compute_vif.sim_cycles;
         #1ns;
         reset_value = 1'b0;
         reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
@@ -993,6 +1224,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_TAIL, 32'd0);
         axil_write(REG_DOORBELL, 32'd1);
         wait_cpl_tail(32'd1);
+        recovery_cycles = compute_vif.sim_cycles - recovery_start_cycle;
         expect_completion(CPLQ_LOCAL + 32'h300, 16'h0622, -32'sd15, 32'd4,
                           "post-reset SFU recovery");
         expect_spad(GELU_Y0_LOCAL + 32'h00, 32'd8, "post-reset GELU output0");
@@ -1007,6 +1239,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         banked_grants_total += compute_vif.arb_banked_grants;
         core_grants_total += compute_vif.arb_core_grants;
         `uvm_info("CLUSTER_RESET_RECOVERY_PASS", "active Matrix/SFU reset discarded both in-flight tasks, preserved SRAM sentinels, and accepted a fresh post-reset SFU task", UVM_LOW)
+        `uvm_info("CLUSTER_RECOVERY_BENCH", $sformatf(
+            "active reset-to-recovery completion=%0d cycles; scoreboard later reports reset-dropped accepted SPAD reads",
+            recovery_cycles), UVM_LOW)
+
+        run_dma_store_response_test();
 
         `uvm_info("COMPUTE_CLUSTER_REAL_UVM_PASS", $sformatf(
             "standalone Matrix16x32x64 Golden + 16 A-tile reuse hits; parallel Matrix/CNM GEMV with separate response tags and four-bank Golden + next-K prefetch + queued SFU tasks + concurrent abort/reset/recovery seed=%0d; prefetch_overlap=%0d matrix_cnm_overlap=%0d matrix_rsp=%0d cnm_rsp=%0d cnm_lanes=%b overlap=%0d arbiter_contention=%0d banked_grants=%0d cnm_grants=%0d core_grants=%0d",

@@ -18,6 +18,7 @@ class ai_compute_cluster_coverage extends uvm_component;
     bit cnm_lane1_response;
     bit cnm_lane2_response;
     bit cnm_lane3_response;
+    int unsigned response_client_hits[0:5];
 
     covergroup cluster_cg;
         option.per_instance = 1;
@@ -54,6 +55,7 @@ class ai_compute_cluster_coverage extends uvm_component;
         super.new(name, parent);
         analysis_export = new("analysis_export", this);
         cluster_cg = new();
+        foreach (response_client_hits[i]) response_client_hits[i] = 0;
     endfunction
 
     function automatic int decode_engine(bit [7:0] op);
@@ -79,6 +81,8 @@ class ai_compute_cluster_coverage extends uvm_component;
         matrix_prefetch_active = obs.matrix_prefetch_active;
         matrix_a_cache_hit = obs.matrix_a_cache_hit;
         response_client = obs.rsp_valid ? obs.rsp_client : -1;
+        if (obs.rsp_valid && obs.rsp_client <= 3'd5)
+            response_client_hits[obs.rsp_client]++;
         response_route = {obs.matrix_rsp_valid, (|obs.cnm_rsp_valid)};
         cnm_lane0_response = obs.cnm_rsp_valid[0];
         cnm_lane1_response = obs.cnm_rsp_valid[1];
@@ -93,6 +97,10 @@ class ai_compute_cluster_coverage extends uvm_component;
 
     function void report_phase(uvm_phase phase);
         super.report_phase(phase);
-        `uvm_info("CLUSTER_COVERAGE", $sformatf("focused_compute_cg=%0.1f%%", cluster_cg.get_coverage()), UVM_LOW)
+        `uvm_info("CLUSTER_COVERAGE", $sformatf(
+            "focused_compute_cg=%0.1f%% response_clients={desc:%0d,cpl:%0d,core:%0d,banked:%0d,dma:%0d,cnm:%0d}",
+            cluster_cg.get_coverage(), response_client_hits[0], response_client_hits[1],
+            response_client_hits[2], response_client_hits[3], response_client_hits[4],
+            response_client_hits[5]), UVM_LOW)
     endfunction
 endclass

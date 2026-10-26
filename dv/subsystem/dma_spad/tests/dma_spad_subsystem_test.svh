@@ -706,7 +706,7 @@ class dma_spad_subsystem_monitor extends uvm_component;
                 // client, but it must not be acknowledged without a grant.
                 if (vif.request_client == 3'd2 && !vif.core_ready && any_data_grant)
                     `uvm_error("SPAD_CLIENT_TAG", "arbiter client tag disagrees with granted requester")
-                if ((|vif.cnm_req_ready) && vif.request_client != 3'd3)
+                if ((|vif.cnm_req_ready) && vif.request_client != 3'd5)
                     `uvm_error("SPAD_CLIENT_TAG", "CNM grant has the wrong arbiter client tag")
 
                 // Record an unmatched accepted read only after this cycle's
