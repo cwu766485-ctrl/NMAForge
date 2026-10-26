@@ -15,6 +15,7 @@ COV_METRICS := line+cond+fsm+branch
 .PHONY: datapath-random-test datapath-random-compile datapath-random-run \
 	core-random-test core-random-compile core-random-run a3-core-test \
 	core-prefetch-handoff-test core-prefetch-handoff-regress \
+	core-no-prefetch-fallback-regress \
 	datapath-random-regress core-random-regress array-random-regress \
 	matrix-size-benchmark matrix-pipeline-benchmark matrix-config-comparison
 
@@ -70,14 +71,25 @@ core-random-compile:
 core-random-run: core-random-compile
 	$(CORE_OUT_DIR)/simv +SEED=$(SEED) -cm $(COV_METRICS) \
 		-cm_dir $(CORE_OUT_DIR)/coverage.vdb -cm_name matrix_core_seed_$(SEED) -l $(CORE_OUT_DIR)/run.log
-	grep -q '^MATRIX_CORE_RANDOM_PASS cases=18 faults=25 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 ' $(CORE_OUT_DIR)/run.log
+	grep -q '^MATRIX_CORE_RANDOM_PASS cases=18 faults=34 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 ' $(CORE_OUT_DIR)/run.log
 
 core-random-regress: core-random-compile
 	@set -e; for seed in $(SEEDS); do \
 		$(CORE_OUT_DIR)/simv +SEED=$$seed -cm $(COV_METRICS) \
 			-cm_dir $(CORE_OUT_DIR)/coverage.vdb -cm_name matrix_core_seed_$$seed \
 			-l $(CORE_OUT_DIR)/run_seed_$$seed.log; \
-		grep -q "^MATRIX_CORE_RANDOM_PASS cases=18 faults=25 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 seed=$$seed " $(CORE_OUT_DIR)/run_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_RANDOM_PASS cases=18 faults=34 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 seed=$$seed " $(CORE_OUT_DIR)/run_seed_$$seed.log; \
+	done
+
+# Cover the compile-time fallback transition without invoking fault scenarios
+# that are only meaningful when prefetch is enabled.
+core-no-prefetch-fallback-regress: core-random-compile
+	@set -e; for seed in $(SEEDS); do \
+		$(CORE_OUT_DIR)/simv +SEED=$$seed +MATRIX_BENCHMARK_ONLY -cm $(COV_METRICS) \
+			-cm_dir $(CORE_OUT_DIR)/coverage.vdb -cm_name matrix_no_prefetch_$$seed \
+			-l $(CORE_OUT_DIR)/no_prefetch_seed_$$seed.log; \
+		grep -q "^MATRIX_NO_PREFETCH_FALLBACK_PASS seed=$$seed fallback=1$$" $(CORE_OUT_DIR)/no_prefetch_seed_$$seed.log; \
+		grep -q "^MATRIX_SIZE_BENCHMARK_PASS .*next_k_prefetch=0 " $(CORE_OUT_DIR)/no_prefetch_seed_$$seed.log; \
 	done
 
 core-prefetch-handoff-test: core-random-compile

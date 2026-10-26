@@ -88,6 +88,7 @@ module tb_ai_tensor_matrix_core_random;
   reg prefetch_parity_response_seen=0;
   reg watchdog_during_prefetch_seen=0;
   reg prefetch_handoff_seen=0;
+  reg mac_to_a_req_seen=0;
   integer prefetch_buffer_seen_mask=0;
   reg pending_spad=0;
   wire pending_bank = (bank_response_queue_count != 0);
@@ -101,6 +102,14 @@ module tb_ai_tensor_matrix_core_random;
   integer line_write_count=0,scalar_write_count=0;
   integer seed=20261021,initial_seed;
   integer benchmark_mode=0;
+
+  always @(posedge clk or negedge resetn) begin
+    if(!resetn)
+      mac_to_a_req_seen <= 1'b0;
+    else if(!NEXT_K_PREFETCH_ENABLE && (dut.state_r==8) &&
+            (dut.lane_r==2'd3) && !dut.last_k_group)
+      mac_to_a_req_seen <= 1'b1;
+  end
 
   reg inject_bank_parity=0,inject_spad_parity=0;
   reg inject_bank_protection=0,inject_spad_protection=0;
@@ -965,15 +974,16 @@ module tb_ai_tensor_matrix_core_random;
       if(PHYSICAL_ARRAY_SIZE==4)
         prepare_case(4,8,2,1,0,0,0,0,0,0,0);
       else
-        prepare_case(4,4,2,1,0,0,0,0,0,0,0);
+        prepare_case(16,20,8,1,0,0,0,0,0,0,0);
       force_banked_ready=1;force_zero_bank_latency=1;
       check_valid_case(21);
       if(error || (dut.perf_prefetch_completed==0) ||
          (dut.perf_prefetch_overlap_cycles==0))
         $fatal(1,"Matrix fast prefetch handoff did not complete/overlap completed=%0d overlap=%0d error=%b",
                dut.perf_prefetch_completed,dut.perf_prefetch_overlap_cycles,error);
-      if((PHYSICAL_ARRAY_SIZE==4) && !prefetch_handoff_seen)
-        $fatal(1,"Matrix 4x4 prefetch profile did not take ST_MAC->ST_PREP_MAC handoff");
+      if(!prefetch_handoff_seen)
+        $fatal(1,"Matrix array=%0d prefetch profile did not take ST_MAC->ST_PREP_MAC handoff",
+               PHYSICAL_ARRAY_SIZE);
       force_banked_ready=0;force_zero_bank_latency=0;
       $display("MATRIX_CORE_PREFETCH_HANDOFF_PASS completed=%0d overlap=%0d direct=%b array=%0d",
                dut.perf_prefetch_completed,dut.perf_prefetch_overlap_cycles,
@@ -1049,6 +1059,10 @@ module tb_ai_tensor_matrix_core_random;
       check_valid_case(103);
       prepare_case(32,32,16,1,0,0,0,0,0,0,0);
       check_valid_case(104);
+      if(!NEXT_K_PREFETCH_ENABLE && !mac_to_a_req_seen)
+        $fatal(1,"Matrix no-prefetch configuration missed ST_MAC->ST_A_REQ fallback");
+      if(!NEXT_K_PREFETCH_ENABLE)
+        $display("MATRIX_NO_PREFETCH_FALLBACK_PASS seed=%0d fallback=1",initial_seed);
       $display("MATRIX_SIZE_BENCHMARK_PASS seed=%0d workloads=4x4x32,8x8x32,16x16x32,16x32x32,32x32x64 physical_array=%0dx%0d outstanding_depth=%0d next_k_prefetch=%0d a_tile_cache=%0d bank_response_latency=1 cycle gops_reference_mhz=250 sim_period_ns=10",initial_seed,PHYSICAL_ARRAY_SIZE,PHYSICAL_ARRAY_SIZE,MAX_OUTSTANDING_READS,NEXT_K_PREFETCH_ENABLE,A_TILE_CACHE_ENABLE);
       $finish;
     end
@@ -1082,6 +1096,16 @@ module tb_ai_tensor_matrix_core_random;
     check_valid_case(20);
 
     simple_fault_setup();m_size=0;check_fault(ERR_CONFIG,0);
+    simple_fault_setup();n_size=0;check_fault(ERR_CONFIG,41);
+    simple_fault_setup();k_words=0;check_fault(ERR_CONFIG,42);
+    simple_fault_setup();m_size=6;check_fault(ERR_CONFIG,43);
+    simple_fault_setup();n_size=6;check_fault(ERR_CONFIG,44);
+    simple_fault_setup();src0_base=SRC0_BASE+4;check_fault(ERR_CONFIG,45);
+    simple_fault_setup();src1_base=SRC1_BASE+4;check_fault(ERR_CONFIG,46);
+    simple_fault_setup();dst_base=DST_BASE+2;check_fault(ERR_CONFIG,47);
+    simple_fault_setup();bias_enable=1;bias_base=BIAS_BASE+1;check_fault(ERR_CONFIG,48);
+    simple_fault_setup();inject_bank_protection=1;bank_protection_addr=SRC1_BASE;
+    check_fault(ERR_PROTECTION,49);inject_bank_protection=0;
     prepare_case(4,4,1,1,0,0,0,0,0,0,0);op_mode=8'h7f;check_fault(ERR_OP,1);
     simple_fault_setup();inject_bank_protection=1;bank_protection_addr=SRC0_BASE;
     check_fault(ERR_PROTECTION,2);inject_bank_protection=0;

@@ -37,6 +37,7 @@ class ai_compute_cluster_obs extends uvm_sequence_item;
     bit [15:0] selected_line_wstrb;
     bit selected_banked_valid, selected_banked_ready, selected_banked_access_ok;
     bit [31:0] selected_banked_addr;
+    bit [31:0] matrix_banked_req_addr;
     bit [31:0] banked_rdata[0:3];
     bit [3:0] selected_cnm_valid, selected_cnm_ready, selected_cnm_access_ok;
     bit [31:0] selected_cnm_addr[0:3];

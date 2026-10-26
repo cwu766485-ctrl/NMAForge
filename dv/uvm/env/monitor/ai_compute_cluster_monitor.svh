@@ -4,6 +4,8 @@ class ai_compute_cluster_monitor extends uvm_component;
     uvm_analysis_port #(ai_compute_cluster_obs) ap;
     string mutation_kind;
     bit mutation_injected;
+    bit [6:0] missing_done_pending;
+    bit [6:0] duplicate_done_pending;
 
     function new(string name, uvm_component parent);
         super.new(name, parent);
@@ -16,14 +18,20 @@ class ai_compute_cluster_monitor extends uvm_component;
             `uvm_fatal("NOCOMPUTEVIF", "compute-cluster monitor requires compute_vif")
         mutation_kind = "";
         mutation_injected = 1'b0;
+        missing_done_pending = '0;
+        duplicate_done_pending = '0;
         void'($value$plusargs("CL_MUTATION=%s", mutation_kind));
     endfunction
 
     task run_phase(uvm_phase phase);
         ai_compute_cluster_obs obs;
         int lane;
+        bit flush_missing_done;
+        bit [6:0] sampled_engine_done;
         forever begin
             @(posedge vif.aclk);
+            flush_missing_done = (missing_done_pending != 0);
+            sampled_engine_done = vif.engine_done;
             if (!vif.aresetn || vif.host_valid || vif.selected_spad_valid ||
                 vif.selected_line_valid || vif.selected_banked_valid ||
                 (|vif.selected_cnm_valid) || vif.launch_valid || (|vif.engine_busy) ||
@@ -31,7 +39,8 @@ class ai_compute_cluster_monitor extends uvm_component;
                 vif.core_spad_valid || vif.banked_valid ||
                 (|vif.cnm_valid) || vif.rsp_valid || vif.matrix_rsp_valid ||
                 (|vif.cnm_rsp_valid) || (|vif.read_accept_mask) ||
-                vif.matrix_prefetch_active || vif.matrix_a_cache_hit) begin
+                vif.matrix_prefetch_active || vif.matrix_a_cache_hit ||
+                (missing_done_pending != 0) || (duplicate_done_pending != 0)) begin
                 obs = ai_compute_cluster_obs::type_id::create("obs");
                 obs.reset_active = !vif.aresetn;
                 obs.core_busy = vif.core_busy;
@@ -81,6 +90,7 @@ class ai_compute_cluster_monitor extends uvm_component;
                 obs.selected_banked_ready = vif.selected_banked_ready;
                 obs.selected_banked_access_ok = vif.selected_banked_access_ok;
                 obs.selected_banked_addr = vif.selected_banked_addr;
+                obs.matrix_banked_req_addr = vif.matrix_banked_req_addr;
                 obs.selected_cnm_valid = vif.selected_cnm_valid;
                 obs.selected_cnm_ready = vif.selected_cnm_ready;
                 obs.selected_cnm_access_ok = vif.selected_cnm_access_ok;
@@ -121,6 +131,18 @@ class ai_compute_cluster_monitor extends uvm_component;
                             obs.engine_done[0] = 1'b1;
                             mutation_injected = 1'b1;
                         end
+                        "missing_done": if ((obs.engine_done != 0) && !obs.reset_active) begin
+                            missing_done_pending = obs.engine_done;
+                            obs.engine_done = '0;
+                            mutation_injected = 1'b1;
+                        end
+                        "duplicate_done": if ((duplicate_done_pending != 0) &&
+                                               !(|(duplicate_done_pending & obs.engine_busy)) &&
+                                               !obs.reset_active) begin
+                            obs.engine_done = obs.engine_done | duplicate_done_pending;
+                            duplicate_done_pending = '0;
+                            mutation_injected = 1'b1;
+                        end
                         default: begin end
                     endcase
                     if (mutation_injected)
@@ -128,6 +150,11 @@ class ai_compute_cluster_monitor extends uvm_component;
                             "testbench observation mutation=%s", mutation_kind), UVM_LOW)
                 end
                 ap.write(obs);
+                if ((mutation_kind == "duplicate_done") && !mutation_injected &&
+                    (sampled_engine_done != 0) && vif.aresetn)
+                    duplicate_done_pending = duplicate_done_pending | sampled_engine_done;
+                if (flush_missing_done)
+                    missing_done_pending = '0;
             end
         end
     endtask

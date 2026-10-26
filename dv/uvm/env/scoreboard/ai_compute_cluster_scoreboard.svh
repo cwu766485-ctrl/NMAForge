@@ -212,6 +212,7 @@ class ai_compute_cluster_scoreboard extends uvm_component;
         int client;
         int lane;
         bit [6:0] invalid_done_mask;
+        bit [6:0] missing_done_mask;
         bit [6:0] accepted_engine_mask;
         pending_memory_read_t item;
         bit [127:0] actual;
@@ -242,6 +243,14 @@ class ai_compute_cluster_scoreboard extends uvm_component;
                 "engine_done=%07b has no active transaction; busy=%07b previously_active=%07b",
                 obs.engine_done, obs.engine_busy, active_engine_seen))
         end
+        missing_done_mask = active_engine_seen & ~obs.engine_busy &
+                            ~obs.engine_done & ~obs.engine_error;
+        if (missing_done_mask != 0) begin
+            note_mutation_caught("engine_done_lifecycle");
+            `uvm_error("CLUSTER_MISSING_DONE", $sformatf(
+                "active engines stopped without done/error: engines=%07b",
+                missing_done_mask))
+        end
         active_engine_seen |= obs.engine_busy;
         active_engine_seen &= ~(obs.engine_done | obs.engine_error);
         if (obs.multi_engine_abort) active_engine_seen = 7'd0;
@@ -262,6 +271,7 @@ class ai_compute_cluster_scoreboard extends uvm_component;
                 `uvm_error("CLUSTER_RSP_CLIENT", $sformatf("response has illegal arbiter client=%0d", obs.rsp_client))
             end else if (pending_reads[obs.rsp_client] == 0) begin
                 orphan_responses++;
+                note_mutation_caught("response_owner_route");
                 `uvm_error("CLUSTER_ORPHAN_RSP", $sformatf("response for client=%0d has no accepted read", obs.rsp_client))
             end else begin
                 pending_reads[obs.rsp_client]--;
@@ -376,6 +386,15 @@ class ai_compute_cluster_scoreboard extends uvm_component;
                 write_model_word(obs.selected_line_addr + (lane * 4),
                                  obs.selected_line_wdata[lane*32 +: 32],
                                  obs.selected_line_wstrb[lane*4 +: 4]);
+        end
+
+        if (obs.selected_banked_valid && obs.selected_banked_ready &&
+            (obs.request_client == 3'd3) &&
+            (obs.selected_banked_addr !== obs.matrix_banked_req_addr)) begin
+            note_mutation_caught("matrix_request_address");
+            `uvm_error("CLUSTER_MATRIX_ADDR", $sformatf(
+                "Matrix banked request address mismatch: source=0x%08h selected=0x%08h",
+                obs.matrix_banked_req_addr, obs.selected_banked_addr))
         end
 
         // Requests are snapshotted only after a real arbiter admission. This

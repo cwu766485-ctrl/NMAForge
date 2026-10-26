@@ -86,17 +86,24 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 # observation copy and each run must emit the matching caught-checker marker.
 uvm_compute_cluster_mutation: uvm_compute_cluster_compile
 	@set -e; out='$(COMPUTE_CLUSTER_MUTATION_OUT)'; mkdir -p "$$out"; \
-	for mutation in address data owner wstrb done; do \
+	for mutation in address data owner wstrb done missing_done duplicate_done; do \
 	  log="$$out/$${mutation}.log"; db="$$out/$${mutation}.vdb"; \
+	  case "$$mutation" in \
+	    address) expected_checker=matrix_request_address ;; \
+	    data) expected_checker=memory_data ;; \
+	    owner) expected_checker=response_owner_route ;; \
+	    wstrb) expected_checker=matrix_write_mask ;; \
+	    done|missing_done|duplicate_done) expected_checker=engine_done_lifecycle ;; \
+	  esac; \
 	  "$(COMPUTE_CLUSTER_UVM_OUT)/simv_uvm" +UVM_TESTNAME=ai_compute_cluster_e2e_test \
 	    +COMPUTE_CLUSTER_SEED=20261025 +ntb_random_seed=20261025 +CL_MUTATION=$$mutation \
 	    -cm $(UVM_COV_METRICS) -cm_dir "$$db" -l "$$log"; \
 	  grep -q "\[CLUSTER_MUTATION_INJECTED\].*mutation=$$mutation" "$$log" || { echo "ERROR: mutation $$mutation was not injected"; exit 1; }; \
-	  grep -q "\[CLUSTER_MUTATION_CAUGHT\].*mutation=$$mutation" "$$log" || { echo "ERROR: mutation $$mutation escaped its checker"; exit 1; }; \
+	  grep -q "\[CLUSTER_MUTATION_CAUGHT\].*mutation=$$mutation checker=$$expected_checker" "$$log" || { echo "ERROR: mutation $$mutation escaped checker $$expected_checker"; exit 1; }; \
 	  grep -q 'UVM_ERROR[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$$log" || { echo "ERROR: mutation $$mutation did not produce the expected checker failure"; exit 1; }; \
 	  echo "CLUSTER_MUTATION_PASS: mutation=$$mutation log=$$log"; \
 	done; \
-	echo "COMPUTE_CLUSTER_MUTATION_CAMPAIGN_PASS: address data owner wstrb done artifacts=$$out"
+	echo "COMPUTE_CLUSTER_MUTATION_CAMPAIGN_PASS: address data owner wstrb done missing_done duplicate_done; expected checker verified per mutation; artifacts=$$out"
 
 # Opt-in AXI address/data/response gaps are seeded per vector plan and sampled
 # per transaction. The focused target requires configuration and stall markers.
