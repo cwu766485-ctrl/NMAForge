@@ -53,7 +53,13 @@ The 2026-10-21 [compute run record](COMPUTE_ENGINE_BLOCK_VALIDATION_2026-10-21.m
 contains the historical per-group commands and evidence.
 
 The same-seed Matrix depth/prefetch/cache comparison and the synthetic-weight
-86-descriptor Transformer prefill/decode also pass in the current worktree.
+86-descriptor Transformer prefill/decode also pass in the detached clean replay
+of source SHA `827c0052cf589fde676e93e34bf459188956182f`. The same replay
+includes the three-seed seven-engine UVM, top smoke, and 20-case seeded top
+regression. One targeted memory data-path mutation was detected and then
+replayed successfully after restoring the source; this does not close a broad
+mutation campaign. Exact logs and coverage disposition are in the
+[Compute Cluster replay record](COMPUTE_CLUSTER_CLEAN_REPLAY_2026-10-26.md).
 Current RTL ASIC PPA is still unmeasured: the checkout has no current Matrix/
 Top synthesis runner, SDC, standard-cell library, or SRAM timing view. A
 pretrained-model accuracy comparison is also not part of the synthetic
@@ -69,8 +75,9 @@ Matrix+SFU overlap, same-engine serialization, response routing, ordered
 completion, and abort/drain pass; exhaustive engine-pair coverage and formal
 properties for the new dispatcher remain open. Other open items include
 residual DUT condition/toggle/code coverage, broader fault × abort × reset
-combinations, one fixed-SHA replay manifest, full LEC/DFT closure, and
-post-layout/board evidence.
+combinations, complete Cluster REQ coverage, full LEC/DFT closure, and
+post-layout/board evidence. The selected Compute Cluster fixed-SHA manifest has
+passed; it does not cover the full A10 workstream.
 
 ## Canonical entry points
 

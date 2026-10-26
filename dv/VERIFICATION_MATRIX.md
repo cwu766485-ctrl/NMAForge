@@ -10,7 +10,9 @@
 > bins unhit. This supersedes the earlier 65.4% Matrix/SFU slice below.
 > Whole-top URG includes DUT/SVA/TB/UVM and is not DUT-only coverage. Broader
 > opcode/configuration and protection/fault-phase crosses, mutation campaign,
-> clean-SHA replay, PPA, and complete Cluster closure remain open. Exact
+> selected clean-SHA replay and one targeted checker-sensitivity mutation are
+> now complete at source SHA `827c0052`; full fault/REQ closure, broad mutation,
+> PPA, and complete Cluster signoff remain open. Exact
 > evidence is recorded at the end of this matrix and in the
 > [testplan](../docs/verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md).
 
@@ -909,9 +911,16 @@ cases and reported 3,584 modeled writes, 3,536 compared words, zero
 mismatches/unknown reads, zero orphan responses, and UVM warning/error/fatal
 `0/0/0`. The 97.92% functional group has two explicit misses: DMA and completion
 response-client bins. The byte-addressed reference-memory scoreboard is now
-implemented for observed host/scalar/banked/CNM accesses; line/partial-WSTRB,
-broader randomized feature/fault coverage, mutation, and clean-SHA replay remain
-open. The latest top smoke, 20-case seeded regression, and 86-descriptor
+implemented for observed host/scalar/banked/CNM accesses; line/partial-WSTRB
+and broader randomized feature/fault coverage remain open. One targeted
+mutation and selected fixed-SHA replay were completed afterward; a broader
+mutation campaign remains open. The latest top smoke, 20-case seeded regression, and 86-descriptor
 fixed-weight Transformer functional test are documented in the
 [upgrade roadmap](../docs/verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md).
+This block records the original closeout worktree run. A later detached
+clean-SHA replay at `827c0052cf589fde676e93e34bf459188956182f` reran the
+selected UVM, Matrix, Transformer, smoke, and seeded top targets; one targeted
+scratchpad data mutation was detected and restored-source replay passed. The
+full logs, commands, testpoint mapping, and open coverage items are in the
+[clean replay record](../docs/verification/COMPUTE_CLUSTER_CLEAN_REPLAY_2026-10-26.md).
 Current ASIC area/Fmax/power and pretrained-model accuracy remain unmeasured.

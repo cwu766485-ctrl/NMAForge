@@ -11,7 +11,7 @@
 | 3. P0 Memory Dataflow | Weight/Activation Buffer、预取、双缓冲、数据复用与 bank/backpressure 管理 | **P0-A/B/C 与同 seed 配置对比已完成**。2/4 深度有序读流水、next-K 预取、A-tile reuse 及 8 配置 cycle/read 统计通过；真实 SRAM 时序和 PPA 仍未覆盖。 |
 | 4. P1 Transformer 算子和 KV | 用现有 SFU/Matrix/KV 构成 prefill/decode workload，并验证多 Head/Token 管理 | **单头微型 prefill + 1-token decode 已在真实 top 对拍通过**：86 条 descriptor、非恒等 INT8 fixture weights、causal Softmax、KV 写回/读回及完整 FFN。真实预训练权重、多头/更大 shape 和模型精度对比仍未完成。 |
 | 5. P2 计算融合 | GEMM→SFU streaming，减少 SPAD 中间写回 | **未实现**。当前仍由独立命令和 scratchpad 写回连接算子。 |
-| 6. Compute Cluster UVM | 实际 Cluster、全部 Engine、共享 SPAD、跨 Engine 并发、Abort/Reset 与 feature→testpoint→coverage 闭环 | **真实 top 七引擎 UVM 三 seed PASS**；新增 byte-addressed memory scoreboard（每 seed 3,536 word、0 mismatch/unknown）与 parity cross（14/14 每 seed）。focused covergroup=`97.92%`，已定位 DMA/completion 两个未命中 response-client bins；UVM warning/error/fatal=`0/0/0`。全 REQ/fault-phase、mutation 和 fixed-SHA clean replay 仍开放。 |
+| 6. Compute Cluster UVM | 实际 Cluster、全部 Engine、共享 SPAD、跨 Engine 并发、Abort/Reset 与 feature→testpoint→coverage 闭环 | **真实 top 七引擎 UVM 三 seed 在 fixed SHA clean worktree PASS**；每 seed 3,536 words、0 mismatch/unknown、parity subset 14/14，UVM warning/error/fatal=`0/0/0`。focused covergroup=`97.92%`，DMA/completion response-client bins 未命中。一次 scratchpad read-data bit-flip mutation 被 checker 检出，恢复后同 seed PASS；八配置 Matrix 和 86-descriptor fixed-weight Transformer 也完成 clean replay。完整 REQ/fault-phase closure 与更广 mutation campaign 仍开放。见[clean replay evidence](COMPUTE_CLUSTER_CLEAN_REPLAY_2026-10-26.md)。 |
 | 7. P1 Matrix FSM/code coverage | 补 reachable FSM transition、reset/abort phase 与未命中分析 | **prefetch-enabled DUT profile 为 49/53 transitions（92.45%）**；15/15 状态、prefetch FSM 9/9。四个原始 miss 逐项 review；另一个 prefetch-off Golden benchmark 命中 `ST_MAC→ST_A_REQ`，不同 macro VDB 不合并百分比。Matrix child array code coverage 仍部分。 |
 | 8. Benchmark 与 ASIC PPA | Effective GOPS、MAC 利用率、SPAD traffic、cycles/token、面积、频率和功耗 | **VCS 同 seed 八配置比较完成；新 PPA 仍受输入缺失阻塞**。`dc_shell -x exit` 当前可启动，但本 checkout 没有 Matrix/Top 综合入口、时序 SDC、标准单元库或 SRAM timing view；不得用历史报告替代当前 RTL 的 PPA。 |
 
@@ -48,7 +48,7 @@ arbiter 流量、completion order、双 Engine Abort、活动 Reset 和 recovery
 PASS 检查。初始三 seed 数据记录在此；2026-10-26 P0-C 扩展回归和最新
 coverage 见第 3.4 节。旧 license queue 失败仅作为运行历史保留。全引擎数值、
 parity/fault matrix、独立全引擎 memory scoreboard、全功能 coverage、mutation
-和 clean-SHA replay 仍未完成。
+和 clean-SHA replay 仍未完成。**此段是 2026-10-25 初次 top-UVM run 的历史状态**；后续 closeout 和 fixed-SHA replay 见 §3.7 与[专门回放记录](COMPUTE_CLUSTER_CLEAN_REPLAY_2026-10-26.md)。
 
 ## 3. P0 Tensor Engine：Requirement → Testpoint → Coverage
 
@@ -405,6 +405,18 @@ and `make ai_run AI_RANDOM_CASES=20 AI_SEED=12345` pass on VCS
 `V-2023.12-SP1_Full64`. The weights are hand-authored test fixtures, not
 pretrained model weights; this does not establish model accuracy.
 
+The selected closeout was replayed from exact source SHA
+`827c0052cf589fde676e93e34bf459188956182f` in detached worktree
+`/tmp/nmaforge_clean_cluster_replay_827c005`. Three-seed top UVM, all eight
+Matrix configurations, the separate prefetch-off fallback profile, the
+86-descriptor Transformer, `ai_smoke`, and the 20-case seeded top run all
+passed. One temporary bank-0 read-data bit-0 inversion yielded 192 independent
+memory-scoreboard mismatches and a Golden fatal; after restoring the source,
+the same seed passed with zero mismatches and zero UVM errors/fatals. This is
+one targeted mutation-sensitivity result, not a broad mutation score. Exact
+commands, artifacts, and coverage limitations are in the
+[clean replay evidence record](COMPUTE_CLUSTER_CLEAN_REPLAY_2026-10-26.md).
+
 ### 3.8 PPA disposition
 
 `dc_shell -x exit` succeeds on the current image, so the DC executable and its
@@ -418,11 +430,11 @@ the private library/SRAM overlay and approved clock constraints.
 ## 4. 尚未收敛的 P0/P1 项
 
 - **Memory dataflow optimization**：same-seed 八配置结果已记录；仍需真实 SRAM latency/timing model、更多 shape×fault/backpressure 组合，以及残余阵列/条件/branch coverage disposition。
-- **完整 Compute Cluster UVM**：七引擎真实 top directed sweep、per-engine Golden、请求背压、Matrix/CNM owner、Matrix/SFU abort、reset/recovery、14-case parity subset 和 byte-addressed memory scoreboard 已三 seed 通过；protection × engine × phase、全 feature REQ closure、broader random configurations、mutation campaign 和 fixed-SHA clean replay 仍开放。
+- **完整 Compute Cluster UVM**：七引擎真实 top directed sweep、per-engine Golden、请求背压、Matrix/CNM owner、Matrix/SFU abort、reset/recovery、14-case parity subset、byte-addressed memory scoreboard 和 selected fixed-SHA replay 已通过；另有一次 targeted mutation 被检出。protection × engine × phase、全 feature REQ closure、broader random configurations 和广泛 mutation campaign 仍开放。
 - **DC/PPA**：DC 启动可用，但缺综合入口、SDC、标准单元库和 SRAM timing view；因此当前 16×16 RTL 的面积、critical path/Fmax、功耗仍没有测量证据。
 - **Transformer/KV**：单头小尺寸 synthetic-weight prefill/decode 及 KV SPAD dataflow 已通过 Golden 对拍；真实 pretrained checkpoint、多头/大尺寸模型、模型精度及 cycles/token benchmark 仍开放。
 - **P2 fusion**：定义 GEMM 到 SFU 的流接口、背压、Abort、结果顺序与 SPAD ownership 后再实现 streaming path。
 
 ## 5. 规格和产品边界
 
-Matrix next-K prefetch 的默认配置和 descriptor ABI 保持不变；此轮扩展验证与 software fixture。top Matrix 默认 16×16；same-seed 八配置比较、七引擎 UVM 和 86-descriptor fixed-weight prefill/decode 通过定向验证。Matrix FSM 原始 profile 留有 4 条未命中 transition（`ST_MAC→ST_A_REQ` 已由独立 prefetch-off workload 命中）；array child code coverage 仍部分，mutation/clean replay、PPA 与 pretrained model accuracy 未完成，因此整体 signoff 未完成。
+Matrix next-K prefetch 的默认配置和 descriptor ABI 保持不变；此轮扩展验证与 software fixture。top Matrix 默认 16×16；same-seed 八配置比较、七引擎 UVM 和 86-descriptor fixed-weight prefill/decode 已在 tested SHA `827c0052` clean worktree 复跑。Matrix FSM prefetch-enabled profile 留有 4 条未命中 transition（`ST_MAC→ST_A_REQ` 已由独立 prefetch-off workload 命中）；array child code coverage 仍部分。一个 targeted mutation 被检出，但更广 mutation campaign、PPA 与 pretrained model accuracy 未完成，因此整体 signoff 未完成。

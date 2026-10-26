@@ -49,10 +49,10 @@ The merged URG report has three tests. Its whole-top totals are
 35.87%. Those totals include the whole instantiated top, checker, testbench,
 and UVM definitions; they are not DUT-only or Compute Cluster closure metrics.
 The compile log has one `Warning-[TFIPC]` for omitted ports on the top-level
-protocol SVA instance; elaboration reports zero errors. Other real-engine
-numerics, CNM bank/parity traffic, broad fault/backpressure combinations,
-mutation, clean-SHA replay, and full C1 closure remain open. Exact source-to-test
-trace is in the roadmap and
+protocol SVA instance; elaboration reports zero errors. **This paragraph is
+the initial 2026-10-25 UVM status and is superseded by the later closeout and
+fixed-SHA replay below.** Broader fault/backpressure combinations and full C1
+closure remain open. Exact source-to-test trace is in the roadmap and
 [Compute Cluster UVM Testplan](COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md).
 
 The same replay also reran
@@ -92,7 +92,7 @@ three-seed test with a byte-addressed reference-memory scoreboard and a
 14-case seeded parity cross; see the exact testpoint/bin/result table in the
 [Compute Cluster UVM testplan](COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md). Broader
 opcode/shape crosses, protection × phase combinations, complete REQ coverage,
-mutation campaign and fixed-SHA replay remain open. The compile retains an
+and a broad mutation campaign remain open. The compile retains an
 existing `Warning-[TFIPC]` for unconnected optional top protocol-SVA inputs.
 
 The closeout run `/tmp/nmaforge_cluster_closeout_multiseed_20261026/` passes
@@ -103,6 +103,17 @@ zero orphan responses, empty pending queues, and UVM warning/error/fatal
 `completion` response-client bins are unhit because those requesters are not
 part of this directed compute sequence. The merged whole-top URG still mixes
 DUT, assertions, testbench and UVM and is not a DUT-only coverage claim.
+
+The tested source SHA `827c0052cf589fde676e93e34bf459188956182f` was replayed
+in a detached clean worktree. The three-seed UVM, eight-configuration Matrix
+benchmark, separate prefetch-off fallback run, 86-descriptor fixed-weight
+Transformer, top smoke, and 20-case seeded top run all passed. A temporary
+bank-0 registered read-data bit flip was caught by 192 memory-scoreboard
+mismatches plus a Matrix Golden fatal; restoring the RTL returned the same
+seed to zero mismatches and zero UVM errors/fatals. This is one targeted
+mutation sensitivity check, not a broad mutation campaign. Exact artifacts
+and the coverage audit are in the
+[clean-SHA evidence record](COMPUTE_CLUSTER_CLEAN_REPLAY_2026-10-26.md).
 
 The Matrix core's prefetch-enabled profile remains at 49/53 FSM transitions;
 the four raw misses and a separate prefetch-disabled fallback benchmark are
