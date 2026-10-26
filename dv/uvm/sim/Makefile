@@ -59,8 +59,13 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -q '\[CLUSTER_A_CACHE_BASELINE_PASS\]' "$$log" || { echo "ERROR: standalone Matrix A-tile cache baseline marker missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CNM_OWNER_PASS\]' "$$log" || { echo "ERROR: Matrix/CNM independent response-owner check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CNM_ADDR_PASS\]' "$$log" || { echo "ERROR: four-lane CNM address scoreboard check missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_ALL_ENGINES_PASS\]' "$$log" || { echo "ERROR: seven-engine real-top Golden sweep missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_ABORT_CROSS_PASS\]' "$$log" || { echo "ERROR: multi-engine software-abort cross missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_RESET_RECOVERY_PASS\]' "$$log" || { echo "ERROR: real compute-cluster active-reset/recovery check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_SCOREBOARD\]' "$$log" || { echo "ERROR: compute-cluster scoreboard report missing in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_MEMORY_SCOREBOARD\].*checked_words=[1-9][0-9]* mismatches=0 unknown_reads=0' "$$log" || { echo "ERROR: independent scratchpad memory scoreboard did not close cleanly in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_RANDOM_FAULT_CROSS_PASS\].*parity cases=14/14' "$$log" || { echo "ERROR: randomized Matrix/CNM/INT8/BF16 parity cross missing in $$log"; exit 1; }; \
+		test "$$(grep -c ' \[CLUSTER_FAULT_CASE_PASS\] case=' "$$log")" -eq 14 || { echo "ERROR: expected all 14 parity fault cases in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SCOREBOARD\].*reset_dropped=[1-9][0-9]*' "$$log" || { echo "ERROR: reset did not discard a tracked in-flight SPAD response"; exit 1; }; \
 		grep -q '\[CLUSTER_COVERAGE\]' "$$log" || { echo "ERROR: compute-cluster coverage report missing in $$log"; exit 1; }; \
 		! grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$$log" || { echo "ERROR: UVM warning/error/fatal count is nonzero in $$log"; exit 1; }; \

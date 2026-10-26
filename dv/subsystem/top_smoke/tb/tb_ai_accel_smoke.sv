@@ -3071,11 +3071,11 @@ module tb_ai_accel_smoke;
         axi_write(REG_CMDQ_CTRL, 32'd0);
         axi_write(REG_CMDQ_BASE_LO, TRANSFORMER_DESC_BASE);
         axi_write(REG_CMDQ_BASE_HI, 32'd0);
-        axi_write(REG_CMDQ_SIZE, 32'd64);
+        axi_write(REG_CMDQ_SIZE, 32'd128);
         axi_write(REG_CMDQ_HEAD, 32'd0);
         axi_write(REG_CMDQ_TAIL, TRANSFORMER_DESC_COUNT);
         axi_write(REG_CPLQ_BASE_LO, TRANSFORMER_CPL_BASE);
-        axi_write(REG_CPLQ_SIZE, 32'd64);
+        axi_write(REG_CPLQ_SIZE, 32'd128);
         axi_write(REG_CPLQ_HEAD, 32'd0);
         axi_write(REG_CPLQ_TAIL, 32'd0);
         axi_write(REG_DOORBELL, 32'd1);
@@ -3086,7 +3086,8 @@ module tb_ai_accel_smoke;
                     "A8 Transformer command count");
         expect_completion(TRANSFORMER_CPL_BASE +
                           ((TRANSFORMER_DESC_COUNT-1) * 16),
-                          16'h701d, 4'h1, 4'd0, 32'd1, 32'd4,
+                          TRANSFORMER_LAST_TASK_ID, 4'h1, 4'd0,
+                          TRANSFORMER_LAST_RESULT, 32'd4,
                           "A8 Transformer final completion");
         axi_read(REG_PERF_MATRIX_MAC_CYCLES, rd);
         if (rd == 0) begin

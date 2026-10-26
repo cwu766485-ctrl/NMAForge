@@ -4,15 +4,16 @@
 > **版本**：v1.1 / Parallel Compute Requirement Traceability Baseline\
 > **日期**：2026-10-26\
 > **对应规格**：[Compute Cluster SPEC v1.1](../spec/COMPUTE_CLUSTER_SPEC_ZH.md)\
-> **当前主线 RTL 基线**：`fc8fc298f5890c9012653c6a6888eb7aeee2392f`（2026-10-26 `main`）；本轮未提交 UVM/benchmark 改动不包含在该 SHA，也没有 clean-SHA replay。Matrix 升级前历史基线 `9c4aea103a23a42a00fea7bcb092fbe7483e3a15` 仅用于对比，不是当前 testplan SHA。\
+> **当前主线 RTL 基线**：`2049df3aba40b737c23c4955f71061148a7695bb`（2026-10-26 `main` / `origin/main`）；本轮 UVM、Matrix 测试和 Transformer fixture 改动仍在 dirty worktree，尚未纳入此 SHA，也没有 clean-SHA replay。前一主线 SHA `fc8fc298f5890c9012653c6a6888eb7aeee2392f` 是本次七引擎验证前的历史提交；Matrix 升级前 `9c4aea103a23a42a00fea7bcb092fbe7483e3a15` 仅作更早对照。\
 > **Owner**：NMAForge DV\
-> **状态**：2026-10-26 使用 VCS `V-2023.12-SP1_Full64` 完成真实 top Matrix/CNM 并发 UVM 三 seed 回归；每 seed focused compute covergroup=`93.54%`，UVM warning/error/fatal=`0/0/0`，并已生成 merged URG。该数字仅指本测试的功能 covergroup；whole-top URG 同时含 DUT、SVA、TB 和 UVM，不是 DUT-only coverage。完整 Cluster 验证和 signoff 仍未完成。
+> **状态**：2026-10-26 在 VCS `V-2023.12-SP1_Full64` 完成真实 top 七引擎三 seed UVM；每 seed parity fault cross=`14/14`、独立 SPAD memory scoreboard=`3536` 个 word / `0` mismatch / `0` unknown、UVM warning/error/fatal=`0/0/0`。focused functional covergroup=`97.9%`，URG 显示未命中 response-client DMA/completion bins；whole-top code coverage 混合 DUT、SVA、TB 和 UVM，不作为 DUT-only signoff。Mutation 和 fixed-SHA clean replay 待本次提交后完成；完整 REQ closure 与 signoff 仍未完成。
 
 ## 0. 范围、冻结及验证分层
 
 - **已实现 C0-P 子集**：真实 `ai_parallel_compute_dispatcher` + 真实 `ai_compute_spad_mux`，七个行为 Engine、descriptor fetch BFM、单周期注册读响应和 completion-writer BFM；验证按序 dispatch/retirement、21 对并发、每引擎单活动槽、SPAD ready stall/owner、CPLQ 满、错误、abort/drain 与 reset recovery。
-- **真实 top C1 定向切片（PASS，范围有限）**：`dv/uvm` 的 `tb_ai_accel_uvm` 实例化产品 top，实际使用 `ai_accel_compute_cluster`、`ai_spad_arbiter`、response routing 和四 Bank behavioral SRAM。三 seed 覆盖 Matrix standalone/Matrix+CNM 并发 Golden、四 lane 地址与 response ledger、跨 Engine overlap、按序完成、Abort、活动 Reset 及恢复；精确日志见第 7 节。
-- **仍未完成的 C1 范围**：CNM/FP/Conv/KV/scalar 的全数值覆盖、多 Bank parity 注入、SPAD parity/protection 交叉、ready/backpressure、全 feature URG/断言闭环、mutation 和 clean-SHA replay 仍未完成。当前 sequence 已检查 CNM 四 lane A/B accepted address、四 lane response ledger 和 Matrix/CNM owner route；全引擎 reference-memory scoreboard 仍未抽象。
+- **真实 top C1 定向切片（PASS，范围有限）**：`dv/uvm` 的 `tb_ai_accel_uvm` 实例化产品 top，实际使用生产 dispatch、`ai_spad_arbiter`、response routing 和四 Bank behavioral SRAM。三 seed 检查 Matrix/CNM owner/address ledger、七个生产引擎各自的数值与 completion、请求背压、Matrix/SFU 同时 Abort、活动 Reset/recovery；精确日志见第 7 节。
+- **C1 新增验证（PASS，范围有限）**：真实 top UVM 加入 byte-addressed reference SPAD memory scoreboard 和 14 项 seeded parity fault cross，覆盖 INT8/Matrix/CNM/BF16 的 A/B 操作数及 CNM 四 lane；三 seed 共 42 项全部检查预期错误完成和 no-writeback sentinel。每 seed scoreboard 比较 3,536 words，无 mismatch/unknown read。
+- **仍未完成的 C1 范围**：本轮仍是 directed engine Golden sweep，不等于所有 opcode/configuration 的完整随机 REQ closure。SPAD parity/protection × engine/phase 的全组合、Line/WSTRB、全 38 项 REQ-CL、完整 mutation campaign 与 clean-SHA replay 尚未通过验收。
 - **2026-10-25 Matrix controller milestone**：Matrix block regression 已用真实 `ai_tensor_matrix_core` + 16×16 array 做 16×16/32×16 SPAD/GEMM 独立 Golden 对拍；top-level UVM 进一步加入同一真实 Matrix 路径并已三 seed 通过。
 - **2026-10-26 Matrix/CNM response ownership**：真实 top smoke 与真实 top UVM 都运行 disjoint-SPAD 的 CNM GEMV + Matrix GEMM，并检查不同 response client tag、并发区间、两引擎 Golden 和 completion；该定向子集不关闭全 Cluster REQ-PC-007。
 - **2026-10-26 Matrix/CNM top UVM 增量（已执行）**：真实 top sequence 加入 disjoint-SPAD 的 16×32×64 Matrix + 16-output CNM GEMV；逐 lane 检查 CNM A/B accepted address、四 Bank response mask、tag 3/5 demux、accepted-read ledger、16 个输出与有序 completion。三 seed PASS，且独立 Matrix 基线检查 512 个 Golden 输出和 16 次 A-tile reuse hit。回归中修复了 CNM local controller 在 B request 被 backpressure 时漏接 A response 的 RTL 缺陷，并将四任务测试的 command/completion 环深度设为 8，避免环保留空槽时 tail 回绕造成误配置。
@@ -34,14 +35,17 @@ implemented C0-P: ai_parallel_compute_uvm_test
    |-- fetch/completion delay models and ordered completion payload ledger
    |-- 21-pair overlap bitmap + launch/result/error/abort/reset checkers
 
-implemented C1-focused top test (three-seed VCS pass; selected slice)
+implemented C1-focused top test (three-seed VCS pass; selected all-engine slice)
    |-- production ai_accel_top -> dispatcher -> seven real compute engines
    |-- real ai_spad_arbiter/response routing + four-bank behavioral SRAM
-   |-- passive engine/SPAD monitor + busy/response-owner scoreboard + focused coverage
-   |-- independent 16x16x64 GEMM golden, SFU outputs, ordered CPLQ, abort/reset
+   |-- seven-engine output/completion Goldens + request-backpressure coverage
+   |-- Matrix/CNM response-owner ledger, multi-engine abort, reset/recovery
+implemented C1 additions (three-seed pass)
+   |-- byte-addressed SPAD reference model and accepted-read response checks
+   |-- randomized 14-case parity cross (INT8/Matrix/CNM/BF16, A/B, CNM lanes)
 remaining C1 closure
-   |-- per-engine numeric/memory scoreboard, CNM parity/bank-lane checks
-   |-- backpressure/fault matrix, all-engine functional coverage, mutation
+   |-- broader opcode/configuration and parity/protection × phase crosses
+   |-- complete REQ coverage, mutation campaign, fixed-SHA replay
 ```
 
 **Monitor 事实来源**：Expected 应从命令 Monitor 和不依赖 DUT 的数值/内存模型生成；Observed 来自真实有效握手/Done/Memory；不要只由 Driver 自述接收作为 Checker 输入。每笔读先登记 accepted，再比对实际 response，不能假设 SPAD 有 AXI Read ID。
@@ -137,7 +141,7 @@ remaining C1 closure
 | C1-A（算术 Golden） | Scalar/CNM/FP 复用已成熟模型；Matrix/SFU/CNN/KV 补齐 Oracle | `cl_numeric_by_opcode_seq`、`cl_matrix_transpose_seq`、`cl_kv_stride_seq` | 每个支持 Opcode 有真实数值/地址检查；未定义容差显式 blocked |
 | C1-B（故障/恢复） | error prefix、parity/abort/watchdog/reset、跨任务残留 | `cl_parity_bank_seq`、`cl_abort_prefix_seq`、`cl_reset_recovery_seq` | P0 合法组合执行；未定义多错误优先级不能虚假通过 |
 | C0-P（已实现 Dispatcher + SPAD MUX UVM 子集） | seeded ready stalls、连续 descriptor、CPLQ full hold/resume、out-of-order/simultaneous Done、owner-only error、abort/drain、pending-error active reset | `ai_parallel_compute_uvm_test` | REQ-PC-001～006、009～010 定向子集；三 seed 通过，限制见第 7 节 |
-| C1-REAL（定向切片 PASS） | 真实 top、Matrix/CNM GEMM/GEMV、四 lane address/response ownership、next-K prefetch、A-tile cache、queued SFU、Abort/活动 Reset/恢复 | `dv/uvm/tests/sequences/ai_compute_cluster_e2e_seq.svh` + passive monitor/scoreboard/coverage | 三 seed PASS；独立 Matrix 512 Golden + 16/16 A-tile hit；并发 Matrix/CNM Golden、16 CNM 输出和 tag 3/5 owner route PASS；每 seed UVM warning/error/fatal=`0/0/0`，focused covergroup=`93.54%`。merged whole-top URG line/cond/FSM/branch/assert/group=`53.02/45.30/16.91/43.46/60.00/22.63%`，含 DUT/SVA/TB/UVM，不是 DUT-only。其余引擎的全数值、广泛故障/背压、完整 REQ closure 未覆盖 |
+| C1-REAL（定向全引擎 slice PASS） | 真实 top、7 个生产 Engine、Matrix/CNM owner、独立结果/completion Golden、请求背压、Matrix/SFU simultaneous Abort、活动 Reset/recovery | `dv/uvm/tests/sequences/ai_compute_cluster_e2e_seq.svh` + passive monitor/scoreboard/coverage | 三 seed PASS；所有引擎均启动并与 Golden 匹配，CNM 四 lane address/response ledger、236 request-backpressure cycles、mask `1110111`、Matrix/SFU abort cross 命中；每 seed UVM warning/error/fatal=`0/0/0`，focused functional covergroup=`97.9%`。merged whole-top URG 同时含 DUT/SVA/TB/UVM，不作为 DUT-only closure。随机 shape/fault matrix、通用 scoreboard、mutation、完整 REQ closure 未覆盖 |
 | C0/C1（后续扩展） | 其余真实 Engine numerics、CNM/Matrix side-channel、parity/protection/error prefix、backpressure、完整 Memory Image | 扩展 UVM agents/monitor/reference scoreboard | REQ-PC-007～008 与完整 C0/C1 signoff |
 | C2（回归闭环） | 多 Seed、Coverage/Code/Assertions、Mutation、clean SHA | `cl_regression_seq`、`cl_mutation_sensitivity_seq` | RTM 每个 P0 ID 的日志/种子/覆盖/waiver 可定位 |
 
@@ -212,8 +216,9 @@ OUT_DIR=/tmp/nmaforge_sfu_fsm_converge_multi_20261024` 通过三 seed。每 seed
 这些是当前工作树运行，不是 clean-SHA replay。C0-P UVM 使用 seeded SPAD
 ready stalls 与 completion/fetch delay；SPAD read response 按真实接口固定为
 1 周期注册返回，并非可任意乱序或多周期的响应通道。新的 top UVM 切片已
-接入真实 Arbiter/四 Bank 并完成三 seed 执行；全 C1 数值与 coverage、mutation
-和 clean-SHA replay 仍未通过验收。
+接入真实 Arbiter/四 Bank 并完成三 seed 执行；C1 all-engine 定向证据见本节末。
+随机 shape/fault matrix、完整 C1 coverage、mutation 和 clean-SHA replay
+仍未通过验收。
 
 **2026-10-25 真实 top UVM 三 seed 回归：** 新增入口为
 `make -C dv/uvm/sim uvm_compute_cluster_regress
@@ -265,7 +270,7 @@ Cache ON/OFF 在 16×16 physical array 上：16×32×K32 从 469 降至 417 cycl
 GOPS 假定 250 MHz，不是 SRAM macro timing/PPA。命令、完整结果和 artifact 路径见
 [Compute Cluster 升级路线](COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md)第 3.4 节。
 
-**2026-10-26 Matrix/CNM top UVM（license 恢复后完成）**：真实 top sequence 检查 Matrix+CNM 并发、CNM 四 lane A/B accepted address、Matrix 地址范围、client tag 3/5 路由、lane response accepted/response ledger、16 个 CNM 输出及 CPLQ 顺序；同时检查 Matrix standalone 512-word Golden、16/16 cache hits，及并发 Matrix 512-word Golden。执行命令为：
+**2026-10-26 Matrix/CNM top UVM（license 恢复后的中间结果，后续由七引擎切片更新）**：真实 top sequence 检查 Matrix+CNM 并发、CNM 四 lane A/B accepted address、Matrix 地址范围、client tag 3/5 路由、lane response accepted/response ledger、16 个 CNM 输出及 CPLQ 顺序；同时检查 Matrix standalone 512-word Golden、16/16 cache hits，及并发 Matrix 512-word Golden。执行命令为：
 
 ```sh
 make -C dv/uvm/sim uvm_compute_cluster_regress \
@@ -278,6 +283,48 @@ URG dashboard 的 whole-testbench coverage summary 为 line/condition/FSM/branch
 
 RTL 修改后的 `make -C dv/subsystem/top_smoke/sim ai_smoke` 与
 `make ai_run AI_RANDOM_CASES=20 AI_SEED=12345`（工作目录 `dv/subsystem/top_smoke/sim`）均重新通过，两个 smoke 均打印 `TEST PASS`。此前 license daemon 失败仅保留为历史尝试，已由本次成功重跑取代。
+
+**2026-10-26 七引擎 C1 UVM（初始增量）**：在同一真实 top UVM 环境中，按序执行
+INT8 VDOT、BF16 dot、CNM、Matrix、SFU、Conv3x3、KV write，并单独检查 KV
+readback/token-head stride；每引擎都有结果与 completion 检查。新增请求背压、Matrix/SFU
+并发 Abort、活动 Reset/recovery 和逐 lane CNM 地址/响应归属检查。复现命令：
+
+```sh
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027' \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_c1_all_engines_3seed_20261026
+```
+
+VCS `V-2023.12-SP1_Full64` 三 seed 全部 PASS；每 seed focused compute functional
+covergroup=`97.9%`，UVM warning/error/fatal=`0/0/0`。每 seed scoreboard 汇总为
+`observations/busy/overlap/done/errors/reads/responses/orphan/reset_dropped =
+2594/2343/827/16/2/1152/1150/0/2`；CNM 四 lane 每 lane 64 次 accepted/response，所有
+pending ledger 归零。`errors=2` 是预期 Abort completion。请求背压累计 236 cycles，engine
+mask=`1110111`，Matrix/SFU Abort cross 命中。该 run 是本轮 memory scoreboard / parity
+cross 前的中间版本，相关闭环见下方最新证据表。Merged whole-top URG 包含 DUT、SVA、TB、UVM，
+不能作为 DUT-only code coverage。Compile 有既有 `Warning-[TFIPC]`（top protocol SVA
+instance omitted inputs）；UVM warning/error/fatal 为零。
+
+**2026-10-26 Matrix FSM 收敛增量**：depth-4 Matrix core 三 seed VCS regression 通过，
+并与 4×4 physical-array prefetch handoff 定向回归合并 URG。`ai_tensor_matrix_core`
+line/condition/FSM-transition/branch=`96.45/88.52/49/53 (92.45%)/95.02%`；FSM 状态
+15/15，prefetch FSM transitions 9/9。剩余四条 core transition 已归类为错误保护路径或当前
+参数下关闭的 fallback；Matrix child array line/condition/branch=`82.35/20.00/58.82%`，
+仍未闭合。复现命令、未命中转移解释和 URG 目录见
+[升级路线 §3.7](COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md#37-2026-10-26-all-engine-uvm-matrix-fsm-and-decoder-follow-up)。
+
+### 7.1 最新 Requirement → Testpoint → Coverage → Run ID → Result
+
+| Requirement | Testpoint / Checker | Coverage / 审查结果 | Run ID / artifact | Result |
+|---|---|---|---|---|
+| C1-ENG-001：真实 top 七引擎功能与 completion | `ai_compute_cluster_e2e_seq`；每引擎独立 Golden、completion/order、backpressure、Abort/Reset recovery | 三 seed 均检查 INT8/BF16/CNM/Matrix/SFU/Conv/KV；focused covergroup `97.92%`。URG 指出 `cp_response_client.dma` 与 `.completion` 未命中，因该测试未发起这两类 response traffic | `CC-UVM-3S-20261026`；`/tmp/nmaforge_cluster_closeout_multiseed_20261026/seed_{20261025,20261026,20261027}/run.log` | **PASS（定向 slice）**；两个未命中 bin 已定位 |
+| C1-MEM-001：scratchpad read 与 Golden memory image 对拍 | `ai_compute_cluster_scoreboard`；byte-addressed model、read-accept snapshot、client/lane response compare、reset drain | 每 seed `writes=3584`, `checked_words=3536`, `mismatches=0`, `unknown_reads=0`; orphan=`0`; reset-dropped reads=`2`; pending queues=`0` | `CC-UVM-3S-20261026`；merged URG `/tmp/nmaforge_cluster_closeout_multiseed_20261026/urg_merged` | **PASS（观察到的 host/scalar/banked/CNM accesses）**；line/partial-WSTRB 与完整 REQ image 仍开放 |
+| C1-FAULT-001：engine / operand / CNM-lane parity cross | Seed-shuffled 14-case parity test；检查 completion `error=2/code=5` 与 16-word no-writeback sentinel | 每 seed `14/14`；三 seed 共 `42/42`，覆盖 INT8/Matrix/CNM/BF16、A/B；CNM lane 0–3 全命中 | `CC-UVM-3S-20261026`；log markers `[CLUSTER_FAULT_CASE_PASS]` / `[CLUSTER_RANDOM_FAULT_CROSS_PASS]` | **PASS（parity subset）**；protection、全 engine phase 与并发 fault pair 仍开放 |
+| MATRIX-FSM-001：Matrix core FSM / prefetch FSM | 三 seed depth-4 regression + 4×4 array handoff，VCS/URG；`matrix_core.cm_hier` | prefetch-enabled profile：15/15 states、49/53 transitions；prefetch FSM 9/9；line/condition/branch=`96.45/88.52/95.02%`；array child=`82.35/20.00/N/A/58.82%`。另一个 `NEXT_K_PREFETCH_ENABLE=0` Golden benchmark 命中 `ST_MAC→ST_A_REQ`；macro 不同的 VDB 不合并百分比 | `MATRIX-FSM-D4-20261026` `/tmp/nmaforge_matrix_fsm_final_depth4_20261026/`；`MATRIX-NOPREF-20261026` `/tmp/nmaforge_matrix_fsm_no_prefetch_20261026/` | **PASS（定向功能 / 部分 code coverage）**；Matrix code closure **OPEN** |
+| MATRIX-BENCH-001：八个 outstanding/prefetch/cache 配置同负载比较 | `matrix-config-comparison`, `SEED=20261026`, 16×16 physical array、固定 workloads、1-cycle behavioral bank response | 8 配置均 PASS；同 seed、workload、SPAD latency。16×16×32 265→233 cycles；32×32×64 1698→1187 cycles（baseline→depth4+prefetch+cache） | `MATRIX-8CFG-20261026` `/tmp/nmaforge_matrix_config_closeout_20261026/` | **PASS（cycle benchmark only）**；不代表 macro timing、PPA 或硅上吞吐 |
+| TRANSFORMER-FUNC-001：prefill/decode 数据路径 | real top 86-descriptor sequence + software Golden | 四 token prefill + 一 token decode；固定手工 INT8 权重，不是 pretrained checkpoint / 模型精度测试 | `TRANSFORMER-86D-20261026`（路线图 §3.7；clean-SHA replay 尚待完成） | **PASS（固定权重功能）**；预训练部署/精度 **NOT_RUN** |
+
+**覆盖率结论**：`97.92%` 是该 UVM covergroup 的汇总值，不是 REQ-CL closure；DMA/completion response-client bins 已定位为未命中。Merged UVM URG top-level line/condition/FSM/branch=`60.14/54.16/26.84/50.70%` 混合 DUT、SVA、testbench 与 UVM，不能作为 DUT-only closure。Matrix core raw misses 和 array child 覆盖仍单独跟踪，不以百分比替代 reachability review。
 
 CNM RTL 改动后的定向复核也通过：`ai_cnm_signoff` 中 A2 GEMV、A3 GEMM
 benchmark（L=16/64/256）、SPAD arbiter contention/protection checks 和 top
@@ -315,12 +362,12 @@ make -C dv/uvm/sim uvm_compute_cluster_regress \
 | OPEN-NUM-01/02 — fixed-point | REQ-CL-020/023 | bit-exact 与近似 tolerance 分别建契约，不采用任意 float 误差 |
 | OUT_OF_CONTRACT — illegal launch | REQ-CL-001/002/011 | Busy Start/多 Select 仅鲁棒性探索，不计产品合规覆盖 |
 
-## 9. 第一周建议任务与审查 Checklist
+## 9. 下一阶段任务与审查 Checklist
 
-- 扩展已通过的真实 top 三 seed UVM 切片到 CNM/FP/Conv/KV/scalar 真引擎任务，并为每个引擎保存独立数值和 memory scoreboard 证据。
-- 把 C1 定向切片扩展到 CNM/FP/Conv/KV/scalar 真引擎任务；加入 CNM bank-lane/parity、SPAD parity/protection、请求 backpressure 与相关合法故障组合。
-- 将 sequence 内的 SPAD image/completion 自检提升为独立 reference-memory / lifecycle scoreboard；为真实 top monitor 加入接受请求、响应 owner、写入及 Matrix line/WSTRB 观察。
+- 扩展已通过的真实 top 七引擎定向 UVM 到随机 shape/opcode 配置，并为每个支持配置保存独立数值和 memory scoreboard 证据。
+- 加入 CNM bank-lane/parity、SPAD parity/protection、fault × phase × outstanding 与跨引擎 Abort/Reset 的合法组合；复合故障优先级仍按 SPEC/Design Review 冻结后验证。
+- 扩展已落地的 reference-memory / lifecycle scoreboard，纳入 DMA/completion traffic、Matrix line/partial-WSTRB 与完整 opcode/configuration REQ coverage。
 - 再用真实 arbiter 复核其余 REQ-PC；数值 oracle 按 REQ-CL-020～028 扩展，并建立 requirement→testpoint→coverage→run ID RTM。
 - Execution RTM 要列出 38 条 Requirement 的 Test ID、Run ID、Seed、Coverage Bin、Bug/waiver/blocker。没有证据的状态初始值必须是 NOT_RUN。
 
-**状态声明（2026-10-26 更新）**：C0-P UVM 的 REQ-PC-001～006、009～010 定向子集通过三 seed。真实 top C1 的 Matrix/SFU/CNM 并发定向切片现已通过三 seed，focused compute covergroup=`93.54%`，UVM warning/error/fatal=`0/0/0`。REQ-PC-007 的完整 CNM/banked/line UVM、REQ-PC-008 全引擎 Memory Image scoreboard、其余 engine numerics、全部 38 项 REQ-CL、mutation、clean-SHA replay 和 signoff 仍未完成。
+**状态声明（2026-10-26 更新）**：C0-P 定向 REQ-PC 子集、真实 top 七引擎 selected Golden sweep、14-case parity subset 和 byte-addressed reference-memory scoreboard 均已三 seed 通过；UVM warning/error/fatal=`0/0/0`。Functional covergroup `97.92%` 的两个未命中 bin 是 DMA/completion response-client；merged URG 不是 DUT-only coverage。完整 protection/fault phase cross、line/WSTRB、全部 38 项 REQ-CL、mutation、clean-SHA replay 和总体 signoff 仍未完成。

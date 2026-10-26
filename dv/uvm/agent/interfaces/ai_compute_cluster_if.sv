@@ -12,6 +12,7 @@ interface ai_compute_cluster_if(input logic aclk);
     logic [6:0] engine_busy;
     logic [6:0] engine_done;
     logic [6:0] engine_error;
+    logic dut_abort_active;
     logic [6:0] engine_req_valid;
     logic [6:0] engine_req_ready;
     logic core_spad_valid;
@@ -46,6 +47,29 @@ interface ai_compute_cluster_if(input logic aclk);
     logic [31:0] matrix_prefetch_overlap_cycles;
     logic [5:0] read_accept_mask;
 
+    // Passive scratchpad transaction view consumed by the independent memory
+    // image scoreboard. Host writes seed the image; scheduler writes update
+    // it; tagged read responses are checked against their request-time snapshot.
+    logic host_valid, host_write, host_access_ok;
+    logic [31:0] host_addr, host_wdata;
+    logic [3:0] host_wstrb;
+    logic selected_spad_valid, selected_spad_write, selected_spad_ready;
+    logic selected_spad_access_ok;
+    logic [31:0] selected_spad_addr, selected_spad_wdata;
+    logic selected_line_valid, selected_line_write, selected_line_ready;
+    logic selected_line_access_ok;
+    logic [31:0] selected_line_addr;
+    logic [127:0] selected_line_wdata, selected_line_rdata;
+    logic [15:0] selected_line_wstrb;
+    logic selected_banked_valid, selected_banked_ready, selected_banked_access_ok;
+    logic [31:0] selected_banked_addr;
+    logic [31:0] banked_rdata[0:3];
+    logic [3:0] selected_cnm_valid, selected_cnm_ready, selected_cnm_access_ok;
+    logic [31:0] selected_cnm_addr[0:3];
+    logic [31:0] cnm_rdata[0:3];
+    logic selected_rsp_is_line, selected_rsp_error;
+    logic [31:0] selected_rsp_rdata;
+
     integer overlap_cycles;
     integer core_engine_collision_cycles;
     integer shared_spad_contention_cycles;
@@ -61,6 +85,9 @@ interface ai_compute_cluster_if(input logic aclk);
     integer cnm_route_mismatch_count;
     integer response_count;
     integer same_engine_launch_while_busy;
+    integer engine_backpressure_cycles;
+    logic [6:0] engine_backpressure_seen;
+    integer multi_engine_abort_cycles;
     integer engine_launch_count[0:6];
 
     always_comb begin
@@ -104,11 +131,21 @@ interface ai_compute_cluster_if(input logic aclk);
             cnm_route_mismatch_count <= 0;
             response_count <= 0;
             same_engine_launch_while_busy <= 0;
+            engine_backpressure_cycles <= 0;
+            engine_backpressure_seen <= 7'd0;
+            multi_engine_abort_cycles <= 0;
             for (e = 0; e < 7; e = e + 1) engine_launch_count[e] <= 0;
         end else begin
             if ($countones(engine_busy) > 1) overlap_cycles <= overlap_cycles + 1;
             if ($countones(engine_req_valid) > 1)
                 core_engine_collision_cycles <= core_engine_collision_cycles + 1;
+            if (|(engine_req_valid & ~engine_req_ready)) begin
+                engine_backpressure_cycles <= engine_backpressure_cycles + 1;
+                engine_backpressure_seen <= engine_backpressure_seen |
+                                            (engine_req_valid & ~engine_req_ready);
+            end
+            if (($countones(engine_busy) > 1) && dut_abort_active)
+                multi_engine_abort_cycles <= multi_engine_abort_cycles + 1;
             if (core_spad_valid && banked_valid && !(core_ready && banked_ready))
                 shared_spad_contention_cycles <= shared_spad_contention_cycles + 1;
             if (banked_valid && banked_ready) arb_banked_grants <= arb_banked_grants + 1;
@@ -143,4 +180,5 @@ interface ai_compute_cluster_if(input logic aclk);
             end
         end
     end
+
 endinterface

@@ -9,10 +9,12 @@ ARRAY_SIZES ?= 8 16
 OUTSTANDING_DEPTH ?= 4
 A_TILE_CACHE_ENABLE ?= 1
 NEXT_K_PREFETCH_ENABLE ?= 1
+PHYSICAL_ARRAY_SIZE ?= 16
 COV_METRICS := line+cond+fsm+branch
 
 .PHONY: datapath-random-test datapath-random-compile datapath-random-run \
 	core-random-test core-random-compile core-random-run a3-core-test \
+	core-prefetch-handoff-test core-prefetch-handoff-regress \
 	datapath-random-regress core-random-regress array-random-regress \
 	matrix-size-benchmark matrix-pipeline-benchmark matrix-config-comparison
 
@@ -54,6 +56,7 @@ core-random-compile:
 		+define+MATRIX_MAX_OUTSTANDING_READS=$(OUTSTANDING_DEPTH) \
 		+define+MATRIX_A_TILE_CACHE_ENABLE=$(A_TILE_CACHE_ENABLE) \
 		+define+MATRIX_NEXT_K_PREFETCH_ENABLE=$(NEXT_K_PREFETCH_ENABLE) \
+		+define+MATRIX_ARRAY_SIZE=$(PHYSICAL_ARRAY_SIZE) \
 		-cm $(COV_METRICS) -cm_hier $(CURDIR)/matrix_core.cm_hier \
 		-cm_dir $(CORE_OUT_DIR)/coverage.vdb \
 		-Mdir=$(CORE_OUT_DIR)/csrc \
@@ -67,14 +70,30 @@ core-random-compile:
 core-random-run: core-random-compile
 	$(CORE_OUT_DIR)/simv +SEED=$(SEED) -cm $(COV_METRICS) \
 		-cm_dir $(CORE_OUT_DIR)/coverage.vdb -cm_name matrix_core_seed_$(SEED) -l $(CORE_OUT_DIR)/run.log
-	grep -q '^MATRIX_CORE_RANDOM_PASS cases=17 faults=17 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 ' $(CORE_OUT_DIR)/run.log
+	grep -q '^MATRIX_CORE_RANDOM_PASS cases=18 faults=25 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 ' $(CORE_OUT_DIR)/run.log
 
 core-random-regress: core-random-compile
 	@set -e; for seed in $(SEEDS); do \
 		$(CORE_OUT_DIR)/simv +SEED=$$seed -cm $(COV_METRICS) \
 			-cm_dir $(CORE_OUT_DIR)/coverage.vdb -cm_name matrix_core_seed_$$seed \
 			-l $(CORE_OUT_DIR)/run_seed_$$seed.log; \
-		grep -q "^MATRIX_CORE_RANDOM_PASS cases=17 faults=17 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 seed=$$seed " $(CORE_OUT_DIR)/run_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_RANDOM_PASS cases=18 faults=25 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 seed=$$seed " $(CORE_OUT_DIR)/run_seed_$$seed.log; \
+	done
+
+core-prefetch-handoff-test: core-random-compile
+	$(CORE_OUT_DIR)/simv +SEED=$(SEED) +MATRIX_PREFETCH_HANDOFF_ONLY \
+		-cm $(COV_METRICS) -cm_dir $(CORE_OUT_DIR)/coverage.vdb \
+		-cm_name matrix_prefetch_handoff_$(SEED) -l $(CORE_OUT_DIR)/handoff.log
+	grep -q '^MATRIX_CORE_PREFETCH_HANDOFF_PASS .*direct=1 array=4$$' $(CORE_OUT_DIR)/handoff.log
+	grep -q '^MATRIX_PREFETCH_HANDOFF_ONLY_PASS .*array=4 direct=1$$' $(CORE_OUT_DIR)/handoff.log
+
+core-prefetch-handoff-regress: core-random-compile
+	@set -e; for seed in $(SEEDS); do \
+		$(CORE_OUT_DIR)/simv +SEED=$$seed +MATRIX_PREFETCH_HANDOFF_ONLY \
+			-cm $(COV_METRICS) -cm_dir $(CORE_OUT_DIR)/coverage.vdb \
+			-cm_name matrix_prefetch_handoff_$$seed -l $(CORE_OUT_DIR)/handoff_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_PREFETCH_HANDOFF_PASS .*direct=1 array=4$$" $(CORE_OUT_DIR)/handoff_seed_$$seed.log; \
+		grep -q "^MATRIX_PREFETCH_HANDOFF_ONLY_PASS seed=$$seed array=4 direct=1$$" $(CORE_OUT_DIR)/handoff_seed_$$seed.log; \
 	done
 
 array-random-regress:

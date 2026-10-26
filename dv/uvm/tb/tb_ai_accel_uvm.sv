@@ -33,6 +33,7 @@ module tb_ai_accel_uvm;
     assign compute_obs.engine_busy = dut.engine_busy;
     assign compute_obs.engine_done = dut.engine_done;
     assign compute_obs.engine_error = dut.engine_error;
+    assign compute_obs.dut_abort_active = dut.core_abort;
     assign compute_obs.engine_req_valid = dut.compute_engine_req_valid;
     assign compute_obs.engine_req_ready = dut.compute_engine_ready;
     assign compute_obs.core_spad_valid = dut.core_spad_valid;
@@ -80,6 +81,68 @@ module tb_ai_accel_uvm;
         dut.compute_cluster_u.tensor_matrix_u.perf_a_tile_cache_hits;
     assign compute_obs.matrix_prefetch_overlap_cycles =
         dut.compute_cluster_u.tensor_matrix_u.perf_prefetch_overlap_cycles;
+    assign compute_obs.host_valid = dut.spad_req_valid;
+    assign compute_obs.host_write = dut.reg_req_write_raw;
+    assign compute_obs.host_addr = dut.reg_req_addr_local - 32'h0001_0000;
+    assign compute_obs.host_wdata = dut.reg_req_wdata_raw;
+    assign compute_obs.host_wstrb = dut.reg_req_wstrb_raw;
+    assign compute_obs.host_access_ok =
+        dut.spad_subsystem_u.scratchpad_u.host_access_ok &&
+        dut.spad_subsystem_u.host_prot_allow;
+    assign compute_obs.selected_spad_valid = dut.spad_compute_valid_mux;
+    assign compute_obs.selected_spad_write = dut.spad_compute_write_mux;
+    assign compute_obs.selected_spad_addr = dut.spad_compute_addr_mux;
+    assign compute_obs.selected_spad_wdata = dut.spad_compute_wdata_mux;
+    assign compute_obs.selected_spad_ready =
+        (dut.arb_request_client == 3'd0) ? dut.arb_desc_ready :
+        (dut.arb_request_client == 3'd1) ? dut.arb_cpl_ready :
+        (dut.arb_request_client == 3'd2) ? dut.arb_core_ready :
+        (dut.arb_request_client == 3'd4) ? dut.arb_dma_ready : 1'b0;
+    assign compute_obs.selected_spad_access_ok =
+        dut.spad_subsystem_u.scratchpad_u.compute_access_ok &&
+        dut.spad_subsystem_u.compute_prot_allow;
+    assign compute_obs.selected_line_valid = dut.spad_line_valid;
+    assign compute_obs.selected_line_write = dut.spad_line_write;
+    assign compute_obs.selected_line_addr = dut.spad_line_addr;
+    assign compute_obs.selected_line_wdata = dut.spad_line_wdata;
+    assign compute_obs.selected_line_wstrb = dut.spad_line_wstrb;
+    assign compute_obs.selected_line_ready =
+        (dut.arb_request_client == 3'd2) ? dut.arb_core_line_ready :
+        (dut.arb_request_client == 3'd4) ? dut.arb_dma_line_ready : 1'b0;
+    assign compute_obs.selected_line_access_ok =
+        dut.spad_subsystem_u.scratchpad_u.line_access_ok &&
+        dut.spad_subsystem_u.line_prot_allow;
+    assign compute_obs.selected_line_rdata = dut.spad_line_rdata;
+    assign compute_obs.selected_banked_valid = dut.arb_banked_valid;
+    assign compute_obs.selected_banked_addr = dut.arb_banked_addr;
+    assign compute_obs.selected_banked_ready = dut.arb_banked_ready;
+    assign compute_obs.selected_banked_access_ok =
+        dut.spad_subsystem_u.scratchpad_u.banked_access_ok;
+    assign compute_obs.banked_rdata[0] = dut.banked_data0;
+    assign compute_obs.banked_rdata[1] = dut.banked_data1;
+    assign compute_obs.banked_rdata[2] = dut.banked_data2;
+    assign compute_obs.banked_rdata[3] = dut.banked_data3;
+    assign compute_obs.selected_cnm_valid = dut.arb_cnm_valid;
+    assign compute_obs.selected_cnm_ready = dut.arb_cnm_ready;
+    assign compute_obs.selected_cnm_addr[0] = dut.arb_cnm_addr0;
+    assign compute_obs.selected_cnm_addr[1] = dut.arb_cnm_addr1;
+    assign compute_obs.selected_cnm_addr[2] = dut.arb_cnm_addr2;
+    assign compute_obs.selected_cnm_addr[3] = dut.arb_cnm_addr3;
+    assign compute_obs.selected_cnm_access_ok[0] =
+        dut.spad_subsystem_u.scratchpad_u.cnm_lane_access0;
+    assign compute_obs.selected_cnm_access_ok[1] =
+        dut.spad_subsystem_u.scratchpad_u.cnm_lane_access1;
+    assign compute_obs.selected_cnm_access_ok[2] =
+        dut.spad_subsystem_u.scratchpad_u.cnm_lane_access2;
+    assign compute_obs.selected_cnm_access_ok[3] =
+        dut.spad_subsystem_u.scratchpad_u.cnm_lane_access3;
+    assign compute_obs.cnm_rdata[0] = dut.cnm_data0;
+    assign compute_obs.cnm_rdata[1] = dut.cnm_data1;
+    assign compute_obs.cnm_rdata[2] = dut.cnm_data2;
+    assign compute_obs.cnm_rdata[3] = dut.cnm_data3;
+    assign compute_obs.selected_rsp_is_line = dut.arb_rsp_is_line;
+    assign compute_obs.selected_rsp_error = dut.arb_rsp_error;
+    assign compute_obs.selected_rsp_rdata = dut.arb_rsp_rdata;
     assign compute_obs.dma_valid = dut.dma_spad_valid;
     assign compute_obs.dma_write = dut.dma_spad_write;
     assign compute_obs.dma_ready = dut.arb_dma_ready;

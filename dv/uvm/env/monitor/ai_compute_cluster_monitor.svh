@@ -16,9 +16,12 @@ class ai_compute_cluster_monitor extends uvm_component;
 
     task run_phase(uvm_phase phase);
         ai_compute_cluster_obs obs;
+        int lane;
         forever begin
             @(posedge vif.aclk);
-            if (!vif.aresetn || vif.launch_valid || (|vif.engine_busy) ||
+            if (!vif.aresetn || vif.host_valid || vif.selected_spad_valid ||
+                vif.selected_line_valid || vif.selected_banked_valid ||
+                (|vif.selected_cnm_valid) || vif.launch_valid || (|vif.engine_busy) ||
                 (|vif.engine_done) || (|vif.engine_req_valid) ||
                 vif.core_spad_valid || vif.banked_valid ||
                 (|vif.cnm_valid) || vif.rsp_valid || vif.matrix_rsp_valid ||
@@ -33,6 +36,9 @@ class ai_compute_cluster_monitor extends uvm_component;
                 obs.engine_done = vif.engine_done;
                 obs.engine_error = vif.engine_error;
                 obs.engine_req_valid = vif.engine_req_valid;
+                obs.engine_backpressure = |(vif.engine_req_valid & ~vif.engine_req_ready);
+                obs.multi_engine_abort = (vif.dut_abort_active &&
+                                          ($countones(vif.engine_busy) > 1));
                 obs.core_spad_valid = vif.core_spad_valid;
                 obs.banked_valid = vif.banked_valid;
                 obs.cnm_valid = vif.cnm_valid;
@@ -45,6 +51,41 @@ class ai_compute_cluster_monitor extends uvm_component;
                 obs.cnm_rsp_valid = vif.cnm_rsp_valid;
                 obs.cnm_accept_mask = vif.cnm_accept_mask;
                 obs.read_accept_mask = vif.read_accept_mask;
+                obs.host_valid = vif.host_valid;
+                obs.host_write = vif.host_write;
+                obs.host_access_ok = vif.host_access_ok;
+                obs.host_addr = vif.host_addr;
+                obs.host_wdata = vif.host_wdata;
+                obs.host_wstrb = vif.host_wstrb;
+                obs.selected_spad_valid = vif.selected_spad_valid;
+                obs.selected_spad_write = vif.selected_spad_write;
+                obs.selected_spad_ready = vif.selected_spad_ready;
+                obs.selected_spad_access_ok = vif.selected_spad_access_ok;
+                obs.selected_spad_addr = vif.selected_spad_addr;
+                obs.selected_spad_wdata = vif.selected_spad_wdata;
+                obs.selected_line_valid = vif.selected_line_valid;
+                obs.selected_line_write = vif.selected_line_write;
+                obs.selected_line_ready = vif.selected_line_ready;
+                obs.selected_line_access_ok = vif.selected_line_access_ok;
+                obs.selected_line_addr = vif.selected_line_addr;
+                obs.selected_line_wdata = vif.selected_line_wdata;
+                obs.selected_line_wstrb = vif.selected_line_wstrb;
+                obs.selected_line_rdata = vif.selected_line_rdata;
+                obs.selected_banked_valid = vif.selected_banked_valid;
+                obs.selected_banked_ready = vif.selected_banked_ready;
+                obs.selected_banked_access_ok = vif.selected_banked_access_ok;
+                obs.selected_banked_addr = vif.selected_banked_addr;
+                obs.selected_cnm_valid = vif.selected_cnm_valid;
+                obs.selected_cnm_ready = vif.selected_cnm_ready;
+                obs.selected_cnm_access_ok = vif.selected_cnm_access_ok;
+                for (lane = 0; lane < 4; lane++) begin
+                    obs.banked_rdata[lane] = vif.banked_rdata[lane];
+                    obs.selected_cnm_addr[lane] = vif.selected_cnm_addr[lane];
+                    obs.cnm_rdata[lane] = vif.cnm_rdata[lane];
+                end
+                obs.selected_rsp_is_line = vif.selected_rsp_is_line;
+                obs.selected_rsp_error = vif.selected_rsp_error;
+                obs.selected_rsp_rdata = vif.selected_rsp_rdata;
                 ap.write(obs);
             end
         end

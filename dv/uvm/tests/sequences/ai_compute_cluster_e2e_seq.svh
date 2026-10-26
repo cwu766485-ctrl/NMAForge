@@ -25,6 +25,26 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] CNM_A_LOCAL = 32'h0004_8000;
     localparam bit [31:0] CNM_B_LOCAL = 32'h0004_9000;
     localparam bit [31:0] CNM_Y_LOCAL = 32'h0004_a000;
+    localparam bit [31:0] CLUSTER_SWEEP_CMDQ = 32'h0000_4400;
+    localparam bit [31:0] CLUSTER_SWEEP_CPLQ = 32'h0000_5400;
+    localparam bit [31:0] SCALAR_A_LOCAL = 32'h0004_6000;
+    localparam bit [31:0] SCALAR_B_LOCAL = 32'h0004_6100;
+    localparam bit [31:0] SCALAR_Y_LOCAL = 32'h0004_6200;
+    localparam bit [31:0] FP_A_LOCAL = 32'h0004_6400;
+    localparam bit [31:0] FP_B_LOCAL = 32'h0004_6404;
+    localparam bit [31:0] FP_Y_LOCAL = 32'h0004_6408;
+    localparam bit [31:0] CONV_A_LOCAL = 32'h0004_6600;
+    localparam bit [31:0] CONV_W_LOCAL = 32'h0004_6640;
+    localparam bit [31:0] CONV_Y_LOCAL = 32'h0004_6680;
+    localparam bit [31:0] KV_VECTOR_LOCAL = 32'h0004_6800;
+    localparam bit [31:0] KV_CACHE_LOCAL = 32'h0004_6840;
+    localparam bit [31:0] KV_READ_LOCAL = 32'h0004_6900;
+    localparam bit [31:0] SWEEP_MATRIX_Y_LOCAL = 32'h0004_c000;
+    localparam bit [31:0] SWEEP_CNM_Y_LOCAL = 32'h0004_c800;
+    localparam bit [31:0] SWEEP_SFU_Y_LOCAL = 32'h0004_d000;
+    localparam bit [31:0] FAULT_Y_LOCAL = 32'h0004_e000;
+    localparam bit [31:0] MATRIX_FAULT_A_LOCAL = 32'h0004_f000;
+    localparam bit [31:0] MATRIX_FAULT_B_LOCAL = 32'h0004_f100;
 
     virtual ai_compute_cluster_if compute_vif;
     bit [31:0] rng_state;
@@ -109,6 +129,42 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         spad_write(base + 32'h3c, 32'd3);
     endtask
 
+    task automatic write_cluster_desc(
+        input bit [31:0] base,
+        input bit [7:0] op,
+        input bit [15:0] task_id,
+        input bit [31:0] src0,
+        input bit [31:0] src1,
+        input bit [31:0] dst,
+        input bit [15:0] m,
+        input bit [15:0] n,
+        input bit [15:0] length,
+        input bit [31:0] aux0,
+        input bit [31:0] src0_stride,
+        input bit [31:0] src1_stride,
+        input bit [31:0] dst_stride,
+        input bit [7:0] version
+    );
+        spad_write(base + 32'h00, {task_id, 8'd0, op});
+        spad_write(base + 32'h04, src0);
+        spad_write(base + 32'h08, src1);
+        spad_write(base + 32'h0c, 32'd0);
+        spad_write(base + 32'h10, dst);
+        spad_write(base + 32'h14, {n, m});
+        spad_write(base + 32'h18, {16'd0, length});
+        spad_write(base + 32'h1c, 32'd0);
+        spad_write(base + 32'h20, aux0);
+        spad_write(base + 32'h24, 32'd0);
+        spad_write(base + 32'h28, src0_stride);
+        spad_write(base + 32'h2c, src1_stride);
+        spad_write(base + 32'h30, dst_stride);
+        // FP descriptors require both counts to be zero. Other engines accept
+        // zero as the ABI default of one batch/head.
+        spad_write(base + 32'h34, 32'd0);
+        spad_write(base + 32'h38, 32'd0);
+        spad_write(base + 32'h3c, {16'd0, version});
+    endtask
+
     task automatic write_cnm_v3_desc(
         input bit [31:0] base,
         input bit [15:0] task_id,
@@ -145,6 +201,149 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         expect_spad(base + 32'h04, 32'h0000_0001, {tag, " status"});
         expect_spad(base + 32'h08, result, {tag, " result"});
         expect_spad(base + 32'h0c, elements, {tag, " elements"});
+    endtask
+
+    task automatic inject_spad_parity_fault(
+        input bit [31:0] addr,
+        output string parity_path,
+        output uvm_hdl_data_t saved_parity
+    );
+        int bank;
+        int row;
+        bit ok;
+        uvm_hdl_data_t corrupt_parity;
+        bank = (addr >> 2) & 3;
+        row = addr >> 4;
+        parity_path = $sformatf(
+            "tb_ai_accel_uvm.dut.spad_subsystem_u.scratchpad_u.bank%0d_parity[%0d]",
+            bank, row);
+        if (!uvm_hdl_read(parity_path, saved_parity))
+            `uvm_fatal("CLUSTER_FAULT", $sformatf("cannot read parity bit at %s", parity_path))
+        corrupt_parity = saved_parity;
+        corrupt_parity[0] = ~saved_parity[0];
+        ok = uvm_hdl_deposit(parity_path, corrupt_parity);
+        if (!ok)
+            `uvm_fatal("CLUSTER_FAULT", $sformatf("cannot inject parity fault at %s", parity_path))
+    endtask
+
+    task automatic restore_spad_parity(
+        input string parity_path,
+        input uvm_hdl_data_t saved_parity
+    );
+        bit ok;
+        ok = uvm_hdl_deposit(parity_path, saved_parity);
+        if (!ok)
+            `uvm_fatal("CLUSTER_FAULT", $sformatf("cannot restore parity bit at %s", parity_path))
+    endtask
+
+    task automatic run_random_parity_case(
+        input int unsigned case_id,
+        input int unsigned seed
+    );
+        int unsigned fault_engine;
+        int unsigned fault_phase;
+        int unsigned cnm_lane;
+        int unsigned word_idx;
+        bit [31:0] src0;
+        bit [31:0] src1;
+        bit [31:0] dst;
+        bit [31:0] desc_addr;
+        bit [31:0] cpl_addr;
+        bit [31:0] fault_addr;
+        bit [7:0] opcode;
+        string parity_path;
+        uvm_hdl_data_t saved_parity;
+
+        if (case_id < 2) begin
+            fault_engine = 0; // INT8 scalar
+            fault_phase = case_id;
+            cnm_lane = 0;
+        end else if (case_id < 4) begin
+            fault_engine = 1; // Matrix banked read
+            fault_phase = case_id - 2;
+            cnm_lane = 0;
+        end else if (case_id < 12) begin
+            fault_engine = 2; // CNM lane-local A/B read
+            fault_phase = (case_id - 4) % 2;
+            cnm_lane = (case_id - 4) / 2;
+        end else begin
+            fault_engine = 3; // BF16 dot
+            fault_phase = case_id - 12;
+            cnm_lane = 0;
+        end
+
+        dst = FAULT_Y_LOCAL + (case_id * 32'h100);
+        desc_addr = CLUSTER_SWEEP_CMDQ + 32'h200 + (case_id * 32'h40);
+        cpl_addr = CLUSTER_SWEEP_CPLQ + 32'h200 + (case_id * 32'h10);
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            spad_write(dst + (word_idx << 2), 32'hfa17_0000 | (case_id << 8) | word_idx);
+
+        case (fault_engine)
+            0: begin
+                opcode = 8'h10;
+                src0 = SCALAR_A_LOCAL;
+                src1 = SCALAR_B_LOCAL;
+                fault_addr = fault_phase ? src1 : src0;
+                write_cluster_desc(desc_addr, opcode, 16'h0700 + case_id,
+                                   src0, src1, dst, 16'd0, 16'd0, 16'd1,
+                                   32'd0, 32'd0, 32'd0, 32'd0, 8'd3);
+            end
+            1: begin
+                opcode = 8'h30;
+                src0 = MATRIX_FAULT_A_LOCAL;
+                src1 = MATRIX_FAULT_B_LOCAL;
+                fault_addr = fault_phase ? src1 : src0;
+                write_v3_desc(desc_addr, opcode, 16'h0700 + case_id,
+                              src0, src1, dst, 16'd4, 16'd4, 16'd1);
+            end
+            2: begin
+                opcode = 8'h21;
+                src0 = CNM_A_LOCAL;
+                src1 = CNM_B_LOCAL;
+                fault_addr = (fault_phase ? src1 : src0) + (cnm_lane << 2);
+                write_cnm_v3_desc(desc_addr, 16'h0700 + case_id,
+                                  src0, src1, dst);
+            end
+            default: begin
+                opcode = 8'h50;
+                src0 = FP_A_LOCAL;
+                src1 = FP_B_LOCAL;
+                fault_addr = fault_phase ? src1 : src0;
+                write_cluster_desc(desc_addr, opcode, 16'h0700 + case_id,
+                                   src0, src1, dst, 16'd1, 16'd1, 16'd2,
+                                   32'd0, 32'd0, 32'd0, 32'd0, 8'd7);
+            end
+        endcase
+
+        inject_spad_parity_fault(fault_addr, parity_path, saved_parity);
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, desc_addr);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd1);
+        axil_write(REG_CPLQ_BASE, cpl_addr);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        restore_spad_parity(parity_path, saved_parity);
+
+        expect_spad(cpl_addr + 32'h00, 32'h0000_0700 + case_id,
+                    $sformatf("random parity case%0d task ID", case_id));
+        expect_spad(cpl_addr + 32'h04, 32'h0000_0052,
+                    $sformatf("random parity case%0d ERR_PARITY completion", case_id));
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            expect_spad(dst + (word_idx << 2),
+                        32'hfa17_0000 | (case_id << 8) | word_idx,
+                        $sformatf("random parity case%0d no-writeback[%0d]", case_id, word_idx));
+        `uvm_info("CLUSTER_FAULT_CASE_PASS", $sformatf(
+            "case=%0d engine=%0d operand_phase=%0d cnm_lane=%0d address=0x%08h seed=%0d",
+            case_id, fault_engine, fault_phase, cnm_lane, fault_addr, seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
     task automatic wait_cpl_tail(input bit [31:0] expected);
@@ -302,6 +501,13 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int signed gelu_results[0:3];
         int signed accumulator;
         int unsigned word_idx;
+        int unsigned engine_idx;
+        int unsigned fault_order[0:13];
+        int unsigned fault_i;
+        int unsigned fault_j;
+        int unsigned fault_swap;
+        int unsigned fault_case_id;
+        bit [13:0] fault_cases_seen;
         int unsigned overlap_total;
         int unsigned matrix_prefetch_overlap_total;
         int unsigned matrix_cnm_overlap_total;
@@ -521,6 +727,173 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
 
+        // C1 real-top sweep: issue one descriptor for every physical engine
+        // in one queue window. The work areas are disjoint so concurrent
+        // access tests arbitration without relying on undefined SPAD races.
+        spad_write(SCALAR_A_LOCAL, 32'h0403_0201);
+        spad_write(SCALAR_B_LOCAL, 32'h0807_0605);
+        spad_write(FP_A_LOCAL, 32'h4000_3f80);
+        spad_write(FP_B_LOCAL, 32'h4080_4040);
+        spad_write(FP_Y_LOCAL, 32'hdead_cafe);
+        for (word_idx = 0; word_idx < 9; word_idx++) begin
+            spad_write(CONV_A_LOCAL + (word_idx << 2), word_idx + 1);
+            spad_write(CONV_W_LOCAL + (word_idx << 2), 32'd1);
+        end
+        spad_write(CONV_Y_LOCAL, 32'hdead_c0de);
+        for (word_idx = 0; word_idx < 4; word_idx++) begin
+            spad_write(KV_VECTOR_LOCAL + (word_idx << 2), (word_idx + 1) * 32'h100);
+            spad_write(KV_CACHE_LOCAL + 32'h50 + (word_idx << 2), 32'hbad0_6400 + word_idx);
+        end
+
+        write_v3_desc(CLUSTER_SWEEP_CMDQ + 32'h000, 8'h30, 16'h0640,
+                      MATRIX_A_LOCAL, MATRIX_B_LOCAL, SWEEP_MATRIX_Y_LOCAL,
+                      16'd16, 16'd32, 16'd16);
+        write_cnm_v3_desc(CLUSTER_SWEEP_CMDQ + 32'h040, 16'h0641,
+                          CNM_A_LOCAL, CNM_B_LOCAL, SWEEP_CNM_Y_LOCAL);
+        write_v3_desc(CLUSTER_SWEEP_CMDQ + 32'h080, 8'h35, 16'h0642,
+                      GELU_A_LOCAL, 32'd0, SWEEP_SFU_Y_LOCAL,
+                      16'd0, 16'd0, 16'd4);
+        write_cluster_desc(CLUSTER_SWEEP_CMDQ + 32'h0c0, 8'h10, 16'h0643,
+                           SCALAR_A_LOCAL, SCALAR_B_LOCAL, SCALAR_Y_LOCAL,
+                           16'd0, 16'd0, 16'd1, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd3);
+        write_cluster_desc(CLUSTER_SWEEP_CMDQ + 32'h100, 8'h50, 16'h0644,
+                           FP_A_LOCAL, FP_B_LOCAL, FP_Y_LOCAL,
+                           16'd1, 16'd1, 16'd2, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd7);
+        write_cluster_desc(CLUSTER_SWEEP_CMDQ + 32'h140, 8'h16, 16'h0645,
+                           CONV_A_LOCAL, CONV_W_LOCAL, CONV_Y_LOCAL,
+                           16'd3, 16'd3, 16'd9, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd5);
+        write_cluster_desc(CLUSTER_SWEEP_CMDQ + 32'h180, 8'h43, 16'h0646,
+                           KV_VECTOR_LOCAL, 32'd0, KV_CACHE_LOCAL,
+                           16'd0, 16'd0, 16'd4, {16'd1,16'd1},
+                           32'd16, 32'd64, 32'd0, 8'd5);
+
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, CLUSTER_SWEEP_CMDQ);
+        axil_write(REG_CMDQ_SIZE, 32'd8);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd7);
+        axil_write(REG_CPLQ_BASE, CLUSTER_SWEEP_CPLQ);
+        axil_write(REG_CPLQ_SIZE, 32'd8);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd7);
+        wait_spad_idle();
+
+        for (word_idx = 0; word_idx < 512; word_idx++)
+            expect_spad(SWEEP_MATRIX_Y_LOCAL + (word_idx << 2),
+                        matrix_golden[word_idx / 32][word_idx % 32],
+                        $sformatf("C1 Matrix Golden[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            expect_spad(SWEEP_CNM_Y_LOCAL + (word_idx << 2), 32'd736,
+                        $sformatf("C1 CNM Golden[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 4; word_idx++) begin
+            expect_spad(SWEEP_SFU_Y_LOCAL + (word_idx << 2), gelu_results[word_idx],
+                        $sformatf("C1 SFU Golden[%0d]", word_idx));
+            expect_spad(KV_CACHE_LOCAL + 32'h50 + (word_idx << 2),
+                        (word_idx + 1) * 32'h100,
+                        $sformatf("C1 KV write Golden[%0d]", word_idx));
+        end
+        expect_spad(SCALAR_Y_LOCAL, 32'd70, "C1 scalar INT8 VDOT Golden");
+        expect_spad(FP_Y_LOCAL, 32'h4130_0000, "C1 BF16 dot Golden");
+        expect_spad(CONV_Y_LOCAL, 32'd45, "C1 CONV3x3 Golden");
+        expect_completion(CLUSTER_SWEEP_CPLQ + 32'h00, 16'h0640,
+                          matrix_golden[15][31], 32'd512, "C1 Matrix");
+        expect_completion(CLUSTER_SWEEP_CPLQ + 32'h10, 16'h0641,
+                          32'd736, 32'd16, "C1 CNM");
+        expect_completion(CLUSTER_SWEEP_CPLQ + 32'h20, 16'h0642,
+                          -32'sd15, 32'd4, "C1 SFU");
+        expect_completion(CLUSTER_SWEEP_CPLQ + 32'h30, 16'h0643,
+                          32'd70, 32'd1, "C1 scalar INT8");
+        expect_completion(CLUSTER_SWEEP_CPLQ + 32'h40, 16'h0644,
+                          32'h4130_0000, 32'd2, "C1 BF16");
+        expect_completion(CLUSTER_SWEEP_CPLQ + 32'h50, 16'h0645,
+                          32'd45, 32'd1, "C1 CONV3x3");
+        expect_completion(CLUSTER_SWEEP_CPLQ + 32'h60, 16'h0646,
+                          32'h0000_0400, 32'd4, "C1 KV write");
+        for (engine_idx = 0; engine_idx < 7; engine_idx++) begin
+            if (compute_vif.engine_launch_count[engine_idx] == 0)
+                `uvm_fatal("CLUSTER_ENGINE_COVERAGE", $sformatf(
+                    "real top did not launch engine %0d", engine_idx))
+        end
+        if (compute_vif.engine_backpressure_cycles == 0 ||
+            compute_vif.engine_backpressure_seen == 0)
+            `uvm_fatal("CLUSTER_ENGINE_BACKPRESSURE", "no engine request was denied by the shared compute SPAD mux")
+        `uvm_info("CLUSTER_ALL_ENGINES_PASS", $sformatf(
+                  "all seven production engines launched and matched SPAD Golden; compute-request backpressure cycles=%0d stalled-engine-mask=%07b",
+                  compute_vif.engine_backpressure_cycles,
+                  compute_vif.engine_backpressure_seen), UVM_LOW)
+        axil_read(REG_CMDQ_HEAD, value);
+        if (value !== 32'd7)
+            `uvm_fatal("CLUSTER_ENGINE_COVERAGE", $sformatf("C1 CMDQ_HEAD expected=7 actual=%0d", value))
+        axil_write(REG_CPLQ_HEAD, 32'd7);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+
+        // Read the head/token entry back through the real KV engine after the
+        // KV-write completion, checking both stride address generation and
+        // the complete four-word payload.
+        write_cluster_desc(CLUSTER_SWEEP_CMDQ, 8'h44, 16'h0647,
+                           KV_CACHE_LOCAL, 32'd0, KV_READ_LOCAL,
+                           16'd0, 16'd0, 16'd4, {16'd1,16'd1},
+                           32'd16, 32'd64, 32'd0, 8'd5);
+        axil_write(REG_CMDQ_BASE, CLUSTER_SWEEP_CMDQ);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd1);
+        axil_write(REG_CPLQ_BASE, CLUSTER_SWEEP_CPLQ + 32'h100);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            expect_spad(KV_READ_LOCAL + (word_idx << 2),
+                        (word_idx + 1) * 32'h100,
+                        $sformatf("C1 KV read Golden[%0d]", word_idx));
+        expect_completion(CLUSTER_SWEEP_CPLQ + 32'h100, 16'h0647,
+                          32'h0000_0400, 32'd4, "C1 KV read");
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+
+        // Seeded randomized ordering of a complete parity fault cross:
+        // INT8, Matrix, CNM (all four lanes), and BF16; A/B operand phase;
+        // every failed operation must retire ERR_PARITY without writeback.
+        for (word_idx = 0; word_idx < 4; word_idx++) begin
+            spad_write(MATRIX_FAULT_A_LOCAL + (word_idx << 2),
+                       32'h1100_0000 | word_idx);
+            spad_write(MATRIX_FAULT_B_LOCAL + (word_idx << 2),
+                       32'h2200_0000 | word_idx);
+        end
+        for (fault_i = 0; fault_i < 14; fault_i++) fault_order[fault_i] = fault_i;
+        for (fault_i = 13; fault_i > 0; fault_i--) begin
+            rng_state = rng_state ^ (rng_state << 13);
+            rng_state = rng_state ^ (rng_state >> 17);
+            rng_state = rng_state ^ (rng_state << 5);
+            fault_j = rng_state % (fault_i + 1);
+            fault_swap = fault_order[fault_i];
+            fault_order[fault_i] = fault_order[fault_j];
+            fault_order[fault_j] = fault_swap;
+        end
+        fault_cases_seen = '0;
+        for (fault_i = 0; fault_i < 14; fault_i++) begin
+            fault_case_id = fault_order[fault_i];
+            if (fault_cases_seen[fault_case_id])
+                `uvm_fatal("CLUSTER_FAULT_CROSS", $sformatf("duplicate randomized fault case=%0d", fault_case_id))
+            fault_cases_seen[fault_case_id] = 1'b1;
+            run_random_parity_case(fault_case_id, seed);
+        end
+        if (fault_cases_seen !== 14'h3fff)
+            `uvm_fatal("CLUSTER_FAULT_CROSS", $sformatf("fault cross incomplete: seen=%h", fault_cases_seen))
+        `uvm_info("CLUSTER_RANDOM_FAULT_CROSS_PASS", $sformatf(
+            "parity cases=14/14; engines={INT8,Matrix,CNM,BF16}; operand phases={A,B}; CNM lanes=4/4; randomized_order_seed=%0d",
+            seed), UVM_LOW)
+
         // Abort two real in-flight engines after their overlap is observed.
         // Sentinels prove the Matrix tile has not started writeback at abort.
         for (word_idx = 0; word_idx < 4; word_idx++)
@@ -544,6 +917,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         wait_matrix_prefetch_active();
         axil_write(REG_ABORT, 32'd1);
         wait_cpl_tail(32'd2);
+        if (compute_vif.multi_engine_abort_cycles == 0)
+            `uvm_fatal("CLUSTER_ABORT_CROSS", "software abort was not sampled while multiple real engines were active")
+        `uvm_info("CLUSTER_ABORT_CROSS_PASS", $sformatf(
+                  "simultaneous Matrix/SFU abort observed for %0d cycles",
+                  compute_vif.multi_engine_abort_cycles), UVM_LOW)
         expect_spad(CPLQ_LOCAL + 32'h100, 32'h0000_0610, "abort Matrix task ID");
         expect_spad(CPLQ_LOCAL + 32'h104, 32'h0000_0032, "abort Matrix status/code");
         expect_spad(CPLQ_LOCAL + 32'h110, 32'h0000_0611, "abort SFU task ID");

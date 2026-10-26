@@ -1,6 +1,6 @@
 # NMAForge verification plan
 
-Status: 2026-10-23 · Product baseline: A10 / ABI v7.4 · Top:
+Status: 2026-10-26 · Product baseline: A10 / ABI v7.4 · Top:
 `rtl/top/ai_accel_top.v`
 
 This document defines the verification layers and acceptance rules. The
@@ -37,9 +37,27 @@ block/subsystem acceptance rows. Do not copy dated run logs into this plan.
 
 The five compute verification groups have selected passing functional suites.
 Their raw DUT code coverage is partial; per-engine figures and gaps are in the
-[compute-engine status page](COMPUTE_ENGINE_STATUS.md). The 2026-10-21
-[compute run record](COMPUTE_ENGINE_BLOCK_VALIDATION_2026-10-21.md) contains
-commands and detailed evidence.
+[compute-engine status page](COMPUTE_ENGINE_STATUS.md). The latest Matrix
+depth-4 core run reports 49/53 FSM transitions (92.45%), with all 15 states
+hit. Review found four transitions absent from the prefetch-enabled profile;
+one fallback is also exercised in a separate prefetch-disabled benchmark.
+There is no formal unreachable waiver for the remaining raw misses. The
+real-top Compute Cluster UVM passes three seeds across seven production engines,
+with 14 parity cases per seed and a byte-addressed reference-memory scoreboard
+(3,536 compared words per seed, zero mismatches/unknown reads). Its focused
+functional covergroup is 97.92%; the two unhit bins are DMA and completion
+response-client bins. This is not a DUT-only code-coverage result or a full C1
+signoff. See the
+[current testplan](COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md) for the RTM and artifacts.
+The 2026-10-21 [compute run record](COMPUTE_ENGINE_BLOCK_VALIDATION_2026-10-21.md)
+contains the historical per-group commands and evidence.
+
+The same-seed Matrix depth/prefetch/cache comparison and the synthetic-weight
+86-descriptor Transformer prefill/decode also pass in the current worktree.
+Current RTL ASIC PPA is still unmeasured: the checkout has no current Matrix/
+Top synthesis runner, SDC, standard-cell library, or SRAM timing view. A
+pretrained-model accuracy comparison is also not part of the synthetic
+Transformer test.
 
 The A10 workstreams G0/V1–V5 remain tracked separately in the RTM. Full-domain
 FP parity-to-`ST_WRITE` exclusion is now proven for all nonzero 16-bit lengths
@@ -59,6 +77,9 @@ post-layout/board evidence.
 | Scope | Command |
 |---|---|
 | Selected five-engine cluster regression | `make -C dv/subsystem/tensor_datapath/sim cluster_regress` |
+| Real-top seven-engine Cluster UVM (three seeds) | `make -C dv/uvm/sim uvm_compute_cluster_regress COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027' COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_cluster_closeout_multiseed_20261026` |
+| Matrix depth/prefetch/cache comparison | `make -C dv/block/compute/matrix/sim matrix-config-comparison SEED=20261026 MATRIX_CONFIG_OUT=/tmp/nmaforge_matrix_config_compare_20261026` |
+| Transformer top workload | `make -C dv/subsystem/top_smoke/sim ai_transformer` |
 | Top smoke | `make -C dv/subsystem/top_smoke/sim ai_smoke` |
 | Seeded top regression | `make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=12345` |
 | Command processor UVM | `make -C dv/block/command_processor/uvm regress` |

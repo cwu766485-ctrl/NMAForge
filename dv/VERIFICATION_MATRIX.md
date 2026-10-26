@@ -1,15 +1,17 @@
 # NMAForge block and subsystem verification matrix
 
-> **2026-10-26 real Compute Cluster top-UVM status:** The production-top
-> Matrix/SFU/P0-C slice passed three VCS seeds. Each seed checked a real
-> 16×32×64 GEMM against 512 Golden outputs, 16 A-tile cache hits, 120 cycles
-> of next-K prefetch/MAC overlap, SFU queueing, arbiter/four-bank traffic,
-> ordered completions, prefetch abort/reset and recovery. UVM
-> warning/error/fatal=`0/0/0`; focused covergroup=`65.4%`. Merged whole-top
-> URG line/condition/FSM/branch/assert/group=`47.54/41.38/10.52/37.70/60.00/19.11%`
-> includes DUT/SVA/TB/UVM and is not DUT-only coverage. Other engine numerics,
-> broad parity/protection/backpressure coverage and complete cluster closure
-> remain open. Exact evidence is recorded at the end of this matrix and in the
+> **2026-10-26 real Compute Cluster top-UVM status:** The latest seven-engine
+> directed slice passed three VCS seeds, with independent result/completion
+> checks, Matrix/CNM ownership, request backpressure, Matrix/SFU Abort, and
+> reset recovery. The closeout three-seed rerun adds a byte-addressed reference
+> memory scoreboard (3,536 compared words/seed, zero mismatch/unknown) and a
+> seeded parity cross (14/14 cases/seed); UVM warning/error/fatal=`0/0/0`.
+> Focused functional covergroup=`97.92%`, with DMA/completion response-client
+> bins unhit. This supersedes the earlier 65.4% Matrix/SFU slice below.
+> Whole-top URG includes DUT/SVA/TB/UVM and is not DUT-only coverage. Broader
+> opcode/configuration and protection/fault-phase crosses, mutation campaign,
+> clean-SHA replay, PPA, and complete Cluster closure remain open. Exact
+> evidence is recorded at the end of this matrix and in the
 > [testplan](../docs/verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md).
 
 > **2026-10-23 Multi-Engine NPU Compute Cluster interaction follow-up:** The
@@ -839,7 +841,7 @@ SPAD size benchmark: 16×16 array / 16×16×K32 is 242 cycles, 33.851 MAC/cycle,
 also PASS. These are block/top-smoke results; they are not merged into the
 real-top UVM functional covergroup. P0-C evidence follows.
 
-### Matrix P0-C prefetch and A-tile reuse (2026-10-26)
+### Matrix P0-C prefetch and A-tile reuse (2026-10-26; initial UVM slice)
 
 Depth-2 and depth-4 Matrix core regressions each passed three seeds, with 17
 numeric/layout and 17 fault/recovery cases per seed. The tests check that the
@@ -869,3 +871,47 @@ bank response:
 GOPS is normalized to an assumed 250 MHz; neither these results nor the 10 ns
 testbench period model SRAM macro timing or establish PPA. Exact commands and
 artifact paths are in the [upgrade roadmap](../docs/verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md#34-p0-c-ping-pong-prefetch--p1-bounded-a-tile-reuse).
+
+### 2026-10-26 Matrix FSM convergence and seven-engine top UVM follow-up
+
+The depth-4 Matrix core regression and a focused 4×4 physical-array
+prefetch-handoff regression were merged in URG after the initial P0-C result
+above. `ai_tensor_matrix_core` reached 15/15 states and 49/53 transitions
+(92.45%); prefetch FSM reached 9/9 transitions. Core line/condition/branch
+coverage is 96.45/88.52/95.02%. The four unhit core transitions were reviewed
+against RTL guards and configuration reachability; no formal unreachable
+waiver is claimed. A separate prefetch-disabled Golden benchmark hits the
+`ST_MAC→ST_A_REQ` fallback, but its differently compiled VDB is not merged into
+the prefetch-enabled percentage. The child array remains partial at 82.35% line
+/ 20.00% condition / 58.82% branch.
+
+The real-top UVM now sweeps INT8 VDOT, BF16 dot, CNM, Matrix, SFU, Conv3x3, and
+KV write, with separate KV readback/stride checking. Three seeds pass; each
+engine's result and completion are checked, as are CNM per-lane request/response
+ownership, Matrix/CNM response tags, request backpressure (236 cycles),
+Matrix/SFU concurrent Abort, and reset recovery. Each seed reports focused
+functional covergroup 97.9%, UVM warning/error/fatal `0/0/0`, no orphan response,
+and empty pending ledgers. The merged whole-top URG also includes DUT, SVA,
+testbench, and UVM definitions and must not be interpreted as DUT-only code
+coverage. The older 65.4% UVM and 40/60 Matrix FSM values above are preserved as
+dated intermediate evidence, not current status.
+
+The VCS same-seed Matrix configuration sweep also completed eight combinations
+of outstanding depth, prefetch, and A-tile cache. With one-cycle behavioral
+bank response, 16×16×K32 improved 265→233 cycles, 16×32×K32 improved 504→417
+cycles with reads 128→96, and 32×32×K64 improved 1698→1187 cycles with reads
+512→384, comparing depth-2/no-prefetch/no-cache to depth-4/prefetch/cache.
+These are behavioral cycle/read comparisons, not SRAM timing or PPA.
+
+The closeout reran the same three real-top UVM seeds in
+`/tmp/nmaforge_cluster_closeout_multiseed_20261026/`. Each seed ran 14/14 parity
+cases and reported 3,584 modeled writes, 3,536 compared words, zero
+mismatches/unknown reads, zero orphan responses, and UVM warning/error/fatal
+`0/0/0`. The 97.92% functional group has two explicit misses: DMA and completion
+response-client bins. The byte-addressed reference-memory scoreboard is now
+implemented for observed host/scalar/banked/CNM accesses; line/partial-WSTRB,
+broader randomized feature/fault coverage, mutation, and clean-SHA replay remain
+open. The latest top smoke, 20-case seeded regression, and 86-descriptor
+fixed-weight Transformer functional test are documented in the
+[upgrade roadmap](../docs/verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md).
+Current ASIC area/Fmax/power and pretrained-model accuracy remain unmeasured.

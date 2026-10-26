@@ -7,6 +7,8 @@ class ai_compute_cluster_coverage extends uvm_component;
     int response_client;
     bit matrix_sfu_overlap;
     bit simultaneous_engine_requests;
+    bit engine_backpressure;
+    bit multi_engine_abort;
     bit banked_request;
     bit cnm_request;
     bit matrix_prefetch_active;
@@ -28,6 +30,8 @@ class ai_compute_cluster_coverage extends uvm_component;
         }
         cp_matrix_sfu_overlap: coverpoint matrix_sfu_overlap { bins hit = {1}; }
         cp_simultaneous_engine_requests: coverpoint simultaneous_engine_requests { bins hit = {1}; }
+        cp_engine_backpressure: coverpoint engine_backpressure { bins hit = {1}; }
+        cp_multi_engine_abort: coverpoint multi_engine_abort { bins hit = {1}; }
         cp_banked_request: coverpoint banked_request { bins hit = {1}; }
         cp_cnm_request: coverpoint cnm_request { bins hit = {1}; }
         cp_matrix_prefetch_active: coverpoint matrix_prefetch_active { bins hit = {1}; }
@@ -68,6 +72,8 @@ class ai_compute_cluster_coverage extends uvm_component;
         active_count = $countones(obs.engine_busy);
         matrix_sfu_overlap = obs.engine_busy[3] && obs.engine_busy[4];
         simultaneous_engine_requests = $countones(obs.engine_req_valid) > 1;
+        engine_backpressure = obs.engine_backpressure;
+        multi_engine_abort = obs.multi_engine_abort;
         banked_request = obs.banked_valid;
         cnm_request = |obs.cnm_valid;
         matrix_prefetch_active = obs.matrix_prefetch_active;
@@ -80,6 +86,7 @@ class ai_compute_cluster_coverage extends uvm_component;
         cnm_lane3_response = obs.cnm_rsp_valid[3];
         if (obs.launch_valid || active_count > 0 || simultaneous_engine_requests ||
             banked_request || cnm_request || obs.rsp_valid ||
+            engine_backpressure || multi_engine_abort ||
             matrix_prefetch_active || matrix_a_cache_hit)
             cluster_cg.sample();
     endfunction
