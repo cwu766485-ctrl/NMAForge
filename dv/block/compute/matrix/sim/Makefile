@@ -8,12 +8,13 @@ ARRAY_SEEDS ?= 20261025 20261026 20261027
 ARRAY_SIZES ?= 8 16
 OUTSTANDING_DEPTH ?= 4
 A_TILE_CACHE_ENABLE ?= 1
+NEXT_K_PREFETCH_ENABLE ?= 1
 COV_METRICS := line+cond+fsm+branch
 
 .PHONY: datapath-random-test datapath-random-compile datapath-random-run \
 	core-random-test core-random-compile core-random-run a3-core-test \
 	datapath-random-regress core-random-regress array-random-regress \
-	matrix-size-benchmark
+	matrix-size-benchmark matrix-pipeline-benchmark matrix-config-comparison
 
 datapath-random-test: datapath-random-run
 
@@ -52,6 +53,7 @@ core-random-compile:
 	$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
 		+define+MATRIX_MAX_OUTSTANDING_READS=$(OUTSTANDING_DEPTH) \
 		+define+MATRIX_A_TILE_CACHE_ENABLE=$(A_TILE_CACHE_ENABLE) \
+		+define+MATRIX_NEXT_K_PREFETCH_ENABLE=$(NEXT_K_PREFETCH_ENABLE) \
 		-cm $(COV_METRICS) -cm_hier $(CURDIR)/matrix_core.cm_hier \
 		-cm_dir $(CORE_OUT_DIR)/coverage.vdb \
 		-Mdir=$(CORE_OUT_DIR)/csrc \
@@ -102,6 +104,7 @@ matrix-size-benchmark:
 		$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
 			+define+MATRIX_MAX_OUTSTANDING_READS=$(OUTSTANDING_DEPTH) \
 			+define+MATRIX_A_TILE_CACHE_ENABLE=$(A_TILE_CACHE_ENABLE) \
+			+define+MATRIX_NEXT_K_PREFETCH_ENABLE=$(NEXT_K_PREFETCH_ENABLE) \
 			-cm $(COV_METRICS) -cm_hier $(CURDIR)/matrix_core.cm_hier \
 			-cm_dir $$out/coverage.vdb -Mdir=$$out/csrc \
 			+define+MATRIX_ARRAY_SIZE=$$size -top tb_ai_tensor_matrix_core_random \
@@ -118,3 +121,38 @@ matrix-size-benchmark:
 		done; \
 		grep -q '^MATRIX_SIZE_BENCHMARK_PASS ' $$out/run.log; \
 	done
+
+PIPELINE_ARRAY_SIZE ?= 16
+PIPELINE_BENCH_OUT ?= /tmp/nmaforge_matrix_pipeline_benchmark_d$(OUTSTANDING_DEPTH)_p$(NEXT_K_PREFETCH_ENABLE)_c$(A_TILE_CACHE_ENABLE)_$(SEED)
+matrix-pipeline-benchmark:
+	mkdir -p $(PIPELINE_BENCH_OUT)
+	$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+		+define+MATRIX_MAX_OUTSTANDING_READS=$(OUTSTANDING_DEPTH) \
+		+define+MATRIX_A_TILE_CACHE_ENABLE=$(A_TILE_CACHE_ENABLE) \
+		+define+MATRIX_NEXT_K_PREFETCH_ENABLE=$(NEXT_K_PREFETCH_ENABLE) \
+		+define+MATRIX_ARRAY_SIZE=$(PIPELINE_ARRAY_SIZE) -top tb_ai_tensor_matrix_core_random \
+		../../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v \
+		../../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv \
+		../../../../../rtl/compute/matrix/ai_tensor_matrix_core.v \
+		../tb/tb_ai_tensor_matrix_core_random.sv \
+		-o $(PIPELINE_BENCH_OUT)/simv -l $(PIPELINE_BENCH_OUT)/compile.log
+	$(PIPELINE_BENCH_OUT)/simv +SEED=$(SEED) +MATRIX_BENCHMARK_ONLY \
+		-l $(PIPELINE_BENCH_OUT)/run.log
+	@grep -q '^MATRIX_SIZE_BENCHMARK_PASS .*outstanding_depth=$(OUTSTANDING_DEPTH) next_k_prefetch=$(NEXT_K_PREFETCH_ENABLE) a_tile_cache=$(A_TILE_CACHE_ENABLE) ' $(PIPELINE_BENCH_OUT)/run.log
+	@for case_id in 100 101 102 103 104; do grep -q "^MATRIX_CORE_CASE_PASS id=$$case_id .*physical_array=$(PIPELINE_ARRAY_SIZE)x$(PIPELINE_ARRAY_SIZE)$$" $(PIPELINE_BENCH_OUT)/run.log || exit 1; done
+
+MATRIX_CONFIG_OUT ?= /tmp/nmaforge_matrix_config_compare_$(SEED)
+matrix-config-comparison:
+	@set -e; for depth in 2 4; do \
+		for prefetch in 0 1; do \
+			for cache in 0 1; do \
+				out=$(MATRIX_CONFIG_OUT)/depth_$$depth/prefetch_$$prefetch/cache_$$cache; \
+				$(MAKE) --no-print-directory matrix-pipeline-benchmark \
+					SEED=$(SEED) OUTSTANDING_DEPTH=$$depth \
+					PIPELINE_ARRAY_SIZE=16 \
+					NEXT_K_PREFETCH_ENABLE=$$prefetch A_TILE_CACHE_ENABLE=$$cache \
+					PIPELINE_BENCH_OUT=$$out; \
+			done; \
+		done; \
+	done; \
+	python3 ../../../../../tools/summarize_matrix_config_bench.py --root $(MATRIX_CONFIG_OUT) --seed $(SEED)

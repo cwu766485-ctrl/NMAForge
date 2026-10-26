@@ -27,6 +27,7 @@ module tb_ai_accel_uvm;
 
     assign compute_obs.aresetn = aresetn;
     assign compute_obs.core_busy = dut.core_busy;
+    assign compute_obs.processor_busy = dut.processor_busy;
     assign compute_obs.launch_valid = dut.launch_valid;
     assign compute_obs.launch_op = dut.launch_op;
     assign compute_obs.engine_busy = dut.engine_busy;
@@ -43,6 +44,23 @@ module tb_ai_accel_uvm;
     assign compute_obs.rsp_valid = dut.arb_rsp_valid;
     assign compute_obs.rsp_client = dut.arb_rsp_client;
     assign compute_obs.request_client = dut.arb_request_client;
+    assign compute_obs.matrix_rsp_valid = dut.banked_rsp_valid;
+    assign compute_obs.cnm_rsp_valid = dut.cnm_rsp_valid;
+    assign compute_obs.cnm_request_valid = dut.cnm_read_valid;
+    assign compute_obs.cnm_request_ready = dut.arb_cnm_ready;
+    assign compute_obs.matrix_request_valid = dut.banked_read_valid;
+    assign compute_obs.cnm_core_state = dut.compute_cluster_u.banked_core_u.state_r;
+    assign compute_obs.cnm_lane_state = {
+        dut.compute_cluster_u.banked_core_u.lc3.state_r,
+        dut.compute_cluster_u.banked_core_u.lc2.state_r,
+        dut.compute_cluster_u.banked_core_u.lc1.state_r,
+        dut.compute_cluster_u.banked_core_u.lc0.state_r
+    };
+    assign compute_obs.matrix_banked_req_addr = dut.banked_read_addr;
+    assign compute_obs.cnm_req_addr[0] = dut.cnm_read_addr0;
+    assign compute_obs.cnm_req_addr[1] = dut.cnm_read_addr1;
+    assign compute_obs.cnm_req_addr[2] = dut.cnm_read_addr2;
+    assign compute_obs.cnm_req_addr[3] = dut.cnm_read_addr3;
     assign compute_obs.parallel_queue_mode = dut.parallel_queue_mode_r;
     assign compute_obs.desc_valid = dut.desc_spad_valid;
     assign compute_obs.desc_ready = dut.arb_desc_ready;

@@ -37,6 +37,7 @@ module ai_bank_local_controller #(
     reg [31:0] src0_r, src1_r;
     reg [15:0] length_r, k_r;
     reg [31:0] a_buf0_r, a_buf1_r;
+    reg a_response_seen_r;
 
     // The alternating buffers retain A[k] while the matching B[k] response
     // is received.  A's low K bit is therefore the ping-pong selector.
@@ -82,6 +83,7 @@ module ai_bank_local_controller #(
         if (!resetn) begin
             state_r<=ST_IDLE; src0_r<=0; src1_r<=0; length_r<=0; k_r<=0;
             a_buf0_r<=0; a_buf1_r<=0; busy<=0; done<=0; error<=0; local_sum<=0;
+            a_response_seen_r<=1'b0;
             read_issue_events<=0; prefetch_events<=0; compute_events<=0; response_wait_cycles<=0;
         end else begin
             done<=0;
@@ -93,30 +95,43 @@ module ai_bank_local_controller #(
             else case (state_r)
                 ST_IDLE: if (start) begin
                     src0_r<=src0_base; src1_r<=src1_base; length_r<=length; k_r<=0;
-                    local_sum<=0; busy<=1; error<=0;
+                    local_sum<=0; busy<=1; error<=0; a_response_seen_r<=1'b0;
                     read_issue_events<=0; prefetch_events<=0; compute_events<=0;
                     if (length==0) state_r<=ST_ERROR; else state_r<=ST_A_REQ;
                 end
                 ST_A_REQ: if (req_ready) begin
                     read_issue_events<=read_issue_events+1'b1;
+                    a_response_seen_r<=1'b0;
                     state_r<=ST_B_REQ;
                 end
-                ST_B_REQ: if (req_ready) begin
-                    read_issue_events<=read_issue_events+1'b1;
-                    // A may return in the B issue cycle with the registered
-                    // scratchpad timing model.
-                    if (rsp_valid) begin
-                        if (rsp_parity_error) state_r<=ST_ERROR;
-                        else begin
-                            if (select_a_buffer1) a_buf1_r<=rsp_data; else a_buf0_r<=rsp_data;
-                            state_r<=ST_WAIT_B;
+                ST_B_REQ: begin
+                    if (req_ready)
+                        read_issue_events<=read_issue_events+1'b1;
+                    // The A response can arrive while B is backpressured.
+                    // Capture it independently of B's request handshake so
+                    // it cannot be lost before ST_WAIT_A is entered.
+                    if (rsp_valid && rsp_parity_error)
+                        state_r<=ST_ERROR;
+                    else begin
+                        if (rsp_valid) begin
+                            if (select_a_buffer1) a_buf1_r<=rsp_data;
+                            else a_buf0_r<=rsp_data;
+                            a_response_seen_r<=1'b1;
                         end
-                    end else state_r<=ST_WAIT_A;
+                        if (req_ready) begin
+                            if (rsp_valid || a_response_seen_r) begin
+                                a_response_seen_r<=1'b0;
+                                state_r<=ST_WAIT_B;
+                            end else
+                                state_r<=ST_WAIT_A;
+                        end
+                    end
                 end
                 ST_WAIT_A: if (rsp_valid) begin
                     if (rsp_parity_error) state_r<=ST_ERROR;
                     else begin
                         if (select_a_buffer1) a_buf1_r<=rsp_data; else a_buf0_r<=rsp_data;
+                        a_response_seen_r<=1'b0;
                         state_r<=ST_WAIT_B;
                     end
                 end
@@ -130,6 +145,7 @@ module ai_bank_local_controller #(
                             read_issue_events<=read_issue_events+1'b1;
                             prefetch_events<=prefetch_events+1'b1;
                             k_r<=k_r+1'b1;
+                            a_response_seen_r<=1'b0;
                             state_r<=ST_B_REQ;
                         end else state_r<=ST_PREFETCH_A;
                     end
@@ -138,6 +154,7 @@ module ai_bank_local_controller #(
                     read_issue_events<=read_issue_events+1'b1;
                     prefetch_events<=prefetch_events+1'b1;
                     k_r<=k_r+1'b1;
+                    a_response_seen_r<=1'b0;
                     state_r<=ST_B_REQ;
                 end
                 ST_DONE: begin busy<=0; done<=1; state_r<=ST_IDLE; end

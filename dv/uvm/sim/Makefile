@@ -56,6 +56,9 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 			+COMPUTE_CLUSTER_SEED=$$seed +ntb_random_seed=$$seed \
 			-cm $(UVM_COV_METRICS) -cm_dir "$$db" -l "$$log"; \
 		grep -q '\[COMPUTE_CLUSTER_REAL_UVM_PASS\]' "$$log" || { echo "ERROR: real Compute Cluster pass marker missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_A_CACHE_BASELINE_PASS\]' "$$log" || { echo "ERROR: standalone Matrix A-tile cache baseline marker missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_CNM_OWNER_PASS\]' "$$log" || { echo "ERROR: Matrix/CNM independent response-owner check missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_CNM_ADDR_PASS\]' "$$log" || { echo "ERROR: four-lane CNM address scoreboard check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_RESET_RECOVERY_PASS\]' "$$log" || { echo "ERROR: real compute-cluster active-reset/recovery check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_SCOREBOARD\]' "$$log" || { echo "ERROR: compute-cluster scoreboard report missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SCOREBOARD\].*reset_dropped=[1-9][0-9]*' "$$log" || { echo "ERROR: reset did not discard a tracked in-flight SPAD response"; exit 1; }; \

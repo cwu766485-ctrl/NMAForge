@@ -11,6 +11,11 @@ class ai_compute_cluster_coverage extends uvm_component;
     bit cnm_request;
     bit matrix_prefetch_active;
     bit matrix_a_cache_hit;
+    int response_route;
+    bit cnm_lane0_response;
+    bit cnm_lane1_response;
+    bit cnm_lane2_response;
+    bit cnm_lane3_response;
 
     covergroup cluster_cg;
         option.per_instance = 1;
@@ -29,8 +34,16 @@ class ai_compute_cluster_coverage extends uvm_component;
         cp_matrix_a_cache_hit: coverpoint matrix_a_cache_hit { bins hit = {1}; }
         cp_response_client: coverpoint response_client iff (response_client >= 0) {
             bins descriptor = {0}; bins completion = {1}; bins core = {2};
-            bins banked = {3}; bins dma = {4};
+            bins banked = {3}; bins dma = {4}; bins cnm = {5};
         }
+        cp_response_route: coverpoint response_route iff ((response_client == 3) || (response_client == 5)) {
+            bins matrix_only = {2}; bins cnm_only = {1};
+            illegal_bins dropped_or_aliased = {0, 3};
+        }
+        cp_cnm_lane0_response: coverpoint cnm_lane0_response iff (response_client == 5) { bins hit = {1}; }
+        cp_cnm_lane1_response: coverpoint cnm_lane1_response iff (response_client == 5) { bins hit = {1}; }
+        cp_cnm_lane2_response: coverpoint cnm_lane2_response iff (response_client == 5) { bins hit = {1}; }
+        cp_cnm_lane3_response: coverpoint cnm_lane3_response iff (response_client == 5) { bins hit = {1}; }
     endgroup
 
     function new(string name, uvm_component parent);
@@ -60,6 +73,11 @@ class ai_compute_cluster_coverage extends uvm_component;
         matrix_prefetch_active = obs.matrix_prefetch_active;
         matrix_a_cache_hit = obs.matrix_a_cache_hit;
         response_client = obs.rsp_valid ? obs.rsp_client : -1;
+        response_route = {obs.matrix_rsp_valid, (|obs.cnm_rsp_valid)};
+        cnm_lane0_response = obs.cnm_rsp_valid[0];
+        cnm_lane1_response = obs.cnm_rsp_valid[1];
+        cnm_lane2_response = obs.cnm_rsp_valid[2];
+        cnm_lane3_response = obs.cnm_rsp_valid[3];
         if (obs.launch_valid || active_count > 0 || simultaneous_engine_requests ||
             banked_request || cnm_request || obs.rsp_valid ||
             matrix_prefetch_active || matrix_a_cache_hit)

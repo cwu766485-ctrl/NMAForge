@@ -7,7 +7,8 @@
 module ai_tensor_matrix_core #(
     parameter integer ARRAY_SIZE = 16,
     parameter integer MAX_OUTSTANDING_READS = 4,
-    parameter integer ENABLE_A_TILE_CACHE = 1
+    parameter integer ENABLE_A_TILE_CACHE = 1,
+    parameter integer ENABLE_NEXT_K_PREFETCH = 1
 )(
     input  wire        clk,
     input  wire        resetn,
@@ -919,7 +920,7 @@ module ai_tensor_matrix_core #(
                                 bias_index_r <= {(TILE_INDEX_WIDTH+1){1'b0}};
                                 state_r <= ST_BIAS_REQ;
                             end else begin
-                                if (k_words_r > 1) begin
+                                if (ENABLE_NEXT_K_PREFETCH && (k_words_r > 1)) begin
                                     prefetch_kick <= 1'b1;
                                     prefetch_kick_k_group <= 16'd1;
                                     prefetch_kick_buffer <= 1'b1;
@@ -952,7 +953,8 @@ module ai_tensor_matrix_core #(
                                     state_r <= ST_BIAS_REQ;
                                 end else begin
                                     bias_loaded_r <= 1'b1;
-                                    if ((k_group_r == 0) && (k_words_r > 1)) begin
+                                    if (ENABLE_NEXT_K_PREFETCH &&
+                                        (k_group_r == 0) && (k_words_r > 1)) begin
                                         prefetch_kick <= 1'b1;
                                         prefetch_kick_k_group <= 16'd1;
                                         prefetch_kick_buffer <= 1'b1;
@@ -977,6 +979,11 @@ module ai_tensor_matrix_core #(
                                 write_lane_r <= 2'd0;
                                 dst_row_addr_r <= dst_tile_base_r;
                                 state_r <= ST_WRITE;
+                            end else if (!ENABLE_NEXT_K_PREFETCH) begin
+                                k_group_r <= k_group_r + 1'b1;
+                                compute_buffer_r <= 1'b0;
+                                read_group_r <= 3'd0;
+                                state_r <= ST_A_REQ;
                             end else if (prefetch_valid_r[~compute_buffer_r]) begin
                                 k_group_r <= k_group_r + 1'b1;
                                 compute_buffer_r <= ~compute_buffer_r;
@@ -999,7 +1006,12 @@ module ai_tensor_matrix_core #(
                     end
 
                     ST_PREFETCH_WAIT: begin
-                        if (prefetch_valid_r[~compute_buffer_r]) begin
+                        if (!ENABLE_NEXT_K_PREFETCH) begin
+                            k_group_r <= k_group_r + 1'b1;
+                            compute_buffer_r <= 1'b0;
+                            read_group_r <= 3'd0;
+                            state_r <= ST_A_REQ;
+                        end else if (prefetch_valid_r[~compute_buffer_r]) begin
                             k_group_r <= k_group_r + 1'b1;
                             compute_buffer_r <= ~compute_buffer_r;
                             prefetch_consume <= 1'b1;

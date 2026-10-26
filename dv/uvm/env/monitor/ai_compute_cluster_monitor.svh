@@ -21,7 +21,8 @@ class ai_compute_cluster_monitor extends uvm_component;
             if (!vif.aresetn || vif.launch_valid || (|vif.engine_busy) ||
                 (|vif.engine_done) || (|vif.engine_req_valid) ||
                 vif.core_spad_valid || vif.banked_valid ||
-                (|vif.cnm_valid) || vif.rsp_valid || (|vif.read_accept_mask) ||
+                (|vif.cnm_valid) || vif.rsp_valid || vif.matrix_rsp_valid ||
+                (|vif.cnm_rsp_valid) || (|vif.read_accept_mask) ||
                 vif.matrix_prefetch_active || vif.matrix_a_cache_hit) begin
                 obs = ai_compute_cluster_obs::type_id::create("obs");
                 obs.reset_active = !vif.aresetn;
@@ -40,6 +41,9 @@ class ai_compute_cluster_monitor extends uvm_component;
                 obs.rsp_valid = vif.rsp_valid;
                 obs.rsp_client = vif.rsp_client;
                 obs.request_client = vif.request_client;
+                obs.matrix_rsp_valid = vif.matrix_rsp_valid;
+                obs.cnm_rsp_valid = vif.cnm_rsp_valid;
+                obs.cnm_accept_mask = vif.cnm_accept_mask;
                 obs.read_accept_mask = vif.read_accept_mask;
                 ap.write(obs);
             end

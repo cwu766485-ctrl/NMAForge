@@ -22,6 +22,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] GELU_B_LOCAL = 32'h0002_0100;
     localparam bit [31:0] GELU_Y0_LOCAL = 32'h0002_0200;
     localparam bit [31:0] GELU_Y1_LOCAL = 32'h0002_0300;
+    localparam bit [31:0] CNM_A_LOCAL = 32'h0004_8000;
+    localparam bit [31:0] CNM_B_LOCAL = 32'h0004_9000;
+    localparam bit [31:0] CNM_Y_LOCAL = 32'h0004_a000;
 
     virtual ai_compute_cluster_if compute_vif;
     bit [31:0] rng_state;
@@ -106,6 +109,31 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         spad_write(base + 32'h3c, 32'd3);
     endtask
 
+    task automatic write_cnm_v3_desc(
+        input bit [31:0] base,
+        input bit [15:0] task_id,
+        input bit [31:0] src0,
+        input bit [31:0] src1,
+        input bit [31:0] dst
+    );
+        spad_write(base + 32'h00, {task_id, 8'd0, 8'h21});
+        spad_write(base + 32'h04, src0);
+        spad_write(base + 32'h08, src1);
+        spad_write(base + 32'h0c, 32'd0);
+        spad_write(base + 32'h10, dst);
+        spad_write(base + 32'h14, {16'd1, 16'd16});
+        spad_write(base + 32'h18, 32'd1);
+        spad_write(base + 32'h1c, 32'd0);
+        spad_write(base + 32'h20, 32'd0);
+        spad_write(base + 32'h24, 32'd0);
+        spad_write(base + 32'h28, 32'd0);
+        spad_write(base + 32'h2c, 32'd0);
+        spad_write(base + 32'h30, 32'd0);
+        spad_write(base + 32'h34, 32'h0001_0001);
+        spad_write(base + 32'h38, 32'd0);
+        spad_write(base + 32'h3c, 32'd3);
+    endtask
+
     task automatic expect_completion(
         input bit [31:0] base,
         input bit [15:0] task_id,
@@ -128,6 +156,38 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             if (value == expected) return;
         end
         `uvm_fatal("CLUSTER_TIMEOUT", $sformatf("CPLQ_TAIL expected %0d got %0d", expected, value))
+    endtask
+
+    task automatic wait_spad_idle();
+        int unsigned poll;
+        int unsigned quiet_cycles;
+        quiet_cycles = 0;
+        for (poll = 0; poll < 50000; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (!compute_vif.core_busy && !compute_vif.processor_busy &&
+                (compute_vif.engine_busy == 0) &&
+                (compute_vif.engine_req_valid == 0) &&
+                !compute_vif.core_spad_valid &&
+                !compute_vif.banked_valid &&
+                (compute_vif.cnm_valid == 0) &&
+                !compute_vif.matrix_line_valid &&
+                !compute_vif.dma_valid &&
+                !compute_vif.dma_line_valid &&
+                !compute_vif.desc_valid &&
+                !compute_vif.cpl_valid) begin
+                quiet_cycles++;
+                if (quiet_cycles == 3) return;
+            end else
+                quiet_cycles = 0;
+        end
+        `uvm_fatal("CLUSTER_SPAD_IDLE", $sformatf(
+            "scheduler SPAD did not stay idle: core_busy=%b processor_busy=%b engine_busy=%07b engine_req=%07b core=%b banked=%b cnm=%b line=%b dma=%b dma_line=%b desc=%b cpl=%b",
+            compute_vif.core_busy, compute_vif.processor_busy,
+            compute_vif.engine_busy, compute_vif.engine_req_valid,
+            compute_vif.core_spad_valid, compute_vif.banked_valid,
+            compute_vif.cnm_valid, compute_vif.matrix_line_valid,
+            compute_vif.dma_valid, compute_vif.dma_line_valid,
+            compute_vif.desc_valid, compute_vif.cpl_valid))
     endtask
 
     task automatic wait_matrix_sfu_overlap();
@@ -157,6 +217,71 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         `uvm_fatal("CLUSTER_PREFETCH", "Matrix did not enter next-K prefetch before abort/reset")
     endtask
 
+    task automatic check_cnm_address_stream();
+        int unsigned lane_count[0:3];
+        int unsigned lane;
+        int unsigned poll;
+        int unsigned matrix_reads;
+        bit complete;
+        bit [31:0] expected_addr;
+        bit [31:0] cpl_tail;
+        for (lane = 0; lane < 4; lane++) lane_count[lane] = 0;
+        poll = 0;
+        matrix_reads = 0;
+        complete = 1'b0;
+        while (!complete && poll < 10000) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.aresetn) begin
+                if (compute_vif.banked_valid && compute_vif.banked_ready) begin
+                    if (compute_vif.matrix_banked_req_addr[1:0] != 2'b00 ||
+                        !((compute_vif.matrix_banked_req_addr >= MATRIX_A_LOCAL &&
+                           compute_vif.matrix_banked_req_addr < MATRIX_A_LOCAL + 32'h400) ||
+                          (compute_vif.matrix_banked_req_addr >= MATRIX_B_LOCAL &&
+                           compute_vif.matrix_banked_req_addr < MATRIX_B_LOCAL + 32'h800)))
+                        `uvm_fatal("CLUSTER_MATRIX_ADDR", $sformatf("Matrix banked read outside aligned A/B tile regions: 0x%08h", compute_vif.matrix_banked_req_addr))
+                    matrix_reads++;
+                end
+                for (lane = 0; lane < 4; lane++) begin
+                    if (compute_vif.cnm_accept_mask[lane]) begin
+                        if (lane_count[lane][0])
+                            expected_addr = CNM_B_LOCAL + ((lane_count[lane] >> 1) << 4) + (lane << 2);
+                        else
+                            expected_addr = CNM_A_LOCAL + (lane << 2);
+                        if (compute_vif.cnm_req_addr[lane] !== expected_addr)
+                            `uvm_fatal("CLUSTER_CNM_ADDR", $sformatf("lane%0d read[%0d] expected=0x%08h actual=0x%08h", lane, lane_count[lane], expected_addr, compute_vif.cnm_req_addr[lane]))
+                        lane_count[lane]++;
+                    end
+                end
+            end
+            complete = 1'b1;
+            for (lane = 0; lane < 4; lane++)
+                if (lane_count[lane] != 32) complete = 1'b0;
+            if (!complete && (compute_vif.engine_done[2] ||
+                              compute_vif.engine_error[2]))
+                break;
+            poll++;
+        end
+        for (lane = 0; lane < 4; lane++) begin
+            if (lane_count[lane] != 32) begin
+                axil_read(REG_CPLQ_TAIL, cpl_tail);
+                `uvm_fatal("CLUSTER_CNM_ADDR_TIMEOUT", $sformatf(
+                    "lane0..3 accepted %0d/%0d/%0d/%0d of 32 A/B requests; engine_busy=%07b done=%07b error=%07b cpl_tail=%0d responses=%0d lanes=%b matrix_rsp=%0d cnm_fsm=%0d lane_fsm=%h req=%b ready=%b rsp=%b",
+                    lane_count[0], lane_count[1], lane_count[2], lane_count[3],
+                    compute_vif.engine_busy, compute_vif.engine_done,
+                    compute_vif.engine_error, cpl_tail,
+                    compute_vif.cnm_tag_response_count,
+                    compute_vif.cnm_response_lane_seen,
+                    compute_vif.matrix_tag_response_count,
+                    compute_vif.cnm_core_state, compute_vif.cnm_lane_state,
+                    compute_vif.cnm_request_valid, compute_vif.cnm_request_ready,
+                    compute_vif.cnm_rsp_valid))
+            end
+        end
+        if (matrix_reads == 0)
+            `uvm_fatal("CLUSTER_MATRIX_ADDR", "no accepted Matrix banked reads observed during Matrix/CNM overlap window")
+        `uvm_info("CLUSTER_CNM_ADDR_PASS", $sformatf("all four CNM lanes accepted expected A/B addresses; Matrix accepted %0d reads within its A/B tile regions", matrix_reads), UVM_LOW)
+    endtask
+
     task body();
         bit [31:0] value;
         bit [31:0] packed_word;
@@ -179,6 +304,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned word_idx;
         int unsigned overlap_total;
         int unsigned matrix_prefetch_overlap_total;
+        int unsigned matrix_cnm_overlap_total;
+        int unsigned cnm_grants_total;
+        int unsigned matrix_responses_total;
+        int unsigned cnm_responses_total;
+        bit [3:0] cnm_lanes_seen_total;
         int unsigned contention_total;
         int unsigned banked_grants_total;
         int unsigned core_grants_total;
@@ -248,28 +378,88 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             spad_write(GELU_A_LOCAL + (word_idx << 2), gelu_values[word_idx % 4]);
             spad_write(GELU_B_LOCAL + (word_idx << 2), gelu_values[word_idx % 4]);
         end
+        for (word_idx = 0; word_idx < 4; word_idx++) begin
+            case (word_idx)
+                0: packed_word = 32'h0202_0202;
+                1: packed_word = 32'h0303_0303;
+                2: packed_word = 32'h0404_0404;
+                default: packed_word = 32'h0505_0505;
+            endcase
+            spad_write(CNM_A_LOCAL + (word_idx << 2), packed_word);
+        end
+        for (row_idx = 0; row_idx < 16; row_idx++) begin
+            for (col_idx = 0; col_idx < 4; col_idx++) begin
+                case (col_idx)
+                    0: packed_word = 32'h0707_0707;
+                    1: packed_word = 32'h0b0b_0b0b;
+                    2: packed_word = 32'h0d0d_0d0d;
+                    default: packed_word = 32'h1111_1111;
+                endcase
+                spad_write(CNM_B_LOCAL + (row_idx << 4) + (col_idx << 2), packed_word);
+            end
+        end
 
-        write_v3_desc(CMDQ_LOCAL + 32'h00, 8'h30, 16'h0600,
+        // Keep a strict standalone A-tile reuse baseline before adding CNM
+        // contention. The parallel workload below separately checks data
+        // integrity while the shared banked port is under contention.
+        write_v3_desc(CMDQ_LOCAL, 8'h30, 16'h05ff,
                       MATRIX_A_LOCAL, MATRIX_B_LOCAL, MATRIX_Y_LOCAL,
                       16'd16, 16'd32, 16'd16);
-        write_v3_desc(CMDQ_LOCAL + 32'h40, 8'h35, 16'h0601,
-                      GELU_A_LOCAL, 32'd0, GELU_Y0_LOCAL,
-                      16'd0, 16'd0, 16'd64);
-        write_v3_desc(CMDQ_LOCAL + 32'h80, 8'h35, 16'h0602,
-                      GELU_B_LOCAL, 32'd0, GELU_Y1_LOCAL,
-                      16'd0, 16'd0, 16'd64);
-
         axil_write(REG_CMDQ_CTRL, 32'd0);
         axil_write(REG_CMDQ_BASE, CMDQ_LOCAL);
         axil_write(REG_CMDQ_SIZE, 32'd4);
         axil_write(REG_CMDQ_HEAD, 32'd0);
-        axil_write(REG_CMDQ_TAIL, 32'd3);
+        axil_write(REG_CMDQ_TAIL, 32'd1);
         axil_write(REG_CPLQ_BASE, CPLQ_LOCAL);
         axil_write(REG_CPLQ_SIZE, 32'd4);
         axil_write(REG_CPLQ_HEAD, 32'd0);
         axil_write(REG_CPLQ_TAIL, 32'd0);
         axil_write(REG_DOORBELL, 32'd1);
-        wait_cpl_tail(32'd3);
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        if (compute_vif.matrix_a_cache_hits != 16)
+            `uvm_fatal("CLUSTER_A_CACHE_BASELINE", $sformatf(
+                "standalone 16x32x64 GEMM expected 16 A-tile cache hits, observed %0d",
+                compute_vif.matrix_a_cache_hits))
+        for (word_idx = 0; word_idx < 512; word_idx++)
+            expect_spad(MATRIX_Y_LOCAL + (word_idx << 2),
+                        matrix_golden[word_idx / 32][word_idx % 32],
+                        $sformatf("standalone Matrix Golden[%0d]", word_idx));
+        `uvm_info("CLUSTER_A_CACHE_BASELINE_PASS",
+                  "standalone 16x32x64 Matrix Golden and all 16 A-tile reuse hits passed",
+                  UVM_LOW)
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+
+        write_v3_desc(CMDQ_LOCAL + 32'h00, 8'h30, 16'h0600,
+                      MATRIX_A_LOCAL, MATRIX_B_LOCAL, MATRIX_Y_LOCAL,
+                      16'd16, 16'd32, 16'd16);
+        write_cnm_v3_desc(CMDQ_LOCAL + 32'h40, 16'h0601,
+                          CNM_A_LOCAL, CNM_B_LOCAL, CNM_Y_LOCAL);
+        write_v3_desc(CMDQ_LOCAL + 32'h80, 8'h35, 16'h0602,
+                      GELU_A_LOCAL, 32'd0, GELU_Y0_LOCAL,
+                      16'd0, 16'd0, 16'd64);
+        write_v3_desc(CMDQ_LOCAL + 32'hc0, 8'h35, 16'h0603,
+                      GELU_B_LOCAL, 32'd0, GELU_Y1_LOCAL,
+                      16'd0, 16'd0, 16'd64);
+
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, CMDQ_LOCAL);
+        // The command ring also reserves one slot to distinguish full from
+        // empty, so four outstanding descriptors need an eight-entry ring.
+        axil_write(REG_CMDQ_SIZE, 32'd8);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd4);
+        axil_write(REG_CPLQ_BASE, CPLQ_LOCAL);
+        // This ring keeps one entry empty to distinguish full from empty.
+        // Four ordered completions therefore need an eight-entry ring.
+        axil_write(REG_CPLQ_SIZE, 32'd8);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+        axil_write(REG_DOORBELL, 32'd1);
+        check_cnm_address_stream();
+        wait_cpl_tail(32'd4);
+        wait_spad_idle();
 
         if (compute_vif.overlap_cycles == 0)
             `uvm_fatal("CLUSTER_OVERLAP", "real Matrix and SFU never overlapped")
@@ -279,11 +469,30 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_fatal("CLUSTER_SPAD_TRAFFIC", "expected both banked and core SPAD grants")
         if (compute_vif.same_engine_launch_while_busy != 0)
             `uvm_fatal("CLUSTER_OWNER", $sformatf("same-engine launch while busy count=%0d", compute_vif.same_engine_launch_while_busy))
-        if (compute_vif.matrix_a_cache_hits != 16)
-            `uvm_fatal("CLUSTER_A_CACHE", $sformatf("16x32x64 GEMM expected 16 A-tile cache hits, observed %0d", compute_vif.matrix_a_cache_hits))
+        if (compute_vif.matrix_a_cache_hits == 0)
+            `uvm_fatal("CLUSTER_A_CACHE", "Matrix/CNM contention run recorded no A-tile cache hits")
+        `uvm_info("CLUSTER_A_CACHE_CONTENTION", $sformatf(
+                  "Matrix/CNM workload retained %0d A-tile cache hits under shared-port contention; standalone baseline was 16",
+                  compute_vif.matrix_a_cache_hits), UVM_LOW)
         if (compute_vif.matrix_prefetch_overlap_cycles == 0)
             `uvm_fatal("CLUSTER_PREFETCH", "next-K prefetch did not overlap Matrix MAC")
+        if (compute_vif.matrix_cnm_overlap_cycles == 0)
+            `uvm_fatal("CLUSTER_CNM_OVERLAP", "Matrix and CNM were not simultaneously active")
+        if (compute_vif.matrix_cnm_shared_accept_cycles == 0)
+            `uvm_fatal("CLUSTER_CNM_ARBITRATION", "Matrix and CNM did not contend at shared banked admission")
+        if (compute_vif.matrix_tag_response_count == 0 || compute_vif.cnm_tag_response_count == 0)
+            `uvm_fatal("CLUSTER_CNM_RESPONSE", $sformatf("missing owner responses: Matrix=%0d CNM=%0d", compute_vif.matrix_tag_response_count, compute_vif.cnm_tag_response_count))
+        if (compute_vif.matrix_route_mismatch_count != 0 || compute_vif.cnm_route_mismatch_count != 0)
+            `uvm_fatal("CLUSTER_CNM_ROUTE", $sformatf("response route mismatches: Matrix=%0d CNM=%0d", compute_vif.matrix_route_mismatch_count, compute_vif.cnm_route_mismatch_count))
+        if (compute_vif.cnm_response_lane_seen !== 4'hf)
+            `uvm_fatal("CLUSTER_CNM_BANKS", $sformatf("expected responses from all CNM banks, observed lane mask=%b", compute_vif.cnm_response_lane_seen))
+        `uvm_info("CLUSTER_CNM_OWNER_PASS", $sformatf("Matrix tag3 responses=%0d, CNM tag5 responses=%0d, CNM lane mask=%b, overlap cycles=%0d, shared banked grants=%0d", compute_vif.matrix_tag_response_count, compute_vif.cnm_tag_response_count, compute_vif.cnm_response_lane_seen, compute_vif.matrix_cnm_overlap_cycles, compute_vif.matrix_cnm_shared_accept_cycles), UVM_LOW)
         matrix_prefetch_overlap_total = compute_vif.matrix_prefetch_overlap_cycles;
+        matrix_cnm_overlap_total = compute_vif.matrix_cnm_overlap_cycles;
+        cnm_grants_total = compute_vif.arb_cnm_grants;
+        matrix_responses_total = compute_vif.matrix_tag_response_count;
+        cnm_responses_total = compute_vif.cnm_tag_response_count;
+        cnm_lanes_seen_total = compute_vif.cnm_response_lane_seen;
         overlap_total = compute_vif.overlap_cycles;
         contention_total = compute_vif.shared_spad_contention_cycles;
         banked_grants_total = compute_vif.arb_banked_grants;
@@ -291,6 +500,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         for (word_idx = 0; word_idx < 512; word_idx++)
             expect_spad(MATRIX_Y_LOCAL + (word_idx << 2), matrix_golden[word_idx / 32][word_idx % 32], $sformatf("16x32x64 GEMM[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            expect_spad(CNM_Y_LOCAL + (word_idx << 2), 32'd736,
+                        $sformatf("CNM GEMV row[%0d]", word_idx));
         for (word_idx = 0; word_idx < 64; word_idx++) begin
             expect_spad(GELU_Y0_LOCAL + (word_idx << 2), gelu_results[word_idx % 4],
                         $sformatf("GELU0 output[%0d]", word_idx));
@@ -299,12 +511,13 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         end
 
         expect_completion(CPLQ_LOCAL + 32'h00, 16'h0600, matrix_golden[15][31], 32'd512, "Matrix");
-        expect_completion(CPLQ_LOCAL + 32'h10, 16'h0601, -32'sd15, 32'd64, "SFU first");
-        expect_completion(CPLQ_LOCAL + 32'h20, 16'h0602, -32'sd15, 32'd64, "SFU queued");
+        expect_completion(CPLQ_LOCAL + 32'h10, 16'h0601, 32'd736, 32'd16, "CNM GEMV");
+        expect_completion(CPLQ_LOCAL + 32'h20, 16'h0602, -32'sd15, 32'd64, "SFU first");
+        expect_completion(CPLQ_LOCAL + 32'h30, 16'h0603, -32'sd15, 32'd64, "SFU queued");
         axil_read(REG_CMDQ_HEAD, value);
-        if (value !== 32'd3)
-            `uvm_fatal("CLUSTER_CMDQ", $sformatf("CMDQ_HEAD expected=3 actual=%0d", value))
-        axil_write(REG_CPLQ_HEAD, 32'd3);
+        if (value !== 32'd4)
+            `uvm_fatal("CLUSTER_CMDQ", $sformatf("CMDQ_HEAD expected=4 actual=%0d", value))
+        axil_write(REG_CPLQ_HEAD, 32'd4);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
 
@@ -418,9 +631,12 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         `uvm_info("CLUSTER_RESET_RECOVERY_PASS", "active Matrix/SFU reset discarded both in-flight tasks, preserved SRAM sentinels, and accepted a fresh post-reset SFU task", UVM_LOW)
 
         `uvm_info("COMPUTE_CLUSTER_REAL_UVM_PASS", $sformatf(
-            "real Matrix16x32x64 with next-K prefetch and 16 A-tile reuse hits + queued SFU tasks + concurrent abort/reset/recovery seed=%0d; prefetch_overlap=%0d overlap=%0d arbiter_contention=%0d banked_grants=%0d core_grants=%0d",
+            "standalone Matrix16x32x64 Golden + 16 A-tile reuse hits; parallel Matrix/CNM GEMV with separate response tags and four-bank Golden + next-K prefetch + queued SFU tasks + concurrent abort/reset/recovery seed=%0d; prefetch_overlap=%0d matrix_cnm_overlap=%0d matrix_rsp=%0d cnm_rsp=%0d cnm_lanes=%b overlap=%0d arbiter_contention=%0d banked_grants=%0d cnm_grants=%0d core_grants=%0d",
             seed, matrix_prefetch_overlap_total,
+            matrix_cnm_overlap_total, matrix_responses_total, cnm_responses_total,
+            cnm_lanes_seen_total,
             overlap_total, contention_total,
-            banked_grants_total, core_grants_total), UVM_LOW)
+            banked_grants_total, cnm_grants_total,
+            core_grants_total), UVM_LOW)
     endtask
 endclass

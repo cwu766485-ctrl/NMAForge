@@ -15,8 +15,11 @@ class ai_compute_cluster_obs extends uvm_sequence_item;
     bit rsp_valid;
     bit [2:0] rsp_client;
     bit [2:0] request_client;
+    bit matrix_rsp_valid;
+    bit [3:0] cnm_rsp_valid;
+    bit [3:0] cnm_accept_mask;
     bit reset_active;
-    bit [4:0] read_accept_mask;
+    bit [5:0] read_accept_mask;
 
     function new(string name = "ai_compute_cluster_obs");
         super.new(name);

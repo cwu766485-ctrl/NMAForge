@@ -6,6 +6,7 @@
 interface ai_compute_cluster_if(input logic aclk);
     logic aresetn;
     logic core_busy;
+    logic processor_busy;
     logic launch_valid;
     logic [7:0] launch_op;
     logic [6:0] engine_busy;
@@ -22,6 +23,16 @@ interface ai_compute_cluster_if(input logic aclk);
     logic rsp_valid;
     logic [2:0] rsp_client;
     logic [2:0] request_client;
+    logic matrix_rsp_valid;
+    logic [3:0] cnm_rsp_valid;
+    logic [3:0] cnm_request_valid;
+    logic [3:0] cnm_request_ready;
+    logic matrix_request_valid;
+    logic [3:0] cnm_accept_mask;
+    logic [2:0] cnm_core_state;
+    logic [11:0] cnm_lane_state;
+    logic [31:0] cnm_req_addr[0:3];
+    logic [31:0] matrix_banked_req_addr;
     logic parallel_queue_mode;
     logic desc_valid, desc_ready;
     logic cpl_valid, cpl_write, cpl_ready;
@@ -33,7 +44,7 @@ interface ai_compute_cluster_if(input logic aclk);
     logic matrix_a_cache_hit;
     logic [31:0] matrix_a_cache_hits;
     logic [31:0] matrix_prefetch_overlap_cycles;
-    logic [4:0] read_accept_mask;
+    logic [5:0] read_accept_mask;
 
     integer overlap_cycles;
     integer core_engine_collision_cycles;
@@ -41,6 +52,13 @@ interface ai_compute_cluster_if(input logic aclk);
     integer arb_banked_grants;
     integer arb_cnm_grants;
     integer arb_core_grants;
+    integer matrix_cnm_overlap_cycles;
+    integer matrix_cnm_shared_accept_cycles;
+    integer matrix_tag_response_count;
+    integer cnm_tag_response_count;
+    logic [3:0] cnm_response_lane_seen;
+    integer matrix_route_mismatch_count;
+    integer cnm_route_mismatch_count;
     integer response_count;
     integer same_engine_launch_while_busy;
     integer engine_launch_count[0:6];
@@ -50,10 +68,11 @@ interface ai_compute_cluster_if(input logic aclk);
         read_accept_mask[1] = cpl_valid && cpl_ready && !cpl_write;
         read_accept_mask[2] = (core_spad_valid && core_ready && !core_spad_write) ||
                               (matrix_line_valid && matrix_line_ready && !matrix_line_write);
-        read_accept_mask[3] = (banked_valid && banked_ready) ||
-                              ((|cnm_valid) && (|cnm_ready));
+        read_accept_mask[3] = banked_valid && banked_ready;
         read_accept_mask[4] = (dma_valid && dma_ready && !dma_write) ||
                               (dma_line_valid && dma_line_ready && !dma_line_write);
+        cnm_accept_mask = cnm_valid & cnm_ready;
+        read_accept_mask[5] = |cnm_accept_mask;
     end
 
     function automatic integer engine_id(input logic [7:0] op);
@@ -76,6 +95,13 @@ interface ai_compute_cluster_if(input logic aclk);
             arb_banked_grants <= 0;
             arb_cnm_grants <= 0;
             arb_core_grants <= 0;
+            matrix_cnm_overlap_cycles <= 0;
+            matrix_cnm_shared_accept_cycles <= 0;
+            matrix_tag_response_count <= 0;
+            cnm_tag_response_count <= 0;
+            cnm_response_lane_seen <= 4'd0;
+            matrix_route_mismatch_count <= 0;
+            cnm_route_mismatch_count <= 0;
             response_count <= 0;
             same_engine_launch_while_busy <= 0;
             for (e = 0; e < 7; e = e + 1) engine_launch_count[e] <= 0;
@@ -89,6 +115,24 @@ interface ai_compute_cluster_if(input logic aclk);
             if (|cnm_valid && |cnm_ready) arb_cnm_grants <= arb_cnm_grants + 1;
             if (core_spad_valid && core_ready) arb_core_grants <= arb_core_grants + 1;
             if (rsp_valid) response_count <= response_count + 1;
+            if (parallel_queue_mode && engine_busy[2] && engine_busy[3])
+                matrix_cnm_overlap_cycles <= matrix_cnm_overlap_cycles + 1;
+            // Observe both requesters before the single-owner arbiter. Its
+            // selected outputs are mutually exclusive by construction.
+            if (matrix_request_valid && (|cnm_request_valid) &&
+                (banked_ready || (|cnm_request_ready)))
+                matrix_cnm_shared_accept_cycles <= matrix_cnm_shared_accept_cycles + 1;
+            if (rsp_valid && rsp_client == 3'd3) begin
+                matrix_tag_response_count <= matrix_tag_response_count + 1;
+                if (!matrix_rsp_valid || (|cnm_rsp_valid))
+                    matrix_route_mismatch_count <= matrix_route_mismatch_count + 1;
+            end
+            if (rsp_valid && rsp_client == 3'd5) begin
+                cnm_tag_response_count <= cnm_tag_response_count + 1;
+                cnm_response_lane_seen <= cnm_response_lane_seen | cnm_rsp_valid;
+                if (!(|cnm_rsp_valid) || matrix_rsp_valid)
+                    cnm_route_mismatch_count <= cnm_route_mismatch_count + 1;
+            end
             if (launch_valid) begin
                 if (engine_id(launch_op) >= 0) begin
                     engine_launch_count[engine_id(launch_op)] <=

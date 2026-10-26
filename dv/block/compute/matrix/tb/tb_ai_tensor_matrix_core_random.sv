@@ -9,6 +9,9 @@
 `ifndef MATRIX_A_TILE_CACHE_ENABLE
 `define MATRIX_A_TILE_CACHE_ENABLE 1
 `endif
+`ifndef MATRIX_NEXT_K_PREFETCH_ENABLE
+`define MATRIX_NEXT_K_PREFETCH_ENABLE 1
+`endif
 
 // Full-core A3 transaction test. Operand words are returned through a
 // registered four-bank model; bias/scalar traffic uses a separate registered
@@ -17,6 +20,7 @@ module tb_ai_tensor_matrix_core_random;
   localparam integer PHYSICAL_ARRAY_SIZE = `MATRIX_ARRAY_SIZE;
   localparam integer MAX_OUTSTANDING_READS = `MATRIX_MAX_OUTSTANDING_READS;
   localparam integer A_TILE_CACHE_ENABLE = `MATRIX_A_TILE_CACHE_ENABLE;
+  localparam integer NEXT_K_PREFETCH_ENABLE = `MATRIX_NEXT_K_PREFETCH_ENABLE;
   localparam integer BANK_RESPONSE_QUEUE_DEPTH = 4;
   localparam [31:0] SRC0_BASE = 32'h0000_0100;
   localparam [31:0] SRC1_BASE = 32'h0000_4000;
@@ -136,7 +140,8 @@ module tb_ai_tensor_matrix_core_random;
   ai_tensor_matrix_core #(
     .ARRAY_SIZE(PHYSICAL_ARRAY_SIZE),
     .MAX_OUTSTANDING_READS(MAX_OUTSTANDING_READS),
-    .ENABLE_A_TILE_CACHE(A_TILE_CACHE_ENABLE)
+    .ENABLE_A_TILE_CACHE(A_TILE_CACHE_ENABLE),
+    .ENABLE_NEXT_K_PREFETCH(NEXT_K_PREFETCH_ENABLE)
   ) dut(
     .clk(clk),.resetn(resetn),.start(start),.abort(abort),.op_mode(op_mode),
     .src0_base(src0_base),.src1_base(src1_base),.bias_base(bias_base),.dst_base(dst_base),
@@ -467,14 +472,17 @@ module tb_ai_tensor_matrix_core_random;
          (dut.perf_outstanding_highwater<2))
         $fatal(1,"matrix case %0d did not exercise multiple outstanding reads highwater=%0d",
                case_id,dut.perf_outstanding_highwater);
-      expected_prefetch_count=(cfg_kw-1)*
-          (((cfg_m+PHYSICAL_ARRAY_SIZE-1)/PHYSICAL_ARRAY_SIZE) *
-           ((cfg_n+PHYSICAL_ARRAY_SIZE-1)/PHYSICAL_ARRAY_SIZE) *
-           cfg_instances);
+      expected_prefetch_count=0;
+      if(NEXT_K_PREFETCH_ENABLE)
+        expected_prefetch_count=(cfg_kw-1)*
+            (((cfg_m+PHYSICAL_ARRAY_SIZE-1)/PHYSICAL_ARRAY_SIZE) *
+             ((cfg_n+PHYSICAL_ARRAY_SIZE-1)/PHYSICAL_ARRAY_SIZE) *
+             cfg_instances);
       if(dut.perf_prefetch_completed!=expected_prefetch_count)
         $fatal(1,"matrix case %0d prefetch groups=%0d expected=%0d",
                case_id,dut.perf_prefetch_completed,expected_prefetch_count);
-      if((cfg_kw>1) && (dut.perf_prefetch_overlap_cycles==0))
+      if(NEXT_K_PREFETCH_ENABLE && (cfg_kw>1) &&
+         (dut.perf_prefetch_overlap_cycles==0))
         $fatal(1,"matrix case %0d did not overlap prefetch with MAC",case_id);
       m_macro_tiles=(cfg_m+PHYSICAL_ARRAY_SIZE-1)/PHYSICAL_ARRAY_SIZE;
       n_macro_tiles=(cfg_n+PHYSICAL_ARRAY_SIZE-1)/PHYSICAL_ARRAY_SIZE;
@@ -484,7 +492,8 @@ module tb_ai_tensor_matrix_core_random;
       if(dut.perf_a_tile_cache_hits!=expected_cache_hits)
         $fatal(1,"matrix case %0d A-tile cache hits=%0d expected=%0d",
                case_id,dut.perf_a_tile_cache_hits,expected_cache_hits);
-      if((cfg_kw>2) && (prefetch_buffer_seen_mask!=3))
+      if(NEXT_K_PREFETCH_ENABLE && (cfg_kw>2) &&
+         (prefetch_buffer_seen_mask!=3))
         $fatal(1,"matrix case %0d did not use both ping-pong buffers mask=%0d",
                case_id,prefetch_buffer_seen_mask);
       if((MAX_OUTSTANDING_READS==2) &&
@@ -868,7 +877,7 @@ module tb_ai_tensor_matrix_core_random;
       check_valid_case(103);
       prepare_case(32,32,16,1,0,0,0,0,0,0,0);
       check_valid_case(104);
-      $display("MATRIX_SIZE_BENCHMARK_PASS seed=%0d sizes=4,8,16 workloads=4x4x32,8x8x32,16x16x32,16x32x32,32x32x64 physical_array=%0dx%0d a_tile_cache=%0d bank_response_latency=1 cycle gops_reference_mhz=250 sim_period_ns=10",initial_seed,PHYSICAL_ARRAY_SIZE,PHYSICAL_ARRAY_SIZE,A_TILE_CACHE_ENABLE);
+      $display("MATRIX_SIZE_BENCHMARK_PASS seed=%0d workloads=4x4x32,8x8x32,16x16x32,16x32x32,32x32x64 physical_array=%0dx%0d outstanding_depth=%0d next_k_prefetch=%0d a_tile_cache=%0d bank_response_latency=1 cycle gops_reference_mhz=250 sim_period_ns=10",initial_seed,PHYSICAL_ARRAY_SIZE,PHYSICAL_ARRAY_SIZE,MAX_OUTSTANDING_READS,NEXT_K_PREFETCH_ENABLE,A_TILE_CACHE_ENABLE);
       $finish;
     end
 
