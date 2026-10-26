@@ -1,5 +1,19 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-27 S1/S2 sign-off candidate:** At detached clean-worktree SHA
+> `c83ad7463265062d4edb84d57fe4ada8195f9b10`, Matrix depth-4 three-seed and
+> prefetch-disabled fallback three-seed regressions passed; the seven-engine
+> real-top UVM passed three seeds with 4,852 compared words/seed and zero
+> mismatch/unknown/stale response; and 25/25 passive observation mutations
+> were caught by their expected checker, including Done/missing/duplicate Done
+> on every engine bit. Matrix core line/condition/FSM/branch is
+> `97.08/91.05/93.55/95.52%`, with 49/53 default-profile transitions and
+> four reviewed dispositions. The focused cluster group is 98.96% raw with
+> only the write-only completion read-response bin WAIVED/N/A. S1 is bounded
+> PASS; the tested S2 slice is bounded PASS, while full S2 remains HOLD because
+> 17 requirements are partial, two are BLOCKED_SPEC, and three were not run.
+> See the [S1/S2 sign-off candidate report](../docs/verification/COMPUTE_CLUSTER_S1_S2_SIGNOFF_CANDIDATE_2026-10-27.md).
+
 > **2026-10-26 Stage A + benchmark status:** At tested RTL/DV SHA
 > `03bf257afdca9b0041ff80b6d30cbaf8107cf7e0`, real-top seven-engine UVM passed
 > three clean-worktree VCS seeds. The byte-addressed scoreboard checked 4,852

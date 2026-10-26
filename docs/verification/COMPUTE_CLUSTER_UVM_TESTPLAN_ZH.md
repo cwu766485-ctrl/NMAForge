@@ -2,18 +2,18 @@
 
 > **文档编号**：NMA-CL-DV-TP-001\
 > **版本**：v1.1 / Parallel Compute Requirement Traceability Baseline\
-> **日期**：2026-10-26\
+> **日期**：2026-10-27\
 > **对应规格**：[Compute Cluster SPEC v1.1](../spec/COMPUTE_CLUSTER_SPEC_ZH.md)\
-> **当前验证基线**：Stage A tested source SHA `03bf257afdca9b0041ff80b6d30cbaf8107cf7e0`（2026-10-26）；clean worktree 三 seed UVM、五项 checker-sensitivity mutation、Matrix 8 配置×5 workload benchmark、Matrix depth-4 fault/recovery 和 DMA/CNM contention 均已执行。当前 run ID、精确命令及限制见[Stage A 与 Benchmark 证据](COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md)。之前 SHA `827c0052cf589fde676e93e34bf459188956182f` 的 clean replay 及更早 SHA 均保留为历史记录。\\
+> **当前签核候选**：`c83ad7463265062d4edb84d57fe4ada8195f9b10` 的 detached clean worktree 已重跑 Matrix depth-4 三 seed、prefetch-disabled fallback 三 seed、七引擎 top UVM 三 seed、25 项 checker-sensitivity mutation 和 top smoke。S1 Matrix Block 为 bounded PASS；S2 当前验证切片为 bounded PASS，但全 38 项 REQ closure 仍 HOLD（16 PASS-SCOPED、17 PARTIAL、2 BLOCKED_SPEC、3 NOT_RUN）。精确 run ID、覆盖率、签核边界和日志路径见[2026-10-27 S1/S2 签核候选报告](COMPUTE_CLUSTER_S1_S2_SIGNOFF_CANDIDATE_2026-10-27.md)。Stage A 的 `03bf257` 及更早 SHA 记录仍作为历史证据保留。\\
 > **Owner**：NMAForge DV\
-> **状态**：VCS `V-2023.12-SP1_Full64` 在上述 exact SHA 的 detached clean worktree 完成七引擎三 seed UVM；每 seed parity cross=`14/14`、SPAD scoreboard=`4,852` compared words / `0` mismatch / `0` unknown / `0` stale response、UVM warning/error/fatal=`0/0/0`，focused functional coverage=`99.0%`。DMA response-client bin 命中；completion read-response bin 因 writer 为 write-only 而显式 WAIVED/N/A。Address/Data/Owner/WSTRB/Done 五个 observation-only mutation 均被 checker 捕获。Matrix FSM 为 `49/53` transitions，四项仍未正式证明 unreachable。全 C1 REQ closure、完整 fault cross、partial-WSTRB image、ASIC PPA 与产品 signoff 仍未完成。
+> **Stage A 历史状态**：在 tested SHA `03bf257afdca9b0041ff80b6d30cbaf8107cf7e0` 完成的原始数据见 Stage A 报告。最新 clean-SHA 回归和状态以上述 2026-10-27 候选报告为准。全 C1 REQ closure、完整 fault cross、partial-WSTRB image、ASIC PPA 与产品 signoff 仍未完成。
 
 ## 0. 范围、冻结及验证分层
 
 - **已实现 C0-P 子集**：真实 `ai_parallel_compute_dispatcher` + 真实 `ai_compute_spad_mux`，七个行为 Engine、descriptor fetch BFM、单周期注册读响应和 completion-writer BFM；验证按序 dispatch/retirement、21 对并发、每引擎单活动槽、SPAD ready stall/owner、CPLQ 满、错误、abort/drain 与 reset recovery。
 - **真实 top C1 定向切片（PASS，范围有限）**：`dv/uvm` 的 `tb_ai_accel_uvm` 实例化产品 top，实际使用生产 dispatch、`ai_spad_arbiter`、response routing 和四 Bank behavioral SRAM。三 seed 检查 Matrix/CNM owner/address ledger、七个生产引擎各自的数值与 completion、请求背压、Matrix/SFU 同时 Abort、活动 Reset/recovery；精确日志见第 7 节。
 - **C1 新增验证（Stage A clean SHA，PASS，范围有限）**：真实 top UVM 加入 byte-addressed reference SPAD scoreboard、accepted-owner/epoch 检查、DMA SPAD-to-DDR response bin 和 14 项 seeded parity cross；三 seed 共 42 项全部检查预期错误完成与 no-writeback sentinel。每 seed 比较 4,852 words，无 mismatch/unknown/stale response，UVM warning/error/fatal=`0/0/0`。Focused functional coverage=`99.0%`；DMA response-client PASS，completion read-response 因 write-only writer 显式 WAIVED/N/A。详见 Stage A 报告。
-- **仍未完成的 C1 范围**：本轮仍是 directed engine Golden sweep，不等于所有 opcode/configuration 的完整随机 REQ closure。SPAD parity/protection × engine/phase 的全组合、Line/WSTRB、全 38 项 REQ-CL 和更广的 mutation campaign 尚未通过验收；clean-SHA selected replay 已完成，但它不等于完整 closure。
+- **仍未完成的 C1 范围**：当前仍是 directed engine Golden sweep，不等于所有 opcode/configuration 的完整随机 REQ closure。SPAD parity/protection × engine/phase 的全组合、partial Line/WSTRB 和全部 38 项 REQ closure 仍开放。最新 25/25 mutation suite 只证明 passive checker sensitivity，不是 RTL mutation score；exact SHA 与 disposition 见 2026-10-27 签核候选报告。
 - **2026-10-25 Matrix controller milestone**：Matrix block regression 已用真实 `ai_tensor_matrix_core` + 16×16 array 做 16×16/32×16 SPAD/GEMM 独立 Golden 对拍；top-level UVM 进一步加入同一真实 Matrix 路径并已三 seed 通过。
 - **2026-10-26 Matrix/CNM response ownership**：真实 top smoke 与真实 top UVM 都运行 disjoint-SPAD 的 CNM GEMV + Matrix GEMM，并检查不同 response client tag、并发区间、两引擎 Golden 和 completion；该定向子集不关闭全 Cluster REQ-PC-007。
 - **2026-10-26 Matrix/CNM top UVM 增量（已执行）**：真实 top sequence 加入 disjoint-SPAD 的 16×32×64 Matrix + 16-output CNM GEMV；逐 lane 检查 CNM A/B accepted address、四 Bank response mask、tag 3/5 demux、accepted-read ledger、16 个输出与有序 completion。三 seed PASS，且独立 Matrix 基线检查 512 个 Golden 输出和 16 次 A-tile reuse hit。回归中修复了 CNM local controller 在 B request 被 backpressure 时漏接 A response 的 RTL 缺陷，并将四任务测试的 command/completion 环深度设为 8，避免环保留空槽时 tail 回绕造成误配置。
@@ -141,7 +141,7 @@ remaining C1 closure
 | C1-A（算术 Golden） | Scalar/CNM/FP 复用已成熟模型；Matrix/SFU/CNN/KV 补齐 Oracle | `cl_numeric_by_opcode_seq`、`cl_matrix_transpose_seq`、`cl_kv_stride_seq` | 每个支持 Opcode 有真实数值/地址检查；未定义容差显式 blocked |
 | C1-B（故障/恢复） | error prefix、parity/abort/watchdog/reset、跨任务残留 | `cl_parity_bank_seq`、`cl_abort_prefix_seq`、`cl_reset_recovery_seq` | P0 合法组合执行；未定义多错误优先级不能虚假通过 |
 | C0-P（已实现 Dispatcher + SPAD MUX UVM 子集） | seeded ready stalls、连续 descriptor、CPLQ full hold/resume、out-of-order/simultaneous Done、owner-only error、abort/drain、pending-error active reset | `ai_parallel_compute_uvm_test` | REQ-PC-001～006、009～010 定向子集；三 seed 通过，限制见第 7 节 |
-| C1-REAL（定向全引擎 slice PASS） | 真实 top、7 个生产 Engine、Matrix/CNM owner、独立结果/completion Golden、请求背压、Matrix/SFU simultaneous Abort、活动 Reset/recovery | Latest Stage A clean SHA `03bf257afdca9b0041ff80b6d30cbaf8107cf7e0` 三 seed PASS；每 seed 14/14 parity cases、4,852 word 对拍且 0 mismatch/unknown/stale，UVM severity=`0/0/0`；focused functional covergroup=`99.0%`。DMA response-client 命中；completion read-response bin 因 write-only writer 显式 WAIVED/N/A。五种观察对象 mutation 全部检测。merged whole-top URG 同含 DUT/SVA/TB/UVM，不作 DUT-only closure。完整随机 shape/fault matrix、全部 REQ 和 RTL mutation score 未覆盖；细节见最新 Stage A 报告 |
+| C1-REAL（定向全引擎 slice PASS） | 真实 top、7 个生产 Engine、Matrix/CNM owner、独立结果/completion Golden、请求背压、Matrix/SFU simultaneous Abort、活动 Reset/recovery | 候选 SHA `c83ad7463265062d4edb84d57fe4ada8195f9b10` 三 seed PASS；每 seed parity 14/14、4,852-word 对拍且 0 mismatch/unknown/stale、UVM severity=`0/0/0`；focused group raw=`98.96%`，唯一 miss 为 write-only completion response bin（WAIVED/N/A）。25/25 observation-copy checker mutations 命中对应检查，其中 Done/missing/duplicate Done 覆盖全部七个 engine bit。Merged whole-top URG 包含 DUT/SVA/TB/UVM，不作 DUT-only closure。完整 REQ、fault matrix 与 RTL mutation score 仍未覆盖；见[2026-10-27 签核候选报告](COMPUTE_CLUSTER_S1_S2_SIGNOFF_CANDIDATE_2026-10-27.md) |
 | C0/C1（后续扩展） | 其余真实 Engine numerics、CNM/Matrix side-channel、parity/protection/error prefix、backpressure、完整 Memory Image | 扩展 UVM agents/monitor/reference scoreboard | REQ-PC-007～008 与完整 C0/C1 signoff |
 | C2（回归闭环） | 多 Seed、Coverage/Code/Assertions、Mutation、clean SHA | `cl_regression_seq`、`cl_mutation_sensitivity_seq` | RTM 每个 P0 ID 的日志/种子/覆盖/waiver 可定位 |
 
@@ -174,7 +174,7 @@ agent、memory model、coverage collector 与 protocol assertions 仍是后续�
 
 ## 7. Regression Entry / Evidence / Closure
 
-> 本节早期 SHA 与较低覆盖率记录保留为历史。当前 Stage A/P0 结论、completion-bin disposition、五项 checker mutation、Matrix FSM miss 审查和两个 benchmark 的 clean-SHA 证据以[Stage A 与 Benchmark 证据表](COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md)为准；该报告逐项列出 Requirement → Testpoint → Coverage → Run ID → Result。
+> 本节早期 SHA 与较低覆盖率记录保留为历史。当前 S1/S2 候选结论、38 项 Requirement disposition、clean-SHA run ID、Matrix FSM miss 审查和 25 项 checker-sensitivity 证据以[2026-10-27 S1/S2 签核候选报告](COMPUTE_CLUSTER_S1_S2_SIGNOFF_CANDIDATE_2026-10-27.md)为准；Stage A 与旧 SHA 结果仍见[历史 Stage A 与 Benchmark 证据表](COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md)。
 
 
 执行第一步先记录固定 Commit SHA、`git status --porcelain`、`vcs -ID`、`urg -version`、`make -n` 和回归环境的库/许可证状态。
@@ -331,7 +331,7 @@ line/condition/FSM-transition/branch=`96.45/88.52/49/53 (92.45%)/95.02%`；FSM �
 | C1-MUTATION-STAGEA：Address/Data/Owner/WSTRB/Done checker sensitivity | 在 monitor copied observation 上作五类 mutation，driver、DUT RTL、memory 不变 | 五种 mutation 全部由预期 scoreboard/checker 检出；不折算为 RTL mutation score | `CC-STAGEA-MUT-5`；`/tmp/nmaforge_stageA_clean_03bf257_mutations/{address,data,owner,wstrb,done}.log` | **PASS 5/5（checker sensitivity）** |
 | CLUSTER-BENCH-001：serial / staged parallel / queued execution | 同一 descriptor workload，对比 `Matrix→CNM→SFU` 与 Matrix+CNM overlap 后运行 SFU；再比较四任务队列 | `1239→1070` cycles (1.158×)；four-task sequential/queued `1696→1137` (1.492×)，completion 顺序保持。CNM+DMA subsystem contention 三 seed PASS；Matrix+CNM+DMA top 同发受 DMA busy gate 阻挡 | `CC-STAGEA-UVM-3S`、`DMA-CNM-STAGEA-3S`；[benchmark report](COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md) | **PASS（测试模式）/ BLOCKED（三引擎 DMA 模式）** |
 
-**当前覆盖率结论**：Stage A clean SHA 的 focused UVM covergroup=`99.0%`，仅 completion read-response bin 为架构上不适用的显式 waiver；该百分比不是 REQ-CL closure。当前 top URG 仍混合 DUT、SVA、testbench 与 UVM，不能作为 DUT-only closure。Matrix core 在 depth-4 + 4×4 handoff 合并下为 15/15 states、49/53 transitions，prefetch FSM 9/9；四个残余转移有 source-level review，但没有 formal unreachable waiver。旧的 `97.92%` 与 3,536-word 数字属于上一 SHA 的历史运行。
+**当前覆盖率结论**：最新 focused UVM group、Matrix DUT-only URG、四项 FSM transition disposition 及 clean replay 结论见 2026-10-27 签核候选报告。Stage A 的 `99.0%` 是日志四舍五入值（URG 精确值 `98.96%`），completion read-response bin 显式 WAIVED/N/A；这些 covergroup 数字不等于 REQ-CL closure。Merged top URG 包含 DUT、SVA、testbench 与 UVM，不能作为 DUT-only closure。旧的 `97.92%` 与 3,536-word 数字属于更早 SHA 的历史运行。
 
 CNM RTL 改动后的定向复核也通过：`ai_cnm_signoff` 中 A2 GEMV、A3 GEMM
 benchmark（L=16/64/256）、SPAD arbiter contention/protection checks 和 top

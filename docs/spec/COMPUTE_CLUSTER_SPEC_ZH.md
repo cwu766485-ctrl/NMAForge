@@ -279,7 +279,7 @@ VCS Matrix controller 另保留每任务 FSM state-cycle、Arbiter stall、响�
 | CL-017~019 | 错误/恢复 | Error × State × Recovery，已提交前缀与无幽灵写 | engine × fault_kind × phase |
 | Numeric | 算子数值 | Scalar/CNM/Matrix/SFU/Conv/KV/FP 独立 Golden 与结果 Memory Image | engine × opcode × numeric_class |
 
-**注意**：上述多数条目仍是规划。2026-10-25 在 `dv/uvm` 新增了真实 top Matrix/SFU 并发 GEMM、SPAD 仲裁、Abort/Reset 的定向 test source，但 VCS compile 被 license 阻塞，尚无运行证据；它不覆盖全 Engine、parity、backpressure 及完整 Requirement 集。正式 Testplan 仍须将每个已冻结 Requirement 映射到 **Sequence → Monitor/Scoreboard/SVA → Coverpoint → Test Log**。
+**验证状态更新（2026-10-27）**：真实 top 七引擎 UVM、Matrix depth-4 block、prefetch fallback、checker-sensitivity campaign 和 clean-SHA replay 已有运行证据；这不等于所有冻结 Requirement 已关闭。按 **Sequence → Monitor/Scoreboard/SVA → Coverpoint → Test Log** 的逐项结果、OPEN 依赖、精确 SHA 和运行记录见[2026-10-27 S1/S2 签核候选报告](../verification/COMPUTE_CLUSTER_S1_S2_SIGNOFF_CANDIDATE_2026-10-27.md)及[Compute Cluster UVM Testplan](../verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md)。SPEC 中仍标记 OPEN/BLOCKED 的条款保持未关闭状态。
 
 ### 5.1 推荐验证平台边界
 
