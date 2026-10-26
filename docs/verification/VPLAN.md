@@ -35,35 +35,34 @@ block/subsystem acceptance rows. Do not copy dated run logs into this plan.
 
 ## Current status and next closure work
 
-The five compute verification groups have selected passing functional suites.
-Their raw DUT code coverage is partial; per-engine figures and gaps are in the
-[compute-engine status page](COMPUTE_ENGINE_STATUS.md). The latest Matrix
-depth-4 core run reports 49/53 FSM transitions (92.45%), with all 15 states
-hit. Review found four transitions absent from the prefetch-enabled profile;
-one fallback is also exercised in a separate prefetch-disabled benchmark.
-There is no formal unreachable waiver for the remaining raw misses. The
-real-top Compute Cluster UVM passes three seeds across seven production engines,
-with 14 parity cases per seed and a byte-addressed reference-memory scoreboard
-(3,536 compared words per seed, zero mismatches/unknown reads). Its focused
-functional covergroup is 97.92%; the two unhit bins are DMA and completion
-response-client bins. This is not a DUT-only code-coverage result or a full C1
-signoff. See the
-[current testplan](COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md) for the RTM and artifacts.
-The 2026-10-21 [compute run record](COMPUTE_ENGINE_BLOCK_VALIDATION_2026-10-21.md)
-contains the historical per-group commands and evidence.
+At source SHA `03bf257afdca9b0041ff80b6d30cbaf8107cf7e0`, the real-top
+seven-engine UVM passes three clean-worktree seeds. The byte-addressed memory
+scoreboard checks 4,852 words per seed with zero mismatch, unknown read or
+stale-epoch response. The DMA response-client bin is hit; the completion
+read-response bin is explicitly waived/N/A because the writer is write-only.
+Focused functional coverage is 99.0%. Five observation-only checker mutations
+are detected (5/5), and the selected parity cross passes 42/42 cases. These
+results do not close every Cluster REQ or the full fault × phase × engine ×
+Abort/Reset cross. Merged top URG includes DUT, SVA, testbench and UVM, so it is
+not a DUT-only closure metric. See the [Stage A evidence and benchmark report](COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md)
+and [Compute Cluster testplan](COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md).
 
-The same-seed Matrix depth/prefetch/cache comparison and the synthetic-weight
-86-descriptor Transformer prefill/decode also pass in the detached clean replay
-of source SHA `827c0052cf589fde676e93e34bf459188956182f`. The same replay
-includes the three-seed seven-engine UVM, top smoke, and 20-case seeded top
-regression. One targeted memory data-path mutation was detected and then
-replayed successfully after restoring the source; this does not close a broad
-mutation campaign. Exact logs and coverage disposition are in the
-[Compute Cluster replay record](COMPUTE_CLUSTER_CLEAN_REPLAY_2026-10-26.md).
-Current RTL ASIC PPA is still unmeasured: the checkout has no current Matrix/
-Top synthesis runner, SDC, standard-cell library, or SRAM timing view. A
-pretrained-model accuracy comparison is also not part of the synthetic
-Transformer test.
+Matrix depth-4 regression reports 15/15 FSM states, 49/53 `state_r`
+transitions, and 9/9 prefetch transitions when URG merges the depth-4 database
+with a focused 4×4 handoff run. Four remaining transitions have source-level
+dispositions but no formal unreachable waiver. A separately compiled
+prefetch-disabled run dynamically exercises `ST_MAC→ST_A_REQ`. The requested
+Matrix ablation sweep passes all 40 workload/configuration combinations. The
+Cluster staged benchmark measures 1,239→1,070 cycles (1.158×); queued four-task
+execution measures 1,696→1,137 cycles (1.492×). Exact Matrix+CNM+DMA top
+contention is blocked by the legal DMA busy gate; pairwise CNM+DMA contention
+passes three seeds.
+
+The 2026-10-21 [compute run record](COMPUTE_ENGINE_BLOCK_VALIDATION_2026-10-21.md)
+and [clean replay record](COMPUTE_CLUSTER_CLEAN_REPLAY_2026-10-26.md) remain
+historical evidence. The 86-descriptor Transformer is a fixed-weight functional
+test, not a pretrained-model accuracy comparison. Current RTL ASIC PPA remains
+unmeasured.
 
 The A10 workstreams G0/V1–V5 remain tracked separately in the RTM. Full-domain
 FP parity-to-`ST_WRITE` exclusion is now proven for all nonzero 16-bit lengths
