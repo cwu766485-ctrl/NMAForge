@@ -11,8 +11,48 @@
 > four reviewed dispositions. The focused cluster group is 98.96% raw with
 > only the write-only completion read-response bin WAIVED/N/A. S1 is bounded
 > PASS; the tested S2 slice is bounded PASS, while full S2 remains HOLD because
-> 17 requirements are partial, two are BLOCKED_SPEC, and three were not run.
+> 23 requirements are `PASS-SCOPED`, 13 remain partial, two are BLOCKED_SPEC,
+> and none are NOT_RUN after the 2026-10-27 license-restored rerun. That rerun
+> adds launch/latch, shared-read-only, request-stability, CNN/KV, SFU, and FP
+> checks on the `fa2b4dd` source base with the DV changes listed in the report;
+> those same RTL/DV file contents are committed. A fresh clean-worktree replay
+> is pending because the current VCS license server is unavailable; see the
+> supplemental section below.
+> A later CNM retry encountered an unavailable VCS license server before
+> compilation; it adds no result and does not invalidate the archived PASS runs.
 > See the [S1/S2 sign-off candidate report](../docs/verification/COMPUTE_CLUSTER_S1_S2_SIGNOFF_CANDIDATE_2026-10-27.md).
+
+### 2026-10-27 license-restored supplemental verification at `fa2b4dd`
+
+After the Synopsys license server was restored, the previously blocked CNN/KV
+and SFU random-latency runs passed three seeds. FP mixed-dot UVM passed two
+seeds (596/596 bit-exact transactions each; BF16/FP16, odd-tail parity,
+two-outstanding, latency and selected fault/reset bins all 100%). Matrix depth-4
+core passed three seeds with 18 Golden and 34 fault/recovery cases per seed;
+the eight-configuration/five-workload ablation passed 40/40 runs at one fixed
+seed and behavioral one-cycle SPAD latency.
+
+The real-top Compute Cluster UVM passed seeds `20261025/20261026/20261027` on
+the current checkout with DV-only working-tree changes. It now directly checks
+descriptor launch sampling and scalar VDOT unused fields, in-flight descriptor
+mutation/latching, concurrent Scalar VDOT + SFU reads from one immutable SPAD
+region, and request payload stability across ready stalls. Each seed had UVM
+severity 0/0/0, 4,946 memory writes and 5,256 compared words with zero
+mismatch/unknown/stale/orphan responses, and 2 accepted reads intentionally
+dropped by reset. The focused functional group is 98.96% raw (29/30 variables);
+the only uncovered response-client bin is completion-read, dispositioned
+WAIVED/N/A because the completion writer is write-only. The DUT+TB+UVM merged
+URG dashboard is not a DUT-only percentage.
+
+The 25-run observation mutation campaign caught address, data, response owner,
+WSTRB, and done/missing/duplicate Done faults on all seven engine bits.
+`make ai_smoke` passed with the existing `[LOOP-REROLL-ENABLED]` workload-fixture
+warning. UVM compilation had no `Warning`, `Error`, or `TFIPC` diagnostic. The
+Matrix default-profile FSM remains 49/53 transitions (92.45%); the four misses
+are individually reviewed, but the two invalid-state paths have no formal
+unreachable proof, so no full FSM closure claim is made. Exact commands,
+artifacts, requirement dispositions and residual gaps are in the [S1/S2
+sign-off candidate report](../docs/verification/COMPUTE_CLUSTER_S1_S2_SIGNOFF_CANDIDATE_2026-10-27.md).
 
 > **2026-10-26 Stage A + benchmark status:** At tested RTL/DV SHA
 > `03bf257afdca9b0041ff80b6d30cbaf8107cf7e0`, real-top seven-engine UVM passed

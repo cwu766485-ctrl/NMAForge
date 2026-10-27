@@ -1,8 +1,13 @@
 # Compute Cluster S1/S2 DV Sign-off Candidate
 
-**Review date:** 2026-10-27  
-**Tested source SHA:** `c83ad7463265062d4edb84d57fe4ada8195f9b10`  
-**Simulator:** Synopsys VCS/URG `V-2023.12-SP1_Full64`  
+**Review date:** 2026-10-27
+
+**Baseline reviewed SHA (detached clean worktree):** `c83ad7463265062d4edb84d57fe4ada8195f9b10`
+
+**Supplemental source base:** `fa2b4dd943dba996c82fbad5828ed1a28529a854` (the supplemental RTL/DV changes are listed below)
+
+**Simulator:** Synopsys VCS/URG `V-2023.12-SP1_Full64`
+
 **RTL change in this review:** none. `rtl/` is byte-identical to the prior
 tested RTL baseline `03bf257afdca9b0041ff80b6d30cbaf8107cf7e0`.
 
@@ -12,7 +17,7 @@ tested RTL baseline `03bf257afdca9b0041ff80b6d30cbaf8107cf7e0`.
 |---|---|---|
 | S1: 16×16 Matrix Block DV | **BOUNDED PASS** | Three-seed depth-4 functional/fault regression passed for the tested INT8 GEMM/batch/layout, prefetch/cache, parity/protection, abort/reset and recovery cases. The default-profile FSM has four unhit transitions; each is dispositioned below. No formal unreachable proof is claimed. |
 | S2: Compute Cluster functional slice | **BOUNDED PASS** | Three-seed real-top, seven-engine UVM passed its selected workload set; the accepted-transaction memory scoreboard, 14-case parity cross, reset/abort checks and 25/25 observation-mutation sensitivity campaign passed. The only unhit functional cover variable is completion response-client, explicitly WAIVED/N/A because the completion writer is write-only. |
-| S2: all 38 frozen REQ-CL/REQ-PC requirements | **HOLD** | The table below has 16 `PASS-SCOPED`, 17 `PARTIAL`, 2 `BLOCKED_SPEC`, and 3 `NOT_RUN`. In particular, the full parameter/opcode cross, partial line WSTRB, error-prefix/reset combinations, SFU numeric subcontracts, and shared-read-only isolation are not all closed. This is not full Compute Cluster sign-off. |
+| S2: all 38 frozen REQ-CL/REQ-PC requirements | **HOLD** | The updated table has 23 `PASS-SCOPED`, 13 `PARTIAL`, 2 `BLOCKED_SPEC`, and 0 `NOT_RUN`. Three-seed Conv/KV and two-seed FP block evidence now closes the named functional slices; reset epoch evidence closes the scoped reset requirement. Full parameter/opcode cross, partial line WSTRB disposition, broad error-prefix/reset combinations, and SFU numeric subcontracts remain open. This is not full Compute Cluster sign-off. |
 | S3: complete NPU IP | **OUT OF SCOPE** | DMA/CMDQ-to-compute-to-CPLQ system E2E, complete system regression, and ASIC PPA are not covered by S1/S2 evidence. |
 
 `PASS-SCOPED` means the named requirement behavior was exercised and checked in
@@ -88,10 +93,10 @@ sensitivity and are not an RTL mutation score.
 |---|---|---|
 | REQ-CL-001 | PASS-SCOPED | `CLUSTER-S2-UVM-3S`: legal launches for all seven production engines. |
 | REQ-CL-002 | PARTIAL | Representative opcode-to-engine launches pass; not every legal opcode/configuration tuple is swept. |
-| REQ-CL-003 | NOT_RUN | Launch sampling around all configuration-edge cases lacks a dedicated sequence. |
-| REQ-CL-004 | NOT_RUN | Unused-field perturbation is not systematically swept across engines. |
-| REQ-CL-005 | PARTIAL | Selected in-flight tasks preserve sampled configuration; not the full engine/field matrix. |
-| REQ-CL-006 | PARTIAL | Real top observes 236 compute-request backpressure cycles; not every engine, direction and stall class. |
+| REQ-CL-003 | PASS-SCOPED | `CLUSTER-LAUNCH-3S`: real-top launch monitor captured scalar VDOT source/destination/length/flags/aux/strides against the descriptor. Other engines and boundary-value fields remain outside this test. |
+| REQ-CL-004 | PASS-SCOPED | `CLUSTER-LAUNCH-3S`: scalar VDOT flags, aux0, and all three strides were perturbed; output/completion stayed Golden. Unused-field sweeps for other engines remain open. |
+| REQ-CL-005 | PARTIAL | `CLUSTER-LATCH-3S`: a 64-word scalar VDOT completed with result 4,480 at the original destination after its source/destination descriptor words were changed in flight. This does not cover the full engine/field matrix. |
+| REQ-CL-006 | PARTIAL | `CLUSTER-STABILITY-3S`: no payload violations; stalled mask `1110111`, per-engine stall cycles `{7,4,23,0,261,8,6}`, Matrix banked checks=338, and 30 stall checks on each CNM lane. Matrix line stalls were not observed in this top test; all directions/classes are not closed. |
 | REQ-CL-007 | PASS-SCOPED | Accepted-read ownership ledger; 1,945 responses, zero orphan/stale response; selected ready/response timing. |
 | REQ-CL-008 | PASS-SCOPED | Byte-aware accepted-write memory image: 4,852 words/seed, zero mismatch/unknown. |
 | REQ-CL-009 | PASS-SCOPED | Four CNM lanes, address/response ownership and selected parity cross checked; broader latency/fault matrix remains open. |
@@ -109,9 +114,9 @@ sensitivity and are not an RTL mutation score.
 | REQ-CL-021 | PASS-SCOPED | Four-bank CNM address/response ledger and selected GEMV Golden/parity cases pass. |
 | REQ-CL-022 | PASS-SCOPED | `MATRIX-S1-DEPTH4-3S`: 18 Golden/layout and 34 fault/recovery cases per seed; 16×16 profile covered. Broader option space and line WSTRB remain open. |
 | REQ-CL-023 | BLOCKED_SPEC | Selected SFU vectors run, but approximate/numeric tolerance subcontracts are not fully frozen. |
-| REQ-CL-024 | PARTIAL | Selected Conv3x3 Golden case passes; complete height/width/sign/window classes are not closed. |
-| REQ-CL-025 | PARTIAL | KV write/readback and selected stride/address cases pass; overflow/alias/head/token matrix is incomplete. |
-| REQ-CL-026 | PARTIAL | Selected mixed-FP engine activity is checked; full BF16/FP16 class × odd-tail × response-latency matrix is not closed here. |
+| REQ-CL-024 | PASS-SCOPED | `CNN-KV-RAND-3S`: both Conv3x3 and depthwise opcodes; 25 convolution cases/seed across 3–6 row/column shapes; every valid-window output checked against an independent signed oracle under ready stalls and 0–7-cycle responses. Widths above 6 remain outside this run. |
+| REQ-CL-025 | PASS-SCOPED | `CNN-KV-RAND-3S`: 27 read/write round trips/seed; lengths 1–128, token/head stride fields, zero/minimum/high boundary offsets and complete memory images checked across the 512 KiB model. Exhaustive stride cross-products and out-of-aperture overflow behavior remain open. |
+| REQ-CL-026 | PASS-SCOPED | `FP-UVM-2S`: 596/596 bit-exact mixed BF16/FP16 transactions per seed; odd tails, response latency, two outstanding reads and selected parity/reset cases covered. The real-top cluster UVM also launches and checks the FP engine. |
 | REQ-CL-027 | PARTIAL | Selected engine error codes are observed; a complete Engine × Fault table is blocked by OPEN-CL-006. |
 | REQ-CL-028 | PARTIAL | Matrix and cluster cycle counters are reported; all counter boundaries/events are not independently covered. |
 | REQ-PC-001 | PASS-SCOPED | Three-seed C0-P run covers all 21 unordered engine pairs. |
@@ -121,9 +126,9 @@ sensitivity and are not an RTL mutation score.
 | REQ-PC-005 | PASS-SCOPED | Simultaneous engine Done and distinct completion records are checked. |
 | REQ-PC-006 | PARTIAL | Shared mux ownership, selected ready stalls and response/error routing pass; complete requester/error/backpressure matrix remains open. |
 | REQ-PC-007 | PARTIAL | Matrix/CNM separate tags, four CNM lanes and response ledger pass in selected real-top cases; full line/banked fault/backpressure sweep remains open. |
-| REQ-PC-008 | NOT_RUN | Concurrent shared-read-only isolation has no dedicated scoreboard sequence; conflicting aliases are excluded by software contract. |
+| REQ-PC-008 | PASS-SCOPED | `CLUSTER-SHARED-RO-3S`: scalar VDOT and SFU GELU concurrently read the same immutable 64-word SPAD region, with distinct Golden-checked destinations/completions. Conflicting write aliases remain excluded by software contract. |
 | REQ-PC-009 | PASS-SCOPED | Multi-engine abort stops selected dispatch and drains ordered completions; broader active-engine combinations remain open. |
-| REQ-PC-010 | PARTIAL | Active reset clears selected owner/task state and permits recovery; external SRAM retention/late response contract is still open. |
+| REQ-PC-010 | PASS-SCOPED | `CLUSTER-S2-UVM-3S-FA2B`: active Matrix/SFU reset dropped two already-accepted reads per seed; no stale/orphan response or old completion/writeback appeared, SRAM sentinels were retained, and a fresh post-reset task completed. Other reset phases/engines remain outside this scope. |
 
 ## Reproducible clean-SHA runs
 
@@ -145,9 +150,58 @@ disposition item rather than counted as zero warnings. Mutation runs are
 expected to report UVM checker errors; the normal three-seed regression remains
 at UVM warning/error/fatal `0/0/0`.
 
+## Supplemental validation and license retry on 2026-10-27
+
+The initial CNN/KV and SFU attempts below occurred while VCS could not connect
+to the configured license server; they stopped before compilation. After the
+license was restored, both blocks and the additional runs listed below passed.
+The supplemental runs used the source tree based on `fa2b4dd` with the DV
+interface/sequence/Makefile changes listed below; those same RTL/DV file
+contents are now committed, and `rtl/` was not changed. The final report edits
+followed the run. An independent clean-worktree replay could not be completed
+because the current VCS license server is unavailable; the exact failed retry
+is recorded below.
+
+| Intended run | Command | Result |
+|---|---|---|
+| CNN/KV initial attempt | `make random-latency-regress SEEDS='20261021 20261022 20261023' OUT_DIR=/tmp/nmaforge_unverified_cnn_kv_20261027` from `dv/block/compute/cnn_kv/sim` | BLOCKED_ENV before compile; license server unavailable. A successful retry is below. |
+| SFU initial attempt | `make random-latency-regress SEEDS='20261021 20261022 20261023' OUT_DIR=/tmp/nmaforge_unverified_sfu_20261027` from `dv/block/compute/sfu/sim` | BLOCKED_ENV before compile; license server unavailable. A successful retry is below. |
+| FP independent reference-model unit checks | `python3.12 -m unittest discover -s dv/block/compute/fp/model -p 'test_*.py' -v` | PASS 19/19 software-model tests; this does not exercise RTL. |
+
+Successful retries and new testpoints:
+
+| Run ID | Command | Result / artifact |
+|---|---|---|
+| `CNN-KV-RAND-3S` | `make random-latency-regress SEEDS='20261021 20261022 20261023' OUT_DIR=/tmp/nmaforge_unverified_cnn_kv_retry_20261027` from `dv/block/compute/cnn_kv/sim` | PASS all seeds; each ran 25 Conv + 12 depthwise cases, 27 KV roundtrips, Conv/KV fault counts 6/7, two late faults, reset+fault and recovery; reads matched responses, max delay 7. |
+| `SFU-RAND-3S` | `make random-latency-regress SEEDS='20261021 20261022 20261023' OUT_DIR=/tmp/nmaforge_unverified_sfu_retry_20261027` from `dv/block/compute/sfu/sim` | PASS all seeds; each ran 64 cases/8 error cases, late fault, fault+abort, reset+fault/recovery, 39 reset and 39 abort state observations, 1,040 reads/responses and 427 writes. |
+| `FP-UVM-2S` | `make dot-uvm-regress DOT_UVM_OUT_DIR=/tmp/nmaforge_unverified_fp_uvm_20261027 DOT_UVM_SEEDS='20261028 20261029' DOT_RANDOM_COUNT=256` from `dv/block/compute/fp/sim` | PASS; 596/596 bit-exact scoreboard transactions per seed; BF16/FP16, odd-tail parity, two outstanding, response latency, and selected fault/reset groups all 100%; severity 0/0/0. Merged URG under output directory. |
+| `MATRIX-CORE-3S-FA2B` | `make core-random-regress OUTSTANDING_DEPTH=4 SEEDS='20261021 20261022 20261023' CORE_OUT_DIR=/tmp/nmaforge_unverified_matrix_core_20261027` from `dv/block/compute/matrix/sim` | PASS all seeds; 18 Golden + 34 fault/recovery cases per seed, including late tile fault, fault+abort, reset+fault/recovery, outstanding abort/parity, prefetch parity/abort/watchdog/reset and state-phase abort/reset. |
+| `MATRIX-ABLATION-40-FA2B` | `make matrix-config-comparison SEED=20261026 MATRIX_CONFIG_OUT=/tmp/nmaforge_unverified_matrix_compare_20261027` from `dv/block/compute/matrix/sim` | PASS 8 configurations × 5 workloads. At 32×32×64, depth4/prefetch/cache took 1,187 cycles and 384 bank reads versus 1,698 cycles/512 reads at depth2/no-prefetch/no-cache (30.1% fewer cycles). One seed and one-cycle behavioral SPAD only. |
+| `CLUSTER-S2-UVM-3S-FA2B` | `make uvm_compute_cluster_regress COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027' COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_unverified_cluster_uvm_final3_20261027` from `dv/uvm/sim` | PASS all seeds; all seven engines and selected serial/staged/parallel, fault, abort, reset, DMA response and new launch/latch/shared-read-only checks. UVM severity 0/0/0; memory scoreboard each seed: 4,946 writes, 5,256 checked words, 0 mismatch/unknown/orphan/stale response; selected covergroup 98.96%. Staged workload was 1,239→1,070 cycles (1.158×); four-task queue was 1,696→1,137 cycles (1.492×) with ordered completions. Merged URG is deliberately a DUT+testbench/UVM report, not DUT-only coverage. |
+| `CLUSTER-S2-MUT-25-FA2B` | `make uvm_compute_cluster_mutation COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_unverified_cluster_uvm_final3_20261027 COMPUTE_CLUSTER_MUTATION_OUT=/tmp/nmaforge_unverified_cluster_mutations_final_20261027` from `dv/uvm/sim` | PASS 25/25 expected checker catches: address/data/owner/WSTRB plus done/missing/duplicate done on each of seven engine bits. These mutate monitor observations, not RTL. |
+| `CLUSTER-S2-TOP-SMOKE-FA2B` | `make ai_smoke` from `dv/subsystem/top_smoke/sim` | PASS (`TEST PASS`, mapper precheck and 86-descriptor fixed-weight Transformer flow). Compile retains one `[LOOP-REROLL-ENABLED]` warning from the workload fixture; it affects line-debug capacity. |
+
+The current top UVM adds four checked testpoints: launch-field snapshot and
+unused VDOT-field perturbation; descriptor mutation after launch while the
+scalar engine is busy; concurrent scalar/SFU access to one shared read-only
+SPAD region; and stalled request-payload stability. All passed in all three
+seeds. Per seed, stall observations were engine mask `1110111`, Matrix banked
+338 checks, and 30 checks on each of four CNM lanes; the Matrix line-write
+stall class had zero samples in this workload. The response-client group
+remains raw 98.96% (29/30 variables); its sole uncovered completion-read bin
+is waived/N/A because the completion writer is write-only, while DMA read
+response was observed. UVM compile had no `Warning`, `Error`, or `TFIPC` text.
+
+The four Matrix `state_r` transition misses remain as reviewed dispositions in
+the S1 table: two are mutually exclusive prefetch compile profiles, and two
+have no legal trigger found in the current control path. No formal unreachable
+proof is claimed; the Matrix directory has no dedicated formal harness. The
+Matrix FSM remains 49/53 (92.45%) in the default prefetch-enabled profile and
+is not being presented as 100% closed.
+
 ## Not covered by this sign-off candidate
 
-- The other 17 partial, 2 blocked, and 3 not-run requirements in the table.
+- The other 13 partial and 2 blocked requirements in the table.
 - Full all-opcode × shape × numeric-class closure and full legal fault × phase
   × engine × abort/reset cross.
 - Partial Matrix line WSTRB and all `OPEN-CL-*` / `OPEN-NUM-*` dispositions.
@@ -158,3 +212,9 @@ The next S2 closure action is to resolve `OPEN-CL-002/003/004/006/007` and
 `OPEN-NUM-01/02`, then add targeted testpoints for each now-legal P0 bin. Keep
 the existing `PASS-SCOPED` evidence and add explicit `WAIVED` or `BLOCKED_SPEC`
 dispositions only when approved by the relevant design owner.
+
+The requested current-checkout CNM retry on 2026-10-27 did not start compiling:
+VCS could not connect to the configured license server, including with a
+bounded `-licwait 1` retry. This is a new `BLOCKED_ENV` attempt, not a CNM test
+failure and not additional PASS evidence. Earlier archived CNM runs remain
+historical evidence; this retry is not counted in the 23 `PASS-SCOPED` tally.

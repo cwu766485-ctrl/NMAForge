@@ -64,6 +64,10 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -q '\[CLUSTER_ABORT_CROSS_PASS\]' "$$log" || { echo "ERROR: multi-engine software-abort cross missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_RESET_RECOVERY_PASS\]' "$$log" || { echo "ERROR: real compute-cluster active-reset/recovery check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_DMA_RESPONSE_PASS\]' "$$log" || { echo "ERROR: real top DMA response-client read check missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_LAUNCH_FIELDS_PASS\]' "$$log" || { echo "ERROR: descriptor launch-snapshot/unused-field checks missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_SHARED_READONLY_PASS\]' "$$log" || { echo "ERROR: cross-engine shared read-only SPAD check missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_REQUEST_STABILITY_PASS\]' "$$log" || { echo "ERROR: stalled compute request-stability check missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SERIAL_BENCH_PASS\].*total=[1-9][0-9]*' "$$log" || { echo "ERROR: serial compute benchmark timing missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_STAGED_BENCH_PASS\].*speedup=[1-9].*pair_contention_cycles=[1-9][0-9]*' "$$log" || { echo "ERROR: staged Matrix/CNM contention then SFU benchmark timing missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_PARALLEL_BENCH_PASS\].*speedup=[1-9]' "$$log" || { echo "ERROR: parallel compute benchmark timing missing in $$log"; exit 1; }; \

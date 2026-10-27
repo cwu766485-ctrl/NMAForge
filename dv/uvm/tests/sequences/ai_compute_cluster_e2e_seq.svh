@@ -32,6 +32,14 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] CNM_Y_LOCAL = 32'h0004_a000;
     localparam bit [31:0] CLUSTER_SWEEP_CMDQ = 32'h0000_4400;
     localparam bit [31:0] CLUSTER_SWEEP_CPLQ = 32'h0000_5400;
+    localparam bit [31:0] CLUSTER_CONTRACT_CMDQ = 32'h0000_4800;
+    localparam bit [31:0] CLUSTER_CONTRACT_CPLQ = 32'h0000_5800;
+    localparam bit [31:0] CONTRACT_SHARED_LOCAL = 32'h0004_7000;
+    localparam bit [31:0] CONTRACT_B_LOCAL = 32'h0004_7200;
+    localparam bit [31:0] CONTRACT_Y0_LOCAL = 32'h0004_7400;
+    localparam bit [31:0] CONTRACT_Y1_LOCAL = 32'h0004_7500;
+    localparam bit [31:0] CONTRACT_MUTATED_Y_LOCAL = 32'h0004_7600;
+    localparam bit [31:0] CONTRACT_SFU_Y_LOCAL = 32'h0004_7800;
     localparam bit [31:0] SCALAR_A_LOCAL = 32'h0004_6000;
     localparam bit [31:0] SCALAR_B_LOCAL = 32'h0004_6100;
     localparam bit [31:0] SCALAR_Y_LOCAL = 32'h0004_6200;
@@ -475,6 +483,277 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         `uvm_info("CLUSTER_DMA_RESPONSE_PASS",
             "real top SPAD-to-DDR DMA store returned tagged client-4 reads and matched all four DDR words",
             UVM_LOW)
+    endtask
+
+    task automatic write_contract_vdot_desc(
+        input bit [31:0] base,
+        input bit [15:0] task_id,
+        input bit [31:0] src0,
+        input bit [31:0] src1,
+        input bit [31:0] dst,
+        input bit [15:0] length,
+        input bit [7:0] unused_flags,
+        input bit [31:0] unused_aux0,
+        input bit [31:0] unused_src0_stride,
+        input bit [31:0] unused_src1_stride,
+        input bit [31:0] unused_dst_stride
+    );
+        write_cluster_desc(base, 8'h10, task_id, src0, src1, dst,
+                           16'd0, 16'd0, length, unused_aux0,
+                           unused_src0_stride, unused_src1_stride,
+                           unused_dst_stride, 8'd3);
+        // For VDOT, flags, aux0, and strides are descriptor fields but are
+        // not consumed by the selected scalar opcode.
+        spad_write(base + 32'h1c, {24'd0, unused_flags});
+    endtask
+
+    task automatic configure_contract_queues(
+        input bit [31:0] completion_base,
+        input bit [31:0] descriptor_count
+    );
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, CLUSTER_CONTRACT_CMDQ);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, descriptor_count);
+        axil_write(REG_CPLQ_BASE, completion_base);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+    endtask
+
+    task automatic clear_contract_queues(input bit [31:0] completion_head);
+        axil_write(REG_CPLQ_HEAD, completion_head);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+    task automatic run_launch_snapshot_and_unused_fields_test();
+        int unsigned launch_before;
+
+        spad_write(SCALAR_A_LOCAL, 32'h0403_0201);
+        spad_write(SCALAR_B_LOCAL, 32'h0807_0605);
+        spad_write(CONTRACT_Y0_LOCAL, 32'hbad0_0680);
+        spad_write(CONTRACT_Y1_LOCAL, 32'hbad0_0681);
+        write_contract_vdot_desc(CLUSTER_CONTRACT_CMDQ + 32'h00, 16'h0680,
+                                 SCALAR_A_LOCAL, SCALAR_B_LOCAL,
+                                 CONTRACT_Y0_LOCAL, 16'd1, 8'd0,
+                                 32'd0, 32'd0, 32'd0, 32'd0);
+        write_contract_vdot_desc(CLUSTER_CONTRACT_CMDQ + 32'h40, 16'h0681,
+                                 SCALAR_A_LOCAL, SCALAR_B_LOCAL,
+                                 CONTRACT_Y1_LOCAL, 16'd1, 8'h76,
+                                 32'hcafe_f00d, 32'd16, 32'd32, 32'd64);
+
+        launch_before = compute_vif.launch_sample_count;
+        configure_contract_queues(CLUSTER_CONTRACT_CPLQ, 32'd2);
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd2);
+        wait_spad_idle();
+
+        expect_spad(CONTRACT_Y0_LOCAL, 32'd70, "VDOT default unused fields");
+        expect_spad(CONTRACT_Y1_LOCAL, 32'd70, "VDOT perturbed unused fields");
+        expect_completion(CLUSTER_CONTRACT_CPLQ + 32'h00, 16'h0680,
+                          32'd70, 32'd1, "VDOT default field completion");
+        expect_completion(CLUSTER_CONTRACT_CPLQ + 32'h10, 16'h0681,
+                          32'd70, 32'd1, "VDOT unused-field completion");
+        if (compute_vif.launch_sample_count != launch_before + 2 ||
+            !compute_vif.launch_sample_seen[0])
+            `uvm_fatal("CLUSTER_LAUNCH_SAMPLE", $sformatf(
+                "expected two captured launches; before=%0d after=%0d seen=%07b",
+                launch_before, compute_vif.launch_sample_count,
+                compute_vif.launch_sample_seen))
+        if (compute_vif.launch_snapshot_src0[0] !== SCALAR_A_LOCAL ||
+            compute_vif.launch_snapshot_src1[0] !== SCALAR_B_LOCAL ||
+            compute_vif.launch_snapshot_dst[0] !== CONTRACT_Y1_LOCAL ||
+            compute_vif.launch_snapshot_length[0] !== 16'd1 ||
+            compute_vif.launch_snapshot_flags[0] !== 8'h76 ||
+            compute_vif.launch_snapshot_aux0[0] !== 32'hcafe_f00d ||
+            compute_vif.launch_snapshot_src0_stride[0] !== 32'd16 ||
+            compute_vif.launch_snapshot_src1_stride[0] !== 32'd32 ||
+            compute_vif.launch_snapshot_dst_stride[0] !== 32'd64)
+            `uvm_fatal("CLUSTER_LAUNCH_SAMPLE", $sformatf(
+                "captured scalar launch differs from descriptor: src0=%08h src1=%08h dst=%08h length=%0d flags=%02h aux=%08h strides=%0d/%0d/%0d",
+                compute_vif.launch_snapshot_src0[0],
+                compute_vif.launch_snapshot_src1[0],
+                compute_vif.launch_snapshot_dst[0],
+                compute_vif.launch_snapshot_length[0],
+                compute_vif.launch_snapshot_flags[0],
+                compute_vif.launch_snapshot_aux0[0],
+                compute_vif.launch_snapshot_src0_stride[0],
+                compute_vif.launch_snapshot_src1_stride[0],
+                compute_vif.launch_snapshot_dst_stride[0]))
+        `uvm_info("CLUSTER_LAUNCH_FIELDS_PASS",
+            "launch payload sampled from the descriptor; changing scalar VDOT flags/aux/strides left Golden output unchanged",
+            UVM_LOW)
+        clear_contract_queues(32'd2);
+    endtask
+
+    task automatic run_inflight_parameter_latch_test();
+        int unsigned word_idx;
+        int unsigned poll;
+        int unsigned launch_before;
+        bit busy_seen;
+        bit [31:0] completion_base;
+        completion_base = CLUSTER_CONTRACT_CPLQ + 32'h100;
+
+        for (word_idx = 0; word_idx < 64; word_idx++) begin
+            spad_write(CONTRACT_SHARED_LOCAL + (word_idx << 2), 32'h0403_0201);
+            spad_write(CONTRACT_B_LOCAL + (word_idx << 2), 32'h0807_0605);
+        end
+        spad_write(CONTRACT_Y0_LOCAL, 32'hbad0_0682);
+        spad_write(CONTRACT_MUTATED_Y_LOCAL, 32'hbad0_06f0);
+        write_contract_vdot_desc(CLUSTER_CONTRACT_CMDQ, 16'h0682,
+                                 CONTRACT_SHARED_LOCAL, CONTRACT_B_LOCAL,
+                                 CONTRACT_Y0_LOCAL, 16'd64, 8'd0,
+                                 32'd0, 32'd0, 32'd0, 32'd0);
+        launch_before = compute_vif.launch_sample_count;
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+        busy_seen = 1'b0;
+        for (poll = 0; poll < 3000; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.engine_busy[0]) begin
+                busy_seen = 1'b1;
+                break;
+            end
+        end
+        if (!busy_seen)
+            `uvm_fatal("CLUSTER_PARAM_LATCH", "scalar task did not become active before descriptor mutation")
+
+        // The descriptor has been sampled and the scalar engine is active.
+        // Repointing its backing descriptor now must not change this task.
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h04, CONTRACT_B_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h08, CONTRACT_B_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h10, CONTRACT_MUTATED_Y_LOCAL);
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        expect_spad(CONTRACT_Y0_LOCAL, 32'd4480,
+                    "in-flight latched VDOT destination");
+        expect_spad(CONTRACT_MUTATED_Y_LOCAL, 32'hbad0_06f0,
+                    "in-flight descriptor mutation did not redirect writeback");
+        expect_completion(completion_base, 16'h0682, 32'd4480, 32'd1,
+                          "in-flight VDOT parameter latch");
+        if (compute_vif.launch_sample_count != launch_before + 1 ||
+            compute_vif.launch_snapshot_src0[0] !== CONTRACT_SHARED_LOCAL ||
+            compute_vif.launch_snapshot_src1[0] !== CONTRACT_B_LOCAL ||
+            compute_vif.launch_snapshot_dst[0] !== CONTRACT_Y0_LOCAL)
+            `uvm_fatal("CLUSTER_PARAM_LATCH", "launch-time source/destination snapshot was not retained")
+        `uvm_info("CLUSTER_PARAMETER_LATCH_PASS",
+            "mutating source and destination descriptor words after scalar launch did not alter the in-flight task",
+            UVM_LOW)
+        clear_contract_queues(32'd1);
+    endtask
+
+    task automatic run_shared_readonly_isolation_test();
+        int unsigned word_idx;
+        int unsigned poll;
+        int unsigned launch_before;
+        bit overlap_seen;
+        bit scalar_shared_read_seen;
+        bit sfu_shared_read_seen;
+        bit [31:0] addr;
+        bit [31:0] completion_base;
+        completion_base = CLUSTER_CONTRACT_CPLQ + 32'h200;
+        overlap_seen = 1'b0;
+        scalar_shared_read_seen = 1'b0;
+        sfu_shared_read_seen = 1'b0;
+
+        for (word_idx = 0; word_idx < 64; word_idx++) begin
+            spad_write(CONTRACT_SHARED_LOCAL + (word_idx << 2), 32'd0);
+            spad_write(CONTRACT_B_LOCAL + (word_idx << 2), 32'h0101_0101);
+            spad_write(CONTRACT_SFU_Y_LOCAL + (word_idx << 2), 32'hbad0_0684);
+        end
+        spad_write(CONTRACT_Y0_LOCAL, 32'hbad0_0683);
+        write_contract_vdot_desc(CLUSTER_CONTRACT_CMDQ + 32'h00, 16'h0683,
+                                 CONTRACT_SHARED_LOCAL, CONTRACT_B_LOCAL,
+                                 CONTRACT_Y0_LOCAL, 16'd64, 8'd0,
+                                 32'd0, 32'd0, 32'd0, 32'd0);
+        write_v3_desc(CLUSTER_CONTRACT_CMDQ + 32'h40, 8'h35, 16'h0684,
+                      CONTRACT_SHARED_LOCAL, 32'd0, CONTRACT_SFU_Y_LOCAL,
+                      16'd0, 16'd0, 16'd64);
+
+        launch_before = compute_vif.launch_sample_count;
+        configure_contract_queues(completion_base, 32'd2);
+        axil_write(REG_DOORBELL, 32'd1);
+        for (poll = 0; poll < 50000; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.engine_busy[0] && compute_vif.engine_busy[4])
+                overlap_seen = 1'b1;
+            for (int engine = 0; engine < 7; engine++) begin
+                if (compute_vif.engine_req_valid[engine] &&
+                    compute_vif.engine_req_ready[engine] &&
+                    !compute_vif.engine_req_write[engine]) begin
+                    addr = compute_vif.engine_req_addr[engine*32 +: 32];
+                    if (addr >= CONTRACT_SHARED_LOCAL &&
+                        addr < CONTRACT_SHARED_LOCAL + 32'h100) begin
+                        if (engine == 0) scalar_shared_read_seen = 1'b1;
+                        if (engine == 4) sfu_shared_read_seen = 1'b1;
+                    end
+                end
+            end
+            if (compute_vif.launch_sample_count >= launch_before + 2 &&
+                overlap_seen && !compute_vif.engine_busy[0] &&
+                !compute_vif.engine_busy[4])
+                break;
+        end
+        if (!overlap_seen || !scalar_shared_read_seen || !sfu_shared_read_seen)
+            `uvm_fatal("CLUSTER_SHARED_READONLY", $sformatf(
+                "shared read-only contract incomplete: overlap=%b scalar_read=%b sfu_read=%b launch_delta=%0d",
+                overlap_seen, scalar_shared_read_seen, sfu_shared_read_seen,
+                compute_vif.launch_sample_count - launch_before))
+        wait_cpl_tail(32'd2);
+        wait_spad_idle();
+        expect_spad(CONTRACT_Y0_LOCAL, 32'd0, "shared read-only scalar Golden");
+        for (word_idx = 0; word_idx < 64; word_idx++)
+            expect_spad(CONTRACT_SFU_Y_LOCAL + (word_idx << 2), 32'd0,
+                        $sformatf("shared read-only SFU Golden[%0d]", word_idx));
+        expect_completion(completion_base + 32'h00, 16'h0683,
+                          32'd0, 32'd1, "shared read-only scalar completion");
+        expect_completion(completion_base + 32'h10, 16'h0684,
+                          32'd0, 32'd64, "shared read-only SFU completion");
+        if (compute_vif.launch_snapshot_src0[0] !== CONTRACT_SHARED_LOCAL ||
+            compute_vif.launch_snapshot_src0[4] !== CONTRACT_SHARED_LOCAL)
+            `uvm_fatal("CLUSTER_SHARED_READONLY", "concurrent engines did not sample the same shared read-only source")
+        `uvm_info("CLUSTER_SHARED_READONLY_PASS",
+            "concurrent Scalar VDOT and SFU GELU read the same immutable SPAD region and produced independent Golden outputs",
+            UVM_LOW)
+        clear_contract_queues(32'd2);
+    endtask
+
+    task automatic check_request_stability();
+        int unsigned e;
+        if (compute_vif.engine_req_stability_violations != 0 ||
+            compute_vif.matrix_banked_stall_violations != 0 ||
+            compute_vif.matrix_line_stall_violations != 0 ||
+            compute_vif.cnm_stall_violations != 0)
+            `uvm_fatal("CLUSTER_REQUEST_STABILITY", $sformatf(
+                "stall payload changed: engine=%0d MatrixBanked=%0d MatrixLine=%0d CNM=%0d",
+                compute_vif.engine_req_stability_violations,
+                compute_vif.matrix_banked_stall_violations,
+                compute_vif.matrix_line_stall_violations,
+                compute_vif.cnm_stall_violations))
+        if (compute_vif.engine_req_stall_seen == 0 ||
+            compute_vif.matrix_banked_stall_checks == 0)
+            `uvm_fatal("CLUSTER_REQUEST_STABILITY", $sformatf(
+                "no stalled compute request was checked: engine_mask=%07b banked_checks=%0d",
+                compute_vif.engine_req_stall_seen,
+                compute_vif.matrix_banked_stall_checks))
+        for (e = 0; e < 7; e++)
+            if (compute_vif.engine_req_stall_checks[e] != 0 &&
+                compute_vif.engine_req_stall_cycles[e] == 0)
+                `uvm_fatal("CLUSTER_REQUEST_STABILITY", $sformatf(
+                    "engine%0d stability checks lack a stall sample", e))
+        `uvm_info("CLUSTER_REQUEST_STABILITY_PASS", $sformatf(
+            "engine stalled mask=%07b cycles={%0d,%0d,%0d,%0d,%0d,%0d,%0d}; Matrix banked checks=%0d, Matrix line checks=%0d, CNM lane checks={%0d,%0d,%0d,%0d}",
+            compute_vif.engine_req_stall_seen,
+            compute_vif.engine_req_stall_cycles[0], compute_vif.engine_req_stall_cycles[1],
+            compute_vif.engine_req_stall_cycles[2], compute_vif.engine_req_stall_cycles[3],
+            compute_vif.engine_req_stall_cycles[4], compute_vif.engine_req_stall_cycles[5],
+            compute_vif.engine_req_stall_cycles[6],
+            compute_vif.matrix_banked_stall_checks,
+            compute_vif.matrix_line_stall_checks,
+            compute_vif.cnm_stall_checks[0], compute_vif.cnm_stall_checks[1],
+            compute_vif.cnm_stall_checks[2], compute_vif.cnm_stall_checks[3]), UVM_LOW)
     endtask
 
     task automatic wait_matrix_sfu_overlap();
@@ -1244,6 +1523,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             recovery_cycles), UVM_LOW)
 
         run_dma_store_response_test();
+        run_launch_snapshot_and_unused_fields_test();
+        run_inflight_parameter_latch_test();
+        run_shared_readonly_isolation_test();
+        check_request_stability();
 
         `uvm_info("COMPUTE_CLUSTER_REAL_UVM_PASS", $sformatf(
             "standalone Matrix16x32x64 Golden + 16 A-tile reuse hits; parallel Matrix/CNM GEMV with separate response tags and four-bank Golden + next-K prefetch + queued SFU tasks + concurrent abort/reset/recovery seed=%0d; prefetch_overlap=%0d matrix_cnm_overlap=%0d matrix_rsp=%0d cnm_rsp=%0d cnm_lanes=%b overlap=%0d arbiter_contention=%0d banked_grants=%0d cnm_grants=%0d core_grants=%0d",
