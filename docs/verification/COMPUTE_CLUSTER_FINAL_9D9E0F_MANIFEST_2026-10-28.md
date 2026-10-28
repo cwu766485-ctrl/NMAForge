@@ -17,6 +17,10 @@ make -C dv/block/compute/matrix/sim core-random-regress \
   SEEDS='20261021 20261022 20261023' \
   CORE_OUT_DIR=/tmp/nmaforge_error_abi_matrix_priority_20261028
 
+make -C dv/block/compute/matrix/sim core-random-regress \
+  SEEDS='20261025 20261026 20261027' \
+  CORE_OUT_DIR=/tmp/nmaforge_pending_close_matrix_core_9d9e0f
+
 make -C dv/block/compute/sfu/sim random-latency-regress \
   SEEDS='20261021 20261022 20261023' \
   OUT_DIR=/tmp/nmaforge_error_abi_sfu_priority_20261028
@@ -65,6 +69,7 @@ The R24 directed priority/prefix supplemental commands and their three-seed outc
 | R27 coordinated reset | accepted AR/R and AW/W/B windows PASS against behavioral responder; no stale response; DMA idle and recovery pass. |
 | R28 Matrix FSM formal | 5/5 non-vacuous properties proved; both reachability covers hit. Raw default FSM remains 49/53. |
 | R29 Matrix benchmark | size 45/45 and configuration ablation 120/120; same seed set, one-cycle behavioral SPAD. |
+| R30 Matrix accepted-read fault lifecycle | 3/3 seeds pass 18 functional + 35 fault/recovery cases, including depth-4 outstanding Abort/drain, prefetch Abort/Reset and recovery. Scope is Matrix core; it does not close other-engine top-level drain or external-fabric qualification. |
 
 ## Artifact SHA-256
 
@@ -137,5 +142,9 @@ The R24 directed priority/prefix supplemental commands and their three-seed outc
 | `/tmp/nmaforge_final_9d9e0f_matrix_config_20261025/matrix_config_comparison.csv` | `ed2bb7f4e4fdfbf20216d2e59ff1eb91bc5fa11fcc4e5fd46ace82e571961554` |
 | `/tmp/nmaforge_final_9d9e0f_matrix_config/matrix_config_comparison.csv` | `0314a8df69aa9245e1335942c2ccb00a45b417d0caca23a1e6a4044355e40045` |
 | `/tmp/nmaforge_final_9d9e0f_matrix_config_20261027/matrix_config_comparison.csv` | `71c0a85d7298a23dfb9892096de55c2cb32416e77f08f65069e389ba3879d18b` |
+| `/tmp/nmaforge_pending_close_matrix_core_9d9e0f/compile.log` | `b735e91b99edecf723e51e2c89a82c3fd894f6ffaf15ea039cb3c81e180452aa` |
+| `/tmp/nmaforge_pending_close_matrix_core_9d9e0f/run_seed_20261025.log` | `5a3b64cc0e65a54e92022b7d6780b19929200fbdfd2ff853b000988126097c61` |
+| `/tmp/nmaforge_pending_close_matrix_core_9d9e0f/run_seed_20261026.log` | `94d809ffc012628572c8d4bffd4439a402e667de5137dc3bd8e006e631d0e774` |
+| `/tmp/nmaforge_pending_close_matrix_core_9d9e0f/run_seed_20261027.log` | `f42e00129de63f189cc4b6ab8132246e35359f965909c949fb531c66d921a257` |
 
 These checksums bind the archived result files to the current source-SHA review record. They do not turn the behavioral SRAM/fabric models into silicon timing or external-fabric qualification evidence.
