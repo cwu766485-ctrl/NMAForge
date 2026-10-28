@@ -80,6 +80,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		test "$$(grep -c ' \[CLUSTER_FAULT_CASE_PASS\] case=' "$$log")" -eq 14 || { echo "ERROR: expected all 14 parity fault cases in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SCOREBOARD\].*reset_dropped=[1-9][0-9]*' "$$log" || { echo "ERROR: reset did not discard a tracked in-flight SPAD response"; exit 1; }; \
 		grep -q '\[CLUSTER_COVERAGE\]' "$$log" || { echo "ERROR: compute-cluster coverage report missing in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_COVERAGE\].*focused_compute_cg_applicable=100\.0%.*cpl_read:0[(]N/A[)]' "$$log" || { echo "ERROR: applicable compute testpoint coverage is not 100% or completion-read N/A disposition is missing in $$log"; exit 1; }; \
 		! grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$$log" || { echo "ERROR: UVM warning/error/fatal count is nonzero in $$log"; exit 1; }; \
 	done; \
 	$(URG) -full64 -dir "$$out/compile.vdb" $$cov_dbs -format text \

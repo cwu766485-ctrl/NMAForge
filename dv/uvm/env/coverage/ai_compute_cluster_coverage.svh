@@ -38,7 +38,13 @@ class ai_compute_cluster_coverage extends uvm_component;
         cp_matrix_prefetch_active: coverpoint matrix_prefetch_active { bins hit = {1}; }
         cp_matrix_a_cache_hit: coverpoint matrix_a_cache_hit { bins hit = {1}; }
         cp_response_client: coverpoint response_client iff (response_client >= 0) {
-            bins descriptor = {0}; bins completion = {1}; bins core = {2};
+            bins descriptor = {0};
+            // ai_completion_writer only emits SPAD writes (spad_write=spad_valid),
+            // so a completion read response cannot occur in this interface contract.
+            // Keep the runtime zero-hit checker and disposition log; exclude only
+            // this structurally inapplicable read-response bin from applicable coverage.
+            ignore_bins completion_read_response_not_applicable = {1};
+            bins core = {2};
             bins banked = {3}; bins dma = {4}; bins cnm = {5};
         }
         cp_response_route: coverpoint response_route iff ((response_client == 3) || (response_client == 5)) {
@@ -98,7 +104,7 @@ class ai_compute_cluster_coverage extends uvm_component;
     function void report_phase(uvm_phase phase);
         super.report_phase(phase);
         `uvm_info("CLUSTER_COVERAGE", $sformatf(
-            "focused_compute_cg=%0.1f%% response_clients={desc:%0d,cpl:%0d,core:%0d,banked:%0d,dma:%0d,cnm:%0d}",
+            "focused_compute_cg_applicable=%0.1f%% response_clients={desc:%0d,cpl_read:%0d(N/A),core:%0d,banked:%0d,dma:%0d,cnm:%0d}",
             cluster_cg.get_coverage(), response_client_hits[0], response_client_hits[1],
             response_client_hits[2], response_client_hits[3], response_client_hits[4],
             response_client_hits[5]), UVM_LOW)
