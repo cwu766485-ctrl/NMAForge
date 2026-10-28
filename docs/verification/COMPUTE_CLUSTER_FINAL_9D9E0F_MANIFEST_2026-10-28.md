@@ -55,7 +55,45 @@ make -C dv/block/compute/matrix/sim matrix-config-comparison \
   SEED=20261026 MATRIX_CONFIG_OUT=/tmp/nmaforge_final_9d9e0f_matrix_config
 make -C dv/block/compute/matrix/sim matrix-config-comparison \
   SEED=20261027 MATRIX_CONFIG_OUT=/tmp/nmaforge_final_9d9e0f_matrix_config_20261027
+
+# R31: real CNM + DMA/SPAD subsystem, three randomized seeds and URG merge.
+make -C dv/subsystem/dma_spad/sim subsystem_regress \
+  SEEDS='20261025 20261026 20261027' COV_TAG=R31 \
+  URG_REPORT=/tmp/nmaforge_pending_close_cnm_subsystem_9d9e0f/urg_3seed
+
+# Merge the three passing seed databases after locating the installed URG binary.
+make -C dv/subsystem/dma_spad/sim subsystem_coverage \
+  SEEDS='20261025 20261026 20261027' COV_TAG=R31 \
+  URG=/opt/Synopsys/vcs/V-2023.12-SP1/bin/urg \
+  URG_REPORT=/tmp/nmaforge_pending_close_cnm_subsystem_9d9e0f/urg_3seed
+
+# Add the legal delayed-reset timing point (one cycle after CNM parity during DMA abort drain).
+cd dv/subsystem/dma_spad/sim
+./simv_dma_spad_uvm +UVM_TESTNAME=dma_spad_subsystem_test \
+  +ntb_random_seed=20261028 +SPAD_PARITY_ABORT_RESET_DELAY=1 \
+  +UVM_VERBOSITY=UVM_MEDIUM -cm line+cond+fsm+tgl+branch+assert \
+  -cm_dir coverage/dma_spad_subsystem_test_R31_seed20261028_delay1.vdb \
+  -l dma_spad_subsystem_test_R31_seed20261028_delay1.log
+
+# Exercise the three planned AXI RREADY stall lengths and merge all seven VDBs.
+make subsystem_rready_stress URG=/opt/Synopsys/vcs/V-2023.12-SP1/bin/urg \
+  RREADY_STRESS_TAG=R31_rready
+/opt/Synopsys/vcs/V-2023.12-SP1/bin/urg -full64 \
+  -dir coverage/dma_spad_subsystem_test_R31_seed20261025.vdb \
+  -dir coverage/dma_spad_subsystem_test_R31_seed20261026.vdb \
+  -dir coverage/dma_spad_subsystem_test_R31_seed20261027.vdb \
+  -dir coverage/dma_spad_subsystem_test_R31_seed20261028_delay1.vdb \
+  -dir coverage/R31_rready_16.vdb -dir coverage/R31_rready_64.vdb \
+  -dir coverage/R31_rready_300.vdb \
+  -report /tmp/nmaforge_pending_close_cnm_subsystem_9d9e0f/urg_full_7runs
 ```
+
+The first R31 regression invocation completed all three simulations but its
+wrapper returned nonzero at the merge step because the installed `urg` was not
+on `PATH`. The three-seed merge was then run successfully with the separate
+`subsystem_coverage` command above and the explicit URG path. All seven
+simulation logs report UVM warning/error/fatal `0/0/0`; the compile logs contain
+no `Warning-`, `Error-`, or `[TFIPC]`.
 
 The R24 directed priority/prefix supplemental commands and their three-seed outcomes are indexed in the [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md). They ran against files identical to the committed candidate source.
 
@@ -70,6 +108,7 @@ The R24 directed priority/prefix supplemental commands and their three-seed outc
 | R28 Matrix FSM formal | 5/5 non-vacuous properties proved; both reachability covers hit. Raw default FSM remains 49/53. |
 | R29 Matrix benchmark | size 45/45 and configuration ablation 120/120; same seed set, one-cycle behavioral SPAD. |
 | R30 Matrix accepted-read fault lifecycle | 3/3 seeds pass 18 functional + 35 fault/recovery cases, including depth-4 outstanding Abort/drain, prefetch Abort/Reset and recovery. Scope is Matrix core; it does not close other-engine top-level drain or external-fabric qualification. |
+| R31 CNM/DMA-SPAD fault and backpressure | Three seeds plus directed delayed reset pass CNM accepted-read Abort drain/no-write and recovery; both CNM reset phases; four lane parity under DMA contention; parity during DMA abort followed by same-cycle/delayed shared reset; RREADY stalls 16/64/300. Seven merged VDBs cover all 14 subsystem functional groups (100%). This is subsystem-scoped, not whole-Cluster coverage. |
 
 ## Artifact SHA-256
 
@@ -84,6 +123,20 @@ The R24 directed priority/prefix supplemental commands and their three-seed outc
 | `/tmp/nmaforge_closure_9d9e0f_clean/dv/uvm/sim/uvm_compile.log` | `02e9d37ac68381aaf4ffb5caeba35ab9a855093253d7a1d3aeb3cb7fc511dd1e` |
 | `/tmp/nmaforge_closure_9d9e0f_clean/dv/uvm/sim/uvm_run_ai_mixed_precision_ddr_e2e_test.log` | `77bd315a9d4262d3b18d9ba8aa88f59d9629ab3f9f9c175820688c54a14d8e55` |
 | `/tmp/nmaforge_final_9d9e0f_matrix_formal/vc_formal.log` | `dfffd3da82b9264cf9107f7229e32759a817e386caa72884a8099e9d70dbee8a` |
+| `/tmp/nmaforge_closure_9d9e0f_clean/dv/subsystem/dma_spad/sim/compile_dma_spad_subsystem_test_R31_seed20261025.log` | `22de6866ad63185c4688f4d1472cefe9113b77617a17e6ff92b916bb36f4e63d` |
+| `/tmp/nmaforge_closure_9d9e0f_clean/dv/subsystem/dma_spad/sim/compile_R31_rready_16.log` | `3f165d5491b0b42413afb9aa49587b1c2ca3c02cf88841e6af25ae4ea28327a1` |
+| `/tmp/nmaforge_closure_9d9e0f_clean/dv/subsystem/dma_spad/sim/compile_R31_rready_64.log` | `e9504aa42e4cb028df54d362048a9949b47d032d74a2866e12a74b51e1598ae3` |
+| `/tmp/nmaforge_closure_9d9e0f_clean/dv/subsystem/dma_spad/sim/compile_R31_rready_300.log` | `4a82b0203d1493cd611592d51c8ec1c25d6e853b9fcc0bf351747e21939e6745` |
+| `/tmp/nmaforge_closure_9d9e0f_clean/dv/subsystem/dma_spad/sim/dma_spad_subsystem_test_R31_seed20261025.log` | `ed43e311e9bfa512b7aba064f8095ccd14c45b637e67ee061ca745cf19ba4c0d` |
+| `/tmp/nmaforge_closure_9d9e0f_clean/dv/subsystem/dma_spad/sim/dma_spad_subsystem_test_R31_seed20261026.log` | `9029ace3114c586dad35e90d708e4fe4328c5cefa80a40ef9563381969585ddd` |
+| `/tmp/nmaforge_closure_9d9e0f_clean/dv/subsystem/dma_spad/sim/dma_spad_subsystem_test_R31_seed20261027.log` | `22df3d4ccfd3c50e774607d42b0b4612af08d78a235931ab536cdbe530e705da` |
+| `/tmp/nmaforge_closure_9d9e0f_clean/dv/subsystem/dma_spad/sim/dma_spad_subsystem_test_R31_seed20261028_delay1.log` | `66d0a0a9dfda2c3dd35dbe26f2d3027328e71f97922fe89c9f4de64e93d06daa` |
+| `/tmp/nmaforge_closure_9d9e0f_clean/dv/subsystem/dma_spad/sim/R31_rready_16.log` | `7568d986e5060303a43551bf521082f3d148cfa1b95be08645124595826a135c` |
+| `/tmp/nmaforge_closure_9d9e0f_clean/dv/subsystem/dma_spad/sim/R31_rready_64.log` | `c1d26a75b370a0934d5a79315e406e01d3cc3cc064fbb9061656b589cc981fdf` |
+| `/tmp/nmaforge_closure_9d9e0f_clean/dv/subsystem/dma_spad/sim/R31_rready_300.log` | `d17b5f76191d234e06396478cf18d780645a1cdb80e172c06cc7d5eee64ef447` |
+| `/tmp/nmaforge_pending_close_cnm_subsystem_9d9e0f/urg_full_7runs/dashboard.html` | `469e4f8d52752ae4924ae2c0a58c0a15547670a202d5c44294b179e2a861198a` |
+| `/tmp/nmaforge_pending_close_cnm_subsystem_9d9e0f/urg_full_7runs/groups.html` | `b8dea8f62b82f83742f04485dc6a57a09bd922d1e1f7206c7c4fc3b60991c52a` |
+| `/tmp/nmaforge_pending_close_cnm_subsystem_9d9e0f/urg_full_7runs/asserts.html` | `898125899fdad45584bc45372093487ca65788cc154cab37667397040fd64522` |
 | `/tmp/nmaforge_final_9d9e0f_uvm/seed_20261025/run.log` | `a720bd06f037dbfcc630238f590088e6897d8203813b37e2f15d67b8d893baaf` |
 | `/tmp/nmaforge_final_9d9e0f_uvm/seed_20261026/run.log` | `07c813dca528ad950f305affc8e9b749ec74c132a769ecb3f39020c3e7697647` |
 | `/tmp/nmaforge_final_9d9e0f_uvm/seed_20261027/run.log` | `1b205b967862b0c97e46d63f0ad420c10f0e62f28ae60f24ff49da38fe29396d` |

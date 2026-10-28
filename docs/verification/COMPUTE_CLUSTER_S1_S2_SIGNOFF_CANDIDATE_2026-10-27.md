@@ -15,8 +15,8 @@
 | Gate | Decision | Signed scope / hold reason |
 |---|---|---|
 | S1: 16×16 Matrix Block DV | **BOUNDED PASS** | Three-seed depth-4 functional/fault regression passed for the tested INT8 GEMM/batch/layout, prefetch/cache, parity/protection, abort/reset and recovery cases. Raw default-profile FSM remains 49/53; three guard/invariant edges now have scoped formal disposition, and the fourth profile edge is hit in a separate prefetch-disabled build. |
-| S2: Compute Cluster functional slice | **BOUNDED PASS** | Current-SHA clean three-seed real-top seven-engine UVM, 25/25 checker-sensitivity campaign, coordinated R/B reset/recovery, and v1.4 error-contract cases pass. The only unhit focused functional cover variable is completion response-client, explicitly WAIVED/N/A because the completion writer is write-only. |
-| S2: all 38 frozen REQ-CL/REQ-PC requirements | **HOLD** | Current RTM has 24 `PASS-SCOPED`, 14 `PARTIAL`, 0 `BLOCKED_SPEC`, and 0 `NOT_RUN`. Error ABI/priority/prefix SPEC blockers are removed; Matrix core accepted-read Abort/Reset drain and recovery pass R30. Non-Matrix top-level drain/restart, external-fabric qualification, partial Line WSTRB and broader legal fault/phase crosses remain open. This is not full Compute Cluster sign-off. |
+| S2: Compute Cluster functional slice | **BOUNDED PASS** | Current-SHA clean three-seed real-top seven-engine UVM, 25/25 checker-sensitivity campaign, coordinated R/B reset/recovery, v1.4 error-contract cases and R31 CNM/DMA-SPAD fault/backpressure slice pass. The top focused group remains 29/30; completion response-client is WAIVED/N/A because the completion writer is write-only. R31's separate 14 subsystem functional groups are all hit after 16/64/300-cycle RREADY and delayed-reset additions. |
+| S2: all 38 frozen REQ-CL/REQ-PC requirements | **HOLD** | Current RTM has 24 `PASS-SCOPED`, 14 `PARTIAL`, 0 `BLOCKED_SPEC`, and 0 `NOT_RUN`. Error ABI/priority/prefix SPEC blockers are removed; Matrix core drain/recovery passes R30 and selected CNM/DMA-SPAD Abort/Reset drain/recovery passes R31. Remaining full-Cluster engine drain/restart, external-fabric qualification, partial Line WSTRB and broader legal fault/phase crosses remain open. This is not full Compute Cluster sign-off. |
 | S3: complete NPU IP | **OUT OF SCOPE** | DMA/CMDQ-to-compute-to-CPLQ system E2E, complete system regression, and ASIC PPA are not covered by S1/S2 evidence. |
 
 `PASS-SCOPED` means the named requirement behavior was exercised and checked in
@@ -101,15 +101,15 @@ These runs close the exact-SHA repeatability, AXI assertion antecedent, and Matr
 
 ### Current candidate evidence (2026-10-28)
 
-The selected source SHA is `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9` (SPEC v1.4 Error ABI/priority/prefix implementation). Exact clean-worktree VCS replay passed the seven-engine top UVM on seeds `20261025/26/27`, the reset R/B slice, 25/25 checker-sensitivity mutations, Matrix formal guard checks and the two requested benchmarks. The RTM now records 24 PASS-SCOPED, 14 PARTIAL, 0 BLOCKED_SPEC and 0 NOT_RUN; no partial requirement is silently upgraded.
+The selected source SHA is `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9` (SPEC v1.4 Error ABI/priority/prefix implementation). Exact clean-worktree VCS replay passed the seven-engine top UVM on seeds `20261025/26/27`, the reset R/B slice, 25/25 checker-sensitivity mutations, Matrix formal guard checks, Matrix benchmarks, and R31's CNM/DMA-SPAD abort/reset and RREADY stress. The RTM records 24 PASS-SCOPED, 14 PARTIAL, 0 BLOCKED_SPEC and 0 NOT_RUN; no partial requirement is silently upgraded.
 
 - Error ABI, same-cycle priority and accepted-output prefix are now specified and implemented for the listed Engine causes. Three-seed directed CNM/Matrix/SFU/Conv/KV cases check selected simultaneous Abort/watchdog, code ownership and memory prefix. Full Engine × Fault × Phase × Reset coverage remains partial.
 - Matrix formal run R28 proves five non-vacuous assertions and reaches both `ST_PREFETCH_WAIT` and `ST_ERROR_DRAIN`. The default-profile FSM raw score remains 49/53; the separate no-prefetch profile hits `ST_MAC→ST_A_REQ`.
 - Matrix size benchmark passes 45/45; eight-way Depth/Prefetch/A-Cache ablation passes 120/120 over three seeds. The `32×32×64` workload improves from 1,698 to 1,187 cycles and cuts banked reads by 25% between baseline and the fully enabled configuration.
 - Real-top serial/staged/four-task parallel cycles are 1,239 / 1,070 / 1,137 (versus 1,696 serialized for four tasks), with ordered completions. They use the current production engines and behavioral scratchpad model.
-- Coordinated reset testing excludes stale R and B for a behavioral AXI responder. Matrix depth-4 accepted-read drain/recovery passes in R30. Other-engine top-level accepted-SPAD drain/restart and an actual external fabric implementation remain open integration evidence.
+- Coordinated reset testing excludes stale R and B for a behavioral AXI responder. Matrix depth-4 accepted-read drain/recovery passes in R30; selected CNM/DMA-SPAD accepted-read and prewrite reset recovery passes in R31. Remaining full-Cluster engine drain/restart and an actual external fabric implementation remain open integration evidence.
 
-Detailed Run IDs, tools, seeds and artifact paths are in [Execution RTM R24–R30](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md). These results support bounded S1/S2 review, not CL-DV-v1.0 or whole-NPU sign-off.
+Detailed Run IDs, tools, seeds and artifact paths are in [Execution RTM R24–R31](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md). These results support bounded S1/S2 review, not CL-DV-v1.0 or whole-NPU sign-off.
 
 ## Requirement disposition table
 
@@ -131,11 +131,11 @@ Detailed Run IDs, tools, seeds and artifact paths are in [Execution RTM R24–R3
 | REQ-CL-014 | PARTIAL | Backpressure and bounded progress observed; no full fairness/bound matrix for every engine. |
 | REQ-CL-015 | PARTIAL | Representative Golden tasks pass for all engines; not every opcode × shape × numeric class. |
 | REQ-CL-016 | PASS-SCOPED | Selected cross-engine task switching and stale-response checks pass. |
-| REQ-CL-017 | PARTIAL | Parity/protection/abort prefixes are checked in selected cases; R30 adds Matrix phase Abort and outstanding-response drain. Full engine × fault × phase prefix matrix is open. |
-| REQ-CL-018 | PARTIAL | Matrix block drain/reset recovery and active Matrix/SFU top reset have evidence; other-engine top integration and external-fabric reset/late-response contract remain open. |
-| REQ-CL-019 | PARTIAL | v1.4 freezes same-cycle priority and accepted-write prefix; R30 adds Matrix fault+Abort/Reset cases, but the full legal fault-pair/phase/reset matrix remains open. |
+| REQ-CL-017 | PARTIAL | Parity/protection/abort prefixes are checked in selected cases; R30 adds Matrix phase Abort/drain and R31 adds CNM parity during DMA abort, no result write and recovery. Full engine × fault × phase prefix matrix is open. |
+| REQ-CL-018 | PARTIAL | Matrix block drain/reset and selected CNM/DMA-SPAD accepted-read/prewrite reset recovery have evidence; remaining full-Cluster engine integration and external-fabric reset/late-response contract remain open. |
+| REQ-CL-019 | PARTIAL | v1.4 freezes same-cycle priority and accepted-write prefix; R30 adds Matrix fault+Abort/Reset and R31 adds CNM parity/abort with same-cycle and delayed reset, but the full legal fault-pair/phase/reset matrix remains open. |
 | REQ-CL-020 | PARTIAL | Selected signed INT8 VDOT/GEMM numerics pass; complete opcode, saturation and boundary matrix is not closed. |
-| REQ-CL-021 | PASS-SCOPED | Four-bank CNM address/response ledger and selected GEMV Golden/parity cases pass. |
+| REQ-CL-021 | PASS-SCOPED | Four-bank CNM address/response ledger and selected GEMV Golden/parity cases pass; R31 also sweeps K={1,2,8,9} × M={2,3,4} and four lane parity under DMA contention. |
 | REQ-CL-022 | PASS-SCOPED | `MATRIX-S1-DEPTH4-3S`: 18 Golden/layout and 34 fault/recovery cases per seed; 16×16 profile covered. Broader option space and line WSTRB remain open. |
 | REQ-CL-023 | PASS-SCOPED | v1.3 freezes SFU integer arithmetic; 192/192 selected edge vectors are bit-exact over three seeds. Other legal length/address combinations remain outside that campaign. |
 | REQ-CL-024 | PASS-SCOPED | `CNN-KV-RAND-3S`: both Conv3x3 and depthwise opcodes; 25 convolution cases/seed across 3–6 row/column shapes; every valid-window output checked against an independent signed oracle under ready stalls and 0–7-cycle responses. Widths above 6 remain outside this run. |
@@ -148,11 +148,11 @@ Detailed Run IDs, tools, seeds and artifact paths are in [Execution RTM R24–R3
 | REQ-PC-003 | PASS-SCOPED | Selected CMDQ dispatch and CPLQ retirement order checks pass. |
 | REQ-PC-004 | PASS-SCOPED | Selected variable-latency/full-queue hold and ordered retirement checks pass. |
 | REQ-PC-005 | PASS-SCOPED | Simultaneous engine Done and distinct completion records are checked. |
-| REQ-PC-006 | PARTIAL | Shared mux ownership, selected ready stalls and response/error routing pass; complete requester/error/backpressure matrix remains open. |
-| REQ-PC-007 | PARTIAL | Matrix/CNM separate tags, four CNM lanes and response ledger pass in selected real-top cases; full line/banked fault/backpressure sweep remains open. |
+| REQ-PC-006 | PARTIAL | Shared mux ownership, selected ready stalls and response/error routing pass; R31 adds CNM/FP-versus-DMA contention and 16/64/300-cycle DMA RREADY stalls. Complete requester/error/backpressure matrix remains open. |
+| REQ-PC-007 | PARTIAL | Matrix/CNM separate tags, four CNM lanes and response ledger pass; R31 covers four-lane CNM parity under DMA contention. Full integrated line/banked fault/backpressure sweep remains open. |
 | REQ-PC-008 | PASS-SCOPED | `CLUSTER-SHARED-RO-3S`: scalar VDOT and SFU GELU concurrently read the same immutable 64-word SPAD region, with distinct Golden-checked destinations/completions. Conflicting write aliases remain excluded by software contract. |
 | REQ-PC-009 | PASS-SCOPED | Multi-engine abort stops selected dispatch and drains ordered completions; broader active-engine combinations remain open. |
-| REQ-PC-010 | PASS-SCOPED | `CLUSTER-S2-UVM-3S-FA2B`: active Matrix/SFU reset dropped two already-accepted reads per seed; no stale/orphan response or old completion/writeback appeared, SRAM sentinels were retained, and a fresh post-reset task completed. Other reset phases/engines remain outside this scope. |
+| REQ-PC-010 | PASS-SCOPED | `CLUSTER-S2-UVM-3S-FA2B` and R31: active Matrix/SFU reset dropped two accepted reads per seed; R31 resets CNM and DMA during accepted-read/prewrite phases and checks clean recovery. No stale/orphan response or old completion/writeback appeared in the tested scopes. Other Cluster reset phases and external-fabric qualification remain open. |
 
 ## Reproducible clean-SHA runs
 
@@ -225,23 +225,25 @@ is not being presented as 100% closed.
 
 ## Not covered by this sign-off candidate
 
-- The other 13 partial and 2 blocked requirements in the table.
+- The 14 partial requirements in the table; there are 0 `BLOCKED_SPEC` and 0 `NOT_RUN` rows.
 - Full all-opcode × shape × numeric-class closure and full legal fault × phase
   × engine × abort/reset cross.
 - Partial Matrix line WSTRB and all `OPEN-CL-*` / `OPEN-NUM-*` dispositions.
 - Formal Matrix reachability proof, ASIC synthesis/PPA, and post-layout timing.
 - Full DMA/CMDQ/compute/CPLQ system sign-off or pretrained model deployment.
 
-The next S2 closure action is to resolve `OPEN-CL-002/003/004/006/007` and
-`OPEN-NUM-01/02`, then add targeted testpoints for each now-legal P0 bin. Keep
+The next S2 closure action is to resolve `OPEN-CL-002/003/004`, `CL-COV-006`,
+and `OPEN-NUM-01/02`, then add targeted testpoints for each remaining legal P0 bin. Keep
 the existing `PASS-SCOPED` evidence and add explicit `WAIVED` or `BLOCKED_SPEC`
 dispositions only when approved by the relevant design owner.
 
 The requested current-checkout CNM retry on 2026-10-27 did not start compiling:
 VCS could not connect to the configured license server, including with a
-bounded `-licwait 1` retry. This is a new `BLOCKED_ENV` attempt, not a CNM test
-failure and not additional PASS evidence. Earlier archived CNM runs remain
-historical evidence; this retry is not counted in the 23 `PASS-SCOPED` tally.
+bounded `-licwait 1` retry. That historical attempt is `BLOCKED_ENV`, not a DUT
+failure. After license recovery, exact-candidate R31 ran the CNM/DMA-SPAD
+subsystem from the clean `9d9e0f0` worktree and passed the scoped cases listed
+in the Execution RTM. It is included in the current 24/14 disposition and is
+not inferred from the earlier archived CNM runs.
 
 ## Exact-candidate clean replay after license recovery
 

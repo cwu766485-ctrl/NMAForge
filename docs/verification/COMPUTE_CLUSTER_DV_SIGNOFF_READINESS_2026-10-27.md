@@ -17,8 +17,8 @@
 ## Version and history review
 
 - Selected candidate source is `9d9e0f0`; the preceding evidence baseline was `c0832e5`. Commit `9d9e0f0` changes RTL error constants in Conv/KV/SFU to match the v1.4 cause table and adds directed checker tests. Current evidence replay used the exact commit in a detached clean worktree; the follow-on evidence report commit changes only documentation.
-- Earlier runs R14–R23 remain useful historical evidence; R24–R30 add current-source priority/error tests, clean top UVM, mutation, coordinated reset, Matrix accepted-read drain/recovery, formal guards and Matrix benchmarks. R19 uses the prior candidate's product RTL with local benchmark-only TB additions and a pinned TinyNPU reference.
-- SPEC v1.1 freezes the 38 `REQ-CL`/`REQ-PC` contracts; v1.2 defines coordinated reset/epoch expectations; v1.3 freezes SFU integer arithmetic; v1.4 freezes seven-engine Error ABI, simultaneous-fault priority and accepted-write prefix. `OPEN-CL-006/007` are closed as specification issues. `OPEN-CL-003` remains for non-Matrix top-level drain/restart evidence and target external-fabric qualification; `OPEN-CL-002/004`, scalar `OPEN-NUM-01`, and legal cross coverage remain open. A frozen SPEC is not requirement verification closure.
+- Earlier runs R14–R23 remain useful historical evidence; R24–R31 add current-source priority/error tests, clean top UVM, mutation, coordinated reset, Matrix and CNM/DMA-SPAD accepted-read drain/recovery, formal guards, Matrix benchmarks and RREADY stall stress. R19 uses the prior candidate's product RTL with local benchmark-only TB additions and a pinned TinyNPU reference.
+- SPEC v1.1 freezes the 38 `REQ-CL`/`REQ-PC` contracts; v1.2 defines coordinated reset/epoch expectations; v1.3 freezes SFU integer arithmetic; v1.4 freezes seven-engine Error ABI, simultaneous-fault priority and accepted-write prefix. `OPEN-CL-006/007` are closed as specification issues. `OPEN-CL-003` remains for remaining full-Cluster engine drain/restart evidence and target external-fabric qualification; Matrix and selected CNM/DMA-SPAD slices have evidence. `OPEN-CL-002/004`, scalar `OPEN-NUM-01`, and legal cross coverage remain open. A frozen SPEC is not requirement verification closure.
 - The original `READY` rows in the UVM Testplan remain planning/status-history and are not execution evidence; use the RTM run IDs and artifacts below.
 
 ## Verification evidence review
@@ -30,6 +30,7 @@ The controlling detailed record is the [Execution RTM](COMPUTE_CLUSTER_EXECUTION
 - Request stability observations across seven engines and four CNM lanes. The selected top UVM has no Matrix line-write stall samples; that bin remains open.
 - A selected 14-case parity cross per seed (42/42 aggregate), active Matrix/SFU abort/reset recovery, and exact-candidate 25/25 passive observation-mutation campaign for address, data, owner, WSTRB, and per-engine Done/missing/duplicate completion.
 - Conv/depthwise and KV three-seed block regressions, FP two-seed 596/596 bit-exact regression, Matrix depth-4 and no-prefetch profile regressions, three-seed 45/45 Matrix size sweep, and three-seed 120/120 eight-configuration ablation.
+- R31 real CNM + DMA/SPAD subsystem: three seeds plus a directed delayed-reset run; CNM abort/read-drain/recovery, reset during accepted-read and prewrite phases, four-lane parity under DMA contention, parity during DMA abort plus shared reset, and 16/64/300-cycle AXI RREADY stress. Merged URG hits 100% of the 14 functional groups in this subsystem-only campaign; this is not full-Cluster functional coverage or DUT code coverage.
 - A 16-seed exact-candidate DMA/FP E2E run with real AXI stalls and response gaps, which closes the prior AR/AW/W SVA non-vacuity gap for that traffic profile.
 - The current-source clean SHA replay adds 4,946 accepted writes and 5,256 checked words per top-UVM seed, with zero mismatch/unknown/stale/orphan responses; coordinated reset drops old AR/R and AW/W/B responses in the behavioral model and a post-reset recovery read passes.
 - Current-source Matrix benchmarks pass 45/45 size points and 120/120 ablation points across seeds `20261025/26/27`; the production top measures serial, staged and four-task parallel cycle counts on the same real-engine workloads.
@@ -49,12 +50,21 @@ URG for the three-seed top UVM reports 22 assertion properties: 17 successes, 5 
 
 This shows that SVA ports are connected and there are no current omitted-port warnings. R15 closes the prior AXI assertion-antecedent gap for its actual DDR E2E traffic. Whole-top URG code percentages mix DUT, checker, testbench, and UVM; they are not reported as DUT-only closure.
 
+R31's separate DMA/SPAD subsystem URG reports 28/31 assertion properties with
+real successes, zero failures and zero incomplete attempts. One property,
+`ap_banked_response_tag`, has no real success because this subsystem harness
+does not instantiate a Matrix/banked requester; this is a harness scope gap,
+not evidence that the property is proven. Two UVM RAL properties have no
+attempts and are outside this subsystem's compute protocol. The connected
+Matrix/CNM top owner checks and Matrix block read metadata tests are tracked
+separately in the RTM.
+
 ## Required review outcomes
 
 1. Review the dispositions and evidence paths for all 38 requirements in the RTM (24 PASS-SCOPED / 14 PARTIAL; no BLOCKED_SPEC or NOT_RUN).
-2. SPEC v1.4 removes the Error ABI and priority specification blockers. Review the remaining P0 integration evidence gap for actual external-fabric reset compliance and non-Matrix top-level drain/restart before CL-DV-v1.0 acceptance; Matrix core outstanding-read drain/recovery is covered by R30.
+2. SPEC v1.4 removes the Error ABI and priority specification blockers. Review the remaining P0 integration evidence gap for actual external-fabric reset compliance and full-Cluster drain/restart of engines outside the R30 Matrix-core and R31 CNM/DMA-SPAD slices before CL-DV-v1.0 acceptance.
 3. Keep the Matrix residual transition record bounded: retain raw default-profile 49/53, identify the separate prefetch-disabled edge, and retain the five-proposition formal assumptions and two reachability covers. Do not force illegal events to hit bins.
-4. Current-source replay and selected supplemental campaigns are indexed as `R24`–`R30` in the [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md); exact commands, tool versions and selected raw-artifact hashes are in the [current-candidate replay manifest](COMPUTE_CLUSTER_FINAL_9D9E0F_MANIFEST_2026-10-28.md). R19 remains the bounded TinyNPU matched-workload run with its separate benchmark manifest.
+4. Current-source replay and selected supplemental campaigns are indexed as `R24`–`R31` in the [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md); exact commands, tool versions and selected raw-artifact hashes are in the [current-candidate replay manifest](COMPUTE_CLUSTER_FINAL_9D9E0F_MANIFEST_2026-10-28.md). R19 remains the bounded TinyNPU matched-workload run with its separate benchmark manifest.
 5. Do not extend this Functional DV review into an overall NPU sign-off claim.
 
 See the [remaining Open Issues](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md) and [TinyNPU benchmark report](COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md).
