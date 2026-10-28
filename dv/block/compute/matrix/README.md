@@ -11,6 +11,8 @@ make -C dv/block/compute/matrix/sim array-random-regress \
   ARRAY_SIZES='8 16' ARRAY_SEEDS='20261025 20261026 20261027' \
   ARRAY_OUT_DIR=/tmp/nmaforge_matrix_array_multi_seed
 make -C dv/block/compute/matrix/sim a3-core-test
+make -C dv/block/compute/matrix/formal fsm-guards \
+  OUT=/tmp/nmaforge_matrix_fsm_formal
 ```
 
 `datapath-random-regress` checks 10,072 deterministic/random combinations per
@@ -45,6 +47,19 @@ accumulator checks, ping-pong load/MAC overlap, and positive/negative INT32
 saturation. Each seed passes 4/4 arithmetic cases, 25 overlapped buffer loads,
 two saturation checks, and 100% functional group coverage. DUT-only URG reports
 100% line, 100% condition, 94.12% branch, and no FSM for both parameter sizes.
+
+`formal/fsm-guards` runs VC Formal against the production 16×16 Matrix core
+(`MAX_OUTSTANDING_READS=4`, A-cache and next-K prefetch enabled). It assumes a
+single legal 4×4×3 descriptor and that a banked response has an accepted-read
+owner; reset, abort, watchdog, request/response timing and legal fault inputs
+remain unconstrained. The 2026-10-28 run with VC Formal V-2023.12-SP2 proved
+five non-vacuous properties and covered both `ST_PREFETCH_WAIT` and
+`ST_ERROR_DRAIN`: no outstanding read in IDLE/ERROR, no default-profile
+`ST_PREFETCH_WAIT→ST_A_REQ`, and no `IDLE/ERROR→ST_ERROR_DRAIN` transition.
+This is a legal-state guard disposition, not full FSM transition closure and
+does not force internal states or unowned responses. The separate
+three-seed no-prefetch regression covers the compile-time fallback profile.
+Run logs: `/tmp/nmaforge_matrix_fsm_signoff_20261028/vc_formal.log`.
 
 The 8×8/16×16 block accepts complete A and B vectors at its local-buffer
 interface. It does not yet implement large-tile address generation, SPAD
