@@ -15,7 +15,7 @@
 | Gate | Decision | Signed scope / hold reason |
 |---|---|---|
 | S1: 16×16 Matrix Block DV | **BOUNDED PASS** | Three-seed depth-4 functional/fault regression passed for the tested INT8 GEMM/batch/layout, prefetch/cache, parity/protection, abort/reset and recovery cases. Raw default-profile FSM remains 49/53; three guard/invariant edges now have scoped formal disposition, and the fourth profile edge is hit in a separate prefetch-disabled build. |
-| S2: Compute Cluster functional slice | **BOUNDED PASS** | Current-SHA clean three-seed real-top seven-engine UVM, R32 accepted-read reset sweep across all seven engines, 25/25 checker-sensitivity campaign, coordinated R/B reset/recovery, v1.4 error-contract cases and R31 CNM/DMA-SPAD fault/backpressure slice pass. Focused coverage remains 29/30 variables (98.96%, rounded runtime marker 99.0%); completion response-client is WAIVED/N/A because the writer is write-only. R31's separate 14 subsystem functional groups are all hit after 16/64/300-cycle RREADY and delayed-reset additions. |
+| S2: Compute Cluster functional slice | **BOUNDED PASS** | Current-SHA clean three-seed real-top seven-engine UVM, R32 accepted-read reset sweep across all seven engines, R33 focused testpoint coverage at 100% of applicable bins, 25/25 checker-sensitivity campaign, coordinated R/B reset/recovery, v1.4 error-contract cases and R31 CNM/DMA-SPAD fault/backpressure slice pass. Historical raw coverage was 29/30 variables (98.96%); the sole completion-read response bin is explicitly excluded as structural N/A for the write-only writer and remains checked at zero. R31's separate 14 subsystem functional groups are all hit after 16/64/300-cycle RREADY and delayed-reset additions. |
 | S2: all 38 frozen REQ-CL/REQ-PC requirements | **HOLD** | Current RTM has 24 `PASS-SCOPED`, 14 `PARTIAL`, 0 `BLOCKED_SPEC`, and 0 `NOT_RUN`. Error ABI/priority/prefix SPEC blockers are removed; Matrix core drain/recovery passes R30, selected CNM/DMA-SPAD Abort/Reset drain/recovery passes R31, and R32 resets each production engine after an accepted read. Actual external-fabric qualification, partial Line WSTRB and broader legal fault/phase crosses remain open. This is not full Compute Cluster sign-off. |
 | S3: complete NPU IP | **OUT OF SCOPE** | DMA/CMDQ-to-compute-to-CPLQ system E2E, complete system regression, and ASIC PPA are not covered by S1/S2 evidence. |
 
@@ -215,10 +215,12 @@ scalar engine is busy; concurrent scalar/SFU access to one shared read-only
 SPAD region; and stalled request-payload stability. All passed in all three
 seeds. Per seed, stall observations were engine mask `1110111`, Matrix banked
 338 checks, and 30 checks on each of four CNM lanes; the Matrix line-write
-stall class had zero samples in this workload. The response-client group
-remains raw 98.96% (29/30 variables); its sole uncovered completion-read bin
-is waived/N/A because the completion writer is write-only, while DMA read
-response was observed. UVM compile had no `Warning`, `Error`, or `TFIPC` text.
+stall class had zero samples in this workload. Before R33, the response-client
+group was raw 98.96% (29/30 variables). R33's clean replay reports 29/29
+applicable variables (100.00%); URG lists the completion-read bin as excluded
+N/A with zero hits, and the test keeps the zero-read guard while observing DMA
+read response. This is focused-group coverage, not full requirement closure.
+UVM compile had no `Warning`, `Error`, or `TFIPC` text.
 
 The four Matrix `state_r` transition misses remain as reviewed dispositions in
 the S1 table: one is exercised in the separate no-prefetch profile; one is
@@ -266,9 +268,12 @@ make -C dv/uvm/sim uvm_compute_cluster_regress \
 The command and URG merge exited `0`. All three seeds emitted
 `COMPUTE_CLUSTER_REAL_UVM_PASS`, with UVM warning/error/fatal `0/0/0`. The
 accepted-transaction memory scoreboard checked 5,256 words per seed with no
-mismatch, unknown read, stale epoch or orphan response. Focused compute coverage
-is 29/30 variables (`98.96%`). Compile has no warning/error or `[TFIPC]`
-diagnostic. URG has 22 assertions: 17 successes, 5 uncovered, zero
+mismatch, unknown read, stale epoch or orphan response. In that historical
+R14 run, focused compute coverage was 29/30 variables (`98.96%`). R33 adds the
+current focused testpoint closure at 29/29 applicable variables (`100.00%`),
+with the write-only completion-read response explicitly excluded and guarded
+at zero. Compile has no warning/error or `[TFIPC]` diagnostic. URG has 22
+assertions: 17 successes, 5 uncovered, zero
 failure/incomplete; AR/AW stall cover properties remain unhit. Exact logs,
 checksums and the assertion/group reports are in
 `/tmp/nmaforge_signoff_clean_c0832e5_20261027/` and summarized as R14 in the

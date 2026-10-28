@@ -8,11 +8,13 @@
 > words with zero mismatch/unknown/stale/orphan response, `reset_dropped=9`,
 > and UVM severity `0/0/0`. All seven real production engines were reset
 > after an accepted SPAD read, and destination/completion sentinels were
-> preserved. RTM remains 24 PASS-SCOPED / 14 PARTIAL / 0 BLOCKED_SPEC /
-> 0 NOT_RUN. The focused coverage marker is 99.0% rounded; completion
-> read-response is N/A for the write-only completion writer. This does not
-> close partial Line WSTRB, legal fault/reset crosses, or target external
-> fabric qualification. The older dated rows below are retained as history;
+> preserved. R33 clean test commit `cb9717eb853dc507f4a7e4d188c7bd840160c955`
+> reports 100% applicable focused testpoint coverage (URG 29/29 expected
+> variables); the completion-read response bin is explicitly excluded as N/A
+> and remains checked at zero. The historical raw score is 29/30 (98.96%).
+> RTM remains 24 PASS-SCOPED / 14 PARTIAL / 0 BLOCKED_SPEC / 0 NOT_RUN.
+> This does not close partial Line WSTRB, legal fault/reset crosses, or target
+> external-fabric qualification. The older dated rows below are retained as history;
 > current disposition and artifacts are in the
 > [Execution RTM](../docs/verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
 
