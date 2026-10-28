@@ -85,6 +85,7 @@ def softmax_q15(scores_q8_8: list[int]) -> list[int]:
 def rmsnorm_q15(values: list[int], gamma_q15: list[int], epsilon: int = 1) -> list[int]:
     if not values or len(values) != len(gamma_q15):
         raise ValueError("RMSNorm input and gamma lengths must match and be non-zero")
+    epsilon = 1 if epsilon == 0 else epsilon
     mean_square = sum(value * value for value in values) // len(values)
     root = math.isqrt(mean_square + epsilon)
     root = max(root, 1)
@@ -107,6 +108,7 @@ def layernorm_q15(
         beta = [0] * len(values)
     if len(beta) != len(values):
         raise ValueError("LayerNorm beta length must match input")
+    epsilon = 1 if epsilon == 0 else epsilon
     mean = trunc_div(sum(values), len(values))
     variance = sum((value - mean) ** 2 for value in values) // len(values)
     root = max(math.isqrt(variance + epsilon), 1)

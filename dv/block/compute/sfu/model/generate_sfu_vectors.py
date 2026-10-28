@@ -32,7 +32,8 @@ def build_case(rng: random.Random, name: str, length: int, case_id: int):
     shift = SHIFT_BOUNDARIES[case_id % len(SHIFT_BOUNDARIES)] \
         if name in ("residual", "requant") else 0
     epsilon = rng.randrange(1, 17)
-    beta_enable = int(name == "layernorm" and bool(case_id & 1))
+    beta_enable = int(name == "layernorm" and
+                      (bool(case_id & 1) or length in (3, 16)))
     packed = int(name == "requant" and bool(case_id & 1))
     # Query token is a zero-based inclusive causal boundary.  Exercise token
     # zero at singleton and non-trivial lengths; the remaining cases cover
@@ -42,6 +43,9 @@ def build_case(rng: random.Random, name: str, length: int, case_id: int):
 
     if name in ("softmax", "causal_softmax"):
         x = [rng.randint(-4096, 4096) for _ in range(length)]
+        if length == 16:
+            x[:16] = [32767, -32768, -32767, -3841, -3840, -3839, -256, -1,
+                      0, 1, 255, 256, 32766, 32767, -32768, 0]
         if name == "softmax":
             expected = ref.softmax_q15(x)
         else:
@@ -54,16 +58,35 @@ def build_case(rng: random.Random, name: str, length: int, case_id: int):
         x = [rng.randint(-8192, 8192) for _ in range(length)]
         y = [rng.randint(-32768, 32767) for _ in range(length)]
         beta = [0] * length
+        if length == 3:
+            x[:3] = [1, 2, 2]  # mean-square 3 distinguishes epsilon 0 from 1.
+            y[:3] = [32767, -32768, 16384]
+            epsilon = 0  # RTL normalizes this to one raw variance unit.
+        elif length == 16:
+            x[:8] = [-32768, 32767, -32767, -1, 0, 1, -8192, 8191]
         expected = ref.rmsnorm_q15(x, y, epsilon=epsilon)
     elif name == "layernorm":
         x = [rng.randint(-8192, 8192) for _ in range(length)]
         y = [rng.randint(-32768, 32767) for _ in range(length)]
         beta = [rng.randint(-32, 32) if beta_enable else 0 for _ in range(length)]
+        if length == 3:
+            x[:3] = [0, 1, 4]  # population variance 3 distinguishes epsilon 0 from 1.
+            y[:3] = [32767, -32768, 16384]
+            beta[:3] = [0, (1 << 31) - 1, -(1 << 31)]
+            epsilon = 0
+        elif length == 16:
+            x[:8] = [-32768, 32767, -32767, -1, 0, 1, -8192, 8191]
+            beta[:8] = [-(1 << 31), (1 << 31) - 1, -1, 0, 1, -32, 32, 0]
         expected = ref.layernorm_q15(x, y, beta, epsilon=epsilon)
     elif name == "residual":
         x = [rng.randint(-(1 << 31), (1 << 31) - 1) for _ in range(length)]
         y = [rng.randint(-(1 << 31), (1 << 31) - 1) for _ in range(length)]
         beta = [0] * length
+        if length == 16:
+            x[:8] = [-(1 << 31), (1 << 31) - 1, -1, 1,
+                     -(1 << 31), (1 << 31) - 1, -12345, 12345]
+            y[:8] = [-(1 << 31), 1, -1, -1,
+                     (1 << 31) - 1, 1, 12345, -12345]
         expected = ref.residual_i32(x, y, shift)
     elif name == "gelu":
         x = [rng.randint(-2048, 2048) for _ in range(length)]
@@ -85,6 +108,9 @@ def build_case(rng: random.Random, name: str, length: int, case_id: int):
         x = [rng.randint(-(1 << 31), (1 << 31) - 1) for _ in range(length)]
         y = [0] * length
         beta = [0] * length
+        if length == 16:
+            x[:10] = [-(1 << 31), -129, -128, -127, -1, 0, 1, 126, 127, 128]
+            x[10:16] = [129, (1 << 31) - 1, -256, 255, -32768, 32767]
         expected = ref.requant_i8(x, shift)
     else:
         raise AssertionError(name)
