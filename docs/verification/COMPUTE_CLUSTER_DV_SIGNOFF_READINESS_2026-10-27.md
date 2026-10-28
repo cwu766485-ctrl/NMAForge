@@ -19,7 +19,7 @@
 - HEAD at review: `c0832e5` → `fa2b4dd` → `c83ad74` → `f2457ef` → `f46e5a0` → `03bf257` → `a05e030` → `827c005`.
 - Selected candidate is `c0832e5`; runtime-affecting changes are limited to DV monitor/sequence/Makefile/testbench files; product RTL is byte-identical to its parent. R14 is the SHA-stamped clean-worktree replay; R15–R18 ran from the same detached candidate source with no tracked source changes. R19 runs the candidate product RTL with local benchmark-only TB additions; TinyNPU was pinned separately and simulated with a documented functional primitive surrogate.
 - `c83ad7463265062d4edb84d57fe4ada8195f9b10` is the detached clean worktree SHA for the focused 2026-10-27 Matrix/S2 campaign. Older fixed-SHA replay at `827c0052cf589fde676e93e34bf459188956182f` covers an earlier selected slice. R14 in the RTM now supplies the exact clean replay for selected candidate `c0832e5`.
-- SPEC v1.1 freezes the 38 `REQ-CL`/`REQ-PC` contracts and the legal parallel-dispatch/shared-SPAD assumptions, but explicitly retains `OPEN-CL-002/003/004/006/007` and `OPEN-NUM-01/02`. A frozen SPEC is not the same as requirement verification closure.
+- SPEC v1.1 freezes the 38 `REQ-CL`/`REQ-PC` contracts; v1.2 adds the coordinated reset/epoch boundary for accepted external AXI traffic. `OPEN-CL-003` remains for non-FP outstanding depth, Abort drain/restart and outstanding B-response exclusion; `OPEN-CL-002/004/006/007` and `OPEN-NUM-01/02` also remain. A frozen SPEC is not the same as requirement verification closure.
 - The original `READY` rows in the UVM Testplan remain planning/status-history and are not execution evidence; use the RTM run IDs and artifacts below.
 
 ## Verification evidence review

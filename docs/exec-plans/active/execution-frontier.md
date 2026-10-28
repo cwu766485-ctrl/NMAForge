@@ -1,8 +1,8 @@
 # NMAForge execution frontier
 
-Updated: 2026-10-21. This is a short handoff for the next engineering task; it
-does not duplicate per-run evidence. The checkout is currently modified, so
-results from the present session must not be described as a clean-SHA replay.
+Updated: 2026-10-28. This is a short handoff for the next engineering task; it
+does not duplicate per-run evidence. The current Compute Cluster sign-off and
+benchmark work is tracked in the execution RTM and open-issue report.
 
 ## Project baseline
 
@@ -18,8 +18,9 @@ Key architecture rules:
 - Completion commits all four words before advancing the completion tail.
 - AXI valid/ready, ID, LAST, back-pressure, reset, and abort-drain behavior
   must remain protocol-correct.
-- Compute commands dispatch serially. The command-processor and compute-cluster
-  formal runs verify this contract; parallel engine launch is unsupported.
+- Ordinary compute descriptors can overlap across engines through
+  `ai_parallel_compute_dispatcher`; each engine has one active slot and
+  completions retire in CMDQ order. See the Compute Cluster SPEC v1.1.
 
 ## Current verification frontier
 
@@ -32,14 +33,13 @@ Key architecture rules:
 
 ## Next work
 
-1. Freeze the reviewed source and test manifest, then rerun required gates on
-   one clean SHA. Preserve the current dirty-tree evidence separately.
-2. Continue the FP parity-to-writeback proof from the [FP formal frontier](../../../dv/block/compute/fp/formal/README.md); an inconclusive timeout is not a pass.
-3. Review per-module raw code-coverage residuals and add targeted stimulus or
-   proof for justified gaps. Current compute statistics are in the status page.
-4. Expand cross-layer fault × abort × reset and queue/completion recovery only
-   where the RTM identifies a missing requirement.
-5. Keep LEC, DFT, post-layout PPA, and board results as separate closure gates.
+1. Close the remaining Compute Cluster P0/P1 items in the
+   [execution RTM](../../verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)
+   and [open-issue report](../../verification/COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md).
+2. Freeze the reviewed source and test manifest, then replay required gates on
+   one clean SHA. Do not treat the current-tree reset evidence as clean-SHA replay.
+3. Continue the FP parity-to-writeback proof from the [FP formal frontier](../../../dv/block/compute/fp/formal/README.md); an inconclusive timeout is not a pass.
+4. Keep LEC, DFT, post-layout PPA, and board results as separate closure gates.
 
 ## Canonical commands
 

@@ -86,6 +86,8 @@ class ai_mixed_precision_ddr_e2e_test extends ai_base_test;
             `uvm_error("MIXED_E2E_COVERAGE", "sequence did not verify reset during active compute")
         else if (!seq.active_dma_reset_checked)
             `uvm_error("MIXED_E2E_COVERAGE", "sequence did not verify coordinated reset with an outstanding DMA read")
+        else if (!seq.reset_fabric_contract_checked)
+            `uvm_error("MIXED_E2E_COVERAGE", "sequence did not verify old-epoch response exclusion after coordinated reset")
         else if (!seq.independent_ddr_reset_recovery_checked)
             `uvm_error("MIXED_E2E_COVERAGE", "sequence did not verify DDR service/recovery across accelerator-only reset")
         else if (!seq.fp_watchdog_completion_checked)

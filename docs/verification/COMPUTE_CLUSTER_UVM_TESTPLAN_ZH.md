@@ -75,7 +75,7 @@ remaining C1 closure
 | REQ-CL-015 | 正常执行完整性 | 每Opcode数值正确、合法写回、唯一done；`tc_cl_normal_all_ops` | per-op Oracle + memory result checker | `opcode × shape × numeric_class` | P0 READY |
 | REQ-CL-016 | 跨Engine切换 | FP→Matrix→CNM→SFU等连续任务防迟到污染；`tc_cl_engine_switch` | owner tracker + stale-response checker | `prev_engine × next_engine × spacing` | P0 READY |
 | REQ-CL-017 | 错误后写入前缀 | Parity/Protection/Watchdog/Abort已接受写入正确；`tc_cl_error_prefix` | prefix-memory scoreboard + error model | `engine × fault × phase` | P0 PARTIAL_SPEC |
-| REQ-CL-018 | 复位隔离 | Reset后不泄漏Done/写；旧读响应正确丢弃；`tc_cl_reset_stale` | reset epoch ledger / post-reset memory monitor | `engine × reset_phase × pending_reads` | P0 PARTIAL_SPEC |
+| REQ-CL-018 | 复位隔离 | Reset后不泄漏Done/写；旧读响应正确丢弃；`tc_cl_reset_stale` | reset epoch ledger / post-reset memory monitor | `engine × reset_phase × pending_reads` | P0 PARTIAL；REQ-PC-010 的协调式 AXI read reset 合同已冻结并定向通过；非 FP abort/reset phase 与 AXI B 旧响应仍 OPEN |
 | REQ-CL-019 | 同时异常恢复 | Abort/Reset及其它异常的合法交错；`tc_cl_fault_races` | fault priority oracle + owner monitor | `engine × fault_pair × phase` | P1 BLOCKED_SPEC |
 | REQ-CL-020 | Scalar INT8 | Signed 4lane packed VDOT/GEMV/GEMM/legacyConv,算术边界；`tc_cl_scalar_numeric` | independent bit-exact integer model | `opcode × sign_pattern × saturation` | P0 READY |
 | REQ-CL-021 | CNM numerics | 4Bank局部ACC/global reduction, K/M边界；`tc_cl_cnm_numeric` | bank-aware integer golden + memory compare | `op × K × M × bank_phase` | P0 READY |
@@ -100,7 +100,7 @@ remaining C1 closure
 | REQ-PC-007 | CNM lane 与 Matrix banked/line 通路独立 | per-bank/line monitor 和 response scoreboard | CNM three-seed block regression + 2026-10-26 real top UVM 检查四 lane 地址/response ledger、Matrix/CNM tag 和独立 Golden；更广的 fault/backpressure 与完整 per-bank/line UVM 仍 OPEN |
 | REQ-PC-008 | 并发任务共享只读区、输出区彼此隔离 | 真实 memory image scoreboard；配置非法别名为 out-of-contract | C0-P 未覆盖，待 C1 |
 | REQ-PC-009 | 多 Engine active 时 abort 停止后续派发并有序 drain | 两 active + 一个 fetch 延迟任务；检查 no-new-launch、三笔 ERR_ABORT FIFO、idle | C0-P UVM 3 seeds PASS |
-| REQ-PC-010 | active reset 与 requester error 组合后清空 slot/owner/FIFO | 已接受的 SPAD read 挂起 owner error 时 reset；检查旧响应/错误丢弃与 recovery completion | C0-P UVM 3 seeds PASS；外部 SRAM reset contract仍需 C1 |
+| REQ-PC-010 | active reset 与 requester error 组合后清空 slot/owner/FIFO；外部 AXI reset 按 epoch 隔离 | 已接受 AR 且 R 延迟时同时 reset accelerator/fabric；检查 fabric queue/active/RVALID 清空，8 周期无旧 R 或新 AR，再检查 SPAD sentinel 与 reset 后恢复 | `CC-RESET-FABRIC-UVM-20261028-1022` PASS；行为 responder 的 R 路径已验证；真实集成 fabric 与 outstanding B 路径仍须按平台契约审查 |
 
 ## 3. Coverage Model 与 Cross 设计
 
@@ -374,7 +374,7 @@ make -C dv/uvm/sim uvm_compute_cluster_regress \
 | Issue | 影响需求 | 计划处理/状态 |
 |---|---|---|
 | OPEN-CL-006 — Error ABI | REQ-CL-017/019/027 | 全局统一码 BLOCKED_SPEC；现有 per-engine 原始码 subset READY |
-| OPEN-CL-003 — Abort/Reset Drain | REQ-CL-007/014/016/018/019、REQ-PC-009/010 | Abort 合同已由 v1.1 REQ-PC-009 定义；Reset 下外部 responder 的 late response 隔离边界仍需实测/设计 review |
+| OPEN-CL-003 — Abort/Reset Drain | REQ-CL-007/014/016/018/019、REQ-PC-009/010 | v1.2 已冻结协调式 AXI reset/epoch 边界，`CC-RESET-FABRIC-UVM-20261028-1022` 验证已接受 AR 后无旧 R 泄漏；非 FP outstanding 深度、Abort drain/restart 与 AXI B 旧响应仍 OPEN |
 | OPEN-CL-002 — 参数合法范围 | REQ-CL-004/005/020~025 | 子模型按 validator/engine 各自边界；未核实组合 BLOCKED_SPEC |
 | OPEN-CL-004 — Matrix Line WSTRB | REQ-CL-010/022 | 常规完整 line 可测；部分掩码及不齐整 WSTRB 需 Design Review |
 | OPEN-CL-007 — 同拍故障优先级 | REQ-CL-017/019/027 | 单一故障先测；复合 Fault Cross 在定义前 BLOCKED_SPEC |

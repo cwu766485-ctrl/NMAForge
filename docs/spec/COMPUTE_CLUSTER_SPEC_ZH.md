@@ -139,7 +139,7 @@ write_fire   = request_fire &&  selected_spad_write
 **[REQ-CL-006]** 请求在未接受时必须按照所属 Engine/接口的规定保持有效字段稳定；合法 Abort/Reset 例外需另定义。\
 **[REQ-CL-007]** 读响应的 data/error 必须只由拥有该已接受请求的 Engine 消费；**core_rsp_valid 不是需要 ready 二次接受的 AXI R 通道**。\
 **[REQ-CL-008]** 每一个合法接受的写事务，其地址、数据、数量和最终 Memory Image 与算子 Reference Model 一致；对于多输出算子，错误前可能存在已提交的合法前缀写入。\
-**[v1.1 访存合同及剩余 OPEN-CL-003]** 普通 32-bit 请求先由真实 `ai_compute_spad_mux` 选中一个 Engine，再进入唯一 `ai_spad_arbiter` CORE client；ready/protection 只返回该 owner。注册读响应按接口合同返回已接受读的 owner，非 AXI 通道，不支持任意乱序。FP Dot Outstanding 上限为 2；其它引擎不假定统一深度。Abort 要等待各 Engine 已接受的 SPAD 操作收尾；Reset 的外部响应隔离细节仍为 OPEN，不能虚报 closure。
+**[v1.2 Reset/Fabric 合同，收窄 OPEN-CL-003]** 普通 32-bit 请求先由真实 `ai_compute_spad_mux` 选中一个 Engine，再进入唯一 `ai_spad_arbiter` CORE client；ready/protection 只返回该 owner。注册读响应按接口合同返回已接受读的 owner，非 AXI 通道，不支持任意乱序。FP Dot Outstanding 上限为 2；其它引擎不假定统一深度。Abort 要等待各 Engine 已接受的 SPAD 操作收尾。若 reset 时仍有已接受 AXI 读/写事务，集成必须同时复位加速器与拥有该事务的 AXI fabric；fabric 清除旧 epoch 的 R/B 响应，复位释放后不得向新 epoch 返回旧响应。只复位加速器而保持 fabric 运行时，必须先排空/隔离 DMA，且 AR/AW/W/R/B 均无在途事务。该 reset 不规定外部存储内容是否清零。UVM 覆盖了已接受 AR、协调复位及释放后的旧 R 响应静默检查；B 通道旧响应和非 FP Engine 的 Abort drain 仍按其余 Open Item 追踪。
 
 ### 2.4 CNM 四 Bank 专用端口
 
@@ -325,7 +325,7 @@ Functional Coverage / SVA / URG
 | OPEN-CL-001 | v1.0 已决议 | 非法上游 Launch 不属于合规 DUT 激励 | 环境断言约束；可另外做鲁棒性观察 |
 | OPEN-CL-005 | v1.0 串行假设，由 v1.1 REQ-PC-002/003 supersede | 每个 Engine 有一个 active slot；不同 Engine 可重叠，同一 Engine 的下一 descriptor 等待其 slot 释放 | 按 engine owner 和 CMDQ 顺序校验 |
 | OPEN-CL-006 | P0 未关闭 | Block 使用真实 Engine-specific 编码；产品统一 Error ABI 待设计决定 | 跨引擎统一码 Testpoint=BLOCKED_SPEC |
-| OPEN-CL-003 | P0 部分冻结 | 正常请求/返回归属用真实 Arbiter；异常排空待按 Engine 核对 | 未定异常组合 Testpoint=BLOCKED_SPEC |
+| OPEN-CL-003 | P0 部分冻结 | 正常请求/返回归属用真实 Arbiter；REQ-PC-010 已冻结 reset/fabric epoch 边界；非 FP outstanding 深度及 Abort drain/restart 仍待逐 Engine 核对 | 未定异常组合 Testpoint=BLOCKED_SPEC |
 | OPEN-CL-002 | P1 | 每个 Opcode 的参数合法边界、地址别名/越界、零值规则是什么？ | 数值/地址 Reference 缺口 |
 | OPEN-CL-004 | P1 | Matrix Line 接口 WSTRB、对齐、Protection 的完整规则是什么？ | 128-bit Line Checker 误判 |
 | OPEN-CL-007 | P1 | 多错误同周期优先级和部分写回是否有一致语义？ | Fault/Reset Cross 无法严格闭环 |
@@ -392,6 +392,6 @@ Functional Coverage / SVA / URG
 | REQ-PC-007 | **Banked/Line 独立通道**：CNM 的四 Bank 请求与 Matrix banked/128-bit line 端口维持各自接口与响应归属，不得错误折叠进 32-bit owner MUX。 | 四 lane、banked read、line write/WSTRB 按各自 handshake monitor 校验。 |
 | REQ-PC-008 | **SPAD 冲突责任**：硬件 MUX 只保证单端口 admission 和 owner 路由，不做跨 descriptor 地址锁或依赖推导；软件必须保证并发任务没有 read-after-write/write-after-read/write-after-write 冲突。共享只读输入可重叠。 | 正常并行 Reference 使用分离输出区；冲突输入属于违规软件流量，单独做健壮性观察。 |
 | REQ-PC-009 | **Abort/Drain**：abort 后不再派发未接受的新 descriptor；所有已派发任务均收到 abort，已接受 SPAD 请求/响应按 owner 收尾；任务以 `ERR_ABORT` 或更早已发生的 Engine error 形成一次完成，按 CMDQ 顺序退休。调度器在所有 Engine 和完成项排空前不得报告 idle；未派发的 CMDQ descriptor 留给软件。 | 多 Engine active 时 abort；检查停止新 launch、SPAD owner 无泄漏、完成 FIFO 保序、idle/drain 和随后可恢复运行。 |
-| REQ-PC-010 | **Reset 与恢复**：reset 清除 Engine 活动槽、结果 FIFO、SPAD owner pipeline 和未发布 completion；复位后旧 Done/响应不得污染新 task。Accepted external SPAD transaction 的 reset 丢弃边界由 owning fabric 的 reset contract 决定。 | active reset、旧响应迟到、复位后新任务；未定义的外部 RAM 保留行为不作错误 oracle。 |
+| REQ-PC-010 | **Reset 与恢复**：reset 清除 Engine 活动槽、结果 FIFO、SPAD owner pipeline 和未发布 completion；复位后旧 Done/响应不得污染新 task。若 AXI 外部读/写已接受，必须协调复位加速器与 owning fabric，fabric 丢弃旧 epoch R/B；accelerator-only reset 仅可在 DMA/AXI 通道空闲或已完成显式排空/隔离后执行。 | UVM 在已接受 AR 且 R 延迟时协调复位，检查 fabric read queue/active/RVALID 清空，并在 8 周期安静窗口检查无旧 R、新 AR；再检查 SPAD sentinel 未变及 reset 后新事务恢复。该测试不代表 B 通道或任意外部 fabric 实现的独立证明。 |
 
-**v1.1 Freeze Record**：冻结 REQ-CL-001～028、REQ-PC-001～010、合法并行任务合同、SPAD owner 及按序 completion 行为。SPEC 冻结不等于 UVM、coverage 或最终 Sign-off 已完成。现有 verification evidence 与未闭合项见 [Compute Cluster Testplan](../verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md) 和 [Verification Matrix](../../dv/VERIFICATION_MATRIX.md)。
+**v1.1/v1.2 Freeze Record**：v1.1 冻结 REQ-CL-001～028、REQ-PC-001～010、合法并行任务合同、SPAD owner 及按序 completion 行为；v1.2 冻结上述外部 AXI reset/fabric epoch 边界。SPEC 冻结不等于 UVM、coverage 或最终 Sign-off 已完成。现有 verification evidence 与未闭合项见 [Compute Cluster Testplan](../verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md) 和 [Verification Matrix](../../dv/VERIFICATION_MATRIX.md)。
