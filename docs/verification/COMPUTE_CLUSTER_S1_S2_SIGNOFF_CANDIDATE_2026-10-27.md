@@ -16,7 +16,7 @@
 |---|---|---|
 | S1: 16×16 Matrix Block DV | **BOUNDED PASS** | Three-seed depth-4 functional/fault regression passed for the tested INT8 GEMM/batch/layout, prefetch/cache, parity/protection, abort/reset and recovery cases. Raw default-profile FSM remains 49/53; three guard/invariant edges now have scoped formal disposition, and the fourth profile edge is hit in a separate prefetch-disabled build. |
 | S2: Compute Cluster functional slice | **BOUNDED PASS** | Current-SHA clean three-seed real-top seven-engine UVM, 25/25 checker-sensitivity campaign, coordinated R/B reset/recovery, and v1.4 error-contract cases pass. The only unhit focused functional cover variable is completion response-client, explicitly WAIVED/N/A because the completion writer is write-only. |
-| S2: all 38 frozen REQ-CL/REQ-PC requirements | **HOLD** | Current RTM has 24 `PASS-SCOPED`, 14 `PARTIAL`, 0 `BLOCKED_SPEC`, and 0 `NOT_RUN`. Error ABI/priority/prefix SPEC blockers are removed, but external-fabric qualification, non-FP drain/restart, partial Line WSTRB and broader legal fault/phase crosses remain open. This is not full Compute Cluster sign-off. |
+| S2: all 38 frozen REQ-CL/REQ-PC requirements | **HOLD** | Current RTM has 24 `PASS-SCOPED`, 14 `PARTIAL`, 0 `BLOCKED_SPEC`, and 0 `NOT_RUN`. Error ABI/priority/prefix SPEC blockers are removed; Matrix core accepted-read Abort/Reset drain and recovery pass R30. Non-Matrix top-level drain/restart, external-fabric qualification, partial Line WSTRB and broader legal fault/phase crosses remain open. This is not full Compute Cluster sign-off. |
 | S3: complete NPU IP | **OUT OF SCOPE** | DMA/CMDQ-to-compute-to-CPLQ system E2E, complete system regression, and ASIC PPA are not covered by S1/S2 evidence. |
 
 `PASS-SCOPED` means the named requirement behavior was exercised and checked in
@@ -67,7 +67,7 @@ seven-engine UVM. Each seed reported:
   URG found 29/30 cover variables hit. The sole miss is
   `cp_response_client.completion`; it is explicitly WAIVED/N/A because the
   completion writer issues writes and has no read-response client bin.
-- memory scoreboard: 4,444 accepted writes, 4,852 checked words, zero
+- memory scoreboard: 4,946 accepted writes, 5,256 checked words, zero
   mismatches, unknown reads, stale epochs, or orphan responses; all seven
   engine read/write activity bins were nonzero.
 - line WSTRB observed counts `{full:512, partial:0, zero:0}`; partial WSTRB
@@ -107,9 +107,9 @@ The selected source SHA is `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9` (SPEC v1.4
 - Matrix formal run R28 proves five non-vacuous assertions and reaches both `ST_PREFETCH_WAIT` and `ST_ERROR_DRAIN`. The default-profile FSM raw score remains 49/53; the separate no-prefetch profile hits `ST_MAC→ST_A_REQ`.
 - Matrix size benchmark passes 45/45; eight-way Depth/Prefetch/A-Cache ablation passes 120/120 over three seeds. The `32×32×64` workload improves from 1,698 to 1,187 cycles and cuts banked reads by 25% between baseline and the fully enabled configuration.
 - Real-top serial/staged/four-task parallel cycles are 1,239 / 1,070 / 1,137 (versus 1,696 serialized for four tasks), with ordered completions. They use the current production engines and behavioral scratchpad model.
-- Coordinated reset testing excludes stale R and B for a behavioral AXI responder. An actual external fabric implementation and non-FP accepted-SPAD drain/restart are still open integration evidence.
+- Coordinated reset testing excludes stale R and B for a behavioral AXI responder. Matrix depth-4 accepted-read drain/recovery passes in R30. Other-engine top-level accepted-SPAD drain/restart and an actual external fabric implementation remain open integration evidence.
 
-Detailed Run IDs, tools, seeds and artifact paths are in [Execution RTM R24–R29](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md). These results support bounded S1/S2 review, not CL-DV-v1.0 or whole-NPU sign-off.
+Detailed Run IDs, tools, seeds and artifact paths are in [Execution RTM R24–R30](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md). These results support bounded S1/S2 review, not CL-DV-v1.0 or whole-NPU sign-off.
 
 ## Requirement disposition table
 
@@ -121,19 +121,19 @@ Detailed Run IDs, tools, seeds and artifact paths are in [Execution RTM R24–R2
 | REQ-CL-004 | PASS-SCOPED | `CLUSTER-LAUNCH-3S`: scalar VDOT flags, aux0, and all three strides were perturbed; output/completion stayed Golden. Unused-field sweeps for other engines remain open. |
 | REQ-CL-005 | PARTIAL | `CLUSTER-LATCH-3S`: a 64-word scalar VDOT completed with result 4,480 at the original destination after its source/destination descriptor words were changed in flight. This does not cover the full engine/field matrix. |
 | REQ-CL-006 | PARTIAL | `CLUSTER-STABILITY-3S`: no payload violations; stalled mask `1110111`, per-engine stall cycles `{7,4,23,0,261,8,6}`, Matrix banked checks=338, and 30 stall checks on each CNM lane. Matrix line stalls were not observed in this top test; all directions/classes are not closed. |
-| REQ-CL-007 | PASS-SCOPED | Accepted-read ownership ledger; 1,945 responses, zero orphan/stale response; selected ready/response timing. |
-| REQ-CL-008 | PASS-SCOPED | Byte-aware accepted-write memory image: 4,852 words/seed, zero mismatch/unknown. |
+| REQ-CL-007 | PASS-SCOPED | Accepted-read ownership ledger: 2,351 responses, 2 reset-dropped accepted reads, zero orphan/stale response; pending queues drain. |
+| REQ-CL-008 | PASS-SCOPED | Byte-aware accepted-write memory image: 5,256 words/seed, zero mismatch/unknown. |
 | REQ-CL-009 | PASS-SCOPED | Four CNM lanes, address/response ownership and selected parity cross checked; broader latency/fault matrix remains open. |
-| REQ-CL-010 | PARTIAL | Matrix 2/4 outstanding block regressions and top smoke pass; partial line WSTRB is untested and OPEN-CL-004 remains. |
+| REQ-CL-010 | PARTIAL | Matrix 2/4 outstanding block regressions pass; R30 adds outstanding-read drain/recovery and line-write backpressure. Observed Matrix line mask is full; partial/zero WSTRB semantics remain open under OPEN-CL-004. |
 | REQ-CL-011 | PASS-SCOPED | Seven-engine completion ledger; all-engine Done/missing/duplicate checker mutations caught. |
 | REQ-CL-012 | PASS-SCOPED | Selected per-engine result/error/completion Golden checks pass; not every error/result code. |
 | REQ-CL-013 | PASS-SCOPED | Selected task lifecycle is exactly-once; lifecycle mutations cover every engine bit. |
 | REQ-CL-014 | PARTIAL | Backpressure and bounded progress observed; no full fairness/bound matrix for every engine. |
 | REQ-CL-015 | PARTIAL | Representative Golden tasks pass for all engines; not every opcode × shape × numeric class. |
 | REQ-CL-016 | PASS-SCOPED | Selected cross-engine task switching and stale-response checks pass. |
-| REQ-CL-017 | PARTIAL | Parity/protection/abort prefixes are checked in selected cases; full engine × fault × phase prefix matrix is open. |
-| REQ-CL-018 | PARTIAL | Active Matrix/SFU reset drops tracked responses and recovers; external SRAM reset/late-response contract remains open. |
-| REQ-CL-019 | PARTIAL | v1.4 freezes same-cycle priority and accepted-write prefix; selected cases pass, but the full legal fault-pair/phase/reset matrix remains open. |
+| REQ-CL-017 | PARTIAL | Parity/protection/abort prefixes are checked in selected cases; R30 adds Matrix phase Abort and outstanding-response drain. Full engine × fault × phase prefix matrix is open. |
+| REQ-CL-018 | PARTIAL | Matrix block drain/reset recovery and active Matrix/SFU top reset have evidence; other-engine top integration and external-fabric reset/late-response contract remain open. |
+| REQ-CL-019 | PARTIAL | v1.4 freezes same-cycle priority and accepted-write prefix; R30 adds Matrix fault+Abort/Reset cases, but the full legal fault-pair/phase/reset matrix remains open. |
 | REQ-CL-020 | PARTIAL | Selected signed INT8 VDOT/GEMM numerics pass; complete opcode, saturation and boundary matrix is not closed. |
 | REQ-CL-021 | PASS-SCOPED | Four-bank CNM address/response ledger and selected GEMV Golden/parity cases pass. |
 | REQ-CL-022 | PASS-SCOPED | `MATRIX-S1-DEPTH4-3S`: 18 Golden/layout and 34 fault/recovery cases per seed; 16×16 profile covered. Broader option space and line WSTRB remain open. |

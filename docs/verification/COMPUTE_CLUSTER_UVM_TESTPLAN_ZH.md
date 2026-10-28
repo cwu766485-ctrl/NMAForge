@@ -4,7 +4,7 @@
 > **版本**：v1.4 / Parallel Compute Requirement Traceability Baseline
 > **日期**：2026-10-28
 > **对应规格**：[Compute Cluster SPEC v1.4](../spec/COMPUTE_CLUSTER_SPEC_ZH.md)
-> **当前审查候选**：源码 SHA `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`。38 项 RTM 为 24 PASS-SCOPED、14 PARTIAL、0 BLOCKED_SPEC、0 NOT_RUN。R24–R29 补充当前 SHA 的三 seed 七引擎 top replay、Error ABI/priority 定向测试、25/25 checker sensitivity、R/B reset、Matrix FSM formal、45/45 size benchmark 与 120/120 八配置 benchmark。**不得据此宣称 CL-DV-v1.0 已签核。** 当前控制文件是[Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)、[Sign-off Readiness](COMPUTE_CLUSTER_DV_SIGNOFF_READINESS_2026-10-27.md)、[Benchmark](COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md)与[Open Issues](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md)。旧 SHA/旧计数保留为历史运行记录。
+> **当前审查候选**：源码 SHA `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`。38 项 RTM 为 24 PASS-SCOPED、14 PARTIAL、0 BLOCKED_SPEC、0 NOT_RUN。R24–R30 补充当前 SHA 的三 seed 七引擎 top replay、Error ABI/priority 定向测试、25/25 checker sensitivity、R/B reset、Matrix accepted-read drain/recovery、Matrix FSM formal、45/45 size benchmark 与 120/120 八配置 benchmark。**不得据此宣称 CL-DV-v1.0 已签核。** 当前控制文件是[Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)、[Sign-off Readiness](COMPUTE_CLUSTER_DV_SIGNOFF_READINESS_2026-10-27.md)、[Benchmark](COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md)与[Open Issues](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md)。旧 SHA/旧计数保留为历史运行记录。
 > **Owner**：NMAForge DV\
 > **Stage A 历史状态**：在 tested SHA `03bf257afdca9b0041ff80b6d30cbaf8107cf7e0` 完成的原始数据见 Stage A 报告。当前逐项结论以 2026-10-28 Execution RTM 和 Readiness Report 为准。全 C1 REQ closure、完整 fault cross、partial-WSTRB image、FSM formal unreachable proof、ASIC PPA 与产品 signoff 仍未完成。
 
@@ -74,17 +74,17 @@ remaining C1 closure
 | REQ-CL-014 | 被接受请求/进展 | stall时无假accept；公平响应下有进展；`tc_cl_progress_backpressure` | request ledger + bounded SVA with fairness | `engine × stall_bin × progress` | P0 READY |
 | REQ-CL-015 | 正常执行完整性 | 每Opcode数值正确、合法写回、唯一done；`tc_cl_normal_all_ops` | per-op Oracle + memory result checker | `opcode × shape × numeric_class` | P0 READY |
 | REQ-CL-016 | 跨Engine切换 | FP→Matrix→CNM→SFU等连续任务防迟到污染；`tc_cl_engine_switch` | owner tracker + stale-response checker | `prev_engine × next_engine × spacing` | P0 READY |
-| REQ-CL-017 | 错误后写入前缀 | Parity/Protection/Watchdog/Abort已接受写入正确；`tc_cl_error_prefix` | prefix-memory scoreboard + error model | `engine × fault × phase` | P0 PARTIAL_SPEC |
-| REQ-CL-018 | 复位隔离 | Reset后不泄漏Done/写；旧 R/B 响应正确丢弃；`tc_cl_reset_stale` | reset epoch ledger / post-reset memory monitor | `engine × reset_phase × pending_reads × pending_writes` | P0 PARTIAL；R22 在 behavioral responder 上通过 accepted AR/R、AW/W/pending-B 协调复位与恢复；非 FP Abort drain/restart 和目标外部 fabric 仍 OPEN |
-| REQ-CL-019 | 同时异常恢复 | Abort/Reset及其它异常的合法交错；`tc_cl_fault_races` | fault priority oracle + owner monitor | `engine × fault_pair × phase` | P1 BLOCKED_SPEC |
+| REQ-CL-017 | 错误后写入前缀 | Parity/Protection/Watchdog/Abort已接受写入正确；`tc_cl_error_prefix` | prefix-memory scoreboard + error model | `engine × fault × phase` | P0 PARTIAL；v1.4 已冻结错误/前缀 oracle，合法交叉覆盖未闭合 |
+| REQ-CL-018 | 复位隔离 | Reset后不泄漏Done/写；旧 R/B 响应正确丢弃；`tc_cl_reset_stale` | reset epoch ledger / post-reset memory monitor | `engine × reset_phase × pending_reads × pending_writes` | P0 PARTIAL；R27 在 behavioral responder 上验证 accepted AR/R 与 AW/W/pending-B 协调复位；R30 验证 Matrix depth-4 accepted-read Abort/Reset drain 与恢复；非 Matrix top 集成及目标外部 fabric 仍 OPEN |
+| REQ-CL-019 | 同时异常恢复 | Abort/Reset及其它异常的合法交错；`tc_cl_fault_races` | fault priority oracle + owner monitor | `engine × fault_pair × phase` | P1 PARTIAL；v1.4 已冻结优先级 oracle，完整交叉未闭合 |
 | REQ-CL-020 | Scalar INT8 | Signed 4lane packed VDOT/GEMV/GEMM/legacyConv,算术边界；`tc_cl_scalar_numeric` | independent bit-exact integer model | `opcode × sign_pattern × saturation` | P0 READY |
 | REQ-CL-021 | CNM numerics | 4Bank局部ACC/global reduction, K/M边界；`tc_cl_cnm_numeric` | bank-aware integer golden + memory compare | `op × K × M × bank_phase` | P0 READY |
 | REQ-CL-022 | Matrix numerics | 4×4 tile-major GEMM/batch, transpose, bias, requant/activation; 16×16 macro tile and cross-tile execution; ordered read depth 2/4 | independent int64 reference + real Matrix core SPAD memory image | `op × transA × transB × batch × macro_tile × read_depth × fault_phase` | 2/4 depth each three seed: 10 numeric/layout cases + 14 error/recovery cases per seed PASS; selected 16×16×64 real-top UVM slice passed three seeds; broader option coverage remains |
-| REQ-CL-023 | SFU numerics | softmax/norm/residual/GELU/SiLU/requant/causal；`tc_cl_sfu_numeric` | per-op Q-domain fixed-point golden;approx bounds | `op × vector_len × extreme × pack` | P0 BLOCKED_SPEC subset |
+| REQ-CL-023 | SFU numerics | softmax/norm/residual/GELU/SiLU/requant/causal；`tc_cl_sfu_numeric` | per-op Q-domain fixed-point golden;approx bounds | `op × vector_len × extreme × pack` | P0 PARTIAL；v1.3 已冻结整数域，选定 192 向量通过，更多形状未覆盖 |
 | REQ-CL-024 | Conv 3×3 | valid stride1,no-padding,edge H/W, signed 8→32；`tc_cl_conv_window` | independent convolution window image scoreboard | `op × H_class × W_class × sign` | P0 READY |
 | REQ-CL-025 | KV Cache | token/head/strides READ/WRITE & alias/overflow；`tc_cl_kv_address` | independent 64-bit address math+SPAD image | `op × token × head × stride` | P0 READY |
 | REQ-CL-026 | Mixed FP | 0x50/51 odd tail,NaN,Inf,subnormals,RNE,2 outstanding；`tc_cl_fp_numerical` | raw-bit Python oracle+FP bus scoreboard | `format × class × length × rsp_latency` | P0 READY |
-| REQ-CL-027 | Engine error codes | 每引擎原始code + 前缀写 + owner；`tc_cl_error_code_table` | engine×fault mapping; unsupported unify blocked | `engine × fault_type × code` | P0 PARTIAL_SPEC |
+| REQ-CL-027 | Engine error codes | 每引擎原始code + 前缀写 + owner；`tc_cl_error_code_table` | engine×fault mapping; unsupported unify blocked | `engine × fault_type × code` | P0 PARTIAL；v1.4 已冻结映射，完整引擎/故障交叉未覆盖 |
 | REQ-CL-028 | Perf Counters | done拍cycle/element 与 owner 一致、Matrix events；`tc_cl_perf_observability` | sampled event counters + scoreboard | `engine × count_boundary × perf_event` | P1 READY |
 
 ### 2.1 v1.1 Parallel Dispatcher / SPAD MUX Requirements
@@ -182,7 +182,7 @@ agent、memory model、coverage collector 与 protocol assertions 仍是后续�
 
 **历史候选后续（R15–R18，source SHA `c0832e5`）：** 在当时的 detached worktree 补跑 16-seed mixed-precision DDR E2E、25 项 checker-sensitivity mutation、Matrix size sweep 三 seed，以及八配置消融三 seed。结果分别为 AXI/FP E2E PASS、25/25、45/45、120/120。URG 显示 20/22 assertions success，另外 2 项 UVM RAL assertion 无 attempts、0 failure/incomplete；五条 AR/AW/W payload/burst assertion 均有 real success，AR/AW/W stall-to-accept cover 匹配 166/70/107 次。Mutation 修改 passive monitor observation copy；这不是 RTL mutation score。历史候选当时的 RTM 状态及证据见 R15–R18。
 
-**当前候选收口（R24–R29，source SHA `9d9e0f0`）：** SPEC v1.4 与 RTL 冻结七引擎 Error ABI、priority 和 accepted-write prefix；三 seed 定向故障、当前 SHA clean top UVM、25/25 checker mutation、behavioral AXI R/B reset、Matrix formal 与两组 benchmark 均通过。当前 38 项状态为 24 PASS-SCOPED / 14 PARTIAL / 0 BLOCKED_SPEC / 0 NOT_RUN。外部 fabric 合规、非 FP accepted-SPAD drain/restart、partial Line WSTRB 和广义 Fault × Phase 仍开放。命令、run id、seed、证据路径和 SHA-256 见[当前执行 RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)及[回放清单](COMPUTE_CLUSTER_FINAL_9D9E0F_MANIFEST_2026-10-28.md)。
+**当前候选收口（R24–R30，source SHA `9d9e0f0`）：** SPEC v1.4 与 RTL 冻结七引擎 Error ABI、priority 和 accepted-write prefix；三 seed 定向故障、当前 SHA clean top UVM、25/25 checker mutation、behavioral AXI R/B reset、Matrix depth-4 drain/recovery、Matrix formal 与两组 benchmark 均通过。当前 38 项状态为 24 PASS-SCOPED / 14 PARTIAL / 0 BLOCKED_SPEC / 0 NOT_RUN。非 Matrix top 集成的 Abort/drain/restart、外部 fabric 合规、partial Line WSTRB 和广义 Fault × Phase 仍开放。命令、run id、seed、证据路径和 SHA-256 见[当前执行 RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)及[回放清单](COMPUTE_CLUSTER_FINAL_9D9E0F_MANIFEST_2026-10-28.md)。
 
 **2026-10-28 TinyNPU matched workload (R19)：** Candidate NMAForge Matrix 与 pinned TinyNPU 都用 8×8 physical array 跑 16×16×16 signed INT8 GEMM，使用相同输入且 256 个 INT32 输出均通过独立 Golden。另以相同 3×3 单通道 image/filter 比较 NMAForge native Conv 与 TinyNPU padded GEMM lowering，输出均为 -30。TinyNPU VCS 运行需要临时 DSP48E1 functional model 和 `always_ff` 兼容副本；数据代表此行为仿真/计时边界，不代表 UNISIM 或 FPGA PPA。见 [Benchmark Report](COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md) 和 [Execution RTM R19](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)。
 
@@ -376,11 +376,11 @@ make -C dv/uvm/sim uvm_compute_cluster_regress \
 
 | Issue | 影响需求 | 计划处理/状态 |
 |---|---|---|
-| OPEN-CL-006 — Error ABI | REQ-CL-017/019/027 | 全局统一码 BLOCKED_SPEC；现有 per-engine 原始码 subset READY |
-| OPEN-CL-003 — Abort/Reset Drain | REQ-CL-007/014/016/018/019、REQ-PC-009/010 | v1.2 已冻结协调式 AXI reset/epoch 边界；R22 在 behavioral responder 上验证 accepted AR/R 与 AW/W/pending-B 后复位无旧 R/B 泄漏。非 FP outstanding 深度、Abort drain/restart、目标外部 fabric 合规和更广 phase cross 仍 OPEN |
+| OPEN-CL-006 — Error ABI | REQ-CL-017/019/027 | **SPEC blocker closed by v1.4/R24**; per-engine Error ABI is frozen, while the legal fault/phase verification cross remains partial under CL-COV-006 |
+| OPEN-CL-003 — Abort/Reset Drain | REQ-CL-007/014/016/018/019、REQ-PC-009/010 | v1.2 冻结协调式 AXI reset/epoch；R27 在 behavioral responder 上验证 R/B reset，R30 在 Matrix core 验证 depth-4 accepted-read Abort/Reset drain 与恢复。非 Matrix top 集成与目标外部 fabric 仍 OPEN |
 | OPEN-CL-002 — 参数合法范围 | REQ-CL-004/005/020~025 | 子模型按 validator/engine 各自边界；未核实组合 BLOCKED_SPEC |
 | OPEN-CL-004 — Matrix Line WSTRB | REQ-CL-010/022 | 常规完整 line 可测；部分掩码及不齐整 WSTRB 需 Design Review |
-| OPEN-CL-007 — 同拍故障优先级 | REQ-CL-017/019/027 | 单一故障先测；复合 Fault Cross 在定义前 BLOCKED_SPEC |
+| OPEN-CL-007 — 同拍故障优先级 | REQ-CL-017/019/027 | **SPEC blocker closed by v1.4/R24**; selected same-cycle priority/prefix tests pass, broader legal fault crosses remain partial |
 | OPEN-NUM-01 — Scalar fixed-point | REQ-CL-020 | Scalar rounding/saturation appendix and edge campaign remain open; do not infer coverage from SFU closure. |
 | OPEN-NUM-02 — SFU fixed-point | REQ-CL-023 | **Closed in SPEC v1.3 / R21 for the documented domain:** exact integer formulas plus independent Golden, 192/192 vectors over 3 seeds; larger input/length space is not claimed. |
 | OUT_OF_CONTRACT — illegal launch | REQ-CL-001/002/011 | Busy Start/多 Select 仅鲁棒性探索，不计产品合规覆盖 |

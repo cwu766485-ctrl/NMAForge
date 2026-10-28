@@ -3,7 +3,7 @@
 **Scope:** `REQ-CL-001..028` and `REQ-PC-001..010` from Compute Cluster SPEC v1.4.\
 **Selected review candidate:** `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9` (code/SPEC SHA; documentation evidence is committed separately).\
 **Checkout:** the selected source SHA was replayed from detached clean worktree `/tmp/nmaforge_closure_9d9e0f_clean`. The candidate includes the v1.4 Error ABI/priority/prefix implementation and checker updates.\
-**Evidence status:** current-SHA evidence includes real-top seven-engine UVM, 25/25 checker-sensitivity mutations, coordinated behavioral AXI R/B reset, Matrix FSM formal guards, three-seed Matrix size/ablation benchmarks, and the real-top serial/parallel benchmark. Every result closes only its named scope; external-fabric reset qualification, legal fault-phase crosses and partial Line WSTRB remain open.
+**Evidence status:** current-SHA evidence includes real-top seven-engine UVM, 25/25 checker-sensitivity mutations, coordinated behavioral AXI R/B reset, Matrix accepted-read fault lifecycle, Matrix FSM formal guards, three-seed Matrix size/ablation benchmarks, and the real-top serial/parallel benchmark. Every result closes only its named scope; non-Matrix top-level drain/restart, external-fabric reset qualification, legal fault-phase crosses and partial Line WSTRB remain open.
 
 ## Status summary
 
@@ -59,7 +59,7 @@ R14 reruns the same `ai_compute_cluster_e2e_test` and three seeds as R1 from the
 
 R15–R18 artifact checksums and command manifest: `/tmp/nmaforge_compute_cluster_closure_c0832e5_20261028/RUN_MANIFEST.md` (82 raw logs/reports/CSV artifacts). The detached worktree had pre-existing untracked run artifacts, but no tracked source changes; all new build, simulation, coverage, and benchmark output was directed to `/tmp`.
 
-Current-candidate R24–R29 exact commands, tool versions and SHA-256 hashes for 57 selected raw logs/coverage summaries/benchmark CSVs are in the [9d9e0f0 replay manifest](COMPUTE_CLUSTER_FINAL_9D9E0F_MANIFEST_2026-10-28.md). The VCS outputs and VDBs remain in `/tmp` per repository policy.
+Current-candidate R24–R30 exact commands, tool versions and selected raw-log/coverage-summary/benchmark-CSV SHA-256 hashes are in the [9d9e0f0 replay manifest](COMPUTE_CLUSTER_FINAL_9D9E0F_MANIFEST_2026-10-28.md). The VCS outputs and VDBs remain in `/tmp` per repository policy.
 
 ### Exact-candidate clean replay record (R14)
 
