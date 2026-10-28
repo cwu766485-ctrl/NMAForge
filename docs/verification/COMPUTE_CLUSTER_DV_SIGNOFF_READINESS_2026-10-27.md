@@ -2,24 +2,23 @@
 
 ## Review decision (updated 2026-10-28)
 
-**Selected review candidate:** `c0832e5c822de1a03f82751d5ff8f831d0addb98` (`main`).\
-**Candidate classification:** bounded Functional DV candidate; not CL-DV-v1.0 signed.\
-**Product RTL:** no change in the candidate commit; `rtl/` is unchanged from its parent `fa2b4dd`. The candidate adds DV observation/checking code and updates evidence/status documents.\
-**Clean replay:** completed for this exact SHA on 2026-10-27 after VCS licensing became available. The detached clean worktree compiled with VCS `V-2023.12-SP1_Full64`, passed the real-top Compute Cluster UVM regression on seeds `20261025/20261026/20261027`, and merged URG coverage. This confirms reproducibility for the selected top-UVM slice. R15 later closed the AXI SVA antecedent gap for its traffic profile; requirement, FSM, and broader fault-cross gaps remain.
+**Selected review candidate source SHA:** `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`.\
+**Candidate classification:** bounded Functional DV review candidate; not CL-DV-v1.0 signed.\
+**Product RTL:** this candidate includes scoped Conv/KV/SFU error-code alignment to SPEC v1.4 and targeted checker/test updates; it is not an RTL-unchanged documentation-only commit.\
+**Clean replay:** the exact source SHA was checked out detached at `/tmp/nmaforge_closure_9d9e0f_clean`. VCS `V-2023.12-SP1_Full64` passed the real-top seven-engine regression (3 seeds), coordinated behavioral AXI R/B reset, 25/25 checker-sensitivity mutation campaign, and Matrix benchmark replays. VC Formal `V-2023.12-SP2` proved 5/5 non-vacuous legal Matrix properties and reached both target states. Evidence remains bounded to those tests and assumptions.
 
 | Gate | Readiness | Evidence and remaining gate |
 |---|---|---|
-| **CL-RC1 — Matrix + SPAD dataflow** | **Ready for bounded review** | Exact-candidate three-seed Matrix size sweep (45/45) and eight-way configuration ablation (120/120) complement the Golden/fault/recovery runs. Matrix FSM remains 49/53 transitions; R23 formally dispositions three legal guard paths under stated assumptions, while the compile-profile edge is covered in R4. Line WSTRB rules/partial writes remain open. |
-| **CL-RC2 — seven-engine Cluster** | **Ready for bounded evidence review; not closed** | Exact-candidate real-top seven-engine UVM, memory image, checker-sensitivity mutations, supplemental 16-seed AXI E2E and SFU numeric edge campaign pass. R22 adds behavioral-responder R/B reset exclusion. AXI AR/AW/W assertion antecedents and cover properties are non-vacuous in R15. The 38-row RTM is now 24 PASS-SCOPED, 13 PARTIAL, 1 BLOCKED_SPEC. Dispatcher all-pair overlap still uses behavioral Engine agents. |
-| **CL-DV-v1.0 — defined Functional DV scope** | **HOLD** | P0 spec blockers (`OPEN-CL-003`, `OPEN-CL-006`), partial/blocked requirements, Matrix Line WSTRB gaps, broad legal fault crosses and external-fabric qualification remain open. R23 is scoped formal evidence, not full FSM transition closure. These open items fail the “no unresolved P0 bug/spec blocker; all requirement evidence reviewed” exit gate. |
+| **CL-RC1 — Matrix + SPAD dataflow** | **Ready for bounded review** | Current-SHA size sweep passes 45/45 and eight-way ablation passes 120/120 over three seeds. The Matrix FSM raw enabled-profile result remains 49/53; three guard/invariant edges have scoped formal disposition and the fallback edge is tested in the separate prefetch-disabled build. Line WSTRB partial-write semantics/coverage remain open. |
+| **CL-RC2 — seven-engine Cluster** | **Ready for bounded evidence review; not fully closed** | Current-SHA clean seven-engine UVM passes three seeds with memory scoreboard, 25/25 checker-sensitivity mutations pass, R/B reset and recovery pass against a behavioral responder, and SPEC v1.4 freezes Error ABI/priority/prefix. RTM status is 24 PASS-SCOPED, 14 PARTIAL, 0 BLOCKED_SPEC, 0 NOT_RUN. The dispatcher all-pair overlap test still uses behavioral Engine agents. |
+| **CL-DV-v1.0 — defined Functional DV scope** | **HOLD** | No unresolved Error ABI/priority spec blocker remains. P0 integration/evidence gap `OPEN-CL-003`, legal Engine × Fault × Phase × Reset crosses, Matrix Line WSTRB, and remaining partial requirements prevent full closure. Formal results disposition selected Matrix guards; they do not claim all 53 transitions or every parameter profile. |
 | **Whole NPU sign-off / ASIC PPA / pretrained model deployment** | **Out of this review** | Full DMA/CMDQ/compute/CPLQ system closure, current PPA, and pretrained GPT-2/Qwen deployment are not necessary to review the defined Cluster functional slice, and are not claimed here. |
 
 ## Version and history review
 
-- HEAD at review: `c0832e5` → `fa2b4dd` → `c83ad74` → `f2457ef` → `f46e5a0` → `03bf257` → `a05e030` → `827c005`.
-- Selected candidate is `c0832e5`; runtime-affecting changes are limited to DV monitor/sequence/Makefile/testbench files; product RTL is byte-identical to its parent. R14 is the SHA-stamped clean-worktree replay; R15–R18 ran from the same detached candidate source with no tracked source changes. R19 runs the candidate product RTL with local benchmark-only TB additions; TinyNPU was pinned separately and simulated with a documented functional primitive surrogate.
-- `c83ad7463265062d4edb84d57fe4ada8195f9b10` is the detached clean worktree SHA for the focused 2026-10-27 Matrix/S2 campaign. Older fixed-SHA replay at `827c0052cf589fde676e93e34bf459188956182f` covers an earlier selected slice. R14 in the RTM now supplies the exact clean replay for selected candidate `c0832e5`.
-- SPEC v1.1 freezes the 38 `REQ-CL`/`REQ-PC` contracts; v1.2 adds the coordinated reset/epoch boundary for accepted external AXI traffic; v1.3 freezes the documented SFU arithmetic contract, checked in R21. `OPEN-CL-003` remains for non-FP outstanding depth, Abort drain/restart and outstanding B-response exclusion; `OPEN-CL-002/004/006/007` and scalar-only `OPEN-NUM-01` also remain. A frozen SPEC is not the same as requirement verification closure.
+- Selected candidate source is `9d9e0f0`; the preceding evidence baseline was `c0832e5`. Commit `9d9e0f0` changes RTL error constants in Conv/KV/SFU to match the v1.4 cause table and adds directed checker tests. Current evidence replay used the exact commit in a detached clean worktree; the follow-on evidence report commit changes only documentation.
+- Earlier runs R14–R23 remain useful historical evidence; R24–R29 now add current-source priority/error tests, clean top UVM, mutation, coordinated reset, formal guards and Matrix benchmarks. R19 uses the prior candidate's product RTL with local benchmark-only TB additions and a pinned TinyNPU reference.
+- SPEC v1.1 freezes the 38 `REQ-CL`/`REQ-PC` contracts; v1.2 defines coordinated reset/epoch expectations; v1.3 freezes SFU integer arithmetic; v1.4 freezes seven-engine Error ABI, simultaneous-fault priority and accepted-write prefix. `OPEN-CL-006/007` are closed as specification issues. `OPEN-CL-003` remains for target external-fabric qualification and non-FP accepted-SPAD drain/restart evidence; `OPEN-CL-002/004`, scalar `OPEN-NUM-01`, and legal cross coverage remain open. A frozen SPEC is not requirement verification closure.
 - The original `READY` rows in the UVM Testplan remain planning/status-history and are not execution evidence; use the RTM run IDs and artifacts below.
 
 ## Verification evidence review
@@ -32,8 +31,10 @@ The controlling detailed record is the [Execution RTM](COMPUTE_CLUSTER_EXECUTION
 - A selected 14-case parity cross per seed (42/42 aggregate), active Matrix/SFU abort/reset recovery, and exact-candidate 25/25 passive observation-mutation campaign for address, data, owner, WSTRB, and per-engine Done/missing/duplicate completion.
 - Conv/depthwise and KV three-seed block regressions, FP two-seed 596/596 bit-exact regression, Matrix depth-4 and no-prefetch profile regressions, three-seed 45/45 Matrix size sweep, and three-seed 120/120 eight-configuration ablation.
 - A 16-seed exact-candidate DMA/FP E2E run with real AXI stalls and response gaps, which closes the prior AR/AW/W SVA non-vacuity gap for that traffic profile.
+- The current-source clean SHA replay adds 4,946 accepted writes and 5,256 checked words per top-UVM seed, with zero mismatch/unknown/stale/orphan responses; coordinated reset drops old AR/R and AW/W/B responses in the behavioral model and a post-reset recovery read passes.
+- Current-source Matrix benchmarks pass 45/45 size points and 120/120 ablation points across seeds `20261025/26/27`; the production top measures serial, staged and four-task parallel cycle counts on the same real-engine workloads.
 
-The exact-candidate clean UVM compile uses VCS/URG `V-2023.12-SP1_Full64`. Its compile log reports zero compile warnings/errors and no `[TFIPC]`; `engine_busy`/`engine_done` SVA ports are explicitly connected. Each of the three seed logs has UVM warning/error/fatal `0/0/0`, 4,946 accepted writes, 5,256 compared words, zero memory mismatch/unknown/stale/orphan responses, and focused compute covergroup `98.96%` (29/30). The separate top-smoke compile has one retained `[LOOP-REROLL-ENABLED]` warning in a workload fixture; it is documented and is not an SVA disconnect.
+The current-source clean UVM compile uses VCS/URG `V-2023.12-SP1_Full64`; its log has zero `Warning-`, `Error-`, or `[TFIPC]` diagnostics and `engine_busy`/`engine_done` SVA ports are connected. Each of the three seed logs has UVM warning/error/fatal `0/0/0`, 4,946 accepted writes, 5,256 compared words, zero memory mismatch/unknown/stale/orphan responses, and focused compute covergroup `98.96%` (29/30). A separate top-smoke compile has one retained `[LOOP-REROLL-ENABLED]` workload-fixture warning; it is not an SVA disconnect.
 
 ## Assertion non-vacuity review
 
@@ -50,10 +51,10 @@ This shows that SVA ports are connected and there are no current omitted-port wa
 
 ## Required review outcomes
 
-1. Review the dispositions and listed evidence paths for all 38 requirements in the RTM.
-2. Resolve or formally disposition the P0 specification issues before CL-DV-v1.0 acceptance.
-3. Keep the Matrix residual transition review bounded: the two compile-profile transitions are exercised in separate builds; two guard/invariant paths lack formal unreachable proof. Do not force illegal events to hit them.
-4. The selected candidate SHA clean replay and named supplemental AXI, mutation, and Matrix benchmark campaigns are complete. R19 adds matched GEMM and lowered-convolution functional workloads with TinyNPU. Commands, seeds, artifacts, and assertion results are recorded as `R14`–`R19` in the [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md); R19 source/log checksums are in the [benchmark manifest](COMPUTE_CLUSTER_BENCHMARK_R19_MANIFEST_2026-10-28.md).
+1. Review the dispositions and evidence paths for all 38 requirements in the RTM (24 PASS-SCOPED / 14 PARTIAL; no BLOCKED_SPEC or NOT_RUN).
+2. SPEC v1.4 removes the Error ABI and priority specification blockers. Review the remaining P0 integration evidence gap for actual external-fabric reset compliance and non-FP drain/restart before CL-DV-v1.0 acceptance.
+3. Keep the Matrix residual transition record bounded: retain raw default-profile 49/53, identify the separate prefetch-disabled edge, and retain the five-proposition formal assumptions and two reachability covers. Do not force illegal events to hit bins.
+4. Current-source replay and selected supplemental campaigns are indexed as `R24`–`R29` in the [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md); exact commands, tool versions and selected raw-artifact hashes are in the [current-candidate replay manifest](COMPUTE_CLUSTER_FINAL_9D9E0F_MANIFEST_2026-10-28.md). R19 remains the bounded TinyNPU matched-workload run with its separate benchmark manifest.
 5. Do not extend this Functional DV review into an overall NPU sign-off claim.
 
 See the [remaining Open Issues](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md) and [TinyNPU benchmark report](COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md).

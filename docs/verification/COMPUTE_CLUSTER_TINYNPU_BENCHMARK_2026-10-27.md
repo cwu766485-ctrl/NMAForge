@@ -2,17 +2,33 @@
 
 ## Scope and comparison rule
 
-This report gathers exact-candidate Matrix scaling, three-seed eight-way controller ablation, and real-top Compute Cluster serial/parallel measurements. The latest Matrix runs used candidate `c0832e5c822de1a03f82751d5ff8f831d0addb98` from a detached worktree; it contained pre-existing untracked generated artifacts but no tracked source changes. It separates these local VCS cycle counts from the public TinyNPU project’s documented implementation results. The TinyNPU reference is pinned to `Atharva-Paranjpe/TinyNPU` commit `f965fe9462464fc8c9f944c491c3b81d45af1165`; the selected project documents an 8×8/64-DSP INT8 systolic array and a 16×16 logical GEMM.
+The controlling NMAForge measurements in this report were replayed on source SHA `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9` from a detached clean worktree. They include three-seed Matrix scaling, three-seed eight-way controller ablation, and real-top Compute Cluster serial/staged/parallel measurements. Older TinyNPU matched-workload results are retained as a separately bounded comparison on the earlier product RTL SHA `c0832e5c822de1a03f82751d5ff8f831d0addb98`. The TinyNPU reference is pinned to `Atharva-Paranjpe/TinyNPU` commit `f965fe9462464fc8c9f944c491c3b81d45af1165`; the selected project documents an 8×8/64-DSP INT8 systolic array and a 16×16 logical GEMM.
 
-The numbers below establish a reproducible comparison basis, but they do **not** support a single apples-to-apples speedup claim yet: NMAForge’s logged GEMM has K=32 and a 16×16 physical array; TinyNPU publishes a 16×16 logical GEMM on a physical 8×8 array, with its own matrix-buffer/program control path. NMAForge’s local Matrix runs use a one-cycle behavioral SPAD response and no placed-and-routed memory timing. TinyNPU reports FPGA implementation timing at 100 MHz. These scope, memory, array-size, and frequency differences must be normalized in a matched rerun before ranking the designs.
+The Matrix results are core-cycle measurements with a one-cycle behavioral SPAD response, not SRAM timing, ASIC PPA, or a speed grade. The TinyNPU comparison uses a matched 8×8 physical array and workload but different storage/output behavior; it does not support an implementation-level speedup claim. No theoretical TOPS or 250 MHz normalized throughput is presented as measured Fmax.
+
+## Current-source replay summary
+
+The selected source SHA `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9` was tested in `/tmp/nmaforge_closure_9d9e0f_clean` with VCS `V-2023.12-SP1_Full64`:
+
+| Benchmark | Seeded result | Workload and model |
+|---|---|---|
+| Matrix physical-array scaling | 45/45 PASS | 4×4, 8×8 and 16×16 arrays × 5 GEMM shapes × seeds `20261025/26/27`; fixed depth 4, prefetch/cache enabled, one-cycle behavioral SPAD |
+| Matrix controller ablation | 120/120 PASS | Depth 2/4 × Prefetch OFF/ON × A-Cache OFF/ON × 5 GEMM shapes × seeds `20261025/26/27`; 16×16 physical array |
+| Real Compute Cluster serial/staged/parallel | 3 seeds PASS, deterministic counts | Production Matrix/CNM/SFU/SFU tasks, real seven-engine top and SPAD owner path; exact per-seed logs below |
+
+For the 16×16 physical array, the largest workload `32×32×64` completes in 1,187 cycles with 55.211 MAC/cycle, 21.57% array utilization, 6,144 read bytes, 4,096 write bytes, and 136 bank / 72 line stalls. Against the same configuration's depth-2/no-prefetch/no-cache baseline, the eight-way ablation reduces cycles from 1,698 to 1,187 (30.1%) and banked read traffic from 512 to 384 requests (25%). These values use the behavioral bank model; the 250 MHz column is normalization only.
+
+The real-top task set reports serial Matrix→CNM→SFU = 1,239 cycles; staged Matrix+CNM then dependent SFU = 1,070 cycles (1.158×); and four queued Matrix/CNM/SFU/SFU tasks = 1,137 cycles versus 1,696 serial (1.492×). Completion order was preserved. Shared-SPAD contention was 32 cycles in the staged case and 38 cycles in the four-task case. These mixed-engine cycles do not have a meaningful single MAC/cycle or array-utilization figure.
 
 ## 1. Exact-candidate Matrix size sweep: 4×4, 8×8, 16×16
+
+Current-source command/log checksums are in the [9d9e0f0 replay manifest](COMPUTE_CLUSTER_FINAL_9D9E0F_MANIFEST_2026-10-28.md), run `R29`.
 
 Command recorded in the project roadmap:
 
 ```sh
 make -C dv/block/compute/matrix/sim matrix-size-benchmark \
-  SEED=20261025 BENCH_OUT_DIR=/tmp/nmaforge_matrix_size_c0832e5_20261025
+  SEED=20261025 BENCH_OUT_DIR=/tmp/nmaforge_final_9d9e0f_matrix_size_20261025
 # Repeat with SEED=20261026 and 20261027, writing to matching output directories.
 ```
 
@@ -38,11 +54,11 @@ The larger physical array reduces cycles and operand reads for this workload. It
 
 Every seed produced the same deterministic cycle/event values. Raw log paths:
 
-- `/tmp/nmaforge_matrix_size_c0832e5_20261025/array_{4,8,16}/run.log`
-- `/tmp/nmaforge_matrix_size_c0832e5_20261026/array_{4,8,16}/run.log`
-- `/tmp/nmaforge_matrix_size_c0832e5_20261027/array_{4,8,16}/run.log`
+- `/tmp/nmaforge_final_9d9e0f_matrix_size_20261025/array_{4,8,16}/run.log`
+- `/tmp/nmaforge_final_9d9e0f_matrix_size/array_{4,8,16}/run.log` (seed `20261026`)
+- `/tmp/nmaforge_final_9d9e0f_matrix_size_20261027/array_{4,8,16}/run.log`
 
-The SHA, VCS version, seeds, and commands are indexed as RTM run `R17`; sources came from the exact-candidate detached worktree.
+The historical `c0832e5` size sweep was indexed as RTM run `R17`. The current-source run uses the same workload and is indexed as `R29`; exact commands and checksums are in the replay manifest.
 
 ## 2. Exact-candidate eight-way outstanding/prefetch/cache ablation
 
@@ -50,7 +66,7 @@ Command and run ID:
 
 ```sh
 make -C dv/block/compute/matrix/sim matrix-config-comparison \
-  SEED=20261025 MATRIX_CONFIG_OUT=/tmp/nmaforge_matrix_config_c0832e5_20261025
+  SEED=20261025 MATRIX_CONFIG_OUT=/tmp/nmaforge_final_9d9e0f_matrix_config_20261025
 # Repeat with SEED=20261026 and 20261027, writing to matching output directories.
 ```
 
@@ -80,11 +96,11 @@ Observed effects:
 - A-tile cache changes no read count for the single-N-tile shapes. It reduces bank-read bytes by 25% for 16×32×32 and 32×32×64, with corresponding cycle reductions.
 - Depth 4 has modest additional gains over depth 2 in this workload set. Bank-stall counts are not monotonically lower: more outstanding requests can increase counted stalls while total latency falls.
 
-Raw CSVs: `/tmp/nmaforge_matrix_config_c0832e5_{20261025,20261026,20261027}/matrix_config_comparison.csv`; per-configuration logs are in sibling directories. SHA, VCS version and commands are indexed as RTM run `R18`. This closes repeatability for the local Matrix ablation; it is still a one-cycle behavioral SPAD model, not real SRAM timing or ASIC PPA.
+Raw CSVs: `/tmp/nmaforge_final_9d9e0f_matrix_config_20261025/matrix_config_comparison.csv`, `/tmp/nmaforge_final_9d9e0f_matrix_config/matrix_config_comparison.csv` (seed `20261026`) and `/tmp/nmaforge_final_9d9e0f_matrix_config_20261027/matrix_config_comparison.csv`; per-configuration logs are in sibling directories. Current-SHA commands and results are RTM run `R29`. This closes repeatability for the local Matrix ablation; it remains a one-cycle behavioral SPAD model, not real SRAM timing or ASIC PPA.
 
 ## 3. Real Compute Cluster serial and parallel execution
 
-Exact-candidate `CLUSTER-S2-CAND-CLEAN-3S` measured identical descriptor sets in seeds `20261025/20261026/20261027`. The counter interval starts at the doorbell write and ends at the observed CPLQ tail update; descriptor programming is excluded, while AXI-Lite issue/poll cycles are included. All seeds produced the same deterministic cycle values.
+Current-source clean run `CLUSTER-S2-CLEAN-3S-9D9E0F` measured identical descriptor sets in seeds `20261025/20261026/20261027`. The counter interval starts at the doorbell write and ends at the observed CPLQ tail update; descriptor programming is excluded, while AXI-Lite issue/poll cycles are included. All seeds produced the same deterministic cycle values.
 
 | Mode | Work | Cycles | Speedup | Observed shared-memory stall |
 |---|---|---:|---:|---:|
@@ -93,7 +109,7 @@ Exact-candidate `CLUSTER-S2-CAND-CLEAN-3S` measured identical descriptor sets in
 | Four-task queued | Matrix, CNM, SFU, SFU; same-engine SFU tasks serialize | 1,696 → 1,137 | 1.492× | 38 shared-SPAD contention cycles |
 | Active reset recovery | Reset active Matrix/SFU tasks, then run a recovery SFU | 307 cycles to recovery completion | — | 2 accepted reads dropped from reset epoch |
 
-Completion IDs remained ordered (`0700,0701,0702` and `0600–0603`). This is real-top task sequencing with the production compute engines and SPAD owner path. These mixed workloads combine Matrix/CNM/SFU, so a single MAC/cycle or array-utilization number is not meaningful; per-mode SPAD byte totals were not separately captured. The exact-candidate per-seed logs are `/tmp/nmaforge_signoff_clean_c0832e5_20261027/seed_{20261025,20261026,20261027}/run.log`.
+Completion IDs remained ordered (`0700,0701,0702` and `0600–0603`). This is real-top task sequencing with the production compute engines and SPAD owner path. These mixed workloads combine Matrix/CNM/SFU, so a single MAC/cycle or array-utilization number is not meaningful; per-mode SPAD byte totals were not separately captured. The current-candidate per-seed logs are `/tmp/nmaforge_final_9d9e0f_uvm/seed_{20261025,20261026,20261027}/run.log`.
 
 ## 4. Matched TinyNPU INT8 GEMM
 

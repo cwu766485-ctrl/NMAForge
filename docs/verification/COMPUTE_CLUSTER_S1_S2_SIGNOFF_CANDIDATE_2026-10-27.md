@@ -1,23 +1,22 @@
 # Compute Cluster S1/S2 DV Sign-off Candidate
 
-**Review date:** 2026-10-28 (candidate evidence addendum)
+**Review date:** 2026-10-28 (current source-SHA addendum)
 
-**Baseline reviewed SHA (detached clean worktree):** `c83ad7463265062d4edb84d57fe4ada8195f9b10`
+**Current reviewed source SHA (detached clean worktree):** `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`
 
-**Supplemental source base:** `fa2b4dd943dba996c82fbad5828ed1a28529a854` (the supplemental RTL/DV changes are listed below)
+**Earlier S1 evidence baseline:** `c83ad7463265062d4edb84d57fe4ada8195f9b10`; current supplemental source includes the SPEC v1.4 Error ABI implementation/checkers committed at `9d9e0f0`.
 
 **Simulator:** Synopsys VCS/URG `V-2023.12-SP1_Full64`
 
-**RTL change in this review:** none. `rtl/` is byte-identical to the prior
-tested RTL baseline `03bf257afdca9b0041ff80b6d30cbaf8107cf7e0`.
+**RTL change in this review:** Conv/KV/SFU error-code values were aligned to SPEC v1.4 (`ERR_OP=2`, watchdog `4`, merged SPAD `7`, SFU numeric `8`) and selected simultaneous-fault cases were added. No unrelated datapath/architecture optimization was made.
 
 ## Review decision
 
 | Gate | Decision | Signed scope / hold reason |
 |---|---|---|
-| S1: 16×16 Matrix Block DV | **BOUNDED PASS** | Three-seed depth-4 functional/fault regression passed for the tested INT8 GEMM/batch/layout, prefetch/cache, parity/protection, abort/reset and recovery cases. The default-profile FSM has four unhit transitions; each is dispositioned below. No formal unreachable proof is claimed. |
-| S2: Compute Cluster functional slice | **BOUNDED PASS** | Exact-candidate three-seed real-top, seven-engine UVM and 25/25 checker-sensitivity campaign passed. Supplemental 16-seed DMA/FP E2E also passes with non-vacuous AXI SVA. The only unhit focused functional cover variable is completion response-client, explicitly WAIVED/N/A because the completion writer is write-only. |
-| S2: all 38 frozen REQ-CL/REQ-PC requirements | **HOLD** | The updated table has 23 `PASS-SCOPED`, 13 `PARTIAL`, 2 `BLOCKED_SPEC`, and 0 `NOT_RUN`. Three-seed Conv/KV and two-seed FP block evidence now closes the named functional slices; reset epoch evidence closes the scoped reset requirement. Full parameter/opcode cross, partial line WSTRB disposition, broad error-prefix/reset combinations, and SFU numeric subcontracts remain open. This is not full Compute Cluster sign-off. |
+| S1: 16×16 Matrix Block DV | **BOUNDED PASS** | Three-seed depth-4 functional/fault regression passed for the tested INT8 GEMM/batch/layout, prefetch/cache, parity/protection, abort/reset and recovery cases. Raw default-profile FSM remains 49/53; three guard/invariant edges now have scoped formal disposition, and the fourth profile edge is hit in a separate prefetch-disabled build. |
+| S2: Compute Cluster functional slice | **BOUNDED PASS** | Current-SHA clean three-seed real-top seven-engine UVM, 25/25 checker-sensitivity campaign, coordinated R/B reset/recovery, and v1.4 error-contract cases pass. The only unhit focused functional cover variable is completion response-client, explicitly WAIVED/N/A because the completion writer is write-only. |
+| S2: all 38 frozen REQ-CL/REQ-PC requirements | **HOLD** | Current RTM has 24 `PASS-SCOPED`, 14 `PARTIAL`, 0 `BLOCKED_SPEC`, and 0 `NOT_RUN`. Error ABI/priority/prefix SPEC blockers are removed, but external-fabric qualification, non-FP drain/restart, partial Line WSTRB and broader legal fault/phase crosses remain open. This is not full Compute Cluster sign-off. |
 | S3: complete NPU IP | **OUT OF SCOPE** | DMA/CMDQ-to-compute-to-CPLQ system E2E, complete system regression, and ASIC PPA are not covered by S1/S2 evidence. |
 
 `PASS-SCOPED` means the named requirement behavior was exercised and checked in
@@ -50,11 +49,11 @@ The four transitions not hit in the prefetch-enabled 16×16 build are:
 | Transition | Disposition |
 |---|---|
 | `ST_MAC→ST_A_REQ` | This is the compile-time no-prefetch fallback. A separate 16×16, depth-4, three-seed Golden regression with prefetch disabled hit the fallback marker in all seeds. Its VDB is kept separate because compile-time profiles must not be merged into one percentage. |
-| `ST_PREFETCH_WAIT→ST_A_REQ` | The transition is guarded by `!ENABLE_NEXT_K_PREFETCH`, while `ST_PREFETCH_WAIT` is only entered by the enabled-prefetch path. In the disabled build, execution takes the direct `ST_MAC→ST_A_REQ` transition instead. Reviewed as a mutually exclusive compile-profile branch; no formal proof is claimed. |
-| `ST_IDLE→ST_ERROR_DRAIN` | Abort/watchdog require `busy`; banked protection requires an accepted banked request. The legal Matrix request path is inactive in IDLE. No legal trigger was found in the reviewed control path; no illegal unowned event was injected just to hit this bin. Formal reachability proof is not available. |
-| `ST_ERROR→ST_ERROR_DRAIN` | The state is entered after the error drain reaches zero outstanding reads; the normal request path is inactive in ST_ERROR. A new accepted request/fault is not part of the legal state contract. Reviewed against the outstanding-read invariant, without a formal unreachable proof. |
+| `ST_PREFETCH_WAIT→ST_A_REQ` | The guard depends on prefetch being disabled while `ST_PREFETCH_WAIT` is entered only in the enabled profile. Exact-SHA VC Formal property `ap_prefetch_wait_does_not_fall_back_to_a_req` is proven non-vacuously; no illegal state force was used. |
+| `ST_IDLE→ST_ERROR_DRAIN` | Abort/watchdog require `busy`; banked protection requires an accepted banked request. Exact-SHA VC Formal property `ap_idle_does_not_enter_error_drain` proves the guard under the legal descriptor/response assumptions. |
+| `ST_ERROR→ST_ERROR_DRAIN` | A new request is not legal in `ST_ERROR` after the accepted-response drain. Exact-SHA VC Formal property `ap_error_does_not_reenter_error_drain` proves the guard under the same model assumptions. |
 
-These dispositions are sufficient for the **bounded functional scope** above;
+VC Formal run R28 additionally proves the IDLE/ERROR outstanding-read invariants and reaches both `ST_PREFETCH_WAIT` and `ST_ERROR_DRAIN`. These dispositions are sufficient for the **bounded functional scope** above;
 they are not a blanket waiver of all Matrix code coverage. URG reports nine
 unhit branch outcomes in the same profile. They include 32-bit result-clamp
 branches and control/error paths. No 100% code-coverage claim is made.
@@ -96,9 +95,21 @@ The selected candidate SHA was re-used from its detached worktree after VCS lice
 - `MATRIX-SIZE-CAND-3S-C0832`: 45/45 cases passed across physical 4×4/8×8/16×16 arrays, five GEMM workloads, and three seeds.
 - `MATRIX-ABLATION-CAND-3S-C0832`: 120/120 cases passed across eight Depth/Prefetch/A-Cache configurations, five workloads, and three seeds.
 
-These runs close the exact-SHA repeatability, AXI assertion antecedent, and Matrix benchmark reproducibility items. They do not change the 38 requirement dispositions (23 PASS-SCOPED, 13 PARTIAL, 2 BLOCKED_SPEC) or close the specification-dependent and unproved FSM items. Full logs and paths are in the [Execution RTM R14–R18](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
+These runs close the exact-SHA repeatability, AXI assertion antecedent, and Matrix benchmark reproducibility items for the historical `c0832e5` candidate. The current-source disposition is updated below; the evidence remains linked in the [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
 
-**R19 common-workload benchmark addendum (2026-10-28):** From the current workspace at the same candidate product RTL SHA, a benchmark-only Matrix TB mode ran the pinned TinyNPU A/B values at 16×16×16 on both 8×8 arrays; all 256 outputs passed independent Golden checks. A second case compared native NMAForge 3×3 Conv with TinyNPU's padded-GEMM lowering of the same single-channel image/filter; both returned -30. NMAForge reports 298 cycles for GEMM and 66 for native Conv. TinyNPU reports 1,800 cycles to done / 2,056 through its 256-word result stream. The TinyNPU VCS run required a temporary DSP48E1 functional model and an `always_ff` compatibility copy because local UNISIM is unavailable and the original source has multiple procedural writers. R19 is bounded RTL simulation evidence; it is not a hardware speedup or PPA comparison. It does not change RTM dispositions. See [Execution RTM R19](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md) and [Benchmark Report](COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md).
+**R19 common-workload benchmark addendum (2026-10-28, historical candidate):** At product RTL SHA `c0832e5`, a benchmark-only Matrix TB mode ran the pinned TinyNPU A/B values at 16×16×16 on both 8×8 arrays; all 256 outputs passed independent Golden checks. A second case compared native NMAForge 3×3 Conv with TinyNPU's padded-GEMM lowering of the same single-channel image/filter; both returned -30. NMAForge reports 298 cycles for GEMM and 66 for native Conv. TinyNPU reports 1,800 cycles to done / 2,056 through its 256-word result stream. The temporary DSP48E1 functional model and `always_ff` compatibility copy under `/tmp` make this functional evidence, not hardware speedup or PPA. See R19 in the [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md) and [Benchmark Report](COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md).
+
+### Current candidate evidence (2026-10-28)
+
+The selected source SHA is `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9` (SPEC v1.4 Error ABI/priority/prefix implementation). Exact clean-worktree VCS replay passed the seven-engine top UVM on seeds `20261025/26/27`, the reset R/B slice, 25/25 checker-sensitivity mutations, Matrix formal guard checks and the two requested benchmarks. The RTM now records 24 PASS-SCOPED, 14 PARTIAL, 0 BLOCKED_SPEC and 0 NOT_RUN; no partial requirement is silently upgraded.
+
+- Error ABI, same-cycle priority and accepted-output prefix are now specified and implemented for the listed Engine causes. Three-seed directed CNM/Matrix/SFU/Conv/KV cases check selected simultaneous Abort/watchdog, code ownership and memory prefix. Full Engine × Fault × Phase × Reset coverage remains partial.
+- Matrix formal run R28 proves five non-vacuous assertions and reaches both `ST_PREFETCH_WAIT` and `ST_ERROR_DRAIN`. The default-profile FSM raw score remains 49/53; the separate no-prefetch profile hits `ST_MAC→ST_A_REQ`.
+- Matrix size benchmark passes 45/45; eight-way Depth/Prefetch/A-Cache ablation passes 120/120 over three seeds. The `32×32×64` workload improves from 1,698 to 1,187 cycles and cuts banked reads by 25% between baseline and the fully enabled configuration.
+- Real-top serial/staged/four-task parallel cycles are 1,239 / 1,070 / 1,137 (versus 1,696 serialized for four tasks), with ordered completions. They use the current production engines and behavioral scratchpad model.
+- Coordinated reset testing excludes stale R and B for a behavioral AXI responder. An actual external fabric implementation and non-FP accepted-SPAD drain/restart are still open integration evidence.
+
+Detailed Run IDs, tools, seeds and artifact paths are in [Execution RTM R24–R29](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md). These results support bounded S1/S2 review, not CL-DV-v1.0 or whole-NPU sign-off.
 
 ## Requirement disposition table
 
@@ -122,15 +133,15 @@ These runs close the exact-SHA repeatability, AXI assertion antecedent, and Matr
 | REQ-CL-016 | PASS-SCOPED | Selected cross-engine task switching and stale-response checks pass. |
 | REQ-CL-017 | PARTIAL | Parity/protection/abort prefixes are checked in selected cases; full engine × fault × phase prefix matrix is open. |
 | REQ-CL-018 | PARTIAL | Active Matrix/SFU reset drops tracked responses and recovers; external SRAM reset/late-response contract remains open. |
-| REQ-CL-019 | BLOCKED_SPEC | Same-cycle multi-fault priority and all fault-pair phases remain OPEN-CL-007. |
+| REQ-CL-019 | PARTIAL | v1.4 freezes same-cycle priority and accepted-write prefix; selected cases pass, but the full legal fault-pair/phase/reset matrix remains open. |
 | REQ-CL-020 | PARTIAL | Selected signed INT8 VDOT/GEMM numerics pass; complete opcode, saturation and boundary matrix is not closed. |
 | REQ-CL-021 | PASS-SCOPED | Four-bank CNM address/response ledger and selected GEMV Golden/parity cases pass. |
 | REQ-CL-022 | PASS-SCOPED | `MATRIX-S1-DEPTH4-3S`: 18 Golden/layout and 34 fault/recovery cases per seed; 16×16 profile covered. Broader option space and line WSTRB remain open. |
-| REQ-CL-023 | BLOCKED_SPEC | Selected SFU vectors run, but approximate/numeric tolerance subcontracts are not fully frozen. |
+| REQ-CL-023 | PASS-SCOPED | v1.3 freezes SFU integer arithmetic; 192/192 selected edge vectors are bit-exact over three seeds. Other legal length/address combinations remain outside that campaign. |
 | REQ-CL-024 | PASS-SCOPED | `CNN-KV-RAND-3S`: both Conv3x3 and depthwise opcodes; 25 convolution cases/seed across 3–6 row/column shapes; every valid-window output checked against an independent signed oracle under ready stalls and 0–7-cycle responses. Widths above 6 remain outside this run. |
 | REQ-CL-025 | PASS-SCOPED | `CNN-KV-RAND-3S`: 27 read/write round trips/seed; lengths 1–128, token/head stride fields, zero/minimum/high boundary offsets and complete memory images checked across the 512 KiB model. Exhaustive stride cross-products and out-of-aperture overflow behavior remain open. |
 | REQ-CL-026 | PASS-SCOPED | `FP-UVM-2S`: 596/596 bit-exact mixed BF16/FP16 transactions per seed; odd tails, response latency, two outstanding reads and selected parity/reset cases covered. The real-top cluster UVM also launches and checks the FP engine. |
-| REQ-CL-027 | PARTIAL | Selected engine error codes are observed; a complete Engine × Fault table is blocked by OPEN-CL-006. |
+| REQ-CL-027 | PARTIAL | v1.4 freezes supported per-engine Error ABI and priority. Selected codes/owner/prefix scenarios pass; full Engine × Fault × Phase mapping coverage remains open. |
 | REQ-CL-028 | PARTIAL | Matrix and cluster cycle counters are reported; all counter boundaries/events are not independently covered. |
 | REQ-PC-001 | PASS-SCOPED | Three-seed C0-P run covers all 21 unordered engine pairs. |
 | REQ-PC-002 | PASS-SCOPED | Same-engine queueing with other engines active passes selected scenarios. |
