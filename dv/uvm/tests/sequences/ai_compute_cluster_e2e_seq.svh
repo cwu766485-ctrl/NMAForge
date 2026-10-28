@@ -720,6 +720,152 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         clear_contract_queues(32'd2);
     endtask
 
+    task automatic run_engine_reset_drain_sweep();
+        int engine;
+        int unsigned poll;
+        bit accepted_read;
+        bit [6:0] reset_seen;
+        bit [31:0] completion_base;
+        bit [31:0] reset_dst;
+        bit [31:0] value;
+        bit [31:0] debug_head;
+        bit [31:0] debug_tail;
+        bit [31:0] debug_status;
+        bit [31:0] sentinel;
+        bit [15:0] task_id;
+        bit [31:0] desc_base;
+        uvm_hdl_data_t reset_value;
+        bit reset_ok;
+
+        reset_seen = '0;
+        // Queue setup below points CMDQ_BASE at CLUSTER_CONTRACT_CMDQ, so the
+        // reset probe descriptor must occupy that exact base slot.
+        desc_base = CLUSTER_CONTRACT_CMDQ;
+        for (engine = 0; engine < 7; engine++) begin
+            task_id = 16'h0700 + engine;
+            completion_base = CLUSTER_CONTRACT_CPLQ + 32'h400 + (engine * 32'h10);
+            reset_dst = 32'h0003_3000 + (engine * 32'h100);
+            sentinel = 32'hbad0_7000 + engine;
+            spad_write(reset_dst, sentinel);
+            for (poll = 0; poll < 4; poll++)
+                spad_write(completion_base + (poll * 4), sentinel ^ poll);
+
+            case (engine)
+                0: write_cluster_desc(desc_base, 8'h10, task_id,
+                       SCALAR_A_LOCAL, SCALAR_B_LOCAL, reset_dst,
+                       16'd0, 16'd0, 16'd64, 32'd0,
+                       32'd0, 32'd0, 32'd0, 8'd3);
+                1: write_cluster_desc(desc_base, 8'h50, task_id,
+                       FP_A_LOCAL, FP_B_LOCAL, reset_dst,
+                       16'd1, 16'd1, 16'd64, 32'd0,
+                       32'd0, 32'd0, 32'd0, 8'd7);
+                2: begin
+                    write_cnm_v3_desc(desc_base, task_id,
+                        CNM_A_LOCAL, CNM_B_LOCAL, reset_dst);
+                    spad_write(desc_base + 32'h18, 32'd64);
+                end
+                3: write_v3_desc(desc_base, 8'h30, task_id,
+                       MATRIX_A_LOCAL, MATRIX_B_LOCAL, reset_dst,
+                       16'd16, 16'd32, 16'd16);
+                4: write_v3_desc(desc_base, 8'h35, task_id,
+                       GELU_A_LOCAL, 32'd0, reset_dst,
+                       16'd0, 16'd0, 16'd64);
+                5: write_cluster_desc(desc_base, 8'h16, task_id,
+                       CONV_A_LOCAL, CONV_W_LOCAL, reset_dst,
+                       16'd3, 16'd3, 16'd9, 32'd0,
+                       32'd0, 32'd0, 32'd0, 8'd5);
+                6: write_cluster_desc(desc_base, 8'h43, task_id,
+                       KV_VECTOR_LOCAL, 32'd0, reset_dst,
+                       16'd0, 16'd0, 16'd64, {16'd1,16'd1},
+                       32'd16, 32'd64, 32'd0, 8'd5);
+                default: `uvm_fatal("CLUSTER_ENGINE_RESET", "invalid engine index")
+            endcase
+
+            configure_contract_queues(completion_base, 32'd1);
+            axil_write(REG_DOORBELL, 32'd1);
+            accepted_read = 1'b0;
+            for (poll = 0; poll < 50000; poll++) begin
+                @(posedge compute_vif.aclk);
+                if (compute_vif.engine_busy[engine]) begin
+                    if (engine == 2)
+                        accepted_read = |compute_vif.cnm_accept_mask;
+                    else if (engine == 3)
+                        accepted_read = compute_vif.matrix_request_valid &&
+                                        compute_vif.banked_ready;
+                    else
+                        accepted_read = compute_vif.engine_req_valid[engine] &&
+                                        compute_vif.engine_req_ready[engine] &&
+                                        !compute_vif.engine_req_write[engine];
+                    if (accepted_read) break;
+                end
+            end
+            if (!accepted_read)
+                begin
+                axil_read(REG_CMDQ_HEAD, debug_head);
+                axil_read(REG_CPLQ_TAIL, debug_tail);
+                axil_read(CIMFORGE_SPAD_BASE + completion_base + 32'h04,
+                          debug_status);
+                `uvm_fatal("CLUSTER_ENGINE_RESET", $sformatf(
+                    "engine %0d task_id=%04h did not accept a real SPAD read before reset; busy=%07b req=%07b cnm_accept=%b matrix_req=%b banked_ready=%b cmd_head=%0d cpl_tail=%0d cpl_status=%08h",
+                    engine, task_id, compute_vif.engine_busy,
+                    compute_vif.engine_req_valid, compute_vif.cnm_accept_mask,
+                    compute_vif.matrix_request_valid, compute_vif.banked_ready,
+                    debug_head, debug_tail, debug_status))
+                end
+
+            // Assert reset immediately after the accepted read edge so the
+            // response ledger must discard the old-epoch response cleanly.
+            #1ns;
+            reset_value = 1'b0;
+            reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
+            if (!reset_ok)
+                `uvm_fatal("CLUSTER_ENGINE_RESET", $sformatf(
+                    "failed to reset real engine %0d with an accepted read", engine))
+            repeat (4) @(posedge compute_vif.aclk);
+            if (compute_vif.engine_busy !== 7'b0)
+                `uvm_fatal("CLUSTER_ENGINE_RESET", $sformatf(
+                    "engine %0d remained busy during reset: %07b",
+                    engine, compute_vif.engine_busy))
+            #1ns;
+            reset_value = 1'b1;
+            reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
+            if (!reset_ok)
+                `uvm_fatal("CLUSTER_ENGINE_RESET", $sformatf(
+                    "failed to release reset after engine %0d", engine))
+            repeat (8) @(posedge compute_vif.aclk);
+            wait_spad_idle();
+
+            axil_read(REG_CPLQ_TAIL, value);
+            if (value !== 32'd0)
+                `uvm_fatal("CLUSTER_ENGINE_RESET", $sformatf(
+                    "engine %0d left a stale completion tail after reset: %0d",
+                    engine, value))
+            expect_spad(reset_dst, sentinel, $sformatf(
+                "engine %0d reset prevented output writeback", engine));
+            for (poll = 0; poll < 4; poll++)
+                expect_spad(completion_base + (poll * 4), sentinel ^ poll,
+                    $sformatf("engine %0d reset preserved completion word %0d",
+                              engine, poll));
+            reset_seen[engine] = 1'b1;
+            `uvm_info("CLUSTER_ENGINE_RESET_CASE_PASS", $sformatf(
+                "engine=%0d opcode=%02h accepted_read=1; reset cleared busy and preserved destination/completion image",
+                engine, (engine == 0) ? 8'h10 :
+                        (engine == 1) ? 8'h50 :
+                        (engine == 2) ? 8'h21 :
+                        (engine == 3) ? 8'h30 :
+                        (engine == 4) ? 8'h35 :
+                        (engine == 5) ? 8'h16 : 8'h43), UVM_LOW)
+        end
+
+        if (reset_seen !== 7'h7f)
+            `uvm_fatal("CLUSTER_ENGINE_RESET", $sformatf(
+                "not all real engines were reset after accepted reads: mask=%07b",
+                reset_seen))
+        `uvm_info("CLUSTER_ENGINE_RESET_PASS", $sformatf(
+            "real top reset after accepted SPAD reads on all seven engines; reset mask=%07b; stale completion, destination writeback and completion memory were checked",
+            reset_seen), UVM_LOW)
+    endtask
+
     task automatic check_request_stability();
         int unsigned e;
         if (compute_vif.engine_req_stability_violations != 0 ||
@@ -1527,6 +1673,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_inflight_parameter_latch_test();
         run_shared_readonly_isolation_test();
         check_request_stability();
+        run_engine_reset_drain_sweep();
 
         `uvm_info("COMPUTE_CLUSTER_REAL_UVM_PASS", $sformatf(
             "standalone Matrix16x32x64 Golden + 16 A-tile reuse hits; parallel Matrix/CNM GEMV with separate response tags and four-bank Golden + next-K prefetch + queued SFU tasks + concurrent abort/reset/recovery seed=%0d; prefetch_overlap=%0d matrix_cnm_overlap=%0d matrix_rsp=%0d cnm_rsp=%0d cnm_lanes=%b overlap=%0d arbiter_contention=%0d banked_grants=%0d cnm_grants=%0d core_grants=%0d",
