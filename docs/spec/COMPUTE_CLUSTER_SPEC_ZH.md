@@ -139,7 +139,7 @@ write_fire   = request_fire &&  selected_spad_write
 **[REQ-CL-006]** 请求在未接受时必须按照所属 Engine/接口的规定保持有效字段稳定；合法 Abort/Reset 例外需另定义。\
 **[REQ-CL-007]** 读响应的 data/error 必须只由拥有该已接受请求的 Engine 消费；**core_rsp_valid 不是需要 ready 二次接受的 AXI R 通道**。\
 **[REQ-CL-008]** 每一个合法接受的写事务，其地址、数据、数量和最终 Memory Image 与算子 Reference Model 一致；对于多输出算子，错误前可能存在已提交的合法前缀写入。\
-**[v1.2 Reset/Fabric 合同，收窄 OPEN-CL-003]** 普通 32-bit 请求先由真实 `ai_compute_spad_mux` 选中一个 Engine，再进入唯一 `ai_spad_arbiter` CORE client；ready/protection 只返回该 owner。注册读响应按接口合同返回已接受读的 owner，非 AXI 通道，不支持任意乱序。FP Dot Outstanding 上限为 2；其它引擎不假定统一深度。Abort 要等待各 Engine 已接受的 SPAD 操作收尾。若 reset 时仍有已接受 AXI 读/写事务，集成必须同时复位加速器与拥有该事务的 AXI fabric；fabric 清除旧 epoch 的 R/B 响应，复位释放后不得向新 epoch 返回旧响应。只复位加速器而保持 fabric 运行时，必须先排空/隔离 DMA，且 AR/AW/W/R/B 均无在途事务。该 reset 不规定外部存储内容是否清零。UVM 覆盖了已接受 AR、协调复位及释放后的旧 R 响应静默检查；B 通道旧响应和非 FP Engine 的 Abort drain 仍按其余 Open Item 追踪。
+**[v1.2 Reset/Fabric 合同，收窄 OPEN-CL-003]** 普通 32-bit 请求先由真实 `ai_compute_spad_mux` 选中一个 Engine，再进入唯一 `ai_spad_arbiter` CORE client；ready/protection 只返回该 owner。注册读响应按接口合同返回已接受读的 owner，非 AXI 通道，不支持任意乱序。FP Dot Outstanding 上限为 2；其它引擎不假定统一深度。Abort 要等待各 Engine 已接受的 SPAD 操作收尾。若 reset 时仍有已接受 AXI 读/写事务，集成必须同时复位加速器与拥有该事务的 AXI fabric；fabric 清除旧 epoch 的 R/B 响应，复位释放后不得向新 epoch 返回旧响应。只复位加速器而保持 fabric 运行时，必须先排空/隔离 DMA，且 AR/AW/W/R/B 均无在途事务。该 reset 不规定外部存储内容是否清零。VCS UVM 已分别在 accepted AR/R 与 accepted AW/W、BVALID 等待阶段执行协调复位，并检查释放后 8 周期无旧 R/B 响应、无新 DMA 请求和 DMA idle；证据针对 behavioral AXI responder。任意外部 fabric 的实现合规及非 FP Engine Abort drain 仍开放。
 
 ### 2.4 CNM 四 Bank 专用端口
 
@@ -259,7 +259,7 @@ VCS Matrix controller 另保留每任务 FSM state-cycle、Arbiter stall、响�
 **[AS-IS]** 七个引擎分别实现 Abort、超时和 SPAD 错误响应；Cluster 没有统一异常 FSM。
 
 **[REQ-CL-017]** 错误码与 Result 归属必须来自当前 Engine；发生错误后的内存写入必须符合该 Opcode 已提交前缀的规则。\
-**[REQ-CL-018]** Reset 后无新任务不得出现旧任务 Done/写请求；已接受存储读请求的 Drain/Discard 语义需按 Cluster+SPAD Subsystem 单独审查。\
+**[REQ-CL-018]** Reset 后无新任务不得出现旧任务 Done/写请求；已接受外部存储读/写请求的 Drain/Discard 语义需按 Cluster+SPAD Subsystem 单独审查。\
 **[REQ-CL-019]** 不允许未验证的 Abort/Reset 同拍组合破坏新任务、泄漏旧任务结果。\
 **[v1.0 Block 错误码决议，产品 P0 OPEN-CL-006 未关闭]** 错误码按 Engine × Fault 的当前 RTL 原始值建立 Oracle：Conv 的 ERR_SPAD=4、ERR_WATCHDOG=7；KV 的 ERR_SPAD=4、ERR_WATCHDOG=4（同值无法区分）；FP/Matrix/CNM 常见 Watchdog=4、Parity=5、Protection=6。不得宣称全 Engine 已统一产品 ABI；该跨引擎语义测试为 BLOCKED_SPEC，待产品设计决策后升级 SPEC。\
 **[OPEN-CL-007，P1]** Abort 与 Parity/Protection/Watchdog 同周期发生时，各 Engine 的优先级及在途读排空策略需要逐个冻结，不应在没有规格依据时随意判错。

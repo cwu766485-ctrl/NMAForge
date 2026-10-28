@@ -75,7 +75,7 @@ remaining C1 closure
 | REQ-CL-015 | 正常执行完整性 | 每Opcode数值正确、合法写回、唯一done；`tc_cl_normal_all_ops` | per-op Oracle + memory result checker | `opcode × shape × numeric_class` | P0 READY |
 | REQ-CL-016 | 跨Engine切换 | FP→Matrix→CNM→SFU等连续任务防迟到污染；`tc_cl_engine_switch` | owner tracker + stale-response checker | `prev_engine × next_engine × spacing` | P0 READY |
 | REQ-CL-017 | 错误后写入前缀 | Parity/Protection/Watchdog/Abort已接受写入正确；`tc_cl_error_prefix` | prefix-memory scoreboard + error model | `engine × fault × phase` | P0 PARTIAL_SPEC |
-| REQ-CL-018 | 复位隔离 | Reset后不泄漏Done/写；旧读响应正确丢弃；`tc_cl_reset_stale` | reset epoch ledger / post-reset memory monitor | `engine × reset_phase × pending_reads` | P0 PARTIAL；REQ-PC-010 的协调式 AXI read reset 合同已冻结并定向通过；非 FP abort/reset phase 与 AXI B 旧响应仍 OPEN |
+| REQ-CL-018 | 复位隔离 | Reset后不泄漏Done/写；旧 R/B 响应正确丢弃；`tc_cl_reset_stale` | reset epoch ledger / post-reset memory monitor | `engine × reset_phase × pending_reads × pending_writes` | P0 PARTIAL；R22 在 behavioral responder 上通过 accepted AR/R、AW/W/pending-B 协调复位与恢复；非 FP Abort drain/restart 和目标外部 fabric 仍 OPEN |
 | REQ-CL-019 | 同时异常恢复 | Abort/Reset及其它异常的合法交错；`tc_cl_fault_races` | fault priority oracle + owner monitor | `engine × fault_pair × phase` | P1 BLOCKED_SPEC |
 | REQ-CL-020 | Scalar INT8 | Signed 4lane packed VDOT/GEMV/GEMM/legacyConv,算术边界；`tc_cl_scalar_numeric` | independent bit-exact integer model | `opcode × sign_pattern × saturation` | P0 READY |
 | REQ-CL-021 | CNM numerics | 4Bank局部ACC/global reduction, K/M边界；`tc_cl_cnm_numeric` | bank-aware integer golden + memory compare | `op × K × M × bank_phase` | P0 READY |
@@ -344,7 +344,7 @@ line/condition/FSM-transition/branch=`96.45/88.52/49/53 (92.45%)/95.02%`；FSM �
 | C1-MUTATION-STAGEA：Address/Data/Owner/WSTRB/Done checker sensitivity | 在 monitor copied observation 上作五类 mutation，driver、DUT RTL、memory 不变 | 五种 mutation 全部由预期 scoreboard/checker 检出；不折算为 RTL mutation score | `CC-STAGEA-MUT-5`；`/tmp/nmaforge_stageA_clean_03bf257_mutations/{address,data,owner,wstrb,done}.log` | **PASS 5/5（checker sensitivity）** |
 | CLUSTER-BENCH-001：serial / staged parallel / queued execution | 同一 descriptor workload，对比 `Matrix→CNM→SFU` 与 Matrix+CNM overlap 后运行 SFU；再比较四任务队列 | `1239→1070` cycles (1.158×)；four-task sequential/queued `1696→1137` (1.492×)，completion 顺序保持。CNM+DMA subsystem contention 三 seed PASS；Matrix+CNM+DMA top 同发受 DMA busy gate 阻挡 | `CC-STAGEA-UVM-3S`、`DMA-CNM-STAGEA-3S`；[benchmark report](COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md) | **PASS（测试模式）/ BLOCKED（三引擎 DMA 模式）** |
 
-**当前覆盖率结论**：最新 focused UVM group、Matrix DUT-only URG、四项 FSM transition disposition、R14–R21 clean-candidate/benchmark evidence 见 2026-10-28 Execution RTM 与 Readiness Report。R14 focused compute group 为 `98.96%`；R15 AXI URG 为 20/22 assertions success，另外两项 UVM RAL 未尝试，五个 AXI master assertions 和三个 stall cover 均命中。R21 扩大了 SFU 数值边界向量，但 VDB 百分比不代表整个 Cluster 覆盖率。completion read-response bin 对 write-only writer 显式 WAIVED/N/A。上述覆盖率不等于 REQ-CL closure；Merged top URG 包含 DUT、SVA、testbench 与 UVM，不能作为 DUT-only closure。旧的 `97.92%` 与 3,536-word 数字属于更早 SHA 的历史运行。
+**当前覆盖率结论**：最新 focused UVM group、Matrix DUT-only URG、FSM transition disposition、R14–R23 clean-candidate/benchmark/formal evidence 见 2026-10-28 Execution RTM 与 Readiness Report。R14 focused compute group 为 `98.96%`；R15 AXI URG 为 20/22 assertions success，另外两项 UVM RAL 未尝试，五个 AXI master assertions 和三个 stall cover 均命中。R21 扩大了 SFU 数值边界向量，R23 对三条 Matrix FSM guard 做了非空洞 formal disposition，但 VDB 百分比不代表整个 Cluster 覆盖率。completion read-response bin 对 write-only writer 显式 WAIVED/N/A。上述覆盖率不等于 REQ-CL closure；Merged top URG 包含 DUT、SVA、testbench 与 UVM，不能作为 DUT-only closure。旧的 `97.92%` 与 3,536-word 数字属于更早 SHA 的历史运行。
 
 CNM RTL 改动后的定向复核也通过：`ai_cnm_signoff` 中 A2 GEMV、A3 GEMM
 benchmark（L=16/64/256）、SPAD arbiter contention/protection checks 和 top
@@ -375,7 +375,7 @@ make -C dv/uvm/sim uvm_compute_cluster_regress \
 | Issue | 影响需求 | 计划处理/状态 |
 |---|---|---|
 | OPEN-CL-006 — Error ABI | REQ-CL-017/019/027 | 全局统一码 BLOCKED_SPEC；现有 per-engine 原始码 subset READY |
-| OPEN-CL-003 — Abort/Reset Drain | REQ-CL-007/014/016/018/019、REQ-PC-009/010 | v1.2 已冻结协调式 AXI reset/epoch 边界，`CC-RESET-FABRIC-UVM-20261028-1022` 验证已接受 AR 后无旧 R 泄漏；非 FP outstanding 深度、Abort drain/restart 与 AXI B 旧响应仍 OPEN |
+| OPEN-CL-003 — Abort/Reset Drain | REQ-CL-007/014/016/018/019、REQ-PC-009/010 | v1.2 已冻结协调式 AXI reset/epoch 边界；R22 在 behavioral responder 上验证 accepted AR/R 与 AW/W/pending-B 后复位无旧 R/B 泄漏。非 FP outstanding 深度、Abort drain/restart、目标外部 fabric 合规和更广 phase cross 仍 OPEN |
 | OPEN-CL-002 — 参数合法范围 | REQ-CL-004/005/020~025 | 子模型按 validator/engine 各自边界；未核实组合 BLOCKED_SPEC |
 | OPEN-CL-004 — Matrix Line WSTRB | REQ-CL-010/022 | 常规完整 line 可测；部分掩码及不齐整 WSTRB 需 Design Review |
 | OPEN-CL-007 — 同拍故障优先级 | REQ-CL-017/019/027 | 单一故障先测；复合 Fault Cross 在定义前 BLOCKED_SPEC |

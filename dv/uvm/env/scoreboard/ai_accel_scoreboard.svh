@@ -39,6 +39,7 @@ class ai_accel_scoreboard extends uvm_component;
         }
     endgroup
     bit dma_reset_probe_ar_seen;
+    bit dma_reset_probe_aw_seen;
     bit ddr_reset_recovery_ar_seen;
     bit [127:0] dot_expected_rdata_q[$];
     bit [127:0] dot_expected_rmask_q[$];
@@ -249,7 +250,20 @@ class ai_accel_scoreboard extends uvm_component;
                     end
                 end
                 AXI_AW: begin
-                    if (tr.addr == MIXED_E2E_NARROW_DDR_WRITE_ADDR) begin
+                    if (tr.addr == 64'h0000_0000_0000_1aa0) begin
+                        if ((tr.size != 3'd4) || (tr.len != 0) ||
+                            (tr.burst != 2'b01))
+                            `uvm_error("MIXED_E2E_AXI_AW", $sformatf("expected reset-probe single 128-bit INCR beat, addr=0x%h size=%0d len=%0d burst=%0d", tr.addr, tr.size, tr.len, tr.burst))
+                        if (dma_reset_probe_aw_seen)
+                            `uvm_error("MIXED_E2E_AXI_AW", "duplicate reset-probe DMA write")
+                        dma_reset_probe_aw_seen = 1'b1;
+                        // This write's B response is deliberately interrupted
+                        // by the coordinated reset. Track its accepted W data
+                        // but do not enqueue an expected B, so any old-epoch B
+                        // observed after reset is reported as an orphan.
+                        dot_expected_wdata_q.push_back(32'hbadd_1eaf);
+                        dot_expected_wlane_q.push_back(tr.addr[3:2]);
+                    end else if (tr.addr == MIXED_E2E_NARROW_DDR_WRITE_ADDR) begin
                         if ((tr.size != 3'd2) || (tr.len != 0) ||
                             (tr.burst != 2'b01))
                             `uvm_error("MIXED_E2E_AXI_AW", $sformatf("expected single narrow-32 INCR write, addr=0x%h size=%0d len=%0d burst=%0d", tr.addr, tr.size, tr.len, tr.burst))
@@ -356,16 +370,17 @@ class ai_accel_scoreboard extends uvm_component;
                 (dot_expected_rmask_q.size() != 0) ||
                 (dot_expected_rid_q.size() != 0) || !fp16_y_aw_seen ||
                 !bf16_y_aw_seen || !int8_y_aw_seen || !narrow_axi_read_ar_seen ||
-                !narrow_axi_write_aw_seen || (dot_w_count != 4) || (dot_b_count != 4) ||
+                !narrow_axi_write_aw_seen || (dot_w_count != 5) || (dot_b_count != 4) ||
                 (dot_expected_bid_q.size() != 0) || (dot_expected_wdata_q.size() != 0) ||
                 (dot_expected_wlane_q.size() != 0) ||
                 (expect_dma_read_error &&
                  (dma_error_ar_count != 2 || dma_error_r_count != 2 || dma_error_ar_pending ||
                   dma_error_position_cg.get_coverage() != 100.0)) ||
-                !dma_reset_probe_ar_seen || !ddr_reset_recovery_ar_seen)
-                `uvm_error("MIXED_E2E_AXI_SUMMARY", $sformatf("incomplete mixed DDR path FP16_AR=%0b/%0b BF16_AR=%0b/%0b INT8_AR=%0b/%0b R=%0d W=%0d B=%0d pending_R=%0d pending_B=%0d AW=%0b/%0b/%0b DMA_ERR_R=%0d pending_err=%0b DMA_RESET_AR=%0b DDR_RESET_RECOVERY_AR=%0b", fp16_a_ar_seen, fp16_b_ar_seen, bf16_a_ar_seen, bf16_b_ar_seen, int8_a_ar_seen, int8_b_ar_seen, dot_r_count, dot_w_count, dot_b_count, dot_expected_rdata_q.size(), dot_expected_bid_q.size(), fp16_y_aw_seen, bf16_y_aw_seen, int8_y_aw_seen, dma_error_r_count, dma_error_ar_pending, dma_reset_probe_ar_seen, ddr_reset_recovery_ar_seen))
+                !dma_reset_probe_ar_seen || !dma_reset_probe_aw_seen ||
+                !ddr_reset_recovery_ar_seen)
+                `uvm_error("MIXED_E2E_AXI_SUMMARY", $sformatf("incomplete mixed DDR path FP16_AR=%0b/%0b BF16_AR=%0b/%0b INT8_AR=%0b/%0b R=%0d W=%0d B=%0d pending_R=%0d pending_B=%0d AW=%0b/%0b/%0b DMA_ERR_R=%0d pending_err=%0b DMA_RESET_AR=%0b DMA_RESET_AW=%0b DDR_RESET_RECOVERY_AR=%0b", fp16_a_ar_seen, fp16_b_ar_seen, bf16_a_ar_seen, bf16_b_ar_seen, int8_a_ar_seen, int8_b_ar_seen, dot_r_count, dot_w_count, dot_b_count, dot_expected_rdata_q.size(), dot_expected_bid_q.size(), fp16_y_aw_seen, bf16_y_aw_seen, int8_y_aw_seen, dma_error_r_count, dma_error_ar_pending, dma_reset_probe_ar_seen, dma_reset_probe_aw_seen, ddr_reset_recovery_ar_seen))
             else
-                `uvm_info("MIXED_E2E_AXI_SUMMARY", $sformatf("checked six operand reads, one post-reset recovery read, one narrow-32 read, three result writes, one narrow-32 write, two two-beat DMA SLVERR bursts count=%0d, and one reset-interrupted DMA AR", dma_error_r_count), UVM_LOW)
+                `uvm_info("MIXED_E2E_AXI_SUMMARY", $sformatf("checked six operand reads, one post-reset recovery read, one narrow-32 read, three result writes, one narrow-32 write, two two-beat DMA SLVERR bursts count=%0d, plus reset-interrupted DMA AR and AW/W with no old B response", dma_error_r_count), UVM_LOW)
         end
         if (check_external_macro_fetch) begin
             if ((external_macro_fetch_count != expected_external_macro_fetch_count) ||
