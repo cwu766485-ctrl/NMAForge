@@ -1198,13 +1198,27 @@ module tb_ai_tensor_matrix_core_random;
     repeat(5) @(negedge clk);abort=1;@(negedge clk);abort=0;
     finish_fault(ERR_ABORT,9);
 
-    // Abort wins over a same-cycle bank parity/protection fault and watchdog.
+    // Abort wins over an already-expired watchdog while the command remains
+    // active. Wait for the threshold before asserting Abort at the sampling
+    // edge; the earlier test only asserted Abort before expiry.
+    simple_fault_setup();watchdog_limit=32'd3;
+    @(negedge clk);start=1;@(negedge clk);start=0;
+    timeout_cycles=0;
+    while((!busy || cycle_count<watchdog_limit) && timeout_cycles<2000) begin
+      @(negedge clk);timeout_cycles=timeout_cycles+1;
+    end
+    if(!busy || cycle_count<watchdog_limit)
+      $fatal(1,"Matrix Abort/watchdog priority probe missed active expiry");
+    abort=1;@(negedge clk);abort=0;
+    finish_fault(ERR_ABORT,10);
+
+    // Abort also wins a selected same-cycle bank parity/protection response.
     simple_fault_setup();prepare_case(4,4,2,1,0,0,0,0,0,0,0);
-    watchdog_limit=1;bank_parity_target_issue=bank_read_count;
+    bank_parity_target_issue=bank_read_count;
     inject_bank_parity=1;inject_bank_protection=1;
     bank_protection_addr=SRC0_BASE;
     @(negedge clk);start=1;@(negedge clk);start=0;abort=1;
-    finish_fault(ERR_ABORT,10);
+    finish_fault(ERR_ABORT,11);
     abort=0;inject_bank_parity=0;inject_bank_protection=0;
     run_outstanding_abort();
     run_outstanding_parity_fault();

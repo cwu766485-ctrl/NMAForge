@@ -22,9 +22,10 @@ module ai_kv_cache_engine(
   localparam [7:0] OP_KV_WRITE = 8'h43;
   localparam [7:0] OP_KV_READ  = 8'h44;
   localparam [3:0] ERR_CONFIG   = 4'd1;
+  localparam [3:0] ERR_OP       = 4'd2;
   localparam [3:0] ERR_ABORT    = 4'd3;
-  localparam [3:0] ERR_SPAD     = 4'd4;
   localparam [3:0] ERR_WATCHDOG = 4'd4;
+  localparam [3:0] ERR_SPAD     = 4'd7;
 
   localparam [2:0] ST_IDLE      = 3'd0;
   localparam [2:0] ST_READ_REQ  = 3'd1;
@@ -60,7 +61,8 @@ module ai_kv_cache_engine(
       else if(state_r!=ST_ERROR && ((spad_error && busy) || (abort && busy))) begin error<=1; error_code<=abort?ERR_ABORT:ERR_SPAD; state_r<=ST_ERROR; end
       else case(state_r)
         ST_IDLE: begin busy<=0; error<=0; error_code<=0; if(start) begin
-          if(length==0 || !valid_operation) begin error<=1; error_code<=ERR_CONFIG; state_r<=ST_ERROR; end
+          if(length==0) begin error<=1; error_code<=ERR_CONFIG; state_r<=ST_ERROR; end
+          else if(!valid_operation) begin error<=1; error_code<=ERR_OP; state_r<=ST_ERROR; end
           else begin busy<=1; write_r<=starts_kv_write; src_r<=src0_base; dst_r<=dst_base;
             cache_offset_r <= (aux0[15:0]*src0_stride) + (aux0[31:16]*src1_stride);
             length_r<=length; index_r<=0; result<=0; element_count<=0; watchdog_r<=watchdog_limit; state_r<=ST_READ_REQ; end

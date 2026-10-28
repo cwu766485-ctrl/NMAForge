@@ -159,6 +159,36 @@ module tb_ai_banked_cnm_random;
     end
   endtask
 
+  task automatic expect_abort_over_expired_watchdog;
+    integer writes_before;
+    begin
+      op_mode=8'h20;length=3;watchdog_limit=32'd1;
+      abort=0;parity_error=0;inject_cnm_protection=0;
+      inject_spad_protection=0;writes_before=spad_write_count;
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      timeout=0;
+      while((!busy || cycles<watchdog_limit) && timeout<2000) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(!busy || cycles<watchdog_limit)
+        $fatal(1,"CNM priority probe missed expiry busy=%b cycles=%0d watchdog=%0d done=%b error=%b state=%0d timeout=%0d",
+               busy,cycles,watchdog_limit,done,error,dut.state_r,timeout);
+      // The command is still active on this cycle. Assert Abort before the
+      // next sampling edge so it competes with the already-expired watchdog.
+      abort=1;
+      @(negedge clk);abort=0;
+      timeout=0;
+      while(!done && timeout<20000) begin @(negedge clk);timeout=timeout+1;end
+      if(!done || !error || error_code!==4'd3 || busy)
+        $fatal(1,"CNM Abort/watchdog priority code=%0d expected=3",error_code);
+      if(spad_write_count!=writes_before)
+        $fatal(1,"CNM Abort/watchdog priority committed an output write");
+      watchdog_limit=0;
+      repeat(2) @(negedge clk);
+    end
+  endtask
+
   task automatic check_reset_recovery;
     begin
       @(negedge clk);start=1;
@@ -223,6 +253,7 @@ module tb_ai_banked_cnm_random;
     inject_cnm_protection=1;expect_cnm_error(4'd6,2);
     inject_spad_protection=1;expect_cnm_error(4'd6,3);
     watchdog_limit=1;expect_cnm_error(4'd4,4);
+    expect_abort_over_expired_watchdog();
     launch_abort_error();
     // Abort dominates a simultaneous local parity/protection and SPAD
     // protection fault while the command is active.
