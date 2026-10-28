@@ -17,7 +17,8 @@ COV_METRICS := line+cond+fsm+branch
 	core-prefetch-handoff-test core-prefetch-handoff-regress \
 	core-no-prefetch-fallback-regress \
 	datapath-random-regress core-random-regress array-random-regress \
-	matrix-size-benchmark matrix-pipeline-benchmark matrix-config-comparison
+	matrix-size-benchmark matrix-pipeline-benchmark matrix-config-comparison \
+	tinynpu-matched-benchmark
 
 datapath-random-test: datapath-random-run
 
@@ -187,3 +188,24 @@ matrix-config-comparison:
 		done; \
 	done; \
 	python3 ../../../../../tools/summarize_matrix_config_bench.py --root $(MATRIX_CONFIG_OUT) --seed $(SEED)
+
+# Matched signed-INT8 16x16x16 GEMM using the pinned TinyNPU testbench's
+# deterministic A/B values. Keep this on an 8x8 physical array and the same
+# one-cycle behavioral bank response used by the local Matrix benchmark.
+TINY_MATCH_OUT ?= /tmp/nmaforge_matrix_tinynpu_match_$(SEED)
+tinynpu-matched-benchmark:
+	mkdir -p $(TINY_MATCH_OUT)
+	$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+		+define+MATRIX_MAX_OUTSTANDING_READS=4 \
+		+define+MATRIX_A_TILE_CACHE_ENABLE=1 \
+		+define+MATRIX_NEXT_K_PREFETCH_ENABLE=1 \
+		+define+MATRIX_ARRAY_SIZE=8 -top tb_ai_tensor_matrix_core_random \
+		-Mdir=$(TINY_MATCH_OUT)/csrc \
+		../../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v \
+		../../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv \
+		../../../../../rtl/compute/matrix/ai_tensor_matrix_core.v \
+		../tb/tb_ai_tensor_matrix_core_random.sv \
+		-o $(TINY_MATCH_OUT)/simv -l $(TINY_MATCH_OUT)/compile.log
+	$(TINY_MATCH_OUT)/simv +SEED=$(SEED) +TINY_NPU_MATCH_ONLY -l $(TINY_MATCH_OUT)/run.log
+	grep -q '^MATRIX_CORE_CASE_PASS id=105 shape_mnk=16,16,16 ' $(TINY_MATCH_OUT)/run.log
+	grep -q '^MATRIX_TINY_NPU_MATCH_PASS .*shape=16x16x16 physical_array=8x8 ' $(TINY_MATCH_OUT)/run.log

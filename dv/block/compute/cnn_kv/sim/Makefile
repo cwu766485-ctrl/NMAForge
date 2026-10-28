@@ -5,6 +5,7 @@ COV_METRICS := line+cond+fsm+branch
 
 .PHONY: random-latency-test random-latency-compile random-latency-run
 .PHONY: random-latency-regress
+.PHONY: tinynpu-cnn-matched-benchmark
 
 random-latency-test: random-latency-run
 
@@ -33,3 +34,16 @@ random-latency-regress: random-latency-compile
 			-l $(OUT_DIR)/run_seed_$$seed.log; \
 		grep -q "^CNN_KV_RANDOM_LATENCY_PASS .*seed=$$seed " $(OUT_DIR)/run_seed_$$seed.log; \
 	done
+
+TINYNPU_CNN_OUT ?= /tmp/nmaforge_cnn_tinynpu_match_$(SEED)
+tinynpu-cnn-matched-benchmark:
+	mkdir -p $(TINYNPU_CNN_OUT)
+	$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+		-Mdir=$(TINYNPU_CNN_OUT)/csrc \
+		-top tb_ai_cnn_kv_random_latency \
+		../../../../../rtl/compute/cnn/ai_conv3x3_linebuffer_core.v \
+		../../../../../rtl/compute/kv/ai_kv_cache_engine.v \
+		../tb/tb_ai_cnn_kv_random_latency.sv \
+		-o $(TINYNPU_CNN_OUT)/simv -l $(TINYNPU_CNN_OUT)/compile.log
+	$(TINYNPU_CNN_OUT)/simv +SEED=$(SEED) +TINYNPU_CONV_MATCH_ONLY -l $(TINYNPU_CNN_OUT)/run.log
+	grep -q '^CNN_TINYNPU_MATCH_PASS ' $(TINYNPU_CNN_OUT)/run.log

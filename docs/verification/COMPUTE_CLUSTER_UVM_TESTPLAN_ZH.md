@@ -2,11 +2,11 @@
 
 > **文档编号**：NMA-CL-DV-TP-001\
 > **版本**：v1.1 / Parallel Compute Requirement Traceability Baseline\
-> **日期**：2026-10-27\
+> **日期**：2026-10-28\
 > **对应规格**：[Compute Cluster SPEC v1.1](../spec/COMPUTE_CLUSTER_SPEC_ZH.md)\
-> **当前签核候选**：`c83ad7463265062d4edb84d57fe4ada8195f9b10` 的 detached clean worktree 已重跑 Matrix depth-4 三 seed、prefetch-disabled fallback 三 seed、七引擎 top UVM 三 seed、25 项 checker-sensitivity mutation 和 top smoke。S1 Matrix Block 为 bounded PASS；S2 当前验证切片为 bounded PASS，但全 38 项 REQ closure 仍 HOLD（16 PASS-SCOPED、17 PARTIAL、2 BLOCKED_SPEC、3 NOT_RUN）。精确 run ID、覆盖率、签核边界和日志路径见[2026-10-27 S1/S2 签核候选报告](COMPUTE_CLUSTER_S1_S2_SIGNOFF_CANDIDATE_2026-10-27.md)。Stage A 的 `03bf257` 及更早 SHA 记录仍作为历史证据保留。\\
+> **当前审查候选**：候选 SHA `c0832e5c822de1a03f82751d5ff8f831d0addb98`。38 项 RTM 仍为 23 PASS-SCOPED、13 PARTIAL、2 BLOCKED_SPEC、0 NOT_RUN。R14–R18 补齐了 clean-SHA 三 seed top replay、16-seed AXI SVA E2E、25/25 checker sensitivity、45/45 Matrix size cases 和 120/120 八配置 benchmark；R19 增加同输入 TinyNPU GEMM 与卷积 lowering 基准。**不得据此宣称 CL-DV-v1.0 已签核。** 当前控制文件是[Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)、[Sign-off Readiness](COMPUTE_CLUSTER_DV_SIGNOFF_READINESS_2026-10-27.md)、[Benchmark](COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md)与[Open Issues](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md)。旧 SHA/旧计数保留为历史运行记录。\\
 > **Owner**：NMAForge DV\
-> **Stage A 历史状态**：在 tested SHA `03bf257afdca9b0041ff80b6d30cbaf8107cf7e0` 完成的原始数据见 Stage A 报告。最新 clean-SHA 回归和状态以上述 2026-10-27 候选报告为准。全 C1 REQ closure、完整 fault cross、partial-WSTRB image、ASIC PPA 与产品 signoff 仍未完成。
+> **Stage A 历史状态**：在 tested SHA `03bf257afdca9b0041ff80b6d30cbaf8107cf7e0` 完成的原始数据见 Stage A 报告。当前逐项结论以 2026-10-28 Execution RTM 和 Readiness Report 为准。全 C1 REQ closure、完整 fault cross、partial-WSTRB image、FSM formal unreachable proof、ASIC PPA 与产品 signoff 仍未完成。
 
 ## 0. 范围、冻结及验证分层
 
@@ -51,6 +51,8 @@ remaining C1 closure
 **Monitor 事实来源**：Expected 应从命令 Monitor 和不依赖 DUT 的数值/内存模型生成；Observed 来自真实有效握手/Done/Memory；不要只由 Driver 自述接收作为 Checker 输入。每笔读先登记 accepted，再比对实际 response，不能假设 SPAD 有 AXI Read ID。
 
 ## 2. 需求映射矩阵（逐条 REQ）
+
+> 本节 `READY`/`PARTIAL_SPEC` 是测试规划状态，表中执行细节是按日期记录的历史增量。当前执行判定和逐条证据以[2026-10-27 Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)为准。
 
 **Status 定义**：`READY`=合法规格足以实现测试，**不是 PASS**；`PARTIAL_SPEC`=可测试已明确子集，其余需解除依赖；`BLOCKED_SPEC`=未经 Design Owner 决策，不得给出 DUT PASS/FAIL；`NOT_RUN/PASS/FAIL/WAIVED` 是执行阶段另行填写的结果。
 
@@ -174,7 +176,13 @@ agent、memory model、coverage collector 与 protocol assertions 仍是后续�
 
 ## 7. Regression Entry / Evidence / Closure
 
-> 本节早期 SHA 与较低覆盖率记录保留为历史。当前 S1/S2 候选结论、38 项 Requirement disposition、clean-SHA run ID、Matrix FSM miss 审查和 25 项 checker-sensitivity 证据以[2026-10-27 S1/S2 签核候选报告](COMPUTE_CLUSTER_S1_S2_SIGNOFF_CANDIDATE_2026-10-27.md)为准；Stage A 与旧 SHA 结果仍见[历史 Stage A 与 Benchmark 证据表](COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md)。
+> 本节早期 SHA 与较低覆盖率记录保留为历史。当前逐项 Requirement disposition、Matrix FSM/SVA 未命中项和 checker-sensitivity 证据以[2026-10-28 Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)和[Readiness Report](COMPUTE_CLUSTER_DV_SIGNOFF_READINESS_2026-10-27.md)为准；Benchmark 与 TinyNPU 对标边界见[Benchmark Report](COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md)。Stage A 与更早 SHA 记录仍可用于历史回溯。
+
+**2026-10-27 exact-candidate clean replay：** VCS/URG `V-2023.12-SP1_Full64` 在 detached clean worktree 对 `c0832e5c822de1a03f82751d5ff8f831d0addb98` 完成三 seed 回归（`20261025/20261026/20261027`），`make` 与 URG merge 均 PASS。每 seed：4,946 accepted writes、5,256 words checked、mismatch/unknown/stale/orphan 均为 0，UVM warning/error/fatal=`0/0/0`；focused group 为 29/30 bins=`98.96%`。日志、命令、SHA-256 与 SVA disposition 见[Execution RTM R14](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)。这关闭了候选 SHA clean replay 流程项，不关闭 38 项 requirement 中的 partial/blocked 项。
+
+**2026-10-28 exact-candidate follow-up (R15–R18)：** 在同一 detached 候选 SHA、无源文件改动的 worktree 上补跑 16-seed mixed-precision DDR E2E、25 项 checker-sensitivity mutation、Matrix 4×4/8×8/16×16 size sweep 三 seed，以及八配置消融三 seed。结果分别为 AXI/FP E2E PASS、25/25、45/45、120/120。URG 显示 20/22 assertions success，另外 2 项 UVM RAL assertion 无 attempts、0 failure/incomplete；五条 AR/AW/W payload/burst assertion 均有 real success，AR/AW/W stall-to-accept cover 匹配 166/70/107 次。Mutation 仍只修改 passive monitor observation copy；不能把 25/25 说成 RTL mutation score。详细命令、seed 和产物目录见 [Execution RTM R15–R18](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)。这些结果不改变 RTM 的 23 PASS-SCOPED / 13 PARTIAL / 2 BLOCKED_SPEC 状态。
+
+**2026-10-28 TinyNPU matched workload (R19)：** Candidate NMAForge Matrix 与 pinned TinyNPU 都用 8×8 physical array 跑 16×16×16 signed INT8 GEMM，使用相同输入且 256 个 INT32 输出均通过独立 Golden。另以相同 3×3 单通道 image/filter 比较 NMAForge native Conv 与 TinyNPU padded GEMM lowering，输出均为 -30。TinyNPU VCS 运行需要临时 DSP48E1 functional model 和 `always_ff` 兼容副本；数据代表此行为仿真/计时边界，不代表 UNISIM 或 FPGA PPA。见 [Benchmark Report](COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md) 和 [Execution RTM R19](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)。
 
 
 执行第一步先记录固定 Commit SHA、`git status --porcelain`、`vcs -ID`、`urg -version`、`make -n` 和回归环境的库/许可证状态。
@@ -320,6 +328,10 @@ line/condition/FSM-transition/branch=`96.45/88.52/49/53 (92.45%)/95.02%`；FSM �
 
 | Requirement | Testpoint / Checker | Coverage / 审查结果 | Run ID / artifact | Result |
 |---|---|---|---|---|
+| CLEAN-CLUSTER-001：候选版本可复现回归 | detached clean worktree；`ai_compute_cluster_e2e_test`；memory scoreboard、owner ledger、SVA/URG | Exact SHA `c0832e5c822de1a03f82751d5ff8f831d0addb98`；三 seed PASS；每 seed 5,256 words checked，无 mismatch/unknown/stale/orphan；UVM severity `0/0/0`；focused group `98.96%` | `CLUSTER-S2-CAND-CLEAN-3S`；`/tmp/nmaforge_signoff_clean_c0832e5_20261027/` | **PASS（top UVM replay）**；其他 requirement 状态不变 |
+| AXI-SVA-001：AXI master properties 非空洞 | real DDR/FP E2E AXI traffic；URG assertion + cover properties | 16 seed；AR/AW/W stalls 与 gap；五条 AR/AW/W payload/burst assertion 均 real-success；AR/AW/W stall-to-accept=`166/70/107`；2 个 UVM RAL assertion 未尝试 | `CLUSTER-AXI-E2E-COV-16S-C0832`；`/tmp/nmaforge_c0832e5_axi_cov_20261028/urg_merged/` | **PASS（AXI assertion scope）**；compute requester/fault cross 仍 OPEN |
+| MATRIX-SIZE-CAND-001：固定 SHA 物理阵列对照 | 4×4/8×8/16×16 physical array × 5 个 GEMM × 3 seed | 45/45；同 SHA、同 workload、one-cycle behavioral SPAD；记录 cycles/MAC/cycle/utilization/SPAD reads/stalls | `MATRIX-SIZE-CAND-3S-C0832`；`/tmp/nmaforge_matrix_size_c0832e5_{20261025,20261026,20261027}/` | **PASS（cycle benchmark）**；不是 SRAM timing/PPA |
+| MATRIX-ABLATION-CAND-001：Depth/Prefetch/Cache 八配置 | 2/4 outstanding × prefetch off/on × cache off/on × 5 workloads × 3 seed | 120/120；相同五 workload；每 seed 输出 CSV | `MATRIX-ABLATION-CAND-3S-C0832`；`/tmp/nmaforge_matrix_config_c0832e5_{20261025,20261026,20261027}/` | **PASS（cycle benchmark）**；TinyNPU 同输入 GEMM/CNN lowering 见 R19 |
 | C1-ENG-001：真实 top 七引擎功能与 completion | `ai_compute_cluster_e2e_seq`；每引擎独立 Golden、completion/order、backpressure、Abort/Reset recovery | Latest SHA `03bf257afdca9b0041ff80b6d30cbaf8107cf7e0` 三 seed；parity 14/14、scoreboard 4,852 words/seed 无 mismatch/unknown/stale，UVM severity 0/0/0；focused group 99.0%。DMA response-client 命中；completion read-response 显式 WAIVED/N/A（writer write-only） | `CC-STAGEA-UVM-3S`；`/tmp/nmaforge_stageA_clean_03bf257_uvm/seed_{20261025,20261026,20261027}/run.log` | **PASS（定向 slice）**；完整 C1 REQ closure 仍 OPEN |
 | C1-MEM-001：scratchpad read/write 与 Golden memory image | `ai_compute_cluster_scoreboard`；byte-addressed model、accepted-read snapshot、client/lane/engine owner、WSTRB 与 epoch 检查 | 每 seed `writes=4444`, `checked_words=4852`, `mismatches=0`, `unknown_reads=0`, `stale_epoch=0`; line WSTRB full/partial/zero=`512/0/0`; all four banks/seven engine bits active | `CC-STAGEA-UVM-3S`；clean logs同上 | **PASS（观察到的 traffic classes）**；partial-WSTRB 和完整 REQ image 仍 OPEN |
 | C1-FAULT-001：engine / operand / CNM-lane parity cross | Stage A exact-SHA seed-shuffled 14-case parity test；检查 completion `error=2/code=5` 与 no-writeback sentinel | 每 seed `14/14`；三 seed共`42/42`，覆盖 INT8/Matrix/CNM/BF16、A/B；CNM lane 0–3 全命中。此为选定 parity 子集，不是 protection × phase × Abort/Reset 全组合 | `CC-STAGEA-UVM-3S`；`/tmp/nmaforge_stageA_clean_03bf257_uvm/seed_{20261025,20261026,20261027}/run.log` | **PASS（parity subset）**；更广 fault cross 仍开放 |
@@ -331,7 +343,7 @@ line/condition/FSM-transition/branch=`96.45/88.52/49/53 (92.45%)/95.02%`；FSM �
 | C1-MUTATION-STAGEA：Address/Data/Owner/WSTRB/Done checker sensitivity | 在 monitor copied observation 上作五类 mutation，driver、DUT RTL、memory 不变 | 五种 mutation 全部由预期 scoreboard/checker 检出；不折算为 RTL mutation score | `CC-STAGEA-MUT-5`；`/tmp/nmaforge_stageA_clean_03bf257_mutations/{address,data,owner,wstrb,done}.log` | **PASS 5/5（checker sensitivity）** |
 | CLUSTER-BENCH-001：serial / staged parallel / queued execution | 同一 descriptor workload，对比 `Matrix→CNM→SFU` 与 Matrix+CNM overlap 后运行 SFU；再比较四任务队列 | `1239→1070` cycles (1.158×)；four-task sequential/queued `1696→1137` (1.492×)，completion 顺序保持。CNM+DMA subsystem contention 三 seed PASS；Matrix+CNM+DMA top 同发受 DMA busy gate 阻挡 | `CC-STAGEA-UVM-3S`、`DMA-CNM-STAGEA-3S`；[benchmark report](COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md) | **PASS（测试模式）/ BLOCKED（三引擎 DMA 模式）** |
 
-**当前覆盖率结论**：最新 focused UVM group、Matrix DUT-only URG、四项 FSM transition disposition 及 clean replay 结论见 2026-10-27 签核候选报告。Stage A 的 `99.0%` 是日志四舍五入值（URG 精确值 `98.96%`），completion read-response bin 显式 WAIVED/N/A；这些 covergroup 数字不等于 REQ-CL closure。Merged top URG 包含 DUT、SVA、testbench 与 UVM，不能作为 DUT-only closure。旧的 `97.92%` 与 3,536-word 数字属于更早 SHA 的历史运行。
+**当前覆盖率结论**：最新 focused UVM group、Matrix DUT-only URG、四项 FSM transition disposition、R14–R19 clean-candidate/benchmark evidence 见 2026-10-28 Execution RTM 与 Readiness Report。R14 focused compute group 为 `98.96%`；R15 AXI URG 为 20/22 assertions success，另外两项 UVM RAL 未尝试，五个 AXI master assertions 和三个 stall cover 均命中。completion read-response bin 对 write-only writer 显式 WAIVED/N/A。上述覆盖率不等于 REQ-CL closure；Merged top URG 包含 DUT、SVA、testbench 与 UVM，不能作为 DUT-only closure。旧的 `97.92%` 与 3,536-word 数字属于更早 SHA 的历史运行。
 
 CNM RTL 改动后的定向复核也通过：`ai_cnm_signoff` 中 A2 GEMV、A3 GEMM
 benchmark（L=16/64/256）、SPAD arbiter contention/protection checks 和 top

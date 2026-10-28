@@ -1,6 +1,6 @@
 # Compute Cluster S1/S2 DV Sign-off Candidate
 
-**Review date:** 2026-10-27
+**Review date:** 2026-10-28 (candidate evidence addendum)
 
 **Baseline reviewed SHA (detached clean worktree):** `c83ad7463265062d4edb84d57fe4ada8195f9b10`
 
@@ -16,7 +16,7 @@ tested RTL baseline `03bf257afdca9b0041ff80b6d30cbaf8107cf7e0`.
 | Gate | Decision | Signed scope / hold reason |
 |---|---|---|
 | S1: 16×16 Matrix Block DV | **BOUNDED PASS** | Three-seed depth-4 functional/fault regression passed for the tested INT8 GEMM/batch/layout, prefetch/cache, parity/protection, abort/reset and recovery cases. The default-profile FSM has four unhit transitions; each is dispositioned below. No formal unreachable proof is claimed. |
-| S2: Compute Cluster functional slice | **BOUNDED PASS** | Three-seed real-top, seven-engine UVM passed its selected workload set; the accepted-transaction memory scoreboard, 14-case parity cross, reset/abort checks and 25/25 observation-mutation sensitivity campaign passed. The only unhit functional cover variable is completion response-client, explicitly WAIVED/N/A because the completion writer is write-only. |
+| S2: Compute Cluster functional slice | **BOUNDED PASS** | Exact-candidate three-seed real-top, seven-engine UVM and 25/25 checker-sensitivity campaign passed. Supplemental 16-seed DMA/FP E2E also passes with non-vacuous AXI SVA. The only unhit focused functional cover variable is completion response-client, explicitly WAIVED/N/A because the completion writer is write-only. |
 | S2: all 38 frozen REQ-CL/REQ-PC requirements | **HOLD** | The updated table has 23 `PASS-SCOPED`, 13 `PARTIAL`, 2 `BLOCKED_SPEC`, and 0 `NOT_RUN`. Three-seed Conv/KV and two-seed FP block evidence now closes the named functional slices; reset epoch evidence closes the scoped reset requirement. Full parameter/opcode cross, partial line WSTRB disposition, broad error-prefix/reset combinations, and SFU numeric subcontracts remain open. This is not full Compute Cluster sign-off. |
 | S3: complete NPU IP | **OUT OF SCOPE** | DMA/CMDQ-to-compute-to-CPLQ system E2E, complete system regression, and ASIC PPA are not covered by S1/S2 evidence. |
 
@@ -86,6 +86,19 @@ once each, plus unsolicited Done, missing Done and duplicate Done for each of
 the seven engine bits. Every run emitted the expected checker marker (25/25).
 These are passive monitor-observation mutations; they validate checker
 sensitivity and are not an RTL mutation score.
+
+### 2026-10-28 exact-candidate evidence addendum
+
+The selected candidate SHA was re-used from its detached worktree after VCS licensing was restored; tracked source remained at the selected SHA with no source edits. The following targets passed with VCS/URG `V-2023.12-SP1_Full64`:
+
+- `CLUSTER-AXI-E2E-COV-16S-C0832`: 16 seeded DDR/FP end-to-end simulations and URG merge passed. All five AXI AR/AW/W stability and 4KB boundary assertions recorded real successes; AR/AW/W stall-to-accept covers matched 166/70/107 times. URG has 20/22 assertions with successes, 2 unattempted UVM RAL assertions, and 0 failures/incomplete.
+- `CLUSTER-MUT-CAND-25-C0832`: 25/25 passive-monitor observation mutations were caught by the expected Checker. This is checker-sensitivity evidence, not an RTL mutation score.
+- `MATRIX-SIZE-CAND-3S-C0832`: 45/45 cases passed across physical 4×4/8×8/16×16 arrays, five GEMM workloads, and three seeds.
+- `MATRIX-ABLATION-CAND-3S-C0832`: 120/120 cases passed across eight Depth/Prefetch/A-Cache configurations, five workloads, and three seeds.
+
+These runs close the exact-SHA repeatability, AXI assertion antecedent, and Matrix benchmark reproducibility items. They do not change the 38 requirement dispositions (23 PASS-SCOPED, 13 PARTIAL, 2 BLOCKED_SPEC) or close the specification-dependent and unproved FSM items. Full logs and paths are in the [Execution RTM R14–R18](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
+
+**R19 common-workload benchmark addendum (2026-10-28):** From the current workspace at the same candidate product RTL SHA, a benchmark-only Matrix TB mode ran the pinned TinyNPU A/B values at 16×16×16 on both 8×8 arrays; all 256 outputs passed independent Golden checks. A second case compared native NMAForge 3×3 Conv with TinyNPU's padded-GEMM lowering of the same single-channel image/filter; both returned -30. NMAForge reports 298 cycles for GEMM and 66 for native Conv. TinyNPU reports 1,800 cycles to done / 2,056 through its 256-word result stream. The TinyNPU VCS run required a temporary DSP48E1 functional model and an `always_ff` compatibility copy because local UNISIM is unavailable and the original source has multiple procedural writers. R19 is bounded RTL simulation evidence; it is not a hardware speedup or PPA comparison. It does not change RTM dispositions. See [Execution RTM R19](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md) and [Benchmark Report](COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md).
 
 ## Requirement disposition table
 
@@ -158,9 +171,9 @@ license was restored, both blocks and the additional runs listed below passed.
 The supplemental runs used the source tree based on `fa2b4dd` with the DV
 interface/sequence/Makefile changes listed below; those same RTL/DV file
 contents are now committed, and `rtl/` was not changed. The final report edits
-followed the run. An independent clean-worktree replay could not be completed
-because the current VCS license server is unavailable; the exact failed retry
-is recorded below.
+followed the run. The first independent clean-worktree replay was blocked by
+license-server connectivity; the successful retry after license recovery is
+recorded in the addendum at the end of this report.
 
 | Intended run | Command | Result |
 |---|---|---|
@@ -218,3 +231,31 @@ VCS could not connect to the configured license server, including with a
 bounded `-licwait 1` retry. This is a new `BLOCKED_ENV` attempt, not a CNM test
 failure and not additional PASS evidence. Earlier archived CNM runs remain
 historical evidence; this retry is not counted in the 23 `PASS-SCOPED` tally.
+
+## Exact-candidate clean replay after license recovery
+
+After VCS licensing became available, the selected candidate
+`c0832e5c822de1a03f82751d5ff8f831d0addb98` was replayed from a detached clean
+worktree using VCS/URG `V-2023.12-SP1_Full64`:
+
+```sh
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_signoff_clean_c0832e5_20261027 \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027'
+```
+
+The command and URG merge exited `0`. All three seeds emitted
+`COMPUTE_CLUSTER_REAL_UVM_PASS`, with UVM warning/error/fatal `0/0/0`. The
+accepted-transaction memory scoreboard checked 5,256 words per seed with no
+mismatch, unknown read, stale epoch or orphan response. Focused compute coverage
+is 29/30 variables (`98.96%`). Compile has no warning/error or `[TFIPC]`
+diagnostic. URG has 22 assertions: 17 successes, 5 uncovered, zero
+failure/incomplete; AR/AW stall cover properties remain unhit. Exact logs,
+checksums and the assertion/group reports are in
+`/tmp/nmaforge_signoff_clean_c0832e5_20261027/` and summarized as R14 in the
+[Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
+
+This closes the candidate clean-replay process item for the top-UVM slice. It
+does not close all 38 REQ-CL/REQ-PC rows, the Matrix FSM residuals, all legal
+fault-phase crosses, or CL-DV-v1.0. The initial license-blocked attempt above
+remains only as historical evidence and is superseded by this successful run.

@@ -1,6 +1,6 @@
 # NMAForge verification plan
 
-Status: 2026-10-26 · Product baseline: A10 / ABI v7.4 · Top:
+Status: 2026-10-28 · Product baseline: A10 / ABI v7.4 · Top:
 `rtl/top/ai_accel_top.v`
 
 This document defines the verification layers and acceptance rules. The
@@ -35,28 +35,33 @@ block/subsystem acceptance rows. Do not copy dated run logs into this plan.
 
 ## Current status and next closure work
 
-At source SHA `03bf257afdca9b0041ff80b6d30cbaf8107cf7e0`, the real-top
-seven-engine UVM passes three clean-worktree seeds. The byte-addressed memory
-scoreboard checks 4,852 words per seed with zero mismatch, unknown read or
-stale-epoch response. The DMA response-client bin is hit; the completion
-read-response bin is explicitly waived/N/A because the writer is write-only.
-Focused functional coverage is 99.0%. Five observation-only checker mutations
-are detected (5/5), and the selected parity cross passes 42/42 cases. These
-results do not close every Cluster REQ or the full fault × phase × engine ×
-Abort/Reset cross. Merged top URG includes DUT, SVA, testbench and UVM, so it is
-not a DUT-only closure metric. See the [Stage A evidence and benchmark report](COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md)
-and [Compute Cluster testplan](COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md).
+**2026-10-28 exact-candidate status:** candidate
+`c0832e5c822de1a03f82751d5ff8f831d0addb98` passed detached clean-worktree
+real-top seven-engine UVM on seeds `20261025/20261026/20261027`. Each seed
+checked 5,256 memory words with zero mismatch, unknown read, stale epoch or
+orphan response; focused coverage was 29/30 (`98.96%`), and UVM severity was
+`0/0/0`. Supplemental exact-SHA runs passed 25/25 passive-monitor checker
+mutations, 45/45 Matrix size cases, and 120/120 Matrix configuration/workload
+cases over three seeds. A 16-seed DMA/FP E2E campaign also passed; all five
+AXI AR/AW/W payload/burst assertions had real successes and all three
+stall-to-accept cover properties matched. The merged top URG contains DUT,
+SVA, testbench and UVM, so it is not a DUT-only closure metric.
 
-Matrix depth-4 regression reports 15/15 FSM states, 49/53 `state_r`
-transitions, and 9/9 prefetch transitions when URG merges the depth-4 database
-with a focused 4×4 handoff run. Four remaining transitions have source-level
-dispositions but no formal unreachable waiver. A separately compiled
-prefetch-disabled run dynamically exercises `ST_MAC→ST_A_REQ`. The requested
-Matrix ablation sweep passes all 40 workload/configuration combinations. The
-Cluster staged benchmark measures 1,239→1,070 cycles (1.158×); queued four-task
-execution measures 1,696→1,137 cycles (1.492×). Exact Matrix+CNM+DMA top
-contention is blocked by the legal DMA busy gate; pairwise CNM+DMA contention
-passes three seeds.
+Matrix FSM remains 15/15 states and 49/53 transitions. The no-prefetch profile
+separately hits `ST_MAC→ST_A_REQ`; the two guard/invariant paths still lack
+formal unreachable proof. Partial Line WSTRB semantics, broad legal fault ×
+phase × engine × Abort/Reset crosses, and approved P0 error/reset contracts
+remain open. The 38-row RTM is still 23 PASS-SCOPED, 13 PARTIAL, 2 BLOCKED_SPEC;
+CL-DV-v1.0 remains on hold. See the [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md),
+[Readiness Report](COMPUTE_CLUSTER_DV_SIGNOFF_READINESS_2026-10-27.md), and
+[Compute Cluster testplan](COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md).
+
+The exact-candidate Matrix benchmark assumes one-cycle behavioral SPAD and
+250 MHz only for normalized GOPS arithmetic; it is not SRAM timing or PPA.
+Serial/staged Cluster workload remains 1,239→1,070 cycles (1.158×), and
+four-task queued execution remains 1,696→1,137 cycles (1.492×). The report does
+not claim direct TinyNPU speedup because workload and memory/timer boundaries
+are not matched.
 
 The 2026-10-21 [compute run record](COMPUTE_ENGINE_BLOCK_VALIDATION_2026-10-21.md)
 and [clean replay record](COMPUTE_CLUSTER_CLEAN_REPLAY_2026-10-26.md) remain
@@ -84,7 +89,7 @@ passed; it does not cover the full A10 workstream.
 |---|---|
 | Selected five-engine cluster regression | `make -C dv/subsystem/tensor_datapath/sim cluster_regress` |
 | Real-top seven-engine Cluster UVM (three seeds) | `make -C dv/uvm/sim uvm_compute_cluster_regress COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027' COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_cluster_closeout_multiseed_20261026` |
-| Matrix depth/prefetch/cache comparison | `make -C dv/block/compute/matrix/sim matrix-config-comparison SEED=20261026 MATRIX_CONFIG_OUT=/tmp/nmaforge_matrix_config_compare_20261026` |
+| Matrix depth/prefetch/cache comparison | `make -C dv/block/compute/matrix/sim matrix-config-comparison SEED=20261025 MATRIX_CONFIG_OUT=/tmp/nmaforge_matrix_config_c0832e5_20261025` (repeat for `20261026/20261027`; see candidate RTM) |
 | Transformer top workload | `make -C dv/subsystem/top_smoke/sim ai_transformer` |
 | Top smoke | `make -C dv/subsystem/top_smoke/sim ai_smoke` |
 | Seeded top regression | `make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=12345` |
