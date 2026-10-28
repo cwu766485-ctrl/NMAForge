@@ -1,5 +1,21 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-28 current review addendum:** Product RTL/SPEC candidate is
+> `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`. Clean test commit
+> `bb6e3a270ab819c15df0eb993c184c99d13a6d71` has byte-identical `rtl/` and
+> adds a seven-engine accepted-read reset sweep. VCS/URG
+> `V-2023.12-SP1_Full64` passed 3/3 seeds; each seed checked 5,368 memory
+> words with zero mismatch/unknown/stale/orphan response, `reset_dropped=9`,
+> and UVM severity `0/0/0`. All seven real production engines were reset
+> after an accepted SPAD read, and destination/completion sentinels were
+> preserved. RTM remains 24 PASS-SCOPED / 14 PARTIAL / 0 BLOCKED_SPEC /
+> 0 NOT_RUN. The focused coverage marker is 99.0% rounded; completion
+> read-response is N/A for the write-only completion writer. This does not
+> close partial Line WSTRB, legal fault/reset crosses, or target external
+> fabric qualification. The older dated rows below are retained as history;
+> current disposition and artifacts are in the
+> [Execution RTM](../docs/verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
+
 > **2026-10-27 S1/S2 sign-off candidate:** At detached clean-worktree SHA
 > `c83ad7463265062d4edb84d57fe4ada8195f9b10`, Matrix depth-4 three-seed and
 > prefetch-disabled fallback three-seed regressions passed; the seven-engine

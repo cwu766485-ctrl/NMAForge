@@ -201,3 +201,28 @@ The R24 directed priority/prefix supplemental commands and their three-seed outc
 | `/tmp/nmaforge_pending_close_matrix_core_9d9e0f/run_seed_20261027.log` | `f42e00129de63f189cc4b6ab8132246e35359f965909c949fb531c66d921a257` |
 
 These checksums bind the archived result files to the current source-SHA review record. They do not turn the behavioral SRAM/fabric models into silicon timing or external-fabric qualification evidence.
+
+## R32 — all-engine accepted-read reset sweep (clean test commit)
+
+The reset-sweep testbench change is committed at `bb6e3a270ab819c15df0eb993c184c99d13a6d71`. A detached clean worktree at that commit was used for the replay. A tree comparison confirms `rtl/` is byte-identical to source candidate `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`; the commit adds the UVM test and its run gate, not product RTL. The worktree is `/tmp/nmaforge_clean_bb6e3a2`.
+
+Run from `/tmp/nmaforge_clean_bb6e3a2/dv/uvm/sim`:
+
+```sh
+make uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027' \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_bb6e3a2_clean3s \
+  URG=/opt/Synopsys/vcs/V-2023.12-SP1/bin/urg
+```
+
+VCS/URG `V-2023.12-SP1_Full64`; 3/3 seeds passed. Each seed reset the real top after accepted SPAD reads from all seven production engines, checked that busy cleared and destination/completion sentinels were preserved, and saw no stale completion or writeback. The memory scoreboard reported 5,094 accepted writes, 5,368 checked words, zero mismatch/unknown/stale/orphan response, and `reset_dropped=9`; UVM warning/error/fatal was `0/0/0`. The focused compute coverage marker was `99.0%` (rounded); the completion read-response bin remains architecturally N/A for the write-only completion writer. This is accepted-read reset evidence, not exhaustive Engine × Fault × Phase × Reset closure.
+
+| Artifact | SHA-256 |
+|---|---|
+| `/tmp/nmaforge_bb6e3a2_clean3s/compile.log` | `43a8173e19ded8757e933e5d9a40b4072c3aab54bebc5fe91e39f8133db1d981` |
+| `/tmp/nmaforge_bb6e3a2_clean3s/seed_20261025/run.log` | `7bba1a9f087b52b7cb8222614de2e442b1ffdf44a76ab325f31571f34beda0fe` |
+| `/tmp/nmaforge_bb6e3a2_clean3s/seed_20261026/run.log` | `8c202d4e58c4e8fe01564ac5ac799ae685780838f8067f2f380f89a2b67cbc2c` |
+| `/tmp/nmaforge_bb6e3a2_clean3s/seed_20261027/run.log` | `ff9853e8439909b8ad9ec9c85150975a51df8f8187f9dfa3ec8268c8f1ffdd78` |
+| `/tmp/nmaforge_bb6e3a2_clean3s/urg_merged/dashboard.txt` | `f21015399951489d8b117906f20fd656365f5b7037b5897b4a4a40e03c5341b1` |
+| `/tmp/nmaforge_bb6e3a2_clean3s/urg_merged/groups.txt` | `d1d9b57ef801a1a99483cc35960378dd4a20c19fcf2f6f9492b9f7f3bbc6e248` |
+| `/tmp/nmaforge_bb6e3a2_clean3s/urg_merged/asserts.txt` | `1001e31f337917d60e57de56295c36ecaa6269f65bbe2054714855d417de3fe5` |

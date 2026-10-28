@@ -4,7 +4,7 @@
 > **版本**：v1.4 / Parallel Compute Requirement Traceability Baseline
 > **日期**：2026-10-28
 > **对应规格**：[Compute Cluster SPEC v1.4](../spec/COMPUTE_CLUSTER_SPEC_ZH.md)
-> **当前审查候选**：源码 SHA `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`。38 项 RTM 为 24 PASS-SCOPED、14 PARTIAL、0 BLOCKED_SPEC、0 NOT_RUN。R24–R31 补充当前 SHA 的三 seed 七引擎 top replay、Error ABI/priority 定向测试、25/25 checker sensitivity、R/B reset、Matrix 与 CNM/DMA-SPAD accepted-read drain/recovery、Matrix FSM formal、45/45 size benchmark、120/120 八配置 benchmark，以及 16/64/300 周期 RREADY stress。**不得据此宣称 CL-DV-v1.0 已签核。** 当前控制文件是[Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)、[Sign-off Readiness](COMPUTE_CLUSTER_DV_SIGNOFF_READINESS_2026-10-27.md)、[Benchmark](COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md)与[Open Issues](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md)。旧 SHA/旧计数保留为历史运行记录。
+> **当前审查候选**：产品 RTL/SPEC SHA `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`；R32 测试提交 `bb6e3a270ab819c15df0eb993c184c99d13a6d71` 的 RTL 与候选逐字节一致。38 项 RTM 为 24 PASS-SCOPED、14 PARTIAL、0 BLOCKED_SPEC、0 NOT_RUN。R24–R32 包含三 seed 七引擎 top replay、七引擎 accepted-read reset sweep、Error ABI/priority 定向测试、25/25 checker sensitivity、R/B reset、Matrix 与 CNM/DMA-SPAD accepted-read drain/recovery、Matrix FSM formal、45/45 size benchmark、120/120 八配置 benchmark，以及 16/64/300 周期 RREADY stress。**不得据此宣称 CL-DV-v1.0 已签核。** 当前控制文件是[Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)、[Sign-off Readiness](COMPUTE_CLUSTER_DV_SIGNOFF_READINESS_2026-10-27.md)、[Benchmark](COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md)与[Open Issues](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md)。旧 SHA/旧计数保留为历史运行记录。
 > **Owner**：NMAForge DV\
 > **Stage A 历史状态**：在 tested SHA `03bf257afdca9b0041ff80b6d30cbaf8107cf7e0` 完成的原始数据见 Stage A 报告。当前逐项结论以 2026-10-28 Execution RTM 和 Readiness Report 为准。全 C1 REQ closure、完整 fault cross、partial-WSTRB image、FSM formal unreachable proof、ASIC PPA 与产品 signoff 仍未完成。
 
@@ -75,7 +75,7 @@ remaining C1 closure
 | REQ-CL-015 | 正常执行完整性 | 每Opcode数值正确、合法写回、唯一done；`tc_cl_normal_all_ops` | per-op Oracle + memory result checker | `opcode × shape × numeric_class` | P0 READY |
 | REQ-CL-016 | 跨Engine切换 | FP→Matrix→CNM→SFU等连续任务防迟到污染；`tc_cl_engine_switch` | owner tracker + stale-response checker | `prev_engine × next_engine × spacing` | P0 READY |
 | REQ-CL-017 | 错误后写入前缀 | Parity/Protection/Watchdog/Abort已接受写入正确；`tc_cl_error_prefix` | prefix-memory scoreboard + error model | `engine × fault × phase` | P0 PARTIAL；v1.4 已冻结错误/前缀 oracle，合法交叉覆盖未闭合 |
-| REQ-CL-018 | 复位隔离 | Reset后不泄漏Done/写；旧 R/B 响应正确丢弃；`tc_cl_reset_stale` | reset epoch ledger / post-reset memory monitor | `engine × reset_phase × pending_reads × pending_writes` | P0 PARTIAL；R27 在 behavioral responder 上验证 accepted AR/R 与 AW/W/pending-B 协调复位；R30 验证 Matrix depth-4 accepted-read Abort/Reset drain 与恢复；非 Matrix top 集成及目标外部 fabric 仍 OPEN |
+| REQ-CL-018 | 复位隔离 | Reset后不泄漏Done/写；旧 R/B 响应正确丢弃；`tc_cl_reset_stale` | reset epoch ledger / post-reset memory monitor | `engine × reset_phase × pending_reads × pending_writes` | P0 PARTIAL；R32 在真实 top 对七引擎分别于 accepted SPAD read 后 reset，检查 busy、旧响应、completion 和目的图像；R27 验证 behavioral AXI R/B 协调复位；目标外部 fabric 与更广 fault/reset phase 仍 OPEN |
 | REQ-CL-019 | 同时异常恢复 | Abort/Reset及其它异常的合法交错；`tc_cl_fault_races` | fault priority oracle + owner monitor | `engine × fault_pair × phase` | P1 PARTIAL；v1.4 已冻结优先级 oracle，完整交叉未闭合 |
 | REQ-CL-020 | Scalar INT8 | Signed 4lane packed VDOT/GEMV/GEMM/legacyConv,算术边界；`tc_cl_scalar_numeric` | independent bit-exact integer model | `opcode × sign_pattern × saturation` | P0 READY |
 | REQ-CL-021 | CNM numerics | 4Bank局部ACC/global reduction, K/M边界；`tc_cl_cnm_numeric` | bank-aware integer golden + memory compare | `op × K × M × bank_phase` | P0 READY |
@@ -100,7 +100,7 @@ remaining C1 closure
 | REQ-PC-007 | CNM lane 与 Matrix banked/line 通路独立 | per-bank/line monitor 和 response scoreboard | CNM three-seed block regression + 2026-10-26 real top UVM 检查四 lane 地址/response ledger、Matrix/CNM tag 和独立 Golden；更广的 fault/backpressure 与完整 per-bank/line UVM 仍 OPEN |
 | REQ-PC-008 | 并发任务共享只读区、输出区彼此隔离 | 真实 memory image scoreboard；配置非法别名为 out-of-contract | C0-P 未覆盖，待 C1 |
 | REQ-PC-009 | 多 Engine active 时 abort 停止后续派发并有序 drain | 两 active + 一个 fetch 延迟任务；检查 no-new-launch、三笔 ERR_ABORT FIFO、idle | C0-P UVM 3 seeds PASS |
-| REQ-PC-010 | active reset 与 requester error 组合后清空 slot/owner/FIFO；外部 AXI reset 按 epoch 隔离 | 已接受 AR 且 R 延迟时同时 reset accelerator/fabric；检查 fabric queue/active/RVALID 清空，8 周期无旧 R 或新 AR，再检查 SPAD sentinel 与 reset 后恢复 | `CC-RESET-FABRIC-UVM-20261028-1022` PASS；行为 responder 的 R 路径已验证；真实集成 fabric 与 outstanding B 路径仍须按平台契约审查 |
+| REQ-PC-010 | active reset 与 requester error 组合后清空 slot/owner/FIFO；外部 AXI reset 按 epoch 隔离 | 已接受 AR 且 R 延迟时同时 reset accelerator/fabric；检查 fabric queue/active/RVALID 清空，8 周期无旧 R 或新 AR，再检查 SPAD sentinel 与 reset 后恢复；R32 对真实 top 七引擎执行 accepted-read reset | `CC-RESET-FABRIC-UVM-20261028-1022`、R32 PASS；行为 responder 已覆盖 R/B；真实集成 fabric 仍须按平台契约审查 |
 
 ## 3. Coverage Model 与 Cross 设计
 
@@ -182,7 +182,7 @@ agent、memory model、coverage collector 与 protocol assertions 仍是后续�
 
 **历史候选后续（R15–R18，source SHA `c0832e5`）：** 在当时的 detached worktree 补跑 16-seed mixed-precision DDR E2E、25 项 checker-sensitivity mutation、Matrix size sweep 三 seed，以及八配置消融三 seed。结果分别为 AXI/FP E2E PASS、25/25、45/45、120/120。URG 显示 20/22 assertions success，另外 2 项 UVM RAL assertion 无 attempts、0 failure/incomplete；五条 AR/AW/W payload/burst assertion 均有 real success，AR/AW/W stall-to-accept cover 匹配 166/70/107 次。Mutation 修改 passive monitor observation copy；这不是 RTL mutation score。历史候选当时的 RTM 状态及证据见 R15–R18。
 
-**当前候选收口（R24–R31，source SHA `9d9e0f0`）：** SPEC v1.4 与 RTL 冻结七引擎 Error ABI、priority 和 accepted-write prefix；三 seed 定向故障、当前 SHA clean top UVM、25/25 checker mutation、behavioral AXI R/B reset、Matrix depth-4 drain/recovery、CNM/DMA-SPAD Abort/Reset、RREADY 16/64/300 周期 stress、Matrix formal 与两组 benchmark 均通过。R31 的 14 个子系统功能 covergroup 合并后为 100%，它不代表全 Cluster 功能覆盖或 DUT code coverage。当前 38 项状态为 24 PASS-SCOPED / 14 PARTIAL / 0 BLOCKED_SPEC / 0 NOT_RUN。剩余 full-Cluster engine Abort/drain/restart、外部 fabric 合规、partial Line WSTRB 和广义 Fault × Phase 仍开放。命令、run id、seed、证据路径和 SHA-256 见[当前执行 RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)及[回放清单](COMPUTE_CLUSTER_FINAL_9D9E0F_MANIFEST_2026-10-28.md)。
+**当前候选收口（R24–R32，product RTL SHA `9d9e0f0`）：** SPEC v1.4 与 RTL 冻结七引擎 Error ABI、priority 和 accepted-write prefix；三 seed 定向故障、当前 SHA clean top UVM、七引擎 accepted-read reset sweep、25/25 checker mutation、behavioral AXI R/B reset、Matrix depth-4 drain/recovery、CNM/DMA-SPAD Abort/Reset、RREADY 16/64/300 周期 stress、Matrix formal 与两组 benchmark 均通过。R31 的 14 个子系统功能 covergroup 合并后为 100%，它不代表全 Cluster 功能覆盖或 DUT code coverage。当前 38 项状态为 24 PASS-SCOPED / 14 PARTIAL / 0 BLOCKED_SPEC / 0 NOT_RUN。剩余外部 fabric 合规、partial Line WSTRB 和广义 Fault × Phase × Engine 仍开放。命令、run id、seed、证据路径和 SHA-256 见[当前执行 RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)及[回放清单](COMPUTE_CLUSTER_FINAL_9D9E0F_MANIFEST_2026-10-28.md)。
 
 **2026-10-28 TinyNPU matched workload (R19)：** Candidate NMAForge Matrix 与 pinned TinyNPU 都用 8×8 physical array 跑 16×16×16 signed INT8 GEMM，使用相同输入且 256 个 INT32 输出均通过独立 Golden。另以相同 3×3 单通道 image/filter 比较 NMAForge native Conv 与 TinyNPU padded GEMM lowering，输出均为 -30。TinyNPU VCS 运行需要临时 DSP48E1 functional model 和 `always_ff` 兼容副本；数据代表此行为仿真/计时边界，不代表 UNISIM 或 FPGA PPA。见 [Benchmark Report](COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md) 和 [Execution RTM R19](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)。
 
@@ -321,9 +321,11 @@ instance omitted inputs）；UVM warning/error/fatal 为零。
 **2026-10-26 Matrix FSM 收敛增量**：depth-4 Matrix core 三 seed VCS regression 通过，
 并与 4×4 physical-array prefetch handoff 定向回归合并 URG。`ai_tensor_matrix_core`
 line/condition/FSM-transition/branch=`96.45/88.52/49/53 (92.45%)/95.02%`；FSM 状态
-15/15，prefetch FSM transitions 9/9。剩余四条 core transition 已归类为错误保护路径或当前
-参数下关闭的 fallback；Matrix child array line/condition/branch=`82.35/20.00/58.82%`，
-仍未闭合。复现命令、未命中转移解释和 URG 目录见
+15/15，prefetch FSM transitions 9/9。当前 R28 已逐项 disposition 四条 core transition：
+`ST_MAC→ST_A_REQ` 在独立 no-prefetch profile 命中；其余三条由非空洞 formal guard
+properties 在合法 descriptor/response 假设下证明不会触发。默认 profile 原始分数仍保留
+49/53，不合并不同编译配置，也不宣称全部 FSM/code coverage closure。Matrix child array
+line/condition/branch=`82.35/20.00/58.82%` 仍未闭合。复现命令、假设和 URG 目录见
 [升级路线 §3.7](COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md#37-2026-10-26-all-engine-uvm-matrix-fsm-and-decoder-follow-up)。
 
 ### 7.1 最新 Requirement → Testpoint → Coverage → Run ID → Result
@@ -331,6 +333,7 @@ line/condition/FSM-transition/branch=`96.45/88.52/49/53 (92.45%)/95.02%`；FSM �
 | Requirement | Testpoint / Checker | Coverage / 审查结果 | Run ID / artifact | Result |
 |---|---|---|---|---|
 | CLEAN-CLUSTER-001：候选版本可复现回归 | detached clean worktree；`ai_compute_cluster_e2e_test`；memory scoreboard、owner ledger、SVA/URG | Current source SHA `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`；三 seed PASS；每 seed 5,256 words checked，无 mismatch/unknown/stale/orphan；UVM severity `0/0/0`；focused group `98.96%` | `CLUSTER-S2-CLEAN-3S-9D9E0F`；`/tmp/nmaforge_final_9d9e0f_uvm/` | **PASS（current top UVM replay）**；其余 requirement 状态见 RTM |
+| CLEAN-CLUSTER-002：七引擎 accepted-read reset sweep | clean detached test commit `bb6e3a2`；每个引擎 accepted SPAD read 后对 real top reset；检查 busy、destination/completion image、stale response/writeback | 3 seeds；每 seed 5,094 writes / 5,368 words，zero mismatch/unknown/stale/orphan，reset_dropped=9，UVM severity 0/0/0；focused marker 99.0% rounded | `CLUSTER-ALL-ENGINE-RESET-SWEEP-CLEAN-3S-BB6E3A2`；`/tmp/nmaforge_bb6e3a2_clean3s/` | **PASS（accepted-read reset slice）**；actual external fabric 与 fault/reset cross 仍 OPEN |
 | AXI-SVA-001：AXI master properties 非空洞 | real DDR/FP E2E AXI traffic；URG assertion + cover properties | 16 seed；AR/AW/W stalls 与 gap；五条 AR/AW/W payload/burst assertion 均 real-success；AR/AW/W stall-to-accept=`166/70/107`；2 个 UVM RAL assertion 未尝试 | `CLUSTER-AXI-E2E-COV-16S-C0832`；`/tmp/nmaforge_c0832e5_axi_cov_20261028/urg_merged/` | **PASS（AXI assertion scope）**；compute requester/fault cross 仍 OPEN |
 | SFU-NUM-001：定点算术合同及 Golden 边界 | `random-latency-regress`；独立 `ai_a3_reference.py`；VCS | 8 opcode × 8 lengths × 3 seeds = 192/192 bit-exact；每 seed reads/responses `1043/1043`、writes `427`、最大 response delay 7；compile 无 Warning/Error/TFIPC | `SFU-RAND-NUM-EDGE-3S-20261028`；`/tmp/nmaforge_sfu_numeric_edges_20261028/`；[SFU 数值合同](../spec/SFU_NUMERIC_CONTRACT_ZH.md) | **PASS-SCOPED**；合同域已验证，不代表理想实数误差或所有长度 |
 | MATRIX-SIZE-CAND-001：固定 SHA 物理阵列对照 | 4×4/8×8/16×16 physical array × 5 个 GEMM × 3 seed | 45/45；同 SHA、同 workload、one-cycle behavioral SPAD；记录 cycles/MAC/cycle/utilization/SPAD reads/stalls | `MATRIX-BENCH-CLEAN-3S-9D9E0F`；`/tmp/nmaforge_final_9d9e0f_matrix_size{_20261025,_20261027}/` 与 seed 26 根目录 | **PASS（cycle benchmark）**；不是 SRAM timing/PPA |
@@ -346,7 +349,7 @@ line/condition/FSM-transition/branch=`96.45/88.52/49/53 (92.45%)/95.02%`；FSM �
 | C1-MUTATION-STAGEA：Address/Data/Owner/WSTRB/Done checker sensitivity | 在 monitor copied observation 上作五类 mutation，driver、DUT RTL、memory 不变 | 五种 mutation 全部由预期 scoreboard/checker 检出；不折算为 RTL mutation score | `CC-STAGEA-MUT-5`；`/tmp/nmaforge_stageA_clean_03bf257_mutations/{address,data,owner,wstrb,done}.log` | **PASS 5/5（checker sensitivity）** |
 | CLUSTER-BENCH-001：serial / staged parallel / queued execution | 同一 descriptor workload，对比 `Matrix→CNM→SFU` 与 Matrix+CNM overlap 后运行 SFU；再比较四任务队列 | `1239→1070` cycles (1.158×)；four-task sequential/queued `1696→1137` (1.492×)，completion 顺序保持。CNM+DMA subsystem contention 三 seed PASS；Matrix+CNM+DMA top 同发受 DMA busy gate 阻挡 | `CC-STAGEA-UVM-3S`、`DMA-CNM-STAGEA-3S`；[benchmark report](COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md) | **PASS（测试模式）/ BLOCKED（三引擎 DMA 模式）** |
 
-**当前覆盖率结论**：最新 focused UVM group、Matrix DUT-only URG、FSM transition disposition、R14–R23 clean-candidate/benchmark/formal evidence 见 2026-10-28 Execution RTM 与 Readiness Report。R14 focused compute group 为 `98.96%`；R15 AXI URG 为 20/22 assertions success，另外两项 UVM RAL 未尝试，五个 AXI master assertions 和三个 stall cover 均命中。R21 扩大了 SFU 数值边界向量，R23 对三条 Matrix FSM guard 做了非空洞 formal disposition，但 VDB 百分比不代表整个 Cluster 覆盖率。completion read-response bin 对 write-only writer 显式 WAIVED/N/A。上述覆盖率不等于 REQ-CL closure；Merged top URG 包含 DUT、SVA、testbench 与 UVM，不能作为 DUT-only closure。旧的 `97.92%` 与 3,536-word 数字属于更早 SHA 的历史运行。
+**当前覆盖率结论**：最新 focused UVM group、Matrix DUT-only URG、FSM transition disposition、R14–R32 clean-candidate/benchmark/formal evidence 见 2026-10-28 Execution RTM 与 Readiness Report。R32 focused compute marker 为 `99.0%`（运行时四舍五入；对应 29/30 cover variables，`cp_response_client.completion` 因 completion writer 只有写接口而 WAIVED/N/A）；每 seed memory scoreboard 为 5,368 words，zero mismatch/unknown/stale/orphan。R15 AXI URG 为 20/22 assertions success，另外两项 UVM RAL 未尝试，五个 AXI master assertions 和三个 stall cover 均命中。R28 对 Matrix 默认配置 49/53 raw FSM transitions 的 guard 条目给出 formal/test disposition，不将原始百分比改写为 100%。VDB 百分比不代表整个 Cluster 覆盖率；Merged top URG 包含 DUT、SVA、testbench 与 UVM，不能作为 DUT-only closure。旧的 `97.92%` 与 3,536-word 数字属于更早 SHA 的历史运行。
 
 CNM RTL 改动后的定向复核也通过：`ai_cnm_signoff` 中 A2 GEMV、A3 GEMM
 benchmark（L=16/64/256）、SPAD arbiter contention/protection checks 和 top
@@ -377,7 +380,7 @@ make -C dv/uvm/sim uvm_compute_cluster_regress \
 | Issue | 影响需求 | 计划处理/状态 |
 |---|---|---|
 | OPEN-CL-006 — Error ABI | REQ-CL-017/019/027 | **SPEC blocker closed by v1.4/R24**; per-engine Error ABI is frozen, while the legal fault/phase verification cross remains partial under CL-COV-006 |
-| OPEN-CL-003 — Abort/Reset Drain | REQ-CL-007/014/016/018/019、REQ-PC-009/010 | v1.2 冻结协调式 AXI reset/epoch；R27 在 behavioral responder 上验证 R/B reset，R30 在 Matrix core 验证 depth-4 accepted-read Abort/Reset drain 与恢复。非 Matrix top 集成与目标外部 fabric 仍 OPEN |
+| OPEN-CL-003 — Abort/Reset Drain | REQ-CL-007/014/016/018/019、REQ-PC-009/010 | v1.2 冻结协调式 AXI reset/epoch；R27 在 behavioral responder 上验证 R/B reset，R30 在 Matrix core 验证 depth-4 accepted-read Abort/Reset drain，R32 在 real top 覆盖七引擎 accepted-read reset。更广的 Abort/fault 交叉和目标外部 fabric 合规仍 OPEN |
 | OPEN-CL-002 — 参数合法范围 | REQ-CL-004/005/020~025 | 子模型按 validator/engine 各自边界；未核实组合 BLOCKED_SPEC |
 | OPEN-CL-004 — Matrix Line WSTRB | REQ-CL-010/022 | 常规完整 line 可测；部分掩码及不齐整 WSTRB 需 Design Review |
 | OPEN-CL-007 — 同拍故障优先级 | REQ-CL-017/019/027 | **SPEC blocker closed by v1.4/R24**; selected same-cycle priority/prefix tests pass, broader legal fault crosses remain partial |
