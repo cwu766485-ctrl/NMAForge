@@ -1,0 +1,25 @@
+{
+  "architecture": "64-64-ReLU-10 logits (N padded to 12 in hardware)",
+  "dataset": "sklearn.datasets.load_digits",
+  "epochs": 180,
+  "fp32_test_accuracy": 0.9777777777777777,
+  "hardware_integer_rule": "int32 accumulator; bias before arithmetic right shift; ReLU then signed INT8 clamp",
+  "hardware_test_batches_of_16": 23,
+  "hidden_scale": 0.08442503603757208,
+  "hidden_shift": 10,
+  "input_scale": 0.007874015748031496,
+  "int8_test_accuracy": 0.9777777777777777,
+  "int8_validation_accuracy": 0.9861111111111112,
+  "optimizer": "NumPy Adam, batch=64, learning_rate=0.001, FP32",
+  "padded_logits": 12,
+  "seed": 20261029,
+  "split": {
+    "fit": 1293,
+    "test": 360,
+    "validation": 144
+  },
+  "test_samples": 360,
+  "w1_scale": 0.010470683180441068,
+  "w2_scale": 0.01331984902930072,
+  "weight_quantization": "symmetric per-layer INT8, round-to-nearest, clamp [-127,127]"
+}
