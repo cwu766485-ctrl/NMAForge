@@ -80,7 +80,7 @@ module tb_ai_accel_smoke;
     localparam REG_EVENT_STATUS    = 32'h0000_0168;
     localparam SPAD_BASE         = 32'h0001_0000;
     localparam SPAD_BYTES        = 32'h0008_0000;
-    localparam AI_DIGITS_INPUT_BASE = 32'h0004_0000;
+    localparam AI_DIGITS_INPUT_BASE = 32'h0005_0000;
     localparam AI_DIGITS_OUTPUT_BASE = 32'h0003_b000;
     localparam AI_DIGITS_HIDDEN_I8_BASE = 32'h0002_c000;
     localparam AI_DIGITS_HIDDEN_I8_TILE_BASE = 32'h0003_2000;
@@ -1465,23 +1465,30 @@ module tb_ai_accel_smoke;
                 prediction = 0;
                 for (class_index = 0; class_index < 12; class_index = class_index + 1) begin
                     axi_read(SPAD_BASE + AI_DIGITS_OUTPUT_BASE +
-                             ((sample_index * 12 + class_index) * 4), read_value);
-                    if (read_value !== ai_digits_expected_words[expected_index]) begin
+                             ((sample_index * 16 + class_index) * 4), read_value);
+                    if (class_index < 12) begin
+                        if (read_value !== ai_digits_expected_words[expected_index]) begin
+                            if (errors < 20)
+                                $display("ERROR: digits logit sample=%0d class=%0d rtl=%08h golden=%08h",
+                                         sample_index, class_index, read_value,
+                                         ai_digits_expected_words[expected_index]);
+                            errors = errors + 1;
+                        end
+                        if (class_index == 0)
+                            $fwrite(csv_fd, "%0d", $signed(read_value));
+                        else
+                            $fwrite(csv_fd, ",%0d", $signed(read_value));
+                        expected_index = expected_index + 1;
+                    end else if (read_value !== 32'd0) begin
                         if (errors < 20)
-                            $display("ERROR: digits logit sample=%0d class=%0d rtl=%08h golden=%08h",
-                                     sample_index, class_index, read_value,
-                                     ai_digits_expected_words[expected_index]);
+                            $display("ERROR: digits padded logit sample=%0d class=%0d rtl=%08h expected=00000000",
+                                     sample_index, class_index, read_value);
                         errors = errors + 1;
                     end
-                    if (class_index == 0)
-                        $fwrite(csv_fd, "%0d", $signed(read_value));
-                    else
-                        $fwrite(csv_fd, ",%0d", $signed(read_value));
                     if (class_index < 10 && $signed(read_value) > best_logit) begin
                         best_logit = $signed(read_value);
                         prediction = class_index;
                     end
-                    expected_index = expected_index + 1;
                 end
                 $fwrite(csv_fd, "\n");
                 if (prediction == sample_label)
@@ -1494,7 +1501,7 @@ module tb_ai_accel_smoke;
                 errors = errors + 1;
             end
 
-            mac_count = 23.0 * ((16.0 * 64.0 * 64.0) + (16.0 * 64.0 * 12.0));
+            mac_count = 23.0 * ((16.0 * 64.0 * 64.0) + (16.0 * 64.0 * 16.0));
             if (ai_digits_cycles == 0)
                 mac_per_cycle = 0.0;
             else
