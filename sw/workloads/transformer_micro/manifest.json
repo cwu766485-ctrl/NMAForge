@@ -1,11 +1,173 @@
 {
-  "name": "transformer_micro_4x4",
+  "name": "transformer_micro_4x4_prefill_decode",
   "abi_version": 7,
   "abi_minor": 2,
-  "tokens": 4,
+  "prefill_tokens": 4,
+  "decode_tokens": 1,
   "hidden": 4,
+  "attention_heads": 1,
+  "weight_provenance": "hand-authored deterministic non-identity INT8 test weights; not pretrained",
+  "weights": {
+    "wq": [
+      [
+        1,
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        1,
+        1,
+        0
+      ],
+      [
+        1,
+        -1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        -1
+      ]
+    ],
+    "wk": [
+      [
+        1,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        -1,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        1
+      ],
+      [
+        1,
+        0,
+        0,
+        -1
+      ]
+    ],
+    "wv": [
+      [
+        1,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        -1
+      ],
+      [
+        1,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        1
+      ]
+    ],
+    "wo": [
+      [
+        1,
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        1,
+        -1,
+        0
+      ],
+      [
+        1,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        1
+      ]
+    ],
+    "wup": [
+      [
+        64,
+        0,
+        8,
+        0
+      ],
+      [
+        0,
+        64,
+        0,
+        8
+      ],
+      [
+        8,
+        0,
+        64,
+        0
+      ],
+      [
+        0,
+        8,
+        0,
+        64
+      ]
+    ],
+    "wdown": [
+      [
+        1,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        1
+      ],
+      [
+        1,
+        -1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        -1
+      ]
+    ]
+  },
   "descriptor_base": 69632,
-  "descriptor_count": 30,
+  "descriptor_count": 86,
+  "last_task_id": 28757,
   "pipeline": [
     "q_projection",
     "q_pack",
@@ -13,11 +175,27 @@
     "k_pack",
     "v_projection",
     "v_pack",
+    "prefill_kv_write_k0",
+    "prefill_kv_write_v0",
+    "prefill_kv_write_k1",
+    "prefill_kv_write_v1",
+    "prefill_kv_write_k2",
+    "prefill_kv_write_v2",
+    "prefill_kv_write_k3",
+    "prefill_kv_write_v3",
+    "prefill_kv_read_k0",
+    "prefill_kv_read_v0",
+    "prefill_kv_read_k1",
+    "prefill_kv_read_v1",
+    "prefill_kv_read_k2",
+    "prefill_kv_read_v2",
+    "prefill_kv_read_k3",
+    "prefill_kv_read_v3",
     "qk_transpose",
-    "softmax_row0",
-    "softmax_row1",
-    "softmax_row2",
-    "softmax_row3",
+    "prefill_causal_softmax_row0",
+    "prefill_causal_softmax_row1",
+    "prefill_causal_softmax_row2",
+    "prefill_causal_softmax_row3",
     "prob_pack",
     "attention_value",
     "attention_pack",
@@ -36,7 +214,47 @@
     "layernorm2_row0",
     "layernorm2_row1",
     "layernorm2_row2",
-    "layernorm2_row3"
+    "layernorm2_row3",
+    "decode_q_projection",
+    "decode_q_pack",
+    "decode_k_projection",
+    "decode_k_pack",
+    "decode_v_projection",
+    "decode_v_pack",
+    "decode_kv_write_k4",
+    "decode_kv_write_v4",
+    "decode_kv_read_k1",
+    "decode_kv_read_v1",
+    "decode_kv_read_k2",
+    "decode_kv_read_v2",
+    "decode_kv_read_k3",
+    "decode_kv_read_v3",
+    "decode_kv_read_k4",
+    "decode_kv_read_v4",
+    "decode_qk_transpose",
+    "decode_causal_softmax_row0",
+    "decode_causal_softmax_row1",
+    "decode_causal_softmax_row2",
+    "decode_causal_softmax_row3",
+    "decode_prob_pack",
+    "decode_attention_value",
+    "decode_attention_pack",
+    "decode_output_projection",
+    "decode_residual1",
+    "decode_layernorm1_row0",
+    "decode_layernorm1_row1",
+    "decode_layernorm1_row2",
+    "decode_layernorm1_row3",
+    "decode_norm1_pack",
+    "decode_ffn_up",
+    "decode_gelu",
+    "decode_gelu_pack",
+    "decode_ffn_down",
+    "decode_residual2",
+    "decode_layernorm2_row0",
+    "decode_layernorm2_row1",
+    "decode_layernorm2_row2",
+    "decode_layernorm2_row3"
   ],
   "tensors": {
     "x_i8": {
@@ -197,27 +415,27 @@
       "layout": "row-major",
       "initialized": false
     },
-    "scores": {
+    "k_cache": {
       "address": 66560,
       "shape": [
-        4,
+        8,
         4
       ],
-      "dtype": "i32",
+      "dtype": "i8_packed",
       "layout": "row-major",
-      "initialized": false
+      "initialized": true
     },
-    "prob_q15": {
+    "v_cache": {
       "address": 66624,
       "shape": [
-        4,
+        8,
         4
       ],
-      "dtype": "i32",
+      "dtype": "i8_packed",
       "layout": "row-major",
-      "initialized": false
+      "initialized": true
     },
-    "prob_i8": {
+    "k_prefill": {
       "address": 66688,
       "shape": [
         4,
@@ -227,17 +445,17 @@
       "layout": "row-major",
       "initialized": false
     },
-    "attention_i32": {
+    "v_prefill": {
       "address": 66752,
       "shape": [
         4,
         4
       ],
-      "dtype": "i32",
+      "dtype": "i8_packed",
       "layout": "row-major",
       "initialized": false
     },
-    "attention_i8": {
+    "k_decode": {
       "address": 66816,
       "shape": [
         4,
@@ -247,17 +465,17 @@
       "layout": "row-major",
       "initialized": false
     },
-    "projected": {
+    "v_decode": {
       "address": 66880,
       "shape": [
         4,
         4
       ],
-      "dtype": "i32",
+      "dtype": "i8_packed",
       "layout": "row-major",
       "initialized": false
     },
-    "residual1": {
+    "scores": {
       "address": 66944,
       "shape": [
         4,
@@ -267,7 +485,7 @@
       "layout": "row-major",
       "initialized": false
     },
-    "norm1": {
+    "prob_q15": {
       "address": 67008,
       "shape": [
         4,
@@ -277,7 +495,7 @@
       "layout": "row-major",
       "initialized": false
     },
-    "norm1_i8": {
+    "prob_i8": {
       "address": 67072,
       "shape": [
         4,
@@ -287,7 +505,7 @@
       "layout": "row-major",
       "initialized": false
     },
-    "ffn_up": {
+    "attention_i32": {
       "address": 67136,
       "shape": [
         4,
@@ -297,18 +515,8 @@
       "layout": "row-major",
       "initialized": false
     },
-    "gelu": {
+    "attention_i8": {
       "address": 67200,
-      "shape": [
-        4,
-        4
-      ],
-      "dtype": "i32",
-      "layout": "row-major",
-      "initialized": false
-    },
-    "gelu_i8": {
-      "address": 67264,
       "shape": [
         4,
         4
@@ -317,7 +525,17 @@
       "layout": "row-major",
       "initialized": false
     },
-    "ffn_down": {
+    "projected": {
+      "address": 67264,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "residual1": {
       "address": 67328,
       "shape": [
         4,
@@ -327,7 +545,7 @@
       "layout": "row-major",
       "initialized": false
     },
-    "residual2": {
+    "norm1": {
       "address": 67392,
       "shape": [
         4,
@@ -337,8 +555,298 @@
       "layout": "row-major",
       "initialized": false
     },
-    "norm2": {
+    "norm1_i8": {
       "address": 67456,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "ffn_up": {
+      "address": 67520,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "gelu": {
+      "address": 67584,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "gelu_i8": {
+      "address": 67648,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "ffn_down": {
+      "address": 67712,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "residual2": {
+      "address": 67776,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "norm2": {
+      "address": 67840,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_x_i8": {
+      "address": 67904,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "row-major",
+      "initialized": true
+    },
+    "decode_x_i32": {
+      "address": 67968,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": true
+    },
+    "decode_q_i32": {
+      "address": 68032,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_q_i8": {
+      "address": 68096,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_k_i32": {
+      "address": 68160,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_k_i8": {
+      "address": 68224,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_v_i32": {
+      "address": 68288,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_v_i8": {
+      "address": 68352,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_scores": {
+      "address": 68416,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_prob_q15": {
+      "address": 68480,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_prob_i8": {
+      "address": 68544,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_attention_i32": {
+      "address": 68608,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_attention_i8": {
+      "address": 68672,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_projected": {
+      "address": 68736,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_residual1": {
+      "address": 68800,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_norm1": {
+      "address": 68864,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_norm1_i8": {
+      "address": 68928,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_ffn_up": {
+      "address": 68992,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_gelu": {
+      "address": 69056,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_gelu_i8": {
+      "address": 69120,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i8_packed",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_ffn_down": {
+      "address": 69184,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_residual2": {
+      "address": 69248,
+      "shape": [
+        4,
+        4
+      ],
+      "dtype": "i32",
+      "layout": "row-major",
+      "initialized": false
+    },
+    "decode_norm2": {
+      "address": 69312,
       "shape": [
         4,
         4
@@ -348,35 +856,96 @@
       "initialized": false
     }
   },
-  "expected_final": [
+  "expected_prefill_final": [
     [
-      0,
       1,
       -1,
+      -1,
+      0
+    ],
+    [
+      1,
+      -1,
+      1,
+      -1
+    ],
+    [
+      1,
+      -2,
+      0,
+      -1
+    ],
+    [
+      0,
+      -1,
+      1,
+      -2
+    ]
+  ],
+  "expected_final": [
+    [
+      1,
+      -2,
+      0,
+      -1
+    ],
+    [
+      0,
+      -1,
+      1,
       -2
     ],
     [
-      -2,
+      0,
       -1,
       1,
-      -1
-    ],
-    [
-      1,
-      -2,
-      -1,
-      -1
+      -2
     ],
     [
       0,
-      -2,
       -1,
-      1
+      1,
+      -2
     ]
   ],
+  "expected_kv": {
+    "key_cache_words": [
+      33424128,
+      16843009,
+      66051,
+      4261478403,
+      33751041,
+      0,
+      0,
+      0
+    ],
+    "value_cache_words": [
+      4244636161,
+      66306,
+      16974083,
+      50593537,
+      16843011,
+      0,
+      0,
+      0
+    ],
+    "key_decode_readback_words": [
+      16843009,
+      66051,
+      4261478403,
+      33751041
+    ],
+    "value_decode_readback_words": [
+      66306,
+      16974083,
+      50593537,
+      16843011
+    ]
+  },
   "limitations": [
-    "One attention head and one 4x4 tile are used to keep RTL runtime bounded.",
-    "Softmax Q0.15 probabilities are requantized to INT8 before AV GEMM.",
-    "The workload validates accelerator composition, not model accuracy."
+    "One attention head, hidden size 4, four-token prefill and one-token decode keep RTL runtime bounded.",
+    "The fixed non-identity INT8 weights are deterministic fixtures, not pretrained model weights.",
+    "Softmax Q0.15 probabilities are requantized to INT8 before attention-value GEMM.",
+    "The workload validates accelerator composition and KV address/data flow, not model accuracy."
   ]
 }

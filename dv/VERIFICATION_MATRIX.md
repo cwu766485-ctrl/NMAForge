@@ -1,16 +1,92 @@
 # NMAForge block and subsystem verification matrix
 
-> **2026-10-26 real Compute Cluster top-UVM status:** The production-top
-> Matrix/SFU/P0-C slice passed three VCS seeds. Each seed checked a real
-> 16×32×64 GEMM against 512 Golden outputs, 16 A-tile cache hits, 120 cycles
-> of next-K prefetch/MAC overlap, SFU queueing, arbiter/four-bank traffic,
-> ordered completions, prefetch abort/reset and recovery. UVM
-> warning/error/fatal=`0/0/0`; focused covergroup=`65.4%`. Merged whole-top
-> URG line/condition/FSM/branch/assert/group=`47.54/41.38/10.52/37.70/60.00/19.11%`
-> includes DUT/SVA/TB/UVM and is not DUT-only coverage. Other engine numerics,
-> broad parity/protection/backpressure coverage and complete cluster closure
-> remain open. Exact evidence is recorded at the end of this matrix and in the
-> [testplan](../docs/verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md).
+> **2026-10-28 current review addendum:** Product RTL/SPEC candidate is
+> `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`. Clean test commit
+> `bb6e3a270ab819c15df0eb993c184c99d13a6d71` has byte-identical `rtl/` and
+> adds a seven-engine accepted-read reset sweep. VCS/URG
+> `V-2023.12-SP1_Full64` passed 3/3 seeds; each seed checked 5,368 memory
+> words with zero mismatch/unknown/stale/orphan response, `reset_dropped=9`,
+> and UVM severity `0/0/0`. All seven real production engines were reset
+> after an accepted SPAD read, and destination/completion sentinels were
+> preserved. R33 clean test commit `cb9717eb853dc507f4a7e4d188c7bd840160c955`
+> reports 100% applicable focused testpoint coverage (URG 29/29 expected
+> variables); the completion-read response bin is explicitly excluded as N/A
+> and remains checked at zero. The historical raw score is 29/30 (98.96%).
+> RTM remains 24 PASS-SCOPED / 14 PARTIAL / 0 BLOCKED_SPEC / 0 NOT_RUN.
+> This does not close partial Line WSTRB, legal fault/reset crosses, or target
+> external-fabric qualification. The older dated rows below are retained as history;
+> current disposition and artifacts are in the
+> [Execution RTM](../docs/verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
+
+> **2026-10-27 S1/S2 sign-off candidate:** At detached clean-worktree SHA
+> `c83ad7463265062d4edb84d57fe4ada8195f9b10`, Matrix depth-4 three-seed and
+> prefetch-disabled fallback three-seed regressions passed; the seven-engine
+> real-top UVM passed three seeds with 4,852 compared words/seed and zero
+> mismatch/unknown/stale response; and 25/25 passive observation mutations
+> were caught by their expected checker, including Done/missing/duplicate Done
+> on every engine bit. Matrix core line/condition/FSM/branch is
+> `97.08/91.05/93.55/95.52%`, with 49/53 default-profile transitions and
+> four reviewed dispositions. The focused cluster group is 98.96% raw with
+> only the write-only completion read-response bin WAIVED/N/A. S1 is bounded
+> PASS; the tested S2 slice is bounded PASS, while full S2 remains HOLD because
+> 23 requirements are `PASS-SCOPED`, 13 remain partial, two are BLOCKED_SPEC,
+> and none are NOT_RUN after the 2026-10-27 license-restored rerun. That rerun
+> adds launch/latch, shared-read-only, request-stability, CNN/KV, SFU, and FP
+> checks on the `fa2b4dd` source base with the DV changes listed in the report;
+> those same RTL/DV file contents are committed. A fresh clean-worktree replay
+> is pending because the current VCS license server is unavailable; see the
+> supplemental section below.
+> A later CNM retry encountered an unavailable VCS license server before
+> compilation; it adds no result and does not invalidate the archived PASS runs.
+> See the [S1/S2 sign-off candidate report](../docs/verification/COMPUTE_CLUSTER_S1_S2_SIGNOFF_CANDIDATE_2026-10-27.md).
+
+### 2026-10-27 license-restored supplemental verification at `fa2b4dd`
+
+After the Synopsys license server was restored, the previously blocked CNN/KV
+and SFU random-latency runs passed three seeds. FP mixed-dot UVM passed two
+seeds (596/596 bit-exact transactions each; BF16/FP16, odd-tail parity,
+two-outstanding, latency and selected fault/reset bins all 100%). Matrix depth-4
+core passed three seeds with 18 Golden and 34 fault/recovery cases per seed;
+the eight-configuration/five-workload ablation passed 40/40 runs at one fixed
+seed and behavioral one-cycle SPAD latency.
+
+The real-top Compute Cluster UVM passed seeds `20261025/20261026/20261027` on
+the current checkout with DV-only working-tree changes. It now directly checks
+descriptor launch sampling and scalar VDOT unused fields, in-flight descriptor
+mutation/latching, concurrent Scalar VDOT + SFU reads from one immutable SPAD
+region, and request payload stability across ready stalls. Each seed had UVM
+severity 0/0/0, 4,946 memory writes and 5,256 compared words with zero
+mismatch/unknown/stale/orphan responses, and 2 accepted reads intentionally
+dropped by reset. The focused functional group is 98.96% raw (29/30 variables);
+the only uncovered response-client bin is completion-read, dispositioned
+WAIVED/N/A because the completion writer is write-only. The DUT+TB+UVM merged
+URG dashboard is not a DUT-only percentage.
+
+The 25-run observation mutation campaign caught address, data, response owner,
+WSTRB, and done/missing/duplicate Done faults on all seven engine bits.
+`make ai_smoke` passed with the existing `[LOOP-REROLL-ENABLED]` workload-fixture
+warning. UVM compilation had no `Warning`, `Error`, or `TFIPC` diagnostic. The
+Matrix default-profile FSM remains 49/53 transitions (92.45%); the four misses
+are individually reviewed, but the two invalid-state paths have no formal
+unreachable proof, so no full FSM closure claim is made. Exact commands,
+artifacts, requirement dispositions and residual gaps are in the [S1/S2
+sign-off candidate report](../docs/verification/COMPUTE_CLUSTER_S1_S2_SIGNOFF_CANDIDATE_2026-10-27.md).
+
+> **2026-10-26 Stage A + benchmark status:** At tested RTL/DV SHA
+> `03bf257afdca9b0041ff80b6d30cbaf8107cf7e0`, real-top seven-engine UVM passed
+> three clean-worktree VCS seeds. The byte-addressed scoreboard checked 4,852
+> words/seed with zero mismatch, unknown read or stale-epoch response; the DMA
+> response-client bin is hit, and the write-only completion response bin is
+> explicitly waived/N/A. Focused functional coverage is 99.0%; five
+> observation-only checker mutations were caught (5/5). Matrix FSM audit:
+> 49/53 `state_r` transitions, 15/15 states, prefetch FSM 9/9; four misses are
+> reviewed but not formally waived unreachable. Matrix ablation passed 40/40
+> workload/configuration runs. Cluster staged parallel mode measured 1,239→1,070
+> cycles (1.158×); four-task queued mode measured 1,696→1,137 cycles (1.492×).
+> Matrix+CNM+DMA top contention remains blocked by the legal `DMA_CTRL` busy
+> gate. This is not full C1 signoff; merged top code coverage is not DUT-only.
+> Full evidence and run artifacts are in the
+> [Stage A and benchmark report](../docs/verification/COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md).
 
 > **2026-10-23 Multi-Engine NPU Compute Cluster interaction follow-up:** The
 > three-seed direct regressions now include CNM late parity after 128 accepted
@@ -839,7 +915,7 @@ SPAD size benchmark: 16×16 array / 16×16×K32 is 242 cycles, 33.851 MAC/cycle,
 also PASS. These are block/top-smoke results; they are not merged into the
 real-top UVM functional covergroup. P0-C evidence follows.
 
-### Matrix P0-C prefetch and A-tile reuse (2026-10-26)
+### Matrix P0-C prefetch and A-tile reuse (2026-10-26; initial UVM slice)
 
 Depth-2 and depth-4 Matrix core regressions each passed three seeds, with 17
 numeric/layout and 17 fault/recovery cases per seed. The tests check that the
@@ -869,3 +945,83 @@ bank response:
 GOPS is normalized to an assumed 250 MHz; neither these results nor the 10 ns
 testbench period model SRAM macro timing or establish PPA. Exact commands and
 artifact paths are in the [upgrade roadmap](../docs/verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md#34-p0-c-ping-pong-prefetch--p1-bounded-a-tile-reuse).
+
+### 2026-10-26 initial Matrix FSM convergence and seven-engine top UVM follow-up (superseded)
+
+The depth-4 Matrix core regression and a focused 4×4 physical-array
+prefetch-handoff regression were merged in URG after the initial P0-C result
+above. `ai_tensor_matrix_core` reached 15/15 states and 49/53 transitions
+(92.45%); prefetch FSM reached 9/9 transitions. Core line/condition/branch
+coverage is 96.45/88.52/95.02%. The four unhit core transitions were reviewed
+against RTL guards and configuration reachability; no formal unreachable
+waiver is claimed. A separate prefetch-disabled Golden benchmark hits the
+`ST_MAC→ST_A_REQ` fallback, but its differently compiled VDB is not merged into
+the prefetch-enabled percentage. The child array remains partial at 82.35% line
+/ 20.00% condition / 58.82% branch.
+
+The real-top UVM now sweeps INT8 VDOT, BF16 dot, CNM, Matrix, SFU, Conv3x3, and
+KV write, with separate KV readback/stride checking. Three seeds pass; each
+engine's result and completion are checked, as are CNM per-lane request/response
+ownership, Matrix/CNM response tags, request backpressure (236 cycles),
+Matrix/SFU concurrent Abort, and reset recovery. Each seed reports focused
+functional covergroup 97.9%, UVM warning/error/fatal `0/0/0`, no orphan response,
+and empty pending ledgers. The merged whole-top URG also includes DUT, SVA,
+testbench, and UVM definitions and must not be interpreted as DUT-only code
+coverage. The older 65.4% UVM and 40/60 Matrix FSM values above are preserved as
+dated intermediate evidence, not current status.
+
+The VCS same-seed Matrix configuration sweep also completed eight combinations
+of outstanding depth, prefetch, and A-tile cache. With one-cycle behavioral
+bank response, 16×16×K32 improved 265→233 cycles, 16×32×K32 improved 504→417
+cycles with reads 128→96, and 32×32×K64 improved 1698→1187 cycles with reads
+512→384, comparing depth-2/no-prefetch/no-cache to depth-4/prefetch/cache.
+These are behavioral cycle/read comparisons, not SRAM timing or PPA.
+
+The closeout reran the same three real-top UVM seeds in
+`/tmp/nmaforge_cluster_closeout_multiseed_20261026/`. Each seed ran 14/14 parity
+cases and reported 3,584 modeled writes, 3,536 compared words, zero
+mismatches/unknown reads, zero orphan responses, and UVM warning/error/fatal
+`0/0/0`. The 97.92% functional group has two explicit misses: DMA and completion
+response-client bins. The byte-addressed reference-memory scoreboard is now
+implemented for observed host/scalar/banked/CNM accesses; line/partial-WSTRB
+and broader randomized feature/fault coverage remain open. One targeted
+mutation and selected fixed-SHA replay were completed afterward; a broader
+mutation campaign remains open. The latest top smoke, 20-case seeded regression, and 86-descriptor
+fixed-weight Transformer functional test are documented in the
+[upgrade roadmap](../docs/verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md).
+This block records the original closeout worktree run. A later detached
+clean-SHA replay at `827c0052cf589fde676e93e34bf459188956182f` reran the
+selected UVM, Matrix, Transformer, smoke, and seeded top targets; one targeted
+scratchpad data mutation was detected and restored-source replay passed. The
+full logs, commands, testpoint mapping, and open coverage items are in the
+[clean replay record](../docs/verification/COMPUTE_CLUSTER_CLEAN_REPLAY_2026-10-26.md).
+Current ASIC area/Fmax/power and pretrained-model accuracy remain unmeasured.
+
+### 2026-10-26 Stage A closeout and benchmark replay at `03bf257`
+
+The fixed-SHA clean replay closes the selected Stage A checker tasks: the top
+UVM observes the real DMA response-client path; the completion read-response
+bin is explicitly N/A because the completion writer is write-only; the
+byte-addressed memory scoreboard sees 4,852 compared words/seed with no
+mismatch/unknown/stale response; and address/data/owner/WSTRB/done observation
+mutations are all detected. The functional covergroup is 99.0%, which is not
+REQ closure. The parity cross is 42/42 across three seeds, but broader fault ×
+phase × engine × Abort/Reset cases remain open. VCS compile warning `[TFIPC]`
+is resolved by connecting the real per-engine busy/done SVA inputs.
+
+For Matrix, three depth-4 seeds each pass 18 cases and 25 fault profiles. URG
+over the depth-4 and focused 4×4 handoff databases reports 15/15 states,
+49/53 `state_r` transitions, and 9/9 prefetch transitions. The four remaining
+transitions are reviewed in the report; no formal unreachable waiver is
+claimed. A separate prefetch-disabled run dynamically hits `ST_MAC→ST_A_REQ`.
+The same-SHA 8-configuration/five-workload sweep passes 40/40 combinations.
+
+The Compute Cluster benchmark reports 1,239 serial cycles versus 1,070 staged
+Matrix+CNM-then-SFU cycles (1.158×), and 1,696 sequential versus 1,137 queued
+four-task cycles (1.492×), with ordered completions. Three-seed CNM+DMA
+subsystem contention passes. Exact Matrix+CNM+DMA top contention is blocked by
+the register contract that only launches DMA when `processor_busy` is low.
+This work changes verification/testbench evidence only; it does not claim
+ASIC PPA or full Cluster signoff. See the
+[Stage A and benchmark report](../docs/verification/COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md)
+for the requirement table, commands, artifacts, and coverage dispositions.

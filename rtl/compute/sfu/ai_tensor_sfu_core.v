@@ -69,7 +69,7 @@ module ai_tensor_sfu_core(
     localparam [3:0] ERR_WATCHDOG   = 4'd4;
     localparam [3:0] ERR_PARITY     = 4'd5;
     localparam [3:0] ERR_PROTECTION = 4'd6;
-    localparam [3:0] ERR_NUMERIC    = 4'd11;
+    localparam [3:0] ERR_NUMERIC    = 4'd8;
 
     // Each memory request state has an explicit response wait state.  The
     // divider and square-root start/wait pairs keep their iterative latency

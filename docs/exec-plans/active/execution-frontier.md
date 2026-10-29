@@ -1,8 +1,8 @@
 # NMAForge execution frontier
 
-Updated: 2026-10-21. This is a short handoff for the next engineering task; it
-does not duplicate per-run evidence. The checkout is currently modified, so
-results from the present session must not be described as a clean-SHA replay.
+Updated: 2026-10-29. This is a short handoff for the next engineering task; it
+does not duplicate per-run evidence. The current Compute Cluster sign-off and
+benchmark work is tracked in the execution RTM and open-issue report.
 
 ## Project baseline
 
@@ -18,10 +18,47 @@ Key architecture rules:
 - Completion commits all four words before advancing the completion tail.
 - AXI valid/ready, ID, LAST, back-pressure, reset, and abort-drain behavior
   must remain protocol-correct.
-- Compute commands dispatch serially. The command-processor and compute-cluster
-  formal runs verify this contract; parallel engine launch is unsupported.
+- Ordinary compute descriptors can overlap across engines through
+  `ai_parallel_compute_dispatcher`; each engine has one active slot and
+  completions retire in CMDQ order. See the Compute Cluster SPEC v1.1.
 
 ## Current verification frontier
+
+The VCS license is available in the current environment. On research branch
+`feat/tinynpu-model-inference`, run `DIGITS-RTL-20261029-FINAL` passed: a trained
+INT8 digits MLP ran through the real top-level Matrix/SFU/CMDQ/CPLQ path and
+matched an independent integer Golden for all checked values. The run reports
+the host layout bridge separately; it does not claim host-free inference. See
+the [digits inference report](../../benchmark/REAL_MODEL_INFERENCE.md).
+
+At source SHA `110e0c9db49eb1a7a558c955347accfde87f963e`, the pinned TinyNPU
+benchmark passed: 18 GEMM rows, 256/256 same-vector outputs on both designs,
+TinyNPU's engine regression 6/6, and the same `conv1x_mini.onnx` graph on both
+tops. NMAForge passed all intermediate tensors and final outputs byte-exactly
+using eight CMDQ descriptors. Its recorded windows are 1,985 compute cycles
+plus 1,080 host-layout cycles; TinyNPU's graph smoke is 4,781 testbench cycles.
+Memory setup and timing boundaries differ, so there is no CNN speedup claim.
+Paired evidence is in [`cnn_results.csv`](../../../benchmark/tinynpu/cnn_results.csv)
+and the [comparison report](../../benchmark/NMAFORGE_VS_TINY_NPU.md).
+
+The trained digits INT8 model also reran on this SHA through the real top:
+360 samples, 352 correct (97.78%), 69 descriptors, and exact independent
+integer Golden; it used 93,653 compute cycles plus a separately measured
+70,656-cycle host-layout bridge. The three-seed Matrix size/ablation replay
+also passed on this SHA: 45/45 size cases and 120/120 configuration cases.
+Run ID `MATRIX-PERF-20261025-20261026-20261027-110e0c9d`; CSV/JSON evidence is
+in [`benchmark/compute_performance.csv`](../../../benchmark/compute_performance.csv)
+and [`benchmark/compute_performance_summary.json`](../../../benchmark/compute_performance_summary.json).
+
+The checked-in 86-descriptor prefill/decode fixture also reran with VCS on this
+SHA and passed all tensor/completion checks. It uses deterministic functional
+weights; it is not a trained or pretrained GPT-style model deployment.
+
+The current branch is research work based on the v1.0 audit candidate, not a
+replacement sign-off baseline. The audited candidate remains
+`9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`; its final audit records 24
+PASS-SCOPED and 14 PARTIAL requirements and concludes CL-DV-v1.0 is not signed.
+The digits experiment does not change that disposition.
 
 | Area | Current evidence | Open work |
 |---|---|---|
@@ -32,14 +69,16 @@ Key architecture rules:
 
 ## Next work
 
-1. Freeze the reviewed source and test manifest, then rerun required gates on
-   one clean SHA. Preserve the current dirty-tree evidence separately.
-2. Continue the FP parity-to-writeback proof from the [FP formal frontier](../../../dv/block/compute/fp/formal/README.md); an inconclusive timeout is not a pass.
-3. Review per-module raw code-coverage residuals and add targeted stimulus or
-   proof for justified gaps. Current compute statistics are in the status page.
-4. Expand cross-layer fault × abort × reset and queue/completion recovery only
-   where the RTM identifies a missing requirement.
-5. Keep LEC, DFT, post-layout PPA, and board results as separate closure gates.
+1. Close the remaining Compute Cluster P0/P1 items in the
+   [execution RTM](../../verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)
+   and [open-issue report](../../verification/COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md).
+2. Freeze the reviewed source and test manifest, then replay required gates on
+   one clean SHA. Do not treat the current-tree reset evidence as clean-SHA replay.
+3. Continue the FP parity-to-writeback proof from the [FP formal frontier](../../../dv/block/compute/fp/formal/README.md); an inconclusive timeout is not a pass.
+4. Keep LEC, DFT, post-layout PPA, and board results as separate closure gates.
+5. Continue from the paired TinyNPU CNN and measured small-M utilization into
+   the separate shape-adaptive v2 research branch; no shape-adaptive RTL is
+   claimed in the current branch.
 
 ## Canonical commands
 

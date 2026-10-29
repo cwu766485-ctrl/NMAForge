@@ -22,7 +22,8 @@ module ai_conv3x3_linebuffer_core #(
     output reg [31:0] cycle_count, output reg [31:0] element_count
 );
   localparam [7:0] OP_CONV3X3=8'h16, OP_DWCONV3X3=8'h17;
-  localparam [3:0] ERR_CONFIG=1, ERR_ABORT=3, ERR_SPAD=4, ERR_WATCHDOG=7;
+  localparam [3:0] ERR_CONFIG=4'd1, ERR_OP=4'd2, ERR_ABORT=4'd3,
+                   ERR_WATCHDOG=4'd4, ERR_SPAD=4'd7;
   localparam [3:0] IDLE=0, W_REQ=1, W_WAIT=2, P_REQ=3, P_WAIT=4,
                    CALC=5, WRITE=6, NEXT=7, DONE=8, ERROR=9;
   reg [3:0] state_r; reg [31:0] src_r, weight_r, dst_r, watchdog_r;
@@ -85,7 +86,8 @@ module ai_conv3x3_linebuffer_core #(
       else if(state_r!=ERROR && ((spad_error&&busy)||(abort&&busy))) begin error<=1; error_code<=abort?ERR_ABORT:ERR_SPAD; state_r<=ERROR; end
       else case(state_r)
         IDLE: begin busy<=0; error<=0; error_code<=0; if(start) begin
-          if((op_mode!=OP_CONV3X3 && op_mode!=OP_DWCONV3X3)||height<3||width<3||width>MAX_WIDTH) begin error<=1; error_code<=ERR_CONFIG; state_r<=ERROR; end
+          if(op_mode!=OP_CONV3X3 && op_mode!=OP_DWCONV3X3) begin error<=1; error_code<=ERR_OP; state_r<=ERROR; end
+          else if(height<3||width<3||width>MAX_WIDTH) begin error<=1; error_code<=ERR_CONFIG; state_r<=ERROR; end
           else begin busy<=1; src_r<=src0_base; weight_r<=src1_base; dst_r<=dst_base; h_r<=height; w_r<=width; watchdog_r<=watchdog_limit; row_r<=0; col_r<=0; row_bank_r<=0; weight_idx_r<=0; element_count<=0; result<=0; state_r<=W_REQ; end
         end end
         W_REQ: if(spad_ready) state_r<=W_WAIT;

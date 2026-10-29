@@ -1,0 +1,47 @@
+{
+  "run_id": "MATRIX-PERF-20261025-20261026-20261027-110e0c9d",
+  "source_sha": "110e0c9db49eb1a7a558c955347accfde87f963e",
+  "seeds": [
+    "20261025",
+    "20261026",
+    "20261027"
+  ],
+  "tool": "Synopsys VCS V-2023.12-SP1_Full64",
+  "compiler_flags": [
+    "-full64",
+    "-sverilog",
+    "-debug_access+all",
+    "-timescale=1ns/1ps",
+    "+define+MATRIX_MAX_OUTSTANDING_READS",
+    "+define+MATRIX_A_TILE_CACHE_ENABLE",
+    "+define+MATRIX_NEXT_K_PREFETCH_ENABLE",
+    "+define+MATRIX_ARRAY_SIZE",
+    "-cm line+cond+fsm+branch"
+  ],
+  "clock_period_ns": 10.0,
+  "gops_reference_mhz": 250,
+  "gops_reference_is_measured_frequency": false,
+  "memory_model": "one-cycle behavioral SPAD; not SRAM timing or ASIC PPA",
+  "size_sweep_config": {
+    "physical_arrays": [
+      4,
+      8,
+      16
+    ],
+    "outstanding_depth": 4,
+    "prefetch": 1,
+    "a_tile_cache": 1
+  },
+  "ablation_configs": [
+    "depth 2/4 x prefetch 0/1 x A-cache 0/1"
+  ],
+  "commands": [
+    "make -C dv/block/compute/matrix/sim matrix-size-benchmark SEED=<seed>",
+    "make -C dv/block/compute/matrix/sim matrix-config-comparison SEED=<seed>"
+  ],
+  "size_sweep_cases": 45,
+  "ablation_cases": 120,
+  "golden_pass": 165,
+  "golden_fail": 0,
+  "csv": "compute_performance.csv"
+}

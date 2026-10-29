@@ -1,11 +1,11 @@
 # Compute-engine verification status
 
-Status date: 2026-10-25. The current worktree completed the expanded
+Status date: 2026-10-26. The current worktree completed the expanded
 multi-engine regression, an SFU transition-closure sweep, a focused
-Dispatcher/SPAD-MUX UVM test, the first parameterized Matrix MAC-array
-milestone, and a three-seed real-top Matrix/SFU Cluster UVM slice. This is
-targeted functional and raw code-coverage evidence;
-it is not full signoff.
+Dispatcher/SPAD-MUX UVM test, Matrix 16×16 dataflow updates, a three-seed
+real-top seven-engine UVM slice, and a focused Matrix FSM convergence run.
+This is targeted functional and raw code-coverage evidence; it is not full
+signoff.
 
 The group/compute aggregate figures below remain the 2026-10-23/24 merge and
 were not recomputed with the current Matrix controller RTL. Matrix's updated
@@ -13,7 +13,7 @@ were not recomputed with the current Matrix controller RTL. Matrix's updated
 work are reported separately in the
 [Compute Cluster upgrade roadmap](COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md).
 
-## 2026-10-25 P0 Matrix array milestone
+## 2026-10-25 P0 Matrix array milestone (historical baseline)
 
 `ai_tensor_matrix_core` now defaults to `ai_tensor_matrix_array` at
 `ARRAY_SIZE=16`; the descriptor and 4×4 tile-major SPAD layout remain
@@ -29,10 +29,10 @@ against 4×4/8×8/16×16 workloads at K=32. With one-cycle modeled bank response
 seeded operand generation and fixed LFSR ready/stall pattern, the 16×16 array
 runs 16×16×K32 in 357 cycles: 22.947 useful MAC/cycle, 8.96% command-wide
 array utilization, and 11.473 GOPS normalized to 250 MHz. This is VCS cycle
-throughput, not SRAM timing or PPA. DC and TSMC libraries are unavailable in
-the current environment. DC V-2023.12-SP1 is installed, but synthesis startup
-fails with `DCSH-1: Design Compiler is not enabled`; private TSMC standard-cell
-and SRAM libraries are also unset, so area/Fmax/power remain unmeasured. The
+throughput, not SRAM timing or PPA. DC V-2023.12-SP1 is installed and now starts
+successfully, but this checkout has no current Matrix/Top synthesis runner or
+SDC, and private TSMC standard-cell/SRAM libraries are unset, so
+area/Fmax/power remain unmeasured. The
 C0-P suite still uses behavioral Engines/SPAD. A separate real-top C1 slice
 now passes three VCS seeds for Matrix/SFU GEMM, overlapping dispatch,
 shared-arbiter traffic, ordered completion, active abort/reset, and reset
@@ -49,10 +49,10 @@ The merged URG report has three tests. Its whole-top totals are
 35.87%. Those totals include the whole instantiated top, checker, testbench,
 and UVM definitions; they are not DUT-only or Compute Cluster closure metrics.
 The compile log has one `Warning-[TFIPC]` for omitted ports on the top-level
-protocol SVA instance; elaboration reports zero errors. Other real-engine
-numerics, CNM bank/parity traffic, broad fault/backpressure combinations,
-mutation, clean-SHA replay, and full C1 closure remain open. Exact source-to-test
-trace is in the roadmap and
+protocol SVA instance; elaboration reports zero errors. **This paragraph is
+the initial 2026-10-25 UVM status and is superseded by the later closeout and
+fixed-SHA replay below.** Broader fault/backpressure combinations and full C1
+closure remain open. Exact source-to-test trace is in the roadmap and
 [Compute Cluster UVM Testplan](COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md).
 
 The same replay also reran
@@ -62,6 +62,64 @@ three-seed core regression for seeds `20261021/20261022/20261023` (each seed:
 The refreshed Matrix-core/array URG is 96.17% / 90.83% / 65.85% / 93.52% and
 82.35% / 20.00% / N/A / 58.82% respectively (line/condition/FSM/branch).
 Artifacts are under `/tmp/nmaforge_matrix16_core_regress_vcs_20261025/`.
+
+## 2026-10-26 Matrix FSM and real-top seven-engine update
+
+The Matrix core FSM-focused depth-4 three-seed regression and 4×4
+prefetch-handoff run were merged with URG. `ai_tensor_matrix_core` reports
+96.45% line / 88.52% condition / 49 of 53 FSM transitions (92.45%) / 95.02%
+branch; all 15 states and all 9 prefetch-FSM transitions were hit. The four
+remaining core transitions are individually classified in the
+[upgrade roadmap](COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md#37-2026-10-26-all-engine-uvm-matrix-fsm-and-decoder-follow-up)
+as guarded error paths or compile-time-disabled fallback behavior. The child
+`matrix_tile_array` remains partial at 82.35% line / 20.00% condition /
+58.82% branch. This is focused code-coverage closure, not 100% Matrix closure.
+
+The real `ai_accel_top` UVM test now runs INT8 VDOT, BF16 dot, CNM, Matrix, SFU,
+Conv3x3, and KV write, plus a separate KV readback/stride check. Three seeds
+(`20261025/20261026/20261027`) pass with each engine's Golden/result and
+completion checked. Each seed reports focused functional covergroup 97.9%,
+UVM warning/error/fatal `0/0/0`, request backpressure over 236 cycles, and
+Matrix/SFU concurrent Abort coverage. The scoreboard summary per seed is
+`2594/2343/827/16/2/1152/1150/0/2` for
+observations/busy/overlap/done/errors/reads/responses/orphan/reset-dropped;
+all four CNM lane accepted/response counts are 64 and pending ledgers drain to
+zero. `errors=2` are expected Abort completions. The merged whole-top URG
+includes DUT, SVA, testbench, and UVM, so it is not a DUT-only coverage number.
+
+This remains a directed slice. A later 2026-10-26 closeout extended the same
+three-seed test with a byte-addressed reference-memory scoreboard and a
+14-case seeded parity cross; see the exact testpoint/bin/result table in the
+[Compute Cluster UVM testplan](COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md). Broader
+opcode/shape crosses, protection × phase combinations, complete REQ coverage,
+and a broad mutation campaign remain open. The compile retains an
+existing `Warning-[TFIPC]` for unconnected optional top protocol-SVA inputs.
+
+The closeout run `/tmp/nmaforge_cluster_closeout_multiseed_20261026/` passes
+seeds `20261025/20261026/20261027`, each with 14/14 parity cases, 3,584
+reference-memory writes, 3,536 compared words, zero mismatches/unknown reads,
+zero orphan responses, empty pending queues, and UVM warning/error/fatal
+`0/0/0`. Focused functional coverage is 97.92% (28/30 bins); `dma` and
+`completion` response-client bins are unhit because those requesters are not
+part of this directed compute sequence. The merged whole-top URG still mixes
+DUT, assertions, testbench and UVM and is not a DUT-only coverage claim.
+
+The tested source SHA `827c0052cf589fde676e93e34bf459188956182f` was replayed
+in a detached clean worktree. The three-seed UVM, eight-configuration Matrix
+benchmark, separate prefetch-off fallback run, 86-descriptor fixed-weight
+Transformer, top smoke, and 20-case seeded top run all passed. A temporary
+bank-0 registered read-data bit flip was caught by 192 memory-scoreboard
+mismatches plus a Matrix Golden fatal; restoring the RTL returned the same
+seed to zero mismatches and zero UVM errors/fatals. This is one targeted
+mutation sensitivity check, not a broad mutation campaign. Exact artifacts
+and the coverage audit are in the
+[clean-SHA evidence record](COMPUTE_CLUSTER_CLEAN_REPLAY_2026-10-26.md).
+
+The Matrix core's prefetch-enabled profile remains at 49/53 FSM transitions;
+the four raw misses and a separate prefetch-disabled fallback benchmark are
+reviewed in the roadmap. One `ST_MAC→ST_A_REQ` fallback is now dynamically
+covered with prefetch disabled, but no cross-macro URG percentage is reported
+because the compile-time condition shapes differ.
 
 ## Five compute groups
 

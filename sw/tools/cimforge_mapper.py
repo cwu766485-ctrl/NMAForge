@@ -38,10 +38,29 @@ OP_RESIDUAL = 0x34
 OP_GELU = 0x35
 OP_REQUANT = 0x36
 OP_LAYERNORM = 0x38
+OP_CAUSAL_SOFTMAX = 0x39
+OP_KV_WRITE = 0x43
+OP_KV_READ = 0x44
 FLAG_BIAS = 1 << 0
 FLAG_TRANSPOSE_B = 1 << 2
 FLAG_PACK_I8 = 1 << 4
 DESC_VERSION = 7
+MODEL_WEIGHTS = {
+    "wq": [
+        [1, 0, 0, 1], [0, 1, 1, 0], [1, -1, 0, 0], [0, 0, 1, -1],
+    ],
+    "wk": [
+        [1, 1, 0, 0], [0, 1, -1, 0], [0, 0, 1, 1], [1, 0, 0, -1],
+    ],
+    "wv": [
+        [1, 0, 1, 0], [0, 1, 0, -1], [1, 1, 0, 0], [0, 0, 1, 1],
+    ],
+    "wo": [
+        [1, 0, 0, 1], [0, 1, -1, 0], [1, 0, 1, 0], [0, 1, 0, 1],
+    ],
+    "wup": [[64, 0, 8, 0], [0, 64, 0, 8], [8, 0, 64, 0], [0, 8, 0, 64]],
+    "wdown": [[1, 0, 1, 0], [0, 1, 0, 1], [1, -1, 0, 0], [0, 0, 1, -1]],
+}
 
 
 def align(value: int, alignment: int = 64) -> int:
@@ -79,6 +98,12 @@ def pack_columns(matrix: list[list[int]]) -> list[int]:
     return [pack_i8(column) for column in transpose(matrix)]
 
 
+def pack_matrix_words(matrix: list[list[int]]) -> list[int]:
+    values = flatten(matrix)
+    return [pack_i8(values[index:index + 4])
+            for index in range(0, len(values), 4)]
+
+
 @dataclass
 class Tensor:
     name: str
@@ -104,10 +129,14 @@ class Descriptor:
     flags: int = 0
     aux0: int = 0
     shift: int = 0
+    activation: int = 0
     bias: int = 0
     wait_mask: int = 0
     signal_mask: int = 0
     clear_mask: int = 0
+    src0_stride: int = 0
+    src1_stride: int = 0
+    dst_stride: int = 0
 
     def words(self) -> list[int]:
         words = [0] * 16
@@ -120,7 +149,10 @@ class Descriptor:
         words[6] = self.k_or_length
         words[7] = self.flags
         words[8] = self.aux0
-        words[9] = self.shift & 0x1F
+        words[9] = (self.shift & 0x1F) | ((self.activation & 0x3) << 5)
+        words[10] = self.src0_stride
+        words[11] = self.src1_stride
+        words[12] = self.dst_stride
         words[13] = (1 << 16) | 1  # one head, one batch
         words[14] = (self.signal_mask << 16) | self.wait_mask
         words[15] = (self.clear_mask << 16) | DESC_VERSION
@@ -159,15 +191,24 @@ class Mapper:
         bias = kwargs.pop("bias", 0)
         if isinstance(bias, Tensor):
             bias = bias.addr
+        src0_addr = src0.addr + kwargs.pop("src0_offset", 0)
+        dst_addr = dst.addr + kwargs.pop("dst_offset", 0)
         descriptor = Descriptor(
-            name=name, task_id=self.task_id, op=op, src0=src0.addr,
-            src1=src1, dst=dst.addr, bias=bias, **kwargs,
+            name=name, task_id=self.task_id, op=op, src0=src0_addr,
+            src1=src1, dst=dst_addr, bias=bias, **kwargs,
         )
         self.descriptors.append(descriptor)
         self.task_id += 1
 
 
-def build_workload() -> tuple[Mapper, list[list[int]]]:
+def causal_softmax_q15(scores: list[int], query_token: int) -> list[int]:
+    if not 0 <= query_token < len(scores):
+        raise ValueError("causal query token must be within score length")
+    visible = softmax_q15(scores[: query_token + 1])
+    return visible + [0] * (len(scores) - len(visible))
+
+
+def build_workload() -> tuple[Mapper, dict[str, list]]:
     mapper = Mapper()
     x = [
         [1, 2, 0, -1],
@@ -175,39 +216,55 @@ def build_workload() -> tuple[Mapper, list[list[int]]]:
         [2, 0, 1, 1],
         [1, -1, 0, 2],
     ]
-    identity = [[1 if row == col else 0 for col in range(4)] for row in range(4)]
-    w_up = [[64 if row == col else 0 for col in range(4)] for row in range(4)]
+    wq, wk, wv = MODEL_WEIGHTS["wq"], MODEL_WEIGHTS["wk"], MODEL_WEIGHTS["wv"]
+    wo, w_up, w_down = (
+        MODEL_WEIGHTS["wo"], MODEL_WEIGHTS["wup"], MODEL_WEIGHTS["wdown"]
+    )
     gamma = [32768] * 4
     beta = [0] * 4
 
     x8 = mapper.tensor("x_i8", (4, 4), "i8_packed", "row-major", pack_rows(x))
     x32 = mapper.tensor("x_i32", (4, 4), "i32", "row-major", flatten(x))
-    wq = mapper.tensor("wq", (4, 4), "i8_packed", "column-major", pack_columns(identity))
-    wk = mapper.tensor("wk", (4, 4), "i8_packed", "column-major", pack_columns(identity))
-    wv = mapper.tensor("wv", (4, 4), "i8_packed", "column-major", pack_columns(identity))
-    wo = mapper.tensor("wo", (4, 4), "i8_packed", "column-major", pack_columns(identity))
+    wq_t = mapper.tensor("wq", (4, 4), "i8_packed", "column-major", pack_columns(wq))
+    wk_t = mapper.tensor("wk", (4, 4), "i8_packed", "column-major", pack_columns(wk))
+    wv_t = mapper.tensor("wv", (4, 4), "i8_packed", "column-major", pack_columns(wv))
+    wo_t = mapper.tensor("wo", (4, 4), "i8_packed", "column-major", pack_columns(wo))
     wup = mapper.tensor("wup", (4, 4), "i8_packed", "column-major", pack_columns(w_up))
-    wdown = mapper.tensor("wdown", (4, 4), "i8_packed", "column-major", pack_columns(identity))
+    wdown_t = mapper.tensor("wdown", (4, 4), "i8_packed", "column-major", pack_columns(w_down))
     gamma_t = mapper.tensor("gamma", (4,), "i32", "vector", gamma)
     beta_t = mapper.tensor("beta", (4,), "i32", "vector", beta)
 
-    def empty_i32(name: str) -> Tensor:
+    def empty_i32(name: str, shape: tuple[int, int] = (4, 4)) -> Tensor:
         # Poison every destination before execution.  This prevents a stale or
         # preloaded golden tensor from making the RTL check pass accidentally.
         return mapper.tensor(
-            name, (4, 4), "i32", "row-major", [0x5A5AA5A5] * 16,
+            name, shape, "i32", "row-major",
+            [0x5A5AA5A5] * (shape[0] * shape[1]),
             initialized=False,
         )
 
-    def empty_i8(name: str) -> Tensor:
+    def empty_i8(name: str, shape: tuple[int, int] = (4, 4)) -> Tensor:
         return mapper.tensor(
-            name, (4, 4), "i8_packed", "row-major", [0xA55AA55A] * 4,
+            name, shape, "i8_packed", "row-major",
+            [0xA55AA55A] * (shape[0] * shape[1] // 4),
             initialized=False,
         )
 
     q32, q8 = empty_i32("q_i32"), empty_i8("q_i8")
     k32, k8 = empty_i32("k_i32"), empty_i8("k_i8")
     v32, v8 = empty_i32("v_i32"), empty_i8("v_i8")
+    k_cache = mapper.tensor(
+        "k_cache", (8, 4), "i8_packed", "row-major",
+        [0x5A5AA5A5] * 5 + [0, 0, 0], initialized=True,
+    )
+    v_cache = mapper.tensor(
+        "v_cache", (8, 4), "i8_packed", "row-major",
+        [0xA55A5AA5] * 5 + [0, 0, 0], initialized=True,
+    )
+    k_prefill, v_prefill = empty_i8("k_prefill"), empty_i8("v_prefill")
+    # The first four words are the prefill key/value rows. Decode reads these
+    # back from KV SPAD so its attention operands exercise the real KV engine.
+    k_decode, v_decode = empty_i8("k_decode"), empty_i8("v_decode")
     scores = empty_i32("scores")
     probs32, probs8 = empty_i32("prob_q15"), empty_i8("prob_i8")
     attention32, attention8 = empty_i32("attention_i32"), empty_i8("attention_i8")
@@ -216,32 +273,98 @@ def build_workload() -> tuple[Mapper, list[list[int]]]:
     ffn_up, gelu, gelu_i8 = empty_i32("ffn_up"), empty_i32("gelu"), empty_i8("gelu_i8")
     ffn_down, residual2, norm2 = empty_i32("ffn_down"), empty_i32("residual2"), empty_i32("norm2")
 
-    def gemm(name: str, lhs: Tensor, rhs: Tensor, dst: Tensor, flags: int = 0) -> None:
-        mapper.add(name, OP_GEMM, lhs, dst, src1=rhs, m=4, n=4,
-                   k_or_length=1, flags=flags, aux0=1)
+    def gemm(
+        name: str, lhs: Tensor, rhs: Tensor, dst: Tensor,
+        flags: int = 0, m: int = 4, n: int = 4, k: int = 1,
+    ) -> None:
+        mapper.add(name, OP_GEMM, lhs, dst, src1=rhs, m=m, n=n,
+                   k_or_length=k, flags=flags, aux0=1)
 
-    def pack(name: str, src: Tensor, dst: Tensor, shift: int) -> None:
-        mapper.add(name, OP_REQUANT, src, dst, k_or_length=16,
+    def pack(name: str, src: Tensor, dst: Tensor, shift: int, length: int = 16) -> None:
+        mapper.add(name, OP_REQUANT, src, dst, k_or_length=length,
                    flags=FLAG_PACK_I8, shift=shift, aux0=1)
 
-    gemm("q_projection", x8, wq, q32)
+    def kv_write(
+        name: str, src: Tensor, cache: Tensor, token: int,
+        source_row: int | None = None,
+    ) -> None:
+        row = token if source_row is None else source_row
+        mapper.add(name, OP_KV_WRITE, src, cache, src0_offset=row * 4,
+                   k_or_length=1, aux0=token, src0_stride=4,
+                   src1_stride=32)
+
+    def kv_read(
+        name: str, cache: Tensor, dst: Tensor, token: int,
+        destination_row: int | None = None,
+    ) -> None:
+        row = token if destination_row is None else destination_row
+        mapper.add(name, OP_KV_READ, cache, dst, dst_offset=row * 4,
+                   k_or_length=1, aux0=token, src0_stride=4,
+                   src1_stride=32)
+
+    def add_causal_softmax_rows(
+        source: Tensor, destination: Tensor, width: int,
+        query_tokens: list[int], name: str,
+    ) -> None:
+        for row, query_token in enumerate(query_tokens):
+            mapper.add(
+                f"{name}_row{row}", OP_CAUSAL_SOFTMAX, source, destination,
+                k_or_length=width, aux0=query_token,
+                src0_offset=row * width * 4,
+                dst_offset=row * width * 4,
+            )
+
+    decode_token = [1, -1, 2, 0]
+    decode_rows = [decode_token, [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+    decode_i8 = mapper.tensor(
+        "decode_x_i8", (4, 4), "i8_packed", "row-major", pack_rows(decode_rows)
+    )
+    decode_i32 = mapper.tensor(
+        "decode_x_i32", (4, 4), "i32", "row-major", flatten(decode_rows)
+    )
+    qd32, qd8 = empty_i32("decode_q_i32"), empty_i8("decode_q_i8")
+    kd32, kd8 = empty_i32("decode_k_i32"), empty_i8("decode_k_i8")
+    vd32, vd8 = empty_i32("decode_v_i32"), empty_i8("decode_v_i8")
+    decode_scores = empty_i32("decode_scores")
+    decode_probs32 = empty_i32("decode_prob_q15")
+    decode_probs8 = empty_i8("decode_prob_i8")
+    decode_attention32 = empty_i32("decode_attention_i32")
+    decode_attention8 = empty_i8("decode_attention_i8")
+    decode_projected = empty_i32("decode_projected")
+    decode_residual1 = empty_i32("decode_residual1")
+    decode_norm1 = empty_i32("decode_norm1")
+    decode_norm1_i8 = empty_i8("decode_norm1_i8")
+    decode_ffn_up = empty_i32("decode_ffn_up")
+    decode_gelu = empty_i32("decode_gelu")
+    decode_gelu_i8 = empty_i8("decode_gelu_i8")
+    decode_ffn_down = empty_i32("decode_ffn_down")
+    decode_residual2 = empty_i32("decode_residual2")
+    decode_norm2 = empty_i32("decode_norm2")
+
+    gemm("q_projection", x8, wq_t, q32)
     pack("q_pack", q32, q8, 0)
-    gemm("k_projection", x8, wk, k32)
+    gemm("k_projection", x8, wk_t, k32)
     pack("k_pack", k32, k8, 0)
-    gemm("v_projection", x8, wv, v32)
+    gemm("v_projection", x8, wv_t, v32)
     pack("v_pack", v32, v8, 0)
-    gemm("qk_transpose", q8, k8, scores)
-    for row in range(4):
-        mapper.add(
-            f"softmax_row{row}", OP_SOFTMAX, scores, probs32,
-            k_or_length=4, aux0=1,
-        )
-        mapper.descriptors[-1].src0 += row * 16
-        mapper.descriptors[-1].dst += row * 16
+
+    # Prefill stores each projected token key/value through the production KV
+    # engine, then reads the cache back into the attention operands.
+    for token in range(4):
+        kv_write(f"prefill_kv_write_k{token}", k8, k_cache, token)
+        kv_write(f"prefill_kv_write_v{token}", v8, v_cache, token)
+    for token in range(4):
+        kv_read(f"prefill_kv_read_k{token}", k_cache, k_prefill, token)
+        kv_read(f"prefill_kv_read_v{token}", v_cache, v_prefill, token)
+
+    # K rows are token-major with four feature bytes per word; the controller's
+    # default B mapping consumes this layout as the logical K^T operand.
+    gemm("qk_transpose", q8, k_prefill, scores)
+    add_causal_softmax_rows(scores, probs32, 4, [0, 1, 2, 3], "prefill_causal_softmax")
     pack("prob_pack", probs32, probs8, 8)
-    gemm("attention_value", probs8, v8, attention32, FLAG_TRANSPOSE_B)
+    gemm("attention_value", probs8, v_prefill, attention32, FLAG_TRANSPOSE_B)
     pack("attention_pack", attention32, attention8, 7)
-    gemm("output_projection", attention8, wo, projected)
+    gemm("output_projection", attention8, wo_t, projected)
     mapper.add("residual1", OP_RESIDUAL, projected, residual1, src1=x32,
                k_or_length=16, aux0=1)
     for row in range(4):
@@ -254,7 +377,7 @@ def build_workload() -> tuple[Mapper, list[list[int]]]:
     gemm("ffn_up", norm1_i8, wup, ffn_up)
     mapper.add("gelu", OP_GELU, ffn_up, gelu, k_or_length=16, aux0=1)
     pack("gelu_pack", gelu, gelu_i8, 0)
-    gemm("ffn_down", gelu_i8, wdown, ffn_down)
+    gemm("ffn_down", gelu_i8, wdown_t, ffn_down)
     mapper.add("residual2", OP_RESIDUAL, ffn_down, residual2, src1=norm1,
                k_or_length=16, aux0=1)
     for row in range(4):
@@ -264,30 +387,113 @@ def build_workload() -> tuple[Mapper, list[list[int]]]:
         mapper.descriptors[-1].src0 += row * 16
         mapper.descriptors[-1].dst += row * 16
 
-    q = gemm_i8_i32(x, identity)
-    key = gemm_i8_i32(x, identity)
-    value = gemm_i8_i32(x, identity)
+    # Decode one new token after prefill. Its key/value update token slot 4;
+    # attention then reads the latest four-token sliding context window.
+    gemm("decode_q_projection", decode_i8, wq_t, qd32)
+    pack("decode_q_pack", qd32, qd8, 0)
+    gemm("decode_k_projection", decode_i8, wk_t, kd32)
+    pack("decode_k_pack", kd32, kd8, 0)
+    gemm("decode_v_projection", decode_i8, wv_t, vd32)
+    pack("decode_v_pack", vd32, vd8, 0)
+    kv_write("decode_kv_write_k4", kd8, k_cache, 4, source_row=0)
+    kv_write("decode_kv_write_v4", vd8, v_cache, 4, source_row=0)
+    for row, token in enumerate(range(1, 5)):
+        kv_read(f"decode_kv_read_k{token}", k_cache, k_decode, token, row)
+        kv_read(f"decode_kv_read_v{token}", v_cache, v_decode, token, row)
+    gemm("decode_qk_transpose", qd8, k_decode, decode_scores)
+    add_causal_softmax_rows(
+        decode_scores, decode_probs32, 4, [3, 3, 3, 3], "decode_causal_softmax"
+    )
+    pack("decode_prob_pack", decode_probs32, decode_probs8, 8)
+    gemm("decode_attention_value", decode_probs8, v_decode, decode_attention32,
+         FLAG_TRANSPOSE_B)
+    pack("decode_attention_pack", decode_attention32, decode_attention8, 7)
+    gemm("decode_output_projection", decode_attention8, wo_t, decode_projected)
+    mapper.add("decode_residual1", OP_RESIDUAL, decode_projected,
+               decode_residual1, src1=decode_i32, k_or_length=16, aux0=1)
+    for row in range(4):
+        mapper.add(
+            f"decode_layernorm1_row{row}", OP_LAYERNORM, decode_residual1,
+            decode_norm1, src1=gamma_t, bias=beta_t, k_or_length=4,
+            flags=FLAG_BIAS, aux0=1, src0_offset=row * 16,
+            dst_offset=row * 16,
+        )
+    pack("decode_norm1_pack", decode_norm1, decode_norm1_i8, 0)
+    gemm("decode_ffn_up", decode_norm1_i8, wup, decode_ffn_up)
+    mapper.add("decode_gelu", OP_GELU, decode_ffn_up, decode_gelu,
+               k_or_length=16, aux0=1)
+    pack("decode_gelu_pack", decode_gelu, decode_gelu_i8, 0)
+    gemm("decode_ffn_down", decode_gelu_i8, wdown_t, decode_ffn_down)
+    mapper.add("decode_residual2", OP_RESIDUAL, decode_ffn_down,
+               decode_residual2, src1=decode_norm1, k_or_length=16, aux0=1)
+    for row in range(4):
+        mapper.add(
+            f"decode_layernorm2_row{row}", OP_LAYERNORM, decode_residual2,
+            decode_norm2, src1=gamma_t, bias=beta_t, k_or_length=4,
+            flags=FLAG_BIAS, aux0=1, src0_offset=row * 16,
+            dst_offset=row * 16,
+        )
+
+    q = gemm_i8_i32(x, wq)
+    key = gemm_i8_i32(x, wk)
+    value = gemm_i8_i32(x, wv)
     q_i8 = [requant_i8(row, 0) for row in q]
     k_i8 = [requant_i8(row, 0) for row in key]
     v_i8 = [requant_i8(row, 0) for row in value]
     score_golden = gemm_i8_i32(q_i8, transpose(k_i8))
-    probability_q15 = [softmax_q15(row) for row in score_golden]
+    probability_q15 = [causal_softmax_q15(row, row_index)
+                       for row_index, row in enumerate(score_golden)]
     probability_i8 = [requant_i8(row, 8) for row in probability_q15]
     attended = gemm_i8_i32(probability_i8, v_i8)
     attended_i8 = [requant_i8(row, 7) for row in attended]
-    projection = gemm_i8_i32(attended_i8, identity)
+    projection = gemm_i8_i32(attended_i8, wo)
     residual_1 = [residual_i32(a, b) for a, b in zip(projection, x)]
     norm_1 = [layernorm_q15(row, gamma, beta) for row in residual_1]
     norm_1_i8 = [requant_i8(row, 0) for row in norm_1]
     expanded = gemm_i8_i32(norm_1_i8, w_up)
     activated = [[gelu_q8_8(value) for value in row] for row in expanded]
     activated_i8 = [requant_i8(row, 0) for row in activated]
-    down = gemm_i8_i32(activated_i8, identity)
+    down = gemm_i8_i32(activated_i8, w_down)
     residual_2 = [residual_i32(a, b) for a, b in zip(down, norm_1)]
     norm_2 = [layernorm_q15(row, gamma, beta) for row in residual_2]
 
     # Cross-check the standalone FFN composition helper on the same tensors.
-    assert ffn_i8(norm_1_i8, w_up, identity, 0) == down
+    assert ffn_i8(norm_1_i8, w_up, w_down, 0) == down
+
+    decode_q = gemm_i8_i32(decode_rows, wq)
+    decode_key = gemm_i8_i32(decode_rows, wk)
+    decode_value = gemm_i8_i32(decode_rows, wv)
+    decode_q_i8 = [requant_i8(row, 0) for row in decode_q]
+    decode_key_i8 = [requant_i8(row, 0) for row in decode_key]
+    decode_value_i8 = [requant_i8(row, 0) for row in decode_value]
+    key_cache_golden = k_i8 + [decode_key_i8[0]] + [[0, 0, 0, 0] for _ in range(3)]
+    value_cache_golden = v_i8 + [decode_value_i8[0]] + [[0, 0, 0, 0] for _ in range(3)]
+    decode_key_window = key_cache_golden[1:5]
+    decode_value_window = value_cache_golden[1:5]
+    decode_scores_golden = gemm_i8_i32(
+        decode_q_i8, transpose(decode_key_window)
+    )
+    decode_probs_golden = [causal_softmax_q15(row, 3)
+                            for row in decode_scores_golden]
+    decode_prob_i8 = [requant_i8(row, 8) for row in decode_probs_golden]
+    decode_attended = gemm_i8_i32(decode_prob_i8, decode_value_window)
+    decode_attended_i8 = [requant_i8(row, 7) for row in decode_attended]
+    decode_projection = gemm_i8_i32(decode_attended_i8, wo)
+    decode_residual_1 = [
+        residual_i32(a, b) for a, b in zip(decode_projection, decode_rows)
+    ]
+    decode_norm_1 = [layernorm_q15(row, gamma, beta) for row in decode_residual_1]
+    decode_norm_1_i8 = [requant_i8(row, 0) for row in decode_norm_1]
+    decode_expanded = gemm_i8_i32(decode_norm_1_i8, w_up)
+    decode_activated = [
+        [gelu_q8_8(value) for value in row] for row in decode_expanded
+    ]
+    decode_activated_i8 = [requant_i8(row, 0) for row in decode_activated]
+    decode_down = gemm_i8_i32(decode_activated_i8, w_down)
+    decode_residual_2 = [
+        residual_i32(a, b) for a, b in zip(decode_down, decode_norm_1)
+    ]
+    decode_norm_2 = [layernorm_q15(row, gamma, beta) for row in decode_residual_2]
     # The generated chain reuses destinations and crosses engines.  Publish a
     # two-token dependency chain so its reference result remains deterministic
     # with parallel dispatch enabled.  Independent software workloads can
@@ -300,7 +506,37 @@ def build_workload() -> tuple[Mapper, list[list[int]]]:
         if index + 1 < len(mapper.descriptors):
             descriptor.signal_mask |= 1 << (index & 1)
     validate_descriptor_chain(mapper)
-    return mapper, norm_2
+    expected = {
+        "prefill_final": norm_2,
+        "decode_final": decode_norm_2,
+        "decode_q_i32": decode_q,
+        "decode_q_i8_words": pack_matrix_words(decode_q_i8),
+        "decode_k_i32": decode_key,
+        "decode_k_i8_words": pack_matrix_words(decode_key_i8),
+        "decode_v_i32": decode_value,
+        "decode_v_i8_words": pack_matrix_words(decode_value_i8),
+        "decode_scores": decode_scores_golden,
+        "decode_prob_q15": decode_probs_golden,
+        "decode_prob_i8_words": pack_matrix_words(decode_prob_i8),
+        "decode_attention_i32": decode_attended,
+        "decode_attention_i8_words": pack_matrix_words(decode_attended_i8),
+        "decode_projected": decode_projection,
+        "decode_residual1": decode_residual_1,
+        "decode_norm1": decode_norm_1,
+        "decode_norm1_i8_words": pack_matrix_words(decode_norm_1_i8),
+        "decode_ffn_up": decode_expanded,
+        "decode_gelu": decode_activated,
+        "decode_gelu_i8_words": pack_matrix_words(decode_activated_i8),
+        "decode_ffn_down": decode_down,
+        "decode_residual2": decode_residual_2,
+        "key_cache_words": [pack_i8(row) for row in key_cache_golden],
+        "value_cache_words": [pack_i8(row) for row in value_cache_golden],
+        "key_prefill_readback_words": [pack_i8(row) for row in k_i8],
+        "value_prefill_readback_words": [pack_i8(row) for row in v_i8],
+        "key_decode_readback_words": [pack_i8(row) for row in decode_key_window],
+        "value_decode_readback_words": [pack_i8(row) for row in decode_value_window],
+    }
+    return mapper, expected
 
 
 def tensor_size_bytes(tensor: Tensor) -> int:
@@ -343,9 +579,21 @@ def validate_descriptor_chain(mapper: Mapper) -> None:
         )
 
     for descriptor in mapper.descriptors:
+        source_base = descriptor.src0
+        destination_base = descriptor.dst
+        token_index = descriptor.aux0 & 0xFFFF
+        head_index = (descriptor.aux0 >> 16) & 0xFFFF
+        cache_offset = (
+            token_index * descriptor.src0_stride
+            + head_index * descriptor.src1_stride
+        )
+        if descriptor.op == OP_KV_WRITE:
+            destination_base += cache_offset
+        elif descriptor.op == OP_KV_READ:
+            source_base += cache_offset
         if descriptor.op == OP_GEMM:
             require(
-                descriptor.src0, descriptor.m * descriptor.k_or_length * 4,
+                source_base, descriptor.m * descriptor.k_or_length * 4,
                 descriptor.name, "src0",
             )
             require(
@@ -355,7 +603,7 @@ def validate_descriptor_chain(mapper: Mapper) -> None:
             output_bytes = descriptor.m * descriptor.n * 4
         else:
             require(
-                descriptor.src0, descriptor.k_or_length * 4,
+                source_base, descriptor.k_or_length * 4,
                 descriptor.name, "src0",
             )
             if descriptor.op == OP_RESIDUAL:
@@ -378,11 +626,11 @@ def validate_descriptor_chain(mapper: Mapper) -> None:
                 output_bytes = ((descriptor.k_or_length + 3) // 4) * 4
 
         tensor_name = allocation(
-            descriptor.dst, output_bytes, descriptor.name
+            destination_base, output_bytes, descriptor.name
         )
         available.append(
             (
-                descriptor.dst, descriptor.dst + output_bytes,
+                destination_base, destination_base + output_bytes,
                 f"{descriptor.name}->{tensor_name}",
             )
         )
@@ -394,7 +642,7 @@ def tensor_storage_words(tensor: Tensor) -> list[int]:
     return [u32(value) for value in tensor.values]
 
 
-def write_svh(path: Path, mapper: Mapper, expected: list[list[int]]) -> None:
+def write_svh(path: Path, mapper: Mapper, expected: dict[str, list]) -> None:
     descriptor_base = align(mapper.next_addr, 0x1000)
     completion_base = align(descriptor_base + len(mapper.descriptors) * 64, 0x1000)
     lines = [
@@ -402,6 +650,8 @@ def write_svh(path: Path, mapper: Mapper, expected: list[list[int]]) -> None:
         f"localparam [31:0] TRANSFORMER_DESC_BASE = 32'h{descriptor_base:08x};",
         f"localparam [31:0] TRANSFORMER_CPL_BASE = 32'h{completion_base:08x};",
         f"localparam integer TRANSFORMER_DESC_COUNT = {len(mapper.descriptors)};",
+        f"localparam [15:0] TRANSFORMER_LAST_TASK_ID = 16'h{mapper.descriptors[-1].task_id:04x};",
+        f"localparam [31:0] TRANSFORMER_LAST_RESULT = 32'h{u32(expected['decode_final'][-1][-1]):08x};",
         "",
         "task load_transformer_workload;",
         "  begin",
@@ -426,12 +676,58 @@ def write_svh(path: Path, mapper: Mapper, expected: list[list[int]]) -> None:
         "task check_transformer_workload;",
         "  begin",
     ]
-    norm2 = mapper.tensors["norm2"]
-    for index, value in enumerate(flatten(expected)):
-        lines.append(
-            f"    expect_read(SPAD_BASE + 32'h{norm2.addr + index * 4:08x}, "
-            f"32'h{u32(value):08x}, \"Transformer final[{index}]\");"
-        )
+    for tensor_name, expected_name, label in (
+        ("norm2", "prefill_final", "prefill final"),
+        ("decode_norm2", "decode_final", "decode final"),
+        ("decode_q_i32", "decode_q_i32", "decode Q projection"),
+        ("decode_k_i32", "decode_k_i32", "decode K projection"),
+        ("decode_v_i32", "decode_v_i32", "decode V projection"),
+        ("decode_scores", "decode_scores", "decode attention score"),
+        ("decode_prob_q15", "decode_prob_q15", "decode causal probability"),
+        ("decode_attention_i32", "decode_attention_i32", "decode attention output"),
+        ("decode_projected", "decode_projected", "decode output projection"),
+        ("decode_residual1", "decode_residual1", "decode residual1"),
+        ("decode_norm1", "decode_norm1", "decode layernorm1"),
+        ("decode_ffn_up", "decode_ffn_up", "decode FFN up"),
+        ("decode_gelu", "decode_gelu", "decode GELU"),
+        ("decode_ffn_down", "decode_ffn_down", "decode FFN down"),
+        ("decode_residual2", "decode_residual2", "decode residual2"),
+    ):
+        tensor = mapper.tensors[tensor_name]
+        for index, value in enumerate(flatten(expected[expected_name])):
+            lines.append(
+                f"    expect_read(SPAD_BASE + 32'h{tensor.addr + index * 4:08x}, "
+                f"32'h{u32(value):08x}, \"Transformer {label}[{index}]\");"
+            )
+    for tensor_name, expected_name, label in (
+        ("decode_q_i8", "decode_q_i8_words", "decode Q packed"),
+        ("decode_k_i8", "decode_k_i8_words", "decode K packed"),
+        ("decode_v_i8", "decode_v_i8_words", "decode V packed"),
+        ("decode_prob_i8", "decode_prob_i8_words", "decode probability packed"),
+        ("decode_attention_i8", "decode_attention_i8_words", "decode attention packed"),
+        ("decode_norm1_i8", "decode_norm1_i8_words", "decode norm1 packed"),
+        ("decode_gelu_i8", "decode_gelu_i8_words", "decode GELU packed"),
+    ):
+        tensor = mapper.tensors[tensor_name]
+        for index, value in enumerate(expected[expected_name]):
+            lines.append(
+                f"    expect_read(SPAD_BASE + 32'h{tensor.addr + index * 4:08x}, "
+                f"32'h{u32(value):08x}, \"Transformer {label}[{index}]\");"
+            )
+    for tensor_name, expected_name in (
+        ("k_cache", "key_cache_words"),
+        ("v_cache", "value_cache_words"),
+        ("k_prefill", "key_prefill_readback_words"),
+        ("v_prefill", "value_prefill_readback_words"),
+        ("k_decode", "key_decode_readback_words"),
+        ("v_decode", "value_decode_readback_words"),
+    ):
+        tensor = mapper.tensors[tensor_name]
+        for index, value in enumerate(expected[expected_name]):
+            lines.append(
+                f"    expect_read(SPAD_BASE + 32'h{tensor.addr + index * 4:08x}, "
+                f"32'h{u32(value):08x}, \"Transformer {tensor_name}[{index}]\");"
+            )
     lines += [
         "  end",
         "endtask",
@@ -441,16 +737,23 @@ def write_svh(path: Path, mapper: Mapper, expected: list[list[int]]) -> None:
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def write_manifest(path: Path, mapper: Mapper, expected: list[list[int]]) -> None:
+def write_manifest(path: Path, mapper: Mapper, expected: dict[str, list]) -> None:
     descriptor_base = align(mapper.next_addr, 0x1000)
     manifest = {
-        "name": "transformer_micro_4x4",
+        "name": "transformer_micro_4x4_prefill_decode",
         "abi_version": 7,
         "abi_minor": 2,
-        "tokens": 4,
+        "prefill_tokens": 4,
+        "decode_tokens": 1,
         "hidden": 4,
+        "attention_heads": 1,
+        "weight_provenance": "hand-authored deterministic non-identity INT8 test weights; not pretrained",
+        "weights": {
+            **MODEL_WEIGHTS,
+        },
         "descriptor_base": descriptor_base,
         "descriptor_count": len(mapper.descriptors),
+        "last_task_id": mapper.descriptors[-1].task_id,
         "pipeline": [descriptor.name for descriptor in mapper.descriptors],
         "tensors": {
             tensor.name: {
@@ -462,11 +765,19 @@ def write_manifest(path: Path, mapper: Mapper, expected: list[list[int]]) -> Non
             }
             for tensor in mapper.tensors.values()
         },
-        "expected_final": expected,
+        "expected_prefill_final": expected["prefill_final"],
+        "expected_final": expected["decode_final"],
+        "expected_kv": {
+            "key_cache_words": expected["key_cache_words"],
+            "value_cache_words": expected["value_cache_words"],
+            "key_decode_readback_words": expected["key_decode_readback_words"],
+            "value_decode_readback_words": expected["value_decode_readback_words"],
+        },
         "limitations": [
-            "One attention head and one 4x4 tile are used to keep RTL runtime bounded.",
-            "Softmax Q0.15 probabilities are requantized to INT8 before AV GEMM.",
-            "The workload validates accelerator composition, not model accuracy.",
+            "One attention head, hidden size 4, four-token prefill and one-token decode keep RTL runtime bounded.",
+            "The fixed non-identity INT8 weights are deterministic fixtures, not pretrained model weights.",
+            "Softmax Q0.15 probabilities are requantized to INT8 before attention-value GEMM.",
+            "The workload validates accelerator composition and KV address/data flow, not model accuracy.",
         ],
     }
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -491,7 +802,7 @@ def main() -> None:
     print(
         f"TRANSFORMER_MAPPER_PASS descriptors={len(mapper.descriptors)} "
         f"tensors={len(mapper.tensors)} dataflow=closed poison=enabled "
-        f"final={expected}"
+        f"prefill={expected['prefill_final']} decode={expected['decode_final']}"
     )
 
 

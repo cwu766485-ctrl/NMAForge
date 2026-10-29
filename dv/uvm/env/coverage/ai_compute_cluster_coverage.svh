@@ -7,6 +7,8 @@ class ai_compute_cluster_coverage extends uvm_component;
     int response_client;
     bit matrix_sfu_overlap;
     bit simultaneous_engine_requests;
+    bit engine_backpressure;
+    bit multi_engine_abort;
     bit banked_request;
     bit cnm_request;
     bit matrix_prefetch_active;
@@ -16,6 +18,7 @@ class ai_compute_cluster_coverage extends uvm_component;
     bit cnm_lane1_response;
     bit cnm_lane2_response;
     bit cnm_lane3_response;
+    int unsigned response_client_hits[0:5];
 
     covergroup cluster_cg;
         option.per_instance = 1;
@@ -28,12 +31,20 @@ class ai_compute_cluster_coverage extends uvm_component;
         }
         cp_matrix_sfu_overlap: coverpoint matrix_sfu_overlap { bins hit = {1}; }
         cp_simultaneous_engine_requests: coverpoint simultaneous_engine_requests { bins hit = {1}; }
+        cp_engine_backpressure: coverpoint engine_backpressure { bins hit = {1}; }
+        cp_multi_engine_abort: coverpoint multi_engine_abort { bins hit = {1}; }
         cp_banked_request: coverpoint banked_request { bins hit = {1}; }
         cp_cnm_request: coverpoint cnm_request { bins hit = {1}; }
         cp_matrix_prefetch_active: coverpoint matrix_prefetch_active { bins hit = {1}; }
         cp_matrix_a_cache_hit: coverpoint matrix_a_cache_hit { bins hit = {1}; }
         cp_response_client: coverpoint response_client iff (response_client >= 0) {
-            bins descriptor = {0}; bins completion = {1}; bins core = {2};
+            bins descriptor = {0};
+            // ai_completion_writer only emits SPAD writes (spad_write=spad_valid),
+            // so a completion read response cannot occur in this interface contract.
+            // Keep the runtime zero-hit checker and disposition log; exclude only
+            // this structurally inapplicable read-response bin from applicable coverage.
+            ignore_bins completion_read_response_not_applicable = {1};
+            bins core = {2};
             bins banked = {3}; bins dma = {4}; bins cnm = {5};
         }
         cp_response_route: coverpoint response_route iff ((response_client == 3) || (response_client == 5)) {
@@ -50,6 +61,7 @@ class ai_compute_cluster_coverage extends uvm_component;
         super.new(name, parent);
         analysis_export = new("analysis_export", this);
         cluster_cg = new();
+        foreach (response_client_hits[i]) response_client_hits[i] = 0;
     endfunction
 
     function automatic int decode_engine(bit [7:0] op);
@@ -68,11 +80,15 @@ class ai_compute_cluster_coverage extends uvm_component;
         active_count = $countones(obs.engine_busy);
         matrix_sfu_overlap = obs.engine_busy[3] && obs.engine_busy[4];
         simultaneous_engine_requests = $countones(obs.engine_req_valid) > 1;
+        engine_backpressure = obs.engine_backpressure;
+        multi_engine_abort = obs.multi_engine_abort;
         banked_request = obs.banked_valid;
         cnm_request = |obs.cnm_valid;
         matrix_prefetch_active = obs.matrix_prefetch_active;
         matrix_a_cache_hit = obs.matrix_a_cache_hit;
         response_client = obs.rsp_valid ? obs.rsp_client : -1;
+        if (obs.rsp_valid && obs.rsp_client <= 3'd5)
+            response_client_hits[obs.rsp_client]++;
         response_route = {obs.matrix_rsp_valid, (|obs.cnm_rsp_valid)};
         cnm_lane0_response = obs.cnm_rsp_valid[0];
         cnm_lane1_response = obs.cnm_rsp_valid[1];
@@ -80,12 +96,17 @@ class ai_compute_cluster_coverage extends uvm_component;
         cnm_lane3_response = obs.cnm_rsp_valid[3];
         if (obs.launch_valid || active_count > 0 || simultaneous_engine_requests ||
             banked_request || cnm_request || obs.rsp_valid ||
+            engine_backpressure || multi_engine_abort ||
             matrix_prefetch_active || matrix_a_cache_hit)
             cluster_cg.sample();
     endfunction
 
     function void report_phase(uvm_phase phase);
         super.report_phase(phase);
-        `uvm_info("CLUSTER_COVERAGE", $sformatf("focused_compute_cg=%0.1f%%", cluster_cg.get_coverage()), UVM_LOW)
+        `uvm_info("CLUSTER_COVERAGE", $sformatf(
+            "focused_compute_cg_applicable=%0.1f%% response_clients={desc:%0d,cpl_read:%0d(N/A),core:%0d,banked:%0d,dma:%0d,cnm:%0d}",
+            cluster_cg.get_coverage(), response_client_hits[0], response_client_hits[1],
+            response_client_hits[2], response_client_hits[3], response_client_hits[4],
+            response_client_hits[5]), UVM_LOW)
     endfunction
 endclass

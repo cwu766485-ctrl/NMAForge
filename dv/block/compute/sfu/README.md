@@ -12,11 +12,14 @@ implemented opcode: Softmax, causal Softmax, RMSNorm, LayerNorm, residual,
 GELU, requant, and SiLU. A Python fixed-point reference model supplies the
 expected words. The direct core testbench adds randomized scratchpad request
 stalls and 0–7-cycle ordered response latency, then checks all writes,
-element counts, and read/response accounting. GELU and SiLU vectors exercise
-below-threshold, threshold, and above-threshold signed Q8.8 values. The
-2026-10-23 three-seed VCS regression passed 64/64 vectors per seed with
-1,038/1,038 reads/responses and 426 total writes per seed; maximum response
-latency was 7 cycles. Each seed also checks eight error/interaction cases (invalid length,
+element counts, and read/response accounting. The 2026-10-28 R21 regression
+passed 64/64 vectors per seed (192/192 total) with 1,043/1,043 reads/responses
+and 427 output writes per seed; maximum response latency was 7 cycles. The
+vectors include GELU/SiLU PWL cut points, Softmax signed input extremes,
+normalization epsilon-zero behavior, gamma/beta boundaries, INT32 residual
+overflow, and Requant saturation. Exact formulas and domain limits are in
+[`SFU_NUMERIC_CONTRACT_ZH.md`](../../../../docs/spec/SFU_NUMERIC_CONTRACT_ZH.md).
+Each seed also checks eight error/interaction cases (invalid length,
 unsupported opcode, unaligned input, SPAD protection/parity, abort, and
 watchdog), reset while active, and normal oracle traffic after reset. The
 DUT-only line/condition/FSM/branch VDB accumulates all three runs.

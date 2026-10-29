@@ -2,6 +2,11 @@ class ai_compute_cluster_monitor extends uvm_component;
     `uvm_component_utils(ai_compute_cluster_monitor)
     virtual ai_compute_cluster_if vif;
     uvm_analysis_port #(ai_compute_cluster_obs) ap;
+    string mutation_kind;
+    bit mutation_injected;
+    bit [6:0] missing_done_pending;
+    bit [6:0] duplicate_done_pending;
+    int mutation_engine;
 
     function new(string name, uvm_component parent);
         super.new(name, parent);
@@ -12,18 +17,33 @@ class ai_compute_cluster_monitor extends uvm_component;
         super.build_phase(phase);
         if (!uvm_config_db#(virtual ai_compute_cluster_if)::get(this, "", "compute_vif", vif))
             `uvm_fatal("NOCOMPUTEVIF", "compute-cluster monitor requires compute_vif")
+        mutation_kind = "";
+        mutation_injected = 1'b0;
+        missing_done_pending = '0;
+        duplicate_done_pending = '0;
+        mutation_engine = 0;
+        void'($value$plusargs("CL_MUTATION=%s", mutation_kind));
+        void'($value$plusargs("CL_MUTATION_ENGINE=%d", mutation_engine));
     endfunction
 
     task run_phase(uvm_phase phase);
         ai_compute_cluster_obs obs;
+        int lane;
+        bit flush_missing_done;
+        bit [6:0] sampled_engine_done;
         forever begin
             @(posedge vif.aclk);
-            if (!vif.aresetn || vif.launch_valid || (|vif.engine_busy) ||
+            flush_missing_done = (missing_done_pending != 0);
+            sampled_engine_done = vif.engine_done;
+            if (!vif.aresetn || vif.host_valid || vif.selected_spad_valid ||
+                vif.selected_line_valid || vif.selected_banked_valid ||
+                (|vif.selected_cnm_valid) || vif.launch_valid || (|vif.engine_busy) ||
                 (|vif.engine_done) || (|vif.engine_req_valid) ||
                 vif.core_spad_valid || vif.banked_valid ||
                 (|vif.cnm_valid) || vif.rsp_valid || vif.matrix_rsp_valid ||
                 (|vif.cnm_rsp_valid) || (|vif.read_accept_mask) ||
-                vif.matrix_prefetch_active || vif.matrix_a_cache_hit) begin
+                vif.matrix_prefetch_active || vif.matrix_a_cache_hit ||
+                (missing_done_pending != 0) || (duplicate_done_pending != 0)) begin
                 obs = ai_compute_cluster_obs::type_id::create("obs");
                 obs.reset_active = !vif.aresetn;
                 obs.core_busy = vif.core_busy;
@@ -33,6 +53,10 @@ class ai_compute_cluster_monitor extends uvm_component;
                 obs.engine_done = vif.engine_done;
                 obs.engine_error = vif.engine_error;
                 obs.engine_req_valid = vif.engine_req_valid;
+                obs.engine_req_ready = vif.engine_req_ready;
+                obs.engine_backpressure = |(vif.engine_req_valid & ~vif.engine_req_ready);
+                obs.multi_engine_abort = (vif.dut_abort_active &&
+                                          ($countones(vif.engine_busy) > 1));
                 obs.core_spad_valid = vif.core_spad_valid;
                 obs.banked_valid = vif.banked_valid;
                 obs.cnm_valid = vif.cnm_valid;
@@ -45,7 +69,96 @@ class ai_compute_cluster_monitor extends uvm_component;
                 obs.cnm_rsp_valid = vif.cnm_rsp_valid;
                 obs.cnm_accept_mask = vif.cnm_accept_mask;
                 obs.read_accept_mask = vif.read_accept_mask;
+                obs.host_valid = vif.host_valid;
+                obs.host_write = vif.host_write;
+                obs.host_access_ok = vif.host_access_ok;
+                obs.host_addr = vif.host_addr;
+                obs.host_wdata = vif.host_wdata;
+                obs.host_wstrb = vif.host_wstrb;
+                obs.selected_spad_valid = vif.selected_spad_valid;
+                obs.selected_spad_write = vif.selected_spad_write;
+                obs.selected_spad_ready = vif.selected_spad_ready;
+                obs.selected_spad_access_ok = vif.selected_spad_access_ok;
+                obs.selected_spad_addr = vif.selected_spad_addr;
+                obs.selected_spad_wdata = vif.selected_spad_wdata;
+                obs.selected_line_valid = vif.selected_line_valid;
+                obs.selected_line_write = vif.selected_line_write;
+                obs.selected_line_ready = vif.selected_line_ready;
+                obs.selected_line_access_ok = vif.selected_line_access_ok;
+                obs.selected_line_addr = vif.selected_line_addr;
+                obs.selected_line_wdata = vif.selected_line_wdata;
+                obs.selected_line_wstrb = vif.selected_line_wstrb;
+                obs.selected_line_rdata = vif.selected_line_rdata;
+                obs.selected_banked_valid = vif.selected_banked_valid;
+                obs.selected_banked_ready = vif.selected_banked_ready;
+                obs.selected_banked_access_ok = vif.selected_banked_access_ok;
+                obs.selected_banked_addr = vif.selected_banked_addr;
+                obs.matrix_banked_req_addr = vif.matrix_banked_req_addr;
+                obs.selected_cnm_valid = vif.selected_cnm_valid;
+                obs.selected_cnm_ready = vif.selected_cnm_ready;
+                obs.selected_cnm_access_ok = vif.selected_cnm_access_ok;
+                for (lane = 0; lane < 4; lane++) begin
+                    obs.banked_rdata[lane] = vif.banked_rdata[lane];
+                    obs.selected_cnm_addr[lane] = vif.selected_cnm_addr[lane];
+                    obs.cnm_rdata[lane] = vif.cnm_rdata[lane];
+                end
+                obs.selected_rsp_is_line = vif.selected_rsp_is_line;
+                obs.selected_rsp_error = vif.selected_rsp_error;
+                obs.selected_rsp_rdata = vif.selected_rsp_rdata;
+
+                // Checker-sensitivity mutations alter only the passive
+                // transaction copy. The DUT, memory, and sequence drivers are
+                // never changed. Each campaign run injects one mutation.
+                if (!mutation_injected) begin
+                    case (mutation_kind)
+                        "address": if (obs.selected_banked_valid && obs.selected_banked_ready) begin
+                            obs.selected_banked_addr = obs.selected_banked_addr + 32'd4;
+                            mutation_injected = 1'b1;
+                        end
+                        "data": if (obs.rsp_valid && obs.rsp_client == 3'd3) begin
+                            obs.banked_rdata[0] = obs.banked_rdata[0] ^ 32'd1;
+                            mutation_injected = 1'b1;
+                        end
+                        "owner": if (obs.rsp_valid && obs.rsp_client == 3'd3) begin
+                            obs.rsp_client = 3'd5;
+                            mutation_injected = 1'b1;
+                        end
+                        "wstrb": if (obs.selected_line_valid && obs.selected_line_ready &&
+                                     obs.selected_line_write && obs.request_client == 3'd2) begin
+                            obs.selected_line_wstrb[0] = ~obs.selected_line_wstrb[0];
+                            mutation_injected = 1'b1;
+                        end
+                        "done": if ((obs.engine_busy == 7'd0) &&
+                                    (obs.engine_done == 7'd0) &&
+                                    (obs.engine_error == 7'd0) && !obs.reset_active) begin
+                            obs.engine_done[mutation_engine] = 1'b1;
+                            mutation_injected = 1'b1;
+                        end
+                        "missing_done": if (obs.engine_done[mutation_engine] && !obs.reset_active) begin
+                            missing_done_pending[mutation_engine] = 1'b1;
+                            obs.engine_done[mutation_engine] = 1'b0;
+                            mutation_injected = 1'b1;
+                        end
+                        "duplicate_done": if ((duplicate_done_pending != 0) &&
+                                               !(|(duplicate_done_pending & obs.engine_busy)) &&
+                                               !obs.reset_active) begin
+                            obs.engine_done = obs.engine_done | duplicate_done_pending;
+                            duplicate_done_pending = '0;
+                            mutation_injected = 1'b1;
+                        end
+                        default: begin end
+                    endcase
+                    if (mutation_injected)
+                        `uvm_info("CLUSTER_MUTATION_INJECTED", $sformatf(
+                            "testbench observation mutation=%s engine=%0d",
+                            mutation_kind, mutation_engine), UVM_LOW)
+                end
                 ap.write(obs);
+                if ((mutation_kind == "duplicate_done") && !mutation_injected &&
+                    sampled_engine_done[mutation_engine] && vif.aresetn)
+                    duplicate_done_pending[mutation_engine] = 1'b1;
+                if (flush_missing_done)
+                    missing_done_pending = '0;
             end
         end
     endtask

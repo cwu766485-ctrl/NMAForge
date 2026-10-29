@@ -38,6 +38,7 @@ class ai_fp16_ddr_e2e_seq extends uvm_sequence #(ai_axil_item);
     bit coverage_sample_valid;
     bit active_compute_reset_checked;
     bit active_dma_reset_checked;
+    bit reset_fabric_contract_checked;
     bit independent_ddr_reset_recovery_checked;
     bit fp_watchdog_completion_checked;
     bit fp_abort_completion_checked;
@@ -145,9 +146,11 @@ class ai_fp16_ddr_e2e_seq extends uvm_sequence #(ai_axil_item);
         uvm_hdl_data_t hdl_value;
         bit ok;
         bit read_accepted;
+        bit write_b_pending;
         bit reset_check_ok;
         bit [31:0] value;
         int unsigned poll;
+        int unsigned quiet_cycle;
 
         // This is an explicit coordinated reset of the accelerator and the
         // external responder, used only to clear an accepted in-flight AR.
@@ -212,7 +215,47 @@ class ai_fp16_ddr_e2e_seq extends uvm_sequence #(ai_axil_item);
         if (!ok) `uvm_fatal("MIXED_E2E_DMA_RESET", "failed to release external DDR model reset")
         #60;
 
+        // The registered responder must discard the accepted pre-reset AR
+        // and remain quiet after both reset domains are released. Keep the
+        // observation window longer than the deliberately configured R gap.
         reset_check_ok = 1'b1;
+        for (quiet_cycle = 0; quiet_cycle < 8; quiet_cycle++) begin
+            // This package-based sequence uses the testbench's 10 ns clock
+            // period without a disallowed package-to-module event reference.
+            #10;
+            #1;
+            hdl_value = '0;
+            ok = uvm_hdl_read("tb_ai_accel_uvm.ddr_resetn", hdl_value);
+            if (!ok || hdl_value[0] !== 1'b1) begin
+                reset_check_ok = 1'b0;
+                `uvm_error("MIXED_E2E_DMA_RESET", "external fabric reset was not released during the post-reset quiet window")
+            end
+            hdl_value = '0;
+            ok = uvm_hdl_read("tb_ai_accel_uvm.axi4.arvalid", hdl_value);
+            if (!ok || hdl_value[0] !== 1'b0) begin
+                reset_check_ok = 1'b0;
+                `uvm_error("MIXED_E2E_DMA_RESET", "new AXI AR was issued before post-reset recovery traffic")
+            end
+            hdl_value = '0;
+            ok = uvm_hdl_read("tb_ai_accel_uvm.axi_mem_u.read_active_r", hdl_value);
+            if (!ok || hdl_value[0] !== 1'b0) begin
+                reset_check_ok = 1'b0;
+                `uvm_error("MIXED_E2E_DMA_RESET", "pre-reset external read remained active in the quiet window")
+            end
+            hdl_value = '0;
+            ok = uvm_hdl_read("tb_ai_accel_uvm.axi_mem_u.read_q_count_r", hdl_value);
+            if (!ok || hdl_value[2:0] !== 3'd0) begin
+                reset_check_ok = 1'b0;
+                `uvm_error("MIXED_E2E_DMA_RESET", "pre-reset external read queue was not empty in the quiet window")
+            end
+            hdl_value = '0;
+            ok = uvm_hdl_read("tb_ai_accel_uvm.axi_mem_u.rvalid", hdl_value);
+            if (!ok || hdl_value[0] !== 1'b0) begin
+                reset_check_ok = 1'b0;
+                `uvm_error("MIXED_E2E_DMA_RESET", "stale AXI RVALID appeared after coordinated reset")
+            end
+        end
+
         hdl_value = '0;
         ok = uvm_hdl_read("tb_ai_accel_uvm.axi_mem_u.read_active_r", hdl_value);
         if (!ok || hdl_value[0] !== 1'b0) begin
@@ -249,10 +292,90 @@ class ai_fp16_ddr_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_error("MIXED_E2E_DMA_RESET", $sformatf("in-flight DMA read modified destination: expected sentinel=0xdeedcafe actual=0x%08h", value))
         end
 
+        // Exercise the write-response half of the reset contract. Wait until
+        // the external model has accepted AW and the complete W beat and is
+        // presenting BVALID, then reset both endpoints before B can handshake.
+        axil_write(CIMFORGE_SPAD_BASE + SPAD_ERROR_SENTINEL_ADDR, 32'hbadd_1eaf);
+        axil_write(CIMFORGE_REG_DMA_EXT_ADDR, DDR_RESET_PROBE_ADDR);
+        axil_write(CIMFORGE_REG_DMA_SPAD_ADDR, SPAD_ERROR_SENTINEL_ADDR);
+        axil_write(CIMFORGE_REG_DMA_LENGTH, 32'd1);
+        axil_write(CIMFORGE_REG_DMA_CTRL, 32'd3);
+        write_b_pending = 1'b0;
+        for (poll = 0; poll < 2000; poll++) begin
+            #1;
+            hdl_value = '0;
+            ok = uvm_hdl_read("tb_ai_accel_uvm.axi_mem_u.bvalid", hdl_value);
+            if (!ok) `uvm_fatal("MIXED_E2E_B_RESET", "failed to observe pending AXI B response")
+            if (hdl_value[0] !== 1'b1) continue;
+            hdl_value = '0;
+            ok = uvm_hdl_read("tb_ai_accel_uvm.axi4.bready", hdl_value);
+            if (!ok) `uvm_fatal("MIXED_E2E_B_RESET", "failed to observe AXI BREADY")
+            if (hdl_value[0] !== 1'b1) continue;
+            hdl_value = '0;
+            ok = uvm_hdl_read("tb_ai_accel_uvm.dut.dma_busy", hdl_value);
+            if (!ok) `uvm_fatal("MIXED_E2E_B_RESET", "failed to observe DMA while B is pending")
+            write_b_pending = (hdl_value[0] === 1'b1);
+            if (write_b_pending) break;
+        end
+        if (!write_b_pending)
+            `uvm_fatal("MIXED_E2E_B_RESET", "DMA did not reach pending BVALID/BREADY while busy")
+
+        `uvm_info("MIXED_E2E_B_RESET_ARMED", "DMA AW/W completed; BVALID is pending before coordinated accelerator/fabric reset", UVM_LOW)
+        hdl_value = '0;
+        ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", hdl_value);
+        if (!ok) `uvm_fatal("MIXED_E2E_B_RESET", "failed to assert coordinated system reset with B pending")
+        ok = uvm_hdl_deposit("tb_ai_accel_uvm.ddr_resetn", hdl_value);
+        if (!ok) `uvm_fatal("MIXED_E2E_B_RESET", "failed to assert DDR model reset with B pending")
+        #60;
+        hdl_value = '1;
+        ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", hdl_value);
+        if (!ok) `uvm_fatal("MIXED_E2E_B_RESET", "failed to release coordinated system reset")
+        ok = uvm_hdl_deposit("tb_ai_accel_uvm.ddr_resetn", hdl_value);
+        if (!ok) `uvm_fatal("MIXED_E2E_B_RESET", "failed to release DDR model reset")
+        #60;
+
+        for (quiet_cycle = 0; quiet_cycle < 8; quiet_cycle++) begin
+            #10;
+            #1;
+            hdl_value = '0;
+            ok = uvm_hdl_read("tb_ai_accel_uvm.axi4.awvalid", hdl_value);
+            if (!ok || hdl_value[0] !== 1'b0) begin
+                reset_check_ok = 1'b0;
+                `uvm_error("MIXED_E2E_B_RESET", "new AXI AW appeared before post-reset recovery traffic")
+            end
+            hdl_value = '0;
+            ok = uvm_hdl_read("tb_ai_accel_uvm.axi4.wvalid", hdl_value);
+            if (!ok || hdl_value[0] !== 1'b0) begin
+                reset_check_ok = 1'b0;
+                `uvm_error("MIXED_E2E_B_RESET", "new AXI W appeared before post-reset recovery traffic")
+            end
+            hdl_value = '0;
+            ok = uvm_hdl_read("tb_ai_accel_uvm.axi_mem_u.write_active_r", hdl_value);
+            if (!ok || hdl_value[0] !== 1'b0) begin
+                reset_check_ok = 1'b0;
+                `uvm_error("MIXED_E2E_B_RESET", "pre-reset external write remained active in the quiet window")
+            end
+            hdl_value = '0;
+            ok = uvm_hdl_read("tb_ai_accel_uvm.axi_mem_u.bvalid", hdl_value);
+            if (!ok || hdl_value[0] !== 1'b0) begin
+                reset_check_ok = 1'b0;
+                `uvm_error("MIXED_E2E_B_RESET", "stale AXI BVALID appeared after coordinated reset")
+            end
+        end
+        hdl_value = '0;
+        ok = uvm_hdl_read("tb_ai_accel_uvm.dut.dma_busy", hdl_value);
+        if (!ok || hdl_value[0] !== 1'b0) begin
+            reset_check_ok = 1'b0;
+            `uvm_error("MIXED_E2E_B_RESET", "DMA did not return idle after resetting pending B")
+        end
+
         apply_axi_stall_config("post_dma_reset");
         active_dma_reset_checked = reset_check_ok;
-        if (reset_check_ok)
-            `uvm_info("MIXED_E2E_DMA_RESET_PASS", "accepted DMA read was reset before R; coordinated DUT/AXI-model reset returned idle and preserved the SPAD sentinel", UVM_LOW)
+        reset_fabric_contract_checked = reset_check_ok;
+        if (reset_check_ok) begin
+            `uvm_info("MIXED_E2E_RESET_EPOCH_PASS", "coordinated accelerator/fabric reset discarded accepted pre-reset AR/R and AW/W/B epochs; no stale RVALID/BVALID or new AXI request appeared in the post-reset quiet windows", UVM_LOW)
+            `uvm_info("MIXED_E2E_DMA_RESET_PASS", "accepted DMA read and pending write B were reset with the behavioral AXI model; DMA returned idle and the SPAD read sentinel was preserved", UVM_LOW)
+        end
     endtask
 
     task automatic run_ddr_alive_after_accel_reset_check();

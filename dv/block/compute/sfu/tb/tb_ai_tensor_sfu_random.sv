@@ -192,6 +192,33 @@ module tb_ai_tensor_sfu_random;
     end
   endtask
 
+  task automatic expect_abort_over_expired_watchdog;
+    integer writes_before;
+    begin
+      op_mode=8'h32;length=8;watchdog_limit=32'd1;
+      abort=0;inject_parity=0;inject_protection=0;
+      write_count=0;writes_before=total_write_count;
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      timeout=0;
+      while((!busy || cycle_count<watchdog_limit) && timeout<2000) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(!busy || cycle_count<watchdog_limit)
+        $fatal(1,"SFU priority probe did not reach active expired-watchdog cycle");
+      abort=1;
+      @(negedge clk);abort=0;
+      timeout=0;
+      while(!done && timeout<10000) begin @(negedge clk);timeout=timeout+1;end
+      if(!done || !error || error_code!==4'd3 || busy)
+        $fatal(1,"SFU Abort/watchdog priority code=%0d expected=3",error_code);
+      if(total_write_count!=writes_before)
+        $fatal(1,"SFU Abort/watchdog priority committed an output write");
+      watchdog_limit=0;
+      drain_sfu_response();
+    end
+  endtask
+
   task automatic check_reset_and_recovery;
     begin
       write_count=0;memory[dst_base>>2]=32'hface_cafe;
@@ -388,6 +415,8 @@ module tb_ai_tensor_sfu_random;
   initial begin
     if($value$plusargs("SEED=%d",seed)) begin end
     initial_seed=seed;
+    if(dut.ERR_NUMERIC!==4'd8)
+      $fatal(1,"SFU numeric error ABI code=%0d expected=8",dut.ERR_NUMERIC);
     if(!$value$plusargs("VECTORS=%s",vector_path))
       $fatal(1,"missing +VECTORS=<path>");
     fd=$fopen(vector_path,"r");
@@ -411,9 +440,8 @@ module tb_ai_tensor_sfu_random;
     inject_parity=1;expect_sfu_error(4'd5,5);
     launch_abort_error();
     watchdog_limit=1;expect_sfu_error(4'd4,6);
-    // Abort dominates simultaneous parity, protection, and watchdog inputs.
-    watchdog_limit=1;inject_parity=1;inject_protection=1;abort=1;
-    expect_sfu_error(4'd3,7);
+    // Abort must win when sampled on a cycle whose watchdog is already due.
+    expect_abort_over_expired_watchdog();
     run_late_parity_fault();
     check_reset_and_recovery();
     run_rms_without_gamma();
@@ -430,7 +458,7 @@ module tb_ai_tensor_sfu_random;
              total_write_count,expected_total_writes);
     if(ready_stall_count==0 || max_response_delay==0)
       $fatal(1,"SFU random memory profile missed ready or response stalls");
-    $display("SFU_RANDOM_LATENCY_PASS cases=%0d error_cases=8 late_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 fsm_reset_states=39 fsm_abort_states=39 rms_gamma_bypass=1 seed=%0d reads=%0d responses=%0d writes=%0d max_rsp_delay=%0d ready_stalls=%0d",
+    $display("SFU_RANDOM_LATENCY_PASS cases=%0d error_cases=8 late_faults=1 abort_watchdog=1 reset_fault_combo=1 reset_recovery=1 fsm_reset_states=39 fsm_abort_states=39 rms_gamma_bypass=1 seed=%0d reads=%0d responses=%0d writes=%0d max_rsp_delay=%0d ready_stalls=%0d",
              case_count,initial_seed,read_count,response_count,total_write_count,max_response_delay,ready_stall_count);
     $finish;
   end
