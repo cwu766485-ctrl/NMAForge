@@ -44,6 +44,12 @@ module ai_descriptor_validator (
     wire is_bf16_dot = (op == 8'h50);
     wire is_fp16_dot = (op == 8'h51);
     wire is_fp_dot = is_bf16_dot || is_fp16_dot;
+    wire [31:0] pack_tile_a_elements = {16'd0,m_size} * {16'd0,n_size};
+    wire pack_tile_a_fields_valid =
+        (op == 8'h36) && flags[4] &&
+        (m_size != 0) && (n_size != 0) &&
+        (m_size[1:0] == 0) && (n_size[1:0] == 0) &&
+        (pack_tile_a_elements == {16'd0,length});
 
     assign version_valid = is_fp_dot ? (version == 8'd7) :
                            (version == 8'd7) ? 1'b1 :
@@ -92,6 +98,8 @@ module ai_descriptor_validator (
 
     assign descriptor_invalid = !op_valid || !dimensions_valid ||
                                 !version_valid ||
+                                ((op == 8'h36) && flags[5] &&
+                                 !pack_tile_a_fields_valid) ||
                                 (macro_child_fetch && is_macro) ||
                                 alignment_error ||
                                 (is_macro && (|src0[5:0])) ||

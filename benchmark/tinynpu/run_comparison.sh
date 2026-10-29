@@ -72,6 +72,9 @@ make -C "$REPO_ROOT/dv/subsystem/top_smoke/sim" ai_tinynpu_cnn_match \
     > "$OUT_DIR/nma_cnn_make.log" 2>&1
 
 VERILATOR_VERSION="$("$VERILATOR" --version | head -1)"
+PYTHON_VERSION="$("$PYTHON" -c 'import sys; print(sys.version.split()[0])')"
+NUMPY_VERSION="$("$PYTHON" -c 'import numpy; print(numpy.__version__)')"
+ONNX_VERSION="$("$PYTHON" -c 'import onnx; print(onnx.__version__)')"
 if [[ -z "$VCS_VERSION" ]]; then
     VCS_VERSION="$(grep -m1 -o 'Version V-[^ ]*' "$OUT_DIR/nma_match16/compile.log" | awk '{print $2}')"
 fi
@@ -90,6 +93,8 @@ fi
     --nma-cnn "$OUT_DIR/nma_cnn/run.log" \
     --nma-cnn-manifest "$OUT_DIR/nma_cnn/workload/nma_cnn_manifest.json" \
     --verilator-version "$VERILATOR_VERSION" --vcs-version "$VCS_VERSION" \
+    --python-version "$PYTHON_VERSION" --numpy-version "$NUMPY_VERSION" \
+    --onnx-version "$ONNX_VERSION" \
     --out-csv "$OUT_DIR/gemm_results.csv" \
     --out-cnn-csv "$OUT_DIR/cnn_results.csv" \
     --out-cnn-json "$OUT_DIR/cnn_summary.json" \

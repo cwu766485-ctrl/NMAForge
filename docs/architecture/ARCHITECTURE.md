@@ -185,7 +185,8 @@ VCS benchmark。Matrix banked reader 以最多 4 笔有序 metadata FIFO 记录 
 完整 Cluster UVM、FSM/code-coverage closure 和 DC/PPA 仍开放。实现与证据见[Compute Cluster
 升级路线](../verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md)。
 
-ABI v7.2 曾增加 PACK_I8 layout bridge，现有 `sw/tools/cimforge_mapper.py` 可用它形成
+ABI v7.2 增加 PACK_I8；`0x36` 的 descriptor flag bit 5 现可在硬件中把 Requant 输出写成
+Matrix A 的 4×4 tile-major 顺序，避免主机搬运中间张量。现有 `sw/tools/cimforge_mapper.py` 可用 PACK_I8 形成
 Transformer 微型命令链：
 
 ```text

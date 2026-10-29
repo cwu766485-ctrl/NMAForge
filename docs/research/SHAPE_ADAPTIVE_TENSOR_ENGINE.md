@@ -6,8 +6,8 @@ This is the measurement baseline for a separate v2 architecture study. The
 current `feat/shape-adaptive-gemv-v2` branch is based on the completed
 `feat/tinynpu-model-inference` research branch and does not change product
 Matrix RTL, descriptor ABI, or v1.0 sign-off sources. It contains an isolated
-GEMV compute kernel. The prefetch/bandwidth results below are an analytical
-schedule model, not an implemented SPAD controller or measured memory path.
+GEMV compute kernel and a separate research wrapper around the production
+SPAD arbiter and four-bank scratchpad.
 
 ## Existing Matrix measurements
 
@@ -83,14 +83,53 @@ Machine-readable data is in
 and [`benchmark/shape_adaptive_summary.json`](../../benchmark/shape_adaptive_summary.json).
 Raw VCS runs are under `/tmp/nmaforge_shape_adaptive_20261029_final_8c19eaf`.
 
+## Real SPAD arbiter integration measurement
+
+Commit `ae897524a30d08bd1dc7970f61f01d6abe763b59` adds
+`rtl/research/ai_shape_adaptive_gemv_spad.sv`. The wrapper reads dense INT8
+operands from `ai_scratchpad` through `ai_spad_arbiter`, unpacks the rows into
+the kernel's fixed local-buffer strides, starts the existing kernel, and
+writes every INT64 output as two 32-bit SPAD stores. Its measured interval
+includes registered SPAD reads, arbiter response tagging, kernel execution,
+and output commits. A continuous DMA requester introduces real ready stalls.
+
+Run ID `SHAPE-SPAD-ae897524a30d08bd1dc7970f61f01d6abe763b59-20261029` used VCS
+`V-2023.12-SP1_Full64`, seeds `20261029/20261030/20261031`, and passed 12/12
+baseline-vs-static shape comparisons. Every comparison checked all output
+words against an independent INT32 GEMM Golden. Each seed also passed Abort
+during input fetch, compute, and output writeback, plus Reset with an accepted
+SPAD read awaiting response and sentinel checks for stale writes.
+
+| M×N×K | Baseline cycles | Static-policy cycles | GEMV selected | SPAD read/write bytes | Arbiter wait cycles |
+|---|---:|---:|---:|---:|---:|
+| 1×8×64 | 530 | 474 | Yes | 576 / 64 | 15 / 15 |
+| 4×8×64 | 770 | 738 | Yes | 768 / 256 | 63 / 63 |
+| 8×8×64 | 1,090 | 1,090 | No | 1,024 / 512 | 127 / 127 |
+| 16×8×64 | 1,730 | 1,730 | No | 1,536 / 1,024 | 255 / 255 |
+
+The contention path alternates between same-bank and rotating-bank DMA
+addresses, but the production scalar SPAD scheduler presents one common
+admission port; these runs prove arbiter contention and forward progress, not
+a bank-parallel speedup. The current wrapper deliberately serializes operand
+reads and stores. It is not the Matrix controller, does not implement
+double-buffered fetch overlap or protection-fault injection, and is not
+connected to the product top. The measured 1.12× and 1.04× gains for M=1/4
+include the real memory traffic but apply only to this research integration;
+the static selector retains baseline for M=8/16.
+
+Machine-readable results are in
+[`benchmark/shape_adaptive_spad_ablation.csv`](../../benchmark/shape_adaptive_spad_ablation.csv)
+and [`benchmark/shape_adaptive_spad_summary.json`](../../benchmark/shape_adaptive_spad_summary.json).
+Raw run logs are under `/tmp/nmaforge_shape_adaptive_spad_clean_ae89752`.
+
 ## Remaining v2 work
 
-The next step is a real double-buffered fetch controller with a 4-bank memory
-model, response ownership, variable ready/response latency, and an RTL
-prefetch schedule. Then rerun the same four ablations with identical address
-maps and bank conflicts, add parity/protection/abort/reset fault crosses, and
-measure GEMM regression against the current production core. Area, timing,
-and power remain NOT_RUN; no synthesis library was used.
+The next step is a double-buffered fetch controller with overlapped read/MAC
+phases, bank-aware address scheduling, and a broader variable-latency stress
+matrix. Then rerun the same four ablations with identical address maps, add
+parity/protection fault crosses, and measure GEMM regression against the
+current production core. Area, timing, and power remain NOT_RUN; no synthesis
+library was used.
 
 This research kernel is not top-integrated, does not replace the production
 GEMM path, and provides no sign-off claim. No speedup target is marked as a

@@ -44,6 +44,7 @@ OP_KV_READ = 0x44
 FLAG_BIAS = 1 << 0
 FLAG_TRANSPOSE_B = 1 << 2
 FLAG_PACK_I8 = 1 << 4
+FLAG_PACK_I8_TILE_A = 1 << 5
 DESC_VERSION = 7
 MODEL_WEIGHTS = {
     "wq": [
@@ -280,9 +281,17 @@ def build_workload() -> tuple[Mapper, dict[str, list]]:
         mapper.add(name, OP_GEMM, lhs, dst, src1=rhs, m=m, n=n,
                    k_or_length=k, flags=flags, aux0=1)
 
-    def pack(name: str, src: Tensor, dst: Tensor, shift: int, length: int = 16) -> None:
-        mapper.add(name, OP_REQUANT, src, dst, k_or_length=length,
-                   flags=FLAG_PACK_I8, shift=shift, aux0=1)
+    def pack(name: str, src: Tensor, dst: Tensor, shift: int, length: int = 16,
+             tile_a_shape: tuple[int, int] | None = None) -> None:
+        flags = FLAG_PACK_I8
+        m = n = 0
+        if tile_a_shape is not None:
+            m, n = tile_a_shape
+            if m <= 0 or n <= 0 or m % 4 or n % 4 or length != m * n:
+                raise ValueError("PACK_I8_TILE_A needs M,N multiples of four and length=M*N")
+            flags |= FLAG_PACK_I8_TILE_A
+        mapper.add(name, OP_REQUANT, src, dst, m=m, n=n,
+                   k_or_length=length, flags=flags, shift=shift, aux0=1)
 
     def kv_write(
         name: str, src: Tensor, cache: Tensor, token: int,

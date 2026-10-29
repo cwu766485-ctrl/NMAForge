@@ -14,14 +14,14 @@ import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
-from sw.tools.cimforge_mapper import Descriptor  # noqa: E402
+from sw.tools.cimforge_mapper import (  # noqa: E402
+    Descriptor, FLAG_BIAS, FLAG_PACK_I8, FLAG_PACK_I8_TILE_A,
+)
 from benchmark.digits.digits_quantized_golden import integer_infer  # noqa: E402
 
 
 OP_GEMM = 0x30
 OP_REQUANT = 0x36
-FLAG_BIAS = 1 << 0
-FLAG_PACK_I8 = 1 << 4
 ARRAY_M = 16
 K = 64
 K_WORDS = K // 4
@@ -33,7 +33,6 @@ B1_BASE = 0x12000
 W2_BASE = 0x13000
 B2_BASE = 0x13400
 HIDDEN_I32_BASE = 0x14000
-HIDDEN_I8_BASE = 0x2C000
 HIDDEN_I8_TILE_BASE = 0x32000
 DESC_BASE = 0x38000
 CPL_BASE = 0x3A000
@@ -136,9 +135,7 @@ def main() -> None:
     add_words(memory, W2_BASE, pack_b_columns(w2, ARRAY_M))
     add_words(memory, B2_BASE, b2)
 
-    first_phase_descriptors: list[list[int]] = []
-    second_phase_descriptors: list[list[int]] = []
-    phase1_descriptor_count = 2 * batches
+    descriptors: list[list[int]] = []
     for batch_index in range(batches):
         batch_x = padded[batch_index * BATCH : (batch_index + 1) * BATCH]
         input_base = INPUT_BASE + batch_index * BATCH * 64
@@ -147,31 +144,29 @@ def main() -> None:
         add_words(memory, output_base,
                   [0xA55AA55A] * (BATCH * ARRAY_M))
 
-        first_task = TASK_BASE + batch_index * 2
         hidden_i32_base = HIDDEN_I32_BASE + batch_index * BATCH * 64 * 4
-        hidden_i8_base = HIDDEN_I8_BASE + batch_index * BATCH * 64
         hidden_i8_tile_base = HIDDEN_I8_TILE_BASE + batch_index * BATCH * 64
-        first_phase_descriptors.append(descriptor_words(
-            task_id=first_task, opcode=OP_GEMM, src0=input_base,
+        descriptors.append(descriptor_words(
+            task_id=TASK_BASE + len(descriptors), opcode=OP_GEMM, src0=input_base,
             src1=W1_BASE, bias=B1_BASE, dst=hidden_i32_base,
             m=BATCH, n=64, extent=K_WORDS, flags=FLAG_BIAS,
             shift=shift1, activation=1, signal_mask=1,
         ))
-        first_phase_descriptors.append(descriptor_words(
-            task_id=first_task + 1, opcode=OP_REQUANT,
-            src0=hidden_i32_base, src1=0, bias=0, dst=hidden_i8_base,
-            m=0, n=0, extent=BATCH * 64, flags=FLAG_PACK_I8,
-            wait_mask=1, clear_mask=1,
+        descriptors.append(descriptor_words(
+            task_id=TASK_BASE + len(descriptors), opcode=OP_REQUANT,
+            src0=hidden_i32_base, src1=0, bias=0, dst=hidden_i8_tile_base,
+            m=BATCH, n=64, extent=BATCH * 64,
+            flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A,
+            wait_mask=1, signal_mask=2, clear_mask=1,
         ))
-        second_phase_descriptors.append(descriptor_words(
-            task_id=TASK_BASE + phase1_descriptor_count + batch_index,
+        descriptors.append(descriptor_words(
+            task_id=TASK_BASE + len(descriptors),
             opcode=OP_GEMM,
             src0=hidden_i8_tile_base, src1=W2_BASE, bias=B2_BASE,
             dst=output_base, m=BATCH, n=ARRAY_M, extent=K_WORDS,
-            flags=FLAG_BIAS,
+            flags=FLAG_BIAS, wait_mask=2, clear_mask=2,
         ))
 
-    descriptors = first_phase_descriptors + second_phase_descriptors
     desc_count = len(descriptors)
     if desc_count >= 128:
         raise ValueError("CMDQ depth 128 is insufficient for this test split")
@@ -186,8 +181,9 @@ def main() -> None:
     image_path.write_text("".join(f"{value & 0xFFFFFFFF:08x}\n"
                                    for value in image_words), encoding="ascii")
 
-    hidden_words = [pack_i8(padded_hidden.reshape(-1)[offset : offset + 4])
-                    for offset in range(0, padded_hidden.size, 4)]
+    hidden_words = [word for batch_index in range(batches)
+                    for word in pack_a_rows(
+                        padded_hidden[batch_index * BATCH : (batch_index + 1) * BATCH])]
     hidden_path = args.out_dir / "digits_hidden_expected.memh"
     hidden_path.write_text("".join(
         f"{value & 0xFFFFFFFF:08x}\n"
@@ -211,19 +207,17 @@ def main() -> None:
         "batch": BATCH,
         "batches": batches,
         "descriptor_count": desc_count,
-        "descriptors_per_sample_batch": ["Matrix GEMM+Bias+ReLU", "SFU Requant Pack-I8", "Matrix GEMM+Bias"],
+        "descriptors_per_sample_batch": ["Matrix GEMM+Bias+ReLU", "SFU Requant Pack-I8 to Matrix A tile layout", "Matrix GEMM+Bias"],
         "execution_phases": [
-            "Matrix GEMM+Bias+ReLU and SFU Requant Pack-I8",
-            "host software reorder from row-major bytes to the Matrix 4x4 A microtile layout",
-            "Matrix GEMM+Bias",
+            "CMDQ GEMM+Bias+ReLU -> SFU tiled Pack-I8 -> GEMM+Bias; dependency events serialize each batch without host intermediate writes",
         ],
         "hidden_shift": shift1,
         "input_base": INPUT_BASE,
         "weight1_base": W1_BASE,
         "bias1_base": B1_BASE,
         "hidden_i32_base": HIDDEN_I32_BASE,
-        "hidden_i8_base": HIDDEN_I8_BASE,
         "hidden_i8_tile_base": HIDDEN_I8_TILE_BASE,
+        "hidden_layout": "Matrix A [row_group][k_group][row_lane], generated by SFU descriptor flag bit 5",
         "weight2_base": W2_BASE,
         "bias2_base": B2_BASE,
         "output_base": OUTPUT_BASE,
