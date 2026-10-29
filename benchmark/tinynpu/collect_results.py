@@ -122,6 +122,7 @@ def main() -> None:
         writer = csv.DictWriter(stream, fieldnames=CSV_FIELDS)
         writer.writeheader()
         writer.writerows(rows)
+    args.out_csv.write_bytes(args.out_csv.read_bytes().replace(b"\r\n", b"\n"))
 
     engine_text = args.tiny_engine.read_text(encoding="utf-8", errors="replace")
     cnn_text = args.tiny_cnn.read_text(encoding="utf-8", errors="replace")

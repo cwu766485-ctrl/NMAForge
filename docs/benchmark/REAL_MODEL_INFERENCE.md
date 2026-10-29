@@ -60,6 +60,24 @@ model SHA-256 is
 integer-logit SHA-256 is
 `8a9606b5c31ff4f203731726f89d7caf5f73b59d0cbddf0945a1ac454d855afc`.
 
+## Fixed-SHA replay
+
+The public root target was rerun after the harness commit on source SHA
+`df7335871068c6e2fbbc6a0eaad315d6c5815fef`:
+
+```sh
+make inference-digits \
+  AI_DIGITS_RUN=/tmp/nmaforge_digits_root_target_20261029 \
+  AI_DIGITS_PYTHON=/tmp/nmaforge_ai_venv_20261029/bin/python
+```
+
+Run ID: `DIGITS-RTL-20261029-ROOT-REPLAY`. VCS again reported 360 samples,
+352 correct, 69 descriptors, 93,653 Matrix/SFU cycles, and 97.78% accuracy;
+the independent integer Golden matched all outputs. Quantized model and Golden
+SHA-256 values matched the run recorded above. The host layout bridge remains
+47,104 bytes and 70,656 cycles, so this replay does not close the autonomous
+host-free inference gap.
+
 ## Data layout and limits
 
 Matrix writes INT32 accumulations in row-major order while its A operand reader
@@ -77,3 +95,14 @@ executables, coverage databases, waveforms, and logs stay outside the source
 tree under `/tmp`. This result closes the trained digits-classifier experiment
 only. It does not establish pretrained GPT-2/Qwen inference, whole-NPU
 sign-off, or deployment quality on other image distributions.
+
+## Existing Transformer functional workload
+
+The root `make inference-transformer TRANSFORMER_SEED=20261029` target passed
+on source SHA `df7335871068c6e2fbbc6a0eaad315d6c5815fef` with VCS
+`V-2023.12-SP1_Full64` (Run ID `TRANSFORMER-FIXED-20261029`). The test checked
+86 ABI-v7 descriptors, command/completion ordering, prefill/decode Q/K/V and
+KV-cache words, and final completion words. The checked-in mapper uses
+deterministic functional weights and a four-token fixture. This verifies the
+available operator/dataflow path; it is not TinyGPT training, pretrained
+checkpoint loading, or a language-model quality result.

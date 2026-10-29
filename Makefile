@@ -25,4 +25,4 @@ inference-transformer:
 	$(MAKE) -C dv/subsystem/top_smoke/sim ai_transformer AI_SEED="$(TRANSFORMER_SEED)"
 
 compute-performance-report:
-	COMPUTE_PERF_OUT="$(COMPUTE_PERF_OUT)" bash benchmark/run_compute_performance.sh
+	PYTHON="$(PYTHON)" COMPUTE_PERF_OUT="$(COMPUTE_PERF_OUT)" bash benchmark/run_compute_performance.sh

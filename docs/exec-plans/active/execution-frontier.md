@@ -31,6 +31,19 @@ matched an independent integer Golden for all checked values. The run reports
 the host layout bridge separately; it does not claim host-free inference. See
 the [digits inference report](../../benchmark/REAL_MODEL_INFERENCE.md).
 
+At source SHA `df7335871068c6e2fbbc6a0eaad315d6c5815fef`, the pinned TinyNPU
+benchmark target passed: 18 result rows, 256/256 same-vector GEMM outputs on
+both designs, TinyNPU's engine regression 6/6, and TinyNPU CNN graph outputs
+4/4. The separate three-seed Matrix performance report passed 165/165 checks
+(45 size cases plus 120 ablation cases). The common full-CNN run through
+NMAForge is still open; current CNN evidence is an NMAForge operator check and
+a TinyNPU full-graph smoke with different lowering and timing boundaries. See
+the [benchmark comparison](../../benchmark/NMAFORGE_VS_TINY_NPU.md).
+
+The checked-in 86-descriptor prefill/decode fixture also reran with VCS on this
+SHA and passed all tensor/completion checks. It uses deterministic functional
+weights; it is not a trained or pretrained GPT-style model deployment.
+
 The current branch is research work based on the v1.0 audit candidate, not a
 replacement sign-off baseline. The audited candidate remains
 `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`; its final audit records 24
@@ -53,6 +66,8 @@ The digits experiment does not change that disposition.
    one clean SHA. Do not treat the current-tree reset evidence as clean-SHA replay.
 3. Continue the FP parity-to-writeback proof from the [FP formal frontier](../../../dv/block/compute/fp/formal/README.md); an inconclusive timeout is not a pass.
 4. Keep LEC, DFT, post-layout PPA, and board results as separate closure gates.
+5. Close the paired TinyNPU CNN workload, then continue from measured small-M
+   utilization into the separate shape-adaptive v2 research branch.
 
 ## Canonical commands
 
