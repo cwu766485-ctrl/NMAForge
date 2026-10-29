@@ -114,3 +114,12 @@ KV-cache words, and final completion words. The checked-in mapper uses
 deterministic functional weights and a four-token fixture. This verifies the
 available operator/dataflow path; it is not TinyGPT training, pretrained
 checkpoint loading, or a language-model quality result.
+
+The same public entry point was replayed after the sign-off evidence commit on
+source SHA `530d0816c5f5cc3c442f79b5a9517fc299a6c4b2`; VCS
+`V-2023.12-SP1_Full64`, seed `20261029`. Run ID
+`TRANSFORMER-FIXED-20261029-530d081`. It passed the 86-descriptor/60-tensor
+mapper precheck, intermediate and completion checks, and final `TEST PASS`.
+The existing `[LOOP-REROLL-ENABLED]` fixture warning remains. The workload
+still uses deterministic functional weights and is not a trained or
+pretrained language-model deployment.
