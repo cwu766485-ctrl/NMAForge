@@ -49,9 +49,12 @@ make -C "$REPO_ROOT/dv/block/compute/matrix/sim" \
 make -C "$REPO_ROOT/dv/block/compute/matrix/sim" \
     core-random-compile SEED="$SEED" PHYSICAL_ARRAY_SIZE=16 \
     CORE_OUT_DIR="$OUT_DIR/nma_match16" > "$OUT_DIR/nma_match16_compile.log" 2>&1
-"$OUT_DIR/nma_match16/simv" +SEED="$SEED" +TINY_NPU_MATCH_ONLY \
+"$OUT_DIR/nma_match16/simv" +SEED="$SEED" +TINY_NPU_MATCH_MULTI \
     -l "$OUT_DIR/nma_match16/run.log" > "$OUT_DIR/nma_match16_stdout.log" 2>&1
-grep -q '^MATRIX_TINY_NPU_MATCH_PASS ' "$OUT_DIR/nma_match16/run.log"
+grep -q '^MATRIX_CORE_CASE_PASS id=105 shape_mnk=16,16,16 ' "$OUT_DIR/nma_match16/run.log"
+grep -q '^MATRIX_CORE_CASE_PASS id=106 shape_mnk=16,16,32 ' "$OUT_DIR/nma_match16/run.log"
+grep -q '^MATRIX_CORE_CASE_PASS id=107 shape_mnk=32,32,64 ' "$OUT_DIR/nma_match16/run.log"
+grep -q '^MATRIX_TINY_NPU_MATCH_MULTI_PASS .*cases=3 ' "$OUT_DIR/nma_match16/run.log"
 
 TINY_NPU_ROOT="$TINY_NPU_ROOT" TINYNPU_WORK_ROOT="$WORK_ROOT" \
     TINYNPU_GEMM_OUT="$OUT_DIR/tiny_gemm" VERILATOR="$VERILATOR" \
@@ -93,5 +96,7 @@ fi
     --out-json "$OUT_DIR/benchmark_summary.json"
 cp "$OUT_DIR/gemm_results.csv" "$SCRIPT_DIR/gemm_results.csv"
 cp "$OUT_DIR/cnn_results.csv" "$SCRIPT_DIR/cnn_results.csv"
+cp "$OUT_DIR/benchmark_summary.json" "$SCRIPT_DIR/benchmark_summary.json"
+cp "$OUT_DIR/cnn_summary.json" "$SCRIPT_DIR/cnn_summary.json"
 printf 'BENCHMARK_PASS run_id=%s nmaforge_sha=%s tinynpu_sha=%s output=%s\n' \
     "$RUN_ID" "$NMA_SHA" "$TINY_SHA" "$OUT_DIR"

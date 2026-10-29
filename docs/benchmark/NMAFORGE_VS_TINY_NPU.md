@@ -9,7 +9,7 @@ DMA and SRAM ports; its CNN Graph smoke uses a testbench DMA shim. The CSV
 records the measured endpoints so results are not conflated.
 
 The NMAForge run is on research branch `feat/shape-adaptive-gemv-v2`, source
-SHA `0c525bcf8fbdd957396cc98fb314ec56c7888a18`; Matrix product RTL is identical
+SHA `08c34322879c688afd505ddf41fa4b2a5dc93ac0`; Matrix product RTL is identical
 to the audited candidate `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`. TinyNPU is
 pinned to `harishsg993010/tiny-NPU`
 [`8216c22b762011aa20c05fc2768423fd12dda59d`](https://github.com/harishsg993010/tiny-NPU/tree/8216c22b762011aa20c05fc2768423fd12dda59d).
@@ -25,7 +25,9 @@ entry point is `make benchmark-tinynpu`; instructions are in the
 [harness README](../../benchmark/tinynpu/README.md). The committed
 [GEMM CSV](../../benchmark/tinynpu/gemm_results.csv) includes the current
 source SHA, shape, array size, cycles, MAC/cycle, PE occupancy, SPAD bytes,
-stalls, Golden result, and timing boundary for 18 measurements.
+stalls, Golden result, and timing boundary for 22 measurements. Machine
+summaries are committed in [`benchmark_summary.json`](../../benchmark/tinynpu/benchmark_summary.json)
+and [`cnn_summary.json`](../../benchmark/tinynpu/cnn_summary.json).
 
 The root `make compute-performance-report` entry passed on this same source
 SHA with seeds `20261025/26/27`. Run ID:
@@ -45,21 +47,28 @@ B[k,c] = ((2*k - 3*c + 5) % 9) - 4
 C       = A × B, signed INT32 accumulation
 ```
 
-Both independently check all 256 outputs against the integer Golden.
+Both independently check every output against the integer Golden for the
+three paired shapes (256, 256, and 1,024 outputs).
 
-| Design / measurement | Physical array | Cycles to measured endpoint | MAC/cycle | PE utilization | SPAD read / write | Stalls |
+| Design / shape | Physical array | Cycles to measured endpoint | MAC/cycle | PE utilization | SPAD read / write | Stalls |
 |---|---:|---:|---:|---:|---:|---:|
-| NMAForge Matrix core | 8×8 | 298 | 13.745 | 21.48% | 768 B / 1,024 B | 18 bank, 21 line-write |
-| NMAForge Matrix core | 16×16 | 171 | 23.953 | 9.36% | 512 B / 1,024 B | 7 bank, 18 line-write |
-| TinyNPU systolic array | 16×16 | 52 | 78.769 | 30.77% | Not modeled in this direct-array test | Not modeled |
+| NMAForge 16×16×16 | 8×8 | 298 | 13.745 | 21.48% | 768 B / 1,024 B | 18 bank, 21 line-write |
+| NMAForge 16×16×16 | 16×16 | 171 | 23.953 | 9.36% | 512 B / 1,024 B | 7 bank, 18 line-write |
+| TinyNPU 16×16×16 | 16×16 | 52 | 78.769 | 30.77% | Not modeled | Not modeled |
+| NMAForge 16×16×32 | 16×16 | 263 | 31.148 | 12.17% | 1,024 B / 1,024 B | 17 bank, 28 line-write |
+| TinyNPU 16×16×32 | 16×16 | 100 | 81.920 | 32.00% | Not modeled | Not modeled |
+| NMAForge 32×32×64 | 16×16 | 1,393 | 47.047 | 18.38% | 6,144 B / 4,096 B | 131 bank, 91 line-write |
+| TinyNPU 32×32×64 | 16×16 | 790 | 82.957 | 32.41% | Not modeled | Not modeled |
 
 The NMAForge endpoint starts at Matrix command acceptance and ends after the
 last output SPAD write and `done`. TinyNPU has no command wrapper in this test:
 its endpoint starts when the first skewed systolic operands are accepted and
-ends when every accumulator is stable. The TinyNPU result excludes graph DMA,
-SRAM loading and output streaming. The measurements establish matching
-arithmetic and expose each architecture's measured work; they do **not** define
-a latency speedup because the boundaries and memory paths differ.
+ends when every output-tile accumulator is stable. For 32×32×64, TinyNPU
+clears and runs four output tiles, each accumulating four K tiles. This
+excludes graph DMA, SRAM loading, input stalls, and output streaming. The
+measurements establish matching arithmetic and expose each architecture's
+measured work; they do **not** define a latency speedup because the boundaries
+and memory paths differ.
 
 The standalone NMAForge 3×3 convolution check also passed on VCS, seed
 `20261029`: 9 useful MACs, 66 cycles, 72 B read, 4 B written, result `-30`.
@@ -183,8 +192,10 @@ they are not merged into the current pinned-reference CSV.
 - The paired CNN uses fixed weights from TinyNPU's checked-in ONNX graph; it is
   not a trained model. A hardware-native flatten/reformat operator is not part
   of this workload; the host layout bridge is measured separately.
-- The 16×16×32 and 32×32×64 size sweeps are NMAForge-only in this run. TinyNPU
-  multi-tile common cases remain to be added.
+- TinyNPU and NMAForge now share Golden-checked 16×16×16, 16×16×32, and
+  32×32×64 arithmetic vectors. The broader 8×8 TinyNPU pairing and a
+  bandwidth-constrained run through both memory interfaces remain open.
+- 64×64 workloads are not included in this paired benchmark.
 - No candidate-specific ASIC synthesis, SRAM timing view, measured Fmax, or
   power report was run. Any 250 MHz effective-GOPS column in existing Matrix
   logs is a normalization assumption only.
