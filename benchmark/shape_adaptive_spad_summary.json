@@ -1,0 +1,27 @@
+{
+  "run_id": "SHAPE-SPAD-ae897524a30d08bd1dc7970f61f01d6abe763b59-20261029",
+  "source_sha": "ae897524a30d08bd1dc7970f61f01d6abe763b59",
+  "vcs_version": "V-2023.12-SP1_Full64",
+  "regression_seeds": [
+    20261029,
+    20261030,
+    20261031
+  ],
+  "pass_count": 12,
+  "workloads_per_seed": 4,
+  "dimensions": "M=1/4/8/16, N=8, K=64; signed INT8 \u00d7 INT8 -> signed INT64 accumulation",
+  "memory": {
+    "implementation": "ai_spad_arbiter + ai_scratchpad four-bank VCS behavioral RAM",
+    "read_latency": "two registered scratchpad stages plus arbiter response tagging",
+    "request_width": "32-bit scalar core/DMA requests",
+    "input_layout": "dense row-major INT8 bytes in SPAD, unpacked into kernel MAX_K/MAX_N local-buffer strides"
+  },
+  "stress": {
+    "contention": "continuous DMA reads through the production arbiter; same-bank and rotating-bank address patterns",
+    "abort": "during input-read, kernel-compute, and result-writeback phases",
+    "reset": "asserted with an accepted core read awaiting its response; verifies no stale writeback",
+    "checker": "independent INT32 GEMM plus complete SPAD result-image and uncommitted sentinel checks"
+  },
+  "timing_limit": "research wrapper measures real arbiter/SPAD and kernel RTL; it is not connected to the production Matrix command path and is not an ASIC PPA result",
+  "csv": "/home/ray/workspace/NMAForge/benchmark/shape_adaptive_spad_ablation.csv"
+}
