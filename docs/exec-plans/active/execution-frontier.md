@@ -43,6 +43,15 @@ setup and timing boundaries differ, so there is no CNN speedup claim.
 Paired evidence is in [`cnn_results.csv`](../../../benchmark/tinynpu/cnn_results.csv)
 and the [comparison report](../../benchmark/NMAFORGE_VS_TINY_NPU.md).
 
+The trained digits MLP and the 86-descriptor Transformer fixture also passed
+again on current local SHA `6115212e8587f2ca3374787df358761eada7d7ee` with VCS
+`V-2023.12-SP1_Full64`. Digits matched the independent integer Golden for all
+360 samples (352 correct, 97.78%) over 69 descriptors; its 70,656-cycle host
+layout bridge remains separately counted. The fixed-weight Transformer
+fixture checked all intermediate/completion words and ended in `TEST PASS`.
+Both compiles retain `[LOOP-REROLL-ENABLED]`; neither result claims pretrained
+language-model inference. See the [inference report](../../benchmark/REAL_MODEL_INFERENCE.md).
+
 The three-seed Matrix size/ablation replay at SHA
 `110e0c9db49eb1a7a558c955347accfde87f963e` passed 45/45 size cases and 120/120
 configuration cases. Run ID `MATRIX-PERF-20261025-20261026-20261027-110e0c9d`; CSV/JSON evidence is

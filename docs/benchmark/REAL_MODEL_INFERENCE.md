@@ -86,6 +86,15 @@ SHA-256 values matched the run recorded above. The host layout bridge remains
 47,104 bytes and 70,656 cycles, so this replay does not close the autonomous
 host-free inference gap.
 
+The root `make inference-digits` target passed again on current research SHA
+`6115212e8587f2ca3374787df358761eada7d7ee` (Run ID
+`DIGITS-RTL-20261029-6115212`) using VCS `V-2023.12-SP1_Full64`, Python
+3.11.13, NumPy 2.1.3, and scikit-learn 1.6.1. It reproduced 352/360 correct
+predictions (97.78%), all 69 descriptors, 93,653 Matrix/SFU RTL cycles, and
+exact independent integer Golden outputs. The 70,656-cycle host layout bridge
+is reported separately. The compile retains the existing
+`[LOOP-REROLL-ENABLED]` fixture warning.
+
 ## Data layout and limits
 
 Matrix writes INT32 accumulations in row-major order while its A operand reader
@@ -123,3 +132,10 @@ mapper precheck, intermediate and completion checks, and final `TEST PASS`.
 The existing `[LOOP-REROLL-ENABLED]` fixture warning remains. The workload
 still uses deterministic functional weights and is not a trained or
 pretrained language-model deployment.
+
+The fixture passed once more on source SHA
+`6115212e8587f2ca3374787df358761eada7d7ee` (Run ID
+`TRANSFORMER-FIXED-20261029-6115212`), seed `20261029`. VCS checked the same
+86 descriptors, 60 tensors, intermediate values, and completion words, ending
+with `TEST PASS`. The `[LOOP-REROLL-ENABLED]` fixture warning remains. This is
+still a fixed-weight functional datapath test, not trained TinyGPT inference.
