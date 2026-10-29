@@ -31,17 +31,20 @@ matched an independent integer Golden for all checked values. The run reports
 the host layout bridge separately; it does not claim host-free inference. See
 the [digits inference report](../../benchmark/REAL_MODEL_INFERENCE.md).
 
-At source SHA `0c525bcf8fbdd957396cc98fb314ec56c7888a18`, the pinned TinyNPU
-benchmark passed: 18 GEMM rows, 256/256 same-vector outputs on both designs,
-TinyNPU's engine regression 6/6, and the same `conv1x_mini.onnx` graph on both
-tops. NMAForge passed all intermediate tensors and final outputs byte-exactly
-using eight CMDQ descriptors. Its recorded windows are 1,985 compute cycles
-plus 1,080 host-layout cycles; TinyNPU's graph smoke is 4,781 testbench cycles.
-Run ID `TINY-COMPARE-20261029-S20261029`; VCS
+At source SHA `08c34322879c688afd505ddf41fa4b2a5dc93ac0`, the pinned TinyNPU
+benchmark passed: 22 GEMM rows, including three common 16×16-array shapes
+(16×16×16, 16×16×32, 32×32×64) with every output matched against the independent
+INT32 Golden on both designs. TinyNPU's engine regression passed 6/6. The same
+`conv1x_mini.onnx` graph passed on both tops; NMAForge checked all intermediate
+tensors and outputs byte-exactly using eight CMDQ descriptors. Its recorded
+windows are 1,985 compute cycles plus 1,080 host-layout cycles; TinyNPU's graph
+smoke is 4,781 testbench cycles. Run ID `TINY-COMPARE-20261029-S20261029`; VCS
 `V-2023.12-SP1_Full64`, Verilator 5.052, NumPy 2.1.3, ONNX 1.17.0. Memory
-setup and timing boundaries differ, so there is no CNN speedup claim.
+setup and timing boundaries differ, so there is no CNN or GEMM speedup claim.
 Paired evidence is in [`cnn_results.csv`](../../../benchmark/tinynpu/cnn_results.csv)
-and the [comparison report](../../benchmark/NMAFORGE_VS_TINY_NPU.md).
+and [`gemm_results.csv`](../../../benchmark/tinynpu/gemm_results.csv), with
+machine summaries in the same directory. TinyNPU's direct-array measurements
+exclude SRAM and graph DMA, so equal-bandwidth comparison remains open.
 
 The trained digits MLP and the 86-descriptor Transformer fixture also passed
 again on current local SHA `6115212e8587f2ca3374787df358761eada7d7ee` with VCS

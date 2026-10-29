@@ -1,0 +1,76 @@
+{
+  "run_id": "TINY-COMPARE-20261029-S20261029",
+  "nmaforge_source_sha": "08c34322879c688afd505ddf41fa4b2a5dc93ac0",
+  "nmaforge_matrix_rtl_basis": "same Matrix product RTL as audited candidate 9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9",
+  "tinynpu_source_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+  "seed": "20261029",
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "verilator": "Verilator 5.052 2026-09-05 rev v5.052"
+  },
+  "matched_gemm": {
+    "shapes": [
+      "16x16x16",
+      "16x16x32",
+      "32x32x64"
+    ],
+    "data_type": "signed INT8; INT32 accumulation",
+    "operand_pattern": "same fixed A/B formulas in both testbenches",
+    "golden": "all output words pass against independent INT32 GEMM on both designs",
+    "cases": [
+      {
+        "shape": "16x16x16",
+        "nmaforge_cycles": 171,
+        "nmaforge_spad_read_bytes": 512,
+        "nmaforge_spad_write_bytes": 1024,
+        "tinynpu_direct_array_cycles": 52,
+        "comparison": "no speedup computed; NMAForge includes controller/SPAD while TinyNPU directly drives its systolic array"
+      },
+      {
+        "shape": "16x16x32",
+        "nmaforge_cycles": 263,
+        "nmaforge_spad_read_bytes": 1024,
+        "nmaforge_spad_write_bytes": 1024,
+        "tinynpu_direct_array_cycles": 100,
+        "comparison": "no speedup computed; NMAForge includes controller/SPAD while TinyNPU directly drives its systolic array"
+      },
+      {
+        "shape": "32x32x64",
+        "nmaforge_cycles": 1393,
+        "nmaforge_spad_read_bytes": 6144,
+        "nmaforge_spad_write_bytes": 4096,
+        "tinynpu_direct_array_cycles": 790,
+        "comparison": "no speedup computed; NMAForge includes controller/SPAD while TinyNPU directly drives its systolic array"
+      }
+    ]
+  },
+  "matrix_size_sweep": {
+    "shapes": [
+      "4x4x32",
+      "8x8x32",
+      "16x16x32",
+      "16x32x32",
+      "32x32x64"
+    ],
+    "physical_arrays": [
+      "4x4",
+      "8x8",
+      "16x16"
+    ],
+    "pass_count": 15,
+    "memory": "one-cycle behavioral SPAD; not SRAM timing or ASIC PPA"
+  },
+  "tinynpu_reference": {
+    "engine_regression": "6/6 PASS",
+    "onnx_model": "conv1x_mini.onnx: 8x8x1 -> 3x3 Conv -> ReLU -> Flatten -> GEMM",
+    "cnn_graph_cycles": 4781,
+    "cnn_golden": "PASS, 4/4 output bytes exact",
+    "nmaforge_same_graph_cnn": "PASS; see paired CNN CSV/JSON with separate engine and host-layout timing",
+    "nmaforge_cnn_compute_cycles": 1985,
+    "nmaforge_cnn_host_layout_cycles": 1080,
+    "nmaforge_cnn_spad_read_bytes": 3360,
+    "nmaforge_cnn_spad_write_bytes": 1600,
+    "cnn_speedup_claim": "not computed; design timing boundaries and graph/memory paths differ"
+  },
+  "csv_rows": 22
+}

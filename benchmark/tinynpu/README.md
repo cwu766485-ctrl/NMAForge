@@ -2,7 +2,7 @@
 
 This harness pins `harishsg993010/tiny-NPU` to
 `8216c22b762011aa20c05fc2768423fd12dda59d`, builds its SystemVerilog with
-Verilator, runs a common INT8 GEMM vector on both compute arrays, runs the
+Verilator, runs three common INT8 GEMM shapes on both compute arrays, runs the
 TinyNPU engine regression and ONNX CNN Graph smoke, and writes CSV/JSON
 evidence. It does not modify the TinyNPU checkout.
 
@@ -18,17 +18,19 @@ make benchmark-tinynpu
 
 The script clones the pinned reference under `/tmp` if `TINY_NPU_ROOT` is not
 set. It writes raw compile/run logs and binaries under `/tmp`, then updates
-[`gemm_results.csv`](gemm_results.csv). The run summary JSON remains alongside
-those raw logs and is not committed as a tool database.
+[`gemm_results.csv`](gemm_results.csv), [`cnn_results.csv`](cnn_results.csv),
+[`benchmark_summary.json`](benchmark_summary.json), and
+[`cnn_summary.json`](cnn_summary.json). Raw logs and binaries stay under `/tmp`.
 
-The same logical `16×16×16` signed INT8 matrices and an independent INT32
-integer Golden are checked against 256 outputs on both designs. The current
-TinyNPU 16×16 array is driven directly with its systolic wavefront input
-schedule; its observed endpoint is “first operand accepted to all accumulators
-stable”. NMAForge runs its Matrix controller with a one-cycle behavioral SPAD;
-its endpoint includes bank reads and SPAD writeback. Therefore the two raw cycle
-counts are not an apples-to-apples latency ratio. The CSV keeps both results
-and records each boundary explicitly.
+The same signed INT8 input formulas and independent INT32 Golden are used for
+`16×16×16`, `16×16×32`, and `32×32×64`. TinyNPU tiles each problem across its
+16×16 systolic array and checks every output (256, 256, and 1,024 values).
+NMAForge runs its actual Matrix controller and banked SPAD model and checks all
+output words against the independent Golden. TinyNPU is directly driven with a
+systolic wavefront; its timing starts at the first array input and ends after
+all tiled accumulators are stable. NMAForge timing starts at command acceptance and ends
+after the last SPAD write and `done`. Those cycle counts have different
+boundaries and input-memory paths, so the harness does not report a speedup.
 
 The same command also runs the NMAForge 4×4/8×8/16×16 Matrix size sweep, the
 TinyNPU six-engine reference regression, and both sides of the pinned
@@ -43,13 +45,19 @@ not report a CNN speedup ratio.
 ## Current run
 
 Run ID `TINY-COMPARE-20261029-S20261029` ran on NMAForge SHA
-`0c525bcf8fbdd957396cc98fb314ec56c7888a18` and pinned TinyNPU SHA
-`8216c22b762011aa20c05fc2768423fd12dda59d`. The GEMM CSV has 18 data rows:
-15 NMAForge size cases, two NMAForge common-vector cases, and one TinyNPU
-common-vector case. The paired CNN CSV has one row per design and records
+`08c34322879c688afd505ddf41fa4b2a5dc93ac0` and pinned TinyNPU SHA
+`8216c22b762011aa20c05fc2768423fd12dda59d`. The GEMM CSV has 22 data rows:
+15 NMAForge size cases, one 8×8 NMAForge common case, three 16×16 NMAForge
+common cases, and three TinyNPU common cases. The paired CNN CSV has one row per design and records
 model/input hashes, both cycle windows, SPAD traffic where instrumented, and
-Golden status. Run identity, tools, and exact values are also in the benchmark
-report and the JSON beside the raw logs under `/tmp`.
+Golden status. Run identity, tools, and exact values are in the committed
+summary JSON files and the benchmark report.
+
+For the three paired shapes, NMAForge records 171 / 263 / 1,393 cycles,
+512 / 1,024 / 6,144 SPAD read bytes, and 1,024 / 1,024 / 4,096 write bytes.
+TinyNPU records 52 / 100 / 790 direct-array cycles. These are workload and
+Golden matches, not normalized latency comparisons: NMAForge includes control
+and SPAD activity, while TinyNPU's direct harness bypasses SRAM and graph DMA.
 
 Tools: VCS `V-2023.12-SP1_Full64`, Verilator 5.052 (source tag `v5.052`,
 revision `ea338be98e1e838d3518809ce8899f85a009963c`), Python 3.12.13, NumPy

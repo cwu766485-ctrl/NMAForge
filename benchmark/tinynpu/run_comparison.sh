@@ -96,5 +96,7 @@ fi
     --out-json "$OUT_DIR/benchmark_summary.json"
 cp "$OUT_DIR/gemm_results.csv" "$SCRIPT_DIR/gemm_results.csv"
 cp "$OUT_DIR/cnn_results.csv" "$SCRIPT_DIR/cnn_results.csv"
+cp "$OUT_DIR/benchmark_summary.json" "$SCRIPT_DIR/benchmark_summary.json"
+cp "$OUT_DIR/cnn_summary.json" "$SCRIPT_DIR/cnn_summary.json"
 printf 'BENCHMARK_PASS run_id=%s nmaforge_sha=%s tinynpu_sha=%s output=%s\n' \
     "$RUN_ID" "$NMA_SHA" "$TINY_SHA" "$OUT_DIR"
