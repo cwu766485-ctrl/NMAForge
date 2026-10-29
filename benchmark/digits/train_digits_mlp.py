@@ -156,7 +156,7 @@ def main() -> None:
 
     metrics = {
         "dataset": "sklearn.datasets.load_digits",
-        "architecture": "64-64-ReLU-10 logits (N padded to 12 in hardware)",
+        "architecture": "64-64-ReLU-10 logits (benchmark pads to the 16-column array tile)",
         "seed": SEED,
         "split": {"fit": int(fit_idx.size), "validation": int(valid_idx.size),
                   "test": int(test_idx.size)},
