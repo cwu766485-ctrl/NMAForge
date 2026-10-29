@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+"""Collect bounded Matrix/TinyNPU RTL benchmark logs into CSV and JSON."""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import re
+from pathlib import Path
+
+
+FIELD_RE = re.compile(r"([A-Za-z_]+)=([^\s]+)")
+CSV_FIELDS = [
+    "run_id", "design", "source_sha", "seed", "shape_mnk", "physical_array",
+    "cycles_to_done", "cycles_to_last_output", "macs", "mac_per_cycle",
+    "pe_utilization_pct", "spad_read_bytes", "spad_write_bytes", "bank_stalls",
+    "line_stalls", "golden", "timing_boundary", "comparison_scope",
+]
+
+
+def fields(line: str) -> dict[str, str]:
+    return dict(FIELD_RE.findall(line))
+
+
+def require_line(path: Path, prefix: str) -> str:
+    if not path.exists():
+        raise SystemExit(f"missing run log: {path}")
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if line.startswith(prefix):
+            return line
+    raise SystemExit(f"missing {prefix!r} marker in {path}")
+
+
+def matrix_row(line: str, design: str, source_sha: str, seed: str,
+               run_id: str, scope: str) -> dict[str, str]:
+    value = fields(line)
+    m, n, k = (int(part) for part in value["shape_mnk"].split(","))
+    return {
+        "run_id": run_id,
+        "design": design,
+        "source_sha": source_sha,
+        "seed": seed,
+        "shape_mnk": f"{m}x{n}x{k}",
+        "physical_array": value["physical_array"],
+        "cycles_to_done": value["cycles"],
+        "cycles_to_last_output": value["cycles"],
+        "macs": str(m * n * k),
+        "mac_per_cycle": value["macs_per_cycle"],
+        "pe_utilization_pct": value["array_utilization_pct"],
+        "spad_read_bytes": value["bank_read_bytes"],
+        "spad_write_bytes": value["line_write_bytes"],
+        "bank_stalls": value["bank_stalls"],
+        "line_stalls": value["line_stalls"],
+        "golden": "PASS: all output words",
+        "timing_boundary": "Matrix start accepted through final SPAD write and done",
+        "comparison_scope": scope,
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--nma-sha", required=True)
+    parser.add_argument("--tiny-sha", required=True)
+    parser.add_argument("--seed", required=True)
+    parser.add_argument("--run-id", required=True)
+    parser.add_argument("--size-root", type=Path, required=True)
+    parser.add_argument("--match8", type=Path, required=True)
+    parser.add_argument("--match16", type=Path, required=True)
+    parser.add_argument("--tiny-gemm", type=Path, required=True)
+    parser.add_argument("--tiny-engine", type=Path, required=True)
+    parser.add_argument("--tiny-cnn", type=Path, required=True)
+    parser.add_argument("--out-csv", type=Path, required=True)
+    parser.add_argument("--out-json", type=Path, required=True)
+    parser.add_argument("--vcs-version", default="V-2023.12-SP1_Full64")
+    parser.add_argument("--verilator-version", required=True)
+    args = parser.parse_args()
+
+    rows: list[dict[str, str]] = []
+    for size in (4, 8, 16):
+        log = args.size_root / f"array_{size}" / "run.log"
+        for case_id in range(100, 105):
+            line = require_line(log, f"MATRIX_CORE_CASE_PASS id={case_id} ")
+            rows.append(matrix_row(
+                line, "NMAForge", args.nma_sha, args.seed, args.run_id,
+                "size sweep; behavioral 1-cycle SPAD"))
+
+    nma_match8 = require_line(args.match8, "MATRIX_CORE_CASE_PASS id=105 ")
+    rows.append(matrix_row(
+        nma_match8, "NMAForge", args.nma_sha, args.seed, args.run_id,
+        "matched logical GEMM; NMAForge 8x8 controller + behavioral SPAD"))
+    nma_match16 = require_line(args.match16, "MATRIX_CORE_CASE_PASS id=105 ")
+    rows.append(matrix_row(
+        nma_match16, "NMAForge", args.nma_sha, args.seed, args.run_id,
+        "matched logical GEMM; NMAForge 16x16 controller + behavioral SPAD"))
+
+    tiny_line = require_line(args.tiny_gemm, "TINYNPU_MATCHED_GEMM_PASS ")
+    tiny = fields(tiny_line)
+    rows.append({
+        "run_id": args.run_id,
+        "design": "TinyNPU",
+        "source_sha": args.tiny_sha,
+        "seed": "directed",
+        "shape_mnk": "16x16x16",
+        "physical_array": tiny["physical_array"],
+        "cycles_to_done": "N/A",
+        "cycles_to_last_output": tiny["cycles_input_to_array_stable"],
+        "macs": tiny["macs"],
+        "mac_per_cycle": tiny["mac_per_cycle"],
+        "pe_utilization_pct": tiny["pe_utilization_pct"],
+        "spad_read_bytes": "N/A",
+        "spad_write_bytes": "N/A",
+        "bank_stalls": "N/A",
+        "line_stalls": "N/A",
+        "golden": tiny["golden"],
+        "timing_boundary": "first systolic input through all accumulators stable; direct array wrapper",
+        "comparison_scope": "same deterministic A/B and integer Golden; not latency-normalized to NMAForge controller",
+    })
+
+    args.out_csv.parent.mkdir(parents=True, exist_ok=True)
+    with args.out_csv.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=CSV_FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    engine_text = args.tiny_engine.read_text(encoding="utf-8", errors="replace")
+    cnn_text = args.tiny_cnn.read_text(encoding="utf-8", errors="replace")
+    engine_passes = len(re.findall(r"^(?:GELU|GEMM|Softmax|LayerNorm|Vec ADD|Chained): PASS$",
+                                   engine_text, flags=re.MULTILINE))
+    cycle_match = re.search(r"Graph execution DONE at cycle (\d+)", cnn_text)
+    cnn_pass = "PASS: All 4 bytes match golden!" in cnn_text
+    if engine_passes != 6 or cycle_match is None or not cnn_pass:
+        raise SystemExit("TinyNPU engine/CNN reference regression marker missing")
+
+    summary = {
+        "run_id": args.run_id,
+        "nmaforge_source_sha": args.nma_sha,
+        "nmaforge_matrix_rtl_basis": "same Matrix product RTL as audited candidate 9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9",
+        "tinynpu_source_sha": args.tiny_sha,
+        "seed": args.seed,
+        "tools": {"vcs": args.vcs_version, "verilator": args.verilator_version},
+        "matched_gemm": {
+            "shape": "16x16x16 signed INT8; INT32 accumulation",
+            "operand_pattern": "same fixed A/B formulas in both testbenches",
+            "golden": "PASS, 256/256 outputs on each design",
+            "nmaforge_16x16_cycles": int(fields(nma_match16)["cycles"]),
+            "tinynpu_direct_array_cycles": int(tiny["cycles_input_to_array_stable"]),
+            "latency_speedup_claim": "not computed; NMAForge includes controller/SPAD read/write while TinyNPU test is direct-array input-to-accumulator",
+            "nmaforge_spad_read_bytes": int(fields(nma_match16)["bank_read_bytes"]),
+            "nmaforge_spad_write_bytes": int(fields(nma_match16)["line_write_bytes"]),
+        },
+        "matrix_size_sweep": {
+            "shapes": ["4x4x32", "8x8x32", "16x16x32", "16x32x32", "32x32x64"],
+            "physical_arrays": ["4x4", "8x8", "16x16"],
+            "pass_count": 15,
+            "memory": "one-cycle behavioral SPAD; not SRAM timing or ASIC PPA",
+        },
+        "tinynpu_reference": {
+            "engine_regression": f"{engine_passes}/6 PASS",
+            "onnx_model": "conv1x_mini.onnx: 8x8x1 -> 3x3 Conv -> ReLU -> Flatten -> GEMM",
+            "cnn_graph_cycles": int(cycle_match.group(1)),
+            "cnn_golden": "PASS, 4/4 output bytes exact",
+            "nmaforge_same_graph_cnn": "NOT_RUN; only the standalone matched convolution and GEMM records are available",
+        },
+        "csv_rows": len(rows),
+    }
+    args.out_json.parent.mkdir(parents=True, exist_ok=True)
+    args.out_json.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+
+
+if __name__ == "__main__":
+    main()
