@@ -181,8 +181,7 @@ def main() -> None:
     image_path.write_text("".join(f"{value & 0xFFFFFFFF:08x}\n"
                                    for value in image_words), encoding="ascii")
 
-    padded_hidden = np.zeros((batches * BATCH, 64), dtype=np.int8)
-    padded_hidden[: len(labels)] = hidden_golden
+    padded_hidden, _padded_logits = integer_infer(padded, model)
     hidden_words = [pack_i8(padded_hidden.reshape(-1)[offset : offset + 4])
                     for offset in range(0, padded_hidden.size, 4)]
     hidden_path = args.out_dir / "digits_hidden_expected.memh"
