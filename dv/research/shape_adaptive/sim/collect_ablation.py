@@ -170,7 +170,7 @@ def main():
         "mean_speedup_prefetch_on": round(sum(speedups[1]) / len(speedups[1]), 4),
         "latency_boundary": "RTL compute cycles plus explicit fixed-bandwidth schedule model; not measured integrated SPAD latency",
         "bank_conflicts": "ideal conflict-free interleaving assumed; bank stalls are zero by model construction",
-        "outputs": str(args.csv),
+        "outputs": "benchmark/shape_adaptive_ablation.csv",
         "raw_run_directory": str(args.run_dir),
     }
     args.json.parent.mkdir(parents=True, exist_ok=True)
