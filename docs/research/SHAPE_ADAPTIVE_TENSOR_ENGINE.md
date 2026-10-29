@@ -44,8 +44,8 @@ shape cost estimates at 32 bytes/cycle and retains baseline when folding is
 not predicted to help. The kernel takes packed operand buses directly; it is
 not connected to the Matrix controller or SPAD.
 
-Run ID `SHAPE-ADAPTIVE-20261029-b44894b7` is at NMAForge SHA
-`b44894b7b1a900d5ab7df6a786b783c840808157`, with VCS
+Run ID `SHAPE-ADAPTIVE-20261029-8c19eaf4` is at NMAForge SHA
+`8c19eaf43c4b70a61272d698f1cb7aa9a191f27d`, with VCS
 `V-2023.12-SP1_Full64`, seeds `20261025/20261026/20261027`, and command
 `make shape-adaptive-regress`. Each seed checked 12 shapes (`M=1/4/8/16`,
 `N=8/13/16`, `K=17/64`) for baseline, forced GEMV, and static selection.
@@ -81,7 +81,7 @@ averages, not measured SPAD or product-top speedups.
 Machine-readable data is in
 [`benchmark/shape_adaptive_ablation.csv`](../../benchmark/shape_adaptive_ablation.csv)
 and [`benchmark/shape_adaptive_summary.json`](../../benchmark/shape_adaptive_summary.json).
-Raw VCS runs are under `/tmp/nmaforge_shape_adaptive_20261029_214646`.
+Raw VCS runs are under `/tmp/nmaforge_shape_adaptive_20261029_final_8c19eaf`.
 
 ## Remaining v2 work
 

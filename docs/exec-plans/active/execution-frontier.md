@@ -60,6 +60,14 @@ replacement sign-off baseline. The audited candidate remains
 PASS-SCOPED and 14 PARTIAL requirements and concludes CL-DV-v1.0 is not signed.
 The digits experiment does not change that disposition.
 
+The isolated shape-adaptive kernel also passed a fresh VCS replay on its current
+source SHA `8c19eaf43c4b70a61272d698f1cb7aa9a191f27d`: three seeds, 12 shapes
+per seed, baseline/GEMV Golden checks, Abort/Reset, and invalid-dimension
+rejection all passed. Run ID `SHAPE-ADAPTIVE-20261029-8c19eaf4`; the compile
+log has no Warning, Error, or `[TFIPC]` diagnostics. Its four-way memory
+prefetch schedule remains an analytical fixed-bandwidth model, not an integrated
+SPAD measurement. See the [shape-adaptive report](../../research/SHAPE_ADAPTIVE_TENSOR_ENGINE.md).
+
 | Area | Current evidence | Open work |
 |---|---|---|
 | CNM, CNN/KV, FP, Matrix, SFU | Selected block/subsystem/top regression passed. Raw DUT-only code coverage is partial. | See [compute-engine status](../../verification/COMPUTE_ENGINE_STATUS.md) and [detailed run record](../../verification/COMPUTE_ENGINE_BLOCK_VALIDATION_2026-10-21.md). |
@@ -78,8 +86,8 @@ The digits experiment does not change that disposition.
 3. Continue the FP parity-to-writeback proof from the [FP formal frontier](../../../dv/block/compute/fp/formal/README.md); an inconclusive timeout is not a pass.
 4. Keep LEC, DFT, post-layout PPA, and board results as separate closure gates.
 5. Continue the isolated `feat/shape-adaptive-gemv-v2` branch. Its 256-MAC
-   kernel passes three-seed RTL Golden checks and emits four modeled ablations;
-   the bandwidth/prefetch schedule is analytical and still needs an actual
+   kernel passes three-seed RTL Golden checks at SHA `8c19eaf`; the
+   bandwidth/prefetch schedule is analytical and still needs an actual
    double-buffered SPAD path, bank-arbitration tests, and synthesis evidence.
 
 ## Canonical commands
