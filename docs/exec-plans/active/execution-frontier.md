@@ -31,14 +31,24 @@ matched an independent integer Golden for all checked values. The run reports
 the host layout bridge separately; it does not claim host-free inference. See
 the [digits inference report](../../benchmark/REAL_MODEL_INFERENCE.md).
 
-At source SHA `df7335871068c6e2fbbc6a0eaad315d6c5815fef`, the pinned TinyNPU
-benchmark target passed: 18 result rows, 256/256 same-vector GEMM outputs on
-both designs, TinyNPU's engine regression 6/6, and TinyNPU CNN graph outputs
-4/4. The separate three-seed Matrix performance report passed 165/165 checks
-(45 size cases plus 120 ablation cases). The common full-CNN run through
-NMAForge is still open; current CNN evidence is an NMAForge operator check and
-a TinyNPU full-graph smoke with different lowering and timing boundaries. See
-the [benchmark comparison](../../benchmark/NMAFORGE_VS_TINY_NPU.md).
+At source SHA `110e0c9db49eb1a7a558c955347accfde87f963e`, the pinned TinyNPU
+benchmark passed: 18 GEMM rows, 256/256 same-vector outputs on both designs,
+TinyNPU's engine regression 6/6, and the same `conv1x_mini.onnx` graph on both
+tops. NMAForge passed all intermediate tensors and final outputs byte-exactly
+using eight CMDQ descriptors. Its recorded windows are 1,985 compute cycles
+plus 1,080 host-layout cycles; TinyNPU's graph smoke is 4,781 testbench cycles.
+Memory setup and timing boundaries differ, so there is no CNN speedup claim.
+Paired evidence is in [`cnn_results.csv`](../../../benchmark/tinynpu/cnn_results.csv)
+and the [comparison report](../../benchmark/NMAFORGE_VS_TINY_NPU.md).
+
+The trained digits INT8 model also reran on this SHA through the real top:
+360 samples, 352 correct (97.78%), 69 descriptors, and exact independent
+integer Golden; it used 93,653 compute cycles plus a separately measured
+70,656-cycle host-layout bridge. The three-seed Matrix size/ablation replay
+also passed on this SHA: 45/45 size cases and 120/120 configuration cases.
+Run ID `MATRIX-PERF-20261025-20261026-20261027-110e0c9d`; CSV/JSON evidence is
+in [`benchmark/compute_performance.csv`](../../../benchmark/compute_performance.csv)
+and [`benchmark/compute_performance_summary.json`](../../../benchmark/compute_performance_summary.json).
 
 The checked-in 86-descriptor prefill/decode fixture also reran with VCS on this
 SHA and passed all tensor/completion checks. It uses deterministic functional
@@ -66,8 +76,9 @@ The digits experiment does not change that disposition.
    one clean SHA. Do not treat the current-tree reset evidence as clean-SHA replay.
 3. Continue the FP parity-to-writeback proof from the [FP formal frontier](../../../dv/block/compute/fp/formal/README.md); an inconclusive timeout is not a pass.
 4. Keep LEC, DFT, post-layout PPA, and board results as separate closure gates.
-5. Close the paired TinyNPU CNN workload, then continue from measured small-M
-   utilization into the separate shape-adaptive v2 research branch.
+5. Continue from the paired TinyNPU CNN and measured small-M utilization into
+   the separate shape-adaptive v2 research branch; no shape-adaptive RTL is
+   claimed in the current branch.
 
 ## Canonical commands
 

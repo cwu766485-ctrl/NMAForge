@@ -42,11 +42,19 @@ not report a CNN speedup ratio.
 
 ## Current run
 
-The committed GEMM CSV records Matrix size and common-vector results. The
-paired CNN CSV has one row per design and records model/input hashes, both
-cycle windows, SPAD traffic where instrumented, and Golden status. Its run ID,
-NMAForge SHA, tool versions and exact values are repeated in the benchmark
-report and the JSON generated beside the raw logs under `/tmp`.
+Run ID `TINY-COMPARE-20261029-110e0c9-S20261029` ran on NMAForge SHA
+`110e0c9db49eb1a7a558c955347accfde87f963e` and pinned TinyNPU SHA
+`8216c22b762011aa20c05fc2768423fd12dda59d`. The GEMM CSV has 18 data rows:
+15 NMAForge size cases, two NMAForge common-vector cases, and one TinyNPU
+common-vector case. The paired CNN CSV has one row per design and records
+model/input hashes, both cycle windows, SPAD traffic where instrumented, and
+Golden status. Run identity, tools, and exact values are also in the benchmark
+report and the JSON beside the raw logs under `/tmp`.
+
+Tools: VCS `V-2023.12-SP1_Full64`, Verilator 5.052, Python 3.11.13, NumPy 2.1.3,
+and ONNX 1.17.0. TinyNPU builds use `-Wno-SYNCASYNCNET -Wno-fatal` for the
+pinned reference RTL. The TinyNPU and NMAForge CNN compiles emit the existing
+`LOOP-REROLL-ENABLED` test-fixture warning; no compile errors occurred.
 
 For the paired graph, NMAForge checks all intermediate integer tensors and the
 same four output bytes as TinyNPU. This workload counts 1,872 logical INT8 MACs

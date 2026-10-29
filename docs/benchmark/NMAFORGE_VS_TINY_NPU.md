@@ -9,7 +9,7 @@ DMA and SRAM ports; its CNN Graph smoke uses a testbench DMA shim. The CSV
 records the measured endpoints so results are not conflated.
 
 The NMAForge run is on research branch `feat/tinynpu-model-inference`, source
-SHA `df7335871068c6e2fbbc6a0eaad315d6c5815fef`; Matrix product RTL is identical
+SHA `110e0c9db49eb1a7a558c955347accfde87f963e`; Matrix product RTL is identical
 to the audited candidate `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`. TinyNPU is
 pinned to `harishsg993010/tiny-NPU`
 [`8216c22b762011aa20c05fc2768423fd12dda59d`](https://github.com/harishsg993010/tiny-NPU/tree/8216c22b762011aa20c05fc2768423fd12dda59d).
@@ -19,18 +19,18 @@ RTL; the local Verilator invocation disables an upstream `SYNCASYNCNET`
 warning that otherwise stops the build under `-Wall` and uses
 `-Wno-fatal`. This is simulation compatibility only.
 
-Run ID: `TINY-COMPARE-20261029-S20261029`, seed `20261029`. The reproducible
+Run ID: `TINY-COMPARE-20261029-110e0c9-S20261029`, seed `20261029`. The reproducible
 entry point is `make benchmark-tinynpu`; instructions are in the
 [harness README](../../benchmark/tinynpu/README.md). The committed
 [GEMM CSV](../../benchmark/tinynpu/gemm_results.csv) includes the current
 source SHA, shape, array size, cycles, MAC/cycle, PE occupancy, SPAD bytes,
 stalls, Golden result, and timing boundary for 18 measurements.
 
-The root `make compute-performance-report` entry was also rerun at this SHA
-with seeds `20261025/26/27`. Run ID:
-`MATRIX-PERF-20261025-20261026-20261027-df733587`. All 45 size-sweep rows and
-120 depth/prefetch/cache ablation rows passed their Golden checks (165/165).
-Machine-readable results are in
+The root `make compute-performance-report` entry passed on this same source
+SHA with seeds `20261025/26/27`. Run ID:
+`MATRIX-PERF-20261025-20261026-20261027-110e0c9d`. All 45 size cases and 120
+depth/prefetch/cache ablation cases passed their Golden checks (165/165).
+Machine-readable evidence is in
 [`compute_performance.csv`](../../benchmark/compute_performance.csv) and
 [`compute_performance_summary.json`](../../benchmark/compute_performance_summary.json).
 
@@ -151,7 +151,14 @@ and all four output bytes are checked.
 | NMAForge top | 1,872 | 1,985 | 1,080 | Compute SPAD 3,360 B read / 1,600 B write; layout 144 B read / 576 B write; 3,456 B preload | Intermediate tensors and 4/4 output bytes exact |
 | TinyNPU ONNX graph | 1,872 | 4,781 | N/A | 1,312 B SRAM allocation; per-engine traffic unavailable | 4/4 output bytes exact |
 
-The committed [`cnn_results.csv`](../../benchmark/tinynpu/cnn_results.csv) and
+Run ID `TINY-COMPARE-20261029-110e0c9-S20261029`; NMAForge SHA
+`110e0c9db49eb1a7a558c955347accfde87f963e`, TinyNPU SHA
+`8216c22b762011aa20c05fc2768423fd12dda59d`, model SHA-256
+`1ac385ac18394ac5826a7eb426e99c2199bf6417055f7e3f461c40c1b1811640`, input
+seed 99, and input INT8 SHA-256
+`a74587bfcb5b2dfcd9eed1dbbb4fcf657628264c3b0aae7a4c278f0f70705898`.
+Tools were VCS `V-2023.12-SP1_Full64`, Verilator 5.052, Python 3.11.13,
+NumPy 2.1.3 and ONNX 1.17.0. The committed [`cnn_results.csv`](../../benchmark/tinynpu/cnn_results.csv) and
 the paired `cnn_summary.json` emitted with run logs record the run identity,
 hashes, tools, and measurements. NMAForge's measured engine interval spans two
 CMDQ execution windows and excludes SPAD preload, descriptor programming, and

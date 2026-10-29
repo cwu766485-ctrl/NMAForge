@@ -62,6 +62,14 @@ integer-logit SHA-256 is
 
 ## Fixed-SHA replay
 
+The root `make inference-digits` entry was rerun after the paired-CNN harness
+commit on source SHA `110e0c9db49eb1a7a558c955347accfde87f963e` (Run ID
+`DIGITS-RTL-20261029-110e0c9`). With VCS `V-2023.12-SP1_Full64` and the same
+Python 3.11.13/NumPy 2.1.3 environment, it passed 360 samples with 352 correct,
+69 descriptors, 93,653 Matrix/SFU cycles, and exact independent integer Golden
+matches. Model and Golden hashes match the earlier replay. The paired ONNX CNN
+testbench adds no product RTL changes.
+
 The public root target was rerun after the harness commit on source SHA
 `df7335871068c6e2fbbc6a0eaad315d6c5815fef`:
 

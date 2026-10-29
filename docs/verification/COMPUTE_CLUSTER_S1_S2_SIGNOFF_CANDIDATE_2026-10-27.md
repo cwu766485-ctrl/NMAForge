@@ -15,7 +15,7 @@
 | Gate | Decision | Signed scope / hold reason |
 |---|---|---|
 | S1: 16×16 Matrix Block DV | **BOUNDED PASS** | Three-seed depth-4 functional/fault regression passed for the tested INT8 GEMM/batch/layout, prefetch/cache, parity/protection, abort/reset and recovery cases. Raw default-profile FSM remains 49/53; three guard/invariant edges now have scoped formal disposition, and the fourth profile edge is hit in a separate prefetch-disabled build. |
-| S2: Compute Cluster functional slice | **BOUNDED PASS** | Current-SHA clean three-seed real-top seven-engine UVM, R32 accepted-read reset sweep across all seven engines, R33 focused testpoint coverage at 100% of applicable bins, 25/25 checker-sensitivity campaign, coordinated R/B reset/recovery, v1.4 error-contract cases and R31 CNM/DMA-SPAD fault/backpressure slice pass. Historical raw coverage was 29/30 variables (98.96%); the sole completion-read response bin is explicitly excluded as structural N/A for the write-only writer and remains checked at zero. R31's separate 14 subsystem functional groups are all hit after 16/64/300-cycle RREADY and delayed-reset additions. |
+| S2: Compute Cluster functional slice | **BOUNDED PASS** | Current-SHA clean three-seed real-top seven-engine UVM, R32 accepted-read reset sweep across all seven engines, and R35 clean focused-testpoint replay pass; R35 reaches 100% of applicable bins. The replay test commit's product RTL/SPEC are byte-identical to the reviewed candidate. The 25/25 checker-sensitivity campaign, coordinated R/B reset/recovery, v1.4 error-contract cases and R31 CNM/DMA-SPAD fault/backpressure slice also pass. Historical raw coverage was 29/30 variables (98.96%); the sole completion-read response bin is explicitly excluded as structural N/A for the write-only writer and remains checked at zero. R31's separate 14 subsystem functional groups are all hit after 16/64/300-cycle RREADY and delayed-reset additions. |
 | S2: all 38 frozen REQ-CL/REQ-PC requirements | **HOLD** | Current RTM has 24 `PASS-SCOPED`, 14 `PARTIAL`, 0 `BLOCKED_SPEC`, and 0 `NOT_RUN`. Error ABI/priority/prefix SPEC blockers are removed; Matrix core drain/recovery passes R30, selected CNM/DMA-SPAD Abort/Reset drain/recovery passes R31, and R32 resets each production engine after an accepted read. Actual external-fabric qualification, partial Line WSTRB and broader legal fault/phase crosses remain open. This is not full Compute Cluster sign-off. |
 | S3: complete NPU IP | **OUT OF SCOPE** | DMA/CMDQ-to-compute-to-CPLQ system E2E, complete system regression, and ASIC PPA are not covered by S1/S2 evidence. |
 
@@ -84,6 +84,18 @@ sweep. Product `rtl/` is unchanged between those commits. R32 reported:
   completion sentinels, and reported `reset_dropped=9`, zero stale responses,
   and zero stale completion/writeback.
 
+After license recovery, R35 replayed the focused applicable-compute testpoint
+group from clean test commit `cb9717eb853dc507f4a7e4d188c7bd840160c955` on
+seeds `20261025/20261026/20261027`. `rtl/` and `docs/spec/` were byte-identical
+to the reviewed product candidate `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`.
+All three runs passed with 29/29 applicable variables, 5/5 applicable
+response-client bins, 5,094 writes and 5,368 checked words per seed, zero
+mismatch/unknown/stale/orphan responses, and UVM severity 0/0/0. The structural
+completion-read response remains excluded and checked zero. Merged URG reports
+`cluster_cg` at 100%; the mixed testbench/UVM total is 29.72% and is not DUT
+functional or code coverage. Exact run paths and command are in R35 of the
+[Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
+
 The checker-sensitivity campaign ran 25 tests: address, data, owner and WSTRB
 once each, plus unsolicited Done, missing Done and duplicate Done for each of
 the seven engine bits. Every run emitted the expected checker marker (25/25).
@@ -111,7 +123,7 @@ The selected source SHA is `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9` (SPEC v1.4
 - Matrix formal run R28 proves five non-vacuous assertions and reaches both `ST_PREFETCH_WAIT` and `ST_ERROR_DRAIN`. The default-profile FSM raw score remains 49/53; the separate no-prefetch profile hits `ST_MAC→ST_A_REQ`.
 - Matrix size benchmark passes 45/45; eight-way Depth/Prefetch/A-Cache ablation passes 120/120 over three seeds. The `32×32×64` workload improves from 1,698 to 1,187 cycles and cuts banked reads by 25% between baseline and the fully enabled configuration.
 - Real-top serial/staged/four-task parallel cycles are 1,239 / 1,070 / 1,137 (versus 1,696 serialized for four tasks), with ordered completions. They use the current production engines and behavioral scratchpad model.
-- Coordinated reset testing excludes stale R and B for a behavioral AXI responder. Matrix depth-4 accepted-read drain/recovery passes in R30; selected CNM/DMA-SPAD accepted-read and prewrite reset recovery passes in R31; R32 resets each real top engine after an accepted read. R32 passed seeds `20261025/26/27`; each seed checked busy clear, destination/completion sentinels, stale completion/writeback and owner epoch, with 5,094 accepted writes, 5,368 checked words, zero mismatch/unknown/stale/orphan, `reset_dropped=9`, UVM severity `0/0/0`, and focused coverage `99.0%` rounded. Actual external-fabric compliance remains open integration evidence; legal abort/fault cross coverage also remains partial.
+- Coordinated reset testing excludes stale R and B for a behavioral AXI responder. Matrix depth-4 accepted-read drain/recovery passes in R30; selected CNM/DMA-SPAD accepted-read and prewrite reset recovery passes in R31; R32 resets each real top engine after an accepted read. R32 passed seeds `20261025/26/27`; each seed checked busy clear, destination/completion sentinels, stale completion/writeback and owner epoch, with 5,094 accepted writes, 5,368 checked words, zero mismatch/unknown/stale/orphan, `reset_dropped=9`, UVM severity `0/0/0`, and focused coverage `99.0%` rounded. R35 independently replayed the focused testpoint group at 100% applicable coverage on three seeds with product RTL/SPEC identical to this candidate. Actual external-fabric compliance remains open integration evidence; legal abort/fault cross coverage also remains partial.
 
 Detailed Run IDs, tools, seeds and artifact paths are in [Execution RTM R24–R32](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md). These results support bounded S1/S2 review, not CL-DV-v1.0 or whole-NPU sign-off.
 
@@ -215,11 +227,13 @@ scalar engine is busy; concurrent scalar/SFU access to one shared read-only
 SPAD region; and stalled request-payload stability. All passed in all three
 seeds. Per seed, stall observations were engine mask `1110111`, Matrix banked
 338 checks, and 30 checks on each of four CNM lanes; the Matrix line-write
-stall class had zero samples in this workload. Before R33, the response-client
-group was raw 98.96% (29/30 variables). R33's clean replay reports 29/29
+stall class had zero samples in this workload. Before the focused testpoint
+disposition, the response-client group was raw 98.96% (29/30 variables). R33
+and R35 clean replays report 29/29
 applicable variables (100.00%); URG lists the completion-read bin as excluded
 N/A with zero hits, and the test keeps the zero-read guard while observing DMA
-read response. This is focused-group coverage, not full requirement closure.
+read response. R35 reproduces the result on three seeds after license recovery.
+This is focused-group coverage, not full requirement closure.
 UVM compile had no `Warning`, `Error`, or `TFIPC` text.
 
 The four Matrix `state_r` transition misses remain as reviewed dispositions in
