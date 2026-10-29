@@ -98,7 +98,8 @@ module ai_descriptor_validator (
 
     assign descriptor_invalid = !op_valid || !dimensions_valid ||
                                 !version_valid ||
-                                (flags[5] && !pack_tile_a_fields_valid) ||
+                                ((op == 8'h36) && flags[5] &&
+                                 !pack_tile_a_fields_valid) ||
                                 (macro_child_fetch && is_macro) ||
                                 alignment_error ||
                                 (is_macro && (|src0[5:0])) ||
