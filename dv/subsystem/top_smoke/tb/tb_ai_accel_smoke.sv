@@ -214,6 +214,22 @@ module tb_ai_accel_smoke;
     reg ai_digits_measure = 1'b0;
     integer ai_digits_layout_cycles = 0;
     reg ai_digits_layout_measure = 1'b0;
+    integer ai_digits_sfu_writes_by_batch [0:22];
+    integer ai_digits_sfu_monitor_batch;
+
+    always @(posedge aclk) begin
+        if (dut.sfu_spad_valid && dut.sfu_spad_write &&
+            dut.compute_engine_ready[4] &&
+            (dut.sfu_spad_addr >= AI_DIGITS_HIDDEN_I8_BASE) &&
+            (dut.sfu_spad_addr < AI_DIGITS_HIDDEN_I8_BASE +
+                                   23 * AI_DIGITS_BATCH * 64)) begin
+            ai_digits_sfu_monitor_batch =
+                (dut.sfu_spad_addr - AI_DIGITS_HIDDEN_I8_BASE) /
+                (AI_DIGITS_BATCH * 64);
+            ai_digits_sfu_writes_by_batch[ai_digits_sfu_monitor_batch] =
+                ai_digits_sfu_writes_by_batch[ai_digits_sfu_monitor_batch] + 1;
+        end
+    end
 
     always @(posedge aclk) begin
         if (ai_digits_measure)
@@ -1269,6 +1285,7 @@ module tb_ai_accel_smoke;
         integer destination_word_index;
         integer phase1_descriptor_count;
         integer layout_reorder_bytes;
+        integer sfu_batch_index;
         integer correct_samples;
         integer sample_label;
         integer prediction;
@@ -1329,6 +1346,8 @@ module tb_ai_accel_smoke;
             axi_write(REG_CMDQ_HEAD, 32'd0);
             phase1_descriptor_count = 2 * ((AI_DIGITS_TEST_SAMPLES + AI_DIGITS_BATCH - 1) /
                                            AI_DIGITS_BATCH);
+            for (sfu_batch_index = 0; sfu_batch_index < 23; sfu_batch_index = sfu_batch_index + 1)
+                ai_digits_sfu_writes_by_batch[sfu_batch_index] = 0;
             axi_write(REG_CMDQ_TAIL, phase1_descriptor_count);
             axi_write(REG_CPLQ_BASE_LO, AI_DIGITS_CPL_BASE);
             axi_write(REG_CPLQ_SIZE, 32'd128);
@@ -1374,6 +1393,14 @@ module tb_ai_accel_smoke;
                 if (read_value !== 32'h0000_0001) begin
                     $display("ERROR: digits CPLQ[%0d] status/error=%08h", completion_index,
                              read_value);
+                    errors = errors + 1;
+                end
+            end
+            for (sfu_batch_index = 0; sfu_batch_index < 23; sfu_batch_index = sfu_batch_index + 1) begin
+                if (ai_digits_sfu_writes_by_batch[sfu_batch_index] != 256) begin
+                    $display("ERROR: digits SFU packed writes batch=%0d got=%0d expected=256",
+                             sfu_batch_index,
+                             ai_digits_sfu_writes_by_batch[sfu_batch_index]);
                     errors = errors + 1;
                 end
             end
