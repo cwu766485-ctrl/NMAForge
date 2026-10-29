@@ -12,7 +12,7 @@ not a measured TinyNPU memory-controller result. The CSV retains both raw and
 normalized endpoints.
 
 The NMAForge run is on research branch `feat/shape-adaptive-gemv-v2`, source
-SHA `ae897524a30d08bd1dc7970f61f01d6abe763b59`; Matrix product RTL is identical
+SHA `6848a414eaeaa05cf9e1411cf55d9d27333208a6`; Matrix product RTL is identical
 to the audited candidate `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`. TinyNPU is
 pinned to `harishsg993010/tiny-NPU`
 [`8216c22b762011aa20c05fc2768423fd12dda59d`](https://github.com/harishsg993010/tiny-NPU/tree/8216c22b762011aa20c05fc2768423fd12dda59d).
@@ -23,7 +23,7 @@ RTL; the local Verilator invocation disables an upstream `SYNCASYNCNET`
 warning that otherwise stops the build under `-Wall` and uses
 `-Wno-fatal`. This is simulation compatibility only.
 
-Run ID: `TINY-FAIR-AE89752-S20261029`, seed `20261029`. The reproducible
+Run ID: `TINY-FAIR-6848A41-S20261029`, seed `20261029`. The reproducible
 entry point is `make benchmark-tinynpu`; instructions are in the
 [harness README](../../benchmark/tinynpu/README.md). The committed
 [GEMM CSV](../../benchmark/tinynpu/gemm_results.csv) includes the current
@@ -35,7 +35,7 @@ and [`cnn_summary.json`](../../benchmark/tinynpu/cnn_summary.json).
 
 The root `make compute-performance-report` benchmark was rerun on this exact
 source SHA with seeds `20261029/30/31`. Run ID:
-`MATRIX-PERF-20261029-20261030-20261031-ae897524`. All 45 size cases and 120
+`MATRIX-PERF-20261029-20261030-20261031-6848a414`. All 45 size cases and 120
 depth/prefetch/cache ablation cases passed their Golden checks (165/165).
 The run used VCS `V-2023.12-SP1_Full64`, 10 ns simulation clock settings,
 and a one-cycle behavioral SPAD. Its 250 MHz GOPS reference is an assumption,

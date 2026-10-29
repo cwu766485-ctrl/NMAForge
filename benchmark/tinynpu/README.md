@@ -44,8 +44,8 @@ not report a CNN speedup ratio.
 
 ## Current run
 
-Run ID `TINY-FAIR-AE89752-S20261029` ran on NMAForge SHA
-`ae897524a30d08bd1dc7970f61f01d6abe763b59` and pinned TinyNPU SHA
+Run ID `TINY-FAIR-6848A41-S20261029` ran on NMAForge SHA
+`6848a414eaeaa05cf9e1411cf55d9d27333208a6` and pinned TinyNPU SHA
 `8216c22b762011aa20c05fc2768423fd12dda59d`. The GEMM CSV has 22 data rows:
 15 NMAForge size cases, one 8×8 NMAForge common case, three 16×16 NMAForge
 common cases, and three TinyNPU common cases. The paired CNN CSV has one row per design and records
