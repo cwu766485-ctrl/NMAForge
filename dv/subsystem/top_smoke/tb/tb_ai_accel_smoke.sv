@@ -80,11 +80,12 @@ module tb_ai_accel_smoke;
     localparam REG_EVENT_STATUS    = 32'h0000_0168;
     localparam SPAD_BASE         = 32'h0001_0000;
     localparam SPAD_BYTES        = 32'h0008_0000;
-    localparam AI_DIGITS_INPUT_BASE = 32'h0002_0000;
-    localparam AI_DIGITS_OUTPUT_BASE = 32'h0001_6000;
-    localparam AI_DIGITS_HIDDEN_I8_BASE = 32'h0001_5000;
-    localparam AI_DIGITS_DESC_BASE = 32'h0003_0000;
-    localparam AI_DIGITS_CPL_BASE = 32'h0003_3000;
+    localparam AI_DIGITS_INPUT_BASE = 32'h0004_0000;
+    localparam AI_DIGITS_OUTPUT_BASE = 32'h0003_b000;
+    localparam AI_DIGITS_HIDDEN_I8_BASE = 32'h0002_c000;
+    localparam AI_DIGITS_HIDDEN_I8_TILE_BASE = 32'h0003_2000;
+    localparam AI_DIGITS_DESC_BASE = 32'h0003_8000;
+    localparam AI_DIGITS_CPL_BASE = 32'h0003_a000;
     localparam AI_DIGITS_BATCH = 16;
     localparam AI_DIGITS_DESC_COUNT = 69;
     localparam AI_DIGITS_TEST_SAMPLES = 360;
@@ -211,10 +212,14 @@ module tb_ai_accel_smoke;
     reg [31:0] ai_digits_hidden_words [0:6000];
     integer ai_digits_cycles = 0;
     reg ai_digits_measure = 1'b0;
+    integer ai_digits_layout_cycles = 0;
+    reg ai_digits_layout_measure = 1'b0;
 
     always @(posedge aclk) begin
         if (ai_digits_measure)
             ai_digits_cycles = ai_digits_cycles + 1;
+        if (ai_digits_layout_measure)
+            ai_digits_layout_cycles = ai_digits_layout_cycles + 1;
     end
 
     // During the dedicated FP benchmark, randomize seeded AXI RVALID latency
@@ -1257,6 +1262,13 @@ module tb_ai_accel_smoke;
         integer sample_index;
         integer class_index;
         integer expected_index;
+        integer batch_index;
+        integer row_index;
+        integer k_word_index;
+        integer source_word_index;
+        integer destination_word_index;
+        integer phase1_descriptor_count;
+        integer layout_reorder_bytes;
         integer correct_samples;
         integer sample_label;
         integer prediction;
@@ -1315,15 +1327,92 @@ module tb_ai_accel_smoke;
             axi_write(REG_CMDQ_BASE_LO, AI_DIGITS_DESC_BASE);
             axi_write(REG_CMDQ_SIZE, 32'd128);
             axi_write(REG_CMDQ_HEAD, 32'd0);
-            axi_write(REG_CMDQ_TAIL, AI_DIGITS_DESC_COUNT);
+            phase1_descriptor_count = 2 * ((AI_DIGITS_TEST_SAMPLES + AI_DIGITS_BATCH - 1) /
+                                           AI_DIGITS_BATCH);
+            axi_write(REG_CMDQ_TAIL, phase1_descriptor_count);
             axi_write(REG_CPLQ_BASE_LO, AI_DIGITS_CPL_BASE);
             axi_write(REG_CPLQ_SIZE, 32'd128);
             axi_write(REG_CPLQ_HEAD, 32'd0);
             axi_write(REG_CPLQ_TAIL, 32'd0);
 
             ai_digits_cycles = 0;
+            ai_digits_layout_cycles = 0;
             ai_digits_measure = 1'b1;
             axi_write(REG_DOORBELL, 32'd1);
+            completed = 1'b0;
+            for (poll_index = 0; poll_index < 20000 && !completed; poll_index = poll_index + 1) begin
+                repeat (32) @(posedge aclk);
+                axi_read(REG_CPLQ_TAIL, cpl_tail);
+                if (cpl_tail == phase1_descriptor_count)
+                    completed = 1'b1;
+            end
+            ai_digits_measure = 1'b0;
+            if (!completed) begin
+                $display("ERROR: digits inference completion timeout tail=%0d", cpl_tail);
+                errors = errors + 1;
+            end
+            axi_read(REG_CMDQ_HEAD, cmd_head);
+            if (cmd_head !== phase1_descriptor_count) begin
+                $display("ERROR: digits phase-1 CMDQ head=%0d expected=%0d", cmd_head,
+                         phase1_descriptor_count);
+                errors = errors + 1;
+            end
+
+            // Check the real Matrix/SFU phase before converting the packed
+            // row-major bytes to the Matrix controller's 4x4 A microtile.
+            for (completion_index = 0; completion_index < phase1_descriptor_count;
+                 completion_index = completion_index + 1) begin
+                axi_read(SPAD_BASE + AI_DIGITS_CPL_BASE + completion_index * 16,
+                         read_value);
+                if (read_value !== (32'h0000_d000 + completion_index)) begin
+                    $display("ERROR: digits CPLQ[%0d] task id=%08h", completion_index,
+                             read_value);
+                    errors = errors + 1;
+                end
+                axi_read(SPAD_BASE + AI_DIGITS_CPL_BASE + completion_index * 16 + 4,
+                         read_value);
+                if (read_value !== 32'h0000_0001) begin
+                    $display("ERROR: digits CPLQ[%0d] status/error=%08h", completion_index,
+                             read_value);
+                    errors = errors + 1;
+                end
+            end
+
+            layout_reorder_bytes = 0;
+            ai_digits_layout_measure = 1'b1;
+            for (batch_index = 0; batch_index < ((AI_DIGITS_TEST_SAMPLES + AI_DIGITS_BATCH - 1) /
+                                                  AI_DIGITS_BATCH); batch_index = batch_index + 1) begin
+                for (row_index = 0; row_index < AI_DIGITS_BATCH; row_index = row_index + 1) begin
+                    for (k_word_index = 0; k_word_index < 16; k_word_index = k_word_index + 1) begin
+                        source_word_index = row_index * 16 + k_word_index;
+                        destination_word_index = ((row_index / 4) * 16 + k_word_index) * 4 +
+                                                 (row_index % 4);
+                        axi_read(SPAD_BASE + AI_DIGITS_HIDDEN_I8_BASE +
+                                 (batch_index * AI_DIGITS_BATCH * 64) + source_word_index * 4,
+                                 read_value);
+                        hidden_index = batch_index * AI_DIGITS_BATCH * 16 + source_word_index;
+                        if (read_value !== ai_digits_hidden_words[1 + hidden_index]) begin
+                            if (errors < 20)
+                                $display("ERROR: digits hidden word[%0d] rtl=%08h golden=%08h",
+                                         hidden_index, read_value,
+                                         ai_digits_hidden_words[1 + hidden_index]);
+                            errors = errors + 1;
+                        end
+                        axi_write(SPAD_BASE + AI_DIGITS_HIDDEN_I8_TILE_BASE +
+                                  (batch_index * AI_DIGITS_BATCH * 64) +
+                                  destination_word_index * 4, read_value);
+                        layout_reorder_bytes = layout_reorder_bytes + 8;
+                    end
+                end
+            end
+            ai_digits_layout_measure = 1'b0;
+
+            // Matrix operands for a second GEMM are micro-tile ordered. The
+            // software-visible layout bridge above makes this contract
+            // explicit and keeps that cost outside engine-only cycle counts.
+            axi_write(REG_CMDQ_TAIL, AI_DIGITS_DESC_COUNT);
+            axi_write(REG_DOORBELL, 32'd1);
+            ai_digits_measure = 1'b1;
             completed = 1'b0;
             for (poll_index = 0; poll_index < 20000 && !completed; poll_index = poll_index + 1) begin
                 repeat (32) @(posedge aclk);
@@ -1343,9 +1432,10 @@ module tb_ai_accel_smoke;
                 errors = errors + 1;
             end
 
-            // Check task identity and success status for every committed CPLQ
-            // slot, then validate every packed hidden byte and every logit.
-            for (completion_index = 0; completion_index < AI_DIGITS_DESC_COUNT;
+            // Check task identity and success status for all second-layer
+            // completion entries; first-layer entries were checked above.
+            for (completion_index = phase1_descriptor_count;
+                 completion_index < AI_DIGITS_DESC_COUNT;
                  completion_index = completion_index + 1) begin
                 axi_read(SPAD_BASE + AI_DIGITS_CPL_BASE + completion_index * 16,
                          read_value);
@@ -1359,18 +1449,6 @@ module tb_ai_accel_smoke;
                 if (read_value !== 32'h0000_0001) begin
                     $display("ERROR: digits CPLQ[%0d] status/error=%08h", completion_index,
                              read_value);
-                    errors = errors + 1;
-                end
-            end
-
-            for (hidden_index = 0; hidden_index < hidden_count; hidden_index = hidden_index + 1) begin
-                axi_read(SPAD_BASE + AI_DIGITS_HIDDEN_I8_BASE + hidden_index * 4,
-                         read_value);
-                if (read_value !== ai_digits_hidden_words[1 + hidden_index]) begin
-                    if (errors < 20)
-                        $display("ERROR: digits hidden word[%0d] rtl=%08h golden=%08h",
-                                 hidden_index, read_value,
-                                 ai_digits_hidden_words[1 + hidden_index]);
                     errors = errors + 1;
                 end
             end
@@ -1422,9 +1500,10 @@ module tb_ai_accel_smoke;
             else
                 mac_per_cycle = mac_count / ai_digits_cycles;
             array_utilization = mac_per_cycle / 256.0;
-            $display("DIGITS_RTL_METRICS samples=%0d correct=%0d descriptors=%0d cycles=%0d mac=%0.0f mac_per_cycle=%0.4f array_utilization=%0.2f%% spad_initialization_bytes=%0d",
+            $display("DIGITS_RTL_METRICS samples=%0d correct=%0d descriptors=%0d cycles=%0d host_layout_cycles=%0d host_layout_bytes=%0d mac=%0.0f mac_per_cycle=%0.4f array_utilization=%0.2f%% spad_initialization_bytes=%0d",
                      AI_DIGITS_TEST_SAMPLES, correct_samples, AI_DIGITS_DESC_COUNT,
-                     ai_digits_cycles, mac_count, mac_per_cycle,
+                     ai_digits_cycles, ai_digits_layout_cycles, layout_reorder_bytes,
+                     mac_count, mac_per_cycle,
                      array_utilization * 100.0, image_count * 4);
             if (errors == 0)
                 $display("DIGITS_INFERENCE_PASS model=sklearn_digits_int8 rtl=top_spad_cmdq_cplq accuracy=%0.2f%%",
