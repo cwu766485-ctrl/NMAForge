@@ -2,8 +2,8 @@
 
 **Review date:** 2026-10-29  
 **Selected product/SPEC candidate:** `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`  
-**Evidence review branch:** `work/phase1-dv-signoff-20261029`  
-**Current documentation HEAD:** `d2123ed112f90e43bce96c12e86d2ec967e407f4`  
+- **Follow-up evidence branch:** `feat/shape-adaptive-gemv-v2`
+- **Follow-up evidence replay SHA:** `27638d191f3aabbe9e8fecc350b76849b5ab51d3`
 **Decision:** bounded CL-RC1/CL-RC2 review candidate; **CL-DV-v1.0 is not signed**.
 
 ## Executive disposition
@@ -20,17 +20,20 @@ The **100%** result is limited to the focused top-compute functional testpoint g
 - R33 ran from clean test commit `cb9717eb853dc507f4a7e4d188c7bd840160c955`, with product RTL/SPEC byte-identical to the selected candidate. Each of its three seeds passed with UVM severity `0/0/0`, 5,094 accepted writes, 5,368 checked words, and zero mismatch/unknown/stale/orphan response.
 - R34 (`CLUSTER-COV100-REPLAY-20261029`) was an environment-blocked attempt before VCS license recovery; it produced no simulation or coverage result. R35 (`CLUSTER-COV100-LICENSE-REPLAY-20261029`) reran the exact clean test commit `cb9717e` on seeds `20261025/26/27` after license recovery. All three runs passed, focused applicable compute coverage was 100.0%, and each memory scoreboard checked 5,368 words with zero mismatch/unknown/stale/orphan. Product RTL/SPEC are byte-identical to the selected candidate. R35 supersedes R34 for replay status, not for requirement dispositions.
 - VCS/URG version for R33 is `V-2023.12-SP1_Full64`; Matrix formal uses VC Formal `V-2023.12-SP2`. R33's compile has no `Warning-`, `Error-`, or `[TFIPC]` diagnostic. The separate top-smoke fixture retains one `[LOOP-REROLL-ENABLED]` warning, documented in the RTM.
+- After VCS license recovery, R36 reran the real-top cluster UVM on seeds `20261025/26/27` from follow-up SHA `27638d1`; it passed 3/3 with 100.0% applicable focused compute coverage, 14/14 selected parity cases, 5,368 checked words per seed, and UVM severity `0/0/0`. R37 reran the 25/25 checker-sensitivity mutations at the same SHA. R38 added three common TinyNPU GEMM shapes and paired CNN results. Active product RTL/SPEC remains byte-identical to selected candidate `9d9e0f0`; these follow-up results do not change requirement dispositions by themselves.
 
 ## Checker and coverage review
 
 | Area | Evidence | Audit disposition |
 |---|---|---|
-| Independent memory/result checks | R25/R32/R35 real-top scoreboard and selected per-engine Golden checks; R35 has zero mismatch/unknown/stale/orphan responses | Pass for the named workloads and memory transactions; opcode/shape/fault space remains partial |
-| Mutation sensitivity | R26: 25/25 expected catches for address, data, owner, WSTRB and Done/missing/duplicate-Done observation mutations | Pass for checker sensitivity only; this is not DUT fault injection or an RTL mutation score |
+| Independent memory/result checks | R25/R32/R35/R36 real-top scoreboard and selected per-engine Golden checks; R36 has zero mismatch/unknown/stale/orphan responses | Pass for the named workloads and memory transactions; opcode/shape/fault space remains partial |
+| Mutation sensitivity | R26/R37: 25/25 expected catches for address, data, owner, WSTRB and Done/missing/duplicate-Done observation mutations | Pass for checker sensitivity only; this is not DUT fault injection or an RTL mutation score |
 | SVA connectivity/non-vacuity | R32 has 17/22 top assertion properties with real successes and no failures/incomplete; R15 supplies real AXI AR/AW/W successes and stall-to-accept hits; compute activity properties are active | No disconnected compute activity ports found in the reviewed clean compile. Unattempted RAL and sequence-specific AXI properties remain scoped dispositions, not passes |
-| Functional testpoint coverage | R35: 29/29 applicable variables, 5/5 applicable response-client bins on each of three seeds | 100% only for this focused group; the structural completion-read bin remains excluded/N/A |
+| Functional testpoint coverage | R35/R36: 29/29 applicable variables, 5/5 applicable response-client bins on each of three seeds | 100% only for this focused group; the structural completion-read bin remains excluded/N/A |
 | Matrix FSM | R28: 5/5 non-vacuous legal properties proven; `ST_PREFETCH_WAIT` and `ST_ERROR_DRAIN` reachability covers hit; raw default-profile FSM 49/53 | Selected guards dispositioned; no forced states and no 100% FSM claim |
 | Whole-top code coverage | Existing URG databases include DUT, checker, UVM and testbench code | Not presented as DUT-only or functional closure |
+
+R36's compute-only AXI SVA observations show 0 matches for AR/AW stall-to-accept and one W match. This sequence does not exercise those AXI request stalls; R15 remains the evidence for real AR/AW/W assertion successes. `OPEN-CL-004`, `CL-COV-006`, external-fabric qualification, and the 24 PASS-SCOPED / 14 PARTIAL disposition remain unchanged.
 
 ## Remaining closure items
 

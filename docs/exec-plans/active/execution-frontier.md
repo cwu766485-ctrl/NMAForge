@@ -46,6 +46,21 @@ and [`gemm_results.csv`](../../../benchmark/tinynpu/gemm_results.csv), with
 machine summaries in the same directory. TinyNPU's direct-array measurements
 exclude SRAM and graph DMA, so equal-bandwidth comparison remains open.
 
+On current follow-up SHA `27638d191f3aabbe9e8fecc350b76849b5ab51d3`, the
+license-enabled real Compute Cluster UVM regression passed three seeds with
+14/14 selected parity cases, 100% applicable focused coverage, 5,368 checked
+words per seed, and zero UVM warning/error/fatal. The 25/25 checker-sensitivity
+mutation campaign also passed. These results reconfirm their named evidence;
+the full RTM remains 24 PASS-SCOPED / 14 PARTIAL. Current top `ai_smoke` passed
+with its existing `[LOOP-REROLL-ENABLED]` fixture warning.
+
+The paired TinyNPU benchmark is archived as run
+`TINY-COMPARE-20261029-S20261029`: three tiled INT8 GEMM shapes and the
+`conv1x_mini.onnx` CNN pass independent Golden checks on both designs. The GEMM
+cycle windows differ (NMAForge includes controller/SPAD; TinyNPU directly
+drives its array), so no normalized speedup is reported. See the benchmark
+README, CSV/JSON summaries, and R38 in the [Execution RTM](../../verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
+
 The trained digits MLP and the 86-descriptor Transformer fixture also passed
 again on current local SHA `6115212e8587f2ca3374787df358761eada7d7ee` with VCS
 `V-2023.12-SP1_Full64`. Digits matched the independent integer Golden for all
