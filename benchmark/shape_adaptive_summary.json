@@ -1,0 +1,38 @@
+{
+  "run_id": "SHAPE-ADAPTIVE-20261029-b44894b7",
+  "source_sha": "b44894b7b1a900d5ab7df6a786b783c840808157",
+  "vcs_version": "V-2023.12-SP1_Full64",
+  "seeds": [
+    20261025,
+    20261026,
+    20261027
+  ],
+  "cases_per_seed": 12,
+  "ablation_rows": 144,
+  "logical_workloads": [
+    "1x8x17",
+    "1x13x64",
+    "1x16x64",
+    "4x8x17",
+    "4x13x64",
+    "4x16x64",
+    "8x8x17",
+    "8x13x64",
+    "8x16x64",
+    "16x8x17",
+    "16x13x64",
+    "16x16x64"
+  ],
+  "matched_valid_bandwidth_bytes_per_cycle": 32,
+  "physical_macs": 256,
+  "golden": "PASS for all baseline and GEMV RTL outputs",
+  "mean_gemv_speedup_over_baseline_at_matched_prefetch": 1.3737,
+  "max_speedup_prefetch_off": 3.5556,
+  "max_speedup_prefetch_on": 2.1667,
+  "mean_speedup_prefetch_off": 1.5877,
+  "mean_speedup_prefetch_on": 1.1597,
+  "latency_boundary": "RTL compute cycles plus explicit fixed-bandwidth schedule model; not measured integrated SPAD latency",
+  "bank_conflicts": "ideal conflict-free interleaving assumed; bank stalls are zero by model construction",
+  "outputs": "benchmark/shape_adaptive_ablation.csv",
+  "raw_run_directory": "/tmp/nmaforge_shape_adaptive_20261029_214646"
+}

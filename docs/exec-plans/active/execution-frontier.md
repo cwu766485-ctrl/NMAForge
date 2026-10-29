@@ -72,13 +72,15 @@ The digits experiment does not change that disposition.
 1. Close the remaining Compute Cluster P0/P1 items in the
    [execution RTM](../../verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)
    and [open-issue report](../../verification/COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md).
-2. Freeze the reviewed source and test manifest, then replay required gates on
-   one clean SHA. Do not treat the current-tree reset evidence as clean-SHA replay.
+2. Freeze the reviewed source and test manifest, then replay the remaining
+   required gates on one clean SHA. R35 already replays the focused group from
+   clean test commit `cb9717e` with RTL/SPEC byte-identical to the review candidate.
 3. Continue the FP parity-to-writeback proof from the [FP formal frontier](../../../dv/block/compute/fp/formal/README.md); an inconclusive timeout is not a pass.
 4. Keep LEC, DFT, post-layout PPA, and board results as separate closure gates.
-5. Continue from the paired TinyNPU CNN and measured small-M utilization into
-   the separate shape-adaptive v2 research branch; no shape-adaptive RTL is
-   claimed in the current branch.
+5. Continue the isolated `feat/shape-adaptive-gemv-v2` branch. Its 256-MAC
+   kernel passes three-seed RTL Golden checks and emits four modeled ablations;
+   the bandwidth/prefetch schedule is analytical and still needs an actual
+   double-buffered SPAD path, bank-arbitration tests, and synthesis evidence.
 
 ## Canonical commands
 
