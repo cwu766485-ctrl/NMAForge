@@ -21,7 +21,7 @@ shape-adaptive-regress:
 	  grep -q "^SHAPE_ADAPTIVE_PASS seed=$$seed cases=12$$" "$(RUN_DIR)/seed_$$seed.log"; \
 	done
 	@vcs_version="$$(sed -n 's/.*Version \(V-[^ ]*\).*/\1/p' "$(RUN_DIR)/compile.log" | head -1)"; \
-	$(PYTHON) "$(SUMMARIZER)" --run-dir "$(RUN_DIR)" --seeds "$(SEEDS)" \
+	$(PYTHON) "$(SUMMARIZER)" --run-dir "$(RUN_DIR)" --seeds $(SEEDS) \
 	  --source-sha "$(SOURCE_SHA)" --vcs-version "$$vcs_version" \
 	  --csv "$(REPO_ROOT)/benchmark/shape_adaptive_ablation.csv" \
 	  --json "$(REPO_ROOT)/benchmark/shape_adaptive_summary.json"
