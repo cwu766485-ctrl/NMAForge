@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Collect the fixed-bandwidth schedule model around the RTL GEMV kernel."""
 
-from __future__ import annotations
-
 import argparse
 import csv
 import json
@@ -18,17 +16,17 @@ CASE_RE = re.compile(
 PASS_RE = re.compile(r"SHAPE_ADAPTIVE_PASS seed=(\d+) cases=12")
 
 
-def ceil_div(value: int, divisor: int) -> int:
+def ceil_div(value, divisor):
     return (value + divisor - 1) // divisor
 
 
-def total_cycles(tiles: int, load_cycles: int, compute_cycles: int, prefetch: bool) -> int:
+def total_cycles(tiles, load_cycles, compute_cycles, prefetch):
     if not prefetch:
         return tiles * (load_cycles + compute_cycles)
     return load_cycles + tiles * compute_cycles + (tiles - 1) * max(0, load_cycles - compute_cycles)
 
 
-def collect_log(path: Path, expected_seed: int) -> dict[tuple[int, int, int, int], dict[str, int]]:
+def collect_log(path, expected_seed):
     text = path.read_text(encoding="utf-8", errors="replace")
     pass_seeds = {int(match.group(1)) for match in PASS_RE.finditer(text)}
     if pass_seeds != {expected_seed}:
@@ -36,7 +34,7 @@ def collect_log(path: Path, expected_seed: int) -> dict[tuple[int, int, int, int
     if "ABORT_RESET_PASS" not in text or "BAD_CONFIG_PASS" not in text:
         raise RuntimeError(f"abort/reset or bad-config checker did not pass: {path}")
 
-    cases: dict[tuple[int, int, int, int], dict[str, int]] = {}
+    cases = {}
     for match in CASE_RE.finditer(text):
         seed, m, n, k, mode, selected, cycles, macs, fold = map(int, match.groups())
         key = (seed, m, n, k)
@@ -52,8 +50,7 @@ def collect_log(path: Path, expected_seed: int) -> dict[tuple[int, int, int, int
     return cases
 
 
-def make_row(seed: int, m: int, n: int, k: int, mode: int, prefetch: int,
-             case: dict[str, int]) -> dict[str, int | float | str]:
+def make_row(seed, m, n, k, mode, prefetch, case):
     fold = case["k_parallel"]
     tiles = k if mode == 0 else ceil_div(k, fold)
     useful_macs = m * n * k
@@ -91,7 +88,7 @@ def make_row(seed: int, m: int, n: int, k: int, mode: int, prefetch: int,
     }
 
 
-def main() -> None:
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--seeds", nargs="+", type=int, required=True)
@@ -102,7 +99,7 @@ def main() -> None:
     args = parser.parse_args()
 
     rows = []
-    workload_keys: set[tuple[int, int, int]] = set()
+    workload_keys = set()
     for seed in args.seeds:
         cases = collect_log(args.run_dir / f"seed_{seed}.log", seed)
         for (log_seed, m, n, k), mapping in sorted(cases.items(), key=lambda item: item[0][1:]):
