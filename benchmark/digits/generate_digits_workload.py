@@ -136,7 +136,9 @@ def main() -> None:
     add_words(memory, W2_BASE, pack_b_columns(w2, ARRAY_M))
     add_words(memory, B2_BASE, b2)
 
-    descriptors: list[list[int]] = []
+    first_phase_descriptors: list[list[int]] = []
+    second_phase_descriptors: list[list[int]] = []
+    phase1_descriptor_count = 2 * batches
     for batch_index in range(batches):
         batch_x = padded[batch_index * BATCH : (batch_index + 1) * BATCH]
         input_base = INPUT_BASE + batch_index * BATCH * 64
@@ -145,29 +147,31 @@ def main() -> None:
         add_words(memory, output_base,
                   [0xA55AA55A] * (BATCH * ARRAY_M))
 
-        first_task = TASK_BASE + batch_index * 3
+        first_task = TASK_BASE + batch_index * 2
         hidden_i32_base = HIDDEN_I32_BASE + batch_index * BATCH * 64 * 4
         hidden_i8_base = HIDDEN_I8_BASE + batch_index * BATCH * 64
         hidden_i8_tile_base = HIDDEN_I8_TILE_BASE + batch_index * BATCH * 64
-        descriptors.append(descriptor_words(
+        first_phase_descriptors.append(descriptor_words(
             task_id=first_task, opcode=OP_GEMM, src0=input_base,
             src1=W1_BASE, bias=B1_BASE, dst=hidden_i32_base,
             m=BATCH, n=64, extent=K_WORDS, flags=FLAG_BIAS,
             shift=shift1, activation=1, signal_mask=1,
         ))
-        descriptors.append(descriptor_words(
+        first_phase_descriptors.append(descriptor_words(
             task_id=first_task + 1, opcode=OP_REQUANT,
             src0=hidden_i32_base, src1=0, bias=0, dst=hidden_i8_base,
             m=0, n=0, extent=BATCH * 64, flags=FLAG_PACK_I8,
             wait_mask=1, clear_mask=1,
         ))
-        descriptors.append(descriptor_words(
-            task_id=first_task + 2, opcode=OP_GEMM,
+        second_phase_descriptors.append(descriptor_words(
+            task_id=TASK_BASE + phase1_descriptor_count + batch_index,
+            opcode=OP_GEMM,
             src0=hidden_i8_tile_base, src1=W2_BASE, bias=B2_BASE,
             dst=output_base, m=BATCH, n=ARRAY_M, extent=K_WORDS,
             flags=FLAG_BIAS,
         ))
 
+    descriptors = first_phase_descriptors + second_phase_descriptors
     desc_count = len(descriptors)
     if desc_count >= 128:
         raise ValueError("CMDQ depth 128 is insufficient for this test split")
