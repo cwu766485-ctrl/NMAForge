@@ -8,18 +8,19 @@ one-cycle read response. TinyNPU's direct-array measurement bypasses its graph
 DMA and SRAM ports; its CNN Graph smoke uses a testbench DMA shim. The CSV
 records the measured endpoints so results are not conflated.
 
-The NMAForge run is on research branch `feat/tinynpu-model-inference`, source
-SHA `110e0c9db49eb1a7a558c955347accfde87f963e`; Matrix product RTL is identical
+The NMAForge run is on research branch `feat/shape-adaptive-gemv-v2`, source
+SHA `0c525bcf8fbdd957396cc98fb314ec56c7888a18`; Matrix product RTL is identical
 to the audited candidate `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`. TinyNPU is
 pinned to `harishsg993010/tiny-NPU`
 [`8216c22b762011aa20c05fc2768423fd12dda59d`](https://github.com/harishsg993010/tiny-NPU/tree/8216c22b762011aa20c05fc2768423fd12dda59d).
-Tools: VCS `V-2023.12-SP1_Full64`, Verilator `5.052` (2026-09-05), Python
-3.11.13, NumPy 2.1.3, ONNX 1.17.0. TinyNPU is built from its unmodified pinned
+Tools: VCS `V-2023.12-SP1_Full64`, Verilator `5.052` (2026-09-05, source tag
+`v5.052`, revision `ea338be98e1e838d3518809ce8899f85a009963c`), Python
+3.12.13, NumPy 2.1.3, ONNX 1.17.0. TinyNPU is built from its unmodified pinned
 RTL; the local Verilator invocation disables an upstream `SYNCASYNCNET`
 warning that otherwise stops the build under `-Wall` and uses
 `-Wno-fatal`. This is simulation compatibility only.
 
-Run ID: `TINY-COMPARE-20261029-110e0c9-S20261029`, seed `20261029`. The reproducible
+Run ID: `TINY-COMPARE-20261029-S20261029`, seed `20261029`. The reproducible
 entry point is `make benchmark-tinynpu`; instructions are in the
 [harness README](../../benchmark/tinynpu/README.md). The committed
 [GEMM CSV](../../benchmark/tinynpu/gemm_results.csv) includes the current
