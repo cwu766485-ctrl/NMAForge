@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 45309)
-Total output lines: 3845
-
 `timescale 1ns / 1ps
 
 module tb_ai_accel_smoke;
@@ -1390,7 +1387,1256 @@ module tb_ai_accel_smoke;
             for (image_index = 0; image_index < image_count; image_index = image_index + 1) begin
                 if (ai_digits_image_words[1 + 2 * image_index] >= SPAD_BYTES ||
                     ai_digits_image_words[1 + 2 * image_index][1:0] != 2'b00) begin
-                    $display("ERROR: digits image has invalid SPA…15309 tokens truncated…write back-pressure.
+                    $display("ERROR: digits image has invalid SPAD offset index=%0d addr=%08h",
+                             image_index, ai_digits_image_words[1 + 2 * image_index]);
+                    errors = errors + 1;
+                end else begin
+                    axi_write(SPAD_BASE + ai_digits_image_words[1 + 2 * image_index],
+                              ai_digits_image_words[2 + 2 * image_index]);
+                end
+            end
+            $display("DIGITS_LOAD_DONE spad_words=%0d", image_count);
+
+            // Prove the output region starts with the poison pattern loaded by
+            // the host image. The only writer after this point is the DUT.
+            axi_read(SPAD_BASE + AI_DIGITS_OUTPUT_BASE, read_value);
+            if (read_value !== 32'ha55a_a55a) begin
+                $display("ERROR: digits output was not poison before dispatch: %08h", read_value);
+                errors = errors + 1;
+            end
+
+            axi_write(REG_CMDQ_CTRL, 32'd0);
+            axi_write(REG_CMDQ_BASE_LO, AI_DIGITS_DESC_BASE);
+            axi_write(REG_CMDQ_SIZE, 32'd128);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            for (sfu_batch_index = 0; sfu_batch_index < 23; sfu_batch_index = sfu_batch_index + 1)
+                ai_digits_sfu_writes_by_batch[sfu_batch_index] = 0;
+            axi_write(REG_CMDQ_TAIL, AI_DIGITS_DESC_COUNT);
+            axi_write(REG_CPLQ_BASE_LO, AI_DIGITS_CPL_BASE);
+            axi_write(REG_CPLQ_SIZE, 32'd128);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+
+            ai_digits_cycles = 0;
+            ai_digits_layout_cycles = 0;
+            ai_digits_layout_bytes = 0;
+            ai_digits_measure = 1'b1;
+            ai_digits_layout_measure = 1'b1;
+            axi_write(REG_DOORBELL, 32'd1);
+            completed = 1'b0;
+            for (poll_index = 0; poll_index < 20000 && !completed; poll_index = poll_index + 1) begin
+                repeat (32) @(posedge aclk);
+                axi_read(REG_CPLQ_TAIL, cpl_tail);
+                if (cpl_tail == AI_DIGITS_DESC_COUNT)
+                    completed = 1'b1;
+            end
+            ai_digits_measure = 1'b0;
+            ai_digits_layout_measure = 1'b0;
+            if (!completed) begin
+                $display("ERROR: digits inference completion timeout tail=%0d", cpl_tail);
+                errors = errors + 1;
+            end
+            axi_read(REG_CMDQ_HEAD, cmd_head);
+            if (cmd_head !== AI_DIGITS_DESC_COUNT) begin
+                $display("ERROR: digits CMDQ head=%0d expected=%0d", cmd_head,
+                         AI_DIGITS_DESC_COUNT);
+                errors = errors + 1;
+            end
+
+            // The complete workload runs from the real CMDQ. The SFU performs
+            // the hidden activation's Matrix-A tile reorder in hardware.
+            for (completion_index = 0; completion_index < AI_DIGITS_DESC_COUNT;
+                 completion_index = completion_index + 1) begin
+                axi_read(SPAD_BASE + AI_DIGITS_CPL_BASE + completion_index * 16,
+                         read_value);
+                if (read_value !== (32'h0000_d000 + completion_index)) begin
+                    $display("ERROR: digits CPLQ[%0d] task id=%08h", completion_index,
+                             read_value);
+                    errors = errors + 1;
+                end
+                axi_read(SPAD_BASE + AI_DIGITS_CPL_BASE + completion_index * 16 + 4,
+                         read_value);
+                if (read_value !== 32'h0000_0001) begin
+                    $display("ERROR: digits CPLQ[%0d] status/error=%08h", completion_index,
+                             read_value);
+                    errors = errors + 1;
+                end
+            end
+
+            for (sfu_batch_index = 0; sfu_batch_index < 23; sfu_batch_index = sfu_batch_index + 1) begin
+                if (ai_digits_sfu_writes_by_batch[sfu_batch_index] != 256) begin
+                    $display("ERROR: digits SFU packed writes batch=%0d got=%0d expected=256",
+                             sfu_batch_index,
+                             ai_digits_sfu_writes_by_batch[sfu_batch_index]);
+                    errors = errors + 1;
+                end
+            end
+
+            for (hidden_index = 0; hidden_index < AI_DIGITS_HIDDEN_WORDS;
+                 hidden_index = hidden_index + 1) begin
+                axi_read(SPAD_BASE + AI_DIGITS_HIDDEN_I8_TILE_BASE + hidden_index * 4,
+                         read_value);
+                if (read_value !== ai_digits_hidden_words[1 + hidden_index]) begin
+                    if (errors < 20)
+                        $display("ERROR: digits tile hidden word[%0d] rtl=%08h golden=%08h",
+                                 hidden_index, read_value,
+                                 ai_digits_hidden_words[1 + hidden_index]);
+                    errors = errors + 1;
+                end
+            end
+
+            csv_fd = $fopen(rtl_csv_file, "w");
+            if (csv_fd == 0)
+                $fatal(1, "cannot open digits RTL CSV %0s", rtl_csv_file);
+            expected_index = 1;
+            correct_samples = 0;
+            for (sample_index = 0; sample_index < AI_DIGITS_TEST_SAMPLES; sample_index = sample_index + 1) begin
+                sample_label = ai_digits_expected_words[expected_index];
+                expected_index = expected_index + 1;
+                best_logit = -32'sh8000_0000;
+                prediction = 0;
+                for (class_index = 0; class_index < 12; class_index = class_index + 1) begin
+                    axi_read(SPAD_BASE + AI_DIGITS_OUTPUT_BASE +
+                             ((sample_index * 16 + class_index) * 4), read_value);
+                    if (class_index < 12) begin
+                        if (read_value !== ai_digits_expected_words[expected_index]) begin
+                            if (errors < 20)
+                                $display("ERROR: digits logit sample=%0d class=%0d rtl=%08h golden=%08h",
+                                         sample_index, class_index, read_value,
+                                         ai_digits_expected_words[expected_index]);
+                            errors = errors + 1;
+                        end
+                        if (class_index == 0)
+                            $fwrite(csv_fd, "%0d", $signed(read_value));
+                        else
+                            $fwrite(csv_fd, ",%0d", $signed(read_value));
+                        expected_index = expected_index + 1;
+                    end else if (read_value !== 32'd0) begin
+                        if (errors < 20)
+                            $display("ERROR: digits padded logit sample=%0d class=%0d rtl=%08h expected=00000000",
+                                     sample_index, class_index, read_value);
+                        errors = errors + 1;
+                    end
+                    if (class_index < 10 && $signed(read_value) > best_logit) begin
+                        best_logit = $signed(read_value);
+                        prediction = class_index;
+                    end
+                end
+                $fwrite(csv_fd, "\n");
+                if (prediction == sample_label)
+                    correct_samples = correct_samples + 1;
+            end
+            $fclose(csv_fd);
+            if (expected_index != expected_count * 13 + 1) begin
+                $display("ERROR: digits expected vector consumption=%0d count=%0d",
+                         expected_index, expected_count);
+                errors = errors + 1;
+            end
+
+            mac_count = 23.0 * ((16.0 * 64.0 * 64.0) + (16.0 * 64.0 * 16.0));
+            if (ai_digits_cycles == 0)
+                mac_per_cycle = 0.0;
+            else
+                mac_per_cycle = mac_count / ai_digits_cycles;
+            array_utilization = mac_per_cycle / 256.0;
+            $display("DIGITS_RTL_METRICS samples=%0d correct=%0d descriptors=%0d cycles=%0d host_layout_cycles=0 host_layout_bytes=0 rtl_layout_cycles=%0d rtl_layout_bytes=%0d mac=%0.0f mac_per_cycle=%0.4f array_utilization=%0.2f%% spad_initialization_bytes=%0d",
+                     AI_DIGITS_TEST_SAMPLES, correct_samples, AI_DIGITS_DESC_COUNT,
+                     ai_digits_cycles, ai_digits_layout_cycles, ai_digits_layout_bytes,
+                     mac_count, mac_per_cycle,
+                     array_utilization * 100.0, image_count * 4);
+            if (errors == 0)
+                $display("DIGITS_INFERENCE_PASS model=sklearn_digits_int8 rtl=top_spad_cmdq_cplq accuracy=%0.2f%%",
+                         (100.0 * correct_samples) / AI_DIGITS_TEST_SAMPLES);
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+        end
+    endtask
+
+    task run_tinynpu_cnn_match;
+        reg [1023:0] image_file;
+        reg [1023:0] expected_file;
+        integer image_count;
+        integer expected_count;
+        integer image_index;
+        integer expected_index;
+        integer expected_length;
+        integer poll_index;
+        integer completion_index;
+        integer row_index;
+        integer feature_group;
+        integer descriptor_index;
+        reg completed;
+        reg [31:0] read_value;
+        reg [31:0] cpl_tail;
+        reg [31:0] cmd_head;
+        begin
+            if (!$value$plusargs("AI_TINYNPU_CNN_MEMORY=%s", image_file) ||
+                !$value$plusargs("AI_TINYNPU_CNN_EXPECTED=%s", expected_file))
+                $fatal(1, "TINYNPU_CNN_MATCH requires memory and expected paths");
+            $readmemh(image_file, ai_tinynpu_cnn_image_words);
+            $readmemh(expected_file, ai_tinynpu_cnn_expected_words);
+            image_count = ai_tinynpu_cnn_image_words[0];
+            expected_count = ai_tinynpu_cnn_expected_words[0];
+            if (image_count <= 0 || image_count > 4095 || expected_count != 400)
+                $fatal(1, "TinyNPU CNN input sizes invalid image=%0d expected=%0d",
+                       image_count, expected_count);
+
+            for (image_index = 0; image_index < image_count; image_index = image_index + 1) begin
+                if (ai_tinynpu_cnn_image_words[1 + image_index * 2] >= SPAD_BYTES ||
+                    ai_tinynpu_cnn_image_words[1 + image_index * 2][1:0] != 2'b00)
+                    $fatal(1, "TinyNPU CNN bad SPAD image address index=%0d", image_index);
+                axi_write(SPAD_BASE + ai_tinynpu_cnn_image_words[1 + image_index * 2],
+                          ai_tinynpu_cnn_image_words[2 + image_index * 2]);
+            end
+
+            axi_read(SPAD_BASE + AI_TINYNPU_CNN_FINAL_I8_BASE, read_value);
+            if (read_value !== 32'ha55a_a55a)
+                $fatal(1, "TinyNPU CNN final output was not poisoned: %08h", read_value);
+
+            for (descriptor_index = 0; descriptor_index < 8;
+                 descriptor_index = descriptor_index + 1) begin
+                case (descriptor_index)
+                    0: write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE, OP_TENSOR_GEMM,
+                           16'hd500, AI_TINYNPU_CNN_IM2COL_BASE, 32'h0001_1000,
+                           32'h0001_1100, AI_TINYNPU_CNN_CONV_RAW_BASE,
+                           16'd36, 16'd4, 16'd3, 8'h01, 32'd0, 5'd4, 2'd0,
+                           32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd0, 16'd1, 16'd0);
+                    1: write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h40,
+                           OP_REQUANT_I8, 16'hd501, AI_TINYNPU_CNN_CONV_RAW_BASE,
+                           32'd0, 32'd0, AI_TINYNPU_CNN_CONV_I8_BASE,
+                           16'd0, 16'd0, 16'd144, 8'h10, 32'd0, 5'd0, 2'd0,
+                           32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd1, 16'd2, 16'd1);
+                    2: write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h80,
+                           OP_TENSOR_GEMM, 16'hd502, AI_TINYNPU_CNN_CONV_I8_BASE,
+                           32'h0001_4000, 32'h0001_4100,
+                           AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE,
+                           16'd36, 16'd4, 16'd1, 8'h01, 32'd0, 5'd0, 2'd1,
+                           32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd2, 16'd4, 16'd2);
+                    3: write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'hc0,
+                           OP_REQUANT_I8, 16'hd503,
+                           AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE,
+                           32'd0, 32'd0, AI_TINYNPU_CNN_CONV_RELU_I8_BASE,
+                           16'd0, 16'd0, 16'd144, 8'h10, 32'd0, 5'd0, 2'd0,
+                           32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd4, 16'd8, 16'd4);
+                    4: write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h100,
+                           OP_TENSOR_GEMM, 16'hd504, AI_TINYNPU_CNN_FC_A_BASE,
+                           32'h0001_9000, 32'h0001_a000, AI_TINYNPU_CNN_FC_RAW_BASE,
+                           16'd4, 16'd4, 16'd36, 8'h01, 32'd0, 5'd8, 2'd0,
+                           32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd8, 16'd16, 16'd8);
+                    5: write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h140,
+                           OP_REQUANT_I8, 16'hd505, AI_TINYNPU_CNN_FC_RAW_BASE,
+                           32'd0, 32'd0, AI_TINYNPU_CNN_FC_I8_BASE,
+                           16'd0, 16'd0, 16'd16, 8'h10, 32'd0, 5'd0, 2'd0,
+                           32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd16, 16'd32, 16'd16);
+                    6: write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h180,
+                           OP_TENSOR_GEMM, 16'hd506, AI_TINYNPU_CNN_FC_I8_BASE,
+                           32'h0001_4000, 32'h0001_c100,
+                           AI_TINYNPU_CNN_FC_BIASED_BASE,
+                           16'd4, 16'd4, 16'd1, 8'h01, 32'd0, 5'd0, 2'd0,
+                           32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd32, 16'd64, 16'd32);
+                    default: write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h1c0,
+                           OP_REQUANT_I8, 16'hd507, AI_TINYNPU_CNN_FC_BIASED_BASE,
+                           32'd0, 32'd0, AI_TINYNPU_CNN_FINAL_I8_BASE,
+                           16'd0, 16'd0, 16'd16, 8'h10, 32'd0, 5'd0, 2'd0,
+                           32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd64, 16'd128, 16'd64);
+                endcase
+            end
+
+            axi_write(REG_CMDQ_CTRL, 32'd0);
+            axi_write(REG_CMDQ_BASE_LO, AI_TINYNPU_CNN_DESC_BASE);
+            axi_write(REG_CMDQ_SIZE, 32'd16);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd0);
+            axi_write(REG_CPLQ_BASE_LO, AI_TINYNPU_CNN_CPL_BASE);
+            axi_write(REG_CPLQ_SIZE, 32'd16);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+            ai_tinynpu_cnn_cycles = 0;
+            ai_tinynpu_cnn_layout_cycles = 0;
+            ai_tinynpu_cnn_engine_read_words = 0;
+            ai_tinynpu_cnn_engine_write_words = 0;
+            ai_tinynpu_cnn_banked_read_lines = 0;
+            ai_tinynpu_cnn_line_write_lines = 0;
+            ai_tinynpu_cnn_measure = 1'b1;
+            axi_write(REG_CMDQ_TAIL, 32'd4);
+            axi_write(REG_DOORBELL, 32'd1);
+            completed = 1'b0;
+            for (poll_index = 0; poll_index < 10000 && !completed;
+                 poll_index = poll_index + 1) begin
+                repeat (32) @(posedge aclk);
+                axi_read(REG_CPLQ_TAIL, cpl_tail);
+                if (cpl_tail == 32'd4)
+                    completed = 1'b1;
+            end
+            ai_tinynpu_cnn_measure = 1'b0;
+            if (!completed)
+                $fatal(1, "TinyNPU CNN phase 1 completion timeout tail=%0d", cpl_tail);
+
+            // This is only a layout conversion of actual RTL-produced INT8
+            // values. No convolution, activation, or GEMM is computed here.
+            ai_tinynpu_cnn_layout_measure = 1'b1;
+            for (feature_group = 0; feature_group < 36; feature_group = feature_group + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_RELU_I8_BASE +
+                         feature_group * 4, read_value);
+                for (row_index = 0; row_index < 4; row_index = row_index + 1) begin
+                    if (row_index == 0)
+                        axi_write(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE +
+                                  (feature_group * 4 + row_index) * 4,
+                                  read_value);
+                    else
+                        axi_write(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE +
+                                  (feature_group * 4 + row_index) * 4, 32'd0);
+                end
+            end
+            ai_tinynpu_cnn_layout_measure = 1'b0;
+
+            ai_tinynpu_cnn_measure = 1'b1;
+            axi_write(REG_CMDQ_TAIL, 32'd8);
+            axi_write(REG_DOORBELL, 32'd1);
+            completed = 1'b0;
+            for (poll_index = 0; poll_index < 10000 && !completed;
+                 poll_index = poll_index + 1) begin
+                repeat (32) @(posedge aclk);
+                axi_read(REG_CPLQ_TAIL, cpl_tail);
+                if (cpl_tail == 32'd8)
+                    completed = 1'b1;
+            end
+            ai_tinynpu_cnn_measure = 1'b0;
+            if (!completed)
+                $fatal(1, "TinyNPU CNN phase 2 completion timeout tail=%0d", cpl_tail);
+            axi_read(REG_CMDQ_HEAD, cmd_head);
+            if (cmd_head !== 32'd8)
+                $fatal(1, "TinyNPU CNN CMDQ head=%0d expected=8", cmd_head);
+
+            for (completion_index = 0; completion_index < 8;
+                 completion_index = completion_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CPL_BASE + completion_index * 16,
+                         read_value);
+                if (read_value !== (32'h0000_d500 + completion_index))
+                    $fatal(1, "TinyNPU CNN CPLQ[%0d] task id=%08h",
+                           completion_index, read_value);
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CPL_BASE + completion_index * 16 + 4,
+                         read_value);
+                if (read_value !== 32'd1)
+                    $fatal(1, "TinyNPU CNN CPLQ[%0d] status=%08h",
+                           completion_index, read_value);
+            end
+
+            expected_index = 1;
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 144) $fatal(1, "bad conv rounded Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_RAW_BASE + row_index * 4, read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv rounded output[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 36) $fatal(1, "bad conv INT8 Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_I8_BASE + row_index * 4, read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv INT8 packed[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 144) $fatal(1, "bad conv bias/ReLU Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv bias/ReLU output[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 36) $fatal(1, "bad conv ReLU packed Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_RELU_I8_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv ReLU packed[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 16) $fatal(1, "bad FC rounded Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_RAW_BASE + row_index * 4, read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN FC rounded output[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 4) $fatal(1, "bad FC INT8 Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_I8_BASE + row_index * 4, read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN FC INT8 packed[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 16) $fatal(1, "bad FC bias Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_BIASED_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN FC biased output[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 4) $fatal(1, "bad final CNN Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FINAL_I8_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN final packed output[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            if (expected_index != expected_count + 9)
+                $fatal(1, "TinyNPU CNN Golden words consumed=%0d expected=%0d",
+                       expected_index - 1, expected_count + 8);
+
+            $display("NMA_CNN_RTL_METRICS outputs=4 descriptors=8 cycles=%0d host_layout_cycles=%0d host_layout_read_bytes=144 host_layout_write_bytes=576 compute_spad_read_bytes=%0d compute_spad_write_bytes=%0d bank_read_lines=%0d line_write_lines=%0d model_macs=1872 spad_initialization_bytes=%0d",
+                     ai_tinynpu_cnn_cycles, ai_tinynpu_cnn_layout_cycles,
+                     ai_tinynpu_cnn_engine_read_words * 4 + ai_tinynpu_cnn_banked_read_lines * 16,
+                     ai_tinynpu_cnn_engine_write_words * 4 + ai_tinynpu_cnn_line_write_lines * 16,
+                     ai_tinynpu_cnn_banked_read_lines, ai_tinynpu_cnn_line_write_lines,
+                     image_count * 4);
+            $display("NMA_CNN_INFERENCE_PASS model=TinyNPU_conv1x_mini outputs=4 golden=byte_exact");
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+        end
+    endtask
+
+    `include "ai_transformer_workload.svh"
+
+    function signed [31:0] dot4_i8_sv;
+        input [31:0] a;
+        input [31:0] b;
+        reg signed [7:0] a0;
+        reg signed [7:0] a1;
+        reg signed [7:0] a2;
+        reg signed [7:0] a3;
+        reg signed [7:0] b0;
+        reg signed [7:0] b1;
+        reg signed [7:0] b2;
+        reg signed [7:0] b3;
+        begin
+            a0 = a[7:0];
+            a1 = a[15:8];
+            a2 = a[23:16];
+            a3 = a[31:24];
+            b0 = b[7:0];
+            b1 = b[15:8];
+            b2 = b[23:16];
+            b3 = b[31:24];
+            dot4_i8_sv = (a0 * b0) + (a1 * b1) + (a2 * b2) + (a3 * b3);
+        end
+    endfunction
+
+    task gen_random_word;
+        output [31:0] word_data;
+        begin
+            word_data[7:0]   = $urandom_range(0, 15) - 8;
+            word_data[15:8]  = $urandom_range(0, 15) - 8;
+            word_data[23:16] = $urandom_range(0, 15) - 8;
+            word_data[31:24] = $urandom_range(0, 15) - 8;
+        end
+    endtask
+
+    task run_random_gemv;
+        input integer case_idx;
+        integer m;
+        integer k_words_i;
+        integer row;
+        integer k;
+        reg [31:0] input_word [0:3];
+        reg [31:0] weight_word [0:15];
+        reg signed [31:0] expected;
+        reg [31:0] base_input;
+        reg [31:0] base_weight;
+        reg [31:0] base_output;
+        begin
+            m = $urandom_range(1, 4);
+            k_words_i = $urandom_range(1, 3);
+            base_input  = 32'h1000 + (case_idx * 32'h400);
+            base_weight = base_input + 32'h80;
+            base_output = base_input + 32'h200;
+
+            for (k = 0; k < k_words_i; k = k + 1) begin
+                gen_random_word(input_word[k]);
+                axi_write_delayed(SPAD_BASE + base_input + (k * 4), input_word[k],
+                                  $urandom_range(0, 2), $urandom_range(0, 2), $urandom_range(0, 2));
+            end
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (k = 0; k < k_words_i; k = k + 1) begin
+                    gen_random_word(weight_word[(row * k_words_i) + k]);
+                    axi_write_delayed(SPAD_BASE + base_weight + (((row * k_words_i) + k) * 4),
+                                      weight_word[(row * k_words_i) + k],
+                                      $urandom_range(0, 2), $urandom_range(0, 2), $urandom_range(0, 2));
+                end
+            end
+
+            axi_write(REG_OP_MODE, OP_GEMV_INT8);
+            axi_write(REG_SRC0_BASE, base_input);
+            axi_write(REG_SRC1_BASE, base_weight);
+            axi_write(REG_DST_BASE,  base_output);
+            axi_write(REG_M_SIZE,    m);
+            axi_write(REG_K_WORDS,   k_words_i);
+            axi_write(REG_POST_CTRL, 32'd0);
+            axi_write(REG_QUANT_ACT, 32'd0);
+            axi_write(REG_CTRL,      32'h0000_0003);
+            wait_done();
+
+            for (row = 0; row < m; row = row + 1) begin
+                expected = 0;
+                for (k = 0; k < k_words_i; k = k + 1)
+                    expected = expected + dot4_i8_sv(input_word[k], weight_word[(row * k_words_i) + k]);
+                expect_read(SPAD_BASE + base_output + (row * 4), expected, "random gemv");
+            end
+            clear_done_irq();
+        end
+    endtask
+
+    task run_random_gemm;
+        input integer case_idx;
+        integer m;
+        integer n;
+        integer k_words_i;
+        integer row;
+        integer col;
+        integer k;
+        reg [31:0] a_word [0:15];
+        reg [31:0] b_word [0:15];
+        reg signed [31:0] expected;
+        reg [31:0] base_a;
+        reg [31:0] base_b;
+        reg [31:0] base_out;
+        begin
+            m = $urandom_range(1, 3);
+            n = $urandom_range(1, 3);
+            k_words_i = $urandom_range(1, 2);
+            base_a   = 32'h3000 + (case_idx * 32'h500);
+            base_b   = base_a + 32'h100;
+            base_out = base_a + 32'h300;
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (k = 0; k < k_words_i; k = k + 1) begin
+                    gen_random_word(a_word[(row * k_words_i) + k]);
+                    axi_write_delayed(SPAD_BASE + base_a + (((row * k_words_i) + k) * 4),
+                                      a_word[(row * k_words_i) + k],
+                                      $urandom_range(0, 2), $urandom_range(0, 2), $urandom_range(0, 2));
+                end
+            end
+
+            for (col = 0; col < n; col = col + 1) begin
+                for (k = 0; k < k_words_i; k = k + 1) begin
+                    gen_random_word(b_word[(col * k_words_i) + k]);
+                    axi_write_delayed(SPAD_BASE + base_b + (((col * k_words_i) + k) * 4),
+                                      b_word[(col * k_words_i) + k],
+                                      $urandom_range(0, 2), $urandom_range(0, 2), $urandom_range(0, 2));
+                end
+            end
+
+            axi_write(REG_OP_MODE, OP_GEMM_INT8_TILE);
+            axi_write(REG_SRC0_BASE, base_a);
+            axi_write(REG_SRC1_BASE, base_b);
+            axi_write(REG_DST_BASE,  base_out);
+            axi_write(REG_M_SIZE,    m);
+            axi_write(REG_N_SIZE,    n);
+            axi_write(REG_K_WORDS,   k_words_i);
+            axi_write(REG_POST_CTRL, 32'd0);
+            axi_write(REG_QUANT_ACT, 32'd0);
+            axi_write(REG_CTRL,      32'h0000_0003);
+            wait_done();
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (col = 0; col < n; col = col + 1) begin
+                    expected = 0;
+                    for (k = 0; k < k_words_i; k = k + 1)
+                        expected = expected + dot4_i8_sv(a_word[(row * k_words_i) + k],
+                                                         b_word[(col * k_words_i) + k]);
+                    expect_read(SPAD_BASE + base_out + (((row * n) + col) * 4), expected, "random gemm");
+                end
+            end
+            clear_done_irq();
+        end
+    endtask
+
+    function automatic [31:0] model_postprocess;
+        input signed [63:0] accumulator;
+        input [4:0] shift;
+        input [1:0] activation;
+        reg signed [63:0] value;
+        begin
+            value = accumulator >>> shift;
+            if ((activation == 2'd1) || (activation == 2'd2)) begin
+                if (value < 0)
+                    value = 0;
+            end
+            if ((activation == 2'd2) && (value > 64'sd6))
+                value = 64'sd6;
+            if (value > 64'sd2147483647)
+                model_postprocess = 32'h7fff_ffff;
+            else if (value < -64'sd2147483648)
+                model_postprocess = 32'h8000_0000;
+            else
+                model_postprocess = value[31:0];
+        end
+    endfunction
+
+    task gen_random_3x3_word;
+        input integer word_index;
+        output [31:0] word_data;
+        begin
+            gen_random_word(word_data);
+            // A 3x3 kernel has nine valid lanes; lanes 9..11 are padding.
+            if (word_index == 2)
+                word_data[31:8] = 24'd0;
+        end
+    endtask
+
+    task run_random_conv3x3;
+        input integer case_idx;
+        integer m;
+        integer n;
+        integer row;
+        integer col;
+        integer k;
+        integer activation_i;
+        integer shift_i;
+        integer bias_enable_i;
+        reg [31:0] patch_word [0:5];
+        reg [31:0] weight_word [0:8];
+        reg signed [31:0] bias_word [0:2];
+        reg signed [63:0] accumulator;
+        reg [31:0] expected;
+        reg [31:0] base_patch;
+        reg [31:0] base_weight;
+        reg [31:0] base_bias;
+        reg [31:0] base_output;
+        begin
+            m = $urandom_range(1, 2);
+            n = $urandom_range(1, 3);
+            activation_i = case_idx % 3;
+            shift_i = case_idx % 4;
+            bias_enable_i = case_idx % 2;
+            base_patch  = 32'h0000_a000;
+            base_weight = 32'h0000_a100;
+            base_bias   = 32'h0000_a200;
+            base_output = 32'h0000_a300;
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (k = 0; k < 3; k = k + 1) begin
+                    gen_random_3x3_word(k, patch_word[(row * 3) + k]);
+                    axi_write_delayed(SPAD_BASE + base_patch + (((row * 3) + k) * 4),
+                                      patch_word[(row * 3) + k],
+                                      $urandom_range(0, 2), $urandom_range(0, 2),
+                                      $urandom_range(0, 2));
+                end
+            end
+            for (col = 0; col < n; col = col + 1) begin
+                for (k = 0; k < 3; k = k + 1) begin
+                    gen_random_3x3_word(k, weight_word[(col * 3) + k]);
+                    axi_write_delayed(SPAD_BASE + base_weight + (((col * 3) + k) * 4),
+                                      weight_word[(col * 3) + k],
+                                      $urandom_range(0, 2), $urandom_range(0, 2),
+                                      $urandom_range(0, 2));
+                end
+                bias_word[col] = $urandom_range(0, 127) - 64;
+                axi_write(SPAD_BASE + base_bias + (col * 4), bias_word[col]);
+            end
+
+            axi_write(REG_OP_MODE, OP_CONV3X3_INT8);
+            axi_write(REG_SRC0_BASE, base_patch);
+            axi_write(REG_SRC1_BASE, base_weight);
+            axi_write(REG_DST_BASE, base_output);
+            axi_write(REG_M_SIZE, m);
+            axi_write(REG_N_SIZE, n);
+            axi_write(REG_K_WORDS, 32'd3);
+            axi_write(REG_BIAS_BASE, base_bias);
+            axi_write(REG_POST_CTRL, bias_enable_i);
+            axi_write(REG_QUANT_ACT, (activation_i << 5) | shift_i);
+            axi_write(REG_CTRL, 32'h0000_0003);
+            wait_done();
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (col = 0; col < n; col = col + 1) begin
+                    accumulator = bias_enable_i ? bias_word[col] : 0;
+                    for (k = 0; k < 3; k = k + 1)
+                        accumulator = accumulator +
+                            dot4_i8_sv(patch_word[(row * 3) + k],
+                                      weight_word[(col * 3) + k]);
+                    expected = model_postprocess(accumulator, shift_i[4:0],
+                                                 activation_i[1:0]);
+                    expect_read(SPAD_BASE + base_output + (((row * n) + col) * 4),
+                                expected, "random conv3x3 post-op");
+                end
+            end
+            clear_done_irq();
+        end
+    endtask
+
+    task run_random_dwconv3x3;
+        input integer case_idx;
+        integer m;
+        integer n;
+        integer row;
+        integer col;
+        integer k;
+        integer activation_i;
+        integer shift_i;
+        integer bias_enable_i;
+        reg [31:0] patch_word [0:17];
+        reg [31:0] weight_word [0:8];
+        reg signed [31:0] bias_word [0:2];
+        reg signed [63:0] accumulator;
+        reg [31:0] expected;
+        reg [31:0] base_patch;
+        reg [31:0] base_weight;
+        reg [31:0] base_bias;
+        reg [31:0] base_output;
+        begin
+            m = $urandom_range(1, 2);
+            n = $urandom_range(1, 3);
+            activation_i = (case_idx + 1) % 3;
+            shift_i = (case_idx + 2) % 4;
+            bias_enable_i = (case_idx + 1) % 2;
+            base_patch  = 32'h0000_b000;
+            base_weight = 32'h0000_b100;
+            base_bias   = 32'h0000_b200;
+            base_output = 32'h0000_b300;
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (col = 0; col < n; col = col + 1) begin
+                    for (k = 0; k < 3; k = k + 1) begin
+                        gen_random_3x3_word(k,
+                            patch_word[(((row * n) + col) * 3) + k]);
+                        axi_write_delayed(
+                            SPAD_BASE + base_patch +
+                            (((((row * n) + col) * 3) + k) * 4),
+                            patch_word[(((row * n) + col) * 3) + k],
+                            $urandom_range(0, 2), $urandom_range(0, 2),
+                            $urandom_range(0, 2));
+                    end
+                end
+            end
+            for (col = 0; col < n; col = col + 1) begin
+                for (k = 0; k < 3; k = k + 1) begin
+                    gen_random_3x3_word(k, weight_word[(col * 3) + k]);
+                    axi_write_delayed(SPAD_BASE + base_weight + (((col * 3) + k) * 4),
+                                      weight_word[(col * 3) + k],
+                                      $urandom_range(0, 2), $urandom_range(0, 2),
+                                      $urandom_range(0, 2));
+                end
+                bias_word[col] = $urandom_range(0, 127) - 64;
+                axi_write(SPAD_BASE + base_bias + (col * 4), bias_word[col]);
+            end
+
+            axi_write(REG_OP_MODE, OP_DWCONV3X3_INT8);
+            axi_write(REG_SRC0_BASE, base_patch);
+            axi_write(REG_SRC1_BASE, base_weight);
+            axi_write(REG_DST_BASE, base_output);
+            axi_write(REG_M_SIZE, m);
+            axi_write(REG_N_SIZE, n);
+            axi_write(REG_K_WORDS, 32'd3);
+            axi_write(REG_BIAS_BASE, base_bias);
+            axi_write(REG_POST_CTRL, bias_enable_i);
+            axi_write(REG_QUANT_ACT, (activation_i << 5) | shift_i);
+            axi_write(REG_CTRL, 32'h0000_0003);
+            wait_done();
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (col = 0; col < n; col = col + 1) begin
+                    accumulator = bias_enable_i ? bias_word[col] : 0;
+                    for (k = 0; k < 3; k = k + 1)
+                        accumulator = accumulator + dot4_i8_sv(
+                            patch_word[(((row * n) + col) * 3) + k],
+                            weight_word[(col * 3) + k]);
+                    expected = model_postprocess(accumulator, shift_i[4:0],
+                                                 activation_i[1:0]);
+                    expect_read(SPAD_BASE + base_output + (((row * n) + col) * 4),
+                                expected, "random dwconv3x3 post-op");
+                end
+            end
+            clear_done_irq();
+        end
+    endtask
+
+    initial begin
+        integer pair_engine_a;
+        integer pair_engine_b;
+        integer pair_index;
+        integer pair_setup_i;
+        errors = 0;
+        seed_arg = 20261014;
+        matrix_line_write_count = 0;
+        cp_fetch_done_count = 0;
+        last_dma_araddr = 0;
+        allow_m_axi_error = 1'b0;
+        aresetn = 1'b0;
+        axi_idle();
+        repeat (8) @(posedge aclk);
+        aresetn = 1'b1;
+        repeat (4) @(posedge aclk);
+
+        if ($test$plusargs("FP_DOT_DMA_BENCH")) begin
+            run_fp_dot_dma_benchmark();
+            if (errors != 0)
+                $fatal(1, "FP benchmark reported %0d errors", errors);
+            $finish;
+        end
+
+        if ($test$plusargs("AI_DIGITS_INFERENCE")) begin
+            run_ai_digits_inference();
+            if (errors != 0)
+                $fatal(1, "digits RTL inference reported %0d mismatches", errors);
+            $finish;
+        end
+
+        if ($test$plusargs("AI_TINYNPU_CNN_MATCH")) begin
+            run_tinynpu_cnn_match();
+            if (errors != 0)
+                $fatal(1, "TinyNPU CNN RTL match reported %0d mismatches", errors);
+            $finish;
+        end
+
+        expect_read(REG_VERSION, 32'h1000_000a, "version");
+        expect_read(FPGA_AXI_BASE + REG_VERSION, 32'h1000_000a,
+                    "mapped AXI aperture version");
+        expect_read(REG_ABI_INFO, 32'h1040_0407, "ABI v7.4 sizes");
+        expect_read(REG_CAP2, 32'h0000_00ff, "architectural capabilities");
+        expect_read(REG_ERROR_INFO, 32'h0000_0000, "reset error source");
+        axi_write(REG_DMA_EXT_HI, 32'h0000_0001);
+        expect_read(REG_DMA_EXT_HI, 32'h0000_0001, "DMA 64-bit address high");
+        axi_write(REG_DMA_EXT_HI, 32'd0);
+        axi_write(REG_CMDQ_BASE_HI, 32'h0000_0004);
+        expect_read(REG_CMDQ_BASE_HI, 32'h0000_0004,
+                    "external CMDQ 64-bit address high");
+        axi_write(REG_CMDQ_BASE_HI, 32'd0);
+        axi_write(REG_TILE_EXT_IN_HI, 32'h0000_0002);
+        axi_write(REG_TILE_EXT_OUT_HI, 32'h0000_0003);
+        expect_read(REG_TILE_EXT_IN_HI, 32'h0000_0002, "tile input high");
+        expect_read(REG_TILE_EXT_OUT_HI, 32'h0000_0003, "tile output high");
+        axi_write(REG_TILE_EXT_IN_HI, 32'd0);
+        axi_write(REG_TILE_EXT_OUT_HI, 32'd0);
+        expect_read(REG_SPAD_INFO, SPAD_BYTES, "512 KiB scratchpad capability");
+        axi_write(FPGA_AXI_BASE + SPAD_BASE + 32'h0008, 32'hface_5120);
+        expect_read(FPGA_AXI_BASE + SPAD_BASE + 32'h0008, 32'hface_5120,
+                    "mapped AXI aperture scratchpad");
+        axi_write_bready_preasserted(REG_IRQ_ENABLE, 32'd1);
+        expect_read(REG_IRQ_ENABLE, 32'd1, "preasserted-BREADY AXI write");
+        axi_write_delayed(SPAD_BASE + 32'h000c, 32'h1234_5678, 3, 0, 2);
+        expect_read(SPAD_BASE + 32'h000c, 32'h1234_5678, "split aw/w write");
+        expect_slverr_write(REG_VERSION, 32'hdead_beef);
+        axi_write(SPAD_BASE + SPAD_BYTES - 32'd4, 32'h5120_cafe);
+        expect_read(SPAD_BASE + SPAD_BYTES - 32'd4, 32'h5120_cafe,
+                    "scratchpad highest legal word");
+        expect_slverr_write(SPAD_BASE + SPAD_BYTES, 32'hdead_beef);
+        expect_slverr_read(SPAD_BASE + SPAD_BYTES);
+
+        // VDOT: [1,2,3,4] dot [5,6,7,8] = 70.
+        axi_write(SPAD_BASE + 32'h0000, 32'h0403_0201);
+        axi_write(SPAD_BASE + 32'h0100, 32'h0807_0605);
+        axi_write(REG_OP_MODE, OP_VDOT_INT8);
+        axi_write(REG_SRC0_BASE, 32'h0000);
+        axi_write(REG_SRC1_BASE, 32'h0100);
+        axi_write(REG_DST_BASE,  32'h0200);
+        axi_write(REG_LENGTH,    32'd1);
+        axi_write(REG_QUANT_ACT, 32'd0);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h0200, 32'd70, "vdot output");
+        expect_read(REG_RESULT, 32'd70, "vdot result");
+        expect_read(REG_CPLQ_TAIL, 32'd0, "direct command does not publish completion");
+        if (!irq) begin
+            $display("%0t ERROR: irq not asserted after VDOT", $time);
+            errors = errors + 1;
+        end
+        clear_done_irq();
+
+        // GEMV: two rows, one packed INT8 word per row.
+        // row0 dot input = 70, row1 dot input = 1+0-3+8 = 6.
+        axi_write(SPAD_BASE + 32'h0300, 32'h0403_0201);
+        axi_write(SPAD_BASE + 32'h0400, 32'h0807_0605);
+        axi_write(SPAD_BASE + 32'h0404, 32'h02ff_0001);
+        write_spad_desc(32'h0c00, OP_GEMV_INT8, 16'h0001, 32'h0300, 32'h0400, 32'h0500,
+                        16'd2, 16'd0, 16'd1);
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CMDQ_BASE_LO, 32'h0c00);
+        axi_write(REG_DOORBELL,  32'd1);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h0500, 32'd70, "gemv row0");
+        expect_read(SPAD_BASE + 32'h0504, 32'd6,  "gemv row1");
+        expect_read(REG_CMDQ_HEAD, 32'd1, "cmdq head");
+        expect_read(REG_CPLQ_TAIL, 32'd0, "disabled completion queue tail after gemv");
+        clear_done_irq();
+
+        // Scratchpad command queue ring: size=2, start from entry1, then wrap to entry0.
+        write_spad_desc(32'h1000, OP_VDOT_INT8, 16'h0100, 32'h0000, 32'h0100, 32'h1010,
+                        16'd0, 16'd0, 16'd1);
+        write_spad_desc(32'h1040, OP_VDOT_INT8, 16'h0101, 32'h0000, 32'h0100, 32'h1020,
+                        16'd0, 16'd0, 16'd1);
+        axi_write(REG_CMDQ_CTRL, 32'd0);
+        axi_write(REG_CMDQ_BASE_LO, 32'h1000);
+        axi_write(REG_CMDQ_SIZE, 32'd2);
+        axi_write(REG_CMDQ_HEAD, 32'd1);
+        axi_write(REG_CMDQ_TAIL, 32'd0);
+        axi_write(REG_CPLQ_BASE_LO, 32'h1100);
+        axi_write(REG_CPLQ_SIZE, 32'd2);
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        axi_write(REG_CPLQ_TAIL, 32'd0);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h1020, 32'd70, "ring entry1 vdot");
+        expect_read(REG_CMDQ_HEAD, 32'd0, "cmdq head wrap");
+        wait_cpl_tail(32'd1, "cplq tail entry1");
+        expect_completion(32'h1100, 16'h0101, 4'h1, 4'h0, 32'd70, 32'd1, "cpl entry1");
+        // Software consumes completion entry1 before hardware may write the
+        // wrapped entry0; otherwise a size-2 ring is intentionally full.
+        axi_write(REG_CPLQ_HEAD, 32'd1);
+        clear_done_irq();
+
+        // Publish descriptor entry0, then ring once for this submitted work.
+        axi_write(REG_CMDQ_TAIL, 32'd1);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h1010, 32'd70, "ring entry0 vdot");
+        expect_read(REG_CMDQ_HEAD, 32'd1, "cmdq head next");
+        wait_cpl_tail(32'd0, "cplq tail wrap");
+        expect_completion(32'h1110, 16'h0100, 4'h1, 4'h0, 32'd70, 32'd1, "cpl entry0");
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        clear_done_irq();
+
+        // Empty command queue must be observable and must not issue a fetch.
+        axi_read(REG_QUEUE_STATUS, rd);
+        if (rd[0] !== 1'b1) begin
+            $display("%0t ERROR: expected CMDQ_EMPTY in QUEUE_STATUS", $time);
+            errors = errors + 1;
+        end
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done_expect_error(ERR_CMDQ_EMPTY);
+        clear_done_irq();
+
+        // A full completion ring blocks a newly submitted command before its
+        // descriptor is fetched, preserving unread completion data.
+        axi_write(REG_CMDQ_HEAD, 32'd0);
+        axi_write(REG_CMDQ_TAIL, 32'd1);
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        axi_write(REG_CPLQ_TAIL, 32'd1);
+        axi_read(REG_QUEUE_STATUS, rd);
+        if (rd[2] !== 1'b1) begin
+            $display("%0t ERROR: expected CPLQ_FULL in QUEUE_STATUS", $time);
+            errors = errors + 1;
+        end
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done_expect_error(ERR_CPLQ_FULL);
+        clear_done_irq();
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CPLQ_SIZE, 32'd0);
+
+        // GEMM tile: M=2, N=2, K=1 packed word.
+        // A row0 [1,2,3,4], row1 [2,0,1,1]
+        // B col0 [1,1,1,1], col1 [1,-1,2,0]
+        axi_write(SPAD_BASE + 32'h0600, 32'h0403_0201);
+        axi_write(SPAD_BASE + 32'h0604, 32'h0101_0002);
+        axi_write(SPAD_BASE + 32'h0700, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0704, 32'h0002_ff01);
+        axi_write(REG_OP_MODE, OP_GEMM_INT8_TILE);
+        axi_write(REG_SRC0_BASE, 32'h0600);
+        axi_write(REG_SRC1_BASE, 32'h0700);
+        axi_write(REG_DST_BASE,  32'h0800);
+        axi_write(REG_M_SIZE,    32'd2);
+        axi_write(REG_N_SIZE,    32'd2);
+        axi_write(REG_K_WORDS,   32'd1);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h0800, 32'd10, "gemm row0 col0");
+        expect_read(SPAD_BASE + 32'h0804, 32'd5,  "gemm row0 col1");
+        expect_read(SPAD_BASE + 32'h0808, 32'd4,  "gemm row1 col0");
+        expect_read(SPAD_BASE + 32'h080c, 32'd4,  "gemm row1 col1");
+        clear_done_irq();
+
+        // NHWC 1x1 convolution: two spatial positions (M=H*W=2), four
+        // input channels (K_WORDS=1), and two output channels (N=2).  The
+        // packed input/weight layout is the same matrix data flow as GEMM.
+        axi_write(REG_OP_MODE, OP_CONV1X1_INT8);
+        axi_write(REG_SRC0_BASE, 32'h0600);
+        axi_write(REG_SRC1_BASE, 32'h0700);
+        axi_write(REG_DST_BASE,  32'h0900);
+        axi_write(REG_M_SIZE,    32'd2);
+        axi_write(REG_N_SIZE,    32'd2);
+        axi_write(REG_K_WORDS,   32'd1);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h0900, 32'd10, "conv1x1 pixel0 channel0");
+        expect_read(SPAD_BASE + 32'h0904, 32'd5,  "conv1x1 pixel0 channel1");
+        expect_read(SPAD_BASE + 32'h0908, 32'd4,  "conv1x1 pixel1 channel0");
+        expect_read(SPAD_BASE + 32'h090c, 32'd4,  "conv1x1 pixel1 channel1");
+        clear_done_irq();
+
+        // A2 CONV3x3: one im2col patch (9 valid lanes, padded to three
+        // words). Channel0 uses +1 weights and bias +5; channel1 uses -1
+        // weights and bias +40. ReLU6 clamps the results to 6 and zero.
+        axi_write(SPAD_BASE + 32'h3a00, 32'h0403_0201);
+        axi_write(SPAD_BASE + 32'h3a04, 32'h0807_0605);
+        axi_write(SPAD_BASE + 32'h3a08, 32'h0000_0009);
+        axi_write(SPAD_BASE + 32'h3b00, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3b04, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3b08, 32'h0000_0001);
+        axi_write(SPAD_BASE + 32'h3b0c, 32'hffff_ffff);
+        axi_write(SPAD_BASE + 32'h3b10, 32'hffff_ffff);
+        axi_write(SPAD_BASE + 32'h3b14, 32'h0000_00ff);
+        axi_write(SPAD_BASE + 32'h3c00, 32'd5);
+        axi_write(SPAD_BASE + 32'h3c04, 32'd40);
+        axi_write(REG_OP_MODE, OP_CONV3X3_INT8);
+        axi_write(REG_SRC0_BASE, 32'h3a00);
+        axi_write(REG_SRC1_BASE, 32'h3b00);
+        axi_write(REG_DST_BASE,  32'h3d00);
+        axi_write(REG_M_SIZE,    32'd1);
+        axi_write(REG_N_SIZE,    32'd2);
+        axi_write(REG_K_WORDS,   32'd3);
+        axi_write(REG_BIAS_BASE, 32'h3c00);
+        axi_write(REG_POST_CTRL, 32'd1);
+        axi_write(REG_QUANT_ACT, 32'h0000_0040);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h3d00, 32'd6, "conv3x3 bias relu6 ch0");
+        expect_read(SPAD_BASE + 32'h3d04, 32'd0, "conv3x3 bias relu6 ch1");
+        clear_done_irq();
+
+        // DWConv3x3 input patches are laid out per {pixel,channel}; each
+        // channel consumes only its own packed kernel vector.
+        axi_write(SPAD_BASE + 32'h3e00, 32'h0403_0201);
+        axi_write(SPAD_BASE + 32'h3e04, 32'h0807_0605);
+        axi_write(SPAD_BASE + 32'h3e08, 32'h0000_0009);
+        axi_write(SPAD_BASE + 32'h3e0c, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3e10, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3e14, 32'h0000_0002);
+        axi_write(SPAD_BASE + 32'h3b0c, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3b10, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3b14, 32'h0000_0001);
+        axi_write(REG_OP_MODE, OP_DWCONV3X3_INT8);
+        axi_write(REG_SRC0_BASE, 32'h3e00);
+        axi_write(REG_SRC1_BASE, 32'h3b00);
+        axi_write(REG_DST_BASE,  32'h3f00);
+        axi_write(REG_M_SIZE,    32'd1);
+        axi_write(REG_N_SIZE,    32'd2);
+        axi_write(REG_K_WORDS,   32'd3);
+        axi_write(REG_POST_CTRL, 32'd0);
+        axi_write(REG_PERF_CTRL, 32'd1);
+        axi_write(REG_QUANT_ACT, 32'd0);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h3f00, 32'd45, "dwconv3x3 ch0");
+        expect_read(SPAD_BASE + 32'h3f04, 32'd18, "dwconv3x3 ch1");
+        clear_done_irq();
+
+        // Bank-striped layout: one K group is 16 bytes.  The four words at
+        // offsets +0/+4/+8/+c map to bank0..bank3 and are processed in
+        // parallel by BANKED_VDOT/BANKED_GEMV.
+        axi_write(SPAD_BASE + 32'h3000, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3004, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3008, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h300c, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3100, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3104, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3108, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h310c, 32'h0101_0101);
+        axi_write(REG_OP_MODE, OP_BANKED_VDOT);
+        axi_write(REG_SRC0_BASE, 32'h3000);
+        axi_write(REG_SRC1_BASE, 32'h3100);
+        axi_write(REG_DST_BASE,  32'h3200);
+        axi_write(REG_LENGTH,    32'd1);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h3200, 32'd16, "banked vdot");
+        expect_read(REG_RESULT, 32'd16, "banked vdot result");
+        clear_done_irq();
+
+        // Exercise address bit 18 through the banked datapath.  This catches
+        // any accidental retention of the former 12-bit/64 KiB row index.
+        axi_write(SPAD_BASE + 32'h0007_ffe0, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_ffe4, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_ffe8, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_ffec, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_fff0, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_fff4, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_fff8, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_fffc, 32'h0101_0101);
+        axi_write(REG_OP_MODE, OP_BANKED_VDOT);
+        axi_write(REG_SRC0_BASE, 32'h0007_ffe0);
+        axi_write(REG_SRC1_BASE, 32'h0007_fff0);
+        axi_write(REG_DST_BASE,  32'h0000_3400);
+        axi_write(REG_LENGTH,    32'd1);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h0000_3400, 32'd16,
+                    "banked vdot at 512 KiB boundary");
+        clear_done_irq();
+
+        // Two GEMV rows share the bank-striped input; each weight row occupies
+        // LENGTH*16 bytes.  Row0 uses all ones, row1 uses all twos.
+        axi_write(SPAD_BASE + 32'h3110, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3114, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3118, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h311c, 32'h0202_0202);
+        axi_write(REG_OP_MODE, OP_BANKED_GEMV);
+        axi_write(REG_SRC0_BASE, 32'h3000);
+        axi_write(REG_SRC1_BASE, 32'h3100);
+        axi_write(REG_DST_BASE,  32'h3300);
+        axi_write(REG_LENGTH,    32'd1);
+        axi_write(REG_M_SIZE,    32'd2);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h3300, 32'd16, "banked gemv row0");
+        expect_read(SPAD_BASE + 32'h3304, 32'd32, "banked gemv row1");
+        clear_done_irq();
+
+        // CNM integration case: three K-groups use bank-distinct words.  A
+        // is +1 throughout; B group values are +1, +2 and -1, giving
+        // 16 + 32 - 16 = 32.  Unlike the focused A2.2 unit test, this runs
+        // through AXI-Lite, command processor, SPAD arbiter and writeback.
+        axi_write(SPAD_BASE + 32'h3500, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3504, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3508, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h350c, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3510, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3514, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3518, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h351c, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3520, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3524, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3528, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h352c, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3600, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3604, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3608, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h360c, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3610, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3614, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3618, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h361c, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3620, 32'hffff_ffff);
+        axi_write(SPAD_BASE + 32'h3624, 32'hffff_ffff);
+        axi_write(SPAD_BASE + 32'h3628, 32'hffff_ffff);
+        axi_write(SPAD_BASE + 32'h362c, 32'hffff_ffff);
+        axi_write(REG_OP_MODE, OP_BANKED_VDOT);
+        axi_write(REG_SRC0_BASE, 32'h3500);
+        axi_write(REG_SRC1_BASE, 32'h3600);
+        axi_write(REG_DST_BASE,  32'h3700);
+        axi_write(REG_LENGTH,    32'd3);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h3700, 32'd32, "CNM A2 multi-group vdot");
+        expect_read(REG_RESULT, 32'd32, "CNM A2 multi-group result");
+        clear_done_irq();
+
+        // DMA load external input/weight into scratchpad, compute VDOT, then DMA store result out.
+        axi_mem_u.mem[10'h100] = 32'h0403_0201;
+        axi_mem_u.mem[10'h101] = 32'h0807_0605;
+        dma_load(32'h0000_0400, 32'h2000, 16'd2);
+        expect_read(SPAD_BASE + 32'h2000, 32'h0403_0201, "dma load input");
+        expect_read(SPAD_BASE + 32'h2004, 32'h0807_0605, "dma load weight");
+        axi_write(REG_OP_MODE, OP_VDOT_INT8);
+        axi_write(REG_SRC0_BASE, 32'h2000);
+        axi_write(REG_SRC1_BASE, 32'h2004);
+        axi_write(REG_DST_BASE,  32'h2010);
+        axi_write(REG_LENGTH,    32'd1);
+        axi_write(REG_QUANT_ACT, 32'd0);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h2010, 32'd70, "dma vdot output");
+        dma_store(32'h0000_0500, 32'h2010, 16'd1);
+        if (axi_mem_u.mem[10'h140] !== 32'd70) begin
+            $display("%0t ERROR: dma store expected=%08h actual=%08h",
+                     $time, 32'd70, axi_mem_u.mem[10'h140]);
+            errors = errors + 1;
+        end else begin
+            $display("%0t PASS: dma store output = %0d/%08h", $time,
+                     axi_mem_u.mem[10'h140], axi_mem_u.mem[10'h140]);
+        end
+
+        // A2 ping-pong pipeline with an odd tile count.  This exercises both
+        // buffer contexts, context reuse, and incremental external strides.
+        axi_mem_u.mem[11'h600] = 32'h0403_0201;
+        axi_mem_u.mem[11'h601] = 32'h0202_0202;
+        axi_mem_u.mem[11'h602] = 32'h0303_0303;
+        axi_mem_u.mem[11'h680] = 32'd0;
+        axi_mem_u.mem[11'h681] = 32'd0;
+        axi_mem_u.mem[11'h682] = 32'd0;
+        axi_write(SPAD_BASE + 32'h4400, 32'h0101_0101);
+        axi_write(REG_OP_MODE, OP_VDOT_INT8);
+        axi_write(REG_SRC1_BASE, 32'h4400);
+        axi_write(REG_LENGTH, 32'd1);
+        axi_write(REG_POST_CTRL, 32'd0);
+        axi_write(REG_QUANT_ACT, 32'd0);
+        axi_write(REG_TILE_COUNT, 32'd3);
+        axi_write(REG_TILE_EXT_IN, 32'h0000_1800);
+        axi_write(REG_TILE_EXT_OUT, 32'h0000_1a00);
+        axi_write(REG_TILE_EXT_IN_STRIDE, 32'd4);
+        axi_write(REG_TILE_EXT_OUT_STRIDE, 32'd4);
+        axi_write(REG_TILE_BUF0, 32'h0000_4000);
+        axi_write(REG_TILE_BUF1, 32'h0000_4200);
+        axi_write(REG_TILE_IN_WORDS, 32'd1);
+        axi_write(REG_TILE_OUT_WORDS, 32'd1);
+        axi_write(REG_TILE_OUT_OFFSET, 32'h0000_0040);
+        axi_write(REG_TILE_CTRL, 32'd1);
+        wait_done();
+        if ((axi_mem_u.mem[11'h680] !== 32'd10) ||
+            (axi_mem_u.mem[11'h681] !== 32'd8) ||
+            (axi_mem_u.mem[11'h682] !== 32'd12)) begin
+            $display("%0t ERROR: A2 tile outputs expected=10,8,12 actual=%0d,%0d,%0d",
+                     $time, axi_mem_u.mem[11'h680], axi_mem_u.mem[11'h681],
+                     axi_mem_u.mem[11'h682]);
+            errors = errors + 1;
+        end else begin
+            $display("%0t PASS: A2 ping-pong tile outputs", $time);
+        end
+        expect_read(REG_TILE_COMPLETED, 32'd3, "A2 completed tiles");
+        axi_read(REG_PERF_TOTAL, rd);
+        if (rd == 0) begin
+            $display("%0t ERROR: A2 total cycle counter is zero", $time);
+            errors = errors + 1;
+        end
+        axi_read(REG_PERF_DMA, rd);
+        if (rd == 0) begin
+            $display("%0t ERROR: A2 DMA cycle counter is zero", $time);
+            errors = errors + 1;
+        end
+        axi_read(REG_PERF_COMPUTE, rd);
+        if (rd == 0) begin
+            $display("%0t ERROR: A2 compute cycle counter is zero", $time);
+            errors = errors + 1;
+        end
+        axi_read(REG_PERF_OVERLAP, rd);
+        if (rd == 0) begin
+            $display("%0t ERROR: A2 pipeline recorded no DMA/compute overlap", $time);
+            errors = errors + 1;
+        end else begin
+            $display("%0t PASS: A2 overlap cycles = %0d", $time, rd);
+        end
+        clear_done_irq();
+
+        // Multi-burst DMA load with random-ish write back-pressure.
         axi_mem_u.ready_gap_cfg = 1;
         begin : multi_burst_load
             integer i;
