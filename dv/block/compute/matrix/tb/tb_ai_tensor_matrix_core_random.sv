@@ -430,28 +430,29 @@ module tb_ai_tensor_matrix_core_random;
   // TinyNPU tiled-GEMM testbench. This is a benchmark-only data set, not a
   // product reference model; check_valid_case still checks the full DUT
   // output image against the independent integer GEMM accumulated below.
-  task automatic prepare_tinynpu_match_case;
-    integer rr,cc,kk,tt,ll,local_addr,local_index;
+  task automatic prepare_tinynpu_match_case(input integer m,input integer n,input integer k_size);
+    integer rr,cc,kk,tt,ll,local_addr,local_index,kw;
     integer signed value;
     begin
-      prepare_case(16,16,4,1,0,0,0,0,0,0,0);
+      kw=k_size/4;
+      prepare_case(m,n,kw,1,0,0,0,0,0,0,0);
 
-      for(rr=0;rr<16;rr=rr+1)
-        for(kk=0;kk<16;kk=kk+1) begin
+      for(rr=0;rr<m;rr=rr+1)
+        for(kk=0;kk<k_size;kk=kk+1) begin
           value=((rr*3+kk*2+1)%9)-4;
           logical_a[0][rr][kk]=value;
         end
-      for(kk=0;kk<16;kk=kk+1)
-        for(cc=0;cc<16;cc=cc+1) begin
+      for(kk=0;kk<k_size;kk=kk+1)
+        for(cc=0;cc<n;cc=cc+1) begin
           // Keep the expression identical to the TinyNPU SV testbench,
           // including SystemVerilog's signed remainder semantics.
           value=((kk*2-cc*3+5)%9)-4;
           logical_b[0][kk][cc]=value;
         end
 
-      for(tt=0;tt<4;tt=tt+1)
-        for(kk=0;kk<4;kk=kk+1) begin
-          local_addr=SRC0_BASE+(tt*4+kk)*16;
+      for(tt=0;tt<m/4;tt=tt+1)
+        for(kk=0;kk<kw;kk=kk+1) begin
+          local_addr=SRC0_BASE+(tt*kw+kk)*16;
           local_index=(local_addr>>4)&13'h1fff;
           for(rr=0;rr<4;rr=rr+1)
             bank_mem[rr][local_index]=pack4(
@@ -459,8 +460,10 @@ module tb_ai_tensor_matrix_core_random;
                 logical_a[0][tt*4+rr][kk*4+1],
                 logical_a[0][tt*4+rr][kk*4+2],
                 logical_a[0][tt*4+rr][kk*4+3]);
-
-          local_addr=SRC1_BASE+(tt*4+kk)*16;
+        end
+      for(tt=0;tt<n/4;tt=tt+1)
+        for(kk=0;kk<kw;kk=kk+1) begin
+          local_addr=SRC1_BASE+(tt*kw+kk)*16;
           local_index=(local_addr>>4)&13'h1fff;
           for(cc=0;cc<4;cc=cc+1)
             bank_mem[cc][local_index]=pack4(
@@ -470,13 +473,13 @@ module tb_ai_tensor_matrix_core_random;
                 logical_b[0][kk*4+3][tt*4+cc]);
         end
 
-      for(rr=0;rr<16;rr=rr+1)
-        for(cc=0;cc<16;cc=cc+1) begin
+      for(rr=0;rr<m;rr=rr+1)
+        for(cc=0;cc<n;cc=cc+1) begin
           accum=0;
-          for(kk=0;kk<16;kk=kk+1)
+          for(kk=0;kk<k_size;kk=kk+1)
             accum=accum+$signed(logical_a[0][rr][kk])*
                          $signed(logical_b[0][kk][cc]);
-          local_index=(DST_BASE>>2)+rr*16+cc;
+          local_index=(DST_BASE>>2)+rr*n+cc;
           expected_mem[local_index]=accum;
           output_mem[local_index]=32'hbad0_0000+local_index;
         end
@@ -612,6 +615,16 @@ module tb_ai_tensor_matrix_core_random;
                dut.perf_prefetch_a_drain_cycles,dut.perf_prefetch_b_req_cycles,
                dut.perf_prefetch_b_drain_cycles,dut.perf_prefetch_overlap_cycles,
                dut.perf_prefetch_completed,dut.perf_a_tile_cache_hits,cycle_count);
+    end
+  endtask
+
+  task automatic run_tinynpu_match_case(
+      input integer m,input integer n,input integer k_size,input integer case_id);
+    begin
+      prepare_tinynpu_match_case(m,n,k_size);
+      check_valid_case(case_id);
+      $display("MATRIX_TINY_NPU_MATCH_PASS shape=%0dx%0dx%0d physical_array=%0dx%0d bank_response_latency=1 cycle",
+               m,n,k_size,PHYSICAL_ARRAY_SIZE,PHYSICAL_ARRAY_SIZE);
     end
   endtask
 
@@ -1130,9 +1143,16 @@ module tb_ai_tensor_matrix_core_random;
     end
 
     if($test$plusargs("TINY_NPU_MATCH_ONLY")) begin
-      prepare_tinynpu_match_case();
-      check_valid_case(105);
-      $display("MATRIX_TINY_NPU_MATCH_PASS seed=%0d shape=16x16x16 physical_array=%0dx%0d bank_response_latency=1 cycle",
+      run_tinynpu_match_case(16,16,16,105);
+      $display("MATRIX_TINY_NPU_MATCH_ONLY_PASS seed=%0d",initial_seed);
+      $finish;
+    end
+
+    if($test$plusargs("TINY_NPU_MATCH_MULTI")) begin
+      run_tinynpu_match_case(16,16,16,105);
+      run_tinynpu_match_case(16,16,32,106);
+      run_tinynpu_match_case(32,32,64,107);
+      $display("MATRIX_TINY_NPU_MATCH_MULTI_PASS seed=%0d cases=3 physical_array=%0dx%0d bank_response_latency=1 cycle",
                initial_seed,PHYSICAL_ARRAY_SIZE,PHYSICAL_ARRAY_SIZE);
       $finish;
     end
