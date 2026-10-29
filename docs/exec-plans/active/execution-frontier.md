@@ -31,22 +31,30 @@ matched an independent integer Golden for all checked values. The run reports
 the host layout bridge separately; it does not claim host-free inference. See
 the [digits inference report](../../benchmark/REAL_MODEL_INFERENCE.md).
 
-At source SHA `110e0c9db49eb1a7a558c955347accfde87f963e`, the pinned TinyNPU
+At source SHA `0c525bcf8fbdd957396cc98fb314ec56c7888a18`, the pinned TinyNPU
 benchmark passed: 18 GEMM rows, 256/256 same-vector outputs on both designs,
 TinyNPU's engine regression 6/6, and the same `conv1x_mini.onnx` graph on both
 tops. NMAForge passed all intermediate tensors and final outputs byte-exactly
 using eight CMDQ descriptors. Its recorded windows are 1,985 compute cycles
 plus 1,080 host-layout cycles; TinyNPU's graph smoke is 4,781 testbench cycles.
-Memory setup and timing boundaries differ, so there is no CNN speedup claim.
+Run ID `TINY-COMPARE-20261029-S20261029`; VCS
+`V-2023.12-SP1_Full64`, Verilator 5.052, NumPy 2.1.3, ONNX 1.17.0. Memory
+setup and timing boundaries differ, so there is no CNN speedup claim.
 Paired evidence is in [`cnn_results.csv`](../../../benchmark/tinynpu/cnn_results.csv)
 and the [comparison report](../../benchmark/NMAFORGE_VS_TINY_NPU.md).
 
-The trained digits INT8 model also reran on this SHA through the real top:
-360 samples, 352 correct (97.78%), 69 descriptors, and exact independent
-integer Golden; it used 93,653 compute cycles plus a separately measured
-70,656-cycle host-layout bridge. The three-seed Matrix size/ablation replay
-also passed on this SHA: 45/45 size cases and 120/120 configuration cases.
-Run ID `MATRIX-PERF-20261025-20261026-20261027-110e0c9d`; CSV/JSON evidence is
+The trained digits MLP and the 86-descriptor Transformer fixture also passed
+again on current local SHA `6115212e8587f2ca3374787df358761eada7d7ee` with VCS
+`V-2023.12-SP1_Full64`. Digits matched the independent integer Golden for all
+360 samples (352 correct, 97.78%) over 69 descriptors; its 70,656-cycle host
+layout bridge remains separately counted. The fixed-weight Transformer
+fixture checked all intermediate/completion words and ended in `TEST PASS`.
+Both compiles retain `[LOOP-REROLL-ENABLED]`; neither result claims pretrained
+language-model inference. See the [inference report](../../benchmark/REAL_MODEL_INFERENCE.md).
+
+The three-seed Matrix size/ablation replay at SHA
+`110e0c9db49eb1a7a558c955347accfde87f963e` passed 45/45 size cases and 120/120
+configuration cases. Run ID `MATRIX-PERF-20261025-20261026-20261027-110e0c9d`; CSV/JSON evidence is
 in [`benchmark/compute_performance.csv`](../../../benchmark/compute_performance.csv)
 and [`benchmark/compute_performance_summary.json`](../../../benchmark/compute_performance_summary.json).
 
