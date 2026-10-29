@@ -89,6 +89,40 @@ ai_fp_dot_dma_benchmark: ai_comp
 		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +FP_DOT_DMA_BENCH \
 		+FP_BENCH_SEED=$(FP_BENCH_SEED) -l ai_fp_dot_dma_benchmark.log
 
+# End-to-end INT8 digits MLP through ABI-v7 Matrix/SFU descriptors and the
+# production CMDQ/CPLQ/SPAD path. All generated model, simulator, and result
+# files are isolated under /tmp.
+AI_DIGITS_RUN ?= /tmp/nmaforge_digits_rtl_$(shell date +%Y%m%d_%H%M%S)
+AI_DIGITS_PYTHON ?= python3
+.PHONY: ai_digits_inference
+ai_digits_inference:
+	test ! -e "$(AI_DIGITS_RUN)"
+	mkdir -p "$(AI_DIGITS_RUN)"
+	$(AI_DIGITS_PYTHON) ../../../../benchmark/digits/train_digits_mlp.py \
+		--out-dir "$(AI_DIGITS_RUN)/model"
+	$(AI_DIGITS_PYTHON) ../../../../benchmark/digits/generate_digits_workload.py \
+		--model "$(AI_DIGITS_RUN)/model/digits_mlp_int8.npz" \
+		--out-dir "$(AI_DIGITS_RUN)/workload"
+	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-Mdir=$(AI_DIGITS_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_DIGITS_RUN)/simv -l $(AI_DIGITS_RUN)/compile.log
+	$(AI_DIGITS_RUN)/simv +ntb_random_seed=20261029 +AI_RANDOM_CASES=0 \
+		+AI_SEED=20261029 +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) \
+		+AI_DIGITS_INFERENCE \
+		+AI_DIGITS_MEMORY=$(AI_DIGITS_RUN)/workload/digits_spad_writes.memh \
+		+AI_DIGITS_EXPECTED=$(AI_DIGITS_RUN)/workload/digits_expected.memh \
+		+AI_DIGITS_HIDDEN=$(AI_DIGITS_RUN)/workload/digits_hidden_expected.memh \
+		+AI_DIGITS_RTL_CSV=$(AI_DIGITS_RUN)/rtl_logits.csv \
+		-l $(AI_DIGITS_RUN)/run.log
+	$(AI_DIGITS_PYTHON) ../../../../benchmark/digits/digits_quantized_golden.py \
+		--model "$(AI_DIGITS_RUN)/model/digits_mlp_int8.npz" \
+		--rtl-logits "$(AI_DIGITS_RUN)/rtl_logits.csv" \
+		--out "$(AI_DIGITS_RUN)/golden_comparison.json"
+
 # Optional V3 subsystem stress: inject seeded read/write SLVERR at a random
 # beat of multi-beat DMA bursts and check completion plus AXI drain-to-idle.
 ai_dma_error_stress: ai_comp

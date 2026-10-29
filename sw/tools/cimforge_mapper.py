@@ -129,6 +129,7 @@ class Descriptor:
     flags: int = 0
     aux0: int = 0
     shift: int = 0
+    activation: int = 0
     bias: int = 0
     wait_mask: int = 0
     signal_mask: int = 0
@@ -148,7 +149,7 @@ class Descriptor:
         words[6] = self.k_or_length
         words[7] = self.flags
         words[8] = self.aux0
-        words[9] = self.shift & 0x1F
+        words[9] = (self.shift & 0x1F) | ((self.activation & 0x3) << 5)
         words[10] = self.src0_stride
         words[11] = self.src1_stride
         words[12] = self.dst_stride

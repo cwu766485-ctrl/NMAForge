@@ -80,6 +80,15 @@ module tb_ai_accel_smoke;
     localparam REG_EVENT_STATUS    = 32'h0000_0168;
     localparam SPAD_BASE         = 32'h0001_0000;
     localparam SPAD_BYTES        = 32'h0008_0000;
+    localparam AI_DIGITS_INPUT_BASE = 32'h0002_0000;
+    localparam AI_DIGITS_OUTPUT_BASE = 32'h0001_6000;
+    localparam AI_DIGITS_HIDDEN_I8_BASE = 32'h0001_5000;
+    localparam AI_DIGITS_DESC_BASE = 32'h0003_0000;
+    localparam AI_DIGITS_CPL_BASE = 32'h0003_3000;
+    localparam AI_DIGITS_BATCH = 16;
+    localparam AI_DIGITS_DESC_COUNT = 69;
+    localparam AI_DIGITS_TEST_SAMPLES = 360;
+    localparam AI_DIGITS_HIDDEN_WORDS = 5888;
 
     localparam OP_VDOT_INT8      = 8'h10;
     localparam OP_GEMV_INT8      = 8'h11;
@@ -197,6 +206,16 @@ module tb_ai_accel_smoke;
     integer fp_perf_write_wait_cycles = 0;
     integer fp_perf_dma_wait_cycles = 0;
     integer fp_perf_dma_grants = 0;
+    reg [31:0] ai_digits_image_words [0:32767];
+    reg [31:0] ai_digits_expected_words [0:5000];
+    reg [31:0] ai_digits_hidden_words [0:6000];
+    integer ai_digits_cycles = 0;
+    reg ai_digits_measure = 1'b0;
+
+    always @(posedge aclk) begin
+        if (ai_digits_measure)
+            ai_digits_cycles = ai_digits_cycles + 1;
+    end
 
     // During the dedicated FP benchmark, randomize seeded AXI RVALID latency
     // and write-data back-pressure. This is testbench-only and disabled for
@@ -1223,6 +1242,199 @@ module tb_ai_accel_smoke;
         end
     endtask
 
+    task run_ai_digits_inference;
+        reg [1023:0] image_file;
+        reg [1023:0] expected_file;
+        reg [1023:0] hidden_file;
+        reg [1023:0] rtl_csv_file;
+        integer image_count;
+        integer expected_count;
+        integer hidden_count;
+        integer image_index;
+        integer poll_index;
+        integer completion_index;
+        integer hidden_index;
+        integer sample_index;
+        integer class_index;
+        integer expected_index;
+        integer correct_samples;
+        integer sample_label;
+        integer prediction;
+        integer csv_fd;
+        reg completed;
+        reg [31:0] read_value;
+        reg signed [31:0] best_logit;
+        reg [31:0] cmd_head;
+        reg [31:0] cpl_tail;
+        real mac_count;
+        real mac_per_cycle;
+        real array_utilization;
+        begin
+            if (!$value$plusargs("AI_DIGITS_MEMORY=%s", image_file) ||
+                !$value$plusargs("AI_DIGITS_EXPECTED=%s", expected_file) ||
+                !$value$plusargs("AI_DIGITS_HIDDEN=%s", hidden_file) ||
+                !$value$plusargs("AI_DIGITS_RTL_CSV=%s", rtl_csv_file))
+                $fatal(1, "AI_DIGITS_INFERENCE requires memory, expected, hidden and RTL CSV paths");
+
+            $readmemh(image_file, ai_digits_image_words);
+            $readmemh(expected_file, ai_digits_expected_words);
+            $readmemh(hidden_file, ai_digits_hidden_words);
+            image_count = ai_digits_image_words[0];
+            expected_count = ai_digits_expected_words[0];
+            hidden_count = ai_digits_hidden_words[0];
+            if (image_count <= 0 || image_count > 16000 ||
+                expected_count != AI_DIGITS_TEST_SAMPLES ||
+                hidden_count != AI_DIGITS_HIDDEN_WORDS)
+                $fatal(1, "digits image sizes invalid image=%0d expected=%0d hidden=%0d",
+                       image_count, expected_count, hidden_count);
+
+            $display("DIGITS_LOAD_BEGIN spad_words=%0d samples=%0d", image_count,
+                     expected_count);
+            for (image_index = 0; image_index < image_count; image_index = image_index + 1) begin
+                if (ai_digits_image_words[1 + 2 * image_index] >= SPAD_BYTES ||
+                    ai_digits_image_words[1 + 2 * image_index][1:0] != 2'b00) begin
+                    $display("ERROR: digits image has invalid SPAD offset index=%0d addr=%08h",
+                             image_index, ai_digits_image_words[1 + 2 * image_index]);
+                    errors = errors + 1;
+                end else begin
+                    axi_write(SPAD_BASE + ai_digits_image_words[1 + 2 * image_index],
+                              ai_digits_image_words[2 + 2 * image_index]);
+                end
+            end
+            $display("DIGITS_LOAD_DONE spad_words=%0d", image_count);
+
+            // Prove the output region starts with the poison pattern loaded by
+            // the host image. The only writer after this point is the DUT.
+            axi_read(SPAD_BASE + AI_DIGITS_OUTPUT_BASE, read_value);
+            if (read_value !== 32'ha55a_a55a) begin
+                $display("ERROR: digits output was not poison before dispatch: %08h", read_value);
+                errors = errors + 1;
+            end
+
+            axi_write(REG_CMDQ_CTRL, 32'd0);
+            axi_write(REG_CMDQ_BASE_LO, AI_DIGITS_DESC_BASE);
+            axi_write(REG_CMDQ_SIZE, 32'd128);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, AI_DIGITS_DESC_COUNT);
+            axi_write(REG_CPLQ_BASE_LO, AI_DIGITS_CPL_BASE);
+            axi_write(REG_CPLQ_SIZE, 32'd128);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+
+            ai_digits_cycles = 0;
+            ai_digits_measure = 1'b1;
+            axi_write(REG_DOORBELL, 32'd1);
+            completed = 1'b0;
+            for (poll_index = 0; poll_index < 20000 && !completed; poll_index = poll_index + 1) begin
+                repeat (32) @(posedge aclk);
+                axi_read(REG_CPLQ_TAIL, cpl_tail);
+                if (cpl_tail == AI_DIGITS_DESC_COUNT)
+                    completed = 1'b1;
+            end
+            ai_digits_measure = 1'b0;
+            if (!completed) begin
+                $display("ERROR: digits inference completion timeout tail=%0d", cpl_tail);
+                errors = errors + 1;
+            end
+            axi_read(REG_CMDQ_HEAD, cmd_head);
+            if (cmd_head !== AI_DIGITS_DESC_COUNT) begin
+                $display("ERROR: digits CMDQ head=%0d expected=%0d", cmd_head,
+                         AI_DIGITS_DESC_COUNT);
+                errors = errors + 1;
+            end
+
+            // Check task identity and success status for every committed CPLQ
+            // slot, then validate every packed hidden byte and every logit.
+            for (completion_index = 0; completion_index < AI_DIGITS_DESC_COUNT;
+                 completion_index = completion_index + 1) begin
+                axi_read(SPAD_BASE + AI_DIGITS_CPL_BASE + completion_index * 16,
+                         read_value);
+                if (read_value !== (32'h0000_d000 + completion_index)) begin
+                    $display("ERROR: digits CPLQ[%0d] task id=%08h", completion_index,
+                             read_value);
+                    errors = errors + 1;
+                end
+                axi_read(SPAD_BASE + AI_DIGITS_CPL_BASE + completion_index * 16 + 4,
+                         read_value);
+                if (read_value !== 32'h0000_0001) begin
+                    $display("ERROR: digits CPLQ[%0d] status/error=%08h", completion_index,
+                             read_value);
+                    errors = errors + 1;
+                end
+            end
+
+            for (hidden_index = 0; hidden_index < hidden_count; hidden_index = hidden_index + 1) begin
+                axi_read(SPAD_BASE + AI_DIGITS_HIDDEN_I8_BASE + hidden_index * 4,
+                         read_value);
+                if (read_value !== ai_digits_hidden_words[1 + hidden_index]) begin
+                    if (errors < 20)
+                        $display("ERROR: digits hidden word[%0d] rtl=%08h golden=%08h",
+                                 hidden_index, read_value,
+                                 ai_digits_hidden_words[1 + hidden_index]);
+                    errors = errors + 1;
+                end
+            end
+
+            csv_fd = $fopen(rtl_csv_file, "w");
+            if (csv_fd == 0)
+                $fatal(1, "cannot open digits RTL CSV %0s", rtl_csv_file);
+            expected_index = 1;
+            correct_samples = 0;
+            for (sample_index = 0; sample_index < AI_DIGITS_TEST_SAMPLES; sample_index = sample_index + 1) begin
+                sample_label = ai_digits_expected_words[expected_index];
+                expected_index = expected_index + 1;
+                best_logit = -32'sh8000_0000;
+                prediction = 0;
+                for (class_index = 0; class_index < 12; class_index = class_index + 1) begin
+                    axi_read(SPAD_BASE + AI_DIGITS_OUTPUT_BASE +
+                             ((sample_index * 12 + class_index) * 4), read_value);
+                    if (read_value !== ai_digits_expected_words[expected_index]) begin
+                        if (errors < 20)
+                            $display("ERROR: digits logit sample=%0d class=%0d rtl=%08h golden=%08h",
+                                     sample_index, class_index, read_value,
+                                     ai_digits_expected_words[expected_index]);
+                        errors = errors + 1;
+                    end
+                    if (class_index == 0)
+                        $fwrite(csv_fd, "%0d", $signed(read_value));
+                    else
+                        $fwrite(csv_fd, ",%0d", $signed(read_value));
+                    if (class_index < 10 && $signed(read_value) > best_logit) begin
+                        best_logit = $signed(read_value);
+                        prediction = class_index;
+                    end
+                    expected_index = expected_index + 1;
+                end
+                $fwrite(csv_fd, "\n");
+                if (prediction == sample_label)
+                    correct_samples = correct_samples + 1;
+            end
+            $fclose(csv_fd);
+            if (expected_index != expected_count * 13 + 1) begin
+                $display("ERROR: digits expected vector consumption=%0d count=%0d",
+                         expected_index, expected_count);
+                errors = errors + 1;
+            end
+
+            mac_count = 23.0 * ((16.0 * 64.0 * 64.0) + (16.0 * 64.0 * 12.0));
+            if (ai_digits_cycles == 0)
+                mac_per_cycle = 0.0;
+            else
+                mac_per_cycle = mac_count / ai_digits_cycles;
+            array_utilization = mac_per_cycle / 256.0;
+            $display("DIGITS_RTL_METRICS samples=%0d correct=%0d descriptors=%0d cycles=%0d mac=%0.0f mac_per_cycle=%0.4f array_utilization=%0.2f%% spad_initialization_bytes=%0d",
+                     AI_DIGITS_TEST_SAMPLES, correct_samples, AI_DIGITS_DESC_COUNT,
+                     ai_digits_cycles, mac_count, mac_per_cycle,
+                     array_utilization * 100.0, image_count * 4);
+            if (errors == 0)
+                $display("DIGITS_INFERENCE_PASS model=sklearn_digits_int8 rtl=top_spad_cmdq_cplq accuracy=%0.2f%%",
+                         (100.0 * correct_samples) / AI_DIGITS_TEST_SAMPLES);
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+        end
+    endtask
+
     `include "ai_transformer_workload.svh"
 
     function signed [31:0] dot4_i8_sv;
@@ -1600,6 +1812,13 @@ module tb_ai_accel_smoke;
             run_fp_dot_dma_benchmark();
             if (errors != 0)
                 $fatal(1, "FP benchmark reported %0d errors", errors);
+            $finish;
+        end
+
+        if ($test$plusargs("AI_DIGITS_INFERENCE")) begin
+            run_ai_digits_inference();
+            if (errors != 0)
+                $fatal(1, "digits RTL inference reported %0d mismatches", errors);
             $finish;
         end
 
