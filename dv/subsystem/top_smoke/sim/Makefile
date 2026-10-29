@@ -123,6 +123,32 @@ ai_digits_inference:
 		--rtl-logits "$(AI_DIGITS_RUN)/rtl_logits.csv" \
 		--out "$(AI_DIGITS_RUN)/golden_comparison.json"
 
+# Paired TinyNPU conv1x_mini graph through production top, Matrix/SFU/int8
+# engines, ABI-v7 command/completion queues, and an independent per-layer Golden.
+AI_TINYNPU_CNN_RUN ?= /tmp/nmaforge_tinynpu_cnn_rtl_$(shell date +%Y%m%d_%H%M%S)
+AI_TINYNPU_CNN_PYTHON ?= python3
+.PHONY: ai_tinynpu_cnn_match
+ai_tinynpu_cnn_match:
+	test ! -e "$(AI_TINYNPU_CNN_RUN)"
+	mkdir -p "$(AI_TINYNPU_CNN_RUN)"
+	$(AI_TINYNPU_CNN_PYTHON) ../../../../benchmark/tinynpu/generate_nma_cnn_workload.py \
+		--model "$(AI_TINYNPU_CNN_MODEL)" \
+		--tiny-golden "$(AI_TINYNPU_CNN_GOLDEN)" \
+		--out-dir "$(AI_TINYNPU_CNN_RUN)/workload"
+	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-Mdir=$(AI_TINYNPU_CNN_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_TINYNPU_CNN_RUN)/simv -l $(AI_TINYNPU_CNN_RUN)/compile.log
+	$(AI_TINYNPU_CNN_RUN)/simv +ntb_random_seed=20261029 +AI_RANDOM_CASES=0 \
+		+AI_SEED=20261029 +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_TINYNPU_CNN_MATCH \
+		+AI_TINYNPU_CNN_MEMORY=$(AI_TINYNPU_CNN_RUN)/workload/nma_cnn_spad.memh \
+		+AI_TINYNPU_CNN_EXPECTED=$(AI_TINYNPU_CNN_RUN)/workload/nma_cnn_expected.memh \
+		-l $(AI_TINYNPU_CNN_RUN)/run.log
+	grep -q '^NMA_CNN_INFERENCE_PASS' $(AI_TINYNPU_CNN_RUN)/run.log
+
 # Optional V3 subsystem stress: inject seeded read/write SLVERR at a random
 # beat of multi-beat DMA bursts and check completion plus AXI drain-to-idle.
 ai_dma_error_stress: ai_comp

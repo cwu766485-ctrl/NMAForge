@@ -17,6 +17,14 @@ CSV_FIELDS = [
     "pe_utilization_pct", "spad_read_bytes", "spad_write_bytes", "bank_stalls",
     "line_stalls", "golden", "timing_boundary", "comparison_scope",
 ]
+CNN_FIELDS = [
+    "run_id", "design", "source_sha", "reference_sha", "seed", "model",
+    "model_sha256", "input_sha256", "logical_macs", "outputs",
+    "measured_cycles", "host_layout_cycles", "reported_phase_cycles",
+    "spad_initialization_bytes", "compute_spad_read_bytes",
+    "compute_spad_write_bytes", "host_layout_read_bytes",
+    "host_layout_write_bytes", "golden", "measurement_boundary",
+]
 
 
 def fields(line: str) -> dict[str, str]:
@@ -70,7 +78,11 @@ def main() -> None:
     parser.add_argument("--tiny-gemm", type=Path, required=True)
     parser.add_argument("--tiny-engine", type=Path, required=True)
     parser.add_argument("--tiny-cnn", type=Path, required=True)
+    parser.add_argument("--nma-cnn", type=Path, required=True)
+    parser.add_argument("--nma-cnn-manifest", type=Path, required=True)
     parser.add_argument("--out-csv", type=Path, required=True)
+    parser.add_argument("--out-cnn-csv", type=Path, required=True)
+    parser.add_argument("--out-cnn-json", type=Path, required=True)
     parser.add_argument("--out-json", type=Path, required=True)
     parser.add_argument("--vcs-version", default="V-2023.12-SP1_Full64")
     parser.add_argument("--verilator-version", required=True)
@@ -133,6 +145,98 @@ def main() -> None:
     if engine_passes != 6 or cycle_match is None or not cnn_pass:
         raise SystemExit("TinyNPU engine/CNN reference regression marker missing")
 
+    nma_cnn_line = require_line(args.nma_cnn, "NMA_CNN_RTL_METRICS ")
+    require_line(args.nma_cnn, "NMA_CNN_INFERENCE_PASS ")
+    nma_cnn = fields(nma_cnn_line)
+    manifest = json.loads(args.nma_cnn_manifest.read_text(encoding="utf-8"))
+    if len(manifest.get("golden_int8", [])) != 4:
+        raise SystemExit("NMAForge CNN manifest is incomplete")
+    nma_phases = int(nma_cnn["cycles"]) + int(nma_cnn["host_layout_cycles"])
+    cnn_rows = [
+        {
+            "run_id": args.run_id,
+            "design": "NMAForge",
+            "source_sha": args.nma_sha,
+            "reference_sha": args.tiny_sha,
+            "seed": str(manifest["input_seed"]),
+            "model": "conv1x_mini.onnx",
+            "model_sha256": manifest["model_sha256"],
+            "input_sha256": manifest["input_int8_sha256"],
+            "logical_macs": nma_cnn["model_macs"],
+            "outputs": nma_cnn["outputs"],
+            "measured_cycles": nma_cnn["cycles"],
+            "host_layout_cycles": nma_cnn["host_layout_cycles"],
+            "reported_phase_cycles": str(nma_phases),
+            "spad_initialization_bytes": nma_cnn["spad_initialization_bytes"],
+            "compute_spad_read_bytes": nma_cnn["compute_spad_read_bytes"],
+            "compute_spad_write_bytes": nma_cnn["compute_spad_write_bytes"],
+            "host_layout_read_bytes": nma_cnn["host_layout_read_bytes"],
+            "host_layout_write_bytes": nma_cnn["host_layout_write_bytes"],
+            "golden": "PASS: all intermediate tensors and 4 output bytes",
+            "measurement_boundary": "two CMDQ execution windows; excludes SPAD preload, descriptor programming and final host read; host layout is separate",
+        },
+        {
+            "run_id": args.run_id,
+            "design": "TinyNPU",
+            "source_sha": args.tiny_sha,
+            "reference_sha": args.tiny_sha,
+            "seed": str(manifest["input_seed"]),
+            "model": "conv1x_mini.onnx",
+            "model_sha256": manifest["model_sha256"],
+            "input_sha256": manifest["input_int8_sha256"],
+            "logical_macs": nma_cnn["model_macs"],
+            "outputs": "4",
+            "measured_cycles": cycle_match.group(1),
+            "host_layout_cycles": "N/A",
+            "reported_phase_cycles": cycle_match.group(1),
+            "spad_initialization_bytes": "N/A",
+            "compute_spad_read_bytes": "N/A",
+            "compute_spad_write_bytes": "N/A",
+            "host_layout_read_bytes": "N/A",
+            "host_layout_write_bytes": "N/A",
+            "golden": "PASS: all 4 output bytes",
+            "measurement_boundary": "TinyNPU ONNX graph smoke with graph dispatcher and testbench DMA/SRAM shim; testbench input setup excluded",
+        },
+    ]
+    args.out_cnn_csv.parent.mkdir(parents=True, exist_ok=True)
+    with args.out_cnn_csv.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=CNN_FIELDS)
+        writer.writeheader()
+        writer.writerows(cnn_rows)
+    args.out_cnn_csv.write_bytes(args.out_cnn_csv.read_bytes().replace(b"\r\n", b"\n"))
+
+    cnn_summary = {
+        "run_id": args.run_id,
+        "nmaforge_source_sha": args.nma_sha,
+        "tinynpu_source_sha": args.tiny_sha,
+        "model": "conv1x_mini.onnx",
+        "model_sha256": manifest["model_sha256"],
+        "input_seed": manifest["input_seed"],
+        "input_int8_sha256": manifest["input_int8_sha256"],
+        "logical_macs": int(nma_cnn["model_macs"]),
+        "golden": "both designs PASS; NMAForge checks every intermediate tensor and 4/4 final bytes",
+        "nmaforge": {
+            "descriptors": int(nma_cnn["descriptors"]),
+            "compute_cycles": int(nma_cnn["cycles"]),
+            "host_layout_cycles": int(nma_cnn["host_layout_cycles"]),
+            "reported_phase_cycles": nma_phases,
+            "host_layout_read_bytes": int(nma_cnn["host_layout_read_bytes"]),
+            "host_layout_write_bytes": int(nma_cnn["host_layout_write_bytes"]),
+            "compute_spad_read_bytes": int(nma_cnn["compute_spad_read_bytes"]),
+            "compute_spad_write_bytes": int(nma_cnn["compute_spad_write_bytes"]),
+            "spad_initialization_bytes": int(nma_cnn["spad_initialization_bytes"]),
+            "measurement_boundary": "two CMDQ execution windows; excludes SPAD preload, descriptor programming and final host read",
+        },
+        "tinynpu": {
+            "graph_cycles": int(cycle_match.group(1)),
+            "measurement_boundary": "ONNX graph smoke with graph dispatcher and testbench DMA/SRAM shim",
+        },
+        "cycle_comparison": "No speedup computed: measurement windows, graph dispatch and memory setup differ.",
+        "tools": {"vcs": args.vcs_version, "verilator": args.verilator_version},
+    }
+    args.out_cnn_json.parent.mkdir(parents=True, exist_ok=True)
+    args.out_cnn_json.write_text(json.dumps(cnn_summary, indent=2) + "\n", encoding="utf-8")
+
     summary = {
         "run_id": args.run_id,
         "nmaforge_source_sha": args.nma_sha,
@@ -161,7 +265,12 @@ def main() -> None:
             "onnx_model": "conv1x_mini.onnx: 8x8x1 -> 3x3 Conv -> ReLU -> Flatten -> GEMM",
             "cnn_graph_cycles": int(cycle_match.group(1)),
             "cnn_golden": "PASS, 4/4 output bytes exact",
-            "nmaforge_same_graph_cnn": "NOT_RUN; only the standalone matched convolution and GEMM records are available",
+            "nmaforge_same_graph_cnn": "PASS; see paired CNN CSV/JSON with separate engine and host-layout timing",
+            "nmaforge_cnn_compute_cycles": int(nma_cnn["cycles"]),
+            "nmaforge_cnn_host_layout_cycles": int(nma_cnn["host_layout_cycles"]),
+            "nmaforge_cnn_spad_read_bytes": int(nma_cnn["compute_spad_read_bytes"]),
+            "nmaforge_cnn_spad_write_bytes": int(nma_cnn["compute_spad_write_bytes"]),
+            "cnn_speedup_claim": "not computed; design timing boundaries and graph/memory paths differ",
         },
         "csv_rows": len(rows),
     }

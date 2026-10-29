@@ -91,6 +91,20 @@ module tb_ai_accel_smoke;
     localparam AI_DIGITS_TEST_SAMPLES = 360;
     localparam AI_DIGITS_HIDDEN_WORDS = 5888;
 
+    localparam AI_TINYNPU_CNN_IM2COL_BASE = 32'h0001_0000;
+    localparam AI_TINYNPU_CNN_CONV_RAW_BASE = 32'h0001_2000;
+    localparam AI_TINYNPU_CNN_CONV_I8_BASE = 32'h0001_3000;
+    localparam AI_TINYNPU_CNN_IDENTITY_B_BASE = 32'h0001_4000;
+    localparam AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE = 32'h0001_5000;
+    localparam AI_TINYNPU_CNN_CONV_RELU_I8_BASE = 32'h0001_6000;
+    localparam AI_TINYNPU_CNN_FC_A_BASE = 32'h0001_8000;
+    localparam AI_TINYNPU_CNN_FC_RAW_BASE = 32'h0001_b000;
+    localparam AI_TINYNPU_CNN_FC_I8_BASE = 32'h0001_c000;
+    localparam AI_TINYNPU_CNN_FC_BIASED_BASE = 32'h0001_d000;
+    localparam AI_TINYNPU_CNN_FINAL_I8_BASE = 32'h0001_e000;
+    localparam AI_TINYNPU_CNN_DESC_BASE = 32'h0002_0000;
+    localparam AI_TINYNPU_CNN_CPL_BASE = 32'h0002_1000;
+
     localparam OP_VDOT_INT8      = 8'h10;
     localparam OP_GEMV_INT8      = 8'h11;
     localparam OP_GEMM_INT8_TILE = 8'h12;
@@ -210,12 +224,51 @@ module tb_ai_accel_smoke;
     reg [31:0] ai_digits_image_words [0:32767];
     reg [31:0] ai_digits_expected_words [0:5000];
     reg [31:0] ai_digits_hidden_words [0:6000];
+    reg [31:0] ai_tinynpu_cnn_image_words [0:4095];
+    reg [31:0] ai_tinynpu_cnn_expected_words [0:1023];
     integer ai_digits_cycles = 0;
     reg ai_digits_measure = 1'b0;
     integer ai_digits_layout_cycles = 0;
     reg ai_digits_layout_measure = 1'b0;
     integer ai_digits_sfu_writes_by_batch [0:22];
     integer ai_digits_sfu_monitor_batch;
+    integer ai_tinynpu_cnn_cycles = 0;
+    integer ai_tinynpu_cnn_layout_cycles = 0;
+    integer ai_tinynpu_cnn_engine_read_words = 0;
+    integer ai_tinynpu_cnn_engine_write_words = 0;
+    integer ai_tinynpu_cnn_banked_read_lines = 0;
+    integer ai_tinynpu_cnn_line_write_lines = 0;
+    integer ai_tinynpu_cnn_traffic_lane;
+    reg ai_tinynpu_cnn_measure = 1'b0;
+    reg ai_tinynpu_cnn_layout_measure = 1'b0;
+
+    always @(posedge aclk) begin
+        if (ai_tinynpu_cnn_measure)
+            ai_tinynpu_cnn_cycles = ai_tinynpu_cnn_cycles + 1;
+        if (ai_tinynpu_cnn_layout_measure)
+            ai_tinynpu_cnn_layout_cycles = ai_tinynpu_cnn_layout_cycles + 1;
+        if (ai_tinynpu_cnn_measure) begin
+            for (ai_tinynpu_cnn_traffic_lane = 0;
+                 ai_tinynpu_cnn_traffic_lane < 7;
+                 ai_tinynpu_cnn_traffic_lane = ai_tinynpu_cnn_traffic_lane + 1) begin
+                if (dut.compute_engine_req_valid[ai_tinynpu_cnn_traffic_lane] &&
+                    dut.compute_engine_ready[ai_tinynpu_cnn_traffic_lane]) begin
+                    if (dut.compute_engine_req_write[ai_tinynpu_cnn_traffic_lane])
+                        ai_tinynpu_cnn_engine_write_words =
+                            ai_tinynpu_cnn_engine_write_words + 1;
+                    else
+                        ai_tinynpu_cnn_engine_read_words =
+                            ai_tinynpu_cnn_engine_read_words + 1;
+                end
+            end
+            if (dut.banked_read_valid && dut.arb_banked_ready)
+                ai_tinynpu_cnn_banked_read_lines =
+                    ai_tinynpu_cnn_banked_read_lines + 1;
+            if (dut.matrix_line_valid && dut.arb_core_line_ready)
+                ai_tinynpu_cnn_line_write_lines =
+                    ai_tinynpu_cnn_line_write_lines + 1;
+        end
+    end
 
     always @(posedge aclk) begin
         if (dut.sfu_spad_valid && dut.sfu_spad_write &&
@@ -1548,6 +1601,278 @@ module tb_ai_accel_smoke;
         end
     endtask
 
+    task run_tinynpu_cnn_match;
+        reg [1023:0] image_file;
+        reg [1023:0] expected_file;
+        integer image_count;
+        integer expected_count;
+        integer image_index;
+        integer expected_index;
+        integer expected_length;
+        integer poll_index;
+        integer completion_index;
+        integer row_index;
+        integer feature_group;
+        integer descriptor_index;
+        reg completed;
+        reg [31:0] read_value;
+        reg [31:0] cpl_tail;
+        reg [31:0] cmd_head;
+        begin
+            if (!$value$plusargs("AI_TINYNPU_CNN_MEMORY=%s", image_file) ||
+                !$value$plusargs("AI_TINYNPU_CNN_EXPECTED=%s", expected_file))
+                $fatal(1, "TINYNPU_CNN_MATCH requires memory and expected paths");
+            $readmemh(image_file, ai_tinynpu_cnn_image_words);
+            $readmemh(expected_file, ai_tinynpu_cnn_expected_words);
+            image_count = ai_tinynpu_cnn_image_words[0];
+            expected_count = ai_tinynpu_cnn_expected_words[0];
+            if (image_count <= 0 || image_count > 4095 || expected_count != 400)
+                $fatal(1, "TinyNPU CNN input sizes invalid image=%0d expected=%0d",
+                       image_count, expected_count);
+
+            for (image_index = 0; image_index < image_count; image_index = image_index + 1) begin
+                if (ai_tinynpu_cnn_image_words[1 + image_index * 2] >= SPAD_BYTES ||
+                    ai_tinynpu_cnn_image_words[1 + image_index * 2][1:0] != 2'b00)
+                    $fatal(1, "TinyNPU CNN bad SPAD image address index=%0d", image_index);
+                axi_write(SPAD_BASE + ai_tinynpu_cnn_image_words[1 + image_index * 2],
+                          ai_tinynpu_cnn_image_words[2 + image_index * 2]);
+            end
+
+            axi_read(SPAD_BASE + AI_TINYNPU_CNN_FINAL_I8_BASE, read_value);
+            if (read_value !== 32'ha55a_a55a)
+                $fatal(1, "TinyNPU CNN final output was not poisoned: %08h", read_value);
+
+            for (descriptor_index = 0; descriptor_index < 8;
+                 descriptor_index = descriptor_index + 1) begin
+                case (descriptor_index)
+                    0: write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE, OP_TENSOR_GEMM,
+                           16'hd500, AI_TINYNPU_CNN_IM2COL_BASE, 32'h0001_1000,
+                           32'h0001_1100, AI_TINYNPU_CNN_CONV_RAW_BASE,
+                           16'd36, 16'd4, 16'd3, 8'h01, 32'd0, 5'd4, 2'd0,
+                           32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd0, 16'd1, 16'd0);
+                    1: write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h40,
+                           OP_REQUANT_I8, 16'hd501, AI_TINYNPU_CNN_CONV_RAW_BASE,
+                           32'd0, 32'd0, AI_TINYNPU_CNN_CONV_I8_BASE,
+                           16'd0, 16'd0, 16'd144, 8'h10, 32'd0, 5'd0, 2'd0,
+                           32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd1, 16'd2, 16'd1);
+                    2: write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h80,
+                           OP_TENSOR_GEMM, 16'hd502, AI_TINYNPU_CNN_CONV_I8_BASE,
+                           32'h0001_4000, 32'h0001_4100,
+                           AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE,
+                           16'd36, 16'd4, 16'd1, 8'h01, 32'd0, 5'd0, 2'd1,
+                           32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd2, 16'd4, 16'd2);
+                    3: write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'hc0,
+                           OP_REQUANT_I8, 16'hd503,
+                           AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE,
+                           32'd0, 32'd0, AI_TINYNPU_CNN_CONV_RELU_I8_BASE,
+                           16'd0, 16'd0, 16'd144, 8'h10, 32'd0, 5'd0, 2'd0,
+                           32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd4, 16'd8, 16'd4);
+                    4: write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h100,
+                           OP_TENSOR_GEMM, 16'hd504, AI_TINYNPU_CNN_FC_A_BASE,
+                           32'h0001_9000, 32'h0001_a000, AI_TINYNPU_CNN_FC_RAW_BASE,
+                           16'd4, 16'd4, 16'd36, 8'h01, 32'd0, 5'd8, 2'd0,
+                           32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd8, 16'd16, 16'd8);
+                    5: write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h140,
+                           OP_REQUANT_I8, 16'hd505, AI_TINYNPU_CNN_FC_RAW_BASE,
+                           32'd0, 32'd0, AI_TINYNPU_CNN_FC_I8_BASE,
+                           16'd0, 16'd0, 16'd16, 8'h10, 32'd0, 5'd0, 2'd0,
+                           32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd16, 16'd32, 16'd16);
+                    6: write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h180,
+                           OP_TENSOR_GEMM, 16'hd506, AI_TINYNPU_CNN_FC_I8_BASE,
+                           32'h0001_4000, 32'h0001_c100,
+                           AI_TINYNPU_CNN_FC_BIASED_BASE,
+                           16'd4, 16'd4, 16'd1, 8'h01, 32'd0, 5'd0, 2'd0,
+                           32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd32, 16'd64, 16'd32);
+                    default: write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h1c0,
+                           OP_REQUANT_I8, 16'hd507, AI_TINYNPU_CNN_FC_BIASED_BASE,
+                           32'd0, 32'd0, AI_TINYNPU_CNN_FINAL_I8_BASE,
+                           16'd0, 16'd0, 16'd16, 8'h10, 32'd0, 5'd0, 2'd0,
+                           32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd64, 16'd128, 16'd64);
+                endcase
+            end
+
+            axi_write(REG_CMDQ_CTRL, 32'd0);
+            axi_write(REG_CMDQ_BASE_LO, AI_TINYNPU_CNN_DESC_BASE);
+            axi_write(REG_CMDQ_SIZE, 32'd16);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd0);
+            axi_write(REG_CPLQ_BASE_LO, AI_TINYNPU_CNN_CPL_BASE);
+            axi_write(REG_CPLQ_SIZE, 32'd16);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+            ai_tinynpu_cnn_cycles = 0;
+            ai_tinynpu_cnn_layout_cycles = 0;
+            ai_tinynpu_cnn_engine_read_words = 0;
+            ai_tinynpu_cnn_engine_write_words = 0;
+            ai_tinynpu_cnn_banked_read_lines = 0;
+            ai_tinynpu_cnn_line_write_lines = 0;
+            ai_tinynpu_cnn_measure = 1'b1;
+            axi_write(REG_CMDQ_TAIL, 32'd4);
+            axi_write(REG_DOORBELL, 32'd1);
+            completed = 1'b0;
+            for (poll_index = 0; poll_index < 10000 && !completed;
+                 poll_index = poll_index + 1) begin
+                repeat (32) @(posedge aclk);
+                axi_read(REG_CPLQ_TAIL, cpl_tail);
+                if (cpl_tail == 32'd4)
+                    completed = 1'b1;
+            end
+            ai_tinynpu_cnn_measure = 1'b0;
+            if (!completed)
+                $fatal(1, "TinyNPU CNN phase 1 completion timeout tail=%0d", cpl_tail);
+
+            // This is only a layout conversion of actual RTL-produced INT8
+            // values. No convolution, activation, or GEMM is computed here.
+            ai_tinynpu_cnn_layout_measure = 1'b1;
+            for (feature_group = 0; feature_group < 36; feature_group = feature_group + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_RELU_I8_BASE +
+                         feature_group * 4, read_value);
+                for (row_index = 0; row_index < 4; row_index = row_index + 1) begin
+                    if (row_index == 0)
+                        axi_write(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE +
+                                  (feature_group * 4 + row_index) * 4,
+                                  read_value);
+                    else
+                        axi_write(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE +
+                                  (feature_group * 4 + row_index) * 4, 32'd0);
+                end
+            end
+            ai_tinynpu_cnn_layout_measure = 1'b0;
+
+            ai_tinynpu_cnn_measure = 1'b1;
+            axi_write(REG_CMDQ_TAIL, 32'd8);
+            axi_write(REG_DOORBELL, 32'd1);
+            completed = 1'b0;
+            for (poll_index = 0; poll_index < 10000 && !completed;
+                 poll_index = poll_index + 1) begin
+                repeat (32) @(posedge aclk);
+                axi_read(REG_CPLQ_TAIL, cpl_tail);
+                if (cpl_tail == 32'd8)
+                    completed = 1'b1;
+            end
+            ai_tinynpu_cnn_measure = 1'b0;
+            if (!completed)
+                $fatal(1, "TinyNPU CNN phase 2 completion timeout tail=%0d", cpl_tail);
+            axi_read(REG_CMDQ_HEAD, cmd_head);
+            if (cmd_head !== 32'd8)
+                $fatal(1, "TinyNPU CNN CMDQ head=%0d expected=8", cmd_head);
+
+            for (completion_index = 0; completion_index < 8;
+                 completion_index = completion_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CPL_BASE + completion_index * 16,
+                         read_value);
+                if (read_value !== (32'h0000_d500 + completion_index))
+                    $fatal(1, "TinyNPU CNN CPLQ[%0d] task id=%08h",
+                           completion_index, read_value);
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CPL_BASE + completion_index * 16 + 4,
+                         read_value);
+                if (read_value !== 32'd1)
+                    $fatal(1, "TinyNPU CNN CPLQ[%0d] status=%08h",
+                           completion_index, read_value);
+            end
+
+            expected_index = 1;
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 144) $fatal(1, "bad conv rounded Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_RAW_BASE + row_index * 4, read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv rounded output[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 36) $fatal(1, "bad conv INT8 Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_I8_BASE + row_index * 4, read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv INT8 packed[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 144) $fatal(1, "bad conv bias/ReLU Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv bias/ReLU output[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 36) $fatal(1, "bad conv ReLU packed Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_RELU_I8_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv ReLU packed[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 16) $fatal(1, "bad FC rounded Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_RAW_BASE + row_index * 4, read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN FC rounded output[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 4) $fatal(1, "bad FC INT8 Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_I8_BASE + row_index * 4, read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN FC INT8 packed[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 16) $fatal(1, "bad FC bias Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_BIASED_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN FC biased output[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 4) $fatal(1, "bad final CNN Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FINAL_I8_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN final packed output[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            if (expected_index != expected_count + 9)
+                $fatal(1, "TinyNPU CNN Golden words consumed=%0d expected=%0d",
+                       expected_index - 1, expected_count + 8);
+
+            $display("NMA_CNN_RTL_METRICS outputs=4 descriptors=8 cycles=%0d host_layout_cycles=%0d host_layout_read_bytes=144 host_layout_write_bytes=576 compute_spad_read_bytes=%0d compute_spad_write_bytes=%0d bank_read_lines=%0d line_write_lines=%0d model_macs=1872 spad_initialization_bytes=%0d",
+                     ai_tinynpu_cnn_cycles, ai_tinynpu_cnn_layout_cycles,
+                     ai_tinynpu_cnn_engine_read_words * 4 + ai_tinynpu_cnn_banked_read_lines * 16,
+                     ai_tinynpu_cnn_engine_write_words * 4 + ai_tinynpu_cnn_line_write_lines * 16,
+                     ai_tinynpu_cnn_banked_read_lines, ai_tinynpu_cnn_line_write_lines,
+                     image_count * 4);
+            $display("NMA_CNN_INFERENCE_PASS model=TinyNPU_conv1x_mini outputs=4 golden=byte_exact");
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+        end
+    endtask
+
     `include "ai_transformer_workload.svh"
 
     function signed [31:0] dot4_i8_sv;
@@ -1932,6 +2257,13 @@ module tb_ai_accel_smoke;
             run_ai_digits_inference();
             if (errors != 0)
                 $fatal(1, "digits RTL inference reported %0d mismatches", errors);
+            $finish;
+        end
+
+        if ($test$plusargs("AI_TINYNPU_CNN_MATCH")) begin
+            run_tinynpu_cnn_match();
+            if (errors != 0)
+                $fatal(1, "TinyNPU CNN RTL match reported %0d mismatches", errors);
             $finish;
         end
 

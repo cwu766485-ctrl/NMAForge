@@ -131,10 +131,35 @@ graph in 4,781 testbench cycles. All four output bytes matched the compiler's
 Golden.
 
 That CNN's graph uses fixed random weights from the checked-in model and a
-seeded test input. It is a TinyNPU functional smoke, not a trained model. Its
-cycle count includes the current graph testbench's behavior and DMA shim. The
-full graph has not yet been mapped to NMAForge, so it is not a cross-design CNN
-latency comparison.
+seeded test input. It is a functional smoke, not a trained model. Its cycle
+count includes the graph testbench and DMA/SRAM shim.
+
+## Paired full CNN graph
+
+The pinned `conv1x_mini.onnx` graph was mapped through the production NMAForge
+top. The workload generator reads the ONNX tensors, applies the fixed INT8
+scales/shifts, independently computes Golden intermediate tensors, and
+confirms the four final bytes against TinyNPU's generated `golden.bin`.
+NMAForge executes two GEMM layers and their requant/bias/ReLU post-ops through
+eight CMDQ descriptors. The testbench performs only the explicit
+flatten/matrix-layout conversion of RTL-produced values; it does no operator
+math on the host. Every intermediate tensor, all eight completion IDs/statuses,
+and all four output bytes are checked.
+
+| Design | Logical INT8 MACs | Measured engine/graph cycles | Host layout cycles | Memory traffic | Golden |
+|---|---:|---:|---:|---|---|
+| NMAForge top | 1,872 | 1,985 | 1,080 | Compute SPAD 3,360 B read / 1,600 B write; layout 144 B read / 576 B write; 3,456 B preload | Intermediate tensors and 4/4 output bytes exact |
+| TinyNPU ONNX graph | 1,872 | 4,781 | N/A | 1,312 B SRAM allocation; per-engine traffic unavailable | 4/4 output bytes exact |
+
+The committed [`cnn_results.csv`](../../benchmark/tinynpu/cnn_results.csv) and
+the paired `cnn_summary.json` emitted with run logs record the run identity,
+hashes, tools, and measurements. NMAForge's measured engine interval spans two
+CMDQ execution windows and excludes SPAD preload, descriptor programming, and
+final host reads. Host layout is reported separately. TinyNPU's graph interval
+uses the graph dispatcher and a testbench memory shim. These boundaries and
+memory paths differ, so the cycle counts are **not** an apples-to-apples
+latency or speedup comparison. They demonstrate exact results for the same
+fixed-weight model and input through both RTLs.
 
 The older `R19` TinyNPU pair in the [historical report](../verification/COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md)
 used a different TinyNPU repository/commit and an earlier NMAForge source SHA.
@@ -147,9 +172,9 @@ they are not merged into the current pinned-reference CSV.
   in the tested engine wrapper; current matched-array results use 16×16.
 - The same bandwidth-constrained 16×16 GEMM is not yet run through both
   designs' memory interfaces. Until it is, no normalized speedup is available.
-- The complete TinyNPU ONNX CNN has not run through NMAForge; only NMAForge's
-  separate single-convolution operator test and TinyNPU's full graph smoke are
-  recorded.
+- The paired CNN uses fixed weights from TinyNPU's checked-in ONNX graph; it is
+  not a trained model. A hardware-native flatten/reformat operator is not part
+  of this workload; the host layout bridge is measured separately.
 - The 16×16×32 and 32×32×64 size sweeps are NMAForge-only in this run. TinyNPU
   multi-tile common cases remain to be added.
 - No candidate-specific ASIC synthesis, SRAM timing view, measured Fmax, or

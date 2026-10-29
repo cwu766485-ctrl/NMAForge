@@ -61,6 +61,13 @@ TINY_NPU_ROOT="$TINY_NPU_ROOT" TINYNPU_WORK_ROOT="$WORK_ROOT" \
     VERILATOR="$VERILATOR" JOBS="${JOBS:-4}" \
     "$SCRIPT_DIR/run_tinynpu_cnn.sh" > "$OUT_DIR/tiny_cnn_script.log" 2>&1
 
+make -C "$REPO_ROOT/dv/subsystem/top_smoke/sim" ai_tinynpu_cnn_match \
+    AI_TINYNPU_CNN_RUN="$OUT_DIR/nma_cnn" \
+    AI_TINYNPU_CNN_PYTHON="$PYTHON" \
+    AI_TINYNPU_CNN_MODEL="$TINY_NPU_ROOT/models/conv1x_mini.onnx" \
+    AI_TINYNPU_CNN_GOLDEN="$OUT_DIR/tiny_cnn/graph_cnn/golden.bin" \
+    > "$OUT_DIR/nma_cnn_make.log" 2>&1
+
 VERILATOR_VERSION="$("$VERILATOR" --version | head -1)"
 if [[ -z "$VCS_VERSION" ]]; then
     VCS_VERSION="$(grep -m1 -o 'Version V-[^ ]*' "$OUT_DIR/nma_match16/compile.log" | awk '{print $2}')"
@@ -77,9 +84,14 @@ fi
     --tiny-gemm "$OUT_DIR/tiny_gemm/run.log" \
     --tiny-engine "$OUT_DIR/tiny_gemm/engine_regression.log" \
     --tiny-cnn "$OUT_DIR/tiny_cnn/run.log" \
+    --nma-cnn "$OUT_DIR/nma_cnn/run.log" \
+    --nma-cnn-manifest "$OUT_DIR/nma_cnn/workload/nma_cnn_manifest.json" \
     --verilator-version "$VERILATOR_VERSION" --vcs-version "$VCS_VERSION" \
     --out-csv "$OUT_DIR/gemm_results.csv" \
+    --out-cnn-csv "$OUT_DIR/cnn_results.csv" \
+    --out-cnn-json "$OUT_DIR/cnn_summary.json" \
     --out-json "$OUT_DIR/benchmark_summary.json"
 cp "$OUT_DIR/gemm_results.csv" "$SCRIPT_DIR/gemm_results.csv"
+cp "$OUT_DIR/cnn_results.csv" "$SCRIPT_DIR/cnn_results.csv"
 printf 'BENCHMARK_PASS run_id=%s nmaforge_sha=%s tinynpu_sha=%s output=%s\n' \
     "$RUN_ID" "$NMA_SHA" "$TINY_SHA" "$OUT_DIR"
