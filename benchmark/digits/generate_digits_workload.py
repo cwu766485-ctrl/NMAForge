@@ -126,24 +126,24 @@ def main() -> None:
         padded_hidden, _padded_logits = integer_infer(padded, model)
         model_bytes = args.model.read_bytes()
 
-    w2 = np.zeros((K, 12), dtype=np.int8)
+    w2 = np.zeros((K, ARRAY_M), dtype=np.int8)
     w2[:, :10] = w2_10
-    b2 = np.zeros(12, dtype=np.int32)
+    b2 = np.zeros(ARRAY_M, dtype=np.int32)
     b2[:10] = b2_10
     memory: dict[int, int] = {}
     add_words(memory, W1_BASE, pack_b_columns(w1, 64))
     add_words(memory, B1_BASE, b1)
-    add_words(memory, W2_BASE, pack_b_columns(w2, 12))
+    add_words(memory, W2_BASE, pack_b_columns(w2, ARRAY_M))
     add_words(memory, B2_BASE, b2)
 
     descriptors: list[list[int]] = []
     for batch_index in range(batches):
         batch_x = padded[batch_index * BATCH : (batch_index + 1) * BATCH]
         input_base = INPUT_BASE + batch_index * BATCH * 64
-        output_base = OUTPUT_BASE + batch_index * BATCH * 12 * 4
+        output_base = OUTPUT_BASE + batch_index * BATCH * ARRAY_M * 4
         add_words(memory, input_base, pack_a_rows(batch_x))
         add_words(memory, output_base,
-                  [0xA55AA55A] * (BATCH * 12))
+                  [0xA55AA55A] * (BATCH * ARRAY_M))
 
         first_task = TASK_BASE + batch_index * 3
         hidden_i32_base = HIDDEN_I32_BASE + batch_index * BATCH * 64 * 4
@@ -164,7 +164,7 @@ def main() -> None:
         descriptors.append(descriptor_words(
             task_id=first_task + 2, opcode=OP_GEMM,
             src0=hidden_i8_tile_base, src1=W2_BASE, bias=B2_BASE,
-            dst=output_base, m=BATCH, n=12, extent=K_WORDS,
+            dst=output_base, m=BATCH, n=ARRAY_M, extent=K_WORDS,
             flags=FLAG_BIAS,
         ))
 
