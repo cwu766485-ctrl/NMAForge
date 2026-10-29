@@ -83,6 +83,7 @@ def make_row(seed, m, n, k, mode, prefetch, case):
         "modeled_spad_write_bytes_int32": m * n * 4,
         "valid_bandwidth_bytes_per_cycle": 32,
         "modeled_bank_stall_cycles": 0,
+        "speedup_vs_baseline_same_prefetch": 1.0,
         "golden": "PASS",
         "timing_source": "RTL compute cycles + fixed-bandwidth analytical schedule model",
     }
@@ -118,6 +119,19 @@ def main():
     if len(workload_keys) != 12 or len(rows) != len(args.seeds) * 12 * 4:
         raise RuntimeError(f"unexpected workload/ablation count: {len(workload_keys)} / {len(rows)}")
 
+    row_index = {}
+    for row in rows:
+        key = (int(row["seed"]), str(row["shape_mnk"]),
+               int(row["bandwidth_aware_prefetch"]), str(row["mapping"]))
+        row_index[key] = row
+    for row in rows:
+        if row["mapping"] == "gemv_fold":
+            key = (int(row["seed"]), str(row["shape_mnk"]),
+                   int(row["bandwidth_aware_prefetch"]), "baseline")
+            baseline = row_index[key]
+            row["speedup_vs_baseline_same_prefetch"] = round(
+                float(baseline["schedule_cycles"]) / float(row["schedule_cycles"]), 4)
+
     fields = list(rows[0])
     args.csv.parent.mkdir(parents=True, exist_ok=True)
     with args.csv.open("w", newline="", encoding="utf-8") as stream:
@@ -129,12 +143,13 @@ def main():
     for row in rows:
         key = (int(row["seed"]), str(row["shape_mnk"]))
         paired.setdefault(key, {})[(str(row["mapping"]), int(row["bandwidth_aware_prefetch"]))] = row
-    speedups = []
+    speedups = {0: [], 1: []}
     for modes in paired.values():
         for prefetch in (0, 1):
             baseline = modes[("baseline", prefetch)]
             gemv = modes[("gemv_fold", prefetch)]
-            speedups.append(float(baseline["schedule_cycles"]) / float(gemv["schedule_cycles"]))
+            speedups[prefetch].append(
+                float(baseline["schedule_cycles"]) / float(gemv["schedule_cycles"]))
 
     summary = {
         "run_id": f"SHAPE-ADAPTIVE-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{args.source_sha[:8]}",
@@ -147,8 +162,12 @@ def main():
         "matched_valid_bandwidth_bytes_per_cycle": 32,
         "physical_macs": 256,
         "golden": "PASS for all baseline and GEMV RTL outputs",
-        "mean_gemv_speedup_over_baseline_at_matched_prefetch": round(sum(speedups)/len(speedups), 4),
-        "maximum_gemv_speedup_at_matched_prefetch": round(max(speedups), 4),
+        "mean_gemv_speedup_over_baseline_at_matched_prefetch": round(
+            sum(speedups[0] + speedups[1]) / (len(speedups[0]) + len(speedups[1])), 4),
+        "max_speedup_prefetch_off": round(max(speedups[0]), 4),
+        "max_speedup_prefetch_on": round(max(speedups[1]), 4),
+        "mean_speedup_prefetch_off": round(sum(speedups[0]) / len(speedups[0]), 4),
+        "mean_speedup_prefetch_on": round(sum(speedups[1]) / len(speedups[1]), 4),
         "latency_boundary": "RTL compute cycles plus explicit fixed-bandwidth schedule model; not measured integrated SPAD latency",
         "bank_conflicts": "ideal conflict-free interleaving assumed; bank stalls are zero by model construction",
         "outputs": str(args.csv),
@@ -157,7 +176,8 @@ def main():
     args.json.parent.mkdir(parents=True, exist_ok=True)
     args.json.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     print(f"SHAPE_ADAPTIVE_BENCHMARK_PASS run_id={summary['run_id']} rows={len(rows)} "
-          f"workloads={len(workload_keys)} max_matched_bw_speedup={summary['maximum_gemv_speedup_at_matched_prefetch']}")
+          f"workloads={len(workload_keys)} max_speedup_prefetch_off={summary['max_speedup_prefetch_off']} "
+          f"max_speedup_prefetch_on={summary['max_speedup_prefetch_on']}")
 
 
 if __name__ == "__main__":
