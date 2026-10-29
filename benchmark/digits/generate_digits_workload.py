@@ -33,11 +33,12 @@ B1_BASE = 0x12000
 W2_BASE = 0x13000
 B2_BASE = 0x13400
 HIDDEN_I32_BASE = 0x14000
-HIDDEN_I8_BASE = 0x15000
-OUTPUT_BASE = 0x16000
-INPUT_BASE = 0x20000
-DESC_BASE = 0x30000
-CPL_BASE = 0x33000
+HIDDEN_I8_BASE = 0x2C000
+HIDDEN_I8_TILE_BASE = 0x32000
+DESC_BASE = 0x38000
+CPL_BASE = 0x3A000
+OUTPUT_BASE = 0x3B000
+INPUT_BASE = 0x40000
 TASK_BASE = 0xD000
 
 
@@ -130,10 +131,6 @@ def main() -> None:
     add_words(memory, B1_BASE, b1)
     add_words(memory, W2_BASE, pack_b_columns(w2, 12))
     add_words(memory, B2_BASE, b2)
-    add_words(memory, HIDDEN_I32_BASE,
-              [0x5A5AA5A5] * (BATCH * 64))
-    add_words(memory, HIDDEN_I8_BASE,
-              [0xA55AA55A] * ((BATCH * 64) // 4))
 
     batches = (len(labels) + BATCH - 1) // BATCH
     padded = np.zeros((batches * BATCH, 64), dtype=np.int8)
@@ -148,23 +145,26 @@ def main() -> None:
                   [0xA55AA55A] * (BATCH * 12))
 
         first_task = TASK_BASE + batch_index * 3
+        hidden_i32_base = HIDDEN_I32_BASE + batch_index * BATCH * 64 * 4
+        hidden_i8_base = HIDDEN_I8_BASE + batch_index * BATCH * 64
+        hidden_i8_tile_base = HIDDEN_I8_TILE_BASE + batch_index * BATCH * 64
         descriptors.append(descriptor_words(
             task_id=first_task, opcode=OP_GEMM, src0=input_base,
-            src1=W1_BASE, bias=B1_BASE, dst=HIDDEN_I32_BASE,
+            src1=W1_BASE, bias=B1_BASE, dst=hidden_i32_base,
             m=BATCH, n=64, extent=K_WORDS, flags=FLAG_BIAS,
             shift=shift1, activation=1, signal_mask=1,
         ))
         descriptors.append(descriptor_words(
             task_id=first_task + 1, opcode=OP_REQUANT,
-            src0=HIDDEN_I32_BASE, src1=0, bias=0, dst=HIDDEN_I8_BASE,
+            src0=hidden_i32_base, src1=0, bias=0, dst=hidden_i8_base,
             m=0, n=0, extent=BATCH * 64, flags=FLAG_PACK_I8,
-            wait_mask=1, signal_mask=2, clear_mask=1,
+            wait_mask=1, clear_mask=1,
         ))
         descriptors.append(descriptor_words(
             task_id=first_task + 2, opcode=OP_GEMM,
-            src0=HIDDEN_I8_BASE, src1=W2_BASE, bias=B2_BASE,
+            src0=hidden_i8_tile_base, src1=W2_BASE, bias=B2_BASE,
             dst=output_base, m=BATCH, n=12, extent=K_WORDS,
-            flags=FLAG_BIAS, wait_mask=2, clear_mask=2,
+            flags=FLAG_BIAS,
         ))
 
     desc_count = len(descriptors)
@@ -209,12 +209,18 @@ def main() -> None:
         "batches": batches,
         "descriptor_count": desc_count,
         "descriptors_per_sample_batch": ["Matrix GEMM+Bias+ReLU", "SFU Requant Pack-I8", "Matrix GEMM+Bias"],
+        "execution_phases": [
+            "Matrix GEMM+Bias+ReLU and SFU Requant Pack-I8",
+            "host software reorder from row-major bytes to the Matrix 4x4 A microtile layout",
+            "Matrix GEMM+Bias",
+        ],
         "hidden_shift": shift1,
         "input_base": INPUT_BASE,
         "weight1_base": W1_BASE,
         "bias1_base": B1_BASE,
         "hidden_i32_base": HIDDEN_I32_BASE,
         "hidden_i8_base": HIDDEN_I8_BASE,
+        "hidden_i8_tile_base": HIDDEN_I8_TILE_BASE,
         "weight2_base": W2_BASE,
         "bias2_base": B2_BASE,
         "output_base": OUTPUT_BASE,
