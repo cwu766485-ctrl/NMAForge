@@ -107,7 +107,7 @@ Scalar   = core_start && 上述五个 Engine Select 都为 0
 | launch_shift | 5 | 量化或后处理 Shift |
 | launch_activation | 2 | 激活方式 |
 | launch_bias_base / launch_bias_enable | 32 / 1 | Bias 地址和使能 |
-| launch_flags | 8 | Matrix flags[1]/[2] 分别控制 A/B transpose；SFU flags[4] 控制 requant packing |
+| launch_flags | 8 | Matrix flags[1]/[2] 分别控制 A/B transpose；SFU flags[4] 控制 requant packing，flags[5] 在 `0x36` 选择 Matrix A tile 输出布局 |
 | launch_aux0 | 32 | SFU epsilon/causal token、KV token/head 等 |
 | launch_src0_stride / launch_src1_stride / launch_dst_stride | 32 各 | Batch、KV 等地址步长，单位 byte |
 | launch_instance_count | 32 | Matrix Batch 实例数；集成顶层从 Batch × Head 产生 |

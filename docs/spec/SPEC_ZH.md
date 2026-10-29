@@ -88,7 +88,7 @@ SPAD 保护寄存器配置四个区域 R0–R3；每区的 `BASE` 是包含的�
 | 1~4 | src0/src1/bias/dst | 地址或宏子描述符参数 |
 | 5 | shape | M[15:0]、N[31:16] |
 | 6 | extent | K、向量长度或子描述符数 |
-| 7 | flags | bit0 bias；bit1/2 transpose A/B；bit3 外部宏；bit4 packed INT8 |
+| 7 | flags | bit0 bias；bit1/2 transpose A/B；bit3 外部宏；bit4 packed INT8；bit5 `PACK_I8_TILE_A` |
 | 8 | aux0 | 操作专用字段，例如 KV head/token |
 | 9 | postprocess | shift[4:0]、activation[6:5] |
 | 10~12 | strides | src0、src1、dst 实例/批次步长 |
@@ -99,6 +99,8 @@ SPAD 保护寄存器配置四个区域 R0–R3；每区的 `BASE` 是包含的�
 描述符版本、opcode、必要尺寸、宏子描述符或依赖不合法时必须拒绝。转置通过地址/布局产生，不要求整矩阵复制。完成项固定 16 字节：word0=task ID、word1=状态和 error[7:4]、word2=result、word3=element count。关键错误：abort=3、fetch=6、validation=7、empty queue=8、completion=9、protection=10、dependency=12；`ERROR_INFO` 的 source=1/2 分别代表命令/DMA 来源。
 
 宏 opcode `0x40`–`0x42` 支持 v4 兼容地址与 ABI v7 地址：v4 从 `src0` 取 32-bit 子描述符列表基址；v7 从 `{src1,src0}` 取 64-bit 基址。列表基址需 64-byte 对齐，`length` 是子描述符数量，`flags[3]` 选择外部内存 fetch（1）或 scratchpad fetch（0）。v7 的 `src1` 是地址高 32 位，不作为独立数据指针做字节对齐检查；完整 64-bit 基址的低位对齐由 `src0` 检查。宏父命令只提交一个 completion，子命令顺序执行且失败时停止后续子命令。
+
+SFU `REQUANT_I8`（opcode `0x36`）中 `flags[4]` 将饱和后的 INT32 结果按输入连续顺序打包为 INT8。可选 `flags[5]=PACK_I8_TILE_A` 必须同时设置 `flags[4]`，并要求 `M,N` 为非零 4 的倍数且 `length=M×N`。输入仍按 row-major 读取；输出按 Matrix A 的 `[row_group][k_group][row_lane]` 顺序写入，每 word 的四个低字节对应连续四列 K。其 word index 为 `(((row/4)×(N/4)+k/4)×4)+(row mod 4)`，地址为 `dst+4×word_index`。该模式没有 partial word；legacy bit4-only 的线性 packing 语义不变。
 
 ### 4.1 Compute CMDQ 并行派发
 
