@@ -60,8 +60,13 @@ def pack_a_rows(matrix: np.ndarray) -> list[int]:
     m, k = matrix.shape
     if m != ARRAY_M or k != K or k % 4:
         raise ValueError("unsupported A operand shape")
-    return [pack_i8(matrix[row, k0 : k0 + 4])
-            for row in range(m) for k0 in range(0, k, 4)]
+    # Matrix issues one banked read per 4-row group and K-word. Each response
+    # contains the four row words for that K-word, so memory order is
+    # [row_group][k_group][row_lane], matching banked_word_offset in the core.
+    return [pack_i8(matrix[row_group + row_lane, k0 : k0 + 4])
+            for row_group in range(0, m, 4)
+            for k0 in range(0, k, 4)
+            for row_lane in range(4)]
 
 
 def pack_b_columns(matrix: np.ndarray, n_valid: int) -> list[int]:
