@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-10-28. This is a short handoff for the next engineering task; it
+Updated: 2026-10-29. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -23,6 +23,19 @@ Key architecture rules:
   completions retire in CMDQ order. See the Compute Cluster SPEC v1.1.
 
 ## Current verification frontier
+
+The VCS license is available in the current environment. On research branch
+`feat/tinynpu-model-inference`, run `DIGITS-RTL-20261029-FINAL` passed: a trained
+INT8 digits MLP ran through the real top-level Matrix/SFU/CMDQ/CPLQ path and
+matched an independent integer Golden for all checked values. The run reports
+the host layout bridge separately; it does not claim host-free inference. See
+the [digits inference report](../../benchmark/REAL_MODEL_INFERENCE.md).
+
+The current branch is research work based on the v1.0 audit candidate, not a
+replacement sign-off baseline. The audited candidate remains
+`9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`; its final audit records 24
+PASS-SCOPED and 14 PARTIAL requirements and concludes CL-DV-v1.0 is not signed.
+The digits experiment does not change that disposition.
 
 | Area | Current evidence | Open work |
 |---|---|---|
