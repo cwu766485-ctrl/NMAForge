@@ -120,6 +120,10 @@ def main() -> None:
         b2_10 = model["b2_acc_int32"].astype(np.int32)[:10]
         shift1 = int(model["hidden_shift"])
         hidden_golden, logits_golden = integer_infer(x_q, model)
+        batches = (len(labels) + BATCH - 1) // BATCH
+        padded = np.zeros((batches * BATCH, 64), dtype=np.int8)
+        padded[: len(labels)] = x_q
+        padded_hidden, _padded_logits = integer_infer(padded, model)
         model_bytes = args.model.read_bytes()
 
     w2 = np.zeros((K, 12), dtype=np.int8)
@@ -132,9 +136,6 @@ def main() -> None:
     add_words(memory, W2_BASE, pack_b_columns(w2, 12))
     add_words(memory, B2_BASE, b2)
 
-    batches = (len(labels) + BATCH - 1) // BATCH
-    padded = np.zeros((batches * BATCH, 64), dtype=np.int8)
-    padded[: len(labels)] = x_q
     descriptors: list[list[int]] = []
     for batch_index in range(batches):
         batch_x = padded[batch_index * BATCH : (batch_index + 1) * BATCH]
@@ -181,7 +182,6 @@ def main() -> None:
     image_path.write_text("".join(f"{value & 0xFFFFFFFF:08x}\n"
                                    for value in image_words), encoding="ascii")
 
-    padded_hidden, _padded_logits = integer_infer(padded, model)
     hidden_words = [pack_i8(padded_hidden.reshape(-1)[offset : offset + 4])
                     for offset in range(0, padded_hidden.size, 4)]
     hidden_path = args.out_dir / "digits_hidden_expected.memh"
