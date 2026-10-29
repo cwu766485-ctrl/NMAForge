@@ -70,6 +70,15 @@ VCS `V-2023.12-SP1_Full64`, Python 3.11.13, NumPy 2.4.6, and scikit-learn
 117,760-byte figure counts only accepted SPAD traffic for this conversion, not
 all Compute Cluster traffic.
 
+The full Digits inference was replayed from clean source SHA
+`6848a414eaeaa05cf9e1411cf55d9d27333208a6` after scoping descriptor bit-5
+validation to `REQUANT_I8`. Run ID `DIGITS-HW-TILE-LAYOUT-CLEAN-6848A41` used
+VCS `V-2023.12-SP1_Full64`, Python 3.11.13, NumPy 2.1.3 and scikit-learn
+1.6.1, seed `20261029`. It again passed 360 samples with 352 correct, 69
+descriptors and exact independent integer Golden results. The current-source
+log reports `host_layout_cycles=0` and `host_layout_bytes=0`; artifacts are
+under `/tmp/nmaforge_digits_final_6848a41/`.
+
 The same source SHA passed the focused checks:
 
 ```sh
