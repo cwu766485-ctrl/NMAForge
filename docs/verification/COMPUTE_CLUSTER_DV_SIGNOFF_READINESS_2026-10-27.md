@@ -2,7 +2,7 @@
 
 ## Review decision (updated 2026-10-30)
 
-**Selected RTL/SPEC SHA:** `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413` (R99 CNM Protection alignment fix; selected subsystem, fabric reset, Top Smoke, and seeded top tests pass). **Latest tested Compute Cluster UVM code/test SHA:** `95864f7027ccbec22a09b0a61832c68d3ca08098` (R110 testbench-only change; SPEC v1.8 and product RTL are unchanged). Earlier evidence retains its named source identities.\
+**Selected RTL/SPEC SHA:** `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413` (R99 CNM Protection alignment fix; selected subsystem, fabric reset, Top Smoke, and seeded top tests pass). **Latest tested Compute Cluster UVM code/test SHA:** `bb31f6e093fc4c7bf63ac29301fe5f55aafb00b2` (R112 testbench-only change; SPEC v1.8 and product RTL are unchanged). Earlier evidence retains its named source identities.\
 **Current SPEC:** v1.8 clarifies busy-time CPLQ_HEAD consumption; v1.7 freezes KV address alignment/overflow behavior; v1.6 freezes Scalar INT8 arithmetic order; v1.5 freezes the Matrix Line transfer contract.\
 **Candidate classification:** bounded Functional DV review candidate; not CL-DV-v1.0 signed.\
 **Product RTL:** the candidate preserves the earlier scoped Conv/KV/SFU error-code alignment and KV 32-bit overflow/alignment guard; R73 also allows only the software-owned CPLQ_HEAD pointer write while compute/DMA is busy.\
@@ -215,3 +215,8 @@ At exact committed test SHA `973b4a1`, three VCS seeds each pass a real-top Matr
 
 
 **2026-10-30 R107 concurrent Protection/reset epoch:** At exact committed test SHA `53b40e67ac0f82d01dfc3c40ad36ce34745ea929`, three real-top seeds observe a CNM source-A Protection denial while Matrix is busy and has issued accepted SPAD reads, then assert accelerator reset. The point records 26 accepted Matrix reads and two cycles with both engines busy. Reset leaves no completion, writeback, stale response or owner mismatch; all destination and completion sentinels remain intact. Per-seed scoreboard `reset_dropped` increases from 9 to 11 versus R106, final pending queues are zero, and focused applicable coverage is 100%. UVM severity is `0/0/0`; the named 28/28 checker-sensitivity set, Top Smoke and 20-case top run pass. This point intentionally checks reset superseding the in-flight fault and does not claim an error completion. No RTM status changes; `CL-DV-v1.0` remains HOLD. See [R107 report](COMPUTE_CLUSTER_CNM_PROTECTION_RESET_OWNER_R107_2026-10-30.md).
+
+
+## R112 banked reset/epoch recovery — 2026-10-30
+
+At exact clean code/test SHA `bb31f6e093fc4c7bf63ac29301fe5f55aafb00b2`, VCS/URG pass the selected in-repository fabric's banked reset point on seeds `20261025/26/27`. A testbench-driven client-3 request is accepted at `0x100`, reset flushes it before a registered response, all response-valid owners remain inactive during reset and a four-cycle release quiet interval, and a fresh tagged read returns the four Golden bank words. Focused reset coverage is 100%; the banked response-owner SVA records 3 real successes and no failures/incomplete; UVM severity is `0/0/0` per seed. This does not exercise the production Matrix engine or full shared-engine contention/fault crosses. `REQ-CL-018/PC-007` remain PARTIAL, RTM remains 24 PASS-SCOPED / 14 PARTIAL, and `CL-DV-v1.0` remains HOLD. See the [R112 report](COMPUTE_CLUSTER_BANKED_RESET_EPOCH_R112_2026-10-30.md).
