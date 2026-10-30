@@ -2,7 +2,7 @@
 
 **Review date:** 2026-10-30
 
-**Selected product/SPEC candidate:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2` (SPEC v1.7 KV address update); latest verification/test SHA `2768843da1b3f3a0e988645746000d5befadf12b` (product RTL unchanged); R54 top-test SHA `f24c5383fad511c8b2e1132c1157942807994759`
+**Selected product/SPEC candidate:** `cc357830923e3dd7beda114b4d761fde839b01a7` (corrective Protection RTL, SPEC v1.7); latest verification/test SHA `2ab887ae1b4846512e7673e3d5ea4ce0061c0d0a` (R65 protection phase cross; no RTL changes); R54 top-test SHA `f24c5383fad511c8b2e1132c1157942807994759`
 - **Prior reviewed product baseline:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6`
 - **Follow-up evidence branch:** `work/compute-cluster-kv-overflow-20261030`
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
@@ -11,11 +11,11 @@
 
 ## Executive disposition
 
-The reviewed product baseline has substantial reproducible evidence for Matrix/SPAD and seven-engine Compute Cluster behavior. The follow-up product candidate adds an exact clean-SHA KV address overflow/alignment fix and R53 boundary evidence; R54 adds an exact-clean real-top KV Protection-denial test without changing product RTL. R55–R58 replay the seven-engine test, checker sensitivity, Matrix depth-4 recovery and prefetch-off fallback; R59 replays Top Smoke and the seeded top regression from clean harness SHA `ded9d92`. The Execution RTM accounts for all 38 requirements (`REQ-CL-001..028`, `REQ-PC-001..010`): **24 PASS-SCOPED and 14 PARTIAL**, with no recorded FAIL, BLOCKED_SPEC, or NOT_RUN requirement. PASS-SCOPED means the named scenario passed; it is not full requirement closure.
+The reviewed product baseline has substantial reproducible evidence for Matrix/SPAD and seven-engine Compute Cluster behavior. The follow-up product candidate adds an exact clean-SHA KV address overflow/alignment fix and R53 boundary evidence; R64 fixes Protection gating at Matrix banked/CNM lane SRAM boundaries and adds all-engine source-A checks; R65 extends Protection checks to selected source-B and writeback phases without changing product RTL. The Execution RTM accounts for all 38 requirements (`REQ-CL-001..028`, `REQ-PC-001..010`): **24 PASS-SCOPED and 14 PARTIAL**, with no recorded FAIL, BLOCKED_SPEC, or NOT_RUN requirement. PASS-SCOPED means the named scenario passed; it is not full requirement closure.
 
 The complete requirement-by-requirement execution table lives in the [Compute Cluster Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md). It records each requirement's disposition, testcase/checker or oracle, covered behavior, Run ID, seed, and evidence path. The RTM run/evidence index records source-SHA relationship, tool version, and result; R40–R45 replay the selected candidate SHA from a clean worktree. The [9d9e0f replay manifest](COMPUTE_CLUSTER_FINAL_9D9E0F_MANIFEST_2026-10-28.md) is retained as historical evidence for that earlier candidate. Runs without an exact source identity remain historical/source-equivalent and are not silently upgraded to exact-candidate replay.
 
-The **100%** result is limited to the focused top-compute functional testpoint group reproduced by R40 on six clean seeds and reconfirmed by R55 on three seeds: 29/29 applicable URG variables, with completion-read structurally N/A and checked to remain zero. R53 separately passes 11/11 KV address-contract directed testpoints per seed on three clean seeds; R54 checks four top-level KV Protection testpoints. R57 adds Matrix fault/recovery and Line stability evidence; R58 independently checks the prefetch-off fallback profile; R60 adds 18/18 all-engine parity read points per seed with 25/25 checker sensitivity and clean top replay. These directed marker counts are not whole-design URG coverage. Neither result means 100% requirement, DUT code, or complete Compute Cluster coverage. R52 adds a separate 13-legal-case-per-seed Scalar INT8 numeric campaign, without an URG percentage claim; R51's reserved activation=3 bin is superseded/excluded. The Matrix enabled-profile FSM remains 49/53 raw transitions; selected guard paths have formal disposition and one edge is exercised in the separate prefetch-disabled profile.
+The **100%** result is limited to the focused top-compute functional testpoint group reproduced by R40 on six clean seeds and reconfirmed by R55 on three seeds: 29/29 applicable URG variables, with completion-read structurally N/A and checked to remain zero. R53 separately passes 11/11 KV address-contract directed testpoints per seed on three clean seeds; R54 checks four top-level KV Protection testpoints. R57 adds Matrix fault/recovery and Line stability evidence; R58 independently checks the prefetch-off fallback profile; R60 adds 18/18 all-engine parity read points per seed; R64 adds source-A Protection denial across seven engines; R65 adds source-A/source-B/writeback Protection phases (19 cases per seed) with clean top replay. These directed marker counts are not whole-design URG coverage. Neither result means 100% requirement, DUT code, or complete Compute Cluster coverage. R52 adds a separate 13-legal-case-per-seed Scalar INT8 numeric campaign, without an URG percentage claim; R51's reserved activation=3 bin is superseded/excluded. The Matrix enabled-profile FSM remains 49/53 raw transitions; selected guard paths have formal disposition and one edge is exercised in the separate prefetch-disabled profile.
 
 ## Version and evidence integrity
 
@@ -73,6 +73,8 @@ R49 closes the defined Matrix Line transfer-contract checker slice. R52 closes t
 - [R55–R58 clean replay evidence](COMPUTE_CLUSTER_CLEAN_REPLAY_R55_R58_2026-10-30.md)
 - [R59 Top Smoke replay evidence](COMPUTE_CLUSTER_TOP_SMOKE_REPLAY_R59_2026-10-30.md)
 - [R60 all-engine parity replay evidence](COMPUTE_CLUSTER_ALL_ENGINE_PARITY_R60_2026-10-30.md)
+- [R64 all-engine Protection replay evidence](COMPUTE_CLUSTER_PROTECTION_CROSS_R64_2026-10-30.md)
+- [R65 Protection phase-cross replay evidence](COMPUTE_CLUSTER_PROTECTION_PHASE_CROSS_R65_2026-10-30.md)
 - [Matrix/TinyNPU historical benchmark report](COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md)
 
 ## R61 closeout update — 2026-10-30
