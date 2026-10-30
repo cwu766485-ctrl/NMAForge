@@ -108,6 +108,21 @@ uvm_compute_cluster_mutation: uvm_compute_cluster_compile
 	  grep -q 'UVM_ERROR[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$$log" || { echo "ERROR: mutation $$mutation did not produce the expected checker failure"; exit 1; }; \
 	  echo "CLUSTER_MUTATION_PASS: mutation=$$mutation log=$$log"; \
 	done; \
+	for mutation in completion_error_code write_after_error response_epoch; do \
+	  log="$$out/$${mutation}.log"; db="$$out/$${mutation}.vdb"; \
+	  case "$$mutation" in \
+	    completion_error_code) expected_checker=completion_error_code ;; \
+	    write_after_error) expected_checker=write_after_error_prefix ;; \
+	    response_epoch) expected_checker=response_epoch ;; \
+	  esac; \
+	  "$(COMPUTE_CLUSTER_UVM_OUT)/simv_uvm" +UVM_TESTNAME=ai_compute_cluster_e2e_test \
+	    +COMPUTE_CLUSTER_SEED=20261025 +ntb_random_seed=20261025 +CL_MUTATION=$$mutation \
+	    -cm $(UVM_COV_METRICS) -cm_dir "$$db" -l "$$log"; \
+	  grep -q "\[CLUSTER_MUTATION_INJECTED\].*mutation=$$mutation" "$$log" || { echo "ERROR: mutation $$mutation was not injected"; exit 1; }; \
+	  grep -q "\[CLUSTER_MUTATION_CAUGHT\].*mutation=$$mutation checker=$$expected_checker" "$$log" || { echo "ERROR: mutation $$mutation escaped checker $$expected_checker"; exit 1; }; \
+	  grep -q 'UVM_ERROR[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$$log" || { echo "ERROR: mutation $$mutation did not produce the expected checker failure"; exit 1; }; \
+	  echo "CLUSTER_MUTATION_PASS: mutation=$$mutation log=$$log"; \
+	done; \
 	for mutation in done missing_done duplicate_done; do \
 	  for engine in 0 1 2 3 4 5 6; do \
 	    log="$$out/$${mutation}_engine_$${engine}.log"; db="$$out/$${mutation}_engine_$${engine}.vdb"; \
@@ -121,7 +136,7 @@ uvm_compute_cluster_mutation: uvm_compute_cluster_compile
 	    echo "CLUSTER_MUTATION_PASS: mutation=$$mutation engine=$$engine log=$$log"; \
 	  done; \
 	done; \
-	echo "COMPUTE_CLUSTER_MUTATION_CAMPAIGN_PASS: address data owner wstrb plus done/missing_done/duplicate_done on all seven engines (25/25); expected checker verified per mutation; artifacts=$$out"
+	echo "COMPUTE_CLUSTER_MUTATION_CAMPAIGN_PASS: address data owner wstrb completion_error_code write_after_error response_epoch plus done/missing_done/duplicate_done on all seven engines (28/28); expected checker verified per mutation; artifacts=$$out"
 
 # Opt-in AXI address/data/response gaps are seeded per vector plan and sampled
 # per transaction. The focused target requires configuration and stall markers.

@@ -7,6 +7,10 @@ class ai_compute_cluster_monitor extends uvm_component;
     bit [6:0] missing_done_pending;
     bit [6:0] duplicate_done_pending;
     int mutation_engine;
+    bit write_prefix_pending;
+    bit response_epoch_pending;
+    int response_epoch_client;
+    int pending_read_count[0:4];
 
     function new(string name, uvm_component parent);
         super.new(name, parent);
@@ -22,6 +26,10 @@ class ai_compute_cluster_monitor extends uvm_component;
         missing_done_pending = '0;
         duplicate_done_pending = '0;
         mutation_engine = 0;
+        write_prefix_pending = 1'b0;
+        response_epoch_pending = 1'b0;
+        response_epoch_client = 0;
+        for (int client = 0; client < 5; client++) pending_read_count[client] = 0;
         void'($value$plusargs("CL_MUTATION=%s", mutation_kind));
         void'($value$plusargs("CL_MUTATION_ENGINE=%d", mutation_engine));
     endfunction
@@ -38,12 +46,14 @@ class ai_compute_cluster_monitor extends uvm_component;
             if (!vif.aresetn || vif.host_valid || vif.selected_spad_valid ||
                 vif.selected_line_valid || vif.selected_banked_valid ||
                 (|vif.selected_cnm_valid) || vif.launch_valid || (|vif.engine_busy) ||
-                (|vif.engine_done) || (|vif.engine_req_valid) ||
+                (|vif.engine_done) || (|vif.engine_error) ||
+                (|vif.engine_req_valid) ||
                 vif.core_spad_valid || vif.banked_valid ||
                 (|vif.cnm_valid) || vif.rsp_valid || vif.matrix_rsp_valid ||
                 (|vif.cnm_rsp_valid) || (|vif.read_accept_mask) ||
                 vif.matrix_prefetch_active || vif.matrix_a_cache_hit ||
-                (missing_done_pending != 0) || (duplicate_done_pending != 0)) begin
+                (missing_done_pending != 0) || (duplicate_done_pending != 0) ||
+                write_prefix_pending || response_epoch_pending) begin
                 obs = ai_compute_cluster_obs::type_id::create("obs");
                 obs.reset_active = !vif.aresetn;
                 obs.core_busy = vif.core_busy;
@@ -106,9 +116,44 @@ class ai_compute_cluster_monitor extends uvm_component;
                 obs.selected_rsp_error = vif.selected_rsp_error;
                 obs.selected_rsp_rdata = vif.selected_rsp_rdata;
 
-                // Checker-sensitivity mutations alter only the passive
-                // transaction copy. The DUT, memory, and sequence drivers are
-                // never changed. Each campaign run injects one mutation.
+                if (!vif.aresetn) begin
+                    if (mutation_kind == "response_epoch") begin
+                        for (lane = 0; lane < 5; lane++) begin
+                            if ((pending_read_count[lane] != 0) &&
+                                !response_epoch_pending && !mutation_injected) begin
+                                response_epoch_client = lane;
+                                response_epoch_pending = 1'b1;
+                            end
+                        end
+                    end
+                    for (lane = 0; lane < 5; lane++) pending_read_count[lane] = 0;
+                end else begin
+                    if (vif.rsp_valid && (vif.rsp_client < 5) &&
+                        (pending_read_count[vif.rsp_client] != 0))
+                        pending_read_count[vif.rsp_client]--;
+                    for (lane = 0; lane < 5; lane++)
+                        if (vif.read_accept_mask[lane]) pending_read_count[lane]++;
+                end
+
+                if ((mutation_kind == "response_epoch") &&
+                    response_epoch_pending && vif.aresetn) begin
+                    // Inject an old-epoch response into the passive observation
+                    // stream after reset has flushed its accepted request.
+                    obs.rsp_valid = 1'b1;
+                    obs.rsp_client = response_epoch_client[2:0];
+                    obs.mutation_probe = 1'b1;
+                    response_epoch_pending = 1'b0;
+                    mutation_injected = 1'b1;
+                    `uvm_info("CLUSTER_MUTATION_INJECTED", $sformatf(
+                        "mutation=response_epoch passive response from prior reset epoch client=%0d",
+                        response_epoch_client), UVM_LOW)
+                end
+
+                // Most checker-sensitivity mutations alter only the passive
+                // transaction copy. The completion_error_code probe is a
+                // separate testbench memory-image corruption in the sequence;
+                // none of these probes mutate product RTL. Each run injects
+                // one mutation.
                 if (!mutation_injected) begin
                     case (mutation_kind)
                         "address": if (obs.selected_banked_valid && obs.selected_banked_ready) begin
@@ -145,6 +190,30 @@ class ai_compute_cluster_monitor extends uvm_component;
                             obs.engine_done = obs.engine_done | duplicate_done_pending;
                             duplicate_done_pending = '0;
                             mutation_injected = 1'b1;
+                        end
+                        "write_after_error": begin
+                            if (write_prefix_pending && !obs.reset_active) begin
+                                obs.selected_spad_valid = 1'b1;
+                                obs.selected_spad_write = 1'b1;
+                                obs.selected_spad_ready = 1'b1;
+                                obs.selected_spad_access_ok = 1'b1;
+                                obs.selected_spad_addr = 32'h0005_f000;
+                                obs.selected_spad_wdata = 32'hbad0_0001;
+                                obs.request_client = 3'd2;
+                                obs.engine_req_valid = 7'b1 << mutation_engine;
+                                obs.engine_req_ready = 7'b1 << mutation_engine;
+                                obs.mutation_probe = 1'b1;
+                                write_prefix_pending = 1'b0;
+                                mutation_injected = 1'b1;
+                            end else if ((|obs.engine_error) && !obs.reset_active) begin
+                                for (lane = 0; lane < 7; lane++) begin
+                                    if (obs.engine_error[lane]) begin
+                                        mutation_engine = lane;
+                                        write_prefix_pending = 1'b1;
+                                        break;
+                                    end
+                                end
+                            end
                         end
                         default: begin end
                     endcase
