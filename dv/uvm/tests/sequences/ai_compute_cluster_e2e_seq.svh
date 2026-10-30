@@ -626,7 +626,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
-    task automatic run_matrix_protection_cnm_owner_cross(input int unsigned seed);
+    task automatic run_matrix_protection_cnm_owner_cross(
+        input int unsigned seed, input bit abort_cnm_after_protection);
         bit [31:0] desc_base;
         bit [31:0] cpl_base;
         bit [31:0] matrix_dst;
@@ -639,6 +640,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         bit [31:0] overlap_before;
         bit [31:0] shared_accept_before;
         bit protection_seen;
+        bit abort_issued;
         bit busy_seen;
         bit monitor_done;
         int unsigned cycle;
@@ -656,18 +658,24 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned lane;
         int unsigned byte_idx;
         int unsigned word_idx;
+        bit [15:0] matrix_task_id;
+        bit [15:0] cnm_task_id;
+        bit [31:0] actual_output;
 
         desc_base = 32'h0000_7800;
         cpl_base = 32'h0000_7900;
         matrix_dst = 32'h0000_8000;
         cnm_dst = 32'h0005_4800;
         protection_seen = 1'b0;
+        abort_issued = 1'b0;
         busy_seen = 1'b0;
         monitor_done = 1'b0;
         cnm_busy_cycles = 0;
         matrix_busy_cycles = 0;
         both_busy_cycles = 0;
         parallel_active_cycles = 0;
+        matrix_task_id = abort_cnm_after_protection ? 16'h07d2 : 16'h07d0;
+        cnm_task_id = abort_cnm_after_protection ? 16'h07d3 : 16'h07d1;
 
         // A legal CNM GEMV uses its own contiguous protected window and an
         // independent output image for concurrent owner/Golden checking.
@@ -714,10 +722,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         // output write is denied. This leaves enough execution time for the
         // following CNM task to run concurrently and exercise response-owner
         // isolation through a real Matrix writeback Protection fault.
-        write_v3_desc(desc_base, 8'h30, 16'h07d0,
+        write_v3_desc(desc_base, 8'h30, matrix_task_id,
                       MATRIX_A_LOCAL, MATRIX_B_LOCAL, matrix_dst,
                       16'd16, 16'd32, 16'd16);
-        write_cluster_desc(desc_base + 32'h40, 8'h21, 16'h07d1,
+        write_cluster_desc(desc_base + 32'h40, 8'h21, cnm_task_id,
                            MATRIX_LINE_STALL_CNM_A_LOCAL,
                            MATRIX_LINE_STALL_CNM_B_LOCAL, cnm_dst,
                            16'd16, 16'd1, 16'd32, 32'd0,
@@ -776,14 +784,25 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 compute_vif.selected_line_write &&
                 !compute_vif.selected_line_access_ok &&
                 (compute_vif.selected_line_addr >= matrix_dst) &&
-                (compute_vif.selected_line_addr < matrix_dst + 32'h800))
+                (compute_vif.selected_line_addr < matrix_dst + 32'h800)) begin
                 protection_seen = 1'b1;
+                if (abort_cnm_after_protection && !abort_issued) begin
+                    if (!compute_vif.engine_busy[2])
+                        `uvm_fatal("CLUSTER_PROTECTION_ABORT_OWNER",
+                            "CNM completed before the concurrent Matrix Protection event")
+                    axil_write(REG_ABORT, 32'd1);
+                    abort_issued = 1'b1;
+                end
+            end
             if (busy_seen && !compute_vif.processor_busy)
                 monitor_done = 1'b1;
         end
         if (!busy_seen || !monitor_done)
             `uvm_fatal("CLUSTER_PROTECTION_OWNER",
                 "Matrix output Protection/CNM overlap did not finish in the monitor window")
+        if (abort_cnm_after_protection && !abort_issued)
+            `uvm_fatal("CLUSTER_PROTECTION_ABORT_OWNER",
+                "software Abort was not issued after the Matrix Protection event")
         wait_cpl_tail(32'd2);
         wait_spad_idle();
 
@@ -821,27 +840,53 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_fatal("CLUSTER_PROTECTION_OWNER",
                 "response from the Protection-faulted Matrix task was routed to the wrong engine")
 
-        expect_spad(cpl_base, 32'h0000_07d0,
+        expect_spad(cpl_base, {16'd0, matrix_task_id},
                     "concurrent Protection Matrix task ID/order");
         expect_spad(cpl_base + 32'h04, 32'h0000_0062,
                     "concurrent Protection Matrix error owner");
-        expect_completion(cpl_base + 32'h10, 16'h07d1,
-                          expected_cnm[15], 32'd16,
-                          "concurrent Protection CNM success/order");
+        if (abort_cnm_after_protection) begin
+            expect_spad(cpl_base + 32'h10, {16'd0, cnm_task_id},
+                        "concurrent Protection CNM Abort task ID/order");
+            expect_spad(cpl_base + 32'h14, 32'h0000_0032,
+                        "concurrent Protection CNM ERR_ABORT owner");
+        end else begin
+            expect_completion(cpl_base + 32'h10, cnm_task_id,
+                              expected_cnm[15], 32'd16,
+                              "concurrent Protection CNM success/order");
+        end
         for (word_idx = 0; word_idx < 512; word_idx++)
             expect_spad(matrix_dst + (word_idx << 2),
                         32'hfa17_8000 | word_idx,
                         $sformatf("concurrent Protection Matrix no-writeback[%0d]", word_idx));
-        for (word_idx = 0; word_idx < 16; word_idx++)
-            expect_spad(cnm_dst + (word_idx << 2), expected_cnm[word_idx],
-                        $sformatf("concurrent Protection CNM Golden[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 16; word_idx++) begin
+            if (abort_cnm_after_protection) begin
+                axil_read(CIMFORGE_SPAD_BASE + cnm_dst + (word_idx << 2),
+                          actual_output);
+                if ((actual_output !== expected_cnm[word_idx]) &&
+                    (actual_output !== (32'hfa17_8800 | word_idx)))
+                    `uvm_fatal("CLUSTER_PROTECTION_ABORT_OWNER", $sformatf(
+                        "CNM output after Protection/Abort is neither Golden nor untouched: index=%0d expected=0x%08h sentinel=0x%08h actual=0x%08h",
+                        word_idx, expected_cnm[word_idx],
+                        (32'hfa17_8800 | word_idx), actual_output))
+            end else
+                expect_spad(cnm_dst + (word_idx << 2), expected_cnm[word_idx],
+                            $sformatf("concurrent Protection CNM Golden[%0d]", word_idx));
+        end
 
-        `uvm_info("CLUSTER_PROTECTION_OWNER_CROSS_PASS", $sformatf(
-            "real Matrix output Protection after legal operand reads/compute and concurrent CNM Golden pass; overlap_cycles=%0d shared_banked_accepts=%0d matrix_rsp=%0d cnm_rsp=%0d route_mismatch=0; no Matrix writeback; ordered completion; seed=%0d",
-            compute_vif.matrix_cnm_overlap_cycles - overlap_before,
-            compute_vif.matrix_cnm_shared_accept_cycles - shared_accept_before,
-            compute_vif.matrix_tag_response_count - matrix_rsp_before,
-            compute_vif.cnm_tag_response_count - cnm_rsp_before, seed), UVM_LOW)
+        if (abort_cnm_after_protection)
+            `uvm_info("CLUSTER_PROTECTION_ABORT_OWNER_CROSS_PASS", $sformatf(
+                "Matrix Protection ERR 0x62 is preserved before CNM software Abort ERR 0x32; overlap_cycles=%0d shared_banked_accepts=%0d matrix_rsp=%0d cnm_rsp=%0d route_mismatch=0; no Matrix writeback; CNM outputs are Golden or untouched; seed=%0d",
+                compute_vif.matrix_cnm_overlap_cycles - overlap_before,
+                compute_vif.matrix_cnm_shared_accept_cycles - shared_accept_before,
+                compute_vif.matrix_tag_response_count - matrix_rsp_before,
+                compute_vif.cnm_tag_response_count - cnm_rsp_before, seed), UVM_LOW)
+        else
+            `uvm_info("CLUSTER_PROTECTION_OWNER_CROSS_PASS", $sformatf(
+                "real Matrix output Protection after legal operand reads/compute and concurrent CNM Golden pass; overlap_cycles=%0d shared_banked_accepts=%0d matrix_rsp=%0d cnm_rsp=%0d route_mismatch=0; no Matrix writeback; ordered completion; seed=%0d",
+                compute_vif.matrix_cnm_overlap_cycles - overlap_before,
+                compute_vif.matrix_cnm_shared_accept_cycles - shared_accept_before,
+                compute_vif.matrix_tag_response_count - matrix_rsp_before,
+                compute_vif.cnm_tag_response_count - cnm_rsp_before, seed), UVM_LOW)
 
         axil_write(REG_CPLQ_HEAD, 32'd2);
         axil_write(REG_CMDQ_SIZE, 32'd0);
@@ -3595,7 +3640,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             seed), UVM_LOW)
 
         run_matrix_parity_cnm_owner_cross(seed);
-        run_matrix_protection_cnm_owner_cross(seed);
+        run_matrix_protection_cnm_owner_cross(seed, 1'b0);
+        run_matrix_protection_cnm_owner_cross(seed, 1'b1);
 
         // Cross source-A, source-B where present, and writeback protection
         // phases on real engines. SFU and KV have no second source operand.
