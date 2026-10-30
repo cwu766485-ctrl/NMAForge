@@ -2,7 +2,7 @@
 
 **Review date:** 2026-10-30
 
-**Selected product/SPEC candidate:** `cc357830923e3dd7beda114b4d761fde839b01a7` (corrective Protection RTL, SPEC v1.7); latest verification/test SHA `7837701cefe606a01abd517d46788b982da0f2e4` (R90 descriptor validator/decode test; no product RTL changes); R54 top-test SHA `f24c5383fad511c8b2e1132c1157942807994759`
+**Selected product/SPEC candidate:** `9d4e9abdba1f745644a485960620fa6bbc4979db` (SPEC v1.8); latest exact-clean verification/test SHA `43a84cac688a56e789162dfa5a8106551779abdb` (R91 clean replay; R90 descriptor validator/decode test; no product RTL changes); R54 top-test SHA `f24c5383fad511c8b2e1132c1157942807994759`
 - **Prior reviewed product baseline:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6`
 - **Follow-up evidence branch:** `work/compute-cluster-kv-overflow-20261030`
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
@@ -119,3 +119,7 @@ R89 passes 40/40 Golden points across eight Matrix configurations and five workl
 ## R90 descriptor validator/decode check — 2026-10-30
 
 R90 checks all 27 supported opcode classifications, the `0x36` tile-pack predicate and 21 invalid validator inputs using isolated VCS output at SHA `7837701cefe606a01abd517d46788b982da0f2e4`. This closes only the combinational validator test slice. CMDQ-to-engine dispatch and complete per-engine descriptor boundaries remain open; `REQ-CL-002` stays PARTIAL and CL-DV-v1.0 stays HOLD. See [R90 evidence](COMPUTE_CLUSTER_DESCRIPTOR_VALIDATOR_R90_2026-10-30.md).
+
+## R91 exact-candidate replay — 2026-10-30
+
+At exact clean code/test SHA `43a84cac688a56e789162dfa5a8106551779abdb`, the three-seed real-top UVM, 28/28 named checker-sensitivity mutations, Top Smoke, and the 20-case seeded Top regression pass. Each UVM seed checks 17,388 memory words with zero mismatch/unknown/stale/orphan responses and UVM severity `0/0/0`; the applicable focused cluster group is 64/64. URG assertion status is 17/22 successes with zero failures/incomplete, and the compute-only AXI stall covers match 1/3. The Top Smoke fixture warning is retained. This exact-candidate replay does not alter requirement status: 24 PASS-SCOPED / 14 PARTIAL; CL-DV-v1.0 remains HOLD. See [R91 evidence](COMPUTE_CLUSTER_CLEAN_REPLAY_R91_2026-10-30.md).

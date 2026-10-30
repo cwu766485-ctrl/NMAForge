@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-10-29. This is a short handoff for the next engineering task; it
+Updated: 2026-10-30. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -23,6 +23,17 @@ Key architecture rules:
   completions retire in CMDQ order. See the Compute Cluster SPEC v1.1.
 
 ## Current verification frontier
+
+On the isolated closeout branch, exact clean candidate SHA
+`43a84cac688a56e789162dfa5a8106551779abdb` passes the three-seed real-top
+Compute Cluster UVM, all 28 named checker-sensitivity mutations, Top Smoke,
+and the 20-case seeded Top regression. Each UVM seed checks 17,388 memory
+words with zero mismatch/unknown/stale/orphan response and 100% of the
+applicable focused cluster bins. URG remains 17/22 assertion successes with
+zero failures/incomplete; AR/AW stall properties are not activated by this
+compute-only sequence. This adds reproducibility only: the RTM remains 24
+PASS-SCOPED / 14 PARTIAL, and CL-DV-v1.0 remains HOLD. See the
+[R91 replay report](../../verification/COMPUTE_CLUSTER_CLEAN_REPLAY_R91_2026-10-30.md).
 
 The VCS license is available in the current environment. On research branch
 `feat/tinynpu-model-inference`, run `DIGITS-RTL-20261029-FINAL` passed: a trained

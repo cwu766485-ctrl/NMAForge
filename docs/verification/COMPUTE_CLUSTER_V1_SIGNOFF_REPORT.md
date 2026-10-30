@@ -144,3 +144,7 @@ The exact R88 code/test SHA `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec` passes th
 ## R90 descriptor-validator boundary evidence — 2026-10-30
 
 The isolated regression at SHA `7837701cefe606a01abd517d46788b982da0f2e4` passes 27 supported opcode values, the special `0x36` tile-pack rule and 21 invalid descriptor cases against production validator/decoder RTL. It does not issue CMDQ descriptors or observe top-level launch ownership, so `REQ-CL-002` remains PARTIAL; per-engine address/stride/alias boundaries also remain open. Details and hashes: [R90 report](COMPUTE_CLUSTER_DESCRIPTOR_VALIDATOR_R90_2026-10-30.md). The 38-row RTM remains 24 PASS-SCOPED / 14 PARTIAL and **HOLD**.
+
+## R91 exact-candidate clean replay — 2026-10-30
+
+At exact clean code/test SHA `43a84cac688a56e789162dfa5a8106551779abdb`, three real-top UVM seeds, 28/28 named checker-sensitivity mutations, Top Smoke, and 20-case seeded Top all pass. Each seed checks 17,388 SPAD words with zero mismatch/unknown/stale/orphan response and UVM severity `0/0/0`; the applicable focused cluster group is 64/64. URG has 17/22 assertion properties with real success, no failures/incomplete, and 1/3 AXI stall-to-accept cover matches; three AXI properties lack real success and two UVM RAL properties have no attempts. R91 adds exact-candidate reproducibility only; the 38 requirements remain 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains **HOLD**. Full artifacts and hashes are in [R91](COMPUTE_CLUSTER_CLEAN_REPLAY_R91_2026-10-30.md).
