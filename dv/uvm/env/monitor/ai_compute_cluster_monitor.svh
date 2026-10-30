@@ -11,6 +11,7 @@ class ai_compute_cluster_monitor extends uvm_component;
     bit response_epoch_pending;
     int response_epoch_client;
     int pending_read_count[0:4];
+    int unsigned matrix_fault_cancel_count_seen;
 
     function new(string name, uvm_component parent);
         super.new(name, parent);
@@ -29,6 +30,7 @@ class ai_compute_cluster_monitor extends uvm_component;
         write_prefix_pending = 1'b0;
         response_epoch_pending = 1'b0;
         response_epoch_client = 0;
+        matrix_fault_cancel_count_seen = 0;
         for (int client = 0; client < 5; client++) pending_read_count[client] = 0;
         void'($value$plusargs("CL_MUTATION=%s", mutation_kind));
         void'($value$plusargs("CL_MUTATION_ENGINE=%d", mutation_engine));
@@ -52,6 +54,8 @@ class ai_compute_cluster_monitor extends uvm_component;
                 (|vif.cnm_valid) || vif.rsp_valid || vif.matrix_rsp_valid ||
                 (|vif.cnm_rsp_valid) || (|vif.read_accept_mask) ||
                 vif.matrix_prefetch_active || vif.matrix_a_cache_hit ||
+                (vif.matrix_banked_fault_cancel_checks !=
+                 matrix_fault_cancel_count_seen) ||
                 (missing_done_pending != 0) || (duplicate_done_pending != 0) ||
                 write_prefix_pending || response_epoch_pending) begin
                 obs = ai_compute_cluster_obs::type_id::create("obs");
@@ -72,6 +76,11 @@ class ai_compute_cluster_monitor extends uvm_component;
                 obs.cnm_valid = vif.cnm_valid;
                 obs.matrix_prefetch_active = vif.matrix_prefetch_active;
                 obs.matrix_a_cache_hit = vif.matrix_a_cache_hit;
+                obs.matrix_banked_fault_cancel =
+                    (vif.matrix_banked_fault_cancel_checks !=
+                     matrix_fault_cancel_count_seen);
+                matrix_fault_cancel_count_seen =
+                    vif.matrix_banked_fault_cancel_checks;
                 obs.rsp_valid = vif.rsp_valid;
                 obs.rsp_client = vif.rsp_client;
                 obs.request_client = vif.request_client;
