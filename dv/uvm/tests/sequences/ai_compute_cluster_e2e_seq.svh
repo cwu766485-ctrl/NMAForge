@@ -57,6 +57,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] CONTRACT_SFU_Y_LOCAL = 32'h0004_7800;
     localparam bit [31:0] MATRIX_LATCH_Y_LOCAL = 32'h0003_8000;
     localparam bit [31:0] MATRIX_LATCH_MUTATED_Y_LOCAL = 32'h0003_9000;
+    localparam bit [31:0] SFU_LATCH_SRC_LOCAL = 32'h0004_a100;
+    localparam bit [31:0] SFU_LATCH_MUTATED_SRC_LOCAL = 32'h0004_a140;
+    localparam bit [31:0] SFU_LATCH_Y_LOCAL = 32'h0004_a180;
+    localparam bit [31:0] SFU_LATCH_MUTATED_Y_LOCAL = 32'h0004_a1c0;
     localparam bit [31:0] SCALAR_A_LOCAL = 32'h0004_6000;
     localparam bit [31:0] SCALAR_B_LOCAL = 32'h0004_6100;
     localparam bit [31:0] SCALAR_Y_LOCAL = 32'h0004_6200;
@@ -1208,6 +1212,95 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 compute_vif.launch_snapshot_flags[3]))
         `uvm_info("CLUSTER_MATRIX_PARAMETER_LATCH_PASS",
             "mutating Matrix source, destination, shape, and transpose descriptor fields after launch preserved the original 16x32x64 Golden image and completion",
+            UVM_LOW)
+        clear_contract_queues(32'd1);
+    endtask
+
+    task automatic run_sfu_inflight_parameter_latch_test();
+        int unsigned poll;
+        int unsigned word_idx;
+        int unsigned launch_before;
+        bit state_seen;
+        bit hdl_ok;
+        uvm_hdl_data_t state_value;
+        bit [31:0] completion_base;
+        string state_path;
+        completion_base = CLUSTER_CONTRACT_CPLQ + 32'h400;
+        state_path = "tb_ai_accel_uvm.dut.compute_cluster_u.tensor_sfu_u.state_r";
+
+        // RMSNorm over [1,2,2,0] with epsilon 1 has an exact integer Golden:
+        // floor((1+4+4+0)/4)=2, isqrt(2+1)=1, and the Q30 reciprocal is 1.
+        // A different source [4,4,4,4] would instead normalize to [1,1,1,1].
+        spad_write(SFU_LATCH_SRC_LOCAL + 32'h00, 32'd1);
+        spad_write(SFU_LATCH_SRC_LOCAL + 32'h04, 32'd2);
+        spad_write(SFU_LATCH_SRC_LOCAL + 32'h08, 32'd2);
+        spad_write(SFU_LATCH_SRC_LOCAL + 32'h0c, 32'd0);
+        for (word_idx = 0; word_idx < 4; word_idx++) begin
+            spad_write(SFU_LATCH_MUTATED_SRC_LOCAL + (word_idx << 2), 32'd4);
+            spad_write(SFU_LATCH_Y_LOCAL + (word_idx << 2), 32'hbad0_6c00 | word_idx);
+            spad_write(SFU_LATCH_MUTATED_Y_LOCAL + (word_idx << 2), 32'hbad0_6d00 | word_idx);
+        end
+        write_v3_desc(CLUSTER_CONTRACT_CMDQ, 8'h33, 16'h0686,
+                      SFU_LATCH_SRC_LOCAL, 32'd0, SFU_LATCH_Y_LOCAL,
+                      16'd0, 16'd0, 16'd4);
+        launch_before = compute_vif.launch_sample_count;
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        // State 13 is the iterative RMS mean-square divider wait. The SFU
+        // keeps its SPAD request deasserted here, so host writes to the already
+        // fetched descriptor do not contend with an outstanding engine read.
+        state_seen = 1'b0;
+        for (poll = 0; poll < 10000; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.engine_busy[4]) begin
+                hdl_ok = uvm_hdl_read(state_path, state_value);
+                if (!hdl_ok)
+                    `uvm_fatal("CLUSTER_SFU_PARAM_LATCH",
+                        $sformatf("failed to read SFU state through %s", state_path))
+                if (state_value[5:0] == 6'd13) begin
+                    state_seen = 1'b1;
+                    break;
+                end
+            end
+        end
+        if (!state_seen)
+            `uvm_fatal("CLUSTER_SFU_PARAM_LATCH",
+                "RMSNorm task did not reach the divider wait before descriptor mutation")
+
+        // Mutate the fetched descriptor to point at a different legal input,
+        // destination and one-element length. The accepted four-element task
+        // must continue from its launch-time snapshot.
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h04, SFU_LATCH_MUTATED_SRC_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h10, SFU_LATCH_MUTATED_Y_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h18, 32'd1);
+
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        for (word_idx = 0; word_idx < 4; word_idx++) begin
+            expect_spad(SFU_LATCH_Y_LOCAL + (word_idx << 2),
+                        (word_idx < 3) ? (word_idx == 0 ? 32'd1 : 32'd2) : 32'd0,
+                        $sformatf("in-flight SFU RMSNorm latched Golden[%0d]", word_idx));
+            expect_spad(SFU_LATCH_MUTATED_Y_LOCAL + (word_idx << 2),
+                        32'hbad0_6d00 | word_idx,
+                        $sformatf("in-flight SFU mutation destination sentinel[%0d]", word_idx));
+        end
+        expect_completion(completion_base, 16'h0686, 32'd0, 32'd4,
+                          "in-flight SFU RMSNorm parameter latch");
+        if (compute_vif.launch_sample_count != launch_before + 1 ||
+            compute_vif.launch_snapshot_src0[4] !== SFU_LATCH_SRC_LOCAL ||
+            compute_vif.launch_snapshot_src1[4] !== 32'd0 ||
+            compute_vif.launch_snapshot_dst[4] !== SFU_LATCH_Y_LOCAL ||
+            compute_vif.launch_snapshot_length[4] !== 16'd4)
+            `uvm_fatal("CLUSTER_SFU_PARAM_LATCH", $sformatf(
+                "SFU launch snapshot changed: count=%0d/%0d src0=%08h src1=%08h dst=%08h length=%0d",
+                compute_vif.launch_sample_count, launch_before + 1,
+                compute_vif.launch_snapshot_src0[4],
+                compute_vif.launch_snapshot_src1[4],
+                compute_vif.launch_snapshot_dst[4],
+                compute_vif.launch_snapshot_length[4]))
+        `uvm_info("CLUSTER_SFU_PARAMETER_LATCH_PASS",
+            "real-top RMSNorm retained its four-element source/destination/length snapshot while the backing descriptor was changed during divider wait",
             UVM_LOW)
         clear_contract_queues(32'd1);
     endtask
@@ -2486,6 +2579,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_launch_snapshot_and_unused_fields_test();
         run_inflight_parameter_latch_test();
         run_matrix_inflight_parameter_latch_test(matrix_golden);
+        run_sfu_inflight_parameter_latch_test();
         run_shared_readonly_isolation_test();
         check_request_stability();
         run_engine_reset_drain_sweep();
