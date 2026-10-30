@@ -280,3 +280,7 @@ R61 adds checker evidence relevant to `REQ-CL-011/013` (seven-engine Done lifecy
 ## R62 supplemental AXI stall replay — separate workload
 
 At exact clean code/test SHA `d45b89af0c5aab2107a5db6bbf0a6ab754e81656`, `make uvm_mixed_precision_ddr_e2e_axi_stalls` passes with ARREADY gap 2 and AWREADY gap 3, three UVM severities at zero, and SVA cover matches AR/AW/W=`14/5/12`. This is separate from the Compute Cluster R61 run. Its invocation did not enable coverage collection, so it does not change R61's 22-property URG summary and is not consolidated coverage evidence. See [R62 replay report](COMPUTE_CLUSTER_R62_AXI_STALL_REPLAY_2026-10-30.md).
+
+## R63 combined SVA replay — 2026-10-30
+
+The exact clean code/test SHA `d45b89af0c5aab2107a5db6bbf0a6ab754e81656` now has a coverage-enabled same-SHA URG merge of R61 Compute Cluster seeds (`20261030/25/26`) and the R63 mixed-precision AXI-stall test (`20261015`, AR/AW gaps `2/3`). URG reports 20/22 properties with real successes, zero failures/incomplete, and only two no-attempt UVM RAL internals. All five top AXI AR/AW/W burst/payload assertions have successes and all three AR/AW/W stall-to-accept covers match. The functional workload results remain separately sourced; no testpoint percentage is merged. See [R63 report](COMPUTE_CLUSTER_R63_COMBINED_SVA_2026-10-30.md). The broader v1.0 HOLD items remain open.
