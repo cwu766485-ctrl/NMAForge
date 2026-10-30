@@ -2464,6 +2464,170 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
+    task automatic run_cnm_abort_write_prefix(input int unsigned seed);
+        int signed a_elem[0:3][0:3][0:3];
+        int signed b_elem[0:15][0:3][0:3][0:3];
+        int signed expected_output[0:15];
+        bit [31:0] write_addr[0:15];
+        bit [31:0] write_data[0:15];
+        bit [31:0] desc_base;
+        bit [31:0] completion_base;
+        bit [31:0] src_a;
+        bit [31:0] src_b;
+        bit [31:0] dst;
+        bit [31:0] sentinel;
+        bit [31:0] packed_word;
+        bit [15:0] task_id;
+        int unsigned accepted_write_count;
+        int unsigned accepted_reads;
+        int unsigned returned_reads;
+        int unsigned poll;
+        int unsigned row_idx;
+        int unsigned k_idx;
+        int unsigned lane;
+        int unsigned byte_idx;
+        int signed value_a;
+        int signed value_b;
+        bit first_write_seen;
+        bit abort_seen;
+        bit monitor_done;
+
+        desc_base = CLUSTER_CONTRACT_CMDQ;
+        completion_base = 32'h0000_5e80;
+        src_a = 32'h0004_e000;
+        src_b = 32'h0004_e100;
+        dst = 32'h0004_e800;
+        sentinel = 32'hbad0_7a00;
+        task_id = 16'h0774;
+        accepted_write_count = 0;
+        accepted_reads = 0;
+        returned_reads = 0;
+        first_write_seen = 1'b0;
+        abort_seen = 1'b0;
+        monitor_done = 1'b0;
+
+        // A legal 16-output GEMV with K=4 words.  The four independent
+        // bank lanes each consume one packed INT8 word per K step.  Keep the
+        // operation long enough that software Abort cuts a real output prefix.
+        for (k_idx = 0; k_idx < 4; k_idx++) begin
+            for (lane = 0; lane < 4; lane++) begin
+                packed_word = '0;
+                for (byte_idx = 0; byte_idx < 4; byte_idx++) begin
+                    a_elem[k_idx][lane][byte_idx] =
+                        int'((k_idx + lane + byte_idx) % 5) - 2;
+                    packed_word[byte_idx*8 +: 8] = a_elem[k_idx][lane][byte_idx];
+                end
+                spad_write(src_a + (k_idx << 4) + (lane << 2), packed_word);
+            end
+        end
+        for (row_idx = 0; row_idx < 16; row_idx++) begin
+            expected_output[row_idx] = 0;
+            for (k_idx = 0; k_idx < 4; k_idx++) begin
+                for (lane = 0; lane < 4; lane++) begin
+                    packed_word = '0;
+                    for (byte_idx = 0; byte_idx < 4; byte_idx++) begin
+                        b_elem[row_idx][k_idx][lane][byte_idx] =
+                            int'((row_idx + k_idx + lane + byte_idx) % 7) - 3;
+                        packed_word[byte_idx*8 +: 8] =
+                            b_elem[row_idx][k_idx][lane][byte_idx];
+                        expected_output[row_idx] +=
+                            a_elem[k_idx][lane][byte_idx] *
+                            b_elem[row_idx][k_idx][lane][byte_idx];
+                    end
+                    spad_write(src_b + (row_idx * 64) + (k_idx << 4) +
+                               (lane << 2), packed_word);
+                end
+            end
+            spad_write(dst + (row_idx << 2), sentinel ^ row_idx);
+        end
+        for (row_idx = 0; row_idx < 4; row_idx++)
+            spad_write(completion_base + (row_idx << 2),
+                       32'h7740_0000 | row_idx);
+
+        write_cnm_v3_desc(desc_base, task_id, src_a, src_b, dst);
+        spad_write(desc_base + 32'h18, 32'd4);
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        fork
+            begin : cnm_abort_prefix_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.dut_abort_active)
+                        abort_seen = 1'b1;
+                    accepted_reads += $countones(compute_vif.cnm_accept_mask);
+                    returned_reads += $countones(compute_vif.cnm_rsp_valid);
+                    if (compute_vif.engine_req_valid[2] &&
+                        compute_vif.engine_req_ready[2] &&
+                        compute_vif.engine_req_write[2]) begin
+                        if (accepted_write_count >= 16)
+                            `uvm_fatal("CLUSTER_CNM_ABORT_PREFIX",
+                                "CNM accepted more output writes than its 16-row descriptor")
+                        write_addr[accepted_write_count] =
+                            compute_vif.engine_req_addr[2*32 +: 32];
+                        write_data[accepted_write_count] =
+                            compute_vif.engine_req_wdata[2*32 +: 32];
+                        accepted_write_count++;
+                        first_write_seen = 1'b1;
+                    end
+                end
+            end
+            begin : abort_after_first_cnm_write
+                poll = 0;
+                while (!first_write_seen && poll < 100000) begin
+                    @(posedge compute_vif.aclk);
+                    poll++;
+                end
+                if (!first_write_seen)
+                    `uvm_fatal("CLUSTER_CNM_ABORT_PREFIX",
+                        "CNM did not accept an output write before the Abort timeout")
+                axil_write(REG_ABORT, 32'd1);
+                wait_cpl_tail(32'd1);
+                monitor_done = 1'b1;
+            end
+        join
+
+        wait_spad_idle();
+        if (!abort_seen)
+            `uvm_fatal("CLUSTER_CNM_ABORT_PREFIX",
+                "software Abort was not observed while CNM output was active")
+        if (accepted_write_count == 0 || accepted_write_count >= 16)
+            `uvm_fatal("CLUSTER_CNM_ABORT_PREFIX", $sformatf(
+                "Abort did not cut a non-empty proper CNM output prefix: writes=%0d",
+                accepted_write_count))
+        if (accepted_reads == 0 || returned_reads != accepted_reads)
+            `uvm_fatal("CLUSTER_CNM_ABORT_PREFIX", $sformatf(
+                "CNM read responses did not drain: accepted=%0d returned=%0d",
+                accepted_reads, returned_reads))
+
+        expect_spad(completion_base + 32'h00, {16'd0, task_id},
+                    "CNM accepted-write Abort task ID");
+        expect_spad(completion_base + 32'h04, 32'h0000_0032,
+                    "CNM accepted-write Abort status/code");
+        for (row_idx = 0; row_idx < accepted_write_count; row_idx++) begin
+            if (write_addr[row_idx] !== dst + (row_idx << 2))
+                `uvm_fatal("CLUSTER_CNM_ABORT_PREFIX", $sformatf(
+                    "non-prefix output address index=%0d expected=0x%08h actual=0x%08h",
+                    row_idx, dst + (row_idx << 2), write_addr[row_idx]))
+            if (write_data[row_idx] !== expected_output[row_idx])
+                `uvm_fatal("CLUSTER_CNM_ABORT_PREFIX", $sformatf(
+                    "Golden mismatch in accepted prefix index=%0d expected=%0d actual=%0d",
+                    row_idx, expected_output[row_idx], $signed(write_data[row_idx])))
+            expect_spad(dst + (row_idx << 2), expected_output[row_idx],
+                        $sformatf("CNM accepted Abort prefix Golden[%0d]", row_idx));
+        end
+        for (row_idx = accepted_write_count; row_idx < 16; row_idx++)
+            expect_spad(dst + (row_idx << 2), sentinel ^ row_idx,
+                        $sformatf("CNM Abort preserved unaccepted suffix[%0d]", row_idx));
+
+        `uvm_info("CLUSTER_CNM_ABORT_WRITE_PREFIX_PASS", $sformatf(
+            "task_id=%04h accepted_output_prefix=%0d/16 read_drain=%0d/%0d completion=ERR_ABORT seed=%0d",
+            task_id, accepted_write_count, accepted_reads, returned_reads, seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
     task automatic run_engine_reset_drain_sweep();
         int engine;
         int unsigned poll;
@@ -4098,6 +4262,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_conv_abort_write_prefix(seed);
         run_matrix_abort_write_prefix(seed);
         run_matrix_line_abort_write_prefix(seed);
+        run_cnm_abort_write_prefix(seed);
         run_engine_reset_drain_sweep();
 
         `uvm_info("COMPUTE_CLUSTER_REAL_UVM_PASS", $sformatf(
