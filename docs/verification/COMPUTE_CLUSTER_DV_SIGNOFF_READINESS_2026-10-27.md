@@ -2,7 +2,7 @@
 
 ## Review decision (updated 2026-10-30)
 
-**Selected RTL/SPEC SHA:** `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413` (R99 CNM Protection alignment fix; selected subsystem, fabric reset, Top Smoke, and seeded top tests pass). **Latest tested Compute Cluster UVM code/test SHA:** `b4d99efe95034ff953ca26c66f90a8402a0cde7c` (R112 testbench-only change; SPEC v1.8 and product RTL are unchanged). Earlier evidence retains its named source identities.\
+**Selected RTL/SPEC SHA:** `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413` (R99 CNM Protection alignment fix; selected subsystem, fabric reset, Top Smoke, and seeded top tests pass). **Latest tested Compute Cluster UVM code/test SHA:** `10601142cf912369b871fa9e5affed8fde5f767b` (R113 testbench-only change; SPEC v1.8 and product RTL are unchanged). Earlier evidence retains its named source identities.\
 **Current SPEC:** v1.8 clarifies busy-time CPLQ_HEAD consumption; v1.7 freezes KV address alignment/overflow behavior; v1.6 freezes Scalar INT8 arithmetic order; v1.5 freezes the Matrix Line transfer contract.\
 **Candidate classification:** bounded Functional DV review candidate; not CL-DV-v1.0 signed.\
 **Product RTL:** the candidate preserves the earlier scoped Conv/KV/SFU error-code alignment and KV 32-bit overflow/alignment guard; R73 also allows only the software-owned CPLQ_HEAD pointer write while compute/DMA is busy.\
@@ -220,3 +220,8 @@ At exact committed test SHA `973b4a1`, three VCS seeds each pass a real-top Matr
 ## R112 banked reset/epoch recovery — 2026-10-30
 
 At exact clean code/test SHA `b4d99efe95034ff953ca26c66f90a8402a0cde7c`, VCS/URG pass the selected in-repository fabric's banked reset point on seeds `20261025/26/27`. A testbench-driven client-3 request is accepted at `0x100`, reset flushes it before a registered response, all response-valid owners remain inactive during reset and a four-cycle release quiet interval, and a fresh tagged read returns the four Golden bank words. Focused reset coverage is 100%; the banked response-owner SVA records 3 real successes and no failures/incomplete; UVM severity is `0/0/0` per seed. This does not exercise the production Matrix engine or full shared-engine contention/fault crosses. `REQ-CL-018/PC-007` remain PARTIAL, RTM remains 24 PASS-SCOPED / 14 PARTIAL, and `CL-DV-v1.0` remains HOLD. See the [R112 report](COMPUTE_CLUSTER_BANKED_RESET_EPOCH_R112_2026-10-30.md).
+
+
+## R113 simultaneous banked/core response-owner point — 2026-10-31
+
+At exact published code/test SHA `10601142cf912369b871fa9e5affed8fde5f767b`, VCS/URG pass three seeds with simultaneous scalar/core and Matrix-like banked reads through the selected in-repository fabric. The production arbiter grants Core then Banked; the test checks the exclusive tag-2/tag-3 responses and independent Golden data. Focused group coverage is 100%, the banked response-tag and core grant-owner assertions each record 429 attempts, 3 real successes, and no failure/incomplete, and UVM severity is `0/0/0`. The requesters are testbench driven and do not replace a production Matrix-engine concurrency test. `REQ-PC-007` remains PARTIAL; global status remains 24 PASS-SCOPED / 14 PARTIAL and `CL-DV-v1.0` remains HOLD. See [R113 evidence](COMPUTE_CLUSTER_BANKED_CORE_CONTENTION_R113_2026-10-31.md).

@@ -10,11 +10,11 @@
 |---|---|
 | Product RTL/SPEC candidate | `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413` (R99 CNM Protection response alignment; SPEC v1.8 unchanged) |
 | Latest real-top descriptor-latch SHA | `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28` (R77 SFU descriptor-latch test; Matrix R74 remains separately evidenced) |
-| Latest exact clean code/test SHA | `b4d99efe95034ff953ca26c66f90a8402a0cde7c` (R112 test-only change; product RTL/SPEC remain at R99; no claim of full-coverage closure) |
+| Latest exact clean code/test SHA | `10601142cf912369b871fa9e5affed8fde5f767b` (R113 test-only change; product RTL/SPEC remain at R99; no claim of full-coverage closure) |
 | Prior reviewed product baseline | `6848a414eaeaa05cf9e1411cf55d9d27333208a6` |
-| Latest published closeout snapshot before this follow-up | `fc370aad6b8360af9affb52cb30909ec97d79be3` |
+| Latest published closeout snapshot before this documentation update | `10601142cf912369b871fa9e5affed8fde5f767b` |
 | Review branch | `feat/compute-cluster-closeout-6848a41` |
-| Evidence/test commit | R53 `f916874a9ce60741a4516eaf9e33ebcae4a676c2`; R54 `f24c5383fad511c8b2e1132c1157942807994759`; R55–R58/R59 `ded9d923a432e869592ec8710a22df5501d8d474`; R60 `2768843da1b3f3a0e988645746000d5befadf12b`; R73 `9d4e9abdba1f745644a485960620fa6bbc4979db`; R74 `519ca161f3c2ce8beab78161a88bbdcb6cbcdc61`; R75 `969992291732cf694d7de4bdfef2808d4f017d57`; R77 `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28`; R80/R81/R82 `e4c1e7a93a0afe1c89128996c6eaf9bff5caf907`; R83 `071578d997d69ebf011fe5e7d4742fae3e0f73ac`; R84 `8bc2ee28725d09ac75ecfcb0417e1ba47fd688f2`; R85 `5a35d60d20ee6fc6622e46f92d05fc1ef00dd14d`; R86 `3d6fe5c58631bdeb6333b6e3572f24eeba7da1ef`; R87 `402c8ce4689ae48cfee624f1f5fdca66d534bbbf`; R88 `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec`; R89 benchmark docs `951f83ecbdac1bd153c4d15a3addf11099aa49b7`; R90/R91 tests `eeae0c442bf5f5a747c1fa056cb4755fabb814c1` / `7837701cefe606a01abd517d46788b982da0f2e4`; R93 `d66431b8905ef7c1cccecef16a3cd34f4d62f9b0`; R99 `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`; R104–R107 current owner/reset evidence; R108 `26448b12e545498d31ce8665723db97e10e2c1e2`; R109 `5c212a302b0df6ea0f3815ccdf085e139cb4104f`; R110 `95864f7027ccbec22a09b0a61832c68d3ca08098`; R112 `b4d99efe95034ff953ca26c66f90a8402a0cde7c` |
+| Evidence/test commit | R53 `f916874a9ce60741a4516eaf9e33ebcae4a676c2`; R54 `f24c5383fad511c8b2e1132c1157942807994759`; R55–R58/R59 `ded9d923a432e869592ec8710a22df5501d8d474`; R60 `2768843da1b3f3a0e988645746000d5befadf12b`; R73 `9d4e9abdba1f745644a485960620fa6bbc4979db`; R74 `519ca161f3c2ce8beab78161a88bbdcb6cbcdc61`; R75 `969992291732cf694d7de4bdfef2808d4f017d57`; R77 `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28`; R80/R81/R82 `e4c1e7a93a0afe1c89128996c6eaf9bff5caf907`; R83 `071578d997d69ebf011fe5e7d4742fae3e0f73ac`; R84 `8bc2ee28725d09ac75ecfcb0417e1ba47fd688f2`; R85 `5a35d60d20ee6fc6622e46f92d05fc1ef00dd14d`; R86 `3d6fe5c58631bdeb6333b6e3572f24eeba7da1ef`; R87 `402c8ce4689ae48cfee624f1f5fdca66d534bbbf`; R88 `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec`; R89 benchmark docs `951f83ecbdac1bd153c4d15a3addf11099aa49b7`; R90/R91 tests `eeae0c442bf5f5a747c1fa056cb4755fabb814c1` / `7837701cefe606a01abd517d46788b982da0f2e4`; R93 `d66431b8905ef7c1cccecef16a3cd34f4d62f9b0`; R99 `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`; R104–R107 current owner/reset evidence; R108 `26448b12e545498d31ce8665723db97e10e2c1e2`; R109 `5c212a302b0df6ea0f3815ccdf085e139cb4104f`; R110 `95864f7027ccbec22a09b0a61832c68d3ca08098`; R112 `b4d99efe95034ff953ca26c66f90a8402a0cde7c`; R113 `10601142cf912369b871fa9e5affed8fde5f767b` |
 | SPEC | Compute Cluster SPEC v1.8; R73 records busy-time CPLQ_HEAD progress; earlier KV address overflow/alignment is frozen in v1.7 |
 | VCS | Synopsys VCS `V-2023.12-SP1_Full64`; R49 passed the corrected Matrix checker on three seeds; R50 passed the published-snapshot six-seed UVM and Top Smoke; R52 passed the legal Scalar INT8 numeric campaign; R53 passed KV boundary checks; R75 passed the SFU block random regression on three seeds, with merged URG |
 
@@ -26,7 +26,7 @@ At exact clean code/test SHA `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`, VCS V-2
 
 R99 closes the selected memory-fabric reset evidence item, not all of `REQ-CL-018`. The 38-row disposition remains 24 PASS-SCOPED / 14 PARTIAL, and `CL-DV-v1.0` remains **HOLD** because broader legal Engine × Fault × Phase × Reset crossings and other partial requirements remain.
 
-## R111/R112 incremental closeout evidence
+## R111–R113 incremental closeout evidence
 
 R111 replays the Matrix FSM guard formal checks at the exact R110 source/test SHA: five assertions are non-vacuous and proven, two reachability covers hit, while the raw default-profile FSM remains 49/53. See the [R111 formal report](COMPUTE_CLUSTER_MATRIX_FSM_R111_FORMAL_2026-10-30.md).
 
@@ -86,6 +86,7 @@ PPA and full pretrained-model deployment are outside this Functional DV decision
 - [R99 selected memory-fabric reset evidence](COMPUTE_CLUSTER_MEMORY_FABRIC_RESET_R99_2026-10-30.md)
 - [R111 Matrix FSM formal replay](COMPUTE_CLUSTER_MATRIX_FSM_R111_FORMAL_2026-10-30.md)
 - [R112 banked reset/epoch evidence](COMPUTE_CLUSTER_BANKED_RESET_EPOCH_R112_2026-10-30.md)
+- [R113 banked/core contention evidence](COMPUTE_CLUSTER_BANKED_CORE_CONTENTION_R113_2026-10-31.md)
 - [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)
 - [Open issues](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md)
 - [Sign-off readiness](COMPUTE_CLUSTER_DV_SIGNOFF_READINESS_2026-10-27.md)
@@ -181,3 +182,5 @@ At exact test SHA `26448b12e545498d31ce8665723db97e10e2c1e2`, three VCS seeds pa
 ## R109 KV Cache accepted-write Abort prefix — 2026-10-30
 
 At exact clean code/test SHA `5c212a302b0df6ea0f3815ccdf085e139cb4104f`, three real-top VCS seeds pass a KV_WRITE task for `head=1/token=2`, offset 96, aborted after two of eight accepted cache writes. Each seed checks the Golden prefix, six untouched output words, both adjacent guard words, `ERR_ABORT=0x32`, and drain of all 3/3 accepted reads. The memory scoreboard checks 33,510 words with zero mismatch/unknown/stale/orphan and empty pending queues; UVM severity is `0/0/0`; applicable focused coverage is 100%. At the same SHA, 28/28 checker-sensitivity mutations, Top Smoke and 20-case seeded Top pass. This strengthens `REQ-CL-017/019/025` and `REQ-PC-006/007` only within this named point. Requirement status remains 24 PASS-SCOPED / 14 PARTIAL; the full legal cross remains open and the sign-off decision remains HOLD. See [R109 report](COMPUTE_CLUSTER_KV_ABORT_WRITE_PREFIX_R109_2026-10-30.md).
+
+R113 at exact published test SHA `10601142cf912369b871fa9e5affed8fde5f767b` passes the three-seed simultaneous core/banked requester point through the production fabric and arbiter. Both grants follow the documented round-robin turn, the tag-2 scalar word and tag-3 four-bank response match the independent image, focused coverage is 100%, and both `ap_banked_response_tag` and `ap_core_grant_owner` have 3 real successes with zero failures/incomplete. This is testbench-driven traffic rather than production Matrix execution. It adds bounded `REQ-PC-007` evidence only; the 24 PASS-SCOPED / 14 PARTIAL disposition and HOLD remain unchanged. Details and hashes are in [R113 evidence](COMPUTE_CLUSTER_BANKED_CORE_CONTENTION_R113_2026-10-31.md).
