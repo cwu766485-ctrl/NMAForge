@@ -7,6 +7,7 @@
 - **Follow-up evidence branch:** `work/compute-cluster-kv-overflow-20261030`
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
 - **Latest clean verification replay SHA:** `2768843da1b3f3a0e988645746000d5befadf12b`
+**Latest verification/test candidate:** `5a35d60d20ee6fc6622e46f92d05fc1ef00dd14d` (R85 Conv accepted-write Abort prefix, testbench-only).
 **Decision:** bounded CL-RC1/CL-RC2 review candidate; **CL-DV-v1.0 is not signed**.
 
 ## Executive disposition
@@ -88,3 +89,8 @@ At exact clean test SHA `d45b89af0c5aab2107a5db6bbf0a6ab754e81656`, the three-se
 ## R63 SVA disposition update — 2026-10-30
 
 The initial R61 Compute Cluster-only URG remains 17/22 assertion properties with successes because that compute-focused workload does not issue stalled external AXI address traffic. R63 separately combines the R61 three-seed Compute Cluster VDBs with a same-SHA coverage-enabled mixed-precision DDR/AXI-stall VDB. The merged report has 20/22 properties with real successes, 0 failures/incomplete, and two UVM RAL no-attempt internals; all five top AXI AR/AW/W assertions and all three stall-to-accept covers are hit. This improves SVA non-vacuity evidence, but does not merge functional coverage groups or close broader fabric/fault/reset coverage. See [R63 combined SVA report](COMPUTE_CLUSTER_R63_COMBINED_SVA_2026-10-30.md). CL-DV-v1.0 remains HOLD.
+
+
+## R85 Conv accepted-write Abort prefix — 2026-10-30
+
+Three exact-clean seeds at `5a35d60d20ee6fc6622e46f92d05fc1ef00dd14d` pass a real-top Conv Abort immediately after the first accepted output write. The checker verifies one Golden output prefix word, three unchanged suffix sentinels, 21/21 accepted-read drain, and `ERR_ABORT`; each Memory Scoreboard checks 17,304 words with zero mismatch/unknown/stale and UVM severity `0/0/0`. The same exact SHA passes Top Smoke. This adds one testpoint only: accepted-write prefix lengths for the other engines and the broader legal fault/phase/reset crosses remain open. The 38-row RTM remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains HOLD. See [R85 report](COMPUTE_CLUSTER_CONV_ABORT_WRITE_PREFIX_R85_2026-10-30.md).

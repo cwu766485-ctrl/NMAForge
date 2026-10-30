@@ -1,3 +1,14 @@
+> **2026-10-30 R85 Conv accepted-write Abort prefix:** At exact clean
+> verification/test SHA `5a35d60d20ee6fc6622e46f92d05fc1ef00dd14d`, three real-top UVM seeds abort a Conv 3×3
+> task after its first accepted output write. Each checks a one-word Golden
+> prefix, three unchanged suffix sentinels, 21/21 accepted reads drained, and
+> `ERR_ABORT`; the scoreboard checks 17,304 words/seed with zero
+> mismatch/unknown/stale response and UVM severity 0/0/0. Same-SHA Top
+> Smoke prints `TEST PASS` with the existing fixture warning. This is one
+> Conv timing point, not all-engine/all-prefix closure; RTM remains 24 PASS-SCOPED
+> / 14 PARTIAL and CL-DV-v1.0 HOLD. See the [R85 report]
+> (../docs/verification/COMPUTE_CLUSTER_CONV_ABORT_WRITE_PREFIX_R85_2026-10-30.md).
+
 # NMAForge block and subsystem verification matrix
 
 > **2026-10-30 R84 SFU accepted-write Abort prefix:** At exact clean

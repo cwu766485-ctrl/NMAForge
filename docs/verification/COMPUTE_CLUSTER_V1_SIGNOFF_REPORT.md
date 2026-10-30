@@ -10,11 +10,11 @@
 |---|---|
 | Product RTL/SPEC candidate | `9d4e9abdba1f745644a485960620fa6bbc4979db` (R73; SPEC v1.8 busy-time CPLQ_HEAD contract) |
 | Latest real-top descriptor-latch SHA | `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28` (R77 SFU descriptor-latch test; Matrix R74 remains separately evidenced) |
-| Latest exact clean code/test SHA | `8bc2ee28725d09ac75ecfcb0417e1ba47fd688f2` (R84 real-top SFU accepted-write-prefix Abort; verification/testbench-only change) |
+| Latest exact clean code/test SHA | `5a35d60d20ee6fc6622e46f92d05fc1ef00dd14d` (R85 real-top Conv accepted-write-prefix Abort; verification/testbench-only change) |
 | Prior reviewed product baseline | `6848a414eaeaa05cf9e1411cf55d9d27333208a6` |
 | Latest published closeout snapshot before this follow-up | `fc370aad6b8360af9affb52cb30909ec97d79be3` |
 | Review branch | `work/compute-cluster-kv-overflow-20261030` |
-| Evidence/test commit | R53 `f916874a9ce60741a4516eaf9e33ebcae4a676c2`; R54 `f24c5383fad511c8b2e1132c1157942807994759`; R55–R58/R59 `ded9d923a432e869592ec8710a22df5501d8d474`; R60 `2768843da1b3f3a0e988645746000d5befadf12b`; R73 `9d4e9abdba1f745644a485960620fa6bbc4979db`; R74 `519ca161f3c2ce8beab78161a88bbdcb6cbcdc61`; R75 `969992291732cf694d7de4bdfef2808d4f017d57`; R77 `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28`; R80/R81/R82 `e4c1e7a93a0afe1c89128996c6eaf9bff5caf907`; R83 `071578d997d69ebf011fe5e7d4742fae3e0f73ac`; R84 `8bc2ee28725d09ac75ecfcb0417e1ba47fd688f2` |
+| Evidence/test commit | R53 `f916874a9ce60741a4516eaf9e33ebcae4a676c2`; R54 `f24c5383fad511c8b2e1132c1157942807994759`; R55–R58/R59 `ded9d923a432e869592ec8710a22df5501d8d474`; R60 `2768843da1b3f3a0e988645746000d5befadf12b`; R73 `9d4e9abdba1f745644a485960620fa6bbc4979db`; R74 `519ca161f3c2ce8beab78161a88bbdcb6cbcdc61`; R75 `969992291732cf694d7de4bdfef2808d4f017d57`; R77 `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28`; R80/R81/R82 `e4c1e7a93a0afe1c89128996c6eaf9bff5caf907`; R83 `071578d997d69ebf011fe5e7d4742fae3e0f73ac`; R84 `8bc2ee28725d09ac75ecfcb0417e1ba47fd688f2`; R85 `5a35d60d20ee6fc6622e46f92d05fc1ef00dd14d` |
 | SPEC | Compute Cluster SPEC v1.8; R73 records busy-time CPLQ_HEAD progress; earlier KV address overflow/alignment is frozen in v1.7 |
 | VCS | Synopsys VCS `V-2023.12-SP1_Full64`; R49 passed the corrected Matrix checker on three seeds; R50 passed the published-snapshot six-seed UVM and Top Smoke; R52 passed the legal Scalar INT8 numeric campaign; R53 passed KV boundary checks; R75 passed the SFU block random regression on three seeds, with merged URG |
 
@@ -114,3 +114,8 @@ At exact clean code/test SHA `071578d997d69ebf011fe5e7d4742fae3e0f73ac`, three C
 ## R84 SFU accepted-write Abort prefix — 2026-10-30
 
 At exact clean verification/test SHA `8bc2ee28725d09ac75ecfcb0417e1ba47fd688f2`, three real-top UVM seeds abort SFU immediately after the first accepted GELU output write. Each seed checks one word of contiguous Golden output, 63 untouched suffix sentinels, 2/2 accepted-read responses drained, and `ERR_ABORT`; the independent memory scoreboard checks 17,267 words with zero mismatch/unknown/stale and UVM severity `0/0/0`. The focused applicable functional group stays 31/31; a dedicated marker hits 3/3. Same-SHA Top Smoke prints `TEST PASS` with the existing fixture `LOOP-REROLL-ENABLED` warning. This adds one narrow testpoint, not full prefix or fault/phase/reset closure. Product RTL and SPEC v1.8 are byte-identical to product baseline `9d4e9ab`; requirement disposition remains 24 PASS-SCOPED / 14 PARTIAL and **HOLD**. See [R84 evidence](COMPUTE_CLUSTER_SFU_ABORT_WRITE_PREFIX_R84_2026-10-30.md).
+
+
+## R85 Conv accepted-write Abort prefix — 2026-10-30
+
+At exact clean test SHA `5a35d60d20ee6fc6622e46f92d05fc1ef00dd14d`, the real-top Conv accepted-write Abort prefix test passes three seeds. Each aborts after the first accepted output write, checks the one-word Golden prefix and three unchanged suffix sentinels, drains 21/21 accepted reads and retires `ERR_ABORT`. The Memory Scoreboard checks 17,304 words/seed with zero mismatch/unknown/stale; UVM severity is `0/0/0`, and focused applicable testpoints remain 31/31. The same SHA passes Top Smoke with the existing fixture warning. Exact artifact paths and hashes are in [R85 evidence](COMPUTE_CLUSTER_CONV_ABORT_WRITE_PREFIX_R85_2026-10-30.md). R85 changes no product RTL/SPEC and promotes no requirement; the RTM remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains HOLD.

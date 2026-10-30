@@ -2,7 +2,7 @@
 
 ## Review decision (updated 2026-10-30)
 
-**Selected exact clean code/test SHA:** `8bc2ee28725d09ac75ecfcb0417e1ba47fd688f2` (R84 adds UVM sequence and Makefile gates only; product RTL/SPEC v1.8 remain byte-identical to R73 `9d4e9abdba1f745644a485960620fa6bbc4979db`). Latest Matrix benchmark remains R82 at `e4c1e7a`; R83 adds accepted-read Abort/drain evidence on all seven production engines and R84 adds one SFU accepted-write-prefix Abort point. Earlier evidence retains its named source identities.\
+**Selected exact clean code/test SHA:** `5a35d60d20ee6fc6622e46f92d05fc1ef00dd14d` (R85 adds UVM sequence and Makefile gates only; product RTL/SPEC v1.8 remain byte-identical to R73 `9d4e9abdba1f745644a485960620fa6bbc4979db`). Latest Matrix benchmark remains R82 at `e4c1e7a`; R83 adds accepted-read Abort/drain evidence on all seven production engines, R84 adds one SFU accepted-write-prefix Abort point, and R85 adds one Conv accepted-write-prefix Abort point. Earlier evidence retains its named source identities.\
 **Current SPEC:** v1.8 clarifies busy-time CPLQ_HEAD consumption; v1.7 freezes KV address alignment/overflow behavior; v1.6 freezes Scalar INT8 arithmetic order; v1.5 freezes the Matrix Line transfer contract.\
 **Candidate classification:** bounded Functional DV review candidate; not CL-DV-v1.0 signed.\
 **Product RTL:** the candidate preserves the earlier scoped Conv/KV/SFU error-code alignment and KV 32-bit overflow/alignment guard; R73 also allows only the software-owned CPLQ_HEAD pointer write while compute/DMA is busy.\
@@ -143,3 +143,8 @@ At exact clean code/test SHA `071578d997d69ebf011fe5e7d4742fae3e0f73ac`, three C
 ## R84 SFU accepted-write Abort prefix — 2026-10-30
 
 At exact clean code/test SHA `8bc2ee28725d09ac75ecfcb0417e1ba47fd688f2`, the real-top SFU GELU test aborts immediately after the first accepted output write. Three seeds each check a one-word contiguous Golden prefix, 63 untouched output sentinels, two accepted reads drained, and `ERR_ABORT`; each scoreboard checks 17,267 words with zero mismatch/unknown/stale and UVM severity `0/0/0`. Focused applicable compute coverage stays 31/31; the new explicit testpoint marker hits once per seed. Same-SHA Top Smoke prints `TEST PASS` with its existing fixture warning. This is one SFU timing point only; it does not close prefix behavior for other engines or the broader Engine × Fault × Phase × Reset matrix. R84 leaves all requirement dispositions unchanged and `CL-DV-v1.0` remains HOLD. See [R84 report](COMPUTE_CLUSTER_SFU_ABORT_WRITE_PREFIX_R84_2026-10-30.md).
+
+
+## R85 Conv accepted-write Abort prefix — 2026-10-30
+
+At exact clean code/test SHA `5a35d60d20ee6fc6622e46f92d05fc1ef00dd14d`, the real-top Conv 3×3 test aborts immediately after its first accepted output write. Three seeds each check a one-word Golden prefix, three untouched output sentinels, 21/21 accepted reads drained, and `ERR_ABORT`; each scoreboard checks 17,304 words with zero mismatch/unknown/stale and UVM severity `0/0/0`. The focused applicable compute group remains 31/31; the new marker hits once per seed. Same-SHA Top Smoke prints `TEST PASS` with its existing fixture warning. This adds one legal Conv timing point only; other prefix lengths, engines, and the broader Engine × Fault × Phase × Reset cross remain open. Requirement dispositions do not change and `CL-DV-v1.0` remains HOLD. See [R85 report](COMPUTE_CLUSTER_CONV_ABORT_WRITE_PREFIX_R85_2026-10-30.md).
