@@ -28,6 +28,18 @@ interface ai_dma_spad_system_if(input logic clk, input logic resetn);
     logic core_rsp_valid;
     logic core_rsp_error;
 
+    // Matrix-like 128-bit banked read requester.  The focused ownership test
+    // drives the real memory fabric/arbiter boundary without substituting a
+    // behavioral response path.
+    logic banked_valid;
+    logic [31:0] banked_addr;
+    logic banked_ready;
+    logic banked_rsp_valid;
+    logic [31:0] banked_data0;
+    logic [31:0] banked_data1;
+    logic [31:0] banked_data2;
+    logic [31:0] banked_data3;
+
     // Real mixed-precision compute client controls/observations. The UVM
     // subsystem test can select this RTL engine instead of the synthetic
     // scalar requester while it shares the same arbiter port with DMA.
@@ -115,8 +127,10 @@ interface ai_dma_spad_system_if(input logic clk, input logic resetn);
     logic dma_valid;
     logic dma_write;
     logic dma_ready;
+    logic dma_rsp_valid;
     logic dma_line_valid;
     logic dma_line_ready;
+    logic dma_line_rsp_valid;
     logic [2:0] request_client;
     logic arb_rsp_valid;
     logic [2:0] arb_rsp_client;
@@ -138,6 +152,8 @@ interface ai_dma_spad_system_if(input logic clk, input logic resetn);
         core_write = 1'b0;
         core_addr = '0;
         core_wdata = '0;
+        banked_valid = 1'b0;
+        banked_addr = '0;
         fp_mode = 1'b0;
         fp_start = 1'b0;
         fp_format_fp16 = 1'b0;

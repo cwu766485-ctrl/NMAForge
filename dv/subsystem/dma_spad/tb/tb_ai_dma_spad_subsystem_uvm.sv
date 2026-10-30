@@ -153,7 +153,8 @@ module tb_ai_dma_spad_subsystem_uvm;
         .core_rsp_valid(core_rsp_valid), .core_rsp_error(core_rsp_error),
         .core_line_valid(1'b0), .core_line_write(1'b0), .core_line_addr(32'd0),
         .core_line_wdata(128'd0), .core_line_wstrb(16'd0), .core_line_ready(),
-        .banked_valid(1'b0), .banked_addr(32'd0), .banked_ready(),
+        .banked_valid(sys_if.banked_valid), .banked_addr(sys_if.banked_addr),
+        .banked_ready(sys_if.banked_ready),
         .cnm_valid(sys_if.cnm_req_valid), .cnm_addr0(sys_if.cnm_addr0),
         .cnm_addr1(sys_if.cnm_addr1), .cnm_addr2(sys_if.cnm_addr2),
         .cnm_addr3(sys_if.cnm_addr3), .cnm_ready(sys_if.cnm_req_ready),
@@ -208,8 +209,10 @@ module tb_ai_dma_spad_subsystem_uvm;
     assign sys_if.dma_valid = spad_if.spad_valid;
     assign sys_if.dma_write = spad_if.spad_write;
     assign sys_if.dma_ready = dma_ready;
+    assign sys_if.dma_rsp_valid = dma_rsp_valid;
     assign sys_if.dma_line_valid = spad_if.line_valid;
     assign sys_if.dma_line_ready = dma_line_ready;
+    assign sys_if.dma_line_rsp_valid = dma_line_rsp_valid;
     assign sys_if.request_client = request_client;
     assign sys_if.arb_rsp_valid = arb_rsp_valid;
     assign sys_if.arb_rsp_client = rsp_client;
@@ -218,6 +221,11 @@ module tb_ai_dma_spad_subsystem_uvm;
     assign sys_if.arb_rsp_error = arb_rsp_error;
     assign sys_if.desc_rsp_valid = desc_rsp_valid;
     assign sys_if.desc_rsp_error = desc_rsp_error;
+    assign sys_if.banked_rsp_valid = banked_rsp_valid;
+    assign sys_if.banked_data0 = banked_data0;
+    assign sys_if.banked_data1 = banked_data1;
+    assign sys_if.banked_data2 = banked_data2;
+    assign sys_if.banked_data3 = banked_data3;
 
     assign spad_if.spad_ready = dma_ready;
     assign spad_if.spad_rsp_valid = dma_rsp_valid;

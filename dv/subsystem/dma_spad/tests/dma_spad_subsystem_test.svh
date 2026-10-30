@@ -863,6 +863,7 @@ class dma_spad_subsystem_test extends dma_block_base_test;
     int unsigned cov_rready_stall_cycles;
     bit cov_rready_stall_completed;
     bit rready_stall_only;
+    bit banked_owner_only;
     int unsigned rready_stall_cycles_requested;
 
     covergroup dma_rready_stall_cg;
@@ -1029,6 +1030,88 @@ class dma_spad_subsystem_test extends dma_block_base_test;
             else
                 `uvm_error("DMA_RREADY_STALL", "scenario failed; PASS marker suppressed")
         end
+    endtask
+
+    task run_banked_response_owner_probe();
+        bit [31:0] expected_lane[4];
+        bit grant_seen;
+        bit response_seen;
+        int unsigned poll;
+
+        grant_seen = 1'b0;
+        response_seen = 1'b0;
+        for (int unsigned lane = 0; lane < 4; lane++)
+            expected_lane[lane] = 32'hc001_0000 ^ ((32'h100 + (lane * 4)) >> 2);
+
+        // Permit the four aligned physical banks for execute/read.  The
+        // request then traverses the real production arbiter and SRAM read
+        // pipeline; only the requester itself is testbench driven.
+        @(negedge sys_vif.clk);
+        sys_vif.region0_base <= 32'h0000_0100;
+        sys_vif.region0_limit <= 32'h0000_0200;
+        sys_vif.region0_perm <= 4'b1101;
+        repeat (2) @(posedge sys_vif.clk);
+
+        @(negedge sys_vif.clk);
+        sys_vif.banked_addr <= 32'h0000_0100;
+        sys_vif.banked_valid <= 1'b1;
+        for (poll = 0; poll < 32; poll++) begin
+            @(posedge sys_vif.clk);
+            if (sys_vif.banked_ready) begin
+                if (sys_vif.request_client !== 3'd3)
+                    `uvm_fatal("SPAD_BANKED_OWNER", $sformatf(
+                        "banked request granted with request_client=%0d",
+                        sys_vif.request_client))
+                grant_seen = 1'b1;
+                break;
+            end
+        end
+        if (!grant_seen)
+            `uvm_fatal("SPAD_BANKED_OWNER", "real banked requester was not granted")
+
+        @(negedge sys_vif.clk);
+        sys_vif.banked_valid <= 1'b0;
+        for (poll = 0; poll < 16; poll++) begin
+            @(posedge sys_vif.clk);
+            #1;
+            if (sys_vif.banked_rsp_valid) begin
+                if (!sys_vif.arb_rsp_valid ||
+                    sys_vif.arb_rsp_client !== 3'd3 ||
+                    sys_vif.arb_rsp_is_line !== 1'b0 ||
+                    sys_vif.desc_rsp_valid || sys_vif.core_rsp_valid ||
+                    sys_vif.dma_rsp_valid || sys_vif.dma_line_rsp_valid ||
+                    (|sys_vif.cnm_rsp_valid))
+                    `uvm_fatal("SPAD_BANKED_OWNER", $sformatf(
+                        "response owner mismatch: arb_valid=%0b client=%0d line=%0b desc=%0b core=%0b dma=%0b dma_line=%0b cnm=%b",
+                        sys_vif.arb_rsp_valid, sys_vif.arb_rsp_client,
+                        sys_vif.arb_rsp_is_line, sys_vif.desc_rsp_valid,
+                        sys_vif.core_rsp_valid, sys_vif.dma_rsp_valid,
+                        sys_vif.dma_line_rsp_valid, sys_vif.cnm_rsp_valid))
+                if (sys_vif.banked_data0 !== expected_lane[0] ||
+                    sys_vif.banked_data1 !== expected_lane[1] ||
+                    sys_vif.banked_data2 !== expected_lane[2] ||
+                    sys_vif.banked_data3 !== expected_lane[3])
+                    `uvm_fatal("SPAD_BANKED_OWNER", $sformatf(
+                        "banked read data mismatch: got={%08h,%08h,%08h,%08h} expected={%08h,%08h,%08h,%08h}",
+                        sys_vif.banked_data3, sys_vif.banked_data2,
+                        sys_vif.banked_data1, sys_vif.banked_data0,
+                        expected_lane[3], expected_lane[2],
+                        expected_lane[1], expected_lane[0]))
+                response_seen = 1'b1;
+                break;
+            end
+        end
+        if (!response_seen)
+            `uvm_fatal("SPAD_BANKED_OWNER", "tagged banked response did not return")
+        // Keep the run phase active through the next sampling edge.  The
+        // registered response is asserted after its launching edge and the
+        // assertion samples it at the following positive edge.
+        @(posedge sys_vif.clk);
+        #1;
+        @(negedge sys_vif.clk);
+        sys_vif.region0_perm <= 4'b0000;
+        `uvm_info("SPAD_BANKED_OWNER_PASS", $sformatf(
+            "real ai_accel_memory_fabric banked request grant/response owner tag=3; aligned row=0x100; four bank words match the independent host-write image"), UVM_LOW)
     endtask
 
     function void build_phase(uvm_phase phase);
@@ -4069,12 +4152,19 @@ class dma_spad_subsystem_test extends dma_block_base_test;
         bit [31:0] readback;
         int unsigned cnm_reset_phase_first;
         rready_stall_only = $test$plusargs("A10_RREADY_STALL_ONLY");
+        banked_owner_only = $test$plusargs("A10_BANKED_OWNER_ONLY");
         phase.raise_objection(this);
         wait (sys_vif.resetn === 1'b1);
         preload_scratchpad();
 
         if (rready_stall_only) begin
             run_dma_rready_stall();
+            phase.drop_objection(this);
+            return;
+        end
+
+        if (banked_owner_only) begin
+            run_banked_response_owner_probe();
             phase.drop_objection(this);
             return;
         end
