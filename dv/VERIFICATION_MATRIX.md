@@ -1,5 +1,16 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-30 R84 SFU accepted-write Abort prefix:** At exact clean
+> verification/test SHA `8bc2ee28725d09ac75ecfcb0417e1ba47fd688f2`, three real-top UVM seeds abort the SFU
+> GELU task after its first accepted output write. Each checks a one-word
+> Golden prefix, 63 untouched output sentinels, 2/2 accepted reads drained,
+> and `ERR_ABORT`; the scoreboard checks 17,267 words with zero
+> mismatch/unknown/stale response and UVM severity 0/0/0. Same-SHA Top
+> Smoke prints `TEST PASS` with the existing fixture warning. This is one
+> SFU timing point, not all-engine prefix closure; RTM remains 24 PASS-SCOPED
+> / 14 PARTIAL and CL-DV-v1.0 HOLD. See the [R84 report]
+> (../docs/verification/COMPUTE_CLUSTER_SFU_ABORT_WRITE_PREFIX_R84_2026-10-30.md).
+
 > **2026-10-30 R83 all-engine accepted-read Abort/drain:** At exact clean
 > verification/test SHA `071578d997d69ebf011fe5e7d4742fae3e0f73ac`, three
 > VCS seeds each abort Scalar INT8, FP, CNM, Matrix, SFU, Conv and KV after a
