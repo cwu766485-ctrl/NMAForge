@@ -1,13 +1,13 @@
 # NMAForge Compute Cluster 功能与接口规格（中文）
 
 > **文档编号**：NMA-CL-SPEC-001\
-> **版本**：v1.5，**Parallel Compute Cluster 功能与 DV 需求基线**（不是 RTL/产品 Sign-off）\
+> **版本**：v1.6，**Parallel Compute Cluster 功能与 DV 需求基线**（不是 RTL/产品 Sign-off）\
 > **日期**：2026-10-30\
 > **基线**：从 NMAForge main commit 6742e227c1f52b5266ea19e034b17f33c583b813 延伸，A10 / ABI v7.4\
 > **设计模块**：rtl/top/fabric/compute/ai_accel_compute_cluster.v\
 > **目的**：约束 Compute Cluster 的功能、时序、对外端口和异常处理，作为 UVM Testplan / Scoreboard / Coverage / SVA 的需求来源。
 > **对应 Testplan**：[COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md](../verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md)。
-> **Freeze**：v1.1 冻结 REQ-CL-001～028 与 REQ-PC-001～010；v1.2 冻结外部 AXI reset/fabric epoch 边界；v1.3 冻结 SFU 数值合同；v1.4 冻结七类 Engine 的 4-bit Error ABI、同拍错误优先级和可见写回前缀规则；v1.5 冻结 Matrix Line full-strobe/alignment/fallback/protection 合同。未完成的 Engine × Fault × Phase 覆盖仍是验证缺口，不因写入规格而视为通过；接口或可观察行为变化必须升版。
+> **Freeze**：v1.1 冻结 REQ-CL-001～028 与 REQ-PC-001～010；v1.2 冻结外部 AXI reset/fabric epoch 边界；v1.3 冻结 SFU 数值合同；v1.4 冻结七类 Engine 的 4-bit Error ABI、同拍错误优先级和可见写回前缀规则；v1.5 冻结 Matrix Line full-strobe/alignment/fallback/protection 合同；v1.6 冻结 Scalar INT8 有符号累加、算术移位、激活和饱和顺序。未完成的 Engine × Fault × Phase 覆盖仍是验证缺口，不因写入规格而视为通过；接口或可观察行为变化必须升版。
 
 ## 0. 规范用语及适用范围
 
@@ -200,7 +200,16 @@ VCS Matrix controller 另保留每任务 FSM state-cycle、Arbiter stall、响�
 
 - 32-bit SPAD word 含 4 个 signed INT8 lane；Dot4 按有符号乘法累加。
 - 检查输入符号扩展、K words、输出条数、Bias、右移、ReLU/ReLU6、饱和及写回地址。
-- **[OPEN-NUM-01]** 每个 Opcode 的逐位舍入/截断、先后处理顺序、溢出边界须补 Numeric Appendix。
+
+**[v1.6 Scalar INT8 数值合同]** 本合同冻结 `ai_int8_datapath` 被 Scalar INT8 Core 使用时的当前可观察算术，不改变 RTL 或 Descriptor ABI。
+
+1. 每个 32-bit operand word 的 lane 为 bits `[7:0]`, `[15:8]`, `[23:16]`, `[31:24]`，按低到高顺序分别解释为 signed two's-complement INT8。每个 K word 的 Dot4 为四个对应 lane 乘积的精确有符号整数和。
+2. 初始 accumulator 为零；若启用 Bias，则先把对应 32-bit SPAD bias 按 signed INT32 符号扩展至 signed 64-bit，并作为初始 accumulator。每个完整 K word 的 Dot4 以整数精度加到 accumulator。合法 `K<=65535` 时，packed INT8 点积与 signed INT32 bias 的总和幅值小于 `2^33`，signed 64-bit 累加不溢出。
+3. 最后一个 K word 后执行一次 signed arithmetic right shift `acc >>> scale_shift`，`scale_shift` 范围为 0–31；不做 round-to-nearest。负值右移按 two's-complement 算术移位向负无穷取整。
+4. Shift 后再执行 Activation：`0` 为 identity；`1` 为 ReLU `max(x,0)`；`2` 为 ReLU6 `min(max(x,0),6)`。当前 RTL 对编码 `3` 也走 identity datapath，但该编码未分配给软件，合规 descriptor 不得依赖此行为。
+5. Activation 后 saturate to signed INT32：大于 `2^31-1` 输出 `0x7fffffff`，小于 `-2^31` 输出 `0x80000000`，其余输出低 32-bit two's-complement。Bias、dot product、shift、activation、saturation 的顺序不可调换。输出每个元素写入一个 32-bit word，按当前 opcode 的逻辑输出顺序推进地址。
+
+该合同消除 `OPEN-NUM-01` 的 Scalar 算术规则歧义；测试覆盖范围仍需由 RTM 的 Run ID、Seed、Golden 和 Memory Image 证据决定，不因合同冻结自动变成 PASS。
 
 ### 3.2 CNM：Bank-Local PE 与 Global Reduction
 
@@ -394,7 +403,7 @@ Functional Coverage / SVA / URG
 1. 合法环境：每项 descriptor 只选择一个 Engine；仅当该 Engine 活动槽空闲时派发。不同 Engine 任务允许重叠；软件负责避免并发 SPAD 读写冲突。违反者仅记录 OUT_OF_CONTRACT。
 2. Compute Cluster 裸模块没有统一事务 ID 或 AXI 接口；并发 subsystem Testbench 必须复用真实 Top `ai_compute_spad_mux`、Response Routing 与 `ai_spad_arbiter`，并单独跟踪 descriptor/task owner。
 3. 验证 Checker 分开处理成功 Memory Image、出错前已提交前缀、未接受请求不得算作成功、Done 恰好一次、返回不能串入下一个 Engine。
-4. 非 FP Outstanding 深度/异常 Drain、完整 Fault × Phase 覆盖和 MATRIX-LINE-001 的执行仍归档为 OPEN/PARTIAL；partial/zero WSTRB 属于不支持行为。Error ABI 与 priority oracle 按本 SPEC v1.4；SFU 算术按 v1.3 合同验收，不可变成空 Covergroup 的 100%。
+4. 非 FP Outstanding 深度/异常 Drain、完整 Fault × Phase 覆盖仍归档为 OPEN/PARTIAL；Matrix Line 的 v1.5 checker 子项由 R49 关闭；partial/zero WSTRB 属于不支持行为。Error ABI 与 priority oracle 按本 SPEC v1.4；SFU 算术按 v1.3 合同验收，不可变成空 Covergroup 的 100%。
 
 ### 8.2 Open Issue Disposition
 
@@ -402,12 +411,12 @@ Functional Coverage / SVA / URG
 |---|---|---|
 | OPEN-CL-003 | P0 部分 OPEN | 非 FP 在途请求深度、Abort/Reset drain/restart 时序、Response ownership 波形与断言证据 |
 | OPEN-CL-002 | P1 OPEN | Validator × Engine 的每算子地址/长度/stride/alias 精确定义 |
-| OPEN-CL-004 | P1 verification OPEN | v1.5 定义的 full-strobe/alignment/fallback/protection 合同；三 seed MATRIX-LINE-001 marker 与完整 Memory Image |
+| OPEN-CL-004 | **Closed scoped by v1.5/R49** | Matrix Line full-strobe/alignment/fallback/protection checker and reference-memory slice pass on three seeds; broader REQ-CL-010/022 remain partial |
 | CL-COV-006 | P1 PARTIAL | 依 v1.4 固定优先级 oracle，补齐合法 Engine × Fault × Phase × committed-prefix checker；不可达及接口不提供的故障组合单列 disposition |
-| OPEN-NUM-01 | P1 OPEN | Scalar INT8 的逐算子舍入、定点溢出和边界 Numeric Appendix |
+| OPEN-NUM-01 | **Contract frozen in v1.6; R51 clean replay pending** | Scalar INT8 order/rounding/saturation is defined above; retain PARTIAL until the independent edge campaign passes on the committed test SHA |
 | OPEN-NUM-02 | **Closed in v1.3** | SFU 数值公式和独立 bit-exact oracle 已冻结；合同域的实测闭环见 RTM R21 |
 
-**冻结状态说明**：v1.1 是并行派发合法范围 DV 基线；v1.2 定义协调 reset/fabric epoch 约束；v1.3 定义 SFU 定点算术；v1.4 定义 Compute Engine Error ABI、优先级与写回前缀；v1.5 冻结 Matrix Line 的 full-strobe/alignment/fallback/protection 合同。其他 Open Item 不因升版自动关闭，未来修改可观察行为必须升版并关联 Testplan 的 Requirement ID。
+**冻结状态说明**：v1.1 是并行派发合法范围 DV 基线；v1.2 定义协调 reset/fabric epoch 约束；v1.3 定义 SFU 定点算术；v1.4 定义 Compute Engine Error ABI、优先级与写回前缀；v1.5 冻结 Matrix Line 的 full-strobe/alignment/fallback/protection 合同；v1.6 冻结 Scalar INT8 算术顺序与 signed overflow/saturation 规则。其他 Open Item 不因升版自动关闭，未来修改可观察行为必须升版并关联 Testplan 的 Requirement ID。
 
 ## 7. 仓库基线及引用文件
 
@@ -436,4 +445,4 @@ Functional Coverage / SVA / URG
 | REQ-PC-009 | **Abort/Drain**：abort 后不再派发未接受的新 descriptor；所有已派发任务均收到 abort，已接受 SPAD 请求/响应按 owner 收尾；任务以 `ERR_ABORT` 或更早已发生的 Engine error 形成一次完成，按 CMDQ 顺序退休。调度器在所有 Engine 和完成项排空前不得报告 idle；未派发的 CMDQ descriptor 留给软件。 | 多 Engine active 时 abort；检查停止新 launch、SPAD owner 无泄漏、完成 FIFO 保序、idle/drain 和随后可恢复运行。 |
 | REQ-PC-010 | **Reset 与恢复**：reset 清除 Engine 活动槽、结果 FIFO、SPAD owner pipeline 和未发布 completion；复位后旧 Done/响应不得污染新 task。若 AXI 外部读/写已接受，必须协调复位加速器与 owning fabric，fabric 丢弃旧 epoch R/B；accelerator-only reset 仅可在 DMA/AXI 通道空闲或已完成显式排空/隔离后执行。 | UVM 在已接受 AR 且 R 延迟时协调复位，检查 fabric read queue/active/RVALID 清空，并在 8 周期安静窗口检查无旧 R、新 AR；再检查 SPAD sentinel 未变及 reset 后新事务恢复。该测试不代表 B 通道或任意外部 fabric 实现的独立证明。 |
 
-**v1.1/v1.2/v1.3/v1.4/v1.5 Freeze Record**：v1.1 冻结 REQ-CL-001～028、REQ-PC-001～010、合法并行任务合同、SPAD owner 及按序 completion 行为；v1.2 冻结外部 AXI reset/fabric epoch 边界；v1.3 冻结 SFU 数值整数公式和约定输入域；v1.4 冻结 Compute Engine Error ABI、同周期优先级和可见写回前缀；v1.5 冻结 Matrix Line full-strobe/alignment/fallback/protection 合同。SPEC 冻结不等于 UVM、coverage 或最终 Sign-off 已完成。现有 verification evidence 与未闭合项见 [Compute Cluster Testplan](../verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md)、[Execution RTM](../verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md) 和 [Verification Matrix](../../dv/VERIFICATION_MATRIX.md)。
+**v1.1/v1.2/v1.3/v1.4/v1.5/v1.6 Freeze Record**：v1.1 冻结 REQ-CL-001～028、REQ-PC-001～010、合法并行任务合同、SPAD owner 及按序 completion 行为；v1.2 冻结外部 AXI reset/fabric epoch 边界；v1.3 冻结 SFU 数值整数公式和约定输入域；v1.4 冻结 Compute Engine Error ABI、同周期优先级和可见写回前缀；v1.5 冻结 Matrix Line full-strobe/alignment/fallback/protection 合同；v1.6 冻结 Scalar INT8 packed Dot 与 post-processing 合同。SPEC 冻结不等于 UVM、coverage 或最终 Sign-off 已完成。现有 verification evidence 与未闭合项见 [Compute Cluster Testplan](../verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md)、[Execution RTM](../verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md) 和 [Verification Matrix](../../dv/VERIFICATION_MATRIX.md)。
