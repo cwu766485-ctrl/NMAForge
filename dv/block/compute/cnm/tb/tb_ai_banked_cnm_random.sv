@@ -204,6 +204,36 @@ module tb_ai_banked_cnm_random;
     end
   endtask
 
+  task automatic reset_at_local_phase(input [2:0] target_state,input integer id);
+    integer local_timeout,writes_before;
+    begin
+      op_mode=8'h20;length=(target_state==ST_DONE)?16'd1:16'd4;
+      watchdog_limit=0;abort=0;parity_error=0;inject_cnm_protection=0;
+      inject_spad_protection=0;extra_response_delay=1;
+      prefetch_backpressure=(target_state==ST_PREFETCH_A);
+      writes_before=spad_write_count;
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      local_timeout=0;
+      while(dut.lc0.state_r!=target_state && local_timeout<10000) begin
+        @(negedge clk);local_timeout=local_timeout+1;
+      end
+      if(dut.lc0.state_r!=target_state)
+        $fatal(1,"CNM phase Reset id=%0d failed to reach local state=%0d current=%0d",
+               id,target_state,dut.lc0.state_r);
+      resetn=0;#1;prefetch_backpressure=0;
+      if(busy || done || error || error_code!=0 ||
+         dut.lc0.state_r!=3'd0 || dut.lc1.state_r!=3'd0 ||
+         dut.lc2.state_r!=3'd0 || dut.lc3.state_r!=3'd0)
+        $fatal(1,"CNM phase Reset id=%0d failed to clear the core",id);
+      repeat(3) @(negedge clk);resetn=1;
+      repeat(2) @(negedge clk);
+      if(spad_write_count!=writes_before)
+        $fatal(1,"CNM phase Reset id=%0d committed output write",id);
+      run_case(20+id,3,0,1);
+    end
+  endtask
+
   task automatic expect_cnm_error(input [3:0] expected_code,input integer fault_id);
     integer writes_before;
     begin
@@ -340,7 +370,17 @@ module tb_ai_banked_cnm_random;
     abort_at_local_phase(ST_WAIT_B,3);
     abort_at_local_phase(ST_PREFETCH_A,4);
     abort_at_local_phase(ST_DONE,5);
+    reset_at_local_phase(ST_A_REQ,0);
+    reset_at_local_phase(ST_B_REQ,1);
+    reset_at_local_phase(ST_WAIT_A,2);
+    reset_at_local_phase(ST_WAIT_B,3);
+    reset_at_local_phase(ST_PREFETCH_A,4);
+    reset_at_local_phase(ST_DONE,5);
     length=0;expect_cnm_error(4'd1,0);
+    if(dut.local_start || dut.local_busy!==4'b0000 ||
+       dut.lc0.state_r!=3'd0 || dut.lc1.state_r!=3'd0 ||
+       dut.lc2.state_r!=3'd0 || dut.lc3.state_r!=3'd0)
+      $fatal(1,"CNM zero-length descriptor reached a bank-local controller");
     length=3;parity_error=4'hf;expect_cnm_error(4'd5,1);
     inject_cnm_protection=1;expect_cnm_error(4'd6,2);
     inject_spad_protection=1;expect_cnm_error(4'd6,3);
@@ -355,7 +395,7 @@ module tb_ai_banked_cnm_random;
     run_late_parity_fault();
     check_reset_recovery();
     if(errors) $fatal(1,"CNM random regression mismatches=%0d",errors);
-    $display("CNM_RANDOM_PASS cases=12 faults=8 phase_abort=6 late_faults=1 reset_fault_combo=1 reset_recovery=1 wait_a=1 prefetch_backpressure=1 fast_response=1 seed=%0d",initial_seed);
+    $display("CNM_RANDOM_PASS golden_cases=17 faults=8 phase_abort=6 phase_reset=6 late_faults=1 reset_fault_combo=1 reset_recovery=1 wait_a=1 prefetch_backpressure=1 fast_response=1 seed=%0d",initial_seed);
     $finish;
   end
 endmodule
