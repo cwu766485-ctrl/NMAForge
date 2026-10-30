@@ -82,6 +82,7 @@ PPA and full pretrained-model deployment are outside this Functional DV decision
 - [R59 Top Smoke replay evidence](COMPUTE_CLUSTER_TOP_SMOKE_REPLAY_R59_2026-10-30.md)
 - [R76 exact-candidate clean replay evidence](COMPUTE_CLUSTER_CLEAN_REPLAY_R76_2026-10-30.md)
 - [R81 exact-candidate coverage and mutation audit](COMPUTE_CLUSTER_CLEAN_REPLAY_R81_2026-10-30.md)
+- [R82 Matrix size/ablation and top task benchmark](../benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R82_2026-10-30.md)
 - [R60 all-engine parity clean replay evidence](COMPUTE_CLUSTER_ALL_ENGINE_PARITY_R60_2026-10-30.md)
 - [R75 SFU block-core parameter-latch evidence](COMPUTE_CLUSTER_SFU_PARAMETER_LATCH_R75_2026-10-30.md)
 - [Compute Cluster SPEC v1.6](../spec/COMPUTE_CLUSTER_SPEC_ZH.md)
@@ -99,3 +100,7 @@ R79 at exact clean test SHA `a45864565ace4702783f5c5632c1f13a001c7653` exercises
 ## R81 exact-candidate coverage and mutation audit — 2026-10-30
 
 At the same exact code/test SHA `e4c1e7a93a0afe1c89128996c6eaf9bff5caf907`, R81 passes three real-top seven-engine UVM seeds, each checking 17,094 SPAD words with zero mismatch/unknown/stale/orphan and UVM severity `0/0/0`. The defined applicable functional covergroup is 31/31 variables; all 28 passive checker-sensitivity mutations are caught by their expected named checkers. Five-seed Top Smoke DUT code coverage reports line/condition/FSM/branch `86.38/72.92/44.59/75.36%`, and is kept distinct from functional coverage. UVM URG assertion success is 17/22, with zero failures/incomplete, three AXI AR/AW properties without successful antecedents in this compute-only run, and two UVM RAL properties without attempts. This adds reproducibility and audit evidence only; the RTM remains 24 PASS-SCOPED / 14 PARTIAL, and `CL-DV-v1.0` remains HOLD. See [R81 evidence](COMPUTE_CLUSTER_CLEAN_REPLAY_R81_2026-10-30.md).
+
+## R82 benchmark replay — 2026-10-30
+
+R82 reruns the Matrix physical array-size sweep and depth/prefetch/cache ablation at exact code/test SHA `e4c1e7a93a0afe1c89128996c6eaf9bff5caf907`. VCS passes 165/165 independent Golden cases across three seeds: 45 size points and 120 ablation points. At 32×32×64 on the 16×16 array, `d4p1c1` is 1,187 cycles/6,144 B reads versus the `d2p0c0` baseline of 1,698 cycles/8,192 B reads. The R81 real-top UVM task profile records serial 1,239 cycles, staged 1,070 cycles, and four-task parallel 1,137 versus 1,696 cycles serial. Timing uses one-cycle behavioral SPAD responses; 250 MHz is only a normalization assumption. The full CSV, exact commands, seed agreement, log manifest and limitations are in the [R82 report](../benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R82_2026-10-30.md). This improves `REQ-CL-028` evidence without changing its PARTIAL status or the overall **HOLD** decision.
