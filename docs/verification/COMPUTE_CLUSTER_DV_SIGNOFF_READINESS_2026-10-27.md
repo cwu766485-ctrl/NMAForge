@@ -114,3 +114,7 @@ See the [remaining Open Issues](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md) and [
 ## R77 evidence update — 2026-10-30
 
 R77 at clean code/test SHA `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28` adds the legal real-top SFU RMSNorm descriptor-latch point and replays three-seed top UVM, 28/28 checker-sensitivity mutations, Top Smoke, 20-case top regression, behavioral AXI stall/reset, 45/45 Matrix size and 120/120 Matrix ablation. Product RTL/SPEC remain byte-identical to `9d4e9ab`. This increases evidence for `REQ-CL-005` without closing it. Requirement status remains 24 PASS-SCOPED / 14 PARTIAL; `CL-DV-v1.0` remains HOLD because legal fault/phase/reset crosses and actual target-fabric qualification remain open. See [R77 replay report](COMPUTE_CLUSTER_CLEAN_REPLAY_R77_2026-10-30.md).
+
+## R78 SPAD scheduler fairness — 2026-10-30
+
+At the same exact code/test SHA, VCS/URG `V-2023.12-SP1_Full64` passes a 10,000-cycle request-mode arbiter run with 3,334 grants/client and maximum observed wait 2 cycles/client, along with directed three-client fairness and CNM/DMA ownership cases. URG checks both assertion properties with attempts and no failures. Raw block coverage is line/condition/toggle/branch `100.00/86.89/10.73/100.00%`. This is a standalone `ai_spad_arbiter` harness, without downstream SRAM backpressure or the full seven-engine request/response path. `REQ-CL-014` remains PARTIAL; the requirement counts stay 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains HOLD. See [R78 report](COMPUTE_CLUSTER_SPAD_FAIRNESS_R78_2026-10-30.md).
