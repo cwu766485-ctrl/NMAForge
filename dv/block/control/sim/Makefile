@@ -42,6 +42,7 @@ DESCRIPTOR_VALIDATOR_OUT ?= /tmp/nmaforge_descriptor_validator_r90
 descriptor-validator-regress:
 	mkdir -p $(DESCRIPTOR_VALIDATOR_OUT)
 	$(VCS) -full64 -sverilog -timescale=1ns/1ps \
+		-Mdir=$(DESCRIPTOR_VALIDATOR_OUT)/csrc \
 		-top tb_ai_descriptor_validator \
 		../../../../rtl/control/descriptor/ai_descriptor_validator.v \
 		../../../../rtl/control/descriptor/ai_accel_opcode_decode.v \
