@@ -18,7 +18,7 @@ The PASS-SCOPED count preserves the scoped review classification. In particular,
 
 ## Run and evidence index
 
-All VCS/URG evidence is local under `/tmp`; generated databases are deliberately not checked in. Paths are retained here to make each row resolvable. R40–R45 replay the selected candidate SHA from a detached clean worktree. R46 checks out the latest published closeout snapshot; R47 attempts the new Matrix Line checker on the v1.5 review worktree. Both are blocked before compile by the unreachable license server. For earlier rows, “source-equivalent” means the RTL/DV files used by the run match the named committed source files; the run did not necessarily execute from a clean checkout of that SHA.
+All VCS/URG evidence is local under `/tmp`; generated databases are deliberately not checked in. Paths are retained here to make each row resolvable. R40–R45 replay the selected candidate SHA from a detached clean worktree. R46 checks out the latest published closeout snapshot. R47 records the initial Matrix Line checker attempt; R48 retries the final checker source on the v1.5 review worktree. R46–R48 are blocked before simulation because VCS could not acquire a license. For earlier rows, “source-equivalent” means the RTL/DV files used by the run match the named committed source files; the run did not necessarily execute from a clean checkout of that SHA.
 
 | Ref / Run ID | Source / tool / seeds | Result and primary evidence path |
 |---|---|---|
