@@ -39,7 +39,7 @@ CPU -- 32-bit AXI4-Lite --> 寄存器/IRQ --> 命令处理器(CMDQ/CPLQ)
 下列职责是强制架构边界：
 
 - `ai_accel_regs` 只保存软件配置、产生控制脉冲、记录 sticky 状态和 IRQ，不能推进队列或调度描述符。
-- 普通 compute CMDQ 由 `ai_parallel_compute_dispatcher` 按序取/校验并派发，维护每引擎活动槽、依赖事件、abort/drain、CMDQ_HEAD 和按序 CPLQ_TAIL；宏/direct 等串行兼容路径仍由 `ai_command_processor` 协调。两者的具体边界与 REQ-PC 验收条款见 [Compute Cluster SPEC v1.1](COMPUTE_CLUSTER_SPEC_ZH.md)。
+- 普通 compute CMDQ 由 `ai_parallel_compute_dispatcher` 按序取/校验并派发，维护每引擎活动槽、依赖事件、abort/drain、CMDQ_HEAD 和按序 CPLQ_TAIL；宏/direct 等串行兼容路径仍由 `ai_command_processor` 协调。两者的具体边界与 REQ-PC 验收条款见 [Compute Cluster SPEC v1.5](COMPUTE_CLUSTER_SPEC_ZH.md)。
 - `ai_spad_arbiter` 是 scratchpad 调度端口的唯一拥有者。描述符和完成写入为高优先级控制流；标量、line、banked 计算和 DMA 在数据面轮询。顶层不得另加 scratchpad mux。
 - `ai_desc_fetch` 读取片上描述符，`axi_desc_fetch` 读取外部描述符；处理器在一条命令期间保持来源不变。
 - `ai_completion_writer` 先提交完成项的四个 32-bit word，才发布新的 `CPLQ_TAIL`。
@@ -104,7 +104,7 @@ SFU `REQUANT_I8`（opcode `0x36`）中 `flags[4]` 将饱和后的 INT32 结果�
 
 ### 4.1 Compute CMDQ 并行派发
 
-普通 compute descriptor 按 CMDQ 顺序逐个读取、校验和派发；不同计算引擎的任务允许重叠，每个引擎最多有一个未完成任务。一个引擎仍忙时，属于该引擎的后续 descriptor 留在队列中，不能覆盖它的活动上下文。普通 descriptor 的 `CMDQ_HEAD` 在被派发或被判定为错误时推进；完成记录严格按 descriptor 的 CMDQ 顺序写入 CPLQ，且每项四个 word 全部提交后才推进 `CPLQ_TAIL`。因此任务执行完成顺序可以不同，软件观察到的完成顺序不变。Requirement 编号、测试台架边界和验证证据见 [Compute Cluster SPEC v1.1](COMPUTE_CLUSTER_SPEC_ZH.md) 与 [Compute Cluster UVM Testplan](../verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md)。
+普通 compute descriptor 按 CMDQ 顺序逐个读取、校验和派发；不同计算引擎的任务允许重叠，每个引擎最多有一个未完成任务。一个引擎仍忙时，属于该引擎的后续 descriptor 留在队列中，不能覆盖它的活动上下文。普通 descriptor 的 `CMDQ_HEAD` 在被派发或被判定为错误时推进；完成记录严格按 descriptor 的 CMDQ 顺序写入 CPLQ，且每项四个 word 全部提交后才推进 `CPLQ_TAIL`。因此任务执行完成顺序可以不同，软件观察到的完成顺序不变。Requirement 编号、测试台架边界和验证证据见 [Compute Cluster SPEC v1.5](COMPUTE_CLUSTER_SPEC_ZH.md) 与 [Compute Cluster UVM Testplan](../verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md)。
 
 事件依赖仍按顺序提交语义处理：依赖事件在对应任务成功完成并轮到它按序退休后才生效；`wait`、`clear` 和 `signal` 不改变 CPLQ 顺序。宏 descriptor 在此前并行任务排空后移交串行命令处理器，宏内部仍按子 descriptor 顺序执行并只产生一个父 completion。direct/tile 模式也不与 CMDQ 并行任务混跑。
 

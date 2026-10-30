@@ -100,6 +100,13 @@ module tb_ai_tensor_matrix_core_random;
   integer spad_read_count=0,spad_response_count=0;
   integer bank_stall_count=0,spad_stall_count=0,line_stall_count=0;
   integer line_write_count=0,scalar_write_count=0;
+  integer line_stall_stability_checks=0,line_full_strobe_checks=0;
+  reg line_stall_pending=0;
+  reg [31:0] stalled_line_addr=0;
+  reg [127:0] stalled_line_wdata=0;
+  reg [15:0] stalled_line_wstrb=0;
+  reg matrix_unaligned_fallback_seen=0;
+  reg matrix_line_protection_seen=0;
   integer seed=20261021,initial_seed;
   integer benchmark_mode=0;
 
@@ -190,7 +197,42 @@ module tb_ai_tensor_matrix_core_random;
       pending_spad_data<=0;spad_read_count<=0;spad_response_count<=0;
       line_ready<=0;
       line_write_count<=0;scalar_write_count<=0;
+      line_stall_pending<=0;
+      stalled_line_addr<=0;stalled_line_wdata<=0;stalled_line_wstrb<=0;
+      // Keep test-run aggregate counters across directed DUT reset scenarios.
     end else begin
+      // Matrix v1 uses the 128-bit port only for complete, 16-byte-aligned
+      // rows. A stalled request remains stable until handshake; an abort/error
+      // may cancel a request that was never accepted.
+      if(line_stall_pending) begin
+        if(!line_valid) begin
+          if(!abort && (error_code==4'd0))
+            $fatal(1,"Matrix line request dropped while stalled without cancel/error");
+        end else begin
+          if((line_addr!==stalled_line_addr) ||
+             (line_wdata!==stalled_line_wdata) ||
+             (line_wstrb!==stalled_line_wstrb) || (line_write!==1'b1))
+            $fatal(1,"Matrix line request changed while stalled");
+          line_stall_stability_checks<=line_stall_stability_checks+1;
+        end
+      end
+      if(line_valid) begin
+        if(line_addr[3:0]!==4'b0000)
+          $fatal(1,"Matrix line address is not 16-byte aligned: %08x",line_addr);
+        if(line_write!==1'b1)
+          $fatal(1,"Matrix line port asserted a non-write request");
+        if(line_wstrb!==16'hffff)
+          $fatal(1,"Matrix v1 line port emitted unsupported WSTRB=%04x",line_wstrb);
+        line_full_strobe_checks<=line_full_strobe_checks+1;
+        line_stall_pending<=!line_ready;
+        if(!line_ready) begin
+          stalled_line_addr<=line_addr;
+          stalled_line_wdata<=line_wdata;
+          stalled_line_wstrb<=line_wstrb;
+        end
+      end else begin
+        line_stall_pending<=1'b0;
+      end
       if(perf_mac_active) mac_cycle_count<=mac_cycle_count+1;
       if(dut.prefetch_active &&
          (dut.prefetch_buffer_r==dut.compute_buffer_r))
@@ -524,6 +566,8 @@ module tb_ai_tensor_matrix_core_random;
       if(line_write_count!==expected_line_writes || scalar_write_count!==expected_scalar_writes)
         $fatal(1,"matrix case %0d writes line=%0d/%0d scalar=%0d/%0d",case_id,
                line_write_count,expected_line_writes,scalar_write_count,expected_scalar_writes);
+      if(cfg_unaligned && (scalar_write_count==expected_scalar_writes))
+        matrix_unaligned_fallback_seen=1'b1;
       for(ii=0;ii<cfg_instances;ii=ii+1)
         for(rr=0;rr<cfg_m;rr=rr+1)
           for(cc=0;cc<cfg_n;cc=cc+1) begin
@@ -650,7 +694,11 @@ module tb_ai_tensor_matrix_core_random;
   endtask
 
   task automatic check_fault(input integer expected_code,input integer fault_id);
-    begin launch_and_wait();finish_fault(expected_code,fault_id);end
+    begin
+      launch_and_wait();
+      finish_fault(expected_code,fault_id);
+      if(fault_id==6) matrix_line_protection_seen=1'b1;
+    end
   endtask
 
   task automatic simple_fault_setup;
@@ -1281,6 +1329,13 @@ module tb_ai_tensor_matrix_core_random;
     if(bank_stall_count==0 || spad_stall_count==0 || line_stall_count==0)
       $fatal(1,"matrix randomized ready profile missed stalls bank/spad/line=%0d/%0d/%0d",
              bank_stall_count,spad_stall_count,line_stall_count);
+    if(line_full_strobe_checks==0 || line_stall_stability_checks==0 ||
+       !matrix_unaligned_fallback_seen || !matrix_line_protection_seen)
+      $fatal(1,"Matrix line contract points missing full=%0d stable=%0d unaligned=%b protection=%b",
+             line_full_strobe_checks,line_stall_stability_checks,
+             matrix_unaligned_fallback_seen,matrix_line_protection_seen);
+    $display("MATRIX_LINE_CONTRACT_PASS full_wstrb=1 aligned=1 stalled_stability=%0d unaligned_scalar_fallback=1 protection_error=1 partial_zero_wstrb=unsupported",
+             line_stall_stability_checks);
     $display("MATRIX_CORE_RANDOM_PASS cases=%0d faults=%0d late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 seed=%0d bank_reads=%0d responses=%0d spad_reads=%0d responses=%0d stalls=%0d/%0d/%0d",
              case_count,fault_count,initial_seed,bank_read_count,bank_response_count,
              spad_read_count,spad_response_count,bank_stall_count,spad_stall_count,line_stall_count);

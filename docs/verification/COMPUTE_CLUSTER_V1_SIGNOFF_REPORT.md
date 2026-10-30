@@ -1,0 +1,73 @@
+# NMAForge Compute Cluster v1.0 Functional DV Sign-off Report
+
+**Review date:** 2026-10-30  
+**Decision:** **HOLD — not signed off**  
+**Scope:** Compute Cluster functional DV only; no claim of whole-NPU sign-off or ASIC PPA closure.
+
+## Version and evidence baseline
+
+| Item | Frozen identity |
+|---|---|
+| Product RTL candidate | `6848a414eaeaa05cf9e1411cf55d9d27333208a6` |
+| Latest published closeout snapshot | `be78ee27b5a08783ec2560334ca1361baf382157` |
+| Review branch | `work/compute-cluster-v1-closeout-20261030` |
+| Evidence/test commit | `5b1d282b97d091e806b035c4a93556f5ac250c37` for R51; evidence documentation is committed separately |
+| SPEC | Compute Cluster SPEC v1.6; no product RTL changed by R51 |
+| VCS | Synopsys VCS `V-2023.12-SP1_Full64`; R49 passed the corrected Matrix checker on three seeds; R50 passed published-snapshot six-seed UVM and Top Smoke; R51 passed the Scalar INT8 numeric campaign on three seeds |
+
+The review branch is isolated from the v2 research branch. The review commit adds DV checks and evidence documentation only; it does not change product RTL.
+
+## Requirement disposition
+
+The Execution RTM maps all 38 requirements (`REQ-CL-001..028`, `REQ-PC-001..010`) to test IDs, checkers, coverage, run IDs, seeds and evidence paths.
+
+| Disposition | Count | Meaning |
+|---|---:|---|
+| PASS-SCOPED | 24 | Evidence passes only for the explicitly exercised scope |
+| PARTIAL | 14 | Remaining cases or integration evidence are open |
+| BLOCKED_SPEC | 0 | No unresolved specification blocker remains in the current frozen contract |
+| NOT_RUN | 0 | Every requirement has a recorded disposition; this does not mean every test ran |
+
+R46/R47 were historical `BLOCKED_ENV` attempts; R48 exposed a testbench coverage-counter reset issue; R49 resolves that issue for the scoped Matrix Line contract. R50 passes on the exact published closeout SHA. R51 passes 14 independent Scalar INT8 Golden cases on each of three clean-worktree seeds. These scoped results do not change the 38-requirement disposition counts.
+
+## Review findings
+
+| Area | Evidence | Remaining issue / disposition |
+|---|---|---|
+| Golden and memory image | R40: six clean seeds on the selected product SHA; seven-engine memory scoreboard; R45: Digits 360/360 with bit-exact integer Golden | Bounded to tested operations and shapes; see the RTM partial rows |
+| Shared SPAD and response ownership | R40 top scoreboard, R31 CNM/DMA-SPAD lifecycle slice, R32 accepted-read reset sweep across seven engines | Production-top pair and fault-phase combinations remain incomplete; actual external-fabric reset qualification is open |
+| Backpressure, parity, protection, abort and reset | R30–R32 and R40–R41 cover named Matrix, CNM, DMA/SPAD, parity, reset and mutation slices | No complete legal `Engine × Fault × Phase × Reset` matrix has been demonstrated |
+| Mutation sensitivity | R41 catches 25/25 passive checker observation mutations for address, data, owner, WSTRB and completion lifecycle | This is checker sensitivity, not a DUT RTL mutation score; broader fault/error injection remains open |
+| Matrix FSM | R28 records raw enabled-profile coverage 49/53, five non-vacuous formal proofs, state reachability covers, and the separate prefetch-disabled transition | Preserve raw 49/53; no illegal stimulus is used to force bins. Remaining transitions are dispositioned only within the documented proof assumptions/configuration |
+| Matrix Line output | SPEC v1.5 freezes aligned full-`WSTRB` Line writes, scalar fallback for 4-byte-aligned non-Line-aligned output, protection-prefix behavior, and partial/zero WSTRB as unsupported. `MATRIX-LINE-001` checks these interface rules plus stall stability | R49 passes three seeds; each records 312 stable stalls, full WSTRB/alignment, fallback and protection checks, and reference-memory comparison. Scoped Line contract is closed; this does not close the broader Matrix requirement rows |
+| SVA and compile diagnostics | R40/R15 provide non-vacuity and AXI assertion evidence for their named properties; R50 has no UVM severity or compile errors | R50 compute-only AR/AW stall-to-accept cover bins have zero matches (W has one); the separate R15 E2E profile supplies 3/3 AXI stall covers. Top Smoke keeps one `LOOP-REROLL-ENABLED` fixture warning. Evidence does not cover every requester/fault/backpressure combination |
+| Descriptor and scalar numeric boundaries | R51 freezes and checks common Scalar INT8 arithmetic semantics across 14 VDOT/GEMV/GEMM Golden cases per seed, with output Memory Image checks on three seeds | `OPEN-NUM-01` closes within this common arithmetic scope; legacy Conv and broader `REQ-CL-020` opcode/shape/fault coverage remain PARTIAL, as do descriptor boundary rules |
+
+## Clean replay status
+
+The candidate SHA passed the previously recorded clean R40–R45 campaigns: six-seed seven-engine UVM, 25/25 checker-sensitivity mutations, 165/165 Matrix size/ablation checks, pinned TinyNPU paired cases, Top Smoke and Digits inference. Those passes remain valid for their named sources and scope.
+
+The latest published closeout snapshot was checked out into a clean worktree. The initial R46 attempt was license-blocked; after license recovery R50 passed six UVM seeds and Top Smoke at the exact published SHA. R48 exposed a testbench aggregate-counter reset issue, fixed and verified by R49 on three seeds. R51 then passed on a detached clean worktree fixed at test commit `5b1d282`; it exercises the Scalar INT8 common arithmetic path without changing product RTL. R50's focused compute-only SVA cover-bin results and the retained Top Smoke fixture warning are explicitly recorded in the RTM. Logs and exact commands are indexed in the [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md) and [R51 numeric report](COMPUTE_CLUSTER_SCALAR_INT8_NUMERIC_R51.md).
+
+## Sign-off decision and exit conditions
+
+**CL-DV-v1.0 remains HOLD.** The current evidence does not satisfy the required closure for 14 partial requirements. No coverage percentage is used to waive missing legal scenarios.
+
+Before an independent review can consider sign-off, the open items must be closed or receive an approved scope disposition, including:
+
+1. Complete legal fault/reset phase crosses and production-top shared-SPAD ownership cases, or document approved bounded exclusions.
+2. Qualify the coordinated reset/epoch contract against the selected external fabric, or attach its approved compliance review.
+3. Freeze and test remaining descriptor boundaries; R51 closes the common Scalar INT8 arithmetic contract, while legacy Conv and broader opcode/shape verification remain open.
+4. Review all 38 RTM rows and their evidence paths with an independent reviewer.
+
+PPA and full pretrained-model deployment are outside this Functional DV decision and remain unclaimed.
+
+## Evidence documents
+
+- [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)
+- [Open issues](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md)
+- [Sign-off readiness](COMPUTE_CLUSTER_DV_SIGNOFF_READINESS_2026-10-27.md)
+- [UVM testplan](COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md)
+- [Scalar INT8 R51 evidence](COMPUTE_CLUSTER_SCALAR_INT8_NUMERIC_R51.md)
+- [Compute Cluster SPEC v1.6](../spec/COMPUTE_CLUSTER_SPEC_ZH.md)
+- [Verification matrix](../../dv/VERIFICATION_MATRIX.md)

@@ -1,6 +1,29 @@
 # NMAForge block and subsystem verification matrix
 
-> **2026-10-28 current review addendum:** Product RTL/SPEC candidate is
+> **2026-10-30 current review addendum:** Product RTL baseline is
+> `6848a414eaeaa05cf9e1411cf55d9d27333208a6`; SPEC v1.5 freezes the current
+> Matrix Line behavior (aligned full WSTRB, scalar fallback, and no partial or
+> zero WSTRB). The new `MATRIX-LINE-001` checker enforces Line alignment,
+> strobe, stall stability, fallback, and protection error behavior. Its
+> first final-source VCS run exposed a testbench counter reset issue (RTM R48);
+> the corrected three-seed replay passes R49 with 312 stall-stability checks per
+> seed and reference-memory checks. Published closeout SHA
+> `be78ee27b5a08783ec2560334ca1361baf382157` now passes a six-seed clean UVM
+> replay and Top Smoke (R50): 100% applicable focused coverage per seed,
+> 5,368 checked memory words with zero mismatch, and `TEST PASS`. R49
+> is the latest Matrix Line PASS evidence; R50 validates the published snapshot
+> but does not change the overall
+> Compute Cluster status remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0
+> HOLD; see the [current Execution RTM](../docs/verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
+
+> **2026-10-30 Scalar INT8 numeric addendum:** R51 passes 14 independent
+> Golden cases per seed on three seeds at clean test SHA `5b1d282`, covering
+> VDOT/GEMV/GEMM arithmetic boundaries, output Memory Image, response drain,
+> and read/write backpressure. SPEC v1.6 closes the common arithmetic contract
+> ambiguity; legacy Conv and wider REQ-CL-020 opcode/shape coverage remain
+> partial. See the [R51 report](../docs/verification/COMPUTE_CLUSTER_SCALAR_INT8_NUMERIC_R51.md).
+
+> **2026-10-28 historical review addendum:** Product RTL/SPEC candidate is
 > `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`. Clean test commit
 > `bb6e3a270ab819c15df0eb993c184c99d13a6d71` has byte-identical `rtl/` and
 > adds a seven-engine accepted-read reset sweep. VCS/URG

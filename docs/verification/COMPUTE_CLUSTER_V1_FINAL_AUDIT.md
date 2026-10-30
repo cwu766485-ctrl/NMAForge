@@ -1,6 +1,7 @@
 # Compute Cluster v1.0 Final Audit
 
-**Review date:** 2026-10-29  
+**Review date:** 2026-10-30
+
 **Selected product/SPEC candidate:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6`
 - **Follow-up evidence branch:** `feat/shape-adaptive-gemv-v2`
 - **Follow-up evidence replay SHA:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6`
@@ -12,7 +13,7 @@ The selected candidate has substantial reproducible evidence for Matrix/SPAD and
 
 The complete requirement-by-requirement execution table lives in the [Compute Cluster Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md). It records each requirement's disposition, testcase/checker or oracle, covered behavior, Run ID, seed, and evidence path. The RTM run/evidence index records source-SHA relationship, tool version, and result; R40–R45 replay the selected candidate SHA from a clean worktree. The [9d9e0f replay manifest](COMPUTE_CLUSTER_FINAL_9D9E0F_MANIFEST_2026-10-28.md) is retained as historical evidence for that earlier candidate. Runs without an exact source identity remain historical/source-equivalent and are not silently upgraded to exact-candidate replay.
 
-The **100%** result is limited to the focused top-compute functional testpoint group reproduced by R40 on six clean seeds (`20261025/26/27/29/30/31`): 29/29 applicable URG variables, with the completion-read bin explicitly excluded as structural N/A and checked to remain zero. It does not mean 100% requirement, DUT code, or complete Compute Cluster coverage. The Matrix default prefetch-enabled FSM remains 49/53 raw transitions; selected guard paths have formal disposition and one edge is exercised in the separate prefetch-disabled profile.
+The **100%** result is limited to the focused top-compute functional testpoint group reproduced by R40 on six clean seeds (`20261025/26/27/29/30/31`): 29/29 applicable URG variables, with the completion-read bin explicitly excluded as structural N/A and checked to remain zero. It does not mean 100% requirement, DUT code, or complete Compute Cluster coverage. R51 adds a separate 14-case-per-seed Scalar INT8 numeric testpoint campaign, without an URG percentage claim. The Matrix default prefetch-enabled FSM remains 49/53 raw transitions; selected guard paths have formal disposition and one edge is exercised in the separate prefetch-disabled profile.
 
 ## Version and evidence integrity
 
@@ -33,7 +34,7 @@ The **100%** result is limited to the focused top-compute functional testpoint g
 | Matrix FSM | R28: 5/5 non-vacuous legal properties proven; `ST_PREFETCH_WAIT` and `ST_ERROR_DRAIN` reachability covers hit; raw default-profile FSM 49/53 | Selected guards dispositioned; no forced states and no 100% FSM claim |
 | Whole-top code coverage | Existing URG databases include DUT, checker, UVM and testbench code | Not presented as DUT-only or functional closure |
 
-R36's compute-only AXI SVA observations show 0 matches for AR/AW stall-to-accept and one W match. This sequence does not exercise those AXI request stalls; R15 remains the evidence for real AR/AW/W assertion successes. `OPEN-CL-004`, `CL-COV-006`, external-fabric qualification, and the 24 PASS-SCOPED / 14 PARTIAL disposition remain unchanged.
+R36's compute-only AXI SVA observations show 0 matches for AR/AW stall-to-accept and one W match. This sequence does not exercise those AXI request stalls; R15 remains the evidence for real AR/AW/W assertion successes. R51 closes `OPEN-NUM-01` for common VDOT/GEMV/GEMM arithmetic semantics, but does not change the 24 PASS-SCOPED / 14 PARTIAL requirement dispositions.
 
 ## Remaining closure items
 
@@ -41,13 +42,13 @@ R36's compute-only AXI SVA observations show 0 matches for AR/AW stall-to-accept
 |---|---|---|
 | `OPEN-CL-003` | REQ-CL-018, REQ-PC-009/010 | Qualify coordinated reset/epoch behavior against the selected external AXI fabric, or attach its approved compliance evidence. Current reset evidence uses a behavioral responder. |
 | `OPEN-CL-002` | REQ-CL-002/015/020/024/025 | Freeze remaining legal descriptor ranges, aliases/overflow, strides and zero-value rules, then cover their boundaries. |
-| `OPEN-CL-004` | REQ-CL-010/022, REQ-PC-007 | Approve Matrix Line alignment, partial/zero WSTRB, protection and partial-commit semantics before adding legal tests. Existing observed masks are full; no unsupported behavior is inferred. |
-| `OPEN-NUM-01` | REQ-CL-020 | Freeze scalar INT8 rounding/saturation boundary rules and run the independent edge-vector campaign. |
 | `CL-COV-006` | REQ-CL-017/019/027, REQ-PC-006/007/009/010 | Expand legal Engine × Fault × Phase × Reset coverage with completion-code and accepted-write-prefix checkers. The current selected cases do not close the full cross. |
 | `CL-COV-004` | REQ-PC-001/006/007 | The 21/21 pair test uses the real dispatcher but behavioral engine agents. Production top pair coverage remains selected, not all real-engine pairs. |
 | `CL-COV-002/003` | Dataflow, opcode/shape and protocol coverage | Matrix line-write stall remains unobserved at top; broader legal request/backpressure and opcode × shape × numeric boundaries remain partial. |
 
 The full owner-by-owner issue log is in [Compute Cluster Open Issues](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md). No FSM state forcing or unsupported fault combinations are accepted as closure evidence.
+
+R49 closes the defined Matrix Line transfer-contract checker slice. R51 closes the Scalar INT8 common arithmetic contract and directed VDOT/GEMV/GEMM edge campaign on three clean-worktree seeds. Legacy Conv and broader legal opcode/shape coverage remain PARTIAL under `REQ-CL-020`/`CL-COV-003`; neither closure implies complete subsystem coverage.
 
 ## Final review outcome
 
