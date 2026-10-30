@@ -89,8 +89,8 @@ subsystem_memory_fabric_reset_regress:
 		grep -q '\*\* Report counts by severity' "$$log" || { echo "ERROR: UVM report summary missing in $$log"; exit 1; }; \
 		! grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$$log" || { echo "ERROR: UVM warning/error/fatal count is nonzero in $$log"; exit 1; }; \
 		done; \
-	$(URG) -full64 $$dbs -report "$$out/urg"; \
-	@test -f "$$out/urg/dashboard.html" || { echo "ERROR: fabric reset URG dashboard missing"; exit 1; }; \
+	$(URG) -full64 -dir "$$out/compile.vdb" $$dbs -report "$$out/urg"; \
+	test -f "$$out/urg/dashboard.html" || { echo "ERROR: fabric reset URG dashboard missing"; exit 1; }; \
 	echo "MEMORY_FABRIC_RESET_REGRESS_PASS: seeds=$(MEMORY_FABRIC_RESET_SEEDS) pending-SPAD-response/owner-flush plus DMA/CNM recovery; logs=$$logs; coverage=$$out/urg"
 
 subsystem_regress:
