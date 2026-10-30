@@ -109,6 +109,8 @@ for that engine. The two UVM RAL properties without attempts remain out of scope
 The connected production Matrix/CNM top ownership tests remain separately
 identified in the RTM.
 
+**2026-10-30 R111 Matrix FSM exact-SHA formal replay:** The clean R110 code/test SHA `95864f7027ccbec22a09b0a61832c68d3ca08098` passes the existing VC Formal gate on the production 16×16 Matrix core: 5/5 non-vacuous assertions proven, both reachability covers hit, and setup reports no issues. This formally dispositions three guard-incompatible default-profile edges under the bounded legal environment. The raw default-profile FSM remains 49/53 and the no-prefetch `ST_MAC→ST_A_REQ` fallback remains a separate simulation result. No requirement status changes. See the [R111 report](COMPUTE_CLUSTER_MATRIX_FSM_R111_FORMAL_2026-10-30.md).
+
 ## Required review outcomes
 
 1. Review the dispositions and evidence paths for all 38 requirements in the RTM (24 PASS-SCOPED / 14 PARTIAL; no BLOCKED_SPEC or NOT_RUN); R55–R58 add exact-clean test evidence but do not promote partial requirements.

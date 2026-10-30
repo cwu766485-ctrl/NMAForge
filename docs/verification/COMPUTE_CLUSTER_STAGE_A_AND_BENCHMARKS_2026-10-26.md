@@ -32,16 +32,20 @@ The exact-SHA depth-4 profile reports four uncovered transitions. The separate
 profile covers `ST_MAC→ST_A_REQ`. Those profile-specific results are not merged
 into the depth-4 prefetch-enabled percentage.
 
-| Uncovered transition in the prefetch-enabled aggregate | Review |
-|---|---|
-| `ST_ERROR→ST_ERROR_DRAIN` | Abort/watchdog transition guards explicitly exclude `ST_ERROR`. No formal unreachable proof is claimed. |
-| `ST_IDLE→ST_ERROR_DRAIN` | The drain path requires an active/busy transaction, while IDLE is observed with `busy=0`. No formal unreachable proof is claimed. |
-| `ST_MAC→ST_A_REQ` | Legal fallback when prefetch is disabled; it is dynamically covered in the separate prefetch-disabled run. |
-| `ST_PREFETCH_WAIT→ST_A_REQ` | The fallback requires prefetch disabled, while entering `ST_PREFETCH_WAIT` requires prefetch enabled. No formal unreachable proof is claimed. |
+**R111 exact-clean follow-up at code/test SHA `95864f7027ccbec22a09b0a61832c68d3ca08098`:** VC Formal `V-2023.12-SP2` non-vacuously proves all five guard/invariant assertions and reaches both state covers (`ST_PREFETCH_WAIT` depth 11, `ST_ERROR_DRAIN` depth 5). This updates the original Stage A review below: its “no formal proof” statements describe the evidence available at SHA `03bf257`, not the current disposition. The three default-profile guard edges are now formally dispositioned under the assumptions in the [R111 report](COMPUTE_CLUSTER_MATRIX_FSM_R111_FORMAL_2026-10-30.md). The separately compiled no-prefetch profile still supplies the legal `ST_MAC→ST_A_REQ` transition. Raw enabled-profile coverage remains 49/53; there is no full-FSM closure claim.
 
-The raw FSM percentage is a review aid, not a sign-off criterion. The two
-guard-incompatible transitions remain open pending formal proof or an approved
-requirements-based disposition.
+| Uncovered transition in the original prefetch-enabled aggregate | Original Stage A review at `03bf257` |
+|---|---|
+| `ST_ERROR→ST_ERROR_DRAIN` | At the original run no formal proof was available. R111 later proves `ap_error_does_not_reenter_error_drain` non-vacuously under the documented legal model. |
+| `ST_IDLE→ST_ERROR_DRAIN` | At the original run no formal proof was available. R111 later proves `ap_idle_does_not_enter_error_drain` non-vacuously under the documented legal model. |
+| `ST_MAC→ST_A_REQ` | Legal fallback when prefetch is disabled; it is dynamically covered in the separate prefetch-disabled run. |
+| `ST_PREFETCH_WAIT→ST_A_REQ` | At the original run no formal proof was available. R111 later proves `ap_prefetch_wait_does_not_fall_back_to_a_req` non-vacuously with prefetch enabled. |
+
+The raw FSM percentage is a review aid, not a sign-off criterion. R111
+dispositions the three default-profile guard edges within its bounded legal
+model; `ST_MAC→ST_A_REQ` remains profile-specific and is exercised only in the
+separate no-prefetch build. The four raw misses remain absent from the enabled
+profile, so the 49/53 coverage result is retained.
 
 ## Benchmark 1: Matrix architecture ablation
 
@@ -186,8 +190,10 @@ done
 - The fault campaign closes a selected parity cross, not every protection,
   fault-phase, outstanding, Abort, and Reset combination.
 - Four Matrix FSM transitions remain absent in the combined prefetch-enabled
-  profile. Two guard-related misses have review notes but no formal unreachable
-  proof. The separate fallback runs are not merged into that percentage.
+  profile. R111 formally dispositions the three guard-incompatible edges under
+  stated assumptions; the legal `ST_MAC→ST_A_REQ` fallback is exercised in a
+  separate no-prefetch build. The profile databases are not merged, and raw FSM
+  coverage remains 49/53.
 - Matrix+CNM+DMA simultaneous top contention is blocked by the documented
   `DMA_CTRL` busy gate; pairwise CNM+DMA contention is covered.
 - ASIC area/Fmax/power and pretrained-model accuracy are not measured here.
