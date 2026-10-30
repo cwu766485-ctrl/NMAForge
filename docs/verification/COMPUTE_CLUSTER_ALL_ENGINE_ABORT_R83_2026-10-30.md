@@ -1,8 +1,8 @@
 # Compute Cluster all-engine Abort/drain replay — R83
 
-**Date:** 2026-10-30  
-**Exact clean code/test SHA:** `120847b8c9b334179b6d667e7f500681c6d70b15`  
-**Product RTL/SPEC baseline:** unchanged from product RTL `9d4e9abdba1f745644a485960620fa6bbc4979db`, Compute Cluster SPEC v1.8.  
+**Date:** 2026-10-30
+**Exact clean code/test SHA:** `8c758b7f864f9b3b8bc8999a7913f874929107ab`
+**Product RTL/SPEC baseline:** unchanged from product RTL `9d4e9abdba1f745644a485960620fa6bbc4979db`, Compute Cluster SPEC v1.8.
 **Tools:** Synopsys VCS/URG `V-2023.12-SP1_Full64` / `V-2023.12-SP1`.
 
 ## Result
@@ -23,11 +23,11 @@ The UVM regression gates seven per-engine case markers and the final `abort mask
 
 ## Reproduction
 
-The run used a detached clean worktree at the exact code/test SHA above.
+The final GitHub-bound replay used a clean worktree based on the published closeout branch tip and tested the exact code/test SHA above.
 
 ```sh
 make -C dv/uvm/sim uvm_compute_cluster_regress \
-  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_r83_clean_120847b_uvm
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_r83_github_8c758b7_uvm
 ```
 
 The three seeds passed and URG merged the run databases. From the same clean worktree:
@@ -43,15 +43,15 @@ Top Smoke printed `TEST PASS` after the 86-descriptor mapper precheck. Its compi
 
 | Artifact | Path | SHA-256 |
 |---|---|---|
-| UVM compile log | `/tmp/nmaforge_r83_clean_120847b_uvm/compile.log` | `bec6dee9c440c3dc7a58b2cb98995201c9567545e5e28f73f864cc552c4a8308` |
-| Seed `20261025` | `/tmp/nmaforge_r83_clean_120847b_uvm/seed_20261025/run.log` | `616921754580b271d37c51e0aba40e05af47c0c3fa215b2e5e6b0b9ea8189bec` |
-| Seed `20261026` | `/tmp/nmaforge_r83_clean_120847b_uvm/seed_20261026/run.log` | `25179efbe88f0d8b1858f6a2bac10fa9e6e19542d222aaab4785cd0a940b6c9a` |
-| Seed `20261027` | `/tmp/nmaforge_r83_clean_120847b_uvm/seed_20261027/run.log` | `1ab53d7b45cab9eebf8a267451da16d8c5eba7516dd906b9e1f0b75afb1f41d5` |
-| URG merge log | `/tmp/nmaforge_r83_clean_120847b_uvm/urg_merged.log` | `eb012c63c4c88f4f016c820ed4178eecb577a2866b479f0b38d98e1ad5298219` |
-| Top Smoke compile log | `/tmp/nmaforge_r83_clean_120847b/dv/subsystem/top_smoke/sim/ai_comp.log` | `2427a140207075a0826c7be9609ad54db2fea03312cd2a23d4d22ac384d7cde9` |
-| Top Smoke run log | `/tmp/nmaforge_r83_clean_120847b/dv/subsystem/top_smoke/sim/ai_accel_smoke.log` | `e9f3bcf88d005b8eb1e3159cf46222a15d52042e5e5f11ce2475acc9b16c721b` |
+| UVM compile log | `/tmp/nmaforge_r83_github_8c758b7_uvm/compile.log` | `07210aab8e99648dd5f17b5e0b7b81f2fb3a90968f55cb50da267dede332b52c` |
+| Seed `20261025` | `/tmp/nmaforge_r83_github_8c758b7_uvm/seed_20261025/run.log` | `313fea45897e99e9e7ceffa39af008154ae5e3bee8a2538563aae78d3e180a45` |
+| Seed `20261026` | `/tmp/nmaforge_r83_github_8c758b7_uvm/seed_20261026/run.log` | `42d231608274df971be4dca48c18304f23a14f870eb044695cc2072588d656d5` |
+| Seed `20261027` | `/tmp/nmaforge_r83_github_8c758b7_uvm/seed_20261027/run.log` | `d2123b9558b09596901db49a5541459b90ac3b6c4ac78ec291b4e25dff99a8f2` |
+| URG merge log | `/tmp/nmaforge_r83_github_8c758b7_uvm/urg_merged.log` | `fbdca7a2a123fe4cf30422582038c003492e997546fcbdebeec51a3c34660276` |
+| Top Smoke compile log | `/tmp/nmaforge_r83_github/dv/subsystem/top_smoke/sim/ai_comp.log` | `4704ee195d545850fff123a2a04f7006ce9f446c8839097d9b0f6785752a41fd` |
+| Top Smoke run log | `/tmp/nmaforge_r83_github/dv/subsystem/top_smoke/sim/ai_accel_smoke.log` | `97ac26c7c84d1dc742a29df5bbebb0b1ee52320075ffb888f1a17d353ffce8f1` |
 
-Manifest: `/tmp/nmaforge_r83_clean_120847b_uvm/SHA256SUMS.log`, SHA-256 `b951f0f9fb677732e0a7001823f16614843b1210c4a209242e711e21beff379a`.
+Manifest: `/tmp/nmaforge_r83_github_8c758b7_uvm/SHA256SUMS.log`, SHA-256 `cead3602f6e528a11d25e8a8961157c1386b3bb96c772733b29fab60fdb91a2c`.
 
 ## Coverage and limits
 

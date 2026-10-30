@@ -1,7 +1,7 @@
 # NMAForge block and subsystem verification matrix
 
 > **2026-10-30 R83 all-engine accepted-read Abort/drain:** At exact clean
-> verification/test SHA `120847b8c9b334179b6d667e7f500681c6d70b15`, three
+> verification/test SHA `8c758b7f864f9b3b8bc8999a7913f874929107ab`, three
 > VCS seeds each abort Scalar INT8, FP, CNM, Matrix, SFU, Conv and KV after a
 > real SPAD read is accepted. All 21/21 cases complete with `ERR_ABORT=0x32`,
 > accepted reads equal returned responses, and every engine drains idle. The
