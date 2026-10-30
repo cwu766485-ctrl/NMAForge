@@ -10,11 +10,11 @@
 |---|---|
 | Product RTL/SPEC candidate | `9d4e9abdba1f745644a485960620fa6bbc4979db` (R73; SPEC v1.8 busy-time CPLQ_HEAD contract) |
 | Latest real-top descriptor-latch SHA | `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28` (R77 SFU descriptor-latch test; Matrix R74 remains separately evidenced) |
-| Latest exact clean code/test SHA | `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec` (R88 aligned Matrix Line Abort-prefix test; verification-only change) |
+| Latest exact clean code/test SHA | `7837701cefe606a01abd517d46788b982da0f2e4` (R90 descriptor validator/decode boundary test; verification-only change) |
 | Prior reviewed product baseline | `6848a414eaeaa05cf9e1411cf55d9d27333208a6` |
 | Latest published closeout snapshot before this follow-up | `fc370aad6b8360af9affb52cb30909ec97d79be3` |
 | Review branch | `work/compute-cluster-kv-overflow-20261030` |
-| Evidence/test commit | R53 `f916874a9ce60741a4516eaf9e33ebcae4a676c2`; R54 `f24c5383fad511c8b2e1132c1157942807994759`; R55–R58/R59 `ded9d923a432e869592ec8710a22df5501d8d474`; R60 `2768843da1b3f3a0e988645746000d5befadf12b`; R73 `9d4e9abdba1f745644a485960620fa6bbc4979db`; R74 `519ca161f3c2ce8beab78161a88bbdcb6cbcdc61`; R75 `969992291732cf694d7de4bdfef2808d4f017d57`; R77 `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28`; R80/R81/R82 `e4c1e7a93a0afe1c89128996c6eaf9bff5caf907`; R83 `071578d997d69ebf011fe5e7d4742fae3e0f73ac`; R84 `8bc2ee28725d09ac75ecfcb0417e1ba47fd688f2`; R85 `5a35d60d20ee6fc6622e46f92d05fc1ef00dd14d`; R86 `3d6fe5c58631bdeb6333b6e3572f24eeba7da1ef`; R87 `402c8ce4689ae48cfee624f1f5fdca66d534bbbf`; R88 `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec` |
+| Evidence/test commit | R53 `f916874a9ce60741a4516eaf9e33ebcae4a676c2`; R54 `f24c5383fad511c8b2e1132c1157942807994759`; R55–R58/R59 `ded9d923a432e869592ec8710a22df5501d8d474`; R60 `2768843da1b3f3a0e988645746000d5befadf12b`; R73 `9d4e9abdba1f745644a485960620fa6bbc4979db`; R74 `519ca161f3c2ce8beab78161a88bbdcb6cbcdc61`; R75 `969992291732cf694d7de4bdfef2808d4f017d57`; R77 `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28`; R80/R81/R82 `e4c1e7a93a0afe1c89128996c6eaf9bff5caf907`; R83 `071578d997d69ebf011fe5e7d4742fae3e0f73ac`; R84 `8bc2ee28725d09ac75ecfcb0417e1ba47fd688f2`; R85 `5a35d60d20ee6fc6622e46f92d05fc1ef00dd14d`; R86 `3d6fe5c58631bdeb6333b6e3572f24eeba7da1ef`; R87 `402c8ce4689ae48cfee624f1f5fdca66d534bbbf`; R88 `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec`; R89 benchmark docs `951f83ecbdac1bd153c4d15a3addf11099aa49b7`; R90/R91 tests `eeae0c442bf5f5a747c1fa056cb4755fabb814c1` / `7837701cefe606a01abd517d46788b982da0f2e4` |
 | SPEC | Compute Cluster SPEC v1.8; R73 records busy-time CPLQ_HEAD progress; earlier KV address overflow/alignment is frozen in v1.7 |
 | VCS | Synopsys VCS `V-2023.12-SP1_Full64`; R49 passed the corrected Matrix checker on three seeds; R50 passed the published-snapshot six-seed UVM and Top Smoke; R52 passed the legal Scalar INT8 numeric campaign; R53 passed KV boundary checks; R75 passed the SFU block random regression on three seeds, with merged URG |
 
@@ -139,3 +139,8 @@ At exact clean test SHA `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec`, three real-t
 ## R89 current-candidate Matrix configuration benchmark — 2026-10-30
 
 The exact R88 code/test SHA `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec` passes the one-seed R89 eight-configuration × five-workload benchmark (40/40 independent Golden checks) with VCS `V-2023.12-SP1_Full64`. Comparing d2/p0/c0 with d4/p1/c1 gives 2,701→2,029 summed Matrix-core cycles and 12,032→9,472 SPAD read bytes across the five independent cases. The same one-cycle behavioral bank model and seed are used throughout. Line stalls increase for two workloads; full metrics, CSV, hashes, and model limits are recorded in [R89](../benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R89_2026-10-30.md). This updates Matrix block-cycle evidence only; it does not close full-system throughput or PPA. The 38-row RTM remains 24 PASS-SCOPED / 14 PARTIAL and **HOLD**.
+
+
+## R90 descriptor-validator boundary evidence — 2026-10-30
+
+The isolated regression at SHA `7837701cefe606a01abd517d46788b982da0f2e4` passes 27 supported opcode values, the special `0x36` tile-pack rule and 21 invalid descriptor cases against production validator/decoder RTL. It does not issue CMDQ descriptors or observe top-level launch ownership, so `REQ-CL-002` remains PARTIAL; per-engine address/stride/alias boundaries also remain open. Details and hashes: [R90 report](COMPUTE_CLUSTER_DESCRIPTOR_VALIDATOR_R90_2026-10-30.md). The 38-row RTM remains 24 PASS-SCOPED / 14 PARTIAL and **HOLD**.

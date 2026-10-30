@@ -2,7 +2,7 @@
 
 **Review date:** 2026-10-30
 
-**Selected product/SPEC candidate:** `cc357830923e3dd7beda114b4d761fde839b01a7` (corrective Protection RTL, SPEC v1.7); latest verification/test SHA `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec` (R88 aligned Matrix Line Abort-prefix test; no product RTL changes); R54 top-test SHA `f24c5383fad511c8b2e1132c1157942807994759`
+**Selected product/SPEC candidate:** `cc357830923e3dd7beda114b4d761fde839b01a7` (corrective Protection RTL, SPEC v1.7); latest verification/test SHA `7837701cefe606a01abd517d46788b982da0f2e4` (R90 descriptor validator/decode test; no product RTL changes); R54 top-test SHA `f24c5383fad511c8b2e1132c1157942807994759`
 - **Prior reviewed product baseline:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6`
 - **Follow-up evidence branch:** `work/compute-cluster-kv-overflow-20261030`
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
@@ -114,3 +114,8 @@ Exact clean SHA `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec` passes three seeds wi
 ## R89 Matrix configuration benchmark — 2026-10-30
 
 R89 passes 40/40 Golden points across eight Matrix configurations and five workloads at code/test SHA `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec` using one-cycle behavioral SPAD. For d2/p0/c0→d4/p1/c1 the simulated cycle sum is 2,701→2,029; SPAD reads are 12,032→9,472 bytes, while Line stalls rise on two cases. The evidence is Matrix-core only and uses seed `20261026`; 250 MHz is not measured Fmax. See [R89 report and CSV](../benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R89_2026-10-30.md). Requirement dispositions do not change and `CL-DV-v1.0` remains HOLD.
+
+
+## R90 descriptor validator/decode check — 2026-10-30
+
+R90 checks all 27 supported opcode classifications, the `0x36` tile-pack predicate and 21 invalid validator inputs using isolated VCS output at SHA `7837701cefe606a01abd517d46788b982da0f2e4`. This closes only the combinational validator test slice. CMDQ-to-engine dispatch and complete per-engine descriptor boundaries remain open; `REQ-CL-002` stays PARTIAL and CL-DV-v1.0 stays HOLD. See [R90 evidence](COMPUTE_CLUSTER_DESCRIPTOR_VALIDATOR_R90_2026-10-30.md).

@@ -1,3 +1,8 @@
+> **2026-10-30 R90 descriptor validator boundaries:** At exact clean SHA
+> `7837701cefe606a01abd517d46788b982da0f2e4`, VCS passes 27 supported opcode
+> classifications, tile-pack and 21 invalid cases. This is validator/decode
+> scope, not top-level CMDQ dispatch. [R90 report](../docs/verification/COMPUTE_CLUSTER_DESCRIPTOR_VALIDATOR_R90_2026-10-30.md).
+
 > **2026-10-30 R89 Matrix configuration benchmark:** At R88 code/test SHA
 > `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec`, VCS passes 40/40 Golden cases
 > across eight Depth/Prefetch/A-Cache configurations and five workloads with a

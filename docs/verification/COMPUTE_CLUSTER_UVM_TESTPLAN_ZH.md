@@ -429,3 +429,8 @@ make -C dv/uvm/sim uvm_compute_cluster_regress \
 - Execution RTM 要列出 38 条 Requirement 的 Test ID、Run ID、Seed、Coverage Bin、Bug/waiver/blocker。没有证据的状态初始值必须是 NOT_RUN。
 
 **状态声明（2026-10-26 Stage A 更新）**：固定 SHA `03bf257afdca9b0041ff80b6d30cbaf8107cf7e0` 的 clean worktree 三 seed 七引擎 UVM、5/5 observation-only checker mutation、40/40 Matrix 配置/工作负载、三 seed Matrix depth-4 fault/recovery 与三 seed CNM/DMA subsystem contention 均已执行。Functional covergroup=`99.0%`；DMA bin PASS，completion read-response bin WAIVED/N/A；Memory scoreboard 每 seed 比对 4,852 words 且 mismatch/unknown/stale 均为 0。Matrix `state_r` 49/53、prefetch 9/9，残余状态已逐项审查但未作 formal unreachable waiver。Serial/staged Cluster benchmark 为 1,239/1,070 cycles，四任务 queued mode 为 1,696/1,137 cycles。完整 protection/fault phase cross、partial-WSTRB image、全部 38 项 REQ-CL、Matrix+CNM+DMA top contention（受合法 DMA busy gate 限制）、ASIC PPA 与总体 signoff 仍未完成。详见[Stage A 与 Benchmark 证据](COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md)。
+
+
+### 2026-10-30 descriptor validator boundary addendum (R90)
+
+Exact clean SHA `7837701cefe606a01abd517d46788b982da0f2e4` passes 27 supported opcode classification points, the `0x36` tile-pack predicate, and 21 invalid descriptor cases with isolated VCS output. This directly tests the production combinational validator/decoder only; it does not close top-level CMDQ-to-engine dispatch or every engine dimension/address contract. See [R90 run report](COMPUTE_CLUSTER_DESCRIPTOR_VALIDATOR_R90_2026-10-30.md). The overall 38-row RTM remains 24 PASS-SCOPED / 14 PARTIAL and HOLD.
