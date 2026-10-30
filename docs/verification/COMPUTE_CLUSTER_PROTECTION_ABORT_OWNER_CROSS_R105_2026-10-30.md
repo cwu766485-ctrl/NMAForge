@@ -1,6 +1,6 @@
 # Matrix Protection and CNM Abort Owner Cross — R105
 
-**Run IDs:** `CLUSTER-PROTECTION-ABORT-OWNER-CROSS-R105-3S`, `CLUSTER-MUTATION-R105-28`  
+**Run IDs:** `CLUSTER-PROTECTION-ABORT-OWNER-CROSS-R105-3S`, `CLUSTER-MUTATION-R105-28`, `TOP-SMOKE-R105`, `TOP-RANDOM-R105-20`
 **Exact committed test SHA:** `973b4a1291bc3d63deb96ba0720337d84cb3ae34`  
 **GitHub closeout branch commit:** `1e44f1356a5b13c63b8b8da13b69c16796a85386` (tree-identical to local SHA; test-only)  
 **Product RTL/SPEC:** unchanged from R99 candidate `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`; SPEC v1.8.  
@@ -30,6 +30,18 @@ make -C dv/uvm/sim uvm_compute_cluster_mutation \
 
 Both Make targets returned exit code `0`. The UVM regression was run twice at this SHA; both three-seed runs completed, and the final run is the one summarized below. Neither compile log contains `Warning-`, `Error-`, or `[TFIPC]`.
 
+The final published closeout tree also passes the restored top-level smoke and seeded replay. These commands ran from clean local documentation-only commit `c856623`, tree-identical to GitHub commit `9663ca179cccd23c7cd67ab9d4e5b32ee47d4a4e`; the RTL, UVM, and test files are byte-identical to R105 test SHA `973b4a1`:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_linux_compat \
+make -C dv/subsystem/top_smoke/sim ai_smoke
+
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_linux_compat \
+make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=12345
+```
+
+Both returned exit code `0`. The mapper precheck reports 86 descriptors and 60 tensors, `ai_smoke` ends in `TEST PASS`, and the 20-case seeded replay also ends in `TEST PASS`. The existing VCS fixture warning `[LOOP-REROLL-ENABLED]` is present; it is recorded, not suppressed.
+
 ## Results
 
 | Seed | Matrix/CNM active cycles, normal Protection cross | Shared overlap / bank accepts | Normal Matrix/CNM responses | Protection→Abort overlap / bank accepts | Abort Matrix/CNM responses | Scoreboard |
@@ -50,4 +62,4 @@ The exact-source checker-sensitivity target passes `28/28`: address, data, respo
 
 R105 adds bounded evidence to `REQ-CL-017`, `REQ-CL-019`, `REQ-CL-027`, `REQ-PC-006`, and `REQ-PC-007`. It does not close those broader requirements. Remaining gaps include the legal Engine × Fault × Phase × Reset space, production requesters under downstream memory backpressure, other concurrent fault/owner combinations, and broader accepted-write prefix cut points. The 38-row RTM remains 24 PASS-SCOPED / 14 PARTIAL; no status was promoted and `CL-DV-v1.0` remains **HOLD**.
 
-UVM logs and coverage databases are under `/tmp/nmaforge_r105_protection_abort_owner_20261030/`; mutation logs are under `/tmp/nmaforge_r105_mutations_20261030/`. The SHA-256 manifest is `/tmp/nmaforge_r105_SHA256SUMS.txt` (`66afd4843e4947624a0a466373309b666082a8058d270d62e1a78294ff5c9f35`). Private generated run data stays outside the repository.
+UVM logs and coverage databases are under `/tmp/nmaforge_r105_protection_abort_owner_20261030/`; mutation logs are under `/tmp/nmaforge_r105_mutations_20261030/`. The SHA-256 manifest is `/tmp/nmaforge_r105_SHA256SUMS.txt` (`b26f01216873b29da2fb61e0c5d05fb04f09dbe4eaff6ed917efad8c15196ec8`). Private generated run data stays outside the repository.
