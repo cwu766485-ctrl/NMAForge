@@ -2927,10 +2927,14 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned returned_reads;
         int unsigned accepted_now;
         int unsigned returned_now;
+        int unsigned accepted_output_writes;
+        int unsigned post_abort_output_writes;
         bit accepted_read;
         bit monitor_done;
         bit abort_seen;
+        bit abort_active_seen;
         bit [6:0] abort_seen_mask;
+        bit [6:0] sentinel_preserved_mask;
         bit [31:0] completion_base;
         bit [31:0] desc_base;
         bit [31:0] abort_dst;
@@ -2939,6 +2943,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         bit [15:0] task_id;
 
         abort_seen_mask = '0;
+        sentinel_preserved_mask = '0;
         desc_base = CLUSTER_CONTRACT_CMDQ;
         // Give every long-running engine fully initialized legal operands so
         // the independent memory scoreboard can check all accepted reads.
@@ -3007,6 +3012,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             accepted_read = 1'b0;
             accepted_reads = 0;
             returned_reads = 0;
+            accepted_output_writes = 0;
+            post_abort_output_writes = 0;
+            abort_active_seen = 1'b0;
             for (poll = 0; poll < 50000; poll++) begin
                 @(posedge compute_vif.aclk);
                 accepted_now = 0;
@@ -3037,8 +3045,21 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 begin : abort_drain_monitor
                     while (!monitor_done) begin
                         @(posedge compute_vif.aclk);
-                        if (compute_vif.dut_abort_active)
+                        if (compute_vif.engine_req_valid[engine] &&
+                            compute_vif.engine_req_ready[engine] &&
+                            compute_vif.engine_req_write[engine]) begin
+                            accepted_output_writes++;
+                            // A write accepted on the same edge that the engine
+                            // first samples core_abort is part of the frozen
+                            // committed prefix. Only a later handshake is a
+                            // post-Abort write violation.
+                            if (abort_active_seen)
+                                post_abort_output_writes++;
+                        end
+                        if (compute_vif.dut_abort_active) begin
                             abort_seen = 1'b1;
+                            abort_active_seen = 1'b1;
+                        end
                         accepted_now = 0;
                         returned_now = 0;
                         case (engine)
@@ -3084,14 +3105,32 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 `uvm_fatal("CLUSTER_ENGINE_ABORT", $sformatf(
                     "engine %0d Abort failed to drain accepted reads: accepted=%0d returned=%0d",
                     engine, accepted_reads, returned_reads))
+            if (post_abort_output_writes != 0)
+                `uvm_fatal("CLUSTER_ENGINE_ABORT", $sformatf(
+                    "engine %0d accepted %0d output writes after the first edge on which it sampled Abort",
+                    engine, post_abort_output_writes))
+            if (accepted_output_writes == 0) begin
+                for (word_idx = 0; word_idx < 8; word_idx++)
+                    expect_spad(abort_dst + (word_idx << 2),
+                                32'hbad0_7600 | (engine << 8) | word_idx,
+                                $sformatf("engine%0d Abort preserved output sentinel[%0d]",
+                                          engine, word_idx));
+                sentinel_preserved_mask[engine] = 1'b1;
+            end else if (engine < 4) begin
+                `uvm_fatal("CLUSTER_ENGINE_ABORT", $sformatf(
+                    "engine %0d unexpectedly committed an output prefix before Abort sampling; prefix=%0d",
+                    engine, accepted_output_writes))
+            end
             expect_spad(completion_base + 32'h00, {16'd0, task_id},
                         $sformatf("engine%0d Abort completion task ID", engine));
             expect_spad(completion_base + 32'h04, 32'h0000_0032,
                         $sformatf("engine%0d Abort completion status/code", engine));
             abort_seen_mask[engine] = 1'b1;
             `uvm_info("CLUSTER_ENGINE_ABORT_CASE_PASS", $sformatf(
-                "engine=%0d task_id=%04h accepted_read=1 abort=1 completion=ERR_ABORT accepted_reads=%0d returned_reads=%0d all_engines_idle=1",
-                engine, task_id, accepted_reads, returned_reads), UVM_LOW)
+                "engine=%0d task_id=%04h accepted_read=1 abort=1 completion=ERR_ABORT accepted_reads=%0d returned_reads=%0d accepted_prefix_writes=%0d post_abort_output_writes=%0d sentinel_check=%s all_engines_idle=1",
+                engine, task_id, accepted_reads, returned_reads,
+                accepted_output_writes, post_abort_output_writes,
+                (accepted_output_writes == 0) ? "8/8" : "prefix_oracle"), UVM_LOW)
             axil_write(REG_CPLQ_HEAD, 32'd1);
             axil_write(REG_CMDQ_SIZE, 32'd0);
             axil_write(REG_CPLQ_SIZE, 32'd0);
@@ -3101,9 +3140,14 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_fatal("CLUSTER_ENGINE_ABORT", $sformatf(
                 "not all real engines passed accepted-read Abort/drain: mask=%07b",
                 abort_seen_mask))
+        if (sentinel_preserved_mask[3:0] !== 4'hf)
+            `uvm_fatal("CLUSTER_ENGINE_ABORT", $sformatf(
+                "long-running Scalar/FP/CNM/Matrix Abort cases failed to preserve zero-prefix sentinels: mask=%07b",
+                sentinel_preserved_mask))
         `uvm_info("CLUSTER_ENGINE_ABORT_PASS", $sformatf(
-            "software Abort after accepted SPAD reads drained all real engines; abort mask=%07b; completion owner/status and accepted-read response balance checked",
-            abort_seen_mask), UVM_LOW)
+            "software Abort after accepted SPAD reads drained all real engines; abort mask=%07b post-abort output-write suppression=7/7 zero-prefix sentinel mask=%07b words=%0d/56; short visible prefixes are checked by per-engine Golden tests; completion owner/status and accepted-read response balance checked",
+            abort_seen_mask, sentinel_preserved_mask,
+            $countones(sentinel_preserved_mask) * 8), UVM_LOW)
     endtask
 
     task automatic run_sfu_abort_write_prefix(input int unsigned seed);

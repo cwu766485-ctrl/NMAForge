@@ -68,8 +68,9 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -q '\[CLUSTER_ABORT_CROSS_PASS\]' "$$log" || { echo "ERROR: multi-engine software-abort cross missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_RESET_RECOVERY_PASS\]' "$$log" || { echo "ERROR: real compute-cluster active-reset/recovery check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_ENGINE_RESET_PASS\].*reset mask=1111111' "$$log" || { echo "ERROR: accepted-read reset/drain sweep for all seven real engines missing in $$log"; exit 1; }; \
-		grep -q '\[CLUSTER_ENGINE_ABORT_PASS\].*abort mask=1111111' "$$log" || { echo "ERROR: accepted-read software Abort/drain sweep for all seven real engines missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_ENGINE_ABORT_PASS\].*abort mask=1111111 post-abort output-write suppression=7/7' "$$log" || { echo "ERROR: seven-engine accepted-read Abort post-sampling output-write suppression missing in $$log"; exit 1; }; \
 		test "$$(grep -c ' \[CLUSTER_ENGINE_ABORT_CASE_PASS\] engine=' "$$log")" -eq 7 || { echo "ERROR: expected all seven real-engine accepted-read Abort cases in $$log"; exit 1; }; \
+		test "$$(grep -c ' \[CLUSTER_ENGINE_ABORT_CASE_PASS\].*post_abort_output_writes=0' "$$log")" -eq 7 || { echo "ERROR: one or more real engines wrote output after sampling Abort in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_SFU_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: SFU accepted-write Abort prefix check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CONV_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: Conv accepted-write Abort prefix check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_KV_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: KV accepted-write Abort prefix check missing in $$log"; exit 1; }; \
