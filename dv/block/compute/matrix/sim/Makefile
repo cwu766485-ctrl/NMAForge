@@ -3,6 +3,7 @@ URG ?= /opt/Synopsys/vcs/V-2023.12-SP1/bin/urg
 SEED ?= 20261021
 OUT_DIR ?= /tmp/nmaforge_matrix_datapath_$(SEED)
 CORE_OUT_DIR ?= /tmp/nmaforge_matrix_core_$(SEED)
+NO_PREFETCH_CORE_OUT_DIR ?= /tmp/nmaforge_matrix_core_no_prefetch_$(SEED)
 ARRAY_OUT_DIR ?= /tmp/nmaforge_matrix_array_20261025
 ARRAY_SEEDS ?= 20261025 20261026 20261027
 ARRAY_SIZES ?= 8 16
@@ -15,7 +16,7 @@ COV_METRICS := line+cond+fsm+branch
 .PHONY: datapath-random-test datapath-random-compile datapath-random-run \
 	core-random-test core-random-compile core-random-run a3-core-test \
 	core-prefetch-handoff-test core-prefetch-handoff-regress \
-	core-no-prefetch-fallback-regress \
+	core-no-prefetch-fallback-compile core-no-prefetch-fallback-regress \
 	datapath-random-regress core-random-regress array-random-regress \
 	matrix-size-benchmark matrix-pipeline-benchmark matrix-config-comparison \
 	tinynpu-matched-benchmark
@@ -84,15 +85,32 @@ core-random-regress: core-random-compile
 		grep -Eq '^MATRIX_LINE_CONTRACT_PASS full_wstrb=1 aligned=1 stalled_stability=[1-9][0-9]* unaligned_scalar_fallback=1 protection_error=1 partial_zero_wstrb=unsupported$$' $(CORE_OUT_DIR)/run_seed_$$seed.log; \
 	done
 
-# Cover the compile-time fallback transition without invoking fault scenarios
-# that are only meaningful when prefetch is enabled.
-core-no-prefetch-fallback-regress: core-random-compile
+# Build a distinct prefetch-disabled DUT profile so this test covers the
+# compile-time fallback transition without invoking prefetch-only fault cases.
+core-no-prefetch-fallback-compile:
+	mkdir -p $(NO_PREFETCH_CORE_OUT_DIR)
+	$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+		+define+MATRIX_MAX_OUTSTANDING_READS=$(OUTSTANDING_DEPTH) \
+		+define+MATRIX_A_TILE_CACHE_ENABLE=$(A_TILE_CACHE_ENABLE) \
+		+define+MATRIX_NEXT_K_PREFETCH_ENABLE=0 \
+		+define+MATRIX_ARRAY_SIZE=$(PHYSICAL_ARRAY_SIZE) \
+		-cm $(COV_METRICS) -cm_hier $(CURDIR)/matrix_core.cm_hier \
+		-cm_dir $(NO_PREFETCH_CORE_OUT_DIR)/coverage.vdb \
+		-Mdir=$(NO_PREFETCH_CORE_OUT_DIR)/csrc \
+		-top tb_ai_tensor_matrix_core_random \
+		../../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v \
+		../../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv \
+		../../../../../rtl/compute/matrix/ai_tensor_matrix_core.v \
+		../tb/tb_ai_tensor_matrix_core_random.sv \
+		-o $(NO_PREFETCH_CORE_OUT_DIR)/simv -l $(NO_PREFETCH_CORE_OUT_DIR)/compile.log
+
+core-no-prefetch-fallback-regress: core-no-prefetch-fallback-compile
 	@set -e; for seed in $(SEEDS); do \
-		$(CORE_OUT_DIR)/simv +SEED=$$seed +MATRIX_BENCHMARK_ONLY -cm $(COV_METRICS) \
-			-cm_dir $(CORE_OUT_DIR)/coverage.vdb -cm_name matrix_no_prefetch_$$seed \
-			-l $(CORE_OUT_DIR)/no_prefetch_seed_$$seed.log; \
-		grep -q "^MATRIX_NO_PREFETCH_FALLBACK_PASS seed=$$seed fallback=1$$" $(CORE_OUT_DIR)/no_prefetch_seed_$$seed.log; \
-		grep -q "^MATRIX_SIZE_BENCHMARK_PASS .*next_k_prefetch=0 " $(CORE_OUT_DIR)/no_prefetch_seed_$$seed.log; \
+		$(NO_PREFETCH_CORE_OUT_DIR)/simv +SEED=$$seed +MATRIX_BENCHMARK_ONLY -cm $(COV_METRICS) \
+			-cm_dir $(NO_PREFETCH_CORE_OUT_DIR)/coverage.vdb -cm_name matrix_no_prefetch_$$seed \
+			-l $(NO_PREFETCH_CORE_OUT_DIR)/run_seed_$$seed.log; \
+		grep -q "^MATRIX_NO_PREFETCH_FALLBACK_PASS seed=$$seed fallback=1$$" $(NO_PREFETCH_CORE_OUT_DIR)/run_seed_$$seed.log; \
+		grep -q "^MATRIX_SIZE_BENCHMARK_PASS .*next_k_prefetch=0 " $(NO_PREFETCH_CORE_OUT_DIR)/run_seed_$$seed.log; \
 	done
 
 core-prefetch-handoff-test: core-random-compile
