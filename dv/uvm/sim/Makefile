@@ -78,6 +78,8 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -Eq '\[CLUSTER_MEMORY_SCOREBOARD\].*checked_words=[1-9][0-9]* mismatches=0 unknown_reads=0' "$$log" || { echo "ERROR: independent scratchpad memory scoreboard did not close cleanly in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_RANDOM_FAULT_CROSS_PASS\].*parity cases=18/18' "$$log" || { echo "ERROR: randomized seven-engine parity fault cross missing in $$log"; exit 1; }; \
 		test "$$(grep -c ' \[CLUSTER_FAULT_CASE_PASS\] case=' "$$log")" -eq 18 || { echo "ERROR: expected all 18 parity fault cases in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_PROTECTION_CROSS_PASS\].*cases=7/7' "$$log" || { echo "ERROR: all-engine real-top protection fault cross missing in $$log"; exit 1; }; \
+		test "$$(grep -c ' \[CLUSTER_PROTECTION_CASE_PASS\] engine=' "$$log")" -eq 7 || { echo "ERROR: expected seven real-engine protection fault cases in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SCOREBOARD\].*reset_dropped=[1-9][0-9]*' "$$log" || { echo "ERROR: reset did not discard a tracked in-flight SPAD response"; exit 1; }; \
 		grep -q '\[CLUSTER_COVERAGE\]' "$$log" || { echo "ERROR: compute-cluster coverage report missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_COVERAGE\].*focused_compute_cg_applicable=100\.0%.*cpl_read:0[(]N/A[)]' "$$log" || { echo "ERROR: applicable compute testpoint coverage is not 100% or completion-read N/A disposition is missing in $$log"; exit 1; }; \

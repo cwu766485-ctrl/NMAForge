@@ -687,11 +687,6 @@ module ai_accel_top #(
     assign banked_protection_error = arb_banked_valid &&
                                      (!banked_prot_allow ||
                                       (arb_banked_addr > SPAD_BYTES - 32'd16));
-    assign cnm_protection_error = (|arb_cnm_valid) &&
-                                  ((arb_cnm_addr0 > SPAD_BYTES-32'd4) ||
-                                   (arb_cnm_addr1 > SPAD_BYTES-32'd4) ||
-                                   (arb_cnm_addr2 > SPAD_BYTES-32'd4) ||
-                                   (arb_cnm_addr3 > SPAD_BYTES-32'd4));
     assign core_spad_error = compute_prot_error;
     assign spad_line_error = spad_line_raw_error || line_prot_error;
     assign cpl_protection_error = !cpl_prot_allow ||
@@ -732,6 +727,7 @@ module ai_accel_top #(
         .banked_data2(banked_data2), .banked_data3(banked_data3),
         .banked_parity_error(banked_parity), .cnm_data0(cnm_data0), .cnm_data1(cnm_data1),
         .cnm_data2(cnm_data2), .cnm_data3(cnm_data3), .cnm_parity_error(cnm_parity),
+        .cnm_protection_error(cnm_protection_error),
         .host_prot_allow(host_prot_allow), .compute_prot_allow(compute_prot_allow),
         .line_prot_allow(line_prot_allow), .banked_prot_allow(banked_prot_allow),
         .cpl_prot_allow(cpl_prot_allow)

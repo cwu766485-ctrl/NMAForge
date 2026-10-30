@@ -181,6 +181,11 @@ module ai_scratchpad #(
         cnm_data0 <= cnm_data0_pipe; cnm_data1 <= cnm_data1_pipe;
         cnm_data2 <= cnm_data2_pipe; cnm_data3 <= cnm_data3_pipe;
         cnm_parity_error <= cnm_parity_pipe;
+        // Parity belongs to the currently accepted registered read. Clear
+        // unused/error-only response slots so a denied banked/CNM request
+        // cannot inherit a parity bit from an older transaction.
+        banked_parity_pipe <= 4'b0;
+        cnm_parity_pipe <= 4'b0;
         // Port A: host/debug.  Registered read data is visible two cycles after
         // host_valid; writes are byte-enabled and preserve parity.
         if (host_access_ok) begin
