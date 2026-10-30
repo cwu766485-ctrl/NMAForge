@@ -23,6 +23,7 @@ class ai_compute_cluster_obs extends uvm_sequence_item;
     bit [3:0] cnm_accept_mask;
     bit reset_active;
     bit [5:0] read_accept_mask;
+    bit mutation_probe;
 
     bit host_valid, host_write, host_access_ok;
     bit [31:0] host_addr, host_wdata;

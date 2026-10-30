@@ -76,6 +76,10 @@ class ai_compute_cluster_coverage extends uvm_component;
     endfunction
 
     function void write_compute_coverage(ai_compute_cluster_obs obs);
+        // Sensitivity probes alter the passive observation copy to verify a
+        // checker. They are not legal DUT stimulus and must not contaminate
+        // functional coverage bins or hit illegal bins.
+        if (obs.mutation_probe) return;
         engine_id = obs.launch_valid ? decode_engine(obs.launch_op) : -1;
         active_count = $countones(obs.engine_busy);
         matrix_sfu_overlap = obs.engine_busy[3] && obs.engine_busy[4];

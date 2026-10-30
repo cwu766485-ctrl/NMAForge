@@ -61,6 +61,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
     virtual ai_compute_cluster_if compute_vif;
     bit [31:0] rng_state;
+    string mutation_kind;
 
     function automatic int signed next_small_signed();
         int unsigned value;
@@ -109,8 +110,20 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     task automatic expect_spad(input bit [31:0] addr, input bit [31:0] expected, input string tag);
         bit [31:0] actual;
         axil_read(CIMFORGE_SPAD_BASE + addr, actual);
-        if (actual !== expected)
-            `uvm_fatal("CLUSTER_GOLDEN", $sformatf("%s addr=0x%08h expected=0x%08h actual=0x%08h", tag, addr, expected, actual))
+        if (actual !== expected) begin
+            if ((mutation_kind == "completion_error_code") &&
+                (tag == "random parity case0 ERR_PARITY completion")) begin
+                `uvm_info("CLUSTER_MUTATION_CAUGHT",
+                    "mutation=completion_error_code checker=completion_error_code", UVM_LOW)
+                `uvm_error("CLUSTER_COMPLETION_ERROR_CODE", $sformatf(
+                    "%s addr=0x%08h expected=0x%08h actual=0x%08h",
+                    tag, addr, expected, actual))
+            end else begin
+                `uvm_fatal("CLUSTER_GOLDEN", $sformatf(
+                    "%s addr=0x%08h expected=0x%08h actual=0x%08h",
+                    tag, addr, expected, actual))
+            end
+        end
     endtask
 
     task automatic write_v3_desc(
@@ -389,6 +402,14 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         expected_status_error = ((fault_engine == 5) || (fault_engine == 6)) ?
                                 32'h0000_0072 : 32'h0000_0052;
+        if ((mutation_kind == "completion_error_code") && (case_id == 0)) begin
+            // Testbench memory-image corruption checks that the directed
+            // completion oracle rejects an incorrect error-code word. This
+            // is not a DUT RTL mutation.
+            spad_write(cpl_addr + 32'h04, expected_status_error ^ 32'd1);
+            `uvm_info("CLUSTER_MUTATION_INJECTED",
+                "mutation=completion_error_code target=completion_word1", UVM_LOW)
+        end
         expect_spad(cpl_addr + 32'h00, 32'h0000_0700 + case_id,
                     $sformatf("random parity case%0d task ID", case_id));
         expect_spad(cpl_addr + 32'h04, expected_status_error,
@@ -1103,6 +1124,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         if (compute_vif == null)
             `uvm_fatal("CLUSTER_NOVIF", "real compute cluster sequence requires compute_vif")
 
+        mutation_kind = "";
+        void'($value$plusargs("CL_MUTATION=%s", mutation_kind));
         seed = 20261025;
         void'($value$plusargs("COMPUTE_CLUSTER_SEED=%d", seed));
         rng_state = seed ^ 32'h7ac4_01d3;

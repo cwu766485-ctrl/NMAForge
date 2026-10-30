@@ -52,6 +52,7 @@ class ai_compute_cluster_scoreboard extends uvm_component;
     int unsigned invalid_engine_done;
     bit [6:0] active_engine_seen;
     bit [6:0] error_terminal_pending;
+    bit [6:0] error_seen;
     bit reset_active_previous;
     string mutation_kind;
     bit mutation_caught;
@@ -223,6 +224,7 @@ class ai_compute_cluster_scoreboard extends uvm_component;
             reset_active_previous = 1'b1;
             active_engine_seen = 7'd0;
             error_terminal_pending = 7'd0;
+            error_seen = 7'd0;
             for (client = 0; client < 6; client++) begin
                 if (pending_reads[client] != 0)
                     reset_dropped_reads += pending_reads[client];
@@ -236,6 +238,20 @@ class ai_compute_cluster_scoreboard extends uvm_component;
             return;
         end
         reset_active_previous = 1'b0;
+
+        if (obs.launch_valid) begin
+            case (obs.launch_op)
+                8'h10, 8'h11, 8'h12, 8'h13, 8'h14, 8'h15: error_seen[0] = 1'b0;
+                8'h50, 8'h51: error_seen[1] = 1'b0;
+                8'h20, 8'h21: error_seen[2] = 1'b0;
+                8'h30, 8'h31: error_seen[3] = 1'b0;
+                8'h32, 8'h33, 8'h34, 8'h35, 8'h36, 8'h37, 8'h38, 8'h39:
+                    error_seen[4] = 1'b0;
+                8'h16, 8'h17: error_seen[5] = 1'b0;
+                8'h43, 8'h44: error_seen[6] = 1'b0;
+                default: ;
+            endcase
+        end
 
         // Some engines retire an errored operation with a Done pulse one
         // sampled cycle after the error pulse. Preserve that owner-specific
@@ -288,7 +304,10 @@ class ai_compute_cluster_scoreboard extends uvm_component;
                 `uvm_error("CLUSTER_RSP_CLIENT", $sformatf("response has illegal arbiter client=%0d", obs.rsp_client))
             end else if (pending_reads[obs.rsp_client] == 0) begin
                 orphan_responses++;
-                note_mutation_caught("response_owner_route");
+                if ((mutation_kind == "response_epoch") && (memory_epoch != 0))
+                    note_mutation_caught("response_epoch");
+                else
+                    note_mutation_caught("response_owner_route");
                 `uvm_error("CLUSTER_ORPHAN_RSP", $sformatf("response for client=%0d has no accepted read", obs.rsp_client))
             end else begin
                 pending_reads[obs.rsp_client]--;
@@ -378,6 +397,12 @@ class ai_compute_cluster_scoreboard extends uvm_component;
                     `uvm_error("CLUSTER_MEMORY_OWNER", $sformatf(
                         "accepted core write must have one engine owner: valid=%07b ready=%07b addr=0x%08h",
                         obs.engine_req_valid, obs.engine_req_ready, obs.selected_spad_addr))
+                if (|(accepted_engine_mask & error_seen)) begin
+                    note_mutation_caught("write_after_error_prefix");
+                    `uvm_error("CLUSTER_WRITE_AFTER_ERROR", $sformatf(
+                        "accepted engine write after terminal error: owner=%07b error_seen=%07b addr=0x%08h",
+                        accepted_engine_mask, error_seen, obs.selected_spad_addr))
+                end
                 for (lane = 0; lane < 7; lane++)
                     if (accepted_engine_mask[lane]) write_engine_hits[lane]++;
             end
@@ -399,6 +424,12 @@ class ai_compute_cluster_scoreboard extends uvm_component;
             end
             if ((obs.request_client == 3'd2) && obs.engine_busy[3])
                 write_engine_hits[3]++;
+            if ((obs.request_client == 3'd2) && error_seen[3]) begin
+                note_mutation_caught("write_after_error_prefix");
+                `uvm_error("CLUSTER_WRITE_AFTER_ERROR", $sformatf(
+                    "accepted Matrix line write after terminal error: error_seen=%07b addr=0x%08h",
+                    error_seen, obs.selected_line_addr))
+            end
             for (lane = 0; lane < 4; lane++)
                 write_model_word(obs.selected_line_addr + (lane * 4),
                                  obs.selected_line_wdata[lane*32 +: 32],
@@ -465,6 +496,7 @@ class ai_compute_cluster_scoreboard extends uvm_component;
                         5, 7'b0000100, lane));
             end
         end
+        error_seen |= obs.engine_error;
     endfunction
 
     function void report_phase(uvm_phase phase);
