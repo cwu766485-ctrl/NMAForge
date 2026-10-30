@@ -91,6 +91,7 @@ subsystem_memory_fabric_reset_regress:
 		done; \
 	$(URG) -full64 -dir "$$out/compile.vdb" $$dbs -report "$$out/urg"; \
 	test -f "$$out/urg/dashboard.html" || { echo "ERROR: fabric reset URG dashboard missing"; exit 1; }; \
+	python3 -c 'import re,sys; h=open(sys.argv[1],encoding="utf-8").read(); ns=("dma_spad_subsystem_pkg::dma_spad_subsystem_monitor::dma_cnm_shared_reset_cg","dma_spad_subsystem_pkg::dma_spad_subsystem_monitor::cnm_reset_phase_cg","dma_spad_subsystem_pkg::dma_spad_subsystem_monitor::dma_reset_phase_cg"); bad=[n for n in ns if not (lambda m:m and "100.00" in m.group(0))(re.search(r"<tr[^>]*>.*?"+re.escape(n)+r".*?</tr>",h,re.S))]; print("MEMORY_FABRIC_RESET_FUNCTIONAL_COVERAGE="+("PASS: 3/3 groups at 100%" if not bad else "FAIL: "+", ".join(bad))); sys.exit(bool(bad))' "$$out/urg/groups.html"; \
 	echo "MEMORY_FABRIC_RESET_REGRESS_PASS: seeds=$(MEMORY_FABRIC_RESET_SEEDS) pending-SPAD-response/owner-flush plus DMA/CNM recovery; logs=$$logs; coverage=$$out/urg"
 
 subsystem_regress:
