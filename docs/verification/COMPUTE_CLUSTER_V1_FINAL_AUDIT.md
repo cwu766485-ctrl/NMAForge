@@ -74,3 +74,7 @@ R49 closes the defined Matrix Line transfer-contract checker slice. R52 closes t
 - [R59 Top Smoke replay evidence](COMPUTE_CLUSTER_TOP_SMOKE_REPLAY_R59_2026-10-30.md)
 - [R60 all-engine parity replay evidence](COMPUTE_CLUSTER_ALL_ENGINE_PARITY_R60_2026-10-30.md)
 - [Matrix/TinyNPU historical benchmark report](COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md)
+
+## R61 closeout update — 2026-10-30
+
+At exact clean test SHA `d45b89af0c5aab2107a5db6bbf0a6ab754e81656`, the three-seed real-cluster UVM regression, 28/28 named checker-sensitivity campaign, Top Smoke, and 20-case top regression pass. The focused applicable compute testpoint group is 100% on those seeds; this does not imply 100% RTL or requirement coverage. URG retains 5 uncovered properties out of 22, including three AXI AR/AW assertions without real successes and two UVM RAL properties without attempts. The three new mutation-style probes alter testbench observations/memory image, not the DUT. External-fabric qualification, broad legal fault/phase/reset crosses, unsupported Matrix partial/zero WSTRB, descriptor breadth, and other partial RTM requirements remain unresolved. **CL-DV-v1.0 remains HOLD; this is not a sign-off declaration.** See [R61 evidence](COMPUTE_CLUSTER_R61_CHECKER_SENSITIVITY_2026-10-30.md).
