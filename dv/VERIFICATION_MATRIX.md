@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 30845)
-Total output lines: 1085
-
 > **2026-10-30 R99 CNM Protection and selected memory-fabric reset:** At exact
 > clean SHA `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`, the full three-seed
 > DMA/SPAD/CNM regression passes after aligning CNM Protection errors with the
@@ -73,6 +70,16 @@ Total output lines: 1139
 > (../docs/verification/COMPUTE_CLUSTER_CONV_ABORT_WRITE_PREFIX_R85_2026-10-30.md).
 
 # NMAForge block and subsystem verification matrix
+
+> **2026-10-30 R102 current-candidate AXI SVA gate:** At exact code/test
+> commit `d0b94ec74865f1f68af14de12113a8c19caf5204`, the mixed-precision
+> behavioral-DDR stall/reset E2E passes with UVM severity 0/0/0. The
+> regression target now fails unless AR/AW/W `stall_then_accept` SVA covers
+> all match; VCS reports 3,287 attempts and 14/5/12 matches. This supplements
+> current-candidate R101's compute-only AXI property no-success observations;
+> it does not close broad compute requester × fault/backpressure crosses.
+> RTM remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 HOLD. See
+> [R102 report](../docs/verification/COMPUTE_CLUSTER_AXI_STALL_SVA_R102_2026-10-30.md).
 
 > **2026-10-30 R101 full Compute Cluster replay:** At exact tested tree
 > `94a3797dfea4d9011ab16ab4d3877244f0a6aafe` (R100 documentation-only
@@ -339,7 +346,486 @@ sign-off candidate report](../docs/verification/COMPUTE_CLUSTER_S1_S2_SIGNOFF_CA
 
 > **2026-10-19 exact-main CP high-payload replay (`35c7670`):** Clean
 > detached worktree at pushed SHA
-> `35c767…18845 tokens truncated…/branch/assertion/group=`52.45/50.04/46.14/10.64/38.39/88.24/81.26%`, including TB/UVM and not DUT-only. New `ai_smoke` passed with the FP checker connected. Accelerator reset is during active compute at an AXI idle boundary; DDR remains active and DMA recovery reads the retained operand. Not an in-flight AXI reset test; global DUT-only/V4/V5 closure remains open. |
+> `35c7670594c85d471bad1e5a975df7f16369c78f`; seven seeds × 24 profiles
+> passed (168/168), each with 32/32 scenarios and UVM severity `0/0/0`.
+> URG passed at 63/63 functional variables, 34/34 crosses, high-payload 1/1,
+> mixed reset 4/4, kind×delay×reset 24/24, abort timing 7/7; assertions
+> 13 success, 0 failure/incomplete, 2 UVM RAL no-attempts; covers 4/4.
+> `ai_smoke` printed `TEST PASS`. Raw CP/writer toggle coverage remains
+> 13.21%/41.81%; no waiver is claimed. Testbench models the compute/fetch/DMA
+> endpoints, so this is CP-block evidence only, not V2/A10/V5 closure. See the
+> [exact-SHA run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN35C7670_V2_CP_HIGH_PAYLOAD.md).
+
+> **2026-10-19 CP seeded-random mixed-interaction follow-up:** Based on
+> `35c7670` with the additive random target in the working tree, 200 seeds
+> (`20262021..20262220`) passed the full CP UVM test: 200/200 logs, 32/32
+> scenario bins each, UVM warning/error/fatal=`0/0/0`. URG passed 63/63
+> variables, 34/34 crosses, mixed reset 4/4, kind×delay×reset 24/24, and
+> abort timing 7/7; 13 assertions succeeded, 0 failed/incomplete, 2 UVM RAL
+> no-attempts; covers 4/4. `ai_smoke` printed `TEST PASS`. Raw CP/writer
+> toggle coverage remains 13.21%/41.81%. This closes only the selected
+> randomized CP mixed error→abort→partial-reset→recovery slice, not V2/A10/V5.
+> See [run record](../docs/verification/A10_DV_RUN_2026-10-19_CP_RANDOM_200.md).
+
+> **2026-10-19 CP high-payload slice (`90757f5b` dirty-worktree evidence):**
+> The seven-seed × 24-profile CP campaign completed 168/168 profiles. Each
+> profile reached `scenario_bins=32/32`, the `CP_HIGH_PAYLOAD` marker, and UVM
+> warning/error/fatal=`0/0/0`. URG measured `cp_cg` 63/63 variables and 34/34
+> crosses, `cp_high_payload` 1/1, mixed reset 4/4, kind×delay×reset 24/24,
+> abort timing 7/7; assertions were 13 success, 0 failure/incomplete, and two
+> UVM RAL no-attempts, with 4/4 covers matched. The initial final gate had a
+> stale 62/62 variable expectation; the corrected `check-coverage` passed.
+> `ai_smoke` printed `TEST PASS`. The case checks v7 INT8 VDOT `length=ffff`,
+> task ID `c3a5`, CPLQ base `0x78000` inside the 512 KiB SPAD, result
+> `3e123456`, cycles `00010023`, elements `ffff`, four completion words, and
+> exactly-once tail advancement. This is dirty-worktree evidence, not a
+> fixed-SHA replay or V2/A10/V5 closure; endpoint compute/fetch/DMA behavior is
+> still block-level modeled. See the [run record](../docs/verification/A10_DV_RUN_2026-10-19_CP_HIGH_PAYLOAD.md).
+
+> **2026-10-19 exact-main V5 FP result-path mutation replay (`3cdb6cc`):**
+> Detached baseline and restore passed FP dot UVM seeds `712345` and `987654`,
+> each with 484/484 bit-exact scoreboard checks and UVM severity `0/0/0`.
+> A one-bit product-path mutant produced real scoreboard mismatches (`0/424/0`)
+> and failed the Makefile pass gate. This checks FP scoreboard sensitivity only;
+> it does not close V1/A10/V5. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN3CDB6CC_FP_MUTATION.md).
+
+> **2026-10-19 exact-SHA V5 completion-tail mutation replay (`0490a7f`):**
+> CP UVM baseline and restore (`ai_cp_test`, seed `20261019`) passed with
+> 31/31 scenario bins and UVM severity `0/0/0`. The final-word-index mutant
+> omitted word 3 and advanced the tail early; the existing monitor/scoreboard
+> reported 314 UVM errors. Compile logs were clean, and logs/VDBs are retained
+> outside the repository. This is targeted checker-sensitivity evidence, not
+> V2/V5 closure. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN0490A7F_COMPLETION_TAIL_MUTATION.md).
+
+> **2026-10-19 exact-SHA V5 DMA accepted-write abort/drain mutation replay (`9a8fde0`):**
+> Detached baseline and post-restore focused subsystem runs passed with UVM
+> severity `0/0/0`. The premature-retirement mutant was caught by
+> `accepted/completed=1/0 pending=1` and a drain-coverage miss (UVM `0/2/0`).
+> Baseline/restored RTL SHA-256 matched and the worktree was clean. This is
+> targeted checker-sensitivity evidence only; full V5 remains open. [Run
+> record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN9A8FDE0_DMA_WRITE_ABORT_MUTATION.md).
+
+> **2026-10-19 exact-SHA V5 CNM backpressure mutation replay (`200448c`):**
+> On a detached clean worktree, `dma_spad_subsystem_test` seed `20261014`
+> passed on baseline and post-restore with UVM severity `0/0/0`. The one-line
+> denied-prefetch fallback mutant was detected by two
+> `ap_cnm_request_stable_when_stalled` failures and CNM timeout/drain/result
+> checker errors before the 150,000,000 ps testbench timeout. VCS returned RC 0,
+> so classification uses the explicit checker evidence. This is one targeted
+> checker-sensitivity replay—not full V5 mutation closure; the original
+> historical failure artifact/fix SHA remain missing. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN200448C_CNM_MUTATION.md).
+
+> **2026-10-19 exact-SHA V5 CNM protection-tag mutation replay (`6d97d65`):**
+> At pushed source SHA `6d97d6511db78f3a177b72decb715505fdaadc7f`, the
+> DMA/SPAD/CNM subsystem test passed baseline and post-restore with the
+> protection marker, `TEST_DONE`, and UVM severity `0/0/0`. The one-line
+> current-request-tag mutant was detected by 15 UVM errors, including
+> response-tag/status mismatches and unauthorized protected writes. The mutant
+> reached `TEST_DONE`, but UVM severity was `0/15/0`; it is not a pass. This is
+> targeted sensitivity evidence, not full V5 mutation closure. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN6D97D65_CNM_PROTECTION_MUTATION.md).
+
+> **2026-10-19 exact-main V2 CP seed expansion (`3855d51`):** Detached clean
+> replay on pushed SHA `3855d513614782b14163e4a59c2be266b1c65998` passed
+> 168/168 mixed profiles across seven seeds; every run had 31/31 scenario
+> bins and UVM severity `0/0/0`. URG: CP 61/61 variables + 34/34 crosses,
+> reset 4/4, kind×delay×reset 24/24, abort timing 7/7; 13 assertions
+> succeeded, none failed/incomplete, two UVM RAL no-attempts; all four covers
+> matched. Top `ai_smoke` passed. The 15 raw CP condition outcomes remain
+> uncovered but retain the prior formal/assume-guarantee disposition; raw
+> toggle and broader V2/A10/V5 closure remain open. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN3855D513_V2_CP_SEED_EXPANSION.md).
+
+> **2026-10-19 exact-current-main V3 replay (`76cde0f`):** Clean exact-SHA
+> replay passed 10 DMA–SPAD–CNM seeds, 16/64/300-cycle AXI RREADY stress,
+> reset-delay cutpoints 0/1/2/3, standalone SPAD arbiter fairness/coverage,
+> and top `ai_smoke`. The merged RREADY group reached 4/4 variables + 3/3
+> crosses; parity×abort×reset reached 4/4 + 2/2. Assertions were 29 success,
+> zero failure/incomplete, and two UVM RAL no-attempts. Standalone arbiter
+> raw line/condition/branch/toggle=`100/86.89/100/10.73%`; subsystem raw DUT
+> coverage and broader V3/A10/V5 requirements remain open. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN76CDE0F_V3.md).
+
+> **2026-10-19 exact-SHA V2 CP replay (`aee74ef`):** Clean detached worktree;
+> 72/72 configured mixed reset/error/abort profiles passed, each with 31/31
+> scenario bins and UVM severity 0/0/0. URG CP functional coverage was 61/61
+> variables + 34/34 crosses; reset words 4/4, mixed reset cross 24/24, abort
+> timing 7/7. Assertions: 13 success, 0 failure/incomplete, two UVM RAL
+> no-attempts; all four covers matched. CP raw condition=`237/252` (94.05%),
+> line/FSM transitions/branch=100%; completion-writer line/condition/FSM
+> transitions/branch=100%. Top `ai_smoke` passed. CP toggle remains open;
+> the 15 raw-uncovered condition outcomes have existing formal/assume-guarantee
+> disposition recorded in the RTM. This is not full V2/A10/V5 closure.
+> [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAINAEE74EF_V2_CP.md).
+
+> **2026-10-19 当前 `main` 的 V1 FP exact-SHA recheck（`1956f36`）：** clean detached worktree 中新跑 8 seeds × 200 vectors；8/8 PASS、每 seed 484/484 bit-exact、UVM severity 0/0/0、peak outstanding reads=2；六个 FP 功能 coverage groups 均 100%。这仅代表 FP block UVM 选定功能切片，不表示 full-domain parity/writeback formal 或 A10 coverage closure。详见[运行记录](../docs/verification/A10_DV_RUN_2026-10-19_MAIN1956F36_V1_FP.md)。
+
+> **2026-10-19 最新 `main` 的 V1 FP directed 切片（`9e497a5`）：** FP dot core 与最大长度 parity 定向测试通过；四种 BF16/FP16 × A/B cutoff 均 drain 65,536 笔 reads 并完成无复位 recovery，Python FP model 19/19。仍不代表 full-domain formal 或 A10/V1–V5 sign-off。[运行记录](../docs/verification/A10_DV_RUN_2026-10-19_MAIN9E497A5_V1_FP_DIRECTED.md)。
+
+> **2026-10-19 固定 SHA 的 V4 混合精度 DDR E2E（`2b18b5f`）：** 已推送 `main` 的 detached clean worktree 中，官方顶层 UVM 192-seed 回归全部通过；192 个日志均有 E2E PASS marker，非零 UVM severity 为 0。URG 的 E2E 组、四个逐事务 AXI 组和 Makefile 要求的 19 个功能点均为 100%。Assertions：20 项成功、0 失败/未完成、2 项 UVM RAL 内部属性未触发；3/3 AXI stall covers 命中。这是固定 SHA 的选定 V4 复跑，不代表 V4/A10/V5 全部闭环。[运行记录](../docs/verification/A10_DV_RUN_2026-10-19_MAIN2B18B5F_V4_E2E.md)。
+
+> **2026-10-19 exact-SHA baseline replay (`2166334`):** A detached clean
+> worktree at pushed SHA `21663348789175ad7dc74bc2934302255b25bb4b` passed
+> selected FP directed/3-seed UVM and reference-model tests, DMA UVM 19/19,
+> Control UVM 9/9, top `ai_smoke`, and 20/20 seeded top cases. DMA/Control
+> severity summaries were zero and official URG reports were generated. This
+> is a frozen-SHA reproducibility checkpoint, not complete A10 acceptance:
+> FP parity-to-writeback formal remains open, as do CP lifecycle, broad V3/V4
+> coverage disposition, and V5 review. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_MAIN2166334.md).
+
+> **2026-10-19 latest SPAD arbiter coverage/formal follow-up (`d0ae9b5`):**
+> Exact-source VCS/URG passed scheduler fairness, fallback, control priority,
+> and response checks. Raw line/condition/branch/toggle=`100.00/86.89/100.00/10.73%`.
+> VC Formal `V-2023.12-SP2` proved 8/8 decode/response invariants
+> non-vacuously and reached 4/4 covers, dispositioning all eight raw condition
+> tuples from the URG report without synthetic hits/waivers. Exact-source top
+> smoke and 20-case seeded top regression passed. This is a selected scheduler
+> slice, not V3/A10/V5 closure. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_SPAD_ARB_PRIORITY.md).
+
+> **2026-10-19 earlier SPAD arbiter coverage follow-up (`cc89574`, superseded by `a1e87d9` below):**
+> VCS/URG standalone run passed the 10k-cycle scheduler fairness test and 12
+> directed legal RR fallback request cases. Six previously unhit data-plane
+> fallback source lines are now covered. `ai_spad_arbiter` line/condition/
+> branch/toggle=`96.79/81.97/96.97/6.22%`; CPL selection line/branch and raw
+> condition tuples remain open with no waiver. Exact-main top `ai_smoke`
+> printed `TEST PASS`. This is not full V3/A10/V5 closure. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_SPAD_ARB_COVERAGE.md).
+
+> **2026-10-19 exact-SHA V3 subsystem replay (`7271c54`):** Detached clean worktree; full DMA-SPAD-CNM test 10/10 seeds, RREADY 16/64/300-cycle stress 3/3 profiles, reset cutpoints 0/1/2/3 all passed with UVM warning/error/fatal=`0/0/0`; top `ai_smoke` passed. Combined URG `dma_rready_stall_cg`=4/4 variables + 3/3 crosses and `cnm_parity_abort_reset_cg`=4/4 + 2/2; assertions 29 success, 0 failure/incomplete, 2 UVM RAL no-attempts. This closes only selected scenarios, not overall V3/A10/V5. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_V3_CLEAN_REPLAY.md).
+
+> **2026-10-19 exact-SHA V3 parity/abort/reset replay (`c500b3d`):** On a detached clean worktree at `c500b3daba529d3123ffe250644f3297ae8c16f3`, 20 randomized seeds plus four forced reset delays (`0..3` cycles) passed with UVM warning/error/fatal=`0/0/0`; combined URG covered `cnm_parity_abort_reset_cg` at 4/4 variables and 2/2 crosses, and 29/31 assertions succeeded with 0 failures/incomplete (two UVM RAL no-attempts). Top `ai_smoke` passed. This closes only the exercised CNM parity-error + DMA abort-drain + shared-reset timing slice; broader V3/A10/V5 remain open. [Run record](../docs/verification/A10_DV_RUN_2026-10-19_V3_FAULT_ABORT_RESET.md).
+
+> **2026-10-18 CP tile load-DMA error/recovery follow-up (pushed `c500b3d`):** `CP_TILE_PINGPONG` runs a successful three-tile job, a first-load DMA error (`dma_done` + `dma_error`, code `0xA`), then a successful restart. Focused/full CP UVM, 3-seed regression, 72/72 three-seed × 24-profile URG campaign, and top `ai_smoke` passed. Every profile log reported `tiles=7/6/6 events=3 dma_errors=1 recovery_events=1 error_completion_starts=0`; UVM severity=`0/0/0`, scenario bins=`31/31`, `cp_cg`=`61/61` variables + `34/34` crosses, abort timing=`7/7`. A detached clean-worktree replay at exact SHA `c500b3daba529d3123ffe250644f3297ae8c16f3` also passed 72/72 profiles and top `ai_smoke`, with worktree clean before/after. No product RTL/SPEC/ABI change. This closes one directed tile error/recovery slice only; broader V2/A10/V5 remain open. [Run record](../docs/verification/A10_DV_RUN_2026-10-18_CP_COMPLETION_AVAILABILITY.md#follow-up-tile-load-dma-error-propagation).
+
+> **2026-10-18 CP decode busy-hold and formal follow-up (UVM based on `2317abb`; formal based on pushed `5439cb7`):** The macro-child decode-abort sequence synchronizes to the child request/response, and `CP_SUBMIT_GUARD` verifies two cycles of `ST_DECODE` hold while `compute_busy=1`, then exactly one launch/completion after release. Focused/full CP UVM, 72/72 coverage profiles, and top `ai_smoke` passed with UVM severity `0/0/0`; every full-suite run had scenario bins `31/31`. URG CP line/FSM/branch=`250/250`, `6/6` states + `13/13` transitions, and `67/67` branches; condition=`229/252` (90.87%, 23 outcomes remain raw-uncovered). VC Formal setup check reported no issues; 5/5 assertions proved non-vacuously and 3/3 covers reached, including busy-hold/release/launch and tile activity ownership. Of the 23 raw condition outcomes, 5 now have formal unreachable proofs, 2 are definitionally impossible, 1 is semantically masked, and 15 need cross-layer review. No product RTL/SPEC/ABI change. Evidence is from shared-worktree increments, not a clean-SHA replay; V2/A10 remain open. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_CP_DECODE_BUSY.md).
+
+> **2026-10-18 CP descriptor-fetch done ownership smoke check:** With a testbench-only monitor in top `ai_smoke`, the integrated descriptor-source mux produced 56 `desc_done` pulses; every pulse coincided with CP `ST_FETCH`. `ai_smoke` printed `TEST PASS` on Rocky Linux 8.10 / VCS `V-2023.12-SP1_Full64`. This is exercised integration evidence only; it does not change the raw URG score or close the all-input/formal disposition of the fetch-done condition. No DUT RTL/SPEC/ABI change. See the [CP run record](../docs/verification/A10_DV_RUN_2026-10-18_CP_DECODE_BUSY.md#integrated-descriptor-fetch-done-ownership-smoke-check).
+
+> **2026-10-18 current-worktree AXI-Lite SLVERR response follow-up (HEAD `bd3a7cd`):**
+> Added top-E2E checks for unmapped register `0x1fc`: writes and reads return
+> SLVERR and reads return zero. Focused run, the 16-seed FP-length matrix,
+> the 192-seed E2E campaign, and `ai_smoke` passed; UVM warning/error/fatal
+> counts were `0/0/0`, and URG AXI-Lite response plus E2E groups were 100%.
+> DECERR is legal AXI but excluded from this direct-IP coverage boundary,
+> which has no interconnect decoder. Shared dirty worktree; not a clean-SHA
+> replay and not full A10/V5 closure. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_AXILITE_SLVERR.md).
+
+> **2026-10-18 current-worktree V4 narrow-32 AXI E2E follow-up (HEAD `77b2ceb`):**
+> Added a scoreboard-checked 32-bit DMA read/write round-trip at non-128-bit-
+> aligned addresses. The 192-seed mixed-precision DDR E2E campaign passed
+> 192/192 with UVM warning/error/fatal=`0/0/0`; merged URG AXI4 and E2E groups
+> are both 64/64 (100%), and `ai_smoke` passed. This was run on a shared dirty
+> worktree, not a clean commit replay; raw RTL code coverage and the broader
+> V4/V5/A10 closure remain open. See the [narrow-32 run record](../docs/verification/A10_DV_RUN_2026-10-18_NARROW32_AXI.md).
+
+> **2026-10-18 exact-main V4 mixed-precision DDR E2E replay (`968c8bc`):**
+> The top-level 192-seed UVM campaign passed 192/192 with UVM
+> warning/error/fatal=`0/0/0`; selected E2E functional points and all four
+> transaction-level AXI gap/backpressure groups reached 100%. The aggregate
+> URG score was 90.63%, with a malformed generic AXI4 `kind` coverpoint
+> (32-bit `int` auto-binned into 64 ranges for a five-value enum) and unhit
+> narrow-32 / >16-beat / non-OKAY AXI-Lite scenarios. These are recorded as
+> coverage-model or scenario-scope follow-ups, not silently waived. V4
+> selected end-to-end behavior is reproduced; V4/V5/A10 remain open. See the
+> [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-v4-mixed-precision-ddr-e2e-replay-at-968c8bc).
+
+> **2026-10-18 exact-main V3 DMA–SPAD–CNM/RREADY replay (`575f1ae`):**
+> Three subsystem seeds and the dedicated 16/64/300-cycle AXI RREADY stress
+> passed with UVM severity `0/0/0`. The merged URG covered all 14 selected
+> functional groups at 100%; 29/31 assertions had successful attempts, with
+> 0 failures/incomplete and two UVM RAL no-attempts. Exact-SHA top `ai_smoke`
+> passed. This is selected subsystem evidence, not V3/A10 closure; fairness,
+> broad fault×abort×reset, DUT-only residual coverage, and full queue/completion
+> lifecycle remain open. See the [run evidence](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-pushed-main-v3-dma-spad-cnm-and-rready-replay-at-575f1ae).
+
+> **2026-10-18 exact-main CP/Completion replay (`b4c9f8b`):** Three seeds ×
+> 24 mixed profiles passed 72/72, each with 31/31 scenario bins and UVM
+> severity `0/0/0`. URG `cp_cg` was 61/61 variables + 34/34 crosses; the
+> mixed reset and abort-timing groups passed their gates. Thirteen assertions
+> succeeded, zero failed/incomplete, two UVM RAL no-attempts; four covers
+> matched. CP raw condition/branch coverage remains 90.48%/97.01%, so this is
+> not full CP/V2 closure. See the [run evidence](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-cpcompletion-coverage-replay-at-b4c9f8b).
+
+> **2026-10-18 exact-main FP directed increment (`bcc1fba`):** `dot-core-test`
+> passed the directed core suite and four maximum-length final-word parity
+> cases (BF16/FP16 × A/B); all 65,536 accepted reads drained, failed jobs made
+> no result write, peak outstanding was 2, and each post-error recovery passed.
+> This is a V1 simulation increment; full-domain formal parity disposition
+> remains open. See the [run evidence](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-fp-directed-core-and-maximum-parity-replay-at-bcc1fba).
+
+> **2026-10-18 exact pushed-main selected baseline (`1fe66f0`):** FP UVM
+> passed 3 seeds × 200 random vectors per format with 484/484 bit-exact
+> transactions per seed; Python FP model tests passed 19/19; Control UVM
+> passed 9/9 tests; DMA UVM passed 16/16 tests; and top `ai_smoke` passed
+> from an isolated worktree at the exact SHA. UVM severity was `0/0/0` for
+> FP/Control/DMA. This is selected G0 reproducibility, not A10 closure. See
+> the [run evidence](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-pushed-main-baseline-replay-at-1fe66f0).
+
+> **2026-10-18 CP macro event-only frontend-error increment (tree based on pushed `651b7a7`):** Added two `CPLQ_SIZE=0` macro-child cases for invalid descriptor (`0x15a0`, `ERR_DESC`) and dependency timeout (`0x15b0`, `ERR_DEPENDENCY`). Each checks one parent event/head advance and no child launch/later fetch/completion write/CPLQ tail advance. Focused/full CP UVM, 72/72 three-seed × 24-profile coverage runs, URG gates, and top `ai_smoke` passed with UVM severity `0/0/0`. CP raw line/condition/FSM/branch=`100/90.48/100/97.01%`; remaining CP bins, V2, and A10 remain open. This tests the existing no-CPLQ compatibility path only; no RTL/SPEC/ABI changed. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-cp-macro-child-event-only-frontend-errors-with-cplq-disabled).
+
+> **2026-10-18 CP macro-child error ownership increment (candidate based on pushed `1c1ab96`):** Added UVM checks for invalid child-descriptor and dependency-timeout failures under an active macro parent. Both paths return the parent task ID with the expected error and suppress child launches. Focused case, full CP UVM, 72/72 coverage profiles, and top `ai_smoke` passed; UVM severity=`0/0/0`; CP raw coverage improved to 228/252 conditions and 65/67 branches. Remaining raw bins and V2/A10 are still open. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-cp-macro-child-error-ownership-increment).
+
+> **2026-10-18 CP tile-launch ownership follow-up (tree based on `522df73`):** Added a tile-state launch ownership SVA/cover. Focused tile case passed (3 cover matches); full CP coverage matrix passed 72/72 profiles and URG merge; all four covers matched, new tile cover=216, UVM severity=`0/0/0`, 0 assertion failures/incomplete. Top `ai_smoke` passed. Raw DUT coverage: CP lines 100%, condition 89.68%, FSM 100%, branch 94.03%; completion writer line/condition/FSM/branch all 100%. Four CP raw branch bins and remaining condition bins are not closed; see the [detailed disposition](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-cp-tile-launch-ownership-and-raw-code-coverage-disposition).
+
+> **2026-10-18 CP submit-guard follow-up (tested tree based on `7aafb72`):** Added dependency-wait `ST_DECODE` re-submit coverage and synchronized the mixed abort/reset testbench sampling. Focused assertion/cover, full CP suite, 72/72 three-seed × 24-profile URG matrix, and top `ai_smoke` passed; UVM severity was `0/0/0`, all three CP covers matched, and URG reported 0 assertion failures/incomplete. This is not raw DUT code-coverage closure or full V2/A10 acceptance. Detailed results: [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-cp-submit-guard-and-mixed-reset-synchronization-follow-up).
+
+> **Latest exact-main V2 CP/Completion run (`d0babfb`, 2026-10-18):** 72/72 profiles passed at the pushed SHA; every profile had 31/31 scenario bins and UVM warning/error/fatal=`0/0/0`. URG `cp_cg` 61/61 variables + 34/34 crosses; reset-word bins 4/4; kind×delay×reset crosses 24/24; abort timing 7/7. Assertions: 11 success, 0 failure/incomplete, two UVM RAL no-attempts; both covers matched. Exact-main `ai_smoke` passed. This closes only the tested CP mixed reset interaction; raw DUT code coverage, remaining CP lifecycle, external descriptor/DMA integration, and global A10/V5 are still open. See [the run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v2-cpcompletion-replay-at-d0babfb).
+
+> **2026-10-18 exact-main V3-CUR-04 parity/abort/reset slice (`ae925bd`):** The exact-main 20-seed replay passed with UVM warning/error/fatal=`0/0/0`; a directed zero-cycle shared-reset run then closed the selected `cp_reset_timing` and `fault_abort_reset_x_timing` bins at 2/2 each (100%). URG assertions: 29 successful, 0 failures/incomplete, 2 unattempted UVM RAL internals; top `ai_smoke` passed. This evidence is limited to the modeled parity-error × DMA-abort-drain × shared-reset scenario, not broad V3 or A10 closure. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-v3-parityabortreset-timing-coverage-addendum-ae925bd).
+
+> **2026-10-18 exact-main V3 DMA-SPAD-CNM replay (`4c4738a`):** Ten seeds (`20261030..20261039`) passed on pushed SHA `4c4738a6240f9ebb3b6b2d6705c2232ce4414ef9`, all UVM warning/error/fatal=`0/0/0`; URG had 14 groups and 29/31 assertions successful, with 0 failures/incomplete and 2 UVM RAL no-attempts. GEMV-shape, parity-contention, arbiter, reset-phase, and error-overlap groups were 100%; top `ai_smoke` printed `TEST PASS`. Broader V3 fairness/fault×abort×reset and A10/V5 closure remain open. See the [exact-main run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-main-v3-dma-spad-cnm-10-seed-replay-at-4c4738a).
+
+> **2026-10-18 DMA write-ID slot coverage increment (candidate based on `3014be4`):** Added `dma_store_four_booo_test`, which accepts all four write IDs (`8..11`), returns B responses newest-first (`11..8`), checks 32 DDR words, and confirms no pending response. Focused and full 17-test DMA UVM regressions passed with per-test warning/error/fatal=`0/0/0`; random stress passed 20/20 and top `ai_smoke` printed `TEST PASS`. URG reports `ai_dma_write_response_tracker` line/condition/toggle/branch=`100.00/66.67/85.71/100.00%`; all 11 named DMA DUT SVA had nonzero successes, with no failure/incomplete. This closes only the write-slot slice; reachable burst-planner edge bins, full V3 and A10/V5 remain open. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-dma-four-write-id-slot-coverage-increment).
+
+> **2026-10-18 exact-current-main DMA block replay at `3310d3d`:** VCS/URG
+> passed all 16 DMA UVM tests with per-test UVM warning/error/fatal=`0/0/0`;
+> random stress scored 20/20 transfers. `dma_cmd_cg` reached 14/14 variables
+> and 5/5 crosses. All 11 named DMA DUT SVA had real successes, with 0
+> failure/incomplete; two UVM RAL assertions were unattempted. DUT-only
+> `ai_axi128_dma` line/condition/toggle/FSM/branch=`93.48/71.04/36.69/53.57/86.92%`.
+> The same SHA passed top `ai_smoke`. Residual RTL bins and full V3/A10 closure
+> remain open. See the [exact-main run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-dma-block-uvmurg-replay-at-3310d3d).
+
+> **2026-10-18 V3 prolonged AXI RREADY stress increment (candidate based on `0da26d4`):** Focused 16/64/300-cycle backpressure profiles each held `RVALID` and its payload stable, drained four accepted read responses, and matched all 32 SPAD words; UVM warning/error/fatal=`0/0/0` for each. URG stall-length bins and stall×completion crosses were 3/3 (100%); 8 DUT-facing assertions plus one UVM check succeeded, 0 failed/incomplete, with two UVM RAL no-attempts. The default three-seed DMA-SPAD regression and `ai_smoke` passed. This is prolonged response-channel evidence, not complete arbiter fairness or V3/A10 closure. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-v3-prolonged-axi-rready-backpressure-profiles).
+
+> **2026-10-18 exact-current-main V3 DMA-SPAD replay at `188e523`:** The
+> three-seed subsystem regression passed with `[TEST_DONE]`, nine runtime
+> pass markers per seed, and UVM warning/error/fatal=`0/0/0`. The focused
+> 16-cycle AXI RREADY stall held the response payload stable and matched all
+> 32 SPAD words. Selected URG groups were 100%; 29 assertions succeeded,
+> 0 failed/incomplete, two UVM RAL no-attempts, and 2/2 covers matched. This
+> is selected subsystem/backpressure evidence, not full V3/A10 closure. See
+> the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v3-dma-spad-subsystem-replay-at-188e523).
+
+> **2026-10-18 exact-current-main V2 CP/completion matrix at `1655db9`:**
+> UVM `cov-regress` passed 72/72 mixed-error/abort/reset profiles, each with
+> 31/31 scenario bins and severity `0/0/0`. URG `cp_cg` was 61/61 variables +
+> 34/34 crosses; reset-word coverage 4/4, kind × delay × reset cross 24/24,
+> and abort timing 7/7. Eleven assertions succeeded; 0 failed/incomplete, two
+> UVM RAL no-attempts, and 2/2 covers matched. The real CP, completion writer,
+> and tile scheduler were exercised, while descriptor-fetch/DMA endpoints are
+> behavioral models. This closes the tested CP lifecycle matrix, not external
+> descriptor-fetch integration, V3 DMA/SPAD concurrency, raw DUT coverage, or
+> full A10. See the [run evidence](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v2-cpcompletion-full-suite-replay-at-1655db9).
+
+> **2026-10-18 exact-current-main V1 FP replay at `08f398e`:** Directed core
+> and all four maximum-length BF16/FP16 A/B parity drain/recovery scenarios
+> passed. Three UVM seeds passed 484/484 bit-exact transactions each with
+> UVM warning/error/fatal=`0/0/0`; URG selected FP groups were 100%, with
+> 22,676 successes on the DUT stalled-request stability assertion and both
+> selected covers matched. Python model passed 19/19. DUT line/condition/FSM/
+> branch coverage was 97.96/97.00/85.71/92.86%; residual coverage disposition
+> is explicit: the main FSM is 5/5 states and 10/10 transitions, while
+> `pending_error_r` is 6/6 states and 14/18 transitions. Three prior-error to
+> protection transitions have canonical formal dispositions; parity to
+> protection and full-domain parity-to-writeback remain open. Three raw RTL
+> lines/four branches remain unhit, with legal-interface invariant mappings
+> documented separately. This is a scoped V1 slice, not V1/A10 closure. See
+> the [run evidence](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v1-fp-replay-at-08f398e).
+
+> **2026-10-18 exact-current-main V2 CP replay at `e24b770`:** The full CP
+> scenario suite passed across 72/72 mixed error/abort/reset profiles (three
+> seeds × 24 profiles), each with 31/31 scenario bins and UVM severity
+> `0/0/0`. URG: `cp_cg` 61/61 variables + 34/34 crosses, reset cutpoints
+> 4/4, kind×delay×reset cross 24/24, abort timing 7/7; 11 assertions
+> succeeded, none failed/incomplete, two UVM RAL internals had no attempts,
+> and 2/2 covers matched. This closes only the exercised mixed-reset slice,
+> not full V2/A10. See the [exact-main run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v2-command-processor-mixed-reset-replay-at-e24b770).
+
+> **2026-10-18 exact-current-main V4 randomized DDR E2E at `3345286`:** The
+> 192-seed campaign passed 192/192 at the exact pushed SHA with zero nonzero
+> UVM warning/error/fatal logs. URG `e2e_cg`, four per-transaction AXI gap/
+> back-pressure groups, and every Makefile-gated functional point were 100%;
+> assertions had 20 successes, 0 failures/incomplete, 2 UVM RAL no-attempts,
+> and all 3 AXI stall covers matched. This closes only the selected randomized
+> E2E slice, not broad V4, global DUT-only coverage review, or A10/V5. See the
+> [exact-main run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v4-randomized-ddr-e2e-at-3345286).
+
+> **2026-10-18 exact-current-main V3 DMA-SPAD replay at `b1257fb`:** The
+> focused 16-cycle AXI RREADY-stall case and three-seed subsystem regression
+> passed at the exact pushed SHA; each seed had `[TEST_DONE]`, nine runtime
+> pass markers, and UVM warning/error/fatal=`0/0/0`. URG selected functional
+> groups were 100%, with 29 assertions successful, 0 failed/incomplete, and
+> two UVM RAL internals unattempted. This closes only the exercised response-
+> backpressure/subsystem slice; broader V3 and A10/V5 remain open. See the
+> [exact-main run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v3-dma-spad-replay-at-b1257fb).
+
+> **2026-10-18 exact-current-main CP/completion replay at `9dce04d`:** The
+> 3-seed × 24-profile mixed prefix-error/abort/reset campaign passed 72/72;
+> every run hit 31/31 scenario bins and UVM warning/error/fatal=`0/0/0`.
+> URG `cp_cg` was 61/61 variables + 34/34 crosses, reset cutpoints 4/4,
+> kind×delay×reset cross 24/24, abort timing 7/7. Ten testbench/DUT-facing
+> assertions plus one UVM framework check succeeded; two UVM RAL internals
+> were unattempted, with 0 failures/incomplete and 2/2 covers matched. This
+> closes only the exercised mixed-reset interaction, not all CP/V2/A10 work.
+> See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-v2-command-processor-mixed-reset-replay-at-9dce04d).
+
+> **2026-10-18 exact-main FP replay at `880c697`:** FP directed core and
+> maximum-length parity tests passed; three UVM seeds passed 484/484 each with
+> UVM severity `0/0/0`, peak outstanding=2, and six selected FP functional
+> groups at 100%; Python model passed 19/19. URG reports one DUT request-
+> stability SVA with 22,676 real successes, one UVM component-name check, two
+> UVM RAL no-attempts, and both covers matched. DUT line/condition/FSM/branch
+> was `97.96/97.00/85.71/92.86%`; code-coverage disposition and full-domain
+> parity formal remain open. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-fp-baseline-at-880c697).
+
+> **2026-10-18 current-main FP stall/latency stress:** At pushed `main` SHA
+> `90ddbbd`, six seeded unit-SPAD profiles passed with BF16/FP16 lengths
+> 1..1024 and request back-pressure / ordered response jitter settings
+> `0/0`, `30/3`, and `60/11`; read-only audit checked all 108 format/length
+> rows. This is not DMA contention, UVM/URG coverage, or full-domain formal
+> closure. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-current-main-fp-spad-latencybackpressure-stress).
+
+> **2026-10-18 V3 DMA RREADY-backpressure increment:** A new subsystem test
+> holds the DUT-side AXI `RREADY` low for 16 cycles, checks response tuple
+> stability, then checks all four bursts and 32 SPAD words. Focused run and
+> three-seed `subsystem_regress` passed with UVM warning/error/fatal=`0/0/0`;
+> URG merge and top `ai_smoke` passed. This is a bounded AXI response-stall
+> scenario only; system fairness and V3/A10 closure remain open. See the
+> [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-v3-axi-rready-downstream-backpressure-increment).
+
+> **2026-10-18 baseline replay at `edf115cd`:** Control UVM passed 9/9 and DMA UVM passed 16/16 (current DMA Makefile count; older 15-test note is stale), with per-test severity 0/0/0 and `[TEST_DONE]` / scoreboard pass markers. Top `ai_smoke` exited 0 (`TEST PASS`). Non-fatal compile clock-skew warnings were present. URG and seeded top 20-case `ai_run` were not run; this does not represent clean-worktree or full A10 closure. See the [A10 run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-edf115cd-controldmatop-baseline-replay).
+
+> **2026-10-18 `edf115cd` FP dot UVM/URG replay:** Three seeds (`712345`, `987654`, `20261015`) each passed 484/484 mixed BF16/FP16 bit-exact transactions, UVM warning/error/fatal=`0/0/0`, peak outstanding=2. URG merged at 100%; all six selected functional groups were 100%. One DUT-facing request-stability assertion succeeded (22,676 real successes), one UVM component-name check succeeded, two UVM RAL internal no-attempts are not counted as DUT passes, and both selected covers matched. Python reference-model tests passed 19/19 from the model directory. This is focused V1 evidence, not full parity/writeback formal or A10 closure. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-edf115cd-fp-dot-uvmurg-replay).
+
+> **2026-10-18 V2 command-processor reset sweep:** On the dirty worktree based on `d1ed485`, CP UVM mixed prefix-error/abort/reset coverage passed 72/72 runs (3 seeds × 24 combinations), each with 31/31 scenario bins and UVM severity `0/0/0`. Reset was injected at completion word cut points 0, 1, 2, and 3; URG covered all 4 reset bins and all 24 kind × abort-delay-class × reset-word cross bins. `cp_cg` aggregate is 61/61 variables + 34/34 crosses, 100%. Eleven assertions succeeded, 0 failed/incomplete, two UVM RAL internals had no attempts; both cover properties matched. This is a focused V2 interaction closure, not full command-processor or A10 closure. Exact evidence and repro command: [2026-10-18 A10 run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md).
+
+> **2026-10-18 `edf115c` CP mixed error/abort/reset rerun:** CP RTL/UVM inputs matched HEAD `edf115c` (only documentation changed during the run). `make -C dv/block/command_processor/uvm cov-regress SEEDS='20261017 20261018 20261019' COV_OUT=/tmp/nmaforge_cp_mix_reset_edf115c_20261018` exited 0 on Rocky 8.10 / VCS+URG `V-2023.12-SP1_Full64`: 72/72 runs, each `scenario_bins=31/31`, UVM warning/error/fatal=`0/0/0`. URG merge and hard `check-coverage` passed: `cp_cg` 61/61 variables + 34/34 crosses, `cp_mixed_reset_words` 4/4, `cp_mixed_kind_delay_reset_cross` 24/24, `abort_timing_cg` 7/7. This is closure evidence only for the exercised CP mixed error/abort/reset slice; raw code-coverage disposition, cross-layer and other V2 residuals, and V5 remain open—not full CP V2/A10. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#cp-mixed-errorabortreset-rerun-at-head-edf115c-2026-10-18).
+
+> **2026-10-18 reachable CP fetch/macro abort increment:** From baseline HEAD `189cd2a5f4a0d2542387e9b3b5a6169cc175d804`, the existing `CP_FETCH_ABORT` and `CP_MACRO_CHILDREN` scenarios now exercise direct `ST_FETCH` abort on the `fetch_done` cycle with `abort_pending=0`, plus macro child-fetch and child-decode aborts. All 72 runs (3 seeds × 24 profiles) passed with scenario bins 31/31 and UVM warning/error/fatal `0/0/0`; all logs hit the three new abort-route bins. URG `/tmp/nmaforge_a10_cp_reachable_cov_r1_20261018/coverage/urg_merged/`: `cp_cg` 61/61 variables + 34/34 crosses, `abort_timing_cg` 7/7 variables. Assertions: 11 successes, 0 failure/incomplete, 2 UVM RAL no-attempts; 2/2 cover properties matched. The Makefile `check-coverage` gate requires the 7/7 abort group and passed against this report. Only these three reachable paths are closed; this is not all CP code coverage or V2 closure. See [the run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-cp-reachable-fetchmacro-abort-coverage).
+
+> **2026-10-18 `edf115c` exact-commit FP dot-core aggregate:** Tracked worktree clean; `make -j -C dv/block/compute/fp/sim dot-core-test DOT_CORE_OUT_DIR=/tmp/nmaforge_a10_fp_dotcore_edf115c_20261018 DOT_CORE_PARITY_MAX_OUT_DIR=/tmp/nmaforge_a10_fp_parity_edf115c_20261018` passed on Rocky 8.10 / VCS `V-2023.12-SP1_Full64`. The legacy BF16 dot marker passed, then all four BF16/FP16 final-A/final-B maximum-length parity cases passed: each drained 65,536 reads at prefix 65,534, peak outstanding=2, 98,306 cycles, and recovered without reset to `0x3f800000`. `make -j` serialized the VCS compiles successfully; a non-fatal clock-skew warning was present. Focused aggregate only, not UVM/URG, formal, or full A10; `ai_smoke` was not rerun because `edf115c` has no RTL change. See the [exact-commit run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-edf115c-clean-tracked-worktree-fp-aggregate-verification).
+
+> **2026-10-18 current-main replay:** At SHA `452813f`, Rocky 8.10 / VCS+URG `V-2023.12-SP1_Full64` passed F…169 tokens truncated…1103' OUT=/tmp/nmaforge_cp_final3_retry_20261016 COV_OUT=/tmp/nmaforge_cp_final3_retry_20261016/coverage VCS=/opt/Synopsys/vcs/V-2023.12-SP1/bin/vcs URG=/opt/Synopsys/vcs/V-2023.12-SP1/bin/urg`; also `make check-coverage COV_OUT=/tmp/nmaforge_cp_final3_retry_20261016/coverage` | Focused cases 25/22/26 and default suite pass; 27/27 scenario bins. Coverage campaign: 18/18 seed/profile logs and VDBs, severity 0/0/0; URG 47/47 functional variables + 10/10 crosses. CP DUT line/condition/toggle/FSM/branch=`100.00/76.10/9.68/100.00/88.06%`; writer=`97.44/100.00/28.74/100.00/91.67%`. No RTL/SPEC/ABI change or exclusions. Illegal FSM injection is robustness stimulus, not legal traffic. Residual CP bins and V2/V5/clean-SHA closure remain open. See the linked A10 run record. |
+| Command Processor completion-writer illegal-state recovery coverage addendum (2026-10-16) | Real `ai_command_processor` + `ai_completion_writer`; testbench-only force/release of writer state `2'b11` while idle | Rocky 8.10 / VCS V-2023.12-SP1; focused `CP_ONLY_CASE=28`; then from `dv/block/command_processor/uvm`, `make cov-regress SEEDS='20261081 20261082 20261083' OUT=/tmp/nmaforge_a10_cp_writer_fsm_cov_20261016 COV_OUT=/tmp/nmaforge_a10_cp_writer_fsm_cov_20261016/coverage VCS='/opt/Synopsys/vcs/V-2023.12-SP1/bin/vcs -licwait 1' URG=/opt/Synopsys/vcs/V-2023.12-SP1/bin/urg`; independently re-ran `make check-coverage` and verified all 18 logs | Writer default branch returns to IDLE with no SPAD write, done/busy pulse, or pointer movement; a subsequent legal task completes. Focused case passed. All 18 seed×profile logs report 29/29 scenarios, recovery marker, UVM warning/error/fatal=0/0/0; URG `cp_cg` 49/49 variables + 10/10 crosses. DUT-only CP line/condition/toggle/FSM/branch=`100.00/83.67/10.10/100.00/88.06%`; writer=`100.00/100.00/28.74/100.00/100.00%`, branches 12/12. `make check-coverage` passes. Illegal state is robustness fault injection, not legal protocol stimulus; no RTL/SPEC/ABI change. CP residual condition/toggle, fault×abort×reset cross-layer closure, and clean fixed-SHA replay remain open; see the A10 run record. |
+| Command Processor macro child descriptor-fetch error (2026-10-16) | Real `ai_command_processor` + `ai_completion_writer`; UVM fetch endpoint returns `ERR_FETCH` on the second child descriptor of a 3-child macro | `make run SEED=20261016 OUT=/tmp/nmaforge_a10_macro_child_fetch_error_focus_20261016`; `make cov-regress SEEDS='20261016 20261017 20261018' MIXED_COV_CASES='1-0 1-1 1-3 2-0 2-1 2-3' OUT=/tmp/nmaforge_a10_cp_macro_fetch_error_cov_20261016`; followed by top `make ai_smoke` | First child completes; second child fetch fails; parent ID `0x1550` receives one `ERR_FETCH` completion; third child does not launch. Focused full suite passes; all 18 seed/profile logs/VDBs pass with UVM warning/error/fatal=0/0/0 and marker present. URG `cp_cg` 49/49 variables + 10/10 crosses; CP DUT line/condition/toggle/FSM/branch=`100.00/85.66/10.28/100.00/92.54%`; completion writer=`100.00/100.00/28.74/100.00/100.00%`. Five CP interface SVA have non-vacuous successes `960/6244/1390/54/54`, 0 failure/incomplete; two no-attempts are UVM RAL internals. `ai_smoke` PASS. Testbench-only; no RTL/SPEC/ABI/source-list change. Residual condition/toggle and cross-layer fault×abort×reset closure remain open; dirty-tree evidence, not clean frozen-SHA replay. |
+| SPAD arbiter sustained and seeded request-mode round-robin fairness (2026-10-18 refresh) | `ai_spad_arbiter` directed testbench; continuously pending core, banked/CNM and DMA clients | `cd dv/subsystem/top_smoke/sim && make ai_spad_arb_run`; followed by `make ai_smoke` | Retains the 30-cycle directed and 300-cycle seeded checks. Adds a configurable seeded request-mode run (`+SPAD_RR_MODE_CYCLES=10000`) with xorshift seed `0xA10D2026`, changing each accepted client's request form among core scalar/line, banked/CNM, and DMA scalar/line while preserving valid until grant. Checks client tag, one grant maximum per cycle, no wait beyond two ungranted cycles, every mode hit, then drains pending requests. | Rocky 8.10 / VCS `V-2023.12-SP1_Full64`: default 300-cycle and 10,000-cycle runs PASS; 10,000-cycle phase plus 2 tail-drain grants; total grants core/banked/DMA=`3334/3334/3334`, max wait=`2/2/2`; request-mode counts core scalar/line=`1654/1680`, banked/CNM=`1667/1667`, DMA scalar/line=`1659/1675` (all six nonzero). Existing CNM/DMA contention remains 6/6 and response-parity check passes; `ai_smoke` prints `TEST PASS`. This is prolonged scheduler-admission fairness under held requests; the arbiter has no downstream ready signal, so it does not model memory response back-pressure or establish long system-level fairness. Testbench/target/docs only; no product RTL/SPEC/ABI change. See [A10 SPAD fairness run record](../docs/verification/A10_DV_RUN_2026-10-18_SPAD_RR.md). |
+| Compute-engine block-validation expansion (2026-10-21) | Direct CNN line-buffer/KV, Matrix datapath, and SFU cores; existing CNM, mixed-FP, and top/shared-fabric environments | `make -C dv/block/compute/cnn_kv/sim random-latency-test SEED=20261021`; `make -C dv/block/compute/matrix/sim datapath-random-test SEED=20261021`; `make -C dv/block/compute/sfu/sim random-latency-test SEED=20261021`; aggregate `make -C dv/subsystem/tensor_datapath/sim cluster_regress CLUSTER_TAG=multi_engine_20261021_final CLUSTER_OUT=/tmp/nmaforge_compute_cluster_multi_engine_20261021_final` | All direct RTL gates PASS: CNN/KV 24 convolutions + 24 KV round trips, 596/596 read responses, 7-cycle max latency and 280 ready stalls; Matrix 10,072 cases; SFU 64 cases across all 8 opcodes and lengths 1/2/3/4/7/8/15/16, 1,038/1,038 reads/responses, 426 total writes, 7-cycle max latency and 532 ready stalls. Aggregate exit 0 / `MULTI_ENGINE_COMPUTE_CLUSTER_PASS`; CNM A2.2/GEMV and Matrix A3 gates, 10 DMA–SPAD–CNM seeds, 3 FP UVM seeds (212/212 bit-exact each, warning/error/fatal=0/0/0), FP model 19/19, A4 reference 10,000 cases, and top smoke (20 seeded INT8 cases, `TEST PASS`) completed. SFU testing found missing GELU/SiLU threshold branches; RTL and SPEC were updated and 64/64 passed after correction. Full-cluster formal, DUT-only code-coverage disposition, simultaneous engine dispatch, and broad per-engine fault/reset combinations remain open. See [validation run record](../docs/verification/COMPUTE_ENGINE_BLOCK_VALIDATION_2026-10-21.md). |
+| Compute-cluster verification closure follow-up (2026-10-21) | Full Matrix core; causal Softmax zero-token boundary; all seven production compute engines under serial dispatch; top DUT-only code coverage | `make -C dv/subsystem/tensor_datapath/sim cluster_regress CLUSTER_TAG=multi_engine_20261021_complete CLUSTER_OUT=/tmp/nmaforge_compute_cluster_multi_engine_20261021_complete AI_SEED=20261021`; plus `make -C dv/block/command_processor/formal completion-ownership OUT=/tmp/nmaforge_compute_cluster_cp_serial_formal_20261021 VCF=/opt/Synopsys/vc_formal/V-2023.12-SP2/bin/vcf` | Aggregate exit 0 / `MULTI_ENGINE_COMPUTE_CLUSTER_PASS`. Matrix: five numerical/layout cases, ten config/parity/protection/abort/watchdog faults, post-fault recovery, bank 64/64 and SPAD 49/49 responses. SFU: causal query token 0 at lengths 1 and 7, all 64 vectors pass. Fixed Matrix prefetch-valid and watchdog-error-state defects. VC Formal on actual `ai_accel_compute_cluster`: 3/3 assertions proven, 7/7 engine covers reached, setup clean. Complementary command-processor formal: 7/7 assertions proven non-vacuously, including busy-blocks-launch; 3/3 covers reached. Together with production top wiring, these verify serial dispatch; parallel starts are unsupported by the architecture. VCS/URG code coverage is scoped under `tb_ai_accel_smoke.dut`; raw DUT subtree line/condition/FSM/branch=`81.07/68.61/35.59/71.65%`, with uncovered bins retained. This is selected control formal and one-seed raw code coverage, not numerical full-top formal or coverage closure. See [run record](../docs/verification/COMPUTE_ENGINE_BLOCK_VALIDATION_2026-10-21.md). |
+| FP16 DDR-to-compute | `ai_axi128_dma` ↔ scratchpad ↔ queued `0x51` FP16 dot ↔ completion writer ↔ DMA | Directed top smoke loads two packed FP16 words from the AXI memory model, computes the dot, then stores FP32 result back to the model. | Checks both SPAD operands, FP32 result, shared completion and external-memory result (`0x41300000`). Passed in current `ai_smoke`; does not model DDR PHY or randomized DDR errors. |
+| Top smoke | `ai_accel_top` ↔ AXI-Lite tasks ↔ AXI4 memory model | Directed register/DMA/queue/compute, BF16/FP16 command tests, FP16 DDR path and Transformer micro-workload. | `TEST PASS`, SVA clean, expected completion/result checks and fixed-point reference gate pass.  This is regression evidence, not UVM coverage closure. |
+| Top smoke seeded regression (2026-10-16) | Same top smoke testbench and full integration RTL | `cd dv/subsystem/top_smoke/sim && make ai_run AI_RANDOM_CASES=20 AI_SEED=12345` | Rocky 8.10 / VCS `V-2023.12-SP1_Full64`; exit 0, `TEST PASS` at 411,470,000 ps. Includes directed baseline, 20 seeded random GEMV/GEMM/Conv3x3/DWConv post-op cases, protection and reset recovery. Current dirty worktree evidence, not a fixed-SHA replay. |
+| Top smoke seeded regression (2026-10-26 owner follow-up) | Same top smoke testbench and full integration RTL | `make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=12345` | VCS `V-2023.12-SP1_Full64`; exit 0, `TEST PASS`. Includes real concurrent CNM GEMV + Matrix GEMM ownership/data checks followed by 20 seeded random compute cases, protection and reset recovery. Current-worktree evidence, not a fixed-SHA replay. |
+| Shared top UVM ABI smoke | `dv/uvm` AXI-Lite UVM agent ↔ `ai_accel_top` | `make -C dv/uvm/sim uvm_smoke` reads VERSION only. | A10 expected value `0x1000000a`; 2026-10-14 run has one AXI-Lite transaction and UVM warning/error/fatal=0. This is infrastructure/ABI bring-up only. |
+| Top UVM queued INT8/BF16/FP16 DDR vertical slice + mixed-FP length/AXI-gap sweep | `dv/uvm` AXI-Lite sequencer + passive AXI4 monitor/scoreboard ↔ `ai_accel_top` + AXI memory model | `make -C dv/uvm/sim uvm_mixed_precision_ddr_e2e_regress` runs six order/layout/validator/error/reset cases; `make -C dv/uvm/sim uvm_mixed_precision_ddr_e2e_cov_regress` adds 16 FP16 K=1..4 × BF16 K=1..4 runs and read/WREADY gap bins 0..3, including K=3 odd tail and K=4 two packed words. | 16/16 sweep PASS. Its URG `e2e_cg` result at that run was 41/41 variable bins and 16/16 cross bins (100%), report `/tmp/nmaforge_mixed_precision_e2e_cov_20261015_140052_244573981/urg_merged`. Whole-design raw summary for that run: line 48.18%, condition 42.99%, FSM 9.09%, branch 36.23%, assertion 33.33%, score 40.44; not overall closure. Later 42/42, 52/52 and 53/53 results are historical; the latest 54/54 result including the independent accelerator-reset/DDR-live check is in the seeded-random row below. Ordinary six-run regression also PASS (`/tmp/nmaforge_a10_mixed_e2e_order_regress_20261015.log`). **Selected slices passed; V4/V5 remain open.** |
+| Top UVM seeded-random mixed-precision DDR E2E + bounded AXI latency/back-pressure + reset + FP watchdog/software abort (2026-10-16 rerun) | Same top-level active AXI-Lite/passive AXI4 environment and AXI memory model | `cd dv/uvm/sim && make uvm_mixed_precision_ddr_e2e_random_cov_regress MIXED_E2E_RANDOM_OUT=/tmp/nmaforge_a10_20261016_e2e_independent_reset_final`; Rocky 8.10 / VCS `V-2023.12-SP1_Full64`; seeds `20261101..20261292` (192 runs), no order/layout/FP16 K/BF16 K override; seeded UVM randomizes descriptor order, SPAD layout, K=1..4 and operands. Each run covers queued INT8/BF16/FP16, invalid descriptor, two-beat DMA RRESP SLVERR at first and last position, idle-AXI-boundary accelerator-only reset with live DDR and a post-reset DMA readback, separate outstanding-DMA coordinated reset/recovery, FP watchdog completion, software abort, and bounded AXI gap/back-pressure configs. | All 192 seed logs have E2E and independent-DDR-reset PASS markers, UVM_WARNING/ERROR/FATAL=0; compile log has no VCS `Warning-`/`Error-`; target and URG merge exited 0. Fresh URG `e2e_cg`: 54/54 variables + 16/16 crosses; new `cp_independent_ddr_reset` hit 192 times; `dma_error_position_cg`: before-last/on-last 192 hits each, 2/2 bins (100%). Whole-design dashboard line/condition/FSM/branch/assertion/score=`49.44/45.81/10.64/37.80/33.33/43.05%` aggregates DUT, TB and UVM; URG assertion report has one UVM component-name property with successes and two UVM RAL no-attempt properties, but no top DUT SVA evidence. **Historical V4-RAND-01 path run before SVA enablement; retain these numbers only as historical functional-coverage evidence. The intermediate 12-property SVA run at `/tmp/nmaforge_a10_20261016_e2e_dut_sva_random` is superseded by the final FP checker campaign at `/tmp/nmaforge_a10_20261016_e2e_fp_sva_random`; preserve the old URG metrics and apply no new numbers to that old URG.** Gap configuration remains fixed per run, not per transaction; independent reset is only tested with the AXI/DDR boundary idle, not with an external transaction in flight. Broader descriptor fields and global coverage closure remain open; artifacts stay under `/tmp`, V4/V5 remain open. |
+| Top UVM seeded-random mixed-precision DDR E2E, refreshed after ABI-v7 macro test (2026-10-16) | Same top-level active AXI-Lite/passive AXI4 environment and AXI memory model | `cd dv/uvm/sim && make uvm_mixed_precision_ddr_e2e_cov_regress MIXED_E2E_COV_OUT=/tmp/nmaforge_a10_e2e_post_macro_final_20261016 && make uvm_mixed_precision_ddr_e2e_random_cov_regress MIXED_E2E_RANDOM_OUT=/tmp/nmaforge_a10_top_e2e_random_post_macro_20261016`; Rocky 8.10 / VCS `V-2023.12-SP1_Full64`; random seeds `20261101..20261292` | 16-case mixed FP length/gap sweep plus 192 seeded E2E runs covering descriptor order, SPAD layout/bank, K=1..4 and operands, invalid descriptors, first/last DMA SLVERR, reset/recovery, watchdog/abort and bounded AXI gaps/backpressure; URG functional bins and top-level protocol assertions | Both targets and URG merges exit 0; 192/192 run directories, UVM warning/error/fatal=0 and no VCS compile `Warning-`/`Error-`; selected `e2e_cg` and modeled functional bins=100%. Latest URG `/tmp/nmaforge_a10_top_e2e_random_post_macro_20261016/urg_merged`: 22 properties, 20 success, 0 failure/incomplete, 2 no-attempt UVM RAL properties; five DUT-owned AXI master assertions have non-vacuous real successes `1920/1012/576/383/1494`, three AR/AW/W stall covers match `1012/383/1494`; 14 engine activity checks are testbench monitors. Whole-design line/condition/FSM/branch/assertion/score=`51.58/47.40/12.28/39.48/84.62/47.07%` includes DUT+TB+UVM and is not DUT-only; remaining per-DUT code/assertion disposition, transaction-level independent gap randomization, fault×abort×reset combinations and clean frozen-SHA replay remain open. Strong selected V4 evidence, not V4/V5 closure. |
+| Top UVM ABI-v7 external macro descriptor DDR E2E | `ai_accel_top` + command processor + external AXI descriptor fetch + shared SPAD/INT8 compute/completion | `cd dv/uvm/sim && make uvm_external_macro_ddr_e2e` | Parent descriptor points to `0x0000_0001_0000_1000`; fetch 3 child descriptors, check full 64-bit AR addresses, AXI ID/order/4-beat RLAST framing, 3 child result words and exactly one aggregate completion. | VCS `V-2023.12-SP1_Full64`; focused UVM severity `0/0/0`, `MACRO_EXTERNAL_DDR_E2E_PASS` and `MACRO_AXI_DESC_FETCH_PASS`; 3 fetches/12 beats/3 results/1 completion. Top-UVM-only memory-model option aliases upper tag `1` into a small 4096-word backing array while rejecting other nonzero high tags; this is address-routing verification, not >4 GiB physical DDR/PHY validation. Follow-up six-seed mixed E2E and `make ai_smoke` also pass. Targeted V4 slice only; V4/V5 remain open. |
+| Top UVM accelerator-only reset with live DDR | Same top-level mixed-precision UVM and AXI memory model, with separate DUT `aresetn` and memory-model `ddr_resetn` | Included in all 192 runs of `uvm_mixed_precision_ddr_e2e_random_cov_regress MIXED_E2E_RANDOM_OUT=/tmp/nmaforge_a10_20261016_e2e_independent_reset_final` | During active FP compute, assert accelerator reset only after proving DMA/AXI/DDR request and response queues are idle; leave DDR responder out of reset, then perform a real DMA read of retained DDR word `0xdada5511` and compare SPAD readback. | `cp_independent_ddr_reset` 192/192; each run logs `[MIXED_E2E_DDR_INDEPENDENT_RESET_PASS]`; UVM severity 0/0/0. This proves the idle-boundary reset/recovery behavior only; it does not define or verify accelerator-only reset while AXI traffic is in flight. |
+> Matrix history note: the older `e2e_dut_sva_random` entry is superseded by the final FP activity-checker campaign at `/tmp/nmaforge_a10_20261016_e2e_fp_sva_random`; preserve its old metrics and do not apply new metrics to its URG.
+| Top UVM DMA two-beat SLVERR position / burst-atomicity addendum (2026-10-15) | Same top-level mixed-precision UVM and AXI memory model | Focused `make -C dv/uvm/sim uvm_mixed_precision_ddr_e2e`; six-seed order/layout regression; 16-run `uvm_mixed_precision_ddr_e2e_cov_regress MIXED_E2E_COV_OUT=/tmp/nmaforge_a10_v4_errorpos_cov_check_20261015` | Inject one SLVERR in beat 0 and one on RLAST of two-beat/8-word reads; monitor RID through RLAST, error count/beat count and read-error position coverage; check `ERR_AXI_RD` and all 8 SPAD sentinels unchanged because no burst data commits before successful OKAY RLAST. | Focused, six-seed and 16-run regressions PASS with UVM warning/error/fatal=0. URG `dma_error_position_cg` has before-last/on-last bins each hit 16 times (2/2, 100%) at `/tmp/nmaforge_a10_v4_errorpos_cov_check_20261015/urg_merged`. A first test version incorrectly expected partial commit on final-beat error; it was corrected to match the RTL burst-buffer contract. This directed error-position evidence does not close random error/reset/abort combinations or V4/V5. |
+| DMA–SPAD concurrent FP AXI error drain | Real BF16/FP16 dot core + DMA + shared memory fabric | `make -C dv/subsystem/dma_spad/sim subsystem_regress COV_TAG=a10errfpfix SEEDS='12345 987654 20261014' URG_REPORT=/tmp/nmaforge_a10errfpfix_urg`; each seed runs BF16 and FP16 with one injected DMA RRESP SLVERR while 4 reads are outstanding. | Checks 4/4 accepted/drained reads, one accepted injected SLVERR, FP/DMA error overlap, no DMA SPAD write, FP result/readback `0x43000000`, fully idle fabric/DMA and a subsequent clean DMA transfer without reset. All three seeds PASS with UVM warning/error/fatal=0. Fixed address and directed delay only; does not close random AXI-error × compute concurrency, abort/parity/protection, CNM, CMDQ/completion-writer lifecycle, or V3 overall. |
+| DMA–SPAD CNM protection-error alignment/recovery addendum (2026-10-15) | Real `ai_banked_cnm_core` through shared memory fabric and registered SPAD response path | `make -C dv/subsystem/dma_spad/sim subsystem_regress COV_TAG=a10cnmprot_matrix VCS=/opt/Synopsys/vcs/V-2023.12-SP1/bin/vcs URG=/opt/Synopsys/vcs/V-2023.12-SP1/bin/urg URG_REPORT=/tmp/nmaforge_a10cnmprot_matrix_urg` (Makefile defaults to seeds `12345/987654/20261014`); then `ai_smoke` and `ai_run AI_RANDOM_CASES=20 AI_SEED=12345` | In 4 KiB profile, separately set source A and B to OOB `0x1180`; third case enables a region with read/execute permission but no write permission for in-range destination `0x2b0`; check aligned read response tags, `ERR_PROTECTION=6`, destination sentinel, then legal recovery without reset | All three seeds PASS; UVM warning/error/fatal=0 and A/B/destination-permission bins=100%. Fresh URG: 31 assertions, 29 success, 0 failure/incomplete, 2 unattempted internal UVM RAL assertions; source protection-response assertion has 6 successes. GEMV shape cross remains 12/12. `ai_smoke` and the 20-case seeded top regression PASS. These are directed protection scenarios only; broad protection/parity/error combinations and V3 closure remain open. |
+| Top UVM per-transaction AXI latency/back-pressure jitter (2026-10-16) | `ai_accel_top` mixed-precision DDR E2E and testbench AXI memory responder | `cd dv/uvm/sim && make uvm_mixed_precision_ddr_e2e_axi_stalls`; `make uvm_mixed_precision_ddr_e2e_cov_regress`; `make uvm_mixed_precision_ddr_e2e_random_cov_regress` (192 seeds `20261101..20261292`) | Seeded, independently bounded ARREADY/AWREADY address stalls, per-beat R response gaps and WREADY gaps; scoreboard checks transaction integrity. Deterministic outstanding-DMA reset probe temporarily disables jitter and restores it afterward. | Focused, 16-run sweep and 192-run campaign PASS on Rocky 8.10 / VCS+URG `V-2023.12-SP1_Full64`; four dedicated URG groups (`axi_arready_stall_cg`, `axi_awready_stall_cg`, `axi_read_response_gap_cg`, `axi_write_data_gap_cg`) each 100%. `ai_smoke`, 20-case `ai_run`, six default-mode order runs and DMA UVM 15/15 also PASS. Current dirty-worktree evidence only; no product RTL/SPEC/ABI change. This supersedes earlier rows that describe AXI gap selection as fixed per run. In-flight external-AXI reset semantics, all fault×abort×reset combinations and overall V4/V5 closure remain open; see [A10 run record](../docs/verification/A10_DV_RUN_2026-10-16.md). |
+
+> **2026-10-15 V4 FP abort-drain rerun:** strengthened `run_fp_abort_completion_check` so every run observes the top-level `core_abort` pulse while `outstanding_reads_r=1`, then checks that the count returns to zero before the `ERR_ABORT` completion. The focused test, 16-run coverage sweep, 192/192 seeded-random campaign, `ai_smoke`, and `ai_run AI_RANDOM_CASES=20 AI_SEED=12345` pass; latest URG report is `/tmp/nmaforge_a10_abort_drain_random_20261015/urg_merged` (selected `e2e_cg`: 53/53 variables and 16/16 crosses). This supersedes the prior row's report path for the latest rerun; it does not close global V4/V5 coverage.
+
+## Evidence status
+
+### 2026-10-18 exact pushed SHA `622ecc7` replay
+
+At exact `main` SHA `622ecc7`, Rocky 8.10 / VCS `V-2023.12-SP1_Full64` and
+URG `V-2023.12-SP1`, selected frozen-baseline replay passed: FP directed test,
+three FP UVM seeds (484/484 bit-exact each, UVM severity 0/0/0, selected
+functional groups 100%), FP model 19/19, DMA UVM 16/16, Control UVM 9/9, top
+`ai_smoke`, and seeded `ai_run` 20/20. DMA `dma_cmd_cg` and Control coverage
+groups were 100%; DMA/Control URG had 0 assertion failures/incomplete, with
+two unattempted UVM RAL internals in each. Canonical FP formal passed 12/12
+assertions and both selected covers. Three short-vector parity lifecycle
+properties under the fixed two-cycle core-facing SPAD model re-proved
+non-vacuously at depths 224/27/206. This is selected exact-SHA evidence only;
+full 16-bit parity proof, remaining subsystem/top coverage disposition, and
+V1–V5 overall closure remain open. Full commands and limits are in the
+[exact-SHA run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-pushed-sha-622ecc7-replay).
+
+### 2026-10-18 exact current-main `e06f49c` maximum-length FP parity replay
+
+Fresh Rocky 8.10 / VCS `V-2023.12-SP1_Full64` `dot-core-parity-max-test`
+passed all BF16/FP16 × final-A/final-B parity cases at length `16'hffff`;
+each drained 65,536 reads, stopped at a 65,534-element prefix with one
+`ERR_PARITY`, emitted zero destination writes, and recovered without reset
+with one exact FP32 `1.0` write. This updates the maximum-length parity
+simulation evidence from dirty-worktree to an exact current-main run, but does
+not close full-domain formal, V1-FP-04, or A10. See the [run record](../docs/verification/A10_DV_RUN_2026-10-18_MAIN452.md#2026-10-18-exact-current-main-maximum-length-fp-parity-replay).
+
+VCS compile, top smoke, historical 20-case top random, FP block (three seeds × 256 random,
+584 checks/seed, severity zero, peak outstanding=2), Control UVM, DMA UVM
+(current 14 tests), Command Processor UVM (latest 25/25 scenario bins per seed across
+50 seeds; latest 2026-10-17 CP replay is 31/31 scenario bins per seed and
+`cp_cg` 57/57 variables + 10/10 crosses with the direct-start compute-error
+event-only and stale-ERR_ABORT-code robustness bins/SVAs exercised; CPLQ full/hold/resume, BF16/FP16 direct-start validation,
+macro paths, fetch-error without completion, and abort/partial-completion/reset recovery), and DMA/SPAD
+subsystem UVM (latest 10-seed campaign) have passing evidence. The ordinary six-run top order/layout
+regression, 16-run FP16 K=1..4 × BF16 K=1..4 plus AXI-gap sweep, and refreshed
+192-seed mixed E2E campaign with compute-active reset and FP watchdog completion
+also pass; latest targeted `e2e_cg` is 54/54 variable bins and 16/16 cross bins,
+including the real watchdog, software-abort completion, and idle-boundary
+independent accelerator-reset/DDR-live recovery bins. Overall A10 V1–V5 remain
+incomplete: V1 has strong bounded block evidence; V2/V3 have block/subsystem
+coverage but no unified closure; V4 covers selected E2E features (the new
+20-case rerun passed after license recovery; V5 still needs
+overall code/assertion review, mutation, a final reproducible manifest, and
+classification/disposition of outstanding coverage. Previous full-design raw
+dashboard values are historical and this watchdog increment does not recalculate
+them; they are not a closure claim.
+
+2026-10-17 initial V3 refresh (historical; its AW-stability assertion disposition
+was superseded by the follow-up below): the dirty worktree passed a fresh
+10-seed `dma_spad_subsystem_test` regression (`20261110..20261119`) on Rocky
+8.10 / VCS `V-2023.12-SP1_Full64`. All seeds had UVM warning/error/fatal
+`0/0/0` and emitted `[SPAD_CNM_DMA_PASS]` and `[DMA_SPAD_ERR_DRAIN_PASS]`;
+GEMV and parity coverage checks passed. URG
+`/tmp/nmaforge_a10_v3_refresh_20261017_b/urg_merged` reports 13 functional
+groups at 100%; assertion totals are `31/28/0/0/3` (total/success/failure/
+incomplete/uncovered). Two uncovered assertions are UVM RAL `do_read` and
+`do_write` no-attempts; one was then-unresolved DUT DMA instance `unnamed$$_1`
+(119,882 attempts, 0 successes, 0 failures). This is bounded dirty-worktree
+evidence, not frozen-SHA replay.
+
+The follow-up V3 AW-stability replay labels that property as
+`ap_dma_aw_payload_stable`, applies four real responder-controlled AW stall
+cycles, and records 50 real assertion successes across ten seeds with zero
+failures/incomplete. The same result was reproduced in the detached clean-SHA
+replay at `43dbbbc`. This dispositions the AW-stability assertion slice only;
+it does not close V3 fairness, broader fault/abort/reset, residual DUT code
+coverage, or full command/completion lifecycle. See the
+[AW-stability addendum](../docs/verification/A10_DV_RUN_2026-10-17_REFRESH.md)
+and [clean-SHA replay](../docs/verification/A10_DV_CLEAN_SHA_REPLAY_43DBBBC.md).
+Additional prolonged/downstream-backpressure fairness (the separate 300-cycle
+admission test reaches max wait=2 but has no downstream response backpressure),
+broad fault×abort×reset, residual DUT code coverage, and V3/A10 closure remain
+open. See
+[`A10_DV_RUN_2026-10-17_REFRESH.md`](../docs/verification/A10_DV_RUN_2026-10-17_REFRESH.md)
+and [`A10_DV_RTM.md`](../docs/verification/A10_DV_RTM.md).
+
+## 下一步
+| 阶段 | 验证层级 | 验证对象 | 主要内容 | 通过标准 |
+|---|---|---|---|---|
+| 0 | 基线 | 全项目 | 固化 RTL/filelist/ABI、整理 test plan、lint triage | 顶层 smoke 可复现、路径唯一 |
+| 1 | Block | AXI-Lite control | RAL、寄存器读写、WSTRB、IRQ、reset、sticky error | 2026-08-13 六项 VCS 回归通过；寄存器镜像、协议与本地 SVA 均通过。coverage closure 与多 seed 仍待完成。 |
+| 2 | Block | DMA | 1D、2D、gather、32/128-bit、store/BID、4 KiB、abort、随机 back-pressure | DDR↔SPAD scoreboard 正确；ID/RLAST/BID/abort SVA 通过；DMA coverage 达标 |
+| 3 | Block | SPAD arbiter | descriptor/completion/DMA/compute 多客户端争用、优先级、round-robin | 无丢包/重复；控制面优先；无饥饿 |
+| 4 | Block | Command processor | descriptor 合法性、CMDQ/CPLQ 指针、event dependency、error/abort | 不合法任务不启动；head/tail 所有权正确；completion 原子提交 |
+| 5 | Block | CNM / Matrix / SFU / CNN-KV | INT8 算法正确性、边界值、transpose、量化、Softmax/Norm、卷积窗口、KV 地址 | 与 Python bit-aware golden 匹配；无死锁、无越界 |
+| 6 | Subsystem | DMA–SPAD | DMA 通过 arbiter 访问真实 scratchpad，同时叠加 compute-like client | 数据正确、仲裁正确、protection/error 可恢复 |
+| 7 | Subsystem | Queue–completion | AXI-Lite 配置 → CMDQ → processor → completion writer | completion 四个 word 完成后才推进 tail；reset/abort 正确 |
+| 8 | Subsystem | Multi-Engine NPU Compute Cluster Verification | Five compute groups through real top dispatch; shared-SPAD concurrency; per-engine slot and ordered-completion checks; all `rtl/compute` module coverage | The 2026-10-23 full `cluster_regress` VDB merge remains the source for the listed line/condition/branch numbers. It reports 23 `rtl/compute` module definitions, 20 executable and 3 wiring wrappers N/A; weighted line/condition/FSM/branch=`92.69/90.00/54.67/87.31%`; five-seed top-only compute slice=`83.79/66.39/41.60/69.19%`. The targeted 2026-10-24 SFU-refresh re-merge updates the compute FSM weighted value to 76.11% (258/339; nine FSM-bearing modules), and the new three-seed Dispatcher/SPAD-MUX UVM reaches 21/21 overlap pairs + 5/5 scenario bins per seed. The 2026-10-25 Matrix controller integration follow-up is tracked separately: default `ARRAY_SIZE=16` now executes real descriptor-facing SPAD GEMM; three seeds each pass 8 numeric/layout cases including 16×16 and 32×16 multi-macro-tile GEMM, plus 12 fault/recovery cases. Matrix core DUT-scoped URG is line/condition/FSM-transition/branch=`96.17/90.83/65.85/93.52%`; array child=`82.35/20.00/N/A/58.82%`. A fixed-response VCS 4×4/8×8/16×16 physical-array × workload-size benchmark is recorded separately; it is not DC/PPA. These additions do not recalculate older full-merge compute line/condition/branch values and do not close full C0/C1. Each engine pair also overlaps and passes ordered abort drain in top smoke. Dispatcher formal proves 5/5 assertions and reaches 23/23 covers (4 antecedent properties non-vacuous). Full-domain FP writeback exclusion is proven; the FP six-property unassisted lifecycle remains 3/6 and project-wide closure remains partial. [Status](../docs/verification/COMPUTE_ENGINE_STATUS.md) / [Interaction run record](../docs/verification/COMPUTE_ENGINE_INTERACTION_FOLLOWUP_2026-10-23.md) / [Compute Cluster Testplan](../docs/verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md) / [Upgrade roadmap](../docs/verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md) |
+| 9 | Top UVM | `ai_accel_top` | 软件可见 ABI、随机 CMDQ、乱序 DDR、IRQ、reset、Transformer command-chain | 端到端结果、completion、错误恢复、性能计数器一致 |
+| 10 | 静态/形式/覆盖率 | 全 RTL | SpyGlass lint/CDC/RDC、关键 SVA formal、functional/code coverage closure | P0 lint 清零或有 waiver；CDC/RDC 收口；coverage 达标 |
+| 11 | FPGA/板级 | XCZU15EG | bitstream、DDR DMA、IRQ、ILA、性能计数器、长时间稳定性 | 实测数据与仿真一致，日志与性能报告归档 |
+
+### A10 当前增量：DMA–SPAD CNM parity × DMA contention（2026-10-15）
+
+`dv/subsystem/dma_spad` 三 seed 回归 `12345/987654/20261014` 全部通过：每个 seed 均覆盖四个 CNM lane 的 parity fault 与 DDR→SPAD DMA 并发，逐场景检查 `ERR_PARITY=5`、响应 drain、结果写抑制、目的 sentinel 保持及 parity restore 后的 oracle/readback recovery。每 seed UVM warning/error/fatal 为 `0/0/0`；lane×DMA functional cross 每 seed 与 merged URG 均为 4/4。紧随其后的 top `ai_smoke` 也 PASS。注入仅通过 VCS behavioral scratchpad RAM testbench backdoor 实现，并非 SRAM macro 物理故障模型；没有修改产品 RTL。此项是 V3 targeted fault/contention evidence，不代表 subsystem-wide error/reset/fairness 或 A10/V5 closure；详细命令见 [A10 RTM](../docs/verification/A10_DV_RTM.md) 和 [A10 baseline](../docs/verification/A10_DV_BASELINE_2026-10-14.md)。
+
+### A10 最新增量：CNM active × DMA SLVERR drain overlap（2026-10-15）
+
+`make -C dv/subsystem/dma_spad/sim subsystem_regress COV_TAG=a10cnmerrphase3 VCS=vcs URG=urg URG_REPORT=/tmp/nmaforge_a10cnmerrphase3_urg` 三 seed PASS，UVM warning/error/fatal=`0/0/0`；CNM-busy/error overlap 和 DMA 4/4 accepted/completed drain 均检查通过，错误读没有产生 DMA SPAD grant/write，CNM oracle/readback 正确，随后 clean DMA load 无 reset 恢复。merged URG 新增 `cnm_dma_error_overlap_cg` 两个 coverpoint 和 cross 均为 100%。其后 top `ai_smoke` 与 `ai_run AI_RANDOM_CASES=20 AI_SEED=12345` PASS。此处故障地址是 newest-first 的首个响应，因此该增量只证明计算活动与 DMA 错误排空重叠，不是 SPAD arbiter contention；定向 error address/delay、不覆盖随机 fault/reset 组合，也不关闭 V3/A10。详细证据见 [A10 RTM](../docs/verification/A10_DV_RTM.md) 和 [A10 baseline](../docs/verification/A10_DV_BASELINE_2026-10-14.md)。
+
+### A10 V3 late SLVERR after valid DMA commits（2026-10-15）
+
+将 SLVERR 故障位置扩展为 newest-first 响应流中 0、1、2、3 个成功 burst 后注入。三 seed subsystem regression、`ai_smoke` 和 20-case seeded `ai_run` 均 PASS，UVM warning/error/fatal=`0/0/0`。每 seed 分别逐 word 核对合法已提交数据数 `0/8/16/24`，其余 sentinel 不变；所有用例 DMA 4/4 response drain 到 idle，CNM oracle/readback 正确，随后无 reset 的 DMA recovery 通过。晚于首响应的三种位置与真实 CNM 请求竞争，DMA grants 每 seed 为 `1/3/3`。URG `/tmp/nmaforge_a10cnmerrpos4_urg` 的四个位置 bins 各命中 3 次，scenario×drain 4/4、overlap×drain 1/1（100%）。这是固定响应地址/延迟的 directed sweep，不是随机 fault/reset/abort closure，也不代表 V3/A10 完成；详见 A10 RTM 和 baseline。
+
+### A10 V3 CNM active × DMA abort/drain overlap（2026-10-15）
+
+DMA–SPAD subsystem 新增 DMA abort 与真实四-lane CNM 并发场景。DMA 在 CNM busy 期间、首个 AXI R response 前 abort；三 seed `12345/987654/20261014` 均检查 4/4 accepted/completed reads、outstanding 回零、4-deep highwater、无 DMA SPAD commit、目标 32-word sentinel 不变、CNM oracle/readback 正确，以及无需 reset 的 DMA clean-load recovery。UVM warning/error/fatal=`0/0/0`；URG `/tmp/nmaforge_a10cnmabort1_urg` 的 overlap/drain/no-commit/four-outstanding bins 各 3/3。之后 `ai_smoke` 和 20-case `ai_run` PASS。此为固定时刻 directed overlap，不覆盖随机 abort/error/reset 全组合；没有改产品 RTL，V3/A10 仍开放。详见 A10 RTM 与 baseline。
+| Top UVM seeded-random mixed-precision DDR E2E + compute-activity SVA evidence (2026-10-16 final FP SVA) | `ai_accel_top` mixed INT8/BF16/FP16 DDR E2E, reset/recovery, DMA error positions, and compute activity properties | `cd dv/uvm/sim && make uvm_mixed_precision_ddr_e2e_random_cov_regress MIXED_E2E_RANDOM_OUT=/tmp/nmaforge_a10_20261016_e2e_fp_sva_random` | VCS `V-2023.12-SP1`, exit 0; 192 seed dirs; 192/192 E2E and independent-DDR-reset markers; zero non-zero UVM WARNING/ERROR/FATAL summaries; compile.log zero `Warning-`/`Error-`; URG `/tmp/nmaforge_a10_20261016_e2e_fp_sva_random/urg_merged`, 192 tests. asserts Total/Uncovered/Success/Failure/Incomplete/Without Attempts=`17/2/15/0/0/2`; 14 compute-activity properties (Scalar/CNM/Matrix/SFU/CNN/KV/FP, two each) have 593422 attempts each and zero failure/incomplete, plus one UVM component visitor; FP real successes are 521737 and 520393; two no-attempts are UVM RAL. | Whole-design dashboard score/line/condition/FSM/branch/assertion/group=`52.45/50.04/46.14/10.64/38.39/88.24/81.26%`, including TB/UVM and not DUT-only. New `ai_smoke` passed with the FP checker connected. Accelerator reset is during active compute at an AXI idle boundary; DDR remains active and DMA recovery reads the retained operand. Not an in-flight AXI reset test; global DUT-only/V4/V5 closure remains open. |
 ### A10 V3 CNM parity fault during DMA abort/drain (2026-10-16)
 
 Added one directed cross-layer fault/abort scenario to `dv/subsystem/dma_spad`: four DMA read bursts are accepted, DMA abort begins before the first R response, and a real four-lane CNM operation then retires `ERR_PARITY=5` while the DMA remains active draining accepted traffic. The checker requires 4/4 DMA read responses, zero DMA SPAD commits, zero CNM result writes, all accepted CNM lane responses drained, and both destination sentinels unchanged. After restoring the behavioral parity bit, clean DMA load and CNM compute/readback both recover without subsystem reset. Three seeds `12345/987654/20261014` pass with UVM warning/error/fatal=`0/0/0`; merged URG `cnm_parity_dma_abort_cg.parity_abort_x_drain` is 1/1 (100%). Top `ai_smoke` passes. This is testbench backdoor parity injection against behavioral SRAM, one directed lane/address/timing—not a physical SRAM fault model or randomized fault×abort×reset closure. Product RTL/ABI unchanged; V3/A10 remain open.
