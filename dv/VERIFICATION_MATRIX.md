@@ -1,3 +1,5 @@
+> **2026-10-30 R108 CNM accepted-write Abort prefix:** At exact clean code/test SHA `26448b12e545498d31ce8665723db97e10e2c1e2`, three real-top seeds abort a legal 16-output CNM GEMV after the first accepted output. Each seed checks the independent signed Golden prefix, all 15 untouched suffix sentinels, 40/40 CNM read-response drain, and owner/status `ERR_ABORT=0x32`. The memory scoreboard checks 33,491 words with zero mismatch/unknown/stale/orphan and pending queues empty; UVM severity is 0/0/0, and applicable focused compute coverage is 100%. At this same clean SHA, checker sensitivity is 28/28, Top Smoke and the 20-case seeded Top run pass. This is a directed one-shape/one-cut-point result; legal fault/phase/reset closure remains open, the RTM stays 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains HOLD. See the [R108 report](../docs/verification/COMPUTE_CLUSTER_CNM_ABORT_WRITE_PREFIX_R108_2026-10-30.md).
+
 > **2026-10-30 R99 CNM Protection and selected memory-fabric reset:** At exact
 > clean SHA `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`, the full three-seed
 > DMA/SPAD/CNM regression passes after aligning CNM Protection errors with the
