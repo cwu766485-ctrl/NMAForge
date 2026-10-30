@@ -1,7 +1,7 @@
 # NMAForge Compute Cluster v1.0 Functional DV Sign-off Report
 
-**Review date:** 2026-10-30  
-**Decision:** **HOLD — not signed off**  
+**Review date:** 2026-10-30
+**Decision:** **HOLD — not signed off**
 **Scope:** Compute Cluster functional DV only; no claim of whole-NPU sign-off or ASIC PPA closure.
 
 ## Version and evidence baseline
@@ -10,11 +10,11 @@
 |---|---|
 | Product RTL/SPEC candidate | `9d4e9abdba1f745644a485960620fa6bbc4979db` (R73; SPEC v1.8 busy-time CPLQ_HEAD contract) |
 | Latest real-top descriptor-latch SHA | `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28` (R77 SFU descriptor-latch test; Matrix R74 remains separately evidenced) |
-| Latest exact clean code/test SHA | `e4c1e7a93a0afe1c89128996c6eaf9bff5caf907` (R80 production MUX-to-arbiter fairness/response follow-up) |
+| Latest exact clean code/test SHA | `071578d997d69ebf011fe5e7d4742fae3e0f73ac` (R83 all-engine accepted-read Abort/drain; verification/testbench-only change) |
 | Prior reviewed product baseline | `6848a414eaeaa05cf9e1411cf55d9d27333208a6` |
 | Latest published closeout snapshot before this follow-up | `fc370aad6b8360af9affb52cb30909ec97d79be3` |
 | Review branch | `work/compute-cluster-kv-overflow-20261030` |
-| Evidence/test commit | R53 `f916874a9ce60741a4516eaf9e33ebcae4a676c2`; R54 `f24c5383fad511c8b2e1132c1157942807994759`; R55–R58/R59 `ded9d923a432e869592ec8710a22df5501d8d474`; R60 `2768843da1b3f3a0e988645746000d5befadf12b`; R73 `9d4e9abdba1f745644a485960620fa6bbc4979db`; R74 `519ca161f3c2ce8beab78161a88bbdcb6cbcdc61`; R75 `969992291732cf694d7de4bdfef2808d4f017d57`; R77 `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28`; R80 `e4c1e7a93a0afe1c89128996c6eaf9bff5caf907` |
+| Evidence/test commit | R53 `f916874a9ce60741a4516eaf9e33ebcae4a676c2`; R54 `f24c5383fad511c8b2e1132c1157942807994759`; R55–R58/R59 `ded9d923a432e869592ec8710a22df5501d8d474`; R60 `2768843da1b3f3a0e988645746000d5befadf12b`; R73 `9d4e9abdba1f745644a485960620fa6bbc4979db`; R74 `519ca161f3c2ce8beab78161a88bbdcb6cbcdc61`; R75 `969992291732cf694d7de4bdfef2808d4f017d57`; R77 `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28`; R80/R81/R82 `e4c1e7a93a0afe1c89128996c6eaf9bff5caf907`; R83 `071578d997d69ebf011fe5e7d4742fae3e0f73ac` |
 | SPEC | Compute Cluster SPEC v1.8; R73 records busy-time CPLQ_HEAD progress; earlier KV address overflow/alignment is frozen in v1.7 |
 | VCS | Synopsys VCS `V-2023.12-SP1_Full64`; R49 passed the corrected Matrix checker on three seeds; R50 passed the published-snapshot six-seed UVM and Top Smoke; R52 passed the legal Scalar INT8 numeric campaign; R53 passed KV boundary checks; R75 passed the SFU block random regression on three seeds, with merged URG |
 
@@ -83,6 +83,7 @@ PPA and full pretrained-model deployment are outside this Functional DV decision
 - [R76 exact-candidate clean replay evidence](COMPUTE_CLUSTER_CLEAN_REPLAY_R76_2026-10-30.md)
 - [R81 exact-candidate coverage and mutation audit](COMPUTE_CLUSTER_CLEAN_REPLAY_R81_2026-10-30.md)
 - [R82 Matrix size/ablation and top task benchmark](../benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R82_2026-10-30.md)
+- [R83 all-engine accepted-read Abort/drain replay](COMPUTE_CLUSTER_ALL_ENGINE_ABORT_R83_2026-10-30.md)
 - [R60 all-engine parity clean replay evidence](COMPUTE_CLUSTER_ALL_ENGINE_PARITY_R60_2026-10-30.md)
 - [R75 SFU block-core parameter-latch evidence](COMPUTE_CLUSTER_SFU_PARAMETER_LATCH_R75_2026-10-30.md)
 - [Compute Cluster SPEC v1.6](../spec/COMPUTE_CLUSTER_SPEC_ZH.md)
@@ -104,3 +105,7 @@ At the same exact code/test SHA `e4c1e7a93a0afe1c89128996c6eaf9bff5caf907`, R81 
 ## R82 benchmark replay — 2026-10-30
 
 R82 reruns the Matrix physical array-size sweep and depth/prefetch/cache ablation at exact code/test SHA `e4c1e7a93a0afe1c89128996c6eaf9bff5caf907`. VCS passes 165/165 independent Golden cases across three seeds: 45 size points and 120 ablation points. At 32×32×64 on the 16×16 array, `d4p1c1` is 1,187 cycles/6,144 B reads versus the `d2p0c0` baseline of 1,698 cycles/8,192 B reads. The R81 real-top UVM task profile records serial 1,239 cycles, staged 1,070 cycles, and four-task parallel 1,137 versus 1,696 cycles serial. Timing uses one-cycle behavioral SPAD responses; 250 MHz is only a normalization assumption. The full CSV, exact commands, seed agreement, log manifest and limitations are in the [R82 report](../benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R82_2026-10-30.md). This improves `REQ-CL-028` evidence without changing its PARTIAL status or the overall **HOLD** decision.
+
+## R83 all-engine accepted-read Abort/drain — 2026-10-30
+
+At exact clean code/test SHA `071578d997d69ebf011fe5e7d4742fae3e0f73ac`, three Compute Cluster UVM seeds each pass Abort after an accepted SPAD read on Scalar INT8, FP, CNM, Matrix, SFU, Conv, and KV (21/21 cases). Each receives `ERR_ABORT=0x32`; per-engine accepted reads balance with returned responses, all engines reach idle, and each seed's independent memory scoreboard checks 17,249 words with zero mismatch/unknown/stale/orphan response. UVM severity is `0/0/0`; the existing applicable focused testpoint covergroup is 31/31. Same-SHA Top Smoke prints `TEST PASS` with the existing fixture `LOOP-REROLL-ENABLED` warning. The URG assertion report remains 17/22 properties with success, zero failure/incomplete, three top AR/AW properties without successful antecedents in this compute profile, and two UVM RAL properties without attempts. This closes only the directed accepted-read Abort/drain testpoint; full fault × phase × reset coverage and external-fabric qualification remain open. The 38-requirement status stays 24 PASS-SCOPED / 14 PARTIAL; the sign-off decision remains **HOLD**. See the [R83 report](COMPUTE_CLUSTER_ALL_ENGINE_ABORT_R83_2026-10-30.md).

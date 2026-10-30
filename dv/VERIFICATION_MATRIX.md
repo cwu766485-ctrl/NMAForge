@@ -1,5 +1,18 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-10-30 R83 all-engine accepted-read Abort/drain:** At exact clean
+> verification/test SHA `071578d997d69ebf011fe5e7d4742fae3e0f73ac`, three
+> VCS seeds each abort Scalar INT8, FP, CNM, Matrix, SFU, Conv and KV after a
+> real SPAD read is accepted. All 21/21 cases complete with `ERR_ABORT=0x32`,
+> accepted reads equal returned responses, and every engine drains idle. The
+> independent scoreboard checks 17,249 words/seed with zero mismatch,
+> unknown, stale-epoch or orphan responses; UVM severity is 0/0/0. This closes
+> only the directed accepted-read Abort/drain point. Full legal fault/phase/
+> reset crosses and external-fabric reset qualification remain open; status is
+> still 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 HOLD. See the [R83 replay
+> report](../docs/verification/COMPUTE_CLUSTER_ALL_ENGINE_ABORT_R83_2026-10-30.md)
+> and [Execution RTM](../docs/verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
+
 > **2026-10-30 current review addendum:** Product RTL baseline is
 > `6848a414eaeaa05cf9e1411cf55d9d27333208a6`; SPEC v1.5 freezes the current
 > Matrix Line behavior (aligned full WSTRB, scalar fallback, and no partial or
