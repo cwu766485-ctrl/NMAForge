@@ -87,3 +87,7 @@ The checker-sensitivity row is extended from the prior 25/25 set to 28/28 expect
 ## R77 evidence update — 2026-10-30
 
 At clean code/test SHA `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28`, R77 adds one legal real-top SFU RMSNorm descriptor-latch point: descriptor source, destination and length are rewritten during divider wait with no active SFU SPAD request; original-output Golden, completion and mutated-destination sentinel checks pass on three seeds. The same SHA passes the named UVM, 28/28 checker-sensitivity, Top Smoke/seeded-top, behavioral AXI and Matrix benchmark suites. This improves `REQ-CL-005` evidence but does not close it. RTM remains 24 PASS-SCOPED / 14 PARTIAL; external-fabric reset qualification and broader legal fault/phase/engine coverage remain open. See [R77 report](COMPUTE_CLUSTER_CLEAN_REPLAY_R77_2026-10-30.md).
+
+## R78 fairness evidence update — 2026-10-30
+
+The exact R77 code/test SHA passes the standalone 10,000-cycle `ai_spad_arbiter` fairness gate, with 3,334 grants per client and maximum observed wait 2 cycles, plus directed contention and response-owner checks. This target omits downstream memory backpressure and the seven-engine end-to-end response path, so `REQ-CL-014` remains PARTIAL and the v1.0 decision remains HOLD. See [R78 report](COMPUTE_CLUSTER_SPAD_FAIRNESS_R78_2026-10-30.md).
