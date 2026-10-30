@@ -72,6 +72,7 @@ core-random-compile:
 core-random-run: core-random-compile
 	$(CORE_OUT_DIR)/simv +SEED=$(SEED) -cm $(COV_METRICS) \
 		-cm_dir $(CORE_OUT_DIR)/coverage.vdb -cm_name matrix_core_seed_$(SEED) -l $(CORE_OUT_DIR)/run.log
+	grep -Eq '^MATRIX_LINE_CONTRACT_PASS full_wstrb=1 aligned=1 stalled_stability=[1-9][0-9]* unaligned_scalar_fallback=1 protection_error=1 partial_zero_wstrb=unsupported$$' $(CORE_OUT_DIR)/run.log
 	grep -q '^MATRIX_CORE_RANDOM_PASS cases=18 faults=35 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 ' $(CORE_OUT_DIR)/run.log
 
 core-random-regress: core-random-compile
@@ -80,6 +81,7 @@ core-random-regress: core-random-compile
 			-cm_dir $(CORE_OUT_DIR)/coverage.vdb -cm_name matrix_core_seed_$$seed \
 			-l $(CORE_OUT_DIR)/run_seed_$$seed.log; \
 		grep -q "^MATRIX_CORE_RANDOM_PASS cases=18 faults=35 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 seed=$$seed " $(CORE_OUT_DIR)/run_seed_$$seed.log; \
+		grep -Eq '^MATRIX_LINE_CONTRACT_PASS full_wstrb=1 aligned=1 stalled_stability=[1-9][0-9]* unaligned_scalar_fallback=1 protection_error=1 partial_zero_wstrb=unsupported$$' $(CORE_OUT_DIR)/run_seed_$$seed.log; \
 	done
 
 # Cover the compile-time fallback transition without invoking fault scenarios

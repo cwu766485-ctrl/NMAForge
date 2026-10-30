@@ -1,6 +1,20 @@
 # NMAForge block and subsystem verification matrix
 
-> **2026-10-28 current review addendum:** Product RTL/SPEC candidate is
+> **2026-10-30 current review addendum:** Product RTL baseline is
+> `6848a414eaeaa05cf9e1411cf55d9d27333208a6`; SPEC v1.5 freezes the current
+> Matrix Line behavior (aligned full WSTRB, scalar fallback, and no partial or
+> zero WSTRB). The new `MATRIX-LINE-001` checker enforces Line alignment,
+> strobe, stall stability, fallback, and protection error behavior. Its
+> three-seed VCS run is `BLOCKED_ENV` because VCS did not acquire a license
+> after over 75 seconds in its `-licwait 1` retry (RTM R48). A clean replay of published closeout SHA
+> `be78ee27b5a08783ec2560334ca1361baf382157` also stopped before compile for
+> the same environment issue; the restored top-smoke mapper precheck passed
+> all 86 descriptors, but there is no new simulation or coverage result
+> (RTM R46). Prior R40–R45 evidence remains the latest PASS evidence. Overall
+> Compute Cluster status remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0
+> HOLD; see the [current Execution RTM](../docs/verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
+
+> **2026-10-28 historical review addendum:** Product RTL/SPEC candidate is
 > `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`. Clean test commit
 > `bb6e3a270ab819c15df0eb993c184c99d13a6d71` has byte-identical `rtl/` and
 > adds a seven-engine accepted-read reset sweep. VCS/URG
