@@ -1,7 +1,7 @@
 # Compute Cluster banked reset epoch evidence — R112
 
 **Run ID:** `SPAD-BANKED-RESET-R112-3S`
-**Exact clean code/test SHA:** `03921b7eb038d89a1093efba87aaec22c4a77ff5` (R112).
+**Exact clean code/test SHA:** `b4d99efe95034ff953ca26c66f90a8402a0cde7c` (R112).
 **Product RTL/SPEC baseline:** R99 `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`; R112 changes only the subsystem UVM test and Make gate. SPEC v1.8 is unchanged.
 **Target:** repository `ai_accel_memory_fabric`, through the production arbiter and registered four-bank SPAD response path.
 **Tools:** VCS `V-2023.12-SP1_Full64`, URG `V-2023.12-SP1`.
@@ -22,26 +22,26 @@ From a detached clean worktree at the exact SHA above:
 
 ```sh
 env -u VCS_ARCH_OVERRIDE VCS_HOME=/opt/Synopsys/vcs/V-2023.12-SP1 \
-  make -C /tmp/nmaforge_r112_clean_03921b7/dv/subsystem/dma_spad/sim \
+  make -C /tmp/nmaforge_r112_published_b4d99_clean/dv/subsystem/dma_spad/sim \
   subsystem_banked_reset_regress \
-  BANKED_RESET_OUT=/tmp/nmaforge_r112_clean_03921b7_runs \
+  BANKED_RESET_OUT=/tmp/nmaforge_r112_published_b4d99_clean_runs \
   VCS=/opt/Synopsys/vcs/V-2023.12-SP1/bin/vcs \
   URG=/opt/Synopsys/vcs/V-2023.12-SP1/bin/urg
 ```
 
-The command targeted `dv/subsystem/dma_spad/sim` in the detached clean worktree and exited `0`. Logs and generated coverage output are outside the repository at `/tmp/nmaforge_r112_clean_03921b7_runs/`.
+The command targeted `dv/subsystem/dma_spad/sim` in the detached clean worktree and exited `0`. Logs and generated coverage output are outside the repository at `/tmp/nmaforge_r112_published_b4d99_clean_runs/`.
 
 ## Evidence hashes
 
 | Artifact | SHA-256 |
 |---|---|
-| `compile.log` | `262b480551f53b6a0838a5f58340d53290389902518cf4aa1d40614525c681ef` |
-| `seed_20261025/run.log` | `4e1c3d7d7e494eb68e1e72f81805304628b11ef2d7e985e6ded57f488b9fa634` |
-| `seed_20261026/run.log` | `fcd2ab051126c7645335976ae5ff1859d9903c55b0c8814f5a1ead696d8987a2` |
-| `seed_20261027/run.log` | `5c6296209d5c7da6fe2dab3b3140f789b93c147eca3fa424bb1491db325c6863` |
-| `urg/asserts.html` | `45459ec933a830856ae1213265d583dbce60fff43dac14c0d197a23e477d44b0` |
+| `compile.log` | `244a1c4e11470a21ecbfefecaf55082fb93c832ed1ebe442124dda90c115c4e8` |
+| `seed_20261025/run.log` | `95bafba7db42b921d286dac9706c559a4993ec9fe817adc7537a79f762757e38` |
+| `seed_20261026/run.log` | `06197784403ef3b3badce7b6ad441fed3627656fc96ff828cd613c04335c39ce` |
+| `seed_20261027/run.log` | `8e8c5a19590ea492832f940c587c3d8851ab58c1d69b60a2438cc74c1dee03b0` |
+| `urg/asserts.html` | `d0fbd984d8236d6592560f8d53721d0a3dffdaf3b94428af6642870232ad14b4` |
 | `urg/groups.html` | `ebe31b760619b12e1c5eb5b3a3f41190bcb446d77422d5aff03228c4ea008c9d` |
-| `urg/dashboard.html` | `81ac3dc078901ef75c7bb65dad1e609225b52aeb85cf883cf66c3df69db0bed7` |
+| `urg/dashboard.html` | `63b6354b3c9cc2c7bf08c829c92e85889be4bc99536150af77e4ddf6115ea942` |
 
 ## Scope limits and disposition
 
