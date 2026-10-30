@@ -12,9 +12,13 @@ MIXED_E2E_RANDOM_SEEDS ?= $(shell seq 20261101 20261292)
 MIXED_E2E_RANDOM_OUT ?= /tmp/nmaforge_mixed_precision_e2e_random_$(shell date +%Y%m%d_%H%M%S_%N)
 URG ?= $(VCS_HOME)/bin/urg
 UVM_COV_METRICS ?= line+cond+branch+fsm+assert
-COMPUTE_CLUSTER_UVM_OUT ?= /tmp/nmaforge_real_compute_cluster_uvm_$(shell date +%Y%m%d_%H%M%S)
+# Evaluate the run stamp once. Recursive $(shell date ...) expansion changes
+# the output path on every reference and can make mutation targets launch a
+# simv path different from the one built by their compile prerequisite.
+COMPUTE_CLUSTER_RUN_STAMP := $(shell date +%Y%m%d_%H%M%S_%N)
+COMPUTE_CLUSTER_UVM_OUT ?= /tmp/nmaforge_real_compute_cluster_uvm_$(COMPUTE_CLUSTER_RUN_STAMP)
 COMPUTE_CLUSTER_UVM_SEEDS ?= 20261025 20261026 20261027
-COMPUTE_CLUSTER_MUTATION_OUT ?= /tmp/nmaforge_compute_cluster_mutations_$(shell date +%Y%m%d_%H%M%S)
+COMPUTE_CLUSTER_MUTATION_OUT ?= /tmp/nmaforge_compute_cluster_mutations_$(COMPUTE_CLUSTER_RUN_STAMP)
 
 .PHONY: uvm_compile uvm_run uvm_smoke uvm_fp16_ddr_e2e uvm_mixed_precision_ddr_e2e uvm_external_macro_ddr_e2e uvm_mixed_precision_ddr_e2e_axi_stalls uvm_mixed_precision_ddr_e2e_regress uvm_mixed_precision_ddr_e2e_cov_regress uvm_mixed_precision_ddr_e2e_random_cov_regress uvm_compute_cluster_compile uvm_compute_cluster_regress uvm_compute_cluster_mutation clean
 uvm_compile:
