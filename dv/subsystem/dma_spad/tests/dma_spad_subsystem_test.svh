@@ -1200,6 +1200,7 @@ class dma_spad_subsystem_test extends dma_block_base_test;
             sys_vif.arb_rsp_client !== 3'd2 || sys_vif.arb_rsp_is_line ||
             sys_vif.banked_rsp_valid || sys_vif.dma_rsp_valid ||
             sys_vif.dma_line_rsp_valid || sys_vif.desc_rsp_valid ||
+            (|sys_vif.cnm_rsp_valid) ||
             sys_vif.core_rsp_error || sys_vif.arb_rsp_error ||
             sys_vif.core_rdata !== expected_core)
             `uvm_fatal("SPAD_BANKED_CORE_CONTENTION", $sformatf(
