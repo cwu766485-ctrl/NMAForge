@@ -5,8 +5,9 @@
 > Matrix Line behavior (aligned full WSTRB, scalar fallback, and no partial or
 > zero WSTRB). The new `MATRIX-LINE-001` checker enforces Line alignment,
 > strobe, stall stability, fallback, and protection error behavior. Its
-> three-seed VCS run is `BLOCKED_ENV` because VCS did not acquire a license
-> after over 75 seconds in its `-licwait 1` retry (RTM R48). A clean replay of published closeout SHA
+> first final-source VCS run compiled but failed its end gate because the new
+> testbench stability counter was cleared by directed DUT resets (RTM R48). The
+> counter fix is committed; the corrected three-seed replay is pending. A clean replay of published closeout SHA
 > `be78ee27b5a08783ec2560334ca1361baf382157` also stopped before compile for
 > the same environment issue; the restored top-smoke mapper precheck passed
 > all 86 descriptors, but there is no new simulation or coverage result

@@ -199,7 +199,7 @@ module tb_ai_tensor_matrix_core_random;
       line_write_count<=0;scalar_write_count<=0;
       line_stall_pending<=0;
       stalled_line_addr<=0;stalled_line_wdata<=0;stalled_line_wstrb<=0;
-      line_stall_stability_checks<=0;line_full_strobe_checks<=0;
+      // Keep test-run aggregate counters across directed DUT reset scenarios.
     end else begin
       // Matrix v1 uses the 128-bit port only for complete, 16-byte-aligned
       // rows. A stalled request remains stable until handshake; an abort/error

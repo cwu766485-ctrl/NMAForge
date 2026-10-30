@@ -13,7 +13,7 @@
 | Review branch | `work/compute-cluster-v1-closeout-20261030` |
 | Evidence state when this report was drafted | `8feca2d46a9f8003118147d62b75180e65c0da65` |
 | SPEC | Compute Cluster SPEC v1.5; product RTL unchanged by this review commit |
-| VCS | Synopsys VCS `V-2023.12-SP1_Full64`; license could not be acquired for R46–R48 |
+| VCS | Synopsys VCS `V-2023.12-SP1_Full64`; R46/R47 blocked by license, R48 compiled and ran one seed |
 
 The review branch is isolated from the v2 research branch. The review commit adds DV checks and evidence documentation only; it does not change product RTL.
 
@@ -39,7 +39,7 @@ The 2026-10-30 clean replay attempts R46–R48 are separately classified `BLOCKE
 | Backpressure, parity, protection, abort and reset | R30–R32 and R40–R41 cover named Matrix, CNM, DMA/SPAD, parity, reset and mutation slices | No complete legal `Engine × Fault × Phase × Reset` matrix has been demonstrated |
 | Mutation sensitivity | R41 catches 25/25 passive checker observation mutations for address, data, owner, WSTRB and completion lifecycle | This is checker sensitivity, not a DUT RTL mutation score; broader fault/error injection remains open |
 | Matrix FSM | R28 records raw enabled-profile coverage 49/53, five non-vacuous formal proofs, state reachability covers, and the separate prefetch-disabled transition | Preserve raw 49/53; no illegal stimulus is used to force bins. Remaining transitions are dispositioned only within the documented proof assumptions/configuration |
-| Matrix Line output | SPEC v1.5 freezes aligned full-`WSTRB` Line writes, scalar fallback for 4-byte-aligned non-Line-aligned output, protection-prefix behavior, and partial/zero WSTRB as unsupported. `MATRIX-LINE-001` checks these interface rules plus stall stability | The final checker source has not compiled or run; R48 is `BLOCKED_ENV`. No new PASS, memory-image comparison or coverage is claimed |
+| Matrix Line output | SPEC v1.5 freezes aligned full-`WSTRB` Line writes, scalar fallback for 4-byte-aligned non-Line-aligned output, protection-prefix behavior, and partial/zero WSTRB as unsupported. `MATRIX-LINE-001` checks these interface rules plus stall stability | R48 compiled and ran seed `20261025`; it failed the end gate because the testbench cleared its aggregate stability counter during directed DUT resets. Counter reset was removed; corrected three-seed result is pending. No Matrix Line PASS or coverage closure is claimed |
 | SVA and compile diagnostics | R40/R15 provide non-vacuity and AXI assertion evidence for their named properties; prior focused compile had no `[TFIPC]` diagnostics | Evidence does not cover every requester/fault/backpressure combination; see the individual RTM notes |
 | Descriptor and scalar numeric boundaries | Existing representative descriptor, scalar, Matrix and engine Golden checks | Per-opcode legal descriptor boundaries and full scalar INT8 arithmetic edge campaign remain open |
 
@@ -47,7 +47,7 @@ The 2026-10-30 clean replay attempts R46–R48 are separately classified `BLOCKE
 
 The candidate SHA passed the previously recorded clean R40–R45 campaigns: six-seed seven-engine UVM, 25/25 checker-sensitivity mutations, 165/165 Matrix size/ablation checks, pinned TinyNPU paired cases, Top Smoke and Digits inference. Those passes remain valid for their named sources and scope.
 
-The latest published closeout snapshot was checked out into a clean worktree for R46. UVM compilation and restored Top Smoke compilation stopped before simulation because VCS could not contact/acquire a license. The 86-descriptor mapper precheck did pass. R47 was the initial Matrix Line checker attempt; R48 retried the final checker source with the same license wait outcome. Logs and exact commands are indexed in the [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
+The latest published closeout snapshot was checked out into a clean worktree for R46. UVM compilation and restored Top Smoke compilation stopped before simulation because VCS could not contact/acquire a license. The 86-descriptor mapper precheck did pass. R47 was an earlier license-blocked Matrix Line attempt. After license recovery, R48 compiled and reached the end gate on seed `20261025`, exposing the testbench aggregate-counter reset issue; the corrected source is awaiting three-seed confirmation. Logs and exact commands are indexed in the [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
 
 ## Sign-off decision and exit conditions
 
