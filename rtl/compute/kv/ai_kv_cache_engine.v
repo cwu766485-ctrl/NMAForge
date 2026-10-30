@@ -41,6 +41,28 @@ module ai_kv_cache_engine(
   reg [31:0] data_r;
   wire valid_operation = (op_mode == OP_KV_WRITE) || (op_mode == OP_KV_READ);
   wire starts_kv_write = (op_mode == OP_KV_WRITE);
+  // Compute address products and the combined cache offset at a width that
+  // preserves all 16x32-bit product bits. The SPAD port is word based, so
+  // bases/strides must be word aligned and all generated addresses must fit
+  // the 32-bit byte-address space before a command is accepted.
+  wire [47:0] token_stride_product = {32'd0,aux0[15:0]} * {16'd0,src0_stride};
+  wire [47:0] head_stride_product  = {32'd0,aux0[31:16]} * {16'd0,src1_stride};
+  wire [48:0] cache_offset_wide = {1'b0,token_stride_product} +
+                                           {1'b0,head_stride_product};
+  wire [31:0] last_word_byte_offset = ({16'd0,length} - 32'd1) << 2;
+  wire [31:0] cache_base = starts_kv_write ? dst_base : src0_base;
+  wire [31:0] linear_base = starts_kv_write ? src0_base : dst_base;
+  wire [33:0] cache_last_addr_wide = {2'b0,cache_base} +
+                                              {2'b0,cache_offset_wide[31:0]} +
+                                              {2'b0,last_word_byte_offset};
+  wire [33:0] linear_last_addr_wide = {2'b0,linear_base} +
+                                               {2'b0,last_word_byte_offset};
+  wire kv_address_config_error =
+      (src0_base[1:0] != 2'b00) || (dst_base[1:0] != 2'b00) ||
+      (src0_stride[1:0] != 2'b00) || (src1_stride[1:0] != 2'b00) ||
+      (cache_offset_wide[48:32] != 0) ||
+      (cache_last_addr_wide[33:32] != 0) ||
+      (linear_last_addr_wide[33:32] != 0);
   wire watchdog_expired = busy && watchdog_r != 0 &&
                           cycle_count >= watchdog_r;
   wire [31:0] cache_addr = cache_offset_r + ({16'd0,index_r}<<2);
@@ -63,8 +85,9 @@ module ai_kv_cache_engine(
         ST_IDLE: begin busy<=0; error<=0; error_code<=0; if(start) begin
           if(length==0) begin error<=1; error_code<=ERR_CONFIG; state_r<=ST_ERROR; end
           else if(!valid_operation) begin error<=1; error_code<=ERR_OP; state_r<=ST_ERROR; end
+          else if(kv_address_config_error) begin error<=1; error_code<=ERR_CONFIG; state_r<=ST_ERROR; end
           else begin busy<=1; write_r<=starts_kv_write; src_r<=src0_base; dst_r<=dst_base;
-            cache_offset_r <= (aux0[15:0]*src0_stride) + (aux0[31:16]*src1_stride);
+            cache_offset_r <= cache_offset_wide[31:0];
             length_r<=length; index_r<=0; result<=0; element_count<=0; watchdog_r<=watchdog_limit; state_r<=ST_READ_REQ; end
         end end
         ST_READ_REQ: if(spad_ready) state_r<=ST_READ_WAIT;

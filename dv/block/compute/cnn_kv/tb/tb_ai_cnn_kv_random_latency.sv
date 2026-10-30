@@ -186,6 +186,31 @@ module tb_ai_cnn_kv_random_latency;
     end
   endtask
 
+  task automatic expect_kv_address_config_error(input integer case_id);
+    integer reads_before,writes_before,request_seen;
+    begin
+      reads_before=accepted_read_count;
+      writes_before=write_count;
+      request_seen=0;
+      @(negedge clk);kv_start=1;
+      @(negedge clk);kv_start=0;
+      timeout=0;
+      while(!kvdone && timeout<20000) begin
+        @(negedge clk);
+        timeout=timeout+1;
+        if(kvv) request_seen=1;
+      end
+      if(!kvdone || !kve || kvec!==4'd1 || kvb)
+        $fatal(1,"KV address-config case=%0d done/error/code/busy=%b/%b/%0d/%b expected=1",
+               case_id,kvdone,kve,kvec,kvb);
+      if(request_seen || accepted_read_count!=reads_before || write_count!=writes_before)
+        $fatal(1,"KV address-config case=%0d issued SPAD request or side effect: request=%0d reads=%0d/%0d writes=%0d/%0d",
+               case_id,request_seen,accepted_read_count,reads_before,write_count,writes_before);
+      @(negedge clk);
+      $display("KV_ADDRESS_CONFIG_PASS case=%0d",case_id);
+    end
+  endtask
+
   task automatic expect_conv_watchdog_priority;
     integer writes_before;
     begin
@@ -334,6 +359,34 @@ module tb_ai_cnn_kv_random_latency;
         if (memory[spad_word_index(kv_dst)+i]!==expected_words[i])
           $fatal(1,"KV read trial=%0d i=%0d got=%08x expected=%08x",
                  trial_id,i,memory[spad_word_index(kv_dst)+i],expected_words[i]);
+    end
+  endtask
+
+  task automatic run_kv_last_spad_word_roundtrip;
+    integer last_word_index,previous_word_index;
+    reg [31:0] boundary_value;
+    begin
+      last_word_index=spad_word_index(32'h0007_fffc);
+      previous_word_index=last_word_index-1;
+      boundary_value=32'h5a17_c0de;
+      memory[spad_word_index(32'h0000_1000)]=boundary_value;
+      memory[previous_word_index]=32'hb04d_0a71;
+      kv_op=8'h43;kv_length=1;kv_src=32'h0000_1000;kv_dst=32'h0007_fffc;
+      kv_aux=0;kv_stride_token=0;kv_stride_head=0;write_count=0;
+      launch_kv();
+      if(kvel!==1 || write_count!=1 || kvr!==boundary_value ||
+         memory[last_word_index]!==boundary_value ||
+         memory[previous_word_index]!==32'hb04d_0a71)
+        $fatal(1,"KV top-word write boundary result=%08x memory=%08x previous=%08x",
+               kvr,memory[last_word_index],memory[previous_word_index]);
+
+      kv_op=8'h44;kv_src=32'h0007_fffc;kv_dst=32'h0000_3000;write_count=0;
+      launch_kv();
+      if(kvel!==1 || write_count!=1 || kvr!==boundary_value ||
+         memory[spad_word_index(kv_dst)]!==boundary_value)
+        $fatal(1,"KV top-word read boundary result=%08x memory=%08x expected=%08x",
+               kvr,memory[spad_word_index(kv_dst)],boundary_value);
+      $display("KV_ADDRESS_BOUNDARY_PASS address=0007fffc read_write=1");
     end
   endtask
 
@@ -547,6 +600,35 @@ module tb_ai_cnn_kv_random_latency;
     kv_watchdog=0;
     spad_error=1;kv_abort=1;expect_kv_error(4'd3,5);
     expect_kv_watchdog_priority();
+
+    // Address arithmetic is byte based, but each generated SPAD access is a
+    // 32-bit word. Reject misalignment and every 32-bit overflow before the
+    // first request so arithmetic wrap cannot alias an unrelated SPAD word.
+    kv_op=8'h43;kv_length=1;kv_src=32'h0000_1000;kv_dst=32'h0000_2000;
+    kv_aux={16'd0,16'd4};kv_stride_token=32'h4000_0000;kv_stride_head=0;
+    expect_kv_address_config_error(0); // token * stride exceeds 32 bits
+    kv_aux={16'd1,16'd1};kv_stride_token=32'h8000_0000;kv_stride_head=32'h8000_0000;
+    expect_kv_address_config_error(1); // individually representable products overflow when added
+    kv_aux=0;kv_stride_token=0;kv_stride_head=0;kv_length=3;
+    kv_src=32'h0000_1000;kv_dst=32'hffff_fff8;
+    expect_kv_address_config_error(2); // cache destination final word wraps
+    kv_src=32'hffff_fff8;kv_dst=32'h0000_2000;
+    expect_kv_address_config_error(3); // linear source final word wraps
+    kv_op=8'h44;kv_src=32'hffff_fff8;kv_dst=32'h0000_2000;
+    expect_kv_address_config_error(4); // cache source final word wraps
+    kv_src=32'h0000_1000;kv_dst=32'hffff_fff8;
+    expect_kv_address_config_error(5); // linear destination final word wraps
+    kv_op=8'h43;kv_length=1;kv_src=32'h0000_1002;kv_dst=32'h0000_2000;
+    expect_kv_address_config_error(6); // unaligned source base
+    kv_src=32'h0000_1000;kv_aux={16'd0,16'd1};kv_stride_token=32'd2;
+    expect_kv_address_config_error(7); // unaligned token stride
+    kv_src=32'h0000_1000;kv_dst=32'h0000_2002;kv_aux=0;
+    kv_stride_token=0;kv_stride_head=0;
+    expect_kv_address_config_error(8); // unaligned destination base
+    kv_dst=32'h0000_2000;kv_aux={16'd1,16'd0};kv_stride_head=32'd2;
+    expect_kv_address_config_error(9); // unaligned head stride
+    run_kv_last_spad_word_roundtrip();
+
     run_late_kv_fault();
     check_reset_recovery();
 
@@ -555,7 +637,7 @@ module tb_ai_cnn_kv_random_latency;
              accepted_read_count,response_count,rsp_pending);
     if (ready_stall_cycles==0 || max_response_delay==0)
       $fatal(1,"SPAD latency stress did not exercise ready or response stalls");
-    $display("CNN_KV_RANDOM_LATENCY_PASS conv_cases=25 conv_dw_cases=%0d kv_roundtrips=27 conv_faults=6 kv_faults=7 late_faults=2 reset_fault_combo=1 reset_recovery=1 seed=%0d reads=%0d responses=%0d max_rsp_delay=%0d ready_stalls=%0d",
+    $display("CNN_KV_RANDOM_LATENCY_PASS conv_cases=25 conv_dw_cases=%0d kv_roundtrips=27 conv_faults=6 kv_faults=7 kv_address_config_cases=10 kv_last_spad_word=1 late_faults=2 reset_fault_combo=1 reset_recovery=1 seed=%0d reads=%0d responses=%0d max_rsp_delay=%0d ready_stalls=%0d",
              conv_dw_count,initial_seed,accepted_read_count,response_count,max_response_delay,ready_stall_cycles);
     $finish;
   end
