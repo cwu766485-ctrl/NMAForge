@@ -12,9 +12,18 @@
 > replay and Top Smoke (R50): 100% applicable focused coverage per seed,
 > 5,368 checked memory words with zero mismatch, and `TEST PASS`. R49
 > is the latest Matrix Line PASS evidence; R50 validates the published snapshot
-> but does not change the overall
-> Compute Cluster status remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0
+> but does not change the overall Compute Cluster status of
+> 24 PASS-SCOPED / 14 PARTIAL; CL-DV-v1.0 remains
 > HOLD; see the [current Execution RTM](../docs/verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
+
+> **2026-10-30 KV address contract addendum:** Candidate SHA `f916874` adds
+> SPEC v1.7 validation for 32-bit KV byte-address overflow and word alignment.
+> Clean VCS R53 passes ten invalid-address/alignment cases and the legal final
+> SPAD word read/write boundary on three seeds; every invalid descriptor is
+> rejected before SPAD access. KV DUT-only URG line/condition/FSM/branch is
+> `100.00/98.77/73.33/96.97%`; four raw FSM transitions remain without a
+> reachability disposition. The KV top-level Protection-region denial and
+> other Engine descriptor contracts remain open. See the [R53 evidence](../docs/verification/COMPUTE_CLUSTER_KV_ADDRESS_R53.md).
 
 > **2026-10-30 Scalar INT8 numeric addendum:** R52 passes 13 independent
 > Golden cases per seed on three seeds at clean test SHA `dde7806`, covering
