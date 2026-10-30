@@ -2,7 +2,7 @@
 
 **Review date:** 2026-10-30
 
-**Selected product/SPEC candidate:** `cc357830923e3dd7beda114b4d761fde839b01a7` (corrective Protection RTL, SPEC v1.7); latest verification/test SHA `94c11ef846089784e62ce36db66adbf03870d81d` (R69 CNM local-FSM test expansion; no product RTL changes); R54 top-test SHA `f24c5383fad511c8b2e1132c1157942807994759`
+**Selected product/SPEC candidate:** `cc357830923e3dd7beda114b4d761fde839b01a7` (corrective Protection RTL, SPEC v1.7); latest verification/test SHA `cfcd4dbe69d54beaaa93ac2f350279a6b95cb144` (R71 Matrix Line top-stall test; no product RTL changes); R54 top-test SHA `f24c5383fad511c8b2e1132c1157942807994759`
 - **Prior reviewed product baseline:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6`
 - **Follow-up evidence branch:** `work/compute-cluster-kv-overflow-20261030`
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
@@ -11,7 +11,7 @@
 
 ## Executive disposition
 
-The reviewed product baseline has substantial reproducible evidence for Matrix/SPAD and seven-engine Compute Cluster behavior. R64 fixes Protection gating at Matrix banked/CNM lane SRAM boundaries and adds all-engine source-A checks; R65 extends Protection checks to selected source-B and writeback phases without changing product RTL. R66 reruns the 28-case checker-sensitivity campaign at the exact R65 SHA. R69/R70 add legal CNM response delay, backpressure, Abort/Reset phase checks, a scoped local-FSM disposition, and an exact clean-SHA replay of UVM, Matrix, CNN/KV, CNM, Top Smoke, seeded top and mutation targets at `94c11ef`. The Execution RTM still accounts for all 38 requirements (`REQ-CL-001..028`, `REQ-PC-001..010`): **24 PASS-SCOPED and 14 PARTIAL**, with no recorded FAIL, BLOCKED_SPEC, or NOT_RUN requirement. PASS-SCOPED means the named scenario passed; it is not full requirement closure.
+The reviewed product baseline has substantial reproducible evidence for Matrix/SPAD and seven-engine Compute Cluster behavior. R64 fixes Protection gating at Matrix banked/CNM lane SRAM boundaries and adds all-engine source-A checks; R65 extends Protection checks to selected source-B and writeback phases without changing product RTL. R66 reruns the 28-case checker-sensitivity campaign at the exact R65 SHA. R69/R70 add legal CNM response delay, backpressure, Abort/Reset phase checks, a scoped local-FSM disposition, and exact clean-SHA replay of their named scopes at `94c11ef`; R71 adds a three-seed real-top Matrix Line stall integration point at exact clean SHA `cfcd4db`. The Execution RTM still accounts for all 38 requirements (`REQ-CL-001..028`, `REQ-PC-001..010`): **24 PASS-SCOPED and 14 PARTIAL**, with no recorded FAIL, BLOCKED_SPEC, or NOT_RUN requirement. PASS-SCOPED means the named scenario passed; it is not full requirement closure.
 
 The complete requirement-by-requirement execution table lives in the [Compute Cluster Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md). It records each requirement's disposition, testcase/checker or oracle, covered behavior, Run ID, seed, and evidence path. The RTM run/evidence index records source-SHA relationship, tool version, and result; R40–R45 replay the selected candidate SHA from a clean worktree. The [9d9e0f replay manifest](COMPUTE_CLUSTER_FINAL_9D9E0F_MANIFEST_2026-10-28.md) is retained as historical evidence for that earlier candidate. Runs without an exact source identity remain historical/source-equivalent and are not silently upgraded to exact-candidate replay.
 
