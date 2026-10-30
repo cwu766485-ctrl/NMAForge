@@ -224,6 +224,8 @@ SPAD_ARB_COV_RUN ?= /tmp/nmaforge_spad_arbiter_cov_$(shell date +%Y%m%d_%H%M%S)
 SPAD_ARB_COV_METRICS := line+cond+tgl+branch+assert
 COMPUTE_SPAD_MUX_RR_RUN ?= /tmp/nmaforge_compute_spad_mux_rr_$(shell date +%Y%m%d_%H%M%S)
 COMPUTE_SPAD_MUX_RR_METRICS := line+cond+tgl+branch+assert
+COMPUTE_SPAD_PATH_RUN ?= /tmp/nmaforge_compute_spad_path_$(shell date +%Y%m%d_%H%M%S)
+COMPUTE_SPAD_PATH_METRICS := line+cond+tgl+branch+assert
 
 .PHONY: ai_spad_arb_cov
 ai_spad_arb_cov:
@@ -278,6 +280,35 @@ ai_compute_spad_mux_fairness:
 	grep -Fq 'ap_stalled_payload_stable' "$(COMPUTE_SPAD_MUX_RR_RUN)/urg/asserts.txt"
 	grep -Fq 'ap_response_owner_onehot' "$(COMPUTE_SPAD_MUX_RR_RUN)/urg/asserts.txt"
 	echo "COMPUTE_SPAD_MUX_FAIRNESS_COVERAGE_PASS report=$(COMPUTE_SPAD_MUX_RR_RUN)/urg"
+
+.PHONY: ai_compute_spad_path_fairness
+ai_compute_spad_path_fairness:
+	test ! -e "$(COMPUTE_SPAD_PATH_RUN)"
+	mkdir -p "$(COMPUTE_SPAD_PATH_RUN)"
+	cd "$(COMPUTE_SPAD_PATH_RUN)" && $(VCS) -full64 -sverilog -timescale=1ns/1ps +define+VCS \
+		-cm $(COMPUTE_SPAD_PATH_METRICS) -cm_dir coverage.vdb \
+		-top tb_ai_compute_spad_path_fairness \
+		$(CURDIR)/../../../../rtl/top/fabric/compute/ai_compute_spad_mux.v \
+		$(CURDIR)/../../../../rtl/memory/ai_spad_arbiter.v \
+		$(CURDIR)/../../../block/compute/spad_mux/tb/tb_ai_compute_spad_path_fairness.sv \
+		-o simv -l compile.log
+	cd "$(COMPUTE_SPAD_PATH_RUN)" && ./simv \
+		-cm $(COMPUTE_SPAD_PATH_METRICS) -cm_dir coverage.vdb -l run.log
+	grep -q '^COMPUTE_SPAD_PATH_FAIRNESS_PASS cycles=4096' "$(COMPUTE_SPAD_PATH_RUN)/run.log"
+	$(URG) -full64 -dir "$(COMPUTE_SPAD_PATH_RUN)/coverage.vdb" -format text \
+		-report "$(COMPUTE_SPAD_PATH_RUN)/urg" -log "$(COMPUTE_SPAD_PATH_RUN)/urg.log"
+	! grep -Eq 'UCAPI-DNYL|Design not loaded' "$(COMPUTE_SPAD_PATH_RUN)/urg.log"
+	grep -Fq 'Failure               0' "$(COMPUTE_SPAD_PATH_RUN)/urg/asserts.txt"
+	grep -Fq 'Incomplete            0' "$(COMPUTE_SPAD_PATH_RUN)/urg/asserts.txt"
+	grep -Fq 'Without Attempts      0' "$(COMPUTE_SPAD_PATH_RUN)/urg/asserts.txt"
+	grep -Fq 'ap_scheduler_grant_at_most_one' "$(COMPUTE_SPAD_PATH_RUN)/urg/asserts.txt"
+	grep -Fq 'ap_engine_response_onehot' "$(COMPUTE_SPAD_PATH_RUN)/urg/asserts.txt"
+	grep -Fq 'ap_core_payload_stable_under_preemption' "$(COMPUTE_SPAD_PATH_RUN)/urg/asserts.txt"
+	grep -Fq 'cp_desc_beats_completion' "$(COMPUTE_SPAD_PATH_RUN)/urg/asserts.txt"
+	grep -Fq 'cp_core_admitted' "$(COMPUTE_SPAD_PATH_RUN)/urg/asserts.txt"
+	grep -Fq 'cp_banked_admitted' "$(COMPUTE_SPAD_PATH_RUN)/urg/asserts.txt"
+	grep -Fq 'cp_dma_admitted' "$(COMPUTE_SPAD_PATH_RUN)/urg/asserts.txt"
+	echo "COMPUTE_SPAD_PATH_FAIRNESS_COVERAGE_PASS report=$(COMPUTE_SPAD_PATH_RUN)/urg"
 
 ai_upgrade_vcs: ai_dma_run ai_spad_arb_run ai_quick
 
