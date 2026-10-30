@@ -73,6 +73,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -q '\[CLUSTER_SFU_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: SFU accepted-write Abort prefix check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CONV_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: Conv accepted-write Abort prefix check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_MATRIX_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: Matrix accepted-write Abort prefix check missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_MATRIX_LINE_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: Matrix aligned Line accepted-write Abort prefix check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_DMA_RESPONSE_PASS\]' "$$log" || { echo "ERROR: real top DMA response-client read check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_LAUNCH_FIELDS_PASS\]' "$$log" || { echo "ERROR: descriptor launch-snapshot/unused-field checks missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \

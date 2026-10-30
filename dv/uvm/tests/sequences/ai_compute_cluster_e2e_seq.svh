@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 42750)
+Total output lines: 3424
+
 class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     `uvm_object_utils(ai_compute_cluster_e2e_seq)
 
@@ -1689,64 +1692,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                                 $sformatf("Matrix accepted Abort Golden[%0d,%0d]", row_idx, col_idx));
                 end else begin
                     expect_spad(dst + (k_idx << 2), sentinel ^ k_idx,
-                                $sformatf("Matrix Abort preserved suffix[%0d,%0d]", row_idx, col_idx));
-                end
-            end
-        end
-
-        `uvm_info("CLUSTER_MATRIX_ABORT_WRITE_PREFIX_PASS", $sformatf(
-            "task_id=%04h accepted_output_prefix=%0d/16 read_drain=%0d/%0d line_fallback=1 completion=ERR_ABORT seed=%0d",
-            task_id, accepted_write_count, accepted_reads, returned_reads, seed), UVM_LOW)
-        axil_write(REG_CPLQ_HEAD, 32'd1);
-        axil_write(REG_CMDQ_SIZE, 32'd0);
-        axil_write(REG_CPLQ_SIZE, 32'd0);
-    endtask
-
-    task automatic run_engine_reset_drain_sweep();
-        int engine;
-        int unsigned poll;
-        bit accepted_read;
-        bit [6:0] reset_seen;
-        bit [31:0] completion_base;
-        bit [31:0] reset_dst;
-        bit [31:0] value;
-        bit [31:0] debug_head;
-        bit [31:0] debug_tail;
-        bit [31:0] debug_status;
-        bit [31:0] sentinel;
-        bit [15:0] task_id;
-        bit [31:0] desc_base;
-        uvm_hdl_data_t reset_value;
-        bit reset_ok;
-
-        reset_seen = '0;
-        // Queue setup below points CMDQ_BASE at CLUSTER_CONTRACT_CMDQ, so the
-        // reset probe descriptor must occupy that exact base slot.
-        desc_base = CLUSTER_CONTRACT_CMDQ;
-        for (engine = 0; engine < 7; engine++) begin
-            task_id = 16'h0700 + engine;
-            completion_base = CLUSTER_CONTRACT_CPLQ + 32'h400 + (engine * 32'h10);
-            reset_dst = 32'h0003_3000 + (engine * 32'h100);
-            sentinel = 32'hbad0_7000 + engine;
-            spad_write(reset_dst, sentinel);
-            for (poll = 0; poll < 4; poll++)
-                spad_write(completion_base + (poll * 4), sentinel ^ poll);
-
-            case (engine)
-                0: write_cluster_desc(desc_base, 8'h10, task_id,
-                       SCALAR_A_LOCAL, SCALAR_B_LOCAL, reset_dst,
-                       16'd0, 16'd0, 16'd64, 32'd0,
-                       32'd0, 32'd0, 32'd0, 8'd3);
-                1: write_cluster_desc(desc_base, 8'h50, task_id,
-                       FP_A_LOCAL, FP_B_LOCAL, reset_dst,
-                       16'd1, 16'd1, 16'd64, 32'd0,
-                       32'd0, 32'd0, 32'd0, 8'd7);
-                2: begin
-                    write_cnm_v3_desc(desc_base, task_id,
-                        CNM_A_LOCAL, CNM_B_LOCAL, reset_dst);
-                    spad_write(desc_base + 32'h18, 32'd64);
-                end
-                3: write_v3_desc(desc_base, 8'h30, task_id,
+                                $sformatf("Matrix Abort preserved suffix[%0d,%0d]", row_idx, col_idx))…2750 tokens truncated…  3: write_v3_desc(desc_base, 8'h30, task_id,
                        MATRIX_A_LOCAL, MATRIX_B_LOCAL, reset_dst,
                        16'd16, 16'd32, 16'd16);
                 4: write_v3_desc(desc_base, 8'h35, task_id,
@@ -3228,6 +3174,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_sfu_abort_write_prefix(seed);
         run_conv_abort_write_prefix(seed);
         run_matrix_abort_write_prefix(seed);
+        run_matrix_line_abort_write_prefix(seed);
         run_engine_reset_drain_sweep();
 
         `uvm_info("COMPUTE_CLUSTER_REAL_UVM_PASS", $sformatf(
