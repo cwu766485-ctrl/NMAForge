@@ -69,6 +69,8 @@ module tb_ai_accel_uvm;
     assign compute_obs.cnm_request_valid = dut.cnm_read_valid;
     assign compute_obs.cnm_request_ready = dut.arb_cnm_ready;
     assign compute_obs.matrix_request_valid = dut.banked_read_valid;
+    assign compute_obs.matrix_response_fault =
+        dut.compute_cluster_u.tensor_matrix_u.banked_response_fault;
     assign compute_obs.cnm_core_state = dut.compute_cluster_u.banked_core_u.state_r;
     assign compute_obs.cnm_lane_state = {
         dut.compute_cluster_u.banked_core_u.lc3.state_r,

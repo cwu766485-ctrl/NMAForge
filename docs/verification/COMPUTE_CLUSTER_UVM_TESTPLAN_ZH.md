@@ -81,7 +81,7 @@ remaining C1 closure
 | REQ-CL-003 | 启动参数时序 | Start 前后变更参数；在采样边缘值稳定；`tc_cl_launch_sampling` | cfg monitor + model | `engine × launch_sampling` | P0 READY |
 | REQ-CL-004 | 无关字段隔离 | 随机扰动本 Opcode 不使用的字段；`tc_cl_unused_field_noise` | Golden对比和存储写回 | `engine × unused_field_group` | P1 READY |
 | REQ-CL-005 | 参数锁存 | Busy期间修改 Launch 参数，完成原任务；`tc_cl_config_latched` | input monitor + memory scoreboard | `engine × mid_task_change` | P0 READY |
-| REQ-CL-006 | 请求背压保持 | 32-bit SPAD ready低1/2/8+周期；`tc_cl_spad_req_stability` | 接口 SVA valid&&!ready |=> $stable(payload) 按Abort例外；R71 real top Matrix Line 观察每 Seed 84 次稳定 payload、0 violation | `engine × stall_bin × rdwr` | P0; R71 Line-stall slice PASS, full requester/stall/progress cross PARTIAL |
+| REQ-CL-006 | 请求背压保持 | 32-bit SPAD ready低1/2/8+周期；`tc_cl_spad_req_stability` | 接口 checker: 普通 stall 保持 payload；已接受 Matrix parity 响应同拍可撤销一笔未接受 banked read，并独立计数；R71 real top Matrix Line 每 Seed 84 次稳定 payload、0 violation | `engine × stall_bin × rdwr × terminal_fault_cancel` | P0; Line-stall slice PASS；parity-cancel 有 real-top directed cross；完整 requester/stall/progress cross 仍 PARTIAL |
 | REQ-CL-007 | 响应归属 | 已接受读取与响应一一对应，无窜发；`tc_cl_rsp_owner` | Response FIFO/accepted read ledger | `engine × response_delay × owner` | P0 READY |
 | REQ-CL-008 | 写回 Memory Image | 每个已接受写后对照 Golden Memory；`tc_cl_memory_commit` | Byte-aware memory scoreboard | `engine × write_count × status` | P0 READY |
 | REQ-CL-009 | 四Bank CNM | 各Bank独立grant/错拍响应/parity；`tc_cl_cnm_bank_independent` | per-bank monitor + CNM ref | `bank × rsp_phase × parity` | P0 READY |

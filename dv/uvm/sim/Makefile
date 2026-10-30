@@ -78,6 +78,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -q '\[CLUSTER_SCOREBOARD\]' "$$log" || { echo "ERROR: compute-cluster scoreboard report missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_MEMORY_SCOREBOARD\].*checked_words=[1-9][0-9]* mismatches=0 unknown_reads=0' "$$log" || { echo "ERROR: independent scratchpad memory scoreboard did not close cleanly in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_RANDOM_FAULT_CROSS_PASS\].*parity cases=18/18' "$$log" || { echo "ERROR: randomized seven-engine parity fault cross missing in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_PARITY_OWNER_CROSS_PASS\].*overlap_cycles=[1-9][0-9]* shared_banked_accepts=[1-9][0-9]* matrix_rsp=[1-9][0-9]* cnm_rsp=[1-9][0-9]* route_mismatch=0; held-read fault cancellations=1' "$$log" || { echo "ERROR: concurrent Matrix parity error/CNM owner-isolation/fault-cancel cross missing or failed in $$log"; exit 1; }; \
 		test "$$(grep -c ' \[CLUSTER_FAULT_CASE_PASS\] case=' "$$log")" -eq 18 || { echo "ERROR: expected all 18 parity fault cases in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_PROTECTION_CROSS_PASS\].*cases=19/19.*sourceA=7 sourceB=5 writeback=7' "$$log" || { echo "ERROR: all-engine phase-qualified real-top protection fault cross missing in $$log"; exit 1; }; \
 		test "$$(grep -c ' \[CLUSTER_PROTECTION_CASE_PASS\] engine=' "$$log")" -eq 19 || { echo "ERROR: expected 19 engine/phase protection fault cases in $$log"; exit 1; }; \

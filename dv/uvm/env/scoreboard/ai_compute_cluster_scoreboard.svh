@@ -53,6 +53,7 @@ class ai_compute_cluster_scoreboard extends uvm_component;
     bit [6:0] active_engine_seen;
     bit [6:0] error_terminal_pending;
     bit [6:0] error_seen;
+    bit [6:0] previous_engine_busy;
     bit reset_active_previous;
     string mutation_kind;
     bit mutation_caught;
@@ -225,6 +226,7 @@ class ai_compute_cluster_scoreboard extends uvm_component;
             active_engine_seen = 7'd0;
             error_terminal_pending = 7'd0;
             error_seen = 7'd0;
+            previous_engine_busy = 7'd0;
             for (client = 0; client < 6; client++) begin
                 if (pending_reads[client] != 0)
                     reset_dropped_reads += pending_reads[client];
@@ -252,6 +254,14 @@ class ai_compute_cluster_scoreboard extends uvm_component;
                 default: ;
             endcase
         end
+
+        // CMDQ work dispatched through the parallel path does not assert the
+        // direct command-processor launch_valid signal. Re-arm only the owner
+        // whose busy signal rises for a new task; the failed task's error_seen
+        // remains live through its terminal drain and idle interval.
+        for (client = 0; client < 7; client++)
+            if (obs.engine_busy[client] && !previous_engine_busy[client])
+                error_seen[client] = 1'b0;
 
         // Some engines retire an errored operation with a Done pulse one
         // sampled cycle after the error pulse. Preserve that owner-specific
@@ -287,6 +297,7 @@ class ai_compute_cluster_scoreboard extends uvm_component;
             active_engine_seen = 7'd0;
             error_terminal_pending = 7'd0;
         end
+        previous_engine_busy = obs.engine_busy;
 
         if (obs.core_busy !== (|obs.engine_busy))
             `uvm_error("CLUSTER_BUSY", $sformatf("core_busy=%b engine_busy=%07b", obs.core_busy, obs.engine_busy))
