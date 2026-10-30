@@ -264,6 +264,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         bit [31:0] cpl_addr;
         bit [31:0] fault_addr;
         bit [7:0] opcode;
+        bit [31:0] expected_status_error;
         string parity_path;
         uvm_hdl_data_t saved_parity;
 
@@ -279,9 +280,21 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             fault_engine = 2; // CNM lane-local A/B read
             fault_phase = (case_id - 4) % 2;
             cnm_lane = (case_id - 4) / 2;
-        end else begin
+        end else if (case_id < 14) begin
             fault_engine = 3; // BF16 dot
             fault_phase = case_id - 12;
+            cnm_lane = 0;
+        end else if (case_id == 14) begin
+            fault_engine = 4; // SFU vector input
+            fault_phase = 0;
+            cnm_lane = 0;
+        end else if (case_id < 17) begin
+            fault_engine = 5; // Conv input / weight
+            fault_phase = case_id - 15;
+            cnm_lane = 0;
+        end else begin
+            fault_engine = 6; // KV source vector
+            fault_phase = 0;
             cnm_lane = 0;
         end
 
@@ -318,13 +331,44 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                                   src0, src1, dst);
             end
             default: begin
-                opcode = 8'h50;
-                src0 = FP_A_LOCAL;
-                src1 = FP_B_LOCAL;
-                fault_addr = fault_phase ? src1 : src0;
-                write_cluster_desc(desc_addr, opcode, 16'h0700 + case_id,
-                                   src0, src1, dst, 16'd1, 16'd1, 16'd2,
-                                   32'd0, 32'd0, 32'd0, 32'd0, 8'd7);
+                case (fault_engine)
+                    3: begin
+                        opcode = 8'h50;
+                        src0 = FP_A_LOCAL;
+                        src1 = FP_B_LOCAL;
+                        fault_addr = fault_phase ? src1 : src0;
+                        write_cluster_desc(desc_addr, opcode, 16'h0700 + case_id,
+                                           src0, src1, dst, 16'd1, 16'd1, 16'd2,
+                                           32'd0, 32'd0, 32'd0, 32'd0, 8'd7);
+                    end
+                    4: begin
+                        opcode = 8'h35;
+                        src0 = GELU_A_LOCAL;
+                        src1 = 32'd0;
+                        fault_addr = src0;
+                        write_v3_desc(desc_addr, opcode, 16'h0700 + case_id,
+                                      src0, src1, dst, 16'd0, 16'd0, 16'd4);
+                    end
+                    5: begin
+                        opcode = 8'h16;
+                        src0 = CONV_A_LOCAL;
+                        src1 = CONV_W_LOCAL;
+                        fault_addr = fault_phase ? src1 : src0;
+                        write_cluster_desc(desc_addr, opcode, 16'h0700 + case_id,
+                                           src0, src1, dst, 16'd3, 16'd3, 16'd9,
+                                           32'd0, 32'd0, 32'd0, 32'd0, 8'd5);
+                    end
+                    default: begin
+                        opcode = 8'h43;
+                        src0 = KV_VECTOR_LOCAL;
+                        src1 = 32'd0;
+                        fault_addr = src0;
+                        write_cluster_desc(desc_addr, opcode, 16'h0700 + case_id,
+                                           src0, src1, dst, 16'd0, 16'd0, 16'd4,
+                                           {16'd1,16'd1}, 32'd16, 32'd64,
+                                           32'd0, 8'd5);
+                    end
+                endcase
             end
         endcase
 
@@ -343,9 +387,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         wait_spad_idle();
         restore_spad_parity(parity_path, saved_parity);
 
+        expected_status_error = ((fault_engine == 5) || (fault_engine == 6)) ?
+                                32'h0000_0072 : 32'h0000_0052;
         expect_spad(cpl_addr + 32'h00, 32'h0000_0700 + case_id,
                     $sformatf("random parity case%0d task ID", case_id));
-        expect_spad(cpl_addr + 32'h04, 32'h0000_0052,
+        expect_spad(cpl_addr + 32'h04, expected_status_error,
                     $sformatf("random parity case%0d ERR_PARITY completion", case_id));
         for (word_idx = 0; word_idx < 16; word_idx++)
             expect_spad(dst + (word_idx << 2),
@@ -1015,12 +1061,12 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int signed accumulator;
         int unsigned word_idx;
         int unsigned engine_idx;
-        int unsigned fault_order[0:13];
+        int unsigned fault_order[0:17];
         int unsigned fault_i;
         int unsigned fault_j;
         int unsigned fault_swap;
         int unsigned fault_case_id;
-        bit [13:0] fault_cases_seen;
+        bit [17:0] fault_cases_seen;
         int unsigned overlap_total;
         int unsigned matrix_prefetch_overlap_total;
         int unsigned matrix_cnm_overlap_total;
@@ -1516,8 +1562,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
 
-        // Seeded randomized ordering of a complete parity fault cross:
-        // INT8, Matrix, CNM (all four lanes), and BF16; A/B operand phase;
+        // Seeded randomized ordering of the parity fault cross:
+        // all seven engines, A/B operand phase where defined, all CNM lanes;
         // every failed operation must retire ERR_PARITY without writeback.
         for (word_idx = 0; word_idx < 4; word_idx++) begin
             spad_write(MATRIX_FAULT_A_LOCAL + (word_idx << 2),
@@ -1525,8 +1571,12 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             spad_write(MATRIX_FAULT_B_LOCAL + (word_idx << 2),
                        32'h2200_0000 | word_idx);
         end
-        for (fault_i = 0; fault_i < 14; fault_i++) fault_order[fault_i] = fault_i;
-        for (fault_i = 13; fault_i > 0; fault_i--) begin
+        for (word_idx = 0; word_idx < 9; word_idx++) begin
+            spad_write(CONV_A_LOCAL + (word_idx << 2), word_idx + 1);
+            spad_write(CONV_W_LOCAL + (word_idx << 2), 32'd1);
+        end
+        for (fault_i = 0; fault_i < 18; fault_i++) fault_order[fault_i] = fault_i;
+        for (fault_i = 17; fault_i > 0; fault_i--) begin
             rng_state = rng_state ^ (rng_state << 13);
             rng_state = rng_state ^ (rng_state >> 17);
             rng_state = rng_state ^ (rng_state << 5);
@@ -1536,17 +1586,17 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             fault_order[fault_j] = fault_swap;
         end
         fault_cases_seen = '0;
-        for (fault_i = 0; fault_i < 14; fault_i++) begin
+        for (fault_i = 0; fault_i < 18; fault_i++) begin
             fault_case_id = fault_order[fault_i];
             if (fault_cases_seen[fault_case_id])
                 `uvm_fatal("CLUSTER_FAULT_CROSS", $sformatf("duplicate randomized fault case=%0d", fault_case_id))
             fault_cases_seen[fault_case_id] = 1'b1;
             run_random_parity_case(fault_case_id, seed);
         end
-        if (fault_cases_seen !== 14'h3fff)
+        if (fault_cases_seen !== 18'h3ffff)
             `uvm_fatal("CLUSTER_FAULT_CROSS", $sformatf("fault cross incomplete: seen=%h", fault_cases_seen))
         `uvm_info("CLUSTER_RANDOM_FAULT_CROSS_PASS", $sformatf(
-            "parity cases=14/14; engines={INT8,Matrix,CNM,BF16}; operand phases={A,B}; CNM lanes=4/4; randomized_order_seed=%0d",
+            "parity cases=18/18; engines={INT8,Matrix,CNM,BF16,SFU,Conv,KV}; operand phases={A,B where defined}; CNM lanes=4/4; randomized_order_seed=%0d",
             seed), UVM_LOW)
 
         // Abort two real in-flight engines after their overlap is observed.

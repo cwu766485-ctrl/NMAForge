@@ -51,6 +51,7 @@ class ai_compute_cluster_scoreboard extends uvm_component;
     int unsigned stale_epoch_responses;
     int unsigned invalid_engine_done;
     bit [6:0] active_engine_seen;
+    bit [6:0] error_terminal_pending;
     bit reset_active_previous;
     string mutation_kind;
     bit mutation_caught;
@@ -221,6 +222,7 @@ class ai_compute_cluster_scoreboard extends uvm_component;
             if (!reset_active_previous) memory_epoch++;
             reset_active_previous = 1'b1;
             active_engine_seen = 7'd0;
+            error_terminal_pending = 7'd0;
             for (client = 0; client < 6; client++) begin
                 if (pending_reads[client] != 0)
                     reset_dropped_reads += pending_reads[client];
@@ -235,7 +237,12 @@ class ai_compute_cluster_scoreboard extends uvm_component;
         end
         reset_active_previous = 1'b0;
 
-        invalid_done_mask = obs.engine_done & ~(active_engine_seen | obs.engine_busy);
+        // Some engines retire an errored operation with a Done pulse one
+        // sampled cycle after the error pulse. Preserve that owner-specific
+        // terminal window; a bare/unowned Done still fails below.
+        invalid_done_mask = obs.engine_done &
+                            ~(active_engine_seen | obs.engine_busy |
+                              error_terminal_pending);
         if (invalid_done_mask != 0) begin
             invalid_engine_done++;
             note_mutation_caught("engine_done_lifecycle");
@@ -254,9 +261,16 @@ class ai_compute_cluster_scoreboard extends uvm_component;
             // pulse does not cascade into an error on every later sample.
             active_engine_seen &= ~missing_done_mask;
         end
+        error_terminal_pending = obs.engine_error & ~obs.engine_done &
+                                 (active_engine_seen | obs.engine_busy |
+                                  error_terminal_pending);
+        error_terminal_pending &= ~obs.engine_done;
         active_engine_seen |= obs.engine_busy;
         active_engine_seen &= ~(obs.engine_done | obs.engine_error);
-        if (obs.multi_engine_abort) active_engine_seen = 7'd0;
+        if (obs.multi_engine_abort) begin
+            active_engine_seen = 7'd0;
+            error_terminal_pending = 7'd0;
+        end
 
         if (obs.core_busy !== (|obs.engine_busy))
             `uvm_error("CLUSTER_BUSY", $sformatf("core_busy=%b engine_busy=%07b", obs.core_busy, obs.engine_busy))
