@@ -2,7 +2,7 @@
 
 ## Review decision (updated 2026-10-30)
 
-**Selected exact clean code/test SHA:** `969992291732cf694d7de4bdfef2808d4f017d57` (R75 SFU block-core parameter-latch follow-up; product RTL and SPEC v1.8 unchanged from R73). Latest real-top descriptor-latch replay remains R74 at `519ca161f3c2ce8beab78161a88bbdcb6cbcdc61`; R75 is block-only and does not extend real-top descriptor coverage. Product/SPEC contract candidate is R73 `9d4e9abdba1f745644a485960620fa6bbc4979db`; earlier SPEC v1.7 ancestry is `f916874a9ce60741a4516eaf9e33ebcae4a676c2`. R54 top test source is `f24c5383fad511c8b2e1132c1157942807994759`.\
+**Selected exact clean code/test SHA:** `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28` (R77 real-top SFU descriptor-latch and clean replay; product RTL/SPEC v1.8 remain byte-identical to R73 `9d4e9abdba1f745644a485960620fa6bbc4979db`). Latest real-top descriptor-latch evidence is Matrix R74 and SFU R77; R75 remains separate block-core evidence. Earlier evidence retains its named source identities.\
 **Current SPEC:** v1.8 clarifies busy-time CPLQ_HEAD consumption; v1.7 freezes KV address alignment/overflow behavior; v1.6 freezes Scalar INT8 arithmetic order; v1.5 freezes the Matrix Line transfer contract.\
 **Candidate classification:** bounded Functional DV review candidate; not CL-DV-v1.0 signed.\
 **Product RTL:** the candidate preserves the earlier scoped Conv/KV/SFU error-code alignment and KV 32-bit overflow/alignment guard; R73 also allows only the software-owned CPLQ_HEAD pointer write while compute/DMA is busy.\
@@ -109,3 +109,8 @@ separately in the RTM.
 5. Do not extend this Functional DV review into an overall NPU sign-off claim.
 
 See the [remaining Open Issues](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md) and [current TinyNPU benchmark report](../benchmark/NMAFORGE_VS_TINY_NPU.md).
+
+
+## R77 evidence update — 2026-10-30
+
+R77 at clean code/test SHA `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28` adds the legal real-top SFU RMSNorm descriptor-latch point and replays three-seed top UVM, 28/28 checker-sensitivity mutations, Top Smoke, 20-case top regression, behavioral AXI stall/reset, 45/45 Matrix size and 120/120 Matrix ablation. Product RTL/SPEC remain byte-identical to `9d4e9ab`. This increases evidence for `REQ-CL-005` without closing it. Requirement status remains 24 PASS-SCOPED / 14 PARTIAL; `CL-DV-v1.0` remains HOLD because legal fault/phase/reset crosses and actual target-fabric qualification remain open. See [R77 replay report](COMPUTE_CLUSTER_CLEAN_REPLAY_R77_2026-10-30.md).

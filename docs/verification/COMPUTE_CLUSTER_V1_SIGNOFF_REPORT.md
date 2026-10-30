@@ -9,12 +9,12 @@
 | Item | Frozen identity |
 |---|---|
 | Product RTL/SPEC candidate | `9d4e9abdba1f745644a485960620fa6bbc4979db` (R73; SPEC v1.8 busy-time CPLQ_HEAD contract) |
-| Latest real-top descriptor-latch SHA | `519ca161f3c2ce8beab78161a88bbdcb6cbcdc61` (R74 Matrix descriptor-latch test) |
-| Latest exact clean code/test SHA | `969992291732cf694d7de4bdfef2808d4f017d57` (R75 SFU block-core parameter-latch test-only follow-up) |
+| Latest real-top descriptor-latch SHA | `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28` (R77 SFU descriptor-latch test; Matrix R74 remains separately evidenced) |
+| Latest exact clean code/test SHA | `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28` (R77 real-top SFU descriptor-latch follow-up) |
 | Prior reviewed product baseline | `6848a414eaeaa05cf9e1411cf55d9d27333208a6` |
 | Latest published closeout snapshot before this follow-up | `fc370aad6b8360af9affb52cb30909ec97d79be3` |
 | Review branch | `work/compute-cluster-kv-overflow-20261030` |
-| Evidence/test commit | R53 `f916874a9ce60741a4516eaf9e33ebcae4a676c2`; R54 `f24c5383fad511c8b2e1132c1157942807994759`; R55–R58/R59 `ded9d923a432e869592ec8710a22df5501d8d474`; R60 `2768843da1b3f3a0e988645746000d5befadf12b`; R73 `9d4e9abdba1f745644a485960620fa6bbc4979db`; R74 `519ca161f3c2ce8beab78161a88bbdcb6cbcdc61`; R75 `969992291732cf694d7de4bdfef2808d4f017d57` |
+| Evidence/test commit | R53 `f916874a9ce60741a4516eaf9e33ebcae4a676c2`; R54 `f24c5383fad511c8b2e1132c1157942807994759`; R55–R58/R59 `ded9d923a432e869592ec8710a22df5501d8d474`; R60 `2768843da1b3f3a0e988645746000d5befadf12b`; R73 `9d4e9abdba1f745644a485960620fa6bbc4979db`; R74 `519ca161f3c2ce8beab78161a88bbdcb6cbcdc61`; R75 `969992291732cf694d7de4bdfef2808d4f017d57`; R77 `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28` |
 | SPEC | Compute Cluster SPEC v1.8; R73 records busy-time CPLQ_HEAD progress; earlier KV address overflow/alignment is frozen in v1.7 |
 | VCS | Synopsys VCS `V-2023.12-SP1_Full64`; R49 passed the corrected Matrix checker on three seeds; R50 passed the published-snapshot six-seed UVM and Top Smoke; R52 passed the legal Scalar INT8 numeric campaign; R53 passed KV boundary checks; R75 passed the SFU block random regression on three seeds, with merged URG |
 
@@ -45,7 +45,7 @@ R46/R47 were historical `BLOCKED_ENV` attempts; R48 exposed a testbench coverage
 | Matrix Line output | SPEC v1.5 freezes aligned full-`WSTRB` Line writes, scalar fallback for 4-byte-aligned non-Line-aligned output, protection-prefix behavior, and partial/zero WSTRB as unsupported. `MATRIX-LINE-001` checks these interface rules plus stall stability | R49 passes three seeds; each records 312 stable stalls, full WSTRB/alignment, fallback and protection checks, and reference-memory comparison. Scoped Line contract is closed; this does not close the broader Matrix requirement rows |
 | SVA and compile diagnostics | R40/R15 provide non-vacuity and AXI assertion evidence for their named properties; R50 has no UVM severity or compile errors | R50 compute-only AR/AW stall-to-accept cover bins have zero matches (W has one); the separate R15 E2E profile supplies 3/3 AXI stall covers. Top Smoke keeps one `LOOP-REROLL-ENABLED` fixture warning. Evidence does not cover every requester/fault/backpressure combination |
 | Descriptor and scalar numeric boundaries | R52 checks the common Scalar INT8 arithmetic semantics across 13 legal VDOT/GEMV/GEMM Golden cases per seed, with 60 output words checked on three seeds | `OPEN-NUM-01` closes within this common arithmetic scope; legacy Conv and broader `REQ-CL-020` opcode/shape/fault coverage remain PARTIAL, as do descriptor boundary rules |
-| SFU launch-parameter retention | R75 mutates every direct-core command input after accepted GELU launch and checks 16 independent Golden words plus original/mutated destination images on three seeds | This is block-core evidence only. A real-top host descriptor rewrite conflicted with an active SFU core SPAD request and was discarded; it does not close top-level `REQ-CL-005` |
+| SFU launch-parameter retention | R75 block-core GELU input mutation plus R77 real-top RMSNorm descriptor mutation during divider wait; independent Golden, completion and destination sentinel checks | R77 adds one legal top-level SFU descriptor-latch point, but other engines/fields and descriptor-boundary crosses remain open; `REQ-CL-005` stays PARTIAL |
 | KV address and Protection | R53 checks ten invalid arithmetic/alignment classes per seed plus legal `0x7fffc` read/write; R54 checks a real-top Protection denial, KV owner/error completion, and sentinel preservation | SPEC v1.7 overflow/alignment slice is covered 11/11 per seed; R54 directed group passes 4/4 points. Raw KV FSM remains 11/15 transitions; broader ownership, stride/alias, and Engine descriptor contracts remain open |
 
 ## Clean replay status
@@ -85,3 +85,8 @@ PPA and full pretrained-model deployment are outside this Functional DV decision
 - [R75 SFU block-core parameter-latch evidence](COMPUTE_CLUSTER_SFU_PARAMETER_LATCH_R75_2026-10-30.md)
 - [Compute Cluster SPEC v1.6](../spec/COMPUTE_CLUSTER_SPEC_ZH.md)
 - [Verification matrix](../../dv/VERIFICATION_MATRIX.md)
+
+
+## R77 exact-clean review update — 2026-10-30
+
+R77's exact clean code/test SHA is `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28`; product RTL/SPEC remain byte-identical to product candidate `9d4e9abdba1f745644a485960620fa6bbc4979db`. R77 adds a real-top SFU RMSNorm descriptor-latch point and passes three-seed UVM, 28/28 checker-sensitivity, Top Smoke, 20-case seeded top, behavioral AXI stall/reset, 45/45 Matrix size and 120/120 Matrix ablation. The new evidence is scoped; RTM remains 24 PASS-SCOPED / 14 PARTIAL and `CL-DV-v1.0` remains HOLD. The behavioral responder does not qualify an external target fabric. See [R77 report](COMPUTE_CLUSTER_CLEAN_REPLAY_R77_2026-10-30.md) and the updated [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
