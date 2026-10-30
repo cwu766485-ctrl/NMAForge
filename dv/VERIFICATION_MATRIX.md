@@ -5,13 +5,13 @@
 > Matrix Line behavior (aligned full WSTRB, scalar fallback, and no partial or
 > zero WSTRB). The new `MATRIX-LINE-001` checker enforces Line alignment,
 > strobe, stall stability, fallback, and protection error behavior. Its
-> first final-source VCS run compiled but failed its end gate because the new
-> testbench stability counter was cleared by directed DUT resets (RTM R48). The
-> counter fix is committed; the corrected three-seed replay is pending. A clean replay of published closeout SHA
-> `be78ee27b5a08783ec2560334ca1361baf382157` also stopped before compile for
+> first final-source VCS run exposed a testbench counter reset issue (RTM R48);
+> the corrected three-seed replay passes R49 with 312 stall-stability checks per
+> seed and reference-memory checks. A clean replay of published closeout SHA
+> `be78ee27b5a08783ec2560334ca1361baf382157` stopped before compile for
 > the same environment issue; the restored top-smoke mapper precheck passed
-> all 86 descriptors, but there is no new simulation or coverage result
-> (RTM R46). Prior R40–R45 evidence remains the latest PASS evidence. Overall
+> all 86 descriptors, but there is no new UVM/Top Smoke result (RTM R46). R49
+> is the latest Matrix Line PASS evidence; it does not change the overall
 > Compute Cluster status remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0
 > HOLD; see the [current Execution RTM](../docs/verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
 
