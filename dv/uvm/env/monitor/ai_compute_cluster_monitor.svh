@@ -52,7 +52,7 @@ class ai_compute_cluster_monitor extends uvm_component;
                 (|vif.engine_req_valid) ||
                 vif.core_spad_valid || vif.banked_valid ||
                 (|vif.cnm_valid) || vif.rsp_valid || vif.matrix_rsp_valid ||
-                (|vif.cnm_rsp_valid) || (|vif.read_accept_mask) ||
+                (|vif.cnm_rsp_valid) || (|vif.read_accept_mask) || vif.cplq_full ||
                 vif.matrix_prefetch_active || vif.matrix_a_cache_hit ||
                 (vif.matrix_banked_fault_cancel_checks !=
                  matrix_fault_cancel_count_seen) ||
@@ -61,6 +61,7 @@ class ai_compute_cluster_monitor extends uvm_component;
                 obs = ai_compute_cluster_obs::type_id::create("obs");
                 obs.reset_active = !vif.aresetn;
                 obs.core_busy = vif.core_busy;
+                obs.cplq_full = vif.cplq_full;
                 obs.launch_valid = vif.launch_valid;
                 obs.launch_op = vif.launch_op;
                 obs.engine_busy = vif.engine_busy;

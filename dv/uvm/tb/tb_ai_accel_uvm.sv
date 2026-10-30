@@ -28,6 +28,7 @@ module tb_ai_accel_uvm;
     assign compute_obs.aresetn = aresetn;
     assign compute_obs.core_busy = dut.core_busy;
     assign compute_obs.processor_busy = dut.processor_busy;
+    assign compute_obs.cplq_full = dut.parallel_compute_dispatcher_u.cplq_full;
     assign compute_obs.launch_valid = dut.launch_valid;
     assign compute_obs.launch_op = dut.launch_op;
     assign compute_obs.launch_src0 = dut.launch_src0;

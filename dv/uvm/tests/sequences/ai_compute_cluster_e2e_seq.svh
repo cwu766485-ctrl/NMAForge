@@ -1498,6 +1498,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int signed accumulator;
         int unsigned word_idx;
         int unsigned engine_idx;
+        int unsigned cplq_poll;
+        bit cplq_all_engines_idle;
         int unsigned protection_case_count;
         int unsigned fault_order[0:17];
         int unsigned fault_i;
@@ -1967,6 +1969,112 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         if (value !== 32'd4)
             `uvm_fatal("CLUSTER_CMDQ", $sformatf("CMDQ_HEAD expected=4 actual=%0d", value))
         axil_write(REG_CPLQ_HEAD, 32'd4);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+
+        // Fill the real four-entry completion ring to its three-entry
+        // capacity while four production engines execute legal, disjoint
+        // tasks. The final completion must remain pending until software
+        // advances CPLQ_HEAD; after release it must wrap the tail in order.
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            spad_write(CPLQ_LOCAL + 32'h330 + (word_idx << 2),
+                       32'hc07f_7200 | word_idx);
+        spad_write(SCALAR_A_LOCAL, 32'h0403_0201);
+        spad_write(SCALAR_B_LOCAL, 32'h0807_0605);
+        write_v3_desc(CMDQ_LOCAL + 32'h300, 8'h30, 16'h0810,
+                      MATRIX_A_LOCAL, MATRIX_B_LOCAL, MATRIX_Y_LOCAL,
+                      16'd16, 16'd32, 16'd16);
+        write_cnm_v3_desc(CMDQ_LOCAL + 32'h340, 16'h0811,
+                          CNM_A_LOCAL, CNM_B_LOCAL, CNM_Y_LOCAL);
+        write_v3_desc(CMDQ_LOCAL + 32'h380, 8'h35, 16'h0812,
+                      GELU_A_LOCAL, 32'd0, SWEEP_SFU_Y_LOCAL,
+                      16'd0, 16'd0, 16'd4);
+        write_cluster_desc(CMDQ_LOCAL + 32'h3c0, 8'h10, 16'h0813,
+                           SCALAR_A_LOCAL, SCALAR_B_LOCAL, SCALAR_Y_LOCAL,
+                           16'd0, 16'd0, 16'd1, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd3);
+
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, CMDQ_LOCAL + 32'h300);
+        axil_write(REG_CMDQ_SIZE, 32'd8);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd4);
+        axil_write(REG_CPLQ_BASE, CPLQ_LOCAL + 32'h300);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd3);
+
+        cplq_all_engines_idle = 1'b0;
+        for (cplq_poll = 0; cplq_poll < 2000; cplq_poll++) begin
+            if (compute_vif.engine_busy == 7'd0) begin
+                cplq_all_engines_idle = 1'b1;
+                break;
+            end
+            @(posedge compute_vif.aclk);
+        end
+        if (!cplq_all_engines_idle)
+            `uvm_fatal("CLUSTER_CPLQ_BACKPRESSURE",
+                $sformatf("engines did not finish while CPLQ was full; busy=%07b",
+                          compute_vif.engine_busy))
+        if (compute_vif.cplq_full !== 1'b1 ||
+            compute_vif.processor_busy !== 1'b1)
+            `uvm_fatal("CLUSTER_CPLQ_BACKPRESSURE", $sformatf(
+                "full completion queue must retain dispatcher work; cplq_full=%0b processor_busy=%0b",
+                compute_vif.cplq_full, compute_vif.processor_busy))
+
+        for (cplq_poll = 0; cplq_poll < 8; cplq_poll++) begin
+            axil_read(REG_CPLQ_TAIL, value);
+            if (value !== 32'd3 || compute_vif.cplq_full !== 1'b1)
+                `uvm_fatal("CLUSTER_CPLQ_BACKPRESSURE", $sformatf(
+                    "completion tail escaped full-ring hold: tail=%0d full=%0b poll=%0d",
+                    value, compute_vif.cplq_full, cplq_poll))
+        end
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            expect_spad(CPLQ_LOCAL + 32'h330 + (word_idx << 2),
+                        32'hc07f_7200 | word_idx,
+                        $sformatf("CPLQ full held completion sentinel[%0d]", word_idx));
+        axil_read(REG_CMDQ_HEAD, value);
+        if (value !== 32'd4)
+            `uvm_fatal("CLUSTER_CPLQ_BACKPRESSURE", $sformatf(
+                "all four descriptors must dispatch before completion backpressure: CMDQ_HEAD=%0d",
+                value))
+
+        expect_completion(CPLQ_LOCAL + 32'h300, 16'h0810,
+                          matrix_golden[15][31], 32'd512,
+                          "CPLQ-full Matrix head completion");
+        expect_completion(CPLQ_LOCAL + 32'h310, 16'h0811, 32'd736, 32'd16,
+                          "CPLQ-full CNM completion");
+        expect_completion(CPLQ_LOCAL + 32'h320, 16'h0812, -32'sd15, 32'd4,
+                          "CPLQ-full SFU completion");
+
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        wait_cpl_tail(32'd0);
+        wait_spad_idle();
+        if (compute_vif.cplq_full !== 1'b1 ||
+            compute_vif.processor_busy !== 1'b0)
+            `uvm_fatal("CLUSTER_CPLQ_BACKPRESSURE", $sformatf(
+                "released slot must retire the pending completion, wrap tail, refill the ring, and drain dispatcher: cplq_full=%0b processor_busy=%0b",
+                compute_vif.cplq_full, compute_vif.processor_busy))
+        expect_completion(CPLQ_LOCAL + 32'h330, 16'h0813, 32'd70, 32'd1,
+                          "CPLQ-full released Scalar completion");
+        for (word_idx = 0; word_idx < 512; word_idx++)
+            expect_spad(MATRIX_Y_LOCAL + (word_idx << 2),
+                        matrix_golden[word_idx / 32][word_idx % 32],
+                        $sformatf("CPLQ full Matrix Golden[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            expect_spad(CNM_Y_LOCAL + (word_idx << 2), 32'd736,
+                        $sformatf("CPLQ full CNM Golden[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            expect_spad(SWEEP_SFU_Y_LOCAL + (word_idx << 2),
+                        gelu_results[word_idx],
+                        $sformatf("CPLQ full SFU Golden[%0d]", word_idx));
+        expect_spad(SCALAR_Y_LOCAL, 32'd70, "CPLQ full Scalar Golden");
+        `uvm_info("CLUSTER_CPLQ_BACKPRESSURE_PASS",
+            "four real engines completed; blocked_tail=3 released_head=1 wrapped_tail=0 all_engines_idle=1; ordered completion, retained sentinel, and four Goldens checked",
+            UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd0);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
 

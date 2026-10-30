@@ -217,7 +217,7 @@ module ai_accel_regs #(
     wire readonly = is_read_only_address(a);
     wire cfg_locked = (processor_busy || dma_busy) && reg_req_write &&
                       !(a == STATUS || a == IRQ_STATUS ||
-                        a == DMA_STATUS || a == ABORT);
+                        a == DMA_STATUS || a == ABORT || a == CPL_HEAD);
     assign cmdq_base={cmd_hi_r,cmd_base_r}; assign cmdq_size=cmd_size_r; assign cmdq_tail=cmd_tail_r;
     assign cplq_base=cpl_base_r; assign cplq_size=cpl_size_r; assign cplq_head=cpl_head_r;
     assign region0_base=r0b; assign region0_limit=r0l; assign region0_perm=r0p;

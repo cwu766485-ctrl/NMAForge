@@ -1,13 +1,13 @@
 # NMAForge Compute Cluster 功能与接口规格（中文）
 
 > **文档编号**：NMA-CL-SPEC-001\
-> **版本**：v1.7，**Parallel Compute Cluster 功能与 DV 需求基线**（不是 RTL/产品 Sign-off）\
+> **版本**：v1.8，**Parallel Compute Cluster 功能与 DV 需求基线**（不是 RTL/产品 Sign-off）\
 > **日期**：2026-10-30\
 > **基线**：从 NMAForge main commit 6742e227c1f52b5266ea19e034b17f33c583b813 延伸，A10 / ABI v7.4\
 > **设计模块**：rtl/top/fabric/compute/ai_accel_compute_cluster.v\
 > **目的**：约束 Compute Cluster 的功能、时序、对外端口和异常处理，作为 UVM Testplan / Scoreboard / Coverage / SVA 的需求来源。
 > **对应 Testplan**：[COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md](../verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md)。
-> **Freeze**：v1.1 冻结 REQ-CL-001～028 与 REQ-PC-001～010；v1.2 冻结外部 AXI reset/fabric epoch 边界；v1.3 冻结 SFU 数值合同；v1.4 冻结七类 Engine 的 4-bit Error ABI、同拍错误优先级和可见写回前缀规则；v1.5 冻结 Matrix Line full-strobe/alignment/fallback/protection 合同；v1.6 冻结 Scalar INT8 有符号累加、算术移位、激活和饱和顺序；v1.7 冻结 KV 字节步长对齐、地址溢出拒绝及错误码。未完成的 Engine × Fault × Phase 覆盖仍是验证缺口，不因写入规格而视为通过；接口或可观察行为变化必须升版。
+> **Freeze**：v1.1 冻结 REQ-CL-001～028 与 REQ-PC-001～010；v1.2 冻结外部 AXI reset/fabric epoch 边界；v1.3 冻结 SFU 数值合同；v1.4 冻结七类 Engine 的 4-bit Error ABI、同拍错误优先级和可见写回前缀规则；v1.5 冻结 Matrix Line full-strobe/alignment/fallback/protection 合同；v1.6 冻结 Scalar INT8 有符号累加、算术移位、激活和饱和顺序；v1.7 冻结 KV 字节步长对齐、地址溢出拒绝及错误码；v1.8 明确硬件 busy 时软件可推进 CPLQ_HEAD 消费已发布完成项，并解除满队列停顿。未完成的 Engine × Fault × Phase 覆盖仍是验证缺口，不因写入规格而视为通过；接口或可观察行为变化必须升版。
 
 ## 0. 规范用语及适用范围
 
@@ -419,7 +419,7 @@ Functional Coverage / SVA / URG
 | OPEN-NUM-01 | **Closed scoped by v1.6/R52** | Legal-activation VDOT/GEMV/GEMM common arithmetic contract and independent edge campaign pass; R51 reserved-activation stimulus is excluded; legacy Conv and broader opcode/shape coverage remain partial under REQ-CL-020 / CL-COV-003 |
 | OPEN-NUM-02 | **Closed in v1.3** | SFU 数值公式和独立 bit-exact oracle 已冻结；合同域的实测闭环见 RTM R21 |
 
-**冻结状态说明**：v1.1 是并行派发合法范围 DV 基线；v1.2 定义协调 reset/fabric epoch 约束；v1.3 定义 SFU 定点算术；v1.4 定义 Compute Engine Error ABI、优先级与写回前缀；v1.5 冻结 Matrix Line 的 full-strobe/alignment/fallback/protection 合同；v1.6 冻结 Scalar INT8 算术顺序与 signed overflow/saturation 规则；v1.7 冻结 KV 32-bit word 地址与溢出合同。其他 Open Item 不因升版自动关闭，未来修改可观察行为必须升版并关联 Testplan 的 Requirement ID。
+**冻结状态说明**：v1.1 是并行派发合法范围 DV 基线；v1.2 定义协调 reset/fabric epoch 约束；v1.3 定义 SFU 定点算术；v1.4 定义 Compute Engine Error ABI、优先级与写回前缀；v1.5 冻结 Matrix Line 的 full-strobe/alignment/fallback/protection 合同；v1.6 冻结 Scalar INT8 算术顺序与 signed overflow/saturation 规则；v1.7 冻结 KV 32-bit word 地址与溢出合同；v1.8 冻结 busy 期间 CPLQ_HEAD 消费推进语义。其他 Open Item 不因升版自动关闭，未来修改可观察行为必须升版并关联 Testplan 的 Requirement ID。
 
 ## 7. 仓库基线及引用文件
 
@@ -440,7 +440,7 @@ Functional Coverage / SVA / URG
 | REQ-PC-001 | **21 个无序 Engine Pair 均可并行**：Scalar INT8、Mixed FP、CNM、Matrix、SFU、Conv、KV 七类引擎两两组合共 `C(7,2)=21`；不同 Engine 可同时 busy。 | 21/21 pair overlap，按实际顶层 CMDQ/引擎启动检查。 |
 | REQ-PC-002 | **每 Engine 一个 Active 槽**：单个 descriptor 只启动一个 Engine；同 Engine 的后继 descriptor 保留在 CMDQ，前一任务结果被安全锁存且活动槽释放后才能派发。 | 跨引擎并行；同引擎不得双重活动、覆盖上下文或丢任务。 |
 | REQ-PC-003 | **CMDQ 派发顺序**：descriptor 按 CMDQ head 顺序取回、校验和尝试派发。目标 Engine 忙时可等待该 descriptor；不得越过它重排软件提交顺序。 | `CMDQ_HEAD`、每次 launch 与 task ID 顺序一致。 |
-| REQ-PC-004 | **CPLQ 完成 FIFO**：执行可乱序完成；结果/error/counters 按其 CMDQ descriptor 顺序进入完成 FIFO。CPLQ 满或 Completion Writer busy 时保留记录、不得覆盖/丢失；四个 completion words 全部写入后才推进 tail。 | 故意反转完成延迟；CPLQ 满后确认停在 head、释放空间后按序恢复。 |
+| REQ-PC-004 | **CPLQ 完成 FIFO**：执行可乱序完成；结果/error/counters 按其 CMDQ descriptor 顺序进入完成 FIFO。CPLQ 满或 Completion Writer busy 时保留记录、不得覆盖/丢失；四个 completion words 全部写入后才推进 tail。软件可在硬件 busy 时推进 CPLQ_HEAD 消费已提交项，释放空间后完成退休须按序恢复。 | 故意反转完成延迟；活动任务期间填满 CPLQ，确认 tail 停在 head、允许消费者推进 head 且按序恢复。 |
 | REQ-PC-005 | **同时 Done**：多个不同 Engine 可同拍报告 Done，必须各自锁存唯一 task owner 的结果与状态，不能因聚合 `core_done` 合并或丢失完成。 | 至少一组双 Engine 同周期 Done，并检查各自最终 completion。 |
 | REQ-PC-006 | **共享 Compute SPAD 单所有权**：七个普通 requester 经 `ai_compute_spad_mux` 逐个准入 `ai_spad_arbiter` CORE 端口；被接受请求的 owner 贯穿 ready、protection error 和 registered response。未接受 requester 不得看到响应或错误。 | requester 竞争和 ready 背压；按硬件接口的一周期注册响应检查地址/数据/错误只回到 owner，未接受 requester 无副作用。 |
 | REQ-PC-007 | **Banked/Line 独立通道**：CNM 的四 Bank 请求与 Matrix banked/128-bit line 端口维持各自接口与响应归属，不得错误折叠进 32-bit owner MUX。 | 四 lane、banked read、line write/WSTRB 按各自 handshake monitor 校验。 |
@@ -448,4 +448,4 @@ Functional Coverage / SVA / URG
 | REQ-PC-009 | **Abort/Drain**：abort 后不再派发未接受的新 descriptor；所有已派发任务均收到 abort，已接受 SPAD 请求/响应按 owner 收尾；任务以 `ERR_ABORT` 或更早已发生的 Engine error 形成一次完成，按 CMDQ 顺序退休。调度器在所有 Engine 和完成项排空前不得报告 idle；未派发的 CMDQ descriptor 留给软件。 | 多 Engine active 时 abort；检查停止新 launch、SPAD owner 无泄漏、完成 FIFO 保序、idle/drain 和随后可恢复运行。 |
 | REQ-PC-010 | **Reset 与恢复**：reset 清除 Engine 活动槽、结果 FIFO、SPAD owner pipeline 和未发布 completion；复位后旧 Done/响应不得污染新 task。若 AXI 外部读/写已接受，必须协调复位加速器与 owning fabric，fabric 丢弃旧 epoch R/B；accelerator-only reset 仅可在 DMA/AXI 通道空闲或已完成显式排空/隔离后执行。 | UVM 在已接受 AR 且 R 延迟时协调复位，检查 fabric read queue/active/RVALID 清空，并在 8 周期安静窗口检查无旧 R、新 AR；再检查 SPAD sentinel 未变及 reset 后新事务恢复。该测试不代表 B 通道或任意外部 fabric 实现的独立证明。 |
 
-**v1.1/v1.2/v1.3/v1.4/v1.5/v1.6 Freeze Record**：v1.1 冻结 REQ-CL-001～028、REQ-PC-001～010、合法并行任务合同、SPAD owner 及按序 completion 行为；v1.2 冻结外部 AXI reset/fabric epoch 边界；v1.3 冻结 SFU 数值整数公式和约定输入域；v1.4 冻结 Compute Engine Error ABI、同周期优先级和可见写回前缀；v1.5 冻结 Matrix Line full-strobe/alignment/fallback/protection 合同；v1.6 冻结 Scalar INT8 packed Dot 与 post-processing 合同。SPEC 冻结不等于 UVM、coverage 或最终 Sign-off 已完成。现有 verification evidence 与未闭合项见 [Compute Cluster Testplan](../verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md)、[Execution RTM](../verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md) 和 [Verification Matrix](../../dv/VERIFICATION_MATRIX.md)。
+**v1.1/v1.2/v1.3/v1.4/v1.5/v1.6/v1.7/v1.8 Freeze Record**：v1.1 冻结 REQ-CL-001～028、REQ-PC-001～010、合法并行任务合同、SPAD owner 及按序 completion 行为；v1.2 冻结外部 AXI reset/fabric epoch 边界；v1.3 冻结 SFU 数值整数公式和约定输入域；v1.4 冻结 Compute Engine Error ABI、同周期优先级和可见写回前缀；v1.5 冻结 Matrix Line full-strobe/alignment/fallback/protection 合同；v1.6 冻结 Scalar INT8 packed Dot 与 post-processing 合同；v1.7 冻结 KV 地址/步长合同；v1.8 明确 busy 时 CPLQ_HEAD 消费推进。SPEC 冻结不等于 UVM、coverage 或最终 Sign-off 已完成。现有 verification evidence 与未闭合项见 [Compute Cluster Testplan](../verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md)、[Execution RTM](../verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md) 和 [Verification Matrix](../../dv/VERIFICATION_MATRIX.md)。

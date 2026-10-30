@@ -48,6 +48,7 @@ interface ai_compute_cluster_if(input logic aclk);
     logic parallel_queue_mode;
     logic desc_valid, desc_ready;
     logic cpl_valid, cpl_write, cpl_ready;
+    logic cplq_full;
     logic core_spad_write;
     logic matrix_line_valid, matrix_line_write, matrix_line_ready;
     logic [31:0] matrix_line_addr;

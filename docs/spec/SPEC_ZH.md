@@ -78,7 +78,7 @@ SPAD 保护寄存器配置四个区域 R0–R3；每区的 `BASE` 是包含的�
 
 ## 4. 队列、描述符与完成项
 
-软件写 CMDQ 描述符并发布 `CMDQ_TAIL`，硬件消费并报告 `CMDQ_HEAD`；硬件写 CPLQ 完成项并发布 `CPLQ_TAIL`，软件消费后发布 `CPLQ_HEAD`。CMDQ/CPLQ 可放在 scratchpad 或外部内存，`CMD_CTRL[0]` 选择外部描述符。CMD_HEAD/CPL_TAIL 的写仅用于复位/调试种子，不是正常运行时的软件推进方式。
+软件写 CMDQ 描述符并发布 `CMDQ_TAIL`，硬件消费并报告 `CMDQ_HEAD`；硬件写 CPLQ 完成项并发布 `CPLQ_TAIL`，软件消费后发布 `CPLQ_HEAD`。软件可在硬件仍 busy 时推进 `CPLQ_HEAD` 以释放满队列空间。CMDQ/CPLQ 可放在 scratchpad 或外部内存，`CMD_CTRL[0]` 选择外部描述符。CMD_HEAD/CPL_TAIL 的写仅用于复位/调试种子，不是正常运行时的软件推进方式。
 
 一条 ABI v7 描述符固定 64 字节、64 字节对齐、16 个 little-endian 32-bit word；A9/ABI v7.3 加入 `0x50 BF16_DOT_ACC_FP32`，A10/ABI v7.4 增加 `0x51 FP16_DOT_ACC_FP32`，均不改变描述符字节布局：
 
