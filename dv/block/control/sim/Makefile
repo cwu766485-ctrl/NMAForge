@@ -9,7 +9,7 @@ SEED ?= 20260813
 TESTS := control_reset_version_test control_register_file_test control_protocol_test control_channel_backpressure_test control_inflight_reset_test control_irq_error_test \
 	control_busy_abort_test control_random_rw_test control_ral_access_test
 
-.PHONY: uvm_compile run_sim uvm_run uvm_smoke uvm_regress coverage
+.PHONY: uvm_compile run_sim uvm_run uvm_smoke uvm_regress coverage descriptor-validator-regress
 
 uvm_compile:
 	$(VCS) -full64 -sverilog -ntb_opts uvm-1.2 -debug_access+all \
@@ -37,3 +37,16 @@ uvm_regress: uvm_compile
 
 coverage:
 	$(URG) -dir $(COV_DIR) -report coverage/report
+
+DESCRIPTOR_VALIDATOR_OUT ?= /tmp/nmaforge_descriptor_validator_r90
+descriptor-validator-regress:
+	mkdir -p $(DESCRIPTOR_VALIDATOR_OUT)
+	$(VCS) -full64 -sverilog -timescale=1ns/1ps \
+		-top tb_ai_descriptor_validator \
+		../../../../rtl/control/descriptor/ai_descriptor_validator.v \
+		../../../../rtl/control/descriptor/ai_accel_opcode_decode.v \
+		../tb/tb_ai_descriptor_validator.sv \
+		-o $(DESCRIPTOR_VALIDATOR_OUT)/simv \
+		-l $(DESCRIPTOR_VALIDATOR_OUT)/compile.log
+	$(DESCRIPTOR_VALIDATOR_OUT)/simv -l $(DESCRIPTOR_VALIDATOR_OUT)/run.log
+	@grep -q '^DESCRIPTOR_VALIDATOR_PASS legal_opcodes=27 tile_pack=1 invalid_rules=21 opcode_classes_consistent=1$$' $(DESCRIPTOR_VALIDATOR_OUT)/run.log

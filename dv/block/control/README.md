@@ -92,3 +92,13 @@ condition/toggle/branch is now 100.00%/85.09%/30.14%/98.51%; its earlier
 50.73%/60.53%/12.23%/25.25% numbers are superseded. Condition/branch outcomes
 and low toggle coverage still need review; this does not close all Control
 coverage or overall A10 sign-off. See [the exact run record](../../../docs/verification/A10_DV_RUN_2026-10-16.md).
+
+
+### Descriptor-validator boundary test
+
+`make descriptor-validator-regress` compiles the production descriptor validator
+and opcode decoder with a small deterministic SV testbench. It checks each of
+the 27 supported opcodes, the special Matrix A tile-pack predicate, and
+invalid opcode/dimension/version/alignment/macro/FP-field cases. This is a
+combinational validator contract test; it does not claim full CMDQ-to-engine
+dispatch coverage.
