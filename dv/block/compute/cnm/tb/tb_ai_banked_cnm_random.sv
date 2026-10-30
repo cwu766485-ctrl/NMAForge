@@ -1,6 +1,8 @@
 `timescale 1ns/1ps
 
 module tb_ai_banked_cnm_random;
+  localparam [2:0] ST_A_REQ=3'd1,ST_B_REQ=3'd2,ST_WAIT_A=3'd3;
+  localparam [2:0] ST_WAIT_B=3'd4,ST_DONE=3'd5,ST_PREFETCH_A=3'd7;
   reg clk=0, resetn=0, start=0, abort=0;
   reg [7:0] op_mode=8'h20;
   reg [31:0] src0=0, src1=0, dst=32'h8000;
@@ -15,6 +17,12 @@ module tb_ai_banked_cnm_random;
   wire [31:0] a0,a1,a2,a3;
   reg [3:0] rsp_valid=0;
   reg [31:0] d0=0,d1=0,d2=0,d3=0;
+  reg [3:0] accepted_req_d1=0;
+  reg [31:0] d0_d1=0,d1_d1=0,d2_d1=0,d3_d1=0;
+  reg [3:0] cnm_req_ready=4'hf;
+  reg prefetch_backpressure=0;
+  reg extra_response_delay=1;
+  wire [3:0] accepted_req=req & cnm_req_ready;
   wire [31:0] result, cycles, elements;
   wire [31:0] local_acc, global_reduce, reads, prefetch, computes, rsp_wait;
   wire busy,done,error,spad_valid,spad_write;
@@ -24,14 +32,32 @@ module tb_ai_banked_cnm_random;
   wire spad_protection_error=inject_spad_protection && spad_valid && spad_ready;
   integer test_seed=20261021, initial_seed, case_id, errors=0,spad_write_count=0,timeout;
   integer cnm_request_count=0;
+  integer wait_a_state_cycles=0,prefetch_a_state_cycles=0;
   always #5 clk=~clk;
+
+  // Exercise the legal request/response contract: only accepted reads return,
+  // responses preserve bank order, and selected prefetch requests can be
+  // backpressured for one cycle without changing their address.
+  always @(*) begin
+    cnm_req_ready=4'hf;
+    if(prefetch_backpressure) begin
+      if(dut.lc0.state_r==3'd4 && rsp_valid[0] &&
+         dut.lc0.k_r!=(dut.lc0.length_r-1'b1)) cnm_req_ready[0]=1'b0;
+      if(dut.lc1.state_r==3'd4 && rsp_valid[1] &&
+         dut.lc1.k_r!=(dut.lc1.length_r-1'b1)) cnm_req_ready[1]=1'b0;
+      if(dut.lc2.state_r==3'd4 && rsp_valid[2] &&
+         dut.lc2.k_r!=(dut.lc2.length_r-1'b1)) cnm_req_ready[2]=1'b0;
+      if(dut.lc3.state_r==3'd4 && rsp_valid[3] &&
+         dut.lc3.k_r!=(dut.lc3.length_r-1'b1)) cnm_req_ready[3]=1'b0;
+    end
+  end
 
   ai_banked_cnm_core dut(
     .clk(clk),.resetn(resetn),.start(start),.abort(abort),.op_mode(op_mode),
     .src0_base(src0),.src1_base(src1),.dst_base(dst),.length(length),
     .m_size(16'd1),.scale_shift(scale_shift),.activation(activation),
     .watchdog_limit(watchdog_limit),.cnm_req_valid(req),.cnm_addr0(a0),.cnm_addr1(a1),
-    .cnm_addr2(a2),.cnm_addr3(a3),.cnm_req_ready(4'hf),.cnm_rsp_valid(rsp_valid),
+    .cnm_addr2(a2),.cnm_addr3(a3),.cnm_req_ready(cnm_req_ready),.cnm_rsp_valid(rsp_valid),
     .cnm_data0(d0),.cnm_data1(d1),.cnm_data2(d2),.cnm_data3(d3),
     .cnm_parity_error(parity_error),.cnm_protection_error(cnm_protection_error),
     .spad_valid(spad_valid),.spad_write(spad_write),.spad_addr(spad_addr),
@@ -69,23 +95,41 @@ module tb_ai_banked_cnm_random;
 
   always @(posedge clk) begin
     if(!resetn) begin
-      rsp_valid<=0;
+      rsp_valid<=0;accepted_req_d1<=0;
       d0<=0;d1<=0;d2<=0;d3<=0;
+      d0_d1<=0;d1_d1<=0;d2_d1<=0;d3_d1<=0;
       cnm_request_count<=0;
+      wait_a_state_cycles<=0;prefetch_a_state_cycles<=0;
     end else begin
-      rsp_valid <= req;
-      cnm_request_count <= cnm_request_count + req[0] + req[1] + req[2] + req[3];
-      if(req[0]) d0 <= model_word(a0);
-      if(req[1]) d1 <= model_word(a1);
-      if(req[2]) d2 <= model_word(a2);
-      if(req[3]) d3 <= model_word(a3);
+      rsp_valid <= extra_response_delay ? accepted_req_d1 : accepted_req;
+      accepted_req_d1 <= accepted_req;
+      if(extra_response_delay) begin
+        d0<=d0_d1;d1<=d1_d1;d2<=d2_d1;d3<=d3_d1;
+      end else begin
+        if(accepted_req[0]) d0<=model_word(a0);
+        if(accepted_req[1]) d1<=model_word(a1);
+        if(accepted_req[2]) d2<=model_word(a2);
+        if(accepted_req[3]) d3<=model_word(a3);
+      end
+      cnm_request_count <= cnm_request_count + accepted_req[0] + accepted_req[1] + accepted_req[2] + accepted_req[3];
+      if(accepted_req[0]) d0_d1 <= model_word(a0);
+      if(accepted_req[1]) d1_d1 <= model_word(a1);
+      if(accepted_req[2]) d2_d1 <= model_word(a2);
+      if(accepted_req[3]) d3_d1 <= model_word(a3);
+      wait_a_state_cycles<=wait_a_state_cycles+
+        ((dut.lc0.state_r==3'd3)?1:0)+((dut.lc1.state_r==3'd3)?1:0)+
+        ((dut.lc2.state_r==3'd3)?1:0)+((dut.lc3.state_r==3'd3)?1:0);
+      prefetch_a_state_cycles<=prefetch_a_state_cycles+
+        ((dut.lc0.state_r==3'd7)?1:0)+((dut.lc1.state_r==3'd7)?1:0)+
+        ((dut.lc2.state_r==3'd7)?1:0)+((dut.lc3.state_r==3'd7)?1:0);
       if(spad_valid && spad_ready && !spad_protection_error)
         spad_write_count<=spad_write_count+1;
     end
   end
 
-  task automatic run_case(input integer id, input [15:0] k_length);
-    integer k,lane;
+  task automatic run_case(input integer id, input [15:0] k_length,
+                          input integer backpressure_mode,input integer extra_delay_mode);
+    integer k,lane,wait_a_before,prefetch_before;
     reg [31:0] a_addr,b_addr;
     reg signed [63:0] expected_sum, expected_result;
     begin
@@ -94,6 +138,10 @@ module tb_ai_banked_cnm_random;
       length=k_length;
       scale_shift=id%4;
       activation=id%2;
+      prefetch_backpressure=(backpressure_mode!=0);
+      extra_response_delay=(extra_delay_mode!=0);
+      wait_a_before=wait_a_state_cycles;
+      prefetch_before=prefetch_a_state_cycles;
       expected_sum=0;
       for(k=0;k<k_length;k=k+1) begin
         for(lane=0;lane<4;lane=lane+1) begin
@@ -117,6 +165,42 @@ module tb_ai_banked_cnm_random;
          reads!==8*k_length || prefetch!==4*(k_length-1) || computes!==4*k_length)
         $fatal(1,"CNM random case=%0d counters elements=%0d local=%0d global=%0d reads=%0d prefetch=%0d compute=%0d",
                id,elements,local_acc,global_reduce,reads,prefetch,computes);
+      if(extra_delay_mode && wait_a_state_cycles==wait_a_before)
+        $fatal(1,"CNM random case=%0d failed to exercise delayed A response state",id);
+      if(backpressure_mode && prefetch_a_state_cycles-prefetch_before!=4*(k_length-1))
+        $fatal(1,"CNM random case=%0d prefetch backpressure holds=%0d expected=%0d",
+               id,prefetch_a_state_cycles-prefetch_before,4*(k_length-1));
+      prefetch_backpressure=0;
+      extra_response_delay=1;
+    end
+  endtask
+
+  task automatic abort_at_local_phase(input [2:0] target_state,input integer id);
+    integer local_timeout,writes_before;
+    begin
+      op_mode=8'h20;length=(target_state==ST_DONE)?16'd1:16'd4;
+      watchdog_limit=0;parity_error=0;inject_cnm_protection=0;
+      inject_spad_protection=0;extra_response_delay=1;
+      prefetch_backpressure=(target_state==ST_PREFETCH_A);
+      writes_before=spad_write_count;
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      local_timeout=0;
+      while(dut.lc0.state_r!=target_state && local_timeout<10000) begin
+        @(negedge clk);local_timeout=local_timeout+1;
+      end
+      if(dut.lc0.state_r!=target_state)
+        $fatal(1,"CNM phase Abort id=%0d failed to reach local state=%0d current=%0d",
+               id,target_state,dut.lc0.state_r);
+      abort=1;@(negedge clk);abort=0;prefetch_backpressure=0;
+      local_timeout=0;
+      while(!done && local_timeout<10000) begin @(negedge clk);local_timeout=local_timeout+1;end
+      if(!done || !error || error_code!==4'd3 || busy)
+        $fatal(1,"CNM phase Abort id=%0d code/done/error/busy=%0d/%b/%b/%b",
+               id,error_code,done,error,busy);
+      if(spad_write_count!=writes_before)
+        $fatal(1,"CNM phase Abort id=%0d committed output write",id);
+      repeat(4) @(negedge clk);
     end
   endtask
 
@@ -205,7 +289,7 @@ module tb_ai_banked_cnm_random;
       abort=0;parity_error=0;inject_cnm_protection=0;inject_spad_protection=0;
       repeat(2) @(negedge clk);
       op_mode=8'h20;length=3;watchdog_limit=0;
-      run_case(9,3);
+      run_case(9,3,0,1);
     end
   endtask
 
@@ -247,7 +331,15 @@ module tb_ai_banked_cnm_random;
     repeat(3) @(negedge clk);
     resetn=1;
     for(case_id=1;case_id<=8;case_id=case_id+1)
-      run_case(case_id,case_id);
+      run_case(case_id,case_id,0,1);
+    run_case(10,4,1,1);
+    run_case(11,3,0,0);
+    abort_at_local_phase(ST_A_REQ,0);
+    abort_at_local_phase(ST_B_REQ,1);
+    abort_at_local_phase(ST_WAIT_A,2);
+    abort_at_local_phase(ST_WAIT_B,3);
+    abort_at_local_phase(ST_PREFETCH_A,4);
+    abort_at_local_phase(ST_DONE,5);
     length=0;expect_cnm_error(4'd1,0);
     length=3;parity_error=4'hf;expect_cnm_error(4'd5,1);
     inject_cnm_protection=1;expect_cnm_error(4'd6,2);
@@ -263,7 +355,7 @@ module tb_ai_banked_cnm_random;
     run_late_parity_fault();
     check_reset_recovery();
     if(errors) $fatal(1,"CNM random regression mismatches=%0d",errors);
-    $display("CNM_RANDOM_PASS cases=10 faults=8 late_faults=1 reset_fault_combo=1 reset_recovery=1 seed=%0d",initial_seed);
+    $display("CNM_RANDOM_PASS cases=12 faults=8 phase_abort=6 late_faults=1 reset_fault_combo=1 reset_recovery=1 wait_a=1 prefetch_backpressure=1 fast_response=1 seed=%0d",initial_seed);
     $finish;
   end
 endmodule
