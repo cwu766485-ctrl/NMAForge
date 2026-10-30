@@ -74,9 +74,6 @@ module ai_accel_memory_fabric #(
     wire compute_prot_allow, line_prot_allow, banked_prot_allow, cpl_prot_allow;
     wire core_spad_error;
     wire spad_line_error;
-    wire cnm_protection_error_request;
-    reg cnm_protection_error_req_d;
-    reg cnm_protection_error_rsp_r;
 
     ai_spad_arbiter spad_arbiter_u(
         .clk(clk), .resetn(resetn),
@@ -113,24 +110,6 @@ module ai_accel_memory_fabric #(
     assign core_spad_error = compute_protection_error;
     assign banked_protection_error = arb_banked_valid &&
                                      (!banked_prot_allow || (arb_banked_addr > SPAD_BYTES - 32'd16));
-    // CNM protection is a response-side indication.  Tag the request only
-    // when the arbiter accepts it, then delay the error alongside the
-    // scratchpad's registered data and cnm_rsp_valid pipeline.
-    assign cnm_protection_error_request =
-        (arb_cnm_valid[0] && (arb_cnm_addr0 > SPAD_BYTES - 32'd4)) ||
-        (arb_cnm_valid[1] && (arb_cnm_addr1 > SPAD_BYTES - 32'd4)) ||
-        (arb_cnm_valid[2] && (arb_cnm_addr2 > SPAD_BYTES - 32'd4)) ||
-        (arb_cnm_valid[3] && (arb_cnm_addr3 > SPAD_BYTES - 32'd4));
-    always @(posedge clk or negedge resetn) begin
-        if (!resetn) begin
-            cnm_protection_error_req_d <= 1'b0;
-            cnm_protection_error_rsp_r <= 1'b0;
-        end else begin
-            cnm_protection_error_req_d <= (|cnm_ready) && cnm_protection_error_request;
-            cnm_protection_error_rsp_r <= cnm_protection_error_req_d;
-        end
-    end
-    assign cnm_protection_error = cnm_protection_error_rsp_r;
     assign line_protection_error = spad_line_valid &&
                                    (!line_prot_allow || (spad_line_addr > SPAD_BYTES - 32'd16));
     assign spad_line_error = line_raw_error || line_protection_error;
@@ -157,6 +136,7 @@ module ai_accel_memory_fabric #(
         .line_rdata(line_rdata), .line_parity_error(line_parity_error), .line_raw_error(line_raw_error),
         .banked_data0(banked_data0), .banked_data1(banked_data1), .banked_data2(banked_data2), .banked_data3(banked_data3), .banked_parity_error(banked_parity),
         .cnm_data0(cnm_data0), .cnm_data1(cnm_data1), .cnm_data2(cnm_data2), .cnm_data3(cnm_data3), .cnm_parity_error(cnm_parity),
+        .cnm_protection_error(cnm_protection_error),
         .host_prot_allow(host_prot_allow), .compute_prot_allow(compute_prot_allow), .line_prot_allow(line_prot_allow), .banked_prot_allow(banked_prot_allow), .cpl_prot_allow(cpl_prot_allow)
     );
 endmodule

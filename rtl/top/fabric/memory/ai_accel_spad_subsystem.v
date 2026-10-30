@@ -71,12 +71,76 @@ module ai_accel_spad_subsystem #(
     output wire [31:0]  cnm_data2,
     output wire [31:0]  cnm_data3,
     output wire [3:0]   cnm_parity_error,
+    output wire         cnm_protection_error,
     output wire         host_prot_allow,
     output wire         compute_prot_allow,
     output wire         line_prot_allow,
     output wire         banked_prot_allow,
     output wire         cpl_prot_allow
 );
+
+    wire [3:0] cnm_lane_prot_allow;
+    wire [3:0] cnm_lane_access_allow;
+    wire banked_access_allow;
+    reg cnm_protection_error_r;
+
+    ai_spad_protection cnm_protection0_u (
+        .region0_base(region0_base), .region0_limit(region0_limit), .region0_perm(region0_perm),
+        .region1_base(region1_base), .region1_limit(region1_limit), .region1_perm(region1_perm),
+        .region2_base(region2_base), .region2_limit(region2_limit), .region2_perm(region2_perm),
+        .region3_base(region3_base), .region3_limit(region3_limit), .region3_perm(region3_perm),
+        .req_valid(cnm_valid[0]), .req_addr(cnm_addr0), .req_bytes(32'd4),
+        .req_write(1'b0), .req_execute(1'b1), .allow(cnm_lane_prot_allow[0])
+    );
+    ai_spad_protection cnm_protection1_u (
+        .region0_base(region0_base), .region0_limit(region0_limit), .region0_perm(region0_perm),
+        .region1_base(region1_base), .region1_limit(region1_limit), .region1_perm(region1_perm),
+        .region2_base(region2_base), .region2_limit(region2_limit), .region2_perm(region2_perm),
+        .region3_base(region3_base), .region3_limit(region3_limit), .region3_perm(region3_perm),
+        .req_valid(cnm_valid[1]), .req_addr(cnm_addr1), .req_bytes(32'd4),
+        .req_write(1'b0), .req_execute(1'b1), .allow(cnm_lane_prot_allow[1])
+    );
+    ai_spad_protection cnm_protection2_u (
+        .region0_base(region0_base), .region0_limit(region0_limit), .region0_perm(region0_perm),
+        .region1_base(region1_base), .region1_limit(region1_limit), .region1_perm(region1_perm),
+        .region2_base(region2_base), .region2_limit(region2_limit), .region2_perm(region2_perm),
+        .region3_base(region3_base), .region3_limit(region3_limit), .region3_perm(region3_perm),
+        .req_valid(cnm_valid[2]), .req_addr(cnm_addr2), .req_bytes(32'd4),
+        .req_write(1'b0), .req_execute(1'b1), .allow(cnm_lane_prot_allow[2])
+    );
+    ai_spad_protection cnm_protection3_u (
+        .region0_base(region0_base), .region0_limit(region0_limit), .region0_perm(region0_perm),
+        .region1_base(region1_base), .region1_limit(region1_limit), .region1_perm(region1_perm),
+        .region2_base(region2_base), .region2_limit(region2_limit), .region2_perm(region2_perm),
+        .region3_base(region3_base), .region3_limit(region3_limit), .region3_perm(region3_perm),
+        .req_valid(cnm_valid[3]), .req_addr(cnm_addr3), .req_bytes(32'd4),
+        .req_write(1'b0), .req_execute(1'b1), .allow(cnm_lane_prot_allow[3])
+    );
+
+    assign cnm_lane_access_allow[0] = cnm_lane_prot_allow[0] &&
+                                      !(|cnm_addr0[1:0]) &&
+                                      (cnm_addr0 <= SPAD_BYTES - 32'd4);
+    assign cnm_lane_access_allow[1] = cnm_lane_prot_allow[1] &&
+                                      !(|cnm_addr1[1:0]) &&
+                                      (cnm_addr1 <= SPAD_BYTES - 32'd4);
+    assign cnm_lane_access_allow[2] = cnm_lane_prot_allow[2] &&
+                                      !(|cnm_addr2[1:0]) &&
+                                      (cnm_addr2 <= SPAD_BYTES - 32'd4);
+    assign cnm_lane_access_allow[3] = cnm_lane_prot_allow[3] &&
+                                      !(|cnm_addr3[1:0]) &&
+                                      (cnm_addr3 <= SPAD_BYTES - 32'd4);
+
+    assign banked_access_allow = banked_prot_allow && !(|banked_addr[3:0]) &&
+                                 (banked_addr <= SPAD_BYTES - 32'd16);
+
+    always @(posedge clk or negedge resetn) begin
+        if (!resetn) begin
+            cnm_protection_error_r <= 1'b0;
+        end else begin
+            cnm_protection_error_r <= |(cnm_valid & ~cnm_lane_access_allow);
+        end
+    end
+    assign cnm_protection_error = cnm_protection_error_r;
 
     ai_spad_protection host_protection_u (
         .region0_base(region0_base), .region0_limit(region0_limit), .region0_perm(region0_perm),
@@ -152,14 +216,17 @@ module ai_accel_spad_subsystem #(
         .line_rdata           (line_rdata),
         .line_parity_error    (line_parity_error),
         .line_error           (line_raw_error),
-        .banked_read_valid    (banked_valid),
+        .banked_read_valid    (banked_valid && banked_access_allow),
         .banked_addr          (banked_addr),
         .banked_data0         (banked_data0),
         .banked_data1         (banked_data1),
         .banked_data2         (banked_data2),
         .banked_data3         (banked_data3),
         .banked_parity_error  (banked_parity_error),
-        .cnm_read_valid       (cnm_valid),
+        // The arbiter still accepts and tags the complete lane mask. Denied
+        // lanes are suppressed at the SRAM boundary and are reported with
+        // the registered Protection error above.
+        .cnm_read_valid       (cnm_valid & cnm_lane_access_allow),
         .cnm_addr0            (cnm_addr0),
         .cnm_addr1            (cnm_addr1),
         .cnm_addr2            (cnm_addr2),
