@@ -1,6 +1,7 @@
 # NMAForge Compute Cluster UVM Testplan（中文）
 
 > **R65 当前执行状态（2026-10-30）**：最新 clean verification/test SHA 为 `2ab887ae1b4846512e7673e3d5ea4ce0061c0d0a`；R65 在三个 seed 上对真实七引擎完成 19 个 Protection phase case/seed（source-A 7、source-B 5、writeback 7），Memory Scoreboard 每 seed 检查 5,812 words 且 mismatch/unknown/stale 均为 0，UVM severity `0/0/0`，同 SHA 的 Top Smoke 和 20-case seeded top regression PASS。R65 仅增加命名的 Protection phase testpoint；38 项 RTM 仍为 24 PASS-SCOPED、14 PARTIAL，`CL-DV-v1.0` 仍为 HOLD。证据与 SHA-256 见 [R65 报告](COMPUTE_CLUSTER_PROTECTION_PHASE_CROSS_R65_2026-10-30.md) 和 [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)。
+> **R66 checker sensitivity 增量（同一 SHA）**：在上述 R65 exact SHA clean worktree 上重新编译并执行 28 项 Mutation Campaign，address/data/owner/WSTRB、completion error、write-after-error、stale epoch 和七引擎 Done/missing/duplicate Done 均被预期 checker 捕获；Makefile gate 通过。Mutation test 中的 UVM error 是有意注入并由 checker 捕获的预期结果，不是 DUT 回归失败；这不是 RTL mutation score。见 [R66 mutation replay](COMPUTE_CLUSTER_MUTATION_CLEAN_REPLAY_R66_2026-10-30.md)。不改变 RTM 24/14 和 HOLD 状态。
 
 > **文档编号**：NMA-CL-DV-TP-001
 > **版本**：v1.7 / Parallel Compute Requirement Traceability Baseline
