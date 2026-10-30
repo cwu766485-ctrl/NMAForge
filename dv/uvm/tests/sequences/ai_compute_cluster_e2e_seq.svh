@@ -1527,6 +1527,193 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             reset_seen), UVM_LOW)
     endtask
 
+    task automatic run_engine_abort_drain_sweep();
+        int engine;
+        int unsigned poll;
+        int unsigned word_idx;
+        int unsigned accepted_reads;
+        int unsigned returned_reads;
+        int unsigned accepted_now;
+        int unsigned returned_now;
+        bit accepted_read;
+        bit monitor_done;
+        bit abort_seen;
+        bit [6:0] abort_seen_mask;
+        bit [31:0] completion_base;
+        bit [31:0] desc_base;
+        bit [31:0] abort_dst;
+        bit [31:0] abort_src0;
+        bit [31:0] abort_src1;
+        bit [15:0] task_id;
+
+        abort_seen_mask = '0;
+        desc_base = CLUSTER_CONTRACT_CMDQ;
+        // Give every long-running engine fully initialized legal operands so
+        // the independent memory scoreboard can check all accepted reads.
+        for (word_idx = 0; word_idx < 64; word_idx++) begin
+            spad_write(32'h0004_a800 + (word_idx << 2), 32'h0102_0304 + word_idx);
+            spad_write(32'h0004_a900 + (word_idx << 2), 32'h0506_0708 + word_idx);
+            spad_write(32'h0004_aa00 + (word_idx << 2), 32'h1111_1111 * (word_idx + 1));
+            spad_write(32'h0004_b000 + (word_idx << 2), 32'd0);
+            spad_write(32'h0004_b100 + (word_idx << 2), word_idx + 1);
+            spad_write(32'h0004_b700 + (word_idx << 2), (word_idx + 1) * 32'h100);
+        end
+        for (word_idx = 64; word_idx < 256; word_idx++)
+            spad_write(32'h0004_b100 + (word_idx << 2), word_idx + 1);
+        for (word_idx = 0; word_idx < 256; word_idx++)
+            spad_write(32'h0004_ab00 + (word_idx << 2),
+                       32'h0101_0101 * ((word_idx % 15) + 1));
+        for (word_idx = 0; word_idx < 9; word_idx++)
+            spad_write(32'h0004_b600 + (word_idx << 2), 32'd1);
+
+        for (engine = 0; engine < 7; engine++) begin
+            task_id = 16'h0760 + engine;
+            completion_base = 32'h0000_5c00;
+            abort_dst = 32'h0003_a000 + (engine * 32'h1000);
+            abort_src0 = 32'h0004_a800;
+            abort_src1 = 32'h0004_a900;
+            for (word_idx = 0; word_idx < 8; word_idx++)
+                spad_write(abort_dst + (word_idx << 2),
+                           32'hbad0_7600 | (engine << 8) | word_idx);
+            for (word_idx = 0; word_idx < 4; word_idx++)
+                spad_write(completion_base + (word_idx << 2),
+                           32'h7600_0000 | (engine << 8) | word_idx);
+
+            case (engine)
+                0: write_cluster_desc(desc_base, 8'h10, task_id,
+                       abort_src0, abort_src1, abort_dst,
+                       16'd0, 16'd0, 16'd64, 32'd0,
+                       32'd0, 32'd0, 32'd0, 8'd3);
+                1: write_cluster_desc(desc_base, 8'h50, task_id,
+                       abort_src0, abort_src1, abort_dst,
+                       16'd1, 16'd1, 16'd64, 32'd0,
+                       32'd0, 32'd0, 32'd0, 8'd7);
+                2: begin
+                    write_cnm_v3_desc(desc_base, task_id,
+                        32'h0004_aa00, 32'h0004_ab00, abort_dst);
+                    spad_write(desc_base + 32'h18, 32'd64);
+                end
+                3: write_v3_desc(desc_base, 8'h30, task_id,
+                       MATRIX_A_LOCAL, MATRIX_B_LOCAL, abort_dst,
+                       16'd16, 16'd32, 16'd16);
+                4: write_v3_desc(desc_base, 8'h35, task_id,
+                       32'h0004_b000, 32'd0, abort_dst,
+                       16'd0, 16'd0, 16'd64);
+                5: write_cluster_desc(desc_base, 8'h16, task_id,
+                       32'h0004_b100, 32'h0004_b600, abort_dst,
+                       16'd16, 16'd16, 16'd9, 32'd0,
+                       32'd0, 32'd0, 32'd0, 8'd5);
+                6: write_cluster_desc(desc_base, 8'h43, task_id,
+                       32'h0004_b700, 32'd0, abort_dst,
+                       16'd0, 16'd0, 16'd64, {16'd1,16'd1},
+                       32'd16, 32'd64, 32'd0, 8'd5);
+                default: `uvm_fatal("CLUSTER_ENGINE_ABORT", "invalid engine index")
+            endcase
+
+            configure_contract_queues(completion_base, 32'd1);
+            axil_write(REG_DOORBELL, 32'd1);
+            accepted_read = 1'b0;
+            accepted_reads = 0;
+            returned_reads = 0;
+            for (poll = 0; poll < 50000; poll++) begin
+                @(posedge compute_vif.aclk);
+                accepted_now = 0;
+                case (engine)
+                    2: accepted_now = $countones(compute_vif.cnm_accept_mask);
+                    3: accepted_now = compute_vif.matrix_request_valid &&
+                                      compute_vif.banked_ready;
+                    default: accepted_now = compute_vif.engine_req_valid[engine] &&
+                                            compute_vif.engine_req_ready[engine] &&
+                                            !compute_vif.engine_req_write[engine];
+                endcase
+                accepted_reads += accepted_now;
+                if (accepted_now != 0) begin
+                    accepted_read = 1'b1;
+                    break;
+                end
+            end
+            if (!accepted_read)
+                `uvm_fatal("CLUSTER_ENGINE_ABORT", $sformatf(
+                    "engine %0d task_id=%04h did not accept a real SPAD read before Abort; busy=%07b req=%07b cnm_accept=%b matrix_req=%b banked_ready=%b",
+                    engine, task_id, compute_vif.engine_busy,
+                    compute_vif.engine_req_valid, compute_vif.cnm_accept_mask,
+                    compute_vif.matrix_request_valid, compute_vif.banked_ready))
+
+            monitor_done = 1'b0;
+            abort_seen = 1'b0;
+            fork
+                begin : abort_drain_monitor
+                    while (!monitor_done) begin
+                        @(posedge compute_vif.aclk);
+                        if (compute_vif.dut_abort_active)
+                            abort_seen = 1'b1;
+                        accepted_now = 0;
+                        returned_now = 0;
+                        case (engine)
+                            2: begin
+                                accepted_now = $countones(compute_vif.cnm_accept_mask);
+                                returned_now = $countones(compute_vif.cnm_rsp_valid);
+                            end
+                            3: begin
+                                accepted_now = compute_vif.matrix_request_valid &&
+                                               compute_vif.banked_ready;
+                                returned_now = compute_vif.rsp_valid &&
+                                               (compute_vif.rsp_client == 3'd3);
+                            end
+                            default: begin
+                                accepted_now = compute_vif.engine_req_valid[engine] &&
+                                               compute_vif.engine_req_ready[engine] &&
+                                               !compute_vif.engine_req_write[engine];
+                                returned_now = compute_vif.rsp_valid &&
+                                               (compute_vif.rsp_client == 3'd2);
+                            end
+                        endcase
+                        accepted_reads += accepted_now;
+                        returned_reads += returned_now;
+                    end
+                end
+                begin : issue_abort_and_retire
+                    axil_write(REG_ABORT, 32'd1);
+                    wait_cpl_tail(32'd1);
+                    monitor_done = 1'b1;
+                end
+            join
+
+            wait_spad_idle();
+            if (!abort_seen)
+                `uvm_fatal("CLUSTER_ENGINE_ABORT", $sformatf(
+                    "software Abort was not observed while engine %0d task_id=%04h was draining",
+                    engine, task_id))
+            if (compute_vif.engine_busy != 0)
+                `uvm_fatal("CLUSTER_ENGINE_ABORT", $sformatf(
+                    "engine %0d completion published with busy mask=%07b",
+                    engine, compute_vif.engine_busy))
+            if (accepted_reads == 0 || returned_reads != accepted_reads)
+                `uvm_fatal("CLUSTER_ENGINE_ABORT", $sformatf(
+                    "engine %0d Abort failed to drain accepted reads: accepted=%0d returned=%0d",
+                    engine, accepted_reads, returned_reads))
+            expect_spad(completion_base + 32'h00, {16'd0, task_id},
+                        $sformatf("engine%0d Abort completion task ID", engine));
+            expect_spad(completion_base + 32'h04, 32'h0000_0032,
+                        $sformatf("engine%0d Abort completion status/code", engine));
+            abort_seen_mask[engine] = 1'b1;
+            `uvm_info("CLUSTER_ENGINE_ABORT_CASE_PASS", $sformatf(
+                "engine=%0d task_id=%04h accepted_read=1 abort=1 completion=ERR_ABORT accepted_reads=%0d returned_reads=%0d all_engines_idle=1",
+                engine, task_id, accepted_reads, returned_reads), UVM_LOW)
+            axil_write(REG_CPLQ_HEAD, 32'd1);
+            axil_write(REG_CMDQ_SIZE, 32'd0);
+            axil_write(REG_CPLQ_SIZE, 32'd0);
+        end
+
+        if (abort_seen_mask !== 7'h7f)
+            `uvm_fatal("CLUSTER_ENGINE_ABORT", $sformatf(
+                "not all real engines passed accepted-read Abort/drain: mask=%07b",
+                abort_seen_mask))
+        `uvm_info("CLUSTER_ENGINE_ABORT_PASS", $sformatf(
+            "software Abort after accepted SPAD reads drained all real engines; abort mask=%07b; completion owner/status and accepted-read response balance checked",
+            abort_seen_mask), UVM_LOW)
+    endtask
+
     task automatic check_request_stability();
         int unsigned e;
         if (compute_vif.engine_req_stability_violations != 0 ||
@@ -2582,6 +2769,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_sfu_inflight_parameter_latch_test();
         run_shared_readonly_isolation_test();
         check_request_stability();
+        run_engine_abort_drain_sweep();
         run_engine_reset_drain_sweep();
 
         `uvm_info("COMPUTE_CLUSTER_REAL_UVM_PASS", $sformatf(
