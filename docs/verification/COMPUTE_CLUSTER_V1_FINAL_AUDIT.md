@@ -2,7 +2,7 @@
 
 **Review date:** 2026-10-30
 
-**Selected product/SPEC candidate:** `cc357830923e3dd7beda114b4d761fde839b01a7` (corrective Protection RTL, SPEC v1.7); latest verification/test SHA `cfcd4dbe69d54beaaa93ac2f350279a6b95cb144` (R71 Matrix Line top-stall test; no product RTL changes); R54 top-test SHA `f24c5383fad511c8b2e1132c1157942807994759`
+**Selected product/SPEC candidate:** `cc357830923e3dd7beda114b4d761fde839b01a7` (corrective Protection RTL, SPEC v1.7); latest verification/test SHA `402c8ce4689ae48cfee624f1f5fdca66d534bbbf` (R87 UVM output-path stabilization; no product RTL changes); R54 top-test SHA `f24c5383fad511c8b2e1132c1157942807994759`
 - **Prior reviewed product baseline:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6`
 - **Follow-up evidence branch:** `work/compute-cluster-kv-overflow-20261030`
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
@@ -99,3 +99,8 @@ Three exact-clean seeds at `5a35d60d20ee6fc6622e46f92d05fc1ef00dd14d` pass a rea
 ## R86 Matrix scalar-fallback accepted-write Abort prefix — 2026-10-30
 
 Three exact-clean seeds at `3d6fe5c58631bdeb6333b6e3572f24eeba7da1ef` pass a real-top Matrix 4×4 INT8 GEMM Abort after six accepted scalar output words. The test uses a word-aligned/non-Line-aligned destination, verifies no Matrix Line use, checks the Golden prefix and ten untouched sentinels, drains 8/8 accepted banked reads, and checks `ERR_ABORT`. Each Memory Scoreboard checks 17,352 words with zero mismatch/unknown/stale and UVM severity `0/0/0`. The same exact SHA passes Top Smoke, the 20-case seeded top run and 28/28 passive checker-sensitivity tests. This adds one testpoint only; aligned Line aborts, more shapes/prefixes and broad legal fault/phase/reset crosses remain open. The RTM remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains HOLD. See [R86 report](COMPUTE_CLUSTER_MATRIX_ABORT_WRITE_PREFIX_R86_2026-10-30.md).
+
+
+## R87 default-path regression reproducibility — 2026-10-30
+
+At exact clean SHA `402c8ce4689ae48cfee624f1f5fdca66d534bbbf`, default-path three-seed Compute Cluster UVM, 28/28 passive checker-sensitivity mutations, and Top Smoke pass. The stable Make stamp keeps the compiled `simv_uvm` and mutation invocations under the same output root. This is harness evidence only; requirement dispositions and the HOLD decision do not change. See [R87 report](COMPUTE_CLUSTER_REGRESSION_PATH_STABILITY_R87_2026-10-30.md).
