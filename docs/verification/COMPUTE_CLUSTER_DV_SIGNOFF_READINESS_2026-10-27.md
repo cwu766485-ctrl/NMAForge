@@ -2,7 +2,7 @@
 
 ## Review decision (updated 2026-10-30)
 
-**Selected RTL/SPEC SHA:** `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413` (R99 CNM Protection alignment fix; selected subsystem, fabric reset, Top Smoke, and seeded top tests pass). **Latest tested Compute Cluster UVM code/test SHA:** `5c212a302b0df6ea0f3815ccdf085e139cb4104f` (R109 test-only change; SPEC v1.8 and product RTL are unchanged). Earlier evidence retains its named source identities.\
+**Selected RTL/SPEC SHA:** `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413` (R99 CNM Protection alignment fix; selected subsystem, fabric reset, Top Smoke, and seeded top tests pass). **Latest tested Compute Cluster UVM code/test SHA:** `95864f7027ccbec22a09b0a61832c68d3ca08098` (R110 testbench-only change; SPEC v1.8 and product RTL are unchanged). Earlier evidence retains its named source identities.\
 **Current SPEC:** v1.8 clarifies busy-time CPLQ_HEAD consumption; v1.7 freezes KV address alignment/overflow behavior; v1.6 freezes Scalar INT8 arithmetic order; v1.5 freezes the Matrix Line transfer contract.\
 **Candidate classification:** bounded Functional DV review candidate; not CL-DV-v1.0 signed.\
 **Product RTL:** the candidate preserves the earlier scoped Conv/KV/SFU error-code alignment and KV 32-bit overflow/alignment guard; R73 also allows only the software-owned CPLQ_HEAD pointer write while compute/DMA is busy.\
@@ -11,6 +11,8 @@
 **2026-10-30 R108 CNM accepted-write Abort prefix:** At exact code/test SHA `26448b12e545498d31ce8665723db97e10e2c1e2`, three VCS seeds each abort the real-top 16-output CNM GEMV after one accepted Golden output. The sequence drains 40/40 accepted CNM reads, checks the `ERR_ABORT` owner/status and all 15 untouched suffix sentinels. Each memory scoreboard checks 33,491 words with zero mismatch/unknown/stale/orphan, all pending queues empty, and UVM severity `0/0/0`; focused applicable coverage remains 100%. The exact clean worktree replay also passes 28/28 checker-sensitivity mutations, Top Smoke and 20-case Top regression at the same SHA. This is one descriptor/timing point and does not close the global fault cross. `REQ-CL-019` and `REQ-PC-006/007` gain bounded evidence but stay PARTIAL. The overall disposition remains 24 PASS-SCOPED / 14 PARTIAL and `CL-DV-v1.0` remains HOLD. See the [R108 report](COMPUTE_CLUSTER_CNM_ABORT_WRITE_PREFIX_R108_2026-10-30.md).
 
 **2026-10-30 R109 KV Cache accepted-write Abort prefix:** At exact code/test SHA `5c212a302b0df6ea0f3815ccdf085e139cb4104f`, three clean VCS seeds execute an eight-word real-top KV_WRITE for `head=1/token=2`, then Abort after the second accepted cache write. The 96-byte cache offset, two-word Golden prefix, six untouched suffix words, both guards, `ERR_ABORT=0x32`, and 3/3 accepted-read responses are checked. Each memory scoreboard checks 33,510 words with zero mismatch/unknown/stale/orphan and empty pending queues; UVM severity is `0/0/0`, focused applicable coverage is 100%. The same clean SHA passes 28/28 checker-sensitivity catches, Top Smoke and the 20-case seeded Top run. This adds scoped `REQ-CL-017/019/025` evidence; the remaining legal fault/phase/reset crosses stay open. The RTM remains 24 PASS-SCOPED / 14 PARTIAL and `CL-DV-v1.0` remains HOLD. See the [R109 report](COMPUTE_CLUSTER_KV_ABORT_WRITE_PREFIX_R109_2026-10-30.md).
+
+**2026-10-30 R110 banked response SVA non-vacuity:** Exact clean code/test SHA `95864f7027ccbec22a09b0a61832c68d3ca08098` passes the three-seed banked-owner regression. `ap_banked_response_tag` has 426 attempts, 3 real successes, 0 failures/incomplete; each seed checks the real fabric response owner and four-bank data against an independent image, with UVM severity `0/0/0`. The same SHA passes selected in-repository fabric reset and regular DMA/SPAD/CNM subsystem checks. This is a testbench requester through production fabric, not a real Matrix-engine integration cross. The RTM stays 24 PASS-SCOPED / 14 PARTIAL; `CL-DV-v1.0` stays HOLD. See the [R110 evidence](COMPUTE_CLUSTER_BANKED_OWNER_SVA_R110_2026-10-30.md).
 
 **2026-10-30 replay:** After license recovery, exact published closeout SHA `be78ee27b5a08783ec2560334ca1361baf382157` passed R50 clean six-seed Compute Cluster UVM and Top Smoke. Each UVM seed has 100% applicable focused testpoint coverage, 5,368 checked words, zero scoreboard mismatch/unknown/stale/orphan, and UVM warning/error/fatal `0/0/0`; Top Smoke reports `TEST PASS` after the 86-descriptor mapper precheck. R49 separately passes the corrected Matrix Line checker on three seeds, with 312 stable-stall observations per seed and reference-memory checks. R50's compute-only AR/AW stall-to-accept SVA cover bins remain at zero (W is one); prior R15 is the evidence for the full three-cover AXI E2E profile. One benign Top Smoke `LOOP-REROLL-ENABLED` fixture warning remains. See RTM R46–R50. These runs do not close the remaining partial requirements.
 
@@ -95,14 +97,17 @@ datapath scope.
 
 This shows that SVA ports are connected and there are no current omitted-port warnings. R15 closes the prior AXI assertion-antecedent gap for its actual DDR E2E traffic. Whole-top URG code percentages mix DUT, checker, testbench, and UVM; they are not reported as DUT-only closure.
 
-R31's separate DMA/SPAD subsystem URG reports 28/31 assertion properties with
-real successes, zero failures and zero incomplete attempts. One property,
-`ap_banked_response_tag`, has no real success because this subsystem harness
-does not instantiate a Matrix/banked requester; this is a harness scope gap,
-not evidence that the property is proven. Two UVM RAL properties have no
-attempts and are outside this subsystem's compute protocol. The connected
-Matrix/CNM top owner checks and Matrix block read metadata tests are tracked
-separately in the RTM.
+R31's separate DMA/SPAD subsystem URG originally had no real success for
+`ap_banked_response_tag` because its harness left the banked requester idle.
+R110 adds a testbench-driven Matrix-like request through the production
+`ai_accel_memory_fabric`/arbiter/four-bank SPAD path. On three clean seeds, URG
+reports 426 attempts, 3 real successes, 0 failures and 0 incomplete; the test
+checks client-3 grant/response ownership and all four returned words. This
+closes the assertion non-vacuity point for this harness only. It does not drive
+the production Matrix engine or cover contention/backpressure/fault crossings
+for that engine. The two UVM RAL properties without attempts remain out of scope.
+The connected production Matrix/CNM top ownership tests remain separately
+identified in the RTM.
 
 ## Required review outcomes
 

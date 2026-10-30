@@ -7,12 +7,14 @@
 - **Follow-up evidence branch:** `work/compute-cluster-kv-overflow-20261030`
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
 - **Latest clean verification replay SHA:** `2768843da1b3f3a0e988645746000d5befadf12b`
-**Latest verification/test candidate:** `3d6fe5c58631bdeb6333b6e3572f24eeba7da1ef` (R86 Matrix scalar-fallback accepted-write Abort prefix, testbench-only).
+**Latest verification/test candidate:** `95864f7027ccbec22a09b0a61832c68d3ca08098` (R110 banked response-owner SVA testpoint, testbench-only); the R86 entry below remains historical evidence.
 **Decision:** bounded CL-RC1/CL-RC2 review candidate; **CL-DV-v1.0 is not signed**.
 
 ## Executive disposition
 
 The reviewed product baseline has substantial reproducible evidence for Matrix/SPAD and seven-engine Compute Cluster behavior. R64 fixes Protection gating at Matrix banked/CNM lane SRAM boundaries and adds all-engine source-A checks; R65 extends Protection checks to selected source-B and writeback phases without changing product RTL. R66 reruns the 28-case checker-sensitivity campaign at the exact R65 SHA. R69/R70 add legal CNM response delay, backpressure, Abort/Reset phase checks, a scoped local-FSM disposition, and exact clean-SHA replay of their named scopes at `94c11ef`; R71 adds a three-seed real-top Matrix Line stall integration point at exact clean SHA `cfcd4db`. The Execution RTM still accounts for all 38 requirements (`REQ-CL-001..028`, `REQ-PC-001..010`): **24 PASS-SCOPED and 14 PARTIAL**, with no recorded FAIL, BLOCKED_SPEC, or NOT_RUN requirement. PASS-SCOPED means the named scenario passed; it is not full requirement closure.
+
+R110 adds a non-vacuous response-owner assertion point through the production `ai_accel_memory_fabric`: 3/3 seed checks pass and URG records 426 attempts, 3 real successes, zero failures/incomplete. The requester is testbench-driven and does not close production Matrix integration or its fault/backpressure crosses; the disposition remains 24 PASS-SCOPED / 14 PARTIAL and `CL-DV-v1.0` remains HOLD. See the [R110 evidence](COMPUTE_CLUSTER_BANKED_OWNER_SVA_R110_2026-10-30.md).
 
 The complete requirement-by-requirement execution table lives in the [Compute Cluster Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md). It records each requirement's disposition, testcase/checker or oracle, covered behavior, Run ID, seed, and evidence path. The RTM run/evidence index records source-SHA relationship, tool version, and result; R40–R45 replay the selected candidate SHA from a clean worktree. The [9d9e0f replay manifest](COMPUTE_CLUSTER_FINAL_9D9E0F_MANIFEST_2026-10-28.md) is retained as historical evidence for that earlier candidate. Runs without an exact source identity remain historical/source-equivalent and are not silently upgraded to exact-candidate replay.
 
