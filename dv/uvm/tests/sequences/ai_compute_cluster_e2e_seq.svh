@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 42750)
-Total output lines: 3424
-
 class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     `uvm_object_utils(ai_compute_cluster_e2e_seq)
 
@@ -1692,7 +1689,245 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                                 $sformatf("Matrix accepted Abort Golden[%0d,%0d]", row_idx, col_idx));
                 end else begin
                     expect_spad(dst + (k_idx << 2), sentinel ^ k_idx,
-                                $sformatf("Matrix Abort preserved suffix[%0d,%0d]", row_idx, col_idx))…2750 tokens truncated…  3: write_v3_desc(desc_base, 8'h30, task_id,
+                                $sformatf("Matrix Abort preserved suffix[%0d,%0d]", row_idx, col_idx));
+                end
+            end
+        end
+
+        `uvm_info("CLUSTER_MATRIX_ABORT_WRITE_PREFIX_PASS", $sformatf(
+            "task_id=%04h accepted_output_prefix=%0d/16 read_drain=%0d/%0d line_fallback=1 completion=ERR_ABORT seed=%0d",
+            task_id, accepted_write_count, accepted_reads, returned_reads, seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+    task automatic run_matrix_line_abort_write_prefix(input int unsigned seed);
+        int signed input_a[0:3][0:3];
+        int signed input_b[0:3][0:15];
+        int signed expected_output[0:3][0:15];
+        bit [31:0] line_addr[0:15];
+        bit [127:0] line_data[0:15];
+        bit [15:0] line_wstrb[0:15];
+        bit [31:0] desc_base;
+        bit [31:0] completion_base;
+        bit [31:0] src_a;
+        bit [31:0] src_b;
+        bit [31:0] dst;
+        bit [31:0] sentinel;
+        bit [31:0] packed_word;
+        bit [15:0] task_id;
+        int unsigned accepted_line_count;
+        int unsigned accepted_reads;
+        int unsigned returned_reads;
+        int unsigned poll;
+        int unsigned row_idx;
+        int unsigned col_idx;
+        int unsigned k_idx;
+        int unsigned lane;
+        int unsigned output_idx;
+        bit first_line_seen;
+        bit abort_seen;
+        bit monitor_done;
+
+        desc_base = CLUSTER_CONTRACT_CMDQ;
+        completion_base = 32'h0000_5f00;
+        src_a = 32'h0004_e000;
+        src_b = 32'h0004_e400;
+        dst = 32'h0004_e800;
+        sentinel = 32'hbad0_7a00;
+        task_id = 16'h0773;
+        accepted_line_count = 0;
+        accepted_reads = 0;
+        returned_reads = 0;
+        first_line_seen = 1'b0;
+        abort_seen = 1'b0;
+        monitor_done = 1'b0;
+
+        // M=4, N=16 and one packed K word produce sixteen aligned 128-bit
+        // output Line writes. Keep values small enough for an independent
+        // signed Golden and preserve a long sentinel suffix after Abort.
+        for (row_idx = 0; row_idx < 4; row_idx++) begin
+            for (k_idx = 0; k_idx < 4; k_idx++)
+                input_a[row_idx][k_idx] = int'(row_idx) + int'(k_idx) - 1;
+        end
+        for (k_idx = 0; k_idx < 4; k_idx++) begin
+            for (col_idx = 0; col_idx < 16; col_idx++)
+                input_b[k_idx][col_idx] = int'(col_idx % 7) - int'(k_idx) + 1;
+        end
+        for (row_idx = 0; row_idx < 4; row_idx++) begin
+            for (col_idx = 0; col_idx < 16; col_idx++) begin
+                expected_output[row_idx][col_idx] = 0;
+                for (k_idx = 0; k_idx < 4; k_idx++)
+                    expected_output[row_idx][col_idx] +=
+                        input_a[row_idx][k_idx] * input_b[k_idx][col_idx];
+            end
+        end
+
+        for (row_idx = 0; row_idx < 4; row_idx++) begin
+            packed_word = '0;
+            for (lane = 0; lane < 4; lane++)
+                packed_word[lane*8 +: 8] = input_a[row_idx][lane];
+            spad_write(src_a + (row_idx << 2), packed_word);
+        end
+        for (col_idx = 0; col_idx < 16; col_idx++) begin
+            packed_word = '0;
+            for (lane = 0; lane < 4; lane++)
+                packed_word[lane*8 +: 8] = input_b[lane][col_idx];
+            spad_write(src_b + (col_idx << 2), packed_word);
+        end
+        for (output_idx = 0; output_idx < 64; output_idx++)
+            spad_write(dst + (output_idx << 2), sentinel ^ output_idx);
+        for (row_idx = 0; row_idx < 4; row_idx++)
+            spad_write(completion_base + (row_idx << 2), 32'h7730_0000 | row_idx);
+
+        write_v3_desc(desc_base, 8'h30, task_id, src_a, src_b, dst,
+                      16'd4, 16'd16, 16'd1);
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        fork
+            begin : matrix_line_abort_prefix_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.dut_abort_active)
+                        abort_seen = 1'b1;
+                    if (compute_vif.matrix_line_valid &&
+                        compute_vif.matrix_line_ready &&
+                        compute_vif.matrix_line_write) begin
+                        if (accepted_line_count >= 16)
+                            `uvm_fatal("CLUSTER_MATRIX_LINE_ABORT_PREFIX",
+                                "Matrix accepted more Line writes than the 4x16 descriptor")
+                        line_addr[accepted_line_count] = compute_vif.matrix_line_addr;
+                        line_data[accepted_line_count] = compute_vif.matrix_line_wdata;
+                        line_wstrb[accepted_line_count] = compute_vif.matrix_line_wstrb;
+                        accepted_line_count++;
+                        first_line_seen = 1'b1;
+                    end
+                    if (compute_vif.matrix_request_valid && compute_vif.banked_ready)
+                        accepted_reads++;
+                    if (compute_vif.rsp_valid && (compute_vif.rsp_client == 3'd3))
+                        returned_reads++;
+                end
+            end
+            begin : abort_after_first_matrix_line
+                poll = 0;
+                while (!first_line_seen && poll < 100000) begin
+                    @(posedge compute_vif.aclk);
+                    poll++;
+                end
+                if (!first_line_seen)
+                    `uvm_fatal("CLUSTER_MATRIX_LINE_ABORT_PREFIX",
+                        "Matrix did not accept an aligned Line output before Abort timeout")
+                axil_write(REG_ABORT, 32'd1);
+                wait_cpl_tail(32'd1);
+                monitor_done = 1'b1;
+            end
+        join
+
+        wait_spad_idle();
+        if (!abort_seen)
+            `uvm_fatal("CLUSTER_MATRIX_LINE_ABORT_PREFIX",
+                "software Abort was not observed while Matrix Line output was active")
+        if (accepted_line_count == 0 || accepted_line_count >= 16)
+            `uvm_fatal("CLUSTER_MATRIX_LINE_ABORT_PREFIX", $sformatf(
+                "Abort did not leave a non-empty proper Line prefix: lines=%0d",
+                accepted_line_count))
+        if (accepted_reads == 0 || returned_reads != accepted_reads)
+            `uvm_fatal("CLUSTER_MATRIX_LINE_ABORT_PREFIX", $sformatf(
+                "Matrix accepted reads did not drain: accepted=%0d returned=%0d",
+                accepted_reads, returned_reads))
+
+        expect_spad(completion_base + 32'h00, {16'd0, task_id},
+                    "Matrix Line accepted-write Abort task ID");
+        expect_spad(completion_base + 32'h04, 32'h0000_0032,
+                    "Matrix Line accepted-write Abort status/code");
+        for (output_idx = 0; output_idx < 64; output_idx++) begin
+            row_idx = output_idx / 16;
+            col_idx = output_idx % 16;
+            if ((row_idx * 4 + (col_idx / 4)) < accepted_line_count)
+                expect_spad(dst + (output_idx << 2), expected_output[row_idx][col_idx],
+                    $sformatf("Matrix Line Abort Golden prefix[%0d,%0d]", row_idx, col_idx));
+            else
+                expect_spad(dst + (output_idx << 2), sentinel ^ output_idx,
+                    $sformatf("Matrix Line Abort preserved suffix[%0d,%0d]", row_idx, col_idx));
+        end
+        for (output_idx = 0; output_idx < accepted_line_count; output_idx++) begin
+            row_idx = output_idx / 4;
+            col_idx = (output_idx % 4) * 4;
+            if (line_addr[output_idx] !== dst + (row_idx * 64) + (col_idx << 2))
+                `uvm_fatal("CLUSTER_MATRIX_LINE_ABORT_PREFIX", $sformatf(
+                    "non-prefix Line address index=%0d expected=0x%08h actual=0x%08h",
+                    output_idx, dst + (row_idx * 64) + (col_idx << 2),
+                    line_addr[output_idx]))
+            if (line_wstrb[output_idx] !== 16'hffff)
+                `uvm_fatal("CLUSTER_MATRIX_LINE_ABORT_PREFIX", $sformatf(
+                    "aligned Matrix Line WSTRB index=%0d expected=ffff actual=%04h",
+                    output_idx, line_wstrb[output_idx]))
+            for (lane = 0; lane < 4; lane++) begin
+                if (line_data[output_idx][lane*32 +: 32] !==
+                    expected_output[row_idx][col_idx + lane])
+                    `uvm_fatal("CLUSTER_MATRIX_LINE_ABORT_PREFIX", $sformatf(
+                        "Line Golden mismatch line=%0d lane=%0d expected=%0d actual=%0d",
+                        output_idx, lane, expected_output[row_idx][col_idx + lane],
+                        $signed(line_data[output_idx][lane*32 +: 32])))
+            end
+        end
+
+        `uvm_info("CLUSTER_MATRIX_LINE_ABORT_WRITE_PREFIX_PASS", $sformatf(
+            "task_id=%04h accepted_line_prefix=%0d/16 accepted_output_words=%0d/64 read_drain=%0d/%0d wstrb=ffff completion=ERR_ABORT seed=%0d",
+            task_id, accepted_line_count, accepted_line_count * 4,
+            accepted_reads, returned_reads, seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+    task automatic run_engine_reset_drain_sweep();
+        int engine;
+        int unsigned poll;
+        bit accepted_read;
+        bit [6:0] reset_seen;
+        bit [31:0] completion_base;
+        bit [31:0] reset_dst;
+        bit [31:0] value;
+        bit [31:0] debug_head;
+        bit [31:0] debug_tail;
+        bit [31:0] debug_status;
+        bit [31:0] sentinel;
+        bit [15:0] task_id;
+        bit [31:0] desc_base;
+        uvm_hdl_data_t reset_value;
+        bit reset_ok;
+
+        reset_seen = '0;
+        // Queue setup below points CMDQ_BASE at CLUSTER_CONTRACT_CMDQ, so the
+        // reset probe descriptor must occupy that exact base slot.
+        desc_base = CLUSTER_CONTRACT_CMDQ;
+        for (engine = 0; engine < 7; engine++) begin
+            task_id = 16'h0700 + engine;
+            completion_base = CLUSTER_CONTRACT_CPLQ + 32'h400 + (engine * 32'h10);
+            reset_dst = 32'h0003_3000 + (engine * 32'h100);
+            sentinel = 32'hbad0_7000 + engine;
+            spad_write(reset_dst, sentinel);
+            for (poll = 0; poll < 4; poll++)
+                spad_write(completion_base + (poll * 4), sentinel ^ poll);
+
+            case (engine)
+                0: write_cluster_desc(desc_base, 8'h10, task_id,
+                       SCALAR_A_LOCAL, SCALAR_B_LOCAL, reset_dst,
+                       16'd0, 16'd0, 16'd64, 32'd0,
+                       32'd0, 32'd0, 32'd0, 8'd3);
+                1: write_cluster_desc(desc_base, 8'h50, task_id,
+                       FP_A_LOCAL, FP_B_LOCAL, reset_dst,
+                       16'd1, 16'd1, 16'd64, 32'd0,
+                       32'd0, 32'd0, 32'd0, 8'd7);
+                2: begin
+                    write_cnm_v3_desc(desc_base, task_id,
+                        CNM_A_LOCAL, CNM_B_LOCAL, reset_dst);
+                    spad_write(desc_base + 32'h18, 32'd64);
+                end
+                3: write_v3_desc(desc_base, 8'h30, task_id,
                        MATRIX_A_LOCAL, MATRIX_B_LOCAL, reset_dst,
                        16'd16, 16'd32, 16'd16);
                 4: write_v3_desc(desc_base, 8'h35, task_id,
