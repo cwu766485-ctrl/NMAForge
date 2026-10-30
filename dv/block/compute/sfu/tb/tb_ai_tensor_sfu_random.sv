@@ -196,6 +196,77 @@ module tb_ai_tensor_sfu_random;
     end
   endtask
 
+  task automatic run_parameter_latch_case;
+    integer expected_latched[0:15];
+    integer input_latched[0:15];
+    integer latch_index;
+    begin
+      input_latched[0]=-2048; input_latched[1]=-769;
+      input_latched[2]=-768;  input_latched[3]=-513;
+      input_latched[4]=-512;  input_latched[5]=-511;
+      input_latched[6]=-256;  input_latched[7]=-1;
+      input_latched[8]=0;     input_latched[9]=1;
+      input_latched[10]=255;  input_latched[11]=256;
+      input_latched[12]=511;  input_latched[13]=512;
+      input_latched[14]=513;  input_latched[15]=2048;
+      expected_latched[0]=0;   expected_latched[1]=0;
+      expected_latched[2]=0;   expected_latched[3]=0;
+      expected_latched[4]=0;   expected_latched[5]=-1;
+      expected_latched[6]=-64; expected_latched[7]=-1;
+      expected_latched[8]=0;   expected_latched[9]=0;
+      expected_latched[10]=191; expected_latched[11]=192;
+      expected_latched[12]=510; expected_latched[13]=512;
+      expected_latched[14]=513; expected_latched[15]=2048;
+
+      op_mode=8'h35;src0_base=32'h100;src1_base=32'h200;
+      beta_base=32'h300;beta_enable=0;pack_enable=0;pack_tile_a=0;
+      dst_base=32'h400;length=16;m_size=0;n_size=0;
+      scale_shift=0;epsilon=1;watchdog_limit=0;
+      abort=0;inject_parity=0;inject_protection=0;
+      for(latch_index=0;latch_index<16;latch_index=latch_index+1) begin
+        memory[(32'h100>>2)+latch_index]=input_latched[latch_index];
+        memory[(32'h400>>2)+latch_index]=32'hface_cafe;
+        memory[(32'h500>>2)+latch_index]=32'hcafe_5000+latch_index;
+      end
+      write_count=0;
+
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      if(!busy || !spad_valid || spad_write || spad_addr!==32'h100)
+        $fatal(1,"SFU parameter-latch probe did not reach first source request");
+
+      // Change every execution parameter after start has been accepted and
+      // while the first source request is active.  The accepted task must
+      // continue using its launch snapshot.
+      op_mode=8'hff;src0_base=32'h180;src1_base=32'h1c0;
+      beta_base=32'h1e0;beta_enable=1;pack_enable=1;pack_tile_a=1;
+      dst_base=32'h500;length=2;m_size=4;n_size=4;
+      scale_shift=31;epsilon=32'hdead_beef;watchdog_limit=1;
+
+      timeout=0;
+      while(!done && timeout<100000) begin @(negedge clk);timeout=timeout+1;end
+      if(!done || busy || error || error_code!==0 || element_count!==16 ||
+         write_count!=16)
+        $fatal(1,"SFU parameter-latch task failed done/busy/error/code/elements/writes=%b/%b/%b/%0d/%0d/%0d",
+               done,busy,error,error_code,element_count,write_count);
+      for(latch_index=0;latch_index<16;latch_index=latch_index+1) begin
+        if(memory[(32'h400>>2)+latch_index]!==expected_latched[latch_index])
+          $fatal(1,"SFU parameter-latch Golden[%0d] got=%08x expected=%08x",
+                 latch_index,memory[(32'h400>>2)+latch_index],
+                 expected_latched[latch_index]);
+        if(memory[(32'h500>>2)+latch_index]!==32'hcafe_5000+latch_index)
+          $fatal(1,"SFU mutated destination changed word=%0d data=%08x",
+                 latch_index,memory[(32'h500>>2)+latch_index]);
+      end
+      expected_total_writes=expected_total_writes+16;
+      $display("SFU_PARAMETER_LATCH_PASS op=GELU length=16 mutated=all_command_inputs golden_words=16");
+      op_mode=8'h36;src0_base=32'h100;src1_base=32'h0;
+      beta_base=32'h300;beta_enable=0;pack_enable=0;pack_tile_a=0;
+      dst_base=32'h400;length=1;m_size=0;n_size=0;
+      scale_shift=0;epsilon=1;watchdog_limit=0;
+    end
+  endtask
+
   task automatic drain_sfu_response;
     begin
       timeout=0;
@@ -499,6 +570,7 @@ module tb_ai_tensor_sfu_random;
     run_late_parity_fault();
     check_reset_and_recovery();
     run_rms_without_gamma();
+    run_parameter_latch_case();
     op_mode=8'h36;length=1;src0_base=32'h100;dst_base=32'h400;
 
     case_id=0;

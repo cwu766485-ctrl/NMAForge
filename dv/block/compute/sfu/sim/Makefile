@@ -31,6 +31,7 @@ run: compile
 		-cm $(COV_METRICS) -cm_dir $(OUT_DIR)/coverage.vdb \
 		-cm_name sfu_seed_$(SEED) -l $(OUT_DIR)/run.log
 	grep -q '^SFU_RANDOM_LATENCY_PASS cases=64 error_cases=9 late_faults=1 abort_watchdog=1 reset_fault_combo=1 reset_recovery=1 fsm_reset_states=39 fsm_abort_states=39 rms_gamma_bypass=1 tile_a_pack=1 ' $(OUT_DIR)/run.log
+	grep -q '^SFU_PARAMETER_LATCH_PASS op=GELU length=16 mutated=all_command_inputs golden_words=16$$' $(OUT_DIR)/run.log
 
 SEEDS ?= 20261021 20261022 20261023
 random-latency-regress: compile
@@ -42,5 +43,7 @@ random-latency-regress: compile
 			-cm $(COV_METRICS) -cm_dir $(OUT_DIR)/coverage.vdb -cm_name sfu_seed_$$seed \
 			-l $(OUT_DIR)/seed_$$seed/run.log; \
 		grep -q "^SFU_RANDOM_LATENCY_PASS cases=64 error_cases=9 late_faults=1 abort_watchdog=1 reset_fault_combo=1 reset_recovery=1 fsm_reset_states=39 fsm_abort_states=39 rms_gamma_bypass=1 tile_a_pack=1 seed=$$seed " \
+			$(OUT_DIR)/seed_$$seed/run.log; \
+		grep -q '^SFU_PARAMETER_LATCH_PASS op=GELU length=16 mutated=all_command_inputs golden_words=16$$' \
 			$(OUT_DIR)/seed_$$seed/run.log; \
 	done
