@@ -24,8 +24,10 @@ BANKED_RESET_SEEDS ?= 20261025 20261026 20261027
 BANKED_RESET_OUT ?= /tmp/nmaforge_banked_reset_$(shell date +%Y%m%d_%H%M%S_%N)
 BANKED_CONTENTION_SEEDS ?= 20261025 20261026 20261027
 BANKED_CONTENTION_OUT ?= /tmp/nmaforge_banked_contention_$(shell date +%Y%m%d_%H%M%S_%N)
+BANKED_CORE_RESET_SEEDS ?= 20261025 20261026 20261027
+BANKED_CORE_RESET_OUT ?= /tmp/nmaforge_banked_core_reset_$(shell date +%Y%m%d_%H%M%S_%N)
 
-.PHONY: subsystem_compile subsystem_run subsystem_regress subsystem_coverage subsystem_rready_stall_run subsystem_rready_stress subsystem_memory_fabric_reset_regress subsystem_banked_owner_regress subsystem_banked_reset_regress subsystem_banked_contention_regress subsystem_clean
+.PHONY: subsystem_compile subsystem_run subsystem_regress subsystem_coverage subsystem_rready_stall_run subsystem_rready_stress subsystem_memory_fabric_reset_regress subsystem_banked_owner_regress subsystem_banked_reset_regress subsystem_banked_contention_regress subsystem_banked_core_reset_regress subsystem_clean
 
 subsystem_compile:
 	mkdir -p $(dir $(COV_DIR))
@@ -171,6 +173,31 @@ subsystem_banked_contention_regress:
 	python3 -c 'import html,re,sys; h=open(sys.argv[1],encoding="utf-8").read(); m=re.search(r"<tr[^>]*>.*?banked_core_contention_cg.*?</tr>",h,re.S); ok=bool(m and "100.00" in m.group(0)); print("BANKED_CORE_CONTENTION_COVERAGE="+("100.00%" if ok else "FAIL")); sys.exit(0 if ok else 1)' "$$out/urg/groups.html"; \
 	python3 -c 'import html,re,sys; s=open(sys.argv[1],encoding="utf-8").read(); m=re.search(r"<td[^>]*>\s*<a[^>]*>[^<]*ap_banked_response_tag</a>\s*</td>(.*?)</tr>",s,re.S); c=[re.sub(r"\s+"," ",html.unescape(re.sub(r"<[^>]+>"," ",v))).strip() for v in re.findall(r"<td[^>]*>(.*?)</td>",m.group(1),re.S)] if m else []; a,su,fa,inc=map(int,c[2:6]) if len(c)>=6 else (0,0,1,1); print(f"AP_BANKED_RESPONSE_TAG attempts={a} real_successes={su} failures={fa} incomplete={inc}"); sys.exit(0 if su>0 and fa==0 and inc==0 else 1)' "$$out/urg/asserts.html"; \
 	echo "SPAD_BANKED_CONTENTION_REGRESS_PASS: seeds=$(BANKED_CONTENTION_SEEDS) core/banked arbitration, owner and Golden data; logs=$$logs; coverage=$$out/urg"
+
+# Interleaves a Core/Banked accepted-read pair with shared reset: the older
+# Core response must retain ownership while reset discards the pending Banked
+# response, after which both clients must recover with their Golden data.
+subsystem_banked_core_reset_regress:
+	@set -e; out='$(BANKED_CORE_RESET_OUT)'; mkdir -p "$$out/csrc"; \
+	$(VCS) -full64 -sverilog -ntb_opts uvm-1.2 -debug_access+all -assert svaext \
+		-cm line+cond+fsm+tgl+branch+assert -cm_dir "$$out/compile.vdb" \
+		-Mdir="$$out/csrc" -timescale=1ns/1ps +define+VCS -top tb_ai_dma_spad_subsystem_uvm \
+		-f dma_spad_subsystem_uvm.f -o "$$out/simv" -l "$$out/compile.log"; \
+	logs=''; dbs=''; \
+	for seed in $(BANKED_CORE_RESET_SEEDS); do \
+		seed_dir="$$out/seed_$$seed"; mkdir -p "$$seed_dir"; \
+		log="$$seed_dir/run.log"; db="$$seed_dir/coverage.vdb"; logs="$$logs $$log"; dbs="$$dbs -dir $$db"; \
+		"$$out/simv" +UVM_TESTNAME=dma_spad_subsystem_test +A10_BANKED_CORE_RESET_ONLY \
+			+ntb_random_seed=$$seed +UVM_VERBOSITY=UVM_MEDIUM \
+			-cm line+cond+fsm+tgl+branch+assert -cm_dir "$$db" -l "$$log"; \
+		grep -q '\[SPAD_BANKED_CORE_RESET_EPOCH_PASS\]' "$$log" || { echo "ERROR: banked/core reset-epoch PASS marker missing in $$log"; exit 1; }; \
+		grep -q '\*\* Report counts by severity' "$$log" || { echo "ERROR: UVM report summary missing in $$log"; exit 1; }; \
+		! grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$$log" || { echo "ERROR: UVM warning/error/fatal count is nonzero in $$log"; exit 1; }; \
+	done; \
+	$(URG) -full64 -dir "$$out/compile.vdb" $$dbs -report "$$out/urg"; \
+	python3 -c 'import html,re,sys; h=open(sys.argv[1],encoding="utf-8").read(); m=re.search(r"<tr[^>]*>.*?banked_core_reset_epoch_cg.*?</tr>",h,re.S); ok=bool(m and "100.00" in m.group(0)); print("BANKED_CORE_RESET_EPOCH_COVERAGE="+("100.00%" if ok else "FAIL")); sys.exit(0 if ok else 1)' "$$out/urg/groups.html"; \
+	python3 -c 'import html,re,sys; s=open(sys.argv[1],encoding="utf-8").read(); names=("ap_core_response_tag","ap_banked_response_tag","ap_single_response_owner"); rows=[re.search(r"<td[^>]*>\s*<a[^>]*>[^<]*"+n+r"</a>\s*</td>(.*?)</tr>",s,re.S) for n in names]; vals=lambda m:[re.sub(r"\s+"," ",html.unescape(re.sub(r"<[^>]+>"," ",v))).strip() for v in re.findall(r"<td[^>]*>(.*?)</td>",m.group(1),re.S)] if m else ["0","0","0","0","1","1"]; counts=[list(map(int,v[2:6])) for v in (vals(m) for m in rows)]; ok=all(su>0 and fa==0 and inc==0 for _,su,fa,inc in counts); print("BANKED_CORE_RESET_OWNER_ASSERTIONS="+str(dict(zip(names,counts)))); sys.exit(0 if ok else 1)' "$$out/urg/asserts.html"; \
+	echo "SPAD_BANKED_CORE_RESET_REGRESS_PASS: seeds=$(BANKED_CORE_RESET_SEEDS) pre-reset owner check, pending-response flush, quiet window and dual-owner recovery; logs=$$logs; coverage=$$out/urg"
 
 subsystem_regress:
 	@set -e; for seed in $(SEEDS); do \

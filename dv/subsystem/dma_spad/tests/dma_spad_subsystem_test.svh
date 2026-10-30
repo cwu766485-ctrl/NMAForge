@@ -866,10 +866,15 @@ class dma_spad_subsystem_test extends dma_block_base_test;
     bit banked_owner_only;
     bit banked_reset_only;
     bit banked_contention_only;
+    bit banked_core_reset_only;
     int unsigned cov_banked_reset_flushed;
     int unsigned cov_banked_reset_recovered;
     bit cov_banked_core_pair_accepted;
     bit cov_banked_core_response_pair_checked;
+    bit cov_banked_core_reset_pair_accepted;
+    bit cov_banked_core_reset_first_response_checked;
+    bit cov_banked_core_reset_pending_banked_flushed;
+    bit cov_banked_core_reset_recovery_pair_checked;
     int unsigned rready_stall_cycles_requested;
 
     covergroup dma_rready_stall_cg;
@@ -907,6 +912,25 @@ class dma_spad_subsystem_test extends dma_block_base_test;
         accepted_x_checked: cross cp_pair_accepted, cp_owner_data_checked;
     endgroup
 
+    covergroup banked_core_reset_epoch_cg;
+        option.per_instance = 1;
+        cp_pair_accepted: coverpoint cov_banked_core_reset_pair_accepted {
+            bins core_then_banked_accepted = {1};
+        }
+        cp_first_owner_checked: coverpoint cov_banked_core_reset_first_response_checked {
+            bins first_response_owner_and_data_checked = {1};
+        }
+        cp_pending_banked_flushed: coverpoint cov_banked_core_reset_pending_banked_flushed {
+            bins banked_response_flushed = {1};
+        }
+        cp_recovery_pair_checked: coverpoint cov_banked_core_reset_recovery_pair_checked {
+            bins both_owners_recovered = {1};
+        }
+        accepted_x_flush_x_recovery: cross cp_pair_accepted,
+                                             cp_pending_banked_flushed,
+                                             cp_recovery_pair_checked;
+    endgroup
+
     `uvm_component_utils(dma_spad_subsystem_test)
 
     function new(string name = "dma_spad_subsystem_test", uvm_component parent = null);
@@ -914,6 +938,7 @@ class dma_spad_subsystem_test extends dma_block_base_test;
         dma_rready_stall_cg = new;
         banked_reset_epoch_cg = new;
         banked_core_contention_cg = new;
+        banked_core_reset_epoch_cg = new;
     endfunction
 
     task run_dma_rready_stall();
@@ -1246,6 +1271,338 @@ class dma_spad_subsystem_test extends dma_block_base_test;
         sys_vif.region0_perm <= 4'b0000;
         `uvm_info("SPAD_BANKED_CORE_CONTENTION_PASS",
             "simultaneous scalar and banked reads were serialized by the real arbiter; each response retained its owner and Golden data",
+            UVM_LOW)
+    endtask
+
+    task run_banked_core_reset_epoch();
+        bit [31:0] expected_core;
+        bit [31:0] expected_lane[4];
+        bit core_accept_seen;
+        bit banked_accept_seen;
+        bit first_core_owner;
+        bit first_response_seen;
+        bit reset_asserted;
+        bit reset_released;
+        bit recovery_core_accept_seen;
+        bit recovery_banked_accept_seen;
+        bit recovery_first_core_owner;
+        bit recovery_first_response_seen;
+        bit recovery_core_response_seen;
+        bit recovery_banked_response_seen;
+        int unsigned poll;
+
+        expected_core = 32'hc001_0000 ^ (32'h17c >> 2);
+        for (int unsigned lane = 0; lane < 4; lane++)
+            expected_lane[lane] = 32'hc001_0000 ^ ((32'h100 + (lane * 4)) >> 2);
+        core_accept_seen = 1'b0;
+        banked_accept_seen = 1'b0;
+        first_core_owner = 1'b0;
+        first_response_seen = 1'b0;
+        reset_asserted = 1'b0;
+        reset_released = 1'b0;
+        recovery_core_accept_seen = 1'b0;
+        recovery_banked_accept_seen = 1'b0;
+        recovery_first_core_owner = 1'b0;
+        recovery_first_response_seen = 1'b0;
+        recovery_core_response_seen = 1'b0;
+        recovery_banked_response_seen = 1'b0;
+        cov_banked_core_reset_pair_accepted = 0;
+        cov_banked_core_reset_first_response_checked = 0;
+        cov_banked_core_reset_pending_banked_flushed = 0;
+        cov_banked_core_reset_recovery_pair_checked = 0;
+
+        // The subsystem setup may have advanced the data round-robin pointer.
+        // Establish a fresh epoch to discard any setup traffic. The focused
+        // pair below follows whichever legal client the arbiter selects first.
+        @(negedge sys_vif.clk);
+        sys_vif.subsystem_reset_req <= 1'b1;
+        reset_asserted = 1'b0;
+        for (poll = 0; poll < 8; poll++) begin
+            @(negedge sys_vif.clk);
+            #1;
+            if (sys_vif.subsystem_reset_ack === 1'b1) begin
+                reset_asserted = 1'b1;
+                break;
+            end
+        end
+        if (!reset_asserted || sys_vif.resetn !== 1'b0)
+            `uvm_fatal("SPAD_BANKED_CORE_RESET", "initial epoch reset assertion timed out")
+        repeat (2) @(posedge sys_vif.clk);
+        @(negedge sys_vif.clk);
+        sys_vif.subsystem_reset_req <= 1'b0;
+        reset_released = 1'b0;
+        for (poll = 0; poll < 8; poll++) begin
+            @(negedge sys_vif.clk);
+            #1;
+            if (sys_vif.subsystem_reset_ack === 1'b0) begin
+                reset_released = 1'b1;
+                break;
+            end
+        end
+        if (!reset_released || sys_vif.resetn !== 1'b1)
+            `uvm_fatal("SPAD_BANKED_CORE_RESET", "initial epoch reset release timed out")
+
+        // Use the real fabric and round-robin arbiter, with a legal shared
+        // execute/read window and independently initialized SPAD words.
+        @(negedge sys_vif.clk);
+        sys_vif.region0_base <= 32'h0000_0100;
+        sys_vif.region0_limit <= 32'h0000_0200;
+        sys_vif.region0_perm <= 4'b1101;
+        repeat (2) @(posedge sys_vif.clk);
+
+        // Keep both requests asserted. The other client must be accepted on
+        // the following round-robin turn, coincident with the first response.
+        @(negedge sys_vif.clk);
+        sys_vif.core_write <= 1'b0;
+        sys_vif.core_addr <= 32'h0000_017c;
+        sys_vif.core_valid <= 1'b1;
+        sys_vif.banked_addr <= 32'h0000_0100;
+        sys_vif.banked_valid <= 1'b1;
+        @(posedge sys_vif.clk);
+        if (sys_vif.core_ready && !sys_vif.banked_ready &&
+            sys_vif.request_client === 3'd2) begin
+            core_accept_seen = 1'b1;
+            first_core_owner = 1'b1;
+        end else if (sys_vif.banked_ready && !sys_vif.core_ready &&
+                     sys_vif.request_client === 3'd3) begin
+            banked_accept_seen = 1'b1;
+            first_core_owner = 1'b0;
+        end else
+            `uvm_fatal("SPAD_BANKED_CORE_RESET", $sformatf(
+                "arbiter did not grant exactly one requester: core_valid=%0b core_ready=%0b banked_valid=%0b banked_ready=%0b requester=%0d",
+                sys_vif.core_valid, sys_vif.core_ready, sys_vif.banked_valid,
+                sys_vif.banked_ready, sys_vif.request_client))
+        if (!first_core_owner)
+            `uvm_fatal("SPAD_BANKED_CORE_RESET",
+                "fresh reset epoch did not start at Core; cannot establish the directed pending-Banked reset case")
+
+        @(negedge sys_vif.clk);
+        if (first_core_owner)
+            sys_vif.core_valid <= 1'b0;
+        else
+            sys_vif.banked_valid <= 1'b0;
+        @(posedge sys_vif.clk);
+        if (first_core_owner) begin
+            if (!sys_vif.banked_ready || sys_vif.core_ready ||
+                sys_vif.request_client !== 3'd3)
+                `uvm_fatal("SPAD_BANKED_CORE_RESET", $sformatf(
+                    "Banked requester was not accepted on the turn after Core: requester=%0d core_ready=%0b banked_ready=%0b",
+                    sys_vif.request_client, sys_vif.core_ready, sys_vif.banked_ready))
+            banked_accept_seen = 1'b1;
+        end else begin
+            if (!sys_vif.core_ready || sys_vif.banked_ready ||
+                sys_vif.request_client !== 3'd2)
+                `uvm_fatal("SPAD_BANKED_CORE_RESET", $sformatf(
+                    "Core requester was not accepted on the turn after Banked: requester=%0d core_ready=%0b banked_ready=%0b",
+                    sys_vif.request_client, sys_vif.core_ready, sys_vif.banked_ready))
+            core_accept_seen = 1'b1;
+        end
+        #1;
+        if (first_core_owner) begin
+            if (!sys_vif.core_rsp_valid || !sys_vif.arb_rsp_valid ||
+                sys_vif.arb_rsp_client !== 3'd2 || sys_vif.arb_rsp_is_line ||
+                sys_vif.banked_rsp_valid || sys_vif.dma_rsp_valid ||
+                sys_vif.dma_line_rsp_valid || sys_vif.desc_rsp_valid ||
+                (|sys_vif.cnm_rsp_valid) || sys_vif.arb_rsp_error ||
+                sys_vif.core_rsp_error || sys_vif.core_rdata !== expected_core)
+                `uvm_fatal("SPAD_BANKED_CORE_RESET", $sformatf(
+                    "Core-first response owner/data mismatch while Banked is pending: owner=%0d core_rsp=%0b banked_rsp=%0b data=%08h expected=%08h error=%0b",
+                    sys_vif.arb_rsp_client, sys_vif.core_rsp_valid,
+                    sys_vif.banked_rsp_valid, sys_vif.core_rdata,
+                    expected_core, sys_vif.arb_rsp_error))
+        end else if (!sys_vif.banked_rsp_valid || !sys_vif.arb_rsp_valid ||
+                     sys_vif.arb_rsp_client !== 3'd3 || sys_vif.arb_rsp_is_line ||
+                     sys_vif.core_rsp_valid || sys_vif.dma_rsp_valid ||
+                     sys_vif.dma_line_rsp_valid || sys_vif.desc_rsp_valid ||
+                     (|sys_vif.cnm_rsp_valid) || sys_vif.arb_rsp_error ||
+                     sys_vif.banked_data0 !== expected_lane[0] ||
+                     sys_vif.banked_data1 !== expected_lane[1] ||
+                     sys_vif.banked_data2 !== expected_lane[2] ||
+                     sys_vif.banked_data3 !== expected_lane[3]) begin
+            `uvm_fatal("SPAD_BANKED_CORE_RESET", $sformatf(
+                "Banked-first response owner/data mismatch: owner=%0d core_rsp=%0b banked_rsp=%0b lanes={%08h,%08h,%08h,%08h}",
+                sys_vif.arb_rsp_client, sys_vif.core_rsp_valid,
+                sys_vif.banked_rsp_valid, sys_vif.banked_data3,
+                sys_vif.banked_data2, sys_vif.banked_data1,
+                sys_vif.banked_data0))
+        end
+        first_response_seen = 1'b1;
+        cov_banked_core_reset_pair_accepted = core_accept_seen && banked_accept_seen;
+        cov_banked_core_reset_first_response_checked = first_response_seen;
+
+        // The second read has been accepted into the registered response
+        // stage, but its banked response is not visible yet. Assert the shared
+        // reset request before the next active edge and check the old epoch is
+        // discarded rather than delivered after release.
+        sys_vif.core_valid <= 1'b0;
+        sys_vif.banked_valid <= 1'b0;
+        sys_vif.subsystem_reset_req <= 1'b1;
+        for (poll = 0; poll < 8; poll++) begin
+            @(negedge sys_vif.clk);
+            #1;
+            if (sys_vif.subsystem_reset_ack === 1'b1) begin
+                reset_asserted = 1'b1;
+                break;
+            end
+        end
+        if (!reset_asserted || sys_vif.resetn !== 1'b0)
+            `uvm_fatal("SPAD_BANKED_CORE_RESET", "shared reset assertion handshake timed out")
+        repeat (2) begin
+            @(posedge sys_vif.clk);
+            #1;
+            if (sys_vif.arb_rsp_valid !== 1'b0 ||
+                sys_vif.banked_rsp_valid !== 1'b0 ||
+                sys_vif.desc_rsp_valid !== 1'b0 ||
+                sys_vif.core_rsp_valid !== 1'b0 ||
+                sys_vif.dma_rsp_valid !== 1'b0 ||
+                sys_vif.dma_line_rsp_valid !== 1'b0 ||
+                (|sys_vif.cnm_rsp_valid))
+                `uvm_fatal("SPAD_BANKED_CORE_RESET",
+                    "fabric response owner remained active during shared reset")
+        end
+
+        @(negedge sys_vif.clk);
+        sys_vif.subsystem_reset_req <= 1'b0;
+        for (poll = 0; poll < 8; poll++) begin
+            @(negedge sys_vif.clk);
+            #1;
+            if (sys_vif.subsystem_reset_ack === 1'b0) begin
+                reset_released = 1'b1;
+                break;
+            end
+        end
+        if (!reset_released || sys_vif.resetn !== 1'b1)
+            `uvm_fatal("SPAD_BANKED_CORE_RESET", "shared reset release handshake timed out")
+
+        repeat (4) begin
+            @(posedge sys_vif.clk);
+            #1;
+            if (sys_vif.arb_rsp_valid !== 1'b0 ||
+                sys_vif.banked_rsp_valid !== 1'b0 ||
+                sys_vif.desc_rsp_valid !== 1'b0 ||
+                sys_vif.core_rsp_valid !== 1'b0 ||
+                sys_vif.dma_rsp_valid !== 1'b0 ||
+                sys_vif.dma_line_rsp_valid !== 1'b0 ||
+                (|sys_vif.cnm_rsp_valid))
+                `uvm_fatal("SPAD_BANKED_CORE_RESET",
+                    "pre-reset Banked owner leaked into the post-reset quiet interval")
+        end
+        cov_banked_core_reset_pending_banked_flushed = 1;
+
+        // Exercise both owners again in the new epoch and compare each result
+        // to the independent initialized memory image.
+        @(negedge sys_vif.clk);
+        sys_vif.core_valid <= 1'b1;
+        sys_vif.core_addr <= 32'h0000_017c;
+        sys_vif.banked_valid <= 1'b1;
+        sys_vif.banked_addr <= 32'h0000_0100;
+        @(posedge sys_vif.clk);
+        if (sys_vif.core_ready && !sys_vif.banked_ready &&
+            sys_vif.request_client === 3'd2) begin
+            recovery_core_accept_seen = 1'b1;
+            recovery_first_core_owner = 1'b1;
+        end else if (sys_vif.banked_ready && !sys_vif.core_ready &&
+                     sys_vif.request_client === 3'd3) begin
+            recovery_banked_accept_seen = 1'b1;
+            recovery_first_core_owner = 1'b0;
+        end else
+            `uvm_fatal("SPAD_BANKED_CORE_RESET", "recovery arbiter did not grant exactly one requester")
+        if (!recovery_first_core_owner)
+            `uvm_fatal("SPAD_BANKED_CORE_RESET",
+                "post-reset recovery did not restart at Core as required by the reset arbitration contract")
+
+        @(negedge sys_vif.clk);
+        if (recovery_first_core_owner)
+            sys_vif.core_valid <= 1'b0;
+        else
+            sys_vif.banked_valid <= 1'b0;
+        @(posedge sys_vif.clk);
+        if (recovery_first_core_owner) begin
+            if (!sys_vif.banked_ready || sys_vif.core_ready ||
+                sys_vif.request_client !== 3'd3)
+                `uvm_fatal("SPAD_BANKED_CORE_RESET", $sformatf(
+                    "Banked recovery requester was not accepted after Core: requester=%0d core_ready=%0b banked_ready=%0b",
+                    sys_vif.request_client, sys_vif.core_ready, sys_vif.banked_ready))
+            recovery_banked_accept_seen = 1'b1;
+        end else begin
+            if (!sys_vif.core_ready || sys_vif.banked_ready ||
+                sys_vif.request_client !== 3'd2)
+                `uvm_fatal("SPAD_BANKED_CORE_RESET", $sformatf(
+                    "Core recovery requester was not accepted after Banked: requester=%0d core_ready=%0b banked_ready=%0b",
+                    sys_vif.request_client, sys_vif.core_ready, sys_vif.banked_ready))
+            recovery_core_accept_seen = 1'b1;
+        end
+        #1;
+        if (recovery_first_core_owner) begin
+            if (!sys_vif.core_rsp_valid || !sys_vif.arb_rsp_valid ||
+                sys_vif.arb_rsp_client !== 3'd2 || sys_vif.arb_rsp_is_line ||
+                sys_vif.arb_rsp_error || sys_vif.core_rsp_error ||
+                sys_vif.core_rdata !== expected_core || sys_vif.banked_rsp_valid ||
+                sys_vif.dma_rsp_valid || sys_vif.dma_line_rsp_valid ||
+                sys_vif.desc_rsp_valid || (|sys_vif.cnm_rsp_valid))
+                `uvm_fatal("SPAD_BANKED_CORE_RESET", $sformatf(
+                    "Core recovery response owner/data mismatch: arb=%0b client=%0d core=%0b banked=%0b data=%08h expected=%08h",
+                    sys_vif.arb_rsp_valid, sys_vif.arb_rsp_client,
+                    sys_vif.core_rsp_valid, sys_vif.banked_rsp_valid,
+                    sys_vif.core_rdata, expected_core))
+            recovery_core_response_seen = 1'b1;
+        end else begin
+            if (!sys_vif.banked_rsp_valid || !sys_vif.arb_rsp_valid ||
+                sys_vif.arb_rsp_client !== 3'd3 || sys_vif.arb_rsp_is_line ||
+                sys_vif.arb_rsp_error || sys_vif.core_rsp_valid ||
+                sys_vif.dma_rsp_valid || sys_vif.dma_line_rsp_valid ||
+                sys_vif.desc_rsp_valid || (|sys_vif.cnm_rsp_valid) ||
+                sys_vif.banked_data0 !== expected_lane[0] ||
+                sys_vif.banked_data1 !== expected_lane[1] ||
+                sys_vif.banked_data2 !== expected_lane[2] ||
+                sys_vif.banked_data3 !== expected_lane[3])
+                `uvm_fatal("SPAD_BANKED_CORE_RESET", "Banked recovery response owner/data mismatch")
+            recovery_banked_response_seen = 1'b1;
+        end
+        recovery_first_response_seen = 1'b1;
+
+        @(negedge sys_vif.clk);
+        sys_vif.core_valid <= 1'b0;
+        sys_vif.banked_valid <= 1'b0;
+        @(posedge sys_vif.clk);
+        #1;
+        if (recovery_first_core_owner) begin
+            if (!sys_vif.banked_rsp_valid || !sys_vif.arb_rsp_valid ||
+                sys_vif.arb_rsp_client !== 3'd3 || sys_vif.arb_rsp_is_line ||
+                sys_vif.core_rsp_valid || sys_vif.dma_rsp_valid ||
+                sys_vif.dma_line_rsp_valid || sys_vif.desc_rsp_valid ||
+                (|sys_vif.cnm_rsp_valid) || sys_vif.arb_rsp_error ||
+                sys_vif.banked_data0 !== expected_lane[0] ||
+                sys_vif.banked_data1 !== expected_lane[1] ||
+                sys_vif.banked_data2 !== expected_lane[2] ||
+                sys_vif.banked_data3 !== expected_lane[3])
+                `uvm_fatal("SPAD_BANKED_CORE_RESET", "Banked recovery response owner/data mismatch")
+            recovery_banked_response_seen = 1'b1;
+        end else begin
+            if (!sys_vif.core_rsp_valid || !sys_vif.arb_rsp_valid ||
+                sys_vif.arb_rsp_client !== 3'd2 || sys_vif.arb_rsp_is_line ||
+                sys_vif.banked_rsp_valid || sys_vif.dma_rsp_valid ||
+                sys_vif.dma_line_rsp_valid || sys_vif.desc_rsp_valid ||
+                (|sys_vif.cnm_rsp_valid) || sys_vif.arb_rsp_error ||
+                sys_vif.core_rdata !== expected_core)
+                `uvm_fatal("SPAD_BANKED_CORE_RESET", "Core recovery response owner/data mismatch")
+            recovery_core_response_seen = 1'b1;
+        end
+
+        // Retain the visible response through assertion sampling, then report
+        // the directed coverage sample and release the temporary permission.
+        @(posedge sys_vif.clk);
+        #1;
+        if (!(recovery_core_accept_seen && recovery_banked_accept_seen &&
+              recovery_first_response_seen &&
+              recovery_core_response_seen && recovery_banked_response_seen))
+            `uvm_fatal("SPAD_BANKED_CORE_RESET", "post-reset owner recovery was incomplete")
+        cov_banked_core_reset_recovery_pair_checked = 1;
+        banked_core_reset_epoch_cg.sample();
+        @(negedge sys_vif.clk);
+        sys_vif.region0_perm <= 4'b0000;
+        `uvm_info("SPAD_BANKED_CORE_RESET_EPOCH_PASS",
+            "simultaneous Core/Banked requests retained owner through one response, reset flushed the pending Banked response, and both owners recovered with Golden data",
             UVM_LOW)
     endtask
 
@@ -4459,6 +4816,7 @@ class dma_spad_subsystem_test extends dma_block_base_test;
         banked_owner_only = $test$plusargs("A10_BANKED_OWNER_ONLY");
         banked_reset_only = $test$plusargs("A10_BANKED_RESET_ONLY");
         banked_contention_only = $test$plusargs("A10_BANKED_CONTENTION_ONLY");
+        banked_core_reset_only = $test$plusargs("A10_BANKED_CORE_RESET_ONLY");
         phase.raise_objection(this);
         wait (sys_vif.resetn === 1'b1);
         preload_scratchpad();
@@ -4483,6 +4841,12 @@ class dma_spad_subsystem_test extends dma_block_base_test;
 
         if (banked_contention_only) begin
             run_banked_core_owner_contention();
+            phase.drop_objection(this);
+            return;
+        end
+
+        if (banked_core_reset_only) begin
+            run_banked_core_reset_epoch();
             phase.drop_objection(this);
             return;
         end
