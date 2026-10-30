@@ -209,7 +209,7 @@ VCS Matrix controller 另保留每任务 FSM state-cycle、Arbiter stall、响�
 4. Shift 后再执行 Activation：`0` 为 identity；`1` 为 ReLU `max(x,0)`；`2` 为 ReLU6 `min(max(x,0),6)`。当前 RTL 对编码 `3` 也走 identity datapath，但该编码未分配给软件，合规 descriptor 不得依赖此行为。
 5. Activation 后 saturate to signed INT32：大于 `2^31-1` 输出 `0x7fffffff`，小于 `-2^31` 输出 `0x80000000`，其余输出低 32-bit two's-complement。Bias、dot product、shift、activation、saturation 的顺序不可调换。输出每个元素写入一个 32-bit word，按当前 opcode 的逻辑输出顺序推进地址。
 
-R51 在固定测试 SHA 上对 VDOT/GEMV/GEMM 的共同算术路径完成独立边界向量验证，因此 `OPEN-NUM-01` 的合同歧义和该测试范围内的验证项已关闭。legacy Conv、其它合法 opcode/shape 和完整 `REQ-CL-020` 覆盖仍按 RTM 保持 PARTIAL，并由 `CL-COV-003` 跟踪；不能从共享 datapath 推断未执行的地址生成与算子场景已通过。
+R52 在固定测试 SHA 上仅使用已分配的 Activation 0/1/2，对 VDOT/GEMV/GEMM 共同算术路径完成独立边界向量验证；R51 曾将未分配的 Activation 3 纳入必测 bin，已标记为 `SUPERSEDED / EXCLUDED`，不作为合规证据。因此 `OPEN-NUM-01` 的合同歧义和 R52 所定义范围内的验证项已关闭。legacy Conv、其它合法 opcode/shape 和完整 `REQ-CL-020` 覆盖仍按 RTM 保持 PARTIAL，并由 `CL-COV-003` 跟踪；不能从共享 datapath 推断未执行的地址生成与算子场景已通过。
 
 ### 3.2 CNM：Bank-Local PE 与 Global Reduction
 
@@ -413,7 +413,7 @@ Functional Coverage / SVA / URG
 | OPEN-CL-002 | P1 OPEN | Validator × Engine 的每算子地址/长度/stride/alias 精确定义 |
 | OPEN-CL-004 | **Closed scoped by v1.5/R49** | Matrix Line full-strobe/alignment/fallback/protection checker and reference-memory slice pass on three seeds; broader REQ-CL-010/022 remain partial |
 | CL-COV-006 | P1 PARTIAL | 依 v1.4 固定优先级 oracle，补齐合法 Engine × Fault × Phase × committed-prefix checker；不可达及接口不提供的故障组合单列 disposition |
-| OPEN-NUM-01 | **Closed scoped by v1.6/R51** | VDOT/GEMV/GEMM common arithmetic contract and independent edge campaign pass; legacy Conv and broader opcode/shape coverage remain partial under REQ-CL-020 / CL-COV-003 |
+| OPEN-NUM-01 | **Closed scoped by v1.6/R52** | Legal-activation VDOT/GEMV/GEMM common arithmetic contract and independent edge campaign pass; R51 reserved-activation stimulus is excluded; legacy Conv and broader opcode/shape coverage remain partial under REQ-CL-020 / CL-COV-003 |
 | OPEN-NUM-02 | **Closed in v1.3** | SFU 数值公式和独立 bit-exact oracle 已冻结；合同域的实测闭环见 RTM R21 |
 
 **冻结状态说明**：v1.1 是并行派发合法范围 DV 基线；v1.2 定义协调 reset/fabric epoch 约束；v1.3 定义 SFU 定点算术；v1.4 定义 Compute Engine Error ABI、优先级与写回前缀；v1.5 冻结 Matrix Line 的 full-strobe/alignment/fallback/protection 合同；v1.6 冻结 Scalar INT8 算术顺序与 signed overflow/saturation 规则。其他 Open Item 不因升版自动关闭，未来修改可观察行为必须升版并关联 Testplan 的 Requirement ID。
