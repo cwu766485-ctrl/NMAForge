@@ -25,6 +25,15 @@
 > reachability disposition. The KV top-level Protection-region denial and
 > other Engine descriptor contracts remain open. See the [R53 evidence](../docs/verification/COMPUTE_CLUSTER_KV_ADDRESS_R53.md).
 
+> **2026-10-30 KV Protection addendum:** DV-only top-test SHA `f24c538` passes
+> the real CMDQ KV source-read / Protection-denied destination-write path,
+> KV response ownership and error completion (`status/error=2/7`), and
+> destination-memory sentinel checks. `make ai_smoke` and the 20-case seeded
+> top regression pass from a detached clean worktree. This closes only the
+> named KV Protection slice; it does not close multi-requester ownership,
+> broader fault crosses or the 38-requirement review. See the
+> [R54 report](../docs/verification/COMPUTE_CLUSTER_KV_PROTECTION_R54.md).
+
 > **2026-10-30 Scalar INT8 numeric addendum:** R52 passes 13 independent
 > Golden cases per seed on three seeds at clean test SHA `dde7806`, covering
 > VDOT/GEMV/GEMM arithmetic boundaries, output Memory Image, response drain,

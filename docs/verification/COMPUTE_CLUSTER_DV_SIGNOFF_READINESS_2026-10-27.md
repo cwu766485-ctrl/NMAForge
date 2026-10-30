@@ -2,7 +2,7 @@
 
 ## Review decision (updated 2026-10-30)
 
-**Selected review candidate source SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`.\
+**Selected product RTL/SPEC SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`; latest top-test SHA `f24c5383fad511c8b2e1132c1157942807994759` (R54 only adds DV).\
 **Current SPEC:** v1.7 freezes KV address alignment/overflow behavior; v1.6 freezes Scalar INT8 arithmetic order; v1.5 freezes the Matrix Line transfer contract.\
 **Candidate classification:** bounded Functional DV review candidate; not CL-DV-v1.0 signed.\
 **Product RTL:** the candidate preserves the earlier scoped Conv/KV/SFU error-code alignment and adds the KV 32-bit overflow/alignment guard.\
@@ -14,6 +14,8 @@
 
 **2026-10-30 KV address closure slice:** R53 at exact clean SHA `f916874` passes ten invalid-address/alignment cases and a legal final-SPAD-word round trip on three seeds. Every invalid case returns `ERR_CONFIG=1` before any SPAD request or side effect. KV DUT-only URG line/condition/FSM/branch is `100/98.77/73.33/96.97%`; four unhit transitions remain open without formal disposition. Top-level KV Protection-region denial and other Engine descriptor ranges remain open. Clean `ai_smoke` and 20-case seeded `ai_run` pass. See the [R53 report](COMPUTE_CLUSTER_KV_ADDRESS_R53.md).
 
+**2026-10-30 KV Protection closure slice:** R54 at exact clean test SHA `f24c538` passes `make ai_smoke` and `make ai_run AI_RANDOM_CASES=20 AI_SEED=12345`. The real top accepts one KV source read, denies the cache destination write through Protection, attributes the error to KV, commits completion status/error `2/7`, and preserves the destination sentinel. This closes only that KV Protection denial path; it does not close multi-requester ownership/fault crosses or the wider `REQ-PC-006`. See the [R54 report](COMPUTE_CLUSTER_KV_PROTECTION_R54.md).
+
 | Gate | Readiness | Evidence and remaining gate |
 |---|---|---|
 | **CL-RC1 — Matrix + SPAD dataflow** | **Ready for bounded review** | Current candidate R42 passes 45/45 size-sweep and 120/120 eight-way ablation points over three seeds. The Matrix FSM raw enabled-profile result remains 49/53; three guard/invariant edges have scoped formal disposition and the fallback edge is tested in the separate prefetch-disabled build. SPEC v1.5 freezes full-strobe Line writes and scalar fallback; R49 passes the scoped Line handshake/output checks on three seeds. |
@@ -23,9 +25,9 @@
 
 ## Version and history review
 
-- Prior reviewed candidate source is `6848a41`; the follow-up candidate is `f916874`. The prior candidate scopes `PACK_I8_TILE_A` descriptor validation to opcode `0x36`; the correction was caught by a clean-seed launch-field regression and then passed six seeds. R53 is exact-clean evidence for the new KV address guard only.
+- Prior reviewed candidate source is `6848a41`; the follow-up product/SPEC candidate is `f916874`, and R54's latest top-test source is `f24c538`. The prior candidate scopes `PACK_I8_TILE_A` descriptor validation to opcode `0x36`; the correction was caught by a clean-seed launch-field regression and then passed six seeds. R53 is exact-clean evidence for the new KV address guard; R54 is exact-clean evidence for the top-level KV Protection denial test. Neither reruns every historical campaign at the latest SHA.
 - R14–R39 remain useful historical/supplemental evidence for their identified source versions. R40–R45 add exact-clean-current-SHA UVM, mutation, Matrix/TinyNPU benchmark, top smoke and trained Digits inference evidence. R32 adds a separate all-engine accepted-read reset sweep, and R19 uses earlier product RTL with local benchmark-only additions and a pinned TinyNPU reference.
-- SPEC v1.1 freezes the 38 `REQ-CL`/`REQ-PC` contracts; v1.2 defines coordinated reset/epoch expectations; v1.3 freezes SFU integer arithmetic; v1.4 freezes seven-engine Error ABI, simultaneous-fault priority and accepted-write prefix; v1.5 freezes the Matrix Line contract; v1.6 freezes Scalar INT8 arithmetic order and saturation; v1.7 freezes KV word alignment/address overflow. `OPEN-CL-006/007` and the Line contract question are closed; R49 closes its scoped checker execution. R32 supplies accepted-read reset evidence for every real top engine; R50 closes the published-snapshot replay. R52 closes `OPEN-NUM-01` within the tested legal common arithmetic scope; R53 narrows `OPEN-CL-002` for KV overflow/alignment, while other descriptor and top-level KV Protection checks remain open. `OPEN-CL-003`, broader opcode/shape and legal fault-cross coverage remain open. A frozen SPEC is not requirement verification closure.
+- SPEC v1.1 freezes the 38 `REQ-CL`/`REQ-PC` contracts; v1.2 defines coordinated reset/epoch expectations; v1.3 freezes SFU integer arithmetic; v1.4 freezes seven-engine Error ABI, simultaneous-fault priority and accepted-write prefix; v1.5 freezes the Matrix Line contract; v1.6 freezes Scalar INT8 arithmetic order and saturation; v1.7 freezes KV word alignment/address overflow. `OPEN-CL-006/007` and the Line contract question are closed; R49 closes its scoped checker execution. R32 supplies accepted-read reset evidence for every real top engine; R50 closes the published-snapshot replay. R52 closes `OPEN-NUM-01` within the tested legal common arithmetic scope; R53/R54 narrow `OPEN-CL-002` for KV overflow/alignment and one top-level Protection denial path, while other descriptor and ownership/fault tests remain open. `OPEN-CL-003`, broader opcode/shape and legal fault-cross coverage remain open. A frozen SPEC is not requirement verification closure.
 - The original `READY` rows in the UVM Testplan remain planning/status-history and are not execution evidence; use the RTM run IDs and artifacts below.
 
 ## Verification evidence review
