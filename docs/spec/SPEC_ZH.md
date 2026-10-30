@@ -78,7 +78,7 @@ SPAD 保护寄存器配置四个区域 R0–R3；每区的 `BASE` 是包含的�
 
 ## 4. 队列、描述符与完成项
 
-软件写 CMDQ 描述符并发布 `CMDQ_TAIL`，硬件消费并报告 `CMDQ_HEAD`；硬件写 CPLQ 完成项并发布 `CPLQ_TAIL`，软件消费后发布 `CPLQ_HEAD`。CMDQ/CPLQ 可放在 scratchpad 或外部内存，`CMD_CTRL[0]` 选择外部描述符。CMD_HEAD/CPL_TAIL 的写仅用于复位/调试种子，不是正常运行时的软件推进方式。
+软件写 CMDQ 描述符并发布 `CMDQ_TAIL`，硬件消费并报告 `CMDQ_HEAD`；硬件写 CPLQ 完成项并发布 `CPLQ_TAIL`，软件消费后发布 `CPLQ_HEAD`。软件可在硬件仍 busy 时推进 `CPLQ_HEAD` 以释放满队列空间。CMDQ/CPLQ 可放在 scratchpad 或外部内存，`CMD_CTRL[0]` 选择外部描述符。CMD_HEAD/CPL_TAIL 的写仅用于复位/调试种子，不是正常运行时的软件推进方式。
 
 一条 ABI v7 描述符固定 64 字节、64 字节对齐、16 个 little-endian 32-bit word；A9/ABI v7.3 加入 `0x50 BF16_DOT_ACC_FP32`，A10/ABI v7.4 增加 `0x51 FP16_DOT_ACC_FP32`，均不改变描述符字节布局：
 
@@ -130,6 +130,8 @@ SFU `REQUANT_I8`（opcode `0x36`）中 `flags[4]` 将饱和后的 INT32 结果�
 | 51 (`0x51`) | FP16 点积、FP32 累加与结果（`FP16_DOT_ACC_FP32`） |
 
 Tensor GEMM descriptor ABI 与 4×4 tile-major SPAD operand 布局保持不变，M/N 仍须为 4 的倍数。Matrix controller 默认以 16×16 MAC array 执行宏 tile：每个 K word 从 SPAD 收集最多四组 4×4 A/B 数据，送入本地 operand buffer；尺寸大于 16 时按宏 tile 遍历，边缘 tile 只写有效元素。`ARRAY_SIZE=4/8/16` 参数配置均保留。
+
+Matrix banked-read 遵循 `valid/ready` 握手：普通背压期间，未接受请求的 `valid` 与地址保持稳定。若已接受的 Matrix 响应在本拍报告 parity error，Matrix 立即停止后续读请求并进入错误排空；此时可在同一拍撤销一笔仍未接受的 banked request，因为它不是已接受传输。此前所有已接受读取仍必须 drain，错误完成码为 `ERR_PARITY`，失败任务不得产生结果写回。该例外只适用于同拍 parity 响应导致的请求终止；普通 ready 背压仍必须保持请求稳定，Abort/Reset 依各自生命周期合同处理。
 
 SFU `GELU_Q8_8` (`0x35`) 与 `SILU_Q8_8` (`0x37`) 输入、输出均为 32-bit
 signed Q8.8 整数。GELU 分段定义为 `x<=-512: 0`、`x>=512: x`、其余为

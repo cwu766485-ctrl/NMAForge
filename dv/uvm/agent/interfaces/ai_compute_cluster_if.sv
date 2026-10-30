@@ -48,6 +48,7 @@ interface ai_compute_cluster_if(input logic aclk);
     logic parallel_queue_mode;
     logic desc_valid, desc_ready;
     logic cpl_valid, cpl_write, cpl_ready;
+    logic cplq_full;
     logic core_spad_write;
     logic matrix_line_valid, matrix_line_write, matrix_line_ready;
     logic [31:0] matrix_line_addr;
@@ -56,6 +57,7 @@ interface ai_compute_cluster_if(input logic aclk);
     logic dma_valid, dma_write, dma_ready;
     logic dma_line_valid, dma_line_write, dma_line_ready;
     logic matrix_prefetch_active;
+    logic matrix_response_fault;
     logic matrix_a_cache_hit;
     logic [31:0] matrix_a_cache_hits;
     logic [31:0] matrix_prefetch_overlap_cycles;
@@ -130,6 +132,7 @@ interface ai_compute_cluster_if(input logic aclk);
     logic [31:0] req_addr_previous[0:6], req_wdata_previous[0:6];
     integer unsigned matrix_banked_stall_checks;
     integer unsigned matrix_banked_stall_violations;
+    integer unsigned matrix_banked_fault_cancel_checks;
     logic matrix_banked_stalled_previous;
     logic [31:0] matrix_banked_addr_previous;
     integer unsigned matrix_line_stall_checks;
@@ -159,6 +162,7 @@ interface ai_compute_cluster_if(input logic aclk);
         req_stalled_previous = '0;
         matrix_banked_stall_checks = 0;
         matrix_banked_stall_violations = 0;
+        matrix_banked_fault_cancel_checks = 0;
         matrix_banked_stalled_previous = 1'b0;
         matrix_line_stall_checks = 0;
         matrix_line_stall_violations = 0;
@@ -250,9 +254,22 @@ interface ai_compute_cluster_if(input logic aclk);
 
             if (matrix_banked_stalled_previous) begin
                 matrix_banked_stall_checks++;
-                if (!matrix_request_valid ||
-                    matrix_banked_req_addr !== matrix_banked_addr_previous)
+                // An accepted parity response terminates Matrix banked-read
+                // issue. In that exact cycle it may cancel a held but
+                // unaccepted request; all other stalls retain strict
+                // valid/address stability checking.
+                if (!matrix_request_valid && matrix_response_fault) begin
+                    matrix_banked_fault_cancel_checks++;
+                end else if (!matrix_request_valid ||
+                             matrix_banked_req_addr !== matrix_banked_addr_previous) begin
+                    if (matrix_banked_stall_violations == 0)
+                        $display("[MATRIX_BANKED_STALL_DIAG] cycle=%0d previous_addr=%08h current_addr=%08h current_valid=%b ready=%b busy=%b parity_fault=%b abort=%b",
+                            sim_cycles, matrix_banked_addr_previous,
+                            matrix_banked_req_addr, matrix_request_valid,
+                            banked_ready, engine_busy[3], matrix_response_fault,
+                            dut_abort_active);
                     matrix_banked_stall_violations++;
+                end
             end
             matrix_banked_stalled_previous = matrix_request_valid && !banked_ready;
             if (matrix_banked_stalled_previous)

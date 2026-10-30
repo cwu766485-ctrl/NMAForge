@@ -13,12 +13,16 @@ class ai_compute_cluster_coverage extends uvm_component;
     bit cnm_request;
     bit matrix_prefetch_active;
     bit matrix_a_cache_hit;
+    bit matrix_banked_fault_cancel;
+    bit cplq_full;
     int response_route;
     bit cnm_lane0_response;
     bit cnm_lane1_response;
     bit cnm_lane2_response;
     bit cnm_lane3_response;
     int unsigned response_client_hits[0:5];
+    int unsigned matrix_banked_fault_cancel_hits;
+    int unsigned cplq_full_hits;
 
     covergroup cluster_cg;
         option.per_instance = 1;
@@ -37,6 +41,12 @@ class ai_compute_cluster_coverage extends uvm_component;
         cp_cnm_request: coverpoint cnm_request { bins hit = {1}; }
         cp_matrix_prefetch_active: coverpoint matrix_prefetch_active { bins hit = {1}; }
         cp_matrix_a_cache_hit: coverpoint matrix_a_cache_hit { bins hit = {1}; }
+        cp_matrix_banked_fault_cancel: coverpoint matrix_banked_fault_cancel {
+            bins parity_response_cancels_held_unaccepted_read = {1};
+        }
+        cp_cplq_full: coverpoint cplq_full {
+            bins full_completion_queue = {1};
+        }
         cp_response_client: coverpoint response_client iff (response_client >= 0) {
             bins descriptor = {0};
             // ai_completion_writer only emits SPAD writes (spad_write=spad_valid),
@@ -61,6 +71,8 @@ class ai_compute_cluster_coverage extends uvm_component;
         super.new(name, parent);
         analysis_export = new("analysis_export", this);
         cluster_cg = new();
+        matrix_banked_fault_cancel_hits = 0;
+        cplq_full_hits = 0;
         foreach (response_client_hits[i]) response_client_hits[i] = 0;
     endfunction
 
@@ -90,6 +102,12 @@ class ai_compute_cluster_coverage extends uvm_component;
         cnm_request = |obs.cnm_valid;
         matrix_prefetch_active = obs.matrix_prefetch_active;
         matrix_a_cache_hit = obs.matrix_a_cache_hit;
+        matrix_banked_fault_cancel = obs.matrix_banked_fault_cancel;
+        cplq_full = obs.cplq_full;
+        if (matrix_banked_fault_cancel)
+            matrix_banked_fault_cancel_hits++;
+        if (cplq_full)
+            cplq_full_hits++;
         response_client = obs.rsp_valid ? obs.rsp_client : -1;
         if (obs.rsp_valid && obs.rsp_client <= 3'd5)
             response_client_hits[obs.rsp_client]++;
@@ -101,16 +119,18 @@ class ai_compute_cluster_coverage extends uvm_component;
         if (obs.launch_valid || active_count > 0 || simultaneous_engine_requests ||
             banked_request || cnm_request || obs.rsp_valid ||
             engine_backpressure || multi_engine_abort ||
-            matrix_prefetch_active || matrix_a_cache_hit)
+            matrix_prefetch_active || matrix_a_cache_hit ||
+            matrix_banked_fault_cancel || cplq_full)
             cluster_cg.sample();
     endfunction
 
     function void report_phase(uvm_phase phase);
         super.report_phase(phase);
         `uvm_info("CLUSTER_COVERAGE", $sformatf(
-            "focused_compute_cg_applicable=%0.1f%% response_clients={desc:%0d,cpl_read:%0d(N/A),core:%0d,banked:%0d,dma:%0d,cnm:%0d}",
+            "focused_compute_cg_applicable=%0.1f%% response_clients={desc:%0d,cpl_read:%0d(N/A),core:%0d,banked:%0d,dma:%0d,cnm:%0d} matrix_banked_fault_cancel=%0d cplq_full=%0d",
             cluster_cg.get_coverage(), response_client_hits[0], response_client_hits[1],
             response_client_hits[2], response_client_hits[3], response_client_hits[4],
-            response_client_hits[5]), UVM_LOW)
+            response_client_hits[5], matrix_banked_fault_cancel_hits,
+            cplq_full_hits), UVM_LOW)
     endfunction
 endclass

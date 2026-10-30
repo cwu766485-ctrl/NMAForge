@@ -1,6 +1,7 @@
 class ai_compute_cluster_obs extends uvm_sequence_item;
     `uvm_object_utils(ai_compute_cluster_obs)
     bit core_busy;
+    bit cplq_full;
     bit launch_valid;
     bit [7:0] launch_op;
     bit [6:0] engine_busy;
@@ -15,6 +16,7 @@ class ai_compute_cluster_obs extends uvm_sequence_item;
     bit [3:0] cnm_valid;
     bit matrix_prefetch_active;
     bit matrix_a_cache_hit;
+    bit matrix_banked_fault_cancel;
     bit rsp_valid;
     bit [2:0] rsp_client;
     bit [2:0] request_client;

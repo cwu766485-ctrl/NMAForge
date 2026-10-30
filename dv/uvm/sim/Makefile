@@ -67,8 +67,11 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -q '\[CLUSTER_DMA_RESPONSE_PASS\]' "$$log" || { echo "ERROR: real top DMA response-client read check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_LAUNCH_FIELDS_PASS\]' "$$log" || { echo "ERROR: descriptor launch-snapshot/unused-field checks missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_MATRIX_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: real Matrix in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_SFU_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: real SFU in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_SHARED_READONLY_PASS\]' "$$log" || { echo "ERROR: cross-engine shared read-only SPAD check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_REQUEST_STABILITY_PASS\]' "$$log" || { echo "ERROR: stalled compute request-stability check missing in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_MATRIX_LINE_STALL_PASS\].*stability checks=[1-9][0-9]* violations=0' "$$log" || { echo "ERROR: real Matrix line-write backpressure stability check missing or failed in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SERIAL_BENCH_PASS\].*total=[1-9][0-9]*' "$$log" || { echo "ERROR: serial compute benchmark timing missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_STAGED_BENCH_PASS\].*speedup=[1-9].*pair_contention_cycles=[1-9][0-9]*' "$$log" || { echo "ERROR: staged Matrix/CNM contention then SFU benchmark timing missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_PARALLEL_BENCH_PASS\].*speedup=[1-9]' "$$log" || { echo "ERROR: parallel compute benchmark timing missing in $$log"; exit 1; }; \
@@ -77,6 +80,8 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -q '\[CLUSTER_SCOREBOARD\]' "$$log" || { echo "ERROR: compute-cluster scoreboard report missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_MEMORY_SCOREBOARD\].*checked_words=[1-9][0-9]* mismatches=0 unknown_reads=0' "$$log" || { echo "ERROR: independent scratchpad memory scoreboard did not close cleanly in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_RANDOM_FAULT_CROSS_PASS\].*parity cases=18/18' "$$log" || { echo "ERROR: randomized seven-engine parity fault cross missing in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_PARITY_OWNER_CROSS_PASS\].*overlap_cycles=[1-9][0-9]* shared_banked_accepts=[1-9][0-9]* matrix_rsp=[1-9][0-9]* cnm_rsp=[1-9][0-9]* route_mismatch=0; held-read fault cancellations=1' "$$log" || { echo "ERROR: concurrent Matrix parity error/CNM owner-isolation/fault-cancel cross missing or failed in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_CPLQ_BACKPRESSURE_PASS\].*blocked_tail=3.*released_head=1.*wrapped_tail=0.*all_engines_idle=1' "$$log" || { echo "ERROR: real-engine CPLQ full hold/release/ordered completion check missing or failed in $$log"; exit 1; }; \
 		test "$$(grep -c ' \[CLUSTER_FAULT_CASE_PASS\] case=' "$$log")" -eq 18 || { echo "ERROR: expected all 18 parity fault cases in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_PROTECTION_CROSS_PASS\].*cases=19/19.*sourceA=7 sourceB=5 writeback=7' "$$log" || { echo "ERROR: all-engine phase-qualified real-top protection fault cross missing in $$log"; exit 1; }; \
 		test "$$(grep -c ' \[CLUSTER_PROTECTION_CASE_PASS\] engine=' "$$log")" -eq 19 || { echo "ERROR: expected 19 engine/phase protection fault cases in $$log"; exit 1; }; \
@@ -85,7 +90,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		test "$$(grep -c ' \[CLUSTER_PROTECTION_CASE_PASS\].*phase=2 ' "$$log")" -eq 7 || { echo "ERROR: expected seven writeback Protection cases in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SCOREBOARD\].*reset_dropped=[1-9][0-9]*' "$$log" || { echo "ERROR: reset did not discard a tracked in-flight SPAD response"; exit 1; }; \
 		grep -q '\[CLUSTER_COVERAGE\]' "$$log" || { echo "ERROR: compute-cluster coverage report missing in $$log"; exit 1; }; \
-		grep -Eq '\[CLUSTER_COVERAGE\].*focused_compute_cg_applicable=100\.0%.*cpl_read:0[(]N/A[)]' "$$log" || { echo "ERROR: applicable compute testpoint coverage is not 100% or completion-read N/A disposition is missing in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_COVERAGE\].*focused_compute_cg_applicable=100\.0%.*cpl_read:0[(]N/A[)].*matrix_banked_fault_cancel=1.*cplq_full=[1-9][0-9]*' "$$log" || { echo "ERROR: applicable compute testpoint coverage is not 100%, Matrix parity-cancel/CPLQ-full bin is missing, or completion-read N/A disposition is missing in $$log"; exit 1; }; \
 		! grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$$log" || { echo "ERROR: UVM warning/error/fatal count is nonzero in $$log"; exit 1; }; \
 	done; \
 	$(URG) -full64 -dir "$$out/compile.vdb" $$cov_dbs -format text \

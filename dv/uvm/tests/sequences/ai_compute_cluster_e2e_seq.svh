@@ -35,6 +35,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] MATRIX_A_LOCAL = 32'h0001_0000;
     localparam bit [31:0] MATRIX_B_LOCAL = 32'h0001_2000;
     localparam bit [31:0] MATRIX_Y_LOCAL = 32'h0003_0000;
+    localparam bit [31:0] MATRIX_LINE_STALL_CNM_A_LOCAL = 32'h0005_0000;
+    localparam bit [31:0] MATRIX_LINE_STALL_CNM_B_LOCAL = 32'h0005_2000;
+    localparam bit [31:0] MATRIX_LINE_STALL_CNM_Y_LOCAL = 32'h0005_6000;
     localparam bit [31:0] GELU_A_LOCAL = 32'h0002_0000;
     localparam bit [31:0] GELU_B_LOCAL = 32'h0002_0100;
     localparam bit [31:0] GELU_Y0_LOCAL = 32'h0002_0200;
@@ -52,6 +55,12 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] CONTRACT_Y1_LOCAL = 32'h0004_7500;
     localparam bit [31:0] CONTRACT_MUTATED_Y_LOCAL = 32'h0004_7600;
     localparam bit [31:0] CONTRACT_SFU_Y_LOCAL = 32'h0004_7800;
+    localparam bit [31:0] MATRIX_LATCH_Y_LOCAL = 32'h0003_8000;
+    localparam bit [31:0] MATRIX_LATCH_MUTATED_Y_LOCAL = 32'h0003_9000;
+    localparam bit [31:0] SFU_LATCH_SRC_LOCAL = 32'h0004_a100;
+    localparam bit [31:0] SFU_LATCH_MUTATED_SRC_LOCAL = 32'h0004_a140;
+    localparam bit [31:0] SFU_LATCH_Y_LOCAL = 32'h0004_a180;
+    localparam bit [31:0] SFU_LATCH_MUTATED_Y_LOCAL = 32'h0004_a1c0;
     localparam bit [31:0] SCALAR_A_LOCAL = 32'h0004_6000;
     localparam bit [31:0] SCALAR_B_LOCAL = 32'h0004_6100;
     localparam bit [31:0] SCALAR_Y_LOCAL = 32'h0004_6200;
@@ -436,6 +445,166 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             "case=%0d engine=%0d operand_phase=%0d cnm_lane=%0d address=0x%08h seed=%0d",
             case_id, fault_engine, fault_phase, cnm_lane, fault_addr, seed), UVM_LOW)
         axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+    task automatic run_matrix_parity_cnm_owner_cross(input int unsigned seed);
+        bit [31:0] desc_base;
+        bit [31:0] cpl_base;
+        bit [31:0] matrix_dst;
+        bit [31:0] cnm_dst;
+        bit [31:0] parity_addr;
+        bit [31:0] packed_word;
+        bit [31:0] matrix_rsp_before;
+        bit [31:0] cnm_rsp_before;
+        bit [31:0] matrix_route_error_before;
+        bit [31:0] cnm_route_error_before;
+        bit [31:0] overlap_before;
+        bit [31:0] shared_accept_before;
+        int unsigned fault_cancel_before;
+        string parity_path;
+        uvm_hdl_data_t saved_parity;
+        int signed expected_cnm[0:15];
+        int signed a_value;
+        int signed b_value;
+        int unsigned row_idx;
+        int unsigned k_word;
+        int unsigned lane;
+        int unsigned byte_idx;
+        int unsigned word_idx;
+
+        desc_base = 32'h0000_7800;
+        cpl_base = 32'h0000_7900;
+        matrix_dst = 32'h0005_4000;
+        cnm_dst = 32'h0005_4800;
+        // Fail the last A-row lane of the final K group. The task remains
+        // active long enough for the queued CNM workload to run concurrently;
+        // the failed output tile must still commit no words.
+        parity_addr = MATRIX_A_LOCAL + 32'h0000_00fc;
+
+        // Prepare a long legal CNM GEMV independently of Matrix's operand
+        // image, so the failing Matrix cannot poison CNM's Golden result.
+        for (k_word = 0; k_word < 32; k_word++) begin
+            for (lane = 0; lane < 4; lane++) begin
+                packed_word = '0;
+                for (byte_idx = 0; byte_idx < 4; byte_idx++) begin
+                    a_value = int'(k_word % 5) + int'(lane * 2) +
+                              int'(byte_idx) - 5;
+                    packed_word[byte_idx*8 +: 8] = a_value[7:0];
+                end
+                spad_write(MATRIX_LINE_STALL_CNM_A_LOCAL +
+                           (k_word << 4) + (lane << 2), packed_word);
+            end
+        end
+        for (row_idx = 0; row_idx < 16; row_idx++) begin
+            expected_cnm[row_idx] = 0;
+            for (k_word = 0; k_word < 32; k_word++) begin
+                for (lane = 0; lane < 4; lane++) begin
+                    packed_word = '0;
+                    for (byte_idx = 0; byte_idx < 4; byte_idx++) begin
+                        a_value = int'(k_word % 5) + int'(lane * 2) +
+                                  int'(byte_idx) - 5;
+                        b_value = int'(row_idx % 5) + int'(k_word % 3) +
+                                  int'(lane) + int'(byte_idx) - 3;
+                        packed_word[byte_idx*8 +: 8] = b_value[7:0];
+                        expected_cnm[row_idx] += a_value * b_value;
+                    end
+                    spad_write(MATRIX_LINE_STALL_CNM_B_LOCAL +
+                               ((row_idx * 32 + k_word) << 4) +
+                               (lane << 2), packed_word);
+                end
+            end
+        end
+
+        for (word_idx = 0; word_idx < 512; word_idx++)
+            spad_write(matrix_dst + (word_idx << 2),
+                       32'hfa17_7000 | word_idx);
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            spad_write(cnm_dst + (word_idx << 2),
+                       32'hfa17_7800 | word_idx);
+
+        write_v3_desc(desc_base, 8'h30, 16'h07e0,
+                      MATRIX_A_LOCAL, MATRIX_B_LOCAL, matrix_dst,
+                      16'd16, 16'd32, 16'd16);
+        write_cluster_desc(desc_base + 32'h40, 8'h21, 16'h07e1,
+                           MATRIX_LINE_STALL_CNM_A_LOCAL,
+                           MATRIX_LINE_STALL_CNM_B_LOCAL, cnm_dst,
+                           16'd16, 16'd1, 16'd32, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd3);
+
+        matrix_rsp_before = compute_vif.matrix_tag_response_count;
+        cnm_rsp_before = compute_vif.cnm_tag_response_count;
+        matrix_route_error_before = compute_vif.matrix_route_mismatch_count;
+        cnm_route_error_before = compute_vif.cnm_route_mismatch_count;
+        overlap_before = compute_vif.matrix_cnm_overlap_cycles;
+        shared_accept_before = compute_vif.matrix_cnm_shared_accept_cycles;
+        fault_cancel_before = compute_vif.matrix_banked_fault_cancel_checks;
+        inject_spad_parity_fault(parity_addr, parity_path, saved_parity);
+
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, desc_base);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd2);
+        axil_write(REG_CPLQ_BASE, cpl_base);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd2);
+        wait_spad_idle();
+        restore_spad_parity(parity_path, saved_parity);
+
+        if (compute_vif.matrix_cnm_overlap_cycles <= overlap_before)
+            `uvm_fatal("CLUSTER_PARITY_OWNER",
+                "Matrix parity fault and CNM valid task never overlapped on real engines")
+        if (compute_vif.matrix_cnm_shared_accept_cycles <= shared_accept_before)
+            `uvm_fatal("CLUSTER_PARITY_OWNER",
+                "Matrix/CNM did not contend for shared banked admission in parity-owner cross")
+        if ((compute_vif.matrix_banked_fault_cancel_checks -
+             fault_cancel_before) != 1)
+            `uvm_fatal("CLUSTER_PARITY_OWNER", $sformatf(
+                "expected exactly one Matrix held-read cancellation on parity response, observed %0d",
+                compute_vif.matrix_banked_fault_cancel_checks - fault_cancel_before))
+        if (compute_vif.matrix_tag_response_count <= matrix_rsp_before ||
+            compute_vif.cnm_tag_response_count <= cnm_rsp_before)
+            `uvm_fatal("CLUSTER_PARITY_OWNER", $sformatf(
+                "missing response owner activity: Matrix %0d->%0d CNM %0d->%0d",
+                matrix_rsp_before, compute_vif.matrix_tag_response_count,
+                cnm_rsp_before, compute_vif.cnm_tag_response_count))
+        if (compute_vif.matrix_route_mismatch_count != matrix_route_error_before ||
+            compute_vif.cnm_route_mismatch_count != cnm_route_error_before)
+            `uvm_fatal("CLUSTER_PARITY_OWNER", $sformatf(
+                "response owner cross-route mismatch: Matrix %0d->%0d CNM %0d->%0d",
+                matrix_route_error_before, compute_vif.matrix_route_mismatch_count,
+                cnm_route_error_before, compute_vif.cnm_route_mismatch_count))
+
+        expect_spad(cpl_base, 32'h0000_07e0,
+                    "concurrent parity Matrix task ID/order");
+        expect_spad(cpl_base + 32'h04, 32'h0000_0052,
+                    "concurrent parity Matrix error owner");
+        expect_completion(cpl_base + 32'h10, 16'h07e1,
+                          expected_cnm[15], 32'd16,
+                          "concurrent parity CNM success/order");
+        for (word_idx = 0; word_idx < 512; word_idx++)
+            expect_spad(matrix_dst + (word_idx << 2),
+                        32'hfa17_7000 | word_idx,
+                        $sformatf("concurrent parity Matrix no-writeback[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            expect_spad(cnm_dst + (word_idx << 2), expected_cnm[word_idx],
+                        $sformatf("concurrent parity CNM Golden[%0d]", word_idx));
+
+        `uvm_info("CLUSTER_PARITY_OWNER_CROSS_PASS", $sformatf(
+            "real Matrix ERR_PARITY=0x52 and concurrent CNM Golden pass; overlap_cycles=%0d shared_banked_accepts=%0d matrix_rsp=%0d cnm_rsp=%0d route_mismatch=0; held-read fault cancellations=%0d; no Matrix writeback; ordered completion; seed=%0d",
+            compute_vif.matrix_cnm_overlap_cycles - overlap_before,
+            compute_vif.matrix_cnm_shared_accept_cycles - shared_accept_before,
+            compute_vif.matrix_tag_response_count - matrix_rsp_before,
+            compute_vif.cnm_tag_response_count - cnm_rsp_before,
+            compute_vif.matrix_banked_fault_cancel_checks - fault_cancel_before,
+            seed), UVM_LOW)
+
+        axil_write(REG_CPLQ_HEAD, 32'd2);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
@@ -962,6 +1131,180 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         clear_contract_queues(32'd1);
     endtask
 
+    task automatic run_matrix_inflight_parameter_latch_test(
+        input int signed expected_matrix[0:15][0:31]
+    );
+        int unsigned word_idx;
+        int unsigned poll;
+        int unsigned launch_before;
+        bit busy_seen;
+        bit [31:0] completion_base;
+        completion_base = CLUSTER_CONTRACT_CPLQ + 32'h300;
+
+        // The matrix operands and independent 16x32x64 Golden were prepared
+        // before the first GEMM in this sequence. Use disjoint destinations so
+        // this probe observes only the in-flight descriptor snapshot.
+        for (word_idx = 0; word_idx < 512; word_idx++) begin
+            spad_write(MATRIX_LATCH_Y_LOCAL + (word_idx << 2),
+                       32'hbad0_6a00 | word_idx);
+            spad_write(MATRIX_LATCH_MUTATED_Y_LOCAL + (word_idx << 2),
+                       32'hbad0_6b00 | word_idx);
+        end
+        write_v3_desc(CLUSTER_CONTRACT_CMDQ, 8'h30, 16'h0685,
+                      MATRIX_A_LOCAL, MATRIX_B_LOCAL, MATRIX_LATCH_Y_LOCAL,
+                      16'd16, 16'd32, 16'd16);
+        launch_before = compute_vif.launch_sample_count;
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        busy_seen = 1'b0;
+        for (poll = 0; poll < 10000; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.engine_busy[3]) begin
+                busy_seen = 1'b1;
+                break;
+            end
+        end
+        if (!busy_seen)
+            `uvm_fatal("CLUSTER_MATRIX_PARAM_LATCH",
+                "Matrix task did not become active before descriptor mutation")
+
+        // Replace the backing descriptor with a different, otherwise legal
+        // Matrix task while the original long GEMM is active. The accepted
+        // task must keep its launch-time source, destination, shape and flags.
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h04, CONTRACT_B_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h08, CONTRACT_SHARED_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h10, MATRIX_LATCH_MUTATED_Y_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h14, {16'd4, 16'd4});
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h18, 32'd4);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h1c, 32'h0000_0006);
+
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        for (word_idx = 0; word_idx < 512; word_idx++) begin
+            expect_spad(MATRIX_LATCH_Y_LOCAL + (word_idx << 2),
+                        expected_matrix[word_idx / 32][word_idx % 32],
+                        $sformatf("in-flight Matrix latched Golden[%0d]", word_idx));
+            expect_spad(MATRIX_LATCH_MUTATED_Y_LOCAL + (word_idx << 2),
+                        32'hbad0_6b00 | word_idx,
+                        $sformatf("in-flight Matrix mutation destination sentinel[%0d]", word_idx));
+        end
+        expect_completion(completion_base, 16'h0685,
+                          expected_matrix[15][31], 32'd512,
+                          "in-flight Matrix parameter latch");
+        if (compute_vif.launch_sample_count != launch_before + 1 ||
+            compute_vif.launch_snapshot_src0[3] !== MATRIX_A_LOCAL ||
+            compute_vif.launch_snapshot_src1[3] !== MATRIX_B_LOCAL ||
+            compute_vif.launch_snapshot_dst[3] !== MATRIX_LATCH_Y_LOCAL ||
+            compute_vif.launch_snapshot_m[3] !== 16'd16 ||
+            compute_vif.launch_snapshot_n[3] !== 16'd32 ||
+            compute_vif.launch_snapshot_k[3] !== 16'd16 ||
+            compute_vif.launch_snapshot_flags[3] !== 8'd0)
+            `uvm_fatal("CLUSTER_MATRIX_PARAM_LATCH", $sformatf(
+                "Matrix launch snapshot changed: count=%0d/%0d src=%08h/%08h dst=%08h shape=%0d/%0d/%0d flags=%02h",
+                compute_vif.launch_sample_count, launch_before + 1,
+                compute_vif.launch_snapshot_src0[3],
+                compute_vif.launch_snapshot_src1[3],
+                compute_vif.launch_snapshot_dst[3],
+                compute_vif.launch_snapshot_m[3],
+                compute_vif.launch_snapshot_n[3],
+                compute_vif.launch_snapshot_k[3],
+                compute_vif.launch_snapshot_flags[3]))
+        `uvm_info("CLUSTER_MATRIX_PARAMETER_LATCH_PASS",
+            "mutating Matrix source, destination, shape, and transpose descriptor fields after launch preserved the original 16x32x64 Golden image and completion",
+            UVM_LOW)
+        clear_contract_queues(32'd1);
+    endtask
+
+    task automatic run_sfu_inflight_parameter_latch_test();
+        int unsigned poll;
+        int unsigned word_idx;
+        int unsigned launch_before;
+        bit state_seen;
+        bit hdl_ok;
+        uvm_hdl_data_t state_value;
+        bit [31:0] completion_base;
+        string state_path;
+        completion_base = CLUSTER_CONTRACT_CPLQ + 32'h400;
+        state_path = "tb_ai_accel_uvm.dut.compute_cluster_u.tensor_sfu_u.state_r";
+
+        // RMSNorm over [1,2,2,0] with epsilon 1 has an exact integer Golden:
+        // floor((1+4+4+0)/4)=2, isqrt(2+1)=1, and the Q30 reciprocal is 1.
+        // A different source [4,4,4,4] would instead normalize to [1,1,1,1].
+        spad_write(SFU_LATCH_SRC_LOCAL + 32'h00, 32'd1);
+        spad_write(SFU_LATCH_SRC_LOCAL + 32'h04, 32'd2);
+        spad_write(SFU_LATCH_SRC_LOCAL + 32'h08, 32'd2);
+        spad_write(SFU_LATCH_SRC_LOCAL + 32'h0c, 32'd0);
+        for (word_idx = 0; word_idx < 4; word_idx++) begin
+            spad_write(SFU_LATCH_MUTATED_SRC_LOCAL + (word_idx << 2), 32'd4);
+            spad_write(SFU_LATCH_Y_LOCAL + (word_idx << 2), 32'hbad0_6c00 | word_idx);
+            spad_write(SFU_LATCH_MUTATED_Y_LOCAL + (word_idx << 2), 32'hbad0_6d00 | word_idx);
+        end
+        write_v3_desc(CLUSTER_CONTRACT_CMDQ, 8'h33, 16'h0686,
+                      SFU_LATCH_SRC_LOCAL, 32'd0, SFU_LATCH_Y_LOCAL,
+                      16'd0, 16'd0, 16'd4);
+        launch_before = compute_vif.launch_sample_count;
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        // State 13 is the iterative RMS mean-square divider wait. The SFU
+        // keeps its SPAD request deasserted here, so host writes to the already
+        // fetched descriptor do not contend with an outstanding engine read.
+        state_seen = 1'b0;
+        for (poll = 0; poll < 10000; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.engine_busy[4]) begin
+                hdl_ok = uvm_hdl_read(state_path, state_value);
+                if (!hdl_ok)
+                    `uvm_fatal("CLUSTER_SFU_PARAM_LATCH",
+                        $sformatf("failed to read SFU state through %s", state_path))
+                if (state_value[5:0] == 6'd13) begin
+                    state_seen = 1'b1;
+                    break;
+                end
+            end
+        end
+        if (!state_seen)
+            `uvm_fatal("CLUSTER_SFU_PARAM_LATCH",
+                "RMSNorm task did not reach the divider wait before descriptor mutation")
+
+        // Mutate the fetched descriptor to point at a different legal input,
+        // destination and one-element length. The accepted four-element task
+        // must continue from its launch-time snapshot.
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h04, SFU_LATCH_MUTATED_SRC_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h10, SFU_LATCH_MUTATED_Y_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h18, 32'd1);
+
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        for (word_idx = 0; word_idx < 4; word_idx++) begin
+            expect_spad(SFU_LATCH_Y_LOCAL + (word_idx << 2),
+                        (word_idx < 3) ? (word_idx == 0 ? 32'd1 : 32'd2) : 32'd0,
+                        $sformatf("in-flight SFU RMSNorm latched Golden[%0d]", word_idx));
+            expect_spad(SFU_LATCH_MUTATED_Y_LOCAL + (word_idx << 2),
+                        32'hbad0_6d00 | word_idx,
+                        $sformatf("in-flight SFU mutation destination sentinel[%0d]", word_idx));
+        end
+        expect_completion(completion_base, 16'h0686, 32'd0, 32'd4,
+                          "in-flight SFU RMSNorm parameter latch");
+        if (compute_vif.launch_sample_count != launch_before + 1 ||
+            compute_vif.launch_snapshot_src0[4] !== SFU_LATCH_SRC_LOCAL ||
+            compute_vif.launch_snapshot_src1[4] !== 32'd0 ||
+            compute_vif.launch_snapshot_dst[4] !== SFU_LATCH_Y_LOCAL ||
+            compute_vif.launch_snapshot_length[4] !== 16'd4)
+            `uvm_fatal("CLUSTER_SFU_PARAM_LATCH", $sformatf(
+                "SFU launch snapshot changed: count=%0d/%0d src0=%08h src1=%08h dst=%08h length=%0d",
+                compute_vif.launch_sample_count, launch_before + 1,
+                compute_vif.launch_snapshot_src0[4],
+                compute_vif.launch_snapshot_src1[4],
+                compute_vif.launch_snapshot_dst[4],
+                compute_vif.launch_snapshot_length[4]))
+        `uvm_info("CLUSTER_SFU_PARAMETER_LATCH_PASS",
+            "real-top RMSNorm retained its four-element source/destination/length snapshot while the backing descriptor was changed during divider wait",
+            UVM_LOW)
+        clear_contract_queues(32'd1);
+    endtask
+
     task automatic run_shared_readonly_isolation_test();
         int unsigned word_idx;
         int unsigned poll;
@@ -1208,13 +1551,14 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 `uvm_fatal("CLUSTER_REQUEST_STABILITY", $sformatf(
                     "engine%0d stability checks lack a stall sample", e))
         `uvm_info("CLUSTER_REQUEST_STABILITY_PASS", $sformatf(
-            "engine stalled mask=%07b cycles={%0d,%0d,%0d,%0d,%0d,%0d,%0d}; Matrix banked checks=%0d, Matrix line checks=%0d, CNM lane checks={%0d,%0d,%0d,%0d}",
+            "engine stalled mask=%07b cycles={%0d,%0d,%0d,%0d,%0d,%0d,%0d}; Matrix banked checks=%0d fault-cancel=%0d, Matrix line checks=%0d, CNM lane checks={%0d,%0d,%0d,%0d}",
             compute_vif.engine_req_stall_seen,
             compute_vif.engine_req_stall_cycles[0], compute_vif.engine_req_stall_cycles[1],
             compute_vif.engine_req_stall_cycles[2], compute_vif.engine_req_stall_cycles[3],
             compute_vif.engine_req_stall_cycles[4], compute_vif.engine_req_stall_cycles[5],
             compute_vif.engine_req_stall_cycles[6],
             compute_vif.matrix_banked_stall_checks,
+            compute_vif.matrix_banked_fault_cancel_checks,
             compute_vif.matrix_line_stall_checks,
             compute_vif.cnm_stall_checks[0], compute_vif.cnm_stall_checks[1],
             compute_vif.cnm_stall_checks[2], compute_vif.cnm_stall_checks[3]), UVM_LOW)
@@ -1328,17 +1672,26 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int signed matrix_a[0:15][0:63];
         int signed matrix_b[0:63][0:31];
         int signed matrix_golden[0:15][0:31];
+        int signed line_stall_cnm_golden[0:15];
         int signed gelu_values[0:3];
         int signed gelu_results[0:3];
         int signed accumulator;
         int unsigned word_idx;
         int unsigned engine_idx;
+        int unsigned cplq_poll;
+        bit cplq_all_engines_idle;
         int unsigned protection_case_count;
         int unsigned fault_order[0:17];
         int unsigned fault_i;
         int unsigned fault_j;
         int unsigned fault_swap;
         int unsigned fault_case_id;
+        int unsigned cnm_lane;
+        int unsigned cnm_byte;
+        int signed cnm_a_value;
+        int signed cnm_b_value;
+        int unsigned matrix_line_stall_checks_before;
+        int unsigned matrix_line_stall_violations_before;
         bit [17:0] fault_cases_seen;
         int unsigned overlap_total;
         int unsigned matrix_prefetch_overlap_total;
@@ -1602,6 +1955,102 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
 
+        // Keep a real CNM banked requester active while the long Matrix GEMM
+        // reaches its line-writeback phase.  The two operations use disjoint
+        // SPAD regions, so this creates legal arbitration pressure without a
+        // read/write dependency or conflicting output ownership.
+        for (k_word = 0; k_word < 32; k_word++) begin
+            for (cnm_lane = 0; cnm_lane < 4; cnm_lane++) begin
+                packed_word = '0;
+                for (cnm_byte = 0; cnm_byte < 4; cnm_byte++) begin
+                    cnm_a_value = int'(k_word % 5) + int'(cnm_lane * 2) +
+                                  int'(cnm_byte) - 5;
+                    packed_word[cnm_byte*8 +: 8] = cnm_a_value[7:0];
+                end
+                spad_write(MATRIX_LINE_STALL_CNM_A_LOCAL +
+                           (k_word << 4) + (cnm_lane << 2), packed_word);
+            end
+        end
+        for (row_idx = 0; row_idx < 16; row_idx++) begin
+            line_stall_cnm_golden[row_idx] = 0;
+            for (k_word = 0; k_word < 32; k_word++) begin
+                for (cnm_lane = 0; cnm_lane < 4; cnm_lane++) begin
+                    packed_word = '0;
+                    for (cnm_byte = 0; cnm_byte < 4; cnm_byte++) begin
+                        cnm_a_value = int'(k_word % 5) + int'(cnm_lane * 2) +
+                                      int'(cnm_byte) - 5;
+                        cnm_b_value = int'(row_idx % 5) + int'(k_word % 3) +
+                                      int'(cnm_lane) + int'(cnm_byte) - 3;
+                        packed_word[cnm_byte*8 +: 8] = cnm_b_value[7:0];
+                        line_stall_cnm_golden[row_idx] +=
+                            cnm_a_value * cnm_b_value;
+                    end
+                    spad_write(MATRIX_LINE_STALL_CNM_B_LOCAL +
+                               ((row_idx * 32 + k_word) << 4) +
+                               (cnm_lane << 2), packed_word);
+                end
+            end
+        end
+
+        write_v3_desc(CMDQ_LOCAL + 32'h180, 8'h30, 16'h0710,
+                      MATRIX_A_LOCAL, MATRIX_B_LOCAL, MATRIX_Y_LOCAL,
+                      16'd16, 16'd32, 16'd16);
+        write_cluster_desc(CMDQ_LOCAL + 32'h1c0, 8'h21, 16'h0711,
+                           MATRIX_LINE_STALL_CNM_A_LOCAL,
+                           MATRIX_LINE_STALL_CNM_B_LOCAL,
+                           MATRIX_LINE_STALL_CNM_Y_LOCAL,
+                           16'd16, 16'd1, 16'd32, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd3);
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, CMDQ_LOCAL + 32'h180);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd2);
+        axil_write(REG_CPLQ_BASE, CPLQ_LOCAL + 32'h180);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+        matrix_line_stall_checks_before = compute_vif.matrix_line_stall_checks;
+        matrix_line_stall_violations_before =
+            compute_vif.matrix_line_stall_violations;
+        parallel_start_cycle = compute_vif.sim_cycles;
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd2);
+        parallel_cycles = compute_vif.sim_cycles - parallel_start_cycle;
+        wait_spad_idle();
+        if ((compute_vif.matrix_line_stall_checks -
+             matrix_line_stall_checks_before) == 0)
+            `uvm_fatal("CLUSTER_MATRIX_LINE_STALL",
+                "legal Matrix/CNM overlap did not exercise Matrix line-write backpressure")
+        if ((compute_vif.matrix_line_stall_violations -
+             matrix_line_stall_violations_before) != 0)
+            `uvm_fatal("CLUSTER_MATRIX_LINE_STALL",
+                "Matrix line payload changed while the shared SPAD arbiter denied acceptance")
+        for (word_idx = 0; word_idx < 512; word_idx++)
+            expect_spad(MATRIX_Y_LOCAL + (word_idx << 2),
+                        matrix_golden[word_idx / 32][word_idx % 32],
+                        $sformatf("line-stalled Matrix Golden[%0d]", word_idx));
+        for (row_idx = 0; row_idx < 16; row_idx++)
+            expect_spad(MATRIX_LINE_STALL_CNM_Y_LOCAL + (row_idx << 2),
+                        line_stall_cnm_golden[row_idx],
+                        $sformatf("line-stalled CNM Golden[%0d]", row_idx));
+        expect_completion(CPLQ_LOCAL + 32'h180, 16'h0710,
+                          matrix_golden[15][31], 32'd512,
+                          "line-stalled Matrix");
+        expect_completion(CPLQ_LOCAL + 32'h190, 16'h0711,
+                          line_stall_cnm_golden[15], 32'd16,
+                          "line-stalled CNM");
+        `uvm_info("CLUSTER_MATRIX_LINE_STALL_PASS", $sformatf(
+            "legal 16x32x64 Matrix + 16x32 CNM overlap; Matrix line stability checks=%0d violations=%0d; overlap_cycles=%0d; outputs and ordered completions match independent Golden",
+            compute_vif.matrix_line_stall_checks -
+                matrix_line_stall_checks_before,
+            compute_vif.matrix_line_stall_violations -
+                matrix_line_stall_violations_before,
+            parallel_cycles), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd2);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+
         write_v3_desc(CMDQ_LOCAL + 32'h00, 8'h30, 16'h0600,
                       MATRIX_A_LOCAL, MATRIX_B_LOCAL, MATRIX_Y_LOCAL,
                       16'd16, 16'd32, 16'd16);
@@ -1700,6 +2149,112 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         if (value !== 32'd4)
             `uvm_fatal("CLUSTER_CMDQ", $sformatf("CMDQ_HEAD expected=4 actual=%0d", value))
         axil_write(REG_CPLQ_HEAD, 32'd4);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+
+        // Fill the real four-entry completion ring to its three-entry
+        // capacity while four production engines execute legal, disjoint
+        // tasks. The final completion must remain pending until software
+        // advances CPLQ_HEAD; after release it must wrap the tail in order.
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            spad_write(CPLQ_LOCAL + 32'h330 + (word_idx << 2),
+                       32'hc07f_7200 | word_idx);
+        spad_write(SCALAR_A_LOCAL, 32'h0403_0201);
+        spad_write(SCALAR_B_LOCAL, 32'h0807_0605);
+        write_v3_desc(CMDQ_LOCAL + 32'h300, 8'h30, 16'h0810,
+                      MATRIX_A_LOCAL, MATRIX_B_LOCAL, MATRIX_Y_LOCAL,
+                      16'd16, 16'd32, 16'd16);
+        write_cnm_v3_desc(CMDQ_LOCAL + 32'h340, 16'h0811,
+                          CNM_A_LOCAL, CNM_B_LOCAL, CNM_Y_LOCAL);
+        write_v3_desc(CMDQ_LOCAL + 32'h380, 8'h35, 16'h0812,
+                      GELU_A_LOCAL, 32'd0, SWEEP_SFU_Y_LOCAL,
+                      16'd0, 16'd0, 16'd4);
+        write_cluster_desc(CMDQ_LOCAL + 32'h3c0, 8'h10, 16'h0813,
+                           SCALAR_A_LOCAL, SCALAR_B_LOCAL, SCALAR_Y_LOCAL,
+                           16'd0, 16'd0, 16'd1, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd3);
+
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, CMDQ_LOCAL + 32'h300);
+        axil_write(REG_CMDQ_SIZE, 32'd8);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd4);
+        axil_write(REG_CPLQ_BASE, CPLQ_LOCAL + 32'h300);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd3);
+
+        cplq_all_engines_idle = 1'b0;
+        for (cplq_poll = 0; cplq_poll < 2000; cplq_poll++) begin
+            if (compute_vif.engine_busy == 7'd0) begin
+                cplq_all_engines_idle = 1'b1;
+                break;
+            end
+            @(posedge compute_vif.aclk);
+        end
+        if (!cplq_all_engines_idle)
+            `uvm_fatal("CLUSTER_CPLQ_BACKPRESSURE",
+                $sformatf("engines did not finish while CPLQ was full; busy=%07b",
+                          compute_vif.engine_busy))
+        if (compute_vif.cplq_full !== 1'b1 ||
+            compute_vif.processor_busy !== 1'b1)
+            `uvm_fatal("CLUSTER_CPLQ_BACKPRESSURE", $sformatf(
+                "full completion queue must retain dispatcher work; cplq_full=%0b processor_busy=%0b",
+                compute_vif.cplq_full, compute_vif.processor_busy))
+
+        for (cplq_poll = 0; cplq_poll < 8; cplq_poll++) begin
+            axil_read(REG_CPLQ_TAIL, value);
+            if (value !== 32'd3 || compute_vif.cplq_full !== 1'b1)
+                `uvm_fatal("CLUSTER_CPLQ_BACKPRESSURE", $sformatf(
+                    "completion tail escaped full-ring hold: tail=%0d full=%0b poll=%0d",
+                    value, compute_vif.cplq_full, cplq_poll))
+        end
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            expect_spad(CPLQ_LOCAL + 32'h330 + (word_idx << 2),
+                        32'hc07f_7200 | word_idx,
+                        $sformatf("CPLQ full held completion sentinel[%0d]", word_idx));
+        axil_read(REG_CMDQ_HEAD, value);
+        if (value !== 32'd4)
+            `uvm_fatal("CLUSTER_CPLQ_BACKPRESSURE", $sformatf(
+                "all four descriptors must dispatch before completion backpressure: CMDQ_HEAD=%0d",
+                value))
+
+        expect_completion(CPLQ_LOCAL + 32'h300, 16'h0810,
+                          matrix_golden[15][31], 32'd512,
+                          "CPLQ-full Matrix head completion");
+        expect_completion(CPLQ_LOCAL + 32'h310, 16'h0811, 32'd736, 32'd16,
+                          "CPLQ-full CNM completion");
+        expect_completion(CPLQ_LOCAL + 32'h320, 16'h0812, -32'sd15, 32'd4,
+                          "CPLQ-full SFU completion");
+
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        wait_cpl_tail(32'd0);
+        wait_spad_idle();
+        if (compute_vif.cplq_full !== 1'b1 ||
+            compute_vif.processor_busy !== 1'b0)
+            `uvm_fatal("CLUSTER_CPLQ_BACKPRESSURE", $sformatf(
+                "released slot must retire the pending completion, wrap tail, refill the ring, and drain dispatcher: cplq_full=%0b processor_busy=%0b",
+                compute_vif.cplq_full, compute_vif.processor_busy))
+        expect_completion(CPLQ_LOCAL + 32'h330, 16'h0813, 32'd70, 32'd1,
+                          "CPLQ-full released Scalar completion");
+        for (word_idx = 0; word_idx < 512; word_idx++)
+            expect_spad(MATRIX_Y_LOCAL + (word_idx << 2),
+                        matrix_golden[word_idx / 32][word_idx % 32],
+                        $sformatf("CPLQ full Matrix Golden[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            expect_spad(CNM_Y_LOCAL + (word_idx << 2), 32'd736,
+                        $sformatf("CPLQ full CNM Golden[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            expect_spad(SWEEP_SFU_Y_LOCAL + (word_idx << 2),
+                        gelu_results[word_idx],
+                        $sformatf("CPLQ full SFU Golden[%0d]", word_idx));
+        expect_spad(SCALAR_Y_LOCAL, 32'd70, "CPLQ full Scalar Golden");
+        `uvm_info("CLUSTER_CPLQ_BACKPRESSURE_PASS",
+            "four real engines completed; blocked_tail=3 released_head=1 wrapped_tail=0 all_engines_idle=1; ordered completion, retained sentinel, and four Goldens checked",
+            UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd0);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
 
@@ -1874,6 +2429,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             "parity cases=18/18; engines={INT8,Matrix,CNM,BF16,SFU,Conv,KV}; operand phases={A,B where defined}; CNM lanes=4/4; randomized_order_seed=%0d",
             seed), UVM_LOW)
 
+        run_matrix_parity_cnm_owner_cross(seed);
+
         // Cross source-A, source-B where present, and writeback protection
         // phases on real engines. SFU and KV have no second source operand.
         protection_case_count = 0;
@@ -2021,6 +2578,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_dma_store_response_test();
         run_launch_snapshot_and_unused_fields_test();
         run_inflight_parameter_latch_test();
+        run_matrix_inflight_parameter_latch_test(matrix_golden);
+        run_sfu_inflight_parameter_latch_test();
         run_shared_readonly_isolation_test();
         check_request_stability();
         run_engine_reset_drain_sweep();
