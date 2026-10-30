@@ -222,6 +222,8 @@ ai_spad_arb_run: ai_spad_arb_comp
 # smoke executable or its logs.
 SPAD_ARB_COV_RUN ?= /tmp/nmaforge_spad_arbiter_cov_$(shell date +%Y%m%d_%H%M%S)
 SPAD_ARB_COV_METRICS := line+cond+tgl+branch+assert
+COMPUTE_SPAD_MUX_RR_RUN ?= /tmp/nmaforge_compute_spad_mux_rr_$(shell date +%Y%m%d_%H%M%S)
+COMPUTE_SPAD_MUX_RR_METRICS := line+cond+tgl+branch+assert
 
 .PHONY: ai_spad_arb_cov
 ai_spad_arb_cov:
@@ -253,6 +255,29 @@ ai_spad_arb_cov:
 	grep -Fq 'ap_idle_decode_uses_default_client' "$(SPAD_ARB_COV_RUN)/urg/asserts.txt"
 	grep -Fq 'ap_banked_response_metadata_is_valid' "$(SPAD_ARB_COV_RUN)/urg/asserts.txt"
 	echo "SPAD_ARBITER_COVERAGE_PASS report=$(SPAD_ARB_COV_RUN)/urg"
+
+.PHONY: ai_compute_spad_mux_fairness
+ai_compute_spad_mux_fairness:
+	test ! -e "$(COMPUTE_SPAD_MUX_RR_RUN)"
+	mkdir -p "$(COMPUTE_SPAD_MUX_RR_RUN)"
+	cd "$(COMPUTE_SPAD_MUX_RR_RUN)" && $(VCS) -full64 -sverilog -timescale=1ns/1ps +define+VCS \
+		-cm $(COMPUTE_SPAD_MUX_RR_METRICS) -cm_dir coverage.vdb \
+		-top tb_ai_compute_spad_mux_fairness $(CURDIR)/../../../../rtl/top/fabric/compute/ai_compute_spad_mux.v \
+		$(CURDIR)/../../../block/compute/spad_mux/tb/tb_ai_compute_spad_mux_fairness.sv \
+		-o simv -l compile.log
+	cd "$(COMPUTE_SPAD_MUX_RR_RUN)" && ./simv \
+		-cm $(COMPUTE_SPAD_MUX_RR_METRICS) -cm_dir coverage.vdb -l run.log
+	grep -q '^COMPUTE_SPAD_MUX_FAIRNESS_PASS cycles=4096' "$(COMPUTE_SPAD_MUX_RR_RUN)/run.log"
+	$(URG) -full64 -dir "$(COMPUTE_SPAD_MUX_RR_RUN)/coverage.vdb" -format text \
+		-report "$(COMPUTE_SPAD_MUX_RR_RUN)/urg" -log "$(COMPUTE_SPAD_MUX_RR_RUN)/urg.log"
+	! grep -Eq 'UCAPI-DNYL|Design not loaded' "$(COMPUTE_SPAD_MUX_RR_RUN)/urg.log"
+	grep -Fq 'Failure               0' "$(COMPUTE_SPAD_MUX_RR_RUN)/urg/asserts.txt"
+	grep -Fq 'Incomplete            0' "$(COMPUTE_SPAD_MUX_RR_RUN)/urg/asserts.txt"
+	grep -Fq 'Without Attempts      0' "$(COMPUTE_SPAD_MUX_RR_RUN)/urg/asserts.txt"
+	grep -Fq 'ap_ready_onehot' "$(COMPUTE_SPAD_MUX_RR_RUN)/urg/asserts.txt"
+	grep -Fq 'ap_stalled_payload_stable' "$(COMPUTE_SPAD_MUX_RR_RUN)/urg/asserts.txt"
+	grep -Fq 'ap_response_owner_onehot' "$(COMPUTE_SPAD_MUX_RR_RUN)/urg/asserts.txt"
+	echo "COMPUTE_SPAD_MUX_FAIRNESS_COVERAGE_PASS report=$(COMPUTE_SPAD_MUX_RR_RUN)/urg"
 
 ai_upgrade_vcs: ai_dma_run ai_spad_arb_run ai_quick
 
