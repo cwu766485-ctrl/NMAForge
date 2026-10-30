@@ -35,6 +35,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] MATRIX_A_LOCAL = 32'h0001_0000;
     localparam bit [31:0] MATRIX_B_LOCAL = 32'h0001_2000;
     localparam bit [31:0] MATRIX_Y_LOCAL = 32'h0003_0000;
+    localparam bit [31:0] MATRIX_LINE_STALL_CNM_A_LOCAL = 32'h0005_0000;
+    localparam bit [31:0] MATRIX_LINE_STALL_CNM_B_LOCAL = 32'h0005_2000;
+    localparam bit [31:0] MATRIX_LINE_STALL_CNM_Y_LOCAL = 32'h0005_6000;
     localparam bit [31:0] GELU_A_LOCAL = 32'h0002_0000;
     localparam bit [31:0] GELU_B_LOCAL = 32'h0002_0100;
     localparam bit [31:0] GELU_Y0_LOCAL = 32'h0002_0200;
@@ -1328,6 +1331,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int signed matrix_a[0:15][0:63];
         int signed matrix_b[0:63][0:31];
         int signed matrix_golden[0:15][0:31];
+        int signed line_stall_cnm_golden[0:15];
         int signed gelu_values[0:3];
         int signed gelu_results[0:3];
         int signed accumulator;
@@ -1339,6 +1343,12 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned fault_j;
         int unsigned fault_swap;
         int unsigned fault_case_id;
+        int unsigned cnm_lane;
+        int unsigned cnm_byte;
+        int signed cnm_a_value;
+        int signed cnm_b_value;
+        int unsigned matrix_line_stall_checks_before;
+        int unsigned matrix_line_stall_violations_before;
         bit [17:0] fault_cases_seen;
         int unsigned overlap_total;
         int unsigned matrix_prefetch_overlap_total;
@@ -1599,6 +1609,102 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             staged_sfu_cycles, staged_total_cycles, measured_speedup,
             staged_contention_cycles), UVM_LOW)
         axil_write(REG_CPLQ_HEAD, 32'd3);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+
+        // Keep a real CNM banked requester active while the long Matrix GEMM
+        // reaches its line-writeback phase.  The two operations use disjoint
+        // SPAD regions, so this creates legal arbitration pressure without a
+        // read/write dependency or conflicting output ownership.
+        for (k_word = 0; k_word < 32; k_word++) begin
+            for (cnm_lane = 0; cnm_lane < 4; cnm_lane++) begin
+                packed_word = '0;
+                for (cnm_byte = 0; cnm_byte < 4; cnm_byte++) begin
+                    cnm_a_value = int'(k_word % 5) + int'(cnm_lane * 2) +
+                                  int'(cnm_byte) - 5;
+                    packed_word[cnm_byte*8 +: 8] = cnm_a_value[7:0];
+                end
+                spad_write(MATRIX_LINE_STALL_CNM_A_LOCAL +
+                           (k_word << 4) + (cnm_lane << 2), packed_word);
+            end
+        end
+        for (row_idx = 0; row_idx < 16; row_idx++) begin
+            line_stall_cnm_golden[row_idx] = 0;
+            for (k_word = 0; k_word < 32; k_word++) begin
+                for (cnm_lane = 0; cnm_lane < 4; cnm_lane++) begin
+                    packed_word = '0;
+                    for (cnm_byte = 0; cnm_byte < 4; cnm_byte++) begin
+                        cnm_a_value = int'(k_word % 5) + int'(cnm_lane * 2) +
+                                      int'(cnm_byte) - 5;
+                        cnm_b_value = int'(row_idx % 5) + int'(k_word % 3) +
+                                      int'(cnm_lane) + int'(cnm_byte) - 3;
+                        packed_word[cnm_byte*8 +: 8] = cnm_b_value[7:0];
+                        line_stall_cnm_golden[row_idx] +=
+                            cnm_a_value * cnm_b_value;
+                    end
+                    spad_write(MATRIX_LINE_STALL_CNM_B_LOCAL +
+                               ((row_idx * 32 + k_word) << 4) +
+                               (cnm_lane << 2), packed_word);
+                end
+            end
+        end
+
+        write_v3_desc(CMDQ_LOCAL + 32'h180, 8'h30, 16'h0710,
+                      MATRIX_A_LOCAL, MATRIX_B_LOCAL, MATRIX_Y_LOCAL,
+                      16'd16, 16'd32, 16'd16);
+        write_cluster_desc(CMDQ_LOCAL + 32'h1c0, 8'h21, 16'h0711,
+                           MATRIX_LINE_STALL_CNM_A_LOCAL,
+                           MATRIX_LINE_STALL_CNM_B_LOCAL,
+                           MATRIX_LINE_STALL_CNM_Y_LOCAL,
+                           16'd16, 16'd1, 16'd32, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd3);
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, CMDQ_LOCAL + 32'h180);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd2);
+        axil_write(REG_CPLQ_BASE, CPLQ_LOCAL + 32'h180);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+        matrix_line_stall_checks_before = compute_vif.matrix_line_stall_checks;
+        matrix_line_stall_violations_before =
+            compute_vif.matrix_line_stall_violations;
+        parallel_start_cycle = compute_vif.sim_cycles;
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd2);
+        parallel_cycles = compute_vif.sim_cycles - parallel_start_cycle;
+        wait_spad_idle();
+        if ((compute_vif.matrix_line_stall_checks -
+             matrix_line_stall_checks_before) == 0)
+            `uvm_fatal("CLUSTER_MATRIX_LINE_STALL",
+                "legal Matrix/CNM overlap did not exercise Matrix line-write backpressure")
+        if ((compute_vif.matrix_line_stall_violations -
+             matrix_line_stall_violations_before) != 0)
+            `uvm_fatal("CLUSTER_MATRIX_LINE_STALL",
+                "Matrix line payload changed while the shared SPAD arbiter denied acceptance")
+        for (word_idx = 0; word_idx < 512; word_idx++)
+            expect_spad(MATRIX_Y_LOCAL + (word_idx << 2),
+                        matrix_golden[word_idx / 32][word_idx % 32],
+                        $sformatf("line-stalled Matrix Golden[%0d]", word_idx));
+        for (row_idx = 0; row_idx < 16; row_idx++)
+            expect_spad(MATRIX_LINE_STALL_CNM_Y_LOCAL + (row_idx << 2),
+                        line_stall_cnm_golden[row_idx],
+                        $sformatf("line-stalled CNM Golden[%0d]", row_idx));
+        expect_completion(CPLQ_LOCAL + 32'h180, 16'h0710,
+                          matrix_golden[15][31], 32'd512,
+                          "line-stalled Matrix");
+        expect_completion(CPLQ_LOCAL + 32'h190, 16'h0711,
+                          line_stall_cnm_golden[15], 32'd16,
+                          "line-stalled CNM");
+        `uvm_info("CLUSTER_MATRIX_LINE_STALL_PASS", $sformatf(
+            "legal 16x32x64 Matrix + 16x32 CNM overlap; Matrix line stability checks=%0d violations=%0d; overlap_cycles=%0d; outputs and ordered completions match independent Golden",
+            compute_vif.matrix_line_stall_checks -
+                matrix_line_stall_checks_before,
+            compute_vif.matrix_line_stall_violations -
+                matrix_line_stall_violations_before,
+            parallel_cycles), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd2);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
 
