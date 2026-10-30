@@ -893,6 +893,212 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
+    task automatic run_cnm_protection_matrix_owner_cross(
+        input int unsigned seed,
+        input int signed expected_matrix[0:15][0:31]);
+        bit [31:0] desc_base;
+        bit [31:0] cpl_base;
+        bit [31:0] matrix_dst;
+        bit [31:0] cnm_dst;
+        bit [31:0] packed_word;
+        bit [31:0] matrix_rsp_before;
+        bit [31:0] cnm_rsp_before;
+        bit [31:0] matrix_route_error_before;
+        bit [31:0] cnm_route_error_before;
+        bit [31:0] overlap_before;
+        bit denied_seen;
+        bit matrix_busy_at_fault;
+        bit busy_seen;
+        bit monitor_done;
+        int unsigned cycle;
+        int unsigned matrix_busy_cycles;
+        int unsigned both_busy_cycles;
+        int unsigned word_idx;
+        int unsigned k_word;
+        int unsigned row_idx;
+        int unsigned lane;
+        int unsigned byte_idx;
+        int signed a_value;
+        int signed b_value;
+        int signed expected_cnm[0:15];
+        bit [31:0] actual_addr;
+        bit [15:0] matrix_task_id;
+        bit [15:0] cnm_task_id;
+
+        desc_base = 32'h0000_7800;
+        cpl_base = 32'h0000_7900;
+        matrix_dst = MATRIX_Y_LOCAL;
+        cnm_dst = MATRIX_LINE_STALL_CNM_Y_LOCAL;
+        matrix_task_id = 16'h07d4;
+        cnm_task_id = 16'h07d5;
+        denied_seen = 1'b0;
+        matrix_busy_at_fault = 1'b0;
+        busy_seen = 1'b0;
+        monitor_done = 1'b0;
+        matrix_busy_cycles = 0;
+        both_busy_cycles = 0;
+
+        // Initialize a legal CNM GEMV image. The CNM source-A window is the
+        // only denied range; Matrix A/B and its writeback remain permitted.
+        for (k_word = 0; k_word < 32; k_word++) begin
+            for (lane = 0; lane < 4; lane++) begin
+                packed_word = '0;
+                for (byte_idx = 0; byte_idx < 4; byte_idx++) begin
+                    a_value = int'(k_word % 5) + int'(lane * 2) +
+                              int'(byte_idx) - 5;
+                    packed_word[byte_idx*8 +: 8] = a_value[7:0];
+                end
+                spad_write(MATRIX_LINE_STALL_CNM_A_LOCAL +
+                           (k_word << 4) + (lane << 2), packed_word);
+            end
+        end
+        for (row_idx = 0; row_idx < 16; row_idx++) begin
+            expected_cnm[row_idx] = 0;
+            for (k_word = 0; k_word < 32; k_word++) begin
+                for (lane = 0; lane < 4; lane++) begin
+                    packed_word = '0;
+                    for (byte_idx = 0; byte_idx < 4; byte_idx++) begin
+                        a_value = int'(k_word % 5) + int'(lane * 2) +
+                                  int'(byte_idx) - 5;
+                        b_value = int'(row_idx % 5) + int'(k_word % 3) +
+                                  int'(lane) + int'(byte_idx) - 3;
+                        packed_word[byte_idx*8 +: 8] = b_value[7:0];
+                        expected_cnm[row_idx] += a_value * b_value;
+                    end
+                    spad_write(MATRIX_LINE_STALL_CNM_B_LOCAL +
+                               ((row_idx * 32 + k_word) << 4) +
+                               (lane << 2), packed_word);
+                end
+            end
+        end
+        for (word_idx = 0; word_idx < 512; word_idx++)
+            spad_write(matrix_dst + (word_idx << 2),
+                       32'hfa17_9000 | word_idx);
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            spad_write(cnm_dst + (word_idx << 2),
+                       32'hfa17_9800 | word_idx);
+
+        write_v3_desc(desc_base, 8'h30, matrix_task_id,
+                      MATRIX_A_LOCAL, MATRIX_B_LOCAL, matrix_dst,
+                      16'd16, 16'd32, 16'd16);
+        write_cluster_desc(desc_base + 32'h40, 8'h21, cnm_task_id,
+                           MATRIX_LINE_STALL_CNM_A_LOCAL,
+                           MATRIX_LINE_STALL_CNM_B_LOCAL, cnm_dst,
+                           16'd16, 16'd1, 16'd32, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd3);
+
+        axil_write(REG_REGION0_PERM, 32'd0);
+        axil_write(REG_REGION1_PERM, 32'd0);
+        axil_write(REG_REGION2_PERM, 32'd0);
+        axil_write(REG_REGION3_PERM, 32'd0);
+        axil_write(REG_REGION0_BASE, desc_base);
+        axil_write(REG_REGION0_LIMIT, cpl_base + 32'h100);
+        axil_write(REG_REGION0_PERM, 32'h0000_000f);
+        axil_write(REG_REGION1_BASE, MATRIX_A_LOCAL);
+        axil_write(REG_REGION1_LIMIT, matrix_dst + 32'h800);
+        axil_write(REG_REGION1_PERM, 32'h0000_000f);
+        axil_write(REG_REGION3_BASE, MATRIX_LINE_STALL_CNM_A_LOCAL);
+        axil_write(REG_REGION3_LIMIT, cnm_dst + 32'h40);
+        axil_write(REG_REGION3_PERM, 32'd0);
+
+        matrix_rsp_before = compute_vif.matrix_tag_response_count;
+        cnm_rsp_before = compute_vif.cnm_tag_response_count;
+        matrix_route_error_before = compute_vif.matrix_route_mismatch_count;
+        cnm_route_error_before = compute_vif.cnm_route_mismatch_count;
+        overlap_before = compute_vif.matrix_cnm_overlap_cycles;
+
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, desc_base);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd2);
+        axil_write(REG_CPLQ_BASE, cpl_base);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        for (cycle = 0; cycle < 30000 && !monitor_done; cycle++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.engine_busy[3]) matrix_busy_cycles++;
+            if (compute_vif.engine_busy[2] && compute_vif.engine_busy[3])
+                both_busy_cycles++;
+            if (compute_vif.processor_busy)
+                busy_seen = 1'b1;
+            for (lane = 0; lane < 4; lane++) begin
+                actual_addr = compute_vif.selected_cnm_addr[lane];
+                if (compute_vif.selected_cnm_valid[lane] &&
+                    !compute_vif.selected_cnm_access_ok[lane] &&
+                    (actual_addr >= MATRIX_LINE_STALL_CNM_A_LOCAL) &&
+                    (actual_addr < MATRIX_LINE_STALL_CNM_A_LOCAL + 32'h200)) begin
+                    denied_seen = 1'b1;
+                    matrix_busy_at_fault |= compute_vif.engine_busy[3];
+                    if (!compute_vif.engine_busy[3])
+                        `uvm_fatal("CLUSTER_CNM_PROTECTION_OWNER",
+                            "CNM Protection error arrived after the concurrent Matrix task had completed")
+                end
+            end
+            if (busy_seen && !compute_vif.processor_busy)
+                monitor_done = 1'b1;
+        end
+        if (!busy_seen || !monitor_done)
+            `uvm_fatal("CLUSTER_CNM_PROTECTION_OWNER",
+                "CNM source Protection/Matrix Golden pair did not complete in the monitor window")
+        if (!denied_seen || !matrix_busy_at_fault || (matrix_busy_cycles == 0) ||
+            (both_busy_cycles == 0))
+            `uvm_fatal("CLUSTER_CNM_PROTECTION_OWNER", $sformatf(
+                "missing concurrent denied CNM source read: denied=%0b Matrix-active-at-fault=%0b Matrix-cycles=%0d both-busy=%0d",
+                denied_seen, matrix_busy_at_fault, matrix_busy_cycles,
+                both_busy_cycles))
+
+        wait_cpl_tail(32'd2);
+        wait_spad_idle();
+        axil_write(REG_REGION0_PERM, 32'd0);
+        axil_write(REG_REGION1_PERM, 32'd0);
+        axil_write(REG_REGION2_PERM, 32'd0);
+        axil_write(REG_REGION3_PERM, 32'd0);
+
+        expect_completion(cpl_base, matrix_task_id,
+                          expected_matrix[15][31], 32'd512,
+                          "Matrix Golden concurrent with CNM Protection");
+        expect_spad(cpl_base + 32'h10, {16'd0, cnm_task_id},
+                    "CNM Protection completion task/order");
+        expect_spad(cpl_base + 32'h14, 32'h0000_0062,
+                    "CNM source-A Protection completion owner");
+        for (word_idx = 0; word_idx < 512; word_idx++)
+            expect_spad(matrix_dst + (word_idx << 2),
+                        expected_matrix[word_idx / 32][word_idx % 32],
+                        $sformatf("CNM Protection concurrent Matrix Golden[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            expect_spad(cnm_dst + (word_idx << 2),
+                        32'hfa17_9800 | word_idx,
+                        $sformatf("CNM Protection no-writeback sentinel[%0d]", word_idx));
+
+        if (compute_vif.matrix_cnm_overlap_cycles <= overlap_before ||
+            compute_vif.matrix_tag_response_count <= matrix_rsp_before ||
+            compute_vif.cnm_tag_response_count <= cnm_rsp_before ||
+            compute_vif.matrix_route_mismatch_count != matrix_route_error_before ||
+            compute_vif.cnm_route_mismatch_count != cnm_route_error_before)
+            `uvm_fatal("CLUSTER_CNM_PROTECTION_OWNER", $sformatf(
+                "owner/overlap evidence missing: overlap=%0d MatrixRsp=%0d CNMRsp=%0d routeMismatch=%0d/%0d",
+                compute_vif.matrix_cnm_overlap_cycles - overlap_before,
+                compute_vif.matrix_tag_response_count - matrix_rsp_before,
+                compute_vif.cnm_tag_response_count - cnm_rsp_before,
+                compute_vif.matrix_route_mismatch_count - matrix_route_error_before,
+                compute_vif.cnm_route_mismatch_count - cnm_route_error_before))
+
+        `uvm_info("CLUSTER_CNM_PROTECTION_MATRIX_OWNER_CROSS_PASS", $sformatf(
+            "CNM source-A Protection ERR 0x62 while Matrix remains active and completes 512-word Golden; both_busy=%0d overlap=%0d MatrixRsp=%0d CNMRsp=%0d route_mismatch=0; CNM destination unchanged; seed=%0d",
+            both_busy_cycles,
+            compute_vif.matrix_cnm_overlap_cycles - overlap_before,
+            compute_vif.matrix_tag_response_count - matrix_rsp_before,
+            compute_vif.cnm_tag_response_count - cnm_rsp_before, seed), UVM_LOW)
+
+        axil_write(REG_CPLQ_HEAD, 32'd2);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
     task automatic run_real_engine_protection_case(
         input int unsigned engine,
         input int unsigned fault_phase,
@@ -3642,6 +3848,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_matrix_parity_cnm_owner_cross(seed);
         run_matrix_protection_cnm_owner_cross(seed, 1'b0);
         run_matrix_protection_cnm_owner_cross(seed, 1'b1);
+        run_cnm_protection_matrix_owner_cross(seed, matrix_golden);
 
         // Cross source-A, source-B where present, and writeback protection
         // phases on real engines. SFU and KV have no second source operand.
