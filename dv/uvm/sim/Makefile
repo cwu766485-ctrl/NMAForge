@@ -64,7 +64,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -q '\[CLUSTER_A_CACHE_BASELINE_PASS\]' "$$log" || { echo "ERROR: standalone Matrix A-tile cache baseline marker missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CNM_OWNER_PASS\]' "$$log" || { echo "ERROR: Matrix/CNM independent response-owner check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CNM_ADDR_PASS\]' "$$log" || { echo "ERROR: four-lane CNM address scoreboard check missing in $$log"; exit 1; }; \
-		grep -q '\[CLUSTER_ALL_ENGINES_PASS\]' "$$log" || { echo "ERROR: seven-engine real-top Golden sweep missing in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_ALL_ENGINES_PASS\].*real pair overlaps=21/21 mask=1fffff' "$$log" || { echo "ERROR: real seven-engine pairwise overlap Golden sweep missing or incomplete in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_ABORT_CROSS_PASS\]' "$$log" || { echo "ERROR: multi-engine software-abort cross missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_RESET_RECOVERY_PASS\]' "$$log" || { echo "ERROR: real compute-cluster active-reset/recovery check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_ENGINE_RESET_PASS\].*reset mask=1111111' "$$log" || { echo "ERROR: accepted-read reset/drain sweep for all seven real engines missing in $$log"; exit 1; }; \

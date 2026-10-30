@@ -81,6 +81,23 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] MATRIX_FAULT_B_LOCAL = 32'h0004_f100;
     localparam bit [31:0] CLUSTER_PROT_CMDQ = 32'h0000_6000;
     localparam bit [31:0] CLUSTER_PROT_CPLQ = 32'h0000_7000;
+    localparam bit [31:0] C1_CNM_A_LOCAL = 32'h0006_0000;
+    localparam bit [31:0] C1_CNM_B_LOCAL = 32'h0006_1000;
+    localparam bit [31:0] C1_CNM_Y_LOCAL = 32'h0006_7000;
+    localparam bit [31:0] C1_SFU_A_LOCAL = 32'h0006_8000;
+    localparam bit [31:0] C1_SFU_Y_LOCAL = 32'h0006_8400;
+    localparam bit [31:0] C1_CONV_A_LOCAL = 32'h0006_9000;
+    localparam bit [31:0] C1_CONV_W_LOCAL = 32'h0006_9400;
+    localparam bit [31:0] C1_CONV_Y_LOCAL = 32'h0006_9800;
+    localparam bit [31:0] C1_KV_VECTOR_LOCAL = 32'h0006_a000;
+    localparam bit [31:0] C1_KV_CACHE_LOCAL = 32'h0006_a400;
+    localparam bit [31:0] C1_KV_READ_LOCAL = 32'h0006_a800;
+    localparam bit [31:0] C1_SCALAR_A_LOCAL = 32'h0006_b000;
+    localparam bit [31:0] C1_SCALAR_B_LOCAL = 32'h0006_b400;
+    localparam bit [31:0] C1_SCALAR_Y_LOCAL = 32'h0006_b800;
+    localparam bit [31:0] C1_FP_A_LOCAL = 32'h0006_c000;
+    localparam bit [31:0] C1_FP_B_LOCAL = 32'h0006_c100;
+    localparam bit [31:0] C1_FP_Y_LOCAL = 32'h0006_c200;
 
     virtual ai_compute_cluster_if compute_vif;
     bit [31:0] rng_state;
@@ -2502,7 +2519,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned word_idx;
         int unsigned engine_idx;
         int unsigned cplq_poll;
+        int unsigned pair_i;
+        int unsigned pair_j;
+        int unsigned pair_index;
+        int unsigned pair_poll;
+        int unsigned max_active_engines;
+        int unsigned c1_k;
+        int unsigned c1_row;
+        int unsigned c1_col;
         bit cplq_all_engines_idle;
+        bit c1_run_started;
+        bit c1_run_complete;
+        bit [20:0] engine_pair_overlap_seen;
         int unsigned protection_case_count;
         int unsigned fault_order[0:17];
         int unsigned fault_i;
@@ -3082,8 +3110,26 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
 
         // C1 real-top sweep: issue one descriptor for every physical engine
-        // in one queue window. The work areas are disjoint so concurrent
-        // access tests arbitration without relying on undefined SPAD races.
+        // in one queue window. Each engine gets a legal, long-running workload
+        // with disjoint SPAD operands, so every observed busy overlap is real
+        // concurrent execution and not an artificial busy signal.
+        for (word_idx = 0; word_idx < 128; word_idx++) begin
+            spad_write(C1_SCALAR_A_LOCAL + (word_idx << 2), 32'h0101_0101);
+            spad_write(C1_SCALAR_B_LOCAL + (word_idx << 2), 32'h0101_0101);
+            if ((word_idx % 2) == 0) begin
+                spad_write(C1_FP_A_LOCAL + (word_idx << 1), 32'h3f80_3f80);
+                spad_write(C1_FP_B_LOCAL + (word_idx << 1), 32'h3f80_3f80);
+            end
+            spad_write(C1_KV_VECTOR_LOCAL + (word_idx << 2), 32'h0000_0100 + word_idx);
+            spad_write(C1_KV_CACHE_LOCAL + 32'h50 + (word_idx << 2), 32'hbad0_6400 + word_idx);
+        end
+        // Keep the dedicated four-word KV parity-fault operand initialized;
+        // its raw parity bit must be known before the directed fault deposit.
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            spad_write(KV_VECTOR_LOCAL + (word_idx << 2), (word_idx + 1) * 32'h100);
+        // Preserve the compact operands used by the independent fault and
+        // reset sweeps that follow C1; those tests inject parity into the
+        // original low-address regions rather than the long C1 buffers.
         spad_write(SCALAR_A_LOCAL, 32'h0403_0201);
         spad_write(SCALAR_B_LOCAL, 32'h0807_0605);
         spad_write(FP_A_LOCAL, 32'h4000_3f80);
@@ -3094,34 +3140,69 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             spad_write(CONV_W_LOCAL + (word_idx << 2), 32'd1);
         end
         spad_write(CONV_Y_LOCAL, 32'hdead_c0de);
-        for (word_idx = 0; word_idx < 4; word_idx++) begin
-            spad_write(KV_VECTOR_LOCAL + (word_idx << 2), (word_idx + 1) * 32'h100);
-            spad_write(KV_CACHE_LOCAL + 32'h50 + (word_idx << 2), 32'hbad0_6400 + word_idx);
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            spad_write(KV_CACHE_LOCAL + 32'h50 + (word_idx << 2),
+                       32'hbad0_6400 + word_idx);
+        spad_write(C1_SCALAR_Y_LOCAL, 32'hdead_cafe);
+        spad_write(C1_FP_Y_LOCAL, 32'hdead_cafe);
+
+        for (c1_k = 0; c1_k < 64; c1_k++) begin
+            for (c1_col = 0; c1_col < 4; c1_col++) begin
+                case (c1_col)
+                    0: packed_word = 32'h0202_0202;
+                    1: packed_word = 32'h0303_0303;
+                    2: packed_word = 32'h0404_0404;
+                    default: packed_word = 32'h0505_0505;
+                endcase
+                spad_write(C1_CNM_A_LOCAL + (c1_k << 4) + (c1_col << 2), packed_word);
+            end
+            for (c1_row = 0; c1_row < 16; c1_row++) begin
+                for (c1_col = 0; c1_col < 4; c1_col++) begin
+                    case (c1_col)
+                        0: packed_word = 32'h0707_0707;
+                        1: packed_word = 32'h0b0b_0b0b;
+                        2: packed_word = 32'h0d0d_0d0d;
+                        default: packed_word = 32'h1111_1111;
+                    endcase
+                    spad_write(C1_CNM_B_LOCAL + (((c1_row * 64) + c1_k) << 4) + (c1_col << 2), packed_word);
+                end
+            end
         end
+        for (word_idx = 0; word_idx < 128; word_idx++) begin
+            spad_write(C1_SFU_A_LOCAL + (word_idx << 2), gelu_values[word_idx % 4]);
+            spad_write(C1_SFU_Y_LOCAL + (word_idx << 2), 32'hdead_0000 | word_idx);
+        end
+        for (word_idx = 0; word_idx < 256; word_idx++)
+            spad_write(C1_CONV_A_LOCAL + (word_idx << 2), 32'd1);
+        for (word_idx = 0; word_idx < 9; word_idx++)
+            spad_write(C1_CONV_W_LOCAL + (word_idx << 2), 32'd1);
+        spad_write(C1_CONV_Y_LOCAL, 32'hdead_c0de);
 
         write_v3_desc(CLUSTER_SWEEP_CMDQ + 32'h000, 8'h30, 16'h0640,
                       MATRIX_A_LOCAL, MATRIX_B_LOCAL, SWEEP_MATRIX_Y_LOCAL,
                       16'd16, 16'd32, 16'd16);
         write_cnm_v3_desc(CLUSTER_SWEEP_CMDQ + 32'h040, 16'h0641,
-                          CNM_A_LOCAL, CNM_B_LOCAL, SWEEP_CNM_Y_LOCAL);
+                          C1_CNM_A_LOCAL, C1_CNM_B_LOCAL, C1_CNM_Y_LOCAL);
+        spad_write(CLUSTER_SWEEP_CMDQ + 32'h054, {16'd1, 16'd16});
+        spad_write(CLUSTER_SWEEP_CMDQ + 32'h058, 32'd64);
         write_v3_desc(CLUSTER_SWEEP_CMDQ + 32'h080, 8'h35, 16'h0642,
-                      GELU_A_LOCAL, 32'd0, SWEEP_SFU_Y_LOCAL,
-                      16'd0, 16'd0, 16'd4);
+                      C1_SFU_A_LOCAL, 32'd0, C1_SFU_Y_LOCAL,
+                      16'd0, 16'd0, 16'd128);
         write_cluster_desc(CLUSTER_SWEEP_CMDQ + 32'h0c0, 8'h10, 16'h0643,
-                           SCALAR_A_LOCAL, SCALAR_B_LOCAL, SCALAR_Y_LOCAL,
-                           16'd0, 16'd0, 16'd1, 32'd0,
+                           C1_SCALAR_A_LOCAL, C1_SCALAR_B_LOCAL, C1_SCALAR_Y_LOCAL,
+                           16'd0, 16'd0, 16'd128, 32'd0,
                            32'd0, 32'd0, 32'd0, 8'd3);
         write_cluster_desc(CLUSTER_SWEEP_CMDQ + 32'h100, 8'h50, 16'h0644,
-                           FP_A_LOCAL, FP_B_LOCAL, FP_Y_LOCAL,
-                           16'd1, 16'd1, 16'd2, 32'd0,
+                           C1_FP_A_LOCAL, C1_FP_B_LOCAL, C1_FP_Y_LOCAL,
+                           16'd1, 16'd1, 16'd128, 32'd0,
                            32'd0, 32'd0, 32'd0, 8'd7);
         write_cluster_desc(CLUSTER_SWEEP_CMDQ + 32'h140, 8'h16, 16'h0645,
-                           CONV_A_LOCAL, CONV_W_LOCAL, CONV_Y_LOCAL,
-                           16'd3, 16'd3, 16'd9, 32'd0,
+                           C1_CONV_A_LOCAL, C1_CONV_W_LOCAL, C1_CONV_Y_LOCAL,
+                           16'd16, 16'd16, 16'd9, 32'd0,
                            32'd0, 32'd0, 32'd0, 8'd5);
         write_cluster_desc(CLUSTER_SWEEP_CMDQ + 32'h180, 8'h43, 16'h0646,
-                           KV_VECTOR_LOCAL, 32'd0, KV_CACHE_LOCAL,
-                           16'd0, 16'd0, 16'd4, {16'd1,16'd1},
+                           C1_KV_VECTOR_LOCAL, 32'd0, C1_KV_CACHE_LOCAL,
+                           16'd0, 16'd0, 16'd128, {16'd1,16'd1},
                            32'd16, 32'd64, 32'd0, 8'd5);
 
         axil_write(REG_CMDQ_CTRL, 32'd0);
@@ -3133,8 +3214,44 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd8);
         axil_write(REG_CPLQ_HEAD, 32'd0);
         axil_write(REG_CPLQ_TAIL, 32'd0);
+        engine_pair_overlap_seen = '0;
+        max_active_engines = 0;
+        c1_run_started = 1'b0;
+        c1_run_complete = 1'b0;
         axil_write(REG_DOORBELL, 32'd1);
-        wait_cpl_tail(32'd7);
+        for (pair_poll = 0; pair_poll < 60000; pair_poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.processor_busy || (compute_vif.engine_busy != 7'd0) ||
+                compute_vif.cpl_valid)
+                c1_run_started = 1'b1;
+            if ($countones(compute_vif.engine_busy) > max_active_engines)
+                max_active_engines = $countones(compute_vif.engine_busy);
+            pair_index = 0;
+            for (pair_i = 0; pair_i < 7; pair_i++) begin
+                for (pair_j = pair_i + 1; pair_j < 7; pair_j++) begin
+                    if (compute_vif.engine_busy[pair_i] &&
+                        compute_vif.engine_busy[pair_j])
+                        engine_pair_overlap_seen[pair_index] = 1'b1;
+                    pair_index++;
+                end
+            end
+            if (c1_run_started && !compute_vif.processor_busy &&
+                (compute_vif.engine_busy == 7'd0) && !compute_vif.cpl_valid) begin
+                c1_run_complete = 1'b1;
+                break;
+            end
+        end
+        if (!c1_run_complete)
+            `uvm_fatal("CLUSTER_ENGINE_PAIR_CROSS",
+                "all-engine C1 queue did not drain before overlap-monitor timeout")
+        axil_read(REG_CPLQ_TAIL, value);
+        if (value !== 32'd7)
+            `uvm_fatal("CLUSTER_ENGINE_PAIR_CROSS", $sformatf(
+                "all-engine C1 completion tail expected=7 actual=%0d", value))
+        if (engine_pair_overlap_seen !== 21'h1f_ffff)
+            `uvm_fatal("CLUSTER_ENGINE_PAIR_CROSS", $sformatf(
+                "real-engine overlap incomplete: pair mask=%06h expected=1fffff max_active=%0d",
+                engine_pair_overlap_seen, max_active_engines))
         wait_spad_idle();
 
         for (word_idx = 0; word_idx < 512; word_idx++)
@@ -3142,32 +3259,34 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                         matrix_golden[word_idx / 32][word_idx % 32],
                         $sformatf("C1 Matrix Golden[%0d]", word_idx));
         for (word_idx = 0; word_idx < 16; word_idx++)
-            expect_spad(SWEEP_CNM_Y_LOCAL + (word_idx << 2), 32'd736,
+            expect_spad(C1_CNM_Y_LOCAL + (word_idx << 2), 32'd47104,
                         $sformatf("C1 CNM Golden[%0d]", word_idx));
-        for (word_idx = 0; word_idx < 4; word_idx++) begin
-            expect_spad(SWEEP_SFU_Y_LOCAL + (word_idx << 2), gelu_results[word_idx],
+        for (word_idx = 0; word_idx < 128; word_idx++) begin
+            expect_spad(C1_SFU_Y_LOCAL + (word_idx << 2), gelu_results[word_idx % 4],
                         $sformatf("C1 SFU Golden[%0d]", word_idx));
-            expect_spad(KV_CACHE_LOCAL + 32'h50 + (word_idx << 2),
-                        (word_idx + 1) * 32'h100,
+            expect_spad(C1_KV_CACHE_LOCAL + 32'h50 + (word_idx << 2),
+                        32'h0000_0100 + word_idx,
                         $sformatf("C1 KV write Golden[%0d]", word_idx));
         end
-        expect_spad(SCALAR_Y_LOCAL, 32'd70, "C1 scalar INT8 VDOT Golden");
-        expect_spad(FP_Y_LOCAL, 32'h4130_0000, "C1 BF16 dot Golden");
-        expect_spad(CONV_Y_LOCAL, 32'd45, "C1 CONV3x3 Golden");
+        expect_spad(C1_SCALAR_Y_LOCAL, 32'd512, "C1 scalar INT8 VDOT Golden");
+        expect_spad(C1_FP_Y_LOCAL, 32'h4300_0000, "C1 BF16 dot Golden");
+        for (word_idx = 0; word_idx < 196; word_idx++)
+            expect_spad(C1_CONV_Y_LOCAL + (word_idx << 2), 32'd9,
+                        $sformatf("C1 CONV3x3 Golden[%0d]", word_idx));
         expect_completion(CLUSTER_SWEEP_CPLQ + 32'h00, 16'h0640,
                           matrix_golden[15][31], 32'd512, "C1 Matrix");
         expect_completion(CLUSTER_SWEEP_CPLQ + 32'h10, 16'h0641,
-                          32'd736, 32'd16, "C1 CNM");
+                          32'd47104, 32'd16, "C1 CNM");
         expect_completion(CLUSTER_SWEEP_CPLQ + 32'h20, 16'h0642,
-                          -32'sd15, 32'd4, "C1 SFU");
+                          -32'sd15, 32'd128, "C1 SFU");
         expect_completion(CLUSTER_SWEEP_CPLQ + 32'h30, 16'h0643,
-                          32'd70, 32'd1, "C1 scalar INT8");
+                          32'd512, 32'd1, "C1 scalar INT8");
         expect_completion(CLUSTER_SWEEP_CPLQ + 32'h40, 16'h0644,
-                          32'h4130_0000, 32'd2, "C1 BF16");
+                          32'h4300_0000, 32'd128, "C1 BF16");
         expect_completion(CLUSTER_SWEEP_CPLQ + 32'h50, 16'h0645,
-                          32'd45, 32'd1, "C1 CONV3x3");
+                          32'd9, 32'd196, "C1 CONV3x3");
         expect_completion(CLUSTER_SWEEP_CPLQ + 32'h60, 16'h0646,
-                          32'h0000_0400, 32'd4, "C1 KV write");
+                          32'h0000_017f, 32'd128, "C1 KV write");
         for (engine_idx = 0; engine_idx < 7; engine_idx++) begin
             if (compute_vif.engine_launch_count[engine_idx] == 0)
                 `uvm_fatal("CLUSTER_ENGINE_COVERAGE", $sformatf(
@@ -3177,7 +3296,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             compute_vif.engine_backpressure_seen == 0)
             `uvm_fatal("CLUSTER_ENGINE_BACKPRESSURE", "no engine request was denied by the shared compute SPAD mux")
         `uvm_info("CLUSTER_ALL_ENGINES_PASS", $sformatf(
-                  "all seven production engines launched and matched SPAD Golden; compute-request backpressure cycles=%0d stalled-engine-mask=%07b",
+                  "all seven production engines launched and matched SPAD Golden; real pair overlaps=21/21 mask=%06h max_active=%0d compute-request backpressure cycles=%0d stalled-engine-mask=%07b",
+                  engine_pair_overlap_seen, max_active_engines,
                   compute_vif.engine_backpressure_cycles,
                   compute_vif.engine_backpressure_seen), UVM_LOW)
         axil_read(REG_CMDQ_HEAD, value);
@@ -3189,10 +3309,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         // Read the head/token entry back through the real KV engine after the
         // KV-write completion, checking both stride address generation and
-        // the complete four-word payload.
+        // the complete 128-word payload.
         write_cluster_desc(CLUSTER_SWEEP_CMDQ, 8'h44, 16'h0647,
-                           KV_CACHE_LOCAL, 32'd0, KV_READ_LOCAL,
-                           16'd0, 16'd0, 16'd4, {16'd1,16'd1},
+                           C1_KV_CACHE_LOCAL, 32'd0, C1_KV_READ_LOCAL,
+                           16'd0, 16'd0, 16'd128, {16'd1,16'd1},
                            32'd16, 32'd64, 32'd0, 8'd5);
         axil_write(REG_CMDQ_BASE, CLUSTER_SWEEP_CMDQ);
         axil_write(REG_CMDQ_SIZE, 32'd4);
@@ -3205,12 +3325,12 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_DOORBELL, 32'd1);
         wait_cpl_tail(32'd1);
         wait_spad_idle();
-        for (word_idx = 0; word_idx < 4; word_idx++)
-            expect_spad(KV_READ_LOCAL + (word_idx << 2),
-                        (word_idx + 1) * 32'h100,
+        for (word_idx = 0; word_idx < 128; word_idx++)
+            expect_spad(C1_KV_READ_LOCAL + (word_idx << 2),
+                        32'h0000_0100 + word_idx,
                         $sformatf("C1 KV read Golden[%0d]", word_idx));
         expect_completion(CLUSTER_SWEEP_CPLQ + 32'h100, 16'h0647,
-                          32'h0000_0400, 32'd4, "C1 KV read");
+                          32'h0000_017f, 32'd128, "C1 KV read");
         axil_write(REG_CPLQ_HEAD, 32'd1);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
