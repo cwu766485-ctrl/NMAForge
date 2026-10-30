@@ -109,3 +109,8 @@ At exact clean SHA `402c8ce4689ae48cfee624f1f5fdca66d534bbbf`, default-path thre
 ## R88 aligned Matrix Line Abort-prefix test — 2026-10-30
 
 Exact clean SHA `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec` passes three seeds with six accepted 128-bit Line writes and 24 accepted output words per seed, full WSTRB, exact Golden Line payload/address, preserved suffix, 5/5 read drain and `ERR_ABORT`. Same-SHA Top Smoke, 20-case seeded top regression and 28/28 checker-sensitivity pass. This is one Matrix shape and Abort timing point; no requirement disposition changes and CL-DV-v1.0 remains HOLD. A truncated intermediate upload failed compile and is explicitly superseded by this exact source SHA. See [R88 report](COMPUTE_CLUSTER_MATRIX_LINE_ABORT_WRITE_PREFIX_R88_2026-10-30.md).
+
+
+## R89 Matrix configuration benchmark — 2026-10-30
+
+R89 passes 40/40 Golden points across eight Matrix configurations and five workloads at code/test SHA `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec` using one-cycle behavioral SPAD. For d2/p0/c0→d4/p1/c1 the simulated cycle sum is 2,701→2,029; SPAD reads are 12,032→9,472 bytes, while Line stalls rise on two cases. The evidence is Matrix-core only and uses seed `20261026`; 250 MHz is not measured Fmax. See [R89 report and CSV](../benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R89_2026-10-30.md). Requirement dispositions do not change and `CL-DV-v1.0` remains HOLD.

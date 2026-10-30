@@ -163,3 +163,8 @@ At exact clean SHA `402c8ce4689ae48cfee624f1f5fdca66d534bbbf`, the default `uvm_
 ## R88 aligned Matrix Line Abort prefix — 2026-10-30
 
 At exact clean SHA `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec`, three top-UVM seeds abort a real Matrix 4×16 INT8 GEMM after six accepted 128-bit Line writes. Each checks 24 accepted Golden output words, WSTRB `ffff`, all unaccepted sentinels, 5/5 accepted read responses drained, and `ERR_ABORT`. The memory scoreboard checks 17,388 words with zero mismatch/unknown/stale and UVM severity `0/0/0`. Same-SHA Top Smoke, 20-case top regression, and 28/28 passive checker-sensitivity mutations pass. This closes only one aligned-Line timing point; all-engine prefixes and broad legal fault/phase/reset crosses remain open. RTM remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains HOLD. See [R88 evidence](COMPUTE_CLUSTER_MATRIX_LINE_ABORT_WRITE_PREFIX_R88_2026-10-30.md).
+
+
+## R89 current-candidate Matrix configuration benchmark — 2026-10-30
+
+At R88 code/test SHA `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec` (run from documentation-only child `c236b7ed93414a2a48590e7b587d56b359f1d30d`), VCS `V-2023.12-SP1_Full64` passes all 40 Golden combinations across eight Depth/Prefetch/A-Cache configurations and five Matrix workloads, with one-cycle behavioral SPAD and seed `20261026`. d2/p0/c0 to d4/p1/c1 reduces the five-workload cycle sum 2,701→2,029 (-24.92%), and read bytes 12,032→9,472; Line stalls increase for two cases and are retained in the report. This is a Matrix block benchmark, not ASIC PPA or whole-cluster performance. No RTL or requirement status changed; `CL-DV-v1.0` remains HOLD. See [R89 report](../benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R89_2026-10-30.md).

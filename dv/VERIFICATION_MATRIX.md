@@ -1,3 +1,9 @@
+> **2026-10-30 R89 Matrix configuration benchmark:** At R88 code/test SHA
+> `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec`, VCS passes 40/40 Golden cases
+> across eight Depth/Prefetch/A-Cache configurations and five workloads with a
+> one-cycle behavioral bank model. Full report and checked-in CSV:
+> [R89 benchmark](../docs/benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R89_2026-10-30.md).
+
 > **2026-10-30 R88 Matrix aligned Line Abort prefix:** At exact clean SHA
 > `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec`, three real-top UVM seeds accept
 > six of 16 aligned 128-bit Line writes (24/64 Golden output words) before
