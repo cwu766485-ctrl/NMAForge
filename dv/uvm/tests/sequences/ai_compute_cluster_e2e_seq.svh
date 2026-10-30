@@ -1381,6 +1381,146 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         clear_contract_queues(32'd2);
     endtask
 
+    task automatic run_conv_abort_write_prefix(input int unsigned seed);
+        int signed expected_output[0:3];
+        bit [31:0] write_addr[0:3];
+        bit [31:0] write_data[0:3];
+        bit [31:0] desc_base;
+        bit [31:0] completion_base;
+        bit [31:0] src;
+        bit [31:0] weights;
+        bit [31:0] dst;
+        bit [31:0] sentinel;
+        bit [15:0] task_id;
+        int unsigned accepted_write_count;
+        int unsigned accepted_reads;
+        int unsigned returned_reads;
+        int unsigned poll;
+        int unsigned word_idx;
+        bit first_write_seen;
+        bit abort_seen;
+        bit monitor_done;
+
+        desc_base = CLUSTER_CONTRACT_CMDQ;
+        completion_base = 32'h0000_5d00;
+        src = 32'h0004_d100;
+        weights = 32'h0004_d200;
+        dst = 32'h0004_d300;
+        sentinel = 32'hbad0_78f0;
+        task_id = 16'h0771;
+        accepted_write_count = 0;
+        accepted_reads = 0;
+        returned_reads = 0;
+        first_write_seen = 1'b0;
+        abort_seen = 1'b0;
+        monitor_done = 1'b0;
+
+        expected_output[0] = 54;
+        expected_output[1] = 63;
+        expected_output[2] = 90;
+        expected_output[3] = 99;
+        for (word_idx = 0; word_idx < 16; word_idx++) begin
+            spad_write(src + (word_idx << 2), word_idx + 1);
+            if (word_idx < 4)
+                spad_write(dst + (word_idx << 2), sentinel ^ word_idx);
+        end
+        for (word_idx = 0; word_idx < 9; word_idx++)
+            spad_write(weights + (word_idx << 2), 32'd1);
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            spad_write(completion_base + (word_idx << 2), 32'h7810_0000 | word_idx);
+
+        // 4x4 input, 3x3 unit kernel, stride-one valid output => four ordered
+        // INT32 results. Abort after the first accepted result must retain a
+        // legal one-to-three-word prefix and preserve every later sentinel.
+        write_cluster_desc(desc_base, 8'h16, task_id, src, weights, dst,
+                           16'd4, 16'd4, 16'd9, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd5);
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        fork
+            begin : conv_abort_prefix_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.dut_abort_active)
+                        abort_seen = 1'b1;
+                    if (compute_vif.engine_req_valid[5] &&
+                        compute_vif.engine_req_ready[5]) begin
+                        if (compute_vif.engine_req_write[5]) begin
+                            if (accepted_write_count >= 4)
+                                `uvm_fatal("CLUSTER_CONV_ABORT_PREFIX",
+                                    "Conv accepted more output writes than its 4x4 valid descriptor")
+                            write_addr[accepted_write_count] =
+                                compute_vif.engine_req_addr[5*32 +: 32];
+                            write_data[accepted_write_count] =
+                                compute_vif.engine_req_wdata[5*32 +: 32];
+                            accepted_write_count++;
+                            first_write_seen = 1'b1;
+                        end else begin
+                            accepted_reads++;
+                        end
+                    end
+                    if (compute_vif.rsp_valid &&
+                        (compute_vif.rsp_client == 3'd2))
+                        returned_reads++;
+                end
+            end
+            begin : abort_after_first_conv_write
+                poll = 0;
+                while (!first_write_seen && poll < 50000) begin
+                    @(posedge compute_vif.aclk);
+                    poll++;
+                end
+                if (!first_write_seen)
+                    `uvm_fatal("CLUSTER_CONV_ABORT_PREFIX",
+                        "Conv did not accept an output write before the Abort timeout")
+                axil_write(REG_ABORT, 32'd1);
+                wait_cpl_tail(32'd1);
+                monitor_done = 1'b1;
+            end
+        join
+
+        wait_spad_idle();
+        if (!abort_seen)
+            `uvm_fatal("CLUSTER_CONV_ABORT_PREFIX",
+                "software Abort was not observed while Conv output was active")
+        if (accepted_write_count == 0 || accepted_write_count >= 4)
+            `uvm_fatal("CLUSTER_CONV_ABORT_PREFIX", $sformatf(
+                "Abort did not cut a non-empty proper output prefix: writes=%0d",
+                accepted_write_count))
+        if (accepted_reads == 0 || returned_reads != accepted_reads)
+            `uvm_fatal("CLUSTER_CONV_ABORT_PREFIX", $sformatf(
+                "Conv read responses did not drain: accepted=%0d returned=%0d",
+                accepted_reads, returned_reads))
+
+        expect_spad(completion_base + 32'h00, {16'd0, task_id},
+                    "Conv accepted-write Abort task ID");
+        expect_spad(completion_base + 32'h04, 32'h0000_0032,
+                    "Conv accepted-write Abort status/code");
+        for (word_idx = 0; word_idx < accepted_write_count; word_idx++) begin
+            if (write_addr[word_idx] !== dst + (word_idx << 2))
+                `uvm_fatal("CLUSTER_CONV_ABORT_PREFIX", $sformatf(
+                    "non-prefix output address index=%0d expected=0x%08h actual=0x%08h",
+                    word_idx, dst + (word_idx << 2), write_addr[word_idx]))
+            if (write_data[word_idx] !== expected_output[word_idx])
+                `uvm_fatal("CLUSTER_CONV_ABORT_PREFIX", $sformatf(
+                    "Golden mismatch in accepted prefix index=%0d expected=%0d actual=%0d",
+                    word_idx, expected_output[word_idx], $signed(write_data[word_idx])))
+            expect_spad(dst + (word_idx << 2), expected_output[word_idx],
+                        $sformatf("Conv accepted Abort prefix Golden[%0d]", word_idx));
+        end
+        for (word_idx = accepted_write_count; word_idx < 4; word_idx++)
+            expect_spad(dst + (word_idx << 2), sentinel ^ word_idx,
+                        $sformatf("Conv Abort preserved unaccepted suffix[%0d]", word_idx));
+
+        `uvm_info("CLUSTER_CONV_ABORT_WRITE_PREFIX_PASS", $sformatf(
+            "task_id=%04h accepted_output_prefix=%0d/4 read_drain=%0d/%0d completion=ERR_ABORT seed=%0d",
+            task_id, accepted_write_count, accepted_reads, returned_reads, seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
     task automatic run_engine_reset_drain_sweep();
         int engine;
         int unsigned poll;
@@ -2905,6 +3045,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         check_request_stability();
         run_engine_abort_drain_sweep();
         run_sfu_abort_write_prefix(seed);
+        run_conv_abort_write_prefix(seed);
         run_engine_reset_drain_sweep();
 
         `uvm_info("COMPUTE_CLUSTER_REAL_UVM_PASS", $sformatf(
