@@ -20,6 +20,8 @@ module tb_ai_banked_cnm_random;
   reg [3:0] accepted_req_d1=0;
   reg [31:0] d0_d1=0,d1_d1=0,d2_d1=0,d3_d1=0;
   reg [3:0] cnm_req_ready=4'hf;
+  reg [3:0] stalled_prev=0;
+  reg [31:0] stalled_addr0=0,stalled_addr1=0,stalled_addr2=0,stalled_addr3=0;
   reg prefetch_backpressure=0;
   reg extra_response_delay=1;
   wire [3:0] accepted_req=req & cnm_req_ready;
@@ -98,9 +100,24 @@ module tb_ai_banked_cnm_random;
       rsp_valid<=0;accepted_req_d1<=0;
       d0<=0;d1<=0;d2<=0;d3<=0;
       d0_d1<=0;d1_d1<=0;d2_d1<=0;d3_d1<=0;
+      stalled_prev<=0;
+      stalled_addr0<=0;stalled_addr1<=0;stalled_addr2<=0;stalled_addr3<=0;
       cnm_request_count<=0;
       wait_a_state_cycles<=0;prefetch_a_state_cycles<=0;
     end else begin
+      if(stalled_prev[0] && (!req[0] || a0!==stalled_addr0))
+        $fatal(1,"CNM lane 0 request changed while backpressured");
+      if(stalled_prev[1] && (!req[1] || a1!==stalled_addr1))
+        $fatal(1,"CNM lane 1 request changed while backpressured");
+      if(stalled_prev[2] && (!req[2] || a2!==stalled_addr2))
+        $fatal(1,"CNM lane 2 request changed while backpressured");
+      if(stalled_prev[3] && (!req[3] || a3!==stalled_addr3))
+        $fatal(1,"CNM lane 3 request changed while backpressured");
+      stalled_prev<=req & ~cnm_req_ready;
+      if(req[0] && !cnm_req_ready[0]) stalled_addr0<=a0;
+      if(req[1] && !cnm_req_ready[1]) stalled_addr1<=a1;
+      if(req[2] && !cnm_req_ready[2]) stalled_addr2<=a2;
+      if(req[3] && !cnm_req_ready[3]) stalled_addr3<=a3;
       rsp_valid <= extra_response_delay ? accepted_req_d1 : accepted_req;
       accepted_req_d1 <= accepted_req;
       if(extra_response_delay) begin
@@ -314,326 +331,4 @@ module tb_ai_banked_cnm_random;
       inject_spad_protection=1;
       resetn=0;#1;
       if(busy || done || error || error_code!=0)
-        $fatal(1,"CNM reset did not clear command status");
-      repeat(3) @(negedge clk);resetn=1;
-      abort=0;parity_error=0;inject_cnm_protection=0;inject_spad_protection=0;
-      repeat(2) @(negedge clk);
-      op_mode=8'h20;length=3;watchdog_limit=0;
-      run_case(9,3,0,1);
-    end
-  endtask
-
-  task automatic run_late_parity_fault;
-    integer writes_before,issues_before;
-    begin
-      op_mode=8'h20;length=256;watchdog_limit=0;abort=0;
-      parity_error=0;inject_cnm_protection=0;inject_spad_protection=0;
-      writes_before=spad_write_count;
-      issues_before=cnm_request_count;
-      @(negedge clk);start=1;
-      @(negedge clk);start=0;
-      timeout=0;
-      while(cnm_request_count<issues_before+128 && timeout<20000) begin
-        @(negedge clk);timeout=timeout+1;
-      end
-      if(cnm_request_count<issues_before+128)
-        $fatal(1,"CNM late parity probe failed to reach issue count=%0d",
-               cnm_request_count-issues_before);
-      // Keep the parity indication active umºÛ[h‘éì¶»§q«^w../../block/dma/agent \
-		+incdir+../fixtures \
-		-Mdir=$(AI_DIGITS_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
-		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
-		-o $(AI_DIGITS_RUN)/simv -l $(AI_DIGITS_RUN)/compile.log
-	$(AI_DIGITS_RUN)/simv +ntb_random_seed=20261029 +AI_RANDOM_CASES=0 \
-		+AI_SEED=20261029 +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) \
-		+AI_DIGITS_INFERENCE \
-		+AI_DIGITS_MEMORY=$(AI_DIGITS_RUN)/workload/digits_spad_writes.memh \
-		+AI_DIGITS_EXPECTED=$(AI_DIGITS_RUN)/workload/digits_expected.memh \
-		+AI_DIGITS_HIDDEN=$(AI_DIGITS_RUN)/workload/digits_hidden_expected.memh \
-		+AI_DIGITS_RTL_CSV=$(AI_DIGITS_RUN)/rtl_logits.csv \
-		-l $(AI_DIGITS_RUN)/run.log
-	$(AI_DIGITS_PYTHON) ../../../../benchmark/digits/digits_quantized_golden.py \
-		--model "$(AI_DIGITS_RUN)/model/digits_mlp_int8.npz" \
-		--rtl-logits "$(AI_DIGITS_RUN)/rtl_logits.csv" \
-		--out "$(AI_DIGITS_RUN)/golden_comparison.json"
-
-# Paired TinyNPU conv1x_mini graph through production top, Matrix/SFU/int8
-# engines, ABI-v7 command/completion queues, and an independent per-layer Golden.
-AI_TINYNPU_CNN_RUN ?= /tmp/nmaforge_tinynpu_cnn_rtl_$(shell date +%Y%m%d_%H%M%S)
-AI_TINYNPU_CNN_PYTHON ?= python3
-.PHONY: ai_tinynpu_cnn_match
-ai_tinynpu_cnn_match:
-	test ! -e "$(AI_TINYNPU_CNN_RUN)"
-	mkdir -p "$(AI_TINYNPU_CNN_RUN)"
-	$(AI_TINYNPU_CNN_PYTHON) ../../../../benchmark/tinynpu/generate_nma_cnn_workload.py \
-		--model "$(AI_TINYNPU_CNN_MODEL)" \
-		--tiny-golden "$(AI_TINYNPU_CNN_GOLDEN)" \
-		--out-dir "$(AI_TINYNPU_CNN_RUN)/workload"
-	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
-		+incdir+../../../block/control/agent \
-		+incdir+../../../block/dma/agent \
-		+incdir+../fixtures \
-		-Mdir=$(AI_TINYNPU_CNN_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
-		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
-		-o $(AI_TINYNPU_CNN_RUN)/simv -l $(AI_TINYNPU_CNN_RUN)/compile.log
-	$(AI_TINYNPU_CNN_RUN)/simv +ntb_random_seed=20261029 +AI_RANDOM_CASES=0 \
-		+AI_SEED=20261029 +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_TINYNPU_CNN_MATCH \
-		+AI_TINYNPU_CNN_MEMORY=$(AI_TINYNPU_CNN_RUN)/workload/nma_cnn_spad.memh \
-		+AI_TINYNPU_CNN_EXPECTED=$(AI_TINYNPU_CNN_RUN)/workload/nma_cnn_expected.memh \
-		-l $(AI_TINYNPU_CNN_RUN)/run.log
-	grep -q '^NMA_CNN_INFERENCE_PASS' $(AI_TINYNPU_CNN_RUN)/run.log
-
-# Optional V3 subsystem stress: inject seeded read/write SLVERR at a random
-# beat of multi-beat DMA bursts and check completion plus AXI drain-to-idle.
-ai_dma_error_stress: ai_comp
-	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=0 +AI_SEED=$(AI_SEED) \
-		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_DMA_ERROR_STRESS \
-		-l ai_dma_error_stress.log
-
-# Activity-aware smoke: uses exactly the same top-level regression as
-# ai_smoke, but writes a VCD only when explicitly requested.  Convert it on
-# the Synopsys Linux environment with `make ai_smoke_saif` before DC power.
-ACLK_PERIOD_NS ?= 10.0
-ACLK_PERIOD_TAG := $(subst .,_,$(ACLK_PERIOD_NS))ns
-VCD_FILE ?= ai_accel_smoke_$(ACLK_PERIOD_TAG).vcd
-SAIF_FILE ?= ai_accel_smoke_$(ACLK_PERIOD_TAG).saif
-SAIF_DC_FILE ?= $(basename $(SAIF_FILE))_dc.saif
-SAIF_INSTANCE ?= tb_ai_accel_smoke/dut
-
-ai_smoke_vcd: ai_comp
-	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=$(AI_RANDOM_CASES) +AI_SEED=$(AI_SEED) +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +VCD_FILE=$(VCD_FILE) -l ai_accel_smoke_vcd.log
-
-ai_smoke_saif: ai_smoke_vcd
-	vcd2saif -input $(VCD_FILE) -output $(SAIF_FILE) -instance $(SAIF_INSTANCE)
-	$(PYTHON) ../../../../syn/normalize_saif_root.py --input $(SAIF_FILE) --output $(SAIF_DC_FILE) --testbench tb_ai_accel_smoke --dut dut --top ai_accel_top
-
-ai_transformer: ai_comp
-	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=0 +AI_SEED=$(AI_SEED) +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) -l ai_transformer.log
-
-# Short Linux/VCS gate: all directed AXI/DMA/A4 tests with random compute
-# cases disabled. Use this after an RTL edit before the seeded regression.
-ai_quick: ai_comp
-	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=0 +AI_SEED=$(AI_SEED) +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) -l ai_quick.log
-
-# Integer reference model is intentionally a separate gate: it validates the
-# documented A3/A4 fixed-point contract without claiming RTL coverage.
-ai_a4_ref:
-	$(PYTHON) ../../../block/compute/matrix/ref/ai_a3_reference.py --cases $(AI_REF_CASES) --seed $(AI_REF_SEED)
-
-ai_precheck: ai_a4_ref ai_quick
-
-# Focused Linux/VCS gates for the unified DMA and scratchpad line/RR arbiter.
-ai_dma_comp:
-	vcs -full64 -sverilog -timescale=1ns/1ns +define+VCS \
-		-top tb_ai_axi128_dma ../../../../rtl/dma/ai_axi128_dma.v \
-		../../../block/dma/tb/tb_ai_axi128_dma.sv -o simv_dma -l ai_dma_comp.log
-
-ai_dma_run: ai_dma_comp
-	./simv_dma -l ai_dma_run.log
-
-ai_spad_arb_comp:
-	vcs -full64 -sverilog -timescale=1ns/1ns +define+VCS \
-		-top tb_ai_spad_arbiter_rr ../../../../rtl/memory/ai_spad_arbiter.v \
-		../../../block/spad_arbiter/tb/tb_ai_spad_arbiter_rr.sv -o simv_spad_arb \
-		-l ai_spad_arb_comp.log
-
-ai_spad_arb_run: ai_spad_arb_comp
-	./simv_spad_arb -l ai_spad_arb_run.log
-	@grep -q '3-client sustained SPAD round-robin PASS grants=10/10/10 max_wait=2' ai_spad_arb_run.log || \
-		{ echo "SPAD arbiter 3-client fairness marker missing"; exit 1; }
-	@grep -q 'Seeded request-mode SPAD RR PASS' ai_spad_arb_run.log || \
-		{ echo "SPAD arbiter seeded request-mode fairness marker missing"; exit 1; }
-	@grep -q 'CNM/DMA SPAD contention PASS cnm_grants=6 dma_line_grants=6' ai_spad_arb_run.log || \
-		{ echo "SPAD arbiter CNM/DMA contention marker missing"; exit 1; }
-	@grep -q 'Scratchpad response parity alignment PASS' ai_spad_arb_run.log || \
-		{ echo "SPAD arbiter response/parity marker missing"; exit 1; }
-	./simv_spad_arb +SPAD_RR_MODE_CYCLES=10000 -l ai_spad_arb_10k_run.log
-	@grep -q 'Seeded request-mode SPAD RR PASS cycles=10000' ai_spad_arb_10k_run.log || \
-		{ echo "SPAD arbiter 10000-cycle seeded request-mode marker missing"; exit 1; }
-
-# Standalone arbiter code-coverage capture.  Keep all generated artifacts in
-# an isolated run directory so this gate does not overwrite the functional
-# smoke executable or its logs.
-SPAD_ARB_COV_RUN ?= /tmp/nmaforge_spad_arbiter_cov_$(shell date +%Y%m%d_%H%M%S)
-SPAD_ARB_COV_METRICS := line+cond+tgl+branch+assert
-
-.PHONY: ai_spad_arb_cov
-ai_spad_arb_cov:
-	test ! -e "$(SPAD_ARB_COV_RUN)"
-	mkdir -p "$(SPAD_ARB_COV_RUN)"
-	cd "$(SPAD_ARB_COV_RUN)" && $(VCS) -full64 -sverilog -timescale=1ns/1ns +define+VCS \
-		-cm $(SPAD_ARB_COV_METRICS) -cm_dir coverage.vdb \
-		-top tb_ai_spad_arbiter_rr $(CURDIR)/../../../../rtl/memory/ai_spad_arbiter.v \
-		$(CURDIR)/../../../block/spad_arbiter/tb/tb_ai_spad_arbiter_rr.sv \
-		-o simv -l compile.log
-	cd "$(SPAD_ARB_COV_RUN)" && ./simv +SPAD_RR_MODE_CYCLES=10000 \
-		-cm $(SPAD_ARB_COV_METRICS) -cm_dir coverage.vdb -l run.log
-	grep -q '3-client sustained SPAD round-robin PASS grants=10/10/10 max_wait=2' "$(SPAD_ARB_COV_RUN)/run.log"
-	grep -q 'Seeded request-mode SPAD RR PASS cycles=10000' "$(SPAD_ARB_COV_RUN)/run.log"
-	grep -q 'CNM/DMA SPAD contention PASS cnm_grants=6 dma_line_grants=6' "$(SPAD_ARB_COV_RUN)/run.log"
-	grep -q 'Scratchpad response parity alignment PASS' "$(SPAD_ARB_COV_RUN)/run.log"
-	grep -q 'SPAD arbiter cursor fallback request forms PASS cases=12' "$(SPAD_ARB_COV_RUN)/run.log"
-	grep -q 'SPAD arbiter descriptor/completion priority and response PASS' "$(SPAD_ARB_COV_RUN)/run.log"
-	grep -q 'SPAD arbiter protection-error response alignment PASS' "$(SPAD_ARB_COV_RUN)/run.log"
-	$(URG) -full64 -dir "$(SPAD_ARB_COV_RUN)/coverage.vdb" -format text \
-		-report "$(SPAD_ARB_COV_RUN)/urg" -log "$(SPAD_ARB_COV_RUN)/urg.log"
-	! grep -Eq 'UCAPI-DNYL|Design not loaded' "$(SPAD_ARB_COV_RUN)/urg.log"
-	test -s "$(SPAD_ARB_COV_RUN)/urg/modinfo.txt"
-	grep -Fq 'Failure               0' "$(SPAD_ARB_COV_RUN)/urg/asserts.txt"
-	grep -Fq 'Incomplete            0' "$(SPAD_ARB_COV_RUN)/urg/asserts.txt"
-	grep -Fq 'Without Attempts      0' "$(SPAD_ARB_COV_RUN)/urg/asserts.txt"
-	grep -Fq 'Uncovered         0' "$(SPAD_ARB_COV_RUN)/urg/asserts.txt"
-	grep -Fq 'Matches           2' "$(SPAD_ARB_COV_RUN)/urg/asserts.txt"
-	grep -Fq 'ap_idle_decode_uses_default_client' "$(SPAD_ARB_COV_RUN)/urg/asserts.txt"
-	grep -Fq 'ap_banked_response_metadata_is_valid' "$(SPAD_ARB_COV_RUN)/urg/asserts.txt"
-	echo "SPAD_ARBITER_COVERAGE_PASS report=$(SPAD_ARB_COV_RUN)/urg"
-
-ai_upgrade_vcs: ai_dma_run ai_spad_arb_run ai_quick
-
-# Focused VCS tests.  Each target creates a separate executable, KDB and log,
-# so a directed failure can be inspected in Verdi without rebuilding ai_smoke.
-VCS_FOCUSED = vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ns +define+VCS
-
-ai_a6_dma_comp:
-	$(VCS_FOCUSED) -top tb_ai_axi128_dma ../../../../rtl/dma/ai_axi128_dma.v \
-		../../../../rtl/dma/ai_dma_burst_planner.v \
-		../../../../rtl/dma/ai_dma_read_slot_tracker.v \
-		../../../../rtl/dma/ai_dma_write_response_tracker.v \
-		../../../../rtl/dma/ai_dma_spad_transfer_adapter.v \
-		../../../block/dma/tb/tb_ai_axi128_dma.sv -o simv_a6_dma -l ai_a6_dma_comp.log
-
-ai_a6_dma_run: ai_a6_dma_comp
-	./simv_a6_dma -l ai_a6_dma_run.log
-
-ai_a6_datapaths_comp:
-	$(VCS_FOCUSED) -top tb_ai_a6_datapaths \
-		../../../../rtl/compute/cnn/ai_conv3x3_linebuffer_core.v \
-		../../../../rtl/compute/kv/ai_kv_cache_engine.v \
-		../../../block/compute/cnn_kv/tb/tb_ai_a6_datapaths.sv -o simv_a6_datapaths -l ai_a6_datapaths_comp.log
-
-ai_a6_datapaths_run: ai_a6_datapaths_comp
-	./simv_a6_datapaths -l ai_a6_datapaths_run.log
-
-ai_a7_vcs: ai_a6_dma_run ai_a6_datapaths_run ai_spad_arb_run
-
-# A2.2 unit gate for the four independent bank-local controllers.
-# This focused executable has occasionally been removed while its VCS .daidir
-# cache remains (for example after a WSL/Windows file sync).  In that state VCS
-# says the design is unchanged but does not recreate simv_cnm_a22.  Clear only
-# this target's generated cache before compile; it does not touch ai_smoke.
-ai_cnm_a22_comp:
-	rm -rf simv_cnm_a22 simv_cnm_a22.daidir
-	$(VCS_FOCUSED) -top tb_ai_banked_cnm_a22 \
-		../../../../rtl/compute/cnm/ai_bank_pe.v \
-		../../../../rtl/compute/cnm/ai_bank_local_controller.v \
-		../../../../rtl/compute/cnm/ai_banked_cnm_core.v \
-		../../../block/compute/cnm/tb/tb_ai_banked_cnm_a22.sv -o simv_cnm_a22 -l ai_cnm_a22_comp.log
-
-ai_cnm_a22_run: ai_cnm_a22_comp
-	./simv_cnm_a22 -l ai_cnm_a22_run.log
-
-ai_cnm_a22: ai_cnm_a22_run
-
-# Comparable VCS microbenchmarks: each A2/A3 case performs 64*L INT8 MACs.
-ai_cnm_a2_gemv_bench_comp:
-	rm -rf simv_cnm_a2_gemv_bench simv_cnm_a2_gemv_bench.daidir
-	$(VCS_FOCUSED) -top tb_ai_cnm_a2_gemv_bench \
-		../../../../rtl/compute/cnm/ai_bank_pe.v \
-		../../../../rtl/compute/cnm/ai_bank_local_controller.v \
-		../../../../rtl/compute/cnm/ai_banked_cnm_core.v \
-		../../../block/compute/cnm/tb/tb_ai_cnm_a2_gemv_bench.sv -o simv_cnm_a2_gemv_bench -l ai_cnm_a2_gemv_bench_comp.log
-
-ai_cnm_a2_gemv_bench_run: ai_cnm_a2_gemv_bench_comp
-	./simv_cnm_a2_gemv_bench -l ai_cnm_a2_gemv_bench_run.log
-
-ai_cnm_a2_gemv_bench: ai_cnm_a2_gemv_bench_run
-
-# Seeded CNM oracle regression. Random signed bytes are generated from the
-# address and seed, then independently reduced by the testbench reference.
-CNM_RANDOM_SEEDS ?= 20261021 20261022 20261023
-ifndef CNM_RANDOM_OUT_DIR
-CNM_RANDOM_OUT_DIR := /tmp/nmaforge_cnm_random_$(shell date +%Y%m%d_%H%M%S)
-endif
-ai_cnm_random_compile:
-	mkdir -p $(CNM_RANDOM_OUT_DIR)
-	$(VCS_FOCUSED) -Mdir=$(CNM_RANDOM_OUT_DIR)/csrc -top tb_ai_banked_cnm_random \
-		-cm line+cond+fsm+branch \
-		-cm_hier $(CURDIR)/../../../block/compute/cnm/tb/cnm_random.cm_hier \
-		-cm_dir $(CNM_RANDOM_OUT_DIR)/coverage.vdb \
-		../../../../rtl/compute/cnm/ai_bank_pe.v \
-		../../../../rtl/compute/cnm/ai_bank_local_controller.v \
-		../../../../rtl/compute/cnm/ai_banked_cnm_core.v \
-		../../../block/compute/cnm/tb/tb_ai_banked_cnm_random.sv \
-		-o $(CNM_RANDOM_OUT_DIR)/simv -l $(CNM_RANDOM_OUT_DIR)/compile.log
-
-.PHONY: ai_cnm_random_compile ai_cnm_random_regress
-ai_cnm_random_regress: ai_cnm_random_compile
-	@set -e; for seed in $(CNM_RANDOM_SEEDS); do \
-		$(CNM_RANDOM_OUT_DIR)/simv +SEED=$$seed -cm line+cond+fsm+branch \
-			-cm_dir $(CNM_RANDOM_OUT_DIR)/coverage.vdb -cm_name cnm_seed_$$seed \
-			-l $(CNM_RANDOM_OUT_DIR)/run_seed_$$seed.log; \
-		grep -q "^CNM_RANDOM_PASS golden_cases=17 faults=8 phase_abort=6 phase_reset=6 late_faults=1 reset_fault_combo=1 reset_recovery=1 wait_a=1 prefetch_backpressure=1 fast_response=1 seed=$$seed$$" $(CNM_RANDOM_OUT_DIR)/run_seed_$$seed.log; \
-	done
-
-ai_tensor_a3_gemm_bench_comp:
-	rm -rf simv_tensor_a3_gemm_bench simv_tensor_a3_gemm_bench.daidir
-	$(VCS_FOCUSED) -top tb_ai_tensor_a3_gemm_bench \
-		../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v \
-		../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv \
-		../../../../rtl/compute/matrix/ai_tensor_matrix_core.v \
-		../../../block/compute/matrix/tb/tb_ai_tensor_a3_gemm_bench.sv -o simv_tensor_a3_gemm_bench -l ai_tensor_a3_gemm_bench_comp.log
-
-ai_tensor_a3_gemm_bench_run: ai_tensor_a3_gemm_bench_comp
-	./simv_tensor_a3_gemm_bench -l ai_tensor_a3_gemm_bench_run.log
-
-ai_tensor_a3_gemm_bench: ai_tensor_a3_gemm_bench_run
-
-ai_cnm_compare: ai_cnm_a2_gemv_bench ai_tensor_a3_gemm_bench
-
-# CNM signoff gate: microarchitecture throughput, SPAD arbitration under
-# CNM/DMA contention, then the full AXI/DMA/compute smoke regression.
-ai_cnm_signoff: ai_cnm_compare ai_spad_arb_run ai_smoke
-
-ai_async_fifo_comp:
-	$(VCS_FOCUSED) -top tb_ai_async_fifo \
-		../../../../rtl/control/cdc/ai_async_fifo.v \
-		../../../block/cdc/tb/tb_ai_async_fifo.sv -o simv_async_fifo -l ai_async_fifo_comp.log
-
-ai_async_fifo_run: ai_async_fifo_comp
-	./simv_async_fifo -l ai_async_fifo_run.log
-
-ai_async_fifo: ai_async_fifo_run
-
-ai_async_fifo_random_comp:
-	$(VCS_FOCUSED) -top tb_ai_async_fifo_random \
-		../../../../rtl/control/cdc/ai_async_fifo.v \
-		../../../block/cdc/tb/tb_ai_async_fifo_random.sv -o simv_async_fifo_random -l ai_async_fifo_random_comp.log
-
-ai_async_fifo_random_run: ai_async_fifo_random_comp
-	./simv_async_fifo_random +SEED=$(AI_SEED) -l ai_async_fifo_random_run.log
-
-ai_async_fifo_random: ai_async_fifo_random_run
-
-ai_async_fifo_reset_comp:
-	$(VCS_FOCUSED) -top tb_ai_async_fifo_reset \
-		../../../../rtl/control/cdc/ai_async_fifo.v \
-		../../../block/cdc/tb/tb_ai_async_fifo_reset.sv -o simv_async_fifo_reset -l ai_async_fifo_reset_comp.log
-
-ai_async_fifo_reset_run: ai_async_fifo_reset_comp
-	./simv_async_fifo_reset -l ai_async_fifo_reset_run.log
-
-ai_async_fifo_reset: ai_async_fifo_reset_run
-
-ai_ctrl_compute_cdc_comp:
-	$(VCS_FOCUSED) -top tb_ai_ctrl_compute_cdc \
-		../../../../rtl/control/cdc/ai_async_fifo.v \
-		../../../../rtl/control/cdc/ai_ctrl_compute_cdc.v \
-		../../../block/cdc/tb/tb_ai_ctrl_compute_cdc.sv -o simv_ctrl_compute_cdc -l ai_ctrl_compute_cdc_comp.log
-
-ai_ctrl_compute_cdc_run: ai_ctrl_compute_cdc_comp
-	./simv_ctrl_compute_cdc -l ai_ctrl_compute_cdc_run.log
-
-ai_ctrl_compute_cdc: ai_ctrl_compute_cdc_run
-
-clean:
-	rm -rf csrc simv* *.log ucli.key *.vpd vc_hdrs.h DVE* novas* *.daidir *.vdb *.key
+        $fatal(1,"CNM rewÓ^­¢G§²ÚîÆ­yØ½™¥áÑÕÉ•Ìp($$µ5‘¥Èô¡%}%%QM}IU8¤½ÍÉŒ€µÑ½ÀÑ‰}…¥}…•±}Íµ½­”€µ˜…¥}…•°¹˜p($$¸¸¼¸¸¼¸¸½‰±½¬½‘µ„½•¹Ø½…á¥}µ•µ½Éå}µ½‘•°¹ÍØ€¸¸½Ñˆ½Ñ‰}…¥}…•±}Íµ½­”¹ÍØp($$µ¼€¡%}%%QM}IU8¤½Í¥µØ€µ°€¡%}%%QM}IU8¤½½µÁ¥±”¹±½œ($¡%}%%QM}IU8¤½Í¥µØ€­¹Ñ‰}É…¹‘½µ}Í••ôÈÀÈØÄÀÈä€­%}I9=5}MLôÀp($$­%}MôÈÀÈØÄÀÈä€­1-}AI%=}9Lô¡1-}AI%=}9L¤p($$­%}%%QM}%9I9p($$­%}%%QM}55=Idô¡%}%%QM}IU8¤½İ½É­±½…½‘¥¥ÑÍ}ÍÁ…‘}İÉ¥Ñ•Ì¹µ•µ p($$­%}%%QM}aAQô¡%}%%QM}IU8¤½İ½É­±½…½‘¥¥ÑÍ}•áÁ•Ñ•¹µ•µ p($$­%}%%QM}!%8ô¡%}%%QM}IU8¤½İ½É­±½…½‘¥¥ÑÍ}¡¥‘‘•¹}•áÁ•Ñ•¹µ•µ p($$­%}%%QM}IQ1}MXô¡%}%%QM}IU8¤½ÉÑ±}±½¥ÑÌ¹ÍØp($$µ°€¡%}%%QM}IU8¤½ÉÕ¸¹±½œ($¡%}%%QM}AeQ!=8¤€¸¸¼¸¸¼¸¸¼¸¸½‰•¹¡µ…É¬½‘¥¥ÑÌ½‘¥¥ÑÍ}ÅÕ…¹Ñ¥é•‘}½±‘•¸¹Áäp($$´µµ½‘•°€ˆ¡%}%%QM}IU8¤½µ½‘•°½‘¥¥ÑÍ}µ±Á}¥¹Ğà¹¹Áèˆp($$´µÉÑ°µ±½¥ÑÌ€ˆ¡%}%%QM}IU8¤½ÉÑ±}±½¥ÑÌ¹ÍØˆp($$´µ½ÕĞ€ˆ¡%}%%QM}IU8¤½½±‘•¹}½µÁ…É¥Í½¸¹©Í½¸ˆ((ŒA…¥É•Q¥¹å9AT½¹ØÅá}µ¥¹¤É…Á Ñ¡É½Õ ÁÉ½‘ÕÑ¥½¸Ñ½À°5…ÑÉ¥à½MT½¥¹Ğà(Œ•¹¥¹•Ì°	$µØÜ½µµ…¹½½µÁ±•Ñ¥½¸ÅÕ•Õ•Ì°…¹…¸¥¹‘•Á•¹‘•¹ĞÁ•Èµ±…å•È½±‘•¸¸)%}Q%9e9AU}99}IU8€üô€½ÑµÀ½¹µ…™½É•}Ñ¥¹å¹ÁÕ}¹¹}ÉÑ±|¡Í¡•±°‘…Ñ”€¬•d•´•‘|• •4•L¤)%}Q%9e9AU}99}AeQ!=8€üôÁåÑ¡½¸Ì(¹A!=9dè…¥}Ñ¥¹å¹ÁÕ}¹¹}µ…Ñ )…¥}Ñ¥¹å¹ÁÕ}¹¹}µ…Ñ è(%Ñ•ÍĞ€„€µ”€ˆ¡%}Q%9e9AU}99}IU8¤ˆ(%µ­‘¥È€µÀ€ˆ¡%}Q%9e9AU}99}IU8¤ˆ($¡%}Q%9e9AU}99}AeQ!=8¤€¸¸¼¸¸¼¸¸¼¸¸½‰•¹¡µ…É¬½Ñ¥¹å¹ÁÔ½•¹•É…Ñ•}¹µ…}¹¹}İ½É­±½…¹Áäp($$´µµ½‘•°€ˆ¡%}Q%9e9AU}99}5=0¤ˆp($$´µÑ¥¹äµ½±‘•¸€ˆ¡%}Q%9e9AU}99}=18¤ˆp($$´µ½ÕĞµ‘¥È€ˆ¡%}Q%9e9AU}99}IU8¤½İ½É­±½…ˆ(%ÙÌ€µ™Õ±°ØĞ€µÍÙ•É¥±½œ€µ‘•‰Õ}…•ÍÌ­…±°€µ­‘ˆ€µÑ¥µ•Í…±”ôÅ¹Ì¼ÅÁÌ€­‘•™¥¹”­YLp($$­¥¹‘¥È¬¸¸¼¸¸¼¸¸½‰±½¬½½¹ÑÉ½°½…•¹Ğp($$­¥¹‘¥È¬¸¸¼¸¸¼¸¸½‰±½¬½‘µ„½…•¹Ğp($$­¥¹‘¥È¬¸¸½™¥áÑÕÉ•Ìp($$µ5‘¥Èô¡%}Q%9e9AU}99}IU8¤½ÍÉŒ€µÑ½ÀÑ‰}…¥}…•±}Íµ½­”€µ˜…¥}…•°¹˜p($$¸¸¼¸¸¼¸¸½‰±½¬½‘µ„½•¹Ø½…á¥}µ•µ½Éå}µ½‘•°¹ÍØ€¸¸½Ñˆ½Ñ‰}…¥}…•±}Íµ½­”¹ÍØp($$µ¼€¡%}Q%9e9AU}99}IU8¤½Í¥µØ€µ°€¡%}Q%9e9AU}99}IU8¤½½µÁ¥±”¹±½œ($¡%}Q%9e9AU}99}IU8¤½Í¥µØ€­¹Ñ‰}É…¹‘½µ}Í••ôÈÀÈØÄÀÈä€­%}I9=5}MLôÀp($$­%}MôÈÀÈØÄÀÈä€­1-}AI%=}9Lô¡1-}AI%=}9L¤€­%}Q%9e9AU}99}5Q p($$­%}Q%9e9AU}99}55=Idô¡%}Q%9e9AU}99}IU8¤½İ½É­±½…½¹µ…}¹¹}ÍÁ…¹µ•µ p($$­%}Q%9e9AU}99}aAQô¡%}Q%9e9AU}99}IU8¤½İ½É­±½…½¹µ…}¹¹}•áÁ•Ñ•¹µ•µ p($$µ°€¡%}Q%9e9AU}99}IU8¤½ÉÕ¸¹±½œ(%É•À€µÄ€y95}99}%9I9}AMLœ€¡%}Q%9e9AU}99}IU8¤½ÉÕ¸¹±½œ((Œ=ÁÑ¥½¹…°XÌÍÕ‰ÍåÍÑ•´ÍÑÉ•ÍÌè¥¹©•ĞÍ••‘•É•…½İÉ¥Ñ”M1YIH…Ğ„É…¹‘½´(Œ‰•…Ğ½˜µÕ±Ñ¤µ‰•…Ğ5‰ÕÉÍÑÌ…¹¡•¬½µÁ±•Ñ¥½¸Á±ÕÌa$‘É…¥¸µÑ¼µ¥‘±”¸)…¥}‘µ…}•ÉÉ½É}ÍÑÉ•ÍÌè…¥}½µÀ($¸½Í¥µØ€­¹Ñ‰}É…¹‘½µ}Í••ô‘íMô€­%}I9=5}MLôÀ€­%}Mô¡%}M¤p($$­1-}AI%=}9Lô¡1-}AI%=}9L¤€­%}5}II=I}MQIMLp($$µ°…¥}‘µ…}•ÉÉ½É}ÍÑÉ•ÍÌ¹±½œ((ŒÑ¥Ù¥Ñäµ…İ…É”Íµ½­”èÕÍ•Ì•á…Ñ±äÑ¡”Í…µ”Ñ½Àµ±•Ù•°É•É•ÍÍ¥½¸…Ì(Œ…¥}Íµ½­”°‰ÕĞİÉ¥Ñ•Ì„Y½¹±äİ¡•¸•áÁ±¥¥Ñ±äÉ•ÅÕ•ÍÑ•¸€½¹Ù•ÉĞ¥Ğ½¸(ŒÑ¡”Må¹½ÁÍåÌ1¥¹Õà•¹Ù¥É½¹µ•¹Ğİ¥Ñ µ…­”…¥}Íµ½­•}Í…¥™€‰•™½É”Á½İ•È¸)1-}AI%=}9L€üô€ÄÀ¸À)1-}AI%=}Q€èô€¡ÍÕ‰ÍĞ€¸±|°¡1-}AI%=}9L¤¥¹Ì)Y}%1€üô…¥}…•±}Íµ½­•|¡1-}AI%=}Q¤¹Ù)M%}%1€üô…¥}…•±}Íµ½­•|¡1-}AI%=}Q¤¹Í…¥˜)M%}}%1€üô€¡‰…Í•¹…µ”€¡M%}%1¤¥}‘Œ¹Í…¥˜)M%}%9MQ9€üôÑ‰}…¥}…•±}Íµ½­”½‘ÕĞ()…¥}Íµ½­•}Ùè…¥}½µÀ($¸½Í¥µØ€­¹Ñ‰}É…¹‘½µ}Í••ô‘íMô€­%}I9=5}MLô¡%}I9=5}ML¤€­%}Mô¡%}M¤€­1-}AI%=}9Lô¡1-}AI%=}9L¤€­Y}%1ô¡Y}%1¤€µ°…¥}…•±}Íµ½­•}Ù¹±½œ()…¥}Íµ½­•}Í…¥˜è…¥}Íµ½­•}Ù(%ÙÉÍ…¥˜€µ¥¹ÁÕĞ€¡Y}%1¤€µ½ÕÑÁÕĞ€¡M%}%1¤€µ¥¹ÍÑ…¹”€¡M%}%9MQ9¤($¡AeQ!=8¤€¸¸¼¸¸¼¸¸¼¸¸½Íå¸½¹½Éµ…±¥é•}Í…¥™}É½½Ğ¹Áä€´µ¥¹ÁÕĞ€¡M%}%1¤€´µ½ÕÑÁÕĞ€¡M%}}%1¤€´µÑ•ÍÑ‰•¹ Ñ‰}…¥}…•±}Íµ½­”€´µ‘ÕĞ‘ÕĞ€´µÑ½À…¥}…•±}Ñ½À()…¥}ÑÉ…¹Í™½Éµ•Èè…¥}½µÀ($¸½Í¥µØ€­¹Ñ‰}É…¹‘½µ}Í••ô‘íMô€­%}I9=5}MLôÀ€­%}Mô¡%}M¤€­1-}AI%=}9Lô¡1-}AI%=}9L¤€µ°…¥}ÑÉ…¹Í™½Éµ•È¹±½œ((ŒM¡½ÉĞ1¥¹Õà½YL…Ñ”è…±°‘¥É•Ñ•a$½5½ĞÑ•ÍÑÌİ¥Ñ É…¹‘½´½µÁÕÑ”(Œ…Í•Ì‘¥Í…‰±•¸UÍ”Ñ¡¥Ì…™Ñ•È…¸IQ0•‘¥Ğ‰•™½É”Ñ¡”Í••‘•É•É•ÍÍ¥½¸¸)…¥}ÅÕ¥¬è…¥}½µÀ($¸½Í¥µØ€­¹Ñ‰}É…¹‘½µ}Í••ô‘íMô€­%}I9=5}MLôÀ€­%}Mô¡%}M¤€­1-}AI%=}9Lô¡1-}AI%=}9L¤€µ°…¥}ÅÕ¥¬¹±½œ((Œ%¹Ñ••ÈÉ•™•É•¹”µ½‘•°¥Ì¥¹Ñ•¹Ñ¥½¹…±±ä„Í•Á…É…Ñ”…Ñ”è¥ĞÙ…±¥‘…Ñ•ÌÑ¡”(Œ‘½Õµ•¹Ñ•Ì½Ğ™¥á•µÁ½¥¹Ğ½¹ÑÉ…Ğİ¥Ñ¡½ÕĞ±…¥µ¥¹œIQ0½Ù•É…”¸)…¥}„Ñ}É•˜è($¡AeQ!=8¤€¸¸¼¸¸¼¸¸½‰±½¬½½µÁÕÑ”½µ…ÑÉ¥à½É•˜½…¥}„Í}É•™•É•¹”¹Áä€´µ…Í•Ì€¡%}I}ML¤€´µÍ••€¡%}I}M¤()…¥}ÁÉ•¡•¬è…¥}„Ñ}É•˜…¥}ÅÕ¥¬((Œ½ÕÍ•1¥¹Õà½YL…Ñ•Ì™½ÈÑ¡”Õ¹¥™¥•5…¹ÍÉ…Ñ¡Á…±¥¹”½IH…É‰¥Ñ•È¸)…¥}‘µ…}½µÀè(%ÙÌ€µ™Õ±°ØĞ€µÍÙ•É¥±½œ€µÑ¥µ•Í…±”ôÅ¹Ì¼Å¹Ì€­‘•™¥¹”­YLp($$µÑ½ÀÑ‰}…¥}…á¤ÄÈá}‘µ„€¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½‘µ„½…¥}…á¤ÄÈá}‘µ„¹Øp($$¸¸¼¸¸¼¸¸½‰±½¬½‘µ„½Ñˆ½Ñ‰}…¥}…á¤ÄÈá}‘µ„¹ÍØ€µ¼Í¥µÙ}‘µ„€µ°…¥}‘µ…}½µÀ¹±½œ()…¥}‘µ…}ÉÕ¸è…¥}‘µ…}½µÀ($¸½Í¥µÙ}‘µ„€µ°…¥}‘µ…}ÉÕ¸¹±½œ()…¥}ÍÁ…‘}…É‰}½µÀè(%ÙÌ€µ™Õ±°ØĞ€µÍÙ•É¥±½œ€µÑ¥µ•Í…±”ôÅ¹Ì¼Å¹Ì€­‘•™¥¹”­YLp($$µÑ½ÀÑ‰}…¥}ÍÁ…‘}…É‰¥Ñ•É}ÉÈ€¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½µ•µ½Éä½…¥}ÍÁ…‘}…É‰¥Ñ•È¹Øp($$¸¸¼¸¸¼¸¸½‰±½¬½ÍÁ…‘}…É‰¥Ñ•È½Ñˆ½Ñ‰}…¥}ÍÁ…‘}…É‰¥Ñ•É}ÉÈ¹ÍØ€µ¼Í¥µÙ}ÍÁ…‘}…Éˆp($$µ°…¥}ÍÁ…‘}…É‰}½µÀ¹±½œ()…¥}ÍÁ…‘}…É‰}ÉÕ¸è…¥}ÍÁ…‘}…É‰}½µÀ($¸½Í¥µÙ}ÍÁ…‘}…Éˆ€µ°…¥}ÍÁ…‘}…É‰}ÉÕ¸¹±½œ(%É•À€µÄ€œÌµ±¥•¹ĞÍÕÍÑ…¥¹•MAÉ½Õ¹µÉ½‰¥¸AMLÉ…¹ÑÌôÄÀ¼ÄÀ¼ÄÀµ…á}İ…¥ĞôÈœ…¥}ÍÁ…‘}…É‰}ÉÕ¸¹±½œñğp($%ì•¡¼€‰MA…É‰¥Ñ•È€Ìµ±¥•¹Ğ™…¥É¹•ÍÌµ…É­•Èµ¥ÍÍ¥¹œˆì•á¥Ğ€Äìô(%É•À€µÄ€M••‘•É•ÅÕ•ÍĞµµ½‘”MAIHAMLœ…¥}ÍÁ…‘}…É‰}ÉÕ¸¹±½œñğp($%ì•¡¼€‰MA…É‰¥Ñ•ÈÍ••‘•É•ÅÕ•ÍĞµµ½‘”™…¥É¹•ÍÌµ…É­•Èµ¥ÍÍ¥¹œˆì•á¥Ğ€Äìô(%É•À€µÄ€94½5MA½¹Ñ•¹Ñ¥½¸AML¹µ}É…¹ÑÌôØ‘µ…}±¥¹•}É…¹ÑÌôØœ…¥}ÍÁ…‘}…É‰}ÉÕ¸¹±½œñğp($%ì•¡¼€‰MA…É‰¥Ñ•È94½5½¹Ñ•¹Ñ¥½¸µ…É­•Èµ¥ÍÍ¥¹œˆì•á¥Ğ€Äìô(%É•À€µÄ€MÉ…Ñ¡Á…É•ÍÁ½¹Í”Á…É¥Ñä…±¥¹µ•¹ĞAMLœ…¥}ÍÁ…‘}…É‰}ÉÕ¸¹±½œñğp($%ì•¡¼€‰MA…É‰¥Ñ•ÈÉ•ÍÁ½¹Í”½Á…É¥Ñäµ…É­•Èµ¥ÍÍ¥¹œˆì•á¥Ğ€Äìô($¸½Í¥µÙ}ÍÁ…‘}…Éˆ€­MA}II}5=}e1LôÄÀÀÀÀ€µ°…¥}ÍÁ…‘}…É‰|ÄÁ­}ÉÕ¸¹±½œ(%É•À€µÄ€M••‘•É•ÅÕ•ÍĞµµ½‘”MAIHAMLå±•ÌôÄÀÀÀÀœ…¥}ÍÁ…‘}…É‰|ÄÁ­}ÉÕ¸¹±½œñğp($%ì•¡¼€‰MA…É‰¥Ñ•È€ÄÀÀÀÀµå±”Í••‘•É•ÅÕ•ÍĞµµ½‘”µ…É­•Èµ¥ÍÍ¥¹œˆì•á¥Ğ€Äìô((ŒMÑ…¹‘…±½¹”…É‰¥Ñ•È½‘”µ½Ù•É…”…ÁÑÕÉ”¸€-••À…±°•¹•É…Ñ•…ÉÑ¥™…ÑÌ¥¸(Œ…¸¥Í½±…Ñ•ÉÕ¸‘¥É•Ñ½ÉäÍ¼Ñ¡¥Ì…Ñ”‘½•Ì¹½Ğ½Ù•ÉİÉ¥Ñ”Ñ¡”™Õ¹Ñ¥½¹…°(ŒÍµ½­”•á•ÕÑ…‰±”½È¥ÑÌ±½Ì¸)MA}I	}=Y}IU8€üô€½ÑµÀ½¹µ…™½É•}ÍÁ…‘}…É‰¥Ñ•É}½Ù|¡Í¡•±°‘…Ñ”€¬•d•´•‘|• •4•L¤)MA}I	}=Y}5QI%L€èô±¥¹”­½¹­Ñ°­‰É…¹ ­…ÍÍ•ÉĞ((¹A!=9dè…¥}ÍÁ…‘}…É‰}½Ø)…¥}ÍÁ…‘}…É‰}½Øè(%Ñ•ÍĞ€„€µ”€ˆ¡MA}I	}=Y}IU8¤ˆ(%µ­‘¥È€µÀ€ˆ¡MA}I	}=Y}IU8¤ˆ(%€ˆ¡MA}I	}=Y}IU8¤ˆ€˜˜€¡YL¤€µ™Õ±°ØĞ€µÍÙ•É¥±½œ€µÑ¥µ•Í…±”ôÅ¹Ì¼Å¹Ì€­‘•™¥¹”­YLp($$µ´€¡MA}I	}=Y}5QI%L¤€µµ}‘¥È½Ù•É…”¹Ù‘ˆp($$µÑ½ÀÑ‰}…¥}ÍÁ…‘}…É‰¥Ñ•É}ÉÈ€¡UI%H¤¼¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½µ•µ½Éä½…¥}ÍÁ…‘}…É‰¥Ñ•È¹Øp($$¡UI%H¤¼¸¸¼¸¸¼¸¸½‰±½¬½ÍÁ…‘}…É‰¥Ñ•È½Ñˆ½Ñ‰}…¥}ÍÁ…‘}…É‰¥Ñ•É}ÉÈ¹ÍØp($$µ¼Í¥µØ€µ°½µÁ¥±”¹±½œ(%€ˆ¡MA}I	}=Y}IU8¤ˆ€˜˜€¸½Í¥µØ€­MA}II}5=}e1LôÄÀÀÀÀp($$µ´€¡MA}I	}=Y}5QI%L¤€µµ}‘¥È½Ù•É…”¹Ù‘ˆ€µ°ÉÕ¸¹±½œ(%É•À€µÄ€œÌµ±¥•¹ĞÍÕÍÑ…¥¹•MAÉ½Õ¹µÉ½‰¥¸AMLÉ…¹ÑÌôÄÀ¼ÄÀ¼ÄÀµ…á}İ…¥ĞôÈœ€ˆ¡MA}I	}=Y}IU8¤½ÉÕ¸¹±½œˆ(%É•À€µÄ€M••‘•É•ÅÕ•ÍĞµµ½‘”MAIHAMLå±•ÌôÄÀÀÀÀœ€ˆ¡MA}I	}=Y}IU8¤½ÉÕ¸¹±½œˆ(%É•À€µÄ€94½5MA½¹Ñ•¹Ñ¥½¸AML¹µ}É…¹ÑÌôØ‘µ…}±¥¹•}É…¹ÑÌôØœ€ˆ¡MA}I	}=Y}IU8¤½ÉÕ¸¹±½œˆ(%É•À€µÄ€MÉ…Ñ¡Á…É•ÍÁ½¹Í”Á…É¥Ñä…±¥¹µ•¹ĞAMLœ€ˆ¡MA}I	}=Y}IU8¤½ÉÕ¸¹±½œˆ(%É•À€µÄ€MA…É‰¥Ñ•ÈÕÉÍ½È™…±±‰…¬É•ÅÕ•ÍĞ™½ÉµÌAML…Í•ÌôÄÈœ€ˆ¡MA}I	}=Y}IU8¤½ÉÕ¸¹±½œˆ(%É•À€µÄ€MA…É‰¥Ñ•È‘•ÍÉ¥ÁÑ½È½½µÁ±•Ñ¥½¸ÁÉ¥½É¥Ñä…¹É•ÍÁ½¹Í”AMLœ€ˆ¡MA}I	}=Y}IU8¤½ÉÕ¸¹±½œˆ(%É•À€µÄ€MA…É‰¥Ñ•ÈÁÉ½Ñ•Ñ¥½¸µ•ÉÉ½ÈÉ•ÍÁ½¹Í”…±¥¹µ•¹ĞAMLœ€ˆ¡MA}I	}=Y}IU8¤½ÉÕ¸¹±½œˆ($¡UI¤€µ™Õ±°ØĞ€µ‘¥È€ˆ¡MA}I	}=Y}IU8¤½½Ù•É…”¹Ù‘ˆˆ€µ™½Éµ…ĞÑ•áĞp($$µÉ•Á½ÉĞ€ˆ¡MA}I	}=Y}IU8¤½ÕÉœˆ€µ±½œ€ˆ¡MA}I	}=Y}IU8¤½ÕÉœ¹±½œˆ($„É•À€µÄ€UA$µ9e1ñ•Í¥¸¹½Ğ±½…‘•œ€ˆ¡MA}I	}=Y}IU8¤½ÕÉœ¹±½œˆ(%Ñ•ÍĞ€µÌ€ˆ¡MA}I	}=Y}IU8¤½ÕÉœ½µ½‘¥¹™¼¹ÑáĞˆ(%É•À€µÄ€…¥±ÕÉ”€€€€€€€€€€€€€€€Àœ€ˆ¡MA}I	}=Y}IU8¤½ÕÉœ½…ÍÍ•ÉÑÌ¹ÑáĞˆ(%É•À€µÄ€%¹½µÁ±•Ñ”€€€€€€€€€€€€Àœ€ˆ¡MA}I	}=Y}IU8¤½ÕÉœ½…ÍÍ•ÉÑÌ¹ÑáĞˆ(%É•À€µÄ€]¥Ñ¡½ÕĞÑÑ•µÁÑÌ€€€€€€Àœ€ˆ¡MA}I	}=Y}IU8¤½ÕÉœ½…ÍÍ•ÉÑÌ¹ÑáĞˆ(%É•À€µÄ€U¹½Ù•É•€€€€€€€€€Àœ€ˆ¡MA}I	}=Y}IU8¤½ÕÉœ½…ÍÍ•ÉÑÌ¹ÑáĞˆ(%É•À€µÄ€5…Ñ¡•Ì€€€€€€€€€€€Èœ€ˆ¡MA}I	}=Y}IU8¤½ÕÉœ½…ÍÍ•ÉÑÌ¹ÑáĞˆ(%É•À€µÄ€…Á}¥‘±•}‘•½‘•}ÕÍ•Í}‘•™…Õ±Ñ}±¥•¹Ğœ€ˆ¡MA}I	}=Y}IU8¤½ÕÉœ½…ÍÍ•ÉÑÌ¹ÑáĞˆ(%É•À€µÄ€…Á}‰…¹­•‘}É•ÍÁ½¹Í•}µ•Ñ…‘…Ñ…}¥Í}Ù…±¥œ€ˆ¡MA}I	}=Y}IU8¤½ÕÉœ½…ÍÍ•ÉÑÌ¹ÑáĞˆ(%•¡¼€‰MA}I	%QI}=YI}AMLÉ•Á½ÉĞô¡MA}I	}=Y}IU8¤½ÕÉœˆ()…¥}ÕÁÉ…‘•}ÙÌè…¥}‘µ…}ÉÕ¸…¥}ÍÁ…‘}…É‰}ÉÕ¸…¥}ÅÕ¥¬((Œ½ÕÍ•YLÑ•ÍÑÌ¸€… Ñ…É•ĞÉ•…Ñ•Ì„Í•Á…É…Ñ”•á•ÕÑ…‰±”°-…¹±½œ°(ŒÍ¼„‘¥É•Ñ•™…¥±ÕÉ”…¸‰”¥¹ÍÁ•Ñ•¥¸Y•É‘¤İ¥Ñ¡½ÕĞÉ•‰Õ¥±‘¥¹œ…¥}Íµ½­”¸)YM}=UM€ôÙÌ€µ™Õ±°ØĞ€µÍÙ•É¥±½œ€µ‘•‰Õ}…•ÍÌ­…±°€µ­‘ˆ€µÑ¥µ•Í…±”ôÅ¹Ì¼Å¹Ì€­‘•™¥¹”­YL()…¥}„Ù}‘µ…}½µÀè($¡YM}=UM¤€µÑ½ÀÑ‰}…¥}…á¤ÄÈá}‘µ„€¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½‘µ„½…¥}…á¤ÄÈá}‘µ„¹Øp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½‘µ„½…¥}‘µ…}‰ÕÉÍÑ}Á±…¹¹•È¹Øp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½‘µ„½…¥}‘µ…}É•…‘}Í±½Ñ}ÑÉ…­•È¹Øp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½‘µ„½…¥}‘µ…}İÉ¥Ñ•}É•ÍÁ½¹Í•}ÑÉ…­•È¹Øp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½‘µ„½…¥}‘µ…}ÍÁ…‘}ÑÉ…¹Í™•É}…‘…ÁÑ•È¹Øp($$¸¸¼¸¸¼¸¸½‰±½¬½‘µ„½Ñˆ½Ñ‰}…¥}…á¤ÄÈá}‘µ„¹ÍØ€µ¼Í¥µÙ}„Ù}‘µ„€µ°…¥}„Ù}‘µ…}½µÀ¹±½œ()…¥}„Ù}‘µ…}ÉÕ¸è…¥}„Ù}‘µ…}½µÀ($¸½Í¥µÙ}„Ù}‘µ„€µ°…¥}„Ù}‘µ…}ÉÕ¸¹±½œ()…¥}„Ù}‘…Ñ…Á…Ñ¡Í}½µÀè($¡YM}=UM¤€µÑ½ÀÑ‰}…¥}„Ù}‘…Ñ…Á…Ñ¡Ìp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½µÁÕÑ”½¹¸½…¥}½¹ØÍàÍ}±¥¹•‰Õ™™•É}½É”¹Øp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½µÁÕÑ”½­Ø½…¥}­Ù}…¡•}•¹¥¹”¹Øp($$¸¸¼¸¸¼¸¸½‰±½¬½½µÁÕÑ”½¹¹}­Ø½Ñˆ½Ñ‰}…¥}„Ù}‘…Ñ…Á…Ñ¡Ì¹ÍØ€µ¼Í¥µÙ}„Ù}‘…Ñ…Á…Ñ¡Ì€µ°…¥}„Ù}‘…Ñ…Á…Ñ¡Í}½µÀ¹±½œ()…¥}„Ù}‘…Ñ…Á…Ñ¡Í}ÉÕ¸è…¥}„Ù}‘…Ñ…Á…Ñ¡Í}½µÀ($¸½Í¥µÙ}„Ù}‘…Ñ…Á…Ñ¡Ì€µ°…¥}„Ù}‘…Ñ…Á…Ñ¡Í}ÉÕ¸¹±½œ()…¥}„İ}ÙÌè…¥}„Ù}‘µ…}ÉÕ¸…¥}„Ù}‘…Ñ…Á…Ñ¡Í}ÉÕ¸…¥}ÍÁ…‘}…É‰}ÉÕ¸((ŒÈ¸ÈÕ¹¥Ğ…Ñ”™½ÈÑ¡”™½ÕÈ¥¹‘•Á•¹‘•¹Ğ‰…¹¬µ±½…°½¹ÑÉ½±±•ÉÌ¸(ŒQ¡¥Ì™½ÕÍ••á•ÕÑ…‰±”¡…Ì½…Í¥½¹…±±ä‰••¸É•µ½Ù•İ¡¥±”¥ÑÌYL€¹‘…¥‘¥È(Œ…¡”É•µ…¥¹Ì€¡™½È•á…µÁ±”…™Ñ•È„]M0½]¥¹‘½İÌ™¥±”Íå¹Œ¤¸€%¸Ñ¡…ĞÍÑ…Ñ”YL(ŒÍ…åÌÑ¡”‘•Í¥¸¥ÌÕ¹¡…¹•‰ÕĞ‘½•Ì¹½ĞÉ•É•…Ñ”Í¥µÙ}¹µ}„ÈÈ¸€±•…È½¹±ä(ŒÑ¡¥ÌÑ…É•ĞÌ•¹•É…Ñ•…¡”‰•™½É”½µÁ¥±”ì¥Ğ‘½•Ì¹½ĞÑ½Õ …¥}Íµ½­”¸)…¥}¹µ}„ÈÉ}½µÀè(%É´€µÉ˜Í¥µÙ}¹µ}„ÈÈÍ¥µÙ}¹µ}„ÈÈ¹‘…¥‘¥È($¡YM}=UM¤€µÑ½ÀÑ‰}…¥}‰…¹­•‘}¹µ}„ÈÈp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½µÁÕÑ”½¹´½…¥}‰…¹­}Á”¹Øp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½µÁÕÑ”½¹´½…¥}‰…¹­}±½…±}½¹ÑÉ½±±•È¹Øp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½µÁÕÑ”½¹´½…¥}‰…¹­•‘}¹µ}½É”¹Øp($$¸¸¼¸¸¼¸¸½‰±½¬½½µÁÕÑ”½¹´½Ñˆ½Ñ‰}…¥}‰…¹­•‘}¹µ}„ÈÈ¹ÍØ€µ¼Í¥µÙ}¹µ}„ÈÈ€µ°…¥}¹µ}„ÈÉ}½µÀ¹±½œ()…¥}¹µ}„ÈÉ}ÉÕ¸è…¥}¹µ}„ÈÉ}½µÀ($¸½Í¥µÙ}¹µ}„ÈÈ€µ°…¥}¹µ}„ÈÉ}ÉÕ¸¹±½œ()…¥}¹µ}„ÈÈè…¥}¹µ}„ÈÉ}ÉÕ¸((Œ½µÁ…É…‰±”YLµ¥É½‰•¹¡µ…É­Ìè•… È½Ì…Í”Á•É™½ÉµÌ€ØĞ©0%9Pà5Ì¸)…¥}¹µ}„É}•µÙ}‰•¹¡}½µÀè(%É´€µÉ˜Í¥µÙ}¹µ}„É}•µÙ}‰•¹ Í¥µÙ}¹µ}„É}•µÙ}‰•¹ ¹‘…¥‘¥È($¡YM}=UM¤€µÑ½ÀÑ‰}…¥}¹µ}„É}•µÙ}‰•¹ p($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½µÁÕÑ”½¹´½…¥}‰…¹­}Á”¹Øp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½µÁÕÑ”½¹´½…¥}‰…¹­}±½…±}½¹ÑÉ½±±•È¹Øp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½µÁÕÑ”½¹´½…¥}‰…¹­•‘}¹µ}½É”¹Øp($$¸¸¼¸¸¼¸¸½‰±½¬½½µÁÕÑ”½¹´½Ñˆ½Ñ‰}…¥}¹µ}„É}•µÙ}‰•¹ ¹ÍØ€µ¼Í¥µÙ}¹µ}„É}•µÙ}‰•¹ €µ°…¥}¹µ}„É}•µÙ}‰•¹¡}½µÀ¹±½œ()…¥}¹µ}„É}•µÙ}‰•¹¡}ÉÕ¸è…¥}¹µ}„É}•µÙ}‰•¹¡}½µÀ($¸½Í¥µÙ}¹µ}„É}•µÙ}‰•¹ €µ°…¥}¹µ}„É}•µÙ}‰•¹¡}ÉÕ¸¹±½œ()…¥}¹µ}„É}•µÙ}‰•¹ è…¥}¹µ}„É}•µÙ}‰•¹¡}ÉÕ¸((ŒM••‘•94½É…±”É•É•ÍÍ¥½¸¸I…¹‘½´Í¥¹•‰åÑ•Ì…É”•¹•É…Ñ•™É½´Ñ¡”(Œ…‘‘É•ÍÌ…¹Í••°Ñ¡•¸¥¹‘•Á•¹‘•¹Ñ±äÉ•‘Õ•‰äÑ¡”Ñ•ÍÑ‰•¹ É•™•É•¹”¸)95}I9=5}ML€üô€ÈÀÈØÄÀÈÄ€ÈÀÈØÄÀÈÈ€ÈÀÈØÄÀÈÌ)¥™¹‘•˜95}I9=5}=UQ}%H)95}I9=5}=UQ}%H€èô€½ÑµÀ½¹µ…™½É•}¹µ}É…¹‘½µ|¡Í¡•±°‘…Ñ”€¬•d•´•‘|• •4•L¤)•¹‘¥˜)…¥}¹µ}É…¹‘½µ}½µÁ¥±”è(%µ­‘¥È€µÀ€¡95}I9=5}=UQ}%H¤($¡YM}=UM¤€µ5‘¥Èô¡95}I9=5}=UQ}%H¤½ÍÉŒ€µÑ½ÀÑ‰}…¥}‰…¹­•‘}¹µ}É…¹‘½´p($$µ´±¥¹”­½¹­™Í´­‰É…¹ p($$µµ}¡¥•È€¡UI%H¤¼¸¸¼¸¸¼¸¸½‰±½¬½½µÁÕÑ”½¹´½Ñˆ½¹µ}É…¹‘½´¹µ}¡¥•Èp($$µµ}‘¥È€¡95}I9=5}=UQ}%H¤½½Ù•É…”¹Ù‘ˆp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½µÁÕÑ”½¹´½…¥}‰…¹­}Á”¹Øp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½µÁÕÑ”½¹´½…¥}‰…¹­}±½…±}½¹ÑÉ½±±•È¹Øp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½µÁÕÑ”½¹´½…¥}‰…¹­•‘}¹µ}½É”¹Øp($$¸¸¼¸¸¼¸¸½‰±½¬½½µÁÕÑ”½¹´½Ñˆ½Ñ‰}…¥}‰…¹­•‘}¹µ}É…¹‘½´¹ÍØp($$µ¼€¡95}I9=5}=UQ}%H¤½Í¥µØ€µ°€¡95}I9=5}=UQ}%H¤½½µÁ¥±”¹±½œ((¹A!=9dè…¥}¹µ}É…¹‘½µ}½µÁ¥±”…¥}¹µ}É…¹‘½µ}É•É•ÍÌ)…¥}¹µ}É…¹‘½µ}É•É•ÍÌè…¥}¹µ}É…¹‘½µ}½µÁ¥±”(%Í•Ğ€µ”ì™½ÈÍ••¥¸€¡95}I9=5}ML¤ì‘¼p($$¡95}I9=5}=UQ}%H¤½Í¥µØ€­Mô‘Í••€µ´±¥¹”­½¹­™Í´­‰É…¹ p($$$µµ}‘¥È€¡95}I9=5}=UQ}%H¤½½Ù•É…”¹Ù‘ˆ€µµ}¹…µ”¹µ}Í••‘|‘Í••p($$$µ°€¡95}I9=5}=UQ}%H¤½ÉÕ¹}Í••‘|‘Í••¹±½œìp($%É•À€µÄ€‰y95}I9=5}AML½±‘•¹}…Í•ÌôÄÜ™…Õ±ÑÌôàÁ¡…Í•}…‰½ÉĞôØÁ¡…Í•}É•Í•ĞôØ±…Ñ•}™…Õ±ÑÌôÄÉ•Í•Ñ}™…Õ±Ñ}½µ‰¼ôÄÉ•Í•Ñ}É•½Ù•ÉäôÄİ…¥Ñ}„ôÄÁÉ•™•Ñ¡}‰…­ÁÉ•ÍÍÕÉ”ôÄÍÑ…‰±•}ÍÑ…±°ôÄÉ•ÍÁ½¹Í•Í}‘É…¥¹•ôÄ™…ÍÑ}É•ÍÁ½¹Í”ôÄÍ••ô‘Í••ˆ€¡95}I9=5}=UQ}%H¤½ÉÕ¹}Í••‘|‘Í••¹±½œìp(%‘½¹”()…¥}Ñ•¹Í½É}„Í}•µµ}‰•¹¡}½µÀè(%É´€µÉ˜Í¥µÙ}Ñ•¹Í½É}„Í}•µµ}‰•¹ Í¥µÙ}Ñ•¹Í½É}„Í}•µµ}‰•¹ ¹‘…¥‘¥È($¡YM}=UM¤€µÑ½ÀÑ‰}…¥}Ñ•¹Í½É}„Í}•µµ}‰•¹ p($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½µÁÕÑ”½µ…ÑÉ¥à½…¥}Ñ•¹Í½É}µ…ÑÉ¥á}‘…Ñ…Á…Ñ ¹Øp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½µÁÕÑ”½µ…ÑÉ¥à½…¥}Ñ•¹Í½É}µ…ÑÉ¥á}…ÉÉ…ä¹ÍØp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½µÁÕÑ”½µ…ÑÉ¥à½…¥}Ñ•¹Í½É}µ…ÑÉ¥á}½É”¹Øp($$¸¸¼¸¸¼¸¸½‰±½¬½½µÁÕÑ”½µ…ÑÉ¥à½Ñˆ½Ñ‰}…¥}Ñ•¹Í½É}„Í}•µµ}‰•¹ ¹ÍØ€µ¼Í¥µÙ}Ñ•¹Í½É}„Í}•µµ}‰•¹ €µ°…¥}Ñ•¹Í½É}„Í}•µµ}‰•¹¡}½µÀ¹±½œ()…¥}Ñ•¹Í½É}„Í}•µµ}‰•¹¡}ÉÕ¸è…¥}Ñ•¹Í½É}„Í}•µµ}‰•¹¡}½µÀ($¸½Í¥µÙ}Ñ•¹Í½É}„Í}•µµ}‰•¹ €µ°…¥}Ñ•¹Í½É}„Í}•µµ}‰•¹¡}ÉÕ¸¹±½œ()…¥}Ñ•¹Í½É}„Í}•µµ}‰•¹ è…¥}Ñ•¹Í½É}„Í}•µµ}‰•¹¡}ÉÕ¸()…¥}¹µ}½µÁ…É”è…¥}¹µ}„É}•µÙ}‰•¹ …¥}Ñ•¹Í½É}„Í}•µµ}‰•¹ ((Œ94Í¥¹½™˜…Ñ”èµ¥É½…É¡¥Ñ•ÑÕÉ”Ñ¡É½Õ¡ÁÕĞ°MA…É‰¥ÑÉ…Ñ¥½¸Õ¹‘•È(Œ94½5½¹Ñ•¹Ñ¥½¸°Ñ¡•¸Ñ¡”™Õ±°a$½5½½µÁÕÑ”Íµ½­”É•É•ÍÍ¥½¸¸)…¥}¹µ}Í¥¹½™˜è…¥}¹µ}½µÁ…É”…¥}ÍÁ…‘}…É‰}ÉÕ¸…¥}Íµ½­”()…¥}…Íå¹}™¥™½}½µÀè($¡YM}=UM¤€µÑ½ÀÑ‰}…¥}…Íå¹}™¥™¼p($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½¹ÑÉ½°½‘Œ½…¥}…Íå¹}™¥™¼¹Øp($$¸¸¼¸¸¼¸¸½‰±½¬½‘Œ½Ñˆ½Ñ‰}…¥}…Íå¹}™¥™¼¹ÍØ€µ¼Í¥µÙ}…Íå¹}™¥™¼€µ°…¥}…Íå¹}™¥™½}½µÀ¹±½œ()…¥}…Íå¹}™¥™½}ÉÕ¸è…¥}…Íå¹}™¥™½}½µÀ($¸½Í¥µÙ}…Íå¹}™¥™¼€µ°…¥}…Íå¹}™¥™½}ÉÕ¸¹±½œ()…¥}…Íå¹}™¥™¼è…¥}…Íå¹}™¥™½}ÉÕ¸()…¥}…Íå¹}™¥™½}É…¹‘½µ}½µÀè($¡YM}=UM¤€µÑ½ÀÑ‰}…¥}…Íå¹}™¥™½}É…¹‘½´p($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½¹ÑÉ½°½‘Œ½…¥}…Íå¹}™¥™¼¹Øp($$¸¸¼¸¸¼¸¸½‰±½¬½‘Œ½Ñˆ½Ñ‰}…¥}…Íå¹}™¥™½}É…¹‘½´¹ÍØ€µ¼Í¥µÙ}…Íå¹}™¥™½}É…¹‘½´€µ°…¥}…Íå¹}™¥™½}É…¹‘½µ}½µÀ¹±½œ()…¥}…Íå¹}™¥™½}É…¹‘½µ}ÉÕ¸è…¥}…Íå¹}™¥™½}É…¹‘½µ}½µÀ($¸½Í¥µÙ}…Íå¹}™¥™½}É…¹‘½´€­Mô¡%}M¤€µ°…¥}…Íå¹}™¥™½}É…¹‘½µ}ÉÕ¸¹±½œ()…¥}…Íå¹}™¥™½}É…¹‘½´è…¥}…Íå¹}™¥™½}É…¹‘½µ}ÉÕ¸()…¥}…Íå¹}™¥™½}É•Í•Ñ}½µÀè($¡YM}=UM¤€µÑ½ÀÑ‰}…¥}…Íå¹}™¥™½}É•Í•Ğp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½¹ÑÉ½°½‘Œ½…¥}…Íå¹}™¥™¼¹Øp($$¸¸¼¸¸¼¸¸½‰±½¬½‘Œ½Ñˆ½Ñ‰}…¥}…Íå¹}™¥™½}É•Í•Ğ¹ÍØ€µ¼Í¥µÙ}…Íå¹}™¥™½}É•Í•Ğ€µ°…¥}…Íå¹}™¥™½}É•Í•Ñ}½µÀ¹±½œ()…¥}…Íå¹}™¥™½}É•Í•Ñ}ÉÕ¸è…¥}…Íå¹}™¥™½}É•Í•Ñ}½µÀ($¸½Í¥µÙ}…Íå¹}™¥™½}É•Í•Ğ€µ°…¥}…Íå¹}™¥™½}É•Í•Ñ}ÉÕ¸¹±½œ()…¥}…Íå¹}™¥™½}É•Í•Ğè…¥}…Íå¹}™¥™½}É•Í•Ñ}ÉÕ¸()…¥}ÑÉ±}½µÁÕÑ•}‘}½µÀè($¡YM}=UM¤€µÑ½ÀÑ‰}…¥}ÑÉ±}½µÁÕÑ•}‘Œp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½¹ÑÉ½°½‘Œ½…¥}…Íå¹}™¥™¼¹Øp($$¸¸¼¸¸¼¸¸¼¸¸½ÉÑ°½½¹ÑÉ½°½‘Œ½…¥}ÑÉ±}½µÁÕÑ•}‘Œ¹Øp($$¸¸¼¸¸¼¸¸½‰±½¬½‘Œ½Ñˆ½Ñ‰}…¥}ÑÉ±}½µÁÕÑ•}‘Œ¹ÍØ€µ¼Í¥µÙ}ÑÉ±}½µÁÕÑ•}‘Œ€µ°…¥}ÑÉ±}½µÁÕÑ•}‘}½µÀ¹±½œ()…¥}ÑÉ±}½µÁÕÑ•}‘}ÉÕ¸è…¥}ÑÉ±}½µÁÕÑ•}‘}½µÀ($¸½Í¥µÙ}ÑÉ±}½µÁÕÑ•}‘Œ€µ°…¥}ÑÉ±}½µÁÕÑ•}‘}ÉÕ¸¹±½œ()…¥}ÑÉ±}½µÁÕÑ•}‘Œè…¥}ÑÉ±}½µÁÕÑ•}‘}ÉÕ¸()±•…¸è(%É´€µÉ˜ÍÉŒÍ¥µØ¨€¨¹±½œÕ±¤¹­•ä€¨¹ÙÁÙ}¡‘ÉÌ¹ Y¨¹½Ù…Ì¨€¨¹‘…¥‘¥È€¨¹Ù‘ˆ€¨¹­•ä(
