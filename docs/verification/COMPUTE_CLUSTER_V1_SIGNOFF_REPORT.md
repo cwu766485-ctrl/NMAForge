@@ -9,6 +9,7 @@
 | Item | Frozen identity |
 |---|---|
 | Product RTL candidate | `f916874a9ce60741a4516eaf9e33ebcae4a676c2` |
+| Latest top-level DV test SHA | `f24c5383fad511c8b2e1132c1157942807994759` (R54; DV-only, product RTL unchanged) |
 | Prior reviewed product baseline | `6848a414eaeaa05cf9e1411cf55d9d27333208a6` |
 | Latest published closeout snapshot before this follow-up | `fc370aad6b8360af9affb52cb30909ec97d79be3` |
 | Review branch | `work/compute-cluster-kv-overflow-20261030` |
@@ -29,7 +30,7 @@ The Execution RTM maps all 38 requirements (`REQ-CL-001..028`, `REQ-PC-001..010`
 | BLOCKED_SPEC | 0 | No unresolved specification blocker remains in the current frozen contract |
 | NOT_RUN | 0 | Every requirement has a recorded disposition; this does not mean every test ran |
 
-R46/R47 were historical `BLOCKED_ENV` attempts; R48 exposed a testbench coverage-counter reset issue; R49 resolves that issue for the scoped Matrix Line contract. R50 passes on its exact published closeout SHA. R52 passes 13 legal Scalar INT8 Golden cases on each of three clean-worktree seeds. R51's reserved-activation testpoint is superseded and excluded. R53 passes ten KV address/configuration rejection bins and the final legal SPAD word round trip on three clean seeds, but the overall 38-requirement disposition remains 24 PASS-SCOPED / 14 PARTIAL.
+R46/R47 were historical `BLOCKED_ENV` attempts; R48 exposed a testbench coverage-counter reset issue; R49 resolves that issue for the scoped Matrix Line contract. R50 passes on its exact published closeout SHA. R52 passes 13 legal Scalar INT8 Golden cases on each of three clean-worktree seeds. R51's reserved-activation testpoint is superseded and excluded. R53 passes ten KV address/configuration rejection bins and the final legal SPAD word round trip on three clean-worktree seeds. R54 passes the real-top KV Protection-denial and completion slice, plus clean Top Smoke and a 20-case seeded run. The overall 38-requirement disposition remains 24 PASS-SCOPED / 14 PARTIAL.
 
 ## Review findings
 
@@ -43,13 +44,13 @@ R46/R47 were historical `BLOCKED_ENV` attempts; R48 exposed a testbench coverage
 | Matrix Line output | SPEC v1.5 freezes aligned full-`WSTRB` Line writes, scalar fallback for 4-byte-aligned non-Line-aligned output, protection-prefix behavior, and partial/zero WSTRB as unsupported. `MATRIX-LINE-001` checks these interface rules plus stall stability | R49 passes three seeds; each records 312 stable stalls, full WSTRB/alignment, fallback and protection checks, and reference-memory comparison. Scoped Line contract is closed; this does not close the broader Matrix requirement rows |
 | SVA and compile diagnostics | R40/R15 provide non-vacuity and AXI assertion evidence for their named properties; R50 has no UVM severity or compile errors | R50 compute-only AR/AW stall-to-accept cover bins have zero matches (W has one); the separate R15 E2E profile supplies 3/3 AXI stall covers. Top Smoke keeps one `LOOP-REROLL-ENABLED` fixture warning. Evidence does not cover every requester/fault/backpressure combination |
 | Descriptor and scalar numeric boundaries | R52 checks the common Scalar INT8 arithmetic semantics across 13 legal VDOT/GEMV/GEMM Golden cases per seed, with 60 output words checked on three seeds | `OPEN-NUM-01` closes within this common arithmetic scope; legacy Conv and broader `REQ-CL-020` opcode/shape/fault coverage remain PARTIAL, as do descriptor boundary rules |
-| KV address and alignment boundaries | R53 checks ten invalid arithmetic/alignment classes per seed plus legal `0x7fffc` read/write against the memory oracle on three exact-SHA seeds | SPEC v1.7 overflow/alignment slice is covered 11/11 per seed; raw KV FSM remains 11/15 transitions and top-level Protection-region denial is open |
+| KV address and Protection | R53 checks ten invalid arithmetic/alignment classes per seed plus legal `0x7fffc` read/write; R54 checks a real-top Protection denial, KV owner/error completion, and sentinel preservation | SPEC v1.7 overflow/alignment slice is covered 11/11 per seed; R54 directed group passes 4/4 points. Raw KV FSM remains 11/15 transitions; broader ownership, stride/alias, and Engine descriptor contracts remain open |
 
 ## Clean replay status
 
 The candidate SHA passed the previously recorded clean R40–R45 campaigns: six-seed seven-engine UVM, 25/25 checker-sensitivity mutations, 165/165 Matrix size/ablation checks, pinned TinyNPU paired cases, Top Smoke and Digits inference. Those passes remain valid for their named sources and scope.
 
-The latest published closeout snapshot was checked out into a clean worktree. The initial R46 attempt was license-blocked; after license recovery R50 passed six UVM seeds and Top Smoke at that exact published SHA. R48 exposed a testbench aggregate-counter reset issue, fixed and verified by R49 on three seeds. R52 passed on a detached clean worktree fixed at test commit `dde7806`; it exercises only legal Scalar INT8 activation values and the common arithmetic path without changing product RTL. R51's reserved activation=3 bin is explicitly excluded. R53 then passed on a detached clean worktree at exact product/test/SPEC SHA `f916874`: three KV seeds, 11/11 directed KV address testpoints per seed, clean `ai_smoke`, and 20-case seeded top `ai_run`. Its DUT-only KV URG is line/condition/FSM/branch `100/98.77/73.33/96.97%`; four transitions remain unhit without an unreachable proof. R50's focused compute-only SVA results and the retained Top Smoke fixture warning are explicitly recorded in the RTM. Logs and exact commands are indexed in the [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md), [R52 numeric report](COMPUTE_CLUSTER_SCALAR_INT8_NUMERIC_R52.md), and [R53 KV report](COMPUTE_CLUSTER_KV_ADDRESS_R53.md).
+The latest published closeout snapshot was checked out into a clean worktree. The initial R46 attempt was license-blocked; after license recovery R50 passed six UVM seeds and Top Smoke at that exact published SHA. R48 exposed a testbench aggregate-counter reset issue, fixed and verified by R49 on three seeds. R52 passed on a detached clean worktree fixed at test commit `dde7806`; it exercises only legal Scalar INT8 activation values and the common arithmetic path without changing product RTL. R51's reserved activation=3 bin is explicitly excluded. R53 then passed on a detached clean worktree at exact product/test/SPEC SHA `f916874`: three KV seeds, 11/11 directed KV address testpoints per seed, clean `ai_smoke`, and 20-case seeded top `ai_run`. R54 passed at exact top-test SHA `f24c538`: real-top KV source-read/Protection-denied-write ownership and completion checks, clean `ai_smoke`, and the same 20-case seeded top run. Its compile retains the existing fixture `LOOP-REROLL-ENABLED` warning. The R53 DUT-only KV URG is line/condition/FSM/branch `100/98.77/73.33/96.97%`; four transitions remain unhit without an unreachable proof. R50's focused compute-only SVA results are explicitly recorded in the RTM. Logs and exact commands are indexed in the [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md), [R52 numeric report](COMPUTE_CLUSTER_SCALAR_INT8_NUMERIC_R52.md), [R53 KV report](COMPUTE_CLUSTER_KV_ADDRESS_R53.md), and [R54 KV Protection report](COMPUTE_CLUSTER_KV_PROTECTION_R54.md).
 
 ## Sign-off decision and exit conditions
 
@@ -59,7 +60,7 @@ Before an independent review can consider sign-off, the open items must be close
 
 1. Complete legal fault/reset phase crosses and production-top shared-SPAD ownership cases, or document approved bounded exclusions.
 2. Qualify the coordinated reset/epoch contract against the selected external fabric, or attach its approved compliance review.
-3. Freeze and test remaining descriptor boundaries; R52 closes the common Scalar INT8 arithmetic contract within its legal VDOT/GEMV/GEMM subset, and R53 closes the KV 32-bit overflow/alignment slice. Legacy Conv, other Engine descriptor limits and top-level KV Protection verification remain open.
+3. Freeze and test remaining descriptor boundaries; R52 closes the common Scalar INT8 arithmetic contract within its legal VDOT/GEMV/GEMM subset, R53 closes the KV 32-bit overflow/alignment slice, and R54 closes one top-level KV Protection-denial path. Legacy Conv, other Engine descriptor limits and broader shared-owner/fault coverage remain open.
 4. Review all 38 RTM rows and their evidence paths with an independent reviewer.
 
 PPA and full pretrained-model deployment are outside this Functional DV decision and remain unclaimed.
@@ -72,5 +73,6 @@ PPA and full pretrained-model deployment are outside this Functional DV decision
 - [UVM testplan](COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md)
 - [Scalar INT8 R52 evidence](COMPUTE_CLUSTER_SCALAR_INT8_NUMERIC_R52.md)
 - [KV address R53 evidence](COMPUTE_CLUSTER_KV_ADDRESS_R53.md)
+- [KV Protection R54 evidence](COMPUTE_CLUSTER_KV_PROTECTION_R54.md)
 - [Compute Cluster SPEC v1.6](../spec/COMPUTE_CLUSTER_SPEC_ZH.md)
 - [Verification matrix](../../dv/VERIFICATION_MATRIX.md)

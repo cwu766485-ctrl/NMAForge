@@ -413,7 +413,7 @@ Functional Coverage / SVA / URG
 | 编号 | 状态 | 解除阻塞所需证据 |
 |---|---|---|
 | OPEN-CL-003 | P0 部分 OPEN | 非 FP 在途请求深度、Abort/Reset drain/restart 时序、Response ownership 波形与断言证据 |
-| OPEN-CL-002 | P1 OPEN，KV 地址/对齐子项按 v1.7/R53 完成定向收口 | 其他 Engine 的 validator × opcode 地址/长度/stride/alias 合同、KV Protection-region top-level denial 和剩余边界组合仍需正式定义与验证 |
+| OPEN-CL-002 | P1 OPEN，KV 地址/对齐子项按 v1.7/R53、KV top Protection denial 按 R54 完成定向验证 | 其他 Engine 的 validator × opcode 地址/长度/stride/alias 合同及 KV 剩余边界组合仍需正式定义与验证 |
 | OPEN-CL-004 | **Closed scoped by v1.5/R49** | Matrix Line full-strobe/alignment/fallback/protection checker and reference-memory slice pass on three seeds; broader REQ-CL-010/022 remain partial |
 | CL-COV-006 | P1 PARTIAL | 依 v1.4 固定优先级 oracle，补齐合法 Engine × Fault × Phase × committed-prefix checker；不可达及接口不提供的故障组合单列 disposition |
 | OPEN-NUM-01 | **Closed scoped by v1.6/R52** | Legal-activation VDOT/GEMV/GEMM common arithmetic contract and independent edge campaign pass; R51 reserved-activation stimulus is excluded; legacy Conv and broader opcode/shape coverage remain partial under REQ-CL-020 / CL-COV-003 |
