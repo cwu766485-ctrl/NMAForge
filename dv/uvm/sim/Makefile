@@ -166,6 +166,9 @@ uvm_mixed_precision_ddr_e2e_axi_stalls: uvm_compile
 	@grep -q '\[MIXED_E2E_AXI_STALL\].*phase=post_reset ar_gap_cfg=[0-3] aw_gap_cfg=[0-3] read_gap_cfg=[0-3] ready_gap_cfg=[0-3] txn_jitter=1' uvm_run_ai_mixed_precision_ddr_e2e_axi_stalls.log || { echo "ERROR: post-reset per-transaction AXI jitter configuration marker missing"; exit 1; }
 	@grep -q '\[AXI_MEM_ADDR_STALL\] channel=AR configured=[1-3] observed=[1-9][0-9]*' uvm_run_ai_mixed_precision_ddr_e2e_axi_stalls.log || { echo "ERROR: ARREADY address backpressure was not exercised"; exit 1; }
 	@grep -q '\[AXI_MEM_ADDR_STALL\] channel=AW configured=[1-3] observed=[1-9][0-9]*' uvm_run_ai_mixed_precision_ddr_e2e_axi_stalls.log || { echo "ERROR: AWREADY address backpressure was not exercised"; exit 1; }
+	@grep -Eq 'c_ar_stall_then_accept, [0-9]+ attempts, [1-9][0-9]* match' uvm_run_ai_mixed_precision_ddr_e2e_axi_stalls.log || { echo "ERROR: AR stall-to-accept SVA cover was not hit"; exit 1; }
+	@grep -Eq 'c_aw_stall_then_accept, [0-9]+ attempts, [1-9][0-9]* match' uvm_run_ai_mixed_precision_ddr_e2e_axi_stalls.log || { echo "ERROR: AW stall-to-accept SVA cover was not hit"; exit 1; }
+	@grep -Eq 'c_w_stall_then_accept, [0-9]+ attempts, [1-9][0-9]* match' uvm_run_ai_mixed_precision_ddr_e2e_axi_stalls.log || { echo "ERROR: W stall-to-accept SVA cover was not hit"; exit 1; }
 	@grep -q '\[MIXED_E2E_ACTIVE_RESET_PASS\]' uvm_run_ai_mixed_precision_ddr_e2e_axi_stalls.log || { echo "ERROR: active-compute reset check missing"; exit 1; }
 	@grep -q '\[MIXED_E2E_DDR_INDEPENDENT_RESET_PASS\]' uvm_run_ai_mixed_precision_ddr_e2e_axi_stalls.log || { echo "ERROR: DDR service across accelerator-only reset check missing"; exit 1; }
 	@grep -q '\[MIXED_E2E_DMA_RESET_PASS\]' uvm_run_ai_mixed_precision_ddr_e2e_axi_stalls.log || { echo "ERROR: outstanding-DMA reset check missing"; exit 1; }
