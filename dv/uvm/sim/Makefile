@@ -72,6 +72,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		test "$$(grep -c ' \[CLUSTER_ENGINE_ABORT_CASE_PASS\] engine=' "$$log")" -eq 7 || { echo "ERROR: expected all seven real-engine accepted-read Abort cases in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_SFU_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: SFU accepted-write Abort prefix check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CONV_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: Conv accepted-write Abort prefix check missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_KV_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: KV accepted-write Abort prefix check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_MATRIX_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: Matrix accepted-write Abort prefix check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_MATRIX_LINE_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: Matrix aligned Line accepted-write Abort prefix check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CNM_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: CNM accepted-write Abort prefix check missing in $$log"; exit 1; }; \

@@ -2102,6 +2102,151 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
+    task automatic run_kv_abort_write_prefix(input int unsigned seed);
+        bit [31:0] expected_output[0:7];
+        bit [31:0] write_addr[0:7];
+        bit [31:0] write_data[0:7];
+        bit [31:0] desc_base;
+        bit [31:0] completion_base;
+        bit [31:0] src;
+        bit [31:0] dst;
+        bit [31:0] cache_offset;
+        bit [31:0] sentinel;
+        bit [31:0] source_word;
+        bit [15:0] task_id;
+        int unsigned accepted_write_count;
+        int unsigned accepted_reads;
+        int unsigned returned_reads;
+        int unsigned poll;
+        int unsigned word_idx;
+        bit first_write_seen;
+        bit abort_seen;
+        bit monitor_done;
+
+        desc_base = CLUSTER_CONTRACT_CMDQ;
+        completion_base = 32'h0000_5e00;
+        src = 32'h0004_d500;
+        dst = 32'h0004_d600;
+        // aux0={head=1,token=2}, token stride=16 B, head stride=64 B.
+        cache_offset = (32'd2 * 32'd16) + (32'd1 * 32'd64);
+        sentinel = 32'hbad0_7a00;
+        task_id = 16'h0775;
+        accepted_write_count = 0;
+        accepted_reads = 0;
+        returned_reads = 0;
+        first_write_seen = 1'b0;
+        abort_seen = 1'b0;
+        monitor_done = 1'b0;
+
+        // KV_WRITE copies eight signed payload words to one head/token cache
+        // slice. Guard words immediately before and after the slice detect an
+        // address-offset or overrun error independently of the accepted prefix.
+        for (word_idx = 0; word_idx < 8; word_idx++) begin
+            source_word = 32'h5a00_0000 ^ (word_idx * 32'h0101_0101);
+            expected_output[word_idx] = source_word;
+            spad_write(src + (word_idx << 2), source_word);
+        end
+        for (word_idx = 0; word_idx < 10; word_idx++)
+            spad_write(dst + cache_offset - 32'd4 + (word_idx << 2),
+                       sentinel ^ word_idx);
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            spad_write(completion_base + (word_idx << 2),
+                       32'h7a50_0000 | word_idx);
+
+        write_cluster_desc(desc_base, 8'h43, task_id, src, 32'd0, dst,
+                           16'd0, 16'd0, 16'd8, {16'd1,16'd2},
+                           32'd16, 32'd64, 32'd0, 8'd5);
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        fork
+            begin : kv_abort_prefix_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.dut_abort_active)
+                        abort_seen = 1'b1;
+                    if (compute_vif.engine_req_valid[6] &&
+                        compute_vif.engine_req_ready[6]) begin
+                        if (compute_vif.engine_req_write[6]) begin
+                            if (accepted_write_count >= 8)
+                                `uvm_fatal("CLUSTER_KV_ABORT_PREFIX",
+                                    "KV accepted more cache writes than its 8-word descriptor")
+                            write_addr[accepted_write_count] =
+                                compute_vif.engine_req_addr[6*32 +: 32];
+                            write_data[accepted_write_count] =
+                                compute_vif.engine_req_wdata[6*32 +: 32];
+                            accepted_write_count++;
+                            first_write_seen = 1'b1;
+                        end else begin
+                            accepted_reads++;
+                        end
+                    end
+                    if (compute_vif.rsp_valid &&
+                        (compute_vif.rsp_client == 3'd2))
+                        returned_reads++;
+                end
+            end
+            begin : abort_after_first_kv_write
+                poll = 0;
+                while (!first_write_seen && poll < 50000) begin
+                    @(posedge compute_vif.aclk);
+                    poll++;
+                end
+                if (!first_write_seen)
+                    `uvm_fatal("CLUSTER_KV_ABORT_PREFIX",
+                        "KV did not accept a cache write before the Abort timeout")
+                axil_write(REG_ABORT, 32'd1);
+                wait_cpl_tail(32'd1);
+                monitor_done = 1'b1;
+            end
+        join
+
+        wait_spad_idle();
+        if (!abort_seen)
+            `uvm_fatal("CLUSTER_KV_ABORT_PREFIX",
+                "software Abort was not observed while KV cache write was active")
+        if (accepted_write_count == 0 || accepted_write_count >= 8)
+            `uvm_fatal("CLUSTER_KV_ABORT_PREFIX", $sformatf(
+                "Abort did not cut a non-empty proper KV output prefix: writes=%0d",
+                accepted_write_count))
+        if (accepted_reads == 0 || returned_reads != accepted_reads)
+            `uvm_fatal("CLUSTER_KV_ABORT_PREFIX", $sformatf(
+                "KV read responses did not drain: accepted=%0d returned=%0d",
+                accepted_reads, returned_reads))
+
+        expect_spad(completion_base + 32'h00, {16'd0, task_id},
+                    "KV accepted-write Abort task ID");
+        expect_spad(completion_base + 32'h04, 32'h0000_0032,
+                    "KV accepted-write Abort status/code");
+        expect_spad(dst + cache_offset - 32'd4, sentinel,
+                    "KV Abort preserved pre-slice guard");
+        for (word_idx = 0; word_idx < accepted_write_count; word_idx++) begin
+            if (write_addr[word_idx] !== dst + cache_offset + (word_idx << 2))
+                `uvm_fatal("CLUSTER_KV_ABORT_PREFIX", $sformatf(
+                    "non-prefix KV cache address index=%0d expected=0x%08h actual=0x%08h",
+                    word_idx, dst + cache_offset + (word_idx << 2), write_addr[word_idx]))
+            if (write_data[word_idx] !== expected_output[word_idx])
+                `uvm_fatal("CLUSTER_KV_ABORT_PREFIX", $sformatf(
+                    "Golden mismatch in accepted KV prefix index=%0d expected=0x%08h actual=0x%08h",
+                    word_idx, expected_output[word_idx], write_data[word_idx]))
+            expect_spad(dst + cache_offset + (word_idx << 2), expected_output[word_idx],
+                        $sformatf("KV accepted Abort prefix Golden[%0d]", word_idx));
+        end
+        for (word_idx = accepted_write_count; word_idx < 8; word_idx++)
+            expect_spad(dst + cache_offset + (word_idx << 2), sentinel ^ (word_idx + 1),
+                        $sformatf("KV Abort preserved unaccepted suffix[%0d]", word_idx));
+        expect_spad(dst + cache_offset + 32'd32, sentinel ^ 9,
+                    "KV Abort preserved post-slice guard");
+
+        `uvm_info("CLUSTER_KV_ABORT_WRITE_PREFIX_PASS", $sformatf(
+            "task_id=%04h accepted_output_prefix=%0d/8 read_drain=%0d/%0d head=1 token=2 cache_offset=%0d completion=ERR_ABORT seed=%0d",
+            task_id, accepted_write_count, accepted_reads, returned_reads,
+            cache_offset, seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
     task automatic run_matrix_abort_write_prefix(input int unsigned seed);
         int signed input_a[0:3][0:15];
         int signed input_b[0:15][0:3];
@@ -4260,6 +4405,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_engine_abort_drain_sweep();
         run_sfu_abort_write_prefix(seed);
         run_conv_abort_write_prefix(seed);
+        run_kv_abort_write_prefix(seed);
         run_matrix_abort_write_prefix(seed);
         run_matrix_line_abort_write_prefix(seed);
         run_cnm_abort_write_prefix(seed);
