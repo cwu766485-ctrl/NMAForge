@@ -2,7 +2,7 @@
 
 **Review date:** 2026-10-30
 
-**Selected product/SPEC candidate:** `9d4e9abdba1f745644a485960620fa6bbc4979db` (SPEC v1.8); latest exact-clean verification/test SHA `43a84cac688a56e789162dfa5a8106551779abdb` (R91 clean replay; R90 descriptor validator/decode test; no product RTL changes); R54 top-test SHA `f24c5383fad511c8b2e1132c1157942807994759`
+**Selected product/SPEC candidate:** `9d4e9abdba1f745644a485960620fa6bbc4979db` (SPEC v1.8); latest exact-clean verification/test SHA `d66431b8905ef7c1cccecef16a3cd34f4d62f9b0` (R93 real-top all-engine pairwise overlap; product RTL/SPEC unchanged); R54 top-test SHA `f24c5383fad511c8b2e1132c1157942807994759`
 - **Prior reviewed product baseline:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6`
 - **Follow-up evidence branch:** `work/compute-cluster-kv-overflow-20261030`
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
@@ -51,8 +51,7 @@ R36's compute-only AXI SVA observations show 0 matches for AR/AW stall-to-accept
 | `OPEN-CL-003` | REQ-CL-018, REQ-PC-009/010 | Qualify coordinated reset/epoch behavior against the selected external AXI fabric, or attach its approved compliance evidence. Current reset evidence uses a behavioral responder. |
 | `OPEN-CL-002` | REQ-CL-002/015/020/024/025 | R53 freezes and verifies KV 32-bit overflow/alignment; R54 verifies one real-top KV Protection denial path. Other Engine descriptor ranges/aliases/strides/zero rules and wider KV boundary/ownership cases remain open. |
 | `CL-COV-006` | REQ-CL-017/019/027, REQ-PC-006/007/009/010 | Expand legal Engine × Fault × Phase × Reset coverage with completion-code and accepted-write-prefix checkers. The current selected cases do not close the full cross. |
-| `CL-COV-004` | REQ-PC-001/006/007 | The 21/21 pair test uses the real dispatcher but behavioral engine agents. Production top pair coverage remains selected, not all real-engine pairs. |
-| `CL-COV-002/003` | Dataflow, opcode/shape and protocol coverage | Matrix line-write stall remains unobserved at top; broader legal request/backpressure and opcode × shape × numeric boundaries remain partial. |
+| `CL-COV-002/003` | Dataflow, opcode/shape and protocol coverage | R71 observes Matrix Line stall stability during real-top Matrix/CNM overlap and R93 observes all real-top engine pairs. Broader legal requester/backpressure/fault crosses and opcode × shape × numeric boundaries remain partial. |
 
 The full owner-by-owner issue log is in [Compute Cluster Open Issues](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md). No FSM state forcing or unsupported fault combinations are accepted as closure evidence.
 
@@ -73,6 +72,11 @@ R49 closes the defined Matrix Line transfer-contract checker slice. R52 closes t
 - [Open issue list](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md)
 - [KV address R53 evidence](COMPUTE_CLUSTER_KV_ADDRESS_R53.md)
 - [KV Protection R54 evidence](COMPUTE_CLUSTER_KV_PROTECTION_R54.md)
+- [R93 real-top pairwise evidence](COMPUTE_CLUSTER_REAL_TOP_PAIRWISE_R93_2026-10-30.md)
+
+## R93 real-top all-engine pairwise overlap — 2026-10-30
+
+At exact clean code/test SHA `d66431b8905ef7c1cccecef16a3cd34f4d62f9b0`, the production top runs all seven engines from legal disjoint-memory descriptors. Three VCS seeds observe 21/21 unordered busy pairs (`mask=1fffff`, maximum seven active engines), check all Golden SPAD images and ordered completions, and pass with UVM severity `0/0/0`. Each seed's memory scoreboard checks 26,451 words with zero mismatch, unknown, stale, or orphan responses; applicable focused compute testpoint coverage is 100%. This closes `CL-COV-004` only for real-top pair overlap. Full `REQ-PC-006/007` owner/fault/backpressure/reset crosses and the other PARTIAL requirements remain open; RTM remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains HOLD. Full command and artifact hashes are in [R93 evidence](COMPUTE_CLUSTER_REAL_TOP_PAIRWISE_R93_2026-10-30.md).
 - [R55–R58 clean replay evidence](COMPUTE_CLUSTER_CLEAN_REPLAY_R55_R58_2026-10-30.md)
 - [R59 Top Smoke replay evidence](COMPUTE_CLUSTER_TOP_SMOKE_REPLAY_R59_2026-10-30.md)
 - [R60 all-engine parity replay evidence](COMPUTE_CLUSTER_ALL_ENGINE_PARITY_R60_2026-10-30.md)
