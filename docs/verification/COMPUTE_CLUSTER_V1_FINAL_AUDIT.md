@@ -10,7 +10,7 @@
 
 ## Executive disposition
 
-The reviewed product baseline has substantial reproducible evidence for Matrix/SPAD and seven-engine Compute Cluster behavior. The follow-up product candidate adds an exact clean-SHA KV address overflow/alignment fix and R53 boundary evidence; R54 adds an exact-clean real-top KV Protection-denial test without changing product RTL. R55–R58 replay the seven-engine test, checker sensitivity, Matrix depth-4 recovery and prefetch-off fallback from clean harness SHA `ded9d92`. The Execution RTM accounts for all 38 requirements (`REQ-CL-001..028`, `REQ-PC-001..010`): **24 PASS-SCOPED and 14 PARTIAL**, with no recorded FAIL, BLOCKED_SPEC, or NOT_RUN requirement. PASS-SCOPED means the named scenario passed; it is not full requirement closure.
+The reviewed product baseline has substantial reproducible evidence for Matrix/SPAD and seven-engine Compute Cluster behavior. The follow-up product candidate adds an exact clean-SHA KV address overflow/alignment fix and R53 boundary evidence; R54 adds an exact-clean real-top KV Protection-denial test without changing product RTL. R55–R58 replay the seven-engine test, checker sensitivity, Matrix depth-4 recovery and prefetch-off fallback; R59 replays Top Smoke and the seeded top regression from clean harness SHA `ded9d92`. The Execution RTM accounts for all 38 requirements (`REQ-CL-001..028`, `REQ-PC-001..010`): **24 PASS-SCOPED and 14 PARTIAL**, with no recorded FAIL, BLOCKED_SPEC, or NOT_RUN requirement. PASS-SCOPED means the named scenario passed; it is not full requirement closure.
 
 The complete requirement-by-requirement execution table lives in the [Compute Cluster Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md). It records each requirement's disposition, testcase/checker or oracle, covered behavior, Run ID, seed, and evidence path. The RTM run/evidence index records source-SHA relationship, tool version, and result; R40–R45 replay the selected candidate SHA from a clean worktree. The [9d9e0f replay manifest](COMPUTE_CLUSTER_FINAL_9D9E0F_MANIFEST_2026-10-28.md) is retained as historical evidence for that earlier candidate. Runs without an exact source identity remain historical/source-equivalent and are not silently upgraded to exact-candidate replay.
 
@@ -69,4 +69,5 @@ R49 closes the defined Matrix Line transfer-contract checker slice. R52 closes t
 - [KV address R53 evidence](COMPUTE_CLUSTER_KV_ADDRESS_R53.md)
 - [KV Protection R54 evidence](COMPUTE_CLUSTER_KV_PROTECTION_R54.md)
 - [R55–R58 clean replay evidence](COMPUTE_CLUSTER_CLEAN_REPLAY_R55_R58_2026-10-30.md)
+- [R59 Top Smoke replay evidence](COMPUTE_CLUSTER_TOP_SMOKE_REPLAY_R59_2026-10-30.md)
 - [Matrix/TinyNPU historical benchmark report](COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md)

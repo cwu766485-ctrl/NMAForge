@@ -46,6 +46,8 @@
 > attempts. The 38-requirement status remains 24 PASS-SCOPED / 14 PARTIAL and
 > CL-DV-v1.0 HOLD. See [R55–R58 evidence](../docs/verification/COMPUTE_CLUSTER_CLEAN_REPLAY_R55_R58_2026-10-30.md).
 
+> **2026-10-30 exact-clean top replay R59:** At harness SHA `ded9d923a432e869592ec8710a22df5501d8d474`, `make ai_smoke` and `make ai_run AI_RANDOM_CASES=20 AI_SEED=12345` both passed. The real-top KV Protection denial completed with status/error `2/7` and preserved source/destination sentinels; Top Smoke also completed mapper precheck, reset recovery and the 86-descriptor workload. The known fixture `LOOP-REROLL-ENABLED` warning remains. See the [R59 evidence](../docs/verification/COMPUTE_CLUSTER_TOP_SMOKE_REPLAY_R59_2026-10-30.md). This does not close any broader requirement or change the 24/14 RTM disposition.
+
 > **2026-10-30 Scalar INT8 numeric addendum:** R52 passes 13 independent
 > Golden cases per seed on three seeds at clean test SHA `dde7806`, covering
 > VDOT/GEMV/GEMM arithmetic boundaries, output Memory Image, response drain,

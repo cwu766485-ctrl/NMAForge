@@ -17,6 +17,8 @@
 
 > **2026-10-30 clean replay R55–R58**：在 `ded9d92` detached worktree 上，七引擎 top UVM 三 Seed 每 Seed 5,368 words 对拍、0 mismatch/unknown/stale/orphan，100% applicable focused testpoints，UVM severity `0/0/0`；25/25 passive observation mutation catches；Matrix depth-4 每 Seed 18 Golden/layout + 35 fault/recovery cases 和 312 次 Line stall-stability；单独编译的 prefetch-off fallback 三 Seed 全通过。Matrix enabled profile DUT-only URG line/condition/FSM/branch `97.08/91.05/93.55/95.52%`，仍是 49/53 FSM；R55 compute-only AXI AR/AW properties有未命中，不代表 AXI E2E closure。详细日志、哈希和 SVA disposition 见 [R55–R58 clean replay report](COMPUTE_CLUSTER_CLEAN_REPLAY_R55_R58_2026-10-30.md)。
 
+> **2026-10-30 Top Smoke clean replay R59**：验证 harness SHA `ded9d92` 上，`make ai_smoke` 与 `make ai_run AI_RANDOM_CASES=20 AI_SEED=12345` 均 PASS；真实 CMDQ KV Protection denial 检查 completion `status/error=2/7` 和源/目的 sentinel，Smoke 还完成 mapper precheck、reset recovery 与 86-descriptor workload。保留 fixture `LOOP-REROLL-ENABLED` 编译 warning。详细日志哈希见 [R59 replay report](COMPUTE_CLUSTER_TOP_SMOKE_REPLAY_R59_2026-10-30.md)。本次不改变 38 项 RTM 的 24 PASS-SCOPED / 14 PARTIAL 和 CL-DV-v1.0 HOLD 状态。
+
 ## 0. 范围、冻结及验证分层
 
 - **已实现 C0-P 子集**：真实 `ai_parallel_compute_dispatcher` + 真实 `ai_compute_spad_mux`，七个行为 Engine、descriptor fetch BFM、单周期注册读响应和 completion-writer BFM；验证按序 dispatch/retirement、21 对并发、每引擎单活动槽、SPAD ready stall/owner、CPLQ 满、错误、abort/drain 与 reset recovery。
