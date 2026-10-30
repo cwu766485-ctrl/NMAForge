@@ -155,3 +155,9 @@ Run IDs and artifacts for both matched workloads are `R19` in the [Execution RTM
 ## 6. Benchmark limits
 
 The local Matrix size sweep and eight-way ablation remain core-cycle measurements using one-cycle behavioral SPAD. The common TinyNPU GEMM uses the same 8×8 array dimension, operand values, K, INT8/INT32 types and start-to-completion observation, but the storage interface/output bandwidth differ. The CNN case is software lowering because TinyNPU has no native convolution engine. TinyNPU’s Artix-7 implementation timing/resources and NMAForge’s cycle counters are different evidence classes; there is no candidate-specific matched ASIC/FPGA PPA in this report. The 250 MHz conversion in the Matrix logs is a normalization point, not measured Fmax, and no theoretical TOPS is described as measured throughput.
+
+## R76 exact-candidate benchmark replay — 2026-10-30
+
+The Matrix size and controller-ablation suites were rerun from exact clean code/test SHA `969992291732cf694d7de4bdfef2808d4f017d57`, VCS `V-2023.12-SP1_Full64`, with seeds `20261030/20261025/20261026`. Results are 45/45 size points (three physical array sizes × five shapes × three seeds) and 120/120 ablation points (eight configurations × five shapes × three seeds). All use the same fixed workloads, 16×16 controller ablation array, and one-cycle behavioral bank response. The three ablation CSVs have matching result fields after excluding their seed column.
+
+For 32×32×64, depth-2/no-prefetch/no-cache remains 1,698 cycles, 512 bank reads, 38.596 MAC/cycle and 15.08% modeled occupancy. Depth-4/prefetch/cache remains 1,187 cycles, 384 bank reads, 55.211 MAC/cycle and 21.57% modeled occupancy. The reported reduction is 30.1% cycles and 25% bank-read requests under this behavioral model. No measured SRAM frequency, ASIC area, power, or silicon TOPS is implied. Raw files and checksums are in the [R76 clean-replay report](COMPUTE_CLUSTER_CLEAN_REPLAY_R76_2026-10-30.md).
