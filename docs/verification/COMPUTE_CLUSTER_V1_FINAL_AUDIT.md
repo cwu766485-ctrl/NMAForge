@@ -13,7 +13,7 @@ The selected candidate has substantial reproducible evidence for Matrix/SPAD and
 
 The complete requirement-by-requirement execution table lives in the [Compute Cluster Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md). It records each requirement's disposition, testcase/checker or oracle, covered behavior, Run ID, seed, and evidence path. The RTM run/evidence index records source-SHA relationship, tool version, and result; R40–R45 replay the selected candidate SHA from a clean worktree. The [9d9e0f replay manifest](COMPUTE_CLUSTER_FINAL_9D9E0F_MANIFEST_2026-10-28.md) is retained as historical evidence for that earlier candidate. Runs without an exact source identity remain historical/source-equivalent and are not silently upgraded to exact-candidate replay.
 
-The **100%** result is limited to the focused top-compute functional testpoint group reproduced by R40 on six clean seeds (`20261025/26/27/29/30/31`): 29/29 applicable URG variables, with the completion-read bin explicitly excluded as structural N/A and checked to remain zero. It does not mean 100% requirement, DUT code, or complete Compute Cluster coverage. R51 adds a separate 14-case-per-seed Scalar INT8 numeric testpoint campaign, without an URG percentage claim. The Matrix default prefetch-enabled FSM remains 49/53 raw transitions; selected guard paths have formal disposition and one edge is exercised in the separate prefetch-disabled profile.
+The **100%** result is limited to the focused top-compute functional testpoint group reproduced by R40 on six clean seeds (`20261025/26/27/29/30/31`): 29/29 applicable URG variables, with the completion-read bin explicitly excluded as structural N/A and checked to remain zero. It does not mean 100% requirement, DUT code, or complete Compute Cluster coverage. R52 adds a separate 13-legal-case-per-seed Scalar INT8 numeric testpoint campaign, without an URG percentage claim; R51's reserved activation=3 bin is superseded and excluded. The Matrix default prefetch-enabled FSM remains 49/53 raw transitions; selected guard paths have formal disposition and one edge is exercised in the separate prefetch-disabled profile.
 
 ## Version and evidence integrity
 
@@ -34,7 +34,7 @@ The **100%** result is limited to the focused top-compute functional testpoint g
 | Matrix FSM | R28: 5/5 non-vacuous legal properties proven; `ST_PREFETCH_WAIT` and `ST_ERROR_DRAIN` reachability covers hit; raw default-profile FSM 49/53 | Selected guards dispositioned; no forced states and no 100% FSM claim |
 | Whole-top code coverage | Existing URG databases include DUT, checker, UVM and testbench code | Not presented as DUT-only or functional closure |
 
-R36's compute-only AXI SVA observations show 0 matches for AR/AW stall-to-accept and one W match. This sequence does not exercise those AXI request stalls; R15 remains the evidence for real AR/AW/W assertion successes. R51 closes `OPEN-NUM-01` for common VDOT/GEMV/GEMM arithmetic semantics, but does not change the 24 PASS-SCOPED / 14 PARTIAL requirement dispositions.
+R36's compute-only AXI SVA observations show 0 matches for AR/AW stall-to-accept and one W match. This sequence does not exercise those AXI request stalls; R15 remains the evidence for real AR/AW/W assertion successes. R52 closes `OPEN-NUM-01` for the legal common VDOT/GEMV/GEMM arithmetic subset, but does not change the 24 PASS-SCOPED / 14 PARTIAL requirement dispositions.
 
 ## Remaining closure items
 
@@ -48,7 +48,7 @@ R36's compute-only AXI SVA observations show 0 matches for AR/AW stall-to-accept
 
 The full owner-by-owner issue log is in [Compute Cluster Open Issues](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md). No FSM state forcing or unsupported fault combinations are accepted as closure evidence.
 
-R49 closes the defined Matrix Line transfer-contract checker slice. R51 closes the Scalar INT8 common arithmetic contract and directed VDOT/GEMV/GEMM edge campaign on three clean-worktree seeds. Legacy Conv and broader legal opcode/shape coverage remain PARTIAL under `REQ-CL-020`/`CL-COV-003`; neither closure implies complete subsystem coverage.
+R49 closes the defined Matrix Line transfer-contract checker slice. R52 closes the Scalar INT8 common arithmetic contract and directed legal VDOT/GEMV/GEMM edge campaign on three clean-worktree seeds. R51 is superseded/excluded due to reserved activation=3 stimulus. Legacy Conv and broader legal opcode/shape coverage remain PARTIAL under `REQ-CL-020`/`CL-COV-003`; neither closure implies complete subsystem coverage.
 
 ## Final review outcome
 

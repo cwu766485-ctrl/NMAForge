@@ -16,12 +16,13 @@
 > Compute Cluster status remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0
 > HOLD; see the [current Execution RTM](../docs/verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
 
-> **2026-10-30 Scalar INT8 numeric addendum:** R51 passes 14 independent
-> Golden cases per seed on three seeds at clean test SHA `5b1d282`, covering
+> **2026-10-30 Scalar INT8 numeric addendum:** R52 passes 13 independent
+> Golden cases per seed on three seeds at clean test SHA `dde7806`, covering
 > VDOT/GEMV/GEMM arithmetic boundaries, output Memory Image, response drain,
-> and read/write backpressure. SPEC v1.6 closes the common arithmetic contract
-> ambiguity; legacy Conv and wider REQ-CL-020 opcode/shape coverage remain
-> partial. See the [R51 report](../docs/verification/COMPUTE_CLUSTER_SCALAR_INT8_NUMERIC_R51.md).
+> and read/write backpressure using only assigned activation values 0/1/2.
+> R51's reserved activation=3 testpoint is superseded and excluded. SPEC v1.6
+> closes the common arithmetic contract ambiguity; legacy Conv and wider
+> REQ-CL-020 opcode/shape coverage remain partial. See the [R52 report](../docs/verification/COMPUTE_CLUSTER_SCALAR_INT8_NUMERIC_R52.md).
 
 > **2026-10-28 historical review addendum:** Product RTL/SPEC candidate is
 > `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`. Clean test commit

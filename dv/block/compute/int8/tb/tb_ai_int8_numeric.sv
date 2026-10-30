@@ -51,7 +51,7 @@ module tb_ai_int8_numeric;
     integer shift_one_bin = 0;
     integer shift_31_bin = 0;
     integer shift_other_bin = 0;
-    integer activation_bins [0:3];
+    integer activation_bins [0:2];
     integer bias_on_bin = 0;
     integer bias_off_bin = 0;
     reg test_active = 1'b0;
@@ -248,7 +248,7 @@ module tb_ai_int8_numeric;
         if (!$value$plusargs("VECTOR_FILE=%s", vector_path))
             $fatal(1, "missing +VECTOR_FILE=<path>");
         for (index = 0; index < 3; index = index + 1) opcode_bins[index] = 0;
-        for (index = 0; index < 4; index = index + 1) activation_bins[index] = 0;
+        for (index = 0; index < 3; index = index + 1) activation_bins[index] = 0;
 
         vector_fd = $fopen(vector_path, "r");
         if (vector_fd == 0) $fatal(1, "cannot open vector file %s", vector_path);
@@ -319,15 +319,15 @@ module tb_ai_int8_numeric;
         if (opcode_bins[0] == 0 || opcode_bins[1] == 0 || opcode_bins[2] == 0 ||
             shift_zero_bin == 0 || shift_one_bin == 0 || shift_31_bin == 0 ||
             activation_bins[0] == 0 || activation_bins[1] == 0 ||
-            activation_bins[2] == 0 || activation_bins[3] == 0 ||
+            activation_bins[2] == 0 ||
             bias_on_bin == 0 || bias_off_bin == 0 ||
             total_read_stalls == 0 || total_write_stalls == 0 ||
             total_read_responses == 0)
             $fatal(1, "required numeric/handshake bin missing");
-        $display("SCALAR_INT8_NUMERIC_PASS cases=%0d opcode_bins={vdot:%0d,gemv:%0d,gemm:%0d} shift_bins={0:%0d,1:%0d,31:%0d,other:%0d} activation_bins={none:%0d,relu:%0d,relu6:%0d,reserved:%0d} bias={off:%0d,on:%0d} read_stalls=%0d write_stalls=%0d responses=%0d",
+        $display("SCALAR_INT8_NUMERIC_PASS cases=%0d opcode_bins={vdot:%0d,gemv:%0d,gemm:%0d} shift_bins={0:%0d,1:%0d,31:%0d,other:%0d} activation_bins={none:%0d,relu:%0d,relu6:%0d} bias={off:%0d,on:%0d} read_stalls=%0d write_stalls=%0d responses=%0d",
                  total_cases, opcode_bins[0], opcode_bins[1], opcode_bins[2],
                  shift_zero_bin, shift_one_bin, shift_31_bin, shift_other_bin,
-                 activation_bins[0], activation_bins[1], activation_bins[2], activation_bins[3],
+                 activation_bins[0], activation_bins[1], activation_bins[2],
                  bias_off_bin, bias_on_bin, total_read_stalls, total_write_stalls,
                  total_read_responses);
         $finish;

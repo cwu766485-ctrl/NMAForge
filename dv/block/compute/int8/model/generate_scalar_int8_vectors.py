@@ -37,7 +37,7 @@ def quantize(acc: int, shift: int, activation: int) -> int:
         value = max(0, value)
     elif activation == 2:
         value = min(6, max(0, value))
-    # Encodings 0 and 3 follow the current RTL's no-activation datapath.
+    # Encoding 0 is identity. Reserved encodings are excluded from legal tests.
     value = min(0x7FFFFFFF, max(-0x80000000, value))
     return value & 0xFFFFFFFF
 
@@ -106,8 +106,6 @@ def build_cases(seed: int) -> list[Case]:
                   [(4, 0, 0, 0)], activation=2),
         make_vdot("vdot_relu6_lower_clamp", [(3, 0, 0, 0)],
                   [(-4, 0, 0, 0)], activation=2),
-        make_vdot("vdot_reserved_activation_falls_through", [(3, 0, 0, 0)],
-                  [(5, 0, 0, 0)], activation=3),
         make_vdot("vdot_bias_before_shift", [(1, 1, 1, 0)],
                   [(-2, -2, -1, 0)], shift=2, bias=11, bias_enable=True),
     ]
