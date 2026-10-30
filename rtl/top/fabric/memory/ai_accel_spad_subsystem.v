@@ -82,6 +82,7 @@ module ai_accel_spad_subsystem #(
     wire [3:0] cnm_lane_prot_allow;
     wire [3:0] cnm_lane_access_allow;
     wire banked_access_allow;
+    reg cnm_protection_error_req_r;
     reg cnm_protection_error_r;
 
     ai_spad_protection cnm_protection0_u (
@@ -135,9 +136,15 @@ module ai_accel_spad_subsystem #(
 
     always @(posedge clk or negedge resetn) begin
         if (!resetn) begin
+            cnm_protection_error_req_r <= 1'b0;
             cnm_protection_error_r <= 1'b0;
         end else begin
-            cnm_protection_error_r <= |(cnm_valid & ~cnm_lane_access_allow);
+            // ai_spad_arbiter tags an accepted request in its first register
+            // stage and raises cnm_rsp_valid in the following cycle. Keep the
+            // request-time Protection result in a matching two-stage pipeline
+            // so it remains attached to that registered CNM response.
+            cnm_protection_error_req_r <= |(cnm_valid & ~cnm_lane_access_allow);
+            cnm_protection_error_r <= cnm_protection_error_req_r;
         end
     end
     assign cnm_protection_error = cnm_protection_error_r;
