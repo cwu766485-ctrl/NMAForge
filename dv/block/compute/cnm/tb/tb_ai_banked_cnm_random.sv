@@ -20,6 +20,8 @@ module tb_ai_banked_cnm_random;
   reg [3:0] accepted_req_d1=0;
   reg [31:0] d0_d1=0,d1_d1=0,d2_d1=0,d3_d1=0;
   reg [3:0] cnm_req_ready=4'hf;
+  reg [3:0] stalled_prev=0;
+  reg [31:0] stalled_addr0=0,stalled_addr1=0,stalled_addr2=0,stalled_addr3=0;
   reg prefetch_backpressure=0;
   reg extra_response_delay=1;
   wire [3:0] accepted_req=req & cnm_req_ready;
@@ -98,9 +100,24 @@ module tb_ai_banked_cnm_random;
       rsp_valid<=0;accepted_req_d1<=0;
       d0<=0;d1<=0;d2<=0;d3<=0;
       d0_d1<=0;d1_d1<=0;d2_d1<=0;d3_d1<=0;
+      stalled_prev<=0;
+      stalled_addr0<=0;stalled_addr1<=0;stalled_addr2<=0;stalled_addr3<=0;
       cnm_request_count<=0;
       wait_a_state_cycles<=0;prefetch_a_state_cycles<=0;
     end else begin
+      if(stalled_prev[0] && (!req[0] || a0!==stalled_addr0))
+        $fatal(1,"CNM lane 0 request changed while backpressured");
+      if(stalled_prev[1] && (!req[1] || a1!==stalled_addr1))
+        $fatal(1,"CNM lane 1 request changed while backpressured");
+      if(stalled_prev[2] && (!req[2] || a2!==stalled_addr2))
+        $fatal(1,"CNM lane 2 request changed while backpressured");
+      if(stalled_prev[3] && (!req[3] || a3!==stalled_addr3))
+        $fatal(1,"CNM lane 3 request changed while backpressured");
+      stalled_prev<=req & ~cnm_req_ready;
+      if(req[0] && !cnm_req_ready[0]) stalled_addr0<=a0;
+      if(req[1] && !cnm_req_ready[1]) stalled_addr1<=a1;
+      if(req[2] && !cnm_req_ready[2]) stalled_addr2<=a2;
+      if(req[3] && !cnm_req_ready[3]) stalled_addr3<=a3;
       rsp_valid <= extra_response_delay ? accepted_req_d1 : accepted_req;
       accepted_req_d1 <= accepted_req;
       if(extra_response_delay) begin
@@ -394,8 +411,10 @@ module tb_ai_banked_cnm_random;
     expect_cnm_error(4'd3,5);
     run_late_parity_fault();
     check_reset_recovery();
+    if((|accepted_req_d1) || (|rsp_valid))
+      $fatal(1,"CNM test ended with accepted reads lacking drained responses");
     if(errors) $fatal(1,"CNM random regression mismatches=%0d",errors);
-    $display("CNM_RANDOM_PASS golden_cases=17 faults=8 phase_abort=6 phase_reset=6 late_faults=1 reset_fault_combo=1 reset_recovery=1 wait_a=1 prefetch_backpressure=1 fast_response=1 seed=%0d",initial_seed);
+    $display("CNM_RANDOM_PASS golden_cases=17 faults=8 phase_abort=6 phase_reset=6 late_faults=1 reset_fault_combo=1 reset_recovery=1 wait_a=1 prefetch_backpressure=1 stable_stall=1 responses_drained=1 fast_response=1 seed=%0d",initial_seed);
     $finish;
   end
 endmodule
