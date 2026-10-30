@@ -85,7 +85,7 @@ subsystem_memory_fabric_reset_regress:
 			-cm line+cond+fsm+tgl+branch+assert -cm_dir "$$db" -l "$$log"; \
 		grep -q '\[MEMORY_FABRIC_RESET_ONLY_PASS\]' "$$log" || { echo "ERROR: fabric reset pass marker missing in $$log"; exit 1; }; \
 		grep -q '\[DMA_CNM_RESET_SETUP\].*accepted SPAD read without its response' "$$log" || { echo "ERROR: reset was not exercised with a real accepted SPAD response pending in $$log"; exit 1; }; \
-		[ "$$(grep -c '\[DMA_CNM_RESET_RECOVERY_PASS\]' "$$log")" -eq 2 ] || { echo "ERROR: both CNM reset phases did not recover in $$log"; exit 1; }; \
+		[ "$$(grep -c 'UVM_INFO.*\[DMA_CNM_RESET_RECOVERY_PASS\]' "$$log")" -eq 2 ] || { echo "ERROR: both CNM reset phases did not recover in $$log"; exit 1; }; \
 		grep -q '\*\* Report counts by severity' "$$log" || { echo "ERROR: UVM report summary missing in $$log"; exit 1; }; \
 		! grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$$log" || { echo "ERROR: UVM warning/error/fatal count is nonzero in $$log"; exit 1; }; \
 		done; \
