@@ -338,7 +338,7 @@ ai_cnm_random_regress: ai_cnm_random_compile
 		$(CNM_RANDOM_OUT_DIR)/simv +SEED=$$seed -cm line+cond+fsm+branch \
 			-cm_dir $(CNM_RANDOM_OUT_DIR)/coverage.vdb -cm_name cnm_seed_$$seed \
 			-l $(CNM_RANDOM_OUT_DIR)/run_seed_$$seed.log; \
-		grep -q "^CNM_RANDOM_PASS cases=12 faults=8 phase_abort=6 late_faults=1 reset_fault_combo=1 reset_recovery=1 wait_a=1 prefetch_backpressure=1 fast_response=1 seed=$$seed$$" $(CNM_RANDOM_OUT_DIR)/run_seed_$$seed.log; \
+		grep -q "^CNM_RANDOM_PASS golden_cases=17 faults=8 phase_abort=6 phase_reset=6 late_faults=1 reset_fault_combo=1 reset_recovery=1 wait_a=1 prefetch_backpressure=1 stable_stall=1 responses_drained=1 fast_response=1 seed=$$seed$$" $(CNM_RANDOM_OUT_DIR)/run_seed_$$seed.log; \
 	done
 
 ai_tensor_a3_gemm_bench_comp:
