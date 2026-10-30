@@ -32,6 +32,15 @@ module tb_ai_accel_smoke;
     localparam REG_REGION0_BASE   = 32'h0000_00d4;
     localparam REG_REGION0_LIMIT  = 32'h0000_00d8;
     localparam REG_REGION0_PERM   = 32'h0000_00dc;
+    localparam REG_REGION1_BASE   = 32'h0000_00e0;
+    localparam REG_REGION1_LIMIT  = 32'h0000_00e4;
+    localparam REG_REGION1_PERM   = 32'h0000_00e8;
+    localparam REG_REGION2_BASE   = 32'h0000_00ec;
+    localparam REG_REGION2_LIMIT  = 32'h0000_00f0;
+    localparam REG_REGION2_PERM   = 32'h0000_00f4;
+    localparam REG_REGION3_BASE   = 32'h0000_00f8;
+    localparam REG_REGION3_LIMIT  = 32'h0000_00fc;
+    localparam REG_REGION3_PERM   = 32'h0000_0100;
     localparam REG_DOORBELL      = 32'h0000_00a0;
     localparam REG_ABORT         = 32'h0000_00a4;
     localparam REG_CMDQ_CTRL      = 32'h0000_00ac;
@@ -206,6 +215,10 @@ module tb_ai_accel_smoke;
     integer matrix_cnm_matrix_responses = 0;
     integer matrix_cnm_cnm_responses = 0;
     reg [20:0] parallel_engine_pair_seen = 21'd0;
+    reg kv_protection_case_active = 1'b0;
+    integer kv_protection_read_accepts = 0;
+    reg kv_protection_write_denied = 1'b0;
+    reg [31:0] kv_protection_denied_addr = 32'd0;
     reg [63:0] last_dma_araddr;
     reg [1023:0] vcd_file;
     reg fp_perf_measure = 1'b0;
@@ -426,6 +439,21 @@ module tb_ai_accel_smoke;
                 matrix_cnm_cnm_responses <= matrix_cnm_cnm_responses + 1;
             if ((|dut.cnm_rsp_valid) && dut.banked_rsp_valid)
                 matrix_cnm_response_alias_seen <= 1'b1;
+        end
+    end
+
+    always @(posedge aclk) begin
+        if (aresetn && kv_protection_case_active) begin
+            if (dut.compute_engine_req_valid[6] &&
+                dut.compute_engine_ready[6] &&
+                !dut.compute_engine_req_write[6])
+                kv_protection_read_accepts = kv_protection_read_accepts + 1;
+            if (dut.compute_engine_req_valid[6] &&
+                dut.compute_engine_req_write[6] &&
+                dut.compute_engine_protection_error[6]) begin
+                kv_protection_write_denied = 1'b1;
+                kv_protection_denied_addr = dut.compute_engine_req_addr[6*32 +: 32];
+            end
         end
     end
 
@@ -1058,6 +1086,76 @@ module tb_ai_accel_smoke;
                          $time, engine_a, engine_b);
                 errors = errors + 1;
             end
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+        end
+    endtask
+
+    task run_kv_top_protection_denial;
+        integer poll;
+        begin
+            // Keep one KV_WRITE source word readable/executable while leaving
+            // its cache destination outside every permitted region. The
+            // descriptor fetch and completion record use a separate RW region.
+            axi_write(REG_REGION0_PERM, 32'd0);
+            axi_write(REG_REGION1_PERM, 32'd0);
+            axi_write(REG_REGION2_PERM, 32'd0);
+            axi_write(REG_REGION3_PERM, 32'd0);
+            axi_write(SPAD_BASE + 32'h0000_1000, 32'h1357_9bdf);
+            axi_write(SPAD_BASE + 32'h0000_2000, 32'hcafe_f00d);
+            write_spad_desc_v3(32'h7d00, 8'h43, 16'h7a53,
+                               32'h0000_1000, 32'd0, 32'd0, 32'h0000_2000,
+                               16'd1, 16'd1, 16'd1, 8'd0, 32'd0,
+                               5'd0, 2'd0, 32'd4, 32'd0, 32'd0,
+                               16'd0, 16'd0, 16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + 32'h7d3c, {16'd0, 8'd0, 8'd5});
+
+            axi_write(REG_REGION0_BASE, 32'h0000_1000);
+            axi_write(REG_REGION0_LIMIT, 32'h0000_1004);
+            axi_write(REG_REGION0_PERM, 32'h0000_000d); // enable + read + execute
+            axi_write(REG_REGION2_BASE, 32'h0000_7d00);
+            axi_write(REG_REGION2_LIMIT, 32'h0000_7d90);
+            axi_write(REG_REGION2_PERM, 32'h0000_000b); // enable + read + write
+
+            axi_write(REG_CMDQ_BASE_LO, 32'h7d00);
+            axi_write(REG_CMDQ_SIZE, 32'd2);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd1);
+            axi_write(REG_CPLQ_BASE_LO, 32'h7d80);
+            axi_write(REG_CPLQ_SIZE, 32'd2);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+
+            kv_protection_read_accepts = 0;
+            kv_protection_write_denied = 1'b0;
+            kv_protection_denied_addr = 32'd0;
+            kv_protection_case_active = 1'b1;
+            axi_write(REG_DOORBELL, 32'd1);
+            wait_cpl_tail(32'd1, "KV top-level protection denial completion");
+            kv_protection_case_active = 1'b0;
+
+            expect_completion(32'h7d80, 16'h7a53, 4'h2, 4'h7,
+                              32'd0, 32'd0,
+                              "KV top-level protection denial completion record");
+            if ((kv_protection_read_accepts != 1) ||
+                !kv_protection_write_denied ||
+                (kv_protection_denied_addr !== 32'h0000_2000)) begin
+                $display("%0t ERROR: KV protection trace reads=%0d denied=%0b addr=%08h",
+                         $time, kv_protection_read_accepts,
+                         kv_protection_write_denied, kv_protection_denied_addr);
+                errors = errors + 1;
+            end else begin
+                $display("%0t PASS: KV top protection accepted source read and denied destination write",
+                         $time);
+            end
+
+            axi_write(REG_REGION0_PERM, 32'd0);
+            axi_write(REG_REGION2_PERM, 32'd0);
+            expect_read(SPAD_BASE + 32'h0000_1000, 32'h1357_9bdf,
+                        "KV protection source preserved");
+            expect_read(SPAD_BASE + 32'h0000_2000, 32'hcafe_f00d,
+                        "KV protection destination unchanged");
             axi_write(REG_CMDQ_SIZE, 32'd0);
             axi_write(REG_CPLQ_SIZE, 32'd0);
             clear_done_irq();
@@ -3797,6 +3895,8 @@ module tb_ai_accel_smoke;
         axi_write(REG_REGION0_PERM, 32'h0000_0000);
         axi_write(SPAD_BASE + 32'h0000_0000, 32'hcafe_babe);
         expect_read(SPAD_BASE + 32'h0000_0000, 32'hcafe_babe, "region protection disabled");
+
+        run_kv_top_protection_denial();
 
         // System reset while a read burst is in flight.  In the board design
         // the same synchronized reset reaches the accelerator and PS AXI
