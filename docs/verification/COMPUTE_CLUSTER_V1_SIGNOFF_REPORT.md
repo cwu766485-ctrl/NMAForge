@@ -81,7 +81,6 @@ PPA and full pretrained-model deployment are outside this Functional DV decision
 - [R55–R58 clean replay evidence](COMPUTE_CLUSTER_CLEAN_REPLAY_R55_R58_2026-10-30.md)
 - [R59 Top Smoke replay evidence](COMPUTE_CLUSTER_TOP_SMOKE_REPLAY_R59_2026-10-30.md)
 - [R76 exact-candidate clean replay evidence](COMPUTE_CLUSTER_CLEAN_REPLAY_R76_2026-10-30.md)
-- [R76 exact-candidate clean replay evidence](COMPUTE_CLUSTER_CLEAN_REPLAY_R76_2026-10-30.md)
 - [R60 all-engine parity clean replay evidence](COMPUTE_CLUSTER_ALL_ENGINE_PARITY_R60_2026-10-30.md)
 - [R75 SFU block-core parameter-latch evidence](COMPUTE_CLUSTER_SFU_PARAMETER_LATCH_R75_2026-10-30.md)
 - [Compute Cluster SPEC v1.6](../spec/COMPUTE_CLUSTER_SPEC_ZH.md)
