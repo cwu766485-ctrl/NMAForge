@@ -9,7 +9,7 @@
 
 ## Result
 
-**PASS for the declared legal Scalar INT8 numeric testpoint subset.** Three clean-worktree seeds (`20261030`, `20261025`, `20261026`) each passed 13 independent Python-Golden cases. The test checked 60 output words across the three seeds and compared every expected output address and word against the simulated SPAD image. Each seed drained its single-outstanding read response, checked the result and write count, enforced request stability while stalled, and hit all declared required opcode, shift, activation, bias, read-stall and write-stall bins. No reserved activation encoding was generated or counted. No product RTL changed.
+**PASS for the declared legal Scalar INT8 numeric testpoint subset.** Three clean-worktree seeds (`20261030`, `20261025`, `20261026`) each passed 13 independent Python-Golden cases. The test checked 60 output words across the three seeds and compared every expected output address and word against the simulated SPAD image. Each seed drained its single-outstanding read response, checked the result and write count, enforced request stability while stalled, and hit all 14/14 mandatory checker bins: 3 opcodes, 3 required shifts, 3 assigned activations, 2 bias states, read stall, write stall, and read response. No reserved activation encoding was generated or counted. No product RTL changed. This 100% figure applies only to those declared counters/testpoints; it is not URG code coverage or whole-Cluster functional coverage.
 
 | Testpoint group | Required/observed scope per seed |
 |---|---|
