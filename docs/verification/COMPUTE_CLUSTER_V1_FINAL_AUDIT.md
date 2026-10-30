@@ -7,7 +7,7 @@
 - **Follow-up evidence branch:** `work/compute-cluster-kv-overflow-20261030`
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
 - **Latest clean verification replay SHA:** `2768843da1b3f3a0e988645746000d5befadf12b`
-**Latest verification/test candidate:** `5a35d60d20ee6fc6622e46f92d05fc1ef00dd14d` (R85 Conv accepted-write Abort prefix, testbench-only).
+**Latest verification/test candidate:** `3d6fe5c58631bdeb6333b6e3572f24eeba7da1ef` (R86 Matrix scalar-fallback accepted-write Abort prefix, testbench-only).
 **Decision:** bounded CL-RC1/CL-RC2 review candidate; **CL-DV-v1.0 is not signed**.
 
 ## Executive disposition
@@ -94,3 +94,8 @@ The initial R61 Compute Cluster-only URG remains 17/22 assertion properties with
 ## R85 Conv accepted-write Abort prefix — 2026-10-30
 
 Three exact-clean seeds at `5a35d60d20ee6fc6622e46f92d05fc1ef00dd14d` pass a real-top Conv Abort immediately after the first accepted output write. The checker verifies one Golden output prefix word, three unchanged suffix sentinels, 21/21 accepted-read drain, and `ERR_ABORT`; each Memory Scoreboard checks 17,304 words with zero mismatch/unknown/stale and UVM severity `0/0/0`. The same exact SHA passes Top Smoke. This adds one testpoint only: accepted-write prefix lengths for the other engines and the broader legal fault/phase/reset crosses remain open. The 38-row RTM remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains HOLD. See [R85 report](COMPUTE_CLUSTER_CONV_ABORT_WRITE_PREFIX_R85_2026-10-30.md).
+
+
+## R86 Matrix scalar-fallback accepted-write Abort prefix — 2026-10-30
+
+Three exact-clean seeds at `3d6fe5c58631bdeb6333b6e3572f24eeba7da1ef` pass a real-top Matrix 4×4 INT8 GEMM Abort after six accepted scalar output words. The test uses a word-aligned/non-Line-aligned destination, verifies no Matrix Line use, checks the Golden prefix and ten untouched sentinels, drains 8/8 accepted banked reads, and checks `ERR_ABORT`. Each Memory Scoreboard checks 17,352 words with zero mismatch/unknown/stale and UVM severity `0/0/0`. The same exact SHA passes Top Smoke, the 20-case seeded top run and 28/28 passive checker-sensitivity tests. This adds one testpoint only; aligned Line aborts, more shapes/prefixes and broad legal fault/phase/reset crosses remain open. The RTM remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains HOLD. See [R86 report](COMPUTE_CLUSTER_MATRIX_ABORT_WRITE_PREFIX_R86_2026-10-30.md).
