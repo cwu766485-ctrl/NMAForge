@@ -1714,6 +1714,140 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             abort_seen_mask), UVM_LOW)
     endtask
 
+    task automatic run_sfu_abort_write_prefix(input int unsigned seed);
+        int signed gelu_inputs[0:3];
+        int signed gelu_golden[0:3];
+        bit [31:0] write_addr[0:63];
+        bit [31:0] write_data[0:63];
+        bit [31:0] desc_base;
+        bit [31:0] completion_base;
+        bit [31:0] dst;
+        bit [31:0] sentinel;
+        bit [15:0] task_id;
+        int unsigned accepted_write_count;
+        int unsigned accepted_reads;
+        int unsigned returned_reads;
+        int unsigned poll;
+        int unsigned word_idx;
+        bit first_write_seen;
+        bit abort_seen;
+        bit monitor_done;
+
+        desc_base = CLUSTER_CONTRACT_CMDQ;
+        completion_base = 32'h0000_5c80;
+        dst = 32'h0004_c000;
+        sentinel = 32'hbad0_77f0;
+        task_id = 16'h0770;
+        accepted_write_count = 0;
+        accepted_reads = 0;
+        returned_reads = 0;
+        first_write_seen = 1'b0;
+        abort_seen = 1'b0;
+        monitor_done = 1'b0;
+
+        gelu_inputs[0] = 16;
+        gelu_inputs[1] = -16;
+        gelu_inputs[2] = 32;
+        gelu_inputs[3] = -32;
+        gelu_golden[0] = 8;
+        gelu_golden[1] = -8;
+        gelu_golden[2] = 17;
+        gelu_golden[3] = -15;
+        for (word_idx = 0; word_idx < 64; word_idx++) begin
+            spad_write(GELU_A_LOCAL + (word_idx << 2), gelu_inputs[word_idx % 4]);
+            spad_write(dst + (word_idx << 2), sentinel ^ word_idx);
+        end
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            spad_write(completion_base + (word_idx << 2), 32'h77f0_0000 | word_idx);
+
+        write_v3_desc(desc_base, 8'h35, task_id, GELU_A_LOCAL, 32'd0, dst,
+                      16'd0, 16'd0, 16'd64);
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        fork
+            begin : sfu_abort_prefix_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.dut_abort_active)
+                        abort_seen = 1'b1;
+                    if (compute_vif.engine_req_valid[4] &&
+                        compute_vif.engine_req_ready[4]) begin
+                        if (compute_vif.engine_req_write[4]) begin
+                            if (accepted_write_count >= 64)
+                                `uvm_fatal("CLUSTER_SFU_ABORT_PREFIX",
+                                    "SFU accepted more output writes than the 64-element descriptor")
+                            write_addr[accepted_write_count] =
+                                compute_vif.engine_req_addr[4*32 +: 32];
+                            write_data[accepted_write_count] =
+                                compute_vif.engine_req_wdata[4*32 +: 32];
+                            accepted_write_count++;
+                            first_write_seen = 1'b1;
+                        end else begin
+                            accepted_reads++;
+                        end
+                    end
+                    if (compute_vif.rsp_valid &&
+                        (compute_vif.rsp_client == 3'd2))
+                        returned_reads++;
+                end
+            end
+            begin : abort_after_first_sfu_write
+                poll = 0;
+                while (!first_write_seen && poll < 50000) begin
+                    @(posedge compute_vif.aclk);
+                    poll++;
+                end
+                if (!first_write_seen)
+                    `uvm_fatal("CLUSTER_SFU_ABORT_PREFIX",
+                        "SFU did not accept an output write before the Abort timeout")
+                axil_write(REG_ABORT, 32'd1);
+                wait_cpl_tail(32'd1);
+                monitor_done = 1'b1;
+            end
+        join
+
+        wait_spad_idle();
+        if (!abort_seen)
+            `uvm_fatal("CLUSTER_SFU_ABORT_PREFIX",
+                "software Abort was not observed during SFU output drain")
+        if (accepted_write_count == 0 || accepted_write_count >= 64)
+            `uvm_fatal("CLUSTER_SFU_ABORT_PREFIX", $sformatf(
+                "Abort did not cut a non-empty proper output prefix: writes=%0d",
+                accepted_write_count))
+        if (accepted_reads == 0 || returned_reads != accepted_reads)
+            `uvm_fatal("CLUSTER_SFU_ABORT_PREFIX", $sformatf(
+                "SFU read responses did not drain: accepted=%0d returned=%0d",
+                accepted_reads, returned_reads))
+
+        expect_spad(completion_base + 32'h00, {16'd0, task_id},
+                    "SFU accepted-write Abort task ID");
+        expect_spad(completion_base + 32'h04, 32'h0000_0032,
+                    "SFU accepted-write Abort status/code");
+        for (word_idx = 0; word_idx < accepted_write_count; word_idx++) begin
+            if (write_addr[word_idx] !== dst + (word_idx << 2))
+                `uvm_fatal("CLUSTER_SFU_ABORT_PREFIX", $sformatf(
+                    "non-prefix output address index=%0d expected=0x%08h actual=0x%08h",
+                    word_idx, dst + (word_idx << 2), write_addr[word_idx]))
+            if (write_data[word_idx] !== gelu_golden[word_idx % 4])
+                `uvm_fatal("CLUSTER_SFU_ABORT_PREFIX", $sformatf(
+                    "Golden mismatch in accepted prefix index=%0d expected=0x%08h actual=0x%08h",
+                    word_idx, gelu_golden[word_idx % 4], write_data[word_idx]))
+            expect_spad(dst + (word_idx << 2), gelu_golden[word_idx % 4],
+                        $sformatf("SFU accepted Abort prefix Golden[%0d]", word_idx));
+        end
+        for (word_idx = accepted_write_count; word_idx < 64; word_idx++)
+            expect_spad(dst + (word_idx << 2), sentinel ^ word_idx,
+                        $sformatf("SFU Abort preserved unaccepted suffix[%0d]", word_idx));
+
+        `uvm_info("CLUSTER_SFU_ABORT_WRITE_PREFIX_PASS", $sformatf(
+            "task_id=%04h accepted_output_prefix=%0d/64 read_drain=%0d/%0d completion=ERR_ABORT seed=%0d",
+            task_id, accepted_write_count, accepted_reads, returned_reads, seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
     task automatic check_request_stability();
         int unsigned e;
         if (compute_vif.engine_req_stability_violations != 0 ||
@@ -2770,6 +2904,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_shared_readonly_isolation_test();
         check_request_stability();
         run_engine_abort_drain_sweep();
+        run_sfu_abort_write_prefix(seed);
         run_engine_reset_drain_sweep();
 
         `uvm_info("COMPUTE_CLUSTER_REAL_UVM_PASS", $sformatf(
