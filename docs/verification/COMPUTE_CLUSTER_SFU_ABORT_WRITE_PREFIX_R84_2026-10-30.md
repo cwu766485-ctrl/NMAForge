@@ -1,9 +1,9 @@
 # Compute Cluster SFU accepted-write Abort prefix — R84
 
-**Date:** 2026-10-30  
-**Exact clean test SHA:** `8bc2ee28725d09ac75ecfcb0417e1ba47fd688f2`  
-**Product RTL/SPEC baseline:** `9d4e9abdba1f745644a485960620fa6bbc4979db`; R84 changes only UVM test/Makefile files.  
-**Run ID:** `CLUSTER-SFU-ABORT-WRITE-PREFIX-3S-8BC2EE2`  
+**Date:** 2026-10-30
+**Exact clean test SHA:** `8bc2ee28725d09ac75ecfcb0417e1ba47fd688f2`
+**Product RTL/SPEC baseline:** `9d4e9abdba1f745644a485960620fa6bbc4979db`; R84 changes only UVM test/Makefile files.
+**Run ID:** `CLUSTER-SFU-ABORT-WRITE-PREFIX-3S-8BC2EE2`
 **Tool:** Synopsys VCS/URG `V-2023.12-SP1_Full64` / `V-2023.12-SP1`.
 
 ## Testpoint
