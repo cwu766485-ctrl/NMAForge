@@ -131,3 +131,11 @@ For RTL edits, run the focused target and `ai_smoke`. For queue, DMA,
 scratchpad, top, or source-list changes, also run the seeded top regression
 when the EDA environment is available. Record exact commands and PASS evidence
 in the owning report; run `git diff --check` before handoff.
+
+## 2026-10-30 update — R61 checker sensitivity replay
+
+- Code/test commit: `d45b89af0c5aab2107a5db6bbf0a6ab754e81656`.
+- Exact clean-SHA replay: 3-seed Compute Cluster UVM PASS, 28/28 checker-sensitivity probes caught, Top Smoke PASS, 20-case seeded top regression PASS.
+- Focused applicable compute testpoint group: 100% for these seeds; not full RTL/RTM closure.
+- Open: external-fabric late-response/reset qualification, legal Engine × Fault × Phase × Reset crosses, Matrix descriptor/partial-WSTRB contract limits, AXI AR/AW SVA real-success gaps, and remaining partial RTM dispositions. CL-DV-v1.0 remains HOLD.
+- Evidence: [R61 report](../../verification/COMPUTE_CLUSTER_R61_CHECKER_SENSITIVITY_2026-10-30.md).
