@@ -4079,6 +4079,28 @@ class dma_spad_subsystem_test extends dma_block_base_test;
             return;
         end
 
+        // Focused regression for the in-repository ai_accel_memory_fabric.
+        // Hold real DMA traffic across external R-channel reset, then overlap
+        // a real CNM request with that traffic so reset lands while the
+        // fabric's registered SPAD response/owner pipeline has an accepted
+        // read outstanding. Keep this opt-in branch separate from the broad
+        // subsystem test so unrelated protection scenarios do not mask this
+        // specific reset contract.
+        if ($test$plusargs("A10_MEMORY_FABRIC_RESET_ONLY")) begin
+            `uvm_info("MEMORY_FABRIC_RESET_ONLY",
+                "running in-repository ai_accel_memory_fabric reset and epoch checks",
+                UVM_LOW)
+            run_dma_reset_recovery(1'b0, 1'b0, 1);
+            run_dma_reset_recovery(1'b1, 1'b0, 1);
+            run_dma_reset_recovery(1'b0, 1'b1, 0);
+            run_dma_reset_recovery(1'b0, 1'b1, 1);
+            `uvm_info("MEMORY_FABRIC_RESET_ONLY_PASS",
+                "DMA AR/R reset, partial-read reset, accepted SPAD-read owner flush, and post-reset DMA/CNM recovery passed",
+                UVM_LOW)
+            phase.drop_objection(this);
+            return;
+        end
+
         `uvm_info("DMA_SPAD", "starting DDR-to-real-SPAD load under scalar compute contention", UVM_LOW)
         fork
             run_dma_command(1'b0, 64'h0000_a000, 32'h400);

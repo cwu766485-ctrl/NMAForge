@@ -16,8 +16,10 @@ RREADY_RUN_LOG ?= $(UVM_TEST)_rready_stall_seed$(SEED).log
 RREADY_COMPILE_LOG ?= compile_$(UVM_TEST)_rready_stall_seed$(SEED).log
 RREADY_STALL_CYCLES ?= 16
 RREADY_STRESS_TAG ?= a10_rready_stress
+MEMORY_FABRIC_RESET_SEEDS ?= 20261025 20261026 20261027
+MEMORY_FABRIC_RESET_OUT ?= /tmp/nmaforge_memory_fabric_reset_$(shell date +%Y%m%d_%H%M%S_%N)
 
-.PHONY: subsystem_compile subsystem_run subsystem_regress subsystem_coverage subsystem_rready_stall_run subsystem_rready_stress subsystem_clean
+.PHONY: subsystem_compile subsystem_run subsystem_regress subsystem_coverage subsystem_rready_stall_run subsystem_rready_stress subsystem_memory_fabric_reset_regress subsystem_clean
 
 subsystem_compile:
 	mkdir -p $(dir $(COV_DIR))
@@ -63,6 +65,33 @@ subsystem_rready_stress:
 		-dir coverage/$(RREADY_STRESS_TAG)_300.vdb \
 		-report coverage/urg_$(RREADY_STRESS_TAG)
 	@test -f coverage/urg_$(RREADY_STRESS_TAG)/dashboard.html || { echo "ERROR: RREADY stress URG dashboard missing"; exit 1; }
+
+# Focused reset qualification for the in-repository ai_accel_memory_fabric.
+# This is the on-chip SPAD fabric boundary, distinct from an arbitrary external
+# AXI fabric implementation. It checks reset with external AXI reads pending,
+# with a real CNM SPAD response pending, and verifies fresh post-reset work.
+subsystem_memory_fabric_reset_regress:
+	@set -e; out='$(MEMORY_FABRIC_RESET_OUT)'; mkdir -p "$$out/csrc"; \
+	$(VCS) -full64 -sverilog -ntb_opts uvm-1.2 -debug_access+all -assert svaext \
+		-cm line+cond+fsm+tgl+branch+assert -cm_dir "$$out/compile.vdb" \
+		-Mdir="$$out/csrc" -timescale=1ns/1ps +define+VCS -top tb_ai_dma_spad_subsystem_uvm \
+		-f dma_spad_subsystem_uvm.f -o "$$out/simv" -l "$$out/compile.log"; \
+	logs=''; dbs=''; \
+	for seed in $(MEMORY_FABRIC_RESET_SEEDS); do \
+		seed_dir="$$out/seed_$$seed"; mkdir -p "$$seed_dir"; \
+		log="$$seed_dir/run.log"; db="$$seed_dir/coverage.vdb"; logs="$$logs $$log"; dbs="$$dbs -dir $$db"; \
+		"$$out/simv" +UVM_TESTNAME=dma_spad_subsystem_test +A10_MEMORY_FABRIC_RESET_ONLY \
+			+ntb_random_seed=$$seed +UVM_VERBOSITY=UVM_MEDIUM \
+			-cm line+cond+fsm+tgl+branch+assert -cm_dir "$$db" -l "$$log"; \
+		grep -q '\[MEMORY_FABRIC_RESET_ONLY_PASS\]' "$$log" || { echo "ERROR: fabric reset pass marker missing in $$log"; exit 1; }; \
+		grep -q '\[DMA_CNM_RESET_SETUP\].*accepted SPAD read without its response' "$$log" || { echo "ERROR: reset was not exercised with a real accepted SPAD response pending in $$log"; exit 1; }; \
+		[ "$$(grep -c '\[DMA_CNM_RESET_RECOVERY_PASS\]' "$$log")" -eq 2 ] || { echo "ERROR: both CNM reset phases did not recover in $$log"; exit 1; }; \
+		grep -q '\*\* Report counts by severity' "$$log" || { echo "ERROR: UVM report summary missing in $$log"; exit 1; }; \
+		! grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$$log" || { echo "ERROR: UVM warning/error/fatal count is nonzero in $$log"; exit 1; }; \
+		done; \
+	$(URG) -full64 $$dbs -report "$$out/urg"; \
+	@test -f "$$out/urg/dashboard.html" || { echo "ERROR: fabric reset URG dashboard missing"; exit 1; }; \
+	echo "MEMORY_FABRIC_RESET_REGRESS_PASS: seeds=$(MEMORY_FABRIC_RESET_SEEDS) pending-SPAD-response/owner-flush plus DMA/CNM recovery; logs=$$logs; coverage=$$out/urg"
 
 subsystem_regress:
 	@set -e; for seed in $(SEEDS); do \
