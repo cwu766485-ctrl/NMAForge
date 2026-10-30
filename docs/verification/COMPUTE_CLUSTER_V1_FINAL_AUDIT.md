@@ -2,7 +2,7 @@
 
 **Review date:** 2026-10-30
 
-**Selected product/SPEC candidate:** `cc357830923e3dd7beda114b4d761fde839b01a7` (corrective Protection RTL, SPEC v1.7); latest verification/test SHA `402c8ce4689ae48cfee624f1f5fdca66d534bbbf` (R87 UVM output-path stabilization; no product RTL changes); R54 top-test SHA `f24c5383fad511c8b2e1132c1157942807994759`
+**Selected product/SPEC candidate:** `cc357830923e3dd7beda114b4d761fde839b01a7` (corrective Protection RTL, SPEC v1.7); latest verification/test SHA `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec` (R88 aligned Matrix Line Abort-prefix test; no product RTL changes); R54 top-test SHA `f24c5383fad511c8b2e1132c1157942807994759`
 - **Prior reviewed product baseline:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6`
 - **Follow-up evidence branch:** `work/compute-cluster-kv-overflow-20261030`
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
@@ -104,3 +104,8 @@ Three exact-clean seeds at `3d6fe5c58631bdeb6333b6e3572f24eeba7da1ef` pass a rea
 ## R87 default-path regression reproducibility — 2026-10-30
 
 At exact clean SHA `402c8ce4689ae48cfee624f1f5fdca66d534bbbf`, default-path three-seed Compute Cluster UVM, 28/28 passive checker-sensitivity mutations, and Top Smoke pass. The stable Make stamp keeps the compiled `simv_uvm` and mutation invocations under the same output root. This is harness evidence only; requirement dispositions and the HOLD decision do not change. See [R87 report](COMPUTE_CLUSTER_REGRESSION_PATH_STABILITY_R87_2026-10-30.md).
+
+
+## R88 aligned Matrix Line Abort-prefix test — 2026-10-30
+
+Exact clean SHA `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec` passes three seeds with six accepted 128-bit Line writes and 24 accepted output words per seed, full WSTRB, exact Golden Line payload/address, preserved suffix, 5/5 read drain and `ERR_ABORT`. Same-SHA Top Smoke, 20-case seeded top regression and 28/28 checker-sensitivity pass. This is one Matrix shape and Abort timing point; no requirement disposition changes and CL-DV-v1.0 remains HOLD. A truncated intermediate upload failed compile and is explicitly superseded by this exact source SHA. See [R88 report](COMPUTE_CLUSTER_MATRIX_LINE_ABORT_WRITE_PREFIX_R88_2026-10-30.md).

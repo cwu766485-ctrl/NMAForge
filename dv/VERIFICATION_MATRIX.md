@@ -1,3 +1,14 @@
+> **2026-10-30 R88 Matrix aligned Line Abort prefix:** At exact clean SHA
+> `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec`, three real-top UVM seeds accept
+> six of 16 aligned 128-bit Line writes (24/64 Golden output words) before
+> Abort; full WSTRB, line address/data, untouched suffix, 5/5 read drain and
+> `ERR_ABORT` pass. Each scoreboard checks 17,388 words with zero mismatch,
+> unknown or stale response and UVM severity 0/0/0. Same-SHA Top Smoke,
+> 20-case seeded Top, and passive checker sensitivity 28/28 pass. This scoped
+> point does not close global prefix/fault crosses; RTM stays 24 PASS-SCOPED /
+> 14 PARTIAL and CL-DV-v1.0 HOLD. See the
+> [R88 report](../docs/verification/COMPUTE_CLUSTER_MATRIX_LINE_ABORT_WRITE_PREFIX_R88_2026-10-30.md).
+
 Warning: truncated output (original token count: 30169)
 Total output lines: 1035
 
