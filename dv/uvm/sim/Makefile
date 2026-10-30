@@ -66,6 +66,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -q '\[CLUSTER_ENGINE_RESET_PASS\].*reset mask=1111111' "$$log" || { echo "ERROR: accepted-read reset/drain sweep for all seven real engines missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_ENGINE_ABORT_PASS\].*abort mask=1111111' "$$log" || { echo "ERROR: accepted-read software Abort/drain sweep for all seven real engines missing in $$log"; exit 1; }; \
 		test "$$(grep -c ' \[CLUSTER_ENGINE_ABORT_CASE_PASS\] engine=' "$$log")" -eq 7 || { echo "ERROR: expected all seven real-engine accepted-read Abort cases in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_SFU_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: SFU accepted-write Abort prefix check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_DMA_RESPONSE_PASS\]' "$$log" || { echo "ERROR: real top DMA response-client read check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_LAUNCH_FIELDS_PASS\]' "$$log" || { echo "ERROR: descriptor launch-snapshot/unused-field checks missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
