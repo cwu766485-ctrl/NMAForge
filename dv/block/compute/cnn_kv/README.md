@@ -29,3 +29,13 @@ seeded run exercises random Conv3x3 and depthwise cases. The direct block test
 covers the actual line-buffer core and KV primitive, not the scalar INT8
 convolution implementation or a DDR memory model. Exhaustive stride
 cross-products and every long-transaction error/reset combination remain open.
+
+The 2026-10-30 KV address-contract increment adds ten required checker bins:
+token-product overflow, product-sum overflow, cache-source/cache-destination
+end-address overflow, linear-source/linear-destination end-address overflow,
+and unaligned source/destination bases or token/head strides. Every invalid
+descriptor must return `ERR_CONFIG` before any SPAD request or side effect.
+Each seed also writes and reads the final legal SPAD word (`0x7fffc`) while
+checking the preceding sentinel. The SPEC v1.7 contract and three-seed VCS
+evidence are recorded in `COMPUTE_CLUSTER_KV_ADDRESS_R53.md`; this does not
+close unrelated descriptor rules or the Compute Cluster sign-off.

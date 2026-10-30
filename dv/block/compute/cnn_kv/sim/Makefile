@@ -25,6 +25,11 @@ random-latency-run: random-latency-compile
 	$(OUT_DIR)/simv +SEED=$(SEED) -cm $(COV_METRICS) \
 		-cm_dir $(OUT_DIR)/coverage.vdb -cm_name cnn_kv_seed_$(SEED) -l $(OUT_DIR)/run.log
 	grep -q '^CNN_KV_RANDOM_LATENCY_PASS ' $(OUT_DIR)/run.log
+	@test "$$(grep -c '^KV_ADDRESS_CONFIG_PASS case=' $(OUT_DIR)/run.log)" -eq 10
+	grep -q '^KV_ADDRESS_BOUNDARY_PASS address=0007fffc read_write=1$$' $(OUT_DIR)/run.log
+	@for case_id in 0 1 2 3 4 5 6 7 8 9; do \
+		grep -q "^KV_ADDRESS_CONFIG_PASS case=$$case_id$$" $(OUT_DIR)/run.log || exit 1; \
+	done
 
 SEEDS ?= 20261021 20261022 20261023
 random-latency-regress: random-latency-compile
@@ -33,6 +38,11 @@ random-latency-regress: random-latency-compile
 			-cm_dir $(OUT_DIR)/coverage.vdb -cm_name cnn_kv_seed_$$seed \
 			-l $(OUT_DIR)/run_seed_$$seed.log; \
 		grep -q "^CNN_KV_RANDOM_LATENCY_PASS .*seed=$$seed " $(OUT_DIR)/run_seed_$$seed.log; \
+		test "$$(grep -c '^KV_ADDRESS_CONFIG_PASS case=' $(OUT_DIR)/run_seed_$$seed.log)" -eq 10; \
+		grep -q '^KV_ADDRESS_BOUNDARY_PASS address=0007fffc read_write=1$$' $(OUT_DIR)/run_seed_$$seed.log; \
+		for case_id in 0 1 2 3 4 5 6 7 8 9; do \
+			grep -q "^KV_ADDRESS_CONFIG_PASS case=$$case_id$$" $(OUT_DIR)/run_seed_$$seed.log || exit 1; \
+		done; \
 	done
 
 TINYNPU_CNN_OUT ?= /tmp/nmaforge_cnn_tinynpu_match_$(SEED)

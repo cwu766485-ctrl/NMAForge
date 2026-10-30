@@ -1,13 +1,13 @@
 # NMAForge Compute Cluster 功能与接口规格（中文）
 
 > **文档编号**：NMA-CL-SPEC-001\
-> **版本**：v1.6，**Parallel Compute Cluster 功能与 DV 需求基线**（不是 RTL/产品 Sign-off）\
+> **版本**：v1.7，**Parallel Compute Cluster 功能与 DV 需求基线**（不是 RTL/产品 Sign-off）\
 > **日期**：2026-10-30\
 > **基线**：从 NMAForge main commit 6742e227c1f52b5266ea19e034b17f33c583b813 延伸，A10 / ABI v7.4\
 > **设计模块**：rtl/top/fabric/compute/ai_accel_compute_cluster.v\
 > **目的**：约束 Compute Cluster 的功能、时序、对外端口和异常处理，作为 UVM Testplan / Scoreboard / Coverage / SVA 的需求来源。
 > **对应 Testplan**：[COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md](../verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md)。
-> **Freeze**：v1.1 冻结 REQ-CL-001～028 与 REQ-PC-001～010；v1.2 冻结外部 AXI reset/fabric epoch 边界；v1.3 冻结 SFU 数值合同；v1.4 冻结七类 Engine 的 4-bit Error ABI、同拍错误优先级和可见写回前缀规则；v1.5 冻结 Matrix Line full-strobe/alignment/fallback/protection 合同；v1.6 冻结 Scalar INT8 有符号累加、算术移位、激活和饱和顺序。未完成的 Engine × Fault × Phase 覆盖仍是验证缺口，不因写入规格而视为通过；接口或可观察行为变化必须升版。
+> **Freeze**：v1.1 冻结 REQ-CL-001～028 与 REQ-PC-001～010；v1.2 冻结外部 AXI reset/fabric epoch 边界；v1.3 冻结 SFU 数值合同；v1.4 冻结七类 Engine 的 4-bit Error ABI、同拍错误优先级和可见写回前缀规则；v1.5 冻结 Matrix Line full-strobe/alignment/fallback/protection 合同；v1.6 冻结 Scalar INT8 有符号累加、算术移位、激活和饱和顺序；v1.7 冻结 KV 字节步长对齐、地址溢出拒绝及错误码。未完成的 Engine × Fault × Phase 覆盖仍是验证缺口，不因写入规格而视为通过；接口或可观察行为变化必须升版。
 
 ## 0. 规范用语及适用范围
 
@@ -241,7 +241,10 @@ R52 在固定测试 SHA 上仅使用已分配的 Activation 0/1/2，对 VDOT/GEM
 
 - KV Write/Read 是片上地址生成与数据搬运，而非完整 Attention 硬件计算。
 - **launch_aux0 = {head_index[15:0], token_index[15:0]}**；src0_stride 表示 Token Byte Stride，src1_stride 表示 Head Byte Stride。
-- 检查 token/head/stride 地址计算、读写方向、相邻缓存区、长度、地址溢出及 Reset/Abort。
+- 所有 KV 访问以 32-bit SPAD word 为单位：src0/dst base 与两个 byte stride 均须 4-byte 对齐；length 须非零。
+- cache byte offset 为 `token_index * src0_stride + head_index * src1_stride`，按无符号完整精度计算。若任一乘积之和超出 `UINT32_MAX`，或本次操作任一源/目标的最后一个 word 起始地址超出 32-bit byte address，必须在发出首个 SPAD 请求前以 `ERR_CONFIG=1` 完成，不得发生读、写或结果副作用。
+- `KV_WRITE` 的线性读区间为 `[src0_base, src0_base + 4*(length-1)]`，缓存写区间为 `[dst_base + cache_offset, dst_base + cache_offset + 4*(length-1)]`；`KV_READ` 的缓存读和线性写区间分别使用相同两种地址形式。
+- 地址未溢出但被配置的 SPAD Protection region 拒绝时，仍按 KV 合并 SPAD 错误 `ERR_SPAD=7` 报告。检查 token/head/stride 地址计算、读写方向、相邻缓存区、长度及 Reset/Abort。
 
 ### 3.7 Mixed FP Dot：0x50/0x51
 
@@ -393,7 +396,7 @@ Functional Coverage / SVA / URG
 | REQ-CL-022 | Matrix：0x30/0x31 保持 4×4 tile-major ABI，并执行 16×16 宏 tile/跨 tile GEMM；batch、transpose、bias、requant、Line WSTRB 结果正确 | M/N 为 4 的整数倍；Line 只发 full WSTRB，非 16-byte 对齐输出走 scalar path；新增稳定性 checker 待 R47 许可恢复后执行 |
 | REQ-CL-023 | SFU：0x32～0x39 定点 Q 格式、近似函数、输出饱和/舍入/打包与 [SFU 数值合同](SFU_NUMERIC_CONTRACT_ZH.md) 一致 | 用独立整数 Golden 做 bit-exact；当前通过域限于合同和 RTM 中列出的长度/边界向量 |
 | REQ-CL-024 | Conv：0x16/0x17 的有符号 3×3 窗口、stride=1、valid/no-padding、INT32 输出和地址正确 | height/width 至少 3，MAX_WIDTH 参数默认 128 |
-| REQ-CL-025 | KV：0x43/0x44 token/head/stride 地址、方向、Memory Image 和异常边界正确 | aux0 高 16=Head、低 16=Token，检查地址计算溢出 |
+| REQ-CL-025 | KV：0x43/0x44 token/head/stride 地址、方向、Memory Image 和异常边界正确 | aux0 高 16=Head、低 16=Token；base/stride 4-byte 对齐；完整精度地址运算不得溢出，溢出须首个 SPAD 请求前报 `ERR_CONFIG=1` |
 | REQ-CL-026 | Mixed FP：0x50/0x51 原始 bit、严格顺序的非融合 FP32 累加、奇数尾元素、至多两笔 Outstanding 与单结果正确 | 采用 FP_EXTENSION_SPEC_ZH.md 原始位型 Golden |
 | REQ-CL-027 | Error：各 Engine 任务 owner、已有提交前缀、合法错误码及异常后无非授权新写正确 | v1.4 统一原因码；Engine 可实现的故障源不同，证据仍按 Engine/Fault/Phase 追踪 |
 | REQ-CL-028 | Perf：cycle/element counters 与唯一任务归属一致；Matrix 活跃/等待事件有可复核计数 | 不假设所有 Engine 的固定周期开销相同 |
@@ -416,7 +419,7 @@ Functional Coverage / SVA / URG
 | OPEN-NUM-01 | **Closed scoped by v1.6/R52** | Legal-activation VDOT/GEMV/GEMM common arithmetic contract and independent edge campaign pass; R51 reserved-activation stimulus is excluded; legacy Conv and broader opcode/shape coverage remain partial under REQ-CL-020 / CL-COV-003 |
 | OPEN-NUM-02 | **Closed in v1.3** | SFU 数值公式和独立 bit-exact oracle 已冻结；合同域的实测闭环见 RTM R21 |
 
-**冻结状态说明**：v1.1 是并行派发合法范围 DV 基线；v1.2 定义协调 reset/fabric epoch 约束；v1.3 定义 SFU 定点算术；v1.4 定义 Compute Engine Error ABI、优先级与写回前缀；v1.5 冻结 Matrix Line 的 full-strobe/alignment/fallback/protection 合同；v1.6 冻结 Scalar INT8 算术顺序与 signed overflow/saturation 规则。其他 Open Item 不因升版自动关闭，未来修改可观察行为必须升版并关联 Testplan 的 Requirement ID。
+**冻结状态说明**：v1.1 是并行派发合法范围 DV 基线；v1.2 定义协调 reset/fabric epoch 约束；v1.3 定义 SFU 定点算术；v1.4 定义 Compute Engine Error ABI、优先级与写回前缀；v1.5 冻结 Matrix Line 的 full-strobe/alignment/fallback/protection 合同；v1.6 冻结 Scalar INT8 算术顺序与 signed overflow/saturation 规则；v1.7 冻结 KV 32-bit word 地址与溢出合同。其他 Open Item 不因升版自动关闭，未来修改可观察行为必须升版并关联 Testplan 的 Requirement ID。
 
 ## 7. 仓库基线及引用文件
 
