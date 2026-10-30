@@ -2,7 +2,7 @@
 
 **Review date:** 2026-10-30
 
-**Selected product/SPEC candidate:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2` (SPEC v1.7 KV address update); latest top-test SHA `f24c5383fad511c8b2e1132c1157942807994759` (R54 DV-only)
+**Selected product/SPEC candidate:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2` (SPEC v1.7 KV address update); latest review harness SHA `ded9d923a432e869592ec8710a22df5501d8d474`; R54 top-test SHA `f24c5383fad511c8b2e1132c1157942807994759`
 - **Prior reviewed product baseline:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6`
 - **Follow-up evidence branch:** `work/compute-cluster-kv-overflow-20261030`
 - **Follow-up evidence replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
@@ -10,11 +10,11 @@
 
 ## Executive disposition
 
-The reviewed product baseline has substantial reproducible evidence for Matrix/SPAD and seven-engine Compute Cluster behavior. The follow-up product candidate adds an exact clean-SHA KV address overflow/alignment fix and R53 boundary evidence; R54 adds an exact-clean real-top KV Protection-denial test without changing product RTL. The Execution RTM accounts for all 38 requirements (`REQ-CL-001..028`, `REQ-PC-001..010`): **24 PASS-SCOPED and 14 PARTIAL**, with no recorded FAIL, BLOCKED_SPEC, or NOT_RUN requirement. PASS-SCOPED means the named scenario passed; it is not full requirement closure.
+The reviewed product baseline has substantial reproducible evidence for Matrix/SPAD and seven-engine Compute Cluster behavior. The follow-up product candidate adds an exact clean-SHA KV address overflow/alignment fix and R53 boundary evidence; R54 adds an exact-clean real-top KV Protection-denial test without changing product RTL. R55–R58 replay the seven-engine test, checker sensitivity, Matrix depth-4 recovery and prefetch-off fallback from clean harness SHA `ded9d92`. The Execution RTM accounts for all 38 requirements (`REQ-CL-001..028`, `REQ-PC-001..010`): **24 PASS-SCOPED and 14 PARTIAL**, with no recorded FAIL, BLOCKED_SPEC, or NOT_RUN requirement. PASS-SCOPED means the named scenario passed; it is not full requirement closure.
 
 The complete requirement-by-requirement execution table lives in the [Compute Cluster Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md). It records each requirement's disposition, testcase/checker or oracle, covered behavior, Run ID, seed, and evidence path. The RTM run/evidence index records source-SHA relationship, tool version, and result; R40–R45 replay the selected candidate SHA from a clean worktree. The [9d9e0f replay manifest](COMPUTE_CLUSTER_FINAL_9D9E0F_MANIFEST_2026-10-28.md) is retained as historical evidence for that earlier candidate. Runs without an exact source identity remain historical/source-equivalent and are not silently upgraded to exact-candidate replay.
 
-The **100%** result is limited to the focused top-compute functional testpoint group reproduced by R40 on six clean seeds (`20261025/26/27/29/30/31`): 29/29 applicable URG variables, with the completion-read bin explicitly excluded as structural N/A and checked to remain zero. R53 separately passes 11/11 KV address-contract directed testpoints per seed on three clean seeds; R54 checks four top-level KV Protection testpoints on its clean source SHA. These directed marker counts are not URG functional coverage. Neither result means 100% requirement, DUT code, or complete Compute Cluster coverage. R52 adds a separate 13-legal-case-per-seed Scalar INT8 numeric testpoint campaign, without an URG percentage claim; R51's reserved activation=3 bin is superseded and excluded. The Matrix default prefetch-enabled FSM remains 49/53 raw transitions; selected guard paths have formal disposition and one edge is exercised in the separate prefetch-disabled profile.
+The **100%** result is limited to the focused top-compute functional testpoint group reproduced by R40 on six clean seeds and reconfirmed by R55 on three seeds: 29/29 applicable URG variables, with completion-read structurally N/A and checked to remain zero. R53 separately passes 11/11 KV address-contract directed testpoints per seed on three clean seeds; R54 checks four top-level KV Protection testpoints. R57 adds Matrix fault/recovery and Line stability evidence; R58 independently checks the prefetch-off fallback profile. These directed marker counts are not whole-design URG coverage. Neither result means 100% requirement, DUT code, or complete Compute Cluster coverage. R52 adds a separate 13-legal-case-per-seed Scalar INT8 numeric campaign, without an URG percentage claim; R51's reserved activation=3 bin is superseded/excluded. The Matrix enabled-profile FSM remains 49/53 raw transitions; selected guard paths have formal disposition and one edge is exercised in the separate prefetch-disabled profile.
 
 ## Version and evidence integrity
 
@@ -34,6 +34,7 @@ The **100%** result is limited to the focused top-compute functional testpoint g
 | Functional testpoint coverage | R35/R36/R40: 29/29 applicable variables, 5/5 applicable response-client bins on each of six R40 seeds | 100% only for this focused group; the structural completion-read bin remains excluded/N/A |
 | Matrix FSM | R28: 5/5 non-vacuous legal properties proven; `ST_PREFETCH_WAIT` and `ST_ERROR_DRAIN` reachability covers hit; raw default-profile FSM 49/53 | Selected guards dispositioned; no forced states and no 100% FSM claim |
 | KV address and Protection | R53: 10 invalid address/alignment cases and final legal SPAD word read/write pass on three clean seeds; R54: real-top Protection denial, KV owner/error completion and sentinel | Address group is 11/11 per seed and R54 hits its four directed points. KV line/condition/FSM/branch is `100/98.77/73.33/96.97%`; four raw KV FSM transitions remain unhit without a formal-unreachable disposition; broader ownership, stride/alias and descriptor contracts remain open |
+| Current clean replay | R55–R58 at `ded9d92`: 3-seed seven-engine UVM, 25/25 checker mutations, Matrix depth-4 18 Golden + 35 fault/recovery cases/seed, and prefetch-off fallback 3 seeds | Named PASS evidence is reproducible; URG R57 preserves enabled-profile 49/53 FSM. R55 has 17/22 assertions with real success, three AXI AR/AW properties without real success and two RAL properties without attempts; R15 remains prior E2E evidence. No full closure implied |
 | Whole-top code coverage | Existing URG databases include DUT, checker, UVM and testbench code | Not presented as DUT-only or functional closure |
 
 R36's compute-only AXI SVA observations show 0 matches for AR/AW stall-to-accept and one W match. This sequence does not exercise those AXI request stalls; R15 remains the evidence for real AR/AW/W assertion successes. R52 closes `OPEN-NUM-01` for the legal common VDOT/GEMV/GEMM arithmetic subset, but does not change the 24 PASS-SCOPED / 14 PARTIAL requirement dispositions.
@@ -67,4 +68,5 @@ R49 closes the defined Matrix Line transfer-contract checker slice. R52 closes t
 - [Open issue list](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md)
 - [KV address R53 evidence](COMPUTE_CLUSTER_KV_ADDRESS_R53.md)
 - [KV Protection R54 evidence](COMPUTE_CLUSTER_KV_PROTECTION_R54.md)
+- [R55–R58 clean replay evidence](COMPUTE_CLUSTER_CLEAN_REPLAY_R55_R58_2026-10-30.md)
 - [Matrix/TinyNPU historical benchmark report](COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md)

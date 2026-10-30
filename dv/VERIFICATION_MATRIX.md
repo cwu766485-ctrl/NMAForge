@@ -34,6 +34,18 @@
 > broader fault crosses or the 38-requirement review. See the
 > [R54 report](../docs/verification/COMPUTE_CLUSTER_KV_PROTECTION_R54.md).
 
+> **2026-10-30 fixed-harness clean replay:** Review harness SHA `ded9d92`
+> passes three-seed real seven-engine UVM (R55), 25/25 passive checker
+> sensitivity mutations (R56), Matrix depth-4 Golden/fault regression (R57),
+> and a separately compiled prefetch-disabled fallback profile (R58). R55 has
+> 100% applicable focused compute testpoints, 5,368 checked words/seed and
+> zero mismatch/unknown/stale/orphan responses. Matrix enabled-profile DUT-only
+> URG is line/condition/FSM/branch `97.08/91.05/93.55/95.52%` (49/53 FSM);
+> no profile percentages are merged. R55's compute-only SVA still has three
+> AXI AR/AW properties without real success and two RAL properties without
+> attempts. The 38-requirement status remains 24 PASS-SCOPED / 14 PARTIAL and
+> CL-DV-v1.0 HOLD. See [R55–R58 evidence](../docs/verification/COMPUTE_CLUSTER_CLEAN_REPLAY_R55_R58_2026-10-30.md).
+
 > **2026-10-30 Scalar INT8 numeric addendum:** R52 passes 13 independent
 > Golden cases per seed on three seeds at clean test SHA `dde7806`, covering
 > VDOT/GEMV/GEMM arithmetic boundaries, output Memory Image, response drain,
