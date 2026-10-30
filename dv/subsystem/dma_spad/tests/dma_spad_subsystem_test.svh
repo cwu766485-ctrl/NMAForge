@@ -864,6 +864,9 @@ class dma_spad_subsystem_test extends dma_block_base_test;
     bit cov_rready_stall_completed;
     bit rready_stall_only;
     bit banked_owner_only;
+    bit banked_reset_only;
+    int unsigned cov_banked_reset_flushed;
+    int unsigned cov_banked_reset_recovered;
     int unsigned rready_stall_cycles_requested;
 
     covergroup dma_rready_stall_cg;
@@ -879,11 +882,23 @@ class dma_spad_subsystem_test extends dma_block_base_test;
         stall_x_completion: cross cp_stall_cycles, cp_completed;
     endgroup
 
+    covergroup banked_reset_epoch_cg;
+        option.per_instance = 1;
+        cp_accepted_read_flushed: coverpoint cov_banked_reset_flushed {
+            bins accepted_banked_read_flushed = {1};
+        }
+        cp_recovery_read: coverpoint cov_banked_reset_recovered {
+            bins banked_read_after_reset = {1};
+        }
+        flush_x_recovery: cross cp_accepted_read_flushed, cp_recovery_read;
+    endgroup
+
     `uvm_component_utils(dma_spad_subsystem_test)
 
     function new(string name = "dma_spad_subsystem_test", uvm_component parent = null);
         super.new(name, parent);
         dma_rready_stall_cg = new;
+        banked_reset_epoch_cg = new;
     endfunction
 
     task run_dma_rready_stall();
@@ -1112,6 +1127,175 @@ class dma_spad_subsystem_test extends dma_block_base_test;
         sys_vif.region0_perm <= 4'b0000;
         `uvm_info("SPAD_BANKED_OWNER_PASS", $sformatf(
             "real ai_accel_memory_fabric banked request grant/response owner tag=3; aligned row=0x100; four bank words match the independent host-write image"), UVM_LOW)
+    endtask
+
+    task run_banked_response_reset_epoch();
+        bit [31:0] expected_lane[4];
+        bit accepted_before_reset;
+        bit reset_asserted;
+        bit reset_released;
+        bit recovery_grant_seen;
+        bit recovery_response_seen;
+        int unsigned poll;
+
+        accepted_before_reset = 1'b0;
+        reset_asserted = 1'b0;
+        reset_released = 1'b0;
+        recovery_grant_seen = 1'b0;
+        recovery_response_seen = 1'b0;
+        cov_banked_reset_flushed = 0;
+        cov_banked_reset_recovered = 0;
+        for (int unsigned lane = 0; lane < 4; lane++)
+            expected_lane[lane] = 32'hc001_0000 ^ ((32'h100 + (lane * 4)) >> 2);
+
+        @(negedge sys_vif.clk);
+        sys_vif.region0_base <= 32'h0000_0100;
+        sys_vif.region0_limit <= 32'h0000_0200;
+        sys_vif.region0_perm <= 4'b1101;
+        repeat (2) @(posedge sys_vif.clk);
+
+        // Accept one real banked read, then request reset before the registered
+        // arbiter response stage can emit its owner/data pulse.
+        @(negedge sys_vif.clk);
+        sys_vif.banked_addr <= 32'h0000_0100;
+        sys_vif.banked_valid <= 1'b1;
+        for (poll = 0; poll < 32; poll++) begin
+            @(posedge sys_vif.clk);
+            if (sys_vif.banked_ready) begin
+                if (sys_vif.request_client !== 3'd3)
+                    `uvm_fatal("SPAD_BANKED_RESET", $sformatf(
+                        "banked request granted with request_client=%0d",
+                        sys_vif.request_client))
+                accepted_before_reset = 1'b1;
+                #1;
+                if (sys_vif.arb_rsp_valid !== 1'b0 ||
+                    sys_vif.banked_rsp_valid !== 1'b0)
+                    `uvm_fatal("SPAD_BANKED_RESET",
+                        "response was already visible before reset request; pending-response test is invalid")
+                // The top-level reset driver samples this request on the
+                // upcoming falling edge and asynchronously clears the fabric's
+                // registered owner/response stages before the next SPAD edge.
+                sys_vif.banked_valid <= 1'b0;
+                sys_vif.subsystem_reset_req <= 1'b1;
+                break;
+            end
+        end
+        if (!accepted_before_reset)
+            `uvm_fatal("SPAD_BANKED_RESET", "banked read was not accepted")
+
+        for (poll = 0; poll < 8; poll++) begin
+            @(negedge sys_vif.clk);
+            #1;
+            if (sys_vif.subsystem_reset_ack === 1'b1) begin
+                reset_asserted = 1'b1;
+                break;
+            end
+        end
+        if (!reset_asserted || sys_vif.resetn !== 1'b0)
+            `uvm_fatal("SPAD_BANKED_RESET", "shared reset assertion handshake timed out")
+        repeat (2) begin
+            @(posedge sys_vif.clk);
+            #1;
+            if (sys_vif.arb_rsp_valid !== 1'b0 ||
+                sys_vif.banked_rsp_valid !== 1'b0 ||
+                sys_vif.desc_rsp_valid !== 1'b0 ||
+                sys_vif.core_rsp_valid !== 1'b0 ||
+                sys_vif.dma_rsp_valid !== 1'b0 ||
+                sys_vif.dma_line_rsp_valid !== 1'b0 ||
+                (|sys_vif.cnm_rsp_valid))
+                `uvm_fatal("SPAD_BANKED_RESET",
+                    "stale fabric response was visible while reset was asserted")
+        end
+
+        @(negedge sys_vif.clk);
+        sys_vif.subsystem_reset_req <= 1'b0;
+        for (poll = 0; poll < 8; poll++) begin
+            @(negedge sys_vif.clk);
+            #1;
+            if (sys_vif.subsystem_reset_ack === 1'b0) begin
+                reset_released = 1'b1;
+                break;
+            end
+        end
+        if (!reset_released || sys_vif.resetn !== 1'b1)
+            `uvm_fatal("SPAD_BANKED_RESET", "shared reset release handshake timed out")
+
+        // A quiet interval after release distinguishes a flushed response from
+        // a delayed stale response that could be misattributed to recovery.
+        repeat (4) begin
+            @(posedge sys_vif.clk);
+            #1;
+            if (sys_vif.arb_rsp_valid !== 1'b0 ||
+                sys_vif.banked_rsp_valid !== 1'b0 ||
+                sys_vif.desc_rsp_valid !== 1'b0 ||
+                sys_vif.core_rsp_valid !== 1'b0 ||
+                sys_vif.dma_rsp_valid !== 1'b0 ||
+                sys_vif.dma_line_rsp_valid !== 1'b0 ||
+                (|sys_vif.cnm_rsp_valid))
+                `uvm_fatal("SPAD_BANKED_RESET",
+                    "pre-reset banked response leaked into the post-reset quiet interval")
+        end
+        cov_banked_reset_flushed = 1;
+
+        // Issue fresh work on the same owner port and verify tag, exclusion,
+        // four-bank data, and the normal SVA sampling edge after recovery.
+        @(negedge sys_vif.clk);
+        sys_vif.banked_addr <= 32'h0000_0100;
+        sys_vif.banked_valid <= 1'b1;
+        for (poll = 0; poll < 32; poll++) begin
+            @(posedge sys_vif.clk);
+            if (sys_vif.banked_ready) begin
+                if (sys_vif.request_client !== 3'd3)
+                    `uvm_fatal("SPAD_BANKED_RESET", $sformatf(
+                        "recovery request granted with request_client=%0d",
+                        sys_vif.request_client))
+                recovery_grant_seen = 1'b1;
+                break;
+            end
+        end
+        if (!recovery_grant_seen)
+            `uvm_fatal("SPAD_BANKED_RESET", "post-reset banked recovery read was not granted")
+
+        @(negedge sys_vif.clk);
+        sys_vif.banked_valid <= 1'b0;
+        for (poll = 0; poll < 16; poll++) begin
+            @(posedge sys_vif.clk);
+            #1;
+            if (sys_vif.banked_rsp_valid) begin
+                if (!sys_vif.arb_rsp_valid ||
+                    sys_vif.arb_rsp_client !== 3'd3 ||
+                    sys_vif.arb_rsp_is_line !== 1'b0 ||
+                    sys_vif.desc_rsp_valid || sys_vif.core_rsp_valid ||
+                    sys_vif.dma_rsp_valid || sys_vif.dma_line_rsp_valid ||
+                    (|sys_vif.cnm_rsp_valid))
+                    `uvm_fatal("SPAD_BANKED_RESET", $sformatf(
+                        "recovery response owner mismatch: valid=%0b client=%0d line=%0b",
+                        sys_vif.arb_rsp_valid, sys_vif.arb_rsp_client,
+                        sys_vif.arb_rsp_is_line))
+                if (sys_vif.banked_data0 !== expected_lane[0] ||
+                    sys_vif.banked_data1 !== expected_lane[1] ||
+                    sys_vif.banked_data2 !== expected_lane[2] ||
+                    sys_vif.banked_data3 !== expected_lane[3])
+                    `uvm_fatal("SPAD_BANKED_RESET", $sformatf(
+                        "recovery data mismatch: got={%08h,%08h,%08h,%08h} expected={%08h,%08h,%08h,%08h}",
+                        sys_vif.banked_data3, sys_vif.banked_data2,
+                        sys_vif.banked_data1, sys_vif.banked_data0,
+                        expected_lane[3], expected_lane[2],
+                        expected_lane[1], expected_lane[0]))
+                recovery_response_seen = 1'b1;
+                break;
+            end
+        end
+        if (!recovery_response_seen)
+            `uvm_fatal("SPAD_BANKED_RESET", "no tagged banked response after reset recovery")
+        @(posedge sys_vif.clk);
+        #1;
+        cov_banked_reset_recovered = 1;
+        banked_reset_epoch_cg.sample();
+        @(negedge sys_vif.clk);
+        sys_vif.region0_perm <= 4'b0000;
+        `uvm_info("SPAD_BANKED_RESET_EPOCH_PASS", $sformatf(
+            "accepted banked read flushed by reset with no stale response; tag-3 four-bank read recovers and matches independent image"), UVM_LOW)
     endtask
 
     function void build_phase(uvm_phase phase);
@@ -4153,6 +4337,7 @@ class dma_spad_subsystem_test extends dma_block_base_test;
         int unsigned cnm_reset_phase_first;
         rready_stall_only = $test$plusargs("A10_RREADY_STALL_ONLY");
         banked_owner_only = $test$plusargs("A10_BANKED_OWNER_ONLY");
+        banked_reset_only = $test$plusargs("A10_BANKED_RESET_ONLY");
         phase.raise_objection(this);
         wait (sys_vif.resetn === 1'b1);
         preload_scratchpad();
@@ -4165,6 +4350,12 @@ class dma_spad_subsystem_test extends dma_block_base_test;
 
         if (banked_owner_only) begin
             run_banked_response_owner_probe();
+            phase.drop_objection(this);
+            return;
+        end
+
+        if (banked_reset_only) begin
+            run_banked_response_reset_epoch();
             phase.drop_objection(this);
             return;
         end
