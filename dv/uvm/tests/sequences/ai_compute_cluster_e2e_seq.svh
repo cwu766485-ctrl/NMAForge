@@ -55,6 +55,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] CONTRACT_Y1_LOCAL = 32'h0004_7500;
     localparam bit [31:0] CONTRACT_MUTATED_Y_LOCAL = 32'h0004_7600;
     localparam bit [31:0] CONTRACT_SFU_Y_LOCAL = 32'h0004_7800;
+    localparam bit [31:0] MATRIX_LATCH_Y_LOCAL = 32'h0003_8000;
+    localparam bit [31:0] MATRIX_LATCH_MUTATED_Y_LOCAL = 32'h0003_9000;
     localparam bit [31:0] SCALAR_A_LOCAL = 32'h0004_6000;
     localparam bit [31:0] SCALAR_B_LOCAL = 32'h0004_6100;
     localparam bit [31:0] SCALAR_Y_LOCAL = 32'h0004_6200;
@@ -1121,6 +1123,91 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_fatal("CLUSTER_PARAM_LATCH", "launch-time source/destination snapshot was not retained")
         `uvm_info("CLUSTER_PARAMETER_LATCH_PASS",
             "mutating source and destination descriptor words after scalar launch did not alter the in-flight task",
+            UVM_LOW)
+        clear_contract_queues(32'd1);
+    endtask
+
+    task automatic run_matrix_inflight_parameter_latch_test(
+        input int signed expected_matrix[0:15][0:31]
+    );
+        int unsigned word_idx;
+        int unsigned poll;
+        int unsigned launch_before;
+        bit busy_seen;
+        bit [31:0] completion_base;
+        completion_base = CLUSTER_CONTRACT_CPLQ + 32'h300;
+
+        // The matrix operands and independent 16x32x64 Golden were prepared
+        // before the first GEMM in this sequence. Use disjoint destinations so
+        // this probe observes only the in-flight descriptor snapshot.
+        for (word_idx = 0; word_idx < 512; word_idx++) begin
+            spad_write(MATRIX_LATCH_Y_LOCAL + (word_idx << 2),
+                       32'hbad0_6a00 | word_idx);
+            spad_write(MATRIX_LATCH_MUTATED_Y_LOCAL + (word_idx << 2),
+                       32'hbad0_6b00 | word_idx);
+        end
+        write_v3_desc(CLUSTER_CONTRACT_CMDQ, 8'h30, 16'h0685,
+                      MATRIX_A_LOCAL, MATRIX_B_LOCAL, MATRIX_LATCH_Y_LOCAL,
+                      16'd16, 16'd32, 16'd16);
+        launch_before = compute_vif.launch_sample_count;
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        busy_seen = 1'b0;
+        for (poll = 0; poll < 10000; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.engine_busy[3]) begin
+                busy_seen = 1'b1;
+                break;
+            end
+        end
+        if (!busy_seen)
+            `uvm_fatal("CLUSTER_MATRIX_PARAM_LATCH",
+                "Matrix task did not become active before descriptor mutation")
+
+        // Replace the backing descriptor with a different, otherwise legal
+        // Matrix task while the original long GEMM is active. The accepted
+        // task must keep its launch-time source, destination, shape and flags.
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h04, CONTRACT_B_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h08, CONTRACT_SHARED_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h10, MATRIX_LATCH_MUTATED_Y_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h14, {16'd4, 16'd4});
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h18, 32'd4);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h1c, 32'h0000_0006);
+
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        for (word_idx = 0; word_idx < 512; word_idx++) begin
+            expect_spad(MATRIX_LATCH_Y_LOCAL + (word_idx << 2),
+                        expected_matrix[word_idx / 32][word_idx % 32],
+                        $sformatf("in-flight Matrix latched Golden[%0d]", word_idx));
+            expect_spad(MATRIX_LATCH_MUTATED_Y_LOCAL + (word_idx << 2),
+                        32'hbad0_6b00 | word_idx,
+                        $sformatf("in-flight Matrix mutation destination sentinel[%0d]", word_idx));
+        end
+        expect_completion(completion_base, 16'h0685,
+                          expected_matrix[15][31], 32'd512,
+                          "in-flight Matrix parameter latch");
+        if (compute_vif.launch_sample_count != launch_before + 1 ||
+            compute_vif.launch_snapshot_src0[3] !== MATRIX_A_LOCAL ||
+            compute_vif.launch_snapshot_src1[3] !== MATRIX_B_LOCAL ||
+            compute_vif.launch_snapshot_dst[3] !== MATRIX_LATCH_Y_LOCAL ||
+            compute_vif.launch_snapshot_m[3] !== 16'd16 ||
+            compute_vif.launch_snapshot_n[3] !== 16'd32 ||
+            compute_vif.launch_snapshot_k[3] !== 16'd16 ||
+            compute_vif.launch_snapshot_flags[3] !== 8'd0)
+            `uvm_fatal("CLUSTER_MATRIX_PARAM_LATCH", $sformatf(
+                "Matrix launch snapshot changed: count=%0d/%0d src=%08h/%08h dst=%08h shape=%0d/%0d/%0d flags=%02h",
+                compute_vif.launch_sample_count, launch_before + 1,
+                compute_vif.launch_snapshot_src0[3],
+                compute_vif.launch_snapshot_src1[3],
+                compute_vif.launch_snapshot_dst[3],
+                compute_vif.launch_snapshot_m[3],
+                compute_vif.launch_snapshot_n[3],
+                compute_vif.launch_snapshot_k[3],
+                compute_vif.launch_snapshot_flags[3]))
+        `uvm_info("CLUSTER_MATRIX_PARAMETER_LATCH_PASS",
+            "mutating Matrix source, destination, shape, and transpose descriptor fields after launch preserved the original 16x32x64 Golden image and completion",
             UVM_LOW)
         clear_contract_queues(32'd1);
     endtask
@@ -2398,6 +2485,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_dma_store_response_test();
         run_launch_snapshot_and_unused_fields_test();
         run_inflight_parameter_latch_test();
+        run_matrix_inflight_parameter_latch_test(matrix_golden);
         run_shared_readonly_isolation_test();
         check_request_stability();
         run_engine_reset_drain_sweep();
