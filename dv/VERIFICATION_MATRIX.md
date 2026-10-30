@@ -1,3 +1,15 @@
+> **2026-10-30 R99 CNM Protection and selected memory-fabric reset:** At exact
+> clean SHA `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`, the full three-seed
+> DMA/SPAD/CNM regression passes after aligning CNM Protection errors with the
+> registered response. Selected source-A/source-B/destination-deny bins are
+> 100%, storage is preserved, and UVM severity is 0/0/0. The user-selected
+> in-repository `ai_accel_memory_fabric` reset target passes all three reset
+> functional groups at 100% on seeds `20261025/26/27`, including pending owner
+> flush and post-reset DMA/CNM recovery. Same-SHA Top Smoke and 20-case seeded
+> Top pass. This closes only the selected reset evidence item; RTM remains
+> 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains HOLD. See the
+> [R99 report](../docs/verification/COMPUTE_CLUSTER_MEMORY_FABRIC_RESET_R99_2026-10-30.md).
+
 > **2026-10-30 R90 descriptor validator boundaries:** At exact clean SHA
 > `7837701cefe606a01abd517d46788b982da0f2e4`, VCS passes 27 supported opcode
 > classifications, tile-pack and 21 invalid cases. This is validator/decode

@@ -8,17 +8,23 @@
 
 | Item | Frozen identity |
 |---|---|
-| Product RTL/SPEC candidate | `9d4e9abdba1f745644a485960620fa6bbc4979db` (R73; SPEC v1.8 busy-time CPLQ_HEAD contract) |
+| Product RTL/SPEC candidate | `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413` (R99 CNM Protection response alignment; SPEC v1.8 unchanged) |
 | Latest real-top descriptor-latch SHA | `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28` (R77 SFU descriptor-latch test; Matrix R74 remains separately evidenced) |
-| Latest exact clean code/test SHA | `d66431b8905ef7c1cccecef16a3cd34f4d62f9b0` (R93 real-top all-seven-engine pair overlap; verification-only change) |
+| Latest exact clean code/test SHA | `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413` (R99 named regressions; no claim of full-coverage closure) |
 | Prior reviewed product baseline | `6848a414eaeaa05cf9e1411cf55d9d27333208a6` |
 | Latest published closeout snapshot before this follow-up | `fc370aad6b8360af9affb52cb30909ec97d79be3` |
-| Review branch | `work/compute-cluster-kv-overflow-20261030` |
-| Evidence/test commit | R53 `f916874a9ce60741a4516eaf9e33ebcae4a676c2`; R54 `f24c5383fad511c8b2e1132c1157942807994759`; R55–R58/R59 `ded9d923a432e869592ec8710a22df5501d8d474`; R60 `2768843da1b3f3a0e988645746000d5befadf12b`; R73 `9d4e9abdba1f745644a485960620fa6bbc4979db`; R74 `519ca161f3c2ce8beab78161a88bbdcb6cbcdc61`; R75 `969992291732cf694d7de4bdfef2808d4f017d57`; R77 `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28`; R80/R81/R82 `e4c1e7a93a0afe1c89128996c6eaf9bff5caf907`; R83 `071578d997d69ebf011fe5e7d4742fae3e0f73ac`; R84 `8bc2ee28725d09ac75ecfcb0417e1ba47fd688f2`; R85 `5a35d60d20ee6fc6622e46f92d05fc1ef00dd14d`; R86 `3d6fe5c58631bdeb6333b6e3572f24eeba7da1ef`; R87 `402c8ce4689ae48cfee624f1f5fdca66d534bbbf`; R88 `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec`; R89 benchmark docs `951f83ecbdac1bd153c4d15a3addf11099aa49b7`; R90/R91 tests `eeae0c442bf5f5a747c1fa056cb4755fabb814c1` / `7837701cefe606a01abd517d46788b982da0f2e4`; R93 `d66431b8905ef7c1cccecef16a3cd34f4d62f9b0` |
+| Review branch | `feat/compute-cluster-closeout-6848a41` |
+| Evidence/test commit | R53 `f916874a9ce60741a4516eaf9e33ebcae4a676c2`; R54 `f24c5383fad511c8b2e1132c1157942807994759`; R55–R58/R59 `ded9d923a432e869592ec8710a22df5501d8d474`; R60 `2768843da1b3f3a0e988645746000d5befadf12b`; R73 `9d4e9abdba1f745644a485960620fa6bbc4979db`; R74 `519ca161f3c2ce8beab78161a88bbdcb6cbcdc61`; R75 `969992291732cf694d7de4bdfef2808d4f017d57`; R77 `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28`; R80/R81/R82 `e4c1e7a93a0afe1c89128996c6eaf9bff5caf907`; R83 `071578d997d69ebf011fe5e7d4742fae3e0f73ac`; R84 `8bc2ee28725d09ac75ecfcb0417e1ba47fd688f2`; R85 `5a35d60d20ee6fc6622e46f92d05fc1ef00dd14d`; R86 `3d6fe5c58631bdeb6333b6e3572f24eeba7da1ef`; R87 `402c8ce4689ae48cfee624f1f5fdca66d534bbbf`; R88 `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec`; R89 benchmark docs `951f83ecbdac1bd153c4d15a3addf11099aa49b7`; R90/R91 tests `eeae0c442bf5f5a747c1fa056cb4755fabb814c1` / `7837701cefe606a01abd517d46788b982da0f2e4`; R93 `d66431b8905ef7c1cccecef16a3cd34f4d62f9b0`; R99 `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413` |
 | SPEC | Compute Cluster SPEC v1.8; R73 records busy-time CPLQ_HEAD progress; earlier KV address overflow/alignment is frozen in v1.7 |
 | VCS | Synopsys VCS `V-2023.12-SP1_Full64`; R49 passed the corrected Matrix checker on three seeds; R50 passed the published-snapshot six-seed UVM and Top Smoke; R52 passed the legal Scalar INT8 numeric campaign; R53 passed KV boundary checks; R75 passed the SFU block random regression on three seeds, with merged URG |
 
 The review branch is isolated from the v2 research branch. R53 changes the KV product RTL to reject invalid 32-bit word addresses before SPAD access and adds its SPEC/test evidence. Earlier R40–R52 evidence retains its own exact source/test SHA relationships.
+
+## R99 selected-fabric reset and CNM Protection response alignment
+
+At exact clean code/test SHA `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`, VCS V-2023.12-SP1 passes the full three-seed DMA/SPAD/CNM subsystem regression after fixing a real response-pipeline misalignment: the CNM Protection deny bit now remains aligned with the registered arbiter response. A/B out-of-range source and denied destination-write bins are 100%, storage is preserved, Protection completion is returned, recovery passes, and each seed reports UVM severity `0/0/0`. The user's selected `ai_accel_memory_fabric` reset target passes three seeds with 3/3 reset functional groups at 100%, including pending owner flush and post-reset DMA/CNM recovery. `ai_smoke` and 20-case `ai_run` pass at this candidate. Exact commands, paths, assertion activity and environment notes are in the [R99 report](COMPUTE_CLUSTER_MEMORY_FABRIC_RESET_R99_2026-10-30.md).
+
+R99 closes the selected memory-fabric reset evidence item, not all of `REQ-CL-018`. The 38-row disposition remains 24 PASS-SCOPED / 14 PARTIAL, and `CL-DV-v1.0` remains **HOLD** because broader legal Engine × Fault × Phase × Reset crossings and other partial requirements remain.
 
 ## Requirement disposition
 
@@ -38,12 +44,12 @@ R46/R47 were historical `BLOCKED_ENV` attempts; R48 exposed a testbench coverage
 | Area | Evidence | Remaining issue / disposition |
 |---|---|---|
 | Golden and memory image | R40: six clean seeds on the selected product SHA; seven-engine memory scoreboard; R45: Digits 360/360 with bit-exact integer Golden | Bounded to tested operations and shapes; see the RTM partial rows |
-| Shared SPAD and response ownership | R93 observes all 21 real-top production engine pairs concurrently with disjoint SPAD regions and checks each Golden image/completion on three seeds; R40/R31/R32 retain selected memory/owner/reset checks | Real-top pair overlap is closed within `CL-COV-004`; exhaustive requester/owner × bank × fault/backpressure/reset combinations and actual external-fabric reset qualification remain open |
+| Shared SPAD and response ownership | R93 observes all 21 real-top production engine pairs concurrently with disjoint SPAD regions and checks each Golden image/completion on three seeds; R40/R31/R32 retain selected memory/owner/reset checks | Real-top pair overlap is closed within `CL-COV-004`; exhaustive requester/owner × bank × fault/backpressure/reset combinations and exhaustive legal reset/fault crossings remain open; the user-selected `ai_accel_memory_fabric` reset point passes R99 |
 | Backpressure, parity, protection, abort and reset | R30–R32 and R40–R41 cover named Matrix, CNM, DMA/SPAD, parity, reset and mutation slices | No complete legal `Engine × Fault × Phase × Reset` matrix has been demonstrated |
 | Mutation sensitivity | R41 catches 25/25 passive checker observation mutations for address, data, owner, WSTRB and completion lifecycle | This is checker sensitivity, not a DUT RTL mutation score; broader fault/error injection remains open |
 | Matrix FSM | R28 records raw enabled-profile coverage 49/53, five non-vacuous formal proofs, state reachability covers, and the separate prefetch-disabled transition | Preserve raw 49/53; no illegal stimulus is used to force bins. Remaining transitions are dispositioned only within the documented proof assumptions/configuration |
 | Matrix Line output | SPEC v1.5 freezes aligned full-`WSTRB` Line writes, scalar fallback for 4-byte-aligned non-Line-aligned output, protection-prefix behavior, and partial/zero WSTRB as unsupported. `MATRIX-LINE-001` checks these interface rules plus stall stability | R49 passes three seeds; each records 312 stable stalls, full WSTRB/alignment, fallback and protection checks, and reference-memory comparison. Scoped Line contract is closed; this does not close the broader Matrix requirement rows |
-| SVA and compile diagnostics | R92 current-source-content URG merge: 20/22 assertion properties with real successes, all five AXI master assertions active, and 3/3 AR/AW/W stall covers hit; R92 UVM compile has no `Warning-`, `Error-`, or `[TFIPC]` diagnostics | Two UVM RAL internals have no attempts. Behavioral responder evidence does not qualify an external fabric or all requester/fault/backpressure combinations; separate Top Smoke retains its fixture warning |
+| SVA and compile diagnostics | R92 current-source-content URG merge: 20/22 assertion properties with real successes, all five AXI master assertions active, and 3/3 AR/AW/W stall covers hit; R92 UVM compile has no `Warning-`, `Error-`, or `[TFIPC]` diagnostics | Two UVM RAL internals have no attempts. R99 separately exercises the selected SPAD fabric reset workload: `ap_single_response_owner` and `ap_cnm_response_tag` record 3,921 and 144 real successes, with zero failures/incomplete. This does not close all requester/fault/backpressure combinations; separate Top Smoke retains its fixture warning |
 | Descriptor and scalar numeric boundaries | R52 checks the common Scalar INT8 arithmetic semantics across 13 legal VDOT/GEMV/GEMM Golden cases per seed, with 60 output words checked on three seeds | `OPEN-NUM-01` closes within this common arithmetic scope; legacy Conv and broader `REQ-CL-020` opcode/shape/fault coverage remain PARTIAL, as do descriptor boundary rules |
 | SFU launch-parameter retention | R75 block-core GELU input mutation plus R77 real-top RMSNorm descriptor mutation during divider wait; independent Golden, completion and destination sentinel checks | R77 adds one legal top-level SFU descriptor-latch point, but other engines/fields and descriptor-boundary crosses remain open; `REQ-CL-005` stays PARTIAL |
 | KV address and Protection | R53 checks ten invalid arithmetic/alignment classes per seed plus legal `0x7fffc` read/write; R54 checks a real-top Protection denial, KV owner/error completion, and sentinel preservation | SPEC v1.7 overflow/alignment slice is covered 11/11 per seed; R54 directed group passes 4/4 points. Raw KV FSM remains 11/15 transitions; broader ownership, stride/alias, and Engine descriptor contracts remain open |
@@ -63,7 +69,7 @@ R76 at the latest exact clean code/test SHA `969992291732cf694d7de4bdfef2808d4f0
 Before an independent review can consider sign-off, the open items must be closed or receive an approved scope disposition, including:
 
 1. Complete legal fault/reset phase crosses and production-top shared-SPAD ownership cases, or document approved bounded exclusions.
-2. Qualify the coordinated reset/epoch contract against the selected external fabric, or attach its approved compliance review.
+2. The selected in-repository `ai_accel_memory_fabric` reset/epoch point is covered by R99. Close the broader legal Engine × Fault × Phase × Reset crossings or document approved bounded exclusions.
 3. Freeze and test remaining descriptor boundaries; R52 closes the common Scalar INT8 arithmetic contract within its legal VDOT/GEMV/GEMM subset, R53 closes the KV 32-bit overflow/alignment slice, and R54 closes one top-level KV Protection-denial path. Legacy Conv, other Engine descriptor limits and broader shared-owner/fault coverage remain open.
 4. Review all 38 RTM rows and their evidence paths with an independent reviewer.
 
@@ -71,6 +77,7 @@ PPA and full pretrained-model deployment are outside this Functional DV decision
 
 ## Evidence documents
 
+- [R99 selected memory-fabric reset evidence](COMPUTE_CLUSTER_MEMORY_FABRIC_RESET_R99_2026-10-30.md)
 - [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)
 - [Open issues](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md)
 - [Sign-off readiness](COMPUTE_CLUSTER_DV_SIGNOFF_READINESS_2026-10-27.md)

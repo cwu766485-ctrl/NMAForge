@@ -2,7 +2,7 @@
 
 **Review date:** 2026-10-30
 
-**Selected product/SPEC candidate:** `9d4e9abdba1f745644a485960620fa6bbc4979db` (SPEC v1.8); latest exact-clean verification/test SHA `d66431b8905ef7c1cccecef16a3cd34f4d62f9b0` (R93 real-top all-engine pairwise overlap; product RTL/SPEC unchanged); R54 top-test SHA `f24c5383fad511c8b2e1132c1157942807994759`
+**Selected product/SPEC candidate:** `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413` (R99 CNM Protection response alignment; SPEC v1.8); latest exact-clean verification/test SHA `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`; R54 top-test SHA `f24c5383fad511c8b2e1132c1157942807994759`
 - **Prior reviewed product baseline:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6`
 - **Follow-up evidence branch:** `work/compute-cluster-kv-overflow-20261030`
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
@@ -44,11 +44,12 @@ The **100%** result is limited to the focused top-compute functional testpoint g
 
 R36's compute-only AXI SVA observations show 0 matches for AR/AW stall-to-accept and one W match. This sequence does not exercise those AXI request stalls; R15 remains the evidence for real AR/AW/W assertion successes. R52 closes `OPEN-NUM-01` for the legal common VDOT/GEMV/GEMM arithmetic subset, but does not change the 24 PASS-SCOPED / 14 PARTIAL requirement dispositions.
 
+R99 closes `OPEN-CL-003` for the designated in-repository `ai_accel_memory_fabric`: three seeds cover pending response-owner flush and recovery, with the three reset groups at 100%. The external DDR model remains behavioral; the unresolved broader legal reset/fault crosses stay under `CL-COV-006`. Evidence: [R99 report](COMPUTE_CLUSTER_MEMORY_FABRIC_RESET_R99_2026-10-30.md).
+
 ## Remaining closure items
 
 | ID | Affected scope | Remaining evidence or contract |
 |---|---|---|
-| `OPEN-CL-003` | REQ-CL-018, REQ-PC-009/010 | Qualify coordinated reset/epoch behavior against the selected external AXI fabric, or attach its approved compliance evidence. Current reset evidence uses a behavioral responder. |
 | `OPEN-CL-002` | REQ-CL-002/015/020/024/025 | R53 freezes and verifies KV 32-bit overflow/alignment; R54 verifies one real-top KV Protection denial path. Other Engine descriptor ranges/aliases/strides/zero rules and wider KV boundary/ownership cases remain open. |
 | `CL-COV-006` | REQ-CL-017/019/027, REQ-PC-006/007/009/010 | Expand legal Engine × Fault × Phase × Reset coverage with completion-code and accepted-write-prefix checkers. The current selected cases do not close the full cross. |
 | `CL-COV-002/003` | Dataflow, opcode/shape and protocol coverage | R71 observes Matrix Line stall stability during real-top Matrix/CNM overlap and R93 observes all real-top engine pairs. Broader legal requester/backpressure/fault crosses and opcode × shape × numeric boundaries remain partial. |
@@ -132,3 +133,8 @@ At exact clean code/test SHA `43a84cac688a56e789162dfa5a8106551779abdb`, the thr
 ## R92 current-source SVA closeout — 2026-10-30
 
 At R91/R92 source content (all `rtl/`, `dv/`, and `docs/spec/` files byte-identical across source tree SHAs `43a84cac` and `4c5b9d4`), the combined URG database reports 20/22 assertions with real successes, zero failures/incomplete, and three of three AR/AW/W stall covers hit. Five top AXI protocol assertions all have nonzero real successes. Two UVM RAL internal properties remain without attempts. The mixed E2E checks a checked-in behavioral AXI responder; external target-fabric qualification is still open. This updates the SVA evidence only: 24 PASS-SCOPED / 14 PARTIAL and `CL-DV-v1.0` **HOLD** remain. See [R92](COMPUTE_CLUSTER_SVA_REPLAY_R92_2026-10-30.md).
+
+
+## R99 selected memory-fabric reset addendum — 2026-10-30
+
+R99 is the current exact clean candidate `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`. The selected in-repository `ai_accel_memory_fabric` reset/epoch evidence is closed for pending DMA/CNM response ownership and post-reset recovery. The same SHA fixes CNM Protection response alignment and passes the full three-seed subsystem regression, Top Smoke, and 20-case seeded Top. See [R99 evidence](COMPUTE_CLUSTER_MEMORY_FABRIC_RESET_R99_2026-10-30.md). The overall decision remains **HOLD** (24 PASS-SCOPED / 14 PARTIAL); broader legal fault/phase/reset crossings remain open.
