@@ -14,7 +14,7 @@
 - **[AS-IS]** 表示已经在指定 RTL 或产品规格中核实的当前行为。
 - **[REQ]** 表示计划约定的设计/集成行为，应经过 Review 后成为 Pass/Fail 标准；**不能仅因本文写入就假定 RTL 已满足**。
 - **[OPEN]** 表示尚未得到统一规范、需要进一步确认或修正的差异；属于未验证或被阻塞的条件，不能凭本文自动转为通过。
-- 本文沿用 v1.0 的七引擎算子和数值基线，并由 v1.1 的 REQ-PC 条款明确 CMDQ 并发、CPLQ 保序、共享 SPAD 所有权及 abort/drain。v1.3 关闭 SFU 定点公式歧义；v1.4 冻结 Error ABI、同拍优先级和写回前缀规则；v1.5 冻结 Matrix Line 输出合同。
+- 本文沿用 v1.0 的七引擎算子和数值基线，并由 v1.1 的 REQ-PC 条款明确 CMDQ 并发、CPLQ 保序、共享 SPAD 所有权及 abort/drain。v1.3 关闭 SFU 定点公式歧义；v1.4 冻结 Error ABI、同拍优先级和写回前缀规则；v1.5 冻结 Matrix Line 输出合同；v1.6 冻结并验证 Scalar INT8 common arithmetic contract。
 - 此文档的 DUT 本体只包括 **ai_accel_compute_cluster** 与内部七类计算核心；顶层 Opcode Decode、普通 Compute Request MUX、SPAD Arbiter、Scratchpad、DMA、AXI、Descriptor Validator、Command Processor 和 Completion Writer 均属于上层/外围。
 - **推荐 Subsystem DV 边界**是 Cluster + 与实际顶层等价的 Compute Request MUX/Response Routing + 真实 SPAD Arbiter + 四 Bank 行为 SRAM。仅测 Cluster 裸模块不能证明真实 SPAD 仲裁无误。
 - 本 SPEC 不声称其为七路同周期发射、Systolic Array 或完整 RISC-V Vector FP ALU。队列按 CMDQ 顺序逐个派发；最多七个不同引擎各有一个活动任务。
@@ -161,7 +161,7 @@ write_fire   = request_fire &&  selected_spad_write
 | Matrix 128-bit Line | **matrix_line_valid**, **matrix_line_write**, **matrix_line_addr[31:0]**, **matrix_line_wdata[127:0]**, **matrix_line_wstrb[15:0]**, **arb_core_line_ready**, **line_prot_error**, **spad_line_raw_error** |
 
 **[REQ-CL-010]** Banked 读取、普通 32-bit 请求、128-bit Line 写回分别使用其对应握手规则、保护判断和数据比对；Line Byte Strobe 为独立的 16-bit 检查对象。\
-**[v1.5 Matrix Line 合同]** Line 端口仅发送 16-byte aligned 的 full `WSTRB=16'hffff` 写；4-byte aligned 但非 16-byte aligned 的输出 chunk 改走四笔有序 32-bit SPAD 写；partial/zero WSTRB 不受支持。Protection error 拒绝整笔 Line transaction，先前已接受输出保留为连续前缀。`OPEN-CL-004` 仅保留新增独立 checker 的执行闭环，详见 Testplan `MATRIX-LINE-001` 与 RTM R47。
+**[v1.5 Matrix Line 合同]** Line 端口仅发送 16-byte aligned 的 full `WSTRB=16'hffff` 写；4-byte aligned 但非 16-byte aligned 的输出 chunk 改走四笔有序 32-bit SPAD 写；partial/zero WSTRB 不受支持。Protection error 拒绝整笔 Line transaction，先前已接受输出保留为连续前缀。`OPEN-CL-004` 的该合同执行子项由 R49 三 Seed 独立 checker 关闭；更广 Matrix requirement/fault crosses 仍 partial。
 
 **[Matrix P0-B 实现约束，2026-10-26]** Matrix 默认最多允许 4 笔已接受的 Banked Read 在途，可用 `MAX_OUTSTANDING_READS=2` 配置两笔模式。请求端只在 `valid && ready` 时推进地址；Response 无 ready/ID，必须按接受顺序返回。Controller 的本地 response metadata FIFO 保存 A/B、4×4 group、K group 和完整地址，按该 metadata 写入对应 operand buffer。Abort、watchdog、保护或 parity fault 会停止后续发读，并在报告 completion/error 前排空所有已接受 response。该实现把读请求和 response latency 流水化；它不表示下一 K group 已与当前 MAC 重叠，后者仍属 ping-pong prefetch 计划。
 
@@ -209,7 +209,7 @@ VCS Matrix controller 另保留每任务 FSM state-cycle、Arbiter stall、响�
 4. Shift 后再执行 Activation：`0` 为 identity；`1` 为 ReLU `max(x,0)`；`2` 为 ReLU6 `min(max(x,0),6)`。当前 RTL 对编码 `3` 也走 identity datapath，但该编码未分配给软件，合规 descriptor 不得依赖此行为。
 5. Activation 后 saturate to signed INT32：大于 `2^31-1` 输出 `0x7fffffff`，小于 `-2^31` 输出 `0x80000000`，其余输出低 32-bit two's-complement。Bias、dot product、shift、activation、saturation 的顺序不可调换。输出每个元素写入一个 32-bit word，按当前 opcode 的逻辑输出顺序推进地址。
 
-该合同消除 `OPEN-NUM-01` 的 Scalar 算术规则歧义；测试覆盖范围仍需由 RTM 的 Run ID、Seed、Golden 和 Memory Image 证据决定，不因合同冻结自动变成 PASS。
+R51 在固定测试 SHA 上对 VDOT/GEMV/GEMM 的共同算术路径完成独立边界向量验证，因此 `OPEN-NUM-01` 的合同歧义和该测试范围内的验证项已关闭。legacy Conv、其它合法 opcode/shape 和完整 `REQ-CL-020` 覆盖仍按 RTM 保持 PARTIAL，并由 `CL-COV-003` 跟踪；不能从共享 datapath 推断未执行的地址生成与算子场景已通过。
 
 ### 3.2 CNM：Bank-Local PE 与 Global Reduction
 
@@ -378,7 +378,7 @@ Functional Coverage / SVA / URG
 | OPEN-CL-006 | **Closed in v1.4** | 七类 Engine 的统一 4-bit 原因码已冻结；Engine 能力差异显式列于 4.2.1 | 码表冻结不等于所有 Engine × Fault 的覆盖已完成 |
 | OPEN-CL-003 | P0 部分冻结 | 正常请求/返回归属用真实 Arbiter；REQ-PC-010 已冻结 reset/fabric epoch 边界；非 FP outstanding 深度及 Abort drain/restart 仍待逐 Engine 核对 | 未定异常组合 Testpoint=BLOCKED_SPEC |
 | OPEN-CL-002 | P1 | 每个 Opcode 的参数合法边界、地址别名/越界、零值规则是什么？ | 数值/地址 Reference 缺口 |
-| OPEN-CL-004 | P1 verification closure | v1.5 合同已冻结；MATRIX-LINE-001 新 checker 尚未运行 | R47 因 VCS license server 不可达而 BLOCKED_ENV；仿真通过前保持 OPEN |
+| OPEN-CL-004 | **Closed scoped by SPEC v1.5/R49** | full WSTRB/alignment/fallback/protection behavior has a three-seed independent checker and reference-memory evidence; broader REQ-CL-010/022 remain partial |
 | OPEN-CL-007 | **Contract frozen in v1.4** | Engine-specific 同拍优先级和输出前缀语义已列于 4.2.2/4.2.3 | 合法 Fault × Phase × Reset 交叉覆盖继续追踪为 PARTIAL |
 | SFU-NUM-01 | **Closed in v1.3** | SFU 的逐位整数公式与输入域见 [SFU 数值合同](SFU_NUMERIC_CONTRACT_ZH.md) | R21 记录已通过的 testpoint；未测试的输入域仍非 PASS |
 
@@ -413,7 +413,7 @@ Functional Coverage / SVA / URG
 | OPEN-CL-002 | P1 OPEN | Validator × Engine 的每算子地址/长度/stride/alias 精确定义 |
 | OPEN-CL-004 | **Closed scoped by v1.5/R49** | Matrix Line full-strobe/alignment/fallback/protection checker and reference-memory slice pass on three seeds; broader REQ-CL-010/022 remain partial |
 | CL-COV-006 | P1 PARTIAL | 依 v1.4 固定优先级 oracle，补齐合法 Engine × Fault × Phase × committed-prefix checker；不可达及接口不提供的故障组合单列 disposition |
-| OPEN-NUM-01 | **Contract frozen in v1.6; R51 clean replay pending** | Scalar INT8 order/rounding/saturation is defined above; retain PARTIAL until the independent edge campaign passes on the committed test SHA |
+| OPEN-NUM-01 | **Closed scoped by v1.6/R51** | VDOT/GEMV/GEMM common arithmetic contract and independent edge campaign pass; legacy Conv and broader opcode/shape coverage remain partial under REQ-CL-020 / CL-COV-003 |
 | OPEN-NUM-02 | **Closed in v1.3** | SFU 数值公式和独立 bit-exact oracle 已冻结；合同域的实测闭环见 RTM R21 |
 
 **冻结状态说明**：v1.1 是并行派发合法范围 DV 基线；v1.2 定义协调 reset/fabric epoch 约束；v1.3 定义 SFU 定点算术；v1.4 定义 Compute Engine Error ABI、优先级与写回前缀；v1.5 冻结 Matrix Line 的 full-strobe/alignment/fallback/protection 合同；v1.6 冻结 Scalar INT8 算术顺序与 signed overflow/saturation 规则。其他 Open Item 不因升版自动关闭，未来修改可观察行为必须升版并关联 Testplan 的 Requirement ID。
