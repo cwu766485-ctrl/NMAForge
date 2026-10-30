@@ -895,7 +895,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
     task automatic run_cnm_protection_matrix_owner_cross(
         input int unsigned seed,
-        input int signed expected_matrix[0:15][0:31]);
+        input int signed expected_matrix[0:15][0:31],
+        input bit reset_after_fault);
         bit [31:0] desc_base;
         bit [31:0] cpl_base;
         bit [31:0] matrix_dst;
@@ -908,12 +909,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         bit [31:0] overlap_before;
         bit denied_seen;
         bit matrix_busy_at_fault;
+        bit both_busy_at_fault;
+        bit matrix_read_accepted;
+        bit reset_triggered;
         bit busy_seen;
         bit monitor_done;
+        bit reset_ok;
         int unsigned cycle;
         int unsigned matrix_busy_cycles;
         int unsigned both_busy_cycles;
+        int unsigned matrix_accept_count;
         int unsigned word_idx;
+        int unsigned cpl_idx;
         int unsigned k_word;
         int unsigned row_idx;
         int unsigned lane;
@@ -922,21 +929,29 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int signed b_value;
         int signed expected_cnm[0:15];
         bit [31:0] actual_addr;
+        bit [31:0] cpl_tail;
+        bit [31:0] matrix_rsp_after_reset;
+        bit [31:0] cnm_rsp_after_reset;
         bit [15:0] matrix_task_id;
         bit [15:0] cnm_task_id;
+        uvm_hdl_data_t reset_value;
 
         desc_base = 32'h0000_7800;
         cpl_base = 32'h0000_7900;
         matrix_dst = MATRIX_Y_LOCAL;
         cnm_dst = MATRIX_LINE_STALL_CNM_Y_LOCAL;
-        matrix_task_id = 16'h07d4;
-        cnm_task_id = 16'h07d5;
+        matrix_task_id = reset_after_fault ? 16'h07d6 : 16'h07d4;
+        cnm_task_id = reset_after_fault ? 16'h07d7 : 16'h07d5;
         denied_seen = 1'b0;
         matrix_busy_at_fault = 1'b0;
+        both_busy_at_fault = 1'b0;
+        matrix_read_accepted = 1'b0;
+        reset_triggered = 1'b0;
         busy_seen = 1'b0;
         monitor_done = 1'b0;
         matrix_busy_cycles = 0;
         both_busy_cycles = 0;
+        matrix_accept_count = 0;
 
         // Initialize a legal CNM GEMV image. The CNM source-A window is the
         // only denied range; Matrix A/B and its writeback remain permitted.
@@ -977,6 +992,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         for (word_idx = 0; word_idx < 16; word_idx++)
             spad_write(cnm_dst + (word_idx << 2),
                        32'hfa17_9800 | word_idx);
+        for (cpl_idx = 0; cpl_idx < 8; cpl_idx++)
+            spad_write(cpl_base + (cpl_idx << 2),
+                       32'hfa17_a000 | cpl_idx);
 
         write_v3_desc(desc_base, 8'h30, matrix_task_id,
                       MATRIX_A_LOCAL, MATRIX_B_LOCAL, matrix_dst,
@@ -1038,6 +1056,67 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                             "CNM Protection error arrived after the concurrent Matrix task had completed")
                 end
             end
+            if (compute_vif.engine_busy[3] &&
+                compute_vif.matrix_request_valid && compute_vif.banked_ready) begin
+                matrix_read_accepted = 1'b1;
+                matrix_accept_count++;
+            end
+            if (reset_after_fault && denied_seen && matrix_read_accepted &&
+                compute_vif.engine_busy[2] && compute_vif.engine_busy[3]) begin
+                both_busy_at_fault = 1'b1;
+                // Assert reset immediately after a sampled CNM Protection
+                // denial while Matrix is active and has accepted real reads.
+                #1ns;
+                reset_value = 1'b0;
+                reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
+                if (!reset_ok)
+                    `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_OWNER",
+                        "failed to assert reset during concurrent CNM Protection and Matrix reads")
+                repeat (4) @(posedge compute_vif.aclk);
+                if (compute_vif.engine_busy !== 7'b0)
+                    `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_OWNER", $sformatf(
+                        "engines remained active during reset: busy=%07b",
+                        compute_vif.engine_busy))
+                #1ns;
+                reset_value = 1'b1;
+                reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
+                if (!reset_ok)
+                    `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_OWNER",
+                        "failed to release reset after concurrent Protection fault")
+                repeat (8) @(posedge compute_vif.aclk);
+                wait_spad_idle();
+                axil_read(REG_CPLQ_TAIL, cpl_tail);
+                if (cpl_tail !== 32'd0)
+                    `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_OWNER", $sformatf(
+                        "reset left a stale completion tail: %0d", cpl_tail))
+                for (word_idx = 0; word_idx < 512; word_idx++)
+                    expect_spad(matrix_dst + (word_idx << 2),
+                                32'hfa17_9000 | word_idx,
+                                $sformatf("reset Matrix no-writeback sentinel[%0d]", word_idx));
+                for (word_idx = 0; word_idx < 16; word_idx++)
+                    expect_spad(cnm_dst + (word_idx << 2),
+                                32'hfa17_9800 | word_idx,
+                                $sformatf("reset CNM no-writeback sentinel[%0d]", word_idx));
+                for (cpl_idx = 0; cpl_idx < 8; cpl_idx++)
+                    expect_spad(cpl_base + (cpl_idx << 2),
+                                32'hfa17_a000 | cpl_idx,
+                                $sformatf("reset no-completion image[%0d]", cpl_idx));
+                matrix_rsp_after_reset = compute_vif.matrix_tag_response_count;
+                cnm_rsp_after_reset = compute_vif.cnm_tag_response_count;
+                repeat (4) @(posedge compute_vif.aclk);
+                if (compute_vif.matrix_tag_response_count != matrix_rsp_after_reset ||
+                    compute_vif.cnm_tag_response_count != cnm_rsp_after_reset ||
+                    compute_vif.matrix_route_mismatch_count != matrix_route_error_before ||
+                    compute_vif.cnm_route_mismatch_count != cnm_route_error_before)
+                    `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_OWNER", $sformatf(
+                        "stale response/owner activity after reset: MatrixRsp=%0d CNMRsp=%0d routeMismatch=%0d/%0d",
+                        compute_vif.matrix_tag_response_count - matrix_rsp_after_reset,
+                        compute_vif.cnm_tag_response_count - cnm_rsp_after_reset,
+                        compute_vif.matrix_route_mismatch_count - matrix_route_error_before,
+                        compute_vif.cnm_route_mismatch_count - cnm_route_error_before))
+                reset_triggered = 1'b1;
+                monitor_done = 1'b1;
+            end
             if (busy_seen && !compute_vif.processor_busy)
                 monitor_done = 1'b1;
         end
@@ -1050,6 +1129,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 "missing concurrent denied CNM source read: denied=%0b Matrix-active-at-fault=%0b Matrix-cycles=%0d both-busy=%0d",
                 denied_seen, matrix_busy_at_fault, matrix_busy_cycles,
                 both_busy_cycles))
+
+        if (reset_after_fault) begin
+            if (!reset_triggered || !both_busy_at_fault || (matrix_accept_count == 0))
+                `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_OWNER", $sformatf(
+                    "missing Protection/reset overlap: reset=%0b both_busy=%0b Matrix_accepts=%0d",
+                    reset_triggered, both_busy_at_fault, matrix_accept_count))
+            `uvm_info("CLUSTER_CNM_PROTECTION_RESET_OWNER_CROSS_PASS", $sformatf(
+                "CNM source-A Protection denial concurrent with active Matrix; reset flushed both engines after %0d accepted Matrix reads, no completion/writeback or post-reset stale response; overlap=%0d seed=%0d",
+                matrix_accept_count,
+                both_busy_cycles, seed), UVM_LOW)
+            return;
+        end
 
         wait_cpl_tail(32'd2);
         wait_spad_idle();
@@ -3848,7 +3939,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_matrix_parity_cnm_owner_cross(seed);
         run_matrix_protection_cnm_owner_cross(seed, 1'b0);
         run_matrix_protection_cnm_owner_cross(seed, 1'b1);
-        run_cnm_protection_matrix_owner_cross(seed, matrix_golden);
+        run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b0);
+        run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b1);
 
         // Cross source-A, source-B where present, and writeback protection
         // phases on real engines. SFU and KV have no second source operand.
