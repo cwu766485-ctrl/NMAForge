@@ -1081,3 +1081,12 @@ This work changes verification/testbench evidence only; it does not claim
 ASIC PPA or full Cluster signoff. See the
 [Stage A and benchmark report](../docs/verification/COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md)
 for the requirement table, commands, artifacts, and coverage dispositions.
+
+
+### Compute Cluster R60 all-engine parity replay — 2026-10-30
+
+At exact clean verification/test SHA `2768843da1b3f3a0e988645746000d5befadf12b` (product RTL/SPEC remains `f916874a9ce60741a4516eaf9e33ebcae4a676c2`), Synopsys VCS/URG `V-2023.12-SP1_Full64` / `V-2023.12-SP1` passes the real top Compute Cluster UVM on seeds `20261030/20261025/20261026`. Each seed hits all 18 selected parity read cases across INT8, Matrix, CNM, BF16, SFU, Conv and KV, including A/B operands where defined and all four CNM lanes. The checker requires owner-specific error completion, drained accepted reads and unchanged output sentinels; Conv/KV use their specified parity completion code 7, other tested engines code 5. Each run reports UVM warning/error/fatal `0/0/0`, 5,445 checked words, zero mismatch/unknown/orphan response, drained pending queues and `reset_dropped=9`.
+
+The scoreboard allows only the matching engine's terminal `Done` in the one sampled cycle after an observed active error, matching production Conv/KV error-state timing. This is a testbench checker correction; no product RTL/SPEC was changed. The same clean SHA passes the 25/25 passive observation checker-sensitivity mutation suite, `make ai_smoke`, and `make ai_run AI_RANDOM_CASES=20 AI_SEED=12345`. Compile log has no VCS warning/error/`TFIPC`; Top Smoke retains the existing `LOOP-REROLL-ENABLED` fixture warning. See [R60 detailed evidence](../docs/verification/COMPUTE_CLUSTER_ALL_ENGINE_PARITY_R60_2026-10-30.md) for commands, log hashes and URG/SVA dispositions.
+
+This closes only the selected parity read slice. The 38 requirement statuses remain 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains HOLD. Legal Engine × Fault × Phase × Abort/Reset crosses, external-fabric reset qualification, remaining coverage gaps and the three uncovered compute-profile AR/AW assertion properties are not closed by R60.

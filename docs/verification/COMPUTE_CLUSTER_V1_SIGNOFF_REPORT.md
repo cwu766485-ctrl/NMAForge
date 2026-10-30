@@ -9,12 +9,12 @@
 | Item | Frozen identity |
 |---|---|
 | Product RTL candidate | `f916874a9ce60741a4516eaf9e33ebcae4a676c2` |
-| Latest top-level DV replay SHA | `ded9d923a432e869592ec8710a22df5501d8d474` (R59; clean Top Smoke + seeded regression) |
-| Latest clean replay harness SHA | `ded9d923a432e869592ec8710a22df5501d8d474` (R55–R58; Matrix test-build Makefile only) |
+| Latest top-level DV replay SHA | `2768843da1b3f3a0e988645746000d5befadf12b` (R60; clean all-engine UVM/mutation + Top Smoke + seeded regression) |
+| Latest clean replay harness SHA | `2768843da1b3f3a0e988645746000d5befadf12b` (R60 verification/test SHA; product RTL/SPEC remains `f916874`) |
 | Prior reviewed product baseline | `6848a414eaeaa05cf9e1411cf55d9d27333208a6` |
 | Latest published closeout snapshot before this follow-up | `fc370aad6b8360af9affb52cb30909ec97d79be3` |
 | Review branch | `work/compute-cluster-kv-overflow-20261030` |
-| Evidence/test commit | R53 `f916874a9ce60741a4516eaf9e33ebcae4a676c2`; R54 `f24c5383fad511c8b2e1132c1157942807994759`; R55–R58 `ded9d923a432e869592ec8710a22df5501d8d474`; R52 `dde780660e40cb6accff5a53c2e6f8163b325839` |
+| Evidence/test commit | R53 `f916874a9ce60741a4516eaf9e33ebcae4a676c2`; R54 `f24c5383fad511c8b2e1132c1157942807994759`; R55–R58/R59 `ded9d923a432e869592ec8710a22df5501d8d474`; R60 `2768843da1b3f3a0e988645746000d5befadf12b`; R52 `dde780660e40cb6accff5a53c2e6f8163b325839` |
 | SPEC | Compute Cluster SPEC v1.7; R53 adds KV address overflow/alignment guards |
 | VCS | Synopsys VCS `V-2023.12-SP1_Full64`; R49 passed the corrected Matrix checker on three seeds; R50 passed the published-snapshot six-seed UVM and Top Smoke; R52 passed the legal Scalar INT8 numeric campaign; R53 passed KV boundary and clean top regressions |
 
@@ -51,7 +51,7 @@ R46/R47 were historical `BLOCKED_ENV` attempts; R48 exposed a testbench coverage
 
 The candidate SHA passed the previously recorded clean R40–R45 campaigns: six-seed seven-engine UVM, 25/25 checker-sensitivity mutations, 165/165 Matrix size/ablation checks, pinned TinyNPU paired cases, Top Smoke and Digits inference. Those passes remain valid for their named sources and scope.
 
-The latest published closeout snapshot was checked out into a clean worktree. The initial R46 attempt was license-blocked; after license recovery R50 passed six UVM seeds and Top Smoke at that exact published SHA. R48 exposed a testbench aggregate-counter reset issue, fixed and verified by R49 on three seeds. R52 passed on a detached clean worktree fixed at test commit `dde7806`; it exercises only legal Scalar INT8 activation values and the common arithmetic path without changing product RTL. R51's reserved activation=3 bin is explicitly excluded. R53 passed at exact product/test/SPEC SHA `f916874`; R54 passed at top-test SHA `f24c538`; R55–R59 pass at detached clean harness SHA `ded9d92`. R59 repeats Top Smoke plus 20-case seeded top run and checks the KV Protection completion/sentinels. R55–R58 details, paths, seeds, scoreboard and URG/SVA dispositions are in the [R55–R58 report](COMPUTE_CLUSTER_CLEAN_REPLAY_R55_R58_2026-10-30.md); R59 logs are in the [Top Smoke report](COMPUTE_CLUSTER_TOP_SMOKE_REPLAY_R59_2026-10-30.md). The R53 DUT-only KV URG is line/condition/FSM/branch `100/98.77/73.33/96.97%`; four transitions remain unhit without an unreachable proof. R55 has three AXI AR/AW properties without real success in the compute-only profile and two RAL assertions without attempts; no failures/incomplete. Logs and commands are indexed in the [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md), [R52 numeric report](COMPUTE_CLUSTER_SCALAR_INT8_NUMERIC_R52.md), [R53 KV report](COMPUTE_CLUSTER_KV_ADDRESS_R53.md), and [R54 KV Protection report](COMPUTE_CLUSTER_KV_PROTECTION_R54.md).
+The latest published closeout snapshot was checked out into a clean worktree. The initial R46 attempt was license-blocked; after license recovery R50 passed six UVM seeds and Top Smoke at that exact published SHA. R48 exposed a testbench aggregate-counter reset issue, fixed and verified by R49 on three seeds. R52 passed on a detached clean worktree fixed at test commit `dde7806`; it exercises only legal Scalar INT8 activation values and the common arithmetic path without changing product RTL. R51's reserved activation=3 bin is explicitly excluded. R53 passed at exact product/test/SPEC SHA `f916874`; R54 passed at top-test SHA `f24c538`; R55–R59 pass at detached clean harness SHA `ded9d92`. R59 repeats Top Smoke plus 20-case seeded top run and checks the KV Protection completion/sentinels. R60 passes at clean verification/test SHA `2768843`: 18/18 selected parity cases per seed for all seven engines, 25/25 checker-sensitivity mutations, Top Smoke and the 20-case top regression; product RTL/SPEC remains `f916874`. R55–R58 details, paths, seeds, scoreboard and URG/SVA dispositions are in the [R55–R58 report](COMPUTE_CLUSTER_CLEAN_REPLAY_R55_R58_2026-10-30.md); R59 logs are in the [Top Smoke report](COMPUTE_CLUSTER_TOP_SMOKE_REPLAY_R59_2026-10-30.md). The R53 DUT-only KV URG is line/condition/FSM/branch `100/98.77/73.33/96.97%`; four transitions remain unhit without an unreachable proof. R55 has three AXI AR/AW properties without real success in the compute-only profile and two RAL assertions without attempts; no failures/incomplete. Logs and commands are indexed in the [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md), [R52 numeric report](COMPUTE_CLUSTER_SCALAR_INT8_NUMERIC_R52.md), [R53 KV report](COMPUTE_CLUSTER_KV_ADDRESS_R53.md), and [R54 KV Protection report](COMPUTE_CLUSTER_KV_PROTECTION_R54.md).
 
 ## Sign-off decision and exit conditions
 
@@ -77,5 +77,6 @@ PPA and full pretrained-model deployment are outside this Functional DV decision
 - [KV Protection R54 evidence](COMPUTE_CLUSTER_KV_PROTECTION_R54.md)
 - [R55–R58 clean replay evidence](COMPUTE_CLUSTER_CLEAN_REPLAY_R55_R58_2026-10-30.md)
 - [R59 Top Smoke replay evidence](COMPUTE_CLUSTER_TOP_SMOKE_REPLAY_R59_2026-10-30.md)
+- [R60 all-engine parity clean replay evidence](COMPUTE_CLUSTER_ALL_ENGINE_PARITY_R60_2026-10-30.md)
 - [Compute Cluster SPEC v1.6](../spec/COMPUTE_CLUSTER_SPEC_ZH.md)
 - [Verification matrix](../../dv/VERIFICATION_MATRIX.md)
