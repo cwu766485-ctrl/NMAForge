@@ -2,7 +2,7 @@
 
 ## Review decision (updated 2026-10-30)
 
-**Selected exact clean code/test SHA:** `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28` (R77 real-top SFU descriptor-latch and clean replay; product RTL/SPEC v1.8 remain byte-identical to R73 `9d4e9abdba1f745644a485960620fa6bbc4979db`). Latest real-top descriptor-latch evidence is Matrix R74 and SFU R77; R75 remains separate block-core evidence. Earlier evidence retains its named source identities.\
+**Selected exact clean code/test SHA:** `a45864565ace4702783f5c5632c1f13a001c7653` (R79 adds standalone production-MUX fairness/response routing; product RTL/SPEC v1.8 remain byte-identical to R73 `9d4e9abdba1f745644a485960620fa6bbc4979db`). Latest real-top descriptor-latch evidence is Matrix R74 and SFU R77; R79 uses behavioral clients at the production MUX boundary. Earlier evidence retains its named source identities.\
 **Current SPEC:** v1.8 clarifies busy-time CPLQ_HEAD consumption; v1.7 freezes KV address alignment/overflow behavior; v1.6 freezes Scalar INT8 arithmetic order; v1.5 freezes the Matrix Line transfer contract.\
 **Candidate classification:** bounded Functional DV review candidate; not CL-DV-v1.0 signed.\
 **Product RTL:** the candidate preserves the earlier scoped Conv/KV/SFU error-code alignment and KV 32-bit overflow/alignment guard; R73 also allows only the software-owned CPLQ_HEAD pointer write while compute/DMA is busy.\
@@ -118,3 +118,7 @@ R77 at clean code/test SHA `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28` adds the l
 ## R78 SPAD scheduler fairness — 2026-10-30
 
 At the same exact code/test SHA, VCS/URG `V-2023.12-SP1_Full64` passes a 10,000-cycle request-mode arbiter run with 3,334 grants/client and maximum observed wait 2 cycles/client, along with directed three-client fairness and CNM/DMA ownership cases. URG checks both assertion properties with attempts and no failures. Raw block coverage is line/condition/toggle/branch `100.00/86.89/10.73/100.00%`. This is a standalone `ai_spad_arbiter` harness, without downstream SRAM backpressure or the full seven-engine request/response path. `REQ-CL-014` remains PARTIAL; the requirement counts stay 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains HOLD. See [R78 report](COMPUTE_CLUSTER_SPAD_FAIRNESS_R78_2026-10-30.md).
+
+## R79 seven-client Compute SPAD MUX — 2026-10-30
+
+At exact clean test SHA `a45864565ace4702783f5c5632c1f13a001c7653`, the production `ai_compute_spad_mux` passes a 4,096-cycle seven-client continuous-request regression with bounded ready gaps. Each client receives 461–462 grants, max wait is 10 cycles, and 2,582 reads return to the correct owner with expected address-derived data and error/parity attribution. All three assertions pass; URG reports zero failures, incomplete attempts, or assertions without attempts. Top Smoke with 20 random cases also passes at this SHA. The test does not include the production requester engines, downstream arbiter/SRAM, protection, or completion path. It is scoped evidence, so `REQ-CL-014` remains PARTIAL and the overall disposition remains 24 PASS-SCOPED / 14 PARTIAL, HOLD. See [R79 report](COMPUTE_CLUSTER_MUX_FAIRNESS_R79_2026-10-30.md).
