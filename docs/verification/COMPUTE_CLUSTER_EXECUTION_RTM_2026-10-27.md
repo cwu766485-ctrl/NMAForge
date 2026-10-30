@@ -3,7 +3,7 @@
 **Scope:** `REQ-CL-001..028` and `REQ-PC-001..010` from Compute Cluster SPEC v1.5.\
 **Selected review candidate:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6` (product/SPEC source SHA; documentation evidence is committed separately).\
 **Checkout:** the selected source SHA was replayed from detached clean worktree `/tmp/nmaforge_final_clean_6848a41`. The candidate contains the v1.4 Error ABI/priority/prefix implementation and scopes `PACK_I8_TILE_A` validation to `REQUANT_I8` per SPEC.\
-**Evidence status:** prior current-SHA evidence includes a six-seed clean seven-engine UVM replay, 25/25 checker-sensitivity mutations, top smoke, trained Digits MLP with zero host layout traffic, 165/165 Matrix size/ablation checks, and a pinned TinyNPU normalized-model comparison. Each result closes only its named scope. SPEC v1.5 freezes the existing Matrix Line behavior; `MATRIX-LINE-001` now passes the defined interface slice on three seeds in R49. The latest published-snapshot replay R46 remains `BLOCKED_ENV` from its earlier license outage. External-fabric reset qualification and legal fault-phase crosses remain open.
+**Evidence status:** selected-candidate evidence includes a six-seed clean seven-engine UVM replay, 25/25 checker-sensitivity mutations, top smoke, trained Digits MLP with zero host layout traffic, 165/165 Matrix size/ablation checks, and a pinned TinyNPU normalized-model comparison. R49 closes the scoped SPEC v1.5 Matrix Line interface slice on three seeds. R50 now replays the latest published closeout SHA `be78ee27b5a08783ec2560334ca1361baf382157` with six-seed UVM and Top Smoke PASS after license recovery. Each result closes only its named scope. External-fabric reset qualification, legal fault-phase crosses, and remaining partial requirements remain open.
 
 ## Status summary
 
@@ -18,7 +18,7 @@ The PASS-SCOPED count preserves the scoped review classification. In particular,
 
 ## Run and evidence index
 
-All VCS/URG evidence is local under `/tmp`; generated databases are deliberately not checked in. Paths are retained here to make each row resolvable. R40–R45 replay the selected candidate SHA from a detached clean worktree. R46 checks out the latest published closeout snapshot; it is blocked before compile by license availability. R47 records an earlier license-blocked Matrix Line attempt. R48 compiled the final checker and ran seed `20261025`, but failed the new stability-point gate because the testbench reset its aggregate counters during directed DUT resets; seeds `20261026/27` were not reached. R49 reruns the corrected monitor and passes all three seeds. For earlier rows, “source-equivalent” means the RTL/DV files used by the run match the named committed source files; the run did not necessarily execute from a clean checkout of that SHA.
+All VCS/URG evidence is local under `/tmp`; generated databases are deliberately not checked in. Paths are retained here to make each row resolvable. R40–R45 replay the selected candidate SHA from a detached clean worktree. R46 is the historical license-blocked attempt at the latest published closeout snapshot; R50 reruns that exact SHA successfully after license recovery. R47 records an earlier license-blocked Matrix Line attempt. R48 compiled the final checker and ran seed `20261025`, but failed the stability-point gate because the testbench reset its aggregate counters during directed DUT resets; seeds `20261026/27` were not reached. R49 reruns the corrected monitor and passes all three seeds. For earlier rows, “source-equivalent” means the RTL/DV files used by the run match the named committed source files; the run did not necessarily execute from a clean checkout of that SHA.
 
 | Ref / Run ID | Source / tool / seeds | Result and primary evidence path |
 |---|---|---|
@@ -71,6 +71,7 @@ All VCS/URG evidence is local under `/tmp`; generated databases are deliberately
 | **R47 `MATRIX-LINE-V15-CORE-3S-20261030`** | Product RTL SHA `6848a414eaeaa05cf9e1411cf55d9d27333208a6`; initial Matrix Line checker; VCS `V-2023.12-SP1_Full64`; seeds `20261025, 20261026, 20261027` requested | **BLOCKED_ENV before compile.** Initial `core-random-regress` attempt could not acquire a VCS license. This predates the final checker allowance for abort/error cancellation of a stalled, unaccepted request; it is retained as a historical attempt and is not evidence for the final checker. Log `/tmp/nmaforge_matrix_line_v15_20261030/compile.log`.
 | **R48 `MATRIX-LINE-V15-CHECKER-3S-20261030`** | Product RTL SHA `6848a414eaeaa05cf9e1411cf55d9d27333208a6`; final Matrix Line checker source before aggregate-counter fix; VCS `V-2023.12-SP1_Full64`; seed `20261025` executed, `20261026/27` not reached | **FAIL — testbench coverage gate, not a DUT functional failure.** Compilation passed and the directed cases through the end-of-test check ran. The monitor reported `full=4 stable=0 unaligned=1 protection=1`; inspection found the new aggregate counters were cleared on each directed DUT reset, erasing earlier stall observations. No `MATRIX_LINE_CONTRACT_PASS` marker or three-seed result exists. Logs `/tmp/nmaforge_matrix_line_v15_retry_20261030/compile.log` and `/tmp/nmaforge_matrix_line_v15_retry_20261030/run_seed_20261025.log`.
 | **R49 `MATRIX-LINE-V15-CHECKER-FIXED-3S-20261030`** | Product RTL SHA `6848a414eaeaa05cf9e1411cf55d9d27333208a6`; monitor fix commit `b4eb07e2bac553b6929160943182b75fffa539c3`; VCS `V-2023.12-SP1_Full64`; seeds `20261025, 20261026, 20261027` | **PASS 3/3.** Each seed passes 18 numeric/layout cases and 35 fault/recovery cases, then reports `MATRIX_LINE_CONTRACT_PASS full_wstrb=1 aligned=1 stalled_stability=312 unaligned_scalar_fallback=1 protection_error=1 partial_zero_wstrb=unsupported`. The aggregate is 936 checked stalled cycles. Existing per-case reference-memory checks and output/fault checks pass. Compile log has no `Warning-`, `Error-`, or `[TFIPC]`. Logs `/tmp/nmaforge_matrix_line_v15_fixed_20261030/run_seed_{20261025,20261026,20261027}.log`, compile `/tmp/nmaforge_matrix_line_v15_fixed_20261030/compile.log`, VCS coverage database `/tmp/nmaforge_matrix_line_v15_fixed_20261030/coverage.vdb` (not post-processed into an URG percentage report).
+| **R50 `PUBLISHED-CLOSEOUT-CLEAN-REPLAY-BE78EE2-6S`** | Exact published closeout SHA `be78ee27b5a08783ec2560334ca1361baf382157`; clean detached worktree `/tmp/nmaforge_phaseA_closeout_be78ee2`; VCS/URG `V-2023.12-SP1_Full64`; seeds `20261025, 20261026, 20261027, 20261029, 20261030, 20261031`; Top Smoke seed `20261030` | **PASS.** Six UVM seeds each report `COMPUTE_CLUSTER_REAL_UVM_PASS`, applicable focused coverage `100.0%`, UVM warning/error/fatal `0/0/0`, 5,368 checked words, zero mismatch/unknown/stale/orphan responses, and empty pending ledgers. All seven real engines, selected Matrix/CNM overlap, 14/14 parity fault cases, response ownership, abort/reset recovery and Golden checks pass. Top Smoke reports `TEST PASS`; mapper precheck covers 86 descriptors. R50's compute-only SVA summary has AR/AW stall-to-accept covers at 0 matches and W at 1; separate R15 E2E evidence remains the source for 3/3 AXI stall covers. Top Smoke compile retains one `LOOP-REROLL-ENABLED` fixture warning; no UVM severity or compile error. Logs `/tmp/nmaforge_phaseA_closeout_be78ee2_uvm_retry_20261030/seed_*/run.log`, compile/URG in that root, and `/tmp/nmaforge_phaseA_closeout_be78ee2/dv/subsystem/top_smoke/sim/{ai_comp.log,ai_accel_smoke.log}`.
 
 ### Exact commands for replayed runs
 
@@ -88,6 +89,17 @@ R49 (from the same directory; corrected monitor):
 make core-random-regress \
   SEEDS='20261025 20261026 20261027' \
   CORE_OUT_DIR=/tmp/nmaforge_matrix_line_v15_fixed_20261030
+```
+
+R50 (from the clean published closeout worktree `/tmp/nmaforge_phaseA_closeout_be78ee2`):
+
+```sh
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027 20261029 20261030 20261031' \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_phaseA_closeout_be78ee2_uvm_retry_20261030 \
+  URG=/opt/Synopsys/vcs/V-2023.12-SP1/bin/urg
+make -C dv/subsystem/top_smoke/sim ai_smoke \
+  SEED=20261030 AI_SEED=20261030 AI_RANDOM_CASES=4
 ```
 
 R33, from the clean test worktree and `dv/uvm/sim`:

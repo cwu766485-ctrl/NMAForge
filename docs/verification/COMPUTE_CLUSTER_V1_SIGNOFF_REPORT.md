@@ -13,7 +13,7 @@
 | Review branch | `work/compute-cluster-v1-closeout-20261030` |
 | Evidence state when this report was drafted | `8feca2d46a9f8003118147d62b75180e65c0da65` |
 | SPEC | Compute Cluster SPEC v1.5; product RTL unchanged by this review commit |
-| VCS | Synopsys VCS `V-2023.12-SP1_Full64`; R46/R47 were license-blocked; R49 passed the corrected Matrix checker on three seeds |
+| VCS | Synopsys VCS/URG `V-2023.12-SP1_Full64`; R49 passed the corrected Matrix checker on three seeds; R50 passed published-snapshot six-seed UVM and Top Smoke |
 
 The review branch is isolated from the v2 research branch. The review commit adds DV checks and evidence documentation only; it does not change product RTL.
 
@@ -28,7 +28,7 @@ The Execution RTM maps all 38 requirements (`REQ-CL-001..028`, `REQ-PC-001..010`
 | BLOCKED_SPEC | 0 | No unresolved specification blocker remains in the current frozen contract |
 | NOT_RUN | 0 | Every requirement has a recorded disposition; this does not mean every test ran |
 
-R46/R47 were `BLOCKED_ENV`; R48 exposed a testbench coverage-counter reset issue; R49 resolves that issue for the scoped Matrix Line contract. These runs do not change the 38-requirement disposition counts.
+R46/R47 were historical `BLOCKED_ENV` attempts; R48 exposed a testbench coverage-counter reset issue; R49 resolves that issue for the scoped Matrix Line contract. R50 passes on the exact published closeout SHA. These runs do not change the 38-requirement disposition counts.
 
 ## Review findings
 
@@ -40,14 +40,14 @@ R46/R47 were `BLOCKED_ENV`; R48 exposed a testbench coverage-counter reset issue
 | Mutation sensitivity | R41 catches 25/25 passive checker observation mutations for address, data, owner, WSTRB and completion lifecycle | This is checker sensitivity, not a DUT RTL mutation score; broader fault/error injection remains open |
 | Matrix FSM | R28 records raw enabled-profile coverage 49/53, five non-vacuous formal proofs, state reachability covers, and the separate prefetch-disabled transition | Preserve raw 49/53; no illegal stimulus is used to force bins. Remaining transitions are dispositioned only within the documented proof assumptions/configuration |
 | Matrix Line output | SPEC v1.5 freezes aligned full-`WSTRB` Line writes, scalar fallback for 4-byte-aligned non-Line-aligned output, protection-prefix behavior, and partial/zero WSTRB as unsupported. `MATRIX-LINE-001` checks these interface rules plus stall stability | R49 passes three seeds; each records 312 stable stalls, full WSTRB/alignment, fallback and protection checks, and reference-memory comparison. Scoped Line contract is closed; this does not close the broader Matrix requirement rows |
-| SVA and compile diagnostics | R40/R15 provide non-vacuity and AXI assertion evidence for their named properties; prior focused compile had no `[TFIPC]` diagnostics | Evidence does not cover every requester/fault/backpressure combination; see the individual RTM notes |
+| SVA and compile diagnostics | R40/R15 provide non-vacuity and AXI assertion evidence for their named properties; R50 has no UVM severity or compile errors | R50 compute-only AR/AW stall-to-accept cover bins have zero matches (W has one); the separate R15 E2E profile supplies 3/3 AXI stall covers. Top Smoke keeps one `LOOP-REROLL-ENABLED` fixture warning. Evidence does not cover every requester/fault/backpressure combination |
 | Descriptor and scalar numeric boundaries | Existing representative descriptor, scalar, Matrix and engine Golden checks | Per-opcode legal descriptor boundaries and full scalar INT8 arithmetic edge campaign remain open |
 
 ## Clean replay status
 
 The candidate SHA passed the previously recorded clean R40–R45 campaigns: six-seed seven-engine UVM, 25/25 checker-sensitivity mutations, 165/165 Matrix size/ablation checks, pinned TinyNPU paired cases, Top Smoke and Digits inference. Those passes remain valid for their named sources and scope.
 
-The latest published closeout snapshot was checked out into a clean worktree for R46. UVM compilation and restored Top Smoke compilation stopped before simulation because VCS could not contact/acquire a license. The 86-descriptor mapper precheck did pass. R47 was an earlier license-blocked Matrix Line attempt. R48 exposed a testbench aggregate-counter reset issue, fixed and verified by R49 on three seeds. The published-snapshot replay is still needed. Logs and exact commands are indexed in the [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
+The latest published closeout snapshot was checked out into a clean worktree. The initial R46 attempt was license-blocked; after license recovery R50 passed six UVM seeds and Top Smoke at the exact published SHA. R48 exposed a testbench aggregate-counter reset issue, fixed and verified by R49 on three seeds. R50's focused compute-only SVA cover-bin results and the retained Top Smoke fixture warning are explicitly recorded in the RTM. Logs and exact commands are indexed in the [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
 
 ## Sign-off decision and exit conditions
 
@@ -55,11 +55,10 @@ The latest published closeout snapshot was checked out into a clean worktree for
 
 Before an independent review can consider sign-off, the open items must be closed or receive an approved scope disposition, including:
 
-1. Re-run the latest published closeout SHA clean-worktree UVM/Top Smoke regression with VCS available.
-2. Complete legal fault/reset phase crosses and production-top shared-SPAD ownership cases, or document approved bounded exclusions.
-3. Qualify the coordinated reset/epoch contract against the selected external fabric, or attach its approved compliance review.
-4. Freeze and test descriptor boundary rules and scalar INT8 numeric boundary vectors.
-5. Review all 38 RTM rows and their evidence paths with an independent reviewer.
+1. Complete legal fault/reset phase crosses and production-top shared-SPAD ownership cases, or document approved bounded exclusions.
+2. Qualify the coordinated reset/epoch contract against the selected external fabric, or attach its approved compliance review.
+3. Freeze and test descriptor boundary rules and scalar INT8 numeric boundary vectors.
+4. Review all 38 RTM rows and their evidence paths with an independent reviewer.
 
 PPA and full pretrained-model deployment are outside this Functional DV decision and remain unclaimed.
 
