@@ -10,10 +10,10 @@
 |---|---|
 | Product RTL/SPEC candidate | `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413` (R99 CNM Protection response alignment; SPEC v1.8 unchanged) |
 | Latest real-top descriptor-latch SHA | `1abf84864a5b6f0f1d3ef5da72fe67b41df3b367` (R123 CNM descriptor-latch test; Matrix R74 and SFU R77 remain separately evidenced) |
-| Latest UVM/test content SHA | `45497791e86468703303542a5961423a0311242c` (published R126 request-stability gate; tree `6eef8fce6dcd544c9327f5c8921c6dd26ac86068`) |
-| Latest full Compute Cluster replay SHA | `175673b0930a81a00732ddff2cf825f358465cf9` (R126 three-seed top UVM; tree `6eef8fce6dcd544c9327f5c8921c6dd26ac86068`) |
+| Latest UVM/test content SHA | d9aae22f8a885a4075258a9ca8c27dbaa79bb80d (published R127 test content; tree e1334264bb8962ed2d508affb0d273d89b6650ed) |
+| Latest full Compute Cluster replay SHA | 0b68ad884fa35f4f9b858953ffa5f3513fc124b4 (R127 three-seed real-top UVM; published same tree at d9aae22f8a885a4075258a9ca8c27dbaa79bb80d) |
 | Latest selected-fabric focused replay | `5ea67bd125bb1ed20af8b86369e2cf8112f25131` (R125 clean checkout; RTL/DV/SPEC identical to R124) |
-| Published report package base | `45497791e86468703303542a5961423a0311242c` (R126 request-stability gate content; R126 evidence docs are the current working closeout package) |
+| Published report package base | d9aae22f8a885a4075258a9ca8c27dbaa79bb80d (R127 code/test content; R127 evidence documentation is published in the following docs commit) |
 | Prior reviewed product baseline | `6848a414eaeaa05cf9e1411cf55d9d27333208a6` |
 | Latest published closeout snapshot replayed | `480eb443b835f8cbe771682e91ff6d97acae0a99` (R117/R118 clean UVM and functional-testpoint merge; R115 Top Smoke remains at its exact earlier published SHA) |
 | Review branch | `feat/compute-cluster-closeout-6848a41` |
@@ -230,3 +230,10 @@ The selected `ai_accel_memory_fabric` reset, banked reset, Core/Banked contentio
 ## R126 per-requester request-stability gate — 2026-10-31
 
 The default three-seed Compute Cluster UVM target now rejects a seed unless its existing request-stability summary contains stall evidence for all scalar clients, Matrix banked/Line, and all four CNM lanes. Exact local replay SHA `175673b0930a81a00732ddff2cf825f358465cf9` and published same-tree content SHA `45497791e86468703303542a5961423a0311242c` pass seeds `20261025/20261026/20261027`, with zero observed stability violations, UVM severity `0/0/0`, and 100% declared focused compute bins. Exact commands and log hashes are in the [R126 report](COMPUTE_CLUSTER_REQUEST_STABILITY_GATE_R126_2026-10-31.md). This adds a regression gate for a bounded `REQ-CL-006` testpoint; the requirement remains PARTIAL and the overall decision remains **HOLD**.
+
+
+## R127 real CMDQ Scalar GEMV/GEMM dispatch — 2026-10-31
+
+R127 adds a required real-top CMDQ Scalar dispatch test for GEMV opcode 0x11 followed by GEMM opcode 0x12. The launch monitor checks order, engine, descriptor fields, two accepted launches, and no same-engine launch while busy; both completions and six output words match an independent signed K=2 Golden. Three VCS seeds pass with 41,832 scoreboard words/seed and zero mismatch, unknown, stale-epoch, or orphan response; UVM warning/error/fatal is 0/0/0. The focused declared cluster_cg is 100%, not whole-design closure. Top Smoke passes, with the existing LOOP-REROLL-ENABLED compile warning retained.
+
+This narrows REQ-CL-002/015/020 only; all remain PARTIAL. The RTM remains 24 PASS-SCOPED / 14 PARTIAL and the decision is **HOLD**. URG reports 17/22 assertions with real successes and zero failures/incomplete; three AXI properties remain without real successes in this compute-only profile, two UVM RAL properties have no attempts, and AR/AW stall cover properties remain unhit. See the [R127 evidence report](COMPUTE_CLUSTER_SCALAR_CMDQ_GEMV_GEMM_R127_2026-10-31.md) for exact commands, artifact hashes, and limits.

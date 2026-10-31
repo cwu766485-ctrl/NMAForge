@@ -1,13 +1,13 @@
 # Compute Cluster v1.0 Final Audit
 
-**Review date:** 2026-10-30
+**Review date:** 2026-10-31
 
-**Selected product/SPEC candidate:** `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413` (R99 CNM Protection response alignment; SPEC v1.8); latest exact-clean verification/test SHA `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`; R54 top-test SHA `f24c5383fad511c8b2e1132c1157942807994759`
+**Selected product/SPEC candidate:** c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413 (R99 CNM Protection response alignment; SPEC v1.8); R54 top-test SHA f24c5383fad511c8b2e1132c1157942807994759
 - **Prior reviewed product baseline:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6`
 - **Follow-up evidence branch:** `work/compute-cluster-kv-overflow-20261030`
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
-- **Latest clean verification replay SHA:** `2768843da1b3f3a0e988645746000d5befadf12b`
-**Latest verification/test candidate:** `95864f7027ccbec22a09b0a61832c68d3ca08098` (R110 banked response-owner SVA testpoint, testbench-only); the R86 entry below remains historical evidence.
+- **Latest clean verification replay SHA:** 0b68ad884fa35f4f9b858953ffa5f3513fc124b4 (R127 three-seed real-top UVM; published same-tree test content d9aae22f8a885a4075258a9ca8c27dbaa79bb80d)
+**Latest verification/test candidate:** executed R127 test SHA 0b68ad884fa35f4f9b858953ffa5f3513fc124b4; published same-tree test content d9aae22f8a885a4075258a9ca8c27dbaa79bb80d (tree e1334264bb8962ed2d508affb0d273d89b6650ed). R110 formal evidence remains separately tied to its exact SHA.
 **Decision:** bounded CL-RC1/CL-RC2 review candidate; **CL-DV-v1.0 is not signed**.
 
 ## Executive disposition
@@ -161,3 +161,8 @@ On clean replay checkout `5ea67bd125bb1ed20af8b86369e2cf8112f25131`, the selecte
 ## R126 per-requester request-stability gate — 2026-10-31
 
 The three-seed Compute Cluster UVM target now requires stalled-payload stability evidence for six scalar request clients, Matrix banked/Line, and four CNM lanes in every seed. R126 passes at local SHA `175673b0930a81a00732ddff2cf825f358465cf9`, published same-tree content `45497791e86468703303542a5961423a0311242c`; UVM severity is `0/0/0`, payload-stability violations are zero, and declared focused compute coverage is 100%. `REQ-CL-006` remains PARTIAL for the full stall-class/direction/phase cross. The 38-row disposition remains 24 PASS-SCOPED / 14 PARTIAL; **HOLD**. See [R126 report](COMPUTE_CLUSTER_REQUEST_STABILITY_GATE_R126_2026-10-31.md).
+
+
+## R127 real CMDQ Scalar GEMV/GEMM dispatch — 2026-10-31
+
+At executed local SHA 0b68ad884fa35f4f9b858953ffa5f3513fc124b4 and published same-tree test content d9aae22f8a885a4075258a9ca8c27dbaa79bb80d, three VCS seeds pass sequential real-top CMDQ Scalar GEMV 0x11 then GEMM 0x12. The monitor checks launch order and descriptor snapshot on engine 0; two completions and all six signed K=2 Golden outputs pass, with no same-engine busy relaunch. Per seed, the scoreboard checks 41,832 words with zero mismatch/unknown/stale/orphan and UVM severity 0/0/0. Top Smoke also passes. This adds bounded evidence to REQ-CL-002/015/020 and does not change their PARTIAL dispositions. The focused cluster_cg is 100% for declared bins only; global RTM remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains **HOLD**. URG non-success properties and Top Smoke's existing compile notice are retained in the [R127 report](COMPUTE_CLUSTER_SCALAR_CMDQ_GEMV_GEMM_R127_2026-10-31.md).
