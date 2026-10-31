@@ -473,7 +473,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
-    task automatic run_matrix_parity_cnm_owner_cross(input int unsigned seed);
+    task automatic run_matrix_parity_cnm_owner_cross(
+        input int unsigned seed,
+        input bit abort_cnm_after_parity);
         bit [31:0] desc_base;
         bit [31:0] cpl_base;
         bit [31:0] matrix_dst;
@@ -497,15 +499,35 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned lane;
         int unsigned byte_idx;
         int unsigned word_idx;
+        int unsigned cycle;
+        int unsigned accepted_cnm_reads;
+        int unsigned returned_cnm_reads;
+        int unsigned accepted_cnm_writes;
+        int unsigned post_abort_cnm_writes;
+        bit abort_issued;
+        bit abort_seen;
+        bit abort_active_seen;
+        bit monitor_done;
+        bit [31:0] cnm_write_addr[0:15];
+        bit [31:0] cnm_write_data[0:15];
 
         desc_base = 32'h0000_7800;
         cpl_base = 32'h0000_7900;
         matrix_dst = 32'h0005_4000;
         cnm_dst = 32'h0005_4800;
-        // Fail the last A-row lane of the final K group. The task remains
-        // active long enough for the queued CNM workload to run concurrently;
-        // the failed output tile must still commit no words.
-        parity_addr = MATRIX_A_LOCAL + 32'h0000_00fc;
+        // The baseline point faults the final A-row lane to exercise held-read
+        // cancellation. The abort cross faults the first legal operand so the
+        // long CNM task is still active when Matrix reports parity.
+        parity_addr = abort_cnm_after_parity ? MATRIX_A_LOCAL :
+                                               MATRIX_A_LOCAL + 32'h0000_00fc;
+        abort_issued = 1'b0;
+        abort_seen = 1'b0;
+        abort_active_seen = 1'b0;
+        monitor_done = 1'b0;
+        accepted_cnm_reads = 0;
+        returned_cnm_reads = 0;
+        accepted_cnm_writes = 0;
+        post_abort_cnm_writes = 0;
 
         // Prepare a long legal CNM GEMV independently of Matrix's operand
         // image, so the failing Matrix cannot poison CNM's Golden result.
@@ -548,14 +570,27 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             spad_write(cnm_dst + (word_idx << 2),
                        32'hfa17_7800 | word_idx);
 
-        write_v3_desc(desc_base, 8'h30, 16'h07e0,
-                      MATRIX_A_LOCAL, MATRIX_B_LOCAL, matrix_dst,
-                      16'd16, 16'd32, 16'd16);
-        write_cluster_desc(desc_base + 32'h40, 8'h21, 16'h07e1,
-                           MATRIX_LINE_STALL_CNM_A_LOCAL,
-                           MATRIX_LINE_STALL_CNM_B_LOCAL, cnm_dst,
-                           16'd16, 16'd1, 16'd32, 32'd0,
-                           32'd0, 32'd0, 32'd0, 8'd3);
+        if (abort_cnm_after_parity) begin
+            // Dispatch CNM first so it is observably in flight before Matrix
+            // reaches the injected parity response and software aborts it.
+            write_cluster_desc(desc_base, 8'h21, 16'h07e3,
+                               MATRIX_LINE_STALL_CNM_A_LOCAL,
+                               MATRIX_LINE_STALL_CNM_B_LOCAL, cnm_dst,
+                               16'd16, 16'd1, 16'd32, 32'd0,
+                               32'd0, 32'd0, 32'd0, 8'd3);
+            write_v3_desc(desc_base + 32'h40, 8'h30, 16'h07e2,
+                          MATRIX_A_LOCAL, MATRIX_B_LOCAL, matrix_dst,
+                          16'd16, 16'd32, 16'd16);
+        end else begin
+            write_v3_desc(desc_base, 8'h30, 16'h07e0,
+                          MATRIX_A_LOCAL, MATRIX_B_LOCAL, matrix_dst,
+                          16'd16, 16'd32, 16'd16);
+            write_cluster_desc(desc_base + 32'h40, 8'h21, 16'h07e1,
+                               MATRIX_LINE_STALL_CNM_A_LOCAL,
+                               MATRIX_LINE_STALL_CNM_B_LOCAL, cnm_dst,
+                               16'd16, 16'd1, 16'd32, 32'd0,
+                               32'd0, 32'd0, 32'd0, 8'd3);
+        end
 
         matrix_rsp_before = compute_vif.matrix_tag_response_count;
         cnm_rsp_before = compute_vif.cnm_tag_response_count;
@@ -575,9 +610,79 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd4);
         axil_write(REG_CPLQ_HEAD, 32'd0);
         axil_write(REG_CPLQ_TAIL, 32'd0);
-        axil_write(REG_DOORBELL, 32'd1);
-        wait_cpl_tail(32'd2);
-        wait_spad_idle();
+        if (!abort_cnm_after_parity) begin
+            axil_write(REG_DOORBELL, 32'd1);
+            wait_cpl_tail(32'd2);
+            wait_spad_idle();
+        end else begin
+            fork
+                begin : matrix_parity_cnm_abort_monitor
+                    while (!monitor_done) begin
+                        @(posedge compute_vif.aclk);
+                        accepted_cnm_reads += $countones(compute_vif.cnm_accept_mask);
+                        returned_cnm_reads += $countones(compute_vif.cnm_rsp_valid);
+                        if (compute_vif.engine_req_valid[2] &&
+                            compute_vif.engine_req_ready[2] &&
+                            compute_vif.engine_req_write[2] &&
+                            (compute_vif.engine_req_addr[2*32 +: 32] >= cnm_dst) &&
+                            (compute_vif.engine_req_addr[2*32 +: 32] < cnm_dst + 32'h40)) begin
+                            if (accepted_cnm_writes >= 16)
+                                `uvm_fatal("CLUSTER_PARITY_ABORT_OWNER",
+                                    "CNM accepted more output writes than its 16-row GEMV")
+                            cnm_write_addr[accepted_cnm_writes] =
+                                compute_vif.engine_req_addr[2*32 +: 32];
+                            cnm_write_data[accepted_cnm_writes] =
+                                compute_vif.engine_req_wdata[2*32 +: 32];
+                            if (cnm_write_addr[accepted_cnm_writes] !==
+                                cnm_dst + (accepted_cnm_writes << 2))
+                                `uvm_fatal("CLUSTER_PARITY_ABORT_OWNER", $sformatf(
+                                    "CNM Abort output writes are not a contiguous prefix: index=%0d expected=0x%08h actual=0x%08h",
+                                    accepted_cnm_writes,
+                                    cnm_dst + (accepted_cnm_writes << 2),
+                                    cnm_write_addr[accepted_cnm_writes]))
+                            accepted_cnm_writes++;
+                            if (abort_active_seen)
+                                post_abort_cnm_writes++;
+                        end
+                        if (compute_vif.dut_abort_active) begin
+                            abort_seen = 1'b1;
+                            abort_active_seen = 1'b1;
+                        end
+                    end
+                end
+                begin : matrix_parity_cnm_abort_control
+                    axil_write(REG_DOORBELL, 32'd1);
+                    for (cycle = 0; cycle < 30000 && !abort_issued; cycle++) begin
+                        @(posedge compute_vif.aclk);
+                        if (compute_vif.matrix_response_fault) begin
+                            if (!compute_vif.engine_busy[2])
+                                `uvm_fatal("CLUSTER_PARITY_ABORT_OWNER",
+                                    "Matrix parity was reported after the concurrent CNM engine became idle")
+                            axil_write(REG_ABORT, 32'd1);
+                            abort_issued = 1'b1;
+                        end
+                    end
+                    if (!abort_issued)
+                        `uvm_fatal("CLUSTER_PARITY_ABORT_OWNER",
+                            "software Abort was not issued after Matrix parity was observed")
+                    wait_cpl_tail(32'd2);
+                    monitor_done = 1'b1;
+                end
+            join
+            wait_spad_idle();
+            if (!abort_seen)
+                `uvm_fatal("CLUSTER_PARITY_ABORT_OWNER",
+                    "CNM did not sample software Abort while draining Matrix parity")
+            if (accepted_cnm_reads == 0 ||
+                returned_cnm_reads != accepted_cnm_reads)
+                `uvm_fatal("CLUSTER_PARITY_ABORT_OWNER", $sformatf(
+                    "CNM parity/Abort read drain mismatch: accepted=%0d returned=%0d",
+                    accepted_cnm_reads, returned_cnm_reads))
+            if (post_abort_cnm_writes != 0)
+                `uvm_fatal("CLUSTER_PARITY_ABORT_OWNER", $sformatf(
+                    "CNM accepted %0d output writes after Abort sampling",
+                    post_abort_cnm_writes))
+        end
         restore_spad_parity(parity_path, saved_parity);
 
         if (compute_vif.matrix_cnm_overlap_cycles <= overlap_before)
@@ -586,10 +691,17 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         if (compute_vif.matrix_cnm_shared_accept_cycles <= shared_accept_before)
             `uvm_fatal("CLUSTER_PARITY_OWNER",
                 "Matrix/CNM did not contend for shared banked admission in parity-owner cross")
-        if ((compute_vif.matrix_banked_fault_cancel_checks -
-             fault_cancel_before) != 1)
+        if (!abort_cnm_after_parity &&
+            ((compute_vif.matrix_banked_fault_cancel_checks -
+              fault_cancel_before) != 1))
             `uvm_fatal("CLUSTER_PARITY_OWNER", $sformatf(
                 "expected exactly one Matrix held-read cancellation on parity response, observed %0d",
+                compute_vif.matrix_banked_fault_cancel_checks - fault_cancel_before))
+        if (abort_cnm_after_parity &&
+            ((compute_vif.matrix_banked_fault_cancel_checks -
+              fault_cancel_before) > 1))
+            `uvm_fatal("CLUSTER_PARITY_ABORT_OWNER", $sformatf(
+                "unexpected repeated Matrix fault-cancel observation count=%0d",
                 compute_vif.matrix_banked_fault_cancel_checks - fault_cancel_before))
         if (compute_vif.matrix_tag_response_count <= matrix_rsp_before ||
             compute_vif.cnm_tag_response_count <= cnm_rsp_before)
@@ -604,29 +716,65 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 matrix_route_error_before, compute_vif.matrix_route_mismatch_count,
                 cnm_route_error_before, compute_vif.cnm_route_mismatch_count))
 
-        expect_spad(cpl_base, 32'h0000_07e0,
-                    "concurrent parity Matrix task ID/order");
-        expect_spad(cpl_base + 32'h04, 32'h0000_0052,
-                    "concurrent parity Matrix error owner");
-        expect_completion(cpl_base + 32'h10, 16'h07e1,
-                          expected_cnm[15], 32'd16,
-                          "concurrent parity CNM success/order");
+        if (abort_cnm_after_parity) begin
+            expect_spad(cpl_base, 32'h0000_07e3,
+                        "Matrix parity/CNM Abort first CMDQ completion");
+            expect_spad(cpl_base + 32'h04, 32'h0000_0032,
+                        "Matrix parity/CNM Abort first status");
+            expect_spad(cpl_base + 32'h10, 32'h0000_07e2,
+                        "Matrix parity second CMDQ completion");
+            expect_spad(cpl_base + 32'h14, 32'h0000_0052,
+                        "Matrix parity second status");
+            for (word_idx = 0; word_idx < 16; word_idx++) begin
+                if (word_idx < accepted_cnm_writes) begin
+                    if (cnm_write_data[word_idx] !== expected_cnm[word_idx])
+                        `uvm_fatal("CLUSTER_PARITY_ABORT_OWNER", $sformatf(
+                            "CNM accepted Abort-prefix Golden mismatch index=%0d expected=%0d actual=%0d",
+                            word_idx, expected_cnm[word_idx],
+                            $signed(cnm_write_data[word_idx])))
+                    expect_spad(cnm_dst + (word_idx << 2), expected_cnm[word_idx],
+                                $sformatf("parity/Abort CNM Golden prefix[%0d]", word_idx));
+                end else
+                    expect_spad(cnm_dst + (word_idx << 2),
+                                32'hfa17_7800 | word_idx,
+                                $sformatf("parity/Abort CNM untouched suffix[%0d]", word_idx));
+            end
+        end else begin
+            expect_spad(cpl_base, 32'h0000_07e0,
+                        "concurrent parity Matrix task ID/order");
+            expect_spad(cpl_base + 32'h04, 32'h0000_0052,
+                        "concurrent parity Matrix error owner");
+            expect_completion(cpl_base + 32'h10, 16'h07e1,
+                              expected_cnm[15], 32'd16,
+                              "concurrent parity CNM success/order");
+        end
         for (word_idx = 0; word_idx < 512; word_idx++)
             expect_spad(matrix_dst + (word_idx << 2),
                         32'hfa17_7000 | word_idx,
                         $sformatf("concurrent parity Matrix no-writeback[%0d]", word_idx));
-        for (word_idx = 0; word_idx < 16; word_idx++)
-            expect_spad(cnm_dst + (word_idx << 2), expected_cnm[word_idx],
-                        $sformatf("concurrent parity CNM Golden[%0d]", word_idx));
+        if (!abort_cnm_after_parity)
+            for (word_idx = 0; word_idx < 16; word_idx++)
+                expect_spad(cnm_dst + (word_idx << 2), expected_cnm[word_idx],
+                            $sformatf("concurrent parity CNM Golden[%0d]", word_idx));
 
-        `uvm_info("CLUSTER_PARITY_OWNER_CROSS_PASS", $sformatf(
-            "real Matrix ERR_PARITY=0x52 and concurrent CNM Golden pass; overlap_cycles=%0d shared_banked_accepts=%0d matrix_rsp=%0d cnm_rsp=%0d route_mismatch=0; held-read fault cancellations=%0d; no Matrix writeback; ordered completion; seed=%0d",
-            compute_vif.matrix_cnm_overlap_cycles - overlap_before,
-            compute_vif.matrix_cnm_shared_accept_cycles - shared_accept_before,
-            compute_vif.matrix_tag_response_count - matrix_rsp_before,
-            compute_vif.cnm_tag_response_count - cnm_rsp_before,
-            compute_vif.matrix_banked_fault_cancel_checks - fault_cancel_before,
-            seed), UVM_LOW)
+        if (abort_cnm_after_parity)
+            `uvm_info("CLUSTER_PARITY_ABORT_OWNER_CROSS_PASS", $sformatf(
+                "Matrix ERR_PARITY=0x52 observed while CNM active; software Abort retires CNM ERR_ABORT=0x32 then Matrix parity in CMDQ order; overlap_cycles=%0d shared_banked_accepts=%0d matrix_rsp=%0d cnm_rsp=%0d route_mismatch=0; held-read fault cancellations=%0d CNM accepted_prefix=%0d/16 post_abort_writes=%0d; CNM Golden prefix/suffix and read drain checked; seed=%0d",
+                compute_vif.matrix_cnm_overlap_cycles - overlap_before,
+                compute_vif.matrix_cnm_shared_accept_cycles - shared_accept_before,
+                compute_vif.matrix_tag_response_count - matrix_rsp_before,
+                compute_vif.cnm_tag_response_count - cnm_rsp_before,
+                compute_vif.matrix_banked_fault_cancel_checks - fault_cancel_before,
+                accepted_cnm_writes, post_abort_cnm_writes, seed), UVM_LOW)
+        else
+            `uvm_info("CLUSTER_PARITY_OWNER_CROSS_PASS", $sformatf(
+                "real Matrix ERR_PARITY=0x52 and concurrent CNM Golden pass; overlap_cycles=%0d shared_banked_accepts=%0d matrix_rsp=%0d cnm_rsp=%0d route_mismatch=0; held-read fault cancellations=%0d; no Matrix writeback; ordered completion; seed=%0d",
+                compute_vif.matrix_cnm_overlap_cycles - overlap_before,
+                compute_vif.matrix_cnm_shared_accept_cycles - shared_accept_before,
+                compute_vif.matrix_tag_response_count - matrix_rsp_before,
+                compute_vif.cnm_tag_response_count - cnm_rsp_before,
+                compute_vif.matrix_banked_fault_cancel_checks - fault_cancel_before,
+                seed), UVM_LOW)
 
         axil_write(REG_CPLQ_HEAD, 32'd2);
         axil_write(REG_CMDQ_SIZE, 32'd0);
@@ -5667,7 +5815,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             "parity cases=18/18; engines={INT8,Matrix,CNM,BF16,SFU,Conv,KV}; operand phases={A,B where defined}; CNM lanes=4/4; randomized_order_seed=%0d",
             seed), UVM_LOW)
 
-        run_matrix_parity_cnm_owner_cross(seed);
+        run_matrix_parity_cnm_owner_cross(seed, 1'b0);
+        run_matrix_parity_cnm_owner_cross(seed, 1'b1);
         run_matrix_protection_cnm_owner_cross(seed, 1'b0, 1'b0, 1'b0);
         run_matrix_protection_cnm_owner_cross(seed, 1'b1, 1'b0, 1'b0);
         run_matrix_protection_cnm_owner_cross(seed, 1'b0, 1'b1, 1'b0);
