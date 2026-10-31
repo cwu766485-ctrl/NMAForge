@@ -1,9 +1,13 @@
 # Compute Cluster Matrix Parity + CNM Abort Owner Cross — R140
 
-**Run ID:** `R140-MATRIX-PARITY-CNM-ABORT-OWNER-3S-20261031`  
-**Result:** PASS for this directed testpoint; no global requirement or sign-off closure.  
-**Fixed test source:** `c9e0214dfbf8847666baa0b3b10faa973b842224`  
-**Tree:** `b7da3b220d847fd360614e375c007839075291ae`  
+**Run ID:** `R140-MATRIX-PARITY-CNM-ABORT-OWNER-3S-20261031`
+
+**Result:** PASS for this directed testpoint; no global requirement or sign-off closure.
+
+**Fixed test source:** `c9e0214dfbf8847666baa0b3b10faa973b842224`
+
+**Tree:** `b7da3b220d847fd360614e375c007839075291ae`
+
 **Product RTL/SPEC:** unchanged by R140; the commit changes only the UVM sequence and regression Makefile.
 
 ## Scenario and checks
