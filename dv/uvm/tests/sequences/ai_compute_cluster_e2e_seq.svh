@@ -1596,6 +1596,86 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
+    task automatic run_banked_vdot_cmdq_dispatch_test(input int unsigned seed);
+        bit [31:0] src0;
+        bit [31:0] src1;
+        bit [31:0] dst;
+        bit [31:0] packed_word;
+        bit [31:0] expected_word;
+        bit [15:0] task_id;
+        int unsigned launch_before;
+        int unsigned k_idx;
+        int unsigned lane;
+        int unsigned byte_idx;
+        int signed a_value;
+        int signed b_value;
+        int signed golden_sum;
+
+        src0 = 32'h0004_e000;
+        src1 = 32'h0004_e100;
+        dst = 32'h0004_e200;
+        task_id = 16'h0687;
+        golden_sum = 0;
+
+        // Banked VDOT consumes three K words from each physical bank. Keep
+        // the four byte lanes distinct so the top-level launch and reduction
+        // are checked against an independent signed Golden.
+        for (k_idx = 0; k_idx < 3; k_idx++) begin
+            for (lane = 0; lane < 4; lane++) begin
+                packed_word = '0;
+                for (byte_idx = 0; byte_idx < 4; byte_idx++) begin
+                    a_value = int'(k_idx) + int'(lane) + int'(byte_idx) - 3;
+                    b_value = (2 * int'(k_idx)) - int'(lane) + int'(byte_idx) + 1;
+                    packed_word[byte_idx*8 +: 8] = a_value[7:0];
+                    golden_sum += a_value * b_value;
+                end
+                spad_write(src0 + (k_idx << 4) + (lane << 2), packed_word);
+
+                packed_word = '0;
+                for (byte_idx = 0; byte_idx < 4; byte_idx++) begin
+                    b_value = (2 * int'(k_idx)) - int'(lane) + int'(byte_idx) + 1;
+                    packed_word[byte_idx*8 +: 8] = b_value[7:0];
+                end
+                spad_write(src1 + (k_idx << 4) + (lane << 2), packed_word);
+            end
+        end
+        expected_word = golden_sum;
+        spad_write(dst, 32'hbad0_0687);
+
+        write_cluster_desc(CLUSTER_CONTRACT_CMDQ, 8'h20, task_id,
+                           src0, src1, dst, 16'd1, 16'd1, 16'd3,
+                           32'd0, 32'd0, 32'd0, 32'd0, 8'd3);
+        launch_before = compute_vif.launch_sample_count;
+        configure_contract_queues(CLUSTER_CONTRACT_CPLQ, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+
+        if ((compute_vif.launch_sample_count - launch_before) != 1 ||
+            compute_vif.launch_snapshot_opcode[2] !== 8'h20 ||
+            compute_vif.launch_snapshot_src0[2] !== src0 ||
+            compute_vif.launch_snapshot_src1[2] !== src1 ||
+            compute_vif.launch_snapshot_dst[2] !== dst ||
+            compute_vif.launch_snapshot_length[2] !== 16'd3)
+            `uvm_fatal("CLUSTER_OPCODE_LAUNCH", $sformatf(
+                "CMDQ opcode 0x20 launch mismatch: count_delta=%0d op=%02h src=%08h/%08h dst=%08h length=%0d",
+                compute_vif.launch_sample_count - launch_before,
+                compute_vif.launch_snapshot_opcode[2],
+                compute_vif.launch_snapshot_src0[2],
+                compute_vif.launch_snapshot_src1[2],
+                compute_vif.launch_snapshot_dst[2],
+                compute_vif.launch_snapshot_length[2]))
+
+        expect_completion(CLUSTER_CONTRACT_CPLQ, task_id,
+                          golden_sum, 32'd1,
+                          "CMDQ banked VDOT opcode 0x20 completion");
+        expect_spad(dst, expected_word, "CMDQ banked VDOT opcode 0x20 Golden");
+        `uvm_info("CLUSTER_OPCODE_LAUNCH_PASS", $sformatf(
+            "CMDQ fetch/validate/launch opcode=0x20 engine=CNM one completion and independent 48-byte-product signed Golden passed seed=%0d result=%0d",
+            seed, golden_sum), UVM_LOW)
+        clear_contract_queues(32'd1);
+    endtask
+
     task automatic run_launch_snapshot_and_unused_fields_test();
         int unsigned launch_before;
 
@@ -4440,6 +4520,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             recovery_cycles), UVM_LOW)
 
         run_dma_store_response_test();
+        run_banked_vdot_cmdq_dispatch_test(seed);
         run_launch_snapshot_and_unused_fields_test();
         run_inflight_parameter_latch_test();
         run_matrix_inflight_parameter_latch_test(matrix_golden);

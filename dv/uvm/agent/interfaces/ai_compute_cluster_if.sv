@@ -111,6 +111,7 @@ interface ai_compute_cluster_if(input logic aclk);
     // so the real-top sequence can check sampling and backpressure behavior.
     integer unsigned launch_sample_count;
     logic [6:0] launch_sample_seen;
+    logic [7:0] launch_snapshot_opcode[0:6];
     logic [31:0] launch_snapshot_src0[0:6], launch_snapshot_src1[0:6];
     logic [31:0] launch_snapshot_dst[0:6], launch_snapshot_aux0[0:6];
     logic [31:0] launch_snapshot_src0_stride[0:6];
@@ -175,6 +176,7 @@ interface ai_compute_cluster_if(input logic aclk);
             req_write_previous[e] = 1'b0;
             req_addr_previous[e] = '0;
             req_wdata_previous[e] = '0;
+            launch_snapshot_opcode[e] = '0;
             launch_snapshot_src0[e] = '0;
             launch_snapshot_src1[e] = '0;
             launch_snapshot_dst[e] = '0;
@@ -214,6 +216,7 @@ interface ai_compute_cluster_if(input logic aclk);
                 if (engine >= 0) begin
                     launch_sample_count = launch_sample_count + 1;
                     launch_sample_seen[engine] = 1'b1;
+                    launch_snapshot_opcode[engine] = launch_op;
                     launch_snapshot_src0[engine] = launch_src0;
                     launch_snapshot_src1[engine] = launch_src1;
                     launch_snapshot_dst[engine] = launch_dst;
