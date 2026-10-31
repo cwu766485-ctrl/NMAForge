@@ -1131,3 +1131,8 @@ At exact clean code/test SHA `95864f7027ccbec22a09b0a61832c68d3ca08098`, Synopsy
 ### Compute Cluster R113 banked/core owner contention — 2026-10-31
 
 Three VCS seeds pass simultaneous scalar/core and Matrix-like banked reads through the selected production fabric. The real arbiter grants the Core request first and the banked request on the next turn; both tagged response owners and independent Golden data pass. Focused coverage is 100%; the banked tag assertion records three real successes and no failures/incomplete. This is not a production Matrix-engine contention test and closes no full requirement. See [R113 evidence](../docs/verification/COMPUTE_CLUSTER_BANKED_CORE_CONTENTION_R113_2026-10-31.md).
+
+
+## R128 Scalar CMDQ minimum-shape and numeric boundary evidence — 2026-10-31
+
+The exact clean-worktree UVM test SHA dfbebbd8c8ee68458c4261f74f041e816b6b0284 passes the three-seed Compute Cluster regression. Seven legal Scalar GEMV M=1/K=1 descriptors cover bias sign-extension/saturation, arithmetic shift 31, and identity/ReLU/ReLU6. Each seed checks 7/7 Golden outputs and completions, case_mask=7f, and a 41,961-word memory image with zero mismatch/unknown/stale/orphan; UVM severity is 0/0/0. The published content SHA is 0e38b482e13eefa759441ac8ed1ab3d4d6246b37. This is scoped evidence for REQ-CL-002/015/020, which remain PARTIAL; global disposition remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains HOLD. See [R128 report](../docs/verification/COMPUTE_CLUSTER_SCALAR_CMDQ_NUMERIC_BOUNDARY_R128_2026-10-31.md).
