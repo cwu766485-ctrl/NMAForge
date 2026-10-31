@@ -112,6 +112,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned shared_reset_coverage_phase;
     int unsigned shared_reset_prefix_coverage_phase;
     int unsigned cnm_protection_reset_prefix_coverage_phase;
+    int unsigned sfu_reset_prefix_phase;
 
     covergroup matrix_cnm_shared_reset_cg;
         option.per_instance = 1;
@@ -146,6 +147,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         }
     endgroup
 
+    covergroup sfu_reset_prefix_cg;
+        option.per_instance = 1;
+        cp_sfu_reset_prefix_phase: coverpoint sfu_reset_prefix_phase {
+            bins sfu_task_busy = {1};
+            bins accepted_golden_prefix = {2};
+            bins reset_quiet_window = {3};
+            bins release_quiet_window = {4};
+            bins prefix_suffix_and_completion_preserved = {5};
+            bins full_golden_recovery = {6};
+        }
+    endgroup
+
     function automatic int signed next_small_signed();
         int unsigned value;
         rng_state = rng_state ^ (rng_state << 13);
@@ -160,9 +173,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         shared_reset_coverage_phase = 0;
         shared_reset_prefix_coverage_phase = 0;
         cnm_protection_reset_prefix_coverage_phase = 0;
+        sfu_reset_prefix_phase = 0;
         matrix_cnm_shared_reset_cg = new();
         matrix_cnm_prefix_reset_cg = new();
         cnm_protection_matrix_prefix_reset_cg = new();
+        sfu_reset_prefix_cg = new();
     endfunction
 
     task automatic axil_write(input bit [31:0] addr, input bit [31:0] data);
@@ -5778,6 +5793,219 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
+    task automatic run_sfu_reset_write_prefix(input int unsigned seed);
+        int signed gelu_inputs[0:3];
+        int signed gelu_golden[0:3];
+        bit [31:0] write_addr[0:63];
+        bit [31:0] write_data[0:63];
+        bit [31:0] desc_base;
+        bit [31:0] completion_base;
+        bit [31:0] dst;
+        bit [31:0] sentinel;
+        bit [31:0] reset_value;
+        bit [31:0] cpl_tail;
+        bit [15:0] task_id;
+        bit [15:0] recovery_task_id;
+        int unsigned accepted_write_count;
+        int unsigned accepted_write_at_reset;
+        int unsigned accepted_reads;
+        int unsigned returned_reads;
+        int unsigned post_reset_writes;
+        int unsigned post_reset_responses;
+        int unsigned poll;
+        int unsigned word_idx;
+        bit first_write_seen;
+        bit reset_monitor_active;
+        bit monitor_done;
+        bit reset_ok;
+
+        desc_base = CLUSTER_CONTRACT_CMDQ;
+        completion_base = 32'h0000_5ca0;
+        dst = 32'h0004_c100;
+        sentinel = 32'hbad0_77a0;
+        task_id = 16'h0778;
+        recovery_task_id = 16'h0779;
+        accepted_write_count = 0;
+        accepted_write_at_reset = 0;
+        accepted_reads = 0;
+        returned_reads = 0;
+        post_reset_writes = 0;
+        post_reset_responses = 0;
+        first_write_seen = 1'b0;
+        reset_monitor_active = 1'b0;
+        monitor_done = 1'b0;
+        sfu_reset_prefix_phase = 0;
+
+        gelu_inputs[0] = 16;
+        gelu_inputs[1] = -16;
+        gelu_inputs[2] = 32;
+        gelu_inputs[3] = -32;
+        gelu_golden[0] = 8;
+        gelu_golden[1] = -8;
+        gelu_golden[2] = 17;
+        gelu_golden[3] = -15;
+        for (word_idx = 0; word_idx < 64; word_idx++) begin
+            spad_write(GELU_A_LOCAL + (word_idx << 2), gelu_inputs[word_idx % 4]);
+            spad_write(dst + (word_idx << 2), sentinel ^ word_idx);
+        end
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            spad_write(completion_base + (word_idx << 2), 32'h77a0_0000 | word_idx);
+
+        write_v3_desc(desc_base, 8'h35, task_id, GELU_A_LOCAL, 32'd0, dst,
+                      16'd0, 16'd0, 16'd64);
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        fork
+            begin : sfu_reset_prefix_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.engine_req_valid[4] &&
+                        compute_vif.engine_req_ready[4]) begin
+                        if (compute_vif.engine_req_write[4]) begin
+                            if (accepted_write_count >= 64)
+                                `uvm_fatal("CLUSTER_SFU_RESET_PREFIX",
+                                    "SFU accepted more writes than the 64-element descriptor")
+                            write_addr[accepted_write_count] =
+                                compute_vif.engine_req_addr[4*32 +: 32];
+                            write_data[accepted_write_count] =
+                                compute_vif.engine_req_wdata[4*32 +: 32];
+                            accepted_write_count++;
+                            first_write_seen = 1'b1;
+                            if (reset_monitor_active)
+                                post_reset_writes++;
+                        end else begin
+                            accepted_reads++;
+                        end
+                    end
+                    if (compute_vif.rsp_valid &&
+                        (compute_vif.rsp_client == 3'd2)) begin
+                        returned_reads++;
+                        if (reset_monitor_active)
+                            post_reset_responses++;
+                    end
+                end
+            end
+            begin : reset_after_sfu_prefix
+                poll = 0;
+                while (!first_write_seen && poll < 50000) begin
+                    @(posedge compute_vif.aclk);
+                    poll++;
+                    if (compute_vif.engine_busy[4] &&
+                        (sfu_reset_prefix_phase == 0)) begin
+                        sfu_reset_prefix_phase = 1;
+                        sfu_reset_prefix_cg.sample();
+                    end
+                end
+                if (!first_write_seen)
+                    `uvm_fatal("CLUSTER_SFU_RESET_PREFIX",
+                        "SFU did not accept an output before the reset timeout")
+                if (accepted_write_count == 0 || accepted_write_count >= 64 ||
+                    !compute_vif.engine_busy[4])
+                    `uvm_fatal("CLUSTER_SFU_RESET_PREFIX", $sformatf(
+                        "reset prefix is not a proper in-flight output prefix: writes=%0d busy=%0b",
+                        accepted_write_count, compute_vif.engine_busy[4]))
+                if (sfu_reset_prefix_phase == 0) begin
+                    sfu_reset_prefix_phase = 1;
+                    sfu_reset_prefix_cg.sample();
+                end
+                sfu_reset_prefix_phase = 2;
+                sfu_reset_prefix_cg.sample();
+                accepted_write_at_reset = accepted_write_count;
+                reset_monitor_active = 1'b1;
+                #1ns;
+                reset_value = 1'b0;
+                reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
+                if (!reset_ok)
+                    `uvm_fatal("CLUSTER_SFU_RESET_PREFIX",
+                        "failed to assert accelerator reset after SFU accepted output prefix")
+                repeat (4) @(posedge compute_vif.aclk);
+                if (compute_vif.engine_busy !== 7'b0)
+                    `uvm_fatal("CLUSTER_SFU_RESET_PREFIX", $sformatf(
+                        "engine busy did not clear in reset: busy=%07b",
+                        compute_vif.engine_busy))
+                sfu_reset_prefix_phase = 3;
+                sfu_reset_prefix_cg.sample();
+                #1ns;
+                reset_value = 1'b1;
+                reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
+                if (!reset_ok)
+                    `uvm_fatal("CLUSTER_SFU_RESET_PREFIX",
+                        "failed to release accelerator reset after SFU prefix test")
+                repeat (8) @(posedge compute_vif.aclk);
+                sfu_reset_prefix_phase = 4;
+                sfu_reset_prefix_cg.sample();
+                monitor_done = 1'b1;
+            end
+        join
+
+        wait_spad_idle();
+        if (post_reset_writes != 0 || post_reset_responses != 0 ||
+            accepted_write_count != accepted_write_at_reset)
+            `uvm_fatal("CLUSTER_SFU_RESET_PREFIX", $sformatf(
+                "old-epoch SFU activity escaped reset/release: writes=%0d responses=%0d prefix=%0d/%0d",
+                post_reset_writes, post_reset_responses,
+                accepted_write_count, accepted_write_at_reset))
+        if (returned_reads > accepted_reads)
+            `uvm_fatal("CLUSTER_SFU_RESET_PREFIX", $sformatf(
+                "SFU returned-read count exceeds accepts: accepted=%0d returned=%0d",
+                accepted_reads, returned_reads))
+        if (accepted_write_at_reset == 0 || accepted_write_at_reset >= 64)
+            `uvm_fatal("CLUSTER_SFU_RESET_PREFIX", $sformatf(
+                "reset did not preserve a proper accepted-write prefix: %0d/64",
+                accepted_write_at_reset))
+
+        axil_read(REG_CPLQ_TAIL, cpl_tail);
+        if (cpl_tail !== 32'd0)
+            `uvm_fatal("CLUSTER_SFU_RESET_PREFIX", $sformatf(
+                "old-epoch SFU task advanced CPLQ_TAIL across reset: %0d", cpl_tail))
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            expect_spad(completion_base + (word_idx << 2),
+                        32'h77a0_0000 | word_idx,
+                        $sformatf("SFU reset suppressed old completion[%0d]", word_idx));
+        for (word_idx = 0; word_idx < accepted_write_at_reset; word_idx++) begin
+            if (write_addr[word_idx] !== dst + (word_idx << 2))
+                `uvm_fatal("CLUSTER_SFU_RESET_PREFIX", $sformatf(
+                    "accepted SFU prefix address mismatch index=%0d expected=0x%08h actual=0x%08h",
+                    word_idx, dst + (word_idx << 2), write_addr[word_idx]))
+            if (write_data[word_idx] !== gelu_golden[word_idx % 4])
+                `uvm_fatal("CLUSTER_SFU_RESET_PREFIX", $sformatf(
+                    "accepted SFU prefix Golden mismatch index=%0d expected=0x%08h actual=0x%08h",
+                    word_idx, gelu_golden[word_idx % 4], write_data[word_idx]))
+            expect_spad(dst + (word_idx << 2), gelu_golden[word_idx % 4],
+                        $sformatf("SFU reset accepted Golden prefix[%0d]", word_idx));
+        end
+        for (word_idx = accepted_write_at_reset; word_idx < 64; word_idx++)
+            expect_spad(dst + (word_idx << 2), sentinel ^ word_idx,
+                        $sformatf("SFU reset untouched output suffix[%0d]", word_idx));
+        sfu_reset_prefix_phase = 5;
+        sfu_reset_prefix_cg.sample();
+
+        write_v3_desc(desc_base, 8'h35, recovery_task_id, GELU_A_LOCAL, 32'd0, dst,
+                      16'd0, 16'd0, 16'd64);
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        expect_completion(completion_base, recovery_task_id, gelu_golden[3],
+                          32'd64, "SFU reset accepted-prefix recovery");
+        for (word_idx = 0; word_idx < 64; word_idx++)
+            expect_spad(dst + (word_idx << 2), gelu_golden[word_idx % 4],
+                        $sformatf("SFU reset full Golden recovery[%0d]", word_idx));
+        sfu_reset_prefix_phase = 6;
+        sfu_reset_prefix_cg.sample();
+        if (sfu_reset_prefix_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_SFU_RESET_PREFIX", $sformatf(
+                "SFU reset-prefix functional bins incomplete: %0.1f%%",
+                sfu_reset_prefix_cg.get_coverage()))
+        `uvm_info("CLUSTER_SFU_RESET_WRITE_PREFIX_PASS", $sformatf(
+            "task_id=%04h accepted_output_prefix=%0d/64 old_completion_suppressed=1 reset_dropped_reads=%0d full_golden_recovery=64/64 focused_bins=6/6 seed=%0d",
+            task_id, accepted_write_at_reset, accepted_reads - returned_reads, seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
     task automatic check_request_stability();
         int unsigned e;
         if (compute_vif.engine_req_stability_violations != 0 ||
@@ -6955,6 +7183,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         check_request_stability();
         run_engine_abort_drain_sweep();
         run_sfu_abort_write_prefix(seed);
+        run_sfu_reset_write_prefix(seed);
         run_conv_abort_write_prefix(seed);
         run_kv_abort_write_prefix(seed);
         run_matrix_abort_write_prefix(seed);
