@@ -50,6 +50,15 @@ module tb_ai_accel_uvm;
     assign compute_obs.engine_busy = dut.engine_busy;
     assign compute_obs.engine_done = dut.engine_done;
     assign compute_obs.engine_error = dut.engine_error;
+    assign compute_obs.engine_parity_rsp_error = {
+        dut.compute_engine_rsp_error[6],
+        dut.compute_engine_rsp_error[5],
+        dut.compute_engine_rsp_error[4],
+        dut.compute_cluster_u.tensor_matrix_u.banked_response_fault,
+        |(dut.cnm_rsp_valid & dut.cnm_parity),
+        dut.compute_engine_rsp_error[1],
+        dut.compute_engine_rsp_error[0]
+    };
     assign compute_obs.dut_abort_active = dut.core_abort;
     assign compute_obs.engine_req_valid = dut.compute_engine_req_valid;
     assign compute_obs.engine_req_ready = dut.compute_engine_ready;

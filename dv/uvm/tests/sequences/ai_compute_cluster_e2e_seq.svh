@@ -4542,13 +4542,15 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         input int unsigned engine,
         input bit operand_b,
         input int unsigned slot,
-        input int unsigned seed);
+        input int unsigned seed,
+        input bit reset_after_response);
         bit [31:0] desc_addr;
         bit [31:0] cpl_addr;
         bit [31:0] dst;
         bit [31:0] fault_addr;
         bit [31:0] value;
         bit accepted_fault_read;
+        bit consumed_fault_response;
         bit [15:0] task_id;
         string parity_path;
         uvm_hdl_data_t saved_parity;
@@ -4596,10 +4598,33 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 compute_vif.engine_busy, compute_vif.engine_req_valid,
                 compute_vif.cnm_accept_mask, compute_vif.matrix_request_valid))
 
-        // The scratchpad response is registered. Reset at +1ns after the
-        // accepted-read edge, before the fault response is sampled by the
-        // requesting engine.
-        #1ns;
+        consumed_fault_response = 1'b0;
+        if (reset_after_response) begin
+            // Wait for the actual per-engine parity response to be presented
+            // at a sampling edge. Matrix uses its dedicated banked path and
+            // CNM has per-lane parity; the other engines use the shared-core
+            // response mux. Reset immediately after this consume edge, while
+            // the core is active in its error path but before Done publishes.
+            for (poll = 0; poll < 50000; poll++) begin
+                @(posedge compute_vif.aclk);
+                if (compute_vif.engine_parity_rsp_error[engine]) begin
+                    if (!compute_vif.engine_busy[engine])
+                        `uvm_fatal("CLUSTER_PARITY_RESET", $sformatf(
+                            "engine=%0d parity response was not sampled while active", engine))
+                    consumed_fault_response = 1'b1;
+                    break;
+                end
+            end
+            if (!consumed_fault_response)
+                `uvm_fatal("CLUSTER_PARITY_RESET", $sformatf(
+                    "engine=%0d operand=%s did not consume its parity response",
+                    engine, operand_b ? "B" : "A"))
+            #1ns;
+        end else begin
+            // The scratchpad response is registered. Reset at +1ns after the
+            // accepted-read edge, before the fault response is sampled.
+            #1ns;
+        end
         reset_value = 1'b0;
         if (!uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value))
             `uvm_fatal("CLUSTER_PARITY_RESET", $sformatf(
@@ -4610,7 +4635,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             @(posedge compute_vif.aclk);
             if (compute_vif.rsp_valid !== 1'b0 ||
                 compute_vif.matrix_rsp_valid !== 1'b0 ||
-                compute_vif.cnm_rsp_valid !== 4'b0)
+                compute_vif.cnm_rsp_valid !== 4'b0 ||
+                compute_vif.engine_parity_rsp_error !== 7'b0)
                 `uvm_fatal("CLUSTER_PARITY_RESET", $sformatf(
                     "old-epoch response visible during reset engine=%0d operand=%s",
                     engine, operand_b ? "B" : "A"))
@@ -4629,7 +4655,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             @(posedge compute_vif.aclk);
             if (compute_vif.rsp_valid !== 1'b0 ||
                 compute_vif.matrix_rsp_valid !== 1'b0 ||
-                compute_vif.cnm_rsp_valid !== 4'b0)
+                compute_vif.cnm_rsp_valid !== 4'b0 ||
+                compute_vif.engine_parity_rsp_error !== 7'b0)
                 `uvm_fatal("CLUSTER_PARITY_RESET", $sformatf(
                     "stale response escaped reset epoch engine=%0d operand=%s",
                     engine, operand_b ? "B" : "A"))
@@ -4665,31 +4692,40 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         expect_spad(cpl_addr + 32'h04, 32'd1,
                     $sformatf("parity-reset recovery status e%0d p%0d", engine, operand_b));
         `uvm_info("CLUSTER_PARITY_RESET_CASE_PASS", $sformatf(
-            "engine=%0d operand=%s accepted parity read; reset discarded old epoch without response/completion/writeback; repaired task retired after recovery; seed=%0d",
-            engine, operand_b ? "B" : "A", seed), UVM_LOW)
+            "engine=%0d operand=%0s reset_phase=%0s; parity epoch produced no stale response/completion/writeback; repaired task retired after recovery; seed=%0d",
+            engine, operand_b ? "B" : "A",
+            reset_after_response ? "after_response_consume" : "before_response_consume", seed), UVM_LOW)
         clear_contract_queues(32'd1);
     endtask
 
     task automatic run_engine_parity_reset_sweep(input int unsigned seed);
         int unsigned cases;
         int unsigned engine;
+        int unsigned operand_phase;
+        int unsigned reset_phase;
 
         cases = 0;
         for (engine = 0; engine < 7; engine++) begin
-            run_engine_parity_reset_case(engine, 1'b0, cases, seed);
-            cases++;
-            if ((engine == 0) || (engine == 1) || (engine == 2) ||
-                (engine == 3) || (engine == 5)) begin
-                run_engine_parity_reset_case(engine, 1'b1, cases, seed);
-                cases++;
+            for (operand_phase = 0; operand_phase < 2; operand_phase++) begin
+                if ((operand_phase == 0) || (engine == 0) || (engine == 1) ||
+                    (engine == 2) || (engine == 3) || (engine == 5)) begin
+                    for (reset_phase = 0; reset_phase < 2; reset_phase++) begin
+                        run_engine_parity_reset_case(engine, operand_phase[0],
+                            cases, seed, reset_phase[0]);
+                        cases++;
+                    end
+                end
             end
         end
-        if (cases != 12)
+        if (cases != 24)
             `uvm_fatal("CLUSTER_PARITY_RESET", $sformatf(
-                "expected 12 legal engine/operand/reset cases, observed %0d", cases))
+                "expected 24 legal engine/operand/reset cases, observed %0d", cases))
         `uvm_info("CLUSTER_PARITY_RESET_CROSS_PASS", $sformatf(
-            "accepted-read-to-reset parity cross=%0d/12; engines=7 operand phases={A all, B where defined}; old-epoch response/completion/writeback suppressed; recovery dispatch verified; seed=%0d",
-            cases, seed), UVM_LOW)
+            "before-response-consume parity reset cross=12/12; engines=7 operands={A all,B where defined}; seed=%0d",
+            seed), UVM_LOW)
+        `uvm_info("CLUSTER_PARITY_RESET_CONSUMED_CROSS_PASS", $sformatf(
+            "after-response-consume parity reset cross=12/12; engines=7 operands={A all,B where defined}; recovery dispatched for all 24 phase cases; seed=%0d",
+            seed), UVM_LOW)
     endtask
 
     task automatic run_matrix_parity_reset_epoch_case(input int unsigned seed);
