@@ -98,6 +98,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] C1_FP_A_LOCAL = 32'h0006_c000;
     localparam bit [31:0] C1_FP_B_LOCAL = 32'h0006_c100;
     localparam bit [31:0] C1_FP_Y_LOCAL = 32'h0006_c200;
+    localparam bit [31:0] CNM_LATCH_Y_LOCAL = 32'h0004_e300;
+    localparam bit [31:0] CNM_LATCH_MUTATED_Y_LOCAL = 32'h0004_e400;
 
     virtual ai_compute_cluster_if compute_vif;
     bit [31:0] rng_state;
@@ -1790,6 +1792,130 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             "mutating source and destination descriptor words after scalar launch did not alter the in-flight task",
             UVM_LOW)
         clear_contract_queues(32'd1);
+    endtask
+
+    task automatic run_cnm_inflight_parameter_latch_test();
+        int unsigned word_idx;
+        int unsigned poll;
+        int unsigned launch_before;
+        int unsigned overlap_cycles;
+        int unsigned descriptor_write_cycles;
+        int signed golden_sum;
+        int signed a_value;
+        int signed b_value;
+        bit cnm_busy_seen;
+        bit scalar_busy_seen;
+        bit cnm_done_seen;
+        bit scalar_done_seen;
+        bit [31:0] completion_base;
+        completion_base = CLUSTER_CONTRACT_CPLQ + 32'h500;
+        overlap_cycles = 0;
+        descriptor_write_cycles = 0;
+        cnm_busy_seen = 1'b0;
+        scalar_busy_seen = 1'b0;
+        cnm_done_seen = 1'b0;
+        scalar_done_seen = 1'b0;
+
+        // Reuse the already initialized C1 banked GEMV operands. Their four
+        // byte lanes have distinct signed values, so this independent Golden
+        // covers all four physical banks and all 64 K terms.
+        golden_sum = 0;
+        for (word_idx = 0; word_idx < 64; word_idx++) begin
+            for (int unsigned lane = 0; lane < 4; lane++) begin
+                case (lane)
+                    0: begin a_value = 2; b_value = 7; end
+                    1: begin a_value = 3; b_value = 11; end
+                    2: begin a_value = 4; b_value = 13; end
+                    default: begin a_value = 5; b_value = 17; end
+                endcase
+                for (int unsigned byte_idx = 0; byte_idx < 4; byte_idx++)
+                    golden_sum += a_value * b_value;
+            end
+        end
+        if (golden_sum != 47104)
+            `uvm_fatal("CLUSTER_CNM_PARAM_LATCH", $sformatf(
+                "independent CNM banked GEMV Golden expected 47104, calculated %0d",
+                golden_sum))
+
+        for (word_idx = 0; word_idx < 16; word_idx++) begin
+            spad_write(CNM_LATCH_Y_LOCAL + (word_idx << 2),
+                       32'hbad0_6c00 | word_idx);
+            spad_write(CNM_LATCH_MUTATED_Y_LOCAL + (word_idx << 2),
+                       32'hbad0_6d00 | word_idx);
+        end
+        spad_write(SCALAR_A_LOCAL, 32'h0403_0201);
+        spad_write(SCALAR_B_LOCAL, 32'h0807_0605);
+        write_cnm_v3_desc(CLUSTER_CONTRACT_CMDQ, 16'h0688,
+                          C1_CNM_A_LOCAL, C1_CNM_B_LOCAL,
+                          CNM_LATCH_Y_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h18, 32'd64);
+        // A second, independent engine performs the descriptor-memory
+        // mutation through a legal scheduler-side SPAD write.  The command
+        // processor fetches both entries before the scalar result overwrites
+        // the CNM destination word, so this avoids an illegal host/compute
+        // collision while still exercising an in-flight CNM descriptor.
+        write_contract_vdot_desc(CLUSTER_CONTRACT_CMDQ + 32'h40, 16'h0689,
+                                 SCALAR_A_LOCAL, SCALAR_B_LOCAL,
+                                 CLUSTER_CONTRACT_CMDQ + 32'h10, 16'd1, 8'd0,
+                                 32'd0, 32'd0, 32'd0, 32'd0);
+        launch_before = compute_vif.launch_sample_count;
+        configure_contract_queues(completion_base, 32'd2);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        for (poll = 0; poll < 10000; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.engine_busy[2]) cnm_busy_seen = 1'b1;
+            if (compute_vif.engine_busy[0]) scalar_busy_seen = 1'b1;
+            if (compute_vif.engine_busy[2] && compute_vif.engine_busy[0])
+                overlap_cycles++;
+            if (compute_vif.engine_busy[2] &&
+                compute_vif.engine_req_valid[0] &&
+                compute_vif.engine_req_write[0] &&
+                compute_vif.engine_req_addr[31:0] ===
+                    (CLUSTER_CONTRACT_CMDQ + 32'h10))
+                descriptor_write_cycles++;
+            if (compute_vif.engine_done[2]) cnm_done_seen = 1'b1;
+            if (compute_vif.engine_done[0]) scalar_done_seen = 1'b1;
+            if (cnm_done_seen && scalar_done_seen) break;
+        end
+        if (!cnm_busy_seen || !scalar_busy_seen || !cnm_done_seen ||
+            !scalar_done_seen || overlap_cycles == 0 ||
+            descriptor_write_cycles == 0)
+            `uvm_fatal("CLUSTER_CNM_PARAM_LATCH",
+                $sformatf("CNM/scalar legal descriptor mutation did not overlap: busy=%b/%b done=%b/%b overlap=%0d writes=%0d",
+                    cnm_busy_seen, scalar_busy_seen, cnm_done_seen,
+                    scalar_done_seen, overlap_cycles, descriptor_write_cycles))
+        wait_cpl_tail(32'd2);
+        wait_spad_idle();
+        for (word_idx = 0; word_idx < 16; word_idx++) begin
+            expect_spad(CNM_LATCH_Y_LOCAL + (word_idx << 2), golden_sum,
+                        $sformatf("in-flight CNM latched Golden[%0d]", word_idx));
+            expect_spad(CNM_LATCH_MUTATED_Y_LOCAL + (word_idx << 2),
+                        32'hbad0_6d00 | word_idx,
+                        $sformatf("in-flight CNM mutation destination sentinel[%0d]", word_idx));
+        end
+        expect_completion(completion_base, 16'h0688, golden_sum, 32'd16,
+                          "in-flight CNM descriptor latch");
+        expect_completion(completion_base + 32'h10, 16'h0689, 32'd70, 32'd1,
+                          "parallel scalar descriptor mutation");
+        expect_spad(CLUSTER_CONTRACT_CMDQ + 32'h10, 32'd70,
+                    "parallel engine changed fetched CNM descriptor word");
+        if (compute_vif.launch_sample_count != launch_before + 2 ||
+            compute_vif.launch_snapshot_opcode[2] !== 8'h21 ||
+            compute_vif.launch_snapshot_src0[2] !== C1_CNM_A_LOCAL ||
+            compute_vif.launch_snapshot_src1[2] !== C1_CNM_B_LOCAL ||
+            compute_vif.launch_snapshot_dst[2] !== CNM_LATCH_Y_LOCAL)
+            `uvm_fatal("CLUSTER_CNM_PARAM_LATCH", $sformatf(
+                "CNM launch snapshot changed: delta=%0d op=%02h src=%08h/%08h dst=%08h",
+                compute_vif.launch_sample_count - launch_before,
+                compute_vif.launch_snapshot_opcode[2],
+                compute_vif.launch_snapshot_src0[2],
+                compute_vif.launch_snapshot_src1[2],
+                compute_vif.launch_snapshot_dst[2]))
+        `uvm_info("CLUSTER_CNM_PARAMETER_LATCH_PASS", $sformatf(
+            "CNM GEMV retained launch parameters while a legal scalar SPAD write changed its fetched descriptor during %0d overlapping cycles; descriptor write overlapped CNM for %0d cycles; 16 outputs match signed 4-bank K=64 Golden=%0d",
+            overlap_cycles, descriptor_write_cycles, golden_sum), UVM_LOW)
+        clear_contract_queues(32'd2);
     endtask
 
     task automatic run_matrix_inflight_parameter_latch_test(
@@ -4521,6 +4647,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         run_dma_store_response_test();
         run_banked_vdot_cmdq_dispatch_test(seed);
+        run_cnm_inflight_parameter_latch_test();
         run_launch_snapshot_and_unused_fields_test();
         run_inflight_parameter_latch_test();
         run_matrix_inflight_parameter_latch_test(matrix_golden);
