@@ -2420,6 +2420,220 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
+    task automatic run_scalar_legacy_conv_cmdq_test(input int unsigned seed);
+        localparam bit [31:0] LEGACY_CMDQ = 32'h0005_c000;
+        localparam bit [31:0] LEGACY_CPLQ = 32'h0005_c100;
+        localparam bit [31:0] LEGACY_A = 32'h0007_3000;
+        localparam bit [31:0] LEGACY_B = 32'h0007_3400;
+        localparam bit [31:0] LEGACY_Y = 32'h0007_3800;
+        localparam int unsigned OUTPUTS = 4;
+        bit [7:0] opcode[0:2];
+        bit [15:0] k_words[0:2];
+        bit [31:0] observed_src0[0:2];
+        bit [31:0] observed_src1[0:2];
+        bit [31:0] observed_dst[0:2];
+        bit [7:0] observed_opcode[0:2];
+        bit [15:0] observed_m[0:2];
+        bit [15:0] observed_n[0:2];
+        bit [15:0] observed_k[0:2];
+        bit [31:0] a_words[0:2][0:17];
+        bit [31:0] b_words[0:2][0:17];
+        bit [31:0] golden[0:2][0:3];
+        bit [2:0] case_mask;
+        longint signed accum;
+        int signed a_value;
+        int signed b_value;
+        int signed sample_value;
+        int unsigned launch_before;
+        int unsigned engine_launch_before;
+        int unsigned busy_launch_before;
+        int unsigned launch_seen;
+        int unsigned poll;
+        int unsigned op_idx;
+        int unsigned word_idx;
+        int unsigned word_count_a;
+        int unsigned word_count_b;
+        int unsigned row_idx;
+        int unsigned col_idx;
+        int unsigned out_idx;
+        int unsigned k_idx;
+        int unsigned lane;
+        int unsigned a_index;
+        int unsigned b_index;
+        bit [31:0] packed_a;
+        bit [31:0] packed_b;
+        bit monitor_complete;
+
+        opcode[0] = 8'h13; // legacy Conv1x1 on the scalar INT8 core
+        opcode[1] = 8'h14; // legacy im2col Conv3x3 on the scalar INT8 core
+        opcode[2] = 8'h15; // legacy depthwise Conv3x3 on the scalar INT8 core
+        k_words[0] = 16'd2;
+        k_words[1] = 16'd9;
+        k_words[2] = 16'd2;
+
+        // Exercise all three legacy opcodes through descriptor fetch,
+        // validator, scalar launch, SPAD, completion writer, and full image.
+        // 0x14 models a 3x3 im2col patch as nine packed K words. 0x15 stores
+        // one A vector per flattened output pixel/channel and one B vector
+        // per channel, matching the core's depthwise address progression.
+        for (op_idx = 0; op_idx < 3; op_idx++) begin
+            word_count_a = (op_idx == 2) ?
+                           (4 * int'(k_words[op_idx])) :
+                           (2 * int'(k_words[op_idx]));
+            word_count_b = 2 * int'(k_words[op_idx]);
+            for (word_idx = 0; word_idx < word_count_a; word_idx++) begin
+                packed_a = '0;
+                for (lane = 0; lane < 4; lane++) begin
+                    sample_value = (int'(seed % 251) + int'(op_idx * 29) +
+                                    int'(word_idx * 17) + int'(lane * 53)) % 255;
+                    sample_value = sample_value - 128;
+                    packed_a[lane*8 +: 8] = sample_value[7:0];
+                end
+                a_words[op_idx][word_idx] = packed_a;
+                spad_write(LEGACY_A + (op_idx * 32'h100) + (word_idx << 2),
+                           packed_a);
+            end
+            for (word_idx = 0; word_idx < word_count_b; word_idx++) begin
+                packed_b = '0;
+                for (lane = 0; lane < 4; lane++) begin
+                    sample_value = (int'(seed % 241) + int'(op_idx * 43) +
+                                    int'(word_idx * 31) + int'(lane * 47)) % 255;
+                    sample_value = sample_value - 128;
+                    packed_b[lane*8 +: 8] = sample_value[7:0];
+                end
+                b_words[op_idx][word_idx] = packed_b;
+                spad_write(LEGACY_B + (op_idx * 32'h100) + (word_idx << 2),
+                           packed_b);
+            end
+
+            for (out_idx = 0; out_idx < OUTPUTS; out_idx++) begin
+                row_idx = out_idx / 2;
+                col_idx = out_idx % 2;
+                accum = 64'sd0;
+                for (k_idx = 0; k_idx < int'(k_words[op_idx]); k_idx++) begin
+                    if (op_idx == 2)
+                        a_index = out_idx * int'(k_words[op_idx]) + k_idx;
+                    else
+                        a_index = row_idx * int'(k_words[op_idx]) + k_idx;
+                    b_index = col_idx * int'(k_words[op_idx]) + k_idx;
+                    for (lane = 0; lane < 4; lane++) begin
+                        a_value = $signed(a_words[op_idx][a_index][lane*8 +: 8]);
+                        b_value = $signed(b_words[op_idx][b_index][lane*8 +: 8]);
+                        accum += a_value * b_value;
+                    end
+                end
+                golden[op_idx][out_idx] = accum[31:0];
+                spad_write(LEGACY_Y + (op_idx * 32'h100) + (out_idx << 2),
+                           32'hbad0_c100 | (op_idx << 4) | out_idx);
+            end
+
+            write_cluster_desc(LEGACY_CMDQ + (op_idx << 6), opcode[op_idx],
+                               16'h06c0 + op_idx,
+                               LEGACY_A + (op_idx * 32'h100),
+                               LEGACY_B + (op_idx * 32'h100),
+                               LEGACY_Y + (op_idx * 32'h100),
+                               16'd2, 16'd2, k_words[op_idx],
+                               32'd0, 32'd0, 32'd0, 32'd0, 8'd3);
+            observed_opcode[op_idx] = '0;
+            observed_src0[op_idx] = '0;
+            observed_src1[op_idx] = '0;
+            observed_dst[op_idx] = '0;
+            observed_m[op_idx] = '0;
+            observed_n[op_idx] = '0;
+            observed_k[op_idx] = '0;
+        end
+
+        launch_before = compute_vif.launch_sample_count;
+        engine_launch_before = compute_vif.engine_launch_count[0];
+        busy_launch_before = compute_vif.same_engine_launch_while_busy;
+        launch_seen = 0;
+        case_mask = '0;
+        monitor_complete = 1'b0;
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, LEGACY_CMDQ);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd3);
+        axil_write(REG_CPLQ_BASE, LEGACY_CPLQ);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+
+        fork
+            begin : legacy_conv_launch_monitor
+                for (poll = 0; poll < 50000 && launch_seen < 3; poll++) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.launch_valid) begin
+                        if (launch_seen >= 3)
+                            `uvm_fatal("CLUSTER_LEGACY_CONV", "unexpected extra Scalar launch")
+                        observed_opcode[launch_seen] = compute_vif.launch_op;
+                        observed_src0[launch_seen] = compute_vif.launch_src0;
+                        observed_src1[launch_seen] = compute_vif.launch_src1;
+                        observed_dst[launch_seen] = compute_vif.launch_dst;
+                        observed_m[launch_seen] = compute_vif.launch_m;
+                        observed_n[launch_seen] = compute_vif.launch_n;
+                        observed_k[launch_seen] = compute_vif.launch_k;
+                        launch_seen++;
+                    end
+                end
+                if (launch_seen != 3)
+                    `uvm_fatal("CLUSTER_LEGACY_CONV", $sformatf(
+                        "real CMDQ launch monitor timed out after %0d/3 legacy Scalar Conv launches",
+                        launch_seen))
+                monitor_complete = 1'b1;
+            end
+            begin : legacy_conv_submit
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(32'd3);
+            end
+        join
+        wait_spad_idle();
+
+        if (!monitor_complete ||
+            compute_vif.launch_sample_count - launch_before != 3 ||
+            compute_vif.engine_launch_count[0] - engine_launch_before != 3 ||
+            compute_vif.same_engine_launch_while_busy != busy_launch_before)
+            `uvm_fatal("CLUSTER_LEGACY_CONV", $sformatf(
+                "legacy Conv launch accounting mismatch: launches=%0d engine0=%0d busy_relaunch_delta=%0d",
+                compute_vif.launch_sample_count - launch_before,
+                compute_vif.engine_launch_count[0] - engine_launch_before,
+                compute_vif.same_engine_launch_while_busy - busy_launch_before))
+
+        for (op_idx = 0; op_idx < 3; op_idx++) begin
+            if (observed_opcode[op_idx] !== opcode[op_idx] ||
+                observed_src0[op_idx] !== (LEGACY_A + (op_idx * 32'h100)) ||
+                observed_src1[op_idx] !== (LEGACY_B + (op_idx * 32'h100)) ||
+                observed_dst[op_idx] !== (LEGACY_Y + (op_idx * 32'h100)) ||
+                observed_m[op_idx] !== 16'd2 || observed_n[op_idx] !== 16'd2 ||
+                observed_k[op_idx] !== k_words[op_idx])
+                `uvm_fatal("CLUSTER_LEGACY_CONV", $sformatf(
+                    "legacy Conv descriptor/launch mismatch index=%0d op=%02h shape=%0dx%0dx%0d expected=%02h/2x2x%0d",
+                    op_idx, observed_opcode[op_idx], observed_m[op_idx],
+                    observed_n[op_idx], observed_k[op_idx], opcode[op_idx],
+                    k_words[op_idx]))
+
+            for (out_idx = 0; out_idx < OUTPUTS; out_idx++)
+                expect_spad(LEGACY_Y + (op_idx * 32'h100) + (out_idx << 2),
+                            golden[op_idx][out_idx],
+                            $sformatf("legacy Conv opcode%02h output%0d Golden",
+                                      opcode[op_idx], out_idx));
+            expect_completion(LEGACY_CPLQ + (op_idx << 4), 16'h06c0 + op_idx,
+                              golden[op_idx][OUTPUTS-1], 32'd4,
+                              $sformatf("legacy Conv opcode%02h completion", opcode[op_idx]));
+            case_mask[op_idx] = 1'b1;
+        end
+
+        if (case_mask !== 3'b111)
+            `uvm_fatal("CLUSTER_LEGACY_CONV", $sformatf(
+                "legacy Conv opcode testpoint coverage incomplete mask=%03b", case_mask))
+        `uvm_info("CLUSTER_LEGACY_CONV_CMDQ_PASS", $sformatf(
+            "real CMDQ Scalar opcodes 0x13/0x14/0x15; Conv1x1 2x2xK2, im2col Conv3x3 2x2xK9, depthwise Conv3x3 2x2xK2; 3/3 launch, completion and 12/12 independent Golden image words passed seed=%0d",
+            seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd3);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
     task automatic run_launch_snapshot_and_unused_fields_test();
         int unsigned launch_before;
 
@@ -5392,6 +5606,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_banked_vdot_cmdq_dispatch_test(seed);
         run_scalar_gemv_gemm_cmdq_dispatch_test(seed);
         run_scalar_cmdq_numeric_boundary_test(seed);
+        run_scalar_legacy_conv_cmdq_test(seed);
         run_scalar_gemv_abort_write_prefix(seed);
         run_cnm_inflight_parameter_latch_test();
         run_launch_snapshot_and_unused_fields_test();
