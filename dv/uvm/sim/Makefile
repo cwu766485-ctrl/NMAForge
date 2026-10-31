@@ -116,8 +116,11 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -Eq '\[CLUSTER_SCOREBOARD\].*reset_dropped=[1-9][0-9]*' "$$log" || { echo "ERROR: reset did not discard a tracked in-flight SPAD response"; exit 1; }; \
 		grep -q '\[CLUSTER_MATRIX_PARITY_RESET_EPOCH_PASS\]' "$$log" || { echo "ERROR: Matrix parity plus accepted-read Reset epoch recovery case missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_MATRIX_PARITY_RESET_AFTER_RESPONSE_PASS\]' "$$log" || { echo "ERROR: Matrix parity response-consumed Reset epoch recovery case missing in $$log"; exit 1; }; \
-		grep -q '\[CLUSTER_PARITY_RESET_CROSS_PASS\].*accepted-read-to-reset parity cross=12/12' "$$log" || { echo "ERROR: all-engine parity/reset cross missing or incomplete in $$log"; exit 1; }; \
-		test "$$(grep -c ' \[CLUSTER_PARITY_RESET_CASE_PASS\] engine=' "$$log")" -eq 12 || { echo "ERROR: expected 12 all-engine parity/reset recovery cases in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_PARITY_RESET_CROSS_PASS\].*before-response-consume parity reset cross=12/12' "$$log" || { echo "ERROR: all-engine pre-consume parity/reset cross missing or incomplete in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_PARITY_RESET_CONSUMED_CROSS_PASS\].*after-response-consume parity reset cross=12/12' "$$log" || { echo "ERROR: all-engine response-consumed parity/reset cross missing or incomplete in $$log"; exit 1; }; \
+		test "$$(grep -c ' \[CLUSTER_PARITY_RESET_CASE_PASS\] engine=' "$$log")" -eq 24 || { echo "ERROR: expected 24 all-engine parity/reset recovery cases in $$log"; exit 1; }; \
+		test "$$(grep -c 'reset_phase=before_response_consume' "$$log")" -eq 12 || { echo "ERROR: expected 12 pre-consume parity/reset cases in $$log"; exit 1; }; \
+		test "$$(grep -c 'reset_phase=after_response_consume' "$$log")" -eq 12 || { echo "ERROR: expected 12 consumed-response parity/reset cases in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_COVERAGE\]' "$$log" || { echo "ERROR: compute-cluster coverage report missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_COVERAGE\].*focused_compute_cg_applicable=100\.0%.*cpl_read:0[(]N/A[)].*matrix_banked_fault_cancel=[1-9][0-9]*.*cplq_full=[1-9][0-9]*' "$$log" || { echo "ERROR: applicable compute testpoint coverage is not 100%, Matrix parity-cancel/CPLQ-full bin is missing, or completion-read N/A disposition is missing in $$log"; exit 1; }; \
 		! grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$$log" || { echo "ERROR: UVM warning/error/fatal count is nonzero in $$log"; exit 1; }; \

@@ -21,6 +21,7 @@ interface ai_compute_cluster_if(input logic aclk);
     logic [6:0] engine_busy;
     logic [6:0] engine_done;
     logic [6:0] engine_error;
+    logic [6:0] engine_parity_rsp_error;
     logic dut_abort_active;
     logic [6:0] engine_req_valid;
     logic [6:0] engine_req_ready;
