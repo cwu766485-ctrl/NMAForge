@@ -6,8 +6,8 @@
 - **Prior reviewed product baseline:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6`
 - **Follow-up evidence branch:** `work/compute-cluster-kv-overflow-20261030`
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
-- **Latest clean verification replay SHA:** dfbebbd8c8ee68458c4261f74f041e816b6b0284 (R128 three-seed clean-worktree real-top UVM; published same tree at 0e38b482e13eefa759441ac8ed1ab3d4d6246b37)
-**Latest verification/test candidate:** R128 test SHA dfbebbd8c8ee68458c4261f74f041e816b6b0284; published same-tree content 0e38b482e13eefa759441ac8ed1ab3d4d6246b37 (tree a5adb3db01aee36f8363eb63a67194d5078d2398). Earlier formal evidence remains tied to its exact source SHA.
+- **Latest clean verification replay SHA:** 8b511e474727fe13439f99674d1a30b46005f274 (R129 three-seed clean-worktree real-top UVM; published same tree at 1ba30c7f85d5b07c13eddb7aef3e6929f7d9624d)
+**Latest verification/test candidate:** R129 test SHA 8b511e474727fe13439f99674d1a30b46005f274; published same-tree content 1ba30c7f85d5b07c13eddb7aef3e6929f7d9624d (tree 4a52f377cf93d008e8effd1310b94478713e82fc). Earlier formal evidence remains separately tied to its exact SHA.
 **Decision:** bounded CL-RC1/CL-RC2 review candidate; **CL-DV-v1.0 is not signed**.
 
 ## Executive disposition
@@ -171,3 +171,7 @@ At executed local SHA 0b68ad884fa35f4f9b858953ffa5f3513fc124b4 and published sam
 ## R128 Scalar CMDQ minimum-shape/numeric boundaries — 2026-10-31
 
 At exact clean-worktree SHA dfbebbd8c8ee68458c4261f74f041e816b6b0284 and published same-tree test content 0e38b482e13eefa759441ac8ed1ab3d4d6246b37, three VCS seeds pass seven Scalar GEMV M=1/K=1 CMDQ cases. The cases cover signed bias extrema and saturation, shift 31, and identity/ReLU/ReLU6. Each seed hits case_mask=7f, checks all outputs and completions, and has zero scoreboard mismatch/unknown/stale/orphan with UVM severity 0/0/0. R128 adds bounded evidence to REQ-CL-002/015/020; all remain PARTIAL. Focused cluster_cg is 100% within declared bins, not whole-design closure. The overall RTM remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains HOLD. See the [R128 report](COMPUTE_CLUSTER_SCALAR_CMDQ_NUMERIC_BOUNDARY_R128_2026-10-31.md).
+
+## R129 Scalar GEMV accepted-write Abort prefix — 2026-10-31
+
+At clean test SHA 8b511e474727fe13439f99674d1a30b46005f274 and published same-tree test content 1ba30c7f85d5b07c13eddb7aef3e6929f7d9624d, three seeds pass a real CMDQ Scalar GEMV Abort after the first output write. Each checks a 1/16 Golden prefix, 15 intact suffix sentinels, 130/130 read drain, ERR_ABORT 0x32, and no output write after Abort sampling. UVM severity is 0/0/0 and the full memory scoreboard has 42,107 checked words with zero mismatch/unknown/stale/orphan. Focused cluster_cg is 100%; overall mixed URG score is 55.92%, not a sign-off percentage. This adds bounded evidence to REQ-CL-017/019/027 and REQ-PC-006; statuses remain PARTIAL and overall HOLD remains. Top Smoke: NOT_RUN at this UVM-only SHA. Mutation campaign: NOT_RUN at this UVM-only SHA. See the R129 report COMPUTE_CLUSTER_SCALAR_GEMV_ABORT_PREFIX_R129_2026-10-31.md.
