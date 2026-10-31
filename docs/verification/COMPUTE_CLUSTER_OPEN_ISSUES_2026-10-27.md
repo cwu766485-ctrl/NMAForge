@@ -1,6 +1,6 @@
 # Compute Cluster Open-Issue List — 2026-10-31
 
-This list governs the bounded CL-RC1/CL-RC2 review candidate. The latest published test-only source commit is R123 `1abf84864a5b6f0f1d3ef5da72fe67b41df3b367` (tree `c8b47296ee6492e8d258f4aa7dc46ebd97844711`); it adds a legal concurrent CNM descriptor-latch point. Product RTL/SPEC remain at R99 base `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`; SPEC v1.8 is unchanged. R123 passes the three-seed UVM, Top Smoke, and 28/28 checker-sensitivity mutations; it adds one `REQ-CL-005` point and closes no requirement row. Earlier evidence retains its recorded source identities. No issue is closed by a coverage percentage alone; the 38-row disposition remains 24 PASS-SCOPED / 14 PARTIAL and `CL-DV-v1.0` remains HOLD.
+This list governs the bounded CL-RC1/CL-RC2 review candidate. The latest published test-only content is R124 `863771c1062ff8390dc82c705594c5cef3289e3c` (tree `9232a92b09f4fed7573ecdc50c786f5680b8281e`); it makes R123's legal CNM descriptor-latch marker mandatory in each default regression seed. Product RTL/SPEC remain at R99 base `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`; SPEC v1.8 is unchanged. R124 passes three-seed UVM, Top Smoke, and 28/28 checker-sensitivity mutations; it closes no requirement row. Earlier evidence retains its recorded source identities. No issue is closed by a coverage percentage alone; the 38-row disposition remains 24 PASS-SCOPED / 14 PARTIAL and `CL-DV-v1.0` remains HOLD.
 
 ## Recently closed RTL defect
 
@@ -27,6 +27,10 @@ This list governs the bounded CL-RC1/CL-RC2 review candidate. The latest publish
 The former `OPEN-CL-006` and `OPEN-CL-007` specification blockers were closed by SPEC v1.4 and the implementation/checker update in commit `9d9e0f0`. The ABI assigns codes `0–8` and reserves `9–15`; the SPEC lists per-engine supported causes, simultaneous-fault priority, owner completion behavior and the accepted-write prefix rule. Verification crosses are tracked separately under `CL-COV-006` and partial requirement rows; freezing an oracle does not make the tests pass automatically.
 
 ## Verification closure gaps
+
+### R124 mandatory CNM latch regression gate — 2026-10-31
+
+The regression Make target now fails if any of its three seed logs lacks `[CLUSTER_CNM_PARAMETER_LATCH_PASS]`. Exact executed SHA `752c9e0327c18b8775f3bfac62f4cf5483dc38d7` and published same-tree SHA `863771c1062ff8390dc82c705594c5cef3289e3c` pass three-seed UVM, Top Smoke, and the 28/28 checker-sensitivity campaign. This prevents regression drift for the R123 point; it does not broaden the descriptor-field matrix. `REQ-CL-005` remains PARTIAL and the full disposition remains 24 PASS-SCOPED / 14 PARTIAL, **HOLD**. See [R124 evidence](COMPUTE_CLUSTER_CNM_LATCH_REGRESSION_GATE_R124_2026-10-31.md).
 
 ### R123 legal concurrent CNM descriptor latch — 2026-10-31
 
