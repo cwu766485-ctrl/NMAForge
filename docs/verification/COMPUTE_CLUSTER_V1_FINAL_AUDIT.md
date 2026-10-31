@@ -146,3 +146,8 @@ R99 is the current exact clean candidate `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a4
 ## R123 legal concurrent CNM descriptor latch — 2026-10-31
 
 At executed clean test SHA `750fd0f9d27c8c2b0f0b9ed6f4a82f6cacb7ca45` (tree `c8b47296ee6492e8d258f4aa7dc46ebd97844711`), three seeds pass a real-top CNM GEMV parameter-latch point while scalar changes the already-fetched destination word through the legal SPAD path. All 16 outputs match independent signed four-bank K=64 Golden `47,104`; the mutated destination sentinel is preserved; both completions pass; and each scoreboard checks 41,776 words with zero mismatch/unknown/stale/orphan. Top Smoke and the 28/28 checker-sensitivity campaign pass. This adds one `REQ-CL-005` point only; that row remains PARTIAL. The same tree is published test-only at `1abf84864a5b6f0f1d3ef5da72fe67b41df3b367`; the overall disposition stays 24 PASS-SCOPED / 14 PARTIAL and **HOLD**. See [R123 evidence](COMPUTE_CLUSTER_CNM_PARAMETER_LATCH_R123_2026-10-31.md).
+
+
+## R124 mandatory CNM latch regression gate — 2026-10-31
+
+The default three-seed Compute Cluster regression now requires the R123 CNM descriptor-latch marker in every seed. Exact executed SHA `752c9e0327c18b8775f3bfac62f4cf5483dc38d7` and published test-content SHA `863771c1062ff8390dc82c705594c5cef3289e3c` share tree `9232a92b09f4fed7573ecdc50c786f5680b8281e`. Three-seed UVM, Top Smoke, and 28/28 checker-sensitivity mutations pass. This preserves regression enforcement for one `REQ-CL-005` point; the row remains PARTIAL, the RTM remains 24 PASS-SCOPED / 14 PARTIAL, and `CL-DV-v1.0` remains **HOLD**. See [R124 report](COMPUTE_CLUSTER_CNM_LATCH_REGRESSION_GATE_R124_2026-10-31.md).
