@@ -30,6 +30,8 @@ The full three-seed sequence checks 63,597 scratchpad words per seed with zero d
 
 The applicable focused compute functional group is 100.0%. Merged mixed-code URG is SCORE 61.06% (line/condition/FSM/branch/assert/group: 69.51/63.63/44.67/59.80/72.00/56.75%). These mixed DUT/testbench/UVM code metrics are not functional requirement closure.
 
+The UVM compile log has no `TFIPC`, VCS `Warning-`, or `Error-` diagnostic; Verdi KDB reports zero compile errors/warnings. The merged assertion report has 17/22 properties with real successes, zero failures/incomplete, and five uncovered: three top AXI AR/AW properties had no real success in this compute-only workload and two UVM RAL properties had no attempts. One of three cover properties matched; AR/AW stall-to-accept remain unhit here. These are disclosed as workload limits, not called assertion closure; the independent AXI workload evidence remains separate. Top Smoke also retains the existing `[LOOP-REROLL-ENABLED]` fixture warning.
+
 ## Fixed-SHA validation
 
 All commands ran in detached clean worktree `/tmp/nmaforge_r151_clean_cc15b48` at source/test SHA `cc15b4841d2266f34ef8cacae7abd895890eb07a`, VCS V-2023.12-SP1_Full64, UVM 1.2, behavioral SPAD (`+define+VCS`).
