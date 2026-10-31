@@ -634,7 +634,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     endtask
 
     task automatic run_matrix_protection_cnm_owner_cross(
-        input int unsigned seed, input bit abort_cnm_after_protection);
+        input int unsigned seed,
+        input bit abort_cnm_after_protection,
+        input bit deny_cnm_writeback);
         bit [31:0] desc_base;
         bit [31:0] cpl_base;
         bit [31:0] matrix_dst;
@@ -647,6 +649,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         bit [31:0] overlap_before;
         bit [31:0] shared_accept_before;
         bit protection_seen;
+        bit cnm_protection_seen;
         bit abort_issued;
         bit busy_seen;
         bit monitor_done;
@@ -674,6 +677,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         matrix_dst = 32'h0000_8000;
         cnm_dst = 32'h0005_4800;
         protection_seen = 1'b0;
+        cnm_protection_seen = 1'b0;
         abort_issued = 1'b0;
         busy_seen = 1'b0;
         monitor_done = 1'b0;
@@ -756,7 +760,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_REGION2_PERM, 32'h0000_000d);
         axil_write(REG_REGION3_BASE, MATRIX_LINE_STALL_CNM_A_LOCAL);
         axil_write(REG_REGION3_LIMIT, 32'h0005_6000);
-        axil_write(REG_REGION3_PERM, 32'h0000_000f);
+        // The dual-fault mode keeps CNM operand reads legal while denying its
+        // output write. Matrix's output remains outside every writable region.
+        axil_write(REG_REGION3_PERM,
+                   deny_cnm_writeback ? 32'h0000_000d : 32'h0000_000f);
 
         matrix_rsp_before = compute_vif.matrix_tag_response_count;
         cnm_rsp_before = compute_vif.cnm_tag_response_count;
@@ -801,6 +808,17 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                     abort_issued = 1'b1;
                 end
             end
+            if (deny_cnm_writeback &&
+                compute_vif.selected_spad_valid &&
+                compute_vif.selected_spad_write &&
+                !compute_vif.selected_spad_access_ok &&
+                (compute_vif.selected_spad_addr >= cnm_dst) &&
+                (compute_vif.selected_spad_addr < cnm_dst + 32'h40)) begin
+                if (!compute_vif.engine_busy[2] || !compute_vif.engine_busy[3])
+                    `uvm_fatal("CLUSTER_DUAL_PROTECTION_OWNER",
+                        "CNM destination Protection denial did not occur while both CNM and Matrix were active")
+                cnm_protection_seen = 1'b1;
+            end
             if (busy_seen && !compute_vif.processor_busy)
                 monitor_done = 1'b1;
         end
@@ -810,6 +828,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         if (abort_cnm_after_protection && !abort_issued)
             `uvm_fatal("CLUSTER_PROTECTION_ABORT_OWNER",
                 "software Abort was not issued after the Matrix Protection event")
+        if (deny_cnm_writeback && !cnm_protection_seen)
+            `uvm_fatal("CLUSTER_DUAL_PROTECTION_OWNER",
+                "CNM output Protection request was not observed at its destination")
         wait_cpl_tail(32'd2);
         wait_spad_idle();
 
@@ -856,6 +877,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                         "concurrent Protection CNM Abort task ID/order");
             expect_spad(cpl_base + 32'h14, 32'h0000_0032,
                         "concurrent Protection CNM ERR_ABORT owner");
+        end else if (deny_cnm_writeback) begin
+            expect_spad(cpl_base + 32'h10, {16'd0, cnm_task_id},
+                        "dual Protection CNM task ID/order");
+            expect_spad(cpl_base + 32'h14, 32'h0000_0062,
+                        "dual Protection CNM error owner");
         end else begin
             expect_completion(cpl_base + 32'h10, cnm_task_id,
                               expected_cnm[15], 32'd16,
@@ -875,12 +901,24 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                         "CNM output after Protection/Abort is neither Golden nor untouched: index=%0d expected=0x%08h sentinel=0x%08h actual=0x%08h",
                         word_idx, expected_cnm[word_idx],
                         (32'hfa17_8800 | word_idx), actual_output))
-            end else
+            end else if (deny_cnm_writeback)
+                expect_spad(cnm_dst + (word_idx << 2),
+                            32'hfa17_8800 | word_idx,
+                            $sformatf("dual Protection CNM no-writeback[%0d]", word_idx));
+            else
                 expect_spad(cnm_dst + (word_idx << 2), expected_cnm[word_idx],
                             $sformatf("concurrent Protection CNM Golden[%0d]", word_idx));
         end
 
-        if (abort_cnm_after_protection)
+        if (deny_cnm_writeback)
+            `uvm_info("CLUSTER_DUAL_PROTECTION_OWNER_CROSS_PASS", $sformatf(
+                "parallel Matrix/CNM tasks both retire Protection ERR 0x62 in CMDQ order; both_busy_at_CNM_fault=1 Matrix denied writeback=%0b CNM denied output=%0b overlap_cycles=%0d shared_banked_accepts=%0d MatrixRsp=%0d CNMRsp=%0d route_mismatch=0; both output sentinels preserved; seed=%0d",
+                protection_seen, cnm_protection_seen,
+                compute_vif.matrix_cnm_overlap_cycles - overlap_before,
+                compute_vif.matrix_cnm_shared_accept_cycles - shared_accept_before,
+                compute_vif.matrix_tag_response_count - matrix_rsp_before,
+                compute_vif.cnm_tag_response_count - cnm_rsp_before, seed), UVM_LOW)
+        else if (abort_cnm_after_protection)
             `uvm_info("CLUSTER_PROTECTION_ABORT_OWNER_CROSS_PASS", $sformatf(
                 "Matrix Protection ERR 0x62 is preserved before CNM software Abort ERR 0x32; overlap_cycles=%0d shared_banked_accepts=%0d matrix_rsp=%0d cnm_rsp=%0d route_mismatch=0; no Matrix writeback; CNM outputs are Golden or untouched; seed=%0d",
                 compute_vif.matrix_cnm_overlap_cycles - overlap_before,
@@ -5452,8 +5490,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             seed), UVM_LOW)
 
         run_matrix_parity_cnm_owner_cross(seed);
-        run_matrix_protection_cnm_owner_cross(seed, 1'b0);
-        run_matrix_protection_cnm_owner_cross(seed, 1'b1);
+        run_matrix_protection_cnm_owner_cross(seed, 1'b0, 1'b0);
+        run_matrix_protection_cnm_owner_cross(seed, 1'b1, 1'b0);
+        run_matrix_protection_cnm_owner_cross(seed, 1'b0, 1'b1);
         run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b0, 1'b0);
         run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b1, 1'b0);
         run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b0, 1'b1);
