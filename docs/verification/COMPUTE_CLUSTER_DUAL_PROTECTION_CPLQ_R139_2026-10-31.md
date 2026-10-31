@@ -21,6 +21,26 @@ make -C dv/uvm/sim uvm_compute_cluster_regress \
 
 VCS is `V-2023.12-SP1_Full64`; URG is `V-2023.12-SP1`. The command exits 0 with `COMPUTE_CLUSTER_REAL_UVM_REGRESS_PASS`. The Make target requires the R139 marker in every seed in addition to its existing regression markers and zero UVM warning/error/fatal counts.
 
+## Same-SHA closeout checks
+
+The following checks were run from a detached checkout of the same test SHA `b86bd5df7256df6a8d641213a5601e1237254124`:
+
+```sh
+make -C dv/subsystem/top_smoke/sim ai_smoke \
+  SEED=20261025 AI_RANDOM_CASES=20 AI_SEED=20261025
+
+make -C dv/uvm/sim uvm_compute_cluster_mutation \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_r139_mutation_compile_20261031 \
+  COMPUTE_CLUSTER_MUTATION_OUT=/tmp/nmaforge_r139_mutations_20261031
+```
+
+Top Smoke passes: mapper reports 86 descriptors and 60 tensors, and simulation ends with `TEST PASS`. The existing `Warning-[LOOP-REROLL-ENABLED]` compile notice remains. Checker sensitivity passes all 28/28 probes: address, data, owner, WSTRB, completion error code, write-after-error, response epoch, and Done/missing-Done/duplicate-Done lifecycle mutations for all seven engines. Each expected mutation is injected and caught by its designated checker; injected UVM errors are expected campaign outcomes.
+
+| Run | Result and archived logs | SHA-256 |
+|---|---|---|
+| `R139-TOP-SMOKE-20CASE-20261031` | PASS; `/tmp/nmaforge_r139_top_smoke_20261031/compile.log`, `run.log` | Compile `920ee7d331c23018b17fd083aa833c36556a14949888fd56d5363f79774f94fb`; run `51e65656dde38b55dc2bcb61f07cbbd0091513dd162a60f7e8d147411d923772` |
+| `R139-MUTATION-28-20261031` | PASS 28/28; `/tmp/nmaforge_r139_mutation_compile_20261031/compile.log`, `/tmp/nmaforge_r139_mutations_20261031/*.log` | Compile `9df1d89067af2c494512d2402355b19826bf7520cbc8d2a4e23c99c8a26c102c`; 29-entry `SHA256SUMS` `0b9ca6c2755b5b38c1b7ec5fdfc27af50f48a8ca775200a3eea692e26a550b79` |
+
 ## Results
 
 | Seed | CPLQ hold and wrap | Matrix/CNM overlap | Tagged responses | Scoreboard checked words | Mismatch / unknown / stale / orphan | UVM warning/error/fatal |
@@ -42,7 +62,7 @@ Every seed reports `focused_compute_cg_applicable=100.0%`; this is the existing 
 | REQ-PC-006 | PARTIAL | Matrix/CNM response-owner counts are 128/64 with zero route mismatch through the blocked-retirement interval | Full requester × error × backpressure/reset matrix remains open |
 | REQ-PC-007 | PARTIAL | Real Matrix and CNM share the production SPAD path during two Protection errors; complete memory image and owner ledgers pass | Broad production-engine arbitration and reset/fault cross remains open |
 
-The 38-row Execution RTM remains **24 PASS-SCOPED / 14 PARTIAL**; no disposition is promoted. `REQ-PC-004` retains its existing PASS-SCOPED disposition; the five other rows above remain PARTIAL. `CL-DV-v1.0` remains **HOLD**. Top Smoke and checker-sensitivity mutation were `NOT_RUN` at this UVM-only commit.
+The 38-row Execution RTM remains **24 PASS-SCOPED / 14 PARTIAL**; no disposition is promoted. `REQ-PC-004` retains its existing PASS-SCOPED disposition; the five other rows above remain PARTIAL. `CL-DV-v1.0` remains **HOLD**. Top Smoke and checker-sensitivity mutation also pass at the same exact SHA as recorded above.
 
 ## Evidence artifacts
 
