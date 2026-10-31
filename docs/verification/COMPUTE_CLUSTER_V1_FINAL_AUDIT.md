@@ -156,3 +156,8 @@ The default three-seed Compute Cluster regression now requires the R123 CNM desc
 ## R125 selected memory-fabric clean replay — 2026-10-31
 
 On clean replay checkout `5ea67bd125bb1ed20af8b86369e2cf8112f25131`, the selected `ai_accel_memory_fabric` reset, banked reset, Core/Banked contention, and Core/Banked reset tests pass for three seeds each. All applicable focused coverage groups reported by the four targets are 100%; response-owner assertions have real successes and zero failure/incomplete. This confirms `OPEN-CL-003` for the selected repository fabric on current R124 functional source content, but does not close the broader integrated fault/backpressure/reset crosses. `REQ-CL-018` and `REQ-PC-007` remain PARTIAL; 24 PASS-SCOPED / 14 PARTIAL; overall **HOLD**. See [R125 report](COMPUTE_CLUSTER_MEMORY_FABRIC_CLEAN_REPLAY_R125_2026-10-31.md).
+
+
+## R126 per-requester request-stability gate — 2026-10-31
+
+The three-seed Compute Cluster UVM target now requires stalled-payload stability evidence for six scalar request clients, Matrix banked/Line, and four CNM lanes in every seed. R126 passes at local SHA `175673b0930a81a00732ddff2cf825f358465cf9`, published same-tree content `45497791e86468703303542a5961423a0311242c`; UVM severity is `0/0/0`, payload-stability violations are zero, and declared focused compute coverage is 100%. `REQ-CL-006` remains PARTIAL for the full stall-class/direction/phase cross. The 38-row disposition remains 24 PASS-SCOPED / 14 PARTIAL; **HOLD**. See [R126 report](COMPUTE_CLUSTER_REQUEST_STABILITY_GATE_R126_2026-10-31.md).

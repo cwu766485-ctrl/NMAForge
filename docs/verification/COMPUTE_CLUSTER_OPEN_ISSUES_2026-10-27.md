@@ -1,6 +1,6 @@
 # Compute Cluster Open-Issue List — 2026-10-31
 
-This list governs the bounded CL-RC1/CL-RC2 review candidate. The latest published test-only content is R124 `863771c1062ff8390dc82c705594c5cef3289e3c` (tree `9232a92b09f4fed7573ecdc50c786f5680b8281e`); it makes R123's legal CNM descriptor-latch marker mandatory in each default regression seed. Product RTL/SPEC remain at R99 base `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`; SPEC v1.8 is unchanged. R124 passes three-seed UVM, Top Smoke, and 28/28 checker-sensitivity mutations; it closes no requirement row. Earlier evidence retains its recorded source identities. No issue is closed by a coverage percentage alone; the 38-row disposition remains 24 PASS-SCOPED / 14 PARTIAL and `CL-DV-v1.0` remains HOLD.
+This list governs the bounded CL-RC1/CL-RC2 review candidate. The latest published test-gate content is R126 `45497791e86468703303542a5961423a0311242c` (tree `6eef8fce6dcd544c9327f5c8921c6dd26ac86068`); it requires per-seed stalled-request evidence from scalar clients, Matrix banked/Line, and all four CNM lanes. Product RTL/SPEC remain at R99 base `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`; SPEC v1.8 is unchanged. R126 passes three-seed UVM with zero stability violations; it narrows `REQ-CL-006` evidence but does not close that requirement. Earlier evidence retains its recorded source identities. No issue is closed by a coverage percentage alone; the 38-row disposition remains 24 PASS-SCOPED / 14 PARTIAL and `CL-DV-v1.0` remains HOLD.
 
 ## Recently closed RTL defect
 
@@ -27,6 +27,10 @@ This list governs the bounded CL-RC1/CL-RC2 review candidate. The latest publish
 The former `OPEN-CL-006` and `OPEN-CL-007` specification blockers were closed by SPEC v1.4 and the implementation/checker update in commit `9d9e0f0`. The ABI assigns codes `0–8` and reserves `9–15`; the SPEC lists per-engine supported causes, simultaneous-fault priority, owner completion behavior and the accepted-write prefix rule. Verification crosses are tracked separately under `CL-COV-006` and partial requirement rows; freezing an oracle does not make the tests pass automatically.
 
 ## Verification closure gaps
+
+### R126 per-requester request-stability gate — 2026-10-31
+
+The default three-seed top UVM Make target now requires the existing checker summary to show stalls for six scalar clients, Matrix banked and Line interfaces, and each of four CNM lanes. R126 passes all three seeds with zero payload-stability violations and UVM severity `0/0/0`; focused compute functional bins remain 100% within their declared scope. The gate prevents a generic marker from hiding a requester class with no stall sample, but does not cover every stall class, direction, or operation phase. `REQ-CL-006` remains PARTIAL and the overall 24 PASS-SCOPED / 14 PARTIAL disposition remains **HOLD**. See [R126 evidence](COMPUTE_CLUSTER_REQUEST_STABILITY_GATE_R126_2026-10-31.md).
 
 ### R125 selected `ai_accel_memory_fabric` clean replay — 2026-10-31
 
