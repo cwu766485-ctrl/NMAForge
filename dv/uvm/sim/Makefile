@@ -115,6 +115,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		test "$$(grep -c ' \[CLUSTER_PROTECTION_CASE_PASS\].*phase=2 ' "$$log")" -eq 7 || { echo "ERROR: expected seven writeback Protection cases in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SCOREBOARD\].*reset_dropped=[1-9][0-9]*' "$$log" || { echo "ERROR: reset did not discard a tracked in-flight SPAD response"; exit 1; }; \
 		grep -q '\[CLUSTER_MATRIX_PARITY_RESET_EPOCH_PASS\]' "$$log" || { echo "ERROR: Matrix parity plus accepted-read Reset epoch recovery case missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_MATRIX_PARITY_RESET_AFTER_RESPONSE_PASS\]' "$$log" || { echo "ERROR: Matrix parity response-consumed Reset epoch recovery case missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_COVERAGE\]' "$$log" || { echo "ERROR: compute-cluster coverage report missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_COVERAGE\].*focused_compute_cg_applicable=100\.0%.*cpl_read:0[(]N/A[)].*matrix_banked_fault_cancel=[1-9][0-9]*.*cplq_full=[1-9][0-9]*' "$$log" || { echo "ERROR: applicable compute testpoint coverage is not 100%, Matrix parity-cancel/CPLQ-full bin is missing, or completion-read N/A disposition is missing in $$log"; exit 1; }; \
 		! grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$$log" || { echo "ERROR: UVM warning/error/fatal count is nonzero in $$log"; exit 1; }; \

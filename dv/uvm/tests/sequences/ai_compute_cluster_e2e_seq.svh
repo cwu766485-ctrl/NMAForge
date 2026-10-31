@@ -4449,6 +4449,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned poll;
         int unsigned word_idx;
         bit accepted_fault_read;
+        bit parity_response_consumed;
         bit [31:0] desc_base;
         bit [31:0] cpl_base;
         bit [31:0] matrix_a;
@@ -4555,8 +4556,103 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             expect_spad(matrix_dst + (word_idx << 2), 32'd4,
                 $sformatf("Matrix parity/reset recovery Golden[%0d]", word_idx));
         clear_contract_queues(32'd1);
+
+        // Exercise the adjacent reset phase: the Matrix samples the registered
+        // parity response on a clock edge, then reset arrives before the
+        // resulting error can be published as a completion.
+        accepted_fault_read = 1'b0;
+        parity_response_consumed = 1'b0;
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            spad_write(matrix_dst + (word_idx << 2), sentinel | word_idx);
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            spad_write(cpl_base + (word_idx << 2), sentinel ^ (word_idx + 8));
+        write_v3_desc(desc_base, 8'h30, 16'h07e6,
+                      matrix_a, matrix_b, matrix_dst,
+                      16'd4, 16'd4, 16'd1);
+        configure_contract_queues(cpl_base, 32'd1);
+        inject_spad_parity_fault(matrix_a, parity_path, saved_parity);
+        axil_write(REG_DOORBELL, 32'd1);
+        for (poll = 0; poll < 50000; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.matrix_request_valid && compute_vif.banked_ready &&
+                (compute_vif.matrix_banked_req_addr == matrix_a)) begin
+                accepted_fault_read = 1'b1;
+                break;
+            end
+        end
+        if (!accepted_fault_read)
+            `uvm_fatal("CLUSTER_MATRIX_PARITY_RESET_AFTER_RESPONSE",
+                "Matrix did not accept the second parity-faulted A read")
+        for (poll = 0; poll < 50000; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.matrix_response_fault) begin
+                if (!compute_vif.engine_busy[3])
+                    `uvm_fatal("CLUSTER_MATRIX_PARITY_RESET_AFTER_RESPONSE",
+                        "Matrix was not active on the edge that consumed its parity response")
+                parity_response_consumed = 1'b1;
+                break;
+            end
+        end
+        if (!parity_response_consumed)
+            `uvm_fatal("CLUSTER_MATRIX_PARITY_RESET_AFTER_RESPONSE",
+                "accepted parity response was not sampled by the Matrix engine")
+
+        // This delay places reset after the response-consume edge, while the
+        // Matrix error path is active and before a completion can be published.
+        #1ns;
+        reset_value = 1'b0;
+        if (!uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value))
+            `uvm_fatal("CLUSTER_MATRIX_PARITY_RESET_AFTER_RESPONSE",
+                "failed to assert reset after Matrix consumed the parity response")
+        restore_spad_parity(parity_path, saved_parity);
+        repeat (4) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.rsp_valid !== 1'b0)
+                `uvm_fatal("CLUSTER_MATRIX_PARITY_RESET_AFTER_RESPONSE",
+                    "consumed-fault epoch produced a response during reset")
+        end
+        #1ns;
+        reset_value = 1'b1;
+        if (!uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value))
+            `uvm_fatal("CLUSTER_MATRIX_PARITY_RESET_AFTER_RESPONSE",
+                "failed to release reset after consumed parity response")
+        repeat (8) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.rsp_valid !== 1'b0)
+                `uvm_fatal("CLUSTER_MATRIX_PARITY_RESET_AFTER_RESPONSE",
+                    "consumed-fault response escaped into the new epoch")
+        end
+        wait_spad_idle();
+        axil_read(REG_CPLQ_TAIL, value);
+        if (value !== 32'd0)
+            `uvm_fatal("CLUSTER_MATRIX_PARITY_RESET_AFTER_RESPONSE", $sformatf(
+                "reset after parity response consumption must suppress old completion, tail=%0d",
+                value))
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            expect_spad(matrix_dst + (word_idx << 2), sentinel | word_idx,
+                $sformatf("Matrix consumed-parity/reset preserved destination[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            expect_spad(cpl_base + (word_idx << 2), sentinel ^ (word_idx + 8),
+                $sformatf("Matrix consumed-parity/reset preserved completion[%0d]", word_idx));
+
+        write_v3_desc(desc_base, 8'h30, 16'h07e7,
+                      matrix_a, matrix_b, matrix_dst,
+                      16'd4, 16'd4, 16'd1);
+        configure_contract_queues(cpl_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        expect_completion(cpl_base, 16'h07e7, 32'd4, 32'd16,
+                          "Matrix consumed-parity/reset new-epoch recovery");
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            expect_spad(matrix_dst + (word_idx << 2), 32'd4,
+                $sformatf("Matrix consumed-parity/reset recovery Golden[%0d]", word_idx));
+        clear_contract_queues(32'd1);
         `uvm_info("CLUSTER_MATRIX_PARITY_RESET_EPOCH_PASS", $sformatf(
-            "accepted Matrix A read with parity fault; reset flushed pending old-epoch response/completion, parity restored, and 4x4x4 GEMM recovered with 16/16 Golden outputs; seed=%0d",
+            "reset before the accepted Matrix parity response was consumed; no old-epoch response/completion escaped and the reissued 4x4x4 GEMM matched all 16 Golden outputs; seed=%0d",
+            seed), UVM_LOW)
+        `uvm_info("CLUSTER_MATRIX_PARITY_RESET_AFTER_RESPONSE_PASS", $sformatf(
+            "Matrix sampled the accepted parity response before reset; no old-epoch completion or data side effect escaped, and the reissued GEMM matched all 16 Golden outputs; seed=%0d",
             seed), UVM_LOW)
     endtask
 
