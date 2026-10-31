@@ -10,8 +10,9 @@
 |---|---|
 | Product RTL/SPEC candidate | `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413` (R99 CNM Protection response alignment; SPEC v1.8 unchanged) |
 | Latest real-top descriptor-latch SHA | `3fdb22640dc8b3c73e9ff05d3b07c6f0e3e67a28` (R77 SFU descriptor-latch test; Matrix R74 remains separately evidenced) |
-| Latest exact clean code/test SHA | `894559c0c373dcef667074d304f94164f8514fee` (R120 UVM/test-gate content; three-seed clean replay; product RTL/SPEC remain at R99) |
-| Published report package base | `0ee5494bc9b7965e368d8e4b2be63e48d13a6e37` (documentation-only parent of this report update; tree `873b11c14b13d8b266cf14b4f7288f6ceccd7876`) |
+| Latest UVM/test content SHA | `894559c0c373dcef667074d304f94164f8514fee` (R120 test-only content; unchanged in the R121 replay tree) |
+| Latest exact clean replay SHA | `53229e2db16cfbd5a6acbf5824e3b366272a51f2` (R121 published review tree; tree `397730f25759e451f1ebd6be80a6df46ce69c1f1`) |
+| Published report package base | `53229e2db16cfbd5a6acbf5824e3b366272a51f2` (parent of this R121 evidence update) |
 | Prior reviewed product baseline | `6848a414eaeaa05cf9e1411cf55d9d27333208a6` |
 | Latest published closeout snapshot replayed | `480eb443b835f8cbe771682e91ff6d97acae0a99` (R117/R118 clean UVM and functional-testpoint merge; R115 Top Smoke remains at its exact earlier published SHA) |
 | Review branch | `feat/compute-cluster-closeout-6848a41` |
@@ -27,7 +28,7 @@ At exact clean code/test SHA `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`, VCS V-2
 
 R99 closes the selected memory-fabric reset evidence item, not all of `REQ-CL-018`. The 38-row disposition remains 24 PASS-SCOPED / 14 PARTIAL, and `CL-DV-v1.0` remains **HOLD** because broader legal Engine × Fault × Phase × Reset crossings and other partial requirements remain.
 
-## R111–R120 incremental closeout evidence
+## R111–R121 incremental closeout evidence
 
 R111 replays the Matrix FSM guard formal checks at the exact R110 source/test SHA: five assertions are non-vacuous and proven, two reachability covers hit, while the raw default-profile FSM remains 49/53. See the [R111 formal report](COMPUTE_CLUSTER_MATRIX_FSM_R111_FORMAL_2026-10-30.md).
 
@@ -44,6 +45,8 @@ R117/R118 exercise the 16/64/300-cycle RREADY profiles and rerun default subsyst
 R119 reruns the Matrix FSM formal gate against the unchanged published R114 RTL/formal source identity `4797a7710a18670d820f8f3815959091f9636e75` from a documentation-only descendant of R118. VC Formal proves all five selected guard/invariant properties non-vacuously and reaches both state covers; the enabled-profile raw transition figure remains 49/53, with the legal prefetch-off edge retained as a separate R58 result. No requirement status changes and the review remains **HOLD**. See the [R119 report](COMPUTE_CLUSTER_MATRIX_FSM_R119_FORMAL_2026-10-31.md).
 
 R120's latest published UVM source/test SHA `894559c0c373dcef667074d304f94164f8514fee` was fetched to an empty detached worktree and replayed with VCS/URG `V-2023.12-SP1` on seeds `20261025/26/27`. All seven real-engine accepted-read Abort cases pass per seed, no output is accepted after the Abort sampling edge, the six dedicated accepted-prefix Golden cases pass, and the memory scoreboard checks 33,510 words with no mismatch/unknown/stale/orphan response. UVM severity is `0/0/0`, and URG merges all three VDBs. This validates the published R120 tree; it does not close additional RTM rows. The disposition remains 24 PASS-SCOPED / 14 PARTIAL and the decision remains **HOLD**. See the [R120 report](COMPUTE_CLUSTER_ABORT_WRITE_CUTOFF_R120_2026-10-31.md).
+
+R121 replays exact published SHA `53229e2db16cfbd5a6acbf5824e3b366272a51f2` from an empty detached worktree. The restored mapper/Top Smoke passes at 86 descriptors/60 tensors, `make ai_run AI_RANDOM_CASES=20 AI_SEED=12345` passes, and the real-top three-seed Compute Cluster UVM/URG regression passes. Each UVM seed reports `0/0/0`, 21/21 real-engine pair overlaps, 18/18 parity cases, 19/19 Protection cases, all-engine accepted-read Abort suppression 7/7, 33,510 checked words with zero mismatch/unknown, and 100.0% applicable focused compute coverage. The merged URG raw mixed DUT/TB/UVM line/condition/FSM/branch/assert/group results are `68.71/61.46/40.99/58.71/72.00/29.72%` (overall score 55.27%); they are not functional testpoint coverage. UVM compile has no TFIPC or VCS Warning/Error diagnostics. The compute-only UVM does not exercise AXI DMA AR/AW traffic, so its AR/AW assertions and stall covers lack real successes; the separate R92/R102 AXI runs provide that evidence. No RTM status changes: 24 PASS-SCOPED / 14 PARTIAL, decision **HOLD**. Full commands, artifact paths, URG dispositions and log hashes are in the [R121 report](COMPUTE_CLUSTER_FINAL_REPLAY_R121_2026-10-31.md).
 
 R114 at exact published code/test SHA `4797a7710a18670d820f8f3815959091f9636e75` passes three clean-worktree seeds through the same in-repository fabric. The test checks simultaneous Core/Banked acceptance, the first tagged response while the second request is pending, reset flush, no response during reset/four-cycle release quiet, then both-owner Golden recovery. Focused `banked_core_reset_epoch_cg` is 100%; `ap_core_response_tag` and `ap_banked_response_tag` each record 471 attempts/3 real successes, and `ap_single_response_owner` records 471/441; all have zero failures/incomplete. UVM severity is `0/0/0`. The requesters remain testbench-driven; this does not close production Matrix-engine contention or broad fault/backpressure crossings. `REQ-CL-018/PC-007` remain PARTIAL and the review remains HOLD. See the [R114 report](COMPUTE_CLUSTER_BANKED_CORE_RESET_R114_2026-10-31.md).
 
@@ -105,6 +108,7 @@ PPA and full pretrained-model deployment are outside this Functional DV decision
 - [R114 banked/core reset epoch evidence](COMPUTE_CLUSTER_BANKED_CORE_RESET_R114_2026-10-31.md)
 - [R115 final published HEAD replay](COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R115_2026-10-31.md)
 - [R120 seven-engine Abort cutoff and published clean replay](COMPUTE_CLUSTER_ABORT_WRITE_CUTOFF_R120_2026-10-31.md)
+- [R121 exact published final replay](COMPUTE_CLUSTER_FINAL_REPLAY_R121_2026-10-31.md)
 - [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)
 - [Open issues](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md)
 - [Sign-off readiness](COMPUTE_CLUSTER_DV_SIGNOFF_READINESS_2026-10-27.md)
