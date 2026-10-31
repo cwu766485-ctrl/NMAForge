@@ -113,6 +113,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned shared_reset_prefix_coverage_phase;
     int unsigned cnm_protection_reset_prefix_coverage_phase;
     int unsigned sfu_reset_prefix_phase;
+    int unsigned scalar_reset_prefix_phase;
 
     covergroup matrix_cnm_shared_reset_cg;
         option.per_instance = 1;
@@ -159,6 +160,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         }
     endgroup
 
+    covergroup scalar_reset_prefix_cg;
+        option.per_instance = 1;
+        cp_scalar_reset_prefix_phase: coverpoint scalar_reset_prefix_phase {
+            bins scalar_task_busy = {1};
+            bins accepted_golden_prefix = {2};
+            bins reset_quiet_window = {3};
+            bins release_quiet_window = {4};
+            bins prefix_suffix_and_completion_preserved = {5};
+            bins full_golden_recovery = {6};
+        }
+    endgroup
+
     function automatic int signed next_small_signed();
         int unsigned value;
         rng_state = rng_state ^ (rng_state << 13);
@@ -174,10 +187,12 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         shared_reset_prefix_coverage_phase = 0;
         cnm_protection_reset_prefix_coverage_phase = 0;
         sfu_reset_prefix_phase = 0;
+        scalar_reset_prefix_phase = 0;
         matrix_cnm_shared_reset_cg = new();
         matrix_cnm_prefix_reset_cg = new();
         cnm_protection_matrix_prefix_reset_cg = new();
         sfu_reset_prefix_cg = new();
+        scalar_reset_prefix_cg = new();
     endfunction
 
     task automatic axil_write(input bit [31:0] addr, input bit [31:0] data);
@@ -3055,6 +3070,262 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             "task_id=%04h accepted_output_prefix=%0d/16 read_drain=%0d/%0d post_abort_writes=%0d completion=ERR_ABORT seed=%0d",
             task_id, accepted_write_count, accepted_reads, returned_reads,
             post_abort_output_writes, seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+
+    task automatic run_scalar_reset_write_prefix(input int unsigned seed);
+        localparam int unsigned ROWS = 16;
+        // Keep the reset cut within the shared top SVA's 2,000-cycle
+        // doorbell bound while still exercising a legal multi-word GEMV.
+        localparam int unsigned K_WORDS = 2;
+        localparam bit [31:0] SRC_A = 32'h0006_d000;
+        localparam bit [31:0] SRC_B = 32'h0006_e000;
+        localparam bit [31:0] DST = 32'h0006_f400;
+        localparam bit [31:0] COMPLETION = 32'h0000_5c40;
+        bit [31:0] write_addr[0:ROWS-1];
+        bit [31:0] write_data[0:ROWS-1];
+        int signed expected_output[0:ROWS-1];
+        bit [31:0] packed_a;
+        bit [31:0] packed_b;
+        bit [31:0] cpl_tail;
+        bit [15:0] task_id;
+        bit [15:0] recovery_task_id;
+        int unsigned accepted_write_count;
+        int unsigned accepted_write_at_reset;
+        int unsigned accepted_reads;
+        int unsigned returned_reads;
+        int unsigned post_reset_writes;
+        int unsigned post_reset_responses;
+        int unsigned poll;
+        int unsigned row_idx;
+        int unsigned k_idx;
+        int unsigned lane;
+        int signed a_value;
+        int signed b_value;
+        bit first_write_seen;
+        bit reset_monitor_active;
+        bit monitor_done;
+        bit reset_ok;
+        bit [31:0] reset_value;
+
+        task_id = 16'h07b0;
+        recovery_task_id = 16'h07b1;
+        accepted_write_count = 0;
+        accepted_write_at_reset = 0;
+        accepted_reads = 0;
+        returned_reads = 0;
+        post_reset_writes = 0;
+        post_reset_responses = 0;
+        first_write_seen = 1'b0;
+        reset_monitor_active = 1'b0;
+        monitor_done = 1'b0;
+        scalar_reset_prefix_phase = 0;
+
+        // Match the existing legal Scalar M=16, K=2 GEMV format and
+        // independently compute every signed INT32 output.
+        for (k_idx = 0; k_idx < K_WORDS; k_idx++) begin
+            packed_a = '0;
+            for (lane = 0; lane < 4; lane++) begin
+                a_value = ((int'(seed % 7) + int'(k_idx * 5) +
+                            int'(lane * 2)) % 15) - 7;
+                packed_a[lane*8 +: 8] = a_value[7:0];
+            end
+            spad_write(SRC_A + (k_idx << 2), packed_a);
+        end
+        for (row_idx = 0; row_idx < ROWS; row_idx++) begin
+            expected_output[row_idx] = 0;
+            for (k_idx = 0; k_idx < K_WORDS; k_idx++) begin
+                packed_b = '0;
+                for (lane = 0; lane < 4; lane++) begin
+                    a_value = ((int'(seed % 7) + int'(k_idx * 5) +
+                                int'(lane * 2)) % 15) - 7;
+                    b_value = ((int'(seed % 5) + int'(row_idx * 3) +
+                                int'(k_idx * 5) + int'(lane * 7)) % 13) - 6;
+                    packed_b[lane*8 +: 8] = b_value[7:0];
+                    expected_output[row_idx] += a_value * b_value;
+                end
+                spad_write(SRC_B + ((row_idx * K_WORDS + k_idx) << 2),
+                           packed_b);
+            end
+            spad_write(DST + (row_idx << 2), 32'hbad0_7b00 | row_idx);
+        end
+        for (row_idx = 0; row_idx < 4; row_idx++)
+            spad_write(COMPLETION + (row_idx << 2),
+                       32'h7b00_0000 | row_idx);
+
+        write_cluster_desc(CLUSTER_CONTRACT_CMDQ, 8'h11, task_id,
+                           SRC_A, SRC_B, DST,
+                           16'd16, 16'd0, 16'd2, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd3);
+        configure_contract_queues(COMPLETION, 32'd1);
+
+        fork
+            begin : scalar_reset_prefix_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.engine_req_valid[0] &&
+                        compute_vif.engine_req_ready[0]) begin
+                        if (compute_vif.engine_req_write[0]) begin
+                            if (accepted_write_count >= ROWS)
+                                `uvm_fatal("CLUSTER_SCALAR_RESET_PREFIX",
+                                    "Scalar accepted more writes than the 16-row GEMV")
+                            write_addr[accepted_write_count] =
+                                compute_vif.engine_req_addr[0 +: 32];
+                            write_data[accepted_write_count] =
+                                compute_vif.engine_req_wdata[0 +: 32];
+                            accepted_write_count++;
+                            first_write_seen = 1'b1;
+                            if (reset_monitor_active)
+                                post_reset_writes++;
+                        end else begin
+                            accepted_reads++;
+                        end
+                    end
+                    if (compute_vif.rsp_valid &&
+                        (compute_vif.rsp_client == 3'd2)) begin
+                        returned_reads++;
+                        if (reset_monitor_active)
+                            post_reset_responses++;
+                    end
+                end
+            end
+            begin : reset_after_scalar_prefix
+                axil_write(REG_DOORBELL, 32'd1);
+                poll = 0;
+                while (!first_write_seen && poll < 100000) begin
+                    @(posedge compute_vif.aclk);
+                    poll++;
+                    if (compute_vif.engine_busy[0] &&
+                        (scalar_reset_prefix_phase == 0)) begin
+                        scalar_reset_prefix_phase = 1;
+                        scalar_reset_prefix_cg.sample();
+                    end
+                end
+                if (!first_write_seen)
+                    `uvm_fatal("CLUSTER_SCALAR_RESET_PREFIX",
+                        "Scalar GEMV did not accept an output before reset timeout")
+                if (accepted_write_count == 0 || accepted_write_count >= ROWS ||
+                    !compute_vif.engine_busy[0])
+                    `uvm_fatal("CLUSTER_SCALAR_RESET_PREFIX", $sformatf(
+                        "reset did not cut a proper active output prefix: writes=%0d busy=%0b",
+                        accepted_write_count, compute_vif.engine_busy[0]))
+                if (scalar_reset_prefix_phase == 0) begin
+                    scalar_reset_prefix_phase = 1;
+                    scalar_reset_prefix_cg.sample();
+                end
+                scalar_reset_prefix_phase = 2;
+                scalar_reset_prefix_cg.sample();
+                accepted_write_at_reset = accepted_write_count;
+                reset_monitor_active = 1'b1;
+                #1ns;
+                reset_value = 1'b0;
+                reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
+                if (!reset_ok)
+                    `uvm_fatal("CLUSTER_SCALAR_RESET_PREFIX",
+                        "failed to assert accelerator reset after Scalar accepted output")
+                repeat (4) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.rsp_valid !== 1'b0 ||
+                        compute_vif.matrix_rsp_valid !== 1'b0 ||
+                        compute_vif.cnm_rsp_valid !== 4'b0 ||
+                        compute_vif.engine_parity_rsp_error !== 7'b0)
+                        `uvm_fatal("CLUSTER_SCALAR_RESET_PREFIX",
+                            "old-epoch response visible during Scalar reset")
+                end
+                if (compute_vif.engine_busy !== 7'b0)
+                    `uvm_fatal("CLUSTER_SCALAR_RESET_PREFIX", $sformatf(
+                        "engine busy survived Scalar reset: busy=%07b",
+                        compute_vif.engine_busy))
+                scalar_reset_prefix_phase = 3;
+                scalar_reset_prefix_cg.sample();
+                #1ns;
+                reset_value = 1'b1;
+                reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
+                if (!reset_ok)
+                    `uvm_fatal("CLUSTER_SCALAR_RESET_PREFIX",
+                        "failed to release accelerator reset after Scalar prefix test")
+                repeat (8) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.rsp_valid !== 1'b0 ||
+                        compute_vif.matrix_rsp_valid !== 1'b0 ||
+                        compute_vif.cnm_rsp_valid !== 4'b0 ||
+                        compute_vif.engine_parity_rsp_error !== 7'b0)
+                        `uvm_fatal("CLUSTER_SCALAR_RESET_PREFIX",
+                            "stale response escaped into the new Scalar epoch")
+                end
+                scalar_reset_prefix_phase = 4;
+                scalar_reset_prefix_cg.sample();
+                monitor_done = 1'b1;
+            end
+        join
+
+        wait_spad_idle();
+        if (post_reset_writes != 0 || post_reset_responses != 0 ||
+            accepted_write_count != accepted_write_at_reset)
+            `uvm_fatal("CLUSTER_SCALAR_RESET_PREFIX", $sformatf(
+                "old-epoch Scalar activity escaped reset: writes=%0d responses=%0d prefix=%0d/%0d",
+                post_reset_writes, post_reset_responses,
+                accepted_write_count, accepted_write_at_reset))
+        if (returned_reads > accepted_reads)
+            `uvm_fatal("CLUSTER_SCALAR_RESET_PREFIX", $sformatf(
+                "Scalar returned-read count exceeds accepts: accepted=%0d returned=%0d",
+                accepted_reads, returned_reads))
+        if (accepted_write_at_reset == 0 || accepted_write_at_reset >= ROWS)
+            `uvm_fatal("CLUSTER_SCALAR_RESET_PREFIX", $sformatf(
+                "reset did not preserve a proper accepted prefix: %0d/16",
+                accepted_write_at_reset))
+
+        axil_read(REG_CPLQ_TAIL, cpl_tail);
+        if (cpl_tail !== 32'd0)
+            `uvm_fatal("CLUSTER_SCALAR_RESET_PREFIX", $sformatf(
+                "old-epoch Scalar task advanced CPLQ_TAIL across reset: %0d", cpl_tail))
+        for (row_idx = 0; row_idx < 4; row_idx++)
+            expect_spad(COMPLETION + (row_idx << 2), 32'h7b00_0000 | row_idx,
+                        $sformatf("Scalar reset suppressed old completion[%0d]", row_idx));
+        for (row_idx = 0; row_idx < accepted_write_at_reset; row_idx++) begin
+            if (write_addr[row_idx] !== DST + (row_idx << 2))
+                `uvm_fatal("CLUSTER_SCALAR_RESET_PREFIX", $sformatf(
+                    "accepted Scalar prefix address mismatch index=%0d expected=0x%08h actual=0x%08h",
+                    row_idx, DST + (row_idx << 2), write_addr[row_idx]))
+            if ($signed(write_data[row_idx]) !== expected_output[row_idx])
+                `uvm_fatal("CLUSTER_SCALAR_RESET_PREFIX", $sformatf(
+                    "accepted Scalar prefix Golden mismatch index=%0d expected=%0d actual=%0d",
+                    row_idx, expected_output[row_idx], $signed(write_data[row_idx])))
+            expect_spad(DST + (row_idx << 2), expected_output[row_idx],
+                        $sformatf("Scalar reset accepted Golden prefix[%0d]", row_idx));
+        end
+        for (row_idx = accepted_write_at_reset; row_idx < ROWS; row_idx++)
+            expect_spad(DST + (row_idx << 2), 32'hbad0_7b00 | row_idx,
+                        $sformatf("Scalar reset untouched output suffix[%0d]", row_idx));
+        scalar_reset_prefix_phase = 5;
+        scalar_reset_prefix_cg.sample();
+
+        write_cluster_desc(CLUSTER_CONTRACT_CMDQ, 8'h11, recovery_task_id,
+                           SRC_A, SRC_B, DST,
+                           16'd16, 16'd0, 16'd2, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd3);
+        configure_contract_queues(COMPLETION, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        expect_completion(COMPLETION, recovery_task_id,
+                          expected_output[ROWS-1], ROWS,
+                          "Scalar reset accepted-prefix recovery");
+        for (row_idx = 0; row_idx < ROWS; row_idx++)
+            expect_spad(DST + (row_idx << 2), expected_output[row_idx],
+                        $sformatf("Scalar reset full Golden recovery[%0d]", row_idx));
+        scalar_reset_prefix_phase = 6;
+        scalar_reset_prefix_cg.sample();
+        if (scalar_reset_prefix_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_SCALAR_RESET_PREFIX", $sformatf(
+                "Scalar reset-prefix functional bins incomplete: %0.1f%%",
+                scalar_reset_prefix_cg.get_coverage()))
+        `uvm_info("CLUSTER_SCALAR_RESET_WRITE_PREFIX_PASS", $sformatf(
+            "task_id=%04h accepted_output_prefix=%0d/16 old_completion_suppressed=1 reset_dropped_reads=%0d full_golden_recovery=16/16 focused_bins=6/6 seed=%0d",
+            task_id, accepted_write_at_reset, accepted_reads - returned_reads, seed), UVM_LOW)
         axil_write(REG_CPLQ_HEAD, 32'd1);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
@@ -6225,6 +6496,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         void'($value$plusargs("COMPUTE_CLUSTER_SEED=%d", seed));
         rng_state = seed ^ 32'h7ac4_01d3;
         if (rng_state == 0) rng_state = 32'h1;
+        // Run the long GEMV setup before any CMDQ doorbell in this sequence;
+        // the shared top SVA has a bounded task watchdog and must not inherit
+        // a pending observation from an earlier command while operands load.
+        run_scalar_reset_write_prefix(seed);
         serial_total_cycles = 0;
         serial_matrix_cnm_sfu_cycles = 0;
         staged_pair_cycles = 0;
