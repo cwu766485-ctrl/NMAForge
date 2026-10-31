@@ -903,7 +903,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     task automatic run_cnm_protection_matrix_owner_cross(
         input int unsigned seed,
         input int signed expected_matrix[0:15][0:31],
-        input bit reset_after_fault);
+        input bit reset_after_fault,
+        input bit abort_matrix_after_fault);
         bit [31:0] desc_base;
         bit [31:0] cpl_base;
         bit [31:0] matrix_dst;
@@ -914,11 +915,19 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         bit [31:0] matrix_route_error_before;
         bit [31:0] cnm_route_error_before;
         bit [31:0] overlap_before;
+        bit [31:0] matrix_line_write_addr[0:127];
+        bit [127:0] matrix_line_write_data[0:127];
+        bit [15:0] matrix_line_write_wstrb[0:127];
+        bit matrix_output_written[0:511];
         bit denied_seen;
         bit matrix_busy_at_fault;
         bit both_busy_at_fault;
         bit matrix_read_accepted;
         bit reset_triggered;
+        bit abort_issued;
+        bit abort_write_done;
+        bit cnm_fault_drained;
+        bit abort_active_seen;
         bit busy_seen;
         bit monitor_done;
         bit reset_ok;
@@ -926,6 +935,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned matrix_busy_cycles;
         int unsigned both_busy_cycles;
         int unsigned matrix_accept_count;
+        int unsigned matrix_write_accept_count;
+        int unsigned post_abort_matrix_writes;
+        int unsigned line_word_idx;
         int unsigned word_idx;
         int unsigned cpl_idx;
         int unsigned k_word;
@@ -949,16 +961,26 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         cnm_dst = MATRIX_LINE_STALL_CNM_Y_LOCAL;
         matrix_task_id = reset_after_fault ? 16'h07d6 : 16'h07d4;
         cnm_task_id = reset_after_fault ? 16'h07d7 : 16'h07d5;
+        if (abort_matrix_after_fault) begin
+            matrix_task_id = 16'h07d8;
+            cnm_task_id = 16'h07d9;
+        end
         denied_seen = 1'b0;
         matrix_busy_at_fault = 1'b0;
         both_busy_at_fault = 1'b0;
         matrix_read_accepted = 1'b0;
         reset_triggered = 1'b0;
+        abort_issued = 1'b0;
+        abort_write_done = 1'b0;
+        cnm_fault_drained = 1'b0;
+        abort_active_seen = 1'b0;
         busy_seen = 1'b0;
         monitor_done = 1'b0;
         matrix_busy_cycles = 0;
         both_busy_cycles = 0;
         matrix_accept_count = 0;
+        matrix_write_accept_count = 0;
+        post_abort_matrix_writes = 0;
 
         // Initialize a legal CNM GEMV image. The CNM source-A window is the
         // only denied range; Matrix A/B and its writeback remain permitted.
@@ -1050,6 +1072,27 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 both_busy_cycles++;
             if (compute_vif.processor_busy)
                 busy_seen = 1'b1;
+            if (compute_vif.selected_line_valid &&
+                compute_vif.selected_line_ready &&
+                compute_vif.selected_line_write &&
+                compute_vif.selected_line_access_ok &&
+                (compute_vif.selected_line_addr >= matrix_dst) &&
+                (compute_vif.selected_line_addr < matrix_dst + 32'h800)) begin
+                if (matrix_write_accept_count >= 128)
+                    `uvm_fatal("CLUSTER_CNM_PROTECTION_ABORT_OWNER",
+                        "Matrix accepted more Line writes than its 16x32 descriptor permits")
+                matrix_line_write_addr[matrix_write_accept_count] =
+                    compute_vif.selected_line_addr;
+                matrix_line_write_data[matrix_write_accept_count] =
+                    compute_vif.selected_line_wdata;
+                matrix_line_write_wstrb[matrix_write_accept_count] =
+                    compute_vif.selected_line_wstrb;
+                matrix_write_accept_count++;
+                if (abort_active_seen)
+                    post_abort_matrix_writes++;
+            end
+            if (compute_vif.dut_abort_active)
+                abort_active_seen = 1'b1;
             for (lane = 0; lane < 4; lane++) begin
                 actual_addr = compute_vif.selected_cnm_addr[lane];
                 if (compute_vif.selected_cnm_valid[lane] &&
@@ -1067,6 +1110,24 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 compute_vif.matrix_request_valid && compute_vif.banked_ready) begin
                 matrix_read_accepted = 1'b1;
                 matrix_accept_count++;
+            end
+            if (abort_matrix_after_fault && denied_seen && !abort_issued &&
+                !compute_vif.engine_busy[2] && compute_vif.engine_busy[3] &&
+                (matrix_write_accept_count != 0)) begin
+                if (!matrix_read_accepted || (matrix_accept_count == 0))
+                    `uvm_fatal("CLUSTER_CNM_PROTECTION_ABORT_OWNER",
+                        "CNM Protection retired before Matrix had accepted a real operand read")
+                cnm_fault_drained = 1'b1;
+                // Wait until the CNM Protection result has left its engine
+                // and Matrix has committed a real output write, then exercise
+                // global Abort against the remaining in-flight task.
+                abort_issued = 1'b1;
+                fork
+                    begin : send_matrix_global_abort
+                        axil_write(REG_ABORT, 32'd1);
+                        abort_write_done = 1'b1;
+                    end
+                join_none
             end
             if (reset_after_fault && denied_seen && matrix_read_accepted &&
                 compute_vif.engine_busy[2] && compute_vif.engine_busy[3]) begin
@@ -1146,6 +1207,118 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 "CNM source-A Protection denial concurrent with active Matrix; reset flushed both engines after %0d accepted Matrix reads, no completion/writeback or post-reset stale response; overlap=%0d seed=%0d",
                 matrix_accept_count,
                 both_busy_cycles, seed), UVM_LOW)
+            return;
+        end
+
+        if (abort_matrix_after_fault) begin
+            if (!abort_issued || !abort_write_done || !cnm_fault_drained || !abort_active_seen ||
+                !matrix_read_accepted || (matrix_accept_count == 0) ||
+                (matrix_write_accept_count == 0))
+                `uvm_fatal("CLUSTER_CNM_PROTECTION_ABORT_OWNER", $sformatf(
+                    "missing CNM Protection/Matrix Abort sequence: issued=%0b write-done=%0b CNM-drained=%0b abort-active=%0b Matrix-reads=%0d Matrix-writes=%0d",
+                    abort_issued, abort_write_done, cnm_fault_drained, abort_active_seen,
+                    matrix_accept_count, matrix_write_accept_count))
+            wait_cpl_tail(32'd2);
+            wait_spad_idle();
+            axil_write(REG_REGION0_PERM, 32'd0);
+            axil_write(REG_REGION1_PERM, 32'd0);
+            axil_write(REG_REGION2_PERM, 32'd0);
+            axil_write(REG_REGION3_PERM, 32'd0);
+
+            expect_spad(cpl_base, {16'd0, matrix_task_id},
+                        "CNM Protection/Matrix Abort ordered Matrix task ID");
+            expect_spad(cpl_base + 32'h04, 32'h0000_0032,
+                        "CNM Protection/Matrix Abort Matrix ERR_ABORT");
+            expect_spad(cpl_base + 32'h10, {16'd0, cnm_task_id},
+                        "CNM Protection/Matrix Abort ordered CNM task ID");
+            expect_spad(cpl_base + 32'h14, 32'h0000_0062,
+                        "CNM Protection/Matrix Abort CNM ERR_PROTECTION");
+
+            begin : check_matrix_abort_write_image
+                bit [31:0] actual_word;
+                int unsigned line_base_word;
+                int unsigned row_idx;
+                int unsigned col_idx;
+                for (word_idx = 0; word_idx < 512; word_idx++)
+                    matrix_output_written[word_idx] = 1'b0;
+                for (cpl_idx = 0; cpl_idx < matrix_write_accept_count; cpl_idx++) begin
+                    if ((matrix_line_write_addr[cpl_idx][3:0] != 0) ||
+                        (matrix_line_write_addr[cpl_idx] < matrix_dst) ||
+                        (matrix_line_write_addr[cpl_idx] >= matrix_dst + 32'h800) ||
+                        (matrix_line_write_wstrb[cpl_idx] != 16'hffff))
+                        `uvm_fatal("CLUSTER_CNM_PROTECTION_ABORT_OWNER", $sformatf(
+                            "Matrix Abort committed malformed output Line: index=%0d addr=0x%08h WSTRB=%04h",
+                            cpl_idx, matrix_line_write_addr[cpl_idx],
+                            matrix_line_write_wstrb[cpl_idx]))
+                    line_base_word = (matrix_line_write_addr[cpl_idx] - matrix_dst) >> 2;
+                    for (lane = 0; lane < 4; lane++) begin
+                        line_word_idx = line_base_word + lane;
+                        if (line_word_idx >= 512)
+                            `uvm_fatal("CLUSTER_CNM_PROTECTION_ABORT_OWNER",
+                                "Matrix Abort output Line exceeds the descriptor destination")
+                        if (matrix_output_written[line_word_idx])
+                            `uvm_fatal("CLUSTER_CNM_PROTECTION_ABORT_OWNER", $sformatf(
+                                "Matrix Abort accepted duplicate output word %0d",
+                                line_word_idx))
+                        row_idx = line_word_idx / 32;
+                        col_idx = line_word_idx % 32;
+                        if (matrix_line_write_data[cpl_idx][lane*32 +: 32] !==
+                            expected_matrix[row_idx][col_idx])
+                            `uvm_fatal("CLUSTER_CNM_PROTECTION_ABORT_OWNER", $sformatf(
+                                "Matrix Abort accepted non-Golden output: word=%0d actual=0x%08h expected=0x%08h",
+                                line_word_idx,
+                                matrix_line_write_data[cpl_idx][lane*32 +: 32],
+                                expected_matrix[row_idx][col_idx]))
+                        matrix_output_written[line_word_idx] = 1'b1;
+                    end
+                end
+                for (word_idx = 0; word_idx < 512; word_idx++) begin
+                    axil_read(CIMFORGE_SPAD_BASE + matrix_dst + (word_idx << 2),
+                              actual_word);
+                    if (matrix_output_written[word_idx]) begin
+                        if (actual_word !==
+                            expected_matrix[word_idx / 32][word_idx % 32])
+                            `uvm_fatal("CLUSTER_CNM_PROTECTION_ABORT_OWNER", $sformatf(
+                                "Matrix Abort accepted output did not commit Golden data: word=%0d actual=0x%08h expected=0x%08h",
+                                word_idx, actual_word,
+                                expected_matrix[word_idx / 32][word_idx % 32]))
+                    end else if (actual_word !== (32'hfa17_9000 | word_idx)) begin
+                        `uvm_fatal("CLUSTER_CNM_PROTECTION_ABORT_OWNER", $sformatf(
+                            "Matrix Abort changed an output word without an accepted Line: word=%0d actual=0x%08h sentinel=0x%08h",
+                            word_idx, actual_word,
+                            (32'hfa17_9000 | word_idx)))
+                    end
+                end
+            end
+            for (word_idx = 0; word_idx < 16; word_idx++)
+                expect_spad(cnm_dst + (word_idx << 2),
+                            32'hfa17_9800 | word_idx,
+                            $sformatf("Protection-faulted CNM no-writeback[%0d]", word_idx));
+
+            if (post_abort_matrix_writes != 0 ||
+                compute_vif.matrix_tag_response_count - matrix_rsp_before !=
+                    matrix_accept_count ||
+                compute_vif.cnm_tag_response_count <= cnm_rsp_before ||
+                compute_vif.matrix_route_mismatch_count != matrix_route_error_before ||
+                compute_vif.cnm_route_mismatch_count != cnm_route_error_before)
+                `uvm_fatal("CLUSTER_CNM_PROTECTION_ABORT_OWNER", $sformatf(
+                    "Abort/drain/owner check failed: accepted Matrix reads=%0d responses=%0d Matrix writes=%0d post-Abort writes=%0d CNM responses=%0d routeMismatch=%0d/%0d",
+                    matrix_accept_count,
+                    compute_vif.matrix_tag_response_count - matrix_rsp_before,
+                    matrix_write_accept_count, post_abort_matrix_writes,
+                    compute_vif.cnm_tag_response_count - cnm_rsp_before,
+                    compute_vif.matrix_route_mismatch_count - matrix_route_error_before,
+                    compute_vif.cnm_route_mismatch_count - cnm_route_error_before))
+
+            `uvm_info("CLUSTER_CNM_PROTECTION_MATRIX_ABORT_CROSS_PASS", $sformatf(
+                "CNM Protection ERR 0x62 drained before software Abort of active Matrix ERR 0x32; ordered completions; accepted Matrix reads=%0d responses=%0d Matrix writes=%0d post-Abort writes=0 CNM responses=%0d route_mismatch=0; Matrix output is Golden prefix plus untouched suffix; seed=%0d",
+                matrix_accept_count,
+                compute_vif.matrix_tag_response_count - matrix_rsp_before,
+                matrix_write_accept_count,
+                compute_vif.cnm_tag_response_count - cnm_rsp_before, seed), UVM_LOW)
+            axil_write(REG_CPLQ_HEAD, 32'd2);
+            axil_write(REG_CMDQ_SIZE, 32'd0);
+            axil_write(REG_CPLQ_SIZE, 32'd0);
             return;
         end
 
@@ -5067,8 +5240,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_matrix_parity_cnm_owner_cross(seed);
         run_matrix_protection_cnm_owner_cross(seed, 1'b0);
         run_matrix_protection_cnm_owner_cross(seed, 1'b1);
-        run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b0);
-        run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b1);
+        run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b0, 1'b0);
+        run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b1, 1'b0);
+        run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b0, 1'b1);
 
         // Cross source-A, source-B where present, and writeback protection
         // phases on real engines. SFU and KV have no second source operand.
