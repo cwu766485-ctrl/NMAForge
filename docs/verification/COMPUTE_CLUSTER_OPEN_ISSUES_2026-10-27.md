@@ -1,6 +1,6 @@
 # Compute Cluster Open-Issue List — 2026-10-31
 
-This list governs the bounded CL-RC1/CL-RC2 review candidate. The exact published review/test SHA replayed in R122 is `6161a6b292cb086e7bd2271b0d9c8234034865a1` (tree `affc79c077acd7edaf31f143844a00bc143b32ea`), with test-only CNM VDOT CMDQ launch coverage. Product RTL/SPEC remain at R99 base `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`; SPEC v1.8 is unchanged. R122 passes the three-seed UVM, Top Smoke, 20-case top regression, and 28/28 checker-sensitivity mutations; it adds one `REQ-CL-002/015` point and closes no requirement row. Earlier evidence retains its recorded source identities. No issue is closed by a coverage percentage alone; the 38-row disposition remains 24 PASS-SCOPED / 14 PARTIAL and `CL-DV-v1.0` remains HOLD.
+This list governs the bounded CL-RC1/CL-RC2 review candidate. The latest published test-only source commit is R123 `1abf84864a5b6f0f1d3ef5da72fe67b41df3b367` (tree `c8b47296ee6492e8d258f4aa7dc46ebd97844711`); it adds a legal concurrent CNM descriptor-latch point. Product RTL/SPEC remain at R99 base `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`; SPEC v1.8 is unchanged. R123 passes the three-seed UVM, Top Smoke, and 28/28 checker-sensitivity mutations; it adds one `REQ-CL-005` point and closes no requirement row. Earlier evidence retains its recorded source identities. No issue is closed by a coverage percentage alone; the 38-row disposition remains 24 PASS-SCOPED / 14 PARTIAL and `CL-DV-v1.0` remains HOLD.
 
 ## Recently closed RTL defect
 
@@ -27,6 +27,10 @@ This list governs the bounded CL-RC1/CL-RC2 review candidate. The exact publishe
 The former `OPEN-CL-006` and `OPEN-CL-007` specification blockers were closed by SPEC v1.4 and the implementation/checker update in commit `9d9e0f0`. The ABI assigns codes `0–8` and reserves `9–15`; the SPEC lists per-engine supported causes, simultaneous-fault priority, owner completion behavior and the accepted-write prefix rule. Verification crosses are tracked separately under `CL-COV-006` and partial requirement rows; freezing an oracle does not make the tests pass automatically.
 
 ## Verification closure gaps
+
+### R123 legal concurrent CNM descriptor latch — 2026-10-31
+
+At tested clean code/test SHA `750fd0f9d27c8c2b0f0b9ed6f4a82f6cacb7ca45` (tree `c8b47296ee6492e8d258f4aa7dc46ebd97844711`), three real-top VCS seeds pass a CNM GEMV launch-snapshot check while a legal scalar SPAD write changes the already-fetched CNM destination word. Ten cycles of CNM/scalar overlap include one descriptor-word write; the test checks the launch snapshot, 16 independent K=64 Golden outputs, the mutated-destination sentinel, both completions, and scoreboard memory/owner state. Each seed has UVM severity `0/0/0`, zero mismatch/unknown/stale/orphan, and 100% of the declared `cluster_cg` bins. Top Smoke passes and the passive checker-sensitivity campaign catches 28/28 mutations. This narrows `REQ-CL-005` only; other CNM fields and engine/field combinations remain open. The same tree is published at `1abf84864a5b6f0f1d3ef5da72fe67b41df3b367`. Mixed URG code coverage and properties without real successes remain separately dispositioned; the overall 24 PASS-SCOPED / 14 PARTIAL summary and **HOLD** remain. See [R123 report](COMPUTE_CLUSTER_CNM_PARAMETER_LATCH_R123_2026-10-31.md).
 
 ### R117/R118 subsystem functional testpoint merge — 2026-10-31
 
