@@ -4445,6 +4445,253 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             reset_seen), UVM_LOW)
     endtask
 
+    task automatic prepare_engine_parity_reset_case(
+        input int unsigned engine,
+        input bit operand_b,
+        input bit [15:0] task_id,
+        input bit [31:0] desc_addr,
+        input bit [31:0] dst,
+        output bit [31:0] fault_addr);
+        bit [31:0] src0;
+        bit [31:0] src1;
+        int unsigned word_idx;
+
+        src0 = '0;
+        src1 = '0;
+        fault_addr = '0;
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            spad_write(dst + (word_idx << 2),
+                       32'hbaad_0000 | (engine << 8) | (operand_b << 7) | word_idx);
+
+        case (engine)
+            0: begin
+                src0 = SCALAR_A_LOCAL;
+                src1 = SCALAR_B_LOCAL;
+                spad_write(src0, 32'h0101_0101);
+                spad_write(src1, 32'h0202_0202);
+                write_cluster_desc(desc_addr, 8'h10, task_id, src0, src1,
+                                   dst, 16'd0, 16'd0, 16'd1, 32'd0,
+                                   32'd0, 32'd0, 32'd0, 8'd3);
+            end
+            1: begin
+                src0 = FP_A_LOCAL;
+                src1 = FP_B_LOCAL;
+                spad_write(src0, 32'h3f80_3f80);
+                spad_write(src1, 32'h4000_4000);
+                write_cluster_desc(desc_addr, 8'h50, task_id, src0, src1,
+                                   dst, 16'd1, 16'd1, 16'd2, 32'd0,
+                                   32'd0, 32'd0, 32'd0, 8'd7);
+            end
+            2: begin
+                src0 = CNM_A_LOCAL;
+                src1 = CNM_B_LOCAL;
+                for (word_idx = 0; word_idx < 4; word_idx++) begin
+                    spad_write(src0 + (word_idx << 2), 32'h0101_0101);
+                    spad_write(src1 + (word_idx << 2), 32'h0202_0202);
+                end
+                write_cnm_v3_desc(desc_addr, task_id, src0, src1, dst);
+            end
+            3: begin
+                src0 = MATRIX_FAULT_A_LOCAL;
+                src1 = MATRIX_FAULT_B_LOCAL;
+                for (word_idx = 0; word_idx < 4; word_idx++) begin
+                    spad_write(src0 + (word_idx << 2), 32'h0101_0101);
+                    spad_write(src1 + (word_idx << 2), 32'h0101_0101);
+                end
+                write_v3_desc(desc_addr, 8'h30, task_id, src0, src1,
+                              dst, 16'd4, 16'd4, 16'd1);
+            end
+            4: begin
+                src0 = GELU_A_LOCAL;
+                for (word_idx = 0; word_idx < 4; word_idx++)
+                    spad_write(src0 + (word_idx << 2), 32'h3f80_0000 + word_idx);
+                write_v3_desc(desc_addr, 8'h35, task_id, src0, 32'd0,
+                              dst, 16'd0, 16'd0, 16'd4);
+            end
+            5: begin
+                src0 = CONV_A_LOCAL;
+                src1 = CONV_W_LOCAL;
+                for (word_idx = 0; word_idx < 9; word_idx++) begin
+                    spad_write(src0 + (word_idx << 2), word_idx + 1);
+                    spad_write(src1 + (word_idx << 2), 32'd1);
+                end
+                write_cluster_desc(desc_addr, 8'h16, task_id, src0, src1,
+                                   dst, 16'd3, 16'd3, 16'd9, 32'd0,
+                                   32'd0, 32'd0, 32'd0, 8'd5);
+            end
+            6: begin
+                src0 = KV_VECTOR_LOCAL;
+                for (word_idx = 0; word_idx < 4; word_idx++)
+                    spad_write(src0 + (word_idx << 2), (word_idx + 1) * 32'h100);
+                write_cluster_desc(desc_addr, 8'h43, task_id, src0, 32'd0,
+                                   dst, 16'd0, 16'd0, 16'd4,
+                                   {16'd1,16'd1}, 32'd16, 32'd64,
+                                   32'd0, 8'd5);
+            end
+            default: `uvm_fatal("CLUSTER_PARITY_RESET", $sformatf(
+                "invalid engine index %0d", engine))
+        endcase
+
+        fault_addr = operand_b ? src1 : src0;
+        if (fault_addr == 0)
+            `uvm_fatal("CLUSTER_PARITY_RESET", $sformatf(
+                "engine %0d does not define operand B", engine))
+    endtask
+
+    task automatic run_engine_parity_reset_case(
+        input int unsigned engine,
+        input bit operand_b,
+        input int unsigned slot,
+        input int unsigned seed);
+        bit [31:0] desc_addr;
+        bit [31:0] cpl_addr;
+        bit [31:0] dst;
+        bit [31:0] fault_addr;
+        bit [31:0] value;
+        bit accepted_fault_read;
+        bit [15:0] task_id;
+        string parity_path;
+        uvm_hdl_data_t saved_parity;
+        uvm_hdl_data_t reset_value;
+        int unsigned poll;
+
+        // configure_contract_queues() publishes CLUSTER_CONTRACT_CMDQ as the
+        // command ring base; keep each case in that actual ring slot.
+        desc_addr = CLUSTER_CONTRACT_CMDQ;
+        cpl_addr = 32'h0000_9000 + (slot * 32'h10);
+        dst = 32'h0003_d000 + (slot * 32'h100);
+        task_id = 16'h07f0 + slot;
+
+        prepare_engine_parity_reset_case(engine, operand_b, task_id,
+                                         desc_addr, dst, fault_addr);
+        for (poll = 0; poll < 4; poll++)
+            spad_write(cpl_addr + (poll * 4), 32'hbaad_c000 | (slot << 4) | poll);
+
+        inject_spad_parity_fault(fault_addr, parity_path, saved_parity);
+        configure_contract_queues(cpl_addr, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+        accepted_fault_read = 1'b0;
+        for (poll = 0; poll < 50000; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.engine_busy[engine]) begin
+                case (engine)
+                    2: accepted_fault_read = compute_vif.cnm_accept_mask[0] &&
+                        (compute_vif.cnm_req_addr[0] == fault_addr);
+                    3: accepted_fault_read = compute_vif.matrix_request_valid &&
+                        compute_vif.banked_ready &&
+                        (compute_vif.matrix_banked_req_addr == fault_addr);
+                    default: accepted_fault_read =
+                        compute_vif.engine_req_valid[engine] &&
+                        compute_vif.engine_req_ready[engine] &&
+                        !compute_vif.engine_req_write[engine] &&
+                        (compute_vif.engine_req_addr[engine*32 +: 32] == fault_addr);
+                endcase
+                if (accepted_fault_read) break;
+            end
+        end
+        if (!accepted_fault_read)
+            `uvm_fatal("CLUSTER_PARITY_RESET", $sformatf(
+                "engine=%0d operand=%s did not accept the parity-faulted read at %08h; busy=%07b req=%07b cnm_accept=%b matrix_req=%b",
+                engine, operand_b ? "B" : "A", fault_addr,
+                compute_vif.engine_busy, compute_vif.engine_req_valid,
+                compute_vif.cnm_accept_mask, compute_vif.matrix_request_valid))
+
+        // The scratchpad response is registered. Reset at +1ns after the
+        // accepted-read edge, before the fault response is sampled by the
+        // requesting engine.
+        #1ns;
+        reset_value = 1'b0;
+        if (!uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value))
+            `uvm_fatal("CLUSTER_PARITY_RESET", $sformatf(
+                "failed to assert reset for engine=%0d operand=%s",
+                engine, operand_b ? "B" : "A"))
+        restore_spad_parity(parity_path, saved_parity);
+        repeat (4) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.rsp_valid !== 1'b0 ||
+                compute_vif.matrix_rsp_valid !== 1'b0 ||
+                compute_vif.cnm_rsp_valid !== 4'b0)
+                `uvm_fatal("CLUSTER_PARITY_RESET", $sformatf(
+                    "old-epoch response visible during reset engine=%0d operand=%s",
+                    engine, operand_b ? "B" : "A"))
+        end
+        if (compute_vif.engine_busy !== 7'b0)
+            `uvm_fatal("CLUSTER_PARITY_RESET", $sformatf(
+                "engine busy survived reset engine=%0d busy=%07b",
+                engine, compute_vif.engine_busy))
+        #1ns;
+        reset_value = 1'b1;
+        if (!uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value))
+            `uvm_fatal("CLUSTER_PARITY_RESET", $sformatf(
+                "failed to release reset for engine=%0d operand=%s",
+                engine, operand_b ? "B" : "A"))
+        repeat (8) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.rsp_valid !== 1'b0 ||
+                compute_vif.matrix_rsp_valid !== 1'b0 ||
+                compute_vif.cnm_rsp_valid !== 4'b0)
+                `uvm_fatal("CLUSTER_PARITY_RESET", $sformatf(
+                    "stale response escaped reset epoch engine=%0d operand=%s",
+                    engine, operand_b ? "B" : "A"))
+        end
+        wait_spad_idle();
+        axil_read(REG_CPLQ_TAIL, value);
+        if (value !== 32'd0)
+            `uvm_fatal("CLUSTER_PARITY_RESET", $sformatf(
+                "reset must suppress old-epoch completion engine=%0d operand=%s tail=%0d",
+                engine, operand_b ? "B" : "A", value))
+        for (poll = 0; poll < 16; poll++)
+            expect_spad(dst + (poll << 2),
+                32'hbaad_0000 | (engine << 8) | (operand_b << 7) | poll,
+                $sformatf("parity-reset destination sentinel e%0d p%0d w%0d",
+                          engine, operand_b, poll));
+        for (poll = 0; poll < 4; poll++)
+            expect_spad(cpl_addr + (poll << 2),
+                32'hbaad_c000 | (slot << 4) | poll,
+                $sformatf("parity-reset completion sentinel e%0d p%0d w%0d",
+                          engine, operand_b, poll));
+
+        // Reissue the repaired legal descriptor to prove the new epoch can
+        // dispatch and retire the same engine operation.
+        restore_spad_parity(parity_path, saved_parity);
+        prepare_engine_parity_reset_case(engine, operand_b, task_id + 16'h0100,
+                                         desc_addr, dst, fault_addr);
+        configure_contract_queues(cpl_addr, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        expect_spad(cpl_addr, {16'd0, task_id + 16'h0100},
+                    $sformatf("parity-reset recovery task id e%0d p%0d", engine, operand_b));
+        expect_spad(cpl_addr + 32'h04, 32'd1,
+                    $sformatf("parity-reset recovery status e%0d p%0d", engine, operand_b));
+        `uvm_info("CLUSTER_PARITY_RESET_CASE_PASS", $sformatf(
+            "engine=%0d operand=%s accepted parity read; reset discarded old epoch without response/completion/writeback; repaired task retired after recovery; seed=%0d",
+            engine, operand_b ? "B" : "A", seed), UVM_LOW)
+        clear_contract_queues(32'd1);
+    endtask
+
+    task automatic run_engine_parity_reset_sweep(input int unsigned seed);
+        int unsigned cases;
+        int unsigned engine;
+
+        cases = 0;
+        for (engine = 0; engine < 7; engine++) begin
+            run_engine_parity_reset_case(engine, 1'b0, cases, seed);
+            cases++;
+            if ((engine == 0) || (engine == 1) || (engine == 2) ||
+                (engine == 3) || (engine == 5)) begin
+                run_engine_parity_reset_case(engine, 1'b1, cases, seed);
+                cases++;
+            end
+        end
+        if (cases != 12)
+            `uvm_fatal("CLUSTER_PARITY_RESET", $sformatf(
+                "expected 12 legal engine/operand/reset cases, observed %0d", cases))
+        `uvm_info("CLUSTER_PARITY_RESET_CROSS_PASS", $sformatf(
+            "accepted-read-to-reset parity cross=%0d/12; engines=7 operand phases={A all, B where defined}; old-epoch response/completion/writeback suppressed; recovery dispatch verified; seed=%0d",
+            cases, seed), UVM_LOW)
+    endtask
+
     task automatic run_matrix_parity_reset_epoch_case(input int unsigned seed);
         int unsigned poll;
         int unsigned word_idx;
@@ -6201,6 +6448,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_matrix_line_abort_write_prefix(seed);
         run_cnm_abort_write_prefix(seed);
         run_engine_reset_drain_sweep();
+        run_engine_parity_reset_sweep(seed);
         run_matrix_parity_reset_epoch_case(seed);
 
         `uvm_info("COMPUTE_CLUSTER_REAL_UVM_PASS", $sformatf(
