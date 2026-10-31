@@ -1143,3 +1143,7 @@ The exact clean-worktree UVM test SHA dfbebbd8c8ee68458c4261f74f041e816b6b0284 p
 ## Compute Cluster R129 Scalar GEMV accepted-write Abort prefix — 2026-10-31
 
 The clean-worktree three-seed top UVM at test SHA 8b511e474727fe13439f99674d1a30b46005f274 passes a real CMDQ Scalar GEMV M=16/K=64 Abort point. Each run commits one Golden output, preserves the other 15 sentinels, drains 130/130 reads, writes no output after Abort sampling, and reports ERR_ABORT 0x32. The 42,107-word scoreboard has zero mismatch/unknown/stale/orphan and UVM severity is 0/0/0. Focused cluster_cg is 100%; the merged mixed URG score is 55.92%. This is scoped evidence for REQ-CL-017/019/027 and REQ-PC-006, all remain PARTIAL. See the R129 report (../docs/verification/COMPUTE_CLUSTER_SCALAR_GEMV_ABORT_PREFIX_R129_2026-10-31.md).
+
+## Compute Cluster R136 Matrix FSM Formal clean replay — 2026-10-31
+
+At the exact published closeout tree `a2e3aafe29262b9237c97d7f4d90e4a9f22e118b`, VC Formal `V-2023.12-SP2` checks out Base/FPV and passes five non-vacuous Matrix FSM assertions plus both selected reachability covers (`ST_PREFETCH_WAIT` depth 11; `ST_ERROR_DRAIN` depth 3). No FSM state is forced. The enabled-prefetch raw FSM remains 49/53; legal `ST_MAC→ST_A_REQ` remains covered in the separate prefetch-off simulation. This is a clean replay of the scoped guard disposition, not global FSM closure. See [R136 report](../docs/verification/COMPUTE_CLUSTER_MATRIX_FSM_R136_FORMAL_REPLAY_2026-10-31.md); the v1.0 disposition stays 24 PASS-SCOPED / 14 PARTIAL, HOLD.
