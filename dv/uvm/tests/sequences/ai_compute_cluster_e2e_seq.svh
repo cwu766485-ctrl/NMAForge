@@ -1861,6 +1861,180 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     endtask
 
 
+    task automatic run_scalar_gemv_abort_write_prefix(input int unsigned seed);
+        localparam int unsigned ROWS = 16;
+        localparam int unsigned K_WORDS = 64;
+        localparam bit [31:0] SRC_A = 32'h0006_d000;
+        localparam bit [31:0] SRC_B = 32'h0006_e000;
+        localparam bit [31:0] DST = 32'h0006_f000;
+        localparam bit [31:0] COMPLETION = 32'h0000_5bc0;
+        bit [31:0] write_addr[0:ROWS-1];
+        bit [31:0] write_data[0:ROWS-1];
+        int signed expected_output[0:ROWS-1];
+        bit [31:0] packed_a;
+        bit [31:0] packed_b;
+        bit [15:0] task_id;
+        int unsigned accepted_write_count;
+        int unsigned accepted_reads;
+        int unsigned returned_reads;
+        int unsigned post_abort_output_writes;
+        int unsigned poll;
+        int unsigned row_idx;
+        int unsigned k_idx;
+        int unsigned lane;
+        int signed a_value;
+        int signed b_value;
+        bit first_write_seen;
+        bit abort_seen;
+        bit abort_active_seen;
+        bit monitor_done;
+
+        task_id = 16'h07a0;
+        accepted_write_count = 0;
+        accepted_reads = 0;
+        returned_reads = 0;
+        post_abort_output_writes = 0;
+        first_write_seen = 1'b0;
+        abort_seen = 1'b0;
+        abort_active_seen = 1'b0;
+        monitor_done = 1'b0;
+
+        // Build a legal 16-row GEMV with enough K work to let software Abort
+        // arrive after a real output handshake and before the suffix is done.
+        for (k_idx = 0; k_idx < K_WORDS; k_idx++) begin
+            packed_a = '0;
+            for (lane = 0; lane < 4; lane++) begin
+                a_value = ((int'(seed % 7) + int'(k_idx * 5) +
+                            int'(lane * 2)) % 15) - 7;
+                packed_a[lane*8 +: 8] = a_value[7:0];
+            end
+            spad_write(SRC_A + (k_idx << 2), packed_a);
+        end
+        for (row_idx = 0; row_idx < ROWS; row_idx++) begin
+            expected_output[row_idx] = 0;
+            for (k_idx = 0; k_idx < K_WORDS; k_idx++) begin
+                packed_b = '0;
+                for (lane = 0; lane < 4; lane++) begin
+                    a_value = ((int'(seed % 7) + int'(k_idx * 5) +
+                                int'(lane * 2)) % 15) - 7;
+                    b_value = ((int'(seed % 5) + int'(row_idx * 3) +
+                                int'(k_idx * 5) + int'(lane * 7)) % 13) - 6;
+                    packed_b[lane*8 +: 8] = b_value[7:0];
+                    expected_output[row_idx] += a_value * b_value;
+                end
+                spad_write(SRC_B + ((row_idx * K_WORDS + k_idx) << 2),
+                           packed_b);
+            end
+            spad_write(DST + (row_idx << 2),
+                       32'hbad0_7a00 | row_idx);
+        end
+        for (row_idx = 0; row_idx < 4; row_idx++)
+            spad_write(COMPLETION + (row_idx << 2),
+                       32'h7a00_0000 | row_idx);
+
+        write_cluster_desc(CLUSTER_CONTRACT_CMDQ, 8'h11, task_id,
+                           SRC_A, SRC_B, DST,
+                           16'd16, 16'd0, 16'd64, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd3);
+        configure_contract_queues(COMPLETION, 32'd1);
+
+        fork
+            begin : scalar_abort_prefix_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.engine_req_valid[0] &&
+                        compute_vif.engine_req_ready[0] &&
+                        compute_vif.engine_req_write[0]) begin
+                        if (accepted_write_count >= ROWS)
+                            `uvm_fatal("CLUSTER_SCALAR_ABORT_PREFIX",
+                                "Scalar accepted more output writes than its 16-row GEMV")
+                        write_addr[accepted_write_count] =
+                            compute_vif.engine_req_addr[0 +: 32];
+                        write_data[accepted_write_count] =
+                            compute_vif.engine_req_wdata[0 +: 32];
+                        accepted_write_count++;
+                        first_write_seen = 1'b1;
+                        // The write accepted on the first Abort-sampling edge
+                        // belongs to the committed prefix. Only later writes
+                        // violate the frozen Abort boundary.
+                        if (abort_active_seen)
+                            post_abort_output_writes++;
+                    end
+                    if (compute_vif.engine_req_valid[0] &&
+                        compute_vif.engine_req_ready[0] &&
+                        !compute_vif.engine_req_write[0])
+                        accepted_reads++;
+                    if (compute_vif.rsp_valid && compute_vif.rsp_client == 3'd2)
+                        returned_reads++;
+                    if (compute_vif.dut_abort_active) begin
+                        abort_seen = 1'b1;
+                        abort_active_seen = 1'b1;
+                    end
+                end
+            end
+            begin : scalar_abort_after_first_output
+                axil_write(REG_DOORBELL, 32'd1);
+                poll = 0;
+                while (!first_write_seen && poll < 100000) begin
+                    @(posedge compute_vif.aclk);
+                    poll++;
+                end
+                if (!first_write_seen)
+                    `uvm_fatal("CLUSTER_SCALAR_ABORT_PREFIX",
+                        "Scalar GEMV did not accept an output write before Abort timeout")
+                axil_write(REG_ABORT, 32'd1);
+                wait_cpl_tail(32'd1);
+                monitor_done = 1'b1;
+            end
+        join
+
+        wait_spad_idle();
+        if (!abort_seen)
+            `uvm_fatal("CLUSTER_SCALAR_ABORT_PREFIX",
+                "software Abort was not observed while Scalar GEMV was active")
+        if (accepted_write_count == 0 || accepted_write_count >= ROWS)
+            `uvm_fatal("CLUSTER_SCALAR_ABORT_PREFIX", $sformatf(
+                "Abort did not cut a non-empty proper Scalar GEMV prefix: writes=%0d",
+                accepted_write_count))
+        if (accepted_reads == 0 || returned_reads != accepted_reads)
+            `uvm_fatal("CLUSTER_SCALAR_ABORT_PREFIX", $sformatf(
+                "Scalar GEMV read responses did not drain: accepted=%0d returned=%0d",
+                accepted_reads, returned_reads))
+        if (post_abort_output_writes != 0)
+            `uvm_fatal("CLUSTER_SCALAR_ABORT_PREFIX", $sformatf(
+                "Scalar GEMV accepted %0d output writes after Abort sampling",
+                post_abort_output_writes))
+
+        expect_spad(COMPLETION + 32'h00, {16'd0, task_id},
+                    "Scalar accepted-write Abort task ID");
+        expect_spad(COMPLETION + 32'h04, 32'h0000_0032,
+                    "Scalar accepted-write Abort status/code");
+        for (row_idx = 0; row_idx < accepted_write_count; row_idx++) begin
+            if (write_addr[row_idx] !== DST + (row_idx << 2))
+                `uvm_fatal("CLUSTER_SCALAR_ABORT_PREFIX", $sformatf(
+                    "non-prefix Scalar output address index=%0d expected=0x%08h actual=0x%08h",
+                    row_idx, DST + (row_idx << 2), write_addr[row_idx]))
+            if (write_data[row_idx] !== expected_output[row_idx])
+                `uvm_fatal("CLUSTER_SCALAR_ABORT_PREFIX", $sformatf(
+                    "Scalar accepted-prefix Golden mismatch index=%0d expected=%0d actual=%0d",
+                    row_idx, expected_output[row_idx], $signed(write_data[row_idx])))
+            expect_spad(DST + (row_idx << 2), expected_output[row_idx],
+                        $sformatf("Scalar accepted Abort prefix Golden[%0d]", row_idx));
+        end
+        for (row_idx = accepted_write_count; row_idx < ROWS; row_idx++)
+            expect_spad(DST + (row_idx << 2), 32'hbad0_7a00 | row_idx,
+                        $sformatf("Scalar Abort preserved unaccepted suffix[%0d]", row_idx));
+
+        `uvm_info("CLUSTER_SCALAR_ABORT_WRITE_PREFIX_PASS", $sformatf(
+            "task_id=%04h accepted_output_prefix=%0d/16 read_drain=%0d/%0d post_abort_writes=%0d completion=ERR_ABORT seed=%0d",
+            task_id, accepted_write_count, accepted_reads, returned_reads,
+            post_abort_output_writes, seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+
     task automatic run_scalar_cmdq_numeric_boundary_test(input int unsigned seed);
         localparam bit [31:0] NUM_CMDQ = 32'h0005_b000;
         localparam bit [31:0] NUM_CPLQ = 32'h0005_b400;
@@ -5044,6 +5218,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_banked_vdot_cmdq_dispatch_test(seed);
         run_scalar_gemv_gemm_cmdq_dispatch_test(seed);
         run_scalar_cmdq_numeric_boundary_test(seed);
+        run_scalar_gemv_abort_write_prefix(seed);
         run_cnm_inflight_parameter_latch_test();
         run_launch_snapshot_and_unused_fields_test();
         run_inflight_parameter_latch_test();
