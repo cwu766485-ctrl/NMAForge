@@ -636,11 +636,21 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     task automatic run_matrix_protection_cnm_owner_cross(
         input int unsigned seed,
         input bit abort_cnm_after_protection,
-        input bit deny_cnm_writeback);
+        input bit deny_cnm_writeback,
+        input bit hold_dual_faults_behind_full_cplq);
         bit [31:0] desc_base;
         bit [31:0] cpl_base;
         bit [31:0] matrix_dst;
         bit [31:0] cnm_dst;
+        bit [31:0] matrix_desc_base;
+        bit [31:0] cnm_desc_base;
+        bit [31:0] cplq_scalar_src0;
+        bit [31:0] cplq_scalar_src1;
+        bit [31:0] cplq_scalar_dst;
+        bit [31:0] cplq_sfu_src;
+        bit [31:0] cplq_sfu_dst;
+        bit [31:0] cplq_kv_src;
+        bit [31:0] cplq_kv_dst;
         bit [31:0] packed_word;
         bit [31:0] matrix_rsp_before;
         bit [31:0] cnm_rsp_before;
@@ -648,6 +658,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         bit [31:0] cnm_route_error_before;
         bit [31:0] overlap_before;
         bit [31:0] shared_accept_before;
+        bit [31:0] queue_pointer;
+        bit [31:0] queue_head;
+        bit [31:0] queue_size;
+        bit [31:0] command_head;
         bit protection_seen;
         bit cnm_protection_seen;
         bit abort_issued;
@@ -661,6 +675,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned cnm_launch_before;
         int unsigned matrix_launch_before;
         int signed expected_cnm[0:15];
+        int signed cplq_sfu_input[0:3];
+        int signed cplq_sfu_golden[0:3];
         int signed a_value;
         int signed b_value;
         int unsigned row_idx;
@@ -672,10 +688,22 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         bit [15:0] cnm_task_id;
         bit [31:0] actual_output;
 
-        desc_base = 32'h0000_7800;
+        desc_base = hold_dual_faults_behind_full_cplq ?
+                    32'h0000_7600 : 32'h0000_7800;
         cpl_base = 32'h0000_7900;
         matrix_dst = 32'h0000_8000;
         cnm_dst = 32'h0005_4800;
+        matrix_desc_base = hold_dual_faults_behind_full_cplq ?
+                           desc_base + 32'hc0 : desc_base;
+        cnm_desc_base = hold_dual_faults_behind_full_cplq ?
+                        desc_base + 32'h100 : desc_base + 32'h40;
+        cplq_scalar_src0 = 32'h0000_7a00;
+        cplq_scalar_src1 = 32'h0000_7a80;
+        cplq_scalar_dst = 32'h0000_7b00;
+        cplq_sfu_src = 32'h0000_7b20;
+        cplq_sfu_dst = 32'h0000_7c20;
+        cplq_kv_src = 32'h0000_7d20;
+        cplq_kv_dst = 32'h0000_7da0;
         protection_seen = 1'b0;
         cnm_protection_seen = 1'b0;
         abort_issued = 1'b0;
@@ -687,6 +715,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         parallel_active_cycles = 0;
         matrix_task_id = abort_cnm_after_protection ? 16'h07d2 : 16'h07d0;
         cnm_task_id = abort_cnm_after_protection ? 16'h07d3 : 16'h07d1;
+        if (hold_dual_faults_behind_full_cplq) begin
+            matrix_task_id = 16'h07e0;
+            cnm_task_id = 16'h07e1;
+        end
 
         // A legal CNM GEMV uses its own contiguous protected window and an
         // independent output image for concurrent owner/Golden checking.
@@ -729,14 +761,61 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             spad_write(cnm_dst + (word_idx << 2),
                        32'hfa17_8800 | word_idx);
 
+        // Keep a sentinel in the fourth ring slot. The preceding real
+        // completions fill slots 0-2 before the two Protection errors retire.
+        if (hold_dual_faults_behind_full_cplq) begin
+            for (word_idx = 0; word_idx < 4; word_idx++)
+                spad_write(cpl_base + 32'h30 + (word_idx << 2),
+                           32'hc07f_7d00 | word_idx);
+            for (word_idx = 0; word_idx < 32; word_idx++) begin
+                spad_write(cplq_scalar_src0 + (word_idx << 2),
+                           32'h0403_0201);
+                spad_write(cplq_scalar_src1 + (word_idx << 2),
+                           32'h0807_0605);
+            end
+            spad_write(cplq_scalar_dst, 32'hc07f_7a08);
+            cplq_sfu_input[0] = 16;
+            cplq_sfu_input[1] = -16;
+            cplq_sfu_input[2] = 32;
+            cplq_sfu_input[3] = -32;
+            cplq_sfu_golden[0] = 8;
+            cplq_sfu_golden[1] = -8;
+            cplq_sfu_golden[2] = 17;
+            cplq_sfu_golden[3] = -15;
+            for (word_idx = 0; word_idx < 64; word_idx++) begin
+                spad_write(cplq_sfu_src + (word_idx << 2),
+                           cplq_sfu_input[word_idx % 4]);
+                spad_write(cplq_sfu_dst + (word_idx << 2),
+                           32'hc07f_7c20 | word_idx);
+            end
+            for (word_idx = 0; word_idx < 32; word_idx++) begin
+                spad_write(cplq_kv_src + (word_idx << 2),
+                           32'hac00_0100 + word_idx);
+                spad_write(cplq_kv_dst + (word_idx << 2),
+                           32'hc07f_7a80 | word_idx);
+            end
+
+            write_contract_vdot_desc(desc_base, 16'h07c0,
+                                     cplq_scalar_src0, cplq_scalar_src1,
+                                     cplq_scalar_dst, 16'd32, 8'd0,
+                                     32'd0, 32'd0, 32'd0, 32'd0);
+            write_v3_desc(desc_base + 32'h40, 8'h35, 16'h07c1,
+                          cplq_sfu_src, 32'd0, cplq_sfu_dst,
+                          16'd0, 16'd0, 16'd64);
+            write_cluster_desc(desc_base + 32'h80, 8'h43, 16'h07c2,
+                               cplq_kv_src, 32'd0, cplq_kv_dst,
+                               16'd0, 16'd0, 16'd32, 32'd0,
+                               32'd16, 32'd64, 32'd0, 8'd5);
+        end
+
         // Matrix reads and computes the legal operands before its first
         // output write is denied. This leaves enough execution time for the
         // following CNM task to run concurrently and exercise response-owner
         // isolation through a real Matrix writeback Protection fault.
-        write_v3_desc(desc_base, 8'h30, matrix_task_id,
+        write_v3_desc(matrix_desc_base, 8'h30, matrix_task_id,
                       MATRIX_A_LOCAL, MATRIX_B_LOCAL, matrix_dst,
                       16'd16, 16'd32, 16'd16);
-        write_cluster_desc(desc_base + 32'h40, 8'h21, cnm_task_id,
+        write_cluster_desc(cnm_desc_base, 8'h21, cnm_task_id,
                            MATRIX_LINE_STALL_CNM_A_LOCAL,
                            MATRIX_LINE_STALL_CNM_B_LOCAL, cnm_dst,
                            16'd16, 16'd1, 16'd32, 32'd0,
@@ -750,7 +829,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_REGION2_PERM, 32'd0);
         axil_write(REG_REGION3_PERM, 32'd0);
         axil_write(REG_REGION0_BASE, desc_base);
-        axil_write(REG_REGION0_LIMIT, desc_base + 32'h200);
+        axil_write(REG_REGION0_LIMIT,
+                   hold_dual_faults_behind_full_cplq ? 32'h0000_7f00 :
+                   desc_base + 32'h200);
         axil_write(REG_REGION0_PERM, 32'h0000_000f);
         axil_write(REG_REGION1_BASE, MATRIX_A_LOCAL);
         axil_write(REG_REGION1_LIMIT, MATRIX_A_LOCAL + 32'h400);
@@ -776,9 +857,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         axil_write(REG_CMDQ_CTRL, 32'd0);
         axil_write(REG_CMDQ_BASE, desc_base);
-        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_SIZE,
+                   hold_dual_faults_behind_full_cplq ? 32'd8 : 32'd4);
         axil_write(REG_CMDQ_HEAD, 32'd0);
-        axil_write(REG_CMDQ_TAIL, 32'd2);
+        axil_write(REG_CMDQ_TAIL,
+                   hold_dual_faults_behind_full_cplq ? 32'd5 : 32'd2);
         axil_write(REG_CPLQ_BASE, cpl_base);
         axil_write(REG_CPLQ_SIZE, 32'd4);
         axil_write(REG_CPLQ_HEAD, 32'd0);
@@ -819,7 +902,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                         "CNM destination Protection denial did not occur while both CNM and Matrix were active")
                 cnm_protection_seen = 1'b1;
             end
-            if (busy_seen && !compute_vif.processor_busy)
+            if (hold_dual_faults_behind_full_cplq) begin
+                if (busy_seen && protection_seen && cnm_protection_seen &&
+                    (compute_vif.engine_busy == 7'b0))
+                    monitor_done = 1'b1;
+            end else if (busy_seen && !compute_vif.processor_busy)
                 monitor_done = 1'b1;
         end
         if (!busy_seen || !monitor_done)
@@ -831,8 +918,89 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         if (deny_cnm_writeback && !cnm_protection_seen)
             `uvm_fatal("CLUSTER_DUAL_PROTECTION_OWNER",
                 "CNM output Protection request was not observed at its destination")
-        wait_cpl_tail(32'd2);
-        wait_spad_idle();
+        if (hold_dual_faults_behind_full_cplq) begin
+            // Both engines can be idle before the earlier legal descriptors
+            // finish ordered retirement. Wait for the visible tail, then
+            // sample the full-queue hold state without racing those writes.
+            wait_cpl_tail(32'd3);
+            axil_read(REG_CPLQ_TAIL, queue_pointer);
+            axil_read(REG_CPLQ_HEAD, queue_head);
+            axil_read(REG_CPLQ_SIZE, queue_size);
+            axil_read(REG_CMDQ_HEAD, command_head);
+            if (queue_pointer !== 32'd3 ||
+                queue_size !== 32'd4 ||
+                compute_vif.cplq_full !== 1'b1 ||
+                compute_vif.processor_busy !== 1'b1 ||
+                compute_vif.engine_busy !== 7'b0)
+                `uvm_fatal("CLUSTER_DUAL_PROTECTION_CPLQ",
+                    $sformatf("dual errors did not hold behind a full CPLQ: size=%0d head=%0d tail=%0d CMDQ_HEAD=%0d full=%0b busy=%0b engines=%07b",
+                              queue_size, queue_head, queue_pointer, command_head,
+                              compute_vif.cplq_full,
+                              compute_vif.processor_busy, compute_vif.engine_busy))
+            if (command_head !==
+                (hold_dual_faults_behind_full_cplq ? 32'd5 : 32'd2))
+                `uvm_fatal("CLUSTER_DUAL_PROTECTION_CPLQ", $sformatf(
+                    "five legal CMDQ descriptors must dispatch before CPLQ stall: CMDQ_HEAD=%0d",
+                    command_head))
+            expect_completion(cpl_base, 16'h07c0, 32'd2240, 32'd1,
+                              "dual Protection preceding Scalar completion");
+            expect_completion(cpl_base + 32'h10, 16'h07c1,
+                              cplq_sfu_golden[3], 32'd64,
+                              "dual Protection preceding SFU completion");
+            expect_completion(cpl_base + 32'h20, 16'h07c2,
+                              32'hac00_011f, 32'd32,
+                              "dual Protection preceding KV completion");
+
+            // Free one slot. Matrix is first in CMDQ order and must wrap the
+            // tail to slot zero. CNM remains pending while the ring is full.
+            axil_write(REG_CPLQ_HEAD, 32'd1);
+            wait_cpl_tail(32'd0);
+            if (compute_vif.cplq_full !== 1'b1 ||
+                compute_vif.processor_busy !== 1'b1 ||
+                compute_vif.engine_busy !== 7'b0)
+                `uvm_fatal("CLUSTER_DUAL_PROTECTION_CPLQ", $sformatf(
+                    "CNM error did not remain blocked after Matrix retirement: full=%0b busy=%0b engines=%07b",
+                    compute_vif.cplq_full, compute_vif.processor_busy,
+                    compute_vif.engine_busy))
+            expect_spad(cpl_base + 32'h30, {16'd0, matrix_task_id},
+                        "dual Protection Matrix wrapped completion ID");
+            expect_spad(cpl_base + 32'h34, 32'h0000_0062,
+                        "dual Protection Matrix wrapped error");
+            expect_completion(cpl_base, 16'h07c0, 32'd2240, 32'd1,
+                              "dual Protection consumed Scalar completion remains intact");
+
+            // Consume another seeded slot to permit CNM's ordered error to
+            // retire. The ring remains full after this second completion.
+            axil_write(REG_CPLQ_HEAD, 32'd2);
+            wait_cpl_tail(32'd1);
+            wait_spad_idle();
+            if (compute_vif.cplq_full !== 1'b1)
+                `uvm_fatal("CLUSTER_DUAL_PROTECTION_CPLQ",
+                    "the three-entry completion ring should be full after both ordered error retirements")
+            expect_spad(cpl_base, {16'd0, cnm_task_id},
+                        "dual Protection CNM wrapped completion ID");
+            expect_spad(cpl_base + 32'h04, 32'h0000_0062,
+                        "dual Protection CNM wrapped error");
+            expect_completion(cpl_base + 32'h10, 16'h07c1,
+                              cplq_sfu_golden[3], 32'd64,
+                              "dual Protection retained SFU completion");
+            expect_completion(cpl_base + 32'h20, 16'h07c2,
+                              32'hac00_011f, 32'd32,
+                              "dual Protection retained KV completion");
+            expect_spad(cplq_scalar_dst, 32'd2240,
+                        "dual Protection prefix Scalar Golden");
+            for (word_idx = 0; word_idx < 64; word_idx++)
+                expect_spad(cplq_sfu_dst + (word_idx << 2),
+                            cplq_sfu_golden[word_idx % 4],
+                            $sformatf("dual Protection prefix SFU Golden[%0d]", word_idx));
+            for (word_idx = 0; word_idx < 32; word_idx++)
+                expect_spad(cplq_kv_dst + (word_idx << 2),
+                            32'hac00_0100 + word_idx,
+                            $sformatf("dual Protection prefix KV Golden[%0d]", word_idx));
+        end else begin
+            wait_cpl_tail(32'd2);
+            wait_spad_idle();
+        end
 
         axil_write(REG_REGION0_PERM, 32'd0);
         axil_write(REG_REGION1_PERM, 32'd0);
@@ -868,24 +1036,28 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_fatal("CLUSTER_PROTECTION_OWNER",
                 "response from the Protection-faulted Matrix task was routed to the wrong engine")
 
-        expect_spad(cpl_base, {16'd0, matrix_task_id},
-                    "concurrent Protection Matrix task ID/order");
-        expect_spad(cpl_base + 32'h04, 32'h0000_0062,
-                    "concurrent Protection Matrix error owner");
-        if (abort_cnm_after_protection) begin
-            expect_spad(cpl_base + 32'h10, {16'd0, cnm_task_id},
-                        "concurrent Protection CNM Abort task ID/order");
-            expect_spad(cpl_base + 32'h14, 32'h0000_0032,
-                        "concurrent Protection CNM ERR_ABORT owner");
-        end else if (deny_cnm_writeback) begin
-            expect_spad(cpl_base + 32'h10, {16'd0, cnm_task_id},
-                        "dual Protection CNM task ID/order");
-            expect_spad(cpl_base + 32'h14, 32'h0000_0062,
-                        "dual Protection CNM error owner");
-        end else begin
-            expect_completion(cpl_base + 32'h10, cnm_task_id,
-                              expected_cnm[15], 32'd16,
-                              "concurrent Protection CNM success/order");
+        // Full-CPLQ mode has already checked the exact wrapped completion
+        // slots above. The ordinary case keeps the original base slots.
+        if (!hold_dual_faults_behind_full_cplq) begin
+            expect_spad(cpl_base, {16'd0, matrix_task_id},
+                        "concurrent Protection Matrix task ID/order");
+            expect_spad(cpl_base + 32'h04, 32'h0000_0062,
+                        "concurrent Protection Matrix error owner");
+            if (abort_cnm_after_protection) begin
+                expect_spad(cpl_base + 32'h10, {16'd0, cnm_task_id},
+                            "concurrent Protection CNM Abort task ID/order");
+                expect_spad(cpl_base + 32'h14, 32'h0000_0032,
+                            "concurrent Protection CNM ERR_ABORT owner");
+            end else if (deny_cnm_writeback) begin
+                expect_spad(cpl_base + 32'h10, {16'd0, cnm_task_id},
+                            "dual Protection CNM task ID/order");
+                expect_spad(cpl_base + 32'h14, 32'h0000_0062,
+                            "dual Protection CNM error owner");
+            end else begin
+                expect_completion(cpl_base + 32'h10, cnm_task_id,
+                                  expected_cnm[15], 32'd16,
+                                  "concurrent Protection CNM success/order");
+            end
         end
         for (word_idx = 0; word_idx < 512; word_idx++)
             expect_spad(matrix_dst + (word_idx << 2),
@@ -933,7 +1105,13 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 compute_vif.matrix_tag_response_count - matrix_rsp_before,
                 compute_vif.cnm_tag_response_count - cnm_rsp_before, seed), UVM_LOW)
 
-        axil_write(REG_CPLQ_HEAD, 32'd2);
+        if (hold_dual_faults_behind_full_cplq)
+            `uvm_info("CLUSTER_DUAL_PROTECTION_CPLQ_BACKPRESSURE_PASS", $sformatf(
+                "blocked_tail=3 released_heads=1,2 wrapped_tails=0,1 engines_idle=1 full_after_each=1 Matrix=0x62 CNM=0x62 completion_order=Matrix,CNM route_mismatch=0; both output sentinels preserved; seed=%0d",
+                seed), UVM_LOW)
+
+        axil_write(REG_CPLQ_HEAD,
+                   hold_dual_faults_behind_full_cplq ? 32'd1 : 32'd2);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
@@ -5490,9 +5668,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             seed), UVM_LOW)
 
         run_matrix_parity_cnm_owner_cross(seed);
-        run_matrix_protection_cnm_owner_cross(seed, 1'b0, 1'b0);
-        run_matrix_protection_cnm_owner_cross(seed, 1'b1, 1'b0);
-        run_matrix_protection_cnm_owner_cross(seed, 1'b0, 1'b1);
+        run_matrix_protection_cnm_owner_cross(seed, 1'b0, 1'b0, 1'b0);
+        run_matrix_protection_cnm_owner_cross(seed, 1'b1, 1'b0, 1'b0);
+        run_matrix_protection_cnm_owner_cross(seed, 1'b0, 1'b1, 1'b0);
+        run_matrix_protection_cnm_owner_cross(seed, 1'b0, 1'b1, 1'b1);
         run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b0, 1'b0);
         run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b1, 1'b0);
         run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b0, 1'b1);
