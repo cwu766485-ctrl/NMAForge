@@ -584,6 +584,19 @@ This adds a bounded point to `REQ-CL-017/019/027` and `REQ-PC-006/007`, all stil
 | REQ-PC-006 | PARTIAL | Same test; accepted SPAD request, response-route monitors and scoreboard pending ledger | Three seeds: 45,617 memory words checked, zero mismatch/unknown/stale/orphan, 26 reset-dropped responses, pending queues empty. Response-consumed reset for all engines and broader simultaneous owner conflicts remain open. | Same Run ID and seeds | Same report and per-seed logs |
 | REQ-PC-007 | PARTIAL | Same test; real production-engine SPAD client acceptance and post-reset recovery | All seven real engine request paths accept a faulted read and recover after reset; source-B also covered where defined. Pairwise production-engine contention under fault/backpressure is not covered by these sequential cases. | Same Run ID and seeds | Same report and per-seed logs |
 
+## R150 SFU reset after an accepted output prefix — 2026-10-31
+
+| Requirement | Disposition | Test ID / checker | Coverage / observed result | Run ID / seeds | Evidence path |
+|---|---|---|---|---|---|
+| REQ-CL-017 | PARTIAL | `TC-CL-R150-SFU-RESET-ACCEPTED-PREFIX`; live SFU request-handshake address/data monitor, accepted-prefix Golden/suffix checker, reset-epoch and recovery checker | Legal 64-output GELU resets after one accepted output while busy. The accepted word is Golden; suffix stays sentinel; no old-epoch output escapes. This is one SFU shape/cut point. | `R150-UVM-SFU-RESET-PREFIX-3S-20261031`; `20261025/26/27` | [R150 report](COMPUTE_CLUSTER_SFU_RESET_ACCEPTED_PREFIX_R150_2026-10-31.md); `/tmp/nmaforge_r150_clean_replay_b49/seed_*/run.log` |
+| REQ-CL-018 | PARTIAL | Same test; six-bin `sfu_reset_prefix_cg`, reset/release quiet-window, response-route and pending-ledger checks | Dedicated group 6/6 each seed; no post-reset SFU writes/responses. This cut has zero pending SFU reads, so it does not add pending-response reset evidence. | Same Run ID and seeds | Same report and per-seed logs |
+| REQ-CL-019 | PARTIAL | Same test; `CPLQ_TAIL`, completion sentinel and new-epoch completion Golden checker | Old completion is suppressed; full recovery completion passes. Other completion ordering/backpressure and error combinations remain open. | Same Run ID and seeds | Same report and per-seed logs |
+| REQ-CL-027 | PARTIAL | Same test; task ID, status, result and length checker | Reissued SFU task returns the expected GELU result and 64 outputs in every seed; per-engine ABI/fault combinations remain incomplete. | Same Run ID and seeds | Same report and per-seed logs |
+| REQ-PC-006 | PARTIAL | Same test; production SPAD request/response monitor, `CLUSTER_SCOREBOARD` and memory image checks | Each seed: 63,497 checked words, zero mismatch/unknown/stale/orphan, empty pending ledgers. Focused SFU reset drops no reads; unrelated reset cases in the full sequence account for 32 drops. | Same Run ID and seeds | Same report and per-seed logs |
+| REQ-PC-007 | PARTIAL | Same test; real SFU requester through top-level `ai_accel_memory_fabric` and response-owner checks | One production SFU path is exercised. The test does not create simultaneous requester contention or a pending fabric response at this reset point. | Same Run ID and seeds | Same report and per-seed logs |
+
+Checker-sensitivity mutation campaign passes 28/28, and Top Smoke plus 20-case seeded Top regression pass on the published SHA. The three-seed mixed URG score is 60.42% (line/condition/FSM/branch/assert/group `69.51/63.60/44.49/59.80/72.00/53.15%`); it is not functional closure. These results do not change the 38-row disposition: 24 `PASS-SCOPED` / 14 `PARTIAL`, `CL-DV-v1.0` **HOLD**. See the [R150 report](COMPUTE_CLUSTER_SFU_RESET_ACCEPTED_PREFIX_R150_2026-10-31.md).
+
 ## R149 CNM Protection with Matrix accepted-prefix reset — 2026-10-31
 
 | Requirement | Disposition | Test ID / checker | Coverage / observed result | Run ID / seeds | Evidence path |
