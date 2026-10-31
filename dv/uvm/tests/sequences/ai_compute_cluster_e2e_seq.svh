@@ -109,6 +109,17 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     virtual ai_compute_cluster_if compute_vif;
     bit [31:0] rng_state;
     string mutation_kind;
+    int unsigned shared_reset_coverage_phase;
+
+    covergroup matrix_cnm_shared_reset_cg;
+        option.per_instance = 1;
+        cp_reset_recovery_phase: coverpoint shared_reset_coverage_phase {
+            bins parity_with_cnm_reads_pending = {1};
+            bins reset_quiet_window = {2};
+            bins release_quiet_window = {3};
+            bins full_golden_recovery = {4};
+        }
+    endgroup
 
     function automatic int signed next_small_signed();
         int unsigned value;
@@ -121,6 +132,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
     function new(string name = "ai_compute_cluster_e2e_seq");
         super.new(name);
+        shared_reset_coverage_phase = 0;
+        matrix_cnm_shared_reset_cg = new();
     endfunction
 
     task automatic axil_write(input bit [31:0] addr, input bit [31:0] data);
@@ -723,6 +736,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                                                    returned_cnm_reads;
                                 matrix_response_seen = 1'b1;
                                 cnm_response_seen = (returned_cnm_reads != 0);
+                                shared_reset_coverage_phase = 1;
+                                matrix_cnm_shared_reset_cg.sample();
                                 if (accepted_cnm_writes >= 16)
                                     `uvm_fatal("CLUSTER_PARITY_RESET_OWNER",
                                         "CNM completed before the shared-reset point")
@@ -747,6 +762,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                                     `uvm_fatal("CLUSTER_PARITY_RESET_OWNER", $sformatf(
                                         "compute engines remained active in reset: busy=%07b",
                                         compute_vif.engine_busy))
+                                shared_reset_coverage_phase = 2;
+                                matrix_cnm_shared_reset_cg.sample();
                                 #1ns;
                                 reset_value = 1'b1;
                                 if (!uvm_hdl_deposit("tb_ai_accel_uvm.aresetn",
@@ -762,6 +779,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                                         `uvm_fatal("CLUSTER_PARITY_RESET_OWNER",
                                             "stale owner response escaped the reset epoch")
                                 end
+                                shared_reset_coverage_phase = 3;
+                                matrix_cnm_shared_reset_cg.sample();
                             end else begin
                                 axil_write(REG_ABORT, 32'd1);
                             end
@@ -920,6 +939,15 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                                 matrix_golden[row_idx][word_idx],
                                 $sformatf("shared reset recovery Matrix Golden[%0d,%0d]",
                                           row_idx, word_idx));
+            shared_reset_coverage_phase = 4;
+            matrix_cnm_shared_reset_cg.sample();
+            if (matrix_cnm_shared_reset_cg.get_coverage() < 100.0)
+                `uvm_fatal("CLUSTER_PARITY_RESET_OWNER", $sformatf(
+                    "named shared-reset functional bins are incomplete: coverage=%0.1f%%",
+                    matrix_cnm_shared_reset_cg.get_coverage()))
+            `uvm_info("CLUSTER_PARITY_RESET_OWNER_COVERAGE_PASS", $sformatf(
+                "shared Matrix/CNM parity reset phase bins=4/4 coverage=%0.1f%%",
+                matrix_cnm_shared_reset_cg.get_coverage()), UVM_LOW)
         end else begin
             expect_spad(cpl_base, 32'h0000_07e0,
                         "concurrent parity Matrix task ID/order");
