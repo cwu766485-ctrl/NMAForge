@@ -1,6 +1,6 @@
 # Compute Cluster Open-Issue List — 2026-10-31
 
-This list governs the bounded CL-RC1/CL-RC2 review candidate. The latest published test-gate content is R129 1ba30c7f85d5b07c13eddb7aef3e6929f7d9624d (tree 4a52f377cf93d008e8effd1310b94478713e82fc), executed at clean local SHA 8b511e474727fe13439f99674d1a30b46005f274. R129 adds a real Scalar GEMV accepted-write Abort prefix test; product RTL/SPEC remain at R99 baseline c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413, SPEC v1.8 unchanged. The 38-row disposition remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains HOLD.
+This list governs the bounded CL-RC1/CL-RC2 review candidate. The latest published test-gate content is R129 1ba30c7f85d5b07c13eddb7aef3e6929f7d9624d (tree 4a52f377cf93d008e8effd1310b94478713e82fc), executed at clean local SHA 8b511e474727fe13439f99674d1a30b46005f274. R129 adds a real Scalar GEMV accepted-write Abort prefix test; product RTL/SPEC remain at R99 baseline c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413, SPEC v1.8 unchanged. R130 clean-replays the selected in-repository `ai_accel_memory_fabric` reset and three banked owner/reset targets at current published tree `3d905d0afe2bd934936a389576ee35dbd70a3f51`. The 38-row disposition remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains HOLD.
 
 ## Recently closed RTL defect
 
@@ -212,3 +212,7 @@ At exact clean-worktree test SHA dfbebbd8c8ee68458c4261f74f041e816b6b0284 (publi
 ## R129 Scalar GEMV accepted-write Abort prefix — 2026-10-31
 
 Three fixed-SHA seeds pass real CMDQ Scalar GEMV M=16/K=64 Abort after the first accepted output write. The committed row matches an independent signed Golden; 15 suffix sentinels remain untouched; 130/130 reads drain; completion is ERR_ABORT 0x32; and no output write occurs after Abort sampling. The scoreboard checks 42,107 words with zero mismatch/unknown/stale/orphan, UVM severity is 0/0/0, and focused cluster_cg is 100%. This narrows CL-COV-006 only; legal cross-product and other phase/shape gaps remain. See R129 evidence (COMPUTE_CLUSTER_SCALAR_GEMV_ABORT_PREFIX_R129_2026-10-31.md).
+
+## R130 selected `ai_accel_memory_fabric` exact-candidate replay — 2026-10-31
+
+At clean commit `e01ca2d8018c201552951179bc46729d1d6b8c98` (tree `3d905d0afe2bd934936a389576ee35dbd70a3f51`), identical to the published review-branch tree, four dedicated fabric/reset/owner regressions pass for seeds `20261025/20261026/20261027`. They cover pending DMA/CNM reset and recovery, banked response reset flush, simultaneous Core/Banked requests and ownership, and reset with both response classes active. All declared functional groups are 100%; owner assertions have real successes and zero failures/incomplete; UVM severity is `0/0/0`. The selected repository fabric item remains closed. These are fabric-level requesters and do not close production-engine banked backpressure or the full fault × phase × reset matrix; `REQ-CL-018/PC-007`, `CL-COV-002/006`, the 24/14 disposition, and overall HOLD remain unchanged. See [R130 report](COMPUTE_CLUSTER_MEMORY_FABRIC_CLEAN_REPLAY_R130_2026-10-31.md).
