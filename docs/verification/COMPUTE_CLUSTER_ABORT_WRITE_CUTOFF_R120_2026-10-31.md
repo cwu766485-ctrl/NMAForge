@@ -39,6 +39,42 @@ In each run, the early-cutoff sweep sees a one-write visible prefix for SFU and 
 
 The full-memory scoreboard reports `33,510` checked words and zero mismatch, unknown, stale-epoch, or orphan-response errors per seed. Its summary is identical across these deterministic seeds: `writes=33111`, `line_wstrb={full:1030,partial:0,zero:0}`. These counts are testbench workload evidence, not global code coverage.
 
+## Published-SHA clean-worktree replay
+
+The published commit was fetched and run from an empty detached worktree before recording this replay:
+
+| Item | Value |
+|---|---|
+| Published commit | `894559c0c373dcef667074d304f94164f8514fee` |
+| Source tree | `4a3fccfd38ca4f46e0ef325368a7ee8b02b107be` |
+| Worktree | `/tmp/nmaforge_r120_clean_894559c` (clean at invocation) |
+| Run ID | `CL-ENGINE-ABORT-CUTOFF-R120-CLEAN-894559C` |
+| Result | Three seeds completed; each contains the required UVM pass marker and zero warning/error/fatal counts; URG merged all three coverage databases |
+
+Exact command:
+
+```sh
+mkdir -p /tmp/nmaforge_r120_tmp2_894559c
+TMPDIR=/tmp/nmaforge_r120_tmp2_894559c make \
+  -C /tmp/nmaforge_r120_clean_894559c/dv/uvm/sim \
+  uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027' \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_r120_clean_replay2_894559c \
+  VCS_HOME=/opt/Synopsys/vcs/V-2023.12-SP1
+```
+
+The isolated `TMPDIR` avoids VCS temporary-directory creation failures seen on the first clean replay attempt. VCS compilation completed with Verdi KDB reporting zero errors and warnings. Each seed repeated the seven-engine post-sampled-Abort suppression check (`7/7`, zero post-Abort output writes), six dedicated accepted-prefix Golden checks, 40/56 zero-prefix sentinel words, and the memory scoreboard (`33,510` checked words, zero mismatch/unknown/stale-epoch errors). The `urg_merged.log` records successful coverage database merge. The run directory is outside the repository at `/tmp/nmaforge_r120_clean_replay2_894559c`.
+
+| Evidence | SHA-256 |
+|---|---|
+| `compile.log` | `f83680fd1e25c62d66507dd09708de129570ced969c78a333a0e1798b1fe571e` |
+| `seed_20261025/run.log` | `045c7d3042457567f1adcb9a54a31e4147250d8087786a934d6a1434aa2b0bbb` |
+| `seed_20261026/run.log` | `c095aa553c074a43ccd9940f1117f88fb612fb27345c77dc116e6927f2a64462` |
+| `seed_20261027/run.log` | `384a07bf00dd944086334adcdf2b5e27f7fe211cc0f733bd162b0aa18f17703d` |
+| `urg_merged.log` | `ab2941ac1506ce4fc8e784c6e958a731a198d04f0b4d0a4d3bbd605ad5cbf1b6` |
+
+This replay verifies the published R120 tree. It does not close additional RTM requirements or change the sign-off disposition.
+
 The original experimental checker treated any output handshake after the AXI-Lite Abort write began as illegal. The observed SFU prefix showed that this boundary did not match SPEC v1.4: an output accepted on the same sampling edge that the engine sees Abort belongs to the committed prefix. The revised checker starts the no-new-write window after that edge. Existing per-engine prefix Golden checks remain mandatory; this change does not relax product behavior or infer that untested prefixes are correct.
 
 ## Limits
