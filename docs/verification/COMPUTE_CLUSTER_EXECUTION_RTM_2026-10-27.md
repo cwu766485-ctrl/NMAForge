@@ -584,6 +584,15 @@ This adds a bounded point to `REQ-CL-017/019/027` and `REQ-PC-006/007`, all stil
 | REQ-PC-006 | PARTIAL | Same test; accepted SPAD request, response-route monitors and scoreboard pending ledger | Three seeds: 45,617 memory words checked, zero mismatch/unknown/stale/orphan, 26 reset-dropped responses, pending queues empty. Response-consumed reset for all engines and broader simultaneous owner conflicts remain open. | Same Run ID and seeds | Same report and per-seed logs |
 | REQ-PC-007 | PARTIAL | Same test; real production-engine SPAD client acceptance and post-reset recovery | All seven real engine request paths accept a faulted read and recover after reset; source-B also covered where defined. Pairwise production-engine contention under fault/backpressure is not covered by these sequential cases. | Same Run ID and seeds | Same report and per-seed logs |
 
+## R146 Matrix/CNM shared reset after parity response — 2026-10-31
+
+| Requirement | Disposition | Test ID / checker | Coverage / observed result | Run ID / seeds | Evidence path |
+|---|---|---|---|---|---|
+| REQ-CL-018 | PARTIAL | `TC-CL-R146-MATRIX-PARITY-CNM-RESET`; shared reset-epoch quiet-window, pending-response, and stale-response checker | Three seeds assert reset after Matrix consumes `ERR_PARITY=0x52` with 8 CNM registered reads still pending; no old-epoch response escapes during reset/release. Broader engine × fault × phase × reset combinations remain open. | `R146-UVM-MATRIX-CNM-PARITY-RESET-3S-20261031`; `20261025/26/27` | [R146 report](COMPUTE_CLUSTER_MATRIX_CNM_PARITY_SHARED_RESET_R146_2026-10-31.md); `/tmp/nmaforge_r146_regress/seed_*/run.log` |
+| REQ-CL-019 | PARTIAL | Same test; CPLQ tail, completion sentinels, task-ID and ordered-recovery checker | Old-epoch tail and completion image remain unchanged; new-epoch CNM/Matrix task completions retire in order with Golden results. Other error/priority/backpressure cases remain open. | Same Run ID and seeds | Same report and per-seed logs |
+| REQ-PC-006 | PARTIAL | Same test; `CLUSTER_SCOREBOARD`, response-route monitor, and pending ledger | Each seed checks 51,444 memory words, zero mismatch/unknown/stale/orphan, and empty pending ledgers; the shared reset drops 8 accepted CNM reads. Other owner/fault/backpressure combinations remain open. | Same Run ID and seeds | Same report and per-seed logs |
+| REQ-PC-007 | PARTIAL | Same test; real Matrix/CNM clients, shared-bank contention monitor, independent Golden image checker | Real Matrix parity and CNM traffic overlap through shared SPAD and recover on all three seeds. Other production requester pairs and memory response profiles remain open. | Same Run ID and seeds | Same report and per-seed logs |
+
 
 ## R145 seven-engine parity/reset response-phase cross — 2026-10-31
 
