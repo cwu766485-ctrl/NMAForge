@@ -1860,6 +1860,219 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
+
+    task automatic run_scalar_cmdq_numeric_boundary_test(input int unsigned seed);
+        localparam bit [31:0] NUM_CMDQ = 32'h0005_b000;
+        localparam bit [31:0] NUM_CPLQ = 32'h0005_b400;
+        localparam bit [31:0] NUM_A = 32'h0007_2000;
+        localparam bit [31:0] NUM_B = 32'h0007_2100;
+        localparam bit [31:0] NUM_Y = 32'h0007_2200;
+        localparam bit [31:0] NUM_BIAS = 32'h0007_2300;
+        bit [31:0] a_data[0:6];
+        bit [31:0] b_data[0:6];
+        bit [31:0] bias_data[0:6];
+        bit bias_enable[0:6];
+        bit [4:0] shifts[0:6];
+        bit [1:0] activations[0:6];
+        bit [31:0] expected[0:6];
+        bit [7:0] observed_op[0:6];
+        bit [31:0] observed_src0[0:6];
+        bit [31:0] observed_src1[0:6];
+        bit [31:0] observed_dst[0:6];
+        bit [15:0] observed_m[0:6];
+        bit [15:0] observed_n[0:6];
+        bit [15:0] observed_k[0:6];
+        bit [4:0] observed_shift[0:6];
+        bit [1:0] observed_activation[0:6];
+        bit [31:0] observed_bias_base[0:6];
+        bit observed_bias_enable[0:6];
+        bit [6:0] case_mask;
+        longint signed accum;
+        longint signed shifted_sum;
+        int signed a_value;
+        int signed b_value;
+        int unsigned lane;
+        int unsigned idx;
+        int unsigned launch_before;
+        int unsigned engine_launch_before;
+        int unsigned busy_launch_before;
+        int unsigned launch_seen;
+        int unsigned poll;
+        bit monitor_complete;
+
+        // Seven legal 1xK1 descriptors cover bias sign extension and saturation,
+        // arithmetic shift 31, and all assigned activation encodings.
+        a_data[0] = 32'h7f7f_7f7f; b_data[0] = 32'h7f7f_7f7f;
+        a_data[1] = 32'h8080_8080; b_data[1] = 32'h7f7f_7f7f;
+        a_data[2] = 32'h7f7f_7f7f; b_data[2] = 32'h7f7f_7f7f;
+        a_data[3] = 32'h7f7f_7f7f; b_data[3] = 32'h7f7f_7f7f;
+        a_data[4] = 32'h8080_8080; b_data[4] = 32'h7f7f_7f7f;
+        a_data[5] = 32'h7f7f_7f7f; b_data[5] = 32'h7f7f_7f7f;
+        a_data[6] = 32'h8080_8080; b_data[6] = 32'h7f7f_7f7f;
+
+        bias_data[0] = 32'h7fff_ffff; bias_enable[0] = 1'b1;
+        bias_data[1] = 32'h8000_0000; bias_enable[1] = 1'b1;
+        bias_data[2] = 32'h8000_0000; bias_enable[2] = 1'b1;
+        bias_data[3] = 32'd0;         bias_enable[3] = 1'b0;
+        bias_data[4] = 32'd0;         bias_enable[4] = 1'b0;
+        bias_data[5] = 32'd0;         bias_enable[5] = 1'b0;
+        bias_data[6] = 32'd0;         bias_enable[6] = 1'b0;
+
+        shifts[0] = 5'd0;  activations[0] = 2'd0;
+        shifts[1] = 5'd0;  activations[1] = 2'd0;
+        shifts[2] = 5'd31; activations[2] = 2'd0;
+        shifts[3] = 5'd0;  activations[3] = 2'd1;
+        shifts[4] = 5'd0;  activations[4] = 2'd1;
+        shifts[5] = 5'd0;  activations[5] = 2'd2;
+        shifts[6] = 5'd0;  activations[6] = 2'd2;
+
+        for (idx = 0; idx < 7; idx++) begin
+            spad_write(NUM_A + (idx << 2), a_data[idx]);
+            spad_write(NUM_B + (idx << 2), b_data[idx]);
+            spad_write(NUM_BIAS + (idx << 2), bias_data[idx]);
+            spad_write(NUM_Y + (idx << 2), 32'hbad0_b200 | idx);
+            write_cluster_desc(NUM_CMDQ + (idx << 6), 8'h11,
+                               16'h06a0 + idx,
+                               NUM_A + (idx << 2), NUM_B + (idx << 2),
+                               NUM_Y + (idx << 2), 16'd1, 16'd0, 16'd1,
+                               32'd0, 32'd0, 32'd0, 32'd0, 8'd3);
+            spad_write(NUM_CMDQ + (idx << 6) + 32'h0c, NUM_BIAS + (idx << 2));
+            spad_write(NUM_CMDQ + (idx << 6) + 32'h1c,
+                       {31'd0, bias_enable[idx]});
+            spad_write(NUM_CMDQ + (idx << 6) + 32'h24,
+                       {25'd0, activations[idx], shifts[idx]});
+            observed_op[idx] = '0;
+            observed_src0[idx] = '0;
+            observed_src1[idx] = '0;
+            observed_dst[idx] = '0;
+            observed_m[idx] = '0;
+            observed_n[idx] = '0;
+            observed_k[idx] = '0;
+            observed_shift[idx] = '0;
+            observed_activation[idx] = '0;
+            observed_bias_base[idx] = '0;
+            observed_bias_enable[idx] = 1'b0;
+
+            accum = 64'sd0;
+            if (bias_enable[idx])
+                accum = $signed(bias_data[idx]);
+            for (lane = 0; lane < 4; lane++) begin
+                a_value = $signed(a_data[idx][lane*8 +: 8]);
+                b_value = $signed(b_data[idx][lane*8 +: 8]);
+                accum += a_value * b_value;
+            end
+            shifted_sum = accum >>> shifts[idx];
+            if (activations[idx] == 2'd1 && shifted_sum < 0)
+                shifted_sum = 64'sd0;
+            else if (activations[idx] == 2'd2) begin
+                if (shifted_sum < 0)
+                    shifted_sum = 64'sd0;
+                else if (shifted_sum > 64'sd6)
+                    shifted_sum = 64'sd6;
+            end
+            if (shifted_sum > 64'sd2147483647)
+                expected[idx] = 32'h7fff_ffff;
+            else if (shifted_sum < -64'sd2147483648)
+                expected[idx] = 32'h8000_0000;
+            else
+                expected[idx] = shifted_sum[31:0];
+        end
+
+        launch_before = compute_vif.launch_sample_count;
+        engine_launch_before = compute_vif.engine_launch_count[0];
+        busy_launch_before = compute_vif.same_engine_launch_while_busy;
+        launch_seen = 0;
+        case_mask = '0;
+        monitor_complete = 1'b0;
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, NUM_CMDQ);
+        axil_write(REG_CMDQ_SIZE, 32'd8);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd7);
+        axil_write(REG_CPLQ_BASE, NUM_CPLQ);
+        axil_write(REG_CPLQ_SIZE, 32'd8);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+
+        fork
+            begin : scalar_numeric_launch_monitor
+                for (poll = 0; poll < 50000 && launch_seen < 7; poll++) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.launch_valid) begin
+                        if (launch_seen >= 7)
+                            `uvm_fatal("CLUSTER_SCALAR_NUMERIC", "unexpected extra Scalar launch")
+                        observed_op[launch_seen] = compute_vif.launch_op;
+                        observed_src0[launch_seen] = compute_vif.launch_src0;
+                        observed_src1[launch_seen] = compute_vif.launch_src1;
+                        observed_dst[launch_seen] = compute_vif.launch_dst;
+                        observed_m[launch_seen] = compute_vif.launch_m;
+                        observed_n[launch_seen] = compute_vif.launch_n;
+                        observed_k[launch_seen] = compute_vif.launch_k;
+                        observed_shift[launch_seen] = compute_vif.launch_shift;
+                        observed_activation[launch_seen] = compute_vif.launch_activation;
+                        observed_bias_base[launch_seen] = compute_vif.launch_bias_base;
+                        observed_bias_enable[launch_seen] = compute_vif.launch_bias_enable;
+                        launch_seen++;
+                    end
+                end
+                if (launch_seen != 7)
+                    `uvm_fatal("CLUSTER_SCALAR_NUMERIC", $sformatf(
+                        "real CMDQ numeric launch monitor timed out after %0d/7 launches",
+                        launch_seen))
+                monitor_complete = 1'b1;
+            end
+            begin : scalar_numeric_submit
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(32'd7);
+            end
+        join
+        wait_spad_idle();
+
+        if (!monitor_complete ||
+            compute_vif.launch_sample_count - launch_before != 7 ||
+            compute_vif.engine_launch_count[0] - engine_launch_before != 7 ||
+            compute_vif.same_engine_launch_while_busy != busy_launch_before)
+            `uvm_fatal("CLUSTER_SCALAR_NUMERIC", $sformatf(
+                "launch accounting mismatch: launches=%0d engine0=%0d busy_relaunch_delta=%0d",
+                compute_vif.launch_sample_count - launch_before,
+                compute_vif.engine_launch_count[0] - engine_launch_before,
+                compute_vif.same_engine_launch_while_busy - busy_launch_before))
+
+        for (idx = 0; idx < 7; idx++) begin
+            if (observed_op[idx] !== 8'h11 ||
+                observed_src0[idx] !== (NUM_A + (idx << 2)) ||
+                observed_src1[idx] !== (NUM_B + (idx << 2)) ||
+                observed_dst[idx] !== (NUM_Y + (idx << 2)) ||
+                observed_m[idx] !== 16'd1 || observed_n[idx] !== 16'd0 ||
+                observed_k[idx] !== 16'd1 ||
+                observed_shift[idx] !== shifts[idx] ||
+                observed_activation[idx] !== activations[idx] ||
+                observed_bias_base[idx] !== (NUM_BIAS + (idx << 2)) ||
+                observed_bias_enable[idx] !== bias_enable[idx])
+                `uvm_fatal("CLUSTER_SCALAR_NUMERIC", $sformatf(
+                    "launch %0d descriptor mismatch op=%02h shape=%0dx%0dx%0d shift=%0d activation=%0d bias=%08h/%0b",
+                    idx, observed_op[idx], observed_m[idx], observed_n[idx],
+                    observed_k[idx], observed_shift[idx], observed_activation[idx],
+                    observed_bias_base[idx], observed_bias_enable[idx]))
+            expect_spad(NUM_Y + (idx << 2), expected[idx],
+                        $sformatf("CMDQ Scalar numeric boundary case%0d", idx));
+            expect_completion(NUM_CPLQ + (idx << 4), 16'h06a0 + idx,
+                              expected[idx], 32'd1,
+                              $sformatf("CMDQ Scalar numeric completion case%0d", idx));
+            case_mask[idx] = 1'b1;
+        end
+
+        if (case_mask !== 7'h7f)
+            `uvm_fatal("CLUSTER_SCALAR_NUMERIC", $sformatf(
+                "numeric case coverage incomplete mask=%02h", case_mask))
+        `uvm_info("CLUSTER_SCALAR_CMDQ_NUMERIC_BOUNDARY_PASS", $sformatf(
+            "real CMDQ 1xK1 Scalar bias min/max, shift31, Identity/ReLU/ReLU6 and signed INT32 saturation; case_mask=%02h outputs=7/7 completions=7/7 seed=%0d",
+            case_mask, seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd7);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
     task automatic run_launch_snapshot_and_unused_fields_test();
         int unsigned launch_before;
 
@@ -4830,6 +5043,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_dma_store_response_test();
         run_banked_vdot_cmdq_dispatch_test(seed);
         run_scalar_gemv_gemm_cmdq_dispatch_test(seed);
+        run_scalar_cmdq_numeric_boundary_test(seed);
         run_cnm_inflight_parameter_latch_test();
         run_launch_snapshot_and_unused_fields_test();
         run_inflight_parameter_latch_test();
