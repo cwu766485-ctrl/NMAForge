@@ -6,8 +6,8 @@
 - **Prior reviewed product baseline:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6`
 - **Follow-up evidence branch:** `work/compute-cluster-kv-overflow-20261030`
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
-- **Latest clean verification replay SHA:** 8b511e474727fe13439f99674d1a30b46005f274 (R129 three-seed clean-worktree real-top UVM; published same tree at 1ba30c7f85d5b07c13eddb7aef3e6929f7d9624d)
-**Latest verification/test candidate:** R129 test SHA 8b511e474727fe13439f99674d1a30b46005f274; published same-tree content 1ba30c7f85d5b07c13eddb7aef3e6929f7d9624d (tree 4a52f377cf93d008e8effd1310b94478713e82fc). Earlier formal evidence remains separately tied to its exact SHA.
+- **Latest clean verification replay SHA:** `b86bd5df7256df6a8d641213a5601e1237254124` (R139 three-seed clean-worktree real-top UVM; tree `a1f77cc77b63795b5abfcf35410588add690f788`).
+**Latest verification/test candidate:** R139 test SHA `b86bd5df7256df6a8d641213a5601e1237254124`; exact clean replay at that source tree. It is test-only; product RTL/SPEC remain tied to their separately reviewed baselines. Earlier formal evidence retains its own exact SHA.
 **Decision:** bounded CL-RC1/CL-RC2 review candidate; **CL-DV-v1.0 is not signed**.
 
 ## Executive disposition
@@ -17,6 +17,8 @@ The reviewed product baseline has substantial reproducible evidence for Matrix/S
 R110 adds a non-vacuous response-owner assertion point through the production `ai_accel_memory_fabric`: 3/3 seed checks pass and URG records 426 attempts, 3 real successes, zero failures/incomplete. The requester is testbench-driven and does not close production Matrix integration or its fault/backpressure crosses; the disposition remains 24 PASS-SCOPED / 14 PARTIAL and `CL-DV-v1.0` remains HOLD. See the [R110 evidence](COMPUTE_CLUSTER_BANKED_OWNER_SVA_R110_2026-10-30.md).
 
 R111 replays the Matrix FSM formal gate at the exact R110 code/test SHA: five non-vacuous assertions proven and both reachability covers hit. This corrects the older Stage A note that those guard paths lacked formal evidence; the raw enabled-profile FSM count remains 49/53 and no full-FSM closure is claimed. See the [R111 report](COMPUTE_CLUSTER_MATRIX_FSM_R111_FORMAL_2026-10-30.md).
+
+R139 adds a three-seed real-top dual-Protection test with a full CPLQ hold and ordered software release across two tail-wrap points. Each run checks 44,611 memory words with zero mismatch/unknown/stale/orphan, UVM severity `0/0/0`, 128 Matrix and 64 CNM tagged responses, and zero response-route mismatch. `REQ-PC-004` keeps its existing PASS-SCOPED status; `REQ-CL-017/019/027` and `REQ-PC-006/007` remain PARTIAL. The RTM remains 24 PASS-SCOPED / 14 PARTIAL and `CL-DV-v1.0` remains HOLD. Top Smoke and checker-sensitivity mutations were NOT_RUN at this UVM-only SHA. See [R139 evidence](COMPUTE_CLUSTER_DUAL_PROTECTION_CPLQ_R139_2026-10-31.md).
 
 The complete requirement-by-requirement execution table lives in the [Compute Cluster Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md). It records each requirement's disposition, testcase/checker or oracle, covered behavior, Run ID, seed, and evidence path. The RTM run/evidence index records source-SHA relationship, tool version, and result; R40–R45 replay the selected candidate SHA from a clean worktree. The [9d9e0f replay manifest](COMPUTE_CLUSTER_FINAL_9D9E0F_MANIFEST_2026-10-28.md) is retained as historical evidence for that earlier candidate. Runs without an exact source identity remain historical/source-equivalent and are not silently upgraded to exact-candidate replay.
 
