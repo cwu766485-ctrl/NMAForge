@@ -10,10 +10,10 @@
 |---|---|
 | Product RTL/SPEC candidate | `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413` (R99 CNM Protection response alignment; SPEC v1.8 unchanged) |
 | Latest real-top descriptor-latch SHA | `1abf84864a5b6f0f1d3ef5da72fe67b41df3b367` (R123 CNM descriptor-latch test; Matrix R74 and SFU R77 remain separately evidenced) |
-| Latest UVM/test content SHA | d9aae22f8a885a4075258a9ca8c27dbaa79bb80d (published R127 test content; tree e1334264bb8962ed2d508affb0d273d89b6650ed) |
-| Latest full Compute Cluster replay SHA | 0b68ad884fa35f4f9b858953ffa5f3513fc124b4 (R127 three-seed real-top UVM; published same tree at d9aae22f8a885a4075258a9ca8c27dbaa79bb80d) |
+| Latest UVM/test content SHA | 0e38b482e13eefa759441ac8ed1ab3d4d6246b37 (published R128 test content; tree a5adb3db01aee36f8363eb63a67194d5078d2398) |
+| Latest full Compute Cluster replay SHA | dfbebbd8c8ee68458c4261f74f041e816b6b0284 (R128 three-seed clean-worktree real-top UVM; published same tree at 0e38b482e13eefa759441ac8ed1ab3d4d6246b37) |
 | Latest selected-fabric focused replay | `5ea67bd125bb1ed20af8b86369e2cf8112f25131` (R125 clean checkout; RTL/DV/SPEC identical to R124) |
-| Published report package base | d9aae22f8a885a4075258a9ca8c27dbaa79bb80d (R127 code/test content; R127 evidence documentation is published in the following docs commit) |
+| Published report package base | 0e38b482e13eefa759441ac8ed1ab3d4d6246b37 (R128 code/test content; evidence documentation is published in the following docs commit) |
 | Prior reviewed product baseline | `6848a414eaeaa05cf9e1411cf55d9d27333208a6` |
 | Latest published closeout snapshot replayed | `480eb443b835f8cbe771682e91ff6d97acae0a99` (R117/R118 clean UVM and functional-testpoint merge; R115 Top Smoke remains at its exact earlier published SHA) |
 | Review branch | `feat/compute-cluster-closeout-6848a41` |
@@ -237,3 +237,8 @@ The default three-seed Compute Cluster UVM target now rejects a seed unless its 
 R127 adds a required real-top CMDQ Scalar dispatch test for GEMV opcode 0x11 followed by GEMM opcode 0x12. The launch monitor checks order, engine, descriptor fields, two accepted launches, and no same-engine launch while busy; both completions and six output words match an independent signed K=2 Golden. Three VCS seeds pass with 41,832 scoreboard words/seed and zero mismatch, unknown, stale-epoch, or orphan response; UVM warning/error/fatal is 0/0/0. The focused declared cluster_cg is 100%, not whole-design closure. Top Smoke passes, with the existing LOOP-REROLL-ENABLED compile warning retained.
 
 This narrows REQ-CL-002/015/020 only; all remain PARTIAL. The RTM remains 24 PASS-SCOPED / 14 PARTIAL and the decision is **HOLD**. URG reports 17/22 assertions with real successes and zero failures/incomplete; three AXI properties remain without real successes in this compute-only profile, two UVM RAL properties have no attempts, and AR/AW stall cover properties remain unhit. See the [R127 evidence report](COMPUTE_CLUSTER_SCALAR_CMDQ_GEMV_GEMM_R127_2026-10-31.md) for exact commands, artifact hashes, and limits.
+
+
+## R128 Scalar CMDQ minimum-shape/numeric boundary regression — 2026-10-31
+
+At clean-worktree SHA dfbebbd8c8ee68458c4261f74f041e816b6b0284, three VCS seeds pass seven real CMDQ Scalar GEMV M=1/K=1 descriptors. They cover INT32_MAX/INT32_MIN bias saturation, signed arithmetic shift 31, and identity, ReLU and ReLU6 outcomes. Every seed checks launch snapshots, 7/7 Golden outputs, 7/7 completions, and 41,961 memory words with zero mismatch/unknown/stale/orphan; UVM severity is 0/0/0 and the declared focused cluster_cg is 100%. Published same-tree test content is 0e38b482e13eefa759441ac8ed1ab3d4d6246b37. This strengthens REQ-CL-002/015/020 without closing them; all remain PARTIAL. The overall disposition is 24 PASS-SCOPED / 14 PARTIAL and **HOLD**. URG residuals and hashes are in the [R128 report](COMPUTE_CLUSTER_SCALAR_CMDQ_NUMERIC_BOUNDARY_R128_2026-10-31.md).
