@@ -100,6 +100,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] C1_FP_Y_LOCAL = 32'h0006_c200;
     localparam bit [31:0] CNM_LATCH_Y_LOCAL = 32'h0004_e300;
     localparam bit [31:0] CNM_LATCH_MUTATED_Y_LOCAL = 32'h0004_e400;
+    localparam bit [31:0] SCALAR_OPCODE_CMDQ = 32'h0005_a000;
+    localparam bit [31:0] SCALAR_OPCODE_CPLQ = 32'h0005_a400;
+    localparam bit [31:0] SCALAR_OPCODE_A_LOCAL = 32'h0007_0000;
+    localparam bit [31:0] SCALAR_OPCODE_B_LOCAL = 32'h0007_0040;
+    localparam bit [31:0] SCALAR_OPCODE_Y_LOCAL = 32'h0007_0080;
 
     virtual ai_compute_cluster_if compute_vif;
     bit [31:0] rng_state;
@@ -1676,6 +1681,183 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             "CMDQ fetch/validate/launch opcode=0x20 engine=CNM one completion and independent 48-byte-product signed Golden passed seed=%0d result=%0d",
             seed, golden_sum), UVM_LOW)
         clear_contract_queues(32'd1);
+    endtask
+
+    task automatic run_scalar_gemv_gemm_cmdq_dispatch_test(input int unsigned seed);
+        bit [31:0] a_words[0:3];
+        bit [31:0] b_words[0:3];
+        bit [31:0] dst_base[0:1];
+        bit [31:0] golden[0:1][0:3];
+        bit [7:0] observed_opcode[0:1];
+        bit [31:0] observed_src0[0:1];
+        bit [31:0] observed_src1[0:1];
+        bit [31:0] observed_dst[0:1];
+        bit [15:0] observed_m[0:1];
+        bit [15:0] observed_n[0:1];
+        bit [15:0] observed_k[0:1];
+        int unsigned launch_before;
+        int unsigned engine_launch_before;
+        int unsigned busy_launch_before;
+        int unsigned launch_seen;
+        int unsigned poll;
+        int unsigned op_idx;
+        int unsigned word_idx;
+        int unsigned lane;
+        int unsigned k_idx;
+        int unsigned row_idx;
+        int unsigned col_idx;
+        int signed a_value;
+        int signed b_value;
+        int signed sum;
+        bit [31:0] packed_a;
+        bit [31:0] packed_b;
+        bit monitor_complete;
+
+        dst_base[0] = SCALAR_OPCODE_Y_LOCAL;
+        dst_base[1] = SCALAR_OPCODE_Y_LOCAL + 32'h20;
+        for (word_idx = 0; word_idx < 4; word_idx++) begin
+            packed_a = '0;
+            packed_b = '0;
+            for (lane = 0; lane < 4; lane++) begin
+                a_value = ((int'(seed % 13) + int'(word_idx * 5) + int'(lane * 3)) % 15) - 7;
+                b_value = ((int'(seed % 11) + int'(word_idx * 7) + int'(lane * 2)) % 13) - 6;
+                packed_a[lane*8 +: 8] = a_value[7:0];
+                packed_b[lane*8 +: 8] = b_value[7:0];
+            end
+            a_words[word_idx] = packed_a;
+            b_words[word_idx] = packed_b;
+            spad_write(SCALAR_OPCODE_A_LOCAL + (word_idx << 2), packed_a);
+            spad_write(SCALAR_OPCODE_B_LOCAL + (word_idx << 2), packed_b);
+        end
+
+        // Build independent signed-byte Goldens for 2xK GEMV and 2x2xK GEMM.
+        // The GEMV input vector is reused for each row; GEMM advances A by row
+        // and B by output column. The same K=2 vectors cover multiple packed
+        // words and mixed positive/negative lane products.
+        for (row_idx = 0; row_idx < 2; row_idx++) begin
+            sum = 0;
+            for (k_idx = 0; k_idx < 2; k_idx++) begin
+                for (lane = 0; lane < 4; lane++) begin
+                    a_value = $signed(a_words[k_idx][lane*8 +: 8]);
+                    b_value = $signed(b_words[row_idx*2 + k_idx][lane*8 +: 8]);
+                    sum += a_value * b_value;
+                end
+            end
+            golden[0][row_idx] = sum;
+            for (col_idx = 0; col_idx < 2; col_idx++) begin
+                sum = 0;
+                for (k_idx = 0; k_idx < 2; k_idx++) begin
+                    for (lane = 0; lane < 4; lane++) begin
+                        a_value = $signed(a_words[row_idx*2 + k_idx][lane*8 +: 8]);
+                        b_value = $signed(b_words[col_idx*2 + k_idx][lane*8 +: 8]);
+                        sum += a_value * b_value;
+                    end
+                end
+                golden[1][row_idx*2 + col_idx] = sum;
+            end
+        end
+
+        for (op_idx = 0; op_idx < 2; op_idx++) begin
+            for (word_idx = 0; word_idx < 4; word_idx++)
+                spad_write(dst_base[op_idx] + (word_idx << 2),
+                           32'hbad0_a100 | (op_idx << 4) | word_idx);
+            write_cluster_desc(SCALAR_OPCODE_CMDQ + (op_idx << 6),
+                               op_idx == 0 ? 8'h11 : 8'h12,
+                               16'h0690 + op_idx,
+                               SCALAR_OPCODE_A_LOCAL, SCALAR_OPCODE_B_LOCAL,
+                               dst_base[op_idx], 16'd2,
+                               op_idx == 0 ? 16'd0 : 16'd2,
+                               16'd2, 32'd0, 32'd0, 32'd0, 32'd0, 8'd3);
+        end
+        for (op_idx = 0; op_idx < 2; op_idx++) begin
+            observed_opcode[op_idx] = '0;
+            observed_src0[op_idx] = '0;
+            observed_src1[op_idx] = '0;
+            observed_dst[op_idx] = '0;
+            observed_m[op_idx] = '0;
+            observed_n[op_idx] = '0;
+            observed_k[op_idx] = '0;
+        end
+
+        launch_before = compute_vif.launch_sample_count;
+        engine_launch_before = compute_vif.engine_launch_count[0];
+        busy_launch_before = compute_vif.same_engine_launch_while_busy;
+        launch_seen = 0;
+        monitor_complete = 1'b0;
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, SCALAR_OPCODE_CMDQ);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd2);
+        axil_write(REG_CPLQ_BASE, SCALAR_OPCODE_CPLQ);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+
+        fork
+            begin : scalar_opcode_launch_monitor
+                for (poll = 0; poll < 50000 && launch_seen < 2; poll++) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.launch_valid) begin
+                        observed_opcode[launch_seen] = compute_vif.launch_op;
+                        observed_src0[launch_seen] = compute_vif.launch_src0;
+                        observed_src1[launch_seen] = compute_vif.launch_src1;
+                        observed_dst[launch_seen] = compute_vif.launch_dst;
+                        observed_m[launch_seen] = compute_vif.launch_m;
+                        observed_n[launch_seen] = compute_vif.launch_n;
+                        observed_k[launch_seen] = compute_vif.launch_k;
+                        launch_seen++;
+                    end
+                end
+                if (launch_seen != 2)
+                    `uvm_fatal("CLUSTER_SCALAR_OPCODE", $sformatf(
+                        "real CMDQ launch monitor timed out after %0d/2 Scalar launches",
+                        launch_seen))
+                monitor_complete = 1'b1;
+            end
+            begin : scalar_opcode_submit
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(32'd2);
+            end
+        join
+        wait_spad_idle();
+
+        if (!monitor_complete || observed_opcode[0] !== 8'h11 ||
+            observed_opcode[1] !== 8'h12 ||
+            observed_src0[0] !== SCALAR_OPCODE_A_LOCAL ||
+            observed_src1[0] !== SCALAR_OPCODE_B_LOCAL ||
+            observed_dst[0] !== dst_base[0] || observed_m[0] !== 16'd2 ||
+            observed_n[0] !== 16'd0 || observed_k[0] !== 16'd2 ||
+            observed_src0[1] !== SCALAR_OPCODE_A_LOCAL ||
+            observed_src1[1] !== SCALAR_OPCODE_B_LOCAL ||
+            observed_dst[1] !== dst_base[1] || observed_m[1] !== 16'd2 ||
+            observed_n[1] !== 16'd2 || observed_k[1] !== 16'd2 ||
+            compute_vif.launch_sample_count - launch_before != 2 ||
+            compute_vif.engine_launch_count[0] - engine_launch_before != 2 ||
+            compute_vif.same_engine_launch_while_busy != busy_launch_before)
+            `uvm_fatal("CLUSTER_SCALAR_OPCODE", $sformatf(
+                "CMDQ Scalar dispatch mismatch: op={%02h,%02h} launches=%0d engine0=%0d busy_relaunch_delta=%0d",
+                observed_opcode[0], observed_opcode[1],
+                compute_vif.launch_sample_count - launch_before,
+                compute_vif.engine_launch_count[0] - engine_launch_before,
+                compute_vif.same_engine_launch_while_busy - busy_launch_before))
+
+        for (row_idx = 0; row_idx < 2; row_idx++)
+            expect_spad(dst_base[0] + (row_idx << 2), golden[0][row_idx],
+                        $sformatf("CMDQ GEMV row%0d Golden", row_idx));
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            expect_spad(dst_base[1] + (word_idx << 2), golden[1][word_idx],
+                        $sformatf("CMDQ GEMM element%0d Golden", word_idx));
+        expect_completion(SCALAR_OPCODE_CPLQ, 16'h0690,
+                          golden[0][1], 32'd2, "CMDQ Scalar GEMV completion");
+        expect_completion(SCALAR_OPCODE_CPLQ + 32'h10, 16'h0691,
+                          golden[1][3], 32'd4, "CMDQ Scalar GEMM completion");
+        `uvm_info("CLUSTER_SCALAR_OPCODE_DISPATCH_PASS", $sformatf(
+            "real CMDQ launches ordered Scalar GEMV 0x11 then GEMM 0x12 on engine 0; 2/2 completion and 6/6 output words match independent signed K=2 Golden; no relaunch while busy; seed=%0d",
+            seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd2);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
     task automatic run_launch_snapshot_and_unused_fields_test();
@@ -4647,6 +4829,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         run_dma_store_response_test();
         run_banked_vdot_cmdq_dispatch_test(seed);
+        run_scalar_gemv_gemm_cmdq_dispatch_test(seed);
         run_cnm_inflight_parameter_latch_test();
         run_launch_snapshot_and_unused_fields_test();
         run_inflight_parameter_latch_test();
