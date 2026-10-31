@@ -64,6 +64,12 @@ The full owner-by-owner issue log is in [Compute Cluster Open Issues](COMPUTE_CL
 
 R49 closes the defined Matrix Line transfer-contract checker slice. R52 closes the Scalar INT8 common arithmetic contract and directed legal VDOT/GEMV/GEMM edge campaign on three clean-worktree seeds. R51 is superseded/excluded due to reserved activation=3 stimulus. Legacy Conv and broader legal opcode/shape coverage remain PARTIAL under `REQ-CL-020`/`CL-COV-003`; neither closure implies complete subsystem coverage.
 
+## R151 latest evidence addendum — 2026-10-31
+
+R151 clean-replays Scalar GEMV M=16/K=2 reset after 1/16 accepted output on seeds `20261025/26/27`, checking the Golden prefix, sentinel suffix, old-completion suppression, reset/release quiet windows, and complete new-epoch recovery. All six directed bins hit per seed. The exact clean source/test SHA is `cc15b4841d2266f34ef8cacae7abd895890eb07a`, tree `41ed9c384dd2ac70d65b06406ff399aca6c85bc1`; the published same-tree commit is `a49d3ffe7abd025cc54d384dc51eff1e6f583659`. Each full-sequence memory scoreboard checks 63,597 words with zero mismatch/unknown/stale/orphan; UVM severity is 0/0/0.
+
+At this SHA, checker-sensitivity Mutation is 28/28, Top Smoke passes, and the 20-case seeded Top passes. Applicable functional coverage is 100%; mixed URG SCORE is 61.06% and is not sign-off closure. R151 adds no pending-response flush evidence because the new Scalar reset point has zero pending reads. All mapped requirements remain PARTIAL, the disposition remains 24 PASS-SCOPED / 14 PARTIAL, and `CL-DV-v1.0` remains **HOLD**. See [R151 evidence](COMPUTE_CLUSTER_SCALAR_RESET_ACCEPTED_PREFIX_R151_2026-10-31.md).
+
 ## Final review outcome
 
 - **CL-RC1 (bounded Matrix + SPAD review):** ready for review with explicit WSTRB and broader legal fault-cross limitations.

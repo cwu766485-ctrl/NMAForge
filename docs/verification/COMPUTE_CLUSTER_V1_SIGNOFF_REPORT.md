@@ -10,10 +10,10 @@
 |---|---|
 | Product RTL/SPEC candidate | `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413` (R99 CNM Protection response alignment; SPEC v1.8 unchanged) |
 | Latest real-top descriptor-latch SHA | `1abf84864a5b6f0f1d3ef5da72fe67b41df3b367` (R123 CNM descriptor-latch test; Matrix R74 and SFU R77 remain separately evidenced) |
-| Latest UVM/test content SHA | 1ba30c7f85d5b07c13eddb7aef3e6929f7d9624d (published R129 test content; tree 4a52f377cf93d008e8effd1310b94478713e82fc) |
-| Latest full Compute Cluster replay SHA | 8b511e474727fe13439f99674d1a30b46005f274 (R129 three-seed clean-worktree real-top UVM; published same tree at 1ba30c7f85d5b07c13eddb7aef3e6929f7d9624d) |
+| Latest UVM/test content SHA | `cc15b4841d2266f34ef8cacae7abd895890eb07a` (R151 clean test; published same tree `41ed9c384dd2ac70d65b06406ff399aca6c85bc1` at `a49d3ffe7abd025cc54d384dc51eff1e6f583659`) |
+| Latest full Compute Cluster replay SHA | `cc15b4841d2266f34ef8cacae7abd895890eb07a` (R151 three-seed clean-worktree UVM, 28/28 Mutation, Top Smoke and 20-case Top) |
 | Latest selected-fabric focused replay | `5ea67bd125bb1ed20af8b86369e2cf8112f25131` (R125 clean checkout; RTL/DV/SPEC identical to R124) |
-| Published report package base | 1ba30c7f85d5b07c13eddb7aef3e6929f7d9624d (R129 code/test content; evidence documentation is published in the following docs commit) |
+| Published report package base | `a49d3ffe7abd025cc54d384dc51eff1e6f583659` (R151 code/test content; evidence documentation follows in a docs commit) |
 | Prior reviewed product baseline | `6848a414eaeaa05cf9e1411cf55d9d27333208a6` |
 | Latest published closeout snapshot replayed | `480eb443b835f8cbe771682e91ff6d97acae0a99` (R117/R118 clean UVM and functional-testpoint merge; R115 Top Smoke remains at its exact earlier published SHA) |
 | Review branch | `feat/compute-cluster-closeout-6848a41` |
@@ -263,3 +263,9 @@ R137 clean-replays real CMDQ Scalar legacy Conv opcodes `0x13/0x14/0x15` on thre
 ## R138 Matrix/CNM dual Protection owner cross — 2026-10-31
 
 At clean test-source SHA `3ac517c23338bfe07dad5563669a625f61471d33` (tree `46de8701e3ce91d4f6e038878b423d4385c919c8`), three VCS seeds pass a real-top parallel Matrix/CNM Protection case. Both engines are active when CNM's denied output write is sampled; Matrix separately reaches its denied Line output. The CMDQ-ordered completions each report `0x62`, Matrix/CNM responses are `128/64`, shared bank accepts are 47, and both destination sentinel images remain unchanged. Each memory scoreboard checks 43,603 words with zero mismatch/unknown/stale/orphan; UVM severity is `0/0/0`; focused `cluster_cg` is 64/64 (100%). The new directed testpoint is required by the three-seed regression gate. R138 does not claim same-cycle error arbitration, global coverage closure, or a requirement status change: the RTM remains 24 PASS-SCOPED / 14 PARTIAL and CL-DV-v1.0 remains **HOLD**. Exact run command and artifact hashes are in the [R138 report](COMPUTE_CLUSTER_DUAL_PROTECTION_OWNER_CROSS_R138_2026-10-31.md).
+
+## R151 latest evidence addendum — 2026-10-31
+
+At clean local replay SHA `cc15b4841d2266f34ef8cacae7abd895890eb07a` (tree `41ed9c384dd2ac70d65b06406ff399aca6c85bc1`; published same-tree commit `a49d3ffe7abd025cc54d384dc51eff1e6f583659`), a real-top Scalar GEMV M=16/K=2 test resets after a 1/16 accepted Golden output prefix. It checks prefix/suffix image, old-completion suppression, reset/release quiet windows, and full 16/16 new-epoch recovery with a six-bin 6/6 group on each of three seeds. The focused compute functional group is 100%; each full sequence checks 63,597 SPAD words with zero mismatch/unknown/stale/orphan and UVM severity 0/0/0. The new Scalar cut reports zero pending reads at reset and does not add pending-response flush evidence.
+
+The exact clean SHA also passes 28/28 checker-sensitivity mutations, Top Smoke, and the 20-case seeded Top run. Merged mixed URG is 61.06% SCORE (line/condition/FSM/branch/assert/group 69.51/63.63/44.67/59.80/72.00/56.75%) and is not a functional closure metric. `REQ-CL-017/018/019/027` and `REQ-PC-006/007` remain PARTIAL; the 38-row RTM remains 24 PASS-SCOPED / 14 PARTIAL, and the release decision remains **HOLD**. Commands, seeds, evidence paths, and limits are in [R151 evidence](COMPUTE_CLUSTER_SCALAR_RESET_ACCEPTED_PREFIX_R151_2026-10-31.md).
