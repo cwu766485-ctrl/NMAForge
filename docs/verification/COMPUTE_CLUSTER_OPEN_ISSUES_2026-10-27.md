@@ -28,6 +28,10 @@ The former `OPEN-CL-006` and `OPEN-CL-007` specification blockers were closed by
 
 ## Verification closure gaps
 
+### R125 selected `ai_accel_memory_fabric` clean replay — 2026-10-31
+
+The selected production fabric reset test and the banked reset, owner contention, and Core/Banked reset suites pass on the R124 functional RTL/DV/SPEC content for three seeds each. Focused coverage is 100%; response-owner SVAs have non-vacuous successes and zero failures/incomplete. `OPEN-CL-003` remains closed for this in-repository fabric target. The replay does not cover the full production-engine × fault × phase × reset/backpressure space; `REQ-CL-018` and `REQ-PC-007` remain PARTIAL, and overall disposition stays 24 PASS-SCOPED / 14 PARTIAL, HOLD. See [R125 evidence](COMPUTE_CLUSTER_MEMORY_FABRIC_CLEAN_REPLAY_R125_2026-10-31.md).
+
 ### R124 mandatory CNM latch regression gate — 2026-10-31
 
 The regression Make target now fails if any of its three seed logs lacks `[CLUSTER_CNM_PARAMETER_LATCH_PASS]`. Exact executed SHA `752c9e0327c18b8775f3bfac62f4cf5483dc38d7` and published same-tree SHA `863771c1062ff8390dc82c705594c5cef3289e3c` pass three-seed UVM, Top Smoke, and the 28/28 checker-sensitivity campaign. This prevents regression drift for the R123 point; it does not broaden the descriptor-field matrix. `REQ-CL-005` remains PARTIAL and the full disposition remains 24 PASS-SCOPED / 14 PARTIAL, **HOLD**. See [R124 evidence](COMPUTE_CLUSTER_CNM_LATCH_REGRESSION_GATE_R124_2026-10-31.md).
