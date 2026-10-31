@@ -32,6 +32,10 @@ The former `OPEN-CL-006` and `OPEN-CL-007` specification blockers were closed by
 
 ## Verification closure gaps
 
+### R146 Matrix/CNM shared reset after parity response — 2026-10-31
+
+At code/test SHA `1691b0368a57ac28ba247858452f6fa38fbc5b37`, three VCS seeds pass a real-top Matrix parity/CNM pending-read reset cross. Each has 8 accepted CNM responses outstanding at reset, zero stale response/completion/output side effect, then complete Matrix/CNM Golden recovery. UVM is `0/0/0`, focused applicable coverage is 100%, 28/28 named checker-sensitivity mutations pass, and Top Smoke plus 20-case seeded Top pass. This closes only the named reset point. The wider legal requester × fault × phase × backpressure matrix and response/error contracts remain open; `REQ-CL-018/019` and `REQ-PC-006/007` stay PARTIAL. See [R146 evidence](COMPUTE_CLUSTER_MATRIX_CNM_PARITY_SHARED_RESET_R146_2026-10-31.md).
+
 ### R139 dual Protection under full Completion Queue backpressure — 2026-10-31
 
 At exact clean test-source SHA `b86bd5df7256df6a8d641213a5601e1237254124` (tree `a1f77cc77b63795b5abfcf35410588add690f788`), three VCS seeds fill the four-entry CPLQ with valid Scalar/SFU/KV completions, launch concurrent Matrix and CNM Protection errors, advance `CPLQ_HEAD` twice while engines remain active, then verify ordered Matrix/CNM error completions and tail wrap `3→0→1`. Each run checks 44,611 scoreboard words, 128 Matrix and 64 CNM tagged responses, and reports zero mismatch/unknown/stale/orphan, route mismatch, or UVM severity. The focused `cluster_cg` is 100% within its declared scope. On the same SHA, Top Smoke passes and all 28 named checker-sensitivity mutations are caught by their expected checkers. This closes only the full-CPLQ dual-Protection testpoint; it is not a same-cycle error-priority test and does not close the legal Engine × Fault × Phase × Abort/Reset or production requester × memory-backpressure spaces. `REQ-CL-017/019/027` and `REQ-PC-006/007` remain PARTIAL; overall disposition remains 24 PASS-SCOPED / 14 PARTIAL and `CL-DV-v1.0` remains **HOLD**. See [R139 evidence](COMPUTE_CLUSTER_DUAL_PROTECTION_CPLQ_R139_2026-10-31.md).
