@@ -254,3 +254,7 @@ At published closeout tree `a2e3aafe29262b9237c97d7f4d90e4a9f22e118b` (GitHub co
 ## R136 Matrix FSM Formal replay — 2026-10-31
 
 On the exact published R135 source tree, VC Formal proves all five existing Matrix guard/invariant assertions non-vacuously and reaches both selected covers (prefetch wait depth 11, error drain depth 3). No FSM state is forced; the raw default-profile FSM result remains 49/53, and the legal prefetch-off edge is covered separately. This replay supports only the previously scoped transition disposition. `REQ-CL-010` remains PARTIAL; `REQ-CL-022` remains PASS-SCOPED* with its existing qualification and the overall 24 PASS-SCOPED / 14 PARTIAL decision remains **HOLD**. See [R136 evidence](COMPUTE_CLUSTER_MATRIX_FSM_R136_FORMAL_REPLAY_2026-10-31.md).
+
+## R137 Scalar legacy Conv CMDQ evidence — 2026-10-31
+
+R137 clean-replays real CMDQ Scalar legacy Conv opcodes `0x13/0x14/0x15` on three seeds. It checks each descriptor's actual Scalar launch, ordered completion, and all 12 signed packed-INT8 output words per seed against an independent reference; the 42,803-word scoreboard has zero mismatch/unknown/stale/orphan and UVM severity is `0/0/0`. The new named opcode testpoint set is 3/3 per seed. The existing focused `cluster_cg` is 100%; mixed URG remains 56.00%, not functional closure. This strengthens REQ-CL-002/015/020 only; each remains PARTIAL, the total remains 24 PASS-SCOPED / 14 PARTIAL, and `CL-DV-v1.0` remains **HOLD**. See [R137 report](COMPUTE_CLUSTER_SCALAR_LEGACY_CONV_CMDQ_R137_2026-10-31.md).
