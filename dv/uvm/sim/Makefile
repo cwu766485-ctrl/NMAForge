@@ -72,6 +72,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		test "$$(grep -c ' \[CLUSTER_ENGINE_ABORT_CASE_PASS\] engine=' "$$log")" -eq 7 || { echo "ERROR: expected all seven real-engine accepted-read Abort cases in $$log"; exit 1; }; \
 		test "$$(grep -c ' \[CLUSTER_ENGINE_ABORT_CASE_PASS\].*post_abort_output_writes=0' "$$log")" -eq 7 || { echo "ERROR: one or more real engines wrote output after sampling Abort in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_SFU_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: SFU accepted-write Abort prefix check missing in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_SFU_RESET_WRITE_PREFIX_PASS\].*accepted_output_prefix=[1-9][0-9]*/64 old_completion_suppressed=1 reset_dropped_reads=[0-9]+ full_golden_recovery=64/64 focused_bins=6/6' "$$log" || { echo "ERROR: SFU accepted-write Reset prefix, old-epoch suppression, or Golden recovery check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CONV_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: Conv accepted-write Abort prefix check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_KV_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: KV accepted-write Abort prefix check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_MATRIX_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: Matrix accepted-write Abort prefix check missing in $$log"; exit 1; }; \
