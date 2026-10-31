@@ -151,3 +151,8 @@ At executed clean test SHA `750fd0f9d27c8c2b0f0b9ed6f4a82f6cacb7ca45` (tree `c8b
 ## R124 mandatory CNM latch regression gate — 2026-10-31
 
 The default three-seed Compute Cluster regression now requires the R123 CNM descriptor-latch marker in every seed. Exact executed SHA `752c9e0327c18b8775f3bfac62f4cf5483dc38d7` and published test-content SHA `863771c1062ff8390dc82c705594c5cef3289e3c` share tree `9232a92b09f4fed7573ecdc50c786f5680b8281e`. Three-seed UVM, Top Smoke, and 28/28 checker-sensitivity mutations pass. This preserves regression enforcement for one `REQ-CL-005` point; the row remains PARTIAL, the RTM remains 24 PASS-SCOPED / 14 PARTIAL, and `CL-DV-v1.0` remains **HOLD**. See [R124 report](COMPUTE_CLUSTER_CNM_LATCH_REGRESSION_GATE_R124_2026-10-31.md).
+
+
+## R125 selected memory-fabric clean replay — 2026-10-31
+
+On clean replay checkout `5ea67bd125bb1ed20af8b86369e2cf8112f25131`, the selected `ai_accel_memory_fabric` reset, banked reset, Core/Banked contention, and Core/Banked reset tests pass for three seeds each. All applicable focused coverage groups reported by the four targets are 100%; response-owner assertions have real successes and zero failure/incomplete. This confirms `OPEN-CL-003` for the selected repository fabric on current R124 functional source content, but does not close the broader integrated fault/backpressure/reset crosses. `REQ-CL-018` and `REQ-PC-007` remain PARTIAL; 24 PASS-SCOPED / 14 PARTIAL; overall **HOLD**. See [R125 report](COMPUTE_CLUSTER_MEMORY_FABRIC_CLEAN_REPLAY_R125_2026-10-31.md).
