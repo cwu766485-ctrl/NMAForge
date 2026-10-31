@@ -111,6 +111,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     string mutation_kind;
     int unsigned shared_reset_coverage_phase;
     int unsigned shared_reset_prefix_coverage_phase;
+    int unsigned cnm_protection_reset_prefix_coverage_phase;
 
     covergroup matrix_cnm_shared_reset_cg;
         option.per_instance = 1;
@@ -133,6 +134,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         }
     endgroup
 
+    covergroup cnm_protection_matrix_prefix_reset_cg;
+        option.per_instance = 1;
+        cp_cnm_protection_matrix_prefix_phase: coverpoint cnm_protection_reset_prefix_coverage_phase {
+            bins cnm_protection_consumed_with_matrix_active = {1};
+            bins matrix_golden_prefix_after_protection = {2};
+            bins reset_quiet_window = {3};
+            bins release_quiet_window = {4};
+            bins prefix_and_suffix_preserved = {5};
+            bins full_golden_recovery = {6};
+        }
+    endgroup
+
     function automatic int signed next_small_signed();
         int unsigned value;
         rng_state = rng_state ^ (rng_state << 13);
@@ -146,8 +159,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         super.new(name);
         shared_reset_coverage_phase = 0;
         shared_reset_prefix_coverage_phase = 0;
+        cnm_protection_reset_prefix_coverage_phase = 0;
         matrix_cnm_shared_reset_cg = new();
         matrix_cnm_prefix_reset_cg = new();
+        cnm_protection_matrix_prefix_reset_cg = new();
     endfunction
 
     task automatic axil_write(input bit [31:0] addr, input bit [31:0] data);
@@ -1553,7 +1568,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         input int unsigned seed,
         input int signed expected_matrix[0:15][0:31],
         input bit reset_after_fault,
-        input bit abort_matrix_after_fault);
+        input bit abort_matrix_after_fault,
+        input bit matrix_prefix_reset_mode);
         bit [31:0] desc_base;
         bit [31:0] cpl_base;
         bit [31:0] matrix_dst;
@@ -1602,6 +1618,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         bit [31:0] cnm_rsp_after_reset;
         bit [15:0] matrix_task_id;
         bit [15:0] cnm_task_id;
+        int unsigned cnm_launches_before;
+        bit cnm_fault_done_seen;
         uvm_hdl_data_t reset_value;
 
         desc_base = 32'h0000_7800;
@@ -1610,6 +1628,13 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         cnm_dst = MATRIX_LINE_STALL_CNM_Y_LOCAL;
         matrix_task_id = reset_after_fault ? 16'h07d6 : 16'h07d4;
         cnm_task_id = reset_after_fault ? 16'h07d7 : 16'h07d5;
+        if (matrix_prefix_reset_mode) begin
+            if (!reset_after_fault || abort_matrix_after_fault)
+                `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_PREFIX",
+                    "Matrix output-prefix reset is only valid for the reset mode")
+            matrix_task_id = 16'h07da;
+            cnm_task_id = 16'h07db;
+        end
         if (abort_matrix_after_fault) begin
             matrix_task_id = 16'h07d8;
             cnm_task_id = 16'h07d9;
@@ -1630,6 +1655,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         matrix_accept_count = 0;
         matrix_write_accept_count = 0;
         post_abort_matrix_writes = 0;
+        cnm_fault_done_seen = 1'b0;
 
         // Initialize a legal CNM GEMV image. The CNM source-A window is the
         // only denied range; Matrix A/B and its writeback remain permitted.
@@ -1702,6 +1728,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         matrix_route_error_before = compute_vif.matrix_route_mismatch_count;
         cnm_route_error_before = compute_vif.cnm_route_mismatch_count;
         overlap_before = compute_vif.matrix_cnm_overlap_cycles;
+        cnm_launches_before = compute_vif.engine_launch_count[2];
 
         axil_write(REG_CMDQ_CTRL, 32'd0);
         axil_write(REG_CMDQ_BASE, desc_base);
@@ -1753,7 +1780,24 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                     if (!compute_vif.engine_busy[3])
                         `uvm_fatal("CLUSTER_CNM_PROTECTION_OWNER",
                             "CNM Protection error arrived after the concurrent Matrix task had completed")
+                    if (compute_vif.engine_busy[2]) begin
+                        both_busy_at_fault = 1'b1;
+                        if (matrix_prefix_reset_mode &&
+                            (cnm_protection_reset_prefix_coverage_phase == 0)) begin
+                            cnm_protection_reset_prefix_coverage_phase = 1;
+                            cnm_protection_matrix_prefix_reset_cg.sample();
+                        end
+                    end
                 end
+            end
+            if (matrix_prefix_reset_mode && denied_seen && compute_vif.engine_error[2])
+                cnm_fault_done_seen = 1'b1;
+            if (matrix_prefix_reset_mode && denied_seen &&
+                (matrix_write_accept_count != 0) && cnm_fault_done_seen &&
+                compute_vif.engine_busy[3] &&
+                (cnm_protection_reset_prefix_coverage_phase == 1)) begin
+                cnm_protection_reset_prefix_coverage_phase = 2;
+                cnm_protection_matrix_prefix_reset_cg.sample();
             end
             if (compute_vif.engine_busy[3] &&
                 compute_vif.matrix_request_valid && compute_vif.banked_ready) begin
@@ -1779,10 +1823,35 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 join_none
             end
             if (reset_after_fault && denied_seen && matrix_read_accepted &&
-                compute_vif.engine_busy[2] && compute_vif.engine_busy[3]) begin
-                both_busy_at_fault = 1'b1;
-                // Assert reset immediately after a sampled CNM Protection
-                // denial while Matrix is active and has accepted real reads.
+                compute_vif.engine_busy[3] &&
+                ((!matrix_prefix_reset_mode && compute_vif.engine_busy[2]) ||
+                 (matrix_prefix_reset_mode && cnm_fault_done_seen &&
+                  !compute_vif.engine_busy[2] && (matrix_write_accept_count != 0)))) begin
+                if (matrix_prefix_reset_mode) begin
+                    if ((matrix_write_accept_count == 0) || !cnm_fault_done_seen ||
+                        compute_vif.engine_busy[2])
+                        `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_PREFIX",
+                            "reset must follow a retired CNM Protection error and an accepted Matrix Golden Line while Matrix remains active")
+                    if (!both_busy_at_fault)
+                        `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_PREFIX",
+                            "Protection and Matrix were not active together when the denial was consumed")
+                    if ((compute_vif.engine_launch_count[2] - cnm_launches_before) != 1)
+                        `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_PREFIX", $sformatf(
+                            "expected one CNM fault task launch, observed %0d",
+                            compute_vif.engine_launch_count[2] - cnm_launches_before))
+                    if (cnm_protection_reset_prefix_coverage_phase != 2)
+                        `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_PREFIX",
+                            "missing consumed-Protection then accepted-Matrix-prefix coverage phase")
+                end else begin
+                    both_busy_at_fault = 1'b1;
+                end
+                // In prefix mode, Matrix is still busy and owns the earlier
+                // CMDQ entry, so the consumed CNM Protection completion is
+                // pending. Reset suppresses it together with Matrix's old
+                // epoch. The post-reset tail and CPLQ sentinel checks prove
+                // that neither completion retired.
+                // Assert reset without another bus transaction so Matrix
+                // cannot advance while the accepted prefix is being sampled.
                 #1ns;
                 reset_value = 1'b0;
                 reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
@@ -1794,6 +1863,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                     `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_OWNER", $sformatf(
                         "engines remained active during reset: busy=%07b",
                         compute_vif.engine_busy))
+                if (matrix_prefix_reset_mode) begin
+                    cnm_protection_reset_prefix_coverage_phase = 3;
+                    cnm_protection_matrix_prefix_reset_cg.sample();
+                end
                 #1ns;
                 reset_value = 1'b1;
                 reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
@@ -1801,15 +1874,78 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                     `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_OWNER",
                         "failed to release reset after concurrent Protection fault")
                 repeat (8) @(posedge compute_vif.aclk);
+                if (matrix_prefix_reset_mode) begin
+                    cnm_protection_reset_prefix_coverage_phase = 4;
+                    cnm_protection_matrix_prefix_reset_cg.sample();
+                end
                 wait_spad_idle();
                 axil_read(REG_CPLQ_TAIL, cpl_tail);
                 if (cpl_tail !== 32'd0)
                     `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_OWNER", $sformatf(
                         "reset left a stale completion tail: %0d", cpl_tail))
-                for (word_idx = 0; word_idx < 512; word_idx++)
-                    expect_spad(matrix_dst + (word_idx << 2),
-                                32'hfa17_9000 | word_idx,
-                                $sformatf("reset Matrix no-writeback sentinel[%0d]", word_idx));
+                if (matrix_prefix_reset_mode) begin : check_matrix_reset_prefix_image
+                    bit [31:0] actual_word;
+                    int unsigned line_base_word;
+                    int unsigned check_row;
+                    int unsigned check_col;
+                    for (word_idx = 0; word_idx < 512; word_idx++)
+                        matrix_output_written[word_idx] = 1'b0;
+                    if (matrix_write_accept_count == 0 ||
+                        matrix_write_accept_count >= 128)
+                        `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_PREFIX", $sformatf(
+                            "reset did not preserve a proper Matrix Line prefix: lines=%0d",
+                            matrix_write_accept_count))
+                    for (cpl_idx = 0; cpl_idx < matrix_write_accept_count; cpl_idx++) begin
+                        if ((matrix_line_write_addr[cpl_idx] !==
+                             matrix_dst + ((cpl_idx / 8) * 32'h80) +
+                                          ((cpl_idx % 8) * 32'h10)) ||
+                            (matrix_line_write_wstrb[cpl_idx] !== 16'hffff))
+                            `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_PREFIX", $sformatf(
+                                "Matrix prefix Line address/WSTRB mismatch index=%0d addr=0x%08h WSTRB=%04h",
+                                cpl_idx, matrix_line_write_addr[cpl_idx],
+                                matrix_line_write_wstrb[cpl_idx]))
+                        line_base_word = (matrix_line_write_addr[cpl_idx] - matrix_dst) >> 2;
+                        check_row = line_base_word / 32;
+                        check_col = line_base_word % 32;
+                        for (lane = 0; lane < 4; lane++) begin
+                            line_word_idx = line_base_word + lane;
+                            if ((check_col + lane) >= 32 ||
+                                (line_word_idx >= 512) ||
+                                matrix_output_written[line_word_idx])
+                                `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_PREFIX", $sformatf(
+                                    "invalid/duplicate Matrix prefix output word=%0d", line_word_idx))
+                            if (matrix_line_write_data[cpl_idx][lane*32 +: 32] !==
+                                expected_matrix[check_row][check_col + lane])
+                                `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_PREFIX", $sformatf(
+                                    "accepted Matrix prefix is not Golden line=%0d lane=%0d actual=0x%08h expected=0x%08h",
+                                    cpl_idx, lane,
+                                    matrix_line_write_data[cpl_idx][lane*32 +: 32],
+                                    expected_matrix[check_row][check_col + lane]))
+                            matrix_output_written[line_word_idx] = 1'b1;
+                        end
+                    end
+                    for (word_idx = 0; word_idx < 512; word_idx++) begin
+                        axil_read(CIMFORGE_SPAD_BASE + matrix_dst + (word_idx << 2),
+                                  actual_word);
+                        if (matrix_output_written[word_idx]) begin
+                            if (actual_word !== expected_matrix[word_idx / 32][word_idx % 32])
+                                `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_PREFIX", $sformatf(
+                                    "accepted Matrix prefix was not committed word=%0d actual=0x%08h expected=0x%08h",
+                                    word_idx, actual_word,
+                                    expected_matrix[word_idx / 32][word_idx % 32]))
+                        end else if (actual_word !== (32'hfa17_9000 | word_idx))
+                            `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_PREFIX", $sformatf(
+                                "unaccepted Matrix suffix changed word=%0d actual=0x%08h sentinel=0x%08h",
+                                word_idx, actual_word, 32'hfa17_9000 | word_idx))
+                    end
+                    cnm_protection_reset_prefix_coverage_phase = 5;
+                    cnm_protection_matrix_prefix_reset_cg.sample();
+                end else begin
+                    for (word_idx = 0; word_idx < 512; word_idx++)
+                        expect_spad(matrix_dst + (word_idx << 2),
+                                    32'hfa17_9000 | word_idx,
+                                    $sformatf("reset Matrix no-writeback sentinel[%0d]", word_idx));
+                end
                 for (word_idx = 0; word_idx < 16; word_idx++)
                     expect_spad(cnm_dst + (word_idx << 2),
                                 32'hfa17_9800 | word_idx,
@@ -1852,10 +1988,63 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_OWNER", $sformatf(
                     "missing Protection/reset overlap: reset=%0b both_busy=%0b Matrix_accepts=%0d",
                     reset_triggered, both_busy_at_fault, matrix_accept_count))
-            `uvm_info("CLUSTER_CNM_PROTECTION_RESET_OWNER_CROSS_PASS", $sformatf(
+            if (matrix_prefix_reset_mode) begin
+                // Recovery is a fresh legal CMDQ epoch. Restore unrestricted
+                // SPAD permissions, republish both descriptors, and check
+                // ordered completions plus complete independent Golden images.
+                axil_write(REG_REGION0_PERM, 32'd0);
+                axil_write(REG_REGION1_PERM, 32'd0);
+                axil_write(REG_REGION2_PERM, 32'd0);
+                axil_write(REG_REGION3_PERM, 32'd0);
+                write_v3_desc(desc_base, 8'h30, 16'h07de,
+                              MATRIX_A_LOCAL, MATRIX_B_LOCAL, matrix_dst,
+                              16'd16, 16'd32, 16'd16);
+                write_cluster_desc(desc_base + 32'h40, 8'h21, 16'h07df,
+                                   MATRIX_LINE_STALL_CNM_A_LOCAL,
+                                   MATRIX_LINE_STALL_CNM_B_LOCAL, cnm_dst,
+                                   16'd16, 16'd1, 16'd32, 32'd0,
+                                   32'd0, 32'd0, 32'd0, 8'd3);
+                axil_write(REG_CMDQ_CTRL, 32'd0);
+                axil_write(REG_CMDQ_BASE, desc_base);
+                axil_write(REG_CMDQ_SIZE, 32'd4);
+                axil_write(REG_CMDQ_HEAD, 32'd0);
+                axil_write(REG_CMDQ_TAIL, 32'd2);
+                axil_write(REG_CPLQ_BASE, cpl_base);
+                axil_write(REG_CPLQ_SIZE, 32'd4);
+                axil_write(REG_CPLQ_HEAD, 32'd0);
+                axil_write(REG_CPLQ_TAIL, 32'd0);
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(32'd2);
+                wait_spad_idle();
+                expect_completion(cpl_base, 16'h07de, expected_matrix[15][31],
+                                  32'd512, "protection-reset Matrix recovery");
+                expect_completion(cpl_base + 32'h10, 16'h07df, expected_cnm[15],
+                                  32'd16, "protection-reset CNM recovery");
+                for (word_idx = 0; word_idx < 512; word_idx++)
+                    expect_spad(matrix_dst + (word_idx << 2),
+                                expected_matrix[word_idx / 32][word_idx % 32],
+                                $sformatf("protection-reset Matrix recovery Golden[%0d]", word_idx));
+                for (word_idx = 0; word_idx < 16; word_idx++)
+                    expect_spad(cnm_dst + (word_idx << 2), expected_cnm[word_idx],
+                                $sformatf("protection-reset CNM recovery Golden[%0d]", word_idx));
+                cnm_protection_reset_prefix_coverage_phase = 6;
+                cnm_protection_matrix_prefix_reset_cg.sample();
+                if (cnm_protection_matrix_prefix_reset_cg.get_coverage() < 100.0)
+                    `uvm_fatal("CLUSTER_CNM_PROTECTION_RESET_PREFIX", $sformatf(
+                        "accepted-prefix reset coverage incomplete: %0.1f%%",
+                        cnm_protection_matrix_prefix_reset_cg.get_coverage()))
+                `uvm_info("CLUSTER_CNM_PROTECTION_MATRIX_PREFIX_RESET_PASS", $sformatf(
+                    "CNM source-A Protection 0x62 consumed during Matrix activity; reset after Matrix accepted Golden Line prefix=%0d/128 while Matrix remained active; untouched suffix, old-epoch completion suppression, quiet reset/release, and full ordered Matrix/CNM Golden recovery pass; focused_bins=6/6 seed=%0d",
+                    matrix_write_accept_count, seed), UVM_LOW)
+                axil_write(REG_CPLQ_HEAD, 32'd2);
+                axil_write(REG_CMDQ_SIZE, 32'd0);
+                axil_write(REG_CPLQ_SIZE, 32'd0);
+            end else begin
+                `uvm_info("CLUSTER_CNM_PROTECTION_RESET_OWNER_CROSS_PASS", $sformatf(
                 "CNM source-A Protection denial concurrent with active Matrix; reset flushed both engines after %0d accepted Matrix reads, no completion/writeback or post-reset stale response; overlap=%0d seed=%0d",
                 matrix_accept_count,
                 both_busy_cycles, seed), UVM_LOW)
+            end
             return;
         end
 
@@ -6602,9 +6791,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_matrix_protection_cnm_owner_cross(seed, 1'b1, 1'b0, 1'b0);
         run_matrix_protection_cnm_owner_cross(seed, 1'b0, 1'b1, 1'b0);
         run_matrix_protection_cnm_owner_cross(seed, 1'b0, 1'b1, 1'b1);
-        run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b0, 1'b0);
-        run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b1, 1'b0);
-        run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b0, 1'b1);
+        run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b0, 1'b0, 1'b0);
+        run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b1, 1'b0, 1'b0);
+        run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b0, 1'b1, 1'b0);
+        run_cnm_protection_matrix_owner_cross(seed, matrix_golden, 1'b1, 1'b0, 1'b1);
 
         // Cross source-A, source-B where present, and writeback protection
         // phases on real engines. SFU and KV have no second source operand.
