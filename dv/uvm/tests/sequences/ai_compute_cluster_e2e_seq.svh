@@ -4445,6 +4445,121 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             reset_seen), UVM_LOW)
     endtask
 
+    task automatic run_matrix_parity_reset_epoch_case(input int unsigned seed);
+        int unsigned poll;
+        int unsigned word_idx;
+        bit accepted_fault_read;
+        bit [31:0] desc_base;
+        bit [31:0] cpl_base;
+        bit [31:0] matrix_a;
+        bit [31:0] matrix_b;
+        bit [31:0] matrix_dst;
+        bit [31:0] value;
+        bit [31:0] sentinel;
+        uvm_hdl_data_t reset_value;
+        uvm_hdl_data_t saved_parity;
+        string parity_path;
+
+        desc_base = CLUSTER_CONTRACT_CMDQ;
+        cpl_base = CLUSTER_CONTRACT_CPLQ + 32'h900;
+        matrix_a = MATRIX_FAULT_A_LOCAL;
+        matrix_b = MATRIX_FAULT_B_LOCAL;
+        matrix_dst = 32'h0003_c000;
+        sentinel = 32'hbad0_7e40;
+        accepted_fault_read = 1'b0;
+
+        // A legal 4x4x4 INT8 GEMM: each packed A/B word contains four ones,
+        // so all 16 outputs are exactly four after recovery.
+        for (word_idx = 0; word_idx < 4; word_idx++) begin
+            spad_write(matrix_a + (word_idx << 2), 32'h0101_0101);
+            spad_write(matrix_b + (word_idx << 2), 32'h0101_0101);
+        end
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            spad_write(matrix_dst + (word_idx << 2), sentinel | word_idx);
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            spad_write(cpl_base + (word_idx << 2), sentinel ^ word_idx);
+
+        write_v3_desc(desc_base, 8'h30, 16'h07e4,
+                      matrix_a, matrix_b, matrix_dst,
+                      16'd4, 16'd4, 16'd1);
+        configure_contract_queues(cpl_base, 32'd1);
+        inject_spad_parity_fault(matrix_a, parity_path, saved_parity);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        for (poll = 0; poll < 50000; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.matrix_request_valid && compute_vif.banked_ready &&
+                (compute_vif.matrix_banked_req_addr == matrix_a)) begin
+                accepted_fault_read = 1'b1;
+                break;
+            end
+        end
+        if (!accepted_fault_read)
+            `uvm_fatal("CLUSTER_MATRIX_PARITY_RESET",
+                "Matrix did not accept the parity-faulted A read before reset")
+
+        // Reset one nanosecond after the accepted banked-read edge, before
+        // the registered parity response can be consumed by the engine.
+        #1ns;
+        reset_value = 1'b0;
+        if (!uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value))
+            `uvm_fatal("CLUSTER_MATRIX_PARITY_RESET",
+                "failed to assert reset with the Matrix parity response pending")
+        restore_spad_parity(parity_path, saved_parity);
+        repeat (4) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.rsp_valid !== 1'b0)
+                `uvm_fatal("CLUSTER_MATRIX_PARITY_RESET",
+                    "old-epoch Matrix parity response was visible during reset")
+        end
+        if (compute_vif.engine_busy !== 7'b0)
+            `uvm_fatal("CLUSTER_MATRIX_PARITY_RESET", $sformatf(
+                "Matrix remained busy during reset: busy=%07b",
+                compute_vif.engine_busy))
+        #1ns;
+        reset_value = 1'b1;
+        if (!uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value))
+            `uvm_fatal("CLUSTER_MATRIX_PARITY_RESET",
+                "failed to release reset after the pending parity response")
+        repeat (8) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.rsp_valid !== 1'b0)
+                `uvm_fatal("CLUSTER_MATRIX_PARITY_RESET",
+                    "stale Matrix parity response escaped into the new epoch")
+        end
+        wait_spad_idle();
+
+        axil_read(REG_CPLQ_TAIL, value);
+        if (value !== 32'd0)
+            `uvm_fatal("CLUSTER_MATRIX_PARITY_RESET", $sformatf(
+                "reset must discard the old-epoch completion, tail=%0d", value))
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            expect_spad(matrix_dst + (word_idx << 2), sentinel | word_idx,
+                $sformatf("Matrix parity/reset preserved destination[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            expect_spad(cpl_base + (word_idx << 2), sentinel ^ word_idx,
+                $sformatf("Matrix parity/reset preserved completion word[%0d]", word_idx));
+
+        // Reissue the same legal descriptor after restoring parity. Golden
+        // completion and all output words prove that the new epoch is usable.
+        write_v3_desc(desc_base, 8'h30, 16'h07e5,
+                      matrix_a, matrix_b, matrix_dst,
+                      16'd4, 16'd4, 16'd1);
+        configure_contract_queues(cpl_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        expect_completion(cpl_base, 16'h07e5, 32'd4, 32'd16,
+                          "Matrix parity/reset new-epoch recovery");
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            expect_spad(matrix_dst + (word_idx << 2), 32'd4,
+                $sformatf("Matrix parity/reset recovery Golden[%0d]", word_idx));
+        clear_contract_queues(32'd1);
+        `uvm_info("CLUSTER_MATRIX_PARITY_RESET_EPOCH_PASS", $sformatf(
+            "accepted Matrix A read with parity fault; reset flushed pending old-epoch response/completion, parity restored, and 4x4x4 GEMM recovered with 16/16 Golden outputs; seed=%0d",
+            seed), UVM_LOW)
+    endtask
+
     task automatic run_engine_abort_drain_sweep();
         int engine;
         int unsigned poll;
@@ -5990,6 +6105,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_matrix_line_abort_write_prefix(seed);
         run_cnm_abort_write_prefix(seed);
         run_engine_reset_drain_sweep();
+        run_matrix_parity_reset_epoch_case(seed);
 
         `uvm_info("COMPUTE_CLUSTER_REAL_UVM_PASS", $sformatf(
             "standalone Matrix16x32x64 Golden + 16 A-tile reuse hits; parallel Matrix/CNM GEMV with separate response tags and four-bank Golden + next-K prefetch + queued SFU tasks + concurrent abort/reset/recovery seed=%0d; prefetch_overlap=%0d matrix_cnm_overlap=%0d matrix_rsp=%0d cnm_rsp=%0d cnm_lanes=%b overlap=%0d arbiter_contention=%0d banked_grants=%0d cnm_grants=%0d core_grants=%0d",
