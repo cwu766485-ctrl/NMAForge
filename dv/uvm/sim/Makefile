@@ -84,7 +84,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -q '\[CLUSTER_SFU_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: real SFU in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CNM_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: legal concurrent CNM in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_SHARED_READONLY_PASS\]' "$$log" || { echo "ERROR: cross-engine shared read-only SPAD check missing in $$log"; exit 1; }; \
-		grep -q '\[CLUSTER_REQUEST_STABILITY_PASS\]' "$$log" || { echo "ERROR: stalled compute request-stability check missing in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_REQUEST_STABILITY_PASS\].*engine stalled mask=1110111 cycles=\{[1-9][0-9]*,[1-9][0-9]*,[1-9][0-9]*,0,[1-9][0-9]*,[1-9][0-9]*,[1-9][0-9]*\}; Matrix banked checks=[1-9][0-9]* fault-cancel=[0-9]+, Matrix line checks=[1-9][0-9]*, CNM lane checks=\{[1-9][0-9]*,[1-9][0-9]*,[1-9][0-9]*,[1-9][0-9]*\}' "$$log" || { echo "ERROR: scalar, Matrix banked/Line, or one of four CNM requesters lacks a stalled-payload stability sample in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_MATRIX_LINE_STALL_PASS\].*stability checks=[1-9][0-9]* violations=0' "$$log" || { echo "ERROR: real Matrix line-write backpressure stability check missing or failed in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SERIAL_BENCH_PASS\].*total=[1-9][0-9]*' "$$log" || { echo "ERROR: serial compute benchmark timing missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_STAGED_BENCH_PASS\].*speedup=[1-9].*pair_contention_cycles=[1-9][0-9]*' "$$log" || { echo "ERROR: staged Matrix/CNM contention then SFU benchmark timing missing in $$log"; exit 1; }; \
