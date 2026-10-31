@@ -583,3 +583,10 @@ This adds a bounded point to `REQ-CL-017/019/027` and `REQ-PC-006/007`, all stil
 | REQ-CL-027 | PARTIAL | Same test; task-ID/status and reset-epoch completion checker | Old task has no published completion; recovery task ID/status are checked for all 12 cases. Full completion-payload/error cross remains open. | Same Run ID and seeds | Same report and per-seed logs |
 | REQ-PC-006 | PARTIAL | Same test; accepted SPAD request, response-route monitors and scoreboard pending ledger | Three seeds: 45,617 memory words checked, zero mismatch/unknown/stale/orphan, 26 reset-dropped responses, pending queues empty. Response-consumed reset for all engines and broader simultaneous owner conflicts remain open. | Same Run ID and seeds | Same report and per-seed logs |
 | REQ-PC-007 | PARTIAL | Same test; real production-engine SPAD client acceptance and post-reset recovery | All seven real engine request paths accept a faulted read and recover after reset; source-B also covered where defined. Pairwise production-engine contention under fault/backpressure is not covered by these sequential cases. | Same Run ID and seeds | Same report and per-seed logs |
+
+
+## R144 Matrix FSM formal replay — 2026-10-31
+
+| Requirement | Disposition | Test ID / checker | Coverage / observed result | Run ID | Evidence path |
+|---|---|---|---|---|---|
+| REQ-CL-010 | PARTIAL | `CL-MATRIX-FSM-FPV-R144-TESTSHA-4008D73`; five non-vacuous formal assertions and two FSM reachability covers | VC Formal proves 5/5 properties and reaches both covers at depths 11 (`ST_PREFETCH_WAIT`) and 5 (`ST_ERROR_DRAIN`); clean setup, non-fatal `COM_OPT009/010` and clock/data-cache notices. Raw enabled-profile Matrix FSM remains 49/53; profile-specific and wider legal transitions retain prior dispositions. | R144 at test SHA `4008d73f800fd470ed2ff8b9c4f7068053d5b041` | [R144 report](COMPUTE_CLUSTER_MATRIX_FSM_R144_FORMAL_REPLAY_2026-10-31.md); `/tmp/nmaforge_r143_matrix_fsm/vc_formal.log` |
