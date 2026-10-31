@@ -1,13 +1,13 @@
 {
-  "run_id": "TINY-FAIR-6848A41-S20261029",
-  "nmaforge_source_sha": "6848a414eaeaa05cf9e1411cf55d9d27333208a6",
+  "run_id": "R134-TINY-NPU-PAIRED-20261031",
+  "nmaforge_source_sha": "207cc3896cb635ff04e7095fc18c435080507724",
   "nmaforge_matrix_rtl_basis": "same Matrix product RTL as audited candidate 9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9",
   "tinynpu_source_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
-  "seed": "20261029",
+  "seed": "20261026",
   "tools": {
     "vcs": "V-2023.12-SP1_Full64",
     "verilator": "Verilator 5.052 2026-09-05 rev v5.052",
-    "python": "3.11.13",
+    "python": "3.12.13",
     "numpy": "2.4.6",
     "onnx": "1.17.0"
   },

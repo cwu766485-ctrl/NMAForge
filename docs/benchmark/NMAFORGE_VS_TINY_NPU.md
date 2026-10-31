@@ -208,3 +208,24 @@ they are not merged into the current pinned-reference CSV.
 - Compute Cluster v1.0 remains a sign-off candidate, not signed: the final
   audit is 24 PASS-SCOPED / 14 PARTIAL, with unresolved functional closure
   items documented in the [audit report](../verification/COMPUTE_CLUSTER_V1_FINAL_AUDIT.md).
+
+## R134 current-candidate replay — 2026-10-31
+
+The current-candidate paired harness was rerun at NMAForge test SHA
+`207cc3896cb635ff04e7095fc18c435080507724` with Run ID
+`R134-TINY-NPU-PAIRED-20261031`, seed `20261026`, and pinned TinyNPU SHA
+`8216c22b762011aa20c05fc2768423fd12dda59d`. VCS `V-2023.12-SP1_Full64`,
+Verilator 5.052, Python 3.12.13, NumPy 2.4.6 and ONNX 1.17.0 were recorded.
+All three same-vector GEMM shapes passed independent output Golden checks on
+both designs; the CNN graph passed as well. NMAForge required 171/263/1,393
+measured Matrix-controller cycles for 16×16×16, 16×16×32 and 32×32×64.
+TinyNPU's array RTL used 52/100/790 cycles; after the explicit serialized
+16-byte/cycle, one-cycle memory schedule, its modeled endpoints were 151/231/
+1,305 cycles. These results show the remaining Matrix path latency and do not
+establish a product-level winner because TinyNPU memory is modeled and the
+two RTL timing boundaries differ. The paired fixed-weight CNN likewise has
+different endpoints and no speedup claim.
+
+The R134 run refreshes the machine-readable CSV/JSON and leaves `REQ-CL-028`
+PARTIAL. The run evidence, exact command, data hashes, and boundary analysis
+are in the [R134 replay report](../verification/COMPUTE_CLUSTER_TINYNPU_REPLAY_R134_2026-10-31.md).
