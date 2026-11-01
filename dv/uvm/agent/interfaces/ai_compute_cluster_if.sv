@@ -93,6 +93,8 @@ interface ai_compute_cluster_if(input logic aclk);
     integer arb_banked_grants;
     integer arb_cnm_grants;
     integer arb_core_grants;
+    integer unsigned benchmark_spad_read_bytes;
+    integer unsigned benchmark_spad_write_bytes;
     integer matrix_cnm_overlap_cycles;
     integer matrix_cnm_shared_accept_cycles;
     integer matrix_tag_response_count;
@@ -334,6 +336,8 @@ interface ai_compute_cluster_if(input logic aclk);
 
     always @(posedge aclk or negedge aresetn) begin
         integer e;
+        integer unsigned read_byte_increment;
+        integer unsigned write_byte_increment;
         if (!aresetn) begin
             overlap_cycles <= 0;
             core_engine_collision_cycles <= 0;
@@ -341,6 +345,8 @@ interface ai_compute_cluster_if(input logic aclk);
             arb_banked_grants <= 0;
             arb_cnm_grants <= 0;
             arb_core_grants <= 0;
+            benchmark_spad_read_bytes <= 0;
+            benchmark_spad_write_bytes <= 0;
             matrix_cnm_overlap_cycles <= 0;
             matrix_cnm_shared_accept_cycles <= 0;
             matrix_tag_response_count <= 0;
@@ -355,6 +361,8 @@ interface ai_compute_cluster_if(input logic aclk);
             multi_engine_abort_cycles <= 0;
             for (e = 0; e < 7; e = e + 1) engine_launch_count[e] <= 0;
         end else begin
+            read_byte_increment = 0;
+            write_byte_increment = 0;
             if ($countones(engine_busy) > 1) overlap_cycles <= overlap_cycles + 1;
             if ($countones(engine_req_valid) > 1)
                 core_engine_collision_cycles <= core_engine_collision_cycles + 1;
@@ -370,6 +378,32 @@ interface ai_compute_cluster_if(input logic aclk);
             if (banked_valid && banked_ready) arb_banked_grants <= arb_banked_grants + 1;
             if (|cnm_valid && |cnm_ready) arb_cnm_grants <= arb_cnm_grants + 1;
             if (core_spad_valid && core_ready) arb_core_grants <= arb_core_grants + 1;
+            if (selected_spad_valid && selected_spad_ready &&
+                selected_spad_access_ok) begin
+                if (selected_spad_write)
+                    write_byte_increment = write_byte_increment + 4;
+                else
+                    read_byte_increment = read_byte_increment + 4;
+            end
+            if (selected_line_valid && selected_line_ready &&
+                selected_line_access_ok) begin
+                if (selected_line_write)
+                    write_byte_increment = write_byte_increment +
+                                           $countones(selected_line_wstrb);
+                else
+                    read_byte_increment = read_byte_increment + 16;
+            end
+            if (selected_banked_valid && selected_banked_ready &&
+                selected_banked_access_ok)
+                read_byte_increment = read_byte_increment + 16;
+            for (e = 0; e < 4; e = e + 1)
+                if (selected_cnm_valid[e] && selected_cnm_ready[e] &&
+                    selected_cnm_access_ok[e])
+                    read_byte_increment = read_byte_increment + 4;
+            benchmark_spad_read_bytes <= benchmark_spad_read_bytes +
+                                         read_byte_increment;
+            benchmark_spad_write_bytes <= benchmark_spad_write_bytes +
+                                          write_byte_increment;
             if (rsp_valid) response_count <= response_count + 1;
             if (parallel_queue_mode && engine_busy[2] && engine_busy[3])
                 matrix_cnm_overlap_cycles <= matrix_cnm_overlap_cycles + 1;

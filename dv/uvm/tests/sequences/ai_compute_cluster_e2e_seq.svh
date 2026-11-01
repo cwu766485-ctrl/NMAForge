@@ -6470,17 +6470,29 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned serial_sfu1_cycles;
         int unsigned serial_total_cycles;
         int unsigned serial_matrix_cnm_sfu_cycles;
+        int unsigned serial_spad_read_start;
+        int unsigned serial_spad_write_start;
+        int unsigned serial_spad_read_bytes;
+        int unsigned serial_spad_write_bytes;
         int unsigned staged_pair_start_cycle;
         int unsigned staged_pair_cycles;
         int unsigned staged_sfu_start_cycle;
         int unsigned staged_sfu_cycles;
         int unsigned staged_total_cycles;
+        int unsigned staged_spad_read_start;
+        int unsigned staged_spad_write_start;
+        int unsigned staged_spad_read_bytes;
+        int unsigned staged_spad_write_bytes;
         int unsigned staged_contention_start;
         int unsigned staged_contention_cycles;
         int unsigned parallel_start_cycle;
         int unsigned parallel_cycles;
         int unsigned parallel_contention_start;
         int unsigned parallel_contention_cycles;
+        int unsigned parallel_spad_read_start;
+        int unsigned parallel_spad_write_start;
+        int unsigned parallel_spad_read_bytes;
+        int unsigned parallel_spad_write_bytes;
         int unsigned recovery_start_cycle;
         int unsigned recovery_cycles;
         real measured_speedup;
@@ -6502,12 +6514,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_scalar_reset_write_prefix(seed);
         serial_total_cycles = 0;
         serial_matrix_cnm_sfu_cycles = 0;
+        serial_spad_read_bytes = 0;
+        serial_spad_write_bytes = 0;
         staged_pair_cycles = 0;
         staged_sfu_cycles = 0;
         staged_total_cycles = 0;
+        staged_spad_read_bytes = 0;
+        staged_spad_write_bytes = 0;
         staged_contention_cycles = 0;
         parallel_cycles = 0;
         parallel_contention_cycles = 0;
+        parallel_spad_read_bytes = 0;
+        parallel_spad_write_bytes = 0;
         recovery_cycles = 0;
         measured_speedup = 0.0;
         for (row_idx = 0; row_idx < 16; row_idx++)
@@ -6627,6 +6645,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         // Same four operations as the parallel run, deliberately submitted
         // and retired one at a time. Capture only doorbell-to-completion-tail
         // cycles; descriptor programming is excluded from both measurements.
+        serial_spad_read_start = compute_vif.benchmark_spad_read_bytes;
+        serial_spad_write_start = compute_vif.benchmark_spad_write_bytes;
         write_cnm_v3_desc(CMDQ_LOCAL, 16'h0601,
                           CNM_A_LOCAL, CNM_B_LOCAL, CNM_Y_LOCAL);
         run_serial_descriptor(CMDQ_LOCAL, CPLQ_LOCAL, 16'h0601,
@@ -6643,13 +6663,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                               -32'sd15, 32'd64, "serial SFU1", serial_sfu1_cycles);
         serial_total_cycles = serial_matrix_cycles + serial_cnm_cycles +
                               serial_sfu0_cycles + serial_sfu1_cycles;
+        serial_spad_read_bytes = compute_vif.benchmark_spad_read_bytes -
+                                 serial_spad_read_start;
+        serial_spad_write_bytes = compute_vif.benchmark_spad_write_bytes -
+                                  serial_spad_write_start;
         serial_matrix_cnm_sfu_cycles = serial_matrix_cycles + serial_cnm_cycles +
                                         serial_sfu0_cycles;
         `uvm_info("CLUSTER_SERIAL_BENCH_PASS", $sformatf(
-            "serial Matrix/CNM/SFU cycles=%0d/%0d/%0d total=%0d; extra queued SFU=%0d four-task total=%0d",
+            "serial Matrix/CNM/SFU cycles=%0d/%0d/%0d total=%0d; extra queued SFU=%0d four-task total=%0d spad_read_bytes=%0d spad_write_bytes=%0d",
             serial_matrix_cycles, serial_cnm_cycles, serial_sfu0_cycles,
             serial_matrix_cnm_sfu_cycles, serial_sfu1_cycles,
-            serial_total_cycles), UVM_LOW)
+            serial_total_cycles, serial_spad_read_bytes,
+            serial_spad_write_bytes), UVM_LOW)
 
         // Benchmark the requested staged mode: Matrix and CNM share the
         // scratchpad concurrently, then SFU starts after both retire. Sum the
@@ -6673,6 +6698,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_HEAD, 32'd0);
         axil_write(REG_CPLQ_TAIL, 32'd0);
         staged_contention_start = compute_vif.matrix_cnm_shared_accept_cycles;
+        staged_spad_read_start = compute_vif.benchmark_spad_read_bytes;
+        staged_spad_write_start = compute_vif.benchmark_spad_write_bytes;
         staged_pair_start_cycle = compute_vif.sim_cycles;
         axil_write(REG_DOORBELL, 32'd1);
         wait_cpl_tail(32'd2);
@@ -6702,6 +6729,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         wait_cpl_tail(32'd3);
         staged_sfu_cycles = compute_vif.sim_cycles - staged_sfu_start_cycle;
         staged_total_cycles = staged_pair_cycles + staged_sfu_cycles;
+        staged_spad_read_bytes = compute_vif.benchmark_spad_read_bytes -
+                                 staged_spad_read_start;
+        staged_spad_write_bytes = compute_vif.benchmark_spad_write_bytes -
+                                  staged_spad_write_start;
         wait_spad_idle();
         expect_completion(CPLQ_LOCAL + 32'h20, 16'h0702, -32'sd15, 32'd64,
                           "staged SFU completion");
@@ -6712,10 +6743,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         measured_speedup = real'(serial_matrix_cnm_sfu_cycles) /
                            real'(staged_total_cycles);
         `uvm_info("CLUSTER_STAGED_BENCH_PASS", $sformatf(
-            "serial Matrix/CNM/SFU=%0d cycles; staged Matrix+CNM=%0d then SFU=%0d total=%0d speedup=%.3f pair_contention_cycles=%0d completion_order=0700,0701,0702",
+            "serial Matrix/CNM/SFU=%0d cycles; staged Matrix+CNM=%0d then SFU=%0d total=%0d speedup=%.3f pair_contention_cycles=%0d spad_read_bytes=%0d spad_write_bytes=%0d completion_order=0700,0701,0702",
             serial_matrix_cnm_sfu_cycles, staged_pair_cycles,
             staged_sfu_cycles, staged_total_cycles, measured_speedup,
-            staged_contention_cycles), UVM_LOW)
+            staged_contention_cycles, staged_spad_read_bytes,
+            staged_spad_write_bytes), UVM_LOW)
         axil_write(REG_CPLQ_HEAD, 32'd3);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
@@ -6842,6 +6874,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_HEAD, 32'd0);
         axil_write(REG_CPLQ_TAIL, 32'd0);
         parallel_contention_start = compute_vif.shared_spad_contention_cycles;
+        parallel_spad_read_start = compute_vif.benchmark_spad_read_bytes;
+        parallel_spad_write_start = compute_vif.benchmark_spad_write_bytes;
         parallel_start_cycle = compute_vif.sim_cycles;
         axil_write(REG_DOORBELL, 32'd1);
         check_cnm_address_stream();
@@ -6849,13 +6883,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         parallel_cycles = compute_vif.sim_cycles - parallel_start_cycle;
         parallel_contention_cycles = compute_vif.shared_spad_contention_cycles -
                                      parallel_contention_start;
+        parallel_spad_read_bytes = compute_vif.benchmark_spad_read_bytes -
+                                   parallel_spad_read_start;
+        parallel_spad_write_bytes = compute_vif.benchmark_spad_write_bytes -
+                                    parallel_spad_write_start;
         wait_spad_idle();
         if (parallel_cycles != 0)
             measured_speedup = real'(serial_total_cycles) / real'(parallel_cycles);
         `uvm_info("CLUSTER_PARALLEL_BENCH_PASS", $sformatf(
-            "same Matrix/CNM/SFU/SFU work parallel cycles=%0d serial_cycles=%0d speedup=%.3f completion_order=0600,0601,0602,0603 shared_spad_contention_cycles=%0d",
+            "same Matrix/CNM/SFU/SFU work parallel cycles=%0d serial_cycles=%0d speedup=%.3f completion_order=0600,0601,0602,0603 shared_spad_contention_cycles=%0d spad_read_bytes=%0d spad_write_bytes=%0d",
             parallel_cycles, serial_total_cycles, measured_speedup,
-            parallel_contention_cycles), UVM_LOW)
+            parallel_contention_cycles, parallel_spad_read_bytes,
+            parallel_spad_write_bytes), UVM_LOW)
 
         if (compute_vif.overlap_cycles == 0)
             `uvm_fatal("CLUSTER_OVERLAP", "real Matrix and SFU never overlapped")
