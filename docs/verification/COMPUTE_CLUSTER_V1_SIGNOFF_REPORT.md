@@ -1,6 +1,6 @@
 # NMAForge Compute Cluster v1.0 Functional DV Sign-off Report
 
-**Review date:** 2026-10-31
+**Review date:** 2026-11-01
 **Decision:** **HOLD — not signed off**
 **Scope:** Compute Cluster functional DV only; no claim of whole-NPU sign-off or ASIC PPA closure.
 
@@ -271,3 +271,8 @@ At clean local replay SHA `cc15b4841d2266f34ef8cacae7abd895890eb07a` (tree `41ed
 R151's UVM compile log has no `TFIPC`, VCS `Warning-`, or `Error-` diagnostic. The merged UVM URG assertion report has 17/22 properties with real successes and zero failures/incomplete; three top AXI AR/AW assertions and two UVM RAL assertions remain uncovered in this compute-only workload, while 1/3 cover properties match. This does not replace independent AXI protocol evidence.
 
 The exact clean SHA also passes 28/28 checker-sensitivity mutations, Top Smoke, and the 20-case seeded Top run. Merged mixed URG is 61.06% SCORE (line/condition/FSM/branch/assert/group 69.51/63.63/44.67/59.80/72.00/56.75%) and is not a functional closure metric. `REQ-CL-017/018/019/027` and `REQ-PC-006/007` remain PARTIAL; the 38-row RTM remains 24 PASS-SCOPED / 14 PARTIAL, and the release decision remains **HOLD**. Commands, seeds, evidence paths, and limits are in [R151 evidence](COMPUTE_CLUSTER_SCALAR_RESET_ACCEPTED_PREFIX_R151_2026-10-31.md).
+## R152 Matrix benchmark replay — 2026-11-01
+
+The current R151 test source SHA `cc15b4841d2266f34ef8cacae7abd895890eb07a` passes 15/15 Matrix physical-array size cases and 40/40 depth/prefetch/A-Tile-cache cases on seed `20261026`, each against the independent full-output Golden. The 4×4/8×8/16×16 sweep, fixed 16×16 ablation, cycle/traffic/stall results and exact command are in the [R152 benchmark report](../benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R152_2026-11-01.md); the 55-row [CSV](../benchmark/compute_cluster_matrix_r152.csv) is checked in. The benchmark source files are identical to the R82 three-seed 165/165 run. A new seed-20261025 replay was blocked by an unreachable VCS license server; it is not counted.
+
+This strengthens only `REQ-CL-028`. Common-memory TinyNPU comparison, GEMV/decode, larger workloads and measured ASIC PPA remain open. The RTM remains 24 `PASS-SCOPED` / 14 `PARTIAL`; Compute Cluster v1.0 remains **HOLD**.
