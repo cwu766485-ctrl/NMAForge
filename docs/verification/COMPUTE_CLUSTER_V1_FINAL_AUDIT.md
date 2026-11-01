@@ -8,6 +8,7 @@
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
 - **Latest exact coverage replay candidate:** `8be88c10f131354fd7aeacfd3678bb08ed439e23` (R166, tree `f5411eb9bad967e1feb6f933dcc12174b4034df1`; three-seed real-top UVM, 16-seed DDR/AXI E2E, and subsystem coverage replay; 18/18 top and 17/17 subsystem declared functional groups at 100%). The executable test content remains the R164 code/test tree `e0816beba67133fbf6221005f16f97cba63eb2ca`; no product RTL/SPEC changes.
 **Latest verification/test candidate:** R166 exact replay SHA `8be88c10f131354fd7aeacfd3678bb08ed439e23`, a documentation-only descendant of R164. The R166 coverage suite builds and runs from this exact clean candidate; product RTL/SPEC and executable UVM/test source remain unchanged from their separately reviewed baselines. R164 still supplies the latest same-test-SHA Matrix benchmark. Earlier formal evidence retains its own exact SHA.
+**Latest exact-candidate integration replay:** R168 replays the R167 executable source at clean checkout `8f5c3cd5f7749ba5bfee1bb6d485a7b10c67f7d0`: Top Smoke, fixed 20-case Top, three-seed real-top UVM, and 28/28 checker sensitivity all pass. R166 remains the latest merged declared functional-coverage report; RTM remains 24 `PASS-SCOPED` / 14 `PARTIAL`. See [R168 evidence](COMPUTE_CLUSTER_R168_FINAL_CANDIDATE_REPLAY_2026-11-02.md).
 **Decision:** bounded CL-RC1/CL-RC2 review candidate; **CL-DV-v1.0 is not signed**.
 
 ## Executive disposition
