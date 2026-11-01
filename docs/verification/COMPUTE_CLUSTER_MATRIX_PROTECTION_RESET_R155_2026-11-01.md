@@ -18,7 +18,9 @@ R155 adds only a UVM sequence and its regression gate. Product RTL, SPEC, SVA, a
 
 ## Test and observed result
 
-The sequence submits a legal 4×4×4 INT8 GEMM through the actual CMDQ/Matrix/SPAD path. Protection permits the descriptor, completion region, and source A, while source B is outside every enabled region. The monitor requires an accepted source-A banked read followed by an accepted, denied source-B request. After the fault is captured, a hierarchical read checks the production Matrix error code is `ERR_PROTECTION=6`.
+The sequence submits a legal 4×4 Matrix descriptor through the actual CMDQ/Matrix/SPAD path. The encoded dimensions are M=4, N=4, and descriptor length field=1; the test checks all 16 output words against 4. Protection permits the descriptor, completion region, and source A, while source B is outside every enabled region. The monitor requires an accepted source-A banked read followed by an accepted, denied source-B request. After the fault is captured, a hierarchical read checks the production Matrix error code is `ERR_PROTECTION=6`.
+
+**Descriptor clarification:** an earlier version of this report called this a 4×4×4 GEMM. That was inaccurate; the checked descriptor length field is 1.
 
 Reset is asserted before the faulted task can retire. The sequence checks that no response is visible during reset or the eight-cycle release quiet window, all engines are idle, CPLQ tail remains zero, and destination/completion sentinels are unchanged. It then reissues the legal GEMM with a new task ID and checks the completion and all 16 result words against the value 4. Six declared phase bins are required by the test and report 6/6.
 
