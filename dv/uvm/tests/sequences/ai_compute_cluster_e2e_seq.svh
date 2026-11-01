@@ -114,6 +114,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned cnm_protection_reset_prefix_coverage_phase;
     int unsigned sfu_reset_prefix_phase;
     int unsigned scalar_reset_prefix_phase;
+    int unsigned matrix_protection_reset_phase;
 
     covergroup matrix_cnm_shared_reset_cg;
         option.per_instance = 1;
@@ -172,6 +173,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         }
     endgroup
 
+    covergroup matrix_protection_reset_cg;
+        option.per_instance = 1;
+        cp_matrix_protection_reset_phase: coverpoint matrix_protection_reset_phase {
+            bins legal_task_launched = {1};
+            bins source_b_protection_denied_after_a_read = {2};
+            bins protection_error_code_observed = {3};
+            bins reset_suppressed_old_completion_and_writeback = {4};
+            bins reset_release_quiet_window = {5};
+            bins new_epoch_full_golden_recovery = {6};
+        }
+    endgroup
+
     function automatic int signed next_small_signed();
         int unsigned value;
         rng_state = rng_state ^ (rng_state << 13);
@@ -188,11 +201,13 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         cnm_protection_reset_prefix_coverage_phase = 0;
         sfu_reset_prefix_phase = 0;
         scalar_reset_prefix_phase = 0;
+        matrix_protection_reset_phase = 0;
         matrix_cnm_shared_reset_cg = new();
         matrix_cnm_prefix_reset_cg = new();
         cnm_protection_matrix_prefix_reset_cg = new();
         sfu_reset_prefix_cg = new();
         scalar_reset_prefix_cg = new();
+        matrix_protection_reset_cg = new();
     endfunction
 
     task automatic axil_write(input bit [31:0] addr, input bit [31:0] data);
@@ -5699,6 +5714,173 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             seed), UVM_LOW)
     endtask
 
+    task automatic run_matrix_protection_reset_epoch_case(input int unsigned seed);
+        int unsigned poll;
+        int unsigned word_idx;
+        int unsigned accepted_a_reads;
+        bit source_b_denied;
+        bit [31:0] desc_base;
+        bit [31:0] cpl_base;
+        bit [31:0] matrix_a;
+        bit [31:0] matrix_b;
+        bit [31:0] matrix_dst;
+        bit [31:0] value;
+        bit [31:0] sentinel;
+        uvm_hdl_data_t reset_value;
+        uvm_hdl_data_t matrix_error_code_value;
+
+        desc_base = CLUSTER_CONTRACT_CMDQ;
+        cpl_base = CLUSTER_CONTRACT_CPLQ + 32'ha00;
+        matrix_a = MATRIX_FAULT_A_LOCAL;
+        matrix_b = MATRIX_FAULT_B_LOCAL;
+        matrix_dst = 32'h0003_d000;
+        sentinel = 32'hbad0_7e80;
+        accepted_a_reads = 0;
+        source_b_denied = 1'b0;
+
+        // Keep the descriptor legal and the source-A region readable. Only
+        // source B is outside every enabled Protection region.
+        axil_write(REG_REGION0_PERM, 32'd0);
+        axil_write(REG_REGION1_PERM, 32'd0);
+        axil_write(REG_REGION2_PERM, 32'd0);
+        axil_write(REG_REGION3_PERM, 32'd0);
+        for (word_idx = 0; word_idx < 4; word_idx++) begin
+            spad_write(matrix_a + (word_idx << 2), 32'h0101_0101);
+            spad_write(matrix_b + (word_idx << 2), 32'h0101_0101);
+        end
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            spad_write(matrix_dst + (word_idx << 2), sentinel | word_idx);
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            spad_write(cpl_base + (word_idx << 2), sentinel ^ word_idx);
+
+        write_v3_desc(desc_base, 8'h30, 16'h07e8,
+                      matrix_a, matrix_b, matrix_dst,
+                      16'd4, 16'd4, 16'd1);
+        configure_contract_queues(cpl_base, 32'd1);
+        axil_write(REG_REGION0_BASE, desc_base);
+        axil_write(REG_REGION0_LIMIT, desc_base + 32'h40);
+        axil_write(REG_REGION0_PERM, 32'h0000_000d); // descriptor read/execute
+        axil_write(REG_REGION1_BASE, cpl_base);
+        axil_write(REG_REGION1_LIMIT, cpl_base + 32'h10);
+        axil_write(REG_REGION1_PERM, 32'h0000_000b); // completion read/write
+        axil_write(REG_REGION2_BASE, matrix_a);
+        axil_write(REG_REGION2_LIMIT, matrix_a + 32'h100);
+        axil_write(REG_REGION2_PERM, 32'h0000_000d); // source-A read/execute
+
+        axil_write(REG_DOORBELL, 32'd1);
+        matrix_protection_reset_phase = 1;
+        matrix_protection_reset_cg.sample();
+
+        // Observe a real admitted A read followed by the real denied B
+        // request at the production Matrix-to-SPAD boundary.
+        for (poll = 0; poll < 50000; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.matrix_request_valid && compute_vif.banked_ready &&
+                (compute_vif.matrix_banked_req_addr >= matrix_a) &&
+                (compute_vif.matrix_banked_req_addr < matrix_a + 32'h10))
+                accepted_a_reads++;
+            if (compute_vif.selected_banked_valid &&
+                compute_vif.selected_banked_ready &&
+                !compute_vif.selected_banked_access_ok &&
+                (compute_vif.selected_banked_addr >= matrix_b) &&
+                (compute_vif.selected_banked_addr < matrix_b + 32'h10)) begin
+                source_b_denied = 1'b1;
+                break;
+            end
+        end
+        if (!source_b_denied || (accepted_a_reads == 0))
+            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_RESET", $sformatf(
+                "expected accepted source-A read then denied source-B request; A accepts=%0d denied-B=%0b",
+                accepted_a_reads, source_b_denied))
+        matrix_protection_reset_phase = 2;
+        matrix_protection_reset_cg.sample();
+
+        // The source-B request fault is captured on the observed acceptance
+        // edge. Check its architectural error code after NBA updates, then
+        // reset before the error drain can retire a completion.
+        #1ns;
+        if (!uvm_hdl_read(
+                "tb_ai_accel_uvm.dut.compute_cluster_u.tensor_matrix_u.error_code",
+                matrix_error_code_value))
+            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_RESET",
+                "failed to read Matrix error_code after the denied source-B request")
+        if (matrix_error_code_value[3:0] !== 4'd6)
+            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_RESET", $sformatf(
+                "source-B Protection fault did not set ERR_PROTECTION=6; error_code=0x%0h",
+                matrix_error_code_value[3:0]))
+        matrix_protection_reset_phase = 3;
+        matrix_protection_reset_cg.sample();
+
+        #1ns;
+        reset_value = 1'b0;
+        if (!uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value))
+            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_RESET",
+                "failed to assert reset after Matrix consumed the source-B Protection fault")
+        repeat (4) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.rsp_valid !== 1'b0)
+                `uvm_fatal("CLUSTER_MATRIX_PROTECTION_RESET",
+                    "old-epoch SPAD response remained visible during reset")
+        end
+        if (compute_vif.engine_busy !== 7'b0)
+            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_RESET", $sformatf(
+                "engine remained busy during reset: busy=%07b", compute_vif.engine_busy))
+        #1ns;
+        reset_value = 1'b1;
+        if (!uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value))
+            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_RESET",
+                "failed to release reset after Matrix source-B Protection fault")
+        repeat (8) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.rsp_valid !== 1'b0)
+                `uvm_fatal("CLUSTER_MATRIX_PROTECTION_RESET",
+                    "old-epoch SPAD response escaped into the new epoch")
+        end
+        matrix_protection_reset_phase = 5;
+        matrix_protection_reset_cg.sample();
+        wait_spad_idle();
+
+        // Reset must suppress both the failing task's completion and any
+        // destination write. The scratchpad image remains readable here.
+        axil_read(REG_CPLQ_TAIL, value);
+        if (value !== 32'd0)
+            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_RESET", $sformatf(
+                "old-epoch Protection task retired a completion after reset, tail=%0d", value))
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            expect_spad(matrix_dst + (word_idx << 2), sentinel | word_idx,
+                $sformatf("Matrix Protection/reset preserved destination[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            expect_spad(cpl_base + (word_idx << 2), sentinel ^ word_idx,
+                $sformatf("Matrix Protection/reset preserved completion[%0d]", word_idx));
+        matrix_protection_reset_phase = 4;
+        matrix_protection_reset_cg.sample();
+
+        // With reset-cleared Protection state, reissue the same legal GEMM
+        // under a new task ID and compare the complete memory result.
+        write_v3_desc(desc_base, 8'h30, 16'h07e9,
+                      matrix_a, matrix_b, matrix_dst,
+                      16'd4, 16'd4, 16'd1);
+        configure_contract_queues(cpl_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        expect_completion(cpl_base, 16'h07e9, 32'd4, 32'd16,
+                          "Matrix Protection/reset new-epoch recovery");
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            expect_spad(matrix_dst + (word_idx << 2), 32'd4,
+                $sformatf("Matrix Protection/reset recovery Golden[%0d]", word_idx));
+        clear_contract_queues(32'd1);
+        matrix_protection_reset_phase = 6;
+        matrix_protection_reset_cg.sample();
+        if (matrix_protection_reset_cg.get_coverage() < 99.99)
+            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_RESET", $sformatf(
+                "focused phase coverage did not reach 100%%: %0.2f%%",
+                matrix_protection_reset_cg.get_coverage()))
+        `uvm_info("CLUSTER_MATRIX_PROTECTION_RESET_EPOCH_PASS", $sformatf(
+            "source-B denial=1 accepted-A=%0d ERR_PROTECTION=6 observed=1 reset suppressed old completion/writeback=1 recovery=16/16 focused_bins=6/6 coverage=%0.1f%% seed=%0d",
+            accepted_a_reads, matrix_protection_reset_cg.get_coverage(), seed), UVM_LOW)
+    endtask
+
     task automatic run_engine_abort_drain_sweep();
         int engine;
         int unsigned poll;
@@ -7520,6 +7702,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_engine_reset_drain_sweep();
         run_engine_parity_reset_sweep(seed);
         run_matrix_parity_reset_epoch_case(seed);
+        run_matrix_protection_reset_epoch_case(seed);
 
         `uvm_info("COMPUTE_CLUSTER_REAL_UVM_PASS", $sformatf(
             "standalone Matrix16x32x64 Golden + 16 A-tile reuse hits; parallel Matrix/CNM GEMV with separate response tags and four-bank Golden + next-K prefetch + queued SFU tasks + concurrent abort/reset/recovery seed=%0d; prefetch_overlap=%0d matrix_cnm_overlap=%0d matrix_rsp=%0d cnm_rsp=%0d cnm_lanes=%b overlap=%0d arbiter_contention=%0d banked_grants=%0d cnm_grants=%0d core_grants=%0d",
