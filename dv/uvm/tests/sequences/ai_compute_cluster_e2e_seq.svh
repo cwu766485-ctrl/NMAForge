@@ -119,6 +119,14 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned engine_protection_reset_engine;
     bit engine_protection_reset_operand_b;
     int unsigned engine_protection_reset_phase;
+    int unsigned fp16_abort_zero_prefix_hit;
+
+    covergroup fp16_abort_zero_prefix_cg;
+        option.per_instance = 1;
+        cp_fp16_abort_zero_prefix: coverpoint fp16_abort_zero_prefix_hit {
+            bins verified_zero_prefix = {1};
+        }
+    endgroup
 
     covergroup matrix_cnm_shared_reset_cg;
         option.per_instance = 1;
@@ -253,6 +261,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         engine_protection_reset_engine = 0;
         engine_protection_reset_operand_b = 1'b0;
         engine_protection_reset_phase = 0;
+        fp16_abort_zero_prefix_hit = 0;
+        fp16_abort_zero_prefix_cg = new();
         matrix_cnm_shared_reset_cg = new();
         matrix_cnm_prefix_reset_cg = new();
         cnm_protection_matrix_prefix_reset_cg = new();
@@ -6807,6 +6817,17 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_fatal("CLUSTER_ENGINE_ABORT", $sformatf(
                 "long-running Scalar/FP/CNM/Matrix Abort cases failed to preserve zero-prefix sentinels: mask=%07b",
                 sentinel_preserved_mask))
+        // Sample only after the real descriptor, accepted-read drain,
+        // completion code, one-result prefix, and sentinel checks all pass.
+        fp16_abort_zero_prefix_hit = 1;
+        fp16_abort_zero_prefix_cg.sample();
+        if (fp16_abort_zero_prefix_cg.get_coverage() < 99.99)
+            `uvm_fatal("CLUSTER_FP16_ABORT_COVERAGE", $sformatf(
+                "FP16 accepted-read Abort zero-prefix functional bin incomplete: %0.1f%%",
+                fp16_abort_zero_prefix_cg.get_coverage()))
+        `uvm_info("CLUSTER_FP16_ABORT_COVERAGE_PASS", $sformatf(
+            "bins=1/1 coverage=%0.1f%% sampled_after_checker_pass=1",
+            fp16_abort_zero_prefix_cg.get_coverage()), UVM_LOW)
         `uvm_info("CLUSTER_ENGINE_ABORT_PASS", $sformatf(
             "software Abort after accepted SPAD reads drained all real engines; abort mask=%07b post-abort output-write suppression=7/7 zero-prefix sentinel mask=%07b words=%0d/56; short visible prefixes are checked by per-engine Golden tests; completion owner/status and accepted-read response balance checked",
             abort_seen_mask, sentinel_preserved_mask,
