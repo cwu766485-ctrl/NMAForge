@@ -11,6 +11,8 @@ class ai_compute_cluster_coverage extends uvm_component;
     bit multi_engine_abort;
     bit banked_request;
     bit cnm_request;
+    bit matrix_cnm_bank_collision;
+    bit matrix_cnm_cnm_granted;
     bit matrix_prefetch_active;
     bit matrix_a_cache_hit;
     bit matrix_banked_fault_cancel;
@@ -39,6 +41,12 @@ class ai_compute_cluster_coverage extends uvm_component;
         cp_multi_engine_abort: coverpoint multi_engine_abort { bins hit = {1}; }
         cp_banked_request: coverpoint banked_request { bins hit = {1}; }
         cp_cnm_request: coverpoint cnm_request { bins hit = {1}; }
+        cp_matrix_cnm_bank_collision: coverpoint matrix_cnm_bank_collision {
+            bins hit = {1};
+        }
+        cp_matrix_cnm_cnm_granted: coverpoint matrix_cnm_cnm_granted {
+            bins cnm_admitted_while_matrix_waits = {1};
+        }
         cp_matrix_prefetch_active: coverpoint matrix_prefetch_active { bins hit = {1}; }
         cp_matrix_a_cache_hit: coverpoint matrix_a_cache_hit { bins hit = {1}; }
         cp_matrix_banked_fault_cancel: coverpoint matrix_banked_fault_cancel {
@@ -100,6 +108,8 @@ class ai_compute_cluster_coverage extends uvm_component;
         multi_engine_abort = obs.multi_engine_abort;
         banked_request = obs.banked_valid;
         cnm_request = |obs.cnm_valid;
+        matrix_cnm_bank_collision = obs.matrix_cnm_bank_collision;
+        matrix_cnm_cnm_granted = obs.matrix_cnm_cnm_granted;
         matrix_prefetch_active = obs.matrix_prefetch_active;
         matrix_a_cache_hit = obs.matrix_a_cache_hit;
         matrix_banked_fault_cancel = obs.matrix_banked_fault_cancel;
@@ -118,6 +128,7 @@ class ai_compute_cluster_coverage extends uvm_component;
         cnm_lane3_response = obs.cnm_rsp_valid[3];
         if (obs.launch_valid || active_count > 0 || simultaneous_engine_requests ||
             banked_request || cnm_request || obs.rsp_valid ||
+            matrix_cnm_bank_collision || matrix_cnm_cnm_granted ||
             engine_backpressure || multi_engine_abort ||
             matrix_prefetch_active || matrix_a_cache_hit ||
             matrix_banked_fault_cancel || cplq_full)
