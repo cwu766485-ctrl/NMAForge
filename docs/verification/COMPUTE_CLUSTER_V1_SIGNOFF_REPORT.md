@@ -282,3 +282,9 @@ This strengthens only `REQ-CL-028`. Common-memory TinyNPU comparison, GEMV/decod
 At clean candidate SHA `6e47629f103e3ab36948c5bb4eadc196cd27dfb4`, the VCS real-top three-seed regression measures a four-task serial workload at 1,696 service cycles, the same four tasks in parallel at 1,137 cycles (1.492×), and a staged Matrix/CNM plus SFU workload at 1,070 cycles versus 1,239 comparable serial cycles (1.158×). All three seeds pass task completion and Golden checks; the memory scoreboard checks 63,597 words with zero mismatch/unknown/stale and UVM severity 0/0/0. The staged joint-admission count is not a stall metric; the full-parallel window records 38 shared-SPAD backpressure cycles.
 
 This adds reproducible performance and traffic evidence only. It does not close the remaining 14 PARTIAL requirements, common-memory TinyNPU comparison, or ASIC PPA. The release decision remains 24 `PASS-SCOPED` / 14 `PARTIAL`; `CL-DV-v1.0` remains **HOLD**. See the [R153 benchmark report](../benchmark/COMPUTE_CLUSTER_REAL_TOP_BENCHMARK_R153_2026-11-01.md) and [CSV](../benchmark/compute_cluster_cluster_r153.csv).
+
+## R153 exact-candidate clean replay addendum — 2026-11-01
+
+At exact candidate SHA `6e47629f103e3ab36948c5bb4eadc196cd27dfb4` (tree `21478d7e4a595e17b27f7b0e89810d3617a4fd82`), the real-top three-seed UVM benchmark, Top Smoke, deterministic 20-case Top regression, and 28/28 checker-sensitivity campaign all pass. Top Smoke retains the existing `LOOP-REROLL-ENABLED` compile warning. Mutation runs intentionally report expected checker errors, and the target verifies each catch against its expected checker. Logs and exact commands are in the [R153 clean replay report](COMPUTE_CLUSTER_CLEAN_REPLAY_R153_2026-11-01.md).
+
+This confirms reproducibility of the named tests only. The remaining RTM PARTIAL rows and their open legal scenario space are not waived by replay; the overall status is still 24 `PASS-SCOPED` / 14 `PARTIAL`, **HOLD**.

@@ -196,3 +196,9 @@ At test SHA `cc15b4841d2266f34ef8cacae7abd895890eb07a` (tree `41ed9c384dd2ac70d6
 At exact clean test SHA `6e47629f103e3ab36948c5bb4eadc196cd27dfb4` (tree `21478d7e4a595e17b27f7b0e89810d3617a4fd82`), VCS/UVM passes seeds `20261025/26/27`. The real-top Matrix16x32x64 + CNM16 + two GELU64 workload measures 1,696 serial service cycles and 1,137 fully parallel cycles (1.492×); staged Matrix/CNM then one GELU measures 1,070 versus 1,239 comparable serial cycles (1.158×). All Golden and completion checks pass; each 63,597-word scoreboard has zero mismatch/unknown/stale and UVM severity 0/0/0. See [R153 benchmark](../benchmark/COMPUTE_CLUSTER_REAL_TOP_BENCHMARK_R153_2026-11-01.md).
 
 R153 adds bounded benchmark and memory-image evidence only. It does not resolve the remaining requirement gaps or common-memory TinyNPU/PPA work. The disposition remains 24 `PASS-SCOPED` / 14 `PARTIAL`; Compute Cluster v1.0 remains **HOLD**.
+
+## R153 exact-candidate clean replay — 2026-11-01
+
+At tested local SHA `6e47629f103e3ab36948c5bb4eadc196cd27dfb4` (tree `21478d7e4a595e17b27f7b0e89810d3617a4fd82`; published same-tree test commit `79b84addfb870aa96ef99e5ccff9d4f1b2dba0af`), the three-seed real-top UVM benchmark, Top Smoke, deterministic 20-case Top regression, and checker-sensitivity mutation campaign pass. The campaign catches all 28 named mutations, including each lifecycle class on all seven engine bits. The Top Smoke compile retains `Warning-[LOOP-REROLL-ENABLED]`; it is not hidden. Full commands, exact scope and archived log hashes are in the [R153 replay report](COMPUTE_CLUSTER_CLEAN_REPLAY_R153_2026-11-01.md).
+
+This replay does not close the broad legal engine × fault × phase × reset/backpressure crossings. RTM remains 24 `PASS-SCOPED` / 14 `PARTIAL`, and `CL-DV-v1.0` remains **HOLD**.
