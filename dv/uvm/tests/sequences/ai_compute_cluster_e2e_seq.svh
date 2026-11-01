@@ -98,6 +98,22 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] C1_FP_A_LOCAL = 32'h0006_c000;
     localparam bit [31:0] C1_FP_B_LOCAL = 32'h0006_c100;
     localparam bit [31:0] C1_FP_Y_LOCAL = 32'h0006_c200;
+    localparam bit [31:0] FP_LATCH_A_LOCAL = 32'h0006_d000;
+    localparam bit [31:0] FP_LATCH_B_LOCAL = 32'h0006_d100;
+    localparam bit [31:0] FP_LATCH_MUTATED_A_LOCAL = 32'h0006_d200;
+    localparam bit [31:0] FP_LATCH_MUTATED_B_LOCAL = 32'h0006_d300;
+    localparam bit [31:0] FP_LATCH_Y_LOCAL = 32'h0006_d400;
+    localparam bit [31:0] FP_LATCH_MUTATED_Y_LOCAL = 32'h0006_d500;
+    localparam bit [31:0] CONV_LATCH_A_LOCAL = 32'h0006_e000;
+    localparam bit [31:0] CONV_LATCH_W_LOCAL = 32'h0006_e100;
+    localparam bit [31:0] CONV_LATCH_MUTATED_A_LOCAL = 32'h0006_e200;
+    localparam bit [31:0] CONV_LATCH_MUTATED_W_LOCAL = 32'h0006_e300;
+    localparam bit [31:0] CONV_LATCH_Y_LOCAL = 32'h0006_e400;
+    localparam bit [31:0] CONV_LATCH_MUTATED_Y_LOCAL = 32'h0006_e500;
+    localparam bit [31:0] KV_LATCH_SRC_LOCAL = 32'h0006_f000;
+    localparam bit [31:0] KV_LATCH_MUTATED_SRC_LOCAL = 32'h0006_f200;
+    localparam bit [31:0] KV_LATCH_CACHE_LOCAL = 32'h0006_f400;
+    localparam bit [31:0] KV_LATCH_MUTATED_CACHE_LOCAL = 32'h0006_f800;
     localparam bit [31:0] CNM_LATCH_Y_LOCAL = 32'h0004_e300;
     localparam bit [31:0] CNM_LATCH_MUTATED_Y_LOCAL = 32'h0004_e400;
     localparam bit [31:0] SCALAR_OPCODE_CMDQ = 32'h0005_a000;
@@ -302,6 +318,36 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
     task automatic spad_write(input bit [31:0] addr, input bit [31:0] data);
         axil_write(CIMFORGE_SPAD_BASE + addr, data);
+    endtask
+
+    task automatic backdoor_write_spad_word(input bit [31:0] addr,
+                                             input bit [31:0] data,
+                                             input string tag);
+        int unsigned word_addr;
+        int unsigned bank;
+        int unsigned row;
+        string data_path;
+        string parity_path;
+        bit data_ok;
+        bit parity_ok;
+        // Host-port writes during a compute-port request are contractually
+        // rejected by the behavioral SPAD. Use a parity-consistent backdoor
+        // mutation to isolate launch-snapshot retention from that collision.
+        word_addr = addr >> 2;
+        bank = word_addr & 3;
+        row = word_addr >> 2;
+        data_path = $sformatf(
+            "tb_ai_accel_uvm.dut.spad_subsystem_u.scratchpad_u.bank%0d[%0d]",
+            bank, row);
+        parity_path = $sformatf(
+            "tb_ai_accel_uvm.dut.spad_subsystem_u.scratchpad_u.bank%0d_parity[%0d]",
+            bank, row);
+        data_ok = uvm_hdl_deposit(data_path, data);
+        parity_ok = uvm_hdl_deposit(parity_path, ^data);
+        if (!data_ok || !parity_ok)
+            `uvm_fatal("CLUSTER_DESC_BACKDOOR", $sformatf(
+                "%s failed descriptor mutation data_ok=%0b parity_ok=%0b data_path=%s parity_path=%s",
+                tag, data_ok, parity_ok, data_path, parity_path))
     endtask
 
     task automatic expect_spad(input bit [31:0] addr, input bit [31:0] expected, input string tag);
@@ -4246,6 +4292,275 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 compute_vif.launch_snapshot_length[4]))
         `uvm_info("CLUSTER_SFU_PARAMETER_LATCH_PASS",
             "real-top RMSNorm retained its four-element source/destination/length snapshot while the backing descriptor was changed during divider wait",
+            UVM_LOW)
+        clear_contract_queues(32'd1);
+    endtask
+
+    task automatic run_fp_inflight_parameter_latch_test();
+        int unsigned word_idx;
+        int unsigned poll;
+        int unsigned launch_before;
+        bit busy_seen;
+        bit [31:0] completion_base;
+        completion_base = CLUSTER_CONTRACT_CPLQ + 32'h600;
+
+        // 128 BF16 products of 1.0 produce the exact FP32 sum 128.0.
+        // Alternate operands contain 2.0, so accidentally re-reading a
+        // descriptor after mutation would change the numerical result.
+        for (word_idx = 0; word_idx < 64; word_idx++) begin
+            spad_write(FP_LATCH_A_LOCAL + (word_idx << 2), 32'h3f80_3f80);
+            spad_write(FP_LATCH_B_LOCAL + (word_idx << 2), 32'h3f80_3f80);
+            spad_write(FP_LATCH_MUTATED_A_LOCAL + (word_idx << 2), 32'h4000_4000);
+            spad_write(FP_LATCH_MUTATED_B_LOCAL + (word_idx << 2), 32'h4000_4000);
+        end
+        spad_write(FP_LATCH_Y_LOCAL, 32'hbad0_6e00);
+        spad_write(FP_LATCH_MUTATED_Y_LOCAL, 32'hbad0_6e01);
+        spad_write(completion_base + 32'h00, 32'hbad0_6e10);
+        spad_write(completion_base + 32'h04, 32'hbad0_6e11);
+        spad_write(completion_base + 32'h08, 32'hbad0_6e12);
+        spad_write(completion_base + 32'h0c, 32'hbad0_6e13);
+        write_cluster_desc(CLUSTER_CONTRACT_CMDQ, 8'h50, 16'h068a,
+                           FP_LATCH_A_LOCAL, FP_LATCH_B_LOCAL, FP_LATCH_Y_LOCAL,
+                           16'd1, 16'd1, 16'd128, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd7);
+        launch_before = compute_vif.launch_sample_count;
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        busy_seen = 1'b0;
+        for (poll = 0; poll < 10000; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.engine_busy[1]) begin
+                busy_seen = 1'b1;
+                break;
+            end
+        end
+        if (!busy_seen)
+            `uvm_fatal("CLUSTER_FP_PARAM_LATCH",
+                "FP16/BF16 dot task did not become active before descriptor mutation")
+
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h04,
+                                 FP_LATCH_MUTATED_A_LOCAL, "FP src0");
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h08,
+                                 FP_LATCH_MUTATED_B_LOCAL, "FP src1");
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h10,
+                                 FP_LATCH_MUTATED_Y_LOCAL, "FP dst");
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h18,
+                                 32'd2, "FP length");
+
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h04, FP_LATCH_A_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h08, FP_LATCH_B_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h10, FP_LATCH_Y_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h18, 32'd128);
+        expect_spad(FP_LATCH_Y_LOCAL, 32'h4300_0000,
+                    "in-flight BF16 latched 128.0 Golden");
+        expect_spad(FP_LATCH_MUTATED_Y_LOCAL, 32'hbad0_6e01,
+                    "in-flight BF16 mutation destination sentinel");
+        expect_completion(completion_base, 16'h068a, 32'h4300_0000, 32'd128,
+                          "in-flight BF16 parameter latch");
+        if (compute_vif.launch_sample_count != launch_before + 1 ||
+            compute_vif.launch_snapshot_opcode[1] !== 8'h50 ||
+            compute_vif.launch_snapshot_src0[1] !== FP_LATCH_A_LOCAL ||
+            compute_vif.launch_snapshot_src1[1] !== FP_LATCH_B_LOCAL ||
+            compute_vif.launch_snapshot_dst[1] !== FP_LATCH_Y_LOCAL ||
+            compute_vif.launch_snapshot_length[1] !== 16'd128)
+            `uvm_fatal("CLUSTER_FP_PARAM_LATCH", $sformatf(
+                "FP launch snapshot changed: count=%0d/%0d op=%02h src=%08h/%08h dst=%08h length=%0d",
+                compute_vif.launch_sample_count, launch_before + 1,
+                compute_vif.launch_snapshot_opcode[1],
+                compute_vif.launch_snapshot_src0[1],
+                compute_vif.launch_snapshot_src1[1],
+                compute_vif.launch_snapshot_dst[1],
+                compute_vif.launch_snapshot_length[1]))
+        `uvm_info("CLUSTER_FP_PARAMETER_LATCH_PASS",
+            "real-top BF16 dot retained both source addresses, destination and 128-element length after parity-consistent UVM backdoor descriptor-memory mutation; exact FP32 Golden passed",
+            UVM_LOW)
+        clear_contract_queues(32'd1);
+    endtask
+
+    task automatic run_conv_inflight_parameter_latch_test();
+        int unsigned word_idx;
+        int unsigned poll;
+        int unsigned launch_before;
+        bit busy_seen;
+        bit [31:0] completion_base;
+        completion_base = CLUSTER_CONTRACT_CPLQ + 32'h700;
+
+        // A 4x4 input and 3x3 unit kernel have four exact outputs.
+        for (word_idx = 0; word_idx < 16; word_idx++) begin
+            spad_write(CONV_LATCH_A_LOCAL + (word_idx << 2), word_idx + 1);
+            spad_write(CONV_LATCH_MUTATED_A_LOCAL + (word_idx << 2), 32'd0);
+        end
+        for (word_idx = 0; word_idx < 9; word_idx++) begin
+            spad_write(CONV_LATCH_W_LOCAL + (word_idx << 2), 32'd1);
+            spad_write(CONV_LATCH_MUTATED_W_LOCAL + (word_idx << 2), 32'd0);
+        end
+        for (word_idx = 0; word_idx < 4; word_idx++) begin
+            spad_write(CONV_LATCH_Y_LOCAL + (word_idx << 2), 32'hbad0_6f00 | word_idx);
+            spad_write(CONV_LATCH_MUTATED_Y_LOCAL + (word_idx << 2), 32'hbad0_6f10 | word_idx);
+        end
+        write_cluster_desc(CLUSTER_CONTRACT_CMDQ, 8'h16, 16'h068b,
+                           CONV_LATCH_A_LOCAL, CONV_LATCH_W_LOCAL, CONV_LATCH_Y_LOCAL,
+                           16'd4, 16'd4, 16'd9, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd5);
+        launch_before = compute_vif.launch_sample_count;
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        busy_seen = 1'b0;
+        for (poll = 0; poll < 10000; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.engine_busy[5]) begin
+                busy_seen = 1'b1;
+                break;
+            end
+        end
+        if (!busy_seen)
+            `uvm_fatal("CLUSTER_CONV_PARAM_LATCH",
+                "Conv task did not become active before descriptor mutation")
+
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h04,
+                                 CONV_LATCH_MUTATED_A_LOCAL, "Conv src0");
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h08,
+                                 CONV_LATCH_MUTATED_W_LOCAL, "Conv src1");
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h10,
+                                 CONV_LATCH_MUTATED_Y_LOCAL, "Conv dst");
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h14,
+                                 {16'd2,16'd2}, "Conv shape");
+
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h04, CONV_LATCH_A_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h08, CONV_LATCH_W_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h10, CONV_LATCH_Y_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h14, {16'd4,16'd4});
+        expect_spad(CONV_LATCH_Y_LOCAL + 32'h00, 32'd54, "in-flight Conv latched Golden[0]");
+        expect_spad(CONV_LATCH_Y_LOCAL + 32'h04, 32'd63, "in-flight Conv latched Golden[1]");
+        expect_spad(CONV_LATCH_Y_LOCAL + 32'h08, 32'd90, "in-flight Conv latched Golden[2]");
+        expect_spad(CONV_LATCH_Y_LOCAL + 32'h0c, 32'd99, "in-flight Conv latched Golden[3]");
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            expect_spad(CONV_LATCH_MUTATED_Y_LOCAL + (word_idx << 2),
+                        32'hbad0_6f10 | word_idx,
+                        $sformatf("in-flight Conv mutation destination sentinel[%0d]", word_idx));
+        expect_completion(completion_base, 16'h068b, 32'd99, 32'd4,
+                          "in-flight Conv parameter latch");
+        if (compute_vif.launch_sample_count != launch_before + 1 ||
+            compute_vif.launch_snapshot_opcode[5] !== 8'h16 ||
+            compute_vif.launch_snapshot_src0[5] !== CONV_LATCH_A_LOCAL ||
+            compute_vif.launch_snapshot_src1[5] !== CONV_LATCH_W_LOCAL ||
+            compute_vif.launch_snapshot_dst[5] !== CONV_LATCH_Y_LOCAL ||
+            compute_vif.launch_snapshot_m[5] !== 16'd4 ||
+            compute_vif.launch_snapshot_n[5] !== 16'd4 ||
+            compute_vif.launch_snapshot_k[5] !== 16'd9)
+            `uvm_fatal("CLUSTER_CONV_PARAM_LATCH", $sformatf(
+                "Conv launch snapshot changed: count=%0d/%0d op=%02h src=%08h/%08h dst=%08h shape=%0d/%0d/%0d",
+                compute_vif.launch_sample_count, launch_before + 1,
+                compute_vif.launch_snapshot_opcode[5],
+                compute_vif.launch_snapshot_src0[5],
+                compute_vif.launch_snapshot_src1[5],
+                compute_vif.launch_snapshot_dst[5],
+                compute_vif.launch_snapshot_m[5],
+                compute_vif.launch_snapshot_n[5],
+                compute_vif.launch_snapshot_k[5]))
+        `uvm_info("CLUSTER_CONV_PARAMETER_LATCH_PASS",
+            "real-top Conv retained its 4x4/3x3 source, weights, destination and shape after parity-consistent UVM backdoor descriptor-memory mutation; all four independent Golden outputs passed",
+            UVM_LOW)
+        clear_contract_queues(32'd1);
+    endtask
+
+    task automatic run_kv_inflight_parameter_latch_test();
+        int unsigned word_idx;
+        int unsigned poll;
+        int unsigned launch_before;
+        bit busy_seen;
+        bit [31:0] completion_base;
+        bit [31:0] source_word;
+        bit [31:0] expected_output[0:7];
+        bit [31:0] cache_offset;
+        completion_base = CLUSTER_CONTRACT_CPLQ + 32'h800;
+        cache_offset = (32'd2 * 32'd16) + (32'd1 * 32'd64);
+
+        for (word_idx = 0; word_idx < 8; word_idx++) begin
+            source_word = 32'h6f00_1000 | word_idx;
+            expected_output[word_idx] = source_word;
+            spad_write(KV_LATCH_SRC_LOCAL + (word_idx << 2), source_word);
+            spad_write(KV_LATCH_MUTATED_SRC_LOCAL + (word_idx << 2), 32'h4000_0000 | word_idx);
+        end
+        for (word_idx = 0; word_idx < 10; word_idx++) begin
+            spad_write(KV_LATCH_CACHE_LOCAL + cache_offset - 32'd4 + (word_idx << 2),
+                       32'hbad0_6f20 | word_idx);
+            spad_write(KV_LATCH_MUTATED_CACHE_LOCAL + (word_idx << 2),
+                       32'hbad0_6f30 | word_idx);
+        end
+        write_cluster_desc(CLUSTER_CONTRACT_CMDQ, 8'h43, 16'h068c,
+                           KV_LATCH_SRC_LOCAL, 32'd0, KV_LATCH_CACHE_LOCAL,
+                           16'd0, 16'd0, 16'd8, {16'd1,16'd2},
+                           32'd16, 32'd64, 32'd0, 8'd5);
+        launch_before = compute_vif.launch_sample_count;
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        busy_seen = 1'b0;
+        for (poll = 0; poll < 10000; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.engine_busy[6]) begin
+                busy_seen = 1'b1;
+                break;
+            end
+        end
+        if (!busy_seen)
+            `uvm_fatal("CLUSTER_KV_PARAM_LATCH",
+                "KV write task did not become active before descriptor mutation")
+
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h04,
+                                 KV_LATCH_MUTATED_SRC_LOCAL, "KV src0");
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h10,
+                                 KV_LATCH_MUTATED_CACHE_LOCAL, "KV dst");
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h18,
+                                 32'd1, "KV length");
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h20,
+                                 32'd0, "KV aux");
+
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h04, KV_LATCH_SRC_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h10, KV_LATCH_CACHE_LOCAL);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h18, 32'd8);
+        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h20, {16'd1,16'd2});
+        for (word_idx = 0; word_idx < 8; word_idx++)
+            expect_spad(KV_LATCH_CACHE_LOCAL + cache_offset + (word_idx << 2),
+                        expected_output[word_idx],
+                        $sformatf("in-flight KV latched Golden[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 10; word_idx++)
+            expect_spad(KV_LATCH_MUTATED_CACHE_LOCAL + (word_idx << 2),
+                        32'hbad0_6f30 | word_idx,
+                        $sformatf("in-flight KV mutation destination sentinel[%0d]", word_idx));
+        expect_completion(completion_base, 16'h068c, expected_output[7], 32'd8,
+                          "in-flight KV parameter latch");
+        if (compute_vif.launch_sample_count != launch_before + 1 ||
+            compute_vif.launch_snapshot_opcode[6] !== 8'h43 ||
+            compute_vif.launch_snapshot_src0[6] !== KV_LATCH_SRC_LOCAL ||
+            compute_vif.launch_snapshot_dst[6] !== KV_LATCH_CACHE_LOCAL ||
+            compute_vif.launch_snapshot_length[6] !== 16'd8 ||
+            compute_vif.launch_snapshot_aux0[6] !== {16'd1,16'd2} ||
+            compute_vif.launch_snapshot_src0_stride[6] !== 32'd16 ||
+            compute_vif.launch_snapshot_src1_stride[6] !== 32'd64 ||
+            compute_vif.launch_snapshot_dst_stride[6] !== 32'd0)
+            `uvm_fatal("CLUSTER_KV_PARAM_LATCH", $sformatf(
+                "KV launch snapshot changed: count=%0d/%0d op=%02h src=%08h dst=%08h len=%0d aux=%08h strides=%0d/%0d/%0d",
+                compute_vif.launch_sample_count, launch_before + 1,
+                compute_vif.launch_snapshot_opcode[6],
+                compute_vif.launch_snapshot_src0[6],
+                compute_vif.launch_snapshot_dst[6],
+                compute_vif.launch_snapshot_length[6],
+                compute_vif.launch_snapshot_aux0[6],
+                compute_vif.launch_snapshot_src0_stride[6],
+                compute_vif.launch_snapshot_src1_stride[6],
+                compute_vif.launch_snapshot_dst_stride[6]))
+        `uvm_info("CLUSTER_KV_PARAMETER_LATCH_PASS",
+            "real-top KV write retained source, cache base, length, token/head and strides after parity-consistent UVM backdoor descriptor-memory mutation; all eight independent Golden cache words passed",
             UVM_LOW)
         clear_contract_queues(32'd1);
     endtask
@@ -8452,6 +8767,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_inflight_parameter_latch_test();
         run_matrix_inflight_parameter_latch_test(matrix_golden);
         run_sfu_inflight_parameter_latch_test();
+        run_fp_inflight_parameter_latch_test();
+        run_conv_inflight_parameter_latch_test();
+        run_kv_inflight_parameter_latch_test();
         run_shared_readonly_isolation_test();
         check_request_stability();
         run_engine_abort_drain_sweep();
