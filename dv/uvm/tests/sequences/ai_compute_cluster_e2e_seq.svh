@@ -7816,6 +7816,30 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_fatal("CLUSTER_CNM_ROUTE", $sformatf("response route mismatches: Matrix=%0d CNM=%0d", compute_vif.matrix_route_mismatch_count, compute_vif.cnm_route_mismatch_count))
         if (compute_vif.cnm_response_lane_seen !== 4'hf)
             `uvm_fatal("CLUSTER_CNM_BANKS", $sformatf("expected responses from all CNM banks, observed lane mask=%b", compute_vif.cnm_response_lane_seen))
+        if (compute_vif.matrix_cnm_collision_cycles == 0 ||
+            compute_vif.matrix_cnm_collision_grant_cycles == 0 ||
+            compute_vif.matrix_cnm_collision_matrix_wait_cycles == 0 ||
+            compute_vif.matrix_cnm_collision_hold_checks == 0 ||
+            compute_vif.matrix_cnm_collision_owner_violations != 0 ||
+            compute_vif.matrix_cnm_collision_stability_violations != 0)
+            `uvm_fatal("CLUSTER_MATRIX_CNM_BANKED_COLLISION",
+                $sformatf("real Matrix/CNM banked arbitration evidence incomplete: collisions=%0d grants=%0d MatrixWait=%0d stableChecks=%0d ownerViolations=%0d holdViolations=%0d",
+                    compute_vif.matrix_cnm_collision_cycles,
+                    compute_vif.matrix_cnm_collision_grant_cycles,
+                    compute_vif.matrix_cnm_collision_matrix_wait_cycles,
+                    compute_vif.matrix_cnm_collision_hold_checks,
+                    compute_vif.matrix_cnm_collision_owner_violations,
+                    compute_vif.matrix_cnm_collision_stability_violations))
+        `uvm_info("CLUSTER_MATRIX_CNM_BANKED_COLLISION_PASS", $sformatf(
+            "real Matrix banked and CNM lane collision cycles=%0d admitted collisions=%0d Matrix wait cycles=%0d held-payload checks=%0d owner violations=%0d hold violations=%0d MatrixRsp=%0d CNMRsp=%0d route_mismatch=0",
+            compute_vif.matrix_cnm_collision_cycles,
+            compute_vif.matrix_cnm_collision_grant_cycles,
+            compute_vif.matrix_cnm_collision_matrix_wait_cycles,
+            compute_vif.matrix_cnm_collision_hold_checks,
+            compute_vif.matrix_cnm_collision_owner_violations,
+            compute_vif.matrix_cnm_collision_stability_violations,
+            compute_vif.matrix_tag_response_count,
+            compute_vif.cnm_tag_response_count), UVM_LOW)
         `uvm_info("CLUSTER_CNM_OWNER_PASS", $sformatf("Matrix tag3 responses=%0d, CNM tag5 responses=%0d, CNM lane mask=%b, overlap cycles=%0d, shared banked grants=%0d", compute_vif.matrix_tag_response_count, compute_vif.cnm_tag_response_count, compute_vif.cnm_response_lane_seen, compute_vif.matrix_cnm_overlap_cycles, compute_vif.matrix_cnm_shared_accept_cycles), UVM_LOW)
         matrix_prefetch_overlap_total = compute_vif.matrix_prefetch_overlap_cycles;
         matrix_cnm_overlap_total = compute_vif.matrix_cnm_overlap_cycles;

@@ -54,6 +54,7 @@ class ai_compute_cluster_monitor extends uvm_component;
                 (|vif.cnm_valid) || vif.rsp_valid || vif.matrix_rsp_valid ||
                 (|vif.cnm_rsp_valid) || (|vif.read_accept_mask) || vif.cplq_full ||
                 vif.matrix_prefetch_active || vif.matrix_a_cache_hit ||
+                (vif.matrix_request_valid && (|vif.cnm_request_valid)) ||
                 (vif.matrix_banked_fault_cancel_checks !=
                  matrix_fault_cancel_count_seen) ||
                 (missing_done_pending != 0) || (duplicate_done_pending != 0) ||
@@ -75,6 +76,12 @@ class ai_compute_cluster_monitor extends uvm_component;
                 obs.core_spad_valid = vif.core_spad_valid;
                 obs.banked_valid = vif.banked_valid;
                 obs.cnm_valid = vif.cnm_valid;
+                obs.matrix_request_valid = vif.matrix_request_valid;
+                obs.cnm_request_valid = vif.cnm_request_valid;
+                obs.matrix_cnm_bank_collision = vif.matrix_request_valid &&
+                                                (|vif.cnm_request_valid);
+                obs.matrix_cnm_cnm_granted = obs.matrix_cnm_bank_collision &&
+                    (|vif.cnm_request_ready) && !vif.banked_ready;
                 obs.matrix_prefetch_active = vif.matrix_prefetch_active;
                 obs.matrix_a_cache_hit = vif.matrix_a_cache_hit;
                 obs.matrix_banked_fault_cancel =

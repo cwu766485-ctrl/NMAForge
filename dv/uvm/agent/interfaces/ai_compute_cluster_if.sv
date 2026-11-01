@@ -97,6 +97,10 @@ interface ai_compute_cluster_if(input logic aclk);
     integer unsigned benchmark_spad_write_bytes;
     integer matrix_cnm_overlap_cycles;
     integer matrix_cnm_shared_accept_cycles;
+    integer matrix_cnm_collision_cycles;
+    integer matrix_cnm_collision_grant_cycles;
+    integer matrix_cnm_collision_matrix_wait_cycles;
+    integer matrix_cnm_collision_owner_violations;
     integer matrix_tag_response_count;
     integer cnm_tag_response_count;
     logic [3:0] cnm_response_lane_seen;
@@ -140,6 +144,10 @@ interface ai_compute_cluster_if(input logic aclk);
     integer unsigned matrix_banked_fault_cancel_checks;
     logic matrix_banked_stalled_previous;
     logic [31:0] matrix_banked_addr_previous;
+    integer unsigned matrix_cnm_collision_hold_checks;
+    integer unsigned matrix_cnm_collision_stability_violations;
+    logic matrix_cnm_collision_stalled_previous;
+    logic [31:0] matrix_cnm_collision_addr_previous;
     integer unsigned matrix_line_stall_checks;
     integer unsigned matrix_line_stall_violations;
     logic [1:0] matrix_line_stall_dir_seen;
@@ -170,6 +178,10 @@ interface ai_compute_cluster_if(input logic aclk);
         matrix_banked_stall_violations = 0;
         matrix_banked_fault_cancel_checks = 0;
         matrix_banked_stalled_previous = 1'b0;
+        matrix_cnm_collision_hold_checks = 0;
+        matrix_cnm_collision_stability_violations = 0;
+        matrix_cnm_collision_stalled_previous = 1'b0;
+        matrix_cnm_collision_addr_previous = '0;
         matrix_line_stall_checks = 0;
         matrix_line_stall_violations = 0;
         matrix_line_stall_dir_seen = '0;
@@ -215,6 +227,7 @@ interface ai_compute_cluster_if(input logic aclk);
         if (!aresetn || dut_abort_active) begin
             req_stalled_previous = '0;
             matrix_banked_stalled_previous = 1'b0;
+            matrix_cnm_collision_stalled_previous = 1'b0;
             matrix_line_stalled_previous = 1'b0;
             cnm_stalled_previous = '0;
         end else begin
@@ -291,6 +304,21 @@ interface ai_compute_cluster_if(input logic aclk);
             if (matrix_banked_stalled_previous)
                 matrix_banked_addr_previous = matrix_banked_req_addr;
 
+            // A real Matrix banked request can coincide with one or more real
+            // CNM lane requests at the shared scheduler admission point. If
+            // CNM wins that admission, Matrix must hold its request payload.
+            if (matrix_cnm_collision_stalled_previous) begin
+                matrix_cnm_collision_hold_checks++;
+                if (!matrix_request_valid ||
+                    matrix_banked_req_addr !== matrix_cnm_collision_addr_previous)
+                    matrix_cnm_collision_stability_violations++;
+            end
+            matrix_cnm_collision_stalled_previous = matrix_request_valid &&
+                (|cnm_request_valid) && !banked_ready &&
+                (|cnm_request_ready);
+            if (matrix_cnm_collision_stalled_previous)
+                matrix_cnm_collision_addr_previous = matrix_banked_req_addr;
+
             if (matrix_line_stalled_previous) begin
                 matrix_line_stall_checks++;
                 if (matrix_line_write === 1'b0)
@@ -365,6 +393,10 @@ interface ai_compute_cluster_if(input logic aclk);
             benchmark_spad_write_bytes <= 0;
             matrix_cnm_overlap_cycles <= 0;
             matrix_cnm_shared_accept_cycles <= 0;
+            matrix_cnm_collision_cycles <= 0;
+            matrix_cnm_collision_grant_cycles <= 0;
+            matrix_cnm_collision_matrix_wait_cycles <= 0;
+            matrix_cnm_collision_owner_violations <= 0;
             matrix_tag_response_count <= 0;
             cnm_tag_response_count <= 0;
             cnm_response_lane_seen <= 4'd0;
@@ -428,6 +460,18 @@ interface ai_compute_cluster_if(input logic aclk);
             if (matrix_request_valid && (|cnm_request_valid) &&
                 (banked_ready || (|cnm_request_ready)))
                 matrix_cnm_shared_accept_cycles <= matrix_cnm_shared_accept_cycles + 1;
+            if (matrix_request_valid && (|cnm_request_valid)) begin
+                matrix_cnm_collision_cycles <= matrix_cnm_collision_cycles + 1;
+                if (banked_ready && (|cnm_request_ready))
+                    matrix_cnm_collision_owner_violations <=
+                        matrix_cnm_collision_owner_violations + 1;
+                if (banked_ready || (|cnm_request_ready))
+                    matrix_cnm_collision_grant_cycles <=
+                        matrix_cnm_collision_grant_cycles + 1;
+                if (!banked_ready && (|cnm_request_ready))
+                    matrix_cnm_collision_matrix_wait_cycles <=
+                        matrix_cnm_collision_matrix_wait_cycles + 1;
+            end
             if (rsp_valid && rsp_client == 3'd3) begin
                 matrix_tag_response_count <= matrix_tag_response_count + 1;
                 if (!matrix_rsp_valid || (|cnm_rsp_valid))
