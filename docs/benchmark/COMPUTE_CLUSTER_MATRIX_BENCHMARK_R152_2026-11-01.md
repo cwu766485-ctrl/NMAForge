@@ -5,15 +5,15 @@
 R152 reruns the Matrix array-size and microarchitecture ablation targets at the
 R151 test source SHA `cc15b4841d2266f34ef8cacae7abd895890eb07a` (tree
 `41ed9c384dd2ac70d65b06406ff399aca6c85bc1`). The same tree is published as
-test-content commit `a49d3ffe7abd025cc54d384dc51eff1e6f583659`. On seed
-`20261026`, all 15 array-size cases and all 40 ablation cases pass independent
-full-output Golden checks (55/55 total).
+test-content commit `a49d3ffe7abd025cc54d384dc51eff1e6f583659`. Seeds
+`20261025`, `20261026`, and `20261027` each pass 15 array-size cases and 40
+ablation cases with independent full-output Golden checks: 165/165 points.
 
-The benchmark RTL, testbench, Makefile, and summarizer are byte-identical to
-the R82 three-seed benchmark sources. R82 separately passed 165/165 points
-across seeds `20261025/26/27`; see [R82 report](COMPUTE_CLUSTER_MATRIX_BENCHMARK_R82_2026-10-30.md)
-and its CSV. R152 adds a replay at the current candidate SHA and provides a
-compact current-candidate CSV.
+The benchmark RTL, testbench, and Makefile are byte-identical to the R82
+three-seed benchmark sources. R152 adds a small checked-in log-to-CSV
+summarizer so all current-candidate runs can be regenerated; see
+[R82 report](COMPUTE_CLUSTER_MATRIX_BENCHMARK_R82_2026-10-30.md) for the prior
+source-set evidence.
 
 ## Reproduction
 
@@ -22,12 +22,29 @@ responses after one cycle. Simulation period is 10 ns.
 
 ```sh
 make -C dv/block/compute/matrix/sim matrix-size-benchmark \
-  SEED=20261026 \
-  BENCH_OUT_DIR=/tmp/nmaforge_r151_matrix_size_20261031
+  SEED=20261025 BENCH_OUT_DIR=/tmp/nmaforge_r151_matrix_size_20261025
+make -C dv/block/compute/matrix/sim matrix-size-benchmark \
+  SEED=20261026 BENCH_OUT_DIR=/tmp/nmaforge_r151_matrix_size_20261031
+make -C dv/block/compute/matrix/sim matrix-size-benchmark \
+  SEED=20261027 BENCH_OUT_DIR=/tmp/nmaforge_r151_matrix_size_20261027
 
 make -C dv/block/compute/matrix/sim matrix-config-comparison \
-  SEED=20261026 \
-  MATRIX_CONFIG_OUT=/tmp/nmaforge_r151_matrix_config_20261031
+  SEED=20261025 MATRIX_CONFIG_OUT=/tmp/nmaforge_r151_matrix_config_20261025
+make -C dv/block/compute/matrix/sim matrix-config-comparison \
+  SEED=20261026 MATRIX_CONFIG_OUT=/tmp/nmaforge_r151_matrix_config_20261031
+make -C dv/block/compute/matrix/sim matrix-config-comparison \
+  SEED=20261027 MATRIX_CONFIG_OUT=/tmp/nmaforge_r151_matrix_config_20261027
+
+python3 tools/summarize_matrix_r152_three_seed.py \
+  --source-sha cc15b4841d2266f34ef8cacae7abd895890eb07a \
+  --seed 20261025 --seed 20261026 --seed 20261027 \
+  --size-root 20261025=/tmp/nmaforge_r151_matrix_size_20261025 \
+  --size-root 20261026=/tmp/nmaforge_r151_matrix_size_20261031 \
+  --size-root 20261027=/tmp/nmaforge_r151_matrix_size_20261027 \
+  --config-root 20261025=/tmp/nmaforge_r151_matrix_config_20261025 \
+  --config-root 20261026=/tmp/nmaforge_r151_matrix_config_20261031 \
+  --config-root 20261027=/tmp/nmaforge_r151_matrix_config_20261027 \
+  --out docs/benchmark/compute_cluster_matrix_r152.csv
 ```
 
 Workloads in each sweep are `4×4×32`, `8×8×32`, `16×16×32`, `16×32×32`,
@@ -80,21 +97,21 @@ savings do not translate one-for-one into elapsed cycles.
 - This is not a TinyNPU comparison or an integrated seven-engine benchmark.
   `REQ-CL-028` stays PARTIAL pending the remaining common-workload and
   system-level comparisons.
-- A same-candidate Seed `20261025` configuration replay could not acquire a
-  VCS license because the license server was unreachable; its run is not
-  counted. Seed `20261027` was not run at this candidate SHA. The matching
-  benchmark sources retain the separate R82 three-seed 165/165 evidence.
+- The three seeds are all direct runs at the same candidate SHA and use the
+  same 10 ns testbench clock and one-cycle behavioral SPAD response model.
 
 ## Evidence
 
-- [Current-candidate detailed CSV](compute_cluster_matrix_r152.csv), 55 rows;
-  SHA-256 `833ec0a69618647eed87034c735b07a9828267166d3090e688c646d40cfb5288`.
-- Array logs: `/tmp/nmaforge_r151_matrix_size_20261031/array_{4,8,16}/run.log`.
-- Ablation CSV and logs: `/tmp/nmaforge_r151_matrix_config_20261031/`.
-- Logs-only evidence archive (includes compile/run logs and the blocked license
-  attempt, excludes simulator binaries and coverage databases):
-  `/tmp/nmaforge_r152_matrix_evidence.tar.gz`, SHA-256
-  `42280e4fa0793e53c77d24615fe69e18ccb1d225e0301176a82e472d38e2bfb6`.
+- [Current-candidate detailed CSV](compute_cluster_matrix_r152.csv), 165 rows
+  (15 array-size + 40 ablation points per seed); SHA-256
+  `e3b46ea03915b146669b9f2209a9e4aaa66ef147a8a6b950395486edd32f2eb8`.
+- Per-seed array logs: `/tmp/nmaforge_r151_matrix_size_{20261025,20261031,20261027}/`.
+- Per-seed ablation CSV and logs:
+  `/tmp/nmaforge_r151_matrix_config_{20261025,20261031,20261027}/`.
+- Logs-only evidence archive: `/tmp/nmaforge_r152_matrix_evidence_3seed.tar.gz`,
+  SHA-256 `01df4dda85702f49ea5717d2c53c11e45246448852ee4b53651e4e323c1b5541`;
+  it includes compile/run logs and per-seed configuration CSVs, excludes
+  simulator binaries and coverage databases.
 - A full current-candidate R151 test/verification evidence bundle is documented
   in [R151 reset evidence](../verification/COMPUTE_CLUSTER_SCALAR_RESET_ACCEPTED_PREFIX_R151_2026-10-31.md).
 
