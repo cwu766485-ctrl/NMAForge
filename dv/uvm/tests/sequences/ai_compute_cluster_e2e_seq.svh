@@ -7164,16 +7164,33 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 compute_vif.engine_req_stall_cycles[e] == 0)
                 `uvm_fatal("CLUSTER_REQUEST_STABILITY", $sformatf(
                     "engine%0d stability checks lack a stall sample", e))
+        for (e = 0; e < 7; e++)
+            if ((e == 2 && compute_vif.engine_req_stall_dir_seen[e] !== 2'b10) ||
+                (e != 2 && e != 3 && compute_vif.engine_req_stall_dir_seen[e] !== 2'b11))
+                `uvm_fatal("CLUSTER_REQUEST_STABILITY", $sformatf(
+                    "engine%0d stalled direction mask is incomplete for its legal requester interface: read_write_mask=%02b",
+                    e, compute_vif.engine_req_stall_dir_seen[e]))
+        if (compute_vif.matrix_line_stall_dir_seen[1] !== 1'b1)
+            `uvm_fatal("CLUSTER_REQUEST_STABILITY",
+                "Matrix Line did not observe a stalled write request")
         `uvm_info("CLUSTER_REQUEST_STABILITY_PASS", $sformatf(
-            "engine stalled mask=%07b cycles={%0d,%0d,%0d,%0d,%0d,%0d,%0d}; Matrix banked checks=%0d fault-cancel=%0d, Matrix line checks=%0d, CNM lane checks={%0d,%0d,%0d,%0d}",
+            "engine stalled mask=%07b cycles={%0d,%0d,%0d,%0d,%0d,%0d,%0d} direction={%02b,%02b,%02b,%02b,%02b,%02b,%02b}; Matrix banked checks=%0d fault-cancel=%0d, Matrix line checks=%0d direction=%02b, CNM lane checks={%0d,%0d,%0d,%0d}",
             compute_vif.engine_req_stall_seen,
             compute_vif.engine_req_stall_cycles[0], compute_vif.engine_req_stall_cycles[1],
             compute_vif.engine_req_stall_cycles[2], compute_vif.engine_req_stall_cycles[3],
             compute_vif.engine_req_stall_cycles[4], compute_vif.engine_req_stall_cycles[5],
             compute_vif.engine_req_stall_cycles[6],
+            compute_vif.engine_req_stall_dir_seen[0],
+            compute_vif.engine_req_stall_dir_seen[1],
+            compute_vif.engine_req_stall_dir_seen[2],
+            compute_vif.engine_req_stall_dir_seen[3],
+            compute_vif.engine_req_stall_dir_seen[4],
+            compute_vif.engine_req_stall_dir_seen[5],
+            compute_vif.engine_req_stall_dir_seen[6],
             compute_vif.matrix_banked_stall_checks,
             compute_vif.matrix_banked_fault_cancel_checks,
             compute_vif.matrix_line_stall_checks,
+            compute_vif.matrix_line_stall_dir_seen,
             compute_vif.cnm_stall_checks[0], compute_vif.cnm_stall_checks[1],
             compute_vif.cnm_stall_checks[2], compute_vif.cnm_stall_checks[3]), UVM_LOW)
     endtask
