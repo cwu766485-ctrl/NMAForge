@@ -678,3 +678,13 @@ The same published source tree passes checker-sensitivity mutations 28/28, Top S
 | REQ-PC-007 | PARTIAL | Same sequence; Matrix/CNM requester activity and shared-SPAD contention counters | Matrix/CNM joint admission and real shared-SPAD backpressure are measured in the named windows; completion ordering and output Golden checks pass. This does not close all seven-engine simultaneous owner/fault/reset crosses. | Same Run ID and seeds | R153 report, CSV and archived seed logs |
 
 R153 changes no requirement disposition. The complete 38-row RTM remains 24 `PASS-SCOPED` / 14 `PARTIAL`, and `CL-DV-v1.0` remains **HOLD**.
+
+## R153 exact-candidate clean replay — 2026-11-01
+
+| Requirement | Disposition | Test ID / checker | Coverage / observed result | Run ID | Evidence path |
+|---|---|---|---|---|---|
+| REQ-CL-011 | PASS-SCOPED | `R153-CHECKER-MUTATION-28-20261101`; Done/missing-Done/duplicate-Done lifecycle checker | At candidate tree `21478d7e4a595e17b27f7b0e89810d3617a4fd82`, all three lifecycle mutation classes are caught for each of seven engine bits; expected checker identity is verified. This is checker sensitivity, not DUT mutation coverage. | R153-CHECKER-MUTATION-28-20261101 | [R153 replay report](COMPUTE_CLUSTER_CLEAN_REPLAY_R153_2026-11-01.md); archived per-mutation logs |
+| REQ-CL-013 | PASS-SCOPED | Same campaign; exactly-once lifecycle checker | 21/21 Done/missing/duplicate observations are caught by `engine_done_lifecycle`; no product RTL is modified by the campaign. Broader task scheduling/lifecycle scenarios remain scoped to their existing evidence. | Same Run ID | Same report and archive |
+| REQ-CL-028 | PARTIAL | R153 real-top serial/staged/parallel cycle and SPAD traffic monitors | R153 three-seed benchmark passes; exact same candidate tree also passes Top Smoke and a deterministic 20-case top regression. This improves replayability only; common-memory TinyNPU, GEMV/decode and PPA comparisons remain open. | R153 benchmark and replay Run IDs | [R153 benchmark](../benchmark/COMPUTE_CLUSTER_REAL_TOP_BENCHMARK_R153_2026-11-01.md), [clean replay](COMPUTE_CLUSTER_CLEAN_REPLAY_R153_2026-11-01.md) |
+
+No requirement dispositions change. The RTM remains 24 `PASS-SCOPED` / 14 `PARTIAL`; `CL-DV-v1.0` remains **HOLD**.
