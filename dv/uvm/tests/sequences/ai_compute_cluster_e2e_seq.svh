@@ -117,6 +117,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned matrix_protection_reset_phase;
     int unsigned matrix_protection_cnm_reset_phase;
     int unsigned engine_protection_reset_engine;
+    bit engine_protection_reset_operand_b;
     int unsigned engine_protection_reset_phase;
 
     covergroup matrix_cnm_shared_reset_cg;
@@ -211,15 +212,24 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             bins conv = {5};
             bins kv = {6};
         }
+        cp_operand: coverpoint engine_protection_reset_operand_b {
+            bins source_a = {1'b0};
+            bins source_b = {1'b1};
+        }
         cp_phase: coverpoint engine_protection_reset_phase {
             bins launched = {1};
-            bins source_a_denied = {2};
+            bins operand_denied = {2};
             bins protection_error_observed = {3};
             bins reset_epoch_flushed = {4};
             bins old_side_effects_suppressed = {5};
             bins recovery_completion = {6};
         }
-        engine_phase_cross: cross cp_engine, cp_phase;
+        engine_operand_phase_cross: cross cp_engine, cp_operand, cp_phase {
+            ignore_bins sfu_has_no_source_b =
+                binsof(cp_engine.sfu) && binsof(cp_operand.source_b);
+            ignore_bins kv_has_no_source_b =
+                binsof(cp_engine.kv) && binsof(cp_operand.source_b);
+        }
     endgroup
 
     function automatic int signed next_small_signed();
@@ -241,6 +251,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         matrix_protection_reset_phase = 0;
         matrix_protection_cnm_reset_phase = 0;
         engine_protection_reset_engine = 0;
+        engine_protection_reset_operand_b = 1'b0;
         engine_protection_reset_phase = 0;
         matrix_cnm_shared_reset_cg = new();
         matrix_cnm_prefix_reset_cg = new();
@@ -6261,14 +6272,15 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
     task automatic run_engine_protection_reset_case(
         input int unsigned engine,
+        input bit operand_b,
         input int unsigned slot,
         input int unsigned seed);
         bit [31:0] desc_addr;
         bit [31:0] cpl_addr;
         bit [31:0] dst;
         bit [31:0] fault_addr;
-        bit [31:0] permitted_src1;
-        bit [31:0] permitted_src1_span;
+        bit [31:0] permitted_operand;
+        bit [31:0] permitted_operand_span;
         bit [31:0] value;
         bit [15:0] task_id;
         bit [3:0] expected_engine_error_code;
@@ -6293,32 +6305,36 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         protection_error_seen = 1'b0;
         denied_addr = '0;
         engine_protection_reset_engine = engine;
+        engine_protection_reset_operand_b = operand_b;
         engine_protection_reset_phase = 0;
-        permitted_src1 = '0;
-        permitted_src1_span = 32'h100;
+        permitted_operand = '0;
+        permitted_operand_span = 32'h100;
         case (engine)
-            0: permitted_src1 = SCALAR_B_LOCAL;
+            0: permitted_operand = operand_b ? SCALAR_A_LOCAL : SCALAR_B_LOCAL;
             1: begin
-                permitted_src1 = FP_B_LOCAL;
-                permitted_src1_span = 32'd4;
+                permitted_operand = operand_b ? FP_A_LOCAL : FP_B_LOCAL;
+                permitted_operand_span = 32'd4;
             end
-            2: permitted_src1 = CNM_B_LOCAL;
-            3: permitted_src1 = MATRIX_FAULT_B_LOCAL;
-            5: permitted_src1 = CONV_W_LOCAL;
+            2: permitted_operand = operand_b ? CNM_A_LOCAL : CNM_B_LOCAL;
+            3: permitted_operand = operand_b ? MATRIX_FAULT_A_LOCAL : MATRIX_FAULT_B_LOCAL;
+            5: begin
+                permitted_operand = operand_b ? CONV_A_LOCAL : CONV_W_LOCAL;
+                permitted_operand_span = 32'h40;
+            end
             default: begin end
         endcase
         expected_engine_error_code = ((engine == 5) || (engine == 6)) ? 4'd7 : 4'd6;
 
-        prepare_engine_parity_reset_case(engine, 1'b0, task_id,
+        prepare_engine_parity_reset_case(engine, operand_b, task_id,
                                          desc_addr, dst, fault_addr);
         for (word_idx = 0; word_idx < 4; word_idx++)
             spad_write(cpl_addr + (word_idx << 2),
                        32'hbaad_c000 | (slot << 4) | word_idx);
 
-        // Authorize command/completion plus the other operand when this
-        // operation consumes one. Keep the legal source-A address outside all
-        // enabled regions so the intended real requester receives the first
-        // Protection denial on A (Conv legitimately reads weights before A).
+        // Authorize command/completion plus the non-faulted operand when the
+        // operation consumes one. This lets the real requester reach the
+        // selected legal Source-A or Source-B address without relying on a
+        // denied earlier transaction.
         axil_write(REG_REGION0_PERM, 32'd0);
         axil_write(REG_REGION1_PERM, 32'd0);
         axil_write(REG_REGION2_PERM, 32'd0);
@@ -6329,9 +6345,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_REGION1_BASE, cpl_addr);
         axil_write(REG_REGION1_LIMIT, cpl_addr + 32'h10);
         axil_write(REG_REGION1_PERM, 32'h0000_000b);
-        if (permitted_src1 != 0) begin
-            axil_write(REG_REGION2_BASE, permitted_src1);
-            axil_write(REG_REGION2_LIMIT, permitted_src1 + permitted_src1_span);
+        if (permitted_operand != 0) begin
+            axil_write(REG_REGION2_BASE, permitted_operand);
+            axil_write(REG_REGION2_LIMIT, permitted_operand + permitted_operand_span);
             axil_write(REG_REGION2_PERM, 32'h0000_000d);
         end
         configure_contract_queues(cpl_addr, 32'd1);
@@ -6374,8 +6390,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         end
         if (!denied_seen)
             `uvm_fatal("CLUSTER_ENGINE_PROTECTION_RESET", $sformatf(
-                "engine=%0d did not present its source-A address 0x%08h as a denied production request; busy=%07b",
-                engine, fault_addr, compute_vif.engine_busy))
+                "engine=%0d operand=%s did not present address 0x%08h as a denied production request; busy=%07b",
+                engine, operand_b ? "B" : "A", fault_addr, compute_vif.engine_busy))
         engine_protection_reset_phase = 2;
         engine_protection_reset_cg.sample();
 
@@ -6402,8 +6418,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         end
         if (!protection_error_seen)
             `uvm_fatal("CLUSTER_ENGINE_PROTECTION_RESET", $sformatf(
-                "engine=%0d denied 0x%08h but did not expose expected Protection-mapped code=%0d before completion; error vector=0x%07h",
-                engine, denied_addr, expected_engine_error_code, engine_error_codes[27:0]))
+                "engine=%0d operand=%s denied 0x%08h but did not expose expected Protection-mapped code=%0d before completion; error vector=0x%07h",
+                engine, operand_b ? "B" : "A", denied_addr, expected_engine_error_code, engine_error_codes[27:0]))
         if (compute_vif.cpl_valid)
             `uvm_fatal("CLUSTER_ENGINE_PROTECTION_RESET", $sformatf(
                 "engine=%0d protection completion was already valid before reset", engine))
@@ -6449,7 +6465,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 "old-epoch engine=%0d completion was not suppressed; tail=%0d", engine, value))
         for (word_idx = 0; word_idx < 16; word_idx++)
             expect_spad(dst + (word_idx << 2),
-                32'hbaad_0000 | (engine << 8) | word_idx,
+                32'hbaad_0000 | (engine << 8) | (operand_b << 7) | word_idx,
                 $sformatf("Protection-reset engine%0d output sentinel[%0d]", engine, word_idx));
         for (word_idx = 0; word_idx < 4; word_idx++)
             expect_spad(cpl_addr + (word_idx << 2),
@@ -6470,7 +6486,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             5: completion_elements = 32'd1;
             default: completion_elements = 32'd4;
         endcase
-        prepare_engine_parity_reset_case(engine, 1'b0, task_id + 16'h0100,
+        prepare_engine_parity_reset_case(engine, operand_b, task_id + 16'h0100,
                                          desc_addr, dst, fault_addr);
         configure_contract_queues(cpl_addr, 32'd1);
         axil_write(REG_DOORBELL, 32'd1);
@@ -6490,21 +6506,60 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         engine_protection_reset_phase = 6;
         engine_protection_reset_cg.sample();
         `uvm_info("CLUSTER_ENGINE_PROTECTION_RESET_CASE_PASS", $sformatf(
-            "engine=%0d denied_source_A=0x%08h Protection_mapped_error=%0d old_completion/writeback suppressed; reset epoch clean; recovery completion and element count=%0d passed; seed=%0d",
-            engine, denied_addr, expected_engine_error_code, completion_elements, seed), UVM_LOW)
+            "engine=%0d operand=%s denied_address=0x%08h Protection_mapped_error=%0d old_completion/writeback suppressed; reset epoch clean; recovery completion and element count=%0d passed; seed=%0d",
+            engine, operand_b ? "B" : "A", denied_addr, expected_engine_error_code,
+            completion_elements, seed), UVM_LOW)
         clear_contract_queues(32'd1);
     endtask
 
     task automatic run_engine_protection_reset_sweep(input int unsigned seed);
+        int unsigned engine_order[0:11];
+        bit operand_b_order[0:11];
         int unsigned engine;
-        for (engine = 0; engine < 7; engine++)
-            run_engine_protection_reset_case(engine, 32 + engine, seed);
+        int unsigned case_idx;
+        int unsigned swap_idx;
+        int unsigned tmp_engine;
+        bit tmp_operand_b;
+
+        case_idx = 0;
+        for (engine = 0; engine < 7; engine++) begin
+            engine_order[case_idx] = engine;
+            operand_b_order[case_idx] = 1'b0;
+            case_idx++;
+            if (engine == 0 || engine == 1 || engine == 2 ||
+                engine == 3 || engine == 5) begin
+                engine_order[case_idx] = engine;
+                operand_b_order[case_idx] = 1'b1;
+                case_idx++;
+            end
+        end
+        if (case_idx != 12)
+            `uvm_fatal("CLUSTER_ENGINE_PROTECTION_RESET", $sformatf(
+                "legal Protection operand cross expected 12 cases, built=%0d", case_idx))
+
+        // Shuffle only the order of legal cases; the seed remains reproducible
+        // and no fault is injected into an unsupported operand combination.
+        for (case_idx = 11; case_idx > 0; case_idx--) begin
+            rng_state = rng_state ^ (rng_state << 13);
+            rng_state = rng_state ^ (rng_state >> 17);
+            rng_state = rng_state ^ (rng_state << 5);
+            swap_idx = rng_state % (case_idx + 1);
+            tmp_engine = engine_order[case_idx];
+            engine_order[case_idx] = engine_order[swap_idx];
+            engine_order[swap_idx] = tmp_engine;
+            tmp_operand_b = operand_b_order[case_idx];
+            operand_b_order[case_idx] = operand_b_order[swap_idx];
+            operand_b_order[swap_idx] = tmp_operand_b;
+        end
+        for (case_idx = 0; case_idx < 12; case_idx++)
+            run_engine_protection_reset_case(engine_order[case_idx],
+                operand_b_order[case_idx], 32 + case_idx, seed);
         if (engine_protection_reset_cg.get_coverage() < 99.99)
             `uvm_fatal("CLUSTER_ENGINE_PROTECTION_RESET", $sformatf(
-                "seven-engine Protection/reset cross did not cover every declared bin: %0.2f%%",
+                "legal seven-engine/source-operand Protection/reset cross did not cover every declared bin: %0.2f%%",
                 engine_protection_reset_cg.get_coverage()))
         `uvm_info("CLUSTER_ENGINE_PROTECTION_RESET_CROSS_PASS", $sformatf(
-            "Source-A Protection/reset/recovery cross=7/7 engines x 6/6 phases=42/42 coverage=%0.1f%%; real denial, existing per-engine error-code mapping, old-side-effect suppression, and recovery completion checked; seed=%0d",
+            "Protection/reset/recovery cross=7/7 engines, 12/12 legal engine/operand pairs x 6/6 phases=72/72 coverage=%0.1f%%; real denied A/B requests, existing per-engine error-code mapping, old-side-effect suppression, and recovery completion checked in seeded-random order; seed=%0d",
             engine_protection_reset_cg.get_coverage(), seed), UVM_LOW)
     endtask
 
