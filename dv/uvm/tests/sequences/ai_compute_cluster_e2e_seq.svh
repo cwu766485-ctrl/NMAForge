@@ -115,6 +115,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned sfu_reset_prefix_phase;
     int unsigned scalar_reset_prefix_phase;
     int unsigned matrix_protection_reset_phase;
+    int unsigned matrix_protection_cnm_reset_phase;
 
     covergroup matrix_cnm_shared_reset_cg;
         option.per_instance = 1;
@@ -185,6 +186,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         }
     endgroup
 
+    covergroup matrix_protection_cnm_reset_cg;
+        option.per_instance = 1;
+        cp_matrix_protection_cnm_reset_phase: coverpoint matrix_protection_cnm_reset_phase {
+            bins legal_matrix_and_cnm_tasks_launched = {1};
+            bins matrix_source_b_protection_observed = {2};
+            bins cnm_read_response_pending_at_reset = {3};
+            bins reset_quiet_window = {4};
+            bins release_quiet_and_old_side_effects_suppressed = {5};
+            bins matrix_cnm_golden_recovery = {6};
+        }
+    endgroup
+
     function automatic int signed next_small_signed();
         int unsigned value;
         rng_state = rng_state ^ (rng_state << 13);
@@ -202,12 +215,14 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         sfu_reset_prefix_phase = 0;
         scalar_reset_prefix_phase = 0;
         matrix_protection_reset_phase = 0;
+        matrix_protection_cnm_reset_phase = 0;
         matrix_cnm_shared_reset_cg = new();
         matrix_cnm_prefix_reset_cg = new();
         cnm_protection_matrix_prefix_reset_cg = new();
         sfu_reset_prefix_cg = new();
         scalar_reset_prefix_cg = new();
         matrix_protection_reset_cg = new();
+        matrix_protection_cnm_reset_cg = new();
     endfunction
 
     task automatic axil_write(input bit [31:0] addr, input bit [31:0] data);
@@ -5881,6 +5896,342 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             accepted_a_reads, matrix_protection_reset_cg.get_coverage(), seed), UVM_LOW)
     endtask
 
+    task automatic run_matrix_protection_cnm_pending_reset_case(input int unsigned seed);
+        int unsigned poll;
+        int unsigned word_idx;
+        int unsigned k_word;
+        int unsigned row_idx;
+        int unsigned lane;
+        int unsigned byte_idx;
+        int unsigned accepted_a_reads;
+        int unsigned accepted_cnm_reads;
+        int unsigned returned_cnm_reads;
+        int unsigned accepted_cnm_writes;
+        int unsigned dropped_cnm_reads;
+        int signed a_value;
+        int signed b_value;
+        int signed expected_cnm[0:15];
+        bit [31:0] packed_word;
+        bit [31:0] cnm_write_data[0:15];
+        bit [31:0] desc_base;
+        bit [31:0] cpl_base;
+        bit [31:0] matrix_a;
+        bit [31:0] matrix_b;
+        bit [31:0] matrix_dst;
+        bit [31:0] cnm_dst;
+        bit [31:0] sentinel;
+        bit [31:0] value;
+        bit source_b_denied;
+        bit matrix_fault_seen;
+        bit both_engines_seen;
+        bit reset_asserted;
+        bit monitor_done;
+        uvm_hdl_data_t reset_value;
+        uvm_hdl_data_t matrix_error_code_value;
+
+        desc_base = CLUSTER_CONTRACT_CMDQ;
+        cpl_base = CLUSTER_CONTRACT_CPLQ + 32'hb00;
+        matrix_a = MATRIX_FAULT_A_LOCAL;
+        matrix_b = MATRIX_FAULT_B_LOCAL;
+        matrix_dst = 32'h0003_d400;
+        cnm_dst = MATRIX_LINE_STALL_CNM_Y_LOCAL;
+        sentinel = 32'hbad0_7ea0;
+        accepted_a_reads = 0;
+        accepted_cnm_reads = 0;
+        returned_cnm_reads = 0;
+        accepted_cnm_writes = 0;
+        dropped_cnm_reads = 0;
+        source_b_denied = 1'b0;
+        matrix_fault_seen = 1'b0;
+        both_engines_seen = 1'b0;
+        reset_asserted = 1'b0;
+        monitor_done = 1'b0;
+        matrix_protection_cnm_reset_phase = 0;
+
+        // Prepare a legal, long-running real CNM GEMV. Launch it first and
+        // publish Matrix only after an accepted CNM read is observably pending.
+        for (k_word = 0; k_word < 32; k_word++) begin
+            for (lane = 0; lane < 4; lane++) begin
+                packed_word = '0;
+                for (byte_idx = 0; byte_idx < 4; byte_idx++) begin
+                    a_value = int'(k_word % 5) + int'(lane * 2) +
+                              int'(byte_idx) - 5;
+                    packed_word[byte_idx*8 +: 8] = a_value[7:0];
+                end
+                spad_write(MATRIX_LINE_STALL_CNM_A_LOCAL +
+                           (k_word << 4) + (lane << 2), packed_word);
+            end
+        end
+        for (row_idx = 0; row_idx < 16; row_idx++) begin
+            expected_cnm[row_idx] = 0;
+            for (k_word = 0; k_word < 32; k_word++) begin
+                for (lane = 0; lane < 4; lane++) begin
+                    packed_word = '0;
+                    for (byte_idx = 0; byte_idx < 4; byte_idx++) begin
+                        a_value = int'(k_word % 5) + int'(lane * 2) +
+                                  int'(byte_idx) - 5;
+                        b_value = int'(row_idx % 5) + int'(k_word % 3) +
+                                  int'(lane) + int'(byte_idx) - 3;
+                        packed_word[byte_idx*8 +: 8] = b_value[7:0];
+                        expected_cnm[row_idx] += a_value * b_value;
+                    end
+                    spad_write(MATRIX_LINE_STALL_CNM_B_LOCAL +
+                               ((row_idx * 32 + k_word) << 4) +
+                               (lane << 2), packed_word);
+                end
+            end
+        end
+
+        for (word_idx = 0; word_idx < 4; word_idx++) begin
+            spad_write(matrix_a + (word_idx << 2), 32'h0101_0101);
+            spad_write(matrix_b + (word_idx << 2), 32'h0101_0101);
+        end
+        for (word_idx = 0; word_idx < 16; word_idx++) begin
+            spad_write(matrix_dst + (word_idx << 2), sentinel | word_idx);
+            spad_write(cnm_dst + (word_idx << 2), sentinel ^ word_idx);
+        end
+        for (word_idx = 0; word_idx < 8; word_idx++)
+            spad_write(cpl_base + (word_idx << 2), sentinel ^ (word_idx + 16));
+
+        write_cluster_desc(desc_base, 8'h21, 16'h07ea,
+                           MATRIX_LINE_STALL_CNM_A_LOCAL,
+                           MATRIX_LINE_STALL_CNM_B_LOCAL, cnm_dst,
+                           16'd16, 16'd1, 16'd32, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd3);
+        write_v3_desc(desc_base + 32'h40, 8'h30, 16'h07eb,
+                      matrix_a, matrix_b, matrix_dst,
+                      16'd4, 16'd4, 16'd1);
+
+        axil_write(REG_REGION0_PERM, 32'd0);
+        axil_write(REG_REGION1_PERM, 32'd0);
+        axil_write(REG_REGION2_PERM, 32'd0);
+        axil_write(REG_REGION3_PERM, 32'd0);
+        axil_write(REG_REGION0_BASE, desc_base);
+        axil_write(REG_REGION0_LIMIT, desc_base + 32'h80);
+        axil_write(REG_REGION0_PERM, 32'h0000_000d); // descriptor read/execute
+        axil_write(REG_REGION1_BASE, cpl_base);
+        axil_write(REG_REGION1_LIMIT, cpl_base + 32'h20);
+        axil_write(REG_REGION1_PERM, 32'h0000_000b); // completion read/write
+        axil_write(REG_REGION2_BASE, matrix_a);
+        axil_write(REG_REGION2_LIMIT, matrix_a + 32'h100);
+        axil_write(REG_REGION2_PERM, 32'h0000_000d); // Matrix source-A read
+        axil_write(REG_REGION3_BASE, MATRIX_LINE_STALL_CNM_A_LOCAL);
+        axil_write(REG_REGION3_LIMIT, cnm_dst + 32'h40);
+        axil_write(REG_REGION3_PERM, 32'h0000_000f); // CNM A/B and output
+
+        fork
+            begin : matrix_protection_cnm_response_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    accepted_cnm_reads += $countones(compute_vif.cnm_accept_mask);
+                    returned_cnm_reads += $countones(compute_vif.cnm_rsp_valid);
+                    if (compute_vif.engine_req_valid[2] &&
+                        compute_vif.engine_req_ready[2] &&
+                        compute_vif.engine_req_write[2] &&
+                        (compute_vif.engine_req_addr[2*32 +: 32] >= cnm_dst) &&
+                        (compute_vif.engine_req_addr[2*32 +: 32] < cnm_dst + 32'h40)) begin
+                        if (accepted_cnm_writes >= 16)
+                            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_CNM_RESET",
+                                "CNM accepted more output writes than its 16-row GEMV")
+                        if (compute_vif.engine_req_addr[2*32 +: 32] !==
+                            cnm_dst + (accepted_cnm_writes << 2))
+                            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_CNM_RESET", $sformatf(
+                                "pre-reset CNM writes are not a contiguous prefix: index=%0d expected=0x%08h actual=0x%08h",
+                                accepted_cnm_writes,
+                                cnm_dst + (accepted_cnm_writes << 2),
+                                compute_vif.engine_req_addr[2*32 +: 32]))
+                        cnm_write_data[accepted_cnm_writes] =
+                            compute_vif.engine_req_wdata[2*32 +: 32];
+                        if ($signed(cnm_write_data[accepted_cnm_writes]) !==
+                            expected_cnm[accepted_cnm_writes])
+                            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_CNM_RESET", $sformatf(
+                                "pre-reset CNM write is not Golden: index=%0d expected=%0d actual=%0d",
+                                accepted_cnm_writes, expected_cnm[accepted_cnm_writes],
+                                $signed(cnm_write_data[accepted_cnm_writes])))
+                        accepted_cnm_writes++;
+                    end
+                end
+            end
+            begin : matrix_protection_cnm_reset_control
+                bit matrix_a_accept_now;
+                bit matrix_b_denied_now;
+                bit both_engines_now;
+
+                configure_contract_queues(cpl_base, 32'd2);
+                axil_write(REG_CMDQ_BASE, desc_base);
+                axil_write(REG_DOORBELL, 32'd1);
+                // Both descriptors are legal and published together. CMDQ
+                // order launches CNM first; descriptor fetch latency plus its
+                // long GEMV keeps a real response outstanding at Matrix fault.
+                for (poll = 0; poll < 50000 && !reset_asserted; poll++) begin
+                    @(posedge compute_vif.aclk);
+                    matrix_a_accept_now =
+                        compute_vif.matrix_request_valid &&
+                        compute_vif.banked_ready &&
+                        (compute_vif.matrix_banked_req_addr >= matrix_a) &&
+                        (compute_vif.matrix_banked_req_addr < matrix_a + 32'h10);
+                    matrix_b_denied_now =
+                        compute_vif.selected_banked_valid &&
+                        compute_vif.selected_banked_ready &&
+                        !compute_vif.selected_banked_access_ok &&
+                        (compute_vif.selected_banked_addr >= matrix_b) &&
+                        (compute_vif.selected_banked_addr < matrix_b + 32'h10);
+                    both_engines_now = compute_vif.engine_busy[2] &&
+                                       compute_vif.engine_busy[3];
+                    #1ns;
+                    if (matrix_a_accept_now)
+                        accepted_a_reads++;
+                    if (both_engines_now && !both_engines_seen) begin
+                        both_engines_seen = 1'b1;
+                        matrix_protection_cnm_reset_phase = 1;
+                        matrix_protection_cnm_reset_cg.sample();
+                    end
+                    if (matrix_b_denied_now && !matrix_fault_seen) begin
+                        source_b_denied = 1'b1;
+                        matrix_fault_seen = 1'b1;
+                        if (!uvm_hdl_read(
+                                "tb_ai_accel_uvm.dut.compute_cluster_u.tensor_matrix_u.error_code",
+                                matrix_error_code_value))
+                            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_CNM_RESET",
+                                "failed to read Matrix error_code after source-B denial")
+                        if (matrix_error_code_value[3:0] !== 4'd6)
+                            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_CNM_RESET", $sformatf(
+                                "Matrix source-B denial did not set ERR_PROTECTION=6; error_code=0x%0h",
+                                matrix_error_code_value[3:0]))
+                        matrix_protection_cnm_reset_phase = 2;
+                        matrix_protection_cnm_reset_cg.sample();
+                    end
+                    if (matrix_fault_seen && compute_vif.engine_busy[2] &&
+                        compute_vif.engine_busy[3] &&
+                        (accepted_cnm_reads > returned_cnm_reads)) begin
+                        dropped_cnm_reads = accepted_cnm_reads -
+                                            returned_cnm_reads;
+                        matrix_protection_cnm_reset_phase = 3;
+                        matrix_protection_cnm_reset_cg.sample();
+                        reset_value = 1'b0;
+                        if (!uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value))
+                            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_CNM_RESET",
+                                "failed to assert shared reset with Matrix Protection and a pending CNM response")
+                        reset_asserted = 1'b1;
+                        monitor_done = 1'b1;
+                        break;
+                    end
+                end
+            end
+        join
+        if (!source_b_denied || (accepted_a_reads == 0) || !both_engines_seen ||
+            !reset_asserted || (dropped_cnm_reads == 0))
+            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_CNM_RESET", $sformatf(
+                "Matrix Protection/CNM pending reset point not reached: denied=%0b A_accepts=%0d both_busy=%0b reset=%0b CNM accepted=%0d returned=%0d",
+                source_b_denied, accepted_a_reads, both_engines_seen,
+                reset_asserted, accepted_cnm_reads, returned_cnm_reads))
+
+        repeat (4) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.rsp_valid !== 1'b0 ||
+                compute_vif.matrix_rsp_valid !== 1'b0 ||
+                compute_vif.cnm_rsp_valid !== 4'b0)
+                `uvm_fatal("CLUSTER_MATRIX_PROTECTION_CNM_RESET", $sformatf(
+                    "old-epoch response remained visible during reset: spad=%0b Matrix=%0b CNM=%b",
+                    compute_vif.rsp_valid, compute_vif.matrix_rsp_valid,
+                    compute_vif.cnm_rsp_valid))
+        end
+        if (compute_vif.engine_busy !== 7'b0)
+            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_CNM_RESET", $sformatf(
+                "engines remained busy during shared reset: busy=%07b",
+                compute_vif.engine_busy))
+        matrix_protection_cnm_reset_phase = 4;
+        matrix_protection_cnm_reset_cg.sample();
+        #1ns;
+        reset_value = 1'b1;
+        if (!uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value))
+            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_CNM_RESET",
+                "failed to release shared reset")
+        repeat (8) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.rsp_valid !== 1'b0 ||
+                compute_vif.matrix_rsp_valid !== 1'b0 ||
+                compute_vif.cnm_rsp_valid !== 4'b0)
+                `uvm_fatal("CLUSTER_MATRIX_PROTECTION_CNM_RESET", $sformatf(
+                    "old-epoch response escaped into the new epoch: spad=%0b Matrix=%0b CNM=%b",
+                    compute_vif.rsp_valid, compute_vif.matrix_rsp_valid,
+                    compute_vif.cnm_rsp_valid))
+        end
+        wait_spad_idle();
+
+        axil_read(REG_CPLQ_TAIL, value);
+        if (value !== 32'd0)
+            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_CNM_RESET", $sformatf(
+                "shared reset published an old-epoch completion tail=%0d", value))
+        for (word_idx = 0; word_idx < 16; word_idx++) begin
+            expect_spad(matrix_dst + (word_idx << 2), sentinel | word_idx,
+                $sformatf("Matrix/CNM reset preserved Matrix destination[%0d]", word_idx));
+            if (word_idx < accepted_cnm_writes)
+                expect_spad(cnm_dst + (word_idx << 2), expected_cnm[word_idx],
+                    $sformatf("Matrix/CNM reset preserved CNM Golden prefix[%0d]", word_idx));
+            else
+                expect_spad(cnm_dst + (word_idx << 2), sentinel ^ word_idx,
+                    $sformatf("Matrix/CNM reset preserved CNM untouched suffix[%0d]", word_idx));
+        end
+        for (word_idx = 0; word_idx < 8; word_idx++)
+            expect_spad(cpl_base + (word_idx << 2), sentinel ^ (word_idx + 16),
+                $sformatf("Matrix/CNM reset preserved completion[%0d]", word_idx));
+        matrix_protection_cnm_reset_phase = 5;
+        matrix_protection_cnm_reset_cg.sample();
+
+        // Replay both legal tasks in a fresh epoch and compare complete
+        // independently generated Matrix and CNM output images.
+        for (word_idx = 0; word_idx < 4; word_idx++) begin
+            spad_write(matrix_a + (word_idx << 2), 32'h0101_0101);
+            spad_write(matrix_b + (word_idx << 2), 32'h0101_0101);
+        end
+        write_cluster_desc(desc_base, 8'h21, 16'h07ec,
+                           MATRIX_LINE_STALL_CNM_A_LOCAL,
+                           MATRIX_LINE_STALL_CNM_B_LOCAL, cnm_dst,
+                           16'd16, 16'd1, 16'd32, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd3);
+        write_v3_desc(desc_base + 32'h40, 8'h30, 16'h07ed,
+                      matrix_a, matrix_b, matrix_dst,
+                      16'd4, 16'd4, 16'd1);
+        for (word_idx = 0; word_idx < 4; word_idx++) begin
+            expect_spad(matrix_a + (word_idx << 2), 32'h0101_0101,
+                $sformatf("Matrix/CNM recovery source-A image[%0d]", word_idx));
+            expect_spad(matrix_b + (word_idx << 2), 32'h0101_0101,
+                $sformatf("Matrix/CNM recovery source-B image[%0d]", word_idx));
+        end
+        expect_spad(desc_base + 32'h44, matrix_a,
+                    "Matrix/CNM recovery descriptor source-A address");
+        expect_spad(desc_base + 32'h48, matrix_b,
+                    "Matrix/CNM recovery descriptor source-B address");
+        configure_contract_queues(cpl_base, 32'd2);
+        axil_write(REG_CMDQ_BASE, desc_base);
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd2);
+        wait_spad_idle();
+        expect_completion(cpl_base, 16'h07ec, expected_cnm[15], 32'd16,
+                          "Matrix Protection/CNM reset recovery CNM");
+        expect_completion(cpl_base + 32'h10, 16'h07ed, 32'd4, 32'd16,
+                          "Matrix Protection/CNM reset recovery Matrix");
+        for (word_idx = 0; word_idx < 16; word_idx++) begin
+            expect_spad(cnm_dst + (word_idx << 2), expected_cnm[word_idx],
+                $sformatf("Matrix Protection/CNM reset CNM Golden[%0d]", word_idx));
+            expect_spad(matrix_dst + (word_idx << 2), 32'd4,
+                $sformatf("Matrix Protection/CNM reset Matrix Golden[%0d]", word_idx));
+        end
+        clear_contract_queues(32'd2);
+        matrix_protection_cnm_reset_phase = 6;
+        matrix_protection_cnm_reset_cg.sample();
+        if (matrix_protection_cnm_reset_cg.get_coverage() < 99.99)
+            `uvm_fatal("CLUSTER_MATRIX_PROTECTION_CNM_RESET", $sformatf(
+                "focused Matrix/CNM Protection-reset phase coverage did not reach 100%%: %0.2f%%",
+                matrix_protection_cnm_reset_cg.get_coverage()))
+        `uvm_info("CLUSTER_MATRIX_PROTECTION_CNM_RESET_EPOCH_PASS", $sformatf(
+            "source-B denial=1 accepted-A=%0d ERR_PROTECTION=6 CNM reads accepted=%0d returned=%0d reset_dropped=%0d preserved_Golden_prefix=%0d/16 reset suppressed stale completion/writeback=1 recovery matrix=16/16 cnm=16/16 focused_bins=6/6 coverage=%0.1f%% seed=%0d",
+            accepted_a_reads, accepted_cnm_reads, returned_cnm_reads,
+            dropped_cnm_reads, accepted_cnm_writes,
+            matrix_protection_cnm_reset_cg.get_coverage(), seed), UVM_LOW)
+    endtask
+
     task automatic run_engine_abort_drain_sweep();
         int engine;
         int unsigned poll;
@@ -7703,6 +8054,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_engine_parity_reset_sweep(seed);
         run_matrix_parity_reset_epoch_case(seed);
         run_matrix_protection_reset_epoch_case(seed);
+        run_matrix_protection_cnm_pending_reset_case(seed);
 
         `uvm_info("COMPUTE_CLUSTER_REAL_UVM_PASS", $sformatf(
             "standalone Matrix16x32x64 Golden + 16 A-tile reuse hits; parallel Matrix/CNM GEMV with separate response tags and four-bank Golden + next-K prefetch + queued SFU tasks + concurrent abort/reset/recovery seed=%0d; prefetch_overlap=%0d matrix_cnm_overlap=%0d matrix_rsp=%0d cnm_rsp=%0d cnm_lanes=%b overlap=%0d arbiter_contention=%0d banked_grants=%0d cnm_grants=%0d core_grants=%0d",
