@@ -1,13 +1,13 @@
 # Compute Cluster v1.0 Final Audit
 
-**Review date:** 2026-11-01
+**Review date:** 2026-11-02
 
 **Selected product/SPEC candidate:** c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413 (R99 CNM Protection response alignment; SPEC v1.8); R54 top-test SHA f24c5383fad511c8b2e1132c1157942807994759
 - **Prior reviewed product baseline:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6`
 - **Follow-up evidence branch:** `work/compute-cluster-kv-overflow-20261030`
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
-- **Latest clean verification replay SHA:** `cc15b4841d2266f34ef8cacae7abd895890eb07a` (R151 three-seed clean-worktree real-top UVM, 28/28 checker-sensitivity, Top Smoke, and 20-case seeded Top; tree `41ed9c384dd2ac70d65b06406ff399aca6c85bc1`).
-**Latest verification/test candidate:** R151 test SHA `cc15b4841d2266f34ef8cacae7abd895890eb07a`; exact clean replay at that source tree. It is test-only; product RTL/SPEC remain tied to their separately reviewed baselines. R152 separately reruns the Matrix benchmark on this test SHA. Earlier formal evidence retains its own exact SHA.
+- **Latest clean verification replay SHA:** `db7588be34200ac68ac66072799adca54ad287a5` (R164 three-seed real-top UVM, 28/28 checker-sensitivity, Top Smoke, 20-case seeded Top, and three-seed Matrix benchmark; tree `e0816beba67133fbf6221005f16f97cba63eb2ca`).
+**Latest verification/test candidate:** R164 test SHA `db7588be34200ac68ac66072799adca54ad287a5`; exact clean replay at that source tree. It is verification-only; product RTL/SPEC remain tied to their separately reviewed baselines. R164 reruns the Matrix size and eight-configuration benchmark on the same test SHA. Earlier formal evidence retains its own exact SHA.
 **Decision:** bounded CL-RC1/CL-RC2 review candidate; **CL-DV-v1.0 is not signed**.
 
 ## Executive disposition
@@ -220,3 +220,9 @@ At exact test SHA `3c4b558c4b9d7fa479c259be175abbff9c48b9f9` (tree `d3cc2b761292
 ## R163 FP16 single-result Abort — 2026-11-01
 
 At clean test SHA `f2e671de1c5d0a9a7f6c23d49b34c9d8a9501432` (tree `e79fa9bfd27c992816c02f4dfd364b6aed5fcc23`), the real-top FP16 `0x51` accepted-read Abort point passes on seeds `20261025/26/27`. Each run drains 4/4 accepted reads, checks `ERR_ABORT`, preserves the single FP32 output's 8-word sentinel region, suppresses post-Abort writes, and completes the independent 68,712-word Memory Scoreboard with zero mismatch/unknown/stale. The required marker is gated on all seeds; the same clean SHA passes Top Smoke, 20-case seeded Top, and 28/28 checker-sensitivity mutations. `cluster_cg` remains 64/64 and mixed all-group URG is 64.86%; the new point has no separate URG bin. This is scoped evidence only: `REQ-CL-017/019/027` and `REQ-PC-006` remain PARTIAL; broad fault × phase × reset and completion interactions remain open, and `CL-DV-v1.0` remains **HOLD**. See [R163 report](COMPUTE_CLUSTER_FP16_ABORT_ZERO_PREFIX_R163_2026-11-01.md); logs-only archive SHA-256 `b6a88bd167754d9c92a03df9ae882eae2511a61f6fd3b30d526213e1cb29cfc7`.
+
+## R164 FP16 coverage and benchmark replay — 2026-11-02
+
+At exact test SHA `db7588be34200ac68ac66072799adca54ad287a5` (tree `e0816beba67133fbf6221005f16f97cba63eb2ca`), the new FP16 `0x51` Abort group reaches `1/1` (`100.00%`) after all scenario checkers pass; URG merges three actual hits. Each UVM seed checks 4/4 accepted reads drained, `ERR_ABORT`, the legal `0/1` single-FP32 output prefix, 8/8 sentinels, no post-Abort writes, and a 68,712-word scoreboard with zero mismatch/unknown/stale/orphan. The same SHA passes 28/28 assigned-checker sensitivity probes, Top Smoke, and the 20-case seeded Top run. Compute `cluster_cg` is `64/64`; nine sequence-level Compute Cluster functional groups are 100%. The aggregate UVM group score is `66.93%`, with DMA/AXI groups unhit by this compute-only test and AXI4/AXI-Lite groups partial; this is not global functional coverage.
+
+At the same SHA, 165/165 Matrix size/ablation benchmark points pass over three seeds. Results, modeled SPAD assumptions, cycles, utilization, bandwidth, stall counts, and the benchmark CSV are in the [R164 report](../benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R164_2026-11-02.md). The VCS/URG logs-only archive SHA-256 is `c784ba44f8e1af5ad0c793fcf644b78ae855d457192825f806fb8552bec1fada`. These additions improve only named coverage points and performance evidence; they do not promote the 38-row status (`24 PASS-SCOPED / 14 PARTIAL`) or the overall **HOLD** decision.
