@@ -292,3 +292,7 @@ This confirms reproducibility of the named tests only. The remaining RTM PARTIAL
 ## R153 selected memory-fabric replay addendum — 2026-11-01
 
 On exact candidate tree `21478d7e4a595e17b27f7b0e89810d3617a4fd82`, all four user-selected `ai_accel_memory_fabric` reset/owner targets pass on seeds `20261025/26/27`. The named functional groups are each 100%; relevant owner/tag SVA properties have non-vacuous successes with zero failures/incomplete, and each run reports UVM severity `0/0/0`. The replay confirms the in-repository fabric slice only: Core/Banked requesters are testbench-driven and do not qualify production Matrix-engine contention or the complete seven-engine fault/reset cross. `REQ-CL-018/PC-007` remain PARTIAL; overall **HOLD** remains. See the [R153 fabric report](COMPUTE_CLUSTER_MEMORY_FABRIC_CLEAN_REPLAY_R153_2026-11-01.md).
+
+## R154 Matrix FSM residual disposition — 2026-11-01
+
+At the exact R153 candidate SHA `6e47629f103e3ab36948c5bb4eadc196cd27dfb4`, enabled-profile Matrix VCS/URG reproduces 49/53 transitions on three seeds; the prefetch-off compile separately covers the legal `ST_MAC→ST_A_REQ` fallback on three seeds. VC Formal proves 5/5 non-vacuous guard/invariant assertions and reaches both covers. This supplies current-candidate evidence for the four residual raw transitions without forcing states or changing RTL. Raw enabled-profile coverage remains 49/53, `REQ-CL-010` remains PARTIAL, and overall v1.0 remains HOLD. See [R154 report](COMPUTE_CLUSTER_MATRIX_FSM_R154_R153_EXACT_REPLAY_2026-11-01.md).

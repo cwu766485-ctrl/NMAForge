@@ -697,3 +697,11 @@ No requirement dispositions change. The RTM remains 24 `PASS-SCOPED` / 14 `PARTI
 | REQ-PC-007 | PARTIAL | `subsystem_banked_contention_regress`, `subsystem_banked_core_reset_regress`; production arbiter request/grant and tagged response-owner assertions | Core/Banked simultaneous requests preserve owner and Golden data; reset flushes pending responses and recovery succeeds. Requesters are testbench-driven; production Matrix banked contention and all seven-engine fault/backpressure/reset crossings remain open. | R153-BANKED-CONTENTION / BANKED-CORE-RESET; seeds `20261025/26/27` | Same report and archive |
 
 R153 confirms the user-selected repository `ai_accel_memory_fabric` slice at the current candidate tree. It does not promote either requirement to full closure; overall disposition remains 24 `PASS-SCOPED` / 14 `PARTIAL`, **HOLD**.
+
+## R154 Matrix FSM residuals at the R153 candidate — 2026-11-01
+
+| Requirement | Disposition | Test ID / checker | Coverage / observed result | Run ID / seeds | Evidence path |
+|---|---|---|---|---|---|
+| REQ-CL-010 | PARTIAL | Enabled-profile `core-random-regress`/URG, prefetch-off `core-no-prefetch-fallback-regress`, and `fsm-guards` VC Formal properties | Exact R153 candidate: enabled-profile 49/53 transitions on three seeds; all four raw misses individually dispositioned. Three enabled-profile guard edges have non-vacuous formal proofs; legal `ST_MAC→ST_A_REQ` is hit in the separate disabled profile. Five assertions proven, two reachability covers reached at depths 11 and 3. | `CL-MATRIX-FSM-ENABLED-R154-3S-20261101`, `CL-MATRIX-FSM-NOPREF-R154-3S-20261101`, `CL-MATRIX-FSM-FPV-R154-R153-6E47629-20261101`; seeds `20261030/20261025/20261026` | [R154 report](COMPUTE_CLUSTER_MATRIX_FSM_R154_R153_EXACT_REPLAY_2026-11-01.md); `/tmp/nmaforge_r153_matrix_fsm_evidence.tar.gz` |
+
+The raw enabled-profile FSM remains 49/53; this is an explicit disposition of legal/profile-specific and guard-incompatible residuals, not 100% raw coverage. The full requirement remains PARTIAL for its other open behavior. No requirement disposition changes; the RTM remains 24 `PASS-SCOPED` / 14 `PARTIAL`, and `CL-DV-v1.0` remains **HOLD**.
