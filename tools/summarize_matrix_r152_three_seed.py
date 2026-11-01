@@ -115,6 +115,10 @@ def parse_run(log_path: Path, seed: int, array: str, depth: int, prefetch: int, 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-sha", required=True)
+    parser.add_argument("--run-label", default="R152",
+                        help="run ID label for this replay (default: R152 for historical reproduction)")
+    parser.add_argument("--run-date", default="20261101",
+                        help="run ID date in YYYYMMDD form (default: 20261101 for historical reproduction)")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--seed", type=int, action="append", required=True)
     parser.add_argument("--size-root", action="append", required=True,
@@ -135,14 +139,14 @@ def main() -> None:
             rows.extend(parse_run(
                 size_roots[seed] / f"array_{physical}" / "run.log", seed,
                 f"{physical}x{physical}", 4, 1, 1, args.source_sha,
-                f"R152-MATRIX-SIZE-3S-20261101-SEED{seed}", "array_size",
+                f"{args.run_label}-MATRIX-SIZE-3S-{args.run_date}-SEED{seed}", "array_size",
             ))
         for depth, prefetch, cache in CONFIGS:
             rows.extend(parse_run(
                 config_roots[seed] / f"depth_{depth}" / f"prefetch_{prefetch}" /
                 f"cache_{cache}" / "run.log", seed, "16x16", depth, prefetch,
                 cache, args.source_sha,
-                f"R152-MATRIX-ABLATION-3S-20261101-SEED{seed}", "config_ablation",
+                f"{args.run_label}-MATRIX-ABLATION-3S-{args.run_date}-SEED{seed}", "config_ablation",
             ))
     if len(rows) != len(args.seed) * 55:
         raise SystemExit(f"expected {len(args.seed) * 55} rows, got {len(rows)}")
@@ -151,7 +155,7 @@ def main() -> None:
         writer = csv.DictWriter(handle, fieldnames=COLUMNS, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
-    print(f"R152 three-seed Matrix CSV: {args.out}; rows={len(rows)}")
+    print(f"{args.run_label} three-seed Matrix CSV: {args.out}; rows={len(rows)}")
 
 
 if __name__ == "__main__":
