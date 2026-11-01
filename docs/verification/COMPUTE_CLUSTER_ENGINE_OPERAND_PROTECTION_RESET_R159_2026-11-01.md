@@ -67,3 +67,30 @@ The VCS compile has no `TFIPC`, `Warning-`, or `Error-` diagnostics. The logs an
 | REQ-PC-007 | All seven real requesters covered sequentially; pairwise concurrent owner/fault cross remains open | PARTIAL |
 
 R159 does not cover concurrent seven-engine activity in these cases, all completion error ABI combinations, all fault classes/phases, completion backpressure crossed with reset, or every legal descriptor shape. It promotes no requirement and does not establish full coverage closure. The complete disposition remains 24 `PASS-SCOPED` / 14 `PARTIAL`; `CL-DV-v1.0` remains **HOLD**.
+
+## Exact published-HEAD clean replay
+
+The published branch head was replayed from an independent detached worktree after the report commit:
+
+| Item | Result |
+|---|---|
+| Published HEAD / tree | `56f83d6006a931b05286aaa5d7d3a8a0af4a1691` / `1a345218a80f2eb3248946d34e009f39dbd7e406` |
+| Clean worktree | `/tmp/nmaforge_r159_published_56f83` |
+| UVM Run ID | `R159-PUBLISHED-HEAD-UVM-3S-20261101`; seeds `20261025/26/27` |
+| Top Smoke Run ID | `R159-PUBLISHED-HEAD-TOP-SMOKE-20-20261101`; `AI_SEED=12345` |
+| Mutation Run ID | `R159-PUBLISHED-HEAD-MUTATION-28-20261101` |
+
+The exact UVM command was:
+
+```sh
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_r159_published_56f83_uvm \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027' \
+  VCS_UVM='/opt/Synopsys/vcs/V-2023.12-SP1/bin/vcs -licwait 1 -full64 -sverilog -ntb_opts uvm-1.2 -debug_access+all -kdb -timescale=1ns/1ns +define+VCS'
+```
+
+All three seeds pass with the scoped protection cross at 72/72, Memory Scoreboard at 68,692 checked words, zero mismatch/unknown/stale/orphan, 21,903 accepted reads = 21,862 returned + 41 reset-dropped, empty pending ledgers, and UVM severity `0/0/0`. Merged URG reports `cluster_cg` 64/64 and the named cross 72/72; the all-group score remains 64.86% because unrelated groups are inactive.
+
+The Top Smoke command is `make ai_smoke AI_RANDOM_CASES=20 AI_SEED=12345` from `dv/subsystem/top_smoke/sim`; mapper precheck reports 86 descriptors/60 tensors and the run ends `TEST PASS`. The existing `[LOOP-REROLL-ENABLED]` fixture compile warning remains. The same published HEAD passes 28/28 expected checker-sensitivity probes; this is not an RTL mutation score. The UVM compile has no `TFIPC`, `Warning-`, or `Error-` diagnostics.
+
+Published-HEAD logs and URG summaries are archived outside the repository at `/tmp/nmaforge_r159_published_56f83_evidence.tar.gz` (SHA-256 `6d40de6658e2a373b03814bd0a14983628e56a413d8ea449da3218b4c2682783`); the 39-file checksum manifest is `/tmp/nmaforge_r159_published_56f83_evidence_sha256.txt`. The replay confirms the exact published tree and adds no scope: the 38-row disposition remains 24 `PASS-SCOPED` / 14 `PARTIAL`, and `CL-DV-v1.0` remains **HOLD**.
