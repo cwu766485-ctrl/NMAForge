@@ -6565,6 +6565,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
     task automatic run_engine_abort_drain_sweep();
         int engine;
+        int abort_case;
         int unsigned poll;
         int unsigned word_idx;
         int unsigned accepted_reads;
@@ -6579,6 +6580,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         bit abort_active_seen;
         bit [6:0] abort_seen_mask;
         bit [6:0] sentinel_preserved_mask;
+        bit fp16_abort_seen;
         bit [31:0] completion_base;
         bit [31:0] desc_base;
         bit [31:0] abort_dst;
@@ -6588,6 +6590,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         abort_seen_mask = '0;
         sentinel_preserved_mask = '0;
+        fp16_abort_seen = 1'b0;
         desc_base = CLUSTER_CONTRACT_CMDQ;
         // Give every long-running engine fully initialized legal operands so
         // the independent memory scoreboard can check all accepted reads.
@@ -6607,8 +6610,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         for (word_idx = 0; word_idx < 9; word_idx++)
             spad_write(32'h0004_b600 + (word_idx << 2), 32'd1);
 
-        for (engine = 0; engine < 7; engine++) begin
-            task_id = 16'h0760 + engine;
+        for (abort_case = 0; abort_case < 8; abort_case++) begin
+            engine = (abort_case == 7) ? 1 : abort_case;
+            task_id = 16'h0760 + abort_case;
             completion_base = 32'h0000_5c00;
             abort_dst = 32'h0003_a000 + (engine * 32'h1000);
             abort_src0 = 32'h0004_a800;
@@ -6625,7 +6629,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                        abort_src0, abort_src1, abort_dst,
                        16'd0, 16'd0, 16'd64, 32'd0,
                        32'd0, 32'd0, 32'd0, 8'd3);
-                1: write_cluster_desc(desc_base, 8'h50, task_id,
+                1: write_cluster_desc(desc_base,
+                       (abort_case == 7) ? 8'h51 : 8'h50, task_id,
                        abort_src0, abort_src1, abort_dst,
                        16'd1, 16'd1, 16'd64, 32'd0,
                        32'd0, 32'd0, 32'd0, 8'd7);
@@ -6770,11 +6775,22 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             expect_spad(completion_base + 32'h04, 32'h0000_0032,
                         $sformatf("engine%0d Abort completion status/code", engine));
             abort_seen_mask[engine] = 1'b1;
-            `uvm_info("CLUSTER_ENGINE_ABORT_CASE_PASS", $sformatf(
-                "engine=%0d task_id=%04h accepted_read=1 abort=1 completion=ERR_ABORT accepted_reads=%0d returned_reads=%0d accepted_prefix_writes=%0d post_abort_output_writes=%0d sentinel_check=%s all_engines_idle=1",
-                engine, task_id, accepted_reads, returned_reads,
-                accepted_output_writes, post_abort_output_writes,
-                (accepted_output_writes == 0) ? "8/8" : "prefix_oracle"), UVM_LOW)
+            if (abort_case == 7) begin
+                if (accepted_output_writes != 0 || post_abort_output_writes != 0)
+                    `uvm_fatal("CLUSTER_FP16_ABORT_ZERO_PREFIX",
+                        $sformatf("FP16 single-result Abort committed output: prefix=%0d post_abort=%0d",
+                                  accepted_output_writes, post_abort_output_writes))
+                fp16_abort_seen = 1'b1;
+                `uvm_info("CLUSTER_FP16_ABORT_ZERO_PREFIX_PASS", $sformatf(
+                    "opcode=0x51 task_id=%04h accepted_reads=%0d returned_reads=%0d completion=ERR_ABORT fp32_result_words=1 accepted_output_prefix=0/1 sentinel=8/8 post_abort_writes=0",
+                    task_id, accepted_reads, returned_reads), UVM_LOW)
+            end else begin
+                `uvm_info("CLUSTER_ENGINE_ABORT_CASE_PASS", $sformatf(
+                    "engine=%0d task_id=%04h accepted_read=1 abort=1 completion=ERR_ABORT accepted_reads=%0d returned_reads=%0d accepted_prefix_writes=%0d post_abort_output_writes=%0d sentinel_check=%s all_engines_idle=1",
+                    engine, task_id, accepted_reads, returned_reads,
+                    accepted_output_writes, post_abort_output_writes,
+                    (accepted_output_writes == 0) ? "8/8" : "prefix_oracle"), UVM_LOW)
+            end
             axil_write(REG_CPLQ_HEAD, 32'd1);
             axil_write(REG_CMDQ_SIZE, 32'd0);
             axil_write(REG_CPLQ_SIZE, 32'd0);
@@ -6784,6 +6800,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_fatal("CLUSTER_ENGINE_ABORT", $sformatf(
                 "not all real engines passed accepted-read Abort/drain: mask=%07b",
                 abort_seen_mask))
+        if (!fp16_abort_seen)
+            `uvm_fatal("CLUSTER_FP16_ABORT_ZERO_PREFIX",
+                "FP16 0x51 accepted-read Abort and one-word zero-prefix proof did not run")
         if (sentinel_preserved_mask[3:0] !== 4'hf)
             `uvm_fatal("CLUSTER_ENGINE_ABORT", $sformatf(
                 "long-running Scalar/FP/CNM/Matrix Abort cases failed to preserve zero-prefix sentinels: mask=%07b",
