@@ -9,9 +9,9 @@
 | Item | Frozen identity |
 |---|---|
 | Product RTL/SPEC candidate | `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413` (R99 CNM Protection response alignment; SPEC v1.8 unchanged) |
-| Latest real-top descriptor-latch SHA | `1abf84864a5b6f0f1d3ef5da72fe67b41df3b367` (R123 CNM descriptor-latch test; Matrix R74 and SFU R77 remain separately evidenced) |
-| Latest UVM/test content SHA | R164 `db7588be34200ac68ac66072799adca54ad287a5` (tree `e0816beba67133fbf6221005f16f97cba63eb2ca`; verification-only FP16 Abort functional covergroup and mandatory Make gate) |
-| Latest full Compute Cluster replay SHA | R166 exact clean-worktree candidate `8be88c10f131354fd7aeacfd3678bb08ed439e23` (three-seed Cluster UVM, 16-seed DDR/AXI E2E, and 15-VDB subsystem merge; 18/18 same-top and 17/17 subsystem functional groups at 100%; see R166 coverage report) |
+| Latest real-top descriptor-latch SHA | R167 4eb689c866650679d238d1ada955d6b03e68c6ec (FP/Conv/KV added; Matrix R74, SFU R77, CNM R123 remain separately evidenced) |
+| Latest UVM/test content SHA | R167 4eb689c866650679d238d1ada955d6b03e68c6ec (tree e65fae5d62fc08e468b30ae271438ba6cb215959; mandatory FP/Conv/KV parameter-latch checks) |
+| Latest full Compute Cluster UVM replay SHA | R167 clean exact test commit 4eb689c866650679d238d1ada955d6b03e68c6ec (three-seed UVM; R166 remains the latest 18/18 same-top and 17/17 subsystem declared-group coverage merge) |
 | Latest selected-fabric focused replay | `5ea67bd125bb1ed20af8b86369e2cf8112f25131` (R125 clean checkout; RTL/DV/SPEC identical to R124) |
 | Published report package base | `8e3735e930f01c4a6bbb6a79251e153611dfcda2` (R158 code/test content; this evidence package is the following documentation commit) |
 | Prior reviewed product baseline | `6848a414eaeaa05cf9e1411cf55d9d27333208a6` |
@@ -346,3 +346,7 @@ The clean R164 candidate replays the existing Matrix formal target successfully:
 At exact candidate SHA `8be88c10f131354fd7aeacfd3678bb08ed439e23` (tree `f5411eb9bad967e1feb6f933dcc12174b4034df1`), the declared subsystem and top-level functional testpoint coverage targets now close: 17/17 DMA/SPAD/CNM groups and 18/18 same-top Compute Cluster + DDR/AXI groups report 100.00%. The Compute `cluster_cg` is 64/64; nine sequence-level Cluster groups are also 100%. The three-seed real Cluster UVM, 16-seed mixed E2E, three-seed subsystem baseline, three RREADY profiles and three banked/Core campaigns produce 34 simulation logs with severity 0/0/0. The 21-VDB same-top assertion merge has 20 successes, zero failures/incomplete and two UVM RAL internal no-attempts; all three AXI stall cover properties match. The 15-VDB subsystem assertion merge has 29 successes, zero failures/incomplete and the same two RAL no-attempts. Both compile logs are free of Warning-, Error- and TFIPC diagnostics.
 
 R166 meets this round’s declared functional group coverage goal. It does not close the broader legal requester × fault × phase × reset/backpressure spaces or the 38-row RTM: status remains 24 PASS-SCOPED / 14 PARTIAL, and CL-DV-v1.0 remains **HOLD**. The full commands and scope boundary are in [R166 coverage report](COMPUTE_CLUSTER_FUNCTIONAL_TESTPOINT_COVERAGE_R166_2026-11-02.md); logs-only archive SHA-256 is `7a9f8cd745629be7e3644d22a5502c8cc80734b981039bc762d404b879aab6ca`.
+
+## R167 descriptor-latch update — 2026-11-02
+
+The clean R167 test commit adds real-top FP BF16, Conv, and KV_WRITE launch-snapshot mutation points and requires each PASS marker in the three-seed Compute Cluster regression. All three seeds pass with UVM severity 0/0/0 and 68,921 scoreboard-checked memory words per seed, with zero mismatch/unknown/stale. The selected RTL/SPEC baseline is unchanged. The mutation uses a parity-consistent UVM backdoor update while the engine is active, then restores the words over the host port after completion; this does not claim legal concurrent host writes. The 38-row RTM remains 24 PASS-SCOPED / 14 PARTIAL. REQ-CL-005 remains PARTIAL, and the sign-off decision remains HOLD. Details: [R167 report](COMPUTE_CLUSTER_DESCRIPTOR_LATCH_FP_CONV_KV_R167_2026-11-02.md).
