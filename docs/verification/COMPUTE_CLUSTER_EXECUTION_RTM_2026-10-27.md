@@ -816,3 +816,12 @@ The directed FP16 marker is required per seed; R163 adds no new URG functional b
 | `REQ-CL-028` | PARTIAL | Matrix independent Golden benchmark | 165/165 array-size and ablation cases pass on three seeds; behavioral one-cycle SPAD only | `R164-MATRIX-SIZE/ABLATION-3S-20261102`; `20261025/26/27` | [R164 benchmark](../benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R164_2026-11-02.md), [CSV](../benchmark/compute_cluster_matrix_r164.csv) |
 
 At exact clean SHA `db7588be34200ac68ac66072799adca54ad287a5`, VCS/URG passes three-seed real-top UVM, all `28/28` assigned-checker sensitivity probes, Top Smoke, 20-case seeded top, and the two Matrix benchmark sweeps. The new `verified_zero_prefix` bin is hit three times and reports `100.00%`. `cluster_cg` is `64/64`; nine sequence-level Compute Cluster functional groups also report `100.00%`. The full UVM merged raw group score is `66.93%`, since this compute-only run does not exercise five DMA/AXI groups and only partially exercises AXI4/AXI-Lite groups. This scoped improvement does not promote any requirement: the 38-row disposition remains `24 PASS-SCOPED / 14 PARTIAL`, and `CL-DV-v1.0` remains **HOLD**.
+
+## R165 Matrix FSM formal replay — 2026-11-02
+
+| Requirement | Disposition | Test ID / checker | Coverage / observed result | Run ID | Evidence |
+|---|---|---|---|---|---|
+| `REQ-CL-010` | PARTIAL | `TC-CL-R165-MATRIX-FSM-FPV`; five non-vacuous guard/invariant assertions and two reachability covers | 5/5 assertions proven; `ST_PREFETCH_WAIT` and `ST_ERROR_DRAIN` covers reached at depths 11 and 5. Four raw misses remain individually dispositioned; enabled-profile raw FSM stays 49/53. | `R165-MATRIX-FSM-FORMAL-CLEAN-R164-20261102`; candidate `5a1bc0753df677c906c8f8036540a4c3edd54e58` | [R165 formal replay](COMPUTE_CLUSTER_MATRIX_FSM_R165_FORMAL_REPLAY_2026-11-02.md); `/tmp/nmaforge_r164_matrix_fsm_formal_clean_5a1bc07/vc_formal.log` |
+| `REQ-CL-022` | PASS-SCOPED* | Same Matrix FSM proof plus existing independent Golden and fault-prefix checks | R165 replays only formal guards/covers; it adds no new Matrix functional profile and does not change the existing qualification. | Same run | Same report |
+
+The candidate tree was clean and the Matrix RTL/formal harness checksums match R154. VC Formal `V-2023.12-SP2` exited 0 with no setup issue; non-fatal `COM_OPT009/010`, clock-unit, and learned-data notices remain disclosed. R165 is a replay only: 24 `PASS-SCOPED` / 14 `PARTIAL` and `CL-DV-v1.0` **HOLD** remain.
