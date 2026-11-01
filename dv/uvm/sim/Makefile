@@ -123,6 +123,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -Eq '\[CLUSTER_SCOREBOARD\].*reset_dropped=[1-9][0-9]*' "$$log" || { echo "ERROR: reset did not discard a tracked in-flight SPAD response"; exit 1; }; \
 		grep -q '\[CLUSTER_MATRIX_PARITY_RESET_EPOCH_PASS\]' "$$log" || { echo "ERROR: Matrix parity plus accepted-read Reset epoch recovery case missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_MATRIX_PARITY_RESET_AFTER_RESPONSE_PASS\]' "$$log" || { echo "ERROR: Matrix parity response-consumed Reset epoch recovery case missing in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_MATRIX_PROTECTION_RESET_EPOCH_PASS\].*source-B denial=1 accepted-A=[1-9][0-9]* ERR_PROTECTION=6 observed=1 reset suppressed old completion/writeback=1 recovery=16/16 focused_bins=6/6 coverage=100\.0%' "$$log" || { echo "ERROR: Matrix source-B Protection/reset epoch and full Golden recovery check missing or failed in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_PARITY_RESET_CROSS_PASS\].*before-response-consume parity reset cross=12/12' "$$log" || { echo "ERROR: all-engine pre-consume parity/reset cross missing or incomplete in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_PARITY_RESET_CONSUMED_CROSS_PASS\].*after-response-consume parity reset cross=12/12' "$$log" || { echo "ERROR: all-engine response-consumed parity/reset cross missing or incomplete in $$log"; exit 1; }; \
 		test "$$(grep -c ' \[CLUSTER_PARITY_RESET_CASE_PASS\] engine=' "$$log")" -eq 24 || { echo "ERROR: expected 24 all-engine parity/reset recovery cases in $$log"; exit 1; }; \
