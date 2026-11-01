@@ -41,3 +41,11 @@ This replay validates only its named scenarios. It does not turn the current
 24 PASS-SCOPED / 14 PARTIAL RTM into full closure, and Compute Cluster v1.0
 remains **HOLD**. The legal engine × fault × phase × reset/backpressure space
 and remaining requirement clauses still require review or additional evidence.
+
+The user-selected in-repository memory-fabric targets were also replayed on
+this exact candidate tree: shared DMA/CNM reset, banked response reset,
+Core/Banked contention, and Core/Banked reset. All four three-seed Make
+targets pass with UVM severity 0/0/0; each named functional covergroup is
+100%, and the exercised owner/tag assertions have real successes with zero
+failures/incomplete. The testbench-driven requester limit is retained in the
+[separate fabric replay report](COMPUTE_CLUSTER_MEMORY_FABRIC_CLEAN_REPLAY_R153_2026-11-01.md).
