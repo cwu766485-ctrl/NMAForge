@@ -688,3 +688,12 @@ R153 changes no requirement disposition. The complete 38-row RTM remains 24 `PAS
 | REQ-CL-028 | PARTIAL | R153 real-top serial/staged/parallel cycle and SPAD traffic monitors | R153 three-seed benchmark passes; exact same candidate tree also passes Top Smoke and a deterministic 20-case top regression. This improves replayability only; common-memory TinyNPU, GEMV/decode and PPA comparisons remain open. | R153 benchmark and replay Run IDs | [R153 benchmark](../benchmark/COMPUTE_CLUSTER_REAL_TOP_BENCHMARK_R153_2026-11-01.md), [clean replay](COMPUTE_CLUSTER_CLEAN_REPLAY_R153_2026-11-01.md) |
 
 No requirement dispositions change. The RTM remains 24 `PASS-SCOPED` / 14 `PARTIAL`; `CL-DV-v1.0` remains **HOLD**.
+
+## R153 selected memory-fabric reset/owner replay — 2026-11-01
+
+| Requirement | Disposition | Test ID / checker | Coverage / observed result | Run ID / seeds | Evidence path |
+|---|---|---|---|---|---|
+| REQ-CL-018 | PARTIAL | `subsystem_memory_fabric_reset_regress`, `subsystem_banked_reset_regress`, `subsystem_banked_core_reset_regress`; reset epoch, quiet-window, response-tag and recovery checkers | Three seeds per target pass pending-response flush and post-reset recovery; named reset covergroups hit 100%. `ap_cnm_response_tag`, `ap_banked_response_tag`, `ap_core_response_tag`, and single-owner assertions have real successes with zero failures/incomplete. This does not close all production-engine × fault × reset phases. | R153-FABRIC-RESET / BANKED-RESET / BANKED-CORE-RESET; seeds `20261025/26/27` | [R153 fabric replay report](COMPUTE_CLUSTER_MEMORY_FABRIC_CLEAN_REPLAY_R153_2026-11-01.md), archived seed logs |
+| REQ-PC-007 | PARTIAL | `subsystem_banked_contention_regress`, `subsystem_banked_core_reset_regress`; production arbiter request/grant and tagged response-owner assertions | Core/Banked simultaneous requests preserve owner and Golden data; reset flushes pending responses and recovery succeeds. Requesters are testbench-driven; production Matrix banked contention and all seven-engine fault/backpressure/reset crossings remain open. | R153-BANKED-CONTENTION / BANKED-CORE-RESET; seeds `20261025/26/27` | Same report and archive |
+
+R153 confirms the user-selected repository `ai_accel_memory_fabric` slice at the current candidate tree. It does not promote either requirement to full closure; overall disposition remains 24 `PASS-SCOPED` / 14 `PARTIAL`, **HOLD**.
