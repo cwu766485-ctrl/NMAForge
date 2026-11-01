@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-01
 **Decision:** scoped testpoint PASS; `REQ-PC-007` remains PARTIAL; `CL-DV-v1.0` remains HOLD.
-**Run ID:** `R162-UVM-MATRIX-CNM-BANKED-COLLISION-3S-20261101`
+**Run ID:** `R162-UVM-MATRIX-CNM-BANKED-COLLISION-3S-20261101`; seeded Top replay `R162-TOP-AI-RUN-20-20261101`
 **Executed test SHA/tree:** `3c4b558c4b9d7fa479c259be175abbff9c48b9f9` / `d3cc2b76129213ce943f8e9301ec6f539365a9b0`
 **RTL/SPEC:** unchanged; testbench, coverage, gate, and evidence documentation only.
 
@@ -32,9 +32,10 @@ make uvm_compute_cluster_mutation \
   COMPUTE_CLUSTER_MUTATION_OUT=/tmp/nmaforge_r162_matrix_cnm_collision_mutations
 
 cd dv/subsystem/top_smoke/sim && make ai_smoke
+make ai_run AI_RANDOM_CASES=20 AI_SEED=12345
 ```
 
-All commands exited 0. The UVM target printed `COMPUTE_CLUSTER_REAL_UVM_REGRESS_PASS`; each seed reported UVM warning/error/fatal `0/0/0`. Top Smoke ended with `TEST PASS` after the mapper precheck (86 descriptors, 60 tensors). Its existing `[LOOP-REROLL-ENABLED]` fixture notice remains. The UVM compile log has no `Warning-`, `Error-`, or `[TFIPC]` diagnostic.
+All commands exited 0. The UVM target printed `COMPUTE_CLUSTER_REAL_UVM_REGRESS_PASS`; each seed reported UVM warning/error/fatal `0/0/0`. Top Smoke ended with `TEST PASS` after the mapper precheck (86 descriptors, 60 tensors). At the same source SHA, `make ai_run AI_RANDOM_CASES=20 AI_SEED=12345` also reports both requested settings and ends `TEST PASS`. Its log-only archive is `/tmp/nmaforge_r162_top_replay_evidence.tar.gz`, SHA-256 `f2b856aa07b3191d1c2bf6c26027b8116bca3ab95933d5963a486f8b1eb34c0f`. The existing `[LOOP-REROLL-ENABLED]` fixture notice and VCS ASLR save/restore notice are retained. The UVM compile log has no `Warning-`, `Error-`, or `[TFIPC]` diagnostic.
 
 ## Coverage, checker sensitivity, and limits
 
