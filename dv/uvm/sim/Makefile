@@ -87,6 +87,9 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -q '\[CLUSTER_MATRIX_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: real Matrix in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_SFU_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: real SFU in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CNM_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: legal concurrent CNM in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_FP_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: real FP in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_CONV_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: real Conv in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_KV_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: real KV in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SCALAR_OPCODE_DISPATCH_PASS\].*GEMV 0x11 then GEMM 0x12.*6/6 output words' "$$log" || { echo "ERROR: real CMDQ Scalar GEMV/GEMM dispatch and Golden comparison missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SCALAR_CMDQ_NUMERIC_BOUNDARY_PASS\].*case_mask=7f outputs=7/7 completions=7/7' "$$log" || { echo "ERROR: real CMDQ Scalar numeric boundary cases are incomplete in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SCALAR_ABORT_WRITE_PREFIX_PASS\].*accepted_output_prefix=[1-9][0-9]*/16.*read_drain=[1-9][0-9]*/[1-9][0-9]* post_abort_writes=0 completion=ERR_ABORT' "$$log" || { echo "ERROR: real CMDQ Scalar GEMV accepted-write Abort prefix/drain check missing or failed in $$log"; exit 1; }; \
