@@ -6,8 +6,8 @@
 - **Prior reviewed product baseline:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6`
 - **Follow-up evidence branch:** `work/compute-cluster-kv-overflow-20261030`
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
-- **Latest clean verification replay SHA:** `db7588be34200ac68ac66072799adca54ad287a5` (R164 three-seed real-top UVM, 28/28 checker-sensitivity, Top Smoke, 20-case seeded Top, and three-seed Matrix benchmark; tree `e0816beba67133fbf6221005f16f97cba63eb2ca`).
-**Latest verification/test candidate:** R164 test SHA `db7588be34200ac68ac66072799adca54ad287a5`; exact clean replay at that source tree. It is verification-only; product RTL/SPEC remain tied to their separately reviewed baselines. R164 reruns the Matrix size and eight-configuration benchmark on the same test SHA. Earlier formal evidence retains its own exact SHA.
+- **Latest exact coverage replay candidate:** `8be88c10f131354fd7aeacfd3678bb08ed439e23` (R166, tree `f5411eb9bad967e1feb6f933dcc12174b4034df1`; three-seed real-top UVM, 16-seed DDR/AXI E2E, and subsystem coverage replay; 18/18 top and 17/17 subsystem declared functional groups at 100%). The executable test content remains the R164 code/test tree `e0816beba67133fbf6221005f16f97cba63eb2ca`; no product RTL/SPEC changes.
+**Latest verification/test candidate:** R166 exact replay SHA `8be88c10f131354fd7aeacfd3678bb08ed439e23`, a documentation-only descendant of R164. The R166 coverage suite builds and runs from this exact clean candidate; product RTL/SPEC and executable UVM/test source remain unchanged from their separately reviewed baselines. R164 still supplies the latest same-test-SHA Matrix benchmark. Earlier formal evidence retains its own exact SHA.
 **Decision:** bounded CL-RC1/CL-RC2 review candidate; **CL-DV-v1.0 is not signed**.
 
 ## Executive disposition
@@ -230,3 +230,7 @@ At the same SHA, 165/165 Matrix size/ablation benchmark points pass over three s
 ## R165 Matrix FSM formal replay
 
 At clean candidate `5a1bc0753df677c906c8f8036540a4c3edd54e58` (tree `32d7bee7f278e4477ed633763188680b2bd59235`), VC Formal `V-2023.12-SP2` exits 0: all five Matrix guard/invariant assertions are proven non-vacuously and both existing state covers hit at depths 11 and 5. The four raw enabled-profile misses remain at 49/53 with the R154 per-transition dispositions; the prefetch-off fallback remains a separate profile. This is not 100% raw FSM coverage and does not close `REQ-CL-010`. See [R165 replay](COMPUTE_CLUSTER_MATRIX_FSM_R165_FORMAL_REPLAY_2026-11-02.md), log SHA-256 `cb7f6225dbddcc311cadac46b5d21894c7e2d169bc97ff8b7cb1154518849902`.
+
+## R166 functional testpoint coverage update — 2026-11-02
+
+R166 meets the declared functional coverage goal on exact clean candidate `8be88c10f131354fd7aeacfd3678bb08ed439e23`: subsystem 17/17 and same-top Compute Cluster + DDR/AXI 18/18 covergroups are 100.00%; the Compute Cluster group is 64/64. All 34 simulation logs pass with UVM severity 0/0/0. The combined assertion summary is 20 real successes, 0 failures/incomplete, and 2 UVM RAL internal properties without attempts; the subsystem assertion summary is 29 real successes, 0 failures/incomplete, and the same two no-attempts. This is functional covergroup closure for the named campaigns, not RTL code-coverage or complete requirement closure. The RTM remains 24 PASS-SCOPED / 14 PARTIAL; `CL-DV-v1.0` remains HOLD. See [R166 evidence](COMPUTE_CLUSTER_FUNCTIONAL_TESTPOINT_COVERAGE_R166_2026-11-02.md), archive SHA-256 `7a9f8cd745629be7e3644d22a5502c8cc80734b981039bc762d404b879aab6ca`.
