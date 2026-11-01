@@ -6472,6 +6472,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned serial_matrix_cnm_sfu_cycles;
         int unsigned serial_spad_read_start;
         int unsigned serial_spad_write_start;
+        int unsigned serial_matrix_spad_read_start;
+        int unsigned serial_matrix_spad_write_start;
+        int unsigned serial_matrix_spad_read_bytes;
+        int unsigned serial_matrix_spad_write_bytes;
         int unsigned serial_spad_read_bytes;
         int unsigned serial_spad_write_bytes;
         int unsigned staged_pair_start_cycle;
@@ -6516,6 +6520,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         serial_matrix_cnm_sfu_cycles = 0;
         serial_spad_read_bytes = 0;
         serial_spad_write_bytes = 0;
+        serial_matrix_spad_read_bytes = 0;
+        serial_matrix_spad_write_bytes = 0;
         staged_pair_cycles = 0;
         staged_sfu_cycles = 0;
         staged_total_cycles = 0;
@@ -6620,11 +6626,17 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd4);
         axil_write(REG_CPLQ_HEAD, 32'd0);
         axil_write(REG_CPLQ_TAIL, 32'd0);
+        serial_matrix_spad_read_start = compute_vif.benchmark_spad_read_bytes;
+        serial_matrix_spad_write_start = compute_vif.benchmark_spad_write_bytes;
         parallel_start_cycle = compute_vif.sim_cycles;
         axil_write(REG_DOORBELL, 32'd1);
         wait_cpl_tail(32'd1);
         serial_matrix_cycles = compute_vif.sim_cycles - parallel_start_cycle;
         wait_spad_idle();
+        serial_matrix_spad_read_bytes = compute_vif.benchmark_spad_read_bytes -
+                                        serial_matrix_spad_read_start;
+        serial_matrix_spad_write_bytes = compute_vif.benchmark_spad_write_bytes -
+                                         serial_matrix_spad_write_start;
         expect_completion(CPLQ_LOCAL, 16'h05ff, matrix_golden[15][31],
                           32'd512, "serial Matrix baseline");
         if (compute_vif.matrix_a_cache_hits != 16)
@@ -6663,9 +6675,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                               -32'sd15, 32'd64, "serial SFU1", serial_sfu1_cycles);
         serial_total_cycles = serial_matrix_cycles + serial_cnm_cycles +
                               serial_sfu0_cycles + serial_sfu1_cycles;
-        serial_spad_read_bytes = compute_vif.benchmark_spad_read_bytes -
+        serial_spad_read_bytes = serial_matrix_spad_read_bytes +
+                                 compute_vif.benchmark_spad_read_bytes -
                                  serial_spad_read_start;
-        serial_spad_write_bytes = compute_vif.benchmark_spad_write_bytes -
+        serial_spad_write_bytes = serial_matrix_spad_write_bytes +
+                                  compute_vif.benchmark_spad_write_bytes -
                                   serial_spad_write_start;
         serial_matrix_cnm_sfu_cycles = serial_matrix_cycles + serial_cnm_cycles +
                                         serial_sfu0_cycles;
