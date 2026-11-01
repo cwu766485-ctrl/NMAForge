@@ -190,3 +190,9 @@ R140 adds a real-top Matrix parity response while CNM is active, then software A
 ## R152 current-candidate Matrix benchmark replay — 2026-11-01
 
 At test SHA `cc15b4841d2266f34ef8cacae7abd895890eb07a` (tree `41ed9c384dd2ac70d65b06406ff399aca6c85bc1`), seeds `20261025/26/27` each pass the 15/15 physical-array size sweep and 40/40 eight-way depth/prefetch/cache ablation (165/165 total). All cases compare the complete output image against the independent signed INT8 Golden. The 165-row CSV records cycles, MAC/cycle, array utilization, SPAD bytes, stalls and the one-cycle behavioral memory boundary. The Matrix benchmark RTL, testbench, Makefile and original summarizer are byte-identical to the R82 sources. R152 strengthens `REQ-CL-028` only. TinyNPU common-memory fairness, GEMV/decode, and PPA remain open; 24 `PASS-SCOPED` / 14 `PARTIAL`, overall **HOLD**. See [R152 report](../benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R152_2026-11-01.md).
+
+## R153 real-top cluster benchmark — 2026-11-01
+
+At exact clean test SHA `6e47629f103e3ab36948c5bb4eadc196cd27dfb4` (tree `21478d7e4a595e17b27f7b0e89810d3617a4fd82`), VCS/UVM passes seeds `20261025/26/27`. The real-top Matrix16x32x64 + CNM16 + two GELU64 workload measures 1,696 serial service cycles and 1,137 fully parallel cycles (1.492×); staged Matrix/CNM then one GELU measures 1,070 versus 1,239 comparable serial cycles (1.158×). All Golden and completion checks pass; each 63,597-word scoreboard has zero mismatch/unknown/stale and UVM severity 0/0/0. See [R153 benchmark](../benchmark/COMPUTE_CLUSTER_REAL_TOP_BENCHMARK_R153_2026-11-01.md).
+
+R153 adds bounded benchmark and memory-image evidence only. It does not resolve the remaining requirement gaps or common-memory TinyNPU/PPA work. The disposition remains 24 `PASS-SCOPED` / 14 `PARTIAL`; Compute Cluster v1.0 remains **HOLD**.
