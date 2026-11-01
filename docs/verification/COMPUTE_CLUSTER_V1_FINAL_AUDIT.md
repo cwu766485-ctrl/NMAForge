@@ -1,13 +1,13 @@
 # Compute Cluster v1.0 Final Audit
 
-**Review date:** 2026-10-31
+**Review date:** 2026-11-01
 
 **Selected product/SPEC candidate:** c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413 (R99 CNM Protection response alignment; SPEC v1.8); R54 top-test SHA f24c5383fad511c8b2e1132c1157942807994759
 - **Prior reviewed product baseline:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6`
 - **Follow-up evidence branch:** `work/compute-cluster-kv-overflow-20261030`
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
-- **Latest clean verification replay SHA:** `c9e0214dfbf8847666baa0b3b10faa973b842224` (R140 three-seed clean-worktree real-top UVM; tree `b7da3b220d847fd360614e375c007839075291ae`).
-**Latest verification/test candidate:** R140 test SHA `c9e0214dfbf8847666baa0b3b10faa973b842224`; exact clean replay at that source tree. It is test-only; product RTL/SPEC remain tied to their separately reviewed baselines. Earlier formal evidence retains its own exact SHA.
+- **Latest clean verification replay SHA:** `cc15b4841d2266f34ef8cacae7abd895890eb07a` (R151 three-seed clean-worktree real-top UVM, 28/28 checker-sensitivity, Top Smoke, and 20-case seeded Top; tree `41ed9c384dd2ac70d65b06406ff399aca6c85bc1`).
+**Latest verification/test candidate:** R151 test SHA `cc15b4841d2266f34ef8cacae7abd895890eb07a`; exact clean replay at that source tree. It is test-only; product RTL/SPEC remain tied to their separately reviewed baselines. R152 separately reruns the Matrix benchmark on this test SHA. Earlier formal evidence retains its own exact SHA.
 **Decision:** bounded CL-RC1/CL-RC2 review candidate; **CL-DV-v1.0 is not signed**.
 
 ## Executive disposition
@@ -187,3 +187,6 @@ At exact clean-worktree SHA dfbebbd8c8ee68458c4261f74f041e816b6b0284 and publish
 At clean test SHA 8b511e474727fe13439f99674d1a30b46005f274 and published same-tree test content 1ba30c7f85d5b07c13eddb7aef3e6929f7d9624d, three seeds pass a real CMDQ Scalar GEMV Abort after the first output write. Each checks a 1/16 Golden prefix, 15 intact suffix sentinels, 130/130 read drain, ERR_ABORT 0x32, and no output write after Abort sampling. UVM severity is 0/0/0 and the full memory scoreboard has 42,107 checked words with zero mismatch/unknown/stale/orphan. Focused cluster_cg is 100%; overall mixed URG score is 55.92%, not a sign-off percentage. This adds bounded evidence to REQ-CL-017/019/027 and REQ-PC-006; statuses remain PARTIAL and overall HOLD remains. Top Smoke: NOT_RUN at this UVM-only SHA. Mutation campaign: NOT_RUN at this UVM-only SHA. See the R129 report COMPUTE_CLUSTER_SCALAR_GEMV_ABORT_PREFIX_R129_2026-10-31.md.
 
 R140 adds a real-top Matrix parity response while CNM is active, then software Abort with ordered CNM `ERR_ABORT=0x32` before Matrix `ERR_PARITY=0x52`. Three exact-SHA seeds pass; each checks 44,811 words without mismatch/unknown/stale/orphan, zero response-route mismatch, and no post-Abort CNM write. Top Smoke and 28/28 checker-sensitivity mutations also pass. Focused `cluster_cg` is 100% within its declared group, while mixed URG is 56.01%. This is bounded evidence only: `REQ-CL-017/019/027` and `REQ-PC-006/007` remain PARTIAL, RTM remains 24 PASS-SCOPED / 14 PARTIAL, and `CL-DV-v1.0` remains HOLD. Commands, hashes, and limitations are in [R140 evidence](COMPUTE_CLUSTER_PARITY_CNM_ABORT_OWNER_CROSS_R140_2026-10-31.md).
+## R152 current-candidate Matrix benchmark replay — 2026-11-01
+
+At test SHA `cc15b4841d2266f34ef8cacae7abd895890eb07a` (tree `41ed9c384dd2ac70d65b06406ff399aca6c85bc1`), the VCS Matrix size sweep passes 15/15 and the eight-way depth/prefetch/cache ablation passes 40/40 on seed `20261026`. All cases compare the complete output image against the independent signed INT8 Golden. A 55-row CSV is included in `docs/benchmark/compute_cluster_matrix_r152.csv`; the report records cycle counts, MAC/cycle, array utilization, SPAD bytes, stalls and the one-cycle behavioral memory boundary. The Matrix benchmark RTL, testbench, Makefile and summarizer are byte-identical to the R82 sources, which separately passed 165/165 across three seeds. A current-candidate seed-20261025 replay could not acquire VCS because the license server was unreachable; it is excluded from PASS counts. R152 strengthens `REQ-CL-028` only. TinyNPU common-memory fairness, GEMV/decode, and PPA remain open; 24 `PASS-SCOPED` / 14 `PARTIAL`, overall **HOLD**. See [R152 report](../benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R152_2026-11-01.md).
