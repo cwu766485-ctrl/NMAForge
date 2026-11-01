@@ -1,7 +1,7 @@
 # Compute Cluster Execution RTM — 2026-11-01
 
 **Scope:** `REQ-CL-001..028` and `REQ-PC-001..010` from Compute Cluster SPEC v1.8.\
-**Selected review candidate:** R162 test source `3c4b558c4b9d7fa479c259be175abbff9c48b9f9` (tree `d3cc2b76129213ce943f8e9301ec6f539365a9b0`; verification-only UVM/Make changes, no RTL/SPEC changes). Product RTL/SPEC baseline remains `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`, SPEC v1.8. Earlier evidence retains its own source identities.
+**Selected review candidate:** R163 test source `f2e671de1c5d0a9a7f6c23d49b34c9d8a9501432` (tree `e79fa9bfd27c992816c02f4dfd364b6aed5fcc23`; verification-only UVM/Make changes, no RTL/SPEC changes). Product RTL/SPEC baseline remains `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`, SPEC v1.8. Earlier evidence retains its own source identities.
 **Latest selected-fabric replay:** R153 executes the in-repository `ai_accel_memory_fabric` reset, banked reset, Core/Banked contention, and Core/Banked reset targets on the R153 RTL/DV content; all four targets pass three seeds. See [R153 fabric replay](COMPUTE_CLUSTER_MEMORY_FABRIC_CLEAN_REPLAY_R153_2026-11-01.md).
 **Latest request-stability delta:** R160 adds direction-aware stalled-request sampling and a mandatory legal-direction gate; three exact-clean seeds observe all 17 declared legal requester/direction classes with zero payload-stability violations. The real-top three-seed UVM, Top Smoke, and 28/28 checker-sensitivity campaign pass on test tree `451b66e`. This is scoped checker/testpoint evidence, not global coverage closure. See [R160 report](COMPUTE_CLUSTER_REQUEST_DIRECTION_STABILITY_R160_2026-11-01.md).
 **Latest Protection/fault-cross delta:** R159 extends the real-top Protection/reset/recovery cross from seven Source-A cases to 12 legal engine/operand pairs (A on all seven engines; B on INT8, FP, CNM, Matrix, and Conv) across six phases: 72/72 bins per seed. Three clean seeds each check 68,692 Memory Image words with zero mismatch/unknown/stale/orphan and UVM severity `0/0/0`; Top Smoke and 28/28 named checker-sensitivity mutations pass at the same test SHA. SFU/KV Source-B combinations are excluded because those descriptors have no B operand. This does not close the broader fault × phase × reset or pairwise concurrency spaces. See [R159 report](COMPUTE_CLUSTER_ENGINE_OPERAND_PROTECTION_RESET_R159_2026-11-01.md). Requirement totals remain 24 PASS-SCOPED / 14 PARTIAL and `CL-DV-v1.0` remains HOLD.
@@ -793,3 +793,15 @@ The exact published closeout HEAD `56f83d6006a931b05286aaa5d7d3a8a0af4a1691` (tr
 | REQ-PC-006 | PARTIAL | Same test; `CLUSTER_MEMORY_SCOREBOARD`, production response ledger, Matrix/CNM route mismatch counter | 68,692 words checked per seed; zero mismatch/unknown/stale and zero Matrix/CNM route mismatch. Broader owner/error/reset matrix remains open. | Same run and seeds | Same report/archive |
 
 Mutation sensitivity on this exact test source passes 28/28 assigned-checker probes; Top Smoke passes. This remains scoped evidence: the complete disposition remains 24 PASS-SCOPED / 14 PARTIAL, and `CL-DV-v1.0` remains HOLD.
+
+
+## R163 FP16 single-result Abort point — 2026-11-01
+
+| Requirement | Disposition | Test ID / checker | Coverage / observed result | Run ID / seeds | Evidence |
+|---|---|---|---|---|---|
+| `REQ-CL-017` | PARTIAL | `TC-CL-R163-FP16-ABORT-ZERO-PREFIX`; accepted-read Abort/drain, output handshake cutoff and sentinel checker | FP16 `0x51` accepts/returns 4/4 reads, retires `ERR_ABORT`, preserves all 8 output sentinels, and has zero post-Abort writes; Make gate requires the point on each seed. | `R163-UVM-FP16-ZERO-PREFIX-CLEAN-3S-20261101`; `20261025/26/27` | [R163 report](COMPUTE_CLUSTER_FP16_ABORT_ZERO_PREFIX_R163_2026-11-01.md) |
+| `REQ-CL-019` | PARTIAL | Completion status/code/task-ID and engine-idle checker | Correct single-result completion owner and `ERR_ABORT` code; other engine/fault/queue combinations remain open. | Same run/seeds | Same report |
+| `REQ-CL-027` | PARTIAL | FP16 error/Completion ABI checker | FP16 task ID and error status/code match SPEC v1.8; complete error ABI cross remains open. | Same run/seeds | Same report |
+| `REQ-PC-006` | PARTIAL | `CLUSTER_MEMORY_SCOREBOARD` and full output sentinel image | 68,712 words per seed; zero mismatch, unknown read or stale epoch. | Same run/seeds | Same report and logs-only archive SHA-256 `b6a88bd167754d9c92a03df9ae882eae2511a61f6fd3b30d526213e1cb29cfc7` |
+
+The directed FP16 marker is required per seed; R163 adds no new URG functional bin. Existing `cluster_cg` remains 64/64; mixed all-group URG remains 64.86%. The scenario does not close other Abort timings, reset/error interactions, concurrent owner crosses, or the full legal Engine × Fault × Phase × Reset space. The 38-row disposition remains 24 PASS-SCOPED / 14 PARTIAL, and `CL-DV-v1.0` remains **HOLD**.
