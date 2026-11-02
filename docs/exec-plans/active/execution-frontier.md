@@ -248,3 +248,11 @@ in the owning report; run `git diff --check` before handoff.
 - The same SHA's R194 real-top UVM reports 320 Matrix/CNM shared-bank admissions per seed, 768 Matrix and 1,120 CNM responses, and zero owner/hold/route mismatch.
 - This strengthens only selected fabric and named production Matrix/CNM points. `REQ-PC-006/007` and `REQ-CL-018` remain PARTIAL; aggregate status remains 24 PASS-SCOPED / 14 PARTIAL, and CL-DV-v1.0 remains HOLD.
 - No RTL or test source changed. Evidence: [R197 report](../../verification/COMPUTE_CLUSTER_MEMORY_FABRIC_OWNER_CONTENTION_RESET_R197_2026-11-02.md); logs-only archive SHA-256 `83f03ec53a1e0344e017ccd9b8af20bfab7d0c0c8e2757ad4fe418f10e54d153`.
+
+## 2026-11-02 update — R198 Matrix Line contract clean replay
+
+- Fixed code/test SHA `f87acc9bca3b3ecece385fadfd5623de6837ea8d`; detached clean worktree at tree `cfc7ba4955488ae58d58f36deec368173c6ec98c`.
+- The enabled 16×16 Matrix core regression passes 18 numerical/layout and 35 fault/recovery cases on each of three seeds. It checks full WSTRB, 16-byte Line alignment, 312 stall-stability samples, unaligned scalar fallback and Protection error. Partial/zero WSTRB are unsupported by SPEC v1.5.
+- The separately compiled prefetch-disabled fallback and five-workload marker pass all three seeds. This uses the block-level one-cycle behavioral SPAD model, not ASIC timing or PPA.
+- `OPEN-CL-004` is replayed at the current candidate; `REQ-CL-010` remains PARTIAL because the enabled raw FSM is 49/53 and wider request/fault crosses remain open. Overall status remains 24 PASS-SCOPED / 14 PARTIAL, HOLD.
+- Evidence: [R198 report](../../verification/COMPUTE_CLUSTER_MATRIX_LINE_CONTRACT_R198_2026-11-02.md); archive SHA-256 `1a0099840d43316a6bb320a6fd4d5da2b51b5702c003fd0d00df202cd1fd8690`.
