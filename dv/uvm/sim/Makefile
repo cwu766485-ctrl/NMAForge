@@ -66,6 +66,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -Eq '\[CLUSTER_MATRIX_CNM_BANKED_COLLISION_PASS\].*collision cycles=[1-9][0-9]* admitted collisions=[1-9][0-9]* Matrix wait cycles=[1-9][0-9]* held-payload checks=[1-9][0-9]* owner violations=0 hold violations=0' "$$log" || { echo "ERROR: real Matrix banked/CNM admission collision, Matrix wait stability, or single-owner check missing or failed in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CNM_ADDR_PASS\]' "$$log" || { echo "ERROR: four-lane CNM address scoreboard check missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_ALL_ENGINES_PASS\].*real pair overlaps=21/21 mask=1fffff' "$$log" || { echo "ERROR: real seven-engine pairwise overlap Golden sweep missing or incomplete in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_ALL_ENGINE_PAIR_COVERAGE_PASS\].*pair bins=21/21 coverage=100\.0%' "$$log" || { echo "ERROR: real seven-engine pairwise overlap functional coverage incomplete in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_ABORT_CROSS_PASS\]' "$$log" || { echo "ERROR: multi-engine software-abort cross missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_RESET_RECOVERY_PASS\]' "$$log" || { echo "ERROR: real compute-cluster active-reset/recovery check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_ENGINE_RESET_PASS\].*reset mask=1111111' "$$log" || { echo "ERROR: accepted-read reset/drain sweep for all seven real engines missing in $$log"; exit 1; }; \
