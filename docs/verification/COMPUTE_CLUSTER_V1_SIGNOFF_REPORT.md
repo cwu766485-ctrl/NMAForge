@@ -10,11 +10,11 @@
 |---|---|
 | Product RTL/SPEC candidate | `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413` (R99 CNM Protection response alignment; SPEC v1.8 unchanged) |
 | Latest real-top descriptor-latch SHA | R167 4eb689c866650679d238d1ada955d6b03e68c6ec (FP/Conv/KV added; Matrix R74, SFU R77, CNM R123 remain separately evidenced) |
-| Latest UVM/test content SHA | R167 4eb689c866650679d238d1ada955d6b03e68c6ec (tree e65fae5d62fc08e468b30ae271438ba6cb215959; mandatory FP/Conv/KV parameter-latch checks) |
-| Latest full Compute Cluster UVM replay SHA | R167 clean exact test commit 4eb689c866650679d238d1ada955d6b03e68c6ec (three-seed UVM; R166 remains the latest 18/18 same-top and 17/17 subsystem declared-group coverage merge) |
-| Latest exact-candidate integration replay | R168 at clean checkout `8f5c3cd5f7749ba5bfee1bb6d485a7b10c67f7d0`; Top Smoke, 20-case Top, three-seed UVM, and 28/28 checker-sensitivity PASS; [evidence](COMPUTE_CLUSTER_R168_FINAL_CANDIDATE_REPLAY_2026-11-02.md) |
+| Latest UVM/test content SHA | R170 test source `a702091b5db8937061f6b766ec7e1d60e6e5f2f2` (tree `041ffab053bcfb6fc83d6d34c61d5e60445b1c8c`); exact published replay commit `82b748898448800f807b947042d2bd0ed25c2951` contains byte-identical UVM sequence and Make gate |
+| Latest full Compute Cluster UVM replay SHA | R170 clean exact published SHA `82b748898448800f807b947042d2bd0ed25c2951` (three-seed UVM; R166 remains the latest all-declared-group coverage merge at 18/18 same-top and 17/17 subsystem) |
+| Latest exact-candidate integration replay | R170 at detached clean published SHA `82b748898448800f807b947042d2bd0ed25c2951`; Top Smoke with 20 fixed cases, three-seed real-top UVM, and 28/28 checker-sensitivity PASS; [R170 evidence](COMPUTE_CLUSTER_CONV_RESET_WRITE_PREFIX_R170_2026-11-02.md) |
 | Latest Matrix benchmark replay | R169 at source checkout `4253bbe695482ddb11275673013e27eab3a76d7a`; 165/165 size/ablation Golden points; [report](../benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R169_2026-11-02.md) |
-| Latest attempted testpoint | R170 Conv reset accepted-write prefix at clean source SHA `a702091b5db8937061f6b766ec7e1d60e6e5f2f2`; `BLOCKED_ENV` after one-minute license wait before HDL compilation, status `NOT_RUN`; [report](COMPUTE_CLUSTER_CONV_RESET_WRITE_PREFIX_R170_2026-11-02.md) |
+| Latest focused testpoint | R170 Conv reset accepted-write prefix passes at exact published SHA `82b748898448800f807b947042d2bd0ed25c2951`; six focused bins are 6/6, 69,022 words/seed have zero scoreboard errors, and UVM severity is `0/0/0`; [report](COMPUTE_CLUSTER_CONV_RESET_WRITE_PREFIX_R170_2026-11-02.md) |
 | Latest selected-fabric focused replay | `5ea67bd125bb1ed20af8b86369e2cf8112f25131` (R125 clean checkout; RTL/DV/SPEC identical to R124) |
 | Published report package base | `8e3735e930f01c4a6bbb6a79251e153611dfcda2` (R158 code/test content; this evidence package is the following documentation commit) |
 | Prior reviewed product baseline | `6848a414eaeaa05cf9e1411cf55d9d27333208a6` |
