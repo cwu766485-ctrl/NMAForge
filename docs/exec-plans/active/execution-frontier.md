@@ -240,3 +240,11 @@ in the owning report; run `git diff --check` before handoff.
 - REQ-CL-017/019/027 and REQ-PC-006 gain bounded evidence and remain PARTIAL. RTM remains 24 PASS-SCOPED / 14 PARTIAL; CL-DV-v1.0 HOLD.
 - Top Smoke and mutation campaign were not rerun for this UVM-only change.
 - Evidence: R129 report (../../verification/COMPUTE_CLUSTER_SCALAR_GEMV_ABORT_PREFIX_R129_2026-10-31.md).
+
+## 2026-11-02 update — R197 selected memory-fabric owner/contention/reset replay
+
+- Fixed code/test SHA `f87acc9bca3b3ecece385fadfd5623de6837ea8d`; detached clean worktree at the matching tree `cfc7ba4955488ae58d58f36deec368173c6ec98c`.
+- Four existing banked owner/contention/reset targets pass three seeds each with UVM severity `0/0/0`; contention and reset functional groups are 100%, and owner/tag assertions have real success with no failure/incomplete.
+- The same SHA's R194 real-top UVM reports 320 Matrix/CNM shared-bank admissions per seed, 768 Matrix and 1,120 CNM responses, and zero owner/hold/route mismatch.
+- This strengthens only selected fabric and named production Matrix/CNM points. `REQ-PC-006/007` and `REQ-CL-018` remain PARTIAL; aggregate status remains 24 PASS-SCOPED / 14 PARTIAL, and CL-DV-v1.0 remains HOLD.
+- No RTL or test source changed. Evidence: [R197 report](../../verification/COMPUTE_CLUSTER_MEMORY_FABRIC_OWNER_CONTENTION_RESET_R197_2026-11-02.md); logs-only archive SHA-256 `83f03ec53a1e0344e017ccd9b8af20bfab7d0c0c8e2757ad4fe418f10e54d153`.
