@@ -77,6 +77,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -q '\[CLUSTER_SFU_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: SFU accepted-write Abort prefix check missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SFU_RESET_WRITE_PREFIX_PASS\].*accepted_output_prefix=[1-9][0-9]*/64 old_completion_suppressed=1 reset_dropped_reads=[0-9]+ full_golden_recovery=64/64 focused_bins=6/6' "$$log" || { echo "ERROR: SFU accepted-write Reset prefix, old-epoch suppression, or Golden recovery check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CONV_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: Conv accepted-write Abort prefix check missing in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_CONV_RESET_WRITE_PREFIX_PASS\].*accepted_output_prefix=[1-9][0-9]*/16 old_completion_suppressed=1 reset_dropped_reads=[0-9]+ full_golden_recovery=16/16 focused_bins=6/6' "$$log" || { echo "ERROR: Conv accepted-write Reset prefix, old-epoch suppression, or Golden recovery check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_KV_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: KV accepted-write Abort prefix check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_MATRIX_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: Matrix accepted-write Abort prefix check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_MATRIX_LINE_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: Matrix aligned Line accepted-write Abort prefix check missing in $$log"; exit 1; }; \

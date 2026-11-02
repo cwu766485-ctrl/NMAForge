@@ -129,6 +129,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned shared_reset_prefix_coverage_phase;
     int unsigned cnm_protection_reset_prefix_coverage_phase;
     int unsigned sfu_reset_prefix_phase;
+    int unsigned conv_reset_prefix_phase;
     int unsigned scalar_reset_prefix_phase;
     int unsigned matrix_protection_reset_phase;
     int unsigned matrix_protection_cnm_reset_phase;
@@ -181,6 +182,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         option.per_instance = 1;
         cp_sfu_reset_prefix_phase: coverpoint sfu_reset_prefix_phase {
             bins sfu_task_busy = {1};
+            bins accepted_golden_prefix = {2};
+            bins reset_quiet_window = {3};
+            bins release_quiet_window = {4};
+            bins prefix_suffix_and_completion_preserved = {5};
+            bins full_golden_recovery = {6};
+        }
+    endgroup
+
+    covergroup conv_reset_prefix_cg;
+        option.per_instance = 1;
+        cp_conv_reset_prefix_phase: coverpoint conv_reset_prefix_phase {
+            bins conv_task_busy = {1};
             bins accepted_golden_prefix = {2};
             bins reset_quiet_window = {3};
             bins release_quiet_window = {4};
@@ -271,6 +284,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         shared_reset_prefix_coverage_phase = 0;
         cnm_protection_reset_prefix_coverage_phase = 0;
         sfu_reset_prefix_phase = 0;
+        conv_reset_prefix_phase = 0;
         scalar_reset_prefix_phase = 0;
         matrix_protection_reset_phase = 0;
         matrix_protection_cnm_reset_phase = 0;
@@ -283,6 +297,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         matrix_cnm_prefix_reset_cg = new();
         cnm_protection_matrix_prefix_reset_cg = new();
         sfu_reset_prefix_cg = new();
+        conv_reset_prefix_cg = new();
         scalar_reset_prefix_cg = new();
         matrix_protection_reset_cg = new();
         matrix_protection_cnm_reset_cg = new();
@@ -4781,6 +4796,242 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
+    task automatic run_conv_reset_write_prefix(input int unsigned seed);
+        int signed expected_output[0:15];
+        bit [31:0] write_addr[0:15];
+        bit [31:0] write_data[0:15];
+        bit [31:0] desc_base;
+        bit [31:0] completion_base;
+        bit [31:0] src;
+        bit [31:0] weights;
+        bit [31:0] dst;
+        bit [31:0] sentinel;
+        bit [31:0] reset_value;
+        bit [31:0] cpl_tail;
+        bit [15:0] task_id;
+        bit [15:0] recovery_task_id;
+        int signed accum;
+        int unsigned accepted_write_count;
+        int unsigned accepted_write_at_reset;
+        int unsigned accepted_reads;
+        int unsigned returned_reads;
+        int unsigned post_reset_writes;
+        int unsigned post_reset_responses;
+        int unsigned poll;
+        int unsigned word_idx;
+        int unsigned out_row;
+        int unsigned out_col;
+        int unsigned kernel_row;
+        int unsigned kernel_col;
+        bit first_write_seen;
+        bit reset_monitor_active;
+        bit monitor_done;
+        bit reset_ok;
+
+        desc_base = CLUSTER_CONTRACT_CMDQ;
+        completion_base = 32'h0000_5d40;
+        src = 32'h0004_d400;
+        weights = 32'h0004_d500;
+        dst = 32'h0004_d600;
+        sentinel = 32'hbad0_77c0;
+        task_id = 16'h077a;
+        recovery_task_id = 16'h077b;
+        accepted_write_count = 0;
+        accepted_write_at_reset = 0;
+        accepted_reads = 0;
+        returned_reads = 0;
+        post_reset_writes = 0;
+        post_reset_responses = 0;
+        first_write_seen = 1'b0;
+        reset_monitor_active = 1'b0;
+        monitor_done = 1'b0;
+        conv_reset_prefix_phase = 0;
+
+        for (word_idx = 0; word_idx < 36; word_idx++)
+            spad_write(src + (word_idx << 2), word_idx + 1);
+        for (word_idx = 0; word_idx < 9; word_idx++)
+            spad_write(weights + (word_idx << 2), 32'd1);
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            spad_write(dst + (word_idx << 2), sentinel ^ word_idx);
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            spad_write(completion_base + (word_idx << 2), 32'h77c0_0000 | word_idx);
+
+        for (out_row = 0; out_row < 4; out_row++) begin
+            for (out_col = 0; out_col < 4; out_col++) begin
+                accum = 0;
+                for (kernel_row = 0; kernel_row < 3; kernel_row++) begin
+                    for (kernel_col = 0; kernel_col < 3; kernel_col++)
+                        accum += ((out_row + kernel_row) * 6) +
+                                 (out_col + kernel_col) + 1;
+                end
+                expected_output[(out_row * 4) + out_col] = accum;
+            end
+        end
+
+        // A 6x6 input with a 3x3 unit kernel produces a 4x4 output image.
+        // Reset immediately after the first accepted write must preserve that
+        // Golden prefix, suppress completion, and leave the suffix untouched.
+        write_cluster_desc(desc_base, 8'h16, task_id, src, weights, dst,
+                           16'd6, 16'd6, 16'd9, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd5);
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        fork
+            begin : conv_reset_prefix_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.engine_req_valid[5] &&
+                        compute_vif.engine_req_ready[5]) begin
+                        if (compute_vif.engine_req_write[5]) begin
+                            if (accepted_write_count >= 16)
+                                `uvm_fatal("CLUSTER_CONV_RESET_PREFIX",
+                                    "Conv accepted more writes than the 6x6 valid descriptor")
+                            write_addr[accepted_write_count] =
+                                compute_vif.engine_req_addr[5*32 +: 32];
+                            write_data[accepted_write_count] =
+                                compute_vif.engine_req_wdata[5*32 +: 32];
+                            accepted_write_count++;
+                            first_write_seen = 1'b1;
+                            if (reset_monitor_active)
+                                post_reset_writes++;
+                        end else begin
+                            accepted_reads++;
+                        end
+                    end
+                    if (compute_vif.rsp_valid &&
+                        (compute_vif.rsp_client == 3'd2)) begin
+                        returned_reads++;
+                        if (reset_monitor_active)
+                            post_reset_responses++;
+                    end
+                end
+            end
+            begin : reset_after_first_conv_write
+                poll = 0;
+                while (!first_write_seen && poll < 50000) begin
+                    @(posedge compute_vif.aclk);
+                    poll++;
+                    if (compute_vif.engine_busy[5] &&
+                        (conv_reset_prefix_phase == 0)) begin
+                        conv_reset_prefix_phase = 1;
+                        conv_reset_prefix_cg.sample();
+                    end
+                end
+                if (!first_write_seen)
+                    `uvm_fatal("CLUSTER_CONV_RESET_PREFIX",
+                        "Conv did not accept an output before the reset timeout")
+                // Let the monitor retire this edge before snapshotting the
+                // accepted prefix; this avoids a fork scheduling race.
+                @(negedge compute_vif.aclk);
+                if (accepted_write_count == 0 || accepted_write_count >= 16 ||
+                    !compute_vif.engine_busy[5])
+                    `uvm_fatal("CLUSTER_CONV_RESET_PREFIX", $sformatf(
+                        "reset prefix is not a proper in-flight output prefix: writes=%0d busy=%0b",
+                        accepted_write_count, compute_vif.engine_busy[5]))
+                if (conv_reset_prefix_phase == 0) begin
+                    conv_reset_prefix_phase = 1;
+                    conv_reset_prefix_cg.sample();
+                end
+                conv_reset_prefix_phase = 2;
+                conv_reset_prefix_cg.sample();
+                accepted_write_at_reset = accepted_write_count;
+                reset_monitor_active = 1'b1;
+                #1ns;
+                reset_value = 1'b0;
+                reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
+                if (!reset_ok)
+                    `uvm_fatal("CLUSTER_CONV_RESET_PREFIX",
+                        "failed to assert accelerator reset after Conv accepted output prefix")
+                repeat (4) @(posedge compute_vif.aclk);
+                if (compute_vif.engine_busy !== 7'b0)
+                    `uvm_fatal("CLUSTER_CONV_RESET_PREFIX", $sformatf(
+                        "engine busy did not clear in reset: busy=%07b",
+                        compute_vif.engine_busy))
+                conv_reset_prefix_phase = 3;
+                conv_reset_prefix_cg.sample();
+                #1ns;
+                reset_value = 1'b1;
+                reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
+                if (!reset_ok)
+                    `uvm_fatal("CLUSTER_CONV_RESET_PREFIX",
+                        "failed to release accelerator reset after Conv prefix test")
+                repeat (8) @(posedge compute_vif.aclk);
+                conv_reset_prefix_phase = 4;
+                conv_reset_prefix_cg.sample();
+                monitor_done = 1'b1;
+            end
+        join
+
+        wait_spad_idle();
+        if (post_reset_writes != 0 || post_reset_responses != 0 ||
+            accepted_write_count != accepted_write_at_reset)
+            `uvm_fatal("CLUSTER_CONV_RESET_PREFIX", $sformatf(
+                "old-epoch Conv activity escaped reset/release: writes=%0d responses=%0d prefix=%0d/%0d",
+                post_reset_writes, post_reset_responses,
+                accepted_write_count, accepted_write_at_reset))
+        if (returned_reads > accepted_reads)
+            `uvm_fatal("CLUSTER_CONV_RESET_PREFIX", $sformatf(
+                "Conv returned-read count exceeds accepts: accepted=%0d returned=%0d",
+                accepted_reads, returned_reads))
+        if (accepted_write_at_reset == 0 || accepted_write_at_reset >= 16)
+            `uvm_fatal("CLUSTER_CONV_RESET_PREFIX", $sformatf(
+                "reset did not preserve a proper accepted-write prefix: %0d/16",
+                accepted_write_at_reset))
+
+        axil_read(REG_CPLQ_TAIL, cpl_tail);
+        if (cpl_tail !== 32'd0)
+            `uvm_fatal("CLUSTER_CONV_RESET_PREFIX", $sformatf(
+                "old-epoch Conv task advanced CPLQ_TAIL across reset: %0d", cpl_tail))
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            expect_spad(completion_base + (word_idx << 2),
+                        32'h77c0_0000 | word_idx,
+                        $sformatf("Conv reset suppressed old completion[%0d]", word_idx));
+        for (word_idx = 0; word_idx < accepted_write_at_reset; word_idx++) begin
+            if (write_addr[word_idx] !== dst + (word_idx << 2))
+                `uvm_fatal("CLUSTER_CONV_RESET_PREFIX", $sformatf(
+                    "accepted Conv prefix address mismatch index=%0d expected=0x%08h actual=0x%08h",
+                    word_idx, dst + (word_idx << 2), write_addr[word_idx]))
+            if (write_data[word_idx] !== expected_output[word_idx])
+                `uvm_fatal("CLUSTER_CONV_RESET_PREFIX", $sformatf(
+                    "accepted Conv prefix Golden mismatch index=%0d expected=%0d actual=%0d",
+                    word_idx, expected_output[word_idx], $signed(write_data[word_idx])))
+            expect_spad(dst + (word_idx << 2), expected_output[word_idx],
+                        $sformatf("Conv reset accepted Golden prefix[%0d]", word_idx));
+        end
+        for (word_idx = accepted_write_at_reset; word_idx < 16; word_idx++)
+            expect_spad(dst + (word_idx << 2), sentinel ^ word_idx,
+                        $sformatf("Conv reset untouched output suffix[%0d]", word_idx));
+        conv_reset_prefix_phase = 5;
+        conv_reset_prefix_cg.sample();
+
+        write_cluster_desc(desc_base, 8'h16, recovery_task_id, src, weights, dst,
+                           16'd6, 16'd6, 16'd9, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd5);
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        expect_completion(completion_base, recovery_task_id,
+                          expected_output[15], 32'd16,
+                          "Conv reset accepted-prefix recovery");
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            expect_spad(dst + (word_idx << 2), expected_output[word_idx],
+                        $sformatf("Conv reset full Golden recovery[%0d]", word_idx));
+        conv_reset_prefix_phase = 6;
+        conv_reset_prefix_cg.sample();
+        if (conv_reset_prefix_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_CONV_RESET_PREFIX", $sformatf(
+                "Conv reset-prefix functional bins incomplete: %0.1f%%",
+                conv_reset_prefix_cg.get_coverage()))
+        `uvm_info("CLUSTER_CONV_RESET_WRITE_PREFIX_PASS", $sformatf(
+            "task_id=%04h accepted_output_prefix=%0d/16 old_completion_suppressed=1 reset_dropped_reads=%0d full_golden_recovery=16/16 focused_bins=6/6 seed=%0d",
+            task_id, accepted_write_at_reset, accepted_reads - returned_reads, seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
     task automatic run_kv_abort_write_prefix(input int unsigned seed);
         bit [31:0] expected_output[0:7];
         bit [31:0] write_addr[0:7];
@@ -8776,6 +9027,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_sfu_abort_write_prefix(seed);
         run_sfu_reset_write_prefix(seed);
         run_conv_abort_write_prefix(seed);
+        run_conv_reset_write_prefix(seed);
         run_kv_abort_write_prefix(seed);
         run_matrix_abort_write_prefix(seed);
         run_matrix_line_abort_write_prefix(seed);
