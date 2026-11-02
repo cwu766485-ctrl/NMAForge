@@ -215,6 +215,21 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     endgroup
 
     int unsigned engine_pair_overlap_cov_idx;
+    int unsigned cmdq_invalid_descriptor_case;
+    covergroup cmdq_invalid_descriptor_cg;
+        option.per_instance = 1;
+        cp_engine_descriptor_reject: coverpoint cmdq_invalid_descriptor_case {
+            bins scalar_zero_length = {0};
+            bins cnm_zero_length = {1};
+            bins matrix_dimension = {2};
+            bins sfu_zero_length = {3};
+            bins conv_minimum_dimension = {4};
+            bins kv_zero_length = {5};
+            bins mixed_fp_reserved_field = {6};
+            bins macro_minimum_child_count = {7};
+        }
+    endgroup
+
     covergroup engine_pair_overlap_cg;
         option.per_instance = 1;
         cp_engine_pair_overlap: coverpoint engine_pair_overlap_cov_idx {
@@ -328,6 +343,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         sfu_reset_prefix_cg = new();
         conv_reset_prefix_cg = new();
         scalar_reset_prefix_cg = new();
+        cmdq_invalid_descriptor_cg = new();
         engine_pair_overlap_cg = new();
         matrix_protection_reset_cg = new();
         matrix_protection_cnm_reset_cg = new();
@@ -2809,6 +2825,131 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
     task automatic clear_contract_queues(input bit [31:0] completion_head);
         axil_write(REG_CPLQ_HEAD, completion_head);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+    task automatic run_cmdq_invalid_descriptor_matrix_test(input int unsigned seed);
+        localparam int unsigned CASE_COUNT = 8;
+        bit [31:0] cmdq_base;
+        bit [31:0] cplq_base;
+        bit [31:0] sentinel_base;
+        bit [31:0] descriptor_dst[0:CASE_COUNT-1];
+        bit [7:0] opcode[0:CASE_COUNT-1];
+        bit [15:0] m_size[0:CASE_COUNT-1];
+        bit [15:0] n_size[0:CASE_COUNT-1];
+        bit [15:0] length[0:CASE_COUNT-1];
+        bit [7:0] version[0:CASE_COUNT-1];
+        bit [31:0] actual;
+        bit [15:0] expected_task_id;
+        bit monitor_done;
+        int unsigned launch_before;
+        int unsigned bad_request_cycles;
+        int unsigned i;
+
+        cmdq_base = 32'h0007_4000;
+        cplq_base = 32'h0007_4800;
+        sentinel_base = 32'h0007_7000;
+        bad_request_cycles = 0;
+        monitor_done = 1'b0;
+
+        // Each case violates a descriptor rule already defined by SPEC v1.8.
+        // They are sent through the real CMDQ fetch/validator/retirement path;
+        // no illegal engine inputs or internal state forcing are used.
+        opcode[0] = 8'h10; m_size[0] = 16'd0; n_size[0] = 16'd0; length[0] = 16'd0; version[0] = 8'd7;
+        opcode[1] = 8'h20; m_size[1] = 16'd0; n_size[1] = 16'd0; length[1] = 16'd0; version[1] = 8'd7;
+        opcode[2] = 8'h30; m_size[2] = 16'd2; n_size[2] = 16'd4; length[2] = 16'd1; version[2] = 8'd3;
+        opcode[3] = 8'h35; m_size[3] = 16'd0; n_size[3] = 16'd0; length[3] = 16'd0; version[3] = 8'd3;
+        opcode[4] = 8'h16; m_size[4] = 16'd2; n_size[4] = 16'd3; length[4] = 16'd9; version[4] = 8'd5;
+        opcode[5] = 8'h43; m_size[5] = 16'd0; n_size[5] = 16'd0; length[5] = 16'd0; version[5] = 8'd5;
+        opcode[6] = 8'h50; m_size[6] = 16'd1; n_size[6] = 16'd1; length[6] = 16'd1; version[6] = 8'd7;
+        opcode[7] = 8'h40; m_size[7] = 16'd0; n_size[7] = 16'd0; length[7] = 16'd2; version[7] = 8'd4;
+
+        for (i = 0; i < CASE_COUNT; i++) begin
+            descriptor_dst[i] = sentinel_base + (i << 5);
+            spad_write(descriptor_dst[i], 32'hde5c_0000 | i);
+            spad_write(descriptor_dst[i] + 32'd4, 32'hde5c_1000 | i);
+            write_cluster_desc(cmdq_base + (i << 6), opcode[i],
+                               16'h08a0 + i, 32'h0007_8000,
+                               32'h0007_8100, descriptor_dst[i],
+                               m_size[i], n_size[i], length[i],
+                               32'd0, 32'd0, 32'd0, 32'd0, version[i]);
+        end
+        // FP descriptors require flags to be zero; keep every other field
+        // legal so the selected rejection cause is unambiguous.
+        spad_write(cmdq_base + (6 << 6) + 32'h1c, 32'd1);
+
+        launch_before = compute_vif.launch_sample_count;
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, cmdq_base);
+        axil_write(REG_CMDQ_SIZE, 32'd16);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, CASE_COUNT);
+        axil_write(REG_CPLQ_BASE, cplq_base);
+        axil_write(REG_CPLQ_SIZE, 32'd16);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+
+        fork
+            begin : invalid_descriptor_request_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if ((|compute_vif.engine_req_valid) ||
+                        compute_vif.matrix_line_valid ||
+                        compute_vif.banked_valid ||
+                        (|compute_vif.cnm_valid) ||
+                        compute_vif.dma_valid || compute_vif.dma_line_valid)
+                        bad_request_cycles++;
+                end
+            end
+            begin : invalid_descriptor_submit
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(CASE_COUNT);
+                monitor_done = 1'b1;
+            end
+        join
+        wait_spad_idle();
+
+        if (compute_vif.launch_sample_count != launch_before)
+            `uvm_fatal("CLUSTER_DESC_REJECT", $sformatf(
+                "invalid CMDQ descriptors launched an engine: launches_before=%0d after=%0d",
+                launch_before, compute_vif.launch_sample_count))
+        if (bad_request_cycles != 0)
+            `uvm_fatal("CLUSTER_DESC_REJECT", $sformatf(
+                "invalid CMDQ descriptors generated compute/DMA requests for %0d sampled cycles",
+                bad_request_cycles))
+
+        for (i = 0; i < CASE_COUNT; i++) begin
+            expected_task_id = 16'h08a0 + i;
+            expect_spad(cplq_base + (i << 4), {16'd0, expected_task_id},
+                        $sformatf("invalid descriptor %0d ERR_DESC task ID", i));
+            expect_spad(cplq_base + (i << 4) + 32'd4, 32'h0000_0072,
+                        $sformatf("invalid descriptor %0d ERR_DESC status", i));
+            expect_spad(cplq_base + (i << 4) + 32'd8, 32'd0,
+                        $sformatf("invalid descriptor %0d ERR_DESC result", i));
+            expect_spad(cplq_base + (i << 4) + 32'd12, 32'd0,
+                        $sformatf("invalid descriptor %0d ERR_DESC elements", i));
+            expect_spad(descriptor_dst[i], 32'hde5c_0000 | i,
+                        $sformatf("invalid descriptor %0d destination sentinel", i));
+            expect_spad(descriptor_dst[i] + 32'd4, 32'hde5c_1000 | i,
+                        $sformatf("invalid descriptor %0d adjacent guard", i));
+            cmdq_invalid_descriptor_case = i;
+            cmdq_invalid_descriptor_cg.sample();
+        end
+        axil_read(REG_CMDQ_HEAD, actual);
+        if (actual != CASE_COUNT)
+            `uvm_fatal("CLUSTER_DESC_REJECT", $sformatf(
+                "CMDQ head expected %0d after ordered ERR_DESC retirements, got %0d",
+                CASE_COUNT, actual))
+        if (cmdq_invalid_descriptor_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_DESC_REJECT", $sformatf(
+                "CMDQ invalid-descriptor functional bins incomplete: coverage=%0.1f%%",
+                cmdq_invalid_descriptor_cg.get_coverage()))
+
+        `uvm_info("CLUSTER_CMDQ_INVALID_DESCRIPTOR_PASS", $sformatf(
+            "cases=8/8 engines_and_macro=8 ERR_DESC=8 ordered_head=8 no_launch=1 no_compute_or_dma_request_cycles=%0d sentinels=16/16 focused_bins=8/8 coverage=%0.1f%% seed=%0d",
+            bad_request_cycles, cmdq_invalid_descriptor_cg.get_coverage(), seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, CASE_COUNT);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
@@ -9057,6 +9198,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         run_dma_store_response_test();
         run_banked_vdot_cmdq_dispatch_test(seed);
+        run_cmdq_invalid_descriptor_matrix_test(seed);
         run_scalar_gemv_gemm_cmdq_dispatch_test(seed);
         run_scalar_cmdq_numeric_boundary_test(seed);
         run_scalar_legacy_conv_cmdq_test(seed);
