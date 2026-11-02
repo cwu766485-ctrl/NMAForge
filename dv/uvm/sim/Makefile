@@ -125,7 +125,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -Eq '\[CLUSTER_CPLQ_BACKPRESSURE_PASS\].*blocked_tail=3.*released_head=1.*wrapped_tail=0.*all_engines_idle=1' "$$log" || { echo "ERROR: real-engine CPLQ full hold/release/ordered completion check missing or failed in $$log"; exit 1; }; \
 		test "$$(grep -c ' \[CLUSTER_FAULT_CASE_PASS\] case=' "$$log")" -eq 18 || { echo "ERROR: expected all 18 parity fault cases in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_PROTECTION_CROSS_PASS\].*cases=19/19.*sourceA=7 sourceB=5 writeback=7' "$$log" || { echo "ERROR: all-engine phase-qualified real-top protection fault cross missing in $$log"; exit 1; }; \
-		grep -Eq '\[CLUSTER_PROTECTION_CPLQ_CROSS_PASS\].*writeback Protection x full CPLQ x ordered wrap: engines=7/7 coverage=100\.0%%' "$$log" || { echo "ERROR: seven-engine writeback-Protection/full-CPLQ ordered-wrap cross missing or incomplete in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_PROTECTION_CPLQ_CROSS_PASS\].*writeback Protection x full CPLQ x ordered wrap: engines=7/7 coverage=100\.0%' "$$log" || { echo "ERROR: seven-engine writeback-Protection/full-CPLQ ordered-wrap cross missing or incomplete in $$log"; exit 1; }; \
 		test "$$(grep -c ' \[CLUSTER_PROTECTION_CPLQ_CASE_PASS\] engine=' "$$log")" -eq 7 || { echo "ERROR: expected full-CPLQ writeback Protection checks for all seven engines in $$log"; exit 1; }; \
 		test "$$(grep -c ' \[CLUSTER_PROTECTION_CASE_PASS\] engine=' "$$log")" -eq 19 || { echo "ERROR: expected 19 engine/phase protection fault cases in $$log"; exit 1; }; \
 		test "$$(grep -c ' \[CLUSTER_PROTECTION_CASE_PASS\].*phase=0 ' "$$log")" -eq 7 || { echo "ERROR: expected seven source-A Protection cases in $$log"; exit 1; }; \
