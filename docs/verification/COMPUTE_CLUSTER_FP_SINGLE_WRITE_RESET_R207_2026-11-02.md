@@ -4,7 +4,8 @@
 
 - Test commit: `40b11572ca85ca67ef8ee54e19540a8dd2b42359` (`dv: cover FP single-result reset before retirement`).
 - Test tree: `d542977155a9c80beec2a65509c2f3928f930baa`.
-- Checkout: detached clean worktree `/tmp/nmaforge_r207_fp_reset_clean`.
+- UVM/mutation checkout: detached clean test tree `/tmp/nmaforge_r207_fp_reset_clean` at `d542977155a9c80beec2a65509c2f3928f930baa`.
+- Top Smoke/seeded Top ran from documentation-only descendant `fffa1d1` (tree `c4ac33bc529ca6cb61717aa1792bad7f7097465a`); `rtl/` and `dv/` match the tested tree.
 - Product RTL comparison: `git diff f87acc9bca3b3ecece385fadfd5623de6837ea8d -- rtl` is empty; no RTL or SPEC was changed.
 - Tools: Synopsys VCS `V-2023.12-SP1_Full64`, URG `V-2023.12-SP1`, UVM 1.2.
 - Run IDs: `R207-FP-SINGLE-WRITE-RESET-CLEAN-3S-20261102`, `R207-MIXED-E2E-COV-16S-20261102`, `R207-DUT-MUTATION-7-20261102`.
@@ -23,6 +24,7 @@ This adds one legal reset point for a single-result FP operation. The BF16 `0x50
 | Combined URG functional groups | **22/22 declared groups at 100.00%**, merging the 3 Cluster and 16 mixed E2E seed VDBs. This number is the declared covergroup score, not requirement or all-code coverage. |
 | Assertions and cover properties | 20/22 assertions have real successes; 0 failures and 0 incomplete. The two no-attempt properties are UVM RAL `do_read`/`do_write` internals. All 3 AXI stall cover properties match. |
 | Raw RTL/test coverage | Line 73.70%, condition 68.72%, FSM 46.69%, branch 64.70%; assertion score 92.00%. These remain below full code coverage. |
+| Top Smoke / seeded Top | **PASS** at the documentation-only descendant with identical RTL/DV sources. Mapper reports 86 descriptors / 60 tensors; `ai_smoke` passes with 4 random cases, then `ai_run AI_RANDOM_CASES=20 AI_SEED=12345` passes. The existing fixture warning `[LOOP-REROLL-ENABLED]` remains visible. |
 | Real RTL mutation | **7/7 detected** by their assigned checker: Address→`CLUSTER_MEMORY_UNKNOWN`, Data→`CLUSTER_GOLDEN`, Response Owner→`CLUSTER_ENGINE_RESPONSE_OWNER`, WSTRB→`CLUSTER_MATRIX_WSTRB`, Completion Error→`CLUSTER_COMPLETION_ERROR_CODE`, Missing Done→`CLUSTER_MISSING_DONE`, Duplicate Done→`CLUSTER_DONE_WITHOUT_ACTIVE`. |
 | Compile diagnostics | Cluster and all seven mutation compile logs contain no `Warning-`, `Error-`, or `[TFIPC]` diagnostics. |
 
@@ -48,6 +50,18 @@ VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
 python3 dv/uvm/sim/run_compute_cluster_dut_mutations.py \
   --out /tmp/nmaforge_r207_clean_mutations \
   --vcs-home /tmp/nmaforge_vcs_home_linux_alias
+
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+make -C dv/subsystem/top_smoke/sim ai_smoke \
+  VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 1' \
+  SEED=20261025 AI_RANDOM_CASES=4 AI_SEED=12345
+
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+make -C dv/subsystem/top_smoke/sim ai_run \
+  VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 1' \
+  SEED=20261025 AI_RANDOM_CASES=20 AI_SEED=12345
 ```
 
 The final 19-database URG merge is reproduced by the full input list recorded in the archived `combined_urg/dashboard.txt` and `RUN_MANIFEST.txt`.
@@ -63,6 +77,6 @@ The final 19-database URG merge is reproduced by the full input list recorded in
 | `REQ-PC-006` | PARTIAL (unchanged) | Full Memory Scoreboard and output image/epoch checks | Same run / seeds |
 | `REQ-PC-007` | PARTIAL (unchanged) | Real-top response-owner ledger; no route/data/error mismatch or pending response | Same run / seeds |
 
-No RTM disposition is promoted. The complete 38-row matrix remains **24 PASS-SCOPED / 14 PARTIAL**, and `CL-DV-v1.0` remains **HOLD**. The broader production requester × fault × phase × reset × backpressure cross, Matrix FSM residuals, and remaining requirement-specific contract gaps are still open. The R207 Top Smoke/seeded Top targets were not rerun; the test change is UVM-only. Existing benchmark evidence is reported at its own fixed source/test SHA and is not relabeled as an R207 benchmark.
+No RTM disposition is promoted. The complete 38-row matrix remains **24 PASS-SCOPED / 14 PARTIAL**, and `CL-DV-v1.0` remains **HOLD**. The broader production requester × fault × phase × reset × backpressure cross, Matrix FSM residuals, and remaining requirement-specific contract gaps are still open. Top Smoke and the 20-case seeded Top are now PASS at the documentation-only descendant tree with identical RTL/DV inputs; the Smoke compile retains the existing `[LOOP-REROLL-ENABLED]` fixture warning. Existing benchmark evidence is reported at its own fixed source/test SHA and is not relabeled as an R207 benchmark.
 
-Text logs, compile logs, mutation evidence and URG reports are archived outside the repository at `/tmp/nmaforge_r207_fp_single_write_evidence.tar.gz`, SHA-256 `82fe8eefa8b7244763a09f16efbc5affbc57b5a94a2fd8c9d6e19ee110dfe329`. VDBs, simulator executables, compiler directories, waveforms and license configuration are excluded.
+Text logs, compile logs, mutation evidence and URG reports are archived outside the repository at `/tmp/nmaforge_r207_fp_single_write_evidence.tar.gz`, SHA-256 `9a949ad380e1e32eb6d8bb469472e586864944dd7561e9a79fd10765ae073cb6`. VDBs, simulator executables, compiler directories, waveforms and license configuration are excluded.
