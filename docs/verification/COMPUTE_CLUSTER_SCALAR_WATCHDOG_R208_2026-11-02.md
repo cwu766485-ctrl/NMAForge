@@ -2,6 +2,7 @@
 
 **Candidate:** `30378888dadc21a6fd2dace0a125ee78fd20d45b`  
 **Tree:** `412ec3700cd79b6c3f5b64e4f0f37691e2f679d8`  
+**Published same-tree commit:** [`f482fcb508b2dabd4337c9d7d911acc61b88526b`](https://github.com/cwu766485-ctrl/NMAForge/commit/f482fcb508b2dabd4337c9d7d911acc61b88526b)
 **Run:** `CL-ENGINE-WATCHDOG-R208-CLEAN-3S-20261102`  
 **Seeds:** `20261025`, `20261026`, `20261027`  
 **Environment:** detached clean worktree `/tmp/nmaforge_r208_clean`; VCS `V-2023.12-SP1_Full64`; URG `V-2023.12-SP1`; UVM 1.2.
