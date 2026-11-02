@@ -126,7 +126,8 @@
                 if ((rsp_count != 0) && (bfm_cycle >= rsp_due[rsp_head])) begin
                     vif.spad_rsp_valid = 1'b1;
                     vif.spad_rdata = rsp_data[rsp_head];
-                        if ((((req.fault_mode == FP_FAULT_READ_PARITY) &&
+                        if (((((req.fault_mode == FP_FAULT_READ_PARITY) ||
+                               (req.fault_mode == FP_FAULT_READ_PARITY_ABORT)) &&
                               (responses_delivered == 0)) ||
                              ((req.fault_mode == FP_FAULT_READ_B_PARITY) &&
                               (responses_delivered == 1)) ||
@@ -136,6 +137,14 @@
                             vif.spad_parity_error = 1'b1;
                             parity_injected = 1;
                         end
+                    if ((req.fault_mode == FP_FAULT_READ_PARITY_ABORT) &&
+                        (responses_delivered == 0) && !abort_injected) begin
+                        vif.abort = 1'b1;
+                        abort_injected = 1;
+                        `uvm_info("FP_SAME_CYCLE_PRIORITY", $sformatf(
+                            "Parity response and Abort asserted together for tx%0d; next posedge samples both",
+                            req.transaction_id), UVM_LOW)
+                    end
                     rsp_head = (rsp_head == 3) ? 0 : rsp_head + 1;
                     rsp_count--;
                 end
@@ -160,6 +169,7 @@
                             !vif.spad_write)
                             stall_left = 0;
                         if ((req.fault_mode == FP_FAULT_READ_PARITY) ||
+                            (req.fault_mode == FP_FAULT_READ_PARITY_ABORT) ||
                             (req.fault_mode == FP_FAULT_READ_B_PARITY) ||
                             (req.fault_mode == FP_FAULT_READ_PARITY_LATE) ||
                             (req.fault_mode == FP_FAULT_READ_PROTECTION))
@@ -239,6 +249,16 @@
                 end
 
                 @(posedge vif.clk);
+                if ((req.fault_mode == FP_FAULT_READ_PARITY_ABORT) &&
+                    (responses_delivered == 0) && vif.spad_rsp_valid) begin
+                    if (!vif.abort || !vif.spad_parity_error)
+                        `uvm_fatal("FP_SAME_CYCLE_PRIORITY",
+                            "Parity response and Abort were not both asserted on the sampled response edge")
+                    same_cycle_priority_sampled = 1;
+                    `uvm_info("FP_SAME_CYCLE_PRIORITY_SAMPLE", $sformatf(
+                        "sampled Parity response and Abort together on tx%0d",
+                        req.transaction_id), UVM_LOW)
+                end
                 if (vif.spad_valid && vif.spad_ready) begin
                     if ((req.fault_mode == FP_FAULT_WRITE_PROTECTION_ABORT) &&
                         vif.spad_write) begin

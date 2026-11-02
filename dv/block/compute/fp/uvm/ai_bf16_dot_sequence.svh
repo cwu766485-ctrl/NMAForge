@@ -399,6 +399,10 @@
             // an otherwise eligible next-pair request on that same cycle.
             send_fault_case(FP_FAULT_READ_PARITY, 1'b1, 4, 4'd5, 2, 0);
             send_fault_case(FP_FAULT_READ_PARITY, 1'b0, 4, 4'd5, 2, 0);
+            // A parity error on an accepted response and Abort are legal on
+            // the same edge; the frozen priority requires ERR_PARITY.
+            send_fault_case(FP_FAULT_READ_PARITY_ABORT, 1'b0, 1, 4'd5, 2, 0);
+            send_fault_case(FP_FAULT_READ_PARITY_ABORT, 1'b1, 1, 4'd5, 2, 0);
             // Use a longer command so the next pair's A read can be accepted
             // after A0 returns but before the B0 parity response. B0's longer
             // response latency exercises the two-outstanding boundary at the
