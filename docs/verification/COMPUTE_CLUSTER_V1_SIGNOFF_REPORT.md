@@ -16,6 +16,7 @@
 | Latest AXI SVA/TFIPC audit | R172 on the same published source SHA; clean UVM compile, focused AXI stall gate, and 16-seed mixed E2E coverage regression pass; [audit](COMPUTE_CLUSTER_SVA_AUDIT_R172_2026-11-02.md) |
 | Latest Matrix benchmark replay | R169 at source checkout `4253bbe695482ddb11275673013e27eab3a76d7a`; 165/165 size/ablation Golden points; [report](../benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R169_2026-11-02.md) |
 | Latest focused testpoint | R171 engine-pair overlap functional coverage passes 21/21 named bins on three seeds; 69,022 words/seed have zero mismatch/unknown/stale, and UVM severity is `0/0/0`; [report](COMPUTE_CLUSTER_ENGINE_PAIR_COVERAGE_R171_2026-11-02.md) |
+| Latest formal reachability disposition | R181 VC Formal proves the core-level same-edge new-read Protection+Abort exclusion (2/2 non-vacuous assertions; 2/2 active/reachability covers); candidate N/A review only, with no coverage credit and no REQ-CL-019 closure; [report](COMPUTE_CLUSTER_FP_READ_PROTECTION_ABORT_R181_FORMAL_2026-11-02.md) |
 | Latest selected-fabric focused replay | `5ea67bd125bb1ed20af8b86369e2cf8112f25131` (R125 clean checkout; RTL/DV/SPEC identical to R124) |
 | Published report package base | `8e3735e930f01c4a6bbb6a79251e153611dfcda2` (R158 code/test content; this evidence package is the following documentation commit) |
 | Prior reviewed product baseline | `6848a414eaeaa05cf9e1411cf55d9d27333208a6` |
@@ -62,6 +63,10 @@ R114 at exact published code/test SHA `4797a7710a18670d820f8f3815959091f9636e75`
 ## R162 production Matrix/CNM collision update — 2026-11-01
 
 The exact R162 test tree passes three seeds of concurrent production Matrix banked and CNM lane traffic. Each run observes 320 simultaneous admissions, 320 Matrix wait/held-payload checks, zero owner/stability/route violations, and 68,692 checked Memory Image words without mismatch/unknown/stale response. The two declared collision coverpoints are 100%; `cluster_cg` is 64/64 and all-group URG remains 64.86%. The exact test also passes Top Smoke and 28/28 assigned-checker sensitivity mutations. This adds one real requester-pair point and does not promote a requirement: the 38-row disposition remains 24 PASS-SCOPED / 14 PARTIAL and the review decision remains **HOLD**. See [R162 report](COMPUTE_CLUSTER_REAL_MATRIX_CNM_BANKED_COLLISION_R162_2026-11-01.md); evidence archive SHA-256 `86ea3c68f0e57d920d904223ecee1a85d7d8ef4640a2d8777edbf283b000dde0`.
+
+## R181 formal reachability disposition
+
+At exact clean formal/test commit `183983d2bdb6d5447b2b3af3edf40754abc9e6d5` (tree `52e2cb47b3673f4eef34bd8ee0c0079b0fc7cedc`), VC Formal `V-2023.12-SP2` proves both active-run properties non-vacuously: Abort blocks a new read acceptance, and the same-edge Abort+Protection inputs cannot produce a read Protection failure. Two depth-2 covers confirm both the input cross and the Protection-only accepted-read error are reachable. No accepted-read or Protection assumptions were used. This supports a candidate unreachable disposition for that single cross; SPEC/reviewer approval remains pending. R177's failed exploratory UVM run remains NOT PASS/no coverage credit. `REQ-CL-019` remains PARTIAL, requirement totals remain 24 PASS-SCOPED / 14 PARTIAL, and the decision stays **HOLD**. Full warning disposition and archived log hash are in the [R181 report](COMPUTE_CLUSTER_FP_READ_PROTECTION_ABORT_R181_FORMAL_2026-11-02.md).
 
 ## Requirement disposition
 
