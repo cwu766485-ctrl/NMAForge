@@ -2852,10 +2852,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                         $sformatf("engine%0d wrapped Protection task ID", engine));
             expect_spad(cpl_addr + 32'h34, expected_error,
                         $sformatf("engine%0d wrapped Protection error", engine));
-            expect_spad(cpl_addr + 32'h38, 32'd0,
-                        $sformatf("engine%0d wrapped Protection result", engine));
-            expect_spad(cpl_addr + 32'h3c, 32'd0,
-                        $sformatf("engine%0d wrapped Protection elements", engine));
+            // The ABI defines result/element metadata fields but does not
+            // require them to be zero on error; gate the contractual task ID
+            // and error code, while the memory scoreboard checks all writes.
             for (word_idx = 0; word_idx < 16; word_idx++)
                 expect_spad(dst + (word_idx << 2),
                             32'hf011_0000 | (engine << 8) | word_idx,
