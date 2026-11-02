@@ -133,6 +133,12 @@ R76 at the latest exact clean code/test SHA `969992291732cf694d7de4bdfef2808d4f0
 
 **CL-DV-v1.0 remains HOLD.** The current evidence does not satisfy the required closure for 14 partial requirements. No coverage percentage is used to waive missing legal scenarios.
 
+## R193 actual DUT mutation and response-owner checker update — 2026-11-02
+
+At fixed clean candidate `0225e1a73e2265cc72907b905947fdcea8b3f76e`, three real-top UVM seeds pass with zero UVM warning/error/fatal and 69,656 Memory Image words checked per seed. A newly added response-owner scoreboard checks 2,828 actual Core engine responses per seed against 2,847 accepted reads, accounting for 19 reset-dropped reads and reporting zero route/data/error mismatch and no pending response.
+
+The fixed-SHA mutation target also catches five real temporary RTL mutations with the expected Checkers: SPAD address, write data, response owner, Matrix WSTRB, and successful completion error code. This is genuine DUT mutation evidence for five named defects; the older R189 28/28 result remains checker-sensitivity evidence and is not reclassified as RTL mutation. R193 does not close the complete mutation campaign or broad integrated requester/fault/phase/reset/backpressure requirements. `REQ-PC-006/007` remain PARTIAL, the total remains 24 PASS-SCOPED / 14 PARTIAL, and the sign-off decision remains **HOLD**. See [R193 report](COMPUTE_CLUSTER_DUT_MUTATION_R193_2026-11-02.md), evidence archive SHA-256 `9d979ab3e52d7c97c201e012eb174f9a115c27847bdeccf286ba2c5c6c5944ea`.
+
 Before an independent review can consider sign-off, the open items must be closed or receive an approved scope disposition, including:
 
 1. Complete legal fault/reset phase crosses and production-top shared-SPAD ownership cases, or document approved bounded exclusions.
