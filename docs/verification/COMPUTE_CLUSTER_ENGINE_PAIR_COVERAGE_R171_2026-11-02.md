@@ -25,6 +25,14 @@ All seven output images and completion records also pass the existing independen
 
 The same worktree passes Top Smoke with the 86-descriptor mapper precheck and 20 random cases (`TEST PASS`). It reports the existing fixture `[LOOP-REROLL-ENABLED]` line-debug notice. The UVM compile log has no `Warning-`, `Error-`, or `TFIPC` diagnostics; VCS reports successful elaboration with 0 errors and 0 warnings.
 
+## Checker-sensitivity mutation campaign
+
+At the same published clean SHA, the existing 28-case checker-sensitivity campaign exits 0. Address, Data, response Owner, WSTRB, completion error code, write-after-error, and response epoch each carry an assigned checker; Done, Missing-Done, and Duplicate-Done are checked independently on all seven engines. All 28 logs contain the intended injection and its assigned checker marker. The nonzero UVM Error count in each mutation log is expected: the deliberately corrupted observation is detected. This is a checker-sensitivity campaign, not a DUT RTL mutation score.
+
+- Mutation Run ID: `R171-CHECKER-SENSITIVITY-28-20261102`
+- Mutation Test ID: `TC-CL-R171-CHECKER-SENSITIVITY-28`
+- Injection seed: `20261025`
+
 ## Commands
 
 ```sh
@@ -33,11 +41,16 @@ make -C dv/uvm/sim uvm_compute_cluster_regress \
   COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_r171_published_replay_8a2d5f \
   COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027'
 
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+make -C dv/uvm/sim uvm_compute_cluster_mutation \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_r171_published_replay_8a2d5f \
+  COMPUTE_CLUSTER_MUTATION_OUT=/tmp/nmaforge_r171_mutation_8a2d5f
+
 # From dv/subsystem/top_smoke/sim
 make ai_smoke AI_RANDOM_CASES=20 AI_SEED=12345 SEED=20261025
 ```
 
-The regression uses Synopsys VCS `V-2023.12-SP1_Full64`, URG `V-2023.12-SP1`, and UVM 1.2. Per-seed logs and merged coverage are under `/tmp/nmaforge_r171_published_replay_8a2d5f/urg_merged`. The external evidence archive includes both the initial candidate run and this published clean replay; it is `/tmp/nmaforge_r171_paircov_evidence.tar.gz` (SHA-256 `1a374d4b4f866752e7a7e2e7e8cf005a311cfc4573ed03e431376a12d981d7ae`); its manifest is `/tmp/nmaforge_r171_paircov_evidence/MANIFEST.sha256` (SHA-256 `a9a9f4c0be8bc514add59ef12da409d404e800913e371fbed8bac67b907a6590`).
+The regression uses Synopsys VCS `V-2023.12-SP1_Full64`, URG `V-2023.12-SP1`, and UVM 1.2. Per-seed logs and merged coverage are under `/tmp/nmaforge_r171_published_replay_8a2d5f/urg_merged`; the 28 checker-sensitivity logs are under `/tmp/nmaforge_r171_mutation_8a2d5f`. The external evidence archive includes the initial candidate run, this published clean replay, and the exact-SHA mutation logs; it is `/tmp/nmaforge_r171_paircov_evidence.tar.gz` (SHA-256 `460a11bf4d59dd61e75459951a900bf89b802881f0e134527da33f2035bba076`); its manifest is `/tmp/nmaforge_r171_paircov_evidence/MANIFEST.sha256` (SHA-256 `456db9c51865be961a53d886813064e13c4cb2e0e1ea28db0e91c7e7d484be97`).
 
 ## Requirement and sign-off boundary
 
