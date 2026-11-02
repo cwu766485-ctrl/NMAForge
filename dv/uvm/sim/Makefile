@@ -86,6 +86,8 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -q '\[CLUSTER_MATRIX_LINE_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: Matrix aligned Line accepted-write Abort prefix check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CNM_ABORT_WRITE_PREFIX_PASS\]' "$$log" || { echo "ERROR: CNM accepted-write Abort prefix check missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_ENGINE_WATCHDOG_PASS\].*engines=7/7 busy=7/7 error=7/7 ERR_WATCHDOG completions=7/7 no-writeback=7/7 focused bins=7/7 coverage=100\.0%' "$$log" || { echo "ERROR: seven-engine real CMDQ watchdog/error/completion/no-writeback coverage missing or incomplete in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_ENGINE_WATCHDOG_CPLQ_PASS\].*engines=7/7 error=7/7 blocked=7/7 released=7/7 wrapped=7/7 exactly-once=7/7 focused bins=7/7 coverage=100\.0%' "$$log" || { echo "ERROR: seven-engine watchdog completion/full-CPLQ backpressure cross missing or incomplete in $$log"; exit 1; }; \
+		test "$$(grep -c ' \[CLUSTER_ENGINE_WATCHDOG_CPLQ_CASE_PASS\] engine=' "$$log")" -eq 7 || { echo "ERROR: expected seven real-engine watchdog/full-CPLQ cases in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_DMA_RESPONSE_PASS\]' "$$log" || { echo "ERROR: real top DMA response-client read check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_LAUNCH_FIELDS_PASS\]' "$$log" || { echo "ERROR: descriptor launch-snapshot/unused-field checks missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
