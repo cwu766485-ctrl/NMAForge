@@ -311,7 +311,7 @@ R52 在固定测试 SHA 上仅使用已分配的 Activation 0/1/2，对 VDOT/GEM
 | Scalar INT8、CNM、SFU | Abort > Watchdog > Protection > Parity | 单故障有码表测试；CNM/SFU 本轮增加 Abort 与已到期 Watchdog 同拍测试；完整 Fault × Phase 未闭环 |
 | Matrix | Abort > Watchdog > Protection > Parity > bank-response context/config | Matrix core 定向回归检查已到期 Watchdog 同拍 Abort 和 Abort 与 bank parity/protection；并发 Phase 矩阵仍部分 |
 | Conv、KV | Watchdog > Abort > 合并 SPAD error | 本轮逐个检查 Watchdog 已到期时与 Abort/SPAD error 同拍 |
-| Mixed FP | 当前尚无 pending error 时，Parity > Read Protection > Write Protection > Abort > Watchdog；跨周期先采到的错误保持为最终原因 | R176 在 BF16/FP16 两种格式检查 Write Protection 与 Abort 同拍且同一结果写请求被采样时最终报告 Protection；其余同拍组合和故障阶段仍待测 |
+| Mixed FP | 当前尚无 pending error 时，Parity > Read Protection > Write Protection > Abort > Watchdog；跨周期先采到的错误保持为最终原因 | R176 在 BF16/FP16 检查同拍结果写 Protection+Abort 最终报告 Protection；R178 检查同拍 Parity 响应+Abort 最终报告 Parity。读 Protection+Abort 同拍接受请求因 abort 门控尚无合法可达性结论，其余同拍组合和故障阶段仍待测 |
 
 #### 4.2.3 已提交输出前缀
 
