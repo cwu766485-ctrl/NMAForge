@@ -21,7 +21,7 @@
 | Latest Matrix benchmark replay | R191 at clean source checkout `c95ab5e1446d4afbfdbb945d748124e551e2bd55` (tree `8762e7f7e7e933b480e9beaad3c9fb286c4c5c2b`); 165/165 size/ablation Golden points on three seeds; [report](../benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R191_2026-11-02.md) |
 | Latest focused functional testpoint | R180 Mixed FP parity + expired-watchdog priority passes on BF16/FP16 with 28/28 fault-mode bins and 56/56 format×fault bins; [report](COMPUTE_CLUSTER_FP_PRIORITY_R180_2026-11-02.md) |
 | Latest formal reachability disposition | R181 VC Formal proves the core-level same-edge new-read Protection+Abort exclusion (2/2 non-vacuous assertions; 2/2 active/reachability covers); candidate N/A review only, with no coverage credit and no REQ-CL-019 closure; [report](COMPUTE_CLUSTER_FP_READ_PROTECTION_ABORT_R181_FORMAL_2026-11-02.md) |
-| Latest selected-fabric focused replay | `5ea67bd125bb1ed20af8b86369e2cf8112f25131` (R125 clean checkout; RTL/DV/SPEC identical to R124) |
+| Latest selected-fabric focused replay | R196 at exact clean code/test SHA `f87acc9bca3b3ecece385fadfd5623de6837ea8d`; three reset groups 100%, owner/tag SVAs 3,921/144 successes with zero failure/incomplete; [R196 report](COMPUTE_CLUSTER_MEMORY_FABRIC_RESET_R196_2026-11-02.md) |
 | Published report package base | `8e3735e930f01c4a6bbb6a79251e153611dfcda2` (R158 code/test content; this evidence package is the following documentation commit) |
 | Prior reviewed product baseline | `6848a414eaeaa05cf9e1411cf55d9d27333208a6` |
 | Latest published closeout snapshot replayed | `480eb443b835f8cbe771682e91ff6d97acae0a99` (R117/R118 clean UVM and functional-testpoint merge; R115 Top Smoke remains at its exact earlier published SHA) |
@@ -132,6 +132,10 @@ R76 at the latest exact clean code/test SHA `969992291732cf694d7de4bdfef2808d4f0
 ## Sign-off decision and exit conditions
 
 **CL-DV-v1.0 remains HOLD.** The current evidence does not satisfy the required closure for 14 partial requirements. No coverage percentage is used to waive missing legal scenarios.
+
+## R196 selected memory-fabric reset replay — 2026-11-02
+
+At exact R194 code/test SHA `f87acc9bca3b3ecece385fadfd5623de6837ea8d`, the selected in-repository `ai_accel_memory_fabric` reset target passes three clean-worktree seeds. Every seed resets with four DMA reads outstanding and a real accepted CNM SPAD response pending, then checks the owner/epoch flush and fresh DMA/CNM recovery. All three declared reset groups are 100.00%; owner/tag SVAs have 3,921/144 real successes, zero failure/incomplete, and UVM severity is `0/0/0` per seed. The first run stopped at URG discovery after all simulations passed; the repeat explicitly selected the installed URG binary and completed successfully without source changes. This reconfirms `OPEN-CL-003` for the user-selected repository fabric, not an arbitrary external AXI target. `REQ-CL-018`, `REQ-PC-006`, and `REQ-PC-007` remain PARTIAL; `REQ-PC-010` remains PASS-SCOPED to its defined reset contract. Overall status is still 24 PASS-SCOPED / 14 PARTIAL and **HOLD**. See [R196 report](COMPUTE_CLUSTER_MEMORY_FABRIC_RESET_R196_2026-11-02.md); archive SHA-256 `7eee9b67718896402ad2882a7f9a145287d0a101e8a0fb903f7d481681095879`.
 
 ## R195 fixed-SHA SVA and Top Smoke replay — 2026-11-02
 
