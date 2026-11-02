@@ -1,5 +1,6 @@
-**Current closeout snapshot (2026-11-02):** Published HEAD `353695f4badca20a8a12a515393af0d59a4b66b5` is documentation-only above tested code/test SHA `f87acc9bca3b3ecece385fadfd5623de6837ea8d`. R194/R195/R197/R198 provide separate clean fixed-SHA evidence at `f87acc9`; R199 attempted the exact published-HEAD replay but was `BLOCKED_ENV` before compilation because VCS could not reach its configured license service. The RTM remains 24 PASS-SCOPED / 14 PARTIAL; decision **HOLD**. See [R199](COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R199_2026-11-02.md).
+# Compute Cluster v1.0 Final Audit
 
+**Current closeout snapshot (2026-11-02):** Published HEAD `353695f4badca20a8a12a515393af0d59a4b66b5` is documentation-only above tested code/test SHA `f87acc9bca3b3ecece385fadfd5623de6837ea8d`. R194/R195/R197/R198 provide separate clean fixed-SHA evidence at `f87acc9`; R199 attempted the exact published-HEAD replay but was `BLOCKED_ENV` before compilation because VCS could not reach its configured license service. The RTM remains 24 PASS-SCOPED / 14 PARTIAL; decision **HOLD**. See [R199](COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R199_2026-11-02.md).
 
 **Review date:** 2026-11-02
 

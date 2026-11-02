@@ -1,5 +1,6 @@
-**Latest published-HEAD replay attempt (R199):** The exact closeout branch HEAD `353695f4badca20a8a12a515393af0d59a4b66b5` was checked out clean. VCS compile was `BLOCKED_ENV` because the configured license service was unreachable; no simulator image or seed run was produced. Prior R194/R195/R197/R198 PASS evidence remains bound to code/test SHA `f87acc9bca3b3ecece385fadfd5623de6837ea8d`, not relabeled as a run at the documentation-only HEAD. See [R199](COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R199_2026-11-02.md).
+# Compute Cluster Execution RTM — 2026-11-02
 
+**Latest published-HEAD replay attempt (R199):** The exact closeout branch HEAD `353695f4badca20a8a12a515393af0d59a4b66b5` was checked out clean. VCS compile was `BLOCKED_ENV` because the configured license service was unreachable; no simulator image or seed run was produced. Prior R194/R195/R197/R198 PASS evidence remains bound to code/test SHA `f87acc9bca3b3ecece385fadfd5623de6837ea8d`, not relabeled as a run at the documentation-only HEAD. See [R199](COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R199_2026-11-02.md).
 
 **Scope:** `REQ-CL-001..028` and `REQ-PC-001..010` from Compute Cluster SPEC v1.8.\
 **Latest exact-SHA real-top UVM replay:** R194 commit `f87acc9bca3b3ecece385fadfd5623de6837ea8d` (tree `cfc7ba4955488ae58d58f36deec368173c6ec98c`) passes three seeds and catches 7/7 targeted real RTL mutations from a detached clean worktree. The top Smoke replay remains R192; combined declared functional-group coverage remains R190. R194 adds evidence only and does not promote requirements.

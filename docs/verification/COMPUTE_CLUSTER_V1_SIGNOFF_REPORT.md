@@ -1,5 +1,6 @@
-**Current closeout snapshot (2026-11-02):** Published HEAD is `353695f4badca20a8a12a515393af0d59a4b66b5`; its RTL/test content matches the tested code/test SHA `f87acc9bca3b3ecece385fadfd5623de6837ea8d`. Exact-HEAD replay R199 was attempted from a clean detached worktree but is `BLOCKED_ENV` because VCS could not reach its configured license service before compilation. R194/R195/R197/R198 remain scoped PASS evidence at `f87acc9`, not at the later documentation commit. Current disposition is still 24 PASS-SCOPED / 14 PARTIAL, **HOLD**. See [R199](COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R199_2026-11-02.md).
+# NMAForge Compute Cluster v1.0 Functional DV Sign-off Report
 
+**Current closeout snapshot (2026-11-02):** Published HEAD is `353695f4badca20a8a12a515393af0d59a4b66b5`; its RTL/test content matches the tested code/test SHA `f87acc9bca3b3ecece385fadfd5623de6837ea8d`. Exact-HEAD replay R199 was attempted from a clean detached worktree but is `BLOCKED_ENV` because VCS could not reach its configured license service before compilation. R194/R195/R197/R198 remain scoped PASS evidence at `f87acc9`, not at the later documentation commit. Current disposition is still 24 PASS-SCOPED / 14 PARTIAL, **HOLD**. See [R199](COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R199_2026-11-02.md).
 
 **Review date:** 2026-11-02
 **Decision:** **HOLD — not signed off**
