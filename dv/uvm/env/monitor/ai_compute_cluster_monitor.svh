@@ -6,6 +6,7 @@ class ai_compute_cluster_monitor extends uvm_component;
     bit mutation_injected;
     bit [6:0] missing_done_pending;
     bit [6:0] duplicate_done_pending;
+    bit [6:0] sampled_engine_busy_previous;
     int mutation_engine;
     bit write_prefix_pending;
     bit response_epoch_pending;
@@ -26,6 +27,7 @@ class ai_compute_cluster_monitor extends uvm_component;
         mutation_injected = 1'b0;
         missing_done_pending = '0;
         duplicate_done_pending = '0;
+        sampled_engine_busy_previous = '0;
         mutation_engine = 0;
         write_prefix_pending = 1'b0;
         response_epoch_pending = 1'b0;
@@ -58,6 +60,7 @@ class ai_compute_cluster_monitor extends uvm_component;
                 (vif.matrix_request_valid && (|vif.cnm_request_valid)) ||
                 (vif.matrix_banked_fault_cancel_checks !=
                  matrix_fault_cancel_count_seen) ||
+                (vif.engine_busy !== sampled_engine_busy_previous) ||
                 (missing_done_pending != 0) || (duplicate_done_pending != 0) ||
                 write_prefix_pending || response_epoch_pending) begin
                 obs = ai_compute_cluster_obs::type_id::create("obs");
@@ -250,6 +253,7 @@ class ai_compute_cluster_monitor extends uvm_component;
                 if (flush_missing_done)
                     missing_done_pending = '0;
             end
+            sampled_engine_busy_previous = vif.engine_busy;
         end
     endtask
 endclass

@@ -59,6 +59,26 @@ MUTATIONS = {
         ],
         "checker": r"CLUSTER_COMPLETION_ERROR_CODE",
     },
+    "missing_done": {
+        "source": "rtl/top/fabric/compute/ai_accel_compute_cluster.v",
+        "replacements": [(
+            "assign engine_done = {kv_done, conv_done, sfu_done, matrix_done,\n"
+            "                          banked_done, fp_done, scalar_done};",
+            "assign engine_done = {kv_done, conv_done, sfu_done, matrix_done,\n"
+            "                          banked_done, fp_done, 1'b0};",
+        )],
+        "checker": r"CLUSTER_MISSING_DONE",
+    },
+    "duplicate_done": {
+        "source": "rtl/top/fabric/compute/ai_accel_compute_cluster.v",
+        "replacements": [(
+            "assign engine_done = {kv_done, conv_done, sfu_done, matrix_done,\n"
+            "                          banked_done, fp_done, scalar_done};",
+            "assign engine_done = {scalar_done, conv_done, sfu_done, matrix_done,\n"
+            "                          banked_done, fp_done, scalar_done};",
+        )],
+        "checker": r"CLUSTER_DONE_WITHOUT_ACTIVE",
+    },
 }
 
 
