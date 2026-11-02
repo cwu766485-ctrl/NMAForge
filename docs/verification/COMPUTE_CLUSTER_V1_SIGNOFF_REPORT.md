@@ -33,6 +33,10 @@
 
 At clean test SHA `65c83c75c0a8a1518f186a345f414416a6acc2dd`, three seeds pass a real-CMDQ writeback Protection denial on all seven engines while CPLQ is full, including ordered release/tail wrap, per-engine error mapping and unchanged output sentinels. Each run has zero Memory Scoreboard mismatches/unknown/stale epochs and UVM severity `0/0/0`. The same SHA passes 28/28 checker-sensitivity probes, Top Smoke and the 20-case seeded top regression. This adds bounded evidence only; the 38-row status remains 24 `PASS-SCOPED` / 14 `PARTIAL`, and the decision remains **HOLD**. See [R185 report](COMPUTE_CLUSTER_PROTECTION_CPLQ_CROSS_R185_2026-11-02.md), archive SHA-256 `137c2cec3dc13985b13f2e48a18bcf5cdd4d96627989b408ef7d6df358470edc`.
 
+## R186 Matrix FSM legal-profile replay
+
+On the same fixed candidate SHA, the three-seed default-profile Matrix regression and three-seed prefetch-disabled fallback regression pass. The default URG Matrix module FSM result is 93.55%; the dedicated enabled-profile raw transition count remains 49/53. VC Formal proves five non-vacuous guard assertions and reaches both legal-state covers. Residual transitions retain guard/profile dispositions, with no forced state or illegal response stimulus. The broader Matrix requirement remains `PARTIAL`, and the sign-off decision stays **HOLD**. See [R186 report](COMPUTE_CLUSTER_MATRIX_FSM_R186_CLEAN_REPLAY_2026-11-02.md).
+
 The review branch is isolated from the v2 research branch. R53 changes the KV product RTL to reject invalid 32-bit word addresses before SPAD access and adds its SPEC/test evidence. Earlier R40–R52 evidence retains its own exact source/test SHA relationships.
 
 ## R99 selected-fabric reset and CNM Protection response alignment
