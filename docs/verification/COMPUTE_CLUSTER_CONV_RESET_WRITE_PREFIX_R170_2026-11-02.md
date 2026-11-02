@@ -22,6 +22,8 @@ The legal descriptor uses a 6×6 input and 3×3 unit kernel, producing a row-maj
 
 The focused `conv_reset_prefix_cg` has six expected/covered bins on each seed. The three-seed URG merge reports 6/6 (100%), with each bin hit three times: `conv_task_busy`, `accepted_golden_prefix`, `reset_quiet_window`, `release_quiet_window`, `prefix_suffix_and_completion_preserved`, and `full_golden_recovery`. This is the focused testpoint result. The merged all-group URG score is 68.77% because this compute-only run leaves unrelated DMA/AXI groups unexercised or partial; it is not global coverage closure.
 
+The same three-seed full UVM regression also exercises the existing C1 all-engine concurrency case: all seven production engines launch, all 21 engine pairs overlap, maximum active engines is 7, compute-request backpressure is observed for 2,694 cycles, and each engine's output/completion matches its independent Golden. This is one shared workload with deterministic queue ordering; fault/reset/latency crosses remain open.
+
 The same exact SHA passes the 28/28 named checker-sensitivity campaign: address, data, response owner, WSTRB, completion error code, write-after-error, response epoch, and Done/Missing-Done/Duplicate-Done for all seven engines. These are assigned checker-sensitivity probes, not DUT RTL mutation testing. Top Smoke with 20 deterministic random cases (`SEED=20261025`, `AI_SEED=12345`) also passes (`TEST PASS`).
 
 ## Commands
@@ -64,6 +66,6 @@ Logs and coverage summaries are archived outside Git at `/tmp/nmaforge_r170_publ
 | `REQ-CL-019` | `PARTIAL` | Old completion suppression and successful recovery completion | Other completion owner, backpressure, error, and concurrency combinations remain open |
 | `REQ-CL-027` | `PARTIAL` | Conv task completion and Memory Image Golden checks | Full error ABI and all-engine completion combinations remain open |
 | `REQ-PC-006` | `PARTIAL` | `CLUSTER_MEMORY_SCOREBOARD`, 69,022 words per seed | Broader memory request/response and backpressure combinations remain open |
-| `REQ-PC-007` | `PARTIAL` | Conv requester reset/recovery point | Production requester-pair ownership and contention combinations remain open |
+| `REQ-PC-007` | `PARTIAL` | All-engine C1 completion/Golden checks, production response-owner scoreboard, and Conv reset/epoch checker | The full regression observes all seven real engines, 21/21 pair overlaps, max-active 7, and 2,694 shared-mux backpressure cycles with Golden outputs; broad bank/latency/fault/reset ownership combinations remain open |
 
 The full 38-row disposition stays **24 `PASS-SCOPED` / 14 `PARTIAL`**. No P0 issue is waived by this testpoint; `CL-DV-v1.0` remains **HOLD**.
