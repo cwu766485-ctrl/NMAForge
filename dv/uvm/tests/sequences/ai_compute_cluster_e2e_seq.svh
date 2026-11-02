@@ -2761,7 +2761,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                     src1 = 32'd0;
                     write_cluster_desc(desc_addr + 32'hc0, 8'h43,
                                        task_id[15:0], src0, src1, dst,
-                                       16'd0, 16'd0, 16'd4, {16'd1,16'd1},
+                                       16'd0, 16'd0, 16'd4, 32'd0,
                                        32'd16, 32'd64, 32'd0, 8'd5);
                 end
             endcase
