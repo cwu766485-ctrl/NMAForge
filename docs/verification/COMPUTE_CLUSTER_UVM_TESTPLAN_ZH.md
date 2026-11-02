@@ -412,7 +412,7 @@ make -C dv/uvm/sim uvm_compute_cluster_regress \
 | Issue | 影响需求 | 计划处理/状态 |
 |---|---|---|
 | OPEN-CL-006 — Error ABI | REQ-CL-017/019/027 | **SPEC blocker closed by v1.4/R24**; per-engine Error ABI is frozen, while the legal fault/phase verification cross remains partial under CL-COV-006 |
-| OPEN-CL-003 — Abort/Reset Drain | REQ-CL-007/014/016/018/019、REQ-PC-009/010 | v1.2 冻结协调式 AXI reset/epoch；R27 在 behavioral responder 上验证 R/B reset，R30 在 Matrix core 验证 depth-4 accepted-read Abort/Reset drain，R32 在 real top 覆盖七引擎 accepted-read reset。更广的 Abort/fault 交叉和目标外部 fabric 合规仍 OPEN |
+| OPEN-CL-003 — Abort/Reset Drain | REQ-CL-007/014/016/018/019、REQ-PC-009/010 | **所选仓库 fabric 子项 CLOSED：** 用户指定的 `ai_accel_memory_fabric` 已由 R99 验证并由 R173 在最新 published source/test SHA 三 seed 重放；覆盖 pending CNM SPAD response、四笔 DMA read、复位/恢复和 non-vacuous owner SVA。R27 的外部 AXI responder 仍为 behavioral；任意 SoC DDR/AXI fabric 不在结论内。更广的 Abort/fault/phase cross 仍 OPEN。见 R173 报告。 |
 | OPEN-CL-002 — 参数合法范围 | REQ-CL-004/005/020~025 | R53 冻结并验证 KV 的 32-bit overflow/alignment 子项；R54 验证一条真实 top-level KV Protection denial；其他 Engine descriptor 规则、KV stride/aliasing 仍 OPEN |
 | OPEN-CL-004 — Matrix Line checker execution | REQ-CL-010/022 | **Closed for the scoped Line transfer contract by SPEC v1.5 + R49.** Three seeds pass full WSTRB, alignment, scalar fallback, stall stability and protection checks with reference-memory verification. Broader REQ-CL-010/022 coverage remains partial. |
 | OPEN-CL-007 — 同拍故障优先级 | REQ-CL-017/019/027 | **SPEC blocker closed by v1.4/R24**; selected same-cycle priority/prefix tests pass, broader legal fault crosses remain partial |
