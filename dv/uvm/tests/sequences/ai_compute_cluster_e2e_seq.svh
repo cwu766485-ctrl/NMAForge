@@ -2660,6 +2660,227 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
+    task automatic run_engine_protection_full_cplq_cross(input int unsigned seed);
+        bit [31:0] desc_addr;
+        bit [31:0] cpl_addr;
+        bit [31:0] src0;
+        bit [31:0] src1;
+        bit [31:0] src0_span;
+        bit [31:0] src1_span;
+        bit [31:0] dst;
+        bit [31:0] task_id;
+        bit [31:0] expected_error;
+        bit [31:0] request_addr;
+        bit [31:0] denied_addr;
+        bit denied_seen;
+        bit [6:0] engine_seen;
+        bit [31:0] value;
+        int unsigned cycle;
+        int unsigned engine;
+        int unsigned word_idx;
+
+        engine_seen = '0;
+        for (engine = 0; engine < 7; engine++) begin
+            // Three real validator-error completions fill the four-slot ring's
+            // usable capacity. The fourth, real engine descriptor reaches a
+            // legal operand read and then a denied destination write.
+            desc_addr = 32'h0000_9000 + (engine * 32'h200);
+            cpl_addr = 32'h0000_a000 + (engine * 32'h40);
+            dst = FAULT_Y_LOCAL + 32'h4000 + (engine * 32'h100);
+            task_id = 32'h08b0 + engine;
+            denied_seen = 1'b0;
+            denied_addr = '0;
+            src0_span = 32'h100;
+            src1_span = 32'h100;
+
+            for (word_idx = 0; word_idx < 3; word_idx++) begin
+                write_cluster_desc(desc_addr + (word_idx * 32'h40),
+                                   8'h10, 16'h08c0 + (engine * 3) + word_idx,
+                                   SCALAR_A_LOCAL, SCALAR_B_LOCAL, dst,
+                                   16'd0, 16'd0, 16'd0, 32'd0,
+                                   32'd0, 32'd0, 32'd0, 8'd3);
+            end
+            for (word_idx = 0; word_idx < 16; word_idx++)
+                spad_write(dst + (word_idx << 2),
+                           32'hf011_0000 | (engine << 8) | word_idx);
+            for (word_idx = 0; word_idx < 4; word_idx++)
+                spad_write(cpl_addr + 32'h30 + (word_idx << 2),
+                           32'hf011_7d00 | (engine << 4) | word_idx);
+
+            case (engine)
+                0: begin
+                    src0 = SCALAR_A_LOCAL;
+                    src1 = SCALAR_B_LOCAL;
+                    write_cluster_desc(desc_addr + 32'hc0, 8'h10,
+                                       task_id[15:0], src0, src1, dst,
+                                       16'd0, 16'd0, 16'd1, 32'd0,
+                                       32'd0, 32'd0, 32'd0, 8'd3);
+                end
+                1: begin
+                    src0 = FP_A_LOCAL;
+                    src1 = FP_B_LOCAL;
+                    src0_span = 32'd4;
+                    src1_span = 32'd4;
+                    write_cluster_desc(desc_addr + 32'hc0, 8'h50,
+                                       task_id[15:0], src0, src1, dst,
+                                       16'd1, 16'd1, 16'd2, 32'd0,
+                                       32'd0, 32'd0, 32'd0, 8'd7);
+                end
+                2: begin
+                    src0 = CNM_A_LOCAL;
+                    src1 = CNM_B_LOCAL;
+                    write_cnm_v3_desc(desc_addr + 32'hc0, task_id[15:0],
+                                      src0, src1, dst);
+                end
+                3: begin
+                    src0 = MATRIX_FAULT_A_LOCAL;
+                    src1 = MATRIX_FAULT_B_LOCAL;
+                    write_v3_desc(desc_addr + 32'hc0, 8'h30,
+                                  task_id[15:0], src0, src1, dst,
+                                  16'd4, 16'd4, 16'd1);
+                end
+                4: begin
+                    src0 = GELU_A_LOCAL;
+                    src1 = 32'd0;
+                    write_v3_desc(desc_addr + 32'hc0, 8'h35,
+                                  task_id[15:0], src0, src1, dst,
+                                  16'd0, 16'd0, 16'd4);
+                end
+                5: begin
+                    src0 = CONV_A_LOCAL;
+                    src1 = CONV_W_LOCAL;
+                    src0_span = 32'h40;
+                    src1_span = 32'h40;
+                    write_cluster_desc(desc_addr + 32'hc0, 8'h16,
+                                       task_id[15:0], src0, src1, dst,
+                                       16'd3, 16'd3, 16'd9, 32'd0,
+                                       32'd0, 32'd0, 32'd0, 8'd5);
+                end
+                default: begin
+                    src0 = KV_VECTOR_LOCAL;
+                    src1 = 32'd0;
+                    write_cluster_desc(desc_addr + 32'hc0, 8'h43,
+                                       task_id[15:0], src0, src1, dst,
+                                       16'd0, 16'd0, 16'd4, {16'd1,16'd1},
+                                       32'd16, 32'd64, 32'd0, 8'd5);
+                end
+            endcase
+
+            axil_write(REG_REGION0_PERM, 32'd0);
+            axil_write(REG_REGION1_PERM, 32'd0);
+            axil_write(REG_REGION2_PERM, 32'd0);
+            axil_write(REG_REGION3_PERM, 32'd0);
+            axil_write(REG_REGION0_BASE, desc_addr);
+            axil_write(REG_REGION0_LIMIT, desc_addr + 32'h100);
+            axil_write(REG_REGION0_PERM, 32'h0000_000d);
+            axil_write(REG_REGION1_BASE, cpl_addr);
+            axil_write(REG_REGION1_LIMIT, cpl_addr + 32'h40);
+            axil_write(REG_REGION1_PERM, 32'h0000_000b);
+            axil_write(REG_REGION2_BASE, src0);
+            axil_write(REG_REGION2_LIMIT, src0 + src0_span);
+            axil_write(REG_REGION2_PERM, 32'h0000_000d);
+            if (src1 != 0) begin
+                axil_write(REG_REGION3_BASE, src1);
+                axil_write(REG_REGION3_LIMIT, src1 + src1_span);
+                axil_write(REG_REGION3_PERM, 32'h0000_000d);
+            end
+
+            axil_write(REG_CMDQ_CTRL, 32'd0);
+            axil_write(REG_CMDQ_BASE, desc_addr);
+            axil_write(REG_CMDQ_SIZE, 32'd8);
+            axil_write(REG_CMDQ_HEAD, 32'd0);
+            axil_write(REG_CMDQ_TAIL, 32'd4);
+            axil_write(REG_CPLQ_BASE, cpl_addr);
+            axil_write(REG_CPLQ_SIZE, 32'd4);
+            axil_write(REG_CPLQ_HEAD, 32'd0);
+            axil_write(REG_CPLQ_TAIL, 32'd0);
+            axil_write(REG_DOORBELL, 32'd1);
+
+            for (cycle = 0; cycle < 30000; cycle++) begin
+                @(posedge compute_vif.aclk);
+                request_addr = compute_vif.selected_spad_addr;
+                if (compute_vif.selected_spad_valid &&
+                    compute_vif.selected_spad_write &&
+                    !compute_vif.selected_spad_access_ok &&
+                    request_addr >= dst && request_addr < dst + 32'h40) begin
+                    denied_seen = 1'b1;
+                    denied_addr = request_addr;
+                end
+                if ((engine == 3) && compute_vif.selected_line_valid &&
+                    compute_vif.selected_line_write &&
+                    !compute_vif.selected_line_access_ok &&
+                    compute_vif.selected_line_addr >= dst &&
+                    compute_vif.selected_line_addr < dst + 32'h40) begin
+                    denied_seen = 1'b1;
+                    denied_addr = compute_vif.selected_line_addr;
+                end
+                if (denied_seen && (compute_vif.engine_busy == 7'b0))
+                    break;
+            end
+            if (!denied_seen || compute_vif.engine_busy !== 7'b0)
+                `uvm_fatal("CLUSTER_PROTECTION_CPLQ_CROSS", $sformatf(
+                    "engine %0d writeback Protection did not drain behind full CPLQ; denied=%0b busy=%07b",
+                    engine, denied_seen, compute_vif.engine_busy))
+
+            wait_cpl_tail(32'd3);
+            axil_read(REG_CMDQ_HEAD, value);
+            if (compute_vif.cplq_full !== 1'b1 ||
+                compute_vif.processor_busy !== 1'b1 || value !== 32'd4)
+                `uvm_fatal("CLUSTER_PROTECTION_CPLQ_CROSS", $sformatf(
+                    "engine %0d error completion was not retained behind full CPLQ; full=%0b processor_busy=%0b CMDQ_HEAD=%0d",
+                    engine, compute_vif.cplq_full,
+                    compute_vif.processor_busy, value))
+
+            for (word_idx = 0; word_idx < 3; word_idx++) begin
+                expect_spad(cpl_addr + (word_idx << 4),
+                            {16'd0, 16'h08c0 + (engine * 3) + word_idx},
+                            $sformatf("engine%0d full-CPLQ filler%0d task", engine, word_idx));
+                expect_spad(cpl_addr + (word_idx << 4) + 32'd4, 32'h72,
+                            $sformatf("engine%0d full-CPLQ filler%0d ERR_DESC", engine, word_idx));
+            end
+            for (word_idx = 0; word_idx < 4; word_idx++)
+                expect_spad(cpl_addr + 32'h30 + (word_idx << 2),
+                            32'hf011_7d00 | (engine << 4) | word_idx,
+                            $sformatf("engine%0d full-CPLQ held completion sentinel[%0d]", engine, word_idx));
+
+            axil_write(REG_CPLQ_HEAD, 32'd1);
+            wait_cpl_tail(32'd0);
+            wait_spad_idle();
+            expected_error = ((engine == 5) || (engine == 6)) ?
+                             32'h0000_0072 : 32'h0000_0062;
+            expect_spad(cpl_addr + 32'h30, {16'd0, task_id[15:0]},
+                        $sformatf("engine%0d wrapped Protection task ID", engine));
+            expect_spad(cpl_addr + 32'h34, expected_error,
+                        $sformatf("engine%0d wrapped Protection error", engine));
+            expect_spad(cpl_addr + 32'h38, 32'd0,
+                        $sformatf("engine%0d wrapped Protection result", engine));
+            expect_spad(cpl_addr + 32'h3c, 32'd0,
+                        $sformatf("engine%0d wrapped Protection elements", engine));
+            for (word_idx = 0; word_idx < 16; word_idx++)
+                expect_spad(dst + (word_idx << 2),
+                            32'hf011_0000 | (engine << 8) | word_idx,
+                            $sformatf("engine%0d full-CPLQ no-writeback[%0d]", engine, word_idx));
+
+            engine_seen[engine] = 1'b1;
+            `uvm_info("CLUSTER_PROTECTION_CPLQ_CASE_PASS", $sformatf(
+                "engine=%0d task=0x%04h denied_addr=0x%08h retained_error=0x%02h ring_capacity=3 wrap=1 seed=%0d",
+                engine, task_id[15:0], denied_addr, expected_error[7:0], seed), UVM_LOW)
+            axil_write(REG_CPLQ_HEAD, 32'd0);
+            axil_write(REG_CMDQ_SIZE, 32'd0);
+            axil_write(REG_CPLQ_SIZE, 32'd0);
+        end
+        if (engine_seen !== 7'h7f)
+            `uvm_fatal("CLUSTER_PROTECTION_CPLQ_CROSS", $sformatf(
+                "full-CPLQ Protection engine bins incomplete: seen=%07b", engine_seen))
+        axil_write(REG_REGION0_PERM, 32'd0);
+        axil_write(REG_REGION1_PERM, 32'd0);
+        axil_write(REG_REGION2_PERM, 32'd0);
+        axil_write(REG_REGION3_PERM, 32'd0);
+        `uvm_info("CLUSTER_PROTECTION_CPLQ_CROSS_PASS", $sformatf(
+            "writeback Protection x full CPLQ x ordered wrap: engines=7/7 coverage=100.0%% seed=%0d",
+            seed), UVM_LOW)
+    endtask
+
     task automatic wait_cpl_tail(input bit [31:0] expected);
         bit [31:0] value;
         int unsigned poll;
@@ -9199,6 +9420,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_dma_store_response_test();
         run_banked_vdot_cmdq_dispatch_test(seed);
         run_cmdq_invalid_descriptor_matrix_test(seed);
+        run_engine_protection_full_cplq_cross(seed);
         run_scalar_gemv_gemm_cmdq_dispatch_test(seed);
         run_scalar_cmdq_numeric_boundary_test(seed);
         run_scalar_legacy_conv_cmdq_test(seed);
