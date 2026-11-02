@@ -1,45 +1,69 @@
 # Compute Cluster Conv reset accepted-write prefix — R170
 
-**Run ID:** `R170-CONV-RESET-PREFIX-VCS-BLOCKED-20261102`
+**Run ID:** `R170-PUBLISHED-82B748-CLEAN-3S-20261102`
 **Test ID:** `TC-CL-R170-CONV-RESET-WRITE-PREFIX`
-**Result:** `BLOCKED_ENV` — VCS did not acquire a compile license; HDL elaboration and simulation did not start.
+**Result:** `PASS` for this focused testpoint on the exact published clean SHA below.
+**Requirement disposition:** unchanged; affected requirements remain `PARTIAL`.
 **Product RTL/SPEC:** unchanged.
 
-## Change under review
+## Fixed source and test
 
-Test commit `a702091b5db8937061f6b766ec7e1d60e6e5f2f2` (tree `041ffab053bcfb6fc83d6d34c61d5e60445b1c8c`) adds a real-top Conv reset cut point to `ai_compute_cluster_e2e_seq.svh` and makes its PASS marker mandatory in `uvm_compute_cluster_regress`.
+The Conv reset-prefix test and mandatory per-seed regression marker were added in source commit `a702091b5db8937061f6b766ec7e1d60e6e5f2f2` (tree `041ffab053bcfb6fc83d6d34c61d5e60445b1c8c`). The published replay used exact branch HEAD `82b748898448800f807b947042d2bd0ed25c2951` (tree `1536a92a2af4c05fe5e10a1dff4e7907796ef5f1`) from detached clean worktree `/tmp/nmaforge_r170_published_clean_82b748`. `ai_compute_cluster_e2e_seq.svh` and the regression Makefile match the R170 source commit byte-for-byte.
 
-The directed descriptor uses a legal 6×6 input and 3×3 unit kernel, producing a row-major 4×4 output. The sequence independently calculates all 16 Golden values, seeds destination and completion sentinels, asserts reset after an accepted non-empty proper output prefix, and checks prefix data/address, untouched suffix, old completion suppression, post-reset quiet, and a full 16-word new-epoch Golden recovery. A six-bin focused group is declared. This is one intended legal fault/phase/reset point; it does not close the broader `CL-COV-006` cross.
+The legal descriptor uses a 6×6 input and 3×3 unit kernel, producing a row-major 4×4 output. The sequence independently computes all 16 Golden values, seeds output and completion sentinels, asserts reset after the first accepted output write, and checks the accepted Golden prefix, untouched suffix, old-completion suppression, reset/release quiet windows, and full 16-word new-epoch Golden recovery.
 
-The corresponding checker evidence was **not observed** because VCS could not enter compilation. Coverage is therefore `NOT_RUN`; no simulation seed ran and no PASS marker or coverage database was produced.
+## Clean published-SHA results
 
-## Commands and environment result
+| Seed | Conv result | Memory scoreboard | UVM severity |
+|---:|---|---|---|
+| `20261025` | accepted prefix `1/16`; old completion suppressed; reset-dropped reads `0`; recovery `16/16` | 69,022 words; mismatch/unknown/stale epoch `0/0/0` | warning/error/fatal `0/0/0` |
+| `20261026` | accepted prefix `1/16`; old completion suppressed; reset-dropped reads `0`; recovery `16/16` | 69,022 words; mismatch/unknown/stale epoch `0/0/0` | warning/error/fatal `0/0/0` |
+| `20261027` | accepted prefix `1/16`; old completion suppressed; reset-dropped reads `0`; recovery `16/16` | 69,022 words; mismatch/unknown/stale epoch `0/0/0` | warning/error/fatal `0/0/0` |
 
-The compile/regression command was:
+The focused `conv_reset_prefix_cg` has six expected/covered bins on each seed. The three-seed URG merge reports 6/6 (100%), with each bin hit three times: `conv_task_busy`, `accepted_golden_prefix`, `reset_quiet_window`, `release_quiet_window`, `prefix_suffix_and_completion_preserved`, and `full_golden_recovery`. This is the focused testpoint result. The merged all-group URG score is 68.77% because this compute-only run leaves unrelated DMA/AXI groups unexercised or partial; it is not global coverage closure.
+
+The same exact SHA passes the 28/28 named checker-sensitivity campaign: address, data, response owner, WSTRB, completion error code, write-after-error, response epoch, and Done/Missing-Done/Duplicate-Done for all seven engines. These are assigned checker-sensitivity probes, not DUT RTL mutation testing. Top Smoke with 20 deterministic random cases (`SEED=20261025`, `AI_SEED=12345`) also passes (`TEST PASS`).
+
+## Commands
+
+Three-seed real-top UVM and merged URG:
 
 ```sh
 VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
 make -C dv/uvm/sim uvm_compute_cluster_regress \
-COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_r170_conv_reset_3seed \
+COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_r170_published_82b748_3seed \
 COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027'
 ```
 
-VCS `V-2023.12-SP1_Full64` reported `Cannot connect to the license server` and exited before HDL compilation. A second attempt added `-licwait 1`; VCS entered its license queue and was stopped after the server remained unreachable. The license variable was configured in the environment; its value is intentionally omitted. Diagnostic log: `/tmp/nmaforge_r170_conv_reset_3seed/compile.log`.
+Checker-sensitivity campaign:
 
-## Fixed-SHA clean-worktree retry
+```sh
+make -C dv/uvm/sim uvm_compute_cluster_mutation \
+COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_r170_published_82b748_3seed \
+COMPUTE_CLUSTER_MUTATION_OUT=/tmp/nmaforge_r170_published_82b748_mutation_28
+```
 
-The same three-seed target was retried from a clean detached worktree at exact source SHA `a702091b5db8937061f6b766ec7e1d60e6e5f2f2` (tree `041ffab053bcfb6fc83d6d34c61d5e60445b1c8c`) with `-licwait 1`. VCS again could not connect, then reported `Unable to get a license after 1.0 minutes`; Make exited at `uvm_compute_cluster_compile` before HDL compilation. Run ID: `R170-CLEAN-SHA-UVM-BLOCKED-20261102`. Diagnostic log: `/tmp/nmaforge_r170_clean_retry_3seed/compile.log`.
+Top Smoke and fixed 20-case Top run:
 
-This confirms that the source SHA is reproducibly blocked at license acquisition. It is not a test failure or a compile result because the HDL frontend did not run.
+```sh
+make -C dv/subsystem/top_smoke/sim ai_smoke AI_RANDOM_CASES=20 AI_SEED=12345 SEED=20261025
+```
 
-No UVM seed, Golden/Memory Image scoreboard, functional bin, or checker result is claimed. The ordinary three-seed UVM target must be rerun from this exact source commit once VCS license service is reachable. Top Smoke and checker mutations were not rerun because this attempt did not alter RTL or checker implementations.
+The only captured compile notice is the existing fixture `[LOOP-REROLL-ENABLED]` line-debug notice in `ai_transformer_workload.svh`; UVM compile has no warning/error/TFIPC diagnostics. The earlier license-server failures and one-minute timeout were historical attempts; the exact published-SHA retry above later acquired VCS and completed successfully.
+
+## Evidence archive
+
+Logs and coverage summaries are archived outside Git at `/tmp/nmaforge_r170_published_82b748_evidence.tar.gz` (SHA-256 `05a5173f5116d4381921cff0f51dc1b43bdb032b2e5e6f713f37e44822d1a00e`). The file checksum manifest is `/tmp/nmaforge_r170_published_82b748_evidence_sha256.txt` (SHA-256 `ea893754805557cd64fc776671f55ecf4f0ff13d462cc0bf0e6679bd30999c60`). It contains per-seed UVM logs, compile and URG summaries, all 28 mutation logs, and deterministic Top Smoke compile/run logs.
 
 ## Requirement disposition
 
-| Requirement | Existing disposition | R170 testpoint status | Evidence |
+| Requirement | Disposition | R170 evidence added | Why still open |
 |---|---|---|---|
-| `REQ-CL-017/018/019/027` | `PARTIAL` | `NOT_RUN` (`BLOCKED_ENV` before elaboration) | This report and compile log |
-| `REQ-PC-006/007` | `PARTIAL` | `NOT_RUN` (`BLOCKED_ENV` before elaboration) | This report and compile log |
+| `REQ-CL-017` | `PARTIAL` | Legal Conv reset after one accepted output; prefix/suffix and response/completion checks | Other fault classes, accepted-response phases, engines, and concurrent crossings remain open |
+| `REQ-CL-018` | `PARTIAL` | Reset/release quiet windows and full new-epoch Conv recovery | The broader legal engine × fault × phase × reset space is not closed |
+| `REQ-CL-019` | `PARTIAL` | Old completion suppression and successful recovery completion | Other completion owner, backpressure, error, and concurrency combinations remain open |
+| `REQ-CL-027` | `PARTIAL` | Conv task completion and Memory Image Golden checks | Full error ABI and all-engine completion combinations remain open |
+| `REQ-PC-006` | `PARTIAL` | `CLUSTER_MEMORY_SCOREBOARD`, 69,022 words per seed | Broader memory request/response and backpressure combinations remain open |
+| `REQ-PC-007` | `PARTIAL` | Conv requester reset/recovery point | Production requester-pair ownership and contention combinations remain open |
 
-The 38-row disposition remains **24 PASS-SCOPED / 14 PARTIAL**. Declared coverage totals and `CL-DV-v1.0` decision do not change: **HOLD**.
-
+The full 38-row disposition stays **24 `PASS-SCOPED` / 14 `PARTIAL`**. No P0 issue is waived by this testpoint; `CL-DV-v1.0` remains **HOLD**.
