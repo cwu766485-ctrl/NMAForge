@@ -1,8 +1,12 @@
 # NMAForge execution frontier
 
-Updated: 2026-10-30. This is a short handoff for the next engineering task; it
+Updated: 2026-11-02. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
+
+## Latest Compute Cluster evidence
+
+R184 is the latest clean real-top test candidate (`15e3b5a608ae405fafbd551d26c975ab895c5d7c`; GitHub same-tree commit `c07fb019753de8b23ed6150f4166a184a696042d`). Three-seed UVM rejects eight invalid CMDQ descriptors, the focused group is 8/8 per seed, 28/28 checker-sensitivity probes pass, and Top Smoke passes with 20 random cases. The broader RTM remains 24 PASS-SCOPED / 14 PARTIAL and sign-off remains HOLD; continue Phase A closure before v2.0 work. See the [R184 evidence report](../../verification/COMPUTE_CLUSTER_CMDQ_INVALID_DESCRIPTOR_R184_2026-11-02.md) and [Execution RTM](../../verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).
 
 ## Project baseline
 
