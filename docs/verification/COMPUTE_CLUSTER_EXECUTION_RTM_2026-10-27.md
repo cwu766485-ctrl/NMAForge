@@ -894,3 +894,12 @@ The fixed published source/test SHA is `8a2d5f85add54f81019df1a8d6a29ad08bbe88d6
 | `REQ-CL-019` | `PARTIAL` | `TC-CL-R176-FP-WRPROT-ABORT-SAME-CYCLE`; sampled-posedge cause checker plus independent FP result/completion scoreboard | BF16 and FP16 each sample accepted result-write, `spad_ready`, write Protection, and Abort on the same rising edge; scoreboard requires Protection priority `ERR_PROTECTION=6`, two accepted reads, one denied write, and no protocol error. Three seeds pass 214/214 transactions each; merged FP fault coverage is 25/25 and format×fault is 50/50. This is FP-core scoped evidence, not top CMDQ/completion integration or full engine/fault/phase closure. | `R176-FP-PRIORITY-CLEAN-3S-20261102`; `20261025/20261026/20261027` | [R176 report](COMPUTE_CLUSTER_FP_PRIORITY_R176_2026-11-02.md); `/tmp/nmaforge_r176_fp_priority_clean_3seed/seed_*/run.log`; archive SHA-256 `dc24a67407e21e5626bfce99935780280c5514244b43ffaf967f2f4bc8fad6c1` |
 
 This directed point does not promote `REQ-CL-019`: broad fault/phase/reset combinations and integrated completion/owner checks remain open. Requirement totals stay 24 `PASS-SCOPED` / 14 `PARTIAL`; `CL-DV-v1.0` remains **HOLD**.
+
+
+## R177 Mixed FP read Protection/Abort reachability review — 2026-11-02
+
+| Requirement | Disposition | Test ID / checker | Coverage / observed result | Run ID / seed | Evidence path |
+|---|---|---|---|---|---|
+| `REQ-CL-019` | `PARTIAL` | `TC-CL-R177-FP-READ-PROT-ABORT-REACHABILITY`; mandatory accepted-request sampled-edge guard in the exploratory driver | **No passing testpoint and no coverage credit.** On seed `20261025`, the guard detected that the proposed accepted-read Protection+Abort edge was not sampled. RTL request gating (`read_request_enable` includes `!abort`) makes that handshake unreachable through this interface. Seeds `20261026/27` were `NOT_RUN`. The candidate N/A disposition is pending SPEC/reviewer approval or formal proof; broader fault/phase/completion/owner closure remains open. | `R177-FP-READ-PROT-ABORT-REACHABILITY-20261102`; seed `20261025` only | [R177 review](COMPUTE_CLUSTER_FP_READ_PROTECTION_ABORT_R177_2026-11-02.md); `/tmp/nmaforge_r177_fp_read_priority_3seed/seed_20261025/run.log` (SHA-256 `fb81b5bbffb5420bd8eae9026684e8d01af30fcd886aef0119efd156e98be31b`) |
+
+The exploratory test change was reverted after the reachability check. It is not a DUT failure, approved waiver, or PASS. Requirement totals and sign-off status do not change: 24 `PASS-SCOPED` / 14 `PARTIAL`, **HOLD**.
