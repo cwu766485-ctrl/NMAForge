@@ -1,8 +1,8 @@
 # Compute Cluster Conv reset accepted-write prefix — R170
 
-**Run ID:** `R170-CONV-RESET-PREFIX-VCS-BLOCKED-20261102`  
-**Test ID:** `TC-CL-R170-CONV-RESET-WRITE-PREFIX`  
-**Result:** `BLOCKED_ENV` — VCS did not acquire a compile license; HDL elaboration and simulation did not start.  
+**Run ID:** `R170-CONV-RESET-PREFIX-VCS-BLOCKED-20261102`
+**Test ID:** `TC-CL-R170-CONV-RESET-WRITE-PREFIX`
+**Result:** `BLOCKED_ENV` — VCS did not acquire a compile license; HDL elaboration and simulation did not start.
 **Product RTL/SPEC:** unchanged.
 
 ## Change under review
