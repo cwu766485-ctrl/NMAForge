@@ -275,3 +275,10 @@ in the owning report; run `git diff --check` before handoff.
 - Extended the RTM checker to verify repository-relative Markdown evidence targets. All 92/92 linked targets resolve; it deliberately excludes absolute `/tmp` artifacts and does not inspect evidence sufficiency.
 - The 38-row matrix and its 24 PASS-SCOPED / 14 PARTIAL dispositions are unchanged; CL-DV-v1.0 remains **HOLD**.
 - Evidence: [R202 report](../../verification/COMPUTE_CLUSTER_RTM_LINK_AUDIT_R202_2026-11-02.md). VCS rerun remains pending license-server reachability.
+
+## 2026-11-02 update — R203 exact latest-HEAD replay retry
+
+- A detached clean worktree at local commit `518b75541e32878998c9dd478a692f0ba27c0982` (tree `03c034bf30e5bbb2af2200411fa0b1e674ebf3d6`; published same-tree commit `18059052b73ad1507f7b754108b9c84ed75a929a`) was used for the three-seed Compute Cluster UVM target.
+- VCS could not reach the configured license service, queued for `VCS-BASE-COMPILE/VCSCompiler_Net`, and was stopped by the 120-second timeout before producing a simulator image. No seed, Top Smoke, or seeded Top test ran. Result: `BLOCKED_ENV`.
+- RTM remains 24 PASS-SCOPED / 14 PARTIAL; `CL-DV-v1.0` remains **HOLD**. No product RTL or test source changed.
+- Evidence: [R203 report](../../verification/COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R203_2026-11-02.md); raw log remains outside repository at `/tmp/nmaforge_r203_compile.log`, SHA-256 `3103ee7046612a59855f0094d61574a4ce4c2c4cf71d0454eafc0fce10e6b95c`.

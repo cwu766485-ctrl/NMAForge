@@ -1,6 +1,8 @@
 # Compute Cluster Execution RTM — 2026-11-02
 
-**Latest published-HEAD replay attempt (R199):** The exact closeout branch HEAD `353695f4badca20a8a12a515393af0d59a4b66b5` was checked out clean. VCS compile was `BLOCKED_ENV` because the configured license service was unreachable; no simulator image or seed run was produced. Prior R194/R195/R197/R198 PASS evidence remains bound to code/test SHA `f87acc9bca3b3ecece385fadfd5623de6837ea8d`, not relabeled as a run at the documentation-only HEAD. See [R199](COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R199_2026-11-02.md).
+**Latest clean-HEAD replay retry (R203):** Local candidate `518b75541e32878998c9dd478a692f0ba27c0982`, tree `03c034bf30e5bbb2af2200411fa0b1e674ebf3d6` (published same-tree commit `18059052b73ad1507f7b754108b9c84ed75a929a`) was checked out detached and clean. The three-seed UVM compile queued for `VCS-BASE-COMPILE/VCSCompiler_Net` because the configured license service remained unreachable; the 120-second timeout terminated compilation before a simulator or seed run. No Top Smoke or seeded Top run was started. Prior PASS evidence remains bound to RTL/test SHA `f87acc9bca3b3ecece385fadfd5623de6837ea8d`. See [R203](COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R203_2026-11-02.md).
+
+**Prior published-HEAD attempt (R199):** Commit `353695f4badca20a8a12a515393af0d59a4b66b5` was also blocked before compilation by license-service reachability. See [R199](COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R199_2026-11-02.md).
 
 **RTM structural audit (R200):** `python3 tools/verify_compute_cluster_rtm.py` passes all 28 `REQ-CL` and 10 `REQ-PC` rows with no missing/duplicate IDs and all required checker, coverage, Run/Seed, and evidence fields populated. This validates traceability-table structure only; it does not replay runs or promote dispositions. See [R200](COMPUTE_CLUSTER_RTM_INTEGRITY_R200_2026-11-02.md).
 
