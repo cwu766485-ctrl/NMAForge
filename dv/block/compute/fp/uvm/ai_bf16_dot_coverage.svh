@@ -62,7 +62,6 @@
                 bins read_b_parity = {FP_FAULT_READ_B_PARITY};
                 bins late_word_parity = {FP_FAULT_READ_PARITY_LATE};
                 bins read_protection = {FP_FAULT_READ_PROTECTION};
-                bins read_protection_abort_same_cycle = {FP_FAULT_READ_PROTECTION_ABORT};
                 bins read_b_protection = {FP_FAULT_READ_B_PROTECTION};
                 bins late_read_protection = {FP_FAULT_READ_LATE_PROTECTION};
                 bins late_read_b_protection = {FP_FAULT_READ_LATE_B_PROTECTION};

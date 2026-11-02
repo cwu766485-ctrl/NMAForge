@@ -162,8 +162,7 @@
                         if ((req.fault_mode == FP_FAULT_READ_PARITY) ||
                             (req.fault_mode == FP_FAULT_READ_B_PARITY) ||
                             (req.fault_mode == FP_FAULT_READ_PARITY_LATE) ||
-                            (req.fault_mode == FP_FAULT_READ_PROTECTION) ||
-                            (req.fault_mode == FP_FAULT_READ_PROTECTION_ABORT))
+                            (req.fault_mode == FP_FAULT_READ_PROTECTION))
                             stall_left = 0;
                         if (req.fault_mode == FP_FAULT_READ_B_PROTECTION)
                             stall_left = 0;
@@ -190,16 +189,6 @@
                             !vif.spad_write && !read_protection_injected) begin
                             vif.spad_protection_error = 1'b1;
                             read_protection_injected = 1;
-                        end
-                        if ((req.fault_mode == FP_FAULT_READ_PROTECTION_ABORT) &&
-                            !vif.spad_write && !read_protection_injected) begin
-                            vif.spad_protection_error = 1'b1;
-                            vif.abort = 1'b1;
-                            read_protection_injected = 1;
-                            abort_injected = 1;
-                            `uvm_info("FP_SAME_CYCLE_PRIORITY", $sformatf(
-                                "read Protection and Abort asserted with ready for tx%0d; next posedge samples both",
-                                req.transaction_id), UVM_LOW)
                         end
                         if ((req.fault_mode == FP_FAULT_READ_B_PROTECTION) &&
                             !vif.spad_write && (accepted_reads == 1) &&
@@ -251,17 +240,15 @@
 
                 @(posedge vif.clk);
                 if (vif.spad_valid && vif.spad_ready) begin
-                    if (((req.fault_mode == FP_FAULT_WRITE_PROTECTION_ABORT) &&
-                         vif.spad_write) ||
-                        ((req.fault_mode == FP_FAULT_READ_PROTECTION_ABORT) &&
-                         !vif.spad_write)) begin
+                    if ((req.fault_mode == FP_FAULT_WRITE_PROTECTION_ABORT) &&
+                        vif.spad_write) begin
                         if (!vif.abort || !vif.spad_protection_error)
                             `uvm_fatal("FP_SAME_CYCLE_PRIORITY",
-                                "Protection and Abort were not both asserted on the accepted fault edge")
+                                "Protection and Abort were not both asserted on the accepted result edge")
                         same_cycle_priority_sampled = 1;
                         `uvm_info("FP_SAME_CYCLE_PRIORITY_SAMPLE", $sformatf(
-                            "sampled %s Protection and Abort together on accepted edge tx%0d",
-                            vif.spad_write ? "write" : "read", req.transaction_id), UVM_LOW)
+                            "sampled write Protection and Abort together on accepted result edge tx%0d",
+                            req.transaction_id), UVM_LOW)
                     end
                     if (vif.spad_addr[31:2] >= 256)
                         `uvm_fatal("BF16/DRV", $sformatf("SPAD address out of model range: %08x", vif.spad_addr))
@@ -296,11 +283,10 @@
                 if (vif.done === 1'b1)
                     break;
             end
-            if (((req.fault_mode == FP_FAULT_WRITE_PROTECTION_ABORT) ||
-                 (req.fault_mode == FP_FAULT_READ_PROTECTION_ABORT)) &&
+            if ((req.fault_mode == FP_FAULT_WRITE_PROTECTION_ABORT) &&
                 !same_cycle_priority_sampled)
                 `uvm_fatal("FP_SAME_CYCLE_PRIORITY",
-                    "Directed simultaneous Protection/Abort request edge was not sampled")
+                    "Directed simultaneous Protection/Abort result edge was not sampled")
             @(negedge vif.clk);
             vif.spad_ready = 1'b0;
             vif.spad_rsp_valid = 1'b0;
