@@ -131,6 +131,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned sfu_reset_prefix_phase;
     int unsigned conv_reset_prefix_phase;
     int unsigned scalar_reset_prefix_phase;
+    int unsigned fp_reset_single_write_phase;
     int unsigned matrix_protection_reset_phase;
     int unsigned matrix_protection_cnm_reset_phase;
     int unsigned engine_protection_reset_engine;
@@ -211,6 +212,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             bins release_quiet_window = {4};
             bins prefix_suffix_and_completion_preserved = {5};
             bins full_golden_recovery = {6};
+        }
+    endgroup
+
+    covergroup fp_reset_single_write_cg;
+        option.per_instance = 1;
+        cp_fp_reset_single_write_phase: coverpoint fp_reset_single_write_phase {
+            bins task_busy = {1};
+            bins sole_result_accepted = {2};
+            bins reset_quiet_window = {3};
+            bins release_quiet_window = {4};
+            bins old_completion_suppressed_and_result_preserved = {5};
+            bins new_epoch_recovery = {6};
         }
     endgroup
 
@@ -329,6 +342,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         sfu_reset_prefix_phase = 0;
         conv_reset_prefix_phase = 0;
         scalar_reset_prefix_phase = 0;
+        fp_reset_single_write_phase = 0;
         engine_pair_overlap_cov_idx = 0;
         matrix_protection_reset_phase = 0;
         matrix_protection_cnm_reset_phase = 0;
@@ -343,6 +357,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         sfu_reset_prefix_cg = new();
         conv_reset_prefix_cg = new();
         scalar_reset_prefix_cg = new();
+        fp_reset_single_write_cg = new();
         cmdq_invalid_descriptor_cg = new();
         engine_pair_overlap_cg = new();
         matrix_protection_reset_cg = new();
@@ -8251,6 +8266,197 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
+    task automatic run_fp_reset_single_write(input int unsigned seed);
+        bit [31:0] src0;
+        bit [31:0] src1;
+        bit [31:0] dst;
+        bit [31:0] completion_base;
+        bit [31:0] sentinel;
+        bit [31:0] reset_value;
+        bit [31:0] cpl_tail;
+        bit [31:0] accepted_write_addr;
+        bit [31:0] accepted_write_data;
+        bit [15:0] task_id;
+        bit [15:0] recovery_task_id;
+        int unsigned accepted_reads;
+        int unsigned returned_reads;
+        int unsigned post_reset_writes;
+        int unsigned post_reset_responses;
+        int unsigned poll;
+        int unsigned word_idx;
+        bit reset_monitor_active;
+        bit monitor_done;
+        bit accepted_write_seen;
+        bit busy_at_write;
+        bit reset_ok;
+
+        src0 = 32'h0006_8800;
+        src1 = 32'h0006_8900;
+        dst = 32'h0006_8a00;
+        completion_base = 32'h0000_5f80;
+        sentinel = 32'hbad0_7fc0;
+        task_id = 16'h077c;
+        recovery_task_id = 16'h077d;
+        accepted_reads = 0;
+        returned_reads = 0;
+        post_reset_writes = 0;
+        post_reset_responses = 0;
+        accepted_write_addr = '0;
+        accepted_write_data = '0;
+        reset_monitor_active = 1'b0;
+        monitor_done = 1'b0;
+        accepted_write_seen = 1'b0;
+        busy_at_write = 1'b0;
+        fp_reset_single_write_phase = 0;
+
+        // 128 BF16 products of 1.0 produce the exact FP32 result 128.0.
+        // Unlike a vector engine, this descriptor has only one output word;
+        // reset is therefore taken after its sole write handshake and before
+        // ordered completion retirement, not described as a partial prefix.
+        for (word_idx = 0; word_idx < 64; word_idx++) begin
+            spad_write(src0 + (word_idx << 2), 32'h3f80_3f80);
+            spad_write(src1 + (word_idx << 2), 32'h3f80_3f80);
+        end
+        spad_write(dst, sentinel);
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            spad_write(completion_base + (word_idx << 2),
+                       32'h7fc0_0000 | word_idx);
+
+        write_cluster_desc(CLUSTER_CONTRACT_CMDQ, 8'h50, task_id,
+                           src0, src1, dst, 16'd1, 16'd1, 16'd128,
+                           32'd0, 32'd0, 32'd0, 32'd0, 8'd7);
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        fork
+            begin : fp_single_write_reset_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.engine_req_valid[1] &&
+                        compute_vif.engine_req_ready[1]) begin
+                        if (compute_vif.engine_req_write[1]) begin
+                            if (accepted_write_seen)
+                                `uvm_fatal("CLUSTER_FP_RESET_SINGLE_WRITE",
+                                    "FP Dot issued more than its one descriptor output")
+                            accepted_write_seen = 1'b1;
+                            accepted_write_addr =
+                                compute_vif.engine_req_addr[1*32 +: 32];
+                            accepted_write_data =
+                                compute_vif.engine_req_wdata[1*32 +: 32];
+                            if (reset_monitor_active)
+                                post_reset_writes++;
+                        end else begin
+                            accepted_reads++;
+                        end
+                    end
+                    if (compute_vif.rsp_valid &&
+                        (compute_vif.rsp_client == 3'd2)) begin
+                        returned_reads++;
+                        if (reset_monitor_active)
+                            post_reset_responses++;
+                    end
+                end
+            end
+            begin : reset_after_fp_result_before_retirement
+                for (poll = 0; poll < 50000; poll++) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.engine_req_valid[1] &&
+                        compute_vif.engine_req_ready[1] &&
+                        compute_vif.engine_req_write[1]) begin
+                        busy_at_write = compute_vif.engine_busy[1];
+                        if (!busy_at_write)
+                            `uvm_fatal("CLUSTER_FP_RESET_SINGLE_WRITE",
+                                "FP result handshake was not observed while its engine remained active")
+                        fp_reset_single_write_phase = 1;
+                        fp_reset_single_write_cg.sample();
+                        fp_reset_single_write_phase = 2;
+                        fp_reset_single_write_cg.sample();
+                        reset_monitor_active = 1'b1;
+                        #1ns;
+                        reset_value = 1'b0;
+                        reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
+                        if (!reset_ok)
+                            `uvm_fatal("CLUSTER_FP_RESET_SINGLE_WRITE",
+                                "failed to assert reset after the FP result write handshake")
+                        repeat (4) @(posedge compute_vif.aclk);
+                        if (compute_vif.engine_busy !== 7'b0)
+                            `uvm_fatal("CLUSTER_FP_RESET_SINGLE_WRITE", $sformatf(
+                                "engine busy did not clear in reset: busy=%07b",
+                                compute_vif.engine_busy))
+                        fp_reset_single_write_phase = 3;
+                        fp_reset_single_write_cg.sample();
+                        #1ns;
+                        reset_value = 1'b1;
+                        reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
+                        if (!reset_ok)
+                            `uvm_fatal("CLUSTER_FP_RESET_SINGLE_WRITE",
+                                "failed to release reset after the FP result write")
+                        repeat (8) @(posedge compute_vif.aclk);
+                        fp_reset_single_write_phase = 4;
+                        fp_reset_single_write_cg.sample();
+                        monitor_done = 1'b1;
+                        break;
+                    end
+                end
+                if (!monitor_done)
+                    `uvm_fatal("CLUSTER_FP_RESET_SINGLE_WRITE",
+                        "FP Dot did not accept its sole output before the reset timeout")
+            end
+        join
+
+        wait_spad_idle();
+        if (!accepted_write_seen || accepted_write_addr !== dst ||
+            accepted_write_data !== 32'h4300_0000)
+            `uvm_fatal("CLUSTER_FP_RESET_SINGLE_WRITE", $sformatf(
+                "sole BF16 result write mismatch: seen=%0b address=0x%08h data=0x%08h",
+                accepted_write_seen, accepted_write_addr, accepted_write_data))
+        if (accepted_reads == 0 || returned_reads != accepted_reads)
+            `uvm_fatal("CLUSTER_FP_RESET_SINGLE_WRITE", $sformatf(
+                "FP read responses were not fully consumed before result write: accepted=%0d returned=%0d",
+                accepted_reads, returned_reads))
+        if (post_reset_writes != 0 || post_reset_responses != 0)
+            `uvm_fatal("CLUSTER_FP_RESET_SINGLE_WRITE", $sformatf(
+                "old-epoch FP activity escaped reset/release: writes=%0d responses=%0d",
+                post_reset_writes, post_reset_responses))
+
+        axil_read(REG_CPLQ_TAIL, cpl_tail);
+        if (cpl_tail !== 32'd0)
+            `uvm_fatal("CLUSTER_FP_RESET_SINGLE_WRITE", $sformatf(
+                "old-epoch FP task advanced CPLQ_TAIL across reset: %0d", cpl_tail))
+        expect_spad(dst, 32'h4300_0000,
+                    "FP result remains committed across pre-retirement reset");
+        for (word_idx = 0; word_idx < 4; word_idx++)
+            expect_spad(completion_base + (word_idx << 2),
+                        32'h7fc0_0000 | word_idx,
+                        $sformatf("FP reset suppressed old completion[%0d]", word_idx));
+        fp_reset_single_write_phase = 5;
+        fp_reset_single_write_cg.sample();
+
+        write_cluster_desc(CLUSTER_CONTRACT_CMDQ, 8'h50, recovery_task_id,
+                           src0, src1, dst, 16'd1, 16'd1, 16'd128,
+                           32'd0, 32'd0, 32'd0, 32'd0, 8'd7);
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        expect_completion(completion_base, recovery_task_id, 32'h4300_0000,
+                          32'd128, "FP reset single-result recovery");
+        expect_spad(dst, 32'h4300_0000,
+                    "FP reset single-result recovery Golden");
+        fp_reset_single_write_phase = 6;
+        fp_reset_single_write_cg.sample();
+        if (fp_reset_single_write_cg.get_coverage() < 99.99)
+            `uvm_fatal("CLUSTER_FP_RESET_SINGLE_WRITE", $sformatf(
+                "FP reset single-result functional bins incomplete: %0.1f%%",
+                fp_reset_single_write_cg.get_coverage()))
+        `uvm_info("CLUSTER_FP_RESET_SINGLE_WRITE_PASS", $sformatf(
+            "BF16 sole output committed before reset; old completion suppressed; accepted_reads=%0d returned=%0d post_reset_writes=0 post_reset_responses=0; full Golden recovery=1/1 focused_bins=6/6 seed=%0d",
+            accepted_reads, returned_reads, seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
     task automatic check_request_stability();
         int unsigned e;
         if (compute_vif.engine_req_stability_violations != 0 ||
@@ -9551,6 +9757,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_engine_abort_drain_sweep();
         run_sfu_abort_write_prefix(seed);
         run_sfu_reset_write_prefix(seed);
+        run_fp_reset_single_write(seed);
         run_conv_abort_write_prefix(seed);
         run_conv_reset_write_prefix(seed);
         run_kv_abort_write_prefix(seed);
