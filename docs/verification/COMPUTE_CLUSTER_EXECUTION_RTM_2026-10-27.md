@@ -860,3 +860,8 @@ The clean test commit is 4eb689c866650679d238d1ada955d6b03e68c6ec, tree e65fae5d
 | `REQ-PC-007` | `PARTIAL` | C1 all-engine completion/Golden checks, response-owner scoreboard, and Conv reset/epoch checker | All seven real engines launch; 21/21 engine pairs overlap; max-active 7; 2,694 shared-mux request-backpressure cycles; all output images/completions match Golden. Broad bank/latency/fault/reset ownership combinations remain open. | Same Run ID and seeds | R170 report; per-seed logs |
 
 The exact published test SHA is `82b748898448800f807b947042d2bd0ed25c2951` (tree `1536a92a2af4c05fe5e10a1dff4e7907796ef5f1`). The same SHA passes Top Smoke with 20 fixed random cases and 28/28 named checker-sensitivity probes. Three-seed UVM merged all-group URG is 68.77%; only the named focused group is claimed at 100%. The full requirement disposition remains 24 `PASS-SCOPED` / 14 `PARTIAL`; `CL-DV-v1.0` remains **HOLD**.
+
+
+## R172 AXI SVA audit — supplemental evidence, no disposition change
+
+At exact published source SHA `8a2d5f85add54f81019df1a8d6a29ad08bbe88d6`, the clean UVM compile has 0 errors/0 warnings and no `TFIPC` diagnostic. The focused and 16-seed mixed E2E gates show non-vacuous AR/AW/W stall covers and real successes for all five top AXI master assertions; 8/8 applicable mixed-workload functional groups are 100%. Two UVM RAL properties remain without attempts, and `cluster_cg` is out-of-scope/17.76% in this workload. This evidence is supplemental and does not promote any of the 38 requirements or close integrated production-engine SPAD ownership/fault crosses. See [R172 audit](COMPUTE_CLUSTER_SVA_AUDIT_R172_2026-11-02.md); full archive SHA-256 `93118dceef83dc298b9b590aaab19c130211c43cfff2f54c4c26cca79ab6c333`.

@@ -1,5 +1,7 @@
 # Compute Cluster Open-Issue List — 2026-11-02
 
+**R172 AXI SVA/TFIPC audit:** On exact published SHA `8a2d5f85add54f81019df1a8d6a29ad08bbe88d6`, clean compile reports 0 error/0 warning and no `TFIPC`; 16-seed mixed E2E hits all five AXI master assertion properties and all three stall covers, with 8/8 applicable functional groups at 100%. Two UVM RAL internals have no attempts, and the mixed-workload `cluster_cg` is 17.76%; overall group score is 90.86%, not global closure. This closes the scoped warning/non-vacuity review only. The 38-row RTM stays 24 PASS-SCOPED / 14 PARTIAL, **HOLD**. See [R172 audit](COMPUTE_CLUSTER_SVA_AUDIT_R172_2026-11-02.md); archive SHA-256 `93118dceef83dc298b9b590aaab19c130211c43cfff2f54c4c26cca79ab6c333`.
+
 **R168 exact-candidate replay:** The R167 executable test source passes Top Smoke, fixed 20-case Top regression, three-seed real-top UVM, and the complete 28/28 checker-sensitivity campaign at the documented clean checkout. No requirement disposition changes; the full replay and archive checksum are in the [R168 report](COMPUTE_CLUSTER_R168_FINAL_CANDIDATE_REPLAY_2026-11-02.md).
 
 **R169 Matrix benchmark replay:** The fixed R168 source checkout passes all 15 array-size and 40 ablation points per seed on three seeds (165/165 Golden PASS). Traffic/cycle evidence is refreshed; integrated seven-engine and TinyNPU common-memory performance remain open, so `REQ-CL-028` stays PARTIAL. See [R169 report](../benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R169_2026-11-02.md).
