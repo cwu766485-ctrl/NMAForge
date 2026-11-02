@@ -26,6 +26,12 @@ COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027'
 
 VCS `V-2023.12-SP1_Full64` reported `Cannot connect to the license server` and exited before HDL compilation. A second attempt added `-licwait 1`; VCS entered its license queue and was stopped after the server remained unreachable. The license variable was configured in the environment; its value is intentionally omitted. Diagnostic log: `/tmp/nmaforge_r170_conv_reset_3seed/compile.log`.
 
+## Fixed-SHA clean-worktree retry
+
+The same three-seed target was retried from a clean detached worktree at exact source SHA `a702091b5db8937061f6b766ec7e1d60e6e5f2f2` (tree `041ffab053bcfb6fc83d6d34c61d5e60445b1c8c`) with `-licwait 1`. VCS again could not connect, then reported `Unable to get a license after 1.0 minutes`; Make exited at `uvm_compute_cluster_compile` before HDL compilation. Run ID: `R170-CLEAN-SHA-UVM-BLOCKED-20261102`. Diagnostic log: `/tmp/nmaforge_r170_clean_retry_3seed/compile.log`.
+
+This confirms that the source SHA is reproducibly blocked at license acquisition. It is not a test failure or a compile result because the HDL frontend did not run.
+
 No UVM seed, Golden/Memory Image scoreboard, functional bin, or checker result is claimed. The ordinary three-seed UVM target must be rerun from this exact source commit once VCS license service is reachable. Top Smoke and checker mutations were not rerun because this attempt did not alter RTL or checker implementations.
 
 ## Requirement disposition
