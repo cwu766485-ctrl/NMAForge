@@ -26,6 +26,7 @@ ALLOWED_DISPOSITIONS = {
     "NOT_RUN",
 }
 REQUIRE_EVIDENCE_COLUMNS = (2, 3, 4, 5)
+MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 
 
 def read_matrix(lines: List[str], heading: str) -> List[List[str]]:
@@ -54,6 +55,7 @@ def validate(path: Path) -> List[str]:
     lines = path.read_text(encoding="utf-8").splitlines()
     errors: List[str] = []
     counts = Counter()
+    checked_links = 0
 
     for heading, expected_ids in EXPECTED.items():
         try:
@@ -82,6 +84,16 @@ def validate(path: Path) -> List[str]:
                     errors.append(
                         f"{requirement}: empty required evidence field in RTM column {index + 1}"
                     )
+            for target in MARKDOWN_LINK.findall(row[5]):
+                target = target.strip().split("#", 1)[0].split("?", 1)[0]
+                if not target or target.startswith("/") or re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", target):
+                    continue
+                checked_links += 1
+                evidence_path = (path.parent / target).resolve()
+                if not evidence_path.exists():
+                    errors.append(
+                        f"{requirement}: broken repository evidence link {target!r}"
+                    )
             counts[disposition] += 1
 
         print(f"{heading}: {len(rows)}/{len(expected_ids)} rows")
@@ -92,7 +104,8 @@ def validate(path: Path) -> List[str]:
         return errors
 
     print(f"dispositions: {dict(sorted(counts.items()))}")
-    print("COMPUTE_CLUSTER_RTM_INTEGRITY_PASS: 38/38 IDs; checker, coverage, run/seed, and evidence fields present")
+    print(f"repository evidence links: {checked_links}/{checked_links} targets exist")
+    print("COMPUTE_CLUSTER_RTM_INTEGRITY_PASS: 38/38 IDs; evidence fields populated; repository links resolve")
     return []
 
 
