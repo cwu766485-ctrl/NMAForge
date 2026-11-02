@@ -133,6 +133,10 @@ R76 at the latest exact clean code/test SHA `969992291732cf694d7de4bdfef2808d4f0
 
 **CL-DV-v1.0 remains HOLD.** The current evidence does not satisfy the required closure for 14 partial requirements. No coverage percentage is used to waive missing legal scenarios.
 
+## R195 fixed-SHA SVA and Top Smoke replay — 2026-11-02
+
+At the R194 tested code SHA, a dedicated mixed-precision DDR/AXI E2E obtains real AR/AW/W stall-to-accept SVA matches `14/5/12` (3,287 attempts/property) with UVM severity `0/0/0`. Independent FP16/BF16/INT8 Golden, DMA error, reset, watchdog and Abort checks pass. Top Smoke and a 20-case seeded top run also pass; the existing Loop Reroll fixture warning is retained. This resolves the previously inactive AR/AW covers only for the named AXI stall workload. The 38-row status remains **24 PASS-SCOPED / 14 PARTIAL**, and `CL-DV-v1.0` remains **HOLD**. See [R195 report](COMPUTE_CLUSTER_SVA_TOP_REPLAY_R195_2026-11-02.md); archive SHA-256 `bd1cfc4479831560b0dcbcd8c9bd961fa09e11ca5cb83b927c7c7cc9d39301be`.
+
 ## R194 completion-mutation and fixed-SHA replay update — 2026-11-02
 
 At fixed clean candidate `f87acc9bca3b3ecece385fadfd5623de6837ea8d` (tree `cfc7ba4955488ae58d58f36deec368173c6ec98c`), three real-top UVM seeds pass with UVM warning/error/fatal `0/0/0` and 69,656 Memory Image words checked per seed. The response-owner ledger checks 2,828 responses from 2,847 accepted reads, accounts for 19 reset drops, and reports zero route/data/error mismatch and no pending entries. Seven real temporary RTL mutations are caught by their assigned checkers: address, data, response owner, WSTRB, completion error, Missing Done, and wrong-engine Duplicate Done. The busy-transition monitor sample was needed for Missing Done to trigger its dedicated checker before the later timeout. Product RTL and SPEC are unchanged.
