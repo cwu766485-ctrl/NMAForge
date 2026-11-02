@@ -4,6 +4,8 @@
 
 **RTM structural audit (R200):** `python3 tools/verify_compute_cluster_rtm.py` passes all 28 `REQ-CL` and 10 `REQ-PC` rows with no missing/duplicate IDs and all required checker, coverage, Run/Seed, and evidence fields populated. This validates traceability-table structure only; it does not replay runs or promote dispositions. See [R200](COMPUTE_CLUSTER_RTM_INTEGRITY_R200_2026-11-02.md).
 
+**RTM evidence-link audit (R202):** the checker now also confirms all 92 relative Markdown evidence targets exist in the repository. Absolute `/tmp` logs and artifact contents remain outside this check; no requirement is promoted. See [R202](COMPUTE_CLUSTER_RTM_LINK_AUDIT_R202_2026-11-02.md).
+
 **Scope:** `REQ-CL-001..028` and `REQ-PC-001..010` from Compute Cluster SPEC v1.8.\
 **Latest exact-SHA real-top UVM replay:** R194 commit `f87acc9bca3b3ecece385fadfd5623de6837ea8d` (tree `cfc7ba4955488ae58d58f36deec368173c6ec98c`) passes three seeds and catches 7/7 targeted real RTL mutations from a detached clean worktree. The top Smoke replay remains R192; combined declared functional-group coverage remains R190. R194 adds evidence only and does not promote requirements.
 **Latest fixed-SHA AXI SVA / Top Smoke replay:** R195 reruns `uvm_mixed_precision_ddr_e2e_axi_stalls`, Top Smoke, and the 20-case seeded top on the same R194 code SHA. AR/AW/W stall-to-accept covers match 14/5/12 times; both top runs pass. This closes only the named assertion-stimulus/replay point; requirement disposition is unchanged. See [R195 report](COMPUTE_CLUSTER_SVA_TOP_REPLAY_R195_2026-11-02.md).
