@@ -33,4 +33,4 @@ The raw log remains outside the repository at `/tmp/nmaforge_r203_compile.log`; 
 
 ## Sign-off impact
 
-R203 adds no requirement evidence and changes no disposition. The RTM remains 24 `PASS-SCOPED` / 14 `PARTIAL`; `CL-DV-v1.0` remains **HOLD**. The latest clean exact-HEAD regression is still blocked by license-service reachability. Do not relabel earlier PASS runs at `f87acc9` as evidence at this documentation-only candidate.
+R203 adds no requirement evidence and changes no disposition. Its `BLOCKED_ENV` result records the state during that attempt. The user subsequently restored license reachability; R204 reran the latest clean candidate and passed the named UVM, Top Smoke, seeded Top, declared functional-coverage, and mutation gates. The 38-row RTM remains 24 `PASS-SCOPED` / 14 `PARTIAL`; `CL-DV-v1.0` remains **HOLD**. See [R204](COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R204_2026-11-02.md).
