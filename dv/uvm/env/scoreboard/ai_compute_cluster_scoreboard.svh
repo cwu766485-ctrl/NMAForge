@@ -21,6 +21,7 @@ class ai_compute_cluster_scoreboard extends uvm_component;
     bit [7:0] model_byte[longint unsigned];
     pending_memory_read_t pending_memory_reads[0:5][$];
     pending_memory_read_t pending_cnm_lane_reads[0:3][$];
+    bit [6:0] expected_engine_response_owners[$];
 
     int unsigned observations;
     int unsigned busy_observations;
@@ -37,6 +38,12 @@ class ai_compute_cluster_scoreboard extends uvm_component;
     int unsigned cnm_pending_lane_reads[0:3];
     int unsigned cnm_lane_accepts[0:3];
     int unsigned cnm_lane_responses[0:3];
+    int unsigned engine_owner_accepted;
+    int unsigned engine_owner_checked;
+    int unsigned engine_owner_reset_dropped;
+    int unsigned engine_owner_route_mismatches;
+    int unsigned engine_owner_data_mismatches;
+    int unsigned engine_owner_error_mismatches;
     int unsigned memory_model_writes;
     int unsigned memory_data_checks;
     int unsigned memory_data_mismatches;
@@ -217,6 +224,8 @@ class ai_compute_cluster_scoreboard extends uvm_component;
         bit [6:0] invalid_done_mask;
         bit [6:0] missing_done_mask;
         bit [6:0] accepted_engine_mask;
+        bit [6:0] expected_engine_owner;
+        int engine_owner_index;
         pending_memory_read_t item;
         bit [127:0] actual;
         observations++;
@@ -237,6 +246,8 @@ class ai_compute_cluster_scoreboard extends uvm_component;
                 cnm_pending_lane_reads[lane] = 0;
                 pending_cnm_lane_reads[lane].delete();
             end
+            engine_owner_reset_dropped += expected_engine_response_owners.size();
+            expected_engine_response_owners.delete();
             return;
         end
         reset_active_previous = 1'b0;
@@ -360,6 +371,46 @@ class ai_compute_cluster_scoreboard extends uvm_component;
                         actual = item.is_line ? obs.selected_line_rdata : {96'd0, obs.selected_rsp_rdata};
                         compare_snapshot(item, actual, obs.rsp_client, -1);
                     end
+                    if ((obs.rsp_client == 3'd2) && !obs.selected_rsp_is_line) begin
+                        if (expected_engine_response_owners.size() == 0) begin
+                            engine_owner_route_mismatches++;
+                            `uvm_error("CLUSTER_ENGINE_RESPONSE_OWNER",
+                                "32-bit core response has no accepted engine-owner ledger entry")
+                        end else begin
+                            expected_engine_owner = expected_engine_response_owners.pop_front();
+                            engine_owner_checked++;
+                            if ((expected_engine_owner == 7'd0) ||
+                                (obs.engine_rsp_valid !== expected_engine_owner) ||
+                                ($countones(obs.engine_rsp_valid) != 1)) begin
+                                engine_owner_route_mismatches++;
+                                `uvm_error("CLUSTER_ENGINE_RESPONSE_OWNER", $sformatf(
+                                    "engine response owner mismatch expected=%07b actual=%07b arbiter_client=%0d",
+                                    expected_engine_owner, obs.engine_rsp_valid, obs.rsp_client))
+                            end else begin
+                                for (engine_owner_index = 0; engine_owner_index < 7;
+                                     engine_owner_index++) begin
+                                    if (expected_engine_owner[engine_owner_index]) begin
+                                        if (obs.engine_rsp_rdata[engine_owner_index*32 +: 32] !==
+                                            obs.selected_rsp_rdata) begin
+                                            engine_owner_data_mismatches++;
+                                            `uvm_error("CLUSTER_ENGINE_RESPONSE_DATA", $sformatf(
+                                                "engine=%0d response data mismatch expected=0x%08h actual=0x%08h",
+                                                engine_owner_index, obs.selected_rsp_rdata,
+                                                obs.engine_rsp_rdata[engine_owner_index*32 +: 32]))
+                                        end
+                                        if (obs.engine_rsp_error[engine_owner_index] !==
+                                            obs.selected_rsp_error) begin
+                                            engine_owner_error_mismatches++;
+                                            `uvm_error("CLUSTER_ENGINE_RESPONSE_ERROR", $sformatf(
+                                                "engine=%0d response error mismatch expected=%0b actual=%0b",
+                                                engine_owner_index, obs.selected_rsp_error,
+                                                obs.engine_rsp_error[engine_owner_index]))
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
                 end
             end
         end else if ((|obs.cnm_rsp_valid) || obs.matrix_rsp_valid) begin
@@ -477,6 +528,14 @@ class ai_compute_cluster_scoreboard extends uvm_component;
                                 "accepted core read must have one engine owner: valid=%07b ready=%07b addr=0x%08h",
                                 obs.engine_req_valid, obs.engine_req_ready,
                                 obs.selected_spad_addr))
+                        if ((client == 2) &&
+                            !(obs.selected_line_valid && obs.selected_line_ready &&
+                              !obs.selected_line_write)) begin
+                            if ($countones(accepted_engine_mask) == 1) begin
+                                expected_engine_response_owners.push_back(accepted_engine_mask);
+                                engine_owner_accepted++;
+                            end
+                        end
                         if (obs.selected_line_valid && obs.selected_line_ready &&
                             !obs.selected_line_write)
                             pending_memory_reads[client].push_back(
@@ -520,6 +579,24 @@ class ai_compute_cluster_scoreboard extends uvm_component;
             if (pending_memory_reads[client].size() != 0)
                 `uvm_error("CLUSTER_MEMORY_DRAIN", $sformatf("client=%0d has %0d memory snapshots at test end", client, pending_memory_reads[client].size()))
         end
+        if (expected_engine_response_owners.size() != 0)
+            `uvm_error("CLUSTER_ENGINE_RESPONSE_DRAIN", $sformatf(
+                "%0d accepted engine reads have no owner-routed response",
+                expected_engine_response_owners.size()))
+        if (engine_owner_accepted != engine_owner_checked + engine_owner_reset_dropped)
+            `uvm_error("CLUSTER_ENGINE_RESPONSE_DRAIN", $sformatf(
+                "accepted=%0d checked=%0d reset_dropped=%0d",
+                engine_owner_accepted, engine_owner_checked,
+                engine_owner_reset_dropped))
+        if ((engine_owner_route_mismatches == 0) &&
+            (engine_owner_data_mismatches == 0) &&
+            (engine_owner_error_mismatches == 0) &&
+            (expected_engine_response_owners.size() == 0) &&
+            (engine_owner_accepted == engine_owner_checked + engine_owner_reset_dropped))
+            `uvm_info("CLUSTER_ENGINE_RESPONSE_OWNER_PASS", $sformatf(
+                "accepted=%0d checked=%0d reset_dropped=%0d route_mismatch=0 data_mismatch=0 error_mismatch=0 pending=0",
+                engine_owner_accepted, engine_owner_checked,
+                engine_owner_reset_dropped), UVM_LOW)
         for (lane = 0; lane < 4; lane++) begin
             if (cnm_pending_lane_reads[lane] != 0)
                 `uvm_error("CLUSTER_CNM_LANE_DRAIN", $sformatf("CNM lane=%0d has %0d accepted reads without response", lane, cnm_pending_lane_reads[lane]))

@@ -413,13 +413,23 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
     task automatic expect_spad(input bit [31:0] addr, input bit [31:0] expected, input string tag);
         bit [31:0] actual;
+        int tag_len;
+        bit completion_status_or_error;
         axil_read(CIMFORGE_SPAD_BASE + addr, actual);
+        tag_len = tag.len();
+        completion_status_or_error = (addr[3:0] == 4'h4) &&
+            (((tag_len >= 7) && (tag.substr(tag_len - 7, tag_len - 1) == " status")) ||
+             ((tag_len >= 11) && (tag.substr(tag_len - 11, tag_len - 1) == " completion")));
         if (actual !== expected) begin
             if ((mutation_kind == "completion_error_code") &&
                 (tag == "random parity case0 ERR_PARITY completion")) begin
                 `uvm_info("CLUSTER_MUTATION_CAUGHT",
                     "mutation=completion_error_code checker=completion_error_code", UVM_LOW)
                 `uvm_error("CLUSTER_COMPLETION_ERROR_CODE", $sformatf(
+                    "%s addr=0x%08h expected=0x%08h actual=0x%08h",
+                    tag, addr, expected, actual))
+            end else if (completion_status_or_error) begin
+                `uvm_fatal("CLUSTER_COMPLETION_ERROR_CODE", $sformatf(
                     "%s addr=0x%08h expected=0x%08h actual=0x%08h",
                     tag, addr, expected, actual))
             end else begin
