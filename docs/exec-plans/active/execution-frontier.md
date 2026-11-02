@@ -282,3 +282,10 @@ in the owning report; run `git diff --check` before handoff.
 - VCS could not reach the configured license service, queued for `VCS-BASE-COMPILE/VCSCompiler_Net`, and was stopped by the 120-second timeout before producing a simulator image. No seed, Top Smoke, or seeded Top test ran. Result: `BLOCKED_ENV`.
 - RTM remains 24 PASS-SCOPED / 14 PARTIAL; `CL-DV-v1.0` remains **HOLD**. No product RTL or test source changed.
 - Evidence: [R203 report](../../verification/COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R203_2026-11-02.md); raw log remains outside repository at `/tmp/nmaforge_r203_compile.log`, SHA-256 `3103ee7046612a59855f0094d61574a4ce4c2c4cf71d0454eafc0fce10e6b95c`.
+
+## 2026-11-02 update — R204 latest clean-candidate verification
+
+- The user restored VCS license access. A detached clean worktree at `bce4f81ef37158cf80e46f5804256c8e7531a9d9` passes three-seed Compute Cluster UVM, Top Smoke, a 20-case seeded Top run, 16-seed mixed E2E coverage, and 7/7 real RTL mutations.
+- Combined URG reports all 21 declared functional groups at 100%; RTL/test line/condition/FSM/branch coverage is 73.70/68.72/46.69/64.70%. Assertions are 20/22 with zero failures/incomplete and two UVM RAL no-attempts; all 3 cover properties match.
+- The clean replay closes the immediate environment/reproducibility gap only. RTM remains 24 PASS-SCOPED / 14 PARTIAL; `CL-DV-v1.0` remains **HOLD** pending legal cross and contract dispositions.
+- Evidence: [R204 report](../../verification/COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R204_2026-11-02.md); archive `/tmp/nmaforge_r204_evidence_20261102.tar.gz`, SHA-256 `9f32c098463213e338cd6ef4a9da9b44631771b17f48c0350bc7fbca4d3a490f`.
