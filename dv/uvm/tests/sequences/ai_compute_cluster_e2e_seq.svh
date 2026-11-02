@@ -3261,6 +3261,102 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         clear_contract_queues(32'd1);
     endtask
 
+    task automatic run_scalar_vdot_minimum_cmdq_boundary_test(input int unsigned seed);
+        localparam bit [31:0] SRC_A = 32'h0007_5000;
+        localparam bit [31:0] SRC_B = 32'h0007_5010;
+        localparam bit [31:0] DST = 32'h0007_5020;
+        localparam bit [31:0] COMPLETION = CLUSTER_CONTRACT_CPLQ + 32'h100;
+        bit [31:0] packed_a;
+        bit [31:0] packed_b;
+        bit [31:0] expected;
+        bit [31:0] observed_src_a;
+        bit [31:0] observed_src_b;
+        bit [31:0] observed_dst;
+        bit [15:0] observed_length;
+        bit [7:0] observed_opcode;
+        int signed a_value;
+        int signed b_value;
+        int signed golden_sum;
+        int unsigned lane;
+        int unsigned launch_before;
+        int unsigned launch_seen;
+        int unsigned poll;
+
+        // Opcode 0x10 counts packed 32-bit K words. Length=1 is the smallest
+        // nonzero validator-accepted VDOT and must execute exactly four lanes.
+        packed_a = '0;
+        packed_b = '0;
+        golden_sum = 0;
+        for (lane = 0; lane < 4; lane++) begin
+            case (lane)
+                0: begin a_value = -128; b_value = 127; end
+                1: begin a_value = -1;   b_value = -128; end
+                2: begin a_value = 0;    b_value = 11; end
+                default: begin a_value = 127; b_value = -1; end
+            endcase
+            packed_a[lane*8 +: 8] = a_value[7:0];
+            packed_b[lane*8 +: 8] = b_value[7:0];
+            golden_sum += a_value * b_value;
+        end
+        expected = golden_sum;
+        spad_write(SRC_A, packed_a);
+        spad_write(SRC_B, packed_b);
+        spad_write(DST, 32'hbad0_1001);
+        spad_write(DST + 32'd4, 32'hbad0_1002);
+        write_contract_vdot_desc(CLUSTER_CONTRACT_CMDQ, 16'h08b0,
+                                 SRC_A, SRC_B, DST, 16'd1,
+                                 8'd0, 32'd0, 32'd0, 32'd0, 32'd0);
+
+        launch_before = compute_vif.launch_sample_count;
+        launch_seen = 0;
+        configure_contract_queues(COMPLETION, 32'd1);
+        fork
+            begin : scalar_vdot_min_launch_monitor
+                for (poll = 0; poll < 50000 && launch_seen == 0; poll++) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.launch_valid) begin
+                        observed_opcode = compute_vif.launch_op;
+                        observed_src_a = compute_vif.launch_src0;
+                        observed_src_b = compute_vif.launch_src1;
+                        observed_dst = compute_vif.launch_dst;
+                        observed_length = compute_vif.launch_length;
+                        launch_seen++;
+                    end
+                end
+                if (launch_seen != 1)
+                    `uvm_fatal("CLUSTER_SCALAR_VDOT_MIN", $sformatf(
+                        "real CMDQ minimum VDOT launch monitor timed out after %0d launches",
+                        launch_seen))
+            end
+            begin : scalar_vdot_min_submit
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(32'd1);
+            end
+        join
+        wait_spad_idle();
+
+        if (launch_seen != 1 ||
+            (compute_vif.launch_sample_count - launch_before) != 1 ||
+            observed_opcode !== 8'h10 || observed_src_a !== SRC_A ||
+            observed_src_b !== SRC_B || observed_dst !== DST ||
+            observed_length !== 16'd1)
+            `uvm_fatal("CLUSTER_SCALAR_VDOT_MIN", $sformatf(
+                "minimum VDOT launch mismatch count=%0d op=%02h src=%08h/%08h dst=%08h length=%0d",
+                compute_vif.launch_sample_count - launch_before,
+                observed_opcode, observed_src_a, observed_src_b,
+                observed_dst, observed_length))
+
+        expect_completion(COMPLETION, 16'h08b0, expected, 32'd1,
+                          "CMDQ minimum Scalar VDOT completion");
+        expect_spad(DST, expected, "CMDQ minimum Scalar VDOT Golden");
+        expect_spad(DST + 32'd4, 32'hbad0_1002,
+                    "CMDQ minimum Scalar VDOT adjacent guard");
+        `uvm_info("CLUSTER_SCALAR_VDOT_MIN_BOUNDARY_PASS", $sformatf(
+            "real CMDQ opcode=0x10 minimum length=1 accepted; four signed INT8 lanes, Golden=%0d, one completion and adjacent guard passed; seed=%0d",
+            golden_sum, seed), UVM_LOW)
+        clear_contract_queues(32'd1);
+    endtask
+
     task automatic run_scalar_gemv_gemm_cmdq_dispatch_test(input int unsigned seed);
         bit [31:0] a_words[0:3];
         bit [31:0] b_words[0:3];
@@ -9425,6 +9521,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         run_dma_store_response_test();
         run_banked_vdot_cmdq_dispatch_test(seed);
+        run_scalar_vdot_minimum_cmdq_boundary_test(seed);
         run_cmdq_invalid_descriptor_matrix_test(seed);
         run_engine_protection_full_cplq_cross(seed);
         run_scalar_gemv_gemm_cmdq_dispatch_test(seed);
