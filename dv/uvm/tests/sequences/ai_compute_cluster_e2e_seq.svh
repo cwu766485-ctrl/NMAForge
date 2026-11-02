@@ -138,6 +138,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned fp_reset_single_write_phase;
     int unsigned engine_watchdog_cov_idx;
     int unsigned engine_watchdog_cplq_cov_idx;
+    int unsigned engine_parity_cplq_cov_idx;
     int unsigned matrix_protection_reset_phase;
     int unsigned matrix_protection_cnm_reset_phase;
     int unsigned engine_protection_reset_engine;
@@ -249,6 +250,19 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     covergroup engine_watchdog_cplq_cg;
         option.per_instance = 1;
         cp_engine_watchdog_cplq: coverpoint engine_watchdog_cplq_cov_idx {
+            bins scalar_int8 = {0};
+            bins fp = {1};
+            bins cnm = {2};
+            bins matrix = {3};
+            bins sfu = {4};
+            bins conv = {5};
+            bins kv = {6};
+        }
+    endgroup
+
+    covergroup engine_parity_cplq_cg;
+        option.per_instance = 1;
+        cp_engine_parity_cplq: coverpoint engine_parity_cplq_cov_idx {
             bins scalar_int8 = {0};
             bins fp = {1};
             bins cnm = {2};
@@ -377,6 +391,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         fp_reset_single_write_phase = 0;
         engine_watchdog_cov_idx = 0;
         engine_watchdog_cplq_cov_idx = 0;
+        engine_parity_cplq_cov_idx = 0;
         engine_pair_overlap_cov_idx = 0;
         matrix_protection_reset_phase = 0;
         matrix_protection_cnm_reset_phase = 0;
@@ -394,6 +409,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         fp_reset_single_write_cg = new();
         engine_watchdog_cg = new();
         engine_watchdog_cplq_cg = new();
+        engine_parity_cplq_cg = new();
         cmdq_invalid_descriptor_cg = new();
         engine_pair_overlap_cg = new();
         matrix_protection_reset_cg = new();
@@ -3181,6 +3197,194 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 engines_seen, engine_watchdog_cplq_cg.get_coverage()))
         `uvm_info("CLUSTER_ENGINE_WATCHDOG_CPLQ_PASS", $sformatf(
             "real CMDQ watchdog x full CPLQ: engines=7/7 error=7/7 blocked=7/7 released=7/7 wrapped=7/7 exactly-once=7/7 focused bins=7/7 coverage=100.0%% seed=%0d",
+            seed), UVM_LOW)
+    endtask
+
+    // Exercise parity-error retirement while the architectural completion
+    // queue is full. This complements the separate watchdog and Protection
+    // queue tests with a real accepted SPAD response carrying a parity error.
+    task automatic run_engine_parity_full_cplq_cross(input int unsigned seed);
+        bit [31:0] desc_addr;
+        bit [31:0] cpl_addr;
+        bit [31:0] dst;
+        bit [31:0] fault_addr;
+        bit [31:0] value;
+        bit [31:0] task_id;
+        bit [31:0] expected_error;
+        bit [6:0] engines_seen;
+        string parity_path;
+        uvm_hdl_data_t saved_parity;
+        int unsigned engine;
+        int unsigned word_idx;
+        int unsigned poll;
+        int unsigned quiet_cycles;
+        bit busy_seen;
+        bit parity_response_seen;
+        bit error_seen;
+        bit full_seen;
+
+        desc_addr = CLUSTER_WATCHDOG_CMDQ;
+        cpl_addr = CLUSTER_WATCHDOG_CPLQ;
+        engines_seen = '0;
+
+        for (engine = 0; engine < 7; engine++) begin
+            task_id = 32'h0e20 + engine;
+            dst = CLUSTER_WATCHDOG_Y_LOCAL + 32'h1000 + (engine * 32'h100);
+
+            // Three legal CMDQ validation failures fill the three usable
+            // entries of the four-slot ring. The fourth descriptor is a real
+            // engine operation whose source-A read returns parity error.
+            for (word_idx = 0; word_idx < 3; word_idx++) begin
+                write_cluster_desc(desc_addr + (word_idx << 6), 8'h10,
+                    16'h0e00 + (engine * 3) + word_idx,
+                    SCALAR_A_LOCAL, SCALAR_B_LOCAL, dst, 16'd0, 16'd0,
+                    16'd0, 32'd0, 32'd0, 32'd0, 32'd0, 8'd3);
+            end
+            prepare_engine_parity_reset_case(engine, 1'b0,
+                task_id[15:0], desc_addr + 32'hc0, dst, fault_addr);
+            for (word_idx = 0; word_idx < 4; word_idx++)
+                spad_write(cpl_addr + 32'h30 + (word_idx << 2),
+                           32'h0e2c_7d00 | (engine << 4) | word_idx);
+
+            axil_write(REG_REGION0_PERM, 32'd0);
+            axil_write(REG_REGION1_PERM, 32'd0);
+            axil_write(REG_REGION2_PERM, 32'd0);
+            axil_write(REG_REGION3_PERM, 32'd0);
+            axil_write(REG_WATCHDOG, 32'd0);
+            inject_spad_parity_fault(fault_addr, parity_path, saved_parity);
+            axil_write(REG_CMDQ_CTRL, 32'd0);
+            axil_write(REG_CMDQ_BASE, desc_addr);
+            axil_write(REG_CMDQ_SIZE, 32'd8);
+            axil_write(REG_CMDQ_HEAD, 32'd0);
+            axil_write(REG_CMDQ_TAIL, 32'd4);
+            axil_write(REG_CPLQ_BASE, cpl_addr);
+            axil_write(REG_CPLQ_SIZE, 32'd4);
+            axil_write(REG_CPLQ_HEAD, 32'd0);
+            axil_write(REG_CPLQ_TAIL, 32'd0);
+
+            busy_seen = 1'b0;
+            parity_response_seen = 1'b0;
+            error_seen = 1'b0;
+            full_seen = 1'b0;
+            fork
+                begin : parity_cplq_submit
+                    axil_write(REG_DOORBELL, 32'd1);
+                    wait_cpl_tail(32'd3);
+                    full_seen = 1'b1;
+                end
+                begin : parity_cplq_engine_monitor
+                    for (poll = 0; poll < 50000; poll++) begin
+                        @(posedge compute_vif.aclk);
+                        if (compute_vif.engine_busy[engine])
+                            busy_seen = 1'b1;
+                        if (compute_vif.engine_parity_rsp_error[engine])
+                            parity_response_seen = 1'b1;
+                        if (compute_vif.engine_error[engine])
+                            error_seen = 1'b1;
+                        if (full_seen && busy_seen && parity_response_seen &&
+                            error_seen && !compute_vif.engine_busy[engine] &&
+                            compute_vif.cplq_full)
+                            break;
+                    end
+                end
+            join
+
+            if (!busy_seen || !parity_response_seen || !error_seen ||
+                !full_seen || compute_vif.engine_busy[engine] !== 1'b0 ||
+                compute_vif.cplq_full !== 1'b1 ||
+                compute_vif.processor_busy !== 1'b1)
+                `uvm_fatal("CLUSTER_PARITY_CPLQ_CROSS", $sformatf(
+                    "engine=%0d parity error did not retire behind full CPLQ: busy_seen=%0b parity_rsp=%0b error=%0b full_seen=%0b busy=%07b cplq_full=%0b processor_busy=%0b",
+                    engine, busy_seen, parity_response_seen, error_seen,
+                    full_seen, compute_vif.engine_busy, compute_vif.cplq_full,
+                    compute_vif.processor_busy))
+
+            // The parity response has been consumed and the engine has
+            // retired. Restore the physical parity bit before host readback.
+            restore_spad_parity(parity_path, saved_parity);
+            quiet_cycles = 0;
+            for (poll = 0; poll < 5000; poll++) begin
+                @(negedge compute_vif.aclk);
+                if ((compute_vif.engine_req_valid == 0) &&
+                    !compute_vif.core_spad_valid &&
+                    !compute_vif.banked_valid &&
+                    (compute_vif.cnm_valid == 0) &&
+                    !compute_vif.matrix_line_valid &&
+                    !compute_vif.dma_valid && !compute_vif.dma_line_valid &&
+                    !compute_vif.desc_valid && !compute_vif.rsp_valid) begin
+                    quiet_cycles++;
+                    if (quiet_cycles == 3) break;
+                end else
+                    quiet_cycles = 0;
+            end
+            if (quiet_cycles != 3)
+                `uvm_fatal("CLUSTER_PARITY_CPLQ_CROSS", $sformatf(
+                    "engine=%0d parity-fault traffic did not drain while completion was blocked: engine_req=%07b core=%0b banked=%0b cnm=%04b line=%0b desc=%0b rsp=%0b",
+                    engine, compute_vif.engine_req_valid,
+                    compute_vif.core_spad_valid, compute_vif.banked_valid,
+                    compute_vif.cnm_valid, compute_vif.matrix_line_valid,
+                    compute_vif.desc_valid, compute_vif.rsp_valid))
+            axil_read(REG_CMDQ_HEAD, value);
+            if (value !== 32'd4)
+                `uvm_fatal("CLUSTER_PARITY_CPLQ_CROSS", $sformatf(
+                    "engine=%0d CMDQ head expected=4 actual=%0d", engine, value))
+            axil_read(REG_CPLQ_TAIL, value);
+            if (value !== 32'd3)
+                `uvm_fatal("CLUSTER_PARITY_CPLQ_CROSS", $sformatf(
+                    "engine=%0d parity completion escaped full-ring hold: tail=%0d",
+                    engine, value))
+            for (word_idx = 0; word_idx < 3; word_idx++) begin
+                expect_spad(cpl_addr + (word_idx << 4),
+                    {16'd0, 16'h0e00 + (engine * 3) + word_idx},
+                    $sformatf("parity CPLQ engine%0d filler%0d task", engine, word_idx));
+                expect_spad(cpl_addr + (word_idx << 4) + 32'd4, 32'h72,
+                    $sformatf("parity CPLQ engine%0d filler%0d ERR_DESC", engine, word_idx));
+            end
+            for (word_idx = 0; word_idx < 4; word_idx++)
+                expect_spad(cpl_addr + 32'h30 + (word_idx << 2),
+                    32'h0e2c_7d00 | (engine << 4) | word_idx,
+                    $sformatf("parity CPLQ engine%0d held completion sentinel[%0d]",
+                              engine, word_idx));
+            for (word_idx = 0; word_idx < 16; word_idx++)
+                expect_spad(dst + (word_idx << 2),
+                    32'hbaad_0000 | (engine << 8) | (word_idx),
+                    $sformatf("parity CPLQ engine%0d no-writeback[%0d]",
+                              engine, word_idx));
+
+            axil_write(REG_CPLQ_HEAD, 32'd1);
+            wait_cpl_tail(32'd0);
+            wait_spad_idle();
+            expected_error = ((engine == 5) || (engine == 6)) ?
+                             32'h0000_0072 : 32'h0000_0052;
+            expect_spad(cpl_addr + 32'h30, {16'd0, task_id[15:0]},
+                        $sformatf("parity CPLQ engine%0d wrapped task ID", engine));
+            expect_spad(cpl_addr + 32'h34, expected_error,
+                        $sformatf("parity CPLQ engine%0d wrapped error", engine));
+            #100;
+            axil_read(REG_CPLQ_TAIL, value);
+            if (value !== 32'd0)
+                `uvm_fatal("CLUSTER_PARITY_CPLQ_CROSS", $sformatf(
+                    "engine=%0d parity completion was published more than once: tail=%0d",
+                    engine, value))
+
+            engines_seen[engine] = 1'b1;
+            engine_parity_cplq_cov_idx = engine;
+            engine_parity_cplq_cg.sample();
+            `uvm_info("CLUSTER_PARITY_CPLQ_CASE_PASS", $sformatf(
+                "engine=%0d task=0x%04h accepted_parity_response=1 error=0x%02h held_while_full=1 released_wrap=1 no_writeback=1 exactly_once=1 seed=%0d",
+                engine, task_id[15:0], expected_error[7:0], seed), UVM_LOW)
+            axil_write(REG_CPLQ_HEAD, 32'd0);
+            axil_write(REG_CMDQ_SIZE, 32'd0);
+            axil_write(REG_CPLQ_SIZE, 32'd0);
+        end
+
+        if (engines_seen !== 7'h7f ||
+            engine_parity_cplq_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_PARITY_CPLQ_COVERAGE", $sformatf(
+                "seven-engine parity/full-CPLQ bins incomplete: engines=%07b coverage=%.1f%%",
+                engines_seen, engine_parity_cplq_cg.get_coverage()))
+        `uvm_info("CLUSTER_PARITY_CPLQ_CROSS_PASS", $sformatf(
+            "accepted parity response x full Completion Queue: engines=7/7 response=7/7 blocked=7/7 released/wrapped=7/7 no-writeback=7/7 exactly-once=7/7 focused coverage=100.0%% seed=%0d",
             seed), UVM_LOW)
     endtask
 
@@ -10271,6 +10475,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_engine_protection_reset_sweep(seed);
         run_real_engine_watchdog_sweep(seed);
         run_engine_watchdog_full_cplq_cross(seed);
+        run_engine_parity_full_cplq_cross(seed);
 
         `uvm_info("COMPUTE_CLUSTER_REAL_UVM_PASS", $sformatf(
             "standalone Matrix16x32x64 Golden + 16 A-tile reuse hits; parallel Matrix/CNM GEMV with separate response tags and four-bank Golden + next-K prefetch + queued SFU tasks + concurrent abort/reset/recovery seed=%0d; prefetch_overlap=%0d matrix_cnm_overlap=%0d matrix_rsp=%0d cnm_rsp=%0d cnm_lanes=%b overlap=%0d arbiter_contention=%0d banked_grants=%0d cnm_grants=%0d core_grants=%0d",
