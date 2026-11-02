@@ -43,7 +43,8 @@ R184 adds real-CMDQ rejection evidence for `REQ-CL-002` and narrows the invalid-
 
 ## Evidence archive
 
-Logs-only archive: `/tmp/nmaforge_r184_cmdq_invalid_descriptor_logs.tar.gz`  
+Logs-only archive: `/tmp/nmaforge_r184_cmdq_invalid_descriptor_logs.tar.gz`.
+
 SHA-256: `3c7cd394f9e267a3ffadf0ca69784a238182e2f637575a7ea85c94a2d249d1e4`.
 
 The archive contains the run manifest, per-seed UVM logs, compile/URG summaries, all 28 mutation logs, Top Smoke logs, and checksums. It excludes generated VCS/VDB trees.
