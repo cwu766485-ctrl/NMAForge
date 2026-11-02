@@ -419,6 +419,10 @@
             send_fault_case(FP_FAULT_CONFIG, 1'b0, 0, 4'd1, 0, 0);
             send_fault_case(FP_FAULT_READ_PROTECTION, 1'b0, 1, 4'd6, 1, 0);
             send_fault_case(FP_FAULT_READ_PROTECTION, 1'b1, 1, 4'd6, 1, 0);
+            // Read Protection has higher priority than Abort for Mixed FP,
+            // even when both are present on the accepted source request.
+            send_fault_case(FP_FAULT_READ_PROTECTION_ABORT, 1'b0, 1, 4'd6, 1, 0);
+            send_fault_case(FP_FAULT_READ_PROTECTION_ABORT, 1'b1, 1, 4'd6, 1, 0);
             // Protection on the accepted B word is retained as an error even
             // when both returned words make the operand pair appear ready.
             send_fault_case(FP_FAULT_READ_B_PROTECTION, 1'b0, 1, 4'd6, 2, 0);
