@@ -40,6 +40,7 @@
             bit reset_injected;
             bit reset_condition;
             bit unqualified_parity_injected;
+            bit same_cycle_priority_sampled;
 
             request_seen = 0;
             bfm_cycle = 0;
@@ -56,6 +57,7 @@
             abort_injected = 0;
             reset_injected = 0;
             unqualified_parity_injected = 0;
+            same_cycle_priority_sampled = 0;
             wait (vif.start === 1'b1);
             while ((vif.done !== 1'b1) && !reset_injected) begin
                 @(negedge vif.clk);
@@ -152,6 +154,8 @@
                                      $urandom_range(1, 3);
                         if (req.fault_mode == FP_FAULT_WATCHDOG)
                             stall_left = 0;
+                        if (req.fault_mode == FP_FAULT_WRITE_PROTECTION_ABORT)
+                            stall_left = 0;
                         if ((req.spad_write_stall_cycles != 0) &&
                             !vif.spad_write)
                             stall_left = 0;
@@ -210,6 +214,15 @@
                             vif.spad_protection_error = 1'b1;
                             write_protection_injected = 1;
                         end
+                        if ((req.fault_mode == FP_FAULT_WRITE_PROTECTION_ABORT) &&
+                            vif.spad_write && !write_protection_injected) begin
+                            vif.spad_protection_error = 1'b1;
+                            vif.abort = 1'b1;
+                            write_protection_injected = 1;
+                            `uvm_info("FP_SAME_CYCLE_PRIORITY", $sformatf(
+                                "write Protection and Abort asserted with ready for tx%0d; next posedge samples both",
+                                req.transaction_id), UVM_LOW)
+                        end
                     end else
                         stall_left--;
                 end else begin
@@ -227,6 +240,16 @@
 
                 @(posedge vif.clk);
                 if (vif.spad_valid && vif.spad_ready) begin
+                    if ((req.fault_mode == FP_FAULT_WRITE_PROTECTION_ABORT) &&
+                        vif.spad_write) begin
+                        if (!vif.abort || !vif.spad_protection_error)
+                            `uvm_fatal("FP_SAME_CYCLE_PRIORITY",
+                                "Protection and Abort were not both asserted on the accepted result edge")
+                        same_cycle_priority_sampled = 1;
+                        `uvm_info("FP_SAME_CYCLE_PRIORITY_SAMPLE", $sformatf(
+                            "sampled write Protection and Abort together on accepted result edge tx%0d",
+                            req.transaction_id), UVM_LOW)
+                    end
                     if (vif.spad_addr[31:2] >= 256)
                         `uvm_fatal("BF16/DRV", $sformatf("SPAD address out of model range: %08x", vif.spad_addr))
                     word_index = vif.spad_addr[9:2];
@@ -260,6 +283,10 @@
                 if (vif.done === 1'b1)
                     break;
             end
+            if ((req.fault_mode == FP_FAULT_WRITE_PROTECTION_ABORT) &&
+                !same_cycle_priority_sampled)
+                `uvm_fatal("FP_SAME_CYCLE_PRIORITY",
+                    "Directed simultaneous Protection/Abort result edge was not sampled")
             @(negedge vif.clk);
             vif.spad_ready = 1'b0;
             vif.spad_rsp_valid = 1'b0;

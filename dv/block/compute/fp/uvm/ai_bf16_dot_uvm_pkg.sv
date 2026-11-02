@@ -30,6 +30,7 @@ package ai_bf16_dot_uvm_pkg;
         FP_FAULT_ABORT_WAIT_A,
         FP_FAULT_WATCHDOG,
         FP_FAULT_WRITE_PROTECTION,
+        FP_FAULT_WRITE_PROTECTION_ABORT,
         FP_FAULT_ABORT_CALC,
         FP_FAULT_RESET_READ_A,
         FP_FAULT_RESET_WAIT_A,

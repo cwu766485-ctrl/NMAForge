@@ -452,6 +452,11 @@
             send_fault_case(FP_FAULT_ABORT_CALC, 1'b0, 1, 4'd3, 2, 0);
             send_fault_case(FP_FAULT_WRITE_PROTECTION, 1'b0, 1, 4'd6, 2, 1);
             send_fault_case(FP_FAULT_WRITE_PROTECTION, 1'b1, 1, 4'd6, 2, 1);
+            // Assert write Protection and Abort together on the accepted
+            // result request. The frozen FP ordering requires Protection to
+            // remain the reported cause for this sampled edge.
+            send_fault_case(FP_FAULT_WRITE_PROTECTION_ABORT, 1'b0, 1, 4'd6, 2, 1);
+            send_fault_case(FP_FAULT_WRITE_PROTECTION_ABORT, 1'b1, 1, 4'd6, 2, 1);
             // Exercise PROTECTION -> CONFIG after a write-protection retire.
             send_fault_case(FP_FAULT_CONFIG, 1'b1, 0, 4'd1, 0, 0);
             send_fault_case(FP_FAULT_ABORT_UNACCEPTED_A, 1'b1, 1, 4'd3, 0, 0);

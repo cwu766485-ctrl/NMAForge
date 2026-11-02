@@ -69,6 +69,7 @@
                 bins abort_wait_a = {FP_FAULT_ABORT_WAIT_A};
                 bins watchdog = {FP_FAULT_WATCHDOG};
                 bins write_protection = {FP_FAULT_WRITE_PROTECTION};
+                bins write_protection_abort_same_cycle = {FP_FAULT_WRITE_PROTECTION_ABORT};
                 bins abort_calc = {FP_FAULT_ABORT_CALC};
                 bins reset_read_a = {FP_FAULT_RESET_READ_A};
                 bins reset_wait_a = {FP_FAULT_RESET_WAIT_A};
