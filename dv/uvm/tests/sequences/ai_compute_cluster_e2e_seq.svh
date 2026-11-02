@@ -2846,6 +2846,13 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             axil_write(REG_CPLQ_HEAD, 32'd1);
             wait_cpl_tail(32'd0);
             wait_spad_idle();
+            // The host readback path is subject to the same protection
+            // regions, so retire the test-only permission map before checking
+            // completion words and preserved destination sentinels.
+            axil_write(REG_REGION0_PERM, 32'd0);
+            axil_write(REG_REGION1_PERM, 32'd0);
+            axil_write(REG_REGION2_PERM, 32'd0);
+            axil_write(REG_REGION3_PERM, 32'd0);
             expected_error = ((engine == 5) || (engine == 6)) ?
                              32'h0000_0072 : 32'h0000_0062;
             expect_spad(cpl_addr + 32'h30, {16'd0, task_id[15:0]},
