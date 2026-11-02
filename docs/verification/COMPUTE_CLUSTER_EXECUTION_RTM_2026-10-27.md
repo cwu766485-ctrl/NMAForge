@@ -912,3 +912,12 @@ The exploratory test change was reverted after the reachability check. It is not
 | `REQ-CL-019` | `PARTIAL` | `TC-CL-R178-FP-PARITY-ABORT-SAME-CYCLE`; sampled-response-edge checker and independent FP result/completion scoreboard | BF16 and FP16 each sample an accepted parity-error response with Abort on the same edge; scoreboard requires `ERR_PARITY=5`, two accepted reads drained, and zero writes. Three seeds pass 216/216 bit-exact transactions; merged FP fault coverage is 26/26 variables and 52/52 format×fault bins. This is FP-core scoped evidence, not integrated seven-engine completion/owner closure. | `R178-FP-PARITY-ABORT-CLEAN-3S-20261102`; `20261025/20261026/20261027` | [R178 report](COMPUTE_CLUSTER_FP_PRIORITY_R178_2026-11-02.md); `/tmp/nmaforge_r178_fp_parity_abort_3seed_clean/seed_*/run.log`; archive SHA-256 `e42bcb511f58c77c2a2ad8439589e59f3b5a527d1b28e09eb5beefcfcb49ef88` |
 
 R178 adds one legal simultaneous-priority point only. R177's accepted-read Protection+Abort candidate remains pending reachability review; neither changes the 38-row disposition (24 `PASS-SCOPED` / 14 `PARTIAL`) or **HOLD** status.
+
+
+## R179 Mixed FP Abort/Watchdog same-cycle priority — 2026-11-02
+
+| Requirement | Disposition | Test ID / checker | Coverage / observed result | Run ID / seeds | Evidence path |
+|---|---|---|---|---|---|
+| `REQ-CL-019` | `PARTIAL` | `TC-CL-R179-FP-ABORT-WATCHDOG-SAME-CYCLE`; watchdog-threshold/Abort sampled-edge checker and independent FP error/completion scoreboard | BF16 and FP16 each sample Abort with `cycle_count >= watchdog_limit` while busy and before any SPAD transfer; scoreboard requires `ERR_ABORT=3`, zero reads and writes. Three seeds pass 218/218 bit-exact transactions; merged FP fault coverage is 27/27 mode variables and 54/54 format×fault bins. This is focused FP-core evidence only. | `R179-FP-ABORT-WATCHDOG-CLEAN-3S-20261102`; `20261025/20261026/20261027` | [R179 report](COMPUTE_CLUSTER_FP_PRIORITY_R179_2026-11-02.md); `/tmp/nmaforge_r179_fp_abort_watchdog_3seed_final/seed_*/run.log`; archive SHA-256 `27ba15375c0dce884bfaa56da698abea3ea810accb4e1c33b916bb7e8b9caad7` |
+
+R179 adds one legal control-priority point only. The 38-row disposition remains 24 `PASS-SCOPED` / 14 `PARTIAL`, and `CL-DV-v1.0` remains **HOLD**.
