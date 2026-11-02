@@ -1,5 +1,7 @@
 # Compute Cluster Open-Issue List — 2026-11-02
 
+**R213 exact-source descriptor-validator replay:** Current published executable inputs pass all 27 opcode classifications, 21 invalid rules, 38 accepted and 26 rejected validator-boundary vectors. This does not establish engine-legal maximum dimensions, per-opcode stride/alias rules, or address-overflow behavior; `OPEN-CL-002` and `REQ-CL-002/015/020` remain open/partial. [R213 report](COMPUTE_CLUSTER_DESCRIPTOR_VALIDATOR_R213_2026-11-02.md); compile/run SHA-256 `7417d20f434f5d1409074e1f1585285c77a290a22bcc848c11c40155a8b1217f` / `52cea68cc0b2c9e8d74393d292a5d33731208f766c67e229aac4520e039746f7`.
+
 **R212 targeted real RTL mutation campaign:** VCS `V-2023.12-SP1_Full64` compiles seven temporary mutants and the production UVM checker catches Address, Data, Response Owner, Matrix WSTRB, Completion Error, Missing Done, and Duplicate Done (7/7, seed `20261025`). This adds actual RTL mutation evidence to the previous passive checker-sensitivity runs. It is not exhaustive mutation closure; remaining legal Engine × Fault × Phase × Reset/backpressure and partial requirement clauses stay open. Overall remains 24 `PASS-SCOPED` / 14 `PARTIAL`, **HOLD**. [R212 report](COMPUTE_CLUSTER_DUT_MUTATION_R212_2026-11-02.md); evidence archive SHA-256 `7b594830689596be85e49f4cfc8e83261c5be11f5bf7f69700d68cb0d36eea9e`.
 
 
