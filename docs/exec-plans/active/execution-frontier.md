@@ -6,7 +6,7 @@ benchmark work is tracked in the execution RTM and open-issue report.
 
 ## Latest Compute Cluster evidence
 
-R204 is the latest clean-candidate replay: documentation candidate `bce4f81ef37158cf80e46f5804256c8e7531a9d9`, tree `a60e7523a11795cceddb83ccce71828f204e6ff3`, with RTL/UVM content `f87acc9bca3b3ecece385fadfd5623de6837ea8d`. Three real-top UVM seeds, Top Smoke, 20-case seeded Top, 16-seed mixed E2E/AXI coverage and 7/7 real RTL mutations pass. The merged run reaches all 21 declared functional groups at 100%; raw RTL/test coverage remains below 100% and the RTM is still 24 PASS-SCOPED / 14 PARTIAL.
+R206 is the latest exact-candidate clean replay: documentation/evidence candidate `0b6332a60d63c78c4145ed40e5e5efc275c491d3`, tree `bde94d427d993302376c69eb81e168cf5c938cce`; RTL/UVM/Top Smoke source files still match `f87acc9bca3b3ecece385fadfd5623de6837ea8d`. Three real-top UVM seeds, Top Smoke, 20-case seeded Top, 16-seed mixed E2E/AXI coverage and 7/7 real RTL mutations pass. The merged run reaches all 21 declared functional groups at 100%; raw RTL/test coverage remains below 100% and the RTM is still 24 PASS-SCOPED / 14 PARTIAL. `CL-DV-v1.0` remains HOLD.
 
 R205 runs the Matrix eight-way depth/prefetch/A-tile-cache comparison on the same clean candidate for three seeds: 120/120 shape/configuration/seed Golden points pass with identical cycle counts. D4/P1/C1 reduces the five-shape cycle sum 24.88% and bank reads 25% on the two multi-A-tile shapes. The same R204 UVM logs reproduce real-top Serial, Staged, Parallel and Reset-Recovery cycles across all three seeds. Both reports identify the one-cycle behavioral SPAD boundary and do not claim ASIC PPA or TinyNPU speedup.
 
