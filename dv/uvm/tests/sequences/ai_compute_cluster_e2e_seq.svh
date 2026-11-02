@@ -12,6 +12,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] REG_CPLQ_HEAD = 32'h0000_00cc;
     localparam bit [31:0] REG_DOORBELL = 32'h0000_00a0;
     localparam bit [31:0] REG_ABORT = 32'h0000_00a4;
+    localparam bit [31:0] REG_WATCHDOG = 32'h0000_00a8;
     localparam bit [31:0] REG_DMA_CTRL = 32'h0000_00b0;
     localparam bit [31:0] REG_DMA_STATUS = 32'h0000_00b4;
     localparam bit [31:0] REG_DMA_EXT = 32'h0000_00b8;
@@ -81,6 +82,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] MATRIX_FAULT_B_LOCAL = 32'h0004_f100;
     localparam bit [31:0] CLUSTER_PROT_CMDQ = 32'h0000_6000;
     localparam bit [31:0] CLUSTER_PROT_CPLQ = 32'h0000_7000;
+    localparam bit [31:0] CLUSTER_WATCHDOG_CMDQ = 32'h0000_7400;
+    localparam bit [31:0] CLUSTER_WATCHDOG_CPLQ = 32'h0000_7500;
+    localparam bit [31:0] CLUSTER_WATCHDOG_Y_LOCAL = 32'h0007_c000;
     localparam bit [31:0] C1_CNM_A_LOCAL = 32'h0006_0000;
     localparam bit [31:0] C1_CNM_B_LOCAL = 32'h0006_1000;
     localparam bit [31:0] C1_CNM_Y_LOCAL = 32'h0006_7000;
@@ -132,6 +136,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned conv_reset_prefix_phase;
     int unsigned scalar_reset_prefix_phase;
     int unsigned fp_reset_single_write_phase;
+    int unsigned engine_watchdog_cov_idx;
     int unsigned matrix_protection_reset_phase;
     int unsigned matrix_protection_cnm_reset_phase;
     int unsigned engine_protection_reset_engine;
@@ -224,6 +229,19 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             bins release_quiet_window = {4};
             bins old_completion_suppressed_and_result_preserved = {5};
             bins new_epoch_recovery = {6};
+        }
+    endgroup
+
+    covergroup engine_watchdog_cg;
+        option.per_instance = 1;
+        cp_engine_watchdog: coverpoint engine_watchdog_cov_idx {
+            bins scalar_int8 = {0};
+            bins fp = {1};
+            bins cnm = {2};
+            bins matrix = {3};
+            bins sfu = {4};
+            bins conv = {5};
+            bins kv = {6};
         }
     endgroup
 
@@ -343,6 +361,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         conv_reset_prefix_phase = 0;
         scalar_reset_prefix_phase = 0;
         fp_reset_single_write_phase = 0;
+        engine_watchdog_cov_idx = 0;
         engine_pair_overlap_cov_idx = 0;
         matrix_protection_reset_phase = 0;
         matrix_protection_cnm_reset_phase = 0;
@@ -358,6 +377,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         conv_reset_prefix_cg = new();
         scalar_reset_prefix_cg = new();
         fp_reset_single_write_cg = new();
+        engine_watchdog_cg = new();
         cmdq_invalid_descriptor_cg = new();
         engine_pair_overlap_cg = new();
         matrix_protection_reset_cg = new();
@@ -2683,6 +2703,190 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_HEAD, 32'd1);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+    // Drive the software watchdog through the real CMDQ/engine/completion
+    // path for every production engine. The work sizes are deliberately long
+    // enough that the watchdog expires while the selected engine is busy;
+    // every destination word is guarded so a premature result write is seen.
+    task automatic run_real_engine_watchdog_sweep(input int unsigned seed);
+        bit [31:0] desc_addr;
+        bit [31:0] cpl_addr;
+        bit [31:0] src0;
+        bit [31:0] src1;
+        bit [31:0] dst;
+        bit [31:0] output_base;
+        bit [31:0] task_id;
+        bit [31:0] value;
+        bit [31:0] expected_sentinel;
+        int unsigned output_words;
+        int unsigned engine;
+        int unsigned word_idx;
+        int unsigned poll;
+        bit busy_seen;
+        bit error_seen;
+        bit monitor_done;
+        bit [6:0] engines_seen;
+
+        desc_addr = CLUSTER_WATCHDOG_CMDQ;
+        cpl_addr = CLUSTER_WATCHDOG_CPLQ;
+        engines_seen = '0;
+
+        for (engine = 0; engine < 7; engine++) begin
+            src0 = 32'd0;
+            src1 = 32'd0;
+            dst = CLUSTER_WATCHDOG_Y_LOCAL;
+            output_base = dst;
+            output_words = 1;
+            task_id = 32'h0d70 + engine;
+
+            case (engine)
+                0: begin
+                    src0 = C1_SCALAR_A_LOCAL;
+                    src1 = C1_SCALAR_B_LOCAL;
+                    write_cluster_desc(desc_addr, 8'h10, task_id[15:0],
+                                       src0, src1, dst, 16'd0, 16'd0,
+                                       16'd128, 32'd0, 32'd0, 32'd0,
+                                       32'd0, 8'd3);
+                end
+                1: begin
+                    src0 = C1_FP_A_LOCAL;
+                    src1 = C1_FP_B_LOCAL;
+                    write_cluster_desc(desc_addr, 8'h50, task_id[15:0],
+                                       src0, src1, dst, 16'd1, 16'd1,
+                                       16'd128, 32'd0, 32'd0, 32'd0,
+                                       32'd0, 8'd7);
+                end
+                2: begin
+                    src0 = C1_CNM_A_LOCAL;
+                    src1 = C1_CNM_B_LOCAL;
+                    write_cnm_v3_desc(desc_addr, task_id[15:0], src0,
+                                      src1, dst);
+                    // Match the exercised 16x1, K=64 CNM GEMV descriptor.
+                    spad_write(desc_addr + 32'h14, {16'd1, 16'd16});
+                    spad_write(desc_addr + 32'h18, 32'd64);
+                end
+                3: begin
+                    src0 = MATRIX_A_LOCAL;
+                    src1 = MATRIX_B_LOCAL;
+                    output_words = 512;
+                    write_v3_desc(desc_addr, 8'h30, task_id[15:0],
+                                  src0, src1, dst, 16'd16, 16'd32,
+                                  16'd16);
+                end
+                4: begin
+                    src0 = C1_SFU_A_LOCAL;
+                    output_words = 128;
+                    write_v3_desc(desc_addr, 8'h35, task_id[15:0],
+                                  src0, 32'd0, dst, 16'd0, 16'd0,
+                                  16'd128);
+                end
+                5: begin
+                    src0 = C1_CONV_A_LOCAL;
+                    src1 = C1_CONV_W_LOCAL;
+                    output_words = 196;
+                    write_cluster_desc(desc_addr, 8'h16, task_id[15:0],
+                                       src0, src1, dst, 16'd16, 16'd16,
+                                       16'd9, 32'd0, 32'd0, 32'd0,
+                                       32'd0, 8'd5);
+                end
+                default: begin
+                    src0 = C1_KV_VECTOR_LOCAL;
+                    dst = C1_KV_CACHE_LOCAL;
+                    output_base = dst + 32'h50;
+                    output_words = 128;
+                    write_cluster_desc(desc_addr, 8'h43, task_id[15:0],
+                                       src0, 32'd0, dst, 16'd0, 16'd0,
+                                       16'd128, {16'd1, 16'd1},
+                                       32'd16, 32'd64, 32'd0, 8'd5);
+                end
+            endcase
+
+            for (word_idx = 0; word_idx < output_words; word_idx++) begin
+                expected_sentinel = 32'hd07c_0000 | (engine << 12) | word_idx;
+                spad_write(output_base + (word_idx << 2), expected_sentinel);
+            end
+
+            axil_write(REG_REGION0_PERM, 32'd0);
+            axil_write(REG_REGION1_PERM, 32'd0);
+            axil_write(REG_REGION2_PERM, 32'd0);
+            axil_write(REG_REGION3_PERM, 32'd0);
+            axil_write(REG_WATCHDOG, 32'd1);
+            axil_write(REG_CMDQ_CTRL, 32'd0);
+            axil_write(REG_CMDQ_BASE, desc_addr);
+            axil_write(REG_CMDQ_SIZE, 32'd4);
+            axil_write(REG_CMDQ_HEAD, 32'd0);
+            axil_write(REG_CMDQ_TAIL, 32'd1);
+            axil_write(REG_CPLQ_BASE, cpl_addr);
+            axil_write(REG_CPLQ_SIZE, 32'd4);
+            axil_write(REG_CPLQ_HEAD, 32'd0);
+            axil_write(REG_CPLQ_TAIL, 32'd0);
+
+            busy_seen = 1'b0;
+            error_seen = 1'b0;
+            monitor_done = 1'b0;
+            `uvm_info("CLUSTER_ENGINE_WATCHDOG_CASE_START", $sformatf(
+                "engine=%0d task=0x%04h watchdog_limit=1 descriptor=0x%08h completion=0x%08h",
+                engine, task_id[15:0], desc_addr, cpl_addr), UVM_LOW)
+            fork
+                begin : watchdog_completion_waiter
+                    axil_write(REG_DOORBELL, 32'd1);
+                    wait_cpl_tail(32'd1);
+                    monitor_done = 1'b1;
+                end
+                begin : watchdog_engine_monitor
+                    for (poll = 0; poll < 50000 && !monitor_done; poll++) begin
+                        @(negedge compute_vif.aclk);
+                        if (compute_vif.engine_busy[engine])
+                            busy_seen = 1'b1;
+                        if (compute_vif.engine_error[engine])
+                            error_seen = 1'b1;
+                        // The completion checker below proves that a real
+                        // engine error reached the architectural queue.
+                    end
+                end
+            join
+
+            if (!busy_seen || !error_seen)
+                `uvm_fatal("CLUSTER_ENGINE_WATCHDOG", $sformatf(
+                    "engine %0d did not show busy and real error during watchdog termination: busy=%0b error=%0b",
+                    engine, busy_seen, error_seen))
+            wait_spad_idle();
+            axil_write(REG_WATCHDOG, 32'd0);
+            expect_spad(cpl_addr, {16'd0, task_id[15:0]},
+                        $sformatf("watchdog engine%0d task ID", engine));
+            expect_spad(cpl_addr + 32'h04, 32'h0000_0042,
+                        $sformatf("watchdog engine%0d ERR_WATCHDOG completion", engine));
+            for (word_idx = 0; word_idx < output_words; word_idx++) begin
+                expected_sentinel = 32'hd07c_0000 | (engine << 12) | word_idx;
+                expect_spad(output_base + (word_idx << 2), expected_sentinel,
+                            $sformatf("watchdog engine%0d no-writeback[%0d]", engine, word_idx));
+            end
+            #100;
+            axil_read(REG_CPLQ_TAIL, value);
+            if (value !== 32'd1)
+                `uvm_fatal("CLUSTER_ENGINE_WATCHDOG", $sformatf(
+                    "engine %0d watchdog completion retired more than once: CPLQ_TAIL=%0d",
+                    engine, value))
+
+            engines_seen[engine] = 1'b1;
+            engine_watchdog_cov_idx = engine;
+            engine_watchdog_cg.sample();
+            `uvm_info("CLUSTER_ENGINE_WATCHDOG_CASE_PASS", $sformatf(
+                "engine=%0d task=0x%04h busy=1 error=1 completion=ERR_WATCHDOG output_words=%0d unchanged=1 seed=%0d",
+                engine, task_id[15:0], output_words, seed), UVM_LOW)
+            axil_write(REG_CPLQ_HEAD, 32'd1);
+            axil_write(REG_CMDQ_SIZE, 32'd0);
+            axil_write(REG_CPLQ_SIZE, 32'd0);
+        end
+
+        if (engines_seen !== 7'h7f || engine_watchdog_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_ENGINE_WATCHDOG_COVERAGE", $sformatf(
+                "real-engine watchdog bins incomplete: seen=%07b coverage=%0.1f%% expected=7/7 and 100.0%%",
+                engines_seen, engine_watchdog_cg.get_coverage()))
+        `uvm_info("CLUSTER_ENGINE_WATCHDOG_PASS", $sformatf(
+            "real CMDQ watchdog: engines=7/7 busy=7/7 error=7/7 ERR_WATCHDOG completions=7/7 no-writeback=7/7 focused bins=7/7 coverage=100.0%% seed=%0d",
+            seed), UVM_LOW)
     endtask
 
     task automatic run_engine_protection_full_cplq_cross(input int unsigned seed);
@@ -9770,6 +9974,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_matrix_protection_reset_epoch_case(seed);
         run_matrix_protection_cnm_pending_reset_case(seed);
         run_engine_protection_reset_sweep(seed);
+        run_real_engine_watchdog_sweep(seed);
 
         `uvm_info("COMPUTE_CLUSTER_REAL_UVM_PASS", $sformatf(
             "standalone Matrix16x32x64 Golden + 16 A-tile reuse hits; parallel Matrix/CNM GEMV with separate response tags and four-bank Golden + next-K prefetch + queued SFU tasks + concurrent abort/reset/recovery seed=%0d; prefetch_overlap=%0d matrix_cnm_overlap=%0d matrix_rsp=%0d cnm_rsp=%0d cnm_lanes=%b overlap=%0d arbiter_contention=%0d banked_grants=%0d cnm_grants=%0d core_grants=%0d",

@@ -327,10 +327,12 @@ module ai_int8_compute_core(
             else if (busy)
                 cycle_count <= cycle_count + 32'd1;
 
-            if (busy && abort) begin
+            // Let ST_ERROR execute its one-cycle done/error retirement even
+            // when abort remains asserted or the watchdog stays expired.
+            if (busy && abort && (state_r != ST_ERROR)) begin
                 error_code <= ERR_ABORT;
                 state_r    <= ST_ERROR;
-            end else if (watchdog_expired) begin
+            end else if (watchdog_expired && (state_r != ST_ERROR)) begin
                 error_code <= ERR_WATCHDOG;
                 state_r    <= ST_ERROR;
             end else begin
