@@ -263,3 +263,9 @@ in the owning report; run `git diff --check` before handoff.
 - The three-seed UVM compile queued for `VCS-BASE-COMPILE/VCSCompiler_Net`; VCS and a local reachability check could not reach the configured license service. No sim image or test seed ran. Result is `BLOCKED_ENV`; Top Smoke, seeded Top, and combined coverage merge remain NOT_RUN at this exact HEAD.
 - Prior PASS evidence stays tied to its exact tested code/test SHA. RTM remains 24 PASS-SCOPED / 14 PARTIAL; CL-DV-v1.0 remains **HOLD**.
 - Evidence: [R199 report](../../verification/COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R199_2026-11-02.md); archive SHA-256 `d9459a09a06ad173323a04f65c494ef7b79f9e334e240cd83ac5a67cafe99376`.
+
+## 2026-11-02 update — R200 Execution RTM integrity checker
+
+- Added `tools/verify_compute_cluster_rtm.py` to check expected IDs, duplicate/missing rows, disposition labels, six-column formatting, and required Test/Checker, Coverage, Run/Seed, and Evidence fields.
+- `python3 tools/verify_compute_cluster_rtm.py` passes 28/28 `REQ-CL` plus 10/10 `REQ-PC` rows; disposition counts are 24 PASS-SCOPED / 14 PARTIAL. The check does not verify historical artifact contents or promote sign-off.
+- Evidence: [R200 report](../../verification/COMPUTE_CLUSTER_RTM_INTEGRITY_R200_2026-11-02.md). Exact published-HEAD VCS replay remains `BLOCKED_ENV` under R199.
