@@ -214,6 +214,34 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         }
     endgroup
 
+    int unsigned engine_pair_overlap_cov_idx;
+    covergroup engine_pair_overlap_cg;
+        option.per_instance = 1;
+        cp_engine_pair_overlap: coverpoint engine_pair_overlap_cov_idx {
+            bins int8_matrix = {0};
+            bins int8_cnm = {1};
+            bins int8_bf16 = {2};
+            bins int8_sfu = {3};
+            bins int8_conv = {4};
+            bins int8_kv = {5};
+            bins matrix_cnm = {6};
+            bins matrix_bf16 = {7};
+            bins matrix_sfu = {8};
+            bins matrix_conv = {9};
+            bins matrix_kv = {10};
+            bins cnm_bf16 = {11};
+            bins cnm_sfu = {12};
+            bins cnm_conv = {13};
+            bins cnm_kv = {14};
+            bins bf16_sfu = {15};
+            bins bf16_conv = {16};
+            bins bf16_kv = {17};
+            bins sfu_conv = {18};
+            bins sfu_kv = {19};
+            bins conv_kv = {20};
+        }
+    endgroup
+
     covergroup matrix_protection_reset_cg;
         option.per_instance = 1;
         cp_matrix_protection_reset_phase: coverpoint matrix_protection_reset_phase {
@@ -286,6 +314,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         sfu_reset_prefix_phase = 0;
         conv_reset_prefix_phase = 0;
         scalar_reset_prefix_phase = 0;
+        engine_pair_overlap_cov_idx = 0;
         matrix_protection_reset_phase = 0;
         matrix_protection_cnm_reset_phase = 0;
         engine_protection_reset_engine = 0;
@@ -299,6 +328,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         sfu_reset_prefix_cg = new();
         conv_reset_prefix_cg = new();
         scalar_reset_prefix_cg = new();
+        engine_pair_overlap_cg = new();
         matrix_protection_reset_cg = new();
         matrix_protection_cnm_reset_cg = new();
         engine_protection_reset_cg = new();
@@ -7919,6 +7949,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned pair_i;
         int unsigned pair_j;
         int unsigned pair_index;
+        int unsigned engine_pair_overlap_bins_hit;
         int unsigned pair_poll;
         int unsigned max_active_engines;
         int unsigned c1_k;
@@ -8730,6 +8761,19 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_fatal("CLUSTER_ENGINE_PAIR_CROSS", $sformatf(
                 "real-engine overlap incomplete: pair mask=%06h expected=1fffff max_active=%0d",
                 engine_pair_overlap_seen, max_active_engines))
+        engine_pair_overlap_bins_hit = 0;
+        for (pair_index = 0; pair_index < 21; pair_index++) begin
+            if (engine_pair_overlap_seen[pair_index]) begin
+                engine_pair_overlap_cov_idx = pair_index;
+                engine_pair_overlap_cg.sample();
+                engine_pair_overlap_bins_hit++;
+            end
+        end
+        if (engine_pair_overlap_bins_hit != 21 ||
+            engine_pair_overlap_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_ENGINE_PAIR_COVERAGE", $sformatf(
+                "real engine-pair coverage bins=%0d/21 coverage=%0.1f%% expected=100.0%%",
+                engine_pair_overlap_bins_hit, engine_pair_overlap_cg.get_coverage()))
         wait_spad_idle();
 
         for (word_idx = 0; word_idx < 512; word_idx++)
@@ -8778,6 +8822,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                   engine_pair_overlap_seen, max_active_engines,
                   compute_vif.engine_backpressure_cycles,
                   compute_vif.engine_backpressure_seen), UVM_LOW)
+        `uvm_info("CLUSTER_ALL_ENGINE_PAIR_COVERAGE_PASS", $sformatf(
+            "pair bins=%0d/21 coverage=%0.1f%% sampled only from observed overlap mask=%06h",
+            engine_pair_overlap_bins_hit, engine_pair_overlap_cg.get_coverage(),
+            engine_pair_overlap_seen), UVM_LOW)
         axil_read(REG_CMDQ_HEAD, value);
         if (value !== 32'd7)
             `uvm_fatal("CLUSTER_ENGINE_COVERAGE", $sformatf("C1 CMDQ_HEAD expected=7 actual=%0d", value))
