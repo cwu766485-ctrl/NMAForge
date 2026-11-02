@@ -31,7 +31,8 @@
             req.expected_read_count = expected_reads;
             req.expected_write_count = expected_writes;
             req.watchdog_limit = ((mode == FP_FAULT_WATCHDOG) ||
-                                  (mode == FP_FAULT_ABORT_WATCHDOG)) ? 1 : 256;
+                                  (mode == FP_FAULT_ABORT_WATCHDOG)) ? 1 :
+                                 ((mode == FP_FAULT_READ_PARITY_WATCHDOG) ? 2 : 256);
             req.response_jitter_max = 0;
             req.response_latency_override_cycles =
                 (mode == FP_FAULT_READ_B_PARITY) ? 4 : 0;
@@ -404,6 +405,10 @@
             // the same edge; the frozen priority requires ERR_PARITY.
             send_fault_case(FP_FAULT_READ_PARITY_ABORT, 1'b0, 1, 4'd5, 2, 0);
             send_fault_case(FP_FAULT_READ_PARITY_ABORT, 1'b1, 1, 4'd5, 2, 0);
+            // Align the first parity response with watchdog expiry; Parity
+            // remains the first reported cause over Watchdog.
+            send_fault_case(FP_FAULT_READ_PARITY_WATCHDOG, 1'b0, 1, 4'd5, 2, 0);
+            send_fault_case(FP_FAULT_READ_PARITY_WATCHDOG, 1'b1, 1, 4'd5, 2, 0);
             // Use a longer command so the next pair's A read can be accepted
             // after A0 returns but before the B0 parity response. B0's longer
             // response latency exercises the two-outstanding boundary at the

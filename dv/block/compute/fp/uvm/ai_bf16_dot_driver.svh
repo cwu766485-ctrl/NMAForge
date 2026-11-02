@@ -134,17 +134,18 @@
                 if ((rsp_count != 0) && (bfm_cycle >= rsp_due[rsp_head])) begin
                     vif.spad_rsp_valid = 1'b1;
                     vif.spad_rdata = rsp_data[rsp_head];
-                        if (((((req.fault_mode == FP_FAULT_READ_PARITY) ||
-                               (req.fault_mode == FP_FAULT_READ_PARITY_ABORT)) &&
-                              (responses_delivered == 0)) ||
-                             ((req.fault_mode == FP_FAULT_READ_B_PARITY) &&
-                              (responses_delivered == 1)) ||
-                             ((req.fault_mode == FP_FAULT_READ_PARITY_LATE) &&
-                              (responses_delivered == 2))) &&
-                            !parity_injected) begin
-                            vif.spad_parity_error = 1'b1;
-                            parity_injected = 1;
-                        end
+                    if (!parity_injected &&
+                        ((((req.fault_mode == FP_FAULT_READ_PARITY) ||
+                           (req.fault_mode == FP_FAULT_READ_PARITY_ABORT) ||
+                           (req.fault_mode == FP_FAULT_READ_PARITY_WATCHDOG)) &&
+                          (responses_delivered == 0)) ||
+                         ((req.fault_mode == FP_FAULT_READ_B_PARITY) &&
+                          (responses_delivered == 1)) ||
+                         ((req.fault_mode == FP_FAULT_READ_PARITY_LATE) &&
+                          (responses_delivered == 2)))) begin
+                        vif.spad_parity_error = 1'b1;
+                        parity_injected = 1;
+                    end
                     if ((req.fault_mode == FP_FAULT_READ_PARITY_ABORT) &&
                         (responses_delivered == 0) && !abort_injected) begin
                         vif.abort = 1'b1;
@@ -180,6 +181,7 @@
                             stall_left = 0;
                         if ((req.fault_mode == FP_FAULT_READ_PARITY) ||
                             (req.fault_mode == FP_FAULT_READ_PARITY_ABORT) ||
+                            (req.fault_mode == FP_FAULT_READ_PARITY_WATCHDOG) ||
                             (req.fault_mode == FP_FAULT_READ_B_PARITY) ||
                             (req.fault_mode == FP_FAULT_READ_PARITY_LATE) ||
                             (req.fault_mode == FP_FAULT_READ_PROTECTION))
@@ -277,6 +279,21 @@
                         "sampled Abort with expired watchdog at cycle %0d tx%0d",
                         vif.cycle_count, req.transaction_id), UVM_LOW)
                 end
+                if ((req.fault_mode == FP_FAULT_READ_PARITY_WATCHDOG) &&
+                    (responses_delivered == 0) && vif.spad_rsp_valid) begin
+                    if (!vif.busy || (vif.cycle_count < req.watchdog_limit) ||
+                        !vif.spad_parity_error || vif.abort ||
+                        (vif.spad_valid && vif.spad_ready))
+                        `uvm_fatal("FP_SAME_CYCLE_PRIORITY", $sformatf(
+                            "Parity/watchdog edge invalid: busy=%0b cycle=%0d limit=%0d parity=%0b abort=%0b valid=%0b ready=%0b",
+                            vif.busy, vif.cycle_count, req.watchdog_limit,
+                            vif.spad_parity_error, vif.abort,
+                            vif.spad_valid, vif.spad_ready))
+                    same_cycle_priority_sampled = 1;
+                    `uvm_info("FP_SAME_CYCLE_PRIORITY_SAMPLE", $sformatf(
+                        "sampled Parity response with expired watchdog at cycle %0d tx%0d",
+                        vif.cycle_count, req.transaction_id), UVM_LOW)
+                end
                 if ((req.fault_mode == FP_FAULT_READ_PARITY_ABORT) &&
                     (responses_delivered == 0) && vif.spad_rsp_valid) begin
                     if (!vif.abort || !vif.spad_parity_error)
@@ -331,10 +348,14 @@
                 if (vif.done === 1'b1)
                     break;
             end
-            if ((req.fault_mode == FP_FAULT_WRITE_PROTECTION_ABORT) &&
+            if (((req.fault_mode == FP_FAULT_WRITE_PROTECTION_ABORT) ||
+                 (req.fault_mode == FP_FAULT_ABORT_WATCHDOG) ||
+                 (req.fault_mode == FP_FAULT_READ_PARITY_ABORT) ||
+                 (req.fault_mode == FP_FAULT_READ_PARITY_WATCHDOG)) &&
                 !same_cycle_priority_sampled)
                 `uvm_fatal("FP_SAME_CYCLE_PRIORITY",
-                    "Directed simultaneous Protection/Abort result edge was not sampled")
+                    $sformatf("Directed simultaneous-priority edge was not sampled for fault mode %0d",
+                              req.fault_mode))
             @(negedge vif.clk);
             vif.spad_ready = 1'b0;
             vif.spad_rsp_valid = 1'b0;

@@ -60,6 +60,7 @@
                 bins misaligned_dst = {FP_FAULT_CONFIG_DST_ALIGN};
                 bins read_a_parity = {FP_FAULT_READ_PARITY};
                 bins read_parity_abort_same_cycle = {FP_FAULT_READ_PARITY_ABORT};
+                bins read_parity_watchdog_same_cycle = {FP_FAULT_READ_PARITY_WATCHDOG};
                 bins read_b_parity = {FP_FAULT_READ_B_PARITY};
                 bins late_word_parity = {FP_FAULT_READ_PARITY_LATE};
                 bins read_protection = {FP_FAULT_READ_PROTECTION};
