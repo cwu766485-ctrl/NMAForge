@@ -50,4 +50,4 @@ descriptor-validator-regress:
 		-o $(DESCRIPTOR_VALIDATOR_OUT)/simv \
 		-l $(DESCRIPTOR_VALIDATOR_OUT)/compile.log
 	$(DESCRIPTOR_VALIDATOR_OUT)/simv -l $(DESCRIPTOR_VALIDATOR_OUT)/run.log
-	@grep -q '^DESCRIPTOR_VALIDATOR_PASS legal_opcodes=27 tile_pack=1 invalid_rules=21 opcode_classes_consistent=1$$' $(DESCRIPTOR_VALIDATOR_OUT)/run.log
+	@grep -q '^DESCRIPTOR_VALIDATOR_PASS legal_opcodes=27 tile_pack=1 invalid_rules=21 boundary_accept=38/38 boundary_reject=26/26 opcode_classes_consistent=1 engine_limit_claim=0$$' $(DESCRIPTOR_VALIDATOR_OUT)/run.log

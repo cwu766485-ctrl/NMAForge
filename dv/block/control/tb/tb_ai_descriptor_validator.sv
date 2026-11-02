@@ -20,6 +20,8 @@ module tb_ai_descriptor_validator;
 
     integer legal_opcode_checks;
     integer invalid_rule_checks;
+    integer boundary_accept_checks;
+    integer boundary_reject_checks;
     integer i;
     reg [7:0] supported_ops [0:26];
 
@@ -120,9 +122,31 @@ module tb_ai_descriptor_validator;
         end
     endtask
 
+    task automatic check_boundary_accept(input reg [255:0] label_text);
+        begin
+            #1;
+            if (!dimensions_valid || descriptor_invalid)
+                $fatal(1, "validator rejected documented dimension boundary: %0s op=0x%02h dims=%b invalid=%b",
+                       label_text, op, dimensions_valid, descriptor_invalid);
+            boundary_accept_checks = boundary_accept_checks + 1;
+        end
+    endtask
+
+    task automatic check_boundary_reject(input reg [255:0] label_text);
+        begin
+            #1;
+            if (dimensions_valid || !descriptor_invalid)
+                $fatal(1, "validator accepted dimension outside current rule: %0s op=0x%02h dims=%b invalid=%b",
+                       label_text, op, dimensions_valid, descriptor_invalid);
+            boundary_reject_checks = boundary_reject_checks + 1;
+        end
+    endtask
+
     initial begin
         legal_opcode_checks = 0;
         invalid_rule_checks = 0;
+        boundary_accept_checks = 0;
+        boundary_reject_checks = 0;
         supported_ops[0]=8'h10; supported_ops[1]=8'h11; supported_ops[2]=8'h12;
         supported_ops[3]=8'h13; supported_ops[4]=8'h14; supported_ops[5]=8'h15;
         supported_ops[6]=8'h16; supported_ops[7]=8'h17; supported_ops[8]=8'h20;
@@ -168,9 +192,86 @@ module tb_ai_descriptor_validator;
         set_legal_defaults(8'h50); src0_stride=32'd4; check_invalid("FP stride unsupported");
         set_legal_defaults(8'h51); flags=8'h02; check_invalid("FP transpose flags unsupported");
 
-        if (legal_opcode_checks != 28 || invalid_rule_checks != 21)
-            $fatal(1, "testpoint count mismatch legal=%0d invalid=%0d expected=28/21", legal_opcode_checks, invalid_rule_checks);
-        $display("DESCRIPTOR_VALIDATOR_PASS legal_opcodes=27 tile_pack=1 invalid_rules=21 opcode_classes_consistent=1");
+        // Characterize validator dimension edges. These are validator-only
+        // checks: accepting a 16-bit maximum does not claim that the selected
+        // engine, address range, or complete memory image supports that size.
+        set_legal_defaults(8'h10); length=16'd1; check_boundary_accept("VDOT minimum length 1");
+        set_legal_defaults(8'h10); length=16'hffff; check_boundary_accept("VDOT maximum encoded length");
+        set_legal_defaults(8'h11); m_size=16'd1; k_words=16'd1; check_boundary_accept("Scalar GEMV minimum M/K");
+        set_legal_defaults(8'h11); m_size=16'hffff; k_words=16'hffff; check_boundary_accept("Scalar GEMV maximum encoded M/K");
+        set_legal_defaults(8'h11); m_size=16'd0; check_boundary_reject("Scalar GEMV M below minimum");
+        set_legal_defaults(8'h11); k_words=16'd0; check_boundary_reject("Scalar GEMV K below minimum");
+
+        for (i=8'h12; i<=8'h15; i=i+1) begin
+            set_legal_defaults(i[7:0]); m_size=16'd1; n_size=16'd1; k_words=16'd1;
+            check_boundary_accept("Scalar GEMM minimum M/N/K");
+            set_legal_defaults(i[7:0]); m_size=16'hffff; n_size=16'hffff; k_words=16'hffff;
+            check_boundary_accept("Scalar GEMM maximum encoded M/N/K");
+        end
+        set_legal_defaults(8'h12); m_size=16'd0; check_boundary_reject("Scalar GEMM M below minimum");
+        set_legal_defaults(8'h12); n_size=16'd0; check_boundary_reject("Scalar GEMM N below minimum");
+        set_legal_defaults(8'h12); k_words=16'd0; check_boundary_reject("Scalar GEMM K below minimum");
+
+        set_legal_defaults(8'h20); length=16'd1; check_boundary_accept("CNM VDOT minimum length 1");
+        set_legal_defaults(8'h20); length=16'hffff; check_boundary_accept("CNM VDOT maximum encoded length");
+        set_legal_defaults(8'h21); m_size=16'd1; length=16'd1; check_boundary_accept("CNM GEMV minimum M/length");
+        set_legal_defaults(8'h21); m_size=16'hffff; length=16'hffff; check_boundary_accept("CNM GEMV maximum encoded M/length");
+        set_legal_defaults(8'h21); m_size=16'd0; check_boundary_reject("CNM GEMV M below minimum");
+        set_legal_defaults(8'h21); length=16'd0; check_boundary_reject("CNM GEMV length below minimum");
+
+        for (i=8'h30; i<=8'h31; i=i+1) begin
+            set_legal_defaults(i[7:0]); m_size=16'd4; n_size=16'd4; k_words=16'd1;
+            check_boundary_accept("Matrix minimum aligned M/N and K");
+            set_legal_defaults(i[7:0]); m_size=16'd65532; n_size=16'd65532; k_words=16'hffff;
+            check_boundary_accept("Matrix maximum encoded aligned M/N and K");
+            set_legal_defaults(i[7:0]); m_size=16'd3; check_boundary_reject("Matrix M below aligned minimum");
+            set_legal_defaults(i[7:0]); n_size=16'd3; check_boundary_reject("Matrix N below aligned minimum");
+            set_legal_defaults(i[7:0]); k_words=16'd0; check_boundary_reject("Matrix K below minimum");
+        end
+
+        set_legal_defaults(8'h32); length=16'd1; check_boundary_accept("SFU minimum length 1");
+        set_legal_defaults(8'h32); length=16'hffff; check_boundary_accept("SFU maximum encoded length");
+        set_legal_defaults(8'h35); length=16'd0; check_boundary_reject("SFU length below minimum");
+
+        set_legal_defaults(8'h16); m_size=16'd3; n_size=16'd3; check_boundary_accept("Conv minimum 3x3 window");
+        set_legal_defaults(8'h17); m_size=16'hffff; n_size=16'hffff; check_boundary_accept("Depthwise Conv maximum encoded shape");
+        set_legal_defaults(8'h16); m_size=16'd2; check_boundary_reject("Conv height below minimum");
+        set_legal_defaults(8'h17); n_size=16'd2; check_boundary_reject("Depthwise Conv width below minimum");
+
+        for (i=8'h43; i<=8'h44; i=i+1) begin
+            set_legal_defaults(i[7:0]); length=16'd1; check_boundary_accept("KV minimum length 1");
+            set_legal_defaults(i[7:0]); length=16'hffff; check_boundary_accept("KV maximum encoded length");
+            set_legal_defaults(i[7:0]); length=16'd0; check_boundary_reject("KV length below minimum");
+        end
+
+        for (i=8'h50; i<=8'h51; i=i+1) begin
+            set_legal_defaults(i[7:0]); length=16'd1; check_boundary_accept("FP dot minimum length 1");
+            set_legal_defaults(i[7:0]); length=16'hffff; check_boundary_accept("FP dot maximum encoded length");
+            set_legal_defaults(i[7:0]); m_size=16'd0; check_boundary_reject("FP dot M outside fixed one-element descriptor");
+        end
+
+        set_legal_defaults(8'h40); length=16'd3; check_boundary_accept("Macro exact child count");
+        set_legal_defaults(8'h40); length=16'd4; check_boundary_reject("Macro count above exact child count");
+        for (i=8'h41; i<=8'h42; i=i+1) begin
+            set_legal_defaults(i[7:0]); length=16'd3; check_boundary_accept("Macro minimum child count");
+            set_legal_defaults(i[7:0]); length=16'd256; check_boundary_accept("Macro maximum child count");
+            set_legal_defaults(i[7:0]); length=16'd2; check_boundary_reject("Macro child count below minimum");
+            set_legal_defaults(i[7:0]); length=16'd257; check_boundary_reject("Macro child count above maximum");
+        end
+
+        set_legal_defaults(8'h36); m_size=16'd16; n_size=16'd16; length=16'd256; flags=8'h30;
+        check_boundary_accept("Matrix A tile-pack aligned 16x16 exact length");
+        set_legal_defaults(8'h36); m_size=16'd16; n_size=16'd16; length=16'd255; flags=8'h30;
+        #1;
+        if (!descriptor_invalid)
+            $fatal(1, "Matrix A tile-pack accepted a non-matching M*N length");
+        boundary_reject_checks = boundary_reject_checks + 1;
+
+        if (legal_opcode_checks != 28 || invalid_rule_checks != 21 ||
+            boundary_accept_checks != 38 || boundary_reject_checks != 26)
+            $fatal(1, "testpoint count mismatch legal=%0d invalid=%0d boundary_accept=%0d boundary_reject=%0d expected=28/21/38/26",
+                   legal_opcode_checks, invalid_rule_checks, boundary_accept_checks, boundary_reject_checks);
+        $display("DESCRIPTOR_VALIDATOR_PASS legal_opcodes=27 tile_pack=1 invalid_rules=21 boundary_accept=38/38 boundary_reject=26/26 opcode_classes_consistent=1 engine_limit_claim=0");
         $finish;
     end
 endmodule
