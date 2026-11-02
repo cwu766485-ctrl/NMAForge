@@ -72,6 +72,9 @@
                      (accepted_reads == 1) && !abort_injected) ||
                     ((req.fault_mode == FP_FAULT_ABORT_CALC) &&
                      (responses_delivered == 2) && !abort_injected) ||
+                    ((req.fault_mode == FP_FAULT_ABORT_WATCHDOG) &&
+                     vif.busy && (vif.cycle_count >= req.watchdog_limit) &&
+                     !abort_injected) ||
                     ((req.fault_mode == FP_FAULT_READ_LATE_PROTECTION_ABORT) &&
                      (responses_delivered == 2) && (rsp_count != 0) &&
                      (bfm_cycle >= rsp_due[rsp_head]) && !abort_injected) ||
@@ -83,6 +86,11 @@
                      vif.spad_valid && !vif.spad_write && !abort_injected)) begin
                     vif.abort = 1'b1;
                     abort_injected = 1;
+                    if (req.fault_mode == FP_FAULT_ABORT_WATCHDOG)
+                        `uvm_info("FP_ABORT_WATCHDOG", $sformatf(
+                            "assert Abort at negedge busy=%0b cycle=%0d limit=%0d valid=%0b ready=%0b",
+                            vif.busy, vif.cycle_count, req.watchdog_limit,
+                            vif.spad_valid, vif.spad_ready), UVM_LOW)
                 end
 
                 reset_condition = 0;
@@ -163,6 +171,8 @@
                                      $urandom_range(1, 3);
                         if (req.fault_mode == FP_FAULT_WATCHDOG)
                             stall_left = 0;
+                        if (req.fault_mode == FP_FAULT_ABORT_WATCHDOG)
+                            stall_left = 4;
                         if (req.fault_mode == FP_FAULT_WRITE_PROTECTION_ABORT)
                             stall_left = 0;
                         if ((req.spad_write_stall_cycles != 0) &&
@@ -249,6 +259,24 @@
                 end
 
                 @(posedge vif.clk);
+                if ((req.fault_mode == FP_FAULT_ABORT_WATCHDOG) &&
+                    abort_injected && !same_cycle_priority_sampled) begin
+                    `uvm_info("FP_ABORT_WATCHDOG_SAMPLE", $sformatf(
+                        "sampled Abort/watchdog busy=%0b cycle=%0d limit=%0d abort=%0b valid=%0b ready=%0b",
+                        vif.busy, vif.cycle_count, req.watchdog_limit, vif.abort,
+                        vif.spad_valid, vif.spad_ready), UVM_LOW)
+                    if (!vif.abort || !vif.busy ||
+                        (vif.cycle_count < req.watchdog_limit) ||
+                        (vif.spad_valid && vif.spad_ready))
+                        `uvm_fatal("FP_SAME_CYCLE_PRIORITY", $sformatf(
+                            "Abort/watchdog edge invalid: busy=%0b cycle=%0d limit=%0d abort=%0b valid=%0b ready=%0b",
+                            vif.busy, vif.cycle_count, req.watchdog_limit, vif.abort,
+                            vif.spad_valid, vif.spad_ready))
+                    same_cycle_priority_sampled = 1;
+                    `uvm_info("FP_SAME_CYCLE_PRIORITY_SAMPLE", $sformatf(
+                        "sampled Abort with expired watchdog at cycle %0d tx%0d",
+                        vif.cycle_count, req.transaction_id), UVM_LOW)
+                end
                 if ((req.fault_mode == FP_FAULT_READ_PARITY_ABORT) &&
                     (responses_delivered == 0) && vif.spad_rsp_valid) begin
                     if (!vif.abort || !vif.spad_parity_error)

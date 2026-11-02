@@ -69,6 +69,7 @@
                 bins late_read_protection_abort = {FP_FAULT_READ_LATE_PROTECTION_ABORT};
                 bins abort_wait_a = {FP_FAULT_ABORT_WAIT_A};
                 bins watchdog = {FP_FAULT_WATCHDOG};
+                bins abort_watchdog_same_cycle = {FP_FAULT_ABORT_WATCHDOG};
                 bins write_protection = {FP_FAULT_WRITE_PROTECTION};
                 bins write_protection_abort_same_cycle = {FP_FAULT_WRITE_PROTECTION_ABORT};
                 bins abort_calc = {FP_FAULT_ABORT_CALC};

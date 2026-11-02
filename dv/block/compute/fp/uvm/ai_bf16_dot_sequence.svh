@@ -30,7 +30,8 @@
             req.expected_error_code = expected_error_code;
             req.expected_read_count = expected_reads;
             req.expected_write_count = expected_writes;
-            req.watchdog_limit = (mode == FP_FAULT_WATCHDOG) ? 1 : 256;
+            req.watchdog_limit = ((mode == FP_FAULT_WATCHDOG) ||
+                                  (mode == FP_FAULT_ABORT_WATCHDOG)) ? 1 : 256;
             req.response_jitter_max = 0;
             req.response_latency_override_cycles =
                 (mode == FP_FAULT_READ_B_PARITY) ? 4 : 0;
@@ -450,6 +451,10 @@
             send_fault_case(FP_FAULT_CONFIG, 1'b1, 0, 4'd1, 0, 0);
             send_fault_case(FP_FAULT_WATCHDOG, 1'b0, 1, 4'd4, 1, 0);
             send_fault_case(FP_FAULT_WATCHDOG, 1'b1, 1, 4'd4, 1, 0);
+            // Abort sampled on the watchdog-expiry edge has the higher
+            // Mixed FP priority; stall the request so no SPAD read is accepted.
+            send_fault_case(FP_FAULT_ABORT_WATCHDOG, 1'b0, 1, 4'd3, 0, 0);
+            send_fault_case(FP_FAULT_ABORT_WATCHDOG, 1'b1, 1, 4'd3, 0, 0);
             // Exercise WATCHDOG -> CONFIG on the next accepted start.
             send_fault_case(FP_FAULT_CONFIG, 1'b0, 0, 4'd1, 0, 0);
             send_fault_case(FP_FAULT_ABORT_CALC, 1'b1, 1, 4'd3, 2, 0);
