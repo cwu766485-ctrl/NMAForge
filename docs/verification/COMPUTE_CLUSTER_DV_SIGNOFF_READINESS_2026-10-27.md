@@ -1,10 +1,15 @@
+Warning: truncated output (original token count: 20097)
+Total output lines: 310
+
 # Compute Cluster DV Sign-off Readiness — 2026-10-30
 
-## Review decision (updated 2026-11-02)
+## Review decision (updated 2026-11-03)
 
 **2026-11-03 R215 exact published-head replay:** Published clean SHA `eb27e716fc40c6e526e479e2472837b165675a97` passes 3-seed real-top Compute Cluster UVM, 16-seed mixed E2E, Matrix enabled and prefetch-disabled profiles, all five selected `ai_accel_memory_fabric` reset/owner/contention targets, 7/7 real RTL mutations, Matrix FSM formal and Top Smoke. Combined URG has 25/25 declared functional groups at 100%; raw line/condition/FSM/branch coverage is 73.95/69.39/46.69/64.95%. Assertions are 20/22 with real successes, two UVM RAL internal no-attempts, zero failure/incomplete; covers 3/3. This verifies the exact published candidate and declared testpoints only. It closes no remaining RTM row: 24 `PASS-SCOPED` / 14 `PARTIAL`, **HOLD**. See [R215 report](COMPUTE_CLUSTER_PUBLISHED_CLEAN_REPLAY_R215_2026-11-03.md), archive SHA-256 `bb1922cd9b6f66d258dd4bbf4db8690294b15fbed4aecd9aa9b411c5e70f874c`.
 
 **2026-11-03 R216 seven-engine Abort × full-CPLQ testpoint:** Fixed SHA `09f9d31209fdcc803ec322cf3822bd51e763665a` passes three clean UVM seeds and Top Smoke. All seven real engines hold `ERR_ABORT` behind a full ring, release in order with one tail wrap, and show zero output writes after Abort sampling; focused coverage is 7/7 and each scoreboard checks 72,512 words with zero data/owner mismatch. This is an exact named-scope result, not closure of the broad fault/phase/reset/backpressure cross. `REQ-CL-017/027` remain PARTIAL and the overall disposition stays 24 PASS-SCOPED / 14 PARTIAL, **HOLD**. See [R216 report](COMPUTE_CLUSTER_ABORT_CPLQ_R216_2026-11-03.md).
+
+**2026-11-03 R217 exact-candidate real RTL Mutation:** At published code/test SHA `09f9d31209fdcc803ec322cf3822bd51e763665a` (tree `9778101254417c7272c37d8177e319e70849c8b4`), VCS `V-2023.12-SP1_Full64` catches 7/7 temporary RTL mutants at seed `20261025`: Address, Data, Response Owner, Matrix WSTRB, Completion Error, Missing Done, and Duplicate Done. Each defect reaches its assigned production checker. This supplements `REQ-CL-010/011/013/027` and `REQ-PC-006/007` checker-sensitivity evidence; it does not exercise broad legal fault/phase/reset/backpressure crosses or promote any status. The RTM remains 24 `PASS-SCOPED` / 14 `PARTIAL`, **HOLD**. See [R217 report](COMPUTE_CLUSTER_DUT_MUTATION_R217_2026-11-03.md); logs-only archive SHA-256 `aa905e9e582c5431ce3d207c53299856cc6fa3a88e3db51b7bb9069949755e85`.
 
 **2026-11-02 R214 parity × full-CPLQ cross:** On fixed test SHA `8316555c110416c613c1d7c08c5910039ffbfb3f`, VCS three-seed real-top UVM passes the legal parity-response/full-completion-queue point across all seven engines. Focused bins are 7/7; error completion hold/release, owner/error code, tail wrap, no-writeback and exactly-once checks pass. The whole-run URG score is 76.57%, not global closure. This adds scoped evidence to five RTM rows but closes none of them; 24 `PASS-SCOPED` / 14 `PARTIAL`, **HOLD** remain. [R214 report](COMPUTE_CLUSTER_PARITY_CPLQ_R214_2026-11-02.md); evidence archive SHA-256 `268a5e49be7dc1ad357a02597c50bbcd324a2ca185834262947647827625efcb`.
 
@@ -104,9 +109,7 @@ The controlling detailed record is the [Execution RTM](COMPUTE_CLUSTER_EXECUTION
 
 R40's current-candidate clean UVM compile uses VCS/URG `V-2023.12-SP1_Full64`, with no `Warning-`, `Error-` or `[TFIPC]` diagnostics; `engine_busy`/`engine_done` SVA ports are connected. Each of six seeds has UVM warning/error/fatal `0/0/0`, 5,094 accepted writes, 5,368 compared words, zero memory mismatch/unknown/stale/orphan responses, and 100% applicable focused testpoint coverage (URG 29/29 variables). The completion read-response bin is explicitly excluded as N/A and checked to remain zero. A separate top-smoke compile has one retained `[LOOP-REROLL-ENABLED]` workload-fixture warning; it is not an SVA disconnect.
 
-## Assertion non-vacuity review
-
-URG for the three-seed top UVM reports 22 assertion properties: 17 successes, 5 uncovered, no failures, and no incomplete attempts. All 14 compute-activity properties (two each for Scalar, CNM, Matrix, SFU, Conv, KV, and FP) have substantial real attempts and successes. The exact-candidate 16-seed mixed-precision DDR E2E run (R15) reports 20 successes, 2 without attempts, and zero failures/incomplete:
+## Assertion non…97 tokens truncated…ts, and zero failures/incomplete:
 
 R32's merged URG keeps the same bounded disposition: 17/22 properties have
 real successes and zero fail/incomplete; the five uncovered include three AXI
