@@ -110,7 +110,7 @@ remaining C1 closure
 | REQ-CL-012 | Result MUX归属 | done拍比对result/error/code/counters；`tc_cl_result_owner` | engine monitor + done-owner scoreboard | `engine × result_class × error` | P0 READY |
 | REQ-CL-013 | Exactly Once | 单启动唯一结束，不重复/漏 done；`tc_cl_completion_once` | start/done lifecycle ledger + watchdog bounded | `engine × completion_count` | P0 READY |
 | REQ-CL-014 | 被接受请求/进展 | stall时无假accept；公平响应下有进展；`tc_cl_progress_backpressure` | request ledger + bounded SVA with fairness | `engine × stall_bin × progress` | P0 READY |
-| REQ-CL-015 | 正常执行完整性 | 每Opcode数值正确、合法写回、唯一done；`tc_cl_normal_all_ops` | per-op Oracle + memory result checker | `opcode × shape × numeric_class` | P0 READY |
+| REQ-CL-015 | 正常执行完整性 | 每Opcode数值正确、合法写回、唯一done；`tc_cl_normal_all_ops`；R256 real-CMDQ FP16 `0x51` exact Golden | per-op Oracle + memory result checker；FP16 输出/完成/launch snapshot；`two_term_exact_six` | `opcode × shape × numeric_class`；R256 focused bin 3/3 | P0 PARTIAL；仍需扩展其余 opcode/shape/numeric class |
 | REQ-CL-016 | 跨Engine切换 | FP→Matrix→CNM→SFU等连续任务防迟到污染；`tc_cl_engine_switch` | owner tracker + stale-response checker | `prev_engine × next_engine × spacing` | P0 READY |
 | REQ-CL-017 | 错误后写入前缀 | Parity/Protection/Watchdog/Abort已接受写入正确；`tc_cl_error_prefix` | prefix-memory scoreboard + error model | `engine × fault × phase` | P0 PARTIAL；v1.4 已冻结错误/前缀 oracle，合法交叉覆盖未闭合 |
 | REQ-CL-018 | 复位隔离 | Reset后不泄漏Done/写；旧 R/B 响应正确丢弃；`tc_cl_reset_stale` | reset epoch ledger / post-reset memory monitor | `engine × reset_phase × pending_reads × pending_writes` | P0 PARTIAL；R32 在真实 top 对七引擎分别于 accepted SPAD read 后 reset，检查 busy、旧响应、completion 和目的图像；R27 验证 behavioral AXI R/B 协调复位；目标外部 fabric 与更广 fault/reset phase 仍 OPEN |
