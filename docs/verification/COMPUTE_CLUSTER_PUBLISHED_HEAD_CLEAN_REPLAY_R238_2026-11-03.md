@@ -32,6 +32,20 @@ The UVM-only three-seed URG report shows line/condition/FSM/branch/assert/group 
 
 The VCS UVM compile log has no `Warning-`, `Error-`, or `[TFIPC]` diagnostics. The Top Smoke fixture warning is recorded above rather than hidden.
 
+## Mixed-precision and AXI assertion closure
+
+To exercise the AXI assertions missing from the compute-only run, the current tree also passes the 16-seed mixed-precision DDR/AXI coverage regression from a clean detached worktree:
+
+```sh
+make -C dv/uvm/sim uvm_mixed_precision_ddr_e2e_cov_regress \
+  VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+  MIXED_E2E_COV_OUT=/tmp/nmaforge_r238_mixed_e2e_cov_20261103
+```
+
+All 16 seeds pass with UVM warning/error/fatal counts `0/0/0`. The target covers FP16/BF16 lengths K=1..4 and all 16 length pairs, six command-order/layout bins, four SPAD banks, six invalid-descriptor classes, and per-transaction AXI gaps. A combined URG merge of these 16 runs and the three Compute Cluster runs has 19 tests and all 28 declared functional covergroups at `100%`.
+
+Combined assertions have 20/22 real successes, zero failures/incomplete attempts, and two UVM RAL internal properties without attempts. All three AXI stall-to-accept cover properties match: AR/AW/W=`166/70/126`. The merged hierarchy line/condition/FSM/branch numbers are `73.95/69.39/47.24/64.95%`; they include UVM testbench hierarchy and are not DUT-only closure. No assertion was removed, weakened, or waived.
+
 ## Actual RTL mutation campaign
 
 The production RTL was not edited. The mutation runner generated isolated temporary RTL copies in `/tmp`, compiled each copy, and required the real production-top UVM checker to report the assigned failure. The run used a clean detached worktree at the same tree and seed `20261025`:
@@ -72,6 +86,12 @@ Mutation-only logs and text summary:
 - `/tmp/nmaforge_r238_dut_mutation_evidence_20261103.tar.gz`
 - Archive SHA-256: `f7bbcf015b7cfa69d6767c117ec28f2cf00b36246c6edc53b3a08f37e16c434e`
 - Manifest SHA-256: `cce98db8ce815b0663b684ccb210b72685cffc2ca6cb6539882d8182ed4bf883`
+
+Mixed-precision/AXI seed logs and combined URG text reports:
+
+- `/tmp/nmaforge_r238_mixed_e2e_evidence_20261103.tar.gz`
+- Archive SHA-256: `95f8f933b71c6b33690e11a056a5c7bebcb38748994e712748508f9166d83ee3`
+- Manifest SHA-256: `17238e553f918c284b0f5ca1be159d11a612302288822e04176f2b7408bb86db`
 
 ## Requirement and sign-off impact
 
