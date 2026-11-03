@@ -47,6 +47,33 @@ VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias VCS_ARCH_OVERRIDE=linux \
 
 The clean three-seed regression returns 0 and `COMPUTE_CLUSTER_REAL_UVM_REGRESS_PASS`. Each run log contains exactly eight `CLUSTER_REQUEST_STALL_INJECT_PASS` markers and its own `COMPUTE_CLUSTER_REAL_UVM_PASS`. Top Smoke returns 0 and prints `TEST PASS`; the existing fixture `LOOP-REROLL-ENABLED` warning remains.
 
+## Exact published-HEAD replay
+
+After the R270 evidence and audit indexes were published, the exact closeout HEAD was replayed from a detached clean worktree:
+
+- Published SHA/tree: `b50cffea5948f0efd925132d24a2eef2298aff49` / `6c36193bfe82cb6e1974249cd56943ce11a543b4`
+- Run ID: `CL-REQ006-SPAD-STALLED-REQUEST-R270-PUBLISHED-3S-20261104`
+- Worktree: `/tmp/nmaforge_r270_published_clean`
+- UVM output: `/tmp/nmaforge_r270_published_3seed`
+- Seeds: `20261025/26/27`; each has eight stall-recovery markers, UVM severity `0/0/0`, 77,501 Memory Scoreboard writes, 96,595 checked words, zero mismatch/unknown/stale, and owner ledger `6139 accepted / 6119 checked / 20 reset-dropped`, zero mismatch, pending=0
+- Top Smoke: `TEST PASS`; the known `LOOP-REROLL-ENABLED` fixture warning remains
+- Logs-only archive: `/tmp/nmaforge_r270_published_evidence.tar.gz`
+- Archive SHA-256: `d325028a6f32e50336227371d9b53d2bce0824bedcb38a4f80a8b7bf2e935f33`
+
+Commands:
+
+```bash
+VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias VCS_ARCH_OVERRIDE=linux \
+  make -C dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_r270_published_3seed \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027'
+
+VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias VCS_ARCH_OVERRIDE=linux \
+  make -C dv/subsystem/top_smoke/sim ai_smoke
+```
+
+This is the exact published commit at replay time. The following documentation-only report-index commit does not change RTL, DV sources, or the tested target.
+
 ## Limits and remaining work
 
 The stall is introduced in the testbench at the scheduler admission point. This verifies legal held-request behavior and recovery on the selected production-client paths. It does not qualify arbitrary external fabric reset/epoch semantics, memory response latency/error contracts, scheduler fairness under unconstrained contention, or the full engine × fault × phase × reset cross. Those gaps keep `REQ-CL-006`, `REQ-PC-006`, and `REQ-PC-007` open. The whole-Cluster RTM disposition and sign-off decision are unchanged.
