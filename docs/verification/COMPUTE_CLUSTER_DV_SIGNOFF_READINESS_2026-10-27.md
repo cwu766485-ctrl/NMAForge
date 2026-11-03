@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 20097)
-Total output lines: 310
-
 # Compute Cluster DV Sign-off Readiness — 2026-10-30
 
 ## Review decision (updated 2026-11-03)
@@ -109,7 +106,9 @@ The controlling detailed record is the [Execution RTM](COMPUTE_CLUSTER_EXECUTION
 
 R40's current-candidate clean UVM compile uses VCS/URG `V-2023.12-SP1_Full64`, with no `Warning-`, `Error-` or `[TFIPC]` diagnostics; `engine_busy`/`engine_done` SVA ports are connected. Each of six seeds has UVM warning/error/fatal `0/0/0`, 5,094 accepted writes, 5,368 compared words, zero memory mismatch/unknown/stale/orphan responses, and 100% applicable focused testpoint coverage (URG 29/29 variables). The completion read-response bin is explicitly excluded as N/A and checked to remain zero. A separate top-smoke compile has one retained `[LOOP-REROLL-ENABLED]` workload-fixture warning; it is not an SVA disconnect.
 
-## Assertion non…97 tokens truncated…ts, and zero failures/incomplete:
+## Assertion non-vacuity review
+
+URG for the three-seed top UVM reports 22 assertion properties: 17 successes, 5 uncovered, no failures, and no incomplete attempts. All 14 compute-activity properties (two each for Scalar, CNM, Matrix, SFU, Conv, KV, and FP) have substantial real attempts and successes. The exact-candidate 16-seed mixed-precision DDR E2E run (R15) reports 20 successes, 2 without attempts, and zero failures/incomplete:
 
 R32's merged URG keeps the same bounded disposition: 17/22 properties have
 real successes and zero fail/incomplete; the five uncovered include three AXI
