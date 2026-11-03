@@ -1192,3 +1192,12 @@ At the fixed product/source candidate `c5755985b0e5b1e1a850122ece983a37be112272`
 | `REQ-CL-027` | `PARTIAL` | Same test; completion cause checker | One completion carries `ERR_ABORT`; this is core-level and does not close the complete engine-to-CPLQ ABI mapping. | Same run / seeds | Same report/archive |
 
 The test is an incremental point only. No requirement disposition is promoted; current totals remain 24 `PASS-SCOPED` / 14 `PARTIAL`, and `CL-DV-v1.0` remains **HOLD**.
+## R237 Scalar INT8 Abort/Reset simultaneous-edge point — 2026-11-03
+
+| Requirement | Disposition | Test ID / Checker | Coverage / observed result | Run ID / seeds | Evidence path |
+|---|---|---|---|---|---|
+| `REQ-CL-013` | `PARTIAL` | `TC-CL-R237-SCALAR-ABORT-RESET`; old-task completion and post-reset Golden checker | Old task has no completion/writeback; fresh VDOT produces one Golden result `70`. Full-engine exact-once remains open. | `R237-SCALAR-ABORT-RESET-PRIORITY-CLEAN-3S-20261103`; `20261025/26/27` | [R237 report](COMPUTE_CLUSTER_SCALAR_ABORT_RESET_PRIORITY_R237_2026-11-03.md); clean-worktree archive SHA-256 `c538ac23e82dbdc3ccfd0578d1cd01101b86738303162cd4b8f832fd70851b88` |
+| `REQ-CL-017` | `PARTIAL` | Same test; Reset-over-Abort error/status checker and destination sentinel | Reset clears busy/done/error/code, suppresses old task, and keeps destination sentinel unchanged. Other engines and integrated error-owner paths remain open. | Same run / seeds | Same report/archive |
+| `REQ-CL-019` | `PARTIAL` | Same test; simultaneous input-edge checker, four-cycle release quiet checker, fresh-task recovery Golden | Reset+Abort same sampling edge passes, followed by four quiet cycles and a correct new VDOT. Pending-response and cross-engine reset cases remain open. | Same run / seeds | Same report/archive |
+
+This is a bounded core-level point, not full reset/fault closure; the 38-row status remains 24 `PASS-SCOPED` / 14 `PARTIAL`, **HOLD**.
