@@ -12,6 +12,10 @@ module tb_ai_cnn_kv_random_latency;
   reg [31:0] kv_src=32'h100, kv_dst=32'h500;
   reg [15:0] kv_length=1;
   reg [31:0] kv_stride_token=64, kv_stride_head=16, kv_aux=0;
+  reg kv_transition_probe=0, kv_probe_ready=1, kv_probe_rsp_hold=0;
+  reg [3:0] kv_residual_transition_seen=0;
+  localparam [2:0] KV_ST_IDLE=3'd0, KV_ST_READ_WAIT=3'd2,
+                   KV_ST_WRITE=3'd3, KV_ST_DONE=3'd4, KV_ST_ERROR=3'd5;
 
   wire cv,cw,cb,cdone,ce; wire [3:0] cec;
   wire [31:0] ca,cd,cr,ccyc,cel;
@@ -32,6 +36,7 @@ module tb_ai_cnn_kv_random_latency;
   reg [31:0] memory[0:131071];
   integer seed=20261021,initial_seed;
   integer write_count=0, accepted_read_count=0, response_count=0;
+  integer reset_dropped_read_count=0;
   integer ready_stall_cycles=0, max_response_delay=0;
   integer i,trial,idx,head,token,length,offset,timeout;
   integer out_count,out_row,out_col,kr,kc,source_index,weight_index,conv_dw_count=0;
@@ -81,11 +86,14 @@ module tb_ai_cnn_kv_random_latency;
       temp<=32'hd192_ed03;
     end else begin
       temp <= {temp[30:0],temp[31]^temp[21]^temp[1]^temp[0]};
-      spad_ready <= tinynpu_conv_bench ? 1'b1 : (temp[0] | temp[3]);
+      spad_ready <= kv_transition_probe ? kv_probe_ready :
+                    (tinynpu_conv_bench ? 1'b1 : (temp[0] | temp[3]));
       spad_rsp_valid <= 0;
       if (spad_valid && !spad_ready) ready_stall_cycles<=ready_stall_cycles+1;
       if (rsp_pending) begin
-        if (rsp_delay==0) begin
+        if (kv_transition_probe && kv_probe_rsp_hold) begin
+          spad_rsp_valid<=0;
+        end else if (rsp_delay==0) begin
           spad_rsp_valid<=1;
           spad_rdata<=rsp_pending_data;
           rsp_pending<=0;
@@ -94,7 +102,8 @@ module tb_ai_cnn_kv_random_latency;
       end else if (spad_valid && !spad_write && spad_ready) begin
         rsp_pending_data<=memory[spad_word_index(spad_addr)];
         rsp_pending<=1;
-        rsp_delay<=tinynpu_conv_bench ? 4'd0 : temp[6:4];
+        rsp_delay<=kv_transition_probe ? 4'd0 :
+                   (tinynpu_conv_bench ? 4'd0 : temp[6:4]);
         accepted_read_count<=accepted_read_count+1;
         if (temp[6:4]>max_response_delay) max_response_delay<=temp[6:4];
       end
@@ -266,6 +275,148 @@ module tb_ai_cnn_kv_random_latency;
                write_count,writes_before);
       @(negedge clk);kv_abort=0;kv_watchdog=0;spad_error=0;
       drain_spad_response();
+    end
+  endtask
+
+  task automatic run_kv_residual_fsm_transition_tests;
+    integer writes_before;
+    integer reads_before;
+    begin
+      // Deterministic service is used only to place legal lifecycle events at
+      // real protocol phases. No internal state is deposited or forced.
+      kv_transition_probe=1;
+      kv_probe_ready=1;
+      kv_probe_rsp_hold=0;
+      kv_op=8'h43;kv_length=1;kv_src=32'h0000_0100;kv_dst=32'h0000_0500;
+      kv_aux=0;kv_stride_token=0;kv_stride_head=0;
+      memory[spad_word_index(kv_src)]=32'hcafe_2210;
+      memory[spad_word_index(kv_dst)]=32'hface_2210;
+
+      // The final accepted write moves ST_WRITE -> ST_DONE. A watchdog limit
+      // equal to the resulting cycle_count expires on the following ST_DONE
+      // cycle, legally exercising the outer watchdog priority.
+      writes_before=write_count;
+      kv_watchdog=4;
+      @(negedge clk);kv_start=1;
+      @(negedge clk);kv_start=0;
+      timeout=0;
+      while(kv.state_r!==KV_ST_DONE && timeout<100) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(kv.state_r!==KV_ST_DONE || kvcyc!=kv_watchdog)
+        $fatal(1,"KV residual FSM watchdog cut did not reach ST_DONE at limit: state=%0d cycle=%0d limit=%0d",
+               kv.state_r,kvcyc,kv_watchdog);
+      @(posedge clk);#1ps;
+      if(kv.state_r!==KV_ST_ERROR || !kve || kvec!==4'd4)
+        $fatal(1,"KV ST_DONE->ST_ERROR watchdog transition failed: state=%0d error/code=%b/%0d",
+               kv.state_r,kve,kvec);
+      kv_residual_transition_seen[0]=1'b1;
+      timeout=0;
+      while(!kvdone && timeout<20) begin @(negedge clk);timeout=timeout+1;end
+      if(!kvdone || kvb || write_count!=writes_before+1 ||
+         memory[spad_word_index(kv_dst)]!==32'hcafe_2210)
+        $fatal(1,"KV ST_DONE watchdog retirement or accepted output prefix invalid: done=%b busy=%b writes=%0d/%0d data=%08x",
+               kvdone,kvb,write_count,writes_before,
+               memory[spad_word_index(kv_dst)]);
+      @(negedge clk);kv_watchdog=0;
+
+      // Hold a legal accepted read's response, then reset while the engine is
+      // genuinely in ST_READ_WAIT. Reset must flush both engine and responder.
+      memory[spad_word_index(kv_dst)]=32'hface_2211;
+      writes_before=write_count;reads_before=accepted_read_count;
+      kv_probe_ready=1;kv_probe_rsp_hold=1;kv_watchdog=0;
+      @(negedge clk);kv_start=1;
+      @(negedge clk);kv_start=0;
+      timeout=0;
+      while((kv.state_r!==KV_ST_READ_WAIT || !rsp_pending) && timeout<100) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(kv.state_r!==KV_ST_READ_WAIT || !rsp_pending ||
+         accepted_read_count!=reads_before+1)
+        $fatal(1,"KV reset-to-IDLE read cut was not a legal outstanding response: state=%0d pending=%b reads=%0d/%0d",
+               kv.state_r,rsp_pending,accepted_read_count,reads_before);
+      reset_dropped_read_count=reset_dropped_read_count+1;
+      resetn=0;#1ps;
+      if(kv.state_r!==KV_ST_IDLE || kvb || rsp_pending || write_count!=writes_before)
+        $fatal(1,"KV ST_READ_WAIT->ST_IDLE reset failed: state=%0d busy=%b pending=%b writes=%0d/%0d",
+               kv.state_r,kvb,rsp_pending,write_count,writes_before);
+      kv_residual_transition_seen[1]=1'b1;
+      repeat(3) @(negedge clk);
+      resetn=1;kv_probe_rsp_hold=0;
+      repeat(2) @(negedge clk);
+      if(spad_rsp_valid || rsp_pending)
+        $fatal(1,"KV read response from reset epoch escaped after release");
+
+      // Reach ST_WRITE with a backpressured write request, then assert legal
+      // Abort. The accepted-read has returned, but the write is not accepted.
+      memory[spad_word_index(kv_src)]=32'hcafe_2212;
+      memory[spad_word_index(kv_dst)]=32'hface_2212;
+      writes_before=write_count;
+      kv_probe_ready=1;kv_probe_rsp_hold=0;kv_watchdog=0;
+      @(negedge clk);kv_start=1;
+      @(negedge clk);kv_start=0;
+      timeout=0;
+      while(kv.state_r!==KV_ST_READ_WAIT && timeout<100) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(kv.state_r!==KV_ST_READ_WAIT || !rsp_pending)
+        $fatal(1,"KV Abort-to-error setup did not accept a read response");
+      kv_probe_ready=0;
+      timeout=0;
+      while(kv.state_r!==KV_ST_WRITE && timeout<100) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(kv.state_r!==KV_ST_WRITE || spad_ready || !kvw)
+        $fatal(1,"KV Abort-to-error setup did not hold an unaccepted ST_WRITE request");
+      kv_abort=1;
+      @(posedge clk);#1ps;
+      if(kv.state_r!==KV_ST_ERROR || !kve || kvec!==4'd3 ||
+         write_count!=writes_before)
+        $fatal(1,"KV ST_WRITE->ST_ERROR abort transition failed: state=%0d code=%0d writes=%0d/%0d",
+               kv.state_r,kvec,write_count,writes_before);
+      kv_residual_transition_seen[2]=1'b1;
+      timeout=0;
+      while(!kvdone && timeout<20) begin @(negedge clk);timeout=timeout+1;end
+      if(!kvdone || kvb || memory[spad_word_index(kv_dst)]!==32'hface_2212)
+        $fatal(1,"KV Abort transition did not retire without an output write");
+      @(negedge clk);kv_abort=0;kv_probe_ready=1;
+
+      // Repeat the legal accepted-read setup, consume the response, and reset
+      // in ST_WRITE while ready is low; the pending write must not commit.
+      memory[spad_word_index(kv_src)]=32'hcafe_2213;
+      memory[spad_word_index(kv_dst)]=32'hface_2213;
+      writes_before=write_count;reads_before=accepted_read_count;
+      @(negedge clk);kv_start=1;
+      @(negedge clk);kv_start=0;
+      timeout=0;
+      while(kv.state_r!==KV_ST_READ_WAIT && timeout<100) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(kv.state_r!==KV_ST_READ_WAIT || !rsp_pending)
+        $fatal(1,"KV reset-to-IDLE write cut did not reach a legal accepted-read phase");
+      kv_probe_ready=0;
+      timeout=0;
+      while(kv.state_r!==KV_ST_WRITE && timeout<100) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(kv.state_r!==KV_ST_WRITE || spad_ready || !kvw ||
+         accepted_read_count!=reads_before+1)
+        $fatal(1,"KV reset-to-IDLE write cut lacked a held, unaccepted write request");
+      resetn=0;#1ps;
+      if(kv.state_r!==KV_ST_IDLE || kvb || write_count!=writes_before ||
+         memory[spad_word_index(kv_dst)]!==32'hface_2213)
+        $fatal(1,"KV ST_WRITE->ST_IDLE reset failed: state=%0d busy=%b writes=%0d/%0d destination=%08x",
+               kv.state_r,kvb,write_count,writes_before,
+               memory[spad_word_index(kv_dst)]);
+      kv_residual_transition_seen[3]=1'b1;
+      repeat(3) @(negedge clk);
+      resetn=1;kv_probe_ready=1;kv_transition_probe=0;
+      repeat(2) @(negedge clk);
+      if(kv_residual_transition_seen!==4'b1111)
+        $fatal(1,"KV residual legal FSM transitions incomplete: seen=%04b",
+               kv_residual_transition_seen);
+      $display("KV_FSM_RESIDUAL_TRANSITIONS_PASS done_to_error=watchdog read_wait_to_idle=reset write_to_error=abort write_to_idle=reset bins=4/4 seed=%0d",
+               initial_seed);
     end
   endtask
 
@@ -628,17 +779,19 @@ module tb_ai_cnn_kv_random_latency;
     kv_dst=32'h0000_2000;kv_aux={16'd1,16'd0};kv_stride_head=32'd2;
     expect_kv_address_config_error(9); // unaligned head stride
     run_kv_last_spad_word_roundtrip();
+    run_kv_residual_fsm_transition_tests();
 
     run_late_kv_fault();
     check_reset_recovery();
 
-    if (accepted_read_count!=response_count || rsp_pending)
-      $fatal(1,"SPAD response accounting reads=%0d responses=%0d pending=%b",
-             accepted_read_count,response_count,rsp_pending);
+    if (accepted_read_count!=response_count+reset_dropped_read_count || rsp_pending)
+      $fatal(1,"SPAD response accounting reads=%0d responses=%0d reset_dropped=%0d pending=%b",
+             accepted_read_count,response_count,reset_dropped_read_count,rsp_pending);
     if (ready_stall_cycles==0 || max_response_delay==0)
       $fatal(1,"SPAD latency stress did not exercise ready or response stalls");
-    $display("CNN_KV_RANDOM_LATENCY_PASS conv_cases=25 conv_dw_cases=%0d kv_roundtrips=27 conv_faults=6 kv_faults=7 kv_address_config_cases=10 kv_last_spad_word=1 late_faults=2 reset_fault_combo=1 reset_recovery=1 seed=%0d reads=%0d responses=%0d max_rsp_delay=%0d ready_stalls=%0d",
-             conv_dw_count,initial_seed,accepted_read_count,response_count,max_response_delay,ready_stall_cycles);
+    $display("CNN_KV_RANDOM_LATENCY_PASS conv_cases=25 conv_dw_cases=%0d kv_roundtrips=27 conv_faults=6 kv_faults=7 kv_address_config_cases=10 kv_last_spad_word=1 late_faults=2 reset_fault_combo=1 reset_recovery=1 seed=%0d reads=%0d responses=%0d reset_dropped=%0d max_rsp_delay=%0d ready_stalls=%0d",
+             conv_dw_count,initial_seed,accepted_read_count,response_count,
+             reset_dropped_read_count,max_response_delay,ready_stall_cycles);
     $finish;
   end
 endmodule
