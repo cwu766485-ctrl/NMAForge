@@ -298,6 +298,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
     int unsigned engine_pair_overlap_cov_idx;
     int unsigned cmdq_invalid_descriptor_case;
+    int unsigned opcode_dispatch_case;
     int unsigned conv_descriptor_boundary_case;
     int unsigned depthwise_descriptor_boundary_case;
     int unsigned depthwise_channel_sequence_case;
@@ -314,6 +315,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             bins kv_zero_length = {5};
             bins mixed_fp_reserved_field = {6};
             bins macro_minimum_child_count = {7};
+        }
+    endgroup
+
+    covergroup opcode_dispatch_cg;
+        option.per_instance = 1;
+        cp_opcode_dispatch: coverpoint opcode_dispatch_case {
+            bins op_10 = {0}; bins op_11 = {1}; bins op_12 = {2}; bins op_13 = {3};
+            bins op_14 = {4}; bins op_15 = {5}; bins op_16 = {6}; bins op_17 = {7};
+            bins op_20 = {8}; bins op_21 = {9}; bins op_30 = {10}; bins op_31 = {11};
+            bins op_32 = {12}; bins op_33 = {13}; bins op_34 = {14}; bins op_35 = {15};
+            bins op_36 = {16}; bins op_37 = {17}; bins op_38 = {18}; bins op_39 = {19};
+            bins op_43 = {20}; bins op_44 = {21}; bins op_50 = {22}; bins op_51 = {23};
         }
     endgroup
 
@@ -447,6 +460,27 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         return int'(value) - 2;
     endfunction
 
+    // Independent REQ-CL-002 oracle from the frozen opcode-to-engine table.
+    // Engine indices match engine_busy[6:0]: Scalar, FP, CNM, Matrix, SFU,
+    // Conv, KV.
+    function automatic int expected_engine_for_dispatch_opcode(input bit [7:0] opcode);
+        if ((opcode >= 8'h10) && (opcode <= 8'h15))
+            return 0;
+        if ((opcode == 8'h50) || (opcode == 8'h51))
+            return 1;
+        if ((opcode == 8'h20) || (opcode == 8'h21))
+            return 2;
+        if ((opcode == 8'h30) || (opcode == 8'h31))
+            return 3;
+        if ((opcode >= 8'h32) && (opcode <= 8'h39))
+            return 4;
+        if ((opcode == 8'h16) || (opcode == 8'h17))
+            return 5;
+        if ((opcode == 8'h43) || (opcode == 8'h44))
+            return 6;
+        return -1;
+    endfunction
+
     function new(string name = "ai_compute_cluster_e2e_seq");
         super.new(name);
         shared_reset_coverage_phase = 0;
@@ -480,6 +514,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         engine_parity_cplq_cg = new();
         engine_abort_cplq_cg = new();
         cmdq_invalid_descriptor_cg = new();
+        opcode_dispatch_cg = new();
         conv_descriptor_boundary_cg = new();
         depthwise_descriptor_boundary_cg = new();
         depthwise_channel_sequence_cg = new();
@@ -4142,6 +4177,210 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_HEAD, completion_head);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+    task automatic run_opcode_dispatch_sweep(input int unsigned seed);
+        localparam int unsigned CASE_COUNT = 24;
+        localparam bit [31:0] DISPATCH_A = 32'h0007_1000;
+        localparam bit [31:0] DISPATCH_B = 32'h0007_2000;
+        localparam bit [31:0] DISPATCH_Y = 32'h0007_3000;
+        localparam bit [31:0] DISPATCH_KV = 32'h0007_6000;
+        bit [7:0] opcode[0:CASE_COUNT-1];
+        bit [31:0] src0, src1, dst, actual;
+        bit [6:0] expected_select;
+        bit [23:0] seen_mask;
+        bit [15:0] descriptor_m, descriptor_n, descriptor_length;
+        bit [7:0] descriptor_version;
+        int expected_engine;
+        int unsigned opcode_idx, word_idx, poll;
+        int unsigned launch_before, launch_seen;
+
+        opcode_idx = 0;
+        for (word_idx = 0; word_idx < 8; word_idx++)
+            opcode[opcode_idx++] = 8'h10 + word_idx[7:0];
+        opcode[opcode_idx++] = 8'h20;
+        opcode[opcode_idx++] = 8'h21;
+        opcode[opcode_idx++] = 8'h30;
+        opcode[opcode_idx++] = 8'h31;
+        for (word_idx = 0; word_idx < 8; word_idx++)
+            opcode[opcode_idx++] = 8'h32 + word_idx[7:0];
+        opcode[opcode_idx++] = 8'h43;
+        opcode[opcode_idx++] = 8'h44;
+        opcode[opcode_idx++] = 8'h50;
+        opcode[opcode_idx++] = 8'h51;
+        if (opcode_idx != CASE_COUNT)
+            `uvm_fatal("CLUSTER_OPCODE_DISPATCH", $sformatf(
+                "opcode list construction count=%0d expected=%0d", opcode_idx, CASE_COUNT))
+
+        // Seed valid, nonzero operands once. The dispatch checker below is
+        // deliberately separate from numerical Golden coverage.
+        // The mixed-precision dot path consumes its fixed vector span even
+        // when this dispatch-only descriptor uses the minimum legal length.
+        // Initialize the complete observed span so the global memory-image
+        // scoreboard never sees accepted reads from unknown bytes.
+        for (word_idx = 0; word_idx < 256; word_idx++) begin
+            spad_write(DISPATCH_A + (word_idx << 2),
+                       32'h0000_4000 + word_idx + (seed & 32'h0000_000f));
+            spad_write(DISPATCH_B + (word_idx << 2),
+                       32'h0000_2000 + (word_idx << 1) + (seed & 32'h0000_0007));
+        end
+        // One finite positive BF16/FP16 value in the low halfword.
+        spad_write(DISPATCH_A, 32'h0000_3f80);
+        spad_write(DISPATCH_B, 32'h0000_3f80);
+        seen_mask = '0;
+
+        for (opcode_idx = 0; opcode_idx < CASE_COUNT; opcode_idx++) begin
+            src0 = DISPATCH_A;
+            src1 = DISPATCH_B;
+            dst = DISPATCH_Y + (opcode_idx << 8);
+            descriptor_m = 16'd0;
+            descriptor_n = 16'd0;
+            descriptor_length = 16'd4;
+            descriptor_version = 8'd3;
+            case (opcode[opcode_idx])
+                8'h10: begin descriptor_length = 16'd1; end
+                8'h11: begin descriptor_m = 16'd2; descriptor_length = 16'd2; end
+                8'h12: begin descriptor_m = 16'd2; descriptor_n = 16'd2; descriptor_length = 16'd2; end
+                8'h13: begin descriptor_m = 16'd2; descriptor_n = 16'd2; descriptor_length = 16'd2; end
+                8'h14: begin descriptor_m = 16'd2; descriptor_n = 16'd2; descriptor_length = 16'd9; end
+                8'h15: begin descriptor_m = 16'd2; descriptor_n = 16'd2; descriptor_length = 16'd2; end
+                8'h16, 8'h17: begin
+                    descriptor_m = 16'd3; descriptor_n = 16'd3;
+                    descriptor_length = 16'd9; descriptor_version = 8'd5;
+                end
+                8'h20: begin
+                    descriptor_m = 16'd1; descriptor_n = 16'd1;
+                    descriptor_length = 16'd3;
+                end
+                8'h21: begin
+                    descriptor_m = 16'd16; descriptor_n = 16'd1;
+                    descriptor_length = 16'd4;
+                end
+                8'h30, 8'h31: begin
+                    descriptor_m = 16'd4; descriptor_n = 16'd4;
+                    descriptor_length = 16'd1;
+                end
+                8'h32, 8'h33, 8'h34, 8'h35,
+                8'h36, 8'h37, 8'h38, 8'h39: begin
+                    descriptor_length = 16'd4;
+                    if ((opcode[opcode_idx] == 8'h34) ||
+                        (opcode[opcode_idx] == 8'h38))
+                        src1 = DISPATCH_B;
+                end
+                8'h43, 8'h44: begin
+                    descriptor_length = 16'd4;
+                    descriptor_version = 8'd5;
+                    if (opcode[opcode_idx] == 8'h43)
+                        dst = DISPATCH_KV;
+                    else
+                        src0 = DISPATCH_KV;
+                end
+                8'h50, 8'h51: begin
+                    descriptor_m = 16'd1; descriptor_n = 16'd1;
+                    descriptor_length = 16'd1; descriptor_version = 8'd7;
+                end
+                default:
+                    `uvm_fatal("CLUSTER_OPCODE_DISPATCH", $sformatf(
+                        "unexpected opcode in frozen table: 0x%02h", opcode[opcode_idx]))
+            endcase
+
+            if ((opcode[opcode_idx] == 8'h20)) begin
+                write_cluster_desc(CLUSTER_CONTRACT_CMDQ, opcode[opcode_idx],
+                                   16'h0a00 + opcode_idx, src0, src1, dst,
+                                   descriptor_m, descriptor_n, descriptor_length,
+                                   32'd0, 32'd0, 32'd0, 32'd0, descriptor_version);
+            end else if (opcode[opcode_idx] == 8'h21) begin
+                write_cnm_v3_desc(CLUSTER_CONTRACT_CMDQ, 16'h0a00 + opcode_idx,
+                                  src0, src1, dst);
+                spad_write(CLUSTER_CONTRACT_CMDQ + 32'h18, {16'd0, descriptor_length});
+            end else if ((opcode[opcode_idx] == 8'h30) ||
+                         (opcode[opcode_idx] == 8'h31) ||
+                         ((opcode[opcode_idx] >= 8'h32) &&
+                          (opcode[opcode_idx] <= 8'h39))) begin
+                write_v3_desc(CLUSTER_CONTRACT_CMDQ, opcode[opcode_idx],
+                              16'h0a00 + opcode_idx, src0, src1, dst,
+                              descriptor_m, descriptor_n, descriptor_length);
+            end else begin
+                write_cluster_desc(CLUSTER_CONTRACT_CMDQ, opcode[opcode_idx],
+                                   16'h0a00 + opcode_idx, src0, src1, dst,
+                                   descriptor_m, descriptor_n, descriptor_length,
+                                   (opcode[opcode_idx] == 8'h39) ? 32'd1 :
+                                   ((opcode[opcode_idx] == 8'h43) ||
+                                    (opcode[opcode_idx] == 8'h44)) ? {16'd1,16'd1} : 32'd0,
+                                   ((opcode[opcode_idx] == 8'h43) ||
+                                    (opcode[opcode_idx] == 8'h44)) ? 32'd16 : 32'd0,
+                                   ((opcode[opcode_idx] == 8'h43) ||
+                                    (opcode[opcode_idx] == 8'h44)) ? 32'd64 : 32'd0,
+                                   32'd0, descriptor_version);
+            end
+
+            expected_engine = expected_engine_for_dispatch_opcode(opcode[opcode_idx]);
+            if (expected_engine < 0)
+                `uvm_fatal("CLUSTER_OPCODE_DISPATCH", $sformatf(
+                    "frozen opcode table has no engine for 0x%02h", opcode[opcode_idx]))
+            expected_select = 7'b0000001 << expected_engine;
+            launch_before = compute_vif.launch_sample_count;
+            launch_seen = 0;
+            configure_contract_queues(CLUSTER_CONTRACT_CPLQ, 32'd1);
+
+            fork
+                begin : opcode_dispatch_launch_monitor
+                    for (poll = 0; poll < 20000 && launch_seen == 0; poll++) begin
+                        @(posedge compute_vif.aclk);
+                        if (compute_vif.launch_valid) begin
+                            if (compute_vif.launch_op !== opcode[opcode_idx])
+                                `uvm_fatal("CLUSTER_OPCODE_DISPATCH", $sformatf(
+                                    "CMDQ launch opcode mismatch case=%0d expected=%02h actual=%02h",
+                                    opcode_idx, opcode[opcode_idx], compute_vif.launch_op))
+                            if (compute_vif.engine_start_select !== expected_select)
+                                `uvm_fatal("CLUSTER_OPCODE_DISPATCH", $sformatf(
+                                    "engine select mismatch opcode=%02h expected onehot=%07b actual=%07b",
+                                    opcode[opcode_idx], expected_select,
+                                    compute_vif.engine_start_select))
+                            launch_seen++;
+                            seen_mask[opcode_idx] = 1'b1;
+                            opcode_dispatch_case = opcode_idx;
+                            opcode_dispatch_cg.sample();
+                        end
+                    end
+                    if (launch_seen != 1)
+                        `uvm_fatal("CLUSTER_OPCODE_DISPATCH", $sformatf(
+                            "real CMDQ opcode 0x%02h launch timeout or duplicate, observed=%0d",
+                            opcode[opcode_idx], launch_seen))
+                end
+                begin : opcode_dispatch_submit
+                    axil_write(REG_DOORBELL, 32'd1);
+                    wait_cpl_tail(32'd1);
+                end
+            join
+            wait_spad_idle();
+
+            if ((compute_vif.launch_sample_count - launch_before) != 1)
+                `uvm_fatal("CLUSTER_OPCODE_DISPATCH", $sformatf(
+                    "opcode 0x%02h launch count delta=%0d expected=1",
+                    opcode[opcode_idx], compute_vif.launch_sample_count - launch_before))
+            expect_spad(CLUSTER_CONTRACT_CPLQ,
+                        {16'd0, (16'h0a00 + opcode_idx)},
+                        $sformatf("opcode 0x%02h successful completion owner", opcode[opcode_idx]));
+            expect_spad(CLUSTER_CONTRACT_CPLQ + 32'd4, 32'd1,
+                        $sformatf("opcode 0x%02h normal completion status", opcode[opcode_idx]));
+            if (compute_vif.engine_busy !== 7'd0)
+                `uvm_fatal("CLUSTER_OPCODE_DISPATCH", $sformatf(
+                    "opcode 0x%02h retired with active engine mask=%07b",
+                    opcode[opcode_idx], compute_vif.engine_busy))
+            axil_write(REG_CPLQ_HEAD, 32'd1);
+            axil_write(REG_CMDQ_SIZE, 32'd0);
+            axil_write(REG_CPLQ_SIZE, 32'd0);
+        end
+
+        if (seen_mask !== 24'hff_ffff || opcode_dispatch_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_OPCODE_DISPATCH", $sformatf(
+                "supported opcode dispatch coverage mask=%06h bins=%0.1f%% expected 24/24 and 100%%",
+                seen_mask, opcode_dispatch_cg.get_coverage()))
+        `uvm_info("CLUSTER_OPCODE_DISPATCH_PASS", $sformatf(
+            "real CMDQ/validator/dispatcher launched all 24 supported opcodes; independent checker matched exactly one actual core start per opcode; all 24 completed successfully; dispatch bins=24/24 coverage=%.1f%% seed=%0d",
+            opcode_dispatch_cg.get_coverage(), seed), UVM_LOW)
+        clear_contract_queues(32'd1);
     endtask
 
     task automatic run_cmdq_invalid_descriptor_matrix_test(input int unsigned seed);
@@ -12134,6 +12373,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_real_engine_watchdog_sweep(seed);
         run_engine_watchdog_full_cplq_cross(seed);
         run_engine_parity_full_cplq_cross(seed);
+        run_opcode_dispatch_sweep(seed);
 
         `uvm_info("COMPUTE_CLUSTER_REAL_UVM_PASS", $sformatf(
             "standalone Matrix16x32x64 Golden + 16 A-tile reuse hits; parallel Matrix/CNM GEMV with separate response tags and four-bank Golden + next-K prefetch + queued SFU tasks + concurrent abort/reset/recovery seed=%0d; prefetch_overlap=%0d matrix_cnm_overlap=%0d matrix_rsp=%0d cnm_rsp=%0d cnm_lanes=%b overlap=%0d arbiter_contention=%0d banked_grants=%0d cnm_grants=%0d core_grants=%0d",
