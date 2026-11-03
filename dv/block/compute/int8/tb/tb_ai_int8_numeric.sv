@@ -45,6 +45,7 @@ module tb_ai_int8_numeric;
     integer total_write_stalls = 0;
     integer total_read_stalls = 0;
     integer total_read_responses = 0;
+    integer total_read_accepts = 0;
     integer total_cases = 0;
     integer opcode_bins [0:2];
     integer shift_zero_bin = 0;
@@ -57,6 +58,7 @@ module tb_ai_int8_numeric;
     reg test_active = 1'b0;
 
     reg [31:0] lfsr = 32'h1;
+    reg deterministic_spad = 1'b0;
     reg read_pending = 1'b0;
     integer read_delay = 0;
     reg [31:0] read_pending_data = 0;
@@ -120,7 +122,7 @@ module tb_ai_int8_numeric;
         end else begin
             lfsr <= {lfsr[30:0], lfsr[31] ^ lfsr[21] ^ lfsr[1] ^ lfsr[0]};
             // Deterministic random ready with both accepted cycles and stalls.
-            spad_ready <= lfsr[0] | lfsr[3];
+            spad_ready <= deterministic_spad ? 1'b1 : (lfsr[0] | lfsr[3]);
         end
     end
 
@@ -174,8 +176,9 @@ module tb_ai_int8_numeric;
                         $fatal(1, "core issued a second read with a response outstanding");
                     if (spad_addr[1:0] != 2'b00)
                         $fatal(1, "unaligned SPAD read addr=%08x", spad_addr);
+                    total_read_accepts = total_read_accepts + 1;
                     read_pending <= 1'b1;
-                    read_delay <= 1 + lfsr[3:2];
+                    read_delay <= deterministic_spad ? 1 : (1 + lfsr[3:2]);
                     read_pending_data <= spad_mem[spad_addr[15:2]];
                 end
             end
@@ -239,6 +242,90 @@ module tb_ai_int8_numeric;
             repeat (2) @(negedge clk);
             resetn = 1'b1;
             @(negedge clk);
+        end
+    endtask
+
+    task automatic run_abort_watchdog_priority;
+        integer wait_cycles;
+        integer done_pulses;
+        integer responses_before;
+        integer reads_before;
+        begin
+            // Legal VDOT descriptor with deterministic one-cycle reads. Apply
+            // Abort at ST_CALC when both reads are retired and the watchdog
+            // reaches its threshold on that same sampling edge.
+            resetn = 1'b0;
+            start = 1'b0;
+            abort = 1'b0;
+            deterministic_spad = 1'b1;
+            op_mode = 8'h10;
+            src0_base = 32'h0000_0100;
+            src1_base = 32'h0000_0200;
+            dst_base = 32'h0000_0300;
+            length = 16'd1;
+            m_size = 16'd0;
+            n_size = 16'd0;
+            k_words = 16'd0;
+            bias_enable = 1'b0;
+            watchdog_limit = 32'd6;
+            spad_rsp_valid = 1'b0;
+            responses_before = total_read_responses;
+            reads_before = total_read_accepts;
+            repeat (3) @(negedge clk);
+            resetn = 1'b1;
+            @(negedge clk);
+            start = 1'b1;
+            @(negedge clk);
+            start = 1'b0;
+
+            wait_cycles = 0;
+            while ((!busy || cycle_count < watchdog_limit ||
+                    total_read_responses < responses_before + 2 ||
+                    spad_valid || read_pending) && wait_cycles < 16) begin
+                @(negedge clk);
+                wait_cycles = wait_cycles + 1;
+            end
+            if (!busy || cycle_count != watchdog_limit ||
+                total_read_responses != responses_before + 2 ||
+                total_read_accepts != reads_before + 2 ||
+                spad_valid || read_pending || element_count != 0 || done)
+                $fatal(1, "priority setup invalid busy=%b cycles=%0d reads=%0d/%0d responses=%0d/%0d valid=%b pending=%b elements=%0d done=%b",
+                       busy, cycle_count, total_read_accepts, reads_before + 2,
+                       total_read_responses, responses_before + 2, spad_valid,
+                       read_pending, element_count, done);
+            if (dut.watchdog_expired !== 1'b1)
+                $fatal(1, "watchdog was not expired at the sampled Abort edge cycles=%0d limit=%0d",
+                       cycle_count, watchdog_limit);
+
+            abort = 1'b1;
+            @(negedge clk);
+            if (done || error_code != 4'd3 || !busy)
+                $fatal(1, "Abort did not win simultaneous Abort/Watchdog edge: done=%b busy=%b code=%0d",
+                       done, busy, error_code);
+            @(negedge clk);
+            if (!done || !error || error_code != 4'd3 || busy || element_count != 0)
+                $fatal(1, "Abort priority retirement mismatch: done=%b error=%b busy=%b code=%0d elements=%0d",
+                       done, error, busy, error_code, element_count);
+
+            done_pulses = 1;
+            abort = 1'b0;
+            repeat (3) begin
+                @(negedge clk);
+                if (done) done_pulses = done_pulses + 1;
+            end
+            if (done_pulses != 1 || total_read_accepts != reads_before + 2 ||
+                total_read_responses != responses_before + 2)
+                $fatal(1, "Abort priority pulse/response mismatch done_pulses=%0d responses=%0d/%0d",
+                       done_pulses, total_read_responses, responses_before + 2);
+
+            resetn = 1'b0;
+            repeat (2) @(negedge clk);
+            deterministic_spad = 1'b0;
+            watchdog_limit = 32'd0;
+            resetn = 1'b1;
+            @(negedge clk);
+            $display("SCALAR_INT8_ABORT_WATCHDOG_PRIORITY_PASS legal_vdot=1 simultaneous=1 winner=ABORT accepted_reads=2 returned_reads=2 accepted_writes=0 completion_pulses=1 seed=%0d",
+                     seed);
         end
     endtask
 
@@ -314,6 +401,7 @@ module tb_ai_int8_numeric;
             @(negedge clk);
             run_one_case(case_id, case_name);
         end
+        run_abort_watchdog_priority();
         $fclose(vector_fd);
 
         if (opcode_bins[0] == 0 || opcode_bins[1] == 0 || opcode_bins[2] == 0 ||
