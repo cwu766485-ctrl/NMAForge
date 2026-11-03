@@ -10348,6 +10348,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 `uvm_fatal("CLUSTER_REQUEST_STABILITY", $sformatf(
                     "engine%0d stability checks lack a stall sample", e))
         for (e = 0; e < 7; e++)
+            if (compute_vif.engine_req_stall_seen[e] &&
+                compute_vif.engine_req_max_stall_cycles[e] == 0)
+                `uvm_fatal("CLUSTER_REQUEST_PROGRESS", $sformatf(
+                    "engine%0d has stalled samples but no measured wait run", e))
+        for (e = 0; e < 7; e++)
             if ((e == 2 && compute_vif.engine_req_stall_dir_seen[e] !== 2'b10) ||
                 (e != 2 && e != 3 && compute_vif.engine_req_stall_dir_seen[e] !== 2'b11))
                 `uvm_fatal("CLUSTER_REQUEST_STABILITY", $sformatf(
@@ -10376,6 +10381,16 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             compute_vif.matrix_line_stall_dir_seen,
             compute_vif.cnm_stall_checks[0], compute_vif.cnm_stall_checks[1],
             compute_vif.cnm_stall_checks[2], compute_vif.cnm_stall_checks[3]), UVM_LOW)
+        `uvm_info("CLUSTER_ENGINE_WAIT_OBSERVED_PASS", $sformatf(
+            "max consecutive engine-port wait cycles={%0d,%0d,%0d,%0d,%0d,%0d,%0d}; stalled mask=%07b; metric is observed traffic only, with no injected downstream SRAM stall",
+            compute_vif.engine_req_max_stall_cycles[0],
+            compute_vif.engine_req_max_stall_cycles[1],
+            compute_vif.engine_req_max_stall_cycles[2],
+            compute_vif.engine_req_max_stall_cycles[3],
+            compute_vif.engine_req_max_stall_cycles[4],
+            compute_vif.engine_req_max_stall_cycles[5],
+            compute_vif.engine_req_max_stall_cycles[6],
+            compute_vif.engine_req_stall_seen), UVM_LOW)
     endtask
 
     task automatic wait_matrix_sfu_overlap();

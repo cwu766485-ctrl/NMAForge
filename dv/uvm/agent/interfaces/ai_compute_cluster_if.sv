@@ -136,6 +136,8 @@ interface ai_compute_cluster_if(input logic aclk);
     logic [7:0] launch_snapshot_flags[0:6];
     integer unsigned engine_req_stall_checks[0:6];
     integer unsigned engine_req_stall_cycles[0:6];
+    integer unsigned engine_req_stall_run_cycles[0:6];
+    integer unsigned engine_req_max_stall_cycles[0:6];
     logic [1:0] engine_req_stall_dir_seen[0:6];
     logic [6:0] engine_req_stall_seen;
     integer unsigned engine_req_stability_violations;
@@ -193,6 +195,8 @@ interface ai_compute_cluster_if(input logic aclk);
         for (e = 0; e < 7; e++) begin
             engine_req_stall_checks[e] = 0;
             engine_req_stall_cycles[e] = 0;
+            engine_req_stall_run_cycles[e] = 0;
+            engine_req_max_stall_cycles[e] = 0;
             engine_req_stall_dir_seen[e] = '0;
             req_write_previous[e] = 1'b0;
             req_addr_previous[e] = '0;
@@ -228,6 +232,8 @@ interface ai_compute_cluster_if(input logic aclk);
         integer engine;
         if (!aresetn || dut_abort_active) begin
             req_stalled_previous = '0;
+            for (e = 0; e < 7; e++)
+                engine_req_stall_run_cycles[e] = 0;
             matrix_banked_stalled_previous = 1'b0;
             matrix_cnm_collision_stalled_previous = 1'b0;
             matrix_line_stalled_previous = 1'b0;
@@ -270,6 +276,9 @@ interface ai_compute_cluster_if(input logic aclk);
                 req_stalled_previous[e] = engine_req_valid[e] && !engine_req_ready[e];
                 if (req_stalled_previous[e]) begin
                     engine_req_stall_cycles[e] = engine_req_stall_cycles[e] + 1;
+                    engine_req_stall_run_cycles[e] = engine_req_stall_run_cycles[e] + 1;
+                    if (engine_req_stall_run_cycles[e] > engine_req_max_stall_cycles[e])
+                        engine_req_max_stall_cycles[e] = engine_req_stall_run_cycles[e];
                     engine_req_stall_seen[e] = 1'b1;
                     if (engine_req_write[e] === 1'b0)
                         engine_req_stall_dir_seen[e][0] = 1'b1;
@@ -280,7 +289,7 @@ interface ai_compute_cluster_if(input logic aclk);
                     req_write_previous[e] = engine_req_write[e];
                     req_addr_previous[e] = engine_req_addr[e*32 +: 32];
                     req_wdata_previous[e] = engine_req_wdata[e*32 +: 32];
-                end
+                end else engine_req_stall_run_cycles[e] = 0;
             end
 
             if (matrix_banked_stalled_previous) begin
