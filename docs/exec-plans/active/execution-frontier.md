@@ -6,6 +6,8 @@ benchmark work is tracked in the execution RTM and open-issue report.
 
 ## Latest Compute Cluster evidence
 
+R235 re-audits the exact R232 published-head UVM logs for the seven-engine writeback Protection × full-CPLQ × ordered-wrap point: 7/7 engines on all three seeds, correct error mapping and sentinels, and clean memory/owner scoreboards. This testpoint is now traced to the `c5755985` RTL/DV identity; the wider fault/phase/reset/backpressure matrix remains open. See the [R235 audit](../../verification/COMPUTE_CLUSTER_P0_PROTECTION_CPLQ_REPLAY_R235_2026-11-03.md).
+
 R234 reruns the Matrix depth/prefetch/A-Tile Cache ablation at the current `c5755985` executable RTL/DV identity: 120/120 Golden points across five shapes, eight configurations, and three seeds. D4/P1/C1 is 24.88% lower in measured cycles and 21.3% lower in read bytes than D2/P0/C0 under the one-cycle behavioral SPAD model. R232's real-top task cycles use the same RTL/DV source. Common-memory TinyNPU and PPA comparisons remain open; Phase A stays HOLD. See the [R234 benchmark](../../benchmark/COMPUTE_CLUSTER_CONFIG_AND_CONCURRENCY_BENCHMARK_R234_2026-11-03.md).
 
 R233 additionally passes all nine Control UVM tests, including frontdoor RAL read/write, with zero UVM severity. All seven Control AXI-Lite assertions have real successes; two UVM library `uvm_reg_map` properties remain no-attempts and are explicitly disclosed. This does not alter the Phase A HOLD.
