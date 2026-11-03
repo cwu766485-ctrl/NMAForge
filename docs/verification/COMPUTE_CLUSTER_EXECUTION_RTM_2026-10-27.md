@@ -1182,3 +1182,13 @@ The 38-row disposition remains 24 `PASS-SCOPED` / 14 `PARTIAL`; `CL-DV-v1.0` rem
 ## R231 descriptor-validator boundary replay — 2026-11-03
 
 At the fixed product/source candidate `c5755985b0e5b1e1a850122ece983a37be112272` (validator RTL, opcode decoder, testbench, and Makefile byte-identical), the VCS descriptor-validator target passes all 27 legal opcode-decode cases, 21 invalid-rule cases, 38/38 accepted and 26/26 rejected boundary vectors. `engine_limit_claim=0`: this is combinational validator evidence, not proof of engine-specific maximum dimensions, stride/alias, address-overflow, or descriptor-to-engine execution. `OPEN-CL-002` remains open; `REQ-CL-002/015/020` remain PARTIAL. No RTM row is promoted; 24 `PASS-SCOPED` / 14 `PARTIAL`, **HOLD**. See [R231 report](COMPUTE_CLUSTER_DESCRIPTOR_VALIDATOR_R231_2026-11-03.md); logs-only archive SHA-256 `5b1c8035aba6d2998bcdfe9ada62e92409cbbebc32b41f6eb3f39ed1b1c4516e`.
+
+## R236 Scalar INT8 Abort-over-Watchdog priority point — 2026-11-03
+
+| Requirement | Disposition | Test ID / Checker | Coverage / observed result | Run ID / seeds | Evidence path |
+|---|---|---|---|---|---|
+| `REQ-CL-013` | `PARTIAL` | `TC-CL-R236-SCALAR-ABORT-WATCHDOG`; done-pulse and output-write checker | One core completion pulse and zero accepted output writes in the simultaneous-fault test; full-engine exact-once coverage remains broader. | `R236-SCALAR-ABORT-WATCHDOG-PRIORITY-CLEAN-3S-20261103`; `20261025/26/27` | [R236 report](COMPUTE_CLUSTER_SCALAR_ABORT_WATCHDOG_PRIORITY_R236_2026-11-03.md); clean-worktree log archive SHA-256 `28ad641d08dd0490d38931c7dba4fc3d4e257ce9fb042a2d1622933fe13abcb9` |
+| `REQ-CL-017` | `PARTIAL` | Same test; non-vacuous `watchdog_expired` check, Scalar `error_code` checker and read/write accounting | Abort wins over an expired Watchdog (`error_code=3`); both accepted reads return, zero writes commit. Other error causes, phases and top ownership remain open. | Same run / seeds | Same report/archive |
+| `REQ-CL-027` | `PARTIAL` | Same test; completion cause checker | One completion carries `ERR_ABORT`; this is core-level and does not close the complete engine-to-CPLQ ABI mapping. | Same run / seeds | Same report/archive |
+
+The test is an incremental point only. No requirement disposition is promoted; current totals remain 24 `PASS-SCOPED` / 14 `PARTIAL`, and `CL-DV-v1.0` remains **HOLD**.
