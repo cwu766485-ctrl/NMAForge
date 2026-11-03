@@ -5,6 +5,7 @@
 - Test ID: `TC-CL-R216-ENGINE-ABORT-FULL-CPLQ-7`
 - Run ID: `CL-ABORT-CPLQ-R216-CLEAN-3S-20261103`
 - Fixed code/test SHA: `ec9b922d2ad8d4de6bca08211ea9bb3bc1672779`
+- Published GitHub code commit: `09f9d31209fdcc803ec322cf3822bd51e763665a` (tree `9778101254417c7272c37d8177e319e70849c8b4`, identical to the tested SHA tree)
 - Parent published closeout source: `eb27e716fc40c6e526e479e2472837b165675a97`
 - Tools: VCS/URG `V-2023.12-SP1_Full64` / `V-2023.12-SP1`
 - RTL and SPEC were not changed. The change is confined to the UVM sequence and regression gate.
