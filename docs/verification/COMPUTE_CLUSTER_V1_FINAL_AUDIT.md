@@ -1,6 +1,6 @@
 # Compute Cluster v1.0 Final Audit
 
-**Review date:** 2026-11-02
+**Review date:** 2026-11-03
 
 **Selected product/SPEC candidate:** c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413 (R99 CNM Protection response alignment; SPEC v1.8); R54 top-test SHA f24c5383fad511c8b2e1132c1157942807994759
 - **Prior reviewed product baseline:** `6848a414eaeaa05cf9e1411cf55d9d27333208a6`
@@ -8,7 +8,8 @@
 - **Follow-up product replay SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`
 - **Latest exact coverage replay candidate:** `8be88c10f131354fd7aeacfd3678bb08ed439e23` (R166, tree `f5411eb9bad967e1feb6f933dcc12174b4034df1`; three-seed real-top UVM, 16-seed DDR/AXI E2E, and subsystem coverage replay; 18/18 top and 17/17 subsystem declared functional groups at 100%). The executable test content remains the R164 code/test tree `e0816beba67133fbf6221005f16f97cba63eb2ca`; no product RTL/SPEC changes.
 **Latest verification/test candidate:** R166 exact replay SHA `8be88c10f131354fd7aeacfd3678bb08ed439e23`, a documentation-only descendant of R164. The R166 coverage suite builds and runs from this exact clean candidate; product RTL/SPEC and executable UVM/test source remain unchanged from their separately reviewed baselines. R164 still supplies the latest same-test-SHA Matrix benchmark. Earlier formal evidence retains its own exact SHA.
-**Latest exact-candidate integration replay:** R170 passes Top Smoke with 20 fixed cases, three-seed real-top UVM, and 28/28 named checker-sensitivity probes at exact clean published SHA `82b748898448800f807b947042d2bd0ed25c2951`. The Conv reset-prefix group is 6/6 per seed and merged; per-seed scoreboard checks 69,022 words with zero mismatch/unknown/stale and severity `0/0/0`. R166 remains the latest merged declared functional-coverage report; the full RTM remains 24 `PASS-SCOPED` / 14 `PARTIAL`, with `CL-DV-v1.0` **HOLD**. See [R170 evidence](COMPUTE_CLUSTER_CONV_RESET_WRITE_PREFIX_R170_2026-11-02.md).
+**Latest exact-candidate integration replay:** R176 passes the three-seed real-top UVM, seven real-DUT mutation catches, Top Smoke, and 16-seed mixed DDR/AXI E2E campaign at published clean SHA 643a2aee5708e7a815e86e0144f9b0e4a5c881ce. It reports 20/20 declared testbench functional groups at 100%; this is not DUT code coverage or full sign-off. The 38-row RTM remains 24 PASS-SCOPED / 14 PARTIAL; CL-DV-v1.0 remains HOLD. See the R176 evidence report.
+**Latest published clean Compute Cluster replay:** R176 at SHA `643a2aee5708e7a815e86e0144f9b0e4a5c881ce`, tree `c549564fb3492f14afdf74a596fd712810aee80f`, passes three-seed seven-engine UVM, seven real-DUT mutations, Top Smoke, and 16-seed mixed DDR/AXI E2E coverage. The 20/20 result applies to declared testbench functional groups; merged DUT/UVM code coverage is lower and is not sign-off closure. RTM remains 24 `PASS-SCOPED` / 14 `PARTIAL`; `CL-DV-v1.0` remains **HOLD**. See [R176 evidence](COMPUTE_CLUSTER_R176_REAL_DUT_MUTATION_2026-11-03.md).
 **Latest Matrix benchmark:** R169 passes 165/165 size and ablation Golden points on the exact R168 source checkout. Results remain behavioral-SPAD Matrix-core measurements; integrated Cluster/TinyNPU common-memory comparison and ASIC PPA are still open. See [R169 report](../benchmark/COMPUTE_CLUSTER_MATRIX_BENCHMARK_R169_2026-11-02.md).
 **Latest focused testpoint:** R170 adds and verifies a legal Conv accepted-write-prefix reset scenario on exact published SHA `82b748898448800f807b947042d2bd0ed25c2951`. Historical license-blocked attempts were superseded by the successful clean replay; only the six focused bins receive coverage credit, and no requirement disposition changes. The full 38-row decision remains 24 `PASS-SCOPED` / 14 `PARTIAL`, **HOLD**. See [R170 report](COMPUTE_CLUSTER_CONV_RESET_WRITE_PREFIX_R170_2026-11-02.md).
 **Decision:** bounded CL-RC1/CL-RC2 review candidate; **CL-DV-v1.0 is not signed**.
@@ -91,6 +92,7 @@ At this SHA, checker-sensitivity Mutation is 28/28, Top Smoke passes, and the 20
 - [KV address R53 evidence](COMPUTE_CLUSTER_KV_ADDRESS_R53.md)
 - [KV Protection R54 evidence](COMPUTE_CLUSTER_KV_PROTECTION_R54.md)
 - [R93 real-top pairwise evidence](COMPUTE_CLUSTER_REAL_TOP_PAIRWISE_R93_2026-10-30.md)
+- [R176 exact clean replay and real-DUT mutation evidence](COMPUTE_CLUSTER_R176_REAL_DUT_MUTATION_2026-11-03.md)
 
 ## R93 real-top all-engine pairwise overlap — 2026-10-30
 
