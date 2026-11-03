@@ -6,15 +6,21 @@ benchmark work is tracked in the execution RTM and open-issue report.
 
 ## Latest Compute Cluster evidence
 
+R244 reruns the eight depth/prefetch/A-Tile Cache Matrix configurations on the current test tree (`3db422d6456edfaf9b5dc74460f9d5507a42c08c`): all 120 shape/configuration/seed Golden points pass. D4/P1/C1 reduces the five-workload cycle sum 2,701→2,029 (24.88%) and SPAD read bytes 12,032→9,472 (21.28%); writes are unchanged, while measured line-write stalls increase. This remains one-cycle behavioral-SPAD evidence, not ASIC PPA or a TinyNPU win. See the [R244 report](../../benchmark/COMPUTE_CLUSTER_MATRIX_CONFIG_COMPARISON_R244_2026-11-03.md) and [CSV](../../../benchmark/compute_cluster_matrix_config_comparison_r244.csv).
+
+R243 adds passive per-engine request-wait observation and reruns real seven-engine UVM plus Top Smoke on the exact published code tree. Three seeds pass with clean memory and owner ledgers; maximum request waits are `{12,14,53,0,64,126,14}` cycles. No downstream SRAM stall is injected, so `REQ-CL-014` remains PARTIAL. See the [R243 report](../../verification/COMPUTE_CLUSTER_ENGINE_REQUEST_WAIT_R243_2026-11-03.md).
+
+R240 is the latest detached clean-worktree replay of the published closeout tree: three real-top Cluster seeds and Top Smoke pass; 92,871 Memory Image words/seed have zero mismatch/unknown/stale and `cluster_cg` is 64/64. R241 separately records non-vacuous AXI AR/AW/W payload-stability assertions and stall-to-accept covers. See the [R240 replay](../../verification/COMPUTE_CLUSTER_FINAL_CANDIDATE_REPLAY_R240_2026-11-03.md) and [R241 SVA report](../../verification/COMPUTE_CLUSTER_SVA_NONVACUITY_R241_2026-11-03.md).
+
 R235 re-audits the exact R232 published-head UVM logs for the seven-engine writeback Protection × full-CPLQ × ordered-wrap point: 7/7 engines on all three seeds, correct error mapping and sentinels, and clean memory/owner scoreboards. This testpoint is now traced to the `c5755985` RTL/DV identity; the wider fault/phase/reset/backpressure matrix remains open. See the [R235 audit](../../verification/COMPUTE_CLUSTER_P0_PROTECTION_CPLQ_REPLAY_R235_2026-11-03.md).
 
-R234 reruns the Matrix depth/prefetch/A-Tile Cache ablation at the current `c5755985` executable RTL/DV identity: 120/120 Golden points across five shapes, eight configurations, and three seeds. D4/P1/C1 is 24.88% lower in measured cycles and 21.3% lower in read bytes than D2/P0/C0 under the one-cycle behavioral SPAD model. R232's real-top task cycles use the same RTL/DV source. Common-memory TinyNPU and PPA comparisons remain open; Phase A stays HOLD. See the [R234 benchmark](../../benchmark/COMPUTE_CLUSTER_CONFIG_AND_CONCURRENCY_BENCHMARK_R234_2026-11-03.md).
+R234 is the earlier same-RTL benchmark snapshot; R244 refreshes its 8-way ablation at the later test tree. Common-memory TinyNPU and PPA comparisons remain open.
 
 R233 additionally passes all nine Control UVM tests, including frontdoor RAL read/write, with zero UVM severity. All seven Control AXI-Lite assertions have real successes; two UVM library `uvm_reg_map` properties remain no-attempts and are explicitly disclosed. This does not alter the Phase A HOLD.
 
 R232 replayed the exact published closeout HEAD 3259d4da158d56aebe41c227c426b6b4b74a0f72 from a clean worktree. Top Smoke, three-seed real seven-engine Compute Cluster UVM, 16-seed mixed E2E coverage, and the 28/28 actual RTL mutation campaign pass. Combined URG reports 28/28 declared functional covergroups at 100%; all AR/AW/W stall-to-accept cover properties match. Each Cluster seed checks 92,871 Memory Image words with zero mismatch/unknown/stale and drains the owner ledger. The combined simulation hierarchy still reports line/condition/FSM/branch coverage 73.95/69.39/47.24/64.95%, with two UVM RAL internal assertions without attempts.
 
-The declared testpoint target is met for this merged plan. The full Phase A exit criteria are not met: the 38-row RTM remains 24 PASS-SCOPED / 14 PARTIAL, so CL-DV-v1.0 stays HOLD. Continue closing requirement-level legal fault × phase × reset × backpressure interactions, descriptor max/stride/alias/overflow and dispatch boundaries, Matrix integration, and the remaining benchmark contract. Keep v2.0 product changes behind the v1.0 review.
+The declared testpoint target is met for this merged plan. The full Phase A exit criteria are not met: the 38-row RTM remains 24 PASS-SCOPED / 14 PARTIAL, so CL-DV-v1.0 stays HOLD. Next, strengthen legal downstream-stall/fairness evidence without claiming a bound absent from SPEC, close requirement-level fault × phase × reset × backpressure interactions and descriptor max/stride/alias/overflow boundaries, then review Matrix integration and remaining benchmark scope. Keep v2.0 product changes behind the v1.0 review.
 
 See the [R232 report](../../verification/COMPUTE_CLUSTER_PUBLISHED_HEAD_CLEAN_REPLAY_R232_2026-11-03.md), [Execution RTM](../../verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md), [Open-Issue List](../../verification/COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md), and [Sign-off Readiness](../../verification/COMPUTE_CLUSTER_DV_SIGNOFF_READINESS_2026-10-27.md). The logs-only archive is /tmp/nmaforge_r232_final_evidence_20261103.tar.gz, SHA-256 ac1f65990fd2aef1b044a680170878ac8f327eb848f53be722b9a13801b2e0ba.
 
@@ -36,7 +42,7 @@ Key architecture rules:
   `ai_parallel_compute_dispatcher`; each engine has one active slot and
   completions retire in CMDQ order. See the Compute Cluster SPEC v1.1.
 
-## Current verification frontier
+## Historical branch evidence snapshots
 
 On the isolated closeout branch, exact clean candidate SHA
 `43a84cac688a56e789162dfa5a8106551779abdb` passes the three-seed real-top
