@@ -139,6 +139,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned engine_watchdog_cov_idx;
     int unsigned engine_watchdog_cplq_cov_idx;
     int unsigned engine_parity_cplq_cov_idx;
+    int unsigned engine_abort_cplq_cov_idx;
     int unsigned matrix_protection_reset_phase;
     int unsigned matrix_protection_cnm_reset_phase;
     int unsigned engine_protection_reset_engine;
@@ -273,6 +274,19 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         }
     endgroup
 
+    covergroup engine_abort_cplq_cg;
+        option.per_instance = 1;
+        cp_engine_abort_cplq: coverpoint engine_abort_cplq_cov_idx {
+            bins scalar_int8 = {0};
+            bins fp = {1};
+            bins cnm = {2};
+            bins matrix = {3};
+            bins sfu = {4};
+            bins conv = {5};
+            bins kv = {6};
+        }
+    endgroup
+
     int unsigned engine_pair_overlap_cov_idx;
     int unsigned cmdq_invalid_descriptor_case;
     covergroup cmdq_invalid_descriptor_cg;
@@ -392,6 +406,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         engine_watchdog_cov_idx = 0;
         engine_watchdog_cplq_cov_idx = 0;
         engine_parity_cplq_cov_idx = 0;
+        engine_abort_cplq_cov_idx = 0;
         engine_pair_overlap_cov_idx = 0;
         matrix_protection_reset_phase = 0;
         matrix_protection_cnm_reset_phase = 0;
@@ -410,6 +425,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         engine_watchdog_cg = new();
         engine_watchdog_cplq_cg = new();
         engine_parity_cplq_cg = new();
+        engine_abort_cplq_cg = new();
         cmdq_invalid_descriptor_cg = new();
         engine_pair_overlap_cg = new();
         matrix_protection_reset_cg = new();
@@ -3385,6 +3401,292 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 engines_seen, engine_parity_cplq_cg.get_coverage()))
         `uvm_info("CLUSTER_PARITY_CPLQ_CROSS_PASS", $sformatf(
             "accepted parity response x full Completion Queue: engines=7/7 response=7/7 blocked=7/7 released/wrapped=7/7 no-writeback=7/7 exactly-once=7/7 focused coverage=100.0%% seed=%0d",
+            seed), UVM_LOW)
+    endtask
+
+    // Exercise the architectural software-Abort path with a real-engine error
+    // completion held by a full four-slot CPLQ. The three legal descriptor
+    // errors fill the usable ring capacity before the long-running fourth
+    // engine is aborted. The test checks that accepted output writes stop at
+    // the sampled Abort edge and that the ordered ERR_ABORT completion is
+    // retained until software advances the head.
+    task automatic run_engine_abort_full_cplq_cross(input int unsigned seed);
+        bit [31:0] desc_addr;
+        bit [31:0] cpl_addr;
+        bit [31:0] src0;
+        bit [31:0] src1;
+        bit [31:0] dst;
+        bit [31:0] output_base;
+        bit [31:0] task_id;
+        bit [31:0] value;
+        int unsigned output_words;
+        int unsigned engine;
+        int unsigned word_idx;
+        int unsigned submit_poll;
+        int unsigned monitor_poll;
+        int unsigned quiet_cycles;
+        bit [6:0] engines_seen;
+        bit busy_seen;
+        bit abort_seen;
+        bit abort_active_seen;
+        bit full_seen;
+        bit submit_done;
+        bit monitor_done;
+        int unsigned accepted_output_writes;
+        int unsigned post_abort_output_writes;
+
+        desc_addr = CLUSTER_WATCHDOG_CMDQ;
+        cpl_addr = CLUSTER_WATCHDOG_CPLQ;
+        engines_seen = '0;
+
+        for (engine = 0; engine < 7; engine++) begin
+            src0 = 32'd0;
+            src1 = 32'd0;
+            dst = CLUSTER_WATCHDOG_Y_LOCAL;
+            output_base = dst;
+            output_words = 128;
+            task_id = 32'h0f90 + engine;
+
+            // Three legal CMDQ validation failures occupy the ring's three
+            // usable entries. The real operation is deliberately long enough
+            // to observe busy and deliver Abort after the ring becomes full.
+            for (word_idx = 0; word_idx < 3; word_idx++)
+                write_cluster_desc(desc_addr + (word_idx << 6), 8'h10,
+                    16'h0f60 + (engine * 3) + word_idx,
+                    SCALAR_A_LOCAL, SCALAR_B_LOCAL, dst, 16'd0, 16'd0,
+                    16'd0, 32'd0, 32'd0, 32'd0, 32'd0, 8'd3);
+
+            case (engine)
+                0: begin
+                    src0 = 32'h0004_a800;
+                    src1 = 32'h0004_a900;
+                    write_cluster_desc(desc_addr + 32'hc0, 8'h10,
+                        task_id[15:0], src0, src1, dst, 16'd0, 16'd0,
+                        16'd64, 32'd0, 32'd0, 32'd0, 32'd0, 8'd3);
+                end
+                1: begin
+                    src0 = 32'h0004_a800;
+                    src1 = 32'h0004_a900;
+                    write_cluster_desc(desc_addr + 32'hc0, 8'h50,
+                        task_id[15:0], src0, src1, dst, 16'd1, 16'd1,
+                        16'd64, 32'd0, 32'd0, 32'd0, 32'd0, 8'd7);
+                end
+                2: begin
+                    src0 = 32'h0004_aa00;
+                    src1 = 32'h0004_ab00;
+                    write_cnm_v3_desc(desc_addr + 32'hc0,
+                        task_id[15:0], src0, src1, dst);
+                    spad_write(desc_addr + 32'hd8, 32'd64);
+                end
+                3: begin
+                    src0 = MATRIX_A_LOCAL;
+                    src1 = MATRIX_B_LOCAL;
+                    output_words = 512;
+                    write_v3_desc(desc_addr + 32'hc0, 8'h30,
+                        task_id[15:0], src0, src1, dst,
+                        16'd16, 16'd32, 16'd16);
+                end
+                4: begin
+                    src0 = 32'h0004_b000;
+                    output_words = 64;
+                    write_v3_desc(desc_addr + 32'hc0, 8'h35,
+                        task_id[15:0], src0, 32'd0, dst,
+                        16'd0, 16'd0, 16'd64);
+                end
+                5: begin
+                    src0 = 32'h0004_b100;
+                    src1 = 32'h0004_b600;
+                    output_words = 196;
+                    write_cluster_desc(desc_addr + 32'hc0, 8'h16,
+                        task_id[15:0], src0, src1, dst,
+                        16'd16, 16'd16, 16'd9, 32'd0,
+                        32'd0, 32'd0, 32'd0, 8'd5);
+                end
+                default: begin
+                    src0 = 32'h0004_b700;
+                    dst = 32'h0003_9000;
+                    output_base = dst + 32'h50;
+                    output_words = 64;
+                    write_cluster_desc(desc_addr + 32'hc0, 8'h43,
+                        task_id[15:0], src0, 32'd0, dst,
+                        16'd0, 16'd0, 16'd64, {16'd1,16'd1},
+                        32'd16, 32'd64, 32'd0, 8'd5);
+                end
+            endcase
+
+            for (word_idx = 0; word_idx < output_words; word_idx++)
+                spad_write(output_base + (word_idx << 2),
+                           32'hab07_0000 | (engine << 12) | word_idx);
+            for (word_idx = 0; word_idx < 4; word_idx++)
+                spad_write(cpl_addr + 32'h30 + (word_idx << 2),
+                           32'hab07_7d00 | (engine << 4) | word_idx);
+
+            axil_write(REG_REGION0_PERM, 32'd0);
+            axil_write(REG_REGION1_PERM, 32'd0);
+            axil_write(REG_REGION2_PERM, 32'd0);
+            axil_write(REG_REGION3_PERM, 32'd0);
+            axil_write(REG_WATCHDOG, 32'd0);
+            axil_write(REG_CMDQ_CTRL, 32'd0);
+            axil_write(REG_CMDQ_BASE, desc_addr);
+            axil_write(REG_CMDQ_SIZE, 32'd8);
+            axil_write(REG_CMDQ_HEAD, 32'd0);
+            axil_write(REG_CMDQ_TAIL, 32'd4);
+            axil_write(REG_CPLQ_BASE, cpl_addr);
+            axil_write(REG_CPLQ_SIZE, 32'd4);
+            axil_write(REG_CPLQ_HEAD, 32'd0);
+            axil_write(REG_CPLQ_TAIL, 32'd0);
+
+            busy_seen = 1'b0;
+            abort_seen = 1'b0;
+            abort_active_seen = 1'b0;
+            full_seen = 1'b0;
+            submit_done = 1'b0;
+            monitor_done = 1'b0;
+            accepted_output_writes = 0;
+            post_abort_output_writes = 0;
+
+            fork
+                begin : abort_cplq_submit
+                    axil_write(REG_DOORBELL, 32'd1);
+                    wait_cpl_tail(32'd3);
+                    full_seen = 1'b1;
+                    if (compute_vif.cplq_full !== 1'b1)
+                        `uvm_fatal("CLUSTER_ABORT_CPLQ",
+                            $sformatf("engine=%0d three filler completions did not fill CPLQ", engine))
+                    for (submit_poll = 0; submit_poll < 50000; submit_poll++) begin
+                        @(negedge compute_vif.aclk);
+                        if (compute_vif.engine_busy[engine]) begin
+                            busy_seen = 1'b1;
+                            break;
+                        end
+                    end
+                    if (!busy_seen)
+                        `uvm_fatal("CLUSTER_ABORT_CPLQ", $sformatf(
+                            "engine=%0d did not become active behind full CPLQ", engine))
+                    axil_write(REG_ABORT, 32'd1);
+                    submit_done = 1'b1;
+                end
+                begin : abort_cplq_engine_monitor
+                    quiet_cycles = 0;
+                    for (monitor_poll = 0; monitor_poll < 50000; monitor_poll++) begin
+                        @(posedge compute_vif.aclk);
+                        if ((engine == 3) && compute_vif.matrix_line_valid &&
+                            compute_vif.matrix_line_ready &&
+                            compute_vif.matrix_line_write) begin
+                            accepted_output_writes++;
+                            if (abort_active_seen)
+                                post_abort_output_writes++;
+                        end else if ((engine != 3) &&
+                            compute_vif.engine_req_valid[engine] &&
+                            compute_vif.engine_req_ready[engine] &&
+                            compute_vif.engine_req_write[engine]) begin
+                            accepted_output_writes++;
+                            if (abort_active_seen)
+                                post_abort_output_writes++;
+                        end
+                        if (compute_vif.dut_abort_active) begin
+                            abort_seen = 1'b1;
+                            abort_active_seen = 1'b1;
+                        end
+                        if (abort_seen && !compute_vif.engine_busy[engine] &&
+                            compute_vif.cplq_full && compute_vif.processor_busy) begin
+                            quiet_cycles++;
+                            if (quiet_cycles == 3) begin
+                                monitor_done = 1'b1;
+                                break;
+                            end
+                        end else
+                            quiet_cycles = 0;
+                    end
+                end
+            join
+
+            if (!submit_done || !monitor_done || !busy_seen || !abort_seen ||
+                !full_seen || compute_vif.engine_busy[engine] !== 1'b0 ||
+                compute_vif.cplq_full !== 1'b1 ||
+                compute_vif.processor_busy !== 1'b1)
+                `uvm_fatal("CLUSTER_ABORT_CPLQ", $sformatf(
+                    "engine=%0d Abort completion did not remain pending behind full CPLQ: submit=%0b monitor=%0b busy_seen=%0b abort_seen=%0b full_seen=%0b busy=%07b full=%0b processor_busy=%0b",
+                    engine, submit_done, monitor_done, busy_seen, abort_seen,
+                    full_seen, compute_vif.engine_busy, compute_vif.cplq_full,
+                    compute_vif.processor_busy))
+            if (post_abort_output_writes != 0)
+                `uvm_fatal("CLUSTER_ABORT_CPLQ", $sformatf(
+                    "engine=%0d accepted %0d output writes after sampled Abort",
+                    engine, post_abort_output_writes))
+
+            quiet_cycles = 0;
+            for (monitor_poll = 0; monitor_poll < 5000; monitor_poll++) begin
+                @(negedge compute_vif.aclk);
+                if ((compute_vif.engine_req_valid == 0) &&
+                    !compute_vif.core_spad_valid &&
+                    !compute_vif.banked_valid &&
+                    (compute_vif.cnm_valid == 0) &&
+                    !compute_vif.matrix_line_valid &&
+                    !compute_vif.dma_valid && !compute_vif.dma_line_valid &&
+                    !compute_vif.desc_valid && !compute_vif.rsp_valid) begin
+                    quiet_cycles++;
+                    if (quiet_cycles == 3) break;
+                end else
+                    quiet_cycles = 0;
+            end
+            if (quiet_cycles != 3)
+                `uvm_fatal("CLUSTER_ABORT_CPLQ", $sformatf(
+                    "engine=%0d accepted SPAD traffic failed to drain while CPLQ was blocked", engine))
+
+            axil_read(REG_CMDQ_HEAD, value);
+            if (value !== 32'd4)
+                `uvm_fatal("CLUSTER_ABORT_CPLQ", $sformatf(
+                    "engine=%0d expected all four descriptors fetched before Abort; CMDQ_HEAD=%0d",
+                    engine, value))
+            axil_read(REG_CPLQ_TAIL, value);
+            if (value !== 32'd3)
+                `uvm_fatal("CLUSTER_ABORT_CPLQ", $sformatf(
+                    "engine=%0d Abort completion escaped full queue before head release: tail=%0d",
+                    engine, value))
+            for (word_idx = 0; word_idx < 3; word_idx++) begin
+                expect_spad(cpl_addr + (word_idx << 4),
+                    {16'd0, 16'h0f60 + (engine * 3) + word_idx},
+                    $sformatf("Abort CPLQ engine%0d filler%0d task", engine, word_idx));
+                expect_spad(cpl_addr + (word_idx << 4) + 32'd4, 32'h72,
+                    $sformatf("Abort CPLQ engine%0d filler%0d ERR_DESC", engine, word_idx));
+            end
+            for (word_idx = 0; word_idx < 4; word_idx++)
+                expect_spad(cpl_addr + 32'h30 + (word_idx << 2),
+                    32'hab07_7d00 | (engine << 4) | word_idx,
+                    $sformatf("Abort CPLQ engine%0d held slot sentinel[%0d]", engine, word_idx));
+
+            axil_write(REG_CPLQ_HEAD, 32'd1);
+            wait_cpl_tail(32'd0);
+            wait_spad_idle();
+            expect_spad(cpl_addr + 32'h30, {16'd0, task_id[15:0]},
+                $sformatf("Abort CPLQ engine%0d wrapped task ID", engine));
+            expect_spad(cpl_addr + 32'h34, 32'h32,
+                $sformatf("Abort CPLQ engine%0d wrapped ERR_ABORT", engine));
+            #100;
+            axil_read(REG_CPLQ_TAIL, value);
+            if (value !== 32'd0)
+                `uvm_fatal("CLUSTER_ABORT_CPLQ", $sformatf(
+                    "engine=%0d Abort completion published more than once after release: tail=%0d",
+                    engine, value))
+
+            engines_seen[engine] = 1'b1;
+            engine_abort_cplq_cov_idx = engine;
+            engine_abort_cplq_cg.sample();
+            `uvm_info("CLUSTER_ABORT_CPLQ_CASE_PASS", $sformatf(
+                "engine=%0d task=0x%04h busy=1 abort=1 error=ERR_ABORT cplq_blocked=1 filler_errors=3 tail=3 released_head=1 wrapped_tail=0 post_abort_writes=0 exactly_once=1 seed=%0d",
+                engine, task_id[15:0], seed), UVM_LOW)
+            axil_write(REG_CPLQ_HEAD, 32'd0);
+            axil_write(REG_CMDQ_SIZE, 32'd0);
+            axil_write(REG_CPLQ_SIZE, 32'd0);
+        end
+
+        if (engines_seen !== 7'h7f || engine_abort_cplq_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_ABORT_CPLQ_COVERAGE", $sformatf(
+                "seven-engine Abort/full-CPLQ bins incomplete: engines=%07b coverage=%.1f%%",
+                engines_seen, engine_abort_cplq_cg.get_coverage()))
+        `uvm_info("CLUSTER_ABORT_CPLQ_CROSS_PASS", $sformatf(
+            "software Abort x full Completion Queue: engines=7/7 blocked=7/7 released/wrapped=7/7 post-abort suppression=7/7 exactly-once=7/7 focused bins=7/7 coverage=100.0%% seed=%0d",
             seed), UVM_LOW)
     endtask
 
@@ -10458,6 +10760,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_shared_readonly_isolation_test();
         check_request_stability();
         run_engine_abort_drain_sweep();
+        run_engine_abort_full_cplq_cross(seed);
         run_sfu_abort_write_prefix(seed);
         run_sfu_reset_write_prefix(seed);
         run_fp_reset_single_write(seed);
