@@ -492,6 +492,19 @@ module tb_ai_spad_arbiter_rr;
     repeat(2) @(posedge clk);
     @(negedge clk);
     resetn=1;
+    // A completed core write advances the global data-plane round-robin
+    // pointer to RR_BANKED before sustained Matrix/CNM contention begins.
+    core_valid=1;
+    core_write=1;
+    core_addr=32'h0000_0600;
+    core_wdata=32'hc0de_0600;
+    #1;
+    if (!core_ready || request_client!=3'd2 || !spad_valid || !spad_write)
+      $fatal(1,"failed to position scheduler at RR_BANKED before subclient fairness test");
+    @(posedge clk);
+    @(negedge clk);
+    core_valid=0;
+    core_write=0;
     banked_valid=1;
     banked_addr=32'h0000_0300;
     cnm_valid=4'b1011;
@@ -561,7 +574,7 @@ module tb_ai_spad_arbiter_rr;
     if (sustained_cnm_grants!=12 || sustained_banked_grants!=12)
       $fatal(1,"sustained Matrix/CNM round-robin mismatch cnm=%0d matrix=%0d",
              sustained_cnm_grants,sustained_banked_grants);
-    $display("Sustained Matrix/CNM banked-class fairness PASS cycles=24 grants=%0d/%0d max_wait=1",
+    $display("Sustained Matrix/CNM banked-class fairness PASS start=RR_BANKED cycles=24 grants=%0d/%0d max_wait=1",
              sustained_cnm_grants,sustained_banked_grants);
     @(negedge clk);
     cnm_valid=0; banked_valid=0;

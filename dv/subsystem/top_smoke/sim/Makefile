@@ -205,6 +205,8 @@ ai_spad_arb_comp:
 
 ai_spad_arb_run: ai_spad_arb_comp
 	./simv_spad_arb -l ai_spad_arb_run.log
+	@grep -q 'Sustained Matrix/CNM banked-class fairness PASS start=RR_BANKED cycles=24 grants=12/12 max_wait=1' ai_spad_arb_run.log || \
+		{ echo "Missing RR_BANKED-start sustained Matrix/CNM fairness evidence"; exit 1; }
 	@grep -q '3-client sustained SPAD round-robin PASS grants=10/10/10 max_wait=2' ai_spad_arb_run.log || \
 		{ echo "SPAD arbiter 3-client fairness marker missing"; exit 1; }
 	@grep -q 'Seeded request-mode SPAD RR PASS' ai_spad_arb_run.log || \
