@@ -1,5 +1,7 @@
 # Compute Cluster Open-Issue List — 2026-11-03
 
+**R267 latest clean replay (2026-11-03):** Exact published closeout SHA `bb2a1a843cda878c04bfe12773ebd9bd9871ff14` passes three-seed real-top UVM, 16-seed mixed DDR/AXI E2E, Top Smoke, and 7/7 actual RTL mutations. The declared Cluster group is 64/64; that is not all requirement-level closure. The 38-row RTM remains 27 `PASS-SCOPED` / 11 `PARTIAL`, and `CL-DV-v1.0` stays **HOLD**. [R267 report](COMPUTE_CLUSTER_FINAL_CLEAN_REPLAY_R267_2026-11-03.md), logs-only archive SHA-256 `4ef8f2f4fa1323e95780133434bab0cc9bd99fe35b7e0527bc2830b095a2f3c4`.
+
 **R265 checker-sensitivity update (2026-11-03):** On the latest published closeout tree, seven temporary RTL mutations (Address, Data, Response Owner, WSTRB, Completion Error, Missing Done, Duplicate Done) are caught by their assigned production Checkers. This closes no legal functional coverage cross; all 11 remaining partial RTM rows stay open and `CL-DV-v1.0` remains **HOLD**. See [R265 report](COMPUTE_CLUSTER_DUT_MUTATION_R265_2026-11-03.md), archive SHA-256 `edbb92285bfe4c0228602d641d8f2d7b36f8749783f27819ff565fcfa6fce94c`.
 
 **R259 matched-vector TinyNPU controller replay (2026-11-03):** The D4/P1/C1
