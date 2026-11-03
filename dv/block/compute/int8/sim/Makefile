@@ -17,4 +17,6 @@ numeric-regress:
 		-top tb_ai_int8_numeric -Mdir="$(OUT)/csrc" $(RTL) $(TB) \
 		-o "$(SIMV)" -l "$(OUT)/compile.log"
 	"$(SIMV)" +SEED=$(SEED) +VECTOR_FILE="$(VECTORS)" -l "$(OUT)/run.log"
-	grep -q '^SCALAR_INT8_NUMERIC_PASS cases=13 ' "$(OUT)/run.log"
+	grep -q '^SCALAR_INT8_ABORT_WATCHDOG_PRIORITY_PASS .*winner=ABORT .*completion_pulses=1 ' "$(OUT)/run.log"
+	grep -q '^SCALAR_INT8_ABORT_RESET_PRIORITY_PASS .*winner=RESET .*recovery_golden=70 ' "$(OUT)/run.log"
+	grep -q '^SCALAR_INT8_NUMERIC_PASS cases=14 ' "$(OUT)/run.log"

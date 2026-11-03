@@ -329,6 +329,92 @@ module tb_ai_int8_numeric;
         end
     endtask
 
+    task automatic run_abort_reset_edge;
+        integer wait_cycles;
+        integer reads_before;
+        integer responses_before;
+        integer quiet_cycles;
+        begin
+            // Reset and Abort are asserted together at a legal calculation
+            // boundary after all reads have returned, then a fresh VDOT proves
+            // that the old task cannot leak into the next reset epoch.
+            resetn = 1'b0;
+            start = 1'b0;
+            abort = 1'b0;
+            deterministic_spad = 1'b1;
+            op_mode = 8'h10;
+            src0_base = 32'h0000_0100;
+            src1_base = 32'h0000_0200;
+            dst_base = 32'h0000_0300;
+            length = 16'd1;
+            m_size = 16'd0;
+            n_size = 16'd0;
+            k_words = 16'd0;
+            scale_shift = 5'd0;
+            activation = 2'd0;
+            bias_enable = 1'b0;
+            watchdog_limit = 32'd0;
+            spad_rsp_valid = 1'b0;
+            spad_mem[32'h0000_0100 >> 2] = 32'h0403_0201;
+            spad_mem[32'h0000_0200 >> 2] = 32'h0807_0605;
+            spad_mem[32'h0000_0300 >> 2] = 32'hdead_beef;
+            reads_before = total_read_accepts;
+            responses_before = total_read_responses;
+            repeat (3) @(negedge clk);
+            resetn = 1'b1;
+            @(negedge clk);
+            start = 1'b1;
+            @(negedge clk);
+            start = 1'b0;
+
+            wait_cycles = 0;
+            while ((!busy || total_read_accepts < reads_before + 2 ||
+                    total_read_responses < responses_before + 2 ||
+                    spad_valid || read_pending) && wait_cycles < 16) begin
+                @(negedge clk);
+                wait_cycles = wait_cycles + 1;
+            end
+            if (!busy || total_read_accepts != reads_before + 2 ||
+                total_read_responses != responses_before + 2 || spad_valid ||
+                read_pending || element_count != 0 || done)
+                $fatal(1, "Abort/Reset setup invalid busy=%b reads=%0d/%0d responses=%0d/%0d valid=%b pending=%b elements=%0d done=%b",
+                       busy, total_read_accepts, reads_before + 2,
+                       total_read_responses, responses_before + 2,
+                       spad_valid, read_pending, element_count, done);
+
+            abort = 1'b1;
+            resetn = 1'b0;
+            @(negedge clk);
+            if (busy || done || error || error_code != 4'd0 || element_count != 0 ||
+                spad_mem[32'h0000_0300 >> 2] !== 32'hdead_beef)
+                $fatal(1, "Reset did not dominate same-edge Abort: busy=%b done=%b error=%b code=%0d elements=%0d dst=%08x",
+                       busy, done, error, error_code, element_count,
+                       spad_mem[32'h0000_0300 >> 2]);
+            repeat (2) @(negedge clk);
+            abort = 1'b0;
+            resetn = 1'b1;
+            quiet_cycles = 0;
+            repeat (4) begin
+                @(negedge clk);
+                quiet_cycles = quiet_cycles + 1;
+                if (busy || done || error || error_code != 4'd0)
+                    $fatal(1, "old task leaked after Abort/Reset release cycle=%0d busy=%b done=%b error=%b code=%0d",
+                           quiet_cycles, busy, done, error, error_code);
+            end
+
+            expected_count = 1;
+            expected_addr[0] = 32'h0000_0300;
+            expected_data[0] = 32'd70;
+            expected_write_seen[0] = 1'b0;
+            test_active = 1'b1;
+            run_one_case(99, "abort_reset_recovery");
+            test_active = 1'b0;
+            deterministic_spad = 1'b0;
+            $display("SCALAR_INT8_ABORT_RESET_PRIORITY_PASS legal_vdot=1 same_edge=1 winner=RESET old_task_quiet=4 recovery_golden=70 accepted_reads=2 returned_reads=2 seed=%0d",
+                     seed);
+        end
+    endtask
+
     initial begin
         seed = 20261030;
         if (!$value$plusargs("SEED=%d", seed)) seed = 20261030;
@@ -402,6 +488,7 @@ module tb_ai_int8_numeric;
             run_one_case(case_id, case_name);
         end
         run_abort_watchdog_priority();
+        run_abort_reset_edge();
         $fclose(vector_fd);
 
         if (opcode_bins[0] == 0 || opcode_bins[1] == 0 || opcode_bins[2] == 0 ||
