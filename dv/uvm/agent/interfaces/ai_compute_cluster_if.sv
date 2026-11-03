@@ -142,12 +142,15 @@ interface ai_compute_cluster_if(input logic aclk);
     integer unsigned engine_req_stall_run_cycles[0:6];
     integer unsigned engine_req_max_stall_cycles[0:6];
     logic [1:0] engine_req_stall_dir_seen[0:6];
+    logic [2:0] engine_req_stall_len_bins[0:6][0:1];
     logic [6:0] engine_req_stall_seen;
     integer unsigned engine_req_stability_violations;
     logic [6:0] req_stalled_previous, req_write_previous;
     logic [31:0] req_addr_previous[0:6], req_wdata_previous[0:6];
     integer unsigned matrix_banked_stall_checks;
     integer unsigned matrix_banked_stall_violations;
+    integer unsigned matrix_banked_stall_run_cycles;
+    logic [2:0] matrix_banked_stall_len_bins;
     integer unsigned matrix_banked_fault_cancel_checks;
     logic matrix_banked_stalled_previous;
     logic [31:0] matrix_banked_addr_previous;
@@ -157,6 +160,8 @@ interface ai_compute_cluster_if(input logic aclk);
     logic [31:0] matrix_cnm_collision_addr_previous;
     integer unsigned matrix_line_stall_checks;
     integer unsigned matrix_line_stall_violations;
+    integer unsigned matrix_line_stall_run_cycles;
+    logic [2:0] matrix_line_stall_len_bins;
     logic [1:0] matrix_line_stall_dir_seen;
     logic matrix_line_stalled_previous;
     logic matrix_line_write_previous;
@@ -165,6 +170,8 @@ interface ai_compute_cluster_if(input logic aclk);
     logic [15:0] matrix_line_wstrb_previous;
     integer unsigned cnm_stall_checks[0:3];
     integer unsigned cnm_stall_violations;
+    integer unsigned cnm_stall_run_cycles[0:3];
+    logic [2:0] cnm_stall_len_bins[0:3];
     logic [3:0] cnm_stalled_previous;
     logic [31:0] cnm_addr_previous[0:3];
 
@@ -183,6 +190,8 @@ interface ai_compute_cluster_if(input logic aclk);
         req_stalled_previous = '0;
         matrix_banked_stall_checks = 0;
         matrix_banked_stall_violations = 0;
+        matrix_banked_stall_run_cycles = 0;
+        matrix_banked_stall_len_bins = '0;
         matrix_banked_fault_cancel_checks = 0;
         matrix_banked_stalled_previous = 1'b0;
         matrix_cnm_collision_hold_checks = 0;
@@ -191,6 +200,8 @@ interface ai_compute_cluster_if(input logic aclk);
         matrix_cnm_collision_addr_previous = '0;
         matrix_line_stall_checks = 0;
         matrix_line_stall_violations = 0;
+        matrix_line_stall_run_cycles = 0;
+        matrix_line_stall_len_bins = '0;
         matrix_line_stall_dir_seen = '0;
         matrix_line_stalled_previous = 1'b0;
         cnm_stall_violations = 0;
@@ -201,6 +212,8 @@ interface ai_compute_cluster_if(input logic aclk);
             engine_req_stall_run_cycles[e] = 0;
             engine_req_max_stall_cycles[e] = 0;
             engine_req_stall_dir_seen[e] = '0;
+            engine_req_stall_len_bins[e][0] = '0;
+            engine_req_stall_len_bins[e][1] = '0;
             req_write_previous[e] = 1'b0;
             req_addr_previous[e] = '0;
             req_wdata_previous[e] = '0;
@@ -224,6 +237,8 @@ interface ai_compute_cluster_if(input logic aclk);
         end
         for (e = 0; e < 4; e++) begin
             cnm_stall_checks[e] = 0;
+            cnm_stall_run_cycles[e] = 0;
+            cnm_stall_len_bins[e] = '0;
             cnm_addr_previous[e] = '0;
         end
     end
@@ -237,9 +252,13 @@ interface ai_compute_cluster_if(input logic aclk);
             req_stalled_previous = '0;
             for (e = 0; e < 7; e++)
                 engine_req_stall_run_cycles[e] = 0;
+            matrix_banked_stall_run_cycles = 0;
             matrix_banked_stalled_previous = 1'b0;
             matrix_cnm_collision_stalled_previous = 1'b0;
+            matrix_line_stall_run_cycles = 0;
             matrix_line_stalled_previous = 1'b0;
+            for (e = 0; e < 4; e++)
+                cnm_stall_run_cycles[e] = 0;
             cnm_stalled_previous = '0;
         end else begin
             if (launch_valid) begin
@@ -278,6 +297,21 @@ interface ai_compute_cluster_if(input logic aclk);
                 end
                 req_stalled_previous[e] = engine_req_valid[e] && !engine_req_ready[e];
                 if (req_stalled_previous[e]) begin
+                    if (engine_req_write[e] === 1'b0) begin
+                        if (engine_req_stall_run_cycles[e] == 0)
+                            engine_req_stall_len_bins[e][0][0] = 1'b1;
+                        if (engine_req_stall_run_cycles[e] == 1)
+                            engine_req_stall_len_bins[e][0][1] = 1'b1;
+                        if (engine_req_stall_run_cycles[e] == 7)
+                            engine_req_stall_len_bins[e][0][2] = 1'b1;
+                    end else if (engine_req_write[e] === 1'b1) begin
+                        if (engine_req_stall_run_cycles[e] == 0)
+                            engine_req_stall_len_bins[e][1][0] = 1'b1;
+                        if (engine_req_stall_run_cycles[e] == 1)
+                            engine_req_stall_len_bins[e][1][1] = 1'b1;
+                        if (engine_req_stall_run_cycles[e] == 7)
+                            engine_req_stall_len_bins[e][1][2] = 1'b1;
+                    end
                     engine_req_stall_cycles[e] = engine_req_stall_cycles[e] + 1;
                     engine_req_stall_run_cycles[e] = engine_req_stall_run_cycles[e] + 1;
                     if (engine_req_stall_run_cycles[e] > engine_req_max_stall_cycles[e])
@@ -315,8 +349,16 @@ interface ai_compute_cluster_if(input logic aclk);
                 end
             end
             matrix_banked_stalled_previous = matrix_request_valid && !banked_ready;
-            if (matrix_banked_stalled_previous)
+            if (matrix_banked_stalled_previous) begin
+                if (matrix_banked_stall_run_cycles == 0)
+                    matrix_banked_stall_len_bins[0] = 1'b1;
+                if (matrix_banked_stall_run_cycles == 1)
+                    matrix_banked_stall_len_bins[1] = 1'b1;
+                if (matrix_banked_stall_run_cycles == 7)
+                    matrix_banked_stall_len_bins[2] = 1'b1;
+                matrix_banked_stall_run_cycles++;
                 matrix_banked_addr_previous = matrix_banked_req_addr;
+            end else matrix_banked_stall_run_cycles = 0;
 
             // A real Matrix banked request can coincide with one or more real
             // CNM lane requests at the shared scheduler admission point. If
@@ -349,11 +391,18 @@ interface ai_compute_cluster_if(input logic aclk);
             end
             matrix_line_stalled_previous = matrix_line_valid && !matrix_line_ready;
             if (matrix_line_stalled_previous) begin
+                if (matrix_line_stall_run_cycles == 0)
+                    matrix_line_stall_len_bins[0] = 1'b1;
+                if (matrix_line_stall_run_cycles == 1)
+                    matrix_line_stall_len_bins[1] = 1'b1;
+                if (matrix_line_stall_run_cycles == 7)
+                    matrix_line_stall_len_bins[2] = 1'b1;
+                matrix_line_stall_run_cycles++;
                 matrix_line_write_previous = matrix_line_write;
                 matrix_line_addr_previous = matrix_line_addr;
                 matrix_line_wdata_previous = matrix_line_wdata;
                 matrix_line_wstrb_previous = matrix_line_wstrb;
-            end
+            end else matrix_line_stall_run_cycles = 0;
 
             for (e = 0; e < 4; e++) begin
                 if (cnm_stalled_previous[e]) begin
@@ -363,8 +412,16 @@ interface ai_compute_cluster_if(input logic aclk);
                         cnm_stall_violations++;
                 end
                 cnm_stalled_previous[e] = cnm_request_valid[e] && !cnm_request_ready[e];
-                if (cnm_stalled_previous[e])
+                if (cnm_stalled_previous[e]) begin
+                    if (cnm_stall_run_cycles[e] == 0)
+                        cnm_stall_len_bins[e][0] = 1'b1;
+                    if (cnm_stall_run_cycles[e] == 1)
+                        cnm_stall_len_bins[e][1] = 1'b1;
+                    if (cnm_stall_run_cycles[e] == 7)
+                        cnm_stall_len_bins[e][2] = 1'b1;
+                    cnm_stall_run_cycles[e]++;
                     cnm_addr_previous[e] = cnm_req_addr[e];
+                end else cnm_stall_run_cycles[e] = 0;
             end
         end
     end
