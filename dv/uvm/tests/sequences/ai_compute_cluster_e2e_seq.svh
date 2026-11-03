@@ -300,6 +300,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned cmdq_invalid_descriptor_case;
     int unsigned conv_descriptor_boundary_case;
     int unsigned depthwise_descriptor_boundary_case;
+    int unsigned depthwise_channel_sequence_case;
     int unsigned engine_parallel_fault_cov_idx;
     int unsigned engine_parallel_reset_phase;
     covergroup cmdq_invalid_descriptor_cg;
@@ -329,6 +330,13 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         cp_depthwise_descriptor_boundary: coverpoint depthwise_descriptor_boundary_case {
             bins minimum_3x3 = {0};
             bins maximum_width_3x128 = {1};
+        }
+    endgroup
+
+    covergroup depthwise_channel_sequence_cg;
+        option.per_instance = 1;
+        cp_depthwise_channel_sequence: coverpoint depthwise_channel_sequence_case {
+            bins two_channel_descriptors = {1};
         }
     endgroup
 
@@ -474,6 +482,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         cmdq_invalid_descriptor_cg = new();
         conv_descriptor_boundary_cg = new();
         depthwise_descriptor_boundary_cg = new();
+        depthwise_channel_sequence_cg = new();
         engine_parallel_fault_cg = new();
         engine_parallel_reset_cg = new();
         engine_pair_overlap_cg = new();
@@ -6549,6 +6558,204 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
+    task automatic run_depthwise_multichannel_cmdq_test(input int unsigned seed);
+        localparam bit [31:0] CMDQ = 32'h0005_c400;
+        localparam bit [31:0] CPLQ = 32'h0005_c500;
+        localparam bit [31:0] CHANNEL_A0 = 32'h0007_f000;
+        localparam bit [31:0] CHANNEL_A1 = 32'h0007_f100;
+        localparam bit [31:0] CHANNEL_W0 = 32'h0007_f200;
+        localparam bit [31:0] CHANNEL_W1 = 32'h0007_f300;
+        localparam bit [31:0] CHANNEL_Y0 = 32'h0007_f400;
+        localparam bit [31:0] CHANNEL_Y1 = 32'h0007_f420;
+        bit signed [7:0] pixels[0:1][0:15];
+        bit signed [7:0] kernel[0:1][0:8];
+        bit [31:0] golden[0:1][0:3];
+        bit [31:0] src_addr[0:1];
+        bit [31:0] weight_addr[0:1];
+        bit [31:0] dst_addr[0:1];
+        bit [31:0] observed_src0[0:1];
+        bit [31:0] observed_src1[0:1];
+        bit [31:0] observed_dst[0:1];
+        bit [15:0] observed_m[0:1];
+        bit [15:0] observed_n[0:1];
+        bit [15:0] observed_k[0:1];
+        bit monitor_complete;
+        int unsigned launch_before;
+        int unsigned conv_launch_before;
+        int unsigned busy_launch_before;
+        int unsigned launch_seen;
+        int unsigned poll;
+        int unsigned channel_idx;
+        int unsigned idx;
+        int unsigned out_row;
+        int unsigned out_col;
+        int unsigned kernel_row;
+        int unsigned kernel_col;
+        int unsigned out_idx;
+        int signed sample_value;
+        int signed pixel_value;
+        int signed weight_value;
+        longint signed accum;
+
+        src_addr[0] = CHANNEL_A0;
+        src_addr[1] = CHANNEL_A1;
+        weight_addr[0] = CHANNEL_W0;
+        weight_addr[1] = CHANNEL_W1;
+        dst_addr[0] = CHANNEL_Y0;
+        dst_addr[1] = CHANNEL_Y1;
+
+        // SPEC 3.5 defines Depthwise as one descriptor per channel. Exercise
+        // two distinct 4x4 input/kernel/output regions in one real CMDQ so
+        // descriptor ordering, channel address independence and full images
+        // are checked through the production dispatcher and Conv engine.
+        for (channel_idx = 0; channel_idx < 2; channel_idx++) begin
+            for (idx = 0; idx < 16; idx++) begin
+                sample_value = ((int'(idx * 29) + int'(channel_idx * 67) +
+                                int'(seed % 113)) % 256) - 128;
+                pixels[channel_idx][idx] = sample_value[7:0];
+                spad_write(src_addr[channel_idx] + (idx << 2),
+                           {24'd0, pixels[channel_idx][idx]});
+            end
+            for (idx = 0; idx < 9; idx++) begin
+                sample_value = ((int'(idx * 43) + int'(channel_idx * 31) +
+                                int'(seed % 97)) % 256) - 128;
+                kernel[channel_idx][idx] = sample_value[7:0];
+                spad_write(weight_addr[channel_idx] + (idx << 2),
+                           {24'd0, kernel[channel_idx][idx]});
+            end
+            for (out_idx = 0; out_idx < 4; out_idx++)
+                spad_write(dst_addr[channel_idx] + (out_idx << 2),
+                           32'hbad0_d000 | (channel_idx << 8) | out_idx);
+            spad_write(dst_addr[channel_idx] - 32'd4,
+                       32'hbad0_cfff | (channel_idx << 8));
+            spad_write(dst_addr[channel_idx] + 32'h10,
+                       32'hbad0_d004 | (channel_idx << 8));
+
+            for (out_row = 0; out_row < 2; out_row++) begin
+                for (out_col = 0; out_col < 2; out_col++) begin
+                    accum = 64'sd0;
+                    for (kernel_row = 0; kernel_row < 3; kernel_row++) begin
+                        for (kernel_col = 0; kernel_col < 3; kernel_col++) begin
+                            pixel_value = $signed(pixels[channel_idx][
+                                ((out_row + kernel_row) * 4) + out_col + kernel_col]);
+                            weight_value = $signed(kernel[channel_idx][
+                                (kernel_row * 3) + kernel_col]);
+                            accum += pixel_value * weight_value;
+                        end
+                    end
+                    out_idx = (out_row * 2) + out_col;
+                    golden[channel_idx][out_idx] = accum[31:0];
+                end
+            end
+        end
+
+        write_cluster_desc(CMDQ, 8'h17, 16'h06e0,
+                           CHANNEL_A0, CHANNEL_W0, CHANNEL_Y0,
+                           16'd4, 16'd4, 16'd9,
+                           32'd0, 32'd0, 32'd0, 32'd0, 8'd5);
+        write_cluster_desc(CMDQ + 32'h40, 8'h17, 16'h06e1,
+                           CHANNEL_A1, CHANNEL_W1, CHANNEL_Y1,
+                           16'd4, 16'd4, 16'd9,
+                           32'd0, 32'd0, 32'd0, 32'd0, 8'd5);
+
+        launch_before = compute_vif.launch_sample_count;
+        conv_launch_before = compute_vif.engine_launch_count[5];
+        busy_launch_before = compute_vif.same_engine_launch_while_busy;
+        launch_seen = 0;
+        monitor_complete = 1'b0;
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, CMDQ);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd2);
+        axil_write(REG_CPLQ_BASE, CPLQ);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+
+        fork
+            begin : depthwise_channel_launch_monitor
+                for (poll = 0; poll < 200000 && launch_seen < 2; poll++) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.launch_valid) begin
+                        if (launch_seen >= 2)
+                            `uvm_fatal("CLUSTER_DEPTHWISE_MULTICHANNEL",
+                                "unexpected extra Depthwise channel launch")
+                        observed_src0[launch_seen] = compute_vif.launch_src0;
+                        observed_src1[launch_seen] = compute_vif.launch_src1;
+                        observed_dst[launch_seen] = compute_vif.launch_dst;
+                        observed_m[launch_seen] = compute_vif.launch_m;
+                        observed_n[launch_seen] = compute_vif.launch_n;
+                        observed_k[launch_seen] = compute_vif.launch_k;
+                        launch_seen++;
+                    end
+                end
+                if (launch_seen != 2)
+                    `uvm_fatal("CLUSTER_DEPTHWISE_MULTICHANNEL", $sformatf(
+                        "real CMDQ monitor timed out after %0d/2 Depthwise channel launches",
+                        launch_seen))
+                monitor_complete = 1'b1;
+            end
+            begin : depthwise_channel_submit
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(32'd2);
+            end
+        join
+        wait_spad_idle();
+
+        if (!monitor_complete ||
+            compute_vif.launch_sample_count - launch_before != 2 ||
+            compute_vif.engine_launch_count[5] - conv_launch_before != 2 ||
+            compute_vif.same_engine_launch_while_busy != busy_launch_before)
+            `uvm_fatal("CLUSTER_DEPTHWISE_MULTICHANNEL", $sformatf(
+                "channel launch accounting mismatch total=%0d conv=%0d busy-relaunch-delta=%0d",
+                compute_vif.launch_sample_count - launch_before,
+                compute_vif.engine_launch_count[5] - conv_launch_before,
+                compute_vif.same_engine_launch_while_busy - busy_launch_before))
+        for (channel_idx = 0; channel_idx < 2; channel_idx++) begin
+            if (observed_src0[channel_idx] !== src_addr[channel_idx] ||
+                observed_src1[channel_idx] !== weight_addr[channel_idx] ||
+                observed_dst[channel_idx] !== dst_addr[channel_idx] ||
+                observed_m[channel_idx] !== 16'd4 ||
+                observed_n[channel_idx] !== 16'd4 ||
+                observed_k[channel_idx] !== 16'd9)
+                `uvm_fatal("CLUSTER_DEPTHWISE_MULTICHANNEL", $sformatf(
+                    "channel descriptor launch mismatch channel=%0d src=%08h weights=%08h dst=%08h shape=%0dx%0dx%0d",
+                    channel_idx, observed_src0[channel_idx], observed_src1[channel_idx],
+                    observed_dst[channel_idx], observed_m[channel_idx],
+                    observed_n[channel_idx], observed_k[channel_idx]))
+            for (out_idx = 0; out_idx < 4; out_idx++)
+                expect_spad(dst_addr[channel_idx] + (out_idx << 2),
+                            golden[channel_idx][out_idx],
+                            $sformatf("Depthwise channel%0d output%0d Golden",
+                                      channel_idx, out_idx));
+            expect_completion(CPLQ + (channel_idx << 4), 16'h06e0 + channel_idx,
+                              golden[channel_idx][3], 32'd4,
+                              $sformatf("Depthwise channel%0d completion", channel_idx));
+            expect_spad(dst_addr[channel_idx] - 32'd4,
+                        32'hbad0_cfff | (channel_idx << 8),
+                        $sformatf("Depthwise channel%0d leading sentinel", channel_idx));
+            expect_spad(dst_addr[channel_idx] + 32'h10,
+                        32'hbad0_d004 | (channel_idx << 8),
+                        $sformatf("Depthwise channel%0d trailing sentinel", channel_idx));
+        end
+
+        depthwise_channel_sequence_case = 1;
+        depthwise_channel_sequence_cg.sample();
+        if (depthwise_channel_sequence_cg.get_coverage() != 100.0)
+            `uvm_fatal("CLUSTER_DEPTHWISE_MULTICHANNEL", $sformatf(
+                "multi-channel functional coverage incomplete: %0.2f%%",
+                depthwise_channel_sequence_cg.get_coverage()))
+        `uvm_info("CLUSTER_DEPTHWISE_MULTICHANNEL_PASS", $sformatf(
+            "real CMDQ 0x17 per-channel Depthwise: two ordered 4x4 descriptors with independent A/weight/destination regions; 8/8 signed INT32 Golden outputs, 2/2 completions and sentinels passed; focused_bins=1/1 coverage=100.0%% seed=%0d",
+            seed), UVM_LOW)
+        `uvm_info("CLUSTER_DEPTHWISE_MULTICHANNEL_COVERAGE_PASS",
+            "two-channel descriptor sequence bins=1/1 coverage=100.0%", UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd2);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
     task automatic run_launch_snapshot_and_unused_fields_test();
         int unsigned launch_before;
 
@@ -11895,6 +12102,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_scalar_cmdq_numeric_boundary_test(seed);
         run_scalar_legacy_conv_cmdq_test(seed);
         run_conv_cmdq_shape_boundary_test(seed);
+        run_depthwise_multichannel_cmdq_test(seed);
         run_scalar_gemv_abort_write_prefix(seed);
         run_cnm_inflight_parameter_latch_test();
         run_launch_snapshot_and_unused_fields_test();
