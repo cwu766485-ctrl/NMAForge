@@ -1,39 +1,115 @@
 # NMAForge vs TinyNPU RTL Benchmark
 
+## Current distance snapshot — 2026-11-03
+
+This snapshot compares the latest available paired workloads and clearly
+separates measured RTL from modeled memory service. The current research
+branch is `feat/shape-adaptive-gemv-v2` at SHA
+`3d3403564d6b00f89eb17167b0a65ee8dff8ce41`. The paired common-GEMM run is
+`TINY-FAIR-6848A41-S20261029`, NMAForge SHA
+`6848a414eaeaa05cf9e1411cf55d9d27333208a6`, and pinned TinyNPU SHA
+`8216c22b762011aa20c05fc2768423fd12dda59d`. The current branch's Matrix RTL,
+SPAD arbiter, scratchpad and compute-cluster integration files are byte
+identical to the paired NMAForge source. This snapshot does not claim a fresh
+benchmark run at the current documentation commit.
+
+### Paired 16×16-array INT8 GEMM
+
+All three workloads use the same signed INT8 vectors and independent INT32
+Golden checks. Both designs use 16×16 physical arrays (256 MAC lanes). NMAForge
+cycles measure its Matrix controller with a one-cycle behavioral SPAD. TinyNPU
+array cycles are measured directly, while the “common endpoint” adds a
+serialized 16-byte/cycle, one-cycle-response memory schedule because the
+pinned TinyNPU wrapper has no matching SPAD request/response port.
+
+| Shape | NMAForge measured cycles | TinyNPU array RTL cycles | TinyNPU common endpoint (modeled memory) | TinyNPU endpoint fewer cycles than NMAForge | NMAForge read/write bytes | TinyNPU read/write bytes |
+|---|---:|---:|---:|---:|---:|---:|
+| 16×16×16 | 171 | 52 | 151 | 11.7% | 512 / 1,024 | 512 / 1,024 modeled |
+| 16×16×32 | 263 | 100 | 231 | 12.2% | 1,024 / 1,024 | 1,024 / 1,024 modeled |
+| 32×32×64 | 1,393 | 790 | 1,305 | 6.3% | 6,144 / 4,096 | 4,096 / 4,096 modeled |
+
+Both sides pass every Golden output. At the modeled common endpoint, TinyNPU
+has the lower cycle count on these three GEMMs; this is a conditional
+cycle-model result, not measured end-to-end TinyNPU memory performance or an
+ASIC/FPGA speedup. NMAForge's 32×32×64 Matrix run issues 2,048 more read bytes
+than the TinyNPU schedule model, which is a visible traffic and controller
+efficiency gap to investigate. TinyNPU's direct 52/100/790 array cycles omit
+memory/controller service and must not be compared directly to NMAForge's
+171/263/1,393 cycle windows.
+
+### Paired fixed-weight CNN graph
+
+The same pinned `conv1x_mini.onnx` fixed-weight graph produces matching outputs
+on both designs. NMAForge reports 1,985 engine cycles plus 1,080 host-layout
+cycles; TinyNPU reports 4,781 graph-testbench cycles. These windows have
+different setup, dispatcher, layout and memory boundaries, so they establish
+functional parity but do not establish a CNN speedup. The checked-in weights
+are not pretrained model evidence.
+
+### GEMV research distance
+
+The current NMAForge research wrapper connects a static GEMV selector to the
+real four-bank behavioral SPAD and production SPAD arbiter. Across three
+seeds, M=1, N=8, K=64 improves from 530 to 474 cycles (10.6% fewer), and M=4
+improves from 770 to 738 cycles (4.2% fewer). The selector retains baseline
+for M=8 and M=16. These numbers use source SHA
+`ae897524a30d08bd1dc7970f61f01d6abe763b59`; they include serialized SPAD
+traffic and concurrent DMA contention, but the research wrapper is not wired
+into the production Matrix controller. TinyNPU has no matching GEMV/decode
+result in this paired run, so no cross-design GEMV distance is established.
+
+### Assessment
+
+The current evidence shows exact arithmetic parity and a small, conditional
+TinyNPU cycle advantage on common GEMM workloads. It does not show a robust
+NMAForge performance win under a fully measured common memory system. NMAForge
+has a broader seven-engine Compute Cluster and shared-SPAD architecture; the
+tested TinyNPU array wrapper does not expose an equivalent shared-memory
+interface, so system-level throughput and contention remain unpaired. The next
+fair comparison needs the same memory adapter, latency/bandwidth, workload
+start/end boundary, and an integrated NMAForge GEMV/Matrix path. ASIC PPA,
+measured Fmax and power are not part of this comparison.
+
 ## Review boundary
 
-This is a functional RTL and cycle-count comparison, not an ASIC PPA or an
-implementation-level speedup claim. NMAForge uses a behavioral SPAD with a
-one-cycle read response. TinyNPU's direct-array measurement bypasses its graph
-DMA and SRAM ports; its CNN Graph smoke uses a testbench DMA shim. The CSV
-records the measured endpoints so results are not conflated.
+This is a functional RTL and cycle-count comparison, not ASIC PPA evidence.
+NMAForge uses a behavioral SPAD with a one-cycle read response. The pinned
+TinyNPU RTL array wrapper exposes no SPAD request/response port, so its
+array-cycle measurement is extended with an explicit common-memory schedule:
+16 bytes/cycle, one-cycle read response, and serialized load/compute/store.
+That normalized TinyNPU endpoint is a model around measured array RTL cycles,
+not a measured TinyNPU memory-controller result. The CSV retains both raw and
+normalized endpoints.
 
 The NMAForge run is on research branch `feat/shape-adaptive-gemv-v2`, source
-SHA `08c34322879c688afd505ddf41fa4b2a5dc93ac0`; Matrix product RTL is identical
+SHA `6848a414eaeaa05cf9e1411cf55d9d27333208a6`; Matrix product RTL is identical
 to the audited candidate `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`. TinyNPU is
 pinned to `harishsg993010/tiny-NPU`
 [`8216c22b762011aa20c05fc2768423fd12dda59d`](https://github.com/harishsg993010/tiny-NPU/tree/8216c22b762011aa20c05fc2768423fd12dda59d).
 Tools: VCS `V-2023.12-SP1_Full64`, Verilator `5.052` (2026-09-05, source tag
 `v5.052`, revision `ea338be98e1e838d3518809ce8899f85a009963c`), Python
-3.12.13, NumPy 2.1.3, ONNX 1.17.0. TinyNPU is built from its unmodified pinned
+3.11.13, NumPy 2.4.6, ONNX 1.17.0. TinyNPU is built from its unmodified pinned
 RTL; the local Verilator invocation disables an upstream `SYNCASYNCNET`
 warning that otherwise stops the build under `-Wall` and uses
 `-Wno-fatal`. This is simulation compatibility only.
 
-Run ID: `TINY-COMPARE-20261029-S20261029`, seed `20261029`. The reproducible
+Run ID: `TINY-FAIR-6848A41-S20261029`, seed `20261029`. The reproducible
 entry point is `make benchmark-tinynpu`; instructions are in the
 [harness README](../../benchmark/tinynpu/README.md). The committed
 [GEMM CSV](../../benchmark/tinynpu/gemm_results.csv) includes the current
-source SHA, shape, array size, cycles, MAC/cycle, PE occupancy, SPAD bytes,
-stalls, Golden result, and timing boundary for 22 measurements. Machine
+source SHA, shape, array size, raw and normalized cycles, memory bandwidth,
+MAC/cycle, PE occupancy, SPAD bytes, stalls, Golden result, and timing
+boundary for 22 measurements. Machine
 summaries are committed in [`benchmark_summary.json`](../../benchmark/tinynpu/benchmark_summary.json)
 and [`cnn_summary.json`](../../benchmark/tinynpu/cnn_summary.json).
 
-The root `make compute-performance-report` entry passed on this same source
-SHA with seeds `20261025/26/27`. Run ID:
-`MATRIX-PERF-20261025-20261026-20261027-110e0c9d`. All 45 size cases and 120
+The root `make compute-performance-report` benchmark was rerun on this exact
+source SHA with seeds `20261029/30/31`. Run ID:
+`MATRIX-PERF-20261029-20261030-20261031-6848a414`. All 45 size cases and 120
 depth/prefetch/cache ablation cases passed their Golden checks (165/165).
-Machine-readable evidence is in
+The run used VCS `V-2023.12-SP1_Full64`, 10 ns simulation clock settings,
+and a one-cycle behavioral SPAD. Its 250 MHz GOPS reference is an assumption,
+not a measured clock frequency. Machine-readable evidence is in
 [`compute_performance.csv`](../../benchmark/compute_performance.csv) and
 [`compute_performance_summary.json`](../../benchmark/compute_performance_summary.json).
 
@@ -50,25 +126,30 @@ C       = A × B, signed INT32 accumulation
 Both independently check every output against the integer Golden for the
 three paired shapes (256, 256, and 1,024 outputs).
 
-| Design / shape | Physical array | Cycles to measured endpoint | MAC/cycle | PE utilization | SPAD read / write | Stalls |
+| Design / shape | Physical array | Raw RTL cycles | Common-boundary cycles | MAC/cycle at common boundary | PE utilization at common boundary | Read / write bytes | Stalls |
 |---|---:|---:|---:|---:|---:|---:|
-| NMAForge 16×16×16 | 8×8 | 298 | 13.745 | 21.48% | 768 B / 1,024 B | 18 bank, 21 line-write |
-| NMAForge 16×16×16 | 16×16 | 171 | 23.953 | 9.36% | 512 B / 1,024 B | 7 bank, 18 line-write |
-| TinyNPU 16×16×16 | 16×16 | 52 | 78.769 | 30.77% | Not modeled | Not modeled |
-| NMAForge 16×16×32 | 16×16 | 263 | 31.148 | 12.17% | 1,024 B / 1,024 B | 17 bank, 28 line-write |
-| TinyNPU 16×16×32 | 16×16 | 100 | 81.920 | 32.00% | Not modeled | Not modeled |
-| NMAForge 32×32×64 | 16×16 | 1,393 | 47.047 | 18.38% | 6,144 B / 4,096 B | 131 bank, 91 line-write |
-| TinyNPU 32×32×64 | 16×16 | 790 | 82.957 | 32.41% | Not modeled | Not modeled |
+| NMAForge 16×16×16 | 16×16 | 171 | 171 measured | 23.953 | 9.36% | 512 / 1,024 | 7 bank, 18 line-write |
+| TinyNPU 16×16×16 | 16×16 | 52 array | 151 modeled | 27.126 | 10.60% | 512 / 1,024 modeled | N/A |
+| NMAForge 16×16×32 | 16×16 | 263 | 263 measured | 31.148 | 12.17% | 1,024 / 1,024 | 17 bank, 28 line-write |
+| TinyNPU 16×16×32 | 16×16 | 100 array | 231 modeled | 35.463 | 13.85% | 1,024 / 1,024 modeled | N/A |
+| NMAForge 32×32×64 | 16×16 | 1,393 | 1,393 measured | 47.047 | 18.38% | 6,144 / 4,096 | 131 bank, 91 line-write |
+| TinyNPU 32×32×64 | 16×16 | 790 array | 1,305 modeled | 50.219 | 19.62% | 4,096 / 4,096 modeled | N/A |
 
-The NMAForge endpoint starts at Matrix command acceptance and ends after the
-last output SPAD write and `done`. TinyNPU has no command wrapper in this test:
-its endpoint starts when the first skewed systolic operands are accepted and
-ends when every output-tile accumulator is stable. For 32×32×64, TinyNPU
-clears and runs four output tiles, each accumulating four K tiles. This
-excludes graph DMA, SRAM loading, input stalls, and output streaming. The
-measurements establish matching arithmetic and expose each architecture's
-measured work; they do **not** define a latency speedup because the boundaries
-and memory paths differ.
+The common model uses one 128-bit line (16 bytes) per cycle and one cycle of
+read response latency. NMAForge numbers are measured from Matrix start through
+final output write and `done`, using its behavioral SPAD/controller path.
+TinyNPU's estimated service is `ceil((A+B bytes)/16) + 1` read cycles and
+`ceil(C bytes/16)` write cycles, added around the measured array interval and
+two accumulator-clear cycles. Its load, compute, and store are serialized.
+
+The cycle ratio `TinyNPU normalized / NMAForge measured` is 0.883, 0.878, and
+0.937 for the three shapes. This is a model-normalized cycle comparison, not a
+measured TinyNPU end-to-end RTL result or silicon speedup. The upstream
+TinyNPU graph DMA/SRAM path remains a separate smoke measurement. Both sides
+use identical INT8 values, output shapes, independent INT32 Golden checks, and
+the stated 16-byte/cycle timing assumption. The earlier direct-array cycles
+remain in the CSV for audit and are not compared directly to NMAForge's
+controller interval.
 
 The standalone NMAForge 3×3 convolution check also passed on VCS, seed
 `20261029`: 9 useful MACs, 66 cycles, 72 B read, 4 B written, result `-30`.
@@ -115,19 +196,12 @@ cycles, 6,144 B read, 4,096 B written, 136 bank stalls, 72 line-write stalls,
 only 2.63% for 4×4×32 on a 16×16 array, which exposes the shape mismatch for
 small batches.
 
-The existing same-seed eight-way Matrix ablation evidence is in the
-[Compute Cluster benchmark report](../verification/COMPUTE_CLUSTER_TINYNPU_BENCHMARK_2026-10-27.md):
-depth 2/4 × Prefetch OFF/ON × A-cache OFF/ON, five shapes, three seeds
-`20261025/26/27`, 120/120 checks passed on the clean candidate. For 32×32×64,
-the depth-2/no-prefetch/no-cache baseline is 1,698 cycles and 512 bank reads;
-depth-4/prefetch/cache is 1,187 cycles and 384 reads (30.1% fewer cycles and
-25% fewer bank reads). This result uses the same one-cycle behavioral SPAD
-model, not physical SRAM.
-
-The new three-seed run reproduced those 32×32×64 endpoint values in all seeds:
-depth-2/prefetch-off/cache-off was 1,698 cycles and 8,192 B of bank reads;
-depth-4/prefetch-on/cache-on was 1,187 cycles and 6,144 B. This is 30.1% fewer
-cycles and 25% fewer bank-read bytes in the fixed behavioral memory model.
+The eight-way Matrix ablation is depth 2/4 × Prefetch OFF/ON × A-cache OFF/ON,
+five shapes, three seeds. For 32×32×64, the depth-2/no-prefetch/no-cache
+baseline is 1,698 cycles and 8,192 B of bank reads; depth-4/prefetch/cache is
+1,187 cycles and 6,144 B (30.1% fewer cycles and 25% fewer bank-read bytes).
+All 120 ablation points pass Golden on the current candidate. These results
+use the fixed one-cycle behavioral SPAD model, not physical SRAM.
 
 ## TinyNPU reference integrity and CNN Graph
 
@@ -187,8 +261,10 @@ they are not merged into the current pinned-reference CSV.
 
 - The current pinned TinyNPU reference does not expose an 8×8 configuration
   in the tested engine wrapper; current matched-array results use 16×16.
-- The same bandwidth-constrained 16×16 GEMM is not yet run through both
-  designs' memory interfaces. Until it is, no normalized speedup is available.
+- TinyNPU does not expose a matching SPAD interface in its tested array
+  wrapper. The common-memory TinyNPU values are a transparent adapter model;
+  an actual same-interface RTL comparison requires an upstream memory adapter
+  or a dedicated TinyNPU wrapper.
 - The paired CNN uses fixed weights from TinyNPU's checked-in ONNX graph; it is
   not a trained model. A hardware-native flatten/reformat operator is not part
   of this workload; the host layout bridge is measured separately.

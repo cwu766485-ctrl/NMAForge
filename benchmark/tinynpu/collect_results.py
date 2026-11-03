@@ -16,6 +16,10 @@ CSV_FIELDS = [
     "cycles_to_done", "cycles_to_last_output", "macs", "mac_per_cycle",
     "pe_utilization_pct", "spad_read_bytes", "spad_write_bytes", "bank_stalls",
     "line_stalls", "golden", "timing_boundary", "comparison_scope",
+    "common_spad_bytes_per_cycle", "common_spad_read_latency_cycles",
+    "common_read_bytes", "common_write_bytes", "common_read_service_cycles",
+    "common_write_service_cycles", "common_endpoint_cycles",
+    "common_mac_per_cycle", "common_pe_utilization_pct", "measurement_kind",
 ]
 CNN_FIELDS = [
     "run_id", "design", "source_sha", "reference_sha", "seed", "model",
@@ -54,6 +58,8 @@ def matrix_row(line: str, design: str, source_sha: str, seed: str,
                run_id: str, scope: str) -> dict[str, str]:
     value = fields(line)
     m, n, k = (int(part) for part in value["shape_mnk"].split(","))
+    cycles = int(value["cycles"])
+    macs = m * n * k
     return {
         "run_id": run_id,
         "design": design,
@@ -63,7 +69,7 @@ def matrix_row(line: str, design: str, source_sha: str, seed: str,
         "physical_array": value["physical_array"],
         "cycles_to_done": value["cycles"],
         "cycles_to_last_output": value["cycles"],
-        "macs": str(m * n * k),
+        "macs": str(macs),
         "mac_per_cycle": value["macs_per_cycle"],
         "pe_utilization_pct": value["array_utilization_pct"],
         "spad_read_bytes": value["bank_read_bytes"],
@@ -73,6 +79,16 @@ def matrix_row(line: str, design: str, source_sha: str, seed: str,
         "golden": "PASS: all output words",
         "timing_boundary": "Matrix start accepted through final SPAD write and done",
         "comparison_scope": scope,
+        "common_spad_bytes_per_cycle": "16",
+        "common_spad_read_latency_cycles": "1",
+        "common_read_bytes": value["bank_read_bytes"],
+        "common_write_bytes": value["line_write_bytes"],
+        "common_read_service_cycles": str((int(value["bank_read_bytes"])+15)//16),
+        "common_write_service_cycles": str((int(value["line_write_bytes"])+15)//16),
+        "common_endpoint_cycles": str(cycles),
+        "common_mac_per_cycle": f"{macs/cycles:.4f}",
+        "common_pe_utilization_pct": f"{100*macs/(256*cycles):.2f}",
+        "measurement_kind": "measured Matrix RTL + one-cycle behavioral SPAD",
     }
 
 
@@ -96,6 +112,9 @@ def main() -> None:
     parser.add_argument("--out-json", type=Path, required=True)
     parser.add_argument("--vcs-version", default="V-2023.12-SP1_Full64")
     parser.add_argument("--verilator-version", required=True)
+    parser.add_argument("--python-version", required=True)
+    parser.add_argument("--numpy-version", required=True)
+    parser.add_argument("--onnx-version", required=True)
     args = parser.parse_args()
 
     rows: list[dict[str, str]] = []
@@ -139,6 +158,18 @@ def main() -> None:
             "NMAForge", args.nma_sha, args.seed, args.run_id,
             "matched tiled GEMM; 16x16 controller + one-cycle behavioral SPAD"))
         tiny_m, tiny_n, tiny_k = (int(part) for part in tiny["shape_mnk"].split(","))
+        tiny_array_cycles = int(tiny["cycles_input_to_array_stable"])
+        tiny_read_bytes = tiny_m*tiny_k + tiny_k*tiny_n
+        tiny_write_bytes = tiny_m*tiny_n*4
+        tiny_read_service = (tiny_read_bytes+15)//16 + 1
+        tiny_write_service = (tiny_write_bytes+15)//16
+        # TinyNPU's public array wrapper has no SPAD request/response port.
+        # Normalize its array run with the same 128-bit line bandwidth and
+        # one-cycle read response, serializing input load, array execution,
+        # and output commit. Include the two accumulator-clear cycles omitted
+        # from the direct-array stopwatch.
+        tiny_common_cycles = tiny_read_service + tiny_array_cycles + tiny_write_service + 2
+        tiny_common_macs = tiny_m*tiny_n*tiny_k
         rows.append({
             "run_id": args.run_id,
             "design": "TinyNPU",
@@ -156,8 +187,18 @@ def main() -> None:
             "bank_stalls": "N/A",
             "line_stalls": "N/A",
             "golden": tiny["golden"],
-            "timing_boundary": "first systolic input through all tiled accumulators stable; direct array wrapper",
-            "comparison_scope": "same deterministic A/B and integer Golden; excludes TinyNPU memory path and is not latency-normalized to NMAForge controller",
+            "timing_boundary": "normalized command acceptance through final output commit; direct array run plus modeled SPAD load/store",
+            "comparison_scope": "same deterministic A/B and integer Golden; common 16-byte/cycle line model, one-cycle read response, no overlap between TinyNPU load/compute/store",
+            "common_spad_bytes_per_cycle": "16",
+            "common_spad_read_latency_cycles": "1",
+            "common_read_bytes": str(tiny_read_bytes),
+            "common_write_bytes": str(tiny_write_bytes),
+            "common_read_service_cycles": str(tiny_read_service),
+            "common_write_service_cycles": str(tiny_write_service),
+            "common_endpoint_cycles": str(tiny_common_cycles),
+            "common_mac_per_cycle": f"{tiny_common_macs/tiny_common_cycles:.4f}",
+            "common_pe_utilization_pct": f"{100*tiny_common_macs/(256*tiny_common_cycles):.2f}",
+            "measurement_kind": "direct TinyNPU RTL array cycles + explicit serial SPAD timing model",
         })
         if int(tiny["macs"]) != tiny_m * tiny_n * tiny_k:
             raise SystemExit(f"TinyNPU MAC count mismatch for {normalized_shape}")
@@ -265,10 +306,45 @@ def main() -> None:
             "measurement_boundary": "ONNX graph smoke with graph dispatcher and testbench DMA/SRAM shim",
         },
         "cycle_comparison": "No speedup computed: measurement windows, graph dispatch and memory setup differ.",
-        "tools": {"vcs": args.vcs_version, "verilator": args.verilator_version},
+        "tools": {
+            "vcs": args.vcs_version,
+            "verilator": args.verilator_version,
+            "python": args.python_version,
+            "numpy": args.numpy_version,
+            "onnx": args.onnx_version,
+        },
     }
     args.out_cnn_json.parent.mkdir(parents=True, exist_ok=True)
     args.out_cnn_json.write_text(json.dumps(cnn_summary, indent=2) + "\n", encoding="utf-8")
+
+    common_pairs = []
+    for shape in matched_shapes:
+        nma = nma_matches[shape]
+        tiny = tiny_matches[shape]
+        m, n, k = (int(part) for part in shape.split(","))
+        tiny_read = m*k + k*n
+        tiny_write = m*n*4
+        tiny_cycles = ((tiny_read+15)//16 + 1 +
+                       int(tiny["cycles_input_to_array_stable"]) +
+                       (tiny_write+15)//16 + 2)
+        nma_cycles = int(nma["cycles"])
+        common_pairs.append({
+            "shape": shape.replace(",", "x"),
+            "common_spad_bandwidth_bytes_per_cycle": 16,
+            "common_spad_read_latency_cycles": 1,
+            "nmaforge_measured_cycles": nma_cycles,
+            "nmaforge_measured_spad_read_bytes": int(nma["bank_read_bytes"]),
+            "nmaforge_measured_spad_write_bytes": int(nma["line_write_bytes"]),
+            "tinynpu_array_rtl_cycles": int(tiny["cycles_input_to_array_stable"]),
+            "tinynpu_modeled_read_bytes": tiny_read,
+            "tinynpu_modeled_write_bytes": tiny_write,
+            "tinynpu_modeled_read_service_cycles": (tiny_read+15)//16+1,
+            "tinynpu_modeled_write_service_cycles": (tiny_write+15)//16,
+            "tinynpu_normalized_cycles": tiny_cycles,
+            "nmaforge_over_tinynpu_normalized_ratio": round(tiny_cycles/nma_cycles, 4),
+            "golden": "PASS on both designs",
+            "boundary_note": "NMAForge endpoint is real Matrix controller + behavioral SPAD; TinyNPU endpoint adds a serialized bandwidth/latency model around the measured RTL array because upstream exposes no SPAD port",
+        })
 
     summary = {
         "run_id": args.run_id,
@@ -276,7 +352,13 @@ def main() -> None:
         "nmaforge_matrix_rtl_basis": "same Matrix product RTL as audited candidate 9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9",
         "tinynpu_source_sha": args.tiny_sha,
         "seed": args.seed,
-        "tools": {"vcs": args.vcs_version, "verilator": args.verilator_version},
+        "tools": {
+            "vcs": args.vcs_version,
+            "verilator": args.verilator_version,
+            "python": args.python_version,
+            "numpy": args.numpy_version,
+            "onnx": args.onnx_version,
+        },
         "matched_gemm": {
             "shapes": [shape.replace(",", "x") for shape in matched_shapes],
             "data_type": "signed INT8; INT32 accumulation",
@@ -289,10 +371,22 @@ def main() -> None:
                     "nmaforge_spad_read_bytes": int(nma_matches[shape]["bank_read_bytes"]),
                     "nmaforge_spad_write_bytes": int(nma_matches[shape]["line_write_bytes"]),
                     "tinynpu_direct_array_cycles": int(tiny_matches[shape]["cycles_input_to_array_stable"]),
-                    "comparison": "no speedup computed; NMAForge includes controller/SPAD while TinyNPU directly drives its systolic array",
+                    "tinynpu_normalized_cycles": common_pairs[index]["tinynpu_normalized_cycles"],
+                    "nmaforge_over_tinynpu_normalized_ratio": common_pairs[index]["nmaforge_over_tinynpu_normalized_ratio"],
+                    "comparison": "normalized model ratio only; TinyNPU uses serialized memory service with the common 16-byte/cycle, one-cycle-response model",
                 }
-                for shape in matched_shapes
+                for index, shape in enumerate(matched_shapes)
             ],
+            "normalized_boundary": {
+                "spad_line_width_bytes": 16,
+                "spad_bandwidth_bytes_per_cycle": 16,
+                "read_response_latency_cycles": 1,
+                "endpoint": "command acceptance to final output commit",
+                "nmaforge": "measured Matrix controller and behavioral SPAD; actual measured traffic",
+                "tinynpu": "measured RTL array cycles plus modeled input read and output write service; load, compute, and store are serialized; two accumulator-clear cycles included",
+                "ratio_is_asic_speedup": False,
+            },
+            "normalized_cases": common_pairs,
         },
         "matrix_size_sweep": {
             "shapes": ["4x4x32", "8x8x32", "16x16x32", "16x32x32", "32x32x64"],

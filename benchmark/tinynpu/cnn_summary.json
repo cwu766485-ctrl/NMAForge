@@ -1,6 +1,6 @@
 {
-  "run_id": "TINY-COMPARE-20261029-S20261029",
-  "nmaforge_source_sha": "08c34322879c688afd505ddf41fa4b2a5dc93ac0",
+  "run_id": "TINY-FAIR-6848A41-S20261029",
+  "nmaforge_source_sha": "6848a414eaeaa05cf9e1411cf55d9d27333208a6",
   "tinynpu_source_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
   "model": "conv1x_mini.onnx",
   "model_sha256": "1ac385ac18394ac5826a7eb426e99c2199bf6417055f7e3f461c40c1b1811640",
@@ -27,6 +27,9 @@
   "cycle_comparison": "No speedup computed: measurement windows, graph dispatch and memory setup differ.",
   "tools": {
     "vcs": "V-2023.12-SP1_Full64",
-    "verilator": "Verilator 5.052 2026-09-05 rev v5.052"
+    "verilator": "Verilator 5.052 2026-09-05 rev v5.052",
+    "python": "3.11.13",
+    "numpy": "2.4.6",
+    "onnx": "1.17.0"
   }
 }

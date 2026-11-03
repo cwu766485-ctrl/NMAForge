@@ -4,9 +4,9 @@ module tb_ai_tensor_sfu_random;
   reg clk=0,resetn=0,start=0,abort=0;
   reg [7:0] op_mode=0;
   reg [31:0] src0_base=32'h100,src1_base=0,beta_base=32'h300;
-  reg beta_enable=0,pack_enable=0;
+  reg beta_enable=0,pack_enable=0,pack_tile_a=0;
   reg [31:0] dst_base=32'h400;
-  reg [15:0] length=0;
+  reg [15:0] length=0,m_size=0,n_size=0;
   reg [4:0] scale_shift=0;
   reg [31:0] epsilon=1,watchdog_limit=0;
   wire spad_valid,spad_write;
@@ -39,8 +39,10 @@ module tb_ai_tensor_sfu_random;
   ai_tensor_sfu_core dut(
     .clk(clk),.resetn(resetn),.start(start),.abort(abort),.op_mode(op_mode),
     .src0_base(src0_base),.src1_base(src1_base),.beta_base(beta_base),
-    .beta_enable(beta_enable),.pack_enable(pack_enable),.dst_base(dst_base),
-    .length(length),.scale_shift(scale_shift),.epsilon(epsilon),
+    .beta_enable(beta_enable),.pack_enable(pack_enable),
+    .pack_tile_a(pack_tile_a),.dst_base(dst_base),
+    .length(length),.m_size(m_size),.n_size(n_size),
+    .scale_shift(scale_shift),.epsilon(epsilon),
     .watchdog_limit(watchdog_limit),.spad_valid(spad_valid),
     .spad_write(spad_write),.spad_addr(spad_addr),.spad_wdata(spad_wdata),
     .spad_ready(spad_ready),.spad_rsp_valid(spad_rsp_valid),
@@ -95,7 +97,8 @@ module tb_ai_tensor_sfu_random;
       if(rc!=7) $fatal(1,"failed to read SFU case header %0d",case_id);
       op_mode=op[7:0];length=length_i[15:0];scale_shift=shift_i[4:0];
       epsilon=(op==8'h39)?query_i:epsilon_i;
-      beta_enable=beta_enable_i[0];pack_enable=pack_enable_i[0];
+      beta_enable=beta_enable_i[0];pack_enable=pack_enable_i[0];pack_tile_a=0;
+      m_size=0;n_size=0;
       src0_base=32'h100;src1_base=32'h0;beta_base=32'h300;dst_base=32'h400;
       if(op==8'h33 || op==8'h34 || op==8'h38) src1_base=32'h200;
       for(i=0;i<length_i;i=i+1) begin
@@ -140,6 +143,56 @@ module tb_ai_tensor_sfu_random;
       end
       expected_total_writes=expected_total_writes+expected_writes;
       case_id=case_id+1;
+    end
+  endtask
+
+  task automatic run_tile_a_pack_case;
+    integer row_group,k_group,row_lane,k_lane,source_row,source_k,word_index;
+    integer signed sample_value;
+    begin
+      op_mode=8'h36;src0_base=32'h100;dst_base=32'h400;
+      length=32;m_size=4;n_size=8;scale_shift=0;
+      pack_enable=1;pack_tile_a=1;beta_enable=0;watchdog_limit=0;
+      abort=0;inject_parity=0;inject_protection=0;
+      for(i=0;i<32;i=i+1) begin
+        memory[(src0_base>>2)+i]=i*3-40;
+        memory[(dst_base>>2)+(i/4)]=32'hface_cafe;
+      end
+      word_index=0;
+      for(row_group=0;row_group<4;row_group=row_group+4)
+        for(k_group=0;k_group<2;k_group=k_group+1)
+          for(row_lane=0;row_lane<4;row_lane=row_lane+1) begin
+            packed_word=0;
+            source_row=row_group+row_lane;
+            for(k_lane=0;k_lane<4;k_lane=k_lane+1) begin
+              source_k=k_group*4+k_lane;
+              sample_value=source_row*8+source_k;
+              packed_word[k_lane*8+:8]=sample_value*3-40;
+            end
+            expected[word_index]=packed_word;
+            word_index=word_index+1;
+          end
+
+      write_count=0;
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      timeout=0;
+      while(!done && timeout<100000) begin @(negedge clk);timeout=timeout+1;end
+      if(!done || error || busy || error_code!=0)
+        $fatal(1,"SFU Matrix A tile pack failed code=%0d cycles=%0d",error_code,cycle_count);
+      if(element_count!=32 || write_count!=8)
+        $fatal(1,"SFU Matrix A tile pack counts elements=%0d writes=%0d",element_count,write_count);
+      for(word_index=0;word_index<8;word_index=word_index+1)
+        if(memory[(dst_base>>2)+word_index]!==expected[word_index])
+          $fatal(1,"SFU Matrix A tile pack word=%0d got=%08x expected=%08x",
+                 word_index,memory[(dst_base>>2)+word_index],expected[word_index]);
+      expected_total_writes=expected_total_writes+8;
+
+      // A malformed shape must be rejected before issuing a source read or
+      // committing any partial tile word.
+      length=31;
+      expect_sfu_error(4'd1,77);
+      pack_tile_a=0;pack_enable=0;m_size=0;n_size=0;
     end
   endtask
 
@@ -314,7 +367,8 @@ module tb_ai_tensor_sfu_random;
       src1_base=((op_mode==8'h34) ||
                  (op_mode==8'h33 && target_state>=20 && target_state<=21)) ?
                 32'h200:32'd0;
-      beta_base=32'h300;beta_enable=(op_mode==8'h38);pack_enable=0;
+      beta_base=32'h300;beta_enable=(op_mode==8'h38);pack_enable=0;pack_tile_a=0;
+      m_size=0;n_size=0;
       dst_base=32'h400;scale_shift=0;epsilon=1;watchdog_limit=0;
       for(j=0;j<32;j=j+1) begin
         memory[(src0_base>>2)+j]=j+1;
@@ -449,6 +503,7 @@ module tb_ai_tensor_sfu_random;
 
     case_id=0;
     while(case_id<case_count) run_vector();
+    run_tile_a_pack_case();
     $fclose(fd);
     if(read_count!=response_count || response_pending)
       $fatal(1,"SPAD response accounting reads=%0d responses=%0d pending=%b",
@@ -458,7 +513,7 @@ module tb_ai_tensor_sfu_random;
              total_write_count,expected_total_writes);
     if(ready_stall_count==0 || max_response_delay==0)
       $fatal(1,"SFU random memory profile missed ready or response stalls");
-    $display("SFU_RANDOM_LATENCY_PASS cases=%0d error_cases=8 late_faults=1 abort_watchdog=1 reset_fault_combo=1 reset_recovery=1 fsm_reset_states=39 fsm_abort_states=39 rms_gamma_bypass=1 seed=%0d reads=%0d responses=%0d writes=%0d max_rsp_delay=%0d ready_stalls=%0d",
+    $display("SFU_RANDOM_LATENCY_PASS cases=%0d error_cases=9 late_faults=1 abort_watchdog=1 reset_fault_combo=1 reset_recovery=1 fsm_reset_states=39 fsm_abort_states=39 rms_gamma_bypass=1 tile_a_pack=1 seed=%0d reads=%0d responses=%0d writes=%0d max_rsp_delay=%0d ready_stalls=%0d",
              case_count,initial_seed,read_count,response_count,total_write_count,max_response_delay,ready_stall_count);
     $finish;
   end

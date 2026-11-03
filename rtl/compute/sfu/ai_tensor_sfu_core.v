@@ -28,8 +28,12 @@ module ai_tensor_sfu_core(
     // Descriptor flag[4] turns REQUANT into a layout bridge: four saturated
     // INT8 results are packed into one word for a following matrix command.
     input  wire        pack_enable,
+    // Descriptor flag[5] writes packed words in the Matrix A 4x4 tile order.
+    input  wire        pack_tile_a,
     input  wire [31:0] dst_base,
     input  wire [15:0] length,
+    input  wire [15:0] m_size,
+    input  wire [15:0] n_size,
     input  wire [4:0]  scale_shift,
     input  wire [31:0] epsilon,
     input  wire [31:0] watchdog_limit,
@@ -127,7 +131,9 @@ module ai_tensor_sfu_core(
     reg signed [63:0] sum_x_r;
     reg signed [63:0] vector_product_r;
     reg [31:0] rms_root_r, inv_rms_r;
-    reg rms_normalize_phase_r, beta_enable_r, pack_enable_r;
+    reg rms_normalize_phase_r, beta_enable_r, pack_enable_r, pack_tile_a_r;
+    reg [15:0] m_size_r, n_size_r, pack_row_r, pack_k_group_r;
+    reg [31:0] pack_tile_group_base_r;
     reg [31:0] pack_word_r;
 
     reg div_start_r, sqrt_start_r;
@@ -141,9 +147,13 @@ module ai_tensor_sfu_core(
     wire [31:0] src1_addr = src1_r + ({16'd0,index_r}<<2);
     wire [31:0] beta_addr = beta_base_r + ({16'd0,index_r}<<2);
     wire packed_requant = (op_r == OP_REQUANT_I8) && pack_enable_r;
+    wire [31:0] pack_tile_word_index = pack_tile_group_base_r +
+        ({16'd0,pack_k_group_r} << 2) + {30'd0,pack_row_r[1:0]};
+    wire [31:0] packed_word_index = pack_tile_a_r ? pack_tile_word_index :
+                                    {18'd0,index_r[15:2]};
     wire [31:0] dst_addr = dst_r +
                            (packed_requant ?
-                            ({18'd0,index_r[15:2]} << 2) :
+                            (packed_word_index << 2) :
                             ({16'd0,index_r} << 2));
     wire signed [31:0] spad_signed = spad_rdata;
     wire causal_masked = (op_r == OP_CAUSAL_SOFTMAX_Q15) &&
@@ -165,6 +175,13 @@ module ai_tensor_sfu_core(
                                   (src1_base != 0) && (|src1_base[1:0])) ||
                                  ((op_mode == OP_LAYERNORM_Q15) && beta_enable &&
                                   (|beta_base[1:0]));
+    wire [31:0] pack_tile_expected_length =
+        {16'd0,m_size} * {16'd0,n_size};
+    wire pack_tile_config_error = pack_tile_a &&
+        ((op_mode != OP_REQUANT_I8) || !pack_enable ||
+         (m_size == 0) || (n_size == 0) ||
+         (m_size[1:0] != 0) || (n_size[1:0] != 0) ||
+         (pack_tile_expected_length != {16'd0,length}));
     wire last_element = (index_r == length_r - 1'b1);
     wire is_layernorm = (op_r == OP_LAYERNORM_Q15);
     wire is_normalization = (op_r == OP_RMSNORM_Q15) || is_layernorm;
@@ -237,7 +254,9 @@ module ai_tensor_sfu_core(
             exp_r<=0; output_word_r<=0; sum_exp_r<=0; sum_sq_r<=0;
             mean_sq_r<=0; vector_product_r<=0; rms_root_r<=0; inv_rms_r<=0;
             sum_x_r<=0; rms_normalize_phase_r<=0; beta_enable_r<=0;
-            pack_enable_r<=0; pack_word_r<=0;
+            pack_enable_r<=0; pack_word_r<=0; pack_tile_a_r<=0;
+            m_size_r<=0; n_size_r<=0; pack_row_r<=0; pack_k_group_r<=0;
+            pack_tile_group_base_r<=0;
             div_start_r<=0; sqrt_start_r<=0; div_dividend_r<=0; div_divisor_r<=0;
             busy<=0; done<=0; error<=0; error_code<=0; result<=0;
             cycle_count<=0; element_count<=0;
@@ -255,7 +274,10 @@ module ai_tensor_sfu_core(
                     if (start) begin
                         op_r<=op_mode; src0_r<=src0_base; src1_r<=src1_base;
                         beta_base_r<=beta_base; beta_enable_r<=beta_enable;
-                        pack_enable_r<=pack_enable; dst_r<=dst_base;
+                        pack_enable_r<=pack_enable; pack_tile_a_r<=pack_tile_a;
+                        m_size_r<=m_size; n_size_r<=n_size;
+                        pack_row_r<=0; pack_k_group_r<=0;
+                        pack_tile_group_base_r<=0; dst_r<=dst_base;
                         length_r<=length; scale_shift_r<=scale_shift;
                         // For causal Softmax this field is a zero-based query
                         // token index, so zero must remain a valid boundary.
@@ -268,7 +290,8 @@ module ai_tensor_sfu_core(
                         max_r<=32'sh8000_0000; sum_exp_r<=0; sum_sq_r<=0; sum_x_r<=0;
                         mean_r<=0; beta_r<=0; pack_word_r<=0;
                         rms_normalize_phase_r<=0;
-                        if (length==0 || input_alignment_error) begin
+                        if (length==0 || input_alignment_error ||
+                            pack_tile_config_error) begin
                             error_code<=ERR_CONFIG; state_r<=ST_ERROR;
                         end else if (!valid_operation) begin
                             error_code<=ERR_OP; state_r<=ST_ERROR;
@@ -512,6 +535,17 @@ module ai_tensor_sfu_core(
                              ({30'd0,index_r[1:0]} + 32'd1) : 32'd1);
                         if (packed_requant)
                             pack_word_r<=0;
+                        if (packed_requant && pack_tile_a_r) begin
+                            if (pack_k_group_r == (n_size_r[15:2] - 1'b1)) begin
+                                pack_k_group_r<=0;
+                                pack_row_r<=pack_row_r+1'b1;
+                                if (pack_row_r[1:0] == 2'd3)
+                                    pack_tile_group_base_r<=pack_tile_group_base_r +
+                                                            {16'd0,n_size_r};
+                            end else begin
+                                pack_k_group_r<=pack_k_group_r+1'b1;
+                            end
+                        end
                         if (last_element) state_r<=ST_DONE;
                         else begin index_r<=index_r+1'b1;
                             state_r<=is_normalization ? ST_RMS_X_REQ : ST_VEC_A_REQ;
