@@ -12,6 +12,7 @@ class ai_compute_cluster_monitor extends uvm_component;
     int response_epoch_client;
     int pending_read_count[0:4];
     int unsigned matrix_fault_cancel_count_seen;
+    bit [6:0] sampled_engine_busy_previous;
 
     function new(string name, uvm_component parent);
         super.new(name, parent);
@@ -31,6 +32,7 @@ class ai_compute_cluster_monitor extends uvm_component;
         response_epoch_pending = 1'b0;
         response_epoch_client = 0;
         matrix_fault_cancel_count_seen = 0;
+        sampled_engine_busy_previous = '0;
         for (int client = 0; client < 5; client++) pending_read_count[client] = 0;
         void'($value$plusargs("CL_MUTATION=%s", mutation_kind));
         void'($value$plusargs("CL_MUTATION_ENGINE=%d", mutation_engine));
@@ -50,6 +52,8 @@ class ai_compute_cluster_monitor extends uvm_component;
                 (|vif.selected_cnm_valid) || vif.launch_valid || (|vif.engine_busy) ||
                 (|vif.engine_done) || (|vif.engine_error) ||
                 (|vif.engine_req_valid) ||
+                (|vif.engine_rsp_valid) ||
+                (vif.engine_busy !== sampled_engine_busy_previous) ||
                 vif.core_spad_valid || vif.banked_valid ||
                 (|vif.cnm_valid) || vif.rsp_valid || vif.matrix_rsp_valid ||
                 (|vif.cnm_rsp_valid) || (|vif.read_accept_mask) || vif.cplq_full ||
@@ -70,6 +74,9 @@ class ai_compute_cluster_monitor extends uvm_component;
                 obs.engine_error = vif.engine_error;
                 obs.engine_req_valid = vif.engine_req_valid;
                 obs.engine_req_ready = vif.engine_req_ready;
+                obs.engine_rsp_valid = vif.engine_rsp_valid;
+                obs.engine_rsp_rdata = vif.engine_rsp_rdata;
+                obs.engine_rsp_error = vif.engine_rsp_error;
                 obs.engine_backpressure = |(vif.engine_req_valid & ~vif.engine_req_ready);
                 obs.multi_engine_abort = (vif.dut_abort_active &&
                                           ($countones(vif.engine_busy) > 1));
@@ -246,6 +253,7 @@ class ai_compute_cluster_monitor extends uvm_component;
                 if (flush_missing_done)
                     missing_done_pending = '0;
             end
+            sampled_engine_busy_previous = vif.engine_busy;
         end
     endtask
 endclass

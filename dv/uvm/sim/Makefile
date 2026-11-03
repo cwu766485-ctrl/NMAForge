@@ -19,8 +19,9 @@ COMPUTE_CLUSTER_RUN_STAMP := $(shell date +%Y%m%d_%H%M%S_%N)
 COMPUTE_CLUSTER_UVM_OUT ?= /tmp/nmaforge_real_compute_cluster_uvm_$(COMPUTE_CLUSTER_RUN_STAMP)
 COMPUTE_CLUSTER_UVM_SEEDS ?= 20261025 20261026 20261027
 COMPUTE_CLUSTER_MUTATION_OUT ?= /tmp/nmaforge_compute_cluster_mutations_$(COMPUTE_CLUSTER_RUN_STAMP)
+COMPUTE_CLUSTER_DUT_MUTATION_OUT ?= /tmp/nmaforge_compute_cluster_dut_mutations_$(COMPUTE_CLUSTER_RUN_STAMP)
 
-.PHONY: uvm_compile uvm_run uvm_smoke uvm_fp16_ddr_e2e uvm_mixed_precision_ddr_e2e uvm_external_macro_ddr_e2e uvm_mixed_precision_ddr_e2e_axi_stalls uvm_mixed_precision_ddr_e2e_regress uvm_mixed_precision_ddr_e2e_cov_regress uvm_mixed_precision_ddr_e2e_random_cov_regress uvm_compute_cluster_compile uvm_compute_cluster_regress uvm_compute_cluster_mutation clean
+.PHONY: uvm_compile uvm_run uvm_smoke uvm_fp16_ddr_e2e uvm_mixed_precision_ddr_e2e uvm_external_macro_ddr_e2e uvm_mixed_precision_ddr_e2e_axi_stalls uvm_mixed_precision_ddr_e2e_regress uvm_mixed_precision_ddr_e2e_cov_regress uvm_mixed_precision_ddr_e2e_random_cov_regress uvm_compute_cluster_compile uvm_compute_cluster_regress uvm_compute_cluster_mutation uvm_compute_cluster_dut_mutation clean
 uvm_compile:
 	rm -rf simv_uvm simv_uvm.daidir csrc
 	$(VCS_UVM) -top tb_ai_accel_uvm -f ai_accel_uvm.f -o simv_uvm -l uvm_compile.log
@@ -106,6 +107,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -Eq '\[CLUSTER_RESPONSE_CLIENT_DISPOSITION\].*DMA read-response bin=[1-9][0-9]* PASS; completion read-response bin=0 WAIVED' "$$log" || { echo "ERROR: DMA/completion response-client disposition missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_SCOREBOARD\]' "$$log" || { echo "ERROR: compute-cluster scoreboard report missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_MEMORY_SCOREBOARD\].*checked_words=[1-9][0-9]* mismatches=0 unknown_reads=0' "$$log" || { echo "ERROR: independent scratchpad memory scoreboard did not close cleanly in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_ENGINE_RESPONSE_OWNER_PASS\].*accepted=[1-9][0-9]* checked=[1-9][0-9]* reset_dropped=[0-9]+ route_mismatch=0 data_mismatch=0 error_mismatch=0 pending=0' "$$log" || { echo "ERROR: accepted 32-bit engine reads did not all receive one correct owner/data/error response (or an accounted reset drop) in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_RANDOM_FAULT_CROSS_PASS\].*parity cases=18/18' "$$log" || { echo "ERROR: randomized seven-engine parity fault cross missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_PARITY_OWNER_CROSS_PASS\].*overlap_cycles=[1-9][0-9]* shared_banked_accepts=[1-9][0-9]* matrix_rsp=[1-9][0-9]* cnm_rsp=[1-9][0-9]* route_mismatch=0; held-read fault cancellations=1' "$$log" || { echo "ERROR: concurrent Matrix parity error/CNM owner-isolation/fault-cancel cross missing or failed in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_PARITY_ABORT_OWNER_CROSS_PASS\].*Matrix ERR_PARITY=0x52 observed while CNM active; software Abort retires CNM ERR_ABORT=0x32 then Matrix parity in CMDQ order; overlap_cycles=[1-9][0-9]* shared_banked_accepts=[1-9][0-9]* matrix_rsp=[1-9][0-9]* cnm_rsp=[1-9][0-9]* route_mismatch=0; held-read fault cancellations=[0-1] CNM accepted_prefix=[0-9]+/16 post_abort_writes=0; CNM Golden prefix/suffix and read drain checked' "$$log" || { echo "ERROR: Matrix parity followed by concurrent CNM Abort/drain/owner cross missing or failed in $$log"; exit 1; }; \
@@ -198,6 +200,13 @@ uvm_compute_cluster_mutation: uvm_compute_cluster_compile
 	  done; \
 	done; \
 	echo "COMPUTE_CLUSTER_MUTATION_CAMPAIGN_PASS: address data owner wstrb completion_error_code write_after_error response_epoch plus done/missing_done/duplicate_done on all seven engines (28/28); expected checker verified per mutation; artifacts=$$out"
+
+# Rebuild real DUT RTL with isolated source mutations and require the unchanged
+# monitor/scoreboard plus functional sequence to catch each defect.
+uvm_compute_cluster_dut_mutation:
+	python3 run_compute_cluster_dut_mutations.py \
+	  --out "$(COMPUTE_CLUSTER_DUT_MUTATION_OUT)" \
+	  --vcs-home "$(VCS_HOME)"
 
 # Opt-in AXI address/data/response gaps are seeded per vector plan and sampled
 # per transaction. The focused target requires configuration and stall markers.

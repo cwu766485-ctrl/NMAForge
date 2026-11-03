@@ -27,6 +27,8 @@ interface ai_compute_cluster_if(input logic aclk);
     logic [6:0] engine_req_ready;
     logic [6:0] engine_req_write;
     logic [223:0] engine_req_addr, engine_req_wdata;
+    logic [6:0] engine_rsp_valid, engine_rsp_error;
+    logic [223:0] engine_rsp_rdata;
     logic core_spad_valid;
     logic banked_valid;
     logic [3:0] cnm_valid;
