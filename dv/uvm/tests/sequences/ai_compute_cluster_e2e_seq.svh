@@ -7309,6 +7309,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         spad_write(CLUSTER_CONTRACT_CMDQ + 32'h18, 32'd4);
         spad_write(CLUSTER_CONTRACT_CMDQ + 32'h1c, 32'h0000_0006);
 
+        // Exercise a legal scheduler-side admission stall on the actual
+        // banked-read interface, then require the same request to be accepted.
+        stall_matrix_banked_read_once(8);
+
         wait_cpl_tail(32'd1);
         wait_spad_idle();
         for (word_idx = 0; word_idx < 512; word_idx++) begin
@@ -7404,6 +7408,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         spad_write(CLUSTER_CONTRACT_CMDQ + 32'h04, SFU_LATCH_MUTATED_SRC_LOCAL);
         spad_write(CLUSTER_CONTRACT_CMDQ + 32'h10, SFU_LATCH_MUTATED_Y_LOCAL);
         spad_write(CLUSTER_CONTRACT_CMDQ + 32'h18, 32'd1);
+
+        // Hold the real SFU output write at the production scheduler admission
+        // point; after release, normal Golden and completion checks still apply.
+        stall_core_engine_write_once(4, 8);
 
         wait_cpl_tail(32'd1);
         wait_spad_idle();
@@ -7640,6 +7648,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h14,
                                  {16'd2,16'd2}, "Conv shape");
 
+        // Cover unaccepted Conv output hold/recovery through the real top.
+        stall_core_engine_write_once(5, 8);
+
         wait_cpl_tail(32'd1);
         wait_spad_idle();
         spad_write(CLUSTER_CONTRACT_CMDQ + 32'h04, CONV_LATCH_A_LOCAL);
@@ -7732,6 +7743,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                                  32'd1, "KV length");
         backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h20,
                                  32'd0, "KV aux");
+
+        // Cover unaccepted KV cache-write hold/recovery through the real top.
+        stall_core_engine_write_once(6, 8);
 
         wait_cpl_tail(32'd1);
         wait_spad_idle();
@@ -11296,6 +11310,54 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_fatal("CLUSTER_STALL_INJECT",
                 "failed to retrigger arbiter combinational selection after stall")
         void'(uvm_hdl_release("tb_ai_accel_uvm.dut.spad_arbiter_u.dma_addr"));
+    endtask
+
+    task automatic stall_matrix_banked_read_once(input int unsigned stall_cycles);
+        int unsigned poll;
+        int unsigned stall_idx;
+        bit request_seen;
+        bit accepted_after_release;
+        bit [31:0] held_addr;
+
+        request_seen = 1'b0;
+        for (poll = 0; poll < 10000; poll++) begin
+            @(negedge compute_vif.aclk);
+            if (compute_vif.matrix_request_valid) begin
+                request_seen = 1'b1;
+                held_addr = compute_vif.matrix_banked_req_addr;
+                break;
+            end
+        end
+        if (!request_seen)
+            `uvm_fatal("CLUSTER_STALL_INJECT",
+                "Matrix produced no banked read request for directed stall")
+        force_scheduler_admission_stall();
+        for (stall_idx = 0; stall_idx < stall_cycles; stall_idx++) begin
+            @(posedge compute_vif.aclk);
+            #1;
+            if (!compute_vif.matrix_request_valid ||
+                compute_vif.banked_ready !== 1'b0 ||
+                compute_vif.matrix_banked_req_addr !== held_addr)
+                `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
+                    "Matrix banked read did not remain unaccepted/stable at injected stall cycle %0d",
+                    stall_idx))
+        end
+        @(negedge compute_vif.aclk);
+        release_scheduler_admission_stall();
+
+        accepted_after_release = 1'b0;
+        for (poll = 0; poll < 10000 && !accepted_after_release; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.matrix_request_valid && compute_vif.banked_ready &&
+                compute_vif.matrix_banked_req_addr === held_addr)
+                accepted_after_release = 1'b1;
+        end
+        if (!accepted_after_release)
+            `uvm_fatal("CLUSTER_STALL_INJECT",
+                "Matrix banked read made no progress after injected backpressure release")
+        `uvm_info("CLUSTER_REQUEST_STALL_INJECT_PASS", $sformatf(
+            "Matrix banked read held unaccepted for %0d cycles, then accepted once ready resumed",
+            stall_cycles), UVM_LOW)
     endtask
 
     task automatic stall_core_engine_write_once(
