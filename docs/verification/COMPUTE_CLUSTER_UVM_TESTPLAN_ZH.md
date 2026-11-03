@@ -97,7 +97,7 @@ remaining C1 closure
 | Requirement | Feature | Testpoint / Testcase ID | Checker / Oracle | Coverpoint / Cross | Priority / 设计状态 |
 |---|---|---|---|---|---|
 | REQ-CL-001 | 合法 Launch | idle / single-task；`tc_cl_legal_start` | 命令 Monitor+owner tracker | `cp_engine × launch_phase` | P0 READY |
-| REQ-CL-002 | Engine Decode | 0x10-17,20/21,30-39,43/44,50/51逐一启动，select一致；`tc_cl_opcode_dispatch` | engine start观察 + dec独立解码 | `opcode × selected_engine` | P0 READY |
+| REQ-CL-002 | Engine Decode | 0x10-17,20/21,30-39,43/44,50/51逐一启动，select一致；`tc_cl_opcode_dispatch` / `TC-CL-R255-OPCODE-DISPATCH-24` | 冻结 SPEC 的独立 decode oracle 对比七个真实 core `start` 端口；检查唯一启动和正常 completion | `opcode × selected_engine`，24 bins | P0 READY；R255 三 Seed 24/24，PASS-SCOPED |
 | REQ-CL-003 | 启动参数时序 | Start 前后变更参数；在采样边缘值稳定；`tc_cl_launch_sampling` | cfg monitor + model | `engine × launch_sampling` | P0 READY |
 | REQ-CL-004 | 无关字段隔离 | 随机扰动本 Opcode 不使用的字段；`tc_cl_unused_field_noise` | Golden对比和存储写回 | `engine × unused_field_group` | P1 READY |
 | REQ-CL-005 | 参数锁存 | Busy期间修改 Launch 参数，完成原任务；`tc_cl_config_latched` | input monitor + memory scoreboard | `engine × mid_task_change` | P0 READY |
