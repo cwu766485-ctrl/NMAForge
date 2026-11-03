@@ -298,6 +298,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
     int unsigned engine_pair_overlap_cov_idx;
     int unsigned cmdq_invalid_descriptor_case;
+    int unsigned conv_descriptor_boundary_case;
     int unsigned engine_parallel_fault_cov_idx;
     int unsigned engine_parallel_reset_phase;
     covergroup cmdq_invalid_descriptor_cg;
@@ -311,6 +312,14 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             bins kv_zero_length = {5};
             bins mixed_fp_reserved_field = {6};
             bins macro_minimum_child_count = {7};
+        }
+    endgroup
+
+    covergroup conv_descriptor_boundary_cg;
+        option.per_instance = 1;
+        cp_conv_descriptor_boundary: coverpoint conv_descriptor_boundary_case {
+            bins minimum_3x3 = {0};
+            bins maximum_width_3x128 = {1};
         }
     endgroup
 
@@ -454,6 +463,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         engine_parity_cplq_cg = new();
         engine_abort_cplq_cg = new();
         cmdq_invalid_descriptor_cg = new();
+        conv_descriptor_boundary_cg = new();
         engine_parallel_fault_cg = new();
         engine_parallel_reset_cg = new();
         engine_pair_overlap_cg = new();
@@ -6283,6 +6293,197 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
+    task automatic run_conv_cmdq_shape_boundary_test(input int unsigned seed);
+        localparam bit [31:0] BOUNDARY_CMDQ = 32'h0005_c200;
+        localparam bit [31:0] BOUNDARY_CPLQ = 32'h0005_c300;
+        localparam bit [31:0] MIN_A = 32'h0007_8800;
+        localparam bit [31:0] MAX_A = 32'h0007_9000;
+        localparam bit [31:0] WEIGHTS = 32'h0007_9800;
+        localparam bit [31:0] MIN_Y = 32'h0007_a000;
+        localparam bit [31:0] MAX_Y = 32'h0007_a100;
+        localparam int unsigned MAX_WIDTH = 128;
+        localparam int unsigned MAX_OUTPUTS = MAX_WIDTH - 2;
+        bit signed [7:0] pixels[0:3*MAX_WIDTH-1];
+        bit signed [7:0] kernel[0:8];
+        bit [31:0] golden_min[0:0];
+        bit [31:0] golden_max[0:MAX_OUTPUTS-1];
+        bit [7:0] observed_op[0:1];
+        bit [15:0] observed_m[0:1];
+        bit [15:0] observed_n[0:1];
+        bit [15:0] observed_k[0:1];
+        bit [1:0] case_mask;
+        bit monitor_complete;
+        int unsigned launch_before;
+        int unsigned conv_launch_before;
+        int unsigned busy_launch_before;
+        int unsigned launch_seen;
+        int unsigned poll;
+        int unsigned idx;
+        int unsigned col_idx;
+        int unsigned kernel_row;
+        int unsigned kernel_col;
+        int unsigned input_idx;
+        int signed sample_value;
+        int signed pixel_value;
+        int signed weight_value;
+        longint signed accum;
+
+        // The v1.5 Conv contract uses one signed INT8 sample per low byte,
+        // valid/no-padding 3x3 windows, and MAX_WIDTH=128. Exercise both
+        // legal edges through descriptor fetch, validation, real Conv RTL,
+        // ordered completion, and the complete independent memory Golden.
+        for (idx = 0; idx < 3 * MAX_WIDTH; idx++) begin
+            sample_value = ((int'(idx * 37) + int'(seed % 73)) % 256) - 128;
+            pixels[idx] = sample_value[7:0];
+            spad_write(MAX_A + (idx << 2), {24'd0, pixels[idx]});
+            if (idx < 9)
+                spad_write(MIN_A + (idx << 2), {24'd0, pixels[idx]});
+        end
+        for (idx = 0; idx < 9; idx++) begin
+            sample_value = ((int'(idx * 53) + int'(seed % 101)) % 256) - 128;
+            kernel[idx] = sample_value[7:0];
+            spad_write(WEIGHTS + (idx << 2), {24'd0, kernel[idx]});
+        end
+
+        accum = 64'sd0;
+        for (kernel_row = 0; kernel_row < 3; kernel_row++) begin
+            for (kernel_col = 0; kernel_col < 3; kernel_col++) begin
+                pixel_value = $signed(pixels[(kernel_row * 3) + kernel_col]);
+                weight_value = $signed(kernel[(kernel_row * 3) + kernel_col]);
+                accum += pixel_value * weight_value;
+            end
+        end
+        golden_min[0] = accum[31:0];
+
+        for (col_idx = 0; col_idx < MAX_OUTPUTS; col_idx++) begin
+            accum = 64'sd0;
+            for (kernel_row = 0; kernel_row < 3; kernel_row++) begin
+                for (kernel_col = 0; kernel_col < 3; kernel_col++) begin
+                    input_idx = (kernel_row * MAX_WIDTH) + col_idx + kernel_col;
+                    pixel_value = $signed(pixels[input_idx]);
+                    weight_value = $signed(kernel[(kernel_row * 3) + kernel_col]);
+                    accum += pixel_value * weight_value;
+                end
+            end
+            golden_max[col_idx] = accum[31:0];
+            spad_write(MAX_Y + (col_idx << 2), 32'hbad0_c300 | col_idx);
+        end
+        spad_write(MIN_Y - 32'd4, 32'hbad0_c2ff);
+        spad_write(MIN_Y + 32'd4, 32'hbad0_c2fe);
+        spad_write(MAX_Y - 32'd4, 32'hbad0_c2fd);
+        spad_write(MAX_Y + (MAX_OUTPUTS << 2), 32'hbad0_c2fc);
+
+        write_cluster_desc(BOUNDARY_CMDQ, 8'h16, 16'h06d0,
+                           MIN_A, WEIGHTS, MIN_Y,
+                           16'd3, 16'd3, 16'd9,
+                           32'd0, 32'd0, 32'd0, 32'd0, 8'd5);
+        write_cluster_desc(BOUNDARY_CMDQ + 32'h40, 8'h16, 16'h06d1,
+                           MAX_A, WEIGHTS, MAX_Y,
+                           16'd3, 16'd128, 16'd9,
+                           32'd0, 32'd0, 32'd0, 32'd0, 8'd5);
+
+        launch_before = compute_vif.launch_sample_count;
+        conv_launch_before = compute_vif.engine_launch_count[5];
+        busy_launch_before = compute_vif.same_engine_launch_while_busy;
+        launch_seen = 0;
+        monitor_complete = 1'b0;
+        case_mask = '0;
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, BOUNDARY_CMDQ);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd2);
+        axil_write(REG_CPLQ_BASE, BOUNDARY_CPLQ);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+
+        fork
+            begin : conv_boundary_launch_monitor
+                for (poll = 0; poll < 100000 && launch_seen < 2; poll++) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.launch_valid) begin
+                        if (launch_seen >= 2)
+                            `uvm_fatal("CLUSTER_CONV_DESCRIPTOR_BOUNDARY",
+                                "unexpected extra Conv launch")
+                        observed_op[launch_seen] = compute_vif.launch_op;
+                        observed_m[launch_seen] = compute_vif.launch_m;
+                        observed_n[launch_seen] = compute_vif.launch_n;
+                        observed_k[launch_seen] = compute_vif.launch_k;
+                        launch_seen++;
+                    end
+                end
+                if (launch_seen != 2)
+                    `uvm_fatal("CLUSTER_CONV_DESCRIPTOR_BOUNDARY", $sformatf(
+                        "real CMDQ launch monitor timed out after %0d/2 Conv boundary launches",
+                        launch_seen))
+                monitor_complete = 1'b1;
+            end
+            begin : conv_boundary_submit
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(32'd2);
+            end
+        join
+        wait_spad_idle();
+
+        if (!monitor_complete ||
+            compute_vif.launch_sample_count - launch_before != 2 ||
+            compute_vif.engine_launch_count[5] - conv_launch_before != 2 ||
+            compute_vif.same_engine_launch_while_busy != busy_launch_before)
+            `uvm_fatal("CLUSTER_CONV_DESCRIPTOR_BOUNDARY", $sformatf(
+                "Conv launch accounting mismatch total=%0d engine=%0d busy_relaunch_delta=%0d",
+                compute_vif.launch_sample_count - launch_before,
+                compute_vif.engine_launch_count[5] - conv_launch_before,
+                compute_vif.same_engine_launch_while_busy - busy_launch_before))
+        if (observed_op[0] !== 8'h16 || observed_m[0] !== 16'd3 ||
+            observed_n[0] !== 16'd3 || observed_k[0] !== 16'd9 ||
+            observed_op[1] !== 8'h16 || observed_m[1] !== 16'd3 ||
+            observed_n[1] !== 16'd128 || observed_k[1] !== 16'd9)
+            `uvm_fatal("CLUSTER_CONV_DESCRIPTOR_BOUNDARY", $sformatf(
+                "Conv launch descriptor mismatch min=%02h/%0dx%0dx%0d max=%02h/%0dx%0dx%0d",
+                observed_op[0], observed_m[0], observed_n[0], observed_k[0],
+                observed_op[1], observed_m[1], observed_n[1], observed_k[1]))
+
+        expect_spad(MIN_Y, golden_min[0], "Conv minimum 3x3 Golden output");
+        expect_completion(BOUNDARY_CPLQ, 16'h06d0, golden_min[0], 32'd1,
+                          "Conv minimum 3x3 completion");
+        expect_spad(MIN_Y - 32'd4, 32'hbad0_c2ff,
+                    "Conv minimum boundary before sentinel");
+        expect_spad(MIN_Y + 32'd4, 32'hbad0_c2fe,
+                    "Conv minimum boundary after sentinel");
+        conv_descriptor_boundary_case = 0;
+        conv_descriptor_boundary_cg.sample();
+        case_mask[0] = 1'b1;
+
+        for (col_idx = 0; col_idx < MAX_OUTPUTS; col_idx++)
+            expect_spad(MAX_Y + (col_idx << 2), golden_max[col_idx],
+                        $sformatf("Conv MAX_WIDTH Golden output[%0d]", col_idx));
+        expect_completion(BOUNDARY_CPLQ + 32'h10, 16'h06d1,
+                          golden_max[MAX_OUTPUTS-1], MAX_OUTPUTS,
+                          "Conv MAX_WIDTH completion");
+        expect_spad(MAX_Y - 32'd4, 32'hbad0_c2fd,
+                    "Conv MAX_WIDTH boundary before sentinel");
+        expect_spad(MAX_Y + (MAX_OUTPUTS << 2), 32'hbad0_c2fc,
+                    "Conv MAX_WIDTH boundary after sentinel");
+        conv_descriptor_boundary_case = 1;
+        conv_descriptor_boundary_cg.sample();
+        case_mask[1] = 1'b1;
+
+        if (case_mask !== 2'b11)
+            `uvm_fatal("CLUSTER_CONV_DESCRIPTOR_BOUNDARY", $sformatf(
+                "minimum/maximum Conv boundary coverage incomplete mask=%02b",
+                case_mask))
+        `uvm_info("CLUSTER_CONV_DESCRIPTOR_BOUNDARY_COVERAGE_PASS",
+            "minimum 3x3 and maximum 3x128 Conv descriptor bins=2/2 coverage=100.0%",
+            UVM_LOW)
+        `uvm_info("CLUSTER_CONV_DESCRIPTOR_BOUNDARY_PASS", $sformatf(
+            "real CMDQ Conv minimum=3x3 outputs=1 and MAX_WIDTH=128 shape=3x128 outputs=126; launch, ordered completion, full independent INT8 Golden image, and guard sentinels passed seed=%0d",
+            seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd2);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
     task automatic run_launch_snapshot_and_unused_fields_test();
         int unsigned launch_before;
 
@@ -11628,6 +11829,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_scalar_gemv_gemm_cmdq_dispatch_test(seed);
         run_scalar_cmdq_numeric_boundary_test(seed);
         run_scalar_legacy_conv_cmdq_test(seed);
+        run_conv_cmdq_shape_boundary_test(seed);
         run_scalar_gemv_abort_write_prefix(seed);
         run_cnm_inflight_parameter_latch_test();
         run_launch_snapshot_and_unused_fields_test();
