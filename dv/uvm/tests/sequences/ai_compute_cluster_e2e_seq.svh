@@ -11794,7 +11794,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned engine_pair_overlap_bins_hit;
         int unsigned pair_poll;
         int unsigned max_active_engines;
-        int unsigned c1_alias_max_outstanding;
+    int unsigned c1_alias_max_read_owners;
         int unsigned c1_k;
         int unsigned c1_row;
         int unsigned c1_col;
@@ -12583,31 +12583,35 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         c1_alias_accept_seen = '0;
         c1_alias_response_seen = '0;
         c1_alias_pending = '0;
-        c1_alias_max_outstanding = 0;
+        c1_alias_max_read_owners = 0;
         c1_run_started = 1'b0;
         c1_run_complete = 1'b0;
         axil_write(REG_DOORBELL, 32'd1);
         for (pair_poll = 0; pair_poll < 60000; pair_poll++) begin
             @(posedge compute_vif.aclk);
             // Scalar (engine 0) and KV (engine 6) legally share the same
-            // read-only vector. Track actual accepted reads and tagged returns
-            // while all seven production engines execute through the top mux.
+            // read-only vector. Track accepted reads anywhere in that vector
+            // and tagged returns while all seven engines use the production mux.
             if (compute_vif.engine_req_valid[0] &&
                 compute_vif.engine_req_ready[0] &&
                 !compute_vif.engine_req_write[0] &&
-                compute_vif.engine_req_addr[0*32 +: 32] == C1_KV_VECTOR_LOCAL) begin
+                compute_vif.engine_req_addr[0*32 +: 32] >= C1_KV_VECTOR_LOCAL &&
+                compute_vif.engine_req_addr[0*32 +: 32] <
+                    C1_KV_VECTOR_LOCAL + 32'd512) begin
                 c1_alias_accept_seen[0] = 1'b1;
                 c1_alias_pending[0] = 1'b1;
             end
             if (compute_vif.engine_req_valid[6] &&
                 compute_vif.engine_req_ready[6] &&
                 !compute_vif.engine_req_write[6] &&
-                compute_vif.engine_req_addr[6*32 +: 32] == C1_KV_VECTOR_LOCAL) begin
+                compute_vif.engine_req_addr[6*32 +: 32] >= C1_KV_VECTOR_LOCAL &&
+                compute_vif.engine_req_addr[6*32 +: 32] <
+                    C1_KV_VECTOR_LOCAL + 32'd512) begin
                 c1_alias_accept_seen[6] = 1'b1;
                 c1_alias_pending[6] = 1'b1;
             end
-            if ($countones(c1_alias_pending) > c1_alias_max_outstanding)
-                c1_alias_max_outstanding = $countones(c1_alias_pending);
+            if ($countones(c1_alias_pending) > c1_alias_max_read_owners)
+                c1_alias_max_read_owners = $countones(c1_alias_pending);
             if (compute_vif.engine_rsp_valid[0] && c1_alias_pending[0]) begin
                 c1_alias_pending[0] = 1'b0;
                 c1_alias_response_seen[0] = 1'b1;
@@ -12706,12 +12710,12 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_fatal("CLUSTER_ENGINE_BACKPRESSURE", "no engine request was denied by the shared compute SPAD mux")
         if (c1_alias_accept_seen !== 7'b1000001 ||
             c1_alias_response_seen !== 7'b1000001 ||
-            c1_alias_pending !== 7'b0 || c1_alias_max_outstanding != 2 ||
+            c1_alias_pending !== 7'b0 || c1_alias_max_read_owners != 2 ||
             !engine_pair_overlap_seen[5])
             `uvm_fatal("CLUSTER_SHARED_READ_ALIAS", $sformatf(
-                "Scalar/KV shared read-only source did not overlap and drain with correct owner: accepted=%07b responses=%07b pending=%07b max_outstanding=%0d scalar_kv_busy_overlap=%0b",
+                "Scalar/KV shared read-only region did not overlap and drain with correct owner: accepted=%07b responses=%07b pending=%07b max_read_owners=%0d scalar_kv_busy_overlap=%0b",
                 c1_alias_accept_seen, c1_alias_response_seen,
-                c1_alias_pending, c1_alias_max_outstanding,
+                c1_alias_pending, c1_alias_max_read_owners,
                 engine_pair_overlap_seen[5]))
         c1_shared_read_alias_case = 1;
         c1_shared_read_alias_cg.sample();
@@ -12729,9 +12733,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             engine_pair_overlap_bins_hit, engine_pair_overlap_cg.get_coverage(),
             engine_pair_overlap_seen), UVM_LOW)
         `uvm_info("CLUSTER_SHARED_READ_ALIAS_PASS", $sformatf(
-            "Scalar/KV read the same read-only SPAD source; accepted requests=%0d/2 owner-tagged responses=%0d/2 max simultaneous accepted reads=%0d Scalar/KV busy-overlap=%0b focused bin=1/1 coverage=%.1f%%",
+            "Scalar/KV read the same read-only SPAD region; accepted request owners=%0d/2 owner-tagged responses=%0d/2 max simultaneous read owners=%0d Scalar/KV busy-overlap=%0b focused bin=1/1 coverage=%.1f%%",
             $countones(c1_alias_accept_seen),
-            $countones(c1_alias_response_seen), c1_alias_max_outstanding,
+            $countones(c1_alias_response_seen), c1_alias_max_read_owners,
             engine_pair_overlap_seen[5], c1_shared_read_alias_cg.get_coverage()),
             UVM_LOW)
         axil_read(REG_CMDQ_HEAD, value);
