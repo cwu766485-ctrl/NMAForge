@@ -11260,9 +11260,29 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             compute_vif.engine_req_stall_seen), UVM_LOW)
     endtask
 
-    // Insert legal downstream backpressure at the MUX/arbiter handshake:
-    // suppress the arbiter input valid and return ready low together, so no
-    // request is accepted while the real engine must retain its payload.
+    // Insert a legal scheduler admission pause in the testbench: suppress the
+    // arbiter's accepted-valid and all SRAM-side valids together. This keeps
+    // the source valids visible, returns ready low, and prevents any commit.
+    task automatic force_scheduler_admission_stall();
+        bit [1023:0] force_zero;
+        force_zero = '0;
+        if (!uvm_hdl_force("tb_ai_accel_uvm.dut.spad_arbiter_u.accept_valid", force_zero) ||
+            !uvm_hdl_force("tb_ai_accel_uvm.dut.spad_arbiter_u.spad_valid", force_zero) ||
+            !uvm_hdl_force("tb_ai_accel_uvm.dut.spad_arbiter_u.spad_line_valid", force_zero) ||
+            !uvm_hdl_force("tb_ai_accel_uvm.dut.spad_arbiter_u.spad_banked_valid", force_zero) ||
+            !uvm_hdl_force("tb_ai_accel_uvm.dut.spad_arbiter_u.spad_cnm_valid", force_zero))
+            `uvm_fatal("CLUSTER_STALL_INJECT",
+                "failed to pause scheduler admission and mask SRAM-side request valids")
+    endtask
+
+    task automatic release_scheduler_admission_stall();
+        void'(uvm_hdl_release("tb_ai_accel_uvm.dut.spad_arbiter_u.spad_cnm_valid"));
+        void'(uvm_hdl_release("tb_ai_accel_uvm.dut.spad_arbiter_u.spad_banked_valid"));
+        void'(uvm_hdl_release("tb_ai_accel_uvm.dut.spad_arbiter_u.spad_line_valid"));
+        void'(uvm_hdl_release("tb_ai_accel_uvm.dut.spad_arbiter_u.spad_valid"));
+        void'(uvm_hdl_release("tb_ai_accel_uvm.dut.spad_arbiter_u.accept_valid"));
+    endtask
+
     task automatic stall_core_engine_write_once(
         input int unsigned engine_idx,
         input int unsigned stall_cycles
@@ -11271,17 +11291,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned stall_idx;
         bit request_seen;
         bit accepted_after_release;
-        bit [1023:0] force_zero;
-        string arbiter_core_valid_path;
-        string mux_spad_ready_path;
 
         if (engine_idx >= 7 || stall_cycles < 8)
             `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
                 "invalid core write stall target engine=%0d cycles=%0d",
                 engine_idx, stall_cycles))
-        force_zero = '0;
-        arbiter_core_valid_path = "tb_ai_accel_uvm.dut.spad_arbiter_u.core_valid";
-        mux_spad_ready_path = "tb_ai_accel_uvm.dut.compute_spad_mux_u.spad_ready";
         request_seen = 1'b0;
         for (poll = 0; poll < 10000; poll++) begin
             @(negedge compute_vif.aclk);
@@ -11294,14 +11308,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         if (!request_seen)
             `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
                 "engine%0d produced no write request for directed stall", engine_idx))
-        if (!uvm_hdl_force(arbiter_core_valid_path, force_zero))
-            `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
-                "failed to gate arbiter core valid at %s", arbiter_core_valid_path))
-        if (!uvm_hdl_force(mux_spad_ready_path, force_zero)) begin
-            void'(uvm_hdl_release(arbiter_core_valid_path));
-            `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
-                "failed to gate MUX ready at %s", mux_spad_ready_path))
-        end
+        force_scheduler_admission_stall();
         for (stall_idx = 0; stall_idx < stall_cycles; stall_idx++) begin
             @(posedge compute_vif.aclk);
             #1;
@@ -11313,8 +11320,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                     engine_idx, stall_idx))
         end
         @(negedge compute_vif.aclk);
-        void'(uvm_hdl_release(mux_spad_ready_path));
-        void'(uvm_hdl_release(arbiter_core_valid_path));
+        release_scheduler_admission_stall();
 
         accepted_after_release = 1'b0;
         for (poll = 0; poll < 10000 && !accepted_after_release; poll++) begin
@@ -11338,13 +11344,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned stall_idx;
         bit request_seen;
         bit accepted_after_release;
-        bit [1023:0] force_zero;
-        string arbiter_line_valid_path;
-        string line_ready_path;
 
-        force_zero = '0;
-        arbiter_line_valid_path = "tb_ai_accel_uvm.dut.spad_arbiter_u.core_line_valid";
-        line_ready_path = "tb_ai_accel_uvm.dut.arb_core_line_ready";
         request_seen = 1'b0;
         for (poll = 0; poll < 10000; poll++) begin
             @(negedge compute_vif.aclk);
@@ -11356,14 +11356,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         if (!request_seen)
             `uvm_fatal("CLUSTER_STALL_INJECT",
                 "Matrix produced no Line write request for directed stall")
-        if (!uvm_hdl_force(arbiter_line_valid_path, force_zero))
-            `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
-                "failed to gate arbiter Matrix Line valid at %s", arbiter_line_valid_path))
-        if (!uvm_hdl_force(line_ready_path, force_zero)) begin
-            void'(uvm_hdl_release(arbiter_line_valid_path));
-            `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
-                "failed to gate Matrix Line ready at %s", line_ready_path))
-        end
+        force_scheduler_admission_stall();
         for (stall_idx = 0; stall_idx < stall_cycles; stall_idx++) begin
             @(posedge compute_vif.aclk);
             #1;
@@ -11375,8 +11368,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                     stall_idx))
         end
         @(negedge compute_vif.aclk);
-        void'(uvm_hdl_release(line_ready_path));
-        void'(uvm_hdl_release(arbiter_line_valid_path));
+        release_scheduler_admission_stall();
 
         accepted_after_release = 1'b0;
         for (poll = 0; poll < 10000 && !accepted_after_release; poll++) begin
@@ -11398,13 +11390,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned stall_idx;
         bit request_seen;
         bit accepted_after_release;
-        bit [1023:0] force_zero;
-        string arbiter_cnm_valid_path;
-        string cnm_ready_path;
 
-        force_zero = '0;
-        arbiter_cnm_valid_path = "tb_ai_accel_uvm.dut.spad_arbiter_u.cnm_valid";
-        cnm_ready_path = "tb_ai_accel_uvm.dut.arb_cnm_ready";
         request_seen = 1'b0;
         for (poll = 0; poll < 10000; poll++) begin
             @(negedge compute_vif.aclk);
@@ -11416,14 +11402,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         if (!request_seen)
             `uvm_fatal("CLUSTER_STALL_INJECT",
                 "CNM did not present all four legal lane reads together for directed stall")
-        if (!uvm_hdl_force(arbiter_cnm_valid_path, force_zero))
-            `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
-                "failed to gate arbiter CNM valid at %s", arbiter_cnm_valid_path))
-        if (!uvm_hdl_force(cnm_ready_path, force_zero)) begin
-            void'(uvm_hdl_release(arbiter_cnm_valid_path));
-            `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
-                "failed to gate CNM ready at %s", cnm_ready_path))
-        end
+        force_scheduler_admission_stall();
         for (stall_idx = 0; stall_idx < stall_cycles; stall_idx++) begin
             @(posedge compute_vif.aclk);
             #1;
@@ -11431,12 +11410,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 compute_vif.cnm_request_ready !== 4'h0)
                 `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
                     "four-lane CNM reads did not remain unaccepted/stable at injected stall cycle %0d valid=%h ready=%h",
-                    stall_idx, compute_vif.cnm_request_valid,
-                    compute_vif.cnm_request_ready))
+                    stall_idx,
+                    compute_vif.cnm_request_valid, compute_vif.cnm_request_ready))
         end
         @(negedge compute_vif.aclk);
-        void'(uvm_hdl_release(cnm_ready_path));
-        void'(uvm_hdl_release(arbiter_cnm_valid_path));
+        release_scheduler_admission_stall();
 
         accepted_after_release = 1'b0;
         for (poll = 0; poll < 10000 && !accepted_after_release; poll++) begin
@@ -12069,8 +12047,6 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         fork
             begin
                 stall_matrix_line_write_once(8);
-            end
-            begin
                 stall_cnm_four_lane_read_once(8);
             end
             begin
