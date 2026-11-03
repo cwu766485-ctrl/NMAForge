@@ -299,6 +299,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned engine_pair_overlap_cov_idx;
     int unsigned cmdq_invalid_descriptor_case;
     int unsigned engine_parallel_fault_cov_idx;
+    int unsigned engine_parallel_reset_phase;
     covergroup cmdq_invalid_descriptor_cg;
         option.per_instance = 1;
         cp_engine_descriptor_reject: coverpoint cmdq_invalid_descriptor_case {
@@ -317,6 +318,15 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         option.per_instance = 1;
         cp_engine_fault_with_parallel_recovery: coverpoint engine_parallel_fault_cov_idx {
             bins matrix_parity_with_six_engine_completions = {0};
+        }
+    endgroup
+
+    covergroup engine_parallel_reset_cg;
+        option.per_instance = 1;
+        cp_engine_parallel_reset_phase: coverpoint engine_parallel_reset_phase {
+            bins all_engines_read_pending_at_reset = {1};
+            bins old_epoch_quiet_and_unretired = {2};
+            bins seven_engine_golden_recovery = {3};
         }
     endgroup
 
@@ -445,6 +455,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         engine_abort_cplq_cg = new();
         cmdq_invalid_descriptor_cg = new();
         engine_parallel_fault_cg = new();
+        engine_parallel_reset_cg = new();
         engine_pair_overlap_cg = new();
         matrix_protection_reset_cg = new();
         matrix_protection_cnm_reset_cg = new();
@@ -4672,6 +4683,565 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             matrix_overlap_mask, max_active_engines,
             compute_vif.engine_backpressure_cycles - backpressure_before,
             engine_parallel_fault_cg.get_coverage(), seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd7);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+    task automatic run_all_engine_parallel_reset_epoch_test(
+        input int unsigned seed,
+        input int signed matrix_golden[0:15][0:31]);
+        localparam bit [15:0] TASK_ID_BASE = 16'h06e0;
+        bit [31:0] expected_result[0:6];
+        bit [31:0] expected_elements[0:6];
+        bit [31:0] expected_status[0:6];
+        bit [31:0] observed;
+        bit [6:0] accepted_engine_mask;
+        bit [6:0] completion_seen;
+        bit monitor_done;
+        bit reset_seen;
+        bit reset_ok;
+        bit output_write_seen;
+        bit accepted_output_write_now;
+        int unsigned accepted_reads[0:6];
+        int unsigned returned_reads[0:6];
+        int unsigned accepted_output_words[0:6];
+        int unsigned pending_reads;
+        int unsigned accepted_this_cycle;
+        int unsigned returned_this_cycle;
+        int signed output_engine;
+        int unsigned output_word_index;
+        bit [31:0] output_base;
+        bit [31:0] expected_output_word;
+        int unsigned launch_before[0:6];
+        int unsigned engine;
+        int unsigned slot;
+        int unsigned word_idx;
+        int unsigned poll;
+        int unsigned max_active;
+        uvm_hdl_data_t reset_value;
+
+        accepted_engine_mask = '0;
+        completion_seen = '0;
+        monitor_done = 1'b0;
+        reset_seen = 1'b0;
+        output_write_seen = 1'b0;
+        max_active = 0;
+        for (engine = 0; engine < 7; engine++) begin
+            accepted_reads[engine] = 0;
+            returned_reads[engine] = 0;
+            accepted_output_words[engine] = 0;
+            launch_before[engine] = compute_vif.engine_launch_count[engine];
+        end
+
+        // C1 inputs are the same legal images used by the seven-engine
+        // Golden test. This reset cut is deliberately taken only while every
+        // engine has an accepted read outstanding and no output write has
+        // committed, so all old destinations/completions have exact sentinels.
+        for (word_idx = 0; word_idx < 512; word_idx++)
+            spad_write(PARALLEL_FAULT_MATRIX_Y + (word_idx << 2),
+                       32'hbad0_e300 | word_idx);
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            spad_write(PARALLEL_FAULT_CNM_Y + (word_idx << 2),
+                       32'hbad0_e800 | word_idx);
+        for (word_idx = 0; word_idx < 128; word_idx++) begin
+            spad_write(PARALLEL_FAULT_SFU_Y + (word_idx << 2),
+                       32'hbad0_e900 | word_idx);
+            spad_write(PARALLEL_FAULT_KV_CACHE + 32'h50 + (word_idx << 2),
+                       32'hbad0_f000 | word_idx);
+        end
+        spad_write(PARALLEL_FAULT_SCALAR_Y, 32'hbad0_eb00);
+        spad_write(PARALLEL_FAULT_FP_Y, 32'hbad0_eb10);
+        for (word_idx = 0; word_idx < 196; word_idx++)
+            spad_write(PARALLEL_FAULT_CONV_Y + (word_idx << 2),
+                       32'hbad0_ec00 | word_idx);
+        for (slot = 0; slot < 7; slot++) begin
+            spad_write(PARALLEL_FAULT_CPLQ + (slot << 4) + 32'h00,
+                       32'hbad0_e000 | slot);
+            spad_write(PARALLEL_FAULT_CPLQ + (slot << 4) + 32'h04,
+                       32'hbad0_e100 | slot);
+            spad_write(PARALLEL_FAULT_CPLQ + (slot << 4) + 32'h08,
+                       32'hbad0_e200 | slot);
+            spad_write(PARALLEL_FAULT_CPLQ + (slot << 4) + 32'h0c,
+                       32'hbad0_e400 | slot);
+        end
+
+        write_cnm_v3_desc(PARALLEL_FAULT_CMDQ + 32'h000,
+                          TASK_ID_BASE + 16'd2, C1_CNM_A_LOCAL,
+                          C1_CNM_B_LOCAL, PARALLEL_FAULT_CNM_Y);
+        spad_write(PARALLEL_FAULT_CMDQ + 32'h014, {16'd1, 16'd16});
+        spad_write(PARALLEL_FAULT_CMDQ + 32'h018, 32'd64);
+        write_v3_desc(PARALLEL_FAULT_CMDQ + 32'h040, 8'h35,
+                      TASK_ID_BASE + 16'd4, C1_SFU_A_LOCAL, 32'd0,
+                      PARALLEL_FAULT_SFU_Y, 16'd0, 16'd0, 16'd128);
+        write_cluster_desc(PARALLEL_FAULT_CMDQ + 32'h080, 8'h10,
+                           TASK_ID_BASE + 16'd0, C1_SCALAR_A_LOCAL,
+                           C1_SCALAR_B_LOCAL, PARALLEL_FAULT_SCALAR_Y,
+                           16'd0, 16'd0, 16'd128, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd3);
+        write_cluster_desc(PARALLEL_FAULT_CMDQ + 32'h0c0, 8'h50,
+                           TASK_ID_BASE + 16'd1, C1_FP_A_LOCAL,
+                           C1_FP_B_LOCAL, PARALLEL_FAULT_FP_Y,
+                           16'd1, 16'd1, 16'd128, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd7);
+        write_cluster_desc(PARALLEL_FAULT_CMDQ + 32'h100, 8'h16,
+                           TASK_ID_BASE + 16'd5, C1_CONV_A_LOCAL,
+                           C1_CONV_W_LOCAL, PARALLEL_FAULT_CONV_Y,
+                           16'd16, 16'd16, 16'd9, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd5);
+        write_cluster_desc(PARALLEL_FAULT_CMDQ + 32'h140, 8'h43,
+                           TASK_ID_BASE + 16'd6, C1_KV_VECTOR_LOCAL,
+                           32'd0, PARALLEL_FAULT_KV_CACHE,
+                           16'd0, 16'd0, 16'd128, {16'd1,16'd1},
+                           32'd16, 32'd64, 32'd0, 8'd5);
+        write_v3_desc(PARALLEL_FAULT_CMDQ + 32'h180, 8'h30,
+                      TASK_ID_BASE + 16'd3, MATRIX_A_LOCAL,
+                      MATRIX_B_LOCAL, PARALLEL_FAULT_MATRIX_Y,
+                      16'd16, 16'd32, 16'd16);
+
+        expected_status[0] = 32'h0000_0001;
+        expected_result[0] = 32'd512;
+        expected_elements[0] = 32'd1;
+        expected_status[1] = 32'h0000_0001;
+        expected_result[1] = 32'h4300_0000;
+        expected_elements[1] = 32'd128;
+        expected_status[2] = 32'h0000_0001;
+        expected_result[2] = 32'd47104;
+        expected_elements[2] = 32'd16;
+        expected_status[3] = 32'h0000_0001;
+        expected_result[3] = 32'd0;
+        expected_elements[3] = 32'd512;
+        expected_status[4] = 32'h0000_0001;
+        expected_result[4] = -32'sd15;
+        expected_elements[4] = 32'd128;
+        expected_status[5] = 32'h0000_0001;
+        expected_result[5] = 32'd9;
+        expected_elements[5] = 32'd196;
+        expected_status[6] = 32'h0000_0001;
+        expected_result[6] = 32'h0000_017f;
+        expected_elements[6] = 32'd128;
+
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, PARALLEL_FAULT_CMDQ);
+        axil_write(REG_CMDQ_SIZE, 32'd8);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd7);
+        axil_write(REG_CPLQ_BASE, PARALLEL_FAULT_CPLQ);
+        axil_write(REG_CPLQ_SIZE, 32'd8);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+
+        fork
+            begin : all_engine_parallel_reset_monitor
+                for (poll = 0; poll < 100000 && !monitor_done; poll++) begin
+                    @(posedge compute_vif.aclk);
+                    if ($countones(compute_vif.engine_busy) > max_active)
+                        max_active = $countones(compute_vif.engine_busy);
+
+                    // Count real handshakes and returns by the production
+                    // engine owner. The accepted mask is not inferred from
+                    // busy/launch signals.
+                    for (engine = 0; engine < 7; engine++) begin
+                        accepted_this_cycle = 0;
+                        returned_this_cycle = 0;
+                        case (engine)
+                            2: begin
+                                accepted_this_cycle = $countones(compute_vif.cnm_accept_mask);
+                                returned_this_cycle = $countones(compute_vif.cnm_rsp_valid);
+                            end
+                            3: begin
+                                accepted_this_cycle = compute_vif.matrix_request_valid &&
+                                                      compute_vif.banked_ready;
+                                returned_this_cycle = compute_vif.matrix_rsp_valid;
+                            end
+                            default: begin
+                                accepted_this_cycle = compute_vif.engine_req_valid[engine] &&
+                                                      compute_vif.engine_req_ready[engine] &&
+                                                      !compute_vif.engine_req_write[engine];
+                                returned_this_cycle = compute_vif.engine_rsp_valid[engine];
+                            end
+                        endcase
+                        if (accepted_this_cycle != 0) begin
+                            accepted_reads[engine] += accepted_this_cycle;
+                            accepted_engine_mask[engine] = 1'b1;
+                        end
+                        returned_reads[engine] += returned_this_cycle;
+                    end
+
+                    accepted_output_write_now = 1'b0;
+                    if (compute_vif.selected_spad_valid &&
+                        compute_vif.selected_spad_ready &&
+                        compute_vif.selected_spad_write) begin
+                        output_engine = -1;
+                        output_base = 32'd0;
+                        if ((compute_vif.selected_spad_addr >= PARALLEL_FAULT_MATRIX_Y) &&
+                            (compute_vif.selected_spad_addr < PARALLEL_FAULT_MATRIX_Y + 32'h800)) begin
+                            output_engine = 3;
+                            output_base = PARALLEL_FAULT_MATRIX_Y;
+                        end else if ((compute_vif.selected_spad_addr >= PARALLEL_FAULT_CNM_Y) &&
+                                     (compute_vif.selected_spad_addr < PARALLEL_FAULT_CNM_Y + 32'h40)) begin
+                            output_engine = 2;
+                            output_base = PARALLEL_FAULT_CNM_Y;
+                        end else if ((compute_vif.selected_spad_addr >= PARALLEL_FAULT_SFU_Y) &&
+                                     (compute_vif.selected_spad_addr < PARALLEL_FAULT_SFU_Y + 32'h200)) begin
+                            output_engine = 4;
+                            output_base = PARALLEL_FAULT_SFU_Y;
+                        end else if (compute_vif.selected_spad_addr == PARALLEL_FAULT_SCALAR_Y) begin
+                            output_engine = 0;
+                            output_base = PARALLEL_FAULT_SCALAR_Y;
+                        end else if (compute_vif.selected_spad_addr == PARALLEL_FAULT_FP_Y) begin
+                            output_engine = 1;
+                            output_base = PARALLEL_FAULT_FP_Y;
+                        end else if ((compute_vif.selected_spad_addr >= PARALLEL_FAULT_CONV_Y) &&
+                                     (compute_vif.selected_spad_addr < PARALLEL_FAULT_CONV_Y + 32'h310)) begin
+                            output_engine = 5;
+                            output_base = PARALLEL_FAULT_CONV_Y;
+                        end else if ((compute_vif.selected_spad_addr >= PARALLEL_FAULT_KV_CACHE + 32'h50) &&
+                                     (compute_vif.selected_spad_addr < PARALLEL_FAULT_KV_CACHE + 32'h250)) begin
+                            output_engine = 6;
+                            output_base = PARALLEL_FAULT_KV_CACHE + 32'h50;
+                        end
+                        if (output_engine >= 0) begin
+                            output_word_index = (compute_vif.selected_spad_addr - output_base) >> 2;
+                            if (output_word_index != accepted_output_words[output_engine])
+                                `uvm_fatal("CLUSTER_PARALLEL_RESET_PREFIX", $sformatf(
+                                    "engine=%0d output writes are not a contiguous prefix: addr=0x%08h word=%0d expected=%0d",
+                                    output_engine, compute_vif.selected_spad_addr,
+                                    output_word_index, accepted_output_words[output_engine]))
+                            accepted_output_words[output_engine]++;
+                            accepted_output_write_now = 1'b1;
+                        end
+                    end
+                    if (compute_vif.selected_line_valid &&
+                        compute_vif.selected_line_ready &&
+                        compute_vif.selected_line_write &&
+                        compute_vif.selected_line_addr >= PARALLEL_FAULT_MATRIX_Y &&
+                        compute_vif.selected_line_addr < PARALLEL_FAULT_MATRIX_Y + 32'h800) begin
+                        output_word_index = (compute_vif.selected_line_addr -
+                                             PARALLEL_FAULT_MATRIX_Y) >> 2;
+                        if ((compute_vif.selected_line_wstrb !== 16'hffff) ||
+                            ((compute_vif.selected_line_addr & 32'hf) != 0) ||
+                            (output_word_index != accepted_output_words[3]))
+                            `uvm_fatal("CLUSTER_PARALLEL_RESET_PREFIX", $sformatf(
+                                "Matrix accepted Line is not a full aligned output prefix: addr=0x%08h word=%0d expected=%0d wstrb=%04h",
+                                compute_vif.selected_line_addr, output_word_index,
+                                accepted_output_words[3], compute_vif.selected_line_wstrb))
+                        accepted_output_words[3] += 4;
+                        accepted_output_write_now = 1'b1;
+                    end
+                    output_write_seen |= accepted_output_write_now;
+
+                    pending_reads = 0;
+                    for (engine = 0; engine < 7; engine++) begin
+                        if (returned_reads[engine] > accepted_reads[engine])
+                            `uvm_fatal("CLUSTER_PARALLEL_RESET_OWNER", $sformatf(
+                                "owner %0d returned more reads than accepted: accepted=%0d returned=%0d",
+                                engine, accepted_reads[engine], returned_reads[engine]))
+                        pending_reads += accepted_reads[engine] - returned_reads[engine];
+                    end
+
+                    if ((compute_vif.engine_busy === 7'b111_1111) &&
+                        ($countones(accepted_engine_mask) >= 2) &&
+                        (pending_reads != 0)) begin
+                        if (max_active != 7)
+                            `uvm_fatal("CLUSTER_PARALLEL_RESET", $sformatf(
+                                "reset trigger lacked all-engine overlap: max_active=%0d",
+                                max_active))
+                        engine_parallel_reset_phase = 1;
+                        engine_parallel_reset_cg.sample();
+                        #1ns;
+                        reset_value = 1'b0;
+                        reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
+                        if (!reset_ok)
+                            `uvm_fatal("CLUSTER_PARALLEL_RESET",
+                                "failed to assert shared reset with seven engine owners pending")
+                        `uvm_info("CLUSTER_PARALLEL_RESET_CUT", $sformatf(
+                            "cut busy=%07b accepted_mask=%07b pending_reads=%0d committed_output_words=%0d/%0d/%0d/%0d/%0d/%0d/%0d",
+                            7'b111_1111, accepted_engine_mask, pending_reads,
+                            accepted_output_words[0], accepted_output_words[1],
+                            accepted_output_words[2], accepted_output_words[3],
+                            accepted_output_words[4], accepted_output_words[5],
+                            accepted_output_words[6]), UVM_LOW)
+                        repeat (4) @(posedge compute_vif.aclk);
+                        if (compute_vif.engine_busy !== 7'b0 ||
+                            compute_vif.engine_req_valid !== 7'b0 ||
+                            compute_vif.matrix_request_valid !== 1'b0 ||
+                            compute_vif.cnm_request_valid !== 4'b0 ||
+                            compute_vif.cpl_valid !== 1'b0)
+                            `uvm_fatal("CLUSTER_PARALLEL_RESET", $sformatf(
+                                "shared reset did not quiesce cluster: busy=%07b req=%07b matrix=%b cnm=%b cpl=%b",
+                                compute_vif.engine_busy, compute_vif.engine_req_valid,
+                                compute_vif.matrix_request_valid,
+                                compute_vif.cnm_request_valid, compute_vif.cpl_valid))
+                        #1ns;
+                        reset_value = 1'b1;
+                        reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
+                        if (!reset_ok)
+                            `uvm_fatal("CLUSTER_PARALLEL_RESET",
+                                "failed to release shared seven-engine reset")
+                        repeat (8) begin
+                            @(posedge compute_vif.aclk);
+                            if (compute_vif.engine_req_valid !== 7'b0 ||
+                                compute_vif.engine_rsp_valid !== 7'b0 ||
+                                compute_vif.matrix_request_valid !== 1'b0 ||
+                                compute_vif.matrix_rsp_valid !== 1'b0 ||
+                                compute_vif.cnm_request_valid !== 4'b0 ||
+                                compute_vif.cnm_rsp_valid !== 4'b0 ||
+                                (compute_vif.selected_spad_valid &&
+                                 compute_vif.selected_spad_ready &&
+                                 compute_vif.selected_spad_write) ||
+                                (compute_vif.selected_line_valid &&
+                                 compute_vif.selected_line_ready &&
+                                 compute_vif.selected_line_write))
+                                `uvm_fatal("CLUSTER_PARALLEL_RESET", $sformatf(
+                                    "old epoch emitted a request/response/write after reset release: req/rsp=%07b/%07b matrix=%b/%b cnm=%b/%b spad=%b line=%b",
+                                    compute_vif.engine_req_valid,
+                                    compute_vif.engine_rsp_valid,
+                                    compute_vif.matrix_request_valid,
+                                    compute_vif.matrix_rsp_valid,
+                                    compute_vif.cnm_request_valid,
+                                    compute_vif.cnm_rsp_valid,
+                                    compute_vif.selected_spad_valid &&
+                                    compute_vif.selected_spad_ready &&
+                                    compute_vif.selected_spad_write,
+                                    compute_vif.selected_line_valid &&
+                                    compute_vif.selected_line_ready &&
+                                    compute_vif.selected_line_write))
+                        end
+                        wait_spad_idle();
+                        if (compute_vif.engine_busy !== 7'b0 ||
+                            compute_vif.engine_req_valid !== 7'b0 ||
+                            compute_vif.engine_rsp_valid !== 7'b0 ||
+                            compute_vif.matrix_request_valid !== 1'b0 ||
+                            compute_vif.matrix_rsp_valid !== 1'b0 ||
+                            compute_vif.cnm_request_valid !== 4'b0 ||
+                            compute_vif.cnm_rsp_valid !== 4'b0)
+                            `uvm_fatal("CLUSTER_PARALLEL_RESET", $sformatf(
+                                "old-epoch activity survived reset release: busy=%07b req/rsp=%07b/%07b matrix=%b/%b cnm=%b/%b",
+                                compute_vif.engine_busy, compute_vif.engine_req_valid,
+                                compute_vif.engine_rsp_valid,
+                                compute_vif.matrix_request_valid,
+                                compute_vif.matrix_rsp_valid,
+                                compute_vif.cnm_request_valid,
+                                compute_vif.cnm_rsp_valid))
+                        reset_seen = 1'b1;
+                        monitor_done = 1'b1;
+                        break;
+                    end
+                end
+                if (!reset_seen)
+                    `uvm_fatal("CLUSTER_PARALLEL_RESET", $sformatf(
+                        "did not find a legal seven-engine concurrent accepted-read reset cut: busy=%07b accepted=%07b pending=%0d output_write_seen=%0b max_active=%0d",
+                        compute_vif.engine_busy, accepted_engine_mask,
+                        pending_reads, output_write_seen, max_active))
+            end
+            begin : all_engine_parallel_reset_submit
+                axil_write(REG_DOORBELL, 32'd1);
+                wait (reset_seen);
+            end
+        join
+
+        axil_read(REG_CPLQ_TAIL, observed);
+        if (observed !== 32'd0)
+            `uvm_fatal("CLUSTER_PARALLEL_RESET", $sformatf(
+                "old-epoch completion tail was not cleared: %0d", observed))
+        for (word_idx = 0; word_idx < 512; word_idx++) begin
+            expected_output_word = (word_idx < accepted_output_words[3]) ?
+                matrix_golden[word_idx / 32][word_idx % 32] :
+                (32'hbad0_e300 | word_idx);
+            expect_spad(PARALLEL_FAULT_MATRIX_Y + (word_idx << 2),
+                        expected_output_word,
+                        $sformatf("parallel reset Matrix Golden prefix/suffix[%0d]", word_idx));
+        end
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            expect_spad(PARALLEL_FAULT_CNM_Y + (word_idx << 2),
+                        (word_idx < accepted_output_words[2]) ? 32'd47104 :
+                        (32'hbad0_e800 | word_idx),
+                        $sformatf("parallel reset CNM Golden prefix/suffix[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 128; word_idx++) begin
+            expect_spad(PARALLEL_FAULT_SFU_Y + (word_idx << 2),
+                        (word_idx < accepted_output_words[4]) ?
+                        ((word_idx % 4 == 0) ? 32'd8 :
+                         (word_idx % 4 == 1) ? -32'sd8 :
+                         (word_idx % 4 == 2) ? 32'd17 : -32'sd15) :
+                        (32'hbad0_e900 | word_idx),
+                        $sformatf("parallel reset SFU Golden prefix/suffix[%0d]", word_idx));
+            expect_spad(PARALLEL_FAULT_KV_CACHE + 32'h50 + (word_idx << 2),
+                        (word_idx < accepted_output_words[6]) ?
+                        (32'h0000_0100 + word_idx) : (32'hbad0_f000 | word_idx),
+                        $sformatf("parallel reset KV Golden prefix/suffix[%0d]", word_idx));
+        end
+        expect_spad(PARALLEL_FAULT_SCALAR_Y,
+                    (accepted_output_words[0] != 0) ? 32'd512 : 32'hbad0_eb00,
+                    "parallel reset Scalar sentinel");
+        expect_spad(PARALLEL_FAULT_FP_Y,
+                    (accepted_output_words[1] != 0) ? 32'h4300_0000 : 32'hbad0_eb10,
+                    "parallel reset FP sentinel");
+        for (word_idx = 0; word_idx < 196; word_idx++)
+            expect_spad(PARALLEL_FAULT_CONV_Y + (word_idx << 2),
+                        (word_idx < accepted_output_words[5]) ? 32'd9 :
+                        (32'hbad0_ec00 | word_idx),
+                        $sformatf("parallel reset Conv Golden prefix/suffix[%0d]", word_idx));
+        for (slot = 0; slot < 7; slot++) begin
+            expect_spad(PARALLEL_FAULT_CPLQ + (slot << 4) + 32'h00,
+                        32'hbad0_e000 | slot,
+                        $sformatf("parallel reset completion sentinel ID[%0d]", slot));
+            expect_spad(PARALLEL_FAULT_CPLQ + (slot << 4) + 32'h04,
+                        32'hbad0_e100 | slot,
+                        $sformatf("parallel reset completion sentinel status[%0d]", slot));
+            expect_spad(PARALLEL_FAULT_CPLQ + (slot << 4) + 32'h08,
+                        32'hbad0_e200 | slot,
+                        $sformatf("parallel reset completion sentinel result[%0d]", slot));
+            expect_spad(PARALLEL_FAULT_CPLQ + (slot << 4) + 32'h0c,
+                        32'hbad0_e400 | slot,
+                        $sformatf("parallel reset completion sentinel count[%0d]", slot));
+        end
+        engine_parallel_reset_phase = 2;
+        engine_parallel_reset_cg.sample();
+
+        // Submit a fresh seven-engine generation and require complete owner,
+        // numerical and memory-image recovery, not just an idle indication.
+        write_cnm_v3_desc(PARALLEL_FAULT_CMDQ + 32'h000,
+                          TASK_ID_BASE + 16'd2, C1_CNM_A_LOCAL,
+                          C1_CNM_B_LOCAL, PARALLEL_FAULT_CNM_Y);
+        spad_write(PARALLEL_FAULT_CMDQ + 32'h014, {16'd1, 16'd16});
+        spad_write(PARALLEL_FAULT_CMDQ + 32'h018, 32'd64);
+        write_v3_desc(PARALLEL_FAULT_CMDQ + 32'h040, 8'h35,
+                      TASK_ID_BASE + 16'd4, C1_SFU_A_LOCAL, 32'd0,
+                      PARALLEL_FAULT_SFU_Y, 16'd0, 16'd0, 16'd128);
+        write_cluster_desc(PARALLEL_FAULT_CMDQ + 32'h080, 8'h10,
+                           TASK_ID_BASE + 16'd0, C1_SCALAR_A_LOCAL,
+                           C1_SCALAR_B_LOCAL, PARALLEL_FAULT_SCALAR_Y,
+                           16'd0, 16'd0, 16'd128, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd3);
+        write_cluster_desc(PARALLEL_FAULT_CMDQ + 32'h0c0, 8'h50,
+                           TASK_ID_BASE + 16'd1, C1_FP_A_LOCAL,
+                           C1_FP_B_LOCAL, PARALLEL_FAULT_FP_Y,
+                           16'd1, 16'd1, 16'd128, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd7);
+        write_cluster_desc(PARALLEL_FAULT_CMDQ + 32'h100, 8'h16,
+                           TASK_ID_BASE + 16'd5, C1_CONV_A_LOCAL,
+                           C1_CONV_W_LOCAL, PARALLEL_FAULT_CONV_Y,
+                           16'd16, 16'd16, 16'd9, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd5);
+        write_cluster_desc(PARALLEL_FAULT_CMDQ + 32'h140, 8'h43,
+                           TASK_ID_BASE + 16'd6, C1_KV_VECTOR_LOCAL,
+                           32'd0, PARALLEL_FAULT_KV_CACHE,
+                           16'd0, 16'd0, 16'd128, {16'd1,16'd1},
+                           32'd16, 32'd64, 32'd0, 8'd5);
+        write_v3_desc(PARALLEL_FAULT_CMDQ + 32'h180, 8'h30,
+                      TASK_ID_BASE + 16'd3, MATRIX_A_LOCAL,
+                      MATRIX_B_LOCAL, PARALLEL_FAULT_MATRIX_Y,
+                      16'd16, 16'd32, 16'd16);
+        for (slot = 0; slot < 7; slot++) begin
+            spad_write(PARALLEL_FAULT_CPLQ + (slot << 4) + 32'h00,
+                       32'hbad0_f000 | slot);
+            spad_write(PARALLEL_FAULT_CPLQ + (slot << 4) + 32'h04,
+                       32'hbad0_f100 | slot);
+            spad_write(PARALLEL_FAULT_CPLQ + (slot << 4) + 32'h08,
+                       32'hbad0_f200 | slot);
+            spad_write(PARALLEL_FAULT_CPLQ + (slot << 4) + 32'h0c,
+                       32'hbad0_f400 | slot);
+        end
+        axil_write(REG_CMDQ_BASE, PARALLEL_FAULT_CMDQ);
+        axil_write(REG_CMDQ_SIZE, 32'd8);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd7);
+        axil_write(REG_CPLQ_BASE, PARALLEL_FAULT_CPLQ);
+        axil_write(REG_CPLQ_SIZE, 32'd8);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+        for (engine = 0; engine < 7; engine++)
+            launch_before[engine] = compute_vif.engine_launch_count[engine];
+        axil_write(REG_DOORBELL, 32'd1);
+        wait_cpl_tail(32'd7);
+        wait_spad_idle();
+
+        for (slot = 0; slot < 7; slot++) begin
+            axil_read(CIMFORGE_SPAD_BASE + PARALLEL_FAULT_CPLQ + (slot << 4),
+                      observed);
+            if (observed[31:16] !== 16'd0 ||
+                observed[15:0] < TASK_ID_BASE ||
+                observed[15:0] > TASK_ID_BASE + 16'd6)
+                `uvm_fatal("CLUSTER_PARALLEL_RESET_RECOVERY", $sformatf(
+                    "recovery completion slot %0d has invalid task ID 0x%08h",
+                    slot, observed))
+            engine = observed[15:0] - TASK_ID_BASE;
+            if (completion_seen[engine])
+                `uvm_fatal("CLUSTER_PARALLEL_RESET_RECOVERY", $sformatf(
+                    "duplicate recovery completion for engine=%0d", engine))
+            completion_seen[engine] = 1'b1;
+            axil_read(CIMFORGE_SPAD_BASE + PARALLEL_FAULT_CPLQ +
+                      (slot << 4) + 32'd4, observed);
+            if (observed !== expected_status[engine])
+                `uvm_fatal("CLUSTER_PARALLEL_RESET_RECOVERY", $sformatf(
+                    "engine=%0d recovery status expected=0x%08h actual=0x%08h",
+                    engine, expected_status[engine], observed))
+            axil_read(CIMFORGE_SPAD_BASE + PARALLEL_FAULT_CPLQ +
+                      (slot << 4) + 32'd12, observed);
+            if (observed !== expected_elements[engine])
+                `uvm_fatal("CLUSTER_PARALLEL_RESET_RECOVERY", $sformatf(
+                    "engine=%0d recovery element count expected=%0d actual=%0d",
+                    engine, expected_elements[engine], observed))
+            if (engine != 3) begin
+                axil_read(CIMFORGE_SPAD_BASE + PARALLEL_FAULT_CPLQ +
+                          (slot << 4) + 32'd8, observed);
+                if (observed !== expected_result[engine])
+                    `uvm_fatal("CLUSTER_PARALLEL_RESET_RECOVERY", $sformatf(
+                        "engine=%0d recovery result expected=0x%08h actual=0x%08h",
+                        engine, expected_result[engine], observed))
+            end
+        end
+        if (completion_seen !== 7'b111_1111)
+            `uvm_fatal("CLUSTER_PARALLEL_RESET_RECOVERY", $sformatf(
+                "seven-engine recovery completion owners incomplete: %07b",
+                completion_seen))
+        for (engine = 0; engine < 7; engine++)
+            if ((compute_vif.engine_launch_count[engine] - launch_before[engine]) != 1)
+                `uvm_fatal("CLUSTER_PARALLEL_RESET_RECOVERY", $sformatf(
+                    "engine=%0d recovery launch count delta=%0d expected=1",
+                    engine,
+                    compute_vif.engine_launch_count[engine] - launch_before[engine]))
+
+        expect_spad(PARALLEL_FAULT_SCALAR_Y, 32'd512,
+                    "parallel reset Scalar recovery Golden");
+        expect_spad(PARALLEL_FAULT_FP_Y, 32'h4300_0000,
+                    "parallel reset FP recovery Golden");
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            expect_spad(PARALLEL_FAULT_CNM_Y + (word_idx << 2), 32'd47104,
+                        $sformatf("parallel reset CNM recovery Golden[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 128; word_idx++) begin
+            expect_spad(PARALLEL_FAULT_SFU_Y + (word_idx << 2),
+                        (word_idx % 4 == 0) ? 32'd8 :
+                        (word_idx % 4 == 1) ? -32'sd8 :
+                        (word_idx % 4 == 2) ? 32'd17 : -32'sd15,
+                        $sformatf("parallel reset SFU recovery Golden[%0d]", word_idx));
+            expect_spad(PARALLEL_FAULT_KV_CACHE + 32'h50 + (word_idx << 2),
+                        32'h0000_0100 + word_idx,
+                        $sformatf("parallel reset KV recovery Golden[%0d]", word_idx));
+        end
+        for (word_idx = 0; word_idx < 196; word_idx++)
+            expect_spad(PARALLEL_FAULT_CONV_Y + (word_idx << 2), 32'd9,
+                        $sformatf("parallel reset Conv recovery Golden[%0d]", word_idx));
+        for (word_idx = 0; word_idx < 16; word_idx++)
+            for (slot = 0; slot < 32; slot++)
+                expect_spad(PARALLEL_FAULT_MATRIX_Y +
+                            (((word_idx * 32) + slot) << 2),
+                            matrix_golden[word_idx][slot],
+                            $sformatf("parallel reset Matrix recovery Golden[%0d,%0d]",
+                                      word_idx, slot));
+
+        engine_parallel_reset_phase = 3;
+        engine_parallel_reset_cg.sample();
+        if (engine_parallel_reset_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_PARALLEL_RESET_COVERAGE", $sformatf(
+                "seven-engine shared-reset focused coverage=%0.1f%% expected 100%%",
+                engine_parallel_reset_cg.get_coverage()))
+        `uvm_info("CLUSTER_ALL_ENGINE_PARALLEL_RESET_PASS", $sformatf(
+            "shared reset during real seven-engine overlap; accepted_mask=%07b accepted_owners=%0d pending_reads=%0d max_active=%0d output_prefix_checked=1/1 old_completion=0 stale_activity=0; reset/release recovered all seven task owners and complete Golden images focused_bins=3/3 coverage=%.1f%% seed=%0d",
+            accepted_engine_mask, $countones(accepted_engine_mask),
+            pending_reads, max_active,
+            engine_parallel_reset_cg.get_coverage(), seed), UVM_LOW)
         axil_write(REG_CPLQ_HEAD, 32'd7);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
@@ -10809,6 +11379,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
 
         run_matrix_parity_all_engine_parallel_test(seed, matrix_golden);
+        run_all_engine_parallel_reset_epoch_test(seed, matrix_golden);
 
         // Read the head/token entry back through the real KV engine after the
         // KV-write completion, checking both stride address generation and
