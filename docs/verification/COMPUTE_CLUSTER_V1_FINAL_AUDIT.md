@@ -84,7 +84,7 @@ R183's 100.00% is the aggregate of 20 declared functional covergroups across the
 
 R36's compute-only AXI SVA observations show 0 matches for AR/AW stall-to-accept and one W match. This sequence does not exercise those AXI request stalls; R15 remains the evidence for real AR/AW/W assertion successes. R52/R175 confirm the legal common VDOT/GEMV/GEMM arithmetic scope; R174 reconfirms the frozen Matrix Line contract. These scoped results do not close broader requirements.
 
-R99 closes `OPEN-CL-003` for the designated in-repository `ai_accel_memory_fabric`: three seeds cover pending response-owner flush and recovery, with the three reset groups at 100%. The external DDR model remains behavioral; the unresolved broader legal reset/fault crosses stay under `CL-COV-006`. Evidence: [R99 report](COMPUTE_CLUSTER_MEMORY_FABRIC_RESET_R99_2026-10-30.md).
+R258 clean-replays the user-selected `ai_accel_memory_fabric` reset scope at current source/test SHA `795142a3c3acf90e238371661b9a0f8e2ffa5ccb`: three seeds cover two reset cut points, pending response-owner flush, and fresh DMA/CNM recovery, with the three reset groups at 100% and non-vacuous owner assertions. The external AXI responder remains behavioral; the broader legal reset/fault crossings stay under `CL-COV-006`. Evidence: [R258 report](COMPUTE_CLUSTER_MEMORY_FABRIC_RESET_R258_2026-11-03.md), archive SHA-256 `e99de7d2806140f842592b569f0f53eae25cede8bdde2f17745e29b1001d80a8`.
 
 ## Remaining closure items
 
