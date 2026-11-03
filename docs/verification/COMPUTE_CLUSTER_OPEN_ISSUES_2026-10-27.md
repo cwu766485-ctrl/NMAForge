@@ -1,5 +1,14 @@
 # Compute Cluster Open-Issue List — 2026-11-03
 
+**R259 matched-vector TinyNPU controller replay (2026-11-03):** The D4/P1/C1
+Matrix controller runs the exact pinned TinyNPU INT8 vectors with a fixed
+one-cycle behavioral SPAD response. All 9 shape/seed Golden checks pass across
+three seeds. NMAForge measures 152/231/1,198 cycles versus TinyNPU's
+151/231/1,305 cycles after a serialized 16-byte/cycle memory estimate; the
+largest case reads 6,144 B on NMAForge versus 4,096 B modeled for TinyNPU, so
+this remains a modeled-boundary comparison rather than a same-bandwidth win.
+`REQ-CL-028` remains PARTIAL. See [R259 benchmark](../benchmark/COMPUTE_CLUSTER_TINY_NPU_MATCHED_CONTROLLER_R259_2026-11-03.md).
+
 **R257 candidate replay (2026-11-03):** Three-seed seven-engine UVM, 16-seed mixed DDR/AXI E2E, Top Smoke, and seven actual RTL mutations pass on the R256 tested code/test content. The combined plan reaches all 33 declared functional groups; this does not close broad requirement-level legal Engine × Fault × Phase × Reset × Backpressure combinations. Matrix enabled-profile FSM remains 49/53, with REQ-CL-010 still PARTIAL; the full RTM remains 25 PASS-SCOPED / 13 PARTIAL and `CL-DV-v1.0` stays **HOLD**. Two UVM RAL assertions have no attempts; merged hierarchy coverage is not DUT-only. See [R257 report](COMPUTE_CLUSTER_FINAL_CANDIDATE_REPLAY_R257_2026-11-03.md), archive SHA-256 `d803e4209d805ba74a4a4f37a179d701de95f9b0e11652b8ff776f769e2e9ce3`.
 
 **R257 Matrix benchmark recheck (2026-11-03):** The current closeout tree passes 40/40 Matrix Golden points for one seed across the eight depth/prefetch/cache configurations. The same behavioral-SPAD cycle and read-traffic aggregate as the R244 three-seed campaign reproduces. This narrows reproduction risk but does not close `REQ-CL-028`; common-memory TinyNPU, GEMV/decode, integrated system throughput and candidate PPA remain open. See [R257 benchmark](../benchmark/COMPUTE_CLUSTER_MATRIX_CONFIG_COMPARISON_R257_2026-11-03.md), [CSV](../benchmark/compute_cluster_matrix_config_comparison_r257.csv), archive SHA-256 `c7c54fa78e988058622f3d110a9d1c26db747dac2b92151e6dc23565686e09a7`.

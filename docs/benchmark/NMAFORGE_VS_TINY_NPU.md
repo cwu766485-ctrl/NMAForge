@@ -263,3 +263,27 @@ and [R257 replay report](COMPUTE_CLUSTER_MATRIX_CONFIG_COMPARISON_R257_2026-11-0
 As of R258, the Compute Cluster RTM is 25 `PASS-SCOPED` / 13 `PARTIAL` and
 `CL-DV-v1.0` remains **HOLD**. Benchmark evidence does not substitute for the
 remaining DV closure.
+
+## R259 D4/P1/C1 matched-vector controller replay — 2026-11-03
+
+R259 reruns the three exact TinyNPU signed INT8 operand vectors through the
+NMAForge 16×16 Matrix controller using outstanding depth 4, next-K prefetch,
+A-tile cache, and a fixed one-cycle behavioral SPAD response. Three seeds
+(`20261029/30/31`) each pass all outputs against the independent INT32 Golden
+(9/9 shape/seed cases). Results are 152, 231, and 1,198 cycles for 16×16×16,
+16×16×32, and 32×32×64. The pinned TinyNPU array uses 52, 100, and 790 RTL
+cycles; the existing serialized 16-byte/cycle memory model gives endpoints
+151, 231, and 1,305 cycles.
+
+This places NMAForge within one cycle on the first shape, even on the second,
+and 107 cycles (8.2%) below the modeled endpoint on the largest shape. The
+largest NMAForge case reads 6,144 bytes while TinyNPU's model charges 4,096;
+NMAForge overlaps banked work and TinyNPU's unavailable memory path is
+serialized. So this is a stronger same-vector cycle result, but still not a
+same-bandwidth RTL comparison or a product-level performance win. The full
+run identity, command, per-shape stalls, hashes, and log archive are in the
+[R259 report](COMPUTE_CLUSTER_TINY_NPU_MATCHED_CONTROLLER_R259_2026-11-03.md).
+`REQ-CL-028` remains `PARTIAL`, and the Compute Cluster v1.0 audit remains
+25 `PASS-SCOPED` / 13 `PARTIAL`, **HOLD**.
+The per-seed machine-readable data are in
+[`matched_controller_r259.csv`](../../benchmark/tinynpu/matched_controller_r259.csv).

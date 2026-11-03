@@ -1161,7 +1161,8 @@ module tb_ai_tensor_matrix_core_random;
 
   initial begin
     if($value$plusargs("SEED=%d",seed)) begin end
-    benchmark_mode=$test$plusargs("MATRIX_BENCHMARK_ONLY");
+    benchmark_mode=$test$plusargs("MATRIX_BENCHMARK_ONLY") ||
+                   $test$plusargs("TINY_NPU_MATCH_BENCHMARK");
     initial_seed=seed;rand_state=seed;
     for(inst=0;inst<4;inst=inst+1)
       for(row=0;row<8192;row=row+1)
@@ -1170,6 +1171,16 @@ module tb_ai_tensor_matrix_core_random;
       bias_mem[row]=0;output_mem[row]=0;expected_mem[row]=0;
     end
     repeat(4) @(negedge clk);resetn=1;
+
+    if($test$plusargs("TINY_NPU_MATCH_BENCHMARK")) begin
+      run_tinynpu_match_case(16,16,16,105);
+      run_tinynpu_match_case(16,16,32,106);
+      run_tinynpu_match_case(32,32,64,107);
+      $display("MATRIX_TINY_NPU_MATCH_CONTROLLER_PASS seed=%0d cases=3 physical_array=%0dx%0d outstanding_depth=%0d prefetch=%0d a_tile_cache=%0d bank_response_latency=1 cycle",
+               initial_seed,PHYSICAL_ARRAY_SIZE,PHYSICAL_ARRAY_SIZE,
+               MAX_OUTSTANDING_READS,NEXT_K_PREFETCH_ENABLE,A_TILE_CACHE_ENABLE);
+      $finish;
+    end
 
     if($test$plusargs("MATRIX_BENCHMARK_ONLY")) begin
       prepare_case(4,4,8,1,0,0,0,0,0,0,0);

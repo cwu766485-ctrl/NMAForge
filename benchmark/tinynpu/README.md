@@ -80,3 +80,22 @@ schedule estimate, not SRAM timing, ASIC PPA, or measured Fmax. See the
 identity, cycle boundaries, memory traffic, ablation and the remaining need
 for an actual TinyNPU memory adapter. The separate three-seed Matrix performance rerun is archived
 in [`compute_performance.csv`](../compute_performance.csv) and its summary JSON.
+
+## Matched D4/P1/C1 controller replay
+
+To send the exact TinyNPU vectors through the NMAForge 16×16 Matrix
+controller with a fixed one-cycle behavioral SPAD response, run:
+
+```sh
+make -C dv/block/compute/matrix/sim tinynpu-matched-controller-benchmark \
+  SEED=20261029 \
+  TINYNPU_MATCH_SEEDS='20261029 20261030 20261031' \
+  OUTSTANDING_DEPTH=4 NEXT_K_PREFETCH_ENABLE=1 A_TILE_CACHE_ENABLE=1 \
+  PHYSICAL_ARRAY_SIZE=16
+```
+
+R259 passed all three workloads on all three seeds. It is a paired vector and
+cycle experiment; the TinyNPU memory endpoint remains a serialized estimate
+because its tested array wrapper has no SPAD request/response port. See the
+[R259 result and limits](../../docs/benchmark/COMPUTE_CLUSTER_TINY_NPU_MATCHED_CONTROLLER_R259_2026-11-03.md).
+Per-seed measurements are in [`matched_controller_r259.csv`](matched_controller_r259.csv).

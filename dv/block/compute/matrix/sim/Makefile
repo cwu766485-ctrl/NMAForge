@@ -19,7 +19,7 @@ COV_METRICS := line+cond+fsm+branch
 	core-no-prefetch-fallback-compile core-no-prefetch-fallback-regress \
 	datapath-random-regress core-random-regress array-random-regress \
 	matrix-size-benchmark matrix-pipeline-benchmark matrix-config-comparison \
-	tinynpu-matched-benchmark
+	tinynpu-matched-benchmark tinynpu-matched-controller-benchmark
 
 datapath-random-test: datapath-random-run
 
@@ -229,3 +229,20 @@ tinynpu-matched-benchmark:
 	$(TINY_MATCH_OUT)/simv +SEED=$(SEED) +TINY_NPU_MATCH_ONLY -l $(TINY_MATCH_OUT)/run.log
 	grep -q '^MATRIX_CORE_CASE_PASS id=105 shape_mnk=16,16,16 ' $(TINY_MATCH_OUT)/run.log
 	grep -q '^MATRIX_TINY_NPU_MATCH_PASS .*shape=16x16x16 physical_array=8x8 ' $(TINY_MATCH_OUT)/run.log
+
+# Same TinyNPU signed INT8 vectors through the full Matrix controller, with a
+# fixed one-cycle behavioral bank response and the selected D4/P1/C1 profile.
+TINYNPU_MATCH_SEEDS ?= 20261029 20261030 20261031
+tinynpu-matched-controller-benchmark: core-random-compile
+	@set -e; for seed in $(TINYNPU_MATCH_SEEDS); do \
+		$(CORE_OUT_DIR)/simv +SEED=$$seed +TINY_NPU_MATCH_BENCHMARK \
+			-cm $(COV_METRICS) -cm_dir $(CORE_OUT_DIR)/coverage.vdb \
+			-cm_name tiny_controller_match_$$seed \
+			-l $(CORE_OUT_DIR)/tiny_match_seed_$$seed.log; \
+		for case_id in 105 106 107; do \
+			grep -q "^MATRIX_CORE_CASE_PASS id=$$case_id .*physical_array=$(PHYSICAL_ARRAY_SIZE)x$(PHYSICAL_ARRAY_SIZE)$$" \
+				$(CORE_OUT_DIR)/tiny_match_seed_$$seed.log; \
+		done; \
+		grep -q "^MATRIX_TINY_NPU_MATCH_CONTROLLER_PASS seed=$$seed cases=3 physical_array=$(PHYSICAL_ARRAY_SIZE)x$(PHYSICAL_ARRAY_SIZE) outstanding_depth=$(OUTSTANDING_DEPTH) prefetch=$(NEXT_K_PREFETCH_ENABLE) a_tile_cache=$(A_TILE_CACHE_ENABLE) bank_response_latency=1 cycle$$" \
+			$(CORE_OUT_DIR)/tiny_match_seed_$$seed.log; \
+	done
