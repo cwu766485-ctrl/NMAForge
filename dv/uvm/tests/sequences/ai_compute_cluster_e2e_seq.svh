@@ -11130,6 +11130,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
     task automatic check_request_stability();
         int unsigned e;
+        int unsigned d;
+        int unsigned depth_bin;
+        int unsigned legal_class_count;
+        int unsigned hit_depth_bin_count;
         if (compute_vif.engine_req_stability_violations != 0 ||
             compute_vif.matrix_banked_stall_violations != 0 ||
             compute_vif.matrix_line_stall_violations != 0 ||
@@ -11165,6 +11169,53 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         if (compute_vif.matrix_line_stall_dir_seen[1] !== 1'b1)
             `uvm_fatal("CLUSTER_REQUEST_STABILITY",
                 "Matrix Line did not observe a stalled write request")
+        legal_class_count = 0;
+        hit_depth_bin_count = 0;
+        for (e = 0; e < 7; e++) begin
+            for (d = 0; d < 2; d++) begin
+                if (compute_vif.engine_req_stall_dir_seen[e][d]) begin
+                    legal_class_count++;
+                    for (depth_bin = 0; depth_bin < 3; depth_bin++) begin
+                        if (compute_vif.engine_req_stall_len_bins[e][d][depth_bin])
+                            hit_depth_bin_count++;
+                    end
+                    if (compute_vif.engine_req_stall_len_bins[e][d] !== 3'b111)
+                        `uvm_fatal("CLUSTER_REQUEST_STALL_DEPTH",
+                            $sformatf("engine%0d direction%0d stall-depth bins incomplete: %03b (required 1/2/8+ cycles)",
+                                e, d, compute_vif.engine_req_stall_len_bins[e][d]))
+                end
+            end
+        end
+        if (compute_vif.matrix_banked_stall_len_bins !== 3'b111)
+            `uvm_fatal("CLUSTER_REQUEST_STALL_DEPTH",
+                $sformatf("Matrix banked-read stall-depth bins incomplete: %03b (required 1/2/8+ cycles)",
+                    compute_vif.matrix_banked_stall_len_bins))
+        legal_class_count++;
+        for (depth_bin = 0; depth_bin < 3; depth_bin++)
+            if (compute_vif.matrix_banked_stall_len_bins[depth_bin])
+                hit_depth_bin_count++;
+        if (compute_vif.matrix_line_stall_len_bins !== 3'b111)
+            `uvm_fatal("CLUSTER_REQUEST_STALL_DEPTH",
+                $sformatf("Matrix Line-write stall-depth bins incomplete: %03b (required 1/2/8+ cycles)",
+                    compute_vif.matrix_line_stall_len_bins))
+        legal_class_count++;
+        for (depth_bin = 0; depth_bin < 3; depth_bin++)
+            if (compute_vif.matrix_line_stall_len_bins[depth_bin])
+                hit_depth_bin_count++;
+        for (e = 0; e < 4; e++) begin
+            if (compute_vif.cnm_stall_len_bins[e] !== 3'b111)
+                `uvm_fatal("CLUSTER_REQUEST_STALL_DEPTH",
+                    $sformatf("CNM lane%0d read stall-depth bins incomplete: %03b (required 1/2/8+ cycles)",
+                        e, compute_vif.cnm_stall_len_bins[e]))
+            legal_class_count++;
+            for (depth_bin = 0; depth_bin < 3; depth_bin++)
+                if (compute_vif.cnm_stall_len_bins[e][depth_bin])
+                    hit_depth_bin_count++;
+        end
+        if (legal_class_count != 17 || hit_depth_bin_count != 51)
+            `uvm_fatal("CLUSTER_REQUEST_STALL_DEPTH",
+                $sformatf("legal request/depth coverage incomplete: classes=%0d/17 bins=%0d/51",
+                    legal_class_count, hit_depth_bin_count))
         `uvm_info("CLUSTER_REQUEST_STABILITY_PASS", $sformatf(
             "engine stalled mask=%07b cycles={%0d,%0d,%0d,%0d,%0d,%0d,%0d} direction={%02b,%02b,%02b,%02b,%02b,%02b,%02b}; Matrix banked checks=%0d fault-cancel=%0d, Matrix line checks=%0d direction=%02b, CNM lane checks={%0d,%0d,%0d,%0d}",
             compute_vif.engine_req_stall_seen,
@@ -11185,6 +11236,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             compute_vif.matrix_line_stall_dir_seen,
             compute_vif.cnm_stall_checks[0], compute_vif.cnm_stall_checks[1],
             compute_vif.cnm_stall_checks[2], compute_vif.cnm_stall_checks[3]), UVM_LOW)
+        `uvm_info("CLUSTER_REQUEST_STALL_DEPTH_COVERAGE_PASS", $sformatf(
+            "classes=%0d/17 bins=%0d/51 stall depths=1,2,8+ consecutive cycles; legal observed traffic only",
+            legal_class_count, hit_depth_bin_count), UVM_LOW)
         `uvm_info("CLUSTER_ENGINE_WAIT_OBSERVED_PASS", $sformatf(
             "max consecutive engine-port wait cycles={%0d,%0d,%0d,%0d,%0d,%0d,%0d}; stalled mask=%07b; metric is observed traffic only, with no injected downstream SRAM stall",
             compute_vif.engine_req_max_stall_cycles[0],
