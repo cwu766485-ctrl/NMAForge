@@ -6312,6 +6312,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 axil_write(REG_DOORBELL, 32'd1);
                 wait_cpl_tail(32'd7);
             end
+            begin : scalar_numeric_write_stall
+                stall_core_engine_write_once(0, 8);
+            end
         join
         wait_spad_idle();
 
@@ -7551,6 +7554,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         end
         if (!busy_seen)
             `uvm_fatal("CLUSTER_FP16_NUMERIC", "real CMDQ FP16 engine did not become active")
+
+        stall_core_engine_write_once(1, 8);
 
         wait_cpl_tail(32'd1);
         wait_spad_idle();
@@ -11253,6 +11258,79 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             compute_vif.engine_req_max_stall_cycles[5],
             compute_vif.engine_req_max_stall_cycles[6],
             compute_vif.engine_req_stall_seen), UVM_LOW)
+    endtask
+
+    // Insert legal downstream backpressure at the MUX/arbiter handshake:
+    // suppress the arbiter input valid and return ready low together, so no
+    // request is accepted while the real engine must retain its payload.
+    task automatic stall_core_engine_write_once(
+        input int unsigned engine_idx,
+        input int unsigned stall_cycles
+    );
+        int unsigned poll;
+        int unsigned stall_idx;
+        bit request_seen;
+        bit accepted_after_release;
+        bit [1023:0] force_zero;
+        string arbiter_core_valid_path;
+        string mux_spad_ready_path;
+
+        if (engine_idx >= 7 || stall_cycles < 8)
+            `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
+                "invalid core write stall target engine=%0d cycles=%0d",
+                engine_idx, stall_cycles))
+        force_zero = '0;
+        arbiter_core_valid_path = "tb_ai_accel_uvm.dut.spad_arbiter_u.core_valid";
+        mux_spad_ready_path = "tb_ai_accel_uvm.dut.compute_spad_mux_u.spad_ready";
+        request_seen = 1'b0;
+        for (poll = 0; poll < 10000; poll++) begin
+            @(negedge compute_vif.aclk);
+            if (compute_vif.engine_req_valid[engine_idx] &&
+                compute_vif.engine_req_write[engine_idx]) begin
+                request_seen = 1'b1;
+                break;
+            end
+        end
+        if (!request_seen)
+            `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
+                "engine%0d produced no write request for directed stall", engine_idx))
+        if (!uvm_hdl_force(arbiter_core_valid_path, force_zero))
+            `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
+                "failed to gate arbiter core valid at %s", arbiter_core_valid_path))
+        if (!uvm_hdl_force(mux_spad_ready_path, force_zero)) begin
+            void'(uvm_hdl_release(arbiter_core_valid_path));
+            `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
+                "failed to gate MUX ready at %s", mux_spad_ready_path))
+        end
+        for (stall_idx = 0; stall_idx < stall_cycles; stall_idx++) begin
+            @(posedge compute_vif.aclk);
+            #1;
+            if (!compute_vif.engine_req_valid[engine_idx] ||
+                !compute_vif.engine_req_write[engine_idx] ||
+                compute_vif.engine_req_ready[engine_idx] !== 1'b0)
+                `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
+                    "engine%0d write did not remain unaccepted/stable at injected stall cycle %0d",
+                    engine_idx, stall_idx))
+        end
+        @(negedge compute_vif.aclk);
+        void'(uvm_hdl_release(mux_spad_ready_path));
+        void'(uvm_hdl_release(arbiter_core_valid_path));
+
+        accepted_after_release = 1'b0;
+        for (poll = 0; poll < 10000 && !accepted_after_release; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.engine_req_valid[engine_idx] &&
+                compute_vif.engine_req_write[engine_idx] &&
+                compute_vif.engine_req_ready[engine_idx])
+                accepted_after_release = 1'b1;
+        end
+        if (!accepted_after_release)
+            `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
+                "engine%0d write made no progress after releasing injected backpressure",
+                engine_idx))
+        `uvm_info("CLUSTER_REQUEST_STALL_INJECT_PASS", $sformatf(
+            "engine%0d write held unaccepted for %0d cycles, then accepted once ready resumed",
+            engine_idx, stall_cycles), UVM_LOW)
     endtask
 
     task automatic wait_matrix_sfu_overlap();
