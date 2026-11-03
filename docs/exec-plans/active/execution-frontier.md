@@ -1,16 +1,16 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-02. This is a short handoff for the next engineering task; it
+Updated: 2026-11-03. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
 ## Latest Compute Cluster evidence
 
-R208 is the latest exact test candidate: `30378888dadc21a6fd2dace0a125ee78fd20d45b`, tree `412ec3700cd79b6c3f5b64e4f0f37691e2f679d8`. Detached clean-worktree three-seed UVM, Top Smoke, 20-case seeded Top, and 7/7 real RTL mutations pass. The new watchdog test drives all seven production engines through real CMDQ and completion paths; each seed records all seven busy/error/`ERR_WATCHDOG`/no-writeback outcomes and focused coverage 7/7 (100%). Per seed, the Memory Scoreboard checks 70,577 words with zero mismatch/unknown/stale; the response-owner ledger has zero mismatches and no pending entries. This repairs a Scalar error-state retirement hang but adds only a bounded watchdog point. UVM-only URG aggregate group score is 74.44%; the focused group is 100%, while unrelated AXI groups are unexercised. The RTM remains 24 PASS-SCOPED / 14 PARTIAL; `CL-DV-v1.0` remains HOLD. See the [R208 report](../../verification/COMPUTE_CLUSTER_SCALAR_WATCHDOG_R208_2026-11-02.md), archive SHA-256 `bafb452bfbadde0c4d80df68b8da0feb3dc4192a15b4f1ba493261fc75cd29ce`.
+R232 replayed the exact published closeout HEAD 3259d4da158d56aebe41c227c426b6b4b74a0f72 from a clean worktree. Top Smoke, three-seed real seven-engine Compute Cluster UVM, 16-seed mixed E2E coverage, and the 28/28 actual RTL mutation campaign pass. Combined URG reports 28/28 declared functional covergroups at 100%; all AR/AW/W stall-to-accept cover properties match. Each Cluster seed checks 92,871 Memory Image words with zero mismatch/unknown/stale and drains the owner ledger. The combined simulation hierarchy still reports line/condition/FSM/branch coverage 73.95/69.39/47.24/64.95%, with two UVM RAL internal assertions without attempts.
 
-R205 runs the Matrix eight-way depth/prefetch/A-tile-cache comparison on the same clean candidate for three seeds: 120/120 shape/configuration/seed Golden points pass with identical cycle counts. D4/P1/C1 reduces the five-shape cycle sum 24.88% and bank reads 25% on the two multi-A-tile shapes. The same R204 UVM logs reproduce real-top Serial, Staged, Parallel and Reset-Recovery cycles across all three seeds. Both reports identify the one-cycle behavioral SPAD boundary and do not claim ASIC PPA or TinyNPU speedup.
+The declared testpoint target is met for this merged plan. The full Phase A exit criteria are not met: the 38-row RTM remains 24 PASS-SCOPED / 14 PARTIAL, so CL-DV-v1.0 stays HOLD. Continue closing requirement-level legal fault × phase × reset × backpressure interactions, descriptor max/stride/alias/overflow and dispatch boundaries, Matrix integration, and the remaining benchmark contract. Keep v2.0 product changes behind the v1.0 review.
 
-The overall RTM remains 24 PASS-SCOPED / 14 PARTIAL and sign-off remains HOLD. Continue Phase A closure before v2.0 work. See the [R204 replay](../../verification/COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R204_2026-11-02.md), [R205 benchmark](../../benchmark/COMPUTE_CLUSTER_CONFIG_AND_CONCURRENCY_BENCHMARK_R205_2026-11-02.md), [Execution RTM](../../verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md), and [open issues](../../verification/COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md).
+See the [R232 report](../../verification/COMPUTE_CLUSTER_PUBLISHED_HEAD_CLEAN_REPLAY_R232_2026-11-03.md), [Execution RTM](../../verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md), [Open-Issue List](../../verification/COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md), and [Sign-off Readiness](../../verification/COMPUTE_CLUSTER_DV_SIGNOFF_READINESS_2026-10-27.md). The logs-only archive is /tmp/nmaforge_r232_final_evidence_20261103.tar.gz, SHA-256 ac1f65990fd2aef1b044a680170878ac8f327eb848f53be722b9a13801b2e0ba.
 
 ## Project baseline
 
