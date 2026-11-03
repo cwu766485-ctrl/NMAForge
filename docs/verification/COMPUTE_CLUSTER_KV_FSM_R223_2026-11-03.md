@@ -80,8 +80,22 @@ Each seed reports UVM warning/error/fatal `0/0/0`, checks 92,871 memory words af
 
 The three-seed UVM URG dashboard is score `79.18%`; line/condition/FSM/branch are `70.42/65.51/45.96/60.64%`. Assertions have 17/22 real successes, zero failures/incomplete, and two UVM RAL internal no-attempts; the AR/AW payload/burst assertion properties have attempts but no real success. Of the three SVA cover properties, W stall-to-accept matches once and AR/AW stall-to-accept have zero matches in this Compute Cluster-only workload. These bins remain uncovered here; the separate mixed AXI E2E evidence is not merged into this run.
 
+### Selected in-repository memory-fabric reset/epoch replay
+
+On the same clean source SHA, the user-selected `ai_accel_memory_fabric` reset target also passes three seeds:
+
+```sh
+make -C dv/subsystem/dma_spad/sim subsystem_memory_fabric_reset_regress \
+  VCS=/tmp/nmaforge_vcs_home_linux_alias/bin/vcs \
+  URG=/tmp/nmaforge_vcs_home_linux_alias/bin/urg \
+  MEMORY_FABRIC_RESET_OUT=/tmp/nmaforge_r223_final_fabric_reset_0e273b8 \
+  MEMORY_FABRIC_RESET_SEEDS='20261025 20261026 20261027'
+```
+
+Each seed resets with four DMA reads outstanding and an accepted CNM SPAD read awaiting its response, then runs two post-reset DMA/CNM recovery phases. UVM severity is `0/0/0` per seed. URG reports the three declared fabric reset groups (`dma_cnm_shared_reset_cg`, `cnm_reset_phase_cg`, `dma_reset_phase_cg`) at 100%; `ap_single_response_owner` has 3,921 real successes and `ap_cnm_response_tag` has 144, with zero failure/incomplete. The compile has no `Warning-`, `Error-`, or `[TFIPC]` diagnostics. This qualifies only the selected repository fabric and its modeled responder; it does not qualify an arbitrary external fabric implementation.
+
 ## Evidence and requirement disposition
 
-Focused KV/Top Smoke logs-only archive: `/tmp/nmaforge_r223_kv_fsm_evidence_20261103.tar.gz`, SHA-256 `889d646d9a538fb0c899c69ab4175f8f7a29efd2f0c5c53c5dd49973aafcb060`. The latest consolidated exact-candidate archive is `/tmp/nmaforge_r223_full_clean_evidence_20261103_v2.tar.gz`, SHA-256 `fde6a1fc7d3e0c5ac107a35c5f96010aed7a2585bd4da7d7db0c0bd67bb29e2b`; it contains KV, Top Smoke, fixed-seed Top, three real-top UVM logs and URG reports. Archives are logs/reports only and exclude databases, binaries, and waveforms.
+Focused KV/Top Smoke logs-only archive: `/tmp/nmaforge_r223_kv_fsm_evidence_20261103.tar.gz`, SHA-256 `889d646d9a538fb0c899c69ab4175f8f7a29efd2f0c5c53c5dd49973aafcb060`. The latest consolidated exact-candidate archive is `/tmp/nmaforge_r223_full_clean_evidence_20261103_v3.tar.gz`, SHA-256 `8d094780c06d9ee353dbeb7645d32cb10b358c62453d39c97ff80af6e153157f`; it contains KV, Top Smoke, fixed-seed Top, three-seed real-top UVM, selected memory-fabric reset logs and URG reports. Archives are logs/reports only and exclude databases, binaries, and waveforms.
 
-`REQ-CL-025` remains **PASS-SCOPED**. R223 adds the four-transition KV FSM evidence to its existing KV address/Protection/Golden evidence. Exhaustive KV stride/alias products, broader per-engine descriptor contracts, and the remaining partial requirement clauses are still open. No requirement status is promoted by this block test. The 38-row RTM remains 24 `PASS-SCOPED` / 14 `PARTIAL`; `CL-DV-v1.0` remains **HOLD**.
+`REQ-CL-025` remains **PASS-SCOPED**. R223 adds the four-transition KV FSM evidence to its existing KV address/Protection/Golden evidence and clean replay for the named real-top/fabric tests. Exhaustive KV stride/alias products, broader per-engine descriptor contracts, external-fabric qualification and the remaining partial requirement clauses are still open. No requirement status is promoted by these testpoints. The 38-row RTM remains 24 `PASS-SCOPED` / 14 `PARTIAL`; `CL-DV-v1.0` remains **HOLD**.
