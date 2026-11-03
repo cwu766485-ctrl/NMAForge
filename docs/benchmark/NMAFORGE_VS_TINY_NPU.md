@@ -1,5 +1,75 @@
 # NMAForge vs TinyNPU RTL Benchmark
 
+## Current distance snapshot — 2026-11-03
+
+This snapshot compares the latest available paired workloads and clearly
+separates measured RTL from modeled memory service. The current research
+branch is `feat/shape-adaptive-gemv-v2` at SHA
+`3d3403564d6b00f89eb17167b0a65ee8dff8ce41`. The paired common-GEMM run is
+`TINY-FAIR-6848A41-S20261029`, NMAForge SHA
+`6848a414eaeaa05cf9e1411cf55d9d27333208a6`, and pinned TinyNPU SHA
+`8216c22b762011aa20c05fc2768423fd12dda59d`. The current branch's Matrix RTL,
+SPAD arbiter, scratchpad and compute-cluster integration files are byte
+identical to the paired NMAForge source. This snapshot does not claim a fresh
+benchmark run at the current documentation commit.
+
+### Paired 16×16-array INT8 GEMM
+
+All three workloads use the same signed INT8 vectors and independent INT32
+Golden checks. Both designs use 16×16 physical arrays (256 MAC lanes). NMAForge
+cycles measure its Matrix controller with a one-cycle behavioral SPAD. TinyNPU
+array cycles are measured directly, while the “common endpoint” adds a
+serialized 16-byte/cycle, one-cycle-response memory schedule because the
+pinned TinyNPU wrapper has no matching SPAD request/response port.
+
+| Shape | NMAForge measured cycles | TinyNPU array RTL cycles | TinyNPU common endpoint (modeled memory) | TinyNPU endpoint fewer cycles than NMAForge | NMAForge read/write bytes | TinyNPU read/write bytes |
+|---|---:|---:|---:|---:|---:|---:|
+| 16×16×16 | 171 | 52 | 151 | 11.7% | 512 / 1,024 | 512 / 1,024 modeled |
+| 16×16×32 | 263 | 100 | 231 | 12.2% | 1,024 / 1,024 | 1,024 / 1,024 modeled |
+| 32×32×64 | 1,393 | 790 | 1,305 | 6.3% | 6,144 / 4,096 | 4,096 / 4,096 modeled |
+
+Both sides pass every Golden output. At the modeled common endpoint, TinyNPU
+has the lower cycle count on these three GEMMs; this is a conditional
+cycle-model result, not measured end-to-end TinyNPU memory performance or an
+ASIC/FPGA speedup. NMAForge's 32×32×64 Matrix run issues 2,048 more read bytes
+than the TinyNPU schedule model, which is a visible traffic and controller
+efficiency gap to investigate. TinyNPU's direct 52/100/790 array cycles omit
+memory/controller service and must not be compared directly to NMAForge's
+171/263/1,393 cycle windows.
+
+### Paired fixed-weight CNN graph
+
+The same pinned `conv1x_mini.onnx` fixed-weight graph produces matching outputs
+on both designs. NMAForge reports 1,985 engine cycles plus 1,080 host-layout
+cycles; TinyNPU reports 4,781 graph-testbench cycles. These windows have
+different setup, dispatcher, layout and memory boundaries, so they establish
+functional parity but do not establish a CNN speedup. The checked-in weights
+are not pretrained model evidence.
+
+### GEMV research distance
+
+The current NMAForge research wrapper connects a static GEMV selector to the
+real four-bank behavioral SPAD and production SPAD arbiter. Across three
+seeds, M=1, N=8, K=64 improves from 530 to 474 cycles (10.6% fewer), and M=4
+improves from 770 to 738 cycles (4.2% fewer). The selector retains baseline
+for M=8 and M=16. These numbers use source SHA
+`ae897524a30d08bd1dc7970f61f01d6abe763b59`; they include serialized SPAD
+traffic and concurrent DMA contention, but the research wrapper is not wired
+into the production Matrix controller. TinyNPU has no matching GEMV/decode
+result in this paired run, so no cross-design GEMV distance is established.
+
+### Assessment
+
+The current evidence shows exact arithmetic parity and a small, conditional
+TinyNPU cycle advantage on common GEMM workloads. It does not show a robust
+NMAForge performance win under a fully measured common memory system. NMAForge
+has a broader seven-engine Compute Cluster and shared-SPAD architecture; the
+tested TinyNPU array wrapper does not expose an equivalent shared-memory
+interface, so system-level throughput and contention remain unpaired. The next
+fair comparison needs the same memory adapter, latency/bandwidth, workload
+start/end boundary, and an integrated NMAForge GEMV/Matrix path. ASIC PPA,
+measured Fmax and power are not part of this comparison.
+
 ## Review boundary
 
 This is a functional RTL and cycle-count comparison, not ASIC PPA evidence.
