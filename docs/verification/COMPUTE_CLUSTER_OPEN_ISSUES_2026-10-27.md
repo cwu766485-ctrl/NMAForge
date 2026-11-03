@@ -1,5 +1,7 @@
 # Compute Cluster Open-Issue List — 2026-11-03
 
+**R265 checker-sensitivity update (2026-11-03):** On the latest published closeout tree, seven temporary RTL mutations (Address, Data, Response Owner, WSTRB, Completion Error, Missing Done, Duplicate Done) are caught by their assigned production Checkers. This closes no legal functional coverage cross; all 11 remaining partial RTM rows stay open and `CL-DV-v1.0` remains **HOLD**. See [R265 report](COMPUTE_CLUSTER_DUT_MUTATION_R265_2026-11-03.md), archive SHA-256 `edbb92285bfe4c0228602d641d8f2d7b36f8749783f27819ff565fcfa6fce94c`.
+
 **R259 matched-vector TinyNPU controller replay (2026-11-03):** The D4/P1/C1
 Matrix controller runs the exact pinned TinyNPU INT8 vectors with a fixed
 one-cycle behavioral SPAD response. All 9 shape/seed Golden checks pass across
