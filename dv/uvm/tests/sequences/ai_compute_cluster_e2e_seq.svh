@@ -324,7 +324,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     covergroup engine_parallel_reset_cg;
         option.per_instance = 1;
         cp_engine_parallel_reset_phase: coverpoint engine_parallel_reset_phase {
-            bins all_engines_read_pending_at_reset = {1};
+            bins seven_engine_overlap_with_pending_reads = {1};
             bins old_epoch_quiet_and_unretired = {2};
             bins seven_engine_golden_recovery = {3};
         }
@@ -4735,9 +4735,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         end
 
         // C1 inputs are the same legal images used by the seven-engine
-        // Golden test. This reset cut is deliberately taken only while every
-        // engine has an accepted read outstanding and no output write has
-        // committed, so all old destinations/completions have exact sentinels.
+        // Golden test. Take the reset cut only after each engine has completed
+        // a real read handshake and at least one response remains pending
+        // systemwide. Output writes may already have committed; the monitor
+        // below records and checks each accepted Golden prefix and sentinel
+        // suffix before testing full recovery.
         for (word_idx = 0; word_idx < 512; word_idx++)
             spad_write(PARALLEL_FAULT_MATRIX_Y + (word_idx << 2),
                        32'hbad0_e300 | word_idx);
@@ -4941,7 +4943,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                     end
 
                     if ((compute_vif.engine_busy === 7'b111_1111) &&
-                        ($countones(accepted_engine_mask) >= 2) &&
+                        (accepted_engine_mask === 7'b111_1111) &&
                         (pending_reads != 0)) begin
                         if (max_active != 7)
                             `uvm_fatal("CLUSTER_PARALLEL_RESET", $sformatf(
