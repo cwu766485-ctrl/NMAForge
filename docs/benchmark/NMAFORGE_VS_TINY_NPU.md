@@ -205,8 +205,8 @@ they are not merged into the current pinned-reference CSV.
 - No candidate-specific ASIC synthesis, SRAM timing view, measured Fmax, or
   power report was run. Any 250 MHz effective-GOPS column in existing Matrix
   logs is a normalization assumption only.
-- Compute Cluster v1.0 remains a sign-off candidate, not signed: the final
-  audit is 24 PASS-SCOPED / 14 PARTIAL, with unresolved functional closure
+- Compute Cluster v1.0 remains a sign-off candidate, not signed: the current
+  audit is 25 PASS-SCOPED / 13 PARTIAL, with unresolved functional closure
   items documented in the [audit report](../verification/COMPUTE_CLUSTER_V1_FINAL_AUDIT.md).
 
 ## R134 current-candidate replay — 2026-10-31
@@ -229,3 +229,37 @@ different endpoints and no speedup claim.
 The R134 run refreshes the machine-readable CSV/JSON and leaves `REQ-CL-028`
 PARTIAL. The run evidence, exact command, data hashes, and boundary analysis
 are in the [R134 replay report](../verification/COMPUTE_CLUSTER_TINYNPU_REPLAY_R134_2026-10-31.md).
+
+## Distance update after Matrix ablation — 2026-11-03
+
+The latest NMAForge 16×16-array ablation is R244 (three seeds, 120/120 Golden
+checks), independently replayed for one seed in R257. Its D4/P1/C1 configuration
+measures 233 cycles for 16×16×32 and 1,187 cycles for 32×32×64. The pinned
+TinyNPU R134 comparison reports 231 and 1,305 cycles respectively after its
+serialized 16-byte/cycle memory model is added to measured array cycles.
+
+| Shape | NMAForge D4/P1/C1 cycles | TinyNPU normalized cycles | NMAForge delta |
+|---|---:|---:|---:|
+| 16×16×32 | 233 | 231 | +2 cycles (+0.9%) |
+| 32×32×64 | 1,187 | 1,305 | −118 cycles (−9.0%) |
+
+This suggests the optimized Matrix controller is near parity on 16×16×32 and
+has a promising cycle result on 32×32×64. It is not yet a defensible TinyNPU
+performance win: the TinyNPU memory interval is modeled and serialized, the
+NMAForge result uses its behavioral SPAD with D4/P1/C1 overlap, the measurements
+come from separate runs, and R244/R257 do not reuse the exact TinyNPU input
+vectors. The earlier same-vector R134 comparison therefore remains the only
+paired arithmetic-vector result; there NMAForge measured 171/263/1,393 cycles
+versus TinyNPU's modeled 151/231/1,305 for 16×16×16, 16×16×32, and 32×32×64.
+
+For the fixed-weight CNN, both sides still pass exact output Golden checks,
+but NMAForge's 1,985 engine cycles plus separately reported 1,080 host-layout
+cycles and TinyNPU's 4,781 graph-testbench cycles have different boundaries;
+no speedup is claimed. No matched-memory GEMV/decode, 64×64 pair, trained-model
+comparison, or candidate-specific ASIC PPA is available. R244 and R257 details
+are in the [three-seed Matrix report](COMPUTE_CLUSTER_MATRIX_CONFIG_COMPARISON_R244_2026-11-03.md)
+and [R257 replay report](COMPUTE_CLUSTER_MATRIX_CONFIG_COMPARISON_R257_2026-11-03.md).
+
+As of R258, the Compute Cluster RTM is 25 `PASS-SCOPED` / 13 `PARTIAL` and
+`CL-DV-v1.0` remains **HOLD**. Benchmark evidence does not substitute for the
+remaining DV closure.
