@@ -1217,3 +1217,10 @@ The test is an incremental point only. No requirement disposition is promoted; c
 | `REQ-CL-019` | `PARTIAL` | Same test; simultaneous input-edge checker, four-cycle release quiet checker, fresh-task recovery Golden | Reset+Abort same sampling edge passes, followed by four quiet cycles and a correct new VDOT. Pending-response and cross-engine reset cases remain open. | Same run / seeds | Same report/archive |
 
 This is a bounded core-level point, not full reset/fault closure; the 38-row status remains 24 `PASS-SCOPED` / 14 `PARTIAL`, **HOLD**.
+
+
+## R248 final published-tree coverage replay — 2026-11-03
+
+On published `main` commit `4c7a95242dd9d910969f2a9ab01bca1e7de2b0c6` / tree `00431c3f0c05d11de2d8cf90f69ce0020c7944bf`, clean detached replay commit `76d5121493407cddef6fdbe92c9f31058ff5ec1b` has the identical tree. Three-seed seven-engine UVM, Top Smoke, 16-seed mixed-precision/AXI E2E and seven actual RTL mutation probes pass. URG merges 19 tests and reports 28/28 declared functional groups at 100%, 3/3 AXI stall-to-accept cover matches, 20/22 assertions with real successes, zero failures/incomplete, and two no-attempt UVM RAL library properties. Hierarchy line/condition/FSM/branch/assert is 73.99/69.39/47.24/64.95/92.00%.
+
+This replay confirms the merged declared testpoint target only. It does not close the remaining 14 `PARTIAL` requirement rows or raise the sign-off decision; the matrix remains 24 `PASS-SCOPED` / 14 `PARTIAL`, **HOLD**. See [R248 final-tree replay](COMPUTE_CLUSTER_FINAL_TREE_REPLAY_R248_2026-11-03.md); logs-only archive SHA-256 `fd62fa63ad1978b53a091e50d6f809dfe4b05e49c93b6e44dbded8ef20ce184c`.
