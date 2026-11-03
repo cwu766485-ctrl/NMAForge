@@ -11333,6 +11333,125 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             engine_idx, stall_cycles), UVM_LOW)
     endtask
 
+    task automatic stall_matrix_line_write_once(input int unsigned stall_cycles);
+        int unsigned poll;
+        int unsigned stall_idx;
+        bit request_seen;
+        bit accepted_after_release;
+        bit [1023:0] force_zero;
+        string arbiter_line_valid_path;
+        string line_ready_path;
+
+        force_zero = '0;
+        arbiter_line_valid_path = "tb_ai_accel_uvm.dut.spad_arbiter_u.core_line_valid";
+        line_ready_path = "tb_ai_accel_uvm.dut.arb_core_line_ready";
+        request_seen = 1'b0;
+        for (poll = 0; poll < 10000; poll++) begin
+            @(negedge compute_vif.aclk);
+            if (compute_vif.matrix_line_valid && compute_vif.matrix_line_write) begin
+                request_seen = 1'b1;
+                break;
+            end
+        end
+        if (!request_seen)
+            `uvm_fatal("CLUSTER_STALL_INJECT",
+                "Matrix produced no Line write request for directed stall")
+        if (!uvm_hdl_force(arbiter_line_valid_path, force_zero))
+            `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
+                "failed to gate arbiter Matrix Line valid at %s", arbiter_line_valid_path))
+        if (!uvm_hdl_force(line_ready_path, force_zero)) begin
+            void'(uvm_hdl_release(arbiter_line_valid_path));
+            `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
+                "failed to gate Matrix Line ready at %s", line_ready_path))
+        end
+        for (stall_idx = 0; stall_idx < stall_cycles; stall_idx++) begin
+            @(posedge compute_vif.aclk);
+            #1;
+            if (!compute_vif.matrix_line_valid ||
+                !compute_vif.matrix_line_write ||
+                compute_vif.matrix_line_ready !== 1'b0)
+                `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
+                    "Matrix Line write did not remain unaccepted/stable at injected stall cycle %0d",
+                    stall_idx))
+        end
+        @(negedge compute_vif.aclk);
+        void'(uvm_hdl_release(line_ready_path));
+        void'(uvm_hdl_release(arbiter_line_valid_path));
+
+        accepted_after_release = 1'b0;
+        for (poll = 0; poll < 10000 && !accepted_after_release; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.matrix_line_valid && compute_vif.matrix_line_write &&
+                compute_vif.matrix_line_ready)
+                accepted_after_release = 1'b1;
+        end
+        if (!accepted_after_release)
+            `uvm_fatal("CLUSTER_STALL_INJECT",
+                "Matrix Line write made no progress after injected backpressure release")
+        `uvm_info("CLUSTER_REQUEST_STALL_INJECT_PASS", $sformatf(
+            "Matrix Line write held unaccepted for %0d cycles, then accepted once ready resumed",
+            stall_cycles), UVM_LOW)
+    endtask
+
+    task automatic stall_cnm_four_lane_read_once(input int unsigned stall_cycles);
+        int unsigned poll;
+        int unsigned stall_idx;
+        bit request_seen;
+        bit accepted_after_release;
+        bit [1023:0] force_zero;
+        string arbiter_cnm_valid_path;
+        string cnm_ready_path;
+
+        force_zero = '0;
+        arbiter_cnm_valid_path = "tb_ai_accel_uvm.dut.spad_arbiter_u.cnm_valid";
+        cnm_ready_path = "tb_ai_accel_uvm.dut.arb_cnm_ready";
+        request_seen = 1'b0;
+        for (poll = 0; poll < 10000; poll++) begin
+            @(negedge compute_vif.aclk);
+            if (compute_vif.cnm_request_valid === 4'hf) begin
+                request_seen = 1'b1;
+                break;
+            end
+        end
+        if (!request_seen)
+            `uvm_fatal("CLUSTER_STALL_INJECT",
+                "CNM did not present all four legal lane reads together for directed stall")
+        if (!uvm_hdl_force(arbiter_cnm_valid_path, force_zero))
+            `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
+                "failed to gate arbiter CNM valid at %s", arbiter_cnm_valid_path))
+        if (!uvm_hdl_force(cnm_ready_path, force_zero)) begin
+            void'(uvm_hdl_release(arbiter_cnm_valid_path));
+            `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
+                "failed to gate CNM ready at %s", cnm_ready_path))
+        end
+        for (stall_idx = 0; stall_idx < stall_cycles; stall_idx++) begin
+            @(posedge compute_vif.aclk);
+            #1;
+            if (compute_vif.cnm_request_valid !== 4'hf ||
+                compute_vif.cnm_request_ready !== 4'h0)
+                `uvm_fatal("CLUSTER_STALL_INJECT", $sformatf(
+                    "four-lane CNM reads did not remain unaccepted/stable at injected stall cycle %0d valid=%h ready=%h",
+                    stall_idx, compute_vif.cnm_request_valid,
+                    compute_vif.cnm_request_ready))
+        end
+        @(negedge compute_vif.aclk);
+        void'(uvm_hdl_release(cnm_ready_path));
+        void'(uvm_hdl_release(arbiter_cnm_valid_path));
+
+        accepted_after_release = 1'b0;
+        for (poll = 0; poll < 10000 && !accepted_after_release; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (|(compute_vif.cnm_request_valid & compute_vif.cnm_request_ready))
+                accepted_after_release = 1'b1;
+        end
+        if (!accepted_after_release)
+            `uvm_fatal("CLUSTER_STALL_INJECT",
+                "CNM lane read made no progress after injected backpressure release")
+        `uvm_info("CLUSTER_REQUEST_STALL_INJECT_PASS", $sformatf(
+            "four CNM lane reads held unaccepted for %0d cycles, then resumed",
+            stall_cycles), UVM_LOW)
+    endtask
+
     task automatic wait_matrix_sfu_overlap();
         int unsigned poll;
         for (poll = 0; poll < 3000; poll++) begin
@@ -11947,7 +12066,17 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             compute_vif.matrix_line_stall_violations;
         parallel_start_cycle = compute_vif.sim_cycles;
         axil_write(REG_DOORBELL, 32'd1);
-        wait_cpl_tail(32'd2);
+        fork
+            begin
+                stall_matrix_line_write_once(8);
+            end
+            begin
+                stall_cnm_four_lane_read_once(8);
+            end
+            begin
+                wait_cpl_tail(32'd2);
+            end
+        join
         parallel_cycles = compute_vif.sim_cycles - parallel_start_cycle;
         wait_spad_idle();
         if ((compute_vif.matrix_line_stall_checks -
