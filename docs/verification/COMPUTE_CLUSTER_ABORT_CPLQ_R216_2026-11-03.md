@@ -4,7 +4,7 @@
 
 - Test ID: `TC-CL-R216-ENGINE-ABORT-FULL-CPLQ-7`
 - Run ID: `CL-ABORT-CPLQ-R216-CLEAN-3S-20261103`
-- Fixed code/test SHA: `ec9b922d2ad8d4de6bca08211ea9bb3bc1672779`
+- Fixed code/test SHA: `09f9d31209fdcc803ec322cf3822bd51e763665a`
 - Published GitHub code commit: `09f9d31209fdcc803ec322cf3822bd51e763665a` (tree `9778101254417c7272c37d8177e319e70849c8b4`, identical to the tested SHA tree)
 - Parent published closeout source: `eb27e716fc40c6e526e479e2472837b165675a97`
 - Tools: VCS/URG `V-2023.12-SP1_Full64` / `V-2023.12-SP1`
@@ -32,7 +32,7 @@ Top Smoke also passes at the same committed source: mapper precheck covers 86 de
 ```sh
 VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
   make -C dv/uvm/sim uvm_compute_cluster_regress \
-  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_abort_cplq_clean_sha_ec9b922 \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_abort_cplq_published_sha_09f9d312 \
   COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027'
 
 VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
@@ -40,7 +40,7 @@ VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
   AI_RANDOM_CASES=20 AI_SEED=12345
 ```
 
-The clean-SHA compile log has no `Warning-`, `Error-`, or `[TFIPC]` diagnostics. Logs and selected URG reports are archived outside the repository at `/tmp/nmaforge_abort_cplq_r216_evidence_ec9b922_20261103.tar.gz` (SHA-256 `4e8a01bed62c11cbb3791423eaeda3c61483a8a44a45b7515471c1beb4d2d06f`). The archive contains the compile log, all three seed logs, merged URG dashboard/groups/assertions, and the Top Smoke compile/run logs; it excludes VDBs and generated executables.
+The clean-SHA compile log has no `Warning-`, `Error-`, or `[TFIPC]` diagnostics. Logs and selected URG reports are archived outside the repository at `/tmp/nmaforge_abort_cplq_r216_published_09f9d312_20261103.tar.gz` (SHA-256 `a93725d2c8787f69b1c8baea4ad5761e89e7afef4d3b0917a15096b4e18b7026`). The archive contains the compile log, all three seed logs, merged URG dashboard/groups/assertions, and the Top Smoke compile/run logs; it excludes VDBs and generated executables.
 
 ## Remaining sign-off issues
 
