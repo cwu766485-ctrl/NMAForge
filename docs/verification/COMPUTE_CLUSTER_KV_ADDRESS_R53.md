@@ -1,5 +1,7 @@
 # Compute Cluster KV Address Boundary — R53
 
+> **Follow-up R223 (2026-11-03):** The four raw FSM transitions reported below as unhit were subsequently covered through legal watchdog, Abort, and reset scenarios. The clean three-seed R223 URG result is 15/15 KV state transitions; see [R223 report](COMPUTE_CLUSTER_KV_FSM_R223_2026-11-03.md). R53's address results and source identity below are unchanged.
+
 **Run ID:** `KV-ADDR-CONTRACT-F916874-3S`  
 **Date:** 2026-10-30  
 **Product/test SHA:** `f916874a9ce60741a4516eaf9e33ebcae4a676c2`  
