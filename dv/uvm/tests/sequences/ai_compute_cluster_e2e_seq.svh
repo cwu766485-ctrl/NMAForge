@@ -1,6 +1,11 @@
 class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     `uvm_object_utils(ai_compute_cluster_e2e_seq)
 
+    // Regression bound for the fixed legal all-engine workload only.  The
+    // measured three-seed maximum is 126 cycles; this 2x guard is not a general
+    // SRAM-backpressure or platform fairness guarantee.
+    localparam int unsigned CLUSTER_ENGINE_WAIT_BOUND_CYCLES = 256;
+
     localparam bit [31:0] REG_CMDQ_CTRL = 32'h0000_00ac;
     localparam bit [31:0] REG_CMDQ_BASE = 32'h0000_0080;
     localparam bit [31:0] REG_CMDQ_SIZE = 32'h0000_0088;
@@ -415,6 +420,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         }
     endgroup
 
+    covergroup engine_progress_bound_cg with function sample(
+        bit [6:0] stalled_mask, int unsigned max_wait_cycles);
+        option.per_instance = 1;
+        cp_expected_stall_mask: coverpoint stalled_mask {
+            bins six_contended_engine_ports = {7'b1110111};
+        }
+        cp_wait_within_bound: coverpoint max_wait_cycles {
+            bins observed_wait_within_bound = {[1:256]};
+        }
+        cp_bounded_progress: cross cp_expected_stall_mask, cp_wait_within_bound;
+    endgroup
+
     covergroup matrix_protection_reset_cg;
         option.per_instance = 1;
         cp_matrix_protection_reset_phase: coverpoint matrix_protection_reset_phase {
@@ -544,6 +561,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         engine_parallel_fault_cg = new();
         engine_parallel_reset_cg = new();
         engine_pair_overlap_cg = new();
+        engine_progress_bound_cg = new();
         matrix_protection_reset_cg = new();
         matrix_protection_cnm_reset_cg = new();
         engine_protection_reset_cg = new();
@@ -11153,7 +11171,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned depth_bin;
         int unsigned legal_class_count;
         int unsigned hit_depth_bin_count;
+        int unsigned max_engine_wait_cycles;
         string missing_stall_depth_bins;
+        max_engine_wait_cycles = 0;
         if (compute_vif.engine_req_stability_violations != 0 ||
             compute_vif.matrix_banked_stall_violations != 0 ||
             compute_vif.matrix_line_stall_violations != 0 ||
@@ -11180,6 +11200,30 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 compute_vif.engine_req_max_stall_cycles[e] == 0)
                 `uvm_fatal("CLUSTER_REQUEST_PROGRESS", $sformatf(
                     "engine%0d has stalled samples but no measured wait run", e))
+        if (compute_vif.engine_req_stall_seen !== 7'b1110111)
+            `uvm_fatal("CLUSTER_REQUEST_PROGRESS", $sformatf(
+                "fixed legal all-engine workload stall mask changed: observed=%07b expected=1110111",
+                compute_vif.engine_req_stall_seen))
+        for (e = 0; e < 7; e++) begin
+            if (compute_vif.engine_req_stall_seen[e] &&
+                compute_vif.engine_req_max_stall_cycles[e] >
+                    CLUSTER_ENGINE_WAIT_BOUND_CYCLES)
+                `uvm_fatal("CLUSTER_REQUEST_PROGRESS", $sformatf(
+                    "engine%0d request wait exceeded fixed-workload regression bound: observed=%0d bound=%0d cycles",
+                    e, compute_vif.engine_req_max_stall_cycles[e],
+                    CLUSTER_ENGINE_WAIT_BOUND_CYCLES))
+            if (compute_vif.engine_req_stall_seen[e] &&
+                compute_vif.engine_req_max_stall_cycles[e] >
+                    max_engine_wait_cycles)
+                max_engine_wait_cycles = compute_vif.engine_req_max_stall_cycles[e];
+        end
+        engine_progress_bound_cg.sample(compute_vif.engine_req_stall_seen,
+                                        max_engine_wait_cycles);
+        if (engine_progress_bound_cg.get_coverage() < 99.99)
+            `uvm_fatal("CLUSTER_REQUEST_PROGRESS", $sformatf(
+                "bounded progress coverage incomplete: mask=%07b max_wait=%0d coverage=%0.1f%%",
+                compute_vif.engine_req_stall_seen, max_engine_wait_cycles,
+                engine_progress_bound_cg.get_coverage()))
         for (e = 0; e < 7; e++)
             if ((e == 2 && compute_vif.engine_req_stall_dir_seen[e] !== 2'b10) ||
                 (e != 2 && e != 3 && compute_vif.engine_req_stall_dir_seen[e] !== 2'b11))
@@ -11272,6 +11316,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             compute_vif.engine_req_max_stall_cycles[5],
             compute_vif.engine_req_max_stall_cycles[6],
             compute_vif.engine_req_stall_seen), UVM_LOW)
+        `uvm_info("CLUSTER_REQUEST_PROGRESS_BOUND_PASS", $sformatf(
+            "fixed legal all-engine workload progressed within bound=%0d cycles; stalled mask=%07b max wait={%0d,%0d,%0d,%0d,%0d,%0d,%0d}; progress coverage=%0.1f%%; not a general external-memory fairness claim",
+            CLUSTER_ENGINE_WAIT_BOUND_CYCLES,
+            compute_vif.engine_req_stall_seen,
+            compute_vif.engine_req_max_stall_cycles[0],
+            compute_vif.engine_req_max_stall_cycles[1],
+            compute_vif.engine_req_max_stall_cycles[2],
+            compute_vif.engine_req_max_stall_cycles[3],
+            compute_vif.engine_req_max_stall_cycles[4],
+            compute_vif.engine_req_max_stall_cycles[5],
+            compute_vif.engine_req_max_stall_cycles[6],
+            engine_progress_bound_cg.get_coverage()), UVM_LOW)
     endtask
 
     // Insert a legal scheduler admission pause in the testbench: suppress the

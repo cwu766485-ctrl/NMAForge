@@ -1,10 +1,12 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-03. This is a short handoff for the next engineering task; it
+Updated: 2026-11-04. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
 ## Latest Compute Cluster evidence
+
+**R272 fixed-workload request progress (2026-11-04):** Current UVM adds a mandatory 256-cycle guard and 100% functional coverage bin for the expected `1110111` stalled-port mask in the legal seven-engine contention workload. Three seeds observe max waits `{12,14,53,0,64,126,14}`; all Golden results and completions pass, each Memory Scoreboard checks 96,595 words with no mismatch/unknown/stale, and the owner ledger drains. This does not emulate downstream SRAM stalls or establish general fairness, so `REQ-CL-014` remains `PARTIAL` and the RTM stays 27 `PASS-SCOPED` / 11 `PARTIAL`, `CL-DV-v1.0` **HOLD**. [R272 evidence](../../verification/COMPUTE_CLUSTER_REQUEST_PROGRESS_BOUND_R272_2026-11-04.md), archive SHA-256 `a0966edb31e2915156f23267b39384e780936e6b0749999cea5472ed7693fb4f`.
 
 **R267 exact published-head clean replay (2026-11-03):** Published closeout SHA `bb2a1a843cda878c04bfe12773ebd9bd9871ff14` passes detached clean-worktree real-top Cluster UVM (3 seeds), mixed DDR/AXI E2E (16 seeds), Top Smoke (20 cases), and 7/7 temporary RTL mutants. Cluster-only `cluster_cg=64/64`; mixed E2E URG has 20/22 assertions with real successes and no failures/incomplete. The existing Top Smoke fixture warning remains. This does not promote any RTM row: 27 `PASS-SCOPED` / 11 `PARTIAL`, `CL-DV-v1.0` **HOLD**. [R267 report](../../verification/COMPUTE_CLUSTER_FINAL_CLEAN_REPLAY_R267_2026-11-03.md), logs-only archive SHA-256 `4ef8f2f4fa1323e95780133434bab0cc9bd99fe35b7e0527bc2830b095a2f3c4`.
 
