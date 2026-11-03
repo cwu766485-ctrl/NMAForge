@@ -20,6 +20,9 @@ interface ai_compute_cluster_if(input logic aclk);
     logic [31:0] launch_src0_stride, launch_src1_stride, launch_dst_stride;
     logic [6:0] engine_busy;
     logic [6:0] engine_done;
+    // The seven actual core-start pins, ordered like engine_busy[6:0].
+    // This observes the selected DUT ports rather than re-decoding launch_op.
+    logic [6:0] engine_start_select;
     logic [6:0] engine_error;
     logic [6:0] engine_parity_rsp_error;
     logic dut_abort_active;

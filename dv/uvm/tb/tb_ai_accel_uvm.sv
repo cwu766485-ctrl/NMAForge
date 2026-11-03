@@ -49,6 +49,15 @@ module tb_ai_accel_uvm;
     assign compute_obs.launch_dst_stride = dut.launch_dst_stride;
     assign compute_obs.engine_busy = dut.engine_busy;
     assign compute_obs.engine_done = dut.engine_done;
+    assign compute_obs.engine_start_select = {
+        dut.compute_cluster_u.kv_cache_u.start,
+        dut.compute_cluster_u.conv_linebuffer_u.start,
+        dut.compute_cluster_u.tensor_sfu_u.start,
+        dut.compute_cluster_u.tensor_matrix_u.start,
+        dut.compute_cluster_u.banked_core_u.start,
+        dut.compute_cluster_u.mixed_precision_dot_core_u.start,
+        dut.compute_cluster_u.core_u.start
+    };
     assign compute_obs.engine_error = dut.engine_error;
     assign compute_obs.engine_parity_rsp_error = {
         dut.compute_engine_rsp_error[6],
