@@ -1,8 +1,8 @@
 # NMAForge Compute Cluster v1.0 Functional DV Sign-off Report
 
-**Current closeout snapshot (2026-11-03):** At fixed clean test SHA `0e273b8974dbfa593452f7a6a7996c78ddfe4a6e` (tree `eef6ed76de2e402c2447735ce6d3b2df87d103ed`), R223 replays three-seed KV FSM, real-top Compute Cluster UVM, Top Smoke, seeded Top, and selected repository memory-fabric reset; R224 replays Matrix default/no-prefetch regressions and VC Formal (5/5 non-vacuous guards, 2/2 covers, default raw FSM 49/53). Declared functional groups have reached 100% in named campaigns, but raw code coverage and requirement-level crosses remain incomplete. The RTM remains 24 PASS-SCOPED / 14 PARTIAL; **HOLD** remains. See [R223](COMPUTE_CLUSTER_KV_FSM_R223_2026-11-03.md), [R224](COMPUTE_CLUSTER_MATRIX_FSM_R224_CLEAN_REPLAY_2026-11-03.md), and [R206](COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R206_2026-11-02.md).
+**Current closeout snapshot (2026-11-03):** At fixed clean test SHA `0e273b8974dbfa593452f7a6a7996c78ddfe4a6e` (tree `eef6ed76de2e402c2447735ce6d3b2df87d103ed`), R223 replays three-seed KV FSM, real-top Compute Cluster UVM, Top Smoke, seeded Top, and selected repository memory-fabric reset; R224 replays Matrix default/no-prefetch regressions and VC Formal (5/5 non-vacuous guards, 2/2 covers, default raw FSM 49/53); R225 catches 7/7 targeted actual RTL mutants at their assigned production checkers. Declared functional groups have reached 100% in named campaigns, but raw code coverage and requirement-level crosses remain incomplete. The RTM remains 24 PASS-SCOPED / 14 PARTIAL; **HOLD** remains. See [R223](COMPUTE_CLUSTER_KV_FSM_R223_2026-11-03.md), [R224](COMPUTE_CLUSTER_MATRIX_FSM_R224_CLEAN_REPLAY_2026-11-03.md), [R225](COMPUTE_CLUSTER_DUT_MUTATION_R225_2026-11-03.md), and [R206](COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R206_2026-11-02.md).
 
-**Review date:** 2026-11-02
+**Review date:** 2026-11-03
 **Decision:** **HOLD — not signed off**
 **Scope:** Compute Cluster functional DV only; no claim of whole-NPU sign-off or ASIC PPA closure.
 
