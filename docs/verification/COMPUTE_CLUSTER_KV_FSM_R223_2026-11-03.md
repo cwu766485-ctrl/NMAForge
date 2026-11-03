@@ -56,6 +56,15 @@ make ai_smoke
 
 The run ends in `TEST PASS`; the mapper precheck reports 86 descriptors and 60 tensors. The existing `[LOOP-REROLL-ENABLED]` fixture compile warning remains and is not hidden or treated as a test failure. The KV block compile has no `Warning-`, `Error-`, or `[TFIPC]` diagnostic.
 
+The same clean tree also passes the fixed-seed 20-case Top regression:
+
+```sh
+make ai_run AI_RANDOM_CASES=20 AI_SEED=12345 \
+  VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias
+```
+
+The run reports VCS `+ntb_random_seed=1793677008`, `AI_SEED=12345`, and ends in `TEST PASS`.
+
 ### Exact-candidate real-top UVM replay
 
 After the focused KV run, the same clean tested source SHA passes the three-seed real-top Compute Cluster UVM regression:
@@ -73,6 +82,6 @@ The three-seed UVM URG dashboard is score `79.18%`; line/condition/FSM/branch ar
 
 ## Evidence and requirement disposition
 
-Focused KV/Top Smoke logs-only archive: `/tmp/nmaforge_r223_kv_fsm_evidence_20261103.tar.gz`, SHA-256 `889d646d9a538fb0c899c69ab4175f8f7a29efd2f0c5c53c5dd49973aafcb060`. Combined exact-candidate evidence archive: `/tmp/nmaforge_r223_full_clean_evidence_20261103.tar.gz`, SHA-256 `fcc46e79235eb94337e41e45b67138933d0bb3daf8ff8690bce6c8af80b1d8c5`. The combined logs-only archive adds the three real-top UVM logs and URG reports; both archives exclude databases, binaries, and waveforms.
+Focused KV/Top Smoke logs-only archive: `/tmp/nmaforge_r223_kv_fsm_evidence_20261103.tar.gz`, SHA-256 `889d646d9a538fb0c899c69ab4175f8f7a29efd2f0c5c53c5dd49973aafcb060`. The latest consolidated exact-candidate archive is `/tmp/nmaforge_r223_full_clean_evidence_20261103_v2.tar.gz`, SHA-256 `fde6a1fc7d3e0c5ac107a35c5f96010aed7a2585bd4da7d7db0c0bd67bb29e2b`; it contains KV, Top Smoke, fixed-seed Top, three real-top UVM logs and URG reports. Archives are logs/reports only and exclude databases, binaries, and waveforms.
 
 `REQ-CL-025` remains **PASS-SCOPED**. R223 adds the four-transition KV FSM evidence to its existing KV address/Protection/Golden evidence. Exhaustive KV stride/alias products, broader per-engine descriptor contracts, and the remaining partial requirement clauses are still open. No requirement status is promoted by this block test. The 38-row RTM remains 24 `PASS-SCOPED` / 14 `PARTIAL`; `CL-DV-v1.0` remains **HOLD**.
