@@ -57,8 +57,11 @@ Dependency events become visible only when the successful command retires in
 order. Macro descriptors are handed to the serial command processor after
 earlier parallel work drains; direct and tile modes do not overlap CMDQ work.
 The round-robin core-SPAD sub-arbiter preserves request/response ownership but
-does not provide inter-command data dependencies or address locks. Software
-must prevent conflicting SPAD reads and writes among commands that can overlap;
+does not provide inter-command data dependencies or address locks. Matrix
+banked reads and CNM requests share one arbitration class; when both remain
+pending, accepted grants alternate their sub-priority. This is time-multiplexed
+admission, not same-cycle multi-bank service for distinct clients. Software must
+prevent conflicting SPAD reads and writes among commands that can overlap;
 read-only inputs may be shared if no active command writes those locations.
 
 Writing `ABORT` stops new dispatch, aborts all issued compute engines, and
