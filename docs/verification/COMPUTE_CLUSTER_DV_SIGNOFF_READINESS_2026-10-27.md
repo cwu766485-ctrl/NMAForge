@@ -1,5 +1,10 @@
 # Compute Cluster DV Sign-off Readiness — 2026-11-03
 
+**R241 AXI SVA non-vacuity replay:** The mixed-precision DDR/AXI E2E passes with real AR/AW/W stalls; payload-stability assertions and stall covers match 14/5/12 times, URG has zero failure/incomplete, and the only two no-attempt assertions are UVM RAL internals. See [R241 report](COMPUTE_CLUSTER_SVA_NONVACUITY_R241_2026-11-03.md), archive SHA-256 `a73812e601186fccd772f45c05b2606bcfca400e65e9cf93933fc6ab01373202`.
+
+**R240 current published-tree clean replay:** Top Smoke and three-seed seven-engine Cluster UVM pass on the published tree; all seeds check 92,871 Memory Image words, have zero mismatch/unknown/stale and `cluster_cg` 64/64. This is replay evidence only; the requirement dispositions remain 24 `PASS-SCOPED` / 14 `PARTIAL`, **HOLD**. See [R240 report](COMPUTE_CLUSTER_FINAL_CANDIDATE_REPLAY_R240_2026-11-03.md), archive SHA-256 `b137662f59950a940aac0ef323f5fa3b56a422ad77f3d767045b9fbcc2f0b231`.
+
+
 ## Review decision (updated 2026-11-03)
 
 **R239 SFU numeric boundary replay:** Three seeds pass all 64 SFU exact-Golden vectors per seed across eight opcodes and lengths `1/2/3/4/7/8/15/16`, with GELU/SiLU piecewise boundaries, randomized response latency, nine error cases, Abort/watchdog priority and reset recovery. This provides scoped `REQ-CL-023` evidence; URG code coverage is not used as a sign-off metric. See [R239 report](COMPUTE_CLUSTER_SFU_NUMERIC_BOUNDARY_R239_2026-11-03.md); archive SHA-256 `b8014ce9b625fd6ca7a70b6411f5bd4e281956a8aab5384a1f8edfaf68bac612`.
