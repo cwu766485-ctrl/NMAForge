@@ -11276,11 +11276,24 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     endtask
 
     task automatic release_scheduler_admission_stall();
+        bit [1023:0] force_ones;
+        force_ones = '1;
         void'(uvm_hdl_release("tb_ai_accel_uvm.dut.spad_arbiter_u.spad_cnm_valid"));
         void'(uvm_hdl_release("tb_ai_accel_uvm.dut.spad_arbiter_u.spad_banked_valid"));
         void'(uvm_hdl_release("tb_ai_accel_uvm.dut.spad_arbiter_u.spad_line_valid"));
         void'(uvm_hdl_release("tb_ai_accel_uvm.dut.spad_arbiter_u.spad_valid"));
         void'(uvm_hdl_release("tb_ai_accel_uvm.dut.spad_arbiter_u.accept_valid"));
+        // VCS holds a released procedural variable's forced value until the
+        // combinational process executes again.  Toggle an inactive DMA address
+        // input (DMA valid is zero in these directed compute-only cases) to
+        // retrigger the arbiter selection before the next active clock edge.
+        if (compute_vif.dma_valid)
+            `uvm_fatal("CLUSTER_STALL_INJECT",
+                "cannot retrigger arbiter selection while a DMA request is active")
+        if (!uvm_hdl_force("tb_ai_accel_uvm.dut.spad_arbiter_u.dma_addr", force_ones))
+            `uvm_fatal("CLUSTER_STALL_INJECT",
+                "failed to retrigger arbiter combinational selection after stall")
+        void'(uvm_hdl_release("tb_ai_accel_uvm.dut.spad_arbiter_u.dma_addr"));
     endtask
 
     task automatic stall_core_engine_write_once(
