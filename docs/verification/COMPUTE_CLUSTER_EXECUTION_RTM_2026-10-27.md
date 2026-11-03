@@ -1174,3 +1174,7 @@ Published test candidate `decc918e238f5ff153677c8f6cb2c3d3dd30ee18` (tree `36a0d
 | `REQ-PC-007` | `PARTIAL` | Same test; production CMDQ completion owner map; existing accepted-response owner ledger | Seven concurrent task completions are attributed to their originating engines. Broader simultaneous accepted-read response ownership × fault/reset/backpressure combinations remain open. | Same run / seeds | Same report/archive |
 
 The 38-row disposition remains 24 `PASS-SCOPED` / 14 `PARTIAL`; `CL-DV-v1.0` remains **HOLD**. Logs-only archive SHA-256 is `945b88fbcca863f56ef482853a0763644a8cb8ea5797f2910725ea72b931a72a`; file-manifest SHA-256 is `6c91611be40731c6c56ac5c635694cf32d9671ae77851d8654d9eb9498f5f4a5`.
+
+## R231 descriptor-validator boundary replay — 2026-11-03
+
+At the fixed product/source candidate `c5755985b0e5b1e1a850122ece983a37be112272` (validator RTL, opcode decoder, testbench, and Makefile byte-identical), the VCS descriptor-validator target passes all 27 legal opcode-decode cases, 21 invalid-rule cases, 38/38 accepted and 26/26 rejected boundary vectors. `engine_limit_claim=0`: this is combinational validator evidence, not proof of engine-specific maximum dimensions, stride/alias, address-overflow, or descriptor-to-engine execution. `OPEN-CL-002` remains open; `REQ-CL-002/015/020` remain PARTIAL. No RTM row is promoted; 24 `PASS-SCOPED` / 14 `PARTIAL`, **HOLD**. See [R231 report](COMPUTE_CLUSTER_DESCRIPTOR_VALIDATOR_R231_2026-11-03.md); logs-only archive SHA-256 `5b1c8035aba6d2998bcdfe9ada62e92409cbbebc32b41f6eb3f39ed1b1c4516e`.
