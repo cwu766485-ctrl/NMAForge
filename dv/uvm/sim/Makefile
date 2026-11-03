@@ -63,6 +63,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 			-cm $(UVM_COV_METRICS) -cm_dir "$$db" -l "$$log"; \
 		grep -q '\[COMPUTE_CLUSTER_REAL_UVM_PASS\]' "$$log" || { echo "ERROR: real Compute Cluster pass marker missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_A_CACHE_BASELINE_PASS\]' "$$log" || { echo "ERROR: standalone Matrix A-tile cache baseline marker missing in $$log"; exit 1; }; \
+		grep -q '\[CLUSTER_MATRIX_MULTITILE_CMDQ_PASS\].*Golden outputs=1024/1024.*focused_bins=1/1 coverage=100.0%' "$$log" || { echo "ERROR: real CMDQ 32x32x64 Matrix multi-tile Golden/coverage check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CNM_OWNER_PASS\]' "$$log" || { echo "ERROR: Matrix/CNM independent response-owner check missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_MATRIX_CNM_BANKED_COLLISION_PASS\].*collision cycles=[1-9][0-9]* admitted collisions=[1-9][0-9]* Matrix wait cycles=[1-9][0-9]* held-payload checks=[1-9][0-9]* owner violations=0 hold violations=0' "$$log" || { echo "ERROR: real Matrix banked/CNM admission collision, Matrix wait stability, or single-owner check missing or failed in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CNM_ADDR_PASS\]' "$$log" || { echo "ERROR: four-lane CNM address scoreboard check missing in $$log"; exit 1; }; \

@@ -134,6 +134,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] PARALLEL_FAULT_FP_Y = 32'h0007_db10;
     localparam bit [31:0] PARALLEL_FAULT_CONV_Y = 32'h0007_dc00;
     localparam bit [31:0] PARALLEL_FAULT_KV_CACHE = 32'h0007_e000;
+    localparam bit [31:0] MATRIX_MULTI_A_LOCAL = 32'h0000_b000;
+    localparam bit [31:0] MATRIX_MULTI_B_LOCAL = 32'h0000_b800;
+    localparam bit [31:0] MATRIX_MULTI_Y_LOCAL = 32'h0000_d000;
 
     virtual ai_compute_cluster_if compute_vif;
     bit [31:0] rng_state;
@@ -303,6 +306,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned conv_descriptor_boundary_case;
     int unsigned depthwise_descriptor_boundary_case;
     int unsigned depthwise_channel_sequence_case;
+    int unsigned matrix_multitile_shape_case;
     int unsigned engine_parallel_fault_cov_idx;
     int unsigned engine_parallel_reset_phase;
     covergroup cmdq_invalid_descriptor_cg;
@@ -358,6 +362,13 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         option.per_instance = 1;
         cp_depthwise_channel_sequence: coverpoint depthwise_channel_sequence_case {
             bins two_channel_descriptors = {1};
+        }
+    endgroup
+
+    covergroup matrix_multitile_shape_cg;
+        option.per_instance = 1;
+        cp_matrix_multitile_shape: coverpoint matrix_multitile_shape_case {
+            bins two_by_two_array_tiles = {1};
         }
     endgroup
 
@@ -528,6 +539,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         conv_descriptor_boundary_cg = new();
         depthwise_descriptor_boundary_cg = new();
         depthwise_channel_sequence_cg = new();
+        matrix_multitile_shape_case = 0;
+        matrix_multitile_shape_cg = new();
         engine_parallel_fault_cg = new();
         engine_parallel_reset_cg = new();
         engine_pair_overlap_cg = new();
@@ -11276,6 +11289,106 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         `uvm_info("CLUSTER_CNM_ADDR_PASS", $sformatf("all four CNM lanes accepted expected A/B addresses; Matrix accepted %0d reads within its A/B tile regions", matrix_reads), UVM_LOW)
     endtask
 
+    task automatic run_matrix_multitile_cmdq_test();
+        int signed matrix_a[0:31][0:63];
+        int signed matrix_b[0:63][0:31];
+        int signed matrix_golden[0:31][0:31];
+        int signed accumulator;
+        bit [31:0] packed_word;
+        int unsigned tile_row;
+        int unsigned tile_col;
+        int unsigned k_word;
+        int unsigned row_lane;
+        int unsigned col_lane;
+        int unsigned k_lane;
+        int unsigned row_idx;
+        int unsigned col_idx;
+        int unsigned k_idx;
+        int unsigned word_idx;
+        int unsigned elapsed_cycles;
+        real focused_coverage;
+
+        // M=N=32 spans two 16x16 Array tiles on both axes; K=64 is the
+        // already-used legal Matrix depth. Operands and output occupy
+        // disjoint unused regions of the 512 KiB SPAD.
+        for (row_idx = 0; row_idx < 32; row_idx++)
+            for (k_idx = 0; k_idx < 64; k_idx++)
+                matrix_a[row_idx][k_idx] = next_small_signed();
+        for (k_idx = 0; k_idx < 64; k_idx++)
+            for (col_idx = 0; col_idx < 32; col_idx++)
+                matrix_b[k_idx][col_idx] = next_small_signed();
+
+        for (tile_row = 0; tile_row < 8; tile_row++) begin
+            for (k_word = 0; k_word < 16; k_word++) begin
+                for (row_lane = 0; row_lane < 4; row_lane++) begin
+                    packed_word = '0;
+                    for (k_lane = 0; k_lane < 4; k_lane++) begin
+                        row_idx = tile_row * 4 + row_lane;
+                        k_idx = k_word * 4 + k_lane;
+                        packed_word[k_lane*8 +: 8] = matrix_a[row_idx][k_idx];
+                    end
+                    spad_write(MATRIX_MULTI_A_LOCAL +
+                               ((tile_row * 16 + k_word) << 4) +
+                               (row_lane << 2), packed_word);
+                end
+            end
+        end
+        for (tile_col = 0; tile_col < 8; tile_col++) begin
+            for (k_word = 0; k_word < 16; k_word++) begin
+                for (col_lane = 0; col_lane < 4; col_lane++) begin
+                    packed_word = '0;
+                    for (k_lane = 0; k_lane < 4; k_lane++) begin
+                        col_idx = tile_col * 4 + col_lane;
+                        k_idx = k_word * 4 + k_lane;
+                        packed_word[k_lane*8 +: 8] = matrix_b[k_idx][col_idx];
+                    end
+                    spad_write(MATRIX_MULTI_B_LOCAL +
+                               ((tile_col * 16 + k_word) << 4) +
+                               (col_lane << 2), packed_word);
+                end
+            end
+        end
+
+        for (row_idx = 0; row_idx < 32; row_idx++) begin
+            for (col_idx = 0; col_idx < 32; col_idx++) begin
+                accumulator = 0;
+                for (k_idx = 0; k_idx < 64; k_idx++)
+                    accumulator += matrix_a[row_idx][k_idx] *
+                                   matrix_b[k_idx][col_idx];
+                matrix_golden[row_idx][col_idx] = accumulator;
+            end
+        end
+
+        spad_write(MATRIX_MULTI_Y_LOCAL - 32'd4, 32'hb0a0_0001);
+        spad_write(MATRIX_MULTI_Y_LOCAL + 32'd4096, 32'hb0a0_0002);
+        write_v3_desc(CMDQ_LOCAL, 8'h30, 16'h05f1,
+                      MATRIX_MULTI_A_LOCAL, MATRIX_MULTI_B_LOCAL,
+                      MATRIX_MULTI_Y_LOCAL, 16'd32, 16'd32, 16'd16);
+        run_serial_descriptor(CMDQ_LOCAL, CPLQ_LOCAL, 16'h05f1,
+                              matrix_golden[31][31], 32'd1024,
+                              "Matrix 32x32x64 multi-tile", elapsed_cycles);
+        for (word_idx = 0; word_idx < 1024; word_idx++)
+            expect_spad(MATRIX_MULTI_Y_LOCAL + (word_idx << 2),
+                        matrix_golden[word_idx / 32][word_idx % 32],
+                        $sformatf("Matrix 32x32x64 multi-tile Golden[%0d]",
+                                  word_idx));
+        expect_spad(MATRIX_MULTI_Y_LOCAL - 32'd4, 32'hb0a0_0001,
+                    "Matrix multi-tile lower output guard");
+        expect_spad(MATRIX_MULTI_Y_LOCAL + 32'd4096, 32'hb0a0_0002,
+                    "Matrix multi-tile upper output guard");
+
+        matrix_multitile_shape_case = 1;
+        matrix_multitile_shape_cg.sample();
+        focused_coverage = matrix_multitile_shape_cg.get_inst_coverage();
+        if (focused_coverage < 100.0)
+            `uvm_fatal("CLUSTER_MATRIX_MULTITILE_COVERAGE",
+                $sformatf("legal Matrix multi-tile CMDQ bin incomplete: coverage=%0.1f%%",
+                          focused_coverage))
+        `uvm_info("CLUSTER_MATRIX_MULTITILE_CMDQ_PASS", $sformatf(
+            "real CMDQ Matrix M=32 N=32 K=64 across 2x2 Array tiles; Golden outputs=1024/1024, completion=1/1, lower/upper guards=2/2, elapsed_cycles=%0d, focused_bins=1/1 coverage=%0.1f%%",
+            elapsed_cycles, focused_coverage), UVM_LOW)
+    endtask
+
     task body();
         bit [31:0] value;
         bit [31:0] packed_word;
@@ -11524,6 +11637,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_HEAD, 32'd1);
+        run_matrix_multitile_cmdq_test();
 
         // Same four operations as the parallel run, deliberately submitted
         // and retired one at a time. Capture only doorbell-to-completion-tail
