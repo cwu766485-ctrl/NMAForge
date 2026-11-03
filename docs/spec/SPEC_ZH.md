@@ -40,7 +40,7 @@ CPU -- 32-bit AXI4-Lite --> 寄存器/IRQ --> 命令处理器(CMDQ/CPLQ)
 
 - `ai_accel_regs` 只保存软件配置、产生控制脉冲、记录 sticky 状态和 IRQ，不能推进队列或调度描述符。
 - 普通 compute CMDQ 由 `ai_parallel_compute_dispatcher` 按序取/校验并派发，维护每引擎活动槽、依赖事件、abort/drain、CMDQ_HEAD 和按序 CPLQ_TAIL；宏/direct 等串行兼容路径仍由 `ai_command_processor` 协调。两者的具体边界与 REQ-PC 验收条款见 [Compute Cluster SPEC v1.5](COMPUTE_CLUSTER_SPEC_ZH.md)。
-- `ai_spad_arbiter` 是 scratchpad 调度端口的唯一拥有者。描述符和完成写入为高优先级控制流；标量、line、banked 计算和 DMA 在数据面轮询。顶层不得另加 scratchpad mux。
+- `ai_spad_arbiter` 是 scratchpad 调度端口的唯一拥有者。描述符和完成写入为高优先级控制流；标量、line、banked 计算和 DMA 在数据面轮询。顶层不得另加 scratchpad mux。Matrix banked 与 CNM 请求共用 banked class 时隙；两者持续同时请求时，每次接受后轮换子优先级。这是时分仲裁，不表示跨 client 的多 bank 同拍访问。
 - `ai_desc_fetch` 读取片上描述符，`axi_desc_fetch` 读取外部描述符；处理器在一条命令期间保持来源不变。
 - `ai_completion_writer` 先提交完成项的四个 32-bit word，才发布新的 `CPLQ_TAIL`。
 
@@ -108,7 +108,7 @@ SFU `REQUANT_I8`（opcode `0x36`）中 `flags[4]` 将饱和后的 INT32 结果�
 
 事件依赖仍按顺序提交语义处理：依赖事件在对应任务成功完成并轮到它按序退休后才生效；`wait`、`clear` 和 `signal` 不改变 CPLQ 顺序。宏 descriptor 在此前并行任务排空后移交串行命令处理器，宏内部仍按子 descriptor 顺序执行并只产生一个父 completion。direct/tile 模式也不与 CMDQ 并行任务混跑。
 
-多个引擎可经 scheduler 的 round-robin core-SPAD 子仲裁器交错访问 scratchpad。该仲裁只保证单次端口请求和响应归属，不为不同 descriptor 建立数据依赖或跨引擎地址锁。软件必须确保可能并行的任务之间没有 SPAD 读写冲突；共享只读输入可以重叠，任何任务输出都不得覆盖另一活动任务仍要读取的数据。
+多个引擎可经 scheduler 的 round-robin core-SPAD 子仲裁器交错访问 scratchpad。Matrix banked 与 CNM 共用一个仲裁类别；当两者持续同时请求时，该类别在每次接受后轮换子优先级。该仲裁只保证单次端口请求和响应归属，不为不同 descriptor 建立数据依赖或跨引擎地址锁，也不支持不同 client 同拍访问不同 bank。软件必须确保可能并行的任务之间没有 SPAD 读写冲突；共享只读输入可以重叠，任何任务输出都不得覆盖另一活动任务仍要读取的数据。
 
 写 `ABORT` 后停止派发新的 CMDQ descriptor，并向所有已派发的活动计算引擎发 abort。正在读取的 descriptor 先完成 fetch，再归类为 `ERR_ABORT`；已派发任务停止产生后续结果写入，并等待已接受的 SPAD 操作收尾。任务错误按引擎已报告的错误码记录；若 CPLQ 已启用，所有记录仍按 CMDQ 顺序退休。全部在途任务排空后调度器才报告空闲，尚未取出的 descriptor 保留在 CMDQ。
 

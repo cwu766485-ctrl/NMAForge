@@ -44,6 +44,9 @@ DDR <== 128-bit AXI4 ==> ai_axi128_dma <==> ai_spad_arbiter <==> ai_scratchpad
 - `ai_spad_arbiter` 是 scheduler-side scratchpad 的唯一拥有者。descriptor/completion
   保持控制面优先；scalar/line/banked compute 与 DMA 在数据面 round-robin；禁止顶层 bypass mux。
   BF16/FP16 dot 共用现有 arbiter-owned 32-bit core SPAD 口，不增加 scratchpad bypass。
+- Matrix banked read 与 CNM 四 lane request 共用一个 banked class admission slot；当两者持续
+  同时有效时，该 slot 在每次接受后交替选择 Matrix/CNM。该子类公平性不代表不同 SRAM bank
+  可在同一周期接受不同 client 的独立请求。
 - Matrix 单行 banked read 与 CNM 四 lane 请求共用 banked 轮询时隙，但 response tag 分别为
   `3` / `5`；`banked_rsp_valid` 只送 Matrix，`cnm_rsp_valid[3:0]` 只送 CNM。该分离避免两个
   Engine 并发时 Matrix 把 CNM 响应误认为自己的读数据，不增加 SPAD 端口或改变 ABI。
