@@ -543,6 +543,17 @@ module tb_ai_spad_arbiter_rr;
     sustained_banked_grants=0;
     for (i=0;i<24;i=i+1) begin
       @(negedge clk);
+      if (rsp_valid !== (i>=1))
+        $fatal(1,"sustained Matrix/CNM response-valid latency mismatch cycle=%0d valid=%b",
+               i,rsp_valid);
+      if (i>=1) begin
+        if ((i%2)==1 && (rsp_client!=3'd5 || cnm_rsp_valid!==4'hf))
+          $fatal(1,"sustained CNM response owner/lane mismatch cycle=%0d client=%0d lanes=%b",
+                 i,rsp_client,cnm_rsp_valid);
+        if ((i%2)==0 && (rsp_client!=3'd3 || cnm_rsp_valid!==4'h0))
+          $fatal(1,"sustained Matrix response owner/lane mismatch cycle=%0d client=%0d lanes=%b",
+                 i,rsp_client,cnm_rsp_valid);
+      end
       if (cnm_ready!=0) sustained_cnm_grants=sustained_cnm_grants+1;
       if (banked_ready) sustained_banked_grants=sustained_banked_grants+1;
       @(posedge clk);
@@ -554,6 +565,16 @@ module tb_ai_spad_arbiter_rr;
              sustained_cnm_grants,sustained_banked_grants);
     @(negedge clk);
     cnm_valid=0; banked_valid=0;
+    if (rsp_valid!==1'b1 || rsp_client!=3'd3 || cnm_rsp_valid!==4'h0)
+      $fatal(1,"final sustained Matrix response was missing or misrouted");
+    @(posedge clk);
+    @(negedge clk);
+    if (rsp_valid!==1'b1 || rsp_client!=3'd5 || cnm_rsp_valid!==4'hf)
+      $fatal(1,"final sustained CNM response was missing or misrouted");
+    @(posedge clk);
+    @(negedge clk);
+    if (rsp_valid!==1'b0 || cnm_rsp_valid!==4'h0)
+      $fatal(1,"sustained Matrix/CNM response pipeline did not drain");
 
     // Scratchpad parity arrives registered with the read-data response.  A
     // parity error asserted in that response cycle must not be sampled one
