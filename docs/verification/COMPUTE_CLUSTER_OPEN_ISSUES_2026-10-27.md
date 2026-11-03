@@ -1,5 +1,7 @@
 # Compute Cluster Open-Issue List — 2026-11-03
 
+**R243 fairness evidence update (2026-11-03):** The real seven-engine UVM regression now records maximum observed request waits per engine port on three seeds (`{12,14,53,0,64,126,14}`, mask `1110111`); all three runs pass with drained owner ledger and clean 92,871-word Memory Scoreboard. Because the run does not inject downstream SRAM stalls, it does not prove a general starvation bound. `REQ-CL-014` stays PARTIAL and the sign-off stays HOLD. See [R243 report](COMPUTE_CLUSTER_ENGINE_REQUEST_WAIT_R243_2026-11-03.md), archive SHA-256 `52ac4189e8da742ddf0882b797d92d9bca5f9870e83da359802f7995453d713f`.
+
 **R241 AXI SVA non-vacuity update (2026-11-03):** On the current published tree, AXI AR/AW/W payload-stability assertions and stall-to-accept covers have real successes 14/5/12; UVM severity is 0/0/0, URG reports zero assertion failure/incomplete, and only the two UVM RAL internal assertions have no attempts. No requirement status changes. See [R241 report](COMPUTE_CLUSTER_SVA_NONVACUITY_R241_2026-11-03.md).
 
 **R240 clean published-tree replay (2026-11-03):** Three-seed real-top Cluster UVM and Top Smoke pass on the current candidate tree. Each seed checks 92,871 Memory Image words with zero mismatch/unknown/stale; cluster group is 64/64. The 24 PASS-SCOPED / 14 PARTIAL disposition and HOLD remain. See [R240 report](COMPUTE_CLUSTER_FINAL_CANDIDATE_REPLAY_R240_2026-11-03.md).

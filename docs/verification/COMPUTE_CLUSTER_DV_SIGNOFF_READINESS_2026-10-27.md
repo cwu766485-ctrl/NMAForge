@@ -1,5 +1,7 @@
 # Compute Cluster DV Sign-off Readiness — 2026-11-03
 
+**R243 request-wait measurement:** Three real-top Cluster seeds pass with a drained owner ledger and 92,871 checked memory words per seed. The passive monitor observes per-port maximum request waits `{12,14,53,0,64,126,14}` (mask `1110111`). No external memory stall was injected; this adds bounded observation but does not establish general fairness. `REQ-CL-014` remains PARTIAL. See [R243 report](COMPUTE_CLUSTER_ENGINE_REQUEST_WAIT_R243_2026-11-03.md), archive SHA-256 `52ac4189e8da742ddf0882b797d92d9bca5f9870e83da359802f7995453d713f`.
+
 **R241 AXI SVA non-vacuity replay:** The mixed-precision DDR/AXI E2E passes with real AR/AW/W stalls; payload-stability assertions and stall covers match 14/5/12 times, URG has zero failure/incomplete, and the only two no-attempt assertions are UVM RAL internals. See [R241 report](COMPUTE_CLUSTER_SVA_NONVACUITY_R241_2026-11-03.md), archive SHA-256 `a73812e601186fccd772f45c05b2606bcfca400e65e9cf93933fc6ab01373202`.
 
 **R240 current published-tree clean replay:** Top Smoke and three-seed seven-engine Cluster UVM pass on the published tree; all seeds check 92,871 Memory Image words, have zero mismatch/unknown/stale and `cluster_cg` 64/64. This is replay evidence only; the requirement dispositions remain 24 `PASS-SCOPED` / 14 `PARTIAL`, **HOLD**. See [R240 report](COMPUTE_CLUSTER_FINAL_CANDIDATE_REPLAY_R240_2026-11-03.md), archive SHA-256 `b137662f59950a940aac0ef323f5fa3b56a422ad77f3d767045b9fbcc2f0b231`.
