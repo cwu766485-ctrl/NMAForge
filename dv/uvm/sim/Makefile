@@ -105,6 +105,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -q '\[CLUSTER_SFU_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: real SFU in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CNM_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: legal concurrent CNM in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_FP_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: real FP in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_FP16_CMDQ_NUMERIC_PASS\].*opcode=0x51 FP16 dot produced exact FP32 6\.0.*focused=1/1 coverage=100\.0%' "$$log" || { echo "ERROR: real CMDQ FP16 numeric Golden/coverage check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CONV_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: real Conv in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_KV_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: real KV in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SCALAR_OPCODE_DISPATCH_PASS\].*GEMV 0x11 then GEMM 0x12.*6/6 output words' "$$log" || { echo "ERROR: real CMDQ Scalar GEMV/GEMM dispatch and Golden comparison missing in $$log"; exit 1; }; \

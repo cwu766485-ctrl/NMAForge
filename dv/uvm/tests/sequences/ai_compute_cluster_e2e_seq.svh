@@ -299,6 +299,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned engine_pair_overlap_cov_idx;
     int unsigned cmdq_invalid_descriptor_case;
     int unsigned opcode_dispatch_case;
+    int unsigned fp16_cmdq_numeric_case;
     int unsigned conv_descriptor_boundary_case;
     int unsigned depthwise_descriptor_boundary_case;
     int unsigned depthwise_channel_sequence_case;
@@ -327,6 +328,13 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             bins op_32 = {12}; bins op_33 = {13}; bins op_34 = {14}; bins op_35 = {15};
             bins op_36 = {16}; bins op_37 = {17}; bins op_38 = {18}; bins op_39 = {19};
             bins op_43 = {20}; bins op_44 = {21}; bins op_50 = {22}; bins op_51 = {23};
+        }
+    endgroup
+
+    covergroup fp16_cmdq_numeric_cg;
+        option.per_instance = 1;
+        cp_fp16_cmdq_numeric: coverpoint fp16_cmdq_numeric_case {
+            bins two_term_exact_six = {1};
         }
     endgroup
 
@@ -515,6 +523,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         engine_abort_cplq_cg = new();
         cmdq_invalid_descriptor_cg = new();
         opcode_dispatch_cg = new();
+        fp16_cmdq_numeric_case = 0;
+        fp16_cmdq_numeric_cg = new();
         conv_descriptor_boundary_cg = new();
         depthwise_descriptor_boundary_cg = new();
         depthwise_channel_sequence_cg = new();
@@ -7493,6 +7503,75 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         clear_contract_queues(32'd1);
     endtask
 
+    task automatic run_fp16_cmdq_numeric_golden_test(input int unsigned seed);
+        int unsigned poll;
+        int unsigned launch_before;
+        bit busy_seen;
+        bit [31:0] completion_base;
+        completion_base = CLUSTER_CONTRACT_CPLQ + 32'h900;
+
+        // Packed IEEE binary16 lanes are [15:0] then [31:16]. The selected
+        // values give an exact, independently hand-computable FP32 result:
+        // 1.0*2.0 + (-2.0)*(-2.0) = 6.0 (0x40c00000).
+        spad_write(FP_LATCH_A_LOCAL, 32'hc000_3c00);
+        spad_write(FP_LATCH_B_LOCAL, 32'hc000_4000);
+        spad_write(FP_LATCH_Y_LOCAL, 32'hbad0_6e20);
+        spad_write(completion_base + 32'h00, 32'hbad0_6e30);
+        spad_write(completion_base + 32'h04, 32'hbad0_6e31);
+        spad_write(completion_base + 32'h08, 32'hbad0_6e32);
+        spad_write(completion_base + 32'h0c, 32'hbad0_6e33);
+        write_cluster_desc(CLUSTER_CONTRACT_CMDQ, 8'h51, 16'h0b51,
+                           FP_LATCH_A_LOCAL, FP_LATCH_B_LOCAL, FP_LATCH_Y_LOCAL,
+                           16'd1, 16'd1, 16'd2, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd7);
+        launch_before = compute_vif.launch_sample_count;
+        configure_contract_queues(completion_base, 32'd1);
+        axil_write(REG_DOORBELL, 32'd1);
+
+        busy_seen = 1'b0;
+        for (poll = 0; poll < 10000; poll++) begin
+            @(posedge compute_vif.aclk);
+            if (compute_vif.engine_busy[1]) begin
+                busy_seen = 1'b1;
+                break;
+            end
+        end
+        if (!busy_seen)
+            `uvm_fatal("CLUSTER_FP16_NUMERIC", "real CMDQ FP16 engine did not become active")
+
+        wait_cpl_tail(32'd1);
+        wait_spad_idle();
+        expect_spad(FP_LATCH_Y_LOCAL, 32'h40c0_0000,
+                    "FP16 CMDQ independent two-term Golden result 6.0");
+        expect_completion(completion_base, 16'h0b51, 32'h40c0_0000, 32'd2,
+                          "FP16 CMDQ numeric Golden");
+        if ((compute_vif.launch_sample_count != launch_before + 1) ||
+            (compute_vif.launch_snapshot_opcode[1] !== 8'h51) ||
+            (compute_vif.launch_snapshot_src0[1] !== FP_LATCH_A_LOCAL) ||
+            (compute_vif.launch_snapshot_src1[1] !== FP_LATCH_B_LOCAL) ||
+            (compute_vif.launch_snapshot_dst[1] !== FP_LATCH_Y_LOCAL) ||
+            (compute_vif.launch_snapshot_length[1] !== 16'd2))
+            `uvm_fatal("CLUSTER_FP16_NUMERIC", $sformatf(
+                "FP16 launch snapshot/count mismatch count=%0d expected=%0d op=%02h src=%08h/%08h dst=%08h length=%0d",
+                compute_vif.launch_sample_count, launch_before + 1,
+                compute_vif.launch_snapshot_opcode[1],
+                compute_vif.launch_snapshot_src0[1],
+                compute_vif.launch_snapshot_src1[1],
+                compute_vif.launch_snapshot_dst[1],
+                compute_vif.launch_snapshot_length[1]))
+
+        fp16_cmdq_numeric_case = 1;
+        fp16_cmdq_numeric_cg.sample();
+        if (fp16_cmdq_numeric_cg.get_coverage() < 99.99)
+            `uvm_fatal("CLUSTER_FP16_NUMERIC", $sformatf(
+                "focused FP16 CMDQ numeric coverage=%0.1f%% expected 100%%",
+                fp16_cmdq_numeric_cg.get_coverage()))
+        `uvm_info("CLUSTER_FP16_CMDQ_NUMERIC_PASS", $sformatf(
+            "real CMDQ opcode=0x51 FP16 dot produced exact FP32 6.0; output image, completion owner/status/result/elements and launch snapshot pass; focused=1/1 coverage=%.1f%% seed=%0d",
+            fp16_cmdq_numeric_cg.get_coverage(), seed), UVM_LOW)
+        clear_contract_queues(32'd1);
+    endtask
+
     task automatic run_conv_inflight_parameter_latch_test();
         int unsigned word_idx;
         int unsigned poll;
@@ -12349,6 +12428,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_matrix_inflight_parameter_latch_test(matrix_golden);
         run_sfu_inflight_parameter_latch_test();
         run_fp_inflight_parameter_latch_test();
+        run_fp16_cmdq_numeric_golden_test(seed);
         run_conv_inflight_parameter_latch_test();
         run_kv_inflight_parameter_latch_test();
         run_shared_readonly_isolation_test();
