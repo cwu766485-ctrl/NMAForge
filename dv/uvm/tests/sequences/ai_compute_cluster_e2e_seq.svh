@@ -11267,6 +11267,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         bit [1023:0] force_zero;
         force_zero = '0;
         if (!uvm_hdl_force("tb_ai_accel_uvm.dut.spad_arbiter_u.accept_valid", force_zero) ||
+            !uvm_hdl_force("tb_ai_accel_uvm.dut.spad_arbiter_u.accept_response", force_zero) ||
             !uvm_hdl_force("tb_ai_accel_uvm.dut.spad_arbiter_u.spad_valid", force_zero) ||
             !uvm_hdl_force("tb_ai_accel_uvm.dut.spad_arbiter_u.spad_line_valid", force_zero) ||
             !uvm_hdl_force("tb_ai_accel_uvm.dut.spad_arbiter_u.spad_banked_valid", force_zero) ||
@@ -11282,6 +11283,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         void'(uvm_hdl_release("tb_ai_accel_uvm.dut.spad_arbiter_u.spad_banked_valid"));
         void'(uvm_hdl_release("tb_ai_accel_uvm.dut.spad_arbiter_u.spad_line_valid"));
         void'(uvm_hdl_release("tb_ai_accel_uvm.dut.spad_arbiter_u.spad_valid"));
+        void'(uvm_hdl_release("tb_ai_accel_uvm.dut.spad_arbiter_u.accept_response"));
         void'(uvm_hdl_release("tb_ai_accel_uvm.dut.spad_arbiter_u.accept_valid"));
         // VCS holds a released procedural variable's forced value until the
         // combinational process executes again.  Toggle an inactive DMA address
