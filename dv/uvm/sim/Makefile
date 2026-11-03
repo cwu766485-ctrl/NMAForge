@@ -68,6 +68,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -q '\[CLUSTER_CNM_ADDR_PASS\]' "$$log" || { echo "ERROR: four-lane CNM address scoreboard check missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_ALL_ENGINES_PASS\].*real pair overlaps=21/21 mask=1fffff' "$$log" || { echo "ERROR: real seven-engine pairwise overlap Golden sweep missing or incomplete in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_ALL_ENGINE_PAIR_COVERAGE_PASS\].*pair bins=21/21 coverage=100\.0%' "$$log" || { echo "ERROR: real seven-engine pairwise overlap functional coverage incomplete in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_PARALLEL_ENGINE_FAULT_PASS\].*Matrix ERR_PARITY during legal seven-engine CMDQ overlap.*focused_bins=1/1 coverage=100\.0%' "$$log" || { echo "ERROR: seven-engine parallel Matrix parity recovery point missing or incomplete in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_ABORT_CROSS_PASS\]' "$$log" || { echo "ERROR: multi-engine software-abort cross missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_ABORT_CPLQ_CROSS_PASS\].*engines=7/7 blocked=7/7 released/wrapped=7/7 post-abort suppression=7/7 exactly-once=7/7 focused bins=7/7 coverage=100\.0%' "$$log" || { echo "ERROR: seven-engine Abort/full-CPLQ backpressure cross missing or incomplete in $$log"; exit 1; }; \
 		test "$$(grep -c ' \[CLUSTER_ABORT_CPLQ_CASE_PASS\] engine=' "$$log")" -eq 7 || { echo "ERROR: expected seven real-engine Abort/full-CPLQ cases in $$log"; exit 1; }; \
