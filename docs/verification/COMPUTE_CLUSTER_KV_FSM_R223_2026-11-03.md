@@ -56,8 +56,23 @@ make ai_smoke
 
 The run ends in `TEST PASS`; the mapper precheck reports 86 descriptors and 60 tensors. The existing `[LOOP-REROLL-ENABLED]` fixture compile warning remains and is not hidden or treated as a test failure. The KV block compile has no `Warning-`, `Error-`, or `[TFIPC]` diagnostic.
 
+### Exact-candidate real-top UVM replay
+
+After the focused KV run, the same clean tested source SHA passes the three-seed real-top Compute Cluster UVM regression:
+
+```sh
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_r223_final_uvm_0e273b8 \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027'
+```
+
+Each seed reports UVM warning/error/fatal `0/0/0`, checks 92,871 memory words after 73,190 writes with zero mismatch/unknown/stale/orphan, and drains the response-owner ledger: accepted 5,015, checked 4,995, reset-dropped 20, route/data/error mismatches 0, pending 0. Each seed also passes the mandatory real-engine overlap, Matrix/CNM collision and hold, seven-engine parity, reset/recovery, Abort, Protection, and Completion Queue checks enforced by the Makefile gate.
+
+The three-seed UVM URG dashboard is score `79.18%`; line/condition/FSM/branch are `70.42/65.51/45.96/60.64%`. Assertions have 17/22 real successes, zero failures/incomplete, and two UVM RAL internal no-attempts; the AR/AW payload/burst assertion properties have attempts but no real success. Of the three SVA cover properties, W stall-to-accept matches once and AR/AW stall-to-accept have zero matches in this Compute Cluster-only workload. These bins remain uncovered here; the separate mixed AXI E2E evidence is not merged into this run.
+
 ## Evidence and requirement disposition
 
-Logs-only archive: `/tmp/nmaforge_r223_kv_fsm_evidence_20261103.tar.gz`, SHA-256 `889d646d9a538fb0c899c69ab4175f8f7a29efd2f0c5c53c5dd49973aafcb060`. It contains the VCS compile and three seed logs, URG dashboard/module details/test list, and Top Smoke compile/run logs with a SHA-256 manifest; it excludes databases, binaries, and waveforms.
+Focused KV/Top Smoke logs-only archive: `/tmp/nmaforge_r223_kv_fsm_evidence_20261103.tar.gz`, SHA-256 `889d646d9a538fb0c899c69ab4175f8f7a29efd2f0c5c53c5dd49973aafcb060`. Combined exact-candidate evidence archive: `/tmp/nmaforge_r223_full_clean_evidence_20261103.tar.gz`, SHA-256 `fcc46e79235eb94337e41e45b67138933d0bb3daf8ff8690bce6c8af80b1d8c5`. The combined logs-only archive adds the three real-top UVM logs and URG reports; both archives exclude databases, binaries, and waveforms.
 
 `REQ-CL-025` remains **PASS-SCOPED**. R223 adds the four-transition KV FSM evidence to its existing KV address/Protection/Golden evidence. Exhaustive KV stride/alias products, broader per-engine descriptor contracts, and the remaining partial requirement clauses are still open. No requirement status is promoted by this block test. The 38-row RTM remains 24 `PASS-SCOPED` / 14 `PARTIAL`; `CL-DV-v1.0` remains **HOLD**.
