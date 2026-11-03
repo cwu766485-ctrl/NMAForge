@@ -1,9 +1,9 @@
 # Compute Cluster Combined Functional Coverage — R219
 
-**Date:** 2026-11-03  
-**Fixed RTL/UVM source SHA:** `09f9d31209fdcc803ec322cf3822bd51e763665a`  
-**Source tree:** `9778101254417c7272c37d8177e319e70849c8b4`  
-**Run ID:** `R219-COMBINED-FUNCTIONAL-COVERAGE-19S-20261103`  
+**Date:** 2026-11-03
+**Fixed RTL/UVM source SHA:** `09f9d31209fdcc803ec322cf3822bd51e763665a`
+**Source tree:** `9778101254417c7272c37d8177e319e70849c8b4`
+**Run ID:** `R219-COMBINED-FUNCTIONAL-COVERAGE-19S-20261103`
 **Tools:** Synopsys VCS `V-2023.12-SP1_Full64`; URG `V-2023.12-SP1`
 
 ## Result
