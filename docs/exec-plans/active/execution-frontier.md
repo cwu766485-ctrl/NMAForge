@@ -6,6 +6,8 @@ benchmark work is tracked in the execution RTM and open-issue report.
 
 ## Latest Compute Cluster evidence
 
+R234 reruns the Matrix depth/prefetch/A-Tile Cache ablation at the current `c5755985` executable RTL/DV identity: 120/120 Golden points across five shapes, eight configurations, and three seeds. D4/P1/C1 is 24.88% lower in measured cycles and 21.3% lower in read bytes than D2/P0/C0 under the one-cycle behavioral SPAD model. R232's real-top task cycles use the same RTL/DV source. Common-memory TinyNPU and PPA comparisons remain open; Phase A stays HOLD. See the [R234 benchmark](../../benchmark/COMPUTE_CLUSTER_CONFIG_AND_CONCURRENCY_BENCHMARK_R234_2026-11-03.md).
+
 R233 additionally passes all nine Control UVM tests, including frontdoor RAL read/write, with zero UVM severity. All seven Control AXI-Lite assertions have real successes; two UVM library `uvm_reg_map` properties remain no-attempts and are explicitly disclosed. This does not alter the Phase A HOLD.
 
 R232 replayed the exact published closeout HEAD 3259d4da158d56aebe41c227c426b6b4b74a0f72 from a clean worktree. Top Smoke, three-seed real seven-engine Compute Cluster UVM, 16-seed mixed E2E coverage, and the 28/28 actual RTL mutation campaign pass. Combined URG reports 28/28 declared functional covergroups at 100%; all AR/AW/W stall-to-accept cover properties match. Each Cluster seed checks 92,871 Memory Image words with zero mismatch/unknown/stale and drains the owner ledger. The combined simulation hierarchy still reports line/condition/FSM/branch coverage 73.95/69.39/47.24/64.95%, with two UVM RAL internal assertions without attempts.
