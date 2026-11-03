@@ -1343,3 +1343,11 @@ Exact published source/test SHA `487794dfa2d931391fd5ac82f16626b7c6f878e5`, tree
 ## R280 actual-RTL checker-sensitivity campaign — 2026-11-04
 
 At the same published source/test SHA `487794dfa2d931391fd5ac82f16626b7c6f878e5`, the actual-RTL mutation runner passes 7/7: Address, Data, Response Owner, Matrix WSTRB, Completion Error Code, Missing Done, and Duplicate Done each reach their expected production checker. The runner leaves the source/test tree unchanged and its seven compile logs contain no `Warning-`, `Error-`, or `[TFIPC]` diagnostics. This closes the declared mutation campaign point only; it does not close the remaining legal fault/phase/reset matrix and promotes no requirement. The RTM remains 27 `PASS-SCOPED` / 11 `PARTIAL`, `CL-DV-v1.0` **HOLD**. See [R280 mutation report](COMPUTE_CLUSTER_DUT_MUTATION_R280_2026-11-04.md), logs archive SHA-256 `9270b0afca3e4a4f54e4f3f27063392cf0b23d41842dbe260eba540a42fbd46d`.
+
+## R281 Matrix FSM exact-published-SHA replay — 2026-11-04
+
+| Requirement | Disposition | Test ID / Checker | Coverage / observed result | Run ID / seeds | Evidence path |
+|---|---|---|---|---|---|
+| `REQ-CL-010` | `PARTIAL` | `TC-CL-R281-MATRIX-FSM-CLEAN-REPLAY`; Matrix transition regression, legal fallback marker, VC Formal assertions and reachability covers | Default 16×16 depth-4 prefetch/cache profile passes 18 functional + 35 fault/recovery cases per seed; prefetch-disabled fallback and five size workloads pass on three seeds; 5/5 formal guards proven non-vacuously and 2/2 covers hit. Enabled-profile raw FSM remains 49/53. | `R281-MATRIX-FSM-CLEAN-REPLAY-20261104`; `20261021/22/23` | [R281 report](COMPUTE_CLUSTER_MATRIX_FSM_R281_REPLAY_2026-11-04.md); `/tmp/nmaforge_r281_matrix_fsm_evidence.tar.gz`, SHA-256 `533e2763f1c8961c856583f88d5df68981701b491e628f256623fbe31df6f120` |
+
+The Matrix core and formal harness checksums match the prior R249 review; the focused replay confirms that disposition on the published closeout SHA without forcing illegal transitions. It does not recompute a new URG aggregate or close the broader REQ-CL-010 integration and legal fault/phase/reset/backpressure clauses. No row is promoted; the 38-row matrix remains 27 `PASS-SCOPED` / 11 `PARTIAL`, and `CL-DV-v1.0` remains **HOLD**.
