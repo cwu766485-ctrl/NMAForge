@@ -1,5 +1,18 @@
 # NMAForge vs TinyNPU RTL Benchmark
 
+## Latest matched-controller replay (2026-11-04)
+
+The current closeout tree reproduces the D4/P1/C1 NMAForge controller run at
+152 / 231 / 1,198 cycles for 16×16×16, 16×16×32, and 32×32×64. Against the
+pinned TinyNPU results and the stated serialized-memory estimate, this is
+near parity for the two smaller shapes and 8.2% fewer cycles for the largest
+shape. The largest case reads 6,144 bytes on NMAForge versus 4,096 modeled
+bytes on TinyNPU, so it does not establish a fair same-bandwidth advantage.
+The NMAForge side passed all Golden checks across three seeds; TinyNPU array
+cycles are the earlier direct RTL measurements at the same pinned SHA, not a
+new TinyNPU simulation in this replay. See the [R273 replay report](COMPUTE_CLUSTER_TINY_NPU_MATCHED_CONTROLLER_R273_2026-11-04.md)
+and [CSV](tinynpu_matched_controller_r273.csv) for exact scope and limits.
+
 ## Review boundary
 
 This is a functional RTL and cycle-count comparison, not ASIC PPA evidence.
