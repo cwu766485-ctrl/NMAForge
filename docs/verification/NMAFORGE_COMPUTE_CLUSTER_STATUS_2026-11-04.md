@@ -2,7 +2,7 @@
 
 **Snapshot:** 2026-11-04. This is a planning estimate, not a sign-off or coverage metric.
 
-**Latest local code/test candidate:** `a88c310afbfaf3b02c3c16a5accc31c04ff379f2` / tree `a8a0fd314f505348bb623c43133e3da464df8718`; detached clean three-seed VCS replay passes. R312 records eight legal held-request reset cuts per seed and improves the observed held-request × pending-response-owner cross to 8/49 bins (16.33%); 41 pairs remain without reachability disposition. The existing GitHub closeout branch was at `23a51b1f8942a9db7df8b15ee9337690aa9405b7` when checked; R312's code and evidence documentation are pending publication. See [R312 evidence](COMPUTE_CLUSTER_REQUEST_PENDING_RESPONSE_OWNER_CROSS_R312_2026-11-04.md). R311 and earlier R307 broad replay / R308 actual-RTL mutation evidence remain applicable to their recorded source trees.
+**Published branch:** `cwu766485-ctrl/NMAForge`, branch `feat/compute-cluster-closeout-audit`, HEAD `0d5a453f80eb844ea85c77b08c592b2fce7083c3`, tree `f1a2386bce946c98f53f9911fc60b9f4991c359c`. It contains the R312 test tree-identical to clean VCS-tested SHA `a88c310afbfaf3b02c3c16a5accc31c04ff379f2` / tree `a8a0fd314f505348bb623c43133e3da464df8718`, plus the R312 evidence updates. R312 records eight legal held-request reset cuts per seed and improves the observed held-request × pending-response-owner cross to 8/49 bins (16.33%); 41 pairs remain without reachability disposition. See [R312 evidence](COMPUTE_CLUSTER_REQUEST_PENDING_RESPONSE_OWNER_CROSS_R312_2026-11-04.md). R311 and earlier R307 broad replay / R308 actual-RTL mutation evidence remain applicable to their recorded source trees.
 
 ## Current position
 
