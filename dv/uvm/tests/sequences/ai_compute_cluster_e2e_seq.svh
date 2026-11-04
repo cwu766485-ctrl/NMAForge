@@ -13423,10 +13423,16 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         for (engine_idx = 0; engine_idx < 7; engine_idx++)
             run_all_engine_parallel_reset_epoch_test(seed, matrix_golden,
                                                       engine_idx, 0);
-        // A second legal queue order changes the immediately preceding SPAD
-        // responder at the Matrix held-request cut. Keep the canonical case
-        // above so the Matrix self-pending-read pair remains covered too.
+        // Additional legal CMDQ rotations sample Matrix request cuts at
+        // different points in the seven-engine issue interleave. Keep both
+        // canonical rotation 0 and the known rotation 3 above; every candidate
+        // still requires a real held request and a pending accepted read.
         run_all_engine_parallel_reset_epoch_test(seed, matrix_golden, 3, 3);
+        for (engine_idx = 1; engine_idx < 7; engine_idx++) begin
+            if (engine_idx != 3)
+                run_all_engine_parallel_reset_epoch_test(seed, matrix_golden,
+                                                          3, engine_idx);
+        end
         if (engine_parallel_reset_stall_cg.get_coverage() < 100.0)
             `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL_COVERAGE", $sformatf(
                 "held production request owner bins=%0.1f%% expected 100%% (7 engine classes)",
