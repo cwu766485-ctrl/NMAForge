@@ -190,9 +190,11 @@ still commits every output line to SPAD. A bank becomes valid only after all
 16 output lines have been accepted with no protection error. The next opted-in
 `0x53` consumer reads a tile only when `src0_base` exactly matches the saved
 destination base; on a tag miss, the request falls back to the normal SPAD
-path. When both bits are set, the consumer reads the old bank while filling
-the other bank with its own output. Line back-pressure holds the existing
-write transaction and prevents capture from getting ahead of SPAD acceptance.
+path. When both bits are set, the command reads its input from the old bank,
+then captures its result into the other bank during writeback; the old bank
+remains intact until the command finishes. Line back-pressure holds the
+existing write transaction and prevents capture from getting ahead of SPAD
+acceptance.
 Abort/error and reset invalidate the local tag; reset starts a new local
 validity epoch.
 

@@ -313,3 +313,11 @@ in the owning report; run `git diff --check` before handoff.
 - Combined URG reports all 21 declared functional groups at 100%; RTL/test line/condition/FSM/branch coverage is 73.70/68.72/46.69/64.70%. Assertions are 20/22 with zero failures/incomplete and two UVM RAL no-attempts; all 3 cover properties match.
 - The clean replay closes the immediate environment/reproducibility gap only. RTM remains 24 PASS-SCOPED / 14 PARTIAL; `CL-DV-v1.0` remains **HOLD** pending legal cross and contract dispositions.
 - Evidence: [R204 report](../../verification/COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R204_2026-11-02.md); archive `/tmp/nmaforge_r204_evidence_20261102.tar.gz`, SHA-256 `9f32c098463213e338cd6ef4a9da9b44631771b17f48c0350bc7fbca4d3a490f`.
+
+## 2026-11-05 update — v2 bounded fused-tile forwarding
+
+- Implementation/test commit `3124ba4b3be31402641da2352510f4db3a9954c6` adds opt-in `0x53` capture/consume fields, two local 16×128-bit tile banks, descriptor validation, C header macros, and a mapper contract test. Legacy `0x30/0x31` semantics remain unchanged.
+- Paired VCS core ablation (`V2-TILE-FORWARD-ABL-20261105`, seed `20261105`) is bit-exact: the 16×16/K4 consumer falls from 141 to 118 cycles and 32 to 16 SPAD reads (512 B to 256 B); both variants retain 16 output line writes. Tag-miss fallback, back-pressure, reset and Abort invalidation pass.
+- Three-seed Matrix core regression, descriptor-validator regression (29 invalid rules, 42/42 accepted boundaries), Python mapper tests, and Top Smoke pass. Top Smoke retains its existing `LOOP-REROLL-ENABLED` warning. No synthesis/PPA claim is made.
+- This closes only the bounded RTL experiment. Top-level CMDQ forwarding, feature-specific multi-seed/fault coverage, cross-engine coherence, TinyNPU comparison and physical resource cost remain open; v1.0 sign-off disposition is unchanged.
+- Evidence: [Tensor Layout Optimization report](../../architecture/TENSOR_LAYOUT_OPTIMIZATION_REPORT.md); raw VCS logs under `/tmp/nmaforge_tile_forward_ablation_20261105_final/` and `/tmp/nmaforge_tile_forward_core_regress_final_20261105/`.

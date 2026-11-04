@@ -97,14 +97,71 @@ remaining banked responses. Top-level Digits verification checks all 5,888
 hidden activation words in SPAD against an independent Python Golden before
 checking every final logit.
 
+## Bounded fused-tile forwarding experiment
+
+**Implementation SHA:** `3124ba4b3be31402641da2352510f4db3a9954c6`.
+**Run ID:** `V2-TILE-FORWARD-ABL-20261105`.
+
+The new v2-only opt-in uses opcode `0x53 aux0[5]` to capture a complete 16×16
+requantized tile and `aux0[6]` to consume the exact-tag prior tile as Matrix A.
+It adds two 16-line × 128-bit local banks (512 B / 4,096 bits plus control).
+The producer and consumer still commit their output lines to SPAD; this path
+only avoids reading the prior tile back from SPAD. A tag mismatch falls back
+to the normal read path. The descriptor validator rejects unsupported
+capture/consume shapes and preserves the legacy `0x30/0x31` contract.
+
+The paired VCS run used seed `20261105`, VCS `V-2023.12-SP1_Full64`, and the
+registered four-bank behavioral responder in the Matrix core testbench. Both
+variants ran the same producer/consumer descriptors and independent packed
+INT8 Golden. The consumer used ready bank requests and the testbench's
+zero-latency response override; this is a controlled RTL ablation, not a
+general memory-service or ASIC result.
+
+| Measure | Forwarding disabled | Forwarding enabled |
+|---|---:|---:|
+| Producer cycles | 147 | 147 |
+| Consumer cycles | 141 | 118 |
+| Producer + consumer cycles | 288 | 265 |
+| Consumer banked reads | 32 (512 B) | 16 (256 B) |
+| Consumer output line writes | 16 (256 B) | 16 (256 B) |
+| Golden | bit-exact | bit-exact |
+
+For this one M=N=16, K=4 chain, consumer latency fell 16.31% and the two-command
+interval fell 7.99%. The consumer saved 16 banked line reads, or 256 B; output
+write traffic did not change. The enabled test also passed producer
+line-ready back-pressure and last-line commit, exact-tag miss fallback with
+Golden and all 32 reads, ping-pong bank flip, reset invalidation, and Abort
+invalidation with no output line commit.
+
+Evidence paths:
+
+- `/tmp/nmaforge_tile_forward_ablation_20261105_final/enable_0/run.log`
+- `/tmp/nmaforge_tile_forward_ablation_20261105_final/enable_1/run.log`
+- `/tmp/nmaforge_tile_forward_core_regress_final_20261105/run_seed_20261105.log` through `run_seed_20261107.log`
+- `/tmp/nmaforge_v2_descriptor_validator_final_20261105/run.log`
+- `dv/subsystem/top_smoke/sim/ai_accel_smoke.log`
+
+The core regression passed all 18 legacy randomized cases and 35 fault cases
+on each of three seeds. Top Smoke passed; its pre-existing
+`LOOP-REROLL-ENABLED` VCS warning remains. Descriptor validation reports 29
+legal opcodes, 29 invalid-rule checks, 42/42 accepted boundaries, 26/26
+rejected boundaries, and 3/3 tile-forward descriptor cases. The mapper unit
+test passed 3 cases under Python 3.12.
+
 ## Limits and open issues
 
 - This is behavioral RTL simulation, not an ASIC timing or area result. No
   synthesis, PPA, power, or physical SRAM timing claim is made.
-- Fused-op-specific Abort/Reset during gather and held-line commit, parity,
-  protection faults, and broader `M/N/K` tile tails still need directed
-  verification. Existing legacy Matrix fault/reset tests passed, but do not
-  close these new-op-specific scenarios.
+- Tile forwarding is verified at the Matrix core and descriptor-validator
+  boundaries; a forwarding chain through the top-level CMDQ and multi-seed
+  feature-specific regression remain open. New-feature parity/protection and
+  held-line Abort cases also remain open.
+- The forwarding subset is one 16×16 capture and one M=16/K=4 consume; broader
+  `M/N/K` tails, repeated consumers, and cross-engine coherence are unsupported.
+  Software must not overwrite the tagged source tile between producer and
+  opted-in consumer.
+- The 512 B local tile banks have not been synthesized. Register/BRAM/SRAM
+  mapping, area, Fmax, and power remain `NOT_RUN`.
 - The integrated Digits workload covers `M=16`, `N=64`, `K=64`; the focused
   saturation test covers `M=N=K=4`. Other shape and batch-stride combinations
   remain `NOT_RUN` for opcode `0x53`.
