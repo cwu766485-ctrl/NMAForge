@@ -1,3 +1,15 @@
+> **2026-11-04 R316 exact-tree real-RTL mutation sensitivity:** At R315 tested
+> source/test SHA `695d348e4bb8ad77ed26ff502013765261606995` / tree
+> `03c33489ad9743bfb480c38c76a24df1e5e102d5`, eight temporary DUT mutants
+> (Address, Data, Response Owner, Matrix WSTRB, Completion Error, Missing
+> Done, Duplicate Done, and Stalled Request Payload) are each caught by the
+> expected checker. All mutant compile logs are free of Warning-/Error-/TFIPC/
+> fatal diagnostics. This proves sensitivity for these eight injected faults,
+> not full fault-cross closure; no requirement is promoted. RTM remains 27
+> PASS-SCOPED / 11 PARTIAL, `CL-DV-v1.0` HOLD. See [R316 report]
+> (../docs/verification/COMPUTE_CLUSTER_DUT_MUTATION_R316_2026-11-04.md),
+> archive SHA-256 `bb079d12e70c2e448f1e8d3b006529d575bf49d879376fa361fa4273981ef0a4`.
+
 > **2026-11-04 R315 legal Matrix requester-order reset replay:** At clean
 > SHA `695d348e4bb8ad77ed26ff502013765261606995` / tree
 > `03c33489ad9743bfb480c38c76a24df1e5e102d5`, three UVM seeds pass 13
