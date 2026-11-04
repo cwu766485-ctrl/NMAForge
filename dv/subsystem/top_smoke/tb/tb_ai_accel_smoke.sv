@@ -609,6 +609,9 @@ module tb_ai_accel_smoke;
         .core_error     (dut.core_error),
         .engine_busy    (dut.engine_busy),
         .engine_done    (dut.engine_done),
+        .launch_valid   (dut.launch_valid),
+        .launch_op      (dut.launch_op),
+        .launch_length  (dut.launch_length),
         .processor_event_valid(dut.processor_event_valid)
     );
 

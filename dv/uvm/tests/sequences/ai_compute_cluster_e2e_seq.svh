@@ -4099,6 +4099,23 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         `uvm_fatal("CLUSTER_TIMEOUT", $sformatf("CPLQ_TAIL expected %0d got %0d", expected, value))
     endtask
 
+    task automatic wait_cpl_tail_long(input bit [31:0] expected);
+        bit [31:0] value;
+        int unsigned poll;
+        value = '0;
+        // The longest legal Scalar VDOT runs for hundreds of thousands of
+        // clocks. Poll the architected tail at a bounded interval instead of
+        // using the short helper intended for ordinary directed tests.
+        for (poll = 0; poll < 8192; poll++) begin
+            repeat (256) @(posedge compute_vif.aclk);
+            axil_read(REG_CPLQ_TAIL, value);
+            if (value == expected) return;
+        end
+        `uvm_fatal("CLUSTER_TIMEOUT", $sformatf(
+            "long-running CPLQ_TAIL expected %0d got %0d after 2097152 clock polls",
+            expected, value))
+    endtask
+
     task automatic run_serial_descriptor(
         input bit [31:0] descriptor_base,
         input bit [31:0] completion_base,
@@ -4759,6 +4776,103 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         `uvm_info("CLUSTER_SCALAR_VDOT_MIN_BOUNDARY_PASS", $sformatf(
             "real CMDQ opcode=0x10 minimum length=1 accepted; four signed INT8 lanes, Golden=%0d, one completion and adjacent guard passed; seed=%0d",
             golden_sum, seed), UVM_LOW)
+        clear_contract_queues(32'd1);
+    endtask
+
+    task automatic run_scalar_vdot_maximum_cmdq_boundary_test(input int unsigned seed);
+        localparam bit [31:0] SRC = 32'h0001_0000;
+        localparam bit [31:0] DST = 32'h0007_5040;
+        localparam bit [31:0] COMPLETION = CLUSTER_CONTRACT_CPLQ + 32'h100;
+        localparam int unsigned MAX_WORDS = 65535;
+        localparam bit [31:0] PACKED_MIN_I8 = 32'h8080_8080;
+        bit [31:0] expected;
+        bit [31:0] observed_src_a;
+        bit [31:0] observed_src_b;
+        bit [31:0] observed_dst;
+        bit [15:0] observed_length;
+        bit [7:0] observed_opcode;
+        longint signed exact_golden;
+        int unsigned word_idx;
+        int unsigned launch_before;
+        int unsigned launch_seen;
+        int unsigned launch_poll;
+        int unsigned start_cycle;
+        int unsigned elapsed_cycles;
+
+        // Initialize the complete legal input span through the host SPAD
+        // port. Both VDOT operands intentionally alias the same immutable
+        // vector, so each packed -128 dot produces +65,536 before 64-bit
+        // accumulation. This makes saturation at the maximum encoded length
+        // independently predictable without relying on uninitialized SRAM.
+        exact_golden = 64'sd0;
+        for (word_idx = 0; word_idx < MAX_WORDS; word_idx++) begin
+            spad_write(SRC + (word_idx << 2), PACKED_MIN_I8);
+            exact_golden += 64'sd65536;
+        end
+        if (exact_golden != 64'sd4294901760)
+            `uvm_fatal("CLUSTER_SCALAR_VDOT_MAX",
+                $sformatf("independent 64-bit Golden mismatch exact=%0d", exact_golden))
+
+        expected = 32'h7fff_ffff;
+        spad_write(DST, 32'hbad0_2001);
+        spad_write(DST + 32'd4, 32'hbad0_2002);
+        write_contract_vdot_desc(CLUSTER_CONTRACT_CMDQ, 16'h08b1,
+                                 SRC, SRC, DST, 16'hffff,
+                                 8'd0, 32'd0, 32'd0, 32'd0, 32'd0);
+
+        launch_before = compute_vif.launch_sample_count;
+        launch_seen = 0;
+        configure_contract_queues(COMPLETION, 32'd1);
+        start_cycle = compute_vif.sim_cycles;
+        fork
+            begin : scalar_vdot_max_launch_monitor
+                for (launch_poll = 0; launch_poll < 50000 && launch_seen == 0;
+                     launch_poll++) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.launch_valid) begin
+                        observed_opcode = compute_vif.launch_op;
+                        observed_src_a = compute_vif.launch_src0;
+                        observed_src_b = compute_vif.launch_src1;
+                        observed_dst = compute_vif.launch_dst;
+                        observed_length = compute_vif.launch_length;
+                        launch_seen++;
+                    end
+                end
+                if (launch_seen != 1)
+                    `uvm_fatal("CLUSTER_SCALAR_VDOT_MAX", $sformatf(
+                        "real CMDQ maximum VDOT launch monitor timed out after %0d launches",
+                        launch_seen))
+            end
+            begin : scalar_vdot_max_submit
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail_long(32'd1);
+            end
+        join
+        wait_spad_idle();
+        elapsed_cycles = compute_vif.sim_cycles - start_cycle;
+
+        if (launch_seen != 1 ||
+            (compute_vif.launch_sample_count - launch_before) != 1 ||
+            observed_opcode !== 8'h10 || observed_src_a !== SRC ||
+            observed_src_b !== SRC || observed_dst !== DST ||
+            observed_length !== 16'hffff)
+            `uvm_fatal("CLUSTER_SCALAR_VDOT_MAX", $sformatf(
+                "maximum VDOT launch mismatch count=%0d op=%02h src=%08h/%08h dst=%08h length=%0d",
+                compute_vif.launch_sample_count - launch_before,
+                observed_opcode, observed_src_a, observed_src_b,
+                observed_dst, observed_length))
+
+        expect_completion(COMPLETION, 16'h08b1, expected, 32'd1,
+                          "CMDQ maximum Scalar VDOT completion");
+        expect_spad(SRC, PACKED_MIN_I8, "CMDQ maximum Scalar VDOT input first word");
+        expect_spad(SRC + ((MAX_WORDS - 1) << 2), PACKED_MIN_I8,
+                    "CMDQ maximum Scalar VDOT input last word");
+        expect_spad(DST, expected, "CMDQ maximum Scalar VDOT saturated Golden");
+        expect_spad(DST + 32'd4, 32'hbad0_2002,
+                    "CMDQ maximum Scalar VDOT adjacent guard");
+        `uvm_info("CLUSTER_SCALAR_VDOT_MAX_BOUNDARY_PASS", $sformatf(
+            "real CMDQ opcode=0x10 maximum length=65535 accepted; exact 64-bit Golden=%0d saturated=0x%08h; one completion, full input span, and adjacent guard passed; elapsed_cycles=%0d seed=%0d",
+            exact_golden, expected, elapsed_cycles, seed), UVM_LOW)
         clear_contract_queues(32'd1);
     endtask
 
@@ -13166,6 +13280,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_engine_watchdog_full_cplq_cross(seed);
         run_engine_parity_full_cplq_cross(seed);
         run_opcode_dispatch_sweep(seed);
+        // This maximum-length case fills a 256-KiB operand span. Keep it last
+        // so its deterministic vector initialization cannot perturb earlier
+        // tests' intentionally retained SPAD sentinels.
+        run_scalar_vdot_maximum_cmdq_boundary_test(seed);
 
         `uvm_info("COMPUTE_CLUSTER_REAL_UVM_PASS", $sformatf(
             "standalone Matrix16x32x64 Golden + 16 A-tile reuse hits; parallel Matrix/CNM GEMV with separate response tags and four-bank Golden + next-K prefetch + queued SFU tasks + concurrent abort/reset/recovery seed=%0d; prefetch_overlap=%0d matrix_cnm_overlap=%0d matrix_rsp=%0d cnm_rsp=%0d cnm_lanes=%b overlap=%0d arbiter_contention=%0d banked_grants=%0d cnm_grants=%0d core_grants=%0d",
