@@ -302,18 +302,19 @@ interface ai_compute_cluster_if(input logic aclk);
                     // that exact response cycle; all other payload changes
                     // under backpressure remain violations.
                     if (!engine_req_valid[e] && !req_write_previous[e] &&
-                        engine_parity_rsp_error[e]) begin
+                        engine_rsp_valid[e] && engine_parity_rsp_error[e]) begin
                         engine_req_parity_cancel_checks[e]++;
                     end else if (!engine_req_valid[e] ||
                         engine_req_write[e] !== req_write_previous[e] ||
                         engine_req_addr[e*32 +: 32] !== req_addr_previous[e] ||
                         engine_req_wdata[e*32 +: 32] !== req_wdata_previous[e]) begin
-                        $display("[ENGINE_REQ_STALL_DIAG] cycle=%0d engine=%0d previous_valid=1 current_valid=%0b previous_write=%0b current_write=%0b previous_addr=%08h current_addr=%08h previous_wdata=%08h current_wdata=%08h ready=%0b parity_rsp=%0b busy=%07b abort=%0b",
+                        $display("[ENGINE_REQ_STALL_DIAG] cycle=%0d engine=%0d previous_valid=1 current_valid=%0b previous_write=%0b current_write=%0b previous_addr=%08h current_addr=%08h previous_wdata=%08h current_wdata=%08h ready=%0b rsp_valid=%0b parity_rsp=%0b busy=%07b abort=%0b",
                             sim_cycles, e, engine_req_valid[e],
                             req_write_previous[e], engine_req_write[e],
                             req_addr_previous[e], engine_req_addr[e*32 +: 32],
                             req_wdata_previous[e], engine_req_wdata[e*32 +: 32],
-                            engine_req_ready[e], engine_parity_rsp_error[e],
+                            engine_req_ready[e], engine_rsp_valid[e],
+                            engine_parity_rsp_error[e],
                             engine_busy, dut_abort_active);
                         engine_req_stability_violations = engine_req_stability_violations + 1;
                     end
