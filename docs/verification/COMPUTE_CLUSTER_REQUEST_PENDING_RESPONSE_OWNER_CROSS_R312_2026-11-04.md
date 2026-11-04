@@ -49,7 +49,7 @@ The merged raw 7×7 cross observes **8/49 bins (16.33%)**, each three times acro
 
 The remaining 41 raw bins have **no reachability disposition yet**. They are neither waived nor declared illegal. Continue with source-level legal scheduling/reachability analysis and add only cases reachable through the production dispatcher, mux, and arbiter. No artificial invalid traffic is required to hit a Cartesian cross.
 
-Compile log scan found no `Warning-`, `Error-`, `[TFIPC]`, or fatal diagnostic. The top AXI assertion summary still reports `c_ar_stall_then_accept` and `c_aw_stall_then_accept` with 1,920,893 attempts and 0 matches each; `c_w_stall_then_accept` has one match. AR/AW property applicability/non-vacuity remains a review item; this run does not claim assertion closure.
+Compile log scan found no `Warning-`, `Error-`, `[TFIPC]`, or fatal diagnostic. This Cluster-only workload reports `c_ar_stall_then_accept` and `c_aw_stall_then_accept` with 1,920,893 attempts and 0 matches each; `c_w_stall_then_accept` has one match. Follow-up R314 on this same code/test SHA runs the designated AXI-stall workload and records AR/AW/W matches `14/5/12`, confirming non-vacuity for these cover properties. See [R314 SVA report](COMPUTE_CLUSTER_AXI_SVA_NONVACUITY_R314_2026-11-04.md); R312's zero AR/AW matches are specific to its workload, not a failure of the cover wiring.
 
 ## Requirement and sign-off effect
 
