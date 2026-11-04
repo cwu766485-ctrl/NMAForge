@@ -367,7 +367,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     covergroup depthwise_channel_sequence_cg;
         option.per_instance = 1;
         cp_depthwise_channel_sequence: coverpoint depthwise_channel_sequence_case {
-            bins two_channel_descriptors = {1};
+            bins three_channel_descriptors = {3};
         }
     endgroup
 
@@ -6979,26 +6979,30 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     endtask
 
     task automatic run_depthwise_multichannel_cmdq_test(input int unsigned seed);
+        localparam int unsigned CHANNEL_COUNT = 3;
         localparam bit [31:0] CMDQ = 32'h0005_c400;
         localparam bit [31:0] CPLQ = 32'h0005_c500;
         localparam bit [31:0] CHANNEL_A0 = 32'h0007_f000;
         localparam bit [31:0] CHANNEL_A1 = 32'h0007_f100;
+        localparam bit [31:0] CHANNEL_A2 = 32'h0007_f500;
         localparam bit [31:0] CHANNEL_W0 = 32'h0007_f200;
         localparam bit [31:0] CHANNEL_W1 = 32'h0007_f300;
+        localparam bit [31:0] CHANNEL_W2 = 32'h0007_f600;
         localparam bit [31:0] CHANNEL_Y0 = 32'h0007_f400;
         localparam bit [31:0] CHANNEL_Y1 = 32'h0007_f420;
-        bit signed [7:0] pixels[0:1][0:15];
-        bit signed [7:0] kernel[0:1][0:8];
-        bit [31:0] golden[0:1][0:3];
-        bit [31:0] src_addr[0:1];
-        bit [31:0] weight_addr[0:1];
-        bit [31:0] dst_addr[0:1];
-        bit [31:0] observed_src0[0:1];
-        bit [31:0] observed_src1[0:1];
-        bit [31:0] observed_dst[0:1];
-        bit [15:0] observed_m[0:1];
-        bit [15:0] observed_n[0:1];
-        bit [15:0] observed_k[0:1];
+        localparam bit [31:0] CHANNEL_Y2 = 32'h0007_f740;
+        bit signed [7:0] pixels[0:CHANNEL_COUNT-1][0:15];
+        bit signed [7:0] kernel[0:CHANNEL_COUNT-1][0:8];
+        bit [31:0] golden[0:CHANNEL_COUNT-1][0:3];
+        bit [31:0] src_addr[0:CHANNEL_COUNT-1];
+        bit [31:0] weight_addr[0:CHANNEL_COUNT-1];
+        bit [31:0] dst_addr[0:CHANNEL_COUNT-1];
+        bit [31:0] observed_src0[0:CHANNEL_COUNT-1];
+        bit [31:0] observed_src1[0:CHANNEL_COUNT-1];
+        bit [31:0] observed_dst[0:CHANNEL_COUNT-1];
+        bit [15:0] observed_m[0:CHANNEL_COUNT-1];
+        bit [15:0] observed_n[0:CHANNEL_COUNT-1];
+        bit [15:0] observed_k[0:CHANNEL_COUNT-1];
         bit monitor_complete;
         int unsigned launch_before;
         int unsigned conv_launch_before;
@@ -7019,16 +7023,19 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         src_addr[0] = CHANNEL_A0;
         src_addr[1] = CHANNEL_A1;
+        src_addr[2] = CHANNEL_A2;
         weight_addr[0] = CHANNEL_W0;
         weight_addr[1] = CHANNEL_W1;
+        weight_addr[2] = CHANNEL_W2;
         dst_addr[0] = CHANNEL_Y0;
         dst_addr[1] = CHANNEL_Y1;
+        dst_addr[2] = CHANNEL_Y2;
 
         // SPEC 3.5 defines Depthwise as one descriptor per channel. Exercise
-        // two distinct 4x4 input/kernel/output regions in one real CMDQ so
+        // three distinct 4x4 input/kernel/output regions in one real CMDQ so
         // descriptor ordering, channel address independence and full images
         // are checked through the production dispatcher and Conv engine.
-        for (channel_idx = 0; channel_idx < 2; channel_idx++) begin
+        for (channel_idx = 0; channel_idx < CHANNEL_COUNT; channel_idx++) begin
             for (idx = 0; idx < 16; idx++) begin
                 sample_value = ((int'(idx * 29) + int'(channel_idx * 67) +
                                 int'(seed % 113)) % 256) - 128;
@@ -7077,6 +7084,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                            CHANNEL_A1, CHANNEL_W1, CHANNEL_Y1,
                            16'd4, 16'd4, 16'd9,
                            32'd0, 32'd0, 32'd0, 32'd0, 8'd5);
+        write_cluster_desc(CMDQ + 32'h80, 8'h17, 16'h06e2,
+                           CHANNEL_A2, CHANNEL_W2, CHANNEL_Y2,
+                           16'd4, 16'd4, 16'd9,
+                           32'd0, 32'd0, 32'd0, 32'd0, 8'd5);
 
         launch_before = compute_vif.launch_sample_count;
         conv_launch_before = compute_vif.engine_launch_count[5];
@@ -7087,7 +7098,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CMDQ_BASE, CMDQ);
         axil_write(REG_CMDQ_SIZE, 32'd4);
         axil_write(REG_CMDQ_HEAD, 32'd0);
-        axil_write(REG_CMDQ_TAIL, 32'd2);
+        axil_write(REG_CMDQ_TAIL, CHANNEL_COUNT);
         axil_write(REG_CPLQ_BASE, CPLQ);
         axil_write(REG_CPLQ_SIZE, 32'd4);
         axil_write(REG_CPLQ_HEAD, 32'd0);
@@ -7095,10 +7106,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         fork
             begin : depthwise_channel_launch_monitor
-                for (poll = 0; poll < 200000 && launch_seen < 2; poll++) begin
+                for (poll = 0; poll < 200000 && launch_seen < CHANNEL_COUNT; poll++) begin
                     @(posedge compute_vif.aclk);
                     if (compute_vif.launch_valid) begin
-                        if (launch_seen >= 2)
+                        if (launch_seen >= CHANNEL_COUNT)
                             `uvm_fatal("CLUSTER_DEPTHWISE_MULTICHANNEL",
                                 "unexpected extra Depthwise channel launch")
                         observed_src0[launch_seen] = compute_vif.launch_src0;
@@ -7110,29 +7121,29 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                         launch_seen++;
                     end
                 end
-                if (launch_seen != 2)
+                if (launch_seen != CHANNEL_COUNT)
                     `uvm_fatal("CLUSTER_DEPTHWISE_MULTICHANNEL", $sformatf(
-                        "real CMDQ monitor timed out after %0d/2 Depthwise channel launches",
-                        launch_seen))
+                        "real CMDQ monitor timed out after %0d/%0d Depthwise channel launches",
+                        launch_seen, CHANNEL_COUNT))
                 monitor_complete = 1'b1;
             end
             begin : depthwise_channel_submit
                 axil_write(REG_DOORBELL, 32'd1);
-                wait_cpl_tail(32'd2);
+                wait_cpl_tail(CHANNEL_COUNT);
             end
         join
         wait_spad_idle();
 
         if (!monitor_complete ||
-            compute_vif.launch_sample_count - launch_before != 2 ||
-            compute_vif.engine_launch_count[5] - conv_launch_before != 2 ||
+            compute_vif.launch_sample_count - launch_before != CHANNEL_COUNT ||
+            compute_vif.engine_launch_count[5] - conv_launch_before != CHANNEL_COUNT ||
             compute_vif.same_engine_launch_while_busy != busy_launch_before)
             `uvm_fatal("CLUSTER_DEPTHWISE_MULTICHANNEL", $sformatf(
                 "channel launch accounting mismatch total=%0d conv=%0d busy-relaunch-delta=%0d",
                 compute_vif.launch_sample_count - launch_before,
                 compute_vif.engine_launch_count[5] - conv_launch_before,
                 compute_vif.same_engine_launch_while_busy - busy_launch_before))
-        for (channel_idx = 0; channel_idx < 2; channel_idx++) begin
+        for (channel_idx = 0; channel_idx < CHANNEL_COUNT; channel_idx++) begin
             if (observed_src0[channel_idx] !== src_addr[channel_idx] ||
                 observed_src1[channel_idx] !== weight_addr[channel_idx] ||
                 observed_dst[channel_idx] !== dst_addr[channel_idx] ||
@@ -7160,18 +7171,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                         $sformatf("Depthwise channel%0d trailing sentinel", channel_idx));
         end
 
-        depthwise_channel_sequence_case = 1;
+        depthwise_channel_sequence_case = CHANNEL_COUNT;
         depthwise_channel_sequence_cg.sample();
         if (depthwise_channel_sequence_cg.get_coverage() != 100.0)
             `uvm_fatal("CLUSTER_DEPTHWISE_MULTICHANNEL", $sformatf(
                 "multi-channel functional coverage incomplete: %0.2f%%",
                 depthwise_channel_sequence_cg.get_coverage()))
         `uvm_info("CLUSTER_DEPTHWISE_MULTICHANNEL_PASS", $sformatf(
-            "real CMDQ 0x17 per-channel Depthwise: two ordered 4x4 descriptors with independent A/weight/destination regions; 8/8 signed INT32 Golden outputs, 2/2 completions and sentinels passed; focused_bins=1/1 coverage=100.0%% seed=%0d",
+            "real CMDQ 0x17 per-channel Depthwise: three ordered 4x4 descriptors with independent A/weight/destination regions; 12/12 signed INT32 Golden outputs, 3/3 completions and sentinels passed; focused_bins=1/1 coverage=100.0%% seed=%0d",
             seed), UVM_LOW)
         `uvm_info("CLUSTER_DEPTHWISE_MULTICHANNEL_COVERAGE_PASS",
-            "two-channel descriptor sequence bins=1/1 coverage=100.0%", UVM_LOW)
-        axil_write(REG_CPLQ_HEAD, 32'd2);
+            "three-channel descriptor sequence bins=1/1 coverage=100.0%", UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, CHANNEL_COUNT);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
