@@ -97,6 +97,7 @@ module tb_ai_tensor_matrix_core_random;
                            (bank_response_delay_fifo[bank_response_rd_ptr] == 0);
   wire bank_request_accept = banked_read_valid && banked_ready;
   reg [31:0] rng=32'h7ac4_01d3;
+  reg [31:0] rng_seed=32'h7ac4_01d3;
   integer bank_read_count=0,bank_response_count=0;
   integer spad_read_count=0,spad_response_count=0;
   integer bank_stall_count=0,spad_stall_count=0,line_stall_count=0;
@@ -187,7 +188,7 @@ module tb_ai_tensor_matrix_core_random;
   // independently; the core observes the response and data on the next edge.
   always @(posedge clk or negedge resetn) begin
     if(!resetn) begin
-      rng<=32'h7ac4_01d3;
+      rng<=rng_seed;
       mac_cycle_count<=0;
       banked_ready<=0;banked_rsp_valid<=0;bank_response_queue_count<=0;
       bank_response_wr_ptr<=0;bank_response_rd_ptr<=0;
@@ -1524,6 +1525,8 @@ module tb_ai_tensor_matrix_core_random;
 
   initial begin
     if($value$plusargs("SEED=%d",seed)) begin end
+    rng_seed=seed^32'h7ac4_01d3;
+    if(rng_seed==0) rng_seed=32'h7ac4_01d3;
     benchmark_mode=$test$plusargs("MATRIX_BENCHMARK_ONLY");
     initial_seed=seed;rand_state=seed;
     for(inst=0;inst<4;inst=inst+1)
