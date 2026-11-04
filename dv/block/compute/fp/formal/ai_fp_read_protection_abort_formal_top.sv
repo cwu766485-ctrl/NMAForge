@@ -69,4 +69,20 @@ module ai_fp_read_protection_abort_formal_top (
         busy && (dut.state_r == 4'd1) && !abort &&
         spad_ready && spad_protection_error && dut.read_fire &&
         dut.read_protection_failure);
+
+    // A Parity response to an already accepted read masks the next request.
+    // Thus a simultaneous Protection sideband can be present, but cannot be
+    // qualified as a new accepted-read Protection failure on that edge.
+    ap_parity_response_excludes_read_protection_failure: assert property (
+        @(posedge clk) disable iff (!resetn)
+        busy && (dut.state_r == 4'd1) && dut.response_parity_failure |->
+        !dut.read_protection_failure);
+    cp_parity_response_with_outstanding_read_reachable: cover property (
+        @(posedge clk) disable iff (!resetn)
+        busy && (dut.state_r == 4'd1) && (dut.outstanding_reads_r != 0) &&
+        dut.response_parity_failure);
+    cp_parity_response_and_protection_sideband_reachable: cover property (
+        @(posedge clk) disable iff (!resetn)
+        busy && (dut.state_r == 4'd1) && (dut.outstanding_reads_r != 0) &&
+        dut.response_parity_failure && spad_protection_error);
 endmodule
