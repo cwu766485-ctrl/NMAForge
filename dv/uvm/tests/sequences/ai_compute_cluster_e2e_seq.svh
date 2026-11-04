@@ -5712,7 +5712,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
                     if ((compute_vif.engine_busy === 7'b111_1111) &&
                         (accepted_engine_mask === 7'b111_1111) &&
-                        (pending_reads != 0)) begin
+                        (pending_reads >= 2)) begin
                         if (max_active != 7)
                             `uvm_fatal("CLUSTER_PARALLEL_RESET", $sformatf(
                                 "reset trigger lacked all-engine overlap: max_active=%0d",
@@ -5844,9 +5844,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                                     engine, accepted_reads[engine], returned_reads[engine]))
                             pending_reads += accepted_reads[engine] - returned_reads[engine];
                         end
-                        if (pending_reads == 0 && stalled_owner == 6)
+                        if (pending_reads == 0)
                             `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL",
-                                "KV reset-cut control no longer has an accepted read pending")
+                                $sformatf("target owner %0d reset cut did not retain any accepted old-epoch read after the held request stall",
+                                          stalled_owner))
                         `uvm_info("CLUSTER_PARALLEL_RESET_STALL_PASS", $sformatf(
                             "target request owner=%0d selected while ready, then held stable/unaccepted for one sampled cycle before reset; engine_mask=%07b MatrixBanked=%0b MatrixLine=%0b CNM=%04b; pending_reads=%0d",
                             stalled_owner,
@@ -13366,7 +13367,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 "held production request owner bins=%0.1f%% expected 100%% (7 engine classes)",
                 engine_parallel_reset_stall_cg.get_coverage()))
         `uvm_info("CLUSTER_PARALLEL_RESET_STALL_COVERAGE_PASS", $sformatf(
-            "legal request owner × shared reset cuts={INT8,FP,CNM,Matrix,SFU,Conv,KV}=7/7 coverage=%.1f%%; each cut checks held payload, reset quiet and seven-engine Golden recovery; KV cut additionally requires an old-epoch read pending; seed=%0d",
+            "legal request owner × shared reset cuts={INT8,FP,CNM,Matrix,SFU,Conv,KV}=7/7 coverage=%.1f%%; each cut checks held payload, a pending old-epoch read after the stall, reset quiet and seven-engine Golden recovery; seed=%0d",
             engine_parallel_reset_stall_cg.get_coverage(), seed), UVM_LOW)
 
         // Read the head/token entry back through the real KV engine after the
