@@ -1,3 +1,17 @@
+> **2026-11-04 R287 Matrix FSM formal replay:** At fixed clean test SHA
+> `01a4114118cc0664c52602c6bed6a1e33b76681c` / tree
+> `1f4e183723b359b3e3b1eb556619929849df8ea6`, VC Formal V-2023.12-SP2
+> proves all five FSM guards non-vacuously and reaches both covers (Prefetch
+> Wait depth 11, Error Drain depth 3); setup is clean. Matrix core/SVA harness
+> hashes match R249/R281. Enabled-profile raw FSM remains 49/53; three misses
+> have proven guard/invariant dispositions and the fourth legal fallback edge
+> is hit with prefetch disabled. This supersedes the old 2026-10-27 note below
+> that formal disposition was missing; it does not imply 100% raw FSM coverage
+> or full `REQ-CL-010` closure. Requirement stays PARTIAL and
+> `CL-DV-v1.0` stays HOLD. See [R287 report]
+> (../docs/verification/COMPUTE_CLUSTER_MATRIX_FSM_R287_FORMAL_REPLAY_2026-11-04.md),
+> archive SHA-256 `5e89ee962f50577130f7e9ddd341503c5467ac0c401a5417b33afe4d35d74fa8`.
+
 > **2026-11-02 R192 final evidence-commit clean replay:** At clean commit `9388d6730b480d5136f7347823a25e5e2ce6d3e6` (tree `fcbf60bd035691ae88f1631c3b5db747d411ebe0`), Top Smoke passes the 86-descriptor/60-tensor mapper check and 20 seeded random cases; three real-top Compute Cluster UVM seeds pass with severity 0/0/0, 69,656 checked Memory Image words/seed, zero mismatch/unknown/stale/orphan, and all response ledgers drained. The all-engine C1 point observes 21/21 pair overlaps/max-active 7; legal Protection/reset coverage is 72/72 per seed. Compute-only URG remains 71.89% across 20 groups; three AXI AR/AW assertions have no real success in this workload, while R190's mixed E2E merge supplies separate AXI functional-coverage evidence. Top Smoke retains `LOOP-REROLL-ENABLED`. Reproducibility only: 24 PASS-SCOPED / 14 PARTIAL, `CL-DV-v1.0` HOLD. See [R192 report](../docs/verification/COMPUTE_CLUSTER_CLEAN_REPLAY_R192_2026-11-02.md), archive SHA-256 `14499d80187adffd8c8316ee29cea60bff9d3fdfa726181865086c0952351294`.
 
 > **2026-11-02 R184 real-CMDQ invalid-descriptor rejection:** At exact clean SHA `15e3b5a608ae405fafbd551d26c975ab895c5d7c` (published branch equivalent `c07fb019753de8b23ed6150f4166a184a696042d`), three seeds reject eight malformed descriptors across the seven engines and Macro parent. Each case requires ordered `ERR_DESC`, no launch/request cycle, and unchanged sentinels. Focused group is 8/8 per seed; 28/28 checker-sensitivity and 20-case Top Smoke pass. This narrows only invalid-descriptor rejection coverage; it does not close the 38-row RTM (24 PASS-SCOPED / 14 PARTIAL, HOLD). See [R184 report](../docs/verification/COMPUTE_CLUSTER_CMDQ_INVALID_DESCRIPTOR_R184_2026-11-02.md).
