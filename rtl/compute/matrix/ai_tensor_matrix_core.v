@@ -83,6 +83,7 @@ module ai_tensor_matrix_core #(
 
     localparam [7:0] OP_TENSOR_GEMM       = 8'h30;
     localparam [7:0] OP_TENSOR_BATCH_GEMM = 8'h31;
+    localparam [7:0] OP_TENSOR_GEMV_KFOLD = 8'h52;
     localparam [7:0] OP_TENSOR_GEMM_REQUANT_TILE_A = 8'h53;
 
     localparam [3:0] ERR_CONFIG     = 4'd1;
@@ -166,6 +167,8 @@ module ai_tensor_matrix_core #(
     reg [1:0] activation_r;
     reg [4:0] requant_shift_r;
     reg fused_output_r;
+    reg gemv_kfold_r;
+    reg [15:0] gemv_k_elements_r;
     reg [31:0] watchdog_limit_r;
 
     reg [31:0] a_batch_base_r, b_batch_base_r, dst_batch_base_r;
@@ -192,6 +195,7 @@ module ai_tensor_matrix_core #(
     wire [31:0] array_selected_result;
     wire array_selected_overflow;
     reg [ARRAY_SIZE*8-1:0] array_load_a, array_load_b;
+    reg [ARRAY_SIZE*ARRAY_SIZE*8-1:0] array_load_b_matrix;
     reg [1:0] array_load_lane;
     wire array_buffer_write_valid;
     wire array_buffer_write_bank;
@@ -202,6 +206,7 @@ module ai_tensor_matrix_core #(
     integer reset_i;
     integer perf_i;
     integer cache_i;
+    integer matrix_col_i;
 
     wire [31:0] row_tile_origin =
         {16'd0,row_tile_r} * ARRAY_SIZE;
@@ -213,8 +218,8 @@ module ai_tensor_matrix_core #(
         rows_remaining > ARRAY_SIZE ? ARRAY_SIZE : rows_remaining;
     wire [31:0] valid_cols =
         cols_remaining > ARRAY_SIZE ? ARRAY_SIZE : cols_remaining;
-    wire [31:0] a_group_count = valid_rows >> 2;
-    wire [31:0] b_group_count = valid_cols >> 2;
+    wire [31:0] a_group_count = gemv_kfold_r ? valid_rows : (valid_rows >> 2);
+    wire [31:0] b_group_count = gemv_kfold_r ? 32'd4 : (valid_cols >> 2);
     wire [31:0] m_tile_count =
         ({16'd0,m_r} + ARRAY_SIZE - 1) / ARRAY_SIZE;
     wire [31:0] n_tile_count =
@@ -225,8 +230,21 @@ module ai_tensor_matrix_core #(
     wire [31:0] banked_word_offset =
         (({29'd0,read_group_r} * {16'd0,k_words_r}) +
           {16'd0,k_group_r}) << 4;
-    wire [31:0] a_read_addr = a_tile_base_r + banked_word_offset;
-    wire [31:0] b_read_addr = b_tile_base_r + banked_word_offset;
+    wire [31:0] legacy_a_read_addr = a_tile_base_r + banked_word_offset;
+    wire [31:0] legacy_b_read_addr = b_tile_base_r + banked_word_offset;
+    // The first product K-fold descriptor uses dense row-major operands. Each
+    // A request reads one 16-byte segment of an output row; each B request
+    // reads one 16-byte row containing sixteen output columns.
+    wire [31:0] gemv_a_read_addr =
+        (a_tile_base_r + ({29'd0,read_group_r} * {16'd0,gemv_k_elements_r}) +
+         ({16'd0,k_group_r} << 2)) & 32'hffff_fff0;
+    wire [31:0] gemv_b_read_addr = b_tile_base_r +
+        ((({16'd0,k_group_r} << 2) + {29'd0,read_group_r}) *
+         {16'd0,n_r});
+    wire [31:0] a_read_addr = gemv_kfold_r ? gemv_a_read_addr :
+                                                    legacy_a_read_addr;
+    wire [31:0] b_read_addr = gemv_kfold_r ? gemv_b_read_addr :
+                                                    legacy_b_read_addr;
     wire prefetch_active = (prefetch_state_r != PF_IDLE);
     wire prefetch_is_b_req = (prefetch_state_r == PF_B_REQ);
     wire prefetch_request_pending =
@@ -301,9 +319,16 @@ module ai_tensor_matrix_core #(
     wire [31:0] response_group_offset =
         (({29'd0,response_group} * {16'd0,k_words_r}) +
          {16'd0,response_k_group}) << 4;
-    wire [31:0] response_expected_addr = response_operand_b ?
-        (b_tile_base_r + response_group_offset) :
-        (a_tile_base_r + response_group_offset);
+    wire [31:0] gemv_response_a_addr =
+        (a_tile_base_r + ({29'd0,response_group} * {16'd0,gemv_k_elements_r}) +
+         ({16'd0,response_k_group} << 2)) & 32'hffff_fff0;
+    wire [31:0] gemv_response_b_addr = b_tile_base_r +
+        ((({16'd0,response_k_group} << 2) + {29'd0,response_group}) *
+         {16'd0,n_r});
+    wire [31:0] response_expected_addr = gemv_kfold_r ?
+        (response_operand_b ? gemv_response_b_addr : gemv_response_a_addr) :
+        (response_operand_b ? (b_tile_base_r + response_group_offset) :
+                              (a_tile_base_r + response_group_offset));
     wire banked_response_context_fault = banked_response_accept &&
         (state_r != ST_ERROR_DRAIN) &&
         ((response_k_group >= k_words_r) ||
@@ -318,13 +343,22 @@ module ai_tensor_matrix_core #(
     wire [31:0] write_row_addr = dst_row_addr_r + line_byte_offset;
     wire line_store_eligible = (write_row_addr[3:0] == 4'd0);
     wire fused_requant_output = fused_output_r;
+    wire gemv_kfold_command = (op_mode == OP_TENSOR_GEMV_KFOLD);
     wire valid_operation = (op_mode == OP_TENSOR_GEMM) ||
                            (op_mode == OP_TENSOR_BATCH_GEMM) ||
+                           (op_mode == OP_TENSOR_GEMV_KFOLD) ||
                            (op_mode == OP_TENSOR_GEMM_REQUANT_TILE_A);
+    wire invalid_gemv_contract = gemv_kfold_command &&
+        ((ARRAY_SIZE != 16) || (m_size != 16'd4) || (n_size != 16'd16) ||
+         (k_words < 16'd16) || (k_words[3:0] != 4'd0) || transpose_a ||
+         transpose_b || (aux0 != 32'd0) || (instance_count > 32'd1) ||
+         (src0_batch_stride != 32'd0) || (src1_batch_stride != 32'd0) ||
+         (dst_batch_stride != 32'd0));
     wire invalid_dimensions = (m_size == 0) || (n_size == 0) ||
                               (k_words == 0) || |m_size[1:0] ||
                               |n_size[1:0] || (ARRAY_SIZE < 4) ||
-                              ((ARRAY_SIZE % 4) != 0);
+                              ((ARRAY_SIZE % 4) != 0) ||
+                              invalid_gemv_contract;
     wire invalid_alignment = |src0_base[3:0] || |src1_base[3:0] ||
                              |dst_base[1:0] || (bias_enable && |bias_base[1:0]);
     wire last_k_group = (k_group_r == k_words_r - 1'b1);
@@ -347,13 +381,17 @@ module ai_tensor_matrix_core #(
     wire [31:0] write_index1 = write_index0 + 32'd1;
     wire [31:0] write_index2 = write_index0 + 32'd2;
     wire [31:0] write_index3 = write_index0 + 32'd3;
-    wire signed [63:0] write_acc0 =
+    wire signed [63:0] write_acc0 = gemv_kfold_r ?
+        gemv_reduced_accumulator(write_row_r,write_col_r) :
         array_accumulator_vector[write_index0*64 +: 64];
-    wire signed [63:0] write_acc1 =
+    wire signed [63:0] write_acc1 = gemv_kfold_r ?
+        gemv_reduced_accumulator(write_row_r,write_col_r+1) :
         array_accumulator_vector[write_index1*64 +: 64];
-    wire signed [63:0] write_acc2 =
+    wire signed [63:0] write_acc2 = gemv_kfold_r ?
+        gemv_reduced_accumulator(write_row_r,write_col_r+2) :
         array_accumulator_vector[write_index2*64 +: 64];
-    wire signed [63:0] write_acc3 =
+    wire signed [63:0] write_acc3 = gemv_kfold_r ?
+        gemv_reduced_accumulator(write_row_r,write_col_r+3) :
         array_accumulator_vector[write_index3*64 +: 64];
     wire signed [31:0] write_bias0 =
         bias_enable_r ? bias_words_r[write_col_r] : 32'sd0;
@@ -441,6 +479,24 @@ module ai_tensor_matrix_core #(
         end
     endfunction
 
+    function signed [63:0] gemv_reduced_accumulator;
+        input integer logical_row;
+        input integer logical_col;
+        integer fold_lane;
+        integer physical_index;
+        reg signed [63:0] sum;
+        begin
+            sum = 64'sd0;
+            for (fold_lane = 0; fold_lane < 4; fold_lane = fold_lane + 1) begin
+                physical_index = (((logical_row * 4) + fold_lane) * ARRAY_SIZE) +
+                                 logical_col;
+                sum = sum + $signed(array_accumulator_vector[
+                    physical_index*64 +: 64]);
+            end
+            gemv_reduced_accumulator = sum;
+        end
+    endfunction
+
     function [7:0] requant_matrix_i8;
         input signed [31:0] value;
         input [4:0] shift;
@@ -512,24 +568,41 @@ module ai_tensor_matrix_core #(
         else
             array_load_lane = lane_r;
 
+        array_load_b_matrix = {ARRAY_SIZE*ARRAY_SIZE*8{1'b0}};
         for (vector_i = 0; vector_i < ARRAY_SIZE; vector_i = vector_i + 1) begin
-            array_load_a[vector_i*8 +: 8] = matrix_tile_element(
-                a_tile_words_r[compute_buffer_r][(vector_i/4)*4+0],
-                a_tile_words_r[compute_buffer_r][(vector_i/4)*4+1],
-                a_tile_words_r[compute_buffer_r][(vector_i/4)*4+2],
-                a_tile_words_r[compute_buffer_r][(vector_i/4)*4+3],
-                vector_i%4,array_load_lane,transpose_a_r);
-            array_load_b[vector_i*8 +: 8] = matrix_tile_element(
-                b_tile_words_r[compute_buffer_r][(vector_i/4)*4+0],
-                b_tile_words_r[compute_buffer_r][(vector_i/4)*4+1],
-                b_tile_words_r[compute_buffer_r][(vector_i/4)*4+2],
-                b_tile_words_r[compute_buffer_r][(vector_i/4)*4+3],
-                vector_i%4,array_load_lane,transpose_b_r);
+            if (gemv_kfold_r) begin
+                array_load_a[vector_i*8 +: 8] = matrix_tile_element(
+                    a_tile_words_r[compute_buffer_r][(vector_i/4)*4+0],
+                    a_tile_words_r[compute_buffer_r][(vector_i/4)*4+1],
+                    a_tile_words_r[compute_buffer_r][(vector_i/4)*4+2],
+                    a_tile_words_r[compute_buffer_r][(vector_i/4)*4+3],
+                    k_group_r[1:0],vector_i%4,1'b0);
+                array_load_b[vector_i*8 +: 8] = 8'd0;
+                for (matrix_col_i = 0; matrix_col_i < ARRAY_SIZE;
+                     matrix_col_i = matrix_col_i + 1)
+                    array_load_b_matrix[(vector_i*ARRAY_SIZE+matrix_col_i)*8 +: 8] =
+                        b_tile_words_r[compute_buffer_r][
+                            ((vector_i%4)*4)+(matrix_col_i/4)]
+                            [(matrix_col_i%4)*8 +: 8];
+            end else begin
+                array_load_a[vector_i*8 +: 8] = matrix_tile_element(
+                    a_tile_words_r[compute_buffer_r][(vector_i/4)*4+0],
+                    a_tile_words_r[compute_buffer_r][(vector_i/4)*4+1],
+                    a_tile_words_r[compute_buffer_r][(vector_i/4)*4+2],
+                    a_tile_words_r[compute_buffer_r][(vector_i/4)*4+3],
+                    vector_i%4,array_load_lane,transpose_a_r);
+                array_load_b[vector_i*8 +: 8] = matrix_tile_element(
+                    b_tile_words_r[compute_buffer_r][(vector_i/4)*4+0],
+                    b_tile_words_r[compute_buffer_r][(vector_i/4)*4+1],
+                    b_tile_words_r[compute_buffer_r][(vector_i/4)*4+2],
+                    b_tile_words_r[compute_buffer_r][(vector_i/4)*4+3],
+                    vector_i%4,array_load_lane,transpose_b_r);
+            end
         end
     end
 
     assign array_buffer_write_valid = (state_r == ST_PREP_MAC) ||
-                                      ((state_r == ST_MAC) &&
+                                      ((state_r == ST_MAC) && !gemv_kfold_r &&
                                        (lane_r != 2'd3));
     assign array_buffer_write_bank = (state_r == ST_PREP_MAC) ?
                                      1'b0 : ~lane_r[0];
@@ -549,10 +622,10 @@ module ai_tensor_matrix_core #(
         .buffer_write_bank(array_buffer_write_bank),
         .buffer_write_a(array_load_a),
         .buffer_write_b(array_load_b),
-        .buffer_write_b_matrix({ARRAY_SIZE*ARRAY_SIZE*8{1'b0}}),
+        .buffer_write_b_matrix(array_load_b_matrix),
         .mac_enable(array_mac_enable),
         .mac_bank(lane_r[0]),
-        .gemv_kfold_mode(1'b0),
+        .gemv_kfold_mode(gemv_kfold_r),
         .result_index(write_index0[ARRAY_INDEX_WIDTH-1:0]),
         .result_bias(32'sd0),
         .result_shift(5'd0),
@@ -680,6 +753,8 @@ module ai_tensor_matrix_core #(
             activation_r <= 2'd0;
             requant_shift_r <= 5'd0;
             fused_output_r <= 1'b0;
+            gemv_kfold_r <= 1'b0;
+            gemv_k_elements_r <= 16'd0;
             watchdog_limit_r <= 32'd0;
             a_batch_base_r <= 32'd0;
             b_batch_base_r <= 32'd0;
@@ -871,7 +946,10 @@ module ai_tensor_matrix_core #(
                         if (start) begin
                             m_r <= m_size;
                             n_r <= n_size;
-                            k_words_r <= k_words;
+                            k_words_r <= (op_mode == OP_TENSOR_GEMV_KFOLD) ?
+                                         (k_words >> 2) : k_words;
+                            gemv_k_elements_r <=
+                                (op_mode == OP_TENSOR_GEMV_KFOLD) ? k_words : 16'd0;
                             instance_count_r <= (instance_count == 0) ?
                                                 32'd1 : instance_count;
                             transpose_a_r <= transpose_a;
@@ -882,6 +960,8 @@ module ai_tensor_matrix_core #(
                             requant_shift_r <= aux0[4:0];
                             fused_output_r <=
                                 (op_mode == OP_TENSOR_GEMM_REQUANT_TILE_A);
+                            gemv_kfold_r <=
+                                (op_mode == OP_TENSOR_GEMV_KFOLD);
                             watchdog_limit_r <= watchdog_limit;
                             a_batch_base_r <= src0_base;
                             b_batch_base_r <= src1_base;
@@ -927,6 +1007,7 @@ module ai_tensor_matrix_core #(
                                 error_code <= ERR_OP;
                                 state_r <= ST_ERROR;
                             end else if (invalid_dimensions || invalid_alignment ||
+                                invalid_gemv_contract ||
                                 ((op_mode == OP_TENSOR_GEMM_REQUANT_TILE_A) &&
                                  ((aux0[31:5] != 0) || (|dst_base[3:0]) ||
                                   ((dst_batch_stride != 0) &&
@@ -976,7 +1057,8 @@ module ai_tensor_matrix_core #(
                                 bias_index_r <= {(TILE_INDEX_WIDTH+1){1'b0}};
                                 state_r <= ST_BIAS_REQ;
                             end else begin
-                                if (ENABLE_NEXT_K_PREFETCH && (k_words_r > 1)) begin
+                                if (ENABLE_NEXT_K_PREFETCH && !gemv_kfold_r &&
+                                    (k_words_r > 1)) begin
                                     prefetch_kick <= 1'b1;
                                     prefetch_kick_k_group <= 16'd1;
                                     prefetch_kick_buffer <= 1'b1;
@@ -1009,7 +1091,7 @@ module ai_tensor_matrix_core #(
                                     state_r <= ST_BIAS_REQ;
                                 end else begin
                                     bias_loaded_r <= 1'b1;
-                                    if (ENABLE_NEXT_K_PREFETCH &&
+                                    if (ENABLE_NEXT_K_PREFETCH && !gemv_kfold_r &&
                                         (k_group_r == 0) && (k_words_r > 1)) begin
                                         prefetch_kick <= 1'b1;
                                         prefetch_kick_k_group <= 16'd1;
@@ -1027,7 +1109,20 @@ module ai_tensor_matrix_core #(
                     end
 
                     ST_MAC: begin
-                        if (lane_r == 2'd3) begin
+                        if (gemv_kfold_r) begin
+                            if (last_k_group) begin
+                                write_row_r <= {TILE_INDEX_WIDTH{1'b0}};
+                                write_col_r <= {TILE_INDEX_WIDTH{1'b0}};
+                                write_lane_r <= 2'd0;
+                                dst_row_addr_r <= dst_tile_base_r;
+                                state_r <= ST_WRITE;
+                            end else begin
+                                k_group_r <= k_group_r + 1'b1;
+                                compute_buffer_r <= 1'b0;
+                                read_group_r <= 3'd0;
+                                state_r <= ST_A_REQ;
+                            end
+                        end else if (lane_r == 2'd3) begin
                             lane_r <= 2'd0;
                             if (last_k_group) begin
                                 write_row_r <= {TILE_INDEX_WIDTH{1'b0}};

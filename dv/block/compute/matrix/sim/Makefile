@@ -17,6 +17,7 @@ COV_METRICS := line+cond+fsm+branch
 	core-random-test core-random-compile core-random-run a3-core-test \
 	core-prefetch-handoff-test core-prefetch-handoff-regress \
 	core-no-prefetch-fallback-compile core-no-prefetch-fallback-regress \
+	product-gemv-test product-gemv-regress \
 	datapath-random-regress core-random-regress array-random-regress \
 	matrix-size-benchmark matrix-pipeline-benchmark matrix-config-comparison \
 	tinynpu-matched-benchmark
@@ -75,6 +76,10 @@ core-random-run: core-random-compile
 		-cm_dir $(CORE_OUT_DIR)/coverage.vdb -cm_name matrix_core_seed_$(SEED) -l $(CORE_OUT_DIR)/run.log
 	grep -Eq '^MATRIX_LINE_CONTRACT_PASS full_wstrb=1 aligned=1 stalled_stability=[1-9][0-9]* unaligned_scalar_fallback=1 protection_error=1 partial_zero_wstrb=unsupported$$' $(CORE_OUT_DIR)/run.log
 	grep -q '^MATRIX_CORE_RANDOM_PASS cases=18 faults=35 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 ' $(CORE_OUT_DIR)/run.log
+	$(CORE_OUT_DIR)/simv +SEED=$(SEED) +MATRIX_PRODUCT_GEMV_ONLY -cm $(COV_METRICS) \
+		-cm_dir $(CORE_OUT_DIR)/coverage.vdb -cm_name matrix_product_gemv_$(SEED) \
+		-l $(CORE_OUT_DIR)/product_gemv.log
+	grep -q '^MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 ' $(CORE_OUT_DIR)/product_gemv.log
 
 core-random-regress: core-random-compile
 	@set -e; for seed in $(SEEDS); do \
@@ -83,6 +88,25 @@ core-random-regress: core-random-compile
 			-l $(CORE_OUT_DIR)/run_seed_$$seed.log; \
 		grep -q "^MATRIX_CORE_RANDOM_PASS cases=18 faults=35 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 seed=$$seed " $(CORE_OUT_DIR)/run_seed_$$seed.log; \
 		grep -Eq '^MATRIX_LINE_CONTRACT_PASS full_wstrb=1 aligned=1 stalled_stability=[1-9][0-9]* unaligned_scalar_fallback=1 protection_error=1 partial_zero_wstrb=unsupported$$' $(CORE_OUT_DIR)/run_seed_$$seed.log; \
+		$(CORE_OUT_DIR)/simv +SEED=$$seed +MATRIX_PRODUCT_GEMV_ONLY \
+			-cm $(COV_METRICS) -cm_dir $(CORE_OUT_DIR)/coverage.vdb \
+			-cm_name matrix_product_gemv_$$seed -l $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+	done
+
+product-gemv-test: core-random-compile
+	$(CORE_OUT_DIR)/simv +SEED=$(SEED) +MATRIX_PRODUCT_GEMV_ONLY \
+		-cm $(COV_METRICS) -cm_dir $(CORE_OUT_DIR)/coverage.vdb \
+		-cm_name matrix_product_gemv_$(SEED) -l $(CORE_OUT_DIR)/product_gemv.log
+	grep -q '^MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 .*golden=bit-exact$$' $(CORE_OUT_DIR)/product_gemv.log
+
+product-gemv-regress: core-random-compile
+	@set -e; for seed in $(SEEDS); do \
+		$(CORE_OUT_DIR)/simv +SEED=$$seed +MATRIX_PRODUCT_GEMV_ONLY \
+			-cm $(COV_METRICS) -cm_dir $(CORE_OUT_DIR)/coverage.vdb \
+			-cm_name matrix_product_gemv_$$seed -l $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_PRODUCT_GEMV_ONLY_PASS seed=$$seed$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 	done
 
 # Build a distinct prefetch-disabled DUT profile so this test covers the

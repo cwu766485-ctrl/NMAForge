@@ -231,3 +231,36 @@ incremental v2 staging budget. Product controller integration, M/N/K
 descriptor tails, SPAD request overlap, response ownership, and measured
 controller-plus-SPAD GEMV cycles remain open; no GEMV product performance
 claim is made from these primitive or research-wrapper runs.
+
+## 9. Product GEMV integration follow-up — 2026-11-04
+
+The first product controller slice is now implemented at opcode `0x52` for
+dense ABI-v7 `M=4,N=16,K>=16` with K divisible by 16. The real Matrix
+controller performs K-fold reduction using the shared 256-MAC array; the
+descriptor validator rejects the unsupported `K=20` tail before dispatch.
+The feature and exact supported-field boundary are documented in the [v2
+specification](../spec/NPU_ARCHITECTURE_V2_SPEC.md) and the [GEMV
+implementation report](SHAPE_ADAPTIVE_GEMM_GEMV_REPORT.md).
+
+VCS `V-2023.12-SP1_Full64` three-seed regression on implementation/test
+snapshot `70c8aad94e9e8d16bf67d0e4667effb58977ccf7` passes all 64 output words
+against the independent Golden on each seed. The `M=4,N=16,K=32` controller
+profile is 262 cycles, 8 MAC-active cycles, 64 accepted banked reads (1,024 B),
+and 16 output line writes (256 B). Observed read outstanding high-water is 4;
+fetch does not overlap MAC. The A operand lines are reread across four K-fold
+uses, so this run provides functional integration evidence and exposes the
+first throughput/traffic bottleneck; it is not a speedup claim. A real top
+smoke passes a CMDQ descriptor with bias, shift and ReLU enabled, then rejects
+K=20 without a destination write.
+
+The implementation was clean-replayed from detached worktree SHA
+`10aa2ed903cb5298317617a1ca7c2c15819774e7`: the product GEMV three-seed target
+and `ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261104` both pass. Raw logs are under
+`/tmp/nmaforge_v2_product_gemv_clean_10aa2ed/` and
+`/tmp/nmaforge-v2-gemv-clean-10aa2ed/`.
+
+This follow-up supersedes only the historical statement above that product
+controller integration was absent. Product M=1/8/16, N/K tails, striding,
+batching, fault/Abort/Reset, mutation, broad coverage, same-workload GEMM
+comparison, TinyNPU fairness, and ASIC PPA remain open or `NOT_RUN`. The v1.0
+Compute Cluster sign-off remains **HOLD**.

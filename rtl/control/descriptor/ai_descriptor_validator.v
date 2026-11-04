@@ -38,9 +38,10 @@ module ai_descriptor_validator (
                       ((op >= 8'h30) && (op <= 8'h39)) ||
                       ((op >= 8'h43) && (op <= 8'h44)) ||
                       is_macro || (op == 8'h50) || (op == 8'h51) ||
-                      (op == 8'h53);
+                      (op == 8'h52) || (op == 8'h53);
 
     assign is_tensor_matrix = (op == 8'h30) || (op == 8'h31) ||
+                              (op == 8'h52) ||
                               (op == 8'h53);
     assign is_tensor_sfu = (op >= 8'h32) && (op <= 8'h39);
     wire is_bf16_dot = (op == 8'h50);
@@ -69,9 +70,13 @@ module ai_descriptor_validator (
                               ((op >= 8'h12 && op <= 8'h15) &&
                                m_size != 0 && n_size != 0 && k_words != 0) ||
                               (op == 8'h20 && length != 0) ||
-                              (is_tensor_matrix && m_size != 0 &&
+                              (is_tensor_matrix && (op != 8'h52) &&
+                               m_size != 0 &&
                                n_size != 0 && k_words != 0 &&
                                m_size[1:0] == 0 && n_size[1:0] == 0) ||
+                              ((op == 8'h52) && (m_size == 16'd4) &&
+                               (n_size == 16'd16) && (k_words >= 16'd16) &&
+                               (k_words[3:0] == 4'd0)) ||
                               (is_tensor_sfu && length != 0) ||
                               ((op == 8'h16 || op == 8'h17) &&
                                m_size >= 16'd3 && n_size >= 16'd3) ||
@@ -89,7 +94,9 @@ module ai_descriptor_validator (
     assign alignment_error = (|src0[1:0]) ||
                              ((|src1[1:0]) && !macro_v7_uses_64b_child_base) ||
                              (|dst[1:0]) ||
-                             (bias_enable && (|bias_base[1:0]));
+                             (bias_enable && (|bias_base[1:0])) ||
+                             ((op == 8'h52) &&
+                              ((|src0[3:0]) || (|src1[3:0])));
 
     wire fp_dot_fields_valid =
         (bias_base == 32'd0) && !bias_enable && (flags == 8'd0) &&
@@ -103,6 +110,17 @@ module ai_descriptor_validator (
         (dst_stride == 0 || dst_stride[3:0] == 0) &&
         (dst[3:0] == 0));
 
+    // Initial product GEMV implementation gate. Keep the broader v2
+    // architecture target explicit in the SPEC, but reject unimplemented
+    // shapes/strides at descriptor validation instead of misrouting them.
+    wire gemv_fields_valid =
+        (op != 8'h52) ||
+        ((version == 8'd7) && (flags[7:1] == 7'd0) &&
+         (flags[0] == bias_enable) && (aux0 == 32'd0) &&
+         (src0_stride == 32'd0) && (src1_stride == 32'd0) &&
+         (dst_stride == 32'd0) && (batch_count <= 16'd1) &&
+         (head_count == 16'd0));
+
     assign descriptor_invalid = !op_valid || !dimensions_valid ||
                                 !version_valid ||
                                 ((op == 8'h36) && flags[5] &&
@@ -111,6 +129,7 @@ module ai_descriptor_validator (
                                 alignment_error ||
                                 (is_macro && (|src0[5:0])) ||
                                 (is_fp_dot && !fp_dot_fields_valid) ||
-                                !fused_matrix_fields_valid;
+                                !fused_matrix_fields_valid ||
+                                !gemv_fields_valid;
 
 endmodule

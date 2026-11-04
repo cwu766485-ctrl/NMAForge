@@ -123,6 +123,7 @@ module tb_ai_accel_smoke;
     localparam OP_BANKED_GEMV    = 8'h21;
     localparam OP_TENSOR_GEMM    = 8'h30;
     localparam OP_BATCH_GEMM     = 8'h31;
+    localparam OP_TENSOR_GEMV_KFOLD = 8'h52;
     localparam OP_SOFTMAX_Q15    = 8'h32;
     localparam OP_RMSNORM_Q15    = 8'h33;
     localparam OP_RESIDUAL_I32   = 8'h34;
@@ -3104,6 +3105,134 @@ module tb_ai_accel_smoke;
             errors = errors + 1;
         end
         clear_done_irq();
+
+        // Product opcode 0x52 descriptor path: dense row-major signed INT8
+        // operands, real CMDQ/validator/dispatcher/SPAD, shared Matrix MAC
+        // array with K-fold reduction, and row-major INT32 output.
+        begin : product_dense_gemv
+            integer rr_g, cc_g, kk_g, bank_g;
+            integer a0_g, a1_g, a2_g, a3_g;
+            integer b0_g, b1_g, b2_g, b3_g;
+            integer accum_g, expected_g, expected_last_g, errors_before_g;
+            reg [31:0] desc_result_g;
+
+            errors_before_g = errors;
+            for (rr_g = 0; rr_g < 4; rr_g = rr_g + 1)
+                for (kk_g = 0; kk_g < 32; kk_g = kk_g + 16)
+                    for (bank_g = 0; bank_g < 4; bank_g = bank_g + 1) begin
+                        a0_g = ((rr_g + 2*(kk_g + bank_g*4 + 0)) % 13) - 6;
+                        a1_g = ((rr_g + 2*(kk_g + bank_g*4 + 1)) % 13) - 6;
+                        a2_g = ((rr_g + 2*(kk_g + bank_g*4 + 2)) % 13) - 6;
+                        a3_g = ((rr_g + 2*(kk_g + bank_g*4 + 3)) % 13) - 6;
+                        axi_write(SPAD_BASE + 32'h5000 + rr_g*32 + kk_g +
+                                  bank_g*4,
+                                  {a3_g[7:0],a2_g[7:0],a1_g[7:0],a0_g[7:0]});
+                    end
+            for (kk_g = 0; kk_g < 32; kk_g = kk_g + 1)
+                for (bank_g = 0; bank_g < 4; bank_g = bank_g + 1) begin
+                    b0_g = ((3*kk_g + bank_g*4 + 0) % 11) - 5;
+                    b1_g = ((3*kk_g + bank_g*4 + 1) % 11) - 5;
+                    b2_g = ((3*kk_g + bank_g*4 + 2) % 11) - 5;
+                    b3_g = ((3*kk_g + bank_g*4 + 3) % 11) - 5;
+                    axi_write(SPAD_BASE + 32'h5200 + kk_g*16 + bank_g*4,
+                              {b3_g[7:0],b2_g[7:0],b1_g[7:0],b0_g[7:0]});
+                end
+            for (cc_g = 0; cc_g < 16; cc_g = cc_g + 1)
+                axi_write(SPAD_BASE + 32'h6000 + cc_g*4, cc_g-8);
+            for (rr_g = 0; rr_g < 4; rr_g = rr_g + 1)
+                for (cc_g = 0; cc_g < 16; cc_g = cc_g + 1)
+                    axi_write(SPAD_BASE + 32'h5400 + (rr_g*16+cc_g)*4,
+                              32'hbad0_5200 + rr_g*16 + cc_g);
+
+            write_spad_desc_v3(32'h4d00, OP_TENSOR_GEMV_KFOLD, 16'h0520,
+                               32'h5000, 32'h5200, 32'h6000, 32'h5400,
+                               16'd4, 16'd16, 16'd32, 8'h01, 32'd0,
+                               5'd1, 2'd1, 32'd0, 32'd0, 32'd0,
+                               16'd0, 16'd0, 16'd0, 16'd0, 16'd0);
+            // The descriptor helper emits ABI-v3 for legacy tests. Opcode
+            // 0x52 is intentionally exercised through its v7 contract.
+            axi_write(SPAD_BASE + 32'h4d3c, 32'd7);
+            axi_write(REG_CMDQ_CTRL, 32'd0);
+            axi_write(REG_CMDQ_BASE_LO, 32'h4d00);
+            axi_write(REG_CMDQ_SIZE, 32'd2);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd1);
+            axi_write(REG_CPLQ_BASE_LO, 32'h4e00);
+            axi_write(REG_CPLQ_SIZE, 32'd2);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+            matrix_line_write_count = 0;
+            axi_write(REG_DOORBELL, 32'd1);
+            wait_cpl_tail(32'd1, "product dense GEMV completion");
+
+            expected_last_g = 0;
+            for (rr_g = 0; rr_g < 4; rr_g = rr_g + 1)
+                for (cc_g = 0; cc_g < 16; cc_g = cc_g + 1) begin
+                    accum_g = 0;
+                    for (kk_g = 0; kk_g < 32; kk_g = kk_g + 1)
+                        accum_g = accum_g +
+                            ((((rr_g + 2*kk_g) % 13) - 6) *
+                             (((3*kk_g + cc_g) % 11) - 5));
+                    accum_g = accum_g + (cc_g - 8);
+                    expected_g = accum_g >>> 1;
+                    if (expected_g < 0)
+                        expected_g = 0;
+                    if ((rr_g == 3) && (cc_g == 15))
+                        expected_last_g = expected_g;
+                    expect_read(SPAD_BASE + 32'h5400 + (rr_g*16+cc_g)*4,
+                                expected_g, "product dense GEMV output");
+                end
+            desc_result_g = expected_last_g;
+            if (matrix_line_write_count != 16) begin
+                $display("%0t ERROR: product dense GEMV line writes=%0d expected=16",
+                         $time, matrix_line_write_count);
+                errors = errors + 1;
+            end
+            expect_completion(32'h4e00, 16'h0520, 4'h1, 4'd0,
+                             desc_result_g, 32'd64,
+                             "product dense GEMV descriptor");
+            if (errors != errors_before_g)
+                $fatal(1, "product dense GEMV descriptor path had %0d errors",
+                       errors - errors_before_g);
+            $display("MATRIX_PRODUCT_GEMV_DESCRIPTOR_PASS opcode=0x52 shape=4x16x32 dense=1 bias=1 shift=1 relu=1 outputs=64 lines=%0d golden=bit-exact",
+                     matrix_line_write_count);
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+
+            // Non-16-element K tails are not implemented in this first
+            // product slice. ABI-v7 validation must reject them before the
+            // Matrix engine can modify the destination.
+            axi_write(SPAD_BASE + 32'h5600, 32'hface_5200);
+            write_spad_desc_v3(32'h4d40, OP_TENSOR_GEMV_KFOLD, 16'h0521,
+                               32'h5000, 32'h5200, 32'd0, 32'h5600,
+                               16'd4, 16'd16, 16'd20, 8'd0, 32'd0,
+                               5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                               16'd0, 16'd0, 16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + 32'h4d7c, 32'd7);
+            errors_before_g = errors;
+            axi_write(REG_CMDQ_BASE_LO, 32'h4d40);
+            axi_write(REG_CMDQ_SIZE, 32'd2);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd1);
+            axi_write(REG_CPLQ_BASE_LO, 32'h4e40);
+            axi_write(REG_CPLQ_SIZE, 32'd2);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+            axi_write(REG_DOORBELL, 32'd1);
+            wait_cpl_tail(32'd1, "unsupported GEMV tail rejection");
+            expect_completion(32'h4e40, 16'h0521, 4'h2, ERR_DESC_INVALID,
+                              32'd0, 32'd0, "unsupported GEMV tail");
+            expect_read(SPAD_BASE + 32'h5600, 32'hface_5200,
+                        "unsupported GEMV tail destination unchanged");
+            if (errors != errors_before_g)
+                $fatal(1, "unsupported GEMV tail disposition had %0d errors",
+                       errors - errors_before_g);
+            $display("MATRIX_PRODUCT_GEMV_DESCRIPTOR_REJECT_PASS k_tail=20 status=ERR_DESC_INVALID no_write=1");
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+        end
 
         // Numerically defined SFU primitives used by a Transformer chain.
         // Equal Q8.8 log2 scores produce four exact Q0.15 probabilities.

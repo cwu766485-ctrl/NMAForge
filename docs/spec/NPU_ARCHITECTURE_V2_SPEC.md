@@ -1,6 +1,6 @@
 # NMAForge NPU Architecture v2.0 Specification
 
-**Status:** In-progress implementation contract; fused Matrix opcode `0x53` is implemented and Golden-checked. A shared-array K-fold operand mode now passes an isolated array test, but the product Matrix controller/SPAD/descriptor path is not connected. v2 is not signed off.
+**Status:** In-progress implementation contract; fused Matrix opcode `0x53` is implemented and Golden-checked. Additive product opcode `0x52` now passes a bounded dense `M=4,N=16,K=32` Matrix-controller/SPAD/top-dispatch slice. General GEMV shapes, fault closure, architecture-wide performance, and full v2 sign-off remain open.
 **Frozen starting point:** NMAForge R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`.
 **Version boundary:** Existing ABI v7 descriptors and opcodes retain their behavior. v2 additions are additive and must be rejected by older RTL as unsupported descriptors.
 **Related audit:** [NPU v2 Phase 0 baseline](../architecture/NPU_ARCHITECTURE_V2_PHASE0_BASELINE.md).
@@ -57,10 +57,12 @@ Ordered completion
 ```
 
 The diagram shows the target structure. The fused `0x53` epilogue is active in
-the product Matrix command path. The shared array also has an alternate per-PE
-B-operand buffer and K-fold MAC mode, but `ai_tensor_matrix_core` currently
-ties that mode off; there is no product GEMV K-fold descriptor or SPAD schedule
-yet. Current v1.0 sign-off remains **HOLD** with 24 `PASS-SCOPED` and 14
+the product Matrix command path. Opcode `0x52` activates the shared array's
+K-fold mode for one dense shape: `M=4,N=16,K>=16`, with K divisible by 16.
+This is a functional integration slice, not the complete descriptor contract
+or an architecture-level performance win. See the current-subset table below
+and the [GEMV implementation report](../architecture/SHAPE_ADAPTIVE_GEMM_GEMV_REPORT.md).
+Current v1.0 sign-off remains **HOLD** with 24 `PASS-SCOPED` and 14
 `PARTIAL`; v2 work does not change those dispositions. The seven-engine
 inventory, current ports, and measured resource declarations are maintained
 in the Phase 0 baseline report.
@@ -77,8 +79,9 @@ in the Phase 0 baseline report.
 4. Existing Matrix opcodes `0x30/0x31` retain four-element K-word and tile
    layout semantics. v2 GEMV uses a new additive opcode `0x52` in an ABI-v7
    64-byte descriptor; it does not reinterpret the K field for old opcodes.
-   The opcode is currently unused by R250. It must be added consistently to
-   the decoder, descriptor validator, software headers/mapper, and tests.
+   Its first supported shape subset is narrower than the target contract
+   below. Decoder, validator, dispatcher, software header, and tests must
+   agree on every supported and rejected field.
 5. Opcode `0x53` is reserved for fused GEMM → INT8 Matrix-A-layout writeback.
    It uses the existing GEMM fields for INT32 post-processing and `aux0[4:0]`
    for the subsequent SFU-compatible requant shift; `aux0[31:5]` must be zero.
@@ -125,6 +128,20 @@ macro-tiles of at most 16 columns. K streams in 16-element array steps. The
 test and implementation must not require the whole matrix to fit in a packed
 operand bus.
 
+### Current product RTL subset for opcode `0x52`
+
+The present controller/validator implementation accepts ABI-v7 dense row-major
+`M=4,N=16,K>=16`, where K is divisible by 16. Transpose, nonzero source or
+destination stride, batching (`batch_count` greater than one), nonzero head
+count, nonzero `aux0`, and nonzero reserved `flags[7:1]` are rejected;
+`flags[0]` must equal `bias_enable`. Source bases must be 16-byte aligned;
+the destination follows the existing word-alignment rule. The kernel uses the
+shared 16×16 array and four-way K reduction, with the existing bias/shift/
+activation and INT32 output path. Unsupported shapes are rejected before
+dispatch; they are not silently rounded or masked. M=1/8/16, N tails, K tails,
+strided/batched access, bank-aware overlap, and fault/Abort/Reset coverage are
+not yet implemented for this opcode.
+
 Operand bytes are little-endian packed four signed INT8 values per 32-bit
 SPAD word. The first logical element occupies bits `[7:0]`. A/B base addresses
 must be word-aligned. For a final partial word, invalid lanes are zero-masked
@@ -133,9 +150,10 @@ contains one signed 32-bit word per valid `(m,n)` result. Existing Matrix
 line-write rules apply: use a 128-bit line only for an aligned full line with
 full WSTRB; otherwise use legal ordered 32-bit writes.
 
-Opcode `0x52` remains an architecture allocation until the integrated RTL,
-software mapper, descriptor validator, and independent Golden agree on this
-contract. A partially implemented decoder change alone is not a released ABI.
+Opcode `0x52` has a bounded product implementation for the current subset
+documented above. The broader descriptor contract remains a target, not a
+claim of implemented support. Decoder acceptance alone is not evidence that a
+shape is supported; unsupported fields/shapes must be rejected and covered.
 
 Opcode `0x53` is the optional fused-output form of Matrix GEMM. It keeps the
 same source, shape, K-word, bias, Matrix shift, activation, and transpose
@@ -216,19 +234,18 @@ mapping; the final inferred resources must be recorded.
 |---|---:|---:|
 | INT8 MAC array | 16×16 = 256 MAC | unchanged, shared by GEMM/GEMV |
 | 64-bit accumulator state | 16×16×64 bits = 2 KiB | reuse the same array accumulator; reduction may not add a second full accumulator bank |
-| Current operand staging | 256 B A/B staging + 1 KiB bounded A cache | retain; up to 1 KiB incremental budget; current K-fold array primitive declares a 512 B dual-bank per-PE B view, not yet connected to the product controller |
+| Current operand staging | 256 B A/B staging + 1 KiB bounded A cache | retain; up to 1 KiB incremental budget; K-fold per-PE B view uses two 256 B banks and is active for the current `0x52` shape subset |
 | Matrix read metadata | up to four 53-bit FIFO entries | at most four accepted reads; each response must carry an explicit destination buffer, operand, K tile, bank group, and reset epoch |
 | SPAD capacity | four banks × 32K × 32-bit = 512 KiB | unchanged |
 | SPAD word/line ports | 32-bit word; 128-bit line + 16-bit WSTRB | unchanged; no new bypass port |
 | DMA external port | 128-bit AXI4 data, 64-bit address | unchanged |
 
 The two GEMV/GEMM tile sets target one 16×16 INT8 tile for A and one for B
-per set. The current isolated K-fold primitive adds two 16×16-byte B banks
-(512 B total) to `ai_tensor_matrix_array`; it reuses the existing A vector
-banks and 64-bit accumulator bank. In the product core the mode is tied off,
-so synthesis may remove the new B banks until controller integration. K
-folding must stream successive K tiles and must not allocate full M×K/K×N
-tensors in flops. The 1 KiB target is incremental staging capacity and
+per set. The K-fold operand primitive adds two 16×16-byte B banks (512 B total)
+to `ai_tensor_matrix_array`; opcode `0x52` uses this view and reuses the
+existing 64-bit accumulator bank. K folding must stream successive K tiles
+and must not allocate full M×K/K×N tensors in flops. The 1 KiB target is
+incremental staging capacity and
 includes valid/owner tags only by accounting them separately in synthesis.
 If implementation requires more storage, report the exact increase and
 demonstrate the throughput need before changing this ceiling.
@@ -238,7 +255,10 @@ default. Responses are FIFO ordered because the existing SPAD core interface
 does not expose a transaction ID. Reset increments or invalidates the local
 epoch; a response from an older epoch can never write an active tile buffer.
 The R250 Matrix profile only reached outstanding high-water 2, so the new
-design must report achieved high-water and not infer it from a parameter.
+design must report achieved high-water and not infer it from a parameter. The
+current `0x52` controller can reach high-water 4 within an A or B fetch phase,
+but does not overlap A with B fetch or fetch with MAC. Its current K32 profile
+also refetches the same 16-byte A line four times for each 16-element K span.
 
 ## 6. Performance counters and acceptance boundary
 

@@ -29,6 +29,8 @@ ai_run:
 	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=$(AI_RANDOM_CASES) +AI_SEED=$(AI_SEED) +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) -l ai_accel_smoke.log
 
 ai_smoke: ai_comp ai_run
+	grep -q '^MATRIX_PRODUCT_GEMV_DESCRIPTOR_PASS opcode=0x52 shape=4x16x32 dense=1 bias=1 shift=1 relu=1 outputs=64 lines=16 golden=bit-exact$$' ai_accel_smoke.log
+	grep -q '^MATRIX_PRODUCT_GEMV_DESCRIPTOR_REJECT_PASS k_tail=20 status=ERR_DESC_INVALID no_write=1$$' ai_accel_smoke.log
 
 # Integrated compute DUT-only code-coverage capture. The cm_hier scope selects
 # ai_accel_compute_cluster and the command processor's tile-pipeline instance;

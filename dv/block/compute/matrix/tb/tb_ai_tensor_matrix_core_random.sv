@@ -471,6 +471,121 @@ module tb_ai_tensor_matrix_core_random;
     end
   endtask
 
+  // Opcode 0x52's first product slice is dense row-major M=4, N=16,
+  // K=32. The TB builds contiguous packed-byte rows independently of the
+  // legacy Matrix 4x4 tile-major fixture and checks every INT32 result.
+  task automatic prepare_dense_gemv_case;
+    integer rr,cc,kk,bank,local_addr,local_index,local_word;
+    integer signed value,accum,result_value;
+    begin
+      m_size=4;n_size=16;k_words=32;instance_count=1;
+      op_mode=8'h52;src0_base=SRC0_BASE;src1_base=SRC1_BASE;
+      bias_base=BIAS_BASE;dst_base=DST_BASE;
+      src0_batch_stride=0;src1_batch_stride=0;dst_batch_stride=0;
+      transpose_a=0;transpose_b=0;bias_enable=1;
+      scale_shift=1;activation=1;aux0=0;watchdog_limit=0;
+
+      for(rr=0;rr<4;rr=rr+1)
+        for(kk=0;kk<32;kk=kk+1) begin
+          value=((rr*5+kk*3+1)%15)-7;
+          logical_a[0][rr][kk]=value;
+        end
+      for(kk=0;kk<32;kk=kk+1)
+        for(cc=0;cc<16;cc=cc+1) begin
+          value=((kk*7-cc*2+3)%17)-8;
+          logical_b[0][kk][cc]=value;
+        end
+      for(cc=0;cc<16;cc=cc+1) begin
+        logical_bias[cc]=(cc%9)-4;
+        bias_mem[(BIAS_BASE>>2)+cc]=logical_bias[cc];
+      end
+
+      for(rr=0;rr<4;rr=rr+1)
+        for(kk=0;kk<32;kk=kk+16) begin
+          local_addr=SRC0_BASE+rr*32+kk;
+          local_index=(local_addr>>4)&13'h1fff;
+          for(bank=0;bank<4;bank=bank+1)
+            bank_mem[bank][local_index]=pack4(
+                logical_a[0][rr][kk+bank*4+0],
+                logical_a[0][rr][kk+bank*4+1],
+                logical_a[0][rr][kk+bank*4+2],
+                logical_a[0][rr][kk+bank*4+3]);
+        end
+      for(kk=0;kk<32;kk=kk+1) begin
+        local_addr=SRC1_BASE+kk*16;
+        local_index=(local_addr>>4)&13'h1fff;
+        for(bank=0;bank<4;bank=bank+1)
+          bank_mem[bank][local_index]=pack4(
+              logical_b[0][kk][bank*4+0],
+              logical_b[0][kk][bank*4+1],
+              logical_b[0][kk][bank*4+2],
+              logical_b[0][kk][bank*4+3]);
+      end
+
+      for(rr=0;rr<4;rr=rr+1)
+        for(cc=0;cc<16;cc=cc+1) begin
+          accum=0;
+          for(kk=0;kk<32;kk=kk+1)
+            accum=accum+$signed(logical_a[0][rr][kk])*
+                         $signed(logical_b[0][kk][cc]);
+          accum=accum+logical_bias[cc];
+          result_value=accum >>> 1;
+          if(result_value<0) result_value=0;
+          local_word=(DST_BASE>>2)+rr*16+cc;
+          expected_mem[local_word]=result_value;
+          output_mem[local_word]=32'hbad0_0000+local_word;
+        end
+      line_write_count=0;scalar_write_count=0;
+      case_mac_snapshot=mac_cycle_count;
+      case_bank_snapshot=bank_read_count;
+      case_bank_stall_snapshot=bank_stall_count;
+      case_line_stall_snapshot=line_stall_count;
+    end
+  endtask
+
+  task automatic check_dense_gemv_case;
+    integer rr,cc,local_word,gemv_mac_cycles,gemv_bank_reads;
+    begin
+      launch_and_wait();
+      if(error || error_code!==0 || busy || element_count!==32'd64)
+        $fatal(1,"product GEMV completion error=%b code=%0d busy=%b elements=%0d",
+               error,error_code,busy,element_count);
+      if(line_write_count!==16 || scalar_write_count!==0)
+        $fatal(1,"product GEMV write shape lines=%0d scalar=%0d expected=16/0",
+               line_write_count,scalar_write_count);
+      for(rr=0;rr<4;rr=rr+1)
+        for(cc=0;cc<16;cc=cc+1) begin
+          local_word=(DST_BASE>>2)+rr*16+cc;
+          if(output_mem[local_word]!==expected_mem[local_word])
+            $fatal(1,"product GEMV row=%0d col=%0d got=%08x expected=%08x",
+                   rr,cc,output_mem[local_word],expected_mem[local_word]);
+        end
+      if(bank_read_count!=bank_response_count || pending_bank ||
+         spad_read_count!=spad_response_count || pending_spad)
+        $fatal(1,"product GEMV left a request/response outstanding");
+      gemv_mac_cycles=mac_cycle_count-case_mac_snapshot;
+      gemv_bank_reads=bank_read_count-case_bank_snapshot;
+      if(gemv_mac_cycles!=8 || gemv_bank_reads!=64 ||
+         dut.perf_prefetch_completed!=0)
+        $fatal(1,"product GEMV profile mac=%0d bank_reads=%0d prefetch=%0d expected=8/64/0",
+               gemv_mac_cycles,gemv_bank_reads,dut.perf_prefetch_completed);
+      $display("MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 cycles=%0d mac_cycles=%0d bank_reads=%0d read_bytes=%0d outputs=%0d dense=1 golden=bit-exact",
+               cycle_count,gemv_mac_cycles,gemv_bank_reads,
+               gemv_bank_reads*16,element_count);
+      $display("MATRIX_CORE_GEMV_KFOLD_PROFILE a_req=%0d a_wait=%0d b_req=%0d b_wait=%0d bias_req=%0d bias_wait=%0d prep_mac=%0d mac=%0d write=%0d next=%0d done=%0d error=%0d error_drain=%0d prefetch_wait=%0d arbiter_stall=%0d response_wait=%0d writeback_wait=%0d outstanding_highwater=%0d prefetch_completed=%0d line_write_bytes=%0d",
+               dut.perf_state_cycles[1],dut.perf_state_cycles[2],
+               dut.perf_state_cycles[3],dut.perf_state_cycles[4],
+               dut.perf_state_cycles[5],dut.perf_state_cycles[6],
+               dut.perf_state_cycles[7],dut.perf_state_cycles[8],
+               dut.perf_state_cycles[9],dut.perf_state_cycles[10],
+               dut.perf_state_cycles[11],dut.perf_state_cycles[12],
+               dut.perf_state_cycles[13],dut.perf_state_cycles[14],
+               dut.perf_arbiter_stall_cycles,dut.perf_response_wait_cycles,
+               dut.perf_writeback_wait_cycles,dut.perf_outstanding_highwater,
+               dut.perf_prefetch_completed,line_write_count*16);
+    end
+  endtask
+
   // Reuse the exact deterministic signed INT8 operands from the pinned
   // TinyNPU tiled-GEMM testbench. This is a benchmark-only data set, not a
   // product reference model; check_valid_case still checks the full DUT
@@ -1236,6 +1351,13 @@ module tb_ai_tensor_matrix_core_random;
       run_tinynpu_match_case(32,32,64,107);
       $display("MATRIX_TINY_NPU_MATCH_MULTI_PASS seed=%0d cases=3 physical_array=%0dx%0d bank_response_latency=1 cycle",
                initial_seed,PHYSICAL_ARRAY_SIZE,PHYSICAL_ARRAY_SIZE);
+      $finish;
+    end
+
+    if($test$plusargs("MATRIX_PRODUCT_GEMV_ONLY")) begin
+      prepare_dense_gemv_case();
+      check_dense_gemv_case();
+      $display("MATRIX_PRODUCT_GEMV_ONLY_PASS seed=%0d",initial_seed);
       $finish;
     end
 
