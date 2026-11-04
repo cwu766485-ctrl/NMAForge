@@ -43,6 +43,7 @@ OP_CAUSAL_SOFTMAX = 0x39
 OP_KV_WRITE = 0x43
 OP_KV_READ = 0x44
 FLAG_BIAS = 1 << 0
+FLAG_TRANSPOSE_A = 1 << 1
 FLAG_TRANSPOSE_B = 1 << 2
 FLAG_PACK_I8 = 1 << 4
 FLAG_PACK_I8_TILE_A = 1 << 5
@@ -159,6 +160,39 @@ class Descriptor:
         words[14] = (self.signal_mask << 16) | self.wait_mask
         words[15] = (self.clear_mask << 16) | DESC_VERSION
         return [u32(word) for word in words]
+
+
+def validate_fused_tile_fields(descriptor: Descriptor) -> None:
+    """Validate the ABI-v7 opt-in forwarding bits for opcode 0x53."""
+    capture = bool(descriptor.aux0 & (1 << 5))
+    consume = bool(descriptor.aux0 & (1 << 6))
+    if descriptor.aux0 & ~0x7F:
+        raise ValueError(
+            f"{descriptor.name}: fused Matrix aux0 must fit seven bits"
+        )
+    if descriptor.dst & 0xF or descriptor.dst_stride & 0xF:
+        raise ValueError(
+            f"{descriptor.name}: fused tile destination/stride must be 16-byte aligned"
+        )
+    if descriptor.m % 4 or descriptor.n % 4:
+        raise ValueError(
+            f"{descriptor.name}: fused Matrix-A tile shape must be 4-aligned"
+        )
+    if capture and (
+        descriptor.m != 16 or descriptor.n != 16 or descriptor.dst_stride != 0
+    ):
+        raise ValueError(
+            f"{descriptor.name}: tile capture requires dense 16x16 output"
+        )
+    if consume and (
+        descriptor.m != 16
+        or descriptor.k_or_length != 4
+        or (descriptor.flags & FLAG_TRANSPOSE_A)
+        or descriptor.src0_stride != 0
+    ):
+        raise ValueError(
+            f"{descriptor.name}: tile consume requires M=16, K=4, dense non-transposed A"
+        )
 
 
 class Mapper:
@@ -603,18 +637,7 @@ def validate_descriptor_chain(mapper: Mapper) -> None:
             source_base += cache_offset
         if descriptor.op in (OP_GEMM, OP_GEMM_REQUANT_TILE_A):
             if descriptor.op == OP_GEMM_REQUANT_TILE_A:
-                if descriptor.aux0 & ~0x1F:
-                    raise ValueError(
-                        f"{descriptor.name}: fused requant aux0 must fit five bits"
-                    )
-                if descriptor.dst & 0xF or descriptor.dst_stride & 0xF:
-                    raise ValueError(
-                        f"{descriptor.name}: fused tile destination/stride must be 16-byte aligned"
-                    )
-                if descriptor.m % 4 or descriptor.n % 4:
-                    raise ValueError(
-                        f"{descriptor.name}: fused Matrix-A tile shape must be 4-aligned"
-                    )
+                validate_fused_tile_fields(descriptor)
             require(
                 source_base, descriptor.m * descriptor.k_or_length * 4,
                 descriptor.name, "src0",

@@ -4,6 +4,7 @@ SEED ?= 20261021
 OUT_DIR ?= /tmp/nmaforge_matrix_datapath_$(SEED)
 CORE_OUT_DIR ?= /tmp/nmaforge_matrix_core_$(SEED)
 NO_PREFETCH_CORE_OUT_DIR ?= /tmp/nmaforge_matrix_core_no_prefetch_$(SEED)
+TILE_FORWARD_OUT_DIR ?= /tmp/nmaforge_matrix_tile_forward_$(SEED)
 ARRAY_OUT_DIR ?= /tmp/nmaforge_matrix_array_20261025
 ARRAY_SEEDS ?= 20261025 20261026 20261027
 ARRAY_SIZES ?= 8 16
@@ -19,6 +20,7 @@ COV_METRICS := line+cond+fsm+branch
 	core-no-prefetch-fallback-compile core-no-prefetch-fallback-regress \
 	product-gemv-test product-gemv-regress \
 	product-gemv-prefetch-ablation \
+	core-tile-forward-ablation \
 	datapath-random-regress core-random-regress array-random-regress \
 	matrix-size-benchmark matrix-pipeline-benchmark matrix-config-comparison \
 	tinynpu-matched-benchmark
@@ -131,6 +133,32 @@ product-gemv-prefetch-ablation: core-random-compile
 				$(CORE_OUT_DIR)/ablation_$${shape}_$$seed.log; \
 		done; \
 	done
+
+# Compare the same producer/consumer chain with the optional bounded local
+# tile store compiled in and out. The producer SPAD write remains in both runs.
+core-tile-forward-ablation:
+	@set -e; for enable in 0 1; do \
+		out=$(TILE_FORWARD_OUT_DIR)/enable_$$enable; mkdir -p $$out; \
+		$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+			+define+MATRIX_MAX_OUTSTANDING_READS=$(OUTSTANDING_DEPTH) \
+			+define+MATRIX_A_TILE_CACHE_ENABLE=$(A_TILE_CACHE_ENABLE) \
+			+define+MATRIX_NEXT_K_PREFETCH_ENABLE=$(NEXT_K_PREFETCH_ENABLE) \
+			+define+MATRIX_ELASTIC_TILE_FORWARDING_ENABLE=$$enable \
+			+define+MATRIX_ARRAY_SIZE=$(PHYSICAL_ARRAY_SIZE) \
+			-cm $(COV_METRICS) -cm_hier $(CURDIR)/matrix_core.cm_hier \
+			-cm_dir $$out/coverage.vdb -Mdir=$$out/csrc \
+			-top tb_ai_tensor_matrix_core_random \
+			../../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v \
+			../../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv \
+			../../../../../rtl/compute/matrix/ai_tensor_matrix_core.v \
+			../tb/tb_ai_tensor_matrix_core_random.sv \
+			-o $$out/simv -l $$out/compile.log; \
+		$$out/simv +SEED=$(SEED) +MATRIX_TILE_FORWARD_CHAIN_ONLY \
+			-cm $(COV_METRICS) -cm_dir $$out/coverage.vdb \
+			-cm_name matrix_tile_forward_$$enable -l $$out/run.log; \
+		grep -q "^MATRIX_TILE_FORWARD_CHAIN_PASS enable=$$enable " $$out/run.log; \
+		grep -q "^MATRIX_TILE_FORWARD_CHAIN_ONLY_PASS enable=$$enable seed=$(SEED)$$" $$out/run.log; \
+		done
 
 # Build a distinct prefetch-disabled DUT profile so this test covers the
 # compile-time fallback transition without invoking prefetch-only fault cases.

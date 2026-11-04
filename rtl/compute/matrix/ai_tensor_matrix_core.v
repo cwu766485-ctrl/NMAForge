@@ -8,7 +8,8 @@ module ai_tensor_matrix_core #(
     parameter integer ARRAY_SIZE = 16,
     parameter integer MAX_OUTSTANDING_READS = 4,
     parameter integer ENABLE_A_TILE_CACHE = 1,
-    parameter integer ENABLE_NEXT_K_PREFETCH = 1
+    parameter integer ENABLE_NEXT_K_PREFETCH = 1,
+    parameter integer ENABLE_ELASTIC_TILE_FORWARDING = 1
 )(
     input  wire        clk,
     input  wire        resetn,
@@ -182,6 +183,21 @@ module ai_tensor_matrix_core #(
     reg fused_commit_pending_r;
     wire [31:0] fused_word_current;
 
+    // Optional 16x16 INT8 producer/consumer tile cache. Two physical banks
+    // allow a consumer to read the previous tile while a fused command fills
+    // the other bank. Only a complete, explicitly tagged tile becomes valid.
+    reg [127:0] tile_forward_lines_r [0:1][0:15];
+    reg tile_forward_valid_r;
+    reg tile_forward_bank_r;
+    reg [31:0] tile_forward_tag_base_r;
+    reg tile_forward_capture_active_r;
+    reg tile_forward_consume_active_r;
+    reg tile_forward_read_bank_r;
+    reg tile_forward_write_bank_r;
+    reg [15:0] tile_forward_capture_mask_r;
+    reg [31:0] perf_tile_forward_hits;
+    reg [31:0] perf_tile_forward_reads_saved;
+
     reg [31:0] a_tile_words_r [0:1][0:ARRAY_SIZE-1];
     reg [31:0] b_tile_words_r [0:1][0:ARRAY_SIZE-1];
     reg [31:0] a_tile_cache_words_r [0:A_TILE_CACHE_K_WORDS-1][0:ARRAY_SIZE-1];
@@ -261,6 +277,8 @@ module ai_tensor_matrix_core #(
     wire [31:0] b_read_addr = gemv_kfold_r ? gemv_b_read_addr :
                                                     legacy_b_read_addr;
     wire prefetch_active = (prefetch_state_r != PF_IDLE);
+    wire tile_forward_a_copy = (state_r == ST_A_REQ) &&
+                               tile_forward_consume_active_r;
     wire prefetch_is_b_req = (prefetch_state_r == PF_B_REQ);
     wire prefetch_request_pending =
         ((prefetch_state_r == PF_A_REQ) && (prefetch_group_r < a_group_count)) ||
@@ -313,6 +331,7 @@ module ai_tensor_matrix_core #(
     wire banked_read_accept = banked_read_valid && banked_ready;
     wire read_request_pending = prefetch_active ? prefetch_request_pending :
         (((state_r == ST_A_REQ) && !a_cache_initial_copy &&
+          !tile_forward_a_copy &&
           !gemv_a_line_reuse &&
           (read_group_r < a_group_count)) ||
          ((state_r == ST_B_REQ) && (read_group_r < b_group_count)));
@@ -389,6 +408,16 @@ module ai_tensor_matrix_core #(
          transpose_b || (aux0 != 32'd0) || (instance_count > 32'd1) ||
          (src0_batch_stride != 32'd0) || (src1_batch_stride != 32'd0) ||
          (dst_batch_stride != 32'd0));
+    wire invalid_tile_forward_contract =
+        ((op_mode == OP_TENSOR_GEMM_REQUANT_TILE_A) &&
+         ((aux0[31:7] != 0) ||
+          (aux0[5] && ((m_size != 16'd16) || (n_size != 16'd16) ||
+                       (instance_count > 32'd1) ||
+                       (dst_batch_stride != 0))) ||
+          (aux0[6] && ((m_size != 16'd16) ||
+                       (k_words != ARRAY_GROUPS) || transpose_a ||
+                       (instance_count > 32'd1) ||
+                       (src0_batch_stride != 0)))));
     wire invalid_dimensions = (m_size == 0) || (n_size == 0) ||
                               (k_words == 0) ||
                               (!gemv_kfold_command &&
@@ -451,6 +480,33 @@ module ai_tensor_matrix_core #(
         (write_lane_r == 2'd0) ? write_result0 :
         (write_lane_r == 2'd1) ? write_result1 :
         (write_lane_r == 2'd2) ? write_result2 : write_result3;
+
+    wire tile_forward_capture_request =
+        ENABLE_ELASTIC_TILE_FORWARDING &&
+        (ARRAY_SIZE == 16) &&
+        (op_mode == OP_TENSOR_GEMM_REQUANT_TILE_A) && aux0[5] &&
+        (m_size == 16'd16) && (n_size == 16'd16) &&
+        ((instance_count == 0) || (instance_count == 1)) &&
+        (dst_batch_stride == 0);
+    wire tile_forward_consume_request =
+        ENABLE_ELASTIC_TILE_FORWARDING && (ARRAY_SIZE == 16) &&
+        (op_mode == OP_TENSOR_GEMM_REQUANT_TILE_A) && aux0[6] &&
+        tile_forward_valid_r &&
+        (src0_base == tile_forward_tag_base_r) &&
+        (m_size == 16'd16) && (k_words == ARRAY_GROUPS) &&
+        !transpose_a && ((instance_count == 0) || (instance_count == 1)) &&
+        (src0_batch_stride == 0);
+    wire [3:0] tile_forward_capture_line_index =
+        ((write_row_r >> 2) * 4) + (write_col_r >> 2);
+    wire tile_forward_capture_valid = tile_forward_capture_active_r &&
+        fused_requant_output && line_valid && line_store_eligible;
+    wire tile_forward_capture_ready =
+        !tile_forward_capture_mask_r[tile_forward_capture_line_index];
+    wire tile_forward_capture_fire = tile_forward_capture_valid &&
+        tile_forward_capture_ready && line_ready &&
+        !output_write_has_protection_error;
+    wire tile_forward_capture_last = tile_forward_capture_fire &&
+                                     (tile_forward_capture_line_index == 4'd15);
 
     assign perf_mac_active = (state_r == ST_MAC);
     assign perf_banked_wait =
@@ -569,6 +625,7 @@ module ai_tensor_matrix_core #(
             banked_addr = prefetch_read_addr;
         end else if (!prefetch_active && (state_r == ST_A_REQ) &&
             !a_cache_initial_copy &&
+            !tile_forward_a_copy &&
             !gemv_a_line_reuse &&
             (read_group_r < a_group_count) &&
             (read_outstanding_count < MAX_OUTSTANDING_READS) &&
@@ -712,7 +769,8 @@ module ai_tensor_matrix_core #(
                 prefetch_buffer_r <= prefetch_kick_buffer;
                 prefetch_valid_r[prefetch_kick_buffer] <= 1'b0;
                 prefetch_state_r <=
-                    (a_cache_prefetch_hit || gemv_a_prefetch_reuse) ?
+                    (a_cache_prefetch_hit || gemv_a_prefetch_reuse ||
+                     tile_forward_consume_active_r) ?
                     PF_B_REQ : PF_A_REQ;
             end else begin
                 case (prefetch_state_r)
@@ -772,6 +830,8 @@ module ai_tensor_matrix_core #(
             perf_prefetch_wait_cycles <= 32'd0;
             perf_prefetch_completed <= 32'd0;
             perf_a_tile_cache_hits <= 32'd0;
+            perf_tile_forward_hits <= 32'd0;
+            perf_tile_forward_reads_saved <= 32'd0;
             compute_buffer_r <= 1'b0;
             prefetch_kick <= 1'b0;
             prefetch_kick_k_group <= 16'd0;
@@ -826,6 +886,14 @@ module ai_tensor_matrix_core #(
             dst_row_stride_r <= 32'd0;
             fused_line_buffer_r <= 128'd0;
             fused_commit_pending_r <= 1'b0;
+            tile_forward_valid_r <= 1'b0;
+            tile_forward_bank_r <= 1'b0;
+            tile_forward_tag_base_r <= 32'd0;
+            tile_forward_capture_active_r <= 1'b0;
+            tile_forward_consume_active_r <= 1'b0;
+            tile_forward_read_bank_r <= 1'b0;
+            tile_forward_write_bank_r <= 1'b0;
+            tile_forward_capture_mask_r <= 16'd0;
             for (reset_i = 0; reset_i < ARRAY_SIZE; reset_i = reset_i + 1) begin
                 a_tile_words_r[0][reset_i] <= 32'd0;
                 a_tile_words_r[1][reset_i] <= 32'd0;
@@ -906,6 +974,41 @@ module ai_tensor_matrix_core #(
                 for (cache_i = 0; cache_i < ARRAY_SIZE; cache_i = cache_i + 1)
                     a_tile_words_r[prefetch_kick_buffer][cache_i] <=
                         a_tile_words_r[compute_buffer_r][cache_i];
+            end
+            if (prefetch_kick && (prefetch_state_r == PF_IDLE) &&
+                tile_forward_consume_active_r) begin
+                for (cache_i = 0; cache_i < ARRAY_SIZE; cache_i = cache_i + 1)
+                    a_tile_words_r[prefetch_kick_buffer][cache_i] <=
+                        tile_forward_lines_r[tile_forward_read_bank_r]
+                            [((cache_i / 4) * 4) + prefetch_kick_k_group]
+                            [(cache_i % 4)*32 +: 32];
+                if (col_tile_r == 0)
+                    perf_tile_forward_reads_saved <=
+                        perf_tile_forward_reads_saved + a_group_count;
+            end
+            if (tile_forward_capture_fire) begin
+                tile_forward_lines_r[tile_forward_write_bank_r]
+                                    [tile_forward_capture_line_index] <= line_wdata;
+                tile_forward_capture_mask_r[tile_forward_capture_line_index] <= 1'b1;
+            end else if (tile_forward_capture_valid && !tile_forward_capture_ready) begin
+                // A duplicate line means the promised complete tile image is
+                // not trustworthy. Preserve the normal SPAD write but drop
+                // the optional local forwarding candidate.
+                tile_forward_capture_active_r <= 1'b0;
+                tile_forward_valid_r <= 1'b0;
+            end
+            if (tile_forward_a_copy) begin
+                for (cache_i = 0; cache_i < ARRAY_SIZE; cache_i = cache_i + 1)
+                    a_tile_words_r[compute_buffer_r][cache_i] <=
+                        tile_forward_lines_r[tile_forward_read_bank_r]
+                            [((cache_i / 4) * 4) + k_group_r]
+                            [(cache_i % 4)*32 +: 32];
+                if (col_tile_r == 0) begin
+                    perf_tile_forward_reads_saved <=
+                        perf_tile_forward_reads_saved + a_group_count;
+                    if (k_group_r == 0)
+                        perf_tile_forward_hits <= perf_tile_forward_hits + 1'b1;
+                end
             end
 
             if ((state_r == ST_IDLE) && start)
@@ -1058,6 +1161,18 @@ module ai_tensor_matrix_core #(
                             write_col_r <= {TILE_INDEX_WIDTH{1'b0}};
                             write_lane_r <= 2'd0;
                             fused_commit_pending_r <= 1'b0;
+                            tile_forward_consume_active_r <=
+                                tile_forward_consume_request;
+                            tile_forward_read_bank_r <= tile_forward_bank_r;
+                            tile_forward_capture_active_r <=
+                                tile_forward_capture_request;
+                            tile_forward_write_bank_r <=
+                                tile_forward_valid_r ? ~tile_forward_bank_r : 1'b0;
+                            tile_forward_capture_mask_r <= 16'd0;
+                            perf_tile_forward_hits <= 32'd0;
+                            perf_tile_forward_reads_saved <= 32'd0;
+                            if (!tile_forward_consume_request)
+                                tile_forward_valid_r <= 1'b0;
                             bias_index_r <= {(TILE_INDEX_WIDTH+1){1'b0}};
                             bias_loaded_r <= 1'b0;
                             element_count <= 32'd0;
@@ -1067,8 +1182,9 @@ module ai_tensor_matrix_core #(
                                 state_r <= ST_ERROR;
                             end else if (invalid_dimensions || invalid_alignment ||
                                 invalid_gemv_contract ||
+                                invalid_tile_forward_contract ||
                                 ((op_mode == OP_TENSOR_GEMM_REQUANT_TILE_A) &&
-                                 ((aux0[31:5] != 0) || (|dst_base[3:0]) ||
+                                 ((|dst_base[3:0]) ||
                                   ((dst_batch_stride != 0) &&
                                    (|dst_batch_stride[3:0]))))) begin
                                 error_code <= ERR_CONFIG;
@@ -1081,6 +1197,9 @@ module ai_tensor_matrix_core #(
 
                     ST_A_REQ: begin
                         if (gemv_a_line_reuse) begin
+                            read_group_r <= 3'd0;
+                            state_r <= ST_B_REQ;
+                        end else if (tile_forward_a_copy) begin
                             read_group_r <= 3'd0;
                             state_r <= ST_B_REQ;
                         end else if (a_cache_initial_copy) begin
@@ -1398,6 +1517,17 @@ module ai_tensor_matrix_core #(
                     end
 
                     ST_DONE: begin
+                        if (tile_forward_capture_active_r &&
+                            (tile_forward_capture_mask_r == 16'hffff)) begin
+                            tile_forward_valid_r <= 1'b1;
+                            tile_forward_bank_r <= tile_forward_write_bank_r;
+                            tile_forward_tag_base_r <= dst_batch_base_r;
+                        end else if (tile_forward_consume_active_r ||
+                                     tile_forward_capture_active_r) begin
+                            tile_forward_valid_r <= 1'b0;
+                        end
+                        tile_forward_capture_active_r <= 1'b0;
+                        tile_forward_consume_active_r <= 1'b0;
                         busy <= 1'b0;
                         done <= 1'b1;
                         error <= 1'b0;
@@ -1405,6 +1535,10 @@ module ai_tensor_matrix_core #(
                     end
 
                     ST_ERROR: begin
+                        tile_forward_valid_r <= 1'b0;
+                        tile_forward_capture_active_r <= 1'b0;
+                        tile_forward_consume_active_r <= 1'b0;
+                        tile_forward_capture_mask_r <= 16'd0;
                         busy <= 1'b0;
                         done <= 1'b1;
                         error <= 1'b1;

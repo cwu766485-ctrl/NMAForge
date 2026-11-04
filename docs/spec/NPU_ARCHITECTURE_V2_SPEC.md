@@ -1,6 +1,6 @@
 # NMAForge NPU Architecture v2.0 Specification
 
-**Status:** In-progress implementation contract; fused Matrix opcode `0x53` is implemented and Golden-checked. Product opcode `0x52` accepts dense `1<=M,N<=16`, `K>=1` descriptors, passes directed core plus Top Smoke Golden checks for N/K tails, and has bounded next-K prefetch/MAC overlap measured on three seeds per shape. Bank-aware issue, fault closure, architecture-wide performance, and full v2 sign-off remain open.
+**Status:** In-progress implementation contract; fused Matrix opcode `0x53` is Golden-checked, with opt-in bounded tile forwarding now passing a paired core ablation and tag-miss/reset/abort checks. Product opcode `0x52` accepts dense `1<=M,N<=16`, `K>=1` descriptors, passes directed core plus Top Smoke Golden checks for N/K tails, and has bounded next-K prefetch/MAC overlap measured on three seeds per shape. Bank-aware issue, fault closure, architecture-wide performance, and full v2 sign-off remain open.
 **Frozen starting point:** NMAForge R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`.
 **Version boundary:** Existing ABI v7 descriptors and opcodes retain their behavior. v2 additions are additive and must be rejected by older RTL as unsupported descriptors.
 **Related audit:** [NPU v2 Phase 0 baseline](../architecture/NPU_ARCHITECTURE_V2_PHASE0_BASELINE.md).
@@ -85,10 +85,13 @@ in the Phase 0 baseline report.
    below. Decoder, validator, dispatcher, software header, and tests must
    agree on every supported and rejected field.
 5. Opcode `0x53` is reserved for fused GEMM → INT8 Matrix-A-layout writeback.
-   It uses the existing GEMM fields for INT32 post-processing and `aux0[4:0]`
-   for the subsequent SFU-compatible requant shift; `aux0[31:5]` must be zero.
-   It writes packed signed INT8 values and is therefore not compatible with the
-   legacy INT32 GEMM output contract. Older hardware rejects it as unsupported.
+   It uses the existing GEMM fields for INT32 post-processing, `aux0[4:0]`
+   for the subsequent SFU-compatible requant shift, `aux0[5]` to capture the
+   completed output tile, and `aux0[6]` to consume a matching prior tile as A.
+   `aux0[31:7]` must be zero. The capture/consume bits are v2-only and leave
+   legacy opcodes `0x30/0x31` unchanged. Opcode `0x53` writes packed signed
+   INT8 values and is therefore not compatible with the legacy INT32 GEMM
+   output contract. Older hardware rejects `0x53` as unsupported.
 6. Existing opcode behavior is the compatibility default. Fused requant is
    enabled only by the explicit v2 opcode `0x53`; do not silently fuse the
    legacy `0x30/0x31` result path.
@@ -172,6 +175,35 @@ aligned, and a nonzero destination instance stride must be 16-byte aligned.
 The default instance stride is `M*N` bytes. No INT32 intermediate is written.
 This opcode is v2-only and is not a replacement for `0x30`.
 
+### 3.1 Bounded fused-tile forwarding subset
+
+The initial local forwarding implementation uses `0x53 aux0[5]` to capture a
+producer tile and `0x53 aux0[6]` to request the preceding tile as Matrix A.
+`aux0[4:0]` remains the requant shift. The implementation supports only a
+16×16 producer, a 16-row consumer with exactly four K words, no transpose-A,
+and a single instance. Capture additionally requires a 16×16 output. Other
+shapes are rejected when they set the new bits; old `0x30/0x31` descriptors
+are unchanged.
+
+The core stores two 16-line × 128-bit banks (512 bytes total). A producer
+still commits every output line to SPAD. A bank becomes valid only after all
+16 output lines have been accepted with no protection error. The next opted-in
+`0x53` consumer reads a tile only when `src0_base` exactly matches the saved
+destination base; on a tag miss, the request falls back to the normal SPAD
+path. When both bits are set, the consumer reads the old bank while filling
+the other bank with its own output. Line back-pressure holds the existing
+write transaction and prevents capture from getting ahead of SPAD acceptance.
+Abort/error and reset invalidate the local tag; reset starts a new local
+validity epoch.
+
+This is a bounded, explicitly ordered Matrix-to-Matrix handoff, not a coherent
+SPAD cache. Software must keep the tagged source tile immutable between the
+producer and opted-in consumer. DMA or another engine must not overwrite it in
+that interval. No cross-engine forwarding or cache-coherence protocol is
+implemented. The consumer still writes its own result to SPAD, so the feature
+avoids the prior tile's 256-byte A read; it does not suppress producer or
+consumer writeback.
+
 ## 4. INT8 arithmetic and layout contract
 
 ### 4.1 Product and accumulation
@@ -240,6 +272,7 @@ mapping; the final inferred resources must be recorded.
 | INT8 MAC array | 16×16 = 256 MAC | unchanged, shared by GEMM/GEMV |
 | 64-bit accumulator state | 16×16×64 bits = 2 KiB | reuse the same array accumulator; reduction may not add a second full accumulator bank |
 | Current operand staging | 256 B A/B staging + 1 KiB bounded A cache | retain; up to 1 KiB incremental budget; K-fold per-PE B view uses two 256 B banks and is active for the current `0x52` shape subset |
+| Optional fused-tile forwarding | none | two 16×128-bit banks = 512 B plus valid/tag/mask control; together with the 512 B K-fold B view this consumes the 1 KiB incremental data-storage budget |
 | Matrix read metadata | up to four 53-bit FIFO entries | at most four accepted reads; each response must carry an explicit destination buffer, operand, K tile, bank group, and reset epoch |
 | SPAD capacity | four banks × 32K × 32-bit = 512 KiB | unchanged |
 | SPAD word/line ports | 32-bit word; 128-bit line + 16-bit WSTRB | unchanged; no new bypass port |

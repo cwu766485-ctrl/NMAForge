@@ -107,9 +107,14 @@ module ai_descriptor_validator (
         (batch_count == 16'd0) && (head_count == 16'd0);
 
     wire fused_matrix_fields_valid =
-        (op != 8'h53) || ((aux0[31:5] == 0) &&
+        (op != 8'h53) || ((version == 8'd7) && (aux0[31:7] == 0) &&
         (dst_stride == 0 || dst_stride[3:0] == 0) &&
-        (dst[3:0] == 0));
+        (dst[3:0] == 0) &&
+        (!aux0[5] || ((m_size == 16) && (n_size == 16) &&
+                      (batch_count <= 16'd1) && (dst_stride == 0))) &&
+        (!aux0[6] || ((m_size == 16) && (k_words == 16'd4) &&
+                      !flags[1] && (batch_count <= 16'd1) &&
+                      (src0_stride == 0))));
 
     // Product GEMV descriptor field gate. Shape support is bounded by the
     // shared 16x16 Matrix array; unsupported strides, batching, and flags are

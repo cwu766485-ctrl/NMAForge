@@ -23,7 +23,7 @@ module tb_ai_descriptor_validator;
     integer boundary_accept_checks;
     integer boundary_reject_checks;
     integer i;
-    reg [7:0] supported_ops [0:26];
+    reg [7:0] supported_ops [0:28];
 
     ai_descriptor_validator validator (
         .op(op), .version(version), .src0(src0), .src1(src1), .dst(dst),
@@ -82,6 +82,8 @@ module tb_ai_descriptor_validator;
                 8'h16, 8'h17: begin m_size = 16'd3; n_size = 16'd3; end
                 8'h21: begin m_size = 16'd1; length = 16'd1; end
                 8'h30, 8'h31: begin m_size = 16'd4; n_size = 16'd4; k_words = 16'd1; end
+                8'h52: begin m_size = 16'd1; n_size = 16'd1; k_words = 16'd1; end
+                8'h53: begin m_size = 16'd4; n_size = 16'd4; k_words = 16'd1; end
                 8'h50, 8'h51: begin m_size = 16'd1; n_size = 16'd1; length = 16'd1; end
                 default: begin end
             endcase
@@ -96,7 +98,8 @@ module tb_ai_descriptor_validator;
             #1;
             expected_int8 = (opcode >= 8'h10) && (opcode <= 8'h17);
             expected_banked = (opcode == 8'h20) || (opcode == 8'h21);
-            expected_matrix = (opcode == 8'h30) || (opcode == 8'h31);
+            expected_matrix = (opcode == 8'h30) || (opcode == 8'h31) ||
+                              (opcode == 8'h52) || (opcode == 8'h53);
             expected_sfu = (opcode >= 8'h32) && (opcode <= 8'h39);
             expected_cnn_kv = (opcode == 8'h43) || (opcode == 8'h44);
             expected_macro = (opcode >= 8'h40) && (opcode <= 8'h42);
@@ -156,8 +159,9 @@ module tb_ai_descriptor_validator;
         supported_ops[18]=8'h38; supported_ops[19]=8'h39; supported_ops[20]=8'h40;
         supported_ops[21]=8'h41; supported_ops[22]=8'h42; supported_ops[23]=8'h43;
         supported_ops[24]=8'h44; supported_ops[25]=8'h50; supported_ops[26]=8'h51;
+        supported_ops[27]=8'h52; supported_ops[28]=8'h53;
 
-        for (i=0; i<27; i=i+1) check_legal(supported_ops[i]);
+        for (i=0; i<29; i=i+1) check_legal(supported_ops[i]);
 
         // The descriptor-only Matrix A tile packing mode has an additional
         // exact M*N==length contract beyond the ordinary SFU length rule.
@@ -191,6 +195,37 @@ module tb_ai_descriptor_validator;
         set_legal_defaults(8'h40); macro_child_fetch=1'b1; check_invalid("nested macro child");
         set_legal_defaults(8'h50); src0_stride=32'd4; check_invalid("FP stride unsupported");
         set_legal_defaults(8'h51); flags=8'h02; check_invalid("FP transpose flags unsupported");
+
+        // Opcode 0x53 tile capture/consume bits are additive ABI-v7 fields;
+        // old Matrix opcodes remain untouched.
+        set_legal_defaults(8'h53); version=8'd7; m_size=16'd16; n_size=16'd16;
+        k_words=16'd4; aux0=32'h20; check_boundary_accept("0x53 tile capture");
+        set_legal_defaults(8'h53); version=8'd7; m_size=16'd16; n_size=16'd16;
+        k_words=16'd4; aux0=32'h40; check_boundary_accept("0x53 tile consume");
+        set_legal_defaults(8'h53); version=8'd7; m_size=16'd16; n_size=16'd16;
+        k_words=16'd4; aux0=32'h60; check_boundary_accept("0x53 ping-pong capture/consume");
+        set_legal_defaults(8'h30); m_size=16'd4; n_size=16'd4;
+        k_words=16'd1; aux0=32'd1;
+        check_boundary_accept("legacy 0x30 aux0 behavior remains accepted");
+        set_legal_defaults(8'h53); version=8'd3; check_invalid("0x53 requires ABI v7");
+        set_legal_defaults(8'h53); m_size=16'd16; n_size=16'd16;
+        k_words=16'd4; aux0=32'h80; check_invalid("0x53 reserved aux bit");
+        set_legal_defaults(8'h53); m_size=16'd8; n_size=16'd16;
+        k_words=16'd4; aux0=32'h20; check_invalid("0x53 tile capture shape");
+        set_legal_defaults(8'h53); m_size=16'd16; n_size=16'd16;
+        k_words=16'd3; aux0=32'h40; check_invalid("0x53 tile consume K");
+        set_legal_defaults(8'h53); m_size=16'd16; n_size=16'd16;
+        k_words=16'd4; flags=8'h02; aux0=32'h40;
+        check_invalid("0x53 transposed tile consume");
+        set_legal_defaults(8'h53); m_size=16'd16; n_size=16'd16;
+        k_words=16'd4; aux0=32'h40; src0_stride=32'd16;
+        check_invalid("0x53 tile consume source stride");
+        set_legal_defaults(8'h53); m_size=16'd16; n_size=16'd16;
+        k_words=16'd4; aux0=32'h20; dst_stride=32'd16;
+        check_invalid("0x53 capture requires dense output");
+        set_legal_defaults(8'h53); m_size=16'd16; n_size=16'd16;
+        k_words=16'd4; aux0=32'h20; batch_count=16'd2;
+        check_invalid("0x53 capture rejects multiple batches");
 
         // Characterize validator dimension edges. These are validator-only
         // checks: accepting a 16-bit maximum does not claim that the selected
@@ -267,11 +302,11 @@ module tb_ai_descriptor_validator;
             $fatal(1, "Matrix A tile-pack accepted a non-matching M*N length");
         boundary_reject_checks = boundary_reject_checks + 1;
 
-        if (legal_opcode_checks != 28 || invalid_rule_checks != 21 ||
-            boundary_accept_checks != 38 || boundary_reject_checks != 26)
-            $fatal(1, "testpoint count mismatch legal=%0d invalid=%0d boundary_accept=%0d boundary_reject=%0d expected=28/21/38/26",
+        if (legal_opcode_checks != 30 || invalid_rule_checks != 29 ||
+            boundary_accept_checks != 42 || boundary_reject_checks != 26)
+            $fatal(1, "testpoint count mismatch legal=%0d invalid=%0d boundary_accept=%0d boundary_reject=%0d expected=30/29/42/26",
                    legal_opcode_checks, invalid_rule_checks, boundary_accept_checks, boundary_reject_checks);
-        $display("DESCRIPTOR_VALIDATOR_PASS legal_opcodes=27 tile_pack=1 invalid_rules=21 boundary_accept=38/38 boundary_reject=26/26 opcode_classes_consistent=1 engine_limit_claim=0");
+        $display("DESCRIPTOR_VALIDATOR_PASS legal_opcodes=29 tile_pack=1 invalid_rules=29 boundary_accept=42/42 boundary_reject=26/26 tile_forward_accept=3/3 legacy_aux_compat=1 opcode_classes_consistent=1 engine_limit_claim=0");
         $finish;
     end
 endmodule
