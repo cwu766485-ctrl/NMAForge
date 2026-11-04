@@ -339,6 +339,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned engine_parallel_fault_recovery_cov_idx;
     int unsigned engine_parallel_reset_phase;
     int unsigned engine_parallel_reset_stall_owner;
+    int unsigned engine_parallel_reset_pending_owner;
     covergroup cmdq_invalid_descriptor_cg;
         option.per_instance = 1;
         cp_engine_descriptor_reject: coverpoint cmdq_invalid_descriptor_case {
@@ -454,6 +455,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             bins conv = {5};
             bins kv = {6};
         }
+    endgroup
+
+    covergroup engine_parallel_reset_owner_pair_cg;
+        option.per_instance = 1;
+        cp_stalled_request_owner: coverpoint engine_parallel_reset_stall_owner {
+            bins owners[] = {[0:6]};
+        }
+        cp_pending_response_owner: coverpoint engine_parallel_reset_pending_owner {
+            bins owners[] = {[0:6]};
+        }
+        request_x_pending_response_owner: cross
+            cp_stalled_request_owner, cp_pending_response_owner;
     endgroup
 
     covergroup engine_pair_overlap_cg;
@@ -636,6 +649,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         engine_parallel_fault_recovery_cg = new();
         engine_parallel_reset_cg = new();
         engine_parallel_reset_stall_cg = new();
+        engine_parallel_reset_owner_pair_cg = new();
         engine_pair_overlap_cg = new();
         c1_shared_read_alias_case = 0;
         c1_shared_read_alias_cg = new();
@@ -5458,6 +5472,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned returned_reads[0:6];
         int unsigned accepted_output_words[0:6];
         int unsigned pending_reads;
+        int unsigned pending_owner_reads[0:6];
         int unsigned accepted_this_cycle;
         int unsigned returned_this_cycle;
         int signed output_engine;
@@ -5473,6 +5488,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         uvm_hdl_data_t reset_value;
         bit [6:0] reset_stalled_engine_mask;
         bit [6:0] reset_stalled_engine_write;
+        bit [6:0] pending_response_owner_mask;
         bit [223:0] reset_stalled_engine_addr;
         bit [223:0] reset_stalled_engine_wdata;
         bit reset_stalled_matrix_banked;
@@ -5499,8 +5515,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             accepted_reads[engine] = 0;
             returned_reads[engine] = 0;
             accepted_output_words[engine] = 0;
+            pending_owner_reads[engine] = 0;
             launch_before[engine] = compute_vif.engine_launch_count[engine];
         end
+        pending_response_owner_mask = '0;
 
         // C1 inputs are the same legal images used by the seven-engine
         // Golden test. Take the reset cut only after each engine has completed
@@ -5837,24 +5855,39 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                             endcase
                         end
                         pending_reads = 0;
+                        pending_response_owner_mask = '0;
                         for (engine = 0; engine < 7; engine++) begin
                             if (returned_reads[engine] > accepted_reads[engine])
                                 `uvm_fatal("CLUSTER_PARALLEL_RESET_OWNER", $sformatf(
                                     "owner %0d returned more reads than accepted at reset cut: accepted=%0d returned=%0d",
                                     engine, accepted_reads[engine], returned_reads[engine]))
-                            pending_reads += accepted_reads[engine] - returned_reads[engine];
+                            pending_owner_reads[engine] =
+                                accepted_reads[engine] - returned_reads[engine];
+                            pending_reads += pending_owner_reads[engine];
+                            if (pending_owner_reads[engine] != 0)
+                                pending_response_owner_mask[engine] = 1'b1;
                         end
                         if (pending_reads == 0)
                             `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL",
                                 $sformatf("target owner %0d reset cut did not retain any accepted old-epoch read after the held request stall",
                                           stalled_owner))
+                        engine_parallel_reset_stall_owner = stalled_owner;
+                        for (engine = 0; engine < 7; engine++) begin
+                            if (pending_owner_reads[engine] != 0) begin
+                                engine_parallel_reset_pending_owner = engine;
+                                engine_parallel_reset_owner_pair_cg.sample();
+                            end
+                        end
                         `uvm_info("CLUSTER_PARALLEL_RESET_STALL_PASS", $sformatf(
-                            "target request owner=%0d selected while ready, then held stable/unaccepted for one sampled cycle before reset; engine_mask=%07b MatrixBanked=%0b MatrixLine=%0b CNM=%04b; pending_reads=%0d",
+                            "target request owner=%0d selected while ready, then held stable/unaccepted for one sampled cycle before reset; engine_mask=%07b MatrixBanked=%0b MatrixLine=%0b CNM=%04b; pending_reads=%0d response_owner_mask=%07b pending_by_owner=%0d/%0d/%0d/%0d/%0d/%0d/%0d",
                             stalled_owner,
                             reset_stalled_engine_mask, reset_stalled_matrix_banked,
                             reset_stalled_matrix_line, reset_stalled_cnm_mask,
-                            pending_reads), UVM_LOW)
-                        engine_parallel_reset_stall_owner = stalled_owner;
+                            pending_reads, pending_response_owner_mask,
+                            pending_owner_reads[0], pending_owner_reads[1],
+                            pending_owner_reads[2], pending_owner_reads[3],
+                            pending_owner_reads[4], pending_owner_reads[5],
+                            pending_owner_reads[6]), UVM_LOW)
                         engine_parallel_reset_stall_cg.sample();
                         #1ns;
                         reset_value = 1'b0;
@@ -13369,6 +13402,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         `uvm_info("CLUSTER_PARALLEL_RESET_STALL_COVERAGE_PASS", $sformatf(
             "legal request owner × shared reset cuts={INT8,FP,CNM,Matrix,SFU,Conv,KV}=7/7 coverage=%.1f%%; each cut checks held payload, a pending old-epoch read after the stall, reset quiet and seven-engine Golden recovery; seed=%0d",
             engine_parallel_reset_stall_cg.get_coverage(), seed), UVM_LOW)
+        `uvm_info("CLUSTER_PARALLEL_RESET_OWNER_CROSS", $sformatf(
+            "stalled-request/pending-response owner covergroup aggregate (includes both owner coverpoints and their cross)=%.1f%% seed=%0d",
+            engine_parallel_reset_owner_pair_cg.get_coverage(), seed), UVM_LOW)
 
         // Read the head/token entry back through the real KV engine after the
         // KV-write completion, checking both stride address generation and
