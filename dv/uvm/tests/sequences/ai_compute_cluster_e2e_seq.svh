@@ -5280,6 +5280,19 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned poll;
         int unsigned max_active;
         uvm_hdl_data_t reset_value;
+        bit [6:0] reset_stalled_engine_mask;
+        bit [6:0] reset_stalled_engine_write;
+        bit [223:0] reset_stalled_engine_addr;
+        bit [223:0] reset_stalled_engine_wdata;
+        bit reset_stalled_matrix_banked;
+        bit [31:0] reset_stalled_matrix_addr;
+        bit reset_stalled_matrix_line;
+        bit [31:0] reset_stalled_matrix_line_addr;
+        bit [127:0] reset_stalled_matrix_line_wdata;
+        bit [15:0] reset_stalled_matrix_line_wstrb;
+        bit [3:0] reset_stalled_cnm_mask;
+        bit [31:0] reset_stalled_cnm_addr[0:3];
+        bit reset_stalled_any_request;
 
         accepted_engine_mask = '0;
         completion_seen = '0;
@@ -5511,12 +5524,122 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                                 max_active))
                         engine_parallel_reset_phase = 1;
                         engine_parallel_reset_cg.sample();
+
+                        // Create backpressure on a ready, production request
+                        // from the falling edge. This avoids changing the
+                        // arbiter's combinational outputs in the same active
+                        // region as the request monitor's sampling edge.
+                        @(negedge compute_vif.aclk);
+                        reset_stalled_engine_mask =
+                            compute_vif.engine_req_valid & compute_vif.engine_req_ready;
+                        reset_stalled_engine_write = compute_vif.engine_req_write;
+                        reset_stalled_engine_addr = compute_vif.engine_req_addr;
+                        reset_stalled_engine_wdata = compute_vif.engine_req_wdata;
+                        reset_stalled_matrix_banked =
+                            compute_vif.matrix_request_valid &&
+                            compute_vif.banked_ready;
+                        reset_stalled_matrix_addr = compute_vif.matrix_banked_req_addr;
+                        reset_stalled_matrix_line =
+                            compute_vif.matrix_line_valid &&
+                            compute_vif.matrix_line_ready;
+                        reset_stalled_matrix_line_addr = compute_vif.matrix_line_addr;
+                        reset_stalled_matrix_line_wdata = compute_vif.matrix_line_wdata;
+                        reset_stalled_matrix_line_wstrb = compute_vif.matrix_line_wstrb;
+                        reset_stalled_cnm_mask = compute_vif.cnm_request_valid &
+                                                 compute_vif.cnm_request_ready;
+                        for (engine = 0; engine < 4; engine++)
+                            reset_stalled_cnm_addr[engine] =
+                                compute_vif.cnm_req_addr[engine];
+                        reset_stalled_any_request = (|reset_stalled_engine_mask) ||
+                            reset_stalled_matrix_banked || reset_stalled_matrix_line ||
+                            (|reset_stalled_cnm_mask);
+                        if (!reset_stalled_any_request)
+                            `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL",
+                                "no ready production request was available for deterministic reset-cut backpressure")
+                        force_scheduler_admission_stall();
+
+                        // Observe one full sampled cycle of injected
+                        // backpressure; each held source payload must remain
+                        // valid and unchanged.
+                        @(posedge compute_vif.aclk);
+                        #1ns;
+                        for (engine = 0; engine < 7; engine++) begin
+                            if (reset_stalled_engine_mask[engine] &&
+                                (!compute_vif.engine_req_valid[engine] ||
+                                 compute_vif.engine_req_ready[engine] ||
+                                 compute_vif.engine_req_write[engine] !==
+                                     reset_stalled_engine_write[engine] ||
+                                 compute_vif.engine_req_addr[engine*32 +: 32] !==
+                                     reset_stalled_engine_addr[engine*32 +: 32] ||
+                                 compute_vif.engine_req_wdata[engine*32 +: 32] !==
+                                     reset_stalled_engine_wdata[engine*32 +: 32]))
+                                `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL", $sformatf(
+                                    "engine%0d request changed or was accepted under reset-cut backpressure",
+                                    engine))
+                        end
+                        if (reset_stalled_matrix_banked &&
+                            (!compute_vif.matrix_request_valid ||
+                             compute_vif.banked_ready ||
+                             compute_vif.matrix_banked_req_addr !==
+                                 reset_stalled_matrix_addr))
+                            `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL",
+                                "Matrix banked request changed or was accepted under reset-cut backpressure")
+                        if (reset_stalled_matrix_line &&
+                            (!compute_vif.matrix_line_valid ||
+                             compute_vif.matrix_line_ready ||
+                             compute_vif.matrix_line_addr !== reset_stalled_matrix_line_addr ||
+                             compute_vif.matrix_line_wdata !== reset_stalled_matrix_line_wdata ||
+                             compute_vif.matrix_line_wstrb !== reset_stalled_matrix_line_wstrb))
+                            `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL",
+                                "Matrix Line request payload changed or was accepted under reset-cut backpressure")
+                        if ((compute_vif.cnm_request_valid & reset_stalled_cnm_mask) !==
+                                reset_stalled_cnm_mask ||
+                            |(compute_vif.cnm_request_ready & reset_stalled_cnm_mask))
+                            `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL",
+                                "CNM lane request was dropped or accepted under reset-cut backpressure")
+                        for (engine = 0; engine < 4; engine++)
+                            if (reset_stalled_cnm_mask[engine] &&
+                                compute_vif.cnm_req_addr[engine] !==
+                                    reset_stalled_cnm_addr[engine])
+                                `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL", $sformatf(
+                                    "CNM lane%0d request address changed under reset-cut backpressure",
+                                    engine))
+                        // The monitor task is paused during this explicit
+                        // stall cut, so account for responses at this edge
+                        // before asserting reset.
+                        for (engine = 0; engine < 7; engine++) begin
+                            case (engine)
+                                2: returned_reads[engine] +=
+                                    $countones(compute_vif.cnm_rsp_valid);
+                                3: returned_reads[engine] +=
+                                    compute_vif.matrix_rsp_valid;
+                                default: returned_reads[engine] +=
+                                    compute_vif.engine_rsp_valid[engine];
+                            endcase
+                        end
+                        pending_reads = 0;
+                        for (engine = 0; engine < 7; engine++) begin
+                            if (returned_reads[engine] > accepted_reads[engine])
+                                `uvm_fatal("CLUSTER_PARALLEL_RESET_OWNER", $sformatf(
+                                    "owner %0d returned more reads than accepted at reset cut: accepted=%0d returned=%0d",
+                                    engine, accepted_reads[engine], returned_reads[engine]))
+                            pending_reads += accepted_reads[engine] - returned_reads[engine];
+                        end
+                        if (pending_reads == 0)
+                            `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL",
+                                "all accepted reads drained before the combined stalled-request/reset cut")
+                        `uvm_info("CLUSTER_PARALLEL_RESET_STALL_PASS", $sformatf(
+                            "request selected while ready, then held stable/unaccepted for one sampled cycle before reset; engine_mask=%07b MatrixBanked=%0b MatrixLine=%0b CNM=%04b; pending_reads=%0d",
+                            reset_stalled_engine_mask, reset_stalled_matrix_banked,
+                            reset_stalled_matrix_line, reset_stalled_cnm_mask,
+                            pending_reads), UVM_LOW)
                         #1ns;
                         reset_value = 1'b0;
                         reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
                         if (!reset_ok)
                             `uvm_fatal("CLUSTER_PARALLEL_RESET",
                                 "failed to assert shared reset with seven engine owners pending")
+                        release_scheduler_admission_stall();
                         `uvm_info("CLUSTER_PARALLEL_RESET_CUT", $sformatf(
                             "cut busy=%07b accepted_mask=%07b pending_reads=%0d committed_output_words=%0d/%0d/%0d/%0d/%0d/%0d/%0d",
                             7'b111_1111, accepted_engine_mask, pending_reads,
