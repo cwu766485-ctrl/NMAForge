@@ -12,6 +12,9 @@ The NMAForge side passed all Golden checks across three seeds; TinyNPU array
 cycles are the earlier direct RTL measurements at the same pinned SHA, not a
 new TinyNPU simulation in this replay. See the [R273 replay report](COMPUTE_CLUSTER_TINY_NPU_MATCHED_CONTROLLER_R273_2026-11-04.md)
 and [CSV](tinynpu_matched_controller_r273.csv) for exact scope and limits.
+Compare those three rows within the R273 D4/P1/C1 controller interval. Other
+tables below preserve earlier runs with different harnesses or timing
+boundaries and should not be mixed into this latest matched-vector result.
 
 ## Review boundary
 
