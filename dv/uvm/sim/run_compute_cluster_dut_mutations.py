@@ -79,6 +79,49 @@ MUTATIONS = {
         )],
         "checker": r"CLUSTER_DONE_WITHOUT_ACTIVE",
     },
+    "stalled_request_payload": {
+        "source": "rtl/top/ai_accel_top.v",
+        "replacements": [
+            (
+                "    wire [6:0] compute_engine_ready, compute_engine_rsp_valid;\n",
+                "    wire [6:0] compute_engine_ready, compute_engine_rsp_valid;\n"
+                "    reg cl_mut_engine_req_stall_toggle;\n"
+                "    reg cl_mut_engine_req_stall_sent;\n"
+                "    reg [2:0] cl_mut_engine_req_stall_count;\n"
+                "    initial begin\n"
+                "        cl_mut_engine_req_stall_toggle = 1'b0;\n"
+                "        cl_mut_engine_req_stall_sent = 1'b0;\n"
+                "        cl_mut_engine_req_stall_count = 3'd0;\n"
+                "    end\n"
+                "    always @(posedge aclk) begin\n"
+                "        if (!aresetn) begin\n"
+                "            cl_mut_engine_req_stall_toggle <= 1'b0;\n"
+                "            cl_mut_engine_req_stall_count <= 3'd0;\n"
+                "        end else if (!cl_mut_engine_req_stall_sent &&\n"
+                "                     compute_engine_req_valid[6] && !compute_engine_ready[6]) begin\n"
+                "            if (cl_mut_engine_req_stall_count < 3'd4)\n"
+                "                cl_mut_engine_req_stall_count <= cl_mut_engine_req_stall_count + 3'd1;\n"
+                "            if (cl_mut_engine_req_stall_count == 3'd3) begin\n"
+                "                cl_mut_engine_req_stall_toggle <= 1'b1;\n"
+                "                cl_mut_engine_req_stall_sent <= 1'b1;\n"
+                "            end else cl_mut_engine_req_stall_toggle <= 1'b0;\n"
+                "        end else begin\n"
+                "            cl_mut_engine_req_stall_toggle <= 1'b0;\n"
+                "            if (!compute_engine_req_valid[6] || compute_engine_ready[6])\n"
+                "                cl_mut_engine_req_stall_count <= 3'd0;\n"
+                "        end\n"
+                "    end\n",
+            ),
+            (
+                "assign compute_engine_req_addr = {kv_spad_addr, conv_spad_addr,",
+                "assign compute_engine_req_addr = {(kv_spad_addr ^\n"
+                "                                       ((cl_mut_engine_req_stall_toggle &&\n"
+                "                                         !compute_engine_ready[6]) ?\n"
+                "                                        32'd4 : 32'd0)), conv_spad_addr,",
+            ),
+        ],
+        "checker": r"CLUSTER_REQUEST_STABILITY",
+    },
 }
 
 
@@ -102,6 +145,8 @@ def main():
     parser.add_argument("--vcs-home", default=os.environ.get(
         "VCS_HOME", "/opt/Synopsys/vcs/V-2023.12-SP1"))
     parser.add_argument("--seed", default="20261025")
+    parser.add_argument("--mutation", action="append", choices=sorted(MUTATIONS),
+                        help="run selected mutation(s); default runs the complete campaign")
     parser.add_argument("--timeout", type=int, default=300,
                         help="maximum seconds for each compile and simulation")
     args = parser.parse_args()
@@ -124,8 +169,10 @@ def main():
         "-cm", "line+cond+branch+fsm+assert",
     ]
 
+    selected_mutations = {name: MUTATIONS[name] for name in args.mutation} \
+        if args.mutation else MUTATIONS
     results = []
-    for name, spec in MUTATIONS.items():
+    for name, spec in selected_mutations.items():
         variant_dir = out / name
         variant_dir.mkdir(parents=True, exist_ok=True)
         source_rel = spec["source"]
@@ -183,7 +230,7 @@ def main():
     summary.write_text("\n".join("{}: {}".format(name, checker)
                                   for name, checker in results) + "\n")
     print("COMPUTE_CLUSTER_DUT_MUTATION_PASS: {}/{} real RTL mutants caught; logs={}".format(
-        len(results), len(MUTATIONS), out))
+        len(results), len(selected_mutations), out))
     return 0
 
 
