@@ -1,3 +1,16 @@
+> **2026-11-04 R315 legal Matrix requester-order reset replay:** At clean
+> SHA `695d348e4bb8ad77ed26ff502013765261606995` / tree
+> `03c33489ad9743bfb480c38c76a24df1e5e102d5`, three UVM seeds pass 13
+> held-request/pending-old-read reset cuts each, including all seven legal
+> Matrix descriptor orders, with full seven-engine Golden recovery. Memory
+> and owner scoreboards are clean (405,647 words, 153,752 accepted / 26
+> reset-dropped per seed), severity 0/0/0; Top Smoke and 20 random cases pass.
+> The raw requester × pending-response-owner cross stays 8/49 (16.33%); 41
+> bins still lack reachability disposition. This is scoped evidence only:
+> 27 PASS-SCOPED / 11 PARTIAL, `CL-DV-v1.0` HOLD. See [R315 report]
+> (../docs/verification/COMPUTE_CLUSTER_REQUEST_PENDING_RESPONSE_OWNER_CROSS_R315_2026-11-04.md),
+> archive SHA-256 `b3779d80997591c0587fa72903e8fa188b0f8e1248242ef92f5988187539d474`.
+
 > **2026-11-04 R287 Matrix FSM formal replay:** At fixed clean test SHA
 > `01a4114118cc0664c52602c6bed6a1e33b76681c` / tree
 > `1f4e183723b359b3e3b1eb556619929849df8ea6`, VC Formal V-2023.12-SP2
