@@ -77,6 +77,7 @@
         bit error;
         bit [3:0] error_code;
         bit protocol_error;
+        bit read_parity_protection_same_cycle_sampled;
         bit reset_abort;
 
         `uvm_object_utils(bf16_dot_observed_item)
@@ -103,6 +104,8 @@
             error = rhs.error;
             error_code = rhs.error_code;
             protocol_error = rhs.protocol_error;
+            read_parity_protection_same_cycle_sampled =
+                rhs.read_parity_protection_same_cycle_sampled;
             reset_abort = rhs.reset_abort;
         endfunction
     endclass

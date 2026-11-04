@@ -45,17 +45,20 @@
             req.write_protection_stall_cycles = 0;
             req.check_element_count =
                 (mode == FP_FAULT_READ_PARITY_LATE) ||
-                (mode == FP_FAULT_READ_B_PARITY);
+                (mode == FP_FAULT_READ_B_PARITY) ||
+                (mode == FP_FAULT_READ_PARITY_PROTECTION);
             if ((mode == FP_FAULT_READ_B_PROTECTION) ||
                 (mode == FP_FAULT_READ_LATE_PROTECTION) ||
                 (mode == FP_FAULT_READ_LATE_B_PROTECTION) ||
                 (mode == FP_FAULT_READ_LATE_PROTECTION_ABORT))
                 req.check_element_count = 1;
-            req.expected_element_count =
-                ((mode == FP_FAULT_READ_LATE_PROTECTION) ||
-                 (mode == FP_FAULT_READ_LATE_B_PROTECTION)) ? 2 :
-                ((mode == FP_FAULT_READ_PARITY_LATE) ? 2 :
-                 ((mode == FP_FAULT_READ_LATE_PROTECTION_ABORT) ? 1 : 0));
+            req.expected_element_count = 0;
+            if ((mode == FP_FAULT_READ_LATE_PROTECTION) ||
+                (mode == FP_FAULT_READ_LATE_B_PROTECTION) ||
+                (mode == FP_FAULT_READ_PARITY_LATE))
+                req.expected_element_count = 2;
+            else if (mode == FP_FAULT_READ_LATE_PROTECTION_ABORT)
+                req.expected_element_count = 1;
             req.fault_mode = mode;
             req.length = length;
             req.a_bits[0] = format_fp16 ? 16'h3c00 : 16'h3f80;
@@ -405,6 +408,10 @@
             // the same edge; the frozen priority requires ERR_PARITY.
             send_fault_case(FP_FAULT_READ_PARITY_ABORT, 1'b0, 1, 4'd5, 2, 0);
             send_fault_case(FP_FAULT_READ_PARITY_ABORT, 1'b1, 1, 4'd5, 2, 0);
+            // A0's parity response overlaps acceptance of A1 with Protection.
+            // Three accepted reads must drain; Parity remains the error code.
+            send_fault_case(FP_FAULT_READ_PARITY_PROTECTION, 1'b0, 3, 4'd5, 3, 0);
+            send_fault_case(FP_FAULT_READ_PARITY_PROTECTION, 1'b1, 3, 4'd5, 3, 0);
             // Align the first parity response with watchdog expiry; Parity
             // remains the first reported cause over Watchdog.
             send_fault_case(FP_FAULT_READ_PARITY_WATCHDOG, 1'b0, 1, 4'd5, 2, 0);

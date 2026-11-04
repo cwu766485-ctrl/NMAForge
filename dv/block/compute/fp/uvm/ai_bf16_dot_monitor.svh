@@ -75,6 +75,7 @@
                     current.error = 0;
                     current.error_code = 0;
                     current.protocol_error = 0;
+                    current.read_parity_protection_same_cycle_sampled = 0;
                     current.reset_abort = 0;
                     outstanding_reads = 0;
                     monitor_cycle = 0;
@@ -83,6 +84,13 @@
 
                 if (current != null)
                     monitor_cycle++;
+
+                // Record the actual interface edge for the legal priority
+                // cross; this is independent of the driver's injection flag.
+                if ((current != null) && vif.spad_rsp_valid &&
+                    vif.spad_parity_error && vif.spad_valid && vif.spad_ready &&
+                    !vif.spad_write && vif.spad_protection_error)
+                    current.read_parity_protection_same_cycle_sampled = 1'b1;
 
                 if ((current != null) && vif.spad_valid && !vif.spad_ready)
                     current.stall_cycles++;
