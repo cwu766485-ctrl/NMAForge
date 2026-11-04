@@ -5455,7 +5455,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     task automatic run_all_engine_parallel_reset_epoch_test(
         input int unsigned seed,
         input int signed matrix_golden[0:15][0:31],
-        input int unsigned stalled_owner);
+        input int unsigned stalled_owner,
+        input int unsigned submission_rotation);
         localparam bit [15:0] TASK_ID_BASE = 16'h06e0;
         bit [31:0] expected_result[0:6];
         bit [31:0] expected_elements[0:6];
@@ -5480,6 +5481,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         bit [31:0] output_base;
         bit [31:0] expected_output_word;
         int unsigned launch_before[0:6];
+        int unsigned descriptor_engine_order[0:6];
+        int unsigned descriptor_engine;
         int unsigned engine;
         int unsigned slot;
         int unsigned word_idx;
@@ -5501,9 +5504,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         bit [31:0] reset_stalled_cnm_addr[0:3];
         bit reset_stalled_any_request;
 
-        if (stalled_owner >= 7)
+        if (stalled_owner >= 7 || submission_rotation >= 7)
             `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL",
-                $sformatf("invalid reset-cut request owner=%0d", stalled_owner))
+                $sformatf("invalid reset-cut request owner=%0d submission rotation=%0d",
+                          stalled_owner, submission_rotation))
 
         accepted_engine_mask = '0;
         completion_seen = '0;
@@ -5554,38 +5558,62 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                        32'hbad0_e400 | slot);
         end
 
-        write_cnm_v3_desc(PARALLEL_FAULT_CMDQ + 32'h000,
-                          TASK_ID_BASE + 16'd2, C1_CNM_A_LOCAL,
-                          C1_CNM_B_LOCAL, PARALLEL_FAULT_CNM_Y);
-        spad_write(PARALLEL_FAULT_CMDQ + 32'h014, {16'd1, 16'd16});
-        spad_write(PARALLEL_FAULT_CMDQ + 32'h018, 32'd64);
-        write_v3_desc(PARALLEL_FAULT_CMDQ + 32'h040, 8'h35,
-                      TASK_ID_BASE + 16'd4, C1_SFU_A_LOCAL, 32'd0,
-                      PARALLEL_FAULT_SFU_Y, 16'd0, 16'd0, 16'd128);
-        write_cluster_desc(PARALLEL_FAULT_CMDQ + 32'h080, 8'h10,
-                           TASK_ID_BASE + 16'd0, C1_SCALAR_A_LOCAL,
-                           C1_SCALAR_B_LOCAL, PARALLEL_FAULT_SCALAR_Y,
-                           16'd0, 16'd0, 16'd128, 32'd0,
-                           32'd0, 32'd0, 32'd0, 8'd3);
-        write_cluster_desc(PARALLEL_FAULT_CMDQ + 32'h0c0, 8'h50,
-                           TASK_ID_BASE + 16'd1, C1_FP_A_LOCAL,
-                           C1_FP_B_LOCAL, PARALLEL_FAULT_FP_Y,
-                           16'd1, 16'd1, 16'd128, 32'd0,
-                           32'd0, 32'd0, 32'd0, 8'd7);
-        write_cluster_desc(PARALLEL_FAULT_CMDQ + 32'h100, 8'h16,
-                           TASK_ID_BASE + 16'd5, C1_CONV_A_LOCAL,
-                           C1_CONV_W_LOCAL, PARALLEL_FAULT_CONV_Y,
-                           16'd16, 16'd16, 16'd9, 32'd0,
-                           32'd0, 32'd0, 32'd0, 8'd5);
-        write_cluster_desc(PARALLEL_FAULT_CMDQ + 32'h140, 8'h43,
-                           TASK_ID_BASE + 16'd6, C1_KV_VECTOR_LOCAL,
-                           32'd0, PARALLEL_FAULT_KV_CACHE,
-                           16'd0, 16'd0, 16'd128, {16'd1,16'd1},
-                           32'd16, 32'd64, 32'd0, 8'd5);
-        write_v3_desc(PARALLEL_FAULT_CMDQ + 32'h180, 8'h30,
-                      TASK_ID_BASE + 16'd3, MATRIX_A_LOCAL,
-                      MATRIX_B_LOCAL, PARALLEL_FAULT_MATRIX_Y,
-                      16'd16, 16'd32, 16'd16);
+        // Keep every independent task and operand legal, but rotate only the
+        // CMDQ submission order across held-request reset cuts. This varies
+        // request arrival/owner interleaving without bypassing the production
+        // dispatcher, mux, arbiter, or response path.
+        descriptor_engine_order[0] = 2; // CNM
+        descriptor_engine_order[1] = 4; // SFU
+        descriptor_engine_order[2] = 0; // INT8
+        descriptor_engine_order[3] = 1; // FP
+        descriptor_engine_order[4] = 5; // Conv
+        descriptor_engine_order[5] = 6; // KV
+        descriptor_engine_order[6] = 3; // Matrix
+        for (slot = 0; slot < 7; slot++) begin
+            descriptor_engine = descriptor_engine_order[
+                (slot + submission_rotation) % 7];
+            case (descriptor_engine)
+                0: write_cluster_desc(PARALLEL_FAULT_CMDQ + (slot << 6),
+                       8'h10, TASK_ID_BASE + 16'd0, C1_SCALAR_A_LOCAL,
+                       C1_SCALAR_B_LOCAL, PARALLEL_FAULT_SCALAR_Y,
+                       16'd0, 16'd0, 16'd128, 32'd0,
+                       32'd0, 32'd0, 32'd0, 8'd3);
+                1: write_cluster_desc(PARALLEL_FAULT_CMDQ + (slot << 6),
+                       8'h50, TASK_ID_BASE + 16'd1, C1_FP_A_LOCAL,
+                       C1_FP_B_LOCAL, PARALLEL_FAULT_FP_Y,
+                       16'd1, 16'd1, 16'd128, 32'd0,
+                       32'd0, 32'd0, 32'd0, 8'd7);
+                2: begin
+                    write_cnm_v3_desc(PARALLEL_FAULT_CMDQ + (slot << 6),
+                        TASK_ID_BASE + 16'd2, C1_CNM_A_LOCAL,
+                        C1_CNM_B_LOCAL, PARALLEL_FAULT_CNM_Y);
+                    spad_write(PARALLEL_FAULT_CMDQ + (slot << 6) + 32'h014,
+                               {16'd1, 16'd16});
+                    spad_write(PARALLEL_FAULT_CMDQ + (slot << 6) + 32'h018,
+                               32'd64);
+                end
+                3: write_v3_desc(PARALLEL_FAULT_CMDQ + (slot << 6),
+                       8'h30, TASK_ID_BASE + 16'd3, MATRIX_A_LOCAL,
+                       MATRIX_B_LOCAL, PARALLEL_FAULT_MATRIX_Y,
+                       16'd16, 16'd32, 16'd16);
+                4: write_v3_desc(PARALLEL_FAULT_CMDQ + (slot << 6),
+                       8'h35, TASK_ID_BASE + 16'd4, C1_SFU_A_LOCAL, 32'd0,
+                       PARALLEL_FAULT_SFU_Y, 16'd0, 16'd0, 16'd128);
+                5: write_cluster_desc(PARALLEL_FAULT_CMDQ + (slot << 6),
+                       8'h16, TASK_ID_BASE + 16'd5, C1_CONV_A_LOCAL,
+                       C1_CONV_W_LOCAL, PARALLEL_FAULT_CONV_Y,
+                       16'd16, 16'd16, 16'd9, 32'd0,
+                       32'd0, 32'd0, 32'd0, 8'd5);
+                6: write_cluster_desc(PARALLEL_FAULT_CMDQ + (slot << 6),
+                       8'h43, TASK_ID_BASE + 16'd6, C1_KV_VECTOR_LOCAL,
+                       32'd0, PARALLEL_FAULT_KV_CACHE,
+                       16'd0, 16'd0, 16'd128, {16'd1,16'd1},
+                       32'd16, 32'd64, 32'd0, 8'd5);
+                default: `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL",
+                    $sformatf("invalid rotated engine order entry=%0d",
+                              descriptor_engine))
+            endcase
+        end
 
         expected_status[0] = 32'h0000_0001;
         expected_result[0] = 32'd512;
@@ -13394,7 +13422,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             engine_parallel_fault_cg.get_coverage(), seed), UVM_LOW)
         for (engine_idx = 0; engine_idx < 7; engine_idx++)
             run_all_engine_parallel_reset_epoch_test(seed, matrix_golden,
-                                                      engine_idx);
+                                                      engine_idx, 0);
+        // A second legal queue order changes the immediately preceding SPAD
+        // responder at the Matrix held-request cut. Keep the canonical case
+        // above so the Matrix self-pending-read pair remains covered too.
+        run_all_engine_parallel_reset_epoch_test(seed, matrix_golden, 3, 3);
         if (engine_parallel_reset_stall_cg.get_coverage() < 100.0)
             `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL_COVERAGE", $sformatf(
                 "held production request owner bins=%0.1f%% expected 100%% (7 engine classes)",
