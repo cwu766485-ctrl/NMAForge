@@ -313,6 +313,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned depthwise_channel_sequence_case;
     int unsigned matrix_multitile_shape_case;
     int unsigned engine_parallel_fault_cov_idx;
+    int unsigned engine_parallel_fault_recovery_cov_idx;
     int unsigned engine_parallel_reset_phase;
     covergroup cmdq_invalid_descriptor_cg;
         option.per_instance = 1;
@@ -388,6 +389,25 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             bins conv_parity_with_six_engine_completions = {5};
             bins kv_parity_with_six_engine_completions = {6};
         }
+    endgroup
+
+    covergroup engine_parallel_fault_recovery_cg;
+        option.per_instance = 1;
+        cp_fault_owner_x_healthy_completion_owner:
+            coverpoint engine_parallel_fault_recovery_cov_idx {
+                // Encode each legal ordered pair as fault_owner * 7 + healthy_owner.
+                // Self-pairs are intentionally absent: one owner cannot be both
+                // the parity-faulted engine and an unaffected successful engine.
+                bins fault_owner_x_healthy_completion_owner[] = {
+                    1, 2, 3, 4, 5, 6,
+                    7, 9, 10, 11, 12, 13,
+                    14, 15, 17, 18, 19, 20,
+                    21, 22, 23, 25, 26, 27,
+                    28, 29, 30, 31, 33, 34,
+                    35, 36, 37, 38, 39, 41,
+                    42, 43, 44, 45, 46, 47
+                };
+            }
     endgroup
 
     covergroup engine_parallel_reset_cg;
@@ -573,6 +593,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         matrix_multitile_shape_case = 0;
         matrix_multitile_shape_cg = new();
         engine_parallel_fault_cg = new();
+        engine_parallel_fault_recovery_cg = new();
         engine_parallel_reset_cg = new();
         engine_pair_overlap_cg = new();
         c1_shared_read_alias_case = 0;
@@ -5085,6 +5106,19 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         if (observed !== 32'd7)
             `uvm_fatal("CLUSTER_PARALLEL_ENGINE_FAULT", $sformatf(
                 "seven-engine completion tail expected=7 actual=%0d", observed))
+        // All completion owner/status/result/element checks and all six healthy
+        // output-image Goldens above have passed. Record the directed legal
+        // fault-owner × unaffected-completion-owner pairs only after those
+        // checkers succeed, so this cross is evidence rather than stimulus intent.
+        for (engine = 0; engine < 7; engine++) begin
+            if (engine != fault_engine) begin
+                engine_parallel_fault_recovery_cov_idx = fault_engine * 7 + engine;
+                engine_parallel_fault_recovery_cg.sample();
+                `uvm_info("CLUSTER_PARALLEL_ENGINE_FAULT_RECOVERY_PAIR_PASS",
+                    $sformatf("fault_engine=%0d healthy_completion_engine=%0d Golden=PASS owner/status/result/elements=PASS seed=%0d",
+                              fault_engine, engine, seed), UVM_LOW)
+            end
+        end
         engine_parallel_fault_cov_idx = fault_engine;
         engine_parallel_fault_cg.sample();
         `uvm_info("CLUSTER_PARALLEL_ENGINE_FAULT_CASE_PASS", $sformatf(
@@ -12844,6 +12878,13 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_fatal("CLUSTER_PARALLEL_ENGINE_FAULT_COVERAGE", $sformatf(
                 "seven-engine parallel parity owner bins=%0.1f%% expected=100%%",
                 engine_parallel_fault_cg.get_coverage()))
+        if (engine_parallel_fault_recovery_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_PARALLEL_ENGINE_FAULT_RECOVERY_COVERAGE", $sformatf(
+                "fault-owner × unaffected-completion-owner bins=%0.1f%% expected=100%%",
+                engine_parallel_fault_recovery_cg.get_coverage()))
+        `uvm_info("CLUSTER_PARALLEL_ENGINE_FAULT_RECOVERY_COVERAGE_PASS", $sformatf(
+            "legal fault-owner × unaffected-completion-owner pairs=42/42 coverage=%.1f%%; self-pairs excluded; every bin sampled after completion and Golden checkers pass; seed=%0d",
+            engine_parallel_fault_recovery_cg.get_coverage(), seed), UVM_LOW)
         `uvm_info("CLUSTER_PARALLEL_ENGINE_FAULT_PASS", $sformatf(
             "legal seven-engine parallel parity: each fault owner overlapped other active engines; six healthy outputs matched Golden; 7 completion owners/statuses checked; no-writeback sentinels passed for each fault owner; fault_owners=7/7 focused_bins=7/7 coverage=%.1f%% seed=%0d",
             engine_parallel_fault_cg.get_coverage(), seed), UVM_LOW)
