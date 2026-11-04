@@ -88,6 +88,7 @@ module tb_ai_accel_uvm;
     assign compute_obs.request_client = dut.arb_request_client;
     assign compute_obs.matrix_rsp_valid = dut.banked_rsp_valid;
     assign compute_obs.cnm_rsp_valid = dut.cnm_rsp_valid;
+    assign compute_obs.cnm_rsp_parity = dut.cnm_parity;
     assign compute_obs.cnm_request_valid = dut.cnm_read_valid;
     assign compute_obs.cnm_request_ready = dut.arb_cnm_ready;
     assign compute_obs.matrix_request_valid = dut.banked_read_valid;
