@@ -222,8 +222,9 @@ they are not merged into the current pinned-reference CSV.
   power report was run. Any 250 MHz effective-GOPS column in existing Matrix
   logs is a normalization assumption only.
 - Compute Cluster v1.0 remains a sign-off candidate, not signed: the current
-  audit is 25 PASS-SCOPED / 13 PARTIAL, with unresolved functional closure
-  items documented in the [audit report](../verification/COMPUTE_CLUSTER_V1_FINAL_AUDIT.md).
+  38-row [Execution RTM](../verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)
+  is 27 PASS-SCOPED / 11 PARTIAL and remains HOLD. The earlier
+  [audit report](../verification/COMPUTE_CLUSTER_V1_FINAL_AUDIT.md) is a historical snapshot.
 
 ## R134 current-candidate replay — 2026-10-31
 
