@@ -1405,3 +1405,11 @@ The Matrix core and formal harness checksums match the prior R249 review; the fo
 | `REQ-PC-006/007` | `PARTIAL` | Same Test ID; whole-run `CLUSTER_MEMORY_SCOREBOARD` and `CLUSTER_ENGINE_RESPONSE_OWNER` | Per seed, 277,883 words checked with zero mismatch/unknown/stale; 141,773 accepted / 141,754 checked / 19 reset-dropped with zero route/data/error mismatch and zero pending. Broader concurrent owner/fault/memory cross remains open. | Same Run ID / seeds | Same report and logs-only archive |
 
 This is bounded testpoint evidence only. The overall 38-row disposition remains 27 `PASS-SCOPED` / 11 `PARTIAL`; no requirement is promoted and `CL-DV-v1.0` remains **HOLD**. Overall program progress and rough effort estimates are in [the current status report](NMAFORGE_COMPUTE_CLUSTER_STATUS_2026-11-04.md).
+
+## R303 stalled-request payload Checker mutation — 2026-11-04
+
+| Requirement | Disposition | Test ID / Checker | Coverage / observed result | Run ID / seed | Evidence |
+|---|---|---|---|---|---|
+| `REQ-CL-006` | `PARTIAL` | `TC-CL-R303-STALL-PAYLOAD-MUTATION`; production request-stability monitor and `CLUSTER_REQUEST_STABILITY` gate | A temporary RTL mutant changes the real KV request address for one sampled cycle after four consecutive unaccepted cycles, then restores it before acceptance. The expected Checker reports the mutation; exactly two stability observations catch the change and restoration. Full campaign: 8/8 Address/Data/Owner/WSTRB/Completion/Missing-Done/Duplicate-Done/Stalled-Payload mutants caught; eight compile logs have zero `Warning-`, `Error-`, or `[TFIPC]` lines. | `R303-STALL-PAYLOAD-MUTATION-CLEAN-20261104`; seed `20261025` | [R303 report](COMPUTE_CLUSTER_REQUEST_STABILITY_MUTATION_R303_2026-11-04.md); `/tmp/nmaforge_r303_clean_mutation_fed6342_logs.tar.gz`, SHA-256 `a5bd0596070bf0c61d4883c1522a9997a818582e7931dc40c08ce05d1d385263` |
+
+This confirms the request-stability Checker detects a stalled payload mutation. It does not close the legal requester × fault × phase × reset/backpressure space, so no Requirement is promoted. The RTM remains 27 `PASS-SCOPED` / 11 `PARTIAL` and `CL-DV-v1.0` remains **HOLD**.
