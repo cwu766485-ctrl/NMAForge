@@ -19,4 +19,5 @@ numeric-regress:
 	"$(SIMV)" +SEED=$(SEED) +VECTOR_FILE="$(VECTORS)" -l "$(OUT)/run.log"
 	grep -q '^SCALAR_INT8_ABORT_WATCHDOG_PRIORITY_PASS .*winner=ABORT .*completion_pulses=1 ' "$(OUT)/run.log"
 	grep -q '^SCALAR_INT8_ABORT_RESET_PRIORITY_PASS .*winner=RESET .*recovery_golden=70 ' "$(OUT)/run.log"
-	grep -q '^SCALAR_INT8_NUMERIC_PASS cases=14 ' "$(OUT)/run.log"
+	grep -q '^SCALAR_INT8_MAX_LENGTH_PASS length=65535 accepted_reads=131070 returned_reads=131070 exact_acc=4294901760 saturated=7fffffff output_word=65535 ' "$(OUT)/run.log"
+	grep -q '^SCALAR_INT8_NUMERIC_PASS cases=15 ' "$(OUT)/run.log"

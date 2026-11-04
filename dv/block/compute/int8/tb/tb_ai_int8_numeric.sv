@@ -37,7 +37,7 @@ module tb_ai_int8_numeric;
     wire [31:0] cycle_count;
     wire [31:0] element_count;
 
-    reg [31:0] spad_mem [0:16383];
+    reg [31:0] spad_mem [0:65535];
     reg [31:0] expected_addr [0:255];
     reg [31:0] expected_data [0:255];
     reg expected_write_seen [0:255];
@@ -78,6 +78,8 @@ module tb_ai_int8_numeric;
     integer slot;
     integer cycle;
     integer read_index;
+    integer fill_index;
+    integer timeout_limit;
     integer j;
     integer seed;
     integer op_index;
@@ -170,7 +172,7 @@ module tb_ai_int8_numeric;
                     if (expected_write_seen[slot])
                         $fatal(1, "duplicate SPAD write addr=%08x", spad_addr);
                     expected_write_seen[slot] = 1'b1;
-                    spad_mem[spad_addr[15:2]] <= spad_wdata;
+                    spad_mem[spad_addr[17:2]] <= spad_wdata;
                 end else begin
                     if (read_pending)
                         $fatal(1, "core issued a second read with a response outstanding");
@@ -179,7 +181,7 @@ module tb_ai_int8_numeric;
                     total_read_accepts = total_read_accepts + 1;
                     read_pending <= 1'b1;
                     read_delay <= deterministic_spad ? 1 : (1 + lfsr[3:2]);
-                    read_pending_data <= spad_mem[spad_addr[15:2]];
+                    read_pending_data <= spad_mem[spad_addr[17:2]];
                 end
             end
         end
@@ -208,7 +210,8 @@ module tb_ai_int8_numeric;
             @(negedge clk);
             start = 1'b0;
             timeout_cycles = 0;
-            while (!done && timeout_cycles < 100000) begin
+            timeout_limit = (id == 100) ? 800000 : 100000;
+            while (!done && timeout_cycles < timeout_limit) begin
                 @(negedge clk);
                 timeout_cycles = timeout_cycles + 1;
             end
@@ -226,10 +229,10 @@ module tb_ai_int8_numeric;
                 if (!expected_write_seen[j])
                     $fatal(1, "missing output write case=%0d name=%s address=%08x",
                            id, name, expected_addr[j]);
-                if (spad_mem[expected_addr[j][15:2]] !== expected_data[j])
+                if (spad_mem[expected_addr[j][17:2]] !== expected_data[j])
                     $fatal(1, "memory image case=%0d name=%s address=%08x got=%08x expected=%08x",
                            id, name, expected_addr[j],
-                           spad_mem[expected_addr[j][15:2]], expected_data[j]);
+                           spad_mem[expected_addr[j][17:2]], expected_data[j]);
             end
             if (read_pending)
                 $fatal(1, "response ledger not drained case=%0d name=%s", id, name);
@@ -242,6 +245,56 @@ module tb_ai_int8_numeric;
             repeat (2) @(negedge clk);
             resetn = 1'b1;
             @(negedge clk);
+        end
+    endtask
+
+    task automatic run_max_vdot_length;
+        integer reads_before;
+        integer responses_before;
+        begin
+            resetn = 1'b0;
+            start = 1'b0;
+            abort = 1'b0;
+            spad_rsp_valid = 1'b0;
+            deterministic_spad = 1'b1;
+            op_mode = 8'h10;
+            src0_base = 32'h0000_0000;
+            src1_base = 32'h0000_0000;
+            dst_base = 32'h0003_fffc;
+            length = 16'hffff;
+            m_size = 16'd0;
+            n_size = 16'd0;
+            k_words = 16'd0;
+            scale_shift = 5'd0;
+            activation = 2'd0;
+            bias_base = 32'd0;
+            bias_enable = 1'b0;
+            watchdog_limit = 32'd0;
+            repeat (3) @(negedge clk);
+            for (fill_index = 0; fill_index < 65535; fill_index = fill_index + 1)
+                spad_mem[fill_index] = 32'h8080_8080;
+            spad_mem[65535] = 32'hdead_beef;
+
+            expected_count = 1;
+            expected_addr[0] = dst_base;
+            expected_data[0] = 32'h7fff_ffff;
+            expected_write_seen[0] = 1'b0;
+            reads_before = total_read_accepts;
+            responses_before = total_read_responses;
+            resetn = 1'b1;
+            @(negedge clk);
+            run_one_case(100, "vdot_max_encoded_length_33bit_accumulator");
+            if (total_read_accepts - reads_before != 131070 ||
+                total_read_responses - responses_before != 131070 || read_pending)
+                $fatal(1, "maximum VDOT transaction count mismatch reads=%0d responses=%0d pending=%b",
+                       total_read_accepts - reads_before,
+                       total_read_responses - responses_before, read_pending);
+            if (spad_mem[65535] !== 32'h7fff_ffff)
+                $fatal(1, "maximum VDOT output memory image mismatch got=%08x",
+                       spad_mem[65535]);
+            deterministic_spad = 1'b0;
+            $display("SCALAR_INT8_MAX_LENGTH_PASS length=65535 accepted_reads=131070 returned_reads=131070 exact_acc=4294901760 saturated=7fffffff output_word=65535 seed=%0d",
+                     seed);
         end
     endtask
 
@@ -437,7 +490,7 @@ module tb_ai_int8_numeric;
         for (case_id = 0; case_id < case_total; case_id = case_id + 1) begin
             resetn = 1'b0;
             repeat (2) @(negedge clk);
-            for (index = 0; index < 16384; index = index + 1)
+            for (index = 0; index < 65536; index = index + 1)
                 spad_mem[index] = 32'd0;
             scan_result = $fscanf(vector_fd,
                 "%s %d %s %h %h %h %h %h %d %d %d %d %d %d %d %d %d\n",
@@ -471,9 +524,9 @@ module tb_ai_int8_numeric;
                 scan_result = $fscanf(vector_fd, "%s %h %h\n", tag, file_addr, file_data);
                 if (scan_result != 3 || tag != "M" || file_addr[1:0] != 2'b00)
                     $fatal(1, "malformed memory entry case=%0d entry=%0d", case_id, index);
-                if (file_addr[31:16] != 0)
-                    $fatal(1, "test memory address outside 64KiB model: %08x", file_addr);
-                spad_mem[file_addr[15:2]] = file_data;
+                if (file_addr[31:18] != 0)
+                    $fatal(1, "test memory address outside 256KiB model: %08x", file_addr);
+                spad_mem[file_addr[17:2]] = file_data;
             end
             for (index = 0; index < expected_count; index = index + 1) begin
                 scan_result = $fscanf(vector_fd, "%s %h %h\n", tag, file_addr, file_data);
@@ -489,6 +542,7 @@ module tb_ai_int8_numeric;
         end
         run_abort_watchdog_priority();
         run_abort_reset_edge();
+        run_max_vdot_length();
         $fclose(vector_fd);
 
         if (opcode_bins[0] == 0 || opcode_bins[1] == 0 || opcode_bins[2] == 0 ||
