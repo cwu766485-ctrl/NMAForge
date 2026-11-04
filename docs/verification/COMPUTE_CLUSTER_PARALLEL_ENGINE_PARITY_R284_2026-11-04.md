@@ -55,11 +55,12 @@ make ai_run AI_RANDOM_CASES=20 AI_SEED=12345
 | Requirement | Disposition | Test ID / Checker | Coverage / 结果 | Run ID / Seed | 证据 |
 |---|---|---|---|---|---|
 | `REQ-CL-006` | `PARTIAL` | `TC-CL-R284-SEVEN-ENGINE-PARALLEL-PARITY`; passive request-stability monitor | 七个 parity owner 各 1 bin；FP same-owner cancel 1/seed，CNM same-lane cancel lane 0/seed；其它 payload 改变仍严格检查。完整 requester × stall × progress 交叉仍未闭合。 | `R284-UVM-CLEAN-3S-20261104`; `20261025/26/27` | clean seed logs、Testplan 和 SPEC 条款；归档见下文 |
-| `REQ-CL-007` / `REQ-PC-007` | `PARTIAL` | `CLUSTER_ENGINE_RESPONSE_OWNER`; accepted-read ledger + CMDQ completion owner checker | 每 Seed 10,678 accepted / 10,658 checked / 20 reset-dropped；route/data/error mismatch=0、pending=0；每次七条 task ID/status/result/element 检查通过。其它 fault/phase/reset 全交叉仍开。 | Same run / seeds | clean seed logs |
-| `REQ-CL-008` / `REQ-PC-006` | `PARTIAL` | `CLUSTER_MEMORY_SCOREBOARD`; independent per-engine Golden + fault sentinel checker | 每 Seed 检查 146,755 words，0 mismatch/unknown/stale；七个故障目的区 sentinel 均未被写，六个健康引擎完整输出与 Golden 一致。WSTRB 本轮仍为 full-only。 | Same run / seeds | clean seed logs |
-| `REQ-CL-011/012` | `PARTIAL` | completion-owner, status/result/element checker | 七个并发任务按 task owner 验证 exactly-once completion；每次运行七个 parity owner sweep 的 completion/result 均通过。其它 op/shape/错误类仍未完全关闭。 | Same run / seeds | clean seed logs |
+| `REQ-CL-007` | `PASS-SCOPED` | `CLUSTER_ENGINE_RESPONSE_OWNER`; accepted-read ledger + CMDQ completion owner checker | 每 Seed 10,678 accepted / 10,658 checked / 20 reset-dropped；route/data/error mismatch=0、pending=0；每次七条 task ID/status/result/element 检查通过。本轮只增加此限定并发 Parity 场景证据。 | Same run / seeds | clean seed logs |
+| `REQ-PC-007` | `PARTIAL` | `CLUSTER_ENGINE_RESPONSE_OWNER`; accepted-read ledger + CMDQ completion owner checker | 本轮上述 owner 账本无错；其它 requester × fault/phase/reset 全交叉仍开。 | Same run / seeds | clean seed logs |
+| `REQ-CL-008` | `PASS-SCOPED` | `CLUSTER_MEMORY_SCOREBOARD`; independent per-engine Golden + fault sentinel checker | 每 Seed 检查 146,755 words，0 mismatch/unknown/stale；七个故障目的区 sentinel 均未被写，六个健康引擎完整输出与 Golden 一致。本轮只增加此限定并发场景证据。 | Same run / seeds | clean seed logs |
+| `REQ-PC-006` | `PARTIAL` | `CLUSTER_MEMORY_SCOREBOARD`; independent output Golden + fault sentinel checker | 上述 output image 与 sentinel 检查通过；partial/zero WSTRB 及完整 requester/fault cross 本轮未覆盖。 | Same run / seeds | clean seed logs |
+| `REQ-CL-011/012` | `PASS-SCOPED` | completion-owner, status/result/element checker | 七个并发任务按 task owner 验证 exactly-once completion；每次运行七个 parity owner sweep 的 completion/result 均通过。本轮只增加此限定并发场景证据。 | Same run / seeds | clean seed logs |
 | `REQ-CL-017` | `PARTIAL` | parity first-read error prefix checker | 每种引擎的首个源读 parity 结果均无输出写入；尚未覆盖已接受写前缀、Protection、Watchdog、Abort 等完整 fault × phase。 | Same run / seeds | clean seed logs |
-
 因此本轮只增加限定 testpoint 的证据；38-row RTM 总数保持 **27 PASS-SCOPED / 11 PARTIAL**，`CL-DV-v1.0` 继续 **HOLD**。这不是 100% code coverage、全 fault cross closure 或完整签核。
 
 ## 证据归档
