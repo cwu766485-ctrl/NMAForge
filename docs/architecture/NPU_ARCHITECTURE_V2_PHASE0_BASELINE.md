@@ -207,3 +207,27 @@ an independent signed-INT8 Python Golden. The minimum focused suite is:
 
 Full v2 UVM/coverage closure remains a later phase, but these functional
 checkers cannot be removed or weakened.
+
+## 8. v2 progress — 2026-11-04
+
+**Shared-array K-fold operand primitive** is committed at
+`30e3ba81c675fe1612db1a393a8d3879aa80ba89`. The 16×16 array can select a
+per-PE B operand view while reusing its existing 256 signed multipliers and
+64-bit accumulators. A self-checking TB maps physical rows as
+`(output_row, K-fold lane)` and checks signed reduction against a scalar
+INT64 Golden, including a K=19 tail. This isolated primitive does not load
+operands from SPAD and is not integrated into the product Matrix controller;
+the controller ties K-fold mode low, so it is not product GEMV evidence.
+
+| Run ID | Command / source | Result |
+|---|---|---|
+| `V2-KFOLD-ARRAY-S3-30e3ba8` | `make array-random-regress ARRAY_OUT_DIR=/tmp/nmaforge_v2_kfold_array_30e3ba8 SEEDS='20261101 20261102 20261103' ARRAY_SEEDS='20261101 20261102 20261103'` from `dv/block/compute/matrix/sim` | PASS: legacy GEMM array tests plus four K-fold shapes on each seed; ARRAY_SIZE 8 and 16; M=1/4/8/16 where legal; K=19 Golden reduction. Logs: `/tmp/nmaforge_v2_kfold_array_30e3ba8/` |
+| `V2-KFOLD-TOP-SMOKE-30e3ba8` | `make ai_smoke` from `dv/subsystem/top_smoke/sim` | PASS `TEST PASS`; legacy product Matrix command path remains on GEMM mode. Existing Transformer fixture loop-reroll warning remains. |
+| `SHAPE-ADAPTIVE-20261104-30e3ba81` | `make shape-adaptive-regress RUN_DIR=/tmp/nmaforge_v2_shape_30e3ba8 SEEDS='20261101 20261102 20261103' SOURCE_SHA=30e3ba81c675fe1612db1a393a8d3879aa80ba89 PYTHON=python3.12` from `dv/research/shape_adaptive/sim` | PASS: 144 signed-INT8 kernel comparisons. Cycle savings still use the explicitly labeled fixed-bandwidth analytical schedule, not integrated product timing. |
+| `SHAPE-SPAD-30e3ba81c675fe1612db1a393a8d3879aa80ba89-20261104` | `make shape-adaptive-spad-regress RUN_DIR=/tmp/nmaforge_v2_shape_spad_30e3ba8 SEEDS='20261101 20261102 20261103' SOURCE_SHA=30e3ba81c675fe1612db1a393a8d3879aa80ba89 PYTHON=python3.12 SPAD_CSV=benchmark/shape_adaptive_spad_ablation.csv SPAD_JSON=benchmark/shape_adaptive_spad_summary.json` from `dv/research/shape_adaptive/sim` | PASS: 12 workloads across three seeds through the research wrapper, real arbiter/four-bank behavioral SPAD, contention, three abort phases and accepted-read reset recovery. This wrapper is still separate from product Matrix command dispatch. |
+
+The new B matrix view declares 512 B across its two banks, within the 1 KiB
+incremental v2 staging budget. Product controller integration, M/N/K
+descriptor tails, SPAD request overlap, response ownership, and measured
+controller-plus-SPAD GEMV cycles remain open; no GEMV product performance
+claim is made from these primitive or research-wrapper runs.

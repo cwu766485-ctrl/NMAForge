@@ -1,11 +1,11 @@
 {
-  "run_id": "SHAPE-ADAPTIVE-20261104-30413555",
-  "source_sha": "3041355528dffe856e2d5384027c6ee5df5d1b42",
+  "run_id": "SHAPE-ADAPTIVE-20261104-30e3ba81",
+  "source_sha": "30e3ba81c675fe1612db1a393a8d3879aa80ba89",
   "vcs_version": "V-2023.12-SP1_Full64",
   "seeds": [
-    20261025,
-    20261026,
-    20261027
+    20261101,
+    20261102,
+    20261103
   ],
   "cases_per_seed": 12,
   "ablation_rows": 144,
@@ -34,5 +34,5 @@
   "latency_boundary": "RTL compute cycles plus explicit fixed-bandwidth schedule model; not measured integrated SPAD latency",
   "bank_conflicts": "ideal conflict-free interleaving assumed; bank stalls are zero by model construction",
   "outputs": "benchmark/shape_adaptive_ablation.csv",
-  "raw_run_directory": "/tmp/nmaforge_v2_shape_r250"
+  "raw_run_directory": "/tmp/nmaforge_v2_shape_30e3ba8"
 }

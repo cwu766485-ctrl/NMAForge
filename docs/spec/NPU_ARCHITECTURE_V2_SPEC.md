@@ -1,6 +1,6 @@
 # NMAForge NPU Architecture v2.0 Specification
 
-**Status:** Architecture baseline and implementation contract; v2 RTL behavior is not yet implemented or signed off.
+**Status:** In-progress implementation contract; fused Matrix opcode `0x53` is implemented and Golden-checked. A shared-array K-fold operand mode now passes an isolated array test, but the product Matrix controller/SPAD/descriptor path is not connected. v2 is not signed off.
 **Frozen starting point:** NMAForge R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`.
 **Version boundary:** Existing ABI v7 descriptors and opcodes retain their behavior. v2 additions are additive and must be rejected by older RTL as unsupported descriptors.
 **Related audit:** [NPU v2 Phase 0 baseline](../architecture/NPU_ARCHITECTURE_V2_PHASE0_BASELINE.md).
@@ -56,10 +56,14 @@ Existing bias → arithmetic shift → activation → INT32 saturation
 Ordered completion
 ```
 
-The diagram shows target structure, not the R250 implementation. Current v1.0
-sign-off remains **HOLD** with 24 `PASS-SCOPED` and 14 `PARTIAL`; v2 work does
-not change those dispositions. The seven-engine inventory, current ports, and
-measured resource declarations are maintained in the Phase 0 baseline report.
+The diagram shows the target structure. The fused `0x53` epilogue is active in
+the product Matrix command path. The shared array also has an alternate per-PE
+B-operand buffer and K-fold MAC mode, but `ai_tensor_matrix_core` currently
+ties that mode off; there is no product GEMV K-fold descriptor or SPAD schedule
+yet. Current v1.0 sign-off remains **HOLD** with 24 `PASS-SCOPED` and 14
+`PARTIAL`; v2 work does not change those dispositions. The seven-engine
+inventory, current ports, and measured resource declarations are maintained
+in the Phase 0 baseline report.
 
 ## 2. Invariants and compatibility
 
@@ -212,18 +216,22 @@ mapping; the final inferred resources must be recorded.
 |---|---:|---:|
 | INT8 MAC array | 16×16 = 256 MAC | unchanged, shared by GEMM/GEMV |
 | 64-bit accumulator state | 16×16×64 bits = 2 KiB | reuse the same array accumulator; reduction may not add a second full accumulator bank |
-| Current operand staging | 256 B A/B staging + 1 KiB bounded A cache | retain; add at most two 16×16 INT8 operand tile sets: 2 × (256 B A + 256 B B) = 1 KiB |
+| Current operand staging | 256 B A/B staging + 1 KiB bounded A cache | retain; up to 1 KiB incremental budget; current K-fold array primitive declares a 512 B dual-bank per-PE B view, not yet connected to the product controller |
 | Matrix read metadata | up to four 53-bit FIFO entries | at most four accepted reads; each response must carry an explicit destination buffer, operand, K tile, bank group, and reset epoch |
 | SPAD capacity | four banks × 32K × 32-bit = 512 KiB | unchanged |
 | SPAD word/line ports | 32-bit word; 128-bit line + 16-bit WSTRB | unchanged; no new bypass port |
 | DMA external port | 128-bit AXI4 data, 64-bit address | unchanged |
 
-The two GEMV/GEMM tile sets store one 16×16 INT8 tile for A and one for B
-per set. K folding streams successive K tiles; it must not allocate full
-M×K/K×N tensors in flops. The 1 KiB target is incremental staging capacity
-and includes valid/owner tags only by accounting them separately in
-synthesis. If implementation requires more storage, report the exact increase
-and demonstrate the throughput need before changing this ceiling.
+The two GEMV/GEMM tile sets target one 16×16 INT8 tile for A and one for B
+per set. The current isolated K-fold primitive adds two 16×16-byte B banks
+(512 B total) to `ai_tensor_matrix_array`; it reuses the existing A vector
+banks and 64-bit accumulator bank. In the product core the mode is tied off,
+so synthesis may remove the new B banks until controller integration. K
+folding must stream successive K tiles and must not allocate full M×K/K×N
+tensors in flops. The 1 KiB target is incremental staging capacity and
+includes valid/owner tags only by accounting them separately in synthesis.
+If implementation requires more storage, report the exact increase and
+demonstrate the throughput need before changing this ceiling.
 
 Outstanding depth is configurable at 2 or 4, with 4 as the v2 candidate
 default. Responses are FIFO ordered because the existing SPAD core interface

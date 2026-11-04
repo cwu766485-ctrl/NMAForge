@@ -17,8 +17,10 @@ module tb_ai_tensor_matrix_array;
     reg buffer_write_bank = 1'b0;
     reg [ARRAY_SIZE*8-1:0] buffer_write_a = '0;
     reg [ARRAY_SIZE*8-1:0] buffer_write_b = '0;
+    reg [ARRAY_SIZE*ARRAY_SIZE*8-1:0] buffer_write_b_matrix = '0;
     reg mac_enable = 1'b0;
     reg mac_bank = 1'b0;
+    reg gemv_kfold_mode = 1'b0;
     reg [INDEX_WIDTH-1:0] result_index = '0;
     reg signed [31:0] result_bias = 32'sd0;
     reg [4:0] result_shift = 5'd0;
@@ -36,6 +38,10 @@ module tb_ai_tensor_matrix_array;
     integer overlap_loads = 0;
     integer cases_run = 0;
     integer saturation_checks = 0;
+    integer kfold_cases = 0;
+    reg signed [7:0] kfold_a [0:ARRAY_SIZE*MAX_K-1];
+    reg signed [7:0] kfold_b [0:MAX_K*ARRAY_SIZE-1];
+    reg signed [63:0] kfold_golden [0:ARRAY_SIZE*ARRAY_SIZE-1];
 
     ai_tensor_matrix_array #(
         .ARRAY_SIZE(ARRAY_SIZE),
@@ -48,8 +54,10 @@ module tb_ai_tensor_matrix_array;
         .buffer_write_bank(buffer_write_bank),
         .buffer_write_a(buffer_write_a),
         .buffer_write_b(buffer_write_b),
+        .buffer_write_b_matrix(buffer_write_b_matrix),
         .mac_enable(mac_enable),
         .mac_bank(mac_bank),
+        .gemv_kfold_mode(gemv_kfold_mode),
         .result_index(result_index),
         .result_bias(result_bias),
         .result_shift(result_shift),
@@ -97,6 +105,7 @@ module tb_ai_tensor_matrix_array;
             @(negedge clk);
             clear_accumulators = 1'b1;
             buffer_write_valid = 1'b0;
+            gemv_kfold_mode = 1'b0;
             mac_enable = 1'b0;
             @(posedge clk);
             #1;
@@ -115,11 +124,167 @@ module tb_ai_tensor_matrix_array;
             buffer_write_bank = bank;
             buffer_write_a = vector_a;
             buffer_write_b = vector_b;
+            buffer_write_b_matrix = '0;
+            gemv_kfold_mode = 1'b0;
             mac_enable = 1'b0;
             @(posedge clk);
             #1;
             @(negedge clk);
             buffer_write_valid = 1'b0;
+        end
+    endtask
+
+    task automatic make_kfold_vectors;
+        input integer rows;
+        input integer cols;
+        input integer k_length;
+        input integer fold_base;
+        output reg [ARRAY_SIZE*8-1:0] vector_a;
+        output reg [ARRAY_SIZE*ARRAY_SIZE*8-1:0] matrix_b;
+        integer fold_lanes;
+        integer physical_row;
+        integer logical_row;
+        integer fold_lane;
+        integer logical_k;
+        integer col_index;
+        begin
+            fold_lanes = ARRAY_SIZE / rows;
+            vector_a = '0;
+            matrix_b = '0;
+            for (physical_row = 0; physical_row < ARRAY_SIZE;
+                 physical_row = physical_row + 1) begin
+                logical_row = physical_row / fold_lanes;
+                fold_lane = physical_row % fold_lanes;
+                logical_k = fold_base + fold_lane;
+                if ((logical_row < rows) && (logical_k < k_length)) begin
+                    vector_a[physical_row*8 +: 8] =
+                        kfold_a[logical_row*MAX_K + logical_k];
+                    for (col_index = 0; col_index < cols;
+                         col_index = col_index + 1)
+                        matrix_b[(physical_row*ARRAY_SIZE+col_index)*8 +: 8] =
+                            kfold_b[logical_k*ARRAY_SIZE+col_index];
+                end
+            end
+        end
+    endtask
+
+    task automatic load_kfold_pair;
+        input bank;
+        input [ARRAY_SIZE*8-1:0] vector_a;
+        input [ARRAY_SIZE*ARRAY_SIZE*8-1:0] matrix_b;
+        begin
+            @(negedge clk);
+            buffer_write_valid = 1'b1;
+            buffer_write_bank = bank;
+            buffer_write_a = vector_a;
+            buffer_write_b = '0;
+            buffer_write_b_matrix = matrix_b;
+            gemv_kfold_mode = 1'b1;
+            mac_enable = 1'b0;
+            @(posedge clk);
+            #1;
+            @(negedge clk);
+            buffer_write_valid = 1'b0;
+        end
+    endtask
+
+    task automatic run_kfold_case;
+        input integer case_id;
+        input integer rows;
+        input integer cols;
+        input integer k_length;
+        reg [ARRAY_SIZE*8-1:0] vector_a;
+        reg [ARRAY_SIZE*ARRAY_SIZE*8-1:0] matrix_b;
+        reg [ARRAY_SIZE*8-1:0] next_a;
+        reg [ARRAY_SIZE*ARRAY_SIZE*8-1:0] next_b;
+        integer fold_lanes;
+        integer row_index;
+        integer col_index;
+        integer k_index;
+        integer fold_base;
+        integer bank;
+        integer physical_row;
+        integer fold_lane;
+        integer active_rows;
+        reg signed [63:0] observed;
+        begin
+            if ((rows == 0) || (rows > ARRAY_SIZE) ||
+                ((ARRAY_SIZE % rows) != 0))
+                $fatal(1, "invalid K-fold test shape array=%0d M=%0d",
+                       ARRAY_SIZE, rows);
+            fold_lanes = ARRAY_SIZE / rows;
+            for (row_index = 0; row_index < rows; row_index = row_index + 1)
+                for (k_index = 0; k_index < k_length; k_index = k_index + 1)
+                    kfold_a[row_index*MAX_K+k_index] = random_byte();
+            for (k_index = 0; k_index < k_length; k_index = k_index + 1)
+                for (col_index = 0; col_index < cols; col_index = col_index + 1)
+                    kfold_b[k_index*ARRAY_SIZE+col_index] = random_byte();
+            for (physical_row = 0; physical_row < ARRAY_SIZE; physical_row = physical_row + 1)
+                for (col_index = 0; col_index < ARRAY_SIZE; col_index = col_index + 1)
+                    kfold_golden[physical_row*ARRAY_SIZE+col_index] = 64'sd0;
+            for (row_index = 0; row_index < rows; row_index = row_index + 1)
+                for (col_index = 0; col_index < cols; col_index = col_index + 1)
+                    for (k_index = 0; k_index < k_length; k_index = k_index + 1)
+                        kfold_golden[row_index*ARRAY_SIZE+col_index] =
+                            kfold_golden[row_index*ARRAY_SIZE+col_index] +
+                            kfold_a[row_index*MAX_K+k_index] *
+                            kfold_b[k_index*ARRAY_SIZE+col_index];
+
+            clear_accumulator_state();
+            make_kfold_vectors(rows, cols, k_length, 0, vector_a, matrix_b);
+            load_kfold_pair(1'b0, vector_a, matrix_b);
+            bank = 0;
+            for (fold_base = 0; fold_base < k_length;
+                 fold_base = fold_base + fold_lanes) begin
+                @(negedge clk);
+                mac_enable = 1'b1;
+                mac_bank = bank[0];
+                if (fold_base + fold_lanes < k_length) begin
+                    make_kfold_vectors(rows, cols, k_length,
+                                       fold_base+fold_lanes, next_a, next_b);
+                    buffer_write_valid = 1'b1;
+                    buffer_write_bank = !bank[0];
+                    buffer_write_a = next_a;
+                    buffer_write_b_matrix = next_b;
+                end else begin
+                    buffer_write_valid = 1'b0;
+                end
+                @(posedge clk);
+                #1;
+                matrix_array_cov.sample();
+                @(negedge clk);
+                mac_enable = 1'b0;
+                buffer_write_valid = 1'b0;
+                bank = !bank;
+            end
+            for (row_index = 0; row_index < rows; row_index = row_index + 1)
+                for (col_index = 0; col_index < cols; col_index = col_index + 1) begin
+                    observed = 64'sd0;
+                    for (fold_lane = 0; fold_lane < fold_lanes; fold_lane = fold_lane + 1) begin
+                        physical_row = row_index*fold_lanes + fold_lane;
+                        observed = observed +
+                            $signed(accumulator_vector[
+                              (physical_row*ARRAY_SIZE+col_index)*64 +: 64]);
+                    end
+                    if (observed !== kfold_golden[row_index*ARRAY_SIZE+col_index])
+                        $fatal(1, "K-fold result mismatch array=%0d case=%0d M=%0d N=%0d K=%0d row=%0d col=%0d got=%0d expected=%0d",
+                               ARRAY_SIZE, case_id, rows, cols, k_length,
+                               row_index, col_index, observed,
+                               kfold_golden[row_index*ARRAY_SIZE+col_index]);
+                end
+            for (physical_row = 0; physical_row < ARRAY_SIZE; physical_row = physical_row + 1) begin
+                active_rows = physical_row / fold_lanes;
+                if (active_rows >= rows)
+                    for (col_index = 0; col_index < ARRAY_SIZE; col_index = col_index + 1)
+                        if ($signed(accumulator_vector[
+                              (physical_row*ARRAY_SIZE+col_index)*64 +: 64]) != 0)
+                            $fatal(1, "K-fold masked row nonzero array=%0d case=%0d row=%0d col=%0d",
+                                   ARRAY_SIZE, case_id, physical_row, col_index);
+            end
+            kfold_cases = kfold_cases + 1;
+            $display("MATRIX_ARRAY_KFOLD_CASE_PASS id=%0d size=%0d M=%0d N=%0d K=%0d fold=%0d cycles=%0d",
+                     case_id, ARRAY_SIZE, rows, cols, k_length, fold_lanes,
+                     (k_length+fold_lanes-1)/fold_lanes);
         end
     endtask
 
@@ -389,6 +554,12 @@ module tb_ai_tensor_matrix_array;
         run_random_gemm_case(3, 17, 1, 1);
         run_saturation_cases();
 
+        run_kfold_case(0, 1, ARRAY_SIZE, 19);
+        run_kfold_case(1, 4, ARRAY_SIZE, 19);
+        if (ARRAY_SIZE >= 8)
+            run_kfold_case(2, 8, ARRAY_SIZE, 19);
+        run_kfold_case(3, ARRAY_SIZE, ARRAY_SIZE, 19);
+
         if (cases_run != 4 || saturation_checks != 2 || overlap_loads != 25)
             $fatal(1, "array coverage marker mismatch cases=%0d saturation=%0d overlap=%0d",
                    cases_run, saturation_checks, overlap_loads);
@@ -398,6 +569,8 @@ module tb_ai_tensor_matrix_array;
         $display("MATRIX_ARRAY_PASS size=%0d cases=%0d saturation=%0d overlapped_loads=%0d functional_coverage=%0.2f seed=%0d",
                  ARRAY_SIZE, cases_run, saturation_checks, overlap_loads,
                  matrix_array_cov.get_coverage(), rng_seed);
+        $display("MATRIX_ARRAY_KFOLD_PASS size=%0d cases=%0d signed=1 tail=1 reduce=golden",
+                 ARRAY_SIZE, kfold_cases);
         $finish;
     end
 endmodule

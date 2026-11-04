@@ -144,6 +144,7 @@ array-random-regress:
 				-cm_dir $$out/coverage.vdb -cm_name matrix_array_$${size}_seed_$$seed \
 				-l $$out/run_seed_$$seed.log; \
 			grep -q "^MATRIX_ARRAY_PASS size=$$size cases=4 saturation=2 overlapped_loads=25 functional_coverage=100.00 seed=$$seed$$" $$out/run_seed_$$seed.log; \
+			grep -q "^MATRIX_ARRAY_KFOLD_PASS size=$$size cases=4 signed=1 tail=1 reduce=golden$$" $$out/run_seed_$$seed.log; \
 		done; \
 		$(URG) -full64 -dir $$out/coverage.vdb -format text -report $$out/urg -log $$out/urg.log; \
 	done
