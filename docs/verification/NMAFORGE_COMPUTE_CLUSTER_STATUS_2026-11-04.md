@@ -2,7 +2,7 @@
 
 **Snapshot:** 2026-11-04. This is a planning estimate, not a sign-off or coverage metric.
 
-**Published:** `cwu766485-ctrl/NMAForge`, branch `feat/compute-cluster-closeout-audit`, head `e44ae441a8b3ff28b82a770f9b3b7132ac87c7ea`. The published tree matches the local committed tree; GitHub API-generated commit IDs are recorded separately where they differ from local commit IDs.
+**Initial publication:** `cwu766485-ctrl/NMAForge`, branch `feat/compute-cluster-closeout-audit`, checkpoint `e44ae441a8b3ff28b82a770f9b3b7132ac87c7ea`. Follow-up documentation records the equivalent published code commit separately because GitHub API-generated commit IDs differ from the local commit IDs. The final synced branch head is reported in the handoff accompanying this snapshot.
 
 ## Current position
 
