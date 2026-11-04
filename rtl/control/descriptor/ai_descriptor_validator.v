@@ -37,9 +37,11 @@ module ai_descriptor_validator (
                       (op == 8'h20) || (op == 8'h21) ||
                       ((op >= 8'h30) && (op <= 8'h39)) ||
                       ((op >= 8'h43) && (op <= 8'h44)) ||
-                      is_macro || (op == 8'h50) || (op == 8'h51);
+                      is_macro || (op == 8'h50) || (op == 8'h51) ||
+                      (op == 8'h53);
 
-    assign is_tensor_matrix = (op == 8'h30) || (op == 8'h31);
+    assign is_tensor_matrix = (op == 8'h30) || (op == 8'h31) ||
+                              (op == 8'h53);
     assign is_tensor_sfu = (op >= 8'h32) && (op <= 8'h39);
     wire is_bf16_dot = (op == 8'h50);
     wire is_fp16_dot = (op == 8'h51);
@@ -96,6 +98,11 @@ module ai_descriptor_validator (
         (src1_stride == 32'd0) && (dst_stride == 32'd0) &&
         (batch_count == 16'd0) && (head_count == 16'd0);
 
+    wire fused_matrix_fields_valid =
+        (op != 8'h53) || ((aux0[31:5] == 0) &&
+        (dst_stride == 0 || dst_stride[3:0] == 0) &&
+        (dst[3:0] == 0));
+
     assign descriptor_invalid = !op_valid || !dimensions_valid ||
                                 !version_valid ||
                                 ((op == 8'h36) && flags[5] &&
@@ -103,6 +110,7 @@ module ai_descriptor_validator (
                                 (macro_child_fetch && is_macro) ||
                                 alignment_error ||
                                 (is_macro && (|src0[5:0])) ||
-                                (is_fp_dot && !fp_dot_fields_valid);
+                                (is_fp_dot && !fp_dot_fields_valid) ||
+                                !fused_matrix_fields_valid;
 
 endmodule

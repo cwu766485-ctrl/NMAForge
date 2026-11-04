@@ -1,11 +1,11 @@
 {
-  "run_id": "SHAPE-SPAD-ae897524a30d08bd1dc7970f61f01d6abe763b59-20261029",
-  "source_sha": "ae897524a30d08bd1dc7970f61f01d6abe763b59",
+  "run_id": "SHAPE-SPAD-3041355528dffe856e2d5384027c6ee5df5d1b42-20261104",
+  "source_sha": "3041355528dffe856e2d5384027c6ee5df5d1b42",
   "vcs_version": "V-2023.12-SP1_Full64",
   "regression_seeds": [
-    20261029,
-    20261030,
-    20261031
+    20261025,
+    20261026,
+    20261027
   ],
   "pass_count": 12,
   "workloads_per_seed": 4,
@@ -23,5 +23,5 @@
     "checker": "independent INT32 GEMM plus complete SPAD result-image and uncommitted sentinel checks"
   },
   "timing_limit": "research wrapper measures real arbiter/SPAD and kernel RTL; it is not connected to the production Matrix command path and is not an ASIC PPA result",
-  "csv": "/home/ray/workspace/NMAForge/benchmark/shape_adaptive_spad_ablation.csv"
+  "csv": "/tmp/nmaforge-architecture-v2/benchmark/shape_adaptive_spad_ablation.csv"
 }

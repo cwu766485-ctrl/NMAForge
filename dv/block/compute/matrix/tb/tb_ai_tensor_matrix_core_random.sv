@@ -39,6 +39,7 @@ module tb_ai_tensor_matrix_core_random;
   reg transpose_a=0,transpose_b=0,bias_enable=0;
   reg [4:0] scale_shift=0;
   reg [1:0] activation=0;
+  reg [31:0] aux0=0;
   reg [31:0] watchdog_limit=0;
 
   wire [31:0] bank0_data,bank1_data,bank2_data,bank3_data;
@@ -167,6 +168,7 @@ module tb_ai_tensor_matrix_core_random;
     .src0_batch_stride(src0_batch_stride),.src1_batch_stride(src1_batch_stride),
     .dst_batch_stride(dst_batch_stride),.transpose_a(transpose_a),.transpose_b(transpose_b),
     .bias_enable(bias_enable),.scale_shift(scale_shift),.activation(activation),
+    .aux0(aux0),
     .watchdog_limit(watchdog_limit),
     .bank0_data(bank0_data),.bank1_data(bank1_data),.bank2_data(bank2_data),.bank3_data(bank3_data),
     .bank_parity_error(bank_parity_error),.banked_read_valid(banked_read_valid),
@@ -368,6 +370,7 @@ module tb_ai_tensor_matrix_core_random;
       dst_base=DST_BASE+(unaligned?4:0);
       transpose_a=ta;transpose_b=tb;bias_enable=use_bias;
       scale_shift=shift;activation=act;watchdog_limit=0;
+      aux0=0;
       local_a_stride=(m/4)*kw*16+(padded?32:0);
       local_b_stride=(n/4)*kw*16+(padded?48:0);
       local_dst_stride=m*n*4+(padded?32:0);
@@ -544,6 +547,37 @@ module tb_ai_tensor_matrix_core_random;
       if(!done) $fatal(1,"matrix core timeout m=%0d n=%0d kw=%0d state=%0d busy=%b cycle=%0d wdog=%0d pending=%b/%b",
                        m_size,n_size,k_words,dut.state_r,busy,cycle_count,
                        dut.watchdog_limit_r,pending_bank,pending_spad);
+    end
+  endtask
+
+  task automatic run_fused_requant_boundary_case;
+    integer a_index,b_index,row;
+    begin
+      prepare_case(4,4,1,1,0,0,0,0,0,0,0);
+      op_mode=8'h53;
+      aux0=0;
+      a_index=(SRC0_BASE>>4)&13'h1fff;
+      b_index=(SRC1_BASE>>4)&13'h1fff;
+      for(row=0;row<4;row=row+1)
+        bank_mem[row][a_index]=pack4(1,1,1,1);
+      bank_mem[0][b_index]=pack4(31,32,32,32);    // +127
+      bank_mem[1][b_index]=pack4(32,32,32,32);    // +128 -> +127
+      bank_mem[2][b_index]=pack4(-32,-32,-32,-32); // -128
+      bank_mem[3][b_index]=pack4(-33,-32,-32,-32); // -129 -> -128
+      launch_and_wait();
+      if(error || error_code!==0 || element_count!==32'd16 ||
+         line_write_count!==1 || scalar_write_count!==0)
+        $fatal(1,"fused requant completion error=%b code=%0d elements=%0d lines=%0d scalar=%0d",
+               error,error_code,element_count,line_write_count,scalar_write_count);
+      for(row=0;row<4;row=row+1)
+        if(output_mem[(dst_base>>2)+row]!==32'h8080_7f7f)
+          $fatal(1,"fused requant row=%0d packed=%08x expected=80807f7f",
+                 row,output_mem[(dst_base>>2)+row]);
+      if(result!==32'hffff_ff80)
+        $fatal(1,"fused requant result sign extension=%08x expected=ffffff80",result);
+      if(bank_read_count!=bank_response_count || pending_bank)
+        $fatal(1,"fused requant left banked responses outstanding");
+      $display("MATRIX_FUSED_REQUANT_PASS shape=4x4x4 boundaries=127,128,-128,-129 lines=1");
     end
   endtask
 
@@ -1334,6 +1368,7 @@ module tb_ai_tensor_matrix_core_random;
       $fatal(1,"Matrix line contract points missing full=%0d stable=%0d unaligned=%b protection=%b",
              line_full_strobe_checks,line_stall_stability_checks,
              matrix_unaligned_fallback_seen,matrix_line_protection_seen);
+    run_fused_requant_boundary_case();
     $display("MATRIX_LINE_CONTRACT_PASS full_wstrb=1 aligned=1 stalled_stability=%0d unaligned_scalar_fallback=1 protection_error=1 partial_zero_wstrb=unsupported",
              line_stall_stability_checks);
     $display("MATRIX_CORE_RANDOM_PASS cases=%0d faults=%0d late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 seed=%0d bank_reads=%0d responses=%0d spad_reads=%0d responses=%0d stalls=%0d/%0d/%0d",

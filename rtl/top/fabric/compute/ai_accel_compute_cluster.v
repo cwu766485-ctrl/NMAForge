@@ -233,6 +233,7 @@ module ai_accel_compute_cluster (
         .instance_count(launch_instance_count),
         .src0_batch_stride(launch_src0_stride), .src1_batch_stride(launch_src1_stride),
         .dst_batch_stride(launch_dst_stride),
+        .aux0(launch_aux0),
         .transpose_a(launch_flags[1]), .transpose_b(launch_flags[2]),
         .bias_enable(launch_bias_enable), .scale_shift(launch_shift),
         .activation(launch_activation), .watchdog_limit(watchdog_limit),

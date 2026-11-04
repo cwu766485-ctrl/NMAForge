@@ -19,7 +19,8 @@ module ai_accel_opcode_decode (
 
     assign is_int8         = (op >= 8'h10) && (op <= 8'h17);
     assign is_banked       = (op == 8'h20) || (op == 8'h21);
-    assign is_tensor_matrix = (op == 8'h30) || (op == 8'h31);
+    assign is_tensor_matrix = (op == 8'h30) || (op == 8'h31) ||
+                              (op == 8'h53);
     assign is_tensor_sfu   = (op >= 8'h32) && (op <= 8'h39);
     assign is_cnn_kv       = (op == 8'h43) || (op == 8'h44);
     assign is_macro        = (op >= 8'h40) && (op <= 8'h42);

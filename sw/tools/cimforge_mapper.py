@@ -33,6 +33,7 @@ from ai_a3_reference import (  # noqa: E402
 
 
 OP_GEMM = 0x30
+OP_GEMM_REQUANT_TILE_A = 0x53
 OP_SOFTMAX = 0x32
 OP_RESIDUAL = 0x34
 OP_GELU = 0x35
@@ -600,7 +601,20 @@ def validate_descriptor_chain(mapper: Mapper) -> None:
             destination_base += cache_offset
         elif descriptor.op == OP_KV_READ:
             source_base += cache_offset
-        if descriptor.op == OP_GEMM:
+        if descriptor.op in (OP_GEMM, OP_GEMM_REQUANT_TILE_A):
+            if descriptor.op == OP_GEMM_REQUANT_TILE_A:
+                if descriptor.aux0 & ~0x1F:
+                    raise ValueError(
+                        f"{descriptor.name}: fused requant aux0 must fit five bits"
+                    )
+                if descriptor.dst & 0xF or descriptor.dst_stride & 0xF:
+                    raise ValueError(
+                        f"{descriptor.name}: fused tile destination/stride must be 16-byte aligned"
+                    )
+                if descriptor.m % 4 or descriptor.n % 4:
+                    raise ValueError(
+                        f"{descriptor.name}: fused Matrix-A tile shape must be 4-aligned"
+                    )
             require(
                 source_base, descriptor.m * descriptor.k_or_length * 4,
                 descriptor.name, "src0",
@@ -609,7 +623,9 @@ def validate_descriptor_chain(mapper: Mapper) -> None:
                 descriptor.src1, descriptor.n * descriptor.k_or_length * 4,
                 descriptor.name, "src1",
             )
-            output_bytes = descriptor.m * descriptor.n * 4
+            output_bytes = descriptor.m * descriptor.n * (
+                1 if descriptor.op == OP_GEMM_REQUANT_TILE_A else 4
+            )
         else:
             require(
                 source_base, descriptor.k_or_length * 4,

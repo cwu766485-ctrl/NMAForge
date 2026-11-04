@@ -91,12 +91,11 @@ module tb_ai_accel_smoke;
     localparam SPAD_BYTES        = 32'h0008_0000;
     localparam AI_DIGITS_INPUT_BASE = 32'h0005_0000;
     localparam AI_DIGITS_OUTPUT_BASE = 32'h0003_b000;
-    localparam AI_DIGITS_HIDDEN_I32_BASE = 32'h0001_4000;
     localparam AI_DIGITS_HIDDEN_I8_TILE_BASE = 32'h0003_2000;
     localparam AI_DIGITS_DESC_BASE = 32'h0003_8000;
     localparam AI_DIGITS_CPL_BASE = 32'h0003_a000;
     localparam AI_DIGITS_BATCH = 16;
-    localparam AI_DIGITS_DESC_COUNT = 69;
+    localparam AI_DIGITS_DESC_COUNT = 46;
     localparam AI_DIGITS_TEST_SAMPLES = 360;
     localparam AI_DIGITS_HIDDEN_WORDS = 5888;
 
@@ -244,7 +243,7 @@ module tb_ai_accel_smoke;
     integer ai_digits_layout_cycles = 0;
     integer ai_digits_layout_bytes = 0;
     reg ai_digits_layout_measure = 1'b0;
-    integer ai_digits_sfu_writes_by_batch [0:22];
+    integer ai_digits_fused_lines_by_batch [0:22];
     integer ai_digits_sfu_monitor_batch;
     integer ai_tinynpu_cnn_cycles = 0;
     integer ai_tinynpu_cnn_layout_cycles = 0;
@@ -285,32 +284,20 @@ module tb_ai_accel_smoke;
     end
 
     always @(posedge aclk) begin
-        if (dut.sfu_spad_valid && dut.sfu_spad_write &&
-            dut.compute_engine_ready[4] &&
-            (dut.sfu_spad_addr >= AI_DIGITS_HIDDEN_I8_TILE_BASE) &&
-            (dut.sfu_spad_addr < AI_DIGITS_HIDDEN_I8_TILE_BASE +
-                                   23 * AI_DIGITS_BATCH * 64)) begin
-            ai_digits_sfu_monitor_batch =
-                (dut.sfu_spad_addr - AI_DIGITS_HIDDEN_I8_TILE_BASE) /
-                (AI_DIGITS_BATCH * 64);
-            ai_digits_sfu_writes_by_batch[ai_digits_sfu_monitor_batch] =
-                ai_digits_sfu_writes_by_batch[ai_digits_sfu_monitor_batch] + 1;
-        end
-        if (ai_digits_layout_measure && dut.compute_cluster_u.tensor_sfu_u.busy &&
-            dut.compute_cluster_u.tensor_sfu_u.pack_tile_a_r)
+        if (ai_digits_layout_measure && dut.compute_cluster_u.tensor_matrix_u.busy &&
+            dut.compute_cluster_u.tensor_matrix_u.fused_output_r)
             ai_digits_layout_cycles = ai_digits_layout_cycles + 1;
-        if (ai_digits_layout_measure && dut.sfu_spad_valid &&
-            dut.compute_engine_ready[4]) begin
-            if (!dut.sfu_spad_write &&
-                dut.sfu_spad_addr >= AI_DIGITS_HIDDEN_I32_BASE &&
-                dut.sfu_spad_addr < AI_DIGITS_HIDDEN_I32_BASE +
-                                    23 * AI_DIGITS_BATCH * 64 * 4)
-                ai_digits_layout_bytes = ai_digits_layout_bytes + 4;
-            if (dut.sfu_spad_write &&
-                dut.sfu_spad_addr >= AI_DIGITS_HIDDEN_I8_TILE_BASE &&
-                dut.sfu_spad_addr < AI_DIGITS_HIDDEN_I8_TILE_BASE +
-                                    23 * AI_DIGITS_BATCH * 64)
-                ai_digits_layout_bytes = ai_digits_layout_bytes + 4;
+        if (ai_digits_layout_measure && dut.matrix_line_valid &&
+            dut.arb_core_line_ready &&
+            dut.matrix_line_addr >= AI_DIGITS_HIDDEN_I8_TILE_BASE &&
+            dut.matrix_line_addr < AI_DIGITS_HIDDEN_I8_TILE_BASE +
+                                   23 * AI_DIGITS_BATCH * 64) begin
+            ai_digits_sfu_monitor_batch =
+                (dut.matrix_line_addr - AI_DIGITS_HIDDEN_I8_TILE_BASE) /
+                (AI_DIGITS_BATCH * 64);
+            ai_digits_fused_lines_by_batch[ai_digits_sfu_monitor_batch] =
+                ai_digits_fused_lines_by_batch[ai_digits_sfu_monitor_batch] + 1;
+            ai_digits_layout_bytes = ai_digits_layout_bytes + 16;
         end
     end
 
@@ -1508,7 +1495,7 @@ module tb_ai_accel_smoke;
             axi_write(REG_CMDQ_SIZE, 32'd128);
             axi_write(REG_CMDQ_HEAD, 32'd0);
             for (sfu_batch_index = 0; sfu_batch_index < 23; sfu_batch_index = sfu_batch_index + 1)
-                ai_digits_sfu_writes_by_batch[sfu_batch_index] = 0;
+                ai_digits_fused_lines_by_batch[sfu_batch_index] = 0;
             axi_write(REG_CMDQ_TAIL, AI_DIGITS_DESC_COUNT);
             axi_write(REG_CPLQ_BASE_LO, AI_DIGITS_CPL_BASE);
             axi_write(REG_CPLQ_SIZE, 32'd128);
@@ -1541,8 +1528,8 @@ module tb_ai_accel_smoke;
                 errors = errors + 1;
             end
 
-            // The complete workload runs from the real CMDQ. The SFU performs
-            // the hidden activation's Matrix-A tile reorder in hardware.
+            // The complete workload runs from the real CMDQ. Matrix opcode
+            // 0x53 writes the hidden activation directly in Matrix-A tile order.
             for (completion_index = 0; completion_index < AI_DIGITS_DESC_COUNT;
                  completion_index = completion_index + 1) begin
                 axi_read(SPAD_BASE + AI_DIGITS_CPL_BASE + completion_index * 16,
@@ -1562,10 +1549,10 @@ module tb_ai_accel_smoke;
             end
 
             for (sfu_batch_index = 0; sfu_batch_index < 23; sfu_batch_index = sfu_batch_index + 1) begin
-                if (ai_digits_sfu_writes_by_batch[sfu_batch_index] != 256) begin
-                    $display("ERROR: digits SFU packed writes batch=%0d got=%0d expected=256",
+                if (ai_digits_fused_lines_by_batch[sfu_batch_index] != 64) begin
+                    $display("ERROR: digits fused tile lines batch=%0d got=%0d expected=64",
                              sfu_batch_index,
-                             ai_digits_sfu_writes_by_batch[sfu_batch_index]);
+                             ai_digits_fused_lines_by_batch[sfu_batch_index]);
                     errors = errors + 1;
                 end
             end
@@ -1637,7 +1624,7 @@ module tb_ai_accel_smoke;
             else
                 mac_per_cycle = mac_count / ai_digits_cycles;
             array_utilization = mac_per_cycle / 256.0;
-            $display("DIGITS_RTL_METRICS samples=%0d correct=%0d descriptors=%0d cycles=%0d host_layout_cycles=0 host_layout_bytes=0 rtl_layout_cycles=%0d rtl_layout_bytes=%0d mac=%0.0f mac_per_cycle=%0.4f array_utilization=%0.2f%% spad_initialization_bytes=%0d",
+            $display("DIGITS_RTL_METRICS samples=%0d correct=%0d descriptors=%0d cycles=%0d rtl_fused_matrix_cycles=%0d rtl_fused_tile_write_bytes=%0d mac=%0.0f mac_per_cycle=%0.4f array_utilization=%0.2f%% spad_initialization_bytes=%0d",
                      AI_DIGITS_TEST_SAMPLES, correct_samples, AI_DIGITS_DESC_COUNT,
                      ai_digits_cycles, ai_digits_layout_cycles, ai_digits_layout_bytes,
                      mac_count, mac_per_cycle,

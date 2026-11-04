@@ -31,6 +31,7 @@ module ai_tensor_matrix_core #(
     input  wire        bias_enable,
     input  wire [4:0]  scale_shift,
     input  wire [1:0]  activation,
+    input  wire [31:0] aux0,
     input  wire [31:0] watchdog_limit,
 
     input  wire [31:0] bank0_data,
@@ -82,6 +83,7 @@ module ai_tensor_matrix_core #(
 
     localparam [7:0] OP_TENSOR_GEMM       = 8'h30;
     localparam [7:0] OP_TENSOR_BATCH_GEMM = 8'h31;
+    localparam [7:0] OP_TENSOR_GEMM_REQUANT_TILE_A = 8'h53;
 
     localparam [3:0] ERR_CONFIG     = 4'd1;
     localparam [3:0] ERR_OP         = 4'd2;
@@ -162,6 +164,8 @@ module ai_tensor_matrix_core #(
     reg transpose_a_r, transpose_b_r, bias_enable_r, bias_loaded_r;
     reg [4:0] scale_shift_r;
     reg [1:0] activation_r;
+    reg [4:0] requant_shift_r;
+    reg fused_output_r;
     reg [31:0] watchdog_limit_r;
 
     reg [31:0] a_batch_base_r, b_batch_base_r, dst_batch_base_r;
@@ -171,6 +175,9 @@ module ai_tensor_matrix_core #(
     reg [31:0] bias_tile_base_r;
     reg [31:0] src0_batch_stride_r, src1_batch_stride_r, dst_batch_stride_r;
     reg [31:0] dst_row_stride_r;
+    reg [127:0] fused_line_buffer_r;
+    reg fused_commit_pending_r;
+    wire [31:0] fused_word_current;
 
     reg [31:0] a_tile_words_r [0:1][0:ARRAY_SIZE-1];
     reg [31:0] b_tile_words_r [0:1][0:ARRAY_SIZE-1];
@@ -310,8 +317,10 @@ module ai_tensor_matrix_core #(
         {{(32-TILE_INDEX_WIDTH-2){1'b0}},write_col_r,write_lane_r};
     wire [31:0] write_row_addr = dst_row_addr_r + line_byte_offset;
     wire line_store_eligible = (write_row_addr[3:0] == 4'd0);
+    wire fused_requant_output = fused_output_r;
     wire valid_operation = (op_mode == OP_TENSOR_GEMM) ||
-                           (op_mode == OP_TENSOR_BATCH_GEMM);
+                           (op_mode == OP_TENSOR_BATCH_GEMM) ||
+                           (op_mode == OP_TENSOR_GEMM_REQUANT_TILE_A);
     wire invalid_dimensions = (m_size == 0) || (n_size == 0) ||
                               (k_words == 0) || |m_size[1:0] ||
                               |n_size[1:0] || (ARRAY_SIZE < 4) ||
@@ -321,14 +330,19 @@ module ai_tensor_matrix_core #(
     wire last_k_group = (k_group_r == k_words_r - 1'b1);
     wire watchdog_expired = busy && (watchdog_limit_r != 0) &&
                             (cycle_count >= watchdog_limit_r);
-    wire output_write_accepted = (line_store_eligible && line_ready) ||
+    wire output_write_accepted = (line_store_eligible && line_ready &&
+                                  (!fused_requant_output || fused_commit_pending_r)) ||
                                  (!line_store_eligible && spad_ready);
     wire output_write_has_protection_error =
-        (line_store_eligible && line_protection_error) ||
+        (line_store_eligible && line_protection_error &&
+         (!fused_requant_output || fused_commit_pending_r)) ||
         (!line_store_eligible && spad_protection_error);
 
+    wire [31:0] write_row_for_output = fused_requant_output ?
+        ({{(32-TILE_INDEX_WIDTH){1'b0}},write_row_r} + {30'd0,write_lane_r}) :
+        {{(32-TILE_INDEX_WIDTH){1'b0}},write_row_r};
     wire [31:0] write_index0 =
-        ({{(32-TILE_INDEX_WIDTH){1'b0}},write_row_r} * ARRAY_SIZE) +
+        (write_row_for_output * ARRAY_SIZE) +
         {{(32-TILE_INDEX_WIDTH){1'b0}},write_col_r};
     wire [31:0] write_index1 = write_index0 + 32'd1;
     wire [31:0] write_index2 = write_index0 + 32'd2;
@@ -427,6 +441,28 @@ module ai_tensor_matrix_core #(
         end
     endfunction
 
+    function [7:0] requant_matrix_i8;
+        input signed [31:0] value;
+        input [4:0] shift;
+        reg signed [31:0] shifted;
+        begin
+            shifted = value >>> shift;
+            if (shifted > 32'sd127)
+                requant_matrix_i8 = 8'h7f;
+            else if (shifted < -32'sd128)
+                requant_matrix_i8 = 8'h80;
+            else
+                requant_matrix_i8 = shifted[7:0];
+        end
+    endfunction
+
+    assign fused_word_current = {
+        requant_matrix_i8($signed(write_result3), requant_shift_r),
+        requant_matrix_i8($signed(write_result2), requant_shift_r),
+        requant_matrix_i8($signed(write_result1), requant_shift_r),
+        requant_matrix_i8($signed(write_result0), requant_shift_r)
+    };
+
     always @* begin
         banked_read_valid = 1'b0;
         banked_addr = 32'd0;
@@ -455,15 +491,19 @@ module ai_tensor_matrix_core #(
         end
 
         spad_valid = (state_r == ST_BIAS_REQ) ||
-                     ((state_r == ST_WRITE) && !line_store_eligible);
-        spad_write = (state_r == ST_WRITE) && !line_store_eligible;
+                     ((state_r == ST_WRITE) && !fused_requant_output &&
+                      !line_store_eligible);
+        spad_write = (state_r == ST_WRITE) && !fused_requant_output &&
+                     !line_store_eligible;
         spad_addr = (state_r == ST_BIAS_REQ) ? bias_read_addr :
                     (dst_row_addr_r + (scalar_word_index << 2));
         spad_wdata = scalar_write_result;
 
-        line_valid = (state_r == ST_WRITE) && line_store_eligible;
+        line_valid = (state_r == ST_WRITE) && line_store_eligible &&
+                     (!fused_requant_output || fused_commit_pending_r);
         line_addr = write_row_addr;
-        line_wdata = {write_result3,write_result2,write_result1,write_result0};
+        line_wdata = fused_requant_output ? fused_line_buffer_r :
+                     {write_result3,write_result2,write_result1,write_result0};
 
         if (state_r == ST_PREP_MAC)
             array_load_lane = 2'd0;
@@ -636,6 +676,8 @@ module ai_tensor_matrix_core #(
             bias_loaded_r <= 1'b0;
             scale_shift_r <= 5'd0;
             activation_r <= 2'd0;
+            requant_shift_r <= 5'd0;
+            fused_output_r <= 1'b0;
             watchdog_limit_r <= 32'd0;
             a_batch_base_r <= 32'd0;
             b_batch_base_r <= 32'd0;
@@ -651,6 +693,8 @@ module ai_tensor_matrix_core #(
             src1_batch_stride_r <= 32'd0;
             dst_batch_stride_r <= 32'd0;
             dst_row_stride_r <= 32'd0;
+            fused_line_buffer_r <= 128'd0;
+            fused_commit_pending_r <= 1'b0;
             for (reset_i = 0; reset_i < ARRAY_SIZE; reset_i = reset_i + 1) begin
                 a_tile_words_r[0][reset_i] <= 32'd0;
                 a_tile_words_r[1][reset_i] <= 32'd0;
@@ -833,6 +877,9 @@ module ai_tensor_matrix_core #(
                             bias_enable_r <= bias_enable;
                             scale_shift_r <= scale_shift;
                             activation_r <= activation;
+                            requant_shift_r <= aux0[4:0];
+                            fused_output_r <=
+                                (op_mode == OP_TENSOR_GEMM_REQUANT_TILE_A);
                             watchdog_limit_r <= watchdog_limit;
                             a_batch_base_r <= src0_base;
                             b_batch_base_r <= src1_base;
@@ -855,7 +902,9 @@ module ai_tensor_matrix_core #(
                                 (({16'd0,n_size} >> 2) * {16'd0,k_words} * 32'd16) :
                                 src1_batch_stride;
                             dst_batch_stride_r <= (dst_batch_stride == 0) ?
-                                ({16'd0,m_size} * {16'd0,n_size} * 32'd4) :
+                                ({16'd0,m_size} * {16'd0,n_size} *
+                                 (op_mode == OP_TENSOR_GEMM_REQUANT_TILE_A ?
+                                  32'd1 : 32'd4)) :
                                 dst_batch_stride;
                             dst_row_stride_r <= {14'd0,n_size,2'b00};
                             instance_r <= 32'd0;
@@ -867,6 +916,7 @@ module ai_tensor_matrix_core #(
                             write_row_r <= {TILE_INDEX_WIDTH{1'b0}};
                             write_col_r <= {TILE_INDEX_WIDTH{1'b0}};
                             write_lane_r <= 2'd0;
+                            fused_commit_pending_r <= 1'b0;
                             bias_index_r <= {(TILE_INDEX_WIDTH+1){1'b0}};
                             bias_loaded_r <= 1'b0;
                             element_count <= 32'd0;
@@ -874,7 +924,11 @@ module ai_tensor_matrix_core #(
                             if (!valid_operation) begin
                                 error_code <= ERR_OP;
                                 state_r <= ST_ERROR;
-                            end else if (invalid_dimensions || invalid_alignment) begin
+                            end else if (invalid_dimensions || invalid_alignment ||
+                                ((op_mode == OP_TENSOR_GEMM_REQUANT_TILE_A) &&
+                                 ((aux0[31:5] != 0) || (|dst_base[3:0]) ||
+                                  ((dst_batch_stride != 0) &&
+                                   (|dst_batch_stride[3:0]))))) begin
                                 error_code <= ERR_CONFIG;
                                 state_r <= ST_ERROR;
                             end else begin
@@ -1027,19 +1081,43 @@ module ai_tensor_matrix_core #(
                     end
 
                     ST_WRITE: begin
-                        if (output_write_accepted) begin
+                        if (fused_requant_output && !fused_commit_pending_r) begin
+                            fused_line_buffer_r[write_lane_r*32 +: 32] <=
+                                fused_word_current;
+                            if (write_lane_r == 2'd3)
+                                fused_commit_pending_r <= 1'b1;
+                            else
+                                write_lane_r <= write_lane_r + 1'b1;
+                        end else if (output_write_accepted) begin
                             if (output_write_has_protection_error) begin
                                 error_code <= ERR_PROTECTION;
                                 state_r <= ST_ERROR;
                             end else begin
-                                result <= line_store_eligible ? write_result3 :
-                                                                  scalar_write_result;
-                                if (line_store_eligible)
+                                result <= fused_requant_output ?
+                                    {{24{fused_line_buffer_r[127]}},
+                                      fused_line_buffer_r[127:120]} :
+                                    (line_store_eligible ? write_result3 :
+                                                           scalar_write_result);
+                                if (fused_requant_output)
+                                    element_count <= element_count + 32'd16;
+                                else if (line_store_eligible)
                                     element_count <= element_count + 32'd4;
                                 else
                                     element_count <= element_count + 32'd1;
 
-                                if (!line_store_eligible && (write_lane_r != 2'd3)) begin
+                                if (fused_requant_output) begin
+                                    fused_commit_pending_r <= 1'b0;
+                                    write_lane_r <= 2'd0;
+                                    if (({28'd0,write_col_r} + 32'd4) < valid_cols) begin
+                                        write_col_r <= write_col_r + 4;
+                                    end else if (({28'd0,write_row_r} + 32'd4) < valid_rows) begin
+                                        write_col_r <= {TILE_INDEX_WIDTH{1'b0}};
+                                        write_row_r <= write_row_r + 4;
+                                        dst_row_addr_r <= dst_row_addr_r + dst_row_stride_r;
+                                    end else begin
+                                        state_r <= ST_NEXT;
+                                    end
+                                end else if (!line_store_eligible && (write_lane_r != 2'd3)) begin
                                     write_lane_r <= write_lane_r + 1'b1;
                                 end else begin
                                     write_lane_r <= 2'd0;
@@ -1063,6 +1141,7 @@ module ai_tensor_matrix_core #(
                         lane_r <= 2'd0;
                         compute_buffer_r <= 1'b0;
                         write_lane_r <= 2'd0;
+                        fused_commit_pending_r <= 1'b0;
                         bias_loaded_r <= 1'b0;
                         if (({16'd0,col_tile_r} + 32'd1) < n_tile_count) begin
                             col_tile_r <= col_tile_r + 1'b1;
@@ -1081,11 +1160,14 @@ module ai_tensor_matrix_core #(
                                 a_cache_group_seen_r[cache_i] <= {ARRAY_GROUPS{1'b0}};
                             b_tile_base_r <= b_batch_base_r;
                             dst_row_tile_base_r <= dst_row_tile_base_r +
-                                                   (dst_row_stride_r * ARRAY_SIZE);
+                                (dst_row_stride_r *
+                                 (fused_requant_output ? ARRAY_SIZE/4 : ARRAY_SIZE));
                             dst_tile_base_r <= dst_row_tile_base_r +
-                                               (dst_row_stride_r * ARRAY_SIZE);
+                                (dst_row_stride_r *
+                                 (fused_requant_output ? ARRAY_SIZE/4 : ARRAY_SIZE));
                             dst_row_addr_r <= dst_row_tile_base_r +
-                                              (dst_row_stride_r * ARRAY_SIZE);
+                                (dst_row_stride_r *
+                                 (fused_requant_output ? ARRAY_SIZE/4 : ARRAY_SIZE));
                             bias_tile_base_r <= bias_batch_base_r;
                             state_r <= ST_A_REQ;
                         end else if ((instance_r + 1'b1) < instance_count_r) begin
