@@ -587,6 +587,204 @@ module tb_ai_tensor_matrix_core_random;
     end
   endtask
 
+  // Tail-capable 0x52 controller case: one output row, thirteen output
+  // columns, and a seventeen-element reduction. A rows are padded to a
+  // 16-byte boundary and B rows occupy one 16-byte line each.
+  task automatic prepare_dense_gemv_tail_case;
+    integer cc,kk,bank,local_addr,local_index,local_word;
+    integer signed value,accum;
+    begin
+      m_size=1;n_size=13;k_words=17;instance_count=1;
+      op_mode=8'h52;src0_base=SRC0_BASE;src1_base=SRC1_BASE;
+      bias_base=BIAS_BASE;dst_base=DST_BASE;
+      src0_batch_stride=0;src1_batch_stride=0;dst_batch_stride=0;
+      transpose_a=0;transpose_b=0;bias_enable=0;
+      scale_shift=0;activation=0;aux0=0;watchdog_limit=0;
+
+      for(kk=0;kk<17;kk=kk+1) begin
+        logical_a[0][0][kk]=((kk*5+1)%19)-9;
+        for(cc=0;cc<13;cc=cc+1)
+          logical_b[0][kk][cc]=((kk*3-cc*2+5)%17)-8;
+      end
+      // Keep every physical padding byte deterministic. Tail lanes are
+      // deliberately nonzero in the line image so the DUT must mask them.
+      for(kk=17;kk<32;kk=kk+1) begin
+        logical_a[0][0][kk]=8'sd7;
+        for(cc=0;cc<16;cc=cc+1)
+          logical_b[0][kk][cc]=8'sd6;
+      end
+      for(cc=13;cc<16;cc=cc+1)
+        for(kk=0;kk<17;kk=kk+1)
+          logical_b[0][kk][cc]=8'sd5;
+
+      for(kk=0;kk<32;kk=kk+16) begin
+        local_addr=SRC0_BASE+kk;
+        local_index=(local_addr>>4)&13'h1fff;
+        for(bank=0;bank<4;bank=bank+1)
+          bank_mem[bank][local_index]=pack4(
+              logical_a[0][0][kk+bank*4+0],
+              logical_a[0][0][kk+bank*4+1],
+              logical_a[0][0][kk+bank*4+2],
+              logical_a[0][0][kk+bank*4+3]);
+      end
+      for(kk=0;kk<17;kk=kk+1) begin
+        local_addr=SRC1_BASE+kk*16;
+        local_index=(local_addr>>4)&13'h1fff;
+        for(bank=0;bank<4;bank=bank+1)
+          bank_mem[bank][local_index]=pack4(
+              logical_b[0][kk][bank*4+0],
+              logical_b[0][kk][bank*4+1],
+              logical_b[0][kk][bank*4+2],
+              logical_b[0][kk][bank*4+3]);
+      end
+
+      for(cc=0;cc<16;cc=cc+1) begin
+        local_word=(DST_BASE>>2)+cc;
+        output_mem[local_word]=32'hbad0_0000+local_word;
+        expected_mem[local_word]=output_mem[local_word];
+      end
+      for(cc=0;cc<13;cc=cc+1) begin
+        accum=0;
+        for(kk=0;kk<17;kk=kk+1)
+          accum=accum+$signed(logical_a[0][0][kk])*
+                       $signed(logical_b[0][kk][cc]);
+        local_word=(DST_BASE>>2)+cc;
+        expected_mem[local_word]=accum;
+      end
+      line_write_count=0;scalar_write_count=0;
+      case_mac_snapshot=mac_cycle_count;
+      case_bank_snapshot=bank_read_count;
+      case_bank_stall_snapshot=bank_stall_count;
+      case_line_stall_snapshot=line_stall_count;
+    end
+  endtask
+
+  task automatic check_dense_gemv_tail_case;
+    integer cc,local_word,gemv_mac_cycles,gemv_bank_reads;
+    begin
+      launch_and_wait();
+      if(error || error_code!==0 || busy || element_count!==32'd13)
+        $fatal(1,"tail GEMV completion error=%b code=%0d busy=%b elements=%0d",
+               error,error_code,busy,element_count);
+      if(line_write_count!==3 || scalar_write_count!==1)
+        $fatal(1,"tail GEMV writes lines=%0d scalar=%0d expected=3/1",
+               line_write_count,scalar_write_count);
+      for(cc=0;cc<16;cc=cc+1) begin
+        local_word=(DST_BASE>>2)+cc;
+        if(output_mem[local_word]!==expected_mem[local_word])
+          $fatal(1,"tail GEMV col=%0d got=%08x expected=%08x",
+                 cc,output_mem[local_word],expected_mem[local_word]);
+      end
+      if(bank_read_count!=bank_response_count || pending_bank ||
+         spad_read_count!=spad_response_count || pending_spad)
+        $fatal(1,"tail GEMV left a request/response outstanding");
+      gemv_mac_cycles=mac_cycle_count-case_mac_snapshot;
+      gemv_bank_reads=bank_read_count-case_bank_snapshot;
+      if(gemv_mac_cycles!=5 || gemv_bank_reads!=19 ||
+         dut.perf_prefetch_completed!=0 || dut.perf_a_tile_cache_hits!=0)
+        $fatal(1,"tail GEMV profile mac=%0d bank_reads=%0d prefetch=%0d a_cache_hits=%0d expected=5/19/0/0",
+               gemv_mac_cycles,gemv_bank_reads,dut.perf_prefetch_completed,
+               dut.perf_a_tile_cache_hits);
+      $display("MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 cycles=%0d mac_cycles=%0d bank_reads=%0d read_bytes=%0d outputs=%0d lines=%0d scalar=%0d golden=bit-exact",
+               cycle_count,gemv_mac_cycles,gemv_bank_reads,
+               gemv_bank_reads*16,element_count,line_write_count,
+               scalar_write_count);
+    end
+  endtask
+
+  // Max-row tiled K-tail case complements the M=1/N-tail case above. It
+  // exercises four successive 4-row tiles and a partial final K fold.
+  task automatic prepare_dense_gemv_m16_tail_case;
+    integer rr,cc,kk,bank,local_addr,local_index,local_word;
+    integer signed value,accum;
+    begin
+      m_size=16;n_size=16;k_words=19;instance_count=1;
+      op_mode=8'h52;src0_base=SRC0_BASE;src1_base=SRC1_BASE;
+      bias_base=BIAS_BASE;dst_base=DST_BASE;
+      src0_batch_stride=0;src1_batch_stride=0;dst_batch_stride=0;
+      transpose_a=0;transpose_b=0;bias_enable=0;
+      scale_shift=0;activation=0;aux0=0;watchdog_limit=0;
+
+      for(rr=0;rr<16;rr=rr+1)
+        for(kk=0;kk<32;kk=kk+1)
+          logical_a[0][rr][kk]=(kk<19) ? (((rr*7+kk*5+1)%23)-11) : 7;
+      for(kk=0;kk<19;kk=kk+1)
+        for(cc=0;cc<16;cc=cc+1)
+          logical_b[0][kk][cc]=((kk*3-cc*2+5)%17)-8;
+
+      for(rr=0;rr<16;rr=rr+1)
+        for(kk=0;kk<32;kk=kk+16) begin
+          local_addr=SRC0_BASE+rr*32+kk;
+          local_index=(local_addr>>4)&13'h1fff;
+          for(bank=0;bank<4;bank=bank+1)
+            bank_mem[bank][local_index]=pack4(
+                logical_a[0][rr][kk+bank*4+0],
+                logical_a[0][rr][kk+bank*4+1],
+                logical_a[0][rr][kk+bank*4+2],
+                logical_a[0][rr][kk+bank*4+3]);
+        end
+      for(kk=0;kk<19;kk=kk+1) begin
+        local_addr=SRC1_BASE+kk*16;
+        local_index=(local_addr>>4)&13'h1fff;
+        for(bank=0;bank<4;bank=bank+1)
+          bank_mem[bank][local_index]=pack4(
+              logical_b[0][kk][bank*4+0],
+              logical_b[0][kk][bank*4+1],
+              logical_b[0][kk][bank*4+2],
+              logical_b[0][kk][bank*4+3]);
+      end
+
+      for(rr=0;rr<16;rr=rr+1)
+        for(cc=0;cc<16;cc=cc+1) begin
+          accum=0;
+          for(kk=0;kk<19;kk=kk+1)
+            accum=accum+$signed(logical_a[0][rr][kk])*
+                         $signed(logical_b[0][kk][cc]);
+          local_word=(DST_BASE>>2)+rr*16+cc;
+          expected_mem[local_word]=accum;
+          output_mem[local_word]=32'hbad0_0000+local_word;
+        end
+      line_write_count=0;scalar_write_count=0;
+      case_mac_snapshot=mac_cycle_count;
+      case_bank_snapshot=bank_read_count;
+      case_bank_stall_snapshot=bank_stall_count;
+      case_line_stall_snapshot=line_stall_count;
+    end
+  endtask
+
+  task automatic check_dense_gemv_m16_tail_case;
+    integer rr,cc,local_word,gemv_mac_cycles,gemv_bank_reads;
+    begin
+      launch_and_wait();
+      if(error || error_code!==0 || busy || element_count!==32'd256)
+        $fatal(1,"M16 tail GEMV completion error=%b code=%0d busy=%b elements=%0d",
+               error,error_code,busy,element_count);
+      if(line_write_count!==64 || scalar_write_count!==0)
+        $fatal(1,"M16 tail GEMV writes lines=%0d scalar=%0d expected=64/0",
+               line_write_count,scalar_write_count);
+      for(rr=0;rr<16;rr=rr+1)
+        for(cc=0;cc<16;cc=cc+1) begin
+          local_word=(DST_BASE>>2)+rr*16+cc;
+          if(output_mem[local_word]!==expected_mem[local_word])
+            $fatal(1,"M16 tail GEMV row=%0d col=%0d got=%08x expected=%08x",
+                   rr,cc,output_mem[local_word],expected_mem[local_word]);
+        end
+      if(bank_read_count!=bank_response_count || pending_bank ||
+         spad_read_count!=spad_response_count || pending_spad)
+        $fatal(1,"M16 tail GEMV left a request/response outstanding");
+      gemv_mac_cycles=mac_cycle_count-case_mac_snapshot;
+      gemv_bank_reads=bank_read_count-case_bank_snapshot;
+      if(gemv_mac_cycles!=20 || gemv_bank_reads!=108 ||
+         dut.perf_prefetch_completed!=0 || dut.perf_a_tile_cache_hits!=0)
+        $fatal(1,"M16 tail GEMV profile mac=%0d bank_reads=%0d prefetch=%0d a_cache_hits=%0d expected=20/108/0/0",
+               gemv_mac_cycles,gemv_bank_reads,dut.perf_prefetch_completed,
+               dut.perf_a_tile_cache_hits);
+      $display("MATRIX_CORE_GEMV_KFOLD_M16_TAIL_PASS opcode=0x52 shape=16x16x19 cycles=%0d mac_cycles=%0d bank_reads=%0d read_bytes=%0d outputs=%0d lines=%0d golden=bit-exact",
+               cycle_count,gemv_mac_cycles,gemv_bank_reads,
+               gemv_bank_reads*16,element_count,line_write_count);
+    end
+  endtask
+
   // Reuse the exact deterministic signed INT8 operands from the pinned
   // TinyNPU tiled-GEMM testbench. This is a benchmark-only data set, not a
   // product reference model; check_valid_case still checks the full DUT
@@ -1364,6 +1562,10 @@ module tb_ai_tensor_matrix_core_random;
         $fatal(1,"product GEMV cache-collision precondition was not established");
       prepare_dense_gemv_case();
       check_dense_gemv_case();
+      prepare_dense_gemv_tail_case();
+      check_dense_gemv_tail_case();
+      prepare_dense_gemv_m16_tail_case();
+      check_dense_gemv_m16_tail_case();
       $display("MATRIX_PRODUCT_GEMV_ONLY_PASS seed=%0d",initial_seed);
       $finish;
     end

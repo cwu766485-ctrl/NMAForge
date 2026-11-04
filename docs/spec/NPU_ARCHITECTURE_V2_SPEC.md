@@ -1,6 +1,6 @@
 # NMAForge NPU Architecture v2.0 Specification
 
-**Status:** In-progress implementation contract; fused Matrix opcode `0x53` is implemented and Golden-checked. Additive product opcode `0x52` now passes a bounded dense `M=4,N=16,K=32` Matrix-controller/SPAD/top-dispatch slice. General GEMV shapes, fault closure, architecture-wide performance, and full v2 sign-off remain open.
+**Status:** In-progress implementation contract; fused Matrix opcode `0x53` is implemented and Golden-checked. Product opcode `0x52` now accepts dense `1<=M,N<=16`, `K>=1` descriptors and passes directed core plus Top Smoke Golden checks for N/K tails. Fetch/compute overlap, fault closure, architecture-wide performance, and full v2 sign-off remain open.
 **Frozen starting point:** NMAForge R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`.
 **Version boundary:** Existing ABI v7 descriptors and opcodes retain their behavior. v2 additions are additive and must be rejected by older RTL as unsupported descriptors.
 **Related audit:** [NPU v2 Phase 0 baseline](../architecture/NPU_ARCHITECTURE_V2_PHASE0_BASELINE.md).
@@ -130,30 +130,32 @@ operand bus.
 
 ### Current product RTL subset for opcode `0x52`
 
-The present controller/validator implementation accepts ABI-v7 dense row-major
-`M=4,N=16,K>=16`, where K is divisible by 16. Transpose, nonzero source or
-destination stride, batching (`batch_count` greater than one), nonzero head
-count, nonzero `aux0`, and nonzero reserved `flags[7:1]` are rejected;
-`flags[0]` must equal `bias_enable`. Source bases must be 16-byte aligned;
-the destination follows the existing word-alignment rule. The kernel uses the
-shared 16×16 array and four-way K reduction, with the existing bias/shift/
-activation and INT32 output path. Unsupported shapes are rejected before
-dispatch; they are not silently rounded or masked. M=1/8/16, N tails, K tails,
-strided/batched access, bank-aware overlap, and fault/Abort/Reset coverage are
-not yet implemented for this opcode.
+The controller and ABI-v7 descriptor validator accept dense row-major
+`1<=M<=16`, `1<=N<=16`, and `1<=K<=65535` shapes. Transpose, nonzero source or
+destination stride, multiple batches, nonzero head count, nonzero `aux0`, and
+nonzero reserved `flags[7:1]` are rejected; `flags[0]` must equal
+`bias_enable`. Source bases must be 16-byte aligned; the destination follows
+the existing word-alignment rule. The shared 16×16 array performs four-way K
+reduction. The existing optional bias, arithmetic shift, activation, INT32
+result, and output path remain in use.
 
-Operand bytes are little-endian packed four signed INT8 values per 32-bit
-SPAD word. The first logical element occupies bits `[7:0]`. A/B base addresses
-must be word-aligned. For a final partial word, invalid lanes are zero-masked
-before MAC and are not fetched beyond the rounded-up word span. The output
-contains one signed 32-bit word per valid `(m,n)` result. Existing Matrix
-line-write rules apply: use a 128-bit line only for an aligned full line with
-full WSTRB; otherwise use legal ordered 32-bit writes.
+For this product opcode, dense A is `[M,K]` signed INT8 with each row padded
+to `round_up(K,16)` bytes. Dense B is `[K,N]` signed INT8 with one 16-byte
+physical row per logical K element; N columns above the descriptor N are
+masked before MAC. K-fold groups beyond K are zero-masked and never issued as
+SPAD requests. N-tail outputs use ordered scalar writes; complete aligned
+four-word groups use full-WSTRB 128-bit writes. This layout is specific to
+opcode `0x52`; it does not change legacy Matrix GEMM layouts.
 
-Opcode `0x52` has a bounded product implementation for the current subset
-documented above. The broader descriptor contract remains a target, not a
-claim of implemented support. Decoder acceptance alone is not evidence that a
-shape is supported; unsupported fields/shapes must be rejected and covered.
+The current implementation does not support N greater than 16, transpose,
+strides, multi-batch operation, head-aware operation, or fused `0x53` mode
+through this opcode. Core Golden coverage includes `M=1,N=13,K=17` and
+`M=16,N=16,K=19`; Top Smoke exercises `M=1,N=13,K=17` through CMDQ,
+validation, dispatch, Matrix, SPAD and completion. Fetch/compute overlap,
+opcode-specific fault/Abort/Reset closure, full shape coverage, mutation,
+architecture-wide performance, and sign-off remain open. Decoder acceptance
+alone is not evidence that unsupported fields are implemented; they remain
+explicitly rejected.
 
 Opcode `0x53` is the optional fused-output form of Matrix GEMM. It keeps the
 same source, shape, K-word, bias, Matrix shift, activation, and transpose

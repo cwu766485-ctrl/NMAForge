@@ -74,9 +74,10 @@ module ai_descriptor_validator (
                                m_size != 0 &&
                                n_size != 0 && k_words != 0 &&
                                m_size[1:0] == 0 && n_size[1:0] == 0) ||
-                              ((op == 8'h52) && (m_size == 16'd4) &&
-                               (n_size == 16'd16) && (k_words >= 16'd16) &&
-                               (k_words[3:0] == 4'd0)) ||
+                              ((op == 8'h52) &&
+                               (m_size >= 16'd1) && (m_size <= 16'd16) &&
+                               (n_size >= 16'd1) && (n_size <= 16'd16) &&
+                               (k_words != 16'd0)) ||
                               (is_tensor_sfu && length != 0) ||
                               ((op == 8'h16 || op == 8'h17) &&
                                m_size >= 16'd3 && n_size >= 16'd3) ||
@@ -110,9 +111,9 @@ module ai_descriptor_validator (
         (dst_stride == 0 || dst_stride[3:0] == 0) &&
         (dst[3:0] == 0));
 
-    // Initial product GEMV implementation gate. Keep the broader v2
-    // architecture target explicit in the SPEC, but reject unimplemented
-    // shapes/strides at descriptor validation instead of misrouting them.
+    // Product GEMV descriptor field gate. Shape support is bounded by the
+    // shared 16x16 Matrix array; unsupported strides, batching, and flags are
+    // rejected before dispatch rather than silently ignored.
     wire gemv_fields_valid =
         (op != 8'h52) ||
         ((version == 8'd7) && (flags[7:1] == 7'd0) &&

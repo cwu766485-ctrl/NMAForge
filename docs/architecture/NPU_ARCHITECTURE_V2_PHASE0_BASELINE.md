@@ -259,11 +259,12 @@ and `ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261104` both pass. Raw logs are under
 `/tmp/nmaforge_v2_product_gemv_clean_10aa2ed/` and
 `/tmp/nmaforge-v2-gemv-clean-10aa2ed/`.
 
-This follow-up supersedes only the historical statement above that product
-controller integration was absent. Product M=1/8/16, N/K tails, striding,
-batching, fault/Abort/Reset, mutation, broad coverage, same-workload GEMM
-comparison, TinyNPU fairness, and ASIC PPA remain open or `NOT_RUN`. The v1.0
-Compute Cluster sign-off remains **HOLD**.
+This section records the initial M4/K32-only integration snapshot. Its then-
+current K20-rejected boundary and profile are historical and were expanded by
+the shape/tail follow-up below. Striding, batching, fault/Abort/Reset,
+mutation, broad coverage, same-workload GEMM comparison, TinyNPU fairness,
+and ASIC PPA remain open or `NOT_RUN`. The v1.0 Compute Cluster sign-off
+remains **HOLD**.
 
 ## 10. Product GEMV A-line reuse — 2026-11-04
 
@@ -287,3 +288,15 @@ logs are under `/tmp/nmaforge_v2_gemv_baseline_8cff286/`. Top Smoke passes on
 the optimized clean SHA. These are Matrix-core behavioral-model results, not
 TinyNPU results, full-chip speedup, or ASIC PPA. Fetch/MAC overlap, broader
 shapes, fault/reset closure, and full v1/v2 sign-off remain open.
+
+## 11. Product GEMV dense shapes and tails — 2026-11-04
+
+The product controller and descriptor validator now support `1<=M,N<=16` and
+`1<=K<=65535` for dense opcode `0x52`. Core VCS Golden checks cover M1/N13/K17
+and M16/N16/K19 in addition to the original M4/N16/K32 case. The Top Smoke
+CMDQ path validates M1/N13/K17 end-to-end, including the exact 13-word
+completion count and untouched N-tail sentinels. See
+[`SHAPE_ADAPTIVE_GEMM_GEMV_REPORT.md`](SHAPE_ADAPTIVE_GEMM_GEMV_REPORT.md) for
+commands, Run IDs, profile, and evidence paths. Fetch/compute overlap, repeated
+B traffic across row tiles, descriptor-wide shape coverage, and opcode-specific
+error recovery remain open; sign-off remains **HOLD**.

@@ -3200,13 +3200,38 @@ module tb_ai_accel_smoke;
             axi_write(REG_CPLQ_SIZE, 32'd0);
             clear_done_irq();
 
-            // Non-16-element K tails are not implemented in this first
-            // product slice. ABI-v7 validation must reject them before the
-            // Matrix engine can modify the destination.
-            axi_write(SPAD_BASE + 32'h5600, 32'hface_5200);
+            // Product GEMV shape/tail contract: M=1, N=13, K=17. A is
+            // padded to a 32-byte row and B uses 16-byte rows. Padding and
+            // N-tail values are nonzero so only explicit DUT masking can
+            // produce the expected valid output image.
+            for (kk_g = 0; kk_g < 32; kk_g = kk_g + 16)
+                for (bank_g = 0; bank_g < 4; bank_g = bank_g + 1) begin
+                    a0_g = (kk_g + bank_g*4 + 0 < 17) ?
+                        (((kk_g + bank_g*4 + 0)*5 + 1) % 19) - 9 : 7;
+                    a1_g = (kk_g + bank_g*4 + 1 < 17) ?
+                        (((kk_g + bank_g*4 + 1)*5 + 1) % 19) - 9 : 7;
+                    a2_g = (kk_g + bank_g*4 + 2 < 17) ?
+                        (((kk_g + bank_g*4 + 2)*5 + 1) % 19) - 9 : 7;
+                    a3_g = (kk_g + bank_g*4 + 3 < 17) ?
+                        (((kk_g + bank_g*4 + 3)*5 + 1) % 19) - 9 : 7;
+                    axi_write(SPAD_BASE + 32'h5000 + kk_g + bank_g*4,
+                              {a3_g[7:0],a2_g[7:0],a1_g[7:0],a0_g[7:0]});
+                end
+            for (kk_g = 0; kk_g < 17; kk_g = kk_g + 1)
+                for (bank_g = 0; bank_g < 4; bank_g = bank_g + 1) begin
+                    b0_g = ((3*kk_g - (bank_g*4 + 0)*2 + 5) % 17) - 8;
+                    b1_g = ((3*kk_g - (bank_g*4 + 1)*2 + 5) % 17) - 8;
+                    b2_g = ((3*kk_g - (bank_g*4 + 2)*2 + 5) % 17) - 8;
+                    b3_g = ((3*kk_g - (bank_g*4 + 3)*2 + 5) % 17) - 8;
+                    axi_write(SPAD_BASE + 32'h5200 + kk_g*16 + bank_g*4,
+                              {b3_g[7:0],b2_g[7:0],b1_g[7:0],b0_g[7:0]});
+                end
+            for (cc_g = 0; cc_g < 16; cc_g = cc_g + 1)
+                axi_write(SPAD_BASE + 32'h5600 + cc_g*4,
+                          32'hface_5200 + cc_g);
             write_spad_desc_v3(32'h4d40, OP_TENSOR_GEMV_KFOLD, 16'h0521,
                                32'h5000, 32'h5200, 32'd0, 32'h5600,
-                               16'd4, 16'd16, 16'd20, 8'd0, 32'd0,
+                               16'd1, 16'd13, 16'd17, 8'd0, 32'd0,
                                5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
                                16'd0, 16'd0, 16'd0, 16'd0, 16'd0);
             axi_write(SPAD_BASE + 32'h4d7c, 32'd7);
@@ -3219,16 +3244,40 @@ module tb_ai_accel_smoke;
             axi_write(REG_CPLQ_SIZE, 32'd2);
             axi_write(REG_CPLQ_HEAD, 32'd0);
             axi_write(REG_CPLQ_TAIL, 32'd0);
+            matrix_line_write_count = 0;
             axi_write(REG_DOORBELL, 32'd1);
-            wait_cpl_tail(32'd1, "unsupported GEMV tail rejection");
-            expect_completion(32'h4e40, 16'h0521, 4'h2, ERR_DESC_INVALID,
-                              32'd0, 32'd0, "unsupported GEMV tail");
-            expect_read(SPAD_BASE + 32'h5600, 32'hface_5200,
-                        "unsupported GEMV tail destination unchanged");
+            wait_cpl_tail(32'd1, "product GEMV M/N/K tail completion");
+            expected_last_g = 0;
+            for (cc_g = 0; cc_g < 16; cc_g = cc_g + 1) begin
+                if (cc_g < 13) begin
+                    accum_g = 0;
+                    for (kk_g = 0; kk_g < 17; kk_g = kk_g + 1)
+                        accum_g = accum_g +
+                            ((((kk_g*5 + 1) % 19) - 9) *
+                             (((3*kk_g - cc_g*2 + 5) % 17) - 8));
+                    expected_g = accum_g;
+                    expected_last_g = expected_g;
+                    expect_read(SPAD_BASE + 32'h5600 + cc_g*4,
+                                expected_g, "product GEMV tail output");
+                end else begin
+                    expect_read(SPAD_BASE + 32'h5600 + cc_g*4,
+                                32'hface_5200 + cc_g,
+                                "product GEMV N-tail sentinel");
+                end
+            end
+            if (matrix_line_write_count != 3) begin
+                $display("%0t ERROR: product GEMV tail line writes=%0d expected=3",
+                         $time, matrix_line_write_count);
+                errors = errors + 1;
+            end
+            expect_completion(32'h4e40, 16'h0521, 4'h1, 4'd0,
+                              expected_last_g, 32'd13,
+                              "product GEMV M/N/K tails");
             if (errors != errors_before_g)
-                $fatal(1, "unsupported GEMV tail disposition had %0d errors",
+                $fatal(1, "product GEMV tail case had %0d errors",
                        errors - errors_before_g);
-            $display("MATRIX_PRODUCT_GEMV_DESCRIPTOR_REJECT_PASS k_tail=20 status=ERR_DESC_INVALID no_write=1");
+            $display("MATRIX_PRODUCT_GEMV_TAIL_DESCRIPTOR_PASS opcode=0x52 shape=1x13x17 valid_outputs=13 line_writes=%0d scalar_tail=1 golden=bit-exact",
+                     matrix_line_write_count);
             axi_write(REG_CMDQ_SIZE, 32'd0);
             axi_write(REG_CPLQ_SIZE, 32'd0);
             clear_done_irq();

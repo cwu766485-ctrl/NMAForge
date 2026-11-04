@@ -1,6 +1,6 @@
 # Shape-Adaptive GEMM/GEMV — First Product Integration Slice
 
-**Status:** Bounded product GEMV slice and A-line reuse optimization demonstrated; architecture-wide performance and sign-off remain open.
+**Status:** Product GEMV supports bounded dense shapes through 16×16 with N/K tail masking; A-line reuse is measured. Fetch/compute overlap, full fault/coverage closure, architecture-wide performance, and sign-off remain open.
 **Frozen v2 base:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`.
 **RTL integration commit:** `3db6cf76781e9c98ec1396315ccf4ab26af58214`.
 **Profile/checker commits:** `c042fd3b5914fe616da5a12dd08a4f4a8b326cd4` and
@@ -13,15 +13,22 @@
 The additive ABI-v7 opcode `0x52` is connected through the descriptor decoder,
 validator, parallel dispatcher, Matrix controller, and software header. It
 reuses the existing 16×16 / 256-MAC Matrix array and accumulator bank. The
-controller accepts one bounded descriptor class:
-
-- Dense row-major signed INT8 A `[4, K]` and B `[K, 16]`.
-- `K >= 16` and divisible by 16; source addresses are 16-byte aligned.
+controller accepts bounded dense shapes with `1<=M,N<=16`, `K>=1`, and
+16-byte-aligned source addresses. A rows are padded to 16-byte strides and B
+- Dense A is `[M,K]`; dense B is `[K,N]`, with each B row occupying 16 bytes.
 - No transpose, nonzero strides, multi-batch, nonzero head count, or nonzero
   `aux0`; reserved `flags[7:1]` must be zero and `flags[0]` must match
   `bias_enable`. Unsupported descriptors are rejected before engine dispatch.
 - Existing optional column bias, scale shift, activation, INT32 output, and
   ordered line writeback are exercised by the Matrix-core Golden case.
+
+The shape extension and exact operand layout are specified in
+[`NPU_ARCHITECTURE_V2_SPEC.md`](../spec/NPU_ARCHITECTURE_V2_SPEC.md). The
+directed controller tests cover the original M4 workload, M1 with both an N
+tail and a K tail, and M16 across four row tiles with a K tail. The real Top
+Smoke path covers M1/N13/K17 through the command queue and completion path.
+The implementation uses padded A rows, 16-byte B rows, K-lane zero masking,
+and scalar output writes for partial or unaligned groups.
 
 The Matrix controller test checks the complete 64-word output image against an
 independent signed INT64 accumulation followed by bias, arithmetic shift, and
@@ -92,17 +99,46 @@ observational and can overlap; they must not be summed as disjoint cycles.
 | `V2-PRODUCT-GEMV-CLEAN-TOP-10aa2ed` | `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261104 SEED=20261104` | Same clean SHA; `/tmp/nmaforge-v2-gemv-clean-10aa2ed/dv/subsystem/top_smoke/sim/ai_accel_smoke.log` | PASS: `TEST PASS`, product descriptor success and `K=20` rejection both present. |
 | `V2-GEMV-AREUSE-MATCHED-BASELINE-S3` | `make product-gemv-regress CORE_OUT_DIR=/tmp/nmaforge_v2_gemv_baseline_8cff286 SEEDS='20261104 20261105 20261106' A_TILE_CACHE_ENABLE=0` | Detached source `8cff28689838d432151d8130b17db4e8a27c7632`; measurement-only testbench copy under `/tmp/nmaforge-v2-gemv-baseline-8cff286`; logs in `/tmp/nmaforge_v2_gemv_baseline_8cff286/` | PASS: 3/3 Golden; each run 269 cycles, 64 reads / 1,024 B. |
 | `V2-GEMV-AREUSE-CLEAN-CORE-S3-cf6cd1e` | `make core-random-regress CORE_OUT_DIR=/tmp/nmaforge_v2_gemv_clean_cf6cd1e_core SEEDS='20261104 20261105 20261106'` | Clean detached worktree SHA `cf6cd1e1e81e9b9372c13a44e3fc64e775b4ca6c`; per-seed logs `/tmp/nmaforge_v2_gemv_clean_cf6cd1e_core/{run_seed,product_gemv_seed}_*.log` | PASS: 3/3 random-core regression (18 directed/random cases and fault/recovery checks per seed); 3/3 GEMV Golden, 214 cycles, 40 reads / 640 B; collision precondition and zero GEMV cache hits checked. |
-| `V2-GEMV-AREUSE-CLEAN-TOP-cf6cd1e` | `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261104 SEED=20261104` | Same clean SHA; `/tmp/nmaforge-v2-gemv-clean-cf6cd1e/dv/subsystem/top_smoke/sim/ai_accel_smoke.log` | PASS: `TEST PASS`; opcode `0x52` descriptor Golden and invalid `K=20` no-write rejection pass. |
+| `V2-GEMV-AREUSE-CLEAN-TOP-cf6cd1e` | `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261104 SEED=20261104` | Same clean SHA; `/tmp/nmaforge-v2-gemv-clean-cf6cd1e/dv/subsystem/top_smoke/sim/ai_accel_smoke.log` | PASS: `TEST PASS`; original opcode `0x52` descriptor Golden passed. This predates the shape extension. |
 
-The product-path test checks all 64 values and all 16 output line writes. The
-focused test does not prove a full-chip memory scoreboard or broad descriptor
-coverage. The Top Smoke compile retains its pre-existing Transformer fixture
-loop-reroll notice; it is not introduced by opcode `0x52`.
+The original product-path test checks all 64 values and all 16 output line
+writes. New runs and their detailed profile are recorded below. These tests do
+not prove broad descriptor coverage or a full-chip memory scoreboard. The Top
+Smoke compile retains its pre-existing Transformer fixture loop-reroll notice;
+it is not introduced by opcode `0x52`.
+
+## Dense shape and tail extension — 2026-11-04
+
+The controller now accepts `1<=M,N<=16` and `K>=1` for opcode `0x52`. A rows
+use a 16-byte-rounded physical stride, B uses one 16-byte row per K element,
+K-tail lanes and N-tail columns are masked, and partial output groups use the
+ordered scalar SPAD path. The descriptor validator admits the same shape
+range while continuing to reject unsupported stride, transpose, batch, head,
+and reserved-field modes. No legacy `0x30` or `0x53` behavior changed.
+
+VCS `V-2023.12-SP1_Full64` profile with a registered behavioral-SPAD model:
+
+| Shape | Command cycles | MAC-active cycles | Operand reads | Read bytes | Output writes | Golden |
+|---|---:|---:|---:|---:|---|---|
+| M1/N13/K17 | 71 | 5 | 19 | 304 B | 3 full lines + 1 scalar word | Bit-exact, all 13 outputs; N-tail sentinel preserved |
+| M16/N16/K19 | 404 | 20 | 108 | 1,728 B | 64 full lines | Bit-exact, all 256 outputs |
+
+For M16/N16/K19, 32 accepted reads fetch A (two padded lines per output
+row); B is reread for each of the four 4-row tiles, accounting for 76 of the
+108 reads. This is a measured remaining traffic opportunity, not an optimized
+result. All three Seeds produced identical cycles, reads, write counts, and
+Golden results.
+
+| Run ID | Exact command | Evidence path | Result |
+|---|---|---|---|
+| `V2-GEMV-SHAPE-CORE-S3-20261104` | `make product-gemv-regress CORE_OUT_DIR=/tmp/nmaforge_v2_gemv_shape_core_20261104 SEEDS='20261104 20261105 20261106'` | `/tmp/nmaforge_v2_gemv_shape_core_20261104/product_gemv_seed_*.log` | PASS: 3/3 seeds; original M4 case, M1/N13/K17 and M16/N16/K19 full Golden and drain checks. |
+| `V2-GEMV-SHAPE-RANDOM-CORE-S3-20261104` | `make core-random-regress CORE_OUT_DIR=/tmp/nmaforge_v2_gemv_tail_random_20261104 SEEDS='20261104 20261105 20261106'` | `/tmp/nmaforge_v2_gemv_tail_random_20261104/{run_seed,product_gemv_seed}_*.log` | PASS: existing 18-case/fault core regression and all three product GEMV Goldens on each seed. |
+| `V2-GEMV-SHAPE-TOP-SMOKE-20261104` | `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261104 SEED=20261104` | `dv/subsystem/top_smoke/sim/ai_accel_smoke.log` in this worktree | PASS: Top Smoke `TEST PASS`; legacy M4 descriptor and M1/N13/K17 descriptor both match independent Golden; tail sentinels and 13-word completion count pass. |
 
 ## Open work
 
-- Product shapes `M=1/8/16`, N tails, and K tails are not implemented. The
-  validator rejects them; there is no tail masking yet.
+- Product shape tests do not yet enumerate every M/N/K combination, especially
+  M8 and scalar N=1; descriptor randomization and a shape matrix remain open.
 - Overlap a legal next operand fetch with current compute while preserving
   response ownership, cache-layout isolation, and Abort/Reset behavior.
 - Add fault/phase coverage for parity, protection, Abort, reset, output
@@ -114,7 +150,7 @@ loop-reroll notice; it is not introduced by opcode `0x52`.
 - TinyNPU common-resource comparison and ASIC PPA remain **NOT_RUN**.
 
 This change does not alter the v1.0 Compute Cluster disposition (**HOLD**) and
-does not close the broader v2 architecture target. The first next optimization
-is to retain each A line across its four K-fold uses, then overlap the next
-legal fetch phase with current compute without weakening response ownership or
-Abort/Reset behavior.
+does not close the broader v2 architecture target. The next optimization is
+to overlap GEMV operand fetch with current compute without weakening response
+ownership or Abort/Reset behavior, then reduce the repeated B fetches across
+M tiles.
