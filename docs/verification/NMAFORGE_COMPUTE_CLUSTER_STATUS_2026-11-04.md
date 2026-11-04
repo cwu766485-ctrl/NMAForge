@@ -2,6 +2,8 @@
 
 **Snapshot:** 2026-11-04. This is a planning estimate, not a sign-off or coverage metric.
 
+**Published:** `cwu766485-ctrl/NMAForge`, branch `feat/compute-cluster-closeout-audit`, head `e44ae441a8b3ff28b82a770f9b3b7132ac87c7ea`. The published tree matches the local committed tree; GitHub API-generated commit IDs are recorded separately where they differ from local commit IDs.
+
 ## Current position
 
 The v1.0 Functional DV package is in candidate review, not signed off. The 38-row Execution RTM has 27 `PASS-SCOPED` rows and 11 `PARTIAL` rows, with no `BLOCKED_SPEC` or `NOT_RUN`. `PASS-SCOPED` means the recorded test scope passed; it does not mean the entire requirement is closed. The latest three-seed clean replay adds the bounded R302 reset-with-held-request testpoint; it does not change dispositions. See the [R302 evidence](COMPUTE_CLUSTER_PARALLEL_RESET_REQUEST_STALL_R302_2026-11-04.md) and [Execution RTM](COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md).

@@ -10,7 +10,8 @@ This is **not** full reset/backpressure closure. The held request was the `engin
 
 | Item | Value |
 |---|---|
-| Test commit / tree | `1ca8755e015033ad68031a26ed54fbd918f449a0` / `3b1edc19571c3f4f4a1ffcd8df022b8993ad5c55` |
+| Locally tested commit / tree | `1ca8755e015033ad68031a26ed54fbd918f449a0` / `3b1edc19571c3f4f4a1ffcd8df022b8993ad5c55` |
+| Published equivalent-tree commit | `845a86fa26cbf67d284a06fd2965804cbd73f6eb` (same tested tree; GitHub API upload) |
 | Parent | `79c10e6c15716f3ed4b567723cdcd9bd790f7050` (published R301 documentation snapshot) |
 | Test ID | `TC-CL-R302-ALL-ENGINE-RESET-WITH-HELD-REQUEST` |
 | Sequence / marker | `run_all_engine_parallel_reset_epoch_test` / `CLUSTER_PARALLEL_RESET_STALL_PASS` |
