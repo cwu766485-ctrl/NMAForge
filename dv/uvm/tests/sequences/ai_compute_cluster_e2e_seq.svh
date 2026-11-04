@@ -338,6 +338,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned engine_parallel_fault_cov_idx;
     int unsigned engine_parallel_fault_recovery_cov_idx;
     int unsigned engine_parallel_reset_phase;
+    int unsigned engine_parallel_reset_stall_owner;
     covergroup cmdq_invalid_descriptor_cg;
         option.per_instance = 1;
         cp_engine_descriptor_reject: coverpoint cmdq_invalid_descriptor_case {
@@ -439,6 +440,19 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             bins seven_engine_overlap_with_pending_reads = {1};
             bins old_epoch_quiet_and_unretired = {2};
             bins seven_engine_golden_recovery = {3};
+        }
+    endgroup
+
+    covergroup engine_parallel_reset_stall_cg;
+        option.per_instance = 1;
+        cp_engine_parallel_reset_stall_owner: coverpoint engine_parallel_reset_stall_owner {
+            bins int8 = {0};
+            bins fp = {1};
+            bins cnm = {2};
+            bins matrix = {3};
+            bins sfu = {4};
+            bins conv = {5};
+            bins kv = {6};
         }
     endgroup
 
@@ -621,6 +635,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         engine_parallel_fault_cg = new();
         engine_parallel_fault_recovery_cg = new();
         engine_parallel_reset_cg = new();
+        engine_parallel_reset_stall_cg = new();
         engine_pair_overlap_cg = new();
         c1_shared_read_alias_case = 0;
         c1_shared_read_alias_cg = new();
@@ -5405,9 +5420,28 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
+    function automatic bit reset_stall_owner_request_ready(input int unsigned owner);
+        case (owner)
+            2: reset_stall_owner_request_ready =
+                |(compute_vif.cnm_request_valid & compute_vif.cnm_request_ready);
+            3: reset_stall_owner_request_ready =
+                (compute_vif.matrix_request_valid && compute_vif.banked_ready) ||
+                (compute_vif.matrix_line_valid && compute_vif.matrix_line_ready);
+            default: begin
+                if (owner < 7)
+                    reset_stall_owner_request_ready =
+                        compute_vif.engine_req_valid[owner] &&
+                        compute_vif.engine_req_ready[owner];
+                else
+                    reset_stall_owner_request_ready = 1'b0;
+            end
+        endcase
+    endfunction
+
     task automatic run_all_engine_parallel_reset_epoch_test(
         input int unsigned seed,
-        input int signed matrix_golden[0:15][0:31]);
+        input int signed matrix_golden[0:15][0:31],
+        input int unsigned stalled_owner);
         localparam bit [15:0] TASK_ID_BASE = 16'h06e0;
         bit [31:0] expected_result[0:6];
         bit [31:0] expected_elements[0:6];
@@ -5450,6 +5484,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         bit [3:0] reset_stalled_cnm_mask;
         bit [31:0] reset_stalled_cnm_addr[0:3];
         bit reset_stalled_any_request;
+
+        if (stalled_owner >= 7)
+            `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL",
+                $sformatf("invalid reset-cut request owner=%0d", stalled_owner))
 
         accepted_engine_mask = '0;
         completion_seen = '0;
@@ -5687,6 +5725,14 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                         // arbiter's combinational outputs in the same active
                         // region as the request monitor's sampling edge.
                         @(negedge compute_vif.aclk);
+                        // Readiness must be sampled immediately before the
+                        // edge at which the request would otherwise be
+                        // accepted. A request observed ready at the preceding
+                        // posedge may already have advanced by this negedge.
+                        // Keep the production traffic running and retry on a
+                        // later cycle instead of mislabeling another owner.
+                        if (!reset_stall_owner_request_ready(stalled_owner))
+                            continue;
                         reset_stalled_engine_mask =
                             compute_vif.engine_req_valid & compute_vif.engine_req_ready;
                         reset_stalled_engine_write = compute_vif.engine_req_write;
@@ -5713,6 +5759,22 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                         if (!reset_stalled_any_request)
                             `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL",
                                 "no ready production request was available for deterministic reset-cut backpressure")
+                        if (!reset_stall_owner_request_ready(stalled_owner))
+                            `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL", $sformatf(
+                                "target request owner %0d was no longer valid/ready at the reset-cut sample",
+                                stalled_owner))
+                        case (stalled_owner)
+                            2: if (reset_stalled_cnm_mask == 4'b0)
+                                `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL",
+                                    "CNM target was not included in the held requester mask")
+                            3: if (!reset_stalled_matrix_banked && !reset_stalled_matrix_line)
+                                `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL",
+                                    "Matrix target was not included in a held banked/Line requester mask")
+                            default: if (!reset_stalled_engine_mask[stalled_owner])
+                                `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL", $sformatf(
+                                    "engine target %0d was not included in the held requester mask",
+                                    stalled_owner))
+                        endcase
                         force_scheduler_admission_stall();
 
                         // Observe one full sampled cycle of injected
@@ -5782,14 +5844,17 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                                     engine, accepted_reads[engine], returned_reads[engine]))
                             pending_reads += accepted_reads[engine] - returned_reads[engine];
                         end
-                        if (pending_reads == 0)
+                        if (pending_reads == 0 && stalled_owner == 6)
                             `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL",
-                                "all accepted reads drained before the combined stalled-request/reset cut")
+                                "KV reset-cut control no longer has an accepted read pending")
                         `uvm_info("CLUSTER_PARALLEL_RESET_STALL_PASS", $sformatf(
-                            "request selected while ready, then held stable/unaccepted for one sampled cycle before reset; engine_mask=%07b MatrixBanked=%0b MatrixLine=%0b CNM=%04b; pending_reads=%0d",
+                            "target request owner=%0d selected while ready, then held stable/unaccepted for one sampled cycle before reset; engine_mask=%07b MatrixBanked=%0b MatrixLine=%0b CNM=%04b; pending_reads=%0d",
+                            stalled_owner,
                             reset_stalled_engine_mask, reset_stalled_matrix_banked,
                             reset_stalled_matrix_line, reset_stalled_cnm_mask,
                             pending_reads), UVM_LOW)
+                        engine_parallel_reset_stall_owner = stalled_owner;
+                        engine_parallel_reset_stall_cg.sample();
                         #1ns;
                         reset_value = 1'b0;
                         reset_ok = uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value);
@@ -13293,7 +13358,16 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         `uvm_info("CLUSTER_PARALLEL_ENGINE_FAULT_PASS", $sformatf(
             "legal seven-engine parallel parity: each fault owner overlapped other active engines; six healthy outputs matched Golden; 7 completion owners/statuses checked; no-writeback sentinels passed for each fault owner; fault_owners=7/7 focused_bins=7/7 coverage=%.1f%% seed=%0d",
             engine_parallel_fault_cg.get_coverage(), seed), UVM_LOW)
-        run_all_engine_parallel_reset_epoch_test(seed, matrix_golden);
+        for (engine_idx = 0; engine_idx < 7; engine_idx++)
+            run_all_engine_parallel_reset_epoch_test(seed, matrix_golden,
+                                                      engine_idx);
+        if (engine_parallel_reset_stall_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_PARALLEL_RESET_STALL_COVERAGE", $sformatf(
+                "held production request owner bins=%0.1f%% expected 100%% (7 engine classes)",
+                engine_parallel_reset_stall_cg.get_coverage()))
+        `uvm_info("CLUSTER_PARALLEL_RESET_STALL_COVERAGE_PASS", $sformatf(
+            "legal request owner × shared reset cuts={INT8,FP,CNM,Matrix,SFU,Conv,KV}=7/7 coverage=%.1f%%; each cut checks held payload, reset quiet and seven-engine Golden recovery; KV cut additionally requires an old-epoch read pending; seed=%0d",
+            engine_parallel_reset_stall_cg.get_coverage(), seed), UVM_LOW)
 
         // Read the head/token entry back through the real KV engine after the
         // KV-write completion, checking both stride address generation and
