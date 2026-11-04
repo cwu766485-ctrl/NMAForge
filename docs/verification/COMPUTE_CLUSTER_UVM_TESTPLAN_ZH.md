@@ -1,3 +1,5 @@
+> **R284 七引擎并发 Parity 扩展（2026-11-04）**：真实 CMDQ 七引擎并发故障用例由单一 Matrix owner 扩为 Scalar/FP/CNM/Matrix/SFU/Conv/KV 七个 fault owner；每个 fault descriptor 在队列末尾，parity 注入首个操作数 word，检查 fault owner 错误码与无写回，其余六个引擎完成独立 Golden、结果/元素数和 task-ID/completion owner。被动请求稳定 checker 只增加精确 parity terminal-cancel 例外：FP 同 owner 且 response_valid/parity_error 同拍响应；CNM 同 lane parity 响应边沿及下一采样边沿；两个场景各有单独计数和用例命中断言。普通背压、仍然 valid 的 payload 改变和其它请求方仍严格检查。三 Seed 的 Run ID、日志和 disposition 见 [R284 report](COMPUTE_CLUSTER_PARALLEL_ENGINE_PARITY_R284_2026-11-04.md)；这只增加 bounded `REQ-CL-006/007/008/011/012/017` 和 `REQ-PC-006/007` 证据，所有对应 PARTIAL 项仍 PARTIAL，整体仍 HOLD。
+
 > **2026-11-02 当前候选与证据：** 产品 RTL/SPEC 基线为 `c4b3b4f676a7ffb5e264d88fca6bb7c9b374a413`，R171–R175 的固定验证 source/test SHA 为 `8a2d5f85add54f81019df1a8d6a29ad08bbe88d6`；R176 的 FP-core DV SHA 为 `546d371107fe1f1ab7dae98a241bb6eaa1b2643c`。R171 三 Seed real-top UVM 观察到 21/21 production engine pair、每 Seed 84 次 Matrix Line stalled-payload stability checks 且 0 violation，并通过 28/28 Checker-sensitivity 与 Top Smoke。R173 复测所选 `ai_accel_memory_fabric` reset/epoch；R174 复测 SPEC v1.5 Line 合同；R175 复测 Scalar INT8 合法数值边界；R176 在 BF16/FP16 两格式验证 Write Protection+Abort 同拍优先级，R178 验证 Parity 响应+Abort 同拍优先级，R179 验证 Abort+已到期 Watchdog 同拍优先级；R177 对读 Protection+Abort 同拍组合的可达性检查未计入覆盖，因 `abort` 会门控撤销读请求。`OPEN-CL-003/004` 与 `OPEN-NUM-01` 的指定范围已关闭；38 条 RTM 仍为 24 PASS-SCOPED / 14 PARTIAL，Compute Cluster v1.0 仍 HOLD，不得称为完整签核。
 
 > **R88 Matrix 对齐 Line Abort 前缀（2026-10-30）**：exact clean SHA `ce2e36d0d38a92d70e0bf2f64ff2523617c6dfec` 用三 Seed 验证 4×16 INT8 GEMM 在 aligned 128-bit Line 输出后 Abort；每 Seed 接受 6/16 条 Line（24/64 words），核验每条 Line 地址/数据、WSTRB=`ffff`、未写回 sentinel、5/5 读响应排空和 `ERR_ABORT`。三 Seed scoreboard 均 17,388 words、零 mismatch/unknown/stale，UVM severity 0/0/0；同 SHA Top Smoke、20-case Top 和 28/28 Checker-sensitivity 通过。只增加该形状/时点，不关闭其他 Matrix prefix 或全局 fault cross；RTM 仍 24 PASS-SCOPED / 14 PARTIAL，`CL-DV-v1.0` HOLD。上传中间版本曾因大文件传输截断而编译失败，完整修复 SHA 才作为 PASS 证据。详见 [R88 报告](COMPUTE_CLUSTER_MATRIX_LINE_ABORT_WRITE_PREFIX_R88_2026-10-30.md)。
@@ -101,7 +103,7 @@ remaining C1 closure
 | REQ-CL-003 | 启动参数时序 | Start 前后变更参数；在采样边缘值稳定；`tc_cl_launch_sampling` | cfg monitor + model | `engine × launch_sampling` | P0 READY |
 | REQ-CL-004 | 无关字段隔离 | 随机扰动本 Opcode 不使用的字段；`tc_cl_unused_field_noise` | Golden对比和存储写回 | `engine × unused_field_group` | P1 READY |
 | REQ-CL-005 | 参数锁存 | Busy期间修改 Launch 参数，完成原任务；`tc_cl_config_latched` | input monitor + memory scoreboard | `engine × mid_task_change` | P0 READY |
-| REQ-CL-006 | 请求背压保持 | 32-bit SPAD ready低1/2/8+周期；`tc_cl_spad_req_stability` | 接口 checker: 普通 stall 保持 payload；已接受 Matrix parity 响应同拍可撤销一笔未接受 banked read，并独立计数；focused covergroup 有 `parity_response_cancels_held_unaccepted_read` bin | `engine × stall_bin × rdwr × terminal_fault_cancel` | P0; R71 Line-stall slice PASS；R72 real-top parity-cancel cross 三 Seed 命中；完整 requester/stall/progress cross 仍 PARTIAL |
+| REQ-CL-006 | 请求背压保持 | 32-bit SPAD ready低1/2/8+周期；`tc_cl_spad_req_stability` | 接口 checker: 普通 stall 保持 payload；同 owner/lane parity response 可终止仍未握手的读请求（Matrix/FP 同采样周期，CNM lane response edge 后下一采样）；每类取消独立计数并由 case assert；请求仍 valid 时任何字段变化仍违规 | `engine × stall_bin × rdwr × terminal_fault_cancel` | P0; R71 Line-stall slice、R72 Matrix parity-cancel、R284 FP/CNM/七 owner 并发 slice 均 PASS；完整 requester/stall/progress cross 仍 PARTIAL |
 | REQ-CL-007 | 响应归属 | 已接受读取与响应一一对应，无窜发；`tc_cl_rsp_owner` | Response FIFO/accepted read ledger | `engine × response_delay × owner` | P0 READY |
 | REQ-CL-008 | 写回 Memory Image | 每个已接受写后对照 Golden Memory；`tc_cl_memory_commit` | Byte-aware memory scoreboard | `engine × write_count × status` | P0 READY |
 | REQ-CL-009 | 四Bank CNM | 各Bank独立grant/错拍响应/parity；`tc_cl_cnm_bank_independent` | per-bank monitor + CNM ref | `bank × rsp_phase × parity` | P0 READY |
@@ -166,7 +168,7 @@ remaining C1 closure
 | CL-SB-007 | result/error_code/counters 来自同一 Done owner | Error 按当前 Engine 原始编码 |
 | CL-SB-008 | performance counters 仅基于已定义事件采样，不能把 latency 模型固定成单一周期 | 对齐 Engine Done 采样周期 |
 | CL-SVA-001 | 每条 launch 只选一个 Engine；该 Engine 无活动槽时不得重复派发 | Scheduler assumption 与 DUT assertion 分开报告 |
-| CL-SVA-002 | req_valid && !req_ready 时 payload 稳定直到 accepted | 合法 abort/reset 允许终止保持 |
+| CL-SVA-002 | req_valid && !req_ready 时 payload 稳定直到 accepted | 合法 Abort/Reset 可结束保持；同 owner/lane parity response 只可撤销未接受读请求（FP/Matrix 同采样周期，CNM 允许对应 lane response 后一个 monitor sample）；其余 valid/address/write-data 变化仍须失败 |
 | CL-SVA-003 | read response 无孤儿、不会多于 accepted read、client/Bank 匹配 | Checker 用 Scoreboard Ledger；并非无 ID AXI reorder |
 | CL-SVA-004 | 同一 descriptor 只记录一次 owner Done；多个不同 Engine 同拍 Done 必须分别锁存 | bind/passive engine_done 向量并检查 FIFO task owner |
 | CL-SVA-005 | reset 后无原任务孤儿写回或 done | Reset 边界要先定义 memory responder 状态 |

@@ -131,7 +131,7 @@ SFU `REQUANT_I8`（opcode `0x36`）中 `flags[4]` 将饱和后的 INT32 结果�
 
 Tensor GEMM descriptor ABI 与 4×4 tile-major SPAD operand 布局保持不变，M/N 仍须为 4 的倍数。Matrix controller 默认以 16×16 MAC array 执行宏 tile：每个 K word 从 SPAD 收集最多四组 4×4 A/B 数据，送入本地 operand buffer；尺寸大于 16 时按宏 tile 遍历，边缘 tile 只写有效元素。`ARRAY_SIZE=4/8/16` 参数配置均保留。
 
-Matrix banked-read 遵循 `valid/ready` 握手：普通背压期间，未接受请求的 `valid` 与地址保持稳定。若已接受的 Matrix 响应在本拍报告 parity error，Matrix 立即停止后续读请求并进入错误排空；此时可在同一拍撤销一笔仍未接受的 banked request，因为它不是已接受传输。此前所有已接受读取仍必须 drain，错误完成码为 `ERR_PARITY`，失败任务不得产生结果写回。该例外只适用于同拍 parity 响应导致的请求终止；普通 ready 背压仍必须保持请求稳定，Abort/Reset 依各自生命周期合同处理。
+SPAD `valid/ready` 请求在普通背压期间必须保持 payload 稳定。Parity 响应会停止该 owner 的后续读请求，但只允许撤销仍未握手的请求：Matrix banked-read 在已接受响应的同拍报告 parity 时可同拍撤销；FP shared-core read 以该 FP owner 的 `engine_parity_rsp_error` 同拍撤销；CNM 以同一 lane 的 `cnm_rsp_valid && cnm_parity` 响应终止 held request，响应边沿后的下一次被动采样允许观察到该撤销（lane controller 在响应边沿更新状态）。这些例外只匹配对应 owner/lane 的 parity response，不适用于地址/数据变化后仍保持 valid 的请求，也不适用于普通 ready 背压。此前已接受的读取仍须按各自 response owner drain/归类；具体错误完成和已提交写入前缀遵循该 Engine 的既有合同，不能由此例外推断为全量回滚。Abort/Reset 依各自生命周期合同处理。
 
 SFU `GELU_Q8_8` (`0x35`) 与 `SILU_Q8_8` (`0x37`) 输入、输出均为 32-bit
 signed Q8.8 整数。GELU 分段定义为 `x<=-512: 0`、`x>=512: x`、其余为

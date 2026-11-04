@@ -43,6 +43,7 @@ interface ai_compute_cluster_if(input logic aclk);
     logic [2:0] request_client;
     logic matrix_rsp_valid;
     logic [3:0] cnm_rsp_valid;
+    logic [3:0] cnm_rsp_parity;
     logic [3:0] cnm_request_valid;
     logic [3:0] cnm_request_ready;
     logic matrix_request_valid;
@@ -145,6 +146,7 @@ interface ai_compute_cluster_if(input logic aclk);
     logic [2:0] engine_req_stall_len_bins[0:6][0:1];
     logic [6:0] engine_req_stall_seen;
     integer unsigned engine_req_stability_violations;
+    integer unsigned engine_req_parity_cancel_checks[0:6];
     logic [6:0] req_stalled_previous, req_write_previous;
     logic [31:0] req_addr_previous[0:6], req_wdata_previous[0:6];
     integer unsigned matrix_banked_stall_checks;
@@ -170,9 +172,11 @@ interface ai_compute_cluster_if(input logic aclk);
     logic [15:0] matrix_line_wstrb_previous;
     integer unsigned cnm_stall_checks[0:3];
     integer unsigned cnm_stall_violations;
+    integer unsigned cnm_parity_cancel_checks[0:3];
     integer unsigned cnm_stall_run_cycles[0:3];
     logic [2:0] cnm_stall_len_bins[0:3];
     logic [3:0] cnm_stalled_previous;
+    logic [3:0] cnm_parity_rsp_previous;
     logic [31:0] cnm_addr_previous[0:3];
 
     // Monotonic testbench clock counter for comparable wall-cycle timing.
@@ -206,7 +210,9 @@ interface ai_compute_cluster_if(input logic aclk);
         matrix_line_stalled_previous = 1'b0;
         cnm_stall_violations = 0;
         cnm_stalled_previous = '0;
+        cnm_parity_rsp_previous = '0;
         for (e = 0; e < 7; e++) begin
+            engine_req_parity_cancel_checks[e] = 0;
             engine_req_stall_checks[e] = 0;
             engine_req_stall_cycles[e] = 0;
             engine_req_stall_run_cycles[e] = 0;
@@ -236,6 +242,7 @@ interface ai_compute_cluster_if(input logic aclk);
             launch_snapshot_flags[e] = '0;
         end
         for (e = 0; e < 4; e++) begin
+            cnm_parity_cancel_checks[e] = 0;
             cnm_stall_checks[e] = 0;
             cnm_stall_run_cycles[e] = 0;
             cnm_stall_len_bins[e] = '0;
@@ -260,6 +267,7 @@ interface ai_compute_cluster_if(input logic aclk);
             for (e = 0; e < 4; e++)
                 cnm_stall_run_cycles[e] = 0;
             cnm_stalled_previous = '0;
+            cnm_parity_rsp_previous = '0;
         end else begin
             if (launch_valid) begin
                 engine = engine_id(launch_op);
@@ -289,11 +297,27 @@ interface ai_compute_cluster_if(input logic aclk);
             for (e = 0; e < 7; e++) begin
                 if (req_stalled_previous[e]) begin
                     engine_req_stall_checks[e] = engine_req_stall_checks[e] + 1;
-                    if (!engine_req_valid[e] ||
+                    // A same-owner parity response terminates an engine read
+                    // stream. The still-unaccepted read may be withdrawn in
+                    // that exact response cycle; all other payload changes
+                    // under backpressure remain violations.
+                    if (!engine_req_valid[e] && !req_write_previous[e] &&
+                        engine_rsp_valid[e] && engine_parity_rsp_error[e]) begin
+                        engine_req_parity_cancel_checks[e]++;
+                    end else if (!engine_req_valid[e] ||
                         engine_req_write[e] !== req_write_previous[e] ||
                         engine_req_addr[e*32 +: 32] !== req_addr_previous[e] ||
-                        engine_req_wdata[e*32 +: 32] !== req_wdata_previous[e])
+                        engine_req_wdata[e*32 +: 32] !== req_wdata_previous[e]) begin
+                        $display("[ENGINE_REQ_STALL_DIAG] cycle=%0d engine=%0d previous_valid=1 current_valid=%0b previous_write=%0b current_write=%0b previous_addr=%08h current_addr=%08h previous_wdata=%08h current_wdata=%08h ready=%0b rsp_valid=%0b parity_rsp=%0b busy=%07b abort=%0b",
+                            sim_cycles, e, engine_req_valid[e],
+                            req_write_previous[e], engine_req_write[e],
+                            req_addr_previous[e], engine_req_addr[e*32 +: 32],
+                            req_wdata_previous[e], engine_req_wdata[e*32 +: 32],
+                            engine_req_ready[e], engine_rsp_valid[e],
+                            engine_parity_rsp_error[e],
+                            engine_busy, dut_abort_active);
                         engine_req_stability_violations = engine_req_stability_violations + 1;
+                    end
                 end
                 req_stalled_previous[e] = engine_req_valid[e] && !engine_req_ready[e];
                 if (req_stalled_previous[e]) begin
@@ -407,9 +431,23 @@ interface ai_compute_cluster_if(input logic aclk);
             for (e = 0; e < 4; e++) begin
                 if (cnm_stalled_previous[e]) begin
                     cnm_stall_checks[e]++;
-                    if (!cnm_request_valid[e] ||
-                        cnm_req_addr[e] !== cnm_addr_previous[e])
+                    // CNM parity is lane-qualified. Permit only that same
+                    // lane's response to terminate a held, unaccepted read.
+                    if (!cnm_request_valid[e] &&
+                        (cnm_rsp_valid[e] && cnm_rsp_parity[e] ||
+                         cnm_parity_rsp_previous[e])) begin
+                        cnm_parity_cancel_checks[e]++;
+                    end else if (!cnm_request_valid[e] ||
+                        cnm_req_addr[e] !== cnm_addr_previous[e]) begin
+                        $display("[CNM_REQ_STALL_DIAG] cycle=%0d lane=%0d previous_valid=1 current_valid=%0b previous_addr=%08h current_addr=%08h ready=%0b rsp_valid=%04b rsp_parity=%04b previous_parity_rsp=%04b cnm_valid=%04b cnm_ready=%04b busy=%07b abort=%0b",
+                            sim_cycles, e, cnm_request_valid[e],
+                            cnm_addr_previous[e], cnm_req_addr[e],
+                            cnm_request_ready[e], cnm_rsp_valid,
+                            cnm_rsp_parity, cnm_parity_rsp_previous,
+                            cnm_request_valid,
+                            cnm_request_ready, engine_busy, dut_abort_active);
                         cnm_stall_violations++;
+                    end
                 end
                 cnm_stalled_previous[e] = cnm_request_valid[e] && !cnm_request_ready[e];
                 if (cnm_stalled_previous[e]) begin
@@ -423,6 +461,7 @@ interface ai_compute_cluster_if(input logic aclk);
                     cnm_addr_previous[e] = cnm_req_addr[e];
                 end else cnm_stall_run_cycles[e] = 0;
             end
+            cnm_parity_rsp_previous = cnm_rsp_valid & cnm_rsp_parity;
         end
     end
 
