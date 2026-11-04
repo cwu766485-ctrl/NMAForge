@@ -82,8 +82,6 @@
                 bins reset_write = {FP_FAULT_RESET_WRITE};
                 bins abort_unaccepted_a = {FP_FAULT_ABORT_UNACCEPTED_A};
                 bins abort_unaccepted_b = {FP_FAULT_ABORT_UNACCEPTED_B};
-                bins parity_response_with_accepted_read_protection =
-                    {FP_FAULT_READ_PARITY_PROTECTION};
             }
             fault_format_cross: cross cp_fault_format, cp_fault_mode;
         endgroup

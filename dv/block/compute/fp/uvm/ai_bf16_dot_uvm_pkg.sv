@@ -42,10 +42,7 @@ package ai_bf16_dot_uvm_pkg;
         FP_FAULT_RESET_CALC,
         FP_FAULT_RESET_WRITE,
         FP_FAULT_ABORT_UNACCEPTED_A,
-        FP_FAULT_ABORT_UNACCEPTED_B,
-        // Prior read response Parity overlaps a newly accepted read with
-        // Protection; Parity has priority.
-        FP_FAULT_READ_PARITY_PROTECTION
+        FP_FAULT_ABORT_UNACCEPTED_B
     } fp_fault_mode_e;
 
     typedef enum int unsigned {

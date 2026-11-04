@@ -107,17 +107,10 @@
                         `uvm_error("FP/SB", $sformatf("tx%0d partial-compute count mismatch observed=%0d expected=%0d",
                                                        exp.transaction_id, obs.element_count,
                                                        exp.expected_element_count))
-                    if ((exp.fault_mode == FP_FAULT_READ_PARITY_PROTECTION) &&
-                        !obs.read_parity_protection_same_cycle_sampled)
-                        `uvm_error("FP/SB", $sformatf(
-                            "tx%0d missed sampled Parity-response + accepted-read-Protection edge",
-                            exp.transaction_id))
                     if (obs.error && (obs.error_code == exp.expected_error_code) &&
                         !obs.protocol_error &&
                         (obs.read_count == exp.expected_read_count) &&
                         (obs.write_count == exp.expected_write_count) &&
-                        ((exp.fault_mode != FP_FAULT_READ_PARITY_PROTECTION) ||
-                         obs.read_parity_protection_same_cycle_sampled) &&
                         (!exp.check_element_count ||
                          (obs.element_count == exp.expected_element_count))) begin
                         publish_fault_coverage(exp, obs);

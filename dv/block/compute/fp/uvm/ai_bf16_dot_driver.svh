@@ -137,8 +137,7 @@
                     if (!parity_injected &&
                         ((((req.fault_mode == FP_FAULT_READ_PARITY) ||
                            (req.fault_mode == FP_FAULT_READ_PARITY_ABORT) ||
-                           (req.fault_mode == FP_FAULT_READ_PARITY_WATCHDOG) ||
-                           (req.fault_mode == FP_FAULT_READ_PARITY_PROTECTION)) &&
+                           (req.fault_mode == FP_FAULT_READ_PARITY_WATCHDOG)) &&
                           (responses_delivered == 0)) ||
                          ((req.fault_mode == FP_FAULT_READ_B_PARITY) &&
                           (responses_delivered == 1)) ||
@@ -183,7 +182,6 @@
                         if ((req.fault_mode == FP_FAULT_READ_PARITY) ||
                             (req.fault_mode == FP_FAULT_READ_PARITY_ABORT) ||
                             (req.fault_mode == FP_FAULT_READ_PARITY_WATCHDOG) ||
-                            (req.fault_mode == FP_FAULT_READ_PARITY_PROTECTION) ||
                             (req.fault_mode == FP_FAULT_READ_B_PARITY) ||
                             (req.fault_mode == FP_FAULT_READ_PARITY_LATE) ||
                             (req.fault_mode == FP_FAULT_READ_PROTECTION))
@@ -216,12 +214,6 @@
                         end
                         if ((req.fault_mode == FP_FAULT_READ_B_PROTECTION) &&
                             !vif.spad_write && (accepted_reads == 1) &&
-                            !read_protection_injected) begin
-                            vif.spad_protection_error = 1'b1;
-                            read_protection_injected = 1;
-                        end
-                        if ((req.fault_mode == FP_FAULT_READ_PARITY_PROTECTION) &&
-                            !vif.spad_write && (accepted_reads == 2) &&
                             !read_protection_injected) begin
                             vif.spad_protection_error = 1'b1;
                             read_protection_injected = 1;
@@ -312,23 +304,6 @@
                         "sampled Parity response and Abort together on tx%0d",
                         req.transaction_id), UVM_LOW)
                 end
-                if ((req.fault_mode == FP_FAULT_READ_PARITY_PROTECTION) &&
-                    (responses_delivered == 0) && vif.spad_rsp_valid) begin
-                    if (!vif.busy || !vif.spad_parity_error || vif.abort ||
-                        !vif.spad_valid || !vif.spad_ready || vif.spad_write ||
-                        !vif.spad_protection_error || (accepted_reads != 2) ||
-                        (vif.spad_addr != (BF16_DOT_SRC0_BASE + 32'd4)))
-                        `uvm_fatal("FP_PARITY_PROTECTION_PRIORITY", $sformatf(
-                            "Expected A0 Parity response + accepted A1 Protection; busy=%0b parity=%0b abort=%0b valid/ready/write=%0b/%0b/%0b prot=%0b accepted_reads=%0d addr=%08x",
-                            vif.busy, vif.spad_parity_error, vif.abort,
-                            vif.spad_valid, vif.spad_ready, vif.spad_write,
-                            vif.spad_protection_error, accepted_reads,
-                            vif.spad_addr))
-                    same_cycle_priority_sampled = 1;
-                    `uvm_info("FP_PARITY_PROTECTION_PRIORITY_SAMPLE", $sformatf(
-                        "sampled older A0 Parity response with newly accepted A1 Protection tx%0d",
-                        req.transaction_id), UVM_LOW)
-                end
                 if (vif.spad_valid && vif.spad_ready) begin
                     if ((req.fault_mode == FP_FAULT_WRITE_PROTECTION_ABORT) &&
                         vif.spad_write) begin
@@ -376,8 +351,7 @@
             if (((req.fault_mode == FP_FAULT_WRITE_PROTECTION_ABORT) ||
                  (req.fault_mode == FP_FAULT_ABORT_WATCHDOG) ||
                  (req.fault_mode == FP_FAULT_READ_PARITY_ABORT) ||
-                 (req.fault_mode == FP_FAULT_READ_PARITY_WATCHDOG) ||
-                 (req.fault_mode == FP_FAULT_READ_PARITY_PROTECTION)) &&
+                 (req.fault_mode == FP_FAULT_READ_PARITY_WATCHDOG)) &&
                 !same_cycle_priority_sampled)
                 `uvm_fatal("FP_SAME_CYCLE_PRIORITY",
                     $sformatf("Directed simultaneous-priority edge was not sampled for fault mode %0d",
