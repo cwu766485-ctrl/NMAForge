@@ -301,26 +301,28 @@ run identity, command, per-shape stalls, hashes, and log archive are in the
 The per-seed machine-readable data are in
 [`matched_controller_r259.csv`](../../benchmark/tinynpu/matched_controller_r259.csv).
 
-## Current distance — matched controller replay R259
+## Current distance — matched controller replay R273
 
-The latest pinned-vector controller replay narrows the GEMM gap, but it is not
-yet a fair product-level win:
+The latest NMAForge replay reproduces the pinned-vector GEMM cycle results on
+three seeds. TinyNPU array counts are the earlier direct RTL measurements at
+the same pinned SHA; its normalized endpoint adds the stated serialized-memory
+model. This is near parity on small shapes, not a demonstrated product-level
+win:
 
 | Shape | NMAForge controller | TinyNPU RTL array | TinyNPU serialized-memory endpoint | Current comparison |
 |---|---:|---:|---:|---|
-| 16×16×16 | 152 cycles | 52 cycles | 151 cycles (modeled) | NMAForge is 1 cycle slower |
-| 16×16×32 | 231 cycles | 100 cycles | 231 cycles (modeled) | Tie at the modeled boundary |
-| 32×32×64 | 1,198 cycles | 790 cycles | 1,305 cycles (modeled) | NMAForge is 8.2% lower than the modeled endpoint |
+| 16×16×16 | 152 cycles | 52 cycles | 151 cycles (modeled) | NMAForge is 1 cycle slower (+0.7%) |
+| 16×16×32 | 231 cycles | 100 cycles | 231 cycles (modeled) | parity |
+| 32×32×64 | 1,198 cycles | 790 cycles | 1,305 cycles (modeled) | NMAForge is 107 cycles lower (−8.2%) |
 
 All three use identical INT8 vectors and pass independent INT32 Goldens on
-three seeds. But the largest NMAForge case reads 6,144 B, versus 4,096 B
-charged by TinyNPU's serialized 16-byte/cycle memory estimate. TinyNPU's
-wrapper exposes no corresponding SPAD request/response port, so its endpoint
-is not measured memory RTL. The result therefore means NMAForge is near parity
-on small GEMM and promising on the larger controller workload under different
-memory-service assumptions; it does not establish a same-bandwidth win.
+three seeds (4,608 output checks). The largest NMAForge case reads 6,144 B,
+versus 4,096 B charged by TinyNPU's serialized 16-byte/cycle memory estimate.
+TinyNPU's wrapper exposes no corresponding SPAD request/response port, so its
+endpoint is not measured memory RTL. The 8.2% cycle difference is promising at
+that modeled boundary but does not establish a same-bandwidth win.
 
-The practical distance is now a matching memory-service experiment and wider
+The practical distance remains a matching memory-service experiment and wider
 workloads, especially GEMV/decode and a CNN pair with identical timing endpoints.
 Neither a trained-model comparison nor candidate ASIC PPA/Fmax/power is
 available. The 250 MHz effective-GOPS figures remain normalization only. Keep
