@@ -1,6 +1,6 @@
 # NMAForge NPU Architecture v2.0 Specification
 
-**Status:** In-progress implementation contract; fused Matrix opcode `0x53` is implemented and Golden-checked. Product opcode `0x52` now accepts dense `1<=M,N<=16`, `K>=1` descriptors and passes directed core plus Top Smoke Golden checks for N/K tails. Fetch/compute overlap, fault closure, architecture-wide performance, and full v2 sign-off remain open.
+**Status:** In-progress implementation contract; fused Matrix opcode `0x53` is implemented and Golden-checked. Product opcode `0x52` accepts dense `1<=M,N<=16`, `K>=1` descriptors, passes directed core plus Top Smoke Golden checks for N/K tails, and has bounded next-K prefetch/MAC overlap measured on three seeds per shape. Bank-aware issue, fault closure, architecture-wide performance, and full v2 sign-off remain open.
 **Frozen starting point:** NMAForge R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`.
 **Version boundary:** Existing ABI v7 descriptors and opcodes retain their behavior. v2 additions are additive and must be rejected by older RTL as unsupported descriptors.
 **Related audit:** [NPU v2 Phase 0 baseline](../architecture/NPU_ARCHITECTURE_V2_PHASE0_BASELINE.md).
@@ -58,10 +58,12 @@ Ordered completion
 
 The diagram shows the target structure. The fused `0x53` epilogue is active in
 the product Matrix command path. Opcode `0x52` activates the shared array's
-K-fold mode for one dense shape: `M=4,N=16,K>=16`, with K divisible by 16.
-This is a functional integration slice, not the complete descriptor contract
-or an architecture-level performance win. See the current-subset table below
-and the [GEMV implementation report](../architecture/SHAPE_ADAPTIVE_GEMM_GEMV_REPORT.md).
+K-fold mode for bounded dense shapes through M/N=16, including N/K tails, and
+can prefetch the next B K-group while current MAC work runs. This is a
+functional integration slice with measured controller-level latency hiding,
+not the complete descriptor contract or an architecture-wide performance win.
+See the current-subset table below and the
+[GEMV implementation report](../architecture/SHAPE_ADAPTIVE_GEMM_GEMV_REPORT.md).
 Current v1.0 sign-off remains **HOLD** with 24 `PASS-SCOPED` and 14
 `PARTIAL`; v2 work does not change those dispositions. The seven-engine
 inventory, current ports, and measured resource declarations are maintained
@@ -151,11 +153,12 @@ The current implementation does not support N greater than 16, transpose,
 strides, multi-batch operation, head-aware operation, or fused `0x53` mode
 through this opcode. Core Golden coverage includes `M=1,N=13,K=17` and
 `M=16,N=16,K=19`; Top Smoke exercises `M=1,N=13,K=17` through CMDQ,
-validation, dispatch, Matrix, SPAD and completion. Fetch/compute overlap,
-opcode-specific fault/Abort/Reset closure, full shape coverage, mutation,
-architecture-wide performance, and sign-off remain open. Decoder acceptance
-alone is not evidence that unsupported fields are implemented; they remain
-explicitly rejected.
+validation, dispatch, Matrix, SPAD and completion. Bounded next-K prefetch/MAC
+overlap is measured in core-level ablation, but opcode-specific fault/Abort/
+Reset closure, full shape coverage, mutation, bank-aware issue, architecture-
+wide performance, and sign-off remain open. Decoder acceptance alone is not
+evidence that unsupported fields are implemented; they remain explicitly
+rejected.
 
 Opcode `0x53` is the optional fused-output form of Matrix GEMM. It keeps the
 same source, shape, K-word, bias, Matrix shift, activation, and transpose
@@ -258,14 +261,18 @@ does not expose a transaction ID. Reset increments or invalidates the local
 epoch; a response from an older epoch can never write an active tile buffer.
 The R250 Matrix profile only reached outstanding high-water 2, so the new
 design must report achieved high-water and not infer it from a parameter. The
-current `0x52` controller can reach high-water 4 within an A or B fetch phase,
-but does not overlap A with B fetch or fetch with MAC. The K32 A-line reuse
-optimization retains each staged A line across its four K-fold uses: the
-measured product-core profile is 214 cycles and 640 B of banked operand reads,
-compared with a matched 269 cycles and 1,024 B before reuse. GEMV bypasses the
-generic GEMM A-tile cache to avoid layout-tag aliasing; a directed same-base
-GEMM-cache collision test checks that the cache is populated, GEMV has no
-cache hit, and all outputs remain bit-exact. See the [implementation
+current `0x52` controller can reach high-water 4 within an operand fetch
+phase. It now issues a bounded next-K B prefetch into the inactive buffer while
+the current K-fold MAC executes, and retains/reuses matching aligned A lines.
+In a paired three-seed core ablation, this reduced cycles by 2.63% for
+M4/N16/K32, 3.11% for M1/N13/K17, and 4.24% for M16/N16/K19; accepted reads
+and bytes were unchanged. This hides some response latency but is not yet a
+bank-aware multi-request scheduler. The earlier K32 A-line-only profile was
+214 cycles and 640 B versus 269 cycles and 1,024 B before A-line reuse; it is
+a separate historical comparison. GEMV bypasses the generic GEMM A-tile cache
+to avoid layout-tag aliasing; a directed same-base GEMM-cache collision test
+checks that the cache is populated, GEMV has no cache hit, and all outputs
+remain bit-exact. See the [implementation
 report](../architecture/SHAPE_ADAPTIVE_GEMM_GEMV_REPORT.md) for source SHAs,
 seeds, run logs, and the behavioral-SPAD comparison boundary.
 

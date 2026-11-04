@@ -1,6 +1,6 @@
 # Shape-Adaptive GEMM/GEMV — First Product Integration Slice
 
-**Status:** Product GEMV supports bounded dense shapes through 16×16 with N/K tail masking; A-line reuse is measured. Fetch/compute overlap, full fault/coverage closure, architecture-wide performance, and sign-off remain open.
+**Status:** Product GEMV supports bounded dense shapes through 16×16 with N/K tail masking, A-line reuse, and bounded next-K prefetch/MAC overlap. The overlap is measured on three seeds per shape using a registered behavioral-SPAD model. Bank-aware issue scheduling, full fault/coverage closure, architecture-wide performance, and sign-off remain open.
 **Frozen v2 base:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`.
 **RTL integration commit:** `3db6cf76781e9c98ec1396315ccf4ab26af58214`.
 **Profile/checker commits:** `c042fd3b5914fe616da5a12dd08a4f4a8b326cd4` and
@@ -47,6 +47,8 @@ with the A-tile cache disabled. The optimized source is
 `cf6cd1e1e81e9b9372c13a44e3fc64e775b4ca6c`; generic A-cache tag matching is
 disabled while opcode `0x52` uses its distinct dense layout. The 3.05% figure
 in the earlier product-integration snapshot was measured before this change.
+This A-line-only profile predates next-K prefetch; the zero prefetch/overlap
+counters below describe that historical run, not the current controller.
 
 | Metric | Baseline | A-line reuse | Change |
 |---|---:|---:|---:|
@@ -135,12 +137,49 @@ Golden results.
 | `V2-GEMV-SHAPE-RANDOM-CORE-S3-20261104` | `make core-random-regress CORE_OUT_DIR=/tmp/nmaforge_v2_gemv_tail_random_20261104 SEEDS='20261104 20261105 20261106'` | `/tmp/nmaforge_v2_gemv_tail_random_20261104/{run_seed,product_gemv_seed}_*.log` | PASS: existing 18-case/fault core regression and all three product GEMV Goldens on each seed. |
 | `V2-GEMV-SHAPE-TOP-SMOKE-20261104` | `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261104 SEED=20261104` | `dv/subsystem/top_smoke/sim/ai_accel_smoke.log` in this worktree | PASS: Top Smoke `TEST PASS`; legacy M4 descriptor and M1/N13/K17 descriptor both match independent Golden; tail sentinels and 13-word completion count pass. |
 
+## Next-K prefetch / MAC overlap — 2026-11-05
+
+Opcode `0x52` now requests the next legal B K-group into the inactive local
+operand buffer while the current K-group is executing. When the next A group
+maps to the same aligned 16-byte A line already retained locally, the controller
+reuses that line rather than issuing another read. Existing response-owner,
+destination-buffer, FIFO ordering, and outstanding limits remain in force.
+This adds control logic but no new SRAM or operand-buffer bits; area impact is
+**NOT_RUN** because this change has not been synthesized.
+
+The paired ablation used the same workload, Golden, registered four-bank
+behavioral-SPAD responder, VCS version, and three independent responder seeds
+with prefetch enabled and disabled. The testbench LFSR is seeded from `+SEED`,
+so each seed selects a different Ready/latency trace. All runs matched the
+independent signed Golden and drained accepted requests.
+
+| Shape | Prefetch OFF cycles (seeds 20261104/05/06) | Prefetch ON cycles (same seeds) | Mean reduction | Useful MAC/cycle OFF → ON | Accepted reads / bytes OFF → ON | ON prefetch completed / overlap |
+|---|---:|---:|---:|---:|---:|---:|
+| M4/N16/K32 | 214 / 213 / 220 (215.67 mean) | 206 / 208 / 216 (210.00 mean) | 2.63% | 9.50 → 9.75 | 40 / 640 B → 40 / 640 B | 7 / 7 |
+| M1/N13/K17 | 78 / 74 / 73 (75.00 mean) | 75 / 74 / 69 (72.67 mean) | 3.11% | 2.95 → 3.04 | 19 / 304 B → 19 / 304 B | 4 / 4 |
+| M16/N16/K19 | 407 / 403 / 394 (401.33 mean) | 385 / 381 / 387 (384.33 mean) | 4.24% | 12.12 → 12.66 | 108 / 1,728 B → 108 / 1,728 B | 16 / 16 |
+
+The counters show latency hiding, not traffic reduction: operand read bytes are
+unchanged. M16/N16/K19 still spends 76 of 108 reads fetching B again across
+four row tiles. This is bounded overlap in the current controller, not a
+bank-aware multi-request scheduler or a full-chip speedup claim. These cycles
+are from the core-level behavioral model and are not TinyNPU measurements,
+silicon results, or ASIC PPA.
+
+| Run ID | Exact command | Evidence path | Result |
+|---|---|---|---|
+| `V2-GEMV-PREFETCH-ON-ABLATION-S3-20261105` | `make product-gemv-prefetch-ablation CORE_OUT_DIR=/tmp/nmaforge_v2_gemv_prefetch_seeded_on_20261104 SEEDS='20261104 20261105 20261106' NEXT_K_PREFETCH_ENABLE=1` | `/tmp/nmaforge_v2_gemv_prefetch_seeded_on_20261104/ablation_{M4,M1,M16}_SHAPE_*.log` | PASS: all 9 shape/seed runs Golden and drain checks; ON cycles and overlap counters as above. |
+| `V2-GEMV-PREFETCH-OFF-ABLATION-S3-20261105` | `make product-gemv-prefetch-ablation CORE_OUT_DIR=/tmp/nmaforge_v2_gemv_prefetch_seeded_off_20261104 SEEDS='20261104 20261105 20261106' NEXT_K_PREFETCH_ENABLE=0` | `/tmp/nmaforge_v2_gemv_prefetch_seeded_off_20261104/ablation_{M4,M1,M16}_SHAPE_*.log` | PASS: all 9 paired runs Golden and drain checks; no prefetch requests. |
+| `V2-GEMV-PREFETCH-RANDOM-CORE-S3-20261105` | `make core-random-regress CORE_OUT_DIR=/tmp/nmaforge_v2_gemv_prefetch_seeded_random_20261104 SEEDS='20261104 20261105 20261106' NEXT_K_PREFETCH_ENABLE=1` | `/tmp/nmaforge_v2_gemv_prefetch_seeded_random_20261104/{run_seed,product_gemv_seed}_*.log` | PASS: 3/3 seeds; 18 cases and 35 fault/recovery checks per seed, with product GEMV Goldens. |
+| `V2-GEMV-PREFETCH-TOP-SMOKE-20261104` | `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261104 SEED=20261104` | `/tmp/nmaforge-architecture-v2/dv/subsystem/top_smoke/sim/ai_accel_smoke.log` | PASS: Top Smoke, including M4 and M1/N13/K17 product descriptors. The top smoke predates the testbench-only LFSR seed correction. |
+
 ## Open work
 
 - Product shape tests do not yet enumerate every M/N/K combination, especially
   M8 and scalar N=1; descriptor randomization and a shape matrix remain open.
-- Overlap a legal next operand fetch with current compute while preserving
-  response ownership, cache-layout isolation, and Abort/Reset behavior.
+- Extend the bounded prefetch into bank-aware request issue/scheduling; the
+  current one-request-per-cycle path does not reduce SPAD bytes and leaves
+  repeated B fetches across row tiles.
 - Add fault/phase coverage for parity, protection, Abort, reset, output
   backpressure, and response ownership for opcode `0x52`.
 - Add descriptor mutation and coverage disposition; mutation is **NOT_RUN**.
@@ -150,7 +189,6 @@ Golden results.
 - TinyNPU common-resource comparison and ASIC PPA remain **NOT_RUN**.
 
 This change does not alter the v1.0 Compute Cluster disposition (**HOLD**) and
-does not close the broader v2 architecture target. The next optimization is
-to overlap GEMV operand fetch with current compute without weakening response
-ownership or Abort/Reset behavior, then reduce the repeated B fetches across
-M tiles.
+does not close the broader v2 architecture target. Next work should improve
+bank-aware issue and B reuse across M tiles while preserving response ownership
+and Abort/Reset behavior.
