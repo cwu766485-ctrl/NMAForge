@@ -265,7 +265,8 @@ module ai_tensor_matrix_core #(
     wire [15:0] banked_request_k_group = prefetch_active ?
                                          prefetch_k_group_r : k_group_r;
     wire banked_request_buffer = prefetch_active ? prefetch_buffer_r : 1'b0;
-    wire a_cache_tag_match = ENABLE_A_TILE_CACHE &&
+    wire gemv_a_line_reuse = gemv_kfold_r && (k_group_r[1:0] != 2'b00);
+    wire a_cache_tag_match = ENABLE_A_TILE_CACHE && !gemv_kfold_r &&
                              (k_words_r <= A_TILE_CACHE_K_WORDS) &&
                              (a_cache_base_r == a_tile_base_r);
     wire a_cache_initial_hit = a_cache_tag_match &&
@@ -284,6 +285,7 @@ module ai_tensor_matrix_core #(
     wire banked_read_accept = banked_read_valid && banked_ready;
     wire read_request_pending = prefetch_active ? prefetch_request_pending :
         (((state_r == ST_A_REQ) && !a_cache_initial_copy &&
+          !gemv_a_line_reuse &&
           (read_group_r < a_group_count)) ||
          ((state_r == ST_B_REQ) && (read_group_r < b_group_count)));
     wire banked_response_accept = banked_rsp_valid &&
@@ -531,6 +533,7 @@ module ai_tensor_matrix_core #(
             banked_addr = prefetch_read_addr;
         end else if (!prefetch_active && (state_r == ST_A_REQ) &&
             !a_cache_initial_copy &&
+            !gemv_a_line_reuse &&
             (read_group_r < a_group_count) &&
             (read_outstanding_count < MAX_OUTSTANDING_READS) &&
             !abort && !watchdog_expired && !banked_response_fault &&
@@ -1021,7 +1024,10 @@ module ai_tensor_matrix_core #(
                     end
 
                     ST_A_REQ: begin
-                        if (a_cache_initial_copy) begin
+                        if (gemv_a_line_reuse) begin
+                            read_group_r <= 3'd0;
+                            state_r <= ST_B_REQ;
+                        end else if (a_cache_initial_copy) begin
                             read_group_r <= 3'd0;
                             state_r <= ST_B_REQ;
                         end else if (banked_read_accept) begin

@@ -565,10 +565,11 @@ module tb_ai_tensor_matrix_core_random;
         $fatal(1,"product GEMV left a request/response outstanding");
       gemv_mac_cycles=mac_cycle_count-case_mac_snapshot;
       gemv_bank_reads=bank_read_count-case_bank_snapshot;
-      if(gemv_mac_cycles!=8 || gemv_bank_reads!=64 ||
-         dut.perf_prefetch_completed!=0)
-        $fatal(1,"product GEMV profile mac=%0d bank_reads=%0d prefetch=%0d expected=8/64/0",
-               gemv_mac_cycles,gemv_bank_reads,dut.perf_prefetch_completed);
+      if(gemv_mac_cycles!=8 || gemv_bank_reads!=40 ||
+         dut.perf_prefetch_completed!=0 || dut.perf_a_tile_cache_hits!=0)
+        $fatal(1,"product GEMV profile mac=%0d bank_reads=%0d prefetch=%0d a_cache_hits=%0d expected=8/40/0/0",
+               gemv_mac_cycles,gemv_bank_reads,dut.perf_prefetch_completed,
+               dut.perf_a_tile_cache_hits);
       $display("MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 cycles=%0d mac_cycles=%0d bank_reads=%0d read_bytes=%0d outputs=%0d dense=1 golden=bit-exact",
                cycle_count,gemv_mac_cycles,gemv_bank_reads,
                gemv_bank_reads*16,element_count);
@@ -1355,6 +1356,12 @@ module tb_ai_tensor_matrix_core_random;
     end
 
     if($test$plusargs("MATRIX_PRODUCT_GEMV_ONLY")) begin
+      // Populate the generic GEMM A-tile cache at the same base first. GEMV
+      // must neither consume nor tag-match these differently laid-out words.
+      prepare_case(4,4,8,1,0,0,0,0,0,0,0);
+      check_valid_case(200);
+      if((dut.a_cache_base_r!==SRC0_BASE) || !dut.a_cache_valid_r[0])
+        $fatal(1,"product GEMV cache-collision precondition was not established");
       prepare_dense_gemv_case();
       check_dense_gemv_case();
       $display("MATRIX_PRODUCT_GEMV_ONLY_PASS seed=%0d",initial_seed);

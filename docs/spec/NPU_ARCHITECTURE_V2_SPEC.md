@@ -257,8 +257,15 @@ epoch; a response from an older epoch can never write an active tile buffer.
 The R250 Matrix profile only reached outstanding high-water 2, so the new
 design must report achieved high-water and not infer it from a parameter. The
 current `0x52` controller can reach high-water 4 within an A or B fetch phase,
-but does not overlap A with B fetch or fetch with MAC. Its current K32 profile
-also refetches the same 16-byte A line four times for each 16-element K span.
+but does not overlap A with B fetch or fetch with MAC. The K32 A-line reuse
+optimization retains each staged A line across its four K-fold uses: the
+measured product-core profile is 214 cycles and 640 B of banked operand reads,
+compared with a matched 269 cycles and 1,024 B before reuse. GEMV bypasses the
+generic GEMM A-tile cache to avoid layout-tag aliasing; a directed same-base
+GEMM-cache collision test checks that the cache is populated, GEMV has no
+cache hit, and all outputs remain bit-exact. See the [implementation
+report](../architecture/SHAPE_ADAPTIVE_GEMM_GEMV_REPORT.md) for source SHAs,
+seeds, run logs, and the behavioral-SPAD comparison boundary.
 
 ## 6. Performance counters and acceptance boundary
 

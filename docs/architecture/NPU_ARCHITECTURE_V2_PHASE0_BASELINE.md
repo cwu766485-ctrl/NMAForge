@@ -264,3 +264,26 @@ controller integration was absent. Product M=1/8/16, N/K tails, striding,
 batching, fault/Abort/Reset, mutation, broad coverage, same-workload GEMM
 comparison, TinyNPU fairness, and ASIC PPA remain open or `NOT_RUN`. The v1.0
 Compute Cluster sign-off remains **HOLD**.
+
+## 10. Product GEMV A-line reuse — 2026-11-04
+
+Commit `cf6cd1e1e81e9b9372c13a44e3fc64e775b4ca6` retains each staged A line
+through the four K-fold uses in the supported dense `M=4,N=16,K=32` product
+descriptor. GEMV explicitly bypasses the generic GEMM A-tile cache, whose
+address tag alone does not encode the operand layout. Its directed test first
+populates that cache with a legacy GEMM using the same A base, asserts that
+the cache entry is valid, then checks the GEMV result remains bit-exact with
+zero GEMV cache hits.
+
+A matched three-seed VCS `V-2023.12-SP1_Full64` core comparison reports 269 →
+214 Matrix command cycles (20.45% fewer) and 1,024 → 640 B banked operand
+reads (37.5% fewer). Both runs use the registered behavioral-SPAD model,
+`M=4,N=16,K=32`, the same workload/Golden, and seeds `20261104`–`20261106`.
+Baseline source is detached SHA `8cff28689838d432151d8130b17db4e8a27c7632`
+with A-tile cache disabled; optimized source is clean detached SHA
+`cf6cd1e1e81e9b9372c13a44e3fc64e775b4ca6c`, where GEMV bypasses that cache.
+Optimized logs are under `/tmp/nmaforge_v2_gemv_clean_cf6cd1e_core/`; baseline
+logs are under `/tmp/nmaforge_v2_gemv_baseline_8cff286/`. Top Smoke passes on
+the optimized clean SHA. These are Matrix-core behavioral-model results, not
+TinyNPU results, full-chip speedup, or ASIC PPA. Fetch/MAC overlap, broader
+shapes, fault/reset closure, and full v1/v2 sign-off remain open.

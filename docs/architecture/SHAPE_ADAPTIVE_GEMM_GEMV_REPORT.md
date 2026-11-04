@@ -1,10 +1,11 @@
 # Shape-Adaptive GEMM/GEMV — First Product Integration Slice
 
-**Status:** Functional product-path slice demonstrated; no performance win claimed.
+**Status:** Bounded product GEMV slice and A-line reuse optimization demonstrated; architecture-wide performance and sign-off remain open.
 **Frozen v2 base:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`.
 **RTL integration commit:** `3db6cf76781e9c98ec1396315ccf4ab26af58214`.
 **Profile/checker commits:** `c042fd3b5914fe616da5a12dd08a4f4a8b326cd4` and
 `70c8aad94e9e8d16bf67d0e4667effb58977ccf7`.
+**A-line reuse commit:** `cf6cd1e1e81e9b9372c13a44e3fc64e775b4ca6c`.
 **Simulator:** Synopsys VCS `V-2023.12-SP1_Full64`.
 
 ## Implemented scope
@@ -29,47 +30,56 @@ ReLU. The real-top test submits an ABI-v7 descriptor with bias enabled, shift
 completion, and checks that `K=20` is rejected as `ERR_DESC_INVALID` without
 modifying the destination sentinel.
 
-## Measured Matrix-core profile
+## Measured Matrix-core profile and A-line reuse
 
 The matched workload is `M=4,N=16,K=32`, for 2,048 useful signed INT8 MACs.
-The three seed runs produced identical results under the testbench's registered
-behavioral-SPAD request/response model:
+The baseline and optimized controller runs use the same registered
+behavioral-SPAD request/response model, workload data, Golden, and three Seeds.
+The baseline is detached source `8cff28689838d432151d8130b17db4e8a27c7632`
+with the A-tile cache disabled. The optimized source is
+`cf6cd1e1e81e9b9372c13a44e3fc64e775b4ca6c`; generic A-cache tag matching is
+disabled while opcode `0x52` uses its distinct dense layout. The 3.05% figure
+in the earlier product-integration snapshot was measured before this change.
 
-| Metric | Result |
-|---|---:|
-| Matrix command cycles | 262 |
-| MAC-active cycles | 8 |
-| Useful MAC/cycle | 7.817 |
-| 16×16 array utilization over command | 3.05% |
-| Accepted banked reads | 64 requests |
-| Operand read bytes | 1,024 B (16 B/request) |
-| Output line writes | 16 × 16 B = 256 B |
-| Outstanding read high-water | 4 |
-| Extra K-reduction cycles | 0 (combinational reduction) |
-| Prefetch completed / fetch-MAC overlap | 0 / 0 |
+| Metric | Baseline | A-line reuse | Change |
+|---|---:|---:|---:|
+| Matrix command cycles | 269 | 214 | −20.45% |
+| MAC-active cycles | 8 | 8 | unchanged |
+| Useful MAC/cycle | 7.61 | 9.57 | +25.7% |
+| 16×16 array utilization over command | 2.97% | 3.74% | +0.77 pp |
+| Accepted banked operand reads | 64 | 40 | −37.5% |
+| Operand read bytes | 1,024 B | 640 B | −37.5% |
+| Bias read + output writes | 64 B + 256 B | 64 B + 256 B | unchanged |
+| Outstanding read high-water | 4 | 4 | unchanged |
+| Prefetch completed / fetch-MAC overlap | 0 / 0 | 0 / 0 | unchanged |
 
-Unique logical operands occupy 128 B for A and 512 B for B. The measured
-1,024 B of banked operand reads therefore includes four fetches of each A
-16-byte line across the four K-fold lanes. The core also reads 64 B of bias
-and writes 256 B of results, for 1,344 B of operand-plus-output traffic; CMDQ
-descriptor fetch is excluded. This redundant A traffic and the lack of
-fetch/MAC overlap explain why the new mapping is not yet shown to beat
-existing GEMM. A common-workload
-GEMM-vs-GEMV cycle comparison and any TinyNPU comparison are **NOT_RUN** for
-this slice. Any 250 MHz normalization would be a calculation, not measured
-frequency or ASIC throughput. PPA is **NOT_RUN**.
+The controller now retains each staged A line across its four K-fold uses,
+reducing the K32 operand fetch from 32 A-line reads plus 32 B-line reads to 8
+A-line reads plus 32 B-line reads. Thus operand-plus-output traffic is 960 B
+(640 B reads, 64 B bias, 256 B output), excluding CMDQ descriptor fetch. The
+cycle and byte changes are measured in this core-level model; they are not a
+TinyNPU comparison, ASIC throughput, or a full-chip performance result.
+
+The product test first runs a legacy GEMM at the same A base to populate the
+generic A-tile cache, asserts that the cache tag is valid, then runs GEMV and
+checks that the differently laid-out GEMV does not hit that cache. All 64
+outputs remain bit-exact. A prior 262-cycle / 1,024-B profile predates this
+optimization and is retained only as historical integration evidence.
+GEMM-vs-GEMV common-workload and TinyNPU comparisons are **NOT_RUN**. Any
+250 MHz normalization is a calculation, not measured frequency or ASIC
+throughput. PPA is **NOT_RUN**.
 
 The following profile counters are reported per run. Stall categories are
 observational and can overlap; they must not be summed as disjoint cycles.
 
 | State/counter | Value per seed |
 |---|---:|
-| A request / A response wait | 41 / 32 cycles |
-| B request / B response wait | 39 / 34 cycles |
-| Bias request / bias response wait | 20 / 50 cycles |
-| Prepare / MAC / write / next | 8 / 8 / 28 / 1 cycles |
-| Arbitrated request stall / response wait | 32 / 97 cycles |
-| Writeback wait | 12 cycles |
+| A request / A response wait | 15 / 9 cycles |
+| B request / B response wait | 41 / 33 cycles |
+| Bias request / bias response wait | 25 / 51 cycles |
+| Prepare / MAC / write / next | 8 / 8 / 22 / 1 cycles |
+| Arbitrated request stall / response wait | 25 / 73 cycles |
+| Writeback wait | 6 cycles |
 | Error / error drain / prefetch wait | 0 / 0 / 0 cycles |
 
 ## Verification evidence
@@ -80,6 +90,9 @@ observational and can overlap; they must not be summed as disjoint cycles.
 | `V2-PRODUCT-GEMV-TOP-SMOKE-20261104` | `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261104 SEED=20261104` | Source RTL `44b9fd792995da4695186746e2887fda0f26bb54`; `/tmp/nmaforge-architecture-v2/dv/subsystem/top_smoke/sim/ai_accel_smoke.log` | PASS: `TEST PASS`; descriptor marker confirms bias/shift/ReLU and all outputs; invalid K-tail rejection marker passes; existing top smoke checks pass. |
 | `V2-PRODUCT-GEMV-CLEAN-CORE-S3-10aa2ed` | `make product-gemv-regress CORE_OUT_DIR=/tmp/nmaforge_v2_product_gemv_clean_10aa2ed SEEDS='20261104 20261105 20261106'` | Clean detached worktree at `10aa2ed903cb5298317617a1ca7c2c15819774e7`; logs `/tmp/nmaforge_v2_product_gemv_clean_10aa2ed/product_gemv_seed_20261104.log` through `...20261106.log` | PASS: all three seeds reproduce the exact Golden image and 262-cycle profile. |
 | `V2-PRODUCT-GEMV-CLEAN-TOP-10aa2ed` | `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261104 SEED=20261104` | Same clean SHA; `/tmp/nmaforge-v2-gemv-clean-10aa2ed/dv/subsystem/top_smoke/sim/ai_accel_smoke.log` | PASS: `TEST PASS`, product descriptor success and `K=20` rejection both present. |
+| `V2-GEMV-AREUSE-MATCHED-BASELINE-S3` | `make product-gemv-regress CORE_OUT_DIR=/tmp/nmaforge_v2_gemv_baseline_8cff286 SEEDS='20261104 20261105 20261106' A_TILE_CACHE_ENABLE=0` | Detached source `8cff28689838d432151d8130b17db4e8a27c7632`; measurement-only testbench copy under `/tmp/nmaforge-v2-gemv-baseline-8cff286`; logs in `/tmp/nmaforge_v2_gemv_baseline_8cff286/` | PASS: 3/3 Golden; each run 269 cycles, 64 reads / 1,024 B. |
+| `V2-GEMV-AREUSE-CLEAN-CORE-S3-cf6cd1e` | `make core-random-regress CORE_OUT_DIR=/tmp/nmaforge_v2_gemv_clean_cf6cd1e_core SEEDS='20261104 20261105 20261106'` | Clean detached worktree SHA `cf6cd1e1e81e9b9372c13a44e3fc64e775b4ca6c`; per-seed logs `/tmp/nmaforge_v2_gemv_clean_cf6cd1e_core/{run_seed,product_gemv_seed}_*.log` | PASS: 3/3 random-core regression (18 directed/random cases and fault/recovery checks per seed); 3/3 GEMV Golden, 214 cycles, 40 reads / 640 B; collision precondition and zero GEMV cache hits checked. |
+| `V2-GEMV-AREUSE-CLEAN-TOP-cf6cd1e` | `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261104 SEED=20261104` | Same clean SHA; `/tmp/nmaforge-v2-gemv-clean-cf6cd1e/dv/subsystem/top_smoke/sim/ai_accel_smoke.log` | PASS: `TEST PASS`; opcode `0x52` descriptor Golden and invalid `K=20` no-write rejection pass. |
 
 The product-path test checks all 64 values and all 16 output line writes. The
 focused test does not prove a full-chip memory scoreboard or broad descriptor
@@ -90,8 +103,8 @@ loop-reroll notice; it is not introduced by opcode `0x52`.
 
 - Product shapes `M=1/8/16`, N tails, and K tails are not implemented. The
   validator rejects them; there is no tail masking yet.
-- Add a matched GEMM mapping run using the same logical data and memory timing,
-  then optimize A-line reuse and measure whether K folding is beneficial.
+- Overlap a legal next operand fetch with current compute while preserving
+  response ownership, cache-layout isolation, and Abort/Reset behavior.
 - Add fault/phase coverage for parity, protection, Abort, reset, output
   backpressure, and response ownership for opcode `0x52`.
 - Add descriptor mutation and coverage disposition; mutation is **NOT_RUN**.
