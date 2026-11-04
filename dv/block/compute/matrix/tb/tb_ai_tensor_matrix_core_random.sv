@@ -566,14 +566,18 @@ module tb_ai_tensor_matrix_core_random;
       gemv_mac_cycles=mac_cycle_count-case_mac_snapshot;
       gemv_bank_reads=bank_read_count-case_bank_snapshot;
       if(gemv_mac_cycles!=8 || gemv_bank_reads!=40 ||
-         dut.perf_prefetch_completed!=0 || dut.perf_a_tile_cache_hits!=0)
-        $fatal(1,"product GEMV profile mac=%0d bank_reads=%0d prefetch=%0d a_cache_hits=%0d expected=8/40/0/0",
+         dut.perf_prefetch_completed!=(NEXT_K_PREFETCH_ENABLE ? 7 : 0) ||
+         ((NEXT_K_PREFETCH_ENABLE != 0) !=
+          (dut.perf_prefetch_overlap_cycles != 0)) ||
+         dut.perf_a_tile_cache_hits!=0)
+        $fatal(1,"product GEMV profile mac=%0d bank_reads=%0d prefetch=%0d overlap=%0d a_cache_hits=%0d prefetch_enabled=%0d",
                gemv_mac_cycles,gemv_bank_reads,dut.perf_prefetch_completed,
-               dut.perf_a_tile_cache_hits);
+               dut.perf_prefetch_overlap_cycles,dut.perf_a_tile_cache_hits,
+               NEXT_K_PREFETCH_ENABLE);
       $display("MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 cycles=%0d mac_cycles=%0d bank_reads=%0d read_bytes=%0d outputs=%0d dense=1 golden=bit-exact",
                cycle_count,gemv_mac_cycles,gemv_bank_reads,
                gemv_bank_reads*16,element_count);
-      $display("MATRIX_CORE_GEMV_KFOLD_PROFILE a_req=%0d a_wait=%0d b_req=%0d b_wait=%0d bias_req=%0d bias_wait=%0d prep_mac=%0d mac=%0d write=%0d next=%0d done=%0d error=%0d error_drain=%0d prefetch_wait=%0d arbiter_stall=%0d response_wait=%0d writeback_wait=%0d outstanding_highwater=%0d prefetch_completed=%0d line_write_bytes=%0d",
+      $display("MATRIX_CORE_GEMV_KFOLD_PROFILE a_req=%0d a_wait=%0d b_req=%0d b_wait=%0d bias_req=%0d bias_wait=%0d prep_mac=%0d mac=%0d write=%0d next=%0d done=%0d error=%0d error_drain=%0d prefetch_wait=%0d arbiter_stall=%0d response_wait=%0d writeback_wait=%0d outstanding_highwater=%0d prefetch_completed=%0d prefetch_overlap=%0d line_write_bytes=%0d",
                dut.perf_state_cycles[1],dut.perf_state_cycles[2],
                dut.perf_state_cycles[3],dut.perf_state_cycles[4],
                dut.perf_state_cycles[5],dut.perf_state_cycles[6],
@@ -583,7 +587,8 @@ module tb_ai_tensor_matrix_core_random;
                dut.perf_state_cycles[13],dut.perf_state_cycles[14],
                dut.perf_arbiter_stall_cycles,dut.perf_response_wait_cycles,
                dut.perf_writeback_wait_cycles,dut.perf_outstanding_highwater,
-               dut.perf_prefetch_completed,line_write_count*16);
+               dut.perf_prefetch_completed,dut.perf_prefetch_overlap_cycles,
+               line_write_count*16);
     end
   endtask
 
@@ -681,14 +686,19 @@ module tb_ai_tensor_matrix_core_random;
       gemv_mac_cycles=mac_cycle_count-case_mac_snapshot;
       gemv_bank_reads=bank_read_count-case_bank_snapshot;
       if(gemv_mac_cycles!=5 || gemv_bank_reads!=19 ||
-         dut.perf_prefetch_completed!=0 || dut.perf_a_tile_cache_hits!=0)
-        $fatal(1,"tail GEMV profile mac=%0d bank_reads=%0d prefetch=%0d a_cache_hits=%0d expected=5/19/0/0",
+         dut.perf_prefetch_completed!=(NEXT_K_PREFETCH_ENABLE ? 4 : 0) ||
+         ((NEXT_K_PREFETCH_ENABLE != 0) !=
+          (dut.perf_prefetch_overlap_cycles != 0)) ||
+         dut.perf_a_tile_cache_hits!=0)
+        $fatal(1,"tail GEMV profile mac=%0d bank_reads=%0d prefetch=%0d overlap=%0d a_cache_hits=%0d prefetch_enabled=%0d",
                gemv_mac_cycles,gemv_bank_reads,dut.perf_prefetch_completed,
-               dut.perf_a_tile_cache_hits);
-      $display("MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 cycles=%0d mac_cycles=%0d bank_reads=%0d read_bytes=%0d outputs=%0d lines=%0d scalar=%0d golden=bit-exact",
+               dut.perf_prefetch_overlap_cycles,dut.perf_a_tile_cache_hits,
+               NEXT_K_PREFETCH_ENABLE);
+      $display("MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 cycles=%0d mac_cycles=%0d bank_reads=%0d read_bytes=%0d outputs=%0d lines=%0d scalar=%0d prefetch_completed=%0d prefetch_overlap=%0d golden=bit-exact",
                cycle_count,gemv_mac_cycles,gemv_bank_reads,
                gemv_bank_reads*16,element_count,line_write_count,
-               scalar_write_count);
+               scalar_write_count,dut.perf_prefetch_completed,
+               dut.perf_prefetch_overlap_cycles);
     end
   endtask
 
@@ -775,13 +785,18 @@ module tb_ai_tensor_matrix_core_random;
       gemv_mac_cycles=mac_cycle_count-case_mac_snapshot;
       gemv_bank_reads=bank_read_count-case_bank_snapshot;
       if(gemv_mac_cycles!=20 || gemv_bank_reads!=108 ||
-         dut.perf_prefetch_completed!=0 || dut.perf_a_tile_cache_hits!=0)
-        $fatal(1,"M16 tail GEMV profile mac=%0d bank_reads=%0d prefetch=%0d a_cache_hits=%0d expected=20/108/0/0",
+         dut.perf_prefetch_completed!=(NEXT_K_PREFETCH_ENABLE ? 16 : 0) ||
+         ((NEXT_K_PREFETCH_ENABLE != 0) !=
+          (dut.perf_prefetch_overlap_cycles != 0)) ||
+         dut.perf_a_tile_cache_hits!=0)
+        $fatal(1,"M16 tail GEMV profile mac=%0d bank_reads=%0d prefetch=%0d overlap=%0d a_cache_hits=%0d prefetch_enabled=%0d",
                gemv_mac_cycles,gemv_bank_reads,dut.perf_prefetch_completed,
-               dut.perf_a_tile_cache_hits);
-      $display("MATRIX_CORE_GEMV_KFOLD_M16_TAIL_PASS opcode=0x52 shape=16x16x19 cycles=%0d mac_cycles=%0d bank_reads=%0d read_bytes=%0d outputs=%0d lines=%0d golden=bit-exact",
+               dut.perf_prefetch_overlap_cycles,dut.perf_a_tile_cache_hits,
+               NEXT_K_PREFETCH_ENABLE);
+      $display("MATRIX_CORE_GEMV_KFOLD_M16_TAIL_PASS opcode=0x52 shape=16x16x19 cycles=%0d mac_cycles=%0d bank_reads=%0d read_bytes=%0d outputs=%0d lines=%0d prefetch_completed=%0d prefetch_overlap=%0d golden=bit-exact",
                cycle_count,gemv_mac_cycles,gemv_bank_reads,
-               gemv_bank_reads*16,element_count,line_write_count);
+               gemv_bank_reads*16,element_count,line_write_count,
+               dut.perf_prefetch_completed,dut.perf_prefetch_overlap_cycles);
     end
   endtask
 
@@ -1535,6 +1550,28 @@ module tb_ai_tensor_matrix_core_random;
       if(!NEXT_K_PREFETCH_ENABLE)
         $display("MATRIX_NO_PREFETCH_FALLBACK_PASS seed=%0d fallback=1",initial_seed);
       $display("MATRIX_SIZE_BENCHMARK_PASS seed=%0d workloads=4x4x32,8x8x32,16x16x32,16x32x32,32x32x64 physical_array=%0dx%0d outstanding_depth=%0d next_k_prefetch=%0d a_tile_cache=%0d bank_response_latency=1 cycle gops_reference_mhz=250 sim_period_ns=10",initial_seed,PHYSICAL_ARRAY_SIZE,PHYSICAL_ARRAY_SIZE,MAX_OUTSTANDING_READS,NEXT_K_PREFETCH_ENABLE,A_TILE_CACHE_ENABLE);
+      $finish;
+    end
+
+    // Run one dense product GEMV from an identical reset-time memory model so
+    // prefetch ON/OFF comparisons do not inherit different random-latency
+    // histories from the generic GEMM cache-collision precondition.
+    if($test$plusargs("MATRIX_GEMV_ABLATION_M4_SHAPE")) begin
+      prepare_dense_gemv_case();
+      check_dense_gemv_case();
+      $display("MATRIX_GEMV_ABLATION_PASS shape=M4x16x32 seed=%0d",initial_seed);
+      $finish;
+    end
+    if($test$plusargs("MATRIX_GEMV_ABLATION_M1_SHAPE")) begin
+      prepare_dense_gemv_tail_case();
+      check_dense_gemv_tail_case();
+      $display("MATRIX_GEMV_ABLATION_PASS shape=M1x13x17 seed=%0d",initial_seed);
+      $finish;
+    end
+    if($test$plusargs("MATRIX_GEMV_ABLATION_M16_SHAPE")) begin
+      prepare_dense_gemv_m16_tail_case();
+      check_dense_gemv_m16_tail_case();
+      $display("MATRIX_GEMV_ABLATION_PASS shape=M16x16x19 seed=%0d",initial_seed);
       $finish;
     end
 

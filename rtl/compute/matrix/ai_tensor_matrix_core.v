@@ -228,6 +228,13 @@ module ai_tensor_matrix_core #(
                                                        (valid_cols >> 2);
     wire [31:0] gemv_a_row_stride =
         ({16'd0,gemv_k_elements_r} + 32'd15) & 32'hffff_fff0;
+    wire [31:0] prefetch_gemv_k_remaining =
+        {16'd0,gemv_k_elements_r} - ({16'd0,prefetch_k_group_r} << 2);
+    wire [31:0] prefetch_gemv_k_valid_lanes =
+        prefetch_gemv_k_remaining > 32'd4 ? 32'd4 :
+                                                   prefetch_gemv_k_remaining;
+    wire [31:0] prefetch_b_group_count = gemv_kfold_r ?
+        prefetch_gemv_k_valid_lanes : b_group_count;
     wire [31:0] m_tile_count =
         ({16'd0,m_r} + row_tile_span - 1) / row_tile_span;
     wire [31:0] n_tile_count =
@@ -257,14 +264,22 @@ module ai_tensor_matrix_core #(
     wire prefetch_is_b_req = (prefetch_state_r == PF_B_REQ);
     wire prefetch_request_pending =
         ((prefetch_state_r == PF_A_REQ) && (prefetch_group_r < a_group_count)) ||
-        ((prefetch_state_r == PF_B_REQ) && (prefetch_group_r < b_group_count));
+        ((prefetch_state_r == PF_B_REQ) &&
+         (prefetch_group_r < prefetch_b_group_count));
     wire [31:0] prefetch_word_offset =
         (({29'd0,prefetch_group_r} * {16'd0,k_words_r}) +
          {16'd0,prefetch_k_group_r}) << 4;
     wire [31:0] prefetch_a_addr = a_tile_base_r + prefetch_word_offset;
     wire [31:0] prefetch_b_addr = b_tile_base_r + prefetch_word_offset;
-    wire [31:0] prefetch_read_addr = prefetch_is_b_req ?
-                                     prefetch_b_addr : prefetch_a_addr;
+    wire [31:0] prefetch_gemv_a_addr =
+        (a_tile_base_r + ({29'd0,prefetch_group_r} * gemv_a_row_stride) +
+         ({16'd0,prefetch_k_group_r} << 2)) & 32'hffff_fff0;
+    wire [31:0] prefetch_gemv_b_addr = b_tile_base_r +
+        ((({16'd0,prefetch_k_group_r} << 2) + {29'd0,prefetch_group_r}) *
+         32'd16);
+    wire [31:0] prefetch_read_addr = gemv_kfold_r ?
+        (prefetch_is_b_req ? prefetch_gemv_b_addr : prefetch_gemv_a_addr) :
+        (prefetch_is_b_req ? prefetch_b_addr : prefetch_a_addr);
     wire banked_request_is_prefetch = prefetch_active;
     wire banked_request_is_b = prefetch_active ? prefetch_is_b_req :
                                (state_r == ST_B_REQ);
@@ -289,6 +304,11 @@ module ai_tensor_matrix_core #(
     wire a_cache_prefetch_copy = prefetch_kick &&
                                  (prefetch_state_r == PF_IDLE) &&
                                  a_cache_prefetch_hit;
+    wire gemv_a_prefetch_reuse = gemv_kfold_r &&
+                                  (prefetch_kick_k_group[1:0] != 2'b00);
+    wire gemv_a_prefetch_copy = prefetch_kick &&
+                                (prefetch_state_r == PF_IDLE) &&
+                                gemv_a_prefetch_reuse;
     wire bank_response_has_parity_error = |bank_parity_error;
     wire banked_read_accept = banked_read_valid && banked_ready;
     wire read_request_pending = prefetch_active ? prefetch_request_pending :
@@ -691,7 +711,9 @@ module ai_tensor_matrix_core #(
                 prefetch_k_group_r <= prefetch_kick_k_group;
                 prefetch_buffer_r <= prefetch_kick_buffer;
                 prefetch_valid_r[prefetch_kick_buffer] <= 1'b0;
-                prefetch_state_r <= a_cache_prefetch_hit ? PF_B_REQ : PF_A_REQ;
+                prefetch_state_r <=
+                    (a_cache_prefetch_hit || gemv_a_prefetch_reuse) ?
+                    PF_B_REQ : PF_A_REQ;
             end else begin
                 case (prefetch_state_r)
                     PF_A_REQ: begin
@@ -710,7 +732,8 @@ module ai_tensor_matrix_core #(
                     end
                     PF_B_REQ: begin
                         if (banked_request_is_prefetch && banked_read_accept) begin
-                            if (({29'd0,prefetch_group_r} + 32'd1) >= b_group_count)
+                            if (({29'd0,prefetch_group_r} + 32'd1) >=
+                                prefetch_b_group_count)
                                 prefetch_state_r <= PF_B_DRAIN;
                             else
                                 prefetch_group_r <= prefetch_group_r + 1'b1;
@@ -878,6 +901,11 @@ module ai_tensor_matrix_core #(
                 for (cache_i = 0; cache_i < ARRAY_SIZE; cache_i = cache_i + 1)
                     a_tile_words_r[prefetch_kick_buffer][cache_i] <=
                         a_tile_cache_words_r[prefetch_kick_k_group[3:0]][cache_i];
+            end
+            if (gemv_a_prefetch_copy) begin
+                for (cache_i = 0; cache_i < ARRAY_SIZE; cache_i = cache_i + 1)
+                    a_tile_words_r[prefetch_kick_buffer][cache_i] <=
+                        a_tile_words_r[compute_buffer_r][cache_i];
             end
 
             if ((state_r == ST_IDLE) && start)
@@ -1091,11 +1119,16 @@ module ai_tensor_matrix_core #(
                                 bias_index_r <= {(TILE_INDEX_WIDTH+1){1'b0}};
                                 state_r <= ST_BIAS_REQ;
                             end else begin
-                                if (ENABLE_NEXT_K_PREFETCH && !gemv_kfold_r &&
-                                    (k_words_r > 1)) begin
+                                if (ENABLE_NEXT_K_PREFETCH &&
+                                    ((gemv_kfold_r &&
+                                      (({16'd0,k_group_r} + 32'd1) <
+                                       {16'd0,k_words_r})) ||
+                                     (!gemv_kfold_r && (k_words_r > 1)))) begin
                                     prefetch_kick <= 1'b1;
-                                    prefetch_kick_k_group <= 16'd1;
-                                    prefetch_kick_buffer <= 1'b1;
+                                    prefetch_kick_k_group <= gemv_kfold_r ?
+                                        (k_group_r + 1'b1) : 16'd1;
+                                    prefetch_kick_buffer <= gemv_kfold_r ?
+                                        ~compute_buffer_r : 1'b1;
                                 end
                                 state_r <= ST_PREP_MAC;
                             end
@@ -1125,11 +1158,17 @@ module ai_tensor_matrix_core #(
                                     state_r <= ST_BIAS_REQ;
                                 end else begin
                                     bias_loaded_r <= 1'b1;
-                                    if (ENABLE_NEXT_K_PREFETCH && !gemv_kfold_r &&
-                                        (k_group_r == 0) && (k_words_r > 1)) begin
+                                    if (ENABLE_NEXT_K_PREFETCH &&
+                                        ((gemv_kfold_r &&
+                                          (({16'd0,k_group_r} + 32'd1) <
+                                           {16'd0,k_words_r})) ||
+                                         (!gemv_kfold_r && (k_group_r == 0) &&
+                                          (k_words_r > 1)))) begin
                                         prefetch_kick <= 1'b1;
-                                        prefetch_kick_k_group <= 16'd1;
-                                        prefetch_kick_buffer <= 1'b1;
+                                        prefetch_kick_k_group <= gemv_kfold_r ?
+                                            (k_group_r + 1'b1) : 16'd1;
+                                        prefetch_kick_buffer <= gemv_kfold_r ?
+                                            ~compute_buffer_r : 1'b1;
                                     end
                                     state_r <= ST_PREP_MAC;
                                 end
@@ -1150,11 +1189,27 @@ module ai_tensor_matrix_core #(
                                 write_lane_r <= 2'd0;
                                 dst_row_addr_r <= dst_tile_base_r;
                                 state_r <= ST_WRITE;
-                            end else begin
+                            end else if (!ENABLE_NEXT_K_PREFETCH) begin
                                 k_group_r <= k_group_r + 1'b1;
                                 compute_buffer_r <= 1'b0;
                                 read_group_r <= 3'd0;
                                 state_r <= ST_A_REQ;
+                            end else if (prefetch_valid_r[~compute_buffer_r]) begin
+                                k_group_r <= k_group_r + 1'b1;
+                                compute_buffer_r <= ~compute_buffer_r;
+                                prefetch_consume <= 1'b1;
+                                prefetch_consume_buffer <= ~compute_buffer_r;
+                                read_group_r <= 3'd0;
+                                if (({16'd0,k_group_r} + 32'd2) <
+                                    {16'd0,k_words_r}) begin
+                                    prefetch_kick <= 1'b1;
+                                    prefetch_kick_k_group <= k_group_r + 2'd2;
+                                    prefetch_kick_buffer <= compute_buffer_r;
+                                end
+                                state_r <= ST_PREP_MAC;
+                            end else begin
+                                read_group_r <= 3'd0;
+                                state_r <= ST_PREFETCH_WAIT;
                             end
                         end else if (lane_r == 2'd3) begin
                             lane_r <= 2'd0;

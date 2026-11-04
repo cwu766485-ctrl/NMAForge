@@ -18,6 +18,7 @@ COV_METRICS := line+cond+fsm+branch
 	core-prefetch-handoff-test core-prefetch-handoff-regress \
 	core-no-prefetch-fallback-compile core-no-prefetch-fallback-regress \
 	product-gemv-test product-gemv-regress \
+	product-gemv-prefetch-ablation \
 	datapath-random-regress core-random-regress array-random-regress \
 	matrix-size-benchmark matrix-pipeline-benchmark matrix-config-comparison \
 	tinynpu-matched-benchmark
@@ -115,6 +116,20 @@ product-gemv-regress: core-random-compile
 		grep -q "^MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 		grep -q "^MATRIX_CORE_GEMV_KFOLD_M16_TAIL_PASS opcode=0x52 shape=16x16x19 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 		grep -q "^MATRIX_PRODUCT_GEMV_ONLY_PASS seed=$$seed$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+	done
+
+# Matched per-shape prefetch ON/OFF runs start directly from reset. This keeps
+# the random Ready/latency stream independent of the generic GEMM precondition.
+product-gemv-prefetch-ablation: core-random-compile
+	@set -e; for seed in $(SEEDS); do \
+		for shape in M4_SHAPE M1_SHAPE M16_SHAPE; do \
+			$(CORE_OUT_DIR)/simv +SEED=$$seed +MATRIX_GEMV_ABLATION_$$shape \
+				-cm $(COV_METRICS) -cm_dir $(CORE_OUT_DIR)/coverage.vdb \
+				-cm_name gemv_prefetch_$${shape}_$$seed \
+				-l $(CORE_OUT_DIR)/ablation_$${shape}_$$seed.log; \
+			grep -q "^MATRIX_GEMV_ABLATION_PASS shape=.* seed=$$seed$$" \
+				$(CORE_OUT_DIR)/ablation_$${shape}_$$seed.log; \
+		done; \
 	done
 
 # Build a distinct prefetch-disabled DUT profile so this test covers the
