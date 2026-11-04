@@ -2,6 +2,7 @@
 
 module ai_accel_sva #(
     parameter integer MAX_TASK_CYCLES = 2000,
+    parameter integer SCALAR_VDOT_CYCLES_PER_WORD = 24,
     parameter integer M_AXI_ADDR_WIDTH = 64
 )(
     input wire        clk,
@@ -63,6 +64,9 @@ module ai_accel_sva #(
     input wire        core_error,
     input wire [6:0]  engine_busy,
     input wire [6:0]  engine_done,
+    input wire        launch_valid,
+    input wire [7:0]  launch_op,
+    input wire [15:0] launch_length,
     // A doorbell may launch a descriptor, DMA-only, or macro command that
     // never raises a compute-core pulse.  The command processor's event is
     // therefore the architectural completion point for the task watchdog.
@@ -93,6 +97,7 @@ module ai_accel_sva #(
     reg        b_hold_valid_r;
     reg        task_pending_r;
     reg [31:0] task_timer_r;
+    reg [31:0] task_limit_r;
     reg [2:0]  m_read_outstanding_r;
 
     wire host_desc_conflict;
@@ -127,6 +132,7 @@ module ai_accel_sva #(
             b_hold_valid_r <= 1'b0;
             task_pending_r <= 1'b0;
             task_timer_r <= 32'd0;
+            task_limit_r <= MAX_TASK_CYCLES;
             m_read_outstanding_r <= 3'd0;
         end else begin
             if (s_axi_awvalid && !s_axi_awready) begin
@@ -278,12 +284,20 @@ module ai_accel_sva #(
             if (doorbell_pulse) begin
                 task_pending_r <= 1'b1;
                 task_timer_r   <= 32'd0;
+                task_limit_r   <= MAX_TASK_CYCLES;
             end else if (task_pending_r &&
                          (processor_event_valid || core_done || core_error)) begin
                 task_pending_r <= 1'b0;
             end else if (task_pending_r) begin
                 task_timer_r <= task_timer_r + 32'd1;
-                if (task_timer_r > MAX_TASK_CYCLES)
+                // Preserve the ordinary task bound, but scale the finite
+                // retirement allowance for Scalar VDOT by its packed-word
+                // count so the legal maximum descriptor can be checked.
+                if (launch_valid && launch_op == 8'h10 && launch_length != 0)
+                    task_limit_r <= MAX_TASK_CYCLES +
+                                    ({16'd0, launch_length} *
+                                     SCALAR_VDOT_CYCLES_PER_WORD);
+                if (task_timer_r > task_limit_r)
                     $fatal(1, "SVA FAIL: doorbell task did not complete before timeout");
             end
 

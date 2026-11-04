@@ -232,6 +232,8 @@ module tb_ai_accel_uvm;
         .host_write(dut.reg_req_write_raw), .host_addr(dut.reg_req_addr_raw - dut.SPAD_BASE),
         .core_busy(dut.core_busy), .core_done(dut.core_done), .core_error(dut.core_error),
         .engine_busy(dut.engine_busy), .engine_done(dut.engine_done),
+        .launch_valid(dut.launch_valid), .launch_op(dut.launch_op),
+        .launch_length(dut.launch_length),
         .processor_event_valid(dut.processor_event_valid)
     );
 
