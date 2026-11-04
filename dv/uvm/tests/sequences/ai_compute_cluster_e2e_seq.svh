@@ -157,6 +157,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     int unsigned engine_watchdog_cplq_cov_idx;
     int unsigned engine_parity_cplq_cov_idx;
     int unsigned engine_abort_cplq_cov_idx;
+    int unsigned engine_protection_cplq_reset_engine;
+    int unsigned engine_protection_cplq_reset_phase;
     int unsigned matrix_protection_reset_phase;
     int unsigned matrix_protection_cnm_reset_phase;
     int unsigned engine_protection_reset_engine;
@@ -302,6 +304,27 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             bins conv = {5};
             bins kv = {6};
         }
+    endgroup
+
+    covergroup engine_protection_cplq_reset_cg;
+        option.per_instance = 1;
+        cp_engine: coverpoint engine_protection_cplq_reset_engine {
+            bins scalar_int8 = {0};
+            bins fp = {1};
+            bins cnm = {2};
+            bins matrix = {3};
+            bins sfu = {4};
+            bins conv = {5};
+            bins kv = {6};
+        }
+        cp_phase: coverpoint engine_protection_cplq_reset_phase {
+            bins protection_completion_blocked = {1};
+            bins reset_asserted = {2};
+            bins release_quiet_window = {3};
+            bins stale_completion_suppressed = {4};
+            bins post_reset_recovery = {5};
+        }
+        engine_phase_cross: cross cp_engine, cp_phase;
     endgroup
 
     int unsigned engine_pair_overlap_cov_idx;
@@ -564,6 +587,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         engine_watchdog_cplq_cov_idx = 0;
         engine_parity_cplq_cov_idx = 0;
         engine_abort_cplq_cov_idx = 0;
+        engine_protection_cplq_reset_engine = 0;
+        engine_protection_cplq_reset_phase = 0;
         engine_pair_overlap_cov_idx = 0;
         matrix_protection_reset_phase = 0;
         matrix_protection_cnm_reset_phase = 0;
@@ -583,6 +608,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         engine_watchdog_cplq_cg = new();
         engine_parity_cplq_cg = new();
         engine_abort_cplq_cg = new();
+        engine_protection_cplq_reset_cg = new();
         cmdq_invalid_descriptor_cg = new();
         opcode_dispatch_cg = new();
         fp16_cmdq_numeric_case = 0;
@@ -3861,7 +3887,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             seed), UVM_LOW)
     endtask
 
-    task automatic run_engine_protection_full_cplq_cross(input int unsigned seed);
+    task automatic run_engine_protection_full_cplq_cross(
+        input int unsigned seed,
+        input bit reset_while_completion_blocked);
         bit [31:0] desc_addr;
         bit [31:0] cpl_addr;
         bit [31:0] src0;
@@ -3875,12 +3903,16 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         bit [31:0] denied_addr;
         bit denied_seen;
         bit [6:0] engine_seen;
+        bit [6:0] reset_seen;
         bit [31:0] value;
+        uvm_hdl_data_t reset_value;
         int unsigned cycle;
         int unsigned engine;
         int unsigned word_idx;
+        int unsigned completion_elements;
 
         engine_seen = '0;
+        reset_seen = '0;
         for (engine = 0; engine < 7; engine++) begin
             // Three real validator-error completions fill the four-slot ring's
             // usable capacity. The fourth, real engine descriptor reaches a
@@ -4044,6 +4076,119 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                             32'hf011_7d00 | (engine << 4) | word_idx,
                             $sformatf("engine%0d full-CPLQ held completion sentinel[%0d]", engine, word_idx));
 
+            if (reset_while_completion_blocked) begin
+                engine_protection_cplq_reset_engine = engine;
+                engine_protection_cplq_reset_phase = 1;
+                engine_protection_cplq_reset_cg.sample();
+
+                // Reset while the real Protection completion is retained
+                // behind a full CPLQ. The engine has finished its denied
+                // write, but the completion writer has not committed it.
+                reset_value = 1'b0;
+                if (!uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value))
+                    `uvm_fatal("CLUSTER_PROTECTION_CPLQ_RESET",
+                        $sformatf("failed to reset engine=%0d with Protection completion blocked", engine))
+                repeat (4) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.rsp_valid !== 1'b0 ||
+                        compute_vif.matrix_rsp_valid !== 1'b0 ||
+                        compute_vif.cnm_rsp_valid !== 4'b0)
+                        `uvm_fatal("CLUSTER_PROTECTION_CPLQ_RESET", $sformatf(
+                            "old-epoch response visible during reset engine=%0d", engine))
+                end
+                if (compute_vif.engine_busy !== 7'b0)
+                    `uvm_fatal("CLUSTER_PROTECTION_CPLQ_RESET", $sformatf(
+                        "engine activity survived reset engine=%0d busy=%07b",
+                        engine, compute_vif.engine_busy))
+                engine_protection_cplq_reset_phase = 2;
+                engine_protection_cplq_reset_cg.sample();
+
+                #1ns;
+                reset_value = 1'b1;
+                if (!uvm_hdl_deposit("tb_ai_accel_uvm.aresetn", reset_value))
+                    `uvm_fatal("CLUSTER_PROTECTION_CPLQ_RESET", $sformatf(
+                        "failed to release reset engine=%0d", engine))
+                repeat (8) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.rsp_valid !== 1'b0 ||
+                        compute_vif.matrix_rsp_valid !== 1'b0 ||
+                        compute_vif.cnm_rsp_valid !== 4'b0 ||
+                        compute_vif.engine_busy !== 7'b0)
+                        `uvm_fatal("CLUSTER_PROTECTION_CPLQ_RESET", $sformatf(
+                            "old-epoch response/task escaped release quiet window engine=%0d busy=%07b",
+                            engine, compute_vif.engine_busy))
+                end
+                wait_spad_idle();
+                engine_protection_cplq_reset_phase = 3;
+                engine_protection_cplq_reset_cg.sample();
+
+                axil_read(REG_CPLQ_TAIL, value);
+                if (value !== 32'd0)
+                    `uvm_fatal("CLUSTER_PROTECTION_CPLQ_RESET", $sformatf(
+                        "reset published stale Protection completion engine=%0d tail=%0d",
+                        engine, value))
+                for (word_idx = 0; word_idx < 16; word_idx++)
+                    expect_spad(dst + (word_idx << 2),
+                        32'hf011_0000 | (engine << 8) | word_idx,
+                        $sformatf("engine%0d reset/full-CPLQ no-writeback[%0d]", engine, word_idx));
+                for (word_idx = 0; word_idx < 4; word_idx++)
+                    expect_spad(cpl_addr + 32'h30 + (word_idx << 2),
+                        32'hf011_7d00 | (engine << 4) | word_idx,
+                        $sformatf("engine%0d reset/full-CPLQ held completion sentinel[%0d]", engine, word_idx));
+                engine_protection_cplq_reset_phase = 4;
+                engine_protection_cplq_reset_cg.sample();
+
+                // Reissue a legal operation for the same real engine in the
+                // fresh epoch. Reset restores the SPEC's all-regions-disabled
+                // permissive configuration.
+                prepare_engine_parity_reset_case(engine, 1'b0,
+                    task_id[15:0] + 16'h0100, desc_addr, dst, request_addr);
+                axil_write(REG_CMDQ_BASE, desc_addr);
+                axil_write(REG_CMDQ_SIZE, 32'd4);
+                axil_write(REG_CMDQ_HEAD, 32'd0);
+                axil_write(REG_CMDQ_TAIL, 32'd1);
+                axil_write(REG_CPLQ_BASE, cpl_addr);
+                axil_write(REG_CPLQ_SIZE, 32'd4);
+                axil_write(REG_CPLQ_HEAD, 32'd0);
+                axil_write(REG_CPLQ_TAIL, 32'd0);
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(32'd1);
+                wait_spad_idle();
+                case (engine)
+                    0: completion_elements = 32'd1;
+                    1: completion_elements = 32'd2;
+                    2: completion_elements = 32'd16;
+                    3: completion_elements = 32'd16;
+                    4: completion_elements = 32'd4;
+                    5: completion_elements = 32'd1;
+                    default: completion_elements = 32'd4;
+                endcase
+                expect_spad(cpl_addr,
+                    {16'd0, (task_id[15:0] + 16'h0100)},
+                    $sformatf("engine%0d reset/full-CPLQ recovery task ID", engine));
+                expect_spad(cpl_addr + 32'h04, 32'd1,
+                    $sformatf("engine%0d reset/full-CPLQ recovery status", engine));
+                expect_spad(cpl_addr + 32'h0c, completion_elements,
+                    $sformatf("engine%0d reset/full-CPLQ recovery element count", engine));
+                if (engine == 0)
+                    expect_spad(dst, 32'd8,
+                        "Scalar reset/full-CPLQ recovery signed VDOT Golden");
+                if (engine == 3) begin
+                    for (word_idx = 0; word_idx < 16; word_idx++)
+                        expect_spad(dst + (word_idx << 2), 32'd4,
+                            $sformatf("Matrix reset/full-CPLQ recovery Golden[%0d]", word_idx));
+                end
+                engine_protection_cplq_reset_phase = 5;
+                engine_protection_cplq_reset_cg.sample();
+                reset_seen[engine] = 1'b1;
+                engine_seen[engine] = 1'b1;
+                `uvm_info("CLUSTER_PROTECTION_CPLQ_RESET_CASE_PASS", $sformatf(
+                    "engine=%0d Protection completion was blocked by full CPLQ, reset suppressed it, held slot stayed sentinel, and same-engine recovery retired once seed=%0d",
+                    engine, seed), UVM_LOW)
+                axil_write(REG_CPLQ_HEAD, 32'd1);
+                axil_write(REG_CMDQ_SIZE, 32'd0);
+                axil_write(REG_CPLQ_SIZE, 32'd0);
+            end else begin
             axil_write(REG_CPLQ_HEAD, 32'd1);
             wait_cpl_tail(32'd0);
             wait_spad_idle();
@@ -4075,6 +4220,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             axil_write(REG_CPLQ_HEAD, 32'd0);
             axil_write(REG_CMDQ_SIZE, 32'd0);
             axil_write(REG_CPLQ_SIZE, 32'd0);
+            end
         end
         if (engine_seen !== 7'h7f)
             `uvm_fatal("CLUSTER_PROTECTION_CPLQ_CROSS", $sformatf(
@@ -4083,9 +4229,20 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_REGION1_PERM, 32'd0);
         axil_write(REG_REGION2_PERM, 32'd0);
         axil_write(REG_REGION3_PERM, 32'd0);
-        `uvm_info("CLUSTER_PROTECTION_CPLQ_CROSS_PASS", $sformatf(
-            "writeback Protection x full CPLQ x ordered wrap: engines=7/7 coverage=100.0%% seed=%0d",
-            seed), UVM_LOW)
+        if (reset_while_completion_blocked) begin
+            if (reset_seen !== 7'h7f ||
+                engine_protection_cplq_reset_cg.get_coverage() < 99.99)
+                `uvm_fatal("CLUSTER_PROTECTION_CPLQ_RESET_COVERAGE", $sformatf(
+                    "Protection/full-CPLQ/reset bins incomplete: engines=%07b coverage=%0.2f%%",
+                    reset_seen, engine_protection_cplq_reset_cg.get_coverage()))
+            `uvm_info("CLUSTER_PROTECTION_CPLQ_RESET_CROSS_PASS", $sformatf(
+                "engines=7/7 blocked=7/7 reset=7/7 stale_completion_suppressed=7/7 same_engine_recovery=7/7 bins=35/35 coverage=%0.1f%% seed=%0d",
+                engine_protection_cplq_reset_cg.get_coverage(), seed), UVM_LOW)
+        end else begin
+            `uvm_info("CLUSTER_PROTECTION_CPLQ_CROSS_PASS", $sformatf(
+                "writeback Protection x full CPLQ x ordered wrap: engines=7/7 coverage=100.0%% seed=%0d",
+                seed), UVM_LOW)
+        end
     endtask
 
     task automatic wait_cpl_tail(input bit [31:0] expected);
@@ -13364,7 +13521,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_banked_vdot_cmdq_dispatch_test(seed);
         run_scalar_vdot_minimum_cmdq_boundary_test(seed);
         run_cmdq_invalid_descriptor_matrix_test(seed);
-        run_engine_protection_full_cplq_cross(seed);
+        run_engine_protection_full_cplq_cross(seed, 1'b0);
+        run_engine_protection_full_cplq_cross(seed, 1'b1);
         run_scalar_gemv_gemm_cmdq_dispatch_test(seed);
         run_scalar_cmdq_numeric_boundary_test(seed);
         run_scalar_legacy_conv_cmdq_test(seed);
