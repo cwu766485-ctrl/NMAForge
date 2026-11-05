@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-03. This is a short handoff for the next engineering task; it
+Updated: 2026-11-05. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -321,3 +321,11 @@ in the owning report; run `git diff --check` before handoff.
 - Three-seed Matrix core regression, descriptor-validator regression (29 invalid rules, 42/42 accepted boundaries), Python mapper tests, and Top Smoke pass. Top Smoke retains its existing `LOOP-REROLL-ENABLED` warning. No synthesis/PPA claim is made.
 - This closes only the bounded RTL experiment. Top-level CMDQ forwarding, feature-specific multi-seed/fault coverage, cross-engine coherence, TinyNPU comparison and physical resource cost remain open; v1.0 sign-off disposition is unchanged.
 - Evidence: [Tensor Layout Optimization report](../../architecture/TENSOR_LAYOUT_OPTIMIZATION_REPORT.md); raw VCS logs under `/tmp/nmaforge_tile_forward_ablation_20261105_final/` and `/tmp/nmaforge_tile_forward_core_regress_final_20261105/`.
+
+## 2026-11-05 update — v2 GEMV B-fold reuse
+
+- The local v2 branch started from published branch head `70e8a4471cb999eb7c4eace293424a66b533f516`; the earlier plan note naming `f95b2ee1a191b1da9dd96d67855e1a5717654063` was stale for this workspace. No v1 sign-off branch was merged.
+- RTL/test feature commit `2e61ff71e1f67b85f68229026d6468036122e9c8` reuses the existing 1 KiB local reuse array for up to 64 K elements of B across GEMV row tiles; it adds no operand data array. Profile instrumentation commit `20d393c5e0e1a32388cce1112a4a20a32e05b5a5` reports per-state and aggregate stalls.
+- `make product-gemv-b-cache-ablation SEEDS='20261105 20261106 20261107' CORE_OUT_DIR=/tmp/nmaforge_gemv_b_cache_profile_final_20261105` passes all six cache-off/on × K19/K65 runs with complete 256-output independent Golden and request drain. Mean command cycles/read bytes change 387.67/1,728 B→261.67/816 B for K19 and 1,036/5,440 B→626.67/2,368 B for K65.
+- `make core-random-regress SEEDS='20261105 20261106 20261107' CORE_OUT_DIR=/tmp/nmaforge_gemv_b_cache_core_regress_final_20261105` passes 18 cases and 35 fault/recovery checks per seed plus GEMV Golden cases. `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105` passes `TEST PASS`; existing `LOOP-REROLL-ENABLED` notice remains. A single-seed prefetch-disabled cache ablation also passes K19 and K65.
+- Evidence is in the [GEMV/GEMM report](../../architecture/SHAPE_ADAPTIVE_GEMM_GEMV_REPORT.md) and [raw profile CSV](../../../benchmark/shape_adaptive_gemv_b_cache_ablation.csv). PPA/area is **NOT_RUN**. The 64-entry K-capacity, operand immutability/non-aliasing contract, full shape/fault matrix, TinyNPU common-resource comparison, and v2 UVM closure remain open. Gate A is not declared complete.

@@ -1,6 +1,6 @@
 # Shape-Adaptive GEMM/GEMV — First Product Integration Slice
 
-**Status:** Product GEMV supports bounded dense shapes through 16×16 with N/K tail masking, A-line reuse, and bounded next-K prefetch/MAC overlap. The overlap is measured on three seeds per shape using a registered behavioral-SPAD model. Bank-aware issue scheduling, full fault/coverage closure, architecture-wide performance, and sign-off remain open.
+**Status:** Product GEMV supports bounded dense shapes through 16×16 with N/K tail masking, A-line reuse, bounded next-K prefetch/MAC overlap, and command-local B-fold reuse for multi-row tiles. Prefetch and B-cache effects are measured with a registered behavioral-SPAD model. Bank-aware issue scheduling, full fault/coverage closure, architecture-wide performance, and sign-off remain open.
 **Frozen v2 base:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`.
 **RTL integration commit:** `3db6cf76781e9c98ec1396315ccf4ab26af58214`.
 **Profile/checker commits:** `c042fd3b5914fe616da5a12dd08a4f4a8b326cd4` and
@@ -173,13 +173,71 @@ silicon results, or ASIC PPA.
 | `V2-GEMV-PREFETCH-RANDOM-CORE-S3-20261105` | `make core-random-regress CORE_OUT_DIR=/tmp/nmaforge_v2_gemv_prefetch_seeded_random_20261104 SEEDS='20261104 20261105 20261106' NEXT_K_PREFETCH_ENABLE=1` | `/tmp/nmaforge_v2_gemv_prefetch_seeded_random_20261104/{run_seed,product_gemv_seed}_*.log` | PASS: 3/3 seeds; 18 cases and 35 fault/recovery checks per seed, with product GEMV Goldens. |
 | `V2-GEMV-PREFETCH-TOP-SMOKE-20261104` | `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261104 SEED=20261104` | `/tmp/nmaforge-architecture-v2/dv/subsystem/top_smoke/sim/ai_accel_smoke.log` | PASS: Top Smoke, including M4 and M1/N13/K17 product descriptors. The top smoke predates the testbench-only LFSR seed correction. |
 
+## B-fold reuse across row tiles — 2026-11-05
+
+The M16 K-fold mapping reread B for each four-row output tile. Opcode `0x52`
+now reuses the existing 1 KiB local reuse array as a command-exclusive cache
+for the first 16 K-fold groups (64 logical K values), while the current B tile
+is staged in the existing ping-pong operand banks. This adds no operand data
+array; it adds a 16-bit group-valid map and cache control. The cache is used
+only when `M>4`, and K groups above 64 bypass it. If the B physical span
+overlaps the destination span, the reuse path is disabled. Software must keep
+operands stable throughout the command and use non-aliasing source/destination
+spans; the current descriptor validator does not enforce those alias rules.
+No cross-engine coherence or source snapshot is provided.
+
+Paired VCS runs used the same shape, Golden, behavioral four-bank registered
+SPAD responder, simulator version, prefetch setting, and seed values with the
+B cache compiled off and on. Each run checked all 256 INT32 outputs against an
+independent signed Golden and verified request drain. The reported effective
+MAC/cycle and command-window array utilization are derived as useful
+`M*N*K` MACs divided by command cycles, and by `256 * command cycles`,
+respectively; they are not a separate hardware occupancy counter.
+
+| Shape | B cache OFF cycles (3 seeds) | B cache ON cycles (same seeds) | Mean cycle change | Read traffic OFF → ON | Useful MAC/cycle OFF → ON | Derived command-window array utilization OFF → ON |
+|---|---:|---:|---:|---:|---:|---:|
+| M16/N16/K19 | 381 / 387 / 395 (387.67 mean) | 266 / 264 / 255 (261.67 mean) | −32.50% | 108 / 1,728 B → 51 / 816 B (−52.78%) | 12.55 → 18.59 | 4.90% → 7.26% |
+| M16/N16/K65 | 1,006 / 1,056 / 1,046 (1,036 mean) | 609 / 642 / 629 (626.67 mean) | −39.51% | 340 / 5,440 B → 148 / 2,368 B (−56.47%) | 16.06 → 26.55 | 6.27% → 10.37% |
+
+For K19, the cache avoids 57 16-byte B-row reads across the three repeated row
+tiles; for K65, it avoids 192 reads for the first 64 K values and fetches the
+final K group normally. Output writes stay at 1,024 B / 64 lines for each run. A
+single-seed, prefetch-disabled check also passes: K19 cycles 403→273 and K65
+cycles 1,074→617, with the same read reduction and bit-exact outputs. These
+results isolate B reuse with `ENABLE_NEXT_K_PREFETCH=1` for the three-seed
+table; they do not isolate it from all controller interactions or demonstrate
+TinyNPU performance.
+
+No synthesis or PPA run was performed. The 16 valid bits and cache-control
+logic have not been mapped to area or timing; no extra operand data bits were
+introduced. The table's utilization is a derived command-window ratio, not an
+ASIC or measured active-array occupancy result. Per-state and aggregate stall
+counters below are observed testbench profile counters; categories can
+overlap, so they must not be summed as disjoint cycles. The RTL source is
+`2e61ff71e1f67b85f68229026d6468036122e9c8`; the profile test source is
+`20d393c5e0e1a32388cce1112a4a20a32e05b5a5`. Raw per-seed values are in
+[`shape_adaptive_gemv_b_cache_ablation.csv`](../../benchmark/shape_adaptive_gemv_b_cache_ablation.csv).
+
+| Shape | Profile counter mean, B cache OFF → ON (cycles) |
+|---|---|
+| M16/N16/K19 | B request 20.67→4.00; B response wait 16.67→5.00; prefetch wait 183.67→84.67; arbiter stall 61.00→41.00; response wait 31.33→18.00; writeback wait 21.67→22.33; Bank Stall 39.33→18.67; line stall 21.67→22.33 |
+| M16/N16/K65 | B request 20.33→6.00; B response wait 16.67→3.67; prefetch wait 734.67→357.67; arbiter stall 148.33→72.00; response wait 33.00→20.67; writeback wait 21.67→16.67; Bank Stall 126.67→55.33; line stall 21.67→16.67 |
+
+| Run ID | Exact command | Evidence path | Result |
+|---|---|---|---|
+| `V2-GEMV-B-CACHE-ABLATION-S3-20261105` | `make product-gemv-b-cache-ablation SEEDS='20261105 20261106 20261107' CORE_OUT_DIR=/tmp/nmaforge_gemv_b_cache_profile_final_20261105` | `/tmp/nmaforge_gemv_b_cache_profile_final_20261105/b_cache_{0,1}/m16_seed_*.log` | PASS: six paired K19/K65 runs; Golden, full outputs, read count, cache hits/saved reads, stall profiles, and drain checks pass. |
+| `V2-GEMV-B-CACHE-NO-PREFETCH-20261105` | `make product-gemv-b-cache-ablation SEEDS='20261105' CORE_OUT_DIR=/tmp/nmaforge_gemv_b_cache_no_prefetch_final_20261105 NEXT_K_PREFETCH_ENABLE=0` | `/tmp/nmaforge_gemv_b_cache_no_prefetch_final_20261105/b_cache_{0,1}/m16_seed_20261105.log` | PASS: K19 and K65 with prefetch disabled, cache off/on, full Golden and drain checks. |
+| `V2-GEMV-B-CACHE-RANDOM-CORE-S3-20261105` | `make core-random-regress SEEDS='20261105 20261106 20261107' CORE_OUT_DIR=/tmp/nmaforge_gemv_b_cache_core_regress_final_20261105` | `/tmp/nmaforge_gemv_b_cache_core_regress_final_20261105/{run_seed,product_gemv_seed}_*.log` | PASS: 18 core cases and 35 fault/recovery checks per seed; product M4, M1-tail, M16/K19, and M16/K65 Golden/drain checks pass on all three seeds. |
+| `V2-GEMV-B-CACHE-TOP-SMOKE-20261105` | `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105` | `dv/subsystem/top_smoke/sim/ai_accel_smoke.log` | PASS: `TEST PASS`; existing opcode `0x52` M4 and M1 tail descriptor checks pass. Existing `LOOP-REROLL-ENABLED` notice remains. |
+
 ## Open work
 
 - Product shape tests do not yet enumerate every M/N/K combination, especially
   M8 and scalar N=1; descriptor randomization and a shape matrix remain open.
 - Extend the bounded prefetch into bank-aware request issue/scheduling; the
-  current one-request-per-cycle path does not reduce SPAD bytes and leaves
-  repeated B fetches across row tiles.
+  current B-fold cache is limited to the first 64 K values and depends on
+  stable, non-aliasing operands. Larger K values still reread B beyond the
+  cached prefix.
 - Add fault/phase coverage for parity, protection, Abort, reset, output
   backpressure, and response ownership for opcode `0x52`.
 - Add descriptor mutation and coverage disposition; mutation is **NOT_RUN**.

@@ -1,6 +1,6 @@
 # NMAForge NPU Architecture v2.0 Specification
 
-**Status:** In-progress implementation contract; fused Matrix opcode `0x53` is Golden-checked, with opt-in bounded tile forwarding now passing a paired core ablation and tag-miss/reset/abort checks. Product opcode `0x52` accepts dense `1<=M,N<=16`, `K>=1` descriptors, passes directed core plus Top Smoke Golden checks for N/K tails, and has bounded next-K prefetch/MAC overlap measured on three seeds per shape. Bank-aware issue, fault closure, architecture-wide performance, and full v2 sign-off remain open.
+**Status:** In-progress implementation contract; fused Matrix opcode `0x53` is Golden-checked, with opt-in bounded tile forwarding passing a paired core ablation and tag-miss/reset/abort checks. Product opcode `0x52` accepts dense `1<=M,N<=16`, `K>=1` descriptors, passes directed core plus Top Smoke Golden checks for N/K tails, and has bounded next-K prefetch/MAC overlap. A command-local GEMV B-fold cache now reuses the existing 1 KiB local reuse array for `M>4`, with three-seed K=19 and K=65 ablations. Bank-aware issue, complete shape/fault closure, architecture-wide performance, and full v2 sign-off remain open.
 **Frozen starting point:** NMAForge R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`.
 **Version boundary:** Existing ABI v7 descriptors and opcodes retain their behavior. v2 additions are additive and must be rejected by older RTL as unsupported descriptors.
 **Related audit:** [NPU v2 Phase 0 baseline](../architecture/NPU_ARCHITECTURE_V2_PHASE0_BASELINE.md).
@@ -152,16 +152,27 @@ SPAD requests. N-tail outputs use ordered scalar writes; complete aligned
 four-word groups use full-WSTRB 128-bit writes. This layout is specific to
 opcode `0x52`; it does not change legacy Matrix GEMM layouts.
 
+For `M>4`, the implementation may reuse the existing 1 KiB local reuse array
+as a command-local B-fold cache for the first 64 logical K values. The array is
+exclusive to either the existing GEMM A-line cache or the GEMV B-fold cache
+for a command; no additional operand data array is added. K groups above the
+first 64 values bypass this cache. The cache is disabled if the B physical
+span overlaps the INT32 destination span. Software must keep A and B operands
+stable for the full command and must use source/destination spans that do not
+alias. The current descriptor validator does not enforce these alias rules;
+that validation remains open. This reuse does not add a cross-engine
+coherence or snapshot mechanism.
+
 The current implementation does not support N greater than 16, transpose,
 strides, multi-batch operation, head-aware operation, or fused `0x53` mode
 through this opcode. Core Golden coverage includes `M=1,N=13,K=17` and
-`M=16,N=16,K=19`; Top Smoke exercises `M=1,N=13,K=17` through CMDQ,
-validation, dispatch, Matrix, SPAD and completion. Bounded next-K prefetch/MAC
-overlap is measured in core-level ablation, but opcode-specific fault/Abort/
-Reset closure, full shape coverage, mutation, bank-aware issue, architecture-
-wide performance, and sign-off remain open. Decoder acceptance alone is not
-evidence that unsupported fields are implemented; they remain explicitly
-rejected.
+`M=16,N=16,K=19` plus `K=65`; Top Smoke exercises `M=1,N=13,K=17` through
+CMDQ, validation, dispatch, Matrix, SPAD and completion. Bounded next-K
+prefetch/MAC overlap and B-fold reuse are measured in core-level ablations,
+but opcode-specific fault/Abort/Reset closure, full shape coverage, alias
+validation, mutation, bank-aware issue, architecture-wide performance, and
+sign-off remain open. Decoder acceptance alone is not evidence that
+unsupported fields are implemented; they remain explicitly rejected.
 
 Opcode `0x53` is the optional fused-output form of Matrix GEMM. It keeps the
 same source, shape, K-word, bias, Matrix shift, activation, and transpose
@@ -297,12 +308,17 @@ epoch; a response from an older epoch can never write an active tile buffer.
 The R250 Matrix profile only reached outstanding high-water 2, so the new
 design must report achieved high-water and not infer it from a parameter. The
 current `0x52` controller can reach high-water 4 within an operand fetch
-phase. It now issues a bounded next-K B prefetch into the inactive buffer while
-the current K-fold MAC executes, and retains/reuses matching aligned A lines.
-In a paired three-seed core ablation, this reduced cycles by 2.63% for
+phase. It issues a bounded next-K B prefetch into the inactive buffer while
+the current K-fold MAC executes, retains/reuses matching aligned A lines, and
+uses the existing 1 KiB local reuse array as a bounded B-fold cache for
+multi-row GEMV. Three-seed B-cache ablations reduced M16/N16/K19 cycles from
+387.67 to 261.67 and read traffic from 1,728 B to 816 B; for K65, cycles
+decreased from 1,036 to 626.67 and reads from 5,440 B to 2,368 B. The detailed
+evidence identifies the enabled prefetch setting and B-cache capacity. The
+earlier three-seed prefetch-only ablation reduced cycles by 2.63% for
 M4/N16/K32, 3.11% for M1/N13/K17, and 4.24% for M16/N16/K19; accepted reads
-and bytes were unchanged. This hides some response latency but is not yet a
-bank-aware multi-request scheduler. The earlier K32 A-line-only profile was
+and bytes were unchanged. This hides response latency and repeated B-fold
+traffic but is not yet a bank-aware multi-request scheduler. The earlier K32 A-line-only profile was
 214 cycles and 640 B versus 269 cycles and 1,024 B before A-line reuse; it is
 a separate historical comparison. GEMV bypasses the generic GEMM A-tile cache
 to avoid layout-tag aliasing; a directed same-base GEMM-cache collision test
