@@ -19,11 +19,17 @@ static void tick() {
     ++cycles;
 }
 
-static int8_t operand_a(int row, int k) {
+static int8_t operand_a(int row, int k, int workload) {
+    if (workload == 1)  // Same padded M=1, K=17 product-GEMV fixture as NMAForge.
+        return static_cast<int8_t>(((k * 5 + 1) % 19) - 9);
+    if (workload == 2)  // Same M=8, K=19 product-GEMV fixture as NMAForge.
+        return static_cast<int8_t>(((row * 7 + k * 5 + 1) % 23) - 11);
     return static_cast<int8_t>(((row * 3 + k * 2 + 1) % 9) - 4);
 }
 
-static int8_t operand_b(int k, int col) {
+static int8_t operand_b(int k, int col, int workload) {
+    if (workload == 1 || workload == 2)
+        return static_cast<int8_t>(((k * 3 - col * 2 + 5) % 17) - 8);
     // Preserve SystemVerilog signed remainder semantics for negative values.
     return static_cast<int8_t>(((k * 2 - col * 3 + 5) % 9) - 4);
 }
@@ -35,7 +41,7 @@ static void clear_words() {
     }
 }
 
-static bool run_gemm(int m, int n, int k) {
+static bool run_gemm(int m, int n, int k, int workload = 0) {
     constexpr int TILE = 16;
     std::vector<int32_t> golden(m * n, 0);
     std::vector<int32_t> actual(m * n, 0);
@@ -44,8 +50,8 @@ static bool run_gemm(int m, int n, int k) {
         for (int col = 0; col < n; ++col)
             for (int kk = 0; kk < k; ++kk)
                 golden[row * n + col] +=
-                    static_cast<int32_t>(operand_a(row, kk)) *
-                    static_cast<int32_t>(operand_b(kk, col));
+                    static_cast<int32_t>(operand_a(row, kk, workload)) *
+                    static_cast<int32_t>(operand_b(kk, col, workload));
 
     uint64_t start_cycle = 0;
     for (int tile_row = 0; tile_row < m; tile_row += TILE) {
@@ -69,17 +75,19 @@ static bool run_gemm(int m, int n, int k) {
                     uint32_t b_flat[4] = {0, 0, 0, 0};
                     for (int row = 0; row < TILE; ++row) {
                         const int local_k = c - row;
-                        if (local_k >= 0 && local_k < TILE) {
+                        if (local_k >= 0 && local_k < TILE &&
+                            tile_row + row < m && k_base + local_k < k) {
                             const uint32_t byte = static_cast<uint8_t>(
-                                operand_a(tile_row + row, k_base + local_k));
+                                operand_a(tile_row + row, k_base + local_k, workload));
                             a_flat[row / 4] |= byte << ((row % 4) * 8);
                         }
                     }
                     for (int col = 0; col < TILE; ++col) {
                         const int local_k = c - col;
-                        if (local_k >= 0 && local_k < TILE) {
+                        if (local_k >= 0 && local_k < TILE &&
+                            tile_col + col < n && k_base + local_k < k) {
                             const uint32_t byte = static_cast<uint8_t>(
-                                operand_b(k_base + local_k, tile_col + col));
+                                operand_b(k_base + local_k, tile_col + col, workload));
                             b_flat[col / 4] |= byte << ((col % 4) * 8);
                         }
                     }
@@ -102,8 +110,9 @@ static bool run_gemm(int m, int n, int k) {
                     dut.sa_acc_rd_row = row;
                     dut.sa_acc_rd_col = col;
                     dut.eval();
-                    actual[(tile_row + row) * n + tile_col + col] =
-                        static_cast<int32_t>(dut.sa_acc_rd_data);
+                    if (tile_row + row < m && tile_col + col < n)
+                        actual[(tile_row + row) * n + tile_col + col] =
+                            static_cast<int32_t>(dut.sa_acc_rd_data);
                 }
             }
         }
@@ -129,11 +138,14 @@ static bool run_gemm(int m, int n, int k) {
             m, n, k, mismatches);
         return false;
     }
+    const char *marker = workload == 0 ? "TINYNPU_MATCHED_GEMM_PASS" :
+                         "TINYNPU_MATCHED_GEMV_PASS";
     std::printf(
-        "TINYNPU_MATCHED_GEMM_PASS shape_mnk=%d,%d,%d physical_array=16x16 "
+        "%s shape_mnk=%d,%d,%d physical_array=16x16 workload=%s "
         "cycles_input_to_array_stable=%llu macs=%d mac_per_cycle=%.4f "
         "pe_utilization_pct=%.2f golden=%d/%d\n",
-        m, n, k, static_cast<unsigned long long>(elapsed), useful_macs,
+        marker, m, n, k, workload == 0 ? "gemm" : "product_gemv_padded_array",
+        static_cast<unsigned long long>(elapsed), useful_macs,
         mac_per_cycle, utilization, m * n, m * n);
     return true;
 }
@@ -153,6 +165,9 @@ int main() {
     if (!run_gemm(16, 16, 16) ||
         !run_gemm(16, 16, 32) ||
         !run_gemm(32, 32, 64))
+        return EXIT_FAILURE;
+    if (!run_gemm(1, 13, 17, 1) ||
+        !run_gemm(8, 16, 19, 2))
         return EXIT_FAILURE;
     return EXIT_SUCCESS;
 }

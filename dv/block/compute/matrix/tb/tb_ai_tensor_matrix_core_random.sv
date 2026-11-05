@@ -701,6 +701,7 @@ module tb_ai_tensor_matrix_core_random;
 
   task automatic check_dense_gemv_tail_case;
     integer cc,local_word,gemv_mac_cycles,gemv_bank_reads;
+    integer gemv_bank_stalls,gemv_line_stalls;
     begin
       launch_and_wait();
       if(error || error_code!==0 || busy || element_count!==32'd13)
@@ -720,6 +721,8 @@ module tb_ai_tensor_matrix_core_random;
         $fatal(1,"tail GEMV left a request/response outstanding");
       gemv_mac_cycles=mac_cycle_count-case_mac_snapshot;
       gemv_bank_reads=bank_read_count-case_bank_snapshot;
+      gemv_bank_stalls=bank_stall_count-case_bank_stall_snapshot;
+      gemv_line_stalls=line_stall_count-case_line_stall_snapshot;
       if(gemv_mac_cycles!=5 || gemv_bank_reads!=19 ||
          dut.perf_prefetch_completed!=(NEXT_K_PREFETCH_ENABLE ? 4 : 0) ||
          ((NEXT_K_PREFETCH_ENABLE != 0) !=
@@ -734,6 +737,18 @@ module tb_ai_tensor_matrix_core_random;
                gemv_bank_reads*16,element_count,line_write_count,
                scalar_write_count,dut.perf_prefetch_completed,
                dut.perf_prefetch_overlap_cycles);
+      $display("MATRIX_CORE_GEMV_TAIL_PROFILE shape=1x13x17 a_req=%0d a_wait=%0d b_req=%0d b_wait=%0d bias_req=%0d bias_wait=%0d prep_mac=%0d mac=%0d write=%0d next=%0d done=%0d error=%0d error_drain=%0d prefetch_wait=%0d arbiter_stall=%0d response_wait=%0d writeback_wait=%0d bank_stalls=%0d line_stalls=%0d outstanding_highwater=%0d fifo_full=%0d",
+               dut.perf_state_cycles[1],dut.perf_state_cycles[2],
+               dut.perf_state_cycles[3],dut.perf_state_cycles[4],
+               dut.perf_state_cycles[5],dut.perf_state_cycles[6],
+               dut.perf_state_cycles[7],dut.perf_state_cycles[8],
+               dut.perf_state_cycles[9],dut.perf_state_cycles[10],
+               dut.perf_state_cycles[11],dut.perf_state_cycles[12],
+               dut.perf_state_cycles[13],dut.perf_state_cycles[14],
+               dut.perf_arbiter_stall_cycles,dut.perf_response_wait_cycles,
+               dut.perf_writeback_wait_cycles,gemv_bank_stalls,
+               gemv_line_stalls,dut.perf_outstanding_highwater,
+               dut.perf_fifo_full_cycles);
     end
   endtask
 
@@ -865,12 +880,15 @@ module tb_ai_tensor_matrix_core_random;
                gemv_bank_reads*16,element_count,line_write_count,
                dut.perf_prefetch_completed,dut.perf_prefetch_overlap_cycles,
                dut.perf_gemv_b_cache_hits,dut.perf_gemv_b_cache_reads_saved);
-      $display("MATRIX_CORE_GEMV_MROWS_PROFILE shape=%0dx16x%0d a_req=%0d a_wait=%0d b_req=%0d b_wait=%0d prep_mac=%0d mac=%0d write=%0d next=%0d prefetch_wait=%0d arbiter_stall=%0d response_wait=%0d writeback_wait=%0d bank_stalls=%0d line_stalls=%0d outstanding_highwater=%0d fifo_full=%0d",
+      $display("MATRIX_CORE_GEMV_MROWS_PROFILE shape=%0dx16x%0d a_req=%0d a_wait=%0d b_req=%0d b_wait=%0d bias_req=%0d bias_wait=%0d prep_mac=%0d mac=%0d write=%0d next=%0d done=%0d error=%0d error_drain=%0d prefetch_wait=%0d arbiter_stall=%0d response_wait=%0d writeback_wait=%0d bank_stalls=%0d line_stalls=%0d outstanding_highwater=%0d fifo_full=%0d",
                m_rows,k_size,dut.perf_state_cycles[1],dut.perf_state_cycles[2],
                dut.perf_state_cycles[3],dut.perf_state_cycles[4],
+               dut.perf_state_cycles[5],dut.perf_state_cycles[6],
                dut.perf_state_cycles[7],dut.perf_state_cycles[8],
                dut.perf_state_cycles[9],dut.perf_state_cycles[10],
-               dut.perf_state_cycles[14],dut.perf_arbiter_stall_cycles,
+               dut.perf_state_cycles[11],dut.perf_state_cycles[12],
+               dut.perf_state_cycles[13],dut.perf_state_cycles[14],
+               dut.perf_arbiter_stall_cycles,
                dut.perf_response_wait_cycles,dut.perf_writeback_wait_cycles,
                gemv_bank_stalls,gemv_line_stalls,
                dut.perf_outstanding_highwater,dut.perf_fifo_full_cycles);

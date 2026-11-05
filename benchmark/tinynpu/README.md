@@ -16,6 +16,18 @@ compiler, and Python 3.9+ with NumPy and ONNX installed. `PYTHON`, `VERILATOR`,
 make benchmark-tinynpu
 ```
 
+The focused product GEMV comparison is run separately:
+
+```sh
+benchmark/tinynpu/run_gemv_match.sh
+```
+
+It exercises NMAForge opcode `0x52` at `M=1,N=13,K=17` and `M=8,N=16,K=19`
+against the pinned TinyNPU 16×16 array with identical operand formulas. The
+TinyNPU cases use zero-padded direct-array inputs; they do not exercise a
+TinyNPU GEMV descriptor, controller, or SPAD. Its memory endpoint is therefore
+reported as a serialized model alongside measured TinyNPU array cycles.
+
 The script clones the pinned reference under `/tmp` if `TINY_NPU_ROOT` is not
 set. It writes raw compile/run logs and binaries under `/tmp`, then updates
 [`gemm_results.csv`](gemm_results.csv), [`cnn_results.csv`](cnn_results.csv),
