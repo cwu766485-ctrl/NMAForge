@@ -129,21 +129,78 @@ an ASIC-ready or tapeout-ready design.
 
 ## Candidate replay status at `410b81d` — 2026-11-05
 
-VCS and URG became available for the fixed candidate and completed the
-functional regressions listed in the [v2 DV report](NMAFORGE_V2_DV_CLOSURE.md).
-That environment change does not provide the private standard-cell library,
-SRAM timing/macro views, DC constraints, or implementation flow needed for
-ASIC evidence. No new SpyGlass lint/CDC/RDC, DC, LEC, macro mapping, or
-physical-design run was executed at this candidate in this increment; the
-465-warning lint inventory and other static-analysis results above remain
-bound to their recorded historical tool/configuration runs.
+The functional regressions listed in the [v2 DV report](NMAFORGE_V2_DV_CLOSURE.md)
+completed at this fixed source/test SHA. SpyGlass V-2023.12-SP1 was also run
+against the checked-in A8 project with the analysis-only
+`SPAD_WORDS_PER_BANK=256` override. The exact lint evidence snapshot is
+`/tmp/nmaforge_v2_410b81_static_eda.tar.gz`, SHA-256
+`178d3267e55304a0c173a9fc89facd547fb7926b516c3c672e1e9ed710dfab60`.
+
+| Goal | Current-candidate result | Disposition |
+|---|---|---|
+| `lint/lint_rtl` | Exit 0; 0 errors, 465 warnings, 5 infos; 0 waived. | Execution PASS only; warning closure OPEN. |
+| `cdc/cdc_setup` / `cdc/cdc_verify_struct` | The scripted `cdc` run produced no current report/output for 6m10s and was terminated (exit 143). | **NOT_RUN**; no current CDC PASS inferred. |
+| `rdc/rdc_verify_struct` | 180s bounded run reached rule 385/478, `Ar_resetcross01`, at about 6.1 GB RSS; timeout exit 124; no final report. | **NOT_RUN**; timeout is not a pass. |
+| Formal / LEC | Not rerun at `410b81d`. | **NOT_RUN**. The prior scoped Matrix FSM proof does not cover the whole v2 design. |
+| DC area / Fmax / power | Not run. DC executable is present, but `external/private`, the configured SDC, and `syn/run_ai_accel_28nm_dc.sh` are absent. | **BLOCKED_ENV**; no PPA result. |
+| SRAM macro mapping, DFT, MBIST, CTS, route, routed STA, IR/EM | Not run; private SRAM and physical views are absent. | **NOT_RUN/BLOCKED_ENV**. |
+
+Exact current static commands from the repository root:
+
+```sh
+PATH="${SPYGLASS_HOME}/bin:${PATH}" bash dv/spyglass/run_spyglass_a8.sh lint
+PATH="${SPYGLASS_HOME}/bin:${PATH}" bash dv/spyglass/run_spyglass_a8.sh cdc
+timeout --signal=TERM --kill-after=10s 180s \
+  env PATH="${SPYGLASS_HOME}/bin:${PATH}" \
+  bash dv/spyglass/run_spyglass_a8.sh rdc
+```
+
+### Lint and reset finding disposition
+
+The 465 warning rule counts are: `W415a` 160, `STARC05-2.2.3.3`
+(`InitValUsingNBA`) 141, `W426` 56, `W287b` 27,
+`STARC05-2.11.3.1` 22, `W528` 20, `STARC05-2.1.3.1` 11,
+`STARC05-2.1.4.5` 11, `W240` 7, `W362` 6, and one each of
+`STARC05-1.3.1.3`, `W216`, `W486`, and `FLAT_504`. `W415a` and
+`InitValUsingNBA` can describe the same sequential assignments, so their
+counts are not unique RTL defects. The warning report is included in the
+snapshot; zero waivers were added.
+
+The current lint `FLAT_504` at `ai_tensor_matrix_core.v:490` says a 16,384-bit
+Matrix accumulator mux is only partially evaluated against the tool's 1,024-bit
+threshold. This is an analysis-precision limitation around a wide variable
+slice, not proof of a functional bug or proof that the logic is safe. Keep it
+open until the analysis limit is resolved with an acceptable runtime and the
+result is reviewed; do not suppress the rule.
+
+The latest completed structural CDC report in the ignored local SpyGlass tree
+is historical (2026-11-05 16:25), not a new 410b81d run. It reports one
+`Reset_sync04`: `aresetn` reaches both
+`compute_spad_mux_u.response_owner_valid_d_r` and
+`spad_subsystem_u.cnm_protection_error_req_r`, both in the `aclk` domain; it
+also reports `Ar_syncdeassert01` through the abstract reset-port constraint,
+zero unsynchronized crossings, and zero convergence. RTL inspection confirms
+both named registers are asynchronously reset. The spec says `aresetn` is an
+active-low asynchronous reset but does not define its release timing. The
+integration contract and reset-release verification therefore remain OPEN;
+the warning is neither waived nor classified as a proven functional failure.
+
+One `AsyncResetOtherUse` lint warning also remains for reset use in the DMA/CNM
+hierarchy and needs source-level disposition. No RTL reset architecture was
+changed in response to these tool findings.
+
+Risk-oriented triage remains OPEN: review reset and width/shift/variable-slice
+findings and disconnected ports first; inspect the repeated-assignment rules
+with their overlapping signals before deciding whether any are functional or
+style-only. All 465 are tool-severity `Warning`, but the rule count is not a
+functional severity ranking and no rule has been waived.
 
 | Readiness item | Current disposition |
 |---|---|
 | Functional simulation | Scoped candidate replay PASS; v2 sign-off remains IN PROGRESS. |
-| SpyGlass warnings / CDC / RDC | NOT_RERUN at `410b81d`; historical warning and structural findings remain OPEN. |
-| Formal / LEC | NOT_RERUN; older Matrix FSM proof does not establish whole-design equivalence or v2 closure. |
-| DC area / Fmax / power | NOT_RUN at `410b81d`; no measured ASIC PPA. |
+| SpyGlass warnings / CDC / RDC | Current lint completed with 465 warnings; current CDC stalled and current RDC timed out as detailed above. |
+| Formal / LEC | NOT_RUN; older Matrix FSM proof does not establish whole-design equivalence or v2 closure. |
+| DC area / Fmax / power | BLOCKED_ENV at `410b81d`; no private libraries/SDC or checked-in synthesis script. |
 | SRAM mapping and capacity study | NOT_RUN; behavioral four-bank SRAM remains the performance-model boundary. |
 | DFT, MBIST, CTS, route, routed STA, IR/EM | NOT_RUN; required before any tapeout-readiness claim. |
 

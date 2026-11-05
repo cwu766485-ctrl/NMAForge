@@ -1,6 +1,30 @@
 # NMAForge RTL 静态分析报告
 
-## v2 候选复查（2026-11-05）
+## 固定 v2 候选复查（2026-11-05，source/test SHA `410b81d`）
+
+VCS 候选回归完成后，使用 SpyGlass V-2023.12-SP1 对当前 A8 project
+重新执行 lint。命令为
+`PATH="$SPYGLASS_HOME/bin:$PATH" bash dv/spyglass/run_spyglass_a8.sh lint`
+（从仓库根目录执行）。结果：exit 0、0 errors、465 warnings、5 infos、0
+waivers。Lint 工具执行通过，但没有达到 warning closure。完整摘要和报告副本在
+`/tmp/nmaforge_v2_410b81_static_eda.tar.gz`，SHA-256
+`178d3267e55304a0c173a9fc89facd547fb7926b516c3c672e1e9ed710dfab60`。
+
+本次 warning 分布：`W415a` 160、`STARC05-2.2.3.3` 141、`W426` 56、
+`W287b` 27、`STARC05-2.11.3.1` 22、`W528` 20、`STARC05-2.1.3.1` 11、
+`STARC05-2.1.4.5` 11、`W240` 7、`W362` 6，以及
+`STARC05-1.3.1.3`、`W216`、`W486`、`FLAT_504` 各 1。`W415a` 与
+`InitValUsingNBA` 有重叠，不可将 rule count 当成互斥缺陷数。当前 Matrix
+宽度项和 `FLAT_504` 均保留待审，未 waiver。
+
+同候选脚本 CDC 尝试在 `cdc_setup` 无新输出运行 6m10s 后被终止，exit 143；
+因此当前 CDC 是 **NOT_RUN**。RDC 在 180 秒上限内推进到 `Ar_resetcross01`
+（规则 385/478、约 6.1 GB RSS）后退出码 124，无 RDC 结论。此前同日完成的
+结构 CDC 报告仍标出一个 `Reset_sync04` 和一个 `FLAT_504`，但不冒充本次重跑。
+其 RTL/约束定位与 disposition 见
+[`NMAFORGE_V2_ASIC_READINESS.md`](NMAFORGE_V2_ASIC_READINESS.md)。
+
+## 历史 v2 候选复查（2026-11-05，source/test SHA `145363d`）
 
 当前 v2 RTL/test 候选为 `145363ddff5141177421ee7429fc65f78834830d`，
 使用 SpyGlass V-2023.12-SP1 对公开 A8 project 复跑：
