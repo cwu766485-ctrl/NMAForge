@@ -29,8 +29,8 @@ in `tools/rocky-bridge.tasks.protocol-vip.json`.
 
 ## Acceptance evidence
 
-Validated against NMAForge commit `f168a3dbbd53b3ba53aa996323c934629f5b4c9d`
-on `feature/axi-vip-integration`, using Rocky-8.10, VCS
+Validated against NMAForge code commit `ca00325` on
+`feature/axi-vip-integration`, using Rocky-8.10, VCS
 `V-2023.12-SP1_Full64`, UVM 1.2, seeds `123` and `98765`. Both seeds passed:
 
 - AXI4 VIP reactive-memory scoreboard: 6 requests completed (5 reads, 1
@@ -38,12 +38,15 @@ on `feature/axi-vip-integration`, using Rocky-8.10, VCS
 - NMAForge block scoreboard: 32-word load, 4-word store, and 4-word readback
   all matched; three `[SB_PASS]` markers per seed.
 - AXI protocol checker: zero violations; UVM WARNING/ERROR/FATAL: `0/0/0`.
+- Backward compatibility: the original `dma_load_ooo_smoke_test` compiled
+  with the non-VIP filelist and passed at seed `123`, matching 32 words with
+  UVM WARNING/ERROR/FATAL=`0/0/0`.
 - DMA command functional coverage: `60.48%` for this deliberately small
   acceptance sequence. This is not coverage closure.
 
 Raw compile and per-seed logs are archived locally under
-`dv/block/dma/artifacts/protocol-vip/`; the directory is intentionally not
-committed. Re-run the named bridge task to regenerate them.
+`dv/block/dma/artifacts/protocol-vip/20261105T123640Z/`; the artifacts are
+intentionally not committed. Re-run the named bridge task to regenerate them.
 
 This evidence qualifies only a functional smoke slice of the AXI4 interface at
 the `ai_axi128_dma` block boundary with the configured 64/128/4 profile. It
