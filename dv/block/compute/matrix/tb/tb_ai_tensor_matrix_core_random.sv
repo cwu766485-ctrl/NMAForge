@@ -1878,6 +1878,19 @@ module tb_ai_tensor_matrix_core_random;
     end
   endtask
 
+  task automatic check_output_sentinel_at(input [31:0] base_addr,
+                                           input integer word_count);
+    integer wi,word_index;
+    begin
+      for(wi=0;wi<word_count;wi=wi+1) begin
+        word_index=(base_addr>>2)+wi;
+        if(output_mem[word_index] !== (32'hbad0_0000+word_index))
+          $fatal(1,"v2 fault modified destination sentinel base=%08x word=%0d got=%08x expected=%08x",
+                 base_addr,word_index,output_mem[word_index],32'hbad0_0000+word_index);
+      end
+    end
+  endtask
+
   task automatic run_v2_opcode_fault_campaign;
     integer timeout,accepted_at_fault,orphan_before;
     begin
@@ -1979,6 +1992,58 @@ module tb_ai_tensor_matrix_core_random;
       check_product_output_sentinel(64);
       prepare_dense_gemv_case();check_dense_gemv_case();
 
+      // Opcode 0x53 reset with a real accepted operand response pending. The
+      // tile source is first captured, then a consumer starts B reads while
+      // A is forwarded. After reset, inject a stale response from that epoch.
+      prepare_case(16,16,4,1,0,0,0,0,0,0,0);
+      op_mode=8'h53;aux0=32'h21;
+      force_banked_ready=1;force_zero_bank_latency=1;force_line_ready=1;
+      launch_and_wait();
+      if(error || error_code!=0 || !dut.tile_forward_valid_r)
+        $fatal(1,"0x53 reset-epoch producer failed completion/tag setup");
+      prepare_case(16,16,4,1,0,0,0,0,0,0,0);
+      src0_base=DST_BASE;dst_base=TILE_FORWARD_CONSUMER_DST;
+      for(timeout=0;timeout<256;timeout=timeout+1)
+        output_mem[(TILE_FORWARD_CONSUMER_DST>>2)+timeout]=
+            32'hbad0_0000+(TILE_FORWARD_CONSUMER_DST>>2)+timeout;
+      op_mode=8'h53;aux0=32'h61;
+      force_banked_ready=1;force_zero_bank_latency=0;
+      force_bank_response_delay=1;force_line_ready=1;
+      @(negedge clk);start=1;@(negedge clk);start=0;
+      timeout=0;
+      while((dut.read_outstanding_count==0) && !done && (timeout<5000)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(dut.read_outstanding_count==0 || !dut.tile_forward_consume_active_r)
+        $fatal(1,"0x53 reset missed consumer/pending-B-response state=%0d outstanding=%0d consume=%b",
+               dut.state_r,dut.read_outstanding_count,dut.tile_forward_consume_active_r);
+      @(negedge clk);resetn=0;#1;
+      if(busy || done || error || error_code!=0 ||
+         dut.read_outstanding_count!=0 || pending_bank ||
+         dut.tile_forward_valid_r || dut.tile_forward_capture_active_r ||
+         dut.tile_forward_consume_active_r || line_write_count!=0)
+        $fatal(1,"0x53 reset failed to flush in-flight response/tile state");
+      repeat(3) @(negedge clk);resetn=1;
+      force_banked_ready=0;force_zero_bank_latency=0;force_bank_response_delay=0;
+      force_line_ready=0;
+      orphan_before=orphan_bank_response_count;
+      @(negedge clk);inject_orphan_bank_response=1;
+      timeout=0;
+      while((orphan_bank_response_count==orphan_before) && (timeout<20)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      repeat(2) @(negedge clk);
+      if(orphan_bank_response_count!=orphan_before+1 || busy || done || error ||
+         error_code!=0 || dut.read_outstanding_count!=0 ||
+         dut.tile_forward_valid_r || line_write_count!=0)
+        $fatal(1,"0x53 stale response escaped reset epoch count=%0d busy/done/error=%b/%b/%b outstanding=%0d tile_valid=%b writes=%0d",
+               orphan_bank_response_count,busy,done,error,
+               dut.read_outstanding_count,dut.tile_forward_valid_r,line_write_count);
+      check_output_sentinel_at(TILE_FORWARD_CONSUMER_DST,256);
+      $display("MATRIX_0X53_RESET_EPOCH_PASS accepted_pending=1 stale_response_discarded=1 tile_tag_flushed=1 sentinel=preserved seed=%0d",
+               initial_seed);
+      run_tile_forward_chain();
+
       // Opcode 0x53 read parity fault: no output line may commit and the local
       // forwarding tag must remain invalid.
       prepare_case(16,16,4,1,0,0,0,0,0,0,0);
@@ -2037,7 +2102,7 @@ module tb_ai_tensor_matrix_core_random;
       // A clean 0x53 chain after the injected faults proves recovery of the
       // producer/consumer Golden path and the bounded tag state.
       run_tile_forward_chain();
-      $display("MATRIX_V2_OPCODE_FAULT_PASS opcode52=parity,protection,abort,reset_orphan opcode53=parity,writeback_protection,held_write_abort recovery=0x52_golden,0x53_tile_chain seed=%0d",
+      $display("MATRIX_V2_OPCODE_FAULT_PASS opcode52=parity,protection,abort,reset_orphan opcode53=reset_epoch,parity,writeback_protection,held_write_abort recovery=0x52_golden,0x53_tile_chain seed=%0d",
                initial_seed);
     end
   endtask

@@ -138,6 +138,8 @@ product-opcode-fault-regress: core-random-compile
 			-cm $(COV_METRICS) -cm_dir $(CORE_OUT_DIR)/coverage.vdb \
 			-cm_name v2_opcode_fault_$$seed \
 			-l $(CORE_OUT_DIR)/v2_opcode_fault_seed_$$seed.log; \
+		grep -q "^MATRIX_0X53_RESET_EPOCH_PASS .* seed=$$seed$$" \
+			$(CORE_OUT_DIR)/v2_opcode_fault_seed_$$seed.log; \
 		grep -q "^MATRIX_V2_OPCODE_FAULT_PASS .* seed=$$seed$$" \
 			$(CORE_OUT_DIR)/v2_opcode_fault_seed_$$seed.log; \
 	done
