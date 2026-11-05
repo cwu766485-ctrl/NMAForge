@@ -441,3 +441,9 @@ in the owning report; run `git diff --check` before handoff.
 - `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105` passes. DUT-only Top URG at fixed test SHA `86e0d6cbba3187bd1deeb18f664c559b606c878d` passes seeds 20261105/06/07. The new v2 group scores 100% on all seeds and in merged URG.
 - Overall functional group score is 20%: four existing AXI-memory groups remain at 0%. DUT-only Line/Condition/FSM/Branch is 86.75/77.62/44.33/84.56%; Matrix FSM is 15/15 states, 25/55 transitions. Feature-wide bins, transition disposition, and exclusions remain open; no sign-off claim.
 - Code/test SHA `86e0d6cbba3187bd1deeb18f664c559b606c878d`, tree `497eaef649c3995c97cb533a9c410417d63ee0de`. No RTL changed. Coverage archive `/tmp/nmaforge_v2_86e0d6c_dut_cov_evidence.tar.gz`, SHA-256 `eb25d2725fa8e3252c0140d0c7254c3abfc03fd1ef44d1ecbd2283e75becd4f8`.
+
+## 2026-11-05 update — actual v2 candidate DUT mutation replay at `bdfda3c`
+
+- Replayed `make -C dv/uvm/sim uvm_compute_cluster_dut_mutation` with VCS `V-2023.12-SP1_Full64`, seed 20261025, and temporary source variants only. All seven injected RTL defects were caught by their intended checker: shared-SPAD address/data/response owner, Matrix WSTRB, Completion error code, missing Done, and duplicate Done (7/7).
+- Run ID `V2-DUT-MUTATION-7X1-BDFDA3C`, source SHA `bdfda3c408a1367ac6b1788ebb9bdb0e5b6f7d47`, tree `89eac43b0b9aa6811608f6587272ec564ea2b456`. Logs archive `/tmp/nmaforge_v2_dut_mutation_bdfda3c_logs.tar.gz`, SHA-256 `a4104e43f95243d75525bab9023f75d7d6831a3fe75eec2333efb7b21d87e95b`.
+- `REQ-V2-COM-005` advances in evidence but remains **PARTIAL**: every checker for every new feature has not yet been mutation-mapped, and broader fault-phase crosses, functional coverage and sign-off remain open. No product RTL changed.

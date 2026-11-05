@@ -5,7 +5,7 @@
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
 **Current reviewed candidate:** `feature/npu-architecture-v2` `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164`
 **Candidate tree:** `dbf5060ac465ef4bb913543024182b298f675413`
-**Latest test-only candidate:** `feature/npu-architecture-v2` `86e0d6cbba3187bd1deeb18f664c559b606c878d` (tree `497eaef649c3995c97cb533a9c410417d63ee0de`); this commit adds a Top Smoke functional coverage group and its gate, with no RTL delta.
+**Latest test-only candidate:** `feature/npu-architecture-v2` `bdfda3c408a1367ac6b1788ebb9bdb0e5b6f7d47` (tree `89eac43b0b9aa6811608f6587272ec564ea2b456`); this commit records the scoped functional coverage and actual DUT mutation replay, with no product RTL delta.
 
 ## Executive disposition
 
@@ -210,3 +210,9 @@ the licensed libraries and constraints are available.
 - The new group is 100% in each run and merged. The four existing AXI-memory covergroups are 0%, so overall functional-group coverage is 20%. DUT-only Line/Condition/FSM/Branch is 86.75/77.62/44.33/84.56%; Matrix core FSM is 15/15 states and 25/55 transitions. This is scoped coverage, not complete legal-v2 coverage or FSM closure.
 - Test-only commit `86e0d6cbba3187bd1deeb18f664c559b606c878d` (tree `497eaef649c3995c97cb533a9c410417d63ee0de`). No product RTL changed. Coverage archive SHA-256 `eb25d2725fa8e3252c0140d0c7254c3abfc03fd1ef44d1ecbd2283e75becd4f8`; the exact record is in the [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
 - `REQ-V2-053-007` remains **PARTIAL** because DMA overwrite, additional engine pairings, held-response ownership, and fault/reset crosses are untested. The aggregate `REQ-V2-COM-004` remains **PARTIAL** because feature-wide bins and residual FSM transitions are open.
+
+## Follow-up actual DUT mutation replay at `bdfda3c` — 2026-11-05
+
+- The existing UVM mutation harness compiled temporary RTL copies and injected seven real DUT defects: shared-SPAD address, data and response owner; Matrix WSTRB; Completion error code; missing Done; and duplicate Done. Each was caught by its assigned scoreboard/checker (7/7) at seed 20261025; the source worktree remained unchanged.
+- Exact command, VCS version, Run ID, checker names and archive SHA-256 are recorded in the [v2 DV closure RTM](../verification/NMAFORGE_V2_DV_CLOSURE.md). The earlier opcode-core mutation suite separately remains 15/15 across three seeds.
+- `REQ-V2-COM-005` remains **PARTIAL**: the selected Completion and engine-owner faults now have direct evidence, while mutation mapping for every new-feature checker and wider fault-phase interactions remain open. No sign-off or RTL behavior change is claimed.

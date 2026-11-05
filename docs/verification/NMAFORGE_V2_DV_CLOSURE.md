@@ -8,6 +8,7 @@
 **Latest fault replay at GitHub branch HEAD:** `de705ee6317557954af9cb396cda94b01eb1c432` (tree `d948c9f72a24fd6ccdfdef9acfd5d940ceb37cfa`), including the added 0x53 Reset/Epoch scenario.
 **Latest RTL-mutation replay:** `a015de58379ca1303ebfc1c4c3899d1fd77affa2` (tree `402f5172240dfe60197bbb41937ab99814333d6a`); this adds only the mutation harness and Make target.
 **Latest scoped cross-engine replay:** `86e0d6cbba3187bd1deeb18f664c559b606c878d` (tree `497eaef649c3995c97cb533a9c410417d63ee0de`); Top Smoke adds a scoped functional coverage group, with no product RTL change.
+**Latest actual DUT mutation replay:** `bdfda3c408a1367ac6b1788ebb9bdb0e5b6f7d47` (tree `89eac43b0b9aa6811608f6587272ec564ea2b456`); seven temporary RTL mutants were caught by their assigned real Compute Cluster UVM checkers.
 
 **Baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Simulator:** Synopsys VCS `V-2023.12-SP1_Full64`
@@ -296,7 +297,7 @@ new opcodes.
 | REQ-V2-053-007: software-held source immutability and cross-engine SPAD access obey the forwarding contract | Explicitly ordered local handoff, no coherence | Top monitor watches seven compute write clients and Matrix line writes; CMDQ Matrix consumer + independent SFU output-image checker | No new SVA | Matrix 0x53 consume overlaps SFU SPAD traffic to a disjoint range; functional bins cover Matrix/SFU overlap, accepted consume-period traffic, no source write attempt, and Golden success (100% in this scoped group) | `V2-0X53-CROSS-ENGINE-COV-3SEED-86E0D6C`, seeds 20261105/06/07, SHA `86e0d6cbba3187bd1deeb18f664c559b606c878d` | **PARTIAL**; legal Matrix+SFU unrelated-region concurrency and its scoped functional group pass 3/3 seeds. This does not test DMA overwrite, illegal source mutation injection, every other-engine pairing, or full response-owner/error crosses; software must keep the tagged source immutable |
 | REQ-V2-COM-003: new-feature assertions are connected and non-vacuous | Matrix FSM and top SVA | VC Formal proves existing Matrix guard set; Top SVA is AXI/quiescence scoped | Formal: 5/5 named Matrix assertions non-vacuous and 2/2 covers reached at `145363ddff5141177421ee7429fc65f78834830d`; no opcode-specific 0x52/0x53 assertion | `prefetch_wait`, `error_drain` covers; no v2 opcode transition cross | `V2-MATRIX-FSM-GUARDS-145363D`, formal run, SHA `145363ddff5141177421ee7429fc65f78834830d` | **PARTIAL**; this does not prove new opcode properties or full SVA connection coverage; `/tmp/nmaforge_v2_matrix_fsm_formal_33e8528/vc_formal.log` |
 | REQ-V2-COM-004: all legal v2 functional bins are merged and every exclusion/waiver has disposition | URG functional/code coverage | VCS URG merge for current Top Smoke DUT-only scope (27 module definitions) across three Seeds; earlier Matrix core/GEMV/fault and Prefetch-OFF runs remain separately identified | One v2-specific functional group samples the legal 0x53 cross-engine handoff; no new SVA | Current Top URG: 86.75/77.62/44.33/84.56% Line/Condition/FSM/Branch; Matrix FSM 15/15 states, 25/55 transitions. New 0x53 group 100%; overall functional group score 20% because four existing AXI-memory groups score 0%. Remaining 0x52/0x53 bins and FSM transitions have no approved disposition | `V2-DUT-COVERAGE-TOP-3SEED-86E0D6C`, seeds 20261105/06/07, source/test SHA `86e0d6cbba3187bd1deeb18f664c559b606c878d`; archive SHA below | **PARTIAL**; only the legal Matrix+SFU handoff group is complete. Broader feature bins, exclusions/waivers, and remaining FSM transition reachability are not closed; aggregate percentages do not establish sign-off |
-| REQ-V2-COM-005: each new checker detects its assigned RTL fault through mutation | 0x52/0x53 Matrix datapath and forwarding checks | Temporary DUT mutants for output data, output address, operand response owner, WSTRB, and tile tag; each checker must emit its assigned fatal | No mutation-specific SVA | Five fault classes × three Seeds = 15/15 caught; Completion and external response-owner mutants remain open | `V2-OPCODE-MUTATION-5X3-A015DE5`, seeds 20261105/06/07, SHA `a015de58379ca1303ebfc1c4c3899d1fd77affa2` | **PARTIAL**; five selected mutants are caught, but Completion and engine-level owner mutations plus any additional new checker remain untested; external log archive above |
+| REQ-V2-COM-005: each new checker detects its assigned RTL fault through mutation | 0x52/0x53 Matrix datapath/forwarding and shared Compute Cluster lifecycle | Actual temporary DUT mutants for shared-SPAD address/data/response owner, Matrix WSTRB, Completion error code, missing Done, and duplicate Done; separate opcode-core mutants for output data/address, operand response owner, WSTRB, and tile tag | Mutation-specific SVA: none; each injected defect must trigger its assigned scoreboard/checker | Current-candidate actual-DUT campaign: 7/7 mutation classes caught at seed 20261025; opcode-core campaign: 5 classes × 3 seeds = 15/15 caught | `V2-DUT-MUTATION-7X1-BDFDA3C`, seed 20261025, SHA `bdfda3c408a1367ac6b1788ebb9bdb0e5b6f7d47`; `V2-OPCODE-MUTATION-5X3-A015DE5`, seeds 20261105/06/07, SHA `a015de58379ca1303ebfc1c4c3899d1fd77affa2` | **PARTIAL**; these selected RTL faults are detected, including Completion and shared response owner. Exhaustive mutation-to-checker mapping for every new feature/checker and the full fault-phase cross remain open; see both external logs archives |
 
 ### Fixed run identities and reproducibility
 
@@ -414,8 +415,7 @@ Compute Cluster disposition from **HOLD**.
 4. Add functional covergroups for the directed `0x52`/`0x53` testpoints; review
    the merged code-coverage gaps and three residual FSM transitions; prove or
    formally disposition them without invalid stimulus. Audit assertion
-   connectivity/non-vacuity and extend mutation to Completion and external
-   engine-owner/checker faults.
+   connectivity/non-vacuity and map mutations to every new-feature checker.
 5. Complete old-opcode compatibility regression beyond the selected Top
    Smoke and Matrix-core test points.
 6. Run formal/LEC, CDC/RDC, DC, SRAM mapping, DFT preparation, and PPA only
@@ -424,3 +424,40 @@ Compute Cluster disposition from **HOLD**.
 
 The v1.0 Compute Cluster remains **HOLD**; no system-wide or ASIC sign-off is
 implied by the scoped v2 evidence above.
+
+## Actual DUT mutation replay at `bdfda3c` — 2026-11-05
+
+The real-DUT harness builds each mutant from a temporary source copy and runs
+the Compute Cluster UVM sequence. The product source and file list in the
+worktree are not modified. All seven selected RTL defects were rejected by
+their intended checker:
+
+| Mutant | Checker observed |
+|---|---|
+| Shared SPAD address offset | `CLUSTER_MEMORY_UNKNOWN` |
+| Shared SPAD write-data bit flip | `CLUSTER_GOLDEN` |
+| Shared SPAD response routed to wrong engine | `CLUSTER_ENGINE_RESPONSE_OWNER` |
+| Matrix WSTRB bit dropped | `CLUSTER_MATRIX_WSTRB` |
+| Completion error code corrupted | `CLUSTER_COMPLETION_ERROR_CODE` |
+| Scalar engine Done suppressed | `CLUSTER_MISSING_DONE` |
+| Scalar Done duplicated onto KV engine | `CLUSTER_DONE_WITHOUT_ACTIVE` |
+
+Run command (VCS `V-2023.12-SP1_Full64`, seed 20261025):
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+make -C dv/uvm/sim uvm_compute_cluster_dut_mutation \
+  COMPUTE_CLUSTER_DUT_MUTATION_OUT=/tmp/nmaforge_v2_dut_mutation_bdfda3c
+```
+
+Result: `COMPUTE_CLUSTER_DUT_MUTATION_PASS: 7/7 real RTL mutants caught`.
+Run ID `V2-DUT-MUTATION-7X1-BDFDA3C`; source SHA
+`bdfda3c408a1367ac6b1788ebb9bdb0e5b6f7d47`, tree
+`89eac43b0b9aa6811608f6587272ec564ea2b456`. Logs-only archive:
+`/tmp/nmaforge_v2_dut_mutation_bdfda3c_logs.tar.gz`, SHA-256
+`a4104e43f95243d75525bab9023f75d7d6831a3fe75eec2333efb7b21d87e95b`.
+This is checker-sensitivity evidence for seven selected fault classes. It does
+not close every v2 checker, fault-phase cross, functional coverage item, or
+the v2 sign-off.
