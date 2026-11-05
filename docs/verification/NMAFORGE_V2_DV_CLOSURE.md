@@ -6,6 +6,7 @@
 **Candidate tree:** `dbf5060ac465ef4bb913543024182b298f675413`
 
 **Latest fault replay at GitHub branch HEAD:** `59d1e5ed6570fefe957a6ed2abc10d6d18c21ed2` (tree `94f3a2748698c100a6f2087c72bd091d357747f8`). This HEAD adds documentation after test commit `465855acf0ba686421d61d77f36b22f1e23bd4f0` (tree `638538e65a4d5e3e214d1ae7b69a2616e8a244ba`); the tested RTL and Matrix testbench blobs are identical.
+**Latest RTL-mutation replay:** `a015de58379ca1303ebfc1c4c3899d1fd77affa2` (tree `402f5172240dfe60197bbb41937ab99814333d6a`); this adds only the mutation harness and Make target.
 
 **Baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Simulator:** Synopsys VCS `V-2023.12-SP1_Full64`
@@ -98,7 +99,6 @@ compile error was observed. VCS line/condition/FSM/branch instrumentation was
 enabled in the Matrix runs, but these databases have not been URG-merged or
 reviewed for exclusions, so no coverage percentage is claimed.
 
-Logs and compile records are archived outside Git at
 Fault logs and compile record are archived outside Git at
 `/tmp/nmaforge_v2_opcode_fault_59d1e5e_logs.tar.gz` (SHA-256
 `5d2f7d0d352287cc00c00ebc04d76f6e637f1a25f60facd7605f1d9d1df257b7`). The
@@ -107,6 +107,36 @@ compatibility logs are archived at
 `cd41f65abb8cb1b38de65fc7d68162ff7310df13bfcfcce0c245e18283447277`). Run
 IDs: `V2-OPCODE-FAULT-3SEED-59D1E5E` and
 `V2-OPCODE-FAULT-COMPAT-3SEED-465855A`.
+
+## Fixed-SHA v2 RTL checker-sensitivity campaign — 2026-11-05
+
+At test SHA `a015de58379ca1303ebfc1c4c3899d1fd77affa2`, a runner mutated
+temporary copies of `ai_tensor_matrix_core.v`; checked-in product RTL was not
+modified. VCS `V-2023.12-SP1_Full64` compiled each mutant once and ran the
+corresponding functional checker on Seeds 20261105/06/07:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+make -C dv/block/compute/matrix/sim product-opcode-mutation-regress \
+  V2_OPCODE_MUTATION_OUT=/tmp/nmaforge_v2_opcode_mutations_a015de5 \
+  PYTHON=python3.12
+```
+
+The run caught all 15/15 mutant-seed checks: output data and output address
+corruption were caught by the independent producer memory-image Golden;
+operand response-owner corruption by the opcode 0x52 completion/GEMV checker;
+partial WSTRB by the Line protocol checker; and a wrong 0x53 tile tag by the
+forwarding read-count checker. No compile warnings or errors were found in
+mutant compile logs. Logs and the result summary are archived at
+`/tmp/nmaforge_v2_opcode_mutations_a015de5_logs.tar.gz` (SHA-256
+`9e7ae868d1746d54aaf209fa445562fd48cba8ec078cbd68ff2721660231e5b6`). Run ID:
+`V2-OPCODE-MUTATION-5X3-A015DE5`.
+
+This is a checker-sensitivity result for five selected RTL fault classes. It
+does not test Completion mutation, external engine-owner mutation, every
+fault-phase cross, or imply full v2 Mutation Closure.
 
 ## Normalized v2 Execution RTM
 
@@ -139,7 +169,7 @@ functional coverage evidence, not merged URG coverage bins.
 | REQ-V2-053-007: software-held source immutability and cross-engine SPAD access obey the forwarding contract | Explicitly ordered local handoff, no coherence | Contract reviewed; no cross-engine checker | None | source mutation/DMA or other-engine write during handoff NOT_RUN | `NOT_RUN@f4ed9c4`, seed N/A, candidate `f4ed9c4f5b711bd6554d588477957e9bf3ce3806` | **NOT_RUN**; spec requires source immutability, but there is no coherent cache or test evidence |
 | REQ-V2-COM-003: new-feature assertions are connected and non-vacuous | Matrix FSM and top SVA | VC Formal proves existing Matrix guard set; Top SVA is AXI/quiescence scoped | Formal: 5/5 named Matrix assertions non-vacuous and 2/2 covers reached at `145363ddff5141177421ee7429fc65f78834830d`; no opcode-specific 0x52/0x53 assertion | `prefetch_wait`, `error_drain` covers; no v2 opcode transition cross | `V2-MATRIX-FSM-GUARDS-145363D`, formal run, SHA `145363ddff5141177421ee7429fc65f78834830d` | **PARTIAL**; this does not prove new opcode properties or full SVA connection coverage; `/tmp/nmaforge_v2_matrix_fsm_formal_33e8528/vc_formal.log` |
 | REQ-V2-COM-004: all legal v2 functional bins are merged and every exclusion/waiver has disposition | URG functional/code coverage | No current-candidate URG merge or reviewed exclusion set | No coverage assertion | VCS line/condition/FSM/branch enabled on core suite, but DB not merged and no per-bin disposition | `NOT_RUN@f4ed9c4`, candidate `f4ed9c4f5b711bd6554d588477957e9bf3ce3806` | **NOT_RUN**; no coverage percentage/closure claim; raw run logs are external only |
-| REQ-V2-COM-005: each new checker detects its assigned RTL fault through mutation | 0x52/0x53 checkers | No v2-specific RTL mutation campaign | None | data/address/owner/WSTRB/completion mutations for v2 NOT_RUN | `NOT_RUN@f4ed9c4`, candidate `f4ed9c4f5b711bd6554d588477957e9bf3ce3806` | **NOT_RUN**; historical v1 mutation results are not inherited |
+| REQ-V2-COM-005: each new checker detects its assigned RTL fault through mutation | 0x52/0x53 Matrix datapath and forwarding checks | Temporary DUT mutants for output data, output address, operand response owner, WSTRB, and tile tag; each checker must emit its assigned fatal | No mutation-specific SVA | Five fault classes × three Seeds = 15/15 caught; Completion and external response-owner mutants remain open | `V2-OPCODE-MUTATION-5X3-A015DE5`, seeds 20261105/06/07, SHA `a015de58379ca1303ebfc1c4c3899d1fd77affa2` | **PARTIAL**; five selected mutants are caught, but Completion and engine-level owner mutations plus any additional new checker remain untested; external log archive above |
 
 ### Fixed run identities and reproducibility
 
@@ -150,7 +180,7 @@ functional coverage evidence, not merged URG coverage bins.
 - `V2-TOP-CMDQ-CLEAN-3SEED-3A283C0`: VCS `V-2023.12-SP1_Full64`; clean detached worktree, `make ai_comp` then `make ai_run AI_RANDOM_CASES=4 AI_SEED=<seed> SEED=<seed>` for Seeds 20261105/06/07; logs-only archive SHA-256 `8e1bc2c3329de0ac11eedafed3972918baecf321c01b09990195662d691e35f6`.
 - `V2-MATRIX-FSM-GUARDS-145363D`: VC Formal `V-2023.12-SP2`; 5/5 named Matrix FSM assertions proven/non-vacuous and 2/2 state covers reached. It is not an opcode 0x52/0x53 assertion campaign.
 
-The RTM currently has 21 requirement IDs: 12 scoped PASS, 6 PARTIAL, and 3
+The RTM currently has 21 requirement IDs: 12 scoped PASS, 7 PARTIAL, and 2
 NOT_RUN. No `BLOCKED_ENV` row was converted to PASS; all successful rows have
 a named, limited test scope. This remains an execution RTM, not an approval
 record. The
@@ -229,8 +259,8 @@ Compute Cluster disposition from **HOLD**.
 3. Define and test tile-source immutability under cross-engine SPAD traffic;
    test repeated consume and producer/consumer interleavings.
 4. Review/merge current-SHA functional coverage; audit assertions for
-   connectivity and non-vacuity; run actual RTL checker mutations for every
-   v2 error class.
+   connectivity and non-vacuity; expand the 5-class RTL mutation campaign to
+   Completion and external engine-owner/checker faults.
 5. Complete old-opcode compatibility regression beyond the selected Top
    Smoke and Matrix-core test points.
 6. Run formal/LEC, CDC/RDC, DC, SRAM mapping, DFT preparation, and PPA only
