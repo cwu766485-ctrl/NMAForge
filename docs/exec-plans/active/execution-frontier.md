@@ -1,30 +1,34 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-05. v2 feature branch HEAD: `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` (tree `dbf5060ac465ef4bb913543024182b298f675413`). This is a short handoff for the next engineering task; it
+Updated: 2026-11-05. v2 feature branch HEAD: `2d88b5766abc2982ee900f47d6ce1887b7aa45d0` (tree `225cb82be50aa11849bfd366b49ffd324b4ef754`). Product RTL/test candidate reviewed for the RTM: `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` (tree `dbf5060ac465ef4bb913543024182b298f675413`); later commits are documentation only. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
 ## NMAForge v2 next-round plan status — 2026-11-05
 
-Phase 0 audit is complete at the target branch HEAD above. Remote `main` is
-still R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`; use that explicit SHA
-because the local `main` ref has drifted. The VS Code worktree remains on
+Phase 0 audit is complete. Remote `main` remains R250
+`3041355528dffe856e2d5384027c6ee5df5d1b42`; the local `main` ref has drifted,
+so comparisons use the explicit R250 SHA. The VS Code worktree remains on
 `feat/shape-adaptive-gemv-v2` with two untracked local simulator config files;
 all ten dirty worktrees and eighty missing/prunable registrations were
-preserved. The latest product RTL change is `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`;
-there is no later RTL diff. See the Phase 0 section in the
-[v2 architecture review](../../architecture/NMAFORGE_V2_ARCHITECTURE_REVIEW.md)
-for source/tree identities, worktree inventory, `.gitignore` audit, and the
-full post-RTL commit list.
+preserved. The latest product RTL change remains
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; no product RTL changed in the
+following report commits. See the Phase 0 section in the [v2 architecture
+review](../../architecture/NMAFORGE_V2_ARCHITECTURE_REVIEW.md) for branch/tree
+identities, worktree inventory, `.gitignore` audit, and post-RTL history.
 
-Phase 1 remains open: normalize `REQ-V2-*` and bind every requirement to a
-test, checker, assertion, coverage bin, run, seed, and SHA. Existing scoped
-Matrix-core, Top CMDQ, tile-forward, and descriptor PASS records remain useful
-but do not equal v2 sign-off. Phase 2 has 4-way Cache×Prefetch and selected
-TinyNPU data; real Top contention attribution and common-memory endpoints are
-open. Phase 3 has a trained Digits MLP only; trained CNN and Tiny Transformer
-are NOT_RUN. Phase 4 has 465 SpyGlass lint warnings, incomplete RDC, and DC
-PPA BLOCKED_ENV; no ASIC readiness claim is made. v1.0 remains HOLD.
+Phase 1 is **IN PROGRESS**. The DV report now has 21 normalized `REQ-V2-*`
+rows: 12 PASS-scoped, 5 PARTIAL, and 4 NOT_RUN. The current candidate
+`ac6b83f` descriptor validator replay passes 29 legal opcode classes, 33
+invalid-rule checks, and 43/43 accepts plus 26/26 rejects; 0x52/0x53 still
+lack feature-specific fault-phase closure, v2 mutation, merged URG disposition,
+and full opcode SVA coverage. Existing 3-seed GEMV, tile-forward, and clean Top
+CMDQ evidence remains bound to its exact historical source SHA. The v2 system
+DV is not signed off. Phase 2 has 4-way Cache×Prefetch and selected TinyNPU
+data; real Top contention attribution and common-memory endpoints are open.
+Phase 3 has a trained Digits MLP only; trained CNN and Tiny Transformer are
+NOT_RUN. Phase 4 has 465 SpyGlass lint warnings, incomplete RDC, and DC PPA
+BLOCKED_ENV; no ASIC readiness claim is made. v1.0 remains HOLD.
 
 ## Current TinyNPU paired replay — 2026-11-05
 
