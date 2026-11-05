@@ -9,6 +9,7 @@ module ai_tensor_matrix_core #(
     parameter integer MAX_OUTSTANDING_READS = 4,
     parameter integer ENABLE_A_TILE_CACHE = 1,
     parameter integer ENABLE_NEXT_K_PREFETCH = 1,
+    parameter integer ENABLE_GEMV_B_TILE_CACHE = 1,
     parameter integer ENABLE_ELASTIC_TILE_FORWARDING = 1
 )(
     input  wire        clk,
@@ -137,6 +138,8 @@ module ai_tensor_matrix_core #(
     reg [31:0] perf_prefetch_wait_cycles;
     reg [31:0] perf_prefetch_completed;
     reg [31:0] perf_a_tile_cache_hits;
+    reg [31:0] perf_gemv_b_cache_hits;
+    reg [31:0] perf_gemv_b_cache_reads_saved;
     reg [2:0] prefetch_state_r;
     reg [2:0] prefetch_group_r;
     reg [15:0] prefetch_k_group_r;
@@ -204,6 +207,9 @@ module ai_tensor_matrix_core #(
     reg [ARRAY_GROUPS-1:0] a_cache_group_seen_r [0:A_TILE_CACHE_K_WORDS-1];
     reg [A_TILE_CACHE_K_WORDS-1:0] a_cache_valid_r;
     reg [31:0] a_cache_base_r;
+    // GEMV reuses the existing 1 KiB A-cache data array as a command-local
+    // B-fold cache. GEMM and GEMV are mutually exclusive Matrix commands.
+    reg [A_TILE_CACHE_K_WORDS-1:0] gemv_b_cache_valid_r;
     reg signed [31:0] bias_words_r [0:ARRAY_SIZE-1];
 
     wire [ARRAY_SIZE*ARRAY_SIZE*64-1:0] array_accumulator_vector;
@@ -240,6 +246,15 @@ module ai_tensor_matrix_core #(
                                     ({16'd0,k_group_r} << 2);
     wire [31:0] gemv_k_valid_lanes = gemv_k_remaining > 32'd4 ?
                                       32'd4 : gemv_k_remaining;
+    wire [31:0] gemv_b_k_remaining = {16'd0,gemv_k_elements_r} -
+                                      ({16'd0,k_group_r} << 2);
+    wire [31:0] gemv_b_k_valid_lanes = gemv_b_k_remaining > 32'd4 ?
+                                        32'd4 : gemv_b_k_remaining;
+    wire [31:0] gemv_b_prefetch_remaining = {16'd0,gemv_k_elements_r} -
+        ({16'd0,prefetch_kick_k_group} << 2);
+    wire [31:0] gemv_b_prefetch_valid_lanes =
+        gemv_b_prefetch_remaining > 32'd4 ? 32'd4 :
+                                             gemv_b_prefetch_remaining;
     wire [31:0] b_group_count = gemv_kfold_r ? gemv_k_valid_lanes :
                                                        (valid_cols >> 2);
     wire [31:0] gemv_a_row_stride =
@@ -307,6 +322,21 @@ module ai_tensor_matrix_core #(
                                          prefetch_k_group_r : k_group_r;
     wire banked_request_buffer = prefetch_active ? prefetch_buffer_r : 1'b0;
     wire gemv_a_line_reuse = gemv_kfold_r && (k_group_r[1:0] != 2'b00);
+    wire [32:0] gemv_b_cache_end = {1'b0,b_batch_base_r} +
+                                      ({17'd0,gemv_k_elements_r} << 4);
+    wire [32:0] gemv_dst_cache_end = {1'b0,dst_batch_base_r} +
+                                     (({17'd0,m_r} * {17'd0,n_r}) << 2);
+    wire gemv_b_dst_overlap =
+        ({1'b0,b_batch_base_r} < gemv_dst_cache_end) &&
+        ({1'b0,dst_batch_base_r} < gemv_b_cache_end);
+    wire gemv_b_cache_allowed = ENABLE_GEMV_B_TILE_CACHE && gemv_kfold_r &&
+                                (m_r > 16'd4) && !gemv_b_dst_overlap;
+    wire gemv_b_cache_hit = gemv_b_cache_allowed &&
+                            (k_group_r < A_TILE_CACHE_K_WORDS) &&
+                            gemv_b_cache_valid_r[k_group_r[3:0]];
+    wire gemv_b_prefetch_hit = gemv_b_cache_allowed &&
+                               (prefetch_kick_k_group < A_TILE_CACHE_K_WORDS) &&
+                               gemv_b_cache_valid_r[prefetch_kick_k_group[3:0]];
     wire a_cache_tag_match = ENABLE_A_TILE_CACHE && !gemv_kfold_r &&
                              (k_words_r <= A_TILE_CACHE_K_WORDS) &&
                              (a_cache_base_r == a_tile_base_r);
@@ -430,6 +460,14 @@ module ai_tensor_matrix_core #(
     wire last_k_group = (k_group_r == k_words_r - 1'b1);
     wire watchdog_expired = busy && (watchdog_limit_r != 0) &&
                             (cycle_count >= watchdog_limit_r);
+    wire gemv_b_initial_copy =
+        ((((state_r == ST_A_REQ) && gemv_a_line_reuse) ||
+          ((state_r == ST_A_WAIT) && (read_outstanding_next == 0))) &&
+         gemv_b_cache_hit && !abort && !watchdog_expired);
+    wire gemv_b_prefetch_copy = prefetch_kick &&
+                                (prefetch_state_r == PF_IDLE) &&
+                                gemv_b_prefetch_hit && !abort &&
+                                !watchdog_expired;
     wire output_write_accepted = (line_store_eligible && line_ready &&
                                   (!fused_requant_output || fused_commit_pending_r)) ||
                                  (!line_store_eligible && scalar_output_valid &&
@@ -771,7 +809,7 @@ module ai_tensor_matrix_core #(
                 prefetch_state_r <=
                     (a_cache_prefetch_hit || gemv_a_prefetch_reuse ||
                      tile_forward_consume_active_r) ?
-                    PF_B_REQ : PF_A_REQ;
+                    (gemv_b_prefetch_hit ? PF_B_DRAIN : PF_B_REQ) : PF_A_REQ;
             end else begin
                 case (prefetch_state_r)
                     PF_A_REQ: begin
@@ -785,7 +823,8 @@ module ai_tensor_matrix_core #(
                     PF_A_DRAIN: begin
                         if (read_outstanding_next == 0) begin
                             prefetch_group_r <= 3'd0;
-                            prefetch_state_r <= PF_B_REQ;
+                            prefetch_state_r <= gemv_b_prefetch_hit ?
+                                                PF_B_DRAIN : PF_B_REQ;
                         end
                     end
                     PF_B_REQ: begin
@@ -830,6 +869,8 @@ module ai_tensor_matrix_core #(
             perf_prefetch_wait_cycles <= 32'd0;
             perf_prefetch_completed <= 32'd0;
             perf_a_tile_cache_hits <= 32'd0;
+            perf_gemv_b_cache_hits <= 32'd0;
+            perf_gemv_b_cache_reads_saved <= 32'd0;
             perf_tile_forward_hits <= 32'd0;
             perf_tile_forward_reads_saved <= 32'd0;
             compute_buffer_r <= 1'b0;
@@ -903,6 +944,7 @@ module ai_tensor_matrix_core #(
             end
             a_cache_base_r <= 32'd0;
             a_cache_valid_r <= {A_TILE_CACHE_K_WORDS{1'b0}};
+            gemv_b_cache_valid_r <= {A_TILE_CACHE_K_WORDS{1'b0}};
             for (cache_i = 0; cache_i < A_TILE_CACHE_K_WORDS; cache_i = cache_i + 1) begin
                 a_cache_group_seen_r[cache_i] <= {ARRAY_GROUPS{1'b0}};
                 for (reset_i = 0; reset_i < ARRAY_SIZE; reset_i = reset_i + 1)
@@ -940,6 +982,13 @@ module ai_tensor_matrix_core #(
                     b_tile_words_r[response_buffer][response_group*4+1] <= bank1_data;
                     b_tile_words_r[response_buffer][response_group*4+2] <= bank2_data;
                     b_tile_words_r[response_buffer][response_group*4+3] <= bank3_data;
+                    if (gemv_b_cache_allowed &&
+                        (response_k_group < A_TILE_CACHE_K_WORDS)) begin
+                        a_tile_cache_words_r[response_k_group[3:0]][response_group*4+0] <= bank0_data;
+                        a_tile_cache_words_r[response_k_group[3:0]][response_group*4+1] <= bank1_data;
+                        a_tile_cache_words_r[response_k_group[3:0]][response_group*4+2] <= bank2_data;
+                        a_tile_cache_words_r[response_k_group[3:0]][response_group*4+3] <= bank3_data;
+                    end
                 end else begin
                     a_tile_words_r[response_buffer][response_group*4+0] <= bank0_data;
                     a_tile_words_r[response_buffer][response_group*4+1] <= bank1_data;
@@ -974,6 +1023,23 @@ module ai_tensor_matrix_core #(
                 for (cache_i = 0; cache_i < ARRAY_SIZE; cache_i = cache_i + 1)
                     a_tile_words_r[prefetch_kick_buffer][cache_i] <=
                         a_tile_words_r[compute_buffer_r][cache_i];
+            end
+            if (gemv_b_initial_copy) begin
+                for (cache_i = 0; cache_i < ARRAY_SIZE; cache_i = cache_i + 1)
+                    b_tile_words_r[compute_buffer_r][cache_i] <=
+                        a_tile_cache_words_r[k_group_r[3:0]][cache_i];
+                perf_gemv_b_cache_hits <= perf_gemv_b_cache_hits + 1'b1;
+                perf_gemv_b_cache_reads_saved <=
+                    perf_gemv_b_cache_reads_saved + gemv_b_k_valid_lanes;
+            end
+            if (gemv_b_prefetch_copy) begin
+                for (cache_i = 0; cache_i < ARRAY_SIZE; cache_i = cache_i + 1)
+                    b_tile_words_r[prefetch_kick_buffer][cache_i] <=
+                        a_tile_cache_words_r[prefetch_kick_k_group[3:0]][cache_i];
+                perf_gemv_b_cache_hits <= perf_gemv_b_cache_hits + 1'b1;
+                perf_gemv_b_cache_reads_saved <=
+                    perf_gemv_b_cache_reads_saved +
+                    gemv_b_prefetch_valid_lanes;
             end
             if (prefetch_kick && (prefetch_state_r == PF_IDLE) &&
                 tile_forward_consume_active_r) begin
@@ -1031,6 +1097,8 @@ module ai_tensor_matrix_core #(
                 perf_prefetch_wait_cycles <= 32'd0;
                 perf_prefetch_completed <= 32'd0;
                 perf_a_tile_cache_hits <= 32'd0;
+                perf_gemv_b_cache_hits <= 32'd0;
+                perf_gemv_b_cache_reads_saved <= 32'd0;
                 perf_outstanding_highwater <= {READ_FIFO_COUNT_WIDTH{1'b0}};
                 perf_fifo_full_cycles <= 32'd0;
                 for (perf_i = 0; perf_i <= ST_PREFETCH_WAIT; perf_i = perf_i + 1)
@@ -1059,6 +1127,9 @@ module ai_tensor_matrix_core #(
                         perf_prefetch_wait_cycles + 1'b1;
                 if (prefetch_complete)
                     perf_prefetch_completed <= perf_prefetch_completed + 1'b1;
+                if (prefetch_complete && gemv_b_cache_allowed &&
+                    (prefetch_k_group_r < A_TILE_CACHE_K_WORDS))
+                    gemv_b_cache_valid_r[prefetch_k_group_r[3:0]] <= 1'b1;
                 if (a_cache_initial_copy || a_cache_prefetch_copy)
                     perf_a_tile_cache_hits <= perf_a_tile_cache_hits + 1'b1;
                 if (read_outstanding_next > perf_outstanding_highwater)
@@ -1137,6 +1208,7 @@ module ai_tensor_matrix_core #(
                             bias_tile_base_r <= bias_base;
                             a_cache_base_r <= src0_base;
                             a_cache_valid_r <= {A_TILE_CACHE_K_WORDS{1'b0}};
+                            gemv_b_cache_valid_r <= {A_TILE_CACHE_K_WORDS{1'b0}};
                             for (cache_i = 0; cache_i < A_TILE_CACHE_K_WORDS; cache_i = cache_i + 1)
                                 a_cache_group_seen_r[cache_i] <= {ARRAY_GROUPS{1'b0}};
                             src0_batch_stride_r <= (src0_batch_stride == 0) ?
@@ -1198,7 +1270,7 @@ module ai_tensor_matrix_core #(
                     ST_A_REQ: begin
                         if (gemv_a_line_reuse) begin
                             read_group_r <= 3'd0;
-                            state_r <= ST_B_REQ;
+                            state_r <= gemv_b_cache_hit ? ST_PREP_MAC : ST_B_REQ;
                         end else if (tile_forward_a_copy) begin
                             read_group_r <= 3'd0;
                             state_r <= ST_B_REQ;
@@ -1217,7 +1289,18 @@ module ai_tensor_matrix_core #(
                     ST_A_WAIT: begin
                         if (read_outstanding_next == 0) begin
                             read_group_r <= 3'd0;
-                            state_r <= ST_B_REQ;
+                            if (gemv_b_cache_hit) begin
+                                if (ENABLE_NEXT_K_PREFETCH &&
+                                    (({16'd0,k_group_r} + 32'd1) <
+                                     {16'd0,k_words_r})) begin
+                                    prefetch_kick <= 1'b1;
+                                    prefetch_kick_k_group <= k_group_r + 1'b1;
+                                    prefetch_kick_buffer <= ~compute_buffer_r;
+                                end
+                                state_r <= ST_PREP_MAC;
+                            end else begin
+                                state_r <= ST_B_REQ;
+                            end
                         end
                     end
 
@@ -1234,6 +1317,9 @@ module ai_tensor_matrix_core #(
                     ST_B_WAIT: begin
                         if (read_outstanding_next == 0) begin
                             read_group_r <= 3'd0;
+                            if (gemv_b_cache_allowed &&
+                                (k_group_r < A_TILE_CACHE_K_WORDS))
+                                gemv_b_cache_valid_r[k_group_r[3:0]] <= 1'b1;
                             if (bias_enable_r && !bias_loaded_r) begin
                                 bias_index_r <= {(TILE_INDEX_WIDTH+1){1'b0}};
                                 state_r <= ST_BIAS_REQ;

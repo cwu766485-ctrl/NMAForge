@@ -11,6 +11,7 @@ ARRAY_SIZES ?= 8 16
 OUTSTANDING_DEPTH ?= 4
 A_TILE_CACHE_ENABLE ?= 1
 NEXT_K_PREFETCH_ENABLE ?= 1
+GEMV_B_TILE_CACHE_ENABLE ?= 1
 PHYSICAL_ARRAY_SIZE ?= 16
 COV_METRICS := line+cond+fsm+branch
 
@@ -20,6 +21,7 @@ COV_METRICS := line+cond+fsm+branch
 	core-no-prefetch-fallback-compile core-no-prefetch-fallback-regress \
 	product-gemv-test product-gemv-regress \
 	product-gemv-prefetch-ablation \
+	product-gemv-b-cache-ablation \
 	core-tile-forward-ablation \
 	datapath-random-regress core-random-regress array-random-regress \
 	matrix-size-benchmark matrix-pipeline-benchmark matrix-config-comparison \
@@ -63,6 +65,7 @@ core-random-compile:
 		+define+MATRIX_MAX_OUTSTANDING_READS=$(OUTSTANDING_DEPTH) \
 		+define+MATRIX_A_TILE_CACHE_ENABLE=$(A_TILE_CACHE_ENABLE) \
 		+define+MATRIX_NEXT_K_PREFETCH_ENABLE=$(NEXT_K_PREFETCH_ENABLE) \
+	+define+MATRIX_GEMV_B_TILE_CACHE_ENABLE=$(GEMV_B_TILE_CACHE_ENABLE) \
 		+define+MATRIX_ARRAY_SIZE=$(PHYSICAL_ARRAY_SIZE) \
 		-cm $(COV_METRICS) -cm_hier $(CURDIR)/matrix_core.cm_hier \
 		-cm_dir $(CORE_OUT_DIR)/coverage.vdb \
@@ -131,6 +134,37 @@ product-gemv-prefetch-ablation: core-random-compile
 				-l $(CORE_OUT_DIR)/ablation_$${shape}_$$seed.log; \
 			grep -q "^MATRIX_GEMV_ABLATION_PASS shape=.* seed=$$seed$$" \
 				$(CORE_OUT_DIR)/ablation_$${shape}_$$seed.log; \
+		done; \
+	done
+
+# Compare product GEMV B-fold reuse against the same shape and responder
+# traces with the shared 1 KiB local reuse array disabled for this purpose.
+product-gemv-b-cache-ablation:
+	@set -e; for enable in 0 1; do \
+		out=$(CORE_OUT_DIR)/b_cache_$$enable; mkdir -p $$out; \
+		$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+			+define+MATRIX_MAX_OUTSTANDING_READS=$(OUTSTANDING_DEPTH) \
+			+define+MATRIX_A_TILE_CACHE_ENABLE=$(A_TILE_CACHE_ENABLE) \
+			+define+MATRIX_NEXT_K_PREFETCH_ENABLE=$(NEXT_K_PREFETCH_ENABLE) \
+			+define+MATRIX_GEMV_B_TILE_CACHE_ENABLE=$$enable \
+			+define+MATRIX_ARRAY_SIZE=$(PHYSICAL_ARRAY_SIZE) \
+			-cm $(COV_METRICS) -cm_hier $(CURDIR)/matrix_core.cm_hier \
+			-cm_dir $$out/coverage.vdb -Mdir=$$out/csrc \
+			-top tb_ai_tensor_matrix_core_random \
+			../../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v \
+			../../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv \
+			../../../../../rtl/compute/matrix/ai_tensor_matrix_core.v \
+			../tb/tb_ai_tensor_matrix_core_random.sv \
+			-o $$out/simv -l $$out/compile.log; \
+		for seed in $(SEEDS); do \
+			$$out/simv +SEED=$$seed +MATRIX_GEMV_ABLATION_M16_SHAPE \
+				-cm $(COV_METRICS) -cm_dir $$out/coverage.vdb \
+				-cm_name b_cache_$${enable}_$$seed \
+				-l $$out/m16_seed_$$seed.log; \
+			grep -q "^MATRIX_GEMV_ABLATION_PASS shape=M16x16x19 seed=$$seed$$" \
+				$$out/m16_seed_$$seed.log; \
+			grep -q "^MATRIX_GEMV_ABLATION_PASS shape=M16x16x65 seed=$$seed$$" \
+				$$out/m16_seed_$$seed.log; \
 		done; \
 	done
 
