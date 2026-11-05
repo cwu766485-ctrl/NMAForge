@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1020" height="470" viewBox="0 0 1020 470">
+<rect width="100%" height="100%" fill="white"/>
+<style>text{font-family:Arial,sans-serif;fill:#202124}.title{font-size:20px;font-weight:bold}.axis{font-size:13px}.legend{font-size:12px}</style>
+<text class="title" x="510" y="30" text-anchor="middle">Compute Cluster Serial / Parallel RTL Benchmark</text>
+<text class="axis" x="510" y="54" text-anchor="middle">Doorbell-to-completion-tail cycles, VCS RTL simulation</text>
+<line x1="100" y1="365.0" x2="960" y2="365.0" stroke="#d8dadd"/>
+<text class="axis" x="88" y="369.0" text-anchor="end">0</text>
+<line x1="100" y1="318.3" x2="960" y2="318.3" stroke="#d8dadd"/>
+<text class="axis" x="88" y="322.3" text-anchor="end">300</text>
+<line x1="100" y1="271.7" x2="960" y2="271.7" stroke="#d8dadd"/>
+<text class="axis" x="88" y="275.7" text-anchor="end">600</text>
+<line x1="100" y1="225.0" x2="960" y2="225.0" stroke="#d8dadd"/>
+<text class="axis" x="88" y="229.0" text-anchor="end">900</text>
+<line x1="100" y1="178.3" x2="960" y2="178.3" stroke="#d8dadd"/>
+<text class="axis" x="88" y="182.3" text-anchor="end">1200</text>
+<line x1="100" y1="131.7" x2="960" y2="131.7" stroke="#d8dadd"/>
+<text class="axis" x="88" y="135.7" text-anchor="end">1500</text>
+<line x1="100" y1="85.0" x2="960" y2="85.0" stroke="#d8dadd"/>
+<text class="axis" x="88" y="89.0" text-anchor="end">1800</text>
+<rect x="270.0" y="101.2" width="42" height="263.8" fill="#34495e" rx="3"/>
+<text class="axis" x="291.0" y="94.2" text-anchor="middle">1696</text>
+<rect x="328.0" y="188.1" width="42" height="176.9" fill="#159a86" rx="3"/>
+<text class="axis" x="349.0" y="181.1" text-anchor="middle">1137</text>
+<text class="axis" x="315.0" y="389" text-anchor="middle">Four tasks</text>
+<rect x="700.0" y="172.3" width="42" height="192.7" fill="#34495e" rx="3"/>
+<text class="axis" x="721.0" y="165.3" text-anchor="middle">1239</text>
+<rect x="758.0" y="198.6" width="42" height="166.4" fill="#159a86" rx="3"/>
+<text class="axis" x="779.0" y="191.6" text-anchor="middle">1070</text>
+<text class="axis" x="745.0" y="389" text-anchor="middle">Three tasks</text>
+<rect x="350" y="432" width="14" height="14" fill="#34495e"/>
+<text class="legend" x="370" y="444">Serial work</text>
+<rect x="520" y="432" width="14" height="14" fill="#159a86"/>
+<text class="legend" x="540" y="444">Concurrent execution</text>
+</svg>
