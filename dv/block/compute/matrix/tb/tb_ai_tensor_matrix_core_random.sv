@@ -839,10 +839,11 @@ module tb_ai_tensor_matrix_core_random;
       reads_saved=GEMV_B_TILE_CACHE_ENABLE ?
                   (m_rows/4-1)*(k_size-(k_size-(cache_groups*4 > k_size ?
                                                    k_size : cache_groups*4))) : 0;
-      if(gemv_mac_cycles!=(k_groups*4) ||
+      // K-fold executes one MAC cycle per K group for each four-row tile.
+      if(gemv_mac_cycles!=(k_groups*(m_rows/4)) ||
          gemv_bank_reads!=(a_line_count+b_read_count) ||
          dut.perf_prefetch_completed!=(NEXT_K_PREFETCH_ENABLE ?
-                                       ((k_groups-1)*4) : 0) ||
+                                       ((k_groups-1)*(m_rows/4)) : 0) ||
          ((NEXT_K_PREFETCH_ENABLE != 0) !=
           (dut.perf_prefetch_overlap_cycles != 0)) ||
          dut.perf_a_tile_cache_hits!=0 ||

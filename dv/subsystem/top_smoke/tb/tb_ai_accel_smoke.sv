@@ -3484,7 +3484,9 @@ module tb_ai_accel_smoke;
             // capture the consumer result into the opposite local bank.
             matrix_line_write_count = 0;
             ai_tile_forward_read_phase = 2;
-            axi_write(REG_CMDQ_TAIL, 32'd4);
+            // The queue has four entries.  After consuming indices 0 and 1,
+            // publishing indices 2 and 3 wraps the tail pointer to index 0.
+            axi_write(REG_CMDQ_TAIL, 32'd0);
             clear_done_irq();
             axi_write(REG_DOORBELL, 32'd1);
             wait_cpl_tail(32'd4, "fused tile forwarding enabled");
