@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-05. v2 feature branch HEAD: `465855acf0ba686421d61d77f36b22f1e23bd4f0` (tree `638538e65a4d5e3e214d1ae7b69a2616e8a244ba`). Product RTL candidate remains `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` (tree `dbf5060ac465ef4bb913543024182b298f675413`); `465855a` adds only a Matrix DV test and Make target. This is a short handoff for the next engineering task; it
+Updated: 2026-11-05. v2 feature branch HEAD: `59d1e5ed6570fefe957a6ed2abc10d6d18c21ed2` (tree `94f3a2748698c100a6f2087c72bd091d357747f8`). Product RTL candidate remains `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` (tree `dbf5060ac465ef4bb913543024182b298f675413`); `465855a` added only a Matrix DV test and Make target, and `59d1e5e` added its replay record. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -19,11 +19,12 @@ identities, worktree inventory, `.gitignore` audit, and post-RTL history.
 
 Phase 1 is **IN PROGRESS**. The DV report has 21 normalized `REQ-V2-*`
 rows: 12 PASS-scoped, 6 PARTIAL, and 3 NOT_RUN. At fixed test SHA
-`465855a`, a new three-seed fault campaign covers 0x52 Parity, Protection,
+`59d1e5e`, a new three-seed fault campaign covers 0x52 Parity, Protection,
 Abort with outstanding prefetch, Reset plus late unowned response, and 0x53
 Parity, output Protection, and held-write Abort; each seed checks recovery
 Golden. The same SHA passes the legacy Matrix-core 3-seed regression and Top
-Smoke. These directed points do not close the full fault/phase matrix. The current candidate
+Smoke (the compatibility replay used the identical RTL/test tree at
+`465855a`). These directed points do not close the full fault/phase matrix. The current candidate
 `ac6b83f` descriptor validator replay passes 29 legal opcode classes, 33
 invalid-rule checks, and 43/43 accepts plus 26/26 rejects; v2 mutation, merged
 URG disposition, cross-engine ownership, and full opcode SVA coverage remain
