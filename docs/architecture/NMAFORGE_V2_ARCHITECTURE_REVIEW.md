@@ -260,6 +260,10 @@ license files, `.env`, `novas.conf`/`novas.rc`, and library/database extensions.
 - The trained Digits model was rerun at this fixed source/test SHA and remains
   bit-exact with 352/360 classifications and 34,761 CMDQ cycles. This does not
   close trained CNN or Transformer model deployment.
+- Current-candidate SpyGlass lint completed with 0 errors, 465 warnings and 5
+  infos. CDC setup stalled without producing a report; bounded RDC stopped at
+  `Ar_resetcross01`. The open reset release contract and wide-mux analysis
+  limitation are detailed in the [ASIC readiness report](../verification/NMAFORGE_V2_ASIC_READINESS.md).
 
 The active branch remains a v2 architecture candidate: v1.0 Compute Cluster
 is **HOLD**, v2 feature-wide DV closure is **IN PROGRESS**, TinyNPU parity is

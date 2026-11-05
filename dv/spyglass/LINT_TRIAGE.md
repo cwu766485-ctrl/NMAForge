@@ -1,5 +1,25 @@
 # NMAForge SpyGlass lint 分类
 
+## 最新固定候选（2026-11-05，`410b81d`）
+
+- 命令：`PATH="$SPYGLASS_HOME/bin:$PATH" bash dv/spyglass/run_spyglass_a8.sh lint`
+  （仓库根目录）；SpyGlass `V-2023.12-SP1`。
+- 结果：0 errors、465 warnings、5 infos、0 waived；工具执行完成，尚未 lint sign-off。
+- Rule counts：`W415a` 160、`STARC05-2.2.3.3` 141、`W426` 56、
+  `W287b` 27、`STARC05-2.11.3.1` 22、`W528` 20、`STARC05-2.1.3.1` 11、
+  `STARC05-2.1.4.5` 11、`W240` 7、`W362` 6；
+  `STARC05-1.3.1.3`、`W216`、`W486`、`FLAT_504` 各 1。`W415a` 与
+  `InitValUsingNBA` 告警可能重叠，不表示 301 个互不相同的功能问题。
+- `FLAT_504` 在 `ai_tensor_matrix_core.v:490`：16,384-bit accumulator mux
+  超过工具 1,024-bit evaluation threshold，工具称逻辑评估为 partial。
+  这是分析精度 OPEN，不是 waiver，也不是 RTL 功能结论。
+- 风险优先项：复位/`Reset_sync04`、函数实参/比较/shift 宽度、矩阵宽 mux 和
+  `W287b` 未连接输出逐项复核；这些规则仍是 OPEN。重复赋值与 `InitValUsingNBA`
+  作为同一过程的交叠诊断复核，不按 301 个独立功能缺陷处理。当前没有任何
+  warning 通过自动 waive 或批量 RTL 改写关闭。
+- 完整 lint/CDC/RDC 结果、reset 合同审查和静态证据归档见
+  [`NMAFORGE_V2_ASIC_READINESS.md`](../../docs/verification/NMAFORGE_V2_ASIC_READINESS.md)。
+
 ## v2 候选复查（2026-11-05）
 
 - RTL/test 候选：`145363ddff5141177421ee7429fc65f78834830d`
