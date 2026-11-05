@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-05. v2 feature branch HEAD: `6b7d6462393ab25ce409c0491037ea8458055741` (report/data-only changes after the cited RTL/test candidates). This is a short handoff for the next engineering task; it
+Updated: 2026-11-05. v2 feature branch HEAD at replay: `294ffec475c6da5ef140e9e35d0d30bafc4fc93b` (report/data-only changes after the cited RTL/test candidates). This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -40,6 +40,9 @@ detached Top Smoke worktree at the same SHA passes 3/3 Seeds, including `0x52`
 M/N/K tails and the real-CMDQ `0x53` output/completion differential (16→0
 source-A bank reads). The exact commands and evidence are in the [fixed-SHA
 replay report](../../verification/V2_P2_TILE_FORWARD_MULTISEED_REPLAY_2026-11-05.md).
+The core OFF/ON target was replayed again at clean branch SHA `294ffec`; all
+six runs retained bit-exact Golden, tag-miss fallback, Abort/Reset flush, and
+completion PASS markers. The latest logs-only checksum is in that report.
 The same candidate also replays the trained 360-image Digits MLP against R250
 using the exact same model and Golden and byte-identical RTL logits: 110,155→
 34,761 doorbell-to-completion-tail cycles (−68.44%), with 352/360 correct in
@@ -48,8 +51,8 @@ both runs. See the [model benchmark](../../benchmark/NMAFORGE_V2_MODEL_BENCHMARK
 [JSON](../../../benchmark/v2_digits_model_comparison.json).
 These supersede the earlier license-blocked attempts for the tested points;
 parity/protection, held-response fault phases, cross-engine coherence, merged
-coverage disposition, paired small/thin GEMV, trained CNN/Transformer, and PPA
-remain open. The v1.0 disposition remains **HOLD**.
+coverage disposition, broader GEMV shapes/common TinyNPU memory service, trained
+CNN/Transformer, and PPA remain open. The v1.0 disposition remains **HOLD**.
 
 ## Current static-analysis and formal evidence — 2026-11-05
 
