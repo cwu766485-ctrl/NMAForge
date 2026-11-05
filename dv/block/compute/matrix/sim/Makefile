@@ -65,7 +65,7 @@ core-random-compile:
 		+define+MATRIX_MAX_OUTSTANDING_READS=$(OUTSTANDING_DEPTH) \
 		+define+MATRIX_A_TILE_CACHE_ENABLE=$(A_TILE_CACHE_ENABLE) \
 		+define+MATRIX_NEXT_K_PREFETCH_ENABLE=$(NEXT_K_PREFETCH_ENABLE) \
-	+define+MATRIX_GEMV_B_TILE_CACHE_ENABLE=$(GEMV_B_TILE_CACHE_ENABLE) \
+		+define+MATRIX_GEMV_B_TILE_CACHE_ENABLE=$(GEMV_B_TILE_CACHE_ENABLE) \
 		+define+MATRIX_ARRAY_SIZE=$(PHYSICAL_ARRAY_SIZE) \
 		-cm $(COV_METRICS) -cm_hier $(CURDIR)/matrix_core.cm_hier \
 		-cm_dir $(CORE_OUT_DIR)/coverage.vdb \
@@ -157,14 +157,18 @@ product-gemv-b-cache-ablation:
 			../tb/tb_ai_tensor_matrix_core_random.sv \
 			-o $$out/simv -l $$out/compile.log; \
 		for seed in $(SEEDS); do \
-			$$out/simv +SEED=$$seed +MATRIX_GEMV_ABLATION_M16_SHAPE \
+			$$out/simv +SEED=$$seed +MATRIX_GEMV_ABLATION_MULTIROW_SHAPES \
 				-cm $(COV_METRICS) -cm_dir $$out/coverage.vdb \
 				-cm_name b_cache_$${enable}_$$seed \
-				-l $$out/m16_seed_$$seed.log; \
+				-l $$out/multirow_seed_$$seed.log; \
+			grep -q "^MATRIX_GEMV_ABLATION_PASS shape=M8x16x19 seed=$$seed$$" \
+				$$out/multirow_seed_$$seed.log; \
+			grep -q "^MATRIX_GEMV_ABLATION_PASS shape=M8x16x65 seed=$$seed$$" \
+				$$out/multirow_seed_$$seed.log; \
 			grep -q "^MATRIX_GEMV_ABLATION_PASS shape=M16x16x19 seed=$$seed$$" \
-				$$out/m16_seed_$$seed.log; \
+				$$out/multirow_seed_$$seed.log; \
 			grep -q "^MATRIX_GEMV_ABLATION_PASS shape=M16x16x65 seed=$$seed$$" \
-				$$out/m16_seed_$$seed.log; \
+				$$out/multirow_seed_$$seed.log; \
 		done; \
 	done
 

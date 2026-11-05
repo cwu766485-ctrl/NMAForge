@@ -737,13 +737,14 @@ module tb_ai_tensor_matrix_core_random;
     end
   endtask
 
-  // Max-row tiled K-tail case complements the M=1/N-tail case above. It
-  // exercises four successive 4-row tiles and a partial final K fold.
-  task automatic prepare_dense_gemv_m16_tail_case(input integer k_size);
+  // Multi-row K-tail case complements the M=1/N-tail case above. It exercises
+  // one or more four-row tiles and a partial final K fold.
+  task automatic prepare_dense_gemv_mrows_tail_case(
+      input integer m_rows, input integer k_size);
     integer rr,cc,kk,bank,local_addr,local_index,local_word,a_stride;
     integer signed value,accum;
     begin
-      m_size=16;n_size=16;k_words=k_size;instance_count=1;
+      m_size=m_rows;n_size=16;k_words=k_size;instance_count=1;
       op_mode=8'h52;src0_base=SRC0_BASE;src1_base=SRC1_BASE;
       bias_base=BIAS_BASE;dst_base=DST_BASE;
       src0_batch_stride=0;src1_batch_stride=0;dst_batch_stride=0;
@@ -751,14 +752,14 @@ module tb_ai_tensor_matrix_core_random;
       scale_shift=0;activation=0;aux0=0;watchdog_limit=0;
 
       a_stride=((k_size+15)/16)*16;
-      for(rr=0;rr<16;rr=rr+1)
+      for(rr=0;rr<m_rows;rr=rr+1)
         for(kk=0;kk<a_stride;kk=kk+1)
           logical_a[0][rr][kk]=(kk<k_size) ? (((rr*7+kk*5+1)%23)-11) : 7;
       for(kk=0;kk<k_size;kk=kk+1)
         for(cc=0;cc<16;cc=cc+1)
           logical_b[0][kk][cc]=((kk*3-cc*2+5)%17)-8;
 
-      for(rr=0;rr<16;rr=rr+1)
+      for(rr=0;rr<m_rows;rr=rr+1)
         for(kk=0;kk<a_stride;kk=kk+16) begin
           local_addr=SRC0_BASE+rr*a_stride+kk;
           local_index=(local_addr>>4)&13'h1fff;
@@ -780,7 +781,7 @@ module tb_ai_tensor_matrix_core_random;
               logical_b[0][kk][bank*4+3]);
       end
 
-      for(rr=0;rr<16;rr=rr+1)
+      for(rr=0;rr<m_rows;rr=rr+1)
         for(cc=0;cc<16;cc=cc+1) begin
           accum=0;
           for(kk=0;kk<k_size;kk=kk+1)
@@ -798,43 +799,46 @@ module tb_ai_tensor_matrix_core_random;
     end
   endtask
 
-  task automatic check_dense_gemv_m16_tail_case(input integer k_size);
+  task automatic check_dense_gemv_mrows_tail_case(
+      input integer m_rows, input integer k_size);
     integer rr,cc,local_word,gemv_mac_cycles,gemv_bank_reads;
     integer gemv_bank_stalls,gemv_line_stalls;
     integer k_groups,a_line_count,b_read_count,cache_groups,cache_hits,reads_saved;
     begin
       launch_and_wait();
-      if(error || error_code!==0 || busy || element_count!==32'd256)
-        $fatal(1,"M16 tail GEMV completion error=%b code=%0d busy=%b elements=%0d",
+      if(error || error_code!==0 || busy || element_count!==(m_rows*16))
+        $fatal(1,"M%0d tail GEMV completion error=%b code=%0d busy=%b elements=%0d",
+               m_rows,
                error,error_code,busy,element_count);
-      if(line_write_count!==64 || scalar_write_count!==0)
-        $fatal(1,"M16 tail GEMV writes lines=%0d scalar=%0d expected=64/0",
-               line_write_count,scalar_write_count);
-      for(rr=0;rr<16;rr=rr+1)
+      if(line_write_count!==(m_rows*4) || scalar_write_count!==0)
+        $fatal(1,"M%0d tail GEMV writes lines=%0d scalar=%0d expected=%0d/0",
+               m_rows,line_write_count,scalar_write_count,m_rows*4);
+      for(rr=0;rr<m_rows;rr=rr+1)
         for(cc=0;cc<16;cc=cc+1) begin
           local_word=(DST_BASE>>2)+rr*16+cc;
           if(output_mem[local_word]!==expected_mem[local_word])
-            $fatal(1,"M16 tail GEMV row=%0d col=%0d got=%08x expected=%08x",
-                   rr,cc,output_mem[local_word],expected_mem[local_word]);
+            $fatal(1,"M%0d tail GEMV row=%0d col=%0d got=%08x expected=%08x",
+                   m_rows,rr,cc,output_mem[local_word],expected_mem[local_word]);
         end
       if(bank_read_count!=bank_response_count || pending_bank ||
          spad_read_count!=spad_response_count || pending_spad)
-        $fatal(1,"M16 tail GEMV left a request/response outstanding");
+        $fatal(1,"M%0d tail GEMV left a request/response outstanding",m_rows);
       gemv_mac_cycles=mac_cycle_count-case_mac_snapshot;
       gemv_bank_reads=bank_read_count-case_bank_snapshot;
       gemv_bank_stalls=bank_stall_count-case_bank_stall_snapshot;
       gemv_line_stalls=line_stall_count-case_line_stall_snapshot;
       k_groups=(k_size+3)/4;
-      a_line_count=16*((k_size+15)/16);
+      a_line_count=m_rows*((k_size+15)/16);
       cache_groups=(GEMV_B_TILE_CACHE_ENABLE && (k_size>64)) ?
                    16 : k_groups;
-      b_read_count=k_size+3*(GEMV_B_TILE_CACHE_ENABLE ?
+      b_read_count=k_size+(m_rows/4-1)*(GEMV_B_TILE_CACHE_ENABLE ?
                    (k_size-(cache_groups*4 > k_size ? k_size : cache_groups*4)) :
                    k_size);
-      cache_hits=GEMV_B_TILE_CACHE_ENABLE ? 3*cache_groups : 0;
+      cache_hits=GEMV_B_TILE_CACHE_ENABLE ?
+                 (m_rows/4-1)*cache_groups : 0;
       reads_saved=GEMV_B_TILE_CACHE_ENABLE ?
-                  3*(k_size-(k_size-(cache_groups*4 > k_size ?
-                                      k_size : cache_groups*4))) : 0;
+                  (m_rows/4-1)*(k_size-(k_size-(cache_groups*4 > k_size ?
+                                                   k_size : cache_groups*4))) : 0;
       if(gemv_mac_cycles!=(k_groups*4) ||
          gemv_bank_reads!=(a_line_count+b_read_count) ||
          dut.perf_prefetch_completed!=(NEXT_K_PREFETCH_ENABLE ?
@@ -846,22 +850,22 @@ module tb_ai_tensor_matrix_core_random;
              cache_hits ||
          dut.perf_gemv_b_cache_reads_saved!=
              reads_saved)
-        $fatal(1,"M16 GEMV profile k=%0d mac=%0d bank_reads=%0d expected_reads=%0d prefetch=%0d overlap=%0d a_cache_hits=%0d b_cache_hits=%0d expected_hits=%0d b_reads_saved=%0d expected_saved=%0d b_cache_enabled=%0d prefetch_enabled=%0d",
-               k_size,
+        $fatal(1,"M%0d GEMV profile k=%0d mac=%0d bank_reads=%0d expected_reads=%0d prefetch=%0d overlap=%0d a_cache_hits=%0d b_cache_hits=%0d expected_hits=%0d b_reads_saved=%0d expected_saved=%0d b_cache_enabled=%0d prefetch_enabled=%0d",
+               m_rows,k_size,
                gemv_mac_cycles,gemv_bank_reads,a_line_count+b_read_count,
                dut.perf_prefetch_completed,
                dut.perf_prefetch_overlap_cycles,dut.perf_a_tile_cache_hits,
                dut.perf_gemv_b_cache_hits,cache_hits,
                dut.perf_gemv_b_cache_reads_saved,reads_saved,
                GEMV_B_TILE_CACHE_ENABLE,NEXT_K_PREFETCH_ENABLE);
-      $display("MATRIX_CORE_GEMV_KFOLD_M16_TAIL_PASS opcode=0x52 shape=16x16x%0d cycles=%0d mac_cycles=%0d bank_reads=%0d read_bytes=%0d outputs=%0d lines=%0d prefetch_completed=%0d prefetch_overlap=%0d b_cache_hits=%0d b_reads_saved=%0d golden=bit-exact",
-               k_size,
+      $display("MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=%0dx16x%0d cycles=%0d mac_cycles=%0d bank_reads=%0d read_bytes=%0d outputs=%0d lines=%0d prefetch_completed=%0d prefetch_overlap=%0d b_cache_hits=%0d b_reads_saved=%0d golden=bit-exact",
+               m_rows,k_size,
                cycle_count,gemv_mac_cycles,gemv_bank_reads,
                gemv_bank_reads*16,element_count,line_write_count,
                dut.perf_prefetch_completed,dut.perf_prefetch_overlap_cycles,
                dut.perf_gemv_b_cache_hits,dut.perf_gemv_b_cache_reads_saved);
-      $display("MATRIX_CORE_GEMV_M16_PROFILE shape=16x16x%0d a_req=%0d a_wait=%0d b_req=%0d b_wait=%0d prep_mac=%0d mac=%0d write=%0d next=%0d prefetch_wait=%0d arbiter_stall=%0d response_wait=%0d writeback_wait=%0d bank_stalls=%0d line_stalls=%0d outstanding_highwater=%0d fifo_full=%0d",
-               k_size,dut.perf_state_cycles[1],dut.perf_state_cycles[2],
+      $display("MATRIX_CORE_GEMV_MROWS_PROFILE shape=%0dx16x%0d a_req=%0d a_wait=%0d b_req=%0d b_wait=%0d prep_mac=%0d mac=%0d write=%0d next=%0d prefetch_wait=%0d arbiter_stall=%0d response_wait=%0d writeback_wait=%0d bank_stalls=%0d line_stalls=%0d outstanding_highwater=%0d fifo_full=%0d",
+               m_rows,k_size,dut.perf_state_cycles[1],dut.perf_state_cycles[2],
                dut.perf_state_cycles[3],dut.perf_state_cycles[4],
                dut.perf_state_cycles[7],dut.perf_state_cycles[8],
                dut.perf_state_cycles[9],dut.perf_state_cycles[10],
@@ -1875,12 +1879,18 @@ module tb_ai_tensor_matrix_core_random;
       $display("MATRIX_GEMV_ABLATION_PASS shape=M1x13x17 seed=%0d",initial_seed);
       $finish;
     end
-    if($test$plusargs("MATRIX_GEMV_ABLATION_M16_SHAPE")) begin
-      prepare_dense_gemv_m16_tail_case(19);
-      check_dense_gemv_m16_tail_case(19);
+    if($test$plusargs("MATRIX_GEMV_ABLATION_MULTIROW_SHAPES")) begin
+      prepare_dense_gemv_mrows_tail_case(8,19);
+      check_dense_gemv_mrows_tail_case(8,19);
+      $display("MATRIX_GEMV_ABLATION_PASS shape=M8x16x19 seed=%0d",initial_seed);
+      prepare_dense_gemv_mrows_tail_case(8,65);
+      check_dense_gemv_mrows_tail_case(8,65);
+      $display("MATRIX_GEMV_ABLATION_PASS shape=M8x16x65 seed=%0d",initial_seed);
+      prepare_dense_gemv_mrows_tail_case(16,19);
+      check_dense_gemv_mrows_tail_case(16,19);
       $display("MATRIX_GEMV_ABLATION_PASS shape=M16x16x19 seed=%0d",initial_seed);
-      prepare_dense_gemv_m16_tail_case(65);
-      check_dense_gemv_m16_tail_case(65);
+      prepare_dense_gemv_mrows_tail_case(16,65);
+      check_dense_gemv_mrows_tail_case(16,65);
       $display("MATRIX_GEMV_ABLATION_PASS shape=M16x16x65 seed=%0d",initial_seed);
       $finish;
     end
@@ -1917,10 +1927,12 @@ module tb_ai_tensor_matrix_core_random;
       check_dense_gemv_case();
       prepare_dense_gemv_tail_case();
       check_dense_gemv_tail_case();
-      prepare_dense_gemv_m16_tail_case(19);
-      check_dense_gemv_m16_tail_case(19);
-      prepare_dense_gemv_m16_tail_case(65);
-      check_dense_gemv_m16_tail_case(65);
+      prepare_dense_gemv_mrows_tail_case(8,19);
+      check_dense_gemv_mrows_tail_case(8,19);
+      prepare_dense_gemv_mrows_tail_case(16,19);
+      check_dense_gemv_mrows_tail_case(16,19);
+      prepare_dense_gemv_mrows_tail_case(16,65);
+      check_dense_gemv_mrows_tail_case(16,65);
       $display("MATRIX_PRODUCT_GEMV_ONLY_PASS seed=%0d",initial_seed);
       $finish;
     end
