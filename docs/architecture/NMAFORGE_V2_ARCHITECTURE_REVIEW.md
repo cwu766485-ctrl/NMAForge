@@ -5,7 +5,7 @@
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
 **Current reviewed candidate:** `feature/npu-architecture-v2` `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164`
 **Candidate tree:** `dbf5060ac465ef4bb913543024182b298f675413`
-**Latest test-only candidate:** `feature/npu-architecture-v2` `0870a76b803ad01b8c23d812cfddd9cbb399f74e` (tree `bb7b6acef1e4262c7facd0b259b9f413cd559975`); this commit adds only a Top Smoke test and its PASS gate, with no RTL delta.
+**Latest test-only candidate:** `feature/npu-architecture-v2` `86e0d6cbba3187bd1deeb18f664c559b606c878d` (tree `497eaef649c3995c97cb533a9c410417d63ee0de`); this commit adds a Top Smoke functional coverage group and its gate, with no RTL delta.
 
 ## Executive disposition
 
@@ -202,3 +202,11 @@ the licensed libraries and constraints are available.
 - Fixed-SHA Top Smoke passes on seeds 20261105/06/07. The new `0x53` legal Matrix+SFU scenario sees 23 accepted SFU SPAD accesses during Matrix consume per seed; source and output-image checks are bit-exact. Logs archive SHA-256: `fb2f2d70128fc919a4d767b11c1257024760a3e9b5019a68b44286cef78662c2`.
 - Current-SHA VCS/URG DUT-only Top coverage (27 module definitions, three Seeds) is 86.75% Line, 77.62% Condition, 44.33% FSM and 84.56% Branch; Matrix core has 15/15 states and 25/55 transitions. The four existing AXI-memory testbench groups are at 0%, and no v2 feature covergroups exist. These results do not close functional coverage or FSM disposition. Coverage archive SHA-256: `691b2e6b5b896a5ec1638796939899ba751a43f1611edc6386dd550bddc052f0`.
 - Exact run IDs, commands and limits are in the [v2 DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md). This increment establishes legal unrelated-region Matrix+SFU concurrency and code-coverage evidence only; it does not establish DMA overwrite handling, full ownership crosses, v2 DV sign-off, ASIC PPA or TinyNPU superiority.
+
+## Follow-up functional coverage at `86e0d6c` — 2026-11-05
+
+- Added a VCS functional covergroup for the legal 0x53 Matrix+SFU handoff. Its sampled bins check Matrix/SFU overlap, at least one accepted SFU SPAD access while Matrix consumes, no compute-client attempt to write the tagged source, bit-exact output checks, and overlap × access cross. The Top Smoke gate fails unless this group reaches 100% for the directed scenario.
+- `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105` passes. `make ai_compute_cluster_cov AI_CLUSTER_COV_RUN=/tmp/nmaforge_v2_86e0d6c_dut_cov AI_CLUSTER_COV_SEEDS='20261105 20261106 20261107' AI_RANDOM_CASES=4` also passes all three seeds and URG merge. VCS/URG is `V-2023.12-SP1_Full64`.
+- The new group is 100% in each run and merged. The four existing AXI-memory covergroups are 0%, so overall functional-group coverage is 20%. DUT-only Line/Condition/FSM/Branch is 86.75/77.62/44.33/84.56%; Matrix core FSM is 15/15 states and 25/55 transitions. This is scoped coverage, not complete legal-v2 coverage or FSM closure.
+- Test-only commit `86e0d6cbba3187bd1deeb18f664c559b606c878d` (tree `497eaef649c3995c97cb533a9c410417d63ee0de`). No product RTL changed. Coverage archive SHA-256 `eb25d2725fa8e3252c0140d0c7254c3abfc03fd1ef44d1ecbd2283e75becd4f8`; the exact record is in the [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+- `REQ-V2-053-007` remains **PARTIAL** because DMA overwrite, additional engine pairings, held-response ownership, and fault/reset crosses are untested. The aggregate `REQ-V2-COM-004` remains **PARTIAL** because feature-wide bins and residual FSM transitions are open.
