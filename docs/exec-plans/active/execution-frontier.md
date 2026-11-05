@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-05. Latest fixed-SHA v2 mutation and opcode fault run: `99566993256778d094c068a8733c074ade2f9921` (tree `2c74d2ec73991494897fb257d863986e3300cd55`). Product RTL candidate remains `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` (tree `dbf5060ac465ef4bb913543024182b298f675413`); the latest commit changes only Matrix test stimulus and reports, not RTL. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Latest fixed-SHA v2 request/backpressure replay: `e7daa34d17d8b3c06d2aaf16c1cc66d3bf8ff50a` (tree `3807f483155df1be4271c25a165a64512a83d04e`). Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; recent commits add only verification/build/report content. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -519,3 +519,11 @@ in the owning report; run `git diff --check` before handoff.
 - Same-profile URG merge is 12 tests with all three new feature groups at 100%. Matrix selected-hierarchy code coverage is Line/Condition/FSM/Branch 93.90/90.88/92.42/96.62%. Prefetch-OFF is separately reported because its DUT compile-time structure differs. No global v2 closure is claimed.
 - Evidence archive `/tmp/nmaforge_v2_feature_coverage_380f961_evidence.tar.gz`, SHA-256 `6529ad5fdbd74f9441be0882180aecde077f6b388fed9bca4a2bccef7f0d63ad`. Exact run IDs, commands, and RTM status are in [DV Closure](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
 - Current state: v1.0 Compute Cluster **HOLD**; v2 DV **IN PROGRESS**; performance values remain tied to prior benchmark SHAs; trained CNN/Transformer **NOT_RUN**; ASIC readiness **NOT READY**. Next: close remaining descriptor alias/range, broader legal fault-phase crosses, feature SVA and system-level coverage without changing product RTL absent a demonstrated defect.
+
+## 2026-11-06 update — v2 request/backpressure checks at `e7daa34`
+
+- Testbench/build-only commit `e7daa34d17d8b3c06d2aaf16c1cc66d3bf8ff50a` (tree `3807f483155df1be4271c25a165a64512a83d04e`); product RTL is unchanged. Added deterministic 0x52 three-cycle bank request backpressure, a VALID/address stability monitor with legal Abort/error/watchdog cancellation, and a separate URG group for GEMV request stall plus 0x53 held line-write backpressure.
+- VCS `V-2023.12-SP1_Full64`, Seeds 20261111/12/13: handshake campaign, existing 18 functional + 35 fault Matrix-core regression, selected 0x52/0x53 opcode-fault campaign, and Prefetch-OFF six-shape GEMV replay all pass. The new URG handshake group is 2/2 (100%), three hits per bin; each released GEMV request completes bit-exact and drains.
+- A first checker run correctly exposed the existing legal watchdog cancellation path; the checker now permits that cancellation and the final three-seed compatibility run passes. This was a testbench checker correction, not an RTL failure.
+- Evidence archive `/tmp/nmaforge_v2_opcode_handshake_e7daa34_evidence.tar.gz`, SHA-256 `20f88eb467383ad65c1ba29d819af053cafc3326dca06f4c0f4c4816bf9e7cb8`. Exact commands and remaining scope are in the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
+- Current state remains: v1.0 Compute Cluster **HOLD**; v2 DV **IN PROGRESS**; `REQ-V2-052-007` PARTIAL pending multi-engine owner/hostile response evidence; `REQ-V2-053-004` PASS only for directed local line-ready stall. No benchmark, model, or PPA results changed. Next: broaden legal fault × phase/reset scenarios and add opcode-specific non-vacuous SVA; keep external-fabric behavior separate from repository-fabric evidence.

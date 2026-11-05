@@ -3,10 +3,10 @@
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Current reviewed code/test candidate:** `feature/npu-architecture-v2` `380f96114dba022300db09fb217264c3a606a2fd`
-**Candidate tree:** `79aaf0782aba0da18d7109b74ae2bd343a473181`
-**Published branch tip before this local coverage update:** `b86d246598d2b368a106d5da1b5b2e33d4bf9c6b` (tree `1c84f0e896394e0e4145fbe3458e1b7b2d544685`).
-**Latest verification-only test candidate:** `380f96114dba022300db09fb217264c3a606a2fd` (tree `79aaf0782aba0da18d7109b74ae2bd343a473181`); product RTL is unchanged.
+**Current reviewed code/test candidate:** `feature/npu-architecture-v2` `e7daa34d17d8b3c06d2aaf16c1cc66d3bf8ff50a`
+**Candidate tree:** `3807f483155df1be4271c25a165a64512a83d04e`
+**Published branch tip before this request-backpressure update:** `e917974c039d1f12274eae476ec9e0cbb519135f` (tree `e2a0be587bcaa53023f273a3082a70be768c20db`).
+**Latest verification-only test candidate:** `e7daa34d17d8b3c06d2aaf16c1cc66d3bf8ff50a` (tree `3807f483155df1be4271c25a165a64512a83d04e`); product RTL is unchanged.
 
 ## Executive disposition
 
@@ -24,15 +24,14 @@ performance win. Keep the overall Compute Cluster disposition at **HOLD**.
 ### Latest v2 verification-only update — 2026-11-06
 
 The current v2 product RTL was not changed. Testbench/build commit
-`380f96114dba022300db09fb217264c3a606a2fd` adds formal covergroups and gates
-for six GEMV shapes, eight selected 0x52/0x53 fault scenarios, and six Tile
-Forwarding scenarios. Prefetch ON and OFF each pass all six named GEMV shape
-Golden tests across Seeds 20261108/09/10. A same-profile URG merge of 12 tests
-reports 100% for each new group; selected Matrix hierarchy Line/Condition/FSM/
-Branch is `93.90/90.88/92.42/96.62%`. Prefetch-OFF is reported separately
-because it changes DUT condition structure. Same-tag repeated consume is
-verified to fall back to SPAD after the tag is consumed once. These are named
-testpoint results, not full v2 coverage or sign-off. Product RTL, benchmark
+`e7daa34d17d8b3c06d2aaf16c1cc66d3bf8ff50a` adds deterministic 0x52 bank-request
+backpressure and a VALID/address stability monitor. Three seeds pass the GEMV
+request hold/release and bit-exact Golden check, plus the existing 0x53 producer
+line-write stall, payload stability, and producer/consumer Golden checks. Its
+URG handshake group scores 2/2 (100%) with three hits per bin. The preceding
+`380f961` replay retains the six-shape Prefetch ON/OFF, selected opcode-fault,
+and tile-forwarding results. These are named testpoint results; full v2 coverage,
+external response ownership, and sign-off remain open. Product RTL, benchmark
 results, and prior FSM formal disposition are unchanged. Exact RTM and evidence
 archive are in the [v2 DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
