@@ -131,6 +131,15 @@ module tb_ai_tensor_matrix_core_random;
   endgroup
   v2_tile_forward_cg v2_tile_forward_cg_inst = new();
 
+  covergroup v2_opcode_handshake_cg with function sample(input integer scenario_id);
+    option.per_instance = 1;
+    cp_handshake_scenario: coverpoint scenario_id {
+      bins gemv_bank_request_backpressure = {1};
+      bins fused_line_write_backpressure = {2};
+    }
+  endgroup
+  v2_opcode_handshake_cg v2_opcode_handshake_cg_inst = new();
+
   reg [31:0] pending_bank_data [0:3];
   reg [31:0] bank_response_data_fifo [0:BANK_RESPONSE_QUEUE_DEPTH-1][0:3];
   integer bank_response_delay_fifo [0:BANK_RESPONSE_QUEUE_DEPTH-1];
@@ -142,7 +151,8 @@ module tb_ai_tensor_matrix_core_random;
   integer orphan_bank_response_count=0;
   integer bank_outstanding_highwater=0;
   integer bank_latency_idx,bank_latency_slot;
-  reg force_banked_ready=0,force_bank_response_delay=0;
+  reg force_banked_ready=0,force_bank_not_ready=0;
+  reg force_bank_response_delay=0;
   reg force_zero_bank_latency=0,force_line_stall=0;
   reg force_line_ready=0;
   integer spad_delay=0;
@@ -171,6 +181,9 @@ module tb_ai_tensor_matrix_core_random;
   reg [31:0] stalled_line_addr=0;
   reg [127:0] stalled_line_wdata=0;
   reg [15:0] stalled_line_wstrb=0;
+  reg bank_stall_pending=0;
+  reg [31:0] stalled_bank_addr=0;
+  integer bank_stall_stability_checks=0;
   reg matrix_unaligned_fallback_seen=0;
   reg matrix_line_protection_seen=0;
   integer seed=20261021,initial_seed;
@@ -255,6 +268,7 @@ module tb_ai_tensor_matrix_core_random;
   always @(posedge clk or negedge resetn) begin
     if(!resetn) begin
       rng<=rng_seed;
+      bank_stall_pending<=1'b0;
       mac_cycle_count<=0;
       banked_ready<=0;banked_rsp_valid<=0;bank_response_queue_count<=0;
       bank_response_wr_ptr<=0;bank_response_rd_ptr<=0;
@@ -286,6 +300,23 @@ module tb_ai_tensor_matrix_core_random;
           line_stall_stability_checks<=line_stall_stability_checks+1;
         end
       end
+      if(bank_stall_pending) begin
+        if(!banked_read_valid) begin
+          if(!abort && !error && !dut.watchdog_expired)
+            $fatal(1,"Matrix bank request dropped while stalled without cancel/error state=%0d addr=%08x outstanding=%0d bank_fault=%b context_fault=%b watchdog=%b",
+                   dut.state_r,stalled_bank_addr,dut.read_outstanding_count,
+                   dut.banked_response_fault,dut.banked_response_context_fault,
+                   dut.watchdog_expired);
+        end else begin
+          if(banked_addr!==stalled_bank_addr)
+            $fatal(1,"Matrix bank request address changed while stalled old=%08x new=%08x",
+                   stalled_bank_addr,banked_addr);
+          bank_stall_stability_checks<=bank_stall_stability_checks+1;
+        end
+      end
+      bank_stall_pending<=banked_read_valid && !banked_ready;
+      if(banked_read_valid && !banked_ready)
+        stalled_bank_addr<=banked_addr;
       if(line_valid) begin
         if(line_addr[3:0]!==4'b0000)
           $fatal(1,"Matrix line address is not 16-byte aligned: %08x",line_addr);
@@ -324,7 +355,8 @@ module tb_ai_tensor_matrix_core_random;
       if(dut.tile_forward_capture_last)
         tile_forward_last_seen<=1'b1;
       rng<={rng[30:0],rng[31]^rng[21]^rng[1]^rng[0]};
-      banked_ready<=force_banked_ready ? 1'b1 : (rng[0]|rng[3]);
+      banked_ready<=force_bank_not_ready ? 1'b0 :
+                     force_banked_ready ? 1'b1 : (rng[0]|rng[3]);
       spad_ready<=rng[2]|rng[5];
       line_ready<=force_line_stall ? 1'b0 :
                   force_line_ready ? 1'b1 : (rng[1]|rng[4]);
@@ -640,10 +672,9 @@ module tb_ai_tensor_matrix_core_random;
     end
   endtask
 
-  task automatic check_dense_gemv_case;
+  task automatic check_dense_gemv_result;
     integer rr,cc,local_word,gemv_mac_cycles,gemv_bank_reads;
     begin
-      launch_and_wait();
       if(error || error_code!==0 || busy || element_count!==32'd64)
         $fatal(1,"product GEMV completion error=%b code=%0d busy=%b elements=%0d",
                error,error_code,busy,element_count);
@@ -687,6 +718,13 @@ module tb_ai_tensor_matrix_core_random;
                dut.perf_prefetch_completed,dut.perf_prefetch_overlap_cycles,
                line_write_count*16);
       v2_gemv_shape_cg_inst.sample(1);
+    end
+  endtask
+
+  task automatic check_dense_gemv_case;
+    begin
+      launch_and_wait();
+      check_dense_gemv_result();
     end
   endtask
 
@@ -1147,6 +1185,7 @@ module tb_ai_tensor_matrix_core_random;
                  dut.tile_forward_valid_r,dut.tile_forward_capture_mask_r,
                  tile_forward_last_seen,tile_forward_backpressure_seen);
         v2_tile_forward_cg_inst.sample(1);
+        v2_opcode_handshake_cg_inst.sample(2);
       end else if(dut.tile_forward_valid_r) begin
         $fatal(1,"disabled tile-forward build unexpectedly retained a tile");
       end
@@ -2076,6 +2115,66 @@ module tb_ai_tensor_matrix_core_random;
     end
   endtask
 
+  task automatic run_v2_opcode_handshake_campaign;
+    integer timeout,accepted_before,stalls_before,stable_before;
+    reg [31:0] stalled_addr;
+    begin
+      // Hold the first legal GEMV operand request not-ready for three full
+      // cycles. The interface monitor checks VALID and address stability;
+      // then release it and verify completion and every output against Golden.
+      prepare_dense_gemv_case();
+      force_banked_ready=0;
+      force_bank_not_ready=1;
+      accepted_before=bank_read_count;
+      stalls_before=bank_stall_count;
+      stable_before=bank_stall_stability_checks;
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      timeout=0;
+      while(!banked_read_valid && !done && timeout<200) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(!banked_read_valid || done || banked_ready)
+        $fatal(1,"0x52 request-stall setup missed VALID&&!READY valid/ready/done=%b/%b/%b state=%0d",
+               banked_read_valid,banked_ready,done,dut.state_r);
+      stalled_addr=banked_addr;
+      repeat(3) @(negedge clk);
+      if(!banked_read_valid || banked_ready || banked_addr!==stalled_addr ||
+         bank_read_count!=accepted_before || bank_stall_count<stalls_before+3 ||
+         bank_stall_stability_checks<stable_before+2)
+        $fatal(1,"0x52 request backpressure was not held stable valid/ready=%b/%b addr=%08x expected=%08x accepts=%0d stalls=%0d stable=%0d",
+               banked_read_valid,banked_ready,banked_addr,stalled_addr,
+               bank_read_count-accepted_before,bank_stall_count-stalls_before,
+               bank_stall_stability_checks-stable_before);
+      force_bank_not_ready=0;
+      force_banked_ready=1;
+      timeout=0;
+      while(!done && timeout<200000) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(!done)
+        $fatal(1,"0x52 request backpressure recovery timed out state=%0d outstanding=%0d",
+               dut.state_r,dut.read_outstanding_count);
+      check_dense_gemv_result();
+      v2_opcode_handshake_cg_inst.sample(1);
+      force_banked_ready=0;
+      force_bank_not_ready=0;
+
+      // Existing 0x53 producer/consumer checks require a held line write,
+      // stable payload, complete capture, and bit-exact producer/consumer.
+      run_tile_forward_chain();
+      if(v2_opcode_handshake_cg_inst.get_coverage()<100.0)
+        $fatal(1,"0x52/0x53 handshake coverage incomplete: %0.2f%%",
+               v2_opcode_handshake_cg_inst.get_coverage());
+      $display("MATRIX_V2_OPCODE_HANDSHAKE_COVERAGE_PASS bins=2 coverage=%0.2f bank_stall_cycles=%0d stable_checks=%0d seed=%0d",
+               v2_opcode_handshake_cg_inst.get_coverage(),
+               bank_stall_count-stalls_before,
+               bank_stall_stability_checks-stable_before,initial_seed);
+      $display("MATRIX_V2_OPCODE_HANDSHAKE_PASS gemv_request_backpressure=3cycle fused_line_write_backpressure=held_payload recovery=bit-exact seed=%0d",
+               initial_seed);
+    end
+  endtask
+
   task automatic run_v2_opcode_fault_campaign;
     integer timeout,accepted_at_fault,orphan_before;
     begin
@@ -2321,6 +2420,11 @@ module tb_ai_tensor_matrix_core_random;
 
     if($test$plusargs("MATRIX_V2_OPCODE_FAULT_ONLY")) begin
       run_v2_opcode_fault_campaign();
+      $finish;
+    end
+
+    if($test$plusargs("MATRIX_V2_OPCODE_HANDSHAKE_ONLY")) begin
+      run_v2_opcode_handshake_campaign();
       $finish;
     end
 
