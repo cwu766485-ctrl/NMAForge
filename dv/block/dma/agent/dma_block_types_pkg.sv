@@ -11,6 +11,9 @@ package dma_block_types_pkg;
         // Subsystem tests connect the DUT to the real arbiter/scratchpad and
         // therefore disable the block-level behavioral SPAD responder.
         bit external_spad_model = 0;
+        // A dedicated acceptance test may replace the local AXI responder with
+        // the reusable protocol-vips active-slave agent.
+        bit external_axi_vip = 0;
         int unsigned ar_stall_cycles = 0;
         // Keep the first responses back until this many ARs are accepted.
         // The default deliberately fills the DMA's four tagged read slots.

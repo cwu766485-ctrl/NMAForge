@@ -10,7 +10,12 @@ class dma_block_base_test extends uvm_test;
     function void build_phase(uvm_phase phase);
         super.build_phase(phase);
         cfg = dma_block_cfg::type_id::create("cfg");
+        configure_cfg();
         uvm_config_db#(dma_block_cfg)::set(this, "env", "cfg", cfg);
         env = dma_block_env::type_id::create("env", this);
+    endfunction
+
+    // Derived tests set environment options before the environment is built.
+    virtual function void configure_cfg();
     endfunction
 endclass

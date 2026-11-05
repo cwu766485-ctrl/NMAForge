@@ -6,16 +6,35 @@ COV_DIR ?= simv_dma_uvm.vdb
 COV_ROOT ?= coverage
 SEED ?= 20260813
 CM_METRICS ?= line+cond+fsm+tgl+branch+assert
+VIP_ROOT ?= $(abspath ../../../../../vip)
+TVIP_AXI_HOME ?= $(VIP_ROOT)/vip_axi
+TUE_HOME ?= $(TVIP_AXI_HOME)/tue
+TVIP_COMMON_HOME ?= $(TVIP_AXI_HOME)/tvip-common
+VIP_SIMV ?= simv_dma_axi_vip
+VIP_COV_DIR ?= $(VIP_SIMV).vdb
+export TVIP_AXI_HOME TUE_HOME TVIP_COMMON_HOME
 TESTS := dma_load_ooo_smoke_test dma_2d_load_test dma_gather_load_test \
 	dma_store_booo_test dma_store_four_booo_test dma_2d_store_test dma_aw_stall_stability_test dma_narrow_load_test \
 	dma_4k_load_test dma_4k_edge_load_test dma_short_tail_store_test dma_abort_read_test dma_read_slverr_test dma_spad_error_drain_test dma_write_slverr_test dma_abort_write_test dma_config_error_test dma_backpressure_test dma_random_stress_test
 
-.PHONY: uvm_compile uvm_run uvm_smoke uvm_regress coverage clean
+.PHONY: uvm_compile uvm_run uvm_smoke uvm_regress uvm_vip_compile uvm_vip_run coverage clean
 
 uvm_compile:
 	$(VCS) -full64 -sverilog -ntb_opts uvm-1.2 -debug_access+all \
 		-cm $(CM_METRICS) -cm_dir $(COV_DIR) \
 		-timescale=1ns/1ps -f dma_block_uvm.f -o $(SIMV)
+
+uvm_vip_compile:
+	$(VCS) -full64 -sverilog -ntb_opts uvm-1.2 -debug_access+all \
+		-cm $(CM_METRICS) -cm_dir $(VIP_COV_DIR) \
+		-timescale=1ns/1ps -top tb_ai_axi128_dma_vip_uvm \
+		-f dma_block_vip_uvm.f -o $(VIP_SIMV)
+
+uvm_vip_run: uvm_vip_compile
+	$(abspath $(VIP_SIMV)) -cm $(CM_METRICS) -cm_dir $(VIP_COV_DIR) \
+		-cm_name dma_axi_vip_integration_test \
+		+UVM_TESTNAME=dma_axi_vip_integration_test \
+		+ntb_random_seed=$(SEED) +UVM_VERBOSITY=UVM_MEDIUM
 
 uvm_run: uvm_compile
 	./$(SIMV) -cm $(CM_METRICS) -cm_dir $(COV_DIR) -cm_name $(UVM_TEST) \

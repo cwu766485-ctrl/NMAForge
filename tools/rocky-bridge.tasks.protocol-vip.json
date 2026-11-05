@@ -1,0 +1,22 @@
+{
+  "defaultDistro": "Rocky-8.10",
+  "workingDirectory": "/mnt/e/workspace/chip/NMAForge-vip-integration",
+  "tasks": {
+    "protocol-vip-dma-static-check": {
+      "description": "Check the NMAForge DMA-to-protocol-vips filelist and Makefile expansion without invoking VCS.",
+      "executable": "bash",
+      "arguments": [
+        "-lic",
+        "set -euo pipefail; make -n -C dv/block/dma/sim uvm_vip_compile VIP_ROOT=/mnt/e/workspace/chip/vip VIP_SIMV=/tmp/protocol_vip_dma_static/simv VIP_COV_DIR=/tmp/protocol_vip_dma_static/compile.vdb VCS='vcs -licwait 1 -Mdir=/tmp/protocol_vip_dma_static/csrc'; echo PROTOCOL_VIP_DMA_STATIC_PASS"
+      ]
+    },
+    "protocol-vip-dma-vcs-regression": {
+      "description": "Compile the NMAForge DMA block against protocol-vips AXI4 active-slave agent and run load/store/readback acceptance at two fixed seeds.",
+      "executable": "bash",
+      "arguments": [
+        "-lic",
+        "./tools/run_protocol_vip_dma_regression.sh"
+      ]
+    }
+  }
+}

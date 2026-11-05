@@ -19,7 +19,8 @@ class dma_block_env extends uvm_env;
             cfg = dma_block_cfg::type_id::create("cfg");
         cmd_sqr = dma_cmd_sequencer::type_id::create("cmd_sqr", this);
         cmd_drv = dma_cmd_driver::type_id::create("cmd_drv", this);
-        axi_rsp = dma_axi_read_responder::type_id::create("axi_rsp", this);
+        if (!cfg.external_axi_vip)
+            axi_rsp = dma_axi_read_responder::type_id::create("axi_rsp", this);
         if (!cfg.external_spad_model)
             spad_model = dma_spad_model::type_id::create("spad_model", this);
         axi_mon = dma_axi_monitor::type_id::create("axi_mon", this);
