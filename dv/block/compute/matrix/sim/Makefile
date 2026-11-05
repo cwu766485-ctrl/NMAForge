@@ -5,6 +5,7 @@ OUT_DIR ?= /tmp/nmaforge_matrix_datapath_$(SEED)
 CORE_OUT_DIR ?= /tmp/nmaforge_matrix_core_$(SEED)
 NO_PREFETCH_CORE_OUT_DIR ?= /tmp/nmaforge_matrix_core_no_prefetch_$(SEED)
 TILE_FORWARD_OUT_DIR ?= /tmp/nmaforge_matrix_tile_forward_$(SEED)
+GEMV_FOUR_WAY_OUT ?= /tmp/nmaforge_matrix_gemv_four_way
 ARRAY_OUT_DIR ?= /tmp/nmaforge_matrix_array_20261025
 ARRAY_SEEDS ?= 20261025 20261026 20261027
 ARRAY_SIZES ?= 8 16
@@ -22,6 +23,7 @@ COV_METRICS := line+cond+fsm+branch
 	product-gemv-test product-gemv-regress \
 	product-gemv-prefetch-ablation \
 	product-gemv-b-cache-ablation \
+	product-gemv-four-way-ablation \
 	core-tile-forward-ablation \
 	datapath-random-regress core-random-regress array-random-regress \
 	matrix-size-benchmark matrix-pipeline-benchmark matrix-config-comparison \
@@ -87,7 +89,7 @@ core-random-run: core-random-compile
 		-l $(CORE_OUT_DIR)/product_gemv.log
 	grep -q '^MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 ' $(CORE_OUT_DIR)/product_gemv.log
 	grep -q '^MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 ' $(CORE_OUT_DIR)/product_gemv.log
-	grep -q '^MATRIX_CORE_GEMV_KFOLD_M16_TAIL_PASS opcode=0x52 shape=16x16x19 ' $(CORE_OUT_DIR)/product_gemv.log
+	grep -q '^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=16x16x19 ' $(CORE_OUT_DIR)/product_gemv.log
 
 core-random-regress: core-random-compile
 	@set -e; for seed in $(SEEDS); do \
@@ -170,6 +172,48 @@ product-gemv-b-cache-ablation:
 			grep -q "^MATRIX_GEMV_ABLATION_PASS shape=M16x16x65 seed=$$seed$$" \
 				$$out/multirow_seed_$$seed.log; \
 		done; \
+	done
+
+# Compare the four matched product-GEMV settings of B-fold reuse and Next-K
+# prefetch under one array, outstanding depth, workload, seed, and responder.
+product-gemv-four-way-ablation:
+	@set -e; for cache in 0 1; do \
+		for prefetch in 0 1; do \
+			out=$(GEMV_FOUR_WAY_OUT)/cache_$$cache/prefetch_$$prefetch; mkdir -p $$out; \
+			$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+				+define+MATRIX_MAX_OUTSTANDING_READS=$(OUTSTANDING_DEPTH) \
+				+define+MATRIX_A_TILE_CACHE_ENABLE=$(A_TILE_CACHE_ENABLE) \
+				+define+MATRIX_NEXT_K_PREFETCH_ENABLE=$$prefetch \
+				+define+MATRIX_GEMV_B_TILE_CACHE_ENABLE=$$cache \
+				+define+MATRIX_ARRAY_SIZE=$(PHYSICAL_ARRAY_SIZE) \
+				-cm $(COV_METRICS) -cm_hier $(CURDIR)/matrix_core.cm_hier \
+				-cm_dir $$out/coverage.vdb -Mdir=$$out/csrc \
+				-top tb_ai_tensor_matrix_core_random \
+				../../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v \
+				../../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv \
+				../../../../../rtl/compute/matrix/ai_tensor_matrix_core.v \
+				../tb/tb_ai_tensor_matrix_core_random.sv \
+				-o $$out/simv -l $$out/compile.log; \
+			for seed in $(SEEDS); do \
+				$$out/simv +SEED=$$seed +MATRIX_GEMV_ABLATION_MULTIROW_SHAPES \
+					-cm $(COV_METRICS) -cm_dir $$out/coverage.vdb \
+					-cm_name gemv_four_way_c$${cache}_p$${prefetch}_$$seed \
+					-l $$out/run_seed_$$seed.log; \
+				for shape in M8x16x19 M8x16x65 M16x16x19 M16x16x65; do \
+					grep -q "^MATRIX_GEMV_ABLATION_PASS shape=$$shape seed=$$seed$$" $$out/run_seed_$$seed.log; \
+				done; \
+			done; \
+		done; \
+	done; \
+	for seed in $(SEEDS); do \
+		python3 ../../../../../tools/summarize_gemv_four_way_ablation.py \
+			--seed $$seed --rtl-sha "$$(git rev-parse HEAD)" \
+			--test-sha "$$(git rev-parse HEAD)" \
+			--p0-b0 $(GEMV_FOUR_WAY_OUT)/cache_0/prefetch_0/run_seed_$$seed.log \
+			--p0-b1 $(GEMV_FOUR_WAY_OUT)/cache_1/prefetch_0/run_seed_$$seed.log \
+			--p1-b0 $(GEMV_FOUR_WAY_OUT)/cache_0/prefetch_1/run_seed_$$seed.log \
+			--p1-b1 $(GEMV_FOUR_WAY_OUT)/cache_1/prefetch_1/run_seed_$$seed.log \
+			--output $(GEMV_FOUR_WAY_OUT)/summary_seed_$$seed.csv; \
 	done
 
 # Compare the same producer/consumer chain with the optional bounded local

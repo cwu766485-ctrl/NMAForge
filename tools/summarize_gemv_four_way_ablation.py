@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 PASS_RE = re.compile(
-    r"^MATRIX_CORE_GEMV_KFOLD_M16_TAIL_PASS opcode=0x52 "
+    r"^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 "
     r"shape=16x16x(?P<k>\d+) cycles=(?P<cycles>\d+) "
     r"mac_cycles=(?P<mac_cycles>\d+) bank_reads=(?P<reads>\d+) "
     r"read_bytes=(?P<read_bytes>\d+) outputs=(?P<outputs>\d+) "
@@ -50,6 +50,21 @@ FIELDS = [
     "prefetch_overlap_cycles",
     "b_cache_fold_hits",
     "b_read_transactions_saved",
+    "a_req_cycles",
+    "a_wait_cycles",
+    "b_req_cycles",
+    "b_wait_cycles",
+    "prep_mac_cycles",
+    "write_state_cycles",
+    "next_state_cycles",
+    "prefetch_wait_state_cycles",
+    "arbiter_stall_cycles",
+    "response_wait_cycles",
+    "writeback_wait_cycles",
+    "bank_stall_cycles",
+    "line_stall_cycles",
+    "outstanding_highwater",
+    "fifo_full_cycles",
     "golden",
     "simulator",
     "memory_model",
@@ -92,6 +107,22 @@ def read_config(config: Config, seed: int, rtl_sha: str, test_sha: str) -> list[
     found_k = [int(match.group("k")) for match in matches]
     if found_k != [19, 65]:
         raise ValueError(f"{run_log}: expected K markers [19, 65], found {found_k}")
+    profiles: dict[int, dict[str, int]] = {}
+    for line in run_text.splitlines():
+        prefix = "MATRIX_CORE_GEMV_MROWS_PROFILE shape=16x16x"
+        if not line.startswith(prefix):
+            continue
+        shape, _, payload = line[len(prefix):].partition(" ")
+        values = {
+            key: int(value)
+            for key, value in re.findall(r"([a-z_]+)=([0-9]+)", payload)
+        }
+        profiles[int(shape)] = values
+    if sorted(profiles) != [19, 65]:
+        raise ValueError(
+            f"{run_log}: expected per-command profile K markers [19, 65], "
+            f"found {sorted(profiles)}"
+        )
     for k in found_k:
         if not re.search(
             rf"^MATRIX_GEMV_ABLATION_PASS shape=M16x16x{k} seed={seed}$",
@@ -120,6 +151,7 @@ def read_config(config: Config, seed: int, rtl_sha: str, test_sha: str) -> list[
             raise ValueError(f"{run_log}: inconsistent metrics for K={k}: {values}")
 
         useful_macs = 16 * 16 * k
+        profile = profiles[k]
         rows.append(
             {
                 "run_id": f"V2-GEMV-FOUR-WAY-S{seed}-K{k}-B{config.cache}-P{config.prefetch}",
@@ -147,6 +179,21 @@ def read_config(config: Config, seed: int, rtl_sha: str, test_sha: str) -> list[
                 "prefetch_overlap_cycles": str(values["prefetch_overlap"]),
                 "b_cache_fold_hits": str(values["b_cache_hits"]),
                 "b_read_transactions_saved": str(values["b_reads_saved"]),
+                "a_req_cycles": str(profile["a_req"]),
+                "a_wait_cycles": str(profile["a_wait"]),
+                "b_req_cycles": str(profile["b_req"]),
+                "b_wait_cycles": str(profile["b_wait"]),
+                "prep_mac_cycles": str(profile["prep_mac"]),
+                "write_state_cycles": str(profile["write"]),
+                "next_state_cycles": str(profile["next"]),
+                "prefetch_wait_state_cycles": str(profile["prefetch_wait"]),
+                "arbiter_stall_cycles": str(profile["arbiter_stall"]),
+                "response_wait_cycles": str(profile["response_wait"]),
+                "writeback_wait_cycles": str(profile["writeback_wait"]),
+                "bank_stall_cycles": str(profile["bank_stalls"]),
+                "line_stall_cycles": str(profile["line_stalls"]),
+                "outstanding_highwater": str(profile["outstanding_highwater"]),
+                "fifo_full_cycles": str(profile["fifo_full"]),
                 "golden": "bit-exact",
                 "simulator": "Synopsys VCS V-2023.12-SP1_Full64",
                 "memory_model": "registered four-bank behavioral SPAD; seed-controlled random ready/latency",
