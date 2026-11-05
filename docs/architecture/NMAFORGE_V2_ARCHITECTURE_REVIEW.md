@@ -256,6 +256,13 @@ license files, `.env`, `novas.conf`/`novas.rc`, and library/database extensions.
   arbitrary external SoC fabrics, opcode-specific fault/reset closure, or full
   v2 sign-off. Evidence archive SHA-256 is
   `14144bdc62932d8040a1b5be72b27f83e6f4f8e52286a8658b1570fdfe3717c5`.
+- A clean current-source Top Smoke compatibility replay at
+  `5f6e282f191b421bdbefc3d252690a9a0c93eb1c` passes three Seeds with 20
+  randomized cases each. It checks legacy `0x30` Tensor GEMM and `0x31`
+  two-head Batch GEMM Golden outputs as well as existing v2 Top cases. This
+  closes `REQ-V2-COM-002` for the tested modes/shapes only; broad legacy aux,
+  shape and fault-interaction coverage remains open. Logs archive SHA-256:
+  `a56378fc6a1364ee4fdcc8f34dcf21b47068270d473ba7b848cdaef6b2a65b3c`.
 - The four-way GEMV ablation passed 48/48 bit-exact Golden points and exact
   exclusive-state cycle partition at this candidate. Its machine records are
   [CSV](../../benchmark/v2_p2_gemv_cache_prefetch_4way_410b81d.csv),
