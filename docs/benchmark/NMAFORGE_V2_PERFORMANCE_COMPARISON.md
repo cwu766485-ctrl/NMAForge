@@ -131,6 +131,56 @@ traffic through the system SPAD Arbiter, nor does it isolate Bank-Aware Issue
 benefit or its logic/timing cost. No scheduling RTL change is justified from
 this result alone; the controlled Top contention experiment remains open.
 
+### Real Compute Cluster serial / parallel workload
+
+The production-top UVM performance sequence was replayed at fixed source/test
+SHA `17b09e068e988ca35480ffd638d865872e9ba564`, on three Seeds. The command
+was:
+
+```sh
+VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias VCS_ARCH_OVERRIDE=linux \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v2_cluster_bench_17b09e0 \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027'
+```
+
+The full Compute Cluster UVM regression and merged URG gate pass on all three
+Seeds. For the same queued four-task workload (Matrix + CNM + two SFU commands),
+serial doorbell-to-completion intervals total 1,696 cycles; one parallel
+CMDQ submission completes in 1,137 cycles, a measured ratio of
+`serial_cycles / parallel_cycles = 1.492` (32.96% fewer cycles). Read and write
+traffic remain 4,352 B and 2,688 B in both modes, with parallel completion
+order `0600,0601,0602,0603`. These are VCS cycle counts, not wall-clock or ASIC
+performance.
+
+A separate three-task staged workload (Matrix+CNM together, then SFU) takes
+1,070 cycles versus its three-command serial reference of 1,239 cycles; the
+ratio is 1.158 (13.64% fewer cycles). The staged run reports 4,032 B read,
+2,416 B written, 32 Matrix/CNM pair-contention cycles, and ordered completions
+`0700,0701,0702`. Its traffic is reported independently; the test does not emit
+a matching three-task serial byte total.
+
+The shared-Arbiter probes show 333 Matrix/CNM banked collision-observation
+cycles, including 320 admitted collisions and 320 Matrix wait cycles. All 320
+held-payload checks pass; Matrix and CNM response counts are 768 and 1,120,
+with zero owner, hold-stability, or route-mismatch errors. A separate Matrix
+line-writeback stall test observes 1,837 overlap cycles and 84 payload-stability
+checks with zero violations. These are event counters and test-window counts,
+not extra cycles to add to benchmark totals.
+
+Machine outputs: [serial/parallel CSV](../../benchmark/v2_p2_cluster_serial_parallel_17b09e0.csv),
+[contention CSV](../../benchmark/v2_p2_cluster_contention_17b09e0.csv),
+[summary JSON](../../benchmark/v2_p2_cluster_serial_parallel_17b09e0_summary.json),
+and [cycle chart](../../benchmark/v2_p2_cluster_serial_parallel_17b09e0.svg).
+Logs-only archive `/tmp/nmaforge_v2_cluster_bench_17b09e0_logs.tar.gz`,
+SHA-256 `a2c2daa85ba57c1617239498c60636763584707f43bb93c345f5e01f7c6d8fbe`.
+
+This confirms legal queued overlap and actual banked-client contention under
+the current scheduler. It does not compare an alternate Bank-Aware Issue
+policy or isolate its area/timing cost, so no scheduling RTL change is
+justified. DMA/DDR timing and a wider workload matrix remain open.
+
 ## Fused output tile forwarding
 
 At fixed candidate `33e85287fbf37187fccb76e97be6effe888670e9`, a three-Seed
