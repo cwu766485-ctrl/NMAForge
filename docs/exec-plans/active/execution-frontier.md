@@ -27,6 +27,16 @@ parity/protection, held-response fault phases, cross-engine coherence, merged
 coverage disposition, current-SHA TinyNPU rerun, trained CNN/Transformer, and
 PPA remain open. The v1.0 disposition remains **HOLD**.
 
+## Current static-analysis and formal evidence — 2026-11-05
+
+At RTL/test candidate `145363ddff5141177421ee7429fc65f78834830d`, SpyGlass
+lint completes with 0 errors but 465 warnings; structural CDC reports 0
+unsynchronized crossings and 0 convergence with two warnings. RDC timed out
+after 180 seconds at `Ar_resetcross01`. Matrix FSM VC Formal passes 5/5
+non-vacuous assertions and 2/2 covers. DC Base-vs-v2 PPA is BLOCKED_ENV by
+missing private standard-cell/SRAM views and public flow script. See the
+[ASIC readiness report](../../verification/NMAFORGE_V2_ASIC_READINESS.md).
+
 
 ## Latest Compute Cluster evidence
 

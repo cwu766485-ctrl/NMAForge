@@ -1,5 +1,19 @@
 # NMAForge SpyGlass lint 分类
 
+## v2 候选复查（2026-11-05）
+
+- RTL/test 候选：`145363ddff5141177421ee7429fc65f78834830d`
+- SpyGlass：V-2023.12-SP1；命令：`PATH=/opt/Synopsys/spyglass/V-2023.12-SP1/SPYGLASS_HOME/bin:$PATH bash ./run_spyglass_a8.sh lint`
+- 当前结果：0 errors、465 warnings、5 infos；exit 0。**尚未 warning closure。**
+- `a8_static.prj` 漏读的 Matrix array、compute SPAD mux 与 parallel dispatcher 已加入；
+  lint-only `mthresh` 改为 16385 以覆盖 16384-bit 累加器。该 project-only 参数不改变产品 RTL。
+- 结构 CDC：0 error、2 warnings、37 infos，0 unsynchronized crossings / 0 convergence。
+  `Reset_sync04` 为 SPAD mux/protection 响应状态复位重复同步；`FLAT_504` 表示
+  16384-bit Matrix 信号超过 CDC evaluator 的 1024-bit 精确评估阈值。
+- RDC 在 `/tmp/nmaforge_v2_rdc_33e8528.log` 的 180 s 有界运行中停在
+  `Ar_resetcross01`，标记 **NOT_RUN**。
+- 完整当前候选结论见 [`NMAFORGE_V2_ASIC_READINESS.md`](../../docs/verification/NMAFORGE_V2_ASIC_READINESS.md)。
+
 ## 最新运行（2026-10-20）
 
 - 环境：Rocky Linux 8.10，SpyGlass V-2023.12-SP1

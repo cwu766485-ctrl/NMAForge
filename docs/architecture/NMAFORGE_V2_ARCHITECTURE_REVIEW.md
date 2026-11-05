@@ -76,6 +76,7 @@ The inherited R250 system hierarchy and constraints are summarized in the
 | Top CMDQ `0x52` + `0x53` smoke | `33e85287fbf37187fccb76e97be6effe888670e9`, clean detached worktree | 3/3 Seeds `TEST PASS`; each checks `0x52` N/K tails and `0x53` image/completion differential. | Top behavioral SPAD; VCS `LOOP-REROLL-ENABLED` notice remains. |
 | Descriptor boundary/alias suite | `33e85287fbf37187fccb76e97be6effe888670e9` | 29 opcode legal cases; 33 invalid rules; accepted boundaries 43/43; rejected boundaries 26/26; tile-forward descriptors 3/3. | Current-SHA validator replay. |
 | Trained Digits MLP, R250 vs v2 | R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`; v2 `33e85287fbf37187fccb76e97be6effe888670e9` | Same model, seed and Golden; 352/360 correct and byte-identical RTL logits. CMDQ interval 110,155→34,761 cycles (−68.44%). | Real top RTL with testbench-preloaded behavioral SPAD; timing and byte counters are scoped in the model report. |
+| Static analysis and Matrix FSM guards | RTL/test `145363ddff5141177421ee7429fc65f78834830d` | SpyGlass lint 0 errors/465 warnings; CDC 0 unsynchronized crossings/2 warnings; targeted Matrix formal 5/5 non-vacuous assertions and 2/2 covers. RDC timed out; PPA not run. | Scope and exact commands are in the [ASIC readiness report](../verification/NMAFORGE_V2_ASIC_READINESS.md). |
 
 Exact Top/core commands and raw evidence locations are in the [multi-Seed
 replay record](../verification/V2_P2_TILE_FORWARD_MULTISEED_REPLAY_2026-11-05.md).

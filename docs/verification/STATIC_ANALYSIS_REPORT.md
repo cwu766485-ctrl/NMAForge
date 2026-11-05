@@ -1,5 +1,28 @@
 # NMAForge RTL 静态分析报告
 
+## v2 候选复查（2026-11-05）
+
+当前 v2 RTL/test 候选为 `145363ddff5141177421ee7429fc65f78834830d`，
+使用 SpyGlass V-2023.12-SP1 对公开 A8 project 复跑：
+
+| Goal | 结果 | 当前判定 |
+|---|---|---|
+| lint/lint_rtl | 0 errors、465 warnings、5 infos；exit 0 | 分析执行完成；warning closure 未完成 |
+| cdc/cdc_setup | 0 errors、1 warning、9 infos | Setup 有 warning，未 sign-off |
+| cdc/cdc_verify_struct | 0 errors、2 warnings、37 infos；unsynchronized crossings=0，convergences=0 | 结构证据；`Reset_sync04` 和 `FLAT_504` 未关闭 |
+| rdc/rdc_verify_struct | 180 s timeout，停在 `Ar_resetcross01` | **NOT_RUN**；无 RDC 结论 |
+
+这次检查发现 `ai_parallel_compute_dispatcher.v`、
+`ai_tensor_matrix_array.sv` 和 `ai_compute_spad_mux.v` 在 `a8_rtl.f` 中有列出，
+但最初未被 `a8_static.prj` 读取。修正 SpyGlass project source list，并将仅供
+分析的 `mthresh` 设为 16385 后，lint 已消除 black-box/unsynthesized 错误；
+没有修改产品 RTL 或屏蔽规则。完整工具、命令和边界见
+[`NMAFORGE_V2_ASIC_READINESS.md`](NMAFORGE_V2_ASIC_READINESS.md)。
+
+Lint/CDC 的完整 RTL view 仍是当前 project 的 256-word/bank 行为 RAM 配置，
+不是 512 KiB SRAM 宏映射、综合或物理 sign-off。SpyGlass reports 和数据库
+保留在本机忽略目录，没有提交。
+
 ## 1. 范围与结论
 
 本报告覆盖 `ai_accel_top` 的公开 SpyGlass project `dv/spyglass/a8_static.prj`，

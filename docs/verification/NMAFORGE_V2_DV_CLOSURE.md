@@ -72,6 +72,27 @@ counters are state cycles; arbitration, response, writeback, bank, and line
 stall counters are event counts that may overlap. They must not be added as
 though they partition total latency.
 
+## Additional fixed-candidate formal evidence — 2026-11-05
+
+At RTL/test SHA `145363ddff5141177421ee7429fc65f78834830d`, the existing
+Matrix FSM guard formal target passes:
+
+```sh
+make -C dv/block/compute/matrix/formal fsm-guards \
+  OUT=/tmp/nmaforge_v2_matrix_fsm_formal_33e8528
+```
+
+VC Formal V-2023.12-SP2 reports 5/5 assertions proven and non-vacuous, plus
+2/2 reachability covers (prefetch wait and error drain). The target's setup
+and proof gates pass. This is additional evidence for those named safety and
+reachability properties only; it does not close full FSM transition coverage,
+new-opcode fault proofs, RTL/gate LEC, or the v2 RTM. Log:
+`/tmp/nmaforge_v2_matrix_fsm_formal_33e8528/vc_formal.log`.
+
+Current v2 lint/CDC/RDC and PPA readiness are summarized in the
+[ASIC readiness report](NMAFORGE_V2_ASIC_READINESS.md). RDC remains NOT_RUN and
+DC Base-vs-v2 PPA remains BLOCKED_ENV.
+
 ## Open closure items
 
 1. Normalize the v2 requirement IDs and generate a signed-off execution RTM
