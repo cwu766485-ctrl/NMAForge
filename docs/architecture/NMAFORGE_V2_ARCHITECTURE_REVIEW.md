@@ -264,6 +264,12 @@ license files, `.env`, `novas.conf`/`novas.rc`, and library/database extensions.
   infos. CDC setup stalled without producing a report; bounded RDC stopped at
   `Ar_resetcross01`. The open reset release contract and wide-mux analysis
   limitation are detailed in the [ASIC readiness report](../verification/NMAFORGE_V2_ASIC_READINESS.md).
+- A current-HEAD NMAForge replay at docs-only descendant `d1867da` rechecked
+  three pinned TinyNPU GEMM vectors and the fixed `conv1x_mini` graph. All
+  NMAForge Golden checks pass; the measured/modelled GEMM ratios remain above
+  1.0 and CNN timing boundaries differ. See the machine data and limits in the
+  [performance](../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md) and
+  [model](../benchmark/NMAFORGE_V2_MODEL_BENCHMARK.md) reports.
 
 The active branch remains a v2 architecture candidate: v1.0 Compute Cluster
 is **HOLD**, v2 feature-wide DV closure is **IN PROGRESS**, TinyNPU parity is
