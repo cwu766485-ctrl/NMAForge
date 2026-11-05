@@ -5,6 +5,7 @@
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
 **Current reviewed candidate:** `feature/npu-architecture-v2` `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164`
 **Candidate tree:** `dbf5060ac465ef4bb913543024182b298f675413`
+**Latest test-only candidate:** `feature/npu-architecture-v2` `0870a76b803ad01b8c23d812cfddd9cbb399f74e` (tree `bb7b6acef1e4262c7facd0b259b9f413cd559975`); this commit adds only a Top Smoke test and its PASS gate, with no RTL delta.
 
 ## Executive disposition
 
@@ -192,3 +193,12 @@ verification increments. Preserve R250 `main` untouched. The next useful
 closure is a current-SHA v2 RTM/fault matrix and controlled Top-level
 memory-contention experiment, followed by independent DC/PPA readiness when
 the licensed libraries and constraints are available.
+
+## Follow-up exact-candidate audit and replay — 2026-11-05
+
+- The target code/test worktree started this increment at `917af306cdc30ccabd608f5a3e94023cfd0b27e7`, exactly matching `origin/feature/npu-architecture-v2`; the test-only commit is `0870a76b803ad01b8c23d812cfddd9cbb399f74e`, tree `bb7b6acef1e4262c7facd0b259b9f413cd559975`. The RTL path diff from `917af30` to `0870a76` is empty. The new source paths are `dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv` and `dv/subsystem/top_smoke/sim/Makefile`.
+- `origin/main` remains R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`; local `main` is stale at `585f3a162c6a80b822563dc30f05a54332041539` (22 local-only / 350 remote-only commits), so baseline comparisons continue to use `origin/main`. Target v2 and `origin/feat/shape-adaptive-gemv-v2` differ by 402 target-only and 2 shape-branch-only commits at this audit; no merge/cherry-pick was performed.
+- The IDE worktree `/home/ray/workspace/NMAForge` remains on `feat/shape-adaptive-gemv-v2` at `c290eba7697138a4fcf2cbbac9262264849f0aeb`, with user-owned untracked `novas.conf` and `novas.rc`; neither was touched. A fresh inventory found 204 registered worktrees: 124 present and 80 missing/prunable. Ten other present worktrees contain uncommitted user/generated files, listed in the earlier Phase 0 audit; they were left untouched.
+- Fixed-SHA Top Smoke passes on seeds 20261105/06/07. The new `0x53` legal Matrix+SFU scenario sees 23 accepted SFU SPAD accesses during Matrix consume per seed; source and output-image checks are bit-exact. Logs archive SHA-256: `fb2f2d70128fc919a4d767b11c1257024760a3e9b5019a68b44286cef78662c2`.
+- Current-SHA VCS/URG DUT-only Top coverage (27 module definitions, three Seeds) is 86.75% Line, 77.62% Condition, 44.33% FSM and 84.56% Branch; Matrix core has 15/15 states and 25/55 transitions. The four existing AXI-memory testbench groups are at 0%, and no v2 feature covergroups exist. These results do not close functional coverage or FSM disposition. Coverage archive SHA-256: `691b2e6b5b896a5ec1638796939899ba751a43f1611edc6386dd550bddc052f0`.
+- Exact run IDs, commands and limits are in the [v2 DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md). This increment establishes legal unrelated-region Matrix+SFU concurrency and code-coverage evidence only; it does not establish DMA overwrite handling, full ownership crosses, v2 DV sign-off, ASIC PPA or TinyNPU superiority.

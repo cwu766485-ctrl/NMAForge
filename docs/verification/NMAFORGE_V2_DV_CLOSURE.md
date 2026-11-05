@@ -7,6 +7,7 @@
 
 **Latest fault replay at GitHub branch HEAD:** `de705ee6317557954af9cb396cda94b01eb1c432` (tree `d948c9f72a24fd6ccdfdef9acfd5d940ceb37cfa`), including the added 0x53 Reset/Epoch scenario.
 **Latest RTL-mutation replay:** `a015de58379ca1303ebfc1c4c3899d1fd77affa2` (tree `402f5172240dfe60197bbb41937ab99814333d6a`); this adds only the mutation harness and Make target.
+**Latest scoped cross-engine replay:** `0870a76b803ad01b8c23d812cfddd9cbb399f74e` (tree `bb7b6acef1e4262c7facd0b259b9f413cd559975`); only Top Smoke testbench and its marker gate changed.
 
 **Baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Simulator:** Synopsys VCS `V-2023.12-SP1_Full64`
@@ -292,9 +293,9 @@ new opcodes.
 | REQ-V2-053-004: producer writeback backpressure cannot outrun capture or alter committed image | Fused line writer and capture handshake | Core `tile_forward_backpressure_seen`, final line and complete memory image checks | None | line stall, all 16 accepted lines, capture mask `ffff` | `V2-TILE-FORWARD-CORE-3SEED-33E8528`, 20261105/06/07, `33e85287fbf37187fccb76e97be6effe888670e9` | **PASS (directed line-ready stall)**; tile report/CSV; arbitrary held-response timing remains untested |
 | REQ-V2-053-005: Abort/reset invalidate tile tag and prevent prior-epoch reuse | Local tile validity epoch | Core abort/reset probes; 0x53 consumer reset with accepted delayed B response, injected stale post-reset response, tag/count/write checks | No epoch-specific SVA | 0x53 tag invalidation/fallback; stale response after reset; three seeds | `V2-OPCODE-FAULT-3SEED-DE705EE`, seeds 20261105/06/07, SHA `de705ee6317557954af9cb396cda94b01eb1c432`; older 0x52 late-response run `59d1e5e` | **PARTIAL**; the selected 0x53 reset interleave now passes with sentinel preservation and post-reset recovery; other legal phase crosses and external-fabric ownership remain open; log archive above |
 | REQ-V2-053-006: parity/protection/held response/Completion faults preserve 0x53 error and memory contract | Fused path fault lifecycle | `run_v2_opcode_fault_campaign`; read Parity, output-write Protection, held output-line Abort, reset-epoch stale response, sentinels and successful tile-chain recovery | No 0x53-specific SVA | Parity, Protection, held write under backpressure and Abort, selected Reset epoch; three seeds | `V2-OPCODE-FAULT-3SEED-DE705EE`, seeds 20261105/06/07, SHA `de705ee6317557954af9cb396cda94b01eb1c432` | **PARTIAL**; selected fault points pass; Completion fault injection, broader held-response/Reset crosses and URG disposition remain open; log archive above |
-| REQ-V2-053-007: software-held source immutability and cross-engine SPAD access obey the forwarding contract | Explicitly ordered local handoff, no coherence | Contract reviewed; no cross-engine checker | None | source mutation/DMA or other-engine write during handoff NOT_RUN | `NOT_RUN@f4ed9c4`, seed N/A, candidate `f4ed9c4f5b711bd6554d588477957e9bf3ce3806` | **NOT_RUN**; spec requires source immutability, but there is no coherent cache or test evidence |
+| REQ-V2-053-007: software-held source immutability and cross-engine SPAD access obey the forwarding contract | Explicitly ordered local handoff, no coherence | Top monitor watches seven compute write clients and Matrix line writes; CMDQ Matrix consumer + independent SFU output-image checker | No new SVA | Matrix 0x53 consume overlaps SFU SPAD traffic to a disjoint range; no compute client attempts a source-tile write; source image stays unchanged; SFU and Matrix output images match Golden | `V2-0X53-CROSS-ENGINE-IMMUTABLE-3SEED-0870A76`, seeds 20261105/06/07, SHA `0870a76b803ad01b8c23d812cfddd9cbb399f74e` | **PARTIAL**; legal Matrix+SFU unrelated-region concurrency passes 3/3 seeds. This does not test DMA overwrite, illegal source mutation injection, every other-engine pairing, or full response-owner/error crosses; software must keep the tagged source immutable |
 | REQ-V2-COM-003: new-feature assertions are connected and non-vacuous | Matrix FSM and top SVA | VC Formal proves existing Matrix guard set; Top SVA is AXI/quiescence scoped | Formal: 5/5 named Matrix assertions non-vacuous and 2/2 covers reached at `145363ddff5141177421ee7429fc65f78834830d`; no opcode-specific 0x52/0x53 assertion | `prefetch_wait`, `error_drain` covers; no v2 opcode transition cross | `V2-MATRIX-FSM-GUARDS-145363D`, formal run, SHA `145363ddff5141177421ee7429fc65f78834830d` | **PARTIAL**; this does not prove new opcode properties or full SVA connection coverage; `/tmp/nmaforge_v2_matrix_fsm_formal_33e8528/vc_formal.log` |
-| REQ-V2-COM-004: all legal v2 functional bins are merged and every exclusion/waiver has disposition | URG functional/code coverage | VCS URG merge for three Seeds of Matrix core+GEMV+fault suite; separate Prefetch-OFF profile | No functional covergroup or coverage assertion | Prefetch-ON code URG: 93.76/90.67/92.42/96.50% Line/Condition/FSM/Branch; FSM 15/15 states, 50/55 transitions. Prefetch-OFF profile separate; three transition pairs remain unhit and undispositioned | `V2-DUT-COVERAGE-9TEST-DE705EE`, seeds 20261105/06/07, source/test SHA `de705ee6317557954af9cb396cda94b01eb1c432`; report replay at docs-only HEAD `871b752`; archive SHA above | **PARTIAL**; code coverage merged per legal compile profile, but functional coverage groups are absent, line/condition/FSM/branch are below 100%, three FSM transitions lack formal disposition, and no exclusions/waivers are approved |
+| REQ-V2-COM-004: all legal v2 functional bins are merged and every exclusion/waiver has disposition | URG functional/code coverage | VCS URG merge for current Top Smoke DUT-only scope (27 module definitions) across three Seeds; earlier Matrix core/GEMV/fault and Prefetch-OFF runs remain separately identified | No v2 feature covergroups or v2-specific coverage assertions; existing Matrix guard formal is tracked in COM-003 | Current Top URG: 86.75/77.62/44.33/84.56% Line/Condition/FSM/Branch; Matrix FSM 15/15 states, 25/55 transitions. Existing four AXI-memory covergroups score 0%; no 0x52/0x53 feature bins. Earlier block profile covered 50/55 Matrix transitions; no missing-transition exclusion is approved | `V2-DUT-COVERAGE-TOP-3SEED-0870A76`, seeds 20261105/06/07, source/test SHA `0870a76b803ad01b8c23d812cfddd9cbb399f74e`; archive SHA below | **PARTIAL**; URG completed for this fixed Top Smoke candidate, but legal feature functional bins, exclusions/waivers, and remaining FSM transition reachability are not closed; aggregate percentages do not establish sign-off |
 | REQ-V2-COM-005: each new checker detects its assigned RTL fault through mutation | 0x52/0x53 Matrix datapath and forwarding checks | Temporary DUT mutants for output data, output address, operand response owner, WSTRB, and tile tag; each checker must emit its assigned fatal | No mutation-specific SVA | Five fault classes × three Seeds = 15/15 caught; Completion and external response-owner mutants remain open | `V2-OPCODE-MUTATION-5X3-A015DE5`, seeds 20261105/06/07, SHA `a015de58379ca1303ebfc1c4c3899d1fd77affa2` | **PARTIAL**; five selected mutants are caught, but Completion and engine-level owner mutations plus any additional new checker remain untested; external log archive above |
 
 ### Fixed run identities and reproducibility
@@ -307,9 +308,37 @@ new opcodes.
 - `V2-DUT-COVERAGE-9TEST-DE705EE`: VCS/URG `V-2023.12-SP1_Full64`; source/test files match `de705ee`, replay recorded at docs-only HEAD `871b752`; Seeds 20261105/06/07; default Prefetch-ON archive SHA-256 `f3aeb84e635112b669028bf007f89c4e87d073b7b8eb1e71792beec8ee389de4`.
 - `V2-DUT-COVERAGE-6TEST-NP-871B752`: VCS/URG `V-2023.12-SP1_Full64`; supported Prefetch-OFF profile, Seeds 20261105/06/07; archive SHA-256 `93206f0594d4fd6536d1a8ce9861d60d440c35f203be3e3c68a48e820f24d395`.
 - `V2-TOP-SMOKE-871B752`: VCS `V-2023.12-SP1_Full64`, `AI_RANDOM_CASES=4`, seed `20261105`, `TEST PASS`; archive SHA-256 `8bdbf261dfd53fd194a7282dddea32ee3cefa2ed6455b11a030e2ac69aab22c8`.
+- `V2-0X53-CROSS-ENGINE-IMMUTABLE-3SEED-0870A76`: VCS `V-2023.12-SP1_Full64`; `make ai_comp` followed by `./simv +ntb_random_seed=<seed> +AI_RANDOM_CASES=4 +AI_SEED=<seed> +ACLK_PERIOD_NS=10.0` for seeds 20261105/06/07. All three logs report full `TEST PASS`, Matrix/SFU busy overlap, 23 accepted SFU SPAD accesses while Matrix consumes the tagged tile, no compute-client source write attempt, unchanged 64-word source image, and bit-exact Matrix/SFU output images and completions. Logs-only archive `/tmp/nmaforge_v2_cross_engine_three_seed_final_0870a76_logs.tar.gz`, SHA-256 `fb2f2d70128fc919a4d767b11c1257024760a3e9b5019a68b44286cef78662c2`. Testbench checks seven compute SPAD request clients and Matrix line writes; it does not monitor DMA traffic in this scenario and adds no coverage database.
+- `V2-DUT-COVERAGE-TOP-3SEED-0870A76`: VCS/URG `V-2023.12-SP1_Full64`, exact test source SHA `0870a76b803ad01b8c23d812cfddd9cbb399f74e`; `make ai_compute_cluster_cov AI_CLUSTER_COV_RUN=/tmp/nmaforge_v2_0870a76_dut_cov AI_CLUSTER_COV_SEEDS='20261105 20261106 20261107' AI_RANDOM_CASES=4`. All 3 seeded runs emit `TEST PASS` and the cross-engine Golden marker. DUT-only Top Smoke URG reports 86.75% Line, 77.62% Condition, 44.33% FSM, 84.56% Branch; Matrix core FSM is 15/15 states and 25/55 transitions. The four existing AXI-memory testbench groups are 0%; no v2 functional covergroups were added. Evidence archive `/tmp/nmaforge_v2_0870a76_dut_cov_evidence.tar.gz`, SHA-256 `691b2e6b5b896a5ec1638796939899ba751a43f1611edc6386dd550bddc052f0`; includes VDB, URG reports, compile/run logs.
 - `V2-MATRIX-FSM-GUARDS-145363D`: VC Formal `V-2023.12-SP2`; 5/5 named Matrix FSM assertions proven/non-vacuous and 2/2 state covers reached. It is not an opcode 0x52/0x53 assertion campaign.
 
-The RTM currently has 21 requirement IDs: 12 scoped PASS, 8 PARTIAL, and 1
+Exact replay commands for the new fixed candidate (run from the repository
+root):
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+  PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+  make -C dv/subsystem/top_smoke/sim ai_comp
+
+cd dv/subsystem/top_smoke/sim
+for seed in 20261105 20261106 20261107; do
+  ./simv +ntb_random_seed=$seed +AI_RANDOM_CASES=4 +AI_SEED=$seed \
+    +ACLK_PERIOD_NS=10.0 \
+    -l /tmp/nmaforge_v2_cross_engine_${seed}_final.log \
+    > /tmp/nmaforge_v2_cross_engine_${seed}_final.console 2>&1 || exit $?
+done
+
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+  PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+  URG=/tmp/nmaforge_vcs_home_linux_alias/bin/urg \
+  make ai_compute_cluster_cov \
+    AI_CLUSTER_COV_RUN=/tmp/nmaforge_v2_0870a76_dut_cov \
+    AI_CLUSTER_COV_SEEDS='20261105 20261106 20261107' AI_RANDOM_CASES=4
+```
+
+The RTM currently has 21 requirement IDs: 12 scoped PASS, 9 PARTIAL, and 0
 NOT_RUN. No `BLOCKED_ENV` row was converted to PASS; all successful rows have
 a named, limited test scope. This remains an execution RTM, not an approval
 record. The
