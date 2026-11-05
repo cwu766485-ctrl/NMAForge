@@ -33,6 +33,7 @@ ai_smoke: ai_comp ai_run
 	grep -q '^MATRIX_PRODUCT_GEMV_TAIL_DESCRIPTOR_PASS opcode=0x52 shape=1x13x17 valid_outputs=13 line_writes=3 scalar_tail=1 golden=bit-exact$$' ai_accel_smoke.log
 	grep -q '^MATRIX_PRODUCT_GEMV_M8_KTAIL_DESCRIPTOR_PASS opcode=0x52 shape=8x16x19 outputs=128 lines=32 golden=bit-exact$$' ai_accel_smoke.log
 	grep -q '^MATRIX_FUSED_TILE_FORWARD_CMDQ_PASS opcode=0x53 shape=16x16x16 baseline_A_reads=16 forwarded_A_reads=0 producer=bit-exact consumer=bit-exact legacy_writeback=enabled$$' ai_accel_smoke.log
+	grep -q '^MATRIX_FUSED_TILE_FORWARD_CROSS_ENGINE_IMMUTABLE_PASS opcode=0x53 matrix_sfu_overlap=1 sfu_spad_accesses_during_consume=[1-9][0-9]* source_unchanged=1 sfu_output=bit-exact golden=bit-exact$$' ai_accel_smoke.log
 
 # Integrated compute DUT-only code-coverage capture. The cm_hier scope selects
 # ai_accel_compute_cluster and the command processor's tile-pipeline instance;

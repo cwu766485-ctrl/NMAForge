@@ -211,6 +211,12 @@ module tb_ai_accel_smoke;
     integer ai_tile_forward_enabled_a_reads = 0;
     integer ai_tile_forward_read_phase = 0;
     reg ai_tile_forward_read_monitor = 1'b0;
+    reg ai_tile_forward_cross_engine_monitor = 1'b0;
+    reg ai_tile_forward_cross_engine_overlap_seen = 1'b0;
+    reg ai_tile_forward_source_write_seen = 1'b0;
+    reg ai_tile_forward_sfu_destination_write_seen = 1'b0;
+    integer ai_tile_forward_sfu_spad_accesses_during_consume = 0;
+    integer ai_tile_forward_engine_scan;
     integer cp_fetch_done_count;
     reg parallel_engine_overlap_seen = 1'b0;
     reg parallel_same_engine_overlap_violation = 1'b0;
@@ -296,6 +302,47 @@ module tb_ai_accel_smoke;
             if (dut.matrix_line_valid && dut.arb_core_line_ready)
                 ai_tinynpu_cnn_line_write_lines =
                     ai_tinynpu_cnn_line_write_lines + 1;
+        end
+    end
+
+    // The 0x53 forwarding tag is a software-ordered, non-coherent handoff.
+    // During a legal Matrix+SFU parallel queue, watch every compute write
+    // client for an attempted write into the producer tile and confirm that
+    // SFU traffic targets a distinct SPAD range while Matrix consumes it.
+    always @(posedge aclk) begin
+        if (aresetn && ai_tile_forward_cross_engine_monitor) begin
+            if (dut.matrix_busy && dut.sfu_busy)
+                ai_tile_forward_cross_engine_overlap_seen <= 1'b1;
+            if (dut.matrix_busy &&
+                dut.compute_cluster_u.tensor_matrix_u.tile_forward_consume_active_r &&
+                dut.compute_engine_req_valid[4] &&
+                dut.compute_engine_ready[4])
+                ai_tile_forward_sfu_spad_accesses_during_consume <=
+                    ai_tile_forward_sfu_spad_accesses_during_consume + 1;
+            if (dut.matrix_line_valid && dut.matrix_line_write &&
+                (dut.matrix_line_addr >= 32'h0000_b000) &&
+                (dut.matrix_line_addr < 32'h0000_b100))
+                ai_tile_forward_source_write_seen <= 1'b1;
+            for (ai_tile_forward_engine_scan = 0;
+                 ai_tile_forward_engine_scan < 7;
+                 ai_tile_forward_engine_scan =
+                     ai_tile_forward_engine_scan + 1) begin
+                if (dut.compute_engine_req_valid[ai_tile_forward_engine_scan] &&
+                    dut.compute_engine_req_write[ai_tile_forward_engine_scan] &&
+                    (dut.compute_engine_req_addr[
+                        ai_tile_forward_engine_scan*32 +: 32] >= 32'h0000_b000) &&
+                    (dut.compute_engine_req_addr[
+                        ai_tile_forward_engine_scan*32 +: 32] < 32'h0000_b100))
+                    ai_tile_forward_source_write_seen <= 1'b1;
+                if (dut.compute_engine_req_valid[ai_tile_forward_engine_scan] &&
+                    dut.compute_engine_ready[ai_tile_forward_engine_scan] &&
+                    dut.compute_engine_req_write[ai_tile_forward_engine_scan] &&
+                    (dut.compute_engine_req_addr[
+                        ai_tile_forward_engine_scan*32 +: 32] >= 32'h0000_d400) &&
+                    (dut.compute_engine_req_addr[
+                        ai_tile_forward_engine_scan*32 +: 32] < 32'h0000_d800))
+                    ai_tile_forward_sfu_destination_write_seen <= 1'b1;
+            end
         end
     end
 
@@ -3387,6 +3434,8 @@ module tb_ai_accel_smoke;
             integer init_word_f;
             integer output_word_f;
             integer errors_before_f;
+            integer cross_engine_word_f;
+            integer overlap_poll_f;
 
             errors_before_f = errors;
             ai_tile_forward_baseline_a_reads = 0;
@@ -3520,6 +3569,133 @@ module tb_ai_accel_smoke;
             $display("MATRIX_FUSED_TILE_FORWARD_CMDQ_PASS opcode=0x53 shape=16x16x16 baseline_A_reads=%0d forwarded_A_reads=%0d producer=bit-exact consumer=bit-exact legacy_writeback=enabled",
                      ai_tile_forward_baseline_a_reads,
                      ai_tile_forward_enabled_a_reads);
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+
+            // A legal cross-engine handoff: a parallel SFU command reads and
+            // writes unrelated SPAD ranges while the 0x53 consumer reads the
+            // still-immutable tagged tile. The v2 spec does not promise
+            // coherence if another engine overwrites b000.
+            for (init_word_f = 0; init_word_f < 256;
+                 init_word_f = init_word_f + 1) begin
+                axi_write(SPAD_BASE + 32'h0000_a000 + (init_word_f * 4),
+                          32'h0101_0101);
+                axi_write(SPAD_BASE + 32'h0000_a800 + (init_word_f * 4),
+                          32'h0101_0101);
+            end
+            for (output_word_f = 0; output_word_f < 64;
+                 output_word_f = output_word_f + 1) begin
+                axi_write(SPAD_BASE + 32'h0000_b400 + (output_word_f * 4),
+                          32'hdead_5340);
+            end
+            for (cross_engine_word_f = 0; cross_engine_word_f < 256;
+                 cross_engine_word_f = cross_engine_word_f + 1) begin
+                axi_write(SPAD_BASE + 32'h0000_d000 + (cross_engine_word_f * 4),
+                          32'd0);
+                axi_write(SPAD_BASE + 32'h0000_d400 + (cross_engine_word_f * 4),
+                          32'hdead_d400);
+            end
+
+            write_spad_desc_v3(32'h9000, OP_TENSOR_GEMM_FUSED, 16'h0534,
+                               32'h0000_a000, 32'h0000_a800, 32'd0,
+                               32'h0000_b000, 16'd16, 16'd16, 16'd4,
+                               8'd0, 32'h0000_0020, 5'd0, 2'd0,
+                               32'd0, 32'd0, 32'd0, 16'd0, 16'd0,
+                               16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + 32'h903c, 32'd7);
+            axi_write(REG_CMDQ_BASE_LO, 32'h9000);
+            axi_write(REG_CMDQ_SIZE, 32'd4);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd1);
+            axi_write(REG_CPLQ_BASE_LO, 32'h9200);
+            axi_write(REG_CPLQ_SIZE, 32'd8);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+            axi_write(REG_DOORBELL, 32'd1);
+            wait_cpl_tail(32'd1, "immutable tile producer completion");
+            if (!dut.compute_cluster_u.tensor_matrix_u.tile_forward_valid_r ||
+                (dut.compute_cluster_u.tensor_matrix_u.tile_forward_tag_base_r !=
+                 32'h0000_b000)) begin
+                $display("%0t ERROR: immutable tile producer did not publish b000 tag",
+                         $time);
+                errors = errors + 1;
+            end
+            expect_completion(32'h9200, 16'h0534, 4'h1, 4'd0,
+                              32'd16, 32'd256,
+                              "immutable tile producer completion record");
+
+            write_spad_desc_v3(32'h9040, OP_TENSOR_GEMM_FUSED, 16'h0535,
+                               32'h0000_b000, 32'h0000_a800, 32'd0,
+                               32'h0000_b400, 16'd16, 16'd16, 16'd4,
+                               8'd0, 32'h0000_0040, 5'd0, 2'd0,
+                               32'd0, 32'd0, 32'd0, 16'd0, 16'd0,
+                               16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + 32'h907c, 32'd7);
+            write_spad_desc_v3(32'h9080, OP_GELU_Q8_8, 16'h0536,
+                               32'h0000_d000, 32'd0, 32'd0,
+                               32'h0000_d400, 16'd0, 16'd0, 16'd256,
+                               8'd0, 32'd1, 5'd0, 2'd0,
+                               32'd0, 32'd0, 32'd0, 16'd1, 16'd1,
+                               16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + 32'h90bc, 32'd7);
+            axi_write(REG_CMDQ_HEAD, 32'd1);
+            axi_write(REG_CPLQ_TAIL, 32'd1);
+            axi_write(REG_CMDQ_TAIL, 32'd3);
+            ai_tile_forward_cross_engine_overlap_seen = 1'b0;
+            ai_tile_forward_source_write_seen = 1'b0;
+            ai_tile_forward_sfu_destination_write_seen = 1'b0;
+            ai_tile_forward_sfu_spad_accesses_during_consume = 0;
+            ai_tile_forward_cross_engine_monitor = 1'b1;
+            clear_done_irq();
+            axi_write(REG_DOORBELL, 32'd1);
+            overlap_poll_f = 0;
+            while (!dut.compute_cluster_u.tensor_matrix_u.tile_forward_consume_active_r &&
+                   overlap_poll_f < 2000) begin
+                @(posedge aclk);
+                overlap_poll_f = overlap_poll_f + 1;
+            end
+            if (!dut.compute_cluster_u.tensor_matrix_u.tile_forward_consume_active_r) begin
+                $display("%0t ERROR: immutable tile consumer did not enter forwarding state",
+                         $time);
+                errors = errors + 1;
+            end
+            wait_cpl_tail(32'd3, "immutable tile consumer and SFU completions");
+            ai_tile_forward_cross_engine_monitor = 1'b0;
+            if (!ai_tile_forward_cross_engine_overlap_seen ||
+                !ai_tile_forward_sfu_destination_write_seen ||
+                ai_tile_forward_source_write_seen ||
+                (ai_tile_forward_sfu_spad_accesses_during_consume == 0)) begin
+                $display("%0t ERROR: immutable tile cross-engine overlap failed busy=%b sfu_write=%b source_write=%b sfu_accesses_during_consume=%0d",
+                         $time, ai_tile_forward_cross_engine_overlap_seen,
+                         ai_tile_forward_sfu_destination_write_seen,
+                         ai_tile_forward_source_write_seen,
+                         ai_tile_forward_sfu_spad_accesses_during_consume);
+                errors = errors + 1;
+            end
+            for (output_word_f = 0; output_word_f < 64;
+                 output_word_f = output_word_f + 1) begin
+                expect_read(SPAD_BASE + 32'h0000_b000 + (output_word_f * 4),
+                            32'h1010_1010, "immutable tagged source unchanged");
+                expect_read(SPAD_BASE + 32'h0000_b400 + (output_word_f * 4),
+                            32'h7f7f_7f7f, "immutable tile consumer output");
+            end
+            for (cross_engine_word_f = 0; cross_engine_word_f < 256;
+                 cross_engine_word_f = cross_engine_word_f + 1)
+                expect_read(SPAD_BASE + 32'h0000_d400 + (cross_engine_word_f * 4),
+                            32'd0, "concurrent SFU Golden output");
+            expect_completion(32'h9210, 16'h0535, 4'h1, 4'd0,
+                              32'd127, 32'd256,
+                              "immutable tile consumer completion record");
+            expect_completion(32'h9220, 16'h0536, 4'h1, 4'd0,
+                              32'd0, 32'd256,
+                              "parallel SFU completion record");
+            if (errors != errors_before_f) begin
+                $fatal(1, "immutable tile/Matrix-SFU interleave had %0d errors",
+                       errors - errors_before_f);
+            end
+            $display("MATRIX_FUSED_TILE_FORWARD_CROSS_ENGINE_IMMUTABLE_PASS opcode=0x53 matrix_sfu_overlap=1 sfu_spad_accesses_during_consume=%0d source_unchanged=1 sfu_output=bit-exact golden=bit-exact",
+                     ai_tile_forward_sfu_spad_accesses_during_consume);
             axi_write(REG_CMDQ_SIZE, 32'd0);
             axi_write(REG_CPLQ_SIZE, 32'd0);
             clear_done_irq();
