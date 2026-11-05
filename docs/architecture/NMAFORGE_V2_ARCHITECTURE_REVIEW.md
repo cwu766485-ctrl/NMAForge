@@ -29,9 +29,10 @@ precondition deterministic across seeds while retaining randomized bank Ready
 and the original high-water checker. At this test SHA, Prefetch-ON core/GEMV/
 fault plus Prefetch-OFF runs pass across Seeds 20261108/09/10; five opcode
 mutation classes are caught in all three seeds. Merged Matrix core URG is
-Line/Condition/FSM/Branch `94.34/90.74/93.94/96.62%`, with 15/15 states and
-51/55 transitions. Four transitions remain unhit, so this is added evidence,
-not coverage closure or sign-off. Exact RTM rows and logs are in the
+Line/Condition/FSM/Branch `95.21/90.74/95.45/97.10%`, with 15/15 states and
+52/55 transitions. The three raw unhit transitions have current-SHA,
+non-vacuous formal guard proofs; opcode-specific formal properties and other
+coverage bins remain open. This is added evidence, not v2 sign-off. Exact RTM rows and logs are in the
 [v2 DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
 ## Baseline and source audit
