@@ -373,3 +373,49 @@ superseded after license restoration: the descriptor validator passed 33
 invalid-rule checks, 43/43 accepted boundaries, 26/26 rejected boundaries, and
 3/3 tile-forward descriptor cases; Top Smoke passed at the tested tree. See the
 [replay evidence](../verification/V2_LICENSE_RESTORED_REPLAY_2026-11-05.md).
+
+## Current-candidate product GEMV and recovery replay — 2026-11-05
+
+The current branch candidate `307eac8b1f148a0727833d35642a2d942ca15932`
+passed the combined Matrix-core random/fault and product GEMV regression with
+VCS `V-2023.12-SP1_Full64`. The test uses the registered behavioral four-bank
+SPAD responder; the different seeds select different Ready/latency traces.
+Each seed passed 18 core cases and 35 fault checks, including Abort/Reset,
+outstanding-read parity, prefetch parity/Abort/watchdog/reset, and request
+handoff. The line contract passed full WSTRB, alignment, stalled-payload
+stability, unaligned scalar fallback, and protection-error checks. Partial
+zero-WSTRB remains explicitly unsupported by the tested interface.
+
+| Shape | Cycles, Seeds 20261105 / 20261106 / 20261107 | Operand reads | Golden |
+|---|---:|---:|---|
+| M4/N16/K32 | 202 / 211 / 201 | 40 / 640 B | 64 outputs, bit-exact |
+| M1/N13/K17 | 70 / 66 / 75 | 19 / 304 B | 13 outputs, bit-exact |
+| M8/N16/K19 | 157 / 148 / 154 | 35 / 560 B | 128 outputs, bit-exact |
+| M16/N16/K19 | 262 / 264 / 264 | 51 / 816 B | 256 outputs, bit-exact |
+| M16/N16/K65 | 635 / 629 / 635 | 148 / 2,368 B | 256 outputs, bit-exact |
+
+The per-seed cycle variation comes from randomized SPAD response timing; the
+read counts and Golden results are stable. These are Matrix-core controller
+cycles with a behavioral memory model, not chip-level latency, ASIC timing,
+TinyNPU-normalized performance, or PPA evidence.
+
+Run ID: `V2-PRODUCT-GEMV-CORE-RANDOM-S3-307EAC8`.
+
+Exact command:
+
+```sh
+env VCS_ARCH_OVERRIDE=linux \
+  VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+  PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+  make -C dv/block/compute/matrix/sim core-random-regress \
+  SEEDS='20261105 20261106 20261107' \
+  CORE_OUT_DIR=/tmp/nmaforge_v2_core_random_307eac8
+```
+
+PASS markers and compile/runtime logs are archived outside Git at
+`/tmp/nmaforge_v2_gemv_random_replay_307eac8_logs.tar.gz` (SHA-256
+`4fd0ba313b484a2da588562ff62411b2951ca089bb703a74e49fed7f2bc506c1`). This
+replay strengthens named GEMV and Matrix-core recovery evidence; it does not
+close the broader v2 fault × phase matrix, coverage disposition, or v1.0
+Compute Cluster sign-off (`HOLD`).
