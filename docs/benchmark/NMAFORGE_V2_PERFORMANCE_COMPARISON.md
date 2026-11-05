@@ -2,7 +2,7 @@
 
 **As of:** 2026-11-05  
 **Product baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
-**Current v2 candidate:** `33e85287fbf37187fccb76e97be6effe888670e9`
+**Latest replay source SHA:** `c3a59f08d8c07a8da973010d0f23d5d6d7eed61b`
 
 ## Comparison boundary
 
@@ -89,13 +89,39 @@ and [raw CSV](../../benchmark/v2_p2_tile_forward_3seed.csv).
 ## TinyNPU comparison status
 
 TinyNPU reference remains pinned at
-`8216c22b762011aa20c05fc2768423fd12dda59d`. The current-SHA paired replay is
-**BLOCKED_ENV** because Verilator is not installed. Earlier GEMM/CNN data uses
-different source identities and memory/timing endpoints, so it is historical
-context and not a v2 performance result. No win/loss claim is made here.
-The benchmark ratio convention remains
+`8216c22b762011aa20c05fc2768423fd12dda59d`. Current replay
+`TINY-COMPARE-V2C3A59-S20261029` ran on NMAForge source SHA
+`c3a59f08d8c07a8da973010d0f23d5d6d7eed61b`, VCS
+`V-2023.12-SP1_Full64`, Verilator `5.052` revision
+`ea338be98e1e838d3518809ce8899f85a009963c`, Python `3.12.13`, NumPy `2.4.6`,
+and ONNX `1.17.0`. Three paired GEMM cases pass independent INT32 Golden on
+both designs. NMAForge used 172/263/1,391 cycles with a measured behavioral
+SPAD controller; TinyNPU direct array used 52/100/790 cycles. The explicitly
+serialized common-memory estimate for TinyNPU is 151/231/1,305 cycles. The
+ratio is NMAForge measured RTL cycles divided by TinyNPU normalized modeled
+cycles: **1.1391 / 1.1385 / 1.0659**. Values above 1 mean NMAForge took more
+cycles under this mixed measured/modeled endpoint; this is not a silicon or
+uniform-memory winner claim. TinyNPU has no scratchpad port in the tested
+wrapper, so its memory portion remains modeled.
+
+The same pinned `conv1x_mini.onnx` graph passes on both sides with the same
+model and input hashes. NMAForge checked every intermediate tensor and all
+four outputs; its measured windows are 1,985 compute cycles plus 1,080 host
+layout cycles. TinyNPU graph execution is 4,781 cycles through its graph
+dispatcher and testbench DMA/SRAM shim. The different execution/memory
+boundaries preclude a CNN speedup ratio. TinyNPU's reference engine regression
+passes 6/6, and the NMAForge matrix-size sweep passes 15/15 points for five
+workloads across 4×4/8×8/16×16 physical-array configurations at this seed.
+
+The exact replay command, per-run artifacts, model hashes, and raw-log archive
+checksum are in the [current replay record](NMAFORGE_V2_TINYNPU_REPLAY_2026-11-05.md).
+Machine-readable data is in [`gemm_results.csv`](../../benchmark/tinynpu/gemm_results.csv),
+[`cnn_results.csv`](../../benchmark/tinynpu/cnn_results.csv), and the two
+summary JSON files. The benchmark ratio convention remains
 `NMAForge cycles / TinyNPU normalized cycles`; values above 1 mean NMAForge
-used more cycles under the stated normalization.
+used more cycles under the stated normalization. Prior BLOCKED_ENV entries
+are superseded for these tested GEMM/CNN points only; the full TinyNPU/model
+benchmark task is not closed.
 
 ## Trained Digits model result
 
@@ -121,6 +147,6 @@ and [JSON](../../benchmark/v2_digits_model_comparison.json).
 The controlled NMAForge RTL results support the existing B-fold Cache and
 bounded tile forwarding for their measured workloads. Prefetch is beneficial
 for some points and neutral or slightly negative for others. Low utilization
-on small shapes and the absence of a fair common-memory TinyNPU run are still
-unresolved product questions. No bank-aware scheduler RTL, second MAC array,
-or PPA claim is introduced by this report.
+on small shapes and TinyNPU's missing RTL memory adapter remain open. No
+bank-aware scheduler RTL, second MAC array, or PPA claim is introduced by this
+report.

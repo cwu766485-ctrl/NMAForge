@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600" viewBox="0 0 1000 600">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<style>text{font-family:Arial,sans-serif;fill:#17212b}.muted{fill:#52606d}.axis{stroke:#83919c;stroke-width:1}.grid{stroke:#dce2e7;stroke-width:1}</style>
+<text x="68" y="46" font-size="27" font-weight="700">Matched INT8 GEMM cycle evidence</text>
+<text x="68" y="75" font-size="15" class="muted">NMAForge behavioral-SPAD RTL; TinyNPU direct array RTL; TinyNPU memory endpoint is a serialized model</text>
+<line x1="100" y1="445.0" x2="930" y2="445.0" class="grid"/>
+<text x="88" y="449.0" text-anchor="end" font-size="13" class="muted">0</text>
+<line x1="100" y1="335.0" x2="930" y2="335.0" class="grid"/>
+<text x="88" y="339.0" text-anchor="end" font-size="13" class="muted">500</text>
+<line x1="100" y1="225.0" x2="930" y2="225.0" class="grid"/>
+<text x="88" y="229.0" text-anchor="end" font-size="13" class="muted">1000</text>
+<line x1="100" y1="115.0" x2="930" y2="115.0" class="grid"/>
+<text x="88" y="119.0" text-anchor="end" font-size="13" class="muted">1500</text>
+<line x1="100" y1="115" x2="100" y2="445" class="axis"/>
+<text x="23" y="290" transform="rotate(-90 23 290)" font-size="14" class="muted">Cycles</text>
+<rect x="180" y="407.2" width="42" height="37.8" fill="#168f83"/>
+<text x="201" y="400.2" text-anchor="middle" font-size="12">172</text>
+<rect x="234" y="433.6" width="42" height="11.4" fill="#d89421"/>
+<text x="255" y="426.6" text-anchor="middle" font-size="12">52</text>
+<rect x="288" y="411.8" width="42" height="33.2" fill="#bb5a36"/>
+<text x="309" y="404.8" text-anchor="middle" font-size="12">151</text>
+<text x="261" y="472" text-anchor="middle" font-size="15" font-weight="700">16 × 16 × 16</text>
+<text x="261" y="493" text-anchor="middle" font-size="13" class="muted">normalized ratio 1.1391</text>
+<rect x="412" y="387.1" width="42" height="57.9" fill="#168f83"/>
+<text x="433" y="380.1" text-anchor="middle" font-size="12">263</text>
+<rect x="466" y="423.0" width="42" height="22.0" fill="#d89421"/>
+<text x="487" y="416.0" text-anchor="middle" font-size="12">100</text>
+<rect x="520" y="394.2" width="42" height="50.8" fill="#bb5a36"/>
+<text x="541" y="387.2" text-anchor="middle" font-size="12">231</text>
+<text x="493" y="472" text-anchor="middle" font-size="15" font-weight="700">16 × 16 × 32</text>
+<text x="493" y="493" text-anchor="middle" font-size="13" class="muted">normalized ratio 1.1385</text>
+<rect x="644" y="139.0" width="42" height="306.0" fill="#168f83"/>
+<text x="665" y="132.0" text-anchor="middle" font-size="12">1391</text>
+<rect x="698" y="271.2" width="42" height="173.8" fill="#d89421"/>
+<text x="719" y="264.2" text-anchor="middle" font-size="12">790</text>
+<rect x="752" y="157.9" width="42" height="287.1" fill="#bb5a36"/>
+<text x="773" y="150.9" text-anchor="middle" font-size="12">1305</text>
+<text x="725" y="472" text-anchor="middle" font-size="15" font-weight="700">32 × 32 × 64</text>
+<text x="725" y="493" text-anchor="middle" font-size="13" class="muted">normalized ratio 1.0659</text>
+<rect x="140" y="507" width="16" height="16" fill="#168f83"/>
+<text x="164" y="520" font-size="14">NMAForge measured</text>
+<rect x="400" y="507" width="16" height="16" fill="#d89421"/>
+<text x="424" y="520" font-size="14">TinyNPU array RTL</text>
+<rect x="660" y="507" width="16" height="16" fill="#bb5a36"/>
+<text x="684" y="520" font-size="14">TinyNPU memory model</text>
+<text x="68" y="566" font-size="13" class="muted">Ratio = NMAForge measured cycles / TinyNPU modeled common-memory cycles; &gt;1 means NMAForge used more cycles.</text>
+</svg>

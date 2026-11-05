@@ -3,6 +3,7 @@
 **Status date:** 2026-11-05  
 **R250 baseline:** `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **v2 RTL/test candidate:** `33e85287fbf37187fccb76e97be6effe888670e9`  
+**Latest paired benchmark source SHA:** `c3a59f08d8c07a8da973010d0f23d5d6d7eed61b`
 **TinyNPU reference:** `8216c22b762011aa20c05fc2768423fd12dda59d`
 
 ## Trained Digits MLP: matched RTL replay
@@ -69,25 +70,29 @@ run did not instrument that stage.
 
 | Workload | Status | Evidence and boundary |
 |---|---|---|
-| ONNX `conv1x_mini` paired graph | **BLOCKED_ENV / NOT_RUN on current v2 SHA** | Pinned TinyNPU SHA is recorded above, but Verilator is absent (`command -v verilator` returns no executable) and the ONNX/model Golden asset is not checked into this worktree or present in the retained `/tmp/nmaforge*` runs. Historical run `R134-TINY-NPU-PAIRED-20261031` used NMAForge SHA `207cc3896cb635ff04e7095fc18c435080507724`; it is not current-v2 evidence. Its two cycle windows differ, so it has no speedup claim. |
+| ONNX `conv1x_mini` paired graph | **PASS on replay SHA `c3a59f0`** | Run `TINY-COMPARE-V2C3A59-S20261029`, TinyNPU SHA `8216c22b762011aa20c05fc2768423fd12dda59d`. Same model SHA `1ac385ac…1811640` and input SHA `a74587bf…705898`; NMAForge checked all intermediate tensors and 4/4 outputs. NMAForge: 1,985 compute + 1,080 host-layout cycles; TinyNPU: 4,781 graph cycles. Different boundaries; no speedup ratio. |
 | Trained-weight CNN | **NOT_RUN** | No trained CNN weight package and independent Golden are available in the current tree. |
 | Tiny Transformer | **NOT_RUN** | The fixed-weight descriptor fixture is not a pretrained-model deployment. No trained model, Prefill/Decode Golden, or current v2 run is claimed. |
 | Host / DMA / compute / writeback / graph cycle split | **PARTIAL** | Digits has a top-level CMDQ interval and a fused Matrix activity counter; the current run does not separately time host, DMA, writeback and orchestration. Its input preload is testbench setup outside the timed interval. |
 
-The checked-in historical paired CNN run and TinyNPU scripts remain useful
-reproduction material, but a current-SHA comparison requires the pinned
-TinyNPU source, Verilator, and the exact ONNX plus Golden assets. Current
-TinyNPU benchmarking is therefore not a v2 pass. No ASIC PPA, measured Fmax,
-power or energy result is inferred from these RTL runs.
+The current paired CNN uses the exact ONNX asset supplied by the pinned
+TinyNPU checkout and archives model/input hashes with its machine-readable
+results. Reproduction logs are archived at
+`/tmp/nmaforge_tinynpu_bench_20261105_20261029_v2c3a59_logs.tar.gz`
+(SHA-256 `6825223159a0d75c6f876fc971d7b02f30be4fef5ae0c7d91911374add385cdf`);
+the archive is outside Git to keep generated simulation logs out of the
+repository. Exact commands and all measured/modelled boundaries are in the
+[replay record](NMAFORGE_V2_TINYNPU_REPLAY_2026-11-05.md). No ASIC PPA,
+measured Fmax, power, or energy result is inferred from these RTL runs.
 
 ## Next model-benchmark closure
 
-1. Restore the pinned TinyNPU checkout and install/activate Verilator; restore
-   the exact hashed ONNX and TinyNPU Golden assets.
-2. Replay the same ONNX workload on both current source trees, recording the
-   model/input/output hashes, setup boundary and separate phase counters.
-3. Add a trained CNN and a small trained Transformer only with independent
+1. Add common Memory Adapter behavior to TinyNPU or keep its memory service
+   explicitly modeled; do not merge the two endpoints into a single score.
+2. Add a trained CNN and a small trained Transformer only with independent
    software Goldens and hardware-executed operators; keep host fallback
-   separately measured.
+   separately measured. Both remain **NOT_RUN**.
+3. Instrument distinct host, DMA, compute, writeback, and graph-orchestration
+   windows for the larger model runs.
 4. Preserve this Digits replay as the fixed regression and report each
    workload independently. Do not aggregate unlike cycle windows.

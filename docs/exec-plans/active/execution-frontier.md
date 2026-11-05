@@ -4,6 +4,21 @@ Updated: 2026-11-05. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
+## Current TinyNPU paired replay — 2026-11-05
+
+Run `TINY-COMPARE-V2C3A59-S20261029` completed on NMAForge source SHA
+`c3a59f08d8c07a8da973010d0f23d5d6d7eed61b` and TinyNPU SHA
+`8216c22b762011aa20c05fc2768423fd12dda59d`: paired 16×16×16, 16×16×32 and
+32×32×64 signed INT8 GEMM Golden PASS on both designs; matrix size sweep 15/15;
+TinyNPU engine regression 6/6; same ONNX `conv1x_mini` CNN Golden PASS on both.
+The TinyNPU GEMM memory schedule is estimated and serialized. NMAForge/TinyNPU
+normalized ratios are 1.1391/1.1385/1.0659 (greater than one means NMAForge
+used more cycles). CNN endpoints differ; no CNN speedup is stated. See the
+[replay report](../../benchmark/NMAFORGE_V2_TINYNPU_REPLAY_2026-11-05.md),
+machine-readable CSV/JSON under `benchmark/tinynpu/`, and its external log
+archive checksum in the report. Trained CNN, Tiny Transformer, true TinyNPU
+memory adapter, small/thin GEMV paired test, and DC PPA remain open.
+
 ## Current v2 candidate replay — 2026-11-05
 
 At fixed source/test SHA `33e85287fbf37187fccb76e97be6effe888670e9` (tree
@@ -24,8 +39,8 @@ both runs. See the [model benchmark](../../benchmark/NMAFORGE_V2_MODEL_BENCHMARK
 [JSON](../../../benchmark/v2_digits_model_comparison.json).
 These supersede the earlier license-blocked attempts for the tested points;
 parity/protection, held-response fault phases, cross-engine coherence, merged
-coverage disposition, current-SHA TinyNPU rerun, trained CNN/Transformer, and
-PPA remain open. The v1.0 disposition remains **HOLD**.
+coverage disposition, paired small/thin GEMV, trained CNN/Transformer, and PPA
+remain open. The v1.0 disposition remains **HOLD**.
 
 ## Current static-analysis and formal evidence — 2026-11-05
 

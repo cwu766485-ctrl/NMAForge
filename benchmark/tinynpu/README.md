@@ -42,40 +42,46 @@ does not calculate model operators. `cnn_results.csv` records both designs'
 cycles and memory boundaries. The timing windows differ, so the harness does
 not report a CNN speedup ratio.
 
-## Current run
+## Latest run
 
-Run ID `TINY-FAIR-6848A41-S20261029` ran on NMAForge SHA
-`6848a414eaeaa05cf9e1411cf55d9d27333208a6` and pinned TinyNPU SHA
-`8216c22b762011aa20c05fc2768423fd12dda59d`. The GEMM CSV has 22 data rows:
-15 NMAForge size cases, one 8×8 NMAForge common case, three 16×16 NMAForge
-common cases, and three TinyNPU common cases. The paired CNN CSV has one row per design and records
-model/input hashes, both cycle windows, SPAD traffic where instrumented, and
-Golden status. Run identity, tools, and exact values are in the committed
-summary JSON files and the benchmark report.
+Run ID `TINY-COMPARE-V2C3A59-S20261029` ran on NMAForge SHA
+`c3a59f08d8c07a8da973010d0f23d5d6d7eed61b` and pinned TinyNPU SHA
+`8216c22b762011aa20c05fc2768423fd12dda59d`. The GEMM CSV has 22 rows: 15
+size-sweep points, four NMAForge matched shapes, and three TinyNPU matched
+shapes. Both designs pass every output of the three paired shapes against an
+independent INT32 Golden. NMAForge cycles are 172 / 263 / 1,391 with 512 /
+1,024 / 6,144 SPAD read bytes and 1,024 / 1,024 / 4,096 write bytes. TinyNPU
+direct-array cycles are 52 / 100 / 790; its serialized common-memory estimates
+are 151 / 231 / 1,305 cycles. The stored ratio is NMAForge measured cycles /
+TinyNPU normalized modeled cycles: 1.1391 / 1.1385 / 1.0659. Values above one
+mean NMAForge used more cycles under this mixed measured/modeled endpoint.
 
-For the three paired shapes, NMAForge records 171 / 263 / 1,393 measured
-cycles, 512 / 1,024 / 6,144 SPAD read bytes, and 1,024 / 1,024 / 4,096 write
-bytes. TinyNPU records 52 / 100 / 790 direct-array cycles and 151 / 231 / 1,305
-normalized cycles under the common model. Both pass every output against
-independent INT32 Golden. The corrected stored ratio is NMAForge measured
-cycles divided by TinyNPU normalized modeled cycles: 1.1325 / 1.1385 / 1.0674.
-Values above 1 mean NMAForge uses more cycles under this mixed measured/modeled
-boundary; they are not a fair winner claim. TinyNPU's tested wrapper has no
-SPAD port, so its endpoint adds a serialized memory schedule. Both use the same
-assumed line bandwidth and response delay, but only NMAForge's controller/SPAD
-interval is measured RTL timing.
+The five-workload 4×4/8×8/16×16 size sweep passes 15/15 points. TinyNPU's
+reference compute-engine regression passes 6/6. The paired ONNX graph uses
+model SHA `1ac385ac…1811640`, input SHA `a74587bf…705898`, and 1,872 logical
+INT8 MACs. Both sides pass Golden: NMAForge checks all intermediate tensors
+and 4/4 outputs (1,985 compute + 1,080 host-layout cycles); TinyNPU checks 4/4
+outputs at 4,781 graph-dispatch/testbench-shim cycles. These CNN timing
+boundaries differ, so no speedup ratio is claimed.
 
-Tools: VCS `V-2023.12-SP1_Full64`, Verilator 5.052 (source tag `v5.052`,
-revision `ea338be98e1e838d3518809ce8899f85a009963c`), Python 3.11.13, NumPy
-2.4.6, and ONNX 1.17.0. TinyNPU builds use `-Wno-SYNCASYNCNET -Wno-fatal` for the
-pinned reference RTL. The TinyNPU and NMAForge CNN compiles emit the existing
-`LOOP-REROLL-ENABLED` test-fixture warning; no compile errors occurred.
+Tools: VCS `V-2023.12-SP1_Full64`, Verilator 5.052 revision
+`ea338be98e1e838d3518809ce8899f85a009963c`, Python 3.12.13, NumPy 2.4.6, and
+ONNX 1.17.0. Raw logs are archived outside Git at
+`/tmp/nmaforge_tinynpu_bench_20261105_20261029_v2c3a59_logs.tar.gz`, SHA-256
+`6825223159a0d75c6f876fc971d7b02f30be4fef5ae0c7d91911374add385cdf`.
+The [replay report](../../docs/benchmark/NMAFORGE_V2_TINYNPU_REPLAY_2026-11-05.md)
+has the exact command, timing boundaries, and evidence paths.
 
-For the paired graph, NMAForge checks all intermediate integer tensors and the
-same four output bytes as TinyNPU. This workload counts 1,872 logical INT8 MACs
-and submits eight CMDQ descriptors. The host-side flatten and matrix-layout
-bridge is measured separately; preserve this distinction in any engine-only
-comparison.
+Charts are regenerated from the checked-in CSVs by:
+
+```sh
+python3 benchmark/tinynpu/plot_results.py
+```
+
+See [`gemm_cycle_comparison.svg`](gemm_cycle_comparison.svg) and
+[`cnn_cycle_breakdown.svg`](cnn_cycle_breakdown.svg). The GEMM chart separates
+TinyNPU measured array cycles from its modeled serialized-memory endpoint; the
+CNN chart labels the differing timing windows and makes no speedup claim.
 
 These CSVs are RTL simulation evidence and an explicitly identified memory
 schedule estimate, not SRAM timing, ASIC PPA, or measured Fmax. See the
