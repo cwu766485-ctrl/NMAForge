@@ -24,6 +24,7 @@ COV_METRICS := line+cond+fsm+branch
 	core-no-prefetch-fallback-compile core-no-prefetch-fallback-regress \
 	product-gemv-test product-gemv-regress \
 	product-opcode-fault-regress \
+	product-opcode-mutation-regress \
 	product-gemv-prefetch-ablation \
 	product-gemv-b-cache-ablation \
 	product-gemv-four-way-ablation \
@@ -140,6 +141,15 @@ product-opcode-fault-regress: core-random-compile
 		grep -q "^MATRIX_V2_OPCODE_FAULT_PASS .* seed=$$seed$$" \
 			$(CORE_OUT_DIR)/v2_opcode_fault_seed_$$seed.log; \
 	done
+
+# Mutate temporary copies of the Matrix DUT and require the 0x52/0x53 Golden,
+# address, WSTRB, and forwarding-tag checkers to reject each real RTL defect.
+V2_OPCODE_MUTATION_OUT ?= /tmp/nmaforge_v2_opcode_mutations_$(SEED)
+V2_OPCODE_MUTATION_SEEDS ?= 20261105 20261106 20261107
+product-opcode-mutation-regress:
+	$(PYTHON) run_v2_opcode_mutations.py --out "$(V2_OPCODE_MUTATION_OUT)" \
+		--vcs "$(VCS)" --vcs-home "$(VCS_HOME)" \
+		--seeds $(V2_OPCODE_MUTATION_SEEDS)
 
 # Matched per-shape prefetch ON/OFF runs start directly from reset. This keeps
 # the random Ready/latency stream independent of the generic GEMM precondition.
