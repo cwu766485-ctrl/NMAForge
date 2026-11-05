@@ -168,18 +168,19 @@ passes.
 
 The current implementation does not support N greater than 16, transpose,
 strides, multi-batch operation, head-aware operation, or fused `0x53` mode
-through this opcode. Core Golden evidence includes `M=1,N=13,K=17` and
-`M=16,N=16,K=19` plus `K=65`; M8/K19 and M8/K65 checks have been added to the
-testbench but are **NOT_RUN** because VCS could not check out its compile
-license. Top Smoke exercises `M=1,N=13,K=17` through CMDQ, validation,
-dispatch, Matrix, SPAD and completion. A new `M=8,N=16,K=19` real-CMDQ
-descriptor case checks the multi-row K-tail path, but is **NOT_RUN** because
-the VCS compile license is unreachable. Bounded next-K
-prefetch/MAC overlap and B-fold reuse are measured in core-level ablations,
-but opcode-specific fault/Abort/Reset closure, full shape coverage, alias
-validation, mutation, bank-aware issue, architecture-wide performance, and
-sign-off remain open. Decoder acceptance alone is not evidence that
-unsupported fields are implemented; they remain explicitly rejected.
+through this opcode. Core Golden evidence includes `M=1,N=13,K=17`,
+`M=8,N=16,K=19/65`, and `M=16,N=16,K=19/65`. The license-restored three-seed
+B-cache ablation passes all 24 shape/configuration/seed cases with bit-exact
+outputs and drained reads. Top Smoke passes `M=1,N=13,K=17` and
+`M=8,N=16,K=19` through CMDQ, validation, dispatch, Matrix, SPAD, and
+completion. The focused descriptor alias/range validator passes 33 invalid
+rules, 43/43 accepted boundaries, 26/26 rejected boundaries, and 3/3 tile-
+forward descriptor cases. Exact commands and evidence are recorded in the
+[license-restored replay](../verification/V2_LICENSE_RESTORED_REPLAY_2026-11-05.md).
+Opcode-specific fault/Abort/Reset closure, full shape coverage, mutation,
+bank-aware issue, architecture-wide performance, and sign-off remain open.
+Decoder acceptance alone is not evidence that unsupported fields are
+implemented; they remain explicitly rejected.
 
 Opcode `0x53` is the optional fused-output form of Matrix GEMM. It keeps the
 same source, shape, K-word, bias, Matrix shift, activation, and transpose

@@ -57,10 +57,13 @@ For the three paired shapes, NMAForge records 171 / 263 / 1,393 measured
 cycles, 512 / 1,024 / 6,144 SPAD read bytes, and 1,024 / 1,024 / 4,096 write
 bytes. TinyNPU records 52 / 100 / 790 direct-array cycles and 151 / 231 / 1,305
 normalized cycles under the common model. Both pass every output against
-independent INT32 Golden. The normalized cycle ratios are estimates, since
-TinyNPU's tested wrapper has no SPAD port. Both use the same assumed line
-bandwidth and response delay, but only NMAForge's controller/SPAD interval is
-measured RTL timing.
+independent INT32 Golden. The corrected stored ratio is NMAForge measured
+cycles divided by TinyNPU normalized modeled cycles: 1.1325 / 1.1385 / 1.0674.
+Values above 1 mean NMAForge uses more cycles under this mixed measured/modeled
+boundary; they are not a fair winner claim. TinyNPU's tested wrapper has no
+SPAD port, so its endpoint adds a serialized memory schedule. Both use the same
+assumed line bandwidth and response delay, but only NMAForge's controller/SPAD
+interval is measured RTL timing.
 
 Tools: VCS `V-2023.12-SP1_Full64`, Verilator 5.052 (source tag `v5.052`,
 revision `ea338be98e1e838d3518809ce8899f85a009963c`), Python 3.11.13, NumPy

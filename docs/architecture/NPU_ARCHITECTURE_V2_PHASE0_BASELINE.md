@@ -300,3 +300,30 @@ completion count and untouched N-tail sentinels. See
 commands, Run IDs, profile, and evidence paths. Fetch/compute overlap, repeated
 B traffic across row tiles, descriptor-wide shape coverage, and opcode-specific
 error recovery remain open; sign-off remains **HOLD**.
+
+
+## 12. P0 v2 baseline freeze and license-restored verification — 2026-11-05
+
+The development checkout remains the isolated `feature/npu-architecture-v2`
+worktree. `main` is preserved at R250
+`3041355528dffe856e2d5384027c6ee5df5d1b42`; the v2 candidate reviewed for this
+freeze is commit `eb158880d11bf7f8baf13ece4a888107877356fd`, tree
+`9a3b35b68b5c021b272f94dcea46c26f82cf5017`. The functional test source tree
+used in the license-restored replay is `0ec98179bc6c5d2008c13810bc14d73044dac1a2`,
+published as `56de6a7aafa55db2e13127256d4983636341f55c`. The subsequent
+candidate commits are documentation-only: product RTL and DV files are
+unchanged between that tested tree and the frozen candidate. No R250 or
+`main` files were modified.
+
+| Item | Frozen result | Evidence |
+|---|---|---|
+| Product opcode `0x52` | M8×16×19 Top Smoke PASS; M8/M16 K19/K65 B-cache OFF/ON, 24/24 cases PASS over seeds 20261105–20261107 | [license-restored VCS replay](../verification/V2_LICENSE_RESTORED_REPLAY_2026-11-05.md), [GEMV report](SHAPE_ADAPTIVE_GEMM_GEMV_REPORT.md) |
+| Product opcode `0x53` | Real CMDQ differential PASS on one seed; 64 packed output words and four completions checked; source-A banked reads 16→0 | [license-restored VCS replay](../verification/V2_LICENSE_RESTORED_REPLAY_2026-11-05.md), [tile-forwarding report](TENSOR_LAYOUT_OPTIMIZATION_REPORT.md) |
+| Descriptor boundaries | 29 legal opcodes, 33 invalid rules, 43/43 accepted, 26/26 rejected, 3/3 tile-forward descriptors | Same replay record |
+| Tool | Synopsys VCS `V-2023.12-SP1_Full64`, four-bank behavioral SPAD | Same replay record |
+
+A pre-existing Top Smoke `[LOOP-REROLL-ENABLED]` notice remains. These are
+bounded functional/performance checks, not full v2 fault/coverage closure,
+ASIC PPA, or a TinyNPU win claim. The v1.0 Compute Cluster disposition remains
+**HOLD**. See the [unified v2 experiment sheet](../../benchmark/architecture_v2_experiment_matrix.csv)
+for measured fields, missing-data markers, and the P1 experiment queue.
