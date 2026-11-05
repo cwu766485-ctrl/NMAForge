@@ -56,5 +56,14 @@ for seed in 123 98765; do
   echo "PASS_SEED=$seed"
 done
 
+archive="$PWD/dv/block/dma/artifacts/protocol-vip/$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p "$archive"
+cp "$out/compile.log" "$archive/compile.log"
+cp "$out/seed_123.log" "$archive/seed_123.log"
+cp "$out/seed_123.console" "$archive/seed_123_console.log"
+cp "$out/seed_98765.log" "$archive/seed_98765.log"
+cp "$out/seed_98765.console" "$archive/seed_98765_console.log"
+
 echo "NMAFORGE_PROTOCOL_VIP_DMA_PASS seeds=2/2 severity=0/0/0"
-echo "ARTIFACT_ROOT=$out"
+echo "TEMP_ARTIFACT_ROOT=$out"
+echo "ARCHIVED_LOG_ROOT=$archive"
