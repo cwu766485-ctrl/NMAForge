@@ -63,5 +63,5 @@ The environment check `verilator --version` returns `/bin/bash: verilator: comma
 
 - This completes the NMAForge Matrix size/configuration benchmark slice of P1, not the fair TinyNPU comparison requirement.
 - No RTL was changed for this benchmark commit.
-- P2 remains open: expand Bank-Aware Issue scheduling tests and multi-seed Tile Forwarding checks, then evaluate legal abort/reset/tail behavior and legacy-path equivalence.
+- The later fixed-SHA v2 replay closes the named three-seed Tile Forwarding core and Top CMDQ checks; broader Bank-Aware Issue, fault/phase combinations, cross-engine coherence, and legacy interaction coverage remain open. See [current performance comparison](NMAFORGE_V2_PERFORMANCE_COMPARISON.md).
 - PPA remains `NOT_RUN`; the 250 MHz reference must not be presented as measured frequency.

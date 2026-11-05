@@ -178,9 +178,14 @@ and forwarded outputs and completions, with 16 versus 0 source-A banked reads.
 
 - This is behavioral RTL simulation, not an ASIC timing or area result. No
   synthesis, PPA, power, or physical SRAM timing claim is made.
-- Tile forwarding has PASS evidence at the Matrix core, descriptor-validator,
-  and one real-top CMDQ differential seed. Multi-seed feature-specific
-  regression, new-feature parity/protection, held-line Abort cases, and
+- At candidate `33e85287fbf37187fccb76e97be6effe888670e9`, tile forwarding has
+  three-Seed Matrix-core OFF/ON Golden evidence and three-Seed real-top CMDQ
+  differential evidence. The core test checks capture backpressure/final-line
+  commit, exact-tag hit/miss fallback, ping-pong bank flip, reset/Abort
+  invalidation, and drain. The top test compares output words/completions and
+  sees source-A reads fall 16→0. See the [fixed-SHA replay
+  report](../verification/V2_P2_TILE_FORWARD_MULTISEED_REPLAY_2026-11-05.md).
+  New-feature parity/protection, held-response/fault-phase combinations, and
   cross-engine coherence remain open.
 - The forwarding subset is one 16×16 capture and one M=16/K=4 consume; broader
   `M/N/K` tails, repeated consumers, and cross-engine coherence are unsupported.

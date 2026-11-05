@@ -339,8 +339,9 @@ Golden, line-write count, and completion checks; see the linked replay record.
   backpressure, and response ownership for opcode `0x52`.
 - Add descriptor mutation and coverage disposition; mutation is **NOT_RUN**.
 - Add real top multi-engine contention and independent full-SPAD scoreboard.
-- Run the eight-configuration benchmark for the new opcode only after its
-  shape contract supports a meaningful same-workload comparison.
+- The four-way B-fold Cache × Next-K Prefetch benchmark for the supported
+  M8/M16, N16, K19/K65 workload is complete at three Seeds (48/48 bit-exact
+  Golden points). Wider shapes and additional depth settings remain open.
 - TinyNPU common-resource comparison and ASIC PPA remain **NOT_RUN**.
 
 This change does not alter the v1.0 Compute Cluster disposition (**HOLD**) and

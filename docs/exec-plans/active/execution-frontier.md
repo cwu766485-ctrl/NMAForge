@@ -4,6 +4,30 @@ Updated: 2026-11-05. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
+## Current v2 candidate replay — 2026-11-05
+
+At fixed source/test SHA `33e85287fbf37187fccb76e97be6effe888670e9` (tree
+`560dc1cbfc1bb13003670354d77271e3708ec0a7`), the Tile Forwarding core OFF/ON
+ablation passes 6/6 runs across Seeds 20261105–20261107. Producer/consumer
+Golden images match; mean consumer cycles are 141→118 and source-A reads are
+32→16 (512→256 B). Capture backpressure, final-line commit, tag hit/miss,
+bank flip, reset/Abort invalidation, and response drain are checked. A clean
+detached Top Smoke worktree at the same SHA passes 3/3 Seeds, including `0x52`
+M/N/K tails and the real-CMDQ `0x53` output/completion differential (16→0
+source-A bank reads). The exact commands and evidence are in the [fixed-SHA
+replay report](../../verification/V2_P2_TILE_FORWARD_MULTISEED_REPLAY_2026-11-05.md).
+The same candidate also replays the trained 360-image Digits MLP against R250
+using the exact same model and Golden and byte-identical RTL logits: 110,155→
+34,761 doorbell-to-completion-tail cycles (−68.44%), with 352/360 correct in
+both runs. See the [model benchmark](../../benchmark/NMAFORGE_V2_MODEL_BENCHMARK.md),
+[CSV](../../../benchmark/v2_digits_model_comparison.csv), and
+[JSON](../../../benchmark/v2_digits_model_comparison.json).
+These supersede the earlier license-blocked attempts for the tested points;
+parity/protection, held-response fault phases, cross-engine coherence, merged
+coverage disposition, current-SHA TinyNPU rerun, trained CNN/Transformer, and
+PPA remain open. The v1.0 disposition remains **HOLD**.
+
+
 ## Latest Compute Cluster evidence
 
 **R250 final published-tree replay (2026-11-03):** Exact published source/test tree `da34f7e314fccf3793372c59768ebac541fa22a7` passes three-seed seven-engine UVM, Top Smoke, 16-seed mixed E2E, and 7/7 actual RTL mutation checks. URG combines 19 tests: 28/28 declared functional groups, all 3 AXI stall covers, 20/22 assertions with real successes, zero failures/incomplete; two no-attempt properties are UVM RAL internals. Hierarchy line/condition/FSM/branch/assert is 73.99/69.39/47.24/64.95/92.00%, not 100% code coverage. The audited RTM remains 24 scoped pass dispositions / 14 `PARTIAL`; `CL-DV-v1.0` remains **HOLD**. See [R250 report](../../verification/COMPUTE_CLUSTER_FINAL_TREE_REPLAY_R250_2026-11-03.md), logs-only archive SHA-256 `9f4865a09e93152548da30c85e25ac3afcd94d6ab05abdd56930c71c6d34b57a`.
@@ -314,59 +338,11 @@ in the owning report; run `git diff --check` before handoff.
 - The clean replay closes the immediate environment/reproducibility gap only. RTM remains 24 PASS-SCOPED / 14 PARTIAL; `CL-DV-v1.0` remains **HOLD** pending legal cross and contract dispositions.
 - Evidence: [R204 report](../../verification/COMPUTE_CLUSTER_FINAL_HEAD_REPLAY_R204_2026-11-02.md); archive `/tmp/nmaforge_r204_evidence_20261102.tar.gz`, SHA-256 `9f32c098463213e338cd6ef4a9da9b44631771b17f48c0350bc7fbca4d3a490f`.
 
-## 2026-11-05 update — v2 bounded fused-tile forwarding
+## 2026-11-05 update — v2 candidate status at `33e8528`
 
-- Implementation/test commit `3124ba4b3be31402641da2352510f4db3a9954c6` adds opt-in `0x53` capture/consume fields, two local 16×128-bit tile banks, descriptor validation, C header macros, and a mapper contract test. Legacy `0x30/0x31` semantics remain unchanged.
-- Paired VCS core ablation (`V2-TILE-FORWARD-ABL-20261105`, seed `20261105`) is bit-exact: the 16×16/K4 consumer falls from 141 to 118 cycles and 32 to 16 SPAD reads (512 B to 256 B); both variants retain 16 output line writes. Tag-miss fallback, back-pressure, reset and Abort invalidation pass.
-- Three-seed Matrix core regression, descriptor-validator regression (29 invalid rules, 42/42 accepted boundaries), Python mapper tests, and Top Smoke pass. Top Smoke retains its existing `LOOP-REROLL-ENABLED` warning. No synthesis/PPA claim is made.
-- This closes only the bounded RTL experiment. Top-level CMDQ forwarding, feature-specific multi-seed/fault coverage, cross-engine coherence, TinyNPU comparison and physical resource cost remain open; v1.0 sign-off disposition is unchanged.
-- Evidence: [Tensor Layout Optimization report](../../architecture/TENSOR_LAYOUT_OPTIMIZATION_REPORT.md); raw VCS logs under `/tmp/nmaforge_tile_forward_ablation_20261105_final/` and `/tmp/nmaforge_tile_forward_core_regress_final_20261105/`.
-
-## 2026-11-05 update — v2 GEMV B-fold reuse
-
-- The local v2 branch started from published branch head `70e8a4471cb999eb7c4eace293424a66b533f516`; the earlier plan note naming `f95b2ee1a191b1da9dd96d67855e1a5717654063` was stale for this workspace. No v1 sign-off branch was merged.
-- RTL/test feature commit `2e61ff71e1f67b85f68229026d6468036122e9c8` reuses the existing 1 KiB local reuse array for up to 64 K elements of B across GEMV row tiles; it adds no operand data array. Profile instrumentation commit `20d393c5e0e1a32388cce1112a4a20a32e05b5a5` reports per-state and aggregate stalls.
-- `make product-gemv-b-cache-ablation SEEDS='20261105 20261106 20261107' CORE_OUT_DIR=/tmp/nmaforge_gemv_b_cache_profile_final_20261105` passes all six cache-off/on × K19/K65 runs with complete 256-output independent Golden and request drain. Mean command cycles/read bytes change 387.67/1,728 B→261.67/816 B for K19 and 1,036/5,440 B→626.67/2,368 B for K65.
-- `make core-random-regress SEEDS='20261105 20261106 20261107' CORE_OUT_DIR=/tmp/nmaforge_gemv_b_cache_core_regress_final_20261105` passes 18 cases and 35 fault/recovery checks per seed plus GEMV Golden cases. `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105` passes `TEST PASS`; existing `LOOP-REROLL-ENABLED` notice remains. A single-seed prefetch-disabled cache ablation also passes K19 and K65.
-- Evidence is in the [GEMV/GEMM report](../../architecture/SHAPE_ADAPTIVE_GEMM_GEMV_REPORT.md) and [raw profile CSV](../../../benchmark/shape_adaptive_gemv_b_cache_ablation.csv). PPA/area is **NOT_RUN**. The 64-entry K-capacity, operand immutability/non-aliasing contract, full shape/fault matrix, TinyNPU common-resource comparison, and v2 UVM closure remain open. Gate A is not declared complete.
-- Follow-up test commit `0a500d17d997dd96dad5cd797849e5a71dfcc6e6` adds M8/K19 and M8/K65 cache ablations and generalizes the M16 checks. The exact one-seed target was attempted, but VCS failed to connect to its license server before source compilation and queued for `VCS-BASE-COMPILE/VCSCompiler_Net`; the run was interrupted. Result: **BLOCKED_ENV / NOT_RUN**, no M8 result claimed. Retry `make product-gemv-b-cache-ablation SEEDS='20261105 20261106 20261107' CORE_OUT_DIR=/tmp/nmaforge_gemv_b_cache_multirow_final_20261105` when the license service is reachable.
-
-## 2026-11-05 update — M8 product GEMV CMDQ testpoint
-
-- Added a real-top `0x52` descriptor test for M=8, N=16, K=19. It poisons the padded A tail, computes all 128 signed INT32 outputs with an independent scalar Golden, checks 32 aligned output lines, and validates completion result/byte count. The Top Smoke target requires the new marker.
-- Committed locally as `81bacfd24f7fb55cbde23aa7a95e474824305be3`; published same-tree commit: `f4d77afe55c1869cb53c5d8fa9356b449595d9a4`.
-- Exact attempt: `timeout -k 3s 50s make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105`. Mapper generation passed; VCS could not obtain `VCS-BASE-COMPILE/VCSCompiler_Net` before SV compilation. Result **BLOCKED_ENV / NOT_RUN**; no simulator image or RTL test ran. Log: `/tmp/nmaforge-architecture-v2/dv/subsystem/top_smoke/sim/ai_comp.log`.
-- VCS compile for the prior M8 core cache-ablation target was retried with a 50-second bound and failed with the same license-server connection error. Do not treat either M8 test as functional evidence until the exact targets pass.
-- Current status remains: M1/N/K tail and next-K prefetch have prior bounded evidence; M8 product integration, bank-aware issue, full opcode fault coverage, architecture-wide benchmark, TinyNPU comparison, PPA and v2 DV closure remain open.
-
-## 2026-11-05 update — GEMV descriptor span/alias guard
-
-- Extended `ai_descriptor_validator` for opcode `0x52` to compute padded-A, dense-B, INT32 output, and enabled-bias byte spans. The validator rejects output/input overlap and 32-bit span-end wrap; exact adjacent half-open spans remain legal.
-- Added directed validator checks for A overlap, B overlap, enabled-bias overlap, B-range overflow, and legal A/output adjacency. Updated the expected target marker to 33 invalid rules and 43 accepted boundaries.
-- Committed locally as `0b1216e6b58ffa30bdbef87cfa2ac63ec47d4b1b`; published same-tree commit: `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
-- Required command `timeout -k 3s 50s make descriptor-validator-regress DESCRIPTOR_VALIDATOR_OUT=/tmp/nmaforge_descriptor_validator_gemv_alias_20261105` failed before SV compilation because VCS could not connect to its license server. Same-change `timeout -k 3s 50s make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105` passed mapper generation and then failed at the same license checkout. Both are **BLOCKED_ENV / NOT_RUN**; old simulation PASS results do not cover this RTL change.
-- The open contract is cross-engine immutability during a command; these guards only prevent descriptor output/input span aliasing. Retry both targets when VCS license connectivity is restored.
-
-## 2026-11-05 update — matched GEMV 2×2 cache/prefetch ablation
-
-- Added `tools/summarize_gemv_four_way_ablation.py` and `benchmark/shape_adaptive_gemv_four_way_ablation.csv`. The script parses existing compile/run logs and rejects a wrong feature define, array size, outstanding depth, seed, missing Golden marker, or unexpected traffic/counter values.
-- Committed locally as `8d58826d7c49a294543a1b8485957df35ca3f17d`; published same-tree commit: `d4d09ad58f882a5e2d59091073fd447bbb3dfaca`.
-- Same-source/test, same-seed `M16×N16×K19/K65` results cover B-fold cache OFF/ON × next-K prefetch OFF/ON. Combined versus both-off changes 403→266 cycles and 1,728→816 B reads at K19; 1,074→609 cycles and 5,440→2,368 B at K65. Each run checks 256 outputs and 64 output lines with bit-exact Golden.
-- This is a one-seed controller sub-ablation, not a legacy GEMM-vs-GEMV comparison or TinyNPU result. Prefetch-off state-stall counters were not logged, so the complete four-way stall breakdown and multi-seed 2×2 rerun remain open. No area/PPA inference is made.
-- Report: [Shape-Adaptive GEMM/GEMV](../../architecture/SHAPE_ADAPTIVE_GEMM_GEMV_REPORT.md). Evidence CSV: `benchmark/shape_adaptive_gemv_four_way_ablation.csv`. Source/test identifiers are `2e61ff71e1f67b85f68229026d6468036122e9c8` / `20d393c5e0e1a32388cce1112a4a20a32e05b5a5`; later unverified RTL changes are outside these runs.
-
-## 2026-11-05 update — `0x53` real-top tile-forwarding test
-
-- Test commit `826647976284803227b645abc60ae6f514714ada` adds a four-command real-CMDQ differential: SPAD producer/consumer baseline followed by capture/consume with legacy SPAD writeback. It compares every packed output word and completion, and monitors accepted reads from the producer tile address. Expected result: 16 A-tile line requests for the baseline consumer and zero for the forwarded consumer.
-- Attempted exact command: `timeout -k 3s 45s make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105`. The mapper precheck passed. VCS `V-2023.12-SP1_Full64` failed before SV compilation with `Cannot connect to the license server` / `Failed to obtain license`; result **BLOCKED_ENV / NOT_RUN**. No simulation image or functional result exists for the new test.
-- VCS remains unavailable for the M8 `0x52` top test and the descriptor span/alias validator checks as well. Existing PASS evidence remains tied to its prior exact RTL/test sources. Retry `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105` and `make descriptor-validator-regress DESCRIPTOR_VALIDATOR_OUT=/tmp/nmaforge_descriptor_validator_gemv_alias_20261105` after license connectivity returns.
-- The same test and the limitation are recorded in the [Tensor Layout Optimization report](../../architecture/TENSOR_LAYOUT_OPTIMIZATION_REPORT.md); v1.0 remains **HOLD**, and forwarding is not considered top-level closed.
-
-## 2026-11-05 update — license-restored v2 verification replay
-
-- Tested and committed testbench tree: `cc7c6b23ef0aa34d50033603c3f8f77489b30220`, tree `0ec98179bc6c5d2008c13810bc14d73044dac1a2`; VCS `V-2023.12-SP1_Full64`.
-- `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105` passes `TEST PASS`. Real-CMDQ M8/K19 opcode `0x52` checks all 128 outputs; `0x53` checks baseline and forwarded output images/completions and reports 16→0 producer-A banked reads. The existing `[LOOP-REROLL-ENABLED]` notice remains.
-- The `0x52` descriptor-validator target passes 33 invalid-rule checks, 43/43 accepted boundaries and 26/26 rejected boundaries. This supersedes the earlier `BLOCKED_ENV / NOT_RUN` entry.
-- The three-seed B-cache OFF/ON multirow ablation passes 24/24 cases. At M8/M16 and K19/K65, mean command cycles fall by 22.15–38.59% and banked read bytes by 35.19–56.47%. This supersedes the earlier M8 ablation `NOT_RUN` entry. Measurements use the Matrix-core behavioral-SPAD model; they are not ASIC or TinyNPU results.
-- The two intervening failures were testbench issues, not product RTL failures: the four-entry CMDQ tail needed to wrap from index 2 to 0, and expected K-fold counters needed to scale by four-row tiles. No product RTL changed.
-- Detailed commands, exact seed metrics, log locations, and evidence archive hash are in the [license-restored v2 replay report](../../verification/V2_LICENSE_RESTORED_REPLAY_2026-11-05.md). `0x53` feature-specific fault/lifecycle coverage, common-resource TinyNPU comparison, PPA, and v1.0 requirement closure remain open; `CL-DV-v1.0` stays **HOLD**.
+- Baseline audit: published `main` is still R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`; the v2 branch merge-base is that SHA, and review start `eb158880d11bf7f8baf13ece4a888107877356fd` is an ancestor. No v1 closeout branch was merged and `main` was not modified. See [v2 architecture review](../../architecture/NMAFORGE_V2_ARCHITECTURE_REVIEW.md).
+- P1 Matrix performance replay at `550ef39f22c22c39eb3bfd7f38dbc574b630e163` passed 165/165 Golden points (array sizes plus 8-way depth/prefetch/A-cache ablation) on three Seeds. It uses a one-cycle behavioral SPAD and is not PPA.
+- Product GEMV Cache×Prefetch replay at RTL/test SHA `b9d593e5f55869ff4a47748013a4b15dcd60f83f` passed 48/48 full output Golden points across M8/M16, K19/K65, four settings, and three Seeds. Existing B-fold reuse dominates the measured benefit; no additional bank-aware scheduler RTL was justified.
+- At fixed current candidate `33e85287fbf37187fccb76e97be6effe888670e9`, Tile Forwarding core OFF/ON passes 6/6 runs and real Top CMDQ Smoke passes 3/3 Seeds. Mean core consumer cycles are 141→118; the selected consumer source-A reads fall 32→16 (512→256 B). See [fixed-SHA replay report](../../verification/V2_P2_TILE_FORWARD_MULTISEED_REPLAY_2026-11-05.md) and [machine-readable run matrix](../../../benchmark/architecture_v2_experiment_matrix.csv).
+- The older VCS license failures remain historical attempts only. The license-restored descriptor-validator replay at commit `cc7c6b23ef0aa34d50033603c3f8f77489b30220` passed its named 33 invalid-rule, boundary, and tile-forward descriptor checks. Those validator counts retain that exact earlier identity; this update does not imply a current-SHA validator rerun.
+- Open: new-opcode Parity/Protection and wider fault-phase coverage, held-response/error recovery, cross-engine coherence, complete RTM/coverage/mutation closure, current-SHA TinyNPU matched benchmark, DC/PPA/power, trained CNN/Transformer inference, and ASIC readiness. `CL-DV-v1.0` remains **HOLD**; no TinyNPU win or Tapeout readiness is claimed.
