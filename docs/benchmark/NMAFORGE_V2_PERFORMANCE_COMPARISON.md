@@ -1,6 +1,6 @@
 # NMAForge v2 Performance Comparison
 
-**As of:** 2026-11-05  
+**As of:** 2026-11-06
 **Product baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Latest replay source/test SHA:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`
 
@@ -414,3 +414,14 @@ bit-exact. Machine records are the [GEMM CSV](../../benchmark/v2_tinynpu_current
 compile/run logs and generated CNN input/expected memory images are archived
 outside Git at `/tmp/nmaforge_v2_tinynpu_current_d1867da_logs.tar.gz`,
 SHA-256 `018d11dc90159192f0fb13c5e5901269b66be7ff8013bf4891cfd26b1e9e7885`.
+
+## Verification-only update — 2026-11-06
+
+The current testbench/build candidate is `380f96114dba022300db09fb217264c3a606a2fd`
+(tree `79aaf0782aba0da18d7109b74ae2bd343a473181`); product RTL is unchanged.
+The new runs add functional coverage for GEMV shapes and Tile Forwarding but
+do not rerun the performance suites. Cycle, traffic, utilization, and TinyNPU
+comparisons above remain tied to their individually listed source/test SHAs
+and timing endpoints. No new PPA or system-level performance result is
+inferred from the coverage replay. See the [DV report](../verification/NMAFORGE_V2_DV_CLOSURE.md)
+for exact run IDs and the evidence archive.

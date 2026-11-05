@@ -1,6 +1,6 @@
 # NMAForge v2 Model Benchmark
 
-**Status date:** 2026-11-05  
+**Status date:** 2026-11-06
 **R250 baseline:** `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Latest v2 RTL/test candidate replay:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`
 **Latest paired benchmark source SHA:** `c3a59f08d8c07a8da973010d0f23d5d6d7eed61b`
@@ -180,3 +180,13 @@ input/expected SPAD images are archived at
 `018d11dc90159192f0fb13c5e5901269b66be7ff8013bf4891cfd26b1e9e7885`).
 The model has fixed reference weights; trained CNN and trained Transformer
 remain **NOT_RUN**.
+
+## Verification-only update — 2026-11-06
+
+The latest testbench/build candidate is `380f96114dba022300db09fb217264c3a606a2fd`
+(tree `79aaf0782aba0da18d7109b74ae2bd343a473181`), with no product RTL
+change. No model workload was rerun on this test-only commit. The Digits,
+fixed `conv1x_mini`, and TinyNPU comparison results above remain bound to
+their named source SHAs; trained-weight CNN/Transformer and separated stage
+timing remain **NOT_RUN**. The v2 feature coverage evidence is recorded in the
+[DV report](../verification/NMAFORGE_V2_DV_CLOSURE.md).

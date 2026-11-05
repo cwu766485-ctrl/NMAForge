@@ -1,12 +1,12 @@
 # NMAForge v2 Architecture Review
 
-**Review date:** 2026-11-05  
+**Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Current reviewed candidate:** `feature/npu-architecture-v2` `410b81dfd37992a760b28258bb7e8c6b6f5017d7`
-**Candidate tree:** `e608e788cf5cc49165d835003c87920259cc84b4`
-**Latest published branch commit at audit:** `6862c68035387fe70441b617b6797b6e070963a6`, with the same tree as the tested candidate.
-**Latest verification-only test candidate:** `99566993256778d094c068a8733c074ade2f9921` (tree `2c74d2ec73991494897fb257d863986e3300cd55`); product RTL is unchanged.
+**Current reviewed code/test candidate:** `feature/npu-architecture-v2` `380f96114dba022300db09fb217264c3a606a2fd`
+**Candidate tree:** `79aaf0782aba0da18d7109b74ae2bd343a473181`
+**Published branch tip before this local coverage update:** `b86d246598d2b368a106d5da1b5b2e33d4bf9c6b` (tree `1c84f0e896394e0e4145fbe3458e1b7b2d544685`).
+**Latest verification-only test candidate:** `380f96114dba022300db09fb217264c3a606a2fd` (tree `79aaf0782aba0da18d7109b74ae2bd343a473181`); product RTL is unchanged.
 
 ## Executive disposition
 
@@ -21,19 +21,20 @@ This is a **bounded v2 functional/performance candidate**, not a v1.0 Compute
 Cluster sign-off, full v2 verification closure, ASIC sign-off, or a TinyNPU
 performance win. Keep the overall Compute Cluster disposition at **HOLD**.
 
-### Latest v2 verification-only update — 2026-11-05
+### Latest v2 verification-only update — 2026-11-06
 
-The current v2 product RTL was not changed. A Matrix testbench-only commit
-`99566993256778d094c068a8733c074ade2f9921` makes the `8×4×8` overlap
-precondition deterministic across seeds while retaining randomized bank Ready
-and the original high-water checker. At this test SHA, Prefetch-ON core/GEMV/
-fault plus Prefetch-OFF runs pass across Seeds 20261108/09/10; five opcode
-mutation classes are caught in all three seeds. Merged Matrix core URG is
-Line/Condition/FSM/Branch `95.21/90.74/95.45/97.10%`, with 15/15 states and
-52/55 transitions. The three raw unhit transitions have current-SHA,
-non-vacuous formal guard proofs; opcode-specific formal properties and other
-coverage bins remain open. This is added evidence, not v2 sign-off. Exact RTM rows and logs are in the
-[v2 DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+The current v2 product RTL was not changed. Testbench/build commit
+`380f96114dba022300db09fb217264c3a606a2fd` adds formal covergroups and gates
+for six GEMV shapes, eight selected 0x52/0x53 fault scenarios, and six Tile
+Forwarding scenarios. Prefetch ON and OFF each pass all six named GEMV shape
+Golden tests across Seeds 20261108/09/10. A same-profile URG merge of 12 tests
+reports 100% for each new group; selected Matrix hierarchy Line/Condition/FSM/
+Branch is `93.90/90.88/92.42/96.62%`. Prefetch-OFF is reported separately
+because it changes DUT condition structure. Same-tag repeated consume is
+verified to fall back to SPAD after the tag is consumed once. These are named
+testpoint results, not full v2 coverage or sign-off. Product RTL, benchmark
+results, and prior FSM formal disposition are unchanged. Exact RTM and evidence
+archive are in the [v2 DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
 ## Baseline and source audit
 
@@ -305,3 +306,16 @@ license files, `.env`, `novas.conf`/`novas.rc`, and library/database extensions.
 The active branch remains a v2 architecture candidate: v1.0 Compute Cluster
 is **HOLD**, v2 feature-wide DV closure is **IN PROGRESS**, TinyNPU parity is
 not established, and ASIC readiness is **NOT READY**.
+
+## Named functional-coverage follow-up — 2026-11-06
+
+Testbench/build commit `380f96114dba022300db09fb217264c3a606a2fd` keeps the
+two selected innovations on the shared Matrix array and adds directed feature
+coverage only: GEMV six-shape tails, selected opcode fault recovery, and
+repeated-consumer tile forwarding. Three same-profile URG groups report 100%
+over 12 tests; the Prefetch-OFF result is separately reported. Product RTL and
+all existing performance/model measurements are unchanged. The covered bins
+do not close all 0x52/0x53 descriptor variants, legal cross-engine fault
+combinations, or system-level assertions. The v2 decision remains a bounded
+candidate, not full DV sign-off; details and archive checksum are in the
+[DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).

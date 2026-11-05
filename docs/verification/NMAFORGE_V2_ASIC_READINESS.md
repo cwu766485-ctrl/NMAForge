@@ -1,8 +1,8 @@
 # NMAForge v2 ASIC Readiness
 
-**Review date:** 2026-11-05  
+**Review date:** 2026-11-06
 **R250 baseline:** `3041355528dffe856e2d5384027c6ee5df5d1b42`  
-**Latest RTL/test candidate replayed:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`
+**Latest RTL/static-analysis candidate replayed:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`
 **Disposition:** **NOT ASIC READY**; v1.0 remains **HOLD**.
 
 ## Current evidence
@@ -209,3 +209,13 @@ four-bank/512-KiB logical SPAD, 1-KiB bounded reuse array and 512-B forwarding
 store. These are RTL-declared sizes, not mapped silicon costs. VCS timing and
 the 250-MHz normalization are not physical timing evidence. Disposition stays
 **NOT ASIC READY**.
+
+## Verification-only update — 2026-11-06
+
+Testbench/build candidate `380f96114dba022300db09fb217264c3a606a2fd` adds
+coverage and directed checks without changing product RTL. SpyGlass, formal,
+DC, LEC or physical-design flows were not rerun for that test-only commit; the
+static-analysis and PPA dispositions above remain bound to the listed
+candidate and tool runs. No area, Fmax, power, SRAM-macro, or tapeout-readiness
+claim follows from the functional coverage results. The current functional
+replay is summarized in the [v2 DV report](NMAFORGE_V2_DV_CLOSURE.md).
