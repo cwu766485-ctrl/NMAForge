@@ -334,6 +334,7 @@ in the owning report; run `git diff --check` before handoff.
 ## 2026-11-05 update — M8 product GEMV CMDQ testpoint
 
 - Added a real-top `0x52` descriptor test for M=8, N=16, K=19. It poisons the padded A tail, computes all 128 signed INT32 outputs with an independent scalar Golden, checks 32 aligned output lines, and validates completion result/byte count. The Top Smoke target requires the new marker.
+- Committed locally as `81bacfd24f7fb55cbde23aa7a95e474824305be3`; published same-tree commit: `f4d77afe55c1869cb53c5d8fa9356b449595d9a4`.
 - Exact attempt: `timeout -k 3s 50s make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105`. Mapper generation passed; VCS could not obtain `VCS-BASE-COMPILE/VCSCompiler_Net` before SV compilation. Result **BLOCKED_ENV / NOT_RUN**; no simulator image or RTL test ran. Log: `/tmp/nmaforge-architecture-v2/dv/subsystem/top_smoke/sim/ai_comp.log`.
 - VCS compile for the prior M8 core cache-ablation target was retried with a 50-second bound and failed with the same license-server connection error. Do not treat either M8 test as functional evidence until the exact targets pass.
 - Current status remains: M1/N/K tail and next-K prefetch have prior bounded evidence; M8 product integration, bank-aware issue, full opcode fault coverage, architecture-wide benchmark, TinyNPU comparison, PPA and v2 DV closure remain open.
@@ -342,12 +343,14 @@ in the owning report; run `git diff --check` before handoff.
 
 - Extended `ai_descriptor_validator` for opcode `0x52` to compute padded-A, dense-B, INT32 output, and enabled-bias byte spans. The validator rejects output/input overlap and 32-bit span-end wrap; exact adjacent half-open spans remain legal.
 - Added directed validator checks for A overlap, B overlap, enabled-bias overlap, B-range overflow, and legal A/output adjacency. Updated the expected target marker to 33 invalid rules and 43 accepted boundaries.
+- Committed locally as `0b1216e6b58ffa30bdbef87cfa2ac63ec47d4b1b`; published same-tree commit: `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
 - Required command `timeout -k 3s 50s make descriptor-validator-regress DESCRIPTOR_VALIDATOR_OUT=/tmp/nmaforge_descriptor_validator_gemv_alias_20261105` failed before SV compilation because VCS could not connect to its license server. Same-change `timeout -k 3s 50s make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105` passed mapper generation and then failed at the same license checkout. Both are **BLOCKED_ENV / NOT_RUN**; old simulation PASS results do not cover this RTL change.
 - The open contract is cross-engine immutability during a command; these guards only prevent descriptor output/input span aliasing. Retry both targets when VCS license connectivity is restored.
 
 ## 2026-11-05 update — matched GEMV 2×2 cache/prefetch ablation
 
 - Added `tools/summarize_gemv_four_way_ablation.py` and `benchmark/shape_adaptive_gemv_four_way_ablation.csv`. The script parses existing compile/run logs and rejects a wrong feature define, array size, outstanding depth, seed, missing Golden marker, or unexpected traffic/counter values.
+- Committed locally as `8d58826d7c49a294543a1b8485957df35ca3f17d`; published same-tree commit: `d4d09ad58f882a5e2d59091073fd447bbb3dfaca`.
 - Same-source/test, same-seed `M16×N16×K19/K65` results cover B-fold cache OFF/ON × next-K prefetch OFF/ON. Combined versus both-off changes 403→266 cycles and 1,728→816 B reads at K19; 1,074→609 cycles and 5,440→2,368 B at K65. Each run checks 256 outputs and 64 output lines with bit-exact Golden.
 - This is a one-seed controller sub-ablation, not a legacy GEMM-vs-GEMV comparison or TinyNPU result. Prefetch-off state-stall counters were not logged, so the complete four-way stall breakdown and multi-seed 2×2 rerun remain open. No area/PPA inference is made.
 - Report: [Shape-Adaptive GEMM/GEMV](../../architecture/SHAPE_ADAPTIVE_GEMM_GEMV_REPORT.md). Evidence CSV: `benchmark/shape_adaptive_gemv_four_way_ablation.csv`. Source/test identifiers are `2e61ff71e1f67b85f68229026d6468036122e9c8` / `20d393c5e0e1a32388cce1112a4a20a32e05b5a5`; later unverified RTL changes are outside these runs.

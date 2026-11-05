@@ -234,6 +234,8 @@ overlap, so they must not be summed as disjoint cycles. The RTL source is
 
 ## Same-seed B-fold-cache × next-K-prefetch ablation — 2026-11-05
 
+Published evidence/summary commit: `d4d09ad58f882a5e2d59091073fd447bbb3dfaca`.
+
 The existing cache-off/on and prefetch-off/on runs provide a matched 2×2
 controller ablation for `M=16,N=16`, with the same RTL SHA
 `2e61ff71e1f67b85f68229026d6468036122e9c8`, profile/test SHA
@@ -294,6 +296,8 @@ simulator image.
 
 ## M8 real-CMDQ descriptor case — 2026-11-05, NOT_RUN
 
+Test addition commit: `f4d77afe55c1869cb53c5d8fa9356b449595d9a4`.
+
 Top Smoke now also submits `M=8,N=16,K=19` through the ABI-v7 CMDQ,
 descriptor validator, dispatcher, product Matrix controller and SPAD. It
 poisons the padded A lane, checks all 128 INT32 outputs against an independent
@@ -337,6 +341,8 @@ bank-aware issue and B reuse across M tiles while preserving response ownership
 and Abort/Reset behavior.
 
 ## `0x52` descriptor range enforcement — 2026-11-05, NOT_RUN
+
+RTL/test commit: `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
 
 The validator now derives byte spans for padded dense A, dense B, contiguous
 INT32 output, and enabled bias. Opcode `0x52` descriptors are rejected when
