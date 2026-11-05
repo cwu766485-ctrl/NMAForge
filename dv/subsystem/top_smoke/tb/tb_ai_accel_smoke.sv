@@ -217,6 +217,28 @@ module tb_ai_accel_smoke;
     reg ai_tile_forward_sfu_destination_write_seen = 1'b0;
     integer ai_tile_forward_sfu_spad_accesses_during_consume = 0;
     integer ai_tile_forward_engine_scan;
+    covergroup ai_v2_cross_engine_handoff_cg with function sample(
+        bit matrix_sfu_overlap,
+        integer sfu_spad_accesses,
+        bit source_write_attempt,
+        bit output_golden_ok);
+        option.per_instance = 1;
+        cp_matrix_sfu_overlap: coverpoint matrix_sfu_overlap {
+            bins matrix_sfu_parallel = {1'b1};
+        }
+        cp_sfu_access_during_consume: coverpoint sfu_spad_accesses {
+            bins accepted_access = {[1:256]};
+        }
+        cp_source_immutable: coverpoint source_write_attempt {
+            bins no_source_write_attempt = {1'b0};
+        }
+        cp_output_golden: coverpoint output_golden_ok {
+            bins bit_exact_outputs = {1'b1};
+        }
+        cp_parallel_traffic: cross cp_matrix_sfu_overlap,
+                                  cp_sfu_access_during_consume;
+    endgroup
+    ai_v2_cross_engine_handoff_cg ai_v2_cross_engine_handoff_cg_inst = new();
     integer cp_fetch_done_count;
     reg parallel_engine_overlap_seen = 1'b0;
     reg parallel_same_engine_overlap_violation = 1'b0;
@@ -3694,8 +3716,17 @@ module tb_ai_accel_smoke;
                 $fatal(1, "immutable tile/Matrix-SFU interleave had %0d errors",
                        errors - errors_before_f);
             end
-            $display("MATRIX_FUSED_TILE_FORWARD_CROSS_ENGINE_IMMUTABLE_PASS opcode=0x53 matrix_sfu_overlap=1 sfu_spad_accesses_during_consume=%0d source_unchanged=1 sfu_output=bit-exact golden=bit-exact",
-                     ai_tile_forward_sfu_spad_accesses_during_consume);
+            ai_v2_cross_engine_handoff_cg_inst.sample(
+                ai_tile_forward_cross_engine_overlap_seen,
+                ai_tile_forward_sfu_spad_accesses_during_consume,
+                ai_tile_forward_source_write_seen,
+                1'b1);
+            if (ai_v2_cross_engine_handoff_cg_inst.get_coverage() < 100.0)
+                $fatal(1, "0x53 legal cross-engine functional coverage incomplete: %0.2f%%",
+                       ai_v2_cross_engine_handoff_cg_inst.get_coverage());
+            $display("MATRIX_FUSED_TILE_FORWARD_CROSS_ENGINE_IMMUTABLE_PASS opcode=0x53 matrix_sfu_overlap=1 sfu_spad_accesses_during_consume=%0d source_unchanged=1 sfu_output=bit-exact golden=bit-exact functional_cov=%0.2f",
+                     ai_tile_forward_sfu_spad_accesses_during_consume,
+                     ai_v2_cross_engine_handoff_cg_inst.get_coverage());
             axi_write(REG_CMDQ_SIZE, 32'd0);
             axi_write(REG_CPLQ_SIZE, 32'd0);
             clear_done_irq();
