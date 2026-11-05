@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-05. v2 feature branch HEAD: `2d88b5766abc2982ee900f47d6ce1887b7aa45d0` (tree `225cb82be50aa11849bfd366b49ffd324b4ef754`). Product RTL/test candidate reviewed for the RTM: `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` (tree `dbf5060ac465ef4bb913543024182b298f675413`); later commits are documentation only. This is a short handoff for the next engineering task; it
+Updated: 2026-11-05. v2 feature branch HEAD: `465855acf0ba686421d61d77f36b22f1e23bd4f0` (tree `638538e65a4d5e3e214d1ae7b69a2616e8a244ba`). Product RTL candidate remains `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` (tree `dbf5060ac465ef4bb913543024182b298f675413`); `465855a` adds only a Matrix DV test and Make target. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -17,13 +17,19 @@ following report commits. See the Phase 0 section in the [v2 architecture
 review](../../architecture/NMAFORGE_V2_ARCHITECTURE_REVIEW.md) for branch/tree
 identities, worktree inventory, `.gitignore` audit, and post-RTL history.
 
-Phase 1 is **IN PROGRESS**. The DV report now has 21 normalized `REQ-V2-*`
-rows: 12 PASS-scoped, 5 PARTIAL, and 4 NOT_RUN. The current candidate
+Phase 1 is **IN PROGRESS**. The DV report has 21 normalized `REQ-V2-*`
+rows: 12 PASS-scoped, 6 PARTIAL, and 3 NOT_RUN. At fixed test SHA
+`465855a`, a new three-seed fault campaign covers 0x52 Parity, Protection,
+Abort with outstanding prefetch, Reset plus late unowned response, and 0x53
+Parity, output Protection, and held-write Abort; each seed checks recovery
+Golden. The same SHA passes the legacy Matrix-core 3-seed regression and Top
+Smoke. These directed points do not close the full fault/phase matrix. The current candidate
 `ac6b83f` descriptor validator replay passes 29 legal opcode classes, 33
-invalid-rule checks, and 43/43 accepts plus 26/26 rejects; 0x52/0x53 still
-lack feature-specific fault-phase closure, v2 mutation, merged URG disposition,
-and full opcode SVA coverage. Existing 3-seed GEMV, tile-forward, and clean Top
-CMDQ evidence remains bound to its exact historical source SHA. The v2 system
+invalid-rule checks, and 43/43 accepts plus 26/26 rejects; v2 mutation, merged
+URG disposition, cross-engine ownership, and full opcode SVA coverage remain
+open. The VCS Matrix line/condition/FSM/branch database from the fault run is
+not merged. Existing ablation and formal evidence remains bound to its exact
+historical source SHA. The v2 system
 DV is not signed off. Phase 2 has 4-way Cache×Prefetch and selected TinyNPU
 data; real Top contention attribution and common-memory endpoints are open.
 Phase 3 has a trained Digits MLP only; trained CNN and Tiny Transformer are
