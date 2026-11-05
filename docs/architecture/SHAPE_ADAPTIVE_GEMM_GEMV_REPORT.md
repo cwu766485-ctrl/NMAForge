@@ -230,10 +230,28 @@ overlap, so they must not be summed as disjoint cycles. The RTL source is
 | `V2-GEMV-B-CACHE-RANDOM-CORE-S3-20261105` | `make core-random-regress SEEDS='20261105 20261106 20261107' CORE_OUT_DIR=/tmp/nmaforge_gemv_b_cache_core_regress_final_20261105` | `/tmp/nmaforge_gemv_b_cache_core_regress_final_20261105/{run_seed,product_gemv_seed}_*.log` | PASS: 18 core cases and 35 fault/recovery checks per seed; product M4, M1-tail, M16/K19, and M16/K65 Golden/drain checks pass on all three seeds. |
 | `V2-GEMV-B-CACHE-TOP-SMOKE-20261105` | `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105` | `dv/subsystem/top_smoke/sim/ai_accel_smoke.log` | PASS: `TEST PASS`; existing opcode `0x52` M4 and M1 tail descriptor checks pass. Existing `LOOP-REROLL-ENABLED` notice remains. |
 
+## M8 multi-row case expansion — 2026-11-05, NOT_RUN
+
+The Matrix-core testbench and ablation target now include M8/N16/K19 and
+M8/N16/K65 alongside the existing M16 cases. The intended checks compare
+B-cache off/on, verify the complete output image and drain, and expect 54→35
+operand reads for K19 and 170→106 for K65. These are analytical expectations
+for the directed traffic model, not measured results.
+
+Attempted command:
+`make product-gemv-b-cache-ablation SEEDS='20261105' CORE_OUT_DIR=/tmp/nmaforge_gemv_b_cache_m8_first_20261105`.
+VCS reported `Cannot connect to the license server` and queued for a
+`VCS-BASE-COMPILE/VCSCompiler_Net` license before source compilation. The run
+was interrupted after the queue wait; no M8 or new M16 simulation ran. Status
+is **BLOCKED_ENV / NOT_RUN**, not PASS. The test expansion is committed as
+`0a500d17d997dd96dad5cd797849e5a71dfcc6e6`; rerun this target before using
+these shapes as evidence.
+
 ## Open work
 
-- Product shape tests do not yet enumerate every M/N/K combination, especially
-  M8 and scalar N=1; descriptor randomization and a shape matrix remain open.
+- Product shape tests do not yet enumerate every M/N/K combination. M8/K19
+  and M8/K65 checks have been added but are **NOT_RUN** due to the license
+  checkout failure above; scalar N=1 and a shape matrix remain open.
 - Extend the bounded prefetch into bank-aware request issue/scheduling; the
   current B-fold cache is limited to the first 64 K values and depends on
   stable, non-aliasing operands. Larger K values still reread B beyond the
