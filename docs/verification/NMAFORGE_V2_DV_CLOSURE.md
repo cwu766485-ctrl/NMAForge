@@ -5,7 +5,7 @@
 
 **Candidate tree:** `dbf5060ac465ef4bb913543024182b298f675413`
 
-**Latest fault replay at GitHub branch HEAD:** `59d1e5ed6570fefe957a6ed2abc10d6d18c21ed2` (tree `94f3a2748698c100a6f2087c72bd091d357747f8`). This HEAD adds documentation after test commit `465855acf0ba686421d61d77f36b22f1e23bd4f0` (tree `638538e65a4d5e3e214d1ae7b69a2616e8a244ba`); the tested RTL and Matrix testbench blobs are identical.
+**Latest fault replay at GitHub branch HEAD:** `de705ee6317557954af9cb396cda94b01eb1c432` (tree `d948c9f72a24fd6ccdfdef9acfd5d940ceb37cfa`), including the added 0x53 Reset/Epoch scenario.
 **Latest RTL-mutation replay:** `a015de58379ca1303ebfc1c4c3899d1fd77affa2` (tree `402f5172240dfe60197bbb41937ab99814333d6a`); this adds only the mutation harness and Make target.
 
 **Baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
@@ -108,6 +108,39 @@ compatibility logs are archived at
 IDs: `V2-OPCODE-FAULT-3SEED-59D1E5E` and
 `V2-OPCODE-FAULT-COMPAT-3SEED-465855A`.
 
+### 0x53 Reset/Epoch follow-up at hosted HEAD
+
+The fault campaign was extended with a 0x53 consumer reset while an accepted
+B-operand response is outstanding. The test first captures a producer tile,
+starts a consumer with delayed bank responses, asserts reset while the consume
+is active, then injects the stale response after reset. It checks that reset
+clears the outstanding count and forwarding tag, the stale response is
+discarded without completion/error/writeback, the destination sentinel is
+unchanged, and a fresh producer/consumer Golden chain recovers.
+
+At exact GitHub SHA `de705ee6317557954af9cb396cda94b01eb1c432` (tree
+`d948c9f72a24fd6ccdfdef9acfd5d940ceb37cfa`), the following command exited 0
+on VCS `V-2023.12-SP1_Full64`:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+make -C dv/block/compute/matrix/sim product-opcode-fault-regress \
+  SEEDS='20261105 20261106 20261107' \
+  CORE_OUT_DIR=/tmp/nmaforge_v2_opcode_fault_de705ee_verified
+```
+
+All three seeds emitted `MATRIX_0X53_RESET_EPOCH_PASS` and
+`MATRIX_V2_OPCODE_FAULT_PASS`, plus bit-exact 0x52 Golden and 0x53 tile-chain
+recovery markers. The archived compile and three seed logs are at
+`/tmp/nmaforge_v2_opcode_fault_de705ee_verified_logs.tar.gz` (SHA-256
+`05edd8a0e9918b6dbd77f7736cbf42ef9ead661822ea430428b9dd4bf50c4675`). VCS
+line/condition/FSM/branch collection was enabled; the databases have not been
+URG-merged or dispositioned. This closes only this directed reset interleave;
+it does not establish the full Reset × Phase × Engine cross or external-fabric
+ownership.
+
 ## Fixed-SHA v2 RTL checker-sensitivity campaign — 2026-11-05
 
 At test SHA `a015de58379ca1303ebfc1c4c3899d1fd77affa2`, a runner mutated
@@ -164,8 +197,8 @@ functional coverage evidence, not merged URG coverage bins.
 | REQ-V2-053-002: capture becomes valid only after accepted producer lines and consume uses exact tag or SPAD fallback | 512 B bounded tile-forward buffer | Core capture mask/final-line checker; tag hit and miss Golden/read-count checker | None | full capture mask; exact tag hit; mismatch miss and 32-read fallback | `V2-TILE-FORWARD-CORE-3SEED-33E8528`, 20261105/06/07, `33e85287fbf37187fccb76e97be6effe888670e9`; Top run above | **PASS (tested core path)**; tile CSV and report; Top CMDQ producer/consumer also passes |
 | REQ-V2-053-003: consume old bank while capture writes the opposite bank; preserve outputs and flip banks | Ping-pong buffer control | Core chain Golden + bank/tag comparison; Top CMDQ output/completion differential | None | simultaneous consume/capture, old-bank data, opposite-bank flip, 16 source-A reads saved | core run SHA `33e85287fbf37187fccb76e97be6effe888670e9`; Top `V2-TOP-CMDQ-CLEAN-3SEED-3A283C0`, seeds 20261105/06/07, `3a283c04724378c46747d907505eb82ea1ccbd4a` | **PASS (16×16 chain)**; tile CSV and Top archive |
 | REQ-V2-053-004: producer writeback backpressure cannot outrun capture or alter committed image | Fused line writer and capture handshake | Core `tile_forward_backpressure_seen`, final line and complete memory image checks | None | line stall, all 16 accepted lines, capture mask `ffff` | `V2-TILE-FORWARD-CORE-3SEED-33E8528`, 20261105/06/07, `33e85287fbf37187fccb76e97be6effe888670e9` | **PASS (directed line-ready stall)**; tile report/CSV; arbitrary held-response timing remains untested |
-| REQ-V2-053-005: Abort/reset invalidate tile tag and prevent prior-epoch reuse | Local tile validity epoch | Core abort/reset probe and stale-tag prevention; 0x52 reset probe injects late unowned response and checks no write/error | No epoch-specific SVA | 0x53 tag invalidation/fallback; 0x52 stale response after reset; three seeds | `V2-TILE-FORWARD-CORE-3SEED-33E8528`; `V2-OPCODE-FAULT-3SEED-59D1E5E`, SHA `59d1e5ed6570fefe957a6ed2abc10d6d18c21ed2` | **PARTIAL**; tag invalidation and a 0x52 late response pass, but a response crossing reset specifically during 0x53 forwarding remains untested; logs archive above |
-| REQ-V2-053-006: parity/protection/held response/Completion faults preserve 0x53 error and memory contract | Fused path fault lifecycle | `run_v2_opcode_fault_campaign`; read Parity, output-write Protection, held output-line Abort, sentinels and successful tile-chain recovery | No 0x53-specific SVA | Parity, Protection, held write under backpressure and abort; three seeds | `V2-OPCODE-FAULT-3SEED-59D1E5E`, seeds 20261105/06/07, SHA `59d1e5ed6570fefe957a6ed2abc10d6d18c21ed2` | **PARTIAL**; selected fault points pass; Completion fault injection and held-response/Reset crosses remain open; logs archive above |
+| REQ-V2-053-005: Abort/reset invalidate tile tag and prevent prior-epoch reuse | Local tile validity epoch | Core abort/reset probes; 0x53 consumer reset with accepted delayed B response, injected stale post-reset response, tag/count/write checks | No epoch-specific SVA | 0x53 tag invalidation/fallback; stale response after reset; three seeds | `V2-OPCODE-FAULT-3SEED-DE705EE`, seeds 20261105/06/07, SHA `de705ee6317557954af9cb396cda94b01eb1c432`; older 0x52 late-response run `59d1e5e` | **PARTIAL**; the selected 0x53 reset interleave now passes with sentinel preservation and post-reset recovery; other legal phase crosses and external-fabric ownership remain open; log archive above |
+| REQ-V2-053-006: parity/protection/held response/Completion faults preserve 0x53 error and memory contract | Fused path fault lifecycle | `run_v2_opcode_fault_campaign`; read Parity, output-write Protection, held output-line Abort, reset-epoch stale response, sentinels and successful tile-chain recovery | No 0x53-specific SVA | Parity, Protection, held write under backpressure and Abort, selected Reset epoch; three seeds | `V2-OPCODE-FAULT-3SEED-DE705EE`, seeds 20261105/06/07, SHA `de705ee6317557954af9cb396cda94b01eb1c432` | **PARTIAL**; selected fault points pass; Completion fault injection, broader held-response/Reset crosses and URG disposition remain open; log archive above |
 | REQ-V2-053-007: software-held source immutability and cross-engine SPAD access obey the forwarding contract | Explicitly ordered local handoff, no coherence | Contract reviewed; no cross-engine checker | None | source mutation/DMA or other-engine write during handoff NOT_RUN | `NOT_RUN@f4ed9c4`, seed N/A, candidate `f4ed9c4f5b711bd6554d588477957e9bf3ce3806` | **NOT_RUN**; spec requires source immutability, but there is no coherent cache or test evidence |
 | REQ-V2-COM-003: new-feature assertions are connected and non-vacuous | Matrix FSM and top SVA | VC Formal proves existing Matrix guard set; Top SVA is AXI/quiescence scoped | Formal: 5/5 named Matrix assertions non-vacuous and 2/2 covers reached at `145363ddff5141177421ee7429fc65f78834830d`; no opcode-specific 0x52/0x53 assertion | `prefetch_wait`, `error_drain` covers; no v2 opcode transition cross | `V2-MATRIX-FSM-GUARDS-145363D`, formal run, SHA `145363ddff5141177421ee7429fc65f78834830d` | **PARTIAL**; this does not prove new opcode properties or full SVA connection coverage; `/tmp/nmaforge_v2_matrix_fsm_formal_33e8528/vc_formal.log` |
 | REQ-V2-COM-004: all legal v2 functional bins are merged and every exclusion/waiver has disposition | URG functional/code coverage | No current-candidate URG merge or reviewed exclusion set | No coverage assertion | VCS line/condition/FSM/branch enabled on core suite, but DB not merged and no per-bin disposition | `NOT_RUN@f4ed9c4`, candidate `f4ed9c4f5b711bd6554d588477957e9bf3ce3806` | **NOT_RUN**; no coverage percentage/closure claim; raw run logs are external only |
@@ -254,8 +287,9 @@ Compute Cluster disposition from **HOLD**.
    run, named checker, assertion disposition, and coverage-bin disposition; the
    current 21-row RTM is normalized but still contains PARTIAL/NOT_RUN rows.
 2. Extend the fixed-SHA `0x52`/`0x53` fault campaign to the remaining legal
-   phase crosses, response holds, request backpressure, 0x53 reset-epoch
-   responses, and completion-fault semantics.
+   phase crosses, response holds, request backpressure, and completion-fault
+   semantics; the selected 0x53 reset-epoch stale-response interleave now
+   passes at `de705ee`.
 3. Define and test tile-source immutability under cross-engine SPAD traffic;
    test repeated consume and producer/consumer interleavings.
 4. Review/merge current-SHA functional coverage; audit assertions for

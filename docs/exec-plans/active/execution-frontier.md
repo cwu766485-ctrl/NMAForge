@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-05. Latest fixed-SHA v2 mutation run: `a015de58379ca1303ebfc1c4c3899d1fd77affa2` (tree `402f5172240dfe60197bbb41937ab99814333d6a`); latest opcode fault run: `59d1e5ed6570fefe957a6ed2abc10d6d18c21ed2` (tree `94f3a2748698c100a6f2087c72bd091d357747f8`). Product RTL candidate remains `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` (tree `dbf5060ac465ef4bb913543024182b298f675413`); later commits add only test infrastructure and reports. This is a short handoff for the next engineering task; it
+Updated: 2026-11-05. Latest fixed-SHA v2 mutation run: `a015de58379ca1303ebfc1c4c3899d1fd77affa2` (tree `402f5172240dfe60197bbb41937ab99814333d6a`); latest opcode fault run: `de705ee6317557954af9cb396cda94b01eb1c432` (tree `d948c9f72a24fd6ccdfdef9acfd5d940ceb37cfa`). Product RTL candidate remains `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` (tree `dbf5060ac465ef4bb913543024182b298f675413`); later commits add only test infrastructure and reports. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -19,14 +19,20 @@ identities, worktree inventory, `.gitignore` audit, and post-RTL history.
 
 Phase 1 is **IN PROGRESS**. The DV report has 21 normalized `REQ-V2-*`
 rows: 12 PASS-scoped, 7 PARTIAL, and 2 NOT_RUN. At fixed test SHA
-`59d1e5e`, a new three-seed fault campaign covers 0x52 Parity, Protection,
-Abort with outstanding prefetch, Reset plus late unowned response, and 0x53
-Parity, output Protection, and held-write Abort; each seed checks recovery
-Golden. The same SHA passes the legacy Matrix-core 3-seed regression and Top
-Smoke (the compatibility replay used the identical RTL/test tree at
-`465855a`). Mutation testing at fixed SHA `a015de5` catches 5 real RTL fault
+`de705ee`, a three-seed fault campaign covers 0x52 Parity, Protection, Abort
+with outstanding prefetch, Reset plus late unowned response, and 0x53 Parity,
+output Protection, held-write Abort, and Reset/Epoch with an accepted delayed
+operand response discarded after reset; each seed checks sentinel preservation
+and Golden recovery. The latest opcode fault target exited 0 with VCS
+`V-2023.12-SP1_Full64`; logs are archived at
+`/tmp/nmaforge_v2_opcode_fault_de705ee_verified_logs.tar.gz` (SHA-256
+`05edd8a0e9918b6dbd77f7736cbf42ef9ead661822ea430428b9dd4bf50c4675`). A prior
+compatibility replay passed the legacy Matrix-core 3-seed regression and Top
+Smoke at `465855a` with the same product RTL but the earlier testbench. Mutation
+testing at fixed SHA `a015de5` catches 5 real RTL fault
 classes across three seeds (15/15 checks). These results do not close the full
-fault/phase matrix or mutation requirements. The current candidate
+fault/phase matrix or mutation requirements. VCS line/condition/FSM/branch
+coverage was collected, but its databases are still not URG-merged. The current candidate
 `ac6b83f` descriptor validator replay passes 29 legal opcode classes, 33
 invalid-rule checks, and 43/43 accepts plus 26/26 rejects; v2 mutation, merged
 URG disposition, cross-engine ownership, and full opcode SVA coverage remain
