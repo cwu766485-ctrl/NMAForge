@@ -22,6 +22,7 @@ COV_METRICS := line+cond+fsm+branch
 	core-random-test core-random-compile core-random-run a3-core-test \
 	core-prefetch-handoff-test core-prefetch-handoff-regress \
 	core-no-prefetch-fallback-compile core-no-prefetch-fallback-regress \
+	core-no-prefetch-gemv-regress \
 	product-gemv-test product-gemv-regress \
 	product-opcode-fault-regress \
 	product-opcode-mutation-regress \
@@ -94,7 +95,9 @@ core-random-run: core-random-compile
 		-l $(CORE_OUT_DIR)/product_gemv.log
 	grep -q '^MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 ' $(CORE_OUT_DIR)/product_gemv.log
 	grep -q '^MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 ' $(CORE_OUT_DIR)/product_gemv.log
+	grep -q '^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=8x16x65 ' $(CORE_OUT_DIR)/product_gemv.log
 	grep -q '^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=16x16x19 ' $(CORE_OUT_DIR)/product_gemv.log
+	grep -Eq '^MATRIX_V2_GEMV_SHAPE_COVERAGE_PASS bins=6 coverage=100\.00 seed=$(SEED)$$' $(CORE_OUT_DIR)/product_gemv.log
 
 core-random-regress: core-random-compile
 	@set -e; for seed in $(SEEDS); do \
@@ -108,7 +111,9 @@ core-random-regress: core-random-compile
 			-cm_name matrix_product_gemv_$$seed -l $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 		grep -q "^MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 		grep -q "^MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=8x16x65 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 		grep -q "^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=16x16x19 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -Eq "^MATRIX_V2_GEMV_SHAPE_COVERAGE_PASS bins=6 coverage=100\\.00 seed=$$seed$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 	done
 
 product-gemv-test: core-random-compile
@@ -117,6 +122,7 @@ product-gemv-test: core-random-compile
 		-cm_name matrix_product_gemv_$(SEED) -l $(CORE_OUT_DIR)/product_gemv.log
 	grep -q '^MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 .*golden=bit-exact$$' $(CORE_OUT_DIR)/product_gemv.log
 	grep -q '^MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 .*golden=bit-exact$$' $(CORE_OUT_DIR)/product_gemv.log
+	grep -q '^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=8x16x65 .*golden=bit-exact$$' $(CORE_OUT_DIR)/product_gemv.log
 	grep -q '^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=16x16x19 .*golden=bit-exact$$' $(CORE_OUT_DIR)/product_gemv.log
 
 product-gemv-regress: core-random-compile
@@ -126,7 +132,9 @@ product-gemv-regress: core-random-compile
 			-cm_name matrix_product_gemv_$$seed -l $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 		grep -q "^MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 		grep -q "^MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=8x16x65 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 		grep -q "^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=16x16x19 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -Eq "^MATRIX_V2_GEMV_SHAPE_COVERAGE_PASS bins=6 coverage=100\\.00 seed=$$seed$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 		grep -q "^MATRIX_PRODUCT_GEMV_ONLY_PASS seed=$$seed$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 	done
 
@@ -141,6 +149,8 @@ product-opcode-fault-regress: core-random-compile
 		grep -q "^MATRIX_0X53_RESET_EPOCH_PASS .* seed=$$seed$$" \
 			$(CORE_OUT_DIR)/v2_opcode_fault_seed_$$seed.log; \
 		grep -q "^MATRIX_V2_OPCODE_FAULT_PASS .* seed=$$seed$$" \
+			$(CORE_OUT_DIR)/v2_opcode_fault_seed_$$seed.log; \
+		grep -Eq "^MATRIX_V2_OPCODE_FAULT_COVERAGE_PASS bins=8 coverage=100\\.00 seed=$$seed$$" \
 			$(CORE_OUT_DIR)/v2_opcode_fault_seed_$$seed.log; \
 	done
 
@@ -268,6 +278,7 @@ core-tile-forward-ablation:
 			-cm_name matrix_tile_forward_$$enable -l $$out/run.log; \
 		grep -q "^MATRIX_TILE_FORWARD_CHAIN_PASS enable=$$enable " $$out/run.log; \
 		grep -q "^MATRIX_TILE_FORWARD_CHAIN_ONLY_PASS enable=$$enable seed=$(SEED)$$" $$out/run.log; \
+		if [ $$enable -eq 1 ]; then grep -Eq '^MATRIX_V2_TILE_FORWARD_COVERAGE_PASS enable=1 bins=6 coverage=100\.00 seed=$(SEED)$$' $$out/run.log; fi; \
 		done
 
 core-tile-forward-regress:
@@ -303,6 +314,27 @@ core-no-prefetch-fallback-regress: core-no-prefetch-fallback-compile
 			-l $(NO_PREFETCH_CORE_OUT_DIR)/run_seed_$$seed.log; \
 		grep -q "^MATRIX_NO_PREFETCH_FALLBACK_PASS seed=$$seed fallback=1$$" $(NO_PREFETCH_CORE_OUT_DIR)/run_seed_$$seed.log; \
 		grep -q "^MATRIX_SIZE_BENCHMARK_PASS .*next_k_prefetch=0 " $(NO_PREFETCH_CORE_OUT_DIR)/run_seed_$$seed.log; \
+	done
+
+# The product-shape covergroup also runs with prefetch compiled out. Keep this
+# separate from the benchmark fallback target so each named GEMV shape has an
+# explicit Golden and per-seed 100% bin gate in both prefetch profiles.
+core-no-prefetch-gemv-regress: core-no-prefetch-fallback-compile
+	@set -e; for seed in $(SEEDS); do \
+		$(NO_PREFETCH_CORE_OUT_DIR)/simv +SEED=$$seed +MATRIX_PRODUCT_GEMV_ONLY \
+			-cm $(COV_METRICS) -cm_dir $(NO_PREFETCH_CORE_OUT_DIR)/coverage.vdb \
+			-cm_name no_prefetch_gemv_$$seed \
+			-l $(NO_PREFETCH_CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 .*golden=bit-exact$$" \
+			$(NO_PREFETCH_CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 .*golden=bit-exact$$" \
+			$(NO_PREFETCH_CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=8x16x65 .*golden=bit-exact$$" \
+			$(NO_PREFETCH_CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=16x16x65 .*golden=bit-exact$$" \
+			$(NO_PREFETCH_CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -Eq "^MATRIX_V2_GEMV_SHAPE_COVERAGE_PASS bins=6 coverage=100\\.00 seed=$$seed$$" \
+			$(NO_PREFETCH_CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 	done
 
 core-prefetch-handoff-test: core-random-compile

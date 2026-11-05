@@ -37,6 +37,8 @@ module tb_ai_tensor_matrix_core_random;
   localparam [31:0] BIAS_BASE = 32'h0000_8000;
   localparam [31:0] DST_BASE  = 32'h0001_0000;
   localparam [31:0] TILE_FORWARD_CONSUMER_DST = 32'h0001_1000;
+  localparam [31:0] TILE_FORWARD_REPEAT_DST = 32'h0001_2000;
+  localparam [31:0] TILE_FORWARD_REPEAT_DST2 = 32'h0001_3000;
   localparam [3:0] ERR_CONFIG=1, ERR_OP=2, ERR_ABORT=3, ERR_WATCHDOG=4,
                    ERR_PARITY=5, ERR_PROTECTION=6;
 
@@ -84,6 +86,50 @@ module tb_ai_tensor_matrix_core_random;
   reg signed [31:0] logical_bias [0:31];
   integer signed tile_forward_hidden0 [0:15][0:15];
   integer signed tile_forward_hidden1 [0:15][0:15];
+  integer signed tile_forward_hidden2 [0:15][0:15];
+
+  // These bins describe only named, Golden-checked v2 scenarios. They do not
+  // imply exhaustive descriptor, fault-phase, or system-level coverage.
+  covergroup v2_gemv_shape_cg with function sample(input integer shape_id);
+    option.per_instance = 1;
+    cp_shape: coverpoint shape_id {
+      bins m4_n16_k32 = {1};
+      bins m1_n13_k17 = {2};
+      bins m8_n16_k19 = {3};
+      bins m8_n16_k65 = {4};
+      bins m16_n16_k19 = {5};
+      bins m16_n16_k65 = {6};
+    }
+  endgroup
+  v2_gemv_shape_cg v2_gemv_shape_cg_inst = new();
+
+  covergroup v2_opcode_fault_cg with function sample(input integer scenario_id);
+    option.per_instance = 1;
+    cp_fault_scenario: coverpoint scenario_id {
+      bins gemv_parity = {1};
+      bins gemv_b_protection = {2};
+      bins gemv_prefetch_abort = {3};
+      bins gemv_prefetch_reset_stale = {4};
+      bins fused_reset_stale = {5};
+      bins fused_parity = {6};
+      bins fused_output_protection = {7};
+      bins fused_held_write_abort = {8};
+    }
+  endgroup
+  v2_opcode_fault_cg v2_opcode_fault_cg_inst = new();
+
+  covergroup v2_tile_forward_cg with function sample(input integer scenario_id);
+    option.per_instance = 1;
+    cp_forward_scenario: coverpoint scenario_id {
+      bins committed_capture = {1};
+      bins tagged_consume_and_bank_flip = {2};
+      bins tag_miss_spad_fallback = {3};
+      bins reset_invalidates_tag = {4};
+      bins abort_invalidates_tag = {5};
+      bins repeated_tag_uses_spad_fallback = {6};
+    }
+  endgroup
+  v2_tile_forward_cg v2_tile_forward_cg_inst = new();
 
   reg [31:0] pending_bank_data [0:3];
   reg [31:0] bank_response_data_fifo [0:BANK_RESPONSE_QUEUE_DEPTH-1][0:3];
@@ -640,6 +686,7 @@ module tb_ai_tensor_matrix_core_random;
                dut.perf_writeback_wait_cycles,dut.perf_outstanding_highwater,
                dut.perf_prefetch_completed,dut.perf_prefetch_overlap_cycles,
                line_write_count*16);
+      v2_gemv_shape_cg_inst.sample(1);
     end
   endtask
 
@@ -765,6 +812,7 @@ module tb_ai_tensor_matrix_core_random;
                dut.perf_writeback_wait_cycles,gemv_bank_stalls,
                gemv_line_stalls,dut.perf_outstanding_highwater,
                dut.perf_fifo_full_cycles);
+      v2_gemv_shape_cg_inst.sample(2);
     end
   endtask
 
@@ -908,6 +956,14 @@ module tb_ai_tensor_matrix_core_random;
                dut.perf_response_wait_cycles,dut.perf_writeback_wait_cycles,
                gemv_bank_stalls,gemv_line_stalls,
                dut.perf_outstanding_highwater,dut.perf_fifo_full_cycles);
+      if(m_rows==8 && k_size==19)
+        v2_gemv_shape_cg_inst.sample(3);
+      else if(m_rows==8 && k_size==65)
+        v2_gemv_shape_cg_inst.sample(4);
+      else if(m_rows==16 && k_size==19)
+        v2_gemv_shape_cg_inst.sample(5);
+      else if(m_rows==16 && k_size==65)
+        v2_gemv_shape_cg_inst.sample(6);
     end
   endtask
 
@@ -1025,7 +1081,8 @@ module tb_ai_tensor_matrix_core_random;
     integer row_group,col_group,row_lane,col_lane,k_lane;
     integer line_address,line_index,consumer_read_snapshot;
     integer producer_bank_snapshot,accumulated,word_index,timeout;
-    integer producer_cycles,consumer_cycles;
+    integer producer_cycles,consumer_cycles,consumer_bank_reads;
+    integer consumer_forward_hits,consumer_reads_saved,consumer_bank_flip;
     reg [31:0] packed_word;
     begin
       if(dut.tile_forward_valid_r)
@@ -1089,6 +1146,7 @@ module tb_ai_tensor_matrix_core_random;
           $fatal(1,"tile-forward producer did not fill/backpressure/commit a full tile valid=%b mask=%04x last=%b stall=%b",
                  dut.tile_forward_valid_r,dut.tile_forward_capture_mask_r,
                  tile_forward_last_seen,tile_forward_backpressure_seen);
+        v2_tile_forward_cg_inst.sample(1);
       end else if(dut.tile_forward_valid_r) begin
         $fatal(1,"disabled tile-forward build unexpectedly retained a tile");
       end
@@ -1151,6 +1209,7 @@ module tb_ai_tensor_matrix_core_random;
                  dut.perf_tile_forward_hits,dut.perf_tile_forward_reads_saved,
                  dut.tile_forward_valid_r,dut.tile_forward_bank_r,
                  producer_bank_snapshot,dut.tile_forward_tag_base_r);
+        v2_tile_forward_cg_inst.sample(2);
       end else if(dut.perf_tile_forward_hits!=0 ||
                   dut.perf_tile_forward_reads_saved!=0 ||
                   dut.tile_forward_valid_r) begin
@@ -1158,12 +1217,124 @@ module tb_ai_tensor_matrix_core_random;
       end
       if(bank_read_count!=bank_response_count || pending_bank)
         $fatal(1,"tile-forward chain left bank responses outstanding");
+      consumer_bank_reads=bank_read_count-consumer_read_snapshot;
+      consumer_forward_hits=dut.perf_tile_forward_hits;
+      consumer_reads_saved=dut.perf_tile_forward_reads_saved;
+      consumer_bank_flip=(dut.tile_forward_bank_r!=producer_bank_snapshot);
+
+      // Consume the exact tile written by the first consumer twice without
+      // recapturing it. This checks repeated tag use and verifies that the
+      // forwarding source remains immutable across both consumers.
+      for(row_group=0;row_group<4;row_group=row_group+1)
+        for(col_group=0;col_group<4;col_group=col_group+1) begin
+          line_address=TILE_FORWARD_CONSUMER_DST+
+                       ((row_group*4+col_group)*16);
+          line_index=(line_address>>4)&13'h1fff;
+          for(row_lane=0;row_lane<4;row_lane=row_lane+1)
+            bank_mem[row_lane][line_index]=
+                output_mem[(line_address>>2)+row_lane];
+        end
+      for(row_group=0;row_group<16;row_group=row_group+1)
+        for(col_group=0;col_group<16;col_group=col_group+1) begin
+          accumulated=0;
+          for(k_lane=0;k_lane<16;k_lane=k_lane+1)
+            accumulated=accumulated+
+                tile_forward_hidden1[row_group][k_lane]*
+                $signed(logical_b[0][k_lane][col_group]);
+          tile_forward_hidden2[row_group][col_group]=
+              ref_requant_i8(accumulated,1);
+        end
+      for(timeout=0;timeout<256;timeout=timeout+1) begin
+        word_index=(TILE_FORWARD_REPEAT_DST>>2)+timeout;
+        output_mem[word_index]=32'hbad0_0000+word_index;
+      end
+      src0_base=TILE_FORWARD_CONSUMER_DST;
+      dst_base=TILE_FORWARD_REPEAT_DST;
+      op_mode=8'h53;aux0=32'h0000_0041;
+      line_write_count=0;scalar_write_count=0;
+      consumer_read_snapshot=bank_read_count;
+      launch_and_wait();
+      if(error || error_code!=0 || element_count!=32'd256 ||
+         line_write_count!=16 || scalar_write_count!=0)
+        $fatal(1,"tile-forward repeated consumer #1 completion error=%b code=%0d elements=%0d lines=%0d scalar=%0d",
+               error,error_code,element_count,line_write_count,scalar_write_count);
+      for(row_group=0;row_group<4;row_group=row_group+1)
+        for(col_group=0;col_group<4;col_group=col_group+1) begin
+          line_address=TILE_FORWARD_REPEAT_DST+
+                       ((row_group*4+col_group)*16);
+          for(row_lane=0;row_lane<4;row_lane=row_lane+1) begin
+            packed_word=0;
+            for(col_lane=0;col_lane<4;col_lane=col_lane+1)
+              packed_word[col_lane*8+:8]=
+                  tile_forward_hidden2[row_group*4+row_lane]
+                                       [col_group*4+col_lane];
+            word_index=(line_address>>2)+row_lane;
+            if(output_mem[word_index]!==packed_word)
+              $fatal(1,"tile-forward repeated consumer #1 Golden mismatch line=%0d lane=%0d got=%08x exp=%08x",
+                     line_address,row_lane,output_mem[word_index],packed_word);
+          end
+        end
+      if(bank_read_count-consumer_read_snapshot !=
+         (ELASTIC_TILE_FORWARDING_ENABLE ? 16 : 32))
+        $fatal(1,"tile-forward repeated consumer #1 reads=%0d expected=%0d",
+               bank_read_count-consumer_read_snapshot,
+               ELASTIC_TILE_FORWARDING_ENABLE ? 16 : 32);
+      if(ELASTIC_TILE_FORWARDING_ENABLE &&
+         (dut.tile_forward_valid_r ||
+          dut.perf_tile_forward_hits!=1 ||
+          dut.perf_tile_forward_reads_saved!=16))
+        $fatal(1,"tile-forward repeated consumer #1 did not consume once and invalidate tag valid=%b hits=%0d saved=%0d",
+               dut.tile_forward_valid_r,dut.perf_tile_forward_hits,
+               dut.perf_tile_forward_reads_saved);
+
+      for(timeout=0;timeout<256;timeout=timeout+1) begin
+        word_index=(TILE_FORWARD_REPEAT_DST2>>2)+timeout;
+        output_mem[word_index]=32'hbad0_0000+word_index;
+      end
+      dst_base=TILE_FORWARD_REPEAT_DST2;
+      line_write_count=0;scalar_write_count=0;
+      consumer_read_snapshot=bank_read_count;
+      launch_and_wait();
+      if(error || error_code!=0 || element_count!=32'd256 ||
+         line_write_count!=16 || scalar_write_count!=0)
+        $fatal(1,"tile-forward repeated consumer #2 completion error=%b code=%0d elements=%0d lines=%0d scalar=%0d",
+               error,error_code,element_count,line_write_count,scalar_write_count);
+      for(row_group=0;row_group<4;row_group=row_group+1)
+        for(col_group=0;col_group<4;col_group=col_group+1) begin
+          line_address=TILE_FORWARD_REPEAT_DST2+
+                       ((row_group*4+col_group)*16);
+          for(row_lane=0;row_lane<4;row_lane=row_lane+1) begin
+            packed_word=0;
+            for(col_lane=0;col_lane<4;col_lane=col_lane+1)
+              packed_word[col_lane*8+:8]=
+                  tile_forward_hidden2[row_group*4+row_lane]
+                                       [col_group*4+col_lane];
+            word_index=(line_address>>2)+row_lane;
+            if(output_mem[word_index]!==packed_word)
+              $fatal(1,"tile-forward repeated consumer #2 Golden mismatch line=%0d lane=%0d got=%08x exp=%08x",
+                     line_address,row_lane,output_mem[word_index],packed_word);
+          end
+        end
+      if(bank_read_count-consumer_read_snapshot != 32)
+        $fatal(1,"tile-forward repeated consumer #2 reads=%0d expected=%0d",
+               bank_read_count-consumer_read_snapshot,32);
+      if(ELASTIC_TILE_FORWARDING_ENABLE &&
+         (dut.tile_forward_valid_r || dut.perf_tile_forward_hits!=0 ||
+          dut.perf_tile_forward_reads_saved!=0))
+        $fatal(1,"tile-forward repeated consumer #2 did not use safe SPAD fallback valid=%b hits=%0d saved=%0d",
+               dut.tile_forward_valid_r,dut.perf_tile_forward_hits,
+               dut.perf_tile_forward_reads_saved);
+      if(ELASTIC_TILE_FORWARDING_ENABLE)
+        v2_tile_forward_cg_inst.sample(6);
+      $display("MATRIX_TILE_FORWARD_REPEATED_CONSUMER_PASS enable=%0d second_same_tag=spad_fallback golden=bit-exact reads=%0d seed=%0d",
+               ELASTIC_TILE_FORWARDING_ENABLE,
+               bank_read_count-consumer_read_snapshot,initial_seed);
+
       $display("MATRIX_TILE_FORWARD_CHAIN_PASS enable=%0d producer_cycles=%0d consumer_cycles=%0d consumer_bank_reads=%0d consumer_read_bytes=%0d forward_hits=%0d reads_saved=%0d ping_pong_bank_flip=%0d golden=bit-exact seed=%0d",
                ELASTIC_TILE_FORWARDING_ENABLE,producer_cycles,
-               consumer_cycles,bank_read_count-consumer_read_snapshot,
-               (bank_read_count-consumer_read_snapshot)*16,
-               dut.perf_tile_forward_hits,dut.perf_tile_forward_reads_saved,
-               (dut.tile_forward_bank_r!=producer_bank_snapshot),initial_seed);
+               consumer_cycles,consumer_bank_reads,consumer_bank_reads*16,
+               consumer_forward_hits,consumer_reads_saved,
+               consumer_bank_flip,initial_seed);
 
       // A tag miss on the opt-in fused opcode must transparently take the
       // ordinary SPAD path and match Golden; a stale local tile must not win.
@@ -1203,6 +1374,8 @@ module tb_ai_tensor_matrix_core_random;
                bank_read_count-consumer_read_snapshot,
                dut.perf_tile_forward_hits,dut.perf_tile_forward_reads_saved,
                dut.tile_forward_valid_r);
+      if(ELASTIC_TILE_FORWARDING_ENABLE)
+        v2_tile_forward_cg_inst.sample(3);
       $display("MATRIX_TILE_FORWARD_MISS_FALLBACK_PASS enable=%0d bank_reads=%0d golden=bit-exact recaptured=%0d",
                ELASTIC_TILE_FORWARDING_ENABLE,
                bank_read_count-consumer_read_snapshot,
@@ -1217,6 +1390,8 @@ module tb_ai_tensor_matrix_core_random;
       if(dut.tile_forward_valid_r)
         $fatal(1,"tile-forward reset did not flush valid tag");
       repeat(3) @(negedge clk);resetn=1;
+      if(ELASTIC_TILE_FORWARDING_ENABLE)
+        v2_tile_forward_cg_inst.sample(4);
       repeat(2) @(negedge clk);
       force_line_ready=1;force_banked_ready=1;force_bank_response_delay=1;
       force_zero_bank_latency=0;
@@ -1248,6 +1423,16 @@ module tb_ai_tensor_matrix_core_random;
         $fatal(1,"tile-forward abort did not flush/no-commit done=%b error=%b code=%0d valid=%b lines=%0d pending=%b",
                done,error,error_code,dut.tile_forward_valid_r,
                line_write_count,pending_bank);
+      if(ELASTIC_TILE_FORWARDING_ENABLE) begin
+        v2_tile_forward_cg_inst.sample(5);
+        if(v2_tile_forward_cg_inst.get_coverage()<100.0)
+          $fatal(1,"0x53 forwarding functional coverage incomplete: %0.2f%%",
+                 v2_tile_forward_cg_inst.get_coverage());
+      end
+      $display("MATRIX_V2_TILE_FORWARD_COVERAGE_PASS enable=%0d bins=%0d coverage=%0.2f seed=%0d",
+               ELASTIC_TILE_FORWARDING_ENABLE,
+               ELASTIC_TILE_FORWARDING_ENABLE ? 6 : 0,
+               v2_tile_forward_cg_inst.get_coverage(),initial_seed);
       $display("MATRIX_TILE_FORWARD_ABORT_RESET_PASS abort=1 reset_flush=1 stale_tag=blocked");
       force_banked_ready=0;force_bank_response_delay=0;
       force_zero_bank_latency=0;force_line_ready=0;
@@ -1910,6 +2095,7 @@ module tb_ai_tensor_matrix_core_random;
         $fatal(1,"0x52 parity failed response drain accepted=%0d returned=%0d outstanding=%0d",
                accepted_at_fault,bank_response_count,dut.read_outstanding_count);
       check_product_output_sentinel(64);
+      v2_opcode_fault_cg_inst.sample(1);
       force_banked_ready=0;force_bank_response_delay=0;
       prepare_dense_gemv_case();check_dense_gemv_case();
 
@@ -1929,6 +2115,7 @@ module tb_ai_tensor_matrix_core_random;
         $fatal(1,"0x52 protection failed response drain accepted=%0d returned=%0d outstanding=%0d",
                accepted_at_fault,bank_response_count,dut.read_outstanding_count);
       check_product_output_sentinel(64);
+      v2_opcode_fault_cg_inst.sample(2);
       force_banked_ready=0;force_bank_response_delay=0;
       prepare_dense_gemv_case();check_dense_gemv_case();
 
@@ -1954,6 +2141,7 @@ module tb_ai_tensor_matrix_core_random;
                accepted_at_fault,bank_read_count,bank_response_count,
                dut.read_outstanding_count,dut.prefetch_valid_r);
       check_product_output_sentinel(64);
+      v2_opcode_fault_cg_inst.sample(3);
       force_banked_ready=0;force_bank_response_delay=0;
       prepare_dense_gemv_case();check_dense_gemv_case();
 
@@ -1990,6 +2178,7 @@ module tb_ai_tensor_matrix_core_random;
         $fatal(1,"late post-reset response was not discarded count=%0d busy/done/error=%b/%b/%b outstanding=%0d",
                orphan_bank_response_count,busy,done,error,dut.read_outstanding_count);
       check_product_output_sentinel(64);
+      v2_opcode_fault_cg_inst.sample(4);
       prepare_dense_gemv_case();check_dense_gemv_case();
 
       // Opcode 0x53 reset with a real accepted operand response pending. The
@@ -2040,6 +2229,7 @@ module tb_ai_tensor_matrix_core_random;
                orphan_bank_response_count,busy,done,error,
                dut.read_outstanding_count,dut.tile_forward_valid_r,line_write_count);
       check_output_sentinel_at(TILE_FORWARD_CONSUMER_DST,256);
+      v2_opcode_fault_cg_inst.sample(5);
       $display("MATRIX_0X53_RESET_EPOCH_PASS accepted_pending=1 stale_response_discarded=1 tile_tag_flushed=1 sentinel=preserved seed=%0d",
                initial_seed);
       run_tile_forward_chain();
@@ -2061,6 +2251,7 @@ module tb_ai_tensor_matrix_core_random;
         $fatal(1,"0x53 parity failed drain/tag invalidation accepted=%0d returned=%0d valid=%b",
                accepted_at_fault,bank_response_count,dut.tile_forward_valid_r);
       check_product_output_sentinel(256);
+      v2_opcode_fault_cg_inst.sample(6);
       force_banked_ready=0;force_bank_response_delay=0;
 
       // Protection on the producer's first output line must block both the
@@ -2077,6 +2268,7 @@ module tb_ai_tensor_matrix_core_random;
       if(dut.tile_forward_valid_r)
         $fatal(1,"0x53 protection fault committed a forwarding tag");
       check_product_output_sentinel(256);
+      v2_opcode_fault_cg_inst.sample(7);
       force_banked_ready=0;force_zero_bank_latency=0;force_line_ready=0;
 
       // Abort a captured producer while its first line is held by backpressure.
@@ -2097,11 +2289,17 @@ module tb_ai_tensor_matrix_core_random;
         $fatal(1,"0x53 held-write abort committed line/tag lines=%0d valid=%b",
                line_write_count,dut.tile_forward_valid_r);
       check_product_output_sentinel(256);
+      v2_opcode_fault_cg_inst.sample(8);
       force_banked_ready=0;force_line_stall=0;
 
       // A clean 0x53 chain after the injected faults proves recovery of the
       // producer/consumer Golden path and the bounded tag state.
       run_tile_forward_chain();
+      if(v2_opcode_fault_cg_inst.get_coverage()<100.0)
+        $fatal(1,"0x52/0x53 fault scenario coverage incomplete: %0.2f%%",
+               v2_opcode_fault_cg_inst.get_coverage());
+      $display("MATRIX_V2_OPCODE_FAULT_COVERAGE_PASS bins=8 coverage=%0.2f seed=%0d",
+               v2_opcode_fault_cg_inst.get_coverage(),initial_seed);
       $display("MATRIX_V2_OPCODE_FAULT_PASS opcode52=parity,protection,abort,reset_orphan opcode53=reset_epoch,parity,writeback_protection,held_write_abort recovery=0x52_golden,0x53_tile_chain seed=%0d",
                initial_seed);
     end
@@ -2210,10 +2408,17 @@ module tb_ai_tensor_matrix_core_random;
       check_dense_gemv_tail_case();
       prepare_dense_gemv_mrows_tail_case(8,19);
       check_dense_gemv_mrows_tail_case(8,19);
+      prepare_dense_gemv_mrows_tail_case(8,65);
+      check_dense_gemv_mrows_tail_case(8,65);
       prepare_dense_gemv_mrows_tail_case(16,19);
       check_dense_gemv_mrows_tail_case(16,19);
       prepare_dense_gemv_mrows_tail_case(16,65);
       check_dense_gemv_mrows_tail_case(16,65);
+      if(v2_gemv_shape_cg_inst.get_coverage()<100.0)
+        $fatal(1,"0x52 named shape coverage incomplete: %0.2f%%",
+               v2_gemv_shape_cg_inst.get_coverage());
+      $display("MATRIX_V2_GEMV_SHAPE_COVERAGE_PASS bins=6 coverage=%0.2f seed=%0d",
+               v2_gemv_shape_cg_inst.get_coverage(),initial_seed);
       $display("MATRIX_PRODUCT_GEMV_ONLY_PASS seed=%0d",initial_seed);
       $finish;
     end
