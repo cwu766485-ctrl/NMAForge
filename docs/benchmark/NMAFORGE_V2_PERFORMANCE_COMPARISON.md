@@ -364,3 +364,53 @@ SHA-256 `c9f88930f24c3ca74140ba48e06d91f3fdbd0d37585fff0f9dac3ded15404ce5`.
 
 These are RTL simulation results with behavioral SPAD. They are not SRAM
 timing, measured Fmax, ASIC area, power, or energy measurements.
+
+## Current-candidate TinyNPU GEMM replay — `d1867da`
+
+The current NMAForge source/test candidate was rerun against the three
+deterministic GEMM vectors used by the pinned TinyNPU reference. The executed
+Git HEAD was `d1867da79a84b17451d63e919f9ce1e8ef4df098`; the v2 RTL/test
+candidate is `410b81dfd37992a760b28258bb7e8c6b6f5017d7`. The intervening tree
+changes are reports and benchmark records; no RTL or testbench source changed
+from `410b81d` to `d1867da`.
+
+| Shape | NMAForge controller + behavioral SPAD | TinyNPU direct RTL array | TinyNPU serialized memory endpoint estimate | NMAForge / estimated TinyNPU |
+|---|---:|---:|---:|---:|
+| 16×16×16 | 172 cycles | 52 cycles | 151 cycles | 1.1391 |
+| 16×16×32 | 263 cycles | 100 cycles | 231 cycles | 1.1385 |
+| 32×32×64 | 1,391 cycles | 790 cycles | 1,305 cycles | 1.0659 |
+
+All three current NMAForge output images pass the independent INT32 Golden.
+NMAForge uses a measured 16×16 Matrix controller with a one-cycle behavioral
+four-bank SPAD. TinyNPU's direct-array cycles were measured at its pinned SHA
+in the earlier `TINY-COMPARE-V2C3A59-S20261029` replay; its memory endpoint is
+an explicit serialized model, not TinyNPU memory RTL. Ratios above 1 mean the
+NMAForge measured interval is longer than the modeled TinyNPU endpoint. This
+is a useful negative result, not a product-level performance win or a uniform
+memory-service comparison. The current environment has no Verilator binary,
+so TinyNPU itself was not rebuilt in this replay.
+
+Run ID: `V2-TINYNPU-REPLAY-CURRENT-D1867DA-S20261029`. Exact current NMAForge
+commands:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+make -C dv/block/compute/matrix/sim core-random-compile \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+  PHYSICAL_ARRAY_SIZE=16 OUTSTANDING_DEPTH=4 A_TILE_CACHE_ENABLE=1 \
+  NEXT_K_PREFETCH_ENABLE=1 GEMV_B_TILE_CACHE_ENABLE=1 \
+  CORE_OUT_DIR=/tmp/nmaforge_v2_tinynpu_current_d1867da
+/tmp/nmaforge_v2_tinynpu_current_d1867da/simv +SEED=20261029 \
+  +TINY_NPU_MATCH_MULTI \
+  -l /tmp/nmaforge_v2_tinynpu_current_d1867da/run.log
+```
+
+The same replay also checked the pinned `conv1x_mini.onnx` graph through the
+current top-level CMDQ path: all intermediate tensors and four outputs were
+bit-exact. Machine records are the [GEMM CSV](../../benchmark/v2_tinynpu_current_d1867da_gemm.csv),
+[CNN CSV](../../benchmark/v2_tinynpu_current_d1867da_cnn.csv), and
+[summary JSON](../../benchmark/v2_tinynpu_current_d1867da_summary.json). VCS
+compile/run logs and generated CNN input/expected memory images are archived
+outside Git at `/tmp/nmaforge_v2_tinynpu_current_d1867da_logs.tar.gz`,
+SHA-256 `018d11dc90159192f0fb13c5e5901269b66be7ff8013bf4891cfd26b1e9e7885`.

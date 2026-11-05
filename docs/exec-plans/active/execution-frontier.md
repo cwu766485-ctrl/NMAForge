@@ -18,32 +18,25 @@ review](../../architecture/NMAFORGE_V2_ARCHITECTURE_REVIEW.md) for branch/tree
 identities, worktree inventory, `.gitignore` audit, and post-RTL history.
 
 Phase 1 is **IN PROGRESS**. The DV report has 21 normalized `REQ-V2-*`
-rows: 12 PASS-scoped, 8 PARTIAL, and 1 NOT_RUN. At fixed opcode test SHA
-`de705ee`, three Seeds cover 0x52 parity/protection/abort/reset and 0x53
-parity/protection/held-write-abort/reset-epoch faults. The latest campaign
-checks delayed response discard, forwarding-tag flush, destination sentinel
-preservation, and successful Golden recovery. Its logs are archived at
-`/tmp/nmaforge_v2_opcode_fault_de705ee_verified_logs.tar.gz` (SHA-256
-`05edd8a0e9918b6dbd77f7736cbf42ef9ead661822ea430428b9dd4bf50c4675`). A
-current-candidate Top Smoke replay at docs-only HEAD `871b752` exits 0 with
-`TEST PASS` and the `0x52` tail/`0x53` CMDQ markers. Mutation testing at fixed
-SHA `a015de5` catches 5 selected RTL fault classes across three Seeds (15/15
-checks); Completion and external-owner mutations remain open.
+rows: 12 PASS-scoped, 9 PARTIAL, and 0 NOT_RUN. At fixed candidate
+`410b81d`, three-seed 0x52/0x53 fault/GEMV, Top Smoke, seven-engine UVM, and
+selected opcode/real-DUT mutations pass their stated scopes. External SPAD
+response ownership, full legal fault × phase × reset crosses, opcode-specific
+SVA, and complete functional-bin disposition remain open. Current Top
+DUT-only URG is Line/Condition/FSM/Branch 86.75/77.62/44.33/84.56%; Matrix
+FSM has 15/15 states and 25/55 transitions. The Matrix+SFU handoff group is
+100%, while the four existing AXI groups are unsampled and total functional
+group coverage is 20%. These figures do not close v2 DV or imply full coverage.
+See the exact run identities and scope in the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
-The current Prefetch-ON DUT-only URG report merges nine three-seed core,
-GEMV, and fault tests: Line/Condition/FSM/Branch is 93.76/90.67/92.42/96.50%,
-with 15/15 states and 50/55 transitions. A separate Prefetch-OFF profile
-exercises two additional legal transitions; across the two profiles, 52/55
-transition pairs are observed. Three transitions still need formal or
-invariant disposition. There are no functional covergroups for these new
-opcodes, so these code-coverage numbers do not close functional bins or imply
-100% coverage. See the coverage and FSM review in the DV report. The current
-candidate `ac6b83f` descriptor validator replay passes 29 legal opcode
-classes, 33 invalid-rule checks, and 43/43 accepts plus 26/26 rejects;
-cross-engine ownership, functional coverage, and opcode-specific SVA remain
-open. Existing ablation and formal evidence remains bound to its exact
-historical source SHA. The v2 system DV is not signed off. Phase 2 has 4-way
-Cache×Prefetch and selected TinyNPU data; real Top contention attribution and common-memory endpoints are open.
+Phase 2 has a fixed-candidate four-way GEMV ablation, real Top serial/parallel
+and Matrix/CNM contention runs, and a current NMAForge-side TinyNPU GEMM/CNN
+replay. The TinyNPU common-memory endpoint remains modeled, no scheduler
+alternative was compared, and the measured/modelled cycle ratios show no
+NMAForge win on the three GEMM shapes. Phase 3 has trained Digits MLP and a
+fixed-weight reference CNN only; trained CNN and Tiny Transformer remain
+NOT_RUN. Phase 4 has 465 SpyGlass lint warnings, incomplete CDC/RDC, and DC PPA
+BLOCKED_ENV; no ASIC readiness claim is made. v1.0 remains HOLD.
 Phase 3 has a trained Digits MLP only; trained CNN and Tiny Transformer are
 NOT_RUN. Phase 4 has 465 SpyGlass lint warnings, incomplete RDC, and DC PPA
 BLOCKED_ENV; no ASIC readiness claim is made. v1.0 remains HOLD.
@@ -470,6 +463,13 @@ in the owning report; run `git diff --check` before handoff.
 - Current Digits rerun passes 360/360 Golden outputs, 352/360 classification, 34,761 cycles at source/test SHA `410b81d`. Trained CNN and Transformer remain **NOT_RUN**; no TinyNPU win is claimed. See the [model report](../../benchmark/NMAFORGE_V2_MODEL_BENCHMARK.md).
 - ASIC: current-candidate lint completed (0 errors, 465 warnings, 5 infos); the scripted CDC attempt stalled and bounded RDC timed out, while DC/LEC/physical runs remain unavailable or not run. Status remains **NOT ASIC READY**; see the [ASIC readiness report](../../verification/NMAFORGE_V2_ASIC_READINESS.md).
 - Evidence archives: `/tmp/nmaforge_v2_current_410b81_signoff_logs.tar.gz` SHA-256 `c9f88930f24c3ca74140ba48e06d91f3fdbd0d37585fff0f9dac3ded15404ce5`; `/tmp/nmaforge_v2_current_410b81_gemv_digits.tar.gz` SHA-256 `26b751910afa296181c1e85aab39910b71f0cdd49e196f493a5cdf1a22f9d5fa`. Generated simulator databases/logs remain outside Git.
+
+## 2026-11-05 update — current-candidate TinyNPU workload replay at `d1867da`
+
+- Current NMAForge 16×16 Matrix run passed the pinned TinyNPU GEMM vectors at 16×16×16, 16×16×32 and 32×32×64 with independent Golden. Cycles are 172/263/1,391; measured SPAD reads are 512/1,024/6,144 B. Pinned TinyNPU direct-array cycles are 52/100/790; serialized memory endpoints are estimated at 151/231/1,305 cycles. Ratios NMAForge measured / TinyNPU estimated are 1.1391/1.1385/1.0659, so these points do not show an NMAForge win.
+- Current top-level fixed `conv1x_mini` replay passes all intermediate tensors and four outputs byte-exact: 1,985 compute cycles, 1,080 host-layout cycles, 3,360/1,600 B compute SPAD read/write. TinyNPU's 4,781-cycle graph value is carried from its pinned prior replay and has a different timing boundary; no ratio is claimed.
+- Run HEAD `d1867da79a84b17451d63e919f9ce1e8ef4df098`; product RTL/test files are unchanged from candidate `410b81d`. VCS `V-2023.12-SP1_Full64`; Python 3.12.13 / NumPy 2.4.6 / ONNX 1.17.0. Exact CSV/JSON and limits are in the [performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md) and [model report](../../benchmark/NMAFORGE_V2_MODEL_BENCHMARK.md). Archive `/tmp/nmaforge_v2_tinynpu_current_d1867da_logs.tar.gz`, SHA-256 `018d11dc90159192f0fb13c5e5901269b66be7ff8013bf4891cfd26b1e9e7885`.
+- The current environment does not have Verilator; the pinned TinyNPU executable was not rebuilt in this replay. Trained CNN/Transformer, current TinyNPU RTL rebuild, and common RTL memory adapter remain OPEN.
 
 ## 2026-11-05 update — current static-analysis evidence at `410b81d`
 

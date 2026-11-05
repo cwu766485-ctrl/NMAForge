@@ -70,7 +70,7 @@ run did not instrument that stage.
 
 | Workload | Status | Evidence and boundary |
 |---|---|---|
-| ONNX `conv1x_mini` paired graph | **PASS on replay SHA `c3a59f0`** | Run `TINY-COMPARE-V2C3A59-S20261029`, TinyNPU SHA `8216c22b762011aa20c05fc2768423fd12dda59d`. Same model SHA `1ac385ac…1811640` and input SHA `a74587bf…705898`; NMAForge checked all intermediate tensors and 4/4 outputs. NMAForge: 1,985 compute + 1,080 host-layout cycles; TinyNPU: 4,781 graph cycles. Different boundaries; no speedup ratio. |
+| ONNX `conv1x_mini` paired graph | **PASS; NMAForge side replayed at `d1867da`** | Current run `V2-TINYNPU-REPLAY-CURRENT-D1867DA-S20261029` rechecked all intermediate tensors and 4/4 outputs against the pinned model Golden. NMAForge: 1,985 compute + 1,080 host-layout cycles; TinyNPU: 4,781 graph cycles from prior run `TINY-COMPARE-V2C3A59-S20261029`. Different timing boundaries; no speedup ratio. |
 | Trained-weight CNN | **NOT_RUN** | No trained CNN weight package and independent Golden are available in the current tree. |
 | Tiny Transformer | **NOT_RUN** | The fixed-weight descriptor fixture is not a pretrained-model deployment. No trained model, Prefill/Decode Golden, or current v2 run is claimed. |
 | Host / DMA / compute / writeback / graph cycle split | **PARTIAL** | Digits has a top-level CMDQ interval and a fused Matrix activity counter; the current run does not separately time host, DMA, writeback and orchestration. Its input preload is testbench setup outside the timed interval. |
@@ -140,3 +140,43 @@ The 360-image output and cycle result reproduce the previously reported v2
 Digits result at this newer source/test SHA. This is not a trained CNN or
 Transformer run. Separate Host, DMA, Compute, Writeback, and graph-orchestration
 timers remain uninstrumented; ASIC PPA remains outside this simulation result.
+
+## Current-candidate paired CNN functional replay — `d1867da`
+
+The fixed-weight `conv1x_mini.onnx` workload was replayed through the current
+NMAForge top, Matrix/SFU datapaths, CMDQ/CPLQ and behavioral SPAD. Executed Git
+HEAD was `d1867da79a84b17451d63e919f9ce1e8ef4df098`; the intervening changes
+from v2 source/test SHA `410b81dfd37992a760b28258bb7e8c6b6f5017d7` are
+documentation and benchmark records only. VCS was
+`V-2023.12-SP1_Full64`; Python 3.12.13, NumPy 2.4.6 and ONNX 1.17.0.
+
+NMAForge passed all intermediate tensors and all four final output bytes.
+The timed RTL window was 1,985 compute cycles plus 1,080 host-layout cycles;
+SPAD traffic was 3,360 read / 1,600 write bytes for compute, with 144 read /
+576 write bytes for host layout. The fixed TinyNPU model SHA is
+`1ac385ac18394ac5826a7eb426e99c2199bf6417055f7e3f461c40c1b1811640` and the
+input is generated with seed 99. TinyNPU's 4,781-cycle graph result is from
+the pinned-reference replay at TinyNPU SHA
+`8216c22b762011aa20c05fc2768423fd12dda59d`; its timing boundary differs, so
+no speedup ratio is reported. This is a fixed reference graph, not a trained
+CNN model.
+
+Reproduction command:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+make -C dv/subsystem/top_smoke/sim ai_tinynpu_cnn_match \
+  AI_TINYNPU_CNN_PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python \
+  AI_TINYNPU_CNN_RUN=/tmp/nmaforge_v2_tinynpu_cnn_current_d1867da \
+  AI_TINYNPU_CNN_MODEL=/tmp/nmaforge_tinynpu_bench_20261105_20261029_v2c3a59/reference/source/models/conv1x_mini.onnx \
+  AI_TINYNPU_CNN_GOLDEN=/tmp/nmaforge_tinynpu_bench_20261105_20261029_v2c3a59/tiny_cnn/graph_cnn/golden.bin
+```
+
+The [current CNN CSV](../../benchmark/v2_tinynpu_current_d1867da_cnn.csv)
+records both sides and their timing boundaries. Logs, generated manifest and
+input/expected SPAD images are archived at
+`/tmp/nmaforge_v2_tinynpu_current_d1867da_logs.tar.gz` (SHA-256
+`018d11dc90159192f0fb13c5e5901269b66be7ff8013bf4891cfd26b1e9e7885`).
+The model has fixed reference weights; trained CNN and trained Transformer
+remain **NOT_RUN**.
