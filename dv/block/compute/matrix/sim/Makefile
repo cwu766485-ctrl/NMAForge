@@ -25,6 +25,7 @@ COV_METRICS := line+cond+fsm+branch
 	core-no-prefetch-gemv-regress \
 	product-gemv-test product-gemv-regress \
 	product-opcode-fault-regress \
+	product-opcode-handshake-regress \
 	product-opcode-mutation-regress \
 	product-gemv-prefetch-ablation \
 	product-gemv-b-cache-ablation \
@@ -152,6 +153,21 @@ product-opcode-fault-regress: core-random-compile
 			$(CORE_OUT_DIR)/v2_opcode_fault_seed_$$seed.log; \
 		grep -Eq "^MATRIX_V2_OPCODE_FAULT_COVERAGE_PASS bins=8 coverage=100\\.00 seed=$$seed$$" \
 			$(CORE_OUT_DIR)/v2_opcode_fault_seed_$$seed.log; \
+	done
+
+# Deterministic request VALID/READY stability for 0x52 and held 0x53 output
+# write payload under backpressure, followed by bit-exact producer/consumer.
+V2_OPCODE_HANDSHAKE_OUT ?= /tmp/nmaforge_v2_opcode_handshake_$(SEED)
+product-opcode-handshake-regress: core-random-compile
+	@set -e; for seed in $(SEEDS); do \
+		$(CORE_OUT_DIR)/simv +SEED=$$seed +MATRIX_V2_OPCODE_HANDSHAKE_ONLY \
+			-cm $(COV_METRICS) -cm_dir $(CORE_OUT_DIR)/coverage.vdb \
+			-cm_name v2_opcode_handshake_$$seed \
+			-l $(V2_OPCODE_HANDSHAKE_OUT)_seed_$$seed.log; \
+		grep -Eq "^MATRIX_V2_OPCODE_HANDSHAKE_COVERAGE_PASS bins=2 coverage=100\\.00 bank_stall_cycles=[3-9][0-9]* stable_checks=[2-9][0-9]* seed=$$seed$$" \
+			$(V2_OPCODE_HANDSHAKE_OUT)_seed_$$seed.log; \
+		grep -q "^MATRIX_V2_OPCODE_HANDSHAKE_PASS .* recovery=bit-exact seed=$$seed$$" \
+			$(V2_OPCODE_HANDSHAKE_OUT)_seed_$$seed.log; \
 	done
 
 # Mutate temporary copies of the Matrix DUT and require the 0x52/0x53 Golden,
