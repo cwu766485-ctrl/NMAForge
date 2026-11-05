@@ -8,6 +8,14 @@
 **A-line reuse commit:** `cf6cd1e1e81e9b9372c13a44e3fc64e775b4ca6c`.
 **Simulator:** Synopsys VCS `V-2023.12-SP1_Full64`.
 
+**License-restored replay update (2026-11-05):** the initial `BLOCKED_ENV / NOT_RUN`
+attempts recorded later in this report have been superseded for the M8/M16
+B-cache ablation, M8 real-CMDQ descriptor, and descriptor alias/range-validator
+regression. All three targets now pass; exact commands, results, and archived
+logs are in the [license-restored replay record](../verification/V2_LICENSE_RESTORED_REPLAY_2026-11-05.md).
+The feature-specific fault/coverage matrix, all-shape sweep, PPA, and common-
+resource TinyNPU comparison remain open.
+
 ## Implemented scope
 
 The additive ABI-v7 opcode `0x52` is connected through the descriptor decoder,
@@ -272,29 +280,30 @@ PASS markers, Golden status, read/line counts, and feature counters before
 writing the CSV. This evidence is tied to those earlier source/test SHAs; it
 does not validate the later descriptor-validator or M8-test changes.
 
-## M8 multi-row case expansion — 2026-11-05, NOT_RUN
+## M8 multi-row case expansion — initial attempt BLOCKED_ENV, replay PASS
 
 The Matrix-core testbench and ablation target now include M8/N16/K19 and
-M8/N16/K65 alongside the existing M16 cases. The intended checks compare
-B-cache off/on, verify the complete output image and drain, and expect 54→35
-operand reads for K19 and 170→106 for K65. These are analytical expectations
-for the directed traffic model, not measured results.
+M8/N16/K65 alongside the existing M16 cases. The test expansion compares B-cache off/on, verifies the complete output
+image and drain, and checks the expected 54→35 operand reads for K19 and
+170→106 for K65. Those counts were initially analytical expectations; the
+license-restored three-seed run later measured and confirmed them (see the
+replay evidence linked above).
 
 Attempted command:
 `make product-gemv-b-cache-ablation SEEDS='20261105' CORE_OUT_DIR=/tmp/nmaforge_gemv_b_cache_m8_first_20261105`.
 VCS reported `Cannot connect to the license server` and queued for a
 `VCS-BASE-COMPILE/VCSCompiler_Net` license before source compilation. The run
 was interrupted after the queue wait; no M8 or new M16 simulation ran. Status
-is **BLOCKED_ENV / NOT_RUN**, not PASS. The test expansion is committed as
-`0a500d17d997dd96dad5cd797849e5a71dfcc6e6`; rerun this target before using
-these shapes as evidence.
+was initially **BLOCKED_ENV / NOT_RUN**. That result was superseded by the
+three-seed replay recorded in the license-restored report. The test expansion is committed as
+`0a500d17d997dd96dad5cd797849e5a71dfcc6e6`.
 
 A bounded retry of `make product-gemv-b-cache-ablation SEEDS='20261105'
 CORE_OUT_DIR=/tmp/nmaforge_gemv_b_cache_m8_retry_20261105` was stopped after
 50 seconds. VCS again could not connect to the license server and produced no
 simulator image.
 
-## M8 real-CMDQ descriptor case — 2026-11-05, NOT_RUN
+## M8 real-CMDQ descriptor case — initial attempt BLOCKED_ENV, replay PASS
 
 Test addition commit: `f4d77afe55c1869cb53c5d8fa9356b449595d9a4`.
 
@@ -310,23 +319,22 @@ Attempted command:
 `timeout -k 3s 50s make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105`.
 The mapper/code-generation precheck passed, then VCS failed to check out
 `VCS-BASE-COMPILE/VCSCompiler_Net` before compiling the SystemVerilog source.
-No simulator image or RTL run was produced. Status is **BLOCKED_ENV / NOT_RUN**;
-the log is `/tmp/nmaforge-architecture-v2/dv/subsystem/top_smoke/sim/ai_comp.log`.
+No simulator image or RTL run was produced by this initial attempt. The result
+was superseded by the license-restored Top Smoke replay, which passes the M8
+Golden, line-write count, and completion checks; see the linked replay record.
 
 ## Open work
 
 - Product shape tests do not yet enumerate every M/N/K combination. M8/K19
-  and M8/K65 checks have been added but are **NOT_RUN** due to the license
-  checkout failure above; the new M8 real-CMDQ descriptor is also **NOT_RUN**.
-  Scalar N=1 and a shape matrix remain open.
+  and M8/K65 B-cache ablations and the M8 real-CMDQ K19 case now pass the
+  named checks; Scalar N=1 and a broader shape matrix remain open.
 - Extend the bounded prefetch into bank-aware request issue/scheduling; the
   current B-fold cache is limited to the first 64 K values and depends on
   cross-engine operand immutability. Larger K values still reread B beyond
   the cached prefix.
-- The `0x52` alias/range validator and its focused tests have been added, but
-  the validator regression is **BLOCKED_ENV / NOT_RUN** because VCS cannot
-  obtain its compile license. Do not treat the new contract as verified until
-  the focused target passes.
+- The `0x52` alias/range validator and focused regression now pass the named
+  descriptor boundary checks. Broader product fault/phase coverage remains
+  open.
 - Add fault/phase coverage for parity, protection, Abort, reset, output
   backpressure, and response ownership for opcode `0x52`.
 - Add descriptor mutation and coverage disposition; mutation is **NOT_RUN**.
@@ -340,7 +348,7 @@ does not close the broader v2 architecture target. Next work should improve
 bank-aware issue and B reuse across M tiles while preserving response ownership
 and Abort/Reset behavior.
 
-## `0x52` descriptor range enforcement — 2026-11-05, NOT_RUN
+## `0x52` descriptor range enforcement — initial attempt BLOCKED_ENV, replay PASS
 
 RTL/test commit: `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
 
@@ -353,12 +361,14 @@ Top Smoke's existing M4 shape places B immediately before output; that legal
 adjacency is deliberately accepted by the half-open interval rule.
 
 The result-count marker is updated to 33 invalid-rule checks and 43 accepted
-boundaries. The focused `make descriptor-validator-regress
+boundaries. The initial focused `make descriptor-validator-regress
 DESCRIPTOR_VALIDATOR_OUT=/tmp/nmaforge_descriptor_validator_gemv_alias_20261105`
 attempt failed before compilation because VCS could not obtain
 `VCS-BASE-COMPILE/VCSCompiler_Net`. The required same-change Top Smoke command
 `timeout -k 3s 50s make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105`
 also failed at the same license checkout point after mapper generation.
-Neither regression produced a simulator image or runtime result. This RTL
-change is committed but **BLOCKED_ENV / NOT_RUN**; older PASS results remain
-tied to the pre-change source SHA.
+Neither initial attempt produced a simulator image or runtime result. Both were
+superseded after license restoration: the descriptor validator passed 33
+invalid-rule checks, 43/43 accepted boundaries, 26/26 rejected boundaries, and
+3/3 tile-forward descriptor cases; Top Smoke passed at the tested tree. See the
+[replay evidence](../verification/V2_LICENSE_RESTORED_REPLAY_2026-11-05.md).

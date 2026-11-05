@@ -168,15 +168,20 @@ run, output comparison, or forwarding-read measurement exists for this test.
 The previous core ablation does not substitute for this real-top test. Its
 fresh status is also included in the [execution frontier](../exec-plans/active/execution-frontier.md).
 
+**Historical first attempt:** the blocked result above was superseded after
+license restoration. The fixed test passed through the real top-level CMDQ;
+see [V2 license-restored replay](../verification/V2_LICENSE_RESTORED_REPLAY_2026-11-05.md)
+for the exact command, source tree, and archived log. It checked the baseline
+and forwarded outputs and completions, with 16 versus 0 source-A banked reads.
+
 ## Limits and open issues
 
 - This is behavioral RTL simulation, not an ASIC timing or area result. No
   synthesis, PPA, power, or physical SRAM timing claim is made.
-- Tile forwarding has PASS evidence only at the Matrix core and
-  descriptor-validator boundaries. A top-level CMDQ differential test is now
-  checked in but remains **NOT_RUN** as documented above. Multi-seed
-  feature-specific regression, new-feature parity/protection, and held-line
-  Abort cases remain open.
+- Tile forwarding has PASS evidence at the Matrix core, descriptor-validator,
+  and one real-top CMDQ differential seed. Multi-seed feature-specific
+  regression, new-feature parity/protection, held-line Abort cases, and
+  cross-engine coherence remain open.
 - The forwarding subset is one 16×16 capture and one M=16/K=4 consume; broader
   `M/N/K` tails, repeated consumers, and cross-engine coherence are unsupported.
   Software must not overwrite the tagged source tile between producer and
