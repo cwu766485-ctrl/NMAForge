@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-05. This is a short handoff for the next engineering task; it
+Updated: 2026-11-05. v2 feature branch HEAD: `6b7d6462393ab25ce409c0491037ea8458055741` (report/data-only changes after the cited RTL/test candidates). This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -17,7 +17,16 @@ used more cycles). CNN endpoints differ; no CNN speedup is stated. See the
 [replay report](../../benchmark/NMAFORGE_V2_TINYNPU_REPLAY_2026-11-05.md),
 machine-readable CSV/JSON under `benchmark/tinynpu/`, and its external log
 archive checksum in the report. Trained CNN, Tiny Transformer, true TinyNPU
-memory adapter, small/thin GEMV paired test, and DC PPA remain open.
+memory adapter, broader small/thin GEMV coverage, and DC PPA remain open.
+
+The focused paired `0x52` small-M replay `GEMV-MATCH-V2-S20261029` also passes
+at NMAForge SHA `0b1d33704f4895cf48b0f5e1d3f452d61b3df535` for `1×13×17` and
+`8×16×19` against TinyNPU `8216c22b762011aa20c05fc2768423fd12dda59d`.
+NMAForge measures 76/158 controller+behavioral-SPAD cycles; TinyNPU direct
+array RTL measures 100/100, with serialized memory estimates of 126/170 total.
+The mismatched endpoints are explicitly caveated and are not a system-level
+speedup claim. See the [small-GEMV replay report](../../benchmark/NMAFORGE_V2_SMALL_GEMV_TINYNPU_2026-11-05.md)
+and its CSV/JSON/SVG artifacts.
 
 ## Current v2 candidate replay — 2026-11-05
 

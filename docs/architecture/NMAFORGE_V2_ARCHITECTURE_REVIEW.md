@@ -3,8 +3,8 @@
 **Review date:** 2026-11-05  
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Current reviewed candidate:** `feature/npu-architecture-v2` `33e85287fbf37187fccb76e97be6effe888670e9`  
-**Candidate tree:** `560dc1cbfc1bb13003670354d77271e3708ec0a7`
+**Current reviewed candidate:** `feature/npu-architecture-v2` `6b7d6462393ab25ce409c0491037ea8458055741`
+**Candidate tree:** `d4059a2cf499d4eed2d9b90d059ff0f5f7b58267`
 
 ## Executive disposition
 
@@ -24,8 +24,13 @@ performance win. Keep the overall Compute Cluster disposition at **HOLD**.
 The published `main` ref resolves to the requested R250 SHA. The merge base of
 the current candidate and R250 is exactly that SHA. The review starting commit
 `eb158880` is an ancestor of the current feature branch. The remote R250 ref
-was not modified. The full candidate delta from R250 contains 45 tracked files;
-20 paths under `rtl/`, `dv/`, and `sw/` cover source, tests, and software.
+was not modified. The full candidate delta from R250 contains 73 tracked paths:
+6 RTL, 12 DV, 3 software, 33 benchmark, 18 documentation, and 1 tool path (21
+paths under `rtl/`, `dv/`, and `sw/`). Since source/test candidate `33e8528`,
+the product RTL has not changed; later additions are a focused Matrix
+testbench profile, SpyGlass project/triage updates, and benchmark/report
+artifacts. Each replay below retains its own source identity rather than
+attributing old runs to the current documentation HEAD.
 
 The active integration top remains `rtl/top/ai_accel_top.v`. The v2 product
 changes are concentrated in:
@@ -76,6 +81,8 @@ The inherited R250 system hierarchy and constraints are summarized in the
 | Top CMDQ `0x52` + `0x53` smoke | `33e85287fbf37187fccb76e97be6effe888670e9`, clean detached worktree | 3/3 Seeds `TEST PASS`; each checks `0x52` N/K tails and `0x53` image/completion differential. | Top behavioral SPAD; VCS `LOOP-REROLL-ENABLED` notice remains. |
 | Descriptor boundary/alias suite | `33e85287fbf37187fccb76e97be6effe888670e9` | 29 opcode legal cases; 33 invalid rules; accepted boundaries 43/43; rejected boundaries 26/26; tile-forward descriptors 3/3. | Current-SHA validator replay. |
 | Trained Digits MLP, R250 vs v2 | R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`; v2 `33e85287fbf37187fccb76e97be6effe888670e9` | Same model, seed and Golden; 352/360 correct and byte-identical RTL logits. CMDQ interval 110,155→34,761 cycles (−68.44%). | Real top RTL with testbench-preloaded behavioral SPAD; timing and byte counters are scoped in the model report. |
+| Paired TinyNPU GEMM/CNN | NMAForge `c3a59f08d8c07a8da973010d0f23d5d6d7eed61b`; TinyNPU `8216c22b762011aa20c05fc2768423fd12dda59d` | Three paired GEMM shapes pass Golden; Tiny engine regression 6/6; same ONNX mini CNN passes Golden on both. GEMM NMA/Tiny-modeled ratios are 1.1391/1.1385/1.0659. | VCS + Verilator RTL simulation; Tiny memory endpoint is modeled, CNN timing windows differ; no general speedup claim. |
+| Paired small-M GEMV | NMAForge `0b1d33704f4895cf48b0f5e1d3f452d61b3df535`; TinyNPU `8216c22b762011aa20c05fc2768423fd12dda59d` | `1×13×17` and `8×16×19` pass Golden. NMA measured cycles 76/158; Tiny direct array 100/100 and serialized modeled endpoint 126/170. | TinyNPU uses padded direct-array mapping and has no tested product GEMV/SPAD path; ratios 0.6032/0.9294 are mixed-boundary only. |
 | Static analysis and Matrix FSM guards | RTL/test `145363ddff5141177421ee7429fc65f78834830d` | SpyGlass lint 0 errors/465 warnings; CDC 0 unsynchronized crossings/2 warnings; targeted Matrix formal 5/5 non-vacuous assertions and 2/2 covers. RDC timed out; PPA not run. | Scope and exact commands are in the [ASIC readiness report](../verification/NMAFORGE_V2_ASIC_READINESS.md). |
 
 Exact Top/core commands and raw evidence locations are in the [multi-Seed
@@ -101,10 +108,11 @@ ablation](../benchmark/NMAFORGE_V2_GEMV_CACHE_PREFETCH_ABLATION.md).
 - VCS functional Golden checks are not coverage closure. A merged current-SHA
   requirement RTM, functional/code coverage disposition, non-vacuity audit,
   and mutation report for every new checker are not complete.
-- The paired TinyNPU rerun at current v2 SHA is `BLOCKED_ENV` because
-  Verilator is not installed in this environment. Historical paired data has
-  different source identities or memory/timing endpoints and is not a current
-  v2 win claim.
+- The TinyNPU tools are now available and the named GEMM/CNN and small-M GEMV
+  replays have passed at the source identities above. A true TinyNPU memory
+  adapter, broader GEMV shapes, trained CNN/Transformer comparisons, and
+  phase-aligned system endpoints remain open; mixed modeled results are not a
+  product-level win claim.
 - DC, formal/LEC, CDC/RDC, SRAM mapping, DFT readiness, power and physical PPA
   are not closed by these VCS runs. ASIC readiness remains `NOT_RUN` or
   `BLOCKED_ENV` by individual tool/input; do not claim Tapeout Ready.

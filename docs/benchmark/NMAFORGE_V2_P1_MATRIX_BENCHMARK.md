@@ -7,7 +7,7 @@
 - Seeds: `20261105`, `20261106`, `20261107`; VCS `V-2023.12-SP1_Full64`.
 - Result: 45 size-sweep + 120 ablation points; 165/165 independent Golden checks PASS.
 - Model: one-cycle behavioral SPAD. 250 MHz is only a reference conversion and is not measured Fmax, SRAM timing, ASIC PPA, or power.
-- The suite measures the Matrix RTL core/controller path; it is not a fair TinyNPU comparison. TinyNPU paired replay is pending because Verilator is unavailable in this workspace.
+- The suite measures the Matrix RTL core/controller path. Separate paired TinyNPU GEMM/CNN and small-M GEMV replays have since run, but use different named source SHAs and different memory/timing endpoints; they are not folded into this sweep's results.
 
 Invocation from the candidate worktree:
 
@@ -57,11 +57,11 @@ For the larger 16×32×32 and 32×32×64 workloads, A-tile reuse cuts bank-read 
 
 ## TinyNPU comparison status
 
-The environment check `verilator --version` returns `/bin/bash: verilator: command not found`. The pinned TinyNPU source is `8216c22b762011aa20c05fc2768423fd12dda59d`; historic paired measurements exist in [`gemm_results.csv`](../../benchmark/tinynpu/gemm_results.csv), but they were run against an earlier NMAForge candidate. They are retained as historical context and are not relabeled as this candidate’s paired benchmark. A current-SHA TinyNPU replay remains `BLOCKED_ENV`.
+The pinned TinyNPU source is `8216c22b762011aa20c05fc2768423fd12dda59d`. A later paired replay at NMAForge SHA `c3a59f08d8c07a8da973010d0f23d5d6d7eed61b` passed three GEMM shapes and the same ONNX mini CNN on both designs. A separate small-M GEMV replay at NMAForge SHA `0b1d33704f4895cf48b0f5e1d3f452d61b3df535` passed two signed INT8 Golden cases. TinyNPU memory service remains modeled, and these runs do not share this P1 sweep's exact candidate SHA or timing boundary. See the [paired performance report](NMAFORGE_V2_PERFORMANCE_COMPARISON.md), [GEMM/CNN replay record](NMAFORGE_V2_TINYNPU_REPLAY_2026-11-05.md), and [small-M GEMV replay record](NMAFORGE_V2_SMALL_GEMV_TINYNPU_2026-11-05.md).
 
 ## Limits and next work
 
-- This completes the NMAForge Matrix size/configuration benchmark slice of P1, not the fair TinyNPU comparison requirement.
+- This completes the NMAForge Matrix size/configuration benchmark slice only. The paired TinyNPU runs provide scoped task evidence, not a common-memory, same-SHA system comparison.
 - No RTL was changed for this benchmark commit.
 - The later fixed-SHA v2 replay closes the named three-seed Tile Forwarding core and Top CMDQ checks; broader Bank-Aware Issue, fault/phase combinations, cross-engine coherence, and legacy interaction coverage remain open. See [current performance comparison](NMAFORGE_V2_PERFORMANCE_COMPARISON.md).
 - PPA remains `NOT_RUN`; the 250 MHz reference must not be presented as measured frequency.
