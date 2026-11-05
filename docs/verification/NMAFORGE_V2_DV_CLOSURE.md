@@ -40,6 +40,7 @@ The exact `REQ-V2-*` evidence delta is:
 | `REQ-V2-COM-004` | Current 3-seed Top URG with one v2 functional group | **PARTIAL**; 100% applies only to the named Matrix+SFU handoff group; overall functional group score is 20%. |
 | `REQ-V2-COM-005` | Current 15/15 opcode mutations and 7/7 Cluster DUT mutations | **PARTIAL**; these are selected mutations, not exhaustive checker-to-fault mapping for every new feature. |
 | `REQ-V2-COM-006` | In-repository `ai_accel_memory_fabric` coordinated reset with DMA reads outstanding and CNM accepted SPAD response / pending result write; owner flush and fresh DMA/CNM recovery | **PASS (selected repository-fabric scope)**; three reset functional groups are 100%, and owner/tag SVAs have real successes. This does not establish behavior for arbitrary external SoC fabrics or close opcode-specific fault/reset crosses. |
+| `REQ-V2-COM-002` | Clean Top compatibility replay at current source/test SHA: fixed legacy checks plus 20 randomized workloads per seed, including Tensor GEMM `0x30` and Batch GEMM `0x31` | **PASS (tested legacy modes/shapes)**; three Seeds pass independent Golden comparisons and existing v2 smoke checks. Exhaustive compatibility across every shape, aux combination, and concurrent fault interaction remains outside this run. |
 
 The UVM run has three top AXI stall assertions with 660,281 attempts each:
 `c_ar_stall_then_accept` and `c_aw_stall_then_accept` have zero matches,
@@ -362,7 +363,7 @@ new opcodes.
 | Requirement | RTL feature | Test / checker | Assertion | Coverage / disposition point | Run ID, seed, source SHA | Status and evidence path |
 |---|---|---|---|---|---|---|
 | REQ-V2-COM-001: ABI-v7 routes 0x52/0x53 to the shared Matrix engine | Opcode decode, descriptor validator, dispatcher | `tb_ai_descriptor_validator`; Top CMDQ output/completion checks | No v2-specific SVA | legal opcode classification; actual CMDQ dispatch | `V2-DESC-VALIDATOR-AC6B83F`, seed N/A, `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164`; `V2-TOP-CMDQ-CLEAN-3SEED-3A283C0`, 20261105/06/07, `3a283c04724378c46747d907505eb82ea1ccbd4a` | **PASS (scoped)**; validator log `/tmp/nmaforge_v2_descriptor_validator_ac6b83f/run.log`; Top archive `/tmp/nmaforge_v2_top_cmdq_clean_3seed_3a283c0_logs.tar.gz` |
-| REQ-V2-COM-002: v2 additions preserve legacy 0x30/0x31 behavior and aux compatibility | Additive opcode ABI | Validator accepts legacy 0x30 aux behavior; Top fused path retains SPAD writeback | No v2-specific compatibility SVA | legacy aux acceptance; baseline and 0x53 producer writeback | `V2-DESC-VALIDATOR-AC6B83F`, seed N/A, SHA `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164`; `V2-TOP-CMDQ-CLEAN-3SEED-3A283C0`, seeds 20261105/06/07, SHA `3a283c04724378c46747d907505eb82ea1ccbd4a` | **PARTIAL**; tested points pass, broad legacy opcode regression is not part of the v2-specific replay; validator and Top archives linked above |
+| REQ-V2-COM-002: v2 additions preserve legacy 0x30/0x31 behavior and aux compatibility | Additive opcode ABI; old Tensor GEMM/Batch GEMM dispatch and legacy writeback | `tb_ai_descriptor_validator`; clean Top Smoke Golden checks for 0x30 4×4 GEMM and 0x31 two-head Batch GEMM; 20 randomized legacy GEMV/GEMM/Conv/Depthwise workloads per seed | No v2-specific compatibility SVA; independent output/completion comparisons are active | Directed 0x30 outputs (7 comparisons) and 0x31 two-head outputs (4 comparisons) per seed; fixed smoke and random Golden comparisons pass | `V2-LEGACY-TOP-COMPAT-3SEED-5F6E282`, seeds 20261108/09/10, source/test SHA `5f6e282f191b421bdbefc3d252690a9a0c93eb1c`, tree `4a5e0a1da1ab7d5a910c6f0a9417304d8a752cb2`; aux acceptance also checked by `V2-DESC-VALIDATOR-AC6B83F` | **PASS (tested legacy modes/shapes)**; all seeds report `TEST PASS`, Golden comparisons, and the existing v2 smoke markers. Not exhaustive across all legacy shapes, aux combinations, or fault/concurrency interactions; logs archive below |
 | REQ-V2-052-001: accept only the documented dense GEMV descriptor subset and legal boundaries | Opcode 0x52 validator | `tb_ai_descriptor_validator` fatal/count checks | None | 43/43 boundary accepts, 26/26 rejects; 33 invalid-rule cases | `V2-DESC-VALIDATOR-AC6B83F`, seed N/A, `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` | **PASS (validator scope)**; `/tmp/nmaforge_v2_descriptor_validator_ac6b83f/run.log`; does not prove execution at maximum encoded dimensions |
 | REQ-V2-052-002: reject output overlap with padded A, dense B, enabled bias, and 32-bit address wrap | Opcode 0x52 span validation | Directed overlap/overflow vectors and `check_invalid` | None | adjacent A/output acceptance; A, B, bias overlap rejects; B end-address wrap reject | `V2-DESC-VALIDATOR-AC6B83F`, seed N/A, `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` | **PASS (directed validator scope)**; same validator log; runtime aliasing of externally changing inputs remains a software ownership contract |
 | REQ-V2-052-003: signed INT8 GEMV, optional bias/postprocess and INT32 outputs match independent Golden | Shared 256-MAC Matrix array, opcode 0x52 mapping | `check_dense_gemv_case`, Top independent reference and output image checks | No opcode-specific SVA | M4×16×32, 64 outputs; bit-exact Golden | `V2-GEMV-CORE-3SEED-18DAD2B`, 20261105/06/07, `18dad2ba4c502680893094bb726d88377d33eb9b`; Top run above, `3a283c04724378c46747d907505eb82ea1ccbd4a` | **PASS (tested shape)**; `/tmp/nmaforge_v2_gemv_random_replay_307eac8_logs.tar.gz` (SHA-256 `4fd0ba313b484a2da588562ff62411b2951ca089bb703a74e49fed7f2bc506c1`), Top archive above |
@@ -398,6 +399,7 @@ new opcodes.
 - `V2-DUT-COVERAGE-TOP-3SEED-0870A76`: VCS/URG `V-2023.12-SP1_Full64`, exact test source SHA `0870a76b803ad01b8c23d812cfddd9cbb399f74e`; `make ai_compute_cluster_cov AI_CLUSTER_COV_RUN=/tmp/nmaforge_v2_0870a76_dut_cov AI_CLUSTER_COV_SEEDS='20261105 20261106 20261107' AI_RANDOM_CASES=4`. All 3 seeded runs emit `TEST PASS` and the cross-engine Golden marker. DUT-only Top Smoke URG reports 86.75% Line, 77.62% Condition, 44.33% FSM, 84.56% Branch; Matrix core FSM is 15/15 states and 25/55 transitions. The four existing AXI-memory testbench groups are 0%; no v2 functional covergroups were added. Evidence archive `/tmp/nmaforge_v2_0870a76_dut_cov_evidence.tar.gz`, SHA-256 `691b2e6b5b896a5ec1638796939899ba751a43f1611edc6386dd550bddc052f0`; includes VDB, URG reports, compile/run logs.
 - `V2-DUT-COVERAGE-TOP-3SEED-86E0D6C`: VCS/URG `V-2023.12-SP1_Full64`, source SHA `86e0d6cbba3187bd1deeb18f664c559b606c878d`; command above, Seeds 20261105/06/07. The cross-engine group checks overlap, accepted consume-period SPAD access, no source write attempt, bit-exact Golden and a pair cross; it scores 100% in each run and merged. DUT-only code coverage is 86.75/77.62/44.33/84.56% Line/Condition/FSM/Branch, Matrix FSM 15/15 states and 25/55 transitions. Overall functional group score is 20% because the four existing AXI-memory groups score 0%; the new group covers only this legal 0x53 scenario. Evidence `/tmp/nmaforge_v2_86e0d6c_dut_cov_evidence.tar.gz`, SHA-256 `eb25d2725fa8e3252c0140d0c7254c3abfc03fd1ef44d1ecbd2283e75becd4f8`; includes VDB, URG reports, compile/run logs.
 - `V2-MEMORY-FABRIC-RESET-3SEED-F340ACA`: VCS/URG `V-2023.12-SP1_Full64`; source/test SHA `f340acaa2cdf7c36075473b8bc6fd6dee8e59873`, tree `7fc556427be1597e64a602c10af4fdd855a0c343`; command `make -C dv/subsystem/dma_spad/sim subsystem_memory_fabric_reset_regress` with `MEMORY_FABRIC_RESET_SEEDS='20261025 20261026 20261027'`, VCS `-licwait 10`, and output `/tmp/nmaforge_v2_fabric_reset_f340aca`. All three seeds report `MEMORY_FABRIC_RESET_ONLY_PASS`, two `DMA_CNM_RESET_RECOVERY_PASS` events, and UVM Warning/Error/Fatal `0/0/0`. Three named reset groups score 100.00% in merged URG. Assertion summary is 13/31 with real successes, 0 failures, 0 incomplete, and two no-attempt UVM RAL properties; `ap_single_response_owner` and `ap_cnm_response_tag` have real successes. Logs-only archive `/tmp/nmaforge_v2_fabric_reset_f340aca_logs.tar.gz`, SHA-256 `14144bdc62932d8040a1b5be72b27f83e6f4f8e52286a8658b1570fdfe3717c5`. VCS databases and simulator binaries are excluded. Scope is the in-repository fabric and this reset interleave only.
+- `V2-LEGACY-TOP-COMPAT-3SEED-5F6E282`: clean detached worktree at source/test SHA `5f6e282f191b421bdbefc3d252690a9a0c93eb1c`, tree `4a5e0a1da1ab7d5a910c6f0a9417304d8a752cb2`; VCS `V-2023.12-SP1_Full64`; compile with `make -C dv/subsystem/top_smoke/sim ai_comp`, then run `./simv +ntb_random_seed=$seed +AI_RANDOM_CASES=20 +AI_SEED=$seed +ACLK_PERIOD_NS=10.0` for seeds 20261108/09/10. Each run reports `TEST PASS`; directed legacy checks include seven Tensor GEMM (`0x30`) outputs and four two-head Batch GEMM (`0x31`) outputs, alongside randomized legacy GEMV/GEMM/Conv/Depthwise Golden comparisons and the current 0x53 smoke path. The known `LOOP-REROLL-ENABLED` debug-capacity notice is present; the simulation logs contain no `ERROR:` lines. Logs-only archive `/tmp/nmaforge_v2_top_compat_5f6e282_logs.tar.gz`, SHA-256 `a56378fc6a1364ee4fdcc8f34dcf21b47068270d473ba7b848cdaef6b2a65b3c`; VCS executables/databases are excluded.
 - `V2-MATRIX-FSM-GUARDS-145363D`: VC Formal `V-2023.12-SP2`; 5/5 named Matrix FSM assertions proven/non-vacuous and 2/2 state covers reached. It is not an opcode 0x52/0x53 assertion campaign.
 
 Exact replay commands for the latest fixed test candidate `86e0d6c` (run from
@@ -432,7 +434,21 @@ make -C dv/subsystem/dma_spad/sim subsystem_memory_fabric_reset_regress \
   MEMORY_FABRIC_RESET_OUT=/tmp/nmaforge_v2_fabric_reset_f340aca
 ```
 
-The RTM currently has 22 requirement IDs: 13 scoped PASS, 9 PARTIAL, and 0
+The clean Top compatibility replay used:
+
+```sh
+export VCS_ARCH_OVERRIDE=linux \
+  VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+  PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH
+make -C dv/subsystem/top_smoke/sim ai_comp
+for seed in 20261108 20261109 20261110; do
+  ./simv +ntb_random_seed=$seed +AI_RANDOM_CASES=20 +AI_SEED=$seed \
+    +ACLK_PERIOD_NS=10.0 \
+    -l /tmp/nmaforge_v2_top_compat_5f6e282_seed_$seed.log
+done
+```
+
+The RTM currently has 22 requirement IDs: 14 scoped PASS, 8 PARTIAL, and 0
 NOT_RUN. No `BLOCKED_ENV` row was converted to PASS; all successful rows have
 a named, limited test scope. This remains an execution RTM, not an approval
 record. The
@@ -516,8 +532,9 @@ Compute Cluster disposition from **HOLD**.
    the merged code-coverage gaps and three residual FSM transitions; prove or
    formally disposition them without invalid stimulus. Audit assertion
    connectivity/non-vacuity and map mutations to every new-feature checker.
-5. Complete old-opcode compatibility regression beyond the selected Top
-   Smoke and Matrix-core test points.
+5. Extend old-opcode compatibility beyond the tested 0x30/0x31 modes/shapes to
+   remaining legacy descriptors, aux combinations, and fault/concurrency
+   interactions; the current clean three-seed Top Golden suite is scoped.
 6. Run formal/LEC, CDC/RDC, DC, SRAM mapping, DFT preparation, and PPA only
    with the appropriate tool, constraints, libraries, and licenses. These
    results remain `NOT_RUN` or `BLOCKED_ENV` as applicable.

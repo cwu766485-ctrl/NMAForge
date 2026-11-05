@@ -18,7 +18,7 @@ review](../../architecture/NMAFORGE_V2_ARCHITECTURE_REVIEW.md) for branch/tree
 identities, worktree inventory, `.gitignore` audit, and post-RTL history.
 
 Phase 1 is **IN PROGRESS**. The DV report has 22 normalized `REQ-V2-*`
-rows: 13 PASS-scoped, 9 PARTIAL, and 0 NOT_RUN. At fixed candidate
+rows: 14 PASS-scoped, 8 PARTIAL, and 0 NOT_RUN. At fixed candidate
 `410b81d`, three-seed 0x52/0x53 fault/GEMV, Top Smoke, seven-engine UVM, and
 selected opcode/real-DUT mutations pass their stated scopes. Arbitrary
 external-SoC SPAD response ownership beyond the repository-fabric boundary,
@@ -39,6 +39,14 @@ closure of arbitrary external-fabric behavior or the opcode-specific
 fault/reset matrix. The whole URG report's functional group score is 23.98%
 for that subsystem run. Logs-only archive SHA-256:
 `14144bdc62932d8040a1b5be72b27f83e6f4f8e52286a8658b1570fdfe3717c5`.
+
+Legacy compatibility also has a current-source clean Top replay at SHA
+`5f6e282f191b421bdbefc3d252690a9a0c93eb1c`: three Seeds with 20 random
+workloads each all pass. Each run checks seven `0x30` Tensor GEMM outputs,
+four `0x31` Batch GEMM outputs and existing v2 smoke paths. This closes
+`REQ-V2-COM-002` for those tested modes/shapes; other aux, shape and
+fault/concurrency combinations remain open. Archive SHA-256:
+`a56378fc6a1364ee4fdcc8f34dcf21b47068270d473ba7b848cdaef6b2a65b3c`.
 
 Phase 2 has a fixed-candidate four-way GEMV ablation, real Top serial/parallel
 and Matrix/CNM contention runs, and a current NMAForge-side TinyNPU GEMM/CNN
@@ -487,6 +495,12 @@ in the owning report; run `git diff --check` before handoff.
 - `make -C dv/subsystem/dma_spad/sim subsystem_memory_fabric_reset_regress` passes seeds 20261025/26/27 at source/test SHA `f340acaa2cdf7c36075473b8bc6fd6dee8e59873` (tree `7fc556427be1597e64a602c10af4fdd855a0c343`), with VCS/URG `V-2023.12-SP1_Full64`. Each seed checks reset with four DMA reads outstanding and a CNM accepted SPAD read without its response, plus reset while CNM awaits its result write; both fresh DMA and CNM tasks recover and pass memory Golden checks.
 - The named groups `dma_cnm_shared_reset_cg`, `dma_reset_phase_cg`, and `cnm_reset_phase_cg` are each 100.00% in merged URG. `ap_single_response_owner` has 3,921 real successes; `ap_cnm_response_tag` has 144; assertion failures/incomplete are zero. Whole-report functional group score is 23.98%, so this targeted result does not imply full v2 coverage or arbitrary external-fabric behavior.
 - Run ID `V2-MEMORY-FABRIC-RESET-3SEED-F340ACA`; logs/selected URG pages archive `/tmp/nmaforge_v2_fabric_reset_f340aca_logs.tar.gz`, SHA-256 `14144bdc62932d8040a1b5be72b27f83e6f4f8e52286a8658b1570fdfe3717c5`. Generated VCS/coverage databases remain outside the repository. `REQ-V2-COM-006` passes only for this in-repository reset/recovery scope; v2 sign-off remains **IN PROGRESS**.
+
+## 2026-11-05 update — legacy Top compatibility replay
+
+- Clean detached worktree at source/test SHA `5f6e282f191b421bdbefc3d252690a9a0c93eb1c`, tree `4a5e0a1da1ab7d5a910c6f0a9417304d8a752cb2`; VCS `V-2023.12-SP1_Full64`. `make -C dv/subsystem/top_smoke/sim ai_comp` followed by `./simv +ntb_random_seed=$seed +AI_RANDOM_CASES=20 +AI_SEED=$seed +ACLK_PERIOD_NS=10.0` for seeds 20261108/09/10. All three logs report `TEST PASS`.
+- Each seed checks 7 legacy `0x30` Tensor GEMM outputs and 4 legacy `0x31` two-head Batch GEMM outputs, plus randomized GEMV/GEMM/Conv/Depthwise results and current v2 smoke paths. This closes `REQ-V2-COM-002` for these tested modes/shapes only; exhaustive descriptor, aux-field and fault/concurrency compatibility remains open. No product RTL or testbench source was changed.
+- Logs archive `/tmp/nmaforge_v2_top_compat_5f6e282_logs.tar.gz`, SHA-256 `a56378fc6a1364ee4fdcc8f34dcf21b47068270d473ba7b848cdaef6b2a65b3c`. The only compile notice is the existing `LOOP-REROLL-ENABLED` debug-capacity message.
 
 ## 2026-11-05 update — current static-analysis evidence at `410b81d`
 
