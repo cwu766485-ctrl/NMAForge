@@ -232,6 +232,44 @@ overlap, so they must not be summed as disjoint cycles. The RTL source is
 | `V2-GEMV-B-CACHE-RANDOM-CORE-S3-20261105` | `make core-random-regress SEEDS='20261105 20261106 20261107' CORE_OUT_DIR=/tmp/nmaforge_gemv_b_cache_core_regress_final_20261105` | `/tmp/nmaforge_gemv_b_cache_core_regress_final_20261105/{run_seed,product_gemv_seed}_*.log` | PASS: 18 core cases and 35 fault/recovery checks per seed; product M4, M1-tail, M16/K19, and M16/K65 Golden/drain checks pass on all three seeds. |
 | `V2-GEMV-B-CACHE-TOP-SMOKE-20261105` | `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105` | `dv/subsystem/top_smoke/sim/ai_accel_smoke.log` | PASS: `TEST PASS`; existing opcode `0x52` M4 and M1 tail descriptor checks pass. Existing `LOOP-REROLL-ENABLED` notice remains. |
 
+## Same-seed B-fold-cache × next-K-prefetch ablation — 2026-11-05
+
+The existing cache-off/on and prefetch-off/on runs provide a matched 2×2
+controller ablation for `M=16,N=16`, with the same RTL SHA
+`2e61ff71e1f67b85f68229026d6468036122e9c8`, profile/test SHA
+`20d393c5e0e1a32388cce1112a4a20a32e05b5a5`, Seed `20261105`, workload,
+registered four-bank behavioral SPAD, and VCS version. All eight cells
+reported bit-exact Golden output and completed the self-checking output/drain
+checks in the Matrix-core testbench.
+
+| K | Cache off / prefetch off | Cache off / prefetch on | Cache on / prefetch off | Cache on / prefetch on | Combined cycle change | Read traffic, base → combined |
+|---:|---:|---:|---:|---:|---:|---:|
+| 19 | 403 cycles, 108 reads | 381, 108 | 273, 51 | 266, 51 | −34.0% | 1,728 B → 816 B (−52.8%) |
+| 65 | 1,074 cycles, 340 reads | 1,006, 340 | 617, 148 | 609, 148 | −43.3% | 5,440 B → 2,368 B (−56.5%) |
+
+In this one-seed run, prefetch alone changes cycles by −5.5% (K19) and −6.3%
+(K65) without changing read bytes. B-fold reuse alone changes cycles by −32.3%
+and −42.5%, while removing 57 and 192 B-row reads respectively. Combining
+both saves another 7 cycles at K19 and 8 cycles at K65 relative to cache-only.
+Each configuration writes the same 1,024 output bytes through 64 lines.
+
+This is a sub-ablation inside the product `0x52` K-fold implementation. It is
+not a matched `0x30` GEMM-vs-GEMV baseline, a multi-seed confidence result, or a
+TinyNPU comparison. The prefetch-off logs do not include the detailed state
+stall profile emitted by the instrumented prefetch-on build, so a complete
+four-way stall decomposition remains open. The eight raw measurements and
+configuration checks are summarized by
+[`summarize_gemv_four_way_ablation.py`](../../tools/summarize_gemv_four_way_ablation.py)
+into [`shape_adaptive_gemv_four_way_ablation.csv`](../../benchmark/shape_adaptive_gemv_four_way_ablation.csv).
+
+The summary command used the four logged runs with `--seed 20261105`, RTL SHA
+`2e61ff71e1f67b85f68229026d6468036122e9c8`, and test SHA
+`20d393c5e0e1a32388cce1112a4a20a32e05b5a5`. It verified the compile-time
+cache/prefetch defines, array size, outstanding depth, run seed, both K-shape
+PASS markers, Golden status, read/line counts, and feature counters before
+writing the CSV. This evidence is tied to those earlier source/test SHAs; it
+does not validate the later descriptor-validator or M8-test changes.
+
 ## M8 multi-row case expansion — 2026-11-05, NOT_RUN
 
 The Matrix-core testbench and ablation target now include M8/N16/K19 and
