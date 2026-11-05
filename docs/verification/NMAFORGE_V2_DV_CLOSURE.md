@@ -93,6 +93,40 @@ Current v2 lint/CDC/RDC and PPA readiness are summarized in the
 [ASIC readiness report](NMAFORGE_V2_ASIC_READINESS.md). RDC remains NOT_RUN and
 DC Base-vs-v2 PPA remains BLOCKED_ENV.
 
+## Current-branch clean Top CMDQ replay — 2026-11-05
+
+The product Top Smoke was recompiled and rerun from a detached clean worktree at
+`3a283c04724378c46747d907505eb82ea1ccbd4a` (tree
+`45ec75947744026e1510f881aa474136f211129d`). VCS
+`V-2023.12-SP1_Full64` passed Seeds `20261105`, `20261106`, and `20261107`.
+Each run reported `TEST PASS` and matched the exact markers for the real CMDQ
+`0x52` M4 GEMV descriptor, M1/N13/K17 scalar tail, M8/N16/K19 K tail, and the
+`0x53` 16×16 producer/consumer output and completion differential. The
+forwarded path observed 16 baseline source-A reads versus zero forwarded
+source-A reads; both producer and consumer output images were bit-exact and
+legacy SPAD writeback remained enabled.
+
+Commands, run from
+`/tmp/nmaforge-v2-top-clean-3a283c0/dv/subsystem/top_smoke/sim`:
+
+```sh
+make ai_comp
+make ai_run AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105
+make ai_run AI_RANDOM_CASES=4 AI_SEED=20261106 SEED=20261106
+make ai_run AI_RANDOM_CASES=4 AI_SEED=20261107 SEED=20261107
+```
+
+The compile emitted the existing `LOOP-REROLL-ENABLED` notice for
+`ai_transformer_workload.svh`; there were no compile errors. Per-seed feature
+markers, `TEST PASS`, and the compile log are archived outside Git at
+`/tmp/nmaforge_v2_top_cmdq_clean_3seed_3a283c0_logs.tar.gz` (SHA-256
+`8e1bc2c3329de0ac11eedafed3972918baecf321c01b09990195662d691e35f6`). Run ID:
+`V2-TOP-CMDQ-CLEAN-3SEED-3A283C0`.
+
+This current-branch replay adds reproducibility for the named top-level test
+points only. It does not close the v2 fault/coverage matrix or change the v1.0
+Compute Cluster disposition from **HOLD**.
+
 ## Open closure items
 
 1. Normalize the v2 requirement IDs and generate a signed-off execution RTM
