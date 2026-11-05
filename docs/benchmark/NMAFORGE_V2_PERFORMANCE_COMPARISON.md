@@ -120,7 +120,7 @@ Machine-readable data is in [`gemm_results.csv`](../../benchmark/tinynpu/gemm_re
 summary JSON files. The benchmark ratio convention remains
 `NMAForge cycles / TinyNPU normalized cycles`; values above 1 mean NMAForge
 used more cycles under the stated normalization. Prior BLOCKED_ENV entries
-are superseded for these tested GEMM/CNN points only; the full TinyNPU/model
+are superseded for these tested GEMM/CNN/GEMV points only; the full TinyNPU/model
 benchmark task is not closed.
 
 ### Small-M GEMV reference comparison
