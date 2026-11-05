@@ -18,29 +18,32 @@ review](../../architecture/NMAFORGE_V2_ARCHITECTURE_REVIEW.md) for branch/tree
 identities, worktree inventory, `.gitignore` audit, and post-RTL history.
 
 Phase 1 is **IN PROGRESS**. The DV report has 21 normalized `REQ-V2-*`
-rows: 12 PASS-scoped, 7 PARTIAL, and 2 NOT_RUN. At fixed test SHA
-`de705ee`, a three-seed fault campaign covers 0x52 Parity, Protection, Abort
-with outstanding prefetch, Reset plus late unowned response, and 0x53 Parity,
-output Protection, held-write Abort, and Reset/Epoch with an accepted delayed
-operand response discarded after reset; each seed checks sentinel preservation
-and Golden recovery. The latest opcode fault target exited 0 with VCS
-`V-2023.12-SP1_Full64`; logs are archived at
+rows: 12 PASS-scoped, 8 PARTIAL, and 1 NOT_RUN. At fixed opcode test SHA
+`de705ee`, three Seeds cover 0x52 parity/protection/abort/reset and 0x53
+parity/protection/held-write-abort/reset-epoch faults. The latest campaign
+checks delayed response discard, forwarding-tag flush, destination sentinel
+preservation, and successful Golden recovery. Its logs are archived at
 `/tmp/nmaforge_v2_opcode_fault_de705ee_verified_logs.tar.gz` (SHA-256
-`05edd8a0e9918b6dbd77f7736cbf42ef9ead661822ea430428b9dd4bf50c4675`). A prior
-compatibility replay passed the legacy Matrix-core 3-seed regression and Top
-Smoke at `465855a` with the same product RTL but the earlier testbench. Mutation
-testing at fixed SHA `a015de5` catches 5 real RTL fault
-classes across three seeds (15/15 checks). These results do not close the full
-fault/phase matrix or mutation requirements. VCS line/condition/FSM/branch
-coverage was collected, but its databases are still not URG-merged. The current candidate
-`ac6b83f` descriptor validator replay passes 29 legal opcode classes, 33
-invalid-rule checks, and 43/43 accepts plus 26/26 rejects; v2 mutation, merged
-URG disposition, cross-engine ownership, and full opcode SVA coverage remain
-open. The VCS Matrix line/condition/FSM/branch database from the fault and
-mutation runs is not merged. Existing ablation and formal evidence remains bound to its exact
-historical source SHA. The v2 system
-DV is not signed off. Phase 2 has 4-way Cache×Prefetch and selected TinyNPU
-data; real Top contention attribution and common-memory endpoints are open.
+`05edd8a0e9918b6dbd77f7736cbf42ef9ead661822ea430428b9dd4bf50c4675`). A
+current-candidate Top Smoke replay at docs-only HEAD `871b752` exits 0 with
+`TEST PASS` and the `0x52` tail/`0x53` CMDQ markers. Mutation testing at fixed
+SHA `a015de5` catches 5 selected RTL fault classes across three Seeds (15/15
+checks); Completion and external-owner mutations remain open.
+
+The current Prefetch-ON DUT-only URG report merges nine three-seed core,
+GEMV, and fault tests: Line/Condition/FSM/Branch is 93.76/90.67/92.42/96.50%,
+with 15/15 states and 50/55 transitions. A separate Prefetch-OFF profile
+exercises two additional legal transitions; across the two profiles, 52/55
+transition pairs are observed. Three transitions still need formal or
+invariant disposition. There are no functional covergroups for these new
+opcodes, so these code-coverage numbers do not close functional bins or imply
+100% coverage. See the coverage and FSM review in the DV report. The current
+candidate `ac6b83f` descriptor validator replay passes 29 legal opcode
+classes, 33 invalid-rule checks, and 43/43 accepts plus 26/26 rejects;
+cross-engine ownership, functional coverage, and opcode-specific SVA remain
+open. Existing ablation and formal evidence remains bound to its exact
+historical source SHA. The v2 system DV is not signed off. Phase 2 has 4-way
+Cache×Prefetch and selected TinyNPU data; real Top contention attribution and common-memory endpoints are open.
 Phase 3 has a trained Digits MLP only; trained CNN and Tiny Transformer are
 NOT_RUN. Phase 4 has 465 SpyGlass lint warnings, incomplete RDC, and DC PPA
 BLOCKED_ENV; no ASIC readiness claim is made. v1.0 remains HOLD.
