@@ -1,0 +1,7 @@
+source_sha,seed,scenario,observation_cycles,admitted_collisions,matrix_wait_cycles,held_payload_checks,matrix_responses,cnm_responses,owner_violations,hold_violations,route_mismatches,simulator,memory_model
+410b81dfd37992a760b28258bb7e8c6b6f5017d7,20261025,matrix_cnm_banked_collision,333,320,320,320,768,1120,0,0,0,Synopsys VCS V-2023.12-SP1_Full64,production Compute Cluster with shared ai_spad_arbiter and behavioral four-bank SPAD
+410b81dfd37992a760b28258bb7e8c6b6f5017d7,20261025,matrix_cnm_line_write_backpressure,1837,,,84,,,,0,,Synopsys VCS V-2023.12-SP1_Full64,production Compute Cluster with shared ai_spad_arbiter and behavioral four-bank SPAD
+410b81dfd37992a760b28258bb7e8c6b6f5017d7,20261026,matrix_cnm_banked_collision,333,320,320,320,768,1120,0,0,0,Synopsys VCS V-2023.12-SP1_Full64,production Compute Cluster with shared ai_spad_arbiter and behavioral four-bank SPAD
+410b81dfd37992a760b28258bb7e8c6b6f5017d7,20261026,matrix_cnm_line_write_backpressure,1837,,,84,,,,0,,Synopsys VCS V-2023.12-SP1_Full64,production Compute Cluster with shared ai_spad_arbiter and behavioral four-bank SPAD
+410b81dfd37992a760b28258bb7e8c6b6f5017d7,20261027,matrix_cnm_banked_collision,333,320,320,320,768,1120,0,0,0,Synopsys VCS V-2023.12-SP1_Full64,production Compute Cluster with shared ai_spad_arbiter and behavioral four-bank SPAD
+410b81dfd37992a760b28258bb7e8c6b6f5017d7,20261027,matrix_cnm_line_write_backpressure,1837,,,84,,,,0,,Synopsys VCS V-2023.12-SP1_Full64,production Compute Cluster with shared ai_spad_arbiter and behavioral four-bank SPAD
