@@ -1,8 +1,30 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-05. v2 feature branch HEAD at replay: `294ffec475c6da5ef140e9e35d0d30bafc4fc93b` (report/data-only changes after the cited RTL/test candidates). This is a short handoff for the next engineering task; it
+Updated: 2026-11-05. v2 feature branch HEAD: `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` (tree `dbf5060ac465ef4bb913543024182b298f675413`). This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
+
+## NMAForge v2 next-round plan status — 2026-11-05
+
+Phase 0 audit is complete at the target branch HEAD above. Remote `main` is
+still R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`; use that explicit SHA
+because the local `main` ref has drifted. The VS Code worktree remains on
+`feat/shape-adaptive-gemv-v2` with two untracked local simulator config files;
+all ten dirty worktrees and eighty missing/prunable registrations were
+preserved. The latest product RTL change is `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`;
+there is no later RTL diff. See the Phase 0 section in the
+[v2 architecture review](../../architecture/NMAFORGE_V2_ARCHITECTURE_REVIEW.md)
+for source/tree identities, worktree inventory, `.gitignore` audit, and the
+full post-RTL commit list.
+
+Phase 1 remains open: normalize `REQ-V2-*` and bind every requirement to a
+test, checker, assertion, coverage bin, run, seed, and SHA. Existing scoped
+Matrix-core, Top CMDQ, tile-forward, and descriptor PASS records remain useful
+but do not equal v2 sign-off. Phase 2 has 4-way Cache×Prefetch and selected
+TinyNPU data; real Top contention attribution and common-memory endpoints are
+open. Phase 3 has a trained Digits MLP only; trained CNN and Tiny Transformer
+are NOT_RUN. Phase 4 has 465 SpyGlass lint warnings, incomplete RDC, and DC
+PPA BLOCKED_ENV; no ASIC readiness claim is made. v1.0 remains HOLD.
 
 ## Current TinyNPU paired replay — 2026-11-05
 

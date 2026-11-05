@@ -116,6 +116,14 @@ dv/spyglass/tsmc28_sram_macro_stub.v
 *.key
 !.gitignore
 
+# Local licensed-tool files and host-specific simulator configuration
+*.lic
+*.license
+*.licence
+license.dat
+novas.conf
+novas.rc
+
 # Local tool UI artefacts and installed Codex skills are not project sources.
 /verdiLog/
 /.agents/skills/chip-architecture-diagram/

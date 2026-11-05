@@ -3,8 +3,8 @@
 **Review date:** 2026-11-05  
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Current reviewed candidate:** `feature/npu-architecture-v2` `6b7d6462393ab25ce409c0491037ea8458055741`
-**Candidate tree:** `d4059a2cf499d4eed2d9b90d059ff0f5f7b58267`
+**Current reviewed candidate:** `feature/npu-architecture-v2` `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164`
+**Candidate tree:** `dbf5060ac465ef4bb913543024182b298f675413`
 
 ## Executive disposition
 
@@ -21,16 +21,79 @@ performance win. Keep the overall Compute Cluster disposition at **HOLD**.
 
 ## Baseline and source audit
 
-The published `main` ref resolves to the requested R250 SHA. The merge base of
-the current candidate and R250 is exactly that SHA. The review starting commit
-`eb158880` is an ancestor of the current feature branch. The remote R250 ref
-was not modified. The full candidate delta from R250 contains 73 tracked paths:
-6 RTL, 12 DV, 3 software, 33 benchmark, 18 documentation, and 1 tool path (21
-paths under `rtl/`, `dv/`, and `sw/`). Since source/test candidate `33e8528`,
-the product RTL has not changed; later additions are a focused Matrix
-testbench profile, SpyGlass project/triage updates, and benchmark/report
-artifacts. Each replay below retains its own source identity rather than
-attributing old runs to the current documentation HEAD.
+Remote `origin/main` resolves to the requested R250 SHA, and the merge base of
+the current candidate and R250 is exactly that SHA. Review start
+`eb158880d11bf7f8baf13ece4a888107877356fd` is an ancestor of the feature
+branch. The local `main` ref is stale and divergent (22 local-only commits,
+350 remote-only commits); all comparisons here use the explicit remote R250
+SHA, not local `main`. The v2 branch contains 44 commits after R250 and no
+baseline-only commits. Its delta has 73 tracked paths: 6 RTL, 12 DV, 3
+software, 33 benchmark, 18 documentation, and 1 tool path.
+
+The most recent product RTL change is
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23` (`fix(gemv): reject aliased
+descriptor output spans`). The RTL tree has no diff from this commit through
+candidate `ac6b83f`. Subsequent changes include Matrix and Top testbench/build
+updates and SpyGlass project/triage updates; benchmark, review, and replay
+commits are listed in the Phase 0 audit below. Every test result retains its
+own source SHA instead of inheriting the documentation HEAD.
+
+### Phase 0 candidate and worktree audit — 2026-11-05
+
+| Item | Audited state |
+|---|---|
+| Target branch/worktree | `feature/npu-architecture-v2`, SHA `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164`, tree `dbf5060ac465ef4bb913543024182b298f675413`, clean, tracking `origin/feature/npu-architecture-v2` exactly. |
+| Baseline | `origin/main` = R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`; target merge base is that SHA. |
+| VS Code worktree | `/home/ray/workspace/NMAForge`, branch `feat/shape-adaptive-gemv-v2`, HEAD `c290eba7697138a4fcf2cbbac9262264849f0aeb`, tree `a7b3821eb9e425927322f2b3729a3c12ad08d9d4`; untracked `novas.conf` and `novas.rc` preserved. Its tree matches `origin/feat/shape-adaptive-gemv-v2` at `03b619ce1b32331c8f01194a42e5efb43bcda033`; that branch has two commits absent from the target v2 branch. Merge base with target v2 is `b5b6ff25ed41fb5ea4c9a5043360063cec58f7ac`; the refs have 2 shape-branch-only and 389 v2-branch-only commits. No merge or cherry-pick was made. |
+| All registered worktrees | 204 registrations: 114 clean, 10 dirty, 80 missing/prunable. No worktree was cleaned or pruned. The other dirty paths are `/tmp/nmaforge-v2-gemv-baseline-8ff286` (Matrix TB edit), `/tmp/nmaforge_r153_clean` and `_final_clean` (`uvm/`), `/tmp/nmaforge_r153_top_clean` (`uvm_mutation/`), `/tmp/nmaforge_r160_subsystem_cov_34e0` (evidence/URG outputs), `/tmp/nmaforge_r163_clean_f2e671d` (evidence/UVM outputs), `/tmp/nmaforge_r164_clean_db7588b` (v1 report edits and CSV), `/tmp/nmaforge_r166_subsystem_clean_8be88c1` (coverage output), and `/tmp/nmaforge_r281_matrixfsm` (local `novas.conf`/`novas.rc`). All were left untouched. |
+| Repository hygiene | Existing ignore rules cover VCS `simv*`, `.vdb`, `csrc`, logs/waves, SpyGlass databases, PDK/library formats, private keys, and `.env`. This audit adds ignore patterns for `*.lic`, `*.license`, `*.licence`, `license.dat`, `novas.conf`, and `novas.rc`; none of these paths is tracked. |
+
+The six RTL paths changed from R250 are `ai_tensor_matrix_array.sv`,
+`ai_tensor_matrix_core.v`, `ai_accel_opcode_decode.v`,
+`ai_descriptor_validator.v`, `ai_parallel_compute_dispatcher.v`, and
+`ai_accel_compute_cluster.v` (662 insertions, 80 deletions). This is an
+additive Matrix mapping/validator/dispatch integration; the existing 16×16,
+256-MAC array remains the only Matrix array. The exact opcode behavior and
+limits are summarized below and specified in
+[`NPU_ARCHITECTURE_V2_SPEC.md`](../spec/NPU_ARCHITECTURE_V2_SPEC.md).
+
+#### Commit history after the last RTL change
+
+The following 25 commits follow the last RTL commit. They contain verification
+test/build updates, benchmark evidence, static-analysis setup, or reports;
+there is no later RTL diff:
+
+| Commit | Change |
+|---|---|
+| `d4d09ad58f882a5e2d59091073fd447bbb3dfaca` | Publish matched GEMV Cache×Prefetch ablation. |
+| `9801cb606abdf1a76610cc3a5462c99c5b62ec7f` | Link evidence to published commits. |
+| `453e5d2194e452eb1dc5e80ce95e8cf2043d058b` | Add Top CMDQ tile-forward differential. |
+| `56de6a7aafa55db2e13127256d4983636341f55c` | Fix Matrix test ring-tail and GEMV profile expectations. |
+| `8bae6168b64e06990f2f821cf4322a14ac4ae696` | Record license-restored VCS checks. |
+| `eb158880d11bf7f8baf13ece4a888107877356fd` | Supersede blocked replay statuses. |
+| `550ef39f22c22c39eb3bfd7f38dbc574b630e163` | Freeze baseline and correct TinyNPU ratio direction. |
+| `52c1d2a75732b8d4c33191b0e3e85fc98d31d67c` | Record three-Seed Matrix sweep and ablation. |
+| `3affab2611fc2075d3af180e60eddf829522b577` | Align GEMV tail test gate with emitted marker. |
+| `15e901a46553b2b842d2ad1d391a94ef688600d2` | Add four-way Cache×Prefetch ablation target. |
+| `b9d593e5f55869ff4a47748013a4b15dcd60f83f` | Use supported Python for GEMV summary. |
+| `ae410661d4f31247be08f2e87ea761452e56a164` | Include M8 GEMV profiles in summary. |
+| `a015f59a04a1efdd9b1debee6be7c7d12475b05e` | Record four-way GEMV ablation. |
+| `33e85287fbf37187fccb76e97be6effe888670e9` | Add multi-Seed tile-forward regression target. |
+| `145363ddff5141177421ee7429fc65f78834830d` | Archive architecture/model replay evidence. |
+| `c3a59f08d8c07a8da973010d0f23d5d6d7eed61b` | Repair v2 SpyGlass source coverage and readiness report. |
+| `be77e765d00dc607da74a82fa75a8ce5c8c5f251` | Replay paired TinyNPU GEMM and CNN. |
+| `47e7340fc1a31193ae00ea5dc01d8d9a676df963` | Add paired small-M GEMV benchmark. |
+| `0b1d33704f4895cf48b0f5e1d3f452d61b3df535` | Invoke the paired TinyNPU script through Bash. |
+| `6b7d6462393ab25ce409c0491037ea8458055741` | Archive matched GEMV evidence. |
+| `294ffec475c6da5ef140e9e35d0d30bafc4fc93b` | Refresh baseline and paired benchmark audit. |
+| `18dad2ba4c502680893094bb726d88377d33eb9b` | Replay tile forwarding on the current branch. |
+| `307eac8b1f148a0727833d35642a2d942ca15932` | Include GEMV in replay disposition. |
+| `3a283c04724378c46747d907505eb82ea1ccbd4a` | Record current GEMV recovery replay. |
+| `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` | Record clean Top CMDQ replay. |
+
+The target branch is clean and exact with its remote. The R250 baseline ref is
+unchanged. These checks confirm repository identity and history only; they do
+not promote v1.0 or close v2 DV, model, or ASIC requirements.
 
 The active integration top remains `rtl/top/ai_accel_top.v`. The v2 product
 changes are concentrated in:
@@ -75,11 +138,11 @@ The inherited R250 system hierarchy and constraints are summarized in the
 |---|---|---|---|
 | 4×4/8×8/16×16 Matrix size and depth/prefetch/A-cache sweep | `550ef39f22c22c39eb3bfd7f38dbc574b630e163` | 165/165 Golden points pass across three Seeds. | Four-bank behavioral SPAD with one-cycle read latency; not ASIC timing. |
 | Product GEMV B-fold cache × next-K prefetch | RTL/test `b9d593e5f55869ff4a47748013a4b15dcd60f83f` | 48/48 full output images pass; four shapes × four feature settings × three Seeds. | Seeded behavioral SPAD ready/response model; stall counters may overlap and are not summed. |
-| Current-SHA product GEMV shape regression | `33e85287fbf37187fccb76e97be6effe888670e9` | 15/15 Golden shape/Seed points pass: M4, M1/N-tail/K-tail, M8, M16 K19/K65 over three Seeds. | Directed Matrix-core run; profiles are in `benchmark/v2_p2_product_gemv_3seed.csv`. |
-| Current-SHA Matrix core functional/fault regression | `33e85287fbf37187fccb76e97be6effe888670e9` | Three Seeds each pass 18 functional cases, 35 fault cases, and the line contract checks. | Shared Matrix core lifecycle evidence; not a full feature-specific 0x52/0x53 fault matrix. |
-| Tile-forward core OFF/ON | `33e85287fbf37187fccb76e97be6effe888670e9` | 6/6 feature/Seed runs bit-exact. Mean consumer cycles 141→118; selected source-A reads 32→16 (512→256 B). | Matrix-core directed responder; no ASIC or whole-system inference. |
-| Top CMDQ `0x52` + `0x53` smoke | `33e85287fbf37187fccb76e97be6effe888670e9`, clean detached worktree | 3/3 Seeds `TEST PASS`; each checks `0x52` N/K tails and `0x53` image/completion differential. | Top behavioral SPAD; VCS `LOOP-REROLL-ENABLED` notice remains. |
-| Descriptor boundary/alias suite | `33e85287fbf37187fccb76e97be6effe888670e9` | 29 opcode legal cases; 33 invalid rules; accepted boundaries 43/43; rejected boundaries 26/26; tile-forward descriptors 3/3. | Current-SHA validator replay. |
+| Current-branch product GEMV shape regression | `307eac8b1f148a0727833d35642a2d942ca15932` | 15/15 Golden shape/Seed points pass: M4, M1/N-tail/K-tail, M8, M16 K19/K65 over three Seeds. | VCS Matrix-core regression with registered behavioral four-bank SPAD. |
+| Current-branch Matrix core functional/fault regression | `307eac8b1f148a0727833d35642a2d942ca15932` | Three Seeds each pass 18 functional cases, 35 fault cases, and line contract checks. | Shared Matrix core lifecycle evidence; not a full feature-specific 0x52/0x53 fault matrix. |
+| Tile-forward core OFF/ON | `294ffec475c6da5ef140e9e35d0d30bafc4fc93b` | 6/6 feature/Seed runs bit-exact. Mean consumer cycles 141→118; selected source-A reads 32→16 (512→256 B). | Matrix-core directed responder; no ASIC or whole-system inference. |
+| Clean Top CMDQ `0x52` + `0x53` smoke | `3a283c04724378c46747d907505eb82ea1ccbd4a`, detached clean worktree | 3/3 Seeds `TEST PASS`; each checks `0x52` N/K tails and `0x53` image/completion differential. | Top behavioral SPAD; VCS `LOOP-REROLL-ENABLED` notice remains. |
+| Current-candidate descriptor boundary/alias suite | `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` | 29 opcode legal cases; 33 invalid rules; accepted boundaries 43/43; rejected boundaries 26/26; tile-forward descriptors 3/3. | `V2-DESC-VALIDATOR-AC6B83F`, VCS `V-2023.12-SP1_Full64`; scope is directed validator checks. |
 | Trained Digits MLP, R250 vs v2 | R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`; v2 `33e85287fbf37187fccb76e97be6effe888670e9` | Same model, seed and Golden; 352/360 correct and byte-identical RTL logits. CMDQ interval 110,155→34,761 cycles (−68.44%). | Real top RTL with testbench-preloaded behavioral SPAD; timing and byte counters are scoped in the model report. |
 | Paired TinyNPU GEMM/CNN | NMAForge `c3a59f08d8c07a8da973010d0f23d5d6d7eed61b`; TinyNPU `8216c22b762011aa20c05fc2768423fd12dda59d` | Three paired GEMM shapes pass Golden; Tiny engine regression 6/6; same ONNX mini CNN passes Golden on both. GEMM NMA/Tiny-modeled ratios are 1.1391/1.1385/1.0659. | VCS + Verilator RTL simulation; Tiny memory endpoint is modeled, CNN timing windows differ; no general speedup claim. |
 | Paired small-M GEMV | NMAForge `0b1d33704f4895cf48b0f5e1d3f452d61b3df535`; TinyNPU `8216c22b762011aa20c05fc2768423fd12dda59d` | `1×13×17` and `8×16×19` pass Golden. NMA measured cycles 76/158; Tiny direct array 100/100 and serialized modeled endpoint 126/170. | TinyNPU uses padded direct-array mapping and has no tested product GEMV/SPAD path; ratios 0.6032/0.9294 are mixed-boundary only. |
