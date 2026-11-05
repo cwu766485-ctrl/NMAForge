@@ -16,7 +16,7 @@ from pathlib import Path
 
 PASS_RE = re.compile(
     r"^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 "
-    r"shape=16x16x(?P<k>\d+) cycles=(?P<cycles>\d+) "
+    r"shape=(?P<m>\d+)x16x(?P<k>\d+) cycles=(?P<cycles>\d+) "
     r"mac_cycles=(?P<mac_cycles>\d+) bank_reads=(?P<reads>\d+) "
     r"read_bytes=(?P<read_bytes>\d+) outputs=(?P<outputs>\d+) "
     r"lines=(?P<lines>\d+) prefetch_completed=(?P<prefetch_completed>\d+) "
@@ -104,28 +104,32 @@ def read_config(config: Config, seed: int, rtl_sha: str, test_sha: str) -> list[
     if f"+SEED={seed}" not in command:
         raise ValueError(f"{run_log}: expected seed {seed} in run command")
     matches = list(PASS_RE.finditer(run_text))
-    found_k = [int(match.group("k")) for match in matches]
-    if found_k != [19, 65]:
-        raise ValueError(f"{run_log}: expected K markers [19, 65], found {found_k}")
-    profiles: dict[int, dict[str, int]] = {}
+    expected_shapes = [(8, 19), (8, 65), (16, 19), (16, 65)]
+    found_shapes = [(int(match.group("m")), int(match.group("k"))) for match in matches]
+    if found_shapes != expected_shapes:
+        raise ValueError(
+            f"{run_log}: expected M/K markers {expected_shapes}, found {found_shapes}"
+        )
+    profiles: dict[tuple[int, int], dict[str, int]] = {}
     for line in run_text.splitlines():
-        prefix = "MATRIX_CORE_GEMV_MROWS_PROFILE shape=16x16x"
+        prefix = "MATRIX_CORE_GEMV_MROWS_PROFILE shape="
         if not line.startswith(prefix):
             continue
         shape, _, payload = line[len(prefix):].partition(" ")
+        m_text, _, k_text = shape.partition("x16x")
         values = {
             key: int(value)
             for key, value in re.findall(r"([a-z_]+)=([0-9]+)", payload)
         }
-        profiles[int(shape)] = values
-    if sorted(profiles) != [19, 65]:
+        profiles[(int(m_text), int(k_text))] = values
+    if sorted(profiles) != expected_shapes:
         raise ValueError(
-            f"{run_log}: expected per-command profile K markers [19, 65], "
+            f"{run_log}: expected per-command profile M/K markers {expected_shapes}, "
             f"found {sorted(profiles)}"
         )
-    for k in found_k:
+    for m_rows, k in expected_shapes:
         if not re.search(
-            rf"^MATRIX_GEMV_ABLATION_PASS shape=M16x16x{k} seed={seed}$",
+            rf"^MATRIX_GEMV_ABLATION_PASS shape=M{m_rows}x16x{k} seed={seed}$",
             run_text,
             re.MULTILINE,
         ):
@@ -135,11 +139,17 @@ def read_config(config: Config, seed: int, rtl_sha: str, test_sha: str) -> list[
     for match in matches:
         values = {name: int(value) for name, value in match.groupdict().items()}
         k = values["k"]
-        expected_saved_reads = {19: 57, 65: 192}[k] if config.cache else 0
-        expected_cache_hits = {19: 15, 65: 48}[k] if config.cache else 0
+        m_rows = values["m"]
+        k_groups = (k + 3) // 4
+        cache_groups = min(k_groups, 16)
+        row_reuse_count = (m_rows // 4) - 1
+        expected_saved_reads = (
+            row_reuse_count * min(k, cache_groups * 4) if config.cache else 0
+        )
+        expected_cache_hits = row_reuse_count * cache_groups if config.cache else 0
         if (
-            values["outputs"] != 256
-            or values["lines"] != 64
+            values["outputs"] != m_rows * 16
+            or values["lines"] != m_rows * 4
             or values["reads"] * 16 != values["read_bytes"]
             or values["b_reads_saved"] != expected_saved_reads
             or values["b_cache_hits"] != expected_cache_hits
@@ -150,15 +160,15 @@ def read_config(config: Config, seed: int, rtl_sha: str, test_sha: str) -> list[
         ):
             raise ValueError(f"{run_log}: inconsistent metrics for K={k}: {values}")
 
-        useful_macs = 16 * 16 * k
-        profile = profiles[k]
+        useful_macs = m_rows * 16 * k
+        profile = profiles[(m_rows, k)]
         rows.append(
             {
                 "run_id": f"V2-GEMV-FOUR-WAY-S{seed}-K{k}-B{config.cache}-P{config.prefetch}",
                 "rtl_sha": rtl_sha,
                 "test_sha": test_sha,
                 "seed": str(seed),
-                "shape_m": "16",
+                "shape_m": str(m_rows),
                 "shape_n": "16",
                 "shape_k": str(k),
                 "b_fold_cache_enabled": str(config.cache),
@@ -227,8 +237,8 @@ def main() -> None:
         for config in configs
         for row in read_config(config, args.seed, args.rtl_sha, args.test_sha)
     ]
-    if len(rows) != 8:
-        raise SystemExit(f"expected 8 measured rows, found {len(rows)}")
+    if len(rows) != 16:
+        raise SystemExit(f"expected 16 measured rows, found {len(rows)}")
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("w", newline="", encoding="utf-8") as output:
