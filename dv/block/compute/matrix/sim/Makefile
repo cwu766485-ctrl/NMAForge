@@ -23,6 +23,7 @@ COV_METRICS := line+cond+fsm+branch
 	core-prefetch-handoff-test core-prefetch-handoff-regress \
 	core-no-prefetch-fallback-compile core-no-prefetch-fallback-regress \
 	product-gemv-test product-gemv-regress \
+	product-opcode-fault-regress \
 	product-gemv-prefetch-ablation \
 	product-gemv-b-cache-ablation \
 	product-gemv-four-way-ablation \
@@ -126,6 +127,18 @@ product-gemv-regress: core-random-compile
 		grep -q "^MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 		grep -q "^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=16x16x19 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 		grep -q "^MATRIX_PRODUCT_GEMV_ONLY_PASS seed=$$seed$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+	done
+
+# Feature-specific 0x52/0x53 error recovery, accepted-read drain, reset epoch,
+# held output backpressure, and post-fault Golden recovery checks.
+product-opcode-fault-regress: core-random-compile
+	@set -e; for seed in $(SEEDS); do \
+		$(CORE_OUT_DIR)/simv +SEED=$$seed +MATRIX_V2_OPCODE_FAULT_ONLY \
+			-cm $(COV_METRICS) -cm_dir $(CORE_OUT_DIR)/coverage.vdb \
+			-cm_name v2_opcode_fault_$$seed \
+			-l $(CORE_OUT_DIR)/v2_opcode_fault_seed_$$seed.log; \
+		grep -q "^MATRIX_V2_OPCODE_FAULT_PASS .* seed=$$seed$$" \
+			$(CORE_OUT_DIR)/v2_opcode_fault_seed_$$seed.log; \
 	done
 
 # Matched per-shape prefetch ON/OFF runs start directly from reset. This keeps

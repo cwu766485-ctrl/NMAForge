@@ -92,6 +92,8 @@ module tb_ai_tensor_matrix_core_random;
   reg [31:0] pending_spad_data;
   integer bank_response_queue_count=0;
   integer bank_response_wr_ptr=0,bank_response_rd_ptr=0;
+  reg inject_orphan_bank_response=0;
+  integer orphan_bank_response_count=0;
   integer bank_outstanding_highwater=0;
   integer bank_latency_idx,bank_latency_slot;
   reg force_banked_ready=0,force_bank_response_delay=0;
@@ -212,6 +214,7 @@ module tb_ai_tensor_matrix_core_random;
       bank_response_wr_ptr<=0;bank_response_rd_ptr<=0;
       bank_outstanding_highwater<=0;
       pending_bank_issue<=0;bank_read_count<=0;bank_response_count<=0;
+      inject_orphan_bank_response<=0;
       pending_bank_data[0]<=0;pending_bank_data[1]<=0;
       pending_bank_data[2]<=0;pending_bank_data[3]<=0;
       spad_ready<=0;spad_rsp_valid<=0;pending_spad<=0;spad_delay<=0;
@@ -343,6 +346,19 @@ module tb_ai_tensor_matrix_core_random;
          bank_outstanding_highwater)
         bank_outstanding_highwater<=bank_response_queue_count +
                                     bank_request_accept - bank_response_due;
+
+      // Model a late response from the just-reset fabric epoch. The DUT must
+      // ignore it because reset cleared the accepted-request ownership FIFO.
+      if(inject_orphan_bank_response) begin
+        banked_rsp_valid<=1'b1;
+        pending_bank_issue<=-1;
+        pending_bank_data[0]<=32'hdeed_0001;
+        pending_bank_data[1]<=32'hdeed_0002;
+        pending_bank_data[2]<=32'hdeed_0003;
+        pending_bank_data[3]<=32'hdeed_0004;
+        inject_orphan_bank_response<=1'b0;
+        orphan_bank_response_count<=orphan_bank_response_count+1;
+      end
 
       if(pending_spad) begin
         if(spad_delay==0) begin
@@ -1850,6 +1866,182 @@ module tb_ai_tensor_matrix_core_random;
     end
   endtask
 
+  task automatic check_product_output_sentinel(input integer word_count);
+    integer wi,word_index;
+    begin
+      for(wi=0;wi<word_count;wi=wi+1) begin
+        word_index=(DST_BASE>>2)+wi;
+        if(output_mem[word_index] !== (32'hbad0_0000+word_index))
+          $fatal(1,"v2 fault modified destination sentinel word=%0d got=%08x expected=%08x",
+                 word_index,output_mem[word_index],32'hbad0_0000+word_index);
+      end
+    end
+  endtask
+
+  task automatic run_v2_opcode_fault_campaign;
+    integer timeout,accepted_at_fault,orphan_before;
+    begin
+      // Opcode 0x52 parity during an accepted operand response must report the
+      // fault, drain all accepted reads, preserve the destination, and recover.
+      prepare_dense_gemv_case();
+      force_banked_ready=1;force_bank_response_delay=1;
+      bank_parity_target_issue=bank_read_count;inject_bank_parity=1;
+      launch_and_wait();
+      if(!error || error_code!=ERR_PARITY)
+        $fatal(1,"0x52 parity error/code mismatch %b/%0d",error,error_code);
+      accepted_at_fault=bank_read_count;
+      inject_bank_parity=0;
+      finish_fault(ERR_PARITY,50);
+      if(bank_response_count<accepted_at_fault || pending_bank ||
+         dut.read_outstanding_count!=0)
+        $fatal(1,"0x52 parity failed response drain accepted=%0d returned=%0d outstanding=%0d",
+               accepted_at_fault,bank_response_count,dut.read_outstanding_count);
+      check_product_output_sentinel(64);
+      force_banked_ready=0;force_bank_response_delay=0;
+      prepare_dense_gemv_case();check_dense_gemv_case();
+
+      // Address-specific protection is injected at the first dense-B read,
+      // after the A rows have been fetched.
+      prepare_dense_gemv_case();
+      force_banked_ready=1;force_bank_response_delay=1;
+      inject_bank_protection=1;bank_protection_addr=SRC1_BASE;
+      launch_and_wait();
+      if(!error || error_code!=ERR_PROTECTION)
+        $fatal(1,"0x52 B protection error/code mismatch %b/%0d",error,error_code);
+      accepted_at_fault=bank_read_count;
+      inject_bank_protection=0;
+      finish_fault(ERR_PROTECTION,51);
+      if(bank_response_count<accepted_at_fault || pending_bank ||
+         dut.read_outstanding_count!=0)
+        $fatal(1,"0x52 protection failed response drain accepted=%0d returned=%0d outstanding=%0d",
+               accepted_at_fault,bank_response_count,dut.read_outstanding_count);
+      check_product_output_sentinel(64);
+      force_banked_ready=0;force_bank_response_delay=0;
+      prepare_dense_gemv_case();check_dense_gemv_case();
+
+      // Abort while 0x52 has a next-K prefetch response outstanding.
+      prepare_dense_gemv_case();
+      force_banked_ready=1;force_bank_response_delay=1;
+      @(negedge clk);start=1;@(negedge clk);start=0;
+      timeout=0;
+      while((!dut.prefetch_active || (dut.read_outstanding_count==0)) &&
+            !done && (timeout<5000)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(!dut.prefetch_active || (dut.read_outstanding_count==0))
+        $fatal(1,"0x52 abort missed active prefetch/outstanding state=%0d count=%0d",
+               dut.state_r,dut.read_outstanding_count);
+      accepted_at_fault=bank_read_count;
+      abort=1;@(negedge clk);abort=0;
+      finish_fault(ERR_ABORT,52);
+      if(bank_read_count!=accepted_at_fault ||
+         bank_response_count<accepted_at_fault || pending_bank ||
+         dut.read_outstanding_count!=0 || dut.prefetch_valid_r!=0)
+        $fatal(1,"0x52 abort failed stop/drain accepted=%0d issued=%0d returned=%0d outstanding=%0d valid=%b",
+               accepted_at_fault,bank_read_count,bank_response_count,
+               dut.read_outstanding_count,dut.prefetch_valid_r);
+      check_product_output_sentinel(64);
+      force_banked_ready=0;force_bank_response_delay=0;
+      prepare_dense_gemv_case();check_dense_gemv_case();
+
+      // Reset with an accepted prefetch response outstanding, then inject a
+      // one-cycle late response with no owner to verify stale-epoch discard.
+      prepare_dense_gemv_case();
+      force_banked_ready=1;force_bank_response_delay=1;
+      @(negedge clk);start=1;@(negedge clk);start=0;
+      timeout=0;
+      while((!dut.prefetch_active || (dut.read_outstanding_count==0)) &&
+            !done && (timeout<5000)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(!dut.prefetch_active || (dut.read_outstanding_count==0))
+        $fatal(1,"0x52 reset missed active prefetch/outstanding state=%0d count=%0d",
+               dut.state_r,dut.read_outstanding_count);
+      @(negedge clk);resetn=0;#1;
+      if(busy || done || error || error_code!=0 ||
+         dut.read_outstanding_count!=0 || pending_bank ||
+         line_write_count!=0 || scalar_write_count!=0)
+        $fatal(1,"0x52 reset failed to clear in-flight command/response state");
+      repeat(3) @(negedge clk);resetn=1;
+      force_banked_ready=0;force_bank_response_delay=0;
+      orphan_before=orphan_bank_response_count;
+      @(negedge clk);inject_orphan_bank_response=1;
+      timeout=0;
+      while((orphan_bank_response_count==orphan_before) && (timeout<20)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      repeat(2) @(negedge clk);
+      if(orphan_bank_response_count!=orphan_before+1 || busy || done ||
+         error || error_code!=0 || dut.read_outstanding_count!=0 ||
+         line_write_count!=0 || scalar_write_count!=0)
+        $fatal(1,"late post-reset response was not discarded count=%0d busy/done/error=%b/%b/%b outstanding=%0d",
+               orphan_bank_response_count,busy,done,error,dut.read_outstanding_count);
+      check_product_output_sentinel(64);
+      prepare_dense_gemv_case();check_dense_gemv_case();
+
+      // Opcode 0x53 read parity fault: no output line may commit and the local
+      // forwarding tag must remain invalid.
+      prepare_case(16,16,4,1,0,0,0,0,0,0,0);
+      op_mode=8'h53;aux0=32'h21;
+      force_banked_ready=1;force_bank_response_delay=1;
+      bank_parity_target_issue=bank_read_count;inject_bank_parity=1;
+      launch_and_wait();
+      if(!error || error_code!=ERR_PARITY)
+        $fatal(1,"0x53 parity error/code mismatch %b/%0d",error,error_code);
+      accepted_at_fault=bank_read_count;
+      inject_bank_parity=0;
+      finish_fault(ERR_PARITY,53);
+      if(bank_response_count<accepted_at_fault || pending_bank ||
+         dut.read_outstanding_count!=0 || dut.tile_forward_valid_r)
+        $fatal(1,"0x53 parity failed drain/tag invalidation accepted=%0d returned=%0d valid=%b",
+               accepted_at_fault,bank_response_count,dut.tile_forward_valid_r);
+      check_product_output_sentinel(256);
+      force_banked_ready=0;force_bank_response_delay=0;
+
+      // Protection on the producer's first output line must block both the
+      // SPAD write and tile capture.
+      prepare_case(16,16,4,1,0,0,0,0,0,0,0);
+      op_mode=8'h53;aux0=32'h21;
+      force_banked_ready=1;force_zero_bank_latency=1;force_line_ready=1;
+      inject_line_protection=1;line_protection_addr=DST_BASE;
+      launch_and_wait();
+      if(!error || error_code!=ERR_PROTECTION)
+        $fatal(1,"0x53 output protection error/code mismatch %b/%0d",error,error_code);
+      inject_line_protection=0;
+      finish_fault(ERR_PROTECTION,54);
+      if(dut.tile_forward_valid_r)
+        $fatal(1,"0x53 protection fault committed a forwarding tag");
+      check_product_output_sentinel(256);
+      force_banked_ready=0;force_zero_bank_latency=0;force_line_ready=0;
+
+      // Abort a captured producer while its first line is held by backpressure.
+      prepare_case(16,16,4,1,0,0,0,0,0,0,0);
+      op_mode=8'h53;aux0=32'h21;
+      force_banked_ready=1;force_line_stall=1;
+      @(negedge clk);start=1;@(negedge clk);start=0;
+      timeout=0;
+      while((dut.state_r!=9 || !line_valid) && !done && (timeout<5000)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(dut.state_r!=9 || !line_valid || line_ready)
+        $fatal(1,"0x53 held-write abort missed first blocked line state=%0d valid/ready=%b/%b",
+               dut.state_r,line_valid,line_ready);
+      abort=1;@(negedge clk);abort=0;
+      finish_fault(ERR_ABORT,55);
+      if(line_write_count!=0 || dut.tile_forward_valid_r)
+        $fatal(1,"0x53 held-write abort committed line/tag lines=%0d valid=%b",
+               line_write_count,dut.tile_forward_valid_r);
+      check_product_output_sentinel(256);
+      force_banked_ready=0;force_line_stall=0;
+
+      // A clean 0x53 chain after the injected faults proves recovery of the
+      // producer/consumer Golden path and the bounded tag state.
+      run_tile_forward_chain();
+      $display("MATRIX_V2_OPCODE_FAULT_PASS opcode52=parity,protection,abort,reset_orphan opcode53=parity,writeback_protection,held_write_abort recovery=0x52_golden,0x53_tile_chain seed=%0d",
+               initial_seed);
+    end
+  endtask
+
   initial begin
     if($value$plusargs("SEED=%d",seed)) begin end
     rng_seed=seed^32'h7ac4_01d3;
@@ -1863,6 +2055,11 @@ module tb_ai_tensor_matrix_core_random;
       bias_mem[row]=0;output_mem[row]=0;expected_mem[row]=0;
     end
     repeat(4) @(negedge clk);resetn=1;
+
+    if($test$plusargs("MATRIX_V2_OPCODE_FAULT_ONLY")) begin
+      run_v2_opcode_fault_campaign();
+      $finish;
+    end
 
     if($test$plusargs("MATRIX_BENCHMARK_ONLY")) begin
       prepare_case(4,4,8,1,0,0,0,0,0,0,0);
