@@ -27,6 +27,10 @@ against the pinned TinyNPU 16×16 array with identical operand formulas. The
 TinyNPU cases use zero-padded direct-array inputs; they do not exercise a
 TinyNPU GEMV descriptor, controller, or SPAD. Its memory endpoint is therefore
 reported as a serialized model alongside measured TinyNPU array cycles.
+The committed [`gemv_results.csv`](gemv_results.csv) and
+[`gemv_summary.json`](gemv_summary.json) correspond to the fixed clean-SHA
+replay documented in
+[`NMAFORGE_V2_SMALL_GEMV_TINYNPU_2026-11-05.md`](../../docs/benchmark/NMAFORGE_V2_SMALL_GEMV_TINYNPU_2026-11-05.md).
 
 The script clones the pinned reference under `/tmp` if `TINY_NPU_ROOT` is not
 set. It writes raw compile/run logs and binaries under `/tmp`, then updates
@@ -91,9 +95,13 @@ python3 benchmark/tinynpu/plot_results.py
 ```
 
 See [`gemm_cycle_comparison.svg`](gemm_cycle_comparison.svg) and
-[`cnn_cycle_breakdown.svg`](cnn_cycle_breakdown.svg). The GEMM chart separates
+[`cnn_cycle_breakdown.svg`](cnn_cycle_breakdown.svg) and
+[`gemv_cycle_comparison.svg`](gemv_cycle_comparison.svg). The GEMM chart separates
 TinyNPU measured array cycles from its modeled serialized-memory endpoint; the
-CNN chart labels the differing timing windows and makes no speedup claim.
+CNN chart labels the differing timing windows; the GEMV chart shows the
+measured NMAForge command, TinyNPU direct array, and modeled TinyNPU memory
+endpoint with the mixed-boundary caveat. Neither chart implies ASIC timing or
+an equivalent product-level memory path.
 
 These CSVs are RTL simulation evidence and an explicitly identified memory
 schedule estimate, not SRAM timing, ASIC PPA, or measured Fmax. See the

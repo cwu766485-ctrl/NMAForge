@@ -165,7 +165,86 @@ def render_cnn():
     (ROOT / "cnn_cycle_breakdown.svg").write_text("\n".join(out) + "\n", encoding="utf-8")
 
 
+def render_gemv():
+    rows = read_rows("gemv_results.csv")
+    shapes = list(dict.fromkeys(row["shape_mnk"] for row in rows))
+    grouped = {}
+    for row in rows:
+        grouped.setdefault(row["shape_mnk"], {})[row["design"]] = row
+    if not shapes or any(
+        shape not in grouped or "NMAForge" not in grouped[shape] or "TinyNPU" not in grouped[shape]
+        for shape in shapes
+    ):
+        raise SystemExit("paired GEMV rows are incomplete in gemv_results.csv")
+
+    values = [
+        float(grouped[shape][design][field])
+        for shape in shapes
+        for design, field in (("NMAForge", "rtl_cycles"), ("TinyNPU", "rtl_cycles"), ("TinyNPU", "normalized_cycles"))
+    ]
+    ymax = max(50, int((max(values) + 49) // 50) * 50)
+    left, top, plot_w, plot_h = 100, 120, 830, 315
+    base_y = top + plot_h
+    scale = plot_h / ymax
+    out = svg_start(
+        "Small-M GEMV cycle evidence",
+        "NMAForge 0x52 controller + behavioral SPAD; TinyNPU direct array RTL plus a separately modeled memory endpoint",
+    )
+    for tick in range(0, ymax + 1, max(1, ymax // 4)):
+        y = base_y - tick * scale
+        out.append('<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" class="grid"/>' %
+                   (left, y, left + plot_w, y))
+        out.append('<text x="%d" y="%.1f" text-anchor="end" font-size="13" class="muted">%d</text>' %
+                   (left - 12, y + 4, tick))
+    out.append('<line x1="%d" y1="%d" x2="%d" y2="%d" class="axis"/>' %
+               (left, top, left, base_y))
+    out.append('<text x="25" y="300" transform="rotate(-90 25 300)" font-size="14" class="muted">Cycles</text>')
+
+    colors = ["#168f83", "#d89421", "#bb5a36"]
+    labels = ["NMAForge measured command", "TinyNPU direct array RTL", "TinyNPU serialized memory model"]
+    bar_w, bar_gap, group_w = 52, 13, 350
+    group_start = left + 75
+    for index, shape in enumerate(shapes):
+        group_x = group_start + index * group_w
+        nma = grouped[shape]["NMAForge"]
+        tiny = grouped[shape]["TinyNPU"]
+        entries = [
+            float(nma["rtl_cycles"]),
+            float(tiny["rtl_cycles"]),
+            float(tiny["normalized_cycles"]),
+        ]
+        for j, value in enumerate(entries):
+            x = group_x + j * (bar_w + bar_gap)
+            h = value * scale
+            y = base_y - h
+            out.append('<rect x="%d" y="%.1f" width="%d" height="%.1f" fill="%s"/>' %
+                       (x, y, bar_w, h, colors[j]))
+            out.append('<text x="%d" y="%.1f" text-anchor="middle" font-size="12">%d</text>' %
+                       (x + bar_w / 2, y - 7, int(value)))
+        center = group_x + (3 * bar_w + 2 * bar_gap) / 2
+        out.append('<text x="%.1f" y="%d" text-anchor="middle" font-size="15" font-weight="700">%s</text>' %
+                   (center, base_y + 26, shape.replace("x", " × ")))
+        ratio = entries[0] / entries[2]
+        out.append('<text x="%.1f" y="%d" text-anchor="middle" font-size="13" class="muted">mixed-endpoint ratio %.4f</text>' %
+                   (center, base_y + 47, ratio))
+
+    legend_x, legend_y = 105, 525
+    for i, label in enumerate(labels):
+        x = legend_x + i * 290
+        out.append('<rect x="%d" y="%d" width="16" height="16" fill="%s"/>' %
+                   (x, legend_y - 13, colors[i]))
+        out.append('<text x="%d" y="%d" font-size="13">%s</text>' %
+                   (x + 23, legend_y, html.escape(label)))
+    out.append('<text x="68" y="566" font-size="13" class="muted">Ratio = NMAForge command cycles / TinyNPU modeled endpoint; endpoints differ, so this is not a system-level speedup claim.</text>')
+    out.append('</svg>')
+    (ROOT / "gemv_cycle_comparison.svg").write_text("\n".join(out) + "\n", encoding="utf-8")
+
+
 if __name__ == "__main__":
     render_gemm()
     render_cnn()
-    print("PLOT_PASS outputs=gemm_cycle_comparison.svg,cnn_cycle_breakdown.svg")
+    if (ROOT / "gemv_results.csv").exists():
+        render_gemv()
+        print("PLOT_PASS outputs=gemm_cycle_comparison.svg,cnn_cycle_breakdown.svg,gemv_cycle_comparison.svg")
+    else:
+        print("PLOT_PASS outputs=gemm_cycle_comparison.svg,cnn_cycle_breakdown.svg")

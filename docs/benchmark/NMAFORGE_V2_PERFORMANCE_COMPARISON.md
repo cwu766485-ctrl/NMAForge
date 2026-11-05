@@ -123,6 +123,30 @@ used more cycles under the stated normalization. Prior BLOCKED_ENV entries
 are superseded for these tested GEMM/CNN points only; the full TinyNPU/model
 benchmark task is not closed.
 
+### Small-M GEMV reference comparison
+
+At NMAForge SHA `0b1d33704f4895cf48b0f5e1d3f452d61b3df535`, run
+`GEMV-MATCH-V2-S20261029` passed signed INT8/INT32 Golden for `1×13×17` and
+`8×16×19` on opcode `0x52`. NMAForge's measured Matrix-controller plus
+behavioral-SPAD intervals were 76 and 158 cycles, with 304/560 B read and
+52/512 B written. The pinned TinyNPU SHA has no equivalent tested GEMV
+descriptor or SPAD port: its 16×16 direct-array RTL took 100 cycles for each
+zero-padded shape. Adding the explicitly serialized memory model yields 126
+and 170 cycles. The resulting ratios are 0.6032 and 0.9294, where
+`NMAForge measured command cycles / TinyNPU modeled endpoint cycles`; ratios
+below one favor NMAForge on this mixed endpoint arithmetic only and are not a
+system-level speedup claim.
+
+The NMAForge event profile closes to 76/158 total cycles when exclusive
+controller-stage counts and prefetch-wait cycles are combined. Arbiter,
+response, writeback, and prefetch wait/event counters can overlap and are not
+summed as independent stalls. Golden, raw rows, tool versions, command, and
+log archive checksum are in the [Small-M GEMV replay record](NMAFORGE_V2_SMALL_GEMV_TINYNPU_2026-11-05.md),
+[`gemv_results.csv`](../../benchmark/tinynpu/gemv_results.csv), and
+[`gemv_summary.json`](../../benchmark/tinynpu/gemv_summary.json). This adds
+two bounded shapes only; broad M/N/K tails, common RTL memory service, and
+product-level TinyNPU equivalence remain open.
+
 ## Trained Digits model result
 
 The same trained INT8 model, seed `20261029`, 360 test inputs, independent
