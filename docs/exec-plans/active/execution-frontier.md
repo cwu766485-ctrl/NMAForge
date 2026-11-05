@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-05. v2 feature branch HEAD: `59d1e5ed6570fefe957a6ed2abc10d6d18c21ed2` (tree `94f3a2748698c100a6f2087c72bd091d357747f8`). Product RTL candidate remains `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` (tree `dbf5060ac465ef4bb913543024182b298f675413`); `465855a` added only a Matrix DV test and Make target, and `59d1e5e` added its replay record. This is a short handoff for the next engineering task; it
+Updated: 2026-11-05. Latest fixed-SHA v2 fault run: `59d1e5ed6570fefe957a6ed2abc10d6d18c21ed2` (tree `94f3a2748698c100a6f2087c72bd091d357747f8`). Product RTL candidate remains `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` (tree `dbf5060ac465ef4bb913543024182b298f675413`); `465855a` added only a Matrix DV test and Make target, and the run/report commits changed no product RTL or Matrix testbench content. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
