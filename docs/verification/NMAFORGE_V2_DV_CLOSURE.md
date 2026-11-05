@@ -9,6 +9,7 @@
 **Latest RTL-mutation replay:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`; 15/15 opcode-core mutant-seed checks caught.
 **Latest scoped cross-engine replay:** `86e0d6cbba3187bd1deeb18f664c559b606c878d` (tree `497eaef649c3995c97cb533a9c410417d63ee0de`); Top Smoke adds a scoped functional coverage group, with no product RTL change.
 **Latest actual DUT mutation replay:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`; seven temporary RTL mutants were caught by their assigned real Compute Cluster UVM checkers.
+**Latest in-repository fabric reset replay:** `f340acaa2cdf7c36075473b8bc6fd6dee8e59873` (tree `7fc556427be1597e64a602c10af4fdd855a0c343`); three seeds pass selected `ai_accel_memory_fabric` reset/epoch and DMA/CNM recovery checks.
 
 **Baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Simulator:** Synopsys VCS `V-2023.12-SP1_Full64`
@@ -38,6 +39,7 @@ The exact `REQ-V2-*` evidence delta is:
 | `REQ-V2-053-001/002/005/006` | Top CMDQ producer/consumer replay plus three-seed tag, ping-pong, Reset/Epoch, Parity, Protection and held-write recovery | Remain scoped PASS/PARTIAL; arbitrary held-response timing, Completion fault injection and all cross-engine contracts remain open. |
 | `REQ-V2-COM-004` | Current 3-seed Top URG with one v2 functional group | **PARTIAL**; 100% applies only to the named Matrix+SFU handoff group; overall functional group score is 20%. |
 | `REQ-V2-COM-005` | Current 15/15 opcode mutations and 7/7 Cluster DUT mutations | **PARTIAL**; these are selected mutations, not exhaustive checker-to-fault mapping for every new feature. |
+| `REQ-V2-COM-006` | In-repository `ai_accel_memory_fabric` coordinated reset with DMA reads outstanding and CNM accepted SPAD response / pending result write; owner flush and fresh DMA/CNM recovery | **PASS (selected repository-fabric scope)**; three reset functional groups are 100%, and owner/tag SVAs have real successes. This does not establish behavior for arbitrary external SoC fabrics or close opcode-specific fault/reset crosses. |
 
 The UVM run has three top AXI stall assertions with 660,281 attempts each:
 `c_ar_stall_then_accept` and `c_aw_stall_then_accept` have zero matches,
@@ -380,6 +382,7 @@ new opcodes.
 | REQ-V2-COM-003: new-feature assertions are connected and non-vacuous | Matrix FSM and top SVA | VC Formal proves existing Matrix guard set; Top SVA is AXI/quiescence scoped | Formal: 5/5 named Matrix assertions non-vacuous and 2/2 covers reached at `145363ddff5141177421ee7429fc65f78834830d`; no opcode-specific 0x52/0x53 assertion | `prefetch_wait`, `error_drain` covers; no v2 opcode transition cross | `V2-MATRIX-FSM-GUARDS-145363D`, formal run, SHA `145363ddff5141177421ee7429fc65f78834830d` | **PARTIAL**; this does not prove new opcode properties or full SVA connection coverage; `/tmp/nmaforge_v2_matrix_fsm_formal_33e8528/vc_formal.log` |
 | REQ-V2-COM-004: all legal v2 functional bins are merged and every exclusion/waiver has disposition | URG functional/code coverage | VCS URG merge for current Top Smoke DUT-only scope (27 module definitions) across three Seeds; earlier Matrix core/GEMV/fault and Prefetch-OFF runs remain separately identified | One v2-specific functional group samples the legal 0x53 cross-engine handoff; no new SVA | Current Top URG: 86.75/77.62/44.33/84.56% Line/Condition/FSM/Branch; Matrix FSM 15/15 states, 25/55 transitions. New 0x53 group 100%; overall functional group score 20% because four existing AXI-memory groups score 0%. Remaining 0x52/0x53 bins and FSM transitions have no approved disposition | `V2-DUT-COVERAGE-TOP-3SEED-86E0D6C`, seeds 20261105/06/07, source/test SHA `86e0d6cbba3187bd1deeb18f664c559b606c878d`; archive SHA below | **PARTIAL**; only the legal Matrix+SFU handoff group is complete. Broader feature bins, exclusions/waivers, and remaining FSM transition reachability are not closed; aggregate percentages do not establish sign-off |
 | REQ-V2-COM-005: each new checker detects its assigned RTL fault through mutation | 0x52/0x53 Matrix datapath/forwarding and shared Compute Cluster lifecycle | Actual temporary DUT mutants for shared-SPAD address/data/response owner, Matrix WSTRB, Completion error code, missing Done, and duplicate Done; separate opcode-core mutants for output data/address, operand response owner, WSTRB, and tile tag | Mutation-specific SVA: none; each injected defect must trigger its assigned scoreboard/checker | Current-candidate actual-DUT campaign: 7/7 mutation classes caught at seed 20261025; opcode-core campaign: 5 classes × 3 seeds = 15/15 caught | `V2-DUT-MUTATION-7X1-BDFDA3C`, seed 20261025, SHA `bdfda3c408a1367ac6b1788ebb9bdb0e5b6f7d47`; `V2-OPCODE-MUTATION-5X3-A015DE5`, seeds 20261105/06/07, SHA `a015de58379ca1303ebfc1c4c3899d1fd77affa2` | **PARTIAL**; these selected RTL faults are detected, including Completion and shared response owner. Exhaustive mutation-to-checker mapping for every new feature/checker and the full fault-phase cross remain open; see both external logs archives |
+| REQ-V2-COM-006: coordinated reset flushes in-repository shared-fabric owners and allows clean DMA/CNM recovery | `ai_accel_memory_fabric`, DMA and banked CNM shared reset/epoch lifecycle | `subsystem_memory_fabric_reset_regress`; DMA memory scoreboard plus `MEMORY_FABRIC_RESET_ONLY_PASS` and `DMA_CNM_RESET_RECOVERY_PASS` checks. It exercises four DMA reads outstanding while CNM has an accepted SPAD read without its response, and a second phase with CNM awaiting result write | URG records `ap_single_response_owner` (3,921 real successes) and `ap_cnm_response_tag` (144 real successes); both have zero failures/incomplete. These are exercised owner/tag properties, not a universal external-fabric epoch proof | `dma_cnm_shared_reset_cg`, `dma_reset_phase_cg`, and `cnm_reset_phase_cg` each 100.00% in the merged report. Whole-report functional group score is only 23.98%; other subsystem groups are outside this scenario | `V2-MEMORY-FABRIC-RESET-3SEED-F340ACA`, seeds 20261025/26/27, source SHA `f340acaa2cdf7c36075473b8bc6fd6dee8e59873`, tree `7fc556427be1597e64a602c10af4fdd855a0c343` | **PASS (selected in-repository fabric scope)**; all three seeds report zero UVM Warning/Error/Fatal and post-reset DMA/CNM Golden recovery. Does not close 0x52/0x53-specific reset-phase crosses or arbitrary external fabric behavior; logs/URG archive and checksum below |
 
 ### Fixed run identities and reproducibility
 
@@ -394,6 +397,7 @@ new opcodes.
 - `V2-0X53-CROSS-ENGINE-IMMUTABLE-3SEED-0870A76`: VCS `V-2023.12-SP1_Full64`; `make ai_comp` followed by `./simv +ntb_random_seed=<seed> +AI_RANDOM_CASES=4 +AI_SEED=<seed> +ACLK_PERIOD_NS=10.0` for seeds 20261105/06/07. All three logs report full `TEST PASS`, Matrix/SFU busy overlap, 23 accepted SFU SPAD accesses while Matrix consumes the tagged tile, no compute-client source write attempt, unchanged 64-word source image, and bit-exact Matrix/SFU output images and completions. Logs-only archive `/tmp/nmaforge_v2_cross_engine_three_seed_final_0870a76_logs.tar.gz`, SHA-256 `fb2f2d70128fc919a4d767b11c1257024760a3e9b5019a68b44286cef78662c2`. Testbench checks seven compute SPAD request clients and Matrix line writes; it does not monitor DMA traffic in this scenario and adds no coverage database.
 - `V2-DUT-COVERAGE-TOP-3SEED-0870A76`: VCS/URG `V-2023.12-SP1_Full64`, exact test source SHA `0870a76b803ad01b8c23d812cfddd9cbb399f74e`; `make ai_compute_cluster_cov AI_CLUSTER_COV_RUN=/tmp/nmaforge_v2_0870a76_dut_cov AI_CLUSTER_COV_SEEDS='20261105 20261106 20261107' AI_RANDOM_CASES=4`. All 3 seeded runs emit `TEST PASS` and the cross-engine Golden marker. DUT-only Top Smoke URG reports 86.75% Line, 77.62% Condition, 44.33% FSM, 84.56% Branch; Matrix core FSM is 15/15 states and 25/55 transitions. The four existing AXI-memory testbench groups are 0%; no v2 functional covergroups were added. Evidence archive `/tmp/nmaforge_v2_0870a76_dut_cov_evidence.tar.gz`, SHA-256 `691b2e6b5b896a5ec1638796939899ba751a43f1611edc6386dd550bddc052f0`; includes VDB, URG reports, compile/run logs.
 - `V2-DUT-COVERAGE-TOP-3SEED-86E0D6C`: VCS/URG `V-2023.12-SP1_Full64`, source SHA `86e0d6cbba3187bd1deeb18f664c559b606c878d`; command above, Seeds 20261105/06/07. The cross-engine group checks overlap, accepted consume-period SPAD access, no source write attempt, bit-exact Golden and a pair cross; it scores 100% in each run and merged. DUT-only code coverage is 86.75/77.62/44.33/84.56% Line/Condition/FSM/Branch, Matrix FSM 15/15 states and 25/55 transitions. Overall functional group score is 20% because the four existing AXI-memory groups score 0%; the new group covers only this legal 0x53 scenario. Evidence `/tmp/nmaforge_v2_86e0d6c_dut_cov_evidence.tar.gz`, SHA-256 `eb25d2725fa8e3252c0140d0c7254c3abfc03fd1ef44d1ecbd2283e75becd4f8`; includes VDB, URG reports, compile/run logs.
+- `V2-MEMORY-FABRIC-RESET-3SEED-F340ACA`: VCS/URG `V-2023.12-SP1_Full64`; source/test SHA `f340acaa2cdf7c36075473b8bc6fd6dee8e59873`, tree `7fc556427be1597e64a602c10af4fdd855a0c343`; command `make -C dv/subsystem/dma_spad/sim subsystem_memory_fabric_reset_regress` with `MEMORY_FABRIC_RESET_SEEDS='20261025 20261026 20261027'`, VCS `-licwait 10`, and output `/tmp/nmaforge_v2_fabric_reset_f340aca`. All three seeds report `MEMORY_FABRIC_RESET_ONLY_PASS`, two `DMA_CNM_RESET_RECOVERY_PASS` events, and UVM Warning/Error/Fatal `0/0/0`. Three named reset groups score 100.00% in merged URG. Assertion summary is 13/31 with real successes, 0 failures, 0 incomplete, and two no-attempt UVM RAL properties; `ap_single_response_owner` and `ap_cnm_response_tag` have real successes. Logs-only archive `/tmp/nmaforge_v2_fabric_reset_f340aca_logs.tar.gz`, SHA-256 `14144bdc62932d8040a1b5be72b27f83e6f4f8e52286a8658b1570fdfe3717c5`. VCS databases and simulator binaries are excluded. Scope is the in-repository fabric and this reset interleave only.
 - `V2-MATRIX-FSM-GUARDS-145363D`: VC Formal `V-2023.12-SP2`; 5/5 named Matrix FSM assertions proven/non-vacuous and 2/2 state covers reached. It is not an opcode 0x52/0x53 assertion campaign.
 
 Exact replay commands for the latest fixed test candidate `86e0d6c` (run from
@@ -415,7 +419,20 @@ VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
     AI_CLUSTER_COV_SEEDS='20261105 20261106 20261107' AI_RANDOM_CASES=4
 ```
 
-The RTM currently has 21 requirement IDs: 12 scoped PASS, 9 PARTIAL, and 0
+The repository-fabric reset replay used:
+
+```sh
+export VCS_ARCH_OVERRIDE=linux \
+  VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+  PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH
+make -C dv/subsystem/dma_spad/sim subsystem_memory_fabric_reset_regress \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+  URG=/tmp/nmaforge_vcs_home_linux_alias/bin/urg \
+  MEMORY_FABRIC_RESET_SEEDS='20261025 20261026 20261027' \
+  MEMORY_FABRIC_RESET_OUT=/tmp/nmaforge_v2_fabric_reset_f340aca
+```
+
+The RTM currently has 22 requirement IDs: 13 scoped PASS, 9 PARTIAL, and 0
 NOT_RUN. No `BLOCKED_ENV` row was converted to PASS; all successful rows have
 a named, limited test scope. This remains an execution RTM, not an approval
 record. The
@@ -487,7 +504,7 @@ Compute Cluster disposition from **HOLD**.
 
 1. Extend the RTM evidence until every required v2 testpoint has a current-SHA
    run, named checker, assertion disposition, and coverage-bin disposition; the
-   current 21-row RTM is normalized but still contains PARTIAL/NOT_RUN rows.
+   current 22-row RTM is normalized but still contains PARTIAL rows.
 2. Extend the fixed-SHA `0x52`/`0x53` fault campaign to the remaining legal
    phase crosses, response holds, request backpressure, and completion-fault
    semantics. The current `410b81d` replay covers selected Reset/Epoch stale
