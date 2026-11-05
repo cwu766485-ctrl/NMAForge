@@ -2228,7 +2228,13 @@ module tb_ai_tensor_matrix_core_random;
     prepare_case(8,8,2,2,0,0,1,1,1,1,0);
     check_valid_case(0);
     prepare_case(8,4,2,1,1,0,0,0,0,0,0);
+    // This narrow-N/two-M-tile shape must cover the multiple-outstanding
+    // bin on every regression seed. Keep bank Ready randomized, but use a
+    // directed three-cycle response latency so the coverage precondition does
+    // not depend on the random latency sequence accidentally overlapping.
+    force_bank_response_delay=1;
     check_valid_case(1);
+    force_bank_response_delay=0;
     prepare_case(4,8,1,2,0,1,1,0,2,1,0);
     check_valid_case(2);
     prepare_case(4,4,1,1,1,1,0,3,0,0,1);
