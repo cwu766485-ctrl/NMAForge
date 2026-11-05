@@ -2,7 +2,8 @@
 """Summarize a matched GEMV B-fold-cache × next-K-prefetch ablation.
 
 The script consumes existing VCS compile and run logs. It does not simulate,
-interpolate missing measurements, or treat absent profile counters as zero.
+interpolate missing measurements, or treat absent profile counters as zero. It
+also requires the mutually exclusive command-state counters to close exactly.
 """
 
 from __future__ import annotations
@@ -39,6 +40,7 @@ FIELDS = [
     "physical_macs",
     "useful_macs",
     "command_cycles",
+    "exclusive_state_partition_cycles",
     "mac_active_cycles",
     "useful_macs_per_command_cycle",
     "command_window_array_utilization_pct",
@@ -54,9 +56,15 @@ FIELDS = [
     "a_wait_cycles",
     "b_req_cycles",
     "b_wait_cycles",
+    "bias_req_cycles",
+    "bias_wait_cycles",
     "prep_mac_cycles",
+    "mac_state_cycles",
     "write_state_cycles",
     "next_state_cycles",
+    "done_state_cycles",
+    "error_state_cycles",
+    "error_drain_state_cycles",
     "prefetch_wait_state_cycles",
     "arbiter_stall_cycles",
     "response_wait_cycles",
@@ -162,6 +170,24 @@ def read_config(config: Config, seed: int, rtl_sha: str, test_sha: str) -> list[
 
         useful_macs = m_rows * 16 * k
         profile = profiles[(m_rows, k)]
+        exclusive_state_fields = (
+            "a_req", "a_wait", "b_req", "b_wait", "bias_req", "bias_wait",
+            "prep_mac", "mac", "write", "next", "done", "error",
+            "error_drain", "prefetch_wait",
+        )
+        state_partition_cycles = sum(
+            profile[name] for name in exclusive_state_fields
+        )
+        if state_partition_cycles != values["cycles"]:
+            raise ValueError(
+                f"{run_log}: exclusive state partition does not close for "
+                f"M={m_rows}, K={k}: {state_partition_cycles} != {values['cycles']}"
+            )
+        if profile["mac"] != values["mac_cycles"]:
+            raise ValueError(
+                f"{run_log}: MAC active/state counters disagree for "
+                f"M={m_rows}, K={k}: {values['mac_cycles']} != {profile['mac']}"
+            )
         rows.append(
             {
                 "run_id": f"V2-GEMV-FOUR-WAY-S{seed}-K{k}-B{config.cache}-P{config.prefetch}",
@@ -176,6 +202,7 @@ def read_config(config: Config, seed: int, rtl_sha: str, test_sha: str) -> list[
                 "physical_macs": "256",
                 "useful_macs": str(useful_macs),
                 "command_cycles": str(values["cycles"]),
+                "exclusive_state_partition_cycles": str(state_partition_cycles),
                 "mac_active_cycles": str(values["mac_cycles"]),
                 "useful_macs_per_command_cycle": f"{useful_macs / values['cycles']:.4f}",
                 "command_window_array_utilization_pct": (
@@ -193,9 +220,15 @@ def read_config(config: Config, seed: int, rtl_sha: str, test_sha: str) -> list[
                 "a_wait_cycles": str(profile["a_wait"]),
                 "b_req_cycles": str(profile["b_req"]),
                 "b_wait_cycles": str(profile["b_wait"]),
+                "bias_req_cycles": str(profile["bias_req"]),
+                "bias_wait_cycles": str(profile["bias_wait"]),
                 "prep_mac_cycles": str(profile["prep_mac"]),
+                "mac_state_cycles": str(profile["mac"]),
                 "write_state_cycles": str(profile["write"]),
                 "next_state_cycles": str(profile["next"]),
+                "done_state_cycles": str(profile["done"]),
+                "error_state_cycles": str(profile["error"]),
+                "error_drain_state_cycles": str(profile["error_drain"]),
                 "prefetch_wait_state_cycles": str(profile["prefetch_wait"]),
                 "arbiter_stall_cycles": str(profile["arbiter_stall"]),
                 "response_wait_cycles": str(profile["response_wait"]),
