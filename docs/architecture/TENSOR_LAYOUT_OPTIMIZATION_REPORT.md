@@ -148,14 +148,35 @@ legal opcodes, 29 invalid-rule checks, 42/42 accepted boundaries, 26/26
 rejected boundaries, and 3/3 tile-forward descriptor cases. The mapper unit
 test passed 3 cases under Python 3.12.
 
+### Real-top CMDQ differential test added — 2026-11-05
+
+Test commit `826647976284803227b645abc60ae6f514714ada` adds a Top Smoke
+producer/consumer pair through the actual descriptor validator, CMDQ,
+dispatcher, Matrix controller, and SPAD. It first runs the pair with ordinary
+SPAD readback, then captures the producer tile and consumes the exact tag while
+capturing the consumer into the opposite local bank. The checker compares all
+64 packed output words per consumer, both producers, all four completions, and
+the accepted A-source request count. Its expected result is 16 A-tile reads in
+the SPAD baseline and zero with forwarding, with legacy SPAD writeback retained.
+
+The exact command was
+`timeout -k 3s 45s make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105`.
+The Python mapper precheck passed, but VCS `V-2023.12-SP1_Full64` failed before
+SV compilation with `Cannot connect to the license server` / `Failed to obtain
+license`. The result is **BLOCKED_ENV / NOT_RUN**: no simulator image, CMDQ
+run, output comparison, or forwarding-read measurement exists for this test.
+The previous core ablation does not substitute for this real-top test. Its
+fresh status is also included in the [execution frontier](../exec-plans/active/execution-frontier.md).
+
 ## Limits and open issues
 
 - This is behavioral RTL simulation, not an ASIC timing or area result. No
   synthesis, PPA, power, or physical SRAM timing claim is made.
-- Tile forwarding is verified at the Matrix core and descriptor-validator
-  boundaries; a forwarding chain through the top-level CMDQ and multi-seed
-  feature-specific regression remain open. New-feature parity/protection and
-  held-line Abort cases also remain open.
+- Tile forwarding has PASS evidence only at the Matrix core and
+  descriptor-validator boundaries. A top-level CMDQ differential test is now
+  checked in but remains **NOT_RUN** as documented above. Multi-seed
+  feature-specific regression, new-feature parity/protection, and held-line
+  Abort cases remain open.
 - The forwarding subset is one 16×16 capture and one M=16/K=4 consume; broader
   `M/N/K` tails, repeated consumers, and cross-engine coherence are unsupported.
   Software must not overwrite the tagged source tile between producer and

@@ -123,6 +123,7 @@ module tb_ai_accel_smoke;
     localparam OP_BANKED_GEMV    = 8'h21;
     localparam OP_TENSOR_GEMM    = 8'h30;
     localparam OP_BATCH_GEMM     = 8'h31;
+    localparam OP_TENSOR_GEMM_FUSED = 8'h53;
     localparam OP_TENSOR_GEMV_KFOLD = 8'h52;
     localparam OP_SOFTMAX_Q15    = 8'h32;
     localparam OP_RMSNORM_Q15    = 8'h33;
@@ -206,6 +207,10 @@ module tb_ai_accel_smoke;
     integer seed_arg;
     integer seed_dummy;
     integer matrix_line_write_count;
+    integer ai_tile_forward_baseline_a_reads = 0;
+    integer ai_tile_forward_enabled_a_reads = 0;
+    integer ai_tile_forward_read_phase = 0;
+    reg ai_tile_forward_read_monitor = 1'b0;
     integer cp_fetch_done_count;
     reg parallel_engine_overlap_seen = 1'b0;
     reg parallel_same_engine_overlap_violation = 1'b0;
@@ -257,6 +262,16 @@ module tb_ai_accel_smoke;
     reg ai_tinynpu_cnn_layout_measure = 1'b0;
 
     always @(posedge aclk) begin
+        if (ai_tile_forward_read_monitor && dut.matrix_banked_read_valid &&
+            dut.arb_banked_ready && dut.matrix_banked_read_addr >= 32'h0000_b000 &&
+            dut.matrix_banked_read_addr < 32'h0000_b100) begin
+            if (ai_tile_forward_read_phase == 1)
+                ai_tile_forward_baseline_a_reads =
+                    ai_tile_forward_baseline_a_reads + 1;
+            else if (ai_tile_forward_read_phase == 2)
+                ai_tile_forward_enabled_a_reads =
+                    ai_tile_forward_enabled_a_reads + 1;
+        end
         if (ai_tinynpu_cnn_measure)
             ai_tinynpu_cnn_cycles = ai_tinynpu_cnn_cycles + 1;
         if (ai_tinynpu_cnn_layout_measure)
@@ -3358,6 +3373,151 @@ module tb_ai_accel_smoke;
                        errors - errors_before_g);
             $display("MATRIX_PRODUCT_GEMV_M8_KTAIL_DESCRIPTOR_PASS opcode=0x52 shape=8x16x19 outputs=128 lines=%0d golden=bit-exact",
                      matrix_line_write_count);
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+        end
+
+        // End-to-end optional 0x53 fused-tile forwarding through the real
+        // descriptor validator, CMDQ, Matrix controller, and SPAD path.  Run
+        // the same producer/consumer pair once through SPAD and once through
+        // the local tagged tile buffer, then compare the complete result image
+        // and directly count accepted reads from the producer tile address.
+        begin : fused_tile_forward_cmdq
+            integer init_word_f;
+            integer output_word_f;
+            integer errors_before_f;
+
+            errors_before_f = errors;
+            ai_tile_forward_baseline_a_reads = 0;
+            ai_tile_forward_enabled_a_reads = 0;
+            ai_tile_forward_read_monitor = 1'b0;
+            ai_tile_forward_read_phase = 0;
+
+            // Uniform signed INT8 matrices make the independent Golden
+            // explicit: producer outputs 16; consumer computes 256 and the
+            // fused INT8 requant saturates each output to +127.
+            for (init_word_f = 0; init_word_f < 256;
+                 init_word_f = init_word_f + 1) begin
+                axi_write(SPAD_BASE + 32'h0000_a000 + (init_word_f * 4),
+                          32'h0101_0101);
+                axi_write(SPAD_BASE + 32'h0000_a800 + (init_word_f * 4),
+                          32'h0101_0101);
+            end
+            for (output_word_f = 0; output_word_f < 64;
+                 output_word_f = output_word_f + 1) begin
+                axi_write(SPAD_BASE + 32'h0000_b000 + (output_word_f * 4),
+                          32'hdead_5300);
+                axi_write(SPAD_BASE + 32'h0000_b400 + (output_word_f * 4),
+                          32'hdead_5301);
+                axi_write(SPAD_BASE + 32'h0000_b800 + (output_word_f * 4),
+                          32'hdead_5302);
+            end
+
+            write_spad_desc_v3(32'h9000, OP_TENSOR_GEMM_FUSED, 16'h0530,
+                               32'h0000_a000, 32'h0000_a800, 32'd0,
+                               32'h0000_b000, 16'd16, 16'd16, 16'd4,
+                               8'd0, 32'd0, 5'd0, 2'd0,
+                               32'd0, 32'd0, 32'd0, 16'd0, 16'd0,
+                               16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + 32'h903c, 32'd7);
+            write_spad_desc_v3(32'h9040, OP_TENSOR_GEMM_FUSED, 16'h0531,
+                               32'h0000_b000, 32'h0000_a800, 32'd0,
+                               32'h0000_b400, 16'd16, 16'd16, 16'd4,
+                               8'd0, 32'd0, 5'd0, 2'd0,
+                               32'd0, 32'd0, 32'd0, 16'd0, 16'd0,
+                               16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + 32'h907c, 32'd7);
+            write_spad_desc_v3(32'h9080, OP_TENSOR_GEMM_FUSED, 16'h0532,
+                               32'h0000_a000, 32'h0000_a800, 32'd0,
+                               32'h0000_b000, 16'd16, 16'd16, 16'd4,
+                               8'd0, 32'h0000_0020, 5'd0, 2'd0,
+                               32'd0, 32'd0, 32'd0, 16'd0, 16'd0,
+                               16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + 32'h90bc, 32'd7);
+            write_spad_desc_v3(32'h90c0, OP_TENSOR_GEMM_FUSED, 16'h0533,
+                               32'h0000_b000, 32'h0000_a800, 32'd0,
+                               32'h0000_b800, 16'd16, 16'd16, 16'd4,
+                               8'd0, 32'h0000_0060, 5'd0, 2'd0,
+                               32'd0, 32'd0, 32'd0, 16'd0, 16'd0,
+                               16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + 32'h90fc, 32'd7);
+
+            axi_write(REG_CMDQ_CTRL, 32'd0);
+            axi_write(REG_CMDQ_BASE_LO, 32'h9000);
+            axi_write(REG_CMDQ_SIZE, 32'd4);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd2);
+            axi_write(REG_CPLQ_BASE_LO, 32'h9200);
+            axi_write(REG_CPLQ_SIZE, 32'd8);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+
+            matrix_line_write_count = 0;
+            ai_tile_forward_read_phase = 1;
+            ai_tile_forward_read_monitor = 1'b1;
+            axi_write(REG_DOORBELL, 32'd1);
+            wait_cpl_tail(32'd2, "fused tile forwarding SPAD baseline");
+            if (matrix_line_write_count != 32) begin
+                $display("%0t ERROR: fused tile SPAD baseline lines=%0d expected=32",
+                         $time, matrix_line_write_count);
+                errors = errors + 1;
+            end
+            for (output_word_f = 0; output_word_f < 64;
+                 output_word_f = output_word_f + 1) begin
+                expect_read(SPAD_BASE + 32'h0000_b000 + (output_word_f * 4),
+                            32'h1010_1010, "fused tile baseline producer");
+                expect_read(SPAD_BASE + 32'h0000_b400 + (output_word_f * 4),
+                            32'h7f7f_7f7f, "fused tile baseline consumer");
+            end
+            expect_completion(32'h9200, 16'h0530, 4'h1, 4'd0,
+                              32'd16, 32'd256, "fused tile baseline producer");
+            expect_completion(32'h9210, 16'h0531, 4'h1, 4'd0,
+                              32'd127, 32'd256, "fused tile baseline consumer");
+            if (ai_tile_forward_baseline_a_reads != 16) begin
+                $display("%0t ERROR: fused tile baseline producer-A reads=%0d expected=16",
+                         $time, ai_tile_forward_baseline_a_reads);
+                errors = errors + 1;
+            end
+
+            // Capture the same producer tile, then consume its exact tag and
+            // capture the consumer result into the opposite local bank.
+            matrix_line_write_count = 0;
+            ai_tile_forward_read_phase = 2;
+            axi_write(REG_CMDQ_TAIL, 32'd4);
+            clear_done_irq();
+            axi_write(REG_DOORBELL, 32'd1);
+            wait_cpl_tail(32'd4, "fused tile forwarding enabled");
+            ai_tile_forward_read_monitor = 1'b0;
+            ai_tile_forward_read_phase = 0;
+            if (matrix_line_write_count != 32) begin
+                $display("%0t ERROR: fused tile forwarding lines=%0d expected=32",
+                         $time, matrix_line_write_count);
+                errors = errors + 1;
+            end
+            for (output_word_f = 0; output_word_f < 64;
+                 output_word_f = output_word_f + 1) begin
+                expect_read(SPAD_BASE + 32'h0000_b000 + (output_word_f * 4),
+                            32'h1010_1010, "fused tile forwarded producer");
+                expect_read(SPAD_BASE + 32'h0000_b800 + (output_word_f * 4),
+                            32'h7f7f_7f7f, "fused tile forwarded consumer");
+            end
+            expect_completion(32'h9220, 16'h0532, 4'h1, 4'd0,
+                              32'd16, 32'd256, "fused tile capture producer");
+            expect_completion(32'h9230, 16'h0533, 4'h1, 4'd0,
+                              32'd127, 32'd256, "fused tile forwarding consumer");
+            if (ai_tile_forward_enabled_a_reads != 0) begin
+                $display("%0t ERROR: fused tile forwarded producer-A reads=%0d expected=0",
+                         $time, ai_tile_forward_enabled_a_reads);
+                errors = errors + 1;
+            end
+            if (errors != errors_before_f) begin
+                $fatal(1, "fused tile CMDQ forwarding had %0d errors",
+                       errors - errors_before_f);
+            end
+            $display("MATRIX_FUSED_TILE_FORWARD_CMDQ_PASS opcode=0x53 shape=16x16x16 baseline_A_reads=%0d forwarded_A_reads=%0d producer=bit-exact consumer=bit-exact legacy_writeback=enabled",
+                     ai_tile_forward_baseline_a_reads,
+                     ai_tile_forward_enabled_a_reads);
             axi_write(REG_CMDQ_SIZE, 32'd0);
             axi_write(REG_CPLQ_SIZE, 32'd0);
             clear_done_irq();
