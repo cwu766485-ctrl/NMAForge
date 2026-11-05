@@ -247,6 +247,15 @@ license files, `.env`, `novas.conf`/`novas.rc`, and library/database extensions.
   mutations ran with VCS `V-2023.12-SP1_Full64`. Current run IDs, commands,
   scoped coverage and caveats are in the
   [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+- A follow-up three-seed run at report/test SHA `f340acaa2cdf7c36075473b8bc6fd6dee8e59873`
+  passes coordinated reset/epoch checks for the repository's
+  `ai_accel_memory_fabric`: DMA reads outstanding, accepted CNM SPAD response
+  owner flush, CNM pending-result-write reset, then fresh DMA/CNM Golden
+  recovery. The three named reset functional groups are 100%; owner/tag
+  assertions have real successes and zero failures. This is not a claim about
+  arbitrary external SoC fabrics, opcode-specific fault/reset closure, or full
+  v2 sign-off. Evidence archive SHA-256 is
+  `14144bdc62932d8040a1b5be72b27f83e6f4f8e52286a8658b1570fdfe3717c5`.
 - The four-way GEMV ablation passed 48/48 bit-exact Golden points and exact
   exclusive-state cycle partition at this candidate. Its machine records are
   [CSV](../../benchmark/v2_p2_gemv_cache_prefetch_4way_410b81d.csv),

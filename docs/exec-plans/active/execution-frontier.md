@@ -17,17 +17,28 @@ following report commits. See the Phase 0 section in the [v2 architecture
 review](../../architecture/NMAFORGE_V2_ARCHITECTURE_REVIEW.md) for branch/tree
 identities, worktree inventory, `.gitignore` audit, and post-RTL history.
 
-Phase 1 is **IN PROGRESS**. The DV report has 21 normalized `REQ-V2-*`
-rows: 12 PASS-scoped, 9 PARTIAL, and 0 NOT_RUN. At fixed candidate
+Phase 1 is **IN PROGRESS**. The DV report has 22 normalized `REQ-V2-*`
+rows: 13 PASS-scoped, 9 PARTIAL, and 0 NOT_RUN. At fixed candidate
 `410b81d`, three-seed 0x52/0x53 fault/GEMV, Top Smoke, seven-engine UVM, and
-selected opcode/real-DUT mutations pass their stated scopes. External SPAD
-response ownership, full legal fault × phase × reset crosses, opcode-specific
-SVA, and complete functional-bin disposition remain open. Current Top
+selected opcode/real-DUT mutations pass their stated scopes. Arbitrary
+external-SoC SPAD response ownership beyond the repository-fabric boundary,
+full legal fault × phase × reset crosses, opcode-specific SVA, and complete
+functional-bin disposition remain open. Current Top
 DUT-only URG is Line/Condition/FSM/Branch 86.75/77.62/44.33/84.56%; Matrix
 FSM has 15/15 states and 25/55 transitions. The Matrix+SFU handoff group is
 100%, while the four existing AXI groups are unsampled and total functional
 group coverage is 20%. These figures do not close v2 DV or imply full coverage.
 See the exact run identities and scope in the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+The repository `ai_accel_memory_fabric` boundary also has a three-seed
+coordinated reset/epoch replay at SHA
+`f340acaa2cdf7c36075473b8bc6fd6dee8e59873`: its three named reset groups
+reach 100%, owner/tag SVAs have real successes, and post-reset DMA plus CNM
+Golden recovery passes. This adds one scoped PASS row (`REQ-V2-COM-006`), not
+closure of arbitrary external-fabric behavior or the opcode-specific
+fault/reset matrix. The whole URG report's functional group score is 23.98%
+for that subsystem run. Logs-only archive SHA-256:
+`14144bdc62932d8040a1b5be72b27f83e6f4f8e52286a8658b1570fdfe3717c5`.
 
 Phase 2 has a fixed-candidate four-way GEMV ablation, real Top serial/parallel
 and Matrix/CNM contention runs, and a current NMAForge-side TinyNPU GEMM/CNN
@@ -470,6 +481,12 @@ in the owning report; run `git diff --check` before handoff.
 - Current top-level fixed `conv1x_mini` replay passes all intermediate tensors and four outputs byte-exact: 1,985 compute cycles, 1,080 host-layout cycles, 3,360/1,600 B compute SPAD read/write. TinyNPU's 4,781-cycle graph value is carried from its pinned prior replay and has a different timing boundary; no ratio is claimed.
 - Run HEAD `d1867da79a84b17451d63e919f9ce1e8ef4df098`; product RTL/test files are unchanged from candidate `410b81d`. VCS `V-2023.12-SP1_Full64`; Python 3.12.13 / NumPy 2.4.6 / ONNX 1.17.0. Exact CSV/JSON and limits are in the [performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md) and [model report](../../benchmark/NMAFORGE_V2_MODEL_BENCHMARK.md). Archive `/tmp/nmaforge_v2_tinynpu_current_d1867da_logs.tar.gz`, SHA-256 `018d11dc90159192f0fb13c5e5901269b66be7ff8013bf4891cfd26b1e9e7885`.
 - The current environment does not have Verilator; the pinned TinyNPU executable was not rebuilt in this replay. Trained CNN/Transformer, current TinyNPU RTL rebuild, and common RTL memory adapter remain OPEN.
+
+## 2026-11-05 update — repository memory-fabric reset/epoch replay
+
+- `make -C dv/subsystem/dma_spad/sim subsystem_memory_fabric_reset_regress` passes seeds 20261025/26/27 at source/test SHA `f340acaa2cdf7c36075473b8bc6fd6dee8e59873` (tree `7fc556427be1597e64a602c10af4fdd855a0c343`), with VCS/URG `V-2023.12-SP1_Full64`. Each seed checks reset with four DMA reads outstanding and a CNM accepted SPAD read without its response, plus reset while CNM awaits its result write; both fresh DMA and CNM tasks recover and pass memory Golden checks.
+- The named groups `dma_cnm_shared_reset_cg`, `dma_reset_phase_cg`, and `cnm_reset_phase_cg` are each 100.00% in merged URG. `ap_single_response_owner` has 3,921 real successes; `ap_cnm_response_tag` has 144; assertion failures/incomplete are zero. Whole-report functional group score is 23.98%, so this targeted result does not imply full v2 coverage or arbitrary external-fabric behavior.
+- Run ID `V2-MEMORY-FABRIC-RESET-3SEED-F340ACA`; logs/selected URG pages archive `/tmp/nmaforge_v2_fabric_reset_f340aca_logs.tar.gz`, SHA-256 `14144bdc62932d8040a1b5be72b27f83e6f4f8e52286a8658b1570fdfe3717c5`. Generated VCS/coverage databases remain outside the repository. `REQ-V2-COM-006` passes only for this in-repository reset/recovery scope; v2 sign-off remains **IN PROGRESS**.
 
 ## 2026-11-05 update — current static-analysis evidence at `410b81d`
 
