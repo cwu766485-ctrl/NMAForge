@@ -26,6 +26,7 @@ uvm_compile:
 
 uvm_vip_compile:
 	$(VCS) -full64 -sverilog -ntb_opts uvm-1.2 -debug_access+all \
+		+define+DMA_PROTOCOL_VIP \
 		-cm $(CM_METRICS) -cm_dir $(VIP_COV_DIR) \
 		-timescale=1ns/1ps -top tb_ai_axi128_dma_vip_uvm \
 		-f dma_block_vip_uvm.f -o $(VIP_SIMV)

@@ -56,6 +56,39 @@ for seed in 123 98765; do
   echo "PASS_SEED=$seed"
 done
 
+# Guard the original BFM-based flow: standard filelists must not depend on the
+# optional protocol-vip packages or integration-only test class.
+legacy_sim="$out/simv_dma_legacy"
+mkdir -p "$out/legacy_csrc"
+if ! make -C dv/block/dma/sim uvm_compile \
+    SIMV="$legacy_sim" \
+    COV_DIR="$out/legacy_compile.vdb" \
+    VCS="vcs -Mdir=$out/legacy_csrc" >"$out/legacy_compile.log" 2>&1; then
+  echo DMA_LEGACY_COMPILE_FAIL
+  tail -n 100 "$out/legacy_compile.log"
+  exit 1
+fi
+legacy_log="$out/legacy_seed_123.log"
+if ! "$legacy_sim" \
+    -cm line+cond+fsm+tgl+branch+assert \
+    -cm_dir "$out/legacy_seed_123.vdb" \
+    -cm_name dma_load_ooo_smoke_test \
+    +UVM_TESTNAME=dma_load_ooo_smoke_test \
+    +ntb_random_seed=123 +UVM_VERBOSITY=UVM_MEDIUM \
+    -l "$legacy_log" >"$out/legacy_seed_123.console" 2>&1; then
+  echo DMA_LEGACY_SIM_FAIL
+  tail -n 100 "$out/legacy_seed_123.console" "$legacy_log"
+  exit 1
+fi
+if ! grep -Fq '[SB_PASS]' "$legacy_log" ||
+   grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$legacy_log"; then
+  echo DMA_LEGACY_EVIDENCE_FAIL
+  tail -n 100 "$legacy_log"
+  exit 1
+fi
+echo "--- LEGACY BFM compatibility evidence ---"
+grep -E '\[SB_PASS\]|UVM_(WARNING|ERROR|FATAL)[[:space:]]*:' "$legacy_log"
+
 archive="$PWD/dv/block/dma/artifacts/protocol-vip/$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "$archive"
 cp "$out/compile.log" "$archive/compile.log"
@@ -63,6 +96,9 @@ cp "$out/seed_123.log" "$archive/seed_123.log"
 cp "$out/seed_123.console" "$archive/seed_123_console.log"
 cp "$out/seed_98765.log" "$archive/seed_98765.log"
 cp "$out/seed_98765.console" "$archive/seed_98765_console.log"
+cp "$out/legacy_compile.log" "$archive/legacy_compile.log"
+cp "$legacy_log" "$archive/legacy_seed_123.log"
+cp "$out/legacy_seed_123.console" "$archive/legacy_seed_123_console.log"
 
 echo "NMAFORGE_PROTOCOL_VIP_DMA_PASS seeds=2/2 severity=0/0/0"
 echo "TEMP_ARTIFACT_ROOT=$out"
