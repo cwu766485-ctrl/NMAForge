@@ -6,6 +6,7 @@ OUT_DIR ?= /tmp/nmaforge_matrix_datapath_$(SEED)
 CORE_OUT_DIR ?= /tmp/nmaforge_matrix_core_$(SEED)
 NO_PREFETCH_CORE_OUT_DIR ?= /tmp/nmaforge_matrix_core_no_prefetch_$(SEED)
 TILE_FORWARD_OUT_DIR ?= /tmp/nmaforge_matrix_tile_forward_$(SEED)
+TILE_FORWARD_REGRESS_OUT ?= /tmp/nmaforge_matrix_tile_forward_regress
 GEMV_FOUR_WAY_OUT ?= /tmp/nmaforge_matrix_gemv_four_way
 ARRAY_OUT_DIR ?= /tmp/nmaforge_matrix_array_20261025
 ARRAY_SEEDS ?= 20261025 20261026 20261027
@@ -26,6 +27,7 @@ COV_METRICS := line+cond+fsm+branch
 	product-gemv-b-cache-ablation \
 	product-gemv-four-way-ablation \
 	core-tile-forward-ablation \
+	core-tile-forward-regress \
 	datapath-random-regress core-random-regress array-random-regress \
 	matrix-size-benchmark matrix-pipeline-benchmark matrix-config-comparison \
 	tinynpu-matched-benchmark
@@ -242,6 +244,13 @@ core-tile-forward-ablation:
 		grep -q "^MATRIX_TILE_FORWARD_CHAIN_PASS enable=$$enable " $$out/run.log; \
 		grep -q "^MATRIX_TILE_FORWARD_CHAIN_ONLY_PASS enable=$$enable seed=$(SEED)$$" $$out/run.log; \
 		done
+
+core-tile-forward-regress:
+	@set -e; for seed in $(SEEDS); do \
+		$(MAKE) --no-print-directory core-tile-forward-ablation \
+			SEED=$$seed \
+			TILE_FORWARD_OUT_DIR=$(TILE_FORWARD_REGRESS_OUT)/seed_$$seed; \
+	done
 
 # Build a distinct prefetch-disabled DUT profile so this test covers the
 # compile-time fallback transition without invoking prefetch-only fault cases.
