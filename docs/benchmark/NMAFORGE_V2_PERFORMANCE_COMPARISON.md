@@ -2,7 +2,7 @@
 
 **As of:** 2026-11-05  
 **Product baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
-**Latest replay source SHA:** `c3a59f08d8c07a8da973010d0f23d5d6d7eed61b`
+**Latest replay source/test SHA:** `17b09e068e988ca35480ffd638d865872e9ba564`
 
 ## Comparison boundary
 
@@ -70,6 +70,66 @@ and +0.8% respectively. The last two are small regressions in this model.
 The B-fold reuse result supports keeping the bounded reuse path; these results
 do not justify a new bank-reordering scheduler without a conflict-focused
 experiment and hardware cost evaluation.
+
+### Fixed-candidate replay with cycle-partition closure
+
+At source/test SHA `17b09e068e988ca35480ffd638d865872e9ba564`, the four-way
+ablation was rerun with the same three Seeds and VCS `V-2023.12-SP1_Full64`.
+The physical array is 16×16 (256 INT8 MACs), read outstanding depth is 4,
+A-Tile Cache is enabled, and the Matrix controller is connected to a registered
+four-bank behavioral SPAD model with seed-controlled ready/response latency.
+This is Matrix-controller RTL evidence, not a full Compute Cluster contention
+measurement.
+
+The successful command was:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+make -C dv/block/compute/matrix/sim product-gemv-four-way-ablation \
+  SEEDS='20261105 20261106 20261107' OUTSTANDING_DEPTH=4 \
+  A_TILE_CACHE_ENABLE=1 PHYSICAL_ARRAY_SIZE=16 \
+  GEMV_FOUR_WAY_OUT=/tmp/nmaforge_v2_gemv_four_way_17b09e0 \
+  PYTHON=python3.12
+```
+
+All 48 shape/configuration/Seed points matched the independent Golden. Means
+for each 3-Seed set:
+
+| Shape | Cache OFF/PF OFF cycles → Cache ON/PF OFF | Read bytes OFF → ON | Cache ON/PF OFF → Cache ON/PF ON | Useful MAC/cycle, both ON | Array utilization, both ON |
+|---|---:|---:|---:|---:|---:|
+| 8×16×19 | 200.67 → 156.00 (−22.26%) | 864 → 560 (−35.19%) | 156.00 → 152.33 (−2.35%) | 15.97 | 6.24% |
+| 8×16×65 | 544.33 → 391.00 (−28.17%) | 2,720 → 1,696 (−37.65%) | 391.00 → 383.00 (−2.05%) | 21.73 | 8.49% |
+| 16×16×19 | 393.67 → 261.00 (−33.70%) | 1,728 → 816 (−52.78%) | 261.00 → 262.67 (+0.64%) | 18.52 | 7.23% |
+| 16×16×65 | 1,075.00 → 627.33 (−41.64%) | 5,440 → 2,368 (−56.47%) | 627.33 → 632.33 (+0.80%) | 26.32 | 10.28% |
+
+Output write traffic is unchanged by Cache/Prefetch (512 B for M=8,
+1,024 B for M=16). Prefetch without B-fold Cache reduces cycles 2.49–4.47%
+without reducing read bytes. With Cache enabled it helps the two M=8 cases by
+2.05–2.35%, and regresses the M=16 cases by 0.64–0.80% in this model. The
+bounded B-fold reuse accounts for the larger measured gain; the prefetch gain
+is shape-dependent.
+
+The summarizer now checks that mutually exclusive A/B/bias request and wait,
+prep, MAC, write, next, done, error, error-drain and prefetch-wait state cycles
+sum exactly to command cycles (48/48). MAC-active, arbiter, response,
+writeback, bank/line stall, prefetch-overlap, occupancy and FIFO-full counters
+are overlapping event/observer metrics and must not be added to that
+partition. The both-enabled M16×16×65 means include 74.0 arbiter-stall,
+20.0 response-wait, 47.7 bank-stall and 26.3 writeback-wait observations per
+command; these values are diagnostic and overlap.
+
+Machine outputs: [48-point CSV](../../benchmark/v2_p2_gemv_cache_prefetch_4way_17b09e0.csv),
+[summary JSON](../../benchmark/v2_p2_gemv_cache_prefetch_4way_17b09e0_summary.json),
+and [ablation chart](../../benchmark/v2_p2_gemv_cache_prefetch_4way_17b09e0.svg).
+Logs-only archive `/tmp/nmaforge_v2_gemv_four_way_17b09e0_logs.tar.gz`,
+SHA-256 `c22d07de2b86de467e8fe05d6426cfd5cb6bf8fada4260b4535a5badc6a24681`.
+
+This single-client controller run does not exercise competing Matrix/CNM/SFU
+traffic through the system SPAD Arbiter, nor does it isolate Bank-Aware Issue
+benefit or its logic/timing cost. No scheduling RTL change is justified from
+this result alone; the controlled Top contention experiment remains open.
 
 ## Fused output tile forwarding
 

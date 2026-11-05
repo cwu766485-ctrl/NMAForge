@@ -5,7 +5,7 @@
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
 **Current reviewed candidate:** `feature/npu-architecture-v2` `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164`
 **Candidate tree:** `dbf5060ac465ef4bb913543024182b298f675413`
-**Latest test-only candidate:** `feature/npu-architecture-v2` `bdfda3c408a1367ac6b1788ebb9bdb0e5b6f7d47` (tree `89eac43b0b9aa6811608f6587272ec564ea2b456`); this commit records the scoped functional coverage and actual DUT mutation replay, with no product RTL delta.
+**Latest test-only candidate:** `feature/npu-architecture-v2` `17b09e068e988ca35480ffd638d865872e9ba564` (tree `be5227e88f6b94914b5e804b3cfbc614cba48258`); this commit enforces exact GEMV cycle partition closure in the benchmark summarizer, with no product RTL delta.
 
 ## Executive disposition
 
