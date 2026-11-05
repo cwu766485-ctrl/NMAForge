@@ -31,6 +31,7 @@ ai_run:
 ai_smoke: ai_comp ai_run
 	grep -q '^MATRIX_PRODUCT_GEMV_DESCRIPTOR_PASS opcode=0x52 shape=4x16x32 dense=1 bias=1 shift=1 relu=1 outputs=64 lines=16 golden=bit-exact$$' ai_accel_smoke.log
 	grep -q '^MATRIX_PRODUCT_GEMV_TAIL_DESCRIPTOR_PASS opcode=0x52 shape=1x13x17 valid_outputs=13 line_writes=3 scalar_tail=1 golden=bit-exact$$' ai_accel_smoke.log
+	grep -q '^MATRIX_PRODUCT_GEMV_M8_KTAIL_DESCRIPTOR_PASS opcode=0x52 shape=8x16x19 outputs=128 lines=32 golden=bit-exact$$' ai_accel_smoke.log
 
 # Integrated compute DUT-only code-coverage capture. The cm_hier scope selects
 # ai_accel_compute_cluster and the command processor's tile-pipeline instance;

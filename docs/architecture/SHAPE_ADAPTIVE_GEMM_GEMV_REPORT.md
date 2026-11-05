@@ -247,11 +247,34 @@ is **BLOCKED_ENV / NOT_RUN**, not PASS. The test expansion is committed as
 `0a500d17d997dd96dad5cd797849e5a71dfcc6e6`; rerun this target before using
 these shapes as evidence.
 
+A bounded retry of `make product-gemv-b-cache-ablation SEEDS='20261105'
+CORE_OUT_DIR=/tmp/nmaforge_gemv_b_cache_m8_retry_20261105` was stopped after
+50 seconds. VCS again could not connect to the license server and produced no
+simulator image.
+
+## M8 real-CMDQ descriptor case — 2026-11-05, NOT_RUN
+
+Top Smoke now also submits `M=8,N=16,K=19` through the ABI-v7 CMDQ,
+descriptor validator, dispatcher, product Matrix controller and SPAD. It
+poisons the padded A lane, checks all 128 INT32 outputs against an independent
+signed scalar Golden, verifies the 32 aligned output line writes, and checks
+completion byte count and result. This complements the existing real-top M4
+and M1/N-tail/K-tail descriptors; it is new test coverage, not evidence that
+M8 passed.
+
+Attempted command:
+`timeout -k 3s 50s make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105`.
+The mapper/code-generation precheck passed, then VCS failed to check out
+`VCS-BASE-COMPILE/VCSCompiler_Net` before compiling the SystemVerilog source.
+No simulator image or RTL run was produced. Status is **BLOCKED_ENV / NOT_RUN**;
+the log is `/tmp/nmaforge-architecture-v2/dv/subsystem/top_smoke/sim/ai_comp.log`.
+
 ## Open work
 
 - Product shape tests do not yet enumerate every M/N/K combination. M8/K19
   and M8/K65 checks have been added but are **NOT_RUN** due to the license
-  checkout failure above; scalar N=1 and a shape matrix remain open.
+  checkout failure above; the new M8 real-CMDQ descriptor is also **NOT_RUN**.
+  Scalar N=1 and a shape matrix remain open.
 - Extend the bounded prefetch into bank-aware request issue/scheduling; the
   current B-fold cache is limited to the first 64 K values and depends on
   stable, non-aliasing operands. Larger K values still reread B beyond the

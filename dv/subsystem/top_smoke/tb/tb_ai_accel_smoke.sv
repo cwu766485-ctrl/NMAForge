@@ -3281,6 +3281,86 @@ module tb_ai_accel_smoke;
             axi_write(REG_CMDQ_SIZE, 32'd0);
             axi_write(REG_CPLQ_SIZE, 32'd0);
             clear_done_irq();
+
+            // Exercise a multi-row product descriptor through the real CMDQ
+            // path. K=19 forces one masked K tail while M=8 uses two row
+            // tiles; nonzero A padding catches an accidental padded-lane MAC.
+            for (rr_g = 0; rr_g < 8; rr_g = rr_g + 1)
+                for (kk_g = 0; kk_g < 32; kk_g = kk_g + 16)
+                    for (bank_g = 0; bank_g < 4; bank_g = bank_g + 1) begin
+                        a0_g = (kk_g + bank_g*4 + 0 < 19) ?
+                            (((rr_g*5 + (kk_g + bank_g*4 + 0)*3 + 1) % 23) - 11) : 17;
+                        a1_g = (kk_g + bank_g*4 + 1 < 19) ?
+                            (((rr_g*5 + (kk_g + bank_g*4 + 1)*3 + 1) % 23) - 11) : 17;
+                        a2_g = (kk_g + bank_g*4 + 2 < 19) ?
+                            (((rr_g*5 + (kk_g + bank_g*4 + 2)*3 + 1) % 23) - 11) : 17;
+                        a3_g = (kk_g + bank_g*4 + 3 < 19) ?
+                            (((rr_g*5 + (kk_g + bank_g*4 + 3)*3 + 1) % 23) - 11) : 17;
+                        axi_write(SPAD_BASE + 32'h5000 + rr_g*32 + kk_g +
+                                  bank_g*4,
+                                  {a3_g[7:0],a2_g[7:0],a1_g[7:0],a0_g[7:0]});
+                    end
+            for (kk_g = 0; kk_g < 19; kk_g = kk_g + 1)
+                for (bank_g = 0; bank_g < 4; bank_g = bank_g + 1) begin
+                    b0_g = ((5*kk_g + (bank_g*4 + 0)*2 + 5) % 17) - 8;
+                    b1_g = ((5*kk_g + (bank_g*4 + 1)*2 + 5) % 17) - 8;
+                    b2_g = ((5*kk_g + (bank_g*4 + 2)*2 + 5) % 17) - 8;
+                    b3_g = ((5*kk_g + (bank_g*4 + 3)*2 + 5) % 17) - 8;
+                    axi_write(SPAD_BASE + 32'h5200 + kk_g*16 + bank_g*4,
+                              {b3_g[7:0],b2_g[7:0],b1_g[7:0],b0_g[7:0]});
+                end
+            for (rr_g = 0; rr_g < 8; rr_g = rr_g + 1)
+                for (cc_g = 0; cc_g < 16; cc_g = cc_g + 1)
+                    axi_write(SPAD_BASE + 32'h5800 + (rr_g*16+cc_g)*4,
+                              32'hface_5280 + rr_g*16 + cc_g);
+            write_spad_desc_v3(32'h4d80, OP_TENSOR_GEMV_KFOLD, 16'h0522,
+                               32'h5000, 32'h5200, 32'd0, 32'h5800,
+                               16'd8, 16'd16, 16'd19, 8'd0, 32'd0,
+                               5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                               16'd0, 16'd0, 16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + 32'h4dbc, 32'd7);
+            errors_before_g = errors;
+            axi_write(REG_CMDQ_BASE_LO, 32'h4d80);
+            axi_write(REG_CMDQ_SIZE, 32'd2);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd1);
+            axi_write(REG_CPLQ_BASE_LO, 32'h4e80);
+            axi_write(REG_CPLQ_SIZE, 32'd2);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+            matrix_line_write_count = 0;
+            axi_write(REG_DOORBELL, 32'd1);
+            wait_cpl_tail(32'd1, "product GEMV M8 K-tail completion");
+            expected_last_g = 0;
+            for (rr_g = 0; rr_g < 8; rr_g = rr_g + 1)
+                for (cc_g = 0; cc_g < 16; cc_g = cc_g + 1) begin
+                    accum_g = 0;
+                    for (kk_g = 0; kk_g < 19; kk_g = kk_g + 1)
+                        accum_g = accum_g +
+                            ((((rr_g*5 + kk_g*3 + 1) % 23) - 11) *
+                             (((5*kk_g + cc_g*2 + 5) % 17) - 8));
+                    expected_g = accum_g;
+                    if ((rr_g == 7) && (cc_g == 15))
+                        expected_last_g = expected_g;
+                    expect_read(SPAD_BASE + 32'h5800 + (rr_g*16+cc_g)*4,
+                                expected_g, "product GEMV M8 output");
+                end
+            if (matrix_line_write_count != 32) begin
+                $display("%0t ERROR: product GEMV M8 line writes=%0d expected=32",
+                         $time, matrix_line_write_count);
+                errors = errors + 1;
+            end
+            expect_completion(32'h4e80, 16'h0522, 4'h1, 4'd0,
+                              expected_last_g, 32'd128,
+                              "product GEMV M8 K-tail descriptor");
+            if (errors != errors_before_g)
+                $fatal(1, "product GEMV M8 K-tail descriptor had %0d errors",
+                       errors - errors_before_g);
+            $display("MATRIX_PRODUCT_GEMV_M8_KTAIL_DESCRIPTOR_PASS opcode=0x52 shape=8x16x19 outputs=128 lines=%0d golden=bit-exact",
+                     matrix_line_write_count);
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
         end
 
         // Numerically defined SFU primitives used by a Transformer chain.
