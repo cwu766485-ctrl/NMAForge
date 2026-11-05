@@ -1,4 +1,5 @@
 VCS ?= vcs -licwait 1
+PYTHON ?= python3.12
 URG ?= /opt/Synopsys/vcs/V-2023.12-SP1/bin/urg
 SEED ?= 20261021
 OUT_DIR ?= /tmp/nmaforge_matrix_datapath_$(SEED)
@@ -206,7 +207,7 @@ product-gemv-four-way-ablation:
 		done; \
 	done; \
 	for seed in $(SEEDS); do \
-		python3 ../../../../../tools/summarize_gemv_four_way_ablation.py \
+		$(PYTHON) ../../../../../tools/summarize_gemv_four_way_ablation.py \
 			--seed $$seed --rtl-sha "$$(git rev-parse HEAD)" \
 			--test-sha "$$(git rev-parse HEAD)" \
 			--p0-b0 $(GEMV_FOUR_WAY_OUT)/cache_0/prefetch_0/run_seed_$$seed.log \
