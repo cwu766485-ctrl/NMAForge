@@ -1,0 +1,41 @@
+{
+  "run_id": "V2-DIGITS-410B81D-S20261029",
+  "status": "PASS_SCOPED",
+  "source_sha": "410b81dfd37992a760b28258bb7e8c6b6f5017d7",
+  "tree_sha": "e608e788cf5cc49165d835003c87920259cc84b4",
+  "seed": 20261029,
+  "simulator": "Synopsys VCS V-2023.12-SP1_Full64",
+  "software_tools": {
+    "python": "3.12.13",
+    "numpy": "2.4.6",
+    "scikit_learn": "1.9.1"
+  },
+  "model": "trained sklearn Digits INT8 MLP",
+  "model_sha256": "e0351dbfa9198937fef05b3adcfc0e5a7f705524eaaede0dcb89892cde9e2c3b",
+  "independent_integer_golden_sha256": "8a9606b5c31ff4f203731726f89d7caf5f73b59d0cbddf0945a1ac454d855afc",
+  "rtl_logits_csv_sha256": "7980fb678505ae0590d13c2f590b9523a98bedee7c3037936ccacb9b10360e9c",
+  "samples": 360,
+  "correct": 352,
+  "accuracy_pct": 97.78,
+  "golden_outputs_checked": 360,
+  "golden_status": "PASS",
+  "descriptors": 46,
+  "doorbell_to_completion_tail_cycles": 34761,
+  "fused_matrix_activity_cycles": 26444,
+  "fused_tile_write_bytes": 23552,
+  "padded_macs": 1884160,
+  "mac_per_cycle": 54.2033,
+  "derived_array_utilization_pct": 21.17,
+  "spad_initialization_bytes": 56224,
+  "abi_version": 7,
+  "endpoint": "CMDQ doorbell to CPLQ completion tail; testbench SPAD preload and post-run Golden read excluded",
+  "memory_model": "checked-in behavioral four-bank SPAD",
+  "evidence_archive": "/tmp/nmaforge_v2_current_410b81_gemv_digits.tar.gz",
+  "evidence_archive_sha256": "26b751910afa296181c1e85aab39910b71f0cdd49e196f493a5cdf1a22f9d5fa",
+  "limitations": [
+    "RTL simulation metric, not ASIC timing or PPA",
+    "No trained CNN or Transformer model run",
+    "No separate host/DMA/compute/writeback/graph phase timers"
+  ],
+  "spad_initialization_image_sha256": "5b118cf55e2152c822a92777210baca5045f3cf2ffdaef2e2eb2830a6e15355e"
+}

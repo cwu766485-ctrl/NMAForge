@@ -1,17 +1,99 @@
 # NMAForge v2 DV Closure Status
 
 **Status:** IN PROGRESS — scoped regressions pass; v2 sign-off is not ready.  
-**Reviewed RTL/test candidate SHA:** `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164`
+**Latest fixed RTL/test candidate SHA:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`
 
-**Candidate tree:** `dbf5060ac465ef4bb913543024182b298f675413`
+**Candidate tree:** `e608e788cf5cc49165d835003c87920259cc84b4`
 
-**Latest fault replay at GitHub branch HEAD:** `de705ee6317557954af9cb396cda94b01eb1c432` (tree `d948c9f72a24fd6ccdfdef9acfd5d940ceb37cfa`), including the added 0x53 Reset/Epoch scenario.
-**Latest RTL-mutation replay:** `a015de58379ca1303ebfc1c4c3899d1fd77affa2` (tree `402f5172240dfe60197bbb41937ab99814333d6a`); this adds only the mutation harness and Make target.
+**Latest fault replay:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7` (tree `e608e788cf5cc49165d835003c87920259cc84b4`), including 0x53 Reset/Epoch, Parity, Protection, and held-write Abort scenarios.
+**Latest RTL-mutation replay:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`; 15/15 opcode-core mutant-seed checks caught.
 **Latest scoped cross-engine replay:** `86e0d6cbba3187bd1deeb18f664c559b606c878d` (tree `497eaef649c3995c97cb533a9c410417d63ee0de`); Top Smoke adds a scoped functional coverage group, with no product RTL change.
-**Latest actual DUT mutation replay:** `bdfda3c408a1367ac6b1788ebb9bdb0e5b6f7d47` (tree `89eac43b0b9aa6811608f6587272ec564ea2b456`); seven temporary RTL mutants were caught by their assigned real Compute Cluster UVM checkers.
+**Latest actual DUT mutation replay:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`; seven temporary RTL mutants were caught by their assigned real Compute Cluster UVM checkers.
 
 **Baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Simulator:** Synopsys VCS `V-2023.12-SP1_Full64`
+
+## Exact-candidate replay at `410b81d` — 2026-11-05
+
+This fixed candidate was tested in the isolated worktree before this
+report-only follow-up. No product RTL changed during these runs. The combined
+run archive is `/tmp/nmaforge_v2_current_410b81_signoff_logs.tar.gz`, SHA-256
+`c9f88930f24c3ca74140ba48e06d91f3fdbd0d37585fff0f9dac3ded15404ce5`.
+VCS/URG was `V-2023.12-SP1_Full64`.
+
+| Run ID | Command / evidence | Result and scope |
+|---|---|---|
+| `V2-GEMV-FAULT-CLEAN-410B81D-3SEED` | `make -C dv/block/compute/matrix/sim product-gemv-regress product-opcode-fault-regress`; output `/tmp/nmaforge_v2_current_410b81_matrix_core` | Seeds 20261105/06/07 pass GEMV Golden and tail cases plus 0x52 Parity/Protection/Abort/Reset and 0x53 reset-epoch stale-response, Parity, output Protection, held-write Abort, and post-fault tile-chain recovery. |
+| `V2-TOP-SMOKE-410B81D` | `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105` | `TEST PASS`; 0x52 CMDQ output cases, 0x53 forwarding producer/consumer, legal Matrix+SFU disjoint-region overlap and Golden pass. VCS emitted the existing `LOOP-REROLL-ENABLED` fixture debug-capacity notice. |
+| `V2-DUT-URG-410B81D-3SEED` | `make ai_compute_cluster_cov AI_CLUSTER_COV_SEEDS='20261105 20261106 20261107'` | Top DUT-only URG: Line/Condition/FSM/Branch `86.75/77.62/44.33/84.56%`; Matrix core `88.34/78.32/51.52/84.95%`. Named v2 Matrix+SFU functional group `100%`; aggregate functional groups `20%` because four AXI responder groups were not sampled. This is not v2 functional closure. |
+| `V2-CLUSTER-UVM-410B81D-3SEED` | `make -C dv/uvm/sim uvm_compute_cluster_regress COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027'` | All three real-top runs pass. Each checks 92,871 memory words, zero mismatch/unknown/stale/orphan; accepted/returned/reset-dropped response-owner ledger `5015/4995/20`, pending `0`; UVM Warning/Error/Fatal `0/0/0`. All seven engine pairs observed `21/21`; merged UVM URG Line/Condition/FSM/Branch/Assert/Group `69.65/62.71/45.62/58.03/72.00/79.18%`. This is generic Cluster scope, not opcode-specific v2 closure. |
+| `V2-OPCODE-MUTATION-410B81D-5X3` | `make -C dv/block/compute/matrix/sim product-opcode-mutation-regress V2_OPCODE_MUTATION_SEEDS='20261105 20261106 20261107'` | 15/15 real temporary RTL mutant-seed checks caught: output data/address, operand response owner, WSTRB, and tile tag. |
+| `V2-CLUSTER-DUT-MUTATION-410B81D-7X1` | `make -C dv/uvm/sim uvm_compute_cluster_dut_mutation SEED=20261025` | 7/7 real DUT mutants caught: SPAD address/data/response owner, Matrix WSTRB, Completion error code, Missing Done, Duplicate Done. |
+
+The exact `REQ-V2-*` evidence delta is:
+
+| Requirement rows | Current SHA evidence added | Disposition |
+|---|---|---|
+| `REQ-V2-052-003/004/006/008` | Three-seed GEMV and fault core replay; signed INT8/INT32 Golden, M/N/K tails, Cache/Prefetch behavior, selected fault recovery | Remain scoped PASS or PARTIAL as listed in the RTM; broader legal shapes, fault-phase crosses and shared external response ownership remain open. |
+| `REQ-V2-053-001/002/005/006` | Top CMDQ producer/consumer replay plus three-seed tag, ping-pong, Reset/Epoch, Parity, Protection and held-write recovery | Remain scoped PASS/PARTIAL; arbitrary held-response timing, Completion fault injection and all cross-engine contracts remain open. |
+| `REQ-V2-COM-004` | Current 3-seed Top URG with one v2 functional group | **PARTIAL**; 100% applies only to the named Matrix+SFU handoff group; overall functional group score is 20%. |
+| `REQ-V2-COM-005` | Current 15/15 opcode mutations and 7/7 Cluster DUT mutations | **PARTIAL**; these are selected mutations, not exhaustive checker-to-fault mapping for every new feature. |
+
+The UVM run has three top AXI stall assertions with 660,281 attempts each:
+`c_ar_stall_then_accept` and `c_aw_stall_then_accept` have zero matches,
+while `c_w_stall_then_accept` has one. These remain unexercised assertion
+checks for this run and require targeted traffic or a documented scope
+disposition. No assertion success is inferred from the overall UVM PASS.
+
+Exact command environment included
+`VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias`, `VCS_ARCH_OVERRIDE=linux`,
+and `PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH`. Top URG report is
+`/tmp/nmaforge_v2_current_410b81_top_cov/top_only_urg/dashboard.txt`; Cluster
+URG report is
+`/tmp/nmaforge_v2_current_410b81_cluster_uvm/urg_merged/dashboard.txt`.
+This adds current-candidate evidence, but full v2 DV remains **IN PROGRESS**.
+
+The exact invocation set was:
+
+```sh
+make -C dv/block/compute/matrix/sim \
+  product-gemv-regress product-opcode-fault-regress \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+  CORE_OUT_DIR=/tmp/nmaforge_v2_current_410b81_matrix_core \
+  SEEDS='20261105 20261106 20261107'
+
+make -C dv/subsystem/top_smoke/sim ai_smoke \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+  AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105
+
+make -C dv/subsystem/top_smoke/sim ai_compute_cluster_cov \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+  URG=/tmp/nmaforge_vcs_home_linux_alias/bin/urg AI_RANDOM_CASES=4 \
+  AI_CLUSTER_COV_RUN=/tmp/nmaforge_v2_current_410b81_top_cov \
+  AI_CLUSTER_COV_SEEDS='20261105 20261106 20261107'
+
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v2_current_410b81_cluster_uvm \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027'
+
+make -C dv/block/compute/matrix/sim product-opcode-mutation-regress \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' PYTHON=python3.12 \
+  V2_OPCODE_MUTATION_OUT=/tmp/nmaforge_v2_current_410b81_opcode_mutation \
+  V2_OPCODE_MUTATION_SEEDS='20261105 20261106 20261107'
+
+make -C dv/uvm/sim uvm_compute_cluster_dut_mutation \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+  COMPUTE_CLUSTER_DUT_MUTATION_OUT=/tmp/nmaforge_v2_current_410b81_dut_mutation \
+  SEED=20261025
+```
+
+Each command used `VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias`,
+`VCS_ARCH_OVERRIDE=linux`, and
+`PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH`. The direct GEMV
+four-way and Digits commands are recorded in the
+[performance](../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md) and
+[model](../benchmark/NMAFORGE_V2_MODEL_BENCHMARK.md) reports respectively.
 
 This report records the initial replay at `33e8528` and now defines the
 normalized v2 `REQ-V2-*` identifiers below. The RTM binds both that fixed
@@ -408,8 +490,9 @@ Compute Cluster disposition from **HOLD**.
    current 21-row RTM is normalized but still contains PARTIAL/NOT_RUN rows.
 2. Extend the fixed-SHA `0x52`/`0x53` fault campaign to the remaining legal
    phase crosses, response holds, request backpressure, and completion-fault
-   semantics; the selected 0x53 reset-epoch stale-response interleave now
-   passes at `de705ee`.
+   semantics. The current `410b81d` replay covers selected Reset/Epoch stale
+   response, Parity, Protection, and held-write Abort cases; it is not the full
+   Engine × Fault × Phase × Reset matrix.
 3. Define and test tile-source immutability under cross-engine SPAD traffic;
    test repeated consume and producer/consumer interleavings.
 4. Add functional covergroups for the directed `0x52`/`0x53` testpoints; review

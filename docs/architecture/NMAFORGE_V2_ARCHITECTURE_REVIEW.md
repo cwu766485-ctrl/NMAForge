@@ -3,9 +3,9 @@
 **Review date:** 2026-11-05  
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Current reviewed candidate:** `feature/npu-architecture-v2` `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164`
-**Candidate tree:** `dbf5060ac465ef4bb913543024182b298f675413`
-**Latest test-only candidate:** `feature/npu-architecture-v2` `17b09e068e988ca35480ffd638d865872e9ba564` (tree `be5227e88f6b94914b5e804b3cfbc614cba48258`); this commit enforces exact GEMV cycle partition closure in the benchmark summarizer, with no product RTL delta.
+**Current reviewed candidate:** `feature/npu-architecture-v2` `410b81dfd37992a760b28258bb7e8c6b6f5017d7`
+**Candidate tree:** `e608e788cf5cc49165d835003c87920259cc84b4`
+**Latest published branch commit at audit:** `6862c68035387fe70441b617b6797b6e070963a6`, with the same tree as the tested candidate.
 
 ## Executive disposition
 
@@ -222,3 +222,45 @@ the licensed libraries and constraints are available.
 - The real Compute Cluster UVM regression passes Seeds 20261025/26/27 with the shared `ai_spad_arbiter`, all seven engines, independent Golden checks and ordered CMDQ completions. Same four-task serial/parallel work measures 1,696/1,137 RTL cycles (ratio 1.492; equal 4,352 B read and 2,688 B write traffic). The three-task staged case measures 1,239/1,070 cycles (ratio 1.158).
 - Real Matrix/CNM contention produces 333 observation cycles, 320 admitted collisions, 320 Matrix wait cycles, and 320 held-payload checks with zero ownership/stability violations. This establishes contention under the current policy but does not compare an alternative scheduler or justify new RTL. Detailed boundaries and machine data are in the [performance report](../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md).
 - Run ID `V2-CLUSTER-SERIAL-PARALLEL-CONTENTION-3SEED-17B09E0`; source/test SHA `17b09e068e988ca35480ffd638d865872e9ba564`; logs archive SHA-256 `a2c2daa85ba57c1617239498c60636763584707f43bb93c345f5e01f7c6d8fbe`.
+
+## Current exact-candidate verification and benchmark replay — `410b81d`
+
+The isolated worktree tested source/test SHA
+`410b81dfd37992a760b28258bb7e8c6b6f5017d7`, tree
+`e608e788cf5cc49165d835003c87920259cc84b4`. Direct `git ls-remote` showed
+published v2 branch commit `6862c68035387fe70441b617b6797b6e070963a6` with
+that same tree; R250 `main` remains `3041355528dffe856e2d5384027c6ee5df5d1b42`.
+The IDE worktree was not changed. This increment made no product RTL changes;
+the only code addition is a CSV/JSON/SVG merger for already completed
+three-seed GEMV measurements, alongside evidence/report files.
+
+The current `git worktree list --porcelain` inventory reports 204 registrations:
+124 present and 80 missing. Eleven present worktrees have changes: this v2
+worktree (the report and benchmark files being prepared), the IDE worktree
+`/home/ray/workspace/NMAForge` (two pre-existing untracked files), and nine
+other pre-existing research/evidence worktrees. No other worktree was cleaned,
+pruned, reset, or edited. `.gitignore` still covers simulator databases,
+license files, `.env`, `novas.conf`/`novas.rc`, and library/database extensions.
+
+- Matrix 0x52/0x53 focused suite, Top Smoke, real seven-engine Cluster UVM,
+  three-seed URG, 15 opcode-core mutations and seven real Cluster DUT
+  mutations ran with VCS `V-2023.12-SP1_Full64`. Current run IDs, commands,
+  scoped coverage and caveats are in the
+  [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+- The four-way GEMV ablation passed 48/48 bit-exact Golden points and exact
+  exclusive-state cycle partition at this candidate. Its machine records are
+  [CSV](../../benchmark/v2_p2_gemv_cache_prefetch_4way_410b81d.csv),
+  [JSON](../../benchmark/v2_p2_gemv_cache_prefetch_4way_410b81d_summary.json)
+  and [SVG](../../benchmark/v2_p2_gemv_cache_prefetch_4way_410b81d.svg).
+- The seven-engine UVM measured one four-task serial/parallel workload at
+  1,696/1,137 cycles with equal 4,352 B read and 2,688 B write traffic. This
+  is overlap under the existing scheduler, not an alternate-arbiter result.
+  The [machine summary](../../benchmark/v2_p2_cluster_serial_parallel_410b81d_summary.json)
+  records its one-workload, behavioral-SPAD boundary.
+- The trained Digits model was rerun at this fixed source/test SHA and remains
+  bit-exact with 352/360 classifications and 34,761 CMDQ cycles. This does not
+  close trained CNN or Transformer model deployment.
+
+The active branch remains a v2 architecture candidate: v1.0 Compute Cluster
+is **HOLD**, v2 feature-wide DV closure is **IN PROGRESS**, TinyNPU parity is
+not established, and ASIC readiness is **NOT READY**.

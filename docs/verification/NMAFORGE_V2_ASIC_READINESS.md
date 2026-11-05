@@ -2,7 +2,7 @@
 
 **Review date:** 2026-11-05  
 **R250 baseline:** `3041355528dffe856e2d5384027c6ee5df5d1b42`  
-**RTL/test candidate:** `145363ddff5141177421ee7429fc65f78834830d`  
+**Latest RTL/test candidate replayed:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`
 **Disposition:** **NOT ASIC READY**; v1.0 remains **HOLD**.
 
 ## Current evidence
@@ -126,3 +126,29 @@ ASIC timing evidence.
 
 Until these results exist, NMAForge v2 is an RTL architecture candidate, not
 an ASIC-ready or tapeout-ready design.
+
+## Candidate replay status at `410b81d` — 2026-11-05
+
+VCS and URG became available for the fixed candidate and completed the
+functional regressions listed in the [v2 DV report](NMAFORGE_V2_DV_CLOSURE.md).
+That environment change does not provide the private standard-cell library,
+SRAM timing/macro views, DC constraints, or implementation flow needed for
+ASIC evidence. No new SpyGlass lint/CDC/RDC, DC, LEC, macro mapping, or
+physical-design run was executed at this candidate in this increment; the
+465-warning lint inventory and other static-analysis results above remain
+bound to their recorded historical tool/configuration runs.
+
+| Readiness item | Current disposition |
+|---|---|
+| Functional simulation | Scoped candidate replay PASS; v2 sign-off remains IN PROGRESS. |
+| SpyGlass warnings / CDC / RDC | NOT_RERUN at `410b81d`; historical warning and structural findings remain OPEN. |
+| Formal / LEC | NOT_RERUN; older Matrix FSM proof does not establish whole-design equivalence or v2 closure. |
+| DC area / Fmax / power | NOT_RUN at `410b81d`; no measured ASIC PPA. |
+| SRAM mapping and capacity study | NOT_RUN; behavioral four-bank SRAM remains the performance-model boundary. |
+| DFT, MBIST, CTS, route, routed STA, IR/EM | NOT_RUN; required before any tapeout-readiness claim. |
+
+The current candidate still uses one 16×16/256-MAC array, existing
+four-bank/512-KiB logical SPAD, 1-KiB bounded reuse array and 512-B forwarding
+store. These are RTL-declared sizes, not mapped silicon costs. VCS timing and
+the 250-MHz normalization are not physical timing evidence. Disposition stays
+**NOT ASIC READY**.

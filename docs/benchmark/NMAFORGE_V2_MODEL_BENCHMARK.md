@@ -2,7 +2,7 @@
 
 **Status date:** 2026-11-05  
 **R250 baseline:** `3041355528dffe856e2d5384027c6ee5df5d1b42`  
-**v2 RTL/test candidate:** `33e85287fbf37187fccb76e97be6effe888670e9`  
+**Latest v2 RTL/test candidate replay:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`
 **Latest paired benchmark source SHA:** `c3a59f08d8c07a8da973010d0f23d5d6d7eed61b`
 **TinyNPU reference:** `8216c22b762011aa20c05fc2768423fd12dda59d`
 
@@ -96,3 +96,47 @@ measured Fmax, power, or energy result is inferred from these RTL runs.
    windows for the larger model runs.
 4. Preserve this Digits replay as the fixed regression and report each
    workload independently. Do not aggregate unlike cycle windows.
+
+## Current fixed-candidate Digits replay — `410b81d`
+
+The trained INT8 sklearn Digits MLP was rerun from the current fixed v2
+candidate using the real top SPAD/CMDQ/CPLQ path and opcode `0x53`. Run ID is
+`V2-DIGITS-410B81D-S20261029`. VCS
+`V-2023.12-SP1_Full64`; Python 3.12.13, NumPy 2.4.6, scikit-learn 1.9.1.
+Command:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+AI_DIGITS_PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python \
+AI_DIGITS_RUN=/tmp/nmaforge_v2_digits_current_410b81 \
+make ai_digits_inference \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10'
+```
+
+The replay passed 360/360 independent integer Golden logit checks and
+classified 352/360 images (97.78%). It issued 46 descriptors and took 34,761
+doorbell-to-completion-tail RTL cycles for 1,884,160 padded MACs, or 54.2033
+MAC/cycle and 21.17% derived 256-lane utilization. The run logged 26,444
+fused Matrix activity cycles and 23,552 bytes of fused tile writes. These
+counters retain their own semantics and are not ASIC measurements.
+
+Current artifact identities:
+
+- Trained INT8 model SHA-256: `e0351dbfa9198937fef05b3adcfc0e5a7f705524eaaede0dcb89892cde9e2c3b`.
+- Independent integer Golden logits SHA-256:
+  `8a9606b5c31ff4f203731726f89d7caf5f73b59d0cbddf0945a1ac454d855afc`.
+- RTL logits CSV SHA-256:
+  `7980fb678505ae0590d13c2f590b9523a98bedee7c3037936ccacb9b10360e9c`.
+- Machine-readable current run record:
+  [JSON](../../benchmark/v2_digits_410b81d.json) records the SPAD
+  initialization-image, model, Golden and output hashes, endpoint, tool
+  versions, and run limits.
+- Combined run archive:
+  `/tmp/nmaforge_v2_current_410b81_gemv_digits.tar.gz`, SHA-256
+  `26b751910afa296181c1e85aab39910b71f0cdd49e196f493a5cdf1a22f9d5fa`.
+
+The 360-image output and cycle result reproduce the previously reported v2
+Digits result at this newer source/test SHA. This is not a trained CNN or
+Transformer run. Separate Host, DMA, Compute, Writeback, and graph-orchestration
+timers remain uninstrumented; ASIC PPA remains outside this simulation result.

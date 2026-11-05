@@ -2,7 +2,7 @@
 
 **As of:** 2026-11-05  
 **Product baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
-**Latest replay source/test SHA:** `17b09e068e988ca35480ffd638d865872e9ba564`
+**Latest replay source/test SHA:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`
 
 ## Comparison boundary
 
@@ -284,3 +284,83 @@ for some points and neutral or slightly negative for others. Low utilization
 on small shapes and TinyNPU's missing RTL memory adapter remain open. No
 bank-aware scheduler RTL, second MAC array, or PPA claim is introduced by this
 report.
+
+## Current candidate replay at `410b81d`
+
+The current candidate reran the registered four-bank behavioral-SPAD product
+GEMV comparison on Seeds 20261105/06/07. VCS was
+`V-2023.12-SP1_Full64`; array 16×16 (256 INT8 MAC), read depth 4, A-Tile Cache
+enabled, and four B-fold Cache × Next-K Prefetch combinations. All 48 complete
+output images passed the independent Golden; exclusive Matrix state cycles
+equal command cycles for all points. Stall/event counters can overlap and are
+not summed as an exclusive partition.
+
+| Shape | Cache OFF / Prefetch OFF | Cache ON / Prefetch OFF | Cache OFF / Prefetch ON | Cache ON / Prefetch ON |
+|---|---:|---:|---:|---:|
+| M8×16×19 cycles / read B | 200.7 / 864 | 156.0 / 560 | 195.7 / 864 | 152.3 / 560 |
+| M8×16×65 cycles / read B | 544.3 / 2,720 | 391.0 / 1,696 | 520.0 / 2,720 | 383.0 / 1,696 |
+| M16×16×19 cycles / read B | 393.7 / 1,728 | 261.0 / 816 | 382.7 / 1,728 | 262.7 / 816 |
+| M16×16×65 cycles / read B | 1,075.0 / 5,440 | 627.3 / 2,368 | 1,029.7 / 5,440 | 632.3 / 2,368 |
+
+B-fold Cache without Prefetch reduces cycles 22.3–41.6% and reads 35.2–56.5%
+for these four shapes. Prefetch without Cache reduces cycles 2.5–4.5%. With
+Cache enabled, Prefetch helps the two M8 cases by about 2.1–2.4% but regresses
+the M16 cases by about 0.6–0.8%. With Cache and Prefetch both enabled, useful
+throughput is 15.97–26.32 MAC/cycle (6.24–10.28% of 256-MAC peak) across the
+four shapes. The best point across all four configurations is 26.53 MAC/cycle
+(10.36%) on M16×16×65 with Cache ON and Prefetch OFF. These are workload-window
+simulation metrics, not silicon utilization.
+
+Exact run: `V2-GEMV-FOUR-WAY-3SEED-410B81D`; merged artifacts are
+[CSV](../../benchmark/v2_p2_gemv_cache_prefetch_4way_410b81d.csv),
+[summary JSON](../../benchmark/v2_p2_gemv_cache_prefetch_4way_410b81d_summary.json)
+and [SVG](../../benchmark/v2_p2_gemv_cache_prefetch_4way_410b81d.svg). The
+run logs and per-seed summaries are outside Git at
+`/tmp/nmaforge_v2_current_410b81_gemv4`; combined GEMV/Digits evidence archive
+SHA-256 is
+`26b751910afa296181c1e85aab39910b71f0cdd49e196f493a5cdf1a22f9d5fa`.
+
+Reproduction command (run from the repository root):
+
+```sh
+VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias VCS_ARCH_OVERRIDE=linux \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+make -C dv/block/compute/matrix/sim product-gemv-four-way-ablation \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+  PYTHON=python3.12 SEEDS='20261105 20261106 20261107' \
+  OUTSTANDING_DEPTH=4 A_TILE_CACHE_ENABLE=1 PHYSICAL_ARRAY_SIZE=16 \
+  GEMV_FOUR_WAY_OUT=/tmp/nmaforge_v2_current_410b81_gemv4
+python3.12 tools/merge_gemv_four_way_ablation.py \
+  --output-prefix benchmark/v2_p2_gemv_cache_prefetch_4way_410b81d \
+  /tmp/nmaforge_v2_current_410b81_gemv4/summary_seed_20261105.csv \
+  /tmp/nmaforge_v2_current_410b81_gemv4/summary_seed_20261106.csv \
+  /tmp/nmaforge_v2_current_410b81_gemv4/summary_seed_20261107.csv
+```
+
+### Seven-engine shared-SPAD workload
+
+The real Compute Cluster top, shared arbiter, and checked-in behavioral
+four-bank SPAD passed the same deterministic serial/parallel workload on three
+Seeds. Descriptor programming and external DDR timing are excluded.
+
+| Case | Cycles | Read / write traffic | Result |
+|---|---:|---:|---|
+| Four tasks serial: Matrix + CNM + SFU + SFU | 1,696 | 4,352 / 2,688 B | Golden PASS |
+| Same four tasks queued/parallel | 1,137 | 4,352 / 2,688 B | 1.492× vs serial, ordered completion |
+| Three tasks serial: Matrix + CNM + SFU | 1,239 | 4,032 / 2,416 B | Golden PASS |
+| Matrix + CNM overlap, then SFU | 1,070 | 4,032 / 2,416 B | 1.158× vs serial |
+
+Observed Matrix/CNM contention is 320 admitted bank collisions and 320 Matrix
+wait cycles, with zero response-owner, held-payload, or route mismatches. This
+demonstrates current-policy contention; no alternative Bank-Aware Issue policy
+was A/B tested, so it is not evidence to add scheduler RTL. See the
+[contention CSV](../../benchmark/v2_p2_cluster_contention_410b81d.csv),
+[serial/parallel CSV](../../benchmark/v2_p2_cluster_serial_parallel_410b81d.csv),
+[summary JSON](../../benchmark/v2_p2_cluster_serial_parallel_410b81d_summary.json)
+and [chart](../../benchmark/v2_p2_cluster_serial_parallel_410b81d.svg).
+Detailed logs are in `/tmp/nmaforge_v2_current_410b81_cluster_uvm` and the
+combined archive `/tmp/nmaforge_v2_current_410b81_signoff_logs.tar.gz`,
+SHA-256 `c9f88930f24c3ca74140ba48e06d91f3fdbd0d37585fff0f9dac3ded15404ce5`.
+
+These are RTL simulation results with behavioral SPAD. They are not SRAM
+timing, measured Fmax, ASIC area, power, or energy measurements.
