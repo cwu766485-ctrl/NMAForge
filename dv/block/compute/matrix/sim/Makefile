@@ -101,7 +101,7 @@ core-random-regress: core-random-compile
 			-cm_name matrix_product_gemv_$$seed -l $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 		grep -q "^MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 		grep -q "^MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
-		grep -q "^MATRIX_CORE_GEMV_KFOLD_M16_TAIL_PASS opcode=0x52 shape=16x16x19 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=16x16x19 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 	done
 
 product-gemv-test: core-random-compile
@@ -110,7 +110,7 @@ product-gemv-test: core-random-compile
 		-cm_name matrix_product_gemv_$(SEED) -l $(CORE_OUT_DIR)/product_gemv.log
 	grep -q '^MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 .*golden=bit-exact$$' $(CORE_OUT_DIR)/product_gemv.log
 	grep -q '^MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 .*golden=bit-exact$$' $(CORE_OUT_DIR)/product_gemv.log
-	grep -q '^MATRIX_CORE_GEMV_KFOLD_M16_TAIL_PASS opcode=0x52 shape=16x16x19 .*golden=bit-exact$$' $(CORE_OUT_DIR)/product_gemv.log
+	grep -q '^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=16x16x19 .*golden=bit-exact$$' $(CORE_OUT_DIR)/product_gemv.log
 
 product-gemv-regress: core-random-compile
 	@set -e; for seed in $(SEEDS); do \
@@ -119,7 +119,7 @@ product-gemv-regress: core-random-compile
 			-cm_name matrix_product_gemv_$$seed -l $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 		grep -q "^MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 		grep -q "^MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
-		grep -q "^MATRIX_CORE_GEMV_KFOLD_M16_TAIL_PASS opcode=0x52 shape=16x16x19 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=16x16x19 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 		grep -q "^MATRIX_PRODUCT_GEMV_ONLY_PASS seed=$$seed$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 	done
 
