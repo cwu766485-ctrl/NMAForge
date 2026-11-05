@@ -6,6 +6,7 @@
 **Current reviewed candidate:** `feature/npu-architecture-v2` `410b81dfd37992a760b28258bb7e8c6b6f5017d7`
 **Candidate tree:** `e608e788cf5cc49165d835003c87920259cc84b4`
 **Latest published branch commit at audit:** `6862c68035387fe70441b617b6797b6e070963a6`, with the same tree as the tested candidate.
+**Latest verification-only test candidate:** `99566993256778d094c068a8733c074ade2f9921` (tree `2c74d2ec73991494897fb257d863986e3300cd55`); product RTL is unchanged.
 
 ## Executive disposition
 
@@ -19,6 +20,19 @@ Golden-checked VCS evidence.
 This is a **bounded v2 functional/performance candidate**, not a v1.0 Compute
 Cluster sign-off, full v2 verification closure, ASIC sign-off, or a TinyNPU
 performance win. Keep the overall Compute Cluster disposition at **HOLD**.
+
+### Latest v2 verification-only update — 2026-11-05
+
+The current v2 product RTL was not changed. A Matrix testbench-only commit
+`99566993256778d094c068a8733c074ade2f9921` makes the `8×4×8` overlap
+precondition deterministic across seeds while retaining randomized bank Ready
+and the original high-water checker. At this test SHA, Prefetch-ON core/GEMV/
+fault plus Prefetch-OFF runs pass across Seeds 20261108/09/10; five opcode
+mutation classes are caught in all three seeds. Merged Matrix core URG is
+Line/Condition/FSM/Branch `94.34/90.74/93.94/96.62%`, with 15/15 states and
+51/55 transitions. Four transitions remain unhit, so this is added evidence,
+not coverage closure or sign-off. Exact RTM rows and logs are in the
+[v2 DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
 ## Baseline and source audit
 

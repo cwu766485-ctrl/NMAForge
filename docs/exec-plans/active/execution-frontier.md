@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-05. Latest fixed-SHA v2 mutation run: `a015de58379ca1303ebfc1c4c3899d1fd77affa2` (tree `402f5172240dfe60197bbb41937ab99814333d6a`); latest opcode fault run: `de705ee6317557954af9cb396cda94b01eb1c432` (tree `d948c9f72a24fd6ccdfdef9acfd5d940ceb37cfa`). Product RTL candidate remains `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` (tree `dbf5060ac465ef4bb913543024182b298f675413`); later commits add only test infrastructure and reports. This is a short handoff for the next engineering task; it
+Updated: 2026-11-05. Latest fixed-SHA v2 mutation and opcode fault run: `99566993256778d094c068a8733c074ade2f9921` (tree `2c74d2ec73991494897fb257d863986e3300cd55`). Product RTL candidate remains `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` (tree `dbf5060ac465ef4bb913543024182b298f675413`); the latest commit changes only Matrix test stimulus and reports, not RTL. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -18,17 +18,18 @@ review](../../architecture/NMAFORGE_V2_ARCHITECTURE_REVIEW.md) for branch/tree
 identities, worktree inventory, `.gitignore` audit, and post-RTL history.
 
 Phase 1 is **IN PROGRESS**. The DV report has 22 normalized `REQ-V2-*`
-rows: 14 PASS-scoped, 8 PARTIAL, and 0 NOT_RUN. At fixed candidate
-`410b81d`, three-seed 0x52/0x53 fault/GEMV, Top Smoke, seven-engine UVM, and
-selected opcode/real-DUT mutations pass their stated scopes. Arbitrary
-external-SoC SPAD response ownership beyond the repository-fabric boundary,
-full legal fault × phase × reset crosses, opcode-specific SVA, and complete
-functional-bin disposition remain open. Current Top
-DUT-only URG is Line/Condition/FSM/Branch 86.75/77.62/44.33/84.56%; Matrix
-FSM has 15/15 states and 25/55 transitions. The Matrix+SFU handoff group is
-100%, while the four existing AXI groups are unsampled and total functional
-group coverage is 20%. These figures do not close v2 DV or imply full coverage.
-See the exact run identities and scope in the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
+rows: 14 PASS-scoped, 8 PARTIAL, and 0 NOT_RUN. At test candidate
+`9956699`, three-seed Matrix core/GEMV, selected 0x52/0x53 fault recovery,
+Prefetch-OFF fallback, and 15/15 selected opcode mutations pass their stated
+scopes. Merged Matrix URG covers 12 tests: Line/Condition/FSM/Branch
+94.34/90.74/93.94/96.62%, 15/15 states and 51/55 transitions; four Matrix
+transitions remain unhit without exclusion/waiver. Arbitrary external-SoC SPAD
+response ownership, full legal fault × phase × reset crosses, opcode-specific
+SVA, and complete functional-bin disposition remain open. Top DUT-only URG is
+still the separate earlier 86.75/77.62/44.33/84.56%; the Matrix+SFU handoff
+group is 100%, while four existing AXI groups are unsampled and total Top
+functional-group coverage is 20%. These figures do not close v2 DV or imply
+full coverage. See run identities and scope in the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
 The repository `ai_accel_memory_fabric` boundary also has a three-seed
 coordinated reset/epoch replay at SHA
