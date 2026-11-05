@@ -119,13 +119,37 @@ module ai_descriptor_validator (
     // Product GEMV descriptor field gate. Shape support is bounded by the
     // shared 16x16 Matrix array; unsupported strides, batching, and flags are
     // rejected before dispatch rather than silently ignored.
+    // Opcode 0x52 consumes dense A rows padded to a 16-byte K stride, dense
+    // B rows of 16 bytes, and a contiguous INT32 output. Keep these byte-span
+    // calculations in the validator so an in-place destination cannot
+    // overwrite operands that later row/K tiles still need to read.
+    wire [31:0] gemv_a_bytes =
+        ((({16'd0,k_words} + 32'd15) & 32'hffff_fff0) * {16'd0,m_size});
+    wire [31:0] gemv_b_bytes = {16'd0,k_words} << 4;
+    wire [31:0] gemv_dst_bytes =
+        {16'd0,m_size} * {16'd0,n_size} * 32'd4;
+    wire [31:0] gemv_bias_bytes = {16'd0,n_size} << 2;
+    wire [32:0] gemv_a_end = {1'b0,src0} + {1'b0,gemv_a_bytes};
+    wire [32:0] gemv_b_end = {1'b0,src1} + {1'b0,gemv_b_bytes};
+    wire [32:0] gemv_dst_end = {1'b0,dst} + {1'b0,gemv_dst_bytes};
+    wire [32:0] gemv_bias_end = {1'b0,bias_base} + {1'b0,gemv_bias_bytes};
+    wire gemv_range_error =
+        (gemv_a_end[32] && (|gemv_a_end[31:0])) ||
+        (gemv_b_end[32] && (|gemv_b_end[31:0])) ||
+        (gemv_dst_end[32] && (|gemv_dst_end[31:0])) ||
+        (bias_enable && gemv_bias_end[32] && (|gemv_bias_end[31:0]));
+    wire gemv_write_alias =
+        (({1'b0,dst} < gemv_a_end) && ({1'b0,src0} < gemv_dst_end)) ||
+        (({1'b0,dst} < gemv_b_end) && ({1'b0,src1} < gemv_dst_end)) ||
+        (bias_enable && ({1'b0,dst} < gemv_bias_end) &&
+         ({1'b0,bias_base} < gemv_dst_end));
     wire gemv_fields_valid =
         (op != 8'h52) ||
         ((version == 8'd7) && (flags[7:1] == 7'd0) &&
          (flags[0] == bias_enable) && (aux0 == 32'd0) &&
          (src0_stride == 32'd0) && (src1_stride == 32'd0) &&
          (dst_stride == 32'd0) && (batch_count <= 16'd1) &&
-         (head_count == 16'd0));
+         (head_count == 16'd0) && !gemv_range_error && !gemv_write_alias);
 
     assign descriptor_invalid = !op_valid || !dimensions_valid ||
                                 !version_valid ||

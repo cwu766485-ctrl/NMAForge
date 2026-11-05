@@ -158,10 +158,13 @@ exclusive to either the existing GEMM A-line cache or the GEMV B-fold cache
 for a command; no additional operand data array is added. K groups above the
 first 64 values bypass this cache. The cache is disabled if the B physical
 span overlaps the INT32 destination span. Software must keep A and B operands
-stable for the full command and must use source/destination spans that do not
-alias. The current descriptor validator does not enforce these alias rules;
-that validation remains open. This reuse does not add a cross-engine
-coherence or snapshot mechanism.
+stable for the full command and must not allow another engine to modify them
+while the command is active; this opcode does not provide cross-engine
+coherence or a snapshot. A new validator change computes the padded-A,
+dense-B, output, and enabled-bias spans, rejects output overlap with those
+read spans, and rejects 32-bit end-address wrap. Focused alias/overflow
+checks are present but remain unverified until the VCS validator regression
+passes.
 
 The current implementation does not support N greater than 16, transpose,
 strides, multi-batch operation, head-aware operation, or fused `0x53` mode

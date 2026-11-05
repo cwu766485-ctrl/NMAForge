@@ -337,3 +337,10 @@ in the owning report; run `git diff --check` before handoff.
 - Exact attempt: `timeout -k 3s 50s make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105`. Mapper generation passed; VCS could not obtain `VCS-BASE-COMPILE/VCSCompiler_Net` before SV compilation. Result **BLOCKED_ENV / NOT_RUN**; no simulator image or RTL test ran. Log: `/tmp/nmaforge-architecture-v2/dv/subsystem/top_smoke/sim/ai_comp.log`.
 - VCS compile for the prior M8 core cache-ablation target was retried with a 50-second bound and failed with the same license-server connection error. Do not treat either M8 test as functional evidence until the exact targets pass.
 - Current status remains: M1/N/K tail and next-K prefetch have prior bounded evidence; M8 product integration, bank-aware issue, full opcode fault coverage, architecture-wide benchmark, TinyNPU comparison, PPA and v2 DV closure remain open.
+
+## 2026-11-05 update — GEMV descriptor span/alias guard
+
+- Extended `ai_descriptor_validator` for opcode `0x52` to compute padded-A, dense-B, INT32 output, and enabled-bias byte spans. The validator rejects output/input overlap and 32-bit span-end wrap; exact adjacent half-open spans remain legal.
+- Added directed validator checks for A overlap, B overlap, enabled-bias overlap, B-range overflow, and legal A/output adjacency. Updated the expected target marker to 33 invalid rules and 43 accepted boundaries.
+- Required command `timeout -k 3s 50s make descriptor-validator-regress DESCRIPTOR_VALIDATOR_OUT=/tmp/nmaforge_descriptor_validator_gemv_alias_20261105` failed before SV compilation because VCS could not connect to its license server. Same-change `timeout -k 3s 50s make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105` passed mapper generation and then failed at the same license checkout. Both are **BLOCKED_ENV / NOT_RUN**; old simulation PASS results do not cover this RTL change.
+- The open contract is cross-engine immutability during a command; these guards only prevent descriptor output/input span aliasing. Retry both targets when VCS license connectivity is restored.

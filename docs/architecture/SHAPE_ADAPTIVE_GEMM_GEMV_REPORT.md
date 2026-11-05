@@ -182,9 +182,11 @@ is staged in the existing ping-pong operand banks. This adds no operand data
 array; it adds a 16-bit group-valid map and cache control. The cache is used
 only when `M>4`, and K groups above 64 bypass it. If the B physical span
 overlaps the destination span, the reuse path is disabled. Software must keep
-operands stable throughout the command and use non-aliasing source/destination
-spans; the current descriptor validator does not enforce those alias rules.
-No cross-engine coherence or source snapshot is provided.
+operands stable throughout the command and prevent another engine from
+modifying them; no cross-engine coherence or source snapshot is provided. The
+descriptor validator now computes A/B/output/enabled-bias spans for `0x52`,
+rejects output overlap and 32-bit end-address wrap. Focused checker cases were
+added, but remain unverified until VCS runs the validator regression.
 
 Paired VCS runs used the same shape, Golden, behavioral four-bank registered
 SPAD responder, simulator version, prefetch setting, and seed values with the
@@ -277,8 +279,12 @@ the log is `/tmp/nmaforge-architecture-v2/dv/subsystem/top_smoke/sim/ai_comp.log
   Scalar N=1 and a shape matrix remain open.
 - Extend the bounded prefetch into bank-aware request issue/scheduling; the
   current B-fold cache is limited to the first 64 K values and depends on
-  stable, non-aliasing operands. Larger K values still reread B beyond the
-  cached prefix.
+  cross-engine operand immutability. Larger K values still reread B beyond
+  the cached prefix.
+- The `0x52` alias/range validator and its focused tests have been added, but
+  the validator regression is **BLOCKED_ENV / NOT_RUN** because VCS cannot
+  obtain its compile license. Do not treat the new contract as verified until
+  the focused target passes.
 - Add fault/phase coverage for parity, protection, Abort, reset, output
   backpressure, and response ownership for opcode `0x52`.
 - Add descriptor mutation and coverage disposition; mutation is **NOT_RUN**.
@@ -291,3 +297,24 @@ This change does not alter the v1.0 Compute Cluster disposition (**HOLD**) and
 does not close the broader v2 architecture target. Next work should improve
 bank-aware issue and B reuse across M tiles while preserving response ownership
 and Abort/Reset behavior.
+
+## `0x52` descriptor range enforcement — 2026-11-05, NOT_RUN
+
+The validator now derives byte spans for padded dense A, dense B, contiguous
+INT32 output, and enabled bias. Opcode `0x52` descriptors are rejected when
+the output intersects any read span or when a span end wraps the 32-bit byte
+address space. The descriptor test adds four rejected cases (A, B, bias
+overlap and B-range overflow) plus an accepted exact-adjacency case. The
+Top Smoke's existing M4 shape places B immediately before output; that legal
+adjacency is deliberately accepted by the half-open interval rule.
+
+The result-count marker is updated to 33 invalid-rule checks and 43 accepted
+boundaries. The focused `make descriptor-validator-regress
+DESCRIPTOR_VALIDATOR_OUT=/tmp/nmaforge_descriptor_validator_gemv_alias_20261105`
+attempt failed before compilation because VCS could not obtain
+`VCS-BASE-COMPILE/VCSCompiler_Net`. The required same-change Top Smoke command
+`timeout -k 3s 50s make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261105 SEED=20261105`
+also failed at the same license checkout point after mapper generation.
+Neither regression produced a simulator image or runtime result. This RTL
+change is committed but **BLOCKED_ENV / NOT_RUN**; older PASS results remain
+tied to the pre-change source SHA.

@@ -196,6 +196,25 @@ module tb_ai_descriptor_validator;
         set_legal_defaults(8'h50); src0_stride=32'd4; check_invalid("FP stride unsupported");
         set_legal_defaults(8'h51); flags=8'h02; check_invalid("FP transpose flags unsupported");
 
+        // Product opcode 0x52 writes a contiguous INT32 result. Reject
+        // destination overlap with any still-live input span, while allowing
+        // exactly adjacent half-open ranges.
+        set_legal_defaults(8'h52); m_size=16'd1; n_size=16'd4; k_words=16'd17;
+        dst=32'h0000_0120;
+        check_boundary_accept("0x52 A/output adjacent spans");
+        set_legal_defaults(8'h52); m_size=16'd1; n_size=16'd4; k_words=16'd17;
+        dst=32'h0000_0110;
+        check_invalid("0x52 output overlaps padded A span");
+        set_legal_defaults(8'h52); m_size=16'd1; n_size=16'd1; k_words=16'd17;
+        dst=32'h0000_0200;
+        check_invalid("0x52 output overlaps dense B span");
+        set_legal_defaults(8'h52); m_size=16'd1; n_size=16'd4; k_words=16'd1;
+        bias_enable=1'b1; flags=8'h01; bias_base=32'h0000_0300;
+        check_invalid("0x52 output overlaps enabled bias span");
+        set_legal_defaults(8'h52); m_size=16'd1; n_size=16'd1; k_words=16'd2;
+        src1=32'hffff_fff0;
+        check_invalid("0x52 B span address overflow");
+
         // Opcode 0x53 tile capture/consume bits are additive ABI-v7 fields;
         // old Matrix opcodes remain untouched.
         set_legal_defaults(8'h53); version=8'd7; m_size=16'd16; n_size=16'd16;
@@ -302,11 +321,11 @@ module tb_ai_descriptor_validator;
             $fatal(1, "Matrix A tile-pack accepted a non-matching M*N length");
         boundary_reject_checks = boundary_reject_checks + 1;
 
-        if (legal_opcode_checks != 30 || invalid_rule_checks != 29 ||
-            boundary_accept_checks != 42 || boundary_reject_checks != 26)
-            $fatal(1, "testpoint count mismatch legal=%0d invalid=%0d boundary_accept=%0d boundary_reject=%0d expected=30/29/42/26",
+        if (legal_opcode_checks != 30 || invalid_rule_checks != 33 ||
+            boundary_accept_checks != 43 || boundary_reject_checks != 26)
+            $fatal(1, "testpoint count mismatch legal=%0d invalid=%0d boundary_accept=%0d boundary_reject=%0d expected=30/33/43/26",
                    legal_opcode_checks, invalid_rule_checks, boundary_accept_checks, boundary_reject_checks);
-        $display("DESCRIPTOR_VALIDATOR_PASS legal_opcodes=29 tile_pack=1 invalid_rules=29 boundary_accept=42/42 boundary_reject=26/26 tile_forward_accept=3/3 legacy_aux_compat=1 opcode_classes_consistent=1 engine_limit_claim=0");
+        $display("DESCRIPTOR_VALIDATOR_PASS legal_opcodes=29 tile_pack=1 invalid_rules=33 boundary_accept=43/43 boundary_reject=26/26 tile_forward_accept=3/3 legacy_aux_compat=1 opcode_classes_consistent=1 engine_limit_claim=0");
         $finish;
     end
 endmodule
