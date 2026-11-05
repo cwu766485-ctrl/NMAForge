@@ -36,7 +36,7 @@ make -C "$REPO_ROOT/dv/block/compute/matrix/sim" product-gemv-test \
 
 TINY_NPU_ROOT="$TINY_NPU_ROOT" TINYNPU_WORK_ROOT="$WORK_ROOT" \
     TINYNPU_GEMM_OUT="$OUT_DIR/tinynpu" VERILATOR="$VERILATOR" \
-    JOBS="${JOBS:-4}" "$SCRIPT_DIR/run_tinynpu_gemm.sh" \
+    JOBS="${JOBS:-4}" bash "$SCRIPT_DIR/run_tinynpu_gemm.sh" \
     > "$OUT_DIR/tinynpu_script.log" 2>&1
 
 "$PYTHON" "$SCRIPT_DIR/summarize_gemv_compare.py" \
