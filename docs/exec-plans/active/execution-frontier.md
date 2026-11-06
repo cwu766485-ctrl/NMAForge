@@ -1,8 +1,23 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `0696c16bd1346207ad5421d21247c719ea018111` (tree `94c8488a9c79f4ad3f0ee771ab43d7528fe285d0`; three-seed clean-worktree regression now includes 0x52 shapes 1×16×17, 8×13×65 and 15×16×31). Latest benchmark source SHA: `85e7db2d12f5edfaed17e8ca3910bb504983779f` (fixed-candidate GEMV Cache×Prefetch and serial/parallel artifact replay). Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commits expand only verification/benchmark workload and evidence. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `0e9f12ec3701030c9e5978ad29b227c5e0c644a7` (tree `18983dbf8708c101bc83aa9ed0902d6370037468`; three-seed clean-worktree regression hits all eight real-CMDQ 0x52 M/N/K aligned-tail combinations). Latest benchmark source SHA: `85e7db2d12f5edfaed17e8ca3910bb504983779f` (fixed-candidate GEMV Cache×Prefetch and serial/parallel artifact replay). Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commits expand only verification/benchmark workload and evidence. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
+
+## 2026-11-06 update — real-CMDQ GEMV M/N/K alignment-tail cross
+
+Testbench-only commit `0e9f12ec3701030c9e5978ad29b227c5e0c644a7` adds a
+functional covergroup for all eight aligned/tail combinations and four new
+legal descriptors on the real Top CMDQ path. Three Seeds each hit 8/8 bins;
+every added shape checks independent signed INT32 Golden outputs, two guards,
+ordered completion, and accepted/returned Matrix reads. Clean detached replay
+passes with VCS/URG `V-2023.12-SP1`; UVM severity is 0/0/0. Merged profile
+Line/Condition/FSM/Branch/Assert/Group is
+`70.71/68.34/46.17/67.66/72.00/82.96%`. This closes only the declared
+alignment-tail cross, not all legal dimension combinations or v2 DV. Product
+RTL is unchanged. Run ID `V2-CMDQ-GEMV-TAIL-CROSS-3SEED-0E9F12E`; exact command
+and logs-only archive checksum are recorded in the [DV closure
+report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
 ## 2026-11-06 update — real-CMDQ GEMV extended shapes
 
