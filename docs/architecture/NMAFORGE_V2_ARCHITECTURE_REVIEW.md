@@ -1,5 +1,35 @@
 # NMAForge v2 Architecture Review
 
+## Focused Research Round 3 — 2026-11-06
+
+**Disposition: `RESEARCH_BASELINE_PARTIAL`.** Starting remote candidate was
+`240ed4106a1b31078cce15e2406d437ca0cde987`; implementation commit is
+`4dab73646989615c5479de0bac76d1488a102758`. `main` R250 remains
+`3041355528dffe856e2d5384027c6ee5df5d1b42`. This round adds a trained,
+four-symbol INT8 Transformer toy and the opt-in `0x53 aux0[7]` bounded
+linear-row writeback. It retains the existing 16×16 / 256-MAC array, four
+SPAD banks, AXI interfaces, CMDQ/CPLQ, and legacy `0x53 aux0[7]=0` output.
+
+The Transformer is a reproducible one-layer, one-head, hidden-size-4 task
+model, not a pretrained language model. Its 86 ABI-v7 descriptors execute on
+the real Top CMDQ at 128 KiB and pass 301 intermediate/final/KV checks. The
+ten-class CNN's 396-sample legacy and optimized Top runs both pass exact
+Golden checks and classify 384/396 (96.97%). The optimized `0x53` output
+produces the next FC's padded K-line layout directly. These are behavioral
+RTL/SPAD results, not silicon or TinyNPU system-level measurements.
+
+The bounded product RTL diff from the round's baseline is confined to
+`rtl/compute/matrix/ai_tensor_matrix_core.v` and
+`rtl/control/descriptor/ai_descriptor_validator.v`: an `aux0[7]` mode bit,
+per-row line address/data selection, and descriptor bounds. No second array,
+new compute engine, or general reshape unit was added. The exact interface
+contract is in [`NPU_ARCHITECTURE_V2_SPEC.md`](../spec/NPU_ARCHITECTURE_V2_SPEC.md).
+
+The records below this section describe earlier snapshots and remain useful
+as historical evidence; where they say trained Transformer inference was
+`NOT_RUN`, that status is superseded by this bounded toy-model run. Full v2 DV
+closure and ASIC readiness remain open.
+
 ## Research-baseline finalization — 2026-11-06
 
 **Disposition: `RESEARCH_BASELINE_PARTIAL`.** This snapshot supersedes earlier

@@ -1,5 +1,65 @@
 # NMAForge v2 Performance Comparison
 
+## Focused Research Round 3 — 2026-11-06
+
+Candidate: `4dab73646989615c5479de0bac76d1488a102758`, parent/reviewed
+remote: `240ed4106a1b31078cce15e2406d437ca0cde987`. TinyNPU reference remains
+`8216c22b762011aa20c05fc2768423fd12dda59d`. All new values below are
+behavioral VCS Top results with the four-bank SPAD model.
+
+### Innovation 1 — Shape-Adaptive GEMM/GEMV
+
+The fixed Cache × Prefetch GEMV ablation remains the evidence from the
+earlier, SHA-bound four-way experiment below: B-fold cache gave 22.3–41.6%
+fewer cycles and 35.2–56.5% fewer reads across the four measured GEMV shapes
+with prefetch off; prefetch had small shape-dependent effects. No new
+model-level Cache/Prefetch ablation was run in this round. The trained toy
+Transformer uses opcode `0x30` GEMM descriptors, not a representative
+opcode-`0x52` GEMV-heavy decode path; applying the GEMV toggles would require a
+different model mapping. Thus no model-level gain is attributed to Innovation
+1 here. This round adds no scheduler or cache RTL.
+
+### Innovation 2 — Fused epilogue and output handoff
+
+The ten-class CNN was rerun at the fixed candidate with `0x53 aux0[7]` off
+(Legacy) and on (linear-row output). The same 396 images passed exact
+intermediate/final Goldens and both modes classified 384/396. Per sample:
+
+| Measure | Legacy | Fused linear-row | Change |
+|---|---:|---:|---:|
+| Top CMDQ cycles | 3,193 | 2,712 | −15.1% |
+| Testbench Host layout | 1,080 cycles; 144 B read + 576 B write | 0 cycles / 0 B | eliminated |
+| End-to-end measured interval | 4,273 cycles | 2,712 cycles | −36.5% |
+| Compute SPAD R/W | 6,048 / 1,920 B | 5,472 / 1,776 B | −576 / −144 B |
+| Total SPAD traffic including Host layout | 8,688 B | 7,248 B | −16.6% |
+| Useful MACs / effective MAC per interval cycle | 2,736 / 0.640 | 2,736 / 1.009 | derived |
+| Golden / classification | 396/396 exact; 96.97% | 396/396 exact; 96.97% | unchanged |
+
+The Host-layout interval is a 10 ns simulation-clock estimate for 36 AXI
+reads plus 144 AXI word writes, not software wall time. Input preload and
+post-run Golden inspection are excluded on both sides. The legacy-to-fused
+CNN comparison combines epilogue fusion and direct consumer layout, so its
+36.5% total-cycle gain must not be attributed to either feature alone. The
+existing Digits MLP fusion result (110,155→34,761 cycles) and the separate
+directed Tile Forwarding result (23 cycles saved, about 8%) remain distinct
+experiments; they are not mixed into this CNN ratio. The bounded linear-row
+mode is a separate output-layout option, not the 512 B elastic tile cache.
+
+### Transformer workload and comparison limits
+
+The trained cyclic toy Transformer ran 4-token Prefill in 5,682 cycles and
+one Decode token in 5,715 cycles (11,397 combined), using 3,816 SPAD read and
+2,120 write bytes and 640 useful MACs. It validates Mapper-loaded training
+weights, operator composition, and KV-cache Golden behavior. It does not
+exercise opcode `0x52`, so it is not a Cache × Prefetch model-level result.
+
+TinyNPU's pinned direct-array and modeled common-memory GEMM/GEMV matrix is
+preserved at its original source/test SHA. The new CNN and Transformer have
+not been run on TinyNPU with a matching memory service, clock boundary,
+weights, and outputs. The results do not establish a cross-system speedup or
+performance victory. DC/ASIC area, Fmax, power, and energy remain
+**BLOCKED_ENV**; no frequency is inferred from the 10 ns simulation clock.
+
 ## Finalization addendum — models and compact SPAD, 2026-11-06
 
 The fixed GEMM/GEMV and innovation-ablation results below remain bound to

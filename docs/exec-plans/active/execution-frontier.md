@@ -1,5 +1,31 @@
 # NMAForge execution frontier
 
+## Focused Research Round 3 — delivery snapshot, 2026-11-06
+
+Implementation candidate `4dab73646989615c5479de0bac76d1488a102758` adds the
+deterministic trained INT8 micro-Transformer flow and bounded `0x53 aux0[7]`
+linear-row output layout. The run uses the existing 16×16 array, 256 INT8
+MACs, four-bank SPAD, AXI/CMDQ/CPLQ, and ABI-v7; no new compute engine or
+second array is added.
+
+The 128 KiB Transformer-only Top run passes 86 descriptors and 301
+intermediate/final/KV Goldens (5,682 Prefill / 5,715 one-token Decode cycles).
+The ten-class CNN legacy and linear-row runs each pass all 396 Top samples
+against independent Goldens and classify 384/396. Per-sample measurements are
+in the model report. The new linear-row path moves total task interval from
+4,273 to 2,712 cycles by combining fused requant and consumer-ready output
+layout; this result does not isolate the two mechanisms. Existing GEMV
+Cache×Prefetch and Tile Forwarding ablations remain bound to their original
+run SHAs; no new GEMV-heavy Transformer decode ablation was run.
+
+`ai_smoke` passes on seed `20261106`; VCS is `V-2023.12-SP1_Full64`. PPA is
+`BLOCKED_ENV` (no public foundry SRAM/library/SDC set), TinyNPU system-level
+speedup is unproven, and full v2 DV sign-off remains open. Implementation
+commit is `4dab73646989615c5479de0bac76d1488a102758`. Final Round 3 report
+commit and remote branch head are in the handoff. **Stop condition:** after
+publishing this bounded report package, do not automatically start another
+RTL, coverage, model, or ASIC phase.
+
 ## Research finalization stop point — 2026-11-06
 
 **Final disposition: `RESEARCH_BASELINE_PARTIAL`; this task stops here.** The

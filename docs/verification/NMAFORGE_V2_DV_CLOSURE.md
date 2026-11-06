@@ -1,5 +1,32 @@
 # NMAForge v2 DV Closure Status
 
+## Focused Research Round 3 functional evidence — 2026-11-06
+
+This round intentionally did **not** pursue full DV closure or 100% coverage.
+At code candidate `4dab73646989615c5479de0bac76d1488a102758`, the configured
+128 KiB Transformer-only VCS run passed all 86 descriptor completions and
+301 independent intermediate/final/KV checks. Run ID:
+`V2-TRAINED-TRANSFORMER-TOP-4DAB736-S20261106`; Prefill/Decode are 5,682 /
+5,715 cycles. The default fixed-weight Top smoke also passed the existing
+INT8 GEMM, opcode `0x52`, legacy opcode `0x53`, and completion paths.
+
+The CNN-specific Top CMDQ path passed all 396 held-out samples in both legacy
+and opt-in linear-row configurations. All expected tensors were byte-exact
+against the independent integer Golden, with 384/396 classification results
+in each mode. The optimized descriptor is ABI-v7 `0x53` with `aux0[7]=1`;
+no Host-generated flattened tensor is used. Full DV sign-off, global
+coverage closure, formal closure, and broad fault/mutation campaigns remain
+out of scope and open.
+
+Exact commands are in the [model benchmark report](../benchmark/NMAFORGE_V2_MODEL_BENCHMARK.md).
+VCS is `V-2023.12-SP1_Full64`, seed `20261106`. The custom 128 KiB build
+defines `AI_SPAD_WORDS_PER_BANK=8192` and, for the CNN map,
+`AI_TINYNPU_CNN_SPAD_BASE_SHIFT=65536`. Standard Top `ai_smoke` uses the
+existing 512 KiB profile and completed with `TEST PASS`; the known
+`LOOP-REROLL-ENABLED` debug-capacity notice remains non-fatal. These results
+are bounded functional/model evidence only and do not change the v2 DV
+sign-off disposition.
+
 ## Finalization functional gate — 2026-11-06
 
 The requested bounded key-function gate is satisfied for the sampled/fixed
