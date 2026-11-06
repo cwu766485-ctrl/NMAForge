@@ -298,8 +298,8 @@ core-tile-forward-ablation:
 		grep -q "^MATRIX_TILE_FORWARD_CHAIN_ONLY_PASS enable=$$enable seed=$(SEED)$$" $$out/run.log; \
 		if [ $$enable -eq 1 ]; then \
 			grep -Eq '^MATRIX_V2_TILE_FORWARD_COVERAGE_PASS enable=1 bins=6 coverage=100\.00 seed=$(SEED)$$' $$out/run.log; \
-			grep -q '^MATRIX_V2_TILE_FORWARD_SVA_PASS assertions=2 nonvacuous_commits=[1-9][0-9]* ' $$out/run.log; \
-			grep -q 'Summary: 2 assertions, 2 with attempts, 0 with failures' $$out/assertions.rpt; \
+			grep -q '^MATRIX_V2_TILE_FORWARD_SVA_PASS assertions=3 nonvacuous_commits=[1-9][0-9]* ' $$out/run.log; \
+			grep -q 'Summary: 3 assertions, 3 with attempts, 0 with failures' $$out/assertions.rpt; \
 			grep -Eq '1 covers, 1 with attempts|[1-9][0-9]* covers, 1 with attempts' $$out/assertions.rpt; \
 			grep -Eq '[1-9][0-9]* match' $$out/assertions.rpt; \
 		fi; \
