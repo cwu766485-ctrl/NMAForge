@@ -2,7 +2,7 @@
 
 **As of:** 2026-11-06
 **Product baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
-**Latest replay source/test SHA:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`
+**Latest replay source/test SHA:** `36d4b9b4bbafe769b452afc003033d2a222a682f` (tree `a92a302ce78ef541aa0a76bb99dfeb0a413ad0c4`; 8-configuration Matrix rerun)
 
 ## Comparison boundary
 
@@ -425,3 +425,77 @@ comparisons above remain tied to their individually listed source/test SHAs
 and timing endpoints. No new PPA or system-level performance result is
 inferred from the coverage replay. See the [DV report](../verification/NMAFORGE_V2_DV_CLOSURE.md)
 for exact run IDs and the evidence archive.
+
+
+## Current-candidate Matrix eight-configuration replay — 2026-11-06
+
+Run ID `V2-MATRIX-EIGHT-CONFIG-3SEED-36D4B9B` ran the existing Matrix
+controller benchmark on source/test SHA
+`36d4b9b4bbafe769b452afc003033d2a222a682f` (tree
+`a92a302ce78ef541aa0a76bb99dfeb0a413ad0c4`). It used the same five GEMM
+workloads, a physical 16×16 array (256 INT8 MACs), fixed one-cycle behavioral
+bank response, and three fixed Seeds. Each Seed completed all eight combinations
+of outstanding depth 2/4, Next-K Prefetch OFF/ON, and A-Tile Cache OFF/ON.
+Every point passed its independent output Golden: 120/120 total.
+
+Mean measurements across the five workloads (three-seed mean per workload,
+then summed) are:
+
+| Depth / Prefetch / A-Tile Cache | Cycles | Change vs baseline | SPAD read bytes | SPAD write bytes | Total SPAD bytes | Weighted MAC/cycle | Weighted array utilization |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 2 / OFF / OFF (baseline) | 2,720.00 | — | 12,032 | 7,488 | 19,520 | 34.07 | 13.31% |
+| 2 / OFF / ON | 2,455.67 | −9.72% | 9,472 | 7,488 | 16,960 | 37.74 | 14.74% |
+| 2 / ON / OFF | 2,447.00 | −10.04% | 12,032 | 7,488 | 19,520 | 37.87 | 14.79% |
+| 2 / ON / ON | 2,133.00 | −21.58% | 9,472 | 7,488 | 16,960 | 43.45 | 16.97% |
+| 4 / OFF / OFF | 2,602.00 | −4.34% | 12,032 | 7,488 | 19,520 | 35.62 | 13.91% |
+| 4 / OFF / ON | 2,346.00 | −13.75% | 9,472 | 7,488 | 16,960 | 39.50 | 15.43% |
+| 4 / ON / OFF | 2,316.00 | −14.85% | 12,032 | 7,488 | 19,520 | 40.01 | 15.63% |
+| 4 / ON / ON | 2,038.33 | −25.06% | 9,472 | 7,488 | 16,960 | 45.46 | 17.76% |
+
+The A-Tile Cache reduces aggregate read traffic by 21.28% for this workload
+set while write traffic is unchanged. The effect is concentrated in shapes
+that reuse A across column tiles. Prefetch-only reduces cycles by 10.04% at
+depth 2 and 14.85% at depth 4 without changing the recorded SPAD bytes. Depth
+4 alone improves cycles by 4.34%; the combined result is not a simple sum of
+independent gains.
+
+Per-workload best configurations vary: Prefetch-only is best on 4×4×32 and
+8×8×32; depth 4 with Prefetch and Cache is best on 16×32×32 and 32×32×64;
+16×16×32 is best at depth 4 with Prefetch and Cache OFF. Against each
+workload's baseline mean, these best points reduce cycles by 22.11%, 13.40%,
+14.88%, 22.85%, and 28.39%, respectively. This is controller-level evidence
+under the stated memory model; it does not establish a universal configuration
+winner or a TinyNPU advantage.
+
+The CSV includes per-Seed cycles, MAC/cycle, array utilization, SPAD read/write
+bytes, bank stalls, response waits, arbiter stalls, writeback waits, Prefetch
+waits, outstanding high-water, FIFO-full observations, and cache-hit counts.
+These event/stall counters can overlap; they are diagnostics and must not be
+added to command wall cycles. SPAD bytes are the measured behavioral-model
+bank-read bytes plus line-write bytes. The 250 MHz number remains only a
+normalization assumption; no ASIC clock, PPA, power, or energy is measured.
+
+Machine outputs: [120-point CSV](v2_matrix_config_closure_36d4b9b_3seed.csv),
+[summary JSON](v2_matrix_config_closure_36d4b9b_3seed.json), and
+[cycle-reduction chart](v2_matrix_config_closure_36d4b9b_3seed.svg). The
+reproducible [summarizer](../../tools/summarize_matrix_config_closure.py)
+validates all expected Seeds/configurations/cases and emits these artifacts.
+The 54-file logs/archive bundle is outside Git at
+`/tmp/nmaforge_v2_matrix_config_closure_36d4b9b_evidence.tar.gz`, SHA-256
+`003c1dedc0de9d3b9875dec63a218fade601e1a09d9b928b791bb250599741fd`.
+
+Exact simulation command, repeated for each Seed:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+make -C dv/block/compute/matrix/sim matrix-config-comparison \
+  SEED=$seed \
+  MATRIX_CONFIG_OUT=/tmp/nmaforge_v2_matrix_config_current_$seed \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10'
+```
+
+Seeds were 20261117, 20261118, and 20261119. Simulator version was Synopsys
+VCS `V-2023.12-SP1_Full64`; the aggregator ran with Python 3.12.13. The
+summarizer command is embedded in the evidence archive manifest and recorded in
+the [execution frontier](../exec-plans/active/execution-frontier.md).
