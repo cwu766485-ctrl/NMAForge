@@ -2,7 +2,7 @@
 
 **As of:** 2026-11-06
 **Product baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
-**Latest fixed benchmark source/test SHA:** `a4dcc6b609878811fcd48a0310401609d4952c62` (tree `430f9ce0c794f6e6a059d56ade7d9112b8a3079f`; current-source three-seed GEMV four-way ablation). **Latest Top contention workload SHA:** `c93d020880710a2804685fd85bb98c2e9c56f290` (tree `24180541c76b1ad4d27b2e97313e7d97a5df2016`; three-seed 16×16 Top Matrix/CNM contention profile). Product RTL in both remains `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
+**Latest fixed benchmark source/test SHA:** `f9f32f71e7168350d74a75ede0a4a4b222844cc9` (tree `0b20e98298852d2648f83d10723c55aabe3a9149`; three-seed eight-configuration Matrix replay). **Latest Top contention workload SHA:** `c93d020880710a2804685fd85bb98c2e9c56f290` (tree `24180541c76b1ad4d27b2e97313e7d97a5df2016`; three-seed 16×16 Top Matrix/CNM contention profile). Product RTL in both remains `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
 **Latest matched Cluster serial/parallel replay:** `f19e92934cd6273d327621c43cb17291cf1a9aa5` (three-seed real-Top Compute Cluster UVM replay of the same 3-task and 4-task workloads; product RTL unchanged).
 
 ## Comparison boundary
@@ -825,3 +825,69 @@ The memory is the checked-in behavioral four-bank SPAD; descriptor setup and
 preload are outside the interval. This is matched NMAForge RTL evidence only,
 not a TinyNPU comparison, SRAM timing, ASIC PPA, or a scheduler-policy A/B
 test. No Bank-Aware Issue RTL change is justified by this replay.
+
+## Current fixed-candidate eight-configuration replay — `f9f32f7`
+
+Run ID `V2-MATRIX-EIGHT-CONFIG-CLEAN-F9F32F7-3SEED` uses source/test SHA
+`f9f32f71e7168350d74a75ede0a4a4b222844cc9` (tree
+`0b20e98298852d2648f83d10723c55aabe3a9149`), VCS
+`V-2023.12-SP1_Full64`, a physical 16×16 array (256 INT8 MACs), the same five
+GEMM workloads, and a fixed one-cycle behavioral four-bank response model.
+Seeds 20261106/07/08 each ran all depth 2/4 × Prefetch OFF/ON × A-Tile Cache
+OFF/ON combinations. The summarizer validated all 120/120 output Golden
+points.
+
+The table sums the three-seed mean for each of the five workloads. Weighted
+MAC/cycle and utilization use 92,672 logical MACs divided by total command
+cycles and 256 physical MAC lanes. Cycle reduction compares each row with
+Depth 2 / Prefetch OFF / Cache OFF.
+
+| Depth / Prefetch / A-Cache | Sum cycles | Fewer cycles vs baseline | Read / write bytes | Weighted MAC/cycle | Utilization |
+|---|---:|---:|---:|---:|---:|
+| 2 / OFF / OFF | 2,702.00 | — | 12,032 / 7,488 | 34.30 | 13.40% |
+| 2 / OFF / ON | 2,400.33 | 11.16% | 9,472 / 7,488 | 38.61 | 15.08% |
+| 2 / ON / OFF | 2,410.00 | 10.81% | 12,032 / 7,488 | 38.45 | 15.02% |
+| 2 / ON / ON | 2,091.33 | 22.60% | 9,472 / 7,488 | 44.31 | 17.31% |
+| 4 / OFF / OFF | 2,565.67 | 5.05% | 12,032 / 7,488 | 36.12 | 14.11% |
+| 4 / OFF / ON | 2,312.33 | 14.42% | 9,472 / 7,488 | 40.08 | 15.66% |
+| 4 / ON / OFF | 2,278.33 | 15.68% | 12,032 / 7,488 | 40.68 | 15.89% |
+| 4 / ON / ON | 1,987.00 | 26.46% | 9,472 / 7,488 | 46.64 | 18.22% |
+
+A-Tile Cache reduces aggregate read traffic by 21.28% for this workload set;
+write traffic is unchanged. The best combined setting is 26.46% fewer cycles
+than baseline in this controller model. Stall/event counters can overlap and
+are not added to command cycles. This is a single Matrix-controller benchmark,
+not multi-engine Top contention or a TinyNPU comparison. The behavior-level
+memory timing does not represent SRAM timing, and 250 MHz remains a reference
+conversion only; no ASIC Fmax, area, power, or energy result was measured.
+
+Machine artifacts are [CSV](../../benchmark/v2_matrix_config_closure_f9f32f7_3seed.csv),
+[JSON](../../benchmark/v2_matrix_config_closure_f9f32f7_3seed.json), and
+[SVG](../../benchmark/v2_matrix_config_closure_f9f32f7_3seed.svg). Logs-only
+evidence archive `/tmp/nmaforge_v2_matrix_config_f9f32f7_logs.tar.gz`, SHA-256
+`517ca1efaa704aea8bdafe39785d0521cbd461ae8b36feeefbd81010a94d6aaf`.
+The archive contains driver, compile, run, and CSV/JSON/SVG text evidence only;
+no simulator executable, VDB, or compiled database.
+
+Reproduction (the first command ran once per listed Seed, with a separate
+output directory):
+
+```sh
+for seed in 20261106 20261107 20261108; do
+  VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias VCS_ARCH_OVERRIDE=linux \
+  PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+  make -C dv/block/compute/matrix/sim matrix-config-comparison \
+    SEED=$seed \
+    MATRIX_CONFIG_OUT=/tmp/nmaforge_v2_matrix_config_f9f32f7_3seed/seed_$seed \
+    VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10'
+done
+python3.12 tools/summarize_matrix_config_closure.py \
+  --seed-root 20261106=/tmp/nmaforge_v2_matrix_config_f9f32f7_3seed/seed_20261106 \
+  --seed-root 20261107=/tmp/nmaforge_v2_matrix_config_f9f32f7_3seed/seed_20261107 \
+  --seed-root 20261108=/tmp/nmaforge_v2_matrix_config_f9f32f7_3seed/seed_20261108 \
+  --source-sha f9f32f71e7168350d74a75ede0a4a4b222844cc9 \
+  --tree-sha 0b20e98298852d2648f83d10723c55aabe3a9149 \
+  --run-id V2-MATRIX-EIGHT-CONFIG-CLEAN-F9F32F7-3SEED \
+  --output-dir /tmp/nmaforge_v2_matrix_config_f9f32f7_3seed/summary \
+  --tag f9f32f7
+```

@@ -1040,3 +1040,23 @@ Detached clean SHA `f9f32f71e7168350d74a75ede0a4a4b222844cc9` passed the
 three-seed `uvm_compute_cluster_regress` for Seeds 20261106/07/08 with UVM
 Warning/Error/Fatal `0/0/0` each and engine-pair overlap 21/21. Merged URG is
 Line/Condition/FSM/Branch/Assert/Functional Group `70.71/68.37/46.17/67.66/72.00/83.94%`; five functional groups remain at zero, and assertion/cover properties are not fully hit. This is selected evidence, not coverage closure. Logs, exact command, and machine record are in the [DV report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+## 2026-11-06 update — Opcode focused checks and mutation at `f9f32f7`
+
+Three clean-SHA seeds passed six declared 0x52 GEMV shape bins, eight selected
+0x52/0x53 fault-recovery bins, two handshake bins and six tile-forward bins.
+Seven actual temporary RTL mutations across three Seeds were all detected
+(21/21). This adds current candidate evidence without changing product RTL;
+remaining shape/range/fault cross coverage and overall URG closure stay open.
+Evidence and precise commands are in the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md) and [JSON](../../benchmark/v2_opcode_f9f32f7_3seed.json).
+
+## 2026-11-06 update — Eight-configuration Matrix replay at `f9f32f7`
+
+Current fixed test SHA `f9f32f71e7168350d74a75ede0a4a4b222844cc9` passed
+all 120 Golden points across 3 Seeds × 5 workloads × 8 configurations at a
+16×16/256-MAC array and one-cycle behavioral four-bank response model. Depth 4
++ Prefetch + A-Tile Cache summed to 1,987 cycles, 26.46% below the baseline;
+A-Tile Cache reduced read bytes by 21.28% with unchanged writes. Full metrics,
+source and tool identities, CSV/JSON/SVG, exact command and archive checksum
+are in the [performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md).
+This is Matrix-controller RTL evidence, not TinyNPU parity or ASIC PPA.
