@@ -39,6 +39,8 @@ def main():
         inputs = testset["input_int8"].astype(np.int8)
         labels = testset["labels"].astype(np.int32)
         input_scale = float(testset["input_scale"].item())
+    with np.load(args.model) as model:
+        num_classes = int(model["fc_w"].shape[0])
     if inputs.shape != (len(labels), 1, 1, 8, 8):
         raise SystemExit("unexpected testset shape %s" % (inputs.shape,))
 
@@ -71,6 +73,7 @@ def main():
             str(args.simv.resolve()), "+ntb_random_seed=%d" % args.seed,
             "+AI_RANDOM_CASES=0", "+AI_SEED=%d" % args.seed,
             "+ACLK_PERIOD_NS=10.0", "+AI_TINYNPU_CNN_MATCH",
+            "+AI_TINYNPU_CNN_CLASSES=%d" % num_classes,
             "+AI_TINYNPU_CNN_MEMORY=" + str(memory_path.resolve()),
             "+AI_TINYNPU_CNN_EXPECTED=" + str(expected_path.resolve()),
         ]
@@ -78,7 +81,7 @@ def main():
             result = subprocess.run(command, cwd=args.out_dir, stdout=console,
                                     stderr=subprocess.STDOUT, check=False)
         text = log_path.read_text(encoding="utf-8", errors="replace")
-        match = re.search(r"NMA_CNN_RTL_METRICS outputs=4 descriptors=8 cycles=(\d+) host_layout_cycles=(\d+) host_layout_read_bytes=(\d+) host_layout_write_bytes=(\d+) compute_spad_read_bytes=(\d+) compute_spad_write_bytes=(\d+).*?model_macs=(\d+)", text)
+        match = re.search(r"NMA_CNN_RTL_METRICS outputs=(\d+) descriptors=(\d+) cycles=(\d+) host_layout_cycles=(\d+) host_layout_read_bytes=(\d+) host_layout_write_bytes=(\d+) compute_spad_read_bytes=(\d+) compute_spad_write_bytes=(\d+).*?model_macs=(\d+)", text)
         if result.returncode != 0 or "NMA_CNN_INFERENCE_PASS" not in text or match is None:
             raise SystemExit("Top CNN replay failed at sample %d; inspect %s" % (index, log_path))
         prediction = int(np.argmax(independent_logits))
@@ -89,13 +92,14 @@ def main():
             "correct": int(prediction == int(label)),
             "logits_int8": ";".join(str(int(v)) for v in independent_logits),
             "rtl_golden": "PASS_ALL_INTERMEDIATES",
-            "rtl_compute_cycles": int(match.group(1)),
-            "host_layout_cycles": int(match.group(2)),
-            "host_layout_read_bytes": int(match.group(3)),
-            "host_layout_write_bytes": int(match.group(4)),
-            "compute_spad_read_bytes": int(match.group(5)),
-            "compute_spad_write_bytes": int(match.group(6)),
-            "model_macs": int(match.group(7)),
+            "rtl_descriptors": int(match.group(2)),
+            "rtl_compute_cycles": int(match.group(3)),
+            "host_layout_cycles": int(match.group(4)),
+            "host_layout_read_bytes": int(match.group(5)),
+            "host_layout_write_bytes": int(match.group(6)),
+            "compute_spad_read_bytes": int(match.group(7)),
+            "compute_spad_write_bytes": int(match.group(8)),
+            "model_macs": int(match.group(9)),
             "input_sha256": sha256(input_path),
             "golden_sha256": sha256(golden_path),
             "run_log": str(log_path),
@@ -116,6 +120,9 @@ def main():
         "candidate_sha": args.candidate_sha,
         "model_sha256": sha256(args.model),
         "testset_sha256": sha256(args.testset),
+        "num_classes": num_classes,
+        "class_labels": list(range(num_classes)),
+        "architecture": "4 shared 3x3 INT8 conv filters + INT8 linear head, output groups of four",
         "samples": len(rows),
         "top_runs_passed": len(rows),
         "all_intermediate_goldens_exact": True,

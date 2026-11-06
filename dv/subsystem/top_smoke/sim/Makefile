@@ -133,6 +133,7 @@ ai_digits_inference:
 # engines, ABI-v7 command/completion queues, and an independent per-layer Golden.
 AI_TINYNPU_CNN_RUN ?= /tmp/nmaforge_tinynpu_cnn_rtl_$(shell date +%Y%m%d_%H%M%S)
 AI_TINYNPU_CNN_PYTHON ?= python3
+AI_TINYNPU_CNN_CLASSES ?= 4
 .PHONY: ai_tinynpu_cnn_match
 ai_tinynpu_cnn_match:
 	test ! -e "$(AI_TINYNPU_CNN_RUN)"
@@ -158,20 +159,23 @@ ai_tinynpu_cnn_match:
 		-o $(AI_TINYNPU_CNN_RUN)/simv -l $(AI_TINYNPU_CNN_RUN)/compile.log
 	$(AI_TINYNPU_CNN_RUN)/simv +ntb_random_seed=20261029 +AI_RANDOM_CASES=0 \
 		+AI_SEED=20261029 +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_TINYNPU_CNN_MATCH \
+		+AI_TINYNPU_CNN_CLASSES=$(AI_TINYNPU_CNN_CLASSES) \
 		+AI_TINYNPU_CNN_MEMORY=$(AI_TINYNPU_CNN_RUN)/workload/nma_cnn_spad.memh \
 		+AI_TINYNPU_CNN_EXPECTED=$(AI_TINYNPU_CNN_RUN)/workload/nma_cnn_expected.memh \
 		-l $(AI_TINYNPU_CNN_RUN)/run.log
 	grep -q '^NMA_CNN_INFERENCE_PASS' $(AI_TINYNPU_CNN_RUN)/run.log
 
-# Trained four-class CNN demo. Both the 3x3 convolution filters and INT8
-# classifier head are trained; the readout uses deployed integer features.
+# Trained Digits CNN demo. The same Top flow supports four- and ten-class
+# heads by running one four-output INT8 Matrix group per command chain.
 AI_TRAINED_CNN_RUN ?= /tmp/nmaforge_trained_cnn_demo_$(shell date +%Y%m%d_%H%M%S)
 AI_TRAINED_CNN_PYTHON ?= python3
+AI_TRAINED_CNN_CLASSES ?= 4
 .PHONY: ai_trained_cnn_demo
 ai_trained_cnn_demo:
 	test ! -e "$(AI_TRAINED_CNN_RUN)"
 	mkdir -p "$(AI_TRAINED_CNN_RUN)/model"
 	$(AI_TRAINED_CNN_PYTHON) ../../../../benchmark/tinynpu/train_nma_cnn_demo.py \
+		--num-classes $(AI_TRAINED_CNN_CLASSES) \
 		--out-dir "$(AI_TRAINED_CNN_RUN)/model"
 	$(AI_TRAINED_CNN_PYTHON) ../../../../benchmark/tinynpu/generate_nma_cnn_demo_golden.py \
 		--model "$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_weights.npz" \
@@ -179,6 +183,7 @@ ai_trained_cnn_demo:
 		--golden "$(AI_TRAINED_CNN_RUN)/model/nma_cnn_golden.bin"
 	$(MAKE) ai_tinynpu_cnn_match \
 		AI_TINYNPU_CNN_PYTHON="$(AI_TRAINED_CNN_PYTHON)" \
+		AI_TINYNPU_CNN_CLASSES="$(AI_TRAINED_CNN_CLASSES)" \
 		AI_TINYNPU_CNN_RUN="$(AI_TRAINED_CNN_RUN)/rtl" \
 		AI_TINYNPU_CNN_MODEL="$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_weights.npz" \
 		AI_TINYNPU_CNN_INPUT_NPZ="$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_input.npz" \
@@ -195,6 +200,13 @@ ai_trained_cnn_dataset_regress:
 		--testset "$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_testset.npz" \
 		--candidate-sha "$$(git rev-parse HEAD)" \
 		--out-dir "$(AI_TRAINED_CNN_RUN)/dataset_replay"
+
+AI_TENCLASS_CNN_RUN ?= /tmp/nmaforge_trained_cnn_tenclass_$(shell date +%Y%m%d_%H%M%S)
+.PHONY: ai_trained_cnn_tenclass_dataset_regress
+ai_trained_cnn_tenclass_dataset_regress:
+	$(MAKE) ai_trained_cnn_dataset_regress \
+		AI_TRAINED_CNN_RUN="$(AI_TENCLASS_CNN_RUN)" \
+		AI_TRAINED_CNN_CLASSES=10
 
 # Optional V3 subsystem stress: inject seeded read/write SLVERR at a random
 # beat of multi-beat DMA bursts and check completion plus AXI drain-to-idle.
