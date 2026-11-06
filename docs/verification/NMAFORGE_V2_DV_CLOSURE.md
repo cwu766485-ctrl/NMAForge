@@ -1650,3 +1650,29 @@ make -C dv/subsystem/top_smoke/sim ai_run \
 The second command was repeated with `<seed>` set to `20261106`, `20261107`,
 and `20261108`. This confirms tested compatibility at the new testbench
 candidate SHA; global v2 coverage remains at the URG values above.
+
+## 2026-11-06 — Top Smoke after Transformer timing instrumentation
+
+At testbench SHA `f9f32f71e7168350d74a75ede0a4a4b222844cc9` with unchanged
+product RTL `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`, `ai_smoke` passes on
+seed 20261106 with four randomized workloads. Required markers pass for
+GEMV `0x52`, fused `0x53`, cross-engine source immutability and the Matrix/CNM
+profile; the log has one `TEST PASS` and no simulation `ERROR:` line. This
+checks that the new Transformer completion-tail timer did not disturb other
+Top paths. It is a compatibility run and adds no UVM/URG bins; the v2 RTM
+remains 14 PASS-scoped / 8 PARTIAL.
+
+Run ID `V2-TOP-SMOKE-POST-TRANSFORMER-TIMING-F9F32F7-S20261106`. Exact command
+from `dv/subsystem/top_smoke/sim`:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261106 SEED=20261106
+```
+
+Machine record: [JSON](../../benchmark/v2_top_smoke_post_transformer_timing_f9f32f7.json).
+Logs-only archive outside Git:
+`/tmp/nmaforge_v2_top_smoke_post_transformer_timing_f9f32f7_logs.tar.gz`,
+SHA-256 `6667deb76dfbfbbfd51219785f27cf283ab7dcb92df57e07f757439dfaf7b428`.

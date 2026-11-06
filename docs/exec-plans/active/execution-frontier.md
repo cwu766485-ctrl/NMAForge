@@ -1002,3 +1002,12 @@ registered worktrees, 136 present, 80 missing, and 10 present worktrees with
 changes; no worktree was cleaned or reset. R250-to-product RTL is still the
 same six-file diff, with last RTL commit `cd0a05d`; no newer RTL modifications
 were introduced. Details are in the [architecture audit](../../architecture/NMAFORGE_V2_ARCHITECTURE_REVIEW.md).
+
+## 2026-11-06 update — Top Smoke after timing monitor change
+
+The exact testbench SHA `f9f32f71e7168350d74a75ede0a4a4b222844cc9` passes
+`ai_smoke` on Seed 20261106 with four randomized workloads. The 0x52 GEMV,
+0x53 fused/cross-engine, and Matrix/CNM markers pass; one `TEST PASS`, zero
+simulation errors. This adds compatibility evidence only, not UVM/URG
+coverage. Run ID `V2-TOP-SMOKE-POST-TRANSFORMER-TIMING-F9F32F7-S20261106`;
+record and archived logs are linked from the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
