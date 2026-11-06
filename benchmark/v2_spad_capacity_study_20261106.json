@@ -1,6 +1,6 @@
 {
   "run_id": "V2-SPAD-CAPACITY-STUDY-20261106-9576E53",
-  "status": "PASS_TWO_CNN_WORKLOADS_AT_128K_AND_512K; OTHER_MODEL_CAPACITY_ROWS_STATIC_ONLY",
+  "status": "PASS_CNN_AND_DIGITS_MLP_AT_128K_512K; TRANSFORMER_FIXTURE_SCOPED_PASS_FULL_SMOKE_FAIL; OTHER_STATIC_ROWS_ONLY",
   "source_sha": "9576e539c21fe6312763c4745a90dc032c6457e0",
   "product_rtl_sha": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
   "tiny_npu_reference_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
@@ -341,14 +341,14 @@
       "banks": 4,
       "words_per_bank_32b": 8192,
       "spad_high_water_bytes": 79200,
-      "run_status": "NOT_RUN_STATIC_ONLY",
-      "run_id": "V2-SPAD-TRANSFORMER-STATIC-20261106",
-      "source_sha": "9576e539c21fe6312763c4745a90dc032c6457e0",
+      "run_status": "PASS_SCOPED_FIXTURE_FULL_SMOKE_FAIL_UNRELATED",
+      "run_id": "V2-R2-TRANSFORMER-FIXTURE-128K-S20261106",
+      "source_sha": "97521d47943b57d518bff4741934f29c07954f96",
       "tiny_npu_sha": null,
       "model_sha256": null,
       "samples": null,
-      "golden": "Hand-authored fixture; prior 512 KiB functional run only",
-      "rtl_compute_cycles": null,
+      "golden": "301 Transformer Golden/KV checks passed; enclosing full Top smoke failed 23 unrelated larger-SPAD/protection/engine-pair checks",
+      "rtl_compute_cycles": 11397,
       "host_layout_cycles": null,
       "useful_macs": null,
       "mac_per_compute_cycle": null,
@@ -360,7 +360,9 @@
       "spad_initialization_bytes": null,
       "accuracy": null,
       "capacity_degradation_vs_512k_percent": null,
-      "measurement_boundary": "Tensor high-water 69376 B; descriptor table 65536+86*64 and completion table at 77824+86*16 produce 79200 B; no reduced-SPAD run."
+      "measurement_boundary": "Scoped 86-descriptor fixture within full Top smoke at 128 KiB behavioral SPAD; prefill 5682, one-token decode 5715; not a full-smoke pass",
+      "run_log": "dv/subsystem/top_smoke/sim/ai_transformer.log",
+      "run_log_sha256": "e260ef443ba6cc0e97cd756fc663dc63df8368e11662a6aa565e780387d1fb96"
     },
     {
       "workload": "Tiny Transformer 86-descriptor fixture fixed map",
@@ -389,20 +391,91 @@
       "accuracy": null,
       "capacity_degradation_vs_512k_percent": null,
       "measurement_boundary": "Tensor high-water 69376 B; descriptor table 65536+86*64 and completion table at 77824+86*16 produce 79200 B; no reduced-SPAD run."
+    },
+    {
+      "workload": "Trained Digits INT8 MLP, compact static map, 360 held-out samples",
+      "capacity_kib": 128,
+      "capacity_bytes": 131072,
+      "banks": 4,
+      "words_per_bank_32b": 8192,
+      "spad_high_water_bytes": 93184,
+      "run_status": "PASS",
+      "run_id": "V2-R2-DIGITS-MLP-128K-S20261029",
+      "source_sha": "acfaec281f5414c0e357c1dc7985b79a829c8c30",
+      "tiny_npu_sha": null,
+      "model_sha256": "e0351dbfa9198937fef05b3adcfc0e5a7f705524eaaede0dcb89892cde9e2c3b",
+      "testset_sha256": null,
+      "samples": 360,
+      "correct": 352,
+      "golden": "Independent INT32 Golden PASS; RTL logits CSV byte-identical at both capacities",
+      "rtl_compute_cycles": 34761,
+      "host_layout_cycles": 0,
+      "useful_macs": 1884160,
+      "mac_per_compute_cycle": 54.2033,
+      "pe_utilization_estimate": 0.2117,
+      "spad_read_bytes": null,
+      "spad_write_bytes": null,
+      "host_layout_read_bytes": 0,
+      "host_layout_write_bytes": 0,
+      "spad_initialization_bytes": 56224,
+      "accuracy": 0.9777777777777777,
+      "capacity_degradation_vs_512k_percent": 0.0,
+      "measurement_boundary": "Per-run CMDQ doorbell to CPLQ tail; preload excluded; compact static map, no streaming; fused tile write bytes are reported, full aggregate read/write traffic not instrumented",
+      "rtl_logits_sha256": "7980fb678505ae0590d13c2f590b9523a98bedee7c3037936ccacb9b10360e9c",
+      "run_log": "/tmp/nmaforge_round2_digits_compact_128k/run.log",
+      "run_log_sha256": "10de3aa0a95512dfbd2ae357910a9e3436d8a88c636225927b7a6619baa5ab5b",
+      "fused_native_tile_write_bytes": 23552
+    },
+    {
+      "workload": "Trained Digits INT8 MLP, compact static map, 360 held-out samples",
+      "capacity_kib": 512,
+      "capacity_bytes": 524288,
+      "banks": 4,
+      "words_per_bank_32b": 32768,
+      "spad_high_water_bytes": 93184,
+      "run_status": "PASS",
+      "run_id": "V2-R2-DIGITS-MLP-512K-S20261029",
+      "source_sha": "acfaec281f5414c0e357c1dc7985b79a829c8c30",
+      "tiny_npu_sha": null,
+      "model_sha256": "e0351dbfa9198937fef05b3adcfc0e5a7f705524eaaede0dcb89892cde9e2c3b",
+      "testset_sha256": null,
+      "samples": 360,
+      "correct": 352,
+      "golden": "Independent INT32 Golden PASS; RTL logits CSV byte-identical at both capacities",
+      "rtl_compute_cycles": 34761,
+      "host_layout_cycles": 0,
+      "useful_macs": 1884160,
+      "mac_per_compute_cycle": 54.2033,
+      "pe_utilization_estimate": 0.2117,
+      "spad_read_bytes": null,
+      "spad_write_bytes": null,
+      "host_layout_read_bytes": 0,
+      "host_layout_write_bytes": 0,
+      "spad_initialization_bytes": 56224,
+      "accuracy": 0.9777777777777777,
+      "capacity_degradation_vs_512k_percent": 0.0,
+      "measurement_boundary": "Per-run CMDQ doorbell to CPLQ tail; preload excluded; compact static map, no streaming; fused tile write bytes are reported, full aggregate read/write traffic not instrumented",
+      "rtl_logits_sha256": "7980fb678505ae0590d13c2f590b9523a98bedee7c3037936ccacb9b10360e9c",
+      "run_log": "/tmp/nmaforge_round2_digits_compact_512k/run.log",
+      "run_log_sha256": "69444446e1e164aba1c638e5749c31f8a183f0d22ef00d709735c5a2f91fc316",
+      "fused_native_tile_write_bytes": 23552
     }
   ],
   "conclusion": {
     "tested_128k_models": [
       "trained 10-class Digits CNN",
-      "TinyNPU conv1x_mini ONNX"
+      "TinyNPU conv1x_mini ONNX",
+      "trained Digits INT8 MLP with compact static map"
     ],
     "tested_512k_models": [
       "trained 10-class Digits CNN",
-      "TinyNPU conv1x_mini ONNX"
+      "TinyNPU conv1x_mini ONNX",
+      "trained Digits INT8 MLP with compact static map"
     ],
     "cycle_change_128k_vs_512k": {
       "trained_cnn": 0.0,
-      "conv1x_mini": 0.0
+      "conv1x_mini": 0.0,
+      "trained_digits_mlp_compact_map": 0.0
     },
     "sram_capacity_bits": {
       "512k": 4194304,
@@ -427,13 +500,20 @@
         "128k": true,
         "64k": false,
         "high_water_bytes": 79200,
-        "reduced_capacity_run": "NOT_RUN"
+        "reduced_capacity_run": "128 KiB fixture-scoped PASS (301 checks); enclosing full Top smoke failed 23 unrelated cases"
       },
       "cnn_compact_map": {
         "128k": true,
         "512k": true,
         "max_high_water_bytes": 69888,
         "64k": "does not fit current compact layout"
+      },
+      "compact_digits_mlp": {
+        "128k": true,
+        "512k": true,
+        "64k": false,
+        "high_water_bytes": 93184,
+        "map_type": "compact static placement; no streaming/liveness reuse"
       }
     }
   },
@@ -453,13 +533,17 @@
     ],
     "ten_class_full_128k": "cd dv/subsystem/top_smoke/sim && VCS='/opt/Synopsys/vcs/V-2023.12-SP1/bin/vcs -licwait 10' make ai_trained_cnn_tenclass_dataset_regress AI_TRAINED_CNN_PYTHON=<Python-3.12.13-venv> AI_TRAINED_CNN_RUN=<fresh-run-dir> AI_SPAD_WORDS_PER_BANK=8192 AI_TINYNPU_CNN_SPAD_BASE_SHIFT=65536",
     "ten_class_full_512k": "cd dv/subsystem/top_smoke/sim && VCS='/opt/Synopsys/vcs/V-2023.12-SP1/bin/vcs -licwait 10' make ai_trained_cnn_tenclass_dataset_regress AI_TRAINED_CNN_PYTHON=<Python-3.12.13-venv> AI_TRAINED_CNN_RUN=<fresh-run-dir> AI_SPAD_WORDS_PER_BANK=32768 AI_TINYNPU_CNN_SPAD_BASE_SHIFT=0",
-    "replay_with_checked_in_model": "python benchmark/tinynpu/run_nma_cnn_demo_dataset.py --simv <compiled-simv> --model benchmark/models/nma_tiny_cnn_10class/nma_tiny_cnn_demo_weights.npz --testset benchmark/models/nma_tiny_cnn_10class/nma_tiny_cnn_demo_testset.npz --candidate-sha 9576e539c21fe6312763c4745a90dc032c6457e0 --spad-base-shift 65536 --out-dir <run-dir>"
+    "replay_with_checked_in_model": "python benchmark/tinynpu/run_nma_cnn_demo_dataset.py --simv <compiled-simv> --model benchmark/models/nma_tiny_cnn_10class/nma_tiny_cnn_demo_weights.npz --testset benchmark/models/nma_tiny_cnn_10class/nma_tiny_cnn_demo_testset.npz --candidate-sha 9576e539c21fe6312763c4745a90dc032c6457e0 --spad-base-shift 65536 --out-dir <run-dir>",
+    "digits_mlp_compact_128k": "cd dv/subsystem/top_smoke/sim && VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH make ai_digits_inference AI_DIGITS_MODEL=<digits_mlp_int8.npz> AI_DIGITS_COMPACT_SPAD=1 AI_SPAD_WORDS_PER_BANK=8192 AI_DIGITS_PYTHON=<Python-3.12.13-venv> AI_DIGITS_RUN=<fresh-run-dir>",
+    "digits_mlp_compact_512k": "same command with AI_SPAD_WORDS_PER_BANK=32768"
   },
   "limitations": [
-    "Only the two listed CNN workloads have both 128 KiB and 512 KiB RTL runs.",
-    "Digits MLP, Transformer fixture, 256 KiB and 64 KiB are static-only/not run.",
+    "Digits MLP legacy address map still does not fit reduced capacities; the compact static map has 128 KiB and 512 KiB RTL runs.",
+    "Transformer fixture has a scoped 128 KiB run; the enclosing full Top smoke failed 23 unrelated checks. It is not trained-model inference.",
+    "No greater-than-128 KiB live-set workload or streaming/DMA-cost run was performed.",
+    "Only the listed CNN and compact MLP workloads have paired 128 KiB / 512 KiB functional runs.",
     "No DC PPA, SRAM macro area, bank timing, or power result.",
-    "TinyNPU golden was generated by its pinned ONNX compiler; TinyNPU Verilator graph runtime was not rerun in this capacity study."
+    "TinyNPU mini-CNN graph runtime was not rerun at the same source SHA; no cross-system speedup claim."
   ],
   "transformer_demo": {
     "status": "PARTIAL_NOT_TRAINED_MODEL",
@@ -470,10 +554,18 @@
     "prefill_cycles": 5682,
     "one_token_decode_cycles": 5715,
     "trained_weights": "NOT_RUN",
-    "tiny_npu_comparison": "NOT_RUN"
+    "tiny_npu_comparison": "NOT_RUN",
+    "128k_fixture_replay": {
+      "run_id": "V2-R2-TRANSFORMER-FIXTURE-128K-S20261106",
+      "source_sha": "97521d47943b57d518bff4741934f29c07954f96",
+      "fixture_checks": 301,
+      "fixture_status": "PASS_SCOPED",
+      "enclosing_full_smoke": "FAIL, 23 unrelated checks",
+      "run_log_sha256": "e260ef443ba6cc0e97cd756fc663dc63df8368e11662a6aa565e780387d1fb96"
+    }
   },
   "artifacts_sha256": {
-    "benchmark/v2_spad_capacity_study_20261106.csv": "7ed693eda5948e89f7dbf7ce6daeedfd8e256069ee4f13830d59d05a0c45508f",
+    "benchmark/v2_spad_capacity_study_20261106.csv": "7aa02e855969a814de6756a881b0fb663a65165a8c2802610cb0a6649ab88cf0",
     "benchmark/v2_trained_cnn_tenclass_top_128k_9576e53.csv": "0c98b36a6699a11e1a47c32bd7d869a227e2a32da93e69145f29646ca93aa4bb",
     "benchmark/v2_trained_cnn_tenclass_top_512k_9576e53.csv": "271d9539845cf5e2a5b076415455bd3a2b0361414b9566e834a2e08c8c936d4a",
     "benchmark/models/nma_tiny_cnn_10class/nma_tiny_cnn_demo_weights.npz": "ef0e616d09ca0be7956fa8ca900e40c62973f8f06e3ec96af09d888eead73726",

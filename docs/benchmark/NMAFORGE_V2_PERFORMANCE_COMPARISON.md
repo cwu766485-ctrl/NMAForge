@@ -1272,3 +1272,38 @@ python3.12 tools/merge_gemv_four_way_ablation.py \
 The Matrix-core experiment is isolated from the TinyNPU and full-CMDQ
 measurement boundaries. The existing same-workload TinyNPU comparison and a
 Top-level all-engine performance decomposition remain open.
+
+## Research closure round 2 addendum — model-level boundaries
+
+The bounded 128/512 KiB Digits MLP rerun is on test/source commit
+`acfaec281f5414c0e357c1dc7985b79a829c8c30`; product RTL is unchanged. Both
+compact-map runs use VCS `V-2023.12-SP1_Full64`, seed `20261029`, four-bank
+behavioral SPAD and 16×16/256-MAC Matrix. They produce 34,761 doorbell-to-CPLQ
+cycles, 23,552 fused native tile-write bytes, 1,884,160 useful MACs, 54.2033
+MAC/cycle, and 21.17% derived array utilization. Output CSV SHA-256 is
+`7980fb678505ae0590d13c2f590b9523a98bedee7c3037936ccacb9b10360e9c` for both
+capacities; independent integer Golden recheck passes all 360 samples at
+97.78% classification accuracy. The compact map high-water is 93,184 B.
+
+The existing trained Digits MLP legacy/fused comparison remains model-level
+evidence for Innovation 2: 110,155 versus 34,761 doorbell-to-completion cycles
+(68.44% lower in the fused run), exact logits and matching 352/360 accuracy.
+The runs have different layout-counter definitions, so their layout-byte
+fields are not compared. The 48-point Cache×Prefetch GEMV ablation remains
+controlled fixed-shape evidence for Innovation 1; a trained/model-level GEMV
+ablation is **NOT_RUN**.
+
+The mini CNN's 1,080 Host Layout cycles are 180 AXI-Lite transfers at six
+cycles each: each of 36 convolution feature groups is read once and written
+four times to form the flattened FC operand (144 B read, 576 B write). The
+current consumer needs a flat K=144 vector, whereas `0x53` writes native
+Matrix-A tile layout. Direct forwarding does not preserve that tensor shape;
+the same CNN Legacy/Fused comparison is therefore **NOT_RUN** and no speedup
+is claimed. Existing mini-CNN cycle values (NMAForge 1,985 compute + 1,080
+host layout; TinyNPU 4,781 graph cycles) have different boundaries and remain
+unratioed.
+
+The 128 KiB MLP/Transformer records and fixture limitations are listed in the
+[round-2 matrix](../../benchmark/v2_round2_research_closure_20261106.json).
+No capacity result establishes streamed execution for a >128 KiB live set;
+no current checked-in workload with such a live set was identified.

@@ -1,0 +1,196 @@
+{
+  "round": "NMAForge v2 Research Closure Round 2",
+  "status": "RESEARCH_BASELINE_PARTIAL",
+  "baseline": {
+    "repository": "cwu766485-ctrl/NMAForge",
+    "branch_target": "feature/npu-architecture-v2",
+    "remote_head_at_review": "97521d47943b57d518bff4741934f29c07954f96",
+    "product_rtl_sha": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+    "code_commit": "acfaec281f5414c0e357c1dc7985b79a829c8c30",
+    "code_tree_sha": "3acc18782e76829e6195ec04b855d9d489e8f5c5",
+    "tiny_npu_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+    "main_r250_sha": "3041355528dffe856e2d5384027c6ee5df5d1b42"
+  },
+  "tool_versions": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "python": "3.12.13",
+    "numpy": "2.4.6",
+    "scikit_learn": "1.9.1",
+    "vcs_execution_compatibility": "VCS_ARCH_OVERRIDE=linux; VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias"
+  },
+  "runs": [
+    {
+      "run_id": "V2-R2-DIGITS-MLP-128K-S20261029",
+      "task": "trained Digits INT8 MLP on compact static address map",
+      "source_sha": "acfaec281f5414c0e357c1dc7985b79a829c8c30",
+      "seed": 20261029,
+      "capacity_kib": 128,
+      "address_profile": "compact; all inputs, weights, intermediates, outputs, descriptors and completions stay resident; no streaming",
+      "spad_high_water_bytes": 93184,
+      "samples": 360,
+      "correct": 352,
+      "accuracy": 0.9777777777777777,
+      "descriptor_count": 46,
+      "cmdq_doorbell_to_cplq_cycles": 34761,
+      "fused_matrix_cycles": 26444,
+      "useful_macs": 1884160,
+      "mac_per_cycle": 54.2033,
+      "derived_array_utilization_percent": 21.17,
+      "fused_native_tile_write_bytes": 23552,
+      "spad_initialization_bytes": 56224,
+      "independent_integer_golden": "PASS",
+      "model_sha256": "e0351dbfa9198937fef05b3adcfc0e5a7f705524eaaede0dcb89892cde9e2c3b",
+      "golden_logits_sha256": "8a9606b5c31ff4f203731726f89d7caf5f73b59d0cbddf0945a1ac454d855afc",
+      "rtl_logits_csv_sha256": "7980fb678505ae0590d13c2f590b9523a98bedee7c3037936ccacb9b10360e9c",
+      "run_log": "/tmp/nmaforge_round2_digits_compact_128k/run.log",
+      "run_log_sha256": "10de3aa0a95512dfbd2ae357910a9e3436d8a88c636225927b7a6619baa5ab5b",
+      "command": "cd dv/subsystem/top_smoke/sim && VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH make ai_digits_inference AI_DIGITS_MODEL=/tmp/nmaforge-research-round2-97521/benchmark/digits/artifacts/digits_mlp_int8.npz AI_DIGITS_COMPACT_SPAD=1 AI_SPAD_WORDS_PER_BANK=8192 AI_DIGITS_PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python AI_DIGITS_RUN=/tmp/nmaforge_round2_digits_compact_128k"
+    },
+    {
+      "run_id": "V2-R2-DIGITS-MLP-512K-S20261029",
+      "task": "same trained Digits INT8 MLP and compact map at baseline capacity",
+      "source_sha": "acfaec281f5414c0e357c1dc7985b79a829c8c30",
+      "seed": 20261029,
+      "capacity_kib": 512,
+      "address_profile": "same compact static map; all tensors remain resident; no streaming",
+      "spad_high_water_bytes": 93184,
+      "samples": 360,
+      "correct": 352,
+      "accuracy": 0.9777777777777777,
+      "descriptor_count": 46,
+      "cmdq_doorbell_to_cplq_cycles": 34761,
+      "fused_matrix_cycles": 26444,
+      "useful_macs": 1884160,
+      "mac_per_cycle": 54.2033,
+      "derived_array_utilization_percent": 21.17,
+      "fused_native_tile_write_bytes": 23552,
+      "spad_initialization_bytes": 56224,
+      "independent_integer_golden": "PASS",
+      "model_sha256": "e0351dbfa9198937fef05b3adcfc0e5a7f705524eaaede0dcb89892cde9e2c3b",
+      "golden_logits_sha256": "8a9606b5c31ff4f203731726f89d7caf5f73b59d0cbddf0945a1ac454d855afc",
+      "rtl_logits_csv_sha256": "7980fb678505ae0590d13c2f590b9523a98bedee7c3037936ccacb9b10360e9c",
+      "run_log": "/tmp/nmaforge_round2_digits_compact_512k/run.log",
+      "run_log_sha256": "69444446e1e164aba1c638e5749c31f8a183f0d22ef00d709735c5a2f91fc316",
+      "command": "cd dv/subsystem/top_smoke/sim && VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH make ai_digits_inference AI_DIGITS_MODEL=/tmp/nmaforge-research-round2-97521/benchmark/digits/artifacts/digits_mlp_int8.npz AI_DIGITS_COMPACT_SPAD=1 AI_SPAD_WORDS_PER_BANK=32768 AI_DIGITS_PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python AI_DIGITS_RUN=/tmp/nmaforge_round2_digits_compact_512k"
+    },
+    {
+      "run_id": "V2-R2-TRANSFORMER-FIXTURE-128K-S20261106",
+      "task": "existing 86-descriptor deterministic fixture, scoped 128 KiB replay",
+      "source_sha": "97521d47943b57d518bff4741934f29c07954f96",
+      "seed": 20261110,
+      "capacity_kib": 128,
+      "transformer_fixture_checks": 301,
+      "prefill_tokens": 4,
+      "prefill_cycles": 5682,
+      "decode_tokens": 1,
+      "decode_cycles": 5715,
+      "total_cycles": 11397,
+      "fixture_golden_kv": "PASS_SCOPED",
+      "enclosing_full_smoke": "FAIL; 23 unrelated checks involving 512 KiB boundary, protection and engine-pair cases",
+      "weights": "deterministic hand-authored fixture values; not trained",
+      "trained_transformer_status": "NOT_RUN_BLOCKED_MODEL_PIPELINE",
+      "run_log": "dv/subsystem/top_smoke/sim/ai_transformer.log",
+      "run_log_sha256": "e260ef443ba6cc0e97cd756fc663dc63df8368e11662a6aa565e780387d1fb96",
+      "command": "cd dv/subsystem/top_smoke/sim && VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH make ai_transformer AI_SPAD_WORDS_PER_BANK=8192 AI_RANDOM_CASES=0 AI_SEED=20261110 SEED=20261110 PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python"
+    }
+  ],
+  "capacity_theory": {
+    "four_bank_32bit_storage_bits": {
+      "512_KiB": 4194304,
+      "256_KiB": 2097152,
+      "128_KiB": 1048576,
+      "64_KiB": 524288
+    },
+    "nominal_4Kx32_16KiB_macro_count": {
+      "512_KiB": 32,
+      "256_KiB": 16,
+      "128_KiB": 8,
+      "64_KiB": 4
+    },
+    "area_ppa_power": "NOT_RUN_BLOCKED_ENV; counts are arithmetic only, no SRAM macro/Liberty/SDC used",
+    "larger_than_128k_live_set_streaming": "NOT_RUN; no suitable checked-in model identified in this bounded round"
+  },
+  "cnn_layout_analysis": {
+    "workload": "conv1x_mini.onnx",
+    "consumer_shape": "flatten 36 spatial groups x 4 channels into one FC row with K=144; descriptor is padded M=4 and only row0 is data-bearing",
+    "host_layout_transfers": "36 groups x (1 AXI-Lite read + 4 writes) = 180 transfers",
+    "host_layout_cycles": 1080,
+    "transfer_cycles": 6,
+    "host_layout_read_bytes": 144,
+    "host_layout_write_bytes": 576,
+    "opcode_0x53_layout": "native Matrix-A [row_group][k_group][row_lane], not the flattened consumer vector",
+    "cnn_legacy_vs_fused": "NOT_RUN_INCOMPATIBLE_LAYOUT; no mapper-only rewrite found that preserves the current input tensor and Golden"
+  },
+  "tiny_npu_comparison": {
+    "reference_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+    "fixed_existing_matrix": "3 GEMM + 4 GEMV rows retained in docs/benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md and benchmark/v2_tinynpu_{gemm,gemv}_current_20261106.{csv,json}",
+    "boundary": "NMAForge cycles are controller/Top RTL; TinyNPU values are direct array; separate common-memory endpoint is estimated, not measured TinyNPU memory RTL",
+    "system_speedup_claim": "NONE",
+    "same_cnn_workload": "Golden-matched conv1x_mini; NMAForge compute 1985 + host layout 1080 cycles versus historical TinyNPU graph 4781 cycles; timing endpoints differ, do not calculate ratio",
+    "innovation_1_model_level": "NOT_RUN; fixed-shape 48-point Cache x Prefetch GEMV ablation remains the evidence",
+    "innovation_2_model_level": "trained Digits MLP legacy/fused evidence retained: 110155 vs 34761 cycles, same exact logits and 352/360 classification; counters have differing layout semantics"
+  },
+  "open_issues": [
+    "Trained Transformer checkpoint and trainable/loadable model path absent; fixed fixture is not trained-model inference.",
+    "No checked-in >128 KiB live-set workload or DMA streaming result; capacity conclusion is compact mapping only.",
+    "128 KiB Transformer enclosing all-feature smoke has 23 unrelated failures; only its 301 fixture checks/timing pass.",
+    "Mini-CNN's flattened FC input is not directly supplied by current 0x53 native tile-A layout; no CNN fused-cycle comparison.",
+    "TinyNPU CNN/model system-level cycle boundaries are not aligned; no speedup ratio.",
+    "No ASIC PPA, macro area, timing or power; v2 remains research partial and not sign-off/tapeout ready."
+  ],
+  "reproduction_artifact": "benchmark/v2_round2_capacity_mlp_20261106.csv",
+  "log_evidence_external_to_git": true,
+  "terminal_status": "RESEARCH_BASELINE_PARTIAL; bounded round complete, stop here",
+  "independent_golden_recheck": {
+    "status": "PASS",
+    "command": "/tmp/nmaforge_arch_v2_py312/bin/python benchmark/digits/digits_quantized_golden.py --model benchmark/digits/artifacts/digits_mlp_int8.npz --rtl-logits /tmp/nmaforge_round2_digits_compact_128k/rtl_logits.csv --out /tmp/nmaforge_round2_digits_compact_128k/golden_recheck.json",
+    "result_file": "/tmp/nmaforge_round2_digits_compact_128k/golden_recheck.json",
+    "result_file_sha256": "bb77030c1c2906ed52a6d9b48f925cbfabfa580538fe7b49ce6f4d997c7e06d6",
+    "samples": 360,
+    "correct": 352,
+    "accuracy": 0.9777777777777777,
+    "integer_golden_logits_sha256": "8a9606b5c31ff4f203731726f89d7caf5f73b59d0cbddf0945a1ac454d855afc"
+  },
+  "evidence_archive": {
+    "path": "/tmp/nmaforge_v2_research_closure_round2_evidence_20261106.tar.gz",
+    "sha256": "4afb293d007ab3396ec9b5b0c22b7553d1d142363e72624cc87c62fb7b99c1b1",
+    "contents": [
+      "128 KiB and 512 KiB Digits MLP run.log, rtl_logits.csv, digits_workload.json",
+      "independent Digits Golden recheck JSON",
+      "128 KiB Transformer Top smoke log"
+    ],
+    "excludes": [
+      "simulator binaries",
+      "waveforms",
+      "compiled databases",
+      "coverage databases"
+    ]
+  },
+  "transformer_compatibility_audit": {
+    "fixture_manifest": "sw/workloads/transformer_micro/manifest.json",
+    "mapper": "sw/tools/cimforge_mapper.py",
+    "fixture_shape": {
+      "layers": 1,
+      "hidden": 4,
+      "attention_heads": 1,
+      "prefill_tokens": 4,
+      "decode_tokens": 1,
+      "descriptor_count": 86
+    },
+    "mapped_operation_classes": [
+      "Q/K/V projection and packing",
+      "KV-cache reads/writes",
+      "QK transpose",
+      "causal softmax",
+      "attention-value projection and packing",
+      "output projection",
+      "residual",
+      "layer normalization",
+      "FFN up/GELU/down",
+      "decode KV update"
+    ],
+    "weight_provenance": "hand-authored deterministic non-identity INT8 test weights; not pretrained",
+    "mapper_weight_support": "fixture weights are hardcoded; no external trained checkpoint/import path found",
+    "conclusion": "No new hardware operation was identified as necessary for this fixture-sized graph, but a trained model requires a training/export and loadable-weight pipeline; NOT_RUN"
+  }
+}

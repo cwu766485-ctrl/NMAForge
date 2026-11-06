@@ -615,3 +615,47 @@ while the 86-descriptor Transformer fixture uses deterministic test weights
 and is not evidence of trained-model inference. A TinyNPU same-task comparison
 and the full host/DMA/compute/writeback timing split remain open. No model
 result is recast as current-candidate performance or as v2 DV/ASIC sign-off.
+
+## Research closure round 2 — compact MLP and bounded Transformer replay
+
+The only code change in this round is test/workload plumbing at commit
+`acfaec281f5414c0e357c1dc7985b79a829c8c30`; product RTL remains at
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
+
+| Model/run | SPAD | RTL cycles | Host layout | Golden / accuracy | Run ID |
+|---|---:|---:|---:|---|---|
+| Trained Digits INT8 MLP, 360 held-out samples | 128 KiB | 34,761 | N/A between layers; preload excluded | Independent integer Golden, exact logits; 352/360 (97.78%) | `V2-R2-DIGITS-MLP-128K-S20261029` |
+| Same Digits MLP and compact map | 512 KiB | 34,761 | N/A between layers; preload excluded | Same byte-identical logits; 352/360 (97.78%) | `V2-R2-DIGITS-MLP-512K-S20261029` |
+| Existing 86-descriptor Transformer fixture | 128 KiB | 11,397 (5,682 prefill + 5,715 one-token decode) | Fixture-defined | 301 Transformer Golden/KV checks pass; weights deterministic hand-authored, not trained | `V2-R2-TRANSFORMER-FIXTURE-128K-S20261106` |
+
+The MLP model SHA is `e0351dbfa9198937fef05b3adcfc0e5a7f705524eaaede0dcb89892cde9e2c3b`;
+the integer-Golden logits SHA and both RTL output CSV SHAs are
+`8a9606b5c31ff4f203731726f89d7caf5f73b59d0cbddf0945a1ac454d855afc` and
+`7980fb678505ae0590d13c2f590b9523a98bedee7c3037936ccacb9b10360e9c`,
+respectively. Both capacity runs use the same 93,184-byte compact static map,
+46 descriptors, 1,884,160 useful MACs, 54.2033 MAC/cycle, and 21.17% derived
+array utilization. This is a placement-only fit result, not streaming or a
+physical-SRAM timing result.
+
+Transformer fixture timing is scoped evidence only. The enclosing full Top
+smoke ended `TEST FAIL errors=23` because existing non-Transformer checks
+probe the 512 KiB boundary and depend on larger-SPAD/all-engine behavior;
+the fixture's 301 own Golden/KV checks and timing completed. No trained
+Transformer checkpoint or training pipeline is present in the repository,
+and the current mapper hardcodes deterministic fixture weights. Therefore a
+trained-weight Transformer is **NOT_RUN / BLOCKED_MODEL_PIPELINE**; the fixed
+fixture must not be described as trained inference.
+
+The fixture compatibility audit finds a bounded one-layer path at hidden size
+4, one head, four-token prefill and one-token decode. Its descriptor chain
+exercises Q/K/V projection and packing, KV writes/reads, QK transpose, causal
+softmax, attention-value projection, output projection, residuals, layer norm,
+FFN up/GELU/down, and decode KV-cache update. These operator classes already
+exist in the mapped fixture; the gap for this task is trained checkpoint,
+training/export and external weight-loading support, not proof that a new
+hardware engine is required. This shape-limited compatibility result does not
+establish a useful language model or general Transformer compiler.
+
+Machine-readable per-run details, exact commands, tool versions and log hashes
+are in the [round-2 record](../../benchmark/v2_round2_research_closure_20261106.json)
+and [capacity CSV](../../benchmark/v2_round2_capacity_mlp_20261106.csv).
