@@ -28,6 +28,10 @@ def main():
     parser.add_argument("--out-dir", required=True, type=Path)
     parser.add_argument("--seed", type=int, default=20261029)
     parser.add_argument("--spad-base-shift", type=lambda value: int(value, 0), default=0)
+    parser.add_argument(
+        "--linearized", action="store_true",
+        help="use the optional 0x53 aux0[7] linear-row writeback path",
+    )
     args = parser.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
     logs_dir = args.out_dir / "logs"
@@ -78,6 +82,8 @@ def main():
             "+AI_TINYNPU_CNN_MEMORY=" + str(memory_path.resolve()),
             "+AI_TINYNPU_CNN_EXPECTED=" + str(expected_path.resolve()),
         ]
+        if args.linearized:
+            command.append("+AI_TINYNPU_CNN_LINEARIZED")
         with log_path.open("w", encoding="utf-8") as console:
             result = subprocess.run(command, cwd=args.out_dir, stdout=console,
                                     stderr=subprocess.STDOUT, check=False)
@@ -117,7 +123,10 @@ def main():
         writer.writerows(rows)
     correct_count = sum(row["correct"] for row in rows)
     summary = {
-        "run_id": "V2-TRAINED-CNN-TOP-DATASET-%s" % args.candidate_sha[:7].upper(),
+        "run_id": "V2-TRAINED-CNN-TOP-DATASET-%s-%s" % (
+            args.candidate_sha[:7].upper(),
+            "LINEARIZED" if args.linearized else "LEGACY_LAYOUT",
+        ),
         "candidate_sha": args.candidate_sha,
         "model_sha256": sha256(args.model),
         "testset_sha256": sha256(args.testset),
@@ -125,6 +134,8 @@ def main():
         "class_labels": list(range(num_classes)),
         "architecture": "4 shared 3x3 INT8 conv filters + INT8 linear head, output groups of four",
         "spad_base_shift_bytes": args.spad_base_shift,
+        "linearized_output_layout": args.linearized,
+        "rtl_mode": "0x53-linear-row" if args.linearized else "legacy-host-layout",
         "samples": len(rows),
         "top_runs_passed": len(rows),
         "all_intermediate_goldens_exact": True,

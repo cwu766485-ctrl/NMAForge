@@ -84,14 +84,15 @@ in the Phase 0 baseline report.
    Its first supported shape subset is narrower than the target contract
    below. Decoder, validator, dispatcher, software header, and tests must
    agree on every supported and rejected field.
-5. Opcode `0x53` is reserved for fused GEMM → INT8 Matrix-A-layout writeback.
-   It uses the existing GEMM fields for INT32 post-processing, `aux0[4:0]`
-   for the subsequent SFU-compatible requant shift, `aux0[5]` to capture the
-   completed output tile, and `aux0[6]` to consume a matching prior tile as A.
-   `aux0[31:7]` must be zero. The capture/consume bits are v2-only and leave
-   legacy opcodes `0x30/0x31` unchanged. Opcode `0x53` writes packed signed
-   INT8 values and is therefore not compatible with the legacy INT32 GEMM
-   output contract. Older hardware rejects `0x53` as unsupported.
+5. Opcode `0x53` is reserved for fused GEMM → INT8 output. It uses the
+   existing GEMM fields for INT32 post-processing and `aux0[4:0]` for the
+   subsequent SFU-compatible requant shift. `aux0[5]` captures a completed
+   output tile, `aux0[6]` consumes a matching prior tile as A, and the v2-only
+   `aux0[7]` selects the bounded linear-row output layout described below.
+   `aux0[31:8]` must be zero. These v2 modes leave legacy opcodes `0x30/0x31`
+   unchanged. Opcode `0x53` writes packed signed INT8 values and is therefore
+   not compatible with the legacy INT32 GEMM output contract. Older hardware
+   rejects `0x53` as unsupported.
 6. Existing opcode behavior is the compatibility default. Fused requant is
    enabled only by the explicit v2 opcode `0x53`; do not silently fuse the
    legacy `0x30/0x31` result path.
@@ -216,6 +217,25 @@ existing write transaction and prevents capture from getting ahead of SPAD
 acceptance.
 Abort/error and reset invalidate the local tag; reset starts a new local
 validity epoch.
+
+### 3.2 Bounded linear-row output layout
+
+`0x53 aux0[7]` optionally writes one 128-bit SPAD line per output row for
+small producer-to-GEMM handoffs. The low 32 bits contain the row's four
+requantized INT8 columns; the upper 96 bits are zero. The accepted contract is
+`M` in 4..64 and divisible by four, `N=4`, one instance, no transpose, no
+forwarding capture/consume bits, a 16-byte aligned destination, and zero
+destination batch stride. The producer still uses the shared Matrix array,
+normal SPAD arbiter, and the `0x53` post-process/requant equations. This layout
+is not a general tensor reshape engine and is not coherent with other engines.
+
+This mode is useful when the next GEMM consumes one four-byte feature vector
+per 16-byte K line with three padded row words. It trades compact output
+storage for direct consumer-ready addressing. Software must allocate the full
+`M*16` byte destination and keep the legacy `aux0[7]=0` layout for all existing
+descriptors. The mode is intended for measured producer/consumer chains such
+as the four-channel CNN handoff; it does not change the output layout of any
+existing `0x53` command.
 
 This is a bounded, explicitly ordered Matrix-to-Matrix handoff, not a coherent
 SPAD cache. Software must keep the tagged source tile immutable between the

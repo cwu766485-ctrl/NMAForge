@@ -163,12 +163,22 @@ class Descriptor:
 
 
 def validate_fused_tile_fields(descriptor: Descriptor) -> None:
-    """Validate the ABI-v7 opt-in forwarding bits for opcode 0x53."""
+    """Validate the ABI-v7 opt-in layout and forwarding bits for opcode 0x53."""
     capture = bool(descriptor.aux0 & (1 << 5))
     consume = bool(descriptor.aux0 & (1 << 6))
-    if descriptor.aux0 & ~0x7F:
+    linearized = bool(descriptor.aux0 & (1 << 7))
+    if descriptor.aux0 & ~0xFF:
         raise ValueError(
-            f"{descriptor.name}: fused Matrix aux0 must fit seven bits"
+            f"{descriptor.name}: fused Matrix aux0 must fit eight bits"
+        )
+    if linearized and (
+        capture or consume or descriptor.n != 4 or descriptor.m > 64
+        or descriptor.m % 4 or descriptor.dst_stride != 0
+        or (descriptor.flags & (FLAG_TRANSPOSE_A | FLAG_TRANSPOSE_B))
+    ):
+        raise ValueError(
+            f"{descriptor.name}: linear row layout requires M=4..64, N=4, "
+            "one dense instance and no transpose/forwarding flags"
         )
     if descriptor.dst & 0xF or descriptor.dst_stride & 0xF:
         raise ValueError(
@@ -244,17 +254,44 @@ def causal_softmax_q15(scores: list[int], query_token: int) -> list[int]:
     return visible + [0] * (len(scores) - len(visible))
 
 
-def build_workload() -> tuple[Mapper, dict[str, list]]:
+def build_workload(
+    model: dict | None = None,
+) -> tuple[Mapper, dict[str, list]]:
     mapper = Mapper()
-    x = [
-        [1, 2, 0, -1],
-        [0, 1, 2, 1],
-        [2, 0, 1, 1],
-        [1, -1, 0, 2],
-    ]
-    wq, wk, wv = MODEL_WEIGHTS["wq"], MODEL_WEIGHTS["wk"], MODEL_WEIGHTS["wv"]
+    if model is None:
+        x = [
+            [1, 2, 0, -1],
+            [0, 1, 2, 1],
+            [2, 0, 1, 1],
+            [1, -1, 0, 2],
+        ]
+        decode_token = [1, -1, 2, 0]
+        model_weights = MODEL_WEIGHTS
+    else:
+        tokens = model.get("prefill_tokens")
+        decode_id = model.get("decode_token")
+        model_weights = model.get("weights")
+        if not isinstance(tokens, list) or len(tokens) != 4 or any(
+            not isinstance(token, int) or token not in range(4)
+            for token in tokens
+        ):
+            raise ValueError("trained model prefill_tokens must be four IDs in [0, 3]")
+        if not isinstance(decode_id, int) or decode_id not in range(4):
+            raise ValueError("trained model decode_token must be an ID in [0, 3]")
+        required = {"wq", "wk", "wv", "wo", "wup", "wdown"}
+        if not isinstance(model_weights, dict) or set(model_weights) != required:
+            raise ValueError("trained model must provide exactly six INT8 matrices")
+        for name, matrix in model_weights.items():
+            if (not isinstance(matrix, list) or len(matrix) != 4 or
+                any(not isinstance(row, list) or len(row) != 4 for row in matrix) or
+                any(not isinstance(value, int) or not -128 <= value <= 127
+                    for row in matrix for value in row)):
+                raise ValueError(f"trained model {name} must be a 4x4 INT8 matrix")
+        x = [[int(token == lane) for lane in range(4)] for token in tokens]
+        decode_token = [int(decode_id == lane) for lane in range(4)]
+    wq, wk, wv = model_weights["wq"], model_weights["wk"], model_weights["wv"]
     wo, w_up, w_down = (
-        MODEL_WEIGHTS["wo"], MODEL_WEIGHTS["wup"], MODEL_WEIGHTS["wdown"]
+        model_weights["wo"], model_weights["wup"], model_weights["wdown"]
     )
     gamma = [32768] * 4
     beta = [0] * 4
@@ -358,7 +395,6 @@ def build_workload() -> tuple[Mapper, dict[str, list]]:
                 dst_offset=row * width * 4,
             )
 
-    decode_token = [1, -1, 2, 0]
     decode_rows = [decode_token, [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
     decode_i8 = mapper.tensor(
         "decode_x_i8", (4, 4), "i8_packed", "row-major", pack_rows(decode_rows)
@@ -582,7 +618,22 @@ def build_workload() -> tuple[Mapper, dict[str, list]]:
         "value_prefill_readback_words": [pack_i8(row) for row in v_i8],
         "key_decode_readback_words": [pack_i8(row) for row in decode_key_window],
         "value_decode_readback_words": [pack_i8(row) for row in decode_value_window],
+        "weights": model_weights,
     }
+    if model is not None:
+        labels = [(token + 1) % 4 for token in model["prefill_tokens"]]
+        predicted = [max(range(4), key=row.__getitem__) for row in norm_2]
+        decode_label = (model["decode_token"] + 1) % 4
+        decode_prediction = max(range(4), key=decode_norm_2[0].__getitem__)
+        expected["task_metrics"] = {
+            "prefill_labels": labels,
+            "prefill_predictions": predicted,
+            "prefill_correct": sum(a == b for a, b in zip(labels, predicted)),
+            "prefill_count": len(labels),
+            "decode_label": decode_label,
+            "decode_prediction": decode_prediction,
+            "decode_correct": int(decode_label == decode_prediction),
+        }
     return mapper, expected
 
 
@@ -789,7 +840,10 @@ def write_svh(path: Path, mapper: Mapper, expected: dict[str, list]) -> None:
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def write_manifest(path: Path, mapper: Mapper, expected: dict[str, list]) -> None:
+def write_manifest(
+    path: Path, mapper: Mapper, expected: dict[str, list],
+    model: dict | None = None, model_sha256: str | None = None,
+) -> None:
     descriptor_base = align(mapper.next_addr, 0x1000)
     manifest = {
         "name": "transformer_micro_4x4_prefill_decode",
@@ -801,9 +855,13 @@ def write_manifest(path: Path, mapper: Mapper, expected: dict[str, list]) -> Non
         "attention_heads": 1,
         "prefill_descriptor_count": expected["prefill_descriptor_count"],
         "decode_descriptor_count": len(mapper.descriptors) - expected["prefill_descriptor_count"],
-        "weight_provenance": "hand-authored deterministic non-identity INT8 test weights; not pretrained",
+        "weight_provenance": (
+            model.get("weight_provenance", "trained integer toy next-token model")
+            if model is not None else
+            "hand-authored deterministic non-identity INT8 test weights; not pretrained"
+        ),
         "weights": {
-            **MODEL_WEIGHTS,
+            **expected["weights"],
         },
         "descriptor_base": descriptor_base,
         "descriptor_count": len(mapper.descriptors),
@@ -827,13 +885,28 @@ def write_manifest(path: Path, mapper: Mapper, expected: dict[str, list]) -> Non
             "key_decode_readback_words": expected["key_decode_readback_words"],
             "value_decode_readback_words": expected["value_decode_readback_words"],
         },
-        "limitations": [
+        "limitations": ([
+            "One attention head, hidden size 4, four-token prefill and one-token decode keep RTL runtime bounded.",
+            "The task is a synthetic four-token cyclic next-token benchmark, not a pretrained language model.",
+            "Task accuracy is scored from the final INT32 tensor after Top CMDQ execution; no host operation supplies hidden activations.",
+            "Softmax Q0.15 probabilities are requantized to INT8 before attention-value GEMM.",
+        ] if model is not None else [
             "One attention head, hidden size 4, four-token prefill and one-token decode keep RTL runtime bounded.",
             "The fixed non-identity INT8 weights are deterministic fixtures, not pretrained model weights.",
             "Softmax Q0.15 probabilities are requantized to INT8 before attention-value GEMM.",
             "The workload validates accelerator composition and KV address/data flow, not model accuracy.",
-        ],
+        ]),
     }
+    if model is not None:
+        manifest.update({
+            "model_name": model.get("model_name"),
+            "model_sha256": model_sha256,
+            "training": model.get("training"),
+            "task": model.get("task"),
+            "prefill_tokens": model.get("prefill_tokens"),
+            "decode_token": model.get("decode_token"),
+            "task_metrics_from_independent_golden": expected.get("task_metrics"),
+        })
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
@@ -849,14 +922,25 @@ def main() -> None:
         "--manifest", type=Path,
         default=REPO_ROOT / "sw" / "workloads" / "transformer_micro" / "manifest.json",
     )
+    parser.add_argument(
+        "--model-json", type=Path,
+        help="load trained INT8 weights and the model's fixed prefill/decode case",
+    )
     args = parser.parse_args()
-    mapper, expected = build_workload()
+    model = json.loads(args.model_json.read_text(encoding="utf-8")) if args.model_json else None
+    model_sha256 = None
+    if args.model_json:
+        import hashlib
+        model_sha256 = hashlib.sha256(args.model_json.read_bytes()).hexdigest()
+    mapper, expected = build_workload(model)
     write_svh(args.svh, mapper, expected)
-    write_manifest(args.manifest, mapper, expected)
+    write_manifest(args.manifest, mapper, expected, model, model_sha256)
     print(
         f"TRANSFORMER_MAPPER_PASS descriptors={len(mapper.descriptors)} "
         f"tensors={len(mapper.tensors)} dataflow=closed poison=enabled "
         f"prefill={expected['prefill_final']} decode={expected['decode_final']}"
+        + (f" task_metrics={expected['task_metrics']} model_sha256={model_sha256}"
+           if model is not None else "")
     )
 
 

@@ -171,6 +171,8 @@ module ai_tensor_matrix_core #(
     reg [1:0] activation_r;
     reg [4:0] requant_shift_r;
     reg fused_output_r;
+    reg fused_linearized_output_r;
+    reg [1:0] fused_linearized_line_index_r;
     reg gemv_kfold_r;
     reg [15:0] gemv_k_elements_r;
     reg [31:0] watchdog_limit_r;
@@ -420,6 +422,11 @@ module ai_tensor_matrix_core #(
     wire [31:0] scalar_word_index =
         {{(32-TILE_INDEX_WIDTH){1'b0}},write_col_r} + {30'd0,write_lane_r};
     wire [31:0] write_row_addr = dst_row_addr_r + line_byte_offset;
+    wire [31:0] fused_linearized_line_addr =
+        dst_row_addr_r + ({28'd0,fused_linearized_line_index_r} << 4);
+    wire [127:0] fused_linearized_line_data =
+        {96'd0,fused_line_buffer_r[
+            fused_linearized_line_index_r*32 +: 32]};
     wire gemv_line_has_four_valid_columns = !gemv_kfold_r ||
         (({28'd0,write_col_r} + 32'd4) <= valid_cols);
     wire line_store_eligible = (write_row_addr[3:0] == 4'd0) &&
@@ -438,9 +445,16 @@ module ai_tensor_matrix_core #(
          transpose_b || (aux0 != 32'd0) || (instance_count > 32'd1) ||
          (src0_batch_stride != 32'd0) || (src1_batch_stride != 32'd0) ||
          (dst_batch_stride != 32'd0));
+    wire fused_linearized_request =
+        (op_mode == OP_TENSOR_GEMM_REQUANT_TILE_A) && aux0[7];
     wire invalid_tile_forward_contract =
         ((op_mode == OP_TENSOR_GEMM_REQUANT_TILE_A) &&
-         ((aux0[31:7] != 0) ||
+         ((aux0[31:8] != 0) ||
+          (fused_linearized_request &&
+           ((aux0[6:5] != 0) || (n_size != 16'd4) ||
+            (m_size > 16'd64) || (instance_count > 16'd1) ||
+            (dst_batch_stride != 0) || transpose_a || transpose_b ||
+            (|dst_base[3:0]))) ||
           (aux0[5] && ((m_size != 16'd16) || (n_size != 16'd16) ||
                        (instance_count > 32'd1) ||
                        (dst_batch_stride != 0))) ||
@@ -691,9 +705,11 @@ module ai_tensor_matrix_core #(
 
         line_valid = (state_r == ST_WRITE) && line_store_eligible &&
                      (!fused_requant_output || fused_commit_pending_r);
-        line_addr = write_row_addr;
-        line_wdata = fused_requant_output ? fused_line_buffer_r :
-                     {write_result3,write_result2,write_result1,write_result0};
+        line_addr = fused_linearized_output_r ? fused_linearized_line_addr :
+                    write_row_addr;
+        line_wdata = fused_linearized_output_r ? fused_linearized_line_data :
+                     (fused_requant_output ? fused_line_buffer_r :
+                      {write_result3,write_result2,write_result1,write_result0});
 
         if (state_r == ST_PREP_MAC)
             array_load_lane = 2'd0;
@@ -908,6 +924,8 @@ module ai_tensor_matrix_core #(
             activation_r <= 2'd0;
             requant_shift_r <= 5'd0;
             fused_output_r <= 1'b0;
+            fused_linearized_output_r <= 1'b0;
+            fused_linearized_line_index_r <= 2'd0;
             gemv_kfold_r <= 1'b0;
             gemv_k_elements_r <= 16'd0;
             watchdog_limit_r <= 32'd0;
@@ -1193,6 +1211,8 @@ module ai_tensor_matrix_core #(
                             requant_shift_r <= aux0[4:0];
                             fused_output_r <=
                                 (op_mode == OP_TENSOR_GEMM_REQUANT_TILE_A);
+                            fused_linearized_output_r <= fused_linearized_request;
+                            fused_linearized_line_index_r <= 2'd0;
                             gemv_kfold_r <=
                                 (op_mode == OP_TENSOR_GEMV_KFOLD);
                             watchdog_limit_r <= watchdog_limit;
@@ -1501,23 +1521,35 @@ module ai_tensor_matrix_core #(
                                     (line_store_eligible ? write_result3 :
                                                            scalar_write_result);
                                 if (fused_requant_output)
-                                    element_count <= element_count + 32'd16;
+                                    element_count <= element_count +
+                                        (fused_linearized_output_r ?
+                                         32'd4 : 32'd16);
                                 else if (line_store_eligible)
                                     element_count <= element_count + 32'd4;
                                 else
                                     element_count <= element_count + 32'd1;
 
                                 if (fused_requant_output) begin
-                                    fused_commit_pending_r <= 1'b0;
-                                    write_lane_r <= 2'd0;
-                                    if (({28'd0,write_col_r} + 32'd4) < valid_cols) begin
-                                        write_col_r <= write_col_r + 4;
-                                    end else if (({28'd0,write_row_r} + 32'd4) < valid_rows) begin
-                                        write_col_r <= {TILE_INDEX_WIDTH{1'b0}};
-                                        write_row_r <= write_row_r + 4;
-                                        dst_row_addr_r <= dst_row_addr_r + dst_row_stride_r;
+                                    if (fused_linearized_output_r &&
+                                        (fused_linearized_line_index_r != 2'd3)) begin
+                                        fused_linearized_line_index_r <=
+                                            fused_linearized_line_index_r + 1'b1;
                                     end else begin
-                                        state_r <= ST_NEXT;
+                                        fused_commit_pending_r <= 1'b0;
+                                        fused_linearized_line_index_r <= 2'd0;
+                                        write_lane_r <= 2'd0;
+                                        if (({28'd0,write_col_r} + 32'd4) < valid_cols) begin
+                                            write_col_r <= write_col_r + 4;
+                                        end else if (({28'd0,write_row_r} + 32'd4) < valid_rows) begin
+                                            write_col_r <= {TILE_INDEX_WIDTH{1'b0}};
+                                            write_row_r <= write_row_r + 4;
+                                            dst_row_addr_r <= dst_row_addr_r +
+                                                (fused_linearized_output_r ?
+                                                 (dst_row_stride_r << 2) :
+                                                 dst_row_stride_r);
+                                        end else begin
+                                            state_r <= ST_NEXT;
+                                        end
                                     end
                                 end else if (!line_store_eligible && (write_lane_r != 2'd3)) begin
                                     write_lane_r <= write_lane_r + 1'b1;
@@ -1567,16 +1599,19 @@ module ai_tensor_matrix_core #(
                             b_tile_base_r <= b_batch_base_r;
                             dst_row_tile_base_r <= dst_row_tile_base_r +
                                 (dst_row_stride_r *
-                                 (fused_requant_output ? ARRAY_SIZE/4 :
-                                  row_tile_span));
+                                 (fused_linearized_output_r ? ARRAY_SIZE :
+                                  (fused_requant_output ? ARRAY_SIZE/4 :
+                                   row_tile_span)));
                             dst_tile_base_r <= dst_row_tile_base_r +
                                 (dst_row_stride_r *
-                                 (fused_requant_output ? ARRAY_SIZE/4 :
-                                  row_tile_span));
+                                 (fused_linearized_output_r ? ARRAY_SIZE :
+                                  (fused_requant_output ? ARRAY_SIZE/4 :
+                                   row_tile_span)));
                             dst_row_addr_r <= dst_row_tile_base_r +
                                 (dst_row_stride_r *
-                                 (fused_requant_output ? ARRAY_SIZE/4 :
-                                  row_tile_span));
+                                 (fused_linearized_output_r ? ARRAY_SIZE :
+                                  (fused_requant_output ? ARRAY_SIZE/4 :
+                                   row_tile_span)));
                             bias_tile_base_r <= bias_batch_base_r;
                             state_r <= ST_A_REQ;
                         end else if ((instance_r + 1'b1) < instance_count_r) begin

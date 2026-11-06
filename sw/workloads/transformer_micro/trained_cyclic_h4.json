@@ -1,0 +1,217 @@
+{
+  "decode_token": 0,
+  "model_name": "tiny_transformer_h4_cyclic_next_token_int8",
+  "prefill_tokens": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "task": {
+    "description": "predict the next symbol in a four-token cyclic stream",
+    "host_fallback": [],
+    "label_rule": "(token_id + 1) % 4",
+    "vocabulary_size": 4
+  },
+  "training": {
+    "heldout_accuracy": 0.6884920634920635,
+    "heldout_correct": 694,
+    "heldout_predictions": 1008,
+    "heldout_sequences": 252,
+    "optimizer": "integer simulated annealing",
+    "seed": 20261106,
+    "steps_executed": 987,
+    "steps_requested": 20000,
+    "training_correct": 16,
+    "training_predictions": 16,
+    "training_sequences": [
+      [
+        0,
+        1,
+        2,
+        3
+      ],
+      [
+        1,
+        2,
+        3,
+        0
+      ],
+      [
+        2,
+        3,
+        0,
+        1
+      ],
+      [
+        3,
+        0,
+        1,
+        2
+      ]
+    ],
+    "weight_range": [
+      -8,
+      8
+    ]
+  },
+  "weight_provenance": "deterministically trained INT8 weights exported by sw/tools/train_transformer_micro.py",
+  "weights": {
+    "wdown": [
+      [
+        1,
+        2,
+        -8,
+        -1
+      ],
+      [
+        2,
+        -1,
+        3,
+        -2
+      ],
+      [
+        -1,
+        -1,
+        -4,
+        2
+      ],
+      [
+        6,
+        8,
+        -3,
+        -5
+      ]
+    ],
+    "wk": [
+      [
+        -2,
+        -1,
+        -2,
+        -2
+      ],
+      [
+        -2,
+        -4,
+        1,
+        -4
+      ],
+      [
+        -4,
+        2,
+        -6,
+        1
+      ],
+      [
+        5,
+        1,
+        8,
+        -5
+      ]
+    ],
+    "wo": [
+      [
+        0,
+        3,
+        -4,
+        1
+      ],
+      [
+        2,
+        7,
+        2,
+        0
+      ],
+      [
+        1,
+        1,
+        3,
+        -5
+      ],
+      [
+        2,
+        3,
+        0,
+        0
+      ]
+    ],
+    "wq": [
+      [
+        2,
+        -6,
+        -3,
+        -7
+      ],
+      [
+        -3,
+        -6,
+        -1,
+        2
+      ],
+      [
+        7,
+        -6,
+        -8,
+        2
+      ],
+      [
+        3,
+        8,
+        -1,
+        -6
+      ]
+    ],
+    "wup": [
+      [
+        -1,
+        2,
+        -7,
+        5
+      ],
+      [
+        -3,
+        1,
+        -5,
+        -4
+      ],
+      [
+        2,
+        0,
+        -1,
+        0
+      ],
+      [
+        1,
+        3,
+        -1,
+        0
+      ]
+    ],
+    "wv": [
+      [
+        -1,
+        1,
+        2,
+        -2
+      ],
+      [
+        5,
+        -1,
+        2,
+        4
+      ],
+      [
+        -1,
+        1,
+        -4,
+        -1
+      ],
+      [
+        0,
+        -1,
+        0,
+        3
+      ]
+    ]
+  }
+}
