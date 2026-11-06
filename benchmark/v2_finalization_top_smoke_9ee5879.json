@@ -1,0 +1,24 @@
+{
+  "run_id": "TOP-SMOKE-9EE5879-S20261106",
+  "status": "PASS",
+  "source_test_sha": "9ee5879edec64644e33386aae6bba9b3885d3b07",
+  "product_rtl_sha": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+  "date": "2026-11-06",
+  "seed": 20261106,
+  "random_cases": 4,
+  "tool": "Synopsys VCS V-2023.12-SP1_Full64",
+  "command": "cd dv/subsystem/top_smoke/sim && VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS='/opt/Synopsys/vcs/V-2023.12-SP1/bin/vcs -licwait 10' make ai_smoke SEED=20261106 AI_SEED=20261106 AI_RANDOM_CASES=4",
+  "checks_observed": [
+    "TEST PASS",
+    "INT8 matrix smoke and normal completion",
+    "opcode 0x52 dense GEMV and M/N/K tail Golden PASS",
+    "opcode 0x53 Top CMDQ tile forwarding producer/consumer Golden PASS",
+    "opcode 0x53 concurrent SFU access source immutability Golden PASS"
+  ],
+  "log_path": "/tmp/nmaforge_research_final_ai_smoke_9ee5879.log",
+  "log_sha256": "1b06d9bc6c2e99c61e2673d1877e847edd8098ddeab6858c7a674752f1530a1a",
+  "limitations": [
+    "This is the bounded smoke subset, not complete DV closure or 100% coverage.",
+    "VCS behavioral scratchpad simulation is not ASIC timing, power, or physical SRAM evidence."
+  ]
+}
