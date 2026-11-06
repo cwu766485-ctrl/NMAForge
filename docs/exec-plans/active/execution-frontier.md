@@ -1,8 +1,21 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `85e7db2d12f5edfaed17e8ca3910bb504983779f` (tree `e8f64f78f7986193bdc0d01dfbc01740a130edcb`; real-Top 0x52 M=N=K=16 concurrent with CNM, separate Golden and response-owner checks). Latest benchmark source SHA remains `c93d020880710a2804685fd85bb98c2e9c56f290` (tree `24180541c76b1ad4d27b2e97313e7d97a5df2016`). Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commit expands only the verification workload/profile. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `85e7db2d12f5edfaed17e8ca3910bb504983779f` (tree `e8f64f78f7986193bdc0d01dfbc01740a130edcb`; real-Top 0x52 M=N=K=16 concurrent with CNM, separate Golden and response-owner checks). Latest benchmark source SHA: `85e7db2d12f5edfaed17e8ca3910bb504983779f` (fixed-candidate 48-point GEMV Cache×Prefetch ablation). Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commits expand only verification/benchmark workload and evidence. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
+
+## 2026-11-06 update — fixed-candidate GEMV Cache × Prefetch benchmark
+
+At fixed source SHA `85e7db2d12f5edfaed17e8ca3910bb504983779f`, the existing
+four-configuration GEMV ablation passed 48/48 Golden points on Seeds
+20261105/06/07. B-fold Cache reduced cycles 22.3–41.6% and read bytes
+35.2–56.5% on the four measured shapes. Prefetch ON improved cached M8 cases
+2.0–2.4% and regressed cached M16 cases 0.6–0.8%. These are Matrix-core
+behavioral-SPAD results, not Top throughput, ASIC PPA, or TinyNPU wins.
+Machine-readable outputs and command are in the
+[performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md);
+logs-only archive SHA-256 is
+`b685a500285bdbfc737292d09771f2d23df69840e301773a6ad91c243c07fc60`.
 
 ## 2026-11-06 update — concurrent opcode-0x52 GEMV + CNM ownership
 

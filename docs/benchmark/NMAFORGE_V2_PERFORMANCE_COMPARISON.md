@@ -474,6 +474,57 @@ python3.12 tools/merge_gemv_four_way_ablation.py \
   /tmp/nmaforge_v2_current_410b81_gemv4/summary_seed_20261107.csv
 ```
 
+### Fixed replay at the concurrent-owner candidate `85e7db2`
+
+Run `V2-GEMV-FOUR-WAY-3SEED-85E7DB2` repeats the four-way Matrix-controller
+GEMV ablation on fixed RTL/test SHA `85e7db2d12f5edfaed17e8ca3910bb504983779f`
+with the same 16×16 array, 256 INT8 MACs, depth 4, A-Tile Cache ON, registered
+four-bank behavioral SPAD, workloads and Seeds `20261105/06/07`. All 48
+configuration/shape/Seed points pass bit-exact Golden, and the mutually
+exclusive FSM state partition closes to command cycles on every point. The
+per-seed throughput, read/write bytes, and overlapping stall counters are in
+the machine-readable CSV/JSON; event counters are not added to exclusive
+cycle partitions.
+
+| Shape | Cache OFF/PF OFF cycles → Cache ON/PF OFF | Read B OFF → ON | Cache ON/PF OFF → Cache ON/PF ON | Both ON speedup vs baseline |
+|---|---:|---:|---:|---:|
+| 8×16×19 | 200.67 → 156.00 (−22.3%) | 864 → 560 (−35.2%) | 156.00 → 152.33 (−2.4%) | 1.317× |
+| 8×16×65 | 544.33 → 391.00 (−28.2%) | 2,720 → 1,696 (−37.6%) | 391.00 → 383.00 (−2.0%) | 1.421× |
+| 16×16×19 | 393.67 → 261.00 (−33.7%) | 1,728 → 816 (−52.8%) | 261.00 → 262.67 (+0.6%) | 1.499× |
+| 16×16×65 | 1,075.00 → 627.33 (−41.6%) | 5,440 → 2,368 (−56.5%) | 627.33 → 632.33 (+0.8%) | 1.700× |
+
+Prefetch remains shape-dependent: it improves the two M8 points when Cache is
+ON and slightly regresses the M16 points. This supports retaining the bounded
+cache evidence and does not justify a new scheduler or universal-prefetch
+claim. This is Matrix-core RTL with a behavioral SPAD, not a full Top/CMDQ
+benchmark, ASIC timing/PPA, or TinyNPU comparison.
+
+Machine outputs: [CSV](../../benchmark/v2_p2_gemv_cache_prefetch_4way_85e7db2.csv),
+[summary JSON](../../benchmark/v2_p2_gemv_cache_prefetch_4way_85e7db2_summary.json),
+[chart](../../benchmark/v2_p2_gemv_cache_prefetch_4way_85e7db2.svg). Logs-only
+archive `/tmp/nmaforge_v2_gemv_four_way_85e7db2_logs.tar.gz`, SHA-256
+`b685a500285bdbfc737292d09771f2d23df69840e301773a6ad91c243c07fc60`.
+The merge tool now derives the summary Run ID from the measured SHA, avoiding
+the stale hard-coded `410B81D` label on subsequent runs.
+
+Exact run and merge commands:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+PYTHON=python3.12 make -C dv/block/compute/matrix/sim product-gemv-four-way-ablation \
+  SEEDS='20261105 20261106 20261107' OUTSTANDING_DEPTH=4 \
+  A_TILE_CACHE_ENABLE=1 PHYSICAL_ARRAY_SIZE=16 \
+  GEMV_FOUR_WAY_OUT=/tmp/nmaforge_v2_gemv_four_way_85e7db2
+
+python3.12 tools/merge_gemv_four_way_ablation.py \
+  --output-prefix benchmark/v2_p2_gemv_cache_prefetch_4way_85e7db2 \
+  /tmp/nmaforge_v2_gemv_four_way_85e7db2/summary_seed_20261105.csv \
+  /tmp/nmaforge_v2_gemv_four_way_85e7db2/summary_seed_20261106.csv \
+  /tmp/nmaforge_v2_gemv_four_way_85e7db2/summary_seed_20261107.csv
+```
+
 ### Seven-engine shared-SPAD workload
 
 The real Compute Cluster top, shared arbiter, and checked-in behavioral
