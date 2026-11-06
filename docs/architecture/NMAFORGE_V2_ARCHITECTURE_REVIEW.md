@@ -584,6 +584,11 @@ candidate, not full DV sign-off; details and archive checksum are in the
   20 random workloads each. This confirms the exercised legacy and `0x52`/
   `0x53` smoke paths remain functional after the testbench addition. It does
   not close the RTM's remaining partials or add a coverage merge.
+- Its real-Top matched UVM workload also reproduces 1.158× staged and 1.492×
+  queued/parallel cycle ratios with unchanged SPAD byte counts; this remains a
+  behavioral-SPAD NMAForge comparison, not TinyNPU or ASIC evidence.
 - Machine records: [GEMV alias](../../benchmark/v2_cmdq_gemv_ab_alias_f19e929.json)
   and [Top compatibility](../../benchmark/v2_top_smoke_compat_f19e929.json).
+  Matched workload metrics are in [CSV](../../benchmark/v2_p2_cluster_serial_parallel_f19e929.csv)
+  and [JSON](../../benchmark/v2_p2_cluster_serial_parallel_f19e929.json).
   Full evidence and limits are in the [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).

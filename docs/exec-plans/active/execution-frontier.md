@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `f19e92934cd6273d327621c43cb17291cf1a9aa5` (tree `2d931c1c81997b482467d7fdf69302dd367975a1`; clean three-seed full Compute Cluster UVM adds real-CMDQ 0x52 legal A/B read-only alias checks). Latest Top compatibility replay SHA: `f19e92934cd6273d327621c43cb17291cf1a9aa5` (directed smoke plus three Seeds × 20 random workloads); latest benchmark replay SHA: `a4dcc6b609878811fcd48a0310401609d4952c62` (current-source GEMV four-way ablation, bit-exact replay of 85e7db2 metrics); latest Top contention test SHA: `c93d020880710a2804685fd85bb98c2e9c56f290`. Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commits expand only verification/benchmark workload and evidence. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `f19e92934cd6273d327621c43cb17291cf1a9aa5` (tree `2d931c1c81997b482467d7fdf69302dd367975a1`; clean three-seed full Compute Cluster UVM adds real-CMDQ 0x52 legal A/B read-only alias checks). Latest Top compatibility and matched Cluster serial/parallel replay SHA: `f19e92934cd6273d327621c43cb17291cf1a9aa5` (directed smoke plus three Seeds × 20 random workloads and same-workload UVM timing); latest Matrix benchmark replay SHA: `a4dcc6b609878811fcd48a0310401609d4952c62` (current-source GEMV four-way ablation, bit-exact replay of 85e7db2 metrics); latest Top contention test SHA: `c93d020880710a2804685fd85bb98c2e9c56f290`. Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commits expand only verification/benchmark workload and evidence. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -952,3 +952,16 @@ compatibility evidence, not URG bins or sign-off. Run ID
 `V2-TOP-SMOKE-COMPAT-20X-3SEED-F19E929`; report and log archive details are in
 the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md) and
 [machine record](../../benchmark/v2_top_smoke_compat_f19e929.json).
+
+## 2026-11-06 update — matched Cluster serial/parallel replay
+
+The same fixed SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5` runs a three-seed
+real Top Compute Cluster UVM benchmark. Matrix+CNM+SFU improves from 1,239 to
+1,070 doorbell-to-tail cycles (1.158×), and Matrix+CNM+SFU+SFU from 1,696 to
+1,137 cycles (1.492×); each matched pair reads and writes identical SPAD byte
+counts. Independent Goldens, ordered completions, source scoreboard and
+response ownership pass. The separate Matrix/CNM banked collision test records
+320 admitted collisions/Matrix wait cycles and zero held-payload or owner
+violations per seed. Behavioral SPAD only; per-command exclusive stall-state
+timeline and alternate-arbiter A/B remain open. Details and artifacts are in
+the [performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md).

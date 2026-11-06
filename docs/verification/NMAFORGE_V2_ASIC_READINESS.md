@@ -21,10 +21,11 @@ SpyGlass, formal/LEC, SRAM mapping, DC, physical PPA, or power evidence below.
 Their existing `NOT_RUN` and `BLOCKED_ENV` dispositions remain in force; no
 ASIC readiness or tapeout claim is made.
 
-The latest targeted DV replay is `8758794c1f3bd6abb41c33276422b84ac5ee7a80`
-(three-seed real-CMDQ `1×1×256` GEMV point); the latest benchmark replay is
-`a4dcc6b609878811fcd48a0310401609d4952c62`. These are testbench/report
-changes only. Product RTL remains at
+The latest targeted DV and matched Cluster serial/parallel replay is
+`f19e92934cd6273d327621c43cb17291cf1a9aa5` (three-seed real-CMDQ `0x52`
+read-only A/B alias checks and existing Cluster UVM benchmark workload); the
+latest Matrix benchmark replay is `a4dcc6b609878811fcd48a0310401609d4952c62`.
+These are testbench/report changes only. Product RTL remains at
 `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`, so neither changes the static RTL
 or PPA result.
 

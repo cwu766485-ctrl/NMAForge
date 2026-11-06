@@ -3,6 +3,7 @@
 **As of:** 2026-11-06
 **Product baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Latest fixed benchmark source/test SHA:** `a4dcc6b609878811fcd48a0310401609d4952c62` (tree `430f9ce0c794f6e6a059d56ade7d9112b8a3079f`; current-source three-seed GEMV four-way ablation). **Latest Top contention workload SHA:** `c93d020880710a2804685fd85bb98c2e9c56f290` (tree `24180541c76b1ad4d27b2e97313e7d97a5df2016`; three-seed 16×16 Top Matrix/CNM contention profile). Product RTL in both remains `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
+**Latest matched Cluster serial/parallel replay:** `f19e92934cd6273d327621c43cb17291cf1a9aa5` (three-seed real-Top Compute Cluster UVM replay of the same 3-task and 4-task workloads; product RTL unchanged).
 
 ## Comparison boundary
 
@@ -780,3 +781,47 @@ baseline cycles divided by configured cycles, so above 1 means fewer cycles.
 The replay adds no new performance, ASIC frequency, area, power, or energy
 evidence. It confirms maximum-shape functional execution only; it is not a
 performance measurement.
+
+## Fixed-candidate Cluster serial/parallel replay — `f19e929`
+
+The complete three-seed Compute Cluster UVM run at fixed testbench SHA
+`f19e92934cd6273d327621c43cb17291cf1a9aa5` re-executes the existing matched
+serial/staged/parallel Top workload. All three seeds report identical cycle
+and byte counts and pass the full UVM checker set. For Matrix + CNM + SFU,
+serial takes 1,239 cycles and staged parallel takes 1,070 cycles (1.158×,
+13.64% fewer cycles); both read 4,032 B and write 2,416 B. For the same four
+tasks Matrix + CNM + SFU + SFU, serial takes 1,696 cycles and queued parallel
+takes 1,137 (1.492×, 32.96% fewer); both read 4,352 B and write 2,688 B.
+Completion order matches the submitted CMDQ order.
+
+Each seed also observes a separate legal Matrix/CNM contention scenario:
+333 collision cycles, 320 admitted collisions and Matrix wait cycles, 320
+held-payload checks, and zero ownership or stability violations. The Matrix
+line-stall check observes 84 stable-payload samples and zero violations. The
+Memory Scoreboard checks 99,783 words with zero mismatch, unknown, or stale
+reads; response ledger is 5,015 accepted / 4,995 checked / 20 reset-dropped,
+with no pending or routing/data/error mismatches. These counters are event
+diagnostics and are not added to the measured cycle totals. This UVM benchmark
+does not provide a full per-command exclusive stall-state timeline; that
+remains open.
+
+The machine-readable results are [CSV](../../benchmark/v2_p2_cluster_serial_parallel_f19e929.csv)
+and [JSON](../../benchmark/v2_p2_cluster_serial_parallel_f19e929.json). Run ID
+`V2-CLUSTER-SERIAL-PARALLEL-UVM-3SEED-F19E929`; the compile/run logs and URG
+text are in `/tmp/nmaforge_v2_gemv_ab_alias_f19e929_logs.tar.gz`, SHA-256
+`18e664689077d9608924af2b9ec08eb912d4979edc9e0cf36b816cbe936447ae`.
+Exact command:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v2_gemv_alias_f19e929 \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261106 20261107 20261108'
+```
+
+The memory is the checked-in behavioral four-bank SPAD; descriptor setup and
+preload are outside the interval. This is matched NMAForge RTL evidence only,
+not a TinyNPU comparison, SRAM timing, ASIC PPA, or a scheduler-policy A/B
+test. No Bank-Aware Issue RTL change is justified by this replay.
