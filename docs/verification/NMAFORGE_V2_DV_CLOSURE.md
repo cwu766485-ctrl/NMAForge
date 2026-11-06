@@ -2083,3 +2083,19 @@ machine record](../../benchmark/v2_clean_cluster_uvm_839b9af.json); text logs
 and URG summary are in `/tmp/nmaforge_v2_clean_839b9af_cluster_3seed_text.tar.gz`,
 SHA-256 `4d036d428c8e72a10490bb7eaf4f9534158a8df185d46722453e49038a374993f`.
 No RTL changed.
+
+## Bounded research closure round 2 disposition
+
+No new UVM, coverage, mutation, or formal campaign was started. The compact
+Digits workload-generator/testbench changes pass the independent integer
+Golden and Top CMDQ/CPLQ checks at 128 KiB and 512 KiB (360/360 output vectors
+match; classification 352/360). The 86-descriptor Transformer fixture's 301
+own Golden/KV checks pass in a 128 KiB build, but the enclosing full smoke is
+`FAIL` with 23 failures in unrelated full-smoke cases that assume larger SPAD
+or exercise other engines. Do not promote this scoped fixture result to a
+Top-smoke PASS. Trained Transformer weights, a >128 KiB streamed workload,
+and CNN-native fused flattening remain `NOT_RUN`/blocked as described in the
+[round-2 research record](../../benchmark/v2_round2_research_closure_20261106.json).
+
+This is research evidence, not v2 DV closure: the existing RTM disposition,
+coverage gaps, and sign-off limitations above remain unchanged.

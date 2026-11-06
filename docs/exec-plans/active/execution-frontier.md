@@ -1283,3 +1283,25 @@ The latest evidence changes no v1.0 or v2 sign-off disposition. Minimum next
 work is to close the remaining v2 DV requirement/checker gaps, then run a
 matched TinyNPU workload on an explicitly shared timing boundary. No product
 RTL change is justified by the four-way ablation alone.
+
+## Research Closure Round 2 — final bounded disposition (2026-11-06)
+
+This bounded round is complete and frozen at code commit
+`acfaec281f5414c0e357c1dc7985b79a829c8c30` plus the following evidence/report
+commit. Product RTL is still
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
+
+| Work item | Status | Evidence / limitation |
+|---|---|---|
+| 128/512 KiB trained Digits MLP | PASS | Same compact map, 360 outputs Golden-exact, 34,761 cycles, 97.78%; 93,184 B high-water |
+| Transformer fixture at 128 KiB | PARTIAL | 301 fixture Golden/KV checks and timing pass; enclosing smoke fails 23 unrelated large-SPAD/all-engine cases |
+| Trained Transformer | NOT_RUN / BLOCKED_MODEL_PIPELINE | No trained checkpoint/training flow; mapper weights are deterministic fixture values |
+| CNN fused flatten/layout | NOT_RUN_INCOMPATIBLE_LAYOUT | `0x53` tile-A output does not directly match current consumer flat K=144 operand |
+| >128 KiB live-set streaming | NOT_RUN | No suitable checked-in workload; no streaming/DMA-cost result |
+| TinyNPU model-level matched timing | PARTIAL | Fixed GEMM/GEMV evidence retained; CNN endpoints differ, no ratio; Tiny Transformer not run |
+| ASIC PPA | BLOCKED_ENV / NOT_RUN | No private SRAM macro/library/SDC; only storage-bit arithmetic |
+
+Machine-readable details: [round-2 record](../../benchmark/v2_round2_research_closure_20261106.json)
+and [MLP capacity CSV](../../benchmark/v2_round2_capacity_mlp_20261106.csv).
+No new verification, RTL, streaming, ASIC, or model task is started after this
+bounded closeout. Overall state remains **RESEARCH_BASELINE_PARTIAL**.

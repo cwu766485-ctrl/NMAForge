@@ -850,3 +850,40 @@ The subsequent authorized Git push attempt at local commit
 `325fe78bead175fc4eda1fae2ed74929f61ba331` failed before authentication:
 Git could not read the GitHub HTTPS username. The v2 branch remained 73 commits
 ahead of its cached remote ref at the time; no remote update is claimed.
+
+## Bounded research closure round 2 — 2026-11-06
+
+This round adds a compact static address profile for the existing trained
+Digits INT8 MLP. It changes workload generation and testbench address
+selection only; product RTL remains
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. The code commit is
+`acfaec281f5414c0e357c1dc7985b79a829c8c30` (tree
+`3acc18782e76829e6195ec04b855d9d489e8f5c5`).
+
+The 360-sample trained Digits MLP passes with the same independent integer
+Golden at both 128 KiB and 512 KiB, using a compact non-overlapping static
+placement with 93,184-byte high-water address. Both runs report 34,761 CMDQ
+cycles, 352/360 correct classifications (97.78%), and byte-identical logits.
+This demonstrates map compaction for this model, not streaming or tensor
+liveness reuse. The checked-in Transformer workload remains an 86-descriptor
+deterministic fixture with hand-authored weights. At 128 KiB, its 301
+Transformer Golden/KV checks pass and its scoped prefill/decode timing is
+captured, but the enclosing all-feature Top smoke fails 23 unrelated
+large-SPAD/protection/engine-pair checks; it is not a full 128 KiB smoke pass.
+
+For the mini CNN, the measured 1,080 Host Layout cycles come from 36 produced
+feature groups, each requiring one AXI-Lite read and four writes to form the
+consumer's flattened K=144 FC input (180 transfers × 6 cycles). Opcode `0x53`
+produces native Matrix-A layout and cannot directly perform this
+spatial/channel flattening for the current FC descriptor. No Mapper-only
+rewrite was found that preserves the same input tensor and Golden, so no CNN
+fused-layout speedup is claimed.
+
+The available checked-in model workloads do not provide a live set above
+128 KiB: compact MLP 93,184 B, Transformer fixture 79,200 B including queue
+tables, and CNN maps below 70 KiB. A larger streaming workload, extra DMA
+cost, and a greater-than-128-KiB live-set experiment were not run. Therefore
+the round closes with research baseline status **RESEARCH_BASELINE_PARTIAL**;
+trained Transformer inference, streaming, same-boundary TinyNPU model timing,
+and ASIC PPA remain open or not run. See the [round-2 machine record](../../benchmark/v2_round2_research_closure_20261106.json)
+and [research summary](../benchmark/NMAFORGE_V2_TINYNPU_BASELINE_SUMMARY.md).

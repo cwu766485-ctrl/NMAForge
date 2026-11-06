@@ -359,3 +359,14 @@ private libraries, SRAM timing views, SDC, and checked-in DC flow inputs are
 unavailable. DFT, MBIST, CTS, route, routed STA, and IR/EM remain `NOT_RUN` or
 `BLOCKED_ENV`. No silicon area, Fmax, power, or tapeout-readiness conclusion
 follows from the current functional or behavioral-SPAD results.
+
+## Research closure round 2
+
+The 128/512 KiB experiments vary behavioral SPAD depth only. No DC synthesis,
+macro mapping, STA, power estimation, or physical implementation ran. At
+four-bank 32-bit words, raw capacity is 4,194,304 / 2,097,152 / 1,048,576 /
+524,288 bits for 512 / 256 / 128 / 64 KiB. If implemented using nominal
+4K×32 (16 KiB) macros this corresponds arithmetically to 32 / 16 / 8 / 4
+macros, but this is only a storage-count estimate; no macro library or area
+data was available. ASIC readiness stays **NOT READY** and PPA remains
+`BLOCKED_ENV`/`NOT_RUN`.
