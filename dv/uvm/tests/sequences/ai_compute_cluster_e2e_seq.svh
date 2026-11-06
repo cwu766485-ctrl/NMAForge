@@ -5000,7 +5000,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             "legal M/N/K alignment-tail combinations bins=8/8 coverage=%0.1f%%; every bin completed independent signed INT32 Golden, guards, completion and response-owner checks; seed=%0d",
             cmdq_product_gemv_tail_cross_cg.get_coverage(), seed), UVM_LOW)
 
-        // Isolate the maximum documented K boundary with a 1x1 output so the
+        // Isolate the K=256 test-bound point with a 1x1 output so the
         // real CMDQ/Matrix/SPAD transaction remains within the unchanged
         // top-level 2,000-cycle task watchdog. The earlier 16x16x256 probe
         // exceeded that bound before completion and produced no Golden result.

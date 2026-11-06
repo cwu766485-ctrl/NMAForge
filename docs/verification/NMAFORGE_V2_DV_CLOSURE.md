@@ -1,7 +1,7 @@
 # NMAForge v2 DV Closure Status
 
 **Status:** IN PROGRESS — scoped regressions pass; v2 sign-off is not ready.  
-**Latest testbench/tooling candidate SHA:** `de22e4652a54dfe7537e14585bdf3ae6f08fe9fb` (tree `29d35cadabd84872081dc7f6d51a7398cfb431b5`; adds full held-out CNN Top replay tooling; product RTL unchanged). Latest long-K GEMV/feature-coverage candidate remains `e944133b43107839e5f5eea902251097a228b312`; no new aggregate URG was collected after that scoped coverage run.
+**Latest testbench/tooling candidate SHA:** `8758794c1f3bd6abb41c33276422b84ac5ee7a80` (tree `6f51976ea8f736e08783487afe892afa8a3a8b36`; adds a real-CMDQ K=256 GEMV test point with non-overlapping SPAD ranges; product RTL unchanged). Latest clean three-seed Compute Cluster UVM regression is `V2-CMDQ-GEMV-K256-1X1-3SEED-8758794`.
 
 **Candidate tree:** `65d56c5d6dd345effde6fdfdf70dad59f135a279` (tree used for the latest three-seed generic Cluster replay)
 
@@ -15,6 +15,36 @@
 
 **Baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Simulator:** Synopsys VCS `V-2023.12-SP1_Full64`
+
+## 2026-11-06 — real-CMDQ GEMV K=256 test-bound point
+
+Testbench-only SHA `8758794c1f3bd6abb41c33276422b84ac5ee7a80` adds a `1×1×256`
+opcode-0x52 descriptor to isolate the K=256 test-bound point while retaining
+the existing 2,000-cycle Top task watchdog. The earlier `16×16×256` probe
+exceeded that watchdog and produced no completion or Golden evidence; the
+watchdog was not changed. This run makes no claim that the maximum M/N workload
+at K=256 passed.
+
+VCS `V-2023.12-SP1_Full64` passes three seeds `20261025/26/27` from clean
+detached worktree `/tmp/nmaforge-v2-max-k-clean-8758794`. Each seed checks the
+real CMDQ launch fields, one signed INT32 output against independent Golden,
+two untouched output sentinels, ordered completion, and all 272/272 accepted /
+returned Matrix reads. UVM Warning/Error/Fatal is `0/0/0` per seed. Merged URG
+Line/Condition/FSM/Branch/Assert/Group is
+`70.71/68.34/46.17/67.66/72.00/83.46%`; this is the full profile total, not
+v2 closure. The evidence archive is
+`/tmp/nmaforge_v2_k256_evidence_8758794.tar.gz`, SHA-256
+`3ceac93b551949ad49a698309460fe0f978b5a7a71be74ec3f873727e17268b9`.
+
+Exact command:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v2_max_k_clean_8758794 \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027'
+```
 
 ## 2026-11-06 — real-CMDQ long-K GEMV at K=128
 
@@ -47,12 +77,13 @@ Logs and selected URG text (simulator binary/VDB excluded):
 `/tmp/nmaforge_v2_long_k_e944133_logs.tar.gz`, SHA-256
 `167fb42c261c861d0bace89aefd6ef40695b5b5f01e85ac2c7e5b3b76b2f19b3`.
 
-K=256 remains open: an attempted real-CMDQ run at test SHA
+The earlier `16×16×256` real-CMDQ attempt at test SHA
 `170ab5b585be819b1a72a22c7ea29be1881cfa21` hit the existing Top SVA
 `MAX_TASK_CYCLES=2000` completion bound before producing a Golden result.
 The bound was not relaxed. This is a timeout against the testbench bound, not
-proof of a datapath mismatch; expected K=256 latency and the appropriate
-end-to-end contract still need review. No product RTL changed.
+proof of a datapath mismatch; the larger M/N workload remains open. A separate
+`1×1×256` K=256 test-bound point subsequently passed; see the clean replay below.
+No product RTL changed.
 
 ## 2026-11-06 — real-CMDQ GEMV M/N/K alignment-tail cross
 
@@ -909,9 +940,11 @@ named Matrix-core scenarios and do not substitute for the Top/Cluster RTM.
 | Requirement | Added test/checker evidence | Coverage | Run identity | Disposition |
 |---|---|---|---|---|
 | REQ-V2-052-003/004 | Real Top CMDQ GEMV Golden/guards/completion for all M%4 × N%16 × K%16 aligned/tail states; new shapes `4×16×17`, `4×13×16`, `3×16×16`, `3×13×16` complete the four previously unhit states | Dedicated `cmdq_product_gemv_tail_cross_cg`: 8/8 user bins, 100% in each of three Seeds and merged URG; 203/203 new output words and 8/8 guards across three Seeds; accepted/returned lines 25/25, 20/20, 19/19, 19/19 per Seed | `V2-CMDQ-GEMV-TAIL-CROSS-3SEED-0E9F12E`, Seeds 20261025/26/27, SHA `0e9f12ec3701030c9e5978ad29b227c5e0c644a7`, tree `18983dbf8708c101bc83aa9ed0902d6370037468` | PASS for the eight declared alignment/tail states and representative shapes; not exhaustive over legal dimensions, aux/postprocess, aliases or fault/lifecycle crosses; logs/URG archive SHA-256 `37c1faa781c24744236a32b51f23ec08ec2616da2a9866b9d63554c34aeb6a14` |
-| REQ-V2-052-003/004 | Real Top CMDQ signed INT8 GEMV at K=128 with independent INT32 Golden, full output image, guards, ordered completion | `cmdq_product_gemv_long_k_cg`: 1/1 bin per Seed and 3 merged hits; 256/256 outputs and two guards per Seed; 448/448 accepted/returned Matrix reads | `V2-CMDQ-GEMV-K128-3SEED-E944133`, Seeds 20261025/26/27, SHA `e944133b43107839e5f5eea902251097a228b312`, tree `430f9ce0c794f6e6a059d56ade7d9112b8a3079f` | PASS for this 16×16×128 point only; attempted K=256 at SHA `170ab5b585be819b1a72a22c7ea29be1881cfa21` hit existing `MAX_TASK_CYCLES=2000` before Golden and remains unresolved; no checker bound was relaxed. Logs-only archive SHA-256 `167fb42c261c861d0bace89aefd6ef40695b5b5f01e85ac2c7e5b3b76b2f19b3` |
+| REQ-V2-052-003/004 | Real Top CMDQ signed INT8 GEMV at K=128 with independent INT32 Golden, full output image, guards, ordered completion | `cmdq_product_gemv_long_k_cg`: 1/1 bin per Seed and 3 merged hits; 256/256 outputs and two guards per Seed; 448/448 accepted/returned Matrix reads | `V2-CMDQ-GEMV-K128-3SEED-E944133`, Seeds 20261025/26/27, SHA `e944133b43107839e5f5eea902251097a228b312`, tree `430f9ce0c794f6e6a059d56ade7d9112b8a3079f` | PASS for this 16×16×128 point only. Historical `16×16×256` probe hit the unchanged `MAX_TASK_CYCLES=2000` before Golden; the reduced `1×1×256` test-bound point is recorded in the next row. Logs-only archive SHA-256 `167fb42c261c861d0bace89aefd6ef40695b5b5f01e85ac2c7e5b3b76b2f19b3` |
+| REQ-V2-052-003/004 | Real Top CMDQ opcode-0x52 K=256 test-bound point; independent signed INT32 Golden, output guards, completion | `cmdq_product_gemv_long_k_cg`: 1/1 per Seed, 3/3 merged; 1/1 result and 2/2 guards per Seed; 272/272 accepted/returned Matrix reads | `V2-CMDQ-GEMV-K256-1X1-3SEED-8758794`, Seeds 20261025/26/27, SHA `8758794c1f3bd6abb41c33276422b84ac5ee7a80`, tree `6f51976ea8f736e08783487afe892afa8a3a8b36` | PASS for the `1×1×256` point only. The `16×16×256` shape remains unverified because it exceeded the unchanged 2,000-cycle Top task watchdog. Evidence archive SHA-256 `3ceac93b551949ad49a698309460fe0f978b5a7a71be74ec3f873727e17268b9` |
 | REQ-V2-052-007 | Real CMDQ accepted/returned Matrix reads for the four added aligned/tail representatives, checked before completion | `4×16×17` 25/25, `4×13×16` 20/20, `3×16×16` 19/19, `3×13×16` 19/19 in each of three Seeds; eight-state group merged 100% | `V2-CMDQ-GEMV-TAIL-CROSS-3SEED-0E9F12E`, Seeds 20261025/26/27, SHA `0e9f12ec3701030c9e5978ad29b227c5e0c644a7` | PARTIAL; proves serial Top response drains for these cases; arbitrary held/late external responses and broader multi-engine/fault/reset ownership remain open |
 | REQ-V2-052-007 | Real CMDQ 16×16×128 operand-read accepted/returned ownership and drain before completion | 448/448 accepted/returned Matrix reads per Seed; no pending read at completion; dedicated long-K group merged 100% | `V2-CMDQ-GEMV-K128-3SEED-E944133`, Seeds 20261025/26/27, SHA `e944133b43107839e5f5eea902251097a228b312` | PARTIAL; ownership closes for this serial long-K point, while arbitrary held/late external responses and broader multi-engine/fault/reset ownership remain open; archive SHA-256 `167fb42c261c861d0bace89aefd6ef40695b5b5f01e85ac2c7e5b3b76b2f19b3` |
+| REQ-V2-052-007 | Real CMDQ K=256 point counts accepted/returned Matrix responses on the shared top path | 272/272 reads accepted/returned per Seed; completion checked and output Golden/sentinels pass | `V2-CMDQ-GEMV-K256-1X1-3SEED-8758794`, Seeds 20261025/26/27, SHA `8758794c1f3bd6abb41c33276422b84ac5ee7a80` | PARTIAL; serial tested ownership point passes. Arbitrary held/late response timing, external fabric ownership and wider multi-engine/fault/reset matrix remain open; archive SHA-256 `3ceac93b551949ad49a698309460fe0f978b5a7a71be74ec3f873727e17268b9` |
 | REQ-V2-COM-001 | Real Top CMDQ fetch/decode/dispatch of ABI-v7 opcode `0x52`; passive launch monitor classifies `0x52`/`0x53` as Matrix | 3×5×5 tail, 1×1×1 minimum, and 16×16×16 maximum launch snapshots match descriptor fields | `V2-CMDQ-PRODUCT-GEMV-GOLDEN-3SEED-FD82E73`, `V2-CMDQ-PRODUCT-GEMV-MIN-BOUNDARY-3SEED-95301C4`, and `V2-CMDQ-PRODUCT-GEMV-FULL-TILE-3SEED-9287478` | PASS for these product-CMDQ shape points; broader mode matrix open |
 | REQ-V2-052-003/004 | Independent signed INT32 Golden; complete output image and two sentinels; completion status/result/elements checked | 15/15 output elements per Seed; M/N/K tail bins 3/3 plus cross 1/1 | Same run ID/SHA | PASS for legal shape 3×5×5 only; full supported shape domain open |
 | REQ-V2-052-003/004 | Independent signed INT32 Golden and complete 16-byte operand line images for minimum descriptor | 1/1 output and guard per Seed; minimum-shape group 1/1 bin, 3 hits; 2/2 operand reads accepted/returned | `V2-CMDQ-PRODUCT-GEMV-MIN-BOUNDARY-3SEED-95301C4`, seeds 20261115/16/17, SHA `95301c46dfa6b9ee68f1e37a38f7767e3111d869` | PASS for M=N=K=1 only; maximum endpoint is covered by the separate row below, while full shape matrix remains open |

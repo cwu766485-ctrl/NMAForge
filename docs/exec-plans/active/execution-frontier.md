@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `e944133b43107839e5f5eea902251097a228b312` (tree `430f9ce0c794f6e6a059d56ade7d9112b8a3079f`; three-seed clean-worktree regression hits all eight real-CMDQ 0x52 M/N/K aligned-tail combinations and 16×16×128 long-K GEMV). Latest benchmark replay SHA: `a4dcc6b609878811fcd48a0310401609d4952c62` (current-source GEMV four-way ablation, bit-exact replay of 85e7db2 metrics); latest Top contention test SHA: `c93d020880710a2804685fd85bb98c2e9c56f290`. Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commits expand only verification/benchmark workload and evidence. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `8758794c1f3bd6abb41c33276422b84ac5ee7a80` (tree `6f51976ea8f736e08783487afe892afa8a3a8b36`; clean three-seed full Compute Cluster UVM includes a real-CMDQ 1×1×256 GEMV test-bound point). Latest Top compatibility replay SHA: `6cbf0e25675e72df4ba8ab32a403ffc8d8245612` (three Seeds × 20 random workloads plus directed legacy/v2 smoke checks). Latest benchmark replay SHA: `a4dcc6b609878811fcd48a0310401609d4952c62` (current-source GEMV four-way ablation, bit-exact replay of 85e7db2 metrics); latest Top contention test SHA: `c93d020880710a2804685fd85bb98c2e9c56f290`. Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commits expand only verification/benchmark workload and evidence. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -35,11 +35,25 @@ Testbench-only SHA `e944133b43107839e5f5eea902251097a228b312` passes a
 Golden outputs, two guards, ordered completion, and 448/448 accepted/returned
 Matrix reads. The named long-K group is 100%; aggregate profile
 Line/Condition/FSM/Branch/Assert/Group is
-`70.71/68.34/46.17/67.66/72.00/83.46%`. A K=256 attempt exceeded the
-existing 2,000-cycle Top completion bound before Golden comparison, so it
-remains open; no timeout/checker limit was changed. Product RTL is unchanged.
+`70.71/68.34/46.17/67.66/72.00/83.46%`. A `16×16×256` attempt exceeded the
+existing 2,000-cycle Top completion bound before Golden comparison. A separate
+`1×1×256` test-bound point now passes at SHA `8758794`; the larger M/N workload
+remains open and no timeout/checker limit was changed. Product RTL is unchanged.
 Run ID `V2-CMDQ-GEMV-K128-3SEED-E944133`; exact command and logs-only archive
 checksum are in the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+## 2026-11-06 update — real-CMDQ K=256 test-bound point
+
+At clean SHA `8758794c1f3bd6abb41c33276422b84ac5ee7a80`, VCS/URG
+`V-2023.12-SP1_Full64` passes three Seeds for an opcode-0x52 `1×1×256`
+descriptor. Each Seed checks the independent signed INT32 result, two output
+sentinels, ordered completion, and 272/272 accepted/returned Matrix reads;
+UVM severity is `0/0/0`. Merged URG Line/Condition/FSM/Branch/Assert/Group is
+`70.71/68.34/46.17/67.66/72.00/83.46%`. This adds a scoped K=256 test point,
+not a claim that `16×16×256` meets the existing watchdog. The evidence archive
+`/tmp/nmaforge_v2_k256_evidence_8758794.tar.gz` has SHA-256
+`3ceac93b551949ad49a698309460fe0f978b5a7a71be74ec3f873727e17268b9`; run
+identity and command are in the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
 ## 2026-11-06 update — real-CMDQ GEMV extended shapes
 
