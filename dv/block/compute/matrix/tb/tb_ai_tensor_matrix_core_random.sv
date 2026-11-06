@@ -281,6 +281,17 @@ module tb_ai_tensor_matrix_core_random;
     assert property (p_tile_forward_commit_requires_complete_capture)
       else $fatal(1,"tile-forward tag committed without a complete producer");
 
+    property p_tile_forward_valid_rises_after_complete_commit;
+      @(posedge clk) disable iff (!resetn)
+        $rose(dut.tile_forward_valid_r) |->
+          ($past(dut.state_r == 4'd11 &&
+                 dut.tile_forward_capture_active_r &&
+                 dut.tile_forward_capture_mask_r == 16'hffff) &&
+           dut.tile_forward_tag_base_r == $past(dut.dst_batch_base_r));
+    endproperty
+    assert property (p_tile_forward_valid_rises_after_complete_commit)
+      else $fatal(1,"tile-forward valid rose before a full tagged capture committed");
+
     property p_tile_forward_tag_stays_stable_between_commits;
       @(posedge clk) disable iff (!resetn)
         (dut.tile_forward_valid_r && $past(dut.tile_forward_valid_r) &&
@@ -1236,7 +1247,7 @@ module tb_ai_tensor_matrix_core_random;
         @(posedge clk); #1;
         if(v2_tile_forward_sva_commit_samples<1)
           $fatal(1,"tile-forward SVA commit antecedent was not exercised");
-        $display("MATRIX_V2_TILE_FORWARD_SVA_PASS assertions=2 nonvacuous_commits=%0d full_capture_mask=%04x exact_tag=%08x",
+        $display("MATRIX_V2_TILE_FORWARD_SVA_PASS assertions=3 nonvacuous_commits=%0d full_capture_mask=%04x exact_tag=%08x",
                  v2_tile_forward_sva_commit_samples,
                  dut.tile_forward_capture_mask_r,dut.tile_forward_tag_base_r);
         v2_tile_forward_cg_inst.sample(1);
