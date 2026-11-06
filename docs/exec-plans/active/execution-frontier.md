@@ -5,17 +5,16 @@ does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
 Latest per-command Top Matrix profile source/test SHA is
-`8adf916e4e8a0e3b2f2e01acc85bacb59fbb8f47` (tree
-`a8c232664436c5b1d1f2888eff34439edb40430d`). The real Top `16×32×64` Matrix
-CMDQ profile passes on three Seeds: 490 Matrix cycles, 565 doorbell-to-tail
-cycles, 3,072 B read, 2,048 B written, and exclusive FSM state sum equal to
-the DUT cycle counter on every run. The profile also reports 128 MAC-active
-cycles, 180 prefetch-wait cycles, 120 MAC/prefetch overlap cycles, three
-response-wait cycles, zero arbitration/writeback stall cycles, and a
-two-request outstanding high-water. UVM Warning/Error/Fatal is 0/0/0. This
-closes per-command breakdown for the standalone Top Matrix baseline only;
-the multi-engine serial/parallel workloads still need the same profiler. See
-the [machine CSV/JSON](../../benchmark/v2_top_matrix_profile_8adf916_3seed.csv)
+`f530fe2c4c98204312b7ed16616cb9d9747670b2` (tree
+`919ebb411a7b47e0e0b3dfd2084852a83a2a5034`). The real Top `16×32×64` Matrix
+profile passes three Seeds in standalone, staged Matrix+CNM, and writeback
+contention scenarios. Internal cycles are 490/533/844; arbiter-stall events
+are 0/43/354; writeback-wait is 0/0/84. Each run's 15 exclusive state buckets
+sum to Matrix `cycle_count`, records 3,072 B read and 2,048 B written, and
+passes the existing Golden. UVM Warning/Error/Fatal is 0/0/0. The earlier
+`8adf916` standalone-only record remains separately available. These profiles
+do not yet provide per-command breakdown for CNM/SFU engines or every queued
+multi-engine workload. See the [machine CSV/JSON](../../benchmark/v2_top_matrix_cluster_profile_f530fe2_3seed.csv)
 and [performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md).
 The RTM and sign-off status do not change.
 

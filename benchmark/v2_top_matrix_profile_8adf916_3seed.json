@@ -17,7 +17,12 @@
     "stall_counters": "diagnostic event counts; may overlap and must not be summed",
     "array_utilization": "MAC operations / (256 physical MACs * Matrix internal cycles)"
   },
-  "seeds": [
+  "seed_ids": [
+    20261125,
+    20261126,
+    20261127
+  ],
+  "profiles": [
     {
       "seed": 20261125,
       "shape": "16x32x64",
@@ -54,6 +59,7 @@
       "outstanding_highwater": 2,
       "fifo_full": 0,
       "a_tile_cache_hits": 16,
+      "profile": "standalone",
       "test_status": "PASS",
       "golden_output_words": 512,
       "uvm_warning": 0,
@@ -106,6 +112,7 @@
       "outstanding_highwater": 2,
       "fifo_full": 0,
       "a_tile_cache_hits": 16,
+      "profile": "standalone",
       "test_status": "PASS",
       "golden_output_words": 512,
       "uvm_warning": 0,
@@ -158,6 +165,7 @@
       "outstanding_highwater": 2,
       "fifo_full": 0,
       "a_tile_cache_hits": 16,
+      "profile": "standalone",
       "test_status": "PASS",
       "golden_output_words": 512,
       "uvm_warning": 0,

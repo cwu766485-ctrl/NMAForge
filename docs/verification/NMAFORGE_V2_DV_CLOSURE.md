@@ -1,7 +1,7 @@
 # NMAForge v2 DV Closure Status
 
 **Status:** IN PROGRESS — scoped regressions pass; v2 sign-off is not ready.  
-**Latest fixed testbench/tooling candidate with clean Top/UVM replay:** `8adf916e4e8a0e3b2f2e01acc85bacb59fbb8f47` (tree `a8c232664436c5b1d1f2888eff34439edb40430d`; adds passive Top Matrix cycle/stall/traffic profiling and an FSM-cycle-sum assertion; product RTL unchanged). The three-seed replay is `V2-TOP-MATRIX-PERF-PROFILE-8ADF916-3SEED`; earlier opcode/fault/shape and compatibility tests remain bound to their listed SHAs.
+**Latest fixed testbench/tooling candidate with clean Top/UVM replay:** `f530fe2c4c98204312b7ed16616cb9d9747670b2` (tree `919ebb411a7b47e0e0b3dfd2084852a83a2a5034`; adds passive per-command Matrix profiles for standalone, staged Matrix/CNM, and Matrix writeback contention plus an FSM-cycle-sum assertion; product RTL unchanged). The three-seed replay is `V2-TOP-MATRIX-CLUSTER-PROFILE-F530FE2-3SEED`; earlier opcode/fault/shape and compatibility tests remain bound to their listed SHAs.
 **Latest three-seed 20-random-workload compatibility replay:** testbench/tooling SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5`; directed smoke plus three 20-random-workload seeds pass legacy/v2 markers. The later clean `f9f32f7` Top Smoke replay is a shorter four-random-workload check and is not a UVM/URG coverage update.
 
 **Earlier generic Cluster replay tree:** `65d56c5d6dd345effde6fdfdf70dad59f135a279`
@@ -1848,3 +1848,16 @@ This is a testbench consistency check and performance evidence, not a new v2
 functional coverage bin. No RTM disposition changed; v2 DV remains **IN
 PROGRESS**. Exact command, archive checksum and CSV/JSON are in the
 [performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md).
+
+The follow-up fixed-SHA UVM replay `f530fe2c4c98204312b7ed16616cb9d9747670b2`
+(tree `919ebb411a7b47e0e0b3dfd2084852a83a2a5034`) adds two more passive
+Matrix observations per Seed under the existing staged Matrix/CNM and
+Matrix-writeback/CNM tests. Seeds 20261128/29/30 pass all existing Cluster
+checks with UVM Warning/Error/Fatal `0/0/0`; all 9 command profiles have
+exclusive FSM bucket sums equal to Matrix `cycle_count`. The line-stall
+scenario records 84 Matrix writeback-wait cycles and 354 arbiter-stall events,
+while the existing Golden and payload-stability checks pass. No new
+functional coverage bins or RTM dispositions are claimed. Machine evidence,
+the exact command and text-log archive checksum are in the
+[performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md)
+and [JSON record](../../benchmark/v2_top_matrix_cluster_profile_f530fe2_3seed.json).

@@ -965,3 +965,64 @@ VCS is `V-2023.12-SP1_Full64`; aggregation used Python 3.6.8. The broader
 matched serial/parallel task benchmark still lacks the same per-command state
 profile, and the eight-configuration and TinyNPU results remain tied to their
 own source SHAs and memory endpoints.
+
+## Real-Top Matrix profiles under shared-SPAD contention — `f530fe2`
+
+Extended the passive Matrix profile to three existing Top CMDQ workloads at
+fixed test/source SHA `f530fe2c4c98204312b7ed16616cb9d9747670b2` (tree
+`919ebb411a7b47e0e0b3dfd2084852a83a2a5034`). The same `16×32×64` Matrix
+command was sampled alone, staged with a CNM GEMV, and during a dedicated
+Matrix-writeback/CNM contention test. Three Seeds (20261128/29/30) produced
+identical values. Every profile's 15 exclusive state buckets equal its Matrix
+`cycle_count`; the test also passes the 512-word Matrix Golden and the full
+Compute Cluster UVM checks with UVM Warning/Error/Fatal `0/0/0` per Seed.
+
+| Matrix profile | Matrix internal cycles | Full CMDQ doorbell-to-completion cycles | Effective MAC/cycle | Array utilization | Matrix SPAD read/write | Arbiter stall | Response wait | Writeback wait | Prefetch wait / MAC overlap |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Standalone | 490 | 565 | 66.87 | 26.12% | 3,072 / 2,048 B | 0 | 3 | 0 | 180 / 120 |
+| Matrix + CNM staged | 533 | 613 | 61.48 | 24.02% | 3,072 / 2,048 B | 43 | 6 | 0 | 219 / 120 |
+| Matrix writeback stalled by CNM | 844 | 1,837 | 38.82 | 15.17% | 3,072 / 2,048 B | 354 | 9 | 84 | 440 / 120 |
+
+The three windows have different meanings: standalone completion is Matrix;
+the staged case retires Matrix and CNM; the writeback case waits for both
+Matrix and CNM completions. Matrix SPAD bytes exclude CNM's bank traffic. The
+line-stall profile's 84 `writeback_wait` cycles are included in the 844 Matrix
+internal cycles; request-arbiter and response wait counters are diagnostic
+events and can overlap state/event counts. These results show measurable
+contention cost in the existing legal workloads, but do not compare an
+alternate arbitration policy or justify Bank-Aware Issue RTL changes.
+
+Machine data is [CSV](../../benchmark/v2_top_matrix_cluster_profile_f530fe2_3seed.csv)
+and [JSON](../../benchmark/v2_top_matrix_cluster_profile_f530fe2_3seed.json).
+Text-only logs and URG summaries are archived at
+`/tmp/nmaforge_v2_top_matrix_cluster_profile_f530fe2_3seed_text.tar.gz`,
+SHA-256 `64f70be1d60805c9898711cfe77f584329e2bd1c285df5b0e99bd5ea8019d542`;
+VDBs and simulator binaries are excluded. Exact UVM command:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v2_matrix_cluster_profile_25873ac_3seed \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261128 20261129 20261130'
+```
+
+Exact aggregation command:
+
+```sh
+python3 tools/summarize_top_matrix_profile.py \
+  --run-root /tmp/nmaforge_v2_matrix_cluster_profile_25873ac_3seed \
+  --source-sha f530fe2c4c98204312b7ed16616cb9d9747670b2 \
+  --tree-sha 919ebb411a7b47e0e0b3dfd2084852a83a2a5034 \
+  --run-id V2-TOP-MATRIX-CLUSTER-PROFILE-F530FE2-3SEED \
+  --expected-seeds 20261128,20261129,20261130 \
+  --required-profiles standalone,staged_matrix_cnm,line_stall_matrix_cnm \
+  --csv benchmark/v2_top_matrix_cluster_profile_f530fe2_3seed.csv \
+  --json benchmark/v2_top_matrix_cluster_profile_f530fe2_3seed.json
+```
+
+The VCS release is `V-2023.12-SP1_Full64`; the checked-in parser runs on Python
+3.6.8. CNM, SFU and other engine-internal per-command stalls are not captured
+by this Matrix-specific interface, and the broader serial/parallel workload
+still lacks a full all-engine timeline. No functional RTM state or product
+RTL changed.
