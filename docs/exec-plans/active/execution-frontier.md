@@ -1157,6 +1157,25 @@ scope, not arbitrary external fabric behavior or 0x52/0x53-specific reset
 crosses. See the [DV report](../../verification/NMAFORGE_V2_DV_CLOSURE.md) and
 [machine record](../../benchmark/v2_memory_fabric_reset_clean_839b9af_3seed.json).
 
+## 2026-11-06 — Matrix/CNM arbiter fairness investigation
+
+The current clean-candidate UVM logs report 18 simultaneous 0x52 GEMV/CNM
+request conflicts per seed, with collision grants Matrix/CNM `0/18` in all
+three seeds. Both outputs, ownership ledgers and ordered completions still
+pass. Inspection of `ai_spad_arbiter.v` shows CNM is considered before the
+Matrix banked requester in every data-class branch; the class-level round
+robin does not arbitrate between those two members. Sustained-CNM starvation
+is therefore a credible risk, but the existing Top workload is not itself a
+continuous-valid liveness proof.
+
+Before RTL modification, the planned focused acceptance is a legal sustained
+CNM/Matrix arbitration test: both clients must receive grants with bounded
+wait, response tags and Golden data must remain correct, and existing Top,
+Cluster, reset/fault regressions must stay green. This is an audit of the
+existing shared-arbiter contract, not a third compute innovation. At this
+checkpoint, product RTL remains unchanged; the bottleneck evidence and
+acceptance criteria are in the [performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md).
+
 ## Current phase disposition
 
 | Area | Status at the current evidence set | Remaining gate |

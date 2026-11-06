@@ -290,15 +290,27 @@ high-water is 2, Matrix accepts 128 16-byte reads, and CNM accepts 128
 profile-window length includes the testbench's doorbell/CPLQ register access
 overhead; it is not a clean standalone hardware latency endpoint.
 
-This is stronger evidence that the present legal workload exercises the
-shared arbiter: it observes 93 engine-overlap cycles and 20 cycles with
-simultaneous Matrix/CNM requests, with no response-valid alias and bit-exact
-outputs. It still does not compare serial versus parallel execution for the
-same two commands, model alternate memory service, isolate a Bank-Aware Issue
-policy, or measure area/timing cost. Therefore no scheduler RTL change is
-justified from this experiment alone. The large `other` phase buckets also
-show that more detailed phase/state correlation is needed before attributing
-the residual latency to memory contention.
+This profile established legal overlap and Golden/owner correctness but did
+not justify a scheduler change by itself. A later fixed-candidate UVM
+owner-cross at `839b9af` records Matrix/CNM request collisions with grants
+`0/18` in all three Seeds. That workload still completes both Goldens and is
+not a sustained-ready fairness proof. Source inspection of
+`ai_spad_arbiter.v` finds that every data-round-robin branch checks CNM before
+the Matrix `banked_valid` requester; the class pointer rotates Core/Banked/
+DMA classes but does not rotate CNM versus Matrix inside the shared Banked
+class. If both remain continuously pending, the current priority can starve
+Matrix. This is a candidate correctness/fairness defect in the existing RR
+contract, not evidence for a third compute innovation or a Bank-Aware Issue
+optimization.
+
+Before changing RTL, the acceptance condition is: a legal sustained CNM plus
+Matrix request test must demonstrate service for both requesters with a
+bounded wait, preserve their response tags and bit-exact data, and show no
+deadlock or reset/fault regression. Then rerun the existing real CMDQ
+0x52/CNM owner workload, the three-seed Compute Cluster regression, and Top
+Smoke. Compare contention grants and cycles before/after; do not claim a
+performance win unless the measured workload improves without a material
+regression to CNM, DMA, or response ownership.
 
 Exact build and run commands (VCS `V-2023.12-SP1_Full64`, behavioral four-bank
 SPAD, `+define+VCS`, 10 ns simulation clock):
@@ -335,7 +347,12 @@ and returned read accounting, and zero response-route mismatches. Each run
 observes 178 both-busy cycles and 18 simultaneous-request collisions; the
 arbiter grants in those collision cycles were Matrix/CNM `0/18`. That is
 functional ownership evidence and one observed arbitration outcome; it is not
-a fairness result or a comparable latency benchmark. Product RTL is unchanged.
+a fairness result or a comparable latency benchmark. The same workload is
+present in the later clean-candidate three-seed Cluster run `839b9af` and again
+reports `0/18` Matrix/CNM grants during collisions. The source-level priority
+analysis and bounded-fairness acceptance condition above explain why this is
+now being tested as an existing round-robin contract issue. Product RTL is
+unchanged in these runs.
 
 The owner overlap/contention covergroup is 100%; regression-wide URG is
 Line/Condition/FSM/Branch/Assert/Group
