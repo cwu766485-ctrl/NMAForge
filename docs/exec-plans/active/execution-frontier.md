@@ -1,8 +1,33 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Latest v2 verification candidate: `4df2efeefafa49f6832af9bc7fa8a71005b28fa9` (tree `71a655d67ff82de6ecab8fadeb10864cb4f95006`). Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; recent commits add only verification/build/report content. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Latest v2 benchmark/testbench source SHA: `4f7195bc01702f4e9a5bef2e609598ecb3dca66d` (tree `cf07292d03e245a0dc258d1d56c70f707e13763b`). Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; recent commits add only verification/build/report content. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
+
+## 2026-11-06 update — real-Top Matrix/CNM performance profile
+
+Added passive Top Smoke instrumentation for the existing legal parallel CMDQ
+workload (Matrix GEMM + CNM GEMV over disjoint SPAD regions); no product RTL
+changed. At source/test SHA `4f7195bc01702f4e9a5bef2e609598ecb3dca66d`,
+VCS `V-2023.12-SP1_Full64` completed full `ai_smoke` on Seeds 20261106,
+20261107, and 20261108. All three runs pass Golden/Completion checks and
+response-alias checking. The 229-cycle doorbell-to-completion window reports
+Matrix busy 20 cycles (4 MAC-active, 2 request wait, 2 response wait, 5
+writeback, 7 other) and CNM busy 146 cycles (16 compute, 1 request wait, 1
+response wait, 16 writeback, 112 other); both mutually exclusive partitions
+close. Engine-interface traffic is 544 B read/128 B write in the tested
+window. There is one request-collision cycle and outstanding-read high-water
+1. Diagnostic wait/lane counters overlap and are not included again in the
+cycle partition.
+
+Evidence: `benchmark/v2_p2_cluster_top_profile_4f7195b.csv`, summary JSON,
+and `/tmp/nmaforge_v2_matrix_cnm_profile_4f7195b_logs.tar.gz` (SHA-256
+`ba82586d8c57cb25cdade6023a4ec7a811c6b892884eab57272e1f92211a2ec5`). This
+Top behavioral-SPAD profile is not a matched serial/parallel performance
+comparison and does not establish Bank-Aware Issue benefit or ASIC PPA. Phase
+2 remains open for controlled contention ablation and comparable memory
+service; Phase 3 trained CNN/Tiny Transformer remain NOT_RUN; Phase 4 PPA is
+BLOCKED_ENV; v1.0 sign-off remains HOLD.
 
 ## 2026-11-06 update — 0x53 valid-rise SVA and mutation sensitivity
 
