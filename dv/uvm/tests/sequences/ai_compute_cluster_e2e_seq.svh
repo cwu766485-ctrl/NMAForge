@@ -303,6 +303,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     bit cmdq_product_gemv_k_tail;
     bit cmdq_product_gemv_min_shape;
     bit cmdq_product_gemv_full_tile_shape;
+    int unsigned cmdq_product_gemv_shape_id;
     bit cmdq_product_gemv_cnm_overlap;
     bit cmdq_product_gemv_cnm_contention;
     int unsigned engine_parallel_fault_cov_idx;
@@ -350,6 +351,15 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         option.per_instance = 1;
         cp_max_mn_full_tile: coverpoint cmdq_product_gemv_full_tile_shape {
             bins max_m_n_tile = {1'b1};
+        }
+    endgroup
+
+    covergroup cmdq_product_gemv_extended_shape_cg;
+        option.per_instance = 1;
+        cp_product_shape: coverpoint cmdq_product_gemv_shape_id {
+            bins m1_n16_k17 = {0};
+            bins m8_n13_k65 = {1};
+            bins m15_n16_k31 = {2};
         }
     endgroup
 
@@ -488,6 +498,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         cmdq_product_gemv_k_tail = 1'b0;
         cmdq_product_gemv_min_shape = 1'b0;
         cmdq_product_gemv_full_tile_shape = 1'b0;
+        cmdq_product_gemv_shape_id = 0;
         cmdq_product_gemv_cnm_overlap = 1'b0;
         cmdq_product_gemv_cnm_contention = 1'b0;
         engine_parity_cplq_cov_idx = 0;
@@ -515,6 +526,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         cmdq_product_gemv_cg = new();
         cmdq_product_gemv_min_cg = new();
         cmdq_product_gemv_full_tile_cg = new();
+        cmdq_product_gemv_extended_shape_cg = new();
         cmdq_product_gemv_cnm_owner_cg = new();
         engine_parallel_fault_cg = new();
         engine_parallel_reset_cg = new();
@@ -4740,6 +4752,191 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_HEAD, 32'd1);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+    task automatic run_product_gemv_cmdq_extended_shape(
+        input int unsigned seed,
+        input int unsigned shape_id,
+        input bit [15:0] m_size,
+        input bit [15:0] n_size,
+        input bit [15:0] k_size,
+        input bit [15:0] task_id,
+        input bit [31:0] src_a,
+        input bit [31:0] src_b,
+        input bit [31:0] dst
+    );
+        localparam bit [31:0] CMDQ_BASE = 32'h0005_b000;
+        localparam bit [31:0] CPLQ_BASE = 32'h0005_b400;
+        int signed a_matrix[0:15][0:255];
+        int signed b_matrix[0:255][0:15];
+        bit [31:0] golden[0:15][0:15];
+        bit [31:0] packed_word;
+        bit monitor_done;
+        int unsigned launch_before;
+        int unsigned matrix_launch_before;
+        int unsigned matrix_responses_before;
+        int unsigned accepted_reads;
+        int unsigned row_idx;
+        int unsigned col_idx;
+        int unsigned k_idx;
+        int unsigned byte_idx;
+        int unsigned lane;
+        int unsigned a_stride;
+        int signed a_value;
+        int signed b_value;
+        int signed sum;
+
+        if ((m_size < 1) || (m_size > 16) || (n_size < 1) ||
+            (n_size > 16) || (k_size < 1) || (k_size > 256))
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_SHAPE", $sformatf(
+                "test supplied out-of-contract shape=%0dx%0dx%0d",
+                m_size, n_size, k_size))
+
+        a_stride = (int'(k_size) + 15) & 'hffff_fff0;
+        for (row_idx = 0; row_idx < m_size; row_idx++) begin
+            for (byte_idx = 0; byte_idx < a_stride; byte_idx += 4) begin
+                packed_word = '0;
+                for (lane = 0; lane < 4; lane++) begin
+                    k_idx = byte_idx + lane;
+                    if (k_idx < k_size) begin
+                        a_value = ((int'(seed % 23) + int'(shape_id * 7) +
+                                    int'(row_idx * 5) + int'(k_idx * 3)) % 31) - 15;
+                        a_matrix[row_idx][k_idx] = a_value;
+                        packed_word[lane*8 +: 8] = a_value[7:0];
+                    end
+                end
+                spad_write(src_a + row_idx*a_stride + byte_idx, packed_word);
+            end
+        end
+        for (k_idx = 0; k_idx < k_size; k_idx++) begin
+            for (byte_idx = 0; byte_idx < 16; byte_idx += 4) begin
+                packed_word = '0;
+                for (lane = 0; lane < 4; lane++) begin
+                    col_idx = byte_idx + lane;
+                    if (col_idx < n_size) begin
+                        b_value = ((int'(seed % 19) + int'(shape_id * 11) +
+                                    int'(k_idx * 7) + int'(col_idx * 2)) % 29) - 14;
+                        b_matrix[k_idx][col_idx] = b_value;
+                        packed_word[lane*8 +: 8] = b_value[7:0];
+                    end
+                end
+                spad_write(src_b + (k_idx << 4) + byte_idx, packed_word);
+            end
+        end
+        for (row_idx = 0; row_idx < m_size; row_idx++) begin
+            for (col_idx = 0; col_idx < n_size; col_idx++) begin
+                sum = 0;
+                for (k_idx = 0; k_idx < k_size; k_idx++)
+                    sum += a_matrix[row_idx][k_idx] * b_matrix[k_idx][col_idx];
+                golden[row_idx][col_idx] = sum;
+                spad_write(dst + ((row_idx*n_size + col_idx) << 2),
+                           32'hbad0_e000 | (shape_id << 8) |
+                           (row_idx*n_size + col_idx));
+            end
+        end
+        spad_write(dst + ((m_size*n_size) << 2),
+                   32'hbad0_e100 | shape_id);
+        spad_write(dst + (((m_size*n_size) + 1) << 2),
+                   32'hbad0_e200 | shape_id);
+        write_cluster_desc(CMDQ_BASE, 8'h52, task_id, src_a, src_b, dst,
+                           m_size, n_size, k_size, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd7);
+
+        launch_before = compute_vif.launch_sample_count;
+        matrix_launch_before = compute_vif.engine_launch_count[3];
+        matrix_responses_before = compute_vif.matrix_tag_response_count;
+        accepted_reads = 0;
+        monitor_done = 1'b0;
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, CMDQ_BASE);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd1);
+        axil_write(REG_CPLQ_BASE, CPLQ_BASE);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+
+        fork
+            begin : extended_gemv_read_accept_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.matrix_request_valid &&
+                        compute_vif.banked_ready)
+                        accepted_reads++;
+                end
+            end
+            begin : extended_gemv_cmdq_submit
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(32'd1);
+                monitor_done = 1'b1;
+            end
+        join
+        wait_spad_idle();
+
+        if ((compute_vif.launch_sample_count - launch_before) != 1 ||
+            (compute_vif.engine_launch_count[3] - matrix_launch_before) != 1 ||
+            compute_vif.launch_snapshot_opcode[3] !== 8'h52 ||
+            compute_vif.launch_snapshot_src0[3] !== src_a ||
+            compute_vif.launch_snapshot_src1[3] !== src_b ||
+            compute_vif.launch_snapshot_dst[3] !== dst ||
+            compute_vif.launch_snapshot_m[3] !== m_size ||
+            compute_vif.launch_snapshot_n[3] !== n_size ||
+            compute_vif.launch_snapshot_k[3] !== k_size)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_SHAPE", $sformatf(
+                "shape %0dx%0dx%0d did not launch with exact descriptor values",
+                m_size, n_size, k_size))
+        if ((accepted_reads == 0) ||
+            ((compute_vif.matrix_tag_response_count - matrix_responses_before) !=
+             accepted_reads))
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_SHAPE", $sformatf(
+                "shape %0dx%0dx%0d response owner mismatch accepted=%0d returned=%0d",
+                m_size, n_size, k_size, accepted_reads,
+                compute_vif.matrix_tag_response_count - matrix_responses_before))
+
+        for (row_idx = 0; row_idx < m_size; row_idx++)
+            for (col_idx = 0; col_idx < n_size; col_idx++)
+                expect_spad(dst + ((row_idx*n_size + col_idx) << 2),
+                            golden[row_idx][col_idx],
+                            $sformatf("CMDQ 0x52 shape %0dx%0dx%0d Golden[%0d][%0d]",
+                                      m_size, n_size, k_size, row_idx, col_idx));
+        expect_spad(dst + ((m_size*n_size) << 2),
+                    32'hbad0_e100 | shape_id,
+                    $sformatf("CMDQ 0x52 shape %0d first output guard", shape_id));
+        expect_spad(dst + (((m_size*n_size) + 1) << 2),
+                    32'hbad0_e200 | shape_id,
+                    $sformatf("CMDQ 0x52 shape %0d second output guard", shape_id));
+        expect_completion(CPLQ_BASE, task_id,
+                          golden[m_size-1][n_size-1], m_size*n_size,
+                          $sformatf("CMDQ 0x52 shape %0dx%0dx%0d completion",
+                                    m_size, n_size, k_size));
+
+        cmdq_product_gemv_shape_id = shape_id;
+        cmdq_product_gemv_extended_shape_cg.sample();
+        `uvm_info("CLUSTER_CMDQ_GEMV_SHAPE_PASS", $sformatf(
+            "real CMDQ 0x52 shape=%0dx%0dx%0d; outputs=%0d and two guards match independent signed INT32 Golden; accepted/returned Matrix reads=%0d/%0d; completion ordered and checked; seed=%0d",
+            m_size, n_size, k_size, m_size*n_size, accepted_reads,
+            compute_vif.matrix_tag_response_count - matrix_responses_before,
+            seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+    task automatic run_product_gemv_cmdq_extended_shapes(input int unsigned seed);
+        run_product_gemv_cmdq_extended_shape(seed, 0, 16'd1, 16'd16, 16'd17,
+            16'h08c3, 32'h0007_d000, 32'h0007_d200, 32'h0007_d400);
+        run_product_gemv_cmdq_extended_shape(seed, 1, 16'd8, 16'd13, 16'd65,
+            16'h08c4, 32'h0007_d800, 32'h0007_de00, 32'h0007_e400);
+        run_product_gemv_cmdq_extended_shape(seed, 2, 16'd15, 16'd16, 16'd31,
+            16'h08c5, 32'h0007_e800, 32'h0007_ea00, 32'h0007_ee00);
+        if (cmdq_product_gemv_extended_shape_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_SHAPE", $sformatf(
+                "extended product GEMV shape sweep missed declared bins: %0.1f%%",
+                cmdq_product_gemv_extended_shape_cg.get_coverage()))
+        `uvm_info("CLUSTER_CMDQ_GEMV_EXT_SHAPES_PASS", $sformatf(
+            "cases=3/3 shapes=1x16x17,8x13x65,15x16x31 independent Golden/guards/completion/response-owner checks passed; focused bins=3/3 coverage=100.0%% seed=%0d",
+            seed), UVM_LOW)
     endtask
 
     task automatic run_product_gemv_cmdq_cnm_owner_cross(input int unsigned seed);
@@ -12389,6 +12586,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_product_gemv_cmdq_golden(seed);
         run_product_gemv_cmdq_min_boundary(seed);
         run_product_gemv_cmdq_full_tile(seed);
+        run_product_gemv_cmdq_extended_shapes(seed);
         run_product_gemv_cmdq_cnm_owner_cross(seed);
         run_engine_protection_full_cplq_cross(seed);
         run_scalar_gemv_gemm_cmdq_dispatch_test(seed);
