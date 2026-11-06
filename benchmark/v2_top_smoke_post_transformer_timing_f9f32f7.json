@@ -1,0 +1,20 @@
+{
+  "run_id": "V2-TOP-SMOKE-POST-TRANSFORMER-TIMING-F9F32F7-S20261106",
+  "status": "PASS_SCOPED",
+  "source_test_sha": "f9f32f71e7168350d74a75ede0a4a4b222844cc9",
+  "product_rtl_sha": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+  "seed": 20261106,
+  "random_workloads": 4,
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "python": "3.12.13"
+  },
+  "command": "VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261106 SEED=20261106",
+  "result": "TEST PASS; required GEMV 0x52, fused 0x53, cross-engine immutability and Matrix/CNM profile markers present; four randomized workloads; zero simulation error lines",
+  "coverage_note": "Top Smoke compatibility replay only; no UVM or URG coverage merge",
+  "compile_notice": "Known non-fatal LOOP-REROLL-ENABLED debug-capacity notice",
+  "compile_log_sha256": "60b9a381b38d7ea897ade2b4c969967d87b9431a81418045972f3b484245fac6",
+  "simulation_log_sha256": "79f8358cf225dd365c71261b7b6592db6b21c62b339824f6d906715f8ba43b28",
+  "log_archive": "/tmp/nmaforge_v2_top_smoke_post_transformer_timing_f9f32f7_logs.tar.gz",
+  "log_archive_sha256": "6667deb76dfbfbbfd51219785f27cf283ab7dcb92df57e07f757439dfaf7b428"
+}

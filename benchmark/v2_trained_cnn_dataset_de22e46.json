@@ -1,0 +1,49 @@
+{
+  "run_id": "V2-TRAINED-CNN-TOP-DATASET-DE22E46",
+  "candidate_sha": "de22e4652a54dfe7537e14585bdf3ae6f08fe9fb",
+  "candidate_tree_sha": "29d35cadabd84872081dc7f6d51a7398cfb431b5",
+  "product_rtl_sha": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "python": "3.12.13",
+    "numpy": "2.4.6",
+    "scikit_learn": "1.9.1"
+  },
+  "model_sha256": "fad54320315377c0bdf155eb0e57302c1868d1bd9a5f46ddd4c3e89a971c1906",
+  "testset_sha256": "4e000728b8e2a6496d7d3fa1439a16b44361d93f433f0a528076410592f31282",
+  "input_contract": "floor(pixel/4) INT8; Conv rounded (acc+8)>>4, clamp and ReLU; FC rounded (acc+128)>>8 then clamp",
+  "model_scope": "four fixed 3x3 edge filters plus trained four-class INT8 LogisticRegression readout",
+  "samples": 159,
+  "top_runs_passed": 159,
+  "all_intermediate_goldens_exact": true,
+  "correct": 158,
+  "accuracy": 0.9937106918238994,
+  "rtl_compute_cycles_per_sample": [
+    1985
+  ],
+  "host_layout_cycles_per_sample": [
+    1080
+  ],
+  "model_macs_per_sample": 1872,
+  "mac_per_compute_cycle": 0.9433,
+  "derived_256_mac_array_utilization": 0.003685,
+  "compute_spad_read_bytes_per_sample": 3360,
+  "compute_spad_write_bytes_per_sample": 1600,
+  "host_layout_spad_read_bytes_per_sample": 144,
+  "host_layout_spad_write_bytes_per_sample": 576,
+  "testbench_spad_initialization_bytes_per_sample_excluded": 3456,
+  "golden_sha256_first_sample": "0760b44581d5d257f4009b7ba06cd39b02644009ad0f4b6b2796d1a6a543f9d2",
+  "classification_source": "independent integer Golden logits, each Golden byte-compared by Top checker",
+  "csv": "v2_trained_cnn_dataset_de22e46.csv",
+  "logs_directory": "/tmp/nmaforge_v2_trained_cnn_dataset_de22e46/dataset_replay/logs",
+  "evidence_archive": {
+    "path": "/tmp/nmaforge_v2_trained_cnn_dataset_de22e46_evidence.tar.gz",
+    "sha256": "dfacc9a6a7e17150def4814cfe9baad11b8c21675d75db1505c0b907c80de1be",
+    "stored_in_git": false
+  },
+  "limits": [
+    "158/159 reflects the entire held-out set through RTL, but fixed edge kernels are not trained convolution weights",
+    "no TinyNPU run of this model or common-memory performance comparison",
+    "host/DMA/compute/writeback/graph orchestration are not all separately timed"
+  ]
+}

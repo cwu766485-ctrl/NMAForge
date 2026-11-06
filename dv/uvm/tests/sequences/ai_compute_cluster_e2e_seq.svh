@@ -298,6 +298,17 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
     int unsigned engine_pair_overlap_cov_idx;
     int unsigned cmdq_invalid_descriptor_case;
+    bit cmdq_product_gemv_m_tail;
+    bit cmdq_product_gemv_n_tail;
+    bit cmdq_product_gemv_k_tail;
+    bit cmdq_product_gemv_min_shape;
+    bit cmdq_product_gemv_full_tile_shape;
+    bit cmdq_product_gemv_long_k_shape;
+    bit cmdq_product_gemv_ab_alias;
+    int unsigned cmdq_product_gemv_shape_id;
+    int unsigned cmdq_product_gemv_tail_combo;
+    bit cmdq_product_gemv_cnm_overlap;
+    bit cmdq_product_gemv_cnm_contention;
     int unsigned engine_parallel_fault_cov_idx;
     int unsigned engine_parallel_reset_phase;
     covergroup cmdq_invalid_descriptor_cg;
@@ -311,7 +322,88 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             bins kv_zero_length = {5};
             bins mixed_fp_reserved_field = {6};
             bins macro_minimum_child_count = {7};
+            bins v2_gemv_output_alias_a = {8};
+            bins v2_gemv_output_alias_b = {9};
+            bins v2_gemv_source_alignment = {10};
+            bins v2_gemv_source_span_wrap = {11};
         }
+    endgroup
+
+    covergroup cmdq_product_gemv_cg;
+        option.per_instance = 1;
+        cp_m_tail: coverpoint cmdq_product_gemv_m_tail {
+            bins non_four_row_tail = {1'b1};
+        }
+        cp_n_tail: coverpoint cmdq_product_gemv_n_tail {
+            bins non_sixteen_column_tail = {1'b1};
+        }
+        cp_k_tail: coverpoint cmdq_product_gemv_k_tail {
+            bins non_sixteen_k_tail = {1'b1};
+        }
+        c_mnk_tail: cross cp_m_tail, cp_n_tail, cp_k_tail;
+    endgroup
+
+    covergroup cmdq_product_gemv_min_cg;
+        option.per_instance = 1;
+        cp_minimum_1x1x1: coverpoint cmdq_product_gemv_min_shape {
+            bins minimum_shape = {1'b1};
+        }
+    endgroup
+
+    covergroup cmdq_product_gemv_full_tile_cg;
+        option.per_instance = 1;
+        cp_max_mn_full_tile: coverpoint cmdq_product_gemv_full_tile_shape {
+            bins max_m_n_tile = {1'b1};
+        }
+    endgroup
+
+    covergroup cmdq_product_gemv_long_k_cg;
+        option.per_instance = 1;
+        cp_long_k_128: coverpoint cmdq_product_gemv_long_k_shape {
+            bins long_k_128 = {1'b1};
+        }
+    endgroup
+
+    covergroup cmdq_product_gemv_ab_alias_cg;
+        option.per_instance = 1;
+        cp_read_only_input_alias: coverpoint cmdq_product_gemv_ab_alias {
+            bins a_equals_b = {1'b1};
+        }
+    endgroup
+
+    covergroup cmdq_product_gemv_extended_shape_cg;
+        option.per_instance = 1;
+        cp_product_shape: coverpoint cmdq_product_gemv_shape_id {
+            bins m1_n16_k17 = {0};
+            bins m8_n13_k65 = {1};
+            bins m15_n16_k31 = {2};
+        }
+    endgroup
+
+    covergroup cmdq_product_gemv_tail_cross_cg;
+        option.per_instance = 1;
+        cp_mnk_alignment_tail: coverpoint cmdq_product_gemv_tail_combo {
+            bins all_aligned = {0};
+            bins k_tail_only = {1};
+            bins n_tail_only = {2};
+            bins nk_tails = {3};
+            bins m_tail_only = {4};
+            bins mk_tails = {5};
+            bins mn_tails = {6};
+            bins mnk_tails = {7};
+        }
+    endgroup
+
+    covergroup cmdq_product_gemv_cnm_owner_cg;
+        option.per_instance = 1;
+        cp_gemv_cnm_overlap: coverpoint cmdq_product_gemv_cnm_overlap {
+            bins overlapped = {1'b1};
+        }
+        cp_gemv_cnm_contention: coverpoint cmdq_product_gemv_cnm_contention {
+            bins shared_admission = {1'b1};
+        }
+        c_overlap_x_contention: cross cp_gemv_cnm_overlap,
+                                     cp_gemv_cnm_contention;
     endgroup
 
     covergroup engine_parallel_fault_cg;
@@ -432,6 +524,14 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         fp_reset_single_write_phase = 0;
         engine_watchdog_cov_idx = 0;
         engine_watchdog_cplq_cov_idx = 0;
+        cmdq_product_gemv_m_tail = 1'b0;
+        cmdq_product_gemv_n_tail = 1'b0;
+        cmdq_product_gemv_k_tail = 1'b0;
+        cmdq_product_gemv_min_shape = 1'b0;
+        cmdq_product_gemv_full_tile_shape = 1'b0;
+        cmdq_product_gemv_shape_id = 0;
+        cmdq_product_gemv_cnm_overlap = 1'b0;
+        cmdq_product_gemv_cnm_contention = 1'b0;
         engine_parity_cplq_cov_idx = 0;
         engine_abort_cplq_cov_idx = 0;
         engine_pair_overlap_cov_idx = 0;
@@ -454,6 +554,14 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         engine_parity_cplq_cg = new();
         engine_abort_cplq_cg = new();
         cmdq_invalid_descriptor_cg = new();
+        cmdq_product_gemv_cg = new();
+        cmdq_product_gemv_min_cg = new();
+        cmdq_product_gemv_full_tile_cg = new();
+        cmdq_product_gemv_long_k_cg = new();
+        cmdq_product_gemv_ab_alias_cg = new();
+        cmdq_product_gemv_extended_shape_cg = new();
+        cmdq_product_gemv_tail_cross_cg = new();
+        cmdq_product_gemv_cnm_owner_cg = new();
         engine_parallel_fault_cg = new();
         engine_parallel_reset_cg = new();
         engine_pair_overlap_cg = new();
@@ -3989,6 +4097,64 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
+    task automatic emit_matrix_profile(
+        input string profile_name,
+        input int unsigned seed,
+        input string shape,
+        input int unsigned doorbell_to_completion_cycles,
+        input int unsigned read_bytes_start,
+        input int unsigned write_bytes_start
+    );
+        int unsigned state_sum;
+        int unsigned state_snapshot[0:14];
+        int unsigned state_idx;
+        state_sum = 0;
+        for (state_idx = 0; state_idx < 15; state_idx++) begin
+            state_snapshot[state_idx] =
+                compute_vif.matrix_profile_state_cycles[state_idx];
+            state_sum += state_snapshot[state_idx];
+        end
+        if (state_sum != compute_vif.matrix_profile_cycle_count)
+            `uvm_fatal("V2_MATRIX_PROFILE_SUM", $sformatf(
+                "profile=%s exclusive Matrix FSM sum %0d != DUT cycle_count %0d",
+                profile_name, state_sum, compute_vif.matrix_profile_cycle_count))
+        $display({
+            "V2_MATRIX_PROFILE_CSV,profile=%s,seed=%0d,shape=%s,",
+            "internal_cycles=%0d,doorbell_to_cpl_cycles=%0d,",
+            "exclusive_state_sum=%0d,spad_read_bytes=%0d,spad_write_bytes=%0d,",
+            "st_idle=%0d,st_a_req=%0d,st_a_wait=%0d,st_b_req=%0d,st_b_wait=%0d,",
+            "st_bias_req=%0d,st_bias_wait=%0d,st_prep_mac=%0d,st_mac=%0d,",
+            "st_write=%0d,st_next=%0d,st_done=%0d,st_error=%0d,",
+            "st_error_drain=%0d,st_prefetch_wait=%0d,",
+            "arbiter_stall=%0d,response_wait=%0d,writeback_wait=%0d,",
+            "prefetch_a_req=%0d,prefetch_a_drain=%0d,prefetch_b_req=%0d,",
+            "prefetch_b_drain=%0d,prefetch_overlap=%0d,prefetch_wait=%0d,",
+            "prefetch_completed=%0d,outstanding_highwater=%0d,fifo_full=%0d,",
+            "a_tile_cache_hits=%0d"},
+            profile_name, seed, shape, compute_vif.matrix_profile_cycle_count,
+            doorbell_to_completion_cycles, state_sum,
+            compute_vif.matrix_spad_read_bytes - read_bytes_start,
+            compute_vif.matrix_spad_write_bytes - write_bytes_start,
+            state_snapshot[0], state_snapshot[1], state_snapshot[2],
+            state_snapshot[3], state_snapshot[4], state_snapshot[5],
+            state_snapshot[6], state_snapshot[7], state_snapshot[8],
+            state_snapshot[9], state_snapshot[10], state_snapshot[11],
+            state_snapshot[12], state_snapshot[13], state_snapshot[14],
+            compute_vif.matrix_profile_arbiter_stall_cycles,
+            compute_vif.matrix_profile_response_wait_cycles,
+            compute_vif.matrix_profile_writeback_wait_cycles,
+            compute_vif.matrix_profile_prefetch_a_req_cycles,
+            compute_vif.matrix_profile_prefetch_a_drain_cycles,
+            compute_vif.matrix_profile_prefetch_b_req_cycles,
+            compute_vif.matrix_profile_prefetch_b_drain_cycles,
+            compute_vif.matrix_profile_prefetch_overlap_cycles,
+            compute_vif.matrix_profile_prefetch_wait_cycles,
+            compute_vif.matrix_profile_prefetch_completed,
+            compute_vif.matrix_profile_outstanding_highwater,
+            compute_vif.matrix_profile_fifo_full_cycles,
+            compute_vif.matrix_a_cache_hits);
+    endtask
+
     task automatic wait_spad_idle();
         int unsigned poll;
         int unsigned quiet_cycles;
@@ -4116,7 +4282,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     endtask
 
     task automatic run_cmdq_invalid_descriptor_matrix_test(input int unsigned seed);
-        localparam int unsigned CASE_COUNT = 8;
+        localparam int unsigned CASE_COUNT = 12;
         bit [31:0] cmdq_base;
         bit [31:0] cplq_base;
         bit [31:0] sentinel_base;
@@ -4150,13 +4316,25 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         opcode[5] = 8'h43; m_size[5] = 16'd0; n_size[5] = 16'd0; length[5] = 16'd0; version[5] = 8'd5;
         opcode[6] = 8'h50; m_size[6] = 16'd1; n_size[6] = 16'd1; length[6] = 16'd1; version[6] = 8'd7;
         opcode[7] = 8'h40; m_size[7] = 16'd0; n_size[7] = 16'd0; length[7] = 16'd2; version[7] = 8'd4;
+        opcode[8] = 8'h52; m_size[8] = 16'd1; n_size[8] = 16'd1; length[8] = 16'd1; version[8] = 8'd7;
+        opcode[9] = 8'h52; m_size[9] = 16'd1; n_size[9] = 16'd1; length[9] = 16'd1; version[9] = 8'd7;
+        opcode[10] = 8'h52; m_size[10] = 16'd1; n_size[10] = 16'd1; length[10] = 16'd1; version[10] = 8'd7;
+        opcode[11] = 8'h52; m_size[11] = 16'd1; n_size[11] = 16'd1; length[11] = 16'd17; version[11] = 8'd7;
 
         for (i = 0; i < CASE_COUNT; i++) begin
             descriptor_dst[i] = sentinel_base + (i << 5);
+            if (i == 8)
+                descriptor_dst[i] = 32'h0007_8000; // Output overlaps padded A.
+            else if (i == 9)
+                descriptor_dst[i] = 32'h0007_8100; // Output overlaps dense B.
+            // K=17 pads A to 32 bytes, so this span wraps past 2^32.
+            // K=1 would end exactly at 2^32 and is a legal half-open range.
             spad_write(descriptor_dst[i], 32'hde5c_0000 | i);
             spad_write(descriptor_dst[i] + 32'd4, 32'hde5c_1000 | i);
             write_cluster_desc(cmdq_base + (i << 6), opcode[i],
-                               16'h08a0 + i, 32'h0007_8000,
+                               16'h08a0 + i,
+                               (i == 10) ? 32'h0007_8004 :
+                               ((i == 11) ? 32'hffff_fff0 : 32'h0007_8000),
                                32'h0007_8100, descriptor_dst[i],
                                m_size[i], n_size[i], length[i],
                                32'd0, 32'd0, 32'd0, 32'd0, version[i]);
@@ -4233,9 +4411,1074 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 cmdq_invalid_descriptor_cg.get_coverage()))
 
         `uvm_info("CLUSTER_CMDQ_INVALID_DESCRIPTOR_PASS", $sformatf(
-            "cases=8/8 engines_and_macro=8 ERR_DESC=8 ordered_head=8 no_launch=1 no_compute_or_dma_request_cycles=%0d sentinels=16/16 focused_bins=8/8 coverage=%0.1f%% seed=%0d",
+            "cases=12/12 engines_and_macro=8 v2_gemv=4 ERR_DESC=12 ordered_head=12 no_launch=1 no_compute_or_dma_request_cycles=%0d sentinels=24/24 focused_bins=12/12 coverage=%0.1f%% seed=%0d",
             bad_request_cycles, cmdq_invalid_descriptor_cg.get_coverage(), seed), UVM_LOW)
         axil_write(REG_CPLQ_HEAD, CASE_COUNT);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+    task automatic sample_product_gemv_tail_cross(
+        input int unsigned m_size,
+        input int unsigned n_size,
+        input int unsigned k_size
+    );
+        cmdq_product_gemv_tail_combo =
+            (((m_size % 4) != 0) ? 4 : 0) |
+            (((n_size % 16) != 0) ? 2 : 0) |
+            (((k_size % 16) != 0) ? 1 : 0);
+        cmdq_product_gemv_tail_cross_cg.sample();
+    endtask
+
+    task automatic run_product_gemv_cmdq_golden(input int unsigned seed);
+        localparam int unsigned M_SIZE = 3;
+        localparam int unsigned N_SIZE = 5;
+        localparam int unsigned K_SIZE = 5;
+        localparam bit [31:0] CMDQ_BASE = 32'h0005_b000;
+        localparam bit [31:0] CPLQ_BASE = 32'h0005_b400;
+        localparam bit [31:0] SRC_A = 32'h0007_b000;
+        localparam bit [31:0] SRC_B = 32'h0007_b100;
+        localparam bit [31:0] DST = 32'h0007_b200;
+        localparam bit [15:0] TASK_ID = 16'h08c0;
+        int signed a_matrix[0:M_SIZE-1][0:K_SIZE-1];
+        int signed b_matrix[0:K_SIZE-1][0:N_SIZE-1];
+        bit [31:0] golden[0:M_SIZE-1][0:N_SIZE-1];
+        bit [31:0] packed_word;
+        bit monitor_done;
+        int unsigned launch_before;
+        int unsigned matrix_launch_before;
+        int unsigned matrix_responses_before;
+        int unsigned accepted_reads;
+        int unsigned row_idx;
+        int unsigned col_idx;
+        int unsigned k_idx;
+        int unsigned word_byte;
+        int unsigned lane;
+        int signed a_value;
+        int signed b_value;
+        int signed sum;
+        bit [31:0] debug_cmdq_head;
+        bit [31:0] debug_completion_task;
+        bit [31:0] debug_completion_status;
+
+        // ABI-v7 0x52 stores each A row padded to 16 bytes and each dense-B
+        // K row in a 16-byte physical slot. This legal 3x5x5 shape exercises
+        // M, N and K tails through the real Top CMDQ path.
+        for (row_idx = 0; row_idx < M_SIZE; row_idx++) begin
+            for (word_byte = 0; word_byte < 16; word_byte += 4) begin
+                packed_word = '0;
+                for (lane = 0; lane < 4; lane++) begin
+                    k_idx = word_byte + lane;
+                    if (k_idx < K_SIZE) begin
+                        a_value = (int'(seed % 13) + int'(row_idx * 5) +
+                                   int'(k_idx * 3)) % 15 - 7;
+                        a_matrix[row_idx][k_idx] = a_value;
+                        packed_word[lane*8 +: 8] = a_value[7:0];
+                    end
+                end
+                spad_write(SRC_A + (row_idx << 4) + word_byte, packed_word);
+            end
+        end
+        for (k_idx = 0; k_idx < K_SIZE; k_idx++) begin
+            for (word_byte = 0; word_byte < 16; word_byte += 4) begin
+                packed_word = '0;
+                for (lane = 0; lane < 4; lane++) begin
+                    col_idx = word_byte + lane;
+                    if (col_idx < N_SIZE) begin
+                        b_value = (int'(seed % 11) + int'(k_idx * 7) +
+                                   int'(col_idx * 2)) % 13 - 6;
+                        b_matrix[k_idx][col_idx] = b_value;
+                        packed_word[lane*8 +: 8] = b_value[7:0];
+                    end
+                end
+                spad_write(SRC_B + (k_idx << 4) + word_byte, packed_word);
+            end
+        end
+
+        for (row_idx = 0; row_idx < M_SIZE; row_idx++) begin
+            for (col_idx = 0; col_idx < N_SIZE; col_idx++) begin
+                sum = 0;
+                for (k_idx = 0; k_idx < K_SIZE; k_idx++)
+                    sum += a_matrix[row_idx][k_idx] * b_matrix[k_idx][col_idx];
+                golden[row_idx][col_idx] = sum;
+                spad_write(DST + ((row_idx * N_SIZE + col_idx) << 2),
+                           32'hbad0_c000 | (row_idx * N_SIZE + col_idx));
+            end
+        end
+        spad_write(DST + ((M_SIZE * N_SIZE) << 2), 32'hbad0_c100);
+        spad_write(DST + ((M_SIZE * N_SIZE + 1) << 2), 32'hbad0_c101);
+        write_cluster_desc(CMDQ_BASE, 8'h52, TASK_ID, SRC_A, SRC_B, DST,
+                           M_SIZE, N_SIZE, K_SIZE, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd7);
+
+        launch_before = compute_vif.launch_sample_count;
+        matrix_launch_before = compute_vif.engine_launch_count[3];
+        matrix_responses_before = compute_vif.matrix_tag_response_count;
+        accepted_reads = 0;
+        monitor_done = 1'b0;
+        cmdq_product_gemv_m_tail = (M_SIZE % 4) != 0;
+        cmdq_product_gemv_n_tail = (N_SIZE % 16) != 0;
+        cmdq_product_gemv_k_tail = (K_SIZE % 16) != 0;
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, CMDQ_BASE);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd1);
+        axil_write(REG_CPLQ_BASE, CPLQ_BASE);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+
+        fork
+            begin : product_gemv_read_accept_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.matrix_request_valid &&
+                        compute_vif.banked_ready)
+                        accepted_reads++;
+                end
+            end
+            begin : product_gemv_cmdq_submit
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(32'd1);
+                monitor_done = 1'b1;
+            end
+        join
+        wait_spad_idle();
+
+        if ((compute_vif.launch_sample_count - launch_before) != 1 ||
+            (compute_vif.engine_launch_count[3] - matrix_launch_before) != 1 ||
+            compute_vif.launch_snapshot_opcode[3] !== 8'h52 ||
+            compute_vif.launch_snapshot_src0[3] !== SRC_A ||
+            compute_vif.launch_snapshot_src1[3] !== SRC_B ||
+            compute_vif.launch_snapshot_dst[3] !== DST ||
+            compute_vif.launch_snapshot_m[3] !== M_SIZE ||
+            compute_vif.launch_snapshot_n[3] !== N_SIZE ||
+            compute_vif.launch_snapshot_k[3] !== K_SIZE) begin
+            axil_read(REG_CMDQ_HEAD, debug_cmdq_head);
+            axil_read(CIMFORGE_SPAD_BASE + CPLQ_BASE, debug_completion_task);
+            axil_read(CIMFORGE_SPAD_BASE + CPLQ_BASE + 32'd4,
+                      debug_completion_status);
+            `uvm_fatal("CLUSTER_CMDQ_GEMV", $sformatf(
+                "0x52 CMDQ launch mismatch launch_delta=%0d matrix_delta=%0d op=%02h shape=%0dx%0dx%0d cmdq_head=%0d completion_task=%08h completion_status=%08h",
+                compute_vif.launch_sample_count - launch_before,
+                compute_vif.engine_launch_count[3] - matrix_launch_before,
+                compute_vif.launch_snapshot_opcode[3],
+                compute_vif.launch_snapshot_m[3],
+                compute_vif.launch_snapshot_n[3],
+                compute_vif.launch_snapshot_k[3], debug_cmdq_head,
+                debug_completion_task, debug_completion_status))
+        end
+        if (accepted_reads == 0 ||
+            (compute_vif.matrix_tag_response_count - matrix_responses_before) != accepted_reads)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV", $sformatf(
+                "0x52 Matrix response ownership mismatch accepted=%0d returned=%0d",
+                accepted_reads,
+                compute_vif.matrix_tag_response_count - matrix_responses_before))
+
+        for (row_idx = 0; row_idx < M_SIZE; row_idx++)
+            for (col_idx = 0; col_idx < N_SIZE; col_idx++)
+                expect_spad(DST + ((row_idx * N_SIZE + col_idx) << 2),
+                            golden[row_idx][col_idx],
+                            $sformatf("CMDQ opcode 0x52 Golden[%0d][%0d]",
+                                      row_idx, col_idx));
+        expect_spad(DST + ((M_SIZE * N_SIZE) << 2), 32'hbad0_c100,
+                    "CMDQ opcode 0x52 first output guard");
+        expect_spad(DST + ((M_SIZE * N_SIZE + 1) << 2), 32'hbad0_c101,
+                    "CMDQ opcode 0x52 second output guard");
+        expect_completion(CPLQ_BASE, TASK_ID, golden[M_SIZE-1][N_SIZE-1],
+                          M_SIZE * N_SIZE, "CMDQ opcode 0x52 completion");
+
+        sample_product_gemv_tail_cross(M_SIZE, N_SIZE, K_SIZE);
+        cmdq_product_gemv_cg.sample();
+        if (cmdq_product_gemv_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV", $sformatf(
+                "0x52 CMDQ M/N/K tail coverage incomplete: %0.1f%%",
+                cmdq_product_gemv_cg.get_coverage()))
+        `uvm_info("CLUSTER_CMDQ_GEMV_GOLDEN_PASS", $sformatf(
+            "real CMDQ opcode=0x52 M=%0d N=%0d K=%0d; all %0d INT32 outputs and 2 guards match independent Golden; accepted/returned Matrix reads=%0d/%0d; focused M/N/K-tail coverage=100%% seed=%0d",
+            M_SIZE, N_SIZE, K_SIZE, M_SIZE*N_SIZE, accepted_reads,
+            compute_vif.matrix_tag_response_count - matrix_responses_before,
+            seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+    task automatic run_product_gemv_cmdq_min_boundary(input int unsigned seed);
+        localparam bit [31:0] CMDQ_BASE = 32'h0005_b000;
+        localparam bit [31:0] CPLQ_BASE = 32'h0005_b400;
+        localparam bit [31:0] SRC_A = 32'h0007_b400;
+        localparam bit [31:0] SRC_B = 32'h0007_b500;
+        localparam bit [31:0] DST = 32'h0007_b600;
+        localparam bit [15:0] TASK_ID = 16'h08c1;
+        int signed a_value;
+        int signed b_value;
+        int signed golden;
+        int unsigned word_byte;
+        bit [31:0] packed_word;
+        bit monitor_done;
+        int unsigned launch_before;
+        int unsigned matrix_launch_before;
+        int unsigned matrix_responses_before;
+        int unsigned accepted_reads;
+
+        // Exercise the minimum legal dimensions through the real descriptor,
+        // CMDQ, dispatcher, banked-SPAD, and completion path. Both operands
+        // occupy their ABI-mandated 16-byte physical slots.
+        a_value = -1 - int'(seed % 3);
+        b_value = 2 + int'(seed % 5);
+        golden = a_value * b_value;
+        for (word_byte = 0; word_byte < 16; word_byte += 4) begin
+            packed_word = '0;
+            if (word_byte == 0)
+                packed_word[7:0] = a_value[7:0];
+            spad_write(SRC_A + word_byte, packed_word);
+            packed_word = '0;
+            if (word_byte == 0)
+                packed_word[7:0] = b_value[7:0];
+            spad_write(SRC_B + word_byte, packed_word);
+        end
+        spad_write(DST, 32'hbad0_c200);
+        spad_write(DST + 32'd4, 32'hbad0_c201);
+        write_cluster_desc(CMDQ_BASE, 8'h52, TASK_ID, SRC_A, SRC_B, DST,
+                           16'd1, 16'd1, 16'd1, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd7);
+
+        launch_before = compute_vif.launch_sample_count;
+        matrix_launch_before = compute_vif.engine_launch_count[3];
+        matrix_responses_before = compute_vif.matrix_tag_response_count;
+        accepted_reads = 0;
+        monitor_done = 1'b0;
+        cmdq_product_gemv_min_shape = 1'b0;
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, CMDQ_BASE);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd1);
+        axil_write(REG_CPLQ_BASE, CPLQ_BASE);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+
+        fork
+            begin : min_gemv_read_accept_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.matrix_request_valid &&
+                        compute_vif.banked_ready)
+                        accepted_reads++;
+                end
+            end
+            begin : min_gemv_cmdq_submit
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(32'd1);
+                monitor_done = 1'b1;
+            end
+        join
+        wait_spad_idle();
+
+        if ((compute_vif.launch_sample_count - launch_before) != 1 ||
+            (compute_vif.engine_launch_count[3] - matrix_launch_before) != 1 ||
+            compute_vif.launch_snapshot_opcode[3] !== 8'h52 ||
+            compute_vif.launch_snapshot_m[3] !== 16'd1 ||
+            compute_vif.launch_snapshot_n[3] !== 16'd1 ||
+            compute_vif.launch_snapshot_k[3] !== 16'd1)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_MIN", "1x1x1 opcode 0x52 descriptor did not launch through Matrix")
+        if (accepted_reads != 2 ||
+            (compute_vif.matrix_tag_response_count - matrix_responses_before) != 2)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_MIN", $sformatf(
+                "1x1x1 expected two accepted/returned operand lines, observed accepted=%0d returned=%0d",
+                accepted_reads,
+                compute_vif.matrix_tag_response_count - matrix_responses_before))
+
+        expect_spad(DST, golden, "CMDQ opcode 0x52 minimum 1x1x1 Golden");
+        expect_spad(DST + 32'd4, 32'hbad0_c201,
+                    "CMDQ opcode 0x52 minimum output guard");
+        expect_completion(CPLQ_BASE, TASK_ID, golden, 32'd1,
+                          "CMDQ opcode 0x52 minimum 1x1x1 completion");
+        sample_product_gemv_tail_cross(16'd1, 16'd1, 16'd1);
+        cmdq_product_gemv_min_shape = 1'b1;
+        cmdq_product_gemv_min_cg.sample();
+        if (cmdq_product_gemv_min_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_MIN", "minimum 1x1x1 functional bin not hit")
+        `uvm_info("CLUSTER_CMDQ_GEMV_MIN_PASS", $sformatf(
+            "real CMDQ opcode=0x52 M=N=K=1; A=%0d B=%0d output=%0d; accepted/returned reads=2/2; guard intact; seed=%0d",
+            a_value, b_value, golden, seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+    task automatic run_product_gemv_cmdq_full_tile(input int unsigned seed);
+        localparam int unsigned M_SIZE = 16;
+        localparam int unsigned N_SIZE = 16;
+        localparam int unsigned K_SIZE = 16;
+        localparam bit [31:0] CMDQ_BASE = 32'h0005_b000;
+        localparam bit [31:0] CPLQ_BASE = 32'h0005_b400;
+        localparam bit [31:0] SRC_A = 32'h0007_b800;
+        localparam bit [31:0] SRC_B = 32'h0007_ba00;
+        localparam bit [31:0] DST = 32'h0007_bc00;
+        localparam bit [15:0] TASK_ID = 16'h08c2;
+        int signed a_matrix[0:M_SIZE-1][0:K_SIZE-1];
+        int signed b_matrix[0:K_SIZE-1][0:N_SIZE-1];
+        bit [31:0] golden[0:M_SIZE-1][0:N_SIZE-1];
+        bit [31:0] packed_word;
+        bit monitor_done;
+        int unsigned launch_before;
+        int unsigned matrix_launch_before;
+        int unsigned matrix_responses_before;
+        int unsigned accepted_reads;
+        int unsigned row_idx;
+        int unsigned col_idx;
+        int unsigned k_idx;
+        int unsigned word_byte;
+        int unsigned lane;
+        int signed a_value;
+        int signed b_value;
+        int signed sum;
+
+        // Exercise the maximum legal M/N tile and full K tile through the
+        // same product CMDQ path. Operand rows use the ABI's 16-byte stride.
+        for (row_idx = 0; row_idx < M_SIZE; row_idx++) begin
+            for (word_byte = 0; word_byte < 16; word_byte += 4) begin
+                packed_word = '0;
+                for (lane = 0; lane < 4; lane++) begin
+                    k_idx = word_byte + lane;
+                    a_value = (int'(seed % 17) + int'(row_idx * 3) +
+                               int'(k_idx * 5)) % 15 - 7;
+                    a_matrix[row_idx][k_idx] = a_value;
+                    packed_word[lane*8 +: 8] = a_value[7:0];
+                end
+                spad_write(SRC_A + (row_idx << 4) + word_byte, packed_word);
+            end
+        end
+        for (k_idx = 0; k_idx < K_SIZE; k_idx++) begin
+            for (word_byte = 0; word_byte < 16; word_byte += 4) begin
+                packed_word = '0;
+                for (lane = 0; lane < 4; lane++) begin
+                    col_idx = word_byte + lane;
+                    b_value = (int'(seed % 19) + int'(k_idx * 7) +
+                               int'(col_idx * 2)) % 13 - 6;
+                    b_matrix[k_idx][col_idx] = b_value;
+                    packed_word[lane*8 +: 8] = b_value[7:0];
+                end
+                spad_write(SRC_B + (k_idx << 4) + word_byte, packed_word);
+            end
+        end
+
+        for (row_idx = 0; row_idx < M_SIZE; row_idx++) begin
+            for (col_idx = 0; col_idx < N_SIZE; col_idx++) begin
+                sum = 0;
+                for (k_idx = 0; k_idx < K_SIZE; k_idx++)
+                    sum += a_matrix[row_idx][k_idx] * b_matrix[k_idx][col_idx];
+                golden[row_idx][col_idx] = sum;
+                spad_write(DST + ((row_idx * N_SIZE + col_idx) << 2),
+                           32'hbad0_d000 | (row_idx * N_SIZE + col_idx));
+            end
+        end
+        spad_write(DST + 32'h400, 32'hbad0_d100);
+        spad_write(DST + 32'h404, 32'hbad0_d101);
+        write_cluster_desc(CMDQ_BASE, 8'h52, TASK_ID, SRC_A, SRC_B, DST,
+                           M_SIZE, N_SIZE, K_SIZE, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd7);
+
+        launch_before = compute_vif.launch_sample_count;
+        matrix_launch_before = compute_vif.engine_launch_count[3];
+        matrix_responses_before = compute_vif.matrix_tag_response_count;
+        accepted_reads = 0;
+        monitor_done = 1'b0;
+        cmdq_product_gemv_full_tile_shape = 1'b0;
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, CMDQ_BASE);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd1);
+        axil_write(REG_CPLQ_BASE, CPLQ_BASE);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+
+        fork
+            begin : full_tile_gemv_read_accept_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.matrix_request_valid &&
+                        compute_vif.banked_ready)
+                        accepted_reads++;
+                end
+            end
+            begin : full_tile_gemv_cmdq_submit
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(32'd1);
+                monitor_done = 1'b1;
+            end
+        join
+        wait_spad_idle();
+
+        if ((compute_vif.launch_sample_count - launch_before) != 1 ||
+            (compute_vif.engine_launch_count[3] - matrix_launch_before) != 1 ||
+            compute_vif.launch_snapshot_opcode[3] !== 8'h52 ||
+            compute_vif.launch_snapshot_src0[3] !== SRC_A ||
+            compute_vif.launch_snapshot_src1[3] !== SRC_B ||
+            compute_vif.launch_snapshot_dst[3] !== DST ||
+            compute_vif.launch_snapshot_m[3] !== M_SIZE ||
+            compute_vif.launch_snapshot_n[3] !== N_SIZE ||
+            compute_vif.launch_snapshot_k[3] !== K_SIZE)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_MAX", "16x16x16 opcode 0x52 descriptor did not launch through Matrix")
+        if (accepted_reads == 0 ||
+            (compute_vif.matrix_tag_response_count - matrix_responses_before) != accepted_reads)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_MAX", $sformatf(
+                "16x16x16 Matrix response ownership mismatch accepted=%0d returned=%0d",
+                accepted_reads,
+                compute_vif.matrix_tag_response_count - matrix_responses_before))
+
+        for (row_idx = 0; row_idx < M_SIZE; row_idx++)
+            for (col_idx = 0; col_idx < N_SIZE; col_idx++)
+                expect_spad(DST + ((row_idx * N_SIZE + col_idx) << 2),
+                            golden[row_idx][col_idx],
+                            $sformatf("CMDQ opcode 0x52 max Golden[%0d][%0d]",
+                                      row_idx, col_idx));
+        expect_spad(DST + 32'h400, 32'hbad0_d100,
+                    "CMDQ opcode 0x52 max first output guard");
+        expect_spad(DST + 32'h404, 32'hbad0_d101,
+                    "CMDQ opcode 0x52 max second output guard");
+        expect_completion(CPLQ_BASE, TASK_ID, golden[15][15], 32'd256,
+                          "CMDQ opcode 0x52 16x16x16 completion");
+
+        sample_product_gemv_tail_cross(M_SIZE, N_SIZE, K_SIZE);
+        cmdq_product_gemv_full_tile_shape = 1'b1;
+        cmdq_product_gemv_full_tile_cg.sample();
+        if (cmdq_product_gemv_full_tile_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_MAX", "maximum 16x16 tile functional bin not hit")
+        `uvm_info("CLUSTER_CMDQ_GEMV_MAX_PASS", $sformatf(
+            "real CMDQ opcode=0x52 M=N=K=16; all 256 INT32 outputs and 2 guards match independent Golden; accepted/returned Matrix reads=%0d/%0d; focused maximum-tile coverage=100%% seed=%0d",
+            accepted_reads,
+            compute_vif.matrix_tag_response_count - matrix_responses_before,
+            seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+    task automatic run_product_gemv_cmdq_extended_shape(
+        input int unsigned seed,
+        input int unsigned shape_id,
+        input bit [15:0] m_size,
+        input bit [15:0] n_size,
+        input bit [15:0] k_size,
+        input bit [15:0] task_id,
+        input bit [31:0] src_a,
+        input bit [31:0] src_b,
+        input bit [31:0] dst
+    );
+        localparam bit [31:0] CMDQ_BASE = 32'h0005_b000;
+        localparam bit [31:0] CPLQ_BASE = 32'h0005_b400;
+        int signed a_matrix[0:15][0:255];
+        int signed b_matrix[0:255][0:15];
+        bit [31:0] golden[0:15][0:15];
+        bit [31:0] packed_word;
+        bit monitor_done;
+        int unsigned launch_before;
+        int unsigned matrix_launch_before;
+        int unsigned matrix_responses_before;
+        int unsigned accepted_reads;
+        int unsigned row_idx;
+        int unsigned col_idx;
+        int unsigned k_idx;
+        int unsigned byte_idx;
+        int unsigned lane;
+        int unsigned a_stride;
+        int signed a_value;
+        int signed b_value;
+        int signed sum;
+
+        if ((m_size < 1) || (m_size > 16) || (n_size < 1) ||
+            (n_size > 16) || (k_size < 1) || (k_size > 256))
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_SHAPE", $sformatf(
+                "test supplied out-of-contract shape=%0dx%0dx%0d",
+                m_size, n_size, k_size))
+
+        a_stride = (int'(k_size) + 15) & 'hffff_fff0;
+        for (row_idx = 0; row_idx < m_size; row_idx++) begin
+            for (byte_idx = 0; byte_idx < a_stride; byte_idx += 4) begin
+                packed_word = '0;
+                for (lane = 0; lane < 4; lane++) begin
+                    k_idx = byte_idx + lane;
+                    if (k_idx < k_size) begin
+                        a_value = ((int'(seed % 23) + int'(shape_id * 7) +
+                                    int'(row_idx * 5) + int'(k_idx * 3)) % 31) - 15;
+                        a_matrix[row_idx][k_idx] = a_value;
+                        packed_word[lane*8 +: 8] = a_value[7:0];
+                    end
+                end
+                spad_write(src_a + row_idx*a_stride + byte_idx, packed_word);
+            end
+        end
+        for (k_idx = 0; k_idx < k_size; k_idx++) begin
+            for (byte_idx = 0; byte_idx < 16; byte_idx += 4) begin
+                packed_word = '0;
+                for (lane = 0; lane < 4; lane++) begin
+                    col_idx = byte_idx + lane;
+                    if (col_idx < n_size) begin
+                        b_value = ((int'(seed % 19) + int'(shape_id * 11) +
+                                    int'(k_idx * 7) + int'(col_idx * 2)) % 29) - 14;
+                        b_matrix[k_idx][col_idx] = b_value;
+                        packed_word[lane*8 +: 8] = b_value[7:0];
+                    end
+                end
+                spad_write(src_b + (k_idx << 4) + byte_idx, packed_word);
+            end
+        end
+        for (row_idx = 0; row_idx < m_size; row_idx++) begin
+            for (col_idx = 0; col_idx < n_size; col_idx++) begin
+                sum = 0;
+                for (k_idx = 0; k_idx < k_size; k_idx++)
+                    sum += a_matrix[row_idx][k_idx] * b_matrix[k_idx][col_idx];
+                golden[row_idx][col_idx] = sum;
+                spad_write(dst + ((row_idx*n_size + col_idx) << 2),
+                           32'hbad0_e000 | (shape_id << 8) |
+                           (row_idx*n_size + col_idx));
+            end
+        end
+        spad_write(dst + ((m_size*n_size) << 2),
+                   32'hbad0_e100 | shape_id);
+        spad_write(dst + (((m_size*n_size) + 1) << 2),
+                   32'hbad0_e200 | shape_id);
+        write_cluster_desc(CMDQ_BASE, 8'h52, task_id, src_a, src_b, dst,
+                           m_size, n_size, k_size, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd7);
+
+        launch_before = compute_vif.launch_sample_count;
+        matrix_launch_before = compute_vif.engine_launch_count[3];
+        matrix_responses_before = compute_vif.matrix_tag_response_count;
+        accepted_reads = 0;
+        monitor_done = 1'b0;
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, CMDQ_BASE);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd1);
+        axil_write(REG_CPLQ_BASE, CPLQ_BASE);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+
+        fork
+            begin : extended_gemv_read_accept_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.matrix_request_valid &&
+                        compute_vif.banked_ready)
+                        accepted_reads++;
+                end
+            end
+            begin : extended_gemv_cmdq_submit
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(32'd1);
+                monitor_done = 1'b1;
+            end
+        join
+        wait_spad_idle();
+
+        if ((compute_vif.launch_sample_count - launch_before) != 1 ||
+            (compute_vif.engine_launch_count[3] - matrix_launch_before) != 1 ||
+            compute_vif.launch_snapshot_opcode[3] !== 8'h52 ||
+            compute_vif.launch_snapshot_src0[3] !== src_a ||
+            compute_vif.launch_snapshot_src1[3] !== src_b ||
+            compute_vif.launch_snapshot_dst[3] !== dst ||
+            compute_vif.launch_snapshot_m[3] !== m_size ||
+            compute_vif.launch_snapshot_n[3] !== n_size ||
+            compute_vif.launch_snapshot_k[3] !== k_size)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_SHAPE", $sformatf(
+                "shape %0dx%0dx%0d did not launch with exact descriptor values",
+                m_size, n_size, k_size))
+        if ((accepted_reads == 0) ||
+            ((compute_vif.matrix_tag_response_count - matrix_responses_before) !=
+             accepted_reads))
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_SHAPE", $sformatf(
+                "shape %0dx%0dx%0d response owner mismatch accepted=%0d returned=%0d",
+                m_size, n_size, k_size, accepted_reads,
+                compute_vif.matrix_tag_response_count - matrix_responses_before))
+
+        for (row_idx = 0; row_idx < m_size; row_idx++)
+            for (col_idx = 0; col_idx < n_size; col_idx++)
+                expect_spad(dst + ((row_idx*n_size + col_idx) << 2),
+                            golden[row_idx][col_idx],
+                            $sformatf("CMDQ 0x52 shape %0dx%0dx%0d Golden[%0d][%0d]",
+                                      m_size, n_size, k_size, row_idx, col_idx));
+        expect_spad(dst + ((m_size*n_size) << 2),
+                    32'hbad0_e100 | shape_id,
+                    $sformatf("CMDQ 0x52 shape %0d first output guard", shape_id));
+        expect_spad(dst + (((m_size*n_size) + 1) << 2),
+                    32'hbad0_e200 | shape_id,
+                    $sformatf("CMDQ 0x52 shape %0d second output guard", shape_id));
+        expect_completion(CPLQ_BASE, task_id,
+                          golden[m_size-1][n_size-1], m_size*n_size,
+                          $sformatf("CMDQ 0x52 shape %0dx%0dx%0d completion",
+                                    m_size, n_size, k_size));
+
+        if (shape_id <= 2) begin
+            cmdq_product_gemv_shape_id = shape_id;
+            cmdq_product_gemv_extended_shape_cg.sample();
+        end
+        sample_product_gemv_tail_cross(m_size, n_size, k_size);
+        `uvm_info("CLUSTER_CMDQ_GEMV_SHAPE_PASS", $sformatf(
+            "real CMDQ 0x52 shape=%0dx%0dx%0d; outputs=%0d and two guards match independent signed INT32 Golden; accepted/returned Matrix reads=%0d/%0d; completion ordered and checked; seed=%0d",
+            m_size, n_size, k_size, m_size*n_size, accepted_reads,
+            compute_vif.matrix_tag_response_count - matrix_responses_before,
+            seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+    task automatic run_product_gemv_cmdq_extended_shapes(input int unsigned seed);
+        run_product_gemv_cmdq_extended_shape(seed, 0, 16'd1, 16'd16, 16'd17,
+            16'h08c3, 32'h0007_d000, 32'h0007_d200, 32'h0007_d400);
+        run_product_gemv_cmdq_extended_shape(seed, 1, 16'd8, 16'd13, 16'd65,
+            16'h08c4, 32'h0007_d800, 32'h0007_de00, 32'h0007_e400);
+        run_product_gemv_cmdq_extended_shape(seed, 2, 16'd15, 16'd16, 16'd31,
+            16'h08c5, 32'h0007_e800, 32'h0007_ea00, 32'h0007_ee00);
+        if (cmdq_product_gemv_extended_shape_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_SHAPE", $sformatf(
+                "extended product GEMV shape sweep missed declared bins: %0.1f%%",
+                cmdq_product_gemv_extended_shape_cg.get_coverage()))
+        `uvm_info("CLUSTER_CMDQ_GEMV_EXT_SHAPES_PASS", $sformatf(
+            "cases=3/3 shapes=1x16x17,8x13x65,15x16x31 independent Golden/guards/completion/response-owner checks passed; focused bins=3/3 coverage=100.0%% seed=%0d",
+            seed), UVM_LOW)
+
+        // Close all eight legal M/N/K aligned-versus-tail combinations on
+        // the real top CMDQ path. Existing cases cover 000, 011, 101, and
+        // 111; these four independent Golden runs cover the remaining bins.
+        run_product_gemv_cmdq_extended_shape(seed, 3, 16'd4, 16'd16, 16'd17,
+            16'h08c6, 32'h0007_d000, 32'h0007_d200, 32'h0007_d400);
+        run_product_gemv_cmdq_extended_shape(seed, 4, 16'd4, 16'd13, 16'd16,
+            16'h08c7, 32'h0007_d000, 32'h0007_d200, 32'h0007_d400);
+        run_product_gemv_cmdq_extended_shape(seed, 5, 16'd3, 16'd16, 16'd16,
+            16'h08c8, 32'h0007_d000, 32'h0007_d200, 32'h0007_d400);
+        run_product_gemv_cmdq_extended_shape(seed, 6, 16'd3, 16'd13, 16'd16,
+            16'h08c9, 32'h0007_d000, 32'h0007_d200, 32'h0007_d400);
+        if (cmdq_product_gemv_tail_cross_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_TAIL_CROSS", $sformatf(
+                "real CMDQ GEMV M/N/K alignment-tail cross incomplete: %0.1f%%",
+                cmdq_product_gemv_tail_cross_cg.get_coverage()))
+        `uvm_info("CLUSTER_CMDQ_GEMV_TAIL_CROSS_PASS", $sformatf(
+            "legal M/N/K alignment-tail combinations bins=8/8 coverage=%0.1f%%; every bin completed independent signed INT32 Golden, guards, completion and response-owner checks; seed=%0d",
+            cmdq_product_gemv_tail_cross_cg.get_coverage(), seed), UVM_LOW)
+
+        // Isolate the K=256 test-bound point with a 1x1 output so the
+        // real CMDQ/Matrix/SPAD transaction remains within the unchanged
+        // top-level 2,000-cycle task watchdog. The earlier 16x16x256 probe
+        // exceeded that bound before completion and produced no Golden result.
+        // This point verifies K=256 only; it does not claim the largest M/N
+        // workload at K=256 has passed.
+        cmdq_product_gemv_long_k_shape = 1'b0;
+        run_product_gemv_cmdq_extended_shape(seed, 7, 16'd1, 16'd1, 16'd256,
+            16'h08ca, 32'h0007_a000, 32'h0007_b000, 32'h0007_c800);
+        cmdq_product_gemv_long_k_shape = 1'b1;
+        cmdq_product_gemv_long_k_cg.sample();
+        if (cmdq_product_gemv_long_k_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_LONG_K", "K=256 functional bin not hit")
+        `uvm_info("CLUSTER_CMDQ_GEMV_LONG_K_PASS", $sformatf(
+            "cases=1/1 real CMDQ shape=1x1x256; output, two guards, completion and all accepted/returned Matrix reads checked against independent signed INT32 Golden; focused max-K bin=1/1 coverage=%0.1f%% seed=%0d",
+            cmdq_product_gemv_long_k_cg.get_coverage(), seed), UVM_LOW)
+    endtask
+
+    task automatic run_product_gemv_cmdq_ab_alias(input int unsigned seed);
+        localparam int unsigned M_SIZE = 1;
+        localparam int unsigned N_SIZE = 16;
+        localparam int unsigned K_SIZE = 16;
+        localparam bit [31:0] CMDQ_BASE = 32'h0005_b000;
+        localparam bit [31:0] CPLQ_BASE = 32'h0005_b400;
+        localparam bit [31:0] SRC_SHARED = 32'h0007_d000;
+        localparam bit [31:0] DST = 32'h0007_d400;
+        localparam bit [15:0] TASK_ID = 16'h08cb;
+        int signed shared_bytes[0:255];
+        int signed a_value;
+        int signed b_value;
+        int signed sum;
+        bit [31:0] golden[0:N_SIZE-1];
+        bit [31:0] packed_word;
+        bit monitor_done;
+        int unsigned launch_before;
+        int unsigned matrix_launch_before;
+        int unsigned matrix_responses_before;
+        int unsigned accepted_reads;
+        int unsigned byte_idx;
+        int unsigned lane;
+        int unsigned k_idx;
+        int unsigned col_idx;
+
+        // Read-only operand ranges may alias under ABI-v7. A is the first
+        // padded row at SRC_SHARED; dense B is the full 16x16 image at that
+        // same base. Destination remains disjoint, as required by validator.
+        for (byte_idx = 0; byte_idx < 256; byte_idx += 4) begin
+            packed_word = '0;
+            for (lane = 0; lane < 4; lane++) begin
+                shared_bytes[byte_idx + lane] =
+                    ((int'(seed % 17) + int'((byte_idx + lane) * 7)) % 31) - 15;
+                packed_word[lane*8 +: 8] = shared_bytes[byte_idx + lane][7:0];
+            end
+            spad_write(SRC_SHARED + byte_idx, packed_word);
+        end
+
+        for (col_idx = 0; col_idx < N_SIZE; col_idx++) begin
+            sum = 0;
+            for (k_idx = 0; k_idx < K_SIZE; k_idx++) begin
+                a_value = shared_bytes[k_idx];
+                b_value = shared_bytes[k_idx * 16 + col_idx];
+                sum += a_value * b_value;
+            end
+            golden[col_idx] = sum;
+            spad_write(DST + (col_idx << 2), 32'hbad0_cb00 | col_idx);
+        end
+        spad_write(DST + (N_SIZE << 2), 32'hbad0_cb10);
+        spad_write(DST + ((N_SIZE + 1) << 2), 32'hbad0_cb11);
+        write_cluster_desc(CMDQ_BASE, 8'h52, TASK_ID, SRC_SHARED,
+                           SRC_SHARED, DST, M_SIZE, N_SIZE, K_SIZE, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd7);
+
+        launch_before = compute_vif.launch_sample_count;
+        matrix_launch_before = compute_vif.engine_launch_count[3];
+        matrix_responses_before = compute_vif.matrix_tag_response_count;
+        accepted_reads = 0;
+        monitor_done = 1'b0;
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, CMDQ_BASE);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd1);
+        axil_write(REG_CPLQ_BASE, CPLQ_BASE);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+
+        fork
+            begin : product_gemv_alias_read_accept_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.matrix_request_valid &&
+                        compute_vif.banked_ready)
+                        accepted_reads++;
+                end
+            end
+            begin : product_gemv_alias_cmdq_submit
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(32'd1);
+                monitor_done = 1'b1;
+            end
+        join
+        wait_spad_idle();
+
+        if ((compute_vif.launch_sample_count - launch_before) != 1 ||
+            (compute_vif.engine_launch_count[3] - matrix_launch_before) != 1 ||
+            compute_vif.launch_snapshot_opcode[3] !== 8'h52 ||
+            compute_vif.launch_snapshot_src0[3] !== SRC_SHARED ||
+            compute_vif.launch_snapshot_src1[3] !== SRC_SHARED ||
+            compute_vif.launch_snapshot_dst[3] !== DST ||
+            compute_vif.launch_snapshot_m[3] !== M_SIZE ||
+            compute_vif.launch_snapshot_n[3] !== N_SIZE ||
+            compute_vif.launch_snapshot_k[3] !== K_SIZE)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_ALIAS", "A/B alias descriptor did not launch with exact opcode and ranges")
+        if (accepted_reads == 0 ||
+            (compute_vif.matrix_tag_response_count - matrix_responses_before) !=
+                accepted_reads)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_ALIAS", $sformatf(
+                "A/B alias response ownership mismatch accepted=%0d returned=%0d",
+                accepted_reads,
+                compute_vif.matrix_tag_response_count - matrix_responses_before))
+
+        // Check the entire shared read-only B image after compute; this also
+        // covers the A row because it is the first 16 bytes of that image.
+        for (byte_idx = 0; byte_idx < 256; byte_idx += 4) begin
+            packed_word = '0;
+            for (lane = 0; lane < 4; lane++)
+                packed_word[lane*8 +: 8] = shared_bytes[byte_idx + lane][7:0];
+            expect_spad(SRC_SHARED + byte_idx, packed_word,
+                        $sformatf("CMDQ 0x52 A/B aliased source immutability word %0d",
+                                  byte_idx >> 2));
+        end
+        for (col_idx = 0; col_idx < N_SIZE; col_idx++)
+            expect_spad(DST + (col_idx << 2), golden[col_idx],
+                        $sformatf("CMDQ 0x52 A/B alias Golden[%0d]", col_idx));
+        expect_spad(DST + (N_SIZE << 2), 32'hbad0_cb10,
+                    "CMDQ 0x52 A/B alias first output guard");
+        expect_spad(DST + ((N_SIZE + 1) << 2), 32'hbad0_cb11,
+                    "CMDQ 0x52 A/B alias second output guard");
+        expect_completion(CPLQ_BASE, TASK_ID, golden[N_SIZE-1], N_SIZE,
+                          "CMDQ 0x52 A/B alias completion");
+
+        cmdq_product_gemv_ab_alias = 1'b1;
+        cmdq_product_gemv_ab_alias_cg.sample();
+        if (cmdq_product_gemv_ab_alias_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_ALIAS", "legal A/B read-only alias bin was not covered")
+        `uvm_info("CLUSTER_CMDQ_GEMV_AB_ALIAS_PASS", $sformatf(
+            "cases=1/1 real CMDQ 0x52 shape=1x16x16 srcA==srcB; 256 B source unchanged; 16/16 INT32 Golden outputs, two guards, completion and accepted/returned Matrix reads=%0d/%0d passed; focused bins=1/1 coverage=100.0%% seed=%0d",
+            accepted_reads,
+            compute_vif.matrix_tag_response_count - matrix_responses_before,
+            seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+    task automatic run_product_gemv_cmdq_cnm_owner_cross(input int unsigned seed);
+        localparam int unsigned M_SIZE = 16;
+        localparam int unsigned N_SIZE = 16;
+        localparam int unsigned K_SIZE = 16;
+        localparam bit [31:0] CMDQ_BASE = 32'h0005_b000;
+        localparam bit [31:0] CPLQ_BASE = 32'h0005_b400;
+        localparam bit [31:0] SRC_A = 32'h0007_b800;
+        localparam bit [31:0] SRC_B = 32'h0007_ba00;
+        localparam bit [31:0] DST = 32'h0007_bc00;
+        localparam bit [31:0] CNM_DST = 32'h0005_4800;
+        localparam bit [15:0] GEMV_TASK_ID = 16'h08c3;
+        localparam bit [15:0] CNM_TASK_ID = 16'h08c4;
+        int signed a_matrix[0:M_SIZE-1][0:K_SIZE-1];
+        int signed b_matrix[0:K_SIZE-1][0:N_SIZE-1];
+        bit [31:0] golden[0:M_SIZE-1][0:N_SIZE-1];
+        int signed expected_cnm[0:15];
+        bit [31:0] packed_word;
+        bit monitor_done;
+        int unsigned launch_before;
+        int unsigned matrix_launch_before;
+        int unsigned cnm_launch_before;
+        int unsigned matrix_responses_before;
+        int unsigned cnm_responses_before;
+        int unsigned matrix_route_error_before;
+        int unsigned cnm_route_error_before;
+        int unsigned overlap_before;
+        int unsigned shared_accept_before;
+        int unsigned accepted_matrix_reads;
+        int unsigned accepted_cnm_reads;
+        int unsigned returned_cnm_reads;
+        int unsigned both_busy_cycles;
+        int unsigned matrix_accept_contention;
+        int unsigned cnm_accept_contention;
+        int unsigned row_idx;
+        int unsigned col_idx;
+        int unsigned k_idx;
+        int unsigned word_byte;
+        int unsigned lane;
+        int unsigned byte_idx;
+        int signed a_value;
+        int signed b_value;
+        int signed sum;
+
+        for (row_idx = 0; row_idx < M_SIZE; row_idx++) begin
+            for (word_byte = 0; word_byte < 16; word_byte += 4) begin
+                packed_word = '0;
+                for (lane = 0; lane < 4; lane++) begin
+                    k_idx = word_byte + lane;
+                    a_value = (int'(seed % 17) + int'(row_idx * 3) +
+                               int'(k_idx * 5)) % 15 - 7;
+                    a_matrix[row_idx][k_idx] = a_value;
+                    packed_word[lane*8 +: 8] = a_value[7:0];
+                end
+                spad_write(SRC_A + (row_idx << 4) + word_byte, packed_word);
+            end
+        end
+        for (k_idx = 0; k_idx < K_SIZE; k_idx++) begin
+            for (word_byte = 0; word_byte < 16; word_byte += 4) begin
+                packed_word = '0;
+                for (lane = 0; lane < 4; lane++) begin
+                    col_idx = word_byte + lane;
+                    b_value = (int'(seed % 19) + int'(k_idx * 7) +
+                               int'(col_idx * 2)) % 13 - 6;
+                    b_matrix[k_idx][col_idx] = b_value;
+                    packed_word[lane*8 +: 8] = b_value[7:0];
+                end
+                spad_write(SRC_B + (k_idx << 4) + word_byte, packed_word);
+            end
+        end
+        for (row_idx = 0; row_idx < M_SIZE; row_idx++) begin
+            for (col_idx = 0; col_idx < N_SIZE; col_idx++) begin
+                sum = 0;
+                for (k_idx = 0; k_idx < K_SIZE; k_idx++)
+                    sum += a_matrix[row_idx][k_idx] * b_matrix[k_idx][col_idx];
+                golden[row_idx][col_idx] = sum;
+                spad_write(DST + ((row_idx * N_SIZE + col_idx) << 2),
+                           32'hbad0_e000 | (row_idx * N_SIZE + col_idx));
+            end
+        end
+        spad_write(DST + 32'h400, 32'hbad0_e100);
+        spad_write(DST + 32'h404, 32'hbad0_e101);
+
+        for (k_idx = 0; k_idx < 32; k_idx++) begin
+            for (lane = 0; lane < 4; lane++) begin
+                packed_word = '0;
+                for (byte_idx = 0; byte_idx < 4; byte_idx++) begin
+                    a_value = int'(k_idx % 5) + int'(lane * 2) +
+                              int'(byte_idx) - 5;
+                    packed_word[byte_idx*8 +: 8] = a_value[7:0];
+                end
+                spad_write(MATRIX_LINE_STALL_CNM_A_LOCAL +
+                           (k_idx << 4) + (lane << 2), packed_word);
+            end
+        end
+        for (row_idx = 0; row_idx < 16; row_idx++) begin
+            expected_cnm[row_idx] = 0;
+            for (k_idx = 0; k_idx < 32; k_idx++) begin
+                for (lane = 0; lane < 4; lane++) begin
+                    packed_word = '0;
+                    for (byte_idx = 0; byte_idx < 4; byte_idx++) begin
+                        a_value = int'(k_idx % 5) + int'(lane * 2) +
+                                  int'(byte_idx) - 5;
+                        b_value = int'(row_idx % 5) + int'(k_idx % 3) +
+                                  int'(lane) + int'(byte_idx) - 3;
+                        packed_word[byte_idx*8 +: 8] = b_value[7:0];
+                        expected_cnm[row_idx] += a_value * b_value;
+                    end
+                    spad_write(MATRIX_LINE_STALL_CNM_B_LOCAL +
+                               ((row_idx * 32 + k_idx) << 4) + (lane << 2),
+                               packed_word);
+                end
+            end
+        end
+        for (row_idx = 0; row_idx < 16; row_idx++)
+            spad_write(CNM_DST + (row_idx << 2),
+                       32'hbad0_e200 | row_idx);
+
+        write_cluster_desc(CMDQ_BASE, 8'h52, GEMV_TASK_ID,
+                           SRC_A, SRC_B, DST, M_SIZE, N_SIZE, K_SIZE,
+                           32'd0, 32'd0, 32'd0, 32'd0, 8'd7);
+        write_cluster_desc(CMDQ_BASE + 32'h40, 8'h21, CNM_TASK_ID,
+                           MATRIX_LINE_STALL_CNM_A_LOCAL,
+                           MATRIX_LINE_STALL_CNM_B_LOCAL, CNM_DST,
+                           16'd16, 16'd1, 16'd32, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd3);
+
+        launch_before = compute_vif.launch_sample_count;
+        matrix_launch_before = compute_vif.engine_launch_count[3];
+        cnm_launch_before = compute_vif.engine_launch_count[2];
+        matrix_responses_before = compute_vif.matrix_tag_response_count;
+        cnm_responses_before = compute_vif.cnm_tag_response_count;
+        matrix_route_error_before = compute_vif.matrix_route_mismatch_count;
+        cnm_route_error_before = compute_vif.cnm_route_mismatch_count;
+        overlap_before = compute_vif.matrix_cnm_overlap_cycles;
+        shared_accept_before = compute_vif.matrix_cnm_shared_accept_cycles;
+        accepted_matrix_reads = 0;
+        accepted_cnm_reads = 0;
+        returned_cnm_reads = 0;
+        both_busy_cycles = 0;
+        matrix_accept_contention = 0;
+        cnm_accept_contention = 0;
+        monitor_done = 1'b0;
+        cmdq_product_gemv_cnm_overlap = 1'b0;
+        cmdq_product_gemv_cnm_contention = 1'b0;
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, CMDQ_BASE);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd2);
+        axil_write(REG_CPLQ_BASE, CPLQ_BASE);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+
+        fork
+            begin : product_gemv_cnm_owner_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.matrix_request_valid &&
+                        compute_vif.banked_ready)
+                        accepted_matrix_reads++;
+                    accepted_cnm_reads += $countones(compute_vif.cnm_accept_mask);
+                    returned_cnm_reads += $countones(compute_vif.cnm_rsp_valid);
+                    if (compute_vif.engine_busy[2] && compute_vif.engine_busy[3])
+                        both_busy_cycles++;
+                    if (compute_vif.matrix_request_valid &&
+                        (|compute_vif.cnm_valid) && compute_vif.banked_ready)
+                        matrix_accept_contention++;
+                    if (compute_vif.matrix_request_valid &&
+                        (|compute_vif.cnm_valid) && (|compute_vif.cnm_ready))
+                        cnm_accept_contention++;
+                end
+            end
+            begin : product_gemv_cnm_owner_submit
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(32'd2);
+                monitor_done = 1'b1;
+            end
+        join
+        wait_spad_idle();
+
+        if ((compute_vif.launch_sample_count - launch_before) != 2 ||
+            (compute_vif.engine_launch_count[3] - matrix_launch_before) != 1 ||
+            (compute_vif.engine_launch_count[2] - cnm_launch_before) != 1 ||
+            compute_vif.launch_snapshot_opcode[3] !== 8'h52 ||
+            compute_vif.launch_snapshot_opcode[2] !== 8'h21 ||
+            compute_vif.launch_snapshot_m[3] !== 16'd16 ||
+            compute_vif.launch_snapshot_n[3] !== 16'd16 ||
+            compute_vif.launch_snapshot_k[3] !== 16'd16)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_CNM_OWNER", $sformatf(
+                "parallel CMDQ launch mismatch launches=%0d Matrix=%0d CNM=%0d opcodes=%02h/%02h",
+                compute_vif.launch_sample_count - launch_before,
+                compute_vif.engine_launch_count[3] - matrix_launch_before,
+                compute_vif.engine_launch_count[2] - cnm_launch_before,
+                compute_vif.launch_snapshot_opcode[3],
+                compute_vif.launch_snapshot_opcode[2]))
+        if (accepted_matrix_reads != 32 ||
+            (compute_vif.matrix_tag_response_count - matrix_responses_before) !=
+                accepted_matrix_reads)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_CNM_OWNER", $sformatf(
+                "0x52 Matrix read drain mismatch accepted=%0d returned=%0d",
+                accepted_matrix_reads,
+                compute_vif.matrix_tag_response_count - matrix_responses_before))
+        if (accepted_cnm_reads == 0 || returned_cnm_reads != accepted_cnm_reads ||
+            (compute_vif.cnm_tag_response_count - cnm_responses_before) == 0)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_CNM_OWNER", $sformatf(
+                "CNM read drain/response owner mismatch accepted=%0d returned=%0d responses=%0d",
+                accepted_cnm_reads, returned_cnm_reads,
+                compute_vif.cnm_tag_response_count - cnm_responses_before))
+        if (compute_vif.matrix_route_mismatch_count != matrix_route_error_before ||
+            compute_vif.cnm_route_mismatch_count != cnm_route_error_before)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_CNM_OWNER", $sformatf(
+                "cross-engine response routing error Matrix=%0d CNM=%0d",
+                compute_vif.matrix_route_mismatch_count - matrix_route_error_before,
+                compute_vif.cnm_route_mismatch_count - cnm_route_error_before))
+        if (both_busy_cycles == 0 || cnm_accept_contention == 0 ||
+            compute_vif.matrix_cnm_overlap_cycles <= overlap_before ||
+            compute_vif.matrix_cnm_shared_accept_cycles <= shared_accept_before)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_CNM_OWNER", $sformatf(
+                "real 0x52/CNM overlap/contention missing both_busy=%0d Matrix_grants_during_collision=%0d CNM_grants_during_collision=%0d",
+                both_busy_cycles, matrix_accept_contention, cnm_accept_contention))
+
+        for (row_idx = 0; row_idx < M_SIZE; row_idx++)
+            for (col_idx = 0; col_idx < N_SIZE; col_idx++)
+                expect_spad(DST + ((row_idx * N_SIZE + col_idx) << 2),
+                            golden[row_idx][col_idx],
+                            $sformatf("concurrent opcode 0x52 Golden[%0d][%0d]",
+                                      row_idx, col_idx));
+        expect_spad(DST + 32'h400, 32'hbad0_e100,
+                    "concurrent opcode 0x52 first output guard");
+        expect_spad(DST + 32'h404, 32'hbad0_e101,
+                    "concurrent opcode 0x52 second output guard");
+        for (row_idx = 0; row_idx < 16; row_idx++)
+            expect_spad(CNM_DST + (row_idx << 2), expected_cnm[row_idx],
+                        $sformatf("concurrent CNM Golden[%0d]", row_idx));
+        expect_completion(CPLQ_BASE, GEMV_TASK_ID, golden[15][15], 32'd256,
+                          "concurrent CMDQ opcode 0x52 first ordered completion");
+        expect_completion(CPLQ_BASE + 32'h10, CNM_TASK_ID, expected_cnm[15],
+                          32'd16, "concurrent CMDQ CNM second ordered completion");
+
+        cmdq_product_gemv_cnm_overlap = 1'b1;
+        cmdq_product_gemv_cnm_contention = 1'b1;
+        cmdq_product_gemv_cnm_owner_cg.sample();
+        if (cmdq_product_gemv_cnm_owner_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_CNM_OWNER", $sformatf(
+                "0x52/CNM owner overlap group incomplete: %0.1f%%",
+                cmdq_product_gemv_cnm_owner_cg.get_coverage()))
+        `uvm_info("CLUSTER_CMDQ_GEMV_CNM_OWNER_PASS", $sformatf(
+            "real CMDQ 0x52 GEMV + CNM concurrent; overlap cycles=%0d collision grants Matrix/CNM=%0d/%0d accepted reads=%0d/%0d returned CNM=%0d Matrix responses=%0d CNM responses=%0d route mismatches=0; dual Golden/completions pass; owner bins=100%% seed=%0d",
+            both_busy_cycles, matrix_accept_contention, cnm_accept_contention,
+            accepted_matrix_reads, accepted_cnm_reads,
+            returned_cnm_reads,
+            compute_vif.matrix_tag_response_count - matrix_responses_before,
+            compute_vif.cnm_tag_response_count - cnm_responses_before,
+            seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd2);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
@@ -10556,6 +11799,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned serial_matrix_spad_write_start;
         int unsigned serial_matrix_spad_read_bytes;
         int unsigned serial_matrix_spad_write_bytes;
+        int unsigned matrix_profile_read_bytes_start;
+        int unsigned matrix_profile_write_bytes_start;
         int unsigned serial_spad_read_bytes;
         int unsigned serial_spad_write_bytes;
         int unsigned staged_pair_start_cycle;
@@ -10708,6 +11953,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_TAIL, 32'd0);
         serial_matrix_spad_read_start = compute_vif.benchmark_spad_read_bytes;
         serial_matrix_spad_write_start = compute_vif.benchmark_spad_write_bytes;
+        matrix_profile_read_bytes_start = compute_vif.matrix_spad_read_bytes;
+        matrix_profile_write_bytes_start = compute_vif.matrix_spad_write_bytes;
         parallel_start_cycle = compute_vif.sim_cycles;
         axil_write(REG_DOORBELL, 32'd1);
         wait_cpl_tail(32'd1);
@@ -10717,6 +11964,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                                         serial_matrix_spad_read_start;
         serial_matrix_spad_write_bytes = compute_vif.benchmark_spad_write_bytes -
                                          serial_matrix_spad_write_start;
+        emit_matrix_profile("standalone", seed, "16x32x64",
+                            serial_matrix_cycles,
+                            matrix_profile_read_bytes_start,
+                            matrix_profile_write_bytes_start);
         expect_completion(CPLQ_LOCAL, 16'h05ff, matrix_golden[15][31],
                           32'd512, "serial Matrix baseline");
         if (compute_vif.matrix_a_cache_hits != 16)
@@ -10794,6 +12045,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         staged_contention_start = compute_vif.matrix_cnm_shared_accept_cycles;
         staged_spad_read_start = compute_vif.benchmark_spad_read_bytes;
         staged_spad_write_start = compute_vif.benchmark_spad_write_bytes;
+        matrix_profile_read_bytes_start = compute_vif.matrix_spad_read_bytes;
+        matrix_profile_write_bytes_start = compute_vif.matrix_spad_write_bytes;
         staged_pair_start_cycle = compute_vif.sim_cycles;
         axil_write(REG_DOORBELL, 32'd1);
         wait_cpl_tail(32'd2);
@@ -10804,6 +12057,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_fatal("CLUSTER_STAGED_CONTENTION",
                 "Matrix and CNM never contended for a shared banked-SPAD admission during the staged pair")
         wait_spad_idle();
+        emit_matrix_profile("staged_matrix_cnm", seed, "16x32x64",
+                            staged_pair_cycles,
+                            matrix_profile_read_bytes_start,
+                            matrix_profile_write_bytes_start);
         expect_completion(CPLQ_LOCAL + 32'h00, 16'h0700,
                           matrix_golden[15][31], 32'd512,
                           "staged Matrix completion");
@@ -10904,11 +12161,17 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         matrix_line_stall_checks_before = compute_vif.matrix_line_stall_checks;
         matrix_line_stall_violations_before =
             compute_vif.matrix_line_stall_violations;
+        matrix_profile_read_bytes_start = compute_vif.matrix_spad_read_bytes;
+        matrix_profile_write_bytes_start = compute_vif.matrix_spad_write_bytes;
         parallel_start_cycle = compute_vif.sim_cycles;
         axil_write(REG_DOORBELL, 32'd1);
         wait_cpl_tail(32'd2);
         parallel_cycles = compute_vif.sim_cycles - parallel_start_cycle;
         wait_spad_idle();
+        emit_matrix_profile("line_stall_matrix_cnm", seed, "16x32x64",
+                            parallel_cycles,
+                            matrix_profile_read_bytes_start,
+                            matrix_profile_write_bytes_start);
         if ((compute_vif.matrix_line_stall_checks -
              matrix_line_stall_checks_before) == 0)
             `uvm_fatal("CLUSTER_MATRIX_LINE_STALL",
@@ -11624,6 +12887,12 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_banked_vdot_cmdq_dispatch_test(seed);
         run_scalar_vdot_minimum_cmdq_boundary_test(seed);
         run_cmdq_invalid_descriptor_matrix_test(seed);
+        run_product_gemv_cmdq_golden(seed);
+        run_product_gemv_cmdq_ab_alias(seed);
+        run_product_gemv_cmdq_min_boundary(seed);
+        run_product_gemv_cmdq_full_tile(seed);
+        run_product_gemv_cmdq_extended_shapes(seed);
+        run_product_gemv_cmdq_cnm_owner_cross(seed);
         run_engine_protection_full_cplq_cross(seed);
         run_scalar_gemv_gemm_cmdq_dispatch_test(seed);
         run_scalar_cmdq_numeric_boundary_test(seed);

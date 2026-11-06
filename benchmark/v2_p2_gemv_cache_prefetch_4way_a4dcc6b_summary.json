@@ -1,0 +1,200 @@
+{
+  "run_id": "V2-GEMV-FOUR-WAY-A4DCC6B-S20261105-07",
+  "source_sha": "a4dcc6b609878811fcd48a0310401609d4952c62",
+  "tree_sha": "430f9ce0c794f6e6a059d56ade7d9112b8a3079f",
+  "product_rtl_sha": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+  "tool": "Synopsys VCS/URG V-2023.12-SP1_Full64",
+  "seeds": [
+    20261105,
+    20261106,
+    20261107
+  ],
+  "physical_array": "16x16 (256 INT8 MACs)",
+  "outstanding_depth": 4,
+  "a_tile_cache_enabled": true,
+  "memory_model": "registered four-bank behavioral SPAD with seed-controlled random ready/response latency",
+  "golden_points": 48,
+  "golden_failures": 0,
+  "partition_closure": "48/48 rows have exclusive_state_partition_cycles == command_cycles",
+  "paired_replay_against": "85e7db2d12f5edfaed17e8ca3910bb504983779f",
+  "paired_measured_fields_identical": true,
+  "paired_field_count": 33,
+  "configuration_means": [
+    {
+      "shape": "8x16x19",
+      "b_fold_cache": 0,
+      "next_k_prefetch": 0,
+      "cycles_mean": 200.67,
+      "mac_per_cycle_mean": 12.1276,
+      "read_bytes_mean": 864,
+      "write_bytes_mean": 512,
+      "array_utilization_pct_mean": 4.7373,
+      "golden": true
+    },
+    {
+      "shape": "8x16x19",
+      "b_fold_cache": 0,
+      "next_k_prefetch": 1,
+      "cycles_mean": 195.67,
+      "mac_per_cycle_mean": 12.4302,
+      "read_bytes_mean": 864,
+      "write_bytes_mean": 512,
+      "array_utilization_pct_mean": 4.8556,
+      "golden": true
+    },
+    {
+      "shape": "8x16x19",
+      "b_fold_cache": 1,
+      "next_k_prefetch": 0,
+      "cycles_mean": 156,
+      "mac_per_cycle_mean": 15.6284,
+      "read_bytes_mean": 560,
+      "write_bytes_mean": 512,
+      "array_utilization_pct_mean": 6.1048,
+      "golden": true
+    },
+    {
+      "shape": "8x16x19",
+      "b_fold_cache": 1,
+      "next_k_prefetch": 1,
+      "cycles_mean": 152.33,
+      "mac_per_cycle_mean": 15.9716,
+      "read_bytes_mean": 560,
+      "write_bytes_mean": 512,
+      "array_utilization_pct_mean": 6.2389,
+      "golden": true
+    },
+    {
+      "shape": "8x16x65",
+      "b_fold_cache": 0,
+      "next_k_prefetch": 0,
+      "cycles_mean": 544.33,
+      "mac_per_cycle_mean": 15.2872,
+      "read_bytes_mean": 2720,
+      "write_bytes_mean": 512,
+      "array_utilization_pct_mean": 5.9716,
+      "golden": true
+    },
+    {
+      "shape": "8x16x65",
+      "b_fold_cache": 0,
+      "next_k_prefetch": 1,
+      "cycles_mean": 520,
+      "mac_per_cycle_mean": 16.0083,
+      "read_bytes_mean": 2720,
+      "write_bytes_mean": 512,
+      "array_utilization_pct_mean": 6.2532,
+      "golden": true
+    },
+    {
+      "shape": "8x16x65",
+      "b_fold_cache": 1,
+      "next_k_prefetch": 0,
+      "cycles_mean": 391,
+      "mac_per_cycle_mean": 21.285,
+      "read_bytes_mean": 1696,
+      "write_bytes_mean": 512,
+      "array_utilization_pct_mean": 8.3145,
+      "golden": true
+    },
+    {
+      "shape": "8x16x65",
+      "b_fold_cache": 1,
+      "next_k_prefetch": 1,
+      "cycles_mean": 383,
+      "mac_per_cycle_mean": 21.726,
+      "read_bytes_mean": 1696,
+      "write_bytes_mean": 512,
+      "array_utilization_pct_mean": 8.4867,
+      "golden": true
+    },
+    {
+      "shape": "16x16x19",
+      "b_fold_cache": 0,
+      "next_k_prefetch": 0,
+      "cycles_mean": 393.67,
+      "mac_per_cycle_mean": 12.3561,
+      "read_bytes_mean": 1728,
+      "write_bytes_mean": 1024,
+      "array_utilization_pct_mean": 4.8266,
+      "golden": true
+    },
+    {
+      "shape": "16x16x19",
+      "b_fold_cache": 0,
+      "next_k_prefetch": 1,
+      "cycles_mean": 382.67,
+      "mac_per_cycle_mean": 12.7145,
+      "read_bytes_mean": 1728,
+      "write_bytes_mean": 1024,
+      "array_utilization_pct_mean": 4.9666,
+      "golden": true
+    },
+    {
+      "shape": "16x16x19",
+      "b_fold_cache": 1,
+      "next_k_prefetch": 0,
+      "cycles_mean": 261,
+      "mac_per_cycle_mean": 18.6608,
+      "read_bytes_mean": 816,
+      "write_bytes_mean": 1024,
+      "array_utilization_pct_mean": 7.2894,
+      "golden": true
+    },
+    {
+      "shape": "16x16x19",
+      "b_fold_cache": 1,
+      "next_k_prefetch": 1,
+      "cycles_mean": 262.67,
+      "mac_per_cycle_mean": 18.5207,
+      "read_bytes_mean": 816,
+      "write_bytes_mean": 1024,
+      "array_utilization_pct_mean": 7.2346,
+      "golden": true
+    },
+    {
+      "shape": "16x16x65",
+      "b_fold_cache": 0,
+      "next_k_prefetch": 0,
+      "cycles_mean": 1075,
+      "mac_per_cycle_mean": 15.4796,
+      "read_bytes_mean": 5440,
+      "write_bytes_mean": 1024,
+      "array_utilization_pct_mean": 6.0467,
+      "golden": true
+    },
+    {
+      "shape": "16x16x65",
+      "b_fold_cache": 0,
+      "next_k_prefetch": 1,
+      "cycles_mean": 1029.67,
+      "mac_per_cycle_mean": 16.1608,
+      "read_bytes_mean": 5440,
+      "write_bytes_mean": 1024,
+      "array_utilization_pct_mean": 6.3128,
+      "golden": true
+    },
+    {
+      "shape": "16x16x65",
+      "b_fold_cache": 1,
+      "next_k_prefetch": 0,
+      "cycles_mean": 627.33,
+      "mac_per_cycle_mean": 26.5259,
+      "read_bytes_mean": 2368,
+      "write_bytes_mean": 1024,
+      "array_utilization_pct_mean": 10.3617,
+      "golden": true
+    },
+    {
+      "shape": "16x16x65",
+      "b_fold_cache": 1,
+      "next_k_prefetch": 1,
+      "cycles_mean": 632.33,
+      "mac_per_cycle_mean": 26.3156,
+      "read_bytes_mean": 2368,
+      "write_bytes_mean": 1024,
+      "array_utilization_pct_mean": 10.2796,
+      "golden": true
+    }
+  ]
+}

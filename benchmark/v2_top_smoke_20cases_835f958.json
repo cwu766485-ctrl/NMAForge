@@ -1,0 +1,24 @@
+{
+  "source_testbench_sha": "835f958b5f486b3f3e4808e735a788721f4f1441",
+  "source_tree_sha": "653d605abd1e3a5bb414721694c46e6897086115",
+  "product_rtl_sha": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+  "simulator": "Synopsys VCS V-2023.12-SP1_Full64",
+  "command_template": "make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=<seed>",
+  "runs": [
+    {"run_id":"V2-TOP-SMOKE-20X-835F958-20261130","ai_seed":20261130,"ntb_random_seed":1793945994,"random_cases":20,"status":"PASS","test_pass_marker":true},
+    {"run_id":"V2-TOP-SMOKE-20X-835F958-20261131","ai_seed":20261131,"ntb_random_seed":1793945994,"random_cases":20,"status":"PASS","test_pass_marker":true},
+    {"run_id":"V2-TOP-SMOKE-20X-835F958-20261132","ai_seed":20261132,"ntb_random_seed":1793945995,"random_cases":20,"status":"PASS","test_pass_marker":true}
+  ],
+  "common_markers": [
+    "MATRIX_PRODUCT_GEMV_TAIL_DESCRIPTOR_PASS",
+    "MATRIX_PRODUCT_GEMV_M8_KTAIL_DESCRIPTOR_PASS",
+    "MATRIX_FUSED_TILE_FORWARD_CMDQ_PASS",
+    "TEST PASS"
+  ],
+  "coverage_disposition": "No new URG coverage run; this adds compatibility/random regression evidence only.",
+  "logs_archive": {
+    "path": "/tmp/nmaforge_v2_ai_run_3seed_835f958_logs.tar.gz",
+    "sha256": "7b71e6a3b5815173e8bc256fec0d323b6efe0d71e5f41f171ef4496ac5df3117",
+    "stored_in_git": false
+  }
+}

@@ -1,0 +1,256 @@
+{
+  "run_id": "V2-COMPUTE-CLUSTER-AND-AXI-DMA-URG-MERGE-19TEST-F9F32F7",
+  "status": "PASS_DECLARED_FUNCTIONAL_COVERAGE",
+  "source_test_sha": "f9f32f71e7168350d74a75ede0a4a4b222844cc9",
+  "source_tree_sha": "0b20e98298852d2648f83d10723c55aabe3a9149",
+  "simulator": "Synopsys VCS V-2023.12-SP1_Full64",
+  "coverage_tool": "Synopsys URG V-2023.12-SP1",
+  "profiles": [
+    {
+      "run_id": "V2-COMPUTE-CLUSTER-UVM-CLEAN-F9F32F7-3SEED",
+      "test": "ai_compute_cluster_e2e_test",
+      "seeds": [
+        20261106,
+        20261107,
+        20261108
+      ]
+    },
+    {
+      "run_id": "V2-MIXED-AXI-DMA-COVERAGE-CLEAN-F9F32F7-16SEED",
+      "test": "ai_mixed_precision_ddr_e2e_test",
+      "seeds": [
+        20261109,
+        20261110,
+        20261111,
+        20261112,
+        20261113,
+        20261114,
+        20261115,
+        20261116,
+        20261117,
+        20261118,
+        20261119,
+        20261120,
+        20261121,
+        20261122,
+        20261123,
+        20261124
+      ]
+    }
+  ],
+  "merge_contract": "Both test profiles were compiled from identical source/tree, UVM top tb_ai_accel_uvm, source list and line+cond+branch+fsm+assert coverage metrics; only runtime test/seed differs. URG completed without warnings. The two profiles are also reported separately.",
+  "test_count": 19,
+  "merged_coverage": {
+    "overall_score_pct": 76.04,
+    "line_pct": 74.13,
+    "condition_pct": 71.59,
+    "fsm_pct": 47.45,
+    "branch_pct": 71.1,
+    "assert_pct": 92.0,
+    "functional_group_pct": 100.0,
+    "declared_functional_groups": 36,
+    "groups_at_100_pct": 36,
+    "group_rows": [
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_env_pkg::ai_axil_coverage::cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_env_pkg::ai_accel_scoreboard::dma_error_position_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_env_pkg::ai_axi4_coverage::cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_env_pkg::ai_mixed_precision_e2e_coverage::e2e_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_env_pkg::ai_compute_cluster_coverage::cluster_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cmdq_product_gemv_ab_alias_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::engine_parallel_fault_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::matrix_cnm_shared_reset_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::fp_reset_single_write_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::engine_watchdog_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cmdq_invalid_descriptor_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cmdq_product_gemv_extended_shape_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::engine_protection_reset_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::conv_reset_prefix_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::fp16_abort_zero_prefix_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::matrix_protection_cnm_reset_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cmdq_product_gemv_cnm_owner_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cmdq_product_gemv_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cmdq_product_gemv_tail_cross_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::engine_parity_cplq_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::engine_abort_cplq_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::engine_parallel_reset_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::matrix_protection_reset_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::engine_pair_overlap_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::matrix_cnm_prefix_reset_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cnm_protection_matrix_prefix_reset_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cmdq_product_gemv_full_tile_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cmdq_product_gemv_long_k_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::sfu_reset_prefix_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::scalar_reset_prefix_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::engine_watchdog_cplq_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cmdq_product_gemv_min_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "tb_ai_accel_uvm.axi_mem_u::axi_write_data_gap_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "tb_ai_accel_uvm.axi_mem_u::axi_awready_stall_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "tb_ai_accel_uvm.axi_mem_u::axi_read_response_gap_cg"
+      },
+      {
+        "coverage_pct": 100.0,
+        "name": "tb_ai_accel_uvm.axi_mem_u::axi_arready_stall_cg"
+      }
+    ],
+    "assertions": {
+      "total": 22,
+      "success": 20,
+      "uncovered": 2,
+      "without_attempts": 2,
+      "failures": 0,
+      "incomplete": 0,
+      "uncovered_items": [
+        "uvm_pkg.uvm_reg_map.do_read",
+        "uvm_pkg.uvm_reg_map.do_write"
+      ]
+    },
+    "cover_properties": {
+      "total": 3,
+      "matches": 3,
+      "match_counts": {
+        "c_ar_stall_then_accept": 161,
+        "c_aw_stall_then_accept": 67,
+      "c_w_stall_then_accept": 126
+      }
+    }
+  },
+  "limitations": [
+    "100% applies to the 36 declared functional covergroups in this merged 19-test plan, not every v2 requirement, legal scenario or RTL code bin.",
+    "Global code coverage remains below 100% (Line/Condition/FSM/Branch 74.13/71.59/47.45/71.10%).",
+    "Two UVM RAL assertion properties have no attempts; all three top AXI stall cover properties matched.",
+    "The v2 RTM remains 14 PASS-scoped / 8 PARTIAL; complete 0x52/0x53 fault-phase-reset and external held/late response points remain open.",
+    "No user coverage waiver/exclusion database was supplied to URG; this merge did not add a waiver."
+  ],
+  "compile_database": "/tmp/nmaforge_v2_cluster_clean_f9f32f7/compile.vdb",
+  "run_databases": [
+    "/tmp/nmaforge_v2_cluster_clean_f9f32f7/seed_20261106/coverage.vdb",
+    "/tmp/nmaforge_v2_cluster_clean_f9f32f7/seed_20261107/coverage.vdb",
+    "/tmp/nmaforge_v2_cluster_clean_f9f32f7/seed_20261108/coverage.vdb",
+    "/tmp/nmaforge_v2_mixcov_f9f32f7_16seed/simv_uvm.vdb",
+    "/tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261109/coverage.vdb",
+    "/tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261110/coverage.vdb",
+    "/tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261111/coverage.vdb",
+    "/tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261112/coverage.vdb",
+    "/tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261113/coverage.vdb",
+    "/tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261114/coverage.vdb",
+    "/tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261115/coverage.vdb",
+    "/tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261116/coverage.vdb",
+    "/tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261117/coverage.vdb",
+    "/tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261118/coverage.vdb",
+    "/tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261119/coverage.vdb",
+    "/tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261120/coverage.vdb",
+    "/tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261121/coverage.vdb",
+    "/tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261122/coverage.vdb",
+    "/tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261123/coverage.vdb",
+    "/tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261124/coverage.vdb"
+  ],
+  "urg_report": "/tmp/nmaforge_v2_combined_urg_f9f32f7_2",
+  "log_archive": "/tmp/nmaforge_v2_combined_urg_f9f32f7_19test_text.tar.gz",
+  "log_archive_sha256": "9ec6f0c496ada3e8ac3188ef863ac4a795a8232c603ad457a4e39d7a30562f86",
+  "coverage_database_policy": "Committed record points to text logs/reports only; VCS executable and VDB files stay under /tmp and are excluded from the repository.",
+  "command": "VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias /tmp/nmaforge_vcs_home_linux_alias/bin/urg -full64 -dir /tmp/nmaforge_v2_cluster_clean_f9f32f7/compile.vdb /tmp/nmaforge_v2_cluster_clean_f9f32f7/seed_20261106/coverage.vdb /tmp/nmaforge_v2_cluster_clean_f9f32f7/seed_20261107/coverage.vdb /tmp/nmaforge_v2_cluster_clean_f9f32f7/seed_20261108/coverage.vdb /tmp/nmaforge_v2_mixcov_f9f32f7_16seed/simv_uvm.vdb /tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261109/coverage.vdb /tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261110/coverage.vdb /tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261111/coverage.vdb /tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261112/coverage.vdb /tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261113/coverage.vdb /tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261114/coverage.vdb /tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261115/coverage.vdb /tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261116/coverage.vdb /tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261117/coverage.vdb /tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261118/coverage.vdb /tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261119/coverage.vdb /tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261120/coverage.vdb /tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261121/coverage.vdb /tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261122/coverage.vdb /tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261123/coverage.vdb /tmp/nmaforge_v2_mixcov_f9f32f7_16seed/seed_20261124/coverage.vdb -format text -report /tmp/nmaforge_v2_combined_urg_f9f32f7_2 -log /tmp/nmaforge_v2_combined_urg_f9f32f7_2.log"
+}

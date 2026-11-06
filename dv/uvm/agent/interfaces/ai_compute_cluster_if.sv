@@ -64,6 +64,22 @@ interface ai_compute_cluster_if(input logic aclk);
     logic matrix_a_cache_hit;
     logic [31:0] matrix_a_cache_hits;
     logic [31:0] matrix_prefetch_overlap_cycles;
+    logic [31:0] matrix_profile_cycle_count;
+    logic [31:0] matrix_profile_state_cycles[0:14];
+    logic [31:0] matrix_profile_arbiter_stall_cycles;
+    logic [31:0] matrix_profile_response_wait_cycles;
+    logic [31:0] matrix_profile_writeback_wait_cycles;
+    logic [31:0] matrix_profile_prefetch_a_req_cycles;
+    logic [31:0] matrix_profile_prefetch_a_drain_cycles;
+    logic [31:0] matrix_profile_prefetch_b_req_cycles;
+    logic [31:0] matrix_profile_prefetch_b_drain_cycles;
+    logic [31:0] matrix_profile_prefetch_overlap_cycles;
+    logic [31:0] matrix_profile_prefetch_wait_cycles;
+    logic [31:0] matrix_profile_prefetch_completed;
+    logic [31:0] matrix_profile_outstanding_highwater;
+    logic [31:0] matrix_profile_fifo_full_cycles;
+    integer unsigned matrix_spad_read_bytes;
+    integer unsigned matrix_spad_write_bytes;
     logic [5:0] read_accept_mask;
 
     // Passive scratchpad transaction view consumed by the independent memory
@@ -382,7 +398,8 @@ interface ai_compute_cluster_if(input logic aclk);
         if (op >= 8'h10 && op <= 8'h15) engine_id = 0;
         else if (op == 8'h50 || op == 8'h51) engine_id = 1;
         else if (op == 8'h20 || op == 8'h21) engine_id = 2;
-        else if (op == 8'h30 || op == 8'h31) engine_id = 3;
+        else if (op == 8'h30 || op == 8'h31 ||
+                 op == 8'h52 || op == 8'h53) engine_id = 3;
         else if (op >= 8'h32 && op <= 8'h39) engine_id = 4;
         else if (op == 8'h16 || op == 8'h17) engine_id = 5;
         else if (op == 8'h43 || op == 8'h44) engine_id = 6;
@@ -402,6 +419,8 @@ interface ai_compute_cluster_if(input logic aclk);
             arb_core_grants <= 0;
             benchmark_spad_read_bytes <= 0;
             benchmark_spad_write_bytes <= 0;
+            matrix_spad_read_bytes <= 0;
+            matrix_spad_write_bytes <= 0;
             matrix_cnm_overlap_cycles <= 0;
             matrix_cnm_shared_accept_cycles <= 0;
             matrix_cnm_collision_cycles <= 0;
@@ -463,6 +482,11 @@ interface ai_compute_cluster_if(input logic aclk);
                                          read_byte_increment;
             benchmark_spad_write_bytes <= benchmark_spad_write_bytes +
                                           write_byte_increment;
+            if (matrix_request_valid && banked_ready)
+                matrix_spad_read_bytes <= matrix_spad_read_bytes + 16;
+            if (matrix_line_valid && matrix_line_ready && matrix_line_write)
+                matrix_spad_write_bytes <= matrix_spad_write_bytes +
+                                           $countones(matrix_line_wstrb);
             if (rsp_valid) response_count <= response_count + 1;
             if (parallel_queue_mode && engine_busy[2] && engine_busy[3])
                 matrix_cnm_overlap_cycles <= matrix_cnm_overlap_cycles + 1;

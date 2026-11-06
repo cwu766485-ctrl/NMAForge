@@ -137,10 +137,18 @@ AI_TINYNPU_CNN_PYTHON ?= python3
 ai_tinynpu_cnn_match:
 	test ! -e "$(AI_TINYNPU_CNN_RUN)"
 	mkdir -p "$(AI_TINYNPU_CNN_RUN)"
+	if [ -n "$(AI_TINYNPU_CNN_INPUT_NPZ)" ]; then \
+		$(AI_TINYNPU_CNN_PYTHON) ../../../../benchmark/tinynpu/generate_nma_cnn_workload.py \
+			--model "$(AI_TINYNPU_CNN_MODEL)" \
+			--tiny-golden "$(AI_TINYNPU_CNN_GOLDEN)" \
+			--input-npz "$(AI_TINYNPU_CNN_INPUT_NPZ)" \
+			--out-dir "$(AI_TINYNPU_CNN_RUN)/workload"; \
+	else \
 	$(AI_TINYNPU_CNN_PYTHON) ../../../../benchmark/tinynpu/generate_nma_cnn_workload.py \
 		--model "$(AI_TINYNPU_CNN_MODEL)" \
 		--tiny-golden "$(AI_TINYNPU_CNN_GOLDEN)" \
-		--out-dir "$(AI_TINYNPU_CNN_RUN)/workload"
+		--out-dir "$(AI_TINYNPU_CNN_RUN)/workload"; \
+	fi
 	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
 		+incdir+../../../block/control/agent \
 		+incdir+../../../block/dma/agent \
@@ -154,6 +162,39 @@ ai_tinynpu_cnn_match:
 		+AI_TINYNPU_CNN_EXPECTED=$(AI_TINYNPU_CNN_RUN)/workload/nma_cnn_expected.memh \
 		-l $(AI_TINYNPU_CNN_RUN)/run.log
 	grep -q '^NMA_CNN_INFERENCE_PASS' $(AI_TINYNPU_CNN_RUN)/run.log
+
+# Trained four-class CNN demo. Both the 3x3 convolution filters and INT8
+# classifier head are trained; the readout uses deployed integer features.
+AI_TRAINED_CNN_RUN ?= /tmp/nmaforge_trained_cnn_demo_$(shell date +%Y%m%d_%H%M%S)
+AI_TRAINED_CNN_PYTHON ?= python3
+.PHONY: ai_trained_cnn_demo
+ai_trained_cnn_demo:
+	test ! -e "$(AI_TRAINED_CNN_RUN)"
+	mkdir -p "$(AI_TRAINED_CNN_RUN)/model"
+	$(AI_TRAINED_CNN_PYTHON) ../../../../benchmark/tinynpu/train_nma_cnn_demo.py \
+		--out-dir "$(AI_TRAINED_CNN_RUN)/model"
+	$(AI_TRAINED_CNN_PYTHON) ../../../../benchmark/tinynpu/generate_nma_cnn_demo_golden.py \
+		--model "$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_weights.npz" \
+		--input-npz "$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_input.npz" \
+		--golden "$(AI_TRAINED_CNN_RUN)/model/nma_cnn_golden.bin"
+	$(MAKE) ai_tinynpu_cnn_match \
+		AI_TINYNPU_CNN_PYTHON="$(AI_TRAINED_CNN_PYTHON)" \
+		AI_TINYNPU_CNN_RUN="$(AI_TRAINED_CNN_RUN)/rtl" \
+		AI_TINYNPU_CNN_MODEL="$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_weights.npz" \
+		AI_TINYNPU_CNN_INPUT_NPZ="$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_input.npz" \
+		AI_TINYNPU_CNN_GOLDEN="$(AI_TRAINED_CNN_RUN)/model/nma_cnn_golden.bin"
+
+# Run the entire held-out set through the compiled production-top testbench;
+# each invocation checks every CNN intermediate against an independent Golden.
+.PHONY: ai_trained_cnn_dataset_regress
+ai_trained_cnn_dataset_regress:
+	$(MAKE) ai_trained_cnn_demo AI_TRAINED_CNN_RUN="$(AI_TRAINED_CNN_RUN)"
+	$(AI_TRAINED_CNN_PYTHON) ../../../../benchmark/tinynpu/run_nma_cnn_demo_dataset.py \
+		--simv "$(AI_TRAINED_CNN_RUN)/rtl/simv" \
+		--model "$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_weights.npz" \
+		--testset "$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_testset.npz" \
+		--candidate-sha "$$(git rev-parse HEAD)" \
+		--out-dir "$(AI_TRAINED_CNN_RUN)/dataset_replay"
 
 # Optional V3 subsystem stress: inject seeded read/write SLVERR at a random
 # beat of multi-beat DMA bursts and check completion plus AXI drain-to-idle.

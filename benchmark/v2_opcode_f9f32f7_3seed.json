@@ -1,0 +1,154 @@
+{
+  "run_id": "V2-OPCODE-SHAPE-FAULT-HANDSHAKE-MUTATION-F9F32F7-3SEED",
+  "status": "PASS_SELECTED_SCOPE",
+  "source_test_sha": "f9f32f71e7168350d74a75ede0a4a4b222844cc9",
+  "source_tree_sha": "0b20e98298852d2648f83d10723c55aabe3a9149",
+  "product_rtl_sha": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+  "simulator": "Synopsys VCS V-2023.12-SP1_Full64",
+  "seeds": [
+    20261106,
+    20261107,
+    20261108
+  ],
+  "commands": [
+    "VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias VCS_ARCH_OVERRIDE=linux PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' make -C dv/block/compute/matrix/sim product-gemv-regress product-opcode-fault-regress product-opcode-handshake-regress SEEDS='20261106 20261107 20261108' CORE_OUT_DIR=/tmp/nmaforge_v2_opcode_f9f32f7",
+    "VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias VCS_ARCH_OVERRIDE=linux PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' make -C dv/block/compute/matrix/sim product-opcode-mutation-regress V2_OPCODE_MUTATION_OUT=/tmp/nmaforge_v2_opcode_mutations_f9f32f7 V2_OPCODE_MUTATION_SEEDS='20261106 20261107 20261108' PYTHON=python3.12"
+  ],
+  "per_run_status": {
+    "gemv_shape_coverage": "6/6 bins per seed (18/18 seed-bin observations); six named M/N/K points passed independent bit-exact Golden",
+    "opcode_fault_recovery": "8/8 bins per seed (24/24); 0x52 Parity/Protection/Abort/Reset-orphan and 0x53 Reset-epoch/Parity/writeback-Protection/held-write Abort, followed by Golden recovery",
+    "request_and_write_backpressure": "2/2 bins per seed (6/6); 0x52 bank-request stall and held 0x53 output-line payload recover to bit-exact Golden",
+    "tile_forwarding": "6/6 declared feature bins per seed in the fault/handshake campaigns; capture/tag/consume/fallback/Bank Flip/Abort-Reset checks",
+    "rtl_mutation": "21/21 mutant-seed checks caught: seven actual temporary RTL mutations \u00d7 three seeds"
+  },
+  "gemv_shapes": [
+    "4x16x32",
+    "1x13x17",
+    "8x16x19",
+    "8x16x65",
+    "16x16x19",
+    "16x16x65"
+  ],
+  "mutation_classes": [
+    "output_data",
+    "output_address",
+    "response_operand_owner",
+    "wstrb",
+    "tile_tag",
+    "early_tile_valid",
+    "request_address_hold"
+  ],
+  "limitations": [
+    "declared feature bins are selected functional coverage, not complete opcode or code coverage closure",
+    "full legal shape and alias/address range cross space remains open",
+    "arbitrary external held/late response timing and exhaustive fault \u00d7 phase \u00d7 reset remains open",
+    "no product RTL was modified"
+  ],
+  "log_archive": "/tmp/nmaforge_v2_opcode_f9f32f7_logs.tar.gz",
+  "log_archive_sha256": "8c016bfa910b36c09a7ad5f398c3cbb025b676f8ded30627755af293bc391ef8",
+  "mutation_text_archive_sha256": "caaec39989f80e5f267f8affdd0f9b79d0b0b382546dec54e4bc09c6d013e7ef",
+  "coverage_database_policy": "binary VCS/VDB and compiled simulator artifacts are excluded from evidence archive and repository",
+  "subruns": [
+    {
+      "run_id": "V2-GEMV-SHAPES-3SEED-F9F32F7",
+      "test": "product-gemv-regress",
+      "seeds": [
+        20261106,
+        20261107,
+        20261108
+      ],
+      "result": "PASS",
+      "coverage": "six named shape bins per seed; all outputs bit-exact against independent signed INT32 Golden"
+    },
+    {
+      "run_id": "V2-OPCODE-FAULT-3SEED-F9F32F7",
+      "test": "product-opcode-fault-regress",
+      "seeds": [
+        20261106,
+        20261107,
+        20261108
+      ],
+      "result": "PASS",
+      "coverage": "eight named 0x52/0x53 fault and recovery bins per seed"
+    },
+    {
+      "run_id": "V2-OPCODE-HANDSHAKE-3SEED-F9F32F7",
+      "test": "product-opcode-handshake-regress",
+      "seeds": [
+        20261106,
+        20261107,
+        20261108
+      ],
+      "result": "PASS",
+      "coverage": "two declared request/output backpressure bins per seed; bit-exact recovery"
+    },
+    {
+      "run_id": "V2-OPCODE-MUTATION-7X3-F9F32F7",
+      "test": "product-opcode-mutation-regress",
+      "seeds": [
+        20261106,
+        20261107,
+        20261108
+      ],
+      "result": "PASS",
+      "coverage": "21/21 actual temporary RTL mutant-seed checks caught by assigned checkers"
+    }
+  ],
+  "requirement_evidence": [
+    {
+      "requirement_ids": [
+        "REQ-V2-052-003",
+        "REQ-V2-052-004"
+      ],
+      "checker": "per-element output, guard, write-count, and signed INT32 Golden checks",
+      "run_id": "V2-GEMV-SHAPES-3SEED-F9F32F7",
+      "coverage": "6/6 named shape bins per seed",
+      "source_sha": "f9f32f71e7168350d74a75ede0a4a4b222844cc9",
+      "disposition": "PASS for named shapes; full legal shape domain remains open"
+    },
+    {
+      "requirement_ids": [
+        "REQ-V2-052-005",
+        "REQ-V2-052-006"
+      ],
+      "checker": "B-fold cache hit/read-saved and next-K prefetch/profile counters plus Golden",
+      "run_id": "V2-GEMV-SHAPES-3SEED-F9F32F7",
+      "coverage": "bounded K19/K65 cache and enabled prefetch points sampled",
+      "source_sha": "f9f32f71e7168350d74a75ede0a4a4b222844cc9",
+      "disposition": "PASS for tested enabled profile; four-way performance comparison is separately recorded"
+    },
+    {
+      "requirement_ids": [
+        "REQ-V2-052-008",
+        "REQ-V2-053-006"
+      ],
+      "checker": "fault completion/error, response drain, destination sentinel, and post-fault Golden/tile-chain recovery",
+      "run_id": "V2-OPCODE-FAULT-3SEED-F9F32F7",
+      "coverage": "8/8 declared combined opcode bins per seed",
+      "source_sha": "f9f32f71e7168350d74a75ede0a4a4b222844cc9",
+      "disposition": "PARTIAL; selected phases only"
+    },
+    {
+      "requirement_ids": [
+        "REQ-V2-053-002",
+        "REQ-V2-053-003",
+        "REQ-V2-053-004"
+      ],
+      "checker": "capture/tag/consume/fallback/Bank Flip checkers and runtime commit/tag assertions",
+      "run_id": "V2-OPCODE-HANDSHAKE-3SEED-F9F32F7",
+      "coverage": "6/6 declared forwarding bins per seed; non-vacuous commit activity observed",
+      "source_sha": "f9f32f71e7168350d74a75ede0a4a4b222844cc9",
+      "disposition": "PASS for selected forwarding points; broader lifecycle crosses remain open"
+    },
+    {
+      "requirement_ids": [
+        "REQ-V2-COM-005"
+      ],
+      "checker": "seven assigned Golden/protocol/SVA mutation checkers",
+      "run_id": "V2-OPCODE-MUTATION-7X3-F9F32F7",
+      "coverage": "21/21 mutant-seed checks caught",
+      "source_sha": "f9f32f71e7168350d74a75ede0a4a4b222844cc9",
+      "disposition": "PARTIAL; selected mutation map only"
+    }
+  ]
+}

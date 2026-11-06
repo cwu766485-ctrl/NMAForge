@@ -1,9 +1,61 @@
 # NMAForge v2 ASIC Readiness
 
+## Bounded benchmark / storage update — 2026-11-06
+
+This round does not pursue ASIC sign-off. No DC, SRAM macro mapping, PPA,
+reduced-capacity RTL, or physical implementation run was performed. The
+current status remains **NOT ASIC READY** / PPA **BLOCKED_ENV** as documented
+below.
+
+The only storage update is a source/address-based capacity assessment. Four
+banks with 32-bit words per bank require these logical storage quantities:
+
+| Total SPAD | Words per bank | Storage bits | Relative same-shape macro capacity |
+|---:|---:|---:|---:|
+| 512 KiB | 32,768 | 4,194,304 | 1× |
+| 256 KiB | 16,384 | 2,097,152 | 1/2× |
+| 128 KiB | 8,192 | 1,048,576 | 1/4× |
+| 64 KiB | 4,096 | 524,288 | 1/8× |
+
+These are logical bit counts and relative capacity only, not foundry macro
+counts or area. Digits' current fixed map reaches 351,232 bytes and its
+simultaneously initialized data objects total at least 79,776 bytes: it fits
+only the 512 KiB option without remapping. A compact 128 KiB map fits that
+static lower bound, while 64 KiB needs streaming/reuse. The mini-CNN's fixed
+descriptor/completion map reaches 135,296 bytes: it fits 256/512 KiB, not
+128/64 KiB. No remapping, data-preservation, cycle, bank-conflict, or <=5%
+performance-degradation experiment was run. Machine table:
+[`static capacity CSV`](../../benchmark/v2_spad_capacity_static_20261106.csv)
+and [JSON](../../benchmark/v2_spad_capacity_static_20261106.json).
+
 **Review date:** 2026-11-06
 **R250 baseline:** `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Latest RTL/static-analysis candidate replayed:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`
 **Disposition:** **NOT ASIC READY**; v1.0 remains **HOLD**.
+
+## Later DV-only provenance — 2026-11-06
+
+Testbench-only SHA `85e7db2d12f5edfaed17e8ca3910bb504983779f` adds three-seed
+real-CMDQ opcode-0x52 GEMV + CNM response-owner and Golden checks. It leaves
+product RTL unchanged and does not update synthesis, timing, power, SRAM,
+formal/LEC, or physical implementation evidence.
+
+The earlier real-Top legal opcode `0x52` UVM regression at source/test SHA
+`92874788fb2cb2a2b15657a3621e5a275a9d5990` adds M=N=K=16 maximum-tile
+execution after the minimum and tail cases. The newer `85e7db2` testbench
+replay adds a concurrent CNM response-owner cross. Both change testbench
+stimulus/coverage only and leave product RTL unchanged. These VCS/URG PASSes do not update the
+SpyGlass, formal/LEC, SRAM mapping, DC, physical PPA, or power evidence below.
+Their existing `NOT_RUN` and `BLOCKED_ENV` dispositions remain in force; no
+ASIC readiness or tapeout claim is made.
+
+The latest targeted DV and matched Cluster serial/parallel replay is
+`f19e92934cd6273d327621c43cb17291cf1a9aa5` (three-seed real-CMDQ `0x52`
+read-only A/B alias checks and existing Cluster UVM benchmark workload); the
+latest Matrix benchmark replay is `a4dcc6b609878811fcd48a0310401609d4952c62`.
+These are testbench/report changes only. Product RTL remains at
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`, so neither changes the static RTL
+or PPA result.
 
 ## Current evidence
 
@@ -17,7 +69,7 @@
 | SpyGlass RDC | 180 s bounded run stopped during `Ar_resetcross01`; shell returned timeout status 124. | **NOT_RUN**; no RDC conclusion. |
 | Matrix FSM formal guards | VC Formal V-2023.12-SP2: 5/5 assertions proven and non-vacuous, 2/2 reachability covers hit. | PASS for the named Matrix guard properties only; not LEC or full `0x52`/`0x53` proof. |
 | LEC | No Base-vs-v2 equivalence run in this review. | **NOT_RUN**. |
-| DC Base-vs-v2 synthesis | Design Compiler V-2023.12-SP1 executable responds, but the public worktree has no DC run script and no standard-cell/SRAM views are configured (`TSMC28_STDCELL_DB` and `TSMC28_SRAM_DB` unset). Private collateral is excluded by `syn/README.md`. | **BLOCKED_ENV**; area, Fmax and power delta are not available. |
+| DC Base-vs-v2 synthesis | Design Compiler `V-2023.12-SP1` is installed at `/opt/Synopsys/syn/V-2023.12-SP1/bin/dc_shell`; the executable reports its version. The public worktree has no DC run script or `external/private` overlay, and `TSMC28_STDCELL_DB`, `TSMC28_SRAM_DB`, SRAM timing and SDC variables are unset. | **BLOCKED_ENV**; executable availability alone is insufficient; area, Fmax and power delta are not available. |
 | SRAM mapping | No current-v2 macro adapter, Liberty/LEF, or SRAM timing view available. | **NOT_RUN**. |
 | DFT | No current-v2 scan, ATPG, MBIST, or test-mode report was run. | **NOT_RUN**. |
 | Physical PPA / power | No placement, CTS, routed parasitics, IR/EM, or workload-annotated current-v2 power run. | **NOT_RUN**. No ASIC performance or power claim. |
@@ -94,8 +146,17 @@ The sanitized [TSMC28 synthesis report](TSMC28_SYNTHESIS_REPORT.md) is
 historical pre-layout evidence for its documented RTL/configuration. It is not
 a v2 result. `syn/README.md` confirms that the public repository excludes the
 foundry libraries, SRAM views, macro wrappers, DC setup and generated reports.
-The current workspace has no DC flow script at the path listed in the supplied
-project instructions, so the Base-vs-v2 synthesis run could not be reproduced.
+An environment probe on 2026-11-06 found DC `V-2023.12-SP1` at its installed
+path, but the flow script listed in the project instructions is absent, the
+private overlay is absent, and the required standard-cell, SRAM timing and SDC
+environment entries are unset. Therefore the Base-vs-v2 synthesis run was not
+attempted: it cannot produce an auditable result in this public workspace.
+
+The probe checked `dc_shell -version`, executable and flow-script paths, the
+`external/private` directory, and only the presence/path-existence state of
+`TSMC28_STDCELL_DB`, `TSMC28_SRAM_DB`, `TSMC28_SRAM_TIMING`, `TSMC28_SDC`, and
+`TSMC28_PRIVATE_OVERLAY`; no private path values or credentials were printed.
+Result: DC installed; run inputs absent; PPA `BLOCKED_ENV`.
 
 Known architectural storage facts are limited to RTL declarations:
 
@@ -109,6 +170,28 @@ No synthesis area is available for those additions. No capacity sweep, SRAM
 macro mapping, measured Fmax, activity-based power, or energy/inference result
 was run. The 10 ns simulation clock and any 250 MHz normalization are not
 ASIC timing evidence.
+
+## Environment recheck — 2026-11-06
+
+The project `eda.yaml` names `external/private` as the PDK root and the
+private TSMC28 standard-cell database and SDC as synthesis inputs. The
+read-only EDA check found Design Compiler installed at
+`/opt/Synopsys/syn/V-2023.12-SP1/bin/dc_shell`; `dc_shell -version` reports
+`V-2023.12-SP1`. `eda.py doctor` found the configured Synopsys executables.
+`eda.py plan --flow synth --dry-run` generated a generic plan under ignored
+`runs/`; it did not execute synthesis and is not PPA evidence.
+
+The required `external/private` directory, `syn/run_ai_accel_28nm_dc.sh`,
+TSMC28 standard-cell/SRAM/timing inputs, and configured SDC are absent in this
+worktree. The environment probe reported only set/unset state for the private
+input variables; their values were not recorded. No DC library read, synthesis,
+or license checkout was attempted. Base-vs-v2 area/Fmax/power remains
+**BLOCKED_ENV** because the design-specific implementation inputs are missing;
+this is not a claim that the DC executable or license is unavailable.
+
+The K=256 verification update at SHA `8758794` does not change the RTL or
+existing PPA boundary. Its functional regression evidence is documented in
+the [DV closure report](NMAFORGE_V2_DV_CLOSURE.md), not as synthesis evidence.
 
 ## Remaining gates
 
@@ -219,3 +302,36 @@ static-analysis and PPA dispositions above remain bound to the listed
 candidate and tool runs. No area, Fmax, power, SRAM-macro, or tapeout-readiness
 claim follows from the functional coverage results. The current functional
 replay is summarized in the [v2 DV report](NMAFORGE_V2_DV_CLOSURE.md).
+
+## Current environment recheck — 2026-11-06
+
+Product RTL is still `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; the later
+v2 commits in this worktree modify verification, measurement, and reports.
+VCS `V-2023.12-SP1_Full64` ran the fixed-weight Transformer Top test and
+`ai_smoke` on the current testbench candidate. The DC executable exists at
+`/opt/Synopsys/syn/V-2023.12-SP1/bin/dc_shell`, but the isolated worktree has
+no `syn/run_ai_accel_28nm_dc.sh`, synthesis Tcl, or `external/private` / TSMC28
+overlay. `TSMC28_STDCELL_DB`, `TSMC28_SRAM_DB`, `TSMC28_SDC`, and
+`TSMC28_TECH_LEF` are unset. No DC run was attempted because the design inputs
+are missing. Base-vs-v2 area/Fmax/power remains **BLOCKED_ENV**; this is not a
+DC license failure or a PPA result.
+
+SpyGlass lint/CDC/RDC were not rerun in this environment refresh. Existing
+evidence remains 465 lint warnings with no waiver, structural CDC with the
+`Reset_sync04` / `FLAT_504` dispositions still open, and RDC **NOT_RUN** after
+the recorded timeout. No formal/LEC, SRAM-macro, DFT, MBIST, CTS, route, routed
+STA, or IR/EM status is advanced. The IP remains **NOT ASIC READY**.
+
+## Current clean-candidate check — `839b9af`
+
+The VCS clean-candidate replays at
+`839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` are testbench/measurement work.
+The product RTL remains at `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`;
+SpyGlass, CDC/RDC, Formal/LEC, DC, SRAM macro mapping, and physical-design
+flows were not rerun for this candidate. Their last recorded outcomes remain
+as in the environment audit above: lint has 465 unwaived warnings, CDC/RDC and
+Formal/LEC are incomplete, and Base-vs-v2 PPA is `BLOCKED_ENV` because the
+private libraries, SRAM timing views, SDC, and checked-in DC flow inputs are
+unavailable. DFT, MBIST, CTS, route, routed STA, and IR/EM remain `NOT_RUN` or
+`BLOCKED_ENV`. No silicon area, Fmax, power, or tapeout-readiness conclusion
+follows from the current functional or behavioral-SPAD results.

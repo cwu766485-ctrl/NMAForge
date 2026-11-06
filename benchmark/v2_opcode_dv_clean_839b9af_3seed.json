@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "run_id": "V2-OPCODE-CLEAN-839B9AF-3SEED",
+  "status": "PASS_SCOPED",
+  "source_sha": "839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0",
+  "tree_sha": "630e498ba467d84dd5359403cfe1ed1e5879f6e9",
+  "worktree": "/tmp/nmaforge-v2-top-smoke-839b9af",
+  "tool": "Synopsys VCS V-2023.12-SP1_Full64",
+  "seeds": [20261128, 20261129, 20261130],
+  "command": "VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' make -C /tmp/nmaforge-v2-top-smoke-839b9af/dv/block/compute/matrix/sim product-gemv-regress product-opcode-fault-regress product-opcode-handshake-regress core-tile-forward-regress product-opcode-mutation-regress SEEDS='20261128 20261129 20261130' TILE_FORWARD_REGRESS_OUT=/tmp/nmaforge_v2_clean_839b9af_tile_forward_3seed V2_OPCODE_HANDSHAKE_OUT=/tmp/nmaforge_v2_clean_839b9af_opcode_handshake V2_OPCODE_MUTATION_OUT=/tmp/nmaforge_v2_clean_839b9af_opcode_mutation V2_OPCODE_MUTATION_SEEDS='20261128 20261129 20261130' CORE_OUT_DIR=/tmp/nmaforge_v2_clean_839b9af_matrix_core",
+  "results": {
+    "opcode_0x52_gemv": {
+      "seed_passes": 3,
+      "declared_shape_bins_per_seed": "6/6",
+      "golden": "bit-exact independent signed INT32 outputs",
+      "log_directory": "/tmp/nmaforge_v2_clean_839b9af_matrix_core"
+    },
+    "opcode_fault_recovery": {
+      "seed_passes": 3,
+      "declared_bins_per_seed": "8/8",
+      "log_directory": "/tmp/nmaforge_v2_clean_839b9af_matrix_core"
+    },
+    "opcode_handshake": {
+      "seed_passes": 3,
+      "declared_bins_per_seed": "2/2",
+      "checks": ["0x52 bank request stall and address stability", "0x53 held line payload and Golden recovery"]
+    },
+    "tile_forwarding": {
+      "seed_passes": 3,
+      "enabled_declared_bins_per_seed": "6/6",
+      "enabled_assertions_per_seed": "3/3 attempted, 0 failures",
+      "enabled_cover_properties_per_seed": "1/1 attempted and matched",
+      "disabled_legacy_path": "all three seeds pass the ablation's disabled-path checks"
+    },
+    "rtl_mutation": {
+      "mutant_classes": 7,
+      "seed_runs_per_mutant": 3,
+      "detected": "21/21",
+      "checker_map": {
+        "output_data": "tile-forward producer SPAD image",
+        "output_address": "tile-forward producer SPAD image",
+        "response_operand_owner": "product GEMV completion checker",
+        "wstrb": "Matrix line-port WSTRB checker",
+        "tile_tag": "tagged-capture validity assertion/checker",
+        "early_tile_valid": "full-capture validity assertion/checker",
+        "request_address_hold": "bank-request address-stability checker"
+      },
+      "summary": "/tmp/nmaforge_v2_clean_839b9af_opcode_mutation/summary.txt"
+    }
+  },
+  "text_evidence_archive": "/tmp/nmaforge_v2_clean_839b9af_opcode_dv_3seed_text.tar.gz",
+  "text_evidence_archive_sha256": "5890df6674f1120041d58e05f709ab76ab8a87ac08e97f2b9fffeb1c3d046ff0",
+  "open_items": [
+    "These are selected directed checks, not the complete legal descriptor domain or all fault x phase x reset crosses.",
+    "External held/late fabric responses and all engine pairings remain outside these Matrix-core tests.",
+    "Mutation campaign does not yet map every new-feature checker to a fault class; Completion fault injection and wider end-to-end ownership mutations remain open.",
+    "Selected feature tests do not close residual aggregate UVM/URG groups or the 22-row v2 RTM."
+  ]
+}

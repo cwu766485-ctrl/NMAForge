@@ -318,6 +318,35 @@ module tb_ai_accel_smoke;
     integer ai_tinynpu_cnn_traffic_lane;
     reg ai_tinynpu_cnn_measure = 1'b0;
     reg ai_tinynpu_cnn_layout_measure = 1'b0;
+    integer transformer_top_cycle_counter = 0;
+    integer transformer_top_start_cycle = 0;
+    integer transformer_top_prefill_end_cycle = 0;
+    integer transformer_top_final_end_cycle = 0;
+    integer transformer_top_prefill_target = 0;
+    integer transformer_top_final_target = 0;
+    reg transformer_top_timing_enable = 1'b0;
+    reg transformer_top_prefill_captured = 1'b0;
+    reg transformer_top_final_captured = 1'b0;
+
+    // Exact top-clock completion-boundary sampling for the serialized
+    // Transformer prefill/decode CMDQ chain. The 1 ps delay observes the
+    // completion-tail nonblocking update in the same clock cycle.
+    always @(posedge aclk) begin
+        transformer_top_cycle_counter = transformer_top_cycle_counter + 1;
+        #0.001;
+        if (transformer_top_timing_enable) begin
+            if (!transformer_top_prefill_captured &&
+                dut.processor_cplq_tail == transformer_top_prefill_target) begin
+                transformer_top_prefill_end_cycle = transformer_top_cycle_counter;
+                transformer_top_prefill_captured = 1'b1;
+            end
+            if (!transformer_top_final_captured &&
+                dut.processor_cplq_tail == transformer_top_final_target) begin
+                transformer_top_final_end_cycle = transformer_top_cycle_counter;
+                transformer_top_final_captured = 1'b1;
+            end
+        end
+    end
 
     always @(posedge aclk) begin
         if (ai_tile_forward_read_monitor && dut.matrix_banked_read_valid &&
@@ -2146,7 +2175,7 @@ module tb_ai_accel_smoke;
                      ai_tinynpu_cnn_engine_write_words * 4 + ai_tinynpu_cnn_line_write_lines * 16,
                      ai_tinynpu_cnn_banked_read_lines, ai_tinynpu_cnn_line_write_lines,
                      image_count * 4);
-            $display("NMA_CNN_INFERENCE_PASS model=TinyNPU_conv1x_mini outputs=4 golden=byte_exact");
+            $display("NMA_CNN_INFERENCE_PASS model=4class_conv_relu_flatten_gemm outputs=4 golden=byte_exact");
             axi_write(REG_CMDQ_SIZE, 32'd0);
             axi_write(REG_CPLQ_SIZE, 32'd0);
             clear_done_irq();
@@ -4694,9 +4723,32 @@ module tb_ai_accel_smoke;
         axi_write(REG_CPLQ_SIZE, 32'd128);
         axi_write(REG_CPLQ_HEAD, 32'd0);
         axi_write(REG_CPLQ_TAIL, 32'd0);
+        transformer_top_prefill_target = TRANSFORMER_PREFILL_DESC_COUNT;
+        transformer_top_final_target = TRANSFORMER_DESC_COUNT;
+        transformer_top_prefill_captured = 1'b0;
+        transformer_top_final_captured = 1'b0;
+        transformer_top_start_cycle = transformer_top_cycle_counter;
+        transformer_top_timing_enable = 1'b1;
         axi_write(REG_DOORBELL, 32'd1);
         wait_cpl_tail(TRANSFORMER_DESC_COUNT,
                       "A8 end-to-end Transformer descriptor chain");
+        transformer_top_timing_enable = 1'b0;
+        if (!transformer_top_prefill_captured ||
+            !transformer_top_final_captured ||
+            transformer_top_prefill_end_cycle <= transformer_top_start_cycle ||
+            transformer_top_final_end_cycle <= transformer_top_prefill_end_cycle) begin
+            $display("%0t ERROR: Transformer Top timing boundary capture failed prefill=%0d final=%0d",
+                     $time, transformer_top_prefill_captured,
+                     transformer_top_final_captured);
+            errors = errors + 1;
+        end else begin
+            $display("TRANSFORMER_TOP_TIMING run_endpoint=doorbell_to_cpl_tail total_cycles=%0d prefill_cycles=%0d prefill_tokens=4 prefill_avg_cycles_per_token=%0.2f decode_cycles=%0d decode_tokens=1 decode_cycles_per_token=%0d",
+                     transformer_top_final_end_cycle - transformer_top_start_cycle,
+                     transformer_top_prefill_end_cycle - transformer_top_start_cycle,
+                     (transformer_top_prefill_end_cycle - transformer_top_start_cycle) / 4.0,
+                     transformer_top_final_end_cycle - transformer_top_prefill_end_cycle,
+                     transformer_top_final_end_cycle - transformer_top_prefill_end_cycle);
+        end
         check_transformer_workload();
         expect_read(REG_CMDQ_HEAD, TRANSFORMER_DESC_COUNT,
                     "A8 Transformer command count");

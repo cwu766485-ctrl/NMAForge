@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "run_id": "V2-CLEAN-CLUSTER-UVM-839B9AF-3SEED",
+  "status": "PASS_SCOPED",
+  "source_sha": "839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0",
+  "tree_sha": "630e498ba467d84dd5359403cfe1ed1e5879f6e9",
+  "worktree": "/tmp/nmaforge-v2-top-smoke-839b9af",
+  "tool": {
+    "simulator": "Synopsys VCS V-2023.12-SP1_Full64",
+    "coverage_merger": "Synopsys URG V-2023.12-SP1"
+  },
+  "command": "VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH make -C /tmp/nmaforge-v2-top-smoke-839b9af/dv/uvm/sim uvm_compute_cluster_regress COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v2_clean_839b9af_cluster_3seed COMPUTE_CLUSTER_UVM_SEEDS='20261128 20261129 20261130'",
+  "seeds": [20261128, 20261129, 20261130],
+  "seed_results": {
+    "passed": 3,
+    "uvm_warning": 0,
+    "uvm_error": 0,
+    "uvm_fatal": 0,
+    "required_cluster_pass_marker": 3,
+    "matrix_profiles": 9,
+    "matrix_profile_profiles_per_seed": [
+      "standalone",
+      "staged_matrix_cnm",
+      "line_stall_matrix_cnm"
+    ],
+    "matrix_fsm_state_partitions_closed": 9
+  },
+  "urg_merged_3_seed": {
+    "tests": 3,
+    "score_percent": 68.14,
+    "line_percent": 70.74,
+    "condition_percent": 68.33,
+    "fsm_percent": 46.17,
+    "branch_percent": 67.70,
+    "assert_percent": 72.00,
+    "functional_group_percent": 83.94,
+    "functional_groups_total": 35,
+    "cluster_cg_percent": 100.0,
+    "assertions_total": 22,
+    "assertions_with_success": 17,
+    "assertions_uncovered": 5,
+    "assertions_without_attempts": 2,
+    "cover_properties_total": 3,
+    "cover_properties_with_matches": 1,
+    "assertion_failures": 0,
+    "assertion_incomplete": 0
+  },
+  "matrix_profile_csv": "benchmark/v2_top_matrix_cluster_profile_839b9af_3seed.csv",
+  "matrix_profile_json": "benchmark/v2_top_matrix_cluster_profile_839b9af_3seed.json",
+  "text_evidence_archive": "/tmp/nmaforge_v2_clean_839b9af_cluster_3seed_text.tar.gz",
+  "text_evidence_archive_sha256": "4d036d428c8e72a10490bb7eaf9534158a8df185d46722453e49038a374993f9",
+  "scope_note": "The cluster_cg reaches its declared bins, but aggregate functional groups are 83.94%, raw code coverage remains below 100%, 5 assertions are uncovered, and 2 cover properties lack matches. Overall v2 DV remains IN PROGRESS; this is not full sign-off."
+}

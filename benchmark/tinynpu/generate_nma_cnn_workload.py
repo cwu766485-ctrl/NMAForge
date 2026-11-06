@@ -56,18 +56,35 @@ def rounded_requant(acc, shift):
     return (np.asarray(acc, dtype=np.int64) + bump) >> shift
 
 
-def build(model_path):
-    model = onnx.load(str(model_path))
-    initializers = {item.name: numpy_helper.to_array(item)
-                    for item in model.graph.initializer}
+def build(model_path, input_npz=None):
+    if model_path.suffix == ".npz":
+        with np.load(model_path) as weights:
+            initializers = {name: weights[name] for name in
+                            ("conv_w", "conv_b", "fc_w", "fc_b")}
+            model_kind = str(weights["model_kind"].item()) if "model_kind" in weights else "quantized_weight_package"
+    else:
+        model = onnx.load(str(model_path))
+        initializers = {item.name: numpy_helper.to_array(item)
+                        for item in model.graph.initializer}
+        model_kind = "onnx_reference_graph"
     conv_w, _ = quantize_int8(initializers["conv_w"])
     conv_b, _ = quantize_int8(initializers["conv_b"])
     fc_w, _ = quantize_int8(initializers["fc_w"])
     fc_b, _ = quantize_int8(initializers["fc_b"])
 
-    np.random.seed(99)
-    input_fp = np.random.randn(1, 1, 8, 8).astype(np.float32) * 0.5
-    input_i8, input_scale = quantize_int8(input_fp)
+    input_label = None
+    if input_npz is not None:
+        with np.load(input_npz) as input_data:
+            input_i8 = np.asarray(input_data["input_int8"])
+            if input_i8.shape != (1, 1, 8, 8) or input_i8.dtype != np.int8:
+                raise ValueError("input_npz input_int8 must be int8 with shape (1,1,8,8)")
+            input_scale = float(input_data["input_scale"].item())
+            input_label = int(input_data["label"].item())
+        input_fp = input_i8.astype(np.float32)
+    else:
+        np.random.seed(99)
+        input_fp = np.random.randn(1, 1, 8, 8).astype(np.float32) * 0.5
+        input_i8, input_scale = quantize_int8(input_fp)
     source = input_i8[0, 0]
     im2col = np.asarray([
         [source[row + rr, col + cc] for rr in range(3) for cc in range(3)]
@@ -169,8 +186,11 @@ def build(model_path):
 
     manifest = {
         "model": model_path.name,
+        "model_kind": model_kind,
         "model_sha256": hashlib.sha256(model_path.read_bytes()).hexdigest(),
-        "input_seed": 99,
+        "input_seed": 99 if input_npz is None else None,
+        "input_label": input_label,
+        "input_npz_sha256": hashlib.sha256(input_npz.read_bytes()).hexdigest() if input_npz is not None else None,
         "input_scale": input_scale,
         "input_int8_sha256": hashlib.sha256(input_i8.tobytes()).hexdigest(),
         "conv_weight_scale": float(np.max(np.abs(initializers["conv_w"]))) / 127.0,
@@ -195,10 +215,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True, type=Path)
     parser.add_argument("--tiny-golden", required=True, type=Path)
+    parser.add_argument("--input-npz", type=Path)
     parser.add_argument("--out-dir", required=True, type=Path)
     args = parser.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    image_words, expected_words, manifest, golden_bytes = build(args.model)
+    image_words, expected_words, manifest, golden_bytes = build(args.model, args.input_npz)
     tiny_golden = args.tiny_golden.read_bytes()
     if tiny_golden != golden_bytes:
         raise SystemExit("independent CNN Golden differs from pinned TinyNPU golden.bin")

@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="640" viewBox="0 0 1120 640">
+<rect width="100%" height="100%" fill="#fff"/>
+<text x="28" y="34" font-family="Arial,sans-serif" font-size="21" font-weight="700">Matrix 16x16 configuration ablation — mean cycle reduction vs D2/P0/C0</text>
+<text x="28" y="54" font-family="Arial,sans-serif" font-size="12" fill="#555">Three fixed seeds; one-cycle behavioral SPAD response; values are RTL simulation cycles, not ASIC timing.</text>
+<text x="28" y="86" font-family="Arial,sans-serif" font-size="15" font-weight="700">4x4x32</text>
+<text x="80" y="76" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p0/c0</text>
+<rect x="190" y="68" width="1.0" height="9" fill="#a8b3bf" rx="2"/>
+<text x="199.0" y="76" font-family="Arial,sans-serif" font-size="10" fill="#333">+0.0%</text>
+<text x="80" y="89" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p0/c1</text>
+<rect x="190" y="81" width="1.0" height="9" fill="#2c7fb8" rx="2"/>
+<text x="199.0" y="89" font-family="Arial,sans-serif" font-size="10" fill="#333">+0.0%</text>
+<text x="80" y="102" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p1/c0</text>
+<rect x="190" y="94" width="527.2" height="9" fill="#41ab5d" rx="2"/>
+<text x="725.2" y="102" font-family="Arial,sans-serif" font-size="10" fill="#333">+20.4%</text>
+<text x="80" y="115" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p1/c1</text>
+<rect x="190" y="107" width="527.2" height="9" fill="#238b45" rx="2"/>
+<text x="725.2" y="115" font-family="Arial,sans-serif" font-size="10" fill="#333">+20.4%</text>
+<text x="80" y="128" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p0/c0</text>
+<rect x="190" y="120" width="1.0" height="9" fill="#8c96a3" rx="2"/>
+<text x="199.0" y="128" font-family="Arial,sans-serif" font-size="10" fill="#333">+0.0%</text>
+<text x="80" y="141" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p0/c1</text>
+<rect x="190" y="133" width="1.0" height="9" fill="#8073ac" rx="2"/>
+<text x="199.0" y="141" font-family="Arial,sans-serif" font-size="10" fill="#333">+0.0%</text>
+<text x="80" y="154" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p1/c0</text>
+<rect x="190" y="146" width="527.2" height="9" fill="#e08214" rx="2"/>
+<text x="725.2" y="154" font-family="Arial,sans-serif" font-size="10" fill="#333">+20.4%</text>
+<text x="80" y="167" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p1/c1</text>
+<rect x="190" y="159" width="527.2" height="9" fill="#1b9e77" rx="2"/>
+<text x="725.2" y="167" font-family="Arial,sans-serif" font-size="10" fill="#333">+20.4%</text>
+<text x="28" y="190" font-family="Arial,sans-serif" font-size="15" font-weight="700">8x8x32</text>
+<text x="80" y="180" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p0/c0</text>
+<rect x="190" y="172" width="1.0" height="9" fill="#a8b3bf" rx="2"/>
+<text x="199.0" y="180" font-family="Arial,sans-serif" font-size="10" fill="#333">+0.0%</text>
+<text x="80" y="193" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p0/c1</text>
+<rect x="190" y="185" width="1.0" height="9" fill="#2c7fb8" rx="2"/>
+<text x="199.0" y="193" font-family="Arial,sans-serif" font-size="10" fill="#333">+0.0%</text>
+<text x="80" y="206" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p1/c0</text>
+<rect x="190" y="198" width="295.3" height="9" fill="#41ab5d" rx="2"/>
+<text x="493.3" y="206" font-family="Arial,sans-serif" font-size="10" fill="#333">+11.4%</text>
+<text x="80" y="219" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p1/c1</text>
+<rect x="190" y="211" width="295.3" height="9" fill="#238b45" rx="2"/>
+<text x="493.3" y="219" font-family="Arial,sans-serif" font-size="10" fill="#333">+11.4%</text>
+<text x="80" y="232" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p0/c0</text>
+<rect x="190" y="224" width="1.0" height="9" fill="#8c96a3" rx="2"/>
+<text x="199.0" y="232" font-family="Arial,sans-serif" font-size="10" fill="#333">+0.0%</text>
+<text x="80" y="245" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p0/c1</text>
+<rect x="190" y="237" width="1.0" height="9" fill="#8073ac" rx="2"/>
+<text x="199.0" y="245" font-family="Arial,sans-serif" font-size="10" fill="#333">+0.0%</text>
+<text x="80" y="258" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p1/c0</text>
+<rect x="190" y="250" width="295.3" height="9" fill="#e08214" rx="2"/>
+<text x="493.3" y="258" font-family="Arial,sans-serif" font-size="10" fill="#333">+11.4%</text>
+<text x="80" y="271" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p1/c1</text>
+<rect x="190" y="263" width="295.3" height="9" fill="#1b9e77" rx="2"/>
+<text x="493.3" y="271" font-family="Arial,sans-serif" font-size="10" fill="#333">+11.4%</text>
+<text x="28" y="294" font-family="Arial,sans-serif" font-size="15" font-weight="700">16x16x32</text>
+<text x="80" y="284" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p0/c0</text>
+<rect x="190" y="276" width="1.0" height="9" fill="#a8b3bf" rx="2"/>
+<text x="199.0" y="284" font-family="Arial,sans-serif" font-size="10" fill="#333">+0.0%</text>
+<text x="80" y="297" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p0/c1</text>
+<rect x="190" y="289" width="1.0" height="9" fill="#2c7fb8" rx="2"/>
+<text x="199.0" y="297" font-family="Arial,sans-serif" font-size="10" fill="#333">+0.0%</text>
+<text x="80" y="310" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p1/c0</text>
+<rect x="190" y="302" width="118.9" height="9" fill="#41ab5d" rx="2"/>
+<text x="316.9" y="310" font-family="Arial,sans-serif" font-size="10" fill="#333">+4.6%</text>
+<text x="80" y="323" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p1/c1</text>
+<rect x="190" y="315" width="118.9" height="9" fill="#238b45" rx="2"/>
+<text x="316.9" y="323" font-family="Arial,sans-serif" font-size="10" fill="#333">+4.6%</text>
+<text x="80" y="336" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p0/c0</text>
+<rect x="190" y="328" width="61.2" height="9" fill="#8c96a3" rx="2"/>
+<text x="259.2" y="336" font-family="Arial,sans-serif" font-size="10" fill="#333">+2.4%</text>
+<text x="80" y="349" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p0/c1</text>
+<rect x="190" y="341" width="61.2" height="9" fill="#8073ac" rx="2"/>
+<text x="259.2" y="349" font-family="Arial,sans-serif" font-size="10" fill="#333">+2.4%</text>
+<text x="80" y="362" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p1/c0</text>
+<rect x="190" y="354" width="200.5" height="9" fill="#e08214" rx="2"/>
+<text x="398.5" y="362" font-family="Arial,sans-serif" font-size="10" fill="#333">+7.8%</text>
+<text x="80" y="375" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p1/c1</text>
+<rect x="190" y="367" width="200.5" height="9" fill="#1b9e77" rx="2"/>
+<text x="398.5" y="375" font-family="Arial,sans-serif" font-size="10" fill="#333">+7.8%</text>
+<text x="28" y="398" font-family="Arial,sans-serif" font-size="15" font-weight="700">16x32x32</text>
+<text x="80" y="388" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p0/c0</text>
+<rect x="190" y="380" width="1.0" height="9" fill="#a8b3bf" rx="2"/>
+<text x="199.0" y="388" font-family="Arial,sans-serif" font-size="10" fill="#333">+0.0%</text>
+<text x="80" y="401" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p0/c1</text>
+<rect x="190" y="393" width="295.4" height="9" fill="#2c7fb8" rx="2"/>
+<text x="493.4" y="401" font-family="Arial,sans-serif" font-size="10" fill="#333">+11.4%</text>
+<text x="80" y="414" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p1/c0</text>
+<rect x="190" y="406" width="254.8" height="9" fill="#41ab5d" rx="2"/>
+<text x="452.8" y="414" font-family="Arial,sans-serif" font-size="10" fill="#333">+9.9%</text>
+<text x="80" y="427" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p1/c1</text>
+<rect x="190" y="419" width="580.6" height="9" fill="#238b45" rx="2"/>
+<text x="778.6" y="427" font-family="Arial,sans-serif" font-size="10" fill="#333">+22.5%</text>
+<text x="80" y="440" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p0/c0</text>
+<rect x="190" y="432" width="119.8" height="9" fill="#8c96a3" rx="2"/>
+<text x="317.8" y="440" font-family="Arial,sans-serif" font-size="10" fill="#333">+4.6%</text>
+<text x="80" y="453" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p0/c1</text>
+<rect x="190" y="445" width="373.0" height="9" fill="#8073ac" rx="2"/>
+<text x="571.0" y="453" font-family="Arial,sans-serif" font-size="10" fill="#333">+14.4%</text>
+<text x="80" y="466" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p1/c0</text>
+<rect x="190" y="458" width="398.3" height="9" fill="#e08214" rx="2"/>
+<text x="596.3" y="466" font-family="Arial,sans-serif" font-size="10" fill="#333">+15.4%</text>
+<text x="80" y="479" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p1/c1</text>
+<rect x="190" y="471" width="666.6" height="9" fill="#1b9e77" rx="2"/>
+<text x="864.6" y="479" font-family="Arial,sans-serif" font-size="10" fill="#333">+25.8%</text>
+<text x="28" y="502" font-family="Arial,sans-serif" font-size="15" font-weight="700">32x32x64</text>
+<text x="80" y="492" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p0/c0</text>
+<rect x="190" y="484" width="1.0" height="9" fill="#a8b3bf" rx="2"/>
+<text x="199.0" y="492" font-family="Arial,sans-serif" font-size="10" fill="#333">+0.0%</text>
+<text x="80" y="505" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p0/c1</text>
+<rect x="190" y="497" width="368.5" height="9" fill="#2c7fb8" rx="2"/>
+<text x="566.5" y="505" font-family="Arial,sans-serif" font-size="10" fill="#333">+14.3%</text>
+<text x="80" y="518" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p1/c0</text>
+<rect x="190" y="510" width="294.8" height="9" fill="#41ab5d" rx="2"/>
+<text x="492.8" y="518" font-family="Arial,sans-serif" font-size="10" fill="#333">+11.4%</text>
+<text x="80" y="531" font-family="Arial,sans-serif" font-size="10" fill="#333">d2/p1/c1</text>
+<rect x="190" y="523" width="679.9" height="9" fill="#238b45" rx="2"/>
+<text x="877.9" y="531" font-family="Arial,sans-serif" font-size="10" fill="#333">+26.3%</text>
+<text x="80" y="544" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p0/c0</text>
+<rect x="190" y="536" width="161.5" height="9" fill="#8c96a3" rx="2"/>
+<text x="359.5" y="544" font-family="Arial,sans-serif" font-size="10" fill="#333">+6.3%</text>
+<text x="80" y="557" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p0/c1</text>
+<rect x="190" y="549" width="469.4" height="9" fill="#8073ac" rx="2"/>
+<text x="667.4" y="557" font-family="Arial,sans-serif" font-size="10" fill="#333">+18.2%</text>
+<text x="80" y="570" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p1/c0</text>
+<rect x="190" y="562" width="439.1" height="9" fill="#e08214" rx="2"/>
+<text x="637.1" y="570" font-family="Arial,sans-serif" font-size="10" fill="#333">+17.0%</text>
+<text x="80" y="583" font-family="Arial,sans-serif" font-size="10" fill="#333">d4/p1/c1</text>
+<rect x="190" y="575" width="800.0" height="9" fill="#1b9e77" rx="2"/>
+<text x="998.0" y="583" font-family="Arial,sans-serif" font-size="10" fill="#333">+31.0%</text>
+<text x="190" y="620" font-family="Arial,sans-serif" font-size="11" fill="#555">Cycle reduction is positive when the configuration is faster. Baseline bar is 0%.</text>
+</svg>

@@ -1,11 +1,52 @@
 # NMAForge v2 Architecture Review
 
+## Bounded benchmark priority update — 2026-11-06
+
+The current task is limited to reusing minimum functional evidence, comparing
+the pinned TinyNPU array on the requested fixed GEMM/GEMV matrix, inspecting
+the existing Digits/CNN layouts, and assessing SPAD capacity statically. Full
+DV closure, 100% code coverage, complete formal closure, and ASIC readiness
+are explicitly not goals of this round.
+
+At audit, the target was `feature/npu-architecture-v2` at
+`219c9f26a85b9661185cd78ab6308ae3f13e3ea7`, 77 commits ahead of fetched
+`origin/feature/npu-architecture-v2` `5d01a88a8a2a7b1add15fbedbb02096d686824ab`
+(tree `bf7306bdeefeca415dd221f0a29305fdcef5b72c`); source tree at audit was
+`e2e3f1d1cc7dfa4de3e3d78fd51fab76d6c43f24`.
+`main` remains R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`. Product RTL
+remains at `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. The Matrix/CNM UVM
+fairness edit already present in the worktree was preserved and is not part
+of the benchmark/report change.
+
+The fixed TinyNPU reference `8216c22b762011aa20c05fc2768423fd12dda59d` and
+NMAForge source `219c9f2` were used for the 3-point GEMM and 4-point GEMV
+matrix, seed `20261106`; all 7 outputs sets match independent INT32 Goldens.
+TinyNPU cycles are direct-array measurements. Its common-memory endpoint is
+an explicitly labeled single-port estimate, not TinyNPU memory RTL. Results,
+stall counters, commands, and archived raw logs are in
+[`benchmark comparison`](../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md)
+and machine-readable CSV/JSON.
+
+The fixed-address Digits workload touches offset `0x55C00` (351,232 bytes)
+from the SPAD base. Its complete padded simultaneous data objects total at
+least 79,776 bytes. Thus current addresses require 512 KiB; a compact remap
+has a static 128 KiB fit but no remapped run exists, while 64 KiB requires
+streaming/reuse. The current mini-CNN map reaches offset `0x21080` (135,296
+bytes), so its present map needs 256 KiB. The capacity analysis is static;
+no smaller-SPAD mapper, cycle, bank-conflict, or PPA result is claimed.
+
+Minimum functional evidence is reused from fixed RTL/test records: clean Top
+smoke, exact trained Digits MLP outputs, exact mini-CNN intermediates/output,
+and the scoped 0x52/0x53 regressions. v2 remains a functional/performance
+candidate; full DV sign-off and ASIC readiness remain open.
+
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Latest fixed test source SHA:** `2999e03252c79aed66116b753b64ee7e389b9a56` (tree `65d56c5d6dd345effde6fdfdf70dad59f135a279`).
-**Current report branch HEAD before this review update:** `7ee16a089b4135d95a57a81c0239214b031fba6b` (tree `3ac2f31a0fcbbb5fa5cd13f3f9ed39a87c3ed3c0`); report-only commits follow the tested source SHA.
-**Published feature branch tip at this audit:** `19f9575f3579869f27d72f2dd17fa980840b6499` (same tree `3ac2f31a0fcbbb5fa5cd13f3f9ed39a87c3ed3c0`).
+**Latest clean Compute Cluster DV candidate SHA:** `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` (tree `630e498ba467d84dd5359403cfe1ed1e5879f6e9`; Top smoke, three-seed Cluster UVM and focused 0x52/0x53 replay). The broader 19-test UVM/URG merge remains separately bound to `f9f32f71e7168350d74a75ede0a4a4b222844cc9`. The `16×16×256` case still exceeds the unchanged watchdog before Golden.
+**Latest Transformer fixture functional replay SHA:** `9b835aeac33d43fd97a81496b1048d359cdff3d0` (86 fixed-weight descriptors; 301 Golden checks). Trained-model inference and measured cycles/token remain NOT_RUN.
+**Current report branch HEAD before this report update:** `d7ca7f3da6492ad9130178128a1e9d38d69d78d6` (tree `307a564f7e6c1ca4e627d37f6a9984ab155c4e24`).
+**Current published v2 branch tip:** `origin/feature/npu-architecture-v2` `5d01a88a8a2a7b1add15fbedbb02096d686824ab` (tree `bf7306bdeefeca415dd221f0a29305fdcef5b72c`).
 **Product RTL SHA:** `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; no RTL change is present in the fixed test source or report-only commits.
 
 ## Executive disposition
@@ -20,6 +61,154 @@ Golden-checked VCS evidence.
 This is a **bounded v2 functional/performance candidate**, not a v1.0 Compute
 Cluster sign-off, full v2 verification closure, ASIC sign-off, or a TinyNPU
 performance win. Keep the overall Compute Cluster disposition at **HOLD**.
+
+### Phase 0 source/worktree audit — 2026-11-06 (prior snapshot)
+
+The isolated target is `feature/npu-architecture-v2`, source SHA
+`fed6c3f320705361bbbf761b99c73b36014cae77`, tree
+`0625812c7f8b6852ad0bc3f52701b49e536062b5`, clean and 53 commits ahead of
+`origin/feature/npu-architecture-v2`. A live `git ls-remote` confirmed that
+GitHub `main` remains the requested R250 SHA
+`3041355528dffe856e2d5384027c6ee5df5d1b42` and R250 is the target branch's
+merge base. Local `main` is stale/divergent and was not used as the baseline.
+
+The VS Code worktree remains at `/home/ray/workspace/NMAForge` on local branch
+`feat/shape-adaptive-gemv-v2`, SHA
+`c290eba7697138a4fcf2cbbac9262264849f0aeb`, tree
+`a7b3821eb9e425927322f2b3729a3c12ad08d9d4`. Its tree matches remote
+`origin/feat/shape-adaptive-gemv-v2` (`03b619ce1b32331c8f01194a42e5efb43bcda033`),
+while its commit history is 63 commits ahead and one behind that remote ref.
+Relative to target v2, it has a distinct history: merge base
+`b5b6ff25ed41fb5ea4c9a5043360063cec58f7ac`, with 497 target-only commits and
+64 `feat/shape-adaptive-gemv-v2`-only commits. The IDE worktree has untracked
+`novas.conf` and `novas.rc`; both remain untouched. No merge, cherry-pick,
+reset, or cleanup was performed.
+
+Git reports 216 registered worktrees: 136 existing and 80 missing; 10 existing
+worktrees have uncommitted changes, including the IDE worktree. The active v2
+worktree was clean during this inventory. The other worktrees were left
+untouched. The target v2 `.gitignore` covers simulator databases, credentials,
+licensed-tool files, PDK/library formats, and Nova local settings. A tracked
+path audit found no matching private file or generated simulation database.
+
+R250-to-product RTL differences remain limited to six files
+(`ai_tensor_matrix_array.sv`, `ai_tensor_matrix_core.v`, opcode decode,
+descriptor validator, parallel dispatcher, and Compute Cluster integration):
+662 insertions and 80 deletions. The last RTL commit remains
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; no RTL change exists from that
+commit through this audit snapshot. Both `0x52` and `0x53` use the existing
+shared Matrix controller/array; there is no second 256-MAC array.
+
+**Audit PASS at that snapshot:** exact R250 ancestry, remote-ref identity,
+worktree identity, the six-file RTL delta, last RTL SHA, clean target tree,
+private-file ignore coverage, and unchanged product RTL after `cd0a05d`.
+At that snapshot the local v2 branch was 53 commits ahead and had not been
+pushed. See the later Phase 0 status refresh below for the updated count and
+push result. The separate IDE branch was not merged.
+
+### Phase 0 status refresh — 2026-11-06
+
+The audit start `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` and R250 SHA
+`3041355528dffe856e2d5384027c6ee5df5d1b42` are both ancestors of the target
+branch. At the evidence-commit parent `30fd00f28555029584d361df5d81289f6cd6b7bc`
+(tree `160fdc923ff5080754ffd11f23ff599d6cf58281`), the active worktree
+`/tmp/nmaforge-architecture-v2` is clean on
+`feature/npu-architecture-v2`. Its cached remote-tracking tip is
+`5d01a88a8a2a7b1add15fbedbb02096d686824ab`; the branch is 63 commits ahead,
+zero behind. The cached `origin/main` remains the requested R250 SHA. A normal
+`git push origin feature/npu-architecture-v2` was attempted and failed because
+Git could not read the HTTPS username (`No such device or address`); no remote
+ref was changed.
+
+The original IDE worktree remains on `feat/shape-adaptive-gemv-v2` at
+`c290eba7697138a4fcf2cbbac9262264849f0aeb`, with only untracked
+`novas.conf` and `novas.rc`. Its history is separate from the target branch:
+the merge base is `b5b6ff25ed41fb5ea4c9a5043360063cec58f7ac`; relative to that
+base, the IDE branch has 64 unique commits and the target branch has 507. No
+merge or cherry-pick was made.
+
+The full Git worktree inventory reports 216 registered paths: 136 exist and
+80 are missing and marked prunable. Ten existing worktrees are dirty: the IDE
+worktree, `/tmp/nmaforge-v2-gemv-baseline-8cff286`,
+`/tmp/nmaforge_r153_clean`, `/tmp/nmaforge_r153_final_clean`,
+`/tmp/nmaforge_r153_top_clean`, `/tmp/nmaforge_r160_subsystem_cov_34e0`,
+`/tmp/nmaforge_r163_clean_f2e671d`, `/tmp/nmaforge_r164_clean_db7588b`,
+`/tmp/nmaforge_r166_subsystem_clean_8be88c1`, and
+`/tmp/nmaforge_r281_matrixfsm`. They were left untouched; no missing worktree
+was pruned. The temporary clean replay worktrees created for the 16-seed and
+merged URG runs were removed after archiving their text-only evidence.
+
+The exact R250-to-target RTL diff remains six files and `662 insertions / 80
+deletions`: Matrix array/core, opcode decode, descriptor validator, parallel
+dispatcher, and Compute Cluster integration. The last product RTL commit is
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; `git diff` confirms no RTL changes
+after it. The ignored/private-file audit in the prior Phase 0 section remains
+valid; the new committed evidence consists of Markdown and JSON only.
+
+**Refresh PASS:** review-start and R250 ancestry, current source/tree identity,
+target branch/worktree cleanliness, full worktree inventory, exact R250 RTL
+diff, and no product RTL changes after the recorded product commit.
+**OPEN:** GitHub synchronization is blocked by missing HTTPS credentials; the
+local target branch remains ahead 63. Dirty IDE/other worktrees and the 80
+missing/prunable registrations were preserved.
+
+### Phase 0 status refresh — current clean replay candidate `839b9af`
+
+Before this report-only update, the target worktree was at
+`d7ca7f3da6492ad9130178128a1e9d38d69d78d6` / tree
+`307a564f7e6c1ca4e627d37f6a9984ab155c4e24`, clean on
+`feature/npu-architecture-v2` and 71 commits ahead of its cached
+remote-tracking tip `5d01a88a8a2a7b1add15fbedbb02096d686824ab`. The clean test
+candidate used for the new VCS evidence is
+`839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` / tree
+`630e498ba467d84dd5359403cfe1ed1e5879f6e9`; both the requested review start
+and R250 remain ancestors of the target branch.
+
+The live worktree inventory now reports 217 registered paths: 137 present
+and 80 missing/prunable; 11 present worktrees are dirty, including this target
+report worktree while its three benchmark artifacts are being added. The IDE
+worktree remains on `feat/shape-adaptive-gemv-v2` at
+`c290eba7697138a4fcf2cbbac9262264849f0aeb` / tree
+`a7b3821eb9e425927322f2b3729a3c12ad08d9d4`, with only `novas.conf` and
+`novas.rc` untracked. Its merge base with target v2 is
+`b5b6ff25ed41fb5ea4c9a5043360063cec58f7ac`; target v2 has 515 unique commits
+and the IDE branch 64. No other worktree was cleaned, merged, or changed.
+
+Both requested ancestry checks pass. The R250-to-v2 RTL diff is still six
+files (`662` insertions, `80` deletions), and the last product RTL commit
+remains `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; no product RTL is changed
+by this report/benchmark update. `.gitignore` checks confirm exclusions for
+`.env`, private library content under `external/private`, and simulator
+databases; the current tracked-file scan remains free of simulator databases
+and matching private library artifacts.
+
+### Latest real-Top GEMV tail-state cross — 2026-11-06
+
+Testbench-only SHA `0e9f12ec3701030c9e5978ad29b227c5e0c644a7` closes the
+declared eight-state M%4 × N%16 × K%16 alignment/tail cross on real opcode-0x52
+CMDQ traffic. Each of the three Seeds hits all eight named bins and checks
+independent signed INT32 outputs, output guards, completion, and accepted/
+returned read ownership. Merged URG reports this focused group at 100%; full
+profile coverage remains Line/Condition/FSM/Branch/Assert/Group
+70.71/68.34/46.17/67.66/72.00/82.96%. This covers representative shapes in
+each state, not every supported dimension, alias, fault, or lifecycle
+combination. The entire v2 DV status remains IN PROGRESS and product RTL is
+unchanged. Run command and archive hash are in the [DV closure
+report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+### Latest real-CMDQ long-K GEMV — 2026-11-06
+
+Testbench-only SHA `e944133b43107839e5f5eea902251097a228b312` also passes a
+16×16×128 opcode-0x52 workload on Seeds 20261025/26/27. Each run compares all
+256 signed INT32 outputs against an independent Golden, checks two guards and
+ordered completion, and drains 448/448 accepted/returned Matrix reads. The
+dedicated long-K functional group is 100%. Merged UVM URG line/condition/FSM/
+branch/assert/group is `70.71/68.34/46.17/67.66/72.00/83.46%`; this remains
+scoped evidence and does not close global v2 coverage. An attempted K=256
+Top-CMDQ case exceeded the existing `MAX_TASK_CYCLES=2000` testbench bound
+before a Golden result; no checker was relaxed, and K=256 remains open pending
+latency-contract review. Product RTL is unchanged. Exact command and logs-only
+archive hash are in the [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
 ### Latest fixed-source verification addendum — 2026-11-06
 
@@ -40,6 +229,108 @@ full WSTRB only); several code-coverage and assertion bins remain unhit;
 external-fabric response behavior, complete fault × phase × reset coverage,
 and all-checker mutation mapping remain open. No test result is transferred
 to a different SHA, and no product RTL changed.
+
+### Latest real-CMDQ descriptor rejection replay — 2026-11-06
+
+Testbench-only commit `c26064e3dda40ce26490c5c93b3e741529946c58` adds four
+ABI-v7 opcode `0x52` malformed descriptors to the real Top CMDQ sequence:
+output aliases padded A, output aliases dense B, 16-byte source misalignment,
+and a 32-byte padded-A source span that actually wraps past `2^32`. Across
+Seeds 20261109/10/11, all twelve invalid descriptors (eight legacy/engine
+cases plus four GEMV cases) retire `ERR_DESC`; there are zero launch or
+compute/DMA request cycles and all 24 sentinel/guard words remain unchanged.
+The focused `cmdq_invalid_descriptor_cg` is 100% (12/12). Aggregate UVM URG
+is Line/Condition/FSM/Branch/Assert/Group `69.65/63.34/45.62/58.03/72.00/79.18%`;
+v2 remains IN PROGRESS. The first input attempt used K=1 and ended exactly at
+`2^32`, so it correctly was not treated as a wrap; the committed test uses
+K=17. Product RTL is unchanged. Full command, logs, and archive checksum are
+recorded in [DV closure](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+### Latest legal 0x52 real-CMDQ replay — 2026-11-06
+
+At source/test SHA `fd82e7323bbf73c428f1a1e72d784220f2440cd0`, the Top UVM
+sequence executes an ABI-v7 `0x52` descriptor for M=3, N=5, K=5 through the
+production CMDQ fetch, descriptor validator, Matrix dispatcher, shared
+banked-SPAD path, and completion writer. Three seeds pass all 15 independent
+INT32 Golden outputs, two destination guards, completion fields, and 8/8
+accepted/returned Matrix reads. The M/N/K-tail group and its cross are 100%.
+
+The first attempt did complete the command, but the passive UVM launch
+monitor returned no launch sample because its opcode-to-engine mapping omitted
+the new `0x52` and `0x53` Matrix opcodes. The monitor is now corrected; this
+was a verification observability issue, not a product RTL issue. Product RTL
+remains at `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. The full command,
+aggregate URG totals, and log archive checksum are in the
+[DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+The 3×5×5 replay closes one legal CMDQ GEMV shape and single-engine response
+drain; the 1×1×1 minimum boundary is tested separately below. Maximum
+supported shapes, exhaustive legal tails, multi-engine 0x52 ownership, and the
+complete fault × phase × reset matrix were open at that replay; later maximum-
+tile and concurrent-owner replays are recorded below. v2 DV remains **IN PROGRESS**.
+
+### Minimum legal GEMV boundary — 2026-11-06
+
+The real Top CMDQ regression also executes opcode `0x52` at M=N=K=1 on fixed
+source/test SHA `95301c46dfa6b9ee68f1e37a38f7767e3111d869` (tree
+`abbb19e1c8205e3d8252e5685fd6ab6161970c3d`). Three Seeds pass signed
+independent Golden outputs −2, −6, and −12, preserve the adjacent output guard,
+check completion, and drain 2/2 accepted/returned operand lines. Its dedicated
+minimum-shape URG bin is 100% (3/3 hits). This closes only the minimum
+descriptor/data point; maximum-dimension execution was still open at this SHA
+and is covered by the following replay. Full GEMV DV remains open. Product RTL
+is unchanged.
+
+### Maximum legal GEMV tile — 2026-11-06
+
+At fixed test SHA `92874788fb2cb2a2b15657a3621e5a275a9d5990` (tree
+`8ddbc13844b9bb2f262c88c471dd60a4e3bbd428`), the real Top CMDQ sequence runs
+opcode `0x52` at M=N=K=16 on Seeds 20261118/19/20. Each Seed checks 256 signed
+INT32 outputs against an independent Golden, two output guards, completion
+status/result/elements, and 32 accepted/32 returned Matrix operand lines. The
+dedicated maximum-tile functional group is 100% (3/3 hits); merged aggregate
+Line/Condition/FSM/Branch/Assert/Group is 70.69/68.28/45.99/67.59/72.00/81.26%.
+This proves the maximum descriptor/data point on the Top CMDQ path. Other
+intermediate shapes, tail combinations, fault phases, concurrent response
+ownership, and the v2 RTM remain open. Product RTL was not modified. Exact
+command and log checksum are recorded in the [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+### Concurrent production GEMV + CNM response ownership — 2026-11-06
+
+Testbench-only commit `85e7db2d12f5edfaed17e8ca3910bb504983779f` (tree
+`e8f64f78f7986193bdc0d01dfbc01740a130edcb`) adds a second real Top CMDQ
+descriptor beside the maximum legal 0x52 GEMV: opcode 0x21 CNM GEMV uses
+disjoint source/destination regions. Three Seeds pass independent full output
+Goldens, guards, ordered completions, 32/32 Matrix request/response ownership,
+CNM accepted/returned read accounting, and zero Matrix/CNM response-route
+mismatches. Each run observes 178 cycles with both engines busy; 18 same-cycle
+request collisions were granted to CNM (Matrix/CNM grants 0/18). This records
+the observed arbitration order; it is not a fairness or starvation proof.
+
+The focused owner overlap/contention covergroup is 100%. Merged UVM URG is
+Line/Condition/FSM/Branch/Assert/Group
+`70.69/68.25/45.99/67.59/72.00/81.86%`; this does not close overall v2
+coverage. Run ID, exact clean-worktree command, report details, and logs-only
+archive checksum are recorded in the [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+No product RTL changed; the product RTL SHA remains
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
+
+### Phase 0 worktree relationship audit — 2026-11-06
+
+The requested feature work was run in a separate worktree on
+`feature/npu-architecture-v2`, currently tested through source SHA
+`c26064e3dda40ce26490c5c93b3e741529946c58`. The original VS Code worktree at
+`/home/ray/workspace/NMAForge` remains on `feat/shape-adaptive-gemv-v2`, HEAD
+`c290eba7697138a4fcf2cbbac9262264849f0aeb`, tree
+`a7b3821eb9e425927322f2b3729a3c12ad08d9d4`, and has two pre-existing
+untracked files (`novas.conf`, `novas.rc`) which were preserved. The branches
+are not interchangeable: their merge base is `b5b6ff25ed41fb5ea4c9a5043360063cec58f7ac`,
+with 446 commits unique to the target feature branch and 64 unique to the
+original `feat/shape-adaptive-gemv-v2` branch. No merge/cherry-pick was
+performed. At audit time GitHub `main` still resolved to R250
+`3041355528dffe856e2d5384027c6ee5df5d1b42`; the published v2 branch was
+`5d01a88a8a2a7b1add15fbedbb02096d686824ab` (tree
+`bf7306b...`).
 
 ### Latest v2 verification-only update — 2026-11-06
 
@@ -190,7 +481,7 @@ opcode under every interaction.
 
 | Opcode | Implemented behavior | Descriptor constraints in current RTL | Verified subset |
 |---|---|---|---|
-| `0x52` | Signed INT8 GEMV mapped as K-fold work on the shared 16×16 Matrix array, with partial-sum reduction. Uses the existing 1 KiB reuse array for bounded B-fold caching, A-line reuse, and optional next-K prefetch. | ABI v7; exact `1≤M,N≤16`, `K≥1`; dense padded A rows and dense B rows; contiguous INT32 output; optional bias. Current product gate rejects transpose, nonzero strides, extra aux/flags, unsupported batch/head fields, address-span overflow, and output overlap with A/B/enabled bias. | Real Top CMDQ Golden for M4×16×32, M1×13×17, M8×16×19; Matrix-core 48/48 four-way Cache×Prefetch Golden checks for M8/M16 × K19/K65 over three Seeds. Descriptor range/alias replay is archived separately. |
+| `0x52` | Signed INT8 GEMV mapped as K-fold work on the shared 16×16 Matrix array, with partial-sum reduction. Uses the existing 1 KiB reuse array for bounded B-fold caching, A-line reuse, and optional next-K prefetch. | ABI v7; exact `1≤M,N≤16`, `K≥1`; dense padded A rows and dense B rows; contiguous INT32 output; optional bias. Current product gate rejects transpose, nonzero strides, extra aux/flags, unsupported batch/head fields, address-span overflow, and output overlap with A/B/enabled bias. | Existing core shape/config checks plus real Top CMDQ Golden at M=N=K=1, 3×5×5 and 16×16×16; max point checks 256 outputs and 32/32 returned reads across three Seeds. Descriptor range/alias replay is archived separately; exhaustive shape/fault matrix remains open. |
 | `0x53` | Matrix GEMM INT32 post-processing followed by signed INT8 requantization and native Matrix-A-layout output. `aux0[4:0]` is shift; `aux0[5]` opts into capture; `aux0[6]` opts into matching-tag consume. | ABI v7; upper aux bits zero; capture is bounded to M=N=16 and one tile; consume is bounded to M=16, K=4, no A transpose, and one tile. Exact source tag is required. A miss uses the regular SPAD path. Both producer and consumer retain SPAD writeback. | Three-Seed Matrix-core OFF/ON Golden ablation with capture backpressure, final-line commit, exact-tag hit/miss, ping-pong bank flip, reset invalidation, Abort invalidation, and drain. Three-Seed product Top CMDQ differential compares all output words/completions and source-A reads. |
 
 The `0x52` validator computes half-open byte spans for padded A, dense B,
@@ -249,17 +540,22 @@ ablation](../benchmark/NMAFORGE_V2_GEMV_CACHE_PREFETCH_ABLATION.md).
   and mutation report for every new checker are not complete.
 - The TinyNPU tools are now available and the named GEMM/CNN and small-M GEMV
   replays have passed at the source identities above. A true TinyNPU memory
-  adapter, broader GEMV shapes, trained CNN/Transformer comparisons, and
-  phase-aligned system endpoints remain open; mixed modeled results are not a
-  product-level win claim.
+  adapter, broader GEMV shapes, trained-weight CNN/Transformer comparisons,
+  and phase-aligned system endpoints remain open; mixed modeled results are
+  not a product-level win claim.
 - DC, formal/LEC, CDC/RDC, SRAM mapping, DFT readiness, power and physical PPA
   are not closed by these VCS runs. ASIC readiness remains `NOT_RUN` or
   `BLOCKED_ENV` by individual tool/input; do not claim Tapeout Ready.
 - v1.0 Compute Cluster stays **HOLD**. This branch's scoped v2 tests do not
   resolve the inherited 38-requirement sign-off record.
 - The matched trained Digits MLP replay is a scoped model result, not a
-  TinyNPU comparison. Separate Host/DMA/Compute/Writeback/Graph phase counters
-  are still missing; trained CNN and Transformer deployment remain `NOT_RUN`.
+  TinyNPU comparison. A four-class Digits CNN with trained convolution filters
+  now passes all 159 held-out inputs through Top CMDQ and matches its
+  independent integer Golden, but this is not a ten-class result or a TinyNPU
+  comparison. The 86-descriptor Transformer functional fixture passes; its
+  deterministic test weights are not trained weights. Separate
+  Host/DMA/Compute/Writeback/Graph phase counters and trained Transformer
+  inference remain open.
 
 ## Current decision
 
@@ -293,6 +589,29 @@ only after Phase 1 closure or a formally reviewed scope disposition.
 - The existing UVM mutation harness compiled temporary RTL copies and injected seven real DUT defects: shared-SPAD address, data and response owner; Matrix WSTRB; Completion error code; missing Done; and duplicate Done. Each was caught by its assigned scoreboard/checker (7/7) at seed 20261025; the source worktree remained unchanged.
 - Exact command, VCS version, Run ID, checker names and archive SHA-256 are recorded in the [v2 DV closure RTM](../verification/NMAFORGE_V2_DV_CLOSURE.md). The earlier opcode-core mutation suite separately remains 15/15 across three seeds.
 - `REQ-V2-COM-005` remains **PARTIAL**: the selected Completion and engine-owner faults now have direct evidence, while mutation mapping for every new-feature checker and wider fault-phase interactions remain open. No sign-off or RTL behavior change is claimed.
+
+## Current clean-worktree compatibility replay — 2026-11-06
+
+At candidate SHA `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` (tree
+`630e498ba467d84dd5359403cfe1ed1e5879f6e9`), a detached clean-worktree Top
+Smoke replay passed with VCS `V-2023.12-SP1_Full64`. It exercised legacy paths,
+three product GEMV descriptors, the `0x53` producer/consumer path, Matrix/SFU
+cross-engine immutability, and the Matrix/CNM profiling scenario. The simulator
+reported `TEST PASS` and no `ERROR:` lines; the known fixture
+`LOOP-REROLL-ENABLED` compile notice remains. This is a compatibility smoke
+result only; it adds no RTM closure and does not change the identified product
+RTL SHA. Details and checksums are in the [DV closure evidence](../verification/NMAFORGE_V2_DV_CLOSURE.md)
+and [machine record](../../benchmark/v2_top_smoke_clean_839b9af.json).
+
+The same candidate SHA/tree also passes clean-worktree three-seed
+`uvm_compute_cluster_regress` for Seeds 20261128/29/30 with zero UVM
+Warning/Error/Fatal. The nine Matrix profile state partitions close, but URG
+functional group coverage is 83.94%, five assertions are uncovered, and only
+one of three cover properties matches. Thus the reproducible baseline is
+stronger, while the remaining v2 DV evidence still prevents full closure. See
+the [DV report](../verification/NMAFORGE_V2_DV_CLOSURE.md), [performance
+report](../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md), and [run
+metadata](../../benchmark/v2_clean_cluster_uvm_839b9af.json).
 
 ## Follow-up system-level contention benchmark at `17b09e0` — 2026-11-05
 
@@ -351,8 +670,10 @@ license files, `.env`, `novas.conf`/`novas.rc`, and library/database extensions.
   The [machine summary](../../benchmark/v2_p2_cluster_serial_parallel_410b81d_summary.json)
   records its one-workload, behavioral-SPAD boundary.
 - The trained Digits model was rerun at this fixed source/test SHA and remains
-  bit-exact with 352/360 classifications and 34,761 CMDQ cycles. This does not
-  close trained CNN or Transformer model deployment.
+  bit-exact with 352/360 classifications and 34,761 CMDQ cycles. A later
+  bounded four-class CNN demo is recorded below; it has fixed convolution
+  filters and a trained readout, so full trained-CNN and Transformer deployment
+  are not closed.
 - Current-candidate SpyGlass lint completed with 0 errors, 465 warnings and 5
   infos. CDC setup stalled without producing a report; bounded RDC stopped at
   `Ar_resetcross01`. The open reset release contract and wide-mux analysis
@@ -380,3 +701,119 @@ do not close all 0x52/0x53 descriptor variants, legal cross-engine fault
 combinations, or system-level assertions. The v2 decision remains a bounded
 candidate, not full DV sign-off; details and archive checksum are in the
 [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+## Trained CNN demo and compatibility smoke — 2026-11-06
+
+- Test/build commit `835f958b5f486b3f3e4808e735a788721f4f1441`; no product RTL
+  changed. The four-class Digits demo uses fixed edge filters and a trained
+  INT8 head. Its initial one-sample replay was later expanded at `de22e46` to
+  all 159 held-out cases through separate real Top CMDQ runs; each stage and
+  final logits match an independent Golden, with 158/159 hardware-checked
+  classifications correct. This remains a scoped demo, not a fully trained
+  convolutional network.
+- VCS `V-2023.12-SP1_Full64`: `ai_trained_cnn_demo`, fixed TinyNPU CNN
+  compatibility replay and `ai_smoke` all pass. Smoke includes legacy GEMM,
+  opcode 0x52/0x53 and CNM markers; existing `LOOP-REROLL-ENABLED` note remains
+  and no new compile error was observed.
+- Machine record:
+  [CSV](../../benchmark/v2_trained_cnn_demo_835f958.csv) and
+  [JSON](../../benchmark/v2_trained_cnn_demo_835f958.json). The trained
+  Transformer, stage-separated full-model timing, full v2 DV closure and ASIC
+  readiness remain open.
+
+## Full held-out CNN Top replay — 2026-11-06
+
+- Test harness commit `de22e4652a54dfe7537e14585bdf3ae6f08fe9fb`, tree
+  `29d35cadabd84872081dc7f6d51a7398cfb431b5`; product RTL is unchanged.
+- Run ID `V2-TRAINED-CNN-TOP-DATASET-DE22E46`: 159/159 Top CMDQ instances
+  passed, all intermediate and output Golden checks exact, 158/159 classified
+  correctly. Each sample uses 1,985 compute cycles plus 1,080 host-layout
+  cycles in the behavior-SPAD testbench.
+- Per-sample CSV and run summary:
+  [CSV](../../benchmark/v2_trained_cnn_dataset_de22e46.csv),
+  [JSON](../../benchmark/v2_trained_cnn_dataset_de22e46.json). All run logs,
+  model, inputs and Goldens archive SHA-256
+  `dfacc9a6a7e17150def4814cfe9baad11b8c21675d75db1505c0b907c80de1be`.
+- Four convolution filters remain fixed; only the classifier head is trained.
+  No TinyNPU comparison, trained Transformer, full timing decomposition, DV
+  sign-off, or ASIC readiness is claimed.
+
+## Current model and Top compatibility evidence — 2026-11-06
+
+- At model/tooling source SHA `9b835aeac33d43fd97a81496b1048d359cdff3d0`,
+  the four shared 3×3 convolution filters and INT8 classifier are both trained.
+  All 159 held-out Digits labels 0–3 passed separate real Top CMDQ runs with
+  every checked intermediate and final integer Golden exact (159/159 correct).
+  This remains a four-class scope, not a ten-class model or TinyNPU result.
+- The existing 86-descriptor Transformer prefill/decode fixture passes the Top
+  path and its intermediate/KV Golden checks at the same source SHA. Its weights
+  are deterministic test weights; trained-model inference and cycles/token are
+  still NOT_RUN.
+- `ai_smoke` plus three 20-random-workload Top runs pass on the same candidate.
+  These are compatibility/smoke results only; they do not alter the v2 URG/RTM
+  status of 14 PASS-scoped / 8 PARTIAL.
+- Machine evidence is in the [model report](../benchmark/NMAFORGE_V2_MODEL_BENCHMARK.md)
+  and [Top compatibility record](../../benchmark/v2_top_smoke_compat_9b835ae.json).
+  Product RTL remains unchanged at `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`;
+  v2 DV remains IN PROGRESS and ASIC PPA remains BLOCKED_ENV/NOT_RUN.
+
+## Post-review fixed-candidate validation — 2026-11-06
+
+- At testbench/tooling SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5`, three
+  clean Compute Cluster UVM seeds exercise `0x52` with `srcA == srcB`; all
+  256 source bytes remain unchanged, 16 signed INT32 outputs match Golden,
+  both guards and completion pass, and Matrix read ownership drains 17/17.
+- The same fixed SHA passes Top `ai_smoke` and three `ai_run` regressions with
+  20 random workloads each. This confirms the exercised legacy and `0x52`/
+  `0x53` smoke paths remain functional after the testbench addition. It does
+  not close the RTM's remaining partials or add a coverage merge.
+- Its real-Top matched UVM workload also reproduces 1.158× staged and 1.492×
+  queued/parallel cycle ratios with unchanged SPAD byte counts; this remains a
+  behavioral-SPAD NMAForge comparison, not TinyNPU or ASIC evidence.
+- Machine records: [GEMV alias](../../benchmark/v2_cmdq_gemv_ab_alias_f19e929.json)
+  and [Top compatibility](../../benchmark/v2_top_smoke_compat_f19e929.json).
+  Matched workload metrics are in [CSV](../../benchmark/v2_p2_cluster_serial_parallel_f19e929.csv)
+  and [JSON](../../benchmark/v2_p2_cluster_serial_parallel_f19e929.json).
+  Full evidence and limits are in the [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+## GitHub publication check — 2026-11-06
+
+At local commit `36c42c2827acb7a8267aacd9cf0f253271c72d0f`, the v2 branch was
+55 commits ahead of `origin/feature/npu-architecture-v2`. The authorized push
+command `git push origin HEAD:refs/heads/feature/npu-architecture-v2` failed
+with exit 128 because this non-interactive environment could not read the
+GitHub HTTPS username. A live read-only `git ls-remote` afterward confirmed
+that the remote v2 ref remains `5d01a88a8a2a7b1add15fbedbb02096d686824ab` and
+`main` remains R250. No remote ref was changed. Local commits remain intact;
+publication is **BLOCKED_AUTH** pending GitHub credentials in the execution
+environment.
+
+## Current-candidate focused feature replay — 2026-11-06
+
+At clean source SHA `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0`, the 0x52 GEMV,
+0x52/0x53 fault recovery, handshake, Tile Forwarding ON/OFF, and temporary RTL
+mutation targets pass three Seeds. Each Seed passes six GEMV shape bins, eight
+selected fault bins, two handshake bins, and six enabled tile-forward bins;
+tile SVA is attempted 3/3 with no failures, and the seven mutation classes are
+caught in all Seeds (21/21). These are scoped core results: full fault-phase-
+reset crosses, external response timing, all-engine ownership pairs, and
+exhaustive checker-to-mutation mapping remain open. The overall v2 RTM stays
+14 PASS-scoped / 8 PARTIAL. Evidence is in the [DV report](../verification/NMAFORGE_V2_DV_CLOSURE.md)
+and [machine record](../../benchmark/v2_opcode_dv_clean_839b9af_3seed.json).
+
+## Same-SHA mixed UVM coverage merge — `839b9af`
+
+The mixed AXI/DMA E2E matrix was rerun at the same clean candidate as the
+three-seed Compute Cluster UVM regression. The 19-test URG merge reaches
+36/36 declared functional groups (100%) and matches all three AR/AW/W
+stall-to-accept cover properties. RTL code Line/Condition/FSM/Branch remains
+`74.15/71.55/47.45/71.14%`; 20/22 assertions have successes and two UVM RAL
+assertions have no attempts. This closes the declared groups in this test
+plan, not all code/FSM bins or v2 requirements: the RTM remains 14
+PASS-scoped / 8 PARTIAL. The exact evidence is in the [DV report](../verification/NMAFORGE_V2_DV_CLOSURE.md)
+and [machine JSON](../../benchmark/v2_clean_urg_19test_839b9af.json).
+
+The subsequent authorized Git push attempt at local commit
+`325fe78bead175fc4eda1fae2ed74929f61ba331` failed before authentication:
+Git could not read the GitHub HTTPS username. The v2 branch remained 73 commits
+ahead of its cached remote ref at the time; no remote update is claimed.

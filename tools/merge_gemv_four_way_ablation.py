@@ -122,7 +122,7 @@ def make_summary(rows: list[dict[str, str]]) -> dict[str, object]:
         configs_by_shape.append({"shape": shape, "configurations": configs})
 
     return {
-        "run_id": "V2-GEMV-FOUR-WAY-3SEED-410B81D",
+        "run_id": f"V2-GEMV-FOUR-WAY-3SEED-{next(iter(source_shas))[:7].upper()}",
         "source_sha": next(iter(source_shas)),
         "rtl_sha": next(iter(source_shas)),
         "test_sha": next(iter(test_shas)),

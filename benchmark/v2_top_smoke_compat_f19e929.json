@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "run_id": "V2-TOP-SMOKE-COMPAT-20X-3SEED-F19E929",
+  "status": "PASS_SCOPED",
+  "candidate": {
+    "branch": "feature/npu-architecture-v2",
+    "commit": "f19e92934cd6273d327621c43cb17291cf1a9aa5",
+    "tree": "2d931c1c81997b482467d7fdf69302dd367975a1",
+    "product_rtl_commit": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+    "worktree": "clean detached worktree"
+  },
+  "tools": {
+    "simulator": "Synopsys VCS V-2023.12-SP1_Full64",
+    "python": "Python 3.12.13",
+    "mapper": "sw/tools/cimforge_mapper.py",
+    "coverage_database": "not collected by Top Smoke target"
+  },
+  "runs": [
+    {
+      "kind": "ai_smoke",
+      "seed": 20261106,
+      "random_workloads": 4,
+      "result": "PASS",
+      "simulation_time_ps": 836100000,
+      "directed_markers": ["legacy GEMM", "opcode 0x52 GEMV", "opcode 0x53 fused forwarding", "opcode 0x53 cross-engine immutability", "Matrix/CNM performance profile"],
+      "errors": 0,
+      "log_sha256": "8251df5c976dbe93e2bedd54486e3f5139ef45a2b32e67a200a509a4d0741dcb"
+    },
+    {
+      "kind": "ai_run",
+      "seed": 20261106,
+      "random_workloads": 20,
+      "result": "PASS",
+      "simulation_time_ps": 984560000,
+      "directed_markers": ["legacy GEMM", "opcode 0x52 GEMV", "opcode 0x53 fused forwarding", "opcode 0x53 cross-engine immutability", "Matrix/CNM performance profile"],
+      "errors": 0,
+      "log_sha256": "e3e193d1cba0ed0b0317a133aff111cfa07dcb8d95a393abbafdd61b1d0b8fcf"
+    },
+    {
+      "kind": "ai_run",
+      "seed": 20261107,
+      "random_workloads": 20,
+      "result": "PASS",
+      "simulation_time_ps": 981920000,
+      "directed_markers": ["legacy GEMM", "opcode 0x52 GEMV", "opcode 0x53 fused forwarding", "opcode 0x53 cross-engine immutability", "Matrix/CNM performance profile"],
+      "errors": 0,
+      "log_sha256": "07374ad5d31a9ddfe268073eeef75a0268021feafdbb74881366af2fbabb7905"
+    },
+    {
+      "kind": "ai_run",
+      "seed": 20261108,
+      "random_workloads": 20,
+      "result": "PASS",
+      "simulation_time_ps": 991190000,
+      "directed_markers": ["legacy GEMM", "opcode 0x52 GEMV", "opcode 0x53 fused forwarding", "opcode 0x53 cross-engine immutability", "Matrix/CNM performance profile"],
+      "errors": 0,
+      "log_sha256": "bb8802fcb1a5d9f7bf753b426e4b459f1639bfb05a945de42e27b9111b25bf3f"
+    }
+  ],
+  "compile_notice": "Existing LOOP-REROLL-ENABLED fixture debug-capacity notice; compile completed and simulations passed.",
+  "commands": [
+    "VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH make -C dv/subsystem/top_smoke/sim ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261106 SEED=20261106",
+    "VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=20261106 SEED=20261106",
+    "VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=20261107 SEED=20261107",
+    "VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=20261108 SEED=20261108"
+  ],
+  "artifacts": {
+    "logs_only_archive": "/tmp/nmaforge_v2_top_compat_f19e929_logs.tar.gz",
+    "logs_only_archive_sha256": "c8054cc1ea0bc0e07f96c96f963806e159845cfc56c3ca17e8c0fd0de0e10f5f",
+    "archive_contents": ["ai_comp.log", "smoke_seed_20261106.log", "ai_run_seed_20261106.log", "ai_run_seed_20261107.log", "ai_run_seed_20261108.log"],
+    "excluded": ["simulator_binary", "coverage_database", "waveforms"]
+  },
+  "overall_v2_dv_signoff": "IN_PROGRESS"
+}

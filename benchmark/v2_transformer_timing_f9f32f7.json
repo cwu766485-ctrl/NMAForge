@@ -1,0 +1,51 @@
+{
+  "run_id": "V2-TRANSFORMER-FIXED-WEIGHTS-TIMED-TOP-F9F32F7-S20261106",
+  "status": "PASS_SCOPED",
+  "source_test_sha": "f9f32f71e7168350d74a75ede0a4a4b222844cc9",
+  "product_rtl_sha": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+  "seed": 20261106,
+  "workload": "ABI-v7 fixed-weight 4-token prefill plus 1-token decode Transformer fixture",
+  "weight_provenance": "hand-authored deterministic test weights; not trained or pretrained",
+  "descriptor_count": 86,
+  "prefill_descriptor_count": 46,
+  "decode_descriptor_count": 40,
+  "tensor_count": 60,
+  "golden_checks_passed": 301,
+  "timing": {
+    "endpoint": "Top CMDQ doorbell write begins to hardware processor_cplq_tail reaches descriptor count",
+    "sampling": "testbench cycle counter; completion tail sampled 1 ps after its clocked update to include the same cycle",
+    "includes": ["command fetch/dispatch", "compute", "SPAD service", "completion commits"],
+    "excludes": ["testbench SPAD/model/descriptor preload", "post-run Golden reads and comparisons"],
+    "clock_period_ns_simulation_only": 10.0,
+    "total_cycles": 11397,
+    "prefill_cycles": 5682,
+    "prefill_tokens": 4,
+    "prefill_average_cycles_per_token": 1420.5,
+    "decode_cycles": 5715,
+    "decode_tokens": 1,
+    "decode_cycles_per_token": 5715,
+    "matrix_mac_activity_cycles": 64
+  },
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "python": "3.12.13"
+  },
+  "commands": [
+    "cd sw/tools && python3.12 -m unittest -v test_cimforge_mapper.py",
+    "cd dv/subsystem/top_smoke/sim && VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' make ai_transformer AI_SEED=20261106 SEED=20261106"
+  ],
+  "result": "Mapper unit tests 4/4 PASS; generated 86 descriptors/60 tensors; Top CMDQ 301/301 independent intermediate/final/KV checks; TEST PASS",
+  "fixture_sha256": "4c3c420616b485ef3ef9fe02fd8d0db8261ddde14d0b72a0c179a675b974c636",
+  "manifest_sha256": "7730c7b12b268a6a3dd40ecc07eb11c8d25c77237d508ee805d83c4fd03e5313",
+  "compile_log_sha256": "d8f5be7de0fdfb4d00174954586eb1e7aa33d6d43f0eacf5a43ca90026397871",
+  "simulation_log_sha256": "ae82dd24b7509887cb83616692633e9d9d14b3bea6398f7a07c28e428ba0e184",
+  "log_archive": "/tmp/nmaforge_v2_transformer_timing_f9f32f7_logs.tar.gz",
+  "log_archive_sha256": "03096fd98236b00a3ce2de3b8543b173a9c851c53b48839300c11e59ad6aea53",
+  "limitations": [
+    "This is fixed-weight functional validation, not trained or pretrained model inference.",
+    "The total includes behavior-level Top/CMDQ/SPAD simulation and is not ASIC timing or power evidence.",
+    "The one decode token is a measured sample, not a steady-state multi-token decode average.",
+    "Host, DMA, compute, writeback, and graph orchestration sub-intervals are not individually separated.",
+    "No TinyNPU common-memory comparison was run."
+  ]
+}
