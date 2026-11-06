@@ -21,10 +21,10 @@ SpyGlass, formal/LEC, SRAM mapping, DC, physical PPA, or power evidence below.
 Their existing `NOT_RUN` and `BLOCKED_ENV` dispositions remain in force; no
 ASIC readiness or tapeout claim is made.
 
-The latest targeted DV source is `e944133b43107839e5f5eea902251097a228b312`
-(three-seed real-CMDQ 0x52 M/N/K tail cross and 16×16×128 GEMV); the latest
-benchmark replay is `a4dcc6b609878811fcd48a0310401609d4952c62`. Both are
-testbench/report changes only. Product RTL remains at
+The latest targeted DV replay is `8758794c1f3bd6abb41c33276422b84ac5ee7a80`
+(three-seed real-CMDQ `1×1×256` GEMV point); the latest benchmark replay is
+`a4dcc6b609878811fcd48a0310401609d4952c62`. These are testbench/report
+changes only. Product RTL remains at
 `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`, so neither changes the static RTL
 or PPA result.
 
@@ -141,6 +141,28 @@ No synthesis area is available for those additions. No capacity sweep, SRAM
 macro mapping, measured Fmax, activity-based power, or energy/inference result
 was run. The 10 ns simulation clock and any 250 MHz normalization are not
 ASIC timing evidence.
+
+## Environment recheck — 2026-11-06
+
+The project `eda.yaml` names `external/private` as the PDK root and the
+private TSMC28 standard-cell database and SDC as synthesis inputs. The
+read-only EDA check found Design Compiler installed at
+`/opt/Synopsys/syn/V-2023.12-SP1/bin/dc_shell`; `dc_shell -version` reports
+`V-2023.12-SP1`. `eda.py doctor` found the configured Synopsys executables.
+`eda.py plan --flow synth --dry-run` generated a generic plan under ignored
+`runs/`; it did not execute synthesis and is not PPA evidence.
+
+The required `external/private` directory, `syn/run_ai_accel_28nm_dc.sh`,
+TSMC28 standard-cell/SRAM/timing inputs, and configured SDC are absent in this
+worktree. The environment probe reported only set/unset state for the private
+input variables; their values were not recorded. No DC library read, synthesis,
+or license checkout was attempted. Base-vs-v2 area/Fmax/power remains
+**BLOCKED_ENV** because the design-specific implementation inputs are missing;
+this is not a claim that the DC executable or license is unavailable.
+
+The K=256 verification update at SHA `8758794` does not change the RTL or
+existing PPA boundary. Its functional regression evidence is documented in
+the [DV closure report](NMAFORGE_V2_DV_CLOSURE.md), not as synthesis evidence.
 
 ## Remaining gates
 
