@@ -27,6 +27,7 @@ def main():
     parser.add_argument("--candidate-sha", required=True)
     parser.add_argument("--out-dir", required=True, type=Path)
     parser.add_argument("--seed", type=int, default=20261029)
+    parser.add_argument("--spad-base-shift", type=lambda value: int(value, 0), default=0)
     args = parser.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
     logs_dir = args.out_dir / "logs"
@@ -59,7 +60,7 @@ def main():
         golden_path.write_bytes(golden)
 
         image_words, expected_words, manifest, mapped_golden = workload.build(
-            args.model, input_path)
+            args.model, input_path, args.spad_base_shift)
         if mapped_golden != golden:
             raise SystemExit("independent Golden mismatch at sample %d" % index)
         case_dir = workload_dir / stem
@@ -123,6 +124,7 @@ def main():
         "num_classes": num_classes,
         "class_labels": list(range(num_classes)),
         "architecture": "4 shared 3x3 INT8 conv filters + INT8 linear head, output groups of four",
+        "spad_base_shift_bytes": args.spad_base_shift,
         "samples": len(rows),
         "top_runs_passed": len(rows),
         "all_intermediate_goldens_exact": True,

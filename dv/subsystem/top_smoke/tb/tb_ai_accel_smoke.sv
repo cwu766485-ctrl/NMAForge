@@ -1,5 +1,12 @@
 `timescale 1ns / 1ps
 
+`ifndef AI_SPAD_WORDS_PER_BANK
+`define AI_SPAD_WORDS_PER_BANK 32768
+`endif
+`ifndef AI_TINYNPU_CNN_SPAD_BASE_SHIFT
+`define AI_TINYNPU_CNN_SPAD_BASE_SHIFT 0
+`endif
+
 module tb_ai_accel_smoke;
 
     localparam FPGA_AXI_BASE     = 32'ha000_0000;
@@ -88,7 +95,7 @@ module tb_ai_accel_smoke;
     localparam REG_SPAD_INFO       = 32'h0000_0164;
     localparam REG_EVENT_STATUS    = 32'h0000_0168;
     localparam SPAD_BASE         = 32'h0001_0000;
-    localparam SPAD_BYTES        = 32'h0008_0000;
+    localparam [31:0] SPAD_BYTES = 4 * `AI_SPAD_WORDS_PER_BANK * 4;
     localparam AI_DIGITS_INPUT_BASE = 32'h0005_0000;
     localparam AI_DIGITS_OUTPUT_BASE = 32'h0003_b000;
     localparam AI_DIGITS_HIDDEN_I8_TILE_BASE = 32'h0003_2000;
@@ -99,19 +106,26 @@ module tb_ai_accel_smoke;
     localparam AI_DIGITS_TEST_SAMPLES = 360;
     localparam AI_DIGITS_HIDDEN_WORDS = 5888;
 
-    localparam AI_TINYNPU_CNN_IM2COL_BASE = 32'h0001_0000;
-    localparam AI_TINYNPU_CNN_CONV_RAW_BASE = 32'h0001_2000;
-    localparam AI_TINYNPU_CNN_CONV_I8_BASE = 32'h0001_3000;
-    localparam AI_TINYNPU_CNN_IDENTITY_B_BASE = 32'h0001_4000;
-    localparam AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE = 32'h0001_5000;
-    localparam AI_TINYNPU_CNN_CONV_RELU_I8_BASE = 32'h0001_6000;
-    localparam AI_TINYNPU_CNN_FC_A_BASE = 32'h0001_8000;
-    localparam AI_TINYNPU_CNN_FC_RAW_BASE = 32'h0001_b000;
-    localparam AI_TINYNPU_CNN_FC_I8_BASE = 32'h0001_c000;
-    localparam AI_TINYNPU_CNN_FC_BIASED_BASE = 32'h0001_d000;
-    localparam AI_TINYNPU_CNN_FINAL_I8_BASE = 32'h0001_e000;
-    localparam AI_TINYNPU_CNN_DESC_BASE = 32'h0002_0000;
-    localparam AI_TINYNPU_CNN_CPL_BASE = 32'h0002_1000;
+    localparam [31:0] AI_TINYNPU_CNN_SPAD_SHIFT = `AI_TINYNPU_CNN_SPAD_BASE_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_IM2COL_BASE = 32'h0001_0000 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_CONV_WEIGHT_BASE = 32'h0001_1000 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_CONV_ROUND_BASE = 32'h0001_1100 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_CONV_RAW_BASE = 32'h0001_2000 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_CONV_I8_BASE = 32'h0001_3000 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_IDENTITY_B_BASE = 32'h0001_4000 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_CONV_BIAS_BASE = 32'h0001_4100 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE = 32'h0001_5000 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_CONV_RELU_I8_BASE = 32'h0001_6000 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_FC_A_BASE = 32'h0001_8000 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_FC_B_BASE = 32'h0001_9000 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_FC_ROUND_BASE = 32'h0001_a000 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_FC_RAW_BASE = 32'h0001_b000 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_FC_I8_BASE = 32'h0001_c000 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_FC_BIAS_BASE = 32'h0001_c100 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_FC_BIASED_BASE = 32'h0001_d000 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_FINAL_I8_BASE = 32'h0001_e000 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_DESC_BASE = 32'h0002_0000 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    localparam [31:0] AI_TINYNPU_CNN_CPL_BASE = 32'h0002_1000 - AI_TINYNPU_CNN_SPAD_SHIFT;
 
     localparam OP_VDOT_INT8      = 8'h10;
     localparam OP_GEMV_INT8      = 8'h11;
@@ -716,7 +730,9 @@ module tb_ai_accel_smoke;
         end
     end
 
-    ai_accel_top dut(
+    ai_accel_top #(
+        .SPAD_WORDS_PER_BANK(`AI_SPAD_WORDS_PER_BANK)
+    ) dut(
         .aclk          (aclk),
         .aresetn       (aresetn),
         .s_axi_awaddr  (s_axi_awaddr),
@@ -2073,8 +2089,9 @@ module tb_ai_accel_smoke;
                 $fatal(1, "TinyNPU CNN final output was not poisoned: %08h", read_value);
 
             write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE, OP_TENSOR_GEMM,
-                   16'hd500, AI_TINYNPU_CNN_IM2COL_BASE, 32'h0001_1000,
-                   32'h0001_1100, AI_TINYNPU_CNN_CONV_RAW_BASE,
+                   16'hd500, AI_TINYNPU_CNN_IM2COL_BASE,
+                   AI_TINYNPU_CNN_CONV_WEIGHT_BASE,
+                   AI_TINYNPU_CNN_CONV_ROUND_BASE, AI_TINYNPU_CNN_CONV_RAW_BASE,
                    16'd36, 16'd4, 16'd3, 8'h01, 32'd0, 5'd4, 2'd0,
                    32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd0, 16'd1, 16'd0);
             write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h40,
@@ -2084,7 +2101,8 @@ module tb_ai_accel_smoke;
                    32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd1, 16'd2, 16'd1);
             write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h80,
                    OP_TENSOR_GEMM, 16'hd502, AI_TINYNPU_CNN_CONV_I8_BASE,
-                   32'h0001_4000, 32'h0001_4100,
+                   AI_TINYNPU_CNN_IDENTITY_B_BASE,
+                   AI_TINYNPU_CNN_CONV_BIAS_BASE,
                    AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE,
                    16'd36, 16'd4, 16'd1, 8'h01, 32'd0, 5'd0, 2'd1,
                    32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd2, 16'd4, 16'd2);
@@ -2152,7 +2170,8 @@ module tb_ai_accel_smoke;
                 write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + descriptor_index * 64,
                        OP_TENSOR_GEMM, 16'hd500 + descriptor_index,
                        AI_TINYNPU_CNN_FC_A_BASE,
-                       32'h0001_9000 + group_index * 32'h240, 32'h0001_a000,
+                       AI_TINYNPU_CNN_FC_B_BASE + group_index * 32'h240,
+                       AI_TINYNPU_CNN_FC_ROUND_BASE,
                        AI_TINYNPU_CNN_FC_RAW_BASE,
                        16'd4, 16'd4, 16'd36, 8'h01, 32'd0, 5'd8, 2'd0,
                        32'd0, 32'd0, 32'd0, 16'd1, 16'd1,
@@ -2166,8 +2185,8 @@ module tb_ai_accel_smoke;
                        event_base << 1, event_base << 2, event_base << 1);
                 write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + (descriptor_index + 2) * 64,
                        OP_TENSOR_GEMM, 16'hd500 + descriptor_index + 2,
-                       AI_TINYNPU_CNN_FC_I8_BASE, 32'h0001_4000,
-                       32'h0001_c100 + group_index * 32'h10,
+                       AI_TINYNPU_CNN_FC_I8_BASE, AI_TINYNPU_CNN_IDENTITY_B_BASE,
+                       AI_TINYNPU_CNN_FC_BIAS_BASE + group_index * 32'h10,
                        AI_TINYNPU_CNN_FC_BIASED_BASE,
                        16'd4, 16'd4, 16'd1, 8'h01, 32'd0, 5'd0, 2'd0,
                        32'd0, 32'd0, 32'd0, 16'd1, 16'd1,

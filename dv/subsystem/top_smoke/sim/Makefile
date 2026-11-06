@@ -5,6 +5,7 @@ URG ?= /opt/Synopsys/vcs/V-2023.12-SP1/bin/urg
 VCS_HOME ?= /opt/Synopsys/vcs/V-2023.12-SP1
 AI_RANDOM_CASES ?= 4
 AI_SEED ?= 12345
+AI_SPAD_WORDS_PER_BANK ?= 32768
 AI_REF_CASES ?= 1000
 AI_REF_SEED ?= 20260722
 # The WSL image keeps an old python3 (3.6) alongside newer interpreters.
@@ -20,6 +21,7 @@ ai_transformer_gen:
 
 ai_comp: ai_transformer_gen
 	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_SPAD_WORDS_PER_BANK=$(AI_SPAD_WORDS_PER_BANK) \
 		+incdir+../../../block/control/agent \
 		+incdir+../../../block/dma/agent \
 		+incdir+../fixtures \
@@ -134,6 +136,7 @@ ai_digits_inference:
 AI_TINYNPU_CNN_RUN ?= /tmp/nmaforge_tinynpu_cnn_rtl_$(shell date +%Y%m%d_%H%M%S)
 AI_TINYNPU_CNN_PYTHON ?= python3
 AI_TINYNPU_CNN_CLASSES ?= 4
+AI_TINYNPU_CNN_SPAD_BASE_SHIFT ?= 0
 .PHONY: ai_tinynpu_cnn_match
 ai_tinynpu_cnn_match:
 	test ! -e "$(AI_TINYNPU_CNN_RUN)"
@@ -143,14 +146,18 @@ ai_tinynpu_cnn_match:
 			--model "$(AI_TINYNPU_CNN_MODEL)" \
 			--tiny-golden "$(AI_TINYNPU_CNN_GOLDEN)" \
 			--input-npz "$(AI_TINYNPU_CNN_INPUT_NPZ)" \
+			--spad-base-shift "$(AI_TINYNPU_CNN_SPAD_BASE_SHIFT)" \
 			--out-dir "$(AI_TINYNPU_CNN_RUN)/workload"; \
 	else \
 	$(AI_TINYNPU_CNN_PYTHON) ../../../../benchmark/tinynpu/generate_nma_cnn_workload.py \
 		--model "$(AI_TINYNPU_CNN_MODEL)" \
 		--tiny-golden "$(AI_TINYNPU_CNN_GOLDEN)" \
+		--spad-base-shift "$(AI_TINYNPU_CNN_SPAD_BASE_SHIFT)" \
 		--out-dir "$(AI_TINYNPU_CNN_RUN)/workload"; \
 	fi
 	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_SPAD_WORDS_PER_BANK=$(AI_SPAD_WORDS_PER_BANK) \
+		+define+AI_TINYNPU_CNN_SPAD_BASE_SHIFT=$(AI_TINYNPU_CNN_SPAD_BASE_SHIFT) \
 		+incdir+../../../block/control/agent \
 		+incdir+../../../block/dma/agent \
 		+incdir+../fixtures \
@@ -164,6 +171,12 @@ ai_tinynpu_cnn_match:
 		+AI_TINYNPU_CNN_EXPECTED=$(AI_TINYNPU_CNN_RUN)/workload/nma_cnn_expected.memh \
 		-l $(AI_TINYNPU_CNN_RUN)/run.log
 	grep -q '^NMA_CNN_INFERENCE_PASS' $(AI_TINYNPU_CNN_RUN)/run.log
+
+.PHONY: ai_tinynpu_cnn_match_128k
+ai_tinynpu_cnn_match_128k:
+	$(MAKE) ai_tinynpu_cnn_match \
+		AI_SPAD_WORDS_PER_BANK=8192 \
+		AI_TINYNPU_CNN_SPAD_BASE_SHIFT=65536
 
 # Trained Digits CNN demo. The same Top flow supports four- and ten-class
 # heads by running one four-output INT8 Matrix group per command chain.

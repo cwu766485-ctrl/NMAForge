@@ -56,7 +56,14 @@ def rounded_requant(acc, shift):
     return (np.asarray(acc, dtype=np.int64) + bump) >> shift
 
 
-def build(model_path, input_npz=None):
+def build(model_path, input_npz=None, spad_base_shift=0):
+    if spad_base_shift < 0 or spad_base_shift & 0x3:
+        raise ValueError("SPAD base shift must be a nonnegative word offset")
+    addr = {name: value - spad_base_shift for name, value in ADDR.items()}
+    desc_base = DESC_BASE - spad_base_shift
+    cpl_base = CPL_BASE - spad_base_shift
+    if min(*addr.values(), desc_base, cpl_base) < 0:
+        raise ValueError("SPAD base shift moves an allocation below address zero")
     if model_path.suffix == ".npz":
         with np.load(model_path) as weights:
             initializers = {name: weights[name] for name in
@@ -137,7 +144,7 @@ def build(model_path, input_npz=None):
                     lanes = list(im2col[row, k0:k0 + 4]) if row < 36 else []
                     lanes += [0] * (4 - len(lanes))
                     im2col_words.append(pack_i8(lanes))
-    add_words(memory, ADDR["im2col"], im2col_words)
+    add_words(memory, addr["im2col"], im2col_words)
 
     # B stores one packed K-word per output column in each 16-byte line.
     conv_b_words = []
@@ -146,13 +153,13 @@ def build(model_path, input_npz=None):
             lanes = list(conv_weights[channel, k0:k0 + 4])
             lanes += [0] * (4 - len(lanes))
             conv_b_words.append(pack_i8(lanes))
-    add_words(memory, ADDR["conv_weight"], conv_b_words)
-    add_words(memory, ADDR["conv_round_bias"], [8] * 4)
-    add_words(memory, ADDR["identity_b"], [
+    add_words(memory, addr["conv_weight"], conv_b_words)
+    add_words(memory, addr["conv_round_bias"], [8] * 4)
+    add_words(memory, addr["identity_b"], [
         pack_i8([1 if k == n else 0 for k in range(4)]) for n in range(4)
     ])
-    add_words(memory, ADDR["conv_bias"], conv_b)
-    add_words(memory, ADDR["fc_a"], [0] * (4 * 36))
+    add_words(memory, addr["conv_bias"], conv_b)
+    add_words(memory, addr["fc_a"], [0] * (4 * 36))
 
     fc_b_group_bytes = 4 * 36 * 4
     for group in range(padded_classes // 4):
@@ -161,15 +168,15 @@ def build(model_path, input_npz=None):
             for n in range(4):
                 fc_b_words.append(pack_i8(
                     fc_weights_padded[group * 4 + n, k0:k0 + 4]))
-        add_words(memory, ADDR["fc_b"] + group * fc_b_group_bytes, fc_b_words)
-        add_words(memory, ADDR["fc_bias"] + group * 16,
+        add_words(memory, addr["fc_b"] + group * fc_b_group_bytes, fc_b_words)
+        add_words(memory, addr["fc_bias"] + group * 16,
                   fc_bias_padded[group * 4:group * 4 + 4])
-    add_words(memory, ADDR["fc_round_bias"], [128] * 4)
+    add_words(memory, addr["fc_round_bias"], [128] * 4)
     for key, count in (("conv_raw", 144), ("conv_i8", 36),
                        ("conv_bias_relu", 144), ("conv_relu_i8", 36),
                        ("fc_raw", 16), ("fc_i8", 4),
                        ("fc_biased", 16), ("final_i8", padded_classes)):
-        add_words(memory, ADDR[key], [0xA55AA55A] * count)
+        add_words(memory, addr[key], [0xA55AA55A] * count)
 
     image_words = [len(memory)]
     for address, value in sorted(memory.items()):
@@ -212,6 +219,8 @@ def build(model_path, input_npz=None):
         "input_label": input_label,
         "input_npz_sha256": hashlib.sha256(input_npz.read_bytes()).hexdigest() if input_npz is not None else None,
         "input_scale": input_scale,
+        "spad_base_shift_bytes": spad_base_shift,
+        "spad_max_allocated_exclusive": max(memory) + 4,
         "input_int8_sha256": hashlib.sha256(input_i8.tobytes()).hexdigest(),
         "conv_weight_scale": float(np.max(np.abs(initializers["conv_w"]))) / 127.0,
         "fc_weight_scale": float(np.max(np.abs(initializers["fc_w"]))) / 127.0,
@@ -240,9 +249,12 @@ def main():
     parser.add_argument("--tiny-golden", required=True, type=Path)
     parser.add_argument("--input-npz", type=Path)
     parser.add_argument("--out-dir", required=True, type=Path)
+    parser.add_argument("--spad-base-shift", type=lambda value: int(value, 0), default=0,
+                        help="subtract this byte offset from every mapped SPAD address")
     args = parser.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    image_words, expected_words, manifest, golden_bytes = build(args.model, args.input_npz)
+    image_words, expected_words, manifest, golden_bytes = build(
+        args.model, args.input_npz, args.spad_base_shift)
     tiny_golden = args.tiny_golden.read_bytes()
     if tiny_golden != golden_bytes:
         raise SystemExit("independent CNN Golden differs from pinned TinyNPU golden.bin")
