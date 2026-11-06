@@ -4,6 +4,23 @@ Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `f19e92934cd6273d3
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
+## 2026-11-06 — 16-seed mixed AXI/DMA coverage and compatible URG merge
+
+At source/test SHA `f9f32f71e7168350d74a75ede0a4a4b222844cc9` (tree
+`0b20e98298852d2648f83d10723c55aabe3a9149`), 16 mixed precision DDR/AXI E2E
+seeds pass with UVM severity `0/0/0`; the named E2E, DMA error-position and
+four AXI memory-model groups are 100%. A same-source/top/source-list-compatible
+URG merge combines these with the three real Cluster seeds: 19 tests and
+36/36 declared functional groups at 100%. Combined code coverage is Line /
+Condition / FSM / Branch `74.13/71.59/47.45/71.10%`; 20/22 assertions have
+real successes (two UVM RAL properties have no attempts), and AR/AW/W cover
+matches are `161/67/126`. This closes only this declared test plan, not all v2
+requirements or all RTL bins; the RTM remains 14 PASS-scoped / 8 PARTIAL and
+v2 DV is **IN PROGRESS**. Product RTL is unchanged. Run IDs, exact commands,
+archive hashes and scope limits are in the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md)
+and machine-readable records [mixed E2E](../../benchmark/v2_mixed_axi_dma_cov_f9f32f7_16seed.json),
+[19-test merge](../../benchmark/v2_merged_urg_f9f32f7_19test.json).
+
 ## 2026-11-06 update — 0x52 read-only A/B alias verification
 
 Commit `f19e92934cd6273d327621c43cb17291cf1a9aa5` adds a real Top CMDQ
