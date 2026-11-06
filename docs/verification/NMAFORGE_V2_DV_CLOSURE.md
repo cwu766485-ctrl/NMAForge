@@ -1878,3 +1878,32 @@ Exact command and parameters, source/tree identity, marker list, and archive
 checksums are in the [machine record](../../benchmark/v2_top_smoke_clean_839b9af.json).
 Text-only run log archive: `/tmp/nmaforge_v2_top_smoke_839b9af_logs.tar.gz`,
 SHA-256 `6fb7768b7b9d03a33b1c56d8b63a5ae44d8608b63492f106e4e04e6ee1dd2dae`.
+
+## Clean-worktree three-seed Cluster replay at the same candidate — 2026-11-06
+
+At the same detached clean source SHA/tree, the full
+`uvm_compute_cluster_regress` target passes Seeds 20261128/29/30. Each seed
+reports UVM Warning/Error/Fatal `0/0/0`, the full Cluster pass marker, the
+existing seven-engine Golden and owner/recovery checks, and three Matrix
+profiles. Across the nine profiles, all 15 exclusive Matrix FSM state buckets
+sum exactly to the Matrix internal cycle counter. The stand-alone,
+Matrix+CNM staged, and Matrix writeback-stall cases reproduce the previously
+reported profile means.
+
+URG merges three tests. Aggregate Line/Condition/FSM/Branch/Assert/Functional
+Group coverage is `70.74/68.33/46.17/67.70/72.00/83.94%`; `cluster_cg` is
+100%, while total declared group score is 83.94%. Of 22 assertions, 17 have
+real successes and zero fail/incomplete; five are uncovered, including two
+without attempts. One of three cover properties matches. Therefore the replay
+confirms reproducibility at the fixed candidate but does not close aggregate
+coverage or promote the 22-row RTM: it remains 14 PASS-scoped / 8 PARTIAL and
+v2 DV remains **IN PROGRESS**.
+
+Exact command, tool versions, URG details and profile artifact paths are in
+the [machine record](../../benchmark/v2_clean_cluster_uvm_839b9af.json). The
+9-row [CSV](../../benchmark/v2_top_matrix_cluster_profile_839b9af_3seed.csv)
+and [JSON](../../benchmark/v2_top_matrix_cluster_profile_839b9af_3seed.json)
+are derived from the run logs by the checked-in summarizer. Text-only log and
+URG archive `/tmp/nmaforge_v2_clean_839b9af_cluster_3seed_text.tar.gz`,
+SHA-256 `4d036d428c8e72a10490bb7eaf9534158a8df185d46722453e49038a374993f9`;
+coverage databases and simulator outputs are excluded.

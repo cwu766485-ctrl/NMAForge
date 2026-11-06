@@ -1111,3 +1111,9 @@ This is Matrix-controller RTL evidence, not TinyNPU parity or ASIC PPA.
 - A detached clean worktree at source SHA `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` / tree `630e498ba467d84dd5359403cfe1ed1e5879f6e9` passes `make ai_smoke` on VCS `V-2023.12-SP1_Full64`: `TEST PASS`, 1,683 `PASS:` lines, no simulation `ERROR:` lines. Required GEMV, tile-forward, Matrix/SFU cross-engine, and Matrix/CNM profile markers all match.
 - The compile keeps the known `LOOP-REROLL-ENABLED` fixture warning. Smoke sampling uses four random cases; no UVM coverage or RTM disposition is promoted.
 - Exact command, runtime seed, evidence archive checksum, and result limits are recorded in the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md) and [machine record](../../benchmark/v2_top_smoke_clean_839b9af.json). Product RTL is unchanged; v2 DV remains **IN PROGRESS**.
+
+## 2026-11-06 update — clean three-seed Cluster UVM at `839b9af`
+
+- In the same detached clean worktree, `uvm_compute_cluster_regress` passes Seeds 20261128/29/30 with UVM Warning/Error/Fatal `0/0/0` and the seven-engine Golden/ownership/recovery checks.
+- All nine standalone/staged/line-stall Matrix profiles close their exclusive FSM state sum to Matrix `cycle_count`; the means reproduce the previous `f530fe2` run. Current profile CSV/JSON and URG evidence are linked from the [DV report](../../verification/NMAFORGE_V2_DV_CLOSURE.md), [performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md), and [run metadata](../../benchmark/v2_clean_cluster_uvm_839b9af.json).
+- URG aggregate group coverage is 83.94%, with raw Line/Condition/FSM/Branch/Assert at 70.74/68.33/46.17/67.70/72.00%; 17/22 assertions have successes and 1/3 cover properties matches. This confirms the test points while leaving aggregate coverage and RTM partials open. v2 DV remains **IN PROGRESS**; model/PPA status is unchanged.

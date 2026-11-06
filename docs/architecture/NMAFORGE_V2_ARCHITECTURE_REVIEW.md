@@ -533,6 +533,16 @@ result only; it adds no RTM closure and does not change the identified product
 RTL SHA. Details and checksums are in the [DV closure evidence](../verification/NMAFORGE_V2_DV_CLOSURE.md)
 and [machine record](../../benchmark/v2_top_smoke_clean_839b9af.json).
 
+The same candidate SHA/tree also passes clean-worktree three-seed
+`uvm_compute_cluster_regress` for Seeds 20261128/29/30 with zero UVM
+Warning/Error/Fatal. The nine Matrix profile state partitions close, but URG
+functional group coverage is 83.94%, five assertions are uncovered, and only
+one of three cover properties matches. Thus the reproducible baseline is
+stronger, while the remaining v2 DV evidence still prevents full closure. See
+the [DV report](../verification/NMAFORGE_V2_DV_CLOSURE.md), [performance
+report](../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md), and [run
+metadata](../../benchmark/v2_clean_cluster_uvm_839b9af.json).
+
 ## Follow-up system-level contention benchmark at `17b09e0` — 2026-11-05
 
 - The real Compute Cluster UVM regression passes Seeds 20261025/26/27 with the shared `ai_spad_arbiter`, all seven engines, independent Golden checks and ordered CMDQ completions. Same four-task serial/parallel work measures 1,696/1,137 RTL cycles (ratio 1.492; equal 4,352 B read and 2,688 B write traffic). The three-task staged case measures 1,239/1,070 cycles (ratio 1.158).

@@ -1026,3 +1026,29 @@ The VCS release is `V-2023.12-SP1_Full64`; the checked-in parser runs on Python
 by this Matrix-specific interface, and the broader serial/parallel workload
 still lacks a full all-engine timeline. No functional RTM state or product
 RTL changed.
+
+### Clean-candidate replay at `839b9af`
+
+The same three-seed Compute Cluster regression and all three profile scenarios
+were replayed from a detached clean worktree at source/test SHA
+`839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` (tree
+`630e498ba467d84dd5359403cfe1ed1e5879f6e9`) using VCS
+`V-2023.12-SP1_Full64`. All 3 seeds pass with UVM Warning/Error/Fatal `0/0/0`;
+all 9 profile FSM partitions close exactly, and the values are identical to
+the `f530fe2` run. This is a clean-candidate reproducibility check, not a new
+workload or a different memory model.
+
+The URG aggregate bounds confidence in this replay: functional group score is
+83.94% (the declared `cluster_cg` alone is 100%), line/condition/FSM/branch is
+70.74/68.33/46.17/67.70%, and assertions have 17/22 real successes with zero
+failures/incomplete; two assertions have no attempts and only 1/3 cover
+properties matches. The complete three-seed URG disposition is in the [DV
+report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+Machine data: [CSV](../../benchmark/v2_top_matrix_cluster_profile_839b9af_3seed.csv),
+[profile JSON](../../benchmark/v2_top_matrix_cluster_profile_839b9af_3seed.json),
+and [run metadata](../../benchmark/v2_clean_cluster_uvm_839b9af.json). Text-only
+logs/URG archive `/tmp/nmaforge_v2_clean_839b9af_cluster_3seed_text.tar.gz`,
+SHA-256 `4d036d428c8e72a10490bb7eaf9534158a8df185d46722453e49038a374993f9`.
+The 256-MAC behavioral-SPAD profile remains an RTL simulation result; it is
+not ASIC timing, power, or TinyNPU comparison evidence.
