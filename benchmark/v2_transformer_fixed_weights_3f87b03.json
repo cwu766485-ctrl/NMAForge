@@ -1,0 +1,32 @@
+{
+  "run_id": "V2-TRANSFORMER-FIXED-WEIGHTS-TOP-3F87B03-S20261106",
+  "status": "PASS_SCOPED",
+  "source_test_sha": "3f87b033cb49c95f9ecb139b532714873a6c9476",
+  "product_rtl_sha": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+  "seed": 20261106,
+  "workload": "ABI-v7 fixed-weight 4-token prefill plus 1-token decode Transformer fixture",
+  "weight_provenance": "hand-authored deterministic test weights; not trained or pretrained",
+  "descriptor_count": 86,
+  "tensor_count": 60,
+  "golden_checks_passed": 301,
+  "matrix_mac_activity_cycles": 64,
+  "end_to_end_cycles": null,
+  "cycles_per_token": null,
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "python": "3.12.13"
+  },
+  "command": "VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' make ai_transformer AI_SEED=20261106 SEED=20261106",
+  "result": "TRANSFORMER_MAPPER_PASS; 301/301 intermediate/final/KV checks; TEST PASS; no simulation error lines",
+  "fixture_sha256": "23b2d4ca831fe2ed858e21309c3d9b44d2354d16cd3d1f6f0798b916e4a72a69",
+  "manifest_sha256": "5f4914a4c04a65fd658f7a192eaacc2042e12456e97f7f8fc0cd787364f37b3e",
+  "simulation_log_sha256": "9dd23e7fd1a00c53da3952d6d24041491e3b28814caf999e47a852727d2408b8",
+  "compile_log_sha256": "d079fe221f728504010be8d10a149681a2f18959e12341c98ce73d6c8e1a8ddb",
+  "log_archive": "/tmp/nmaforge_v2_transformer_fixed_weights_3f87b03_logs.tar.gz",
+  "log_archive_sha256": "30d0d0f744d5aa8a3ed04ca0d37aa30dac8de2aa5f5f31db87d39e78632d3e3e",
+  "limitations": [
+    "The fixture validates functional operator composition and KV flow only; it is not a trained model.",
+    "The reported 64 MAC activity cycles are not the end-to-end latency interval.",
+    "End-to-end cycles, cycles/token, TinyNPU comparison, and host/DMA/compute/writeback stage timings are not measured by this run."
+  ]
+}

@@ -1,6 +1,7 @@
 # NMAForge v2 Model Benchmark
 
 **Status date:** 2026-11-06
+**Latest fixed-weight Transformer Top replay:** `3f87b033cb49c95f9ecb139b532714873a6c9476`
 **R250 baseline:** `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Latest trained-model Top replay candidate:** `9b835aeac33d43fd97a81496b1048d359cdff3d0`
 **Latest Compute Cluster DV replay candidate:** `8758794c1f3bd6abb41c33276422b84ac5ee7a80`
@@ -104,6 +105,37 @@ measured Fmax, power, or energy result is inferred from these RTL runs.
    windows for the larger model runs.
 4. Preserve this Digits replay as the fixed regression and report each
    workload independently. Do not aggregate unlike cycle windows.
+
+## Current fixed-weight Transformer replay — `3f87b03`
+
+The existing ABI-v7 Top CMDQ workload was regenerated and rerun at test/tooling
+SHA `3f87b033cb49c95f9ecb139b532714873a6c9476`; product RTL remains fixed at
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. Command:
+
+```sh
+VCS_ARCH_OVERRIDE=linux \
+VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+make ai_transformer AI_SEED=20261106 SEED=20261106
+```
+
+VCS `V-2023.12-SP1_Full64` and Python `3.12.13` generated 86 ABI-v7
+descriptors over 60 tensors for four-token prefill plus one-token decode. The
+real Top CMDQ path passed 301/301 intermediate, final, and KV checks and ended
+with `TEST PASS`. This reconfirms the fixed deterministic fixture on the
+current tooling candidate; the weights are hand-authored and are not trained
+or pretrained. The logged 64 Matrix MAC activity cycles are not an end-to-end
+latency measurement, so cycles/token remains **NOT_RUN**. TinyNPU comparison
+and separate host/DMA/compute/writeback timing also remain **NOT_RUN**. Compile
+reported the known non-fatal `LOOP-REROLL-ENABLED` debug-capacity notice; there
+were no compile errors or simulation error lines.
+
+Run ID `V2-TRANSFORMER-FIXED-WEIGHTS-TOP-3F87B03-S20261106`. Machine-readable
+record: [JSON](../../benchmark/v2_transformer_fixed_weights_3f87b03.json).
+Compile and simulation logs are archived outside Git at
+`/tmp/nmaforge_v2_transformer_fixed_weights_3f87b03_logs.tar.gz`, SHA-256
+`30d0d0f744d5aa8a3ed04ca0d37aa30dac8de2aa5f5f31db87d39e78632d3e3e`.
 
 ## Current fixed-candidate Digits replay — `410b81d`
 

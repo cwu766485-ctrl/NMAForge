@@ -965,3 +965,15 @@ response ownership pass. The separate Matrix/CNM banked collision test records
 violations per seed. Behavioral SPAD only; per-command exclusive stall-state
 timeline and alternate-arbiter A/B remain open. Details and artifacts are in
 the [performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md).
+
+## 2026-11-06 update — fixed-weight Transformer replay on current candidate
+
+At test/tooling SHA `3f87b033cb49c95f9ecb139b532714873a6c9476`, the generated
+ABI-v7 4-token prefill/1-token decode fixture passed VCS Top CMDQ: 86
+descriptors, 60 tensors, 301/301 intermediate/final/KV checks, and `TEST PASS`.
+Product RTL remains `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. This is a
+hand-authored fixed-weight functional fixture; trained Transformer inference,
+end-to-end cycles/token, stage timing, and TinyNPU comparison remain open. Run
+ID `V2-TRANSFORMER-FIXED-WEIGHTS-TOP-3F87B03-S20261106`; evidence and command
+are in the [model report](../../benchmark/NMAFORGE_V2_MODEL_BENCHMARK.md) and
+[machine record](../../benchmark/v2_transformer_fixed_weights_3f87b03.json).
