@@ -5008,7 +5008,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         // workload at K=256 has passed.
         cmdq_product_gemv_long_k_shape = 1'b0;
         run_product_gemv_cmdq_extended_shape(seed, 7, 16'd1, 16'd1, 16'd256,
-            16'h08ca, 32'h0007_a000, 32'h0007_a800, 32'h0007_b100);
+            16'h08ca, 32'h0007_a000, 32'h0007_b000, 32'h0007_c800);
         cmdq_product_gemv_long_k_shape = 1'b1;
         cmdq_product_gemv_long_k_cg.sample();
         if (cmdq_product_gemv_long_k_cg.get_coverage() < 100.0)
