@@ -184,6 +184,18 @@ ai_trained_cnn_demo:
 		AI_TINYNPU_CNN_INPUT_NPZ="$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_input.npz" \
 		AI_TINYNPU_CNN_GOLDEN="$(AI_TRAINED_CNN_RUN)/model/nma_cnn_golden.bin"
 
+# Run the entire held-out set through the compiled production-top testbench;
+# each invocation checks every CNN intermediate against an independent Golden.
+.PHONY: ai_trained_cnn_dataset_regress
+ai_trained_cnn_dataset_regress:
+	$(MAKE) ai_trained_cnn_demo AI_TRAINED_CNN_RUN="$(AI_TRAINED_CNN_RUN)"
+	$(AI_TRAINED_CNN_PYTHON) ../../../../benchmark/tinynpu/run_nma_cnn_demo_dataset.py \
+		--simv "$(AI_TRAINED_CNN_RUN)/rtl/simv" \
+		--model "$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_weights.npz" \
+		--testset "$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_testset.npz" \
+		--candidate-sha "$$(git rev-parse HEAD)" \
+		--out-dir "$(AI_TRAINED_CNN_RUN)/dataset_replay"
+
 # Optional V3 subsystem stress: inject seeded read/write SLVERR at a random
 # beat of multi-beat DMA bursts and check completion plus AXI drain-to-idle.
 ai_dma_error_stress: ai_comp

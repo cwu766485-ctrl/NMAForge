@@ -17,18 +17,13 @@ def quantize(values):
     return np.clip(np.rint(values * (127.0 / peak)), -128, 127).astype(np.int8)
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=Path, required=True)
-    parser.add_argument("--input-npz", type=Path, required=True)
-    parser.add_argument("--golden", type=Path, required=True)
-    args = parser.parse_args()
-    with np.load(args.model) as package:
+def compute_logits(model_path, input_npz):
+    with np.load(model_path) as package:
         conv_w = quantize(package["conv_w"][:, 0].reshape(4, 9)).astype(np.int64)
         conv_b = quantize(package["conv_b"]).astype(np.int64)
         fc_w = quantize(package["fc_w"]).astype(np.int64)
         fc_b = quantize(package["fc_b"]).astype(np.int64)
-    with np.load(args.input_npz) as sample:
+    with np.load(input_npz) as sample:
         pixels = sample["input_int8"][0, 0].astype(np.int64)
         label = int(sample["label"].item())
 
@@ -45,6 +40,16 @@ def main():
     fc_scaled = (fc_acc + 128) >> 8
     fc_i8 = np.minimum(np.maximum(fc_scaled, -128), 127).astype(np.int64)
     logits = np.minimum(np.maximum(fc_i8 + fc_b, -128), 127).astype(np.int8)
+    return logits, label
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", type=Path, required=True)
+    parser.add_argument("--input-npz", type=Path, required=True)
+    parser.add_argument("--golden", type=Path, required=True)
+    args = parser.parse_args()
+    logits, label = compute_logits(args.model, args.input_npz)
     prediction = int(np.argmax(logits))
     args.golden.parent.mkdir(parents=True, exist_ok=True)
     output = logits.tobytes()

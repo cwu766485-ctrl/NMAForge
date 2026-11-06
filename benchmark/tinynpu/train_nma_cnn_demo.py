@@ -91,12 +91,16 @@ def main():
              fc_b=np.zeros(4, dtype=np.float32),
              model_kind=np.asarray("fixed_edge_conv_trained_int8_readout"))
     input_path = args.out_dir / "nma_tiny_cnn_demo_input.npz"
-    selected = (x_test[selected_index].astype(np.int16) // 4).astype(np.int8)
+    quantized_test = (x_test.astype(np.int16) // 4).astype(np.int8)
+    selected = quantized_test[selected_index]
     np.savez(input_path,
              input_int8=selected.reshape(1, 1, 8, 8),
              input_scale=np.asarray(0.25, dtype=np.float32),
              label=np.asarray(y_test[selected_index], dtype=np.int32),
              test_index=np.asarray(selected_index, dtype=np.int32))
+    testset_path = args.out_dir / "nma_tiny_cnn_demo_testset.npz"
+    np.savez(testset_path, input_int8=quantized_test[:, None, None, :, :],
+             labels=y_test.astype(np.int32), input_scale=np.asarray(0.25, dtype=np.float32))
 
     dataset_hash = hashlib.sha256(
         images.tobytes() + labels.astype(np.uint8).tobytes()).hexdigest()
@@ -122,6 +126,7 @@ def main():
                        "int8_logits": [int(v) for v in test_logits[selected_index]]},
         "model_sha256": hashlib.sha256(model_path.read_bytes()).hexdigest(),
         "input_sha256": hashlib.sha256(input_path.read_bytes()).hexdigest(),
+        "testset_sha256": hashlib.sha256(testset_path.read_bytes()).hexdigest(),
     }
     (args.out_dir / "nma_tiny_cnn_demo_manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
