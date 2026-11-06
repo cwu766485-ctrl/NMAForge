@@ -132,10 +132,12 @@ Relevant fixed addresses (offsets from the SPAD base, in bytes):
 - NMA raw log archive:
   `/tmp/nmaforge_v2_tinynpu_evidence_20261106.tar.gz`, SHA-256
   `3cf83dea684002740ead224ac1fec60e4710c44b2fa887c718082699b51debb9`.
-- The report package is committed locally. GitHub publication is pending
-  authentication: HTTPS push could not read a username, `gh` is not installed,
-  and SSH returned `Permission denied (publickey)`. No remote ref changed;
-  fetched GitHub v2 head remains `5d01a88a8a2a7b1add15fbedbb02096d686824ab`.
+- Standard `git push` could not authenticate (HTTPS username unavailable,
+  `gh` absent, SSH key rejected). The connected GitHub App has repository write
+  permission; the final committed tree is being published as a fast-forward
+  snapshot based on v2 head `5d01a88a8a2a7b1add15fbedbb02096d686824ab`. This
+  preserves remote history and `main`; the local commit sequence remains
+  intact locally, while the remote receives the final tree snapshot.
 - Full v2 DV sign-off: **PAUSED / PARTIAL**. TinyNPU memory RTL and matched
   system endpoint: **NOT_RUN**. Reduced-SPAD mapping/timing: **NOT_RUN**.
   Current v2 PPA: **BLOCKED_ENV** (private libraries/SDC/macros absent). No
