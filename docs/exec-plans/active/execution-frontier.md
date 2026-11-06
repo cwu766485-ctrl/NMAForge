@@ -871,3 +871,25 @@ in the owning report; run `git diff --check` before handoff.
   collected. Logs archive SHA-256
   `7b71e6a3b5815173e8bc256fec0d323b6efe0d71e5f41f171ef4496ac5df3117`.
   The v2 DV RTM remains 14 PASS-scoped / 8 PARTIAL of 22 IDs.
+
+## 2026-11-06 update — full Top replay with trained CNN convolution filters
+
+Product RTL remains unchanged at
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. Model/test-harness candidate
+`9b835aeac33d43fd97a81496b1048d359cdff3d0` trains four shared 3×3 convolution
+filters (NumPy/Adam) and an INT8 readout on Digits labels 0–3. Under VCS
+`V-2023.12-SP1_Full64`, Python 3.12.13, NumPy 2.4.6, and scikit-learn 1.9.1,
+Run ID `V2-TRAINED-CNN-TOP-DATASET-9B835AE` passed all 159 held-out samples
+through separate real Top CMDQ runs; all checked intermediate/output Goldens
+matched and 159/159 predictions were correct on this four-class split. Each
+sample reports 1,985 RTL compute cycles, 1,080 separately counted host-layout
+cycles, 1,872 useful MACs, and 3,360/1,600 B compute read/write traffic.
+This remains a behavioral-SPAD result, not ASIC PPA or a TinyNPU comparison.
+
+Machine-readable evidence is in
+[`v2_trained_cnn_top_dataset_9b835ae.csv`](../../benchmark/v2_trained_cnn_top_dataset_9b835ae.csv)
+and [JSON](../../benchmark/v2_trained_cnn_top_dataset_9b835ae.json). The
+outside-Git evidence archive SHA-256 is
+`c2eb02228567c4f33d5a53a5020c67b7a927cdd2095b3e193c32ff46669ff71d`.
+Ten-class CNN, Tiny Transformer, common-memory TinyNPU comparison, stage-level
+host/DMA/compute/writeback timing, v2 DV closure, and PPA remain open.

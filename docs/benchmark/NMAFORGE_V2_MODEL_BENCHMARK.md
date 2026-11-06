@@ -2,8 +2,9 @@
 
 **Status date:** 2026-11-06
 **R250 baseline:** `3041355528dffe856e2d5384027c6ee5df5d1b42`  
-**Latest model replay candidate:** `de22e4652a54dfe7537e14585bdf3ae6f08fe9fb`
-**Latest v2 RTL/test candidate replay:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`
+**Latest trained-model Top replay candidate:** `9b835aeac33d43fd97a81496b1048d359cdff3d0`
+**Latest Compute Cluster DV replay candidate:** `8758794c1f3bd6abb41c33276422b84ac5ee7a80`
+**Product RTL SHA:** `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`
 **Latest paired benchmark source SHA:** `c3a59f08d8c07a8da973010d0f23d5d6d7eed61b`
 **TinyNPU reference:** `8216c22b762011aa20c05fc2768423fd12dda59d`
 
@@ -77,7 +78,7 @@ run did not instrument that stage.
 | Workload | Status | Evidence and boundary |
 |---|---|---|
 | ONNX `conv1x_mini` paired graph | **PASS; NMAForge side replayed at `d1867da`** | Current run `V2-TINYNPU-REPLAY-CURRENT-D1867DA-S20261029` rechecked all intermediate tensors and 4/4 outputs against the pinned model Golden. NMAForge: 1,985 compute + 1,080 host-layout cycles; TinyNPU: 4,781 graph cycles from prior run `TINY-COMPARE-V2C3A59-S20261029`. Different timing boundaries; no speedup ratio. |
-| Trained-weight CNN | **PASS; scoped full held-out Top run at `de22e46`** | All 159 held-out 4-class Digits samples ran through separate real Top CMDQ instances. Every checked intermediate tensor and final INT8 logits matched the independent integer Golden; 158/159 classified correctly. Four edge filters are fixed and only the INT8 readout is trained. |
+| Trained-weight CNN | **PASS; full held-out Top run at `9b835ae`** | Four shared 3×3 convolution filters and the four-class INT8 readout are trained. All 159 held-out samples passed separate real Top CMDQ runs; every checked intermediate tensor/logit matched the independent integer Golden and all 159 classifications were correct on Digits labels 0–3. This is a scoped four-class model, not a full ten-class deployment. |
 | Tiny Transformer | **NOT_RUN** | The fixed-weight descriptor fixture is not a pretrained-model deployment. No trained model, Prefill/Decode Golden, or current v2 run is claimed. |
 | Host / DMA / compute / writeback / graph cycle split | **PARTIAL** | Digits has a top-level CMDQ interval and a fused Matrix activity counter; the current run does not separately time host, DMA, writeback and orchestration. Its input preload is testbench setup outside the timed interval. |
 
@@ -95,10 +96,10 @@ measured Fmax, power, or energy result is inferred from these RTL runs.
 
 1. Add common Memory Adapter behavior to TinyNPU or keep its memory service
    explicitly modeled; do not merge the two endpoints into a single score.
-2. Expand the scoped trained CNN beyond its single Top-checked sample and
-   consider training the convolution filters; add a small trained Transformer
-   only with independent software Goldens and hardware-executed operators.
-   Keep host fallback separately measured. Transformer remains **NOT_RUN**.
+2. Extend the trained CNN beyond the current four-class Digits subset and
+   measure each supported stage; add a small trained Transformer only with
+   independent software Goldens and hardware-executed operators. Keep host
+   fallback separately measured. Transformer remains **NOT_RUN**.
 3. Instrument distinct host, DMA, compute, writeback, and graph-orchestration
    windows for the larger model runs.
 4. Preserve this Digits replay as the fixed regression and report each
@@ -301,7 +302,7 @@ Model, input, Golden, compile/run logs and smoke logs archive:
 `f0919d1f3b74ff6442ec33c300c7fdf9f88e4f6e842004288f5b4582c691287e`.
 Generated model weights and simulation databases remain outside Git.
 
-## Full held-out-set Top replay — `de22e46`
+## Historical full held-out-set Top replay — `de22e46`
 
 The same model and test split were then run end-to-end for all 159 held-out
 images. Run ID `V2-TRAINED-CNN-TOP-DATASET-DE22E46`, candidate
@@ -346,3 +347,61 @@ The archive includes model/input/testset hashes, all 159 run logs, compile log,
 and Golden records:
 `/tmp/nmaforge_v2_trained_cnn_dataset_de22e46_evidence.tar.gz`, SHA-256
 `dfacc9a6a7e17150def4814cfe9baad11b8c21675d75db1505c0b907c80de1be`.
+
+## 2026-11-06 update — trained convolution weights on full held-out Top set
+
+The previous `de22e46` run used fixed convolution filters. The training flow
+now learns four shared 3×3 convolution filters with deterministic NumPy/Adam
+(250 epochs, batch 128, learning rate 0.006, seed 44), then trains the INT8
+readout on deployed quantized convolution features. The evaluated dataset is
+still deliberately scoped to sklearn Digits labels 0–3: 561 training and 159
+stratified held-out samples (`random_state=29`).
+
+At candidate SHA `9b835aeac33d43fd97a81496b1048d359cdff3d0` (tree
+`04215a9fb125e57aa6a9ce6ead2410f59bafa2b7`), product RTL remains
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. Run ID
+`V2-TRAINED-CNN-TOP-DATASET-9B835AE` passed 159/159 separate Top CMDQ runs.
+Every checked convolution, requantization, activation/layout, FC, and output
+memory image matched the independent integer Golden. All 159 classifications
+were correct (100% on this four-class test split). VCS was
+`V-2023.12-SP1_Full64`; Python 3.12.13, NumPy 2.4.6, scikit-learn 1.9.1;
+simulation seed `20261029`.
+
+Each sample used 1,985 RTL compute cycles and 1,080 separately counted
+host-layout cycles, with 1,872 useful MACs. Compute SPAD traffic was 3,360 B
+read and 1,600 B write; host-layout traffic was 144 B read and 576 B write.
+Testbench preload was 3,456 B and is excluded from these cycle intervals. The
+derived useful rate is 0.9433 MAC/RTL-compute-cycle, or 0.3685% of the nominal
+256 INT8 lanes for this small workload; it is not a large-matrix utilization
+claim. Aggregate over 159 runs: 315,615 RTL compute cycles, 171,720
+host-layout cycles, 534,240/254,400 B compute read/write, and 297,648 useful
+MACs. These are behavioral-SPAD Top simulation results, not ASIC measurements.
+
+Reproduce the clean-source model training and all 159 Top inferences with:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+AI_TRAINED_CNN_PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python \
+AI_TRAINED_CNN_RUN=/tmp/nmaforge_v2_trained_learned_cnn_9b835ae \
+make -C dv/subsystem/top_smoke/sim ai_trained_cnn_dataset_regress
+```
+
+Machine-readable per-sample results and run summary:
+[CSV](../../benchmark/v2_trained_cnn_top_dataset_9b835ae.csv) and
+[JSON](../../benchmark/v2_trained_cnn_top_dataset_9b835ae.json). Model SHA-256
+is `bf19003c13bdc641c560bc380b22534c04bea4c23e5904261160c2c9f841edb1`;
+test-set SHA-256 is
+`4e000728b8e2a6496d7d3fa1439a16b44361d93f433f0a528076410592f31282`; the
+selected-sample independent Golden SHA-256 is
+`a391badd117ff5ac77e7b51266fd04f6164d09fa5e6bc81775f7f4075f7605c3`.
+The archive contains the 159 per-sample Top logs and replay inputs/Goldens,
+plus model and compile/run records, but excludes simulator binaries, databases,
+waveforms, and `ucli.key`:
+`/tmp/nmaforge_v2_trained_cnn_dataset_9b835ae_seed20261029_evidence.tar.gz`
+(SHA-256
+`c2eb02228567c4f33d5a53a5020c67b7a927cdd2095b3e193c32ff46669ff71d`).
+
+No TinyNPU comparison was run on these trained weights, so this result makes no
+relative speedup claim. The ten-class CNN and Tiny Transformer remain open;
+v2 functional sign-off and ASIC PPA are also not implied by this model run.

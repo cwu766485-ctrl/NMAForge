@@ -1,0 +1,63 @@
+{
+  "status": "PASS",
+  "run_id": "V2-TRAINED-CNN-TOP-DATASET-9B835AE",
+  "candidate_sha": "9b835aeac33d43fd97a81496b1048d359cdff3d0",
+  "candidate_tree_sha": "04215a9fb125e57aa6a9ce6ead2410f59bafa2b7",
+  "product_rtl_sha": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+  "vcs": "V-2023.12-SP1_Full64",
+  "python": "3.12.13",
+  "numpy": "2.4.6",
+  "scikit_learn": "1.9.1",
+  "command": "VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH AI_TRAINED_CNN_PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python AI_TRAINED_CNN_RUN=/tmp/nmaforge_v2_trained_learned_cnn_9b835ae make -C dv/subsystem/top_smoke/sim ai_trained_cnn_dataset_regress",
+  "workload": "sklearn.datasets.load_digits restricted to labels 0..3",
+  "model_kind": "trained four-filter 3x3 convolution plus trained four-class INT8 readout",
+  "training": {
+    "convolution": "NumPy backpropagation with Adam; 250 epochs; batch 128; lr 0.006; seed 44",
+    "readout": "scikit-learn LogisticRegression; C=1; fit_intercept=false; trained on deployed integer convolution features",
+    "float_convolution_training_accuracy": 1.0
+  },
+  "train_samples": 561,
+  "test_samples": 159,
+  "split_seed": 29,
+  "model_sha256": "bf19003c13bdc641c560bc380b22534c04bea4c23e5904261160c2c9f841edb1",
+  "testset_sha256": "4e000728b8e2a6496d7d3fa1439a16b44361d93f433f0a528076410592f31282",
+  "golden_sample_sha256": "a391badd117ff5ac77e7b51266fd04f6164d09fa5e6bc81775f7f4075f7605c3",
+  "all_top_runs_passed": 159,
+  "all_intermediate_goldens_exact": true,
+  "correct": 159,
+  "accuracy": 1.0,
+  "classification_source": "independent integer Golden logits, each Golden byte-compared by Top checker",
+  "per_sample": {
+    "rtl_compute_cycles": 1985,
+    "host_layout_cycles": 1080,
+    "useful_macs": 1872,
+    "compute_spad_read_bytes": 3360,
+    "compute_spad_write_bytes": 1600,
+    "host_layout_read_bytes": 144,
+    "host_layout_write_bytes": 576,
+    "testbench_preload_bytes": 3456,
+    "preload_included_in_timing": false
+  },
+  "totals_over_testset": {
+    "rtl_compute_cycles": 315615,
+    "host_layout_cycles": 171720,
+    "useful_macs": 297648,
+    "compute_spad_read_bytes": 534240,
+    "compute_spad_write_bytes": 254400,
+    "host_layout_read_bytes": 22896,
+    "host_layout_write_bytes": 91584
+  },
+  "timing_boundary": "Per-sample Top CMDQ workload cycle counter; separate host-layout counter. Testbench preload and post-run checks are excluded.",
+  "memory_boundary": "Behavioral SPAD RTL; not ASIC timing, area, power, or energy.",
+  "limitations": [
+    "Four-class sklearn Digits subset only (labels 0..3), not full ten-class recognition.",
+    "No TinyNPU run on this trained model; no comparative speedup claim.",
+    "Tiny Transformer remains NOT_RUN."
+  ],
+  "csv": "v2_trained_cnn_top_dataset_9b835ae.csv",
+  "csv_sha256": "245190082efda4a995ab361d34d6324afed0497e4a73e9b22ab96207312c4bbe",
+  "raw_summary_sha256": "88633e3b7deb13211121f3502900e3958b7da2a30b4ad2860846b376c0782768",
+  "seed": 20261029,
+  "evidence_archive": "/tmp/nmaforge_v2_trained_cnn_dataset_9b835ae_seed20261029_evidence.tar.gz",
+  "evidence_archive_sha256": "c2eb02228567c4f33d5a53a5020c67b7a927cdd2095b3e193c32ff46669ff71d"
+}
