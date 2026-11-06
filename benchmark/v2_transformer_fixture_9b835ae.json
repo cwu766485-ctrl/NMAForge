@@ -1,0 +1,38 @@
+{
+  "status": "PASS_FUNCTIONAL_FIXTURE",
+  "run_id": "V2-TRANSFORMER-FIXED-WEIGHTS-TOP-9B835AE-S20261106",
+  "candidate_sha": "9b835aeac33d43fd97a81496b1048d359cdff3d0",
+  "product_rtl_sha": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+  "seed": 20261106,
+  "vcs": "V-2023.12-SP1_Full64",
+  "python": "3.12.13",
+  "command": "VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' make -C dv/subsystem/top_smoke/sim ai_transformer AI_RANDOM_CASES=0 AI_SEED=20261106 SEED=20261106",
+  "test": "TEST PASS; fixed 86-descriptor top CMDQ prefill/decode fixture",
+  "descriptor_count": 86,
+  "tensor_count": 60,
+  "prefill_tokens": 4,
+  "decode_tokens": 1,
+  "hidden": 4,
+  "attention_heads": 1,
+  "mapper_dataflow_closed": true,
+  "poison_output_initialization": true,
+  "intermediate_check_lines": 301,
+  "final_completion_checked": true,
+  "software_golden": "bit-exact for checked intermediate tensors, final prefill/decode states, and KV cache/readback words",
+  "weight_provenance": "hand-authored deterministic non-identity INT8 test weights; not pretrained",
+  "trained_model_inference": "NOT_RUN",
+  "performance": {
+    "matrix_mac_cycles_counter": 64,
+    "cycles_per_token": "NOT_RUN",
+    "end_to_end_latency": "NOT_RUN"
+  },
+  "hashes": {
+    "manifest_sha256": "5f4914a4c04a65fd658f7a192eaacc2042e12456e97f7f8fc0cd787364f37b3e",
+    "fixture_svh_sha256": "23b2d4ca831fe2ed858e21309c3d9b44d2354d16cd3d1f6f0798b916e4a72a69",
+    "compile_log_sha256": "677aaf1ad489edcd4973cfe89bc1516be69bbfb1f303b6893cac82bafbd6ae4e",
+    "run_log_sha256": "046cc3258f87f2c7b7f5caa6bbe609f78cbc0ce387144a64c3f60c4918432604"
+  },
+  "scope_note": "Functional composition/KV flow fixture only; fixed deterministic test weights are not a trained or pretrained model.",
+  "evidence_archive": "/tmp/nmaforge_v2_transformer_fixture_9b835ae_s20261106_evidence.tar.gz",
+  "evidence_archive_sha256": "9b994707c392f0b2ba98cbb26f0235c5fea97c2ece7b5fe6bd0a306caf668387"
+}

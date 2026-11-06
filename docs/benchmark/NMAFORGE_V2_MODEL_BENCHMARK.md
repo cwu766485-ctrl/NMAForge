@@ -79,7 +79,7 @@ run did not instrument that stage.
 |---|---|---|
 | ONNX `conv1x_mini` paired graph | **PASS; NMAForge side replayed at `d1867da`** | Current run `V2-TINYNPU-REPLAY-CURRENT-D1867DA-S20261029` rechecked all intermediate tensors and 4/4 outputs against the pinned model Golden. NMAForge: 1,985 compute + 1,080 host-layout cycles; TinyNPU: 4,781 graph cycles from prior run `TINY-COMPARE-V2C3A59-S20261029`. Different timing boundaries; no speedup ratio. |
 | Trained-weight CNN | **PASS; full held-out Top run at `9b835ae`** | Four shared 3×3 convolution filters and the four-class INT8 readout are trained. All 159 held-out samples passed separate real Top CMDQ runs; every checked intermediate tensor/logit matched the independent integer Golden and all 159 classifications were correct on Digits labels 0–3. This is a scoped four-class model, not a full ten-class deployment. |
-| Tiny Transformer | **NOT_RUN** | The fixed-weight descriptor fixture is not a pretrained-model deployment. No trained model, Prefill/Decode Golden, or current v2 run is claimed. |
+| Tiny Transformer | **PARTIAL** | The fixed-weight 86-descriptor Top prefill/decode fixture passes at `9b835ae` with intermediate/KV Goldens. Its deterministic test weights are not trained or pretrained; trained-model inference and cycles/token remain **NOT_RUN**. |
 | Host / DMA / compute / writeback / graph cycle split | **PARTIAL** | Digits has a top-level CMDQ interval and a fused Matrix activity counter; the current run does not separately time host, DMA, writeback and orchestration. Its input preload is testbench setup outside the timed interval. |
 
 The current paired CNN uses the exact ONNX asset supplied by the pinned
@@ -403,5 +403,47 @@ waveforms, and `ucli.key`:
 `c2eb02228567c4f33d5a53a5020c67b7a927cdd2095b3e193c32ff46669ff71d`).
 
 No TinyNPU comparison was run on these trained weights, so this result makes no
-relative speedup claim. The ten-class CNN and Tiny Transformer remain open;
-v2 functional sign-off and ASIC PPA are also not implied by this model run.
+relative speedup claim. The ten-class CNN and trained Tiny Transformer remain
+open; v2 functional sign-off and ASIC PPA are also not implied by this model
+run.
+
+## 2026-11-06 update — fixed-weight Transformer fixture replay
+
+At the clean detached source SHA
+`9b835aeac33d43fd97a81496b1048d359cdff3d0` (product RTL
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`), the existing
+`transformer_micro_4x4_prefill_decode` fixture was regenerated and run through
+the production Top CMDQ path. Run ID
+`V2-TRANSFORMER-FIXED-WEIGHTS-TOP-9B835AE-S20261106`, VCS
+`V-2023.12-SP1_Full64`, Python 3.12.13, Seed `20261106`: the mapper emitted 86
+ABI-v7 descriptors and 60 tensors with closed data dependencies and poison
+initialization. Top simulation finished with `TEST PASS`; all checked
+intermediate tensors, final prefill/decode states, KV cache and readback values
+matched the mapper's integer Golden. There were 301 Transformer-labeled PASS
+checks in the run log.
+
+This fixture has one attention head, hidden size 4, four-token prefill and
+one-token decode. It uses hand-authored deterministic non-identity INT8 test
+weights, not a trained checkpoint. The result verifies operator composition
+and KV address/data flow only. The Top run reports a 64-cycle Matrix MAC
+activity counter, but no end-to-end latency or cycles/token interval was
+measured, so performance is **NOT_RUN** and the trained Transformer demo stays
+**NOT_RUN**.
+
+Reproduce from repository root:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+make -C dv/subsystem/top_smoke/sim ai_transformer \
+  AI_RANDOM_CASES=0 AI_SEED=20261106 SEED=20261106
+```
+
+Machine-readable run record:
+[JSON](../../benchmark/v2_transformer_fixture_9b835ae.json). Compile/run logs,
+the generated manifest and SystemVerilog workload are archived outside Git at
+`/tmp/nmaforge_v2_transformer_fixture_9b835ae_s20261106_evidence.tar.gz`
+(SHA-256
+`9b994707c392f0b2ba98cbb26f0235c5fea97c2ece7b5fe6bd0a306caf668387`). The
+archive excludes simulator binaries, databases, and waveforms.

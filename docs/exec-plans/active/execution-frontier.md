@@ -891,5 +891,25 @@ Machine-readable evidence is in
 and [JSON](../../benchmark/v2_trained_cnn_top_dataset_9b835ae.json). The
 outside-Git evidence archive SHA-256 is
 `c2eb02228567c4f33d5a53a5020c67b7a927cdd2095b3e193c32ff46669ff71d`.
-Ten-class CNN, Tiny Transformer, common-memory TinyNPU comparison, stage-level
-host/DMA/compute/writeback timing, v2 DV closure, and PPA remain open.
+Ten-class CNN, trained Tiny Transformer, common-memory TinyNPU comparison,
+stage-level host/DMA/compute/writeback timing, v2 DV closure, and PPA remain
+open.
+
+## 2026-11-06 update — fixed-weight Transformer Top fixture
+
+At detached source SHA `9b835aeac33d43fd97a81496b1048d359cdff3d0` with product
+RTL unchanged at `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`, the existing
+4-token prefill / 1-token decode fixture passed `make ai_transformer` on VCS
+`V-2023.12-SP1_Full64`, Seed 20261106. The software mapper generated 86 ABI-v7
+descriptors and 60 tensors; Top simulation passed 301 checked Transformer
+intermediate/final/KV values and reported `TEST PASS`. Weights are fixed
+hand-authored test values; this is not trained-model inference. End-to-end
+latency and cycles/token are NOT_RUN; the 64-cycle Matrix MAC counter is not a
+model latency measurement.
+
+Run ID `V2-TRANSFORMER-FIXED-WEIGHTS-TOP-9B835AE-S20261106`. Machine-readable
+record: [JSON](../../benchmark/v2_transformer_fixture_9b835ae.json). Evidence
+archive SHA-256:
+`9b994707c392f0b2ba98cbb26f0235c5fea97c2ece7b5fe6bd0a306caf668387`.
+The trained Transformer, common-memory TinyNPU comparison, and v2 DV/ASIC
+closure remain open.

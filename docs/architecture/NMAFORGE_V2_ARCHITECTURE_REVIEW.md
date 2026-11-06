@@ -3,8 +3,9 @@
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Latest fixed test source SHA:** `e944133b43107839e5f5eea902251097a228b312` (tree `430f9ce0c794f6e6a059d56ade7d9112b8a3079f`; three-seed real Top CMDQ 0x52 exercises all eight M/N/K aligned-tail states and 16×16×128 GEMV with independent Golden and response-owner checks). The most recent benchmark source remains independently identified in the benchmark report.
-**Current report branch HEAD before this review update:** `85e7db2d12f5edfaed17e8ca3910bb504983779f` (tree `e8f64f78f7986193bdc0d01dfbc01740a130edcb`); report-only commits follow the tested source SHA.
+**Latest fixed Compute Cluster DV source SHA:** `8758794c1f3bd6abb41c33276422b84ac5ee7a80` (tree `6f51976ea8f736e08783487afe892afa8a3a8b36`; three-seed real Top CMDQ 0x52 K=256 test-bound point). The `16×16×256` case still exceeds the unchanged watchdog before Golden. The most recent benchmark source remains independently identified in the benchmark report.
+**Latest trained-model/Transformer fixture source SHA:** `9b835aeac33d43fd97a81496b1048d359cdff3d0` (tree `04215a9fb125e57aa6a9ce6ead2410f59bafa2b7`).
+**Current report branch HEAD before this review update:** `d26bcd2a961ab7def65a2122765778fb8bc37bde` (tree `d5d43b3d004d80c426cb1de692b248d8427868a9`); this documentation update follows that candidate.
 **Published feature branch tip at this audit:** `19f9575f3579869f27d72f2dd17fa980840b6499` (same tree `3ac2f31a0fcbbb5fa5cd13f3f9ed39a87c3ed3c0`).
 **Product RTL SHA:** `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; no RTL change is present in the fixed test source or report-only commits.
 
@@ -379,17 +380,22 @@ ablation](../benchmark/NMAFORGE_V2_GEMV_CACHE_PREFETCH_ABLATION.md).
   and mutation report for every new checker are not complete.
 - The TinyNPU tools are now available and the named GEMM/CNN and small-M GEMV
   replays have passed at the source identities above. A true TinyNPU memory
-  adapter, broader GEMV shapes, trained CNN/Transformer comparisons, and
-  phase-aligned system endpoints remain open; mixed modeled results are not a
-  product-level win claim.
+  adapter, broader GEMV shapes, trained-weight CNN/Transformer comparisons,
+  and phase-aligned system endpoints remain open; mixed modeled results are
+  not a product-level win claim.
 - DC, formal/LEC, CDC/RDC, SRAM mapping, DFT readiness, power and physical PPA
   are not closed by these VCS runs. ASIC readiness remains `NOT_RUN` or
   `BLOCKED_ENV` by individual tool/input; do not claim Tapeout Ready.
 - v1.0 Compute Cluster stays **HOLD**. This branch's scoped v2 tests do not
   resolve the inherited 38-requirement sign-off record.
 - The matched trained Digits MLP replay is a scoped model result, not a
-  TinyNPU comparison. Separate Host/DMA/Compute/Writeback/Graph phase counters
-  are still missing; trained CNN and Transformer deployment remain `NOT_RUN`.
+  TinyNPU comparison. A four-class Digits CNN with trained convolution filters
+  now passes all 159 held-out inputs through Top CMDQ and matches its
+  independent integer Golden, but this is not a ten-class result or a TinyNPU
+  comparison. The 86-descriptor Transformer functional fixture passes; its
+  deterministic test weights are not trained weights. Separate
+  Host/DMA/Compute/Writeback/Graph phase counters and trained Transformer
+  inference remain open.
 
 ## Current decision
 
