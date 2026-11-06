@@ -3,10 +3,10 @@
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Current reviewed code/test candidate:** `feature/npu-architecture-v2` `6a253386f53638a1206a75e359d6020ba27765cb`
-**Candidate tree:** `588806486bd6b22fc0444cd0e29dc108d9f993d3`
+**Current reviewed code/test candidate:** `feature/npu-architecture-v2` `4df2efeefafa49f6832af9bc7fa8a71005b28fa9`
+**Candidate tree:** `71a655d67ff82de6ecab8fadeb10864cb4f95006`
 **Published branch tip before the current 0x53 assertion update:** `9fabb8dd343683830e0cf3f095a2eab8da2cccac` (tree `fb0489ee9b19e48c9fc3eb4af6c662c111455b14`).
-**Latest verification-only candidate:** `6a253386f53638a1206a75e359d6020ba27765cb` (tree `588806486bd6b22fc0444cd0e29dc108d9f993d3`); product RTL is unchanged.
+**Latest verification-only candidate:** `4df2efeefafa49f6832af9bc7fa8a71005b28fa9` (tree `71a655d67ff82de6ecab8fadeb10864cb4f95006`); product RTL is unchanged.
 
 ## Executive disposition
 
@@ -24,7 +24,7 @@ performance win. Keep the overall Compute Cluster disposition at **HOLD**.
 ### Latest v2 verification-only update — 2026-11-06
 
 The current v2 product RTL was not changed. Testbench/mutation-runner commit
-The preceding testbench/mutation-runner commit `ab96d47876beb4d7e47fef01e43b4c4716dd176a`
+`ab96d47876beb4d7e47fef01e43b4c4716dd176a`
 proved that all 18 selected opcode mutant-seed runs (six classes × three Seeds)
 were caught, including request-address instability while `VALID&&!READY`.
 Formal-only commit `b719ac6066616b17dfab4eed2429f8bdfdc49457` then proved the 0x52
@@ -49,6 +49,26 @@ formal proof of all forwarding lifecycle cases. `REQ-V2-COM-003` remains
 PARTIAL; external fabric response ownership, broader legal fault/reset crosses
 and full v2 sign-off remain open. The exact command and archive checksum are
 recorded in the [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md). The archived ON/OFF evidence is SHA-256 `92efa5d9763114cc6fdf121d2b22744c06852ff6e9c66072503d054a53656f15`.
+
+### Premature-valid SVA and checker-sensitivity mutations — 2026-11-06
+
+Verification-only commit `ed17ab1c257c0f7947cf78e60730da31c4548138` adds a
+third 0x53 assertion that rejects `tile_forward_valid` rising before the full
+tagged capture commits. VCS `V-2023.12-SP1_Full64` passes the forwarding
+ON/OFF regression for Seeds 20261123/24/25: the enabled profile has 3/3
+assertions attempted, zero failures, three valid-rise cover matches per seed,
+and all six named forwarding functional bins hit. The complete golden outputs
+remain bit-exact.
+
+The subsequent mutation runner at `4df2efeefafa49f6832af9bc7fa8a71005b28fa9`
+passes seven injected RTL defects across those three seeds (21/21): output
+data/address, operand response owner, WSTRB, bad tile tag, premature validity,
+and a request-address change during backpressure. The tag mutant is now caught
+by the earlier valid/tag SVA, so the expected checker mapping was updated to
+that direct property. This does not complete mutation closure; all-v2-checker
+mapping, broader legal fault/reset crosses, external response ownership and
+overall v2 DV remain open. Exact commands and evidence archive checksums are
+recorded in the [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
 ## Baseline and source audit
 
