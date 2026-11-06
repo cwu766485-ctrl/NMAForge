@@ -1,10 +1,10 @@
 # NMAForge v2 DV Closure Status
 
 **Status:** IN PROGRESS — scoped regressions pass; v2 sign-off is not ready.  
-**Latest testbench/tooling candidate SHA:** `f19e92934cd6273d327621c43cb17291cf1a9aa5` (tree `2d931c1c81997b482467d7fdf69302dd367975a1`; adds legal real-CMDQ 0x52 A/B read-only alias checking; product RTL unchanged). Latest clean three-seed Compute Cluster UVM regression is `V2-CMDQ-GEMV-AB-ALIAS-3SEED-F19E929`.
-**Latest clean Top Smoke compatibility replay:** testbench/tooling SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5`; directed smoke plus three 20-random-workload seeds pass legacy/v2 markers. This is not a UVM/URG coverage update.
+**Latest fixed testbench/tooling candidate with clean Top/UVM replay:** `f9f32f71e7168350d74a75ede0a4a4b222844cc9` (tree `0b20e98298852d2648f83d10723c55aabe3a9149`; includes the legal real-CMDQ 0x52 A/B read-only alias test and testbench-only Transformer timer; product RTL unchanged). Latest clean three-seed Compute Cluster UVM regression is `V2-COMPUTE-CLUSTER-UVM-CLEAN-F9F32F7-3SEED`; latest clean Top Smoke is `V2-CLEAN-WORKTREE-TOP-SMOKE-F9F32F7-S20261106`.
+**Latest three-seed 20-random-workload compatibility replay:** testbench/tooling SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5`; directed smoke plus three 20-random-workload seeds pass legacy/v2 markers. The later clean `f9f32f7` Top Smoke replay is a shorter four-random-workload check and is not a UVM/URG coverage update.
 
-**Candidate tree:** `65d56c5d6dd345effde6fdfdf70dad59f135a279` (tree used for the latest three-seed generic Cluster replay)
+**Earlier generic Cluster replay tree:** `65d56c5d6dd345effde6fdfdf70dad59f135a279`
 
 **Latest fault replay:** `99566993256778d094c068a8733c074ade2f9921`; three seeds pass selected 0x52/0x53 fault/recovery points.
 **Latest RTL-mutation replay:** `ab96d47876beb4d7e47fef01e43b4c4716dd176a`; 18/18 opcode-core mutant-seed checks caught across six mutation classes and three Seeds.
@@ -1703,3 +1703,44 @@ This is clean-worktree compatibility and selected functional evidence only.
 It does not add UVM/URG coverage or close the full `REQ-V2-*` RTM; residual
 fault × phase × reset, held/late external response, and coverage disposition
 items remain open. The 10 ns simulation clock is not a physical timing claim.
+
+## Clean-worktree seven-engine UVM replay at current test candidate — 2026-11-06
+
+At detached source/test SHA `f9f32f71e7168350d74a75ede0a4a4b222844cc9`
+(tree `0b20e98298852d2648f83d10723c55aabe3a9149`), VCS
+`V-2023.12-SP1_Full64` ran `uvm_compute_cluster_regress` for Seeds
+20261106/07/08. Each Seed passed with UVM Warning/Error/Fatal `0/0/0` and
+all seven observed engine-pair overlap bins (21/21). The selected workload
+also exercised shared Matrix/CNM response ownership, parity/protection,
+Abort/Reset recovery, full Completion Queue backpressure, and independent
+Golden checks. The real queued four-task workload measured 1,696 serial
+cycles and 1,137 parallel CMDQ cycles (1.492×); this is VCS RTL simulation
+with behavioral four-bank SPAD, not silicon timing.
+
+Merged URG across the three runs reports Line/Condition/FSM/Branch/Assert/
+Functional Group `70.71/68.37/46.17/67.66/72.00/83.94%`. The targeted
+engine-pair group is 21/21, but overall groups are not closed: five groups
+remain at zero (four AXI memory stall groups and DMA error-position coverage),
+AXI4 is 50.28%, AXI-Lite 87.50%, URG has 17/22 assertions successful with
+five uncovered and two without attempts, and only 1/3 cover properties
+matched. These unhit bins remain visible; no exclusions or waivers were added.
+The run does not close arbitrary external held/late responses, all legal
+fault × phase × reset crosses, or the complete v2 RTM.
+
+Exact command:
+
+```sh
+VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias VCS_ARCH_OVERRIDE=linux \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v2_cluster_clean_f9f32f7 \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261106 20261107 20261108'
+```
+
+Run ID `V2-COMPUTE-CLUSTER-UVM-CLEAN-F9F32F7-3SEED`. Text logs and URG
+summaries (no VDB/compiled simulator databases) are archived at
+`/tmp/nmaforge_v2_cluster_clean_f9f32f7_3seed_logs_urg_text.tar.gz`, SHA-256
+`5b5bef7586349e335e563ee3eaae1dfa56ad9536a583aadd0d711f08b93e9f2d`.
+Machine record: [JSON](../../benchmark/v2_cluster_clean_f9f32f7_3seed.json).
+This advances selected Cluster RTM evidence only; v2 DV stays **IN PROGRESS**.

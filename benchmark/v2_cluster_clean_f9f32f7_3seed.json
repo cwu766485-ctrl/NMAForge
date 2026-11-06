@@ -1,0 +1,39 @@
+{
+  "run_id": "V2-COMPUTE-CLUSTER-UVM-CLEAN-F9F32F7-3SEED",
+  "status": "PASS_SELECTED_SCOPE",
+  "source_test_sha": "f9f32f71e7168350d74a75ede0a4a4b222844cc9",
+  "source_tree_sha": "0b20e98298852d2648f83d10723c55aabe3a9149",
+  "product_rtl_sha": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+  "simulator": "Synopsys VCS V-2023.12-SP1_Full64",
+  "coverage_tool": "Synopsys URG V-2023.12-SP1",
+  "command": "VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias VCS_ARCH_OVERRIDE=linux PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' make -C dv/uvm/sim uvm_compute_cluster_regress COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v2_cluster_clean_f9f32f7 COMPUTE_CLUSTER_UVM_SEEDS='20261106 20261107 20261108'",
+  "seeds": [
+    {"seed": 20261106, "result": "PASS", "uvm_warning": 0, "uvm_error": 0, "uvm_fatal": 0, "engine_pair_bins_hit": 21, "engine_pair_bins_total": 21},
+    {"seed": 20261107, "result": "PASS", "uvm_warning": 0, "uvm_error": 0, "uvm_fatal": 0, "engine_pair_bins_hit": 21, "engine_pair_bins_total": 21},
+    {"seed": 20261108, "result": "PASS", "uvm_warning": 0, "uvm_error": 0, "uvm_fatal": 0, "engine_pair_bins_hit": 21, "engine_pair_bins_total": 21}
+  ],
+  "merged_coverage_percent": {
+    "score": 68.14,
+    "line": 70.71,
+    "condition": 68.37,
+    "fsm": 46.17,
+    "branch": 67.66,
+    "assert": 72.0,
+    "functional_group": 83.94
+  },
+  "selected_evidence": {
+    "seven_engine_pair_overlap": "21/21 bins each seed; sampled from observed overlap mask 0x1fffff",
+    "selected_fault_reset_recovery": "PASS; per-seed logs include selected parity/protection/abort/reset crosses and Golden recovery",
+    "serial_parallel_benchmark": "same workload: serial 1696 cycles, queued parallel 1137 cycles, ratio 1.492; behavior-level four-bank SPAD",
+    "response_owner": "Matrix/CNM response tags distinct; route mismatch 0 in collision and parallel probes"
+  },
+  "coverage_open_items": [
+    "overall functional group score is not closed; five groups are at 0% including four AXI memory stall groups and DMA error-position coverage",
+    "AXI4 functional group 50.28%; AXI-Lite functional group 87.50%",
+    "URG assertion summary has 17/22 successful assertions, 5 uncovered, and two properties without attempts; cover properties have 1/3 matches",
+    "this cluster regression does not close external held/late responses, all opcode fault-phase-reset crosses, or full v2 RTM"
+  ],
+  "log_archive": "/tmp/nmaforge_v2_cluster_clean_f9f32f7_3seed_logs_urg_text.tar.gz",
+  "log_archive_sha256": "5b5bef7586349e335e563ee3eaae1dfa56ad9536a583aadd0d711f08b93e9f2d",
+  "coverage_database_policy": "VCS/URG binary databases and generated simulator outputs are excluded from the archive and repository"
+}

@@ -1033,3 +1033,10 @@ Detached clean worktree `f9f32f71e7168350d74a75ede0a4a4b222844cc9` passed
 was logged. Run ID `V2-CLEAN-WORKTREE-TOP-SMOKE-F9F32F7-S20261106`; archive
 and checksum are recorded in the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
 This replay adds no UVM/URG closure; v2 DV remains IN PROGRESS.
+
+## 2026-11-06 update — Seven-engine UVM replay at `f9f32f7`
+
+Detached clean SHA `f9f32f71e7168350d74a75ede0a4a4b222844cc9` passed the
+three-seed `uvm_compute_cluster_regress` for Seeds 20261106/07/08 with UVM
+Warning/Error/Fatal `0/0/0` each and engine-pair overlap 21/21. Merged URG is
+Line/Condition/FSM/Branch/Assert/Functional Group `70.71/68.37/46.17/67.66/72.00/83.94%`; five functional groups remain at zero, and assertion/cover properties are not fully hit. This is selected evidence, not coverage closure. Logs, exact command, and machine record are in the [DV report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
