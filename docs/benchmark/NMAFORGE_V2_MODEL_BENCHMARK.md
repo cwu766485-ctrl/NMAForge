@@ -517,3 +517,15 @@ the generated manifest and SystemVerilog workload are archived outside Git at
 (SHA-256
 `9b994707c392f0b2ba98cbb26f0235c5fea97c2ece7b5fe6bd0a306caf668387`). The
 archive excludes simulator binaries, databases, and waveforms.
+
+## Current-candidate status check — `839b9af`
+
+The clean-candidate VCS replay at `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0`
+covered Top smoke, Compute Cluster UVM, focused opcode tests, and Matrix
+performance only; trained-model workloads were not rerun at that SHA. Model
+evidence therefore remains tied to the separate source identities above: the
+10-class Digits MLP and four-class trained CNN have Golden-checked Top results,
+while the 86-descriptor Transformer fixture uses deterministic test weights
+and is not evidence of trained-model inference. A TinyNPU same-task comparison
+and the full host/DMA/compute/writeback timing split remain open. No model
+result is recast as current-candidate performance or as v2 DV/ASIC sign-off.

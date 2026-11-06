@@ -293,3 +293,17 @@ evidence remains 465 lint warnings with no waiver, structural CDC with the
 `Reset_sync04` / `FLAT_504` dispositions still open, and RDC **NOT_RUN** after
 the recorded timeout. No formal/LEC, SRAM-macro, DFT, MBIST, CTS, route, routed
 STA, or IR/EM status is advanced. The IP remains **NOT ASIC READY**.
+
+## Current clean-candidate check — `839b9af`
+
+The VCS clean-candidate replays at
+`839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` are testbench/measurement work.
+The product RTL remains at `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`;
+SpyGlass, CDC/RDC, Formal/LEC, DC, SRAM macro mapping, and physical-design
+flows were not rerun for this candidate. Their last recorded outcomes remain
+as in the environment audit above: lint has 465 unwaived warnings, CDC/RDC and
+Formal/LEC are incomplete, and Base-vs-v2 PPA is `BLOCKED_ENV` because the
+private libraries, SRAM timing views, SDC, and checked-in DC flow inputs are
+unavailable. DFT, MBIST, CTS, route, routed STA, and IR/EM remain `NOT_RUN` or
+`BLOCKED_ENV`. No silicon area, Fmax, power, or tapeout-readiness conclusion
+follows from the current functional or behavioral-SPAD results.

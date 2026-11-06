@@ -3,9 +3,9 @@
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Latest fixed Compute Cluster DV source SHA:** `f9f32f71e7168350d74a75ede0a4a4b222844cc9` (three-seed Top UVM, focused 0x52/0x53 tests, and the compatible 19-test Cluster + mixed AXI/DMA URG merge). The `16×16×256` case still exceeds the unchanged watchdog before Golden. The most recent Cluster performance replay is independently identified in the benchmark report.
-**Latest Transformer timing test SHA:** `f9f32f71e7168350d74a75ede0a4a4b222844cc9` (86 descriptors; 301 Golden checks; fixed-weight Top CMDQ Prefill/Decode timing).
-**Current report branch HEAD at the preceding evidence snapshot:** `fed6c3f320705361bbbf761b99c73b36014cae77` (tree `0625812c7f8b6852ad0bc3f52701b49e536062b5`). The later 19-test URG evidence is documented below and in the DV report.
+**Latest clean Compute Cluster DV candidate SHA:** `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` (tree `630e498ba467d84dd5359403cfe1ed1e5879f6e9`; Top smoke, three-seed Cluster UVM and focused 0x52/0x53 replay). The broader 19-test UVM/URG merge remains separately bound to `f9f32f71e7168350d74a75ede0a4a4b222844cc9`. The `16×16×256` case still exceeds the unchanged watchdog before Golden.
+**Latest Transformer fixture functional replay SHA:** `9b835aeac33d43fd97a81496b1048d359cdff3d0` (86 fixed-weight descriptors; 301 Golden checks). Trained-model inference and measured cycles/token remain NOT_RUN.
+**Current report branch HEAD before this report update:** `d7ca7f3da6492ad9130178128a1e9d38d69d78d6` (tree `307a564f7e6c1ca4e627d37f6a9984ab155c4e24`).
 **Current published v2 branch tip:** `origin/feature/npu-architecture-v2` `5d01a88a8a2a7b1add15fbedbb02096d686824ab` (tree `bf7306bdeefeca415dd221f0a29305fdcef5b72c`).
 **Product RTL SHA:** `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; no RTL change is present in the fixed test source or report-only commits.
 
@@ -111,6 +111,36 @@ diff, and no product RTL changes after the recorded product commit.
 **OPEN:** GitHub synchronization is blocked by missing HTTPS credentials; the
 local target branch remains ahead 63. Dirty IDE/other worktrees and the 80
 missing/prunable registrations were preserved.
+
+### Phase 0 status refresh — current clean replay candidate `839b9af`
+
+Before this report-only update, the target worktree was at
+`d7ca7f3da6492ad9130178128a1e9d38d69d78d6` / tree
+`307a564f7e6c1ca4e627d37f6a9984ab155c4e24`, clean on
+`feature/npu-architecture-v2` and 71 commits ahead of its cached
+remote-tracking tip `5d01a88a8a2a7b1add15fbedbb02096d686824ab`. The clean test
+candidate used for the new VCS evidence is
+`839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` / tree
+`630e498ba467d84dd5359403cfe1ed1e5879f6e9`; both the requested review start
+and R250 remain ancestors of the target branch.
+
+The live worktree inventory now reports 217 registered paths: 137 present
+and 80 missing/prunable; 11 present worktrees are dirty, including this target
+report worktree while its three benchmark artifacts are being added. The IDE
+worktree remains on `feat/shape-adaptive-gemv-v2` at
+`c290eba7697138a4fcf2cbbac9262264849f0aeb` / tree
+`a7b3821eb9e425927322f2b3729a3c12ad08d9d4`, with only `novas.conf` and
+`novas.rc` untracked. Its merge base with target v2 is
+`b5b6ff25ed41fb5ea4c9a5043360063cec58f7ac`; target v2 has 515 unique commits
+and the IDE branch 64. No other worktree was cleaned, merged, or changed.
+
+Both requested ancestry checks pass. The R250-to-v2 RTL diff is still six
+files (`662` insertions, `80` deletions), and the last product RTL commit
+remains `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; no product RTL is changed
+by this report/benchmark update. `.gitignore` checks confirm exclusions for
+`.env`, private library content under `external/private`, and simulator
+databases; the current tracked-file scan remains free of simulator databases
+and matching private library artifacts.
 
 ### Latest real-Top GEMV tail-state cross — 2026-11-06
 

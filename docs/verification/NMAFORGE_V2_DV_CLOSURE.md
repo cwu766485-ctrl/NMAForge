@@ -1,7 +1,7 @@
 # NMAForge v2 DV Closure Status
 
 **Status:** IN PROGRESS — scoped regressions pass; v2 sign-off is not ready.  
-**Latest fixed testbench/tooling candidate with clean Top/UVM replay:** `f530fe2c4c98204312b7ed16616cb9d9747670b2` (tree `919ebb411a7b47e0e0b3dfd2084852a83a2a5034`; adds passive per-command Matrix profiles for standalone, staged Matrix/CNM, and Matrix writeback contention plus an FSM-cycle-sum assertion; product RTL unchanged). The three-seed replay is `V2-TOP-MATRIX-CLUSTER-PROFILE-F530FE2-3SEED`; earlier opcode/fault/shape and compatibility tests remain bound to their listed SHAs.
+**Latest clean Top/UVM/opcode replay candidate:** `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` (tree `630e498ba467d84dd5359403cfe1ed1e5879f6e9`; Top smoke, three-seed Cluster UVM, focused 0x52/0x53 tests, and selected mutation checks). Product RTL is unchanged. Earlier broader coverage merges and other workload results remain bound to their own listed SHAs.
 **Latest three-seed 20-random-workload compatibility replay:** testbench/tooling SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5`; directed smoke plus three 20-random-workload seeds pass legacy/v2 markers. The later clean `f9f32f7` Top Smoke replay is a shorter four-random-workload check and is not a UVM/URG coverage update.
 
 **Earlier generic Cluster replay tree:** `65d56c5d6dd345effde6fdfdf70dad59f135a279`
@@ -14,6 +14,31 @@
 **Latest in-repository fabric reset replay:** `f340acaa2cdf7c36075473b8bc6fd6dee8e59873` (tree `7fc556427be1597e64a602c10af4fdd855a0c343`); three seeds pass selected `ai_accel_memory_fabric` reset/epoch and DMA/CNM recovery checks.
 **Latest request/backpressure replay:** clean test SHA `f9f32f71e7168350d74a75ede0a4a4b222844cc9`; three seeds pass named GEMV request-stall and fused output-write stall checks, and the address-hold checker catches its corresponding RTL mutation.
 **Latest merged UVM coverage:** same clean source/test SHA `f9f32f71e7168350d74a75ede0a4a4b222844cc9`; 3 Cluster seeds plus 16 mixed AXI/DMA E2E seeds merge without URG warnings. All 36 declared functional groups are 100%; code coverage and requirement closure remain incomplete. See the 2026-11-06 entry below and [merged machine record](../../benchmark/v2_merged_urg_f9f32f7_19test.json).
+
+## 2026-11-06 — clean-candidate verification replay at `839b9af`
+
+The detached clean worktree at source/test SHA
+`839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` passes the Top `ai_smoke`, the
+three-seed `uvm_compute_cluster_regress`, and the focused Matrix-core 0x52/0x53
+shape, selected-fault, handshake, tile-forwarding, and mutation gates. The
+three Cluster Seeds have UVM Warning/Error/Fatal `0/0/0`; Matrix profile state
+partitions close exactly in all nine sampled profiles. The focused run catches
+21/21 selected temporary RTL mutants across seven classes and three Seeds.
+
+The merged three-Seed Cluster URG remains incomplete: Line/Condition/FSM/Branch/
+Assertion/Functional-Group is `70.74/68.33/46.17/67.70/72.00/83.94%`; 17/22
+assertions have successes, five are uncovered, two were not attempted, and
+only one of three cover properties matches. The 22-row v2 RTM remains 14
+PASS-scoped / 8 PARTIAL. These replay results establish candidate
+reproducibility for the sampled paths, not complete v2 DV closure or v1.0
+sign-off.
+
+Run records with exact commands and tool versions:
+[Top smoke](../../benchmark/v2_top_smoke_clean_839b9af.json),
+[Cluster UVM/URG](../../benchmark/v2_clean_cluster_uvm_839b9af.json), and
+[opcode/fault/mutation](../../benchmark/v2_opcode_dv_clean_839b9af_3seed.json).
+The benchmark at the same candidate is recorded separately in the
+[performance report](../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md).
 
 **Baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Simulator:** Synopsys VCS `V-2023.12-SP1_Full64`

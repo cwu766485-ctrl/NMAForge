@@ -2,7 +2,7 @@
 
 **As of:** 2026-11-06
 **Product baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
-**Latest fixed benchmark source/test SHA:** `f9f32f71e7168350d74a75ede0a4a4b222844cc9` (tree `0b20e98298852d2648f83d10723c55aabe3a9149`; three-seed eight-configuration Matrix replay). **Latest Top contention workload SHA:** `c93d020880710a2804685fd85bb98c2e9c56f290` (tree `24180541c76b1ad4d27b2e97313e7d97a5df2016`; three-seed 16×16 Top Matrix/CNM contention profile). Product RTL in both remains `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
+**Latest fixed Matrix benchmark source/test SHA:** `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` (clean-worktree three-seed Cache × Prefetch GEMV ablation; VCS V-2023.12-SP1_Full64). **Latest Top contention workload SHA:** `c93d020880710a2804685fd85bb98c2e9c56f290` (tree `24180541c76b1ad4d27b2e97313e7d97a5df2016`; three-seed 16×16 Top Matrix/CNM contention profile, replayed at clean candidate `839b9af`). Product RTL in both remains `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
 **Latest matched Cluster serial/parallel replay:** `f19e92934cd6273d327621c43cb17291cf1a9aa5` (three-seed real-Top Compute Cluster UVM replay of the same 3-task and 4-task workloads; product RTL unchanged).
 
 ## Comparison boundary
@@ -1052,3 +1052,64 @@ logs/URG archive `/tmp/nmaforge_v2_clean_839b9af_cluster_3seed_text.tar.gz`,
 SHA-256 `4d036d428c8e72a10490bb7eaf9534158a8df185d46722453e49038a374993f9`.
 The 256-MAC behavioral-SPAD profile remains an RTL simulation result; it is
 not ASIC timing, power, or TinyNPU comparison evidence.
+
+## Clean-candidate Cache × Prefetch replay — `839b9af`
+
+The four product-GEMV configurations were rerun from a detached clean worktree
+at source/test SHA `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` (tree
+`630e498ba467d84dd5359403cfe1ed1e5879f6e9`) on Seeds
+`20261128/20261129/20261130`. The physical array is 16×16 (256 INT8 MACs),
+read outstanding depth is 4, A-Tile Cache is enabled, and the registered
+four-bank behavioral SPAD uses seed-controlled randomized ready/response
+latency. Four shapes × four Cache/Prefetch configurations × three Seeds
+produced 48/48 bit-exact Golden points. All 48 exclusive state partitions
+equal command cycles.
+
+| Shape (M×N×K) | B-fold Cache OFF / Prefetch OFF | Cache ON / Prefetch OFF | Cache OFF / Prefetch ON | Cache ON / Prefetch ON | Read bytes OFF→ON |
+|---|---:|---:|---:|---:|---:|
+| 8×16×19 | 198.3 | 155.0 | 192.3 | 151.3 | 864→560 (−35.2%) |
+| 8×16×65 | 541.3 | 388.0 | 522.0 | 379.7 | 2,720→1,696 (−37.6%) |
+| 16×16×19 | 407.7 | 266.0 | 394.0 | 257.7 | 1,728→816 (−52.8%) |
+| 16×16×65 | 1,077.0 | 639.0 | 1,027.0 | 641.3 | 5,440→2,368 (−56.5%) |
+
+Cycles are means over the three Seeds. At these tested shapes, B-fold Cache
+alone reduces command cycles by 21.9–40.7%; Cache ON reduces read traffic by
+35.2–56.5%. With Cache ON, Prefetch improves the first three shapes by
+2.4%, 2.2%, and 3.1%, while the 16×16×65 result is 0.4% slower. Prefetch
+does not reduce read bytes; its measured overlap is 8/32/16/64 cycles for
+the four shapes with Cache ON. Command-window utilization is 4.7–10.2% and
+useful MAC rate is 11.9–26.0 MAC/cycle, so these small-M cases still leave
+substantial array capacity unused. This data supports bounded B-fold reuse
+for the measured workload; it does not establish a scheduler RTL change,
+full-Top throughput, silicon benefit, or TinyNPU win.
+
+Machine data: [48-point CSV](../../benchmark/v2_gemv_four_way_clean_839b9af_3seed.csv),
+[summary JSON](../../benchmark/v2_gemv_four_way_clean_839b9af_3seed_summary.json),
+and [configuration chart](../../benchmark/v2_gemv_four_way_clean_839b9af_3seed.svg).
+The simulator is Synopsys VCS `V-2023.12-SP1_Full64`; aggregation used Python
+`3.12.13`.
+Text-only compile/run logs and per-Seed summaries are archived outside Git at
+`/tmp/nmaforge_v2_clean_839b9af_gemv_four_way_text.tar.gz`, SHA-256
+`4210b6af9cc45212732fa23ae69df1fbfe5ec3ae6d3335f76815fd4b5d9afa58`;
+coverage databases and simulator executables are excluded.
+
+Exact replay and aggregation commands:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+make -C dv/block/compute/matrix/sim product-gemv-four-way-ablation \
+  SEEDS='20261128 20261129 20261130' \
+  GEMV_FOUR_WAY_OUT=/tmp/nmaforge_v2_clean_839b9af_gemv_four_way
+
+python3.12 tools/merge_gemv_four_way_ablation.py \
+  --output-prefix benchmark/v2_gemv_four_way_clean_839b9af_3seed \
+  /tmp/nmaforge_v2_clean_839b9af_gemv_four_way/summary_seed_20261128.csv \
+  /tmp/nmaforge_v2_clean_839b9af_gemv_four_way/summary_seed_20261129.csv \
+  /tmp/nmaforge_v2_clean_839b9af_gemv_four_way/summary_seed_20261130.csv
+```
+
+The Matrix-core experiment is isolated from the TinyNPU and full-CMDQ
+measurement boundaries. The existing same-workload TinyNPU comparison and a
+Top-level all-engine performance decomposition remain open.
