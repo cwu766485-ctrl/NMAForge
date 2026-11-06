@@ -181,6 +181,41 @@ the current scheduler. It does not compare an alternate Bank-Aware Issue
 policy or isolate its area/timing cost, so no scheduling RTL change is
 justified. DMA/DDR timing and a wider workload matrix remain open.
 
+#### Fixed-candidate replay at SHA `85e7db2`
+
+The same serial/parallel sequence was replayed in the detached clean-worktree
+three-seed UVM run `V2-CMDQ-GEMV-CNM-OWNER-CROSS-3SEED-85E7DB2` at source SHA
+`85e7db2d12f5edfaed17e8ca3910bb504983779f` (tree
+`e8f64f78f7986193bdc0d01dfbc01740a130edcb`). The exact regression command and
+tool versions are recorded in the [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+The benchmark records below were extracted from those three run logs; they are
+not a separate simulator invocation. All three seeds report identical cycles
+and traffic, independent Golden PASS, and UVM Warning/Error/Fatal `0/0/0`.
+
+| Workload | Serial cycles | Concurrent/staged cycles | Ratio (`serial / concurrent`) | Read / write bytes | Result |
+|---|---:|---:|---:|---:|---|
+| Matrix + CNM + SFU + SFU | 1,696 | 1,137 | 1.492× | 4,352 / 2,688 in both modes | PASS; ordered completions `0600,0601,0602,0603`; 38 shared-SPAD contention cycles |
+| Matrix + CNM + SFU | 1,239 | 1,070 staged | 1.158× | staged 4,032 / 2,416; matching serial byte total not emitted | PASS; ordered completions `0700,0701,0702`; 32 Matrix/CNM pair-contention cycles |
+
+The contention checks in the same run observe 333 Matrix/CNM banked-collision
+cycles, 320 admitted collisions, 320 Matrix wait cycles and 320 held-payload
+checks; owner, hold and route-mismatch error counts are all zero. A separate
+Matrix line-writeback stall observes 1,837 overlap cycles and 84 payload
+stability checks, with zero violations. These counters describe test events;
+they are not additional latency to add to command-cycle totals. This is a
+single deterministic queued workload replayed with three seeds, not a broad
+parallel-performance distribution or a TinyNPU comparison.
+
+Machine outputs: [CSV](../../benchmark/v2_p2_cluster_serial_parallel_85e7db2.csv),
+[summary JSON](../../benchmark/v2_p2_cluster_serial_parallel_85e7db2_summary.json),
+and [cycle chart](../../benchmark/v2_p2_cluster_serial_parallel_85e7db2.svg).
+The logs-only source archive is
+`/tmp/nmaforge_v2_gemv_cnm_owner_85e7db2_logs.tar.gz`, SHA-256
+`f04f15c1dc76d64a027fc9bd296b02c40e771bf9d6b06f315dc48598637924b0`.
+This is a VCS RTL-cycle result using the checked-in behavioral four-bank SPAD;
+external DDR timing, SRAM timing, ASIC PPA and alternative arbitration-policy
+benefit remain unmeasured.
+
 ### Latest Top-level 16×16 Matrix + CNM contention profile
 
 Run `V2-TOP-16X16-MATRIX-CNM-CONTENTION-C93D020` uses source/test SHA
