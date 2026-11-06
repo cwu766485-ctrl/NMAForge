@@ -2146,7 +2146,7 @@ module tb_ai_accel_smoke;
                      ai_tinynpu_cnn_engine_write_words * 4 + ai_tinynpu_cnn_line_write_lines * 16,
                      ai_tinynpu_cnn_banked_read_lines, ai_tinynpu_cnn_line_write_lines,
                      image_count * 4);
-            $display("NMA_CNN_INFERENCE_PASS model=TinyNPU_conv1x_mini outputs=4 golden=byte_exact");
+            $display("NMA_CNN_INFERENCE_PASS model=4class_conv_relu_flatten_gemm outputs=4 golden=byte_exact");
             axi_write(REG_CMDQ_SIZE, 32'd0);
             axi_write(REG_CPLQ_SIZE, 32'd0);
             clear_done_irq();
