@@ -35,7 +35,13 @@ and `benchmark/v2_tinynpu_*_current_20261106.{csv,json}` plus
 `benchmark/v2_spad_capacity_static_20261106.{csv,json}`. Full DV remains
 PARTIAL/HOLD; TinyNPU common-memory RTL, reduced-SPAD model runs, and current
 ASIC PPA remain NOT_RUN/BLOCKED_ENV. This objective stops after the report
-package is committed and pushed.
+package is committed. Publishing is currently blocked: `git push` cannot read
+an HTTPS username, `gh` is unavailable, and GitHub SSH has no accepted public
+key. No remote ref was changed; the fetched GitHub v2 head remains
+`5d01a88a8a2a7b1add15fbedbb02096d686824ab`. Once repository authentication
+is restored, the pending local commits can be pushed with
+`git push origin feature/npu-architecture-v2`. No further engineering phase
+is started here.
 
 ## Prior DV handoff snapshot (historical)
 
