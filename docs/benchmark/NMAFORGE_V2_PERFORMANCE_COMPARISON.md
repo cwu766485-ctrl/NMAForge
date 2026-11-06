@@ -2,7 +2,7 @@
 
 **As of:** 2026-11-06
 **Product baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
-**Latest replay source/test SHA:** `36d4b9b4bbafe769b452afc003033d2a222a682f` (tree `a92a302ce78ef541aa0a76bb99dfeb0a413ad0c4`; 8-configuration Matrix rerun)
+**Latest replay source/test SHA:** `4f7195bc01702f4e9a5bef2e609598ecb3dca66d` (tree `cf07292d03e245a0dc258d1d56c70f707e13763b`; three-seed Top Matrix/CNM profile; testbench-only instrumentation)
 
 ## Comparison boundary
 
@@ -180,6 +180,60 @@ This confirms legal queued overlap and actual banked-client contention under
 the current scheduler. It does not compare an alternate Bank-Aware Issue
 policy or isolate its area/timing cost, so no scheduling RTL change is
 justified. DMA/DDR timing and a wider workload matrix remain open.
+
+### Top-level Matrix + CNM cycle and traffic profile
+
+Run `V2-TOP-MATRIX-CNM-PROFILE-4F7195B-S20261106-08` uses source/test SHA
+`4f7195bc01702f4e9a5bef2e609598ecb3dca66d` (tree
+`cf07292d03e245a0dc258d1d56c70f707e13763b`) and VCS
+`V-2023.12-SP1_Full64`. A real top-level CMDQ launches one Matrix GEMM and one
+CNM GEMV with disjoint operand and destination ranges. Three seeds
+(`20261106`–`20261108`) pass the full Top Smoke with four seeded random cases
+each; every profile reports the same directed workload measurements and
+bit-exact output/completion checks.
+
+The doorbell-to-both-completions measurement window is 229 cycles. Matrix is
+busy for 20 cycles, partitioned into 4 MAC-active, 2 request-wait, 2
+response-wait, 5 writeback, and 7 other cycles. CNM is busy for 146 cycles,
+partitioned into 16 compute, 1 request-wait, 1 response-wait, 16 writeback,
+and 112 other cycles. Both exclusive partitions close exactly to their engine
+busy totals. The large CNM `other` bucket is retained as measured control/idle
+work inside its busy interval; it is not recast as useful compute.
+
+Accepted engine-interface traffic is 544 B read (Matrix 32 B, CNM 512 B) and
+128 B written (64 B per engine). There is one cycle with simultaneous Matrix
+and CNM requests, Matrix read-outstanding high-water is 1, and no overlapping
+Matrix/CNM response-valid alias is observed. Request/response lane-cycle and
+writeback-stall counters are diagnostic observations and may overlap the
+exclusive phase counts; they must not be summed again. These byte counts omit
+descriptor/completion traffic, host initialization/readback, and DMA.
+
+This is a bounded real-Top contention profile using VCS behavioral four-bank
+SPAD at a 10 ns simulation clock. It is not a serial-versus-parallel matched
+workload result, a Bank-Aware Issue ablation, a TinyNPU comparison, or ASIC
+PPA. The low measured collision count does not establish a scheduler change's
+benefit; controlled contention and area/timing cost evidence remain open.
+
+Machine evidence: [three-seed CSV](../../benchmark/v2_p2_cluster_top_profile_4f7195b.csv),
+[summary JSON](../../benchmark/v2_p2_cluster_top_profile_4f7195b_summary.json).
+The compile log and three run logs are archived at
+`/tmp/nmaforge_v2_matrix_cnm_profile_4f7195b_logs.tar.gz`, SHA-256
+`ba82586d8c57cb25cdade6023a4ec7a811c6b892884eab57272e1f92211a2ec5`.
+The exact compile/run commands are:
+
+```sh
+make -C dv/subsystem/top_smoke/sim ai_smoke \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+  VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+  AI_SEED=20261106 SEED=20261106
+
+for seed in 20261107 20261108; do
+  dv/subsystem/top_smoke/sim/simv \
+    +ntb_random_seed=$seed +AI_RANDOM_CASES=4 +AI_SEED=$seed \
+    +ACLK_PERIOD_NS=10.0 \
+    -l /tmp/nmaforge_v2_matrix_cnm_profile_4f7195b/run_seed_$seed.log
+done
+```
 
 ## Fused output tile forwarding
 
