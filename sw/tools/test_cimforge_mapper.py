@@ -7,6 +7,7 @@ from cimforge_mapper import (
     Descriptor,
     FLAG_TRANSPOSE_A,
     OP_GEMM_REQUANT_TILE_A,
+    build_workload,
     validate_fused_tile_fields,
 )
 
@@ -51,6 +52,18 @@ class FusedTileFieldTests(unittest.TestCase):
         for changes in cases:
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 validate_fused_tile_fields(self.descriptor(**changes))
+
+
+class TransformerPhaseBoundaryTests(unittest.TestCase):
+    def test_prefill_decode_descriptor_boundary(self):
+        mapper, expected = build_workload()
+
+        self.assertEqual(len(mapper.descriptors), 86)
+        self.assertEqual(expected["prefill_descriptor_count"], 46)
+        self.assertEqual(
+            mapper.descriptors[expected["prefill_descriptor_count"]].name,
+            "decode_q_projection",
+        )
 
 
 if __name__ == "__main__":

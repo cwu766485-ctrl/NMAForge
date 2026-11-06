@@ -431,6 +431,8 @@ def build_workload() -> tuple[Mapper, dict[str, list]]:
         mapper.descriptors[-1].src0 += row * 16
         mapper.descriptors[-1].dst += row * 16
 
+    prefill_descriptor_count = len(mapper.descriptors)
+
     # Decode one new token after prefill. Its key/value update token slot 4;
     # attention then reads the latest four-token sliding context window.
     gemm("decode_q_projection", decode_i8, wq_t, qd32)
@@ -551,6 +553,7 @@ def build_workload() -> tuple[Mapper, dict[str, list]]:
             descriptor.signal_mask |= 1 << (index & 1)
     validate_descriptor_chain(mapper)
     expected = {
+        "prefill_descriptor_count": prefill_descriptor_count,
         "prefill_final": norm_2,
         "decode_final": decode_norm_2,
         "decode_q_i32": decode_q,
@@ -698,6 +701,7 @@ def write_svh(path: Path, mapper: Mapper, expected: dict[str, list]) -> None:
         f"localparam [31:0] TRANSFORMER_DESC_BASE = 32'h{descriptor_base:08x};",
         f"localparam [31:0] TRANSFORMER_CPL_BASE = 32'h{completion_base:08x};",
         f"localparam integer TRANSFORMER_DESC_COUNT = {len(mapper.descriptors)};",
+        f"localparam integer TRANSFORMER_PREFILL_DESC_COUNT = {expected['prefill_descriptor_count']};",
         f"localparam [15:0] TRANSFORMER_LAST_TASK_ID = 16'h{mapper.descriptors[-1].task_id:04x};",
         f"localparam [31:0] TRANSFORMER_LAST_RESULT = 32'h{u32(expected['decode_final'][-1][-1]):08x};",
         "",
@@ -795,6 +799,8 @@ def write_manifest(path: Path, mapper: Mapper, expected: dict[str, list]) -> Non
         "decode_tokens": 1,
         "hidden": 4,
         "attention_heads": 1,
+        "prefill_descriptor_count": expected["prefill_descriptor_count"],
+        "decode_descriptor_count": len(mapper.descriptors) - expected["prefill_descriptor_count"],
         "weight_provenance": "hand-authored deterministic non-identity INT8 test weights; not pretrained",
         "weights": {
             **MODEL_WEIGHTS,

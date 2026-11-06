@@ -2,6 +2,7 @@
 localparam [31:0] TRANSFORMER_DESC_BASE = 32'h00011000;
 localparam [31:0] TRANSFORMER_CPL_BASE = 32'h00013000;
 localparam integer TRANSFORMER_DESC_COUNT = 86;
+localparam integer TRANSFORMER_PREFILL_DESC_COUNT = 46;
 localparam [15:0] TRANSFORMER_LAST_TASK_ID = 16'h7055;
 localparam [31:0] TRANSFORMER_LAST_RESULT = 32'hfffffffe;
 
