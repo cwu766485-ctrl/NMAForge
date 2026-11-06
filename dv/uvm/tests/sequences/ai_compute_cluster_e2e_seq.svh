@@ -303,6 +303,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     bit cmdq_product_gemv_k_tail;
     bit cmdq_product_gemv_min_shape;
     bit cmdq_product_gemv_full_tile_shape;
+    bit cmdq_product_gemv_cnm_overlap;
+    bit cmdq_product_gemv_cnm_contention;
     int unsigned engine_parallel_fault_cov_idx;
     int unsigned engine_parallel_reset_phase;
     covergroup cmdq_invalid_descriptor_cg;
@@ -349,6 +351,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         cp_max_mn_full_tile: coverpoint cmdq_product_gemv_full_tile_shape {
             bins max_m_n_tile = {1'b1};
         }
+    endgroup
+
+    covergroup cmdq_product_gemv_cnm_owner_cg;
+        option.per_instance = 1;
+        cp_gemv_cnm_overlap: coverpoint cmdq_product_gemv_cnm_overlap {
+            bins overlapped = {1'b1};
+        }
+        cp_gemv_cnm_contention: coverpoint cmdq_product_gemv_cnm_contention {
+            bins shared_admission = {1'b1};
+        }
+        c_overlap_x_contention: cross cp_gemv_cnm_overlap,
+                                     cp_gemv_cnm_contention;
     endgroup
 
     covergroup engine_parallel_fault_cg;
@@ -474,6 +488,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         cmdq_product_gemv_k_tail = 1'b0;
         cmdq_product_gemv_min_shape = 1'b0;
         cmdq_product_gemv_full_tile_shape = 1'b0;
+        cmdq_product_gemv_cnm_overlap = 1'b0;
+        cmdq_product_gemv_cnm_contention = 1'b0;
         engine_parity_cplq_cov_idx = 0;
         engine_abort_cplq_cov_idx = 0;
         engine_pair_overlap_cov_idx = 0;
@@ -499,6 +515,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         cmdq_product_gemv_cg = new();
         cmdq_product_gemv_min_cg = new();
         cmdq_product_gemv_full_tile_cg = new();
+        cmdq_product_gemv_cnm_owner_cg = new();
         engine_parallel_fault_cg = new();
         engine_parallel_reset_cg = new();
         engine_pair_overlap_cg = new();
@@ -4721,6 +4738,266 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             compute_vif.matrix_tag_response_count - matrix_responses_before,
             seed), UVM_LOW)
         axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
+    endtask
+
+    task automatic run_product_gemv_cmdq_cnm_owner_cross(input int unsigned seed);
+        localparam int unsigned M_SIZE = 16;
+        localparam int unsigned N_SIZE = 16;
+        localparam int unsigned K_SIZE = 16;
+        localparam bit [31:0] CMDQ_BASE = 32'h0005_b000;
+        localparam bit [31:0] CPLQ_BASE = 32'h0005_b400;
+        localparam bit [31:0] SRC_A = 32'h0007_b800;
+        localparam bit [31:0] SRC_B = 32'h0007_ba00;
+        localparam bit [31:0] DST = 32'h0007_bc00;
+        localparam bit [31:0] CNM_DST = 32'h0005_4800;
+        localparam bit [15:0] GEMV_TASK_ID = 16'h08c3;
+        localparam bit [15:0] CNM_TASK_ID = 16'h08c4;
+        int signed a_matrix[0:M_SIZE-1][0:K_SIZE-1];
+        int signed b_matrix[0:K_SIZE-1][0:N_SIZE-1];
+        bit [31:0] golden[0:M_SIZE-1][0:N_SIZE-1];
+        int signed expected_cnm[0:15];
+        bit [31:0] packed_word;
+        bit monitor_done;
+        int unsigned launch_before;
+        int unsigned matrix_launch_before;
+        int unsigned cnm_launch_before;
+        int unsigned matrix_responses_before;
+        int unsigned cnm_responses_before;
+        int unsigned matrix_route_error_before;
+        int unsigned cnm_route_error_before;
+        int unsigned overlap_before;
+        int unsigned shared_accept_before;
+        int unsigned accepted_matrix_reads;
+        int unsigned accepted_cnm_reads;
+        int unsigned returned_cnm_reads;
+        int unsigned both_busy_cycles;
+        int unsigned matrix_accept_contention;
+        int unsigned cnm_accept_contention;
+        int unsigned row_idx;
+        int unsigned col_idx;
+        int unsigned k_idx;
+        int unsigned word_byte;
+        int unsigned lane;
+        int unsigned byte_idx;
+        int signed a_value;
+        int signed b_value;
+        int signed sum;
+
+        for (row_idx = 0; row_idx < M_SIZE; row_idx++) begin
+            for (word_byte = 0; word_byte < 16; word_byte += 4) begin
+                packed_word = '0;
+                for (lane = 0; lane < 4; lane++) begin
+                    k_idx = word_byte + lane;
+                    a_value = (int'(seed % 17) + int'(row_idx * 3) +
+                               int'(k_idx * 5)) % 15 - 7;
+                    a_matrix[row_idx][k_idx] = a_value;
+                    packed_word[lane*8 +: 8] = a_value[7:0];
+                end
+                spad_write(SRC_A + (row_idx << 4) + word_byte, packed_word);
+            end
+        end
+        for (k_idx = 0; k_idx < K_SIZE; k_idx++) begin
+            for (word_byte = 0; word_byte < 16; word_byte += 4) begin
+                packed_word = '0;
+                for (lane = 0; lane < 4; lane++) begin
+                    col_idx = word_byte + lane;
+                    b_value = (int'(seed % 19) + int'(k_idx * 7) +
+                               int'(col_idx * 2)) % 13 - 6;
+                    b_matrix[k_idx][col_idx] = b_value;
+                    packed_word[lane*8 +: 8] = b_value[7:0];
+                end
+                spad_write(SRC_B + (k_idx << 4) + word_byte, packed_word);
+            end
+        end
+        for (row_idx = 0; row_idx < M_SIZE; row_idx++) begin
+            for (col_idx = 0; col_idx < N_SIZE; col_idx++) begin
+                sum = 0;
+                for (k_idx = 0; k_idx < K_SIZE; k_idx++)
+                    sum += a_matrix[row_idx][k_idx] * b_matrix[k_idx][col_idx];
+                golden[row_idx][col_idx] = sum;
+                spad_write(DST + ((row_idx * N_SIZE + col_idx) << 2),
+                           32'hbad0_e000 | (row_idx * N_SIZE + col_idx));
+            end
+        end
+        spad_write(DST + 32'h400, 32'hbad0_e100);
+        spad_write(DST + 32'h404, 32'hbad0_e101);
+
+        for (k_idx = 0; k_idx < 32; k_idx++) begin
+            for (lane = 0; lane < 4; lane++) begin
+                packed_word = '0;
+                for (byte_idx = 0; byte_idx < 4; byte_idx++) begin
+                    a_value = int'(k_idx % 5) + int'(lane * 2) +
+                              int'(byte_idx) - 5;
+                    packed_word[byte_idx*8 +: 8] = a_value[7:0];
+                end
+                spad_write(MATRIX_LINE_STALL_CNM_A_LOCAL +
+                           (k_idx << 4) + (lane << 2), packed_word);
+            end
+        end
+        for (row_idx = 0; row_idx < 16; row_idx++) begin
+            expected_cnm[row_idx] = 0;
+            for (k_idx = 0; k_idx < 32; k_idx++) begin
+                for (lane = 0; lane < 4; lane++) begin
+                    packed_word = '0;
+                    for (byte_idx = 0; byte_idx < 4; byte_idx++) begin
+                        a_value = int'(k_idx % 5) + int'(lane * 2) +
+                                  int'(byte_idx) - 5;
+                        b_value = int'(row_idx % 5) + int'(k_idx % 3) +
+                                  int'(lane) + int'(byte_idx) - 3;
+                        packed_word[byte_idx*8 +: 8] = b_value[7:0];
+                        expected_cnm[row_idx] += a_value * b_value;
+                    end
+                    spad_write(MATRIX_LINE_STALL_CNM_B_LOCAL +
+                               ((row_idx * 32 + k_idx) << 4) + (lane << 2),
+                               packed_word);
+                end
+            end
+        end
+        for (row_idx = 0; row_idx < 16; row_idx++)
+            spad_write(CNM_DST + (row_idx << 2),
+                       32'hbad0_e200 | row_idx);
+
+        write_cluster_desc(CMDQ_BASE, 8'h52, GEMV_TASK_ID,
+                           SRC_A, SRC_B, DST, M_SIZE, N_SIZE, K_SIZE,
+                           32'd0, 32'd0, 32'd0, 32'd0, 8'd7);
+        write_cluster_desc(CMDQ_BASE + 32'h40, 8'h21, CNM_TASK_ID,
+                           MATRIX_LINE_STALL_CNM_A_LOCAL,
+                           MATRIX_LINE_STALL_CNM_B_LOCAL, CNM_DST,
+                           16'd16, 16'd1, 16'd32, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd3);
+
+        launch_before = compute_vif.launch_sample_count;
+        matrix_launch_before = compute_vif.engine_launch_count[3];
+        cnm_launch_before = compute_vif.engine_launch_count[2];
+        matrix_responses_before = compute_vif.matrix_tag_response_count;
+        cnm_responses_before = compute_vif.cnm_tag_response_count;
+        matrix_route_error_before = compute_vif.matrix_route_mismatch_count;
+        cnm_route_error_before = compute_vif.cnm_route_mismatch_count;
+        overlap_before = compute_vif.matrix_cnm_overlap_cycles;
+        shared_accept_before = compute_vif.matrix_cnm_shared_accept_cycles;
+        accepted_matrix_reads = 0;
+        accepted_cnm_reads = 0;
+        returned_cnm_reads = 0;
+        both_busy_cycles = 0;
+        matrix_accept_contention = 0;
+        cnm_accept_contention = 0;
+        monitor_done = 1'b0;
+        cmdq_product_gemv_cnm_overlap = 1'b0;
+        cmdq_product_gemv_cnm_contention = 1'b0;
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, CMDQ_BASE);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd2);
+        axil_write(REG_CPLQ_BASE, CPLQ_BASE);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+
+        fork
+            begin : product_gemv_cnm_owner_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.matrix_request_valid &&
+                        compute_vif.banked_ready)
+                        accepted_matrix_reads++;
+                    accepted_cnm_reads += $countones(compute_vif.cnm_accept_mask);
+                    returned_cnm_reads += $countones(compute_vif.cnm_rsp_valid);
+                    if (compute_vif.engine_busy[2] && compute_vif.engine_busy[3])
+                        both_busy_cycles++;
+                    if (compute_vif.matrix_request_valid &&
+                        (|compute_vif.cnm_valid) && compute_vif.banked_ready)
+                        matrix_accept_contention++;
+                    if (compute_vif.matrix_request_valid &&
+                        (|compute_vif.cnm_valid) && (|compute_vif.cnm_ready))
+                        cnm_accept_contention++;
+                end
+            end
+            begin : product_gemv_cnm_owner_submit
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(32'd2);
+                monitor_done = 1'b1;
+            end
+        join
+        wait_spad_idle();
+
+        if ((compute_vif.launch_sample_count - launch_before) != 2 ||
+            (compute_vif.engine_launch_count[3] - matrix_launch_before) != 1 ||
+            (compute_vif.engine_launch_count[2] - cnm_launch_before) != 1 ||
+            compute_vif.launch_snapshot_opcode[3] !== 8'h52 ||
+            compute_vif.launch_snapshot_opcode[2] !== 8'h21 ||
+            compute_vif.launch_snapshot_m[3] !== 16'd16 ||
+            compute_vif.launch_snapshot_n[3] !== 16'd16 ||
+            compute_vif.launch_snapshot_k[3] !== 16'd16)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_CNM_OWNER", $sformatf(
+                "parallel CMDQ launch mismatch launches=%0d Matrix=%0d CNM=%0d opcodes=%02h/%02h",
+                compute_vif.launch_sample_count - launch_before,
+                compute_vif.engine_launch_count[3] - matrix_launch_before,
+                compute_vif.engine_launch_count[2] - cnm_launch_before,
+                compute_vif.launch_snapshot_opcode[3],
+                compute_vif.launch_snapshot_opcode[2]))
+        if (accepted_matrix_reads != 32 ||
+            (compute_vif.matrix_tag_response_count - matrix_responses_before) !=
+                accepted_matrix_reads)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_CNM_OWNER", $sformatf(
+                "0x52 Matrix read drain mismatch accepted=%0d returned=%0d",
+                accepted_matrix_reads,
+                compute_vif.matrix_tag_response_count - matrix_responses_before))
+        if (accepted_cnm_reads == 0 || returned_cnm_reads != accepted_cnm_reads ||
+            (compute_vif.cnm_tag_response_count - cnm_responses_before) == 0)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_CNM_OWNER", $sformatf(
+                "CNM read drain/response owner mismatch accepted=%0d returned=%0d responses=%0d",
+                accepted_cnm_reads, returned_cnm_reads,
+                compute_vif.cnm_tag_response_count - cnm_responses_before))
+        if (compute_vif.matrix_route_mismatch_count != matrix_route_error_before ||
+            compute_vif.cnm_route_mismatch_count != cnm_route_error_before)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_CNM_OWNER", $sformatf(
+                "cross-engine response routing error Matrix=%0d CNM=%0d",
+                compute_vif.matrix_route_mismatch_count - matrix_route_error_before,
+                compute_vif.cnm_route_mismatch_count - cnm_route_error_before))
+        if (both_busy_cycles == 0 || cnm_accept_contention == 0 ||
+            compute_vif.matrix_cnm_overlap_cycles <= overlap_before ||
+            compute_vif.matrix_cnm_shared_accept_cycles <= shared_accept_before)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_CNM_OWNER", $sformatf(
+                "real 0x52/CNM overlap/contention missing both_busy=%0d Matrix_grants_during_collision=%0d CNM_grants_during_collision=%0d",
+                both_busy_cycles, matrix_accept_contention, cnm_accept_contention))
+
+        for (row_idx = 0; row_idx < M_SIZE; row_idx++)
+            for (col_idx = 0; col_idx < N_SIZE; col_idx++)
+                expect_spad(DST + ((row_idx * N_SIZE + col_idx) << 2),
+                            golden[row_idx][col_idx],
+                            $sformatf("concurrent opcode 0x52 Golden[%0d][%0d]",
+                                      row_idx, col_idx));
+        expect_spad(DST + 32'h400, 32'hbad0_e100,
+                    "concurrent opcode 0x52 first output guard");
+        expect_spad(DST + 32'h404, 32'hbad0_e101,
+                    "concurrent opcode 0x52 second output guard");
+        for (row_idx = 0; row_idx < 16; row_idx++)
+            expect_spad(CNM_DST + (row_idx << 2), expected_cnm[row_idx],
+                        $sformatf("concurrent CNM Golden[%0d]", row_idx));
+        expect_completion(CPLQ_BASE, GEMV_TASK_ID, golden[15][15], 32'd256,
+                          "concurrent CMDQ opcode 0x52 first ordered completion");
+        expect_completion(CPLQ_BASE + 32'h10, CNM_TASK_ID, expected_cnm[15],
+                          32'd16, "concurrent CMDQ CNM second ordered completion");
+
+        cmdq_product_gemv_cnm_overlap = 1'b1;
+        cmdq_product_gemv_cnm_contention = 1'b1;
+        cmdq_product_gemv_cnm_owner_cg.sample();
+        if (cmdq_product_gemv_cnm_owner_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_CNM_OWNER", $sformatf(
+                "0x52/CNM owner overlap group incomplete: %0.1f%%",
+                cmdq_product_gemv_cnm_owner_cg.get_coverage()))
+        `uvm_info("CLUSTER_CMDQ_GEMV_CNM_OWNER_PASS", $sformatf(
+            "real CMDQ 0x52 GEMV + CNM concurrent; overlap cycles=%0d collision grants Matrix/CNM=%0d/%0d accepted reads=%0d/%0d returned CNM=%0d Matrix responses=%0d CNM responses=%0d route mismatches=0; dual Golden/completions pass; owner bins=100%% seed=%0d",
+            both_busy_cycles, matrix_accept_contention, cnm_accept_contention,
+            accepted_matrix_reads, accepted_cnm_reads,
+            returned_cnm_reads,
+            compute_vif.matrix_tag_response_count - matrix_responses_before,
+            compute_vif.cnm_tag_response_count - cnm_responses_before,
+            seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd2);
         axil_write(REG_CMDQ_SIZE, 32'd0);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
@@ -12112,6 +12389,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_product_gemv_cmdq_golden(seed);
         run_product_gemv_cmdq_min_boundary(seed);
         run_product_gemv_cmdq_full_tile(seed);
+        run_product_gemv_cmdq_cnm_owner_cross(seed);
         run_engine_protection_full_cplq_cross(seed);
         run_scalar_gemv_gemm_cmdq_dispatch_test(seed);
         run_scalar_cmdq_numeric_boundary_test(seed);
