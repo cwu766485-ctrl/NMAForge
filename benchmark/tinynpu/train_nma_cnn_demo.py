@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Train a compact INT8 CNN readout over fixed local edge filters."""
+"""Train a compact INT8 Conv + linear classifier for the production-top demo."""
 
 import argparse
 import hashlib
@@ -10,14 +10,7 @@ import numpy as np
 from sklearn.datasets import load_digits
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
-
-
-KERNELS = np.asarray([
-    [[1, 0, -1], [1, 0, -1], [1, 0, -1]],
-    [[1, 1, 1], [0, 0, 0], [-1, -1, -1]],
-    [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-    [[0, 0, 1], [0, 1, 0], [1, 0, 0]],
-], dtype=np.float32)
+from sklearn.metrics import accuracy_score
 
 
 def quantize_int8(values):
@@ -28,26 +21,80 @@ def quantize_int8(values):
     return np.clip(np.rint(values * (127.0 / peak)), -127, 127).astype(np.int8)
 
 
-def deployed_conv_features(images):
-    weights = quantize_int8(KERNELS).astype(np.int64)
-    result = np.zeros((len(images), 144), dtype=np.uint8)
-    for image_index, image in enumerate(images):
-        pixels = (np.asarray(image, dtype=np.int64) // 4).clip(0, 127)
-        acc = np.zeros((36, 4), dtype=np.int64)
-        position = 0
-        for row in range(6):
-            for col in range(6):
-                for channel in range(4):
-                    total = 0
-                    for kr in range(3):
-                        for kc in range(3):
-                            total += int(pixels[row + kr, col + kc]) * int(weights[channel, kr, kc])
-                    acc[position, channel] = total
-                position += 1
-        rounded = (acc + 8) >> 4
-        signed_i8 = np.clip(rounded, -128, 127).astype(np.int8).astype(np.int16)
-        result[image_index] = np.clip(np.maximum(signed_i8, 0), 0, 127).astype(np.uint8).reshape(-1)
-    return result
+def conv_patches(images):
+    pixels = (np.asarray(images, dtype=np.int64) // 4).astype(np.float32)
+    return np.stack([
+        pixels[:, row:row + 3, col:col + 3].reshape(len(pixels), 9)
+        for row in range(6) for col in range(6)
+    ], axis=1)
+
+
+def train_convolution(images, labels):
+    """Train four shared 3x3 filters with deterministic NumPy/Adam SGD."""
+    patches = conv_patches(images)
+    rng = np.random.default_rng(44)
+    conv_w = (rng.normal(size=(4, 9)) * 0.12).astype(np.float32)
+    conv_b = np.zeros(4, dtype=np.float32)
+    fc_w = (rng.normal(size=(4, 144)) * 0.02).astype(np.float32)
+    fc_b = np.zeros(4, dtype=np.float32)
+    # Conv bias is intentionally fixed at zero: the RTL contract applies its
+    # quantized bias after the requant stage, so fitting a pre-requant float
+    # bias here would train a different function.
+    parameters = [conv_w, fc_w, fc_b]
+    first = [np.zeros_like(item) for item in parameters]
+    second = [np.zeros_like(item) for item in parameters]
+    step = 0
+
+    for _epoch in range(250):
+        order = rng.permutation(len(labels))
+        for start in range(0, len(order), 128):
+            indices = order[start:start + 128]
+            batch = patches[indices]
+            target = labels[indices]
+            batch_count = len(indices)
+
+            conv_acc = batch @ conv_w.T + conv_b
+            activation = np.maximum(conv_acc, 0)
+            logits = activation.reshape(batch_count, 144) @ fc_w.T + fc_b
+            logits -= logits.max(axis=1, keepdims=True)
+            probabilities = np.exp(logits)
+            probabilities /= probabilities.sum(axis=1, keepdims=True)
+            probabilities[np.arange(batch_count), target] -= 1.0
+            probabilities /= batch_count
+
+            grad_fc_w = probabilities.T @ activation.reshape(batch_count, 144)
+            grad_fc_b = probabilities.sum(axis=0)
+            grad_activation = (probabilities @ fc_w).reshape(batch_count, 36, 4)
+            grad_conv_acc = grad_activation * (conv_acc > 0)
+            grad_conv_w = np.einsum("npf,npk->fk", grad_conv_acc, batch)
+            step += 1
+            for parameter, gradient, moment, variance in zip(
+                    parameters,
+                    [grad_conv_w, grad_fc_w, grad_fc_b],
+                    first, second):
+                moment *= 0.9
+                moment += 0.1 * gradient
+                variance *= 0.999
+                variance += 0.001 * gradient * gradient
+                corrected_moment = moment / (1.0 - 0.9 ** step)
+                corrected_variance = variance / (1.0 - 0.999 ** step)
+                parameter -= 0.006 * corrected_moment / (
+                    np.sqrt(corrected_variance) + 1e-8)
+
+    logits = np.maximum(patches @ conv_w.T + conv_b, 0).reshape(len(labels), 144)
+    logits = logits @ fc_w.T + fc_b
+    return conv_w.reshape(4, 1, 3, 3), conv_b, fc_w, fc_b, accuracy_score(
+        labels, logits.argmax(axis=1))
+
+
+def deployed_conv_features(images, conv_w):
+    weights = quantize_int8(conv_w[:, 0].reshape(4, 9)).astype(np.int64)
+    patches = conv_patches(images).astype(np.int64)
+    accumulators = patches @ weights.T
+    rounded = (accumulators + 8) >> 4
+    signed_i8 = np.clip(rounded, -128, 127).astype(np.int8)
+    return np.clip(np.maximum(signed_i8, 0), 0, 127).astype(np.uint8).reshape(
+        len(images), 144)
 
 
 def integer_cnn_logits(features, fc_weights):
@@ -69,14 +116,14 @@ def main():
     labels = dataset.target[keep].astype(np.int64)
     x_train, x_test, y_train, y_test = train_test_split(
         images, labels, test_size=0.22, random_state=29, stratify=labels)
-    train_features = deployed_conv_features(x_train)
-    test_features = deployed_conv_features(x_test)
 
-    # The four 3x3 edge kernels are fixed. The dense readout is trained on
-    # their actual INT8, rounded, saturated RTL-visible feature values.
+    conv_w, conv_b, _float_fc_w, _float_fc_b, float_train_accuracy = \
+        train_convolution(x_train, y_train)
+    train_features = deployed_conv_features(x_train, conv_w).astype(np.float64)
+    test_features = deployed_conv_features(x_test, conv_w).astype(np.float64)
     classifier = LogisticRegression(C=1.0, fit_intercept=False, max_iter=2000,
                                     random_state=29, tol=1e-10)
-    classifier.fit(train_features.astype(np.float64), y_train)
+    classifier.fit(train_features, y_train)
     fc_weights = classifier.coef_.astype(np.float32)
     test_logits = integer_cnn_logits(test_features, fc_weights)
     predictions = np.argmax(test_logits, axis=1)
@@ -85,11 +132,11 @@ def main():
 
     model_path = args.out_dir / "nma_tiny_cnn_demo_weights.npz"
     np.savez(model_path,
-             conv_w=KERNELS[:, None, :, :],
-             conv_b=np.zeros(4, dtype=np.float32),
+             conv_w=conv_w,
+             conv_b=conv_b,
              fc_w=fc_weights,
              fc_b=np.zeros(4, dtype=np.float32),
-             model_kind=np.asarray("fixed_edge_conv_trained_int8_readout"))
+             model_kind=np.asarray("trained_int8_conv_and_trained_int8_readout"))
     input_path = args.out_dir / "nma_tiny_cnn_demo_input.npz"
     quantized_test = (x_test.astype(np.int16) // 4).astype(np.int8)
     selected = quantized_test[selected_index]
@@ -106,15 +153,19 @@ def main():
         images.tobytes() + labels.astype(np.uint8).tobytes()).hexdigest()
     manifest = {
         "model": model_path.name,
-        "model_kind": "four fixed edge kernels plus trained four-class INT8 linear readout",
-        "training": "scikit-learn LogisticRegression; C=1; no fitted intercept; trained on deployed integer convolution features",
+        "model_kind": "trained four-filter 3x3 convolution plus trained four-class INT8 readout",
+        "training": {
+            "convolution": "NumPy backpropagation with Adam; 250 epochs; batch 128; lr 0.006; seed 44",
+            "readout": "scikit-learn LogisticRegression; C=1; fit_intercept=false; trained on deployed integer convolution features",
+            "float_convolution_training_accuracy": float(float_train_accuracy),
+        },
         "dataset": "sklearn.datasets.load_digits restricted to labels 0..3",
         "dataset_sha256": dataset_hash,
         "split": {"train": int(len(y_train)), "test": int(len(y_test)),
                   "test_size": 0.22, "random_state": 29, "stratified": True},
-        "input_quantization": "floor(pixel / 4), INT8; hardware input scale recorded as 0.25",
-        "conv_contract": "signed INT32 dot, round (acc+8)>>4, clamp INT8, ReLU",
-        "fc_contract": "symmetric per-tensor INT8 weights, signed INT32 dot, round (acc+128)>>8, clamp INT8",
+        "input_quantization": "floor(pixel / 4), INT8; input scale 0.25",
+        "conv_contract": "trained shared 3x3 filters; signed INT32 dot; round (acc+8)>>4; clamp INT8; ReLU",
+        "fc_contract": "symmetric per-tensor INT8 weights; signed INT32 dot; round (acc+128)>>8; clamp INT8",
         "test_correct": int(np.count_nonzero(correct)),
         "test_count": int(len(y_test)),
         "test_accuracy": float(np.mean(correct)),
@@ -130,10 +181,9 @@ def main():
     }
     (args.out_dir / "nma_tiny_cnn_demo_manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    print("NMA_TRAINED_CNN_PRECHECK_PASS correct=%d/%d accuracy=%.6f selected_label=%d selected_prediction=%d model_sha256=%s" %
-          (manifest["test_correct"], manifest["test_count"], manifest["test_accuracy"],
-           manifest["rtl_sample"]["label"], manifest["rtl_sample"]["prediction"],
-           manifest["model_sha256"]))
+    print("NMA_TRAINED_CNN_PRECHECK_PASS correct=%d/%d accuracy=%.6f model_sha256=%s" %
+          (manifest["test_correct"], manifest["test_count"],
+           manifest["test_accuracy"], manifest["model_sha256"]))
 
 
 if __name__ == "__main__":

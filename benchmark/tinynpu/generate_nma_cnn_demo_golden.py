@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent software Golden for the fixed-filter trained CNN demo."""
+"""Independent integer Golden for the trained CNN demo."""
 
 import argparse
 import hashlib

@@ -163,8 +163,8 @@ ai_tinynpu_cnn_match:
 		-l $(AI_TINYNPU_CNN_RUN)/run.log
 	grep -q '^NMA_CNN_INFERENCE_PASS' $(AI_TINYNPU_CNN_RUN)/run.log
 
-# Trained four-class CNN demo. Convolution kernels are fixed edge filters;
-# the INT8 classifier head is trained on the exact deployed convolution values.
+# Trained four-class CNN demo. Both the 3x3 convolution filters and INT8
+# classifier head are trained; the readout uses deployed integer features.
 AI_TRAINED_CNN_RUN ?= /tmp/nmaforge_trained_cnn_demo_$(shell date +%Y%m%d_%H%M%S)
 AI_TRAINED_CNN_PYTHON ?= python3
 .PHONY: ai_trained_cnn_demo
