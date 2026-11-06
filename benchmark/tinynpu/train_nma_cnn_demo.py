@@ -29,14 +29,14 @@ def conv_patches(images):
     ], axis=1)
 
 
-def train_convolution(images, labels):
+def train_convolution(images, labels, num_classes):
     """Train four shared 3x3 filters with deterministic NumPy/Adam SGD."""
     patches = conv_patches(images)
     rng = np.random.default_rng(44)
     conv_w = (rng.normal(size=(4, 9)) * 0.12).astype(np.float32)
     conv_b = np.zeros(4, dtype=np.float32)
-    fc_w = (rng.normal(size=(4, 144)) * 0.02).astype(np.float32)
-    fc_b = np.zeros(4, dtype=np.float32)
+    fc_w = (rng.normal(size=(num_classes, 144)) * 0.02).astype(np.float32)
+    fc_b = np.zeros(num_classes, dtype=np.float32)
     # Conv bias is intentionally fixed at zero: the RTL contract applies its
     # quantized bias after the requant stage, so fitting a pre-requant float
     # bias here would train a different function.
@@ -107,18 +107,19 @@ def integer_cnn_logits(features, fc_weights):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--out-dir", required=True, type=Path)
+    parser.add_argument("--num-classes", type=int, choices=(4, 10), default=4)
     args = parser.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     dataset = load_digits()
-    keep = dataset.target < 4
+    keep = dataset.target < args.num_classes
     images = dataset.images[keep].astype(np.uint8)
     labels = dataset.target[keep].astype(np.int64)
     x_train, x_test, y_train, y_test = train_test_split(
         images, labels, test_size=0.22, random_state=29, stratify=labels)
 
     conv_w, conv_b, _float_fc_w, _float_fc_b, float_train_accuracy = \
-        train_convolution(x_train, y_train)
+        train_convolution(x_train, y_train, args.num_classes)
     train_features = deployed_conv_features(x_train, conv_w).astype(np.float64)
     test_features = deployed_conv_features(x_test, conv_w).astype(np.float64)
     classifier = LogisticRegression(C=1.0, fit_intercept=False, max_iter=2000,
@@ -135,8 +136,9 @@ def main():
              conv_w=conv_w,
              conv_b=conv_b,
              fc_w=fc_weights,
-             fc_b=np.zeros(4, dtype=np.float32),
-             model_kind=np.asarray("trained_int8_conv_and_trained_int8_readout"))
+             fc_b=np.zeros(args.num_classes, dtype=np.float32),
+             model_kind=np.asarray("trained_int8_conv_and_trained_%d_class_readout" %
+                                   args.num_classes))
     input_path = args.out_dir / "nma_tiny_cnn_demo_input.npz"
     quantized_test = (x_test.astype(np.int16) // 4).astype(np.int8)
     selected = quantized_test[selected_index]
@@ -153,13 +155,14 @@ def main():
         images.tobytes() + labels.astype(np.uint8).tobytes()).hexdigest()
     manifest = {
         "model": model_path.name,
-        "model_kind": "trained four-filter 3x3 convolution plus trained four-class INT8 readout",
+        "model_kind": "trained four-filter 3x3 convolution plus trained %d-class INT8 readout" % args.num_classes,
+        "num_classes": args.num_classes,
         "training": {
             "convolution": "NumPy backpropagation with Adam; 250 epochs; batch 128; lr 0.006; seed 44",
             "readout": "scikit-learn LogisticRegression; C=1; fit_intercept=false; trained on deployed integer convolution features",
             "float_convolution_training_accuracy": float(float_train_accuracy),
         },
-        "dataset": "sklearn.datasets.load_digits restricted to labels 0..3",
+        "dataset": "sklearn.datasets.load_digits restricted to labels 0..%d" % (args.num_classes - 1),
         "dataset_sha256": dataset_hash,
         "split": {"train": int(len(y_train)), "test": int(len(y_test)),
                   "test_size": 0.22, "random_state": 29, "stratified": True},
@@ -170,7 +173,8 @@ def main():
         "test_count": int(len(y_test)),
         "test_accuracy": float(np.mean(correct)),
         "test_confusion_matrix": [[int(np.sum((y_test == i) & (predictions == j)))
-                                    for j in range(4)] for i in range(4)],
+                                    for j in range(args.num_classes)]
+                                   for i in range(args.num_classes)],
         "rtl_sample": {"test_index": selected_index,
                        "label": int(y_test[selected_index]),
                        "prediction": int(predictions[selected_index]),

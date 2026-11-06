@@ -105,13 +105,24 @@ def build(model_path, input_npz=None):
     conv_relu = np.clip(conv_bias_relu_i32, 0, 127).astype(np.int8)
     conv_relu_flat = conv_relu.reshape(6, 6, 4).reshape(-1)
 
-    fc_weights = fc_w.reshape(4, 144)
+    fc_weights = fc_w.reshape(-1, 144)
+    num_classes = int(fc_weights.shape[0])
+    if num_classes not in (4, 10):
+        raise ValueError("CNN output classes must be 4 or 10")
+    padded_classes = ((num_classes + 3) // 4) * 4
+    fc_bias = fc_b.reshape(-1)
     fc_acc = conv_relu_flat.astype(np.int64) @ fc_weights.astype(np.int64).T
     fc_rounded = rounded_requant(fc_acc, 8)
     fc_pre_bias_i8 = np.clip(fc_rounded, -128, 127).astype(np.int8)
     final_logits = np.clip(fc_pre_bias_i8.astype(np.int16) +
-                           fc_b.astype(np.int16), -128, 127).astype(np.int8)
+                           fc_bias.astype(np.int16), -128, 127).astype(np.int8)
     golden_bytes = final_logits.astype(np.int8).tobytes()
+    fc_weights_padded = np.zeros((padded_classes, 144), dtype=np.int8)
+    fc_weights_padded[:num_classes] = fc_weights
+    fc_bias_padded = np.zeros(padded_classes, dtype=np.int8)
+    fc_bias_padded[:num_classes] = fc_bias
+    fc_rounded_padded = np.zeros(padded_classes, dtype=np.int64)
+    fc_rounded_padded[:num_classes] = fc_rounded
 
     memory = {}
     # The matrix controller fetches each 16-row tile as four row groups. Each
@@ -143,17 +154,21 @@ def build(model_path, input_npz=None):
     add_words(memory, ADDR["conv_bias"], conv_b)
     add_words(memory, ADDR["fc_a"], [0] * (4 * 36))
 
-    fc_b_words = []
-    for k0 in range(0, 144, 4):
-        for n in range(4):
-            fc_b_words.append(pack_i8(fc_weights[n, k0:k0 + 4]))
-    add_words(memory, ADDR["fc_b"], fc_b_words)
+    fc_b_group_bytes = 4 * 36 * 4
+    for group in range(padded_classes // 4):
+        fc_b_words = []
+        for k0 in range(0, 144, 4):
+            for n in range(4):
+                fc_b_words.append(pack_i8(
+                    fc_weights_padded[group * 4 + n, k0:k0 + 4]))
+        add_words(memory, ADDR["fc_b"] + group * fc_b_group_bytes, fc_b_words)
+        add_words(memory, ADDR["fc_bias"] + group * 16,
+                  fc_bias_padded[group * 4:group * 4 + 4])
     add_words(memory, ADDR["fc_round_bias"], [128] * 4)
-    add_words(memory, ADDR["fc_bias"], fc_b)
     for key, count in (("conv_raw", 144), ("conv_i8", 36),
                        ("conv_bias_relu", 144), ("conv_relu_i8", 36),
                        ("fc_raw", 16), ("fc_i8", 4),
-                       ("fc_biased", 16), ("final_i8", 4)):
+                       ("fc_biased", 16), ("final_i8", padded_classes)):
         add_words(memory, ADDR[key], [0xA55AA55A] * count)
 
     image_words = [len(memory)]
@@ -164,21 +179,26 @@ def build(model_path, input_npz=None):
     conv_i8_words = [pack_i8(conv_pre_bias_i8.reshape(36, 4)[r]) for r in range(36)]
     conv_relu_flat_i32 = flatten_words(conv_bias_relu_i32.reshape(36, 4))
     conv_relu_words = [pack_i8(conv_relu.reshape(36, 4)[r]) for r in range(36)]
-    fc_round_padded = np.zeros((4, 4), dtype=np.int64)
-    fc_round_padded[0] = fc_rounded
-    fc_round_words = flatten_words(fc_round_padded)
-    fc_i8_words = [pack_i8(np.clip(fc_round_padded[r], -128, 127))
-                   for r in range(4)]
-    fc_biased_padded = np.tile(fc_b.astype(np.int32), (4, 1))
-    fc_biased_padded[0] += np.clip(fc_rounded, -128, 127).astype(np.int32)
-    fc_biased_flat = flatten_words(fc_biased_padded)
-    fc_final_words = [pack_i8(np.clip(fc_biased_padded[r], -128, 127))
-                      for r in range(4)]
-
-    expected_arrays = [
-        conv_round_flat, conv_i8_words, conv_relu_flat_i32, conv_relu_words,
-        fc_round_words, fc_i8_words, fc_biased_flat, fc_final_words,
-    ]
+    expected_arrays = [conv_round_flat, conv_i8_words,
+                       conv_relu_flat_i32, conv_relu_words]
+    fc_group_expected = []
+    for group in range(padded_classes // 4):
+        lo = group * 4
+        hi = lo + 4
+        rounded_group = fc_rounded_padded[lo:hi]
+        bias_group = fc_bias_padded[lo:hi].astype(np.int32)
+        round_matrix = np.zeros((4, 4), dtype=np.int64)
+        round_matrix[0] = rounded_group
+        round_words = flatten_words(round_matrix)
+        i8_words = [pack_i8(np.clip(round_matrix[row], -128, 127))
+                    for row in range(4)]
+        biased_matrix = np.tile(bias_group, (4, 1))
+        biased_matrix[0] += np.clip(rounded_group, -128, 127).astype(np.int32)
+        biased_words = flatten_words(biased_matrix)
+        final_words = [pack_i8(np.clip(biased_matrix[row], -128, 127))
+                       for row in range(4)]
+        fc_group_expected.append([round_words, i8_words, biased_words, final_words])
+        expected_arrays.extend(fc_group_expected[-1])
     expected_words = [sum(len(values) for values in expected_arrays)]
     for values in expected_arrays:
         expected_words.extend([len(values)])
@@ -196,10 +216,13 @@ def build(model_path, input_npz=None):
         "conv_weight_scale": float(np.max(np.abs(initializers["conv_w"]))) / 127.0,
         "fc_weight_scale": float(np.max(np.abs(initializers["fc_w"]))) / 127.0,
         "conv_shape": "8x8x1 -> 6x6x4, im2col GEMM K=9",
-        "fc_shape": "1x144 x 144x4; padded hardware M=4",
+        "num_classes": num_classes,
+        "padded_classes": padded_classes,
+        "fc_shape": "1x144 x 144x%d; output groups of four on padded M=4 matrix" % num_classes,
         "golden_int8": [int(value) for value in final_logits],
-        "golden_packed_word": pack_i8(final_logits),
+        "golden_class_count": num_classes,
         "golden_sha256": hashlib.sha256(golden_bytes).hexdigest(),
+        "fc_output_group_count": padded_classes // 4,
         "stage_order": ["Conv GEMM + round", "INT8 clamp", "Conv bias + ReLU",
                         "flatten/layout pack", "FC GEMM + round", "INT8 clamp",
                         "FC bias", "INT8 output"],
