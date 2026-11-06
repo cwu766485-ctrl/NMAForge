@@ -205,6 +205,7 @@ module tb_ai_accel_smoke;
     integer errors;
     integer random_cases;
     integer seed_arg;
+    integer profile_ai_seed;
     integer seed_dummy;
     integer matrix_line_write_count;
     integer ai_tile_forward_baseline_a_reads = 0;
@@ -2512,6 +2513,8 @@ module tb_ai_accel_smoke;
         integer pair_setup_i;
         errors = 0;
         seed_arg = 20261014;
+        profile_ai_seed = 0;
+        $value$plusargs("AI_SEED=%d", profile_ai_seed);
         matrix_line_write_count = 0;
         cp_fetch_done_count = 0;
         last_dma_araddr = 0;
@@ -4251,8 +4254,8 @@ module tb_ai_accel_smoke;
                 $display("%0t PASS: Matrix/CNM concurrent response ownership matrix_rsp=%0d cnm_rsp=%0d",
                          $time, matrix_cnm_matrix_responses, matrix_cnm_cnm_responses);
             end
-            $display("MATRIX_CNM_PERF_PROFILE_PASS seed=%0d window_cycles=%0d matrix_busy=%0d matrix_mac=%0d matrix_req_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d matrix_rsp_wait_events=%0d matrix_writeback_wait_events=%0d cnm_busy=%0d cnm_compute=%0d cnm_req_wait=%0d cnm_req_wait_lane_cycles=%0d cnm_rsp_wait=%0d cnm_writeback=%0d cnm_other=%0d cnm_rsp_wait_lane_cycles=%0d cnm_writeback_wait_events=%0d request_collision_cycles=%0d matrix_read_accepts=%0d cnm_read_words=%0d matrix_line_writes=%0d cnm_scalar_writes=%0d matrix_read_bytes=%0d cnm_read_bytes=%0d matrix_write_bytes=%0d cnm_write_bytes=%0d outstanding_highwater=%0d matrix_responses=%0d cnm_response_cycles=%0d cycles_closed=1 golden=bit-exact owner_errors=%0d",
-                     seed_arg, matrix_cnm_profile_window_cycles,
+            $display("MATRIX_CNM_PERF_PROFILE_PASS ai_seed=%0d window_cycles=%0d matrix_busy=%0d matrix_mac=%0d matrix_req_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d matrix_rsp_wait_events=%0d matrix_writeback_wait_events=%0d cnm_busy=%0d cnm_compute=%0d cnm_req_wait=%0d cnm_req_wait_lane_cycles=%0d cnm_rsp_wait=%0d cnm_writeback=%0d cnm_other=%0d cnm_rsp_wait_lane_cycles=%0d cnm_writeback_wait_events=%0d request_collision_cycles=%0d matrix_read_accepts=%0d cnm_read_words=%0d matrix_line_writes=%0d cnm_scalar_writes=%0d matrix_read_bytes=%0d cnm_read_bytes=%0d matrix_write_bytes=%0d cnm_write_bytes=%0d outstanding_highwater=%0d matrix_responses=%0d cnm_response_cycles=%0d cycles_closed=1 golden=bit-exact owner_errors=%0d",
+                     profile_ai_seed, matrix_cnm_profile_window_cycles,
                      matrix_cnm_matrix_busy_cycles, matrix_cnm_matrix_mac_cycles,
                      matrix_cnm_matrix_req_wait_cycles, matrix_cnm_matrix_rsp_wait_cycles,
                      matrix_cnm_matrix_writeback_cycles, matrix_cnm_matrix_other_cycles,
