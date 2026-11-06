@@ -2152,7 +2152,7 @@ module tb_ai_accel_smoke;
                 write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + descriptor_index * 64,
                        OP_TENSOR_GEMM, 16'hd500 + descriptor_index,
                        AI_TINYNPU_CNN_FC_A_BASE,
-                       32'h0001_9000 + group_index * 32'h400, 32'h0001_a000,
+                       32'h0001_9000 + group_index * 32'h240, 32'h0001_a000,
                        AI_TINYNPU_CNN_FC_RAW_BASE,
                        16'd4, 16'd4, 16'd36, 8'h01, 32'd0, 5'd8, 2'd0,
                        32'd0, 32'd0, 32'd0, 16'd1, 16'd1,
