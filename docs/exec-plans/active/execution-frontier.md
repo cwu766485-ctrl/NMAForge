@@ -989,3 +989,16 @@ weights, steady-state decode, TinyNPU parity, and silicon PPA remain open. Run
 ID `V2-TRANSFORMER-FIXED-WEIGHTS-TIMED-TOP-F9F32F7-S20261106`; details and
 machine record are in the [model report](../../benchmark/NMAFORGE_V2_MODEL_BENCHMARK.md)
 and [JSON](../../benchmark/v2_transformer_timing_f9f32f7.json).
+
+## 2026-11-06 update — Phase 0 source and worktree audit
+
+The audited v2 candidate was `fed6c3f320705361bbbf761b99c73b36014cae77`
+(tree `0625812c7f8b6852ad0bc3f52701b49e536062b5`), clean and 53 commits
+ahead of the live GitHub v2 branch at that point. GitHub `main` still matched
+R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`. The IDE branch
+`feat/shape-adaptive-gemv-v2` remains a distinct history and was not merged;
+its two untracked local Nova settings were preserved. Inventory: 216
+registered worktrees, 136 present, 80 missing, and 10 present worktrees with
+changes; no worktree was cleaned or reset. R250-to-product RTL is still the
+same six-file diff, with last RTL commit `cd0a05d`; no newer RTL modifications
+were introduced. Details are in the [architecture audit](../../architecture/NMAFORGE_V2_ARCHITECTURE_REVIEW.md).

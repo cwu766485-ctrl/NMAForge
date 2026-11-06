@@ -3,10 +3,10 @@
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Latest fixed Compute Cluster DV source SHA:** `f19e92934cd6273d327621c43cb17291cf1a9aa5` (tree `2d931c1c81997b482467d7fdf69302dd367975a1`; three-seed Top UVM passes legal real-CMDQ 0x52 read-only A/B alias and full existing cluster regression). The `16×16×256` case still exceeds the unchanged watchdog before Golden. The most recent benchmark source remains independently identified in the benchmark report.
-**Latest trained-model/Transformer fixture source SHA:** `9b835aeac33d43fd97a81496b1048d359cdff3d0` (tree `04215a9fb125e57aa6a9ce6ead2410f59bafa2b7`).
-**Current report branch HEAD before this review update:** `d26bcd2a961ab7def65a2122765778fb8bc37bde` (tree `d5d43b3d004d80c426cb1de692b248d8427868a9`); this documentation update follows that candidate.
-**Published feature branch tip at this audit:** `19f9575f3579869f27d72f2dd17fa980840b6499` (same tree `3ac2f31a0fcbbb5fa5cd13f3f9ed39a87c3ed3c0`).
+**Latest fixed Compute Cluster DV source SHA:** `f19e92934cd6273d327621c43cb17291cf1a9aa5` (three-seed Top UVM passes the legal real-CMDQ 0x52 read-only A/B alias and full existing Cluster regression). The `16×16×256` case still exceeds the unchanged watchdog before Golden. The most recent Cluster performance replay is independently identified in the benchmark report.
+**Latest Transformer timing test SHA:** `f9f32f71e7168350d74a75ede0a4a4b222844cc9` (86 descriptors; 301 Golden checks; fixed-weight Top CMDQ Prefill/Decode timing).
+**Current report branch HEAD before this audit update:** `fed6c3f320705361bbbf761b99c73b36014cae77` (tree `0625812c7f8b6852ad0bc3f52701b49e536062b5`); this audit is documentation-only.
+**Current published v2 branch tip:** `origin/feature/npu-architecture-v2` `5d01a88a8a2a7b1add15fbedbb02096d686824ab` (tree `bf7306bdeefeca415dd221f0a29305fdcef5b72c`).
 **Product RTL SHA:** `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; no RTL change is present in the fixed test source or report-only commits.
 
 ## Executive disposition
@@ -21,6 +21,49 @@ Golden-checked VCS evidence.
 This is a **bounded v2 functional/performance candidate**, not a v1.0 Compute
 Cluster sign-off, full v2 verification closure, ASIC sign-off, or a TinyNPU
 performance win. Keep the overall Compute Cluster disposition at **HOLD**.
+
+### Current Phase 0 source/worktree audit — 2026-11-06
+
+The isolated target is `feature/npu-architecture-v2`, source SHA
+`fed6c3f320705361bbbf761b99c73b36014cae77`, tree
+`0625812c7f8b6852ad0bc3f52701b49e536062b5`, clean and 53 commits ahead of
+`origin/feature/npu-architecture-v2`. A live `git ls-remote` confirmed that
+GitHub `main` remains the requested R250 SHA
+`3041355528dffe856e2d5384027c6ee5df5d1b42` and R250 is the target branch's
+merge base. Local `main` is stale/divergent and was not used as the baseline.
+
+The VS Code worktree remains at `/home/ray/workspace/NMAForge` on local branch
+`feat/shape-adaptive-gemv-v2`, SHA
+`c290eba7697138a4fcf2cbbac9262264849f0aeb`, tree
+`a7b3821eb9e425927322f2b3729a3c12ad08d9d4`. Its tree matches remote
+`origin/feat/shape-adaptive-gemv-v2` (`03b619ce1b32331c8f01194a42e5efb43bcda033`),
+while its commit history is 63 commits ahead and one behind that remote ref.
+Relative to target v2, it has a distinct history: merge base
+`b5b6ff25ed41fb5ea4c9a5043360063cec58f7ac`, with 497 target-only commits and
+64 `feat/shape-adaptive-gemv-v2`-only commits. The IDE worktree has untracked
+`novas.conf` and `novas.rc`; both remain untouched. No merge, cherry-pick,
+reset, or cleanup was performed.
+
+Git reports 216 registered worktrees: 136 existing and 80 missing; 10 existing
+worktrees have uncommitted changes, including the IDE worktree. The active v2
+worktree was clean during this inventory. The other worktrees were left
+untouched. The target v2 `.gitignore` covers simulator databases, credentials,
+licensed-tool files, PDK/library formats, and Nova local settings. A tracked
+path audit found no matching private file or generated simulation database.
+
+R250-to-product RTL differences remain limited to six files
+(`ai_tensor_matrix_array.sv`, `ai_tensor_matrix_core.v`, opcode decode,
+descriptor validator, parallel dispatcher, and Compute Cluster integration):
+662 insertions and 80 deletions. The last RTL commit remains
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; no RTL change exists from that
+commit through this audit snapshot. Both `0x52` and `0x53` use the existing
+shared Matrix controller/array; there is no second 256-MAC array.
+
+**Audit PASS:** exact R250 ancestry, live remote refs, worktree identity, the
+six-file RTL delta, last RTL SHA, clean target tree, private-file ignore
+coverage, and unchanged product RTL after `cd0a05d`. **OPEN:** the local v2
+branch is 53 commits ahead of GitHub and has not been pushed during this
+execution. The separate IDE branch was not merged.
 
 ### Latest real-Top GEMV tail-state cross — 2026-11-06
 
