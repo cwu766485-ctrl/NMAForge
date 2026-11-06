@@ -1,7 +1,7 @@
 # NMAForge v2 DV Closure Status
 
 **Status:** IN PROGRESS — scoped regressions pass; v2 sign-off is not ready.  
-**Latest testbench candidate SHA:** `e944133b43107839e5f5eea902251097a228b312` (tree `430f9ce0c794f6e6a059d56ade7d9112b8a3079f`; three-seed clean-worktree Compute Cluster regression adds all eight legal M/N/K alignment-tail combinations and a real-CMDQ 16×16×128 GEMV; product RTL unchanged)
+**Latest testbench/tooling candidate SHA:** `de22e4652a54dfe7537e14585bdf3ae6f08fe9fb` (tree `29d35cadabd84872081dc7f6d51a7398cfb431b5`; adds full held-out CNN Top replay tooling; product RTL unchanged). Latest long-K GEMV/feature-coverage candidate remains `e944133b43107839e5f5eea902251097a228b312`; no new aggregate URG was collected after that scoped coverage run.
 
 **Candidate tree:** `65d56c5d6dd345effde6fdfdf70dad59f135a279` (tree used for the latest three-seed generic Cluster replay)
 
@@ -1469,3 +1469,35 @@ This advances the named `REQ-V2-053-002` scenarios and adds runtime assertion
 evidence to `REQ-V2-COM-003`; it is not a formal proof of the complete 0x53
 lifecycle. Broader cross-engine ownership and all fault × phase × reset
 contracts remain open. Overall v2 DV remains **IN PROGRESS**.
+
+## 2026-11-06 — three-seed Top compatibility replay after testbench update
+
+The testbench source commit `835f958b5f486b3f3e4808e735a788721f4f1441`
+(tree `653d605abd1e3a5bb414721694c46e6897086115`) was used for three
+`ai_run` simulations with 20 randomized workloads each. The later tooling
+commit `de22e46` did not change RTL or the compiled testbench module.
+
+| Run ID | `AI_SEED` | VCS `ntb_random_seed` | Result |
+|---|---:|---:|---|
+| `V2-TOP-SMOKE-20X-835F958-20261130` | 20261130 | 1793945994 | PASS; legacy GEMM, GEMV `0x52`, tile-forward `0x53`, CNM and 20 randomized workloads |
+| `V2-TOP-SMOKE-20X-835F958-20261131` | 20261131 | 1793945994 | PASS; same directed checks and 20 randomized workloads |
+| `V2-TOP-SMOKE-20X-835F958-20261132` | 20261132 | 1793945995 | PASS; same directed checks and 20 randomized workloads |
+
+Exact command for each row:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=<seed>
+```
+
+This is top-level regression/compatibility evidence. It does not add v2 feature
+functional coverage bins, close residual requirement PARTIALs, or refresh the
+three-seed URG aggregate. The current scoped v2 RTM remains 22 IDs: 14
+PASS-scoped and 8 PARTIAL; overall v2 DV is **IN PROGRESS**. Logs archive:
+`/tmp/nmaforge_v2_ai_run_3seed_835f958_logs.tar.gz`, SHA-256
+`7b71e6a3b5815173e8bc256fec0d323b6efe0d71e5f41f171ef4496ac5df3117`.
+Machine records are in
+[`v2_top_smoke_20cases_835f958.csv`](../../benchmark/v2_top_smoke_20cases_835f958.csv)
+and [`v2_top_smoke_20cases_835f958.json`](../../benchmark/v2_top_smoke_20cases_835f958.json).

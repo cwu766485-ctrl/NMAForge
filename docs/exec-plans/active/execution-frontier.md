@@ -845,3 +845,15 @@ in the owning report; run `git diff --check` before handoff.
 - The filters are fixed and only the classifier readout is trained. A trained
   Transformer, per-stage host/DMA/compute/writeback instrumentation, final DV
   closure and ASIC readiness remain open.
+
+## 2026-11-06 update — compatibility regression after testbench update
+
+- Testbench binary/source `835f958b5f486b3f3e4808e735a788721f4f1441`, product
+  RTL `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; VCS
+  `V-2023.12-SP1_Full64`. Three `ai_run` executions with 20 randomized cases
+  each passed for `AI_SEED` 20261130, 20261131 and 20261132, with legacy GEMM,
+  GEMV `0x52`, forwarding `0x53`, CNM and smoke markers present.
+- This is regression evidence only; no new URG/functional coverage was
+  collected. Logs archive SHA-256
+  `7b71e6a3b5815173e8bc256fec0d323b6efe0d71e5f41f171ef4496ac5df3117`.
+  The v2 DV RTM remains 14 PASS-scoped / 8 PARTIAL of 22 IDs.
