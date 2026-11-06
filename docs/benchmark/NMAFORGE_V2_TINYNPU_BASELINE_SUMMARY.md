@@ -1,5 +1,49 @@
 # NMAForge v2 TinyNPU Baseline Summary
 
+## Research-ready finalization snapshot — 2026-11-06
+
+**Final status: `RESEARCH_BASELINE_PARTIAL`.** This snapshot supersedes the
+older model/capacity status below. Product RTL remains fixed at
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; protected R250 `main` remains
+`3041355528dffe856e2d5384027c6ee5df5d1b42`.
+
+- The fixed TinyNPU GEMM/GEMV matrix remains bound to NMAForge source/test
+  `219c9f26a85b9661185cd78ab6308ae3f13e3ea7`, TinyNPU
+  `8216c22b762011aa20c05fc2768423fd12dda59d`, and seed `20261106`: 3/3 GEMM
+  and 4/4 GEMV independent Golden checks pass. The TinyNPU cycles are direct
+  array timing; the common-memory endpoint is estimated. NMAForge uses 1.06–
+  1.15× that estimate on the listed GEMMs, 0.54×/0.90× on the first two GEMVs,
+  and 1.29×/1.44× on the larger two. These ratios are not a full-system
+  performance win.
+- A trained 10-class INT8 CNN now runs all 396 held-out images through Top
+  CMDQ. All intermediate outputs match independent integer Golden; 384/396
+  classify correctly (96.97%). The exact model, test set, one-image input,
+  Golden bytes, manifests, and per-image CSVs are checked in.
+- `conv1x_mini.onnx` passes NMAForge Top Golden at 128 KiB and 512 KiB. The
+  TinyNPU compiler Golden bytes match, but TinyNPU graph-runtime cycles were
+  not rerun in this capacity study, so no current paired CNN speedup is
+  claimed.
+- Both CNN workloads produce identical outputs, compute cycles, and SPAD
+  traffic at 128 KiB and 512 KiB behavioral SPAD. This is a tested compact
+  capacity candidate for those maps only. Digits MLP and Transformer fixture
+  reduced-capacity rows are static-only; 64/256 KiB were not simulated.
+- The 86-descriptor Transformer result remains a hand-authored fixed-weight
+  fixture: 301 Golden checks, 5,682 prefill cycles and 5,715 cycles for one
+  decode token. A trained Transformer model and TinyNPU comparison are not
+  complete. DC/physical PPA remains `NOT_RUN` / `BLOCKED_ENV`; v2 DV sign-off
+  remains open.
+
+Unified fixed-run table:
+[`CSV`](../../benchmark/v2_research_benchmark_matrix_20261106.csv) /
+[`JSON`](../../benchmark/v2_research_benchmark_matrix_20261106.json).
+Rebuild with `python3 benchmark/tinynpu/build_v2_research_benchmark_matrix.py`.
+Capacity and model evidence:
+[`capacity CSV`](../../benchmark/v2_spad_capacity_study_20261106.csv),
+[`capacity JSON`](../../benchmark/v2_spad_capacity_study_20261106.json),
+and [`trained model artifacts`](../../benchmark/models/nma_tiny_cnn_10class/).
+The execution frontier records the frozen scope and open items; final commit
+and publication identity are included in the delivery handoff.
+
 **Status:** Fixed benchmark matrix complete; full DV remains paused/HOLD; no
 ASIC sign-off claim. **Date:** 2026-11-06.
 

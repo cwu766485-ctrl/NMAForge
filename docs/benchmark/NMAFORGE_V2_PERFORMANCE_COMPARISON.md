@@ -1,5 +1,60 @@
 # NMAForge v2 Performance Comparison
 
+## Finalization addendum — models and compact SPAD, 2026-11-06
+
+The fixed GEMM/GEMV and innovation-ablation results below remain bound to
+their listed historical source/test SHAs; product RTL is unchanged at
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. This addendum records new Top RTL
+capacity runs at source/test SHA `9576e539c21fe6312763c4745a90dc032c6457e0`
+with VCS `V-2023.12-SP1_Full64`, seed `20261029`, and a behavioral SPAD. It
+does not convert the TinyNPU direct-array comparison into a full-system
+comparison.
+
+| Workload | SPAD | Top RTL compute cycles | Host layout cycles | Compute SPAD R/W bytes | Golden / result |
+|---|---:|---:|---:|---:|---|
+| `conv1x_mini.onnx`, fixed deterministic input | 128 / 512 KiB | 1,985 / 1,985 | 1,080 / 1,080 | 3,360 / 1,600 | Bit-exact with pinned TinyNPU compiler Golden |
+| Trained 10-class Digits CNN, 396 held-out images | 128 / 512 KiB | 3,193 / 3,193 per image | 1,080 / 1,080 per image | 6,048 / 1,920 per image | 396/396 Top runs exact; 384/396 classified correctly (96.97%) |
+
+The two tested workloads have **0% cycle change** and identical measured
+per-workload traffic between the compact 128 KiB and 512 KiB behavioral-SPAD
+profiles. This is a valid result for these compact maps, not evidence that
+all models fit or that physical SRAM timing/area is unchanged. Both profiles
+keep four banks, 128-bit lines, and the same 256-MAC array. Host-layout cycles
+are reported separately from RTL compute cycles.
+
+For `conv1x_mini.onnx`, the pinned TinyNPU ONNX compiler Golden and the
+NMAForge Top Golden have SHA-256
+`94642359b0fdf8a4b56f8b17346b0385a477d782b4874bb7d1e979a589eab49c`.
+TinyNPU's Verilator graph runtime was not rerun for this capacity study, so
+there is no paired CNN cycle/speedup claim. TinyNPU reference SHA remains
+`8216c22b762011aa20c05fc2768423fd12dda59d`.
+
+The ten-class CNN model SHA-256 is
+`ef0e616d09ca0be7956fa8ca900e40c62973f8f06e3ec96af09d888eead73726`; the
+held-out test-set SHA-256 is
+`cb851b077542f9bcf42f84938227ba5f1a4750ea0b0fbfe2ba8fcecbb914d107`. The
+fixed split is 1,401 train / 396 test (stratified, seed 29); RTL outputs match
+the independent integer Golden at every checked intermediate. Full per-image
+records are in
+[`128 KiB CSV`](../../benchmark/v2_trained_cnn_tenclass_top_128k_9576e53.csv)
+and [`512 KiB CSV`](../../benchmark/v2_trained_cnn_tenclass_top_512k_9576e53.csv).
+Machine-readable capacity rows and commands are in
+[`capacity JSON`](../../benchmark/v2_spad_capacity_study_20261106.json) and
+[`capacity CSV`](../../benchmark/v2_spad_capacity_study_20261106.csv). A
+single fixed-run matrix normalizing these model rows with the historical
+GEMM/GEMV rows and the fixed Transformer fixture is available as
+[`unified CSV`](../../benchmark/v2_research_benchmark_matrix_20261106.csv)
+and [`JSON manifest`](../../benchmark/v2_research_benchmark_matrix_20261106.json).
+
+The fixed TinyNPU GEMM/GEMV table below is the measured/modeled matrix at
+NMAForge source `219c9f26a85b9661185cd78ab6308ae3f13e3ea7`, seed `20261106`.
+Its TinyNPU numbers are direct-array cycles; the common-memory endpoint is an
+estimate. Under that mixed boundary NMAForge used 1.06–1.15× the estimated
+TinyNPU endpoint for the listed GEMMs, 0.54× for 1×13×17 GEMV, 0.90× for
+8×16×19, 1.29× for 16×16×19, and 1.44× for 16×16×65. These ratios do not
+establish a system-level TinyNPU win; small-M occupancy is poor and the
+estimated endpoint is not TinyNPU memory RTL.
+
 ## Current fixed TinyNPU matrix — 2026-11-06
 
 This section supersedes prior NMAForge cycle rows for the listed fixed shapes.

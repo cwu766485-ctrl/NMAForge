@@ -1,5 +1,74 @@
 # NMAForge v2 Model Benchmark
 
+## Research-baseline model status — 2026-11-06
+
+This section supersedes earlier “current” model/capacity statements below.
+The ten-class CNN is now a trained-weight Top RTL demo; the Transformer
+remains a fixed-weight functional fixture and is **not** a trained-weight
+model demo.
+
+### Trained 10-class Digits CNN — complete for this bounded model
+
+The checked-in flow trains a small INT8 CNN/readout using sklearn Digits:
+1,401 stratified training images and all 396 held-out images, with test split
+seed 29. Convolution weights use NumPy backpropagation with Adam for 250
+epochs, batch 128, learning rate 0.006, training seed 44. The readout is
+scikit-learn LogisticRegression (`C=1`, no intercept) trained on the deployed
+integer convolution features. Model SHA-256 is
+`ef0e616d09ca0be7956fa8ca900e40c62973f8f06e3ec96af09d888eead73726`, test-set
+SHA-256 is `cb851b077542f9bcf42f84938227ba5f1a4750ea0b0fbfe2ba8fcecbb914d107`,
+and independent integer Golden SHA-256 is
+`249587647d45f3e3ef9a54d009a1896cc7d1daf9152de1e11bfba2f4a1b115bc`.
+
+All 396 held-out samples completed the real Top CMDQ path and passed exact
+intermediate/logit Golden checks. Both software and RTL classified 384/396
+(96.97%). Per sample: 16 descriptors, 3,193 RTL compute cycles, 1,080 host
+layout cycles, 2,736 useful MACs, 6,048/1,920 compute SPAD read/write bytes,
+and 144/576 host-layout read/write bytes. These boundaries are kept separate;
+host layout is not counted as RTL compute. The 396-row logs are summarized in
+[`128 KiB`](../../benchmark/v2_trained_cnn_tenclass_top_128k_9576e53.csv) and
+[`512 KiB`](../../benchmark/v2_trained_cnn_tenclass_top_512k_9576e53.csv)
+machine-readable files. The exact trained weights, full test set, selected
+input, Golden bytes, and manifests are checked in under
+[`benchmark/models/nma_tiny_cnn_10class`](../../benchmark/models/nma_tiny_cnn_10class/).
+Run ID: `V2-SPAD-CAPACITY-STUDY-20261106-9576E53`;
+source/test SHA: `9576e539c21fe6312763c4745a90dc032c6457e0`; product RTL SHA:
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
+
+### `conv1x_mini.onnx` and TinyNPU boundary
+
+The pinned TinyNPU ONNX compiler and NMAForge Top produce identical Golden
+bytes (`94642359b0fdf8a4b56f8b17346b0385a477d782b4874bb7d1e979a589eab49c`).
+The NMAForge Top run passes at 128 KiB and 512 KiB: 8 descriptors, 1,985
+compute cycles, 1,080 host-layout cycles, 3,360/1,600 compute SPAD read/write
+bytes, 3,456 initialization bytes, and 1,872 useful MACs. The TinyNPU
+Verilator graph runtime was not rerun here, so this is a Golden comparison,
+not a cycle or system-level speedup comparison. TinyNPU SHA is
+`8216c22b762011aa20c05fc2768423fd12dda59d`.
+
+### Transformer status
+
+The reusable 86-descriptor ABI-v7 Prefill/Decode fixture remains the only
+current Transformer evidence: it uses deterministic hand-authored weights,
+has 301 intermediate Golden checks, and reports 5,682 Prefill plus 5,715
+single-token Decode cycles at its own fixed test SHA. It is not trained
+weights, does not prove model quality or useful token generation, and does
+not meet the trained-model requirement. Its static map high-water is 79,200
+bytes; reduced-SPAD replay is `NOT_RUN_STATIC_ONLY`.
+
+### Reproduction and evidence archive
+
+The exact VCS/Python/NumPy/scikit-learn versions, training command, dataset
+replay command, hashes, and capacity dispositions are recorded in
+[`capacity study JSON`](../../benchmark/v2_spad_capacity_study_20261106.json).
+The normalized four-workload benchmark table is rebuilt by
+`python3 benchmark/tinynpu/build_v2_research_benchmark_matrix.py`.
+The archived raw run logs are outside the Git repository at
+`/tmp/nmaforge_v2_research_capacity_logs_9576e53.tar.gz` (SHA-256
+`fd2c5c9816de8a9fefc1a4c07bb218d216a105b360b2ea0b5f61ae9ecb87a447`); the
+CSV artifacts are checked in. No model result uses Host Fallback to produce
+the final CNN logits.
+
 ## Bounded status update — 2026-11-06
 
 The current TinyNPU GEMM/GEMV fixed matrix is recorded separately in the

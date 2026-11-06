@@ -1,5 +1,38 @@
 # NMAForge v2 Architecture Review
 
+## Research-baseline finalization — 2026-11-06
+
+**Disposition: `RESEARCH_BASELINE_PARTIAL`.** This snapshot supersedes earlier
+“current” status paragraphs in the historical review below. The bounded
+deliverable now has a ten-class trained Digits CNN running through the real
+Top/CMDQ path and a tested compact 128 KiB four-bank behavioral-SPAD profile.
+Two CNN workloads pass at both 128 KiB and 512 KiB with identical output,
+compute cycles, and traffic. The trained Transformer model, reduced-capacity
+Digits MLP replay, current TinyNPU graph runtime, and ASIC PPA remain open or
+not run; therefore this is a research baseline, not a complete model or ASIC
+sign-off package.
+
+The product RTL is fixed at
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; this finalization changed model
+flow, testbench SPAD sizing/address-map support, benchmark artifacts, and
+documentation, not product RTL. The final commit and publication result are
+given in the delivery handoff. R250 `main` remains
+`3041355528dffe856e2d5384027c6ee5df5d1b42`.
+
+The two fixed research contributions map to the existing 16×16 array:
+
+| Contribution | Main RTL | Evidence boundary |
+|---|---|---|
+| Shape-adaptive GEMM/GEMV, B-fold reuse, bounded Next-K prefetch | `rtl/compute/matrix/ai_tensor_matrix_core.v`, `rtl/compute/matrix/ai_tensor_matrix_array.sv`, descriptor decode/validation | Opcode `0x52` and fixed GEMV Cache × Prefetch ablations; existing GEMM array/controller sweeps |
+| Fused epilogue and elastic tile forwarding | `rtl/compute/matrix/ai_tensor_matrix_core.v`; descriptor decode; top CMDQ integration | Opcode `0x53`, fused Digits matched run, and directed producer/consumer forwarding checks |
+
+No second MAC array or third compute contribution was added. The detailed
+module-by-module interfaces, dataflow, control states, and verification entry
+points are in [Architecture Walkthrough](NMAFORGE_V2_ARCHITECTURE_WALKTHROUGH.md).
+The exact run manifests and per-sample output records are in
+[`benchmark/v2_spad_capacity_study_20261106.json`](../../benchmark/v2_spad_capacity_study_20261106.json),
+the matching CSV, and the two 396-row ten-class CNN CSVs.
+
 ## Bounded benchmark priority update — 2026-11-06
 
 The current task is limited to reusing minimum functional evidence, comparing
