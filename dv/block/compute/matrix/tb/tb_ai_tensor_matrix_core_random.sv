@@ -76,6 +76,8 @@ module tb_ai_tensor_matrix_core_random;
   wire [3:0] error_code;
   wire [31:0] result,cycle_count,element_count;
   wire perf_mac_active,perf_banked_wait;
+  integer v2_tile_forward_sva_commit_samples=0;
+  reg v2_tile_forward_sva_valid_q=0;
 
   reg [31:0] bank_mem [0:3][0:8191];
   reg [31:0] bias_mem [0:65535];
@@ -262,6 +264,49 @@ module tb_ai_tensor_matrix_core_random;
     .busy(busy),.done(done),.error(error),.error_code(error_code),.result(result),
     .cycle_count(cycle_count),.element_count(element_count),
     .perf_mac_active(perf_mac_active),.perf_banked_wait(perf_banked_wait));
+
+  // Assert the forwarding ownership boundary on the real Matrix core. A
+  // candidate tile is visible only after all 16 output lines were accepted;
+  // the tag must be committed from that completed producer command.
+  generate if (ELASTIC_TILE_FORWARDING_ENABLE) begin : gen_tile_forward_sva
+    property p_tile_forward_commit_requires_complete_capture;
+      @(posedge clk) disable iff (!resetn)
+        (dut.state_r == 4'd11 && dut.tile_forward_capture_active_r &&
+         dut.tile_forward_capture_mask_r == 16'hffff && !abort &&
+         !dut.watchdog_expired && !dut.banked_request_fault &&
+         !dut.banked_response_fault && !dut.banked_response_context_fault)
+        |=> (dut.tile_forward_valid_r &&
+             dut.tile_forward_tag_base_r == $past(dut.dst_batch_base_r));
+    endproperty
+    assert property (p_tile_forward_commit_requires_complete_capture)
+      else $fatal(1,"tile-forward tag committed without a complete producer");
+
+    property p_tile_forward_tag_stays_stable_between_commits;
+      @(posedge clk) disable iff (!resetn)
+        (dut.tile_forward_valid_r && $past(dut.tile_forward_valid_r) &&
+         !($past(dut.state_r == 4'd11 &&
+                 dut.tile_forward_capture_active_r &&
+                 dut.tile_forward_capture_mask_r == 16'hffff)))
+        |-> $stable(dut.tile_forward_tag_base_r);
+    endproperty
+    assert property (p_tile_forward_tag_stays_stable_between_commits)
+      else $fatal(1,"tile-forward tag changed outside a completed capture");
+
+    cover property (@(posedge clk) disable iff (!resetn)
+      $rose(dut.tile_forward_valid_r));
+
+    always @(posedge clk or negedge resetn) begin
+      if (!resetn) begin
+        v2_tile_forward_sva_valid_q <= 1'b0;
+        v2_tile_forward_sva_commit_samples <= 0;
+      end else begin
+        if (dut.tile_forward_valid_r && !v2_tile_forward_sva_valid_q)
+          v2_tile_forward_sva_commit_samples <=
+              v2_tile_forward_sva_commit_samples + 1;
+        v2_tile_forward_sva_valid_q <= dut.tile_forward_valid_r;
+      end
+    end
+  end endgenerate
 
   // Registered scratchpad response models. Ready and response latency vary
   // independently; the core observes the response and data on the next edge.
@@ -1186,6 +1231,14 @@ module tb_ai_tensor_matrix_core_random;
           $fatal(1,"tile-forward producer did not fill/backpressure/commit a full tile valid=%b mask=%04x last=%b stall=%b",
                  dut.tile_forward_valid_r,dut.tile_forward_capture_mask_r,
                  tile_forward_last_seen,tile_forward_backpressure_seen);
+        // Let the concurrent assertion and its sampled-event counter observe
+        // the newly committed producer tag before checking non-vacuity.
+        @(posedge clk); #1;
+        if(v2_tile_forward_sva_commit_samples<1)
+          $fatal(1,"tile-forward SVA commit antecedent was not exercised");
+        $display("MATRIX_V2_TILE_FORWARD_SVA_PASS assertions=2 nonvacuous_commits=%0d full_capture_mask=%04x exact_tag=%08x",
+                 v2_tile_forward_sva_commit_samples,
+                 dut.tile_forward_capture_mask_r,dut.tile_forward_tag_base_r);
         v2_tile_forward_cg_inst.sample(1);
         v2_opcode_handshake_cg_inst.sample(2);
       end else if(dut.tile_forward_valid_r) begin

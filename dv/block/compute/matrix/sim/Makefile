@@ -276,12 +276,13 @@ core-tile-forward-ablation:
 	@set -e; for enable in 0 1; do \
 		out=$(TILE_FORWARD_OUT_DIR)/enable_$$enable; mkdir -p $$out; \
 		$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+			-assert enable_diag \
 			+define+MATRIX_MAX_OUTSTANDING_READS=$(OUTSTANDING_DEPTH) \
 			+define+MATRIX_A_TILE_CACHE_ENABLE=$(A_TILE_CACHE_ENABLE) \
 			+define+MATRIX_NEXT_K_PREFETCH_ENABLE=$(NEXT_K_PREFETCH_ENABLE) \
 			+define+MATRIX_ELASTIC_TILE_FORWARDING_ENABLE=$$enable \
 			+define+MATRIX_ARRAY_SIZE=$(PHYSICAL_ARRAY_SIZE) \
-			-cm $(COV_METRICS) -cm_hier $(CURDIR)/matrix_core.cm_hier \
+			-cm $(COV_METRICS)+assert -cm_hier $(CURDIR)/matrix_core.cm_hier \
 			-cm_dir $$out/coverage.vdb -Mdir=$$out/csrc \
 			-top tb_ai_tensor_matrix_core_random \
 			../../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v \
@@ -290,11 +291,18 @@ core-tile-forward-ablation:
 			../tb/tb_ai_tensor_matrix_core_random.sv \
 			-o $$out/simv -l $$out/compile.log; \
 		$$out/simv +SEED=$(SEED) +MATRIX_TILE_FORWARD_CHAIN_ONLY \
-			-cm $(COV_METRICS) -cm_dir $$out/coverage.vdb \
+			-assert report=$$out/assertions.rpt+verbose \
+			-cm $(COV_METRICS)+assert -cm_dir $$out/coverage.vdb \
 			-cm_name matrix_tile_forward_$$enable -l $$out/run.log; \
 		grep -q "^MATRIX_TILE_FORWARD_CHAIN_PASS enable=$$enable " $$out/run.log; \
 		grep -q "^MATRIX_TILE_FORWARD_CHAIN_ONLY_PASS enable=$$enable seed=$(SEED)$$" $$out/run.log; \
-		if [ $$enable -eq 1 ]; then grep -Eq '^MATRIX_V2_TILE_FORWARD_COVERAGE_PASS enable=1 bins=6 coverage=100\.00 seed=$(SEED)$$' $$out/run.log; fi; \
+		if [ $$enable -eq 1 ]; then \
+			grep -Eq '^MATRIX_V2_TILE_FORWARD_COVERAGE_PASS enable=1 bins=6 coverage=100\.00 seed=$(SEED)$$' $$out/run.log; \
+			grep -q '^MATRIX_V2_TILE_FORWARD_SVA_PASS assertions=2 nonvacuous_commits=[1-9][0-9]* ' $$out/run.log; \
+			grep -q 'Summary: 2 assertions, 2 with attempts, 0 with failures' $$out/assertions.rpt; \
+			grep -Eq '1 covers, 1 with attempts|[1-9][0-9]* covers, 1 with attempts' $$out/assertions.rpt; \
+			grep -Eq '[1-9][0-9]* match' $$out/assertions.rpt; \
+		fi; \
 		done
 
 core-tile-forward-regress:
