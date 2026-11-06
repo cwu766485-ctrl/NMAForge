@@ -43,6 +43,12 @@ MUTATIONS = {
         "plusarg": "+MATRIX_TILE_FORWARD_CHAIN_ONLY",
         "checker": r"tile-forward bank reads=",
     },
+    "request_address_hold": {
+        "old": "banked_addr = a_read_addr;",
+        "new": "banked_addr = banked_ready ? a_read_addr : (a_read_addr + cycle_count);",
+        "plusarg": "+MATRIX_V2_OPCODE_HANDSHAKE_ONLY",
+        "checker": r"Matrix bank request address changed while stalled",
+    },
 }
 
 
@@ -122,7 +128,9 @@ def main():
             if not re.search(spec["checker"], log):
                 raise RuntimeError("{} mutant escaped its assigned checker at seed {}; see {}".format(
                     name, seed, run_log))
-            if "MATRIX_TILE_FORWARD_CHAIN_ONLY_PASS" in log or "MATRIX_GEMV_ABLATION_PASS" in log:
+            if ("MATRIX_TILE_FORWARD_CHAIN_ONLY_PASS" in log or
+                    "MATRIX_GEMV_ABLATION_PASS" in log or
+                    "MATRIX_V2_OPCODE_HANDSHAKE_PASS" in log):
                 raise RuntimeError("{} mutant reached the normal PASS marker at seed {}".format(name, seed))
             results.append((name, seed, spec["checker"]))
             print("V2_OPCODE_MUTATION_CAUGHT mutation={} checker={} seed={}".format(
