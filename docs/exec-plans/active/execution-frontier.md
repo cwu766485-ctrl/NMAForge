@@ -793,3 +793,21 @@ in the owning report; run `git diff --check` before handoff.
 - This closes the tested maximum M/N/K endpoint only. Intermediate shape
   space, concurrent 0x52 engine ownership, all fault/reset phases, trained
   model demos, updated benchmark comparison, and ASIC readiness remain open.
+
+## 2026-11-06 update — current-candidate model regression replay
+
+- Fixed-candidate commit `4b99d107270a572aec798de007f8c7167749d4af`, product
+  RTL still `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. VCS
+  `V-2023.12-SP1_Full64`; both existing model flows recompiled and passed.
+- Digits Run ID `V2-DIGITS-4B99D10-S20261029`: 360/360 exact integer-Golden
+  logits, 352/360 accuracy, 34,761 CMDQ cycles, 1,884,160 padded MACs.
+- Fixed TinyNPU CNN Run ID `V2-CNN-4B99D10-S20261029`: all intermediate
+  tensors and 4/4 outputs exact; 1,985 compute cycles plus 1,080 separately
+  measured host-layout cycles. It is not a trained CNN and is not a fair
+  timing comparison to TinyNPU's differently bounded 4,781-cycle graph run.
+- Machine-readable rows: [CSV](../../benchmark/v2_model_replay_4b99d10.csv)
+  and [JSON](../../benchmark/v2_model_replay_4b99d10.json). Log archive
+  `/tmp/nmaforge_v2_model_replay_4b99d10_logs.tar.gz`, SHA-256
+  `acd7e8e44778ce5c3465798708f8e32ddbeb979f64030fd92c2756d42acfb801`.
+- Trained CNN, Tiny Transformer, separate host/DMA/compute/writeback timers,
+  common-memory TinyNPU endpoint, and system-level v2 closure remain open.

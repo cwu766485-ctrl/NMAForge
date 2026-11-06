@@ -2,6 +2,7 @@
 
 **Status date:** 2026-11-06
 **R250 baseline:** `3041355528dffe856e2d5384027c6ee5df5d1b42`  
+**Latest model replay candidate:** `4b99d107270a572aec798de007f8c7167749d4af`
 **Latest v2 RTL/test candidate replay:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`
 **Latest paired benchmark source SHA:** `c3a59f08d8c07a8da973010d0f23d5d6d7eed61b`
 **TinyNPU reference:** `8216c22b762011aa20c05fc2768423fd12dda59d`
@@ -206,3 +207,50 @@ product RTL is unchanged and no model benchmark was rerun. Digits, fixed
 timing boundaries listed above. This maximum-tile run is functional evidence,
 not a performance measurement. Trained-weight CNN, trained Transformer, and
 separated Host/DMA/Compute/Writeback/Orchestration timing remain **NOT_RUN**.
+
+### Fixed-candidate model regression replay — `4b99d10`
+
+On candidate `4b99d107270a572aec798de007f8c7167749d4af` (product RTL remains
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`), both existing model paths were
+recompiled and replayed with VCS `V-2023.12-SP1_Full64` and Python 3.12.13.
+These are regression replays of existing workloads, not newly trained CNN or
+Transformer evidence.
+
+| Run ID | Workload | Result | Timed RTL interval | Traffic / endpoint |
+|---|---|---|---:|---|
+| `V2-DIGITS-4B99D10-S20261029` | Trained INT8 sklearn Digits MLP, 360 images, 46 CMDQ descriptors | PASS: 360/360 exact integer-Golden logits; 352/360 classified correctly (97.78%) | 34,761 doorbell-to-completion-tail cycles | 1,884,160 padded MACs; 54.2033 MAC/cycle; 21.17% derived 256-lane utilization; 56,224 B initialization excluded from timed interval |
+| `V2-CNN-4B99D10-S20261029` | Fixed TinyNPU `conv1x_mini` reference graph, 8 CMDQ descriptors | PASS: every checked intermediate tensor and all 4 output bytes match independent Golden | 1,985 compute cycles; separate 1,080 host-layout cycles | Compute: 3,360 B read / 1,600 B written; host layout: 144 B read / 576 B written; 3,456 B initialization excluded |
+
+The fixed TinyNPU reference comparison remains **not timing-equivalent**: its
+4,781 graph cycles use another endpoint and exclude different setup/read work.
+No speedup conclusion is derived. The Digits accuracy is a trained MLP result,
+not a CNN result. A trained-weight CNN, trained Tiny Transformer, and separate
+Host/DMA/Compute/Writeback/Graph-Orchestration stage timers remain **NOT_RUN**.
+
+Reproduction commands:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+AI_DIGITS_PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python \
+AI_DIGITS_RUN=/tmp/nmaforge_v2_digits_current_4b99d10 \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+make -C dv/subsystem/top_smoke/sim ai_digits_inference
+
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+AI_TINYNPU_CNN_PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python \
+AI_TINYNPU_CNN_RUN=/tmp/nmaforge_v2_tinynpu_cnn_current_4b99d10 \
+AI_TINYNPU_CNN_MODEL=/tmp/nmaforge_tinynpu_bench_20261105_20261029_v2c3a59/reference/source/models/conv1x_mini.onnx \
+AI_TINYNPU_CNN_GOLDEN=/tmp/nmaforge_tinynpu_bench_20261105_20261029_v2c3a59/tiny_cnn/graph_cnn/golden.bin \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+make -C dv/subsystem/top_smoke/sim ai_tinynpu_cnn_match
+```
+
+Machine-readable result rows are in
+[`v2_model_replay_4b99d10.csv`](../../benchmark/v2_model_replay_4b99d10.csv)
+and [`v2_model_replay_4b99d10.json`](../../benchmark/v2_model_replay_4b99d10.json).
+Combined raw log/evidence archive:
+`/tmp/nmaforge_v2_model_replay_4b99d10_logs.tar.gz`, SHA-256
+`acd7e8e44778ce5c3465798708f8e32ddbeb979f64030fd92c2756d42acfb801`.
+The archive stays outside Git because it contains generated simulator output.
