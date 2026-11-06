@@ -25,31 +25,36 @@ INTEGER_FIELDS = [
 ]
 
 
-def parse_profile(log_path):
+def parse_profiles(log_path):
     text = log_path.read_text(errors="replace")
     matches = [line.split(MARKER, 1)[1].strip() for line in text.splitlines()
                if MARKER in line]
-    if len(matches) != 1:
-        raise ValueError(f"{log_path}: expected one profile marker, found {len(matches)}")
+    if not matches:
+        raise ValueError(f"{log_path}: no Matrix profile markers found")
 
-    fields = {}
-    for item in matches[0].split(","):
-        key, sep, value = item.partition("=")
-        if not sep or key in fields:
-            raise ValueError(f"{log_path}: malformed or duplicate profile field {item!r}")
-        fields[key] = value
+    rows = []
+    for match in matches:
+        fields = {}
+        for item in match.split(","):
+            key, sep, value = item.partition("=")
+            if not sep or key in fields:
+                raise ValueError(f"{log_path}: malformed or duplicate profile field {item!r}")
+            fields[key] = value
 
-    missing = (set(INTEGER_FIELDS) | {"shape"}) - fields.keys()
-    if missing:
-        raise ValueError(f"{log_path}: missing profile fields {sorted(missing)}")
-    if fields["shape"] != "16x32x64":
-        raise ValueError(f"{log_path}: unexpected profile shape {fields['shape']}")
-    for name in INTEGER_FIELDS:
-        fields[name] = int(fields[name])
+        missing = (set(INTEGER_FIELDS) | {"shape"}) - fields.keys()
+        if missing:
+            raise ValueError(f"{log_path}: missing profile fields {sorted(missing)}")
+        if fields["shape"] != "16x32x64":
+            raise ValueError(f"{log_path}: unexpected profile shape {fields['shape']}")
+        fields.setdefault("profile", "standalone")
+        for name in INTEGER_FIELDS:
+            fields[name] = int(fields[name])
 
-    state_sum = sum(fields[name] for name in STATE_FIELDS)
-    if state_sum != fields["internal_cycles"] or state_sum != fields["exclusive_state_sum"]:
-        raise ValueError(f"{log_path}: FSM state sum {state_sum} does not close to cycle counters")
+        state_sum = sum(fields[name] for name in STATE_FIELDS)
+        if state_sum != fields["internal_cycles"] or state_sum != fields["exclusive_state_sum"]:
+            raise ValueError(f"{log_path}: FSM state sum {state_sum} does not close to cycle counters")
+        rows.append(fields)
+
     for marker in ("[COMPUTE_CLUSTER_REAL_UVM_PASS]", "[CLUSTER_A_CACHE_BASELINE_PASS]"):
         if marker not in text:
             raise ValueError(f"{log_path}: missing required pass marker {marker}")
@@ -57,13 +62,14 @@ def parse_profile(log_path):
         count = re.findall(rf"^UVM_{severity}\s*:\s*(\d+)\s*$", text, re.MULTILINE)
         if not count or any(int(value) != 0 for value in count):
             raise ValueError(f"{log_path}: UVM_{severity} summary missing or nonzero: {count}")
-    fields["test_status"] = "PASS"
-    fields["golden_output_words"] = 512
-    fields["uvm_warning"] = 0
-    fields["uvm_error"] = 0
-    fields["uvm_fatal"] = 0
-    fields["log_path"] = str(log_path)
-    return fields
+    for row in rows:
+        row["test_status"] = "PASS"
+        row["golden_output_words"] = 512
+        row["uvm_warning"] = 0
+        row["uvm_error"] = 0
+        row["uvm_fatal"] = 0
+        row["log_path"] = str(log_path)
+    return rows
 
 
 def main() -> None:
@@ -73,6 +79,7 @@ def main() -> None:
     parser.add_argument("--tree-sha", required=True)
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--expected-seeds", default="20261125,20261126,20261127")
+    parser.add_argument("--required-profiles", default="standalone")
     parser.add_argument("--vcs-version", default="V-2023.12-SP1_Full64")
     parser.add_argument("--csv", type=Path, required=True)
     parser.add_argument("--json", type=Path, required=True)
@@ -85,10 +92,23 @@ def main() -> None:
             f"expected seed directories {expected_seeds}, found "
             f"{[path.name for path in seed_dirs]}"
         )
-    rows = [parse_profile(seed_dir / "run.log") for seed_dir in seed_dirs]
-    for row, seed in zip(rows, expected_seeds):
-        if row["seed"] != seed:
-            raise SystemExit(f"seed directory {seed} contains profile for {row['seed']}")
+    required_profiles = set(
+        profile for profile in args.required_profiles.split(",") if profile
+    )
+    rows = []
+    for seed_dir, seed in zip(seed_dirs, expected_seeds):
+        seed_rows = parse_profiles(seed_dir / "run.log")
+        if any(row["seed"] != seed for row in seed_rows):
+            raise SystemExit(f"seed directory {seed} contains a profile for another seed")
+        profiles = [row["profile"] for row in seed_rows]
+        if len(profiles) != len(set(profiles)):
+            raise SystemExit(f"seed directory {seed} has duplicate profiles: {profiles}")
+        if not required_profiles.issubset(set(profiles)):
+            raise SystemExit(
+                f"seed directory {seed} missing profiles: "
+                f"{sorted(required_profiles - set(profiles))}"
+            )
+        rows.extend(seed_rows)
 
     macs = 16 * 32 * 64
     for row in rows:
@@ -109,7 +129,7 @@ def main() -> None:
     args.csv.parent.mkdir(parents=True, exist_ok=True)
     args.json.parent.mkdir(parents=True, exist_ok=True)
     columns = [
-        "run_id", "source_sha", "tree_sha", "vcs_version", "seed", "shape",
+        "run_id", "source_sha", "tree_sha", "vcs_version", "seed", "profile", "shape",
         "test_status", "mac_operations", "internal_cycles", "doorbell_to_cpl_cycles",
         "effective_mac_per_internal_cycle", "effective_mac_per_doorbell_cycle",
         "effective_array_utilization_percent", "spad_read_bytes", "spad_write_bytes",
@@ -141,10 +161,11 @@ def main() -> None:
             "stall_counters": "diagnostic event counts; may overlap and must not be summed",
             "array_utilization": "MAC operations / (256 physical MACs * Matrix internal cycles)",
         },
-        "seeds": rows,
+        "seed_ids": expected_seeds,
+        "profiles": rows,
     }
     args.json.write_text(json.dumps(output, indent=2) + "\n")
-    print(f"PASS: {len(rows)} profiles; FSM cycles close; outputs={args.csv} {args.json}")
+    print(f"PASS: {len(rows)} command profiles; FSM cycles close; outputs={args.csv} {args.json}")
 
 
 if __name__ == "__main__":

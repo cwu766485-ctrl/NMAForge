@@ -4097,6 +4097,64 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
+    task automatic emit_matrix_profile(
+        input string profile_name,
+        input int unsigned seed,
+        input string shape,
+        input int unsigned doorbell_to_completion_cycles,
+        input int unsigned read_bytes_start,
+        input int unsigned write_bytes_start
+    );
+        int unsigned state_sum;
+        int unsigned state_snapshot[0:14];
+        int unsigned state_idx;
+        state_sum = 0;
+        for (state_idx = 0; state_idx < 15; state_idx++) begin
+            state_snapshot[state_idx] =
+                compute_vif.matrix_profile_state_cycles[state_idx];
+            state_sum += state_snapshot[state_idx];
+        end
+        if (state_sum != compute_vif.matrix_profile_cycle_count)
+            `uvm_fatal("V2_MATRIX_PROFILE_SUM", $sformatf(
+                "profile=%s exclusive Matrix FSM sum %0d != DUT cycle_count %0d",
+                profile_name, state_sum, compute_vif.matrix_profile_cycle_count))
+        $display({
+            "V2_MATRIX_PROFILE_CSV,profile=%s,seed=%0d,shape=%s,",
+            "internal_cycles=%0d,doorbell_to_cpl_cycles=%0d,",
+            "exclusive_state_sum=%0d,spad_read_bytes=%0d,spad_write_bytes=%0d,",
+            "st_idle=%0d,st_a_req=%0d,st_a_wait=%0d,st_b_req=%0d,st_b_wait=%0d,",
+            "st_bias_req=%0d,st_bias_wait=%0d,st_prep_mac=%0d,st_mac=%0d,",
+            "st_write=%0d,st_next=%0d,st_done=%0d,st_error=%0d,",
+            "st_error_drain=%0d,st_prefetch_wait=%0d,",
+            "arbiter_stall=%0d,response_wait=%0d,writeback_wait=%0d,",
+            "prefetch_a_req=%0d,prefetch_a_drain=%0d,prefetch_b_req=%0d,",
+            "prefetch_b_drain=%0d,prefetch_overlap=%0d,prefetch_wait=%0d,",
+            "prefetch_completed=%0d,outstanding_highwater=%0d,fifo_full=%0d,",
+            "a_tile_cache_hits=%0d"},
+            profile_name, seed, shape, compute_vif.matrix_profile_cycle_count,
+            doorbell_to_completion_cycles, state_sum,
+            compute_vif.matrix_spad_read_bytes - read_bytes_start,
+            compute_vif.matrix_spad_write_bytes - write_bytes_start,
+            state_snapshot[0], state_snapshot[1], state_snapshot[2],
+            state_snapshot[3], state_snapshot[4], state_snapshot[5],
+            state_snapshot[6], state_snapshot[7], state_snapshot[8],
+            state_snapshot[9], state_snapshot[10], state_snapshot[11],
+            state_snapshot[12], state_snapshot[13], state_snapshot[14],
+            compute_vif.matrix_profile_arbiter_stall_cycles,
+            compute_vif.matrix_profile_response_wait_cycles,
+            compute_vif.matrix_profile_writeback_wait_cycles,
+            compute_vif.matrix_profile_prefetch_a_req_cycles,
+            compute_vif.matrix_profile_prefetch_a_drain_cycles,
+            compute_vif.matrix_profile_prefetch_b_req_cycles,
+            compute_vif.matrix_profile_prefetch_b_drain_cycles,
+            compute_vif.matrix_profile_prefetch_overlap_cycles,
+            compute_vif.matrix_profile_prefetch_wait_cycles,
+            compute_vif.matrix_profile_prefetch_completed,
+            compute_vif.matrix_profile_outstanding_highwater,
+            compute_vif.matrix_profile_fifo_full_cycles,
+            compute_vif.matrix_a_cache_hits);
+    endtask
+
     task automatic wait_spad_idle();
         int unsigned poll;
         int unsigned quiet_cycles;
@@ -11743,9 +11801,6 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned serial_matrix_spad_write_bytes;
         int unsigned matrix_profile_read_bytes_start;
         int unsigned matrix_profile_write_bytes_start;
-        int unsigned matrix_profile_state_sum;
-        int unsigned matrix_profile_state_snapshot[0:14];
-        int unsigned matrix_profile_i;
         int unsigned serial_spad_read_bytes;
         int unsigned serial_spad_write_bytes;
         int unsigned staged_pair_start_cycle;
@@ -11909,56 +11964,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                                         serial_matrix_spad_read_start;
         serial_matrix_spad_write_bytes = compute_vif.benchmark_spad_write_bytes -
                                          serial_matrix_spad_write_start;
-        matrix_profile_state_sum = 0;
-        for (matrix_profile_i = 0; matrix_profile_i < 15;
-             matrix_profile_i++) begin
-            matrix_profile_state_snapshot[matrix_profile_i] =
-                compute_vif.matrix_profile_state_cycles[matrix_profile_i];
-            matrix_profile_state_sum +=
-                matrix_profile_state_snapshot[matrix_profile_i];
-        end
-        if (matrix_profile_state_sum != compute_vif.matrix_profile_cycle_count)
-            `uvm_fatal("V2_MATRIX_PROFILE_SUM", $sformatf(
-                "exclusive Matrix FSM profile sum %0d != DUT cycle_count %0d",
-                matrix_profile_state_sum, compute_vif.matrix_profile_cycle_count))
-        $display({
-            "V2_MATRIX_PROFILE_CSV,seed=%0d,shape=16x32x64,",
-            "internal_cycles=%0d,doorbell_to_cpl_cycles=%0d,",
-            "exclusive_state_sum=%0d,spad_read_bytes=%0d,spad_write_bytes=%0d,",
-            "st_idle=%0d,st_a_req=%0d,st_a_wait=%0d,st_b_req=%0d,st_b_wait=%0d,",
-            "st_bias_req=%0d,st_bias_wait=%0d,st_prep_mac=%0d,st_mac=%0d,",
-            "st_write=%0d,st_next=%0d,st_done=%0d,st_error=%0d,",
-            "st_error_drain=%0d,st_prefetch_wait=%0d,",
-            "arbiter_stall=%0d,response_wait=%0d,writeback_wait=%0d,",
-            "prefetch_a_req=%0d,prefetch_a_drain=%0d,prefetch_b_req=%0d,",
-            "prefetch_b_drain=%0d,prefetch_overlap=%0d,prefetch_wait=%0d,",
-            "prefetch_completed=%0d,outstanding_highwater=%0d,fifo_full=%0d,",
-            "a_tile_cache_hits=%0d"},
-            seed, compute_vif.matrix_profile_cycle_count, serial_matrix_cycles,
-            matrix_profile_state_sum,
-            compute_vif.matrix_spad_read_bytes - matrix_profile_read_bytes_start,
-            compute_vif.matrix_spad_write_bytes - matrix_profile_write_bytes_start,
-            matrix_profile_state_snapshot[0], matrix_profile_state_snapshot[1],
-            matrix_profile_state_snapshot[2], matrix_profile_state_snapshot[3],
-            matrix_profile_state_snapshot[4], matrix_profile_state_snapshot[5],
-            matrix_profile_state_snapshot[6], matrix_profile_state_snapshot[7],
-            matrix_profile_state_snapshot[8], matrix_profile_state_snapshot[9],
-            matrix_profile_state_snapshot[10], matrix_profile_state_snapshot[11],
-            matrix_profile_state_snapshot[12], matrix_profile_state_snapshot[13],
-            matrix_profile_state_snapshot[14],
-            compute_vif.matrix_profile_arbiter_stall_cycles,
-            compute_vif.matrix_profile_response_wait_cycles,
-            compute_vif.matrix_profile_writeback_wait_cycles,
-            compute_vif.matrix_profile_prefetch_a_req_cycles,
-            compute_vif.matrix_profile_prefetch_a_drain_cycles,
-            compute_vif.matrix_profile_prefetch_b_req_cycles,
-            compute_vif.matrix_profile_prefetch_b_drain_cycles,
-            compute_vif.matrix_profile_prefetch_overlap_cycles,
-            compute_vif.matrix_profile_prefetch_wait_cycles,
-            compute_vif.matrix_profile_prefetch_completed,
-            compute_vif.matrix_profile_outstanding_highwater,
-            compute_vif.matrix_profile_fifo_full_cycles,
-            compute_vif.matrix_a_cache_hits);
+        emit_matrix_profile("standalone", seed, "16x32x64",
+                            serial_matrix_cycles,
+                            matrix_profile_read_bytes_start,
+                            matrix_profile_write_bytes_start);
         expect_completion(CPLQ_LOCAL, 16'h05ff, matrix_golden[15][31],
                           32'd512, "serial Matrix baseline");
         if (compute_vif.matrix_a_cache_hits != 16)
@@ -12036,6 +12045,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         staged_contention_start = compute_vif.matrix_cnm_shared_accept_cycles;
         staged_spad_read_start = compute_vif.benchmark_spad_read_bytes;
         staged_spad_write_start = compute_vif.benchmark_spad_write_bytes;
+        matrix_profile_read_bytes_start = compute_vif.matrix_spad_read_bytes;
+        matrix_profile_write_bytes_start = compute_vif.matrix_spad_write_bytes;
         staged_pair_start_cycle = compute_vif.sim_cycles;
         axil_write(REG_DOORBELL, 32'd1);
         wait_cpl_tail(32'd2);
@@ -12046,6 +12057,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_fatal("CLUSTER_STAGED_CONTENTION",
                 "Matrix and CNM never contended for a shared banked-SPAD admission during the staged pair")
         wait_spad_idle();
+        emit_matrix_profile("staged_matrix_cnm", seed, "16x32x64",
+                            staged_pair_cycles,
+                            matrix_profile_read_bytes_start,
+                            matrix_profile_write_bytes_start);
         expect_completion(CPLQ_LOCAL + 32'h00, 16'h0700,
                           matrix_golden[15][31], 32'd512,
                           "staged Matrix completion");
@@ -12146,11 +12161,17 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         matrix_line_stall_checks_before = compute_vif.matrix_line_stall_checks;
         matrix_line_stall_violations_before =
             compute_vif.matrix_line_stall_violations;
+        matrix_profile_read_bytes_start = compute_vif.matrix_spad_read_bytes;
+        matrix_profile_write_bytes_start = compute_vif.matrix_spad_write_bytes;
         parallel_start_cycle = compute_vif.sim_cycles;
         axil_write(REG_DOORBELL, 32'd1);
         wait_cpl_tail(32'd2);
         parallel_cycles = compute_vif.sim_cycles - parallel_start_cycle;
         wait_spad_idle();
+        emit_matrix_profile("line_stall_matrix_cnm", seed, "16x32x64",
+                            parallel_cycles,
+                            matrix_profile_read_bytes_start,
+                            matrix_profile_write_bytes_start);
         if ((compute_vif.matrix_line_stall_checks -
              matrix_line_stall_checks_before) == 0)
             `uvm_fatal("CLUSTER_MATRIX_LINE_STALL",
