@@ -1,0 +1,27 @@
+{
+  "run_id": "V2-RESEARCH-BENCHMARK-MATRIX-20261106",
+  "status": "FIXED_MATRIX_WITH_EXPLICIT_NA_AND_ESTIMATE_BOUNDARIES",
+  "tiny_npu_reference_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+  "product_rtl_sha": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+  "rows": 12,
+  "csv": "v2_research_benchmark_matrix_20261106.csv",
+  "csv_sha256": "a013602f30b88eb3f9d37e683af293bdf4950467fe9e73f9fbfc72bd3fce151f",
+  "inputs": [
+    "v2_tinynpu_gemm_current_20261106.csv",
+    "v2_tinynpu_gemv_current_20261106.csv",
+    "v2_spad_capacity_study_20261106.json",
+    "v2_transformer_timing_f9f32f7.json"
+  ],
+  "innovation_ablation_evidence": [
+    "v2_p2_gemv_cache_prefetch_4way_85e7db2.csv",
+    "v2_p2_tile_forward_3seed.csv",
+    "docs/benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md"
+  ],
+  "limitations": [
+    "TinyNPU GEMM/GEMV cycles are direct-array RTL; common-memory endpoint is estimated.",
+    "CNN TinyNPU graph runtime is not measured in the capacity study; its Golden is independently matched.",
+    "Transformer row is a fixed-weight fixture, not a trained model.",
+    "Behavioral SPAD metrics are not ASIC PPA or physical SRAM measurements.",
+    "N/A means the corresponding measurement was not collected; do not infer zero."
+  ]
+}
