@@ -1,8 +1,17 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `e944133b43107839e5f5eea902251097a228b312` (tree `430f9ce0c794f6e6a059d56ade7d9112b8a3079f`; three-seed clean-worktree regression hits all eight real-CMDQ 0x52 M/N/K aligned-tail combinations and 16×16×128 long-K GEMV). Latest benchmark source SHA: `85e7db2d12f5edfaed17e8ca3910bb504983779f` (fixed-candidate GEMV Cache×Prefetch and serial/parallel artifact replay). Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commits expand only verification/benchmark workload and evidence. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `e944133b43107839e5f5eea902251097a228b312` (tree `430f9ce0c794f6e6a059d56ade7d9112b8a3079f`; three-seed clean-worktree regression hits all eight real-CMDQ 0x52 M/N/K aligned-tail combinations and 16×16×128 long-K GEMV). Latest benchmark replay SHA: `a4dcc6b609878811fcd48a0310401609d4952c62` (current-source GEMV four-way ablation, bit-exact replay of 85e7db2 metrics); latest Top contention test SHA: `c93d020880710a2804685fd85bb98c2e9c56f290`. Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commits expand only verification/benchmark workload and evidence. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
+
+## 2026-11-06 update — current-source four-way GEMV ablation
+
+At source/test SHA `a4dcc6b609878811fcd48a0310401609d4952c62`, the matched
+Cache × Prefetch matrix reruns 48/48 Golden points on Seeds 20261105/06/07.
+All 48 exclusive state-cycle partitions close exactly to command cycles; all
+33 measured values per point match the earlier `85e7db2` replay. The product
+RTL SHA remains `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. CSV, JSON, exact
+command and archive checksum are in the [performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md).
 
 ## 2026-11-06 update — real-CMDQ GEMV M/N/K alignment-tail cross
 

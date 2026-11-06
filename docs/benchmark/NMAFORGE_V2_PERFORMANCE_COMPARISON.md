@@ -2,7 +2,7 @@
 
 **As of:** 2026-11-06
 **Product baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
-**Latest replay source/test SHA:** `c93d020880710a2804685fd85bb98c2e9c56f290` (tree `24180541c76b1ad4d27b2e97313e7d97a5df2016`; three-seed 16×16 Top Matrix/CNM contention profile; testbench-only workload/instrumentation)
+**Latest fixed benchmark source/test SHA:** `a4dcc6b609878811fcd48a0310401609d4952c62` (tree `430f9ce0c794f6e6a059d56ade7d9112b8a3079f`; current-source three-seed GEMV four-way ablation). **Latest Top contention workload SHA:** `c93d020880710a2804685fd85bb98c2e9c56f290` (tree `24180541c76b1ad4d27b2e97313e7d97a5df2016`; three-seed 16×16 Top Matrix/CNM contention profile). Product RTL in both remains `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
 
 ## Comparison boundary
 
@@ -130,6 +130,49 @@ This single-client controller run does not exercise competing Matrix/CNM/SFU
 traffic through the system SPAD Arbiter, nor does it isolate Bank-Aware Issue
 benefit or its logic/timing cost. No scheduling RTL change is justified from
 this result alone; the controlled Top contention experiment remains open.
+
+### Current-source replay at SHA `a4dcc6b`
+
+Run `V2-GEMV-FOUR-WAY-A4DCC6B-S20261105-07` repeats the same four Cache ×
+Prefetch configurations at fixed source/test SHA
+`a4dcc6b609878811fcd48a0310401609d4952c62` (tree
+`430f9ce0c794f6e6a059d56ade7d9112b8a3079f`). It uses the same 16×16 array,
+256 INT8 MACs, four outstanding reads, enabled A-Tile Cache, registered
+four-bank behavioral SPAD, seed-controlled Ready/response latency, and Seeds
+20261105/06/07 as the `85e7db2` replay. All 48 shape/configuration/Seed points
+pass the independent signed INT8/INT32 Golden. The exclusive state partition
+closes to command cycles on 48/48 points. For the matched 48 rows, all 33
+compared measured fields (cycles, traffic, utilization, MAC activity, state
+and stall counters, occupancy, and Golden) are identical to `85e7db2`; the
+documentation-only candidate update did not alter the benchmark result.
+
+The four-way response remains shape-dependent. With B-fold Cache ON, Cache
+reduces cycles by 22.3–41.6% and read traffic by 35.2–56.5% versus Cache OFF
+with Prefetch OFF. Adding Prefetch to Cache ON improves M8×16×19/65 by 2.35%/
+2.05%, while M16×16×19/65 regresses by 0.64%/0.80%. These are Matrix-core RTL
+cycles with behavioral memory, not Top-contention gains or ASIC metrics.
+
+Exact clean-worktree command (VCS `V-2023.12-SP1_Full64`):
+
+```sh
+git worktree add --detach /tmp/nmaforge-v2-gemv-ablation-a4dcc6b \
+  a4dcc6b609878811fcd48a0310401609d4952c62
+VCS_ARCH_OVERRIDE=linux \
+VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+make -C /tmp/nmaforge-v2-gemv-ablation-a4dcc6b/dv/block/compute/matrix/sim \
+  product-gemv-four-way-ablation \
+  SEEDS='20261105 20261106 20261107' OUTSTANDING_DEPTH=4 \
+  A_TILE_CACHE_ENABLE=1 PHYSICAL_ARRAY_SIZE=16 \
+  GEMV_FOUR_WAY_OUT=/tmp/nmaforge_v2_gemv_four_way_a4dcc6b \
+  PYTHON=python3.12
+```
+
+Machine outputs: [48-point CSV](../../benchmark/v2_p2_gemv_cache_prefetch_4way_a4dcc6b.csv)
+and [summary JSON](../../benchmark/v2_p2_gemv_cache_prefetch_4way_a4dcc6b_summary.json).
+Logs-only archive `/tmp/nmaforge_v2_gemv_four_way_a4dcc6b_logs.tar.gz`,
+SHA-256 `93769cd0db0e4a7596374e6c298119f43b551eaf7c1abc9aa0e59fe337403e46`.
 
 ### Real Compute Cluster serial / parallel workload
 
