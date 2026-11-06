@@ -1,7 +1,7 @@
 # NMAForge v2 DV Closure Status
 
 **Status:** IN PROGRESS — scoped regressions pass; v2 sign-off is not ready.  
-**Latest testbench candidate SHA:** `0e9f12ec3701030c9e5978ad29b227c5e0c644a7` (tree `18983dbf8708c101bc83aa9ed0902d6370037468`; three-seed clean-worktree Compute Cluster regression adds all eight legal M/N/K alignment-tail combinations on real CMDQ opcode 0x52; product RTL unchanged)
+**Latest testbench candidate SHA:** `e944133b43107839e5f5eea902251097a228b312` (tree `430f9ce0c794f6e6a059d56ade7d9112b8a3079f`; three-seed clean-worktree Compute Cluster regression adds all eight legal M/N/K alignment-tail combinations and a real-CMDQ 16×16×128 GEMV; product RTL unchanged)
 
 **Candidate tree:** `65d56c5d6dd345effde6fdfdf70dad59f135a279` (tree used for the latest three-seed generic Cluster replay)
 
@@ -15,6 +15,44 @@
 
 **Baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Simulator:** Synopsys VCS `V-2023.12-SP1_Full64`
+
+## 2026-11-06 — real-CMDQ long-K GEMV at K=128
+
+Testbench-only commit `e944133b43107839e5f5eea902251097a228b312` adds a
+real opcode-0x52 `16×16×128` case. It checks all 256 signed INT32 outputs
+against an independent Golden, two output guards, launch fields, ordered
+completion, and 448/448 accepted/returned Matrix operand lines. The dedicated
+`cmdq_product_gemv_long_k_cg` has one declared bin and scores 1/1 on each
+Seed; merged URG records three hits and 100%.
+
+VCS/URG `V-2023.12-SP1_Full64` passes the complete Compute Cluster UVM suite
+from detached clean worktree `/tmp/nmaforge-v2-clean-e944133` on Seeds
+`20261025/26/27`. Each seed has UVM Warning/Error/Fatal `0/0/0`. Aggregate
+Line/Condition/FSM/Branch/Assert/Group is
+`70.71/68.34/46.17/67.66/72.00/83.46%`; this does not close global v2
+coverage. Product RTL is unchanged.
+
+Run ID: `V2-CMDQ-GEMV-K128-3SEED-E944133`. Exact command:
+
+```sh
+git worktree add --detach /tmp/nmaforge-v2-clean-e944133 \
+  e944133b43107839e5f5eea902251097a228b312
+make -C /tmp/nmaforge-v2-clean-e944133/dv/uvm/sim \
+  uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v2_long_k_clean_e944133 \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027'
+```
+
+Logs and selected URG text (simulator binary/VDB excluded):
+`/tmp/nmaforge_v2_long_k_e944133_logs.tar.gz`, SHA-256
+`167fb42c261c861d0bace89aefd6ef40695b5b5f01e85ac2c7e5b3b76b2f19b3`.
+
+K=256 remains open: an attempted real-CMDQ run at test SHA
+`170ab5b585be819b1a72a22c7ea29be1881cfa21` hit the existing Top SVA
+`MAX_TASK_CYCLES=2000` completion bound before producing a Golden result.
+The bound was not relaxed. This is a timeout against the testbench bound, not
+proof of a datapath mismatch; expected K=256 latency and the appropriate
+end-to-end contract still need review. No product RTL changed.
 
 ## 2026-11-06 — real-CMDQ GEMV M/N/K alignment-tail cross
 
@@ -518,7 +556,7 @@ The exact `REQ-V2-*` evidence delta is:
 |---|---|---|
 | `REQ-V2-052-003/004/006/008` | Three-seed Prefetch-ON and Prefetch-OFF GEMV replay now covers six named shapes with independent bit-exact Golden; 8 selected fault/recovery bins hit across three Seeds | Tested shapes/faults advance; full legal shape space, complete fault × phase × reset crosses and shared external response ownership remain open. |
 | `REQ-V2-053-001/002/005/006` | Top CMDQ producer/consumer replay plus three-seed tag, ping-pong, Reset/Epoch, Parity, Protection and held-write recovery | Remain scoped PASS/PARTIAL; arbitrary held-response timing, Completion fault injection and all cross-engine contracts remain open. |
-| `REQ-V2-COM-004` | Three Matrix-core feature covergroups now merge to 100% for the named 0x52/0x53 points; Top aggregate remains a separate report | **PARTIAL**; the named groups do not cover all opcode/system requirements, and four Top AXI-memory groups remain unsampled. |
+| `REQ-V2-COM-004` | Three Matrix-core feature covergroups and named Top GEMV groups now merge to 100% for their declared points; latest Top profile at `e944133` is Line/Condition/FSM/Branch/Assert/Group `70.71/68.34/46.17/67.66/72.00/83.46%` | **PARTIAL**; the named groups do not cover all opcode/system requirements, residual code bins remain, and four Top AXI-memory groups remain unsampled. |
 | `REQ-V2-COM-005` | Current 18/18 opcode mutations (six classes × three Seeds), including request-address hold, and 7/7 Cluster DUT mutations | **PARTIAL**; selected mutations now exercise the request stability checker, but are not exhaustive checker-to-fault mapping for every new feature. |
 | `REQ-V2-COM-006` | In-repository `ai_accel_memory_fabric` coordinated reset with DMA reads outstanding and CNM accepted SPAD response / pending result write; owner flush and fresh DMA/CNM recovery | **PASS (selected repository-fabric scope)**; three reset functional groups are 100%, and owner/tag SVAs have real successes. This does not establish behavior for arbitrary external SoC fabrics or close opcode-specific fault/reset crosses. |
 | `REQ-V2-COM-002` | Clean Top compatibility replay at current source/test SHA: fixed legacy checks plus 20 randomized workloads per seed, including Tensor GEMM `0x30` and Batch GEMM `0x31` | **PASS (tested legacy modes/shapes)**; three Seeds pass independent Golden comparisons and existing v2 smoke checks. Exhaustive compatibility across every shape, aux combination, and concurrent fault interaction remains outside this run. |
@@ -871,7 +909,9 @@ named Matrix-core scenarios and do not substitute for the Top/Cluster RTM.
 | Requirement | Added test/checker evidence | Coverage | Run identity | Disposition |
 |---|---|---|---|---|
 | REQ-V2-052-003/004 | Real Top CMDQ GEMV Golden/guards/completion for all M%4 × N%16 × K%16 aligned/tail states; new shapes `4×16×17`, `4×13×16`, `3×16×16`, `3×13×16` complete the four previously unhit states | Dedicated `cmdq_product_gemv_tail_cross_cg`: 8/8 user bins, 100% in each of three Seeds and merged URG; 203/203 new output words and 8/8 guards across three Seeds; accepted/returned lines 25/25, 20/20, 19/19, 19/19 per Seed | `V2-CMDQ-GEMV-TAIL-CROSS-3SEED-0E9F12E`, Seeds 20261025/26/27, SHA `0e9f12ec3701030c9e5978ad29b227c5e0c644a7`, tree `18983dbf8708c101bc83aa9ed0902d6370037468` | PASS for the eight declared alignment/tail states and representative shapes; not exhaustive over legal dimensions, aux/postprocess, aliases or fault/lifecycle crosses; logs/URG archive SHA-256 `37c1faa781c24744236a32b51f23ec08ec2616da2a9866b9d63554c34aeb6a14` |
+| REQ-V2-052-003/004 | Real Top CMDQ signed INT8 GEMV at K=128 with independent INT32 Golden, full output image, guards, ordered completion | `cmdq_product_gemv_long_k_cg`: 1/1 bin per Seed and 3 merged hits; 256/256 outputs and two guards per Seed; 448/448 accepted/returned Matrix reads | `V2-CMDQ-GEMV-K128-3SEED-E944133`, Seeds 20261025/26/27, SHA `e944133b43107839e5f5eea902251097a228b312`, tree `430f9ce0c794f6e6a059d56ade7d9112b8a3079f` | PASS for this 16×16×128 point only; attempted K=256 at SHA `170ab5b585be819b1a72a22c7ea29be1881cfa21` hit existing `MAX_TASK_CYCLES=2000` before Golden and remains unresolved; no checker bound was relaxed. Logs-only archive SHA-256 `167fb42c261c861d0bace89aefd6ef40695b5b5f01e85ac2c7e5b3b76b2f19b3` |
 | REQ-V2-052-007 | Real CMDQ accepted/returned Matrix reads for the four added aligned/tail representatives, checked before completion | `4×16×17` 25/25, `4×13×16` 20/20, `3×16×16` 19/19, `3×13×16` 19/19 in each of three Seeds; eight-state group merged 100% | `V2-CMDQ-GEMV-TAIL-CROSS-3SEED-0E9F12E`, Seeds 20261025/26/27, SHA `0e9f12ec3701030c9e5978ad29b227c5e0c644a7` | PARTIAL; proves serial Top response drains for these cases; arbitrary held/late external responses and broader multi-engine/fault/reset ownership remain open |
+| REQ-V2-052-007 | Real CMDQ 16×16×128 operand-read accepted/returned ownership and drain before completion | 448/448 accepted/returned Matrix reads per Seed; no pending read at completion; dedicated long-K group merged 100% | `V2-CMDQ-GEMV-K128-3SEED-E944133`, Seeds 20261025/26/27, SHA `e944133b43107839e5f5eea902251097a228b312` | PARTIAL; ownership closes for this serial long-K point, while arbitrary held/late external responses and broader multi-engine/fault/reset ownership remain open; archive SHA-256 `167fb42c261c861d0bace89aefd6ef40695b5b5f01e85ac2c7e5b3b76b2f19b3` |
 | REQ-V2-COM-001 | Real Top CMDQ fetch/decode/dispatch of ABI-v7 opcode `0x52`; passive launch monitor classifies `0x52`/`0x53` as Matrix | 3×5×5 tail, 1×1×1 minimum, and 16×16×16 maximum launch snapshots match descriptor fields | `V2-CMDQ-PRODUCT-GEMV-GOLDEN-3SEED-FD82E73`, `V2-CMDQ-PRODUCT-GEMV-MIN-BOUNDARY-3SEED-95301C4`, and `V2-CMDQ-PRODUCT-GEMV-FULL-TILE-3SEED-9287478` | PASS for these product-CMDQ shape points; broader mode matrix open |
 | REQ-V2-052-003/004 | Independent signed INT32 Golden; complete output image and two sentinels; completion status/result/elements checked | 15/15 output elements per Seed; M/N/K tail bins 3/3 plus cross 1/1 | Same run ID/SHA | PASS for legal shape 3×5×5 only; full supported shape domain open |
 | REQ-V2-052-003/004 | Independent signed INT32 Golden and complete 16-byte operand line images for minimum descriptor | 1/1 output and guard per Seed; minimum-shape group 1/1 bin, 3 hits; 2/2 operand reads accepted/returned | `V2-CMDQ-PRODUCT-GEMV-MIN-BOUNDARY-3SEED-95301C4`, seeds 20261115/16/17, SHA `95301c46dfa6b9ee68f1e37a38f7767e3111d869` | PASS for M=N=K=1 only; maximum endpoint is covered by the separate row below, while full shape matrix remains open |

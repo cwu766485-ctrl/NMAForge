@@ -3,7 +3,7 @@
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Latest fixed test source SHA:** `0e9f12ec3701030c9e5978ad29b227c5e0c644a7` (tree `18983dbf8708c101bc83aa9ed0902d6370037468`; real Top CMDQ 0x52 exercises all eight M/N/K aligned-tail states with independent Golden and response-owner checks). The most recent benchmark source remains independently identified in the benchmark report.
+**Latest fixed test source SHA:** `e944133b43107839e5f5eea902251097a228b312` (tree `430f9ce0c794f6e6a059d56ade7d9112b8a3079f`; three-seed real Top CMDQ 0x52 exercises all eight M/N/K aligned-tail states and 16×16×128 GEMV with independent Golden and response-owner checks). The most recent benchmark source remains independently identified in the benchmark report.
 **Current report branch HEAD before this review update:** `85e7db2d12f5edfaed17e8ca3910bb504983779f` (tree `e8f64f78f7986193bdc0d01dfbc01740a130edcb`); report-only commits follow the tested source SHA.
 **Published feature branch tip at this audit:** `19f9575f3579869f27d72f2dd17fa980840b6499` (same tree `3ac2f31a0fcbbb5fa5cd13f3f9ed39a87c3ed3c0`).
 **Product RTL SHA:** `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; no RTL change is present in the fixed test source or report-only commits.
@@ -34,6 +34,20 @@ each state, not every supported dimension, alias, fault, or lifecycle
 combination. The entire v2 DV status remains IN PROGRESS and product RTL is
 unchanged. Run command and archive hash are in the [DV closure
 report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+### Latest real-CMDQ long-K GEMV — 2026-11-06
+
+Testbench-only SHA `e944133b43107839e5f5eea902251097a228b312` also passes a
+16×16×128 opcode-0x52 workload on Seeds 20261025/26/27. Each run compares all
+256 signed INT32 outputs against an independent Golden, checks two guards and
+ordered completion, and drains 448/448 accepted/returned Matrix reads. The
+dedicated long-K functional group is 100%. Merged UVM URG line/condition/FSM/
+branch/assert/group is `70.71/68.34/46.17/67.66/72.00/83.46%`; this remains
+scoped evidence and does not close global v2 coverage. An attempted K=256
+Top-CMDQ case exceeded the existing `MAX_TASK_CYCLES=2000` testbench bound
+before a Golden result; no checker was relaxed, and K=256 remains open pending
+latency-contract review. Product RTL is unchanged. Exact command and logs-only
+archive hash are in the [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
 ### Latest fixed-source verification addendum — 2026-11-06
 
