@@ -1,7 +1,7 @@
 # NMAForge v2 DV Closure Status
 
 **Status:** IN PROGRESS — scoped regressions pass; v2 sign-off is not ready.  
-**Latest testbench/tooling candidate SHA:** `8758794c1f3bd6abb41c33276422b84ac5ee7a80` (tree `6f51976ea8f736e08783487afe892afa8a3a8b36`; adds a real-CMDQ K=256 GEMV test point with non-overlapping SPAD ranges; product RTL unchanged). Latest clean three-seed Compute Cluster UVM regression is `V2-CMDQ-GEMV-K256-1X1-3SEED-8758794`.
+**Latest testbench/tooling candidate SHA:** `f19e92934cd6273d327621c43cb17291cf1a9aa5` (tree `2d931c1c81997b482467d7fdf69302dd367975a1`; adds legal real-CMDQ 0x52 A/B read-only alias checking; product RTL unchanged). Latest clean three-seed Compute Cluster UVM regression is `V2-CMDQ-GEMV-AB-ALIAS-3SEED-F19E929`.
 **Latest clean Top Smoke compatibility replay:** model/tooling SHA `9b835aeac33d43fd97a81496b1048d359cdff3d0`; three 20-random-workload seeds pass the Top Smoke markers. This is not a UVM/URG coverage update.
 
 **Candidate tree:** `65d56c5d6dd345effde6fdfdf70dad59f135a279` (tree used for the latest three-seed generic Cluster replay)
@@ -16,6 +16,43 @@
 
 **Baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Simulator:** Synopsys VCS `V-2023.12-SP1_Full64`
+
+## 2026-11-06 — real-CMDQ GEMV read-only A/B alias
+
+The ABI-v7 validator rejects destination overlap with either operand, but it
+does not prohibit the two read-only operand ranges from overlapping. Added a
+real Top CMDQ `0x52` case with `srcA == srcB` and disjoint destination. The
+test checks all 256 source bytes remain unchanged, all 16 signed INT32 outputs
+against an independent Golden, two output guards, the completion record, and
+accepted/returned Matrix reads. Each seed observes 17/17 reads and hits the
+focused alias bin; merged URG confirms 3 hits and 100% for that declared bin.
+
+VCS `V-2023.12-SP1_Full64` passes the complete three-seed Compute Cluster UVM
+regression at clean detached SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5`
+(tree `2d931c1c81997b482467d7fdf69302dd367975a1`). Seeds
+`20261106/20261107/20261108` each pass with UVM Warning/Error/Fatal `0/0/0`.
+Merged whole-test profile is Line/Condition/FSM/Branch/Assert/Group
+`70.71/68.37/46.17/67.66/72.00/83.94%`; this is not v2 coverage closure.
+The test makes no claim about software modifying shared operands while a
+command is in flight. Product RTL remains unchanged at
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
+
+Run ID: `V2-CMDQ-GEMV-AB-ALIAS-3SEED-F19E929`. Machine-readable record:
+[JSON](../../benchmark/v2_cmdq_gemv_ab_alias_f19e929.json). Logs and selected
+URG text (simulator binary/VDB excluded):
+`/tmp/nmaforge_v2_gemv_ab_alias_f19e929_logs.tar.gz`, SHA-256
+`18e664689077d9608924af2b9ec08eb912d4979edc9e0cf36b816cbe936447ae`.
+
+Exact replay command:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v2_gemv_alias_f19e929 \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261106 20261107 20261108'
+```
 
 ## 2026-11-06 — real-CMDQ GEMV K=256 test-bound point
 
@@ -952,6 +989,9 @@ named Matrix-core scenarios and do not substitute for the Top/Cluster RTM.
 | REQ-V2-052-003/004 | Independent signed INT32 Golden for maximum descriptor, complete output image, guards, completion and accepted/returned ownership | 256/256 output words and 2/2 guards per Seed; max-tile group 1/1 bin, 3 hits; 32/32 operand lines accepted/returned | `V2-CMDQ-PRODUCT-GEMV-FULL-TILE-3SEED-9287478`, seeds 20261118/19/20, SHA `92874788fb2cb2a2b15657a3621e5a275a9d5990` | PASS for M=N=K=16 only; all legal shapes and exhaustive tail combinations remain open |
 | REQ-V2-052-003/004 | Real CMDQ 0x52 GEMV for intermediate M/N/K shapes, including K>64, independent signed INT32 Golden, output guards, completion and accepted/returned ownership | `1×16×17`, `8×13×65`, `15×16×31`; per Seed 360/360 output words and 6/6 guards; across three Seeds 1,080/1,080 outputs and 18/18 guards; dedicated URG shape bins 3/3 (100%); 19/19, 106/106 and 61/61 Matrix reads respectively, each fully returned | `V2-CMDQ-GEMV-EXTENDED-SHAPES-3SEED-0696C16`, seeds 20261124/25/26, SHA `0696c16bd1346207ad5421d21247c719ea018111` | PASS for these three additional product-top shapes; full legal shape space, alias/fault crosses and all K boundaries remain open |
 | REQ-V2-052-007 | Count real Matrix banked request accepts and Matrix-tagged responses before completion; concurrently submit CNM and preserve independent response owners | Single GEMV endpoint sizes drain 2/2, 8/8, 32/32; concurrent GEMV/CNM drains Matrix 32/32 and CNM 4096/4096, zero route mismatch, both ordered completions and both Golden images pass; named overlap/owner group 100% | `V2-CMDQ-GEMV-CNM-OWNER-CROSS-3SEED-85E7DB2`, Seeds 20261121/22/23, SHA `85e7db2d12f5edfaed17e8ca3910bb504983779f` | PARTIAL; the real Top pairing closes this tested multi-engine case. Arbitrary external held/late responses and remaining fault/reset/pairing matrix are open |
+| REQ-V2-052-001 | Legal opcode-0x52 read-only A/B input alias (`srcA == srcB`) is accepted by ABI-v7 validation and dispatched through real Top CMDQ | Alias covergroup 1/1 per Seed; launch snapshot confirms equal sources and disjoint output | `V2-CMDQ-GEMV-AB-ALIAS-3SEED-F19E929`, Seeds 20261106/07/08, SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5` | PASS for this legal read-only alias point; other legal span intersections are not exhaustively sampled |
+| REQ-V2-052-003/004 | Alias execution preserves the shared 256-byte source image and produces all 16 signed INT32 Golden outputs | 256 B unchanged, 16/16 outputs bit-exact, two output guards unchanged, successful completion per Seed | `V2-CMDQ-GEMV-AB-ALIAS-3SEED-F19E929`, Seeds 20261106/07/08, SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5` | PASS for shape `1×16×16` only; no concurrent software writes to aliased operands were attempted |
+| REQ-V2-052-007 | Alias command drains every accepted Matrix response before successful completion | 17/17 accepted/returned Matrix reads per Seed; no ownership/count mismatch before completion | `V2-CMDQ-GEMV-AB-ALIAS-3SEED-F19E929`, Seeds 20261106/07/08, SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5` | PARTIAL; closes this serial alias point only; arbitrary held/late responses and the full multi-engine/fault/reset matrix remain open |
 
 - `V2-DESC-VALIDATOR-AC6B83F`: VCS `V-2023.12-SP1_Full64`; seed is not applicable because the test is directed. The run used `VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS="/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10" make -C dv/block/control/sim descriptor-validator-regress DESCRIPTOR_VALIDATOR_OUT=/tmp/nmaforge_v2_descriptor_validator_ac6b83f`; compile/run logs are under `/tmp/nmaforge_v2_descriptor_validator_ac6b83f/`.
 - `V2-GEMV-CORE-3SEED-18DAD2B`: VCS `V-2023.12-SP1_Full64`; Seeds 20261105/06/07; logs-only archive SHA-256 `4fd0ba313b484a2da588562ff62411b2951ca089bb703a74e49fed7f2bc506c1`.

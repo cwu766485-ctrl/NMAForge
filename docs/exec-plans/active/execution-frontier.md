@@ -1,8 +1,21 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `8758794c1f3bd6abb41c33276422b84ac5ee7a80` (tree `6f51976ea8f736e08783487afe892afa8a3a8b36`; clean three-seed full Compute Cluster UVM includes a real-CMDQ 1×1×256 GEMV test-bound point). Latest Top compatibility replay SHA: `6cbf0e25675e72df4ba8ab32a403ffc8d8245612` (three Seeds × 20 random workloads plus directed legacy/v2 smoke checks). Latest benchmark replay SHA: `a4dcc6b609878811fcd48a0310401609d4952c62` (current-source GEMV four-way ablation, bit-exact replay of 85e7db2 metrics); latest Top contention test SHA: `c93d020880710a2804685fd85bb98c2e9c56f290`. Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commits expand only verification/benchmark workload and evidence. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `f19e92934cd6273d327621c43cb17291cf1a9aa5` (tree `2d931c1c81997b482467d7fdf69302dd367975a1`; clean three-seed full Compute Cluster UVM adds real-CMDQ 0x52 legal A/B read-only alias checks). Latest Top compatibility replay SHA: `9b835aeac33d43fd97a81496b1048d359cdff3d0` (three Seeds × 20 random workloads plus directed legacy/v2 smoke checks). Latest benchmark replay SHA: `a4dcc6b609878811fcd48a0310401609d4952c62` (current-source GEMV four-way ablation, bit-exact replay of 85e7db2 metrics); latest Top contention test SHA: `c93d020880710a2804685fd85bb98c2e9c56f290`. Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commits expand only verification/benchmark workload and evidence. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
+
+## 2026-11-06 update — 0x52 read-only A/B alias verification
+
+Commit `f19e92934cd6273d327621c43cb17291cf1a9aa5` adds a real Top CMDQ
+`1×16×16` case with `srcA == srcB`, independent output memory, and a named
+alias coverage bin. A clean three-seed Compute Cluster UVM/URG regression
+passes; each seed checks 256 unchanged source bytes, 16/16 signed INT32
+Golden outputs, two output guards, completion, and 17/17 accepted/returned
+Matrix reads. The merged bin is 3/3 hits at 100%; whole-test coverage remains
+`70.71/68.37/46.17/67.66/72.00/83.94%` Line/Condition/FSM/Branch/Assert/Group.
+This is scoped alias evidence, not v2 coverage closure. Product RTL is
+unchanged. Run ID, archive checksum, and exact command are in the [DV closure
+report](../../verification/NMAFORGE_V2_DV_CLOSURE.md) and [machine record](../../benchmark/v2_cmdq_gemv_ab_alias_f19e929.json).
 
 ## 2026-11-06 update — current-source four-way GEMV ablation
 
