@@ -382,7 +382,8 @@ interface ai_compute_cluster_if(input logic aclk);
         if (op >= 8'h10 && op <= 8'h15) engine_id = 0;
         else if (op == 8'h50 || op == 8'h51) engine_id = 1;
         else if (op == 8'h20 || op == 8'h21) engine_id = 2;
-        else if (op == 8'h30 || op == 8'h31) engine_id = 3;
+        else if (op == 8'h30 || op == 8'h31 ||
+                 op == 8'h52 || op == 8'h53) engine_id = 3;
         else if (op >= 8'h32 && op <= 8'h39) engine_id = 4;
         else if (op == 8'h16 || op == 8'h17) engine_id = 5;
         else if (op == 8'h43 || op == 8'h44) engine_id = 6;
