@@ -304,6 +304,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     bit cmdq_product_gemv_min_shape;
     bit cmdq_product_gemv_full_tile_shape;
     bit cmdq_product_gemv_long_k_shape;
+    bit cmdq_product_gemv_ab_alias;
     int unsigned cmdq_product_gemv_shape_id;
     int unsigned cmdq_product_gemv_tail_combo;
     bit cmdq_product_gemv_cnm_overlap;
@@ -360,6 +361,13 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         option.per_instance = 1;
         cp_long_k_128: coverpoint cmdq_product_gemv_long_k_shape {
             bins long_k_128 = {1'b1};
+        }
+    endgroup
+
+    covergroup cmdq_product_gemv_ab_alias_cg;
+        option.per_instance = 1;
+        cp_read_only_input_alias: coverpoint cmdq_product_gemv_ab_alias {
+            bins a_equals_b = {1'b1};
         }
     endgroup
 
@@ -550,6 +558,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         cmdq_product_gemv_min_cg = new();
         cmdq_product_gemv_full_tile_cg = new();
         cmdq_product_gemv_long_k_cg = new();
+        cmdq_product_gemv_ab_alias_cg = new();
         cmdq_product_gemv_extended_shape_cg = new();
         cmdq_product_gemv_tail_cross_cg = new();
         cmdq_product_gemv_cnm_owner_cg = new();
@@ -5016,6 +5025,144 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         `uvm_info("CLUSTER_CMDQ_GEMV_LONG_K_PASS", $sformatf(
             "cases=1/1 real CMDQ shape=1x1x256; output, two guards, completion and all accepted/returned Matrix reads checked against independent signed INT32 Golden; focused max-K bin=1/1 coverage=%0.1f%% seed=%0d",
             cmdq_product_gemv_long_k_cg.get_coverage(), seed), UVM_LOW)
+    endtask
+
+    task automatic run_product_gemv_cmdq_ab_alias(input int unsigned seed);
+        localparam int unsigned M_SIZE = 1;
+        localparam int unsigned N_SIZE = 16;
+        localparam int unsigned K_SIZE = 16;
+        localparam bit [31:0] CMDQ_BASE = 32'h0005_b000;
+        localparam bit [31:0] CPLQ_BASE = 32'h0005_b400;
+        localparam bit [31:0] SRC_SHARED = 32'h0007_d000;
+        localparam bit [31:0] DST = 32'h0007_d400;
+        localparam bit [15:0] TASK_ID = 16'h08cb;
+        int signed shared_bytes[0:255];
+        int signed a_value;
+        int signed b_value;
+        int signed sum;
+        bit [31:0] golden[0:N_SIZE-1];
+        bit [31:0] packed_word;
+        bit monitor_done;
+        int unsigned launch_before;
+        int unsigned matrix_launch_before;
+        int unsigned matrix_responses_before;
+        int unsigned accepted_reads;
+        int unsigned byte_idx;
+        int unsigned lane;
+        int unsigned k_idx;
+        int unsigned col_idx;
+
+        // Read-only operand ranges may alias under ABI-v7. A is the first
+        // padded row at SRC_SHARED; dense B is the full 16x16 image at that
+        // same base. Destination remains disjoint, as required by validator.
+        for (byte_idx = 0; byte_idx < 256; byte_idx += 4) begin
+            packed_word = '0;
+            for (lane = 0; lane < 4; lane++) begin
+                shared_bytes[byte_idx + lane] =
+                    ((int'(seed % 17) + int'((byte_idx + lane) * 7)) % 31) - 15;
+                packed_word[lane*8 +: 8] = shared_bytes[byte_idx + lane][7:0];
+            end
+            spad_write(SRC_SHARED + byte_idx, packed_word);
+        end
+
+        for (col_idx = 0; col_idx < N_SIZE; col_idx++) begin
+            sum = 0;
+            for (k_idx = 0; k_idx < K_SIZE; k_idx++) begin
+                a_value = shared_bytes[k_idx];
+                b_value = shared_bytes[k_idx * 16 + col_idx];
+                sum += a_value * b_value;
+            end
+            golden[col_idx] = sum;
+            spad_write(DST + (col_idx << 2), 32'hbad0_cb00 | col_idx);
+        end
+        spad_write(DST + (N_SIZE << 2), 32'hbad0_cb10);
+        spad_write(DST + ((N_SIZE + 1) << 2), 32'hbad0_cb11);
+        write_cluster_desc(CMDQ_BASE, 8'h52, TASK_ID, SRC_SHARED,
+                           SRC_SHARED, DST, M_SIZE, N_SIZE, K_SIZE, 32'd0,
+                           32'd0, 32'd0, 32'd0, 8'd7);
+
+        launch_before = compute_vif.launch_sample_count;
+        matrix_launch_before = compute_vif.engine_launch_count[3];
+        matrix_responses_before = compute_vif.matrix_tag_response_count;
+        accepted_reads = 0;
+        monitor_done = 1'b0;
+        axil_write(REG_CMDQ_CTRL, 32'd0);
+        axil_write(REG_CMDQ_BASE, CMDQ_BASE);
+        axil_write(REG_CMDQ_SIZE, 32'd4);
+        axil_write(REG_CMDQ_HEAD, 32'd0);
+        axil_write(REG_CMDQ_TAIL, 32'd1);
+        axil_write(REG_CPLQ_BASE, CPLQ_BASE);
+        axil_write(REG_CPLQ_SIZE, 32'd4);
+        axil_write(REG_CPLQ_HEAD, 32'd0);
+        axil_write(REG_CPLQ_TAIL, 32'd0);
+
+        fork
+            begin : product_gemv_alias_read_accept_monitor
+                while (!monitor_done) begin
+                    @(posedge compute_vif.aclk);
+                    if (compute_vif.matrix_request_valid &&
+                        compute_vif.banked_ready)
+                        accepted_reads++;
+                end
+            end
+            begin : product_gemv_alias_cmdq_submit
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(32'd1);
+                monitor_done = 1'b1;
+            end
+        join
+        wait_spad_idle();
+
+        if ((compute_vif.launch_sample_count - launch_before) != 1 ||
+            (compute_vif.engine_launch_count[3] - matrix_launch_before) != 1 ||
+            compute_vif.launch_snapshot_opcode[3] !== 8'h52 ||
+            compute_vif.launch_snapshot_src0[3] !== SRC_SHARED ||
+            compute_vif.launch_snapshot_src1[3] !== SRC_SHARED ||
+            compute_vif.launch_snapshot_dst[3] !== DST ||
+            compute_vif.launch_snapshot_m[3] !== M_SIZE ||
+            compute_vif.launch_snapshot_n[3] !== N_SIZE ||
+            compute_vif.launch_snapshot_k[3] !== K_SIZE)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_ALIAS", "A/B alias descriptor did not launch with exact opcode and ranges")
+        if (accepted_reads == 0 ||
+            (compute_vif.matrix_tag_response_count - matrix_responses_before) !=
+                accepted_reads)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_ALIAS", $sformatf(
+                "A/B alias response ownership mismatch accepted=%0d returned=%0d",
+                accepted_reads,
+                compute_vif.matrix_tag_response_count - matrix_responses_before))
+
+        // Check the entire shared read-only B image after compute; this also
+        // covers the A row because it is the first 16 bytes of that image.
+        for (byte_idx = 0; byte_idx < 256; byte_idx += 4) begin
+            packed_word = '0;
+            for (lane = 0; lane < 4; lane++)
+                packed_word[lane*8 +: 8] = shared_bytes[byte_idx + lane][7:0];
+            expect_spad(SRC_SHARED + byte_idx, packed_word,
+                        $sformatf("CMDQ 0x52 A/B aliased source immutability word %0d",
+                                  byte_idx >> 2));
+        end
+        for (col_idx = 0; col_idx < N_SIZE; col_idx++)
+            expect_spad(DST + (col_idx << 2), golden[col_idx],
+                        $sformatf("CMDQ 0x52 A/B alias Golden[%0d]", col_idx));
+        expect_spad(DST + (N_SIZE << 2), 32'hbad0_cb10,
+                    "CMDQ 0x52 A/B alias first output guard");
+        expect_spad(DST + ((N_SIZE + 1) << 2), 32'hbad0_cb11,
+                    "CMDQ 0x52 A/B alias second output guard");
+        expect_completion(CPLQ_BASE, TASK_ID, golden[N_SIZE-1], N_SIZE,
+                          "CMDQ 0x52 A/B alias completion");
+
+        cmdq_product_gemv_ab_alias = 1'b1;
+        cmdq_product_gemv_ab_alias_cg.sample();
+        if (cmdq_product_gemv_ab_alias_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_ALIAS", "legal A/B read-only alias bin was not covered")
+        `uvm_info("CLUSTER_CMDQ_GEMV_AB_ALIAS_PASS", $sformatf(
+            "cases=1/1 real CMDQ 0x52 shape=1x16x16 srcA==srcB; 256 B source unchanged; 16/16 INT32 Golden outputs, two guards, completion and accepted/returned Matrix reads=%0d/%0d passed; focused bins=1/1 coverage=100.0%% seed=%0d",
+            accepted_reads,
+            compute_vif.matrix_tag_response_count - matrix_responses_before,
+            seed), UVM_LOW)
+        axil_write(REG_CPLQ_HEAD, 32'd1);
+        axil_write(REG_CMDQ_SIZE, 32'd0);
+        axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
     task automatic run_product_gemv_cmdq_cnm_owner_cross(input int unsigned seed);
@@ -12663,6 +12810,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_scalar_vdot_minimum_cmdq_boundary_test(seed);
         run_cmdq_invalid_descriptor_matrix_test(seed);
         run_product_gemv_cmdq_golden(seed);
+        run_product_gemv_cmdq_ab_alias(seed);
         run_product_gemv_cmdq_min_boundary(seed);
         run_product_gemv_cmdq_full_tile(seed);
         run_product_gemv_cmdq_extended_shapes(seed);
