@@ -43,6 +43,14 @@ MUTATIONS = {
         "plusarg": "+MATRIX_TILE_FORWARD_CHAIN_ONLY",
         "checker": r"tile-forward bank reads=",
     },
+    "early_tile_valid": {
+        "old": "tile_forward_capture_mask_r[tile_forward_capture_line_index] <= 1'b1;",
+        "new": "tile_forward_capture_mask_r[tile_forward_capture_line_index] <= 1'b1;\n"
+               "                if (tile_forward_capture_line_index == 4'd0)\n"
+               "                  tile_forward_valid_r <= 1'b1;",
+        "plusarg": "+MATRIX_TILE_FORWARD_CHAIN_ONLY",
+        "checker": r"tile-forward valid rose before a full tagged capture committed",
+    },
     "request_address_hold": {
         "old": "banked_addr = a_read_addr;",
         "new": "banked_addr = banked_ready ? a_read_addr : (a_read_addr + cycle_count);",
@@ -101,13 +109,14 @@ def main():
         binary = variant / "simv"
         compile_cmd = vcs + [
             "-full64", "-sverilog", "-debug_access+all", "-timescale=1ns/1ps",
+            "-assert", "enable_diag",
             "+define+MATRIX_MAX_OUTSTANDING_READS=4",
             "+define+MATRIX_A_TILE_CACHE_ENABLE=1",
             "+define+MATRIX_NEXT_K_PREFETCH_ENABLE=1",
             "+define+MATRIX_GEMV_B_TILE_CACHE_ENABLE=1",
             "+define+MATRIX_ARRAY_SIZE=16",
             "+define+MATRIX_ELASTIC_TILE_FORWARDING_ENABLE=1",
-            "-cm", "line+cond+fsm+branch", "-cm_dir", str(compile_db),
+            "-cm", "line+cond+fsm+branch+assert", "-cm_dir", str(compile_db),
             "-Mdir=" + str(variant / "csrc"), "-top", "tb_ai_tensor_matrix_core_random",
             str(datapath), str(array), str(mutant_core), str(tb),
             "-o", str(binary), "-l", str(variant / "compile.log"),
@@ -120,7 +129,8 @@ def main():
             run_log = variant / ("run_seed_{}.log".format(seed))
             run_cmd = [
                 str(binary), "+SEED=" + seed, spec["plusarg"],
-                "-cm", "line+cond+fsm+branch", "-cm_dir", str(variant / "run.vdb"),
+                "-assert", "report=" + str(variant / ("assertions_seed_{}.rpt".format(seed))) + "+verbose",
+                "-cm", "line+cond+fsm+branch+assert", "-cm_dir", str(variant / "run.vdb"),
                 "-cm_name", "v2_mutant_{}_{}".format(name, seed), "-l", str(run_log),
             ]
             run(run_cmd, sim_dir, env, variant / ("run_seed_{}.stdout.log".format(seed)), args.timeout)
