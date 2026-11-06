@@ -619,16 +619,17 @@ VCS `V-2023.12-SP1_Full64`; the aggregator ran with Python 3.12.13. The
 summarizer command is embedded in the evidence archive manifest and recorded in
 the [execution frontier](../exec-plans/active/execution-frontier.md).
 
-## Verification-only provenance — 2026-11-06
+## Latest verification-only provenance — 2026-11-06
 
-The later real-Top legal opcode `0x52` CMDQ replay is fixed at test/source SHA
-`95301c46dfa6b9ee68f1e37a38f7767e3111d869`; it adds 1×1×1 minimum-shape
-coverage to the prior 3×5×5 test and changes UVM/testbench code only. It does
-not change product RTL. No performance suite was rerun on this SHA. All cycle,
-traffic, utilization, and TinyNPU comparison values above
+The latest real-Top opcode `0x52` CMDQ boundary replay is fixed at test/source
+SHA `92874788fb2cb2a2b15657a3621e5a275a9d5990`; it adds 16×16×16 maximum-tile
+coverage after the previously recorded 1×1×1 point and changes UVM/testbench
+code only. It does not change product RTL. No performance suite was rerun on
+this SHA. All cycle, traffic, utilization, and TinyNPU comparison values above
 remain bound to their individually listed benchmark SHAs and memory models.
 Ratio directions were audited: `NMAForge cycles / TinyNPU normalized cycles`
 above 1 means NMAForge used more cycles; `speedup_vs_cache0_prefetch0` is
 baseline cycles divided by configured cycles, so above 1 means fewer cycles.
-This verification replay adds no new performance, ASIC frequency, area, power,
-or energy evidence.
+The replay adds no new performance, ASIC frequency, area, power, or energy
+evidence. It confirms maximum-shape functional execution only; it is not a
+performance measurement.

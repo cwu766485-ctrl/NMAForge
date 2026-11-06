@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `95301c46dfa6b9ee68f1e37a38f7767e3111d869` (tree `abbb19e1c8205e3d8252e5685fd6ab6161970c3d`; real-Top 1×1×1 and 3×5×5 opcode 0x52 cases). Latest benchmark source SHA remains `c93d020880710a2804685fd85bb98c2e9c56f290` (tree `24180541c76b1ad4d27b2e97313e7d97a5df2016`). Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commit expands only the verification workload/profile. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `92874788fb2cb2a2b15657a3621e5a275a9d5990` (tree `8ddbc13844b9bb2f262c88c471dd60a4e3bbd428`; real-Top 1×1×1, 3×5×5, and 16×16×16 opcode 0x52 cases). Latest benchmark source SHA remains `c93d020880710a2804685fd85bb98c2e9c56f290` (tree `24180541c76b1ad4d27b2e97313e7d97a5df2016`). Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commit expands only the verification workload/profile. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -694,3 +694,26 @@ in the owning report; run `git diff --check` before handoff.
 - Exact command and requirement disposition are in [DV Closure](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
   Maximum dimensions, all tail/fault combinations, concurrent opcode-specific
   ownership, model benchmarks, and PPA remain open.
+
+## 2026-11-06 update — maximum legal 0x52 GEMV tile
+
+- Testbench-only commit `92874788fb2cb2a2b15657a3621e5a275a9d5990` (tree
+  `8ddbc13844b9bb2f262c88c471dd60a4e3bbd428`) adds M=N=K=16 opcode `0x52`
+  through real Top CMDQ. The independent Golden checks all 256 signed INT32
+  outputs, two destination guards, completion result/elements, and accepted /
+  returned Matrix operand lines. Product RTL remains at
+  `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
+- VCS/URG `V-2023.12-SP1_Full64`, Run ID
+  `V2-CMDQ-PRODUCT-GEMV-FULL-TILE-3SEED-9287478`, fixed-SHA detached clean
+  worktree, Seeds 20261118/19/20: 3/3 full UVM passes, 32/32 operand line
+  responses per Seed, all 256 outputs and guards match; UVM severity is
+  0/0/0. The 1×1×1, 3×5×5-tail, and 16×16×16 focused groups are each 100%.
+  Aggregate Line/Condition/FSM/Branch/Assert/Group is
+  70.69/68.28/45.99/67.59/72.00/81.26%, not full coverage closure.
+- Exact command and archive checksum are recorded in the [DV closure
+  report](../../verification/NMAFORGE_V2_DV_CLOSURE.md). Logs-only archive:
+  `/tmp/nmaforge_v2_product_gemv_fulltile_9287478_logs.tar.gz`, SHA-256
+  `b4249983a366d34e6e1e54f08c98d99e501ed234526c2fc7862a48f842e1a05d`.
+- This closes the tested maximum M/N/K endpoint only. Intermediate shape
+  space, concurrent 0x52 engine ownership, all fault/reset phases, trained
+  model demos, updated benchmark comparison, and ASIC readiness remain open.

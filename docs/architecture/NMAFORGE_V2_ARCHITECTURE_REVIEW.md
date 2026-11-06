@@ -3,8 +3,8 @@
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Latest fixed test source SHA:** `95301c46dfa6b9ee68f1e37a38f7767e3111d869` (tree `abbb19e1c8205e3d8252e5685fd6ab6161970c3d`; real-CMDQ legal 0x52 GEMV, including 1×1×1 minimum boundary). The most recent benchmark source remains independently identified in the benchmark report.
-**Current report branch HEAD before this review update:** `95301c46dfa6b9ee68f1e37a38f7767e3111d869` (tree `abbb19e1c8205e3d8252e5685fd6ab6161970c3d`); report-only commits follow the tested source SHA.
+**Latest fixed test source SHA:** `92874788fb2cb2a2b15657a3621e5a275a9d5990` (tree `8ddbc13844b9bb2f262c88c471dd60a4e3bbd428`; real-CMDQ legal 0x52 GEMV at 1×1×1, 3×5×5, and 16×16×16). The most recent benchmark source remains independently identified in the benchmark report.
+**Current report branch HEAD before this review update:** `92874788fb2cb2a2b15657a3621e5a275a9d5990` (tree `8ddbc13844b9bb2f262c88c471dd60a4e3bbd428`); report-only commits follow the tested source SHA.
 **Published feature branch tip at this audit:** `19f9575f3579869f27d72f2dd17fa980840b6499` (same tree `3ac2f31a0fcbbb5fa5cd13f3f9ed39a87c3ed3c0`).
 **Product RTL SHA:** `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; no RTL change is present in the fixed test source or report-only commits.
 
@@ -77,7 +77,8 @@ aggregate URG totals, and log archive checksum are in the
 The 3×5×5 replay closes one legal CMDQ GEMV shape and single-engine response
 drain; the 1×1×1 minimum boundary is tested separately below. Maximum
 supported shapes, exhaustive legal tails, multi-engine 0x52 ownership, and the
-complete fault × phase × reset matrix remain open; v2 DV remains **IN PROGRESS**.
+complete fault × phase × reset matrix were open at that replay; the newer
+maximum-tile replay is recorded below. v2 DV remains **IN PROGRESS**.
 
 ### Minimum legal GEMV boundary — 2026-11-06
 
@@ -87,8 +88,23 @@ source/test SHA `95301c46dfa6b9ee68f1e37a38f7767e3111d869` (tree
 independent Golden outputs −2, −6, and −12, preserve the adjacent output guard,
 check completion, and drain 2/2 accepted/returned operand lines. Its dedicated
 minimum-shape URG bin is 100% (3/3 hits). This closes only the minimum
-descriptor/data point; maximum-dimension execution and full GEMV DV remain
-open. Product RTL is unchanged.
+descriptor/data point; maximum-dimension execution was still open at this SHA
+and is covered by the following replay. Full GEMV DV remains open. Product RTL
+is unchanged.
+
+### Maximum legal GEMV tile — 2026-11-06
+
+At fixed test SHA `92874788fb2cb2a2b15657a3621e5a275a9d5990` (tree
+`8ddbc13844b9bb2f262c88c471dd60a4e3bbd428`), the real Top CMDQ sequence runs
+opcode `0x52` at M=N=K=16 on Seeds 20261118/19/20. Each Seed checks 256 signed
+INT32 outputs against an independent Golden, two output guards, completion
+status/result/elements, and 32 accepted/32 returned Matrix operand lines. The
+dedicated maximum-tile functional group is 100% (3/3 hits); merged aggregate
+Line/Condition/FSM/Branch/Assert/Group is 70.69/68.28/45.99/67.59/72.00/81.26%.
+This proves the maximum descriptor/data point on the Top CMDQ path. Other
+intermediate shapes, tail combinations, fault phases, concurrent response
+ownership, and the v2 RTM remain open. Product RTL was not modified. Exact
+command and log checksum are recorded in the [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
 ### Phase 0 worktree relationship audit — 2026-11-06
 
@@ -256,7 +272,7 @@ opcode under every interaction.
 
 | Opcode | Implemented behavior | Descriptor constraints in current RTL | Verified subset |
 |---|---|---|---|
-| `0x52` | Signed INT8 GEMV mapped as K-fold work on the shared 16×16 Matrix array, with partial-sum reduction. Uses the existing 1 KiB reuse array for bounded B-fold caching, A-line reuse, and optional next-K prefetch. | ABI v7; exact `1≤M,N≤16`, `K≥1`; dense padded A rows and dense B rows; contiguous INT32 output; optional bias. Current product gate rejects transpose, nonzero strides, extra aux/flags, unsupported batch/head fields, address-span overflow, and output overlap with A/B/enabled bias. | Real Top CMDQ Golden for M4×16×32, M1×13×17, M8×16×19; Matrix-core 48/48 four-way Cache×Prefetch Golden checks for M8/M16 × K19/K65 over three Seeds. Descriptor range/alias replay is archived separately. |
+| `0x52` | Signed INT8 GEMV mapped as K-fold work on the shared 16×16 Matrix array, with partial-sum reduction. Uses the existing 1 KiB reuse array for bounded B-fold caching, A-line reuse, and optional next-K prefetch. | ABI v7; exact `1≤M,N≤16`, `K≥1`; dense padded A rows and dense B rows; contiguous INT32 output; optional bias. Current product gate rejects transpose, nonzero strides, extra aux/flags, unsupported batch/head fields, address-span overflow, and output overlap with A/B/enabled bias. | Existing core shape/config checks plus real Top CMDQ Golden at M=N=K=1, 3×5×5 and 16×16×16; max point checks 256 outputs and 32/32 returned reads across three Seeds. Descriptor range/alias replay is archived separately; exhaustive shape/fault matrix remains open. |
 | `0x53` | Matrix GEMM INT32 post-processing followed by signed INT8 requantization and native Matrix-A-layout output. `aux0[4:0]` is shift; `aux0[5]` opts into capture; `aux0[6]` opts into matching-tag consume. | ABI v7; upper aux bits zero; capture is bounded to M=N=16 and one tile; consume is bounded to M=16, K=4, no A transpose, and one tile. Exact source tag is required. A miss uses the regular SPAD path. Both producer and consumer retain SPAD writeback. | Three-Seed Matrix-core OFF/ON Golden ablation with capture backpressure, final-line commit, exact-tag hit/miss, ping-pong bank flip, reset invalidation, Abort invalidation, and drain. Three-Seed product Top CMDQ differential compares all output words/completions and source-A reads. |
 
 The `0x52` validator computes half-open byte spans for padded A, dense B,

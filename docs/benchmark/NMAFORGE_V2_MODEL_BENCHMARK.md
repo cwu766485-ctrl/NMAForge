@@ -193,10 +193,11 @@ timing remain **NOT_RUN**. The v2 feature coverage evidence is recorded in the
 
 ### Later Top CMDQ verification provenance — 2026-11-06
 
-The legal opcode `0x52` GEMV Top CMDQ replay at test/source SHA
-`95301c46dfa6b9ee68f1e37a38f7767e3111d869` includes an M=N=K=1 minimum
-boundary point and is testbench-only; it changed no product RTL and reran no
-model benchmark. Digits, fixed `conv1x_mini`, and
-TinyNPU values remain tied to the separate SHAs and timing boundaries listed
-above. Trained-weight CNN, trained Transformer, and separated Host/DMA/Compute/
-Writeback/Orchestration timing remain **NOT_RUN**.
+The latest legal opcode `0x52` GEMV Top CMDQ replay at test/source SHA
+`92874788fb2cb2a2b15657a3621e5a275a9d5990` adds maximum 16×16×16 execution
+after the previously recorded M=N=K=1 and 3×5×5 points. It is testbench-only;
+product RTL is unchanged and no model benchmark was rerun. Digits, fixed
+`conv1x_mini`, and TinyNPU results remain tied to their separate SHAs and
+timing boundaries listed above. This maximum-tile run is functional evidence,
+not a performance measurement. Trained-weight CNN, trained Transformer, and
+separated Host/DMA/Compute/Writeback/Orchestration timing remain **NOT_RUN**.

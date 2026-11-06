@@ -7,10 +7,10 @@
 
 ## Later DV-only provenance — 2026-11-06
 
-The real-Top legal opcode `0x52` UVM regression at source/test SHA
-`95301c46dfa6b9ee68f1e37a38f7767e3111d869` adds the M=N=K=1 minimum case and
-changes testbench observability/stimulus only; product RTL is unchanged. This
-VCS/URG PASS does not update the
+The latest real-Top legal opcode `0x52` UVM regression at source/test SHA
+`92874788fb2cb2a2b15657a3621e5a275a9d5990` adds M=N=K=16 maximum-tile
+execution after the earlier minimum and tail cases; it changes testbench
+stimulus/coverage only and leaves product RTL unchanged. This VCS/URG PASS does not update the
 SpyGlass, formal/LEC, SRAM mapping, DC, physical PPA, or power evidence below.
 Their existing `NOT_RUN` and `BLOCKED_ENV` dispositions remain in force; no
 ASIC readiness or tapeout claim is made.
