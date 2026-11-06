@@ -2,7 +2,7 @@
 
 **As of:** 2026-11-06
 **Product baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
-**Latest replay source/test SHA:** `4f7195bc01702f4e9a5bef2e609598ecb3dca66d` (tree `cf07292d03e245a0dc258d1d56c70f707e13763b`; three-seed Top Matrix/CNM profile; testbench-only instrumentation)
+**Latest replay source/test SHA:** `c93d020880710a2804685fd85bb98c2e9c56f290` (tree `24180541c76b1ad4d27b2e97313e7d97a5df2016`; three-seed 16×16 Top Matrix/CNM contention profile; testbench-only workload/instrumentation)
 
 ## Comparison boundary
 
@@ -181,7 +181,72 @@ the current scheduler. It does not compare an alternate Bank-Aware Issue
 policy or isolate its area/timing cost, so no scheduling RTL change is
 justified. DMA/DDR timing and a wider workload matrix remain open.
 
-### Top-level Matrix + CNM cycle and traffic profile
+### Latest Top-level 16×16 Matrix + CNM contention profile
+
+Run `V2-TOP-16X16-MATRIX-CNM-CONTENTION-C93D020` uses source/test SHA
+`c93d020880710a2804685fd85bb98c2e9c56f290` (tree
+`24180541c76b1ad4d27b2e97313e7d97a5df2016`), VCS
+`V-2023.12-SP1_Full64`, and three independent run seeds. The real Top CMDQ
+launches a 16×16 Matrix GEMM descriptor (`k_words=16`) and a 16-row banked
+CNM GEMV over disjoint operand/output regions. Matrix inputs are all INT8 +1,
+so all 256 INT32 outputs equal 64; CNM uses +2 and +3 operands, so its 16
+outputs equal 96. Every Matrix output and every CNM output is read back and
+compared against its INT32 Golden value; completion records also pass. No
+product RTL changed; the product RTL
+identity remains `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
+
+| Seed | Profile window | Both engines busy | Same-cycle request conflicts | Matrix busy / MAC / request wait / response wait / writeback / other | CNM busy / compute / request wait / response wait / writeback / other | Read / write bytes |
+|---:|---:|---:|---:|---|---|---:|
+| 20261106 | 445 | 93 | 20 | 318 / 64 / 17 / 23 / 64 / 150 | 145 / 16 / 0 / 0 / 16 / 113 | 2,560 / 1,088 |
+| 20261107 | 445 | 93 | 20 | same | same | 2,560 / 1,088 |
+| 20261108 | 445 | 93 | 20 | same | same | 2,560 / 1,088 |
+
+For the Matrix engine, the observed 64 MAC-active cycles execute 16,384
+INT8 MACs (256 MACs per active cycle); utilization is 20.13% of its busy
+interval or 14.38% of the profile window. Those are behavioral RTL counters,
+not a clock-rate or silicon throughput claim. Matrix/CNM mutually exclusive
+cycle buckets close to their busy totals on all Seeds. The Matrix read FIFO
+high-water is 2, Matrix accepts 128 16-byte reads, and CNM accepts 128
+4-byte lane reads. Output traffic is 1,024 B Matrix plus 64 B CNM. The
+profile-window length includes the testbench's doorbell/CPLQ register access
+overhead; it is not a clean standalone hardware latency endpoint.
+
+This is stronger evidence that the present legal workload exercises the
+shared arbiter: it observes 93 engine-overlap cycles and 20 cycles with
+simultaneous Matrix/CNM requests, with no response-valid alias and bit-exact
+outputs. It still does not compare serial versus parallel execution for the
+same two commands, model alternate memory service, isolate a Bank-Aware Issue
+policy, or measure area/timing cost. Therefore no scheduler RTL change is
+justified from this experiment alone. The large `other` phase buckets also
+show that more detailed phase/state correlation is needed before attributing
+the residual latency to memory contention.
+
+Exact build and run commands (VCS `V-2023.12-SP1_Full64`, behavioral four-bank
+SPAD, `+define+VCS`, 10 ns simulation clock):
+
+```sh
+make -C dv/subsystem/top_smoke/sim ai_smoke \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+  VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias AI_SEED=20261106 SEED=20261106
+
+cd dv/subsystem/top_smoke/sim
+./simv +ntb_random_seed=20261107 +AI_RANDOM_CASES=4 +AI_SEED=20261107 \
+  +ACLK_PERIOD_NS=10.0 -l ai_accel_smoke_seed_20261107.log
+./simv +ntb_random_seed=20261108 +AI_RANDOM_CASES=4 +AI_SEED=20261108 \
+  +ACLK_PERIOD_NS=10.0 -l ai_accel_smoke_seed_20261108.log
+```
+
+Machine outputs: [three-seed CSV](../../benchmark/v2_p2_cluster_top_contention_c93d020.csv)
+and [summary JSON](../../benchmark/v2_p2_cluster_top_contention_c93d020_summary.json).
+Logs-only archive:
+`/tmp/nmaforge_v2_top_contention_c93d020_logs.tar.gz`, SHA-256
+`b44e858972a704438b803d10146558b5554089a26c19729200619cc0af88ebeb`.
+
+The following section records the earlier 4×4 Matrix micro-workload profile;
+it remains useful as history but is superseded for system contention by the
+16×16 run above.
+
+### Initial short Top-level Matrix + CNM profile
 
 Run `V2-TOP-MATRIX-CNM-PROFILE-4F7195B-S20261106-08` uses source/test SHA
 `4f7195bc01702f4e9a5bef2e609598ecb3dca66d` (tree
