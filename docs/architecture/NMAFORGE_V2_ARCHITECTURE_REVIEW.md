@@ -3,8 +3,8 @@
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Latest fixed test source SHA:** `92874788fb2cb2a2b15657a3621e5a275a9d5990` (tree `8ddbc13844b9bb2f262c88c471dd60a4e3bbd428`; real-CMDQ legal 0x52 GEMV at 1×1×1, 3×5×5, and 16×16×16). The most recent benchmark source remains independently identified in the benchmark report.
-**Current report branch HEAD before this review update:** `92874788fb2cb2a2b15657a3621e5a275a9d5990` (tree `8ddbc13844b9bb2f262c88c471dd60a4e3bbd428`); report-only commits follow the tested source SHA.
+**Latest fixed test source SHA:** `85e7db2d12f5edfaed17e8ca3910bb504983779f` (tree `e8f64f78f7986193bdc0d01dfbc01740a130edcb`; real-CMDQ 0x52 M=N=K=16 plus concurrent CNM with independent Golden and response-owner checks). The most recent benchmark source remains independently identified in the benchmark report.
+**Current report branch HEAD before this review update:** `85e7db2d12f5edfaed17e8ca3910bb504983779f` (tree `e8f64f78f7986193bdc0d01dfbc01740a130edcb`); report-only commits follow the tested source SHA.
 **Published feature branch tip at this audit:** `19f9575f3579869f27d72f2dd17fa980840b6499` (same tree `3ac2f31a0fcbbb5fa5cd13f3f9ed39a87c3ed3c0`).
 **Product RTL SHA:** `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; no RTL change is present in the fixed test source or report-only commits.
 
@@ -77,8 +77,8 @@ aggregate URG totals, and log archive checksum are in the
 The 3×5×5 replay closes one legal CMDQ GEMV shape and single-engine response
 drain; the 1×1×1 minimum boundary is tested separately below. Maximum
 supported shapes, exhaustive legal tails, multi-engine 0x52 ownership, and the
-complete fault × phase × reset matrix were open at that replay; the newer
-maximum-tile replay is recorded below. v2 DV remains **IN PROGRESS**.
+complete fault × phase × reset matrix were open at that replay; later maximum-
+tile and concurrent-owner replays are recorded below. v2 DV remains **IN PROGRESS**.
 
 ### Minimum legal GEMV boundary — 2026-11-06
 
@@ -105,6 +105,26 @@ This proves the maximum descriptor/data point on the Top CMDQ path. Other
 intermediate shapes, tail combinations, fault phases, concurrent response
 ownership, and the v2 RTM remain open. Product RTL was not modified. Exact
 command and log checksum are recorded in the [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+### Concurrent production GEMV + CNM response ownership — 2026-11-06
+
+Testbench-only commit `85e7db2d12f5edfaed17e8ca3910bb504983779f` (tree
+`e8f64f78f7986193bdc0d01dfbc01740a130edcb`) adds a second real Top CMDQ
+descriptor beside the maximum legal 0x52 GEMV: opcode 0x21 CNM GEMV uses
+disjoint source/destination regions. Three Seeds pass independent full output
+Goldens, guards, ordered completions, 32/32 Matrix request/response ownership,
+CNM accepted/returned read accounting, and zero Matrix/CNM response-route
+mismatches. Each run observes 178 cycles with both engines busy; 18 same-cycle
+request collisions were granted to CNM (Matrix/CNM grants 0/18). This records
+the observed arbitration order; it is not a fairness or starvation proof.
+
+The focused owner overlap/contention covergroup is 100%. Merged UVM URG is
+Line/Condition/FSM/Branch/Assert/Group
+`70.69/68.25/45.99/67.59/72.00/81.86%`; this does not close overall v2
+coverage. Run ID, exact clean-worktree command, report details, and logs-only
+archive checksum are recorded in the [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+No product RTL changed; the product RTL SHA remains
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
 
 ### Phase 0 worktree relationship audit — 2026-11-06
 

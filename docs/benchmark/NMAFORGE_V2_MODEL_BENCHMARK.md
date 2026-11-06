@@ -6,6 +6,11 @@
 **Latest paired benchmark source SHA:** `c3a59f08d8c07a8da973010d0f23d5d6d7eed61b`
 **TinyNPU reference:** `8216c22b762011aa20c05fc2768423fd12dda59d`
 
+Later testbench-only source SHA `85e7db2d12f5edfaed17e8ca3910bb504983779f`
+adds a real CMDQ GEMV/CNM ownership cross. It did not rerun any model workload
+or change the model benchmark results below; this report's model run identities
+and boundaries remain unchanged.
+
 ## Trained Digits MLP: matched RTL replay
 
 The 360-image sklearn Digits test set was run against the same trained INT8

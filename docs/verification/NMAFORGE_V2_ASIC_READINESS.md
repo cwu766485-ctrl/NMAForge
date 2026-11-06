@@ -7,10 +7,16 @@
 
 ## Later DV-only provenance — 2026-11-06
 
-The latest real-Top legal opcode `0x52` UVM regression at source/test SHA
+Testbench-only SHA `85e7db2d12f5edfaed17e8ca3910bb504983779f` adds three-seed
+real-CMDQ opcode-0x52 GEMV + CNM response-owner and Golden checks. It leaves
+product RTL unchanged and does not update synthesis, timing, power, SRAM,
+formal/LEC, or physical implementation evidence.
+
+The earlier real-Top legal opcode `0x52` UVM regression at source/test SHA
 `92874788fb2cb2a2b15657a3621e5a275a9d5990` adds M=N=K=16 maximum-tile
-execution after the earlier minimum and tail cases; it changes testbench
-stimulus/coverage only and leaves product RTL unchanged. This VCS/URG PASS does not update the
+execution after the minimum and tail cases. The newer `85e7db2` testbench
+replay adds a concurrent CNM response-owner cross. Both change testbench
+stimulus/coverage only and leave product RTL unchanged. These VCS/URG PASSes do not update the
 SpyGlass, formal/LEC, SRAM mapping, DC, physical PPA, or power evidence below.
 Their existing `NOT_RUN` and `BLOCKED_ENV` dispositions remain in force; no
 ASIC readiness or tapeout claim is made.

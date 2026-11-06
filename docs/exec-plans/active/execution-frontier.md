@@ -1,8 +1,21 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `92874788fb2cb2a2b15657a3621e5a275a9d5990` (tree `8ddbc13844b9bb2f262c88c471dd60a4e3bbd428`; real-Top 1×1×1, 3×5×5, and 16×16×16 opcode 0x52 cases). Latest benchmark source SHA remains `c93d020880710a2804685fd85bb98c2e9c56f290` (tree `24180541c76b1ad4d27b2e97313e7d97a5df2016`). Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commit expands only the verification workload/profile. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `85e7db2d12f5edfaed17e8ca3910bb504983779f` (tree `e8f64f78f7986193bdc0d01dfbc01740a130edcb`; real-Top 0x52 M=N=K=16 concurrent with CNM, separate Golden and response-owner checks). Latest benchmark source SHA remains `c93d020880710a2804685fd85bb98c2e9c56f290` (tree `24180541c76b1ad4d27b2e97313e7d97a5df2016`). Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commit expands only the verification workload/profile. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
+
+## 2026-11-06 update — concurrent opcode-0x52 GEMV + CNM ownership
+
+Testbench/Makefile commit `85e7db2d12f5edfaed17e8ca3910bb504983779f` passes
+the full Compute Cluster UVM regression from detached clean worktree on Seeds
+20261121/22/23. The test submits maximum-shape 0x52 GEMV and CNM GEMV through
+one real CMDQ, checks independent full output Goldens, guards, ordered
+completions, accepted/returned ownership, and zero route mismatches. Named
+owner coverage is 100%; aggregate Line/Condition/FSM/Branch/Assert/Group is
+`70.69/68.25/45.99/67.59/72.00/81.86%`. Collision grants were Matrix/CNM
+`0/18`, so this does not establish fairness. Product RTL is unchanged. Run ID,
+exact command, and logs-only archive checksum are recorded in the
+[v2 DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
 ## 2026-11-06 update — real-Top 16×16 Matrix/CNM contention profile
 

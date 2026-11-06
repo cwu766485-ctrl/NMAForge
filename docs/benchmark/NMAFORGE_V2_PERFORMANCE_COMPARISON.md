@@ -246,6 +246,24 @@ The following section records the earlier 4×4 Matrix micro-workload profile;
 it remains useful as history but is superseded for system contention by the
 16×16 run above.
 
+### Functional owner stress: production 0x52 GEMV + CNM (not a performance comparison)
+
+Run `V2-CMDQ-GEMV-CNM-OWNER-CROSS-3SEED-85E7DB2` at fixed source/test SHA
+`85e7db2d12f5edfaed17e8ca3910bb504983779f` adds a maximum 16×16×16 GEMV and
+CNM GEMV as ordered descriptors in one real Top CMDQ submission. Three Seeds
+pass independent Matrix/CNM output Goldens, guards, completion order, accepted
+and returned read accounting, and zero response-route mismatches. Each run
+observes 178 both-busy cycles and 18 simultaneous-request collisions; the
+arbiter grants in those collision cycles were Matrix/CNM `0/18`. That is
+functional ownership evidence and one observed arbitration outcome; it is not
+a fairness result or a comparable latency benchmark. Product RTL is unchanged.
+
+The owner overlap/contention covergroup is 100%; regression-wide URG is
+Line/Condition/FSM/Branch/Assert/Group
+`70.69/68.25/45.99/67.59/72.00/81.86%`, so v2 DV remains open. Exact clean
+worktree command, tool versions, and log archive checksum are in the
+[DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
 ### Initial short Top-level Matrix + CNM profile
 
 Run `V2-TOP-MATRIX-CNM-PROFILE-4F7195B-S20261106-08` uses source/test SHA
