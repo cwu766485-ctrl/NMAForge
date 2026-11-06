@@ -1,8 +1,28 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Latest fixed-SHA v2 request formal run: `b719ac6066616b17dfab4eed2429f8bdfdc49457` (tree `d269b738226282ea1057f1832fcd41ee51e61b6e`). Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; recent commits add only verification/build/report content. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Latest v2 verification candidate: `4df2efeefafa49f6832af9bc7fa8a71005b28fa9` (tree `71a655d67ff82de6ecab8fadeb10864cb4f95006`). Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; recent commits add only verification/build/report content. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
+
+## 2026-11-06 update — 0x53 valid-rise SVA and mutation sensitivity
+
+Added a third runtime assertion to the 0x53 forwarding core regression. VCS
+`V-2023.12-SP1_Full64` passes three Seeds with 3/3 assertions attempted, zero
+failures, three valid-rise cover matches per Seed, and all six named
+forwarding functional bins hit. Golden output remains bit-exact. A follow-on
+actual-RTL mutation campaign injects seven defects across the same Seeds and
+all 21/21 are caught, including premature validity directly by the new SVA.
+The tile-tag mutant also trips this earlier property, and the runner's
+expected checker was changed to match that direct detection. No product RTL,
+ABI, or benchmark result changed.
+
+`REQ-V2-053-002` remains PASS for named core scenarios. `REQ-V2-COM-003`
+remains PARTIAL because these 0x53 checks are runtime simulation assertions,
+not a complete formal proof. `REQ-V2-COM-005` remains PARTIAL because this is
+selected checker-sensitivity evidence, not exhaustive v2 mutation closure.
+The RTM remains 14 PASS-scoped / 8 PARTIAL; v1.0 Compute Cluster remains
+HOLD; v2 DV remains IN PROGRESS. Evidence IDs, exact commands, and archive
+hashes are in the [v2 DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
 ## NMAForge v2 next-round plan status — 2026-11-05
 
