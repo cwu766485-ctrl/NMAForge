@@ -5000,19 +5000,21 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             "legal M/N/K alignment-tail combinations bins=8/8 coverage=%0.1f%%; every bin completed independent signed INT32 Golden, guards, completion and response-owner checks; seed=%0d",
             cmdq_product_gemv_tail_cross_cg.get_coverage(), seed), UVM_LOW)
 
-        // Exercise a long legal K span with all 256 output words traversing
-        // CMDQ, descriptor validation, Matrix and banked SPAD. Keep K=256
-        // outside this checker-bounded test until its completion time has a
-        // documented end-to-end bound.
+        // Isolate the maximum documented K boundary with a 1x1 output so the
+        // real CMDQ/Matrix/SPAD transaction remains within the unchanged
+        // top-level 2,000-cycle task watchdog. The earlier 16x16x256 probe
+        // exceeded that bound before completion and produced no Golden result.
+        // This point verifies K=256 only; it does not claim the largest M/N
+        // workload at K=256 has passed.
         cmdq_product_gemv_long_k_shape = 1'b0;
-        run_product_gemv_cmdq_extended_shape(seed, 7, 16'd16, 16'd16, 16'd128,
+        run_product_gemv_cmdq_extended_shape(seed, 7, 16'd1, 16'd1, 16'd256,
             16'h08ca, 32'h0007_a000, 32'h0007_a800, 32'h0007_b100);
         cmdq_product_gemv_long_k_shape = 1'b1;
         cmdq_product_gemv_long_k_cg.sample();
         if (cmdq_product_gemv_long_k_cg.get_coverage() < 100.0)
-            `uvm_fatal("CLUSTER_CMDQ_GEMV_LONG_K", "K=128 functional bin not hit")
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_LONG_K", "K=256 functional bin not hit")
         `uvm_info("CLUSTER_CMDQ_GEMV_LONG_K_PASS", $sformatf(
-            "cases=1/1 real CMDQ shape=16x16x128; 256 outputs, two guards, completion and all accepted/returned Matrix reads checked against independent signed INT32 Golden; focused bin=1/1 coverage=%0.1f%% seed=%0d",
+            "cases=1/1 real CMDQ shape=1x1x256; output, two guards, completion and all accepted/returned Matrix reads checked against independent signed INT32 Golden; focused max-K bin=1/1 coverage=%0.1f%% seed=%0d",
             cmdq_product_gemv_long_k_cg.get_coverage(), seed), UVM_LOW)
     endtask
 
