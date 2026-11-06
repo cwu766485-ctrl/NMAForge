@@ -211,6 +211,12 @@ def build(model_path, input_npz=None, spad_base_shift=0):
         expected_words.extend([len(values)])
         expected_words.extend(values)
 
+    descriptor_count = 4 + 4 * (padded_classes // 4)
+    allocated_high_water = max(
+        max(memory) + 4,
+        desc_base + descriptor_count * 64,
+        cpl_base + descriptor_count * 16,
+    )
     manifest = {
         "model": model_path.name,
         "model_kind": model_kind,
@@ -220,7 +226,10 @@ def build(model_path, input_npz=None, spad_base_shift=0):
         "input_npz_sha256": hashlib.sha256(input_npz.read_bytes()).hexdigest() if input_npz is not None else None,
         "input_scale": input_scale,
         "spad_base_shift_bytes": spad_base_shift,
-        "spad_max_allocated_exclusive": max(memory) + 4,
+        "spad_descriptor_base": desc_base,
+        "spad_completion_base": cpl_base,
+        "spad_descriptor_count": descriptor_count,
+        "spad_max_allocated_exclusive": allocated_high_water,
         "input_int8_sha256": hashlib.sha256(input_i8.tobytes()).hexdigest(),
         "conv_weight_scale": float(np.max(np.abs(initializers["conv_w"]))) / 127.0,
         "fc_weight_scale": float(np.max(np.abs(initializers["fc_w"]))) / 127.0,

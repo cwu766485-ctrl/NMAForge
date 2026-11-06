@@ -211,6 +211,7 @@ ai_trained_cnn_dataset_regress:
 		--simv "$(AI_TRAINED_CNN_RUN)/rtl/simv" \
 		--model "$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_weights.npz" \
 		--testset "$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_testset.npz" \
+		--spad-base-shift "$(AI_TINYNPU_CNN_SPAD_BASE_SHIFT)" \
 		--candidate-sha "$$(git rev-parse HEAD)" \
 		--out-dir "$(AI_TRAINED_CNN_RUN)/dataset_replay"
 
