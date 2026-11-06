@@ -3,7 +3,7 @@
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Latest fixed test source SHA:** `2999e03252c79aed66116b753b64ee7e389b9a56` (tree `65d56c5d6dd345effde6fdfdf70dad59f135a279`).
+**Latest fixed test source SHA:** `c26064e3dda40ce26490c5c93b3e741529946c58` (tree `1cd67e6dc3b21867a1180521bfe022464e213a75`; 0x52 real-CMDQ invalid-descriptor replay). The most recent benchmark source remains independently identified in the benchmark report.
 **Current report branch HEAD before this review update:** `7ee16a089b4135d95a57a81c0239214b031fba6b` (tree `3ac2f31a0fcbbb5fa5cd13f3f9ed39a87c3ed3c0`); report-only commits follow the tested source SHA.
 **Published feature branch tip at this audit:** `19f9575f3579869f27d72f2dd17fa980840b6499` (same tree `3ac2f31a0fcbbb5fa5cd13f3f9ed39a87c3ed3c0`).
 **Product RTL SHA:** `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; no RTL change is present in the fixed test source or report-only commits.
@@ -40,6 +40,39 @@ full WSTRB only); several code-coverage and assertion bins remain unhit;
 external-fabric response behavior, complete fault × phase × reset coverage,
 and all-checker mutation mapping remain open. No test result is transferred
 to a different SHA, and no product RTL changed.
+
+### Latest real-CMDQ descriptor rejection replay — 2026-11-06
+
+Testbench-only commit `c26064e3dda40ce26490c5c93b3e741529946c58` adds four
+ABI-v7 opcode `0x52` malformed descriptors to the real Top CMDQ sequence:
+output aliases padded A, output aliases dense B, 16-byte source misalignment,
+and a 32-byte padded-A source span that actually wraps past `2^32`. Across
+Seeds 20261109/10/11, all twelve invalid descriptors (eight legacy/engine
+cases plus four GEMV cases) retire `ERR_DESC`; there are zero launch or
+compute/DMA request cycles and all 24 sentinel/guard words remain unchanged.
+The focused `cmdq_invalid_descriptor_cg` is 100% (12/12). Aggregate UVM URG
+is Line/Condition/FSM/Branch/Assert/Group `69.65/63.34/45.62/58.03/72.00/79.18%`;
+v2 remains IN PROGRESS. The first input attempt used K=1 and ended exactly at
+`2^32`, so it correctly was not treated as a wrap; the committed test uses
+K=17. Product RTL is unchanged. Full command, logs, and archive checksum are
+recorded in [DV closure](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+### Phase 0 worktree relationship audit — 2026-11-06
+
+The requested feature work was run in a separate worktree on
+`feature/npu-architecture-v2`, currently tested through source SHA
+`c26064e3dda40ce26490c5c93b3e741529946c58`. The original VS Code worktree at
+`/home/ray/workspace/NMAForge` remains on `feat/shape-adaptive-gemv-v2`, HEAD
+`c290eba7697138a4fcf2cbbac9262264849f0aeb`, tree
+`a7b3821eb9e425927322f2b3729a3c12ad08d9d4`, and has two pre-existing
+untracked files (`novas.conf`, `novas.rc`) which were preserved. The branches
+are not interchangeable: their merge base is `b5b6ff25ed41fb5ea4c9a5043360063cec58f7ac`,
+with 446 commits unique to the target feature branch and 64 unique to the
+original `feat/shape-adaptive-gemv-v2` branch. No merge/cherry-pick was
+performed. At audit time GitHub `main` still resolved to R250
+`3041355528dffe856e2d5384027c6ee5df5d1b42`; the published v2 branch was
+`5d01a88a8a2a7b1add15fbedbb02096d686824ab` (tree
+`bf7306b...`).
 
 ### Latest v2 verification-only update — 2026-11-06
 
