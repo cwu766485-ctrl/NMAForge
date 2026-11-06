@@ -1,9 +1,9 @@
 # NMAForge v2 DV Closure Status
 
 **Status:** IN PROGRESS — scoped regressions pass; v2 sign-off is not ready.  
-**Latest fixed RTL/test candidate SHA:** `6a253386f53638a1206a75e359d6020ba27765cb` (tree `588806486bd6b22fc0444cd0e29dc108d9f993d3`; testbench/build-only update, product RTL unchanged)
+**Latest fixed RTL/test candidate SHA:** `2999e03252c79aed66116b753b64ee7e389b9a56` (tree `65d56c5d6dd345effde6fdfdf70dad59f135a279`; latest three-seed Cluster UVM replay; product RTL unchanged)
 
-**Candidate tree:** `588806486bd6b22fc0444cd0e29dc108d9f993d3` (latest verification-only tree)
+**Candidate tree:** `65d56c5d6dd345effde6fdfdf70dad59f135a279` (tree used for the latest three-seed generic Cluster replay)
 
 **Latest fault replay:** `99566993256778d094c068a8733c074ade2f9921`; three seeds pass selected 0x52/0x53 fault/recovery points.
 **Latest RTL-mutation replay:** `ab96d47876beb4d7e47fef01e43b4c4716dd176a`; 18/18 opcode-core mutant-seed checks caught across six mutation classes and three Seeds.
@@ -15,6 +15,55 @@
 
 **Baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Simulator:** Synopsys VCS `V-2023.12-SP1_Full64`
+
+## Current Compute Cluster UVM replay at `2999e03` — 2026-11-06
+
+The latest fixed v2 tree was compiled and run with three independent seeds.
+The current UVM sources and product RTL were unchanged for this replay; the
+tree also contains the separately recorded Top Smoke contention testbench and
+benchmark evidence. This is a real-top simulation using the behavioral
+four-bank SPAD, not ASIC timing or sign-off coverage.
+
+| Run ID | Command / evidence | Result and scope |
+|---|---|---|
+| `V2-CLUSTER-UVM-3SEED-2999E03` | `make -C dv/uvm/sim uvm_compute_cluster_regress COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v2_phase1_uvm_c93d020 COMPUTE_CLUSTER_UVM_SEEDS='20261106 20261107 20261108'` | Three seeds pass. Each reaches all 21 observed engine-pair overlap bins; checks 18 Parity and 19 Protection cases, plus 72/72 legal engine/operand/phase Protection × Reset recovery points. The Memory scoreboard checks 92,871 words with zero mismatch, unknown, or stale-epoch reads; response ownership reports accepted/checked/reset-dropped `5015/4995/20`, zero route/data/error mismatch, and zero pending responses. UVM Warning/Error/Fatal is `0/0/0` per seed. |
+
+The seed logs also show ordered Completion Queue backpressure/release, independent
+Matrix/CNM response tags, Abort suppression, all-engine Reset recovery, and
+post-fault Golden recovery. The line-write scoreboard observed 1,589 full
+strobe writes and no partial or zero-strobe writes; this run does **not** close
+the partial-WSTRB contract. Descriptor boundaries and opcode-specific 0x52/0x53
+alias, overlap, tag, and held-response contracts remain separately scoped in
+the RTM.
+
+URG merged the three tests. The focused Compute Cluster covergroup reports
+100.0% for its applicable bins and the observed pairwise-overlap group is
+21/21. The aggregate report is lower: Line/Condition/FSM/Branch
+`69.65/62.74/45.62/58.03%`, Group `79.18%`, and Assert `17/22` real successes
+with zero failures or incomplete attempts. Five assertions are uncovered
+(three top AXI properties without a success and two UVM RAL properties with no
+attempts); two of three AXI stall-to-accept cover properties are also
+unmatched. These are explicit open points, not passes inferred from the UVM
+test result.
+
+Exact tool versions: VCS and URG `V-2023.12-SP1_Full64`, UVM `1.2`. Logs and
+text URG reports, excluding simulator binaries, waveforms, and VDBs, are
+archived at `/tmp/nmaforge_v2_phase1_uvm_2999e03_logs.tar.gz`, SHA-256
+`1596309ee89d002bf48c2733e2d0844781d61e80c6d1d1bec8ae712563186890`.
+`CL-DV-v1.0` remains **HOLD** and v2 DV remains **IN PROGRESS**; this generic
+Cluster replay does not replace opcode-specific v2 closure or complete the
+RTM.
+
+Exact invocation:
+
+```sh
+VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+VCS_ARCH_OVERRIDE=linux \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v2_phase1_uvm_c93d020 \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261106 20261107 20261108'
+```
 
 ## Current Matrix core replay at `9956699` — 2026-11-05
 

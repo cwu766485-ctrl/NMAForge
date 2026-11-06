@@ -91,6 +91,20 @@ unsampled and total Top functional-group coverage is 20%. These figures do
 not close v2 DV or imply full coverage. See run identities and scope in the
 [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
+**Latest generic Cluster replay (2026-11-06):** fixed tree
+`2999e03252c79aed66116b753b64ee7e389b9a56` passes the real-top seven-engine
+UVM regression on Seeds `20261106/07/08`. Each seed observes all 21 engine
+pairs, passes 18 Parity + 19 Protection cases and 72/72 legal engine/operand/
+phase Protection × Reset recovery points, checks 92,871 memory words with zero
+mismatch/unknown/stale reads, and drains the response-owner ledger
+`5015/4995/20` with no route/data/error mismatch or pending response. Focused
+applicable Compute Cluster bins are 100%, but merged aggregate
+Line/Condition/FSM/Branch is `69.65/62.74/45.62/58.03%`; assertions are 17/22
+with zero failures/incomplete, and AR/AW stall covers remain unmatched. This
+generic Cluster run does not close v2 opcode-specific contracts or change the
+14 PARTIAL RTM rows. Logs-only archive SHA-256:
+`1596309ee89d002bf48c2733e2d0844781d61e80c6d1d1bec8ae712563186890`.
+
 The repository `ai_accel_memory_fabric` boundary also has a three-seed
 coordinated reset/epoch replay at SHA
 `f340acaa2cdf7c36075473b8bc6fd6dee8e59873`: its three named reset groups
