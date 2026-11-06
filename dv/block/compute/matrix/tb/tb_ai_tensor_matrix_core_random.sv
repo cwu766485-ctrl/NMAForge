@@ -302,7 +302,9 @@ module tb_ai_tensor_matrix_core_random;
       end
       if(bank_stall_pending) begin
         if(!banked_read_valid) begin
-          if(!abort && !error && !dut.watchdog_expired)
+          if(!abort && !error && !dut.watchdog_expired &&
+             !dut.banked_response_fault &&
+             !dut.banked_response_context_fault)
             $fatal(1,"Matrix bank request dropped while stalled without cancel/error state=%0d addr=%08x outstanding=%0d bank_fault=%b context_fault=%b watchdog=%b",
                    dut.state_r,stalled_bank_addr,dut.read_outstanding_count,
                    dut.banked_response_fault,dut.banked_response_context_fault,
