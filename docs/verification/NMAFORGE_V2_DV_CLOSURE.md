@@ -1,6 +1,22 @@
 # NMAForge v2 DV Closure Status
 
-**Status:** IN PROGRESS — scoped regressions pass; v2 sign-off is not ready.  
+## Scope change — 2026-11-06
+
+Full DV closure is paused for this work round by explicit project direction.
+The active target is the fixed TinyNPU performance baseline plus static SPAD
+capacity analysis. No new coverage, mutation, formal, or UVM scope is being
+opened. Existing fixed-SHA evidence is reused only for the minimum functional
+check: clean Top smoke/completion, scoped INT8 GEMM and opcode `0x52`, the
+scoped `0x53` fused path, exact trained Digits MLP output, and exact
+`conv1x_mini` intermediate/output checks. The new seven-point TinyNPU matrix
+also passes its independent INT32 Golden checks.
+
+This is **not a v2 DV sign-off**. Existing PARTIAL / NOT_RUN / BLOCKED items,
+coverage exclusions, SVA scope limits, and formal gaps remain unchanged. The
+target branch's pre-existing uncommitted UVM fairness assertion edit is
+preserved and was not included in these benchmark records.
+
+**Status:** FULL CLOSURE PAUSED — scoped functional evidence exists; v2 sign-off is not ready.
 **Latest clean Top/UVM/opcode replay candidate:** `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` (tree `630e498ba467d84dd5359403cfe1ed1e5879f6e9`; Top smoke, three-seed Cluster UVM, focused 0x52/0x53 tests, and selected mutation checks). Product RTL is unchanged. Earlier broader coverage merges and other workload results remain bound to their own listed SHAs.
 **Latest three-seed 20-random-workload compatibility replay:** testbench/tooling SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5`; directed smoke plus three 20-random-workload seeds pass legacy/v2 markers. The later clean `f9f32f7` Top Smoke replay is a shorter four-random-workload check and is not a UVM/URG coverage update.
 

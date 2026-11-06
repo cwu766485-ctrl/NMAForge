@@ -1,5 +1,92 @@
 # NMAForge v2 Performance Comparison
 
+## Current fixed TinyNPU matrix — 2026-11-06
+
+This section supersedes prior NMAForge cycle rows for the listed fixed shapes.
+It does not replace or rewrite historical runs. NMAForge used current source
+SHA `219c9f26a85b9661185cd78ab6308ae3f13e3ea7`, product RTL SHA
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`, seed `20261106`, VCS
+`V-2023.12-SP1_Full64`, 16×16 array, depth 4, B-fold cache and prefetch on.
+TinyNPU source is pinned to `8216c22b762011aa20c05fc2768423fd12dda59d`;
+its already-compiled RTL was generated with Verilator 5.052 and the focused
+driver was run with g++ 8.5.0. Both sides use matching deterministic INT8
+operands and independent INT32 Golden checks.
+
+TinyNPU exposes only direct array cycles in this experiment. The separate
+common-memory estimate serializes logical INT8 input reads and INT32 output
+writes through one 16-byte/cycle port, adds one read-response cycle and two
+initial accumulator-clear cycles. It is an estimate, not a TinyNPU controller
+or memory measurement. The ratio column is explicitly
+`NMAForge cycles / TinyNPU estimated endpoint`; values above 1 indicate more
+NMAForge cycles under this mixed measured/estimated boundary.
+
+### GEMM
+
+| Shape M×N×K | NMA cycles | NMA MAC/cycle | NMA array utilization | NMA SPAD read/write B | Tiny array cycles | Tiny common endpoint estimate | NMA / estimated Tiny | Golden |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| 16×16×16 | 173 | 23.676 | 9.25% | 512 / 1,024 | 52 | 151 | 1.1457 | PASS both |
+| 16×16×32 | 259 | 31.629 | 12.36% | 1,024 / 1,024 | 100 | 231 | 1.1212 | PASS both |
+| 32×32×64 | 1,380 | 47.490 | 18.55% | 6,144 / 4,096 | 790 | 1,305 | 1.0575 | PASS both |
+
+### GEMV / padded TinyNPU array mapping
+
+TinyNPU does not execute these through a native GEMV descriptor/controller;
+the reference test drives its 16×16 array with padded operands and checks the
+logical output image. Its direct-array timing excludes memory service.
+
+| Shape M×N×K | NMA cycles | NMA MAC/cycle | NMA utilization | NMA SPAD read/write B | Tiny array cycles | Tiny common endpoint estimate | NMA / estimated Tiny | Golden |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| 1×13×17 | 66 | 3.348 | 1.31% | 304 / 52 | 100 | 122 | 0.5410 | PASS both |
+| 8×16×19 | 148 | 16.432 | 6.42% | 560 / 512 | 100 | 164 | 0.9024 | PASS both |
+| 16×16×19 | 264 | 18.424 | 7.20% | 816 / 1,024 | 100 | 205 | 1.2878 | PASS both |
+| 16×16×65 | 634 | 26.246 | 10.25% | 2,368 / 1,024 | 244 | 441 | 1.4376 | PASS both |
+
+NMA stall observations (cycles; overlapping categories must not be summed):
+
+| Workload | Shape | Bank / line | Prefetch wait | Arbiter / response / writeback |
+|---|---|---:|---:|---:|
+| GEMM | 16×16×16 | 9 / 21 | 47 | 30 / 8 / 21 |
+| GEMM | 16×16×32 | 24 / 21 | 111 | 45 / 10 / 21 |
+| GEMM | 32×32×64 | 134 / 77 | 664 | 211 / 23 / 77 |
+| GEMV | 1×13×17 | 6 / 1 | 36 | 7 / 5 / 2 |
+| GEMV | 8×16×19 | 12 / 3 | 63 | 15 / 11 / 3 |
+| GEMV | 16×16×19 | 18 / 23 | 85 | 41 / 20 / 23 |
+| GEMV | 16×16×65 | 49 / 18 | 363 | 67 / 22 / 18 |
+
+The large-GEMM evidence points to memory/controller service rather than a lack
+of MAC capacity alone: NMA utilization is 9.25–18.55%; the 32×32×64 case has
+134 bank-stall, 77 line-stall, 211 arbiter-stall and 77 writeback-wait
+observations, with category overlap. Small-M GEMV retains poor utilization
+(1.31% at M=1). NMA is below the modeled Tiny endpoint for M=1 and M=8, but
+above it for both M=16 tail cases. Because TinyNPU memory/controller timing
+is not measured, none of these ratios establish a system-level TinyNPU win.
+
+Machine outputs:
+[GEMM CSV](../../benchmark/v2_tinynpu_gemm_current_20261106.csv),
+[GEMM JSON](../../benchmark/v2_tinynpu_gemm_current_20261106.json),
+[GEMV CSV](../../benchmark/v2_tinynpu_gemv_current_20261106.csv), and
+[GEMV JSON](../../benchmark/v2_tinynpu_gemv_current_20261106.json).
+Raw logs and the exact run manifest are archived outside the repository at
+`/tmp/nmaforge_v2_tinynpu_evidence_20261106.tar.gz` (SHA-256
+`3cf83dea684002740ead224ac1fec60e4710c44b2fa887c718082699b51debb9`).
+
+## Innovation ablations and model-level evidence
+
+The fixed 48-point Cache×Prefetch matrix continues to show B-fold Cache
+reducing cycles by 22.3–41.6% and read traffic by 35.2–56.5% versus Cache OFF
+/ Prefetch OFF. Prefetch with Cache ON helps the M8 shapes about 2%, while
+regressing the M16 shapes 0.6–0.8%; this does not justify a new scheduler.
+For fused Digits, the matched RTL run reduces doorbell-to-completion cycles
+from 110,155 to 34,761 (68.44%), with byte-identical logits and 352/360
+classification accuracy in both runs. The 0x53 Tile Forwarding directed
+Matrix-core test saves 23 cycles (about 8%) and halves source-A bank reads;
+that test is not a full CMDQ producer/consumer Top benchmark.
+
+The paired mini-CNN remains Golden-correct on both systems. NMAForge reports
+1,985 compute + 1,080 host-layout cycles; TinyNPU reports 4,781 graph cycles
+under a different endpoint. No CNN speedup ratio is valid. See the [model
+report](NMAFORGE_V2_MODEL_BENCHMARK.md).
+
 **As of:** 2026-11-06
 **Product baseline:** R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Latest fixed Matrix benchmark source/test SHA:** `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` (clean-worktree three-seed Cache × Prefetch GEMV ablation; VCS V-2023.12-SP1_Full64). **Latest Top contention workload SHA:** `c93d020880710a2804685fd85bb98c2e9c56f290` (tree `24180541c76b1ad4d27b2e97313e7d97a5df2016`; three-seed 16×16 Top Matrix/CNM contention profile, replayed at clean candidate `839b9af`). Product RTL in both remains `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.

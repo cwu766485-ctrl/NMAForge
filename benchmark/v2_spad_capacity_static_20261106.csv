@@ -1,0 +1,5 @@
+capacity_kib,capacity_bytes,capacity_bits,banks,words_per_bank_32b,digits_fixed_map_required_bytes,digits_fixed_map_fits,digits_compacted_full_dataset_lower_bound_bytes,digits_compacted_full_dataset_fits_static,cnn_fixed_map_high_water_bytes,cnn_fixed_map_fits,same_current_mapping_all_models_fit,notes,relative_capacity_vs_512k
+512,524288,4194304,4,32768,351232,True,79776,True,135296,True,True,baseline current map,1.0
+256,262144,2097152,4,16384,351232,False,79776,True,135296,True,False,candidate: requires compaction/remap; no run,0.5
+128,131072,1048576,4,8192,351232,False,79776,True,135296,False,False,candidate: requires compaction/remap; no run,0.25
+64,65536,524288,4,4096,351232,False,79776,False,135296,False,False,requires streamed/retiled mapping; no run,0.125

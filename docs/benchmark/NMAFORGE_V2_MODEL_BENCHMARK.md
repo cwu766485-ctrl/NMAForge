@@ -1,5 +1,22 @@
 # NMAForge v2 Model Benchmark
 
+## Bounded status update — 2026-11-06
+
+The current TinyNPU GEMM/GEMV fixed matrix is recorded separately in the
+[performance comparison](NMAFORGE_V2_PERFORMANCE_COMPARISON.md) and its CSV /
+JSON artifacts. It reuses the pinned TinyNPU array model and does not contain a
+TinyNPU memory controller result. The trained Digits MLP and `conv1x_mini`
+ONNX evidence below remains the functional minimum for this round: Digits
+matches all 360 independent Golden logits; the CNN matches all checked
+intermediate tensors and final outputs. CNN cycle windows differ between the
+two implementations, so this report makes no relative-speed claim.
+
+Scratchpad capacity work is static only. The Digits fixed map reaches
+351,232 bytes from SPAD base with a 79,776-byte full-data lower bound; a 128
+KiB compact remap is plausible by byte count, but has not been generated or
+run. The CNN fixed map reaches 135,296 bytes. No reduced-SPAD model replay or
+remapped model timing was run.
+
 **Status date:** 2026-11-06
 **Latest fixed-weight Transformer Top replay:** `f9f32f71e7168350d74a75ede0a4a4b222844cc9`
 **R250 baseline:** `3041355528dffe856e2d5384027c6ee5df5d1b42`  

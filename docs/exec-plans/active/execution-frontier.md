@@ -1,6 +1,58 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Current clean validation candidate: `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` (tree `630e498ba467d84dd5359403cfe1ed1e5879f6e9`), replayed with Top smoke, three-seed Cluster UVM, focused 0x52/0x53 tests/mutations, four-way GEMV benchmark, and in-repository memory-fabric reset. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; recent commits expand only verification/benchmark workload and evidence. GitHub synchronization remains blocked because Git cannot read an HTTPS username in this environment. The latest matched Cluster serial/parallel workload remains `f19e92934cd6273d327621c43cb17291cf1a9aa5`; latest Top contention workload remains `c93d020880710a2804685fd85bb98c2e9c56f290`. Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. This is a short handoff for the next engineering task; it
+## Current bounded objective — 2026-11-06
+
+The open-ended v2 DV closure loop is paused by project direction. This round
+is limited to fixed-SHA core-function evidence reuse, the specified TinyNPU
+GEMM/GEMV matrix, existing model correctness records, and static Scratchpad
+capacity analysis. No additional coverage, mutation, formal, UVM, RTL
+architecture, or ASIC tasks are being started.
+
+Audit snapshot before the report package: branch
+`feature/npu-architecture-v2`, source SHA
+`219c9f26a85b9661185cd78ab6308ae3f13e3ea7`, product RTL SHA
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`, 77 commits ahead of fetched
+GitHub branch head `5d01a88a8a2a7b1add15fbedbb02096d686824ab`; `main` remains R250
+`3041355528dffe856e2d5384027c6ee5df5d1b42`. The source tree was
+`e2e3f1d1cc7dfa4de3e3d78fd51fab76d6c43f24` and the fetched remote tree was
+`bf7306bdeefeca415dd221f0a29305fdcef5b72c`. All other worktrees and
+pre-existing uncommitted edits were preserved. One UVM fairness assertion
+edit remains uncommitted and is excluded from this report/benchmark commit.
+
+The fixed NMAForge/TinyNPU matrix is complete: GEMM 3/3 and GEMV 4/4 Golden
+PASS at seed 20261106. TinyNPU timing is direct array only; the single-port
+memory endpoint is modeled and labeled estimated. The B-fold cache and fused
+output ablations reuse their earlier fixed-SHA evidence. Current bottlenecks
+are Matrix bank/line/arbitration/writeback wait at large GEMM and low useful
+lane occupancy for small-M GEMV. The 512/256/128/64 KiB analysis is static:
+current Digits and CNN fixed maps only fit 512 KiB together; compact 128 KiB
+is a byte-count candidate for Digits but has not been mapped or timed.
+
+Reports and machine outputs are in
+[`NMAFORGE_V2_TINYNPU_BASELINE_SUMMARY.md`](../../benchmark/NMAFORGE_V2_TINYNPU_BASELINE_SUMMARY.md),
+the [TinyNPU performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md),
+and `benchmark/v2_tinynpu_*_current_20261106.{csv,json}` plus
+`benchmark/v2_spad_capacity_static_20261106.{csv,json}`. Full DV remains
+PARTIAL/HOLD; TinyNPU common-memory RTL, reduced-SPAD model runs, and current
+ASIC PPA remain NOT_RUN/BLOCKED_ENV. This objective stops after the report
+package is committed and pushed.
+
+## Prior DV handoff snapshot (historical)
+
+At that earlier update, the clean validation candidate was
+`839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` (tree
+`630e498ba467d84dd5359403cfe1ed1e5879f6e9`), replayed with Top smoke,
+three-seed Cluster UVM, focused 0x52/0x53 tests/mutations, four-way GEMV
+benchmark, and in-repository memory-fabric reset. The product RTL remains
+unchanged from `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. The old note that
+GitHub sync was blocked applies only to that earlier attempt; the current
+target branch and fetched GitHub ref are documented above. The matched Cluster
+serial/parallel workload was `f19e92934cd6273d327621c43cb17291cf1a9aa5`, and
+the Top contention workload was `c93d020880710a2804685fd85bb98c2e9c56f290`.
+The latest 0x53 runtime SVA source/test SHA was
+`ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence was
+at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. The historical frontier was a
+short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 

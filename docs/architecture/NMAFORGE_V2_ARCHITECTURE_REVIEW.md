@@ -1,5 +1,45 @@
 # NMAForge v2 Architecture Review
 
+## Bounded benchmark priority update — 2026-11-06
+
+The current task is limited to reusing minimum functional evidence, comparing
+the pinned TinyNPU array on the requested fixed GEMM/GEMV matrix, inspecting
+the existing Digits/CNN layouts, and assessing SPAD capacity statically. Full
+DV closure, 100% code coverage, complete formal closure, and ASIC readiness
+are explicitly not goals of this round.
+
+At audit, the target was `feature/npu-architecture-v2` at
+`219c9f26a85b9661185cd78ab6308ae3f13e3ea7`, 77 commits ahead of fetched
+`origin/feature/npu-architecture-v2` `5d01a88a8a2a7b1add15fbedbb02096d686824ab`
+(tree `bf7306bdeefeca415dd221f0a29305fdcef5b72c`); source tree at audit was
+`e2e3f1d1cc7dfa4de3e3d78fd51fab76d6c43f24`.
+`main` remains R250 `3041355528dffe856e2d5384027c6ee5df5d1b42`. Product RTL
+remains at `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. The Matrix/CNM UVM
+fairness edit already present in the worktree was preserved and is not part
+of the benchmark/report change.
+
+The fixed TinyNPU reference `8216c22b762011aa20c05fc2768423fd12dda59d` and
+NMAForge source `219c9f2` were used for the 3-point GEMM and 4-point GEMV
+matrix, seed `20261106`; all 7 outputs sets match independent INT32 Goldens.
+TinyNPU cycles are direct-array measurements. Its common-memory endpoint is
+an explicitly labeled single-port estimate, not TinyNPU memory RTL. Results,
+stall counters, commands, and archived raw logs are in
+[`benchmark comparison`](../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md)
+and machine-readable CSV/JSON.
+
+The fixed-address Digits workload touches offset `0x55C00` (351,232 bytes)
+from the SPAD base. Its complete padded simultaneous data objects total at
+least 79,776 bytes. Thus current addresses require 512 KiB; a compact remap
+has a static 128 KiB fit but no remapped run exists, while 64 KiB requires
+streaming/reuse. The current mini-CNN map reaches offset `0x21080` (135,296
+bytes), so its present map needs 256 KiB. The capacity analysis is static;
+no smaller-SPAD mapper, cycle, bank-conflict, or PPA result is claimed.
+
+Minimum functional evidence is reused from fixed RTL/test records: clean Top
+smoke, exact trained Digits MLP outputs, exact mini-CNN intermediates/output,
+and the scoped 0x52/0x53 regressions. v2 remains a functional/performance
+candidate; full DV sign-off and ASIC readiness remain open.
+
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  

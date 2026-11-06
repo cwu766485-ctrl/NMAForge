@@ -167,7 +167,9 @@ int main() {
         !run_gemm(32, 32, 64))
         return EXIT_FAILURE;
     if (!run_gemm(1, 13, 17, 1) ||
-        !run_gemm(8, 16, 19, 2))
+        !run_gemm(8, 16, 19, 2) ||
+        !run_gemm(16, 16, 19, 2) ||
+        !run_gemm(16, 16, 65, 2))
         return EXIT_FAILURE;
     return EXIT_SUCCESS;
 }

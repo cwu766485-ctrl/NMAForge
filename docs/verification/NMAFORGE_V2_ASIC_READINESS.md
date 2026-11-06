@@ -1,5 +1,33 @@
 # NMAForge v2 ASIC Readiness
 
+## Bounded benchmark / storage update — 2026-11-06
+
+This round does not pursue ASIC sign-off. No DC, SRAM macro mapping, PPA,
+reduced-capacity RTL, or physical implementation run was performed. The
+current status remains **NOT ASIC READY** / PPA **BLOCKED_ENV** as documented
+below.
+
+The only storage update is a source/address-based capacity assessment. Four
+banks with 32-bit words per bank require these logical storage quantities:
+
+| Total SPAD | Words per bank | Storage bits | Relative same-shape macro capacity |
+|---:|---:|---:|---:|
+| 512 KiB | 32,768 | 4,194,304 | 1× |
+| 256 KiB | 16,384 | 2,097,152 | 1/2× |
+| 128 KiB | 8,192 | 1,048,576 | 1/4× |
+| 64 KiB | 4,096 | 524,288 | 1/8× |
+
+These are logical bit counts and relative capacity only, not foundry macro
+counts or area. Digits' current fixed map reaches 351,232 bytes and its
+simultaneously initialized data objects total at least 79,776 bytes: it fits
+only the 512 KiB option without remapping. A compact 128 KiB map fits that
+static lower bound, while 64 KiB needs streaming/reuse. The mini-CNN's fixed
+descriptor/completion map reaches 135,296 bytes: it fits 256/512 KiB, not
+128/64 KiB. No remapping, data-preservation, cycle, bank-conflict, or <=5%
+performance-degradation experiment was run. Machine table:
+[`static capacity CSV`](../../benchmark/v2_spad_capacity_static_20261106.csv)
+and [JSON](../../benchmark/v2_spad_capacity_static_20261106.json).
+
 **Review date:** 2026-11-06
 **R250 baseline:** `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Latest RTL/static-analysis candidate replayed:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`

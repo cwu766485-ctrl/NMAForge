@@ -61,6 +61,8 @@ grep -q '^TINYNPU_MATCHED_GEMM_PASS shape_mnk=16,16,32 ' "$OUT_DIR/run.log"
 grep -q '^TINYNPU_MATCHED_GEMM_PASS shape_mnk=32,32,64 ' "$OUT_DIR/run.log"
 grep -q '^TINYNPU_MATCHED_GEMV_PASS shape_mnk=1,13,17 ' "$OUT_DIR/run.log"
 grep -q '^TINYNPU_MATCHED_GEMV_PASS shape_mnk=8,16,19 ' "$OUT_DIR/run.log"
+grep -q '^TINYNPU_MATCHED_GEMV_PASS shape_mnk=16,16,19 ' "$OUT_DIR/run.log"
+grep -q '^TINYNPU_MATCHED_GEMV_PASS shape_mnk=16,16,65 ' "$OUT_DIR/run.log"
 
 # Run the pinned project’s own compute-engine regression using the same
 # Verilated RTL library; this is a reference-integrity check, not a matched

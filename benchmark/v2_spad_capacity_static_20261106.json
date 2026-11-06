@@ -1,0 +1,110 @@
+{
+  "run_id": "V2-SPAD-CAPACITY-STATIC-20261106",
+  "status": "STATIC_SOURCE_ADDRESS_AND_WORKSET_ANALYSIS_NOT_SIMULATED",
+  "source_sha": "219c9f26a85b9661185cd78ab6308ae3f13e3ea7",
+  "product_rtl_sha": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+  "spad_base": "0x00010000",
+  "banks": 4,
+  "line_bytes": 16,
+  "bytes_per_bank_word": 4,
+  "fixed_maps": {
+    "digits_max_relative_exclusive_offset": "0x55C00",
+    "digits_high_water_bytes": 351232,
+    "digits_lower_bound_working_set_bytes": 79776,
+    "cnn_cplq_relative_exclusive_offset": "0x21080",
+    "cnn_fixed_map_high_water_bytes": 135296
+  },
+  "results": [
+    {
+      "capacity_kib": 512,
+      "capacity_bytes": 524288,
+      "capacity_bits": 4194304,
+      "banks": 4,
+      "words_per_bank_32b": 32768,
+      "digits_fixed_map_required_bytes": 351232,
+      "digits_fixed_map_fits": true,
+      "digits_compacted_full_dataset_lower_bound_bytes": 79776,
+      "digits_compacted_full_dataset_fits_static": true,
+      "cnn_fixed_map_high_water_bytes": 135296,
+      "cnn_fixed_map_fits": true,
+      "same_current_mapping_all_models_fit": true,
+      "notes": "baseline current map",
+      "relative_capacity_vs_512k": 1.0
+    },
+    {
+      "capacity_kib": 256,
+      "capacity_bytes": 262144,
+      "capacity_bits": 2097152,
+      "banks": 4,
+      "words_per_bank_32b": 16384,
+      "digits_fixed_map_required_bytes": 351232,
+      "digits_fixed_map_fits": false,
+      "digits_compacted_full_dataset_lower_bound_bytes": 79776,
+      "digits_compacted_full_dataset_fits_static": true,
+      "cnn_fixed_map_high_water_bytes": 135296,
+      "cnn_fixed_map_fits": true,
+      "same_current_mapping_all_models_fit": false,
+      "notes": "candidate: requires compaction/remap; no run",
+      "relative_capacity_vs_512k": 0.5
+    },
+    {
+      "capacity_kib": 128,
+      "capacity_bytes": 131072,
+      "capacity_bits": 1048576,
+      "banks": 4,
+      "words_per_bank_32b": 8192,
+      "digits_fixed_map_required_bytes": 351232,
+      "digits_fixed_map_fits": false,
+      "digits_compacted_full_dataset_lower_bound_bytes": 79776,
+      "digits_compacted_full_dataset_fits_static": true,
+      "cnn_fixed_map_high_water_bytes": 135296,
+      "cnn_fixed_map_fits": false,
+      "same_current_mapping_all_models_fit": false,
+      "notes": "candidate: requires compaction/remap; no run",
+      "relative_capacity_vs_512k": 0.25
+    },
+    {
+      "capacity_kib": 64,
+      "capacity_bytes": 65536,
+      "capacity_bits": 524288,
+      "banks": 4,
+      "words_per_bank_32b": 4096,
+      "digits_fixed_map_required_bytes": 351232,
+      "digits_fixed_map_fits": false,
+      "digits_compacted_full_dataset_lower_bound_bytes": 79776,
+      "digits_compacted_full_dataset_fits_static": false,
+      "cnn_fixed_map_high_water_bytes": 135296,
+      "cnn_fixed_map_fits": false,
+      "same_current_mapping_all_models_fit": false,
+      "notes": "requires streamed/retiled mapping; no run",
+      "relative_capacity_vs_512k": 0.125
+    }
+  ],
+  "limitations": [
+    "No mapper execution or reduced-capacity RTL run; default Python lacks NumPy and Python 3.12 NumPy dependency is unavailable.",
+    "No bank-conflict/performance or additional DMA-cycle estimate for remapped/streamed layouts.",
+    "No SRAM macro mapping or ASIC area estimate; only logical storage bits and relative capacity.",
+    "Candidate performance target <=5% degradation is not measured."
+  ],
+  "address_map_offsets_bytes": {
+    "digits_mlp": {
+      "w1": "0x10000",
+      "b1": "0x12000",
+      "w2": "0x13000",
+      "b2": "0x13400",
+      "hidden": "0x32000",
+      "cmdq_descriptors": "0x38000",
+      "cplq": "0x3A000",
+      "output": "0x3B000",
+      "input": "0x50000"
+    },
+    "conv1x_mini": {
+      "im2col": "0x10000",
+      "conv_weight": "0x11000",
+      "intermediate_range": "0x12000-0x1D000",
+      "final_output": "0x1E000",
+      "cmdq_descriptors": "0x20000",
+      "cplq": "0x21000"
+    }
+  }
+}

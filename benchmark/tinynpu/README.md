@@ -22,6 +22,12 @@ The focused product GEMV comparison is run separately:
 benchmark/tinynpu/run_gemv_match.sh
 ```
 
+The matched array driver now also includes the fixed GEMV tail points
+`16×16×19` and `16×16×65`, in addition to `1×13×17` and `8×16×19`.
+`run_tinynpu_gemm.sh` checks all four output markers. These remain TinyNPU
+direct-array runs with zero-padded operands, not native GEMV controller or
+scratchpad measurements.
+
 It exercises NMAForge opcode `0x52` at `M=1,N=13,K=17` and `M=8,N=16,K=19`
 against the pinned TinyNPU 16×16 array with identical operand formulas. The
 TinyNPU cases use zero-padded direct-array inputs; they do not exercise a
@@ -58,7 +64,7 @@ does not calculate model operators. `cnn_results.csv` records both designs'
 cycles and memory boundaries. The timing windows differ, so the harness does
 not report a CNN speedup ratio.
 
-## Latest run
+## Previous full harness baseline (2026-11-05)
 
 Run ID `TINY-COMPARE-V2C3A59-S20261029` ran on NMAForge SHA
 `c3a59f08d8c07a8da973010d0f23d5d6d7eed61b` and pinned TinyNPU SHA
@@ -109,3 +115,15 @@ schedule estimate, not SRAM timing, ASIC PPA, or measured Fmax. See the
 identity, cycle boundaries, memory traffic, ablation and the remaining need
 for an actual TinyNPU memory adapter. The separate three-seed Matrix performance rerun is archived
 in [`compute_performance.csv`](../compute_performance.csv) and its summary JSON.
+
+## Current focused fixed-shape replay (2026-11-06)
+
+The newer bounded fixed-shape run uses NMAForge seed `20261106` and TinyNPU
+reference SHA `8216c22b762011aa20c05fc2768423fd12dda59d`. NMAForge passes 3/3
+GEMM and 4/4 GEMV shapes against the independent INT32 Golden. TinyNPU's
+precompiled Verilator 5.052 array model passes the same seven logical output
+sets. NMAForge reports Matrix-core plus behavioral-SPAD cycles; TinyNPU reports
+direct array cycles only. A serialized common-memory endpoint is published as
+an estimate, not TinyNPU RTL performance. See the dated fixed matrix in the
+[performance report](../../docs/benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md)
+and raw machine outputs under `benchmark/v2_tinynpu_*_current_20261106`.
