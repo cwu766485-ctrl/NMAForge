@@ -41,7 +41,7 @@ MUTATIONS = {
         "old": "tile_forward_tag_base_r <= dst_batch_base_r;",
         "new": "tile_forward_tag_base_r <= dst_batch_base_r + 32'd16;",
         "plusarg": "+MATRIX_TILE_FORWARD_CHAIN_ONLY",
-        "checker": r"tile-forward bank reads=",
+        "checker": r"tile-forward valid rose before a full tagged capture committed",
     },
     "early_tile_valid": {
         "old": "tile_forward_capture_mask_r[tile_forward_capture_line_index] <= 1'b1;",
