@@ -1907,3 +1907,31 @@ are derived from the run logs by the checked-in summarizer. Text-only log and
 URG archive `/tmp/nmaforge_v2_clean_839b9af_cluster_3seed_text.tar.gz`,
 SHA-256 `4d036d428c8e72a10490bb7eaf9534158a8df185d46722453e49038a374993f9`;
 coverage databases and simulator outputs are excluded.
+
+## Clean-worktree 0x52/0x53 feature and mutation replay — 2026-11-06
+
+At the same fixed candidate SHA/tree, three seeds pass the Matrix-core 0x52/0x53
+focused gates. The exact target set was `product-gemv-regress`,
+`product-opcode-fault-regress`, `product-opcode-handshake-regress`,
+`core-tile-forward-regress`, and `product-opcode-mutation-regress`.
+
+| Scope | Evidence per Seed | Result |
+|---|---|---|
+| Opcode `0x52` GEMV | Six named shape bins; each run checks signed INT32 Golden, complete outputs, and response drain | 3/3 seeds pass; 6/6 bins each |
+| `0x52`/`0x53` selected fault recovery | Parity/Protection/Abort/Reset and stale epoch cases | 3/3 seeds pass; 8/8 declared bins each |
+| Request/line backpressure | `0x52` request VALID/address hold; `0x53` held line payload and recovery | 3/3 seeds pass; 2/2 bins each |
+| Tile Forwarding ON/OFF | Capture/tag/consume, repeated-consumer fallback, ping-pong, miss fallback, abort/reset; enabled runtime assertions | 3/3 seeds pass; enabled 6/6 bins, 3/3 assertions attempted with no failure, 1/1 cover property matched |
+| Actual temporary RTL mutation | Data, address, response operand owner, WSTRB, tile tag, early valid, request-address hold | 21/21 mutant-seed probes detected by the assigned checker |
+
+This replays the selected feature checks at the candidate SHA; it does not
+close every legal M/N/K combination, every fault × phase × reset cross,
+external held/late fabric responses, all cross-engine ownership pairs, or the
+full checker-to-fault mutation matrix. Aggregate v2 URG remains 83.94% functional
+group coverage with residual assertion/cover gaps, and the 22-row RTM remains
+14 PASS-scoped / 8 PARTIAL. No product RTL or coverage disposition changed.
+
+The exact command, per-checker map, seed results, open items and archive hash
+are in the [machine record](../../benchmark/v2_opcode_dv_clean_839b9af_3seed.json).
+Text-only logs, assertion reports and mutation summary:
+`/tmp/nmaforge_v2_clean_839b9af_opcode_dv_3seed_text.tar.gz`, SHA-256
+`5890df6674f1120041d58e05f709ab76ab8a87ac08e97f2b9fffeb1c3d046ff0`.

@@ -717,3 +717,16 @@ that the remote v2 ref remains `5d01a88a8a2a7b1add15fbedbb02096d686824ab` and
 `main` remains R250. No remote ref was changed. Local commits remain intact;
 publication is **BLOCKED_AUTH** pending GitHub credentials in the execution
 environment.
+
+## Current-candidate focused feature replay — 2026-11-06
+
+At clean source SHA `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0`, the 0x52 GEMV,
+0x52/0x53 fault recovery, handshake, Tile Forwarding ON/OFF, and temporary RTL
+mutation targets pass three Seeds. Each Seed passes six GEMV shape bins, eight
+selected fault bins, two handshake bins, and six enabled tile-forward bins;
+tile SVA is attempted 3/3 with no failures, and the seven mutation classes are
+caught in all Seeds (21/21). These are scoped core results: full fault-phase-
+reset crosses, external response timing, all-engine ownership pairs, and
+exhaustive checker-to-mutation mapping remain open. The overall v2 RTM stays
+14 PASS-scoped / 8 PARTIAL. Evidence is in the [DV report](../verification/NMAFORGE_V2_DV_CLOSURE.md)
+and [machine record](../../benchmark/v2_opcode_dv_clean_839b9af_3seed.json).
