@@ -1023,3 +1023,13 @@ Read-only remote verification confirms the v2 branch is unchanged at
 local commits remain intact. Upload requires working GitHub authentication.
 The ASIC environment recheck also leaves Base-vs-v2 PPA **BLOCKED_ENV**;
 details are in the [ASIC readiness report](../../verification/NMAFORGE_V2_ASIC_READINESS.md).
+
+## 2026-11-06 update — Clean-worktree Top Smoke replay at `f9f32f7`
+
+Detached clean worktree `f9f32f71e7168350d74a75ede0a4a4b222844cc9` passed
+`make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261106 SEED=20261106` with VCS
+`V-2023.12-SP1_Full64`; 301/301 Transformer checks passed, all required
+0x52/0x53 and Matrix/CNM markers were present, and no simulation `ERROR:`
+was logged. Run ID `V2-CLEAN-WORKTREE-TOP-SMOKE-F9F32F7-S20261106`; archive
+and checksum are recorded in the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
+This replay adds no UVM/URG closure; v2 DV remains IN PROGRESS.

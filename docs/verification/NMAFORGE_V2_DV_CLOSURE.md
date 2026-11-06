@@ -1676,3 +1676,30 @@ Machine record: [JSON](../../benchmark/v2_top_smoke_post_transformer_timing_f9f3
 Logs-only archive outside Git:
 `/tmp/nmaforge_v2_top_smoke_post_transformer_timing_f9f32f7_logs.tar.gz`,
 SHA-256 `6667deb76dfbfbbfd51219785f27cf283ab7dcb92df57e07f757439dfaf7b428`.
+
+## Clean-worktree current-candidate Top Smoke replay — 2026-11-06
+
+The fixed test/tooling commit `f9f32f71e7168350d74a75ede0a4a4b222844cc9` was
+checked out detached into `/tmp/nmaforge-v2-clean-f9f32f7`; no worktree edits
+were present. VCS `V-2023.12-SP1_Full64` ran:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261106 SEED=20261106
+```
+
+The command exited 0 and emitted one `TEST PASS`, 301/301 Transformer
+intermediate/final/KV Golden checks, and no `ERROR:` lines. Required smoke
+markers passed for 0x52 basic and two tail GEMVs, 0x53 producer/consumer,
+cross-engine SFU overlap with source immutability, and Matrix/CNM cycle closure
+with bit-exact Golden. Run ID
+`V2-CLEAN-WORKTREE-TOP-SMOKE-F9F32F7-S20261106`. Logs-only archive:
+`/tmp/nmaforge_v2_clean_f9f32f7_smoke_logs.tar.gz`, SHA-256
+`1eda8105b2c528ca32110c8f6a5e86b0934e4ba9cc71f59613afb51c5b6e3714`.
+
+This is clean-worktree compatibility and selected functional evidence only.
+It does not add UVM/URG coverage or close the full `REQ-V2-*` RTM; residual
+fault × phase × reset, held/late external response, and coverage disposition
+items remain open. The 10 ns simulation clock is not a physical timing claim.
