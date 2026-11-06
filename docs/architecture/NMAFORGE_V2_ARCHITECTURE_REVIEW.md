@@ -3,10 +3,10 @@
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Current reviewed code/test candidate:** `feature/npu-architecture-v2` `e7daa34d17d8b3c06d2aaf16c1cc66d3bf8ff50a`
-**Candidate tree:** `3807f483155df1be4271c25a165a64512a83d04e`
-**Published branch tip before this request-backpressure update:** `e917974c039d1f12274eae476ec9e0cbb519135f` (tree `e2a0be587bcaa53023f273a3082a70be768c20db`).
-**Latest verification-only test candidate:** `e7daa34d17d8b3c06d2aaf16c1cc66d3bf8ff50a` (tree `3807f483155df1be4271c25a165a64512a83d04e`); product RTL is unchanged.
+**Current reviewed code/test candidate:** `feature/npu-architecture-v2` `ab96d47876beb4d7e47fef01e43b4c4716dd176a`
+**Candidate tree:** `1126cb6e650545fdc0bad003c321a77fe552e3a4`
+**Published branch tip before the current mutation update:** `ff73126e8501f5d5163a774430dde95b0faeae14` (tree `425ff741109d73b431d54a422168c36ed68ec516`).
+**Latest verification-only test candidate:** `ab96d47876beb4d7e47fef01e43b4c4716dd176a` (tree `1126cb6e650545fdc0bad003c321a77fe552e3a4`); product RTL is unchanged.
 
 ## Executive disposition
 
@@ -23,17 +23,18 @@ performance win. Keep the overall Compute Cluster disposition at **HOLD**.
 
 ### Latest v2 verification-only update — 2026-11-06
 
-The current v2 product RTL was not changed. Testbench/build commit
-`e7daa34d17d8b3c06d2aaf16c1cc66d3bf8ff50a` adds deterministic 0x52 bank-request
-backpressure and a VALID/address stability monitor. Three seeds pass the GEMV
-request hold/release and bit-exact Golden check, plus the existing 0x53 producer
-line-write stall, payload stability, and producer/consumer Golden checks. Its
-URG handshake group scores 2/2 (100%) with three hits per bin. The preceding
-`380f961` replay retains the six-shape Prefetch ON/OFF, selected opcode-fault,
-and tile-forwarding results. These are named testpoint results; full v2 coverage,
-external response ownership, and sign-off remain open. Product RTL, benchmark
-results, and prior FSM formal disposition are unchanged. Exact RTM and evidence
-archive are in the [v2 DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+The current v2 product RTL was not changed. Testbench/mutation-runner commit
+`ab96d47876beb4d7e47fef01e43b4c4716dd176a` adds a real request-address-hold
+mutant to the six-class opcode mutation campaign. All 18 mutant-seed runs
+(6 classes × 3 Seeds) were caught, including address instability while
+`VALID&&!READY` by the request stability checker. On this same fixed candidate,
+the Matrix core compatibility/fault, request and line backpressure, selected
+opcode-fault, and Prefetch-OFF six-shape GEMV campaigns pass three Seeds; the
+handshake URG group remains 2/2 with three hits per bin. These are scoped
+results; v2 requirements, external response ownership and sign-off remain open.
+Product RTL, benchmark results, and prior FSM formal disposition are unchanged.
+Exact commands, RTM changes and archive checksum are in the [v2 DV closure
+report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
 ## Baseline and source audit
 

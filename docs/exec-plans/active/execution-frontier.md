@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Latest fixed-SHA v2 request/backpressure replay: `e7daa34d17d8b3c06d2aaf16c1cc66d3bf8ff50a` (tree `3807f483155df1be4271c25a165a64512a83d04e`). Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; recent commits add only verification/build/report content. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Latest fixed-SHA v2 mutation replay: `ab96d47876beb4d7e47fef01e43b4c4716dd176a` (tree `1126cb6e650545fdc0bad003c321a77fe552e3a4`). Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; recent commits add only verification/build/report content. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -527,3 +527,11 @@ in the owning report; run `git diff --check` before handoff.
 - A first checker run correctly exposed the existing legal watchdog cancellation path; the checker now permits that cancellation and the final three-seed compatibility run passes. This was a testbench checker correction, not an RTL failure.
 - Evidence archive `/tmp/nmaforge_v2_opcode_handshake_e7daa34_evidence.tar.gz`, SHA-256 `20f88eb467383ad65c1ba29d819af053cafc3326dca06f4c0f4c4816bf9e7cb8`. Exact commands and remaining scope are in the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
 - Current state remains: v1.0 Compute Cluster **HOLD**; v2 DV **IN PROGRESS**; `REQ-V2-052-007` PARTIAL pending multi-engine owner/hostile response evidence; `REQ-V2-053-004` PASS only for directed local line-ready stall. No benchmark, model, or PPA results changed. Next: broaden legal fault × phase/reset scenarios and add opcode-specific non-vacuous SVA; keep external-fabric behavior separate from repository-fabric evidence.
+
+
+## 2026-11-06 update — request-address mutation at `ab96d47`
+
+- Testbench/mutation-runner-only commit `ab96d47876beb4d7e47fef01e43b4c4716dd176a` (tree `1126cb6e650545fdc0bad003c321a77fe552e3a4`); product RTL is unchanged. Run ID `V2-OPCODE-MUTATION-6X3-AB96D47`, VCS `V-2023.12-SP1_Full64`, Seeds 20261111/12/13: six actual temporary mutations × three Seeds = 18/18 caught. Mutations cover output data, output address, response operand owner, WSTRB, tile tag, and bank request address instability during `VALID&&!READY`.
+- The address-hold mutant is detected by the request stability checker; response-owner corruption is detected by the GEMV Completion/Golden checker. On this SHA, the three-seed Matrix core 18-functional/35-fault, selected opcode fault, request/line backpressure, and Prefetch-OFF six-shape campaigns pass. URG handshake group is 2/2 with three hits per bin. Exact commands and limitations are in [DV Closure](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
+- Evidence archive `/tmp/nmaforge_v2_request_mutation_ab96d47_evidence.tar.gz`, SHA-256 `f137212c354e79f890c4c36f78ca9197694b6853524b1a87b6b9ba5add7fcb03`.
+- The increased mutation count improves checker evidence only; it does not close all checker mappings, opcode-specific SVA, external response ownership, legal fault × phase × reset crosses, or the full v2 RTM. Overall v2 DV remains **IN PROGRESS**. Performance, model, and ASIC results are unchanged; TinyNPU parity is not established and ASIC readiness remains **NOT READY**.
