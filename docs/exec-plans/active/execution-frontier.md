@@ -21,6 +21,20 @@ archive hashes and scope limits are in the [DV closure report](../../verificatio
 and machine-readable records [mixed E2E](../../benchmark/v2_mixed_axi_dma_cov_f9f32f7_16seed.json),
 [19-test merge](../../benchmark/v2_merged_urg_f9f32f7_19test.json).
 
+## 2026-11-06 — Phase 0 worktree and source baseline refresh
+
+The active target worktree is clean on `feature/npu-architecture-v2`; its
+audit snapshot is `30fd00f28555029584d361df5d81289f6cd6b7bc` / tree
+`160fdc923ff5080754ffd11f23ff599d6cf58281`, 63 commits ahead and zero behind
+cached `origin/feature/npu-architecture-v2`. Both requested review start
+`ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` and R250
+`3041355528dffe856e2d5384027c6ee5df5d1b42` are ancestors. The R250-to-v2 RTL
+diff remains six files (`662` insertions, `80` deletions); no product RTL has
+changed after `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. The IDE branch and
+other dirty worktrees were preserved. Push was attempted but HTTPS credential
+lookup failed, so no GitHub ref changed. Full inventory and branch relationship
+are in the [architecture review](../../architecture/NMAFORGE_V2_ARCHITECTURE_REVIEW.md).
+
 ## 2026-11-06 update — 0x52 read-only A/B alias verification
 
 Commit `f19e92934cd6273d327621c43cb17291cf1a9aa5` adds a real Top CMDQ

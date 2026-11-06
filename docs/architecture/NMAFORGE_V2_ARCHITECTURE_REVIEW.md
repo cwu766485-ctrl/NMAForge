@@ -3,9 +3,9 @@
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Latest fixed Compute Cluster DV source SHA:** `f19e92934cd6273d327621c43cb17291cf1a9aa5` (three-seed Top UVM passes the legal real-CMDQ 0x52 read-only A/B alias and full existing Cluster regression). The `16×16×256` case still exceeds the unchanged watchdog before Golden. The most recent Cluster performance replay is independently identified in the benchmark report.
+**Latest fixed Compute Cluster DV source SHA:** `f9f32f71e7168350d74a75ede0a4a4b222844cc9` (three-seed Top UVM, focused 0x52/0x53 tests, and the compatible 19-test Cluster + mixed AXI/DMA URG merge). The `16×16×256` case still exceeds the unchanged watchdog before Golden. The most recent Cluster performance replay is independently identified in the benchmark report.
 **Latest Transformer timing test SHA:** `f9f32f71e7168350d74a75ede0a4a4b222844cc9` (86 descriptors; 301 Golden checks; fixed-weight Top CMDQ Prefill/Decode timing).
-**Current report branch HEAD before this audit update:** `fed6c3f320705361bbbf761b99c73b36014cae77` (tree `0625812c7f8b6852ad0bc3f52701b49e536062b5`); this audit is documentation-only.
+**Current report branch HEAD at the preceding evidence snapshot:** `fed6c3f320705361bbbf761b99c73b36014cae77` (tree `0625812c7f8b6852ad0bc3f52701b49e536062b5`). The later 19-test URG evidence is documented below and in the DV report.
 **Current published v2 branch tip:** `origin/feature/npu-architecture-v2` `5d01a88a8a2a7b1add15fbedbb02096d686824ab` (tree `bf7306bdeefeca415dd221f0a29305fdcef5b72c`).
 **Product RTL SHA:** `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; no RTL change is present in the fixed test source or report-only commits.
 
@@ -22,7 +22,7 @@ This is a **bounded v2 functional/performance candidate**, not a v1.0 Compute
 Cluster sign-off, full v2 verification closure, ASIC sign-off, or a TinyNPU
 performance win. Keep the overall Compute Cluster disposition at **HOLD**.
 
-### Current Phase 0 source/worktree audit — 2026-11-06
+### Phase 0 source/worktree audit — 2026-11-06 (prior snapshot)
 
 The isolated target is `feature/npu-architecture-v2`, source SHA
 `fed6c3f320705361bbbf761b99c73b36014cae77`, tree
@@ -59,11 +59,58 @@ descriptor validator, parallel dispatcher, and Compute Cluster integration):
 commit through this audit snapshot. Both `0x52` and `0x53` use the existing
 shared Matrix controller/array; there is no second 256-MAC array.
 
-**Audit PASS:** exact R250 ancestry, live remote refs, worktree identity, the
-six-file RTL delta, last RTL SHA, clean target tree, private-file ignore
-coverage, and unchanged product RTL after `cd0a05d`. **OPEN:** the local v2
-branch is 53 commits ahead of GitHub and has not been pushed during this
-execution. The separate IDE branch was not merged.
+**Audit PASS at that snapshot:** exact R250 ancestry, remote-ref identity,
+worktree identity, the six-file RTL delta, last RTL SHA, clean target tree,
+private-file ignore coverage, and unchanged product RTL after `cd0a05d`.
+At that snapshot the local v2 branch was 53 commits ahead and had not been
+pushed. See the later Phase 0 status refresh below for the updated count and
+push result. The separate IDE branch was not merged.
+
+### Phase 0 status refresh — 2026-11-06
+
+The audit start `ac6b83ff7f12e626ea1d2c91ad3a0d2f7bcef164` and R250 SHA
+`3041355528dffe856e2d5384027c6ee5df5d1b42` are both ancestors of the target
+branch. At the evidence-commit parent `30fd00f28555029584d361df5d81289f6cd6b7bc`
+(tree `160fdc923ff5080754ffd11f23ff599d6cf58281`), the active worktree
+`/tmp/nmaforge-architecture-v2` is clean on
+`feature/npu-architecture-v2`. Its cached remote-tracking tip is
+`5d01a88a8a2a7b1add15fbedbb02096d686824ab`; the branch is 63 commits ahead,
+zero behind. The cached `origin/main` remains the requested R250 SHA. A normal
+`git push origin feature/npu-architecture-v2` was attempted and failed because
+Git could not read the HTTPS username (`No such device or address`); no remote
+ref was changed.
+
+The original IDE worktree remains on `feat/shape-adaptive-gemv-v2` at
+`c290eba7697138a4fcf2cbbac9262264849f0aeb`, with only untracked
+`novas.conf` and `novas.rc`. Its history is separate from the target branch:
+the merge base is `b5b6ff25ed41fb5ea4c9a5043360063cec58f7ac`; relative to that
+base, the IDE branch has 64 unique commits and the target branch has 507. No
+merge or cherry-pick was made.
+
+The full Git worktree inventory reports 216 registered paths: 136 exist and
+80 are missing and marked prunable. Ten existing worktrees are dirty: the IDE
+worktree, `/tmp/nmaforge-v2-gemv-baseline-8cff286`,
+`/tmp/nmaforge_r153_clean`, `/tmp/nmaforge_r153_final_clean`,
+`/tmp/nmaforge_r153_top_clean`, `/tmp/nmaforge_r160_subsystem_cov_34e0`,
+`/tmp/nmaforge_r163_clean_f2e671d`, `/tmp/nmaforge_r164_clean_db7588b`,
+`/tmp/nmaforge_r166_subsystem_clean_8be88c1`, and
+`/tmp/nmaforge_r281_matrixfsm`. They were left untouched; no missing worktree
+was pruned. The temporary clean replay worktrees created for the 16-seed and
+merged URG runs were removed after archiving their text-only evidence.
+
+The exact R250-to-target RTL diff remains six files and `662 insertions / 80
+deletions`: Matrix array/core, opcode decode, descriptor validator, parallel
+dispatcher, and Compute Cluster integration. The last product RTL commit is
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; `git diff` confirms no RTL changes
+after it. The ignored/private-file audit in the prior Phase 0 section remains
+valid; the new committed evidence consists of Markdown and JSON only.
+
+**Refresh PASS:** review-start and R250 ancestry, current source/tree identity,
+target branch/worktree cleanliness, full worktree inventory, exact R250 RTL
+diff, and no product RTL changes after the recorded product commit.
+**OPEN:** GitHub synchronization is blocked by missing HTTPS credentials; the
+local target branch remains ahead 63. Dirty IDE/other worktrees and the 80
+missing/prunable registrations were preserved.
 
 ### Latest real-Top GEMV tail-state cross — 2026-11-06
 
