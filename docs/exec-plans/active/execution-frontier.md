@@ -913,3 +913,16 @@ archive SHA-256:
 `9b994707c392f0b2ba98cbb26f0235c5fea97c2ece7b5fe6bd0a306caf668387`.
 The trained Transformer, common-memory TinyNPU comparison, and v2 DV/ASIC
 closure remain open.
+
+## 2026-11-06 update — three-seed Top Smoke compatibility
+
+At clean model/tooling candidate SHA `9b835aeac33d43fd97a81496b1048d359cdff3d0`
+and unchanged product RTL SHA `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`,
+`ai_smoke` passes on seed 20261106 with four random workloads, then `ai_run`
+passes 20 random workloads per seed on 20261106/07/08. All three logs include
+the directed 0x52 GEMV, 0x53 forwarding/cross-engine, and Matrix/CNM profile
+markers, one `TEST PASS`, and no error lines. This is current-candidate Top
+compatibility evidence, not UVM or URG coverage. Run ID
+`V2-TOP-SMOKE-COMPAT-20X-3SEED-9B835AE`; machine record:
+[JSON](../../benchmark/v2_top_smoke_compat_9b835ae.json). Logs archive SHA-256:
+`a6eb548b5e37dd2fba1df0513635bed43705d5eafebaa376ecbb13d8abc75159`.

@@ -554,3 +554,22 @@ candidate, not full DV sign-off; details and archive checksum are in the
 - Four convolution filters remain fixed; only the classifier head is trained.
   No TinyNPU comparison, trained Transformer, full timing decomposition, DV
   sign-off, or ASIC readiness is claimed.
+
+## Current model and Top compatibility evidence — 2026-11-06
+
+- At model/tooling source SHA `9b835aeac33d43fd97a81496b1048d359cdff3d0`,
+  the four shared 3×3 convolution filters and INT8 classifier are both trained.
+  All 159 held-out Digits labels 0–3 passed separate real Top CMDQ runs with
+  every checked intermediate and final integer Golden exact (159/159 correct).
+  This remains a four-class scope, not a ten-class model or TinyNPU result.
+- The existing 86-descriptor Transformer prefill/decode fixture passes the Top
+  path and its intermediate/KV Golden checks at the same source SHA. Its weights
+  are deterministic test weights; trained-model inference and cycles/token are
+  still NOT_RUN.
+- `ai_smoke` plus three 20-random-workload Top runs pass on the same candidate.
+  These are compatibility/smoke results only; they do not alter the v2 URG/RTM
+  status of 14 PASS-scoped / 8 PARTIAL.
+- Machine evidence is in the [model report](../benchmark/NMAFORGE_V2_MODEL_BENCHMARK.md)
+  and [Top compatibility record](../../benchmark/v2_top_smoke_compat_9b835ae.json).
+  Product RTL remains unchanged at `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`;
+  v2 DV remains IN PROGRESS and ASIC PPA remains BLOCKED_ENV/NOT_RUN.

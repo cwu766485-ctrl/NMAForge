@@ -2,6 +2,7 @@
 
 **Status:** IN PROGRESS — scoped regressions pass; v2 sign-off is not ready.  
 **Latest testbench/tooling candidate SHA:** `8758794c1f3bd6abb41c33276422b84ac5ee7a80` (tree `6f51976ea8f736e08783487afe892afa8a3a8b36`; adds a real-CMDQ K=256 GEMV test point with non-overlapping SPAD ranges; product RTL unchanged). Latest clean three-seed Compute Cluster UVM regression is `V2-CMDQ-GEMV-K256-1X1-3SEED-8758794`.
+**Latest clean Top Smoke compatibility replay:** model/tooling SHA `9b835aeac33d43fd97a81496b1048d359cdff3d0`; three 20-random-workload seeds pass the Top Smoke markers. This is not a UVM/URG coverage update.
 
 **Candidate tree:** `65d56c5d6dd345effde6fdfdf70dad59f135a279` (tree used for the latest three-seed generic Cluster replay)
 
@@ -1534,3 +1535,40 @@ PASS-scoped and 8 PARTIAL; overall v2 DV is **IN PROGRESS**. Logs archive:
 Machine records are in
 [`v2_top_smoke_20cases_835f958.csv`](../../benchmark/v2_top_smoke_20cases_835f958.csv)
 and [`v2_top_smoke_20cases_835f958.json`](../../benchmark/v2_top_smoke_20cases_835f958.json).
+
+## 2026-11-06 — current model candidate Top Smoke compatibility replay
+
+At clean source SHA `9b835aeac33d43fd97a81496b1048d359cdff3d0` (tree
+`04215a9fb125e57aa6a9ce6ead2410f59bafa2b7`), product RTL is still
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. `make ai_smoke` passes on seed
+20261106 with four randomized workloads and all six required 0x52/0x53/CNM
+markers. The same compiled candidate then passes `ai_run` with 20 randomized
+workloads each on seeds 20261106/07/08. Each log has exactly one `TEST PASS`,
+zero `ERROR:` lines, the directed GEMV, forwarding, cross-engine immutability,
+and Matrix/CNM profile markers; simulation times are 984,560,000 ps,
+981,920,000 ps, and 991,190,000 ps respectively. This is a Top Smoke replay,
+not UVM or a coverage merge.
+
+Exact commands (run from the repository root):
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+make -C dv/subsystem/top_smoke/sim ai_smoke \
+  AI_RANDOM_CASES=4 AI_SEED=20261106 SEED=20261106
+
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+make -C dv/subsystem/top_smoke/sim ai_run \
+  AI_RANDOM_CASES=20 AI_SEED=20261106 SEED=20261106
+```
+
+The second command was repeated with both seed values set to `20261107` and
+`20261108`. The machine-readable record is
+[`v2_top_smoke_compat_9b835ae.json`](../../benchmark/v2_top_smoke_compat_9b835ae.json).
+The logs-only archive is
+`/tmp/nmaforge_v2_top_smoke_compat_9b835ae_3seed_evidence.tar.gz` (SHA-256
+`a6eb548b5e37dd2fba1df0513635bed43705d5eafebaa376ecbb13d8abc75159`). This
+does not add functional coverage bins or alter the scoped RTM disposition of
+14 PASS-scoped / 8 PARTIAL; v2 DV remains **IN PROGRESS**.
