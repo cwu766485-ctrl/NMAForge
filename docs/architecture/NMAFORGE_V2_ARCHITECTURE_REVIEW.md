@@ -635,3 +635,15 @@ candidate, not full DV sign-off; details and archive checksum are in the
   Matched workload metrics are in [CSV](../../benchmark/v2_p2_cluster_serial_parallel_f19e929.csv)
   and [JSON](../../benchmark/v2_p2_cluster_serial_parallel_f19e929.json).
   Full evidence and limits are in the [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+## GitHub publication check — 2026-11-06
+
+At local commit `36c42c2827acb7a8267aacd9cf0f253271c72d0f`, the v2 branch was
+55 commits ahead of `origin/feature/npu-architecture-v2`. The authorized push
+command `git push origin HEAD:refs/heads/feature/npu-architecture-v2` failed
+with exit 128 because this non-interactive environment could not read the
+GitHub HTTPS username. A live read-only `git ls-remote` afterward confirmed
+that the remote v2 ref remains `5d01a88a8a2a7b1add15fbedbb02096d686824ab` and
+`main` remains R250. No remote ref was changed. Local commits remain intact;
+publication is **BLOCKED_AUTH** pending GitHub credentials in the execution
+environment.

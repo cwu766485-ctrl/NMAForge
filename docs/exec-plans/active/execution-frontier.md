@@ -980,15 +980,16 @@ are in the [model report](../../benchmark/NMAFORGE_V2_MODEL_BENCHMARK.md) and
 
 ## 2026-11-06 update — Transformer Prefill/Decode cycle timing
 
-At fixed test/tooling SHA `f9f32f71e7168350d74a75ede0a4a4b222844cc9`, the
-Top testbench captured the exact completion-tail clock boundary: 5,682 cycles
-for four-token Prefill, 5,715 cycles for one Decode token, and 11,397 cycles
-combined. It also retained all 301 bit-exact intermediate/final/KV checks.
-These are behavioral Top CMDQ cycles for the fixed-weight fixture; trained
-weights, steady-state decode, TinyNPU parity, and silicon PPA remain open. Run
-ID `V2-TRANSFORMER-FIXED-WEIGHTS-TIMED-TOP-F9F32F7-S20261106`; details and
-machine record are in the [model report](../../benchmark/NMAFORGE_V2_MODEL_BENCHMARK.md)
-and [JSON](../../benchmark/v2_transformer_timing_f9f32f7.json).
+At fixed test/tooling SHA `f9f32f71e7168350d74a75ede0a4a4b222844cc9`, three
+Top testbench runs on Seeds 20261106/07/08 captured the same completion-tail
+timing: 5,682 cycles for four-token Prefill, 5,715 cycles for one Decode
+token, and 11,397 cycles combined. Each run passed 301 bit-exact
+intermediate/final/KV checks. These are behavioral Top CMDQ cycles for the
+fixed-weight fixture; trained weights, steady-state decode, TinyNPU parity,
+and silicon PPA remain open. Run ID
+`V2-TRANSFORMER-FIXED-WEIGHTS-TIMED-TOP-F9F32F7-3SEED`; details are in the
+[model report](../../benchmark/NMAFORGE_V2_MODEL_BENCHMARK.md) and
+[JSON](../../benchmark/v2_transformer_timing_f9f32f7_3seed.json).
 
 ## 2026-11-06 update — Phase 0 source and worktree audit
 
@@ -1011,3 +1012,14 @@ The exact testbench SHA `f9f32f71e7168350d74a75ede0a4a4b222844cc9` passes
 simulation errors. This adds compatibility evidence only, not UVM/URG
 coverage. Run ID `V2-TOP-SMOKE-POST-TRANSFORMER-TIMING-F9F32F7-S20261106`;
 record and archived logs are linked from the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+## 2026-11-06 update — GitHub sync blocked by missing HTTPS identity
+
+The local v2 branch was 55 commits ahead at the authorized push attempt.
+`git push origin HEAD:refs/heads/feature/npu-architecture-v2` exited 128:
+Git could not read the HTTPS username in this non-interactive environment.
+Read-only remote verification confirms the v2 branch is unchanged at
+`5d01a88a8a2a7b1add15fbedbb02096d686824ab`; no remote update occurred. All
+local commits remain intact. Upload requires working GitHub authentication.
+The ASIC environment recheck also leaves Base-vs-v2 PPA **BLOCKED_ENV**;
+details are in the [ASIC readiness report](../../verification/NMAFORGE_V2_ASIC_READINESS.md).
