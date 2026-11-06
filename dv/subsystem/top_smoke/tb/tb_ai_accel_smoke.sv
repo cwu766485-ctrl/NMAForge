@@ -4154,6 +4154,8 @@ module tb_ai_accel_smoke;
             integer lane;
             integer row;
             integer matrix_word;
+            integer matrix_golden_failures;
+            integer cnm_golden_failures;
             integer matrix_phase_sum;
             integer cnm_phase_sum;
             // Matrix 16x16x(16 K words) requires 4 row groups x 16 K
@@ -4292,18 +4294,35 @@ module tb_ai_accel_smoke;
                               "parallel CNM GEMV completion");
             expect_completion(32'h7d90, 16'h0621, 4'h1, 4'h0, 32'd64, 32'd256,
                               "parallel Matrix GEMM completion");
-            expect_read(SPAD_BASE + 32'h12000, 32'd96,
-                        "parallel CNM GEMV row0");
-            expect_read(SPAD_BASE + 32'h1203c, 32'd96,
-                        "parallel CNM GEMV row15");
-            expect_read(SPAD_BASE + 32'h13800, 32'd64,
-                        "parallel Matrix GEMM row0 col0");
-            expect_read(SPAD_BASE + 32'h1383c, 32'd64,
-                        "parallel Matrix GEMM row0 col15");
-            expect_read(SPAD_BASE + 32'h13900, 32'd64,
-                        "parallel Matrix GEMM row4 col0");
-            expect_read(SPAD_BASE + 32'h13bfc, 32'd64,
-                        "parallel Matrix GEMM row15 col15");
+            cnm_golden_failures = 0;
+            for (row=0; row<16; row=row+1) begin
+                axi_read(SPAD_BASE + 32'h12000 + (row * 4), rd);
+                if (rd !== 32'd96)
+                    cnm_golden_failures = cnm_golden_failures + 1;
+            end
+            if (cnm_golden_failures != 0) begin
+                $display("%0t ERROR: parallel CNM GEMV Golden mismatches=%0d/16",
+                         $time, cnm_golden_failures);
+                errors = errors + 1;
+            end else begin
+                $display("%0t PASS: parallel CNM GEMV all 16 outputs match INT32 Golden",
+                         $time);
+            end
+            matrix_golden_failures = 0;
+            for (row=0; row<16; row=row+1)
+                for (lane=0; lane<16; lane=lane+1) begin
+                    axi_read(SPAD_BASE + 32'h13800 + (row * 64) + (lane * 4), rd);
+                    if (rd !== 32'd64)
+                        matrix_golden_failures = matrix_golden_failures + 1;
+                end
+            if (matrix_golden_failures != 0) begin
+                $display("%0t ERROR: parallel Matrix GEMM Golden mismatches=%0d/256",
+                         $time, matrix_golden_failures);
+                errors = errors + 1;
+            end else begin
+                $display("%0t PASS: parallel Matrix GEMM all 256 outputs match INT32 Golden",
+                         $time);
+            end
             if (matrix_line_write_count != 64) begin
                 $display("%0t ERROR: parallel Matrix GEMM line writes=%0d expected=64",
                          $time, matrix_line_write_count);
