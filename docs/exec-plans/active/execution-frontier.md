@@ -827,3 +827,21 @@ in the owning report; run `git diff --check` before handoff.
   [CSV](../../benchmark/v2_trained_cnn_demo_835f958.csv) and
   [JSON](../../benchmark/v2_trained_cnn_demo_835f958.json). Full trained CNN,
   Tiny Transformer, full-model cycle decomposition and ASIC PPA remain open.
+
+## 2026-11-06 update — full held-out CNN dataset on Top RTL
+
+- Harness commit `de22e4652a54dfe7537e14585bdf3ae6f08fe9fb`; product RTL
+  unchanged at `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. Run ID
+  `V2-TRAINED-CNN-TOP-DATASET-DE22E46`, VCS
+  `V-2023.12-SP1_Full64`: 159/159 independent Top CMDQ runs passed and every
+  intermediate/output Golden matched; 158/159 hardware-checked classifications
+  correct.
+- Per sample 1,985 compute + 1,080 host-layout cycles; 3,360/1,600 B compute
+  read/write and 144/576 B host-layout read/write. This is behavior-SPAD RTL,
+  with testbench input preload excluded; no TinyNPU win is claimed.
+- [Per-sample CSV](../../benchmark/v2_trained_cnn_dataset_de22e46.csv),
+  [summary JSON](../../benchmark/v2_trained_cnn_dataset_de22e46.json), evidence
+  archive SHA-256 `dfacc9a6a7e17150def4814cfe9baad11b8c21675d75db1505c0b907c80de1be`.
+- The filters are fixed and only the classifier readout is trained. A trained
+  Transformer, per-stage host/DMA/compute/writeback instrumentation, final DV
+  closure and ASIC readiness remain open.

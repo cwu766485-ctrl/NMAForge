@@ -2,7 +2,7 @@
 
 **Status date:** 2026-11-06
 **R250 baseline:** `3041355528dffe856e2d5384027c6ee5df5d1b42`  
-**Latest model replay candidate:** `4b99d107270a572aec798de007f8c7167749d4af`
+**Latest model replay candidate:** `de22e4652a54dfe7537e14585bdf3ae6f08fe9fb`
 **Latest v2 RTL/test candidate replay:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`
 **Latest paired benchmark source SHA:** `c3a59f08d8c07a8da973010d0f23d5d6d7eed61b`
 **TinyNPU reference:** `8216c22b762011aa20c05fc2768423fd12dda59d`
@@ -77,7 +77,7 @@ run did not instrument that stage.
 | Workload | Status | Evidence and boundary |
 |---|---|---|
 | ONNX `conv1x_mini` paired graph | **PASS; NMAForge side replayed at `d1867da`** | Current run `V2-TINYNPU-REPLAY-CURRENT-D1867DA-S20261029` rechecked all intermediate tensors and 4/4 outputs against the pinned model Golden. NMAForge: 1,985 compute + 1,080 host-layout cycles; TinyNPU: 4,781 graph cycles from prior run `TINY-COMPARE-V2C3A59-S20261029`. Different timing boundaries; no speedup ratio. |
-| Trained-weight CNN | **PASS; scoped demo at `835f958`** | 4-class Digits CNN demo with fixed edge kernels and a trained INT8 classifier head; 158/159 held-out software samples classify correctly. One selected held-out sample ran through the real Top CMDQ and every checked intermediate tensor plus final logits matched an independent integer Golden. This does not establish trainable convolution kernels or a full multi-sample Top benchmark. |
+| Trained-weight CNN | **PASS; scoped full held-out Top run at `de22e46`** | All 159 held-out 4-class Digits samples ran through separate real Top CMDQ instances. Every checked intermediate tensor and final INT8 logits matched the independent integer Golden; 158/159 classified correctly. Four edge filters are fixed and only the INT8 readout is trained. |
 | Tiny Transformer | **NOT_RUN** | The fixed-weight descriptor fixture is not a pretrained-model deployment. No trained model, Prefill/Decode Golden, or current v2 run is claimed. |
 | Host / DMA / compute / writeback / graph cycle split | **PARTIAL** | Digits has a top-level CMDQ interval and a fused Matrix activity counter; the current run does not separately time host, DMA, writeback and orchestration. Its input preload is testbench setup outside the timed interval. |
 
@@ -278,9 +278,9 @@ Golden byte-for-byte. Golden SHA-256:
 The Top interval was 1,985 compute cycles plus 1,080 separately counted host
 layout cycles. It performed 1,872 useful MACs; compute SPAD traffic was 3,360
 read and 1,600 write bytes; testbench preload was 3,456 bytes and is excluded.
-The selected single-sample run does not report model-level Top accuracy or
-TinyNPU speedup. The 158/159 accuracy is a software evaluation on the held-out
-subset, and only one sample is hardware-executed.
+This first selected-sample run was subsequently expanded to all held-out inputs
+in the full replay below. The model still uses fixed convolution filters, and
+no TinyNPU speedup or common-memory comparison is inferred.
 
 Reproduce with:
 
@@ -300,3 +300,49 @@ Model, input, Golden, compile/run logs and smoke logs archive:
 `/tmp/nmaforge_v2_trained_cnn_835f958_evidence.tar.gz`, SHA-256
 `f0919d1f3b74ff6442ec33c300c7fdf9f88e4f6e842004288f5b4582c691287e`.
 Generated model weights and simulation databases remain outside Git.
+
+## Full held-out-set Top replay — `de22e46`
+
+The same model and test split were then run end-to-end for all 159 held-out
+images. Run ID `V2-TRAINED-CNN-TOP-DATASET-DE22E46`, candidate
+`de22e4652a54dfe7537e14585bdf3ae6f08fe9fb` (tree
+`29d35cadabd84872081dc7f6d51a7398cfb431b5`), product RTL unchanged at
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. All 159 independent Top instances
+passed; every checked Conv, requant, ReLU/layout, FC and output memory image
+matched the independent Golden. The hardware-checked classification result is
+158/159 (99.37%). VCS was `V-2023.12-SP1_Full64`; Python 3.12.13, NumPy 2.4.6,
+scikit-learn 1.9.1.
+
+Per image: 1,985 compute cycles + 1,080 host-layout cycles, 1,872 useful MACs,
+3,360 B compute reads / 1,600 B compute writes, and 144 B host-layout reads /
+576 B host-layout writes. The 3,456 B testbench preload is outside the timed
+interval. These are behavioral-SPAD RTL results, not ASIC measurements.
+The `0.9433` useful MAC/compute-cycle ratio and derived 0.3685% of 256 lanes
+are scoped to this small fixed workload, not a large-array throughput claim.
+
+The software model has four fixed 3×3 edge kernels and a trained four-class
+INT8 LogisticRegression readout trained on the deployed quantized Conv
+features. This proves the trained head's model path, not end-to-end trained
+convolution filters. TinyNPU was not run on this model; no relative performance
+claim is available. The fixed `conv1x_mini` TinyNPU compatibility workload
+remains a separate run with its previously documented timing-boundary caveat.
+
+Reproduce the training and every Top inference with:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+AI_TRAINED_CNN_PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python \
+AI_TRAINED_CNN_RUN=/tmp/nmaforge_v2_trained_cnn_dataset_de22e46 \
+make -C dv/subsystem/top_smoke/sim ai_trained_cnn_dataset_regress
+```
+
+Full per-sample results are in
+[`v2_trained_cnn_dataset_de22e46.csv`](../../benchmark/v2_trained_cnn_dataset_de22e46.csv)
+and summary metadata in
+[`v2_trained_cnn_dataset_de22e46.json`](../../benchmark/v2_trained_cnn_dataset_de22e46.json).
+The archive includes model/input/testset hashes, all 159 run logs, compile log,
+and Golden records:
+`/tmp/nmaforge_v2_trained_cnn_dataset_de22e46_evidence.tar.gz`, SHA-256
+`dfacc9a6a7e17150def4814cfe9baad11b8c21675d75db1505c0b907c80de1be`.

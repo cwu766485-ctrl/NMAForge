@@ -517,10 +517,11 @@ candidate, not full DV sign-off; details and archive checksum are in the
 
 - Test/build commit `835f958b5f486b3f3e4808e735a788721f4f1441`; no product RTL
   changed. The four-class Digits demo uses fixed edge filters and a trained
-  INT8 head. Software integer evaluation is 158/159; one held-out sample runs
-  through real Top CMDQ and all checked stage tensors/final logits match an
-  independent Golden. This is a scoped functional demo, not a fully trained
-  convolutional network or a model-level hardware accuracy result.
+  INT8 head. Its initial one-sample replay was later expanded at `de22e46` to
+  all 159 held-out cases through separate real Top CMDQ runs; each stage and
+  final logits match an independent Golden, with 158/159 hardware-checked
+  classifications correct. This remains a scoped demo, not a fully trained
+  convolutional network.
 - VCS `V-2023.12-SP1_Full64`: `ai_trained_cnn_demo`, fixed TinyNPU CNN
   compatibility replay and `ai_smoke` all pass. Smoke includes legacy GEMM,
   opcode 0x52/0x53 and CNM markers; existing `LOOP-REROLL-ENABLED` note remains
@@ -528,5 +529,22 @@ candidate, not full DV sign-off; details and archive checksum are in the
 - Machine record:
   [CSV](../../benchmark/v2_trained_cnn_demo_835f958.csv) and
   [JSON](../../benchmark/v2_trained_cnn_demo_835f958.json). The trained
-  Transformer, multi-sample Top CNN benchmark, stage-separated full-model
-  timing, full v2 DV closure and ASIC readiness remain open.
+  Transformer, stage-separated full-model timing, full v2 DV closure and ASIC
+  readiness remain open.
+
+## Full held-out CNN Top replay — 2026-11-06
+
+- Test harness commit `de22e4652a54dfe7537e14585bdf3ae6f08fe9fb`, tree
+  `29d35cadabd84872081dc7f6d51a7398cfb431b5`; product RTL is unchanged.
+- Run ID `V2-TRAINED-CNN-TOP-DATASET-DE22E46`: 159/159 Top CMDQ instances
+  passed, all intermediate and output Golden checks exact, 158/159 classified
+  correctly. Each sample uses 1,985 compute cycles plus 1,080 host-layout
+  cycles in the behavior-SPAD testbench.
+- Per-sample CSV and run summary:
+  [CSV](../../benchmark/v2_trained_cnn_dataset_de22e46.csv),
+  [JSON](../../benchmark/v2_trained_cnn_dataset_de22e46.json). All run logs,
+  model, inputs and Goldens archive SHA-256
+  `dfacc9a6a7e17150def4814cfe9baad11b8c21675d75db1505c0b907c80de1be`.
+- Four convolution filters remain fixed; only the classifier head is trained.
+  No TinyNPU comparison, trained Transformer, full timing decomposition, DV
+  sign-off, or ASIC readiness is claimed.
