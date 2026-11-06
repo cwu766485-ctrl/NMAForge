@@ -3,10 +3,10 @@
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Current reviewed code/test candidate:** `feature/npu-architecture-v2` `ab96d47876beb4d7e47fef01e43b4c4716dd176a`
-**Candidate tree:** `1126cb6e650545fdc0bad003c321a77fe552e3a4`
-**Published branch tip before the current mutation update:** `ff73126e8501f5d5163a774430dde95b0faeae14` (tree `425ff741109d73b431d54a422168c36ed68ec516`).
-**Latest verification-only test candidate:** `ab96d47876beb4d7e47fef01e43b4c4716dd176a` (tree `1126cb6e650545fdc0bad003c321a77fe552e3a4`); product RTL is unchanged.
+**Current reviewed code/test candidate:** `feature/npu-architecture-v2` `b719ac6066616b17dfab4eed2429f8bdfdc49457`
+**Candidate tree:** `d269b738226282ea1057f1832fcd41ee51e61b6e`
+**Published branch tip before the current formal update:** `33de29361213059e07d5bbe850d6e987c8954c4e` (tree `7ec461cf80d5399b33056590a65f4f5a0dcae59f`).
+**Latest verification-only/formal candidate:** `b719ac6066616b17dfab4eed2429f8bdfdc49457` (tree `d269b738226282ea1057f1832fcd41ee51e61b6e`); product RTL is unchanged.
 
 ## Executive disposition
 
@@ -24,17 +24,15 @@ performance win. Keep the overall Compute Cluster disposition at **HOLD**.
 ### Latest v2 verification-only update — 2026-11-06
 
 The current v2 product RTL was not changed. Testbench/mutation-runner commit
-`ab96d47876beb4d7e47fef01e43b4c4716dd176a` adds a real request-address-hold
-mutant to the six-class opcode mutation campaign. All 18 mutant-seed runs
-(6 classes × 3 Seeds) were caught, including address instability while
-`VALID&&!READY` by the request stability checker. On this same fixed candidate,
-the Matrix core compatibility/fault, request and line backpressure, selected
-opcode-fault, and Prefetch-OFF six-shape GEMV campaigns pass three Seeds; the
-handshake URG group remains 2/2 with three hits per bin. These are scoped
-results; v2 requirements, external response ownership and sign-off remain open.
-Product RTL, benchmark results, and prior FSM formal disposition are unchanged.
-Exact commands, RTM changes and archive checksum are in the [v2 DV closure
-report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+The preceding testbench/mutation-runner commit `ab96d47876beb4d7e47fef01e43b4c4716dd176a`
+proved that all 18 selected opcode mutant-seed runs (six classes × three Seeds)
+were caught, including request-address instability while `VALID&&!READY`.
+Formal-only commit `b719ac6066616b17dfab4eed2429f8bdfdc49457` then proved the 0x52
+request-hold property non-vacuously and reached its hold/release cover. These
+results are scoped: v2 requirements, 0x53 lifecycle SVA, external response
+ownership and sign-off remain open. Product RTL and benchmark results are
+unchanged. Exact commands, RTM changes and archive checksums are in the [v2 DV
+closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
 ## Baseline and source audit
 

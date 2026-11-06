@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Latest fixed-SHA Matrix configuration benchmark: `36d4b9b4bbafe769b452afc003033d2a222a682f` (tree `a92a302ce78ef541aa0a76bb99dfeb0a413ad0c4`). Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; recent commits add only verification/build/report content. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Latest fixed-SHA v2 request formal run: `b719ac6066616b17dfab4eed2429f8bdfdc49457` (tree `d269b738226282ea1057f1832fcd41ee51e61b6e`). Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; recent commits add only verification/build/report content. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -543,3 +543,10 @@ in the owning report; run `git diff --check` before handoff.
 - Across the five workloads, depth 4 + Prefetch + Cache averaged 2,038.33 summed cycles vs 2,720.00 baseline (−25.06%), with read bytes 12,032→9,472 (−21.28%) and writes unchanged at 7,488 B. Weighted MAC/cycle is 34.07→45.46; weighted utilization 13.31%→17.76%. Per-workload best settings vary, so no universal winner is claimed. Stall/event observations overlap and are not additive.
 - CSV/JSON/SVG are in [the benchmark artifacts](../../benchmark/v2_matrix_config_closure_36d4b9b_3seed.csv); the exact command and model caveats are in the [performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md). Raw compile/run logs archive SHA-256 `003c1dedc0de9d3b9875dec63a218fade601e1a09d9b928b791bb250599741fd`.
 - This is controller RTL simulation using behavioral SPAD and does not replace the multi-engine Top contention benchmark or provide ASIC PPA/TinyNPU victory. Current v2 DV remains **IN PROGRESS**, trained CNN/Transformer remain **NOT_RUN**, and ASIC readiness remains **NOT READY**.
+
+
+## 2026-11-06 update — Opcode 0x52 request stability formal
+
+- Formal-only commit `b719ac6066616b17dfab4eed2429f8bdfdc49457` (tree `d269b738226282ea1057f1832fcd41ee51e61b6e`); product RTL is unchanged. VC Formal `V-2023.12-SP2` completed `gemv-request-stability`: setup clean, request hold property 1/1 proven and non-vacuous, hold/release cover 1/1 reached at depth 4. The bounded descriptor is M1×N1×K1 with an accepted-response-owner assumption.
+- Evidence archive `/tmp/nmaforge_v2_gemv_req_sva_b719ac6_evidence.tar.gz`, SHA-256 `e8f19d5fde55c5067265f8e9d7a2e203a515d4933723ecc50ff5d3f2762ac189`. The [DV report](../../verification/NMAFORGE_V2_DV_CLOSURE.md) records the property, exact command, and scope.
+- This closes only the 0x52 request VALID/address stability assertion. 0x53 lifecycle SVA, broader error/reset proof, cross-engine response ownership, and full v2 RTM remain open; overall v2 DV remains **IN PROGRESS**.
