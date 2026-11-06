@@ -13,7 +13,7 @@
 **Latest actual DUT mutation replay:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`; seven temporary RTL mutants were caught by their assigned real Compute Cluster UVM checkers.
 **Latest in-repository fabric reset replay:** `f340acaa2cdf7c36075473b8bc6fd6dee8e59873` (tree `7fc556427be1597e64a602c10af4fdd855a0c343`); three seeds pass selected `ai_accel_memory_fabric` reset/epoch and DMA/CNM recovery checks.
 **Latest request/backpressure replay:** clean test SHA `f9f32f71e7168350d74a75ede0a4a4b222844cc9`; three seeds pass named GEMV request-stall and fused output-write stall checks, and the address-hold checker catches its corresponding RTL mutation.
-**Latest merged UVM coverage:** same clean source/test SHA `f9f32f71e7168350d74a75ede0a4a4b222844cc9`; 3 Cluster seeds plus 16 mixed AXI/DMA E2E seeds merge without URG warnings. All 36 declared functional groups are 100%; code coverage and requirement closure remain incomplete. See the 2026-11-06 entry below and [merged machine record](../../benchmark/v2_merged_urg_f9f32f7_19test.json).
+**Latest merged UVM coverage:** clean source/test SHA `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0`; 3 Cluster seeds plus 16 mixed AXI/DMA E2E seeds merge without URG warnings. All 36 declared functional groups are 100%, with AR/AW/W stall-to-accept cover properties all matched. Code coverage, two no-attempt UVM RAL assertions, and requirement closure remain incomplete. See the clean-candidate 2026-11-06 entry below and [run record](../../benchmark/v2_clean_urg_19test_839b9af.json).
 
 ## 2026-11-06 — clean-candidate verification replay at `839b9af`
 
@@ -1951,8 +1951,9 @@ focused gates. The exact target set was `product-gemv-regress`,
 This replays the selected feature checks at the candidate SHA; it does not
 close every legal M/N/K combination, every fault × phase × reset cross,
 external held/late fabric responses, all cross-engine ownership pairs, or the
-full checker-to-fault mutation matrix. Aggregate v2 URG remains 83.94% functional
-group coverage with residual assertion/cover gaps, and the 22-row RTM remains
+full checker-to-fault mutation matrix. The three-test Cluster-only URG profile
+at this same SHA scored 83.94% declared groups; the 19-test cross-suite merge
+below reaches 100% for its declared functional groups. The 22-row RTM remains
 14 PASS-scoped / 8 PARTIAL. No product RTL or coverage disposition changed.
 
 The exact command, per-checker map, seed results, open items and archive hash
@@ -1960,3 +1961,35 @@ are in the [machine record](../../benchmark/v2_opcode_dv_clean_839b9af_3seed.jso
 Text-only logs, assertion reports and mutation summary:
 `/tmp/nmaforge_v2_clean_839b9af_opcode_dv_3seed_text.tar.gz`, SHA-256
 `5890df6674f1120041d58e05f709ab76ab8a87ac08e97f2b9fffeb1c3d046ff0`.
+
+## Clean-candidate 19-test Cluster + AXI/DMA URG merge — `839b9af`
+
+To close the unhit AXI/DMA functional groups seen in the three-test Cluster
+profile, I reran the mixed precision DDR/AXI E2E coverage matrix on the same
+clean source/test SHA `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` (tree
+`630e498ba467d84dd5359403cfe1ed1e5879f6e9`). The run used 16 Seeds
+`20261109`–`20261124`; every seed passed the target's functional, DMA first/
+last-beat error, reset recovery, descriptor, AXI gap/jitter checks with UVM
+Warning/Error/Fatal `0/0/0`. Those VDBs were then merged with the three
+same-SHA Cluster UVM VDBs for Seeds `20261128/29/30`.
+
+URG reports 19 tests and 36/36 declared functional groups at 100%. The three
+AXI AR/AW/W stall-to-accept cover properties match `161/67/126` times. The
+combined code/ assertion summary is Line/Condition/FSM/Branch/Assert
+`74.15/71.55/47.45/71.14/92.00%`; 20/22 assertions have real successes,
+zero failures and zero incomplete attempts. The two assertions without
+attempts are UVM RAL `do_read` and `do_write`. This reaches 100% only for the
+declared functional groups in this 19-test plan. It does not close residual
+RTL/FSM bins or all v2 requirement spaces; the v2 RTM remains 14 PASS-scoped /
+8 PARTIAL and v2 DV remains **IN PROGRESS**. No functional exclusions or
+waivers were added, and no illegal-state stimulus was used.
+
+Exact 16-seed simulation command and exact URG input database list are in the
+[machine record](../../benchmark/v2_clean_urg_19test_839b9af.json). The text
+archive with mixed E2E seed logs and combined URG report is
+`/tmp/nmaforge_v2_clean_839b9af_urg_19test_text.tar.gz`, SHA-256
+`6a4ef4e3fd25cf4ec18baee37cfd43c4374a109a2b9c35ff40c07c0435f1e9b6`;
+the standalone 16-seed logs/URG archive is
+`/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed_text.tar.gz`, SHA-256
+`1ded9f9b381b8dbaa3916df6ba1f1cb494dd1cfa0e437c206593348a75c788db`.
+Coverage VDBs, simulator executables and waveforms remain outside Git.

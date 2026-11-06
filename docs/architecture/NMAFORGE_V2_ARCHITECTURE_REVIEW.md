@@ -760,3 +760,20 @@ reset crosses, external response timing, all-engine ownership pairs, and
 exhaustive checker-to-mutation mapping remain open. The overall v2 RTM stays
 14 PASS-scoped / 8 PARTIAL. Evidence is in the [DV report](../verification/NMAFORGE_V2_DV_CLOSURE.md)
 and [machine record](../../benchmark/v2_opcode_dv_clean_839b9af_3seed.json).
+
+## Same-SHA mixed UVM coverage merge — `839b9af`
+
+The mixed AXI/DMA E2E matrix was rerun at the same clean candidate as the
+three-seed Compute Cluster UVM regression. The 19-test URG merge reaches
+36/36 declared functional groups (100%) and matches all three AR/AW/W
+stall-to-accept cover properties. RTL code Line/Condition/FSM/Branch remains
+`74.15/71.55/47.45/71.14%`; 20/22 assertions have successes and two UVM RAL
+assertions have no attempts. This closes the declared groups in this test
+plan, not all code/FSM bins or v2 requirements: the RTM remains 14
+PASS-scoped / 8 PARTIAL. The exact evidence is in the [DV report](../verification/NMAFORGE_V2_DV_CLOSURE.md)
+and [machine JSON](../../benchmark/v2_clean_urg_19test_839b9af.json).
+
+The subsequent authorized Git push attempt at local commit
+`325fe78bead175fc4eda1fae2ed74929f61ba331` failed before authentication:
+Git could not read the GitHub HTTPS username. The v2 branch remained 73 commits
+ahead of its cached remote ref at the time; no remote update is claimed.
