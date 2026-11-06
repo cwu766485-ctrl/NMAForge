@@ -304,6 +304,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     bit cmdq_product_gemv_min_shape;
     bit cmdq_product_gemv_full_tile_shape;
     int unsigned cmdq_product_gemv_shape_id;
+    int unsigned cmdq_product_gemv_tail_combo;
     bit cmdq_product_gemv_cnm_overlap;
     bit cmdq_product_gemv_cnm_contention;
     int unsigned engine_parallel_fault_cov_idx;
@@ -360,6 +361,20 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             bins m1_n16_k17 = {0};
             bins m8_n13_k65 = {1};
             bins m15_n16_k31 = {2};
+        }
+    endgroup
+
+    covergroup cmdq_product_gemv_tail_cross_cg;
+        option.per_instance = 1;
+        cp_mnk_alignment_tail: coverpoint cmdq_product_gemv_tail_combo {
+            bins all_aligned = {0};
+            bins k_tail_only = {1};
+            bins n_tail_only = {2};
+            bins nk_tails = {3};
+            bins m_tail_only = {4};
+            bins mk_tails = {5};
+            bins mn_tails = {6};
+            bins mnk_tails = {7};
         }
     endgroup
 
@@ -527,6 +542,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         cmdq_product_gemv_min_cg = new();
         cmdq_product_gemv_full_tile_cg = new();
         cmdq_product_gemv_extended_shape_cg = new();
+        cmdq_product_gemv_tail_cross_cg = new();
         cmdq_product_gemv_cnm_owner_cg = new();
         engine_parallel_fault_cg = new();
         engine_parallel_reset_cg = new();
@@ -4326,6 +4342,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd0);
     endtask
 
+    task automatic sample_product_gemv_tail_cross(
+        input int unsigned m_size,
+        input int unsigned n_size,
+        input int unsigned k_size
+    );
+        cmdq_product_gemv_tail_combo =
+            (((m_size % 4) != 0) ? 4 : 0) |
+            (((n_size % 16) != 0) ? 2 : 0) |
+            (((k_size % 16) != 0) ? 1 : 0);
+        cmdq_product_gemv_tail_cross_cg.sample();
+    endtask
+
     task automatic run_product_gemv_cmdq_golden(input int unsigned seed);
         localparam int unsigned M_SIZE = 3;
         localparam int unsigned N_SIZE = 5;
@@ -4485,6 +4513,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         expect_completion(CPLQ_BASE, TASK_ID, golden[M_SIZE-1][N_SIZE-1],
                           M_SIZE * N_SIZE, "CMDQ opcode 0x52 completion");
 
+        sample_product_gemv_tail_cross(M_SIZE, N_SIZE, K_SIZE);
         cmdq_product_gemv_cg.sample();
         if (cmdq_product_gemv_cg.get_coverage() < 100.0)
             `uvm_fatal("CLUSTER_CMDQ_GEMV", $sformatf(
@@ -4592,6 +4621,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                     "CMDQ opcode 0x52 minimum output guard");
         expect_completion(CPLQ_BASE, TASK_ID, golden, 32'd1,
                           "CMDQ opcode 0x52 minimum 1x1x1 completion");
+        sample_product_gemv_tail_cross(16'd1, 16'd1, 16'd1);
         cmdq_product_gemv_min_shape = 1'b1;
         cmdq_product_gemv_min_cg.sample();
         if (cmdq_product_gemv_min_cg.get_coverage() < 100.0)
@@ -4740,6 +4770,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         expect_completion(CPLQ_BASE, TASK_ID, golden[15][15], 32'd256,
                           "CMDQ opcode 0x52 16x16x16 completion");
 
+        sample_product_gemv_tail_cross(M_SIZE, N_SIZE, K_SIZE);
         cmdq_product_gemv_full_tile_shape = 1'b1;
         cmdq_product_gemv_full_tile_cg.sample();
         if (cmdq_product_gemv_full_tile_cg.get_coverage() < 100.0)
@@ -4911,8 +4942,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                           $sformatf("CMDQ 0x52 shape %0dx%0dx%0d completion",
                                     m_size, n_size, k_size));
 
-        cmdq_product_gemv_shape_id = shape_id;
-        cmdq_product_gemv_extended_shape_cg.sample();
+        if (shape_id <= 2) begin
+            cmdq_product_gemv_shape_id = shape_id;
+            cmdq_product_gemv_extended_shape_cg.sample();
+        end
+        sample_product_gemv_tail_cross(m_size, n_size, k_size);
         `uvm_info("CLUSTER_CMDQ_GEMV_SHAPE_PASS", $sformatf(
             "real CMDQ 0x52 shape=%0dx%0dx%0d; outputs=%0d and two guards match independent signed INT32 Golden; accepted/returned Matrix reads=%0d/%0d; completion ordered and checked; seed=%0d",
             m_size, n_size, k_size, m_size*n_size, accepted_reads,
@@ -4937,6 +4971,25 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         `uvm_info("CLUSTER_CMDQ_GEMV_EXT_SHAPES_PASS", $sformatf(
             "cases=3/3 shapes=1x16x17,8x13x65,15x16x31 independent Golden/guards/completion/response-owner checks passed; focused bins=3/3 coverage=100.0%% seed=%0d",
             seed), UVM_LOW)
+
+        // Close all eight legal M/N/K aligned-versus-tail combinations on
+        // the real top CMDQ path. Existing cases cover 000, 011, 101, and
+        // 111; these four independent Golden runs cover the remaining bins.
+        run_product_gemv_cmdq_extended_shape(seed, 3, 16'd4, 16'd16, 16'd17,
+            16'h08c6, 32'h0007_d000, 32'h0007_d200, 32'h0007_d400);
+        run_product_gemv_cmdq_extended_shape(seed, 4, 16'd4, 16'd13, 16'd16,
+            16'h08c7, 32'h0007_d000, 32'h0007_d200, 32'h0007_d400);
+        run_product_gemv_cmdq_extended_shape(seed, 5, 16'd3, 16'd16, 16'd16,
+            16'h08c8, 32'h0007_d000, 32'h0007_d200, 32'h0007_d400);
+        run_product_gemv_cmdq_extended_shape(seed, 6, 16'd3, 16'd13, 16'd16,
+            16'h08c9, 32'h0007_d000, 32'h0007_d200, 32'h0007_d400);
+        if (cmdq_product_gemv_tail_cross_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_TAIL_CROSS", $sformatf(
+                "real CMDQ GEMV M/N/K alignment-tail cross incomplete: %0.1f%%",
+                cmdq_product_gemv_tail_cross_cg.get_coverage()))
+        `uvm_info("CLUSTER_CMDQ_GEMV_TAIL_CROSS_PASS", $sformatf(
+            "legal M/N/K alignment-tail combinations bins=8/8 coverage=%0.1f%%; every bin completed independent signed INT32 Golden, guards, completion and response-owner checks; seed=%0d",
+            cmdq_product_gemv_tail_cross_cg.get_coverage(), seed), UVM_LOW)
     endtask
 
     task automatic run_product_gemv_cmdq_cnm_owner_cross(input int unsigned seed);
