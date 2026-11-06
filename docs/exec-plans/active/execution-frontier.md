@@ -550,3 +550,10 @@ in the owning report; run `git diff --check` before handoff.
 - Formal-only commit `b719ac6066616b17dfab4eed2429f8bdfdc49457` (tree `d269b738226282ea1057f1832fcd41ee51e61b6e`); product RTL is unchanged. VC Formal `V-2023.12-SP2` completed `gemv-request-stability`: setup clean, request hold property 1/1 proven and non-vacuous, hold/release cover 1/1 reached at depth 4. The bounded descriptor is M1×N1×K1 with an accepted-response-owner assumption.
 - Evidence archive `/tmp/nmaforge_v2_gemv_req_sva_b719ac6_evidence.tar.gz`, SHA-256 `e8f19d5fde55c5067265f8e9d7a2e203a515d4933723ecc50ff5d3f2762ac189`. The [DV report](../../verification/NMAFORGE_V2_DV_CLOSURE.md) records the property, exact command, and scope.
 - This closes only the 0x52 request VALID/address stability assertion. 0x53 lifecycle SVA, broader error/reset proof, cross-engine response ownership, and full v2 RTM remain open; overall v2 DV remains **IN PROGRESS**.
+
+## 2026-11-06 update — 0x53 forwarding runtime SVA at `6a25338`
+
+- Testbench/build commit `6a253386f53638a1206a75e359d6020ba27765cb` (tree `588806486bd6b22fc0444cd0e29dc108d9f993d3`) adds two SVA for complete 16-line Tile commit and destination-tag stability. Product RTL is unchanged.
+- VCS `V-2023.12-SP1_Full64`, Seeds 20261120/21/22: forwarding ON/OFF chain regression passes. Each enabled run has 2/2 assertion attempts, zero failures, one cover with three matches, non-vacuous commit evidence, and 6/6 named functional bins. Golden outputs, tag-miss fallback, repeated-consumer SPAD fallback, Bank Flip, Abort and Reset checks pass.
+- Evidence archive `/tmp/nmaforge_v2_tile_sva_6a25338_evidence.tar.gz`, SHA-256 `92efa5d9763114cc6fdf121d2b22744c06852ff6e9c66072503d054a53656f15`. Exact command and RTM disposition are in the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
+- `REQ-V2-053-002` advances for the tested core cases; `REQ-V2-COM-003` remains PARTIAL because 0x53 is runtime assertion evidence rather than formal proof, and broader error/reset and cross-engine ownership checks remain open. v2 DV stays **IN PROGRESS**.
