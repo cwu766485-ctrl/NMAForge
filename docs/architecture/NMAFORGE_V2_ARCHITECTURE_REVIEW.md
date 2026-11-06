@@ -3,10 +3,10 @@
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Current reviewed code/test candidate:** `feature/npu-architecture-v2` `b719ac6066616b17dfab4eed2429f8bdfdc49457`
-**Candidate tree:** `d269b738226282ea1057f1832fcd41ee51e61b6e`
-**Published branch tip before the current formal update:** `33de29361213059e07d5bbe850d6e987c8954c4e` (tree `7ec461cf80d5399b33056590a65f4f5a0dcae59f`).
-**Latest verification-only/formal candidate:** `b719ac6066616b17dfab4eed2429f8bdfdc49457` (tree `d269b738226282ea1057f1832fcd41ee51e61b6e`); product RTL is unchanged.
+**Current reviewed code/test candidate:** `feature/npu-architecture-v2` `6a253386f53638a1206a75e359d6020ba27765cb`
+**Candidate tree:** `588806486bd6b22fc0444cd0e29dc108d9f993d3`
+**Published branch tip before the current 0x53 assertion update:** `9fabb8dd343683830e0cf3f095a2eab8da2cccac` (tree `fb0489ee9b19e48c9fc3eb4af6c662c111455b14`).
+**Latest verification-only candidate:** `6a253386f53638a1206a75e359d6020ba27765cb` (tree `588806486bd6b22fc0444cd0e29dc108d9f993d3`); product RTL is unchanged.
 
 ## Executive disposition
 
@@ -33,6 +33,22 @@ results are scoped: v2 requirements, 0x53 lifecycle SVA, external response
 ownership and sign-off remain open. Product RTL and benchmark results are
 unchanged. Exact commands, RTM changes and archive checksums are in the [v2 DV
 closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+### 0x53 forwarding commit/tag runtime SVA — 2026-11-06
+
+At testbench/build commit `6a253386f53638a1206a75e359d6020ba27765cb`, VCS
+`V-2023.12-SP1_Full64` passes two 0x53 forwarding SVA on Seeds
+20261120/21/22: the full-capture commit and destination-tag property, plus
+tag stability between commits. Each seed reports 2/2 assertions attempted,
+zero failures, and three matches for the valid-tag cover. The existing six
+named forwarding functional bins remain 100%, including the bit-exact
+producer/consumer, tag miss, SPAD fallback, Bank Flip, Abort and Reset cases.
+
+This is runtime assertion evidence on the real Matrix-core simulation, not a
+formal proof of all forwarding lifecycle cases. `REQ-V2-COM-003` remains
+PARTIAL; external fabric response ownership, broader legal fault/reset crosses
+and full v2 sign-off remain open. The exact command and archive checksum are
+recorded in the [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md). The archived ON/OFF evidence is SHA-256 `92efa5d9763114cc6fdf121d2b22744c06852ff6e9c66072503d054a53656f15`.
 
 ## Baseline and source audit
 
