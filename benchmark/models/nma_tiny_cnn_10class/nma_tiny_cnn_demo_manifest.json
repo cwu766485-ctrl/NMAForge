@@ -1,0 +1,167 @@
+{
+  "model": "nma_tiny_cnn_demo_weights.npz",
+  "model_kind": "trained four-filter 3x3 convolution plus trained 10-class INT8 readout",
+  "num_classes": 10,
+  "training": {
+    "convolution": "NumPy backpropagation with Adam; 250 epochs; batch 128; lr 0.006; seed 44",
+    "readout": "scikit-learn LogisticRegression; C=1; fit_intercept=false; trained on deployed integer convolution features",
+    "float_convolution_training_accuracy": 1.0
+  },
+  "dataset": "sklearn.datasets.load_digits restricted to labels 0..9",
+  "dataset_sha256": "87ff0c9e40dc7e2c0e34e7257799c2e3f3aec1a016363bb11cad869ec428a826",
+  "split": {
+    "train": 1401,
+    "test": 396,
+    "test_size": 0.22,
+    "random_state": 29,
+    "stratified": true
+  },
+  "input_quantization": "floor(pixel / 4), INT8; input scale 0.25",
+  "conv_contract": "trained shared 3x3 filters; signed INT32 dot; round (acc+8)>>4; clamp INT8; ReLU",
+  "fc_contract": "symmetric per-tensor INT8 weights; signed INT32 dot; round (acc+128)>>8; clamp INT8",
+  "test_correct": 384,
+  "test_count": 396,
+  "test_accuracy": 0.9696969696969697,
+  "test_confusion_matrix": [
+    [
+      39,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      39,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      2,
+      37,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      36,
+      0,
+      1,
+      0,
+      0,
+      1,
+      2
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      39,
+      0,
+      0,
+      1,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      1,
+      39,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      40,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      40,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      36,
+      1
+    ],
+    [
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      39
+    ]
+  ],
+  "rtl_sample": {
+    "test_index": 0,
+    "label": 2,
+    "prediction": 2,
+    "int8_logits": [
+      -38,
+      8,
+      106,
+      29,
+      -26,
+      -6,
+      -48,
+      15,
+      -12,
+      -30
+    ]
+  },
+  "model_sha256": "ef0e616d09ca0be7956fa8ca900e40c62973f8f06e3ec96af09d888eead73726",
+  "input_sha256": "395fa3d65ebd724444abfa47c758de41ec9e157705eda1c10cfccdbe246aceb3",
+  "testset_sha256": "cb851b077542f9bcf42f84938227ba5f1a4750ea0b0fbfe2ba8fcecbb914d107"
+}
