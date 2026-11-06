@@ -1,8 +1,21 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `85e7db2d12f5edfaed17e8ca3910bb504983779f` (tree `e8f64f78f7986193bdc0d01dfbc01740a130edcb`; real-Top 0x52 M=N=K=16 concurrent with CNM, separate Golden and response-owner checks). Latest benchmark source SHA: `85e7db2d12f5edfaed17e8ca3910bb504983779f` (fixed-candidate 48-point GEMV Cache×Prefetch ablation). Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commits expand only verification/benchmark workload and evidence. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `0696c16bd1346207ad5421d21247c719ea018111` (tree `94c8488a9c79f4ad3f0ee771ab43d7528fe285d0`; three-seed clean-worktree regression now includes 0x52 shapes 1×16×17, 8×13×65 and 15×16×31). Latest benchmark source SHA: `85e7db2d12f5edfaed17e8ca3910bb504983779f` (fixed-candidate GEMV Cache×Prefetch and serial/parallel artifact replay). Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commits expand only verification/benchmark workload and evidence. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
+
+## 2026-11-06 update — real-CMDQ GEMV extended shapes
+
+Commit `0696c16bd1346207ad5421d21247c719ea018111` adds real Top CMDQ
+execution for `1×16×17`, `8×13×65`, and `15×16×31` opcode-0x52 descriptors.
+Three Seeds pass independent signed INT32 Golden checks for every result,
+guards, completion payload/order, and Matrix accepted/returned response counts.
+The dedicated URG group is 3/3 (100%) and the existing full Cluster regression
+passes from a detached clean worktree. Product RTL is unchanged. Merged overall
+coverage remains Line/Condition/FSM/Branch/Assert/Group
+`70.71/68.29/46.17/67.66/72.00/82.43%`; this does not close all legal GEMV
+shapes or v2 DV. Exact command and logs archive checksum are in the [DV
+closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
 ## 2026-11-06 update — fixed-candidate GEMV Cache × Prefetch benchmark
 

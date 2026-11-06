@@ -1,7 +1,7 @@
 # NMAForge v2 DV Closure Status
 
 **Status:** IN PROGRESS — scoped regressions pass; v2 sign-off is not ready.  
-**Latest fixed RTL/test candidate SHA:** `85e7db2d12f5edfaed17e8ca3910bb504983779f` (tree `e8f64f78f7986193bdc0d01dfbc01740a130edcb`; three-seed real-CMDQ 0x52 M=N=K=16 GEMV concurrent with CNM; independent Golden/completion/owner checks; product RTL unchanged)
+**Latest testbench candidate SHA:** `0696c16bd1346207ad5421d21247c719ea018111` (tree `94c8488a9c79f4ad3f0ee771ab43d7528fe285d0`; three-seed clean-worktree Compute Cluster regression, with real-CMDQ 0x52 tail, minimum, maximum, extended-K, and GEMV/CNM ownership scenarios; product RTL unchanged)
 
 **Candidate tree:** `65d56c5d6dd345effde6fdfdf70dad59f135a279` (tree used for the latest three-seed generic Cluster replay)
 
@@ -835,6 +835,7 @@ named Matrix-core scenarios and do not substitute for the Top/Cluster RTM.
 | REQ-V2-052-003/004 | Independent signed INT32 Golden; complete output image and two sentinels; completion status/result/elements checked | 15/15 output elements per Seed; M/N/K tail bins 3/3 plus cross 1/1 | Same run ID/SHA | PASS for legal shape 3×5×5 only; full supported shape domain open |
 | REQ-V2-052-003/004 | Independent signed INT32 Golden and complete 16-byte operand line images for minimum descriptor | 1/1 output and guard per Seed; minimum-shape group 1/1 bin, 3 hits; 2/2 operand reads accepted/returned | `V2-CMDQ-PRODUCT-GEMV-MIN-BOUNDARY-3SEED-95301C4`, seeds 20261115/16/17, SHA `95301c46dfa6b9ee68f1e37a38f7767e3111d869` | PASS for M=N=K=1 only; maximum endpoint is covered by the separate row below, while full shape matrix remains open |
 | REQ-V2-052-003/004 | Independent signed INT32 Golden for maximum descriptor, complete output image, guards, completion and accepted/returned ownership | 256/256 output words and 2/2 guards per Seed; max-tile group 1/1 bin, 3 hits; 32/32 operand lines accepted/returned | `V2-CMDQ-PRODUCT-GEMV-FULL-TILE-3SEED-9287478`, seeds 20261118/19/20, SHA `92874788fb2cb2a2b15657a3621e5a275a9d5990` | PASS for M=N=K=16 only; all legal shapes and exhaustive tail combinations remain open |
+| REQ-V2-052-003/004 | Real CMDQ 0x52 GEMV for intermediate M/N/K shapes, including K>64, independent signed INT32 Golden, output guards, completion and accepted/returned ownership | `1×16×17`, `8×13×65`, `15×16×31`; per Seed 360/360 output words and 6/6 guards; across three Seeds 1,080/1,080 outputs and 18/18 guards; dedicated URG shape bins 3/3 (100%); 19/19, 106/106 and 61/61 Matrix reads respectively, each fully returned | `V2-CMDQ-GEMV-EXTENDED-SHAPES-3SEED-0696C16`, seeds 20261124/25/26, SHA `0696c16bd1346207ad5421d21247c719ea018111` | PASS for these three additional product-top shapes; full legal shape space, alias/fault crosses and all K boundaries remain open |
 | REQ-V2-052-007 | Count real Matrix banked request accepts and Matrix-tagged responses before completion; concurrently submit CNM and preserve independent response owners | Single GEMV endpoint sizes drain 2/2, 8/8, 32/32; concurrent GEMV/CNM drains Matrix 32/32 and CNM 4096/4096, zero route mismatch, both ordered completions and both Golden images pass; named overlap/owner group 100% | `V2-CMDQ-GEMV-CNM-OWNER-CROSS-3SEED-85E7DB2`, Seeds 20261121/22/23, SHA `85e7db2d12f5edfaed17e8ca3910bb504983779f` | PARTIAL; the real Top pairing closes this tested multi-engine case. Arbitrary external held/late responses and remaining fault/reset/pairing matrix are open |
 
 - `V2-DESC-VALIDATOR-AC6B83F`: VCS `V-2023.12-SP1_Full64`; seed is not applicable because the test is directed. The run used `VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS="/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10" make -C dv/block/control/sim descriptor-validator-regress DESCRIPTOR_VALIDATOR_OUT=/tmp/nmaforge_v2_descriptor_validator_ac6b83f`; compile/run logs are under `/tmp/nmaforge_v2_descriptor_validator_ac6b83f/`.
@@ -851,6 +852,36 @@ named Matrix-core scenarios and do not substitute for the Top/Cluster RTM.
 - `V2-MEMORY-FABRIC-RESET-3SEED-F340ACA`: VCS/URG `V-2023.12-SP1_Full64`; source/test SHA `f340acaa2cdf7c36075473b8bc6fd6dee8e59873`, tree `7fc556427be1597e64a602c10af4fdd855a0c343`; command `make -C dv/subsystem/dma_spad/sim subsystem_memory_fabric_reset_regress` with `MEMORY_FABRIC_RESET_SEEDS='20261025 20261026 20261027'`, VCS `-licwait 10`, and output `/tmp/nmaforge_v2_fabric_reset_f340aca`. All three seeds report `MEMORY_FABRIC_RESET_ONLY_PASS`, two `DMA_CNM_RESET_RECOVERY_PASS` events, and UVM Warning/Error/Fatal `0/0/0`. Three named reset groups score 100.00% in merged URG. Assertion summary is 13/31 with real successes, 0 failures, 0 incomplete, and two no-attempt UVM RAL properties; `ap_single_response_owner` and `ap_cnm_response_tag` have real successes. Logs-only archive `/tmp/nmaforge_v2_fabric_reset_f340aca_logs.tar.gz`, SHA-256 `14144bdc62932d8040a1b5be72b27f83e6f4f8e52286a8658b1570fdfe3717c5`. VCS databases and simulator binaries are excluded. Scope is the in-repository fabric and this reset interleave only.
 - `V2-LEGACY-TOP-COMPAT-3SEED-5F6E282`: clean detached worktree at source/test SHA `5f6e282f191b421bdbefc3d252690a9a0c93eb1c`, tree `4a5e0a1da1ab7d5a910c6f0a9417304d8a752cb2`; VCS `V-2023.12-SP1_Full64`; compile with `make -C dv/subsystem/top_smoke/sim ai_comp`, then run `./simv +ntb_random_seed=$seed +AI_RANDOM_CASES=20 +AI_SEED=$seed +ACLK_PERIOD_NS=10.0` for seeds 20261108/09/10. Each run reports `TEST PASS`; directed legacy checks include seven Tensor GEMM (`0x30`) outputs and four two-head Batch GEMM (`0x31`) outputs, alongside randomized legacy GEMV/GEMM/Conv/Depthwise Golden comparisons and the current 0x53 smoke path. The known `LOOP-REROLL-ENABLED` debug-capacity notice is present; the simulation logs contain no `ERROR:` lines. Logs-only archive `/tmp/nmaforge_v2_top_compat_5f6e282_logs.tar.gz`, SHA-256 `a56378fc6a1364ee4fdcc8f34dcf21b47068270d473ba7b848cdaef6b2a65b3c`; VCS executables/databases are excluded.
 - `V2-MATRIX-FSM-GUARDS-145363D`: VC Formal `V-2023.12-SP2`; 5/5 named Matrix FSM assertions proven/non-vacuous and 2/2 state covers reached. It is not an opcode 0x52/0x53 assertion campaign.
+
+`V2-CMDQ-GEMV-EXTENDED-SHAPES-3SEED-0696C16` used fixed source/test SHA
+`0696c16bd1346207ad5421d21247c719ea018111` (tree
+`94c8488a9c79f4ad3f0ee771ab43d7528fe285d0`) in detached clean worktree
+`/tmp/nmaforge-v2-clean-0696c16`. Exact command:
+
+```sh
+VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+VCS_ARCH_OVERRIDE=linux \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+make -C /tmp/nmaforge-v2-clean-0696c16/dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v2_gemv_extended_shapes_clean_0696c16 \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261124 20261125 20261126'
+```
+
+VCS and URG are `V-2023.12-SP1_Full64` / `V-2023.12-SP1`; clean compile
+reported 0 errors and 0 warnings. All three seeds pass the full Cluster UVM
+target with UVM Warning/Error/Fatal `0/0/0`. Each added shape has independent
+Golden, two untouched sentinels, ordered completion, and accepted=returned
+Matrix responses. The dedicated URG group is 3/3 (100%); merged aggregate
+Line/Condition/FSM/Branch/Assert/Group is `70.71/68.29/46.17/67.66/72.00/82.43%`.
+The Memory Scoreboard checks 98,199 words per seed with zero mismatches,
+unknown reads or stale-epoch reads; the response ledger is
+`5015/4995/20`, with zero route/data/error mismatch and no pending response.
+Logs plus text URG reports only (no VDB or simulator binary) are archived at
+`/tmp/nmaforge_v2_gemv_extended_shapes_0696c16_logs.tar.gz`, SHA-256
+`cef415263d6d3c3b56a0137c8b5a1561282eae2b7043284bde0484439faa70b7`.
+This expands tested shapes; the full supported descriptor space and overall
+v2 sign-off remain open.
 
 Exact replay commands for the latest fixed test candidate `86e0d6c` (run from
 the repository root):
