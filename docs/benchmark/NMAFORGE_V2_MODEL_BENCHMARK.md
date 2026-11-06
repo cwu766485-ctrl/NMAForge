@@ -148,9 +148,10 @@ the one-token Decode path. This is testbench-only instrumentation. Product RTL
 remains at SHA `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
 
 At fixed test/tooling SHA `f9f32f71e7168350d74a75ede0a4a4b222844cc9`, Mapper
-unit tests pass 4/4 and VCS Top passes all 301 independent intermediate,
-final, and KV checks for 86 descriptors and 60 tensors. The measured 10 ns
-simulation-clock cycle counts are:
+unit tests pass 4/4. Three VCS Top runs on Seeds 20261106/07/08 each pass
+301 independent intermediate, final, and KV checks for 86 descriptors and 60
+tensors (903 checks total). Each run reproduces the same 10 ns simulation-clock
+cycle counts:
 
 | Interval | Top CMDQ cycles | Scope |
 |---|---:|---|
@@ -161,17 +162,18 @@ simulation-clock cycle counts are:
 The endpoint includes descriptor fetch/dispatch, compute, behavioral SPAD
 service, and completion commits. It excludes testbench preload and the later
 Golden read/compare. The 10 ns clock is a simulation setting, not a measured
-silicon frequency. This does not establish trained Transformer inference, a
-TinyNPU speed comparison, ASIC timing, or separate Host/DMA/Compute/Writeback/
-Graph-Orchestration costs. Compile again emitted the known non-fatal
+silicon frequency. The Seed changes vary the simulator seed only; model
+weights and workload remain fixed. This does not establish trained Transformer
+inference, a TinyNPU speed comparison, ASIC timing, or separate
+Host/DMA/Compute/Writeback/Graph-Orchestration costs. Compile emitted the known non-fatal
 `LOOP-REROLL-ENABLED` debug-capacity notice; compilation and simulation had no
 errors.
 
-Run ID `V2-TRANSFORMER-FIXED-WEIGHTS-TIMED-TOP-F9F32F7-S20261106`. Machine
-record: [JSON](../../benchmark/v2_transformer_timing_f9f32f7.json). Logs-only
+Run ID `V2-TRANSFORMER-FIXED-WEIGHTS-TIMED-TOP-F9F32F7-3SEED`. Machine record:
+[JSON](../../benchmark/v2_transformer_timing_f9f32f7_3seed.json). Logs-only
 archive outside Git:
-`/tmp/nmaforge_v2_transformer_timing_f9f32f7_logs.tar.gz`, SHA-256
-`03096fd98236b00a3ce2de3b8543b173a9c851c53b48839300c11e59ad6aea53`.
+`/tmp/nmaforge_v2_transformer_timing_f9f32f7_3seed_logs.tar.gz`, SHA-256
+`664ddf0f3e59e9ee5919bb5bfdaf06aae90fc9bd8d0e14d2dcf86bf2d690a944`.
 
 ## Current fixed-candidate Digits replay — `410b81d`
 
