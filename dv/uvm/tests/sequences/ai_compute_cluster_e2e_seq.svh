@@ -311,6 +311,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             bins kv_zero_length = {5};
             bins mixed_fp_reserved_field = {6};
             bins macro_minimum_child_count = {7};
+            bins v2_gemv_output_alias_a = {8};
+            bins v2_gemv_output_alias_b = {9};
+            bins v2_gemv_source_alignment = {10};
+            bins v2_gemv_source_span_wrap = {11};
         }
     endgroup
 
@@ -4116,7 +4120,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     endtask
 
     task automatic run_cmdq_invalid_descriptor_matrix_test(input int unsigned seed);
-        localparam int unsigned CASE_COUNT = 8;
+        localparam int unsigned CASE_COUNT = 12;
         bit [31:0] cmdq_base;
         bit [31:0] cplq_base;
         bit [31:0] sentinel_base;
@@ -4150,13 +4154,23 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         opcode[5] = 8'h43; m_size[5] = 16'd0; n_size[5] = 16'd0; length[5] = 16'd0; version[5] = 8'd5;
         opcode[6] = 8'h50; m_size[6] = 16'd1; n_size[6] = 16'd1; length[6] = 16'd1; version[6] = 8'd7;
         opcode[7] = 8'h40; m_size[7] = 16'd0; n_size[7] = 16'd0; length[7] = 16'd2; version[7] = 8'd4;
+        opcode[8] = 8'h52; m_size[8] = 16'd1; n_size[8] = 16'd1; length[8] = 16'd1; version[8] = 8'd7;
+        opcode[9] = 8'h52; m_size[9] = 16'd1; n_size[9] = 16'd1; length[9] = 16'd1; version[9] = 8'd7;
+        opcode[10] = 8'h52; m_size[10] = 16'd1; n_size[10] = 16'd1; length[10] = 16'd1; version[10] = 8'd7;
+        opcode[11] = 8'h52; m_size[11] = 16'd1; n_size[11] = 16'd1; length[11] = 16'd1; version[11] = 8'd7;
 
         for (i = 0; i < CASE_COUNT; i++) begin
             descriptor_dst[i] = sentinel_base + (i << 5);
+            if (i == 8)
+                descriptor_dst[i] = 32'h0007_8000; // Output overlaps padded A.
+            else if (i == 9)
+                descriptor_dst[i] = 32'h0007_8100; // Output overlaps dense B.
             spad_write(descriptor_dst[i], 32'hde5c_0000 | i);
             spad_write(descriptor_dst[i] + 32'd4, 32'hde5c_1000 | i);
             write_cluster_desc(cmdq_base + (i << 6), opcode[i],
-                               16'h08a0 + i, 32'h0007_8000,
+                               16'h08a0 + i,
+                               (i == 10) ? 32'h0007_8004 :
+                               ((i == 11) ? 32'hffff_fff0 : 32'h0007_8000),
                                32'h0007_8100, descriptor_dst[i],
                                m_size[i], n_size[i], length[i],
                                32'd0, 32'd0, 32'd0, 32'd0, version[i]);
@@ -4233,7 +4247,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 cmdq_invalid_descriptor_cg.get_coverage()))
 
         `uvm_info("CLUSTER_CMDQ_INVALID_DESCRIPTOR_PASS", $sformatf(
-            "cases=8/8 engines_and_macro=8 ERR_DESC=8 ordered_head=8 no_launch=1 no_compute_or_dma_request_cycles=%0d sentinels=16/16 focused_bins=8/8 coverage=%0.1f%% seed=%0d",
+            "cases=12/12 engines_and_macro=8 v2_gemv=4 ERR_DESC=12 ordered_head=12 no_launch=1 no_compute_or_dma_request_cycles=%0d sentinels=24/24 focused_bins=12/12 coverage=%0.1f%% seed=%0d",
             bad_request_cycles, cmdq_invalid_descriptor_cg.get_coverage(), seed), UVM_LOW)
         axil_write(REG_CPLQ_HEAD, CASE_COUNT);
         axil_write(REG_CMDQ_SIZE, 32'd0);
