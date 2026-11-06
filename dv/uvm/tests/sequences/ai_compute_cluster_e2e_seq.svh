@@ -4157,7 +4157,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         opcode[8] = 8'h52; m_size[8] = 16'd1; n_size[8] = 16'd1; length[8] = 16'd1; version[8] = 8'd7;
         opcode[9] = 8'h52; m_size[9] = 16'd1; n_size[9] = 16'd1; length[9] = 16'd1; version[9] = 8'd7;
         opcode[10] = 8'h52; m_size[10] = 16'd1; n_size[10] = 16'd1; length[10] = 16'd1; version[10] = 8'd7;
-        opcode[11] = 8'h52; m_size[11] = 16'd1; n_size[11] = 16'd1; length[11] = 16'd1; version[11] = 8'd7;
+        opcode[11] = 8'h52; m_size[11] = 16'd1; n_size[11] = 16'd1; length[11] = 16'd17; version[11] = 8'd7;
 
         for (i = 0; i < CASE_COUNT; i++) begin
             descriptor_dst[i] = sentinel_base + (i << 5);
@@ -4165,6 +4165,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                 descriptor_dst[i] = 32'h0007_8000; // Output overlaps padded A.
             else if (i == 9)
                 descriptor_dst[i] = 32'h0007_8100; // Output overlaps dense B.
+            // K=17 pads A to 32 bytes, so this span wraps past 2^32.
+            // K=1 would end exactly at 2^32 and is a legal half-open range.
             spad_write(descriptor_dst[i], 32'hde5c_0000 | i);
             spad_write(descriptor_dst[i] + 32'd4, 32'hde5c_1000 | i);
             write_cluster_desc(cmdq_base + (i << 6), opcode[i],
