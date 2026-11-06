@@ -622,9 +622,10 @@ the [execution frontier](../exec-plans/active/execution-frontier.md).
 ## Verification-only provenance — 2026-11-06
 
 The later real-Top legal opcode `0x52` CMDQ replay is fixed at test/source SHA
-`fd82e7323bbf73c428f1a1e72d784220f2440cd0`; it changes UVM/testbench code only
-and does not change the product RTL. No performance suite was rerun on this
-SHA. All cycle, traffic, utilization, and TinyNPU comparison values above
+`95301c46dfa6b9ee68f1e37a38f7767e3111d869`; it adds 1×1×1 minimum-shape
+coverage to the prior 3×5×5 test and changes UVM/testbench code only. It does
+not change product RTL. No performance suite was rerun on this SHA. All cycle,
+traffic, utilization, and TinyNPU comparison values above
 remain bound to their individually listed benchmark SHAs and memory models.
 Ratio directions were audited: `NMAForge cycles / TinyNPU normalized cycles`
 above 1 means NMAForge used more cycles; `speedup_vs_cache0_prefetch0` is

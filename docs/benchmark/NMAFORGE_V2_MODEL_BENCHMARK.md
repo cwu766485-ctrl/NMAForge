@@ -194,8 +194,9 @@ timing remain **NOT_RUN**. The v2 feature coverage evidence is recorded in the
 ### Later Top CMDQ verification provenance — 2026-11-06
 
 The legal opcode `0x52` GEMV Top CMDQ replay at test/source SHA
-`fd82e7323bbf73c428f1a1e72d784220f2440cd0` is testbench-only; it changed no
-product RTL and reran no model benchmark. Digits, fixed `conv1x_mini`, and
+`95301c46dfa6b9ee68f1e37a38f7767e3111d869` includes an M=N=K=1 minimum
+boundary point and is testbench-only; it changed no product RTL and reran no
+model benchmark. Digits, fixed `conv1x_mini`, and
 TinyNPU values remain tied to the separate SHAs and timing boundaries listed
 above. Trained-weight CNN, trained Transformer, and separated Host/DMA/Compute/
 Writeback/Orchestration timing remain **NOT_RUN**.

@@ -8,8 +8,9 @@
 ## Later DV-only provenance — 2026-11-06
 
 The real-Top legal opcode `0x52` UVM regression at source/test SHA
-`fd82e7323bbf73c428f1a1e72d784220f2440cd0` changes testbench observability and
-stimulus only; product RTL is unchanged. This VCS/URG PASS does not update the
+`95301c46dfa6b9ee68f1e37a38f7767e3111d869` adds the M=N=K=1 minimum case and
+changes testbench observability/stimulus only; product RTL is unchanged. This
+VCS/URG PASS does not update the
 SpyGlass, formal/LEC, SRAM mapping, DC, physical PPA, or power evidence below.
 Their existing `NOT_RUN` and `BLOCKED_ENV` dispositions remain in force; no
 ASIC readiness or tapeout claim is made.

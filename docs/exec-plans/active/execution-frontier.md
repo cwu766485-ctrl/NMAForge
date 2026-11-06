@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `fd82e7323bbf73c428f1a1e72d784220f2440cd0` (tree `780545809ed04b88fe97bd708dd67e54ef4a88ce`). Latest benchmark source SHA remains `c93d020880710a2804685fd85bb98c2e9c56f290` (tree `24180541c76b1ad4d27b2e97313e7d97a5df2016`). Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commit expands only the verification workload/profile. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `95301c46dfa6b9ee68f1e37a38f7767e3111d869` (tree `abbb19e1c8205e3d8252e5685fd6ab6161970c3d`; real-Top 1×1×1 and 3×5×5 opcode 0x52 cases). Latest benchmark source SHA remains `c93d020880710a2804685fd85bb98c2e9c56f290` (tree `24180541c76b1ad4d27b2e97313e7d97a5df2016`). Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commit expands only the verification workload/profile. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -676,3 +676,21 @@ in the owning report; run `git diff --check` before handoff.
   shapes, exhaustive tail/alias/fault phases, and concurrent response-owner
   checks remain open. Benchmark/model/PPA evidence is unchanged and remains
   pinned to its own source SHAs.
+
+
+## 2026-11-06 update — minimum legal 0x52 GEMV boundary
+
+- Testbench-only commit `95301c46dfa6b9ee68f1e37a38f7767e3111d869` (tree
+  `abbb19e1c8205e3d8252e5685fd6ab6161970c3d`) adds M=N=K=1 through the real
+  Top CMDQ path and initializes the complete 16-byte A/B operand lines. Product
+  RTL remains at `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
+- VCS/URG `V-2023.12-SP1_Full64`, Run ID
+  `V2-CMDQ-PRODUCT-GEMV-MIN-BOUNDARY-3SEED-95301C4`, Seeds 20261115/16/17:
+  all three full UVM Seeds pass; outputs −2/−6/−12 match independent signed
+  INT32 Golden, guards and completions pass, and accepted/returned operand reads
+  are 2/2. The dedicated minimum-shape URG bin is 100% (three hits); aggregate
+  Group is 80.61%, not global closure. Logs-only archive SHA-256
+  `4d5b56b411b3c62a9d39a7da3f9c0f3f765612ce82baafe8eab6180970314ed6`.
+- Exact command and requirement disposition are in [DV Closure](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
+  Maximum dimensions, all tail/fault combinations, concurrent opcode-specific
+  ownership, model benchmarks, and PPA remain open.

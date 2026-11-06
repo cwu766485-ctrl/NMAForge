@@ -1,7 +1,7 @@
 # NMAForge v2 DV Closure Status
 
 **Status:** IN PROGRESS — scoped regressions pass; v2 sign-off is not ready.  
-**Latest fixed RTL/test candidate SHA:** `fd82e7323bbf73c428f1a1e72d784220f2440cd0` (tree `780545809ed04b88fe97bd708dd67e54ef4a88ce`; three-seed real-CMDQ legal 0x52 GEMV Golden replay; product RTL unchanged)
+**Latest fixed RTL/test candidate SHA:** `95301c46dfa6b9ee68f1e37a38f7767e3111d869` (tree `abbb19e1c8205e3d8252e5685fd6ab6161970c3d`; three-seed real-CMDQ legal 0x52 3×5×5 and 1×1×1 GEMV Golden replays; product RTL unchanged)
 
 **Candidate tree:** `65d56c5d6dd345effde6fdfdf70dad59f135a279` (tree used for the latest three-seed generic Cluster replay)
 
@@ -103,6 +103,45 @@ single-command accepted/returned portion of `REQ-V2-052-007`. It does not
 close those broader requirements: maximum descriptor shapes, exhaustive
 tail/alias/fault combinations, held external responses, multi-engine
 0x52 response ownership, and complete error/reset crosses remain open.
+
+## 2026-11-06 — minimum 0x52 GEMV descriptor through real Top CMDQ
+
+Testbench-only commit `95301c46dfa6b9ee68f1e37a38f7767e3111d869` adds a
+separate ABI-v7 1×1×1 GEMV command after the 3×5×5 tail test. Each 16-byte
+operand line is initialized so the Top Memory Scoreboard has a complete known
+image. Product RTL is unchanged.
+
+At fixed source/test SHA `95301c46dfa6b9ee68f1e37a38f7767e3111d869` (tree
+`abbb19e1c8205e3d8252e5685fd6ab6161970c3d`), VCS/URG
+`V-2023.12-SP1_Full64` passed three complete real-Top Cluster UVM Seeds
+20261115/16/17. Each case matches its independent signed INT32 Golden
+(−2/−6/−12), preserves the adjacent sentinel, checks completion, and observes
+2 accepted and 2 returned operand-line reads before retirement. The named
+`cmdq_product_gemv_min_cg` is 100% (1/1 bin, three hits). The merged profile is
+Line/Condition/FSM/Branch/Assert/Group
+`70.12/67.95/45.62/67.30/72.00/80.61%`; aggregate coverage is not closure.
+Every Seed has UVM Warning/Error/Fatal `0/0/0` and no
+`CLUSTER_MEMORY_UNKNOWN` reports.
+
+Run ID: `V2-CMDQ-PRODUCT-GEMV-MIN-BOUNDARY-3SEED-95301C4`. Exact fixed-SHA
+command:
+
+```sh
+VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+VCS_ARCH_OVERRIDE=linux \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v2_product_gemv_min_3seed_95301c4 \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261115 20261116 20261117'
+```
+
+Logs and URG text only (no simulator binaries or coverage databases):
+`/tmp/nmaforge_v2_product_gemv_min_95301c4_logs.tar.gz`, SHA-256
+`4d5b56b411b3c62a9d39a7da3f9c0f3f765612ce82baafe8eab6180970314ed6`.
+`REQ-V2-COM-001` and `REQ-V2-052-003/004` gain minimum-shape evidence;
+`REQ-V2-052-007` remains PARTIAL because no concurrent multi-engine 0x52
+response-owner cross was added. Maximum dimensions, exhaustive legal tails,
+fault × phase × reset crosses, and external-fabric responses remain open.
 
 ## Current Compute Cluster UVM replay at `2999e03` — 2026-11-06
 
@@ -707,6 +746,7 @@ named Matrix-core scenarios and do not substitute for the Top/Cluster RTM.
 |---|---|---|---|---|
 | REQ-V2-COM-001 | Real Top CMDQ fetch/decode/dispatch of ABI-v7 opcode `0x52`; passive launch monitor now classifies `0x52`/`0x53` as Matrix | 1 legal launch per Seed; Matrix launch snapshot matches opcode/addresses/3×5×5 dimensions | `V2-CMDQ-PRODUCT-GEMV-GOLDEN-3SEED-FD82E73`, seeds 20261112/13/14, SHA `fd82e7323bbf73c428f1a1e72d784220f2440cd0` | PASS for this product-CMDQ dispatch shape; broader mode matrix open |
 | REQ-V2-052-003/004 | Independent signed INT32 Golden; complete output image and two sentinels; completion status/result/elements checked | 15/15 output elements per Seed; M/N/K tail bins 3/3 plus cross 1/1 | Same run ID/SHA | PASS for legal shape 3×5×5 only; full supported shape domain open |
+| REQ-V2-052-003/004 | Independent signed INT32 Golden and complete 16-byte operand line images for minimum descriptor | 1/1 output and guard per Seed; minimum-shape group 1/1 bin, 3 hits; 2/2 operand reads accepted/returned | `V2-CMDQ-PRODUCT-GEMV-MIN-BOUNDARY-3SEED-95301C4`, seeds 20261115/16/17, SHA `95301c46dfa6b9ee68f1e37a38f7767e3111d869` | PASS for M=N=K=1 only; maximum and full supported shape matrix remain open |
 | REQ-V2-052-007 | Count real Matrix banked request accepts and Matrix-tagged returned responses before completion | 8 accepted / 8 returned each Seed; no pending response at completion | Same run ID/SHA | PARTIAL; single Matrix command only, no concurrent engine owner cross |
 
 - `V2-DESC-VALIDATOR-AC6B83F`: VCS `V-2023.12-SP1_Full64`; seed is not applicable because the test is directed. The run used `VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS="/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10" make -C dv/block/control/sim descriptor-validator-regress DESCRIPTOR_VALIDATOR_OUT=/tmp/nmaforge_v2_descriptor_validator_ac6b83f`; compile/run logs are under `/tmp/nmaforge_v2_descriptor_validator_ac6b83f/`.

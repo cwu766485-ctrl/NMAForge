@@ -3,8 +3,8 @@
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Latest fixed test source SHA:** `fd82e7323bbf73c428f1a1e72d784220f2440cd0` (tree `780545809ed04b88fe97bd708dd67e54ef4a88ce`; real-CMDQ legal 0x52 GEMV regression). The most recent benchmark source remains independently identified in the benchmark report.
-**Current report branch HEAD before this review update:** `fd82e7323bbf73c428f1a1e72d784220f2440cd0` (tree `780545809ed04b88fe97bd708dd67e54ef4a88ce`); report-only commits follow the tested source SHA.
+**Latest fixed test source SHA:** `95301c46dfa6b9ee68f1e37a38f7767e3111d869` (tree `abbb19e1c8205e3d8252e5685fd6ab6161970c3d`; real-CMDQ legal 0x52 GEMV, including 1×1×1 minimum boundary). The most recent benchmark source remains independently identified in the benchmark report.
+**Current report branch HEAD before this review update:** `95301c46dfa6b9ee68f1e37a38f7767e3111d869` (tree `abbb19e1c8205e3d8252e5685fd6ab6161970c3d`); report-only commits follow the tested source SHA.
 **Published feature branch tip at this audit:** `19f9575f3579869f27d72f2dd17fa980840b6499` (same tree `3ac2f31a0fcbbb5fa5cd13f3f9ed39a87c3ed3c0`).
 **Product RTL SHA:** `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; no RTL change is present in the fixed test source or report-only commits.
 
@@ -74,10 +74,21 @@ remains at `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. The full command,
 aggregate URG totals, and log archive checksum are in the
 [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
 
-This closes only one legal CMDQ GEMV shape and single-engine response drain.
-Maximum supported shapes, exhaustive legal tails, multi-engine 0x52 ownership,
-and the complete fault × phase × reset matrix remain open; v2 DV remains
-**IN PROGRESS**.
+The 3×5×5 replay closes one legal CMDQ GEMV shape and single-engine response
+drain; the 1×1×1 minimum boundary is tested separately below. Maximum
+supported shapes, exhaustive legal tails, multi-engine 0x52 ownership, and the
+complete fault × phase × reset matrix remain open; v2 DV remains **IN PROGRESS**.
+
+### Minimum legal GEMV boundary — 2026-11-06
+
+The real Top CMDQ regression also executes opcode `0x52` at M=N=K=1 on fixed
+source/test SHA `95301c46dfa6b9ee68f1e37a38f7767e3111d869` (tree
+`abbb19e1c8205e3d8252e5685fd6ab6161970c3d`). Three Seeds pass signed
+independent Golden outputs −2, −6, and −12, preserve the adjacent output guard,
+check completion, and drain 2/2 accepted/returned operand lines. Its dedicated
+minimum-shape URG bin is 100% (3/3 hits). This closes only the minimum
+descriptor/data point; maximum-dimension execution and full GEMV DV remain
+open. Product RTL is unchanged.
 
 ### Phase 0 worktree relationship audit — 2026-11-06
 
