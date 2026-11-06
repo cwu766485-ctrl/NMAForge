@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `f19e92934cd6273d327621c43cb17291cf1a9aa5` (tree `2d931c1c81997b482467d7fdf69302dd367975a1`; clean three-seed full Compute Cluster UVM adds real-CMDQ 0x52 legal A/B read-only alias checks). Latest Top compatibility replay SHA: `9b835aeac33d43fd97a81496b1048d359cdff3d0` (three Seeds × 20 random workloads plus directed legacy/v2 smoke checks). Latest benchmark replay SHA: `a4dcc6b609878811fcd48a0310401609d4952c62` (current-source GEMV four-way ablation, bit-exact replay of 85e7db2 metrics); latest Top contention test SHA: `c93d020880710a2804685fd85bb98c2e9c56f290`. Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commits expand only verification/benchmark workload and evidence. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `f19e92934cd6273d327621c43cb17291cf1a9aa5` (tree `2d931c1c81997b482467d7fdf69302dd367975a1`; clean three-seed full Compute Cluster UVM adds real-CMDQ 0x52 legal A/B read-only alias checks). Latest Top compatibility replay SHA: `f19e92934cd6273d327621c43cb17291cf1a9aa5` (directed smoke plus three Seeds × 20 random workloads); latest benchmark replay SHA: `a4dcc6b609878811fcd48a0310401609d4952c62` (current-source GEMV four-way ablation, bit-exact replay of 85e7db2 metrics); latest Top contention test SHA: `c93d020880710a2804685fd85bb98c2e9c56f290`. Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commits expand only verification/benchmark workload and evidence. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -939,3 +939,16 @@ compatibility evidence, not UVM or URG coverage. Run ID
 `V2-TOP-SMOKE-COMPAT-20X-3SEED-9B835AE`; machine record:
 [JSON](../../benchmark/v2_top_smoke_compat_9b835ae.json). Logs archive SHA-256:
 `a6eb548b5e37dd2fba1df0513635bed43705d5eafebaa376ecbb13d8abc75159`.
+
+## 2026-11-06 update — fixed-SHA Top compatibility after UVM alias test
+
+At fixed testbench/tooling SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5`,
+directed `ai_smoke` passes and `ai_run` passes 20 random workloads on each of
+Seeds 20261106/07/08. All runs contain the legacy GEMM, 0x52 GEMV, 0x53 fused
+and cross-engine immutability, Matrix/CNM profile markers, one `TEST PASS`,
+and zero error lines. The only compile notice is the known
+`LOOP-REROLL-ENABLED` fixture debug-capacity message. This adds fixed-candidate
+compatibility evidence, not URG bins or sign-off. Run ID
+`V2-TOP-SMOKE-COMPAT-20X-3SEED-F19E929`; report and log archive details are in
+the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md) and
+[machine record](../../benchmark/v2_top_smoke_compat_f19e929.json).

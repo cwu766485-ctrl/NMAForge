@@ -3,7 +3,7 @@
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Latest fixed Compute Cluster DV source SHA:** `8758794c1f3bd6abb41c33276422b84ac5ee7a80` (tree `6f51976ea8f736e08783487afe892afa8a3a8b36`; three-seed real Top CMDQ 0x52 K=256 test-bound point). The `16×16×256` case still exceeds the unchanged watchdog before Golden. The most recent benchmark source remains independently identified in the benchmark report.
+**Latest fixed Compute Cluster DV source SHA:** `f19e92934cd6273d327621c43cb17291cf1a9aa5` (tree `2d931c1c81997b482467d7fdf69302dd367975a1`; three-seed Top UVM passes legal real-CMDQ 0x52 read-only A/B alias and full existing cluster regression). The `16×16×256` case still exceeds the unchanged watchdog before Golden. The most recent benchmark source remains independently identified in the benchmark report.
 **Latest trained-model/Transformer fixture source SHA:** `9b835aeac33d43fd97a81496b1048d359cdff3d0` (tree `04215a9fb125e57aa6a9ce6ead2410f59bafa2b7`).
 **Current report branch HEAD before this review update:** `d26bcd2a961ab7def65a2122765778fb8bc37bde` (tree `d5d43b3d004d80c426cb1de692b248d8427868a9`); this documentation update follows that candidate.
 **Published feature branch tip at this audit:** `19f9575f3579869f27d72f2dd17fa980840b6499` (same tree `3ac2f31a0fcbbb5fa5cd13f3f9ed39a87c3ed3c0`).
@@ -573,3 +573,17 @@ candidate, not full DV sign-off; details and archive checksum are in the
   and [Top compatibility record](../../benchmark/v2_top_smoke_compat_9b835ae.json).
   Product RTL remains unchanged at `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`;
   v2 DV remains IN PROGRESS and ASIC PPA remains BLOCKED_ENV/NOT_RUN.
+
+## Post-review fixed-candidate validation — 2026-11-06
+
+- At testbench/tooling SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5`, three
+  clean Compute Cluster UVM seeds exercise `0x52` with `srcA == srcB`; all
+  256 source bytes remain unchanged, 16 signed INT32 outputs match Golden,
+  both guards and completion pass, and Matrix read ownership drains 17/17.
+- The same fixed SHA passes Top `ai_smoke` and three `ai_run` regressions with
+  20 random workloads each. This confirms the exercised legacy and `0x52`/
+  `0x53` smoke paths remain functional after the testbench addition. It does
+  not close the RTM's remaining partials or add a coverage merge.
+- Machine records: [GEMV alias](../../benchmark/v2_cmdq_gemv_ab_alias_f19e929.json)
+  and [Top compatibility](../../benchmark/v2_top_smoke_compat_f19e929.json).
+  Full evidence and limits are in the [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).

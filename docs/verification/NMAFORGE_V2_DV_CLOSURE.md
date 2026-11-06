@@ -2,7 +2,7 @@
 
 **Status:** IN PROGRESS — scoped regressions pass; v2 sign-off is not ready.  
 **Latest testbench/tooling candidate SHA:** `f19e92934cd6273d327621c43cb17291cf1a9aa5` (tree `2d931c1c81997b482467d7fdf69302dd367975a1`; adds legal real-CMDQ 0x52 A/B read-only alias checking; product RTL unchanged). Latest clean three-seed Compute Cluster UVM regression is `V2-CMDQ-GEMV-AB-ALIAS-3SEED-F19E929`.
-**Latest clean Top Smoke compatibility replay:** model/tooling SHA `9b835aeac33d43fd97a81496b1048d359cdff3d0`; three 20-random-workload seeds pass the Top Smoke markers. This is not a UVM/URG coverage update.
+**Latest clean Top Smoke compatibility replay:** testbench/tooling SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5`; directed smoke plus three 20-random-workload seeds pass legacy/v2 markers. This is not a UVM/URG coverage update.
 
 **Candidate tree:** `65d56c5d6dd345effde6fdfdf70dad59f135a279` (tree used for the latest three-seed generic Cluster replay)
 
@@ -992,6 +992,7 @@ named Matrix-core scenarios and do not substitute for the Top/Cluster RTM.
 | REQ-V2-052-001 | Legal opcode-0x52 read-only A/B input alias (`srcA == srcB`) is accepted by ABI-v7 validation and dispatched through real Top CMDQ | Alias covergroup 1/1 per Seed; launch snapshot confirms equal sources and disjoint output | `V2-CMDQ-GEMV-AB-ALIAS-3SEED-F19E929`, Seeds 20261106/07/08, SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5` | PASS for this legal read-only alias point; other legal span intersections are not exhaustively sampled |
 | REQ-V2-052-003/004 | Alias execution preserves the shared 256-byte source image and produces all 16 signed INT32 Golden outputs | 256 B unchanged, 16/16 outputs bit-exact, two output guards unchanged, successful completion per Seed | `V2-CMDQ-GEMV-AB-ALIAS-3SEED-F19E929`, Seeds 20261106/07/08, SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5` | PASS for shape `1×16×16` only; no concurrent software writes to aliased operands were attempted |
 | REQ-V2-052-007 | Alias command drains every accepted Matrix response before successful completion | 17/17 accepted/returned Matrix reads per Seed; no ownership/count mismatch before completion | `V2-CMDQ-GEMV-AB-ALIAS-3SEED-F19E929`, Seeds 20261106/07/08, SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5` | PARTIAL; closes this serial alias point only; arbitrary held/late responses and the full multi-engine/fault/reset matrix remain open |
+| REQ-V2-COM-002 | Preserve supported legacy opcode behavior alongside v2 additions on fixed source/test SHA | Directed Top Smoke plus 20 seeded random workloads per seed; legacy GEMM and existing 0x52/0x53 markers and independent checks pass | `V2-TOP-SMOKE-COMPAT-20X-3SEED-F19E929`, seed 20261106 smoke + seeds 20261106/07/08, SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5` | PASS for exercised modes and workloads only; not exhaustive legacy shape/aux/fault compatibility |
 
 - `V2-DESC-VALIDATOR-AC6B83F`: VCS `V-2023.12-SP1_Full64`; seed is not applicable because the test is directed. The run used `VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS="/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10" make -C dv/block/control/sim descriptor-validator-regress DESCRIPTOR_VALIDATOR_OUT=/tmp/nmaforge_v2_descriptor_validator_ac6b83f`; compile/run logs are under `/tmp/nmaforge_v2_descriptor_validator_ac6b83f/`.
 - `V2-GEMV-CORE-3SEED-18DAD2B`: VCS `V-2023.12-SP1_Full64`; Seeds 20261105/06/07; logs-only archive SHA-256 `4fd0ba313b484a2da588562ff62411b2951ca089bb703a74e49fed7f2bc506c1`.
@@ -1612,3 +1613,40 @@ The logs-only archive is
 `a6eb548b5e37dd2fba1df0513635bed43705d5eafebaa376ecbb13d8abc75159`). This
 does not add functional coverage bins or alter the scoped RTM disposition of
 14 PASS-scoped / 8 PARTIAL; v2 DV remains **IN PROGRESS**.
+
+## 2026-11-06 — fixed-candidate Top compatibility after GEMV alias test addition
+
+At clean detached testbench SHA `f19e92934cd6273d327621c43cb17291cf1a9aa5`
+(tree `2d931c1c81997b482467d7fdf69302dd367975a1`), the Top Smoke compile and
+directed `ai_smoke` pass on seed 20261106 with four random workloads. Then
+`ai_run` passes 20 random workloads on each seed 20261106/07/08. Every run
+reports one `TEST PASS`, zero `ERROR:` lines, and the legacy GEMM, 0x52 GEMV,
+0x53 fused/cross-engine immutability, and Matrix/CNM profile markers. Simulation
+times are 984,560,000 ps, 981,920,000 ps, and 991,190,000 ps for the three
+20-case runs. Compilation shows the pre-existing
+`LOOP-REROLL-ENABLED` fixture debug-capacity notice; there are no compile
+errors. This is compatibility evidence only, not a new coverage merge or full
+v2 DV sign-off. Product RTL remains unchanged.
+
+Run ID `V2-TOP-SMOKE-COMPAT-20X-3SEED-F19E929`. Machine-readable record:
+[JSON](../../benchmark/v2_top_smoke_compat_f19e929.json). Logs-only archive:
+`/tmp/nmaforge_v2_top_compat_f19e929_logs.tar.gz`, SHA-256
+`c8054cc1ea0bc0e07f96c96f963806e159845cfc56c3ca17e8c0fd0de0e10f5f`.
+
+Exact commands:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+make -C dv/subsystem/top_smoke/sim ai_smoke \
+  AI_RANDOM_CASES=4 AI_SEED=20261106 SEED=20261106
+
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+make -C dv/subsystem/top_smoke/sim ai_run \
+  AI_RANDOM_CASES=20 AI_SEED=<seed> SEED=<seed>
+```
+
+The second command was repeated with `<seed>` set to `20261106`, `20261107`,
+and `20261108`. This confirms tested compatibility at the new testbench
+candidate SHA; global v2 coverage remains at the URG values above.
