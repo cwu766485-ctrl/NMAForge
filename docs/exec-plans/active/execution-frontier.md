@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Latest fixed-SHA v2 mutation replay: `ab96d47876beb4d7e47fef01e43b4c4716dd176a` (tree `1126cb6e650545fdc0bad003c321a77fe552e3a4`). Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; recent commits add only verification/build/report content. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Latest fixed-SHA Matrix configuration benchmark: `36d4b9b4bbafe769b452afc003033d2a222a682f` (tree `a92a302ce78ef541aa0a76bb99dfeb0a413ad0c4`). Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; recent commits add only verification/build/report content. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -535,3 +535,11 @@ in the owning report; run `git diff --check` before handoff.
 - The address-hold mutant is detected by the request stability checker; response-owner corruption is detected by the GEMV Completion/Golden checker. On this SHA, the three-seed Matrix core 18-functional/35-fault, selected opcode fault, request/line backpressure, and Prefetch-OFF six-shape campaigns pass. URG handshake group is 2/2 with three hits per bin. Exact commands and limitations are in [DV Closure](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
 - Evidence archive `/tmp/nmaforge_v2_request_mutation_ab96d47_evidence.tar.gz`, SHA-256 `f137212c354e79f890c4c36f78ca9197694b6853524b1a87b6b9ba5add7fcb03`.
 - The increased mutation count improves checker evidence only; it does not close all checker mappings, opcode-specific SVA, external response ownership, legal fault × phase × reset crosses, or the full v2 RTM. Overall v2 DV remains **IN PROGRESS**. Performance, model, and ASIC results are unchanged; TinyNPU parity is not established and ASIC readiness remains **NOT READY**.
+
+
+## 2026-11-06 update — current-candidate Matrix eight-way ablation
+
+- Run `V2-MATRIX-EIGHT-CONFIG-3SEED-36D4B9B` used current source/test SHA `36d4b9b4bbafe769b452afc003033d2a222a682f`, fixed 16×16/256-MAC array, five GEMM workloads, one-cycle behavioral bank response, three Seeds, and all eight depth/prefetch/A-Tile Cache combinations. VCS `V-2023.12-SP1_Full64`; 120/120 independent Golden points passed.
+- Across the five workloads, depth 4 + Prefetch + Cache averaged 2,038.33 summed cycles vs 2,720.00 baseline (−25.06%), with read bytes 12,032→9,472 (−21.28%) and writes unchanged at 7,488 B. Weighted MAC/cycle is 34.07→45.46; weighted utilization 13.31%→17.76%. Per-workload best settings vary, so no universal winner is claimed. Stall/event observations overlap and are not additive.
+- CSV/JSON/SVG are in [the benchmark artifacts](../../benchmark/v2_matrix_config_closure_36d4b9b_3seed.csv); the exact command and model caveats are in the [performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md). Raw compile/run logs archive SHA-256 `003c1dedc0de9d3b9875dec63a218fade601e1a09d9b928b791bb250599741fd`.
+- This is controller RTL simulation using behavioral SPAD and does not replace the multi-engine Top contention benchmark or provide ASIC PPA/TinyNPU victory. Current v2 DV remains **IN PROGRESS**, trained CNN/Transformer remain **NOT_RUN**, and ASIC readiness remains **NOT READY**.
