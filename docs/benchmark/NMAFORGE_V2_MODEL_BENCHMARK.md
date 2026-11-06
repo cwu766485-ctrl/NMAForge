@@ -1,7 +1,7 @@
 # NMAForge v2 Model Benchmark
 
 **Status date:** 2026-11-06
-**Latest fixed-weight Transformer Top replay:** `3f87b033cb49c95f9ecb139b532714873a6c9476`
+**Latest fixed-weight Transformer Top replay:** `f9f32f71e7168350d74a75ede0a4a4b222844cc9`
 **R250 baseline:** `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Latest trained-model Top replay candidate:** `9b835aeac33d43fd97a81496b1048d359cdff3d0`
 **Latest Compute Cluster DV replay candidate:** `8758794c1f3bd6abb41c33276422b84ac5ee7a80`
@@ -80,7 +80,7 @@ run did not instrument that stage.
 |---|---|---|
 | ONNX `conv1x_mini` paired graph | **PASS; NMAForge side replayed at `d1867da`** | Current run `V2-TINYNPU-REPLAY-CURRENT-D1867DA-S20261029` rechecked all intermediate tensors and 4/4 outputs against the pinned model Golden. NMAForge: 1,985 compute + 1,080 host-layout cycles; TinyNPU: 4,781 graph cycles from prior run `TINY-COMPARE-V2C3A59-S20261029`. Different timing boundaries; no speedup ratio. |
 | Trained-weight CNN | **PASS; full held-out Top run at `9b835ae`** | Four shared 3×3 convolution filters and the four-class INT8 readout are trained. All 159 held-out samples passed separate real Top CMDQ runs; every checked intermediate tensor/logit matched the independent integer Golden and all 159 classifications were correct on Digits labels 0–3. This is a scoped four-class model, not a full ten-class deployment. |
-| Tiny Transformer | **PARTIAL** | The fixed-weight 86-descriptor Top prefill/decode fixture passes at `9b835ae` with intermediate/KV Goldens. Its deterministic test weights are not trained or pretrained; trained-model inference and cycles/token remain **NOT_RUN**. |
+| Tiny Transformer | **PARTIAL** | The fixed-weight 86-descriptor Top prefill/decode fixture passes 301 intermediate/KV/final checks at `f9f32f7`; Top CMDQ interval is 11,397 cycles (5,682 prefill / 5,715 for one decode token). Weights are not trained or pretrained, and the one-token sample is not a steady-state decode result. |
 | Host / DMA / compute / writeback / graph cycle split | **PARTIAL** | Digits has a top-level CMDQ interval and a fused Matrix activity counter; the current run does not separately time host, DMA, writeback and orchestration. Its input preload is testbench setup outside the timed interval. |
 
 The current paired CNN uses the exact ONNX asset supplied by the pinned
@@ -100,7 +100,8 @@ measured Fmax, power, or energy result is inferred from these RTL runs.
 2. Extend the trained CNN beyond the current four-class Digits subset and
    measure each supported stage; add a small trained Transformer only with
    independent software Goldens and hardware-executed operators. Keep host
-   fallback separately measured. Transformer remains **NOT_RUN**.
+   fallback separately measured. Trained Transformer inference remains
+   **NOT_RUN**.
 3. Instrument distinct host, DMA, compute, writeback, and graph-orchestration
    windows for the larger model runs.
 4. Preserve this Digits replay as the fixed regression and report each
@@ -126,8 +127,9 @@ real Top CMDQ path passed 301/301 intermediate, final, and KV checks and ended
 with `TEST PASS`. This reconfirms the fixed deterministic fixture on the
 current tooling candidate; the weights are hand-authored and are not trained
 or pretrained. The logged 64 Matrix MAC activity cycles are not an end-to-end
-latency measurement, so cycles/token remains **NOT_RUN**. TinyNPU comparison
-and separate host/DMA/compute/writeback timing also remain **NOT_RUN**. Compile
+latency measurement. This earlier replay did not measure end-to-end cycles;
+the later fixed-weight replay below adds that measurement. TinyNPU comparison
+and separate host/DMA/compute/writeback timing remain **NOT_RUN**. Compile
 reported the known non-fatal `LOOP-REROLL-ENABLED` debug-capacity notice; there
 were no compile errors or simulation error lines.
 
@@ -136,6 +138,40 @@ record: [JSON](../../benchmark/v2_transformer_fixed_weights_3f87b03.json).
 Compile and simulation logs are archived outside Git at
 `/tmp/nmaforge_v2_transformer_fixed_weights_3f87b03_logs.tar.gz`, SHA-256
 `30d0d0f744d5aa8a3ed04ca0d37aa30dac8de2aa5f5f31db87d39e78632d3e3e`.
+
+## Fixed-weight Transformer Prefill/Decode timing — `f9f32f7`
+
+The testbench timestamps the actual Top `processor_cplq_tail` update at the
+generated Prefill/Decode boundary. The mapper records the 46-descriptor
+Prefill prefix in the fixture/manifest; the remaining 40 descriptors execute
+the one-token Decode path. This is testbench-only instrumentation. Product RTL
+remains at SHA `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
+
+At fixed test/tooling SHA `f9f32f71e7168350d74a75ede0a4a4b222844cc9`, Mapper
+unit tests pass 4/4 and VCS Top passes all 301 independent intermediate,
+final, and KV checks for 86 descriptors and 60 tensors. The measured 10 ns
+simulation-clock cycle counts are:
+
+| Interval | Top CMDQ cycles | Scope |
+|---|---:|---|
+| Four-token Prefill | 5,682 | Doorbell-start through completion of descriptor 46; 1,420.50 average cycles per prefilled token |
+| One-token Decode | 5,715 | Completion of descriptor 46 through completion of descriptor 86; one observed token, not a steady-state average |
+| Combined | 11,397 | Doorbell write begins through final completion-tail update |
+
+The endpoint includes descriptor fetch/dispatch, compute, behavioral SPAD
+service, and completion commits. It excludes testbench preload and the later
+Golden read/compare. The 10 ns clock is a simulation setting, not a measured
+silicon frequency. This does not establish trained Transformer inference, a
+TinyNPU speed comparison, ASIC timing, or separate Host/DMA/Compute/Writeback/
+Graph-Orchestration costs. Compile again emitted the known non-fatal
+`LOOP-REROLL-ENABLED` debug-capacity notice; compilation and simulation had no
+errors.
+
+Run ID `V2-TRANSFORMER-FIXED-WEIGHTS-TIMED-TOP-F9F32F7-S20261106`. Machine
+record: [JSON](../../benchmark/v2_transformer_timing_f9f32f7.json). Logs-only
+archive outside Git:
+`/tmp/nmaforge_v2_transformer_timing_f9f32f7_logs.tar.gz`, SHA-256
+`03096fd98236b00a3ce2de3b8543b173a9c851c53b48839300c11e59ad6aea53`.
 
 ## Current fixed-candidate Digits replay — `410b81d`
 

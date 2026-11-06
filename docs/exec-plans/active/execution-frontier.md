@@ -977,3 +977,15 @@ end-to-end cycles/token, stage timing, and TinyNPU comparison remain open. Run
 ID `V2-TRANSFORMER-FIXED-WEIGHTS-TOP-3F87B03-S20261106`; evidence and command
 are in the [model report](../../benchmark/NMAFORGE_V2_MODEL_BENCHMARK.md) and
 [machine record](../../benchmark/v2_transformer_fixed_weights_3f87b03.json).
+
+## 2026-11-06 update — Transformer Prefill/Decode cycle timing
+
+At fixed test/tooling SHA `f9f32f71e7168350d74a75ede0a4a4b222844cc9`, the
+Top testbench captured the exact completion-tail clock boundary: 5,682 cycles
+for four-token Prefill, 5,715 cycles for one Decode token, and 11,397 cycles
+combined. It also retained all 301 bit-exact intermediate/final/KV checks.
+These are behavioral Top CMDQ cycles for the fixed-weight fixture; trained
+weights, steady-state decode, TinyNPU parity, and silicon PPA remain open. Run
+ID `V2-TRANSFORMER-FIXED-WEIGHTS-TIMED-TOP-F9F32F7-S20261106`; details and
+machine record are in the [model report](../../benchmark/NMAFORGE_V2_MODEL_BENCHMARK.md)
+and [JSON](../../benchmark/v2_transformer_timing_f9f32f7.json).
