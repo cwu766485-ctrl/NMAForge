@@ -1105,3 +1105,9 @@ A-Tile Cache reduced read bytes by 21.28% with unchanged writes. Full metrics,
 source and tool identities, CSV/JSON/SVG, exact command and archive checksum
 are in the [performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md).
 This is Matrix-controller RTL evidence, not TinyNPU parity or ASIC PPA.
+
+## 2026-11-06 update — current-candidate clean Top Smoke at `839b9af`
+
+- A detached clean worktree at source SHA `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` / tree `630e498ba467d84dd5359403cfe1ed1e5879f6e9` passes `make ai_smoke` on VCS `V-2023.12-SP1_Full64`: `TEST PASS`, 1,683 `PASS:` lines, no simulation `ERROR:` lines. Required GEMV, tile-forward, Matrix/SFU cross-engine, and Matrix/CNM profile markers all match.
+- The compile keeps the known `LOOP-REROLL-ENABLED` fixture warning. Smoke sampling uses four random cases; no UVM coverage or RTM disposition is promoted.
+- Exact command, runtime seed, evidence archive checksum, and result limits are recorded in the [DV closure report](../../verification/NMAFORGE_V2_DV_CLOSURE.md) and [machine record](../../benchmark/v2_top_smoke_clean_839b9af.json). Product RTL is unchanged; v2 DV remains **IN PROGRESS**.

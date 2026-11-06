@@ -1861,3 +1861,20 @@ functional coverage bins or RTM dispositions are claimed. Machine evidence,
 the exact command and text-log archive checksum are in the
 [performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md)
 and [JSON record](../../benchmark/v2_top_matrix_cluster_profile_f530fe2_3seed.json).
+
+## Clean-worktree Top Smoke compatibility at the current candidate — 2026-11-06
+
+Detached clean worktree at source SHA `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0`
+(tree `630e498ba467d84dd5359403cfe1ed1e5879f6e9`) passes `make ai_smoke` with
+VCS `V-2023.12-SP1_Full64`. The run reports `TEST PASS`, 1,683 `PASS:` log
+lines, and zero simulation `ERROR:` lines. The existing compile-time
+`LOOP-REROLL-ENABLED` fixture notice remains. Required markers confirm three
+product GEMV cases, the `0x53` CMDQ tile-forward path, legal Matrix/SFU
+cross-engine immutability, and the Matrix/CNM performance profile. The smoke
+uses four randomized cases (`AI_SEED=12345`) and does not replace seeded UVM,
+URG, or full v2 coverage closure. No RTM status changes.
+
+Exact command and parameters, source/tree identity, marker list, and archive
+checksums are in the [machine record](../../benchmark/v2_top_smoke_clean_839b9af.json).
+Text-only run log archive: `/tmp/nmaforge_v2_top_smoke_839b9af_logs.tar.gz`,
+SHA-256 `6fb7768b7b9d03a33b1c56d8b63a5ae44d8608b63492f106e4e04e6ee1dd2dae`.

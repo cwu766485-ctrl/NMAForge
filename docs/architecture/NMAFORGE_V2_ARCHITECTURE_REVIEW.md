@@ -520,6 +520,19 @@ only after Phase 1 closure or a formally reviewed scope disposition.
 - Exact command, VCS version, Run ID, checker names and archive SHA-256 are recorded in the [v2 DV closure RTM](../verification/NMAFORGE_V2_DV_CLOSURE.md). The earlier opcode-core mutation suite separately remains 15/15 across three seeds.
 - `REQ-V2-COM-005` remains **PARTIAL**: the selected Completion and engine-owner faults now have direct evidence, while mutation mapping for every new-feature checker and wider fault-phase interactions remain open. No sign-off or RTL behavior change is claimed.
 
+## Current clean-worktree compatibility replay — 2026-11-06
+
+At candidate SHA `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` (tree
+`630e498ba467d84dd5359403cfe1ed1e5879f6e9`), a detached clean-worktree Top
+Smoke replay passed with VCS `V-2023.12-SP1_Full64`. It exercised legacy paths,
+three product GEMV descriptors, the `0x53` producer/consumer path, Matrix/SFU
+cross-engine immutability, and the Matrix/CNM profiling scenario. The simulator
+reported `TEST PASS` and no `ERROR:` lines; the known fixture
+`LOOP-REROLL-ENABLED` compile notice remains. This is a compatibility smoke
+result only; it adds no RTM closure and does not change the identified product
+RTL SHA. Details and checksums are in the [DV closure evidence](../verification/NMAFORGE_V2_DV_CLOSURE.md)
+and [machine record](../../benchmark/v2_top_smoke_clean_839b9af.json).
+
 ## Follow-up system-level contention benchmark at `17b09e0` — 2026-11-05
 
 - The real Compute Cluster UVM regression passes Seeds 20261025/26/27 with the shared `ai_spad_arbiter`, all seven engines, independent Golden checks and ordered CMDQ completions. Same four-task serial/parallel work measures 1,696/1,137 RTL cycles (ratio 1.492; equal 4,352 B read and 2,688 B write traffic). The three-task staged case measures 1,239/1,070 cycles (ratio 1.158).
