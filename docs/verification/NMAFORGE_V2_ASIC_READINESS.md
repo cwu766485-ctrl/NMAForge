@@ -274,3 +274,22 @@ static-analysis and PPA dispositions above remain bound to the listed
 candidate and tool runs. No area, Fmax, power, SRAM-macro, or tapeout-readiness
 claim follows from the functional coverage results. The current functional
 replay is summarized in the [v2 DV report](NMAFORGE_V2_DV_CLOSURE.md).
+
+## Current environment recheck — 2026-11-06
+
+Product RTL is still `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; the later
+v2 commits in this worktree modify verification, measurement, and reports.
+VCS `V-2023.12-SP1_Full64` ran the fixed-weight Transformer Top test and
+`ai_smoke` on the current testbench candidate. The DC executable exists at
+`/opt/Synopsys/syn/V-2023.12-SP1/bin/dc_shell`, but the isolated worktree has
+no `syn/run_ai_accel_28nm_dc.sh`, synthesis Tcl, or `external/private` / TSMC28
+overlay. `TSMC28_STDCELL_DB`, `TSMC28_SRAM_DB`, `TSMC28_SDC`, and
+`TSMC28_TECH_LEF` are unset. No DC run was attempted because the design inputs
+are missing. Base-vs-v2 area/Fmax/power remains **BLOCKED_ENV**; this is not a
+DC license failure or a PPA result.
+
+SpyGlass lint/CDC/RDC were not rerun in this environment refresh. Existing
+evidence remains 465 lint warnings with no waiver, structural CDC with the
+`Reset_sync04` / `FLAT_504` dispositions still open, and RDC **NOT_RUN** after
+the recorded timeout. No formal/LEC, SRAM-macro, DFT, MBIST, CTS, route, routed
+STA, or IR/EM status is advanced. The IP remains **NOT ASIC READY**.
