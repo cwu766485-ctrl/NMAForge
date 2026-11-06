@@ -247,6 +247,33 @@ module tb_ai_accel_smoke;
     reg matrix_cnm_response_alias_seen = 1'b0;
     integer matrix_cnm_matrix_responses = 0;
     integer matrix_cnm_cnm_responses = 0;
+    integer matrix_cnm_profile_window_cycles = 0;
+    integer matrix_cnm_matrix_busy_cycles = 0;
+    integer matrix_cnm_matrix_mac_cycles = 0;
+    integer matrix_cnm_matrix_req_wait_cycles = 0;
+    integer matrix_cnm_matrix_rsp_wait_cycles = 0;
+    integer matrix_cnm_matrix_writeback_cycles = 0;
+    integer matrix_cnm_matrix_other_cycles = 0;
+    integer matrix_cnm_matrix_rsp_wait_events = 0;
+    integer matrix_cnm_matrix_writeback_wait_events = 0;
+    integer matrix_cnm_cnm_busy_cycles = 0;
+    integer matrix_cnm_cnm_compute_cycles = 0;
+    integer matrix_cnm_cnm_req_wait_cycles = 0;
+    integer matrix_cnm_cnm_rsp_wait_cycles = 0;
+    integer matrix_cnm_cnm_writeback_cycles = 0;
+    integer matrix_cnm_cnm_other_cycles = 0;
+    integer matrix_cnm_cnm_rsp_wait_lane_cycles = 0;
+    integer matrix_cnm_cnm_writeback_wait_events = 0;
+    integer matrix_cnm_request_collision_cycles = 0;
+    integer matrix_cnm_matrix_read_accepts = 0;
+    integer matrix_cnm_cnm_read_words = 0;
+    integer matrix_cnm_matrix_line_writes = 0;
+    integer matrix_cnm_cnm_scalar_writes = 0;
+    integer matrix_cnm_matrix_read_bytes = 0;
+    integer matrix_cnm_cnm_read_bytes = 0;
+    integer matrix_cnm_matrix_write_bytes = 0;
+    integer matrix_cnm_cnm_write_bytes = 0;
+    integer matrix_cnm_outstanding_highwater = 0;
     reg [20:0] parallel_engine_pair_seen = 21'd0;
     reg kv_protection_case_active = 1'b0;
     integer kv_protection_read_accepts = 0;
@@ -503,6 +530,16 @@ module tb_ai_accel_smoke;
 
     always @(posedge aclk) begin
         if (aresetn && matrix_cnm_case_active) begin
+            reg cnm_response_wait_any;
+            reg cnm_compute_any;
+            integer cnm_response_wait_lanes;
+            integer cnm_read_words_this_cycle;
+            cnm_response_wait_any = 1'b0;
+            cnm_compute_any = 1'b0;
+            cnm_response_wait_lanes = 0;
+            cnm_read_words_this_cycle = 0;
+            matrix_cnm_profile_window_cycles <= matrix_cnm_profile_window_cycles + 1;
+
             if (dut.parallel_queue_mode_r && dut.engine_busy[2] && dut.engine_busy[3])
                 matrix_cnm_overlap_seen <= 1'b1;
             if (dut.banked_rsp_valid && dut.arb_rsp_client == 3'd3)
@@ -511,6 +548,109 @@ module tb_ai_accel_smoke;
                 matrix_cnm_cnm_responses <= matrix_cnm_cnm_responses + 1;
             if ((|dut.cnm_rsp_valid) && dut.banked_rsp_valid)
                 matrix_cnm_response_alias_seen <= 1'b1;
+
+            if (dut.banked_read_valid && (|dut.cnm_read_valid))
+                matrix_cnm_request_collision_cycles <= matrix_cnm_request_collision_cycles + 1;
+            if (dut.banked_read_valid && dut.arb_banked_ready) begin
+                matrix_cnm_matrix_read_accepts <= matrix_cnm_matrix_read_accepts + 1;
+                matrix_cnm_matrix_read_bytes <= matrix_cnm_matrix_read_bytes + 16;
+            end
+            if (dut.cnm_read_valid[0] && dut.arb_cnm_ready[0]) begin
+                cnm_read_words_this_cycle = cnm_read_words_this_cycle + 1;
+            end
+            if (dut.cnm_read_valid[1] && dut.arb_cnm_ready[1]) begin
+                cnm_read_words_this_cycle = cnm_read_words_this_cycle + 1;
+            end
+            if (dut.cnm_read_valid[2] && dut.arb_cnm_ready[2]) begin
+                cnm_read_words_this_cycle = cnm_read_words_this_cycle + 1;
+            end
+            if (dut.cnm_read_valid[3] && dut.arb_cnm_ready[3]) begin
+                cnm_read_words_this_cycle = cnm_read_words_this_cycle + 1;
+            end
+            if (cnm_read_words_this_cycle != 0) begin
+                matrix_cnm_cnm_read_words <=
+                    matrix_cnm_cnm_read_words + cnm_read_words_this_cycle;
+                matrix_cnm_cnm_read_bytes <=
+                    matrix_cnm_cnm_read_bytes + (cnm_read_words_this_cycle * 4);
+            end
+            if (dut.matrix_line_valid && dut.arb_core_line_ready) begin
+                matrix_cnm_matrix_line_writes <= matrix_cnm_matrix_line_writes + 1;
+                matrix_cnm_matrix_write_bytes <= matrix_cnm_matrix_write_bytes + 16;
+            end
+            if (dut.banked_spad_valid && dut.compute_engine_ready[2]) begin
+                matrix_cnm_cnm_scalar_writes <= matrix_cnm_cnm_scalar_writes + 1;
+                matrix_cnm_cnm_write_bytes <= matrix_cnm_cnm_write_bytes + 4;
+            end
+
+            if (dut.matrix_busy) begin
+                matrix_cnm_matrix_busy_cycles <= matrix_cnm_matrix_busy_cycles + 1;
+                if (dut.matrix_perf_mac_active)
+                    matrix_cnm_matrix_mac_cycles <= matrix_cnm_matrix_mac_cycles + 1;
+                else if (dut.matrix_line_valid) begin
+                    matrix_cnm_matrix_writeback_cycles <= matrix_cnm_matrix_writeback_cycles + 1;
+                    if (!dut.arb_core_line_ready)
+                        matrix_cnm_matrix_writeback_wait_events <= matrix_cnm_matrix_writeback_wait_events + 1;
+                end else if (dut.banked_read_valid && !dut.arb_banked_ready)
+                    matrix_cnm_matrix_req_wait_cycles <= matrix_cnm_matrix_req_wait_cycles + 1;
+                else if (dut.matrix_perf_banked_wait)
+                    matrix_cnm_matrix_rsp_wait_cycles <= matrix_cnm_matrix_rsp_wait_cycles + 1;
+                else
+                    matrix_cnm_matrix_other_cycles <= matrix_cnm_matrix_other_cycles + 1;
+                if (dut.matrix_perf_banked_wait)
+                    matrix_cnm_matrix_rsp_wait_events <= matrix_cnm_matrix_rsp_wait_events + 1;
+                if (dut.compute_cluster_u.tensor_matrix_u.read_outstanding_count >
+                    matrix_cnm_outstanding_highwater)
+                    matrix_cnm_outstanding_highwater <=
+                        dut.compute_cluster_u.tensor_matrix_u.read_outstanding_count;
+            end
+
+            cnm_compute_any =
+                dut.compute_cluster_u.banked_core_u.lc0.compute_enable ||
+                dut.compute_cluster_u.banked_core_u.lc1.compute_enable ||
+                dut.compute_cluster_u.banked_core_u.lc2.compute_enable ||
+                dut.compute_cluster_u.banked_core_u.lc3.compute_enable;
+            if ((dut.compute_cluster_u.banked_core_u.lc0.state_r == 3'd3 ||
+                 dut.compute_cluster_u.banked_core_u.lc0.state_r == 3'd4) &&
+                !dut.cnm_rsp_valid[0]) begin
+                cnm_response_wait_any = 1'b1;
+                cnm_response_wait_lanes = cnm_response_wait_lanes + 1;
+            end
+            if ((dut.compute_cluster_u.banked_core_u.lc1.state_r == 3'd3 ||
+                 dut.compute_cluster_u.banked_core_u.lc1.state_r == 3'd4) &&
+                !dut.cnm_rsp_valid[1]) begin
+                cnm_response_wait_any = 1'b1;
+                cnm_response_wait_lanes = cnm_response_wait_lanes + 1;
+            end
+            if ((dut.compute_cluster_u.banked_core_u.lc2.state_r == 3'd3 ||
+                 dut.compute_cluster_u.banked_core_u.lc2.state_r == 3'd4) &&
+                !dut.cnm_rsp_valid[2]) begin
+                cnm_response_wait_any = 1'b1;
+                cnm_response_wait_lanes = cnm_response_wait_lanes + 1;
+            end
+            if ((dut.compute_cluster_u.banked_core_u.lc3.state_r == 3'd3 ||
+                 dut.compute_cluster_u.banked_core_u.lc3.state_r == 3'd4) &&
+                !dut.cnm_rsp_valid[3]) begin
+                cnm_response_wait_any = 1'b1;
+                cnm_response_wait_lanes = cnm_response_wait_lanes + 1;
+            end
+            if (cnm_response_wait_lanes != 0)
+                matrix_cnm_cnm_rsp_wait_lane_cycles <=
+                    matrix_cnm_cnm_rsp_wait_lane_cycles + cnm_response_wait_lanes;
+            if (dut.banked_busy) begin
+                matrix_cnm_cnm_busy_cycles <= matrix_cnm_cnm_busy_cycles + 1;
+                if (cnm_compute_any)
+                    matrix_cnm_cnm_compute_cycles <= matrix_cnm_cnm_compute_cycles + 1;
+                else if ((|dut.cnm_read_valid) && !(|dut.arb_cnm_ready))
+                    matrix_cnm_cnm_req_wait_cycles <= matrix_cnm_cnm_req_wait_cycles + 1;
+                else if (cnm_response_wait_any)
+                    matrix_cnm_cnm_rsp_wait_cycles <= matrix_cnm_cnm_rsp_wait_cycles + 1;
+                else if (dut.banked_spad_valid)
+                    matrix_cnm_cnm_writeback_cycles <= matrix_cnm_cnm_writeback_cycles + 1;
+                else
+                    matrix_cnm_cnm_other_cycles <= matrix_cnm_cnm_other_cycles + 1;
+                if (dut.banked_spad_valid && !dut.compute_engine_ready[2])
+                    matrix_cnm_cnm_writeback_wait_events <= matrix_cnm_cnm_writeback_wait_events + 1;
+            end
         end
     end
 
@@ -3993,6 +4133,8 @@ module tb_ai_accel_smoke;
         begin : parallel_matrix_cnm_owner
             integer lane;
             integer row;
+            integer matrix_phase_sum;
+            integer cnm_phase_sum;
             axi_write(SPAD_BASE + 32'h4800, 32'h0403_0201);
             axi_write(SPAD_BASE + 32'h4804, 32'h0807_0605);
             axi_write(SPAD_BASE + 32'h4808, 32'h0000_0001);
@@ -4032,10 +4174,57 @@ module tb_ai_accel_smoke;
             matrix_cnm_response_alias_seen = 1'b0;
             matrix_cnm_matrix_responses = 0;
             matrix_cnm_cnm_responses = 0;
+            matrix_cnm_profile_window_cycles = 0;
+            matrix_cnm_matrix_busy_cycles = 0;
+            matrix_cnm_matrix_mac_cycles = 0;
+            matrix_cnm_matrix_req_wait_cycles = 0;
+            matrix_cnm_matrix_rsp_wait_cycles = 0;
+            matrix_cnm_matrix_writeback_cycles = 0;
+            matrix_cnm_matrix_other_cycles = 0;
+            matrix_cnm_matrix_rsp_wait_events = 0;
+            matrix_cnm_matrix_writeback_wait_events = 0;
+            matrix_cnm_cnm_busy_cycles = 0;
+            matrix_cnm_cnm_compute_cycles = 0;
+            matrix_cnm_cnm_req_wait_cycles = 0;
+            matrix_cnm_cnm_rsp_wait_cycles = 0;
+            matrix_cnm_cnm_writeback_cycles = 0;
+            matrix_cnm_cnm_other_cycles = 0;
+            matrix_cnm_cnm_rsp_wait_lane_cycles = 0;
+            matrix_cnm_cnm_writeback_wait_events = 0;
+            matrix_cnm_request_collision_cycles = 0;
+            matrix_cnm_matrix_read_accepts = 0;
+            matrix_cnm_cnm_read_words = 0;
+            matrix_cnm_matrix_line_writes = 0;
+            matrix_cnm_cnm_scalar_writes = 0;
+            matrix_cnm_matrix_read_bytes = 0;
+            matrix_cnm_cnm_read_bytes = 0;
+            matrix_cnm_matrix_write_bytes = 0;
+            matrix_cnm_cnm_write_bytes = 0;
+            matrix_cnm_outstanding_highwater = 0;
             matrix_line_write_count = 0;
             axi_write(REG_DOORBELL, 32'd1);
             wait_cpl_tail(32'd2, "parallel CNM + Matrix ordered completion");
+            @(negedge aclk);
             matrix_cnm_case_active = 1'b0;
+
+            matrix_phase_sum = matrix_cnm_matrix_mac_cycles +
+                               matrix_cnm_matrix_req_wait_cycles +
+                               matrix_cnm_matrix_rsp_wait_cycles +
+                               matrix_cnm_matrix_writeback_cycles +
+                               matrix_cnm_matrix_other_cycles;
+            cnm_phase_sum = matrix_cnm_cnm_compute_cycles +
+                            matrix_cnm_cnm_req_wait_cycles +
+                            matrix_cnm_cnm_rsp_wait_cycles +
+                            matrix_cnm_cnm_writeback_cycles +
+                            matrix_cnm_cnm_other_cycles;
+            if ((matrix_cnm_profile_window_cycles == 0) ||
+                (matrix_phase_sum != matrix_cnm_matrix_busy_cycles) ||
+                (cnm_phase_sum != matrix_cnm_cnm_busy_cycles)) begin
+                $fatal(1, "Matrix/CNM profile cycles did not close wall=%0d matrix=%0d/%0d cnm=%0d/%0d",
+                       matrix_cnm_profile_window_cycles,
+                       matrix_phase_sum, matrix_cnm_matrix_busy_cycles,
+                       cnm_phase_sum, matrix_cnm_cnm_busy_cycles);
+            end
 
             if (!matrix_cnm_overlap_seen || matrix_cnm_matrix_responses < 2 ||
                 matrix_cnm_cnm_responses == 0 || matrix_cnm_response_alias_seen) begin
@@ -4047,6 +4236,26 @@ module tb_ai_accel_smoke;
                 $display("%0t PASS: Matrix/CNM concurrent response ownership matrix_rsp=%0d cnm_rsp=%0d",
                          $time, matrix_cnm_matrix_responses, matrix_cnm_cnm_responses);
             end
+            $display("MATRIX_CNM_PERF_PROFILE_PASS seed=%0d window_cycles=%0d matrix_busy=%0d matrix_mac=%0d matrix_req_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d matrix_rsp_wait_events=%0d matrix_writeback_wait_events=%0d cnm_busy=%0d cnm_compute=%0d cnm_req_wait=%0d cnm_rsp_wait=%0d cnm_writeback=%0d cnm_other=%0d cnm_rsp_wait_lane_cycles=%0d cnm_writeback_wait_events=%0d request_collision_cycles=%0d matrix_read_accepts=%0d cnm_read_words=%0d matrix_line_writes=%0d cnm_scalar_writes=%0d matrix_read_bytes=%0d cnm_read_bytes=%0d matrix_write_bytes=%0d cnm_write_bytes=%0d outstanding_highwater=%0d matrix_responses=%0d cnm_response_cycles=%0d cycles_closed=1 golden=bit-exact owner_errors=%0d",
+                     seed_arg, matrix_cnm_profile_window_cycles,
+                     matrix_cnm_matrix_busy_cycles, matrix_cnm_matrix_mac_cycles,
+                     matrix_cnm_matrix_req_wait_cycles, matrix_cnm_matrix_rsp_wait_cycles,
+                     matrix_cnm_matrix_writeback_cycles, matrix_cnm_matrix_other_cycles,
+                     matrix_cnm_matrix_rsp_wait_events,
+                     matrix_cnm_matrix_writeback_wait_events,
+                     matrix_cnm_cnm_busy_cycles, matrix_cnm_cnm_compute_cycles,
+                     matrix_cnm_cnm_req_wait_cycles, matrix_cnm_cnm_rsp_wait_cycles,
+                     matrix_cnm_cnm_writeback_cycles, matrix_cnm_cnm_other_cycles,
+                     matrix_cnm_cnm_rsp_wait_lane_cycles,
+                     matrix_cnm_cnm_writeback_wait_events,
+                     matrix_cnm_request_collision_cycles,
+                     matrix_cnm_matrix_read_accepts, matrix_cnm_cnm_read_words,
+                     matrix_cnm_matrix_line_writes, matrix_cnm_cnm_scalar_writes,
+                     matrix_cnm_matrix_read_bytes, matrix_cnm_cnm_read_bytes,
+                     matrix_cnm_matrix_write_bytes, matrix_cnm_cnm_write_bytes,
+                     matrix_cnm_outstanding_highwater,
+                     matrix_cnm_matrix_responses, matrix_cnm_cnm_responses,
+                     matrix_cnm_response_alias_seen);
             expect_completion(32'h7d80, 16'h0620, 4'h1, 4'h0, 32'd96, 32'd16,
                               "parallel CNM GEMV completion");
             expect_completion(32'h7d90, 16'h0621, 4'h1, 4'h0, 32'd1, 32'd16,
