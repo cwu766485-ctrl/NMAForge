@@ -349,6 +349,12 @@ module tb_ai_accel_smoke;
     reg transformer_top_timing_enable = 1'b0;
     reg transformer_top_prefill_captured = 1'b0;
     reg transformer_top_final_captured = 1'b0;
+    integer transformer_spad_read_bytes = 0;
+    integer transformer_spad_write_bytes = 0;
+    integer transformer_prefill_read_bytes = 0;
+    integer transformer_prefill_write_bytes = 0;
+    integer transformer_traffic_lane;
+    reg transformer_traffic_enable = 1'b0;
 
     // Exact top-clock completion-boundary sampling for the serialized
     // Transformer prefill/decode CMDQ chain. The 1 ps delay observes the
@@ -367,6 +373,30 @@ module tb_ai_accel_smoke;
                 transformer_top_final_end_cycle = transformer_top_cycle_counter;
                 transformer_top_final_captured = 1'b1;
             end
+        end
+    end
+
+    always @(posedge aclk) begin
+        if (transformer_traffic_enable) begin
+            for (transformer_traffic_lane = 0;
+                 transformer_traffic_lane < 7;
+                 transformer_traffic_lane = transformer_traffic_lane + 1) begin
+                if (dut.compute_engine_req_valid[transformer_traffic_lane] &&
+                    dut.compute_engine_ready[transformer_traffic_lane]) begin
+                    if (dut.compute_engine_req_write[transformer_traffic_lane])
+                        transformer_spad_write_bytes =
+                            transformer_spad_write_bytes + 4;
+                    else
+                        transformer_spad_read_bytes =
+                            transformer_spad_read_bytes + 4;
+                end
+            end
+            if (dut.banked_read_valid && dut.arb_banked_ready)
+                transformer_spad_read_bytes =
+                    transformer_spad_read_bytes + 16;
+            if (dut.matrix_line_valid && dut.arb_core_line_ready)
+                transformer_spad_write_bytes =
+                    transformer_spad_write_bytes + 16;
         end
     end
 
@@ -1985,6 +2015,75 @@ module tb_ai_accel_smoke;
         end
     endtask
 
+    task check_tinynpu_cnn_linearized_golden;
+        inout integer expected_index;
+        integer expected_length;
+        integer row_index;
+        reg [31:0] read_value;
+        begin
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 144) $fatal(1, "bad conv rounded Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_RAW_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv rounded output[%0d]=%08h expected=%08h",
+                           row_index, read_value,
+                           ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 36) $fatal(1, "bad conv INT8 Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_I8_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv INT8 packed[%0d]=%08h expected=%08h",
+                           row_index, read_value,
+                           ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 144)
+                $fatal(1, "bad fused bias/ReLU source Golden length");
+            // This INT32 tensor is intentionally not materialized by 0x53.
+            // Its independently generated values are consumed as the Golden
+            // source for the fused INT8 output checked below.
+            expected_index = expected_index + expected_length;
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 36)
+                $fatal(1, "bad linearized conv output Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE + row_index * 16,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN linearized fused output[%0d]=%08h expected=%08h",
+                           row_index, read_value,
+                           ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE + row_index * 16 + 4,
+                         read_value);
+                if (read_value !== 32'd0)
+                    $fatal(1, "CNN linearized fused padding[%0d][1]=%08h",
+                           row_index, read_value);
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE + row_index * 16 + 8,
+                         read_value);
+                if (read_value !== 32'd0)
+                    $fatal(1, "CNN linearized fused padding[%0d][2]=%08h",
+                           row_index, read_value);
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE + row_index * 16 + 12,
+                         read_value);
+                if (read_value !== 32'd0)
+                    $fatal(1, "CNN linearized fused padding[%0d][3]=%08h",
+                           row_index, read_value);
+            end
+        end
+    endtask
+
     task check_tinynpu_cnn_fc_group;
         input integer group_index;
         inout integer expected_index;
@@ -2060,7 +2159,9 @@ module tb_ai_accel_smoke;
         integer descriptor_count;
         integer tail_value;
         integer event_base;
+        integer conv_descriptor_count;
         reg completed;
+        reg linearized_mode;
         reg [31:0] read_value;
         reg [31:0] cpl_tail;
         reg [31:0] cmd_head;
@@ -2073,8 +2174,10 @@ module tb_ai_accel_smoke;
                 num_classes = 4;
             if (num_classes != 4 && num_classes != 10)
                 $fatal(1, "CNN class count must be 4 or 10, got %0d", num_classes);
+            linearized_mode = $test$plusargs("AI_TINYNPU_CNN_LINEARIZED");
             output_group_count = (num_classes + 3) / 4;
-            descriptor_count = 4 + 4 * output_group_count;
+            conv_descriptor_count = linearized_mode ? 3 : 4;
+            descriptor_count = conv_descriptor_count + 4 * output_group_count;
             expected_count = 360 + 40 * output_group_count;
             $readmemh(image_file, ai_tinynpu_cnn_image_words);
             $readmemh(expected_file, ai_tinynpu_cnn_expected_words);
@@ -2107,19 +2210,34 @@ module tb_ai_accel_smoke;
                    32'd0, 32'd0, AI_TINYNPU_CNN_CONV_I8_BASE,
                    16'd0, 16'd0, 16'd144, 8'h10, 32'd0, 5'd0, 2'd0,
                    32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd1, 16'd2, 16'd1);
-            write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h80,
-                   OP_TENSOR_GEMM, 16'hd502, AI_TINYNPU_CNN_CONV_I8_BASE,
-                   AI_TINYNPU_CNN_IDENTITY_B_BASE,
-                   AI_TINYNPU_CNN_CONV_BIAS_BASE,
-                   AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE,
-                   16'd36, 16'd4, 16'd1, 8'h01, 32'd0, 5'd0, 2'd1,
-                   32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd2, 16'd4, 16'd2);
-            write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'hc0,
-                   OP_REQUANT_I8, 16'hd503,
-                   AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE,
-                   32'd0, 32'd0, AI_TINYNPU_CNN_CONV_RELU_I8_BASE,
-                   16'd0, 16'd0, 16'd144, 8'h10, 32'd0, 5'd0, 2'd0,
-                   32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd4, 16'd8, 16'd4);
+            if (linearized_mode) begin
+                write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h80,
+                       OP_TENSOR_GEMM_FUSED, 16'hd502,
+                       AI_TINYNPU_CNN_CONV_I8_BASE,
+                       AI_TINYNPU_CNN_IDENTITY_B_BASE,
+                       AI_TINYNPU_CNN_CONV_BIAS_BASE,
+                       AI_TINYNPU_CNN_FC_A_BASE,
+                       16'd36, 16'd4, 16'd1, 8'h01, 32'h0000_0080,
+                       5'd0, 2'd1, 32'd0, 32'd0, 32'd0, 16'd1, 16'd1,
+                       16'd2, 16'd8, 16'd2);
+                // Opcode 0x53's optional linear-row contract is ABI-v7.
+                axi_write(SPAD_BASE + AI_TINYNPU_CNN_DESC_BASE + 32'hbc,
+                          {16'd2, 8'd0, 8'd7});
+            end else begin
+                write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h80,
+                       OP_TENSOR_GEMM, 16'hd502, AI_TINYNPU_CNN_CONV_I8_BASE,
+                       AI_TINYNPU_CNN_IDENTITY_B_BASE,
+                       AI_TINYNPU_CNN_CONV_BIAS_BASE,
+                       AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE,
+                       16'd36, 16'd4, 16'd1, 8'h01, 32'd0, 5'd0, 2'd1,
+                       32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd2, 16'd4, 16'd2);
+                write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'hc0,
+                       OP_REQUANT_I8, 16'hd503,
+                       AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE,
+                       32'd0, 32'd0, AI_TINYNPU_CNN_CONV_RELU_I8_BASE,
+                       16'd0, 16'd0, 16'd144, 8'h10, 32'd0, 5'd0, 2'd0,
+                       32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd4, 16'd8, 16'd4);
+            end
 
             axi_write(REG_CMDQ_CTRL, 32'd0);
             axi_write(REG_CMDQ_BASE_LO, AI_TINYNPU_CNN_DESC_BASE);
@@ -2137,14 +2255,14 @@ module tb_ai_accel_smoke;
             ai_tinynpu_cnn_banked_read_lines = 0;
             ai_tinynpu_cnn_line_write_lines = 0;
             ai_tinynpu_cnn_measure = 1'b1;
-            axi_write(REG_CMDQ_TAIL, 32'd4);
+            axi_write(REG_CMDQ_TAIL, conv_descriptor_count);
             axi_write(REG_DOORBELL, 32'd1);
             completed = 1'b0;
             for (poll_index = 0; poll_index < 10000 && !completed;
                  poll_index = poll_index + 1) begin
                 repeat (32) @(posedge aclk);
                 axi_read(REG_CPLQ_TAIL, cpl_tail);
-                if (cpl_tail == 32'd4)
+                if (cpl_tail == conv_descriptor_count)
                     completed = 1'b1;
             end
             ai_tinynpu_cnn_measure = 1'b0;
@@ -2152,29 +2270,43 @@ module tb_ai_accel_smoke;
                 $fatal(1, "TinyNPU CNN convolution completion timeout tail=%0d", cpl_tail);
 
             expected_index = 1;
-            check_tinynpu_cnn_conv_golden(expected_index);
+            if (linearized_mode) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CPL_BASE + 36, read_value);
+                if (read_value[3:0] != 4'd1 || read_value[7:4] != 4'd0)
+                    $fatal(1, "CNN linearized completion status/error=%08h", read_value);
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CPL_BASE + 44, read_value);
+                if (read_value != 32'd144)
+                    $fatal(1, "CNN linearized completion elements=%0d expected=144",
+                           read_value);
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE, read_value);
+                $display("CNN_LINEARIZED_FC_A0=%08h", read_value);
+                check_tinynpu_cnn_linearized_golden(expected_index);
+            end else
+                check_tinynpu_cnn_conv_golden(expected_index);
 
             // This is only layout conversion of RTL-produced INT8 activations.
             // No convolution, activation, or matrix multiply runs on the host.
-            ai_tinynpu_cnn_layout_measure = 1'b1;
-            for (feature_group = 0; feature_group < 36; feature_group = feature_group + 1) begin
-                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_RELU_I8_BASE +
-                         feature_group * 4, read_value);
-                for (row_index = 0; row_index < 4; row_index = row_index + 1) begin
-                    if (row_index == 0)
-                        axi_write(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE +
-                                  (feature_group * 4 + row_index) * 4, read_value);
-                    else
-                        axi_write(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE +
-                                  (feature_group * 4 + row_index) * 4, 32'd0);
+            if (!linearized_mode) begin
+                ai_tinynpu_cnn_layout_measure = 1'b1;
+                for (feature_group = 0; feature_group < 36; feature_group = feature_group + 1) begin
+                    axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_RELU_I8_BASE +
+                             feature_group * 4, read_value);
+                    for (row_index = 0; row_index < 4; row_index = row_index + 1) begin
+                        if (row_index == 0)
+                            axi_write(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE +
+                                      (feature_group * 4 + row_index) * 4, read_value);
+                        else
+                            axi_write(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE +
+                                      (feature_group * 4 + row_index) * 4, 32'd0);
+                    end
                 end
+                ai_tinynpu_cnn_layout_measure = 1'b0;
             end
-            ai_tinynpu_cnn_layout_measure = 1'b0;
 
             event_base = 8;
             for (group_index = 0; group_index < output_group_count;
                  group_index = group_index + 1) begin
-                descriptor_index = 4 + group_index * 4;
+                descriptor_index = conv_descriptor_count + group_index * 4;
                 write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + descriptor_index * 64,
                        OP_TENSOR_GEMM, 16'hd500 + descriptor_index,
                        AI_TINYNPU_CNN_FC_A_BASE,
@@ -2249,16 +2381,18 @@ module tb_ai_accel_smoke;
                 $fatal(1, "TinyNPU CNN Golden words consumed=%0d expected=%0d",
                        expected_index - 1, expected_count + 4 + 4 * output_group_count);
 
-            $display("NMA_CNN_RTL_METRICS outputs=%0d descriptors=%0d cycles=%0d host_layout_cycles=%0d host_layout_read_bytes=144 host_layout_write_bytes=576 compute_spad_read_bytes=%0d compute_spad_write_bytes=%0d bank_read_lines=%0d line_write_lines=%0d model_macs=%0d padded_macs=%0d spad_initialization_bytes=%0d",
+            $display("NMA_CNN_RTL_METRICS outputs=%0d descriptors=%0d cycles=%0d host_layout_cycles=%0d host_layout_read_bytes=%0d host_layout_write_bytes=%0d compute_spad_read_bytes=%0d compute_spad_write_bytes=%0d bank_read_lines=%0d line_write_lines=%0d model_macs=%0d padded_macs=%0d spad_initialization_bytes=%0d layout_mode=%0d",
                      num_classes, descriptor_count, ai_tinynpu_cnn_cycles,
                      ai_tinynpu_cnn_layout_cycles,
+                     linearized_mode ? 0 : 144,
+                     linearized_mode ? 0 : 576,
                      ai_tinynpu_cnn_engine_read_words * 4 + ai_tinynpu_cnn_banked_read_lines * 16,
                      ai_tinynpu_cnn_engine_write_words * 4 + ai_tinynpu_cnn_line_write_lines * 16,
                      ai_tinynpu_cnn_banked_read_lines, ai_tinynpu_cnn_line_write_lines,
                      1296 + 144 * num_classes, 1296 + 144 * 4 * output_group_count,
-                     image_count * 4);
-            $display("NMA_CNN_INFERENCE_PASS model=trained_int8_conv_relu_flatten_gemm outputs=%0d groups=%0d golden=byte_exact",
-                     num_classes, output_group_count);
+                     image_count * 4, linearized_mode);
+            $display("NMA_CNN_INFERENCE_PASS model=trained_int8_conv_relu_flatten_gemm outputs=%0d groups=%0d layout_mode=%0d golden=byte_exact",
+                     num_classes, output_group_count, linearized_mode);
             axi_write(REG_CMDQ_SIZE, 32'd0);
             axi_write(REG_CPLQ_SIZE, 32'd0);
             clear_done_irq();
@@ -2266,6 +2400,74 @@ module tb_ai_accel_smoke;
     endtask
 
     `include "ai_transformer_workload.svh"
+
+    task run_transformer_only;
+        integer prefill_read_snapshot;
+        integer prefill_write_snapshot;
+        reg [31:0] command_head;
+        begin
+            load_transformer_workload();
+            transformer_spad_read_bytes = 0;
+            transformer_spad_write_bytes = 0;
+            transformer_prefill_read_bytes = 0;
+            transformer_prefill_write_bytes = 0;
+            axi_write(REG_PERF_CTRL, 32'd1);
+            axi_write(REG_CMDQ_CTRL, 32'd0);
+            axi_write(REG_CMDQ_BASE_LO, TRANSFORMER_DESC_BASE);
+            axi_write(REG_CMDQ_BASE_HI, 32'd0);
+            axi_write(REG_CMDQ_SIZE, 32'd128);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, TRANSFORMER_DESC_COUNT);
+            axi_write(REG_CPLQ_BASE_LO, TRANSFORMER_CPL_BASE);
+            axi_write(REG_CPLQ_SIZE, 32'd128);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+            transformer_top_prefill_target = TRANSFORMER_PREFILL_DESC_COUNT;
+            transformer_top_final_target = TRANSFORMER_DESC_COUNT;
+            transformer_top_prefill_captured = 1'b0;
+            transformer_top_final_captured = 1'b0;
+            transformer_top_start_cycle = transformer_top_cycle_counter;
+            transformer_top_timing_enable = 1'b1;
+            transformer_traffic_enable = 1'b1;
+            axi_write(REG_DOORBELL, 32'd1);
+            wait_cpl_tail(TRANSFORMER_PREFILL_DESC_COUNT,
+                          "Transformer-only prefill completion");
+            prefill_read_snapshot = transformer_spad_read_bytes;
+            prefill_write_snapshot = transformer_spad_write_bytes;
+            transformer_prefill_read_bytes = prefill_read_snapshot;
+            transformer_prefill_write_bytes = prefill_write_snapshot;
+            wait_cpl_tail(TRANSFORMER_DESC_COUNT,
+                          "Transformer-only decode completion");
+            transformer_top_timing_enable = 1'b0;
+            transformer_traffic_enable = 1'b0;
+            if (!transformer_top_prefill_captured ||
+                !transformer_top_final_captured ||
+                transformer_top_prefill_end_cycle <= transformer_top_start_cycle ||
+                transformer_top_final_end_cycle <= transformer_top_prefill_end_cycle)
+                $fatal(1, "Transformer-only timing boundary capture failed");
+            $display("TRANSFORMER_TOP_ONLY_TIMING run_endpoint=doorbell_to_cpl_tail total_cycles=%0d prefill_cycles=%0d decode_cycles=%0d",
+                     transformer_top_final_end_cycle - transformer_top_start_cycle,
+                     transformer_top_prefill_end_cycle - transformer_top_start_cycle,
+                     transformer_top_final_end_cycle - transformer_top_prefill_end_cycle);
+            check_transformer_workload();
+            axi_read(REG_CMDQ_HEAD, command_head);
+            if (command_head !== TRANSFORMER_DESC_COUNT)
+                $fatal(1, "Transformer-only CMDQ head=%0d expected=%0d",
+                       command_head, TRANSFORMER_DESC_COUNT);
+            expect_completion(TRANSFORMER_CPL_BASE +
+                              ((TRANSFORMER_DESC_COUNT-1) * 16),
+                              TRANSFORMER_LAST_TASK_ID, 4'h1, 4'd0,
+                              TRANSFORMER_LAST_RESULT, 32'd4,
+                              "Transformer-only final completion");
+            $display("TRANSFORMER_TOP_ONLY_METRICS useful_macs=640 prefill_read_bytes=%0d prefill_write_bytes=%0d decode_read_bytes=%0d decode_write_bytes=%0d total_read_bytes=%0d total_write_bytes=%0d",
+                     transformer_prefill_read_bytes,
+                     transformer_prefill_write_bytes,
+                     transformer_spad_read_bytes - transformer_prefill_read_bytes,
+                     transformer_spad_write_bytes - transformer_prefill_write_bytes,
+                     transformer_spad_read_bytes,
+                     transformer_spad_write_bytes);
+        end
+    endtask
 
     function signed [31:0] dot4_i8_sv;
         input [31:0] a;
@@ -2639,6 +2841,14 @@ module tb_ai_accel_smoke;
         repeat (8) @(posedge aclk);
         aresetn = 1'b1;
         repeat (4) @(posedge aclk);
+
+        if ($test$plusargs("AI_TRANSFORMER_ONLY")) begin
+            run_transformer_only();
+            if (errors != 0)
+                $fatal(1, "Transformer-only replay had %0d mismatches", errors);
+            $display("TRANSFORMER_TOP_ONLY_PASS");
+            $finish;
+        end
 
         if ($test$plusargs("FP_DOT_DMA_BENCH")) begin
             run_fp_dot_dma_benchmark();

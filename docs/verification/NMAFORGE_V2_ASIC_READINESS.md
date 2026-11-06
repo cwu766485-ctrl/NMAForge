@@ -1,5 +1,23 @@
 # NMAForge v2 ASIC Readiness
 
+## Focused Research Round 3 cost note — 2026-11-06
+
+Candidate `4dab73646989615c5479de0bac76d1488a102758` functionally exercises
+the trained Transformer and ten-class CNN with a four-bank **128 KiB**
+behavioral SPAD (`8,192` 32-bit words per bank), retaining the 128-bit line
+interface and 256 INT8 MAC array. This is 1,048,576 logical SRAM bits versus
+4,194,304 bits at 512 KiB; it establishes configured capacity and workload
+fit, not macro count, area, timing, or power.
+
+The opt-in CNN output-layout mode adds one mode register bit and a two-bit
+line index, plus a 128-bit output data selection, 32-bit address selection,
+and control logic. It reuses the existing fused 128-bit line buffer and adds
+no payload SRAM. These are source-level structural estimates only; no DC run
+was available to quantify standard-cell area, Fmax/critical path, switching
+power, or energy. TinyNPU comparison remains bounded by unlike memory
+endpoints. Physical PPA stays **BLOCKED_ENV**, and the project is **not
+Tapeout Ready**.
+
 ## Final research baseline capacity disposition — 2026-11-06
 
 The source/test SHA `9576e539c21fe6312763c4745a90dc032c6457e0` exercised two

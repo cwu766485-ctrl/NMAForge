@@ -8,6 +8,10 @@ AI_SEED ?= 12345
 AI_SPAD_WORDS_PER_BANK ?= 32768
 AI_REF_CASES ?= 1000
 AI_REF_SEED ?= 20260722
+AI_TRANSFORMER_MODEL_JSON ?=
+AI_TRANSFORMER_MANIFEST ?= /tmp/nmaforge_transformer_manifest.json
+AI_TRANSFORMER_SEED ?= 20261106
+AI_TRANSFORMER_STEPS ?= 20000
 # The WSL image keeps an old python3 (3.6) alongside newer interpreters.
 # Pick the first installed Python that can parse the A3/A4 reference model;
 # callers may still override PYTHON for a managed VNC/CI environment.
@@ -17,7 +21,8 @@ all: ai_smoke
 
 ai_transformer_gen:
 	$(PYTHON) ../../../../sw/tools/cimforge_mapper.py \
-		--svh ../fixtures/ai_transformer_workload.svh
+		--svh ../fixtures/ai_transformer_workload.svh \
+		$(if $(AI_TRANSFORMER_MODEL_JSON),--manifest "$(AI_TRANSFORMER_MANIFEST)" --model-json "$(AI_TRANSFORMER_MODEL_JSON)",)
 
 ai_comp: ai_transformer_gen
 	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
@@ -264,6 +269,21 @@ ai_smoke_saif: ai_smoke_vcd
 
 ai_transformer: ai_comp
 	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=0 +AI_SEED=$(AI_SEED) +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) -l ai_transformer.log
+
+# Deterministically train/export a tiny INT8 Transformer model, map its real
+# weights into ABI-v7 descriptors, and run only the Transformer path on the
+# production Top with the selected scratchpad capacity.
+AI_TRANSFORMER_TRAINED_MODEL ?= /tmp/nmaforge_transformer_micro_20261106.json
+.PHONY: ai_transformer_trained
+ai_transformer_trained:
+	$(PYTHON) ../../../../sw/tools/train_transformer_micro.py \
+		--out "$(AI_TRANSFORMER_TRAINED_MODEL)" --seed $(AI_TRANSFORMER_SEED) \
+		--steps $(AI_TRANSFORMER_STEPS)
+	$(MAKE) ai_comp AI_TRANSFORMER_MODEL_JSON="$(AI_TRANSFORMER_TRAINED_MODEL)" \
+		AI_TRANSFORMER_MANIFEST="$(AI_TRANSFORMER_MANIFEST)"
+	./simv +ntb_random_seed=$(AI_TRANSFORMER_SEED) +AI_RANDOM_CASES=0 \
+		+AI_SEED=$(AI_TRANSFORMER_SEED) +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) \
+		+AI_TRANSFORMER_ONLY -l ai_transformer_trained.log
 
 # Short Linux/VCS gate: all directed AXI/DMA/A4 tests with random compute
 # cases disabled. Use this after an RTL edit before the seeded regression.

@@ -1,11 +1,130 @@
 # NMAForge v2 Model Benchmark
 
-## Research-baseline model status — 2026-11-06
+## Focused Research Round 3 — fixed candidate `4dab736`
 
-This section supersedes earlier “current” model/capacity statements below.
-The ten-class CNN is now a trained-weight Top RTL demo; the Transformer
-remains a fixed-weight functional fixture and is **not** a trained-weight
-model demo.
+Source/test candidate: `4dab73646989615c5479de0bac76d1488a102758`, based on
+reviewed remote `240ed4106a1b31078cce15e2406d437ca0cde987`. VCS was
+`V-2023.12-SP1_Full64`; Python was `3.12.13` (NumPy `2.4.6` for the CNN
+dataset flow). The results below are behavioral Top/CMDQ/SPAD simulations.
+They do not measure an ASIC clock, physical SRAM, or energy.
+
+### Trained Tiny Transformer — PASS for the bounded toy task
+
+`sw/tools/train_transformer_micro.py` deterministically trains six INT8 4×4
+matrices with integer simulated annealing. Seed `20261106` converged after
+987/20,000 requested updates. The synthetic task predicts the next symbol in
+a four-symbol cyclic stream: 4 training sequences, 252 exhaustive held-out
+sequences, 16/16 train predictions and 694/1,008 held-out token predictions
+(68.85%). Model SHA-256:
+`55cef19181c84dda9f99e940a0a749c1499fc1ccb176b966b1e13462f8ae3c03`.
+This is a trained tiny Transformer functional demo, **not** pretrained
+language-model inference or evidence of useful natural-language quality.
+
+The Mapper loads the exported JSON weights and emits the existing 86 ABI-v7
+descriptors over 60 tensors. The real Top executes QKV, causal attention,
+Softmax/requant, AV, output projection, residuals, LayerNorm, FFN/GELU, and
+KV-cache reads/writes; Host work is limited to training, mapping/address
+allocation, initial tensor/weight preload, and independent Golden generation
+and comparison. No Host fallback supplies intermediate activations. The Top
+checks 301 intermediate/final/KV values and the completion chain. The selected
+prefill predicts 4/4 next symbols and the single decode predicts 1/1.
+
+| Top interval | Cycles | SPAD reads | SPAD writes | Useful MACs |
+|---|---:|---:|---:|---:|
+| Four-token Prefill | 5,682 | 1,936 B | 1,072 B | included below |
+| One-token Decode | 5,715 | 1,880 B | 1,048 B | included below |
+| Combined doorbell → final CPLQ tail | 11,397 | 3,816 B | 2,120 B | 640 |
+
+Run ID: `V2-TRAINED-TRANSFORMER-TOP-4DAB736-S20261106`. The reportable
+reproduction command is:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+make -C dv/subsystem/top_smoke/sim ai_transformer_trained \
+  PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+  AI_SPAD_WORDS_PER_BANK=8192 \
+  AI_TRANSFORMER_TRAINED_MODEL=/tmp/nmaforge_round3_4dab_transformer/trained_cyclic_h4.json \
+  AI_TRANSFORMER_MANIFEST=/tmp/nmaforge_round3_4dab_transformer/manifest.json \
+  AI_TRANSFORMER_SEED=20261106 AI_TRANSFORMER_STEPS=20000
+```
+
+The full log is `dv/subsystem/top_smoke/sim/ai_transformer_trained.log` at
+run time; a fresh run regenerates the fixture from the committed model JSON.
+The default fixed-weight fixture remains the standard `ai_transformer`
+regression. This 128 KiB run demonstrates fit and functional execution only;
+no 512 KiB timing comparison was repeated.
+
+### CNN fused linear-row handoff — PASS, 396 samples
+
+The 0x53 native tile-major output cannot be consumed directly by the next
+FC's `M=4,K=36` descriptor, which expects one four-INT8 feature word at the
+start of each 16-byte K line. Descriptor strides/address mapping alone cannot
+express the required 4× expansion from compact tile-major storage. Added the
+opt-in ABI-v7 `aux0[7]` mode: for bounded `M=4..64` divisible by four and
+`N=4`, it writes one line per output row, low 32 bits containing four
+requantized INT8 values and upper 96 bits zero. The consumer gets its exact
+layout directly from Matrix; no testbench flattening or Host tensor transform
+is used. The old `aux0[7]=0` contract is unchanged.
+
+Both configurations use the same trained ten-class model and all 396 held-out
+images at 128 KiB, with seed `20261106`. Both produce 384/396 classifications
+(96.97%) and pass all per-sample intermediate/output Golden checks (396/396).
+Model SHA-256 is
+`ef0e616d09ca0be7956fa8ca900e40c62973f8f06e3ec96af09d888eead73726`; test-set
+SHA-256 is
+`cb851b077542f9bcf42f84938227ba5f1a4750ea0b0fbfe2ba8fcecbb914d107`.
+
+| Measure per sample | Legacy Matrix + Host layout | Fused `0x53` linear-row | Change |
+|---|---:|---:|---:|
+| Top CMDQ cycles | 3,193 | 2,712 | −15.1% |
+| Host layout cycles | 1,080 | 0 | −1,080 |
+| Total measured task interval | 4,273 | 2,712 | −36.5% |
+| Compute SPAD read/write | 6,048 / 1,920 B | 5,472 / 1,776 B | −576 / −144 B |
+| Host layout read/write | 144 / 576 B | 0 / 0 B | eliminated |
+| Total measured SPAD traffic | 8,688 B | 7,248 B | −16.6% |
+| Useful MACs | 2,736 | 2,736 | unchanged |
+| Useful MAC / total interval cycle | 0.640 | 1.009 | derived |
+| Golden / accuracy | 396/396 exact; 384/396 | 396/396 exact; 384/396 | unchanged |
+
+The 1,080 layout cycles are measured from the testbench AXI host sequence
+(36 reads and 144 word writes at the configured simulation timing); they are
+not operating-system wall time. The total interval excludes input preload and
+post-run Golden reads on both sides. The new line writes use the existing
+Matrix line port and reuse the existing 128-bit fused line buffer; the mode
+adds three state bits plus address/data selection and control logic. No DC
+area/timing/power run was available, so the physical cost is **BLOCKED_ENV**.
+
+Run IDs: `V2-TRAINED-CNN-TOP-DATASET-4DAB736-LEGACY_LAYOUT` and
+`V2-TRAINED-CNN-TOP-DATASET-4DAB736-LINEARIZED`. They were run using
+`benchmark/tinynpu/run_nma_cnn_demo_dataset.py` with the tracked model and
+testset paths above, `--candidate-sha 4dab73646989615c5479de0bac76d1488a102758`,
+`--seed 20261106`, `--spad-base-shift 65536`; the optimized command adds
+`--linearized`. Per-sample CSVs and 792 VCS logs are retained outside the
+repository under `/tmp/nmaforge_round3_4dab_cnn_{legacy,linear}/`.
+
+### Comparison boundaries
+
+TinyNPU remains pinned to
+`8216c22b762011aa20c05fc2768423fd12dda59d`. The current 3-GEMM/4-GEMV direct
+array and modeled common-memory results remain in the performance report;
+they are not rerun at this candidate. TinyNPU has not run this trained CNN or
+Transformer through a matching Top/memory boundary. Therefore no new
+system-level TinyNPU speedup is claimed.
+
+The sections below are earlier dated model records. Their statements that a
+trained Transformer was not run are historical and superseded by the bounded
+synthetic task above; their fixed-weight fixture, prior CNN, and capacity
+results retain their original source SHAs.
+
+## Earlier research-baseline model status — 2026-11-06 (superseded below)
+
+This earlier closeout snapshot is retained as historical evidence. Its
+statement that the Transformer is only a fixed-weight fixture was superseded
+by the Round 3 trained synthetic-task run at the top of this report. The
+ten-class CNN result and the source-bound capacity measurements below remain
+valid for their stated SHAs.
 
 ### Trained 10-class Digits CNN — complete for this bounded model
 
