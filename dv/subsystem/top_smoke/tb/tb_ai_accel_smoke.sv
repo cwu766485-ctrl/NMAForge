@@ -259,6 +259,7 @@ module tb_ai_accel_smoke;
     integer matrix_cnm_cnm_busy_cycles = 0;
     integer matrix_cnm_cnm_compute_cycles = 0;
     integer matrix_cnm_cnm_req_wait_cycles = 0;
+    integer matrix_cnm_cnm_req_wait_lane_cycles = 0;
     integer matrix_cnm_cnm_rsp_wait_cycles = 0;
     integer matrix_cnm_cnm_writeback_cycles = 0;
     integer matrix_cnm_cnm_other_cycles = 0;
@@ -534,10 +535,12 @@ module tb_ai_accel_smoke;
             reg cnm_compute_any;
             integer cnm_response_wait_lanes;
             integer cnm_read_words_this_cycle;
+            integer cnm_req_stall_lanes;
             cnm_response_wait_any = 1'b0;
             cnm_compute_any = 1'b0;
             cnm_response_wait_lanes = 0;
             cnm_read_words_this_cycle = 0;
+            cnm_req_stall_lanes = 0;
             matrix_cnm_profile_window_cycles <= matrix_cnm_profile_window_cycles + 1;
 
             if (dut.parallel_queue_mode_r && dut.engine_busy[2] && dut.engine_busy[3])
@@ -558,15 +561,23 @@ module tb_ai_accel_smoke;
             if (dut.cnm_read_valid[0] && dut.arb_cnm_ready[0]) begin
                 cnm_read_words_this_cycle = cnm_read_words_this_cycle + 1;
             end
+            if (dut.cnm_read_valid[0] && !dut.arb_cnm_ready[0])
+                cnm_req_stall_lanes = cnm_req_stall_lanes + 1;
             if (dut.cnm_read_valid[1] && dut.arb_cnm_ready[1]) begin
                 cnm_read_words_this_cycle = cnm_read_words_this_cycle + 1;
             end
+            if (dut.cnm_read_valid[1] && !dut.arb_cnm_ready[1])
+                cnm_req_stall_lanes = cnm_req_stall_lanes + 1;
             if (dut.cnm_read_valid[2] && dut.arb_cnm_ready[2]) begin
                 cnm_read_words_this_cycle = cnm_read_words_this_cycle + 1;
             end
+            if (dut.cnm_read_valid[2] && !dut.arb_cnm_ready[2])
+                cnm_req_stall_lanes = cnm_req_stall_lanes + 1;
             if (dut.cnm_read_valid[3] && dut.arb_cnm_ready[3]) begin
                 cnm_read_words_this_cycle = cnm_read_words_this_cycle + 1;
             end
+            if (dut.cnm_read_valid[3] && !dut.arb_cnm_ready[3])
+                cnm_req_stall_lanes = cnm_req_stall_lanes + 1;
             if (cnm_read_words_this_cycle != 0) begin
                 matrix_cnm_cnm_read_words <=
                     matrix_cnm_cnm_read_words + cnm_read_words_this_cycle;
@@ -636,11 +647,14 @@ module tb_ai_accel_smoke;
             if (cnm_response_wait_lanes != 0)
                 matrix_cnm_cnm_rsp_wait_lane_cycles <=
                     matrix_cnm_cnm_rsp_wait_lane_cycles + cnm_response_wait_lanes;
+            if (cnm_req_stall_lanes != 0)
+                matrix_cnm_cnm_req_wait_lane_cycles <=
+                    matrix_cnm_cnm_req_wait_lane_cycles + cnm_req_stall_lanes;
             if (dut.banked_busy) begin
                 matrix_cnm_cnm_busy_cycles <= matrix_cnm_cnm_busy_cycles + 1;
                 if (cnm_compute_any)
                     matrix_cnm_cnm_compute_cycles <= matrix_cnm_cnm_compute_cycles + 1;
-                else if ((|dut.cnm_read_valid) && !(|dut.arb_cnm_ready))
+                else if (cnm_req_stall_lanes != 0)
                     matrix_cnm_cnm_req_wait_cycles <= matrix_cnm_cnm_req_wait_cycles + 1;
                 else if (cnm_response_wait_any)
                     matrix_cnm_cnm_rsp_wait_cycles <= matrix_cnm_cnm_rsp_wait_cycles + 1;
@@ -4186,6 +4200,7 @@ module tb_ai_accel_smoke;
             matrix_cnm_cnm_busy_cycles = 0;
             matrix_cnm_cnm_compute_cycles = 0;
             matrix_cnm_cnm_req_wait_cycles = 0;
+            matrix_cnm_cnm_req_wait_lane_cycles = 0;
             matrix_cnm_cnm_rsp_wait_cycles = 0;
             matrix_cnm_cnm_writeback_cycles = 0;
             matrix_cnm_cnm_other_cycles = 0;
@@ -4236,7 +4251,7 @@ module tb_ai_accel_smoke;
                 $display("%0t PASS: Matrix/CNM concurrent response ownership matrix_rsp=%0d cnm_rsp=%0d",
                          $time, matrix_cnm_matrix_responses, matrix_cnm_cnm_responses);
             end
-            $display("MATRIX_CNM_PERF_PROFILE_PASS seed=%0d window_cycles=%0d matrix_busy=%0d matrix_mac=%0d matrix_req_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d matrix_rsp_wait_events=%0d matrix_writeback_wait_events=%0d cnm_busy=%0d cnm_compute=%0d cnm_req_wait=%0d cnm_rsp_wait=%0d cnm_writeback=%0d cnm_other=%0d cnm_rsp_wait_lane_cycles=%0d cnm_writeback_wait_events=%0d request_collision_cycles=%0d matrix_read_accepts=%0d cnm_read_words=%0d matrix_line_writes=%0d cnm_scalar_writes=%0d matrix_read_bytes=%0d cnm_read_bytes=%0d matrix_write_bytes=%0d cnm_write_bytes=%0d outstanding_highwater=%0d matrix_responses=%0d cnm_response_cycles=%0d cycles_closed=1 golden=bit-exact owner_errors=%0d",
+            $display("MATRIX_CNM_PERF_PROFILE_PASS seed=%0d window_cycles=%0d matrix_busy=%0d matrix_mac=%0d matrix_req_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d matrix_rsp_wait_events=%0d matrix_writeback_wait_events=%0d cnm_busy=%0d cnm_compute=%0d cnm_req_wait=%0d cnm_req_wait_lane_cycles=%0d cnm_rsp_wait=%0d cnm_writeback=%0d cnm_other=%0d cnm_rsp_wait_lane_cycles=%0d cnm_writeback_wait_events=%0d request_collision_cycles=%0d matrix_read_accepts=%0d cnm_read_words=%0d matrix_line_writes=%0d cnm_scalar_writes=%0d matrix_read_bytes=%0d cnm_read_bytes=%0d matrix_write_bytes=%0d cnm_write_bytes=%0d outstanding_highwater=%0d matrix_responses=%0d cnm_response_cycles=%0d cycles_closed=1 golden=bit-exact owner_errors=%0d",
                      seed_arg, matrix_cnm_profile_window_cycles,
                      matrix_cnm_matrix_busy_cycles, matrix_cnm_matrix_mac_cycles,
                      matrix_cnm_matrix_req_wait_cycles, matrix_cnm_matrix_rsp_wait_cycles,
@@ -4244,7 +4259,9 @@ module tb_ai_accel_smoke;
                      matrix_cnm_matrix_rsp_wait_events,
                      matrix_cnm_matrix_writeback_wait_events,
                      matrix_cnm_cnm_busy_cycles, matrix_cnm_cnm_compute_cycles,
-                     matrix_cnm_cnm_req_wait_cycles, matrix_cnm_cnm_rsp_wait_cycles,
+                     matrix_cnm_cnm_req_wait_cycles,
+                     matrix_cnm_cnm_req_wait_lane_cycles,
+                     matrix_cnm_cnm_rsp_wait_cycles,
                      matrix_cnm_cnm_writeback_cycles, matrix_cnm_cnm_other_cycles,
                      matrix_cnm_cnm_rsp_wait_lane_cycles,
                      matrix_cnm_cnm_writeback_wait_events,
