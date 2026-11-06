@@ -4304,6 +4304,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int signed a_value;
         int signed b_value;
         int signed sum;
+        bit [31:0] debug_cmdq_head;
+        bit [31:0] debug_completion_task;
+        bit [31:0] debug_completion_status;
 
         // ABI-v7 0x52 stores each A row padded to 16 bytes and each dense-B
         // K row in a 16-byte physical slot. This legal 3x5x5 shape exercises
@@ -4398,15 +4401,21 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             compute_vif.launch_snapshot_dst[3] !== DST ||
             compute_vif.launch_snapshot_m[3] !== M_SIZE ||
             compute_vif.launch_snapshot_n[3] !== N_SIZE ||
-            compute_vif.launch_snapshot_k[3] !== K_SIZE)
+            compute_vif.launch_snapshot_k[3] !== K_SIZE) begin
+            axil_read(REG_CMDQ_HEAD, debug_cmdq_head);
+            axil_read(CIMFORGE_SPAD_BASE + CPLQ_BASE, debug_completion_task);
+            axil_read(CIMFORGE_SPAD_BASE + CPLQ_BASE + 32'd4,
+                      debug_completion_status);
             `uvm_fatal("CLUSTER_CMDQ_GEMV", $sformatf(
-                "0x52 CMDQ launch mismatch launch_delta=%0d matrix_delta=%0d op=%02h shape=%0dx%0dx%0d",
+                "0x52 CMDQ launch mismatch launch_delta=%0d matrix_delta=%0d op=%02h shape=%0dx%0dx%0d cmdq_head=%0d completion_task=%08h completion_status=%08h",
                 compute_vif.launch_sample_count - launch_before,
                 compute_vif.engine_launch_count[3] - matrix_launch_before,
                 compute_vif.launch_snapshot_opcode[3],
                 compute_vif.launch_snapshot_m[3],
                 compute_vif.launch_snapshot_n[3],
-                compute_vif.launch_snapshot_k[3]))
+                compute_vif.launch_snapshot_k[3], debug_cmdq_head,
+                debug_completion_task, debug_completion_status))
+        end
         if (accepted_reads == 0 ||
             (compute_vif.matrix_tag_response_count - matrix_responses_before) != accepted_reads)
             `uvm_fatal("CLUSTER_CMDQ_GEMV", $sformatf(
