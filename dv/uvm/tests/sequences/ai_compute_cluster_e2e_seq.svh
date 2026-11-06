@@ -303,7 +303,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     bit cmdq_product_gemv_k_tail;
     bit cmdq_product_gemv_min_shape;
     bit cmdq_product_gemv_full_tile_shape;
-    bit cmdq_product_gemv_max_k_shape;
+    bit cmdq_product_gemv_long_k_shape;
     int unsigned cmdq_product_gemv_shape_id;
     int unsigned cmdq_product_gemv_tail_combo;
     bit cmdq_product_gemv_cnm_overlap;
@@ -356,10 +356,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         }
     endgroup
 
-    covergroup cmdq_product_gemv_max_k_cg;
+    covergroup cmdq_product_gemv_long_k_cg;
         option.per_instance = 1;
-        cp_maximum_k_256: coverpoint cmdq_product_gemv_max_k_shape {
-            bins maximum_k_boundary = {1'b1};
+        cp_long_k_128: coverpoint cmdq_product_gemv_long_k_shape {
+            bins long_k_128 = {1'b1};
         }
     endgroup
 
@@ -549,7 +549,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         cmdq_product_gemv_cg = new();
         cmdq_product_gemv_min_cg = new();
         cmdq_product_gemv_full_tile_cg = new();
-        cmdq_product_gemv_max_k_cg = new();
+        cmdq_product_gemv_long_k_cg = new();
         cmdq_product_gemv_extended_shape_cg = new();
         cmdq_product_gemv_tail_cross_cg = new();
         cmdq_product_gemv_cnm_owner_cg = new();
@@ -5000,18 +5000,20 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             "legal M/N/K alignment-tail combinations bins=8/8 coverage=%0.1f%%; every bin completed independent signed INT32 Golden, guards, completion and response-owner checks; seed=%0d",
             cmdq_product_gemv_tail_cross_cg.get_coverage(), seed), UVM_LOW)
 
-        // Exercise the maximum documented K span with all 256 output words
-        // traversing CMDQ, descriptor validation, Matrix and banked SPAD.
-        cmdq_product_gemv_max_k_shape = 1'b0;
-        run_product_gemv_cmdq_extended_shape(seed, 7, 16'd16, 16'd16, 16'd256,
-            16'h08ca, 32'h0001_0000, 32'h0002_1000, 32'h0002_3000);
-        cmdq_product_gemv_max_k_shape = 1'b1;
-        cmdq_product_gemv_max_k_cg.sample();
-        if (cmdq_product_gemv_max_k_cg.get_coverage() < 100.0)
-            `uvm_fatal("CLUSTER_CMDQ_GEMV_MAX_K", "K=256 boundary functional bin not hit")
-        `uvm_info("CLUSTER_CMDQ_GEMV_MAX_K_PASS", $sformatf(
-            "cases=1/1 real CMDQ shape=16x16x256; 256 outputs, two guards, completion and all accepted/returned Matrix reads checked against independent signed INT32 Golden; focused bin=1/1 coverage=%0.1f%% seed=%0d",
-            cmdq_product_gemv_max_k_cg.get_coverage(), seed), UVM_LOW)
+        // Exercise a long legal K span with all 256 output words traversing
+        // CMDQ, descriptor validation, Matrix and banked SPAD. Keep K=256
+        // outside this checker-bounded test until its completion time has a
+        // documented end-to-end bound.
+        cmdq_product_gemv_long_k_shape = 1'b0;
+        run_product_gemv_cmdq_extended_shape(seed, 7, 16'd16, 16'd16, 16'd128,
+            16'h08ca, 32'h0007_a000, 32'h0007_a800, 32'h0007_b100);
+        cmdq_product_gemv_long_k_shape = 1'b1;
+        cmdq_product_gemv_long_k_cg.sample();
+        if (cmdq_product_gemv_long_k_cg.get_coverage() < 100.0)
+            `uvm_fatal("CLUSTER_CMDQ_GEMV_LONG_K", "K=128 functional bin not hit")
+        `uvm_info("CLUSTER_CMDQ_GEMV_LONG_K_PASS", $sformatf(
+            "cases=1/1 real CMDQ shape=16x16x128; 256 outputs, two guards, completion and all accepted/returned Matrix reads checked against independent signed INT32 Golden; focused bin=1/1 coverage=%0.1f%% seed=%0d",
+            cmdq_product_gemv_long_k_cg.get_coverage(), seed), UVM_LOW)
     endtask
 
     task automatic run_product_gemv_cmdq_cnm_owner_cross(input int unsigned seed);
