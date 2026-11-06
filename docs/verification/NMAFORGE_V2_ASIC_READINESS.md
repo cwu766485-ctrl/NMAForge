@@ -21,6 +21,13 @@ SpyGlass, formal/LEC, SRAM mapping, DC, physical PPA, or power evidence below.
 Their existing `NOT_RUN` and `BLOCKED_ENV` dispositions remain in force; no
 ASIC readiness or tapeout claim is made.
 
+The latest targeted DV source is `e944133b43107839e5f5eea902251097a228b312`
+(three-seed real-CMDQ 0x52 M/N/K tail cross and 16×16×128 GEMV); the latest
+benchmark replay is `a4dcc6b609878811fcd48a0310401609d4952c62`. Both are
+testbench/report changes only. Product RTL remains at
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`, so neither changes the static RTL
+or PPA result.
+
 ## Current evidence
 
 | Area | Current result | Sign-off meaning |
@@ -33,7 +40,7 @@ ASIC readiness or tapeout claim is made.
 | SpyGlass RDC | 180 s bounded run stopped during `Ar_resetcross01`; shell returned timeout status 124. | **NOT_RUN**; no RDC conclusion. |
 | Matrix FSM formal guards | VC Formal V-2023.12-SP2: 5/5 assertions proven and non-vacuous, 2/2 reachability covers hit. | PASS for the named Matrix guard properties only; not LEC or full `0x52`/`0x53` proof. |
 | LEC | No Base-vs-v2 equivalence run in this review. | **NOT_RUN**. |
-| DC Base-vs-v2 synthesis | Design Compiler V-2023.12-SP1 executable responds, but the public worktree has no DC run script and no standard-cell/SRAM views are configured (`TSMC28_STDCELL_DB` and `TSMC28_SRAM_DB` unset). Private collateral is excluded by `syn/README.md`. | **BLOCKED_ENV**; area, Fmax and power delta are not available. |
+| DC Base-vs-v2 synthesis | Design Compiler `V-2023.12-SP1` is installed at `/opt/Synopsys/syn/V-2023.12-SP1/bin/dc_shell`; the executable reports its version. The public worktree has no DC run script or `external/private` overlay, and `TSMC28_STDCELL_DB`, `TSMC28_SRAM_DB`, SRAM timing and SDC variables are unset. | **BLOCKED_ENV**; executable availability alone is insufficient; area, Fmax and power delta are not available. |
 | SRAM mapping | No current-v2 macro adapter, Liberty/LEF, or SRAM timing view available. | **NOT_RUN**. |
 | DFT | No current-v2 scan, ATPG, MBIST, or test-mode report was run. | **NOT_RUN**. |
 | Physical PPA / power | No placement, CTS, routed parasitics, IR/EM, or workload-annotated current-v2 power run. | **NOT_RUN**. No ASIC performance or power claim. |
@@ -110,8 +117,17 @@ The sanitized [TSMC28 synthesis report](TSMC28_SYNTHESIS_REPORT.md) is
 historical pre-layout evidence for its documented RTL/configuration. It is not
 a v2 result. `syn/README.md` confirms that the public repository excludes the
 foundry libraries, SRAM views, macro wrappers, DC setup and generated reports.
-The current workspace has no DC flow script at the path listed in the supplied
-project instructions, so the Base-vs-v2 synthesis run could not be reproduced.
+An environment probe on 2026-11-06 found DC `V-2023.12-SP1` at its installed
+path, but the flow script listed in the project instructions is absent, the
+private overlay is absent, and the required standard-cell, SRAM timing and SDC
+environment entries are unset. Therefore the Base-vs-v2 synthesis run was not
+attempted: it cannot produce an auditable result in this public workspace.
+
+The probe checked `dc_shell -version`, executable and flow-script paths, the
+`external/private` directory, and only the presence/path-existence state of
+`TSMC28_STDCELL_DB`, `TSMC28_SRAM_DB`, `TSMC28_SRAM_TIMING`, `TSMC28_SDC`, and
+`TSMC28_PRIVATE_OVERLAY`; no private path values or credentials were printed.
+Result: DC installed; run inputs absent; PPA `BLOCKED_ENV`.
 
 Known architectural storage facts are limited to RTL declarations:
 
