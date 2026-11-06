@@ -102,16 +102,32 @@ ai_fp_dot_dma_benchmark: ai_comp
 # files are isolated under /tmp.
 AI_DIGITS_RUN ?= /tmp/nmaforge_digits_rtl_$(shell date +%Y%m%d_%H%M%S)
 AI_DIGITS_PYTHON ?= python3
+AI_DIGITS_MODEL ?=
+AI_DIGITS_COMPACT_SPAD ?= 0
+ifeq ($(AI_DIGITS_COMPACT_SPAD),1)
+DIGITS_ADDRESS_PROFILE_ARG = --compact-spad
+DIGITS_ADDRESS_PROFILE_DEFINE = +define+AI_DIGITS_COMPACT_SPAD
+else
+DIGITS_ADDRESS_PROFILE_ARG =
+DIGITS_ADDRESS_PROFILE_DEFINE =
+endif
 .PHONY: ai_digits_inference
 ai_digits_inference:
 	test ! -e "$(AI_DIGITS_RUN)"
 	mkdir -p "$(AI_DIGITS_RUN)"
-	$(AI_DIGITS_PYTHON) ../../../../benchmark/digits/train_digits_mlp.py \
-		--out-dir "$(AI_DIGITS_RUN)/model"
+	@if [ -n "$(AI_DIGITS_MODEL)" ]; then \
+		mkdir -p "$(AI_DIGITS_RUN)/model"; \
+		cp "$(AI_DIGITS_MODEL)" "$(AI_DIGITS_RUN)/model/digits_mlp_int8.npz"; \
+	else \
+		$(AI_DIGITS_PYTHON) ../../../../benchmark/digits/train_digits_mlp.py \
+			--out-dir "$(AI_DIGITS_RUN)/model"; \
+	fi
 	$(AI_DIGITS_PYTHON) ../../../../benchmark/digits/generate_digits_workload.py \
 		--model "$(AI_DIGITS_RUN)/model/digits_mlp_int8.npz" \
-		--out-dir "$(AI_DIGITS_RUN)/workload"
+		--out-dir "$(AI_DIGITS_RUN)/workload" $(DIGITS_ADDRESS_PROFILE_ARG)
 	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_SPAD_WORDS_PER_BANK=$(AI_SPAD_WORDS_PER_BANK) \
+		$(DIGITS_ADDRESS_PROFILE_DEFINE) \
 		+incdir+../../../block/control/agent \
 		+incdir+../../../block/dma/agent \
 		+incdir+../fixtures \

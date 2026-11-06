@@ -96,11 +96,19 @@ module tb_ai_accel_smoke;
     localparam REG_EVENT_STATUS    = 32'h0000_0168;
     localparam SPAD_BASE         = 32'h0001_0000;
     localparam [31:0] SPAD_BYTES = 4 * `AI_SPAD_WORDS_PER_BANK * 4;
+`ifdef AI_DIGITS_COMPACT_SPAD
+    localparam AI_DIGITS_INPUT_BASE = 32'h0001_1000;
+    localparam AI_DIGITS_OUTPUT_BASE = 32'h0000_b000;
+    localparam AI_DIGITS_HIDDEN_I8_TILE_BASE = 32'h0000_3000;
+    localparam AI_DIGITS_DESC_BASE = 32'h0000_9000;
+    localparam AI_DIGITS_CPL_BASE = 32'h0000_a000;
+`else
     localparam AI_DIGITS_INPUT_BASE = 32'h0005_0000;
     localparam AI_DIGITS_OUTPUT_BASE = 32'h0003_b000;
     localparam AI_DIGITS_HIDDEN_I8_TILE_BASE = 32'h0003_2000;
     localparam AI_DIGITS_DESC_BASE = 32'h0003_8000;
     localparam AI_DIGITS_CPL_BASE = 32'h0003_a000;
+`endif
     localparam AI_DIGITS_BATCH = 16;
     localparam AI_DIGITS_DESC_COUNT = 46;
     localparam AI_DIGITS_TEST_SAMPLES = 360;
