@@ -105,6 +105,17 @@ generic Cluster run does not close v2 opcode-specific contracts or change the
 14 PARTIAL RTM rows. Logs-only archive SHA-256:
 `1596309ee89d002bf48c2733e2d0844781d61e80c6d1d1bec8ae712563186890`.
 
+The current candidate also passes three-seed Matrix 0x52 GEMV, selected
+0x52/0x53 fault recovery, request/line backpressure, and Tile Forwarding ON/OFF
+regressions. Default-profile URG merges nine tests: all four named v2 Matrix
+covergroups are 100%; code Line/Condition/FSM/Branch is 86.50/84.08/57.58/93.48%.
+Forwarding OFF/ON ablation coverage is intentionally kept in separate build
+profiles; the isolated OFF profile has no sampled v2 groups, while the ON
+profile has 100% tile-group coverage and 37.50% aggregate group score because
+other features are not part of that test. This is not a global waiver or full
+v2 closure. See the DV report for all bins, commands, profiles, and logs-only
+archive SHA-256 `50283ae0441734f1c044b45fae8e8d7f4206470641331e77cba7fe4df974d25a`.
+
 The repository `ai_accel_memory_fabric` boundary also has a three-seed
 coordinated reset/epoch replay at SHA
 `f340acaa2cdf7c36075473b8bc6fd6dee8e59873`: its three named reset groups
