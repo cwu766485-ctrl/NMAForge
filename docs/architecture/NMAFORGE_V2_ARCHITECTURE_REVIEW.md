@@ -3,8 +3,8 @@
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Latest fixed test source SHA:** `c26064e3dda40ce26490c5c93b3e741529946c58` (tree `1cd67e6dc3b21867a1180521bfe022464e213a75`; 0x52 real-CMDQ invalid-descriptor replay). The most recent benchmark source remains independently identified in the benchmark report.
-**Current report branch HEAD before this review update:** `7ee16a089b4135d95a57a81c0239214b031fba6b` (tree `3ac2f31a0fcbbb5fa5cd13f3f9ed39a87c3ed3c0`); report-only commits follow the tested source SHA.
+**Latest fixed test source SHA:** `fd82e7323bbf73c428f1a1e72d784220f2440cd0` (tree `780545809ed04b88fe97bd708dd67e54ef4a88ce`; real-CMDQ legal 0x52 GEMV regression). The most recent benchmark source remains independently identified in the benchmark report.
+**Current report branch HEAD before this review update:** `fd82e7323bbf73c428f1a1e72d784220f2440cd0` (tree `780545809ed04b88fe97bd708dd67e54ef4a88ce`); report-only commits follow the tested source SHA.
 **Published feature branch tip at this audit:** `19f9575f3579869f27d72f2dd17fa980840b6499` (same tree `3ac2f31a0fcbbb5fa5cd13f3f9ed39a87c3ed3c0`).
 **Product RTL SHA:** `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; no RTL change is present in the fixed test source or report-only commits.
 
@@ -56,6 +56,28 @@ v2 remains IN PROGRESS. The first input attempt used K=1 and ended exactly at
 `2^32`, so it correctly was not treated as a wrap; the committed test uses
 K=17. Product RTL is unchanged. Full command, logs, and archive checksum are
 recorded in [DV closure](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+### Latest legal 0x52 real-CMDQ replay — 2026-11-06
+
+At source/test SHA `fd82e7323bbf73c428f1a1e72d784220f2440cd0`, the Top UVM
+sequence executes an ABI-v7 `0x52` descriptor for M=3, N=5, K=5 through the
+production CMDQ fetch, descriptor validator, Matrix dispatcher, shared
+banked-SPAD path, and completion writer. Three seeds pass all 15 independent
+INT32 Golden outputs, two destination guards, completion fields, and 8/8
+accepted/returned Matrix reads. The M/N/K-tail group and its cross are 100%.
+
+The first attempt did complete the command, but the passive UVM launch
+monitor returned no launch sample because its opcode-to-engine mapping omitted
+the new `0x52` and `0x53` Matrix opcodes. The monitor is now corrected; this
+was a verification observability issue, not a product RTL issue. Product RTL
+remains at `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. The full command,
+aggregate URG totals, and log archive checksum are in the
+[DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+This closes only one legal CMDQ GEMV shape and single-engine response drain.
+Maximum supported shapes, exhaustive legal tails, multi-engine 0x52 ownership,
+and the complete fault × phase × reset matrix remain open; v2 DV remains
+**IN PROGRESS**.
 
 ### Phase 0 worktree relationship audit — 2026-11-06
 

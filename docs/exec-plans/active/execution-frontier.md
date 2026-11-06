@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `c26064e3dda40ce26490c5c93b3e741529946c58` (tree `1cd67e6dc3b21867a1180521bfe022464e213a75`). Latest benchmark source SHA remains `c93d020880710a2804685fd85bb98c2e9c56f290` (tree `24180541c76b1ad4d27b2e97313e7d97a5df2016`). Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commit expands only the verification workload/profile. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `fd82e7323bbf73c428f1a1e72d784220f2440cd0` (tree `780545809ed04b88fe97bd708dd67e54ef4a88ce`). Latest benchmark source SHA remains `c93d020880710a2804685fd85bb98c2e9c56f290` (tree `24180541c76b1ad4d27b2e97313e7d97a5df2016`). Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commit expands only the verification workload/profile. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -652,3 +652,27 @@ in the owning report; run `git diff --check` before handoff.
 - Logs-only archive: `/tmp/nmaforge_v2_cmdq_reject_c26064e_logs_v2.tar.gz`, SHA-256 `87bfc434c78426ccfade5cc2b583f5ea56a19d66b9366c7939e515b435142029`. Full scope and exact command are in [DV Closure](../../verification/NMAFORGE_V2_DV_CLOSURE.md).
 - Phase 0 confirmed the original `/home/ray/workspace/NMAForge` branch `feat/shape-adaptive-gemv-v2` is divergent from the target v2 branch: merge base `b5b6ff25ed41fb5ea4c9a5043360063cec58f7ac`, target branch 446 unique commits, original branch 64 unique commits. Original worktree HEAD `c290eba7697138a4fcf2cbbac9262264849f0aeb` has pre-existing untracked `novas.conf` and `novas.rc`; both were left untouched. No branch merge/cherry-pick was done.
 - Current status remains v1.0 Compute Cluster **HOLD**, v2 DV **IN PROGRESS**, trained CNN/Transformer **NOT_RUN**, and ASIC readiness **NOT READY**. Next smallest DV task: expand legal 0x52 alias/range rejection to runtime external/in-flight SPAD scenarios and map those requirements to accepted/returned/discarded response evidence; then repeat fixed-SHA Clean Replay and refresh RTM. Broader benchmark/model/ASIC plan items remain OPEN as documented.
+
+## 2026-11-06 update — legal 0x52 GEMV through real Top CMDQ
+
+- Testbench/build-only commits `c3b6b4a2967edc17e8229151210132959b351f9b`,
+  `fc8f6db640d131b6fb6eeaf7db8c1a76fd0d6281`, and
+  `fd82e7323bbf73c428f1a1e72d784220f2440cd0` exercise and observe an ABI-v7
+  0x52 GEMV descriptor at M=3, N=5, K=5 through the production Top CMDQ path.
+  Product RTL remains at `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
+- VCS/URG `V-2023.12-SP1_Full64`, Run ID
+  `V2-CMDQ-PRODUCT-GEMV-GOLDEN-3SEED-FD82E73`, Seeds 20261112/13/14: 3/3
+  complete Top UVM passes, 0 Warning/Error/Fatal per Seed; each checks 15/15
+  independent INT32 outputs, two guards, completion fields, and 8/8 accepted
+  versus returned Matrix reads. The named tail group/cross is 100%; merged
+  Line/Condition/FSM/Branch/Assert/Group is 70.12/67.96/45.62/67.30/72.00/79.92%,
+  so this is scoped evidence rather than global closure.
+- Logs-only archive `/tmp/nmaforge_v2_product_gemv_fd82e73_logs.tar.gz`,
+  SHA-256 `bb8c975cacb5b48cebb2ef6cd6b802842d9654e21b095c6107141ceda6e24f5e`.
+  The test exposed that the passive UVM monitor did not classify 0x52/0x53 as
+  Matrix; the testbench mapping was corrected. No product RTL defect/change.
+- Exact command and requirement dispositions are in
+  [DV Closure](../../verification/NMAFORGE_V2_DV_CLOSURE.md). Maximum legal
+  shapes, exhaustive tail/alias/fault phases, and concurrent response-owner
+  checks remain open. Benchmark/model/PPA evidence is unchanged and remains
+  pinned to its own source SHAs.

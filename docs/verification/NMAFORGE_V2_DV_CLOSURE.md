@@ -1,7 +1,7 @@
 # NMAForge v2 DV Closure Status
 
 **Status:** IN PROGRESS — scoped regressions pass; v2 sign-off is not ready.  
-**Latest fixed RTL/test candidate SHA:** `c26064e3dda40ce26490c5c93b3e741529946c58` (tree `1cd67e6dc3b21867a1180521bfe022464e213a75`; latest three-seed CMDQ invalid-descriptor replay; product RTL unchanged)
+**Latest fixed RTL/test candidate SHA:** `fd82e7323bbf73c428f1a1e72d784220f2440cd0` (tree `780545809ed04b88fe97bd708dd67e54ef4a88ce`; three-seed real-CMDQ legal 0x52 GEMV Golden replay; product RTL unchanged)
 
 **Candidate tree:** `65d56c5d6dd345effde6fdfdf70dad59f135a279` (tree used for the latest three-seed generic Cluster replay)
 
@@ -61,6 +61,48 @@ rejection evidence for these cases. Output overlap/wrap and alignment are
 proven rejected before dispatch on the tested top path; broad legal shape
 execution, fault × phase × reset crosses, and external-fabric response
 ownership remain open. No product RTL changed; v2 DV remains **IN PROGRESS**.
+
+## 2026-11-06 — legal opcode 0x52 through real Top CMDQ
+
+Testbench commits `c3b6b4a2967edc17e8229151210132959b351f9b`,
+`fc8f6db640d131b6fb6eeaf7db8c1a76fd0d6281`, and
+`fd82e7323bbf73c428f1a1e72d784220f2440cd0` add a legal ABI-v7 3×5×5 GEMV
+descriptor to the real Top CMDQ path, improve failure diagnostics, and teach
+the passive UVM launch monitor that opcodes `0x52`/`0x53` belong to Matrix.
+An initial run completed the task successfully but exposed the monitor's
+missing opcode mapping; no DUT/RTL defect was found. Product RTL remains at
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
+
+At fixed source/test SHA `fd82e7323bbf73c428f1a1e72d784220f2440cd0` (tree
+`780545809ed04b88fe97bd708dd67e54ef4a88ce`), VCS and URG
+`V-2023.12-SP1_Full64` passed Seeds 20261112/13/14. Every seed launches
+opcode `0x52` through CMDQ, checks all 15 signed INT32 outputs against an
+independent Golden, preserves two output guards, verifies task completion,
+and observes 8/8 Matrix accepted/returned reads. The named M/N/K-tail
+functional group is 100% (3/3 bins and its cross). Each complete Top UVM seed
+has zero Warning/Error/Fatal. The merged profile totals
+Line/Condition/FSM/Branch/Assert/Group `70.12/67.96/45.62/67.30/72.00/79.92%`;
+those are broad profile totals, not v2 sign-off closure.
+
+Run ID: `V2-CMDQ-PRODUCT-GEMV-GOLDEN-3SEED-FD82E73`. Exact command:
+
+```sh
+VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+VCS_ARCH_OVERRIDE=linux \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v2_product_gemv_3seed_fd82e73 \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261112 20261113 20261114'
+```
+
+Logs-only archive (no simulator or coverage databases):
+`/tmp/nmaforge_v2_product_gemv_fd82e73_logs.tar.gz`, SHA-256
+`bb8c975cacb5b48cebb2ef6cd6b802842d9654e21b095c6107141ceda6e24f5e`.
+This advances `REQ-V2-COM-001`, `REQ-V2-052-003`, `REQ-V2-052-004`, and the
+single-command accepted/returned portion of `REQ-V2-052-007`. It does not
+close those broader requirements: maximum descriptor shapes, exhaustive
+tail/alias/fault combinations, held external responses, multi-engine
+0x52 response ownership, and complete error/reset crosses remain open.
 
 ## Current Compute Cluster UVM replay at `2999e03` — 2026-11-06
 
@@ -660,6 +702,12 @@ named Matrix-core scenarios and do not substitute for the Top/Cluster RTM.
 | REQ-V2-COM-006: coordinated reset flushes in-repository shared-fabric owners and allows clean DMA/CNM recovery | `ai_accel_memory_fabric`, DMA and banked CNM shared reset/epoch lifecycle | `subsystem_memory_fabric_reset_regress`; DMA memory scoreboard plus `MEMORY_FABRIC_RESET_ONLY_PASS` and `DMA_CNM_RESET_RECOVERY_PASS` checks. It exercises four DMA reads outstanding while CNM has an accepted SPAD read without its response, and a second phase with CNM awaiting result write | URG records `ap_single_response_owner` (3,921 real successes) and `ap_cnm_response_tag` (144 real successes); both have zero failures/incomplete. These are exercised owner/tag properties, not a universal external-fabric epoch proof | `dma_cnm_shared_reset_cg`, `dma_reset_phase_cg`, and `cnm_reset_phase_cg` each 100.00% in the merged report. Whole-report functional group score is only 23.98%; other subsystem groups are outside this scenario | `V2-MEMORY-FABRIC-RESET-3SEED-F340ACA`, seeds 20261025/26/27, source SHA `f340acaa2cdf7c36075473b8bc6fd6dee8e59873`, tree `7fc556427be1597e64a602c10af4fdd855a0c343` | **PASS (selected in-repository fabric scope)**; all three seeds report zero UVM Warning/Error/Fatal and post-reset DMA/CNM Golden recovery. Does not close 0x52/0x53-specific reset-phase crosses or arbitrary external fabric behavior; logs/URG archive and checksum below |
 
 ### Fixed run identities and reproducibility
+
+| Requirement | Added test/checker evidence | Coverage | Run identity | Disposition |
+|---|---|---|---|---|
+| REQ-V2-COM-001 | Real Top CMDQ fetch/decode/dispatch of ABI-v7 opcode `0x52`; passive launch monitor now classifies `0x52`/`0x53` as Matrix | 1 legal launch per Seed; Matrix launch snapshot matches opcode/addresses/3×5×5 dimensions | `V2-CMDQ-PRODUCT-GEMV-GOLDEN-3SEED-FD82E73`, seeds 20261112/13/14, SHA `fd82e7323bbf73c428f1a1e72d784220f2440cd0` | PASS for this product-CMDQ dispatch shape; broader mode matrix open |
+| REQ-V2-052-003/004 | Independent signed INT32 Golden; complete output image and two sentinels; completion status/result/elements checked | 15/15 output elements per Seed; M/N/K tail bins 3/3 plus cross 1/1 | Same run ID/SHA | PASS for legal shape 3×5×5 only; full supported shape domain open |
+| REQ-V2-052-007 | Count real Matrix banked request accepts and Matrix-tagged returned responses before completion | 8 accepted / 8 returned each Seed; no pending response at completion | Same run ID/SHA | PARTIAL; single Matrix command only, no concurrent engine owner cross |
 
 - `V2-DESC-VALIDATOR-AC6B83F`: VCS `V-2023.12-SP1_Full64`; seed is not applicable because the test is directed. The run used `VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS="/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10" make -C dv/block/control/sim descriptor-validator-regress DESCRIPTOR_VALIDATOR_OUT=/tmp/nmaforge_v2_descriptor_validator_ac6b83f`; compile/run logs are under `/tmp/nmaforge_v2_descriptor_validator_ac6b83f/`.
 - `V2-GEMV-CORE-3SEED-18DAD2B`: VCS `V-2023.12-SP1_Full64`; Seeds 20261105/06/07; logs-only archive SHA-256 `4fd0ba313b484a2da588562ff62411b2951ca089bb703a74e49fed7f2bc506c1`.

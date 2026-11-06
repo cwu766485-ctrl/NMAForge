@@ -5,6 +5,15 @@
 **Latest RTL/static-analysis candidate replayed:** `410b81dfd37992a760b28258bb7e8c6b6f5017d7`
 **Disposition:** **NOT ASIC READY**; v1.0 remains **HOLD**.
 
+## Later DV-only provenance — 2026-11-06
+
+The real-Top legal opcode `0x52` UVM regression at source/test SHA
+`fd82e7323bbf73c428f1a1e72d784220f2440cd0` changes testbench observability and
+stimulus only; product RTL is unchanged. This VCS/URG PASS does not update the
+SpyGlass, formal/LEC, SRAM mapping, DC, physical PPA, or power evidence below.
+Their existing `NOT_RUN` and `BLOCKED_ENV` dispositions remain in force; no
+ASIC readiness or tapeout claim is made.
+
 ## Current evidence
 
 | Area | Current result | Sign-off meaning |

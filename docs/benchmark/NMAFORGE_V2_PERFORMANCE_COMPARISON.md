@@ -618,3 +618,16 @@ Seeds were 20261117, 20261118, and 20261119. Simulator version was Synopsys
 VCS `V-2023.12-SP1_Full64`; the aggregator ran with Python 3.12.13. The
 summarizer command is embedded in the evidence archive manifest and recorded in
 the [execution frontier](../exec-plans/active/execution-frontier.md).
+
+## Verification-only provenance — 2026-11-06
+
+The later real-Top legal opcode `0x52` CMDQ replay is fixed at test/source SHA
+`fd82e7323bbf73c428f1a1e72d784220f2440cd0`; it changes UVM/testbench code only
+and does not change the product RTL. No performance suite was rerun on this
+SHA. All cycle, traffic, utilization, and TinyNPU comparison values above
+remain bound to their individually listed benchmark SHAs and memory models.
+Ratio directions were audited: `NMAForge cycles / TinyNPU normalized cycles`
+above 1 means NMAForge used more cycles; `speedup_vs_cache0_prefetch0` is
+baseline cycles divided by configured cycles, so above 1 means fewer cycles.
+This verification replay adds no new performance, ASIC frequency, area, power,
+or energy evidence.
