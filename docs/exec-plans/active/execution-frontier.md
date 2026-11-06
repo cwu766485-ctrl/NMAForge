@@ -35,14 +35,15 @@ and `benchmark/v2_tinynpu_*_current_20261106.{csv,json}` plus
 `benchmark/v2_spad_capacity_static_20261106.{csv,json}`. Full DV remains
 PARTIAL/HOLD; TinyNPU common-memory RTL, reduced-SPAD model runs, and current
 ASIC PPA remain NOT_RUN/BLOCKED_ENV. This objective stops after the report
-package is committed. The standard Git transport cannot authenticate here
-(HTTPS username unavailable; `gh` absent; SSH key rejected), but the connected
-GitHub App has repository write permission. The final local tree is being
-published as a fast-forward snapshot commit based on the fetched v2 ref
-`5d01a88a8a2a7b1add15fbedbb02096d686824ab`. This preserves remote history and
-`main`; the local ahead-only commit sequence remains intact locally and is
-represented by the final tree snapshot on GitHub. No further engineering
-phase is started here.
+package is published on `feature/npu-architecture-v2` through the connected
+GitHub App as fast-forward snapshot commit
+`9a61b4852b61e830c2e284c3b980242a76410148`, parent
+`5d01a88a8a2a7b1add15fbedbb02096d686824ab`. Its tree
+`c78b01dd28074512cdb56304a4c629cd47fb03f8` matches local commit
+`3d4b97666af79d01329b1307fe3560f0e7db5fea`. Standard Git transport lacked
+authentication. Remote history and `main` were preserved; the separate
+uncommitted UVM worktree edit was excluded. No further engineering phase is
+started here.
 
 ## Prior DV handoff snapshot (historical)
 

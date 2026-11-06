@@ -132,12 +132,13 @@ Relevant fixed addresses (offsets from the SPAD base, in bytes):
 - NMA raw log archive:
   `/tmp/nmaforge_v2_tinynpu_evidence_20261106.tar.gz`, SHA-256
   `3cf83dea684002740ead224ac1fec60e4710c44b2fa887c718082699b51debb9`.
-- Standard `git push` could not authenticate (HTTPS username unavailable,
-  `gh` absent, SSH key rejected). The connected GitHub App has repository write
-  permission; the final committed tree is being published as a fast-forward
-  snapshot based on v2 head `5d01a88a8a2a7b1add15fbedbb02096d686824ab`. This
-  preserves remote history and `main`; the local commit sequence remains
-  intact locally, while the remote receives the final tree snapshot.
+- Published to GitHub `feature/npu-architecture-v2` through the connected GitHub
+  App as fast-forward snapshot commit `9a61b4852b61e830c2e284c3b980242a76410148`,
+  parent `5d01a88a8a2a7b1add15fbedbb02096d686824ab`, tree
+  `c78b01dd28074512cdb56304a4c629cd47fb03f8` (matching local tree at
+  `3d4b97666af79d01329b1307fe3560f0e7db5fea`). Standard Git transport lacked
+  authentication. Remote history and `main` were preserved; the separate
+  uncommitted UVM worktree edit was excluded.
 - Full v2 DV sign-off: **PAUSED / PARTIAL**. TinyNPU memory RTL and matched
   system endpoint: **NOT_RUN**. Reduced-SPAD mapping/timing: **NOT_RUN**.
   Current v2 PPA: **BLOCKED_ENV** (private libraries/SDC/macros absent). No
