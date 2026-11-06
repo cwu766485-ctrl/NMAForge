@@ -1,0 +1,20 @@
+{
+  "model_sha256": "ef0e616d09ca0be7956fa8ca900e40c62973f8f06e3ec96af09d888eead73726",
+  "input_sha256": "395fa3d65ebd724444abfa47c758de41ec9e157705eda1c10cfccdbe246aceb3",
+  "independent_integer_logits": [
+    -38,
+    8,
+    106,
+    29,
+    -26,
+    -6,
+    -48,
+    15,
+    -12,
+    -30
+  ],
+  "expected_class": 2,
+  "predicted_class": 2,
+  "classification": "PASS",
+  "golden_bytes_sha256": "249587647d45f3e3ef9a54d009a1896cc7d1daf9152de1e11bfba2f4a1b115bc"
+}
