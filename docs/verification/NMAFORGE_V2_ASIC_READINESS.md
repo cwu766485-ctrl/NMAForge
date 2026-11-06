@@ -1,5 +1,29 @@
 # NMAForge v2 ASIC Readiness
 
+## Final research baseline capacity disposition — 2026-11-06
+
+The source/test SHA `9576e539c21fe6312763c4745a90dc032c6457e0` exercised two
+compact-mapped CNN workloads at both 128 KiB and 512 KiB with the same four
+banks, 128-bit line interface, and 256 INT8 MAC array. Both model outputs
+were Golden-exact, and measured cycles/traffic were unchanged between the
+two capacities. This is behavioral-SPAD simulation evidence, not physical
+SRAM timing, macro area, power, or PPA evidence.
+
+Current-map address high-water analysis: trained 10-class CNN 69,888 bytes;
+`conv1x_mini` 69,760 bytes; legacy Digits MLP 351,232 bytes; fixed 86-descriptor
+Transformer fixture 79,200 bytes. The two CNN models pass at 128 KiB. MLP and
+Transformer capacity rows are static-only; their 128 KiB results are not run
+claims. A 64 KiB capacity cannot hold the current compact CNN map, while 256
+KiB was not separately simulated. Logical storage requirements remain 4,194,304,
+2,097,152, 1,048,576, and 524,288 bits for 512/256/128/64 KiB respectively.
+
+Machine records: [`capacity CSV`](../../benchmark/v2_spad_capacity_study_20261106.csv),
+[`capacity JSON`](../../benchmark/v2_spad_capacity_study_20261106.json). DC,
+SRAM macro mapping, timing, physical design, and power are `NOT_RUN` /
+`BLOCKED_ENV`; foundry libraries, SRAM timing views, and implementation
+constraints were not available in the repository environment. The project is
+not Tapeout Ready.
+
 ## Bounded benchmark / storage update — 2026-11-06
 
 This round does not pursue ASIC sign-off. No DC, SRAM macro mapping, PPA,

@@ -1,5 +1,35 @@
 # NMAForge v2 DV Closure Status
 
+## Finalization functional gate — 2026-11-06
+
+The requested bounded key-function gate is satisfied for the sampled/fixed
+paths at Top smoke source/test SHA
+`9ee5879edec64644e33386aae6bba9b3885d3b07` (VCS
+`V-2023.12-SP1_Full64`, seed `20261106`): the existing smoke completed with
+`TEST PASS`, including INT8 GEMM, opcode `0x52`, opcode `0x53`, and normal
+completion. The exact command was:
+
+```sh
+cd dv/subsystem/top_smoke/sim
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/opt/Synopsys/vcs/V-2023.12-SP1/bin/vcs -licwait 10' \
+make ai_smoke SEED=20261106 AI_SEED=20261106 AI_RANDOM_CASES=4
+```
+
+The trained CNN's all-396-image Top CMDQ replay at source/test SHA
+`9576e539c21fe6312763c4745a90dc032c6457e0` also passed exact intermediate
+Golden checks. Smoke metadata and the log checksum are in
+[`v2_finalization_top_smoke_9ee5879.json`](../../benchmark/v2_finalization_top_smoke_9ee5879.json).
+These are minimum functional/model checks only. This round
+does not claim complete DV closure, 100% coverage, full fault cross coverage,
+complete formal closure, or ASIC readiness. Existing partial/blocked/not-run
+items remain open; no new broad UVM, mutation, or formal scope was started.
+
+The ten-class model run evidence is in the two 396-row CSVs and
+`v2_spad_capacity_study_20261106.json`; the Top smoke log used for this
+snapshot is `/tmp/nmaforge_research_final_ai_smoke_9ee5879.log`.
+
 ## Scope change — 2026-11-06
 
 Full DV closure is paused for this work round by explicit project direction.
@@ -1888,7 +1918,7 @@ bytes; each Seed passes the existing 512-word Golden and A-tile reuse check.
 This is a testbench consistency check and performance evidence, not a new v2
 functional coverage bin. No RTM disposition changed; v2 DV remains **IN
 PROGRESS**. Exact command, archive checksum and CSV/JSON are in the
-[performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md).
+[performance report](../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md).
 
 The follow-up fixed-SHA UVM replay `f530fe2c4c98204312b7ed16616cb9d9747670b2`
 (tree `919ebb411a7b47e0e0b3dfd2084852a83a2a5034`) adds two more passive
@@ -1900,7 +1930,7 @@ scenario records 84 Matrix writeback-wait cycles and 354 arbiter-stall events,
 while the existing Golden and payload-stability checks pass. No new
 functional coverage bins or RTM dispositions are claimed. Machine evidence,
 the exact command and text-log archive checksum are in the
-[performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md)
+[performance report](../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md)
 and [JSON record](../../benchmark/v2_top_matrix_cluster_profile_f530fe2_3seed.json).
 
 ## Clean-worktree Top Smoke compatibility at the current candidate — 2026-11-06
