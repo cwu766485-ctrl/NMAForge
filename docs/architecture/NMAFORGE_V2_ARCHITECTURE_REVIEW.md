@@ -481,8 +481,10 @@ license files, `.env`, `novas.conf`/`novas.rc`, and library/database extensions.
   The [machine summary](../../benchmark/v2_p2_cluster_serial_parallel_410b81d_summary.json)
   records its one-workload, behavioral-SPAD boundary.
 - The trained Digits model was rerun at this fixed source/test SHA and remains
-  bit-exact with 352/360 classifications and 34,761 CMDQ cycles. This does not
-  close trained CNN or Transformer model deployment.
+  bit-exact with 352/360 classifications and 34,761 CMDQ cycles. A later
+  bounded four-class CNN demo is recorded below; it has fixed convolution
+  filters and a trained readout, so full trained-CNN and Transformer deployment
+  are not closed.
 - Current-candidate SpyGlass lint completed with 0 errors, 465 warnings and 5
   infos. CDC setup stalled without producing a report; bounded RDC stopped at
   `Ar_resetcross01`. The open reset release contract and wide-mux analysis
@@ -510,3 +512,21 @@ do not close all 0x52/0x53 descriptor variants, legal cross-engine fault
 combinations, or system-level assertions. The v2 decision remains a bounded
 candidate, not full DV sign-off; details and archive checksum are in the
 [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+## Trained CNN demo and compatibility smoke — 2026-11-06
+
+- Test/build commit `835f958b5f486b3f3e4808e735a788721f4f1441`; no product RTL
+  changed. The four-class Digits demo uses fixed edge filters and a trained
+  INT8 head. Software integer evaluation is 158/159; one held-out sample runs
+  through real Top CMDQ and all checked stage tensors/final logits match an
+  independent Golden. This is a scoped functional demo, not a fully trained
+  convolutional network or a model-level hardware accuracy result.
+- VCS `V-2023.12-SP1_Full64`: `ai_trained_cnn_demo`, fixed TinyNPU CNN
+  compatibility replay and `ai_smoke` all pass. Smoke includes legacy GEMM,
+  opcode 0x52/0x53 and CNM markers; existing `LOOP-REROLL-ENABLED` note remains
+  and no new compile error was observed.
+- Machine record:
+  [CSV](../../benchmark/v2_trained_cnn_demo_835f958.csv) and
+  [JSON](../../benchmark/v2_trained_cnn_demo_835f958.json). The trained
+  Transformer, multi-sample Top CNN benchmark, stage-separated full-model
+  timing, full v2 DV closure and ASIC readiness remain open.

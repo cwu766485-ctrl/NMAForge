@@ -811,3 +811,19 @@ in the owning report; run `git diff --check` before handoff.
   `acd7e8e44778ce5c3465798708f8e32ddbeb979f64030fd92c2756d42acfb801`.
 - Trained CNN, Tiny Transformer, separate host/DMA/compute/writeback timers,
   common-memory TinyNPU endpoint, and system-level v2 closure remain open.
+
+## 2026-11-06 update — scoped trained CNN demo
+
+- Test/build commit `835f958b5f486b3f3e4808e735a788721f4f1441`; product RTL SHA
+  is unchanged at `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
+- Fixed four edge filters plus trained INT8 readout on Digits 0–3: software
+  integer test 158/159 (99.37%). One held-out example passed real Top CMDQ;
+  checked convolution, activation/layout, FC and final logits all matched the
+  independent Golden. This is scoped: kernels fixed, one sample on Top.
+- `ai_trained_cnn_demo`, fixed `conv1x_mini` compatibility replay, and
+  `ai_smoke` all pass with VCS `V-2023.12-SP1_Full64`. Golden/model/input and
+  logs archive SHA-256 `f0919d1f3b74ff6442ec33c300c7fdf9f88e4f6e842004288f5b4582c691287e`.
+- Results:
+  [CSV](../../benchmark/v2_trained_cnn_demo_835f958.csv) and
+  [JSON](../../benchmark/v2_trained_cnn_demo_835f958.json). Full trained CNN,
+  Tiny Transformer, full-model cycle decomposition and ASIC PPA remain open.

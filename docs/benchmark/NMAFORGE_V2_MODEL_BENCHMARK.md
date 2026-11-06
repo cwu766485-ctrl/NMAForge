@@ -77,7 +77,7 @@ run did not instrument that stage.
 | Workload | Status | Evidence and boundary |
 |---|---|---|
 | ONNX `conv1x_mini` paired graph | **PASS; NMAForge side replayed at `d1867da`** | Current run `V2-TINYNPU-REPLAY-CURRENT-D1867DA-S20261029` rechecked all intermediate tensors and 4/4 outputs against the pinned model Golden. NMAForge: 1,985 compute + 1,080 host-layout cycles; TinyNPU: 4,781 graph cycles from prior run `TINY-COMPARE-V2C3A59-S20261029`. Different timing boundaries; no speedup ratio. |
-| Trained-weight CNN | **NOT_RUN** | No trained CNN weight package and independent Golden are available in the current tree. |
+| Trained-weight CNN | **PASS; scoped demo at `835f958`** | 4-class Digits CNN demo with fixed edge kernels and a trained INT8 classifier head; 158/159 held-out software samples classify correctly. One selected held-out sample ran through the real Top CMDQ and every checked intermediate tensor plus final logits matched an independent integer Golden. This does not establish trainable convolution kernels or a full multi-sample Top benchmark. |
 | Tiny Transformer | **NOT_RUN** | The fixed-weight descriptor fixture is not a pretrained-model deployment. No trained model, Prefill/Decode Golden, or current v2 run is claimed. |
 | Host / DMA / compute / writeback / graph cycle split | **PARTIAL** | Digits has a top-level CMDQ interval and a fused Matrix activity counter; the current run does not separately time host, DMA, writeback and orchestration. Its input preload is testbench setup outside the timed interval. |
 
@@ -95,9 +95,10 @@ measured Fmax, power, or energy result is inferred from these RTL runs.
 
 1. Add common Memory Adapter behavior to TinyNPU or keep its memory service
    explicitly modeled; do not merge the two endpoints into a single score.
-2. Add a trained CNN and a small trained Transformer only with independent
-   software Goldens and hardware-executed operators; keep host fallback
-   separately measured. Both remain **NOT_RUN**.
+2. Expand the scoped trained CNN beyond its single Top-checked sample and
+   consider training the convolution filters; add a small trained Transformer
+   only with independent software Goldens and hardware-executed operators.
+   Keep host fallback separately measured. Transformer remains **NOT_RUN**.
 3. Instrument distinct host, DMA, compute, writeback, and graph-orchestration
    windows for the larger model runs.
 4. Preserve this Digits replay as the fixed regression and report each
@@ -254,3 +255,48 @@ Combined raw log/evidence archive:
 `/tmp/nmaforge_v2_model_replay_4b99d10_logs.tar.gz`, SHA-256
 `acd7e8e44778ce5c3465798708f8e32ddbeb979f64030fd92c2756d42acfb801`.
 The archive stays outside Git because it contains generated simulator output.
+
+## Trained four-class CNN Top demo — `835f958`
+
+The existing real Top graph path now also accepts a generated NPZ weight
+package and explicit INT8 input fixture. The small model uses four fixed 3×3
+edge filters and a trained four-class INT8 LogisticRegression readout. The
+readout is trained on the actual quantized convolution feature values, so the
+reported 158/159 (99.37%) held-out accuracy measures the deployed rounding,
+clamping and activation contract. The convolution filters were not trained;
+this scoped benchmark must not be read as a generally trained CNN deployment.
+
+Candidate SHA `835f958b5f486b3f3e4808e735a788721f4f1441`; product RTL remains
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. VCS
+`V-2023.12-SP1_Full64`, Python 3.12.13, NumPy 2.4.6, scikit-learn 1.9.1.
+Run ID `V2-TRAINED-CNN-835F958-S20261029` passed the full Top CMDQ path on one
+held-out image: label/prediction class 0, logits `[87,-73,-19,5]`, all
+intermediate stage memory and final output matched the independent software
+Golden byte-for-byte. Golden SHA-256:
+`0760b44581d5d257f4009b7ba06cd39b02644009ad0f4b6b2796d1a6a543f9d2`.
+
+The Top interval was 1,985 compute cycles plus 1,080 separately counted host
+layout cycles. It performed 1,872 useful MACs; compute SPAD traffic was 3,360
+read and 1,600 write bytes; testbench preload was 3,456 bytes and is excluded.
+The selected single-sample run does not report model-level Top accuracy or
+TinyNPU speedup. The 158/159 accuracy is a software evaluation on the held-out
+subset, and only one sample is hardware-executed.
+
+Reproduce with:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+AI_TRAINED_CNN_PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python \
+AI_TRAINED_CNN_RUN=/tmp/nmaforge_v2_trained_cnn_835f958 \
+make -C dv/subsystem/top_smoke/sim ai_trained_cnn_demo
+```
+
+Machine-readable evidence:
+[`v2_trained_cnn_demo_835f958.csv`](../../benchmark/v2_trained_cnn_demo_835f958.csv)
+and [`v2_trained_cnn_demo_835f958.json`](../../benchmark/v2_trained_cnn_demo_835f958.json).
+Model, input, Golden, compile/run logs and smoke logs archive:
+`/tmp/nmaforge_v2_trained_cnn_835f958_evidence.tar.gz`, SHA-256
+`f0919d1f3b74ff6442ec33c300c7fdf9f88e4f6e842004288f5b4582c691287e`.
+Generated model weights and simulation databases remain outside Git.
