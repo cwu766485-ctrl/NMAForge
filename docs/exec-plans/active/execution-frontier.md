@@ -1,6 +1,6 @@
 # NMAForge execution frontier
 
-Updated: 2026-11-06. Current clean validation candidate: `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` (tree `630e498ba467d84dd5359403cfe1ed1e5879f6e9`), replayed with Top smoke, three-seed Cluster UVM, focused 0x52/0x53 tests/mutations, and the four-way GEMV benchmark. Latest report-branch commit before the current UVM/URG report update is `325fe78bead175fc4eda1fae2ed74929f61ba331` (tree `d5b52a6e547619f4d59ef8a41bd0b4e89d77a46e`); `feature/npu-architecture-v2` was 73 commits ahead of cached `origin/feature/npu-architecture-v2`. A push attempt at that SHA failed because Git could not read the GitHub HTTPS username. The latest matched Cluster serial/parallel workload remains `f19e92934cd6273d327621c43cb17291cf1a9aa5`; latest Top contention workload remains `c93d020880710a2804685fd85bb98c2e9c56f290`. Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; latest commits expand only verification/benchmark workload and evidence. This is a short handoff for the next engineering task; it
+Updated: 2026-11-06. Current clean validation candidate: `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` (tree `630e498ba467d84dd5359403cfe1ed1e5879f6e9`), replayed with Top smoke, three-seed Cluster UVM, focused 0x52/0x53 tests/mutations, four-way GEMV benchmark, and in-repository memory-fabric reset. Product RTL remains unchanged from its last implementation commit `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; recent commits expand only verification/benchmark workload and evidence. GitHub synchronization remains blocked because Git cannot read an HTTPS username in this environment. The latest matched Cluster serial/parallel workload remains `f19e92934cd6273d327621c43cb17291cf1a9aa5`; latest Top contention workload remains `c93d020880710a2804685fd85bb98c2e9c56f290`. Latest 0x53 runtime SVA source/test SHA: `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence remains at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
@@ -1144,6 +1144,18 @@ checked in. Text-only logs and per-Seed summaries are outside Git at
 `/tmp/nmaforge_v2_clean_839b9af_gemv_four_way_text.tar.gz` (SHA-256
 `4210b6af9cc45212732fa23ae69df1fbfe5ec3ae6d3335f76815fd4b5d9afa58`). Exact
 commands and remaining comparisons are in the [performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md).
+
+## 2026-11-06 — clean-candidate in-repository fabric reset
+
+At the same clean source/test SHA `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0`,
+the focused DMA/CNM shared-memory-fabric reset regression passed Seeds
+`20261128/29/30`. All three reset groups reached 100%; the response-owner and
+CNM-tag assertions recorded 3,921 and 144 real successes with zero failures.
+Every seed had UVM Warning/Error/Fatal `0/0/0` and fresh post-reset DMA/CNM
+Golden recovery. This closes only the selected in-repository fabric reset
+scope, not arbitrary external fabric behavior or 0x52/0x53-specific reset
+crosses. See the [DV report](../../verification/NMAFORGE_V2_DV_CLOSURE.md) and
+[machine record](../../benchmark/v2_memory_fabric_reset_clean_839b9af_3seed.json).
 
 ## Current phase disposition
 
