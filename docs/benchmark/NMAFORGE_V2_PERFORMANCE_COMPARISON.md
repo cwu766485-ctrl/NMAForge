@@ -803,7 +803,10 @@ reads; response ledger is 5,015 accepted / 4,995 checked / 20 reset-dropped,
 with no pending or routing/data/error mismatches. These counters are event
 diagnostics and are not added to the measured cycle totals. This UVM benchmark
 does not provide a full per-command exclusive stall-state timeline; that
-remains open.
+remains open for the matched serial/parallel cluster operations. A later
+instrumentation update adds an exclusive FSM/stall profile for the standalone
+Top Matrix baseline only; it does not yet profile every command in those
+multi-engine workloads.
 
 The machine-readable results are [CSV](../../benchmark/v2_p2_cluster_serial_parallel_f19e929.csv)
 and [JSON](../../benchmark/v2_p2_cluster_serial_parallel_f19e929.json). Run ID
@@ -891,3 +894,74 @@ python3.12 tools/summarize_matrix_config_closure.py \
   --output-dir /tmp/nmaforge_v2_matrix_config_f9f32f7_3seed/summary \
   --tag f9f32f7
 ```
+
+## Real-Top per-command Matrix profile — `8adf916`
+
+The Top UVM baseline now samples the Matrix controller's passive per-command
+counters and separately counts accepted Matrix banked reads and line writes.
+At test/source SHA `8adf916e4e8a0e3b2f2e01acc85bacb59fbb8f47` (tree
+`a8c232664436c5b1d1f2888eff34439edb40430d`), the standalone `16×32×64`
+CMDQ workload passes on three Seeds. The 15 exclusive FSM state counters sum
+to the DUT's 490-cycle `cycle_count` on every Seed. The top-level doorbell to
+completion interval is 565 cycles. Each run checks all 512 INT32 output words
+against the independent Golden and observes 16 A-tile cache hits.
+
+| Measure | Result per Seed |
+|---|---:|
+| Matrix internal cycles | 490 |
+| Doorbell-to-completion cycles | 565 |
+| Exclusive MAC-state cycles | 128 |
+| Effective MAC/cycle, Matrix internal window | 66.87 |
+| Effective array utilization, Matrix internal window | 26.12% |
+| Matrix SPAD reads / writes | 3,072 B / 2,048 B |
+| A req / A wait; B req / B wait state cycles | 5 / 2; 8 / 4 |
+| Prefetch wait / MAC overlap | 180 / 120 cycles |
+| Response wait / arbitration stall / writeback wait | 3 / 0 / 0 cycles |
+| Outstanding-read high-water / FIFO-full cycles | 2 / 0 |
+
+The `66.87 MAC/cycle` and `26.12%` utilization are workload-average values
+over the controller's internal command cycles; during the 128 MAC states the
+workload issues 256 INT8 MACs per cycle. The 565-cycle top interval includes
+AXI-Lite doorbell and completion polling. Stall and prefetch counters are
+diagnostic events and can overlap; they are not added to either cycle total.
+This is an isolated single-engine run under the four-bank behavioral SPAD's
+registered one-cycle response model. It is not a multi-engine comparison,
+TinyNPU win, or ASIC PPA result.
+
+Run ID `V2-TOP-MATRIX-PERF-PROFILE-8ADF916-3SEED`; Seeds
+20261125/20261126/20261127 each pass with UVM Warning/Error/Fatal `0/0/0`.
+The machine records are [CSV](../../benchmark/v2_top_matrix_profile_8adf916_3seed.csv)
+and [JSON](../../benchmark/v2_top_matrix_profile_8adf916_3seed.json). The
+reproducible [summarizer](../../tools/summarize_top_matrix_profile.py) validates
+the three Seed directories, Golden/pass markers, zero UVM severity counts,
+and the FSM-cycle sum. Text-only compile, run and URG evidence is archived at
+`/tmp/nmaforge_v2_top_matrix_profile_8adf916_3seed_text.tar.gz`, SHA-256
+`9061e496ec0ab9cd317e0768715b9209328c13a8296ecbfc9d72bf5520fcdbda`;
+simulator binaries and coverage databases are excluded.
+
+Exact regression command:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v2_matrix_profile_ac6b83_3seed \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261125 20261126 20261127'
+```
+
+Exact aggregation command:
+
+```sh
+python3 tools/summarize_top_matrix_profile.py \
+  --run-root /tmp/nmaforge_v2_matrix_profile_ac6b83_3seed \
+  --source-sha 8adf916e4e8a0e3b2f2e01acc85bacb59fbb8f47 \
+  --tree-sha a8c232664436c5b1d1f2888eff34439edb40430d \
+  --run-id V2-TOP-MATRIX-PERF-PROFILE-8ADF916-3SEED \
+  --csv benchmark/v2_top_matrix_profile_8adf916_3seed.csv \
+  --json benchmark/v2_top_matrix_profile_8adf916_3seed.json
+```
+
+VCS is `V-2023.12-SP1_Full64`; aggregation used Python 3.6.8. The broader
+matched serial/parallel task benchmark still lacks the same per-command state
+profile, and the eight-configuration and TinyNPU results remain tied to their
+own source SHAs and memory endpoints.

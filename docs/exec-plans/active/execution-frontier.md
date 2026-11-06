@@ -4,6 +4,21 @@ Updated: 2026-11-06. Latest targeted CMDQ DV source/test SHA: `f19e92934cd6273d3
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
 benchmark work is tracked in the execution RTM and open-issue report.
 
+Latest per-command Top Matrix profile source/test SHA is
+`8adf916e4e8a0e3b2f2e01acc85bacb59fbb8f47` (tree
+`a8c232664436c5b1d1f2888eff34439edb40430d`). The real Top `16×32×64` Matrix
+CMDQ profile passes on three Seeds: 490 Matrix cycles, 565 doorbell-to-tail
+cycles, 3,072 B read, 2,048 B written, and exclusive FSM state sum equal to
+the DUT cycle counter on every run. The profile also reports 128 MAC-active
+cycles, 180 prefetch-wait cycles, 120 MAC/prefetch overlap cycles, three
+response-wait cycles, zero arbitration/writeback stall cycles, and a
+two-request outstanding high-water. UVM Warning/Error/Fatal is 0/0/0. This
+closes per-command breakdown for the standalone Top Matrix baseline only;
+the multi-engine serial/parallel workloads still need the same profiler. See
+the [machine CSV/JSON](../../benchmark/v2_top_matrix_profile_8adf916_3seed.csv)
+and [performance report](../../benchmark/NMAFORGE_V2_PERFORMANCE_COMPARISON.md).
+The RTM and sign-off status do not change.
+
 ## 2026-11-06 — 16-seed mixed AXI/DMA coverage and compatible URG merge
 
 At source/test SHA `f9f32f71e7168350d74a75ede0a4a4b222844cc9` (tree
