@@ -250,6 +250,7 @@ module tb_ai_accel_smoke;
     integer matrix_cnm_cnm_responses = 0;
     integer matrix_cnm_profile_window_cycles = 0;
     integer matrix_cnm_matrix_busy_cycles = 0;
+    integer matrix_cnm_engine_overlap_cycles = 0;
     integer matrix_cnm_matrix_mac_cycles = 0;
     integer matrix_cnm_matrix_req_wait_cycles = 0;
     integer matrix_cnm_matrix_rsp_wait_cycles = 0;
@@ -546,6 +547,8 @@ module tb_ai_accel_smoke;
 
             if (dut.parallel_queue_mode_r && dut.engine_busy[2] && dut.engine_busy[3])
                 matrix_cnm_overlap_seen <= 1'b1;
+            if (dut.parallel_queue_mode_r && dut.engine_busy[2] && dut.engine_busy[3])
+                matrix_cnm_engine_overlap_cycles <= matrix_cnm_engine_overlap_cycles + 1;
             if (dut.banked_rsp_valid && dut.arb_rsp_client == 3'd3)
                 matrix_cnm_matrix_responses <= matrix_cnm_matrix_responses + 1;
             if ((|dut.cnm_rsp_valid) && dut.arb_rsp_client == 3'd5)
@@ -4150,31 +4153,33 @@ module tb_ai_accel_smoke;
         begin : parallel_matrix_cnm_owner
             integer lane;
             integer row;
+            integer matrix_word;
             integer matrix_phase_sum;
             integer cnm_phase_sum;
-            axi_write(SPAD_BASE + 32'h4800, 32'h0403_0201);
-            axi_write(SPAD_BASE + 32'h4804, 32'h0807_0605);
-            axi_write(SPAD_BASE + 32'h4808, 32'h0000_0001);
-            axi_write(SPAD_BASE + 32'h480c, 32'h01ff_01ff);
-            axi_write(SPAD_BASE + 32'h4900, 32'h0000_0001);
-            axi_write(SPAD_BASE + 32'h4904, 32'h0000_0100);
-            axi_write(SPAD_BASE + 32'h4908, 32'h0001_0000);
-            axi_write(SPAD_BASE + 32'h490c, 32'h0100_0000);
+            // Matrix 16x16x(16 K words) requires 4 row groups x 16 K
+            // words x 16 bytes for each operand.  Uniform INT8 ones make
+            // every INT32 output independently predictable as 64.
+            for (matrix_word=0; matrix_word<256; matrix_word=matrix_word+1) begin
+                axi_write(SPAD_BASE + 32'h13000 + (matrix_word * 4),
+                          32'h0101_0101);
+                axi_write(SPAD_BASE + 32'h13400 + (matrix_word * 4),
+                          32'h0101_0101);
+            end
             for (lane=0; lane<4; lane=lane+1)
-                axi_write(SPAD_BASE + 32'h5000 + (lane * 4), 32'h0202_0202);
+                axi_write(SPAD_BASE + 32'h10000 + (lane * 4), 32'h0202_0202);
             for (row=0; row<16; row=row+1)
                 for (lane=0; lane<4; lane=lane+1)
-                    axi_write(SPAD_BASE + 32'h5100 + (row * 16) + (lane * 4),
+                    axi_write(SPAD_BASE + 32'h11000 + (row * 16) + (lane * 4),
                               32'h0303_0303);
 
             write_spad_desc_v3(32'h7d00, OP_BANKED_GEMV, 16'h0620,
-                               32'h5000, 32'h5100, 32'd0, 32'h3400,
+                               32'h10000, 32'h11000, 32'd0, 32'h12000,
                                16'd16, 16'd1, 16'd1, 8'd0, 32'd0,
                                5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
                                16'd1, 16'd1, 16'd0, 16'd0, 16'd0);
             write_spad_desc_v3(32'h7d40, OP_TENSOR_GEMM, 16'h0621,
-                               32'h4800, 32'h4900, 32'd0, 32'h4a00,
-                               16'd4, 16'd4, 16'd1, 8'd0, 32'd1,
+                               32'h13000, 32'h13400, 32'd0, 32'h13800,
+                               16'd16, 16'd16, 16'd16, 8'd0, 32'd1,
                                5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
                                16'd1, 16'd1, 16'd0, 16'd0, 16'd0);
 
@@ -4186,6 +4191,7 @@ module tb_ai_accel_smoke;
             axi_write(REG_CPLQ_SIZE, 32'd4);
             axi_write(REG_CPLQ_HEAD, 32'd0);
             axi_write(REG_CPLQ_TAIL, 32'd0);
+            matrix_line_write_count = 0;
             matrix_cnm_case_active = 1'b1;
             matrix_cnm_overlap_seen = 1'b0;
             matrix_cnm_response_alias_seen = 1'b0;
@@ -4193,6 +4199,7 @@ module tb_ai_accel_smoke;
             matrix_cnm_cnm_responses = 0;
             matrix_cnm_profile_window_cycles = 0;
             matrix_cnm_matrix_busy_cycles = 0;
+            matrix_cnm_engine_overlap_cycles = 0;
             matrix_cnm_matrix_mac_cycles = 0;
             matrix_cnm_matrix_req_wait_cycles = 0;
             matrix_cnm_matrix_rsp_wait_cycles = 0;
@@ -4244,18 +4251,23 @@ module tb_ai_accel_smoke;
                        cnm_phase_sum, matrix_cnm_cnm_busy_cycles);
             end
 
-            if (!matrix_cnm_overlap_seen || matrix_cnm_matrix_responses < 2 ||
+            if (!matrix_cnm_overlap_seen || (matrix_cnm_engine_overlap_cycles == 0) ||
+                (matrix_cnm_request_collision_cycles == 0) ||
+                matrix_cnm_matrix_responses < 2 ||
                 matrix_cnm_cnm_responses == 0 || matrix_cnm_response_alias_seen) begin
-                $display("%0t ERROR: Matrix/CNM owner coverage overlap=%b matrix_rsp=%0d cnm_rsp=%0d alias=%b",
-                         $time, matrix_cnm_overlap_seen, matrix_cnm_matrix_responses,
+                $display("%0t ERROR: Matrix/CNM owner coverage overlap=%b overlap_cycles=%0d collisions=%0d matrix_rsp=%0d cnm_rsp=%0d alias=%b",
+                         $time, matrix_cnm_overlap_seen, matrix_cnm_engine_overlap_cycles,
+                         matrix_cnm_request_collision_cycles,
+                         matrix_cnm_matrix_responses,
                          matrix_cnm_cnm_responses, matrix_cnm_response_alias_seen);
                 errors = errors + 1;
             end else begin
                 $display("%0t PASS: Matrix/CNM concurrent response ownership matrix_rsp=%0d cnm_rsp=%0d",
                          $time, matrix_cnm_matrix_responses, matrix_cnm_cnm_responses);
             end
-            $display("MATRIX_CNM_PERF_PROFILE_PASS ai_seed=%0d window_cycles=%0d matrix_busy=%0d matrix_mac=%0d matrix_req_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d matrix_rsp_wait_event_cycles=%0d matrix_writeback_stall_cycles=%0d cnm_busy=%0d cnm_compute=%0d cnm_req_wait=%0d cnm_req_wait_lane_cycles=%0d cnm_rsp_wait=%0d cnm_writeback=%0d cnm_other=%0d cnm_rsp_wait_lane_cycles=%0d cnm_writeback_stall_cycles=%0d request_collision_cycles=%0d matrix_read_accepts=%0d cnm_read_words=%0d matrix_line_writes=%0d cnm_scalar_writes=%0d matrix_read_bytes=%0d cnm_read_bytes=%0d matrix_write_bytes=%0d cnm_write_bytes=%0d outstanding_highwater=%0d matrix_response_cycles=%0d cnm_response_cycles=%0d cycles_closed=1 golden=bit-exact response_alias_seen=%0d",
+            $display("MATRIX_CNM_PERF_PROFILE_PASS ai_seed=%0d window_cycles=%0d engine_overlap_cycles=%0d matrix_busy=%0d matrix_mac=%0d matrix_req_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d matrix_rsp_wait_event_cycles=%0d matrix_writeback_stall_cycles=%0d cnm_busy=%0d cnm_compute=%0d cnm_req_wait=%0d cnm_req_wait_lane_cycles=%0d cnm_rsp_wait=%0d cnm_writeback=%0d cnm_other=%0d cnm_rsp_wait_lane_cycles=%0d cnm_writeback_stall_cycles=%0d request_collision_cycles=%0d matrix_read_accepts=%0d cnm_read_words=%0d matrix_line_writes=%0d cnm_scalar_writes=%0d matrix_read_bytes=%0d cnm_read_bytes=%0d matrix_write_bytes=%0d cnm_write_bytes=%0d outstanding_highwater=%0d matrix_response_cycles=%0d cnm_response_cycles=%0d cycles_closed=1 golden=bit-exact response_alias_seen=%0d",
                      profile_ai_seed, matrix_cnm_profile_window_cycles,
+                     matrix_cnm_engine_overlap_cycles,
                      matrix_cnm_matrix_busy_cycles, matrix_cnm_matrix_mac_cycles,
                      matrix_cnm_matrix_req_wait_cycles, matrix_cnm_matrix_rsp_wait_cycles,
                      matrix_cnm_matrix_writeback_cycles, matrix_cnm_matrix_other_cycles,
@@ -4278,22 +4290,22 @@ module tb_ai_accel_smoke;
                      matrix_cnm_response_alias_seen);
             expect_completion(32'h7d80, 16'h0620, 4'h1, 4'h0, 32'd96, 32'd16,
                               "parallel CNM GEMV completion");
-            expect_completion(32'h7d90, 16'h0621, 4'h1, 4'h0, 32'd1, 32'd16,
+            expect_completion(32'h7d90, 16'h0621, 4'h1, 4'h0, 32'd64, 32'd256,
                               "parallel Matrix GEMM completion");
-            expect_read(SPAD_BASE + 32'h3400, 32'd96,
+            expect_read(SPAD_BASE + 32'h12000, 32'd96,
                         "parallel CNM GEMV row0");
-            expect_read(SPAD_BASE + 32'h343c, 32'd96,
+            expect_read(SPAD_BASE + 32'h1203c, 32'd96,
                         "parallel CNM GEMV row15");
-            expect_read(SPAD_BASE + 32'h4a00, 32'd1,
+            expect_read(SPAD_BASE + 32'h13800, 32'd64,
                         "parallel Matrix GEMM row0 col0");
-            expect_read(SPAD_BASE + 32'h4a0c, 32'd4,
-                        "parallel Matrix GEMM row0 col3");
-            expect_read(SPAD_BASE + 32'h4a10, 32'd5,
-                        "parallel Matrix GEMM row1 col0");
-            expect_read(SPAD_BASE + 32'h4a3c, 32'd1,
-                        "parallel Matrix GEMM row3 col3");
-            if (matrix_line_write_count != 4) begin
-                $display("%0t ERROR: parallel Matrix GEMM line writes=%0d expected=4",
+            expect_read(SPAD_BASE + 32'h1383c, 32'd64,
+                        "parallel Matrix GEMM row0 col15");
+            expect_read(SPAD_BASE + 32'h13900, 32'd64,
+                        "parallel Matrix GEMM row4 col0");
+            expect_read(SPAD_BASE + 32'h13bfc, 32'd64,
+                        "parallel Matrix GEMM row15 col15");
+            if (matrix_line_write_count != 64) begin
+                $display("%0t ERROR: parallel Matrix GEMM line writes=%0d expected=64",
                          $time, matrix_line_write_count);
                 errors = errors + 1;
             end
