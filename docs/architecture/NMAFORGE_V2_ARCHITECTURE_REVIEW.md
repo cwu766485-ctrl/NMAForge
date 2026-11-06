@@ -3,10 +3,10 @@
 **Review date:** 2026-11-06
 **R250 baseline:** `main` `3041355528dffe856e2d5384027c6ee5df5d1b42`  
 **Review starting commit:** `eb158880d11bf7f8baf13ece4a888107877356fd`  
-**Current reviewed code/test candidate:** `feature/npu-architecture-v2` `4df2efeefafa49f6832af9bc7fa8a71005b28fa9`
-**Candidate tree:** `71a655d67ff82de6ecab8fadeb10864cb4f95006`
-**Published branch tip before the current 0x53 assertion update:** `9fabb8dd343683830e0cf3f095a2eab8da2cccac` (tree `fb0489ee9b19e48c9fc3eb4af6c662c111455b14`).
-**Latest verification-only candidate:** `4df2efeefafa49f6832af9bc7fa8a71005b28fa9` (tree `71a655d67ff82de6ecab8fadeb10864cb4f95006`); product RTL is unchanged.
+**Latest fixed test source SHA:** `2999e03252c79aed66116b753b64ee7e389b9a56` (tree `65d56c5d6dd345effde6fdfdf70dad59f135a279`).
+**Current report branch HEAD before this review update:** `7ee16a089b4135d95a57a81c0239214b031fba6b` (tree `3ac2f31a0fcbbb5fa5cd13f3f9ed39a87c3ed3c0`); report-only commits follow the tested source SHA.
+**Published feature branch tip at this audit:** `19f9575f3579869f27d72f2dd17fa980840b6499` (same tree `3ac2f31a0fcbbb5fa5cd13f3f9ed39a87c3ed3c0`).
+**Product RTL SHA:** `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`; no RTL change is present in the fixed test source or report-only commits.
 
 ## Executive disposition
 
@@ -20,6 +20,26 @@ Golden-checked VCS evidence.
 This is a **bounded v2 functional/performance candidate**, not a v1.0 Compute
 Cluster sign-off, full v2 verification closure, ASIC sign-off, or a TinyNPU
 performance win. Keep the overall Compute Cluster disposition at **HOLD**.
+
+### Latest fixed-source verification addendum — 2026-11-06
+
+At fixed test source SHA `2999e03252c79aed66116b753b64ee7e389b9a56`, VCS
+`V-2023.12-SP1_Full64` ran the real seven-engine Cluster UVM regression on
+Seeds 20261106/07/08, the Matrix 0x52/0x53 focused campaigns on the same
+Seeds, and the descriptor validator boundary suite. Cluster UVM passed all
+seven engine-pair overlap bins (21/21), selected parity/protection/reset
+crosses, and memory/response ownership checks. The Matrix campaigns passed
+the six named GEMV shapes and selected opcode fault/handshake/tile-forward
+bins with independent Golden checks. Descriptor boundary validation passed
+43/43 accepts and 26/26 rejects. Run commands, archive hashes, URG results,
+and scope limits are in the [v2 DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+These replays strengthen the named test evidence but do not close the full
+REQ-V2 RTM. Partial WSTRB was not exercised (the Cluster scoreboard observed
+full WSTRB only); several code-coverage and assertion bins remain unhit;
+external-fabric response behavior, complete fault × phase × reset coverage,
+and all-checker mutation mapping remain open. No test result is transferred
+to a different SHA, and no product RTL changed.
 
 ### Latest v2 verification-only update — 2026-11-06
 
@@ -213,12 +233,17 @@ ablation](../benchmark/NMAFORGE_V2_GEMV_CACHE_PREFETCH_ABLATION.md).
   dominant tested GEMV improvement; next-K prefetch provides smaller,
   workload-dependent gains. A new bank-aware issue scheduler has not been
   justified by a controlled bank-conflict experiment and remains unimplemented.
-- `0x52` still needs broader M/N/K tails, address alias/range/fault/reset and
-  backpressure coverage tied to the current candidate; operand immutability
-  under concurrent engines must be specified and checked.
-- `0x53` still needs held-response, parity/protection, broader Abort/Reset,
-  repeated consumers, and cross-engine coherence coverage. Its 512 B local
-  storage has no current-candidate DC area/Fmax/power result.
+- `0x52` now has six named shapes, descriptor accept/reject boundaries,
+  selected request backpressure, and selected fault recovery at the fixed
+  source SHA. Remaining: broader legal N/K tail combinations, runtime alias
+  execution/sentinel checks, all-phase fault/reset crosses, and concurrent
+  engine response ownership tied directly to opcode requests.
+- `0x53` now has selected tag hit/miss, Bank Flip, repeated-consumer fallback,
+  reset epoch, parity/protection recovery, held line-write, and three runtime
+  assertions. Remaining: arbitrary held-response timing, Completion fault
+  injection, broader cross-engine coherence and complete reset/fault phase
+  coverage. Its 512 B local storage has no current-candidate DC
+  area/Fmax/power result.
 - VCS functional Golden checks are not coverage closure. A merged current-SHA
   requirement RTM, functional/code coverage disposition, non-vacuity audit,
   and mutation report for every new checker are not complete.
@@ -240,9 +265,11 @@ ablation](../benchmark/NMAFORGE_V2_GEMV_CACHE_PREFETCH_ABLATION.md).
 
 Continue v2 on this isolated feature branch with reproducible benchmark and
 verification increments. Preserve R250 `main` untouched. The next useful
-closure is a current-SHA v2 RTM/fault matrix and controlled Top-level
-memory-contention experiment, followed by independent DC/PPA readiness when
-the licensed libraries and constraints are available.
+closure is the remaining fixed-SHA v2 RTM/fault matrix, runtime alias and
+response-ownership checks, and disposition of unhit legal coverage/assertion
+bins. The existing Top-level contention result is useful baseline evidence,
+but no alternate scheduler is justified. Proceed to later model and PPA work
+only after Phase 1 closure or a formally reviewed scope disposition.
 
 ## Follow-up exact-candidate audit and replay — 2026-11-05
 
