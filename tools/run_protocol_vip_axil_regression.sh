@@ -27,7 +27,6 @@ done
 
 mkdir -p "${out_dir}"
 echo "NMAForge AXI4-Lite VIP CSR regression"
-echo "NMAForge: $(git -C "${repo_root}" rev-parse --short HEAD)"
 echo "VIP:      $(git -C "${vip_root}" rev-parse --short HEAD)"
 echo "Output:   ${out_dir}"
 echo "Seeds:    ${seed_list[*]}"

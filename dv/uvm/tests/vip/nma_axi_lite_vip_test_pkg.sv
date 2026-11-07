@@ -4,6 +4,7 @@
 package nma_axi_lite_vip_test_pkg;
   import uvm_pkg::*;
   import tvip_axi_pkg::*;
+  import tvip_axi_types_pkg::*;
   `include "uvm_macros.svh"
 
   class nma_axi_lite_csr_vip_test extends uvm_test;
