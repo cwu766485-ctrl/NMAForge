@@ -25,7 +25,9 @@ Run IDs and retained external evidence:
 | Run | Configuration | Result directory |
 |---|---|---|
 | `R7-ARRAY-8-medium-4.0` | 8×8 diagnostic Array, medium mapping | `/tmp/nmaforge_round7_synth_a2/array_8_medium_4p0ns` |
-| `R7-ai_tensor_matrix_array-16-medium-4.0` | 16×16 Array, medium mapping | `/tmp/nmaforge_round7_synth_a3/array_16_medium_4p0ns` |
+| `R7-ARRAY-16-medium-4.0` | 16×16 Array, medium mapping | `/tmp/nmaforge_round7_synth_a3/array_16_medium_4p0ns` |
+| `R7-ai_tensor_matrix_core-16-medium-4.0` | 16×16 Matrix Core, invalid-condition attempt | `/tmp/nmaforge_round7_core_a2/ai_tensor_matrix_core_16_medium_4p0ns` |
+| Correct-corner 8×8 configuration probe | license refused before DC analysis | `/tmp/nmaforge_round7_array_cornercheck/ai_tensor_matrix_array_8_medium_4p0ns` |
 
 Tool: Synopsys Design Compiler V-2023.12-SP1. The mapped run used the licensed local 28 nm RVT TT / 0.9 V / 25 °C setup, ideal clock network, segmented wire-load mode, no routed parasitics, and no SRAM macros. The runner applies 100 ps setup and 20 ps hold clock uncertainty, 50 ps clock transition, 250/50 ps input/output delay budgets, 20 fF output load, and max-transition/fanout constraints. `compile -map_effort medium` maps once at a 4.0 ns target; the saved mapped netlist is then re-evaluated at 4.0, 3.333333, 2.500000, and 2.222222 ns. The latter are post-map constraint sweeps, not separately optimized clock-target compiles.
 
@@ -54,7 +56,8 @@ The 8×8 diagnostic mapped at 31,809.330 library area units with 35,098 leaf cel
 - These are mapped logic metrics for the standalone Matrix Array only; they exclude Matrix Controller, Scratchpad, SPAD arbitration, clock-tree synthesis, placement, routing, extracted RC, and SRAM macros.
 - Library area units are reported as emitted by DC; no mm² conversion is asserted.
 - The vectorless power report is an estimate without workload SAIF and without routed parasitics.
-- The current Matrix Core mapping is a separate active run. Its result will be recorded here only after the run exits and the netlist/reports are inspected.
+- The Matrix Core has no accepted mapped result. The first attempt reached the 3,600 s wall limit (interactive status 124, reported peak RSS 7.65 GB), but the then-current timeout wrapper retained only a shell command-not-found message and no usable DC report. A later run used the wrong operating condition `tt0p9v25c`; the actual TT name in the `.db` is `tt0p9v0p9v25c`. DC reported `OPT-101` (target library does not contain an inverter); `area_hier.rpt` shows 0 area, gtech-only references, and unmapped logic. This emitted netlist is invalid and is not area/timing evidence.
+- The runner was corrected to validate the operating-condition object, record runner/Tcl hashes, and reject zero-area/unmapped outputs. A short 8×8 correct-corner probe was refused before DC analysis with `Fatal: Design Compiler is not enabled` (exit 255), while another DC job was active and left untouched. A correct-corner Core rerun is therefore NOT_RUN / license-blocked; the Matrix Core remains PARTIAL.
 - Current 400 MHz result: **FAIL for the standalone Array under the stated pre-layout timing model**. A pipeline change would alter observable result timing/handshake and needs a scoped architecture change plus Golden/handshake regression; no RTL change is included in this audit.
 
 ## Reproduction

@@ -1,5 +1,40 @@
 # NMAForge execution frontier
 
+Round 7 is now at its bounded terminal disposition: the standalone 16×16
+Array mapping and CNN three-mode experiment are recorded; Matrix Core mapping,
+full Cluster/macro mapping, 400 MHz closure and larger-model GEMV evidence
+remain open or blocked as stated below and in the Round 7 decision report.
+No follow-on RTL or verification campaign is part of this round.
+
+## Round 7 — bounded synthesis and model-performance work
+
+Round 7 is limited to the two requested lines: real DC mapping/timing and
+model-level evidence for Shape-Adaptive GEMV/Fused Dataflow. No full DV
+sign-off or new engine is being started. The Round 7 baseline is
+`7b6cd8206dfffae3f5e371c83c501d0edb3664ea`; TinyNPU remains pinned to
+`8216c22b762011aa20c05fc2768423fd12dda59d`; product RTL remains
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
+
+Completed in this round: the three-mode mini-CNN and trained ten-class CNN
+replays pass independent Goldens; the trained model passes 396/396 samples
+at 384/396 accuracy. Fused-native reduces per-image CMDQ compute cycles
+3,193→2,712; Linear-Row removes the separate 1,080-cycle testbench-modeled
+layout stage. The standalone 16×16 Matrix Array is mapped at TT/0.9 V/25 °C:
+124,704.412 area units, 137,928 cells, 3.39 ns critical path. It narrowly
+meets 4.0 ns and fails the 3.333 ns and 2.5 ns post-map timing checks.
+
+The Matrix Core did not yield a valid mapped result: the first bounded run
+timed out with the old wrapper-log defect; a second run had an invalid
+operating-condition name and zero-area gtech-only output; the corrected
+corner probe was license-refused before analysis. The standalone Array result
+remains valid. The old 512 KiB full-top synthesis is not source-bound or
+independently reproducible. No compatible current SRAM macro adapter or full
+Compute Cluster PPA exists. See
+[`Round 7 decision`](../../benchmark/NMAFORGE_V2_ROUND7_SYNTHESIS_AND_RESEARCH_DECISION.md)
+and [`historical/current synthesis audit`](../../verification/OLD_VS_NEW_SYNTHESIS_AUDIT.md).
+
+---
+
 ## Round 6 terminal disposition — 2026-11-07
 
 Round 6 fixed work is complete and stops here. Transformer `0x52` GEMV packing

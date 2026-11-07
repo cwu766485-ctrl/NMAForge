@@ -1,5 +1,50 @@
 # NMAForge v2 Performance Comparison
 
+## Round 7 — CNN fused-dataflow ablation and system boundary — 2026-11-07
+
+The three CNN paths were rerun with the same trained weights, input set,
+Independent Golden, VCS Top/CMDQ testbench and seed `20261107`. Testbench
+SHA is `7e64344fbb9bdaed0fd4ce14e8cddb19231827f7`; runner SHA is
+`30ef28b973343acd25ebd62d4df8576c84e8ffb1`; product RTL remains
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
+
+| Workload | Path | Compute cycles | Host-layout phase | Reported phase interval | Read / write bytes (compute + layout) | Golden |
+|---|---|---:|---:|---:|---:|---|
+| `conv1x_mini.onnx`, 4 outputs | Legacy | 1,985 | 1,080 | 3,065 | 3,504 / 2,176 | PASS |
+| same | Fused requant, native Matrix-A layout | 1,504 | 1,080 | 2,584 | 2,928 / 1,600 | PASS |
+| same | Fused requant + Linear-Row | 1,504 | 0 | 1,504 | 2,784 / 1,456 | PASS |
+| Trained 10-class Digits CNN, per image | Legacy | 3,193 | 1,080 | 4,273 | 6,192 / 2,496 | 396/396 exact; 384 correct |
+| same | Fused requant, native Matrix-A layout | 2,712 | 1,080 | 3,792 | 5,616 / 1,920 | 396/396 exact; 384 correct |
+| same | Fused requant + Linear-Row | 2,712 | 0 | 2,712 | 5,472 / 1,776 | 396/396 exact; 384 correct |
+
+The 10-class classifier accuracy remains 384/396 = 96.97% in every path.
+Legacy→fused-native reduces compute cycles by 24.2% for the mini model and
+15.1% for the trained model. Because the 1,080-cycle layout phase remains,
+their phase-interval reductions are 15.7% and 11.3%. Fused-native→Linear-Row
+removes that emulated phase: the phase interval falls another 41.8% (mini) and
+28.5% (trained). Combined Legacy→Linear-Row interval ratios are 2.038× and
+1.576× respectively. These intervals exclude model preload, descriptor
+programming, final output read and other host orchestration; host-layout
+cycles are testbench-modeled AXI operations, not measured host CPU cycles.
+They are same-system ablations and must not be compared as full-system
+TinyNPU speedups.
+
+The current pinned TinyNPU `conv1x_mini` run still reports 4,781 graph cycles,
+whose endpoint includes graph dispatch and its DMA/SRAM shim. No common
+start/stop boundary was established against the NMAForge CMDQ interval, so
+there is no cross-system ratio. The fixed 3-GEMM/4-GEMV TinyNPU matrix is also
+retained with direct-array measurements separate from the serialized memory
+estimate; the estimate is not TinyNPU memory RTL. See the [Round 7 decision](NMAFORGE_V2_ROUND7_SYNTHESIS_AND_RESEARCH_DECISION.md)
+and machine-readable [three-mode CNN CSV](../../benchmark/v2_round7_cnn_fused_modes_20261107.csv).
+
+For Innovation 1, the fixed H=4 single-token Transformer Decode stays at
+5,715 cycles for both default GEMM and `0x52` Q/K/V mapping. The batched
+M=8/16 Cache×Prefetch ablation remains useful command-level evidence, but it
+does not demonstrate Transformer-level acceleration. Round 7 adds no larger
+Transformer measurement.
+
+---
+
 ## Round 6 current comparison — 2026-11-07
 
 This section supersedes earlier Transformer `0x52` failure status for the

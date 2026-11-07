@@ -1,5 +1,36 @@
 # NMAForge v2 Architecture Review
 
+## Round 7 update — 2026-11-07
+
+Round 7 preserves the existing two innovations and changes no product RTL.
+The current product RTL baseline remains
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`. The fixed `0x52` GEMV and `0x53`
+fused output implementations remain in the existing Matrix Core; no second
+16×16 array or additional engine was added.
+
+The trained ten-class CNN now has a three-mode, 396-sample Top replay:
+Legacy, fused requant with native Matrix-A output layout, and fused requant
+with Linear-Row output. All intermediate/output Goldens pass in all modes;
+accuracy is unchanged at 384/396. Compute cycles are 3,193 / 2,712 / 2,712
+per image, and the separate host-layout phase is 1,080 / 1,080 / 0. This
+isolates the fused compute benefit from the layout handoff benefit under the
+same testbench boundary. Detailed data and hashes are in the [Round 7 model
+report](../benchmark/NMAFORGE_V2_MODEL_BENCHMARK.md) and [CSV](../../benchmark/v2_round7_cnn_fused_modes_20261107.csv).
+
+DC completed a valid standalone 16×16 Matrix Array mapping, but its worst
+mapped setup path is 3.39 ns: the one 4.0 ns/250 MHz map meets by only
+0.01 ns, while post-map 3.333 ns/300 MHz and 2.5 ns/400 MHz evaluations fail.
+The Matrix Core mapping did not produce an accepted mapped result: the first
+attempt hit its bounded timeout with an old wrapper-log defect, the next used
+an invalid library condition and generated only zero-area gtech logic, and a
+corrected-corner probe was refused by the license manager before analysis.
+Full Compute Cluster mapping also needs a four-bank SRAM macro adapter proven
+equivalent to behavioral SPAD. Therefore the architecture remains
+`RESEARCH_BASELINE_PARTIAL`, not 400 MHz closed or ASIC ready. The full Round 7
+evidence/disposition is in the [decision report](../benchmark/NMAFORGE_V2_ROUND7_SYNTHESIS_AND_RESEARCH_DECISION.md).
+
+---
+
 ## Round 6 status update — 2026-11-07
 
 The opt-in Transformer GEMV Mapper issue is fixed in software commit
