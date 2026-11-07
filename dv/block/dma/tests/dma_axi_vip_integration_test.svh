@@ -52,6 +52,26 @@ class dma_axi_vip_readback_sequence extends uvm_sequence #(dma_cmd_item);
     endtask
 endclass
 
+// Test-only response policy: delay write ID 8 longer than other write IDs so
+// the VIP can produce a deterministic, legal cross-ID B reorder. The standard
+// reactive slave sequence, memory model, driver, checker and scoreboard remain
+// in use; only the response-start delay policy is specialized for this test.
+class dma_axi_vip_reorder_slave_sequence extends tvip_axi_slave_default_sequence;
+    `uvm_object_utils(dma_axi_vip_reorder_slave_sequence)
+
+    function new(string name = "dma_axi_vip_reorder_slave_sequence");
+        super.new(name);
+    endfunction
+
+    protected virtual function int get_response_start_delay(tvip_axi_slave_item item);
+        if (item.is_write()) begin
+            if (item.id == 4'd8) return 200;
+            return 100;
+        end
+        return -1;
+    endfunction
+endclass
+
 class dma_axi_vip_integration_test extends dma_block_base_test;
     virtual ai_dma_axi_if dma_vif;
     tvip_axi_vif vip_vif;
@@ -139,7 +159,7 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
             vip_env.slave_agents[0].sequencer,
             "run_phase",
             "default_sequence",
-            tvip_axi_slave_default_sequence::type_id::get()
+            dma_axi_vip_reorder_slave_sequence::type_id::get()
         );
     endfunction
 
