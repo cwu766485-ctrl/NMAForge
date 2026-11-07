@@ -1,0 +1,3 @@
+run_id,source_commit,seed,scenario,tile_count,shape,pipe_total_cycles,dma_active_cycles,matrix_compute_active_cycles,overlap_cycles,stall_cycles,golden_status,observed_issue,evidence_retained,disposition
+R8-A2-VDOT-PIPE-S20261107,e0c210685cb5eac463308c76d5ce22e03b6add72,20261107,existing ping-pong tile pipeline VDOT,3,1x1x4,,,,37,,PASS,"three outputs 10/8/12 and completed=3",yes,"overlap evidence is for VDOT only; not Matrix GEMM"
+R8-MATRIX-DMA-PROBE-S20261107,e0c210685cb5eac463308c76d5ce22e03b6add72,20261107,Matrix GEMM in ping-pong tile pipeline,3,4x4x4,145,109,60,31,7,FAIL,"first tile output words 12..15 were X at AXI destination; SPAD last row read 0xffffffff",no,"reject overlap performance result; bounded probe not retained as reproducible test"

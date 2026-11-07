@@ -145,6 +145,26 @@ Cache/Prefetch ablation, fused-model cycles, and capacity results are in the
 its CSV/JSON records. The TinyNPU reference is
 `8216c22b762011aa20c05fc2768423fd12dda59d`. It provides direct array cycles
 for the cited comparison; an estimated common-memory endpoint must not be
-reported as a TinyNPU controller measurement. The current Transformer fixture
-uses hand-authored weights, not trained model weights. Physical PPA and ASIC
-readiness are not established.
+reported as a TinyNPU controller measurement. The default checked-in
+Transformer fixture uses hand-authored weights; the trained H=4 toy-task flow
+can export weights for a Top replay, but this is not pretrained language-model
+inference. Physical PPA and ASIC readiness are not established.
+
+## 7. Round 8 performance reading example
+
+The new Top profiler runs the trained H=4 toy Transformer through the same
+production CMDQ and separates Prefill from one-token Decode. The output is in
+[`Round 8 phase profile`](../../benchmark/v2_round8_transformer_phase_profile_20261107.csv)
+and the 86 completion intervals are in the
+[`per-command profile`](../../benchmark/v2_round8_transformer_command_profile_20261107.csv).
+The Decode interval is 5,715 cycles: 4,537 SFU-busy, 958 no-engine
+control/dispatch remainder, and 32 Matrix MAC-active cycles, with the
+remaining exclusive Matrix/KV categories closing the count. This shows why
+changing GEMM to GEMV at M=1 is unlikely to move this workload without
+reducing SFU or command/packing costs. It does not report PE-lane utilization.
+
+To reproduce the profile, use the `ai_transformer_trained` command in the
+[Round 8 decision report](../benchmark/NMAFORGE_V2_ARCHITECTURE_UPGRADE_DECISION.md).
+The larger CNN, higher-dimensional two-head Transformer, and a Matrix-GEMM
+DMA-overlap Golden remain open; the failed exploratory Matrix overlap is not
+counted as a passing architectural result.
