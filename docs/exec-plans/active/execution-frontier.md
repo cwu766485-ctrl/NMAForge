@@ -1,5 +1,27 @@
 # NMAForge execution frontier
 
+## Round 6 terminal disposition — 2026-11-07
+
+Round 6 fixed work is complete and stops here. Transformer `0x52` GEMV packing
+was corrected in `e100aa2af78ab7a95febc17f265f389f996a8404`; asymmetric
+Mapper differential and both 86-descriptor Top mapping modes pass. The H=4
+single-token Decode remains 5,715 cycles for GEMM and GEMV, so this does not
+show a model-level speedup. The fixed GEMV Cache × Prefetch ablation and same
+`conv1x_mini.onnx` Golden pair also completed.
+
+TinyNPU remains pinned at
+`8216c22b762011aa20c05fc2768423fd12dda59d`. Raw array measurements and the
+modeled common-memory endpoint are in the Round 6 CSV/JSON; no full-system
+TinyNPU speedup is claimed because measurement boundaries differ. Matrix Core
+300 MHz synthesis timed out in mapping before a netlist/report; 400 MHz and
+Compute Cluster synthesis are not run. 128 KiB SRAM area is a macro-geometry
+estimate only and the available single-port macro is not timing-corner or
+port-semantics compatible with the current behavioral SPAD.
+
+Final state: `RESEARCH_BASELINE_PARTIAL`. The Round 6 report is
+[`NMAFORGE_V2_ROUND6_DECISION.md`](../../benchmark/NMAFORGE_V2_ROUND6_DECISION.md).
+Do not automatically start Round 7 or another validation/optimization phase.
+
 ## Round 5 terminal disposition — 2026-11-07
 
 This fixed comparison round is complete and **stops here**. Reviewed base

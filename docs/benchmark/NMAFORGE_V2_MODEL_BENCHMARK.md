@@ -1,5 +1,24 @@
 # NMAForge v2 Model Benchmark
 
+## Round 6 model refresh — 2026-11-07
+
+The fixed `conv1x_mini.onnx` workload was rerun at NMAForge source/test SHA
+`54033ffd3a28378e867947e99598e79d2060fb9d` and TinyNPU SHA
+`8216c22b762011aa20c05fc2768423fd12dda59d`. Model/input hashes and exact
+Golden status are unchanged. NMAForge Legacy measured 1,985 CMDQ cycles plus
+1,080 testbench-emulated host-layout cycles; `0x53` Linear-Row measured 1,504
+CMDQ cycles and no layout stage. TinyNPU measured 4,781 ONNX graph cycles.
+The graph and CMDQ windows differ, so no TinyNPU speedup is computed.
+
+The NMAForge linear-row path was separately rerun by adding
+`+AI_TINYNPU_CNN_LINEARIZED` to the existing `nma_cnn/simv` command. It passed
+all intermediate and final Golden checks. Machine data is in
+[`Round 6 CNN path CSV`](../../benchmark/v2_round6_cnn_legacy_linearized_20261107.csv)
+and [`TinyNPU CNN CSV`](../../benchmark/tinynpu/cnn_results.csv). The Round 6
+fixed-weight H=4 Transformer GEMV run also passes all 86 descriptors, but has
+the same 5,715 Decode cycles as default GEMM; see the
+[`Round 6 decision`](NMAFORGE_V2_ROUND6_DECISION.md).
+
 ## Round 5 current-source model evidence — 2026-11-07
 
 All new measurements use source/test SHA

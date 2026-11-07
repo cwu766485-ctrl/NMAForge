@@ -1,5 +1,40 @@
 # NMAForge v2 ASIC Readiness
 
+## Round 6 synthesis result — 2026-11-07
+
+The private environment has Design Compiler `V-2023.12-SP1` and a usable
+TSMC28 HPC+ RVT standard-cell `.db` at SSG 0.72 V / 125°C. The checked-in
+Round 5 script was corrected to skip redundant pre-map QoR/check reports;
+those reports have zero mapped area and full pre-map checking duplicated the
+earlier `check_design -summary`.
+
+The Matrix Core 300 MHz run used a 3.333333 ns clock, 100 ps uncertainty,
+50 ps clock/input transition, 250 ps max and 50 ps min input/output delays,
+20 fF output load, 0.20 ns max transition, and no false-path or multicycle
+exceptions. DC elaborated the 16×16 `ai_tensor_matrix_core` and entered
+`compile -map_effort high`, but the 240 s run timed out while mapping
+`ai_tensor_matrix_array_ARRAY_SIZE16_RESULT_INDEX_WIDTH8`. No mapped Verilog,
+cell area, WNS/TNS, critical path, or power report was produced. This is a
+**bounded mapping timeout**, not a license or library failure. Matrix Core
+300 MHz is `NOT_RUN/INCOMPLETE`; Matrix 400 MHz and Compute Cluster 400 MHz
+were not started because the first mapped baseline did not finish. No
+450 MHz result exists.
+
+The full RVT standard-cell library is at 0.72 V; the available 4096×32
+single-port SRAM macro views found here are 0.81 V / 0.9 V corners. The macro
+LEF geometry remains 35,239.86555 µm² each: a capacity-only 128 KiB estimate
+is 8 macros / 0.281919 mm², while 512 KiB is 32 macros / 1.127676 mm². These
+are geometry sums only. They cannot be combined with the 0.72 V standard-cell
+timing result, and the candidate macro is single-port while the behavioral
+SPAD exposes independent host and scheduler ports. A preserving adapter would
+need per-bank arbitration/time-multiplexing, response holding and latency
+accounting, byte-write handling, and parity storage. No adapter is implemented
+or proven equivalent. Full macro PPA and 400 MHz feasibility remain open.
+
+Run log: `/tmp/nmaforge_r6_dc_matrix_300_full/console.log`. The exact flow
+configuration and disposition are in the
+[`Round 6 decision`](../benchmark/NMAFORGE_V2_ROUND6_DECISION.md).
+
 ## Round 5 synthesis and SRAM catalog update — 2026-11-07
 
 The private environment does contain the TSMC28 HPC+ RV standard-cell

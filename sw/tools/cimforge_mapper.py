@@ -368,15 +368,17 @@ def build_workload(
                    k_or_length=k, flags=flags, aux0=1)
 
     def gemv_rhs(name: str, matrix: list[list[int]]) -> Tensor:
-        """Pack W[N,K] as the 0x52 dense K-major, N-padded operand."""
-        n_dim = len(matrix)
-        k_dim = len(matrix[0]) if matrix else 0
+        """Pack W[K,N] as 0x52 K-major rows padded across N."""
+        k_dim = len(matrix)
+        n_dim = len(matrix[0]) if matrix else 0
         if not (1 <= n_dim <= 16 and k_dim > 0 and
-                all(len(row) == k_dim for row in matrix)):
-            raise ValueError(f"{name}: opcode 0x52 requires N=1..16 and rectangular K")
+                all(len(row) == n_dim for row in matrix)):
+            raise ValueError(
+                f"{name}: opcode 0x52 requires K>0, N=1..16 and rectangular W[K,N]"
+            )
         words: list[int] = []
         for k_index in range(k_dim):
-            row = [matrix[n_index][k_index] for n_index in range(n_dim)]
+            row = list(matrix[k_index])
             row.extend([0] * (16 - n_dim))
             words.extend(pack_i8(row[offset:offset + 4])
                          for offset in range(0, 16, 4))

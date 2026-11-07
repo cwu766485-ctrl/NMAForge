@@ -90,8 +90,9 @@ set_max_fanout 16 [current_design]
 set_dont_touch_network [get_ports $clock_name]
 set_switching_activity -static_probability 0.5 -toggle_rate 0.1 [all_inputs]
 
-redirect -file [file join $out_dir precompile_qor.rpt] {report_qor}
-redirect -file [file join $out_dir precompile_check.rpt] {check_design}
+# `check_design -summary` already ran after linking above. Pre-mapping QoR
+# reports only zero cell area and can be disproportionately slow on the
+# unflattened 16x16 Matrix Core, so emit QoR/check reports after mapping only.
 
 # Preserve module boundaries to avoid flattening the large shared array into
 # one unbounded mapping problem. DC still maps and times every child design.

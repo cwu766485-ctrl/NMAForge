@@ -10,6 +10,7 @@ from cimforge_mapper import (
     OP_GEMV_KFOLD,
     OP_GEMM_REQUANT_TILE_A,
     build_workload,
+    pack_i8,
     validate_fused_tile_fields,
 )
 
@@ -94,16 +95,47 @@ class TransformerPhaseBoundaryTests(unittest.TestCase):
             self.assertEqual(descriptor.src1 & 0xF, 0)
             self.assertEqual(descriptor.dst & 0x3, 0)
 
-        # First B K-row is [Wq[0,0], Wq[1,0], Wq[2,0], Wq[3,0]],
+        # First B K-row is Wq[K=0, N=0..3],
         # followed by twelve zero output columns to meet the 0x52 contract.
         self.assertEqual(
             gemv_mapper.tensors["decode_wq_gemv"].values[:4],
-            [0x00010001, 0, 0, 0],
+            [0x01000001, 0, 0, 0],
         )
         for tensor_name in ("decode_q_i32", "decode_k_i32", "decode_v_i32"):
             tensor = gemv_mapper.tensors[tensor_name]
             self.assertTrue(tensor.initialized)
             self.assertEqual(tensor.values, [0] * 16)
+
+    def test_asymmetric_gemv_rhs_matches_w_k_n_and_signed_lanes(self):
+        weight = [
+            [1, 2, 3, 4],
+            [-5, -6, -7, -8],
+            [9, 10, 11, 12],
+            [-13, -14, -15, -16],
+        ]
+        weights = {name: weight for name in
+                   ("wq", "wk", "wv", "wo", "wup", "wdown")}
+        model = {
+            "prefill_tokens": [0, 1, 2, 3],
+            "decode_token": 2,
+            "weights": weights,
+        }
+        gemm_mapper, gemm_expected = build_workload(model)
+        gemv_mapper, gemv_expected = build_workload(
+            model, decode_mapping_policy="gemv_qkv"
+        )
+
+        # Each 16-byte physical row is W[k,0..N-1], with zero N padding.
+        expected_words = []
+        for row in weight:
+            expected_words.extend((pack_i8(row), 0, 0, 0))
+        self.assertEqual(
+            gemv_mapper.tensors["decode_wq_gemv"].values, expected_words
+        )
+        self.assertEqual(
+            gemv_expected["decode_q_i32"], gemm_expected["decode_q_i32"]
+        )
+        self.assertEqual(gemv_expected["decode_q_i32"][0], weight[2])
 
     def test_rejects_unknown_decode_mapping_policy(self):
         with self.assertRaises(ValueError):

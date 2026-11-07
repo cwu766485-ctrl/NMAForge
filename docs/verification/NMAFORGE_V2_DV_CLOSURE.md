@@ -1,5 +1,28 @@
 # NMAForge v2 DV Closure Status
 
+## Round 6 focused correction — 2026-11-07
+
+This bounded update fixes the previous opt-in Transformer GEMV Golden failure;
+it is not a full v2 DV sign-off. The root cause was a transpose in
+`sw/tools/cimforge_mapper.py::gemv_rhs`: Mapper packed `W[n][k]` as a
+physical K row, while opcode `0x52` and the Matrix Core require `W[k][n]`.
+The fix only changes Mapper packing; product RTL is unchanged.
+
+An asymmetric signed INT8 differential proves the old packing differs from
+independent GEMM Golden and the corrected packing matches. The Top Transformer
+run then passed all 86 descriptor completions, final Prefill/Decode outputs,
+and K/V cache images under both default `0x30` GEMM and opt-in Q/K/V `0x52`
+GEMV mapping. Seed `20261106`, VCS `V-2023.12-SP1_Full64`; Decode remains
+5,715 cycles for both. Mapper unit tests passed 7/7. Machine record:
+[`Transformer mapping CSV`](../../benchmark/v2_round6_transformer_decode_mapping_20261106.csv);
+raw run logs are `/tmp/nmaforge_r6_gemm_baseline.log` and
+`/tmp/nmaforge_r6_gemv.log`.
+
+The separate four-way Cache × Prefetch matrix passed its bit-exact directed
+cases. This does not close broad v2 requirement coverage, all fault/phase
+crosses, formal, mutation, CDC/RDC, or complete UVM. Remaining findings and
+scope are in the [`Round 6 decision`](../benchmark/NMAFORGE_V2_ROUND6_DECISION.md).
+
 ## Focused Research Round 3 functional evidence — 2026-11-06
 
 This round intentionally did **not** pursue full DV closure or 100% coverage.
