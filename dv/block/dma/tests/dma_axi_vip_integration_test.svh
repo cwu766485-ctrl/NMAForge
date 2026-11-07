@@ -166,25 +166,34 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
     endfunction
 
     task run_command_case(uvm_sequence_base seq, string case_name);
+        int unsigned errors_before;
+
+        errors_before = uvm_report_server::get_server().get_severity_count(UVM_ERROR);
         seq.start(env.cmd_sqr);
         repeat (4) @(posedge dma_vif.clk);
         env.sb.check_complete();
         scenario_count++;
-        `uvm_info("DMA_AXI_VIP_CASE_PASS", $sformatf("case=%s index=%0d",
-                  case_name, scenario_count), UVM_NONE)
+        if (uvm_report_server::get_server().get_severity_count(UVM_ERROR) == errors_before)
+            `uvm_info("DMA_AXI_VIP_CASE_PASS", $sformatf("case=%s index=%0d",
+                      case_name, scenario_count), UVM_NONE)
+        else
+            `uvm_info("DMA_AXI_VIP_CASE_FAIL", $sformatf("case=%s index=%0d",
+                      case_name, scenario_count), UVM_NONE)
     endtask
 
     task run_write_concurrency_case(uvm_sequence_base seq, string case_name,
-                                    int unsigned expected_aw_before_first_b);
+                                    int unsigned expected_aw_before_first_b,
+                                    output bit out_of_order_observed);
         bit sequence_done;
         bit first_b_seen;
-        bit out_of_order_seen;
+        bit aw_fire;
+        bit b_fire;
         int unsigned accepted_aw;
         tvip_axi_id accepted_aw_ids[$];
         tvip_axi_id returned_b_ids[$];
         sequence_done = 0;
         first_b_seen = 0;
-        out_of_order_seen = 0;
+        out_of_order_observed = 0;
         accepted_aw = 0;
         fork
             begin
@@ -194,7 +203,16 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
             begin
                 while (!sequence_done) begin
                     @(posedge dma_vif.clk);
-                    if (vip_vif.bvalid === 1'b1 && vip_vif.bready === 1'b1) begin
+                    // Count both handshakes at this sampling edge before
+                    // evaluating their relation. AW and B may legally fire
+                    // together; checking B first creates a one-cycle race.
+                    aw_fire = (vip_vif.awvalid === 1'b1 && vip_vif.awready === 1'b1);
+                    b_fire = (vip_vif.bvalid === 1'b1 && vip_vif.bready === 1'b1);
+                    if (aw_fire) begin
+                        accepted_aw++;
+                        accepted_aw_ids.push_back(vip_vif.awid);
+                    end
+                    if (b_fire) begin
                         if (!first_b_seen) begin
                             if (accepted_aw < expected_aw_before_first_b)
                                 `uvm_error("DMA_AXI_VIP_WRITE_CONCURRENCY", $sformatf(
@@ -204,42 +222,32 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
                         end
                         returned_b_ids.push_back(vip_vif.bid);
                     end
-                    if (vip_vif.awvalid === 1'b1 && vip_vif.awready === 1'b1) begin
-                        accepted_aw++;
-                        accepted_aw_ids.push_back(vip_vif.awid);
-                    end
                 end
             end
         join
         repeat (4) @(posedge dma_vif.clk);
         env.sb.check_complete();
-        if (accepted_aw < expected_aw_before_first_b)
+        if (!first_b_seen)
+            `uvm_error("DMA_AXI_VIP_WRITE_CONCURRENCY", "write completed without observing a B handshake")
+        if (accepted_aw != expected_aw_before_first_b)
             `uvm_error("DMA_AXI_VIP_WRITE_CONCURRENCY", $sformatf(
-                "accepted AW count=%0d expected at least %0d",
+                "accepted AW count=%0d expected exactly %0d",
                 accepted_aw, expected_aw_before_first_b))
-        if (returned_b_ids.size() < expected_aw_before_first_b ||
-            accepted_aw_ids.size() < expected_aw_before_first_b)
+        if (returned_b_ids.size() != expected_aw_before_first_b ||
+            accepted_aw_ids.size() != expected_aw_before_first_b)
             `uvm_error("DMA_AXI_VIP_WRITE_CONCURRENCY", $sformatf(
-                "captured AW/B IDs=%0d/%0d expected at least %0d",
+                "captured AW/B IDs=%0d/%0d expected exactly %0d",
                 accepted_aw_ids.size(), returned_b_ids.size(),
                 expected_aw_before_first_b))
         else begin
             for (int index = 0; index < expected_aw_before_first_b; index++)
                 if (returned_b_ids[index] != accepted_aw_ids[index])
-                    out_of_order_seen = 1;
-            if (!out_of_order_seen)
-                `uvm_error("DMA_AXI_VIP_WRITE_ORDER", $sformatf(
-                    "B responses followed AW order; expected observed cross-ID reorder, AW=%p B=%p",
-                    accepted_aw_ids, returned_b_ids))
-            else
-                `uvm_info("DMA_AXI_VIP_B_OOO_PASS", $sformatf(
-                    "observed cross-ID B reorder across %0d outstanding writes; AW=%p B=%p",
-                    expected_aw_before_first_b, accepted_aw_ids, returned_b_ids), UVM_NONE)
+                    out_of_order_observed = 1;
+            `uvm_info("DMA_AXI_VIP_WRITE_TRIAL", $sformatf(
+                "case=%s accepted_aw=%0d out_of_order=%0b AW=%p B=%p",
+                case_name, accepted_aw, out_of_order_observed,
+                accepted_aw_ids, returned_b_ids), UVM_LOW)
         end
-        scenario_count++;
-        `uvm_info("DMA_AXI_VIP_CASE_PASS", $sformatf(
-                  "case=%s index=%0d accepted_aw=%0d out_of_order=%0b",
-                  case_name, scenario_count, accepted_aw, out_of_order_seen), UVM_NONE)
     endtask
 
     task set_response_error(bit enable_error);
@@ -276,6 +284,10 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
         tvip_axi_protocol_checker vip_checker;
         int unsigned request_count_before;
         int unsigned read_count_before;
+        int unsigned errors_before_write_trials;
+        int unsigned write_ooo_trials;
+        bit write_ooo_observed;
+        bit write_trial_ooo;
         bit [31:0] sentinel;
 
         phase.raise_objection(this);
@@ -336,8 +348,38 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
         run_command_case(seq, "multi_burst_store");
 
         env.spad_model.preload_source_pattern(32'h1c00, 32);
-        seq = dma_store_four_booo_sequence::type_id::create("store_four_booo_seq");
-        run_write_concurrency_case(seq, "four_outstanding_stores", 4);
+        errors_before_write_trials = uvm_report_server::get_server().get_severity_count(UVM_ERROR);
+        write_ooo_observed = 0;
+        write_ooo_trials = 0;
+        // OUT_OF_ORDER permits legal reordering; it does not force each
+        // individual selection to be non-FIFO. Repeat the directed four-AW
+        // pressure case until cross-ID B reordering is observed or the bounded
+        // trial budget is exhausted.
+        for (int trial = 0; trial < 16 && !write_ooo_observed; trial++) begin
+            seq = dma_store_four_booo_sequence::type_id::create(
+                $sformatf("store_four_booo_seq_%0d", trial));
+            run_write_concurrency_case(seq, "four_outstanding_stores", 4, write_trial_ooo);
+            write_ooo_observed |= write_trial_ooo;
+            write_ooo_trials++;
+            if (uvm_report_server::get_server().get_severity_count(UVM_ERROR) !=
+                errors_before_write_trials)
+                break;
+        end
+        if (!write_ooo_observed)
+            `uvm_error("DMA_AXI_VIP_WRITE_ORDER", $sformatf(
+                "no cross-ID B reorder observed in %0d directed trials", write_ooo_trials))
+        else
+            `uvm_info("DMA_AXI_VIP_B_OOO_PASS", $sformatf(
+                "observed cross-ID B reorder within %0d directed trials", write_ooo_trials), UVM_NONE)
+        scenario_count++;
+        if (uvm_report_server::get_server().get_severity_count(UVM_ERROR) == errors_before_write_trials)
+            `uvm_info("DMA_AXI_VIP_CASE_PASS", $sformatf(
+                "case=four_outstanding_stores index=%0d trials=%0d", scenario_count,
+                write_ooo_trials), UVM_NONE)
+        else
+            `uvm_info("DMA_AXI_VIP_CASE_FAIL", $sformatf(
+                "case=four_outstanding_stores index=%0d trials=%0d", scenario_count,
+                write_ooo_trials), UVM_NONE)
         set_delay_window(vip_cfg.response_start_delay, 3, 4);
 
         env.spad_model.preload_source_pattern(32'hc00, 5);
@@ -443,11 +485,23 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
         if (env.axi_rsp != null)
             `uvm_error("DMA_AXI_VIP_RESPONDER", "Legacy AXI responder must be disabled in VIP integration test")
 
-        `uvm_info("DMA_AXI_VIP_PASS", $sformatf(
-            "DUT=ai_axi128_dma role=active-slave width=64/128/id4 scenarios=%0d requests=%0d reads=%0d writes=%0d positive-negative-corner-matrix=PASS mismatches=%0d outstanding=%0d checker_violations=%0d",
-            scenario_count,
-            vip_sb.request_count, vip_sb.read_count, vip_sb.write_count,
-            vip_sb.mismatch_count, vip_sb.outstanding_count, checker_violation_count()), UVM_NONE)
+        if (uvm_report_server::get_server().get_severity_count(UVM_ERROR) == 0 &&
+            scenario_count == 20 && vip_sb.mismatch_count == 0 &&
+            vip_sb.outstanding_count == 0 && checker_violation_count() == 0) begin
+            `uvm_info("DMA_AXI_VIP_PASS", $sformatf(
+                "DUT=ai_axi128_dma role=active-slave width=64/128/id4 scenarios=%0d requests=%0d reads=%0d writes=%0d positive-negative-corner-matrix=PASS mismatches=%0d outstanding=%0d checker_violations=%0d",
+                scenario_count,
+                vip_sb.request_count, vip_sb.read_count, vip_sb.write_count,
+                vip_sb.mismatch_count, vip_sb.outstanding_count, checker_violation_count()), UVM_NONE)
+        end
+        else begin
+            `uvm_info("DMA_AXI_VIP_FAIL", $sformatf(
+                "PASS suppressed: errors=%0d scenarios=%0d requests=%0d completed=%0d reads=%0d writes=%0d mismatches=%0d outstanding=%0d checker_violations=%0d",
+                uvm_report_server::get_server().get_severity_count(UVM_ERROR),
+                scenario_count, vip_sb.request_count, vip_sb.checked_count,
+                vip_sb.read_count, vip_sb.write_count, vip_sb.mismatch_count,
+                vip_sb.outstanding_count, checker_violation_count()), UVM_NONE)
+        end
         phase.drop_objection(this);
     endtask
 endclass

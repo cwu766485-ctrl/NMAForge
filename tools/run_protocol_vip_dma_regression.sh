@@ -3,6 +3,7 @@ set -euo pipefail
 
 vip_root=/mnt/e/workspace/chip/vip
 out=$(mktemp -d /tmp/nmaforge_protocol_vip_dma.XXXXXX)
+trap 'rc=$?; if [[ $rc -ne 0 ]]; then echo "FAILED_TEMP_ARTIFACT_ROOT=$out"; fi' EXIT
 mkdir -p "$out/csrc"
 sim="$out/simv_dma_axi_vip"
 
@@ -31,23 +32,24 @@ for seed in 123 98765; do
     exit 1
   fi
 
-  if ! grep -Fq '[DMA_AXI_VIP_PASS]' "$log"; then
+  if grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$log"; then
+    echo "VIP_DMA_UVM_SEVERITY_NONZERO_SEED=$seed"
+    grep -E 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*|UVM_ERROR[[:space:]]+[^ ]+' "$log" || true
+    tail -n 60 "$log"
+    exit 1
+  fi
+  if ! grep -Fq '[DMA_AXI_VIP_PASS] DUT=' "$log"; then
     echo "VIP_DMA_PASS_MARKER_MISSING_SEED=$seed"
     tail -n 100 "$log"
     exit 1
   fi
-  if [[ $(grep -Fc '[DMA_AXI_VIP_CASE_PASS]' "$log") -ne 20 ]]; then
+  if [[ $(grep -Fc '[DMA_AXI_VIP_CASE_PASS] case=' "$log") -ne 20 ]]; then
     echo "VIP_DMA_SCENARIO_MATRIX_INCOMPLETE_SEED=$seed"
     tail -n 100 "$log"
     exit 1
   fi
-  if ! grep -Fq '[DMA_AXI_VIP_B_OOO_PASS]' "$log"; then
+  if ! grep -Fq '[DMA_AXI_VIP_B_OOO_PASS] observed cross-ID' "$log"; then
     echo "VIP_DMA_CROSS_ID_B_REORDER_NOT_OBSERVED_SEED=$seed"
-    tail -n 100 "$log"
-    exit 1
-  fi
-  if grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$log"; then
-    echo "VIP_DMA_UVM_SEVERITY_NONZERO_SEED=$seed"
     tail -n 100 "$log"
     exit 1
   fi
