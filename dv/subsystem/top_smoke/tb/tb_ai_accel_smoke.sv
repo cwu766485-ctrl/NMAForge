@@ -2084,6 +2084,58 @@ module tb_ai_accel_smoke;
         end
     endtask
 
+    task check_tinynpu_cnn_fused_native_golden;
+        inout integer expected_index;
+        integer expected_length;
+        integer row_index;
+        reg [31:0] read_value;
+        begin
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 144) $fatal(1, "bad conv rounded Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_RAW_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv rounded output[%0d]=%08h expected=%08h",
+                           row_index, read_value,
+                           ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 36) $fatal(1, "bad conv INT8 Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_I8_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv INT8 packed[%0d]=%08h expected=%08h",
+                           row_index, read_value,
+                           ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 144)
+                $fatal(1, "bad fused bias/ReLU source Golden length");
+            // The fused opcode deliberately does not materialize the INT32
+            // bias/Requant intermediate; retain its independent Golden entry.
+            expected_index = expected_index + expected_length;
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 36) $fatal(1, "bad fused native output Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_RELU_I8_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN fused native output[%0d]=%08h expected=%08h",
+                           row_index, read_value,
+                           ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+        end
+    endtask
+
     task check_tinynpu_cnn_fc_group;
         input integer group_index;
         inout integer expected_index;
@@ -2162,6 +2214,7 @@ module tb_ai_accel_smoke;
         integer conv_descriptor_count;
         reg completed;
         reg linearized_mode;
+        reg fused_native_mode;
         reg [31:0] read_value;
         reg [31:0] cpl_tail;
         reg [31:0] cmd_head;
@@ -2175,8 +2228,11 @@ module tb_ai_accel_smoke;
             if (num_classes != 4 && num_classes != 10)
                 $fatal(1, "CNN class count must be 4 or 10, got %0d", num_classes);
             linearized_mode = $test$plusargs("AI_TINYNPU_CNN_LINEARIZED");
+            fused_native_mode = $test$plusargs("AI_TINYNPU_CNN_FUSED_NATIVE");
+            if (linearized_mode && fused_native_mode)
+                $fatal(1, "CNN fused output modes are mutually exclusive");
             output_group_count = (num_classes + 3) / 4;
-            conv_descriptor_count = linearized_mode ? 3 : 4;
+            conv_descriptor_count = (linearized_mode || fused_native_mode) ? 3 : 4;
             descriptor_count = conv_descriptor_count + 4 * output_group_count;
             expected_count = 360 + 40 * output_group_count;
             $readmemh(image_file, ai_tinynpu_cnn_image_words);
@@ -2210,19 +2266,23 @@ module tb_ai_accel_smoke;
                    32'd0, 32'd0, AI_TINYNPU_CNN_CONV_I8_BASE,
                    16'd0, 16'd0, 16'd144, 8'h10, 32'd0, 5'd0, 2'd0,
                    32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd1, 16'd2, 16'd1);
-            if (linearized_mode) begin
+            if (linearized_mode || fused_native_mode) begin
                 write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h80,
                        OP_TENSOR_GEMM_FUSED, 16'hd502,
                        AI_TINYNPU_CNN_CONV_I8_BASE,
                        AI_TINYNPU_CNN_IDENTITY_B_BASE,
                        AI_TINYNPU_CNN_CONV_BIAS_BASE,
-                       AI_TINYNPU_CNN_FC_A_BASE,
-                       16'd36, 16'd4, 16'd1, 8'h01, 32'h0000_0080,
+                       linearized_mode ? AI_TINYNPU_CNN_FC_A_BASE :
+                                         AI_TINYNPU_CNN_CONV_RELU_I8_BASE,
+                       16'd36, 16'd4, 16'd1, 8'h01,
+                       linearized_mode ? 32'h0000_0080 : 32'd0,
                        5'd0, 2'd1, 32'd0, 32'd0, 32'd0, 16'd1, 16'd1,
                        16'd2, 16'd8, 16'd2);
-                // Opcode 0x53's optional linear-row contract is ABI-v7.
-                axi_write(SPAD_BASE + AI_TINYNPU_CNN_DESC_BASE + 32'hbc,
-                          {16'd2, 8'd0, 8'd7});
+                if (linearized_mode) begin
+                    // Opcode 0x53's optional linear-row contract is ABI-v7.
+                    axi_write(SPAD_BASE + AI_TINYNPU_CNN_DESC_BASE + 32'hbc,
+                              {16'd2, 8'd0, 8'd7});
+                end
             end else begin
                 write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h80,
                        OP_TENSOR_GEMM, 16'hd502, AI_TINYNPU_CNN_CONV_I8_BASE,
@@ -2270,17 +2330,21 @@ module tb_ai_accel_smoke;
                 $fatal(1, "TinyNPU CNN convolution completion timeout tail=%0d", cpl_tail);
 
             expected_index = 1;
-            if (linearized_mode) begin
+            if (linearized_mode || fused_native_mode) begin
                 axi_read(SPAD_BASE + AI_TINYNPU_CNN_CPL_BASE + 36, read_value);
                 if (read_value[3:0] != 4'd1 || read_value[7:4] != 4'd0)
-                    $fatal(1, "CNN linearized completion status/error=%08h", read_value);
+                    $fatal(1, "CNN fused completion status/error=%08h", read_value);
                 axi_read(SPAD_BASE + AI_TINYNPU_CNN_CPL_BASE + 44, read_value);
                 if (read_value != 32'd144)
-                    $fatal(1, "CNN linearized completion elements=%0d expected=144",
+                    $fatal(1, "CNN fused completion elements=%0d expected=144",
                            read_value);
-                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE, read_value);
-                $display("CNN_LINEARIZED_FC_A0=%08h", read_value);
-                check_tinynpu_cnn_linearized_golden(expected_index);
+                if (linearized_mode) begin
+                    axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE, read_value);
+                    $display("CNN_LINEARIZED_FC_A0=%08h", read_value);
+                    check_tinynpu_cnn_linearized_golden(expected_index);
+                end else begin
+                    check_tinynpu_cnn_fused_native_golden(expected_index);
+                end
             end else
                 check_tinynpu_cnn_conv_golden(expected_index);
 
@@ -2390,9 +2454,11 @@ module tb_ai_accel_smoke;
                      ai_tinynpu_cnn_engine_write_words * 4 + ai_tinynpu_cnn_line_write_lines * 16,
                      ai_tinynpu_cnn_banked_read_lines, ai_tinynpu_cnn_line_write_lines,
                      1296 + 144 * num_classes, 1296 + 144 * 4 * output_group_count,
-                     image_count * 4, linearized_mode);
+                     image_count * 4, linearized_mode ? 2 :
+                                                       (fused_native_mode ? 1 : 0));
             $display("NMA_CNN_INFERENCE_PASS model=trained_int8_conv_relu_flatten_gemm outputs=%0d groups=%0d layout_mode=%0d golden=byte_exact",
-                     num_classes, output_group_count, linearized_mode);
+                     num_classes, output_group_count,
+                     linearized_mode ? 2 : (fused_native_mode ? 1 : 0));
             axi_write(REG_CMDQ_SIZE, 32'd0);
             axi_write(REG_CPLQ_SIZE, 32'd0);
             clear_done_irq();
