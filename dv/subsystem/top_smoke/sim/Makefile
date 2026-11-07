@@ -104,6 +104,13 @@ ai_fp_dot_dma_benchmark: ai_comp
 		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +FP_DOT_DMA_BENCH \
 		+FP_BENCH_SEED=$(FP_BENCH_SEED) -l ai_fp_dot_dma_benchmark.log
 
+# Round 9 reproducer for the former exploratory Matrix/DMA ping-pong probe.
+ai_matrix_dma_overlap_probe: ai_comp
+	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=0 +AI_SEED=$(AI_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +R9_MATRIX_DMA_OVERLAP_PROBE \
+		-l ai_matrix_dma_overlap_probe.log
+	grep -q '^R9_MATRIX_DMA_OVERLAP_PASS tiles=3 shape=4x4x4 ' ai_matrix_dma_overlap_probe.log
+
 # End-to-end INT8 digits MLP through ABI-v7 Matrix/SFU descriptors and the
 # production CMDQ/CPLQ/SPAD path. All generated model, simulator, and result
 # files are isolated under /tmp.

@@ -433,7 +433,11 @@ module tb_ai_tensor_sfu_random;
     integer j;
     begin
       op_mode=probe_opcode(target_state);
-      length=(target_state==28)?16'd1:16'd2;
+      // LayerNorm's bounded small-vector path skips its external variance
+      // read-wait state. Use a legal larger vector when probing the retained
+      // legacy path so the reset test still reaches every real FSM state.
+      length=(target_state==28)?16'd1:
+             ((target_state>=32 && target_state<=40)?16'd17:16'd2);
       src0_base=32'h100;
       src1_base=((op_mode==8'h34) ||
                  (op_mode==8'h33 && target_state>=20 && target_state<=21)) ?
