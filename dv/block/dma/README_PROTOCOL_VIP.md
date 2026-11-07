@@ -9,7 +9,7 @@ absent from this block interface are tied low at the adapter boundary.
 The acceptance test uses the independent DMA block scoreboard together with
 the VIP's active-slave driver, sparse memory, protocol checker, transaction
 scoreboard, and coverage. Its 20 directed scenarios cover four outstanding
-reads and writes, 1-D/2-D/gather and narrow loads, 4-KiB boundary cases,
+reads and writes (with observed cross-ID B reordering), 1-D/2-D/gather and narrow loads, 4-KiB boundary cases,
 multi-burst/2-D/tail stores, VIP-memory readback, invalid configuration
 rejection, injected read/write SLVERR, read/write abort drain, and delayed
 responses. The test also requires the VIP's configured maximum burst length

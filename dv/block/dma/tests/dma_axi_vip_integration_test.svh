@@ -178,9 +178,13 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
                                     int unsigned expected_aw_before_first_b);
         bit sequence_done;
         bit first_b_seen;
+        bit out_of_order_seen;
         int unsigned accepted_aw;
+        tvip_axi_id accepted_aw_ids[$];
+        tvip_axi_id returned_b_ids[$];
         sequence_done = 0;
         first_b_seen = 0;
+        out_of_order_seen = 0;
         accepted_aw = 0;
         fork
             begin
@@ -190,16 +194,20 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
             begin
                 while (!sequence_done) begin
                     @(posedge dma_vif.clk);
-                    if (!first_b_seen && vip_vif.bvalid === 1'b1 &&
-                        vip_vif.bready === 1'b1) begin
-                        if (accepted_aw < expected_aw_before_first_b)
-                            `uvm_error("DMA_AXI_VIP_WRITE_CONCURRENCY", $sformatf(
-                                "first B completed after only %0d AW handshakes; expected at least %0d",
-                                accepted_aw, expected_aw_before_first_b))
-                        first_b_seen = 1;
+                    if (vip_vif.bvalid === 1'b1 && vip_vif.bready === 1'b1) begin
+                        if (!first_b_seen) begin
+                            if (accepted_aw < expected_aw_before_first_b)
+                                `uvm_error("DMA_AXI_VIP_WRITE_CONCURRENCY", $sformatf(
+                                    "first B completed after only %0d AW handshakes; expected at least %0d",
+                                    accepted_aw, expected_aw_before_first_b))
+                            first_b_seen = 1;
+                        end
+                        returned_b_ids.push_back(vip_vif.bid);
                     end
-                    if (vip_vif.awvalid === 1'b1 && vip_vif.awready === 1'b1)
+                    if (vip_vif.awvalid === 1'b1 && vip_vif.awready === 1'b1) begin
                         accepted_aw++;
+                        accepted_aw_ids.push_back(vip_vif.awid);
+                    end
                 end
             end
         join
@@ -209,9 +217,29 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
             `uvm_error("DMA_AXI_VIP_WRITE_CONCURRENCY", $sformatf(
                 "accepted AW count=%0d expected at least %0d",
                 accepted_aw, expected_aw_before_first_b))
+        if (returned_b_ids.size() < expected_aw_before_first_b ||
+            accepted_aw_ids.size() < expected_aw_before_first_b)
+            `uvm_error("DMA_AXI_VIP_WRITE_CONCURRENCY", $sformatf(
+                "captured AW/B IDs=%0d/%0d expected at least %0d",
+                accepted_aw_ids.size(), returned_b_ids.size(),
+                expected_aw_before_first_b))
+        else begin
+            for (int index = 0; index < expected_aw_before_first_b; index++)
+                if (returned_b_ids[index] != accepted_aw_ids[index])
+                    out_of_order_seen = 1;
+            if (!out_of_order_seen)
+                `uvm_error("DMA_AXI_VIP_WRITE_ORDER", $sformatf(
+                    "B responses followed AW order; expected observed cross-ID reorder, AW=%p B=%p",
+                    accepted_aw_ids, returned_b_ids))
+            else
+                `uvm_info("DMA_AXI_VIP_B_OOO_PASS", $sformatf(
+                    "observed cross-ID B reorder across %0d outstanding writes; AW=%p B=%p",
+                    expected_aw_before_first_b, accepted_aw_ids, returned_b_ids), UVM_NONE)
+        end
         scenario_count++;
-        `uvm_info("DMA_AXI_VIP_CASE_PASS", $sformatf("case=%s index=%0d accepted_aw=%0d",
-                  case_name, scenario_count, accepted_aw), UVM_NONE)
+        `uvm_info("DMA_AXI_VIP_CASE_PASS", $sformatf(
+                  "case=%s index=%0d accepted_aw=%0d out_of_order=%0b",
+                  case_name, scenario_count, accepted_aw, out_of_order_seen), UVM_NONE)
     endtask
 
     task set_response_error(bit enable_error);
@@ -230,7 +258,9 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
                 checker.b_stability_violation_count + checker.ar_stability_violation_count +
                 checker.r_stability_violation_count + checker.aw_4kb_boundary_violation_count +
                 checker.ar_4kb_boundary_violation_count + checker.aw_burst_legality_violation_count +
-                checker.ar_burst_legality_violation_count + checker.wstrb_lane_violation_count +
+                checker.ar_burst_legality_violation_count + checker.aw_region_page_violation_count +
+                checker.ar_region_page_violation_count + checker.max_outstanding_read_violation_count +
+                checker.max_outstanding_write_violation_count + checker.wstrb_lane_violation_count +
                 checker.wlast_violation_count + checker.rlast_violation_count +
                 checker.unexpected_b_count + checker.unexpected_r_count + checker.reset_unknown_count;
         for (int i = 0; i < 5; i++) begin

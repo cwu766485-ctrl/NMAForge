@@ -41,6 +41,11 @@ for seed in 123 98765; do
     tail -n 100 "$log"
     exit 1
   fi
+  if ! grep -Fq '[DMA_AXI_VIP_B_OOO_PASS]' "$log"; then
+    echo "VIP_DMA_CROSS_ID_B_REORDER_NOT_OBSERVED_SEED=$seed"
+    tail -n 100 "$log"
+    exit 1
+  fi
   if grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$log"; then
     echo "VIP_DMA_UVM_SEVERITY_NONZERO_SEED=$seed"
     tail -n 100 "$log"
