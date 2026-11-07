@@ -30,14 +30,15 @@ export NMAFORGE_R7_COMPILE_MODE="$compile_mode"
 export NMAFORGE_R7_OPCOND="${NMAFORGE_R7_OPCOND:-tt0p9v25c}"
 export NMAFORGE_R7_MAX_CORES="2"
 export NMAFORGE_R7_TOP="$synth_top"
+timeout_s=${NMAFORGE_R7_TIMEOUT_S:-3600}
 
 {
   printf 'run_id=R7-%s-%s-%s-%s\n' "$synth_top" "$array_size" "$compile_mode" "$period_ns"
   printf 'source_sha=%s\n' "$(git -C "$root" rev-parse HEAD)"
   printf 'tool=Synopsys Design Compiler V-2023.12-SP1\n'
   printf 'pvt=TSMC28 HPC+ RVT TT 0.9V 25C\n'
-  printf 'period_ns=%s\narray_size=%s\ncompile_mode=%s\nmax_cores=2\n' \
-    "$period_ns" "$array_size" "$compile_mode"
+  printf 'period_ns=%s\narray_size=%s\ncompile_mode=%s\nmax_cores=2\ntimeout_s=%s\n' \
+    "$period_ns" "$array_size" "$compile_mode" "$timeout_s"
   printf 'host=%s\n' "$(hostname)"
   printf 'started_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf '\n--- memory before run ---\n'
@@ -47,11 +48,13 @@ export NMAFORGE_R7_TOP="$synth_top"
 } > "$run_dir/run_manifest.txt"
 
 set +e
-/usr/bin/time -v timeout --signal=TERM --kill-after=30s 3600s \
+/usr/bin/time -v -o "$run_dir/resource_usage.txt" \
+  timeout --signal=TERM --kill-after=30s "${timeout_s}s" \
   "$dc_bin" -f "$root/syn/run_round7_matrix_synth.tcl" \
-  2>&1 | tee "$run_dir/console.log"
-status=${PIPESTATUS[0]}
+  > "$run_dir/console.log" 2>&1
+status=$?
 set -e
+cat "$run_dir/console.log"
 printf 'exit_status=%s\nfinished_utc=%s\n' "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   >> "$run_dir/run_manifest.txt"
 exit "$status"
