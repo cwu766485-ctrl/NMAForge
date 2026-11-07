@@ -2278,11 +2278,10 @@ module tb_ai_accel_smoke;
                        linearized_mode ? 32'h0000_0080 : 32'd0,
                        5'd0, 2'd1, 32'd0, 32'd0, 32'd0, 16'd1, 16'd1,
                        16'd2, 16'd8, 16'd2);
-                if (linearized_mode) begin
-                    // Opcode 0x53's optional linear-row contract is ABI-v7.
-                    axi_write(SPAD_BASE + AI_TINYNPU_CNN_DESC_BASE + 32'hbc,
-                              {16'd2, 8'd0, 8'd7});
-                end
+                // Opcode 0x53 uses the ABI-v7 descriptor extension in both
+                // native and linear-row output modes.
+                axi_write(SPAD_BASE + AI_TINYNPU_CNN_DESC_BASE + 32'hbc,
+                          {16'd2, 8'd0, 8'd7});
             end else begin
                 write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h80,
                        OP_TENSOR_GEMM, 16'hd502, AI_TINYNPU_CNN_CONV_I8_BASE,
