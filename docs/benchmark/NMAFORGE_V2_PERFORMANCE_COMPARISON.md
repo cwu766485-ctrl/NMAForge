@@ -1,5 +1,108 @@
 # NMAForge v2 Performance Comparison
 
+## Round 6 current comparison — 2026-11-07
+
+This section supersedes earlier Transformer `0x52` failure status for the
+corrected Mapper. Round 6 source/test snapshots are `e100aa2` for the GEMV
+fix/ablation and `54033ffd3a28378e867947e99598e79d2060fb9d` for the fixed
+TinyNPU comparison. The TinyNPU source is pinned to
+`8216c22b762011aa20c05fc2768423fd12dda59d`.
+
+### Transformer `0x52` correction and model result
+
+The Mapper had transposed a `W[K,N]` operand while constructing each physical
+GEMV B row. The corrected mapper emits physical row `k` from `W[k][0:N]` and
+zero-pads unused N lanes. An asymmetric signed INT8 differential catches the
+old layout and confirms the `0x52` output equals independent `0x30` GEMM
+Golden. The fixed VCS Top run executes all 86 descriptors, checks final
+Prefill/Decode results and K/V cache images, and passes. Run ID
+`R6-TRANSFORMER-GEMV-S20261106`, seed `20261106`, VCS
+`V-2023.12-SP1_Full64`.
+
+| Mapping | Prefill | Single-token Decode | Total | Decode SPAD read/write |
+|---|---:|---:|---:|---:|
+| Default GEMM `0x30` | 5,682 | 5,715 | 11,397 | 1,880 / 1,048 B |
+| Q/K/V GEMV `0x52` | 5,682 | 5,715 | 11,397 | 2,024 / 904 B |
+
+The current H=4/M=1 Decode therefore has **no cycle speedup**. GEMV adds
+144 read bytes and saves 144 write bytes in this fixture. A separate
+1×13×17 Matrix-core microcase measured 73 cycles with prefetch off and 69
+with prefetch on (5.5% fewer); it is not a full-Transformer result, and the
+B-fold row cache is disabled at M=1.
+
+### TinyNPU matched-workload results
+
+Run ID `R6-TINY-COMPARISON-S20261106`, seed `20261106`; VCS
+`V-2023.12-SP1_Full64`, Verilator `5.052`, Python `3.12.13`, NumPy `2.4.6`,
+ONNX `1.17.0`. Both systems pass independent signed INT8/INT32 GEMM Golden for
+the same deterministic A/B operands.
+
+| Shape | NMAForge controller + behavioral SPAD | TinyNPU direct array RTL | TinyNPU normalized estimate | NMA / normalized Tiny cycles |
+|---|---:|---:|---:|---:|
+| 16×16×16 | 173 | 52 | 151 | 1.146× |
+| 16×16×32 | 259 | 100 | 231 | 1.121× |
+| 32×32×64 | 1,380 | 790 | 1,305 | 1.058× |
+
+The normalized TinyNPU endpoint adds a serialized 16 B/cycle load/store model,
+one-cycle read response, and two accumulator-clear cycles to TinyNPU RTL array
+cycles. It models no load/compute/store overlap. The ratios above are
+mixed measured/modeled cycle ratios, **not system speedups**. They indicate
+that the NMAForge controller plus behavioral SPAD endpoint used 5.8–14.6%
+more cycles than this conservative serialized estimate. TinyNPU's raw array
+MAC/cycle is higher for all three GEMMs. Full machine data is in
+[`Round 6 GEMM CSV`](../../benchmark/tinynpu/gemm_results.csv) and
+[`benchmark JSON`](../../benchmark/tinynpu/benchmark_summary.json).
+
+For shared model `conv1x_mini.onnx` (model SHA-256
+`1ac385ac18394ac5826a7eb426e99c2199bf6417055f7e3f461c40c1b1811640`, input
+SHA-256 `a74587bfcb5b2dfcd9eed1dbbb4fcf657628264c3b0aae7a4c278f0f70705898`),
+both systems pass exact output Golden. NMAForge Legacy measures 1,985 CMDQ
+compute cycles plus 1,080 testbench-emulated host-layout cycles; `0x53`
+Linear-Row measures 1,504 CMDQ cycles with no host layout. TinyNPU's ONNX
+graph smoke measures 4,781 graph cycles and includes graph dispatch plus its
+DMA/SRAM shim. NMAForge excludes SPAD preload/descriptor setup/final host read,
+so no cross-system CNN speedup is computed. The paired CNN CSV also separates
+the NMAForge modes.
+
+### Innovation 1 — Cache and Prefetch ablation
+
+The 4-way seed `20261106` Matrix-core/behavioral-SPAD results are
+[`v2_round6_gemv_four_way_20261106.csv`](../../benchmark/v2_round6_gemv_four_way_20261106.csv).
+Cache ON reduces cycles and B traffic on each batched shape; prefetch is
+smaller and shape-dependent:
+
+| Shape | Cache/PF OFF | PF only | Cache only | Cache + PF | B-read bytes OFF → Cache |
+|---|---:|---:|---:|---:|---:|
+| 8×16×19 | 197 | 194 | 147 | 148 | 864 → 560 |
+| 8×16×65 | 544 | 532 | 398 | 381 | 2,720 → 1,696 |
+| 16×16×19 | 391 | 382 | 270 | 265 | 1,728 → 816 |
+| 16×16×65 | 1,071 | 1,033 | 627 | 629 | 5,440 → 2,368 |
+
+Cache-only gains versus both OFF range from 1.34× to 1.71×. Prefetch alone
+saves 1.5–3.7% in these cases. Cache + prefetch is 2 cycles worse than cache
+alone at 16×16×65 and 1 cycle worse at 8×16×19; these negative cases remain
+visible. This establishes batched Matrix-core benefit, not H=4 Decode benefit.
+
+### Innovation 2 — Fused epilogue / output layout / forwarding
+
+For the same `conv1x_mini` run, NMAForge Legacy is 1,985 Compute + 1,080
+testbench-emulated layout cycles (3,065 total reported phase cycles), with
+144 B layout reads and 576 B writes. `0x53` Linear-Row is 1,504 cycles, zero
+layout cycles, and 2,784/1,456 B SPAD reads/writes. Outputs are bit-exact.
+Compute-only falls 24.2%; the reported Legacy phase interval to Linear-Row is
+2.038× (50.9% fewer cycles). This is a **combined fused-epilogue plus
+consumer-ready row-layout** comparison; it does not isolate requant fusion
+from layout.
+
+Separate historical evidence remains separate: the ten-class Digits CNN
+Legacy/Linear-Row path measured 3,193→2,712 CMDQ cycles on 396 exact samples;
+the trained Digits MLP measured 110,155→34,761 cycles with exact Golden; the
+directed Tile Forwarding core ablation measured 288→265 producer+consumer
+cycles (7.99%), with consumer banked reads reduced 512→256 B. These are not
+multiplied or merged into one innovation speedup. No Round 6 matched
+Transformer Decode gain or independently isolated `0x53` requant-only gain is
+established.
+
 ## Round 5 current-source update — 2026-11-07
 
 The fixed current-source matrix and model comparisons are in

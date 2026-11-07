@@ -1,5 +1,22 @@
 # NMAForge v2 Architecture Review
 
+## Round 6 status update — 2026-11-07
+
+The opt-in Transformer GEMV Mapper issue is fixed in software commit
+`e100aa2af78ab7a95febc17f265f389f996a8404`: opcode `0x52` stores physical B
+rows in `K,N` order (`W[k][n]`), matching the Matrix Core read address and the
+GEMM contract. No product RTL changed. The asymmetric differential and the
+86-descriptor Top GEMV run passed; see the
+[`Round 6 decision`](../benchmark/NMAFORGE_V2_ROUND6_DECISION.md).
+
+The 16x16 GEMV Cache × Prefetch ablation is reproduced at seed `20261106`.
+The shared `conv1x_mini.onnx` Golden also passes on NMAForge and pinned
+TinyNPU `8216c22b762011aa20c05fc2768423fd12dda59d`. Their graph/command timing
+boundaries differ, so this evidence is not a system-level TinyNPU victory.
+The current 300 MHz Matrix Core DC mapping attempt timed out before producing
+a mapped netlist; 400 MHz and integrated Compute Cluster synthesis are not
+run. The project remains `RESEARCH_BASELINE_PARTIAL`.
+
 ## Round 5 architecture and evidence disposition — 2026-11-07
 
 **Status: `RESEARCH_BASELINE_PARTIAL`; this bounded round stops after publishing
