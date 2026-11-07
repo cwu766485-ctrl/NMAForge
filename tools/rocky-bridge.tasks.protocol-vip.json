@@ -11,7 +11,7 @@
       ]
     },
     "protocol-vip-dma-vcs-regression": {
-      "description": "Compile the NMAForge DMA block against protocol-vips AXI4 active-slave agent and run load/store/readback acceptance at two fixed seeds.",
+      "description": "Compile the NMAForge DMA block against protocol-vips AXI4 active-slave agent and run the 20-scenario positive/negative corner matrix at two fixed seeds, then guard legacy BFM compatibility.",
       "executable": "bash",
       "arguments": [
         "-lic",

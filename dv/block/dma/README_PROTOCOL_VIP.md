@@ -6,14 +6,16 @@ The project-owned `nmaforge_dma_axi4_pin_adapter.sv` maps the DMA's 64-bit
 address, 128-bit data, and 4-bit ID pins; optional cache/protection/QoS pins
 absent from this block interface are tied low at the adapter boundary.
 
-The acceptance test runs a 32-word DDR-to-SPAD load with four read requests in
-flight, a SPAD-to-DDR store, and a readback from the VIP's sparse byte memory.
-The existing DMA scoreboard checks the load and store words; reading the stored
-data back also checks that the reactive memory model retained the accepted W
-payload. The VIP independently runs its protocol checker, transaction
-scoreboard, coverage, and active-slave response driver. The legacy DMA AXI
-responder is disabled only for this dedicated test; all existing block tests
-continue to use their original responder.
+The acceptance test uses the independent DMA block scoreboard together with
+the VIP's active-slave driver, sparse memory, protocol checker, transaction
+scoreboard, and coverage. Its 20 directed scenarios cover four outstanding
+reads and writes, 1-D/2-D/gather and narrow loads, 4-KiB boundary cases,
+multi-burst/2-D/tail stores, VIP-memory readback, invalid configuration
+rejection, injected read/write SLVERR, read/write abort drain, and delayed
+responses. The test also requires the VIP's configured maximum burst length
+to match this DUT instance's `MAX_BURST_BEATS=2`. The legacy DMA AXI responder
+is disabled only for this dedicated test; all existing block tests continue
+to use their original responder.
 
 From Rocky Linux/WSL, with VCS configured and the VIP checkout available at
 `/mnt/e/workspace/chip/vip`:
@@ -26,6 +28,12 @@ make -C dv/block/dma/sim uvm_vip_run \
 
 The reviewed two-seed bridge regression is `protocol-vip-dma-vcs-regression`
 in `tools/rocky-bridge.tasks.protocol-vip.json`.
+
+The bridge runner requires all 20 `[DMA_AXI_VIP_CASE_PASS]` markers on each
+seed and retains the original non-VIP regression as a compatibility guard.
+The expanded matrix is not accepted until that runner has been re-executed
+against the pushed source commit; the historical evidence below is for the
+earlier three-operation smoke only.
 
 ## Acceptance evidence
 

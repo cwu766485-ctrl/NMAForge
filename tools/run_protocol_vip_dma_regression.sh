@@ -36,6 +36,11 @@ for seed in 123 98765; do
     tail -n 100 "$log"
     exit 1
   fi
+  if [[ $(grep -Fc '[DMA_AXI_VIP_CASE_PASS]' "$log") -ne 20 ]]; then
+    echo "VIP_DMA_SCENARIO_MATRIX_INCOMPLETE_SEED=$seed"
+    tail -n 100 "$log"
+    exit 1
+  fi
   if grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$log"; then
     echo "VIP_DMA_UVM_SEVERITY_NONZERO_SEED=$seed"
     tail -n 100 "$log"

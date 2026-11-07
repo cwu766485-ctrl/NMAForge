@@ -57,6 +57,7 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
     tvip_axi_vif vip_vif;
     tvip_axi_env vip_env;
     tvip_axi_configuration vip_cfg;
+    int unsigned scenario_count;
 
     `uvm_component_utils(dma_axi_vip_integration_test)
 
@@ -96,7 +97,9 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
         vip_cfg.address_width = 64;
         vip_cfg.data_width = 128;
         vip_cfg.strobe_width = 16;
-        vip_cfg.max_burst_length = 16;
+        // This DUT instance is deliberately built with MAX_BURST_BEATS=2.
+        // Keep the VIP legality profile aligned with the tested DUT config.
+        vip_cfg.max_burst_length = 2;
         vip_cfg.qos_range[0] = 0;
         vip_cfg.qos_range[1] = 0;
         vip_cfg.response_ordering = TVIP_AXI_OUT_OF_ORDER;
@@ -162,6 +165,62 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
         end
     endfunction
 
+    task run_command_case(uvm_sequence_base seq, string case_name);
+        seq.start(env.cmd_sqr);
+        repeat (4) @(posedge dma_vif.clk);
+        env.sb.check_complete();
+        scenario_count++;
+        `uvm_info("DMA_AXI_VIP_CASE_PASS", $sformatf("case=%s index=%0d",
+                  case_name, scenario_count), UVM_NONE)
+    endtask
+
+    task run_write_concurrency_case(uvm_sequence_base seq, string case_name,
+                                    int unsigned expected_aw_before_first_b);
+        bit sequence_done;
+        bit first_b_seen;
+        int unsigned accepted_aw;
+        sequence_done = 0;
+        first_b_seen = 0;
+        accepted_aw = 0;
+        fork
+            begin
+                seq.start(env.cmd_sqr);
+                sequence_done = 1;
+            end
+            begin
+                while (!sequence_done) begin
+                    @(posedge dma_vif.clk);
+                    if (!first_b_seen && vip_vif.bvalid === 1'b1 &&
+                        vip_vif.bready === 1'b1) begin
+                        if (accepted_aw < expected_aw_before_first_b)
+                            `uvm_error("DMA_AXI_VIP_WRITE_CONCURRENCY", $sformatf(
+                                "first B completed after only %0d AW handshakes; expected at least %0d",
+                                accepted_aw, expected_aw_before_first_b))
+                        first_b_seen = 1;
+                    end
+                    if (vip_vif.awvalid === 1'b1 && vip_vif.awready === 1'b1)
+                        accepted_aw++;
+                end
+            end
+        join
+        repeat (4) @(posedge dma_vif.clk);
+        env.sb.check_complete();
+        if (accepted_aw < expected_aw_before_first_b)
+            `uvm_error("DMA_AXI_VIP_WRITE_CONCURRENCY", $sformatf(
+                "accepted AW count=%0d expected at least %0d",
+                accepted_aw, expected_aw_before_first_b))
+        scenario_count++;
+        `uvm_info("DMA_AXI_VIP_CASE_PASS", $sformatf("case=%s index=%0d accepted_aw=%0d",
+                  case_name, scenario_count, accepted_aw), UVM_NONE)
+    endtask
+
+    task set_response_error(bit enable_error);
+        vip_cfg.response_weight_okay = enable_error ? 0 : 1;
+        vip_cfg.response_weight_exokay = 0;
+        vip_cfg.response_weight_slave_error = enable_error ? 1 : 0;
+        vip_cfg.response_weight_decode_error = 0;
+    endtask
+
     function int unsigned checker_violation_count();
         tvip_axi_protocol_checker checker;
         int unsigned total;
@@ -182,23 +241,24 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
     endfunction
 
     task run_phase(uvm_phase phase);
-        dma_load_ooo_sequence load_seq;
-        dma_axi_vip_store_sequence store_seq;
-        dma_axi_vip_readback_sequence readback_seq;
+        uvm_sequence_base seq;
         tvip_axi_scoreboard vip_sb;
         tvip_axi_protocol_checker vip_checker;
+        int unsigned request_count_before;
+        int unsigned read_count_before;
+        bit [31:0] sentinel;
 
         phase.raise_objection(this);
         wait (dma_vif.resetn === 1'b1);
         @(posedge dma_vif.clk);
+        scenario_count = 0;
+        vip_sb = vip_env.slave_scoreboards[0];
 
         // Seed the same independent DDR oracle used by the block scoreboard.
         seed_pattern_region(64'h0000_0000_0000_1000, 32);
 
-        load_seq = dma_load_ooo_sequence::type_id::create("load_ooo_seq");
-        load_seq.start(env.cmd_sqr);
-        repeat (4) @(posedge dma_vif.clk);
-        env.sb.check_complete();
+        seq = dma_load_ooo_sequence::type_id::create("load_ooo_seq");
+        run_command_case(seq, "four_outstanding_load");
 
         // Store four SPAD words, then read the exact bytes back from the VIP's
         // sparse memory. The chosen external address makes the project oracle
@@ -207,17 +267,133 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
         for (int i = 0; i < 4; i++)
             env.spad_model.preload_word(32'h0000_0C80 + i*4,
                                         dma_spad_source_word(32'h0000_0C80 + i*4));
-        store_seq = dma_axi_vip_store_sequence::type_id::create("store_seq");
-        store_seq.start(env.cmd_sqr);
-        repeat (4) @(posedge dma_vif.clk);
-        env.sb.check_complete();
+        seq = dma_axi_vip_store_sequence::type_id::create("store");
+        run_command_case(seq, "store");
 
-        readback_seq = dma_axi_vip_readback_sequence::type_id::create("readback_seq");
-        readback_seq.start(env.cmd_sqr);
-        repeat (4) @(posedge dma_vif.clk);
-        env.sb.check_complete();
+        seq = dma_axi_vip_readback_sequence::type_id::create("readback_seq");
+        run_command_case(seq, "vip_memory_readback");
 
-        vip_sb = vip_env.slave_scoreboards[0];
+        // 2-D and gather reads exercise non-contiguous DDR address generation
+        // while the protocol VIP remains an unmodified reactive AXI slave.
+        for (int row = 0; row < 3; row++)
+            seed_pattern_region(64'h4000 + row*64'h40, 6);
+        seq = dma_2d_load_sequence::type_id::create("load_2d_seq");
+        run_command_case(seq, "two_dimensional_load");
+
+        seed_pattern_region(64'h5000, 4);
+        seed_pattern_region(64'h5100, 4);
+        seed_pattern_region(64'h5200, 4);
+        seq = dma_gather_load_sequence::type_id::create("gather_load_seq");
+        run_command_case(seq, "gather_load");
+
+        seed_pattern_region(64'h9000, 16);
+        seq = dma_narrow_load_sequence::type_id::create("narrow_load_seq");
+        run_command_case(seq, "mixed_size_narrow_load");
+
+        seed_pattern_region(64'h1fc0, 40);
+        seq = dma_4k_load_sequence::type_id::create("load_4k_seq");
+        run_command_case(seq, "four_kib_boundary_crossing");
+
+        seed_pattern_region(64'h1ff0, 12);
+        seq = dma_4k_edge_load_sequence::type_id::create("load_4k_edge_seq");
+        run_command_case(seq, "four_kib_single_beat_edge");
+
+        // Longer stores cover B-channel reordering and the DUT's four tagged
+        // write slots. The project scoreboard checks every emitted data word.
+        env.spad_model.preload_source_pattern(32'ha00, 16);
+        set_delay_window(vip_cfg.response_start_delay, 20, 20);
+        seq = dma_store_booo_sequence::type_id::create("store_booo_seq");
+        run_command_case(seq, "multi_burst_store");
+
+        env.spad_model.preload_source_pattern(32'h1c00, 32);
+        seq = dma_store_four_booo_sequence::type_id::create("store_four_booo_seq");
+        run_write_concurrency_case(seq, "four_outstanding_stores", 4);
+        set_delay_window(vip_cfg.response_start_delay, 3, 4);
+
+        env.spad_model.preload_source_pattern(32'hc00, 5);
+        env.spad_model.preload_source_pattern(32'hc30, 5);
+        env.spad_model.preload_source_pattern(32'hc60, 5);
+        seq = dma_2d_store_sequence::type_id::create("store_2d_seq");
+        run_command_case(seq, "two_dimensional_store");
+
+        // Tail lengths 1/2/3 require distinct partial WSTRB masks. The
+        // independent project scoreboard also rejects missing/extra words.
+        for (int tail_words = 1; tail_words <= 3; tail_words++) begin
+            dma_short_tail_store_sequence tail_seq;
+            bit [31:0] tail_spad;
+            tail_spad = 32'h1800 + ((tail_words - 1) * 16);
+            env.spad_model.preload_source_pattern(tail_spad, tail_words);
+            tail_seq = dma_short_tail_store_sequence::type_id::create(
+                $sformatf("tail_store_%0d_seq", tail_words));
+            tail_seq.word_count = tail_words;
+            tail_seq.ext_addr = 64'h8000 + ((tail_words - 1) * 16);
+            tail_seq.spad_addr = tail_spad;
+            run_command_case(tail_seq, $sformatf("tail_store_%0d_words", tail_words));
+        end
+
+        // Illegal project configuration must be rejected locally and emit no
+        // AXI request; this is a DUT functional negative, not VIP error mode.
+        request_count_before = vip_sb.request_count;
+        seq = dma_config_error_sequence::type_id::create("config_error_seq");
+        run_command_case(seq, "unaligned_configuration_rejected");
+        if (vip_sb.request_count != request_count_before)
+            `uvm_error("DMA_AXI_VIP_CONFIG_IO", $sformatf(
+                "invalid command emitted AXI traffic: before=%0d after=%0d",
+                request_count_before, vip_sb.request_count))
+
+        // Inject SLVERR through the reusable VIP response policy. Verify the
+        // DUT drains all accepted reads and does not partially commit data.
+        for (int word = 0; word < 32; word++) begin
+            sentinel = 32'hdada_0000 + word;
+            env.spad_model.preload_word(32'hd00 + word*4, sentinel);
+        end
+        set_response_error(1'b1);
+        set_delay_window(vip_cfg.response_start_delay, 20, 20);
+        read_count_before = vip_sb.read_count;
+        seq = dma_read_slverr_sequence::type_id::create("read_slverr_seq");
+        run_command_case(seq, "read_slverr_drain");
+        if ((vip_sb.read_count - read_count_before) < 4)
+            `uvm_error("DMA_AXI_VIP_RSLVERR_DRAIN", $sformatf(
+                "expected at least four completed read bursts, before=%0d after=%0d",
+                read_count_before, vip_sb.read_count))
+        for (int word = 0; word < 32; word++) begin
+            sentinel = 32'hdada_0000 + word;
+            if (env.spad_model.read_word(32'hd00 + word*4) !== sentinel)
+                `uvm_error("DMA_AXI_VIP_RSLVERR_COMMIT", $sformatf(
+                    "SLVERR load modified destination sentinel word %0d", word))
+        end
+
+        set_response_error(1'b0);
+        set_delay_window(vip_cfg.response_start_delay, 3, 4);
+        env.spad_model.preload_source_pattern(32'hf80, 4);
+        set_response_error(1'b1);
+        seq = dma_write_slverr_sequence::type_id::create("write_slverr_seq");
+        run_command_case(seq, "write_slverr");
+
+        // Delay reactive responses long enough for abort to occur with reads
+        // and a write transaction outstanding, then require a clean drain.
+        set_response_error(1'b0);
+        set_delay_window(vip_cfg.response_start_delay, 20, 20);
+        seed_pattern_region(64'h7000, 32);
+        seq = dma_abort_read_sequence::type_id::create("abort_read_seq");
+        run_command_case(seq, "abort_read_outstanding_drain");
+
+        env.spad_model.preload_source_pattern(32'h1000, 16);
+        seq = dma_abort_write_sequence::type_id::create("abort_write_seq");
+        run_command_case(seq, "abort_write_response_drain");
+
+        // Restore normal latency and exercise bounded response backpressure
+        // with a required two-request read high-water mark.
+        set_delay_window(vip_cfg.response_start_delay, 3, 8);
+        set_delay_window(vip_cfg.arready_delay, 0, 4);
+        seed_pattern_region(64'h8800, 24);
+        seq = dma_backpressure_sequence::type_id::create("backpressure_seq");
+        run_command_case(seq, "read_backpressure_outstanding");
+
+        set_response_error(1'b0);
+        set_delay_window(vip_cfg.response_start_delay, 3, 4);
+        set_delay_window(vip_cfg.arready_delay, 0, 1);
+
         vip_checker = vip_env.slave_protocol_checkers[0];
         if (vip_sb.mismatch_count != 0 || vip_sb.outstanding_count != 0 ||
             vip_sb.request_count != vip_sb.checked_count)
@@ -238,7 +414,8 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
             `uvm_error("DMA_AXI_VIP_RESPONDER", "Legacy AXI responder must be disabled in VIP integration test")
 
         `uvm_info("DMA_AXI_VIP_PASS", $sformatf(
-            "DUT=ai_axi128_dma role=active-slave width=64/128/id4 requests=%0d reads=%0d writes=%0d load-store-readback=PASS mismatches=%0d outstanding=%0d checker_violations=%0d",
+            "DUT=ai_axi128_dma role=active-slave width=64/128/id4 scenarios=%0d requests=%0d reads=%0d writes=%0d positive-negative-corner-matrix=PASS mismatches=%0d outstanding=%0d checker_violations=%0d",
+            scenario_count,
             vip_sb.request_count, vip_sb.read_count, vip_sb.write_count,
             vip_sb.mismatch_count, vip_sb.outstanding_count, checker_violation_count()), UVM_NONE)
         phase.drop_objection(this);
