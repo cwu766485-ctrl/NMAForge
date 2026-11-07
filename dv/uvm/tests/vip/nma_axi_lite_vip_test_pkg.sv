@@ -21,6 +21,18 @@ package nma_axi_lite_vip_test_pkg;
       super.new(name, parent);
     endfunction
 
+    function void set_delay_window(tvip_delay_configuration delay_cfg,
+                                   int unsigned min_delay,
+                                   int unsigned max_delay);
+      delay_cfg.min_delay = min_delay;
+      delay_cfg.max_delay = max_delay;
+      delay_cfg.mid_delay[0] = (min_delay == 0) ? 1 : min_delay;
+      delay_cfg.mid_delay[1] = max_delay;
+      delay_cfg.weight_zero_delay = (min_delay == 0) ? 1 : 0;
+      delay_cfg.weight_short_delay = 1;
+      delay_cfg.weight_long_delay = 1;
+    endfunction
+
     function void build_phase(uvm_phase phase);
       string config_error;
       super.build_phase(phase);
@@ -47,6 +59,13 @@ package nma_axi_lite_vip_test_pkg;
         `uvm_fatal("NMA_AXIL_VIP_CFG_RANDOMIZE", "Could not randomize legal 32-bit AXI4-Lite master configuration")
       end
       axi_cfg.agent_mode = UVM_ACTIVE;
+      // The configuration randomizer canonicalizes unconstrained delay
+      // profiles to a fixed zero-delay point. Re-open only the four timing
+      // dimensions exercised by this real-DUT test before sequence randomize.
+      set_delay_window(axi_cfg.request_start_delay, 0, 8);
+      set_delay_window(axi_cfg.write_data_delay, 0, 8);
+      set_delay_window(axi_cfg.bready_delay, 0, 8);
+      set_delay_window(axi_cfg.rready_delay, 0, 8);
       // Start with response READY low. The access sequence raises it only
       // after its per-transaction delay, exercising real CSR response holds.
       axi_cfg.default_bready = 0;
