@@ -86,7 +86,7 @@ module tb_nma_axi_lite_vip;
   end
 
   initial begin
-    uvm_config_db#(tvip_axi_vif)::set(null, "", "vif[0]", axi_vif);
+    uvm_config_db#(tvip_axi_vif)::set(null, "", "vif_axi0", axi_vif);
     run_test();
   end
 endmodule

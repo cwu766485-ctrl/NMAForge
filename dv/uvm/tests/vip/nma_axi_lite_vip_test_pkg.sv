@@ -22,7 +22,7 @@ package nma_axi_lite_vip_test_pkg;
       super.build_phase(phase);
 
       axi_cfg = tvip_axi_configuration::type_id::create("axi_cfg");
-      if (!uvm_config_db#(tvip_axi_vif)::get(null, "", "vif[0]", axi_cfg.vif)) begin
+      if (!uvm_config_db#(tvip_axi_vif)::get(null, "", "vif_axi0", axi_cfg.vif)) begin
         `uvm_fatal("NMA_AXIL_VIP_NOVIF", "No canonical AXI VIP interface was published by the test top")
       end
       if (!axi_cfg.randomize() with {
@@ -63,6 +63,7 @@ package nma_axi_lite_vip_test_pkg;
       tvip_axi_master_access_sequence access;
       access = tvip_axi_master_access_sequence::type_id::create(
         $sformatf("%s_access", case_name));
+      access.set_sequencer(axi_env.master_agents[0].sequencer);
 
       if (is_write) begin
         if (!access.randomize() with {
