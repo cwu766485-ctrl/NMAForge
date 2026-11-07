@@ -207,8 +207,8 @@ make ai_smoke AI_RANDOM_CASES=0 AI_SEED=20261107 SEED=20261107
 
 Result: `TEST PASS`, including the existing `0x52`, `0x53`, Matrix/SFU
 forwarding, and three-tile VDOT checks. It is a directed smoke, not full DV
-closure. The profiler source is committed in `699a8e73` and its testbench
-content is identified by blob hash
+closure. The profiler source is included in the Round 8 branch snapshot; its
+testbench content is identified by blob hash
 `a9df17f58195ded79b1ff53f90764529edd7c8c9`.
 
 The phase profile is in
