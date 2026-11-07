@@ -23,7 +23,7 @@ No main or other worktree was modified. The GitHub target branch and main were c
 | P0 — CNN / Transformer profile | PARTIAL | Reused exact-source functional/performance baselines and completed profile-counter audit. The existing model harness does not export the requested per-command exclusive cycle partition. |
 | P1 — Transformer GEMV mapping | NOT_RUN | Mapper legality was audited. No GEMV policy was changed and no GEMV-mapped Transformer was executed. Current VCS license acquisition failed before simulation. |
 | P2 — TinyNPU comparison | PARTIAL | Pinned TinyNPU conv1x_mini graph run passed with the shared Golden. It has no current-source, same-boundary NMAForge timing partner. Existing GEMM/GEMV microbenchmarks remain mixed measured/modeled historical comparisons. |
-| P3 — 300/400/450 MHz synthesis | BLOCKED_ENV | Synopsys DC shell, standard-cell library, SRAM timing models, and SDC were unavailable. No synthesis or PPA numbers are reported. |
+| P3 — 300/400/450 MHz synthesis | PARTIAL | Local 28nm libraries and DC license work. One constrained 400 MHz Compute Cluster compile reached Matrix mapping but was stopped at the 12-minute bound before producing reports; full Top needs an SRAM adapter and reviewed integration constraints. |
 
 ## 3. P0 — CNN and Transformer performance baseline
 
@@ -31,11 +31,11 @@ No main or other worktree was modified. The GitHub target branch and main were c
 
 The fixed model has 2,736 useful MACs per image and 16 CMDQ descriptors. At the exact-source 4dab736 candidate, all 396 held-out images passed every checked intermediate and final integer Golden; software and RTL classified 384/396 images (96.97%). These are behavioral Top results with a four-bank behavioral SPAD.
 
-| Per image | Legacy layout | Fused linear-row | Change |
-|---|---:|---:|---:|
-| Top CMDQ interval | 3,193 cycles | 2,712 cycles | −15.1% |
-| Testbench Host layout | 1,080 cycles | 0 cycles | −1,080 |
-| Measured task interval | 4,273 cycles | 2,712 cycles | −36.5% |
+| Per image | Legacy layout | Fused linear-row | Change | Speedup (Legacy/Fused) |
+|---|---:|---:|---:|---:|
+| Top CMDQ interval | 3,193 cycles | 2,712 cycles | −15.1% | **1.177×** |
+| Testbench Host layout | 1,080 cycles | 0 cycles | −1,080 | — |
+| Measured task interval | 4,273 cycles | 2,712 cycles | −36.5% | **1.576×** |
 | Compute SPAD read/write | 6,048 / 1,920 B | 5,472 / 1,776 B | −576 / −144 B |
 | Host-layout read/write | 144 / 576 B | 0 / 0 B | removed |
 | Total observed SPAD traffic | 8,688 B | 7,248 B | −16.6% |
@@ -85,14 +85,14 @@ The current toy has K=4. It does not exercise the long-K folding/cache regime th
 
 The following fixed-shape experiment remains historical evidence from source/test SHA b9d593e5f55869ff4a47748013a4b15dcd60f83f, parser SHA ae410661d4f31247be08f2e87ea761452e56a164, three seeds 20261105/06/07, 16×16 array, behavioral four-bank SPAD, and 48/48 Golden checks. It is not Transformer model-level evidence.
 
-| Shape | Cache OFF / Prefetch OFF | Cache ON / Prefetch OFF | Cache cycle / read change | Cache ON / Prefetch ON |
-|---|---:|---:|---:|---:|
-| M8 N16 K19 | 200.7 cyc / 864 B | 156.0 cyc / 560 B | −22.3% / −35.2% | 152.3 cycles |
-| M8 N16 K65 | 544.3 cyc / 2,720 B | 391.0 cyc / 1,696 B | −28.2% / −37.6% | 383.0 cycles |
-| M16 N16 K19 | 393.7 cyc / 1,728 B | 261.0 cyc / 816 B | −33.7% / −52.8% | 262.7 cycles |
-| M16 N16 K65 | 1,075.0 cyc / 5,440 B | 627.3 cyc / 2,368 B | −41.6% / −56.5% | 632.3 cycles |
+| Shape | Cache OFF / Prefetch OFF | Cache ON / Prefetch OFF | Cache speedup | Cache ON / Prefetch ON | Cache+Prefetch speedup |
+|---|---:|---:|---:|---:|---:|
+| M8 N16 K19 | 200.7 cyc / 864 B | 156.0 cyc / 560 B | **1.287×** | 152.3 cycles | **1.318×** |
+| M8 N16 K65 | 544.3 cyc / 2,720 B | 391.0 cyc / 1,696 B | **1.392×** | 383.0 cycles | **1.421×** |
+| M16 N16 K19 | 393.7 cyc / 1,728 B | 261.0 cyc / 816 B | **1.508×** | 262.7 cycles | **1.499×** |
+| M16 N16 K65 | 1,075.0 cyc / 5,440 B | 627.3 cyc / 2,368 B | **1.714×** | 632.3 cycles | **1.700×** |
 
-With Cache enabled, Prefetch ON versus OFF changed these four means by −2.4%, −2.0%, +0.6%, and +0.8%, respectively. Prefetch provides shape-dependent overlap but little additional latency benefit in this bounded test. No result proves model-level Decode acceleration. The four-way raw data is benchmark/v2_p2_gemv_cache_prefetch_4way.csv; detailed run command and counter semantics remain in docs/benchmark/NMAFORGE_V2_GEMV_CACHE_PREFETCH_ABLATION.md.
+Speedup is baseline cycles divided by variant cycles. With Cache enabled, Prefetch ON versus OFF gives 1.024×, 1.021×, 0.994×, and 0.992× for the four shapes respectively: a small gain for M8, and a 0.6–0.8% regression for M16. Prefetch provides shape-dependent overlap but little additional latency benefit in this bounded test. No result proves model-level Decode acceleration. The four-way raw data is benchmark/v2_p2_gemv_cache_prefetch_4way.csv; detailed run command and counter semantics remain in docs/benchmark/NMAFORGE_V2_GEMV_CACHE_PREFETCH_ABLATION.md.
 
 **P1 disposition:** NOT_RUN for a Transformer GEMV variant and its four requested model-level configurations. No current-source Decode cycles, traffic, utilization, or Golden comparison for 0x52 are available.
 
@@ -113,23 +113,25 @@ Tool versions: Verilator 5.052, Python 3.12.13. The model was conv1x_mini.onnx, 
 
 This is a TinyNPU Graph/RTL run. It does not have a paired NMAForge run at the reviewed 59c5 source/test SHA. The earlier NMAForge result for this ONNX workload (1,985 Top compute cycles plus 1,080 simulated Host-layout cycles) is bound to 9576e539c21fe6312763c4745a90dc032c6457e0, whose relevant RTL/test files differ from 59c5. The shared Golden verifies output agreement, but the older NMAForge timing cannot be divided into the new TinyNPU cycle count as a Round 4 speedup. Neither side currently provides a same-boundary decomposition of compute, dispatch, DMA and Host work for this pair.
 
+For the requested arithmetic, the apparent quotient is 4,781 / (1,985 + 1,080) = **1.560×** TinyNPU graph cycles per historical NMAForge compute-plus-Host-layout interval. Dividing by NMAForge compute only gives 4,781 / 1,985 = **2.409×**. Neither value is a valid system speedup: the NMAForge row is from a different source/test SHA and excludes the same graph/DMA boundary used by TinyNPU. They are shown only as raw quotients, not performance claims.
+
 The TinyNPU compile and run logs are retained outside Git under /tmp/nmaforge_round4_tinynpu_cnn (compile.log, onnx_compile.log, run.log). The checked-in source, model and Golden can regenerate the run.
 
 ### 5.2 Fixed GEMM/GEMV shape matrix
 
 The existing matrix at NMAForge source/test SHA 219c9f26a85b9661185cd78ab6308ae3f13e3ea7, seed 20261106, remains a mixed measured/modeled historical comparison. NMAForge controller/behavioral-SPAD cycles were measured; TinyNPU direct-array cycles were measured; TinyNPU common-memory service was estimated as serialized 16 B/cycle input/output service plus one read response and two accumulator-clear cycles. Both sides passed independent INT32 Goldens.
 
-| Workload | Shape | NMA cycles | Tiny direct-array cycles | Tiny estimated endpoint | NMA / estimated endpoint |
-|---|---|---:|---:|---:|---:|
-| GEMM | 16×16×16 | 173 | 52 | 151 | 1.1457 |
-| GEMM | 16×16×32 | 259 | 100 | 231 | 1.1212 |
-| GEMM | 32×32×64 | 1,380 | 790 | 1,305 | 1.0575 |
-| GEMV | 1×13×17 | 66 | 100 | 122 | 0.5410 |
-| GEMV | 8×16×19 | 148 | 100 | 164 | 0.9024 |
-| GEMV | 16×16×19 | 264 | 100 | 205 | 1.2878 |
-| GEMV | 16×16×65 | 634 | 244 | 441 | 1.4376 |
+| Workload | Shape | NMA cycles | Tiny direct-array cycles | Tiny estimated endpoint | NMA / estimated endpoint | Raw NMA speedup (Tiny estimated / NMA) |
+|---|---|---:|---:|---:|---:|---:|
+| GEMM | 16×16×16 | 173 | 52 | 151 | 1.1457 | 0.8728× |
+| GEMM | 16×16×32 | 259 | 100 | 231 | 1.1212 | 0.8919× |
+| GEMM | 32×32×64 | 1,380 | 790 | 1,305 | 1.0575 | 0.9457× |
+| GEMV | 1×13×17 | 66 | 100 | 122 | 0.5410 | 1.8485× |
+| GEMV | 8×16×19 | 148 | 100 | 164 | 0.9024 | 1.1081× |
+| GEMV | 16×16×19 | 264 | 100 | 205 | 1.2878 | 0.7765× |
+| GEMV | 16×16×65 | 634 | 244 | 441 | 1.4376 | 0.6956× |
 
-Ratios above 1 mean more NMAForge cycles than the estimated TinyNPU endpoint. These data show small-M GEMV is mixed: NMAForge is below the modeled endpoint for the first two shapes and above it for the M16 tails. Large GEMM remains close under this particular memory estimate, with NMAForge slightly slower. These are not system-level TinyNPU wins/losses because TinyNPU's memory service is not RTL-measured, and this matrix was not replayed at Round 4 source/test SHA.
+The `NMA / estimated endpoint` column above 1 means NMAForge used more cycles; the inverse raw-speedup column above 1 means fewer NMAForge cycles. Under this modeled endpoint, NMAForge is slower on all three GEMM rows, faster for GEMV M1/M8, and slower for both M16 tails. These are raw historical quotients, not system-level TinyNPU wins/losses: TinyNPU memory service is modeled rather than RTL-measured, and the matrix was not replayed at Round 4 source/test SHA.
 
 ### 5.3 Transformer pairing
 
@@ -139,12 +141,13 @@ No common trained Transformer model was run on both RTL paths. The NMAForge hidd
 
 The existing behavioral capacity study uses the same four-bank interface and 256-MAC array. At historical source/test SHA 9576e539c21fe6312763c4745a90dc032c6457e0, the fixed conv1x_mini and ten-class Digits CNN maps produced equal measured cycles at 128 and 512 KiB. This applies only to those compact fixed maps; it does not establish universal model fit or equal physical area. The 512 KiB configuration stores 4,194,304 bits, while 128 KiB stores 1,048,576 bits, a 75% reduction in nominal SRAM bits. Macro count and area depend on the actual SRAM compiler/macro organization and are not inferred here.
 
-The 300/400/450 MHz synthesis request is BLOCKED_ENV:
-- Synopsys dc_shell and dcnxt_shell are not available in PATH. The local /usr/bin/dc is GNU dc (a calculator), not Design Compiler.
-- TSMC28_STDCELL_DB, TSMC28_SRAM_MACRO_DIR, TSMC28_SRAM_LIB, and SDC_FILE are unset.
-- No usable Round 4 Design Compiler setup with matching cell/SRAM timing libraries, corner, constraints, and clock/IO definitions was available in this worktree.
+Local 28nm collateral is present at `/home/ray/pdk/TSMC28`. The setup script is `/home/ray/pdk/TSMC28/env/setup_tsmc28hpcplus.sh`; it selects the 7-track RVT standard-cell library and its slow-slow 0.72 V / 125 °C `.db`. The selected standard-cell timing directory contains 96 `.lib` and 96 `.db` views. The SRAM timing tree contains 256 NLDM `.lib` views, with Verilog and physical views elsewhere under the same macro release. The installed DC executable is `/opt/Synopsys/syn/V-2023.12-SP1/bin/dc_shell` (V-2023.12-SP1), outside the default PATH. The prior statement that these libraries were unavailable was incorrect.
 
-Therefore logic area, macro area, WNS/TNS, critical path, Fmax, power, and energy/inference are NOT_RUN / BLOCKED_ENV. The simulation's 10 ns clock and any historical assumed frequency are not ASIC timing evidence. No 300, 400, or 450 MHz PASS/FAIL result is asserted.
+The local DC license was checked out successfully with `dc_shell -x 'exit'`, and DC successfully loaded the selected standard-cell `.db`. A constrained module-level compile was attempted for `ai_accel_compute_cluster` with a 2.500 ns clock, 100 ps setup uncertainty, 20 ps hold uncertainty, 250 ps max input/output delays, 50 ps min delays, 50 ps clock transition, 20 fF output load, and the `ssg0p72v125c` operating condition. RTL elaboration and `check_design` completed without unresolved modules, but `compile_ultra` remained in `ai_tensor_matrix_core` mapping until the 12-minute bound and was terminated. No mapped area, timing, or power report was produced. Run label: `R4-DC-COMPUTE-400-20261107`; temporary script/log: `/tmp/nmaforge_r4_dc_400_retry/run.tcl` and `/tmp/nmaforge_r4_dc_400_retry/dc.log`.
+
+Full Top synthesis remains **BLOCKED_CONFIG**. This repository worktree has no reviewed-head SDC or active SRAM macro mapping/adapter: the RTL's non-VCS scratchpad branch instantiates Xilinx `xpm_memory_tdpram`, while the local TSMC SRAM views are macro `.lib` models and no project adapter maps between them. The SRAM tree contains no compiled `.db` views. The older generated `synth.tcl` runs `compile_ultra` without an input SDC or `create_clock` and writes SDC only after compilation, so it is not a constrained 400 MHz run.
+
+The existing docs/verification/TSMC28_SYNTHESIS_REPORT.md records a historical 4.0 ns (250 MHz) pre-layout run with a licensed 28nm library and SRAM macros. Its public report does not bind the result to the reviewed 59c5d14 source SHA, so it is historical evidence, not Round 4 timing. Round 4 logic/macro area, WNS/TNS, critical path, Fmax, power, and energy/inference remain NOT_RUN. No 300, 400, or 450 MHz PASS/FAIL result is asserted.
 
 ## 7. Reproduction record
 
@@ -185,16 +188,13 @@ Training/export and Mapper preflight completed: model SHA-256 55cef19181c84dda9f
 
 Command and output: see §5.1. Run ID R4-TINYNPU-CNN-CONV1X-MINI-20261107; deterministic workload, seed N/A. TinyNPU SHA was verified before execution. Status: PASS for TinyNPU Graph execution and final Golden.
 
-### Synthesis environment check
+### Synthesis environment and attempt
 
-    command -v dc_shell
-    command -v dcnxt_shell
-    test -n "$TSMC28_STDCELL_DB"
-    test -n "$TSMC28_SRAM_MACRO_DIR"
-    test -n "$TSMC28_SRAM_LIB"
-    test -n "$SDC_FILE"
-
-All Design Compiler / library / SDC checks were unavailable or unset.
+- Setup: `source /home/ray/pdk/TSMC28/env/setup_tsmc28hpcplus.sh`
+- DC: `PATH=/opt/Synopsys/syn/V-2023.12-SP1/bin:$PATH dc_shell` — V-2023.12-SP1; license checkout and standard-cell DB load passed.
+- Attempted command: `dc_shell -f /tmp/nmaforge_r4_dc_400_retry/run.tcl`
+- Run ID: `R4-DC-COMPUTE-400-20261107`; log: `/tmp/nmaforge_r4_dc_400_retry/dc.log`; generated reports: none.
+- Status: elaboration/check-design passed with existing warnings; compile stopped at the fixed 12-minute bound during Matrix mapping. No PPA value is reported. The synthesis script and log remain local under `/tmp`; no private PDK content was copied to Git.
 
 ## 8. Conclusions and open issues
 
@@ -202,6 +202,8 @@ All Design Compiler / library / SDC checks were unavailable or unset.
 - The 0x53 fused linear-row CNN route removes the 1,080-cycle simulated Host-layout stage and reduces its Top CMDQ interval by 15.1% for the fixed trained Digits CNN; all 396 images remain bit-exact and classification is unchanged.
 - Existing B-fold Cache has material read-traffic and cycle benefits on four fixed GEMV shapes; incremental Prefetch benefit is small and shape dependent.
 - TinyNPU at the pinned SHA executes conv1x_mini correctly in 4,781 graph cycles and matches the compiler Golden.
+- The trained CNN linear-row route is 1.177× by Top CMDQ cycles and 1.576× over the legacy interval including the simulated Host-layout stage; these are different boundaries and are reported separately.
+- Historical GEMV B-fold Cache speedup is 1.287×–1.714× across four tested shapes; adding Prefetch gives 0.992×–1.421× versus Cache/Prefetch OFF, depending on shape.
 
 **Not established**
 - That 0x52 improves a real Transformer Decode workload.
@@ -209,7 +211,7 @@ All Design Compiler / library / SDC checks were unavailable or unset.
 - A same-source, same-boundary Round 4 NMAForge-vs-TinyNPU CNN speedup.
 - A TinyNPU Transformer comparison at common weights and memory service.
 - A closed mutually-exclusive cycle/stall partition for model-level Top runs.
-- Any 300/400/450 MHz synthesis, ASIC area, Fmax, power, or energy result.
+- Any completed 300/400/450 MHz synthesis result, mapped ASIC area, Fmax, power, or energy result.
 - Full Compute Cluster DV or ASIC sign-off.
 
 This round leaves the project at **RESEARCH_BASELINE_PARTIAL**. The report records the current evidence and blockers; no new RTL optimization or wider verification task was started.
