@@ -106,20 +106,99 @@
     "note": "Single fixed functional probe, not a large-workload throughput result. Counter categories may overlap; total cycles are taken from the measured total counter."
   },
   "tiny_npu_gemm_gemv": {
-    "run_ids": ["R9-NMA-MATRIX-MATCH-S20261107", "R9-TINY-ARRAY-S20261107"],
+    "run_ids": [
+      "R9-NMA-MATRIX-MATCH-S20261107",
+      "R9-TINY-ARRAY-S20261107"
+    ],
     "nmaforge_boundary": "16x16 Matrix core/controller and four-bank behavioral SPAD through final output commit",
     "tinynpu_boundary": "Direct 16x16 systolic array RTL input-to-stable-output; no controller or SPAD",
     "cross_system_speedup": "NOT_COMPUTED: endpoints differ",
     "gemm": [
-      {"shape": "16x16x16", "useful_macs": 4096, "nmaforge_cycles": 185, "nmaforge_mac_per_cycle": 22.141, "nmaforge_utilization_pct": 8.65, "nmaforge_read_bytes": 512, "nmaforge_write_bytes": 1024, "tinynpu_array_cycles": 52, "tinynpu_mac_per_cycle": 78.7692, "tinynpu_utilization_pct": 30.77, "golden": "PASS both"},
-      {"shape": "16x16x32", "useful_macs": 8192, "nmaforge_cycles": 270, "nmaforge_mac_per_cycle": 30.341, "nmaforge_utilization_pct": 11.85, "nmaforge_read_bytes": 1024, "nmaforge_write_bytes": 1024, "tinynpu_array_cycles": 100, "tinynpu_mac_per_cycle": 81.92, "tinynpu_utilization_pct": 32.0, "golden": "PASS both"},
-      {"shape": "32x32x64", "useful_macs": 65536, "nmaforge_cycles": 1381, "nmaforge_mac_per_cycle": 47.455, "nmaforge_utilization_pct": 18.54, "nmaforge_read_bytes": 6144, "nmaforge_write_bytes": 4096, "tinynpu_array_cycles": 790, "tinynpu_mac_per_cycle": 82.957, "tinynpu_utilization_pct": 32.41, "golden": "PASS both"}
+      {
+        "shape": "16x16x16",
+        "useful_macs": 4096,
+        "nmaforge_cycles": 185,
+        "nmaforge_mac_per_cycle": 22.141,
+        "nmaforge_utilization_pct": 8.65,
+        "nmaforge_read_bytes": 512,
+        "nmaforge_write_bytes": 1024,
+        "tinynpu_array_cycles": 52,
+        "tinynpu_mac_per_cycle": 78.7692,
+        "tinynpu_utilization_pct": 30.77,
+        "golden": "PASS both"
+      },
+      {
+        "shape": "16x16x32",
+        "useful_macs": 8192,
+        "nmaforge_cycles": 270,
+        "nmaforge_mac_per_cycle": 30.341,
+        "nmaforge_utilization_pct": 11.85,
+        "nmaforge_read_bytes": 1024,
+        "nmaforge_write_bytes": 1024,
+        "tinynpu_array_cycles": 100,
+        "tinynpu_mac_per_cycle": 81.92,
+        "tinynpu_utilization_pct": 32.0,
+        "golden": "PASS both"
+      },
+      {
+        "shape": "32x32x64",
+        "useful_macs": 65536,
+        "nmaforge_cycles": 1381,
+        "nmaforge_mac_per_cycle": 47.455,
+        "nmaforge_utilization_pct": 18.54,
+        "nmaforge_read_bytes": 6144,
+        "nmaforge_write_bytes": 4096,
+        "tinynpu_array_cycles": 790,
+        "tinynpu_mac_per_cycle": 82.957,
+        "tinynpu_utilization_pct": 32.41,
+        "golden": "PASS both"
+      }
     ],
     "gemv": [
-      {"shape": "1x13x17", "useful_macs": 221, "nmaforge_cycles": 75, "nmaforge_mac_per_cycle": 2.9467, "nmaforge_read_bytes": 304, "tinynpu_array_cycles": 100, "tinynpu_mac_per_cycle": 2.21, "tinynpu_utilization_pct": 0.86, "golden": "PASS both"},
-      {"shape": "8x16x19", "useful_macs": 2432, "nmaforge_cycles": 154, "nmaforge_mac_per_cycle": 15.7922, "nmaforge_read_bytes": 560, "tinynpu_array_cycles": 100, "tinynpu_mac_per_cycle": 24.32, "tinynpu_utilization_pct": 9.5, "golden": "PASS both"},
-      {"shape": "16x16x19", "useful_macs": 4864, "nmaforge_cycles": 250, "nmaforge_mac_per_cycle": 19.456, "nmaforge_read_bytes": 816, "tinynpu_array_cycles": 100, "tinynpu_mac_per_cycle": 48.64, "tinynpu_utilization_pct": 19.0, "golden": "PASS both"},
-      {"shape": "16x16x65", "useful_macs": 16640, "nmaforge_cycles": 631, "nmaforge_mac_per_cycle": 26.3708, "nmaforge_read_bytes": 2368, "tinynpu_array_cycles": 244, "tinynpu_mac_per_cycle": 68.1967, "tinynpu_utilization_pct": 26.64, "golden": "PASS both"}
+      {
+        "shape": "1x13x17",
+        "useful_macs": 221,
+        "nmaforge_cycles": 75,
+        "nmaforge_mac_per_cycle": 2.9467,
+        "nmaforge_read_bytes": 304,
+        "tinynpu_array_cycles": 100,
+        "tinynpu_mac_per_cycle": 2.21,
+        "tinynpu_utilization_pct": 0.86,
+        "golden": "PASS both"
+      },
+      {
+        "shape": "8x16x19",
+        "useful_macs": 2432,
+        "nmaforge_cycles": 154,
+        "nmaforge_mac_per_cycle": 15.7922,
+        "nmaforge_read_bytes": 560,
+        "tinynpu_array_cycles": 100,
+        "tinynpu_mac_per_cycle": 24.32,
+        "tinynpu_utilization_pct": 9.5,
+        "golden": "PASS both"
+      },
+      {
+        "shape": "16x16x19",
+        "useful_macs": 4864,
+        "nmaforge_cycles": 250,
+        "nmaforge_mac_per_cycle": 19.456,
+        "nmaforge_read_bytes": 816,
+        "tinynpu_array_cycles": 100,
+        "tinynpu_mac_per_cycle": 48.64,
+        "tinynpu_utilization_pct": 19.0,
+        "golden": "PASS both"
+      },
+      {
+        "shape": "16x16x65",
+        "useful_macs": 16640,
+        "nmaforge_cycles": 631,
+        "nmaforge_mac_per_cycle": 26.3708,
+        "nmaforge_read_bytes": 2368,
+        "tinynpu_array_cycles": 244,
+        "tinynpu_mac_per_cycle": 68.1967,
+        "tinynpu_utilization_pct": 26.64,
+        "golden": "PASS both"
+      }
     ],
     "tiny_tooling_note": "TinyNPU source checkout is pinned and clean at the SHA above. This round replayed cached binaries; Verilator, NumPy and ONNX are absent for a fresh rebuild."
   },
@@ -157,5 +236,7 @@
     "innovation1_model_level": "NOT_RUN: H=4 Decode uses GEMM mapping; standalone batched GEMV cases pass, but no Transformer Decode GEMV/cache/prefetch ablation ran",
     "innovation2_large_cnn_ablation": "NOT_RUN: no Legacy/Fused-Requant/Linear-Row model-level ablation on a >=100K-MAC CNN",
     "transformer_tinynpu_subgraph": "NOT_RUN: no matched Transformer subgraph was executed on TinyNPU"
-  }
+  },
+  "github_published_equivalent_source_commit": "13f94abf59c3dbea833ad4bbe227ef5cab4df503",
+  "product_source_tree_sha": "56813cb32844bb01683c6710c57d19bce136028a"
 }

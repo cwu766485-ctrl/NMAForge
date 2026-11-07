@@ -6,6 +6,8 @@
 
 **Product RTL/test candidate:** `74402ba991285cb4403cb50737013362f5a2af53`
 
+**Published equivalent source commit:** `13f94abf59c3dbea833ad4bbe227ef5cab4df503` (GitHub API commit; its source tree is identical, tree `56813cb32844bb01683c6710c57d19bce136028a`). Run logs retain the local measured source SHA above.
+
 **TinyNPU reference:** `8216c22b762011aa20c05fc2768423fd12dda59d`
 **Run date:** 2026-11-07
 
