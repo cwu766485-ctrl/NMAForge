@@ -27,7 +27,7 @@ export NMAFORGE_R7_PERIOD_NS="$period_ns"
 export NMAFORGE_R7_RUN_DIR="$run_dir"
 export NMAFORGE_R7_STD_LIB="$std_db"
 export NMAFORGE_R7_COMPILE_MODE="$compile_mode"
-export NMAFORGE_R7_OPCOND="${NMAFORGE_R7_OPCOND:-tt0p9v25c}"
+export NMAFORGE_R7_OPCOND="${NMAFORGE_R7_OPCOND:-tt0p9v0p9v25c}"
 export NMAFORGE_R7_MAX_CORES="2"
 export NMAFORGE_R7_TOP="$synth_top"
 timeout_s=${NMAFORGE_R7_TIMEOUT_S:-3600}
@@ -35,10 +35,12 @@ timeout_s=${NMAFORGE_R7_TIMEOUT_S:-3600}
 {
   printf 'run_id=R7-%s-%s-%s-%s\n' "$synth_top" "$array_size" "$compile_mode" "$period_ns"
   printf 'source_sha=%s\n' "$(git -C "$root" rev-parse HEAD)"
+  printf 'runner_sha256=%s\n' "$(sha256sum "$root/syn/run_round7_matrix_synth.sh" | awk '{print $1}')"
+  printf 'tcl_sha256=%s\n' "$(sha256sum "$root/syn/run_round7_matrix_synth.tcl" | awk '{print $1}')"
   printf 'tool=Synopsys Design Compiler V-2023.12-SP1\n'
   printf 'pvt=TSMC28 HPC+ RVT TT 0.9V 25C\n'
-  printf 'period_ns=%s\narray_size=%s\ncompile_mode=%s\nmax_cores=2\ntimeout_s=%s\n' \
-    "$period_ns" "$array_size" "$compile_mode" "$timeout_s"
+  printf 'opcond=%s\nperiod_ns=%s\narray_size=%s\ncompile_mode=%s\nmax_cores=2\ntimeout_s=%s\n' \
+    "$NMAFORGE_R7_OPCOND" "$period_ns" "$array_size" "$compile_mode" "$timeout_s"
   printf 'host=%s\n' "$(hostname)"
   printf 'started_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf '\n--- memory before run ---\n'
@@ -55,6 +57,16 @@ set +e
 status=$?
 set -e
 cat "$run_dir/console.log"
+if [[ "$status" -eq 0 ]]; then
+  mapped_netlist="$run_dir/${synth_top}_mapped.v"
+  area_report="$run_dir/area_hier.rpt"
+  if [[ ! -s "$mapped_netlist" || ! -s "$area_report" ]] || \
+     rg -q 'contains unmapped logic' "$area_report" || \
+     ! awk '/Total cell area:/ { if (($4 + 0) > 0) found=1 } END { exit !found }' "$area_report"; then
+    echo "R7_SYNTH_INVALID_MAPPING: missing mapped area/netlist or unmapped logic remains" >&2
+    status=7
+  fi
+fi
 printf 'exit_status=%s\nfinished_utc=%s\n' "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   >> "$run_dir/run_manifest.txt"
 exit "$status"

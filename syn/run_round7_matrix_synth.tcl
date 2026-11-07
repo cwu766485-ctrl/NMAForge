@@ -53,9 +53,16 @@ if {[catch {
     puts stderr "R7_SYNTH_LINK_ERROR: $link_error"
     exit 3
 }
-if {$opcond ne "" && [catch {set_operating_conditions -max $opcond} opcond_error]} {
-    puts stderr "R7_SYNTH_LIBRARY_CONDITION_ERROR: $opcond_error"
-    exit 4
+if {$opcond ne ""} {
+    set opcond_matches [get_operating_conditions -quiet $opcond]
+    if {[sizeof_collection $opcond_matches] != 1} {
+        puts stderr "R7_SYNTH_LIBRARY_CONDITION_ERROR: operating condition '$opcond' does not resolve uniquely"
+        exit 4
+    }
+    if {[catch {set_operating_conditions -max $opcond} opcond_error]} {
+        puts stderr "R7_SYNTH_LIBRARY_CONDITION_ERROR: $opcond_error"
+        exit 4
+    }
 }
 
 if {[sizeof_collection [get_ports clk]] == 0} {
