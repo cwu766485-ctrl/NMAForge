@@ -325,6 +325,12 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
         seed_pattern_region(64'h5000, 4);
         seed_pattern_region(64'h5100, 4);
         seed_pattern_region(64'h5200, 4);
+        // The DUT fetches each gather row address from scratchpad. The row
+        // address queue on the UVM command is scoreboard metadata only; it is
+        // not a DUT pin and must not substitute for programming the index RAM.
+        env.spad_model.preload_word(32'h1000, 32'h5000);
+        env.spad_model.preload_word(32'h1004, 32'h5100);
+        env.spad_model.preload_word(32'h1008, 32'h5200);
         seq = dma_gather_load_sequence::type_id::create("gather_load_seq");
         run_command_case(seq, "gather_load");
 
@@ -348,6 +354,10 @@ class dma_axi_vip_integration_test extends dma_block_base_test;
         run_command_case(seq, "multi_burst_store");
 
         env.spad_model.preload_source_pattern(32'h1c00, 32);
+        // Four bursts each need scratchpad gather, AW and W time before their
+        // B responses are allowed to start. Keep the response window closed
+        // long enough to observe all four accepted AWs concurrently.
+        set_delay_window(vip_cfg.response_start_delay, 100, 100);
         errors_before_write_trials = uvm_report_server::get_server().get_severity_count(UVM_ERROR);
         write_ooo_observed = 0;
         write_ooo_trials = 0;
