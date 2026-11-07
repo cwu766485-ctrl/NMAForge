@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 20268)
-Total output lines: 1403
-
 # NMAForge v2 Performance Comparison
 
 ## Round 5 current-source update — 2026-11-07
@@ -410,7 +407,573 @@ make -C /tmp/nmaforge-v2-gemv-ablation-a4dcc6b/dv/block/compute/matrix/sim \
 ```
 
 Machine outputs: [48-point CSV](../../benchmark/v2_p2_gemv_cache_prefetch_4way_a4dcc6b.csv)
-and [summary JSON](../../be…8268 tokens truncated…es
+and [summary JSON](../../benchmark/v2_p2_gemv_cache_prefetch_4way_a4dcc6b_summary.json).
+Logs-only archive `/tmp/nmaforge_v2_gemv_four_way_a4dcc6b_logs.tar.gz`,
+SHA-256 `93769cd0db0e4a7596374e6c298119f43b551eaf7c1abc9aa0e59fe337403e46`.
+
+### Real Compute Cluster serial / parallel workload
+
+The production-top UVM performance sequence was replayed at fixed source/test
+SHA `17b09e068e988ca35480ffd638d865872e9ba564`, on three Seeds. The command
+was:
+
+```sh
+VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias VCS_ARCH_OVERRIDE=linux \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v2_cluster_bench_17b09e0 \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027'
+```
+
+The full Compute Cluster UVM regression and merged URG gate pass on all three
+Seeds. For the same queued four-task workload (Matrix + CNM + two SFU commands),
+serial doorbell-to-completion intervals total 1,696 cycles; one parallel
+CMDQ submission completes in 1,137 cycles, a measured ratio of
+`serial_cycles / parallel_cycles = 1.492` (32.96% fewer cycles). Read and write
+traffic remain 4,352 B and 2,688 B in both modes, with parallel completion
+order `0600,0601,0602,0603`. These are VCS cycle counts, not wall-clock or ASIC
+performance.
+
+A separate three-task staged workload (Matrix+CNM together, then SFU) takes
+1,070 cycles versus its three-command serial reference of 1,239 cycles; the
+ratio is 1.158 (13.64% fewer cycles). The staged run reports 4,032 B read,
+2,416 B written, 32 Matrix/CNM pair-contention cycles, and ordered completions
+`0700,0701,0702`. Its traffic is reported independently; the test does not emit
+a matching three-task serial byte total.
+
+The shared-Arbiter probes show 333 Matrix/CNM banked collision-observation
+cycles, including 320 admitted collisions and 320 Matrix wait cycles. All 320
+held-payload checks pass; Matrix and CNM response counts are 768 and 1,120,
+with zero owner, hold-stability, or route-mismatch errors. A separate Matrix
+line-writeback stall test observes 1,837 overlap cycles and 84 payload-stability
+checks with zero violations. These are event counters and test-window counts,
+not extra cycles to add to benchmark totals.
+
+Machine outputs: [serial/parallel CSV](../../benchmark/v2_p2_cluster_serial_parallel_17b09e0.csv),
+[contention CSV](../../benchmark/v2_p2_cluster_contention_17b09e0.csv),
+[summary JSON](../../benchmark/v2_p2_cluster_serial_parallel_17b09e0_summary.json),
+and [cycle chart](../../benchmark/v2_p2_cluster_serial_parallel_17b09e0.svg).
+Logs-only archive `/tmp/nmaforge_v2_cluster_bench_17b09e0_logs.tar.gz`,
+SHA-256 `a2c2daa85ba57c1617239498c60636763584707f43bb93c345f5e01f7c6d8fbe`.
+
+This confirms legal queued overlap and actual banked-client contention under
+the current scheduler. It does not compare an alternate Bank-Aware Issue
+policy or isolate its area/timing cost, so no scheduling RTL change is
+justified. DMA/DDR timing and a wider workload matrix remain open.
+
+#### Fixed-candidate replay at SHA `85e7db2`
+
+The same serial/parallel sequence was replayed in the detached clean-worktree
+three-seed UVM run `V2-CMDQ-GEMV-CNM-OWNER-CROSS-3SEED-85E7DB2` at source SHA
+`85e7db2d12f5edfaed17e8ca3910bb504983779f` (tree
+`e8f64f78f7986193bdc0d01dfbc01740a130edcb`). The exact regression command and
+tool versions are recorded in the [DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+The benchmark records below were extracted from those three run logs; they are
+not a separate simulator invocation. All three seeds report identical cycles
+and traffic, independent Golden PASS, and UVM Warning/Error/Fatal `0/0/0`.
+
+| Workload | Serial cycles | Concurrent/staged cycles | Ratio (`serial / concurrent`) | Read / write bytes | Result |
+|---|---:|---:|---:|---:|---|
+| Matrix + CNM + SFU + SFU | 1,696 | 1,137 | 1.492× | 4,352 / 2,688 in both modes | PASS; ordered completions `0600,0601,0602,0603`; 38 shared-SPAD contention cycles |
+| Matrix + CNM + SFU | 1,239 | 1,070 staged | 1.158× | staged 4,032 / 2,416; matching serial byte total not emitted | PASS; ordered completions `0700,0701,0702`; 32 Matrix/CNM pair-contention cycles |
+
+The contention checks in the same run observe 333 Matrix/CNM banked-collision
+cycles, 320 admitted collisions, 320 Matrix wait cycles and 320 held-payload
+checks; owner, hold and route-mismatch error counts are all zero. A separate
+Matrix line-writeback stall observes 1,837 overlap cycles and 84 payload
+stability checks, with zero violations. These counters describe test events;
+they are not additional latency to add to command-cycle totals. This is a
+single deterministic queued workload replayed with three seeds, not a broad
+parallel-performance distribution or a TinyNPU comparison.
+
+Machine outputs: [CSV](../../benchmark/v2_p2_cluster_serial_parallel_85e7db2.csv),
+[summary JSON](../../benchmark/v2_p2_cluster_serial_parallel_85e7db2_summary.json),
+and [cycle chart](../../benchmark/v2_p2_cluster_serial_parallel_85e7db2.svg).
+The logs-only source archive is
+`/tmp/nmaforge_v2_gemv_cnm_owner_85e7db2_logs.tar.gz`, SHA-256
+`f04f15c1dc76d64a027fc9bd296b02c40e771bf9d6b06f315dc48598637924b0`.
+This is a VCS RTL-cycle result using the checked-in behavioral four-bank SPAD;
+external DDR timing, SRAM timing, ASIC PPA and alternative arbitration-policy
+benefit remain unmeasured.
+
+### Latest Top-level 16×16 Matrix + CNM contention profile
+
+Run `V2-TOP-16X16-MATRIX-CNM-CONTENTION-C93D020` uses source/test SHA
+`c93d020880710a2804685fd85bb98c2e9c56f290` (tree
+`24180541c76b1ad4d27b2e97313e7d97a5df2016`), VCS
+`V-2023.12-SP1_Full64`, and three independent run seeds. The real Top CMDQ
+launches a 16×16 Matrix GEMM descriptor (`k_words=16`) and a 16-row banked
+CNM GEMV over disjoint operand/output regions. Matrix inputs are all INT8 +1,
+so all 256 INT32 outputs equal 64; CNM uses +2 and +3 operands, so its 16
+outputs equal 96. Every Matrix output and every CNM output is read back and
+compared against its INT32 Golden value; completion records also pass. No
+product RTL changed; the product RTL
+identity remains `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`.
+
+| Seed | Profile window | Both engines busy | Same-cycle request conflicts | Matrix busy / MAC / request wait / response wait / writeback / other | CNM busy / compute / request wait / response wait / writeback / other | Read / write bytes |
+|---:|---:|---:|---:|---|---|---:|
+| 20261106 | 445 | 93 | 20 | 318 / 64 / 17 / 23 / 64 / 150 | 145 / 16 / 0 / 0 / 16 / 113 | 2,560 / 1,088 |
+| 20261107 | 445 | 93 | 20 | same | same | 2,560 / 1,088 |
+| 20261108 | 445 | 93 | 20 | same | same | 2,560 / 1,088 |
+
+For the Matrix engine, the observed 64 MAC-active cycles execute 16,384
+INT8 MACs (256 MACs per active cycle); utilization is 20.13% of its busy
+interval or 14.38% of the profile window. Those are behavioral RTL counters,
+not a clock-rate or silicon throughput claim. Matrix/CNM mutually exclusive
+cycle buckets close to their busy totals on all Seeds. The Matrix read FIFO
+high-water is 2, Matrix accepts 128 16-byte reads, and CNM accepts 128
+4-byte lane reads. Output traffic is 1,024 B Matrix plus 64 B CNM. The
+profile-window length includes the testbench's doorbell/CPLQ register access
+overhead; it is not a clean standalone hardware latency endpoint.
+
+This profile established legal overlap and Golden/owner correctness but did
+not justify a scheduler change by itself. A later fixed-candidate UVM
+owner-cross at `839b9af` records Matrix/CNM request collisions with grants
+`0/18` in all three Seeds. That workload still completes both Goldens and is
+not a sustained-ready fairness proof. Source inspection of
+`ai_spad_arbiter.v` finds that every data-round-robin branch checks CNM before
+the Matrix `banked_valid` requester; the class pointer rotates Core/Banked/
+DMA classes but does not rotate CNM versus Matrix inside the shared Banked
+class. If both remain continuously pending, the current priority can starve
+Matrix. This is a candidate correctness/fairness defect in the existing RR
+contract, not evidence for a third compute innovation or a Bank-Aware Issue
+optimization.
+
+Before changing RTL, the acceptance condition is: a legal sustained CNM plus
+Matrix request test must demonstrate service for both requesters with a
+bounded wait, preserve their response tags and bit-exact data, and show no
+deadlock or reset/fault regression. Then rerun the existing real CMDQ
+0x52/CNM owner workload, the three-seed Compute Cluster regression, and Top
+Smoke. Compare contention grants and cycles before/after; do not claim a
+performance win unless the measured workload improves without a material
+regression to CNM, DMA, or response ownership.
+
+Exact build and run commands (VCS `V-2023.12-SP1_Full64`, behavioral four-bank
+SPAD, `+define+VCS`, 10 ns simulation clock):
+
+```sh
+make -C dv/subsystem/top_smoke/sim ai_smoke \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+  VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias AI_SEED=20261106 SEED=20261106
+
+cd dv/subsystem/top_smoke/sim
+./simv +ntb_random_seed=20261107 +AI_RANDOM_CASES=4 +AI_SEED=20261107 \
+  +ACLK_PERIOD_NS=10.0 -l ai_accel_smoke_seed_20261107.log
+./simv +ntb_random_seed=20261108 +AI_RANDOM_CASES=4 +AI_SEED=20261108 \
+  +ACLK_PERIOD_NS=10.0 -l ai_accel_smoke_seed_20261108.log
+```
+
+Machine outputs: [three-seed CSV](../../benchmark/v2_p2_cluster_top_contention_c93d020.csv)
+and [summary JSON](../../benchmark/v2_p2_cluster_top_contention_c93d020_summary.json).
+Logs-only archive:
+`/tmp/nmaforge_v2_top_contention_c93d020_logs.tar.gz`, SHA-256
+`b44e858972a704438b803d10146558b5554089a26c19729200619cc0af88ebeb`.
+
+The following section records the earlier 4×4 Matrix micro-workload profile;
+it remains useful as history but is superseded for system contention by the
+16×16 run above.
+
+### Functional owner stress: production 0x52 GEMV + CNM (not a performance comparison)
+
+Run `V2-CMDQ-GEMV-CNM-OWNER-CROSS-3SEED-85E7DB2` at fixed source/test SHA
+`85e7db2d12f5edfaed17e8ca3910bb504983779f` adds a maximum 16×16×16 GEMV and
+CNM GEMV as ordered descriptors in one real Top CMDQ submission. Three Seeds
+pass independent Matrix/CNM output Goldens, guards, completion order, accepted
+and returned read accounting, and zero response-route mismatches. Each run
+observes 178 both-busy cycles and 18 simultaneous-request collisions; the
+arbiter grants in those collision cycles were Matrix/CNM `0/18`. That is
+functional ownership evidence and one observed arbitration outcome; it is not
+a fairness result or a comparable latency benchmark. The same workload is
+present in the later clean-candidate three-seed Cluster run `839b9af` and again
+reports `0/18` Matrix/CNM grants during collisions. The source-level priority
+analysis and bounded-fairness acceptance condition above explain why this is
+now being tested as an existing round-robin contract issue. Product RTL is
+unchanged in these runs.
+
+The owner overlap/contention covergroup is 100%; regression-wide URG is
+Line/Condition/FSM/Branch/Assert/Group
+`70.69/68.25/45.99/67.59/72.00/81.86%`, so v2 DV remains open. Exact clean
+worktree command, tool versions, and log archive checksum are in the
+[DV closure report](../verification/NMAFORGE_V2_DV_CLOSURE.md).
+
+### Initial short Top-level Matrix + CNM profile
+
+Run `V2-TOP-MATRIX-CNM-PROFILE-4F7195B-S20261106-08` uses source/test SHA
+`4f7195bc01702f4e9a5bef2e609598ecb3dca66d` (tree
+`cf07292d03e245a0dc258d1d56c70f707e13763b`) and VCS
+`V-2023.12-SP1_Full64`. A real top-level CMDQ launches one Matrix GEMM and one
+CNM GEMV with disjoint operand and destination ranges. Three seeds
+(`20261106`–`20261108`) pass the full Top Smoke with four seeded random cases
+each; every profile reports the same directed workload measurements and
+bit-exact output/completion checks.
+
+The doorbell-to-both-completions measurement window is 229 cycles. Matrix is
+busy for 20 cycles, partitioned into 4 MAC-active, 2 request-wait, 2
+response-wait, 5 writeback, and 7 other cycles. CNM is busy for 146 cycles,
+partitioned into 16 compute, 1 request-wait, 1 response-wait, 16 writeback,
+and 112 other cycles. Both exclusive partitions close exactly to their engine
+busy totals. The large CNM `other` bucket is retained as measured control/idle
+work inside its busy interval; it is not recast as useful compute.
+
+Accepted engine-interface traffic is 544 B read (Matrix 32 B, CNM 512 B) and
+128 B written (64 B per engine). There is one cycle with simultaneous Matrix
+and CNM requests, Matrix read-outstanding high-water is 1, and no overlapping
+Matrix/CNM response-valid alias is observed. Request/response lane-cycle and
+writeback-stall counters are diagnostic observations and may overlap the
+exclusive phase counts; they must not be summed again. These byte counts omit
+descriptor/completion traffic, host initialization/readback, and DMA.
+
+This is a bounded real-Top contention profile using VCS behavioral four-bank
+SPAD at a 10 ns simulation clock. It is not a serial-versus-parallel matched
+workload result, a Bank-Aware Issue ablation, a TinyNPU comparison, or ASIC
+PPA. The low measured collision count does not establish a scheduler change's
+benefit; controlled contention and area/timing cost evidence remain open.
+
+Machine evidence: [three-seed CSV](../../benchmark/v2_p2_cluster_top_profile_4f7195b.csv),
+[summary JSON](../../benchmark/v2_p2_cluster_top_profile_4f7195b_summary.json).
+The compile log and three run logs are archived at
+`/tmp/nmaforge_v2_matrix_cnm_profile_4f7195b_logs.tar.gz`, SHA-256
+`ba82586d8c57cb25cdade6023a4ec7a811c6b892884eab57272e1f92211a2ec5`.
+The exact compile/run commands are:
+
+```sh
+make -C dv/subsystem/top_smoke/sim ai_smoke \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+  VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+  AI_SEED=20261106 SEED=20261106
+
+for seed in 20261107 20261108; do
+  dv/subsystem/top_smoke/sim/simv \
+    +ntb_random_seed=$seed +AI_RANDOM_CASES=4 +AI_SEED=$seed \
+    +ACLK_PERIOD_NS=10.0 \
+    -l /tmp/nmaforge_v2_matrix_cnm_profile_4f7195b/run_seed_$seed.log
+done
+```
+
+## Fused output tile forwarding
+
+At fixed candidate `33e85287fbf37187fccb76e97be6effe888670e9`, a three-Seed
+Matrix-core OFF/ON ablation passed bit-exact Golden checks and a three-Seed
+real Top CMDQ differential passed all output/completion checks. The core test's
+mean consumer cycles are 141→118 (−16.31%); the two-command mean is 290→267
+(−7.93%). The selected source-A line reads are 32→16 (512→256 B) per consumer.
+Producer/consumer output writes remain present in both runs. The top-level
+differential observes 16 baseline versus 0 forwarded source-A bank reads.
+
+This is a bounded 16×16×16 chain. Core-cycle and selected-source traffic
+results use different scopes from the full top run and are not an ASIC or
+whole-model speedup. Details and machine data: [three-Seed replay](../verification/V2_P2_TILE_FORWARD_MULTISEED_REPLAY_2026-11-05.md)
+and [raw CSV](../../benchmark/v2_p2_tile_forward_3seed.csv).
+
+## TinyNPU comparison status
+
+TinyNPU reference remains pinned at
+`8216c22b762011aa20c05fc2768423fd12dda59d`. Current replay
+`TINY-COMPARE-V2C3A59-S20261029` ran on NMAForge source SHA
+`c3a59f08d8c07a8da973010d0f23d5d6d7eed61b`, VCS
+`V-2023.12-SP1_Full64`, Verilator `5.052` revision
+`ea338be98e1e838d3518809ce8899f85a009963c`, Python `3.12.13`, NumPy `2.4.6`,
+and ONNX `1.17.0`. Three paired GEMM cases pass independent INT32 Golden on
+both designs. NMAForge used 172/263/1,391 cycles with a measured behavioral
+SPAD controller; TinyNPU direct array used 52/100/790 cycles. The explicitly
+serialized common-memory estimate for TinyNPU is 151/231/1,305 cycles. The
+ratio is NMAForge measured RTL cycles divided by TinyNPU normalized modeled
+cycles: **1.1391 / 1.1385 / 1.0659**. Values above 1 mean NMAForge took more
+cycles under this mixed measured/modeled endpoint; this is not a silicon or
+uniform-memory winner claim. TinyNPU has no scratchpad port in the tested
+wrapper, so its memory portion remains modeled.
+
+The same pinned `conv1x_mini.onnx` graph passes on both sides with the same
+model and input hashes. NMAForge checked every intermediate tensor and all
+four outputs; its measured windows are 1,985 compute cycles plus 1,080 host
+layout cycles. TinyNPU graph execution is 4,781 cycles through its graph
+dispatcher and testbench DMA/SRAM shim. The different execution/memory
+boundaries preclude a CNN speedup ratio. TinyNPU's reference engine regression
+passes 6/6, and the NMAForge matrix-size sweep passes 15/15 points for five
+workloads across 4×4/8×8/16×16 physical-array configurations at this seed.
+
+The exact replay command, per-run artifacts, model hashes, and raw-log archive
+checksum are in the [current replay record](NMAFORGE_V2_TINYNPU_REPLAY_2026-11-05.md).
+Machine-readable data is in [`gemm_results.csv`](../../benchmark/tinynpu/gemm_results.csv),
+[`cnn_results.csv`](../../benchmark/tinynpu/cnn_results.csv), and the two
+summary JSON files. The benchmark ratio convention remains
+`NMAForge cycles / TinyNPU normalized cycles`; values above 1 mean NMAForge
+used more cycles under the stated normalization. Prior BLOCKED_ENV entries
+are superseded for these tested GEMM/CNN/GEMV points only; the full TinyNPU/model
+benchmark task is not closed.
+
+### Small-M GEMV reference comparison
+
+At NMAForge SHA `0b1d33704f4895cf48b0f5e1d3f452d61b3df535`, run
+`GEMV-MATCH-V2-S20261029` passed signed INT8/INT32 Golden for `1×13×17` and
+`8×16×19` on opcode `0x52`. NMAForge's measured Matrix-controller plus
+behavioral-SPAD intervals were 76 and 158 cycles, with 304/560 B read and
+52/512 B written. The pinned TinyNPU SHA has no equivalent tested GEMV
+descriptor or SPAD port: its 16×16 direct-array RTL took 100 cycles for each
+zero-padded shape. Adding the explicitly serialized memory model yields 126
+and 170 cycles. The resulting ratios are 0.6032 and 0.9294, where
+`NMAForge measured command cycles / TinyNPU modeled endpoint cycles`; ratios
+below one favor NMAForge on this mixed endpoint arithmetic only and are not a
+system-level speedup claim.
+
+The NMAForge event profile closes to 76/158 total cycles when exclusive
+controller-stage counts and prefetch-wait cycles are combined. Arbiter,
+response, writeback, and prefetch wait/event counters can overlap and are not
+summed as independent stalls. Golden, raw rows, tool versions, command, and
+log archive checksum are in the [Small-M GEMV replay record](NMAFORGE_V2_SMALL_GEMV_TINYNPU_2026-11-05.md),
+[`gemv_results.csv`](../../benchmark/tinynpu/gemv_results.csv), and
+[`gemv_summary.json`](../../benchmark/tinynpu/gemv_summary.json). This adds
+two bounded shapes only; broad M/N/K tails, common RTL memory service, and
+product-level TinyNPU equivalence remain open.
+
+## Trained Digits model result
+
+The same trained INT8 model, seed `20261029`, 360 test inputs, independent
+integer Golden and exact RTL logits CSV were replayed on R250 and the v2
+candidate. The R250 CMDQ interval is 110,155 cycles; the `0x53` v2 interval is
+34,761 cycles, a 68.44% reduction for this model workload. Both runs classify
+352/360 images (97.78%) and the two RTL logit files have the same SHA-256.
+The v2 run executes 46 CMDQ descriptors versus 69 on R250 while retaining the
+same 1,884,160 padded MAC count. Its reported 54.2033 MAC/cycle and 21.17%
+utilization are simulation-derived over the full doorbell-to-completion-tail
+interval.
+
+This result compares two NMAForge RTL revisions, not TinyNPU. R250's SFU
+tile-pack counter and v2's fused Matrix counter are different event classes;
+their byte fields are also defined differently and are not ratioed. The
+timing excludes SPAD preload and post-run reads/Golden comparison. See the
+[matched model report](NMAFORGE_V2_MODEL_BENCHMARK.md), [CSV](../../benchmark/v2_digits_model_comparison.csv)
+and [JSON](../../benchmark/v2_digits_model_comparison.json).
+
+## Current conclusion
+
+The controlled NMAForge RTL results support the existing B-fold Cache and
+bounded tile forwarding for their measured workloads. Prefetch is beneficial
+for some points and neutral or slightly negative for others. Low utilization
+on small shapes and TinyNPU's missing RTL memory adapter remain open. No
+bank-aware scheduler RTL, second MAC array, or PPA claim is introduced by this
+report.
+
+## Current candidate replay at `410b81d`
+
+The current candidate reran the registered four-bank behavioral-SPAD product
+GEMV comparison on Seeds 20261105/06/07. VCS was
+`V-2023.12-SP1_Full64`; array 16×16 (256 INT8 MAC), read depth 4, A-Tile Cache
+enabled, and four B-fold Cache × Next-K Prefetch combinations. All 48 complete
+output images passed the independent Golden; exclusive Matrix state cycles
+equal command cycles for all points. Stall/event counters can overlap and are
+not summed as an exclusive partition.
+
+| Shape | Cache OFF / Prefetch OFF | Cache ON / Prefetch OFF | Cache OFF / Prefetch ON | Cache ON / Prefetch ON |
+|---|---:|---:|---:|---:|
+| M8×16×19 cycles / read B | 200.7 / 864 | 156.0 / 560 | 195.7 / 864 | 152.3 / 560 |
+| M8×16×65 cycles / read B | 544.3 / 2,720 | 391.0 / 1,696 | 520.0 / 2,720 | 383.0 / 1,696 |
+| M16×16×19 cycles / read B | 393.7 / 1,728 | 261.0 / 816 | 382.7 / 1,728 | 262.7 / 816 |
+| M16×16×65 cycles / read B | 1,075.0 / 5,440 | 627.3 / 2,368 | 1,029.7 / 5,440 | 632.3 / 2,368 |
+
+B-fold Cache without Prefetch reduces cycles 22.3–41.6% and reads 35.2–56.5%
+for these four shapes. Prefetch without Cache reduces cycles 2.5–4.5%. With
+Cache enabled, Prefetch helps the two M8 cases by about 2.1–2.4% but regresses
+the M16 cases by about 0.6–0.8%. With Cache and Prefetch both enabled, useful
+throughput is 15.97–26.32 MAC/cycle (6.24–10.28% of 256-MAC peak) across the
+four shapes. The best point across all four configurations is 26.53 MAC/cycle
+(10.36%) on M16×16×65 with Cache ON and Prefetch OFF. These are workload-window
+simulation metrics, not silicon utilization.
+
+Exact run: `V2-GEMV-FOUR-WAY-3SEED-410B81D`; merged artifacts are
+[CSV](../../benchmark/v2_p2_gemv_cache_prefetch_4way_410b81d.csv),
+[summary JSON](../../benchmark/v2_p2_gemv_cache_prefetch_4way_410b81d_summary.json)
+and [SVG](../../benchmark/v2_p2_gemv_cache_prefetch_4way_410b81d.svg). The
+run logs and per-seed summaries are outside Git at
+`/tmp/nmaforge_v2_current_410b81_gemv4`; combined GEMV/Digits evidence archive
+SHA-256 is
+`26b751910afa296181c1e85aab39910b71f0cdd49e196f493a5cdf1a22f9d5fa`.
+
+Reproduction command (run from the repository root):
+
+```sh
+VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias VCS_ARCH_OVERRIDE=linux \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+make -C dv/block/compute/matrix/sim product-gemv-four-way-ablation \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+  PYTHON=python3.12 SEEDS='20261105 20261106 20261107' \
+  OUTSTANDING_DEPTH=4 A_TILE_CACHE_ENABLE=1 PHYSICAL_ARRAY_SIZE=16 \
+  GEMV_FOUR_WAY_OUT=/tmp/nmaforge_v2_current_410b81_gemv4
+python3.12 tools/merge_gemv_four_way_ablation.py \
+  --output-prefix benchmark/v2_p2_gemv_cache_prefetch_4way_410b81d \
+  /tmp/nmaforge_v2_current_410b81_gemv4/summary_seed_20261105.csv \
+  /tmp/nmaforge_v2_current_410b81_gemv4/summary_seed_20261106.csv \
+  /tmp/nmaforge_v2_current_410b81_gemv4/summary_seed_20261107.csv
+```
+
+### Fixed replay at the concurrent-owner candidate `85e7db2`
+
+Run `V2-GEMV-FOUR-WAY-3SEED-85E7DB2` repeats the four-way Matrix-controller
+GEMV ablation on fixed RTL/test SHA `85e7db2d12f5edfaed17e8ca3910bb504983779f`
+with the same 16×16 array, 256 INT8 MACs, depth 4, A-Tile Cache ON, registered
+four-bank behavioral SPAD, workloads and Seeds `20261105/06/07`. All 48
+configuration/shape/Seed points pass bit-exact Golden, and the mutually
+exclusive FSM state partition closes to command cycles on every point. The
+per-seed throughput, read/write bytes, and overlapping stall counters are in
+the machine-readable CSV/JSON; event counters are not added to exclusive
+cycle partitions.
+
+| Shape | Cache OFF/PF OFF cycles → Cache ON/PF OFF | Read B OFF → ON | Cache ON/PF OFF → Cache ON/PF ON | Both ON speedup vs baseline |
+|---|---:|---:|---:|---:|
+| 8×16×19 | 200.67 → 156.00 (−22.3%) | 864 → 560 (−35.2%) | 156.00 → 152.33 (−2.4%) | 1.317× |
+| 8×16×65 | 544.33 → 391.00 (−28.2%) | 2,720 → 1,696 (−37.6%) | 391.00 → 383.00 (−2.0%) | 1.421× |
+| 16×16×19 | 393.67 → 261.00 (−33.7%) | 1,728 → 816 (−52.8%) | 261.00 → 262.67 (+0.6%) | 1.499× |
+| 16×16×65 | 1,075.00 → 627.33 (−41.6%) | 5,440 → 2,368 (−56.5%) | 627.33 → 632.33 (+0.8%) | 1.700× |
+
+Prefetch remains shape-dependent: it improves the two M8 points when Cache is
+ON and slightly regresses the M16 points. This supports retaining the bounded
+cache evidence and does not justify a new scheduler or universal-prefetch
+claim. This is Matrix-core RTL with a behavioral SPAD, not a full Top/CMDQ
+benchmark, ASIC timing/PPA, or TinyNPU comparison.
+
+Machine outputs: [CSV](../../benchmark/v2_p2_gemv_cache_prefetch_4way_85e7db2.csv),
+[summary JSON](../../benchmark/v2_p2_gemv_cache_prefetch_4way_85e7db2_summary.json),
+[chart](../../benchmark/v2_p2_gemv_cache_prefetch_4way_85e7db2.svg). Logs-only
+archive `/tmp/nmaforge_v2_gemv_four_way_85e7db2_logs.tar.gz`, SHA-256
+`b685a500285bdbfc737292d09771f2d23df69840e301773a6ad91c243c07fc60`.
+The merge tool now derives the summary Run ID from the measured SHA, avoiding
+the stale hard-coded `410B81D` label on subsequent runs.
+
+Exact run and merge commands:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+PYTHON=python3.12 make -C dv/block/compute/matrix/sim product-gemv-four-way-ablation \
+  SEEDS='20261105 20261106 20261107' OUTSTANDING_DEPTH=4 \
+  A_TILE_CACHE_ENABLE=1 PHYSICAL_ARRAY_SIZE=16 \
+  GEMV_FOUR_WAY_OUT=/tmp/nmaforge_v2_gemv_four_way_85e7db2
+
+python3.12 tools/merge_gemv_four_way_ablation.py \
+  --output-prefix benchmark/v2_p2_gemv_cache_prefetch_4way_85e7db2 \
+  /tmp/nmaforge_v2_gemv_four_way_85e7db2/summary_seed_20261105.csv \
+  /tmp/nmaforge_v2_gemv_four_way_85e7db2/summary_seed_20261106.csv \
+  /tmp/nmaforge_v2_gemv_four_way_85e7db2/summary_seed_20261107.csv
+```
+
+### Seven-engine shared-SPAD workload
+
+The real Compute Cluster top, shared arbiter, and checked-in behavioral
+four-bank SPAD passed the same deterministic serial/parallel workload on three
+Seeds. Descriptor programming and external DDR timing are excluded.
+
+| Case | Cycles | Read / write traffic | Result |
+|---|---:|---:|---|
+| Four tasks serial: Matrix + CNM + SFU + SFU | 1,696 | 4,352 / 2,688 B | Golden PASS |
+| Same four tasks queued/parallel | 1,137 | 4,352 / 2,688 B | 1.492× vs serial, ordered completion |
+| Three tasks serial: Matrix + CNM + SFU | 1,239 | 4,032 / 2,416 B | Golden PASS |
+| Matrix + CNM overlap, then SFU | 1,070 | 4,032 / 2,416 B | 1.158× vs serial |
+
+Observed Matrix/CNM contention is 320 admitted bank collisions and 320 Matrix
+wait cycles, with zero response-owner, held-payload, or route mismatches. This
+demonstrates current-policy contention; no alternative Bank-Aware Issue policy
+was A/B tested, so it is not evidence to add scheduler RTL. See the
+[contention CSV](../../benchmark/v2_p2_cluster_contention_410b81d.csv),
+[serial/parallel CSV](../../benchmark/v2_p2_cluster_serial_parallel_410b81d.csv),
+[summary JSON](../../benchmark/v2_p2_cluster_serial_parallel_410b81d_summary.json)
+and [chart](../../benchmark/v2_p2_cluster_serial_parallel_410b81d.svg).
+Detailed logs are in `/tmp/nmaforge_v2_current_410b81_cluster_uvm` and the
+combined archive `/tmp/nmaforge_v2_current_410b81_signoff_logs.tar.gz`,
+SHA-256 `c9f88930f24c3ca74140ba48e06d91f3fdbd0d37585fff0f9dac3ded15404ce5`.
+
+These are RTL simulation results with behavioral SPAD. They are not SRAM
+timing, measured Fmax, ASIC area, power, or energy measurements.
+
+## Current-candidate TinyNPU GEMM replay — `d1867da`
+
+The current NMAForge source/test candidate was rerun against the three
+deterministic GEMM vectors used by the pinned TinyNPU reference. The executed
+Git HEAD was `d1867da79a84b17451d63e919f9ce1e8ef4df098`; the v2 RTL/test
+candidate is `410b81dfd37992a760b28258bb7e8c6b6f5017d7`. The intervening tree
+changes are reports and benchmark records; no RTL or testbench source changed
+from `410b81d` to `d1867da`.
+
+| Shape | NMAForge controller + behavioral SPAD | TinyNPU direct RTL array | TinyNPU serialized memory endpoint estimate | NMAForge / estimated TinyNPU |
+|---|---:|---:|---:|---:|
+| 16×16×16 | 172 cycles | 52 cycles | 151 cycles | 1.1391 |
+| 16×16×32 | 263 cycles | 100 cycles | 231 cycles | 1.1385 |
+| 32×32×64 | 1,391 cycles | 790 cycles | 1,305 cycles | 1.0659 |
+
+All three current NMAForge output images pass the independent INT32 Golden.
+NMAForge uses a measured 16×16 Matrix controller with a one-cycle behavioral
+four-bank SPAD. TinyNPU's direct-array cycles were measured at its pinned SHA
+in the earlier `TINY-COMPARE-V2C3A59-S20261029` replay; its memory endpoint is
+an explicit serialized model, not TinyNPU memory RTL. Ratios above 1 mean the
+NMAForge measured interval is longer than the modeled TinyNPU endpoint. This
+is a useful negative result, not a product-level performance win or a uniform
+memory-service comparison. The current environment has no Verilator binary,
+so TinyNPU itself was not rebuilt in this replay.
+
+Run ID: `V2-TINYNPU-REPLAY-CURRENT-D1867DA-S20261029`. Exact current NMAForge
+commands:
+
+```sh
+VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias \
+PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH \
+make -C dv/block/compute/matrix/sim core-random-compile \
+  VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' \
+  PHYSICAL_ARRAY_SIZE=16 OUTSTANDING_DEPTH=4 A_TILE_CACHE_ENABLE=1 \
+  NEXT_K_PREFETCH_ENABLE=1 GEMV_B_TILE_CACHE_ENABLE=1 \
+  CORE_OUT_DIR=/tmp/nmaforge_v2_tinynpu_current_d1867da
+/tmp/nmaforge_v2_tinynpu_current_d1867da/simv +SEED=20261029 \
+  +TINY_NPU_MATCH_MULTI \
+  -l /tmp/nmaforge_v2_tinynpu_current_d1867da/run.log
+```
+
+The same replay also checked the pinned `conv1x_mini.onnx` graph through the
+current top-level CMDQ path: all intermediate tensors and four outputs were
+bit-exact. Machine records are the [GEMM CSV](../../benchmark/v2_tinynpu_current_d1867da_gemm.csv),
+[CNN CSV](../../benchmark/v2_tinynpu_current_d1867da_cnn.csv), and
+[summary JSON](../../benchmark/v2_tinynpu_current_d1867da_summary.json). VCS
+compile/run logs and generated CNN input/expected memory images are archived
+outside Git at `/tmp/nmaforge_v2_tinynpu_current_d1867da_logs.tar.gz`,
+SHA-256 `018d11dc90159192f0fb13c5e5901269b66be7ff8013bf4891cfd26b1e9e7885`.
+
+## Verification-only update — 2026-11-06
+
+The current testbench/build candidate is `380f96114dba022300db09fb217264c3a606a2fd`
+(tree `79aaf0782aba0da18d7109b74ae2bd343a473181`); product RTL is unchanged.
+The new runs add functional coverage for GEMV shapes and Tile Forwarding but
+do not rerun the performance suites. Cycle, traffic, utilization, and TinyNPU
+comparisons above remain tied to their individually listed source/test SHAs
+and timing endpoints. No new PPA or system-level performance result is
+inferred from the coverage replay. See the [DV report](../verification/NMAFORGE_V2_DV_CLOSURE.md)
+for exact run IDs and the evidence archive.
+
+
+## Current-candidate Matrix eight-configuration replay — 2026-11-06
+
+Run ID `V2-MATRIX-EIGHT-CONFIG-3SEED-36D4B9B` ran the existing Matrix
+controller benchmark on source/test SHA
+`36d4b9b4bbafe769b452afc003033d2a222a682f` (tree
+`a92a302ce78ef541aa0a76bb99dfeb0a413ad0c4`). It used the same five GEMM
+workloads, a physical 16×16 array (256 INT8 MACs), fixed one-cycle behavioral
+bank response, and three fixed Seeds. Each Seed completed all eight combinations
+of outstanding depth 2/4, Next-K Prefetch OFF/ON, and A-Tile Cache OFF/ON.
+Every point passed its independent output Golden: 120/120 total.
+
+Mean measurements across the five workloads (three-seed mean per workload,
+then summed) are:
+
+| Depth / Prefetch / A-Tile Cache | Cycles | Change vs baseline | SPAD read bytes | SPAD write bytes | Total SPAD bytes | Weighted MAC/cycle | Weighted array utilization |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 2 / OFF / OFF (baseline) | 2,720.00 | — | 12,032 | 7,488 | 19,520 | 34.07 | 13.31% |
+| 2 / OFF / ON | 2,455.67 | −9.72% | 9,472 | 7,488 | 16,960 | 37.74 | 14.74% |
+| 2 / ON / OFF | 2,447.00 | −10.04% | 12,032 | 7,488 | 19,520 | 37.87 | 14.79% |
+| 2 / ON / ON | 2,133.00 | −21.58% | 9,472 | 7,488 | 16,960 | 43.45 | 16.97% |
+| 4 / OFF / OFF | 2,602.00 | −4.34% | 12,032 | 7,488 | 19,520 | 35.62 | 13.91% |
+| 4 / OFF / ON | 2,346.00 | −13.75% | 9,472 | 7,488 | 16,960 | 39.50 | 15.43% |
+| 4 / ON / OFF | 2,316.00 | −14.85% | 12,032 | 7,488 | 19,520 | 40.01 | 15.63% |
+| 4 / ON / ON | 2,038.33 | −25.06% | 9,472 | 7,488 | 16,960 | 45.46 | 17.76% |
+
+The A-Tile Cache reduces aggregate read traffic by 21.28% for this workload
+set while write traffic is unchanged. The effect is concentrated in shapes
 that reuse A across column tiles. Prefetch-only reduces cycles by 10.04% at
 depth 2 and 14.85% at depth 4 without changing the recorded SPAD bytes. Depth
 4 alone improves cycles by 4.34%; the combined result is not a simple sum of

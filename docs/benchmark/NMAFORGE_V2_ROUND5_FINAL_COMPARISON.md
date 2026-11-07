@@ -10,7 +10,7 @@ sign-off, or a TinyNPU system-level victory.
 |---|---|
 | Reviewed source/test SHA | `73caef0f32140d1635816f1eb4ea28372523e80c` |
 | Initial remote target HEAD | `73caef0f32140d1635816f1eb4ea28372523e80c` |
-| Published Mapper experiment snapshot | `ffe9605f3f3647350429497e975ddd37907c1cc4` |
+| Published Mapper experiment snapshot | `acc069072b0b746ef1cdce85b91b56907a782eae` |
 | Product RTL baseline | `cd0a05d8ecd8cfb6c3f39b559788a2531e324b23` |
 | TinyNPU reference | `8216c22b762011aa20c05fc2768423fd12dda59d` |
 | VCS | `V-2023.12-SP1_Full64` |
@@ -139,7 +139,7 @@ is not meaningful on the failing H4 mapping; at M=1 and K=4 there is no
 multi-row B-fold reuse or next-K overlap.
 
 The Mapper experiment is reproducible from snapshot
-`ffe9605f3f3647350429497e975ddd37907c1cc4`; the only change made after the
+`acc069072b0b746ef1cdce85b91b56907a782eae`; the only change made after the
 Top run and included in that snapshot is CLI help text warning against the
 known failing opt-in. It does not alter descriptor generation.
 
