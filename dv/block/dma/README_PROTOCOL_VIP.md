@@ -29,36 +29,45 @@ make -C dv/block/dma/sim uvm_vip_run \
 The reviewed two-seed bridge regression is `protocol-vip-dma-vcs-regression`
 in `tools/rocky-bridge.tasks.protocol-vip.json`.
 
-The bridge runner requires all 20 `[DMA_AXI_VIP_CASE_PASS]` markers on each
-seed and retains the original non-VIP regression as a compatibility guard.
-The expanded matrix is not accepted until that runner has been re-executed
-against the pushed source commit; the historical evidence below is for the
-earlier three-operation smoke only.
+The bridge runner requires all 20 actual `[DMA_AXI_VIP_CASE_PASS] case=...`
+records (not the UVM report-summary count), zero UVM warning/error/fatal
+counts, a gated total-pass marker, observed cross-ID B reordering, clean VIP
+scoreboard accounting, and a passing original non-VIP compatibility smoke.
+Per-scenario and total pass markers are suppressed when their checks fail.
 
-## Acceptance evidence
+## Expanded acceptance evidence
 
-Validated against NMAForge code commit `ca00325` on
-`feature/axi-vip-integration`, using Rocky-8.10, VCS
-`V-2023.12-SP1_Full64`, UVM 1.2, seeds `123` and `98765`. Both seeds passed:
+Validated against NMAForge integration commit `f348960` on
+`feature/axi-vip-integration`, with AXI VIP source `3b4a975`, Rocky-8.10,
+VCS `V-2023.12-SP1_Full64`, UVM 1.2, and seeds `123` and `98765`. Both seeds
+passed the expanded matrix:
 
-- AXI4 VIP reactive-memory scoreboard: 6 requests completed (5 reads, 1
-  write), zero outstanding, reset-aborted requests, or mismatches.
-- NMAForge block scoreboard: 32-word load, 4-word store, and 4-word readback
-  all matched; three `[SB_PASS]` markers per seed.
-- AXI protocol checker: zero violations; UVM WARNING/ERROR/FATAL: `0/0/0`.
-- Backward compatibility: the original `dma_load_ooo_smoke_test` compiled
-  with the non-VIP filelist and passed at seed `123`, matching 32 words with
-  UVM WARNING/ERROR/FATAL=`0/0/0`.
-- DMA command functional coverage: `60.48%` for this deliberately small
-  acceptance sequence. This is not coverage closure.
+- 20/20 directed scenarios passed, including outstanding traffic, 1-D/2-D/
+  gather and narrow loads, 4-KiB splitting, multi-burst and tail stores,
+  VIP-memory readback, invalid configuration rejection, SLVERR, abort/drain,
+  and backpressure.
+- Per seed, the active AXI4 slave VIP completed 48 requests (33 reads, 15
+  writes): zero outstanding, reset-aborted requests, scoreboard mismatches,
+  or protocol-checker violations. UVM WARNING/ERROR/FATAL was `0/0/0`.
+- Four writes were outstanding together. AW IDs `{8,9,A,B}` completed as B
+  IDs `{9,A,B,8}`; the checker reported read/write peak outstanding `4/4` and
+  cross-ID reorder counts `1/6`.
+- The independent DMA block scoreboard matched every positive load/store
+  payload; expected-error and abort cases completed with their expected status.
+  DMA command functional coverage reported `100%` for this bounded test's
+  modeled bins, which is not full DMA or protocol coverage closure. VIP AXI
+  functional coverage was `37.32%`; configured sideband bins were not closed.
+- Backward compatibility: the original non-VIP
+  `dma_load_ooo_smoke_test` compiled from the standard filelist and passed at
+  seed `123`, matching 32 words with UVM WARNING/ERROR/FATAL=`0/0/0`.
 
-Raw compile and per-seed logs are archived locally under
-`dv/block/dma/artifacts/protocol-vip/20261105T123640Z/`; the artifacts are
+Raw compile, both seed logs, and legacy-flow logs are archived locally under
+`dv/block/dma/artifacts/protocol-vip/20261107T050245Z/`; the artifacts are
 intentionally not committed. Re-run the named bridge task to regenerate them.
 
-This evidence qualifies only a functional smoke slice of the AXI4 interface at
-the `ai_axi128_dma` block boundary with the configured 64/128/4 profile. It
-does not close the DMA feature matrix or qualify the full accelerator top,
+This is real-DUT block-level evidence for `ai_axi128_dma` with AXI4
+address/data/ID widths `64/128/4` and `MAX_BURST_BEATS=2`. It does not close
+the full DMA feature matrix or qualify the full accelerator top, top-level
 AXI-Lite control path, DDR PHY/controller, clock-domain crossings,
-reset/fault combinations beyond this test, physical timing, or tapeout
+reset/fault combinations beyond these scenarios, physical timing, or tapeout
 sign-off.
