@@ -12,6 +12,10 @@ package nma_axi_lite_vip_test_pkg;
 
     tvip_axi_env           axi_env;
     tvip_axi_configuration axi_cfg;
+    int unsigned           awvalid_without_w_cycles;
+    int unsigned           wvalid_without_aw_cycles;
+    int unsigned           bready_stall_cycles;
+    int unsigned           rready_stall_cycles;
 
     function new(string name = "nma_axi_lite_csr_vip_test", uvm_component parent = null);
       super.new(name, parent);
@@ -43,6 +47,10 @@ package nma_axi_lite_vip_test_pkg;
         `uvm_fatal("NMA_AXIL_VIP_CFG_RANDOMIZE", "Could not randomize legal 32-bit AXI4-Lite master configuration")
       end
       axi_cfg.agent_mode = UVM_ACTIVE;
+      // Start with response READY low. The access sequence raises it only
+      // after its per-transaction delay, exercising real CSR response holds.
+      axi_cfg.default_bready = 0;
+      axi_cfg.default_rready = 0;
       if (!axi_cfg.validate_configuration(config_error)) begin
         `uvm_fatal("NMA_AXIL_VIP_CFG_INVALID", config_error)
       end
@@ -58,7 +66,10 @@ package nma_axi_lite_vip_test_pkg;
       input tvip_axi_strobe write_strobe,
       input tvip_axi_response expected_response,
       input tvip_axi_data expected_read_data,
-      input string case_name
+      input string case_name,
+      input int unsigned address_start_gap = 0,
+      input int unsigned write_data_gap = 0,
+      input int unsigned response_ready_gap = 0
     );
       tvip_axi_master_access_sequence access;
       access = tvip_axi_master_access_sequence::type_id::create(
@@ -73,10 +84,11 @@ package nma_axi_lite_vip_test_pkg;
           burst_size == 4;
           burst_type == TVIP_AXI_INCREMENTING_BURST;
           protection == '0;
+          start_delay == local::address_start_gap;
           data[0] == local::write_data;
           strobe[0] == local::write_strobe;
-          write_data_delay[0] == 0;
-          response_ready_delay[0] == 0;
+          write_data_delay[0] == local::write_data_gap;
+          response_ready_delay[0] == local::response_ready_gap;
         }) begin
           `uvm_fatal("NMA_AXIL_VIP_RANDOMIZE",
             $sformatf("Could not randomize write case %s", case_name))
@@ -90,7 +102,8 @@ package nma_axi_lite_vip_test_pkg;
           burst_size == 4;
           burst_type == TVIP_AXI_INCREMENTING_BURST;
           protection == '0;
-          response_ready_delay[0] == 0;
+          start_delay == local::address_start_gap;
+          response_ready_delay[0] == local::response_ready_gap;
         }) begin
           `uvm_fatal("NMA_AXIL_VIP_RANDOMIZE",
             $sformatf("Could not randomize read case %s", case_name))
@@ -114,15 +127,37 @@ package nma_axi_lite_vip_test_pkg;
       end
     endtask
 
+    task automatic collect_pin_timing_evidence();
+      forever begin
+        @(axi_cfg.vif.monitor_cb);
+        if ((axi_cfg.vif.monitor_cb.awvalid === 1'b1) &&
+            (axi_cfg.vif.monitor_cb.wvalid === 1'b0))
+          awvalid_without_w_cycles++;
+        if ((axi_cfg.vif.monitor_cb.wvalid === 1'b1) &&
+            (axi_cfg.vif.monitor_cb.awvalid === 1'b0))
+          wvalid_without_aw_cycles++;
+        if ((axi_cfg.vif.monitor_cb.bvalid === 1'b1) &&
+            (axi_cfg.vif.monitor_cb.bready === 1'b0))
+          bready_stall_cycles++;
+        if ((axi_cfg.vif.monitor_cb.rvalid === 1'b1) &&
+            (axi_cfg.vif.monitor_cb.rready === 1'b0))
+          rready_stall_cycles++;
+      end
+    endtask
+
     task run_phase(uvm_phase phase);
       phase.raise_objection(this);
       wait (axi_cfg.vif.areset_n === 1'b1);
+      fork
+        collect_pin_timing_evidence();
+      join_none
+
       access_register(0, 32'h0000_0044, '0, '0, TVIP_AXI_OKAY,
-                      32'h1000_000a, "version_read");
+                      32'h1000_000a, "version_read", 0, 0, 3);
       access_register(1, 32'h0000_0008, 32'h0000_0034, 4'hf,
-                      TVIP_AXI_OKAY, '0, "op_write");
+                      TVIP_AXI_OKAY, '0, "op_write", 0, 5, 4);
       access_register(0, 32'h0000_0008, '0, '0, TVIP_AXI_OKAY,
-                      32'h0000_0034, "op_readback");
+                      32'h0000_0034, "op_readback", 0, 0, 4);
       access_register(0, 32'h0000_0045, '0, '0, TVIP_AXI_SLAVE_ERROR,
                       '0, "unaligned_read");
       access_register(0, 32'h0000_0200, '0, '0, TVIP_AXI_SLAVE_ERROR,
@@ -130,12 +165,25 @@ package nma_axi_lite_vip_test_pkg;
       access_register(1, 32'h0000_0044, 32'hffff_ffff, 4'hf,
                       TVIP_AXI_SLAVE_ERROR, '0, "readonly_write");
       access_register(1, 32'h0000_0008, 32'h0000_0056, 4'h1,
-                      TVIP_AXI_SLAVE_ERROR, '0, "partial_strobe_write");
+                      TVIP_AXI_SLAVE_ERROR, '0, "partial_strobe_write", 5, 0, 3);
       access_register(1, 32'h0000_0200, 32'h0000_0001, 4'hf,
                       TVIP_AXI_SLAVE_ERROR, '0, "unmapped_write");
       repeat (2) @(posedge axi_cfg.vif.aclk);
+      if ((awvalid_without_w_cycles == 0) || (wvalid_without_aw_cycles == 0) ||
+          (bready_stall_cycles < 3) || (rready_stall_cycles < 3)) begin
+        `uvm_error("NMA_AXIL_VIP_TIMING", $sformatf(
+          "AXI-Lite timing evidence incomplete: AW-only=%0d W-only=%0d B-stall=%0d R-stall=%0d",
+          awvalid_without_w_cycles, wvalid_without_aw_cycles,
+          bready_stall_cycles, rready_stall_cycles))
+      end
+      else begin
+        `uvm_info("NMA_AXIL_VIP_TIMING_PASS", $sformatf(
+          "NMA_AXIL_VIP_TIMING_PASS: AW-only=%0d W-only=%0d B-stall=%0d R-stall=%0d",
+          awvalid_without_w_cycles, wvalid_without_aw_cycles,
+          bready_stall_cycles, rready_stall_cycles), UVM_NONE)
+      end
       `uvm_info("NMA_AXIL_VIP_CSR_PASS",
-        "NMA_AXIL_VIP_CSR_PASS: real ai_accel_top; 32-bit AXI4-Lite master; legal read/write and five SLVERR cases",
+        "NMA_AXIL_VIP_CSR_PASS: real ai_accel_top; 32-bit AXI4-Lite master; independent AW/W timing, B/R backpressure, legal read/write and five SLVERR cases",
         UVM_NONE)
       phase.drop_objection(this);
     endtask

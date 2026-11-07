@@ -57,6 +57,11 @@ for seed in "${seed_list[@]}"; do
     tail -n 100 "${run_log}" >&2
     exit 1
   }
+  grep -Eq 'NMA_AXIL_VIP_TIMING_PASS: AW-only=[1-9][0-9]* W-only=[1-9][0-9]* B-stall=([3-9]|[1-9][0-9]+) R-stall=([3-9]|[1-9][0-9]+)' "${run_log}" || {
+    echo "ERROR: independent AW/W timing or B/R backpressure evidence missing at seed ${seed}" >&2
+    tail -n 100 "${run_log}" >&2
+    exit 1
+  }
   grep -Eq 'AXI requests=8 completed=8 reads=4 writes=4 outstanding=0 reset_aborted=0 mismatches=0' "${run_log}" || {
     echo "ERROR: AXI transaction accounting did not close at seed ${seed}" >&2
     tail -n 100 "${run_log}" >&2
