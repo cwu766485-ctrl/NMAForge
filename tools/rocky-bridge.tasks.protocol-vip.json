@@ -18,6 +18,14 @@
         "set -euo pipefail; test -f /mnt/e/workspace/chip/vip/vip_axi/tue/compile.f; test -f /mnt/e/workspace/chip/vip/vip_axi/tvip-common/compile.f; make -n -C dv/uvm/sim axi_lite_vip_compile PROTOCOL_VIP_ROOT=/mnt/e/workspace/chip/vip AXIL_VIP_OUT=/tmp/protocol_vip_axil_static; echo PROTOCOL_VIP_AXIL_STATIC_PASS"
       ]
     },
+    "protocol-vip-axil-vcs-regression": {
+      "description": "Compile the reusable AXI4-Lite master VIP against the real NMAForge ai_accel_top CSR port, run two fixed seeds, and require the CSR acceptance marker, exact transaction accounting, and zero UVM warnings/errors/fatals.",
+      "executable": "bash",
+      "arguments": [
+        "-lic",
+        "bash ./tools/run_protocol_vip_axil_regression.sh"
+      ]
+    },
     "protocol-vip-dma-vcs-regression": {
       "description": "Compile the NMAForge DMA block against protocol-vips AXI4 active-slave agent and run the 20-scenario positive/negative corner matrix at two fixed seeds, then guard legacy BFM compatibility.",
       "executable": "bash",
