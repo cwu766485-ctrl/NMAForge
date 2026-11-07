@@ -26,6 +26,14 @@
         "bash ./tools/run_protocol_vip_axil_regression.sh"
       ]
     },
+    "protocol-vip-axil-latest-log-summary": {
+      "description": "Read-only summary of the most recent AXI4-Lite VIP compile and simulation logs under /tmp, for diagnosing a failed acceptance run.",
+      "executable": "bash",
+      "arguments": [
+        "-lic",
+        "set -euo pipefail; out_dir=$(find /tmp -maxdepth 1 -type d -name 'nmaforge_axi_lite_vip_*' -printf '%T@ %p\\n' | sort -nr | head -n1 | cut -d' ' -f2-); test -n \"$out_dir\"; echo AXIL_VIP_LOG_DIR=$out_dir; for log in \"$out_dir\"/compile.log \"$out_dir\"/run_seed_*.log; do test -f \"$log\" || continue; echo ===$log===; grep -nE 'Error-|Warning-|UVM_(INFO|WARNING|ERROR|FATAL)|NMA_AXIL|AXI requests=|PASS|Simulation finish|Error:' \"$log\" | tail -n 100 || true; done"
+      ]
+    },
     "protocol-vip-dma-vcs-regression": {
       "description": "Compile the NMAForge DMA block against protocol-vips AXI4 active-slave agent and run the 20-scenario positive/negative corner matrix at two fixed seeds, then guard legacy BFM compatibility.",
       "executable": "bash",
