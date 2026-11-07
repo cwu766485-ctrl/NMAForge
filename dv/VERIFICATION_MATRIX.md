@@ -870,3 +870,29 @@ bank response:
 GOPS is normalized to an assumed 250 MHz; neither these results nor the 10 ns
 testbench period model SRAM macro timing or establish PPA. Exact commands and
 artifact paths are in the [upgrade roadmap](../docs/verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md#34-p0-c-ping-pong-prefetch--p1-bounded-a-tile-reuse).
+
+### External protocol VIP AXI4-Lite CSR acceptance (2026-11-07)
+
+The dedicated `tb_nma_axi_lite_vip` test top connects the reusable AXI4-Lite
+Master VIP through `tvip_axi4lite_master_pin_adapter` to the real
+`rtl/top/ai_accel_top.v` CSR slave. The test ran at NMAForge integration branch
+commit `bb5dd74` against VIP source commit `c8ce442`, using Rocky Linux 8.10,
+Synopsys VCS `V-2023.12-SP1_Full64`, UVM 1.2, and seeds `20261107`/`20261108`.
+
+Each seed passed 8/8 requests (4 reads, 4 writes): VERSION read, OP write and
+readback, plus unaligned read, unmapped read/write, read-only write and partial
+WSTRB write. The VIP checker reported zero stability/XZ/reset/burst/4-KiB/
+strobes/outstanding violations; the transaction scoreboard reported 8/8
+completed, zero outstanding/reset-aborted/mismatches; UVM
+WARNING/ERROR/FATAL=`0/0/0`. The bounded run's generic AXI and AXI4-Lite PROT
+coverage summaries were 30.93% and 41.67%; these are not coverage-closure
+claims.
+
+Artifacts: `/tmp/nmaforge_axi_lite_vip_20261107T051728Z/` in the Rocky WSL
+environment. Reproduce from the integration checkout with
+`bash tools/run_protocol_vip_axil_regression.sh`; the script requires the real-
+DUT PASS marker, exact 8-transaction accounting and zero UVM severity counts.
+The test ties off the top's AXI4 data-master port and does not cover the full
+register map, IRQ behavior, reset with outstanding work, DMA/data plane, or
+whole-accelerator function. It is bounded interface/CSR evidence, not full
+NMAForge acceptance or tapeout signoff.

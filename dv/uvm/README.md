@@ -54,7 +54,7 @@ active UVM work is now under `dv/block/`: DMA has 11 passing directed/random
 tests and AXI-Lite control has six passing tests. See `dv/VERIFICATION_MATRIX.md`
 for the current evidence boundary.
 
-## External AXI4-Lite VIP integration (acceptance pending)
+## External AXI4-Lite VIP integration (bounded CSR slice passed)
 
 `tb_nma_axi_lite_vip` is a separate test top that connects the reusable
 `vip_axi` 32-bit AXI4-Lite master through its pin adapter to the real
@@ -64,25 +64,35 @@ project's existing AXI-Lite agent and tests are unchanged. The directed CSR
 test checks VERSION, writable OP readback, unaligned/unmapped accesses,
 read-only writes and partial WSTRB rejection. It ties off the top's AXI4 data
 port and therefore does not claim DMA, interrupt, reset-interruption or full
-register-map verification. This new external-VIP path is not evidence of a
-pass until it has run with a clean fixed source revision on licensed VCS.
+register-map verification. The bounded CSR test passed on the exact integration
+branch commit `bb5dd74` with Rocky Linux 8.10, VCS
+`V-2023.12-SP1_Full64`, UVM 1.2, and seeds `20261107` and `20261108`.
+Both runs completed 8/8 AXI requests (4 reads, 4 writes), with zero scoreboard
+mismatches, zero protocol-checker violations and UVM WARNING/ERROR/FATAL
+`0/0/0`. This is a selected CSR acceptance slice, not full accelerator or
+tapeout signoff.
 
-With the VIP checkout at the sibling `chip/vip` path, run from Rocky Linux:
+With the VIP checkout at `/mnt/e/workspace/chip/vip`, run from the NMAForge
+integration checkout on Rocky Linux:
 
 ```bash
-cd <NMAForge>/dv/uvm/sim
-make axi_lite_vip_csr PROTOCOL_VIP_ROOT=/mnt/e/workspace/chip/vip \
-  AXIL_VIP_OUT=/tmp/nmaforge_axi_lite_vip
+cd <NMAForge>
+bash tools/run_protocol_vip_axil_regression.sh
 ```
 
-The VIP source requires its `vip_axi/tue` and `vip_axi/tvip-common`
-dependencies. Override `PROTOCOL_VIP_ROOT` for another checkout location.
+The runner compiles the real-top test and executes both fixed seeds, requiring
+the CSR PASS marker, exact transaction accounting and zero UVM warnings/errors/
+fatals. Override `PROTOCOL_VIP_ROOT`, `AXIL_VIP_OUT` or `AXIL_VIP_SEEDS` for a
+different VIP checkout, artifact directory or seed list. The VIP source
+requires its `vip_axi/tue` and `vip_axi/tvip-common` dependencies. Logs from
+the recorded run are under `/tmp/nmaforge_axi_lite_vip_20261107T051728Z`.
 
 ## Next additions, in order
 
 1. Block-level `ai_axi128_dma` environment: AXI4 slave responder plus SPAD BFM;
 2. DMA 1D/2D/gather, 4 KiB, abort and four-outstanding block sequences;
 3. `ai_spad_arbiter` and command/queue/completion subsystem environments;
-4. AXI-Lite RAL, reset/error/IRQ tests at top level;
+4. Extend the bounded AXI-Lite top-level CSR test to full RAL/register-map,
+   reset, IRQ, and reset-with-outstanding/error scenarios;
 5. active/error-injection AXI4 memory responder with RID/RLAST/BID scoreboarding;
 6. CNM/matrix/SFU golden-model adapters, Transformer chain, coverage and formal closure.
