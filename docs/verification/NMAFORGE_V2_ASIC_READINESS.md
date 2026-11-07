@@ -1,5 +1,45 @@
 # NMAForge v2 ASIC Readiness
 
+## Round 5 synthesis and SRAM catalog update — 2026-11-07
+
+The private environment does contain the TSMC28 HPC+ RV standard-cell
+database, SRAM Liberty/LEF, and Design Compiler `V-2023.12-SP1`. The Matrix
+Core experiment selected the SSG 0.72 V / 125°C standard-cell corner and set
+a 2.500 ns clock, 100 ps clock uncertainty, 50 ps input transition, 250 ps
+input/output delays, and 20 fF output load. No false-path or multicycle
+exception was applied. These are preliminary port assumptions, not a
+product-level signed SDC.
+
+Two bounded Matrix-Core DC attempts did not produce a mapped netlist or
+usable area/timing/power report. The first valid-library `compile_ultra`
+attempt was terminated while mapping; the follow-up `standard` mode exposed
+an unsupported `-no_autoungroup` option and was stopped before mapping. The
+checked-in script now removes that invalid option, but the corrected script
+has not been rerun. The run reached RTL elaboration/checking and ALIB
+generation only. The zero-area `precompile_qor.rpt` is an un-mapped elaboration
+report and is explicitly not used as synthesis evidence. Matrix 300/400/450
+MHz closure, Compute Cluster synthesis, WNS/TNS, critical path, mapped cell
+area, and vectorless power are **NOT_RUN**. Environment is available; result
+is **PARTIAL due to the bounded flow attempts**, not `BLOCKED_ENV`.
+
+The SRAM catalog contains a 4096×32 (16 KiB) single-port macro with LEF area
+35,239.86555 µm². A logical four-bank 128 KiB SPAD would require two such
+macros per bank (8 total), for 281,918.9244 µm² macro core area. 512 KiB would
+require 8 per bank (32 total), for 1,127,675.6976 µm². These are LEF
+macro-area sums only: no wrapper, redundancy, routing, physical utilization,
+or periphery is included. The macro exposes one address/data port; the RTL
+scratchpad has independent Host and scheduler ports. No compatible adapter
+or bank time-multiplexing change was implemented, so these counts do not
+establish functional equivalence, timing, or integrated area. The available
+SRAM Liberty candidate is not at the selected standard-cell 0.72 V corner;
+use its LEF for geometry only, not for a combined timing result.
+
+Exact run IDs, private-output log paths, log hashes, reproduction command,
+and scope are in
+[`Round 5 final comparison`](../benchmark/NMAFORGE_V2_ROUND5_FINAL_COMPARISON.md)
+and [`run manifest`](../../benchmark/v2_round5_run_manifest_20261107.json).
+No current Round 5 result makes an ASIC sign-off or Tapeout Ready claim.
+
 ## Focused Research Round 3 cost note — 2026-11-06
 
 Candidate `4dab73646989615c5479de0bac76d1488a102758` functionally exercises

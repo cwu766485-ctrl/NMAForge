@@ -10,6 +10,7 @@ AI_REF_CASES ?= 1000
 AI_REF_SEED ?= 20260722
 AI_TRANSFORMER_MODEL_JSON ?=
 AI_TRANSFORMER_MANIFEST ?= /tmp/nmaforge_transformer_manifest.json
+AI_TRANSFORMER_MAPPING_POLICY ?= gemm
 AI_TRANSFORMER_SEED ?= 20261106
 AI_TRANSFORMER_STEPS ?= 20000
 # The WSL image keeps an old python3 (3.6) alongside newer interpreters.
@@ -22,6 +23,7 @@ all: ai_smoke
 ai_transformer_gen:
 	$(PYTHON) ../../../../sw/tools/cimforge_mapper.py \
 		--svh ../fixtures/ai_transformer_workload.svh \
+		--decode-mapping-policy "$(AI_TRANSFORMER_MAPPING_POLICY)" \
 		$(if $(AI_TRANSFORMER_MODEL_JSON),--manifest "$(AI_TRANSFORMER_MANIFEST)" --model-json "$(AI_TRANSFORMER_MODEL_JSON)",)
 
 ai_comp: ai_transformer_gen

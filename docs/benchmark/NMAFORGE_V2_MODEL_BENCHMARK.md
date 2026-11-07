@@ -1,5 +1,63 @@
 # NMAForge v2 Model Benchmark
 
+## Round 5 current-source model evidence — 2026-11-07
+
+All new measurements use source/test SHA
+`73caef0f32140d1635816f1eb4ea28372523e80c` and VCS
+`V-2023.12-SP1_Full64`. Machine-readable per-run records are in
+[`v2_round5_model_summary_20261107.csv`](../../benchmark/v2_round5_model_summary_20261107.csv)
+and [`v2_round5_run_manifest_20261107.json`](../../benchmark/v2_round5_run_manifest_20261107.json).
+
+### `conv1x_mini.onnx` paired NMAForge/TinyNPU replay
+
+The model, deterministic input, and output Golden hashes are respectively
+`1ac385ac18394ac5826a7eb426e99c2199bf6417055f7e3f461c40c1b1811640`,
+`a74587bfcb5b2dfcd9eed1dbbb4fcf657628264c3b0aae7a4c278f0f70705898`, and
+`94642359b0fdf8a4b56f8b17346b0385a477d782b4874bb7d1e979a589eab49c`.
+Both NMAForge layouts and the TinyNPU graph produce byte-exact output.
+
+| Run | Useful MACs | Measured cycles | SPAD traffic available | Golden |
+|---|---:|---:|---:|---|
+| NMAForge Legacy | 1,872 | 1,985 Compute + 1,080 testbench Host Layout | Compute 3,360/1,600 B R/W; Host 144/576 B R/W | PASS |
+| NMAForge `0x53` Linear-Row | 1,872 | 1,504 Compute; no Host Layout | Compute 2,784/1,456 B R/W | PASS |
+| TinyNPU ONNX Graph (`8216c22b…`) | 1,872 | 4,781 Graph-runtime cycles | Not instrumented in this runtime | PASS 4/4 bytes |
+
+The same NMAForge endpoint gives 1.320× speedup for Legacy→Linear-Row
+Compute cycles and 2.038× for the simulator interval that includes Legacy
+Host Layout. TinyNPU's 4,781 cycles include its graph dispatcher and
+testbench DMA/SRAM shim, which do not match the NMAForge interval. Therefore
+no NMAForge/TinyNPU CNN speedup is calculated.
+
+### Trained ten-class CNN at current source
+
+The training-weight SHA is
+`ef0e616d09ca0be7956fa8ca900e40c62973f8f06e3ec96af09d888eead73726`; the
+held-out set SHA is
+`cb851b077542f9bcf42f84938227ba5f1a4750ea0b0fbfe2ba8fcecbb914d107`.
+Both modes run 396/396 samples with exact intermediate/final Golden checks
+and classify 384/396 (96.9697%). Per sample, Legacy→Linear-Row is 3,193→2,712
+CMDQ cycles (1.177×), or 4,273→2,712 cycles (1.576×) including the
+testbench-emulated 1,080-cycle Host Layout. Compute SPAD R/W falls from
+6,048/1,920 B to 5,472/1,776 B; total traffic including the simulated Host
+layout falls 8,688→7,248 B (−16.6%). This paired comparison combines fused
+epilogue and consumer-ready layout; it does not isolate either contribution.
+
+### Transformer GEMV attempt
+
+The current baseline H4 trained cyclic fixture still passes 301/301 checks
+at 11,397 doorbell-to-CPL-tail cycles (5,682 Prefill + 5,715 Decode). The
+opt-in Mapper's Q/K/V `0x52` policy was tested against the same fixture and
+produced 175 Decode Golden mismatches, although prefill stayed correct and
+the command queue completed. The reported 11,397-cycle counter is not
+performance evidence for the failing mapping. The mode remains experimental
+and must not replace the default `0x30` Decode map.
+
+The model JSON SHA is
+`55cef19181c84dda9f99e940a0a749c1499fc1ccb176b966b1e13462f8ae3c03`.
+Mapper unit tests pass, but real Decode GEMV is **FAIL**; no Cache/Prefetch
+ablation or Transformer-level speedup is claimed. The H4 cyclic task is a
+small functional workload, not a representative language-model benchmark.
+
 ## Focused Research Round 3 — fixed candidate `4dab736`
 
 Source/test candidate: `4dab73646989615c5479de0bac76d1488a102758`, based on
