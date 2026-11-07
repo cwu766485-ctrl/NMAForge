@@ -39,6 +39,8 @@ CSV_FIELDS = [
     "other_cycles",
     "spad_request_stall_cycles",
     "spad_response_wait_cycles",
+    "spad_read_accepts",
+    "spad_write_accepts",
     "divider_busy_cycles",
     "sqrt_busy_cycles",
     "exclusive_cycles_closed",
@@ -141,6 +143,8 @@ def main() -> int:
                 "other_cycles": int(profile["other"]),
                 "spad_request_stall_cycles": int(profile["spad_request_stall"]),
                 "spad_response_wait_cycles": int(profile["spad_response_wait"]),
+                "spad_read_accepts": int(profile["spad_read_accepts"]),
+                "spad_write_accepts": int(profile["spad_write_accepts"]),
                 "divider_busy_cycles": int(profile["divider_busy"]),
                 "sqrt_busy_cycles": int(profile["sqrt_busy"]),
                 "exclusive_cycles_closed": closed,
@@ -150,7 +154,7 @@ def main() -> int:
 
     args.csv.parent.mkdir(parents=True, exist_ok=True)
     with args.csv.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=CSV_FIELDS)
+        writer = csv.DictWriter(handle, fieldnames=CSV_FIELDS, lineterminator="\n")
         writer.writeheader()
         writer.writerows(sfus)
 
@@ -169,6 +173,8 @@ def main() -> int:
             "other_cycles",
             "spad_request_stall_cycles",
             "spad_response_wait_cycles",
+            "spad_read_accepts",
+            "spad_write_accepts",
             "divider_busy_cycles",
             "sqrt_busy_cycles",
         ):

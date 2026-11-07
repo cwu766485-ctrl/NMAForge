@@ -119,6 +119,7 @@ module ai_tensor_sfu_core(
     localparam [5:0] ST_LN_VAR_ACC         = 6'd38;
     localparam [5:0] ST_LN_B_REQ           = 6'd39;
     localparam [5:0] ST_LN_B_WAIT          = 6'd40;
+    localparam [15:0] LN_SMALL_FAST_MAX    = 16'd16;
 
     reg [5:0] state_r;
     reg [7:0] op_r;
@@ -135,6 +136,8 @@ module ai_tensor_sfu_core(
     reg [15:0] m_size_r, n_size_r, pack_row_r, pack_k_group_r;
     reg [31:0] pack_tile_group_base_r;
     reg [31:0] pack_word_r;
+    reg ln_small_fast_r;
+    reg signed [31:0] ln_input_cache [0:15];
 
     reg div_start_r, sqrt_start_r;
     reg [63:0] div_dividend_r, div_divisor_r;
@@ -190,6 +193,8 @@ module ai_tensor_sfu_core(
 
     ai_unsigned_divider #(.WIDTH(64)) divider_u(
         .clk(clk), .resetn(resetn), .start(div_start_r),
+        .accelerate((op_r == OP_SOFTMAX_Q15) ||
+                    (op_r == OP_CAUSAL_SOFTMAX_Q15)),
         .dividend(div_dividend_r), .divisor(div_divisor_r),
         .busy(div_busy), .done(div_done), .error(div_error),
         .quotient(div_quotient), .remainder(div_remainder)
@@ -235,8 +240,14 @@ module ai_tensor_sfu_core(
         spad_valid=1'b0; spad_write=1'b0; spad_addr=0; spad_wdata=output_word_r;
         case (state_r)
             ST_SM_MAX_REQ,ST_SM_SUM_REQ,ST_SM_OUT_REQ,ST_RMS_SUM_REQ,
-            ST_RMS_X_REQ,ST_VEC_A_REQ,ST_LN_SUM_REQ,ST_LN_VAR_REQ:
+            ST_VEC_A_REQ,ST_LN_SUM_REQ:
                 begin spad_valid=1; spad_addr=src0_addr; end
+            ST_RMS_X_REQ: if (!(is_layernorm && ln_small_fast_r)) begin
+                spad_valid=1; spad_addr=src0_addr;
+            end
+            ST_LN_VAR_REQ: if (!ln_small_fast_r) begin
+                spad_valid=1; spad_addr=src0_addr;
+            end
             ST_RMS_G_REQ,ST_VEC_B_REQ: begin spad_valid=1; spad_addr=src1_addr; end
             ST_LN_B_REQ: begin spad_valid=1; spad_addr=beta_addr; end
             ST_SM_WRITE,ST_VEC_WRITE: begin
@@ -257,6 +268,7 @@ module ai_tensor_sfu_core(
             pack_enable_r<=0; pack_word_r<=0; pack_tile_a_r<=0;
             m_size_r<=0; n_size_r<=0; pack_row_r<=0; pack_k_group_r<=0;
             pack_tile_group_base_r<=0;
+            ln_small_fast_r<=0;
             div_start_r<=0; sqrt_start_r<=0; div_dividend_r<=0; div_divisor_r<=0;
             busy<=0; done<=0; error<=0; error_code<=0; result<=0;
             cycle_count<=0; element_count<=0;
@@ -276,6 +288,8 @@ module ai_tensor_sfu_core(
                         beta_base_r<=beta_base; beta_enable_r<=beta_enable;
                         pack_enable_r<=pack_enable; pack_tile_a_r<=pack_tile_a;
                         m_size_r<=m_size; n_size_r<=n_size;
+                        ln_small_fast_r <= (op_mode == OP_LAYERNORM_Q15) &&
+                                           (length <= LN_SMALL_FAST_MAX);
                         pack_row_r<=0; pack_k_group_r<=0;
                         pack_tile_group_base_r<=0; dst_r<=dst_base;
                         length_r<=length; scale_shift_r<=scale_shift;
@@ -398,9 +412,17 @@ module ai_tensor_sfu_core(
                         rms_normalize_phase_r<=1; state_r<=ST_RMS_X_REQ;
                     end
                 end
-                ST_RMS_X_REQ: if (spad_ready) begin
-                    if (spad_protection_error) begin error_code<=ERR_PROTECTION; state_r<=ST_ERROR; end
-                    else state_r<=ST_RMS_X_WAIT;
+                ST_RMS_X_REQ: begin
+                    if (is_layernorm && ln_small_fast_r) begin
+                        x_r <= ln_input_cache[index_r] - mean_r;
+                        if (src1_r==0) begin
+                            gamma_r<=32'sd32768;
+                            state_r<=beta_enable_r ? ST_LN_B_REQ : ST_RMS_WRITE;
+                        end else state_r<=ST_RMS_G_REQ;
+                    end else if (spad_ready) begin
+                        if (spad_protection_error) begin error_code<=ERR_PROTECTION; state_r<=ST_ERROR; end
+                        else state_r<=ST_RMS_X_WAIT;
+                    end
                 end
                 ST_RMS_X_WAIT: if (spad_rsp_valid) begin
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end
@@ -560,6 +582,8 @@ module ai_tensor_sfu_core(
                 ST_LN_SUM_WAIT: if (spad_rsp_valid) begin
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end
                     else begin
+                        if (ln_small_fast_r)
+                            ln_input_cache[index_r] <= spad_signed;
                         sum_x_r<=sum_x_r+{{32{spad_signed[31]}},spad_signed};
                         if (last_element) begin index_r<=0; state_r<=ST_LN_MEAN_START; end
                         else begin index_r<=index_r+1'b1; state_r<=ST_LN_SUM_REQ; end
@@ -579,9 +603,14 @@ module ai_tensor_sfu_core(
                         sum_sq_r<=0; index_r<=0; state_r<=ST_LN_VAR_REQ;
                     end
                 end
-                ST_LN_VAR_REQ: if (spad_ready) begin
-                    if (spad_protection_error) begin error_code<=ERR_PROTECTION; state_r<=ST_ERROR; end
-                    else state_r<=ST_LN_VAR_WAIT;
+                ST_LN_VAR_REQ: begin
+                    if (ln_small_fast_r) begin
+                        x_r <= ln_input_cache[index_r] - mean_r;
+                        state_r <= ST_LN_VAR_ACC;
+                    end else if (spad_ready) begin
+                        if (spad_protection_error) begin error_code<=ERR_PROTECTION; state_r<=ST_ERROR; end
+                        else state_r<=ST_LN_VAR_WAIT;
+                    end
                 end
                 ST_LN_VAR_WAIT: if (spad_rsp_valid) begin
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end

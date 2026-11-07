@@ -387,6 +387,8 @@ module tb_ai_accel_smoke;
     integer r9_sfu_other_cycles = 0;
     integer r9_sfu_spad_request_stall_cycles = 0;
     integer r9_sfu_spad_response_wait_cycles = 0;
+    integer r9_sfu_spad_read_accepts = 0;
+    integer r9_sfu_spad_write_accepts = 0;
     integer r9_sfu_divider_busy_cycles = 0;
     integer r9_sfu_sqrt_busy_cycles = 0;
     integer r9_sfu_state;
@@ -411,6 +413,8 @@ module tb_ai_accel_smoke;
                 r9_sfu_other_cycles = 0;
                 r9_sfu_spad_request_stall_cycles = 0;
                 r9_sfu_spad_response_wait_cycles = 0;
+                r9_sfu_spad_read_accepts = 0;
+                r9_sfu_spad_write_accepts = 0;
                 r9_sfu_divider_busy_cycles = 0;
                 r9_sfu_sqrt_busy_cycles = 0;
             end
@@ -421,6 +425,13 @@ module tb_ai_accel_smoke;
                     !dut.compute_cluster_u.tensor_sfu_u.spad_ready)
                     r9_sfu_spad_request_stall_cycles =
                         r9_sfu_spad_request_stall_cycles + 1;
+                if (dut.compute_cluster_u.tensor_sfu_u.spad_valid &&
+                    dut.compute_cluster_u.tensor_sfu_u.spad_ready) begin
+                    if (dut.compute_cluster_u.tensor_sfu_u.spad_write)
+                        r9_sfu_spad_write_accepts = r9_sfu_spad_write_accepts + 1;
+                    else
+                        r9_sfu_spad_read_accepts = r9_sfu_spad_read_accepts + 1;
+                end
                 if (!dut.compute_cluster_u.tensor_sfu_u.spad_rsp_valid &&
                     ((r9_sfu_state == 6'd2) || (r9_sfu_state == 6'd4) ||
                      (r9_sfu_state == 6'd6) || (r9_sfu_state == 6'd11) ||
@@ -478,13 +489,14 @@ module tb_ai_accel_smoke;
                 end
 
                 if ((r9_sfu_state == 6'd28) || (r9_sfu_state == 6'd29)) begin
-                    $display("R9_SFU_COMMAND index=%0d opcode=0x%02h length=%0d cycles=%0d pass0=%0d pass1=%0d pass2=%0d math=%0d other=%0d spad_request_stall=%0d spad_response_wait=%0d divider_busy=%0d sqrt_busy=%0d cycles_closed=%0d",
+                    $display("R9_SFU_COMMAND index=%0d opcode=0x%02h length=%0d cycles=%0d pass0=%0d pass1=%0d pass2=%0d math=%0d other=%0d spad_request_stall=%0d spad_response_wait=%0d spad_read_accepts=%0d spad_write_accepts=%0d divider_busy=%0d sqrt_busy=%0d cycles_closed=%0d",
                              r9_sfu_command_index - 1, r9_sfu_command_opcode,
                              r9_sfu_command_length, r9_sfu_command_cycles,
                              r9_sfu_pass0_cycles, r9_sfu_pass1_cycles,
                              r9_sfu_pass2_cycles, r9_sfu_math_cycles,
                              r9_sfu_other_cycles, r9_sfu_spad_request_stall_cycles,
-                             r9_sfu_spad_response_wait_cycles,
+                             r9_sfu_spad_response_wait_cycles, r9_sfu_spad_read_accepts,
+                             r9_sfu_spad_write_accepts,
                              r9_sfu_divider_busy_cycles, r9_sfu_sqrt_busy_cycles,
                              r9_sfu_pass0_cycles + r9_sfu_pass1_cycles +
                              r9_sfu_pass2_cycles + r9_sfu_math_cycles +
@@ -1777,6 +1789,169 @@ module tb_ai_accel_smoke;
             if (!found || status[2])
                 $fatal(1, "FP tile benchmark did not complete cleanly status=%08h processor_busy=%b tile_active=%b dma_busy=%b fp_busy=%b",
                        status, dut.processor_busy, dut.tile_active, dut.dma_busy, dut.fp_busy);
+        end
+    endtask
+
+    // Round 9 reproducer for the previously non-retained Matrix/DMA ping-pong
+    // failure. Three 4x4 INT8 GEMMs share a fixed B matrix and stream distinct
+    // A tiles through the production top's two-buffer DMA/compute pipeline.
+    task run_matrix_dma_overlap_probe;
+        integer tile_index;
+        integer row_index;
+        integer col_index;
+        integer lane_index;
+        integer value_i;
+        integer expected_i;
+        integer word_index;
+        integer serial_tile;
+        reg [31:0] packed_word;
+        reg [31:0] read_value;
+        reg [31:0] perf_total;
+        reg [31:0] perf_dma;
+        reg [31:0] perf_compute;
+        reg [31:0] perf_overlap;
+        reg [31:0] perf_stall;
+        reg [31:0] serial_total;
+        reg [31:0] serial_dma;
+        reg [31:0] serial_compute;
+        reg [31:0] serial_overlap;
+        reg [31:0] serial_stall;
+        reg [31:0] input_words [0:11];
+        reg [31:0] weight_words [0:3];
+        reg [31:0] expected_words [0:47];
+        begin
+            // B is stored as one four-byte K word for each output column.
+            for (col_index = 0; col_index < 4; col_index = col_index + 1) begin
+                packed_word = 32'd0;
+                for (lane_index = 0; lane_index < 4; lane_index = lane_index + 1) begin
+                    value_i = col_index + 1 - lane_index;
+                    packed_word[lane_index*8 +: 8] = value_i[7:0];
+                end
+                weight_words[col_index] = packed_word;
+                axi_write(SPAD_BASE + 32'h0000_a000 + col_index*4, packed_word);
+            end
+
+            // Each tile has four packed A rows. Values differ by tile/row/lane
+            // so swapped buffers, stale contexts, and wrong tile addresses
+            // cannot accidentally match the expected output.
+            for (tile_index = 0; tile_index < 3; tile_index = tile_index + 1) begin
+                for (row_index = 0; row_index < 4; row_index = row_index + 1) begin
+                    packed_word = 32'd0;
+                    for (lane_index = 0; lane_index < 4; lane_index = lane_index + 1) begin
+                        value_i = tile_index + 2 + row_index*2 + lane_index;
+                        packed_word[lane_index*8 +: 8] = value_i[7:0];
+                    end
+                    word_index = tile_index*4 + row_index;
+                    input_words[word_index] = packed_word;
+                    axi_mem_u.mem[12'h500 + word_index] = packed_word;
+                end
+            end
+
+            for (tile_index = 0; tile_index < 3; tile_index = tile_index + 1)
+                for (row_index = 0; row_index < 4; row_index = row_index + 1)
+                    for (col_index = 0; col_index < 4; col_index = col_index + 1) begin
+                        expected_i = dot4_i8_sv(input_words[tile_index*4 + row_index],
+                                                weight_words[col_index]);
+                        expected_words[tile_index*16 + row_index*4 + col_index] = expected_i;
+                        axi_mem_u.mem[12'h800 + tile_index*16 + row_index*4 + col_index] =
+                            32'hdead_c0de;
+                    end
+
+            axi_write(REG_OP_MODE, OP_GEMM_INT8_TILE);
+            axi_write(REG_SRC1_BASE, 32'h0000_a000);
+            axi_write(REG_LENGTH, 32'd1);
+            axi_write(REG_M_SIZE, 32'd4);
+            axi_write(REG_N_SIZE, 32'd4);
+            axi_write(REG_K_WORDS, 32'd1);
+            axi_write(REG_POST_CTRL, 32'd0);
+            axi_write(REG_QUANT_ACT, 32'd0);
+            axi_write(REG_TILE_EXT_IN_STRIDE, 32'd16);
+            axi_write(REG_TILE_EXT_OUT_STRIDE, 32'd64);
+            axi_write(REG_TILE_BUF0, 32'h0000_8000);
+            axi_write(REG_TILE_BUF1, 32'h0000_9000);
+            axi_write(REG_TILE_IN_WORDS, 32'd4);
+            axi_write(REG_TILE_OUT_WORDS, 32'd16);
+            axi_write(REG_TILE_OUT_OFFSET, 32'h0000_0100);
+
+            serial_total = 0;
+            serial_dma = 0;
+            serial_compute = 0;
+            serial_overlap = 0;
+            serial_stall = 0;
+            for (serial_tile = 0; serial_tile < 3; serial_tile = serial_tile + 1) begin
+                axi_write(REG_TILE_COUNT, 32'd1);
+                axi_write(REG_TILE_EXT_IN, 32'h0000_1400 + serial_tile*16);
+                axi_write(REG_TILE_EXT_OUT, 32'h0000_2000 + serial_tile*64);
+                axi_write(REG_PERF_CTRL, 32'd1);
+                axi_write(REG_TILE_CTRL, 32'd1);
+                fp_perf_wait_tile_done();
+                axi_read(REG_PERF_TOTAL, perf_total);
+                axi_read(REG_PERF_DMA, perf_dma);
+                axi_read(REG_PERF_COMPUTE, perf_compute);
+                axi_read(REG_PERF_OVERLAP, perf_overlap);
+                axi_read(REG_PERF_STALL, perf_stall);
+                serial_total = serial_total + perf_total;
+                serial_dma = serial_dma + perf_dma;
+                serial_compute = serial_compute + perf_compute;
+                serial_overlap = serial_overlap + perf_overlap;
+                serial_stall = serial_stall + perf_stall;
+                expect_read(REG_TILE_COMPLETED, 32'd1,
+                            "R9 serialized Matrix/DMA tile completed");
+                for (word_index = 0; word_index < 16; word_index = word_index + 1)
+                    if (axi_mem_u.mem[12'h800 + serial_tile*16 + word_index] !==
+                        expected_words[serial_tile*16 + word_index])
+                        $fatal(1, "R9 serialized Matrix/DMA Golden mismatch tile=%0d word=%0d expected=%08h actual=%08h",
+                               serial_tile, word_index,
+                               expected_words[serial_tile*16 + word_index],
+                               axi_mem_u.mem[12'h800 + serial_tile*16 + word_index]);
+                clear_done_irq();
+            end
+
+            axi_write(REG_TILE_COUNT, 32'd3);
+            axi_write(REG_TILE_EXT_IN, 32'h0000_1400);
+            axi_write(REG_TILE_EXT_OUT, 32'h0000_2000);
+            axi_write(REG_PERF_CTRL, 32'd1);
+            axi_write(REG_TILE_CTRL, 32'd1);
+            fp_perf_wait_tile_done();
+
+            axi_read(REG_PERF_TOTAL, perf_total);
+            axi_read(REG_PERF_DMA, perf_dma);
+            axi_read(REG_PERF_COMPUTE, perf_compute);
+            axi_read(REG_PERF_OVERLAP, perf_overlap);
+            axi_read(REG_PERF_STALL, perf_stall);
+            expect_read(REG_TILE_COMPLETED, 32'd3,
+                        "R9 Matrix/DMA pipeline completed tiles");
+
+            for (tile_index = 0; tile_index < 3; tile_index = tile_index + 1)
+                for (row_index = 0; row_index < 4; row_index = row_index + 1)
+                    for (col_index = 0; col_index < 4; col_index = col_index + 1) begin
+                        word_index = tile_index*16 + row_index*4 + col_index;
+                        if (axi_mem_u.mem[12'h800 + word_index] !== expected_words[word_index])
+                            $fatal(1, "R9 Matrix/DMA DDR Golden mismatch tile=%0d row=%0d col=%0d expected=%08h actual=%08h",
+                                   tile_index, row_index, col_index,
+                                   expected_words[word_index],
+                                   axi_mem_u.mem[12'h800 + word_index]);
+                    end
+            // Check the last row in both ping-pong buffers independently of
+            // the external AXI write image.
+            for (tile_index = 0; tile_index < 2; tile_index = tile_index + 1)
+                for (col_index = 0; col_index < 4; col_index = col_index + 1) begin
+                    axi_read(SPAD_BASE + (tile_index ? 32'h0000_9000 : 32'h0000_8000) +
+                             32'h0000_0100 + 48 + col_index*4, read_value);
+                    // Tile 2 reuses buffer 0 after tile 0 has been stored.
+                    expected_i = expected_words[(tile_index == 0 ? 2 : 1)*16 + 12 + col_index];
+                    if (read_value !== expected_i)
+                        $fatal(1, "R9 Matrix/DMA SPAD Golden mismatch buffer=%0d word=%0d expected=%08h actual=%08h",
+                               tile_index, col_index, expected_i, read_value);
+                end
+
+            $display("R9_MATRIX_DMA_SERIALIZED tiles=3 shape=4x4x4 total=%0d dma=%0d compute=%0d overlap=%0d stall=%0d golden=bit-exact",
+                     serial_total, serial_dma, serial_compute, serial_overlap,
+                     serial_stall);
+            $display("R9_MATRIX_DMA_OVERLAP_PASS tiles=3 shape=4x4x4 total=%0d dma=%0d compute=%0d overlap=%0d stall=%0d ddr_and_spad_golden=bit-exact seed=%0d",
+                     perf_total, perf_dma, perf_compute, perf_overlap, perf_stall,
+                     profile_ai_seed);
+            clear_done_irq();
         end
     endtask
 
@@ -3212,6 +3387,11 @@ module tb_ai_accel_smoke;
             run_fp_dot_dma_benchmark();
             if (errors != 0)
                 $fatal(1, "FP benchmark reported %0d errors", errors);
+            $finish;
+        end
+
+        if ($test$plusargs("R9_MATRIX_DMA_OVERLAP_PROBE")) begin
+            run_matrix_dma_overlap_probe();
             $finish;
         end
 
