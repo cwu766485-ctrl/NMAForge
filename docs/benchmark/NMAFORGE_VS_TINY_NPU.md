@@ -1,5 +1,25 @@
 # NMAForge vs TinyNPU RTL Benchmark
 
+## Round 10 fresh replay addendum — 2026-11-08
+
+Round 10 rebuilt the pinned TinyNPU checkout at
+`8216c22b762011aa20c05fc2768423fd12dda59d` with Verilator 5.052 and reran the
+3-GEMM/4-GEMV fixed matrix plus the shared `conv1x_mini.onnx` graph. All
+outputs matched independent Goldens. New NMAForge measurements are from
+source `1cd1bde4d82c457d445f97a7817fc22d407b528b` and tested product/test code
+`13f94abf59c3dbea833ad4bbe227ef5cab4df503`.
+
+Machine-readable fresh data is in
+[`Round 10 matrix CSV`](../../benchmark/v2_round10_matrix_tinynpu.csv),
+[`Round 10 CNN CSV`](../../benchmark/v2_round10_cnn_ablation.csv), and
+[`Round 10 evidence JSON`](../../benchmark/v2_round10_evidence.json). NMAForge
+controller+behavioral-SPAD cycles, TinyNPU direct-array cycles, and a modeled
+serialized Tiny memory endpoint remain separate. The 4,781-cycle TinyNPU
+CNN graph endpoint and NMAForge Top CMDQ/layout interval also differ; no
+cross-system CNN speedup is asserted. See the
+[Round 10 report](NMAFORGE_V2_ROUND10_ARCHITECTURE_PERFORMANCE.md) for the
+per-shape results, clean rebuild commands, and current limits.
+
 ## Review boundary
 
 This is a functional RTL and cycle-count comparison, not ASIC PPA evidence.

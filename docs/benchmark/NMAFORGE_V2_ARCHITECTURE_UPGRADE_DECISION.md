@@ -1,5 +1,25 @@
 # NMAForge v2 Round 8 — Architecture Upgrade Decision
 
+## Round 10 disposition — representative-model work remains partial
+
+At source SHA `1cd1bde4d82c457d445f97a7817fc22d407b528b`, product/test code
+remains identical to the Round 9 tested tree. Round 10 fresh CNN and fixed
+TinyNPU data is summarized in the
+[Round 10 decision](NMAFORGE_V2_ROUND10_ARCHITECTURE_PERFORMANCE.md).
+The H=16/two-head Transformer request is blocked by the existing Mapper's
+4×4-only trained weight contract; no H=16 Top run exists. The largest checked
+in CNN remains 2,736 useful MAC/image, so ≥100K MAC/inference throughput is
+not established. Existing H=4 SFU improvements remain toy-model evidence.
+
+The trained Digits CNN still passes all 396 exact sample Goldens with
+96.97% accuracy. Fused Requant saves 481 CMDQ cycles/image; Linear-Row removes
+1,080 testbench-accounted layout cycles without changing CMDQ cycles. This
+supports the small CNN dataflow path only. TinyNPU's fixed array matrix was
+rebuilt and passed, but its direct-array endpoint and Tiny graph cycles are
+not comparable to NMAForge controller/Top intervals. No TinyNPU system winner
+is declared. Keep status `RESEARCH_BASELINE_PARTIAL`; do not begin ASIC/PPA or
+full-DV closure from this evidence.
+
 **Status: `RESEARCH_BASELINE_PARTIAL`**  
 **Review base:** `e0c210685cb5eac463308c76d5ce22e03b6add72`  
 **Work branch:** `feature/npu-architecture-v2` (isolated worktree during this round)  
