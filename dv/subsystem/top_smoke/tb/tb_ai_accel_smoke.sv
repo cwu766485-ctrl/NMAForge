@@ -375,6 +375,125 @@ module tb_ai_accel_smoke;
     integer transformer_prefill_write_bytes = 0;
     integer transformer_traffic_lane;
     reg transformer_traffic_enable = 1'b0;
+    integer r9_sfu_command_index = 0;
+    reg r9_sfu_command_active = 1'b0;
+    integer r9_sfu_command_opcode = 0;
+    integer r9_sfu_command_length = 0;
+    integer r9_sfu_command_cycles = 0;
+    integer r9_sfu_pass0_cycles = 0;
+    integer r9_sfu_pass1_cycles = 0;
+    integer r9_sfu_pass2_cycles = 0;
+    integer r9_sfu_math_cycles = 0;
+    integer r9_sfu_other_cycles = 0;
+    integer r9_sfu_spad_request_stall_cycles = 0;
+    integer r9_sfu_spad_response_wait_cycles = 0;
+    integer r9_sfu_divider_busy_cycles = 0;
+    integer r9_sfu_sqrt_busy_cycles = 0;
+    integer r9_sfu_state;
+
+    // Round 9 SFU profiler. Pass buckets are mutually exclusive FSM states;
+    // request/response/divider counters are overlapping stall/operation
+    // observations and must not be added to the pass totals.
+    always @(posedge aclk) begin
+        if (!transformer_top_timing_enable) begin
+            r9_sfu_command_active = 1'b0;
+        end else begin
+            if (!r9_sfu_command_active && dut.compute_cluster_u.tensor_sfu_u.busy) begin
+                r9_sfu_command_active = 1'b1;
+                r9_sfu_command_index = r9_sfu_command_index + 1;
+                r9_sfu_command_opcode = dut.compute_cluster_u.tensor_sfu_u.op_r;
+                r9_sfu_command_length = dut.compute_cluster_u.tensor_sfu_u.length_r;
+                r9_sfu_command_cycles = 0;
+                r9_sfu_pass0_cycles = 0;
+                r9_sfu_pass1_cycles = 0;
+                r9_sfu_pass2_cycles = 0;
+                r9_sfu_math_cycles = 0;
+                r9_sfu_other_cycles = 0;
+                r9_sfu_spad_request_stall_cycles = 0;
+                r9_sfu_spad_response_wait_cycles = 0;
+                r9_sfu_divider_busy_cycles = 0;
+                r9_sfu_sqrt_busy_cycles = 0;
+            end
+            if (r9_sfu_command_active && dut.compute_cluster_u.tensor_sfu_u.busy) begin
+                r9_sfu_state = dut.compute_cluster_u.tensor_sfu_u.state_r;
+                r9_sfu_command_cycles = r9_sfu_command_cycles + 1;
+                if (dut.compute_cluster_u.tensor_sfu_u.spad_valid &&
+                    !dut.compute_cluster_u.tensor_sfu_u.spad_ready)
+                    r9_sfu_spad_request_stall_cycles =
+                        r9_sfu_spad_request_stall_cycles + 1;
+                if (!dut.compute_cluster_u.tensor_sfu_u.spad_rsp_valid &&
+                    ((r9_sfu_state == 6'd2) || (r9_sfu_state == 6'd4) ||
+                     (r9_sfu_state == 6'd6) || (r9_sfu_state == 6'd11) ||
+                     (r9_sfu_state == 6'd19) || (r9_sfu_state == 6'd21) ||
+                     (r9_sfu_state == 6'd24) || (r9_sfu_state == 6'd26) ||
+                     (r9_sfu_state == 6'd33) || (r9_sfu_state == 6'd37) ||
+                     (r9_sfu_state == 6'd40)))
+                    r9_sfu_spad_response_wait_cycles =
+                        r9_sfu_spad_response_wait_cycles + 1;
+                if (dut.compute_cluster_u.tensor_sfu_u.div_busy)
+                    r9_sfu_divider_busy_cycles = r9_sfu_divider_busy_cycles + 1;
+                if (dut.compute_cluster_u.tensor_sfu_u.sqrt_busy)
+                    r9_sfu_sqrt_busy_cycles = r9_sfu_sqrt_busy_cycles + 1;
+
+                if (r9_sfu_command_opcode == 8'h38) begin
+                    if ((r9_sfu_state == 6'd32) || (r9_sfu_state == 6'd33))
+                        r9_sfu_pass0_cycles = r9_sfu_pass0_cycles + 1;
+                    else if ((r9_sfu_state == 6'd36) || (r9_sfu_state == 6'd37) ||
+                             (r9_sfu_state == 6'd38) ||
+                             ((r9_sfu_state == 6'd31) &&
+                              !dut.compute_cluster_u.tensor_sfu_u.rms_normalize_phase_r))
+                        r9_sfu_pass1_cycles = r9_sfu_pass1_cycles + 1;
+                    else if (((r9_sfu_state >= 6'd18) && (r9_sfu_state <= 6'd22)) ||
+                             ((r9_sfu_state >= 6'd39) && (r9_sfu_state <= 6'd40)) ||
+                             ((r9_sfu_state == 6'd31) &&
+                              dut.compute_cluster_u.tensor_sfu_u.rms_normalize_phase_r) ||
+                             (r9_sfu_state == 6'd27))
+                        r9_sfu_pass2_cycles = r9_sfu_pass2_cycles + 1;
+                    else if ((r9_sfu_state == 6'd12) || (r9_sfu_state == 6'd13) ||
+                             (r9_sfu_state == 6'd14) || (r9_sfu_state == 6'd15) ||
+                             (r9_sfu_state == 6'd16) || (r9_sfu_state == 6'd17) ||
+                             (r9_sfu_state == 6'd34) || (r9_sfu_state == 6'd35))
+                        r9_sfu_math_cycles = r9_sfu_math_cycles + 1;
+                    else
+                        r9_sfu_other_cycles = r9_sfu_other_cycles + 1;
+                end else if ((r9_sfu_command_opcode == 8'h32) ||
+                             (r9_sfu_command_opcode == 8'h39)) begin
+                    if ((r9_sfu_state == 6'd1) || (r9_sfu_state == 6'd2))
+                        r9_sfu_pass0_cycles = r9_sfu_pass0_cycles + 1;
+                    else if ((r9_sfu_state == 6'd3) || (r9_sfu_state == 6'd4))
+                        r9_sfu_pass1_cycles = r9_sfu_pass1_cycles + 1;
+                    else if ((r9_sfu_state >= 6'd5) && (r9_sfu_state <= 6'd9))
+                        r9_sfu_pass2_cycles = r9_sfu_pass2_cycles + 1;
+                    else
+                        r9_sfu_other_cycles = r9_sfu_other_cycles + 1;
+                end else if (r9_sfu_command_opcode == 8'h36) begin
+                    if ((r9_sfu_state == 6'd23) || (r9_sfu_state == 6'd24))
+                        r9_sfu_pass0_cycles = r9_sfu_pass0_cycles + 1;
+                    else if (r9_sfu_state == 6'd27)
+                        r9_sfu_pass1_cycles = r9_sfu_pass1_cycles + 1;
+                    else
+                        r9_sfu_other_cycles = r9_sfu_other_cycles + 1;
+                end else begin
+                    r9_sfu_other_cycles = r9_sfu_other_cycles + 1;
+                end
+
+                if ((r9_sfu_state == 6'd28) || (r9_sfu_state == 6'd29)) begin
+                    $display("R9_SFU_COMMAND index=%0d opcode=0x%02h length=%0d cycles=%0d pass0=%0d pass1=%0d pass2=%0d math=%0d other=%0d spad_request_stall=%0d spad_response_wait=%0d divider_busy=%0d sqrt_busy=%0d cycles_closed=%0d",
+                             r9_sfu_command_index - 1, r9_sfu_command_opcode,
+                             r9_sfu_command_length, r9_sfu_command_cycles,
+                             r9_sfu_pass0_cycles, r9_sfu_pass1_cycles,
+                             r9_sfu_pass2_cycles, r9_sfu_math_cycles,
+                             r9_sfu_other_cycles, r9_sfu_spad_request_stall_cycles,
+                             r9_sfu_spad_response_wait_cycles,
+                             r9_sfu_divider_busy_cycles, r9_sfu_sqrt_busy_cycles,
+                             r9_sfu_pass0_cycles + r9_sfu_pass1_cycles +
+                             r9_sfu_pass2_cycles + r9_sfu_math_cycles +
+                             r9_sfu_other_cycles);
+                    r9_sfu_command_active = 1'b0;
+                end
+            end
+        end
+    end
 
     // Exact top-clock completion-boundary sampling for the serialized
     // Transformer prefill/decode CMDQ chain. The 1 ps delay observes the
