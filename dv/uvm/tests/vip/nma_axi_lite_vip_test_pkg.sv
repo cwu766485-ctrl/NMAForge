@@ -3,6 +3,7 @@
 
 package nma_axi_lite_vip_test_pkg;
   import uvm_pkg::*;
+  import tvip_common_pkg::*;
   import tvip_axi_pkg::*;
   import tvip_axi_types_pkg::*;
   `include "uvm_macros.svh"
