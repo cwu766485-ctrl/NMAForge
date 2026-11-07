@@ -1,5 +1,41 @@
 # NMAForge v2 ASIC Readiness
 
+## Round 7 synthesis update — 2026-11-07
+
+The licensed local DC/TSMC28 environment is available; these results are not
+`BLOCKED_ENV`. A bounded `compile -map_effort medium` mapped the standalone
+16×16 `ai_tensor_matrix_array` at the TT / 0.9 V / 25 °C RVT corner using a
+4.0 ns clock, 100 ps setup and 20 ps hold uncertainty, 50 ps clock transition,
+250/50 ps IO delays, 20 fF output load, and no false or multicycle exceptions.
+Area is 124,704.412 library area units and leaf-cell count is 137,928. Its
+zero-wireload critical path is 3.39 ns. The 4.0 ns map has +0.01 ns setup
+slack; evaluating that mapped netlist at 3.333 ns gives −0.66 ns, and at
+2.5 ns gives −1.49 ns. These are pre-layout results; the 300/400 MHz points
+are constraint sweeps on one 4.0 ns mapping, not independently optimized
+compiles. The vectorless 7.714 mW estimate uses static input probability 0.5
+and toggle 0.1 and is not workload power.
+
+The worst path is result-index selection to selected-result output through
+the result mux and output post-processing. The mapped Array contains 256
+64-bit accumulators (16,384 accumulator flops), no SRAM macros, and excludes
+the Matrix Controller, arbitration, SPAD, placement, CTS and routed parasitics.
+Thus 250 MHz is only a narrow standalone pre-layout point; 300 MHz and the
+2.5 ns / 400 MHz target fail under this timing model. No RTL timing fix was
+made.
+
+Matrix Core attempts did not produce an accepted mapped result. The first
+hit the 3,600 s mapping timeout with an incomplete wrapper log. The next used
+an invalid operating-condition name, emitted only gtech cells, and reported
+zero area/unmapped logic. After correcting the condition to the actual library
+name, an 8×8 probe was refused by the license manager before analysis; no
+correct-corner Core retry completed. Full Cluster synthesis remains NOT_RUN
+pending a parity/protection/byte-enable/port-compatible four-bank SRAM
+adapter. Capacity-only 128 KiB geometry remains eight nominal 16 KiB macros /
+approximately 0.281919 mm²; no macro mapping or differential functional
+proof was made. This is not full-chip PPA or tapeout readiness.
+
+---
+
 ## Round 6 synthesis result — 2026-11-07
 
 The private environment has Design Compiler `V-2023.12-SP1` and a usable

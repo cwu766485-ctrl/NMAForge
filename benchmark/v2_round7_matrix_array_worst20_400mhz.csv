@@ -1,0 +1,21 @@
+rank,period_ns,startpoint,endpoint,arrival_ns,required_ns,slack_ns,scope
+1,2.5,result_index[2],selected_result[21],3.64,2.15,-1.49,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+2,2.5,result_index[2],selected_result[9],3.64,2.15,-1.49,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+3,2.5,result_index[2],selected_result[30],3.63,2.15,-1.48,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+4,2.5,result_index[2],selected_result[31],3.63,2.15,-1.48,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+5,2.5,result_index[2],selected_result[29],3.63,2.15,-1.48,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+6,2.5,result_index[2],selected_result[28],3.63,2.15,-1.48,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+7,2.5,result_index[2],selected_result[27],3.63,2.15,-1.48,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+8,2.5,result_index[2],selected_result[26],3.63,2.15,-1.48,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+9,2.5,result_index[2],selected_result[25],3.63,2.15,-1.48,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+10,2.5,result_index[2],selected_result[8],3.63,2.15,-1.48,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+11,2.5,result_index[2],selected_result[7],3.63,2.15,-1.48,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+12,2.5,result_index[2],selected_result[6],3.63,2.15,-1.48,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+13,2.5,result_index[2],selected_result[5],3.63,2.15,-1.48,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+14,2.5,result_index[2],selected_result[4],3.63,2.15,-1.48,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+15,2.5,result_index[2],selected_result[3],3.63,2.15,-1.48,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+16,2.5,result_index[2],selected_result[0],3.63,2.15,-1.48,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+17,2.5,result_index[2],selected_result[2],3.63,2.15,-1.48,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+18,2.5,result_index[2],selected_result[1],3.63,2.15,-1.48,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+19,2.5,result_index[2],selected_result[13],3.63,2.15,-1.48,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout
+20,2.5,result_index[2],selected_result[12],3.63,2.15,-1.48,16x16 standalone Array; TT/0.9V/25C; zero-wireload; pre-layout

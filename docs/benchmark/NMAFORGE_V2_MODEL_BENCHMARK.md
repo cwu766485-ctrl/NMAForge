@@ -1,5 +1,125 @@
 # NMAForge v2 Model Benchmark
 
+## Round 7 trained CNN dataflow recheck — 2026-11-07
+
+The trained 10-class CNN was run in three modes on the exact same 396 held-out
+samples and fixed trained INT8 weights. Testbench SHA
+`7e64344fbb9bdaed0fd4ce14e8cddb19231827f7`, harness SHA
+`30ef28b973343acd25ebd62d4df8576c84e8ffb1`, product RTL SHA
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`, seed `20261107`, VCS
+`V-2023.12-SP1_Full64`. Model SHA-256 is
+`ef0e616d09ca0be7956fa8ca900e40c62973f8f06e3ec96af09d888eead73726`;
+held-out-set SHA-256 is
+`cb851b077542f9bcf42f84938227ba5f1a4750ea0b0fbfe2ba8fcecbb914d107`.
+
+| Mode | CMDQ compute cycles / image | Layout cycles / image | SPAD bytes read / written per image | Top checks | Classification |
+|---|---:|---:|---:|---:|---:|
+| Legacy | 3,193 | 1,080 | 6,192 / 2,496 (including layout traffic) | 396/396 exact | 384/396 (96.97%) |
+| `0x53` fused requant, native Matrix-A layout | 2,712 | 1,080 | 5,616 / 1,920 | 396/396 exact | 384/396 (96.97%) |
+| `0x53` fused requant + Linear-Row | 2,712 | 0 | 5,472 / 1,776 | 396/396 exact | 384/396 (96.97%) |
+
+The native-layout mode verifies the middle rung: its fused compute path saves
+481 command cycles/image while leaving the same separately modeled layout
+phase. Linear-Row then removes that 1,080-cycle phase with 288 additional
+bytes read and 144 fewer bytes written than the fused-native path for this
+model. The resulting same-harness phase interval is 2,712 vs 4,273 cycles
+(1.576×); it is not a full application or TinyNPU system speedup. Useful work
+is 2,736 MAC/image. The measured command-window rate rises from 0.857 to
+1.009 useful MAC/cycle; this is not active-cycle array utilization. All three
+paths preserve exact per-sample intermediate and output Goldens.
+
+Machine-readable aggregates:
+[`v2_round7_cnn_fused_modes_20261107.csv`](../../benchmark/v2_round7_cnn_fused_modes_20261107.csv).
+Raw 396-row result CSVs and per-sample VCS logs remain outside Git under
+`/tmp/nmaforge_round7_10class_{legacy,fused_native,linearized}_s20261107/`;
+the CSV SHA-256 values are respectively
+`2d649cecf7e92d9a8bd825d62309c24a3685a08fe9fb4d96c2abbcdec22d1963`,
+`4124aa1c88e75ee30356b089915303082ff092ea502d6cb5b3ae7d1e3623b3bc`, and
+`1b3e0dcaa701a99ba180765cc5dd8bc44386e634b91600238656326f7635bb3d`.
+
+The dataset replay used the VCS `V-2023.12-SP1_Full64` top binary compiled
+from the checked-in `ai_accel.f` and `tb_ai_accel_smoke.sv` at testbench
+snapshot `7e64344fbb9bdaed0fd4ce14e8cddb19231827f7`. The recorded compile
+command was:
+
+```sh
+cd dv/subsystem/top_smoke/sim
+vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps \
+  +define+VCS +define+AI_SPAD_WORDS_PER_BANK=32768 \
+  +define+AI_TINYNPU_CNN_SPAD_BASE_SHIFT=0 \
+  +incdir+../../../block/control/agent \
+  +incdir+../../../block/dma/agent +incdir+../fixtures \
+  -Mdir=/tmp/nmaforge_round7_cnn_fused_native_s20261107/fixed/csrc \
+  -top tb_ai_accel_smoke -f ai_accel.f \
+  ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+  -o /tmp/nmaforge_round7_cnn_fused_native_s20261107/fixed/simv \
+  -l /tmp/nmaforge_round7_cnn_fused_native_s20261107/fixed/compile.log
+```
+
+With that compiled binary available as `$SIMV`, the exact dataset replay
+invocations are:
+
+```sh
+python3 benchmark/tinynpu/run_nma_cnn_demo_dataset.py \
+  --simv "$SIMV" \
+  --model benchmark/models/nma_tiny_cnn_10class/nma_tiny_cnn_demo_weights.npz \
+  --testset benchmark/models/nma_tiny_cnn_10class/nma_tiny_cnn_demo_testset.npz \
+  --candidate-sha 7e64344fbb9bdaed0fd4ce14e8cddb19231827f7 \
+  --seed 20261107 --out-dir /tmp/nmaforge_round7_10class_legacy_s20261107
+
+python3 benchmark/tinynpu/run_nma_cnn_demo_dataset.py \
+  --simv "$SIMV" \
+  --model benchmark/models/nma_tiny_cnn_10class/nma_tiny_cnn_demo_weights.npz \
+  --testset benchmark/models/nma_tiny_cnn_10class/nma_tiny_cnn_demo_testset.npz \
+  --candidate-sha 30ef28b973343acd25ebd62d4df8576c84e8ffb1 \
+  --seed 20261107 --fused-native \
+  --out-dir /tmp/nmaforge_round7_10class_fused_native_s20261107
+
+python3 benchmark/tinynpu/run_nma_cnn_demo_dataset.py \
+  --simv "$SIMV" \
+  --model benchmark/models/nma_tiny_cnn_10class/nma_tiny_cnn_demo_weights.npz \
+  --testset benchmark/models/nma_tiny_cnn_10class/nma_tiny_cnn_demo_testset.npz \
+  --candidate-sha 7e64344fbb9bdaed0fd4ce14e8cddb19231827f7 \
+  --seed 20261107 --linearized \
+  --out-dir /tmp/nmaforge_round7_10class_linearized_s20261107
+```
+
+The output directories and compile logs are local run artifacts, not checked
+into Git. The aggregate CSV retains the hashes and run IDs needed to verify
+the archived sample tables.
+
+The intermediate 0x53 native-layout mode is a testbench option that retains
+the current output layout and performs the same explicit host layout phase.
+The Linear-Row descriptor mode uses the existing bounded `0x53` row-write
+logic; no product RTL changed in Round 7. This result applies to the tested
+four-filter CNN and does not imply every consumer tensor can consume this
+layout.
+
+### Four-class mini CNN three-rung replay
+
+The same `conv1x_mini.onnx` model, input SHA-256
+`a74587bfcb5b2dfcd9eed1dbbb4fcf657628264c3b0aae7a4c278f0f70705898`,
+Golden SHA-256
+`94642359b0fdf8a4b56f8b17346b0385a477d782b4874bb7d1e979a589eab49c`,
+seed `20261107`, and Top testbench pass in Legacy / fused-native / Linear-Row
+modes. All three check the 4 output bytes and intermediates byte-exactly.
+Compute cycles are 1,985 / 1,504 / 1,504; testbench host-layout cycles are
+1,080 / 1,080 / 0. These correspond to phase intervals 3,065 / 2,584 /
+1,504. The mini workload contains 1,872 useful MACs per four-output group.
+Logs are in `/tmp/nmaforge_round7_cnn_fused_native_s20261107/`; the matching
+aggregate rows are in the CSV above.
+
+## Round 7 status boundary
+
+This round does not add a larger trained Transformer: the existing H=4,
+one-head, one-layer, 86-descriptor fixture remains the only reproducible
+Transformer path. GEMM and `0x52` Decode are cycle-neutral at 5,715 cycles;
+the B-fold Cache benefit remains demonstrated only on separate batched GEMV
+commands. TinyNPU graph cycles and NMAForge Top CMDQ intervals remain
+different measurement boundaries and are not ratioed.
+
+---
+
 ## Round 6 model refresh — 2026-11-07
 
 The fixed `conv1x_mini.onnx` workload was rerun at NMAForge source/test SHA
