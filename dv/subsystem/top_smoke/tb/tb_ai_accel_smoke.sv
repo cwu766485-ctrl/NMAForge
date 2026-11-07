@@ -346,6 +346,26 @@ module tb_ai_accel_smoke;
     integer transformer_top_final_end_cycle = 0;
     integer transformer_top_prefill_target = 0;
     integer transformer_top_final_target = 0;
+    integer transformer_top_profile_matrix_mac = 0;
+    integer transformer_top_profile_matrix_request_wait = 0;
+    integer transformer_top_profile_matrix_response_wait = 0;
+    integer transformer_top_profile_matrix_writeback = 0;
+    integer transformer_top_profile_matrix_other = 0;
+    integer transformer_top_profile_sfu_busy = 0;
+    integer transformer_top_profile_kv_busy = 0;
+    integer transformer_top_profile_conv_busy = 0;
+    integer transformer_top_profile_banked_busy = 0;
+    integer transformer_top_profile_fp_busy = 0;
+    integer transformer_top_profile_scalar_busy = 0;
+    integer transformer_top_profile_no_engine_busy = 0;
+    integer transformer_top_profile_dma_busy = 0;
+    integer transformer_top_prefill_profile [0:12];
+    integer transformer_top_last_completion_cycle = 0;
+    integer transformer_top_last_completion_tail = 0;
+    integer transformer_top_completion_cycles [0:127];
+    integer transformer_top_profile_index;
+    integer transformer_top_profile_tail;
+    integer transformer_top_profile_cycle;
     reg transformer_top_timing_enable = 1'b0;
     reg transformer_top_prefill_captured = 1'b0;
     reg transformer_top_final_captured = 1'b0;
@@ -361,11 +381,84 @@ module tb_ai_accel_smoke;
     // completion-tail nonblocking update in the same clock cycle.
     always @(posedge aclk) begin
         transformer_top_cycle_counter = transformer_top_cycle_counter + 1;
+        if (transformer_top_timing_enable && !transformer_top_final_captured) begin
+            if (dut.matrix_busy) begin
+                if (dut.matrix_perf_mac_active)
+                    transformer_top_profile_matrix_mac =
+                        transformer_top_profile_matrix_mac + 1;
+                else if (dut.matrix_banked_read_valid && !dut.arb_banked_ready)
+                    transformer_top_profile_matrix_request_wait =
+                        transformer_top_profile_matrix_request_wait + 1;
+                else if (dut.matrix_perf_banked_wait)
+                    transformer_top_profile_matrix_response_wait =
+                        transformer_top_profile_matrix_response_wait + 1;
+                else if (dut.matrix_line_valid)
+                    transformer_top_profile_matrix_writeback =
+                        transformer_top_profile_matrix_writeback + 1;
+                else
+                    transformer_top_profile_matrix_other =
+                        transformer_top_profile_matrix_other + 1;
+            end else if (dut.engine_busy[4]) begin
+                transformer_top_profile_sfu_busy =
+                    transformer_top_profile_sfu_busy + 1;
+            end else if (dut.engine_busy[6]) begin
+                transformer_top_profile_kv_busy =
+                    transformer_top_profile_kv_busy + 1;
+            end else if (dut.engine_busy[5]) begin
+                transformer_top_profile_conv_busy =
+                    transformer_top_profile_conv_busy + 1;
+            end else if (dut.engine_busy[2]) begin
+                transformer_top_profile_banked_busy =
+                    transformer_top_profile_banked_busy + 1;
+            end else if (dut.engine_busy[1]) begin
+                transformer_top_profile_fp_busy =
+                    transformer_top_profile_fp_busy + 1;
+            end else if (dut.engine_busy[0]) begin
+                transformer_top_profile_scalar_busy =
+                    transformer_top_profile_scalar_busy + 1;
+            end else begin
+                transformer_top_profile_no_engine_busy =
+                    transformer_top_profile_no_engine_busy + 1;
+            end
+            if (dut.dma_busy)
+                transformer_top_profile_dma_busy =
+                    transformer_top_profile_dma_busy + 1;
+        end
         #0.001;
         if (transformer_top_timing_enable) begin
+            transformer_top_profile_tail = dut.processor_cplq_tail;
+            if (transformer_top_profile_tail > transformer_top_last_completion_tail) begin
+                for (transformer_top_profile_index =
+                         transformer_top_last_completion_tail;
+                     transformer_top_profile_index < transformer_top_profile_tail;
+                     transformer_top_profile_index = transformer_top_profile_index + 1) begin
+                    transformer_top_profile_cycle = transformer_top_cycle_counter -
+                        transformer_top_last_completion_cycle;
+                    if (transformer_top_profile_index < 128)
+                        transformer_top_completion_cycles[transformer_top_profile_index] =
+                            transformer_top_profile_cycle;
+                    transformer_top_last_completion_cycle =
+                        transformer_top_cycle_counter;
+                end
+                transformer_top_last_completion_tail =
+                    transformer_top_profile_tail;
+            end
             if (!transformer_top_prefill_captured &&
                 dut.processor_cplq_tail == transformer_top_prefill_target) begin
                 transformer_top_prefill_end_cycle = transformer_top_cycle_counter;
+                transformer_top_prefill_profile[0] = transformer_top_profile_matrix_mac;
+                transformer_top_prefill_profile[1] = transformer_top_profile_matrix_request_wait;
+                transformer_top_prefill_profile[2] = transformer_top_profile_matrix_response_wait;
+                transformer_top_prefill_profile[3] = transformer_top_profile_matrix_writeback;
+                transformer_top_prefill_profile[4] = transformer_top_profile_matrix_other;
+                transformer_top_prefill_profile[5] = transformer_top_profile_sfu_busy;
+                transformer_top_prefill_profile[6] = transformer_top_profile_kv_busy;
+                transformer_top_prefill_profile[7] = transformer_top_profile_conv_busy;
+                transformer_top_prefill_profile[8] = transformer_top_profile_banked_busy;
+                transformer_top_prefill_profile[9] = transformer_top_profile_fp_busy;
+                transformer_top_prefill_profile[10] = transformer_top_profile_scalar_busy;
+                transformer_top_prefill_profile[11] = transformer_top_profile_no_engine_busy;
+                transformer_top_prefill_profile[12] = transformer_top_profile_dma_busy;
                 transformer_top_prefill_captured = 1'b1;
             end
             if (!transformer_top_final_captured &&
@@ -2491,7 +2584,26 @@ module tb_ai_accel_smoke;
             transformer_top_final_target = TRANSFORMER_DESC_COUNT;
             transformer_top_prefill_captured = 1'b0;
             transformer_top_final_captured = 1'b0;
+            transformer_top_profile_matrix_mac = 0;
+            transformer_top_profile_matrix_request_wait = 0;
+            transformer_top_profile_matrix_response_wait = 0;
+            transformer_top_profile_matrix_writeback = 0;
+            transformer_top_profile_matrix_other = 0;
+            transformer_top_profile_sfu_busy = 0;
+            transformer_top_profile_kv_busy = 0;
+            transformer_top_profile_conv_busy = 0;
+            transformer_top_profile_banked_busy = 0;
+            transformer_top_profile_fp_busy = 0;
+            transformer_top_profile_scalar_busy = 0;
+            transformer_top_profile_no_engine_busy = 0;
+            transformer_top_profile_dma_busy = 0;
+            for (transformer_top_profile_index = 0;
+                 transformer_top_profile_index < 13;
+                 transformer_top_profile_index = transformer_top_profile_index + 1)
+                transformer_top_prefill_profile[transformer_top_profile_index] = 0;
+            transformer_top_last_completion_tail = 0;
             transformer_top_start_cycle = transformer_top_cycle_counter;
+            transformer_top_last_completion_cycle = transformer_top_start_cycle;
             transformer_top_timing_enable = 1'b1;
             transformer_traffic_enable = 1'b1;
             axi_write(REG_DOORBELL, 32'd1);
@@ -2514,6 +2626,68 @@ module tb_ai_accel_smoke;
                      transformer_top_final_end_cycle - transformer_top_start_cycle,
                      transformer_top_prefill_end_cycle - transformer_top_start_cycle,
                      transformer_top_final_end_cycle - transformer_top_prefill_end_cycle);
+            $display("TRANSFORMER_TOP_ONLY_PROFILE cycles_closed=%0d matrix_mac=%0d matrix_request_wait=%0d matrix_response_wait=%0d matrix_writeback=%0d matrix_other=%0d sfu_busy=%0d kv_busy=%0d conv_busy=%0d banked_busy=%0d fp_busy=%0d scalar_busy=%0d no_engine_busy_control_or_dispatch=%0d dma_busy_event_cycles=%0d",
+                     transformer_top_profile_matrix_mac +
+                         transformer_top_profile_matrix_request_wait +
+                         transformer_top_profile_matrix_response_wait +
+                         transformer_top_profile_matrix_writeback +
+                         transformer_top_profile_matrix_other +
+                         transformer_top_profile_sfu_busy +
+                         transformer_top_profile_kv_busy +
+                         transformer_top_profile_conv_busy +
+                         transformer_top_profile_banked_busy +
+                         transformer_top_profile_fp_busy +
+                         transformer_top_profile_scalar_busy +
+                         transformer_top_profile_no_engine_busy,
+                     transformer_top_profile_matrix_mac,
+                     transformer_top_profile_matrix_request_wait,
+                     transformer_top_profile_matrix_response_wait,
+                     transformer_top_profile_matrix_writeback,
+                     transformer_top_profile_matrix_other,
+                     transformer_top_profile_sfu_busy,
+                     transformer_top_profile_kv_busy,
+                     transformer_top_profile_conv_busy,
+                     transformer_top_profile_banked_busy,
+                     transformer_top_profile_fp_busy,
+                     transformer_top_profile_scalar_busy,
+                     transformer_top_profile_no_engine_busy,
+                     transformer_top_profile_dma_busy);
+            $display("TRANSFORMER_TOP_ONLY_PHASE_PROFILE phase=prefill cycles=%0d matrix_mac=%0d matrix_request_wait=%0d matrix_response_wait=%0d matrix_writeback=%0d matrix_other=%0d sfu_busy=%0d kv_busy=%0d conv_busy=%0d banked_busy=%0d fp_busy=%0d scalar_busy=%0d no_engine_busy_control_or_dispatch=%0d dma_busy_event_cycles=%0d",
+                     transformer_top_prefill_end_cycle - transformer_top_start_cycle,
+                     transformer_top_prefill_profile[0],
+                     transformer_top_prefill_profile[1],
+                     transformer_top_prefill_profile[2],
+                     transformer_top_prefill_profile[3],
+                     transformer_top_prefill_profile[4],
+                     transformer_top_prefill_profile[5],
+                     transformer_top_prefill_profile[6],
+                     transformer_top_prefill_profile[7],
+                     transformer_top_prefill_profile[8],
+                     transformer_top_prefill_profile[9],
+                     transformer_top_prefill_profile[10],
+                     transformer_top_prefill_profile[11],
+                     transformer_top_prefill_profile[12]);
+            $display("TRANSFORMER_TOP_ONLY_PHASE_PROFILE phase=decode cycles=%0d matrix_mac=%0d matrix_request_wait=%0d matrix_response_wait=%0d matrix_writeback=%0d matrix_other=%0d sfu_busy=%0d kv_busy=%0d conv_busy=%0d banked_busy=%0d fp_busy=%0d scalar_busy=%0d no_engine_busy_control_or_dispatch=%0d dma_busy_event_cycles=%0d",
+                     transformer_top_final_end_cycle - transformer_top_prefill_end_cycle,
+                     transformer_top_profile_matrix_mac - transformer_top_prefill_profile[0],
+                     transformer_top_profile_matrix_request_wait - transformer_top_prefill_profile[1],
+                     transformer_top_profile_matrix_response_wait - transformer_top_prefill_profile[2],
+                     transformer_top_profile_matrix_writeback - transformer_top_prefill_profile[3],
+                     transformer_top_profile_matrix_other - transformer_top_prefill_profile[4],
+                     transformer_top_profile_sfu_busy - transformer_top_prefill_profile[5],
+                     transformer_top_profile_kv_busy - transformer_top_prefill_profile[6],
+                     transformer_top_profile_conv_busy - transformer_top_prefill_profile[7],
+                     transformer_top_profile_banked_busy - transformer_top_prefill_profile[8],
+                     transformer_top_profile_fp_busy - transformer_top_prefill_profile[9],
+                     transformer_top_profile_scalar_busy - transformer_top_prefill_profile[10],
+                     transformer_top_profile_no_engine_busy - transformer_top_prefill_profile[11],
+                     transformer_top_profile_dma_busy - transformer_top_prefill_profile[12]);
+            for (transformer_top_profile_index = 0;
+                 transformer_top_profile_index < TRANSFORMER_DESC_COUNT;
+                 transformer_top_profile_index = transformer_top_profile_index + 1)
+                $display("TRANSFORMER_COMMAND_RETIRE index=%0d cycles=%0d",
+                         transformer_top_profile_index,
+                         transformer_top_completion_cycles[transformer_top_profile_index]);
             check_transformer_workload();
             axi_read(REG_CMDQ_HEAD, command_head);
             if (command_head !== TRANSFORMER_DESC_COUNT)
