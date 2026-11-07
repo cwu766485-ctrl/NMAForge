@@ -85,6 +85,6 @@
     "transformer_gemv_fail": "638861b1010c60f4ac9a2c8b332555650d97dcd170fbf22c4c6e93f52cb88707",
     "dc_attempt": "c068b03b2894c20ad667c6ef663713ffd7d5d2c80d262edbd155d57c5a0cfc5b"
   },
-  "transformer_gemv_experiment_source_sha": "ffe9605f3f3647350429497e975ddd37907c1cc4",
+  "transformer_gemv_experiment_source_sha": "acc069072b0b746ef1cdce85b91b56907a782eae",
   "transformer_gemv_experiment_note": "H4 Top run was performed from the same mapper algorithm before commit; the only post-run change in the published snapshot is CLI help text warning that the experimental mode fails Golden. Generated descriptor algorithm and RTL are identical."
 }
