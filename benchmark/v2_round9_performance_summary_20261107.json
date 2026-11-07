@@ -1,0 +1,242 @@
+{
+  "status": "PARTIAL_RESEARCH_BASELINE",
+  "run_date": "2026-11-07",
+  "product_rtl_sha": "74402ba991285cb4403cb50737013362f5a2af53",
+  "reviewed_baseline_sha": "7721302b21b575fa130d023010201216ea69727c",
+  "tinynpu_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "python": "3.12.13",
+    "verilator_rebuild": "BLOCKED_ENV: executable not installed; cached pinned binaries replayed",
+    "onnx_python_rebuild": "BLOCKED_ENV: numpy and onnx modules not installed"
+  },
+  "transformer_h4": {
+    "model_sha256": "001550dbadb816e66f737f5f6cba0819f51821c71a78d84861d62dc80dd8511f",
+    "seed": 20261107,
+    "model_description": "deterministically trained INT8 synthetic cyclic next-token toy; H=4, one layer, one head, four-token prefill plus one-token decode; not a pretrained language model",
+    "training": {
+      "requested_steps": 20000,
+      "converged_steps": 1178,
+      "train_accuracy": "16/16",
+      "heldout_accuracy": "690/1008",
+      "prefill_task_accuracy": "4/4",
+      "decode_task_accuracy": "1/1"
+    },
+    "useful_macs": 640,
+    "baseline": {
+      "run_id": "R9-TR-H4-BASE-GEMM-S20261107",
+      "source_sha": "7721302b21b575fa130d023010201216ea69727c",
+      "testbench_blob_sha": "78aa762e3a2ebf965cc7609b8a358915ceff398d",
+      "prefill_cycles": 5682,
+      "decode_cycles": 5715,
+      "total_cycles": 11397,
+      "prefill_read_bytes": 1936,
+      "decode_read_bytes": 1880,
+      "total_read_bytes": 3816,
+      "total_write_bytes": 2120,
+      "decode_layernorm_cycles": 2631,
+      "decode_softmax_cycles": 1303,
+      "decode_sfu_busy_cycles": 4537,
+      "total_sfu_busy_cycles": 8673,
+      "golden": "PASS: 86 descriptors, 60 tensors, intermediate outputs, final outputs and KV cache"
+    },
+    "optimized": {
+      "run_id": "R9-TR-H4-SM-DIV-S20261107",
+      "source_sha": "74402ba991285cb4403cb50737013362f5a2af53",
+      "testbench_blob_sha": "27256aa548c5c8bd974c647850b992f1c27eeeee",
+      "prefill_cycles": 5259,
+      "decode_cycles": 5110,
+      "total_cycles": 10369,
+      "prefill_read_bytes": 1664,
+      "decode_read_bytes": 1640,
+      "total_read_bytes": 3304,
+      "total_write_bytes": 2120,
+      "decode_layernorm_cycles": 2503,
+      "decode_softmax_cycles": 826,
+      "decode_sfu_busy_cycles": 3932,
+      "total_sfu_busy_cycles": 7645,
+      "golden": "PASS: 86 descriptors, 60 tensors, intermediate outputs, final outputs and KV cache"
+    },
+    "improvement": {
+      "decode_cycles_saved": 605,
+      "decode_reduction_pct": 10.5862,
+      "decode_speed_ratio_same_endpoint": 1.1184,
+      "total_cycles_saved": 1028,
+      "total_reduction_pct": 9.0208,
+      "total_speed_ratio_same_endpoint": 1.0991,
+      "layernorm_decode_cycles_saved": 128,
+      "layernorm_decode_reduction_pct": 4.8654,
+      "softmax_decode_cycles_saved": 477,
+      "softmax_decode_reduction_pct": 36.6078,
+      "total_read_bytes_saved": 512,
+      "total_read_reduction_pct": 13.4172,
+      "write_bytes_changed": false
+    },
+    "bottleneck": {
+      "optimized_decode_cycles": 5110,
+      "optimized_decode_sfu_busy_cycles": 3932,
+      "no_engine_control_or_dispatch_cycles": 2248,
+      "matrix_mac_cycles": 32,
+      "note": "Exclusive top-level cycle buckets close to phase totals. Divider/Sqrt/SPAD event counters overlap these buckets and are not additive."
+    }
+  },
+  "matrix_dma_overlap": {
+    "run_id": "R9-MATRIX-DMA-OVERLAP-S20261107",
+    "source_sha": "74402ba991285cb4403cb50737013362f5a2af53",
+    "seed": 20261107,
+    "workload": "three 4x4x4 INT8 tiles; 192 useful MACs; production ping-pong Matrix/DMA path",
+    "serialized": {
+      "total_cycles": 561,
+      "dma_active_cycles": 108,
+      "matrix_active_cycles": 444,
+      "overlap_cycles": 0,
+      "stall_cycles": 9,
+      "golden": "PASS: all DDR output words bit-exact"
+    },
+    "ping_pong": {
+      "total_cycles": 488,
+      "dma_active_cycles": 108,
+      "matrix_active_cycles": 447,
+      "overlap_cycles": 72,
+      "stall_cycles": 5,
+      "golden": "PASS: all DDR output words and both local SPAD buffer rows bit-exact; 3/3 tiles completed"
+    },
+    "cycles_saved": 73,
+    "reduction_pct": 13.0125,
+    "note": "Single fixed functional probe, not a large-workload throughput result. Counter categories may overlap; total cycles are taken from the measured total counter."
+  },
+  "tiny_npu_gemm_gemv": {
+    "run_ids": [
+      "R9-NMA-MATRIX-MATCH-S20261107",
+      "R9-TINY-ARRAY-S20261107"
+    ],
+    "nmaforge_boundary": "16x16 Matrix core/controller and four-bank behavioral SPAD through final output commit",
+    "tinynpu_boundary": "Direct 16x16 systolic array RTL input-to-stable-output; no controller or SPAD",
+    "cross_system_speedup": "NOT_COMPUTED: endpoints differ",
+    "gemm": [
+      {
+        "shape": "16x16x16",
+        "useful_macs": 4096,
+        "nmaforge_cycles": 185,
+        "nmaforge_mac_per_cycle": 22.141,
+        "nmaforge_utilization_pct": 8.65,
+        "nmaforge_read_bytes": 512,
+        "nmaforge_write_bytes": 1024,
+        "tinynpu_array_cycles": 52,
+        "tinynpu_mac_per_cycle": 78.7692,
+        "tinynpu_utilization_pct": 30.77,
+        "golden": "PASS both"
+      },
+      {
+        "shape": "16x16x32",
+        "useful_macs": 8192,
+        "nmaforge_cycles": 270,
+        "nmaforge_mac_per_cycle": 30.341,
+        "nmaforge_utilization_pct": 11.85,
+        "nmaforge_read_bytes": 1024,
+        "nmaforge_write_bytes": 1024,
+        "tinynpu_array_cycles": 100,
+        "tinynpu_mac_per_cycle": 81.92,
+        "tinynpu_utilization_pct": 32.0,
+        "golden": "PASS both"
+      },
+      {
+        "shape": "32x32x64",
+        "useful_macs": 65536,
+        "nmaforge_cycles": 1381,
+        "nmaforge_mac_per_cycle": 47.455,
+        "nmaforge_utilization_pct": 18.54,
+        "nmaforge_read_bytes": 6144,
+        "nmaforge_write_bytes": 4096,
+        "tinynpu_array_cycles": 790,
+        "tinynpu_mac_per_cycle": 82.957,
+        "tinynpu_utilization_pct": 32.41,
+        "golden": "PASS both"
+      }
+    ],
+    "gemv": [
+      {
+        "shape": "1x13x17",
+        "useful_macs": 221,
+        "nmaforge_cycles": 75,
+        "nmaforge_mac_per_cycle": 2.9467,
+        "nmaforge_read_bytes": 304,
+        "tinynpu_array_cycles": 100,
+        "tinynpu_mac_per_cycle": 2.21,
+        "tinynpu_utilization_pct": 0.86,
+        "golden": "PASS both"
+      },
+      {
+        "shape": "8x16x19",
+        "useful_macs": 2432,
+        "nmaforge_cycles": 154,
+        "nmaforge_mac_per_cycle": 15.7922,
+        "nmaforge_read_bytes": 560,
+        "tinynpu_array_cycles": 100,
+        "tinynpu_mac_per_cycle": 24.32,
+        "tinynpu_utilization_pct": 9.5,
+        "golden": "PASS both"
+      },
+      {
+        "shape": "16x16x19",
+        "useful_macs": 4864,
+        "nmaforge_cycles": 250,
+        "nmaforge_mac_per_cycle": 19.456,
+        "nmaforge_read_bytes": 816,
+        "tinynpu_array_cycles": 100,
+        "tinynpu_mac_per_cycle": 48.64,
+        "tinynpu_utilization_pct": 19.0,
+        "golden": "PASS both"
+      },
+      {
+        "shape": "16x16x65",
+        "useful_macs": 16640,
+        "nmaforge_cycles": 631,
+        "nmaforge_mac_per_cycle": 26.3708,
+        "nmaforge_read_bytes": 2368,
+        "tinynpu_array_cycles": 244,
+        "tinynpu_mac_per_cycle": 68.1967,
+        "tinynpu_utilization_pct": 26.64,
+        "golden": "PASS both"
+      }
+    ],
+    "tiny_tooling_note": "TinyNPU source checkout is pinned and clean at the SHA above. This round replayed cached binaries; Verilator, NumPy and ONNX are absent for a fresh rebuild."
+  },
+  "cnn_conv1x_mini": {
+    "run_id": "R9-CNN-CONV1X-MINI-S20261029",
+    "source_sha": "74402ba991285cb4403cb50737013362f5a2af53",
+    "tinynpu_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+    "model_sha256": "1ac385ac18394ac5826a7eb426e99c2199bf6417055f7e3f461c40c1b1811640",
+    "input_seed": 99,
+    "input_sha256": "a74587bfcb5b2dfcd9eed1dbbb4fcf657628264c3b0aae7a4c278f0f70705898",
+    "golden_sha256": "94642359b0fdf8a4b56f8b17346b0385a477d782b4874bb7d1e979a589eab49c",
+    "useful_macs": 1872,
+    "nmaforge": {
+      "cmdq_cycles": 1985,
+      "host_layout_cycles": 1080,
+      "reported_sum_cycles": 3065,
+      "spad_compute_read_bytes": 3360,
+      "spad_compute_write_bytes": 1600,
+      "host_layout_read_bytes": 144,
+      "host_layout_write_bytes": 576,
+      "golden": "PASS byte-exact"
+    },
+    "tinynpu": {
+      "graph_cycles": 4781,
+      "dma_load_bytes": 1088,
+      "dma_store_bytes": 4,
+      "golden": "PASS 4/4 output bytes"
+    },
+    "comparison": "No speedup computed: NMAForge reports CMDQ plus separately accounted host layout and excludes preload/programming/final read; TinyNPU graph cycle count includes Graph execution and its DMA/SRAM shim."
+  },
+  "unclosed_work": {
+    "h16_h32_transformer": "PARTIAL: current model trainer and mapper are hard-coded to H=4, one head, four-token synthetic task; no representative trained H=16/32 model ran",
+    "large_cnn": "PARTIAL: no multi-layer single-inference CNN with >=100K useful MACs was built or measured",
+    "round8_matrix_dma_four_mismatch_case": "PARTIAL: Round8 archived top smoke does not include the reported four-mismatch probe; the Round9 new three-tile reproducer passes but does not prove the original probe's exact root cause",
+    "innovation1_model_level": "NOT_RUN: H=4 Decode uses GEMM mapping; standalone batched GEMV cases pass, but no Transformer Decode GEMV/cache/prefetch ablation ran",
+    "innovation2_large_cnn_ablation": "NOT_RUN: no Legacy/Fused-Requant/Linear-Row model-level ablation on a >=100K-MAC CNN",
+    "transformer_tinynpu_subgraph": "NOT_RUN: no matched Transformer subgraph was executed on TinyNPU"
+  },
+  "github_published_equivalent_source_commit": "13f94abf59c3dbea833ad4bbe227ef5cab4df503",
+  "product_source_tree_sha": "56813cb32844bb01683c6710c57d19bce136028a"
+}
