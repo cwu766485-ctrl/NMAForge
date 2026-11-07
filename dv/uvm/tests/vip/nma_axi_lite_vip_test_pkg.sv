@@ -25,10 +25,16 @@ package nma_axi_lite_vip_test_pkg;
     function void set_delay_window(tvip_delay_configuration delay_cfg,
                                    int unsigned min_delay,
                                    int unsigned max_delay);
+      int unsigned split_delay;
+
       delay_cfg.min_delay = min_delay;
       delay_cfg.max_delay = max_delay;
-      delay_cfg.mid_delay[0] = (min_delay == 0) ? 1 : min_delay;
-      delay_cfg.mid_delay[1] = max_delay;
+      // tvip_delay_constraint uses two inclusive ranges, [min:mid0] and
+      // [mid1:max]. Keep the boundaries adjacent so no legal delays are
+      // accidentally removed from the configured window.
+      split_delay = min_delay + ((max_delay - min_delay) / 2);
+      delay_cfg.mid_delay[0] = split_delay;
+      delay_cfg.mid_delay[1] = (split_delay < max_delay) ? split_delay + 1 : split_delay;
       delay_cfg.weight_zero_delay = (min_delay == 0) ? 1 : 0;
       delay_cfg.weight_short_delay = 1;
       delay_cfg.weight_long_delay = 1;
