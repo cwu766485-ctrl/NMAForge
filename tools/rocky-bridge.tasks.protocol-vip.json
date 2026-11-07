@@ -10,6 +10,14 @@
         "set -euo pipefail; make -n -C dv/block/dma/sim uvm_vip_compile VIP_ROOT=/mnt/e/workspace/chip/vip VIP_SIMV=/tmp/protocol_vip_dma_static/simv VIP_COV_DIR=/tmp/protocol_vip_dma_static/compile.vdb VCS='vcs -licwait 1 -Mdir=/tmp/protocol_vip_dma_static/csrc'; echo PROTOCOL_VIP_DMA_STATIC_PASS"
       ]
     },
+    "protocol-vip-axil-static-check": {
+      "description": "Check the NMAForge top-level AXI4-Lite VIP integration filelist and Makefile expansion without invoking VCS.",
+      "executable": "bash",
+      "arguments": [
+        "-lic",
+        "set -euo pipefail; test -f /mnt/e/workspace/chip/vip/vip_axi/tue/compile.f; test -f /mnt/e/workspace/chip/vip/vip_axi/tvip-common/compile.f; make -n -C dv/uvm/sim axi_lite_vip_compile PROTOCOL_VIP_ROOT=/mnt/e/workspace/chip/vip AXIL_VIP_OUT=/tmp/protocol_vip_axil_static; echo PROTOCOL_VIP_AXIL_STATIC_PASS"
+      ]
+    },
     "protocol-vip-dma-vcs-regression": {
       "description": "Compile the NMAForge DMA block against protocol-vips AXI4 active-slave agent and run the 20-scenario positive/negative corner matrix at two fixed seeds, then guard legacy BFM compatibility.",
       "executable": "bash",

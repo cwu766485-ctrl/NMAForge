@@ -54,6 +54,30 @@ active UVM work is now under `dv/block/`: DMA has 11 passing directed/random
 tests and AXI-Lite control has six passing tests. See `dv/VERIFICATION_MATRIX.md`
 for the current evidence boundary.
 
+## External AXI4-Lite VIP integration (acceptance pending)
+
+`tb_nma_axi_lite_vip` is a separate test top that connects the reusable
+`vip_axi` 32-bit AXI4-Lite master through its pin adapter to the real
+`rtl/top/ai_accel_top.v` CSR port. It uses the VIP-owned monitor, protocol
+checker, coverage collector and transaction-accounting scoreboard; the
+project's existing AXI-Lite agent and tests are unchanged. The directed CSR
+test checks VERSION, writable OP readback, unaligned/unmapped accesses,
+read-only writes and partial WSTRB rejection. It ties off the top's AXI4 data
+port and therefore does not claim DMA, interrupt, reset-interruption or full
+register-map verification. This new external-VIP path is not evidence of a
+pass until it has run with a clean fixed source revision on licensed VCS.
+
+With the VIP checkout at the sibling `chip/vip` path, run from Rocky Linux:
+
+```bash
+cd <NMAForge>/dv/uvm/sim
+make axi_lite_vip_csr PROTOCOL_VIP_ROOT=/mnt/e/workspace/chip/vip \
+  AXIL_VIP_OUT=/tmp/nmaforge_axi_lite_vip
+```
+
+The VIP source requires its `vip_axi/tue` and `vip_axi/tvip-common`
+dependencies. Override `PROTOCOL_VIP_ROOT` for another checkout location.
+
 ## Next additions, in order
 
 1. Block-level `ai_axi128_dma` environment: AXI4 slave responder plus SPAD BFM;

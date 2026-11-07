@@ -14,8 +14,14 @@ URG ?= $(VCS_HOME)/bin/urg
 UVM_COV_METRICS ?= line+cond+branch+fsm+assert
 COMPUTE_CLUSTER_UVM_OUT ?= /tmp/nmaforge_real_compute_cluster_uvm_$(shell date +%Y%m%d_%H%M%S)
 COMPUTE_CLUSTER_UVM_SEEDS ?= 20261025 20261026 20261027
+PROTOCOL_VIP_ROOT ?= $(abspath ../../../vip)
+TVIP_AXI_HOME ?= $(PROTOCOL_VIP_ROOT)/vip_axi
+TUE_HOME ?= $(TVIP_AXI_HOME)/tue
+TVIP_COMMON_HOME ?= $(TVIP_AXI_HOME)/tvip-common
+AXIL_VIP_OUT ?= /tmp/nmaforge_axi_lite_vip
+export TVIP_AXI_HOME TUE_HOME TVIP_COMMON_HOME
 
-.PHONY: uvm_compile uvm_run uvm_smoke uvm_fp16_ddr_e2e uvm_mixed_precision_ddr_e2e uvm_external_macro_ddr_e2e uvm_mixed_precision_ddr_e2e_axi_stalls uvm_mixed_precision_ddr_e2e_regress uvm_mixed_precision_ddr_e2e_cov_regress uvm_mixed_precision_ddr_e2e_random_cov_regress uvm_compute_cluster_compile uvm_compute_cluster_regress clean
+.PHONY: uvm_compile uvm_run uvm_smoke uvm_fp16_ddr_e2e uvm_mixed_precision_ddr_e2e uvm_external_macro_ddr_e2e uvm_mixed_precision_ddr_e2e_axi_stalls uvm_mixed_precision_ddr_e2e_regress uvm_mixed_precision_ddr_e2e_cov_regress uvm_mixed_precision_ddr_e2e_random_cov_regress uvm_compute_cluster_compile uvm_compute_cluster_regress axi_lite_vip_compile axi_lite_vip_csr clean
 uvm_compile:
 	rm -rf simv_uvm simv_uvm.daidir csrc
 	$(VCS_UVM) -top tb_ai_accel_uvm -f ai_accel_uvm.f -o simv_uvm -l uvm_compile.log
@@ -26,6 +32,24 @@ uvm_run: uvm_compile
 	@! grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' $(RUN_LOG) || { echo "ERROR: UVM warning/error/fatal count is nonzero in $(RUN_LOG)"; exit 1; }
 
 uvm_smoke: uvm_run
+
+# Focused integration of the reusable AXI4-Lite VIP master with the real
+# NMAForge top-level CSR port. The existing project-owned agent remains
+# untouched; this has a separate top, configuration and acceptance test.
+axi_lite_vip_compile:
+	@test -f "$(TUE_HOME)/compile.f" || { echo "ERROR: missing TUE dependency at $(TUE_HOME)"; exit 1; }
+	@test -f "$(TVIP_COMMON_HOME)/compile.f" || { echo "ERROR: missing TVIP Common dependency at $(TVIP_COMMON_HOME)"; exit 1; }
+	@mkdir -p "$(AXIL_VIP_OUT)/csrc"
+	$(VCS_UVM) -Mdir="$(AXIL_VIP_OUT)/csrc" -top tb_nma_axi_lite_vip \
+		-f ai_accel_axi_lite_vip.f -o "$(AXIL_VIP_OUT)/simv" \
+		-l "$(AXIL_VIP_OUT)/compile.log"
+
+axi_lite_vip_csr: axi_lite_vip_compile
+	"$(AXIL_VIP_OUT)/simv" +UVM_TESTNAME=nma_axi_lite_csr_vip_test \
+		+ntb_random_seed=20261107 -l "$(AXIL_VIP_OUT)/run.log"
+	@grep -q '\[NMA_AXIL_VIP_CSR_PASS\]' "$(AXIL_VIP_OUT)/run.log" || { echo "ERROR: AXI-Lite VIP CSR acceptance marker missing"; exit 1; }
+	@grep -Eq 'AXI requests=8 completed=8 reads=4 writes=4 outstanding=0 reset_aborted=0 mismatches=0' "$(AXIL_VIP_OUT)/run.log" || { echo "ERROR: AXI-Lite VIP transaction accounting did not close cleanly"; exit 1; }
+	@! grep -Eq 'UVM_(WARNING|ERROR|FATAL)[[:space:]]*:[[:space:]]*[1-9][0-9]*' "$(AXIL_VIP_OUT)/run.log" || { echo "ERROR: UVM warning/error/fatal count is nonzero"; exit 1; }
 
 uvm_mixed_precision_ddr_e2e:
 	$(MAKE) uvm_run UVM_TEST=ai_mixed_precision_ddr_e2e_test
