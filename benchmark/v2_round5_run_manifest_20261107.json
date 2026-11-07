@@ -1,0 +1,88 @@
+{
+  "title": "NMAForge v2 Round 5 fixed evidence",
+  "reviewed_source_sha": "73caef0f32140d1635816f1eb4ea28372523e80c",
+  "product_rtl_baseline_sha": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+  "tiny_npu_reference_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+  "nmaforge_branch": "feature/npu-architecture-v2 (isolated review worktree codex/round5 based on exact remote head)",
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "python": "3.12.13",
+    "numpy": "2.4.6",
+    "onnx": "1.17.0",
+    "verilator": "5.052",
+    "dc": "V-2023.12-SP1"
+  },
+  "seeds": {
+    "matrix": "20261107",
+    "cnn_mini": "20261029",
+    "digits_training_split": 29,
+    "transformer": "fixture fixed seed in workload JSON"
+  },
+  "models": {
+    "conv1x_mini.onnx_sha256": "1ac385ac18394ac5826a7eb426e99c2199bf6417055f7e3f461c40c1b1811640",
+    "conv1x_input_sha256": "a74587bfcb5b2dfcd9eed1dbbb4fcf657628264c3b0aae7a4c278f0f70705898",
+    "conv1x_golden_sha256": "94642359b0fdf8a4b56f8b17346b0385a477d782b4874bb7d1e979a589eab49c",
+    "digits_weights_sha256": "ef0e616d09ca0be7956fa8ca900e40c62973f8f06e3ec96af09d888eead73726",
+    "digits_testset_sha256": "cb851b077542f9bcf42f84938227ba5f1a4750ea0b0fbfe2ba8fcecbb914d107",
+    "transformer_h4_weights_sha256": "55cef19181c84dda9f99e940a0a749c1499fc1ccb176b966b1e13462f8ae3c03"
+  },
+  "cnn_comparison": {
+    "conv1x_mini": {
+      "nma_legacy_cycles": 1985,
+      "nma_linear_row_cycles": 1504,
+      "same_nma_boundary_speedup": 1.319813829787234,
+      "same_nma_total_window_legacy": 3065,
+      "same_nma_total_window_linear": 1504,
+      "same_nma_total_window_speedup": 2.0378989361702127,
+      "tinynpu_graph_cycles": 4781,
+      "tinynpu_cross_system_speedup": "NOT_COMPUTED_DIFFERENT_BOUNDARY",
+      "golden": "PASS all"
+    },
+    "digits_10class": {
+      "legacy_compute_cycles": 3193,
+      "linear_row_compute_cycles": 2712,
+      "same_boundary_compute_speedup": 1.1773598820058997,
+      "legacy_cmdq_plus_simulated_host_layout": 4273,
+      "linear_cmdq_plus_simulated_host_layout": 2712,
+      "same_boundary_total_speedup": 1.5755899705014749,
+      "classification": "384/396 in both modes",
+      "golden": "396/396 exact in both"
+    }
+  },
+  "transformer_decode_gemv": {
+    "baseline_gemm": "PASS 301/301",
+    "gemv_attempt": "FAIL 175 Golden mismatches",
+    "cycle_comparison": "not valid for optimization due failed correctness",
+    "model_level_speedup": "NOT_ESTABLISHED"
+  },
+  "dc": {
+    "library_environment": "TSMC28 HPC+ standard cell SSG 0.72V 125C library present; DC license check proceeded to elaboration",
+    "run_status": "PARTIAL: no mapped netlist or valid PPA reports; bounded run stopped after elaboration and one compile-command option error",
+    "matrix_400_mhz": "NOT_RUN_VALID_MAPPING",
+    "cluster": "NOT_RUN",
+    "sram_adapter": "NOT_RUN_SINGLE_PORT_MAC_INCOMPATIBLE_WITH_DUAL_PORT_MODEL_WITHOUT_ADAPTER",
+    "macro": "4096x32 single port; 16 KiB; LEF area 35239.86555 um^2",
+    "capacity_128k": {
+      "macro_count": 8,
+      "macro_area_um2": 281918.9244
+    },
+    "capacity_512k": {
+      "macro_count": 32,
+      "macro_area_um2": 1127675.6976
+    },
+    "area_scope": "LEF macro core only, excludes wrappers, control, routing, placement; not integrated PPA"
+  },
+  "matrix_bench_csv": "benchmark/v2_round5_tinynpu_matrix_20261107.csv",
+  "model_summary_csv": "benchmark/v2_round5_model_summary_20261107.csv",
+  "log_hashes": {
+    "nma_conv_legacy": "7c430a551a407fb1d3f1408a75441cc2e787318a7110aeab6c71c12538643983",
+    "nma_conv_linear_row": "df8713074b6048105d1bb4d4b76ae6f0d9b5bfcb90c559f9b2448ddaa327a6a5",
+    "tiny_conv": "88075ee52ada63fb6d44016eb3d5c83e1d2504933d19b206154dd0c84b0dcbaf",
+    "matrix_gemm": "079a632b6fb78df2beb7fce11a7d96ff14c7ae5b33b554eb0ea1e596bb7b224c",
+    "matrix_gemv": "3ae7ada21357a4b354fb512083be2b49a79898b55bb768b26bb9dc9ea67ef267",
+    "tiny_matrix": "e921bef8e90748964ee0b7a566f70607515f5ee650cc00d18bbafbe9a0371bbe",
+    "transformer_gemm": "1fb2147112f11966cef186301357fb283908637b6081aebdb8342100d3fa1bab",
+    "transformer_gemv_fail": "638861b1010c60f4ac9a2c8b332555650d97dcd170fbf22c4c6e93f52cb88707",
+    "dc_attempt": "c068b03b2894c20ad667c6ef663713ffd7d5d2c80d262edbd155d57c5a0cfc5b"
+  }
+}

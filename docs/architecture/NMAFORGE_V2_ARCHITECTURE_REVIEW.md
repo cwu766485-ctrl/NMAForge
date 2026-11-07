@@ -1,5 +1,44 @@
 # NMAForge v2 Architecture Review
 
+## Round 5 architecture and evidence disposition — 2026-11-07
+
+**Status: `RESEARCH_BASELINE_PARTIAL`; this bounded round stops after publishing
+its evidence.** Reviewed source/test SHA was
+`73caef0f32140d1635816f1eb4ea28372523e80c`, identical to the fetched
+`origin/feature/npu-architecture-v2` HEAD. No product RTL was changed in this
+round. Relative to the named product baseline
+`cd0a05d8ecd8cfb6c3f39b559788a2531e324b23`, the existing product RTL delta is
+limited to `ai_tensor_matrix_core.v` and `ai_descriptor_validator.v` for the
+bounded `0x53` linear-row mode; both files predate Round 5. `main` R250 remains
+untouched.
+
+The opt-in Mapper policy `gemv_qkv` now emits legal-shaped opcode `0x52`
+descriptors for the H4 fixture's single-token Q/K/V projections; default
+mapping remains opcode `0x30`. Mapper unit checks pass, but the real Top run
+reported 175 Decode Golden mismatches. The experimental policy is therefore
+**FAIL / do not use** and establishes no Transformer speedup. The baseline
+GEMM policy still passes 301/301 checks. No compute array, product opcode, or
+RTL behavior was added in Round 5.
+
+The same fixed mini-CNN passes on NMAForge and TinyNPU, but their measured
+cycle windows differ. The NMAForge Legacy→Linear-Row comparison is valid
+within the same Top testbench: 1,985→1,504 cycles (1.320×); the trained
+ten-class CNN's CMDQ window is 3,193→2,712 (1.177×). Neither result isolates
+Fused Requant from Linear-Row layout. TinyNPU GEMM/GEMV runs are direct-array
+measurements while NMAForge runs include Matrix controller and behavioral
+SPAD service; raw cycle ratios are not system speedups.
+
+DC and the 28 nm libraries are present. Two bounded Matrix-core synthesis
+attempts produced no accepted mapped netlist or PPA report: one was stopped
+during mapping and one standard-compile mode used an unsupported option. The
+script was corrected afterward; no post-fix synthesis was run. Macro catalog
+inspection gives only a storage-area lower bound; no dual-port-compatible
+SPAD adapter was implemented. Thus Matrix/Cluster 300/400/450 MHz, Fmax,
+critical path, power, and integrated SRAM PPA remain **NOT_RUN**, not
+`BLOCKED_ENV` and not PASS. Full Round 5 values and run records are in
+[`final comparison`](../benchmark/NMAFORGE_V2_ROUND5_FINAL_COMPARISON.md) and
+the machine-readable files in `benchmark/v2_round5_*_20261107.*`.
+
 ## Focused Research Round 3 — 2026-11-06
 
 **Disposition: `RESEARCH_BASELINE_PARTIAL`.** Starting remote candidate was

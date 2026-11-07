@@ -1,5 +1,32 @@
 # NMAForge execution frontier
 
+## Round 5 terminal disposition — 2026-11-07
+
+This fixed comparison round is complete and **stops here**. Reviewed base
+source/test SHA and initial GitHub target HEAD were both
+`73caef0f32140d1635816f1eb4ea28372523e80c`; the TinyNPU reference remains
+`8216c22b762011aa20c05fc2768423fd12dda59d`. `main` R250 and unrelated
+worktrees were not modified.
+
+Completed evidence: paired NMAForge/TinyNPU `conv1x_mini` Golden replay;
+current-source 3 GEMM + 4 GEMV NMAForge/TinyNPU Direct Array cases, all
+Golden-pass; 396-sample ten-class CNN Legacy/Linear-Row comparison; baseline
+Transformer H4 GEMM path, 301/301 pass; and the opt-in Transformer `0x52`
+Q/K/V experiment, recorded as FAIL with 175 Decode mismatches. Same-system
+CNN speedups are reported. No cross-system TinyNPU speedup is claimed because
+the memory/controller and graph timing boundaries differ.
+
+The available TSMC28 / DC environment was checked. The bounded Matrix Core
+mapping attempts did not produce valid synthesis reports; no 300/400/450 MHz
+PPA result is claimed. Catalog-only 128/512 KiB macro area is reported with
+the single-port-vs-dual-port limitation. The fixed evidence, scripts, and
+remaining limitations are in
+[`NMAFORGE_V2_ROUND5_FINAL_COMPARISON.md`](../../benchmark/NMAFORGE_V2_ROUND5_FINAL_COMPARISON.md)
+and `benchmark/v2_round5_*_20261107.*`.
+
+Final state is `RESEARCH_BASELINE_PARTIAL`. Do not auto-start another DV,
+RTL, Transformer, benchmark, or synthesis phase after this publication.
+
 ## Focused Research Round 3 — delivery snapshot, 2026-11-06
 
 Implementation candidate `4dab73646989615c5479de0bac76d1488a102758` adds the

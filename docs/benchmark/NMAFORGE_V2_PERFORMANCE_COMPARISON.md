@@ -1,5 +1,39 @@
 # NMAForge v2 Performance Comparison
 
+## Round 5 current-source update — 2026-11-07
+
+The fixed current-source matrix and model comparisons are in
+[`Round 5 final comparison`](NMAFORGE_V2_ROUND5_FINAL_COMPARISON.md),
+[`matrix CSV`](../../benchmark/v2_round5_tinynpu_matrix_20261107.csv),
+[`model CSV`](../../benchmark/v2_round5_model_summary_20261107.csv), and
+[`run manifest`](../../benchmark/v2_round5_run_manifest_20261107.json).
+NMAForge source/test SHA is `73caef0f32140d1635816f1eb4ea28372523e80c`;
+TinyNPU is fixed at `8216c22b762011aa20c05fc2768423fd12dda59d`.
+
+At that NMAForge SHA, the 3 GEMM + 4 GEMV matrix passed all independent
+Goldens with VCS `V-2023.12-SP1_Full64`, seed `20261107`, a 16×16 array, and
+one-cycle behavioral four-bank SPAD. TinyNPU Verilator array results also
+passed all seven Golden cases. TinyNPU's timed path is the Direct Array only;
+there is no Tiny controller/SPAD timing in those cycles. The separate
+16-byte/cycle common-memory rows are estimates. Consequently, report raw
+cycle ratios and model assumptions only; do not call them cross-system
+speedups.
+
+For the same NMAForge mini-CNN Top case, the Legacy→Linear-Row measured
+interval is 1,985→1,504 cycles, a 1.320× within-system speedup. The trained
+ten-class CNN has 3,193→2,712 Top CMDQ cycles (1.177×) and 4,273→2,712 cycles
+when including its testbench-emulated Host Layout (1.576×); both paths pass
+all 396 sample Goldens and retain 384/396 classifications. The 1,080 Host
+Layout cycles are simulator transactions, not measured host CPU time.
+Fused Requant and Linear-Row effects are not isolated by this paired model
+run. Historical Digits epilogue and directed Tile Forwarding evidence remain
+separate experiments as described below.
+
+The optional Transformer `0x52` Q/K/V Decode mapping preserves the default
+`0x30` path, but its current H4 Top integration fails 175 Golden checks. Its
+cycle counters are not valid performance evidence. No Cache/Prefetch model
+gain is established for Transformer Decode.
+
 ## Focused Research Round 3 — 2026-11-06
 
 Candidate: `4dab73646989615c5479de0bac76d1488a102758`, parent/reviewed

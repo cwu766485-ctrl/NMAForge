@@ -33,6 +33,7 @@ from ai_a3_reference import (  # noqa: E402
 
 
 OP_GEMM = 0x30
+OP_GEMV_KFOLD = 0x52
 OP_GEMM_REQUANT_TILE_A = 0x53
 OP_SOFTMAX = 0x32
 OP_RESIDUAL = 0x34
@@ -140,6 +141,8 @@ class Descriptor:
     src0_stride: int = 0
     src1_stride: int = 0
     dst_stride: int = 0
+    batch_count: int = 1
+    head_count: int = 1
 
     def words(self) -> list[int]:
         words = [0] * 16
@@ -156,7 +159,9 @@ class Descriptor:
         words[10] = self.src0_stride
         words[11] = self.src1_stride
         words[12] = self.dst_stride
-        words[13] = (1 << 16) | 1  # one head, one batch
+        # ABI-v7 word 13 stores head_count in the upper half and
+        # batch_count in the lower half (see ai_desc_fetch).
+        words[13] = (self.head_count << 16) | self.batch_count
         words[14] = (self.signal_mask << 16) | self.wait_mask
         words[15] = (self.clear_mask << 16) | DESC_VERSION
         return [u32(word) for word in words]
@@ -256,7 +261,10 @@ def causal_softmax_q15(scores: list[int], query_token: int) -> list[int]:
 
 def build_workload(
     model: dict | None = None,
+    decode_mapping_policy: str = "gemm",
 ) -> tuple[Mapper, dict[str, list]]:
+    if decode_mapping_policy not in ("gemm", "gemv_qkv"):
+        raise ValueError(f"unsupported decode mapping policy: {decode_mapping_policy}")
     mapper = Mapper()
     if model is None:
         x = [
@@ -307,13 +315,19 @@ def build_workload(
     gamma_t = mapper.tensor("gamma", (4,), "i32", "vector", gamma)
     beta_t = mapper.tensor("beta", (4,), "i32", "vector", beta)
 
-    def empty_i32(name: str, shape: tuple[int, int] = (4, 4)) -> Tensor:
+    def empty_i32(
+        name: str, shape: tuple[int, int] = (4, 4),
+        zero_pad: bool = False,
+    ) -> Tensor:
         # Poison every destination before execution.  This prevents a stale or
         # preloaded golden tensor from making the RTL check pass accidentally.
+        # A one-row GEMV into a four-row decode tensor explicitly initializes
+        # the three architecturally unused rows to zero; these are padding,
+        # not computed or expected output data.
         return mapper.tensor(
             name, shape, "i32", "row-major",
-            [0x5A5AA5A5] * (shape[0] * shape[1]),
-            initialized=False,
+            ([0] if zero_pad else [0x5A5AA5A5]) * (shape[0] * shape[1]),
+            initialized=zero_pad,
         )
 
     def empty_i8(name: str, shape: tuple[int, int] = (4, 4)) -> Tensor:
@@ -352,6 +366,31 @@ def build_workload(
     ) -> None:
         mapper.add(name, OP_GEMM, lhs, dst, src1=rhs, m=m, n=n,
                    k_or_length=k, flags=flags, aux0=1)
+
+    def gemv_rhs(name: str, matrix: list[list[int]]) -> Tensor:
+        """Pack W[N,K] as the 0x52 dense K-major, N-padded operand."""
+        n_dim = len(matrix)
+        k_dim = len(matrix[0]) if matrix else 0
+        if not (1 <= n_dim <= 16 and k_dim > 0 and
+                all(len(row) == k_dim for row in matrix)):
+            raise ValueError(f"{name}: opcode 0x52 requires N=1..16 and rectangular K")
+        words: list[int] = []
+        for k_index in range(k_dim):
+            row = [matrix[n_index][k_index] for n_index in range(n_dim)]
+            row.extend([0] * (16 - n_dim))
+            words.extend(pack_i8(row[offset:offset + 4])
+                         for offset in range(0, 16, 4))
+        return mapper.tensor(
+            name, (k_dim * 16,), "i8_packed", "k-major-n-padded", words
+        )
+
+    def gemv_qkv(name: str, lhs: Tensor, rhs: Tensor, dst: Tensor) -> None:
+        if len(dst.shape) != 2 or dst.shape[0] != 4:
+            raise ValueError(f"{name}: padded decode destination must have four rows")
+        mapper.add(
+            name, OP_GEMV_KFOLD, lhs, dst, src1=rhs.addr, m=1, n=4,
+            k_or_length=4, batch_count=1, head_count=0,
+        )
 
     def pack(name: str, src: Tensor, dst: Tensor, shift: int, length: int = 16,
              tile_a_shape: tuple[int, int] | None = None) -> None:
@@ -402,9 +441,13 @@ def build_workload(
     decode_i32 = mapper.tensor(
         "decode_x_i32", (4, 4), "i32", "row-major", flatten(decode_rows)
     )
-    qd32, qd8 = empty_i32("decode_q_i32"), empty_i8("decode_q_i8")
-    kd32, kd8 = empty_i32("decode_k_i32"), empty_i8("decode_k_i8")
-    vd32, vd8 = empty_i32("decode_v_i32"), empty_i8("decode_v_i8")
+    qkv_zero_pad = decode_mapping_policy == "gemv_qkv"
+    qd32 = empty_i32("decode_q_i32", zero_pad=qkv_zero_pad)
+    qd8 = empty_i8("decode_q_i8")
+    kd32 = empty_i32("decode_k_i32", zero_pad=qkv_zero_pad)
+    kd8 = empty_i8("decode_k_i8")
+    vd32 = empty_i32("decode_v_i32", zero_pad=qkv_zero_pad)
+    vd8 = empty_i8("decode_v_i8")
     decode_scores = empty_i32("decode_scores")
     decode_probs32 = empty_i32("decode_prob_q15")
     decode_probs8 = empty_i8("decode_prob_i8")
@@ -471,11 +514,23 @@ def build_workload(
 
     # Decode one new token after prefill. Its key/value update token slot 4;
     # attention then reads the latest four-token sliding context window.
-    gemm("decode_q_projection", decode_i8, wq_t, qd32)
+    if qkv_zero_pad:
+        wq_gemv = gemv_rhs("decode_wq_gemv", wq)
+        wk_gemv = gemv_rhs("decode_wk_gemv", wk)
+        wv_gemv = gemv_rhs("decode_wv_gemv", wv)
+        gemv_qkv("decode_q_projection", decode_i8, wq_gemv, qd32)
+    else:
+        gemm("decode_q_projection", decode_i8, wq_t, qd32)
     pack("decode_q_pack", qd32, qd8, 0)
-    gemm("decode_k_projection", decode_i8, wk_t, kd32)
+    if qkv_zero_pad:
+        gemv_qkv("decode_k_projection", decode_i8, wk_gemv, kd32)
+    else:
+        gemm("decode_k_projection", decode_i8, wk_t, kd32)
     pack("decode_k_pack", kd32, kd8, 0)
-    gemm("decode_v_projection", decode_i8, wv_t, vd32)
+    if qkv_zero_pad:
+        gemv_qkv("decode_v_projection", decode_i8, wv_gemv, vd32)
+    else:
+        gemm("decode_v_projection", decode_i8, wv_t, vd32)
     pack("decode_v_pack", vd32, vd8, 0)
     kv_write("decode_kv_write_k4", kd8, k_cache, 4, source_row=0)
     kv_write("decode_kv_write_v4", vd8, v_cache, 4, source_row=0)
@@ -590,6 +645,7 @@ def build_workload(
     validate_descriptor_chain(mapper)
     expected = {
         "prefill_descriptor_count": prefill_descriptor_count,
+        "decode_mapping_policy": decode_mapping_policy,
         "prefill_final": norm_2,
         "decode_final": decode_norm_2,
         "decode_q_i32": decode_q,
@@ -703,6 +759,27 @@ def validate_descriptor_chain(mapper: Mapper) -> None:
             output_bytes = descriptor.m * descriptor.n * (
                 1 if descriptor.op == OP_GEMM_REQUANT_TILE_A else 4
             )
+        elif descriptor.op == OP_GEMV_KFOLD:
+            m, n, k = descriptor.m, descriptor.n, descriptor.k_or_length
+            if not (1 <= m <= 16 and 1 <= n <= 16 and k > 0):
+                raise ValueError(f"{descriptor.name}: illegal opcode 0x52 shape")
+            if (descriptor.flags != 0 or descriptor.aux0 != 0 or
+                    descriptor.batch_count > 1 or descriptor.head_count != 0 or
+                    descriptor.src0_stride != 0 or descriptor.src1_stride != 0 or
+                    descriptor.dst_stride != 0 or source_base & 0xF or
+                    descriptor.src1 & 0xF or destination_base & 0x3):
+                raise ValueError(f"{descriptor.name}: illegal opcode 0x52 fields")
+            a_bytes = m * ((k + 15) & ~15)
+            b_bytes = k * 16
+            output_bytes = m * n * 4
+            a_end, b_end, dst_end = source_base + a_bytes, descriptor.src1 + b_bytes, destination_base + output_bytes
+            if max(a_end, b_end, dst_end) > 0x1_0000_0000:
+                raise ValueError(f"{descriptor.name}: opcode 0x52 address range overflows")
+            if ((destination_base < a_end and source_base < dst_end) or
+                    (destination_base < b_end and descriptor.src1 < dst_end)):
+                raise ValueError(f"{descriptor.name}: opcode 0x52 output aliases an operand")
+            require(source_base, a_bytes, descriptor.name, "src0")
+            require(descriptor.src1, b_bytes, descriptor.name, "src1")
         else:
             require(
                 source_base, descriptor.k_or_length * 4,
@@ -855,6 +932,7 @@ def write_manifest(
         "attention_heads": 1,
         "prefill_descriptor_count": expected["prefill_descriptor_count"],
         "decode_descriptor_count": len(mapper.descriptors) - expected["prefill_descriptor_count"],
+        "decode_mapping_policy": expected["decode_mapping_policy"],
         "weight_provenance": (
             model.get("weight_provenance", "trained integer toy next-token model")
             if model is not None else
@@ -926,18 +1004,25 @@ def main() -> None:
         "--model-json", type=Path,
         help="load trained INT8 weights and the model's fixed prefill/decode case",
     )
+    parser.add_argument(
+        "--decode-mapping-policy", choices=("gemm", "gemv_qkv"),
+        default="gemm",
+        help=("keep the legacy 0x30 decode mapping or select experimental 0x52 "
+              "Q/K/V projections (current H4 Top Golden replay fails; do not use)"),
+    )
     args = parser.parse_args()
     model = json.loads(args.model_json.read_text(encoding="utf-8")) if args.model_json else None
     model_sha256 = None
     if args.model_json:
         import hashlib
         model_sha256 = hashlib.sha256(args.model_json.read_bytes()).hexdigest()
-    mapper, expected = build_workload(model)
+    mapper, expected = build_workload(model, args.decode_mapping_policy)
     write_svh(args.svh, mapper, expected)
     write_manifest(args.manifest, mapper, expected, model, model_sha256)
     print(
         f"TRANSFORMER_MAPPER_PASS descriptors={len(mapper.descriptors)} "
         f"tensors={len(mapper.tensors)} dataflow=closed poison=enabled "
+        f"decode_mapping={args.decode_mapping_policy} "
         f"prefill={expected['prefill_final']} decode={expected['decode_final']}"
         + (f" task_metrics={expected['task_metrics']} model_sha256={model_sha256}"
            if model is not None else "")
