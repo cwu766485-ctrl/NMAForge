@@ -1,0 +1,92 @@
+{
+  "round": 11,
+  "status": "PARTIAL",
+  "target_branch": "feature/npu-architecture-v2",
+  "reviewed_source_head": "cd7bdd3f01bea4cf35d4768b5335468784df14ec",
+  "working_branch": "codex/round11",
+  "tiny_npu_reference_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+  "product_rtl_modified": false,
+  "transformer_h16": {
+    "status": "BLOCKED_MAPPER_SUPPORT",
+    "top_status": "NOT_RUN",
+    "prefill_cycles": null,
+    "decode_cycles": null,
+    "model_quality": null,
+    "first_failure": "trained model wq must be a 4x4 INT8 matrix",
+    "sequence_failure": "trained model prefill_tokens must be four IDs in [0, 3]",
+    "notes": "Synthetic identity-weight probes only; no trained H16 model.",
+    "run_id": "R11-H16-MAPPER-PREFLIGHT-20261108",
+    "sequence8_probe_log_sha256": "423220dffb5a241b959ddffa1da8adda68b0c225bee62709ac1a5a92e756a342",
+    "four_token_probe_log_sha256": "5fa5374e01eaeae3fde532d5bad254c9c564342ecd447cac94d447de10fc6ea2",
+    "sequence8_probe_log": "/tmp/nmaforge_r11_h16_probe.log",
+    "four_token_probe_log": "/tmp/nmaforge_r11_h16_probe_4token.log",
+    "probe_input": "six synthetic 16x16 INT8 identity matrices; parser-only diagnostic, not a trained model"
+  },
+  "representative_cnn": {
+    "status": "PARTIAL",
+    "top_status": "BLOCKED_ENV",
+    "offline_golden_status": "PASS",
+    "model": "nma_pointwise_cnn_32x16_16ch_2layer_int8",
+    "seed": 20261108,
+    "weights_trained": false,
+    "useful_macs_per_inference": 262144,
+    "descriptor_count": 4,
+    "spad_capacity_bytes": 131072,
+    "spad_high_water_exclusive": 102976,
+    "preload_spad_bytes": 90944,
+    "checked_intermediate_and_output_words": 20480,
+    "input_sha256": "f8514ef62fc2e83230d533ea2c82afb18a8d2b71e7324886679fd814e99561ea",
+    "weight1_sha256": "b780646f65d0247b5972c9125073988315d6ea4c2fe073ea4c1aa63a569b9d89",
+    "weight2_sha256": "b37e120ac1afbc15ffc67c4ddc2f94368901ef0eca8f0120ae2cba6eb846efa0",
+    "output_sha256": "22cb785cff0275f5cc4bba995800d65350231373effc4723734370b3f4860d5f",
+    "memory_image_sha256": "ed38edf71c161d44ddbadf2178aa203f51a09d9122a4e4bff7a6bef1f486d4c1",
+    "golden_file_sha256": "9e094fda9315fb86e39d20c084015772aaa21eb1bd1fbeb49d8ee72a59833b9d",
+    "command_cycles": null,
+    "end_to_end_cycles": null,
+    "matrix_utilization_pct": null,
+    "spad_read_bytes": null,
+    "spad_write_bytes": null,
+    "reason": "VCS license server connection failed before RTL compilation.",
+    "offline_golden_run_id": "R11-CNN-OFFLINE-GOLDEN-S20261108",
+    "top_run_id": "R11-TOP-REP-CNN-128K-S20261108",
+    "preload_spad_bytes_measured": false,
+    "offline_preload_spad_bytes": 90944
+  },
+  "vcs_attempt": {
+    "run_id": "R11-TOP-REP-CNN-128K-S20261108",
+    "run_dir": "/tmp/nmaforge_r11_top_cnn_128k_20261108",
+    "tool": "VCS V-2023.12-SP1_Full64",
+    "exit_status": 255,
+    "stage": "license checkout before compile",
+    "compile_log_sha256": "8ddf414eaac7d912684e0a059a38e84d6fa6de129c85ccb447a0b42112aefc8c",
+    "simv_created": false,
+    "run_log_created": false
+  },
+  "historical_context": {
+    "source_snapshot": "13f94abf59c3dbea833ad4bbe227ef5cab4df503",
+    "h4_transformer": {
+      "status": "PASS_REUSED",
+      "useful_macs": 640,
+      "descriptors": 86,
+      "prefill_cycles": 5259,
+      "decode_cycles": 5110,
+      "model_sha256": "001550dbadb816e66f737f5f6cba0819f51821c71a78d84861d62dc80dd8511f"
+    },
+    "digits_cnn": {
+      "status": "PASS_REUSED",
+      "useful_macs_per_image": 2736,
+      "fused_linear_row_cycles_per_image": 2712,
+      "golden_checks": "396/396",
+      "correct_classifications": "384/396"
+    }
+  },
+  "artifacts": {
+    "performance_csv": "benchmark/representative/round11_performance.csv",
+    "workload_manifest": "generated under the run directory; not committed",
+    "report": "docs/benchmark/NMAFORGE_V2_ROUND11_REPRESENTATIVE_MODELS.md"
+  },
+  "tool_versions": {
+    "python": "3.12.13",
+    "vcs": "V-2023.12-SP1_Full64"
+  }
+}

@@ -324,6 +324,12 @@ module tb_ai_accel_smoke;
     reg [31:0] ai_digits_hidden_words [0:6000];
     reg [31:0] ai_tinynpu_cnn_image_words [0:4095];
     reg [31:0] ai_tinynpu_cnn_expected_words [0:1023];
+    // Bounded generic Top-CMDQ workload image used by representative model
+    // probes. Files are generated under /tmp; no model data is compiled in.
+    reg [31:0] representative_image_words [0:131071];
+    reg [31:0] representative_golden_words [0:131071];
+    integer representative_load_cycles = 0;
+    integer representative_load_measure = 1'b0;
     integer ai_digits_cycles = 0;
     reg ai_digits_measure = 1'b0;
     integer ai_digits_layout_cycles = 0;
@@ -392,6 +398,11 @@ module tb_ai_accel_smoke;
     integer r9_sfu_divider_busy_cycles = 0;
     integer r9_sfu_sqrt_busy_cycles = 0;
     integer r9_sfu_state;
+
+    always @(posedge aclk) begin
+        if (representative_load_measure)
+            representative_load_cycles = representative_load_cycles + 1;
+    end
 
     // Round 9 SFU profiler. Pass buckets are mutually exclusive FSM states;
     // request/response/divider counters are overlapping stall/operation
@@ -3356,6 +3367,199 @@ module tb_ai_accel_smoke;
         end
     endtask
 
+    task run_representative_model;
+        reg [1023:0] image_file;
+        reg [1023:0] golden_file;
+        integer image_count;
+        integer golden_count;
+        integer image_index;
+        integer golden_index;
+        integer descriptor_base;
+        integer completion_base;
+        integer descriptor_count;
+        integer useful_macs;
+        integer poll_index;
+        integer completion_index;
+        integer matrix_mac_cycles;
+        integer matrix_wait_cycles;
+        integer matrix_response_wait_cycles;
+        integer matrix_writeback_cycles;
+        integer matrix_other_cycles;
+        integer sfu_busy_cycles;
+        integer kv_busy_cycles;
+        integer conv_busy_cycles;
+        integer banked_busy_cycles;
+        integer fp_busy_cycles;
+        integer scalar_busy_cycles;
+        integer no_engine_cycles;
+        integer dma_busy_cycles;
+        integer exclusive_profile_cycles;
+        integer command_cycles;
+        integer preloaded_spad_bytes;
+        integer spad_read_bytes;
+        integer spad_write_bytes;
+        real mac_per_cycle;
+        real array_utilization;
+        reg [31:0] read_value;
+        reg [31:0] status_value;
+        begin
+            if (!$value$plusargs("AI_REPRESENTATIVE_MEMORY=%s", image_file) ||
+                !$value$plusargs("AI_REPRESENTATIVE_GOLDEN=%s", golden_file) ||
+                !$value$plusargs("AI_REPRESENTATIVE_DESC_BASE=%d", descriptor_base) ||
+                !$value$plusargs("AI_REPRESENTATIVE_CPL_BASE=%d", completion_base) ||
+                !$value$plusargs("AI_REPRESENTATIVE_DESC_COUNT=%d", descriptor_count) ||
+                !$value$plusargs("AI_REPRESENTATIVE_USEFUL_MACS=%d", useful_macs))
+                $fatal(1, "representative model mode requires memory, golden, queue and MAC plusargs");
+
+            $readmemh(image_file, representative_image_words);
+            $readmemh(golden_file, representative_golden_words);
+            image_count = representative_image_words[0];
+            golden_count = representative_golden_words[0];
+            if (image_count <= 0 || image_count > 65535 ||
+                golden_count <= 0 || golden_count > 65535 ||
+                descriptor_count < 1 || descriptor_count > 128 ||
+                descriptor_base < 0 || completion_base < 0 ||
+                descriptor_base[1:0] != 0 || completion_base[1:0] != 0)
+                $fatal(1, "representative model image/queue dimensions invalid image=%0d golden=%0d desc=%0d",
+                       image_count, golden_count, descriptor_count);
+
+            representative_load_cycles = 0;
+            representative_load_measure = 1'b1;
+            for (image_index = 0; image_index < image_count; image_index = image_index + 1) begin
+                if (representative_image_words[1 + 2 * image_index] >= SPAD_BYTES ||
+                    representative_image_words[1 + 2 * image_index][1:0] != 2'b00)
+                    $fatal(1, "representative image has invalid SPAD address index=%0d addr=%08h",
+                           image_index, representative_image_words[1 + 2 * image_index]);
+                axi_write(SPAD_BASE + representative_image_words[1 + 2 * image_index],
+                          representative_image_words[2 + 2 * image_index]);
+            end
+            representative_load_measure = 1'b0;
+
+            // Prove every expected result was poisoned before the first command.
+            for (golden_index = 0; golden_index < golden_count; golden_index = golden_index + 1) begin
+                axi_read(SPAD_BASE + representative_golden_words[1 + 2 * golden_index],
+                         read_value);
+                if (read_value !== 32'ha55a_a55a)
+                    $fatal(1, "representative output not poisoned index=%0d addr=%08h value=%08h",
+                           golden_index, representative_golden_words[1 + 2 * golden_index], read_value);
+            end
+
+            axi_write(REG_CMDQ_CTRL, 32'd0);
+            axi_write(REG_CMDQ_BASE_LO, descriptor_base);
+            axi_write(REG_CMDQ_BASE_HI, 32'd0);
+            axi_write(REG_CMDQ_SIZE, 32'd128);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, descriptor_count);
+            axi_write(REG_CPLQ_BASE_LO, completion_base);
+            axi_write(REG_CPLQ_SIZE, 32'd128);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+
+            ai_tinynpu_cnn_engine_read_words = 0;
+            ai_tinynpu_cnn_engine_write_words = 0;
+            ai_tinynpu_cnn_banked_read_lines = 0;
+            ai_tinynpu_cnn_line_write_lines = 0;
+            ai_tinynpu_cnn_measure = 1'b1;
+            transformer_top_profile_matrix_mac = 0;
+            transformer_top_profile_matrix_request_wait = 0;
+            transformer_top_profile_matrix_response_wait = 0;
+            transformer_top_profile_matrix_writeback = 0;
+            transformer_top_profile_matrix_other = 0;
+            transformer_top_profile_sfu_busy = 0;
+            transformer_top_profile_kv_busy = 0;
+            transformer_top_profile_conv_busy = 0;
+            transformer_top_profile_banked_busy = 0;
+            transformer_top_profile_fp_busy = 0;
+            transformer_top_profile_scalar_busy = 0;
+            transformer_top_profile_no_engine_busy = 0;
+            transformer_top_profile_dma_busy = 0;
+            transformer_top_last_completion_tail = dut.processor_cplq_tail;
+            transformer_top_last_completion_cycle = transformer_top_cycle_counter;
+            transformer_top_start_cycle = transformer_top_cycle_counter;
+            transformer_top_final_target = descriptor_count;
+            transformer_top_final_captured = 1'b0;
+            transformer_top_timing_enable = 1'b1;
+            axi_write(REG_DOORBELL, 32'd1);
+            for (poll_index = 0; poll_index < 2000000 &&
+                 !transformer_top_final_captured; poll_index = poll_index + 1)
+                @(posedge aclk);
+            transformer_top_timing_enable = 1'b0;
+            ai_tinynpu_cnn_measure = 1'b0;
+            if (!transformer_top_final_captured)
+                $fatal(1, "representative model completion timeout desc_count=%0d cmd_head=%0d cpl_tail=%0d",
+                       descriptor_count, dut.processor_cmdq_head, dut.processor_cplq_tail);
+            if (dut.processor_cplq_tail != descriptor_count ||
+                dut.processor_cmdq_head != descriptor_count)
+                $fatal(1, "representative model queue did not retire all commands head=%0d tail=%0d",
+                       dut.processor_cmdq_head, dut.processor_cplq_tail);
+
+            for (completion_index = 0; completion_index < descriptor_count;
+                 completion_index = completion_index + 1) begin
+                axi_read(SPAD_BASE + completion_base + completion_index * 16, read_value);
+                if (read_value !== (32'h0000_7100 + completion_index))
+                    $fatal(1, "representative completion task ID mismatch index=%0d got=%08h",
+                           completion_index, read_value);
+                axi_read(SPAD_BASE + completion_base + completion_index * 16 + 4, status_value);
+                if (status_value !== 32'd1)
+                    $fatal(1, "representative completion failed index=%0d status=%08h",
+                           completion_index, status_value);
+            end
+            for (golden_index = 0; golden_index < golden_count; golden_index = golden_index + 1) begin
+                axi_read(SPAD_BASE + representative_golden_words[1 + 2 * golden_index], read_value);
+                if (read_value !== representative_golden_words[2 + 2 * golden_index])
+                    $fatal(1, "representative Golden mismatch index=%0d addr=%08h expected=%08h actual=%08h",
+                           golden_index, representative_golden_words[1 + 2 * golden_index],
+                           representative_golden_words[2 + 2 * golden_index], read_value);
+            end
+
+            matrix_mac_cycles = transformer_top_profile_matrix_mac;
+            matrix_wait_cycles = transformer_top_profile_matrix_request_wait;
+            matrix_response_wait_cycles = transformer_top_profile_matrix_response_wait;
+            matrix_writeback_cycles = transformer_top_profile_matrix_writeback;
+            matrix_other_cycles = transformer_top_profile_matrix_other;
+            sfu_busy_cycles = transformer_top_profile_sfu_busy;
+            kv_busy_cycles = transformer_top_profile_kv_busy;
+            conv_busy_cycles = transformer_top_profile_conv_busy;
+            banked_busy_cycles = transformer_top_profile_banked_busy;
+            fp_busy_cycles = transformer_top_profile_fp_busy;
+            scalar_busy_cycles = transformer_top_profile_scalar_busy;
+            no_engine_cycles = transformer_top_profile_no_engine_busy;
+            dma_busy_cycles = transformer_top_profile_dma_busy;
+            command_cycles = transformer_top_final_end_cycle - transformer_top_start_cycle;
+            exclusive_profile_cycles = matrix_mac_cycles + matrix_wait_cycles +
+                matrix_response_wait_cycles + matrix_writeback_cycles + matrix_other_cycles +
+                sfu_busy_cycles + kv_busy_cycles + conv_busy_cycles + banked_busy_cycles +
+                fp_busy_cycles + scalar_busy_cycles + no_engine_cycles;
+            preloaded_spad_bytes = image_count * 4;
+            if (exclusive_profile_cycles != command_cycles)
+                $fatal(1, "representative exclusive profile does not close cycles=%0d buckets=%0d",
+                       command_cycles, exclusive_profile_cycles);
+            spad_read_bytes = ai_tinynpu_cnn_engine_read_words * 4 +
+                              ai_tinynpu_cnn_banked_read_lines * 16;
+            spad_write_bytes = ai_tinynpu_cnn_engine_write_words * 4 +
+                               ai_tinynpu_cnn_line_write_lines * 16;
+            mac_per_cycle = 0.0;
+            array_utilization = 0.0;
+            if (command_cycles > 0)
+                mac_per_cycle = useful_macs / command_cycles;
+            if (matrix_mac_cycles > 0)
+                array_utilization = 100.0 * useful_macs / (256.0 * matrix_mac_cycles);
+            $display("REPRESENTATIVE_MODEL_PASS desc=%0d golden_words=%0d useful_macs=%0d command_cycles=%0d exclusive_profile_cycles=%0d preload_axi_cycles=%0d preloaded_spad_bytes=%0d mac_per_cycle=%0.4f array_utilization_pct=%0.2f matrix_mac_cycles=%0d matrix_req_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d sfu_busy=%0d kv_busy=%0d conv_busy=%0d banked_busy=%0d fp_busy=%0d scalar_busy=%0d no_engine_dispatch_remainder=%0d dma_busy_overlap=%0d spad_read_bytes=%0d spad_write_bytes=%0d",
+                     descriptor_count, golden_count, useful_macs, command_cycles,
+                     exclusive_profile_cycles, representative_load_cycles,
+                     preloaded_spad_bytes, mac_per_cycle, array_utilization,
+                     matrix_mac_cycles, matrix_wait_cycles,
+                     matrix_response_wait_cycles, matrix_writeback_cycles,
+                     matrix_other_cycles, sfu_busy_cycles, kv_busy_cycles,
+                     conv_busy_cycles, banked_busy_cycles, fp_busy_cycles,
+                     scalar_busy_cycles, no_engine_cycles, dma_busy_cycles,
+                     spad_read_bytes, spad_write_bytes);
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+        end
+    endtask
+
     initial begin
         integer pair_engine_a;
         integer pair_engine_b;
@@ -3380,6 +3584,11 @@ module tb_ai_accel_smoke;
             if (errors != 0)
                 $fatal(1, "Transformer-only replay had %0d mismatches", errors);
             $display("TRANSFORMER_TOP_ONLY_PASS");
+            $finish;
+        end
+
+        if ($test$plusargs("AI_REPRESENTATIVE_MODEL")) begin
+            run_representative_model();
             $finish;
         end
 
