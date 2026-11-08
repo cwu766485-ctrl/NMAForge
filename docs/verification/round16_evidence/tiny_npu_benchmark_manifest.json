@@ -1,0 +1,16 @@
+{
+  "status": "MANIFEST_ONLY_NOT_RUN",
+  "nmaforge_source_sha": "0f6e9f33ae1f129f57b0947849cffb5de43d6281",
+  "tiny_npu_source_sha256": "8216c22b762011aa20c05fc2768423fd12dda59d",
+  "workload": "H16 2-head incremental decode, 1 layer, seq 4 prefill + tokens 4..7",
+  "shared_model_sha256": "756a39fc74134cbc451d8aafa94743f2793abd2651032b36b180b99117d68bfc",
+  "seed": 20261116,
+  "required_for_valid_comparison": [
+    "Build and run the pinned TinyNPU source SHA from source in a recorded tool environment",
+    "Map the same signed INT8 weights, token embeddings, KV contents, and requant/round/saturate rules",
+    "Verify per-stage Q/K/V, attention, FFN, final outputs and updated KV against the same independent Golden",
+    "Define identical compute-only and controller+memory endpoints; provide an equal memory service latency/bandwidth model",
+    "Record TinyNPU SRAM capacity, array dimensions and controller/graph overhead separately"
+  ],
+  "cross_project_speedup": "NOT_CALCULATED: no matching TinyNPU run/endpoint was executed in Round 16"
+}
