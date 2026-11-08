@@ -169,10 +169,28 @@ def main() -> None:
         raise ValueError("descriptor count and manifest contract disagree")
     if manifest["descriptor_count"] > 128:
         raise ValueError("Top smoke CPLQ supports at most 128 descriptors")
+    if manifest.get("runtime_ordering") != (
+        "single ABI event-bit completion chain; each descriptor waits for and "
+        "clears the preceding descriptor's ordered-retirement event"
+    ):
+        raise ValueError("H16 attention workload must declare its serialized ordering")
 
     tensors = manifest["tensors"]
     expected: dict[int, int] = {}
-    for index, contract in enumerate(manifest["descriptor_contract"]):
+    contracts = manifest["descriptor_contract"]
+    for index, contract in enumerate(contracts):
+        expected_wait = 0 if index == 0 else 1
+        expected_clear = 0 if index == 0 else 1
+        expected_signal = 0 if index + 1 == len(contracts) else 1
+        if (contract["wait_mask"], contract["clear_mask"],
+                contract["signal_mask"]) != (
+                    expected_wait, expected_clear, expected_signal):
+            raise ValueError(
+                f"descriptor {index} violates the ordered completion chain: "
+                f"wait={contract['wait_mask']:#x} "
+                f"clear={contract['clear_mask']:#x} "
+                f"signal={contract['signal_mask']:#x}"
+            )
         address = manifest["descriptor_base"] + index * 64
         observed = [memory[address + 4 * word] for word in range(16)]
         if observed != descriptor_words(contract):

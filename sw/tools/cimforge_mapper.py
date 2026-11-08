@@ -253,6 +253,27 @@ class Mapper:
         self.task_id += 1
 
 
+def add_completion_order_chain(mapper: Mapper, event_bit: int = 0) -> None:
+    """Serialize a workload with one ABI dependency event bit.
+
+    The top dispatcher may overlap independent engines. This conservative chain
+    is useful for workload bring-up until every producer/consumer edge has an
+    explicit dependency. The event is signaled only after ordered retirement.
+    """
+    if event_bit < 0 or event_bit >= 16:
+        raise ValueError("completion-chain event bit must be in [0, 15]")
+    if any((d.wait_mask | d.signal_mask | d.clear_mask) & (1 << event_bit)
+           for d in mapper.descriptors):
+        raise ValueError("completion-chain event bit is already in use")
+    event_mask = 1 << event_bit
+    for index, descriptor in enumerate(mapper.descriptors):
+        if index:
+            descriptor.wait_mask |= event_mask
+            descriptor.clear_mask |= event_mask
+        if index + 1 < len(mapper.descriptors):
+            descriptor.signal_mask |= event_mask
+
+
 def causal_softmax_q15(scores: list[int], query_token: int) -> list[int]:
     if not 0 <= query_token < len(scores):
         raise ValueError("causal query token must be within score length")
@@ -1044,6 +1065,7 @@ def build_h16_attention_top_workload(model: dict, out_dir: Path) -> dict:
         "h16_attention_head_merge", OP_RESIDUAL, head_projection[0], merged,
         src1=head_projection[1], k_or_length=128, aux0=1,
     )
+    add_completion_order_chain(mapper)
     validate_descriptor_chain(mapper)
 
     # Generate independent logical outputs using the Python scalar Golden.
@@ -1178,6 +1200,7 @@ def build_h16_attention_top_workload(model: dict, out_dir: Path) -> dict:
         "shape": shape, "seed": model.get("seed"),
         "descriptor_base": descriptor_base, "completion_base": completion_base,
         "descriptor_count": len(mapper.descriptors),
+        "runtime_ordering": "single ABI event-bit completion chain; each descriptor waits for and clears the preceding descriptor's ordered-retirement event",
         "useful_macs": 3 * 8 * 16 * 16 + 2 * 8 * 8 * 8 + 2 * 8 * 8 * 8 + 2 * 8 * 8 * 16,
         "head_count": 2, "head_dim": 8, "sequence_length": 8,
         "head_merge": "two fixed block-identity output projections, added by opcode 0x34",
