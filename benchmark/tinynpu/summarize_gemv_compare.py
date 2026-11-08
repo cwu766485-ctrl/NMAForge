@@ -73,18 +73,23 @@ def main():
     parser.add_argument("--out-json", type=Path, required=True)
     args = parser.parse_args()
 
-    shapes = (("1x13x17", 1 * 13 * 17), ("8x16x19", 8 * 16 * 19))
+    shapes = (
+        ("1x13x17", 1 * 13 * 17, "MATRIX_CORE_GEMV_KFOLD_TAIL_PASS",
+         "MATRIX_CORE_GEMV_TAIL_PROFILE"),
+        ("8x16x19", 8 * 16 * 19, "MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS",
+         "MATRIX_CORE_GEMV_MROWS_PROFILE"),
+        ("16x16x19", 16 * 16 * 19, "MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS",
+         "MATRIX_CORE_GEMV_MROWS_PROFILE"),
+        ("16x16x65", 16 * 16 * 65, "MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS",
+         "MATRIX_CORE_GEMV_MROWS_PROFILE"),
+    )
     nma_events = {}
     tiny_events = {}
     rows = []
     summaries = []
-    for shape, macs in shapes:
-        if shape == "1x13x17":
-            marker = find_line(args.nma_log, "MATRIX_CORE_GEMV_KFOLD_TAIL_PASS", shape)
-            profile = find_line(args.nma_log, "MATRIX_CORE_GEMV_TAIL_PROFILE", shape)
-        else:
-            marker = find_line(args.nma_log, "MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS", shape)
-            profile = find_line(args.nma_log, "MATRIX_CORE_GEMV_MROWS_PROFILE", shape)
+    for shape, macs, marker_prefix, profile_prefix in shapes:
+        marker = find_line(args.nma_log, marker_prefix, shape)
+        profile = find_line(args.nma_log, profile_prefix, shape)
         nma = parse_fields(marker)
         nma_profile = parse_fields(profile)
         tiny = find_tiny(args.tiny_log, shape)
@@ -187,7 +192,7 @@ def main():
         "seed": args.seed,
         "vcs_version": args.vcs_version,
         "verilator_version": args.verilator_version,
-        "workload": "signed INT8 GEMV, INT32 accumulation, no bias/requant",
+        "workload": "four signed INT8 GEMV shapes, INT32 accumulation, no bias/requant",
         "array": "one shared 16x16 / 256-MAC array on each design",
         "tiny_npu_mapping": "TinyNPU has no tested product GEMV descriptor or scratchpad interface; M=1/8 inputs are padded into the 16x16 direct systolic array",
         "common_memory_model": {

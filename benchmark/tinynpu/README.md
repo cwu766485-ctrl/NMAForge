@@ -28,11 +28,12 @@ The matched array driver now also includes the fixed GEMV tail points
 direct-array runs with zero-padded operands, not native GEMV controller or
 scratchpad measurements.
 
-It exercises NMAForge opcode `0x52` at `M=1,N=13,K=17` and `M=8,N=16,K=19`
-against the pinned TinyNPU 16×16 array with identical operand formulas. The
-TinyNPU cases use zero-padded direct-array inputs; they do not exercise a
-TinyNPU GEMV descriptor, controller, or SPAD. Its memory endpoint is therefore
-reported as a serialized model alongside measured TinyNPU array cycles.
+It exercises NMAForge opcode `0x52` at `M=1,N=13,K=17`, `M=8,N=16,K=19`,
+`M=16,N=16,K=19`, and `M=16,N=16,K=65` against the pinned TinyNPU 16×16
+array with identical operand formulas. The TinyNPU cases use zero-padded
+direct-array inputs; they do not exercise a TinyNPU GEMV descriptor,
+controller, or SPAD. Its memory endpoint is therefore reported as a serialized
+model alongside measured TinyNPU array cycles.
 The committed [`gemv_results.csv`](gemv_results.csv) and
 [`gemv_summary.json`](gemv_summary.json) correspond to the fixed clean-SHA
 replay documented in
