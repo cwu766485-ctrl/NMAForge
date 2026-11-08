@@ -10,6 +10,7 @@ scratchpad allocation, tensor layout conversion and ABI-v7 descriptor encoding.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from dataclasses import dataclass
@@ -695,6 +696,159 @@ def build_workload(
     return mapper, expected
 
 
+def _pack_matrix_a_physical(matrix: list[list[int]], physical_rows: int = 16) -> list[int]:
+    """Pack dense A into the existing 16-row Matrix tile-major SPAD layout."""
+    if not matrix or not matrix[0] or physical_rows < len(matrix):
+        raise ValueError("Matrix A must fit its physical row tile")
+    k_dim = len(matrix[0])
+    if k_dim % 4 or any(len(row) != k_dim for row in matrix):
+        raise ValueError("Matrix A K must be a multiple of four and rectangular")
+    padded = [list(row) for row in matrix]
+    padded.extend([[0] * k_dim for _ in range(physical_rows - len(padded))])
+    words = []
+    for tile in range(0, physical_rows, 16):
+        for row_group in range(tile, tile + 16, 4):
+            for k_group in range(0, k_dim, 4):
+                for row in range(row_group, row_group + 4):
+                    words.append(pack_i8(padded[row][k_group:k_group + 4]))
+    return words
+
+
+def _pack_matrix_b_physical(matrix: list[list[int]]) -> list[int]:
+    """Pack dense [K,N] weights in the Matrix B four-column tile layout."""
+    k_dim, n_dim = len(matrix), len(matrix[0])
+    if k_dim % 4 or n_dim % 16 or any(len(row) != n_dim for row in matrix):
+        raise ValueError("Matrix B requires rectangular K%4=0 and N%16=0")
+    words = []
+    for col_group in range(0, n_dim, 4):
+        for k_group in range(0, k_dim, 4):
+            for col in range(col_group, col_group + 4):
+                words.append(pack_i8([matrix[k_group + lane][col] for lane in range(4)]))
+    return words
+
+
+def build_h16_qkv_top_workload(model: dict, out_dir: Path) -> dict:
+    """Map an H=16/two-head trained QKV projection subgraph to Top CMDQ GEMM."""
+    shape = model.get("shape", {})
+    if shape != {"hidden": 16, "attention_heads": 2, "head_dim": 8,
+                 "layers": 1, "sequence_length": 8, "dtype": "signed INT8"}:
+        raise ValueError("H16 QKV model shape contract mismatch")
+    tokens = model.get("prefill_tokens")
+    embeddings = model.get("embeddings")
+    weights = model.get("weights")
+    if not isinstance(tokens, list) or len(tokens) != 8 or any(
+        not isinstance(token, int) or not 0 <= token < 16 for token in tokens
+    ):
+        raise ValueError("H16 QKV workload requires eight token IDs in [0,15]")
+    if not isinstance(embeddings, list) or len(embeddings) != 16 or any(
+        not isinstance(row, list) or len(row) != 16 for row in embeddings
+    ):
+        raise ValueError("H16 embedding table must be 16x16")
+    if not isinstance(weights, dict) or set(weights) != {"wq", "wk", "wv"}:
+        raise ValueError("H16 QKV model must provide exactly wq, wk, and wv")
+    for name, matrix in weights.items():
+        if not isinstance(matrix, list) or len(matrix) != 16 or any(
+            not isinstance(row, list) or len(row) != 16 for row in matrix
+        ) or any(not isinstance(value, int) or not -128 <= value <= 127
+                 for row in matrix for value in row):
+            raise ValueError(f"{name} must be a 16x16 signed INT8 matrix")
+
+    mapper = Mapper()
+    mapper.next_addr = 0x4000
+    mapper.task_id = 0x7100
+    x_rows = [embeddings[token] for token in tokens]
+    x = mapper.tensor("h16_qkv_input", (16, 16), "i8_packed", "matrix_a_tile",
+                      _pack_matrix_a_physical(x_rows), initialized=True)
+    weight_tensors = {}
+    for projection in ("q", "k", "v"):
+        weight_tensors[projection] = mapper.tensor(
+            f"h16_w{projection}", (16, 16), "i8_packed", "matrix_b_tile",
+            _pack_matrix_b_physical(weights[f"w{projection}"]), initialized=True,
+        )
+    output_tensors = {}
+    for projection in ("q", "k", "v"):
+        output_tensors[projection] = mapper.tensor(
+            f"h16_{projection}_i32", (8, 16), "i32", "row-major",
+            [0xA55AA55A] * (8 * 16), initialized=False,
+        )
+
+    for index, projection in enumerate(("q", "k", "v")):
+        mapper.add(
+            f"h16_{projection}_projection", OP_GEMM, x,
+            output_tensors[projection], src1=weight_tensors[projection],
+            m=8, n=16, k_or_length=4, wait_mask=(1 << (index - 1)) if index else 0,
+            signal_mask=(1 << index) if index < 2 else 0, clear_mask=7,
+            batch_count=1, head_count=1,
+        )
+
+    descriptor_base = align(mapper.next_addr, 0x1000)
+    completion_base = descriptor_base + 0x100
+    memory: dict[int, int] = {}
+    for tensor in mapper.tensors.values():
+        for index, word in enumerate(tensor_storage_words(tensor)):
+            memory[tensor.addr + index * 4] = u32(word)
+    for index, descriptor in enumerate(mapper.descriptors):
+        for word_index, word in enumerate(descriptor.words()):
+            memory[descriptor_base + index * 64 + word_index * 4] = word
+        for word_index in range(4):
+            memory[completion_base + index * 16 + word_index * 4] = 0xA55AA55A
+
+    golden: dict[int, int] = {}
+    for projection in ("q", "k", "v"):
+        result = gemm_i8_i32(x_rows, weights[f"w{projection}"])
+        tensor = output_tensors[projection]
+        for row_index, row in enumerate(result):
+            for col_index, value in enumerate(row):
+                golden[tensor.addr + 4 * (row_index * 16 + col_index)] = u32(value)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    def write_pairs(path: Path, pairs: dict[int, int]) -> None:
+        words = [len(pairs)]
+        for address, value in sorted(pairs.items()):
+            words.extend((address, value))
+        path.write_text("".join(f"{word & 0xFFFFFFFF:08x}\n" for word in words),
+                        encoding="ascii")
+
+    write_pairs(out_dir / "model_memory.memh", memory)
+    write_pairs(out_dir / "model_golden.memh", golden)
+    manifest = {
+        "model_name": model.get("model_name"),
+        "model_scope": model.get("model_scope"),
+        "shape": shape,
+        "seed": model.get("seed"),
+        "descriptor_base": descriptor_base,
+        "completion_base": completion_base,
+        "descriptor_count": len(mapper.descriptors),
+        "useful_macs": 3 * 8 * 16 * 16,
+        "projection_order": [descriptor.name for descriptor in mapper.descriptors],
+        "descriptor_contract": [
+            {"task_id": descriptor.task_id, "opcode": descriptor.op,
+             "m": descriptor.m, "n": descriptor.n,
+             "k_words": descriptor.k_or_length,
+             "src0": descriptor.src0, "src1": descriptor.src1,
+             "dst": descriptor.dst, "wait_mask": descriptor.wait_mask,
+             "signal_mask": descriptor.signal_mask}
+            for descriptor in mapper.descriptors
+        ],
+        "tensors": {
+            tensor.name: {"address": tensor.addr, "shape": tensor.shape,
+                          "dtype": tensor.dtype, "layout": tensor.layout}
+            for tensor in mapper.tensors.values()
+        },
+        "head_split": "software view only: columns 0..7 and 8..15; no attention operation is run",
+        "host_fallback": model.get("host_fallback", []),
+        "output_contract": "raw INT32 Q/K/V projection matrices, row-major, 8x16 each",
+        "memory_sha256": hashlib.sha256(
+            (out_dir / "model_memory.memh").read_bytes()).hexdigest(),
+        "golden_sha256": hashlib.sha256(
+            (out_dir / "model_golden.memh").read_bytes()).hexdigest(),
+    }
+    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n",
+                                           encoding="utf-8")
+    return manifest
+
+
 def tensor_size_bytes(tensor: Tensor) -> int:
     count = 1
     for dimension in tensor.shape:
@@ -1007,6 +1161,10 @@ def main() -> None:
         help="load trained INT8 weights and the model's fixed prefill/decode case",
     )
     parser.add_argument(
+        "--h16-qkv-top-dir", type=Path,
+        help="export the bounded H=16/two-head QKV Top-CMDQ projection subgraph",
+    )
+    parser.add_argument(
         "--decode-mapping-policy", choices=("gemm", "gemv_qkv"),
         default="gemm",
         help=("keep the legacy 0x30 decode mapping or select experimental 0x52 "
@@ -1016,8 +1174,20 @@ def main() -> None:
     model = json.loads(args.model_json.read_text(encoding="utf-8")) if args.model_json else None
     model_sha256 = None
     if args.model_json:
-        import hashlib
         model_sha256 = hashlib.sha256(args.model_json.read_bytes()).hexdigest()
+    if args.h16_qkv_top_dir is not None:
+        if model is None:
+            parser.error("--h16-qkv-top-dir requires --model-json")
+        manifest = build_h16_qkv_top_workload(model, args.h16_qkv_top_dir)
+        manifest["model_sha256"] = model_sha256
+        (args.h16_qkv_top_dir / "manifest.json").write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        print(
+            f"TRANSFORMER_H16_QKV_MAPPER_PASS descriptors={manifest['descriptor_count']} "
+            f"useful_macs={manifest['useful_macs']} model_sha256={model_sha256} "
+            f"golden_sha256={manifest['golden_sha256']}"
+        )
+        return
     mapper, expected = build_workload(model, args.decode_mapping_policy)
     write_svh(args.svh, mapper, expected)
     write_manifest(args.manifest, mapper, expected, model, model_sha256)

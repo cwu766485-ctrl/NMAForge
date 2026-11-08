@@ -613,3 +613,40 @@ ai_representative_cnn:
 		+AI_REPRESENTATIVE_DESC_COUNT=$(AI_REPRESENTATIVE_DESC_COUNT) +AI_REPRESENTATIVE_USEFUL_MACS=262144 \
 		-l $(AI_REPRESENTATIVE_RUN)/run.log
 	grep -q '^REPRESENTATIVE_MODEL_PASS ' "$(AI_REPRESENTATIVE_RUN)/run.log"
+
+# Trained synthetic H=16/two-head QKV projection subgraph through Top CMDQ.
+# This is deliberately a QKV-only Gate G2 workload, not full Transformer DV.
+AI_H16_QKV_RUN ?= /tmp/nmaforge_h16_qkv_$(shell date +%Y%m%d_%H%M%S)
+AI_H16_QKV_PYTHON ?= python3.12
+AI_H16_QKV_SEED ?= 20261113
+.PHONY: ai_h16_qkv_top
+ai_h16_qkv_top:
+	test ! -e "$(AI_H16_QKV_RUN)"
+	mkdir -p "$(AI_H16_QKV_RUN)"
+	$(AI_H16_QKV_PYTHON) ../../../../sw/tools/train_transformer_h16_qkv.py \
+		--seed "$(AI_H16_QKV_SEED)" --out "$(AI_H16_QKV_RUN)/model.json"
+	$(AI_H16_QKV_PYTHON) ../../../../sw/tools/cimforge_mapper.py \
+		--model-json "$(AI_H16_QKV_RUN)/model.json" \
+		--h16-qkv-top-dir "$(AI_H16_QKV_RUN)/workload"
+	$(AI_H16_QKV_PYTHON) ../../../../sw/tools/verify_transformer_h16_qkv.py \
+		--model "$(AI_H16_QKV_RUN)/model.json" \
+		--workload-dir "$(AI_H16_QKV_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK \
+		+define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-Mdir=$(AI_H16_QKV_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_H16_QKV_RUN)/simv -l $(AI_H16_QKV_RUN)/compile.log
+	$(AI_H16_QKV_RUN)/simv +ntb_random_seed=$(AI_H16_QKV_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H16_QKV_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H16_QKV_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H16_QKV_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=20480 +AI_REPRESENTATIVE_CPL_BASE=20736 \
+		+AI_REPRESENTATIVE_DESC_COUNT=3 +AI_REPRESENTATIVE_USEFUL_MACS=6144 \
+		-l $(AI_H16_QKV_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=3 golden_words=384 useful_macs=6144 ' \
+		"$(AI_H16_QKV_RUN)/run.log"
