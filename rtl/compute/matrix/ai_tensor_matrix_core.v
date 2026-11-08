@@ -422,15 +422,21 @@ module ai_tensor_matrix_core #(
     wire [31:0] scalar_word_index =
         {{(32-TILE_INDEX_WIDTH){1'b0}},write_col_r} + {30'd0,write_lane_r};
     wire [31:0] write_row_addr = dst_row_addr_r + line_byte_offset;
+    wire fused_linearized_full_row = fused_linearized_output_r &&
+                                     (n_r == 16'd16);
     wire [31:0] fused_linearized_line_addr =
-        dst_row_addr_r + ({28'd0,fused_linearized_line_index_r} << 4);
-    wire [127:0] fused_linearized_line_data =
+        dst_row_addr_r + ({28'd0,(fused_linearized_full_row ?
+                                    write_lane_r :
+                                    fused_linearized_line_index_r)} << 4);
+    wire [127:0] fused_linearized_line_data = fused_linearized_full_row ?
+        fused_line_buffer_r :
         {96'd0,fused_line_buffer_r[
             fused_linearized_line_index_r*32 +: 32]};
     wire gemv_line_has_four_valid_columns = !gemv_kfold_r ||
         (({28'd0,write_col_r} + 32'd4) <= valid_cols);
-    wire line_store_eligible = (write_row_addr[3:0] == 4'd0) &&
-                               gemv_line_has_four_valid_columns;
+    wire line_store_eligible = fused_linearized_full_row ||
+                               ((write_row_addr[3:0] == 4'd0) &&
+                                gemv_line_has_four_valid_columns);
     wire scalar_output_valid = !gemv_kfold_r ||
         (({28'd0,write_col_r} + {30'd0,write_lane_r}) < valid_cols);
     wire fused_requant_output = fused_output_r;
@@ -451,8 +457,10 @@ module ai_tensor_matrix_core #(
         ((op_mode == OP_TENSOR_GEMM_REQUANT_TILE_A) &&
          ((aux0[31:8] != 0) ||
           (fused_linearized_request &&
-           ((aux0[6:5] != 0) || (n_size != 16'd4) ||
-            (m_size > 16'd64) || (instance_count > 16'd1) ||
+           ((aux0[6:5] != 0) ||
+            !(((n_size == 16'd4) && (m_size <= 16'd64)) ||
+              ((n_size == 16'd16) && (m_size <= 16'd512))) ||
+            (instance_count > 16'd1) ||
             (dst_batch_stride != 0) || transpose_a || transpose_b ||
             (|dst_base[3:0]))) ||
           (aux0[5] && ((m_size != 16'd16) || (n_size != 16'd16) ||
@@ -1242,7 +1250,9 @@ module ai_tensor_matrix_core #(
                                  (op_mode == OP_TENSOR_GEMM_REQUANT_TILE_A ?
                                   32'd1 : 32'd4)) :
                                 dst_batch_stride;
-                            dst_row_stride_r <= {14'd0,n_size,2'b00};
+                            dst_row_stride_r <= fused_linearized_request ?
+                                                32'd16 :
+                                                {14'd0,n_size,2'b00};
                             instance_r <= 32'd0;
                             row_tile_r <= 16'd0;
                             col_tile_r <= 16'd0;
@@ -1504,12 +1514,21 @@ module ai_tensor_matrix_core #(
                                 state_r <= ST_NEXT;
                             end
                         end else if (fused_requant_output && !fused_commit_pending_r) begin
-                            fused_line_buffer_r[write_lane_r*32 +: 32] <=
-                                fused_word_current;
-                            if (write_lane_r == 2'd3)
-                                fused_commit_pending_r <= 1'b1;
-                            else
-                                write_lane_r <= write_lane_r + 1'b1;
+                            if (fused_linearized_full_row) begin
+                                fused_line_buffer_r[write_col_r[3:2]*32 +: 32] <=
+                                    fused_word_current;
+                                if (({16'd0,write_col_r} + 32'd4) < valid_cols)
+                                    write_col_r <= write_col_r + 4;
+                                else
+                                    fused_commit_pending_r <= 1'b1;
+                            end else begin
+                                fused_line_buffer_r[write_lane_r*32 +: 32] <=
+                                    fused_word_current;
+                                if (write_lane_r == 2'd3)
+                                    fused_commit_pending_r <= 1'b1;
+                                else
+                                    write_lane_r <= write_lane_r + 1'b1;
+                            end
                         end else if (output_write_accepted) begin
                             if (output_write_has_protection_error) begin
                                 error_code <= ERR_PROTECTION;
@@ -1530,7 +1549,22 @@ module ai_tensor_matrix_core #(
                                     element_count <= element_count + 32'd1;
 
                                 if (fused_requant_output) begin
-                                    if (fused_linearized_output_r &&
+                                    if (fused_linearized_full_row) begin
+                                        fused_commit_pending_r <= 1'b0;
+                                        write_col_r <= {TILE_INDEX_WIDTH{1'b0}};
+                                        if (write_lane_r != 2'd3) begin
+                                            write_lane_r <= write_lane_r + 1'b1;
+                                        end else begin
+                                            write_lane_r <= 2'd0;
+                                            if (({28'd0,write_row_r} + 32'd4) < valid_rows) begin
+                                                write_row_r <= write_row_r + 4;
+                                                dst_row_addr_r <= dst_row_addr_r +
+                                                    (dst_row_stride_r << 2);
+                                            end else begin
+                                                state_r <= ST_NEXT;
+                                            end
+                                        end
+                                    end else if (fused_linearized_output_r &&
                                         (fused_linearized_line_index_r != 2'd3)) begin
                                         fused_linearized_line_index_r <=
                                             fused_linearized_line_index_r + 1'b1;

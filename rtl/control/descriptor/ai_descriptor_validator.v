@@ -111,8 +111,10 @@ module ai_descriptor_validator (
         (dst_stride == 0 || dst_stride[3:0] == 0) &&
         (dst[3:0] == 0) &&
         (!aux0[7] || ((aux0[6:5] == 0) && (m_size != 0) &&
-                      (m_size <= 16'd64) && (m_size[1:0] == 0) &&
-                      (n_size == 16'd4) && (batch_count <= 16'd1) &&
+                      (m_size[1:0] == 0) &&
+                      (((n_size == 16'd4) && (m_size <= 16'd64)) ||
+                       ((n_size == 16'd16) && (m_size <= 16'd512))) &&
+                      (batch_count <= 16'd1) &&
                       (head_count <= 16'd1) && (dst_stride == 0) &&
                       (flags[7:1] == 0) && (flags[0] == bias_enable))) &&
         (!aux0[5] || ((m_size == 16) && (n_size == 16) &&

@@ -38,9 +38,27 @@ class FusedTileFieldTests(unittest.TestCase):
 
     def test_rejects_reserved_bits_and_bad_capture_shape(self):
         cases = (
-            dict(aux0=0x80),
             dict(aux0=0x20, m=8),
             dict(aux0=0x20, dst_stride=16),
+        )
+        for changes in cases:
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                validate_fused_tile_fields(self.descriptor(**changes))
+
+    def test_accepts_bounded_linear_row_shapes(self):
+        validate_fused_tile_fields(
+            self.descriptor(m=64, n=4, aux0=0x80)
+        )
+        validate_fused_tile_fields(
+            self.descriptor(m=512, n=16, aux0=0x80)
+        )
+
+    def test_rejects_linear_row_shape_outside_bounds(self):
+        cases = (
+            dict(m=68, n=4, aux0=0x80),
+            dict(m=516, n=16, aux0=0x80),
+            dict(m=512, n=8, aux0=0x80),
+            dict(m=2, n=4, aux0=0x80),
         )
         for changes in cases:
             with self.subTest(changes=changes), self.assertRaises(ValueError):

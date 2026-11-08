@@ -71,11 +71,12 @@ def pack_b(matrix):
     ]
 
 
-def desc(task, op, a, b, out, m, n, k, flags=0, activation=0):
+def desc(task, op, a, b, out, m, n, k, flags=0, activation=0, aux0=0):
     words = [0] * 16
     words[0] = (task << 16) | op
     words[1], words[2], words[4] = a, b, out
     words[5], words[6], words[7] = (n << 16) | m, k, flags
+    words[8] = aux0
     words[9] = activation << 5
     words[13] = 0x00010001
     words[15] = 7
@@ -107,10 +108,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=20261108)
     parser.add_argument("--fusion-mode",
-                        choices=("legacy", "first", "both", "both_convert"),
+                        choices=("legacy", "first", "both", "both_convert",
+                                 "both_linearized"),
                         default="legacy",
                         help=("legacy 0x30/0x36, first-layer 0x53, both layers "
-                              "0x53, or both fused followed by identity-GEMM layout conversion"))
+                              "0x53, both fused followed by identity-GEMM layout conversion, "
+                              "or both fused with a row-major second-layer output"))
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args()
     started = time.perf_counter()
@@ -161,6 +164,11 @@ def main():
             desc(0x7102, 0x30, SPAD["tile_output"], SPAD["identity"], SPAD["raw2"], M, C, C // 4),
             desc(0x7103, 0x36, SPAD["raw2"], 0, SPAD["output"], 0, 0, M * C, 0x10),
         ],
+        "both_linearized": [
+            desc(0x7100, 0x53, SPAD["input"], SPAD["w1"], SPAD["act1"], M, C, C // 4),
+            desc(0x7101, 0x53, SPAD["act1"], SPAD["w2"], SPAD["output"],
+                 M, C, C // 4, aux0=0x80),
+        ],
     }
     commands = commands_by_mode[args.fusion_mode]
     for index, words in enumerate(commands):
@@ -188,9 +196,13 @@ def main():
         else:
             expect(SPAD["raw1"], [POISON] * (M * C))
     expect(SPAD["act1"], pack_a(act1))
-    if args.fusion_mode == "both":
+    if args.fusion_mode in ("both", "both_linearized"):
         expect(SPAD["raw2"], [POISON] * (M * C))
-        packed_output = pack_a(output)
+        if args.fusion_mode == "both":
+            packed_output = pack_a(output)
+        else:
+            packed_output = [pack([output[row][col] for col in range(i, i + 4)])
+                             for row in range(M) for i in range(0, C, 4)]
     elif args.fusion_mode == "both_convert":
         # The fused second layer produces Matrix-A tile layout. A following
         # identity GEMM converts that exact INT8 tensor to row-major INT32;
