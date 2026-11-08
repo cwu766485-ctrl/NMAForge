@@ -8,6 +8,7 @@
   "attention_heads": 1,
   "prefill_descriptor_count": 46,
   "decode_descriptor_count": 40,
+  "decode_mapping_policy": "gemm",
   "weight_provenance": "hand-authored deterministic non-identity INT8 test weights; not pretrained",
   "weights": {
     "wq": [

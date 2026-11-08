@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Independently decode and verify the generated Matrix workload and Golden."""
 import argparse
+import hashlib
+import json
 from pathlib import Path
 
 M, C = 512, 16
@@ -79,16 +81,33 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--workload-dir", type=Path, required=True)
     args = parser.parse_args()
+    manifest = json.loads((args.workload_dir / "manifest.json").read_text())
+    mode = manifest.get("fusion_mode", "legacy")
     memory = load_pairs(args.workload_dir / "model_memory.memh")
     golden = load_pairs(args.workload_dir / "model_golden.memh")
-    commands = [[memory[DESC + i * 64 + j * 4] for j in range(16)] for i in range(4)]
-    expected = [
-        (0x7100, 0x30, INPUT, W1, RAW1, M, C, C // 4, 0x00, 0, 1),
-        (0x7101, 0x36, RAW1, 0, ACT1, M, C, M * C, 0x30, 1, 2),
-        (0x7102, 0x30, ACT1, W2, RAW2, M, C, C // 4, 0x00, 2, 1),
-        (0x7103, 0x36, RAW2, 0, OUTPUT, 0, 0, M * C, 0x10, 1, 0),
-    ]
-    for index, (cmd, spec) in enumerate(zip(commands, expected)):
+    command_specs = {
+        "legacy": [
+            (0x7100, 0x30, INPUT, W1, RAW1, M, C, C // 4, 0x00, 0, 1),
+            (0x7101, 0x36, RAW1, 0, ACT1, M, C, M * C, 0x30, 1, 2),
+            (0x7102, 0x30, ACT1, W2, RAW2, M, C, C // 4, 0x00, 2, 1),
+            (0x7103, 0x36, RAW2, 0, OUTPUT, 0, 0, M * C, 0x10, 1, 0),
+        ],
+        "first": [
+            (0x7100, 0x53, INPUT, W1, ACT1, M, C, C // 4, 0x00, 0, 1),
+            (0x7101, 0x30, ACT1, W2, RAW2, M, C, C // 4, 0x00, 1, 2),
+            (0x7102, 0x36, RAW2, 0, OUTPUT, 0, 0, M * C, 0x10, 2, 0),
+        ],
+        "both": [
+            (0x7100, 0x53, INPUT, W1, ACT1, M, C, C // 4, 0x00, 0, 1),
+            (0x7101, 0x53, ACT1, W2, OUTPUT, M, C, C // 4, 0x00, 1, 0),
+        ],
+    }
+    if mode not in command_specs:
+        raise ValueError("unknown fusion mode: " + str(mode))
+    specs = command_specs[mode]
+    commands = [[memory[DESC + i * 64 + j * 4] for j in range(16)]
+                for i in range(len(specs))]
+    for index, (cmd, spec) in enumerate(zip(commands, specs)):
         task, op, src0, src1, dst, m, n, extent, flags, wait, signal = spec
         actual = (cmd[0] >> 16, cmd[0] & 0xFF, cmd[1], cmd[2], cmd[4],
                   cmd[5] & 0xFFFF, cmd[5] >> 16, cmd[6], cmd[7],
@@ -115,26 +134,41 @@ def main():
     raw2 = gemm(act1, decode_b(memory, W2))
     output = [[requant_i8(value) for value in row] for row in raw2]
     packed_act1 = pack_a(act1)
-    packed_output = [sum((output[row][col + lane] & 255) << (lane * 8)
-                         for lane in range(4))
-                     for row in range(M) for col in range(0, C, 4)]
+    if mode == "both":
+        packed_output = pack_a(output)
+    else:
+        packed_output = [sum((output[row][col + lane] & 255) << (lane * 8)
+                             for lane in range(4))
+                         for row in range(M) for col in range(0, C, 4)]
     recomputed = {}
     for index, row in enumerate(raw1):
         for col, value in enumerate(row):
-            recomputed[RAW1 + 4 * (index * C + col)] = value & 0xFFFFFFFF
+            recomputed[RAW1 + 4 * (index * C + col)] = (
+                value & 0xFFFFFFFF if mode == "legacy" else POISON)
     for index, value in enumerate(packed_act1):
         recomputed[ACT1 + 4 * index] = value
     for index, row in enumerate(raw2):
         for col, value in enumerate(row):
-            recomputed[RAW2 + 4 * (index * C + col)] = value & 0xFFFFFFFF
+            recomputed[RAW2 + 4 * (index * C + col)] = (
+                value & 0xFFFFFFFF if mode != "both" else POISON)
     for index, value in enumerate(packed_output):
         recomputed[OUTPUT + 4 * index] = value
     if recomputed != golden:
         differing = next(address for address in recomputed
                          if golden.get(address) != recomputed[address])
         raise ValueError("independent Golden mismatch at 0x%08x" % differing)
-    print("REPRESENTATIVE_CNN_OFFLINE_GOLDEN_PASS descriptors=4 tensors=4 useful_macs=%d checked_words=%d" %
-          (2 * M * C * C, len(golden)))
+    raw1_digest = hashlib.sha256(
+        b"".join((int(value) & 0xFFFFFFFF).to_bytes(4, "little")
+                 for row in raw1 for value in row)).hexdigest()
+    raw2_digest = hashlib.sha256(
+        b"".join((int(value) & 0xFFFFFFFF).to_bytes(4, "little")
+                 for row in raw2 for value in row)).hexdigest()
+    if manifest.get("raw1_int32_golden_sha256") != raw1_digest or \
+            manifest.get("raw2_int32_golden_sha256") != raw2_digest:
+        raise ValueError("independent INT32 logical Golden hash mismatch")
+    print("REPRESENTATIVE_CNN_OFFLINE_GOLDEN_PASS mode=%s descriptors=%d tensors=4 useful_macs=%d checked_words=%d output_layout=%s" %
+          (mode, len(specs), 2 * M * C * C, len(golden),
+           manifest.get("output_physical_layout")))
 
 
 if __name__ == "__main__":

@@ -583,12 +583,15 @@ AI_REPRESENTATIVE_RUN ?= /tmp/nmaforge_representative_cnn_$(shell date +%Y%m%d_%
 AI_REPRESENTATIVE_PYTHON ?= $(PYTHON)
 AI_REPRESENTATIVE_SEED ?= 20261108
 AI_REPRESENTATIVE_SPAD_WORDS_PER_BANK ?= 8192
+AI_REPRESENTATIVE_FUSION_MODE ?= legacy
+AI_REPRESENTATIVE_DESC_COUNT ?= 4
 .PHONY: ai_representative_cnn
 ai_representative_cnn:
 	test ! -e "$(AI_REPRESENTATIVE_RUN)"
 	mkdir -p "$(AI_REPRESENTATIVE_RUN)"
 	$(AI_REPRESENTATIVE_PYTHON) ../../../../benchmark/representative/generate_pointwise_cnn_workload.py \
 		--seed "$(AI_REPRESENTATIVE_SEED)" \
+		--fusion-mode "$(AI_REPRESENTATIVE_FUSION_MODE)" \
 		--out-dir "$(AI_REPRESENTATIVE_RUN)/workload"
 	$(AI_REPRESENTATIVE_PYTHON) ../../../../benchmark/representative/verify_pointwise_cnn_workload.py \
 		--workload-dir "$(AI_REPRESENTATIVE_RUN)/workload"
@@ -607,6 +610,79 @@ ai_representative_cnn:
 		+AI_REPRESENTATIVE_MEMORY=$(AI_REPRESENTATIVE_RUN)/workload/model_memory.memh \
 		+AI_REPRESENTATIVE_GOLDEN=$(AI_REPRESENTATIVE_RUN)/workload/model_golden.memh \
 		+AI_REPRESENTATIVE_DESC_BASE=102400 +AI_REPRESENTATIVE_CPL_BASE=102912 \
-		+AI_REPRESENTATIVE_DESC_COUNT=4 +AI_REPRESENTATIVE_USEFUL_MACS=262144 \
+		+AI_REPRESENTATIVE_DESC_COUNT=$(AI_REPRESENTATIVE_DESC_COUNT) +AI_REPRESENTATIVE_USEFUL_MACS=262144 \
 		-l $(AI_REPRESENTATIVE_RUN)/run.log
 	grep -q '^REPRESENTATIVE_MODEL_PASS ' "$(AI_REPRESENTATIVE_RUN)/run.log"
+
+# Trained synthetic H=16/two-head QKV projection subgraph through Top CMDQ.
+# This is deliberately a QKV-only Gate G2 workload, not full Transformer DV.
+AI_H16_QKV_RUN ?= /tmp/nmaforge_h16_qkv_$(shell date +%Y%m%d_%H%M%S)
+AI_H16_QKV_PYTHON ?= python3.12
+AI_H16_QKV_SEED ?= 20261113
+.PHONY: ai_h16_qkv_top
+ai_h16_qkv_top:
+	test ! -e "$(AI_H16_QKV_RUN)"
+	mkdir -p "$(AI_H16_QKV_RUN)"
+	$(AI_H16_QKV_PYTHON) ../../../../sw/tools/train_transformer_h16_qkv.py \
+		--seed "$(AI_H16_QKV_SEED)" --out "$(AI_H16_QKV_RUN)/model.json"
+	$(AI_H16_QKV_PYTHON) ../../../../sw/tools/cimforge_mapper.py \
+		--model-json "$(AI_H16_QKV_RUN)/model.json" \
+		--h16-qkv-top-dir "$(AI_H16_QKV_RUN)/workload"
+	$(AI_H16_QKV_PYTHON) ../../../../sw/tools/verify_transformer_h16_qkv.py \
+		--model "$(AI_H16_QKV_RUN)/model.json" \
+		--workload-dir "$(AI_H16_QKV_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK \
+		+define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-Mdir=$(AI_H16_QKV_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_H16_QKV_RUN)/simv -l $(AI_H16_QKV_RUN)/compile.log
+	$(AI_H16_QKV_RUN)/simv +ntb_random_seed=$(AI_H16_QKV_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H16_QKV_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H16_QKV_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H16_QKV_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=20480 +AI_REPRESENTATIVE_CPL_BASE=20736 \
+		+AI_REPRESENTATIVE_DESC_COUNT=3 +AI_REPRESENTATIVE_USEFUL_MACS=6144 \
+		-l $(AI_H16_QKV_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=3 golden_words=384 useful_macs=6144 ' \
+		"$(AI_H16_QKV_RUN)/run.log"
+
+AI_H16_ATTENTION_RUN ?= /tmp/nmaforge_h16_attention_$(shell date +%Y%m%d_%H%M%S)
+AI_H16_ATTENTION_PYTHON ?= python3.12
+AI_H16_ATTENTION_SEED ?= 20261113
+.PHONY: ai_h16_attention_top
+ai_h16_attention_top:
+	test ! -e "$(AI_H16_ATTENTION_RUN)"
+	mkdir -p "$(AI_H16_ATTENTION_RUN)"
+	$(AI_H16_ATTENTION_PYTHON) ../../../../sw/tools/train_transformer_h16_qkv.py \
+		--seed "$(AI_H16_ATTENTION_SEED)" --out "$(AI_H16_ATTENTION_RUN)/model.json"
+	$(AI_H16_ATTENTION_PYTHON) ../../../../sw/tools/cimforge_mapper.py \
+		--model-json "$(AI_H16_ATTENTION_RUN)/model.json" \
+		--h16-attention-top-dir "$(AI_H16_ATTENTION_RUN)/workload"
+	$(AI_H16_ATTENTION_PYTHON) ../../../../sw/tools/verify_transformer_h16_attention.py \
+		--model "$(AI_H16_ATTENTION_RUN)/model.json" \
+		--workload-dir "$(AI_H16_ATTENTION_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK \
+		+define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-Mdir=$(AI_H16_ATTENTION_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_H16_ATTENTION_RUN)/simv -l $(AI_H16_ATTENTION_RUN)/compile.log
+	$(AI_H16_ATTENTION_RUN)/simv +ntb_random_seed=$(AI_H16_ATTENTION_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H16_ATTENTION_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H16_ATTENTION_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H16_ATTENTION_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H16_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H16_ATTENTION_RUN)/workload/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H16_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H16_ATTENTION_RUN)/workload/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H16_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H16_ATTENTION_RUN)/workload/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H16_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H16_ATTENTION_RUN)/workload/manifest.json"))["useful_macs"])') \
+		-l $(AI_H16_ATTENTION_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS ' "$(AI_H16_ATTENTION_RUN)/run.log"

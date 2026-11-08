@@ -102,6 +102,9 @@ def int8_bytes(values):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=20261108)
+    parser.add_argument("--fusion-mode", choices=("legacy", "first", "both"),
+                        default="legacy",
+                        help="legacy 0x30/0x36, first-layer 0x53, or both layers 0x53")
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args()
     started = time.perf_counter()
@@ -124,15 +127,27 @@ def main():
     add(memory, SPAD["raw2"], [POISON] * (M * C))
     add(memory, SPAD["output"], [POISON] * (M * C // 4))
 
-    commands = [
-        # Tensor GEMM word6 counts packed K groups (four INT8 elements each),
-        # unlike requant's scalar length field.  For K=16, the matrix core
-        # consumes four 128-bit operand groups per 4x4 tile.
-        desc(0x7100, 0x30, SPAD["input"], SPAD["w1"], SPAD["raw1"], M, C, C // 4),
-        desc(0x7101, 0x36, SPAD["raw1"], 0, SPAD["act1"], M, C, M * C, 0x30),
-        desc(0x7102, 0x30, SPAD["act1"], SPAD["w2"], SPAD["raw2"], M, C, C // 4),
-        desc(0x7103, 0x36, SPAD["raw2"], 0, SPAD["output"], 0, 0, M * C, 0x10),
-    ]
+    # Tensor GEMM word6 counts packed K groups (four INT8 elements each),
+    # unlike requant's scalar length field. Opcode 0x53 writes signed INT8
+    # directly in Matrix-A tile layout, which the following GEMM consumes.
+    commands_by_mode = {
+        "legacy": [
+            desc(0x7100, 0x30, SPAD["input"], SPAD["w1"], SPAD["raw1"], M, C, C // 4),
+            desc(0x7101, 0x36, SPAD["raw1"], 0, SPAD["act1"], M, C, M * C, 0x30),
+            desc(0x7102, 0x30, SPAD["act1"], SPAD["w2"], SPAD["raw2"], M, C, C // 4),
+            desc(0x7103, 0x36, SPAD["raw2"], 0, SPAD["output"], 0, 0, M * C, 0x10),
+        ],
+        "first": [
+            desc(0x7100, 0x53, SPAD["input"], SPAD["w1"], SPAD["act1"], M, C, C // 4),
+            desc(0x7101, 0x30, SPAD["act1"], SPAD["w2"], SPAD["raw2"], M, C, C // 4),
+            desc(0x7102, 0x36, SPAD["raw2"], 0, SPAD["output"], 0, 0, M * C, 0x10),
+        ],
+        "both": [
+            desc(0x7100, 0x53, SPAD["input"], SPAD["w1"], SPAD["act1"], M, C, C // 4),
+            desc(0x7101, 0x53, SPAD["act1"], SPAD["w2"], SPAD["output"], M, C, C // 4),
+        ],
+    }
+    commands = commands_by_mode[args.fusion_mode]
     for index, words in enumerate(commands):
         wait = (1 << ((index - 1) & 1)) if index else 0
         signal = (1 << (index & 1)) if index < len(commands) - 1 else 0
@@ -146,11 +161,20 @@ def main():
         expected.extend((base + 4 * i, int(value) & 0xFFFFFFFF)
                         for i, value in enumerate(values))
 
-    expect(SPAD["raw1"], [value for row in raw1 for value in row])
+    # Fused GEMM preserves its logical INT32 result for the independent
+    # software Golden, but must leave the legacy raw tensor physically intact.
+    if args.fusion_mode == "legacy":
+        expect(SPAD["raw1"], [value for row in raw1 for value in row])
+    else:
+        expect(SPAD["raw1"], [POISON] * (M * C))
     expect(SPAD["act1"], pack_a(act1))
-    expect(SPAD["raw2"], [value for row in raw2 for value in row])
-    packed_output = [pack([output[row][col] for col in range(i, i + 4)])
-                     for row in range(M) for i in range(0, C, 4)]
+    if args.fusion_mode == "both":
+        expect(SPAD["raw2"], [POISON] * (M * C))
+        packed_output = pack_a(output)
+    else:
+        expect(SPAD["raw2"], [value for row in raw2 for value in row])
+        packed_output = [pack([output[row][col] for col in range(i, i + 4)])
+                         for row in range(M) for i in range(0, C, 4)]
     expect(SPAD["output"], packed_output)
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
@@ -172,6 +196,7 @@ def main():
     manifest = {
         "model": "nma_pointwise_cnn_32x16_16ch_2layer_linear_int8",
         "seed": args.seed,
+        "fusion_mode": args.fusion_mode,
         "weight_provenance": "fixed-seed reproducible INT8 inference weights; not trained",
         "quantization": "signed INT8 activations/weights, INT32 accumulation, opcode 0x36 shift-0 signed saturation; no activation",
         "layers": ["Conv2D 1x1 16->16 + signed INT8 requant", "Conv2D 1x1 16->16 + signed INT8 requant"],
@@ -190,6 +215,14 @@ def main():
         "weight1_sha256": hashlib.sha256(int8_bytes(value for row in w1 for value in row)).hexdigest(),
         "weight2_sha256": hashlib.sha256(int8_bytes(value for row in w2 for value in row)).hexdigest(),
         "output_sha256": hashlib.sha256(int8_bytes(value for row in output for value in row)).hexdigest(),
+        "raw1_int32_golden_sha256": hashlib.sha256(
+            b"".join((int(value) & 0xFFFFFFFF).to_bytes(4, "little")
+                     for row in raw1 for value in row)).hexdigest(),
+        "raw2_int32_golden_sha256": hashlib.sha256(
+            b"".join((int(value) & 0xFFFFFFFF).to_bytes(4, "little")
+                     for row in raw2 for value in row)).hexdigest(),
+        "output_physical_layout": "matrix_a_tile" if args.fusion_mode == "both" else "row_major_packed_i8",
+        "legacy_output_layout_compatible": args.fusion_mode != "both",
         "independent_golden": "scalar Python integer accumulation; raw INT32 and packed INT8 tensor checks",
         "host_fallback_compute": "none; both convolution layers use ABI-v7 Matrix GEMM on Top RTL",
         "host_im2col": "none; 1x1 pointwise convolution maps directly to Matrix GEMM",
