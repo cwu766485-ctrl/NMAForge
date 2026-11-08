@@ -26,9 +26,10 @@ random-latency-run: random-latency-compile
 		-cm_dir $(OUT_DIR)/coverage.vdb -cm_name cnn_kv_seed_$(SEED) -l $(OUT_DIR)/run.log
 	grep -q '^CNN_KV_RANDOM_LATENCY_PASS ' $(OUT_DIR)/run.log
 	grep -q '^KV_FSM_RESIDUAL_TRANSITIONS_PASS done_to_error=watchdog read_wait_to_idle=reset write_to_error=abort write_to_idle=reset bins=4/4 ' $(OUT_DIR)/run.log
-	@test "$$(grep -c '^KV_ADDRESS_CONFIG_PASS case=' $(OUT_DIR)/run.log)" -eq 10
+	@test "$$(grep -c '^KV_ADDRESS_CONFIG_PASS case=' $(OUT_DIR)/run.log)" -eq 11
 	grep -q '^KV_ADDRESS_BOUNDARY_PASS address=0007fffc read_write=1$$' $(OUT_DIR)/run.log
-	@for case_id in 0 1 2 3 4 5 6 7 8 9; do \
+	grep -q '^KV_MATRIX_B_APPEND_RECOVERY_PASS abort_prefix=1 reset_prefix=2 retries=2 repeated_position=1 invalid_config_no_side_effect=1 token_validity=completion-gated$$' $(OUT_DIR)/run.log
+	@for case_id in 0 1 2 3 4 5 6 7 8 9 10; do \
 		grep -q "^KV_ADDRESS_CONFIG_PASS case=$$case_id$$" $(OUT_DIR)/run.log || exit 1; \
 	done
 
