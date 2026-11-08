@@ -120,9 +120,12 @@ def main():
     add(memory, SPAD["output"], [POISON] * (M * C // 4))
 
     commands = [
-        desc(0x7100, 0x30, SPAD["input"], SPAD["w1"], SPAD["raw1"], M, C, C),
+        # Tensor GEMM word6 counts packed K groups (four INT8 elements each),
+        # unlike requant's scalar length field.  For K=16, the matrix core
+        # consumes four 128-bit operand groups per 4x4 tile.
+        desc(0x7100, 0x30, SPAD["input"], SPAD["w1"], SPAD["raw1"], M, C, C // 4),
         desc(0x7101, 0x36, SPAD["raw1"], 0, SPAD["act1"], M, C, M * C, 0x30, 1),
-        desc(0x7102, 0x30, SPAD["act1"], SPAD["w2"], SPAD["raw2"], M, C, C),
+        desc(0x7102, 0x30, SPAD["act1"], SPAD["w2"], SPAD["raw2"], M, C, C // 4),
         desc(0x7103, 0x36, SPAD["raw2"], 0, SPAD["output"], 0, 0, M * C, 0x10, 1),
     ]
     for index, words in enumerate(commands):

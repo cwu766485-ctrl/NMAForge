@@ -78,9 +78,9 @@ def main():
     golden = load_pairs(args.workload_dir / "model_golden.memh")
     commands = [[memory[DESC + i * 64 + j * 4] for j in range(16)] for i in range(4)]
     expected = [
-        (0x7100, 0x30, INPUT, W1, RAW1, M, C, C, 0x00, 0, 1),
+        (0x7100, 0x30, INPUT, W1, RAW1, M, C, C // 4, 0x00, 0, 1),
         (0x7101, 0x36, RAW1, 0, ACT1, M, C, M * C, 0x30, 1, 2),
-        (0x7102, 0x30, ACT1, W2, RAW2, M, C, C, 0x00, 2, 1),
+        (0x7102, 0x30, ACT1, W2, RAW2, M, C, C // 4, 0x00, 2, 1),
         (0x7103, 0x36, RAW2, 0, OUTPUT, 0, 0, M * C, 0x10, 1, 0),
     ]
     for index, (cmd, spec) in enumerate(zip(commands, expected)):
