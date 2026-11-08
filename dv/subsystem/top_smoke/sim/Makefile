@@ -577,3 +577,35 @@ ai_ctrl_compute_cdc: ai_ctrl_compute_cdc_run
 
 clean:
 	rm -rf csrc simv* *.log ucli.key *.vpd vc_hdrs.h DVE* novas* *.daidir *.vdb *.key
+
+# Reproducible two-layer >=100K-MAC INT8 pointwise CNN through production Top CMDQ.
+AI_REPRESENTATIVE_RUN ?= /tmp/nmaforge_representative_cnn_$(shell date +%Y%m%d_%H%M%S)
+AI_REPRESENTATIVE_PYTHON ?= $(PYTHON)
+AI_REPRESENTATIVE_SEED ?= 20261108
+AI_REPRESENTATIVE_SPAD_WORDS_PER_BANK ?= 8192
+.PHONY: ai_representative_cnn
+ai_representative_cnn:
+	test ! -e "$(AI_REPRESENTATIVE_RUN)"
+	mkdir -p "$(AI_REPRESENTATIVE_RUN)"
+	$(AI_REPRESENTATIVE_PYTHON) ../../../../benchmark/representative/generate_pointwise_cnn_workload.py \
+		--seed "$(AI_REPRESENTATIVE_SEED)" \
+		--out-dir "$(AI_REPRESENTATIVE_RUN)/workload"
+	$(AI_REPRESENTATIVE_PYTHON) ../../../../benchmark/representative/verify_pointwise_cnn_workload.py \
+		--workload-dir "$(AI_REPRESENTATIVE_RUN)/workload"
+	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_SPAD_WORDS_PER_BANK=$(AI_REPRESENTATIVE_SPAD_WORDS_PER_BANK) \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-Mdir=$(AI_REPRESENTATIVE_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_REPRESENTATIVE_RUN)/simv -l $(AI_REPRESENTATIVE_RUN)/compile.log
+	$(AI_REPRESENTATIVE_RUN)/simv +ntb_random_seed=$(AI_REPRESENTATIVE_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_REPRESENTATIVE_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_REPRESENTATIVE_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_REPRESENTATIVE_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=102400 +AI_REPRESENTATIVE_CPL_BASE=102912 \
+		+AI_REPRESENTATIVE_DESC_COUNT=4 +AI_REPRESENTATIVE_USEFUL_MACS=262144 \
+		-l $(AI_REPRESENTATIVE_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS ' "$(AI_REPRESENTATIVE_RUN)/run.log"
