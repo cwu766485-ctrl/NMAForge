@@ -720,5 +720,6 @@ ai_h16_transformer_top:
 		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H16_TRANSFORMER_PYTHON) -c 'import json;print(json.load(open("$(AI_H16_TRANSFORMER_RUN)/workload/manifest.json"))["completion_base"])') \
 		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H16_TRANSFORMER_PYTHON) -c 'import json;print(json.load(open("$(AI_H16_TRANSFORMER_RUN)/workload/manifest.json"))["descriptor_count"])') \
 		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H16_TRANSFORMER_PYTHON) -c 'import json;print(json.load(open("$(AI_H16_TRANSFORMER_RUN)/workload/manifest.json"))["useful_macs"])') \
+		+AI_REPRESENTATIVE_PREFILL_DESC_COUNT=$$($(AI_H16_TRANSFORMER_PYTHON) -c 'import json;print(json.load(open("$(AI_H16_TRANSFORMER_RUN)/workload/manifest.json"))["prefill_descriptor_count"])') \
 		-l $(AI_H16_TRANSFORMER_RUN)/run.log
 	grep -q '^REPRESENTATIVE_MODEL_PASS ' "$(AI_H16_TRANSFORMER_RUN)/run.log"

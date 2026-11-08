@@ -57,6 +57,7 @@ def main() -> None:
             "gamma_beta": "LayerNorm affine parameters use fixed identity initialization (gamma=32768 Q15, beta=0), not trained",
         },
         "prefill_tokens": list(range(8)),
+        "decode_token": 7,
         "embeddings": embeddings,
         "weights": weights,
         "gamma1_q15": [32768] * HIDDEN,

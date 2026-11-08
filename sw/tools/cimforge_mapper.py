@@ -1074,6 +1074,8 @@ def build_h16_attention_top_workload(
     )
 
     block_tensors: dict[str, Tensor] = {}
+    prefill_descriptor_count = len(mapper.descriptors)
+    decode_tensors: dict[str, Tensor] = {}
     if full_block:
         gamma1_values = model.get("gamma1_q15", [32768] * 16)
         beta1_values = model.get("beta1", [0] * 16)
@@ -1084,6 +1086,9 @@ def build_h16_attention_top_workload(
             if (not isinstance(values, list) or len(values) != 16 or
                     any(not isinstance(value, int) for value in values)):
                 raise ValueError(f"{name} must contain 16 integer values")
+        decode_token = model.get("decode_token")
+        if not isinstance(decode_token, int) or not 0 <= decode_token < 16:
+            raise ValueError("full H16 block needs a decode_token ID in [0,15]")
 
         x_i32 = mapper.tensor(
             "h16_block_input_i32", (8, 16), "i32", "row-major",
@@ -1172,6 +1177,216 @@ def build_h16_attention_top_workload(
             "layernorm1_i8": norm1_i8, "ffn_up": ffn_up, "gelu": gelu,
             "gelu_i8": gelu_i8, "ffn_down": ffn_down,
             "residual2": residual2, "layernorm2": norm2,
+        }
+        prefill_descriptor_count = len(mapper.descriptors)
+
+        decode_input = embeddings[decode_token]
+        decode_x_i32_rows = [decode_input] + [[0] * 16 for _ in range(3)]
+        decode_x_i32 = mapper.tensor(
+            "h16_decode_input_i32", (4, 16), "i32", "row-major",
+            flatten(decode_x_i32_rows), initialized=True,
+        )
+        decode_x_i8 = mapper.tensor(
+            "h16_decode_input_i8", (1, 16), "i8_packed", "row-major",
+            pack_matrix_words([decode_input]), initialized=True,
+        )
+        decode_q: dict[int, Tensor] = {}
+        decode_q_i8: dict[int, Tensor] = {}
+        decode_scores: dict[int, Tensor] = {}
+        decode_probs: dict[int, Tensor] = {}
+        decode_probs_i8: dict[int, Tensor] = {}
+        decode_attention: dict[int, Tensor] = {}
+        decode_attention_i8: dict[int, Tensor] = {}
+        decode_head_projection: dict[int, Tensor] = {}
+
+        for head in range(2):
+            head_weights = [row[head * 8:(head + 1) * 8]
+                            for row in weights["wq"]]
+            padded_b_words: list[int] = []
+            for row in head_weights:
+                padded_row = row + [0] * 8
+                padded_b_words.extend(
+                    pack_i8(padded_row[index:index + 4])
+                    for index in range(0, 16, 4)
+                )
+            q_rhs = mapper.tensor(
+                f"h16_decode_q_head{head}_weight_gemv", (16, 16),
+                "i8_packed", "gemv_k_major_n16", padded_b_words,
+            )
+            q_raw = mapper.tensor(
+                f"h16_decode_q_head{head}_raw_i32", (4, 8), "i32", "row-major",
+                [0] * 32, initialized=True,
+            )
+            mapper.add(
+                f"h16_decode_q_head{head}_gemv", OP_GEMV_KFOLD,
+                decode_x_i8, q_raw, src1=q_rhs.addr, m=1, n=8,
+                k_or_length=16, batch_count=1, head_count=0,
+            )
+            q_tile = mapper.tensor(
+                f"h16_decode_q_head{head}_matrix_a", (4, 8), "i8_packed",
+                "matrix_a_tile", [0xA55AA55A] * 8, initialized=False,
+            )
+            mapper.add(
+                f"h16_decode_q_head{head}_requant_tile_a", OP_REQUANT,
+                q_raw, q_tile, m=4, n=8, k_or_length=32,
+                flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1,
+            )
+
+            score = mapper.tensor(
+                f"h16_decode_head{head}_scores_i32", (4, 8), "i32", "row-major",
+                [0xA55AA55A] * 32, initialized=False,
+            )
+            mapper.add(
+                f"h16_decode_head{head}_qk", OP_GEMM, q_tile, score,
+                src1=cached[("k", head)], m=4, n=8, k_or_length=2, aux0=1,
+            )
+            prob = mapper.tensor(
+                f"h16_decode_head{head}_prob_q15", (4, 8), "i32", "row-major",
+                [0xA55AA55A] * 8 + [0] * 24, initialized=True,
+            )
+            mapper.add(
+                f"h16_decode_head{head}_softmax", OP_CAUSAL_SOFTMAX,
+                score, prob, k_or_length=8, aux0=7,
+            )
+            prob_tile = mapper.tensor(
+                f"h16_decode_head{head}_prob_i8", (4, 8), "i8_packed",
+                "matrix_a_tile", [0xA55AA55A] * 8, initialized=False,
+            )
+            mapper.add(
+                f"h16_decode_head{head}_prob_requant", OP_REQUANT,
+                prob, prob_tile, m=4, n=8, k_or_length=32,
+                flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=8, aux0=1,
+            )
+            av = mapper.tensor(
+                f"h16_decode_head{head}_av_i32", (4, 8), "i32", "row-major",
+                [0xA55AA55A] * 32, initialized=False,
+            )
+            mapper.add(
+                f"h16_decode_head{head}_av", OP_GEMM, prob_tile, av,
+                src1=cached[("v", head)], m=4, n=8, k_or_length=2, aux0=1,
+            )
+            av_tile = mapper.tensor(
+                f"h16_decode_head{head}_av_i8", (4, 8), "i8_packed",
+                "matrix_a_tile", [0xA55AA55A] * 8, initialized=False,
+            )
+            mapper.add(
+                f"h16_decode_head{head}_av_requant", OP_REQUANT,
+                av, av_tile, m=4, n=8, k_or_length=32,
+                flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=7, aux0=1,
+            )
+            wo_head = [row[:] for row in weights["wo"][head * 8:(head + 1) * 8]]
+            wo_rhs = mapper.tensor(
+                f"h16_decode_head{head}_wo", (8, 16), "i8_packed",
+                "matrix_b_tile", _pack_matrix_b_physical(wo_head),
+            )
+            projection = mapper.tensor(
+                f"h16_decode_head{head}_wo_i32", (4, 16), "i32", "row-major",
+                [0xA55AA55A] * 64, initialized=False,
+            )
+            mapper.add(
+                f"h16_decode_head{head}_wo_gemm", OP_GEMM, av_tile,
+                projection, src1=wo_rhs, m=4, n=16, k_or_length=2, aux0=1,
+            )
+            decode_q[head] = q_raw
+            decode_q_i8[head] = q_tile
+            decode_scores[head] = score
+            decode_probs[head] = prob
+            decode_probs_i8[head] = prob_tile
+            decode_attention[head] = av
+            decode_attention_i8[head] = av_tile
+            decode_head_projection[head] = projection
+
+        decode_merged = mapper.tensor(
+            "h16_decode_attention_merge_i32", (4, 16), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        mapper.add(
+            "h16_decode_attention_merge", OP_RESIDUAL,
+            decode_head_projection[0], decode_merged,
+            src1=decode_head_projection[1], k_or_length=64, aux0=1,
+        )
+        decode_residual1 = mapper.tensor(
+            "h16_decode_residual1_i32", (4, 16), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        mapper.add("h16_decode_residual1", OP_RESIDUAL, decode_merged,
+                   decode_residual1, src1=decode_x_i32,
+                   k_or_length=64, aux0=1)
+        decode_norm1 = mapper.tensor(
+            "h16_decode_layernorm1_i32", (4, 16), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        for row in range(4):
+            mapper.add(
+                f"h16_decode_layernorm1_row{row}", OP_LAYERNORM,
+                decode_residual1, decode_norm1, src1=gamma1, bias=beta1,
+                k_or_length=16, flags=FLAG_BIAS, aux0=1,
+                src0_offset=row * 64, dst_offset=row * 64,
+            )
+        decode_norm1_i8 = mapper.tensor(
+            "h16_decode_layernorm1_i8", (4, 16), "i8_packed",
+            "matrix_a_tile", [0xA55AA55A] * 16, initialized=False,
+        )
+        mapper.add("h16_decode_layernorm1_requant", OP_REQUANT,
+                   decode_norm1, decode_norm1_i8, m=4, n=16,
+                   k_or_length=64,
+                   flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1)
+        decode_ffn_up = mapper.tensor(
+            "h16_decode_ffn_up_i32", (4, 16), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        mapper.add("h16_decode_ffn_up", OP_GEMM, decode_norm1_i8,
+                   decode_ffn_up, src1=wup, m=4, n=16,
+                   k_or_length=4, aux0=1)
+        decode_gelu = mapper.tensor(
+            "h16_decode_ffn_gelu_i32", (4, 16), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        mapper.add("h16_decode_ffn_gelu", OP_GELU, decode_ffn_up,
+                   decode_gelu, k_or_length=64, aux0=1)
+        decode_gelu_i8 = mapper.tensor(
+            "h16_decode_ffn_gelu_i8", (4, 16), "i8_packed",
+            "matrix_a_tile", [0xA55AA55A] * 16, initialized=False,
+        )
+        mapper.add("h16_decode_ffn_gelu_requant", OP_REQUANT, decode_gelu,
+                   decode_gelu_i8, m=4, n=16, k_or_length=64,
+                   flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1)
+        decode_ffn_down = mapper.tensor(
+            "h16_decode_ffn_down_i32", (4, 16), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        mapper.add("h16_decode_ffn_down", OP_GEMM, decode_gelu_i8,
+                   decode_ffn_down, src1=wdown, m=4, n=16,
+                   k_or_length=4, aux0=1)
+        decode_residual2 = mapper.tensor(
+            "h16_decode_residual2_i32", (4, 16), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        mapper.add("h16_decode_residual2", OP_RESIDUAL, decode_ffn_down,
+                   decode_residual2, src1=decode_norm1,
+                   k_or_length=64, aux0=1)
+        decode_norm2 = mapper.tensor(
+            "h16_decode_layernorm2_i32", (4, 16), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        for row in range(4):
+            mapper.add(
+                f"h16_decode_layernorm2_row{row}", OP_LAYERNORM,
+                decode_residual2, decode_norm2, src1=gamma2, bias=beta2,
+                k_or_length=16, flags=FLAG_BIAS, aux0=1,
+                src0_offset=row * 64, dst_offset=row * 64,
+            )
+        decode_tensors = {
+            "input_i8": decode_x_i8, "input_i32": decode_x_i32,
+            "q": decode_q, "q_i8": decode_q_i8, "scores": decode_scores,
+            "prob": decode_probs, "prob_i8": decode_probs_i8,
+            "av": decode_attention, "av_i8": decode_attention_i8,
+            "projection": decode_head_projection, "merged": decode_merged,
+            "residual1": decode_residual1, "layernorm1": decode_norm1,
+            "layernorm1_i8": decode_norm1_i8, "ffn_up": decode_ffn_up,
+            "gelu": decode_gelu, "gelu_i8": decode_gelu_i8,
+            "ffn_down": decode_ffn_down, "residual2": decode_residual2,
+            "layernorm2": decode_norm2,
         }
 
     add_completion_order_chain(mapper)
@@ -1301,6 +1516,100 @@ def build_h16_attention_top_workload(
             else:
                 add_i32_golden(tensor, matrix)
 
+        decode_token = model["decode_token"]
+        decode_input = embeddings[decode_token]
+        decode_q_raw_gold: dict[int, list[int]] = {}
+        decode_head_projection_gold: dict[int, list[list[int]]] = {}
+        decode_score_gold: dict[int, list[list[int]]] = {}
+        decode_prob_gold: dict[int, list[list[int]]] = {}
+        decode_av_gold: dict[int, list[list[int]]] = {}
+        decode_merged_gold = [[0] * 16 for _ in range(4)]
+        for head in range(2):
+            q_weights = [row[head * 8:(head + 1) * 8]
+                         for row in weights["wq"]]
+            q_raw = gemm_i8_i32([decode_input], q_weights)[0]
+            q_i8 = requant_i8(q_raw, 0)
+            q_tile_rows = [q_i8] + [[0] * 8 for _ in range(3)]
+            k8 = qkv_i8[("k", head)]
+            scores = gemm_i8_i32(q_tile_rows, transpose(k8))
+            probs_row = causal_softmax_q15(scores[0], 7)
+            probs = [probs_row] + [[0] * 8 for _ in range(3)]
+            probs_i8 = [requant_i8(row, 8) for row in probs]
+            v8 = transpose(qkv_i8[("v", head)])
+            av = gemm_i8_i32(probs_i8, v8)
+            av_i8 = [requant_i8(row, 7) for row in av]
+            wo_head = [row[:] for row in weights["wo"][head * 8:(head + 1) * 8]]
+            projected = gemm_i8_i32(av_i8, wo_head)
+            decode_q_raw_gold[head] = q_raw
+            decode_score_gold[head] = scores
+            decode_prob_gold[head] = probs
+            decode_av_gold[head] = av
+            decode_head_projection_gold[head] = projected
+            for row in range(4):
+                for col in range(16):
+                    decode_merged_gold[row][col] += projected[row][col]
+
+        decode_residual1_gold = [
+            residual_i32(lhs, rhs) for lhs, rhs in
+            zip(decode_merged_gold, [decode_input] + [[0] * 16 for _ in range(3)])
+        ]
+        decode_norm1_gold = [layernorm_q15(row, gamma1_values, beta1_values)
+                             for row in decode_residual1_gold]
+        decode_norm1_i8_gold = [requant_i8(row, 0) for row in decode_norm1_gold]
+        decode_ffn_up_gold = gemm_i8_i32(decode_norm1_i8_gold, weights["wup"])
+        decode_gelu_gold = [[gelu_q8_8(value) for value in row]
+                            for row in decode_ffn_up_gold]
+        decode_gelu_i8_gold = [requant_i8(row, 0) for row in decode_gelu_gold]
+        decode_ffn_down_gold = gemm_i8_i32(decode_gelu_i8_gold, weights["wdown"])
+        decode_residual2_gold = [
+            residual_i32(lhs, rhs)
+            for lhs, rhs in zip(decode_ffn_down_gold, decode_norm1_gold)
+        ]
+        decode_norm2_gold = [layernorm_q15(row, gamma2_values, beta2_values)
+                             for row in decode_residual2_gold]
+        if decode_norm2_gold[0] != norm2_gold[decode_token]:
+            raise AssertionError(
+                "single-token decode Golden differs from the corresponding prefill row"
+            )
+        for head in range(2):
+            q_tile_rows = requant_i8(decode_q_raw_gold[head], 0)
+            add_i8_golden(
+                decode_tensors["q_i8"][head],
+                [q_tile_rows] + [[0] * 8 for _ in range(3)], True,
+            )
+            add_i32_golden(decode_tensors["scores"][head], decode_score_gold[head])
+            prob_tensor = decode_tensors["prob"][head]
+            for col, value in enumerate(decode_prob_gold[head][0]):
+                golden[prob_tensor.addr + 4 * col] = u32(value)
+            add_i8_golden(
+                decode_tensors["prob_i8"][head],
+                [requant_i8(decode_prob_gold[head][0], 8)]
+                + [[0] * 8 for _ in range(3)], True,
+            )
+            add_i32_golden(decode_tensors["av"][head], decode_av_gold[head])
+            av_i8_rows = [requant_i8(row, 7) for row in decode_av_gold[head]]
+            add_i8_golden(decode_tensors["av_i8"][head], av_i8_rows, True)
+            add_i32_golden(
+                decode_tensors["projection"][head],
+                decode_head_projection_gold[head],
+            )
+        add_i32_golden(decode_tensors["merged"], decode_merged_gold)
+        for name, matrix in (
+            ("residual1", decode_residual1_gold),
+            ("layernorm1", decode_norm1_gold),
+            ("layernorm1_i8", decode_norm1_i8_gold),
+            ("ffn_up", decode_ffn_up_gold), ("gelu", decode_gelu_gold),
+            ("gelu_i8", decode_gelu_i8_gold),
+            ("ffn_down", decode_ffn_down_gold),
+            ("residual2", decode_residual2_gold),
+            ("layernorm2", decode_norm2_gold),
+        ):
+            tensor = decode_tensors[name]
+            if tensor.dtype == "i8_packed":
+                add_i8_golden(tensor, matrix, True)
+            else:
+                add_i32_golden(tensor, matrix)
+
     descriptor_base = align(mapper.next_addr, 0x1000)
     completion_base = align(descriptor_base + len(mapper.descriptors) * 64, 0x1000)
     memory: dict[int, int] = {}
@@ -1353,8 +1662,15 @@ def build_h16_attention_top_workload(
         "descriptor_base": descriptor_base, "completion_base": completion_base,
         "descriptor_count": len(mapper.descriptors),
         "runtime_ordering": "single ABI event-bit completion chain; each descriptor waits for and clears the preceding descriptor's ordered-retirement event",
-        "useful_macs": (3 * 8 * 16 * 16 + 2 * 8 * 8 * 8 + 2 * 8 * 8 * 8 +
-                        2 * 8 * 8 * 16 + (2 * 8 * 16 * 16 if full_block else 0)),
+        "prefill_useful_macs": (3 * 8 * 16 * 16 + 2 * 8 * 8 * 8 +
+                                 2 * 8 * 8 * 8 + 2 * 8 * 8 * 16 +
+                                 (2 * 8 * 16 * 16 if full_block else 0)),
+        "decode_useful_macs": 1280 if full_block else 0,
+        "useful_macs": ((3 * 8 * 16 * 16 + 2 * 8 * 8 * 8 + 2 * 8 * 8 * 8 +
+                         2 * 8 * 8 * 16 + (2 * 8 * 16 * 16 if full_block else 0)) +
+                        (1280 if full_block else 0)),
+        "prefill_descriptor_count": prefill_descriptor_count,
+        "decode_descriptor_count": len(mapper.descriptors) - prefill_descriptor_count,
         "head_count": 2, "head_dim": 8, "sequence_length": 8,
         "full_block": full_block,
         "prefill_gate": ("G4 residual + LayerNorm + FFN + residual + LayerNorm"

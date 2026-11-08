@@ -3377,6 +3377,7 @@ module tb_ai_accel_smoke;
         integer descriptor_base;
         integer completion_base;
         integer descriptor_count;
+        integer prefill_descriptor_count;
         integer useful_macs;
         integer poll_index;
         integer completion_index;
@@ -3395,6 +3396,10 @@ module tb_ai_accel_smoke;
         integer dma_busy_cycles;
         integer exclusive_profile_cycles;
         integer command_cycles;
+        integer prefill_command_cycles;
+        integer decode_command_cycles;
+        integer prefill_exclusive_cycles;
+        integer decode_exclusive_cycles;
         integer preloaded_spad_bytes;
         integer spad_read_bytes;
         integer spad_write_bytes;
@@ -3417,6 +3422,9 @@ module tb_ai_accel_smoke;
                 !$value$plusargs("AI_REPRESENTATIVE_DESC_COUNT=%d", descriptor_count) ||
                 !$value$plusargs("AI_REPRESENTATIVE_USEFUL_MACS=%d", useful_macs))
                 $fatal(1, "representative model mode requires memory, golden, queue and MAC plusargs");
+            prefill_descriptor_count = 0;
+            void'($value$plusargs("AI_REPRESENTATIVE_PREFILL_DESC_COUNT=%d",
+                                  prefill_descriptor_count));
 
             $readmemh(image_file, representative_image_words);
             $readmemh(golden_file, representative_golden_words);
@@ -3425,6 +3433,8 @@ module tb_ai_accel_smoke;
             if (image_count <= 0 || image_count > 65535 ||
                 golden_count <= 0 || golden_count > 65535 ||
                 descriptor_count < 1 || descriptor_count > 128 ||
+                prefill_descriptor_count < 0 ||
+                prefill_descriptor_count > descriptor_count ||
                 descriptor_base < 0 || completion_base < 0 ||
                 descriptor_base[1:0] != 0 || completion_base[1:0] != 0)
                 $fatal(1, "representative model image/queue dimensions invalid image=%0d golden=%0d desc=%0d",
@@ -3483,8 +3493,13 @@ module tb_ai_accel_smoke;
             transformer_top_last_completion_tail = dut.processor_cplq_tail;
             transformer_top_last_completion_cycle = transformer_top_cycle_counter;
             transformer_top_start_cycle = transformer_top_cycle_counter;
+            transformer_top_prefill_target = prefill_descriptor_count;
             transformer_top_final_target = descriptor_count;
+            transformer_top_prefill_end_cycle = transformer_top_start_cycle;
+            transformer_top_prefill_captured = (prefill_descriptor_count == 0);
             transformer_top_final_captured = 1'b0;
+            for (poll_index = 0; poll_index < 13; poll_index = poll_index + 1)
+                transformer_top_prefill_profile[poll_index] = 0;
             transformer_top_timing_enable = 1'b1;
             axi_write(REG_DOORBELL, 32'd1);
             for (poll_index = 0; poll_index < 2000000 &&
@@ -3585,6 +3600,33 @@ module tb_ai_accel_smoke;
             no_engine_cycles = transformer_top_profile_no_engine_busy;
             dma_busy_cycles = transformer_top_profile_dma_busy;
             command_cycles = transformer_top_final_end_cycle - transformer_top_start_cycle;
+            prefill_command_cycles = 0;
+            decode_command_cycles = 0;
+            prefill_exclusive_cycles = 0;
+            decode_exclusive_cycles = 0;
+            if (prefill_descriptor_count > 0) begin
+                if (!transformer_top_prefill_captured ||
+                    transformer_top_prefill_end_cycle <= transformer_top_start_cycle ||
+                    transformer_top_prefill_end_cycle > transformer_top_final_end_cycle)
+                    $fatal(1, "representative prefill completion boundary was not captured");
+                prefill_command_cycles = transformer_top_prefill_end_cycle -
+                                         transformer_top_start_cycle;
+                decode_command_cycles = transformer_top_final_end_cycle -
+                                        transformer_top_prefill_end_cycle;
+                for (poll_index = 0; poll_index < 12; poll_index = poll_index + 1)
+                    prefill_exclusive_cycles = prefill_exclusive_cycles +
+                        transformer_top_prefill_profile[poll_index];
+                decode_exclusive_cycles = matrix_mac_cycles + matrix_wait_cycles +
+                    matrix_response_wait_cycles + matrix_writeback_cycles +
+                    matrix_other_cycles + sfu_busy_cycles + kv_busy_cycles +
+                    conv_busy_cycles + banked_busy_cycles + fp_busy_cycles +
+                    scalar_busy_cycles + no_engine_cycles - prefill_exclusive_cycles;
+                if (prefill_exclusive_cycles != prefill_command_cycles ||
+                    decode_exclusive_cycles != decode_command_cycles)
+                    $fatal(1, "representative phase profile does not close prefill=%0d/%0d decode=%0d/%0d",
+                           prefill_command_cycles, prefill_exclusive_cycles,
+                           decode_command_cycles, decode_exclusive_cycles);
+            end
             exclusive_profile_cycles = matrix_mac_cycles + matrix_wait_cycles +
                 matrix_response_wait_cycles + matrix_writeback_cycles + matrix_other_cycles +
                 sfu_busy_cycles + kv_busy_cycles + conv_busy_cycles + banked_busy_cycles +
@@ -3603,8 +3645,12 @@ module tb_ai_accel_smoke;
                 mac_per_cycle = 1.0 * useful_macs / command_cycles;
             if (matrix_mac_cycles > 0)
                 array_utilization = 100.0 * useful_macs / (256.0 * matrix_mac_cycles);
-            $display("REPRESENTATIVE_MODEL_PASS desc=%0d golden_words=%0d useful_macs=%0d command_cycles=%0d exclusive_profile_cycles=%0d preload_axi_cycles=%0d preloaded_spad_bytes=%0d mac_per_cycle=%0.4f array_utilization_pct=%0.2f matrix_mac_cycles=%0d matrix_req_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d sfu_busy=%0d kv_busy=%0d conv_busy=%0d banked_busy=%0d fp_busy=%0d scalar_busy=%0d no_engine_dispatch_remainder=%0d dma_busy_overlap=%0d spad_read_bytes=%0d spad_write_bytes=%0d",
-                     descriptor_count, golden_count, useful_macs, command_cycles,
+            $display("REPRESENTATIVE_MODEL_PASS desc=%0d prefill_desc=%0d decode_desc=%0d golden_words=%0d useful_macs=%0d command_cycles=%0d prefill_command_cycles=%0d decode_command_cycles=%0d prefill_exclusive_cycles=%0d decode_exclusive_cycles=%0d exclusive_profile_cycles=%0d preload_axi_cycles=%0d preloaded_spad_bytes=%0d mac_per_cycle=%0.4f array_utilization_pct=%0.2f matrix_mac_cycles=%0d matrix_req_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d sfu_busy=%0d kv_busy=%0d conv_busy=%0d banked_busy=%0d fp_busy=%0d scalar_busy=%0d no_engine_dispatch_remainder=%0d dma_busy_overlap=%0d spad_read_bytes=%0d spad_write_bytes=%0d",
+                     descriptor_count, prefill_descriptor_count,
+                     descriptor_count - prefill_descriptor_count,
+                     golden_count, useful_macs, command_cycles,
+                     prefill_command_cycles, decode_command_cycles,
+                     prefill_exclusive_cycles, decode_exclusive_cycles,
                      exclusive_profile_cycles, representative_load_cycles,
                      preloaded_spad_bytes, mac_per_cycle, array_utilization,
                      matrix_mac_cycles, matrix_wait_cycles,

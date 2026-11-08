@@ -61,6 +61,16 @@ def decode_b(memory: dict[int, int], base: int, k_dim: int, n_dim: int) -> list[
     return result
 
 
+def decode_gemv_rhs(memory: dict[int, int], base: int, k_dim: int) -> list[list[int]]:
+    """Decode opcode 0x52's K-major rows with N padded to 16 bytes."""
+    result = [[0] * 16 for _ in range(k_dim)]
+    for k in range(k_dim):
+        for col in range(16):
+            word = memory[base + (k * 4 + col // 4) * 4]
+            result[k][col] = signed_i8(word >> ((col % 4) * 8))
+    return result
+
+
 def gemm(a: list[list[int]], b: list[list[int]]) -> list[list[int]]:
     if not a or not b or len(a[0]) != len(b):
         raise ValueError("incompatible independent Golden matrix shapes")
@@ -354,6 +364,102 @@ def main() -> None:
             ("h16_ffn_down_i32", ffn_down),
             ("h16_residual2_i32", residual2),
             ("h16_layernorm2_i32", norm2),
+        ):
+            tensor = tensors[name]
+            if tensor["dtype"] == "i8_packed":
+                add_i8(expected, tensor["address"], matrix, tile_a=True)
+            else:
+                add_i32(expected, tensor["address"], matrix)
+
+        decode_token = model.get("decode_token")
+        if not isinstance(decode_token, int) or not 0 <= decode_token < 16:
+            raise ValueError("full-block model is missing a legal decode token")
+        decode_input = model["embeddings"][decode_token]
+        decode_merged = [[0] * 16 for _ in range(4)]
+        decode_rows_per_head = {}
+        for head in range(2):
+            q_name = f"h16_decode_q_head{head}"
+            q_weight = [row[head * 8:(head + 1) * 8]
+                        for row in model["weights"]["wq"]]
+            packed_q_weight = decode_gemv_rhs(
+                memory, tensors[f"{q_name}_weight_gemv"]["address"], 16
+            )
+            if packed_q_weight != [row + [0] * 8 for row in q_weight]:
+                raise ValueError(f"{q_name} opcode 0x52 RHS pack mismatch")
+            q_raw = gemm([decode_input], q_weight)[0]
+            q_i8 = requant([q_raw], 0)[0]
+            q_rows = [q_i8] + [[0] * 8 for _ in range(3)]
+            k_rows = qkv[("k", head)]
+            v_rows = transpose(qkv[("v", head)])
+            score = gemm(q_rows, transpose(k_rows))
+            probability = [softmax_q15(score[0])] + [[0] * 8 for _ in range(3)]
+            probability_i8 = requant(probability, 8)
+            attended = gemm(probability_i8, v_rows)
+            attended_i8 = requant(attended, 7)
+            wo = [row[:] for row in model["weights"]["wo"][head * 8:(head + 1) * 8]]
+            projected = gemm(attended_i8, wo)
+            decode_rows_per_head[head] = {
+                "q_raw": q_raw, "q_rows": q_rows, "score": score,
+                "probability": probability, "probability_i8": probability_i8,
+                "attended": attended, "attended_i8": attended_i8,
+                "projected": projected,
+            }
+            for row in range(4):
+                for col in range(16):
+                    decode_merged[row][col] += projected[row][col]
+
+        decode_input_rows = [decode_input] + [[0] * 16 for _ in range(3)]
+        decode_residual1 = [residual(a, b)
+                            for a, b in zip(decode_merged, decode_input_rows)]
+        decode_norm1 = [layernorm_q15(row, gamma1, beta1)
+                        for row in decode_residual1]
+        decode_norm1_i8 = requant(decode_norm1, 0)
+        decode_ffn_up = gemm(decode_norm1_i8, wup_b)
+        decode_gelu = [[gelu_q8_8(value) for value in row]
+                       for row in decode_ffn_up]
+        decode_gelu_i8 = requant(decode_gelu, 0)
+        decode_ffn_down = gemm(decode_gelu_i8, wdown_b)
+        decode_residual2 = [residual(a, b)
+                            for a, b in zip(decode_ffn_down, decode_norm1)]
+        decode_norm2 = [layernorm_q15(row, gamma2, beta2)
+                        for row in decode_residual2]
+        if decode_norm2[0] != norm2[7]:
+            raise ValueError(
+                "single-token decode Golden differs from prefill output for the same token"
+            )
+        for head, tensors_for_head in decode_rows_per_head.items():
+            add_i8(expected,
+                   tensors[f"h16_decode_q_head{head}_matrix_a"]["address"],
+                   tensors_for_head["q_rows"], tile_a=True)
+            add_i32(expected,
+                    tensors[f"h16_decode_head{head}_scores_i32"]["address"],
+                    tensors_for_head["score"])
+            prob_addr = tensors[f"h16_decode_head{head}_prob_q15"]["address"]
+            for col, value in enumerate(tensors_for_head["probability"][0]):
+                expected[prob_addr + 4 * col] = value & MASK32
+            add_i8(expected,
+                   tensors[f"h16_decode_head{head}_prob_i8"]["address"],
+                   tensors_for_head["probability_i8"], tile_a=True)
+            add_i32(expected,
+                    tensors[f"h16_decode_head{head}_av_i32"]["address"],
+                    tensors_for_head["attended"])
+            add_i8(expected,
+                   tensors[f"h16_decode_head{head}_av_i8"]["address"],
+                   tensors_for_head["attended_i8"], tile_a=True)
+            add_i32(expected,
+                    tensors[f"h16_decode_head{head}_wo_i32"]["address"],
+                    tensors_for_head["projected"])
+        for name, matrix in (
+            ("h16_decode_attention_merge_i32", decode_merged),
+            ("h16_decode_residual1_i32", decode_residual1),
+            ("h16_decode_layernorm1_i32", decode_norm1),
+            ("h16_decode_layernorm1_i8", decode_norm1_i8),
+            ("h16_decode_ffn_up_i32", decode_ffn_up),
+            ("h16_decode_ffn_gelu_i32", decode_gelu),
+            ("h16_decode_ffn_gelu_i8", decode_gelu_i8),
+            ("h16_decode_ffn_down_i32", decode_ffn_down),
+            ("h16_decode_residual2_i32", decode_residual2),
+            ("h16_decode_layernorm2_i32", decode_norm2),
         ):
             tensor = tensors[name]
             if tensor["dtype"] == "i8_packed":
