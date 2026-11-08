@@ -3398,8 +3398,15 @@ module tb_ai_accel_smoke;
         integer preloaded_spad_bytes;
         integer spad_read_bytes;
         integer spad_write_bytes;
+        integer representative_dump_fd;
+        integer representative_dump_index;
+        integer representative_dump_base_a;
+        integer representative_dump_words_a;
+        integer representative_dump_base_b;
+        integer representative_dump_words_b;
         real mac_per_cycle;
         real array_utilization;
+        reg [1023:0] representative_dump_file;
         reg [31:0] read_value;
         reg [31:0] status_value;
         begin
@@ -3510,6 +3517,58 @@ module tb_ai_accel_smoke;
                     $fatal(1, "representative Golden mismatch index=%0d addr=%08h expected=%08h actual=%08h",
                            golden_index, representative_golden_words[1 + 2 * golden_index],
                            representative_golden_words[2 + 2 * golden_index], read_value);
+            end
+
+            // Optional post-prefix SPAD snapshot for staged descriptor debug.
+            // Set DESC_COUNT to stop before the descriptor under investigation;
+            // these reads happen after the queue has drained and are outside the
+            // measured command window.
+            if ($value$plusargs("AI_REPRESENTATIVE_DUMP_FILE=%s",
+                                representative_dump_file)) begin
+                if (!$value$plusargs("AI_REPRESENTATIVE_DUMP_A_BASE=%d",
+                                     representative_dump_base_a) ||
+                    !$value$plusargs("AI_REPRESENTATIVE_DUMP_A_WORDS=%d",
+                                     representative_dump_words_a) ||
+                    !$value$plusargs("AI_REPRESENTATIVE_DUMP_B_BASE=%d",
+                                     representative_dump_base_b) ||
+                    !$value$plusargs("AI_REPRESENTATIVE_DUMP_B_WORDS=%d",
+                                     representative_dump_words_b) ||
+                    representative_dump_words_a < 0 ||
+                    representative_dump_words_b < 0 ||
+                    (representative_dump_base_a[1:0] != 0) ||
+                    (representative_dump_base_b[1:0] != 0) ||
+                    ((representative_dump_base_a +
+                      representative_dump_words_a * 4) > SPAD_BYTES) ||
+                    ((representative_dump_base_b +
+                      representative_dump_words_b * 4) > SPAD_BYTES))
+                    $fatal(1, "invalid representative SPAD dump ranges");
+                representative_dump_fd = $fopen(representative_dump_file, "w");
+                if (representative_dump_fd == 0)
+                    $fatal(1, "could not open representative SPAD dump %0s",
+                           representative_dump_file);
+                for (representative_dump_index = 0;
+                     representative_dump_index < representative_dump_words_a;
+                     representative_dump_index = representative_dump_index + 1) begin
+                    axi_read(SPAD_BASE + representative_dump_base_a +
+                             representative_dump_index * 4, read_value);
+                    $fdisplay(representative_dump_fd, "A %08h %08h",
+                              representative_dump_base_a +
+                              representative_dump_index * 4, read_value);
+                end
+                for (representative_dump_index = 0;
+                     representative_dump_index < representative_dump_words_b;
+                     representative_dump_index = representative_dump_index + 1) begin
+                    axi_read(SPAD_BASE + representative_dump_base_b +
+                             representative_dump_index * 4, read_value);
+                    $fdisplay(representative_dump_fd, "B %08h %08h",
+                              representative_dump_base_b +
+                              representative_dump_index * 4, read_value);
+                end
+                $fclose(representative_dump_fd);
+                $display("REPRESENTATIVE_SPAD_DUMP_PASS file=%0s a_base=%08h a_words=%0d b_base=%08h b_words=%0d",
+                         representative_dump_file, representative_dump_base_a,
+                         representative_dump_words_a, representative_dump_base_b,
+                         representative_dump_words_b);
             end
 
             matrix_mac_cycles = transformer_top_profile_matrix_mac;
