@@ -90,6 +90,11 @@ def scalar_golden(a, b):
     return result
 
 
+def requant_i8(value):
+    """Opcode 0x36 with shift zero: signed INT8 saturation, no activation."""
+    return min(127, max(-128, int(value)))
+
+
 def int8_bytes(values):
     return bytes(int(value) & 0xFF for value in values)
 
@@ -106,9 +111,9 @@ def main():
     w2 = [[rng.randint(-3, 3) for _ in range(C)] for _ in range(C)]
 
     raw1 = scalar_golden(x, w1)
-    act1 = [[min(127, max(0, value)) for value in row] for row in raw1]
+    act1 = [[requant_i8(value) for value in row] for row in raw1]
     raw2 = scalar_golden(act1, w2)
-    output = [[min(127, max(0, value)) for value in row] for row in raw2]
+    output = [[requant_i8(value) for value in row] for row in raw2]
 
     memory = {}
     add(memory, SPAD["input"], pack_a(x))
@@ -120,10 +125,13 @@ def main():
     add(memory, SPAD["output"], [POISON] * (M * C // 4))
 
     commands = [
-        desc(0x7100, 0x30, SPAD["input"], SPAD["w1"], SPAD["raw1"], M, C, C),
-        desc(0x7101, 0x36, SPAD["raw1"], 0, SPAD["act1"], M, C, M * C, 0x30, 1),
-        desc(0x7102, 0x30, SPAD["act1"], SPAD["w2"], SPAD["raw2"], M, C, C),
-        desc(0x7103, 0x36, SPAD["raw2"], 0, SPAD["output"], 0, 0, M * C, 0x10, 1),
+        # Tensor GEMM word6 counts packed K groups (four INT8 elements each),
+        # unlike requant's scalar length field.  For K=16, the matrix core
+        # consumes four 128-bit operand groups per 4x4 tile.
+        desc(0x7100, 0x30, SPAD["input"], SPAD["w1"], SPAD["raw1"], M, C, C // 4),
+        desc(0x7101, 0x36, SPAD["raw1"], 0, SPAD["act1"], M, C, M * C, 0x30),
+        desc(0x7102, 0x30, SPAD["act1"], SPAD["w2"], SPAD["raw2"], M, C, C // 4),
+        desc(0x7103, 0x36, SPAD["raw2"], 0, SPAD["output"], 0, 0, M * C, 0x10),
     ]
     for index, words in enumerate(commands):
         wait = (1 << ((index - 1) & 1)) if index else 0
@@ -162,11 +170,11 @@ def main():
     write_memh(image_path, image)
     write_memh(golden_path, golden)
     manifest = {
-        "model": "nma_pointwise_cnn_32x16_16ch_2layer_int8",
+        "model": "nma_pointwise_cnn_32x16_16ch_2layer_linear_int8",
         "seed": args.seed,
         "weight_provenance": "fixed-seed reproducible INT8 inference weights; not trained",
-        "quantization": "signed INT8 activations/weights, INT32 accumulation, clamp-to-[0,127] ReLU",
-        "layers": ["Conv2D 1x1 16->16 + ReLU", "Conv2D 1x1 16->16 + ReLU"],
+        "quantization": "signed INT8 activations/weights, INT32 accumulation, opcode 0x36 shift-0 signed saturation; no activation",
+        "layers": ["Conv2D 1x1 16->16 + signed INT8 requant", "Conv2D 1x1 16->16 + signed INT8 requant"],
         "input_shape_nchw": [1, C, 32, 16],
         "spatial_positions": M,
         "useful_macs_per_inference": 2 * M * C * C,

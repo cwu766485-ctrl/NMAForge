@@ -59,6 +59,11 @@ def gemm(a, b):
              for col in range(C)] for row in range(M)]
 
 
+def requant_i8(value):
+    """Independent opcode 0x36 contract: shift-zero signed saturation."""
+    return min(127, max(-128, int(value)))
+
+
 def pack_a(matrix):
     result = []
     for tile in range(0, M, 16):
@@ -78,9 +83,9 @@ def main():
     golden = load_pairs(args.workload_dir / "model_golden.memh")
     commands = [[memory[DESC + i * 64 + j * 4] for j in range(16)] for i in range(4)]
     expected = [
-        (0x7100, 0x30, INPUT, W1, RAW1, M, C, C, 0x00, 0, 1),
+        (0x7100, 0x30, INPUT, W1, RAW1, M, C, C // 4, 0x00, 0, 1),
         (0x7101, 0x36, RAW1, 0, ACT1, M, C, M * C, 0x30, 1, 2),
-        (0x7102, 0x30, ACT1, W2, RAW2, M, C, C, 0x00, 2, 1),
+        (0x7102, 0x30, ACT1, W2, RAW2, M, C, C // 4, 0x00, 2, 1),
         (0x7103, 0x36, RAW2, 0, OUTPUT, 0, 0, M * C, 0x10, 1, 0),
     ]
     for index, (cmd, spec) in enumerate(zip(commands, expected)):
@@ -90,7 +95,7 @@ def main():
                   cmd[14] & 0xFFFF, cmd[14] >> 16)
         if actual != spec:
             raise ValueError("descriptor contract mismatch at index %d: %r" % (index, actual))
-        if cmd[9] != (1 << 5 if op == 0x36 and index in (1, 3) else 0):
+        if cmd[9] != 0:
             raise ValueError("descriptor activation mismatch at index %d" % index)
         if cmd[13] != 0x00010001 or cmd[15] != ((wait << 16) | 7):
             raise ValueError("descriptor ABI/event clear mismatch at index %d" % index)
@@ -106,9 +111,9 @@ def main():
 
     x, w1 = decode_a(memory, INPUT), decode_b(memory, W1)
     raw1 = gemm(x, w1)
-    act1 = [[min(127, max(0, value)) for value in row] for row in raw1]
+    act1 = [[requant_i8(value) for value in row] for row in raw1]
     raw2 = gemm(act1, decode_b(memory, W2))
-    output = [[min(127, max(0, value)) for value in row] for row in raw2]
+    output = [[requant_i8(value) for value in row] for row in raw2]
     packed_act1 = pack_a(act1)
     packed_output = [sum((output[row][col + lane] & 255) << (lane * 8)
                          for lane in range(4))

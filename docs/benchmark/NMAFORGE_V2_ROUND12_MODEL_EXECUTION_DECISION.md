@@ -1,136 +1,110 @@
 # NMAForge v2 Round 12 — Model Execution Decision
 
-**Disposition: PARTIAL / HOLD**
-
-Round 12 did not meet either Top-level exit criterion. The 262,144-MAC CNN workload and independent software Golden are reproducible, but VCS stopped at license checkout before RTL compilation. H=16 model generation is blocked by the current H=4 trainer/mapper contract; no H=16 model or descriptor stream was produced. No Top-level PASS, cycle count, or performance claim is made.
+**Disposition: PARTIAL.** The 262,144-useful-MAC CNN now passes through the production Top CMDQ path at the 128 KiB SPAD setting, including all four completions and 20,480 intermediate/final Golden words. H=16 Transformer remains blocked at the software mapper/model-export boundary; no H=16 RTL run or performance result exists. This is a functional baseline, not full model-quality evidence or v2 sign-off.
 
 ## Source and run identity
 
 | Item | Value |
 |---|---|
-| Requested branch | feature/npu-architecture-v2 |
-| Reviewed/source/test SHA | 28cd86e0c18d62e4ce6cfb14a2f43967cdce0d4d |
-| Product RTL changed in Round 12 | No |
-| VCS | V-2023.12-SP1_Full64 |
+| Target branch | feature/npu-architecture-v2 |
+| Tested source/test SHA | f17234cf9435272d05ff8e444a0da846da380963 |
+| Reviewed starting SHA | 28cd86e0c18d62e4ce6cfb14a2f43967cdce0d4d |
+| Product RTL changed in this round | No |
+| Test/workload changes | Long-task SVA limit for this target; packed K-group descriptor correction; opcode-contract Golden correction; fractional MAC/cycle reporting fix |
+| VCS | Synopsys V-2023.12-SP1_Full64 |
 | Python | 3.12.13 |
 | CNN seed | 20261108 |
-| CNN Top run ID | R12-TOP-REP-CNN-128K-S20261108-RETRY2 |
-| CNN offline Golden run ID | R12-CNN-OFFLINE-GOLDEN-S20261108 |
-| H=16 preflight run ID | R12-H16-MAPPER-PREFLIGHT-20261108 |
-| Top log | /tmp/nmaforge_r12_cnn_128k_20261108/run_retry2.log, SHA-256 87af108c5ba74e3ff241fe1243ed1ca34a7629ab66d56a012b35d73a5bc46249 |
-| H=16 eight-token probe log | /tmp/nmaforge_r12_h16_probe8.log, SHA-256 b3938bff16541c9ddb713185da2b755cb8ddb5f9da12914c679a2ccaecc8e3b5 |
-| H=16 16x16-weight probe log | /tmp/nmaforge_r12_h16_probe4.log, SHA-256 1136c20820b437c82e2120c29ed55f799f58c63a7973f2b8d58fa74cee569a38 |
-| Machine-readable status | [round12_model_status.json](../../benchmark/representative/round12_model_status.json) |
-| Machine-readable performance | [round12_performance.csv](../../benchmark/representative/round12_performance.csv) |
+| CNN Top run ID | R12-TOP-REP-CNN-128K-S20261108-FINAL |
+| H=16 preflight | R12-H16-MAPPER-PREFLIGHT-20261108 |
+| Final Top run log | /tmp/nmaforge_r12_cnn_128k_20261108_signedoff/run.log, SHA-256 0c5dabc18cd66140441e4798ee11677ee2cd787b9e06277dbc8dee17db5baf09 |
+| Final VCS compile log | /tmp/nmaforge_r12_cnn_128k_20261108_signedoff/compile.log, SHA-256 35c32648bcfa77c76d96cfde09b2aef94adb778c66e04a55f4bf203e97044a13 |
+| SPAD image | SHA-256 bd2dbed180dae0e996a6bd1a0a049eb642da81858c6ed7f033802d69647a61bd |
+| Golden image | SHA-256 3751998e65e40ad1ffe03106baf732f9d9c83dfb051ed160dda365e21319b2fc |
+| Machine-readable status / metrics | [round12_model_status.json](../../benchmark/representative/round12_model_status.json), [round12_performance.csv](../../benchmark/representative/round12_performance.csv) |
 
-Work was performed in a clean isolated worktree at the reviewed SHA. The user's main worktree, its untracked novas.conf/novas.rc, main R250, and other worktrees were left untouched. Round 12 adds no RTL and carries no private PDK or license configuration.
+Work ran in an isolated worktree. main R250 and the user's other worktrees were not modified. No private PDK, license data, SRAM model, or generated simulation database is included in the repository.
 
 ## Phase 0 — 262,144-MAC CNN Top execution
 
-### Workload contract and offline result
+### Workload contract
 
-The deterministic workload is a two-layer pointwise INT8 CNN fixture:
+The fixed-seed workload has input shape [1,16,32,16] (512 spatial positions, 16 channels), two 1×1 Conv layers (16→16), and 262,144 useful INT8 MACs per inference. Weights are deterministic random inference weights, **not trained**; no classification accuracy is claimed. The Top path is 0x30 GEMM → 0x36 REQUANT_I8 → 0x30 GEMM → 0x36 REQUANT_I8. There is no Host intermediate compute or Im2col.
 
-- Input [1,16,32,16], represented as 512 spatial positions × 16 channels.
-- Layer 1: 1x1 Conv, 16→16, INT32 accumulation, ReLU/clamp.
-- Layer 2: 1x1 Conv, 16→16, INT32 accumulation, ReLU/clamp.
-- Useful work: 2 × 512 × 16 × 16 = 262,144 MAC/inference.
-- Weights are fixed-seed reproducible inference weights, **not trained**. It has no classification-accuracy claim.
-- Top command chain: 0x30 GEMM → 0x36 Requant → 0x30 GEMM → 0x36 Requant; no Host intermediate compute or Im2col.
-- The image uses 90,944 bytes for preload records; its highest used address is 0x19240 (102,976 bytes), within the 128 KiB candidate. This is static image/address accounting, not measured SRAM traffic or capacity characterization.
-
-The generator and independent verifier passed twice with the same seed. The verifier independently decodes the physical Matrix A/B layouts, checks the four descriptor records and dependencies, recomputes INT32 matrix outputs and packed INT8 tensors, and compares 20,480 intermediate/final words.
+The first generated version incorrectly encoded ordinary GEMM word6 as scalar K=16, although this ABI field counts packed four-element K groups; the corrected descriptor encodes K-group count 4. The first Golden also assumed ReLU, but opcode 0x36 implements arithmetic shift and signed INT8 saturation only. The final workload therefore explicitly has **no activation**, preserving the specified hardware contract rather than changing RTL or relaxing the Golden. Both fixes are documented in the generator and independent verifier.
 
 | Artifact | SHA-256 |
 |---|---|
-| Input | f8514ef62fc2e83230d533ea2c82afb18a8d2b71e7324886679fd814e99561ea |
+| Input tensor | f8514ef62fc2e83230d533ea2c82afb18a8d2b71e7324886679fd814e99561ea |
 | Layer 1 weights | b780646f65d0247b5972c9125073988315d6ea4c2fe073ea4c1aa63a569b9d89 |
 | Layer 2 weights | b37e120ac1afbc15ffc67c4ddc2f94368901ef0eca8f0120ae2cba6eb846efa0 |
-| Expected output tensor | 22cb785cff0275f5cc4bba995800d65350231373effc4723734370b3f4860d5f |
-| SPAD image | ed38edf71c161d44ddbadf2178aa203f51a09d9122a4e4bff7a6bef1f486d4c1 |
-| Intermediate/final Golden image | 9e094fda9315fb86e39d20c084015772aaa21eb1bd1fbeb49d8ee72a59833b9d |
+| Final output tensor | 6f81ea743327c2b7daa5d4e11e8e2e88848398b99bfaca97d170c570ccc3170e |
 
-### Top result and performance status
+### Top result
 
-The exact Make target was run twice; the final bounded retry captured a combined log. Workload generation and offline Golden passed, then VCS reported Cannot connect to the license server and Failed to obtain license before source compilation. No simv was produced and no simulation began. No alternative compatible simulator (verilator, iverilog, xrun, or vsim) is installed in this environment.
+| Metric | Result | Boundary / note |
+|---|---:|---|
+| Top compile | PASS | 31 modules, 0 errors; one non-functional LOOP-REROLL-ENABLED warning; KDB elaboration reported 0 errors and 0 warnings |
+| CMDQ descriptors / completions | 4 / 4 PASS | All four completion task IDs and success statuses checked |
+| Independent intermediate/final Golden | PASS | 20,480 words checked after CMDQ completion |
+| Command cycles | 61,310 | Doorbell through final completion; includes engine, dispatch, and retirement time |
+| Host SPAD preload | 136,415 cycles; 90,944 bytes | Measured AXI writes before command issue; not DMA |
+| Load + command subtotal | 197,725 cycles | Excludes CSR setup, poison verification/readback, and software generation; do not label full E2E |
+| Useful MAC / command cycle | 4.2757 | Recomputed from 262,144 / 61,310; TB was corrected to retain fractional division |
+| Matrix MAC-active cycles | 1,024 | Active-cycle counter from Top profile |
+| Active-array utilization | 100.00% | Derived as 262,144 / (256 × 1,024); active-cycle utilization, not whole-command utilization |
+| Matrix request wait / response wait | 16 / 202 cycles | Exclusive Matrix profile buckets |
+| Matrix writeback / other | 4,096 / 2,620 cycles | Exclusive Matrix profile buckets |
+| SFU busy | 53,252 cycles | Two packed requant commands; each command reads 8,192 INT32 values and writes 2,048 packed words |
+| No-engine dispatch/control remainder | 100 cycles | Exclusive profile bucket |
+| SPAD read / write traffic | 98,304 / 81,920 bytes | Top-observed engine accesses during command window; preload AXI bytes are separate |
+| DMA/compute overlap | 0 cycles | This workload does not use DMA for its initial image preload |
 
-| Requirement | Status | Evidence |
-|---|---|---|
-| Four descriptor fields and static 128 KiB address fit | PASS_STATIC | Independent workload verifier; high-water 0x19240 |
-| Independent intermediate/final software Golden | PASS_OFFLINE | 4 tensors, 20,480 checked words; SHA above |
-| Top compilation / four completions / Top Golden | BLOCKED_ENV | VCS license checkout failure before compile |
-| Command and Matrix cycles | NOT_RUN | No simulation |
-| Matrix active/wait and utilization | NOT_RUN | No simulation |
-| SPAD read/write traffic and preload cycles | NOT_RUN | Preload image bytes are static; not measured traffic |
-| Fused/layout/overlap ablation | NOT_RUN | Phase 1 requires a successful Top Golden first |
+The exclusive command profile closes exactly: 1,024 + 16 + 202 + 4,096 + 2,620 + 53,252 + 100 = 61,310. mac_per_cycle in the final VCS log is 4.2757; an earlier passing run printed a truncated integer and was superseded by the final run above.
 
-The descriptor validator accepts ordinary Matrix M,N when nonzero and multiples of four; the Matrix controller iterates M in 16-row tiles. Thus M=512,N=16,K=16 is representable by the ordinary GEMM descriptor and the workload uses legal dimensions. This is a source-level contract review only: the descriptor chain and the M=512 execution were not compiled or exercised at Top. Round 12 does not treat this static observation as proof of hardware support.
+This model is intentionally a functional/throughput stress fixture. It is not trained and has no task accuracy. The measured command window is not full system inference latency; Host preload and software/CSR setup must be accounted separately for an end-to-end comparison.
 
-Phase 1 optimizations were correctly held because the Top Golden gate did not pass. The present workload is 1x1 pointwise convolution; a 3x3 convolution design study and any lowering/Im2col traffic measurement remain open.
+### Iteration record
+
+1. License checkout initially failed before compilation. After the user restored the VCS license, the same target compiled and ran.
+2. The first licensed run reached the TB's generic 2,000-cycle SVA watchdog. A compile define now raises only this representative target's watchdog to 200,000 cycles; the test itself retains its 2,000,000-cycle completion bound.
+3. The first functional mismatch exposed the packed-K-group descriptor bug. Correcting K to four groups made both raw INT32 GEMM tensors match.
+4. The next mismatch exposed a model/operator contract error: the workload assumed ReLU while 0x36 is signed saturation. The final workload contract was corrected to no activation; no expected values were waived.
+5. The final fixed-seed Top run passed compile, all completions, and every Golden word. No product RTL was modified.
+
+## Phase 1 — CNN optimization gate
+
+Status: NOT_RUN_BY_SCOPE. This round establishes the required valid Top baseline only. Fused requant, alternative output layout, and DMA/compute overlap ablations were not run. No speedup claim is made. A 3×3 convolution/Im2col cost study also remains open.
 
 ## Phase 2 — H=16 two-head Transformer
 
-### Shape/ABI support audit
+Current trainer and mapper remain H=4-oriented: one head, four token IDs in [0,3], and six 4×4 matrices. Two preflight probes were rejected by those existing software checks: eight-token input fails the token/model contract, and 16×16 weights fail the fixed weight-shape contract. These are mapper-support findings, not RTL failures.
 
-| Layer | Software-only restriction | Descriptor/RTL primitive | H=16 two-head chain status |
-|---|---|---|---|
-| Trainer/model export | train_transformer_micro.py accepts only output path, seed and step count; trains a four-symbol, four-token H=4 fixture with six 4x4 matrices. | No hardware restriction implied. | BLOCKED_MAPPER_SUPPORT: no H=16 trained weights or independent H=16 Golden. |
-| Q/K/V projection | Mapper requires four input token IDs in [0,3] and six 4x4 matrices. | Ordinary 0x30 Matrix allows nonzero M/N/K with M,N multiples of four and tiled execution; 8x16x16 QKV shapes fit those dimension rules. | NOT_RUN: mapper emits no H=16 descriptors; VCS unavailable for Top check. |
-| Single-token projection | Decode data and Q/K/V tensors are hard-coded to four features/rows. | 0x52 bounds M,N to 1..16, requires K>0 and aligned dense operand bases; H=16 M=1,N=16,K=16 is within stated fields. | NOT_RUN: no H=16 GEMV mapper, weight packing, or Golden check. |
-| Head split, QK, Softmax, AV, merge | No head axis or per-head address/layout allocator exists in the mapper. | Matrix can execute tile GEMM; 0x39 causal Softmax and 0x38 LayerNorm are separate primitives. | NOT_RUN: two-head split/merge and per-head tensor layout/quantization contract are not mapped. Primitive presence is not an end-to-end result. |
-| Residual, LayerNorm, FFN | H4 tensors and offsets are fixed in mapper. | LayerNorm small-vector fast path covers length <=16; ordinary GEMM handles aligned FFN shapes. | NOT_RUN: no H16 tensor addressing, descriptors, or independent per-layer Golden. |
-| KV cache, Prefill, Decode | KV command emission is fixed to one head, four features, four prefill tokens and a five-token window. | KV engine address fields support token and head indices with byte strides; this does not define the required H16 packing by itself. | NOT_RUN: no H16 head stride/address plan, Prefill/Decode queue, or cache Golden. |
-| Top workload loader | The generic Top loader accepts up to 128 descriptors and checks emitted memory-image/Golden pairs. | It can execute a supplied bounded descriptor image via CMDQ. | Loader is reusable in principle; no H16 image exists. The descriptor-count bound must be checked once mapping is implemented. |
-
-Two parser probes with synthetic identity matrices confirmed current software rejection without changing checks:
-
-1. Eight prefill IDs fail at the four-ID [0,3] model contract.
-2. Four IDs with 16x16 weights fail at the required 4x4 weight shape.
-
-These are mapper-contract diagnostics only. They are not trained-model or Top failures and do not show that the RTL arithmetic primitive itself rejects 16-wide GEMM.
-
-### Gate disposition
-
-| Gate | Status | Round 12 result |
+| Gate | Status | Evidence / reason |
 |---|---|---|
-| G1 — reproducible H=16 training/export, shape validation, independent software Golden | BLOCKED_MAPPER_SUPPORT | Existing trainer/export is H4-only; no H16 artifact generated. |
-| G2 — Q/K/V GEMM descriptor and Top Golden | NOT_RUN | Source dimension fields are representable, but the H16 mapper and Top run are absent. |
-| G3 — head split, QK, Softmax, AV and merge | NOT_RUN | No multi-head layout/address mapping or Golden. |
-| G4 — Residual, LayerNorm and FFN | NOT_RUN | No H16 descriptor/tensor chain or Golden. |
-| G5 — KV-cache, Prefill and single-token Decode | NOT_RUN | No H16 cache layout or Top execution. |
+| G1 — train/export H=16, shape validation, independent Golden | BLOCKED_MAPPER_SUPPORT | No H=16 model/weight export or software Golden exists |
+| G2 — Q/K/V GEMM descriptors + Top Golden | NOT_RUN | No H=16 mapping/descriptors generated |
+| G3 — two-head split, QK, Softmax, AV, merge | NOT_RUN | No head layout/address mapping or tensor Golden |
+| G4 — Residual, LayerNorm, FFN | NOT_RUN | No H=16 descriptor/tensor chain |
+| G5 — KV-cache, Prefill, single-token Decode | NOT_RUN | No H=16 cache strides/layout or Top execution |
 
-No H=16 Prefill/Decode latency, accuracy, useful MAC, GEMM/GEMV benefit, cache effect, or SPAD traffic is available. H4 history remains separate: Round 11 reports a previously checked 86-descriptor H4 fixture; it is not Round 12 H16 evidence.
+Probe logs were run at the reviewed starting SHA 28cd86e0c18d62e4ce6cfb14a2f43967cdce0d4d: /tmp/nmaforge_r12_h16_probe8.log (SHA-256 b3938bff16541c9ddb713185da2b755cb8ddb5f9da12914c679a2ccaecc8e3b5) and /tmp/nmaforge_r12_h16_probe4.log (SHA-256 1136c20820b437c82e2120c29ed55f799f58c63a7973f2b8d58fa74cee569a38). H=16 Prefill/Decode cycles, accuracy, MAC/cycle, GEMV benefit, cache/prefetch effect, and SPAD traffic are unavailable. Historical H=4 evidence is not H=16 evidence.
 
-## Commands and reproduction
+## Reproduction
 
-Executed from the clean Round 12 source SHA:
+From repository root, with an authorized VCS license active:
 
     make -C dv/subsystem/top_smoke/sim ai_representative_cnn \
-      AI_REPRESENTATIVE_RUN=/tmp/nmaforge_r12_cnn_128k_20261108_retry2 \
-      AI_REPRESENTATIVE_PYTHON=python3.12 AI_REPRESENTATIVE_SEED=20261108
+      AI_REPRESENTATIVE_RUN=/tmp/nmaforge_r12_cnn_128k_20261108_signedoff \
+      AI_REPRESENTATIVE_PYTHON=python3.12 \
+      AI_REPRESENTATIVE_SEED=20261108
 
-This target ran these software steps before VCS checkout failed:
+The command used AI_SPAD_WORDS_PER_BANK=8192 (128 KiB total, four banks), VCS -full64 -sverilog -debug_access+all -kdb, and the repository Top smoke file list. Offline generation and checking are also run by the Make target:
 
     python3.12 benchmark/representative/generate_pointwise_cnn_workload.py \
-      --seed 20261108 --out-dir /tmp/nmaforge_r12_cnn_128k_20261108_retry2/workload
+      --seed 20261108 --out-dir /tmp/nmaforge_r12_cnn_128k_20261108_signedoff/workload
     python3.12 benchmark/representative/verify_pointwise_cnn_workload.py \
-      --workload-dir /tmp/nmaforge_r12_cnn_128k_20261108_retry2/workload
+      --workload-dir /tmp/nmaforge_r12_cnn_128k_20261108_signedoff/workload
 
-The diagnostics were:
+## Decision
 
-    python3.12 sw/tools/cimforge_mapper.py \
-      --model-json /tmp/nmaforge_r12_h16_probe8.json \
-      --svh /tmp/nmaforge_r12_h16_probe8.svh \
-      --manifest /tmp/nmaforge_r12_h16_probe8_manifest.json
-    python3.12 sw/tools/cimforge_mapper.py \
-      --model-json /tmp/nmaforge_r12_h16_probe4.json \
-      --svh /tmp/nmaforge_r12_h16_probe4.svh \
-      --manifest /tmp/nmaforge_r12_h16_probe4_manifest.json
-
-Both probes intentionally use synthetic 16x16 identity matrices and stop at existing mapper validation. They are not an H16 mapping implementation.
-
-## Decision and remaining work
-
-Round 12 status is PARTIAL; the requested representative-model baseline is not ready to claim. There is no Round 12 product RTL change. The CNN's offline Golden is useful for replay when VCS license service is available, but Top PASS and all simulated performance metrics remain open. The H16 path requires parameterizing training/model schema, tensor/head address allocation, matrix and SFU descriptors, KV strides/cache lifetime, independent software Golden, and the representative Top image generation before its five gates can be tested.
-
-The next actionable items are limited to the unmet Round 12 gates: restore a working authorized VCS checkout and rerun the fixed CNN; implement/test an H16 shape-aware model/export/mapper path, then run G1–G5 in order. Until those exist, no representative CNN optimization, H16 GEMV speedup, or two-innovation model-level benefit is demonstrated. This report records the stopping point for this round and does not claim v2 sign-off or full Transformer inference.
+Round 12 remains PARTIAL: the representative CNN functional/measurement baseline is reproducible and passes Top RTL, while the H=16 model path is blocked before descriptor generation. No CNN optimization ablation, H=16 Transformer inference, ASIC PPA, or v2 sign-off is claimed. Preserve the passing H=4/other historical evidence separately; do not extrapolate it to H=16.

@@ -1,7 +1,14 @@
 `timescale 1ns / 1ps
 
 module ai_accel_sva #(
+`ifdef AI_REPRESENTATIVE_LONG_TASK
+    // Representative large-M workloads legitimately exceed the short smoke
+    // watchdog. Keep the same bounded completion check with a workload-sized
+    // limit; the representative TB also has its own finite 2M-cycle timeout.
+    parameter integer MAX_TASK_CYCLES = 200000,
+`else
     parameter integer MAX_TASK_CYCLES = 2000,
+`endif
     parameter integer M_AXI_ADDR_WIDTH = 64
 )(
     input wire        clk,

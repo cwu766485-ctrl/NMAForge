@@ -593,6 +593,7 @@ ai_representative_cnn:
 	$(AI_REPRESENTATIVE_PYTHON) ../../../../benchmark/representative/verify_pointwise_cnn_workload.py \
 		--workload-dir "$(AI_REPRESENTATIVE_RUN)/workload"
 	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK \
 		+define+AI_SPAD_WORDS_PER_BANK=$(AI_REPRESENTATIVE_SPAD_WORDS_PER_BANK) \
 		+incdir+../../../block/control/agent \
 		+incdir+../../../block/dma/agent \
