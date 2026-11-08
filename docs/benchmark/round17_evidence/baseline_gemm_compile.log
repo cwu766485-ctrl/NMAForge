@@ -1,0 +1,153 @@
+Command: vcs -full64 -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps \
++define+VCS +define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=8192 \
++incdir+../../../block/control/agent +incdir+../../../block/dma/agent +incdir+../fixtures \
+-Mdir=/tmp/nmaforge_r17_profile_gemm/csrc -top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+../tb/tb_ai_accel_smoke.sv -o /tmp/nmaforge_r17_profile_gemm/simv -l /tmp/nmaforge_r17_profile_gemm/compile.log \
+
+                         Chronologic VCS (TM)
+       Version V-2023.12-SP1_Full64 -- Sun Nov  8 23:50:23 2026
+
+                    Copyright (c) 1991 - 2024 Synopsys, Inc.
+   This software and the associated documentation are proprietary to Synopsys,
+ Inc. This software may only be used in accordance with the terms and conditions
+ of a written license agreement with Synopsys, Inc. All other use, reproduction,
+   or distribution of this software is strictly prohibited.  Licensed Products
+     communicate with Synopsys servers for the purpose of providing software
+    updates, detecting software piracy and verifying that customers are using
+    Licensed Products in conformity with the applicable License Key for such
+  Licensed Products. Synopsys will use information gathered in connection with
+    this process to deliver software updates and pursue software pirates and
+                                   infringers.
+
+ Inclusivity & Diversity - Visit SolvNetPlus to read the "Synopsys Statement on
+            Inclusivity and Diversity" (Refer to article 000036315 at
+                        https://solvnetplus.synopsys.com)
+
+Parsing design file '../../../../rtl/control/axi_lite/axi_lite_reg_if.v'
+Parsing design file '../../../../rtl/control/cdc/ai_async_fifo.v'
+Parsing design file '../../../../rtl/control/cdc/ai_ctrl_compute_cdc.v'
+Parsing design file '../../../../rtl/control/cdc/ai_accel_dual_clock_shell.v'
+Parsing design file '../../../../rtl/control/cdc/ai_cdc_event_buffer.v'
+Parsing design file '../../../../rtl/control/cdc/ai_accel_dual_clock_command_path.v'
+Parsing design file '../../../../rtl/dma/ai_dma_burst_planner.v'
+Parsing design file '../../../../rtl/dma/ai_dma_read_slot_tracker.v'
+Parsing design file '../../../../rtl/dma/ai_dma_write_response_tracker.v'
+Parsing design file '../../../../rtl/dma/ai_dma_spad_transfer_adapter.v'
+Parsing design file '../../../../rtl/dma/ai_axi128_dma.v'
+Parsing design file '../../../../rtl/memory/ai_spad_protection.v'
+Parsing design file '../../../../rtl/memory/ai_spad_arbiter.v'
+Parsing design file '../../../../rtl/compute/pipeline/ai_tile_pipeline.v'
+Parsing design file '../../../../rtl/control/queue/ai_perf_monitor.v'
+Parsing design file '../../../../rtl/control/descriptor/ai_accel_opcode_decode.v'
+Parsing design file '../../../../rtl/control/descriptor/ai_descriptor_validator.v'
+Parsing design file '../../../../rtl/control/queue/ai_ring_pointer_next.v'
+Parsing design file '../../../../rtl/control/queue/ai_command_processor.v'
+Parsing design file '../../../../rtl/control/queue/ai_parallel_compute_dispatcher.v'
+Parsing design file '../../../../rtl/compute/cnm/ai_bank_pe.v'
+Parsing design file '../../../../rtl/compute/cnm/ai_bank_local_controller.v'
+Parsing design file '../../../../rtl/compute/cnm/ai_banked_cnm_core.v'
+Parsing design file '../../../../rtl/compute/common/ai_unsigned_divider.v'
+Parsing design file '../../../../rtl/compute/common/ai_integer_sqrt.v'
+Parsing design file '../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v'
+Parsing design file '../../../../rtl/compute/matrix/ai_tensor_matrix_core.v'
+Parsing design file '../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv'
+Parsing design file '../../../../rtl/compute/sfu/ai_tensor_sfu_math.v'
+Parsing design file '../../../../rtl/compute/sfu/ai_tensor_sfu_core.v'
+Parsing design file '../../../../rtl/compute/cnn/ai_conv3x3_linebuffer_core.v'
+Parsing design file '../../../../rtl/compute/kv/ai_kv_cache_engine.v'
+Parsing design file '../../../../rtl/memory/ai_scratchpad.v'
+Parsing design file '../../../../rtl/control/descriptor/ai_desc_fetch.v'
+Parsing design file '../../../../rtl/control/descriptor/axi_desc_fetch.v'
+Parsing design file '../../../../rtl/control/queue/ai_completion_writer.v'
+Parsing design file '../../../../rtl/control/axi_lite/ai_accel_regs.v'
+Parsing design file '../../../../rtl/compute/int8/ai_int8_datapath.v'
+Parsing design file '../../../../rtl/compute/fp/ai_bf16_mul_fp32.v'
+Parsing design file '../../../../rtl/compute/fp/ai_fp16_mul_fp32.v'
+Parsing design file '../../../../rtl/compute/fp/ai_fp32_add.v'
+Parsing design file '../../../../rtl/compute/fp/ai_fp32_accumulator.v'
+Parsing design file '../../../../rtl/compute/fp/ai_mixed_precision_dot_fp32_core.v'
+Parsing design file '../../../../rtl/compute/fp/ai_bf16_dot_fp32_core.v'
+Parsing design file '../../../../rtl/compute/fp/ai_fp16_bf16_addsub.v'
+Parsing design file '../../../../rtl/compute/int8/ai_int8_compute_core.v'
+Parsing design file '../../../../rtl/top/fabric/axi/ai_descriptor_source_mux.v'
+Parsing design file '../../../../rtl/top/fabric/axi/ai_accel_dma_request_mux.v'
+Parsing design file '../../../../rtl/top/fabric/axi/ai_accel_axi_master_router.v'
+Parsing design file '../../../../rtl/top/fabric/axi/ai_accel_axi_fabric.v'
+Parsing design file '../../../../rtl/top/fabric/memory/ai_spad_response_demux.v'
+Parsing design file '../../../../rtl/top/fabric/memory/ai_accel_spad_subsystem.v'
+Parsing design file '../../../../rtl/top/fabric/memory/ai_accel_memory_fabric.v'
+Parsing design file '../../../../rtl/top/fabric/control/ai_accel_control_fabric.v'
+Parsing design file '../../../../rtl/top/fabric/compute/ai_accel_compute_cluster.v'
+Parsing design file '../../../../rtl/top/fabric/compute/ai_compute_spad_mux.v'
+Parsing design file '../../../../rtl/top/ai_accel_top.v'
+Parsing design file '../env/ai_accel_sva.sv'
+Parsing design file '../../../block/dma/env/axi_memory_model.sv'
+Parsing design file '../tb/tb_ai_accel_smoke.sv'
+Parsing included file '../../../block/control/agent/axi_lite_tasks.svh'.
+Back to file '../tb/tb_ai_accel_smoke.sv'.
+Parsing included file '../../../block/dma/agent/ai_dma_tasks.svh'.
+Back to file '../tb/tb_ai_accel_smoke.sv'.
+Parsing included file '../fixtures/ai_transformer_workload.svh'.
+Back to file '../tb/tb_ai_accel_smoke.sv'.
+Top Level Modules:
+       tb_ai_accel_smoke
+TimeScale is 1 ns / 1 ps
+
+Warning-[LOOP-REROLL-ENABLED] Loop reroll optimization is enabled
+../fixtures/ai_transformer_workload.svh, 10
+  It will affect line debug capacity for this block.
+  Please add switch -Xrerolloff if you want to preserve line debug capacity 
+  for this block.
+
+Starting vcs inline pass...
+
+31 modules and 0 UDP read.
+recompiling module ai_axi128_dma
+recompiling module ai_spad_protection
+recompiling module ai_spad_arbiter
+recompiling module ai_perf_monitor
+recompiling module ai_accel_opcode_decode
+recompiling module ai_descriptor_validator
+recompiling module ai_parallel_compute_dispatcher
+recompiling module ai_bank_local_controller
+recompiling module ai_banked_cnm_core
+recompiling module ai_tensor_matrix_core
+recompiling module ai_tensor_matrix_array
+recompiling module ai_tensor_sfu_math
+recompiling module ai_conv3x3_linebuffer_core
+recompiling module ai_kv_cache_engine
+recompiling module ai_desc_fetch
+recompiling module axi_desc_fetch
+recompiling module ai_completion_writer
+recompiling module ai_accel_regs
+recompiling module ai_mixed_precision_dot_fp32_core
+recompiling module ai_int8_compute_core
+recompiling module ai_descriptor_source_mux
+recompiling module ai_accel_dma_request_mux
+recompiling module ai_accel_axi_fabric
+recompiling module ai_spad_response_demux
+recompiling module ai_accel_control_fabric
+recompiling module ai_accel_compute_cluster
+recompiling module ai_accel_top
+recompiling module ai_accel_sva
+recompiling module ai_compute_activity_sva
+recompiling module axi_memory_model
+recompiling module tb_ai_accel_smoke
+All of 31 modules done
+make[1]: Entering directory '/tmp/nmaforge_r17_profile_gemm/csrc'
+rm -f _cuarc*.so _csrc*.so pre_vcsobj_*.so share_vcsobj_*.so
+if [ -x /tmp/nmaforge_r17_profile_gemm/simv ]; then chmod a-x /tmp/nmaforge_r17_profile_gemm/simv; \
+fi
+g++  -o /tmp/nmaforge_r17_profile_gemm/simv      -rdynamic  -Wl,-rpath='$ORIGIN'/simv.daidir \
+-Wl,-rpath=./simv.daidir -Wl,-rpath=/opt/Synopsys/vcs/V-2023.12-SP1/linux64/lib -L/opt/Synopsys/vcs/V-2023.12-SP1/linux64/lib \
+-Wl,-rpath-link=./  /usr/lib64/libnuma.so.1   objs/amcQw_d.o   _135177_archive_1.so \
+SIM_l.o      rmapats_mop.o rmapats.o rmar.o rmar_nd.o  rmar_llvm_0_1.o rmar_llvm_0_0.o \
+-lvirsim -lerrorinf -lsnpsmalloc -lvfs    -lvcsnew -lsimprofile -lreader_common /opt/Synopsys/vcs/V-2023.12-SP1/linux64/lib/libBA.a \
+-luclinative /opt/Synopsys/vcs/V-2023.12-SP1/linux64/lib/vcs_tls.o   -Wl,-whole-archive \
+-lvcsucli    -Wl,-no-whole-archive        _vcs_pli_stub_.o   /opt/Synopsys/vcs/V-2023.12-SP1/linux64/lib/vcs_save_restore_new.o \
+/opt/Synopsys/verdi/V-2023.12-SP2/share/PLI/VCS/LINUX64/pli.a -ldl  -lc -lm -lpthread \
+-ldl 
+/tmp/nmaforge_r17_profile_gemm/simv up to date
+make[1]: Leaving directory '/tmp/nmaforge_r17_profile_gemm/csrc'
+CPU time: 3.560 seconds to compile + .286 seconds to elab + .252 seconds to link
+Verdi KDB elaboration done and the database successfully generated: 0 error(s), 0 warning(s)

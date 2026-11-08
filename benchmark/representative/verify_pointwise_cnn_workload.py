@@ -107,6 +107,10 @@ def main():
             (0x7102, 0x30, RAW1, 0x0D100, RAW2, M, C, C // 4, 0x00, 2, 1),
             (0x7103, 0x36, RAW2, 0, OUTPUT, 0, 0, M * C, 0x10, 1, 0),
         ],
+        "both_linearized": [
+            (0x7100, 0x53, INPUT, W1, ACT1, M, C, C // 4, 0x00, 0, 1),
+            (0x7101, 0x53, ACT1, W2, OUTPUT, M, C, C // 4, 0x00, 1, 0),
+        ],
     }
     if mode not in command_specs:
         raise ValueError("unknown fusion mode: " + str(mode))
@@ -120,6 +124,9 @@ def main():
                   cmd[14] & 0xFFFF, cmd[14] >> 16)
         if actual != spec:
             raise ValueError("descriptor contract mismatch at index %d: %r" % (index, actual))
+        expected_aux0 = 0x80 if mode == "both_linearized" and index == 1 else 0
+        if cmd[8] != expected_aux0:
+            raise ValueError("descriptor aux0 mismatch at index %d" % index)
         if cmd[9] != 0:
             raise ValueError("descriptor activation mismatch at index %d" % index)
         if cmd[13] != 0x00010001 or cmd[15] != ((wait << 16) | 7):
@@ -166,7 +173,7 @@ def main():
         recomputed[ACT1 + 4 * index] = value
     for index, row in enumerate(raw2):
         for col, value in enumerate(row):
-            if mode == "both":
+            if mode in ("both", "both_linearized"):
                 physical_value = POISON
             elif mode == "both_convert":
                 physical_value = output[index][col] & 0xFFFFFFFF

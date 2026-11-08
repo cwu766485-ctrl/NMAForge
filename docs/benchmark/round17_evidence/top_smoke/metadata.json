@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "run_id": "nmaforge_r17_ai_smoke_s1717",
+  "tested_source_sha": "7f6fd2a40ef939a7df3a488e04df8ff89ae039e3",
+  "seed": 1717,
+  "vcs": "V-2023.12-SP1_Full64",
+  "python": "3.12.13",
+  "command": "cd dv/subsystem/top_smoke/sim && make ai_smoke AI_RANDOM_CASES=20 AI_SEED=1717 SEED=1717",
+  "result": "TEST PASS. Existing GEMV, fused tile-forward, product and protocol smoke markers passed. This is a focused integration smoke, not complete DV sign-off."
+}

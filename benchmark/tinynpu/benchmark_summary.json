@@ -1,9 +1,9 @@
 {
-  "run_id": "R6-TINY-COMPARISON-S20261106",
-  "nmaforge_source_sha": "54033ffd3a28378e867947e99598e79d2060fb9d",
+  "run_id": "NMAFORGE-R17-FULL-TINY-S20261117",
+  "nmaforge_source_sha": "84148b9abf35aa82d12e058814e260784d76d554",
   "nmaforge_matrix_rtl_basis": "same Matrix product RTL as audited candidate 9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9",
   "tinynpu_source_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
-  "seed": "20261106",
+  "seed": "20261117",
   "tools": {
     "vcs": "V-2023.12-SP1_Full64",
     "verilator": "Verilator 5.052 2026-09-05 rev v5.052",
@@ -23,32 +23,32 @@
     "cases": [
       {
         "shape": "16x16x16",
-        "nmaforge_cycles": 173,
+        "nmaforge_cycles": 174,
         "nmaforge_spad_read_bytes": 512,
         "nmaforge_spad_write_bytes": 1024,
         "tinynpu_direct_array_cycles": 52,
         "tinynpu_normalized_cycles": 151,
-        "nmaforge_over_tinynpu_normalized_ratio": 1.1457,
+        "nmaforge_over_tinynpu_normalized_ratio": 1.1523,
         "comparison": "normalized model ratio only; TinyNPU uses serialized memory service with the common 16-byte/cycle, one-cycle-response model"
       },
       {
         "shape": "16x16x32",
-        "nmaforge_cycles": 259,
+        "nmaforge_cycles": 248,
         "nmaforge_spad_read_bytes": 1024,
         "nmaforge_spad_write_bytes": 1024,
         "tinynpu_direct_array_cycles": 100,
         "tinynpu_normalized_cycles": 231,
-        "nmaforge_over_tinynpu_normalized_ratio": 1.1212,
+        "nmaforge_over_tinynpu_normalized_ratio": 1.0736,
         "comparison": "normalized model ratio only; TinyNPU uses serialized memory service with the common 16-byte/cycle, one-cycle-response model"
       },
       {
         "shape": "32x32x64",
-        "nmaforge_cycles": 1380,
+        "nmaforge_cycles": 1390,
         "nmaforge_spad_read_bytes": 6144,
         "nmaforge_spad_write_bytes": 4096,
         "tinynpu_direct_array_cycles": 790,
         "tinynpu_normalized_cycles": 1305,
-        "nmaforge_over_tinynpu_normalized_ratio": 1.0575,
+        "nmaforge_over_tinynpu_normalized_ratio": 1.0651,
         "comparison": "normalized model ratio only; TinyNPU uses serialized memory service with the common 16-byte/cycle, one-cycle-response model"
       }
     ],
@@ -67,7 +67,7 @@
         "shape": "16x16x16",
         "common_spad_bandwidth_bytes_per_cycle": 16,
         "common_spad_read_latency_cycles": 1,
-        "nmaforge_measured_cycles": 173,
+        "nmaforge_measured_cycles": 174,
         "nmaforge_measured_spad_read_bytes": 512,
         "nmaforge_measured_spad_write_bytes": 1024,
         "tinynpu_array_rtl_cycles": 52,
@@ -76,7 +76,7 @@
         "tinynpu_modeled_read_service_cycles": 33,
         "tinynpu_modeled_write_service_cycles": 64,
         "tinynpu_normalized_cycles": 151,
-        "nmaforge_over_tinynpu_normalized_ratio": 1.1457,
+        "nmaforge_over_tinynpu_normalized_ratio": 1.1523,
         "golden": "PASS on both designs",
         "boundary_note": "NMAForge endpoint is real Matrix controller + behavioral SPAD; TinyNPU endpoint adds a serialized bandwidth/latency model around the measured RTL array because upstream exposes no SPAD port"
       },
@@ -84,7 +84,7 @@
         "shape": "16x16x32",
         "common_spad_bandwidth_bytes_per_cycle": 16,
         "common_spad_read_latency_cycles": 1,
-        "nmaforge_measured_cycles": 259,
+        "nmaforge_measured_cycles": 248,
         "nmaforge_measured_spad_read_bytes": 1024,
         "nmaforge_measured_spad_write_bytes": 1024,
         "tinynpu_array_rtl_cycles": 100,
@@ -93,7 +93,7 @@
         "tinynpu_modeled_read_service_cycles": 65,
         "tinynpu_modeled_write_service_cycles": 64,
         "tinynpu_normalized_cycles": 231,
-        "nmaforge_over_tinynpu_normalized_ratio": 1.1212,
+        "nmaforge_over_tinynpu_normalized_ratio": 1.0736,
         "golden": "PASS on both designs",
         "boundary_note": "NMAForge endpoint is real Matrix controller + behavioral SPAD; TinyNPU endpoint adds a serialized bandwidth/latency model around the measured RTL array because upstream exposes no SPAD port"
       },
@@ -101,7 +101,7 @@
         "shape": "32x32x64",
         "common_spad_bandwidth_bytes_per_cycle": 16,
         "common_spad_read_latency_cycles": 1,
-        "nmaforge_measured_cycles": 1380,
+        "nmaforge_measured_cycles": 1390,
         "nmaforge_measured_spad_read_bytes": 6144,
         "nmaforge_measured_spad_write_bytes": 4096,
         "tinynpu_array_rtl_cycles": 790,
@@ -110,7 +110,7 @@
         "tinynpu_modeled_read_service_cycles": 257,
         "tinynpu_modeled_write_service_cycles": 256,
         "tinynpu_normalized_cycles": 1305,
-        "nmaforge_over_tinynpu_normalized_ratio": 1.0575,
+        "nmaforge_over_tinynpu_normalized_ratio": 1.0651,
         "golden": "PASS on both designs",
         "boundary_note": "NMAForge endpoint is real Matrix controller + behavioral SPAD; TinyNPU endpoint adds a serialized bandwidth/latency model around the measured RTL array because upstream exposes no SPAD port"
       }

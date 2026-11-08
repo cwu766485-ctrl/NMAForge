@@ -149,6 +149,11 @@ module ai_tensor_sfu_core(
     wire [31:0] src0_addr = src0_r + ({16'd0,index_r}<<2);
     wire [31:0] src1_addr = src1_r + ({16'd0,index_r}<<2);
     wire [31:0] beta_addr = beta_base_r + ({16'd0,index_r}<<2);
+    // For a 16-element LayerNorm vector, the contract's two truncating
+    // divisions by N=16 are exactly magnitude shifts. The signed mean is
+    // restored after truncation toward zero; the nonnegative variance uses
+    // floor division. Other vector lengths keep the iterative divider path.
+    wire [63:0] ln_sum_magnitude = sum_x_r[63] ? (~sum_x_r + 64'd1) : sum_x_r;
     wire packed_requant = (op_r == OP_REQUANT_I8) && pack_enable_r;
     wire [31:0] pack_tile_word_index = pack_tile_group_base_r +
         ({16'd0,pack_k_group_r} << 2) + {30'd0,pack_row_r[1:0]};
@@ -389,8 +394,13 @@ module ai_tensor_sfu_core(
                     end
                 end
                 ST_RMS_MEAN_DIV_START: begin
-                    div_dividend_r<=sum_sq_r; div_divisor_r<={48'd0,length_r};
-                    div_start_r<=1; state_r<=ST_RMS_MEAN_DIV_WAIT;
+                    if (is_layernorm && length_r == 16) begin
+                        mean_sq_r <= sum_sq_r >> 4;
+                        state_r <= ST_RMS_SQRT_START;
+                    end else begin
+                        div_dividend_r<=sum_sq_r; div_divisor_r<={48'd0,length_r};
+                        div_start_r<=1; state_r<=ST_RMS_MEAN_DIV_WAIT;
+                    end
                 end
                 ST_RMS_MEAN_DIV_WAIT: if (div_done) begin
                     if (div_error) begin error_code<=ERR_NUMERIC; state_r<=ST_ERROR; end
@@ -590,9 +600,23 @@ module ai_tensor_sfu_core(
                     end
                 end
                 ST_LN_MEAN_START: begin
-                    div_dividend_r<=sum_x_r[63] ? -sum_x_r : sum_x_r;
-                    div_divisor_r<={48'd0,length_r}; div_start_r<=1;
-                    state_r<=ST_LN_MEAN_WAIT;
+                    if (length_r == 16) begin
+                        if (ln_sum_magnitude[63:4] > 60'd2147483648) begin
+                            error_code <= ERR_NUMERIC;
+                            state_r <= ST_ERROR;
+                        end else begin
+                            mean_r <= sum_x_r[63] ?
+                                -$signed({1'b0, ln_sum_magnitude[35:4]}) :
+                                 $signed({1'b0, ln_sum_magnitude[35:4]});
+                            sum_sq_r <= 0;
+                            index_r <= 0;
+                            state_r <= ST_LN_VAR_REQ;
+                        end
+                    end else begin
+                        div_dividend_r<=sum_x_r[63] ? -sum_x_r : sum_x_r;
+                        div_divisor_r<={48'd0,length_r}; div_start_r<=1;
+                        state_r<=ST_LN_MEAN_WAIT;
+                    end
                 end
                 ST_LN_MEAN_WAIT: if (div_done) begin
                     if (div_error || div_quotient>64'h0000_0000_8000_0000) begin

@@ -178,12 +178,17 @@ def validate_fused_tile_fields(descriptor: Descriptor) -> None:
             f"{descriptor.name}: fused Matrix aux0 must fit eight bits"
         )
     if linearized and (
-        capture or consume or descriptor.n != 4 or descriptor.m > 64
+        capture or consume or
+        not (descriptor.m >= 4 and
+             ((descriptor.n == 4 and descriptor.m <= 64) or
+             (descriptor.n == 16 and descriptor.m <= 512))
+             )
         or descriptor.m % 4 or descriptor.dst_stride != 0
         or (descriptor.flags & (FLAG_TRANSPOSE_A | FLAG_TRANSPOSE_B))
     ):
         raise ValueError(
-            f"{descriptor.name}: linear row layout requires M=4..64, N=4, "
+            f"{descriptor.name}: linear row layout requires M=4..64,N=4 or "
+            "M=4..512,N=16, "
             "one dense instance and no transpose/forwarding flags"
         )
     if descriptor.dst & 0xF or descriptor.dst_stride & 0xF:

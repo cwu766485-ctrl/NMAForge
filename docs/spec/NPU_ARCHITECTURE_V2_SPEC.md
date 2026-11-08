@@ -220,22 +220,23 @@ validity epoch.
 
 ### 3.2 Bounded linear-row output layout
 
-`0x53 aux0[7]` optionally writes one 128-bit SPAD line per output row for
-small producer-to-GEMM handoffs. The low 32 bits contain the row's four
-requantized INT8 columns; the upper 96 bits are zero. The accepted contract is
-`M` in 4..64 and divisible by four, `N=4`, one instance, no transpose, no
-forwarding capture/consume bits, a 16-byte aligned destination, and zero
-destination batch stride. The producer still uses the shared Matrix array,
-normal SPAD arbiter, and the `0x53` post-process/requant equations. This layout
-is not a general tensor reshape engine and is not coherent with other engines.
+`0x53 aux0[7]` optionally writes a 128-bit SPAD line per output row for
+bounded producer-to-consumer handoffs. For `N=4`, the low 32 bits contain the
+row's four requantized INT8 columns and the upper 96 bits are zero. For `N=16`,
+all 16 bytes contain one row, packed in increasing column order. The accepted
+contracts are either `M=4..64,N=4` or `M=4..512,N=16`, with `M` divisible by
+four, one instance, no transpose, no forwarding capture/consume bits, a
+16-byte aligned destination, and zero destination batch stride. The producer
+still uses the shared Matrix array, normal SPAD arbiter, and the `0x53`
+post-process/requant equations. This layout is not a general tensor reshape
+engine and is not coherent with other engines.
 
-This mode is useful when the next GEMM consumes one four-byte feature vector
-per 16-byte K line with three padded row words. It trades compact output
-storage for direct consumer-ready addressing. Software must allocate the full
-`M*16` byte destination and keep the legacy `aux0[7]=0` layout for all existing
-descriptors. The mode is intended for measured producer/consumer chains such
-as the four-channel CNN handoff; it does not change the output layout of any
-existing `0x53` command.
+For `N=4`, this mode is useful when the next GEMM consumes one four-byte
+feature vector per 16-byte K line with three padded row words. For `N=16`, it
+provides a compact row-major packed INT8 result. Software must allocate the
+full `M*16` byte destination and keep the legacy `aux0[7]=0` layout for all
+existing descriptors. It does not change the output layout of any existing
+`0x53` command.
 
 This is a bounded, explicitly ordered Matrix-to-Matrix handoff, not a coherent
 SPAD cache. Software must keep the tagged source tile immutable between the

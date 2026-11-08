@@ -1,0 +1,502 @@
+Command: /tmp/nmaforge_r17_profile_gemm/simv +ntb_random_seed=20261117 +AI_RANDOM_CASES=0 +AI_SEED=20261117 +ACLK_PERIOD_NS=10.0 +AI_H16_INCREMENTAL_DECODE +AI_H16_INCREMENTAL_DIR=/tmp/nmaforge_r17_profile_gemm/workload -l /tmp/nmaforge_r17_profile_gemm/run.log
+Chronologic VCS simulator copyright 1991-2023
+Contains Synopsys proprietary information.
+Compiler version V-2023.12-SP1_Full64; Runtime version V-2023.12-SP1_Full64;  Nov  8 23:50 2026
+R9_SFU_COMMAND index=0 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=1 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=2 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=3 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=4 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=5 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R17_STAGE_OVERLAP stage=prefill_kv_0_3 cycles=0
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=0 task_id=29184 opcode=0x30 cycles=120
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=1 task_id=29185 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=2 task_id=29186 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=3 task_id=29187 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=4 task_id=29188 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=5 task_id=29189 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=6 task_id=29190 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=7 task_id=29191 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=8 task_id=29192 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=9 task_id=29193 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=10 task_id=29194 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=11 task_id=29195 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=12 task_id=29196 opcode=0x43 cycles=19
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=13 task_id=29197 opcode=0x43 cycles=52
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=14 task_id=29198 opcode=0x43 cycles=87
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=15 task_id=29199 opcode=0x43 cycles=19
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=16 task_id=29200 opcode=0x43 cycles=52
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=17 task_id=29201 opcode=0x43 cycles=87
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=18 task_id=29202 opcode=0x43 cycles=19
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=19 task_id=29203 opcode=0x43 cycles=52
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=20 task_id=29204 opcode=0x43 cycles=87
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=21 task_id=29205 opcode=0x43 cycles=19
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=22 task_id=29206 opcode=0x43 cycles=52
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=23 task_id=29207 opcode=0x43 cycles=87
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=24 task_id=29208 opcode=0x43 cycles=19
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=25 task_id=29209 opcode=0x43 cycles=52
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=26 task_id=29210 opcode=0x43 cycles=87
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=27 task_id=29211 opcode=0x43 cycles=19
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=28 task_id=29212 opcode=0x43 cycles=52
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=29 task_id=29213 opcode=0x43 cycles=87
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=30 task_id=29214 opcode=0x43 cycles=19
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=31 task_id=29215 opcode=0x43 cycles=52
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=32 task_id=29216 opcode=0x43 cycles=87
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=33 task_id=29217 opcode=0x43 cycles=19
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=34 task_id=29218 opcode=0x43 cycles=52
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=35 task_id=29219 opcode=0x43 cycles=87
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=36 task_id=29220 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=37 task_id=29221 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=38 task_id=29222 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=prefill_kv_0_3 local_index=39 task_id=29223 opcode=0x44 cycles=76
+R17_MATRIX_COMMAND stage=prefill_kv_0_3 index=0 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=prefill_kv_0_3 index=1 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=prefill_kv_0_3 index=2 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=prefill_kv_0_3 index=3 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=prefill_kv_0_3 index=4 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=prefill_kv_0_3 index=5 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_KV_COMMAND stage=prefill_kv_0_3 index=0 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=prefill_kv_0_3 index=1 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=prefill_kv_0_3 index=2 cycles=43 read_bytes=40 write_bytes=32
+R17_KV_COMMAND stage=prefill_kv_0_3 index=3 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=prefill_kv_0_3 index=4 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=prefill_kv_0_3 index=5 cycles=43 read_bytes=40 write_bytes=32
+R17_KV_COMMAND stage=prefill_kv_0_3 index=6 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=prefill_kv_0_3 index=7 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=prefill_kv_0_3 index=8 cycles=43 read_bytes=40 write_bytes=32
+R17_KV_COMMAND stage=prefill_kv_0_3 index=9 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=prefill_kv_0_3 index=10 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=prefill_kv_0_3 index=11 cycles=43 read_bytes=40 write_bytes=32
+R17_KV_COMMAND stage=prefill_kv_0_3 index=12 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=prefill_kv_0_3 index=13 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=prefill_kv_0_3 index=14 cycles=43 read_bytes=40 write_bytes=32
+R17_KV_COMMAND stage=prefill_kv_0_3 index=15 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=prefill_kv_0_3 index=16 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=prefill_kv_0_3 index=17 cycles=43 read_bytes=40 write_bytes=32
+R17_KV_COMMAND stage=prefill_kv_0_3 index=18 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=prefill_kv_0_3 index=19 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=prefill_kv_0_3 index=20 cycles=43 read_bytes=40 write_bytes=32
+R17_KV_COMMAND stage=prefill_kv_0_3 index=21 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=prefill_kv_0_3 index=22 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=prefill_kv_0_3 index=23 cycles=43 read_bytes=40 write_bytes=32
+R17_KV_COMMAND stage=prefill_kv_0_3 index=24 cycles=71 read_bytes=64 write_bytes=64
+R17_KV_COMMAND stage=prefill_kv_0_3 index=25 cycles=71 read_bytes=64 write_bytes=64
+R17_KV_COMMAND stage=prefill_kv_0_3 index=26 cycles=71 read_bytes=64 write_bytes=64
+R17_KV_COMMAND stage=prefill_kv_0_3 index=27 cycles=65 read_bytes=64 write_bytes=64
+INCREMENTAL_H16_STAGE_PASS stage=prefill_kv_0_3 index=0 desc=40 golden_words=368 useful_macs=3072 cycles=2734 matrix_mac=96 matrix_wait=6 matrix_rsp_wait=24 matrix_writeback=60 matrix_other=132 sfu=642 kv=718 dma_overlap=0 spad_read_bytes=2560 spad_write_bytes=1536 mac_per_cycle=1.1236 array_utilization_pct=12.50 observed=/tmp/nmaforge_r17_profile_gemm/workload/stage_0_prefill_kv_0_3_observed.memh
+R9_SFU_COMMAND index=6 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=7 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=8 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=9 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=10 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=11 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=12 opcode=0x39 length=8 cycles=267 pass0=25 pass1=24 pass2=217 math=0 other=1 spad_request_stall=1 spad_response_wait=24 spad_read_accepts=24 spad_write_accepts=8 divider_busy=170 sqrt_busy=0 cycles_closed=267
+R9_SFU_COMMAND index=13 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=14 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=15 opcode=0x39 length=8 cycles=267 pass0=25 pass1=24 pass2=217 math=0 other=1 spad_request_stall=1 spad_response_wait=24 spad_read_accepts=24 spad_write_accepts=8 divider_busy=170 sqrt_busy=0 cycles_closed=267
+R9_SFU_COMMAND index=16 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=17 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=18 opcode=0x34 length=64 cycles=519 pass0=0 pass1=0 pass2=0 math=0 other=519 spad_request_stall=6 spad_response_wait=128 spad_read_accepts=128 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=519
+R9_SFU_COMMAND index=19 opcode=0x34 length=64 cycles=519 pass0=0 pass1=0 pass2=0 math=0 other=519 spad_request_stall=6 spad_response_wait=128 spad_read_accepts=128 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=519
+R9_SFU_COMMAND index=20 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=21 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=22 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=23 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=24 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=25 opcode=0x35 length=64 cycles=387 pass0=0 pass1=0 pass2=0 math=0 other=387 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=387
+R9_SFU_COMMAND index=26 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=27 opcode=0x34 length=64 cycles=519 pass0=0 pass1=0 pass2=0 math=0 other=519 spad_request_stall=6 spad_response_wait=128 spad_read_accepts=128 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=519
+R9_SFU_COMMAND index=28 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=29 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=30 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=31 opcode=0x38 length=16 cycles=493 pass0=48 pass1=48 pass2=160 math=236 other=1 spad_request_stall=0 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=493
+R17_STAGE_OVERLAP stage=decode_t4 cycles=0
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=0 task_id=29440 opcode=0x30 cycles=120
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=1 task_id=29441 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=2 task_id=29442 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=3 task_id=29443 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=4 task_id=29444 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=5 task_id=29445 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=6 task_id=29446 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=7 task_id=29447 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=8 task_id=29448 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=9 task_id=29449 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=10 task_id=29450 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=11 task_id=29451 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=12 task_id=29452 opcode=0x43 cycles=19
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=13 task_id=29453 opcode=0x43 cycles=52
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=14 task_id=29454 opcode=0x43 cycles=87
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=15 task_id=29455 opcode=0x43 cycles=19
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=16 task_id=29456 opcode=0x43 cycles=52
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=17 task_id=29457 opcode=0x43 cycles=87
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=18 task_id=29458 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=19 task_id=29459 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=20 task_id=29460 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=21 task_id=29461 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=22 task_id=29462 opcode=0x30 cycles=49
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=23 task_id=29463 opcode=0x39 cycles=281
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=24 task_id=29464 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=25 task_id=29465 opcode=0x30 cycles=49
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=26 task_id=29466 opcode=0x36 cycles=121
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=27 task_id=29467 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=28 task_id=29468 opcode=0x30 cycles=49
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=29 task_id=29469 opcode=0x39 cycles=281
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=30 task_id=29470 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=31 task_id=29471 opcode=0x30 cycles=49
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=32 task_id=29472 opcode=0x36 cycles=121
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=33 task_id=29473 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=34 task_id=29474 opcode=0x34 cycles=530
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=35 task_id=29475 opcode=0x34 cycles=530
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=36 task_id=29476 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=37 task_id=29477 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=38 task_id=29478 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=39 task_id=29479 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=40 task_id=29480 opcode=0x36 cycles=222
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=41 task_id=29481 opcode=0x30 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=42 task_id=29482 opcode=0x35 cycles=398
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=43 task_id=29483 opcode=0x36 cycles=222
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=44 task_id=29484 opcode=0x30 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=45 task_id=29485 opcode=0x34 cycles=530
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=46 task_id=29486 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=47 task_id=29487 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=48 task_id=29488 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t4 local_index=49 task_id=29489 opcode=0x38 cycles=504
+R17_MATRIX_COMMAND stage=decode_t4 index=0 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t4 index=1 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t4 index=2 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t4 index=3 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t4 index=4 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t4 index=5 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t4 index=6 cycles=37 mac=8 request_wait=1 response_wait=2 writeback=12 other=14 read_bytes=96 write_bytes=128 exclusive_closed=37
+R17_MATRIX_COMMAND stage=decode_t4 index=7 cycles=37 mac=8 request_wait=1 response_wait=2 writeback=12 other=14 read_bytes=96 write_bytes=128 exclusive_closed=37
+R17_MATRIX_COMMAND stage=decode_t4 index=8 cycles=53 mac=8 request_wait=3 response_wait=3 writeback=22 other=17 read_bytes=160 write_bytes=256 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t4 index=9 cycles=37 mac=8 request_wait=1 response_wait=2 writeback=12 other=14 read_bytes=96 write_bytes=128 exclusive_closed=37
+R17_MATRIX_COMMAND stage=decode_t4 index=10 cycles=37 mac=8 request_wait=1 response_wait=2 writeback=12 other=14 read_bytes=96 write_bytes=128 exclusive_closed=37
+R17_MATRIX_COMMAND stage=decode_t4 index=11 cycles=53 mac=8 request_wait=3 response_wait=3 writeback=22 other=17 read_bytes=160 write_bytes=256 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t4 index=12 cycles=71 mac=16 request_wait=5 response_wait=7 writeback=16 other=27 read_bytes=320 write_bytes=256 exclusive_closed=71
+R17_MATRIX_COMMAND stage=decode_t4 index=13 cycles=71 mac=16 request_wait=5 response_wait=7 writeback=16 other=27 read_bytes=320 write_bytes=256 exclusive_closed=71
+R17_KV_COMMAND stage=decode_t4 index=0 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=decode_t4 index=1 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=decode_t4 index=2 cycles=43 read_bytes=40 write_bytes=32
+R17_KV_COMMAND stage=decode_t4 index=3 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=decode_t4 index=4 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=decode_t4 index=5 cycles=43 read_bytes=40 write_bytes=32
+R17_KV_COMMAND stage=decode_t4 index=6 cycles=71 read_bytes=64 write_bytes=64
+R17_KV_COMMAND stage=decode_t4 index=7 cycles=71 read_bytes=64 write_bytes=64
+R17_KV_COMMAND stage=decode_t4 index=8 cycles=71 read_bytes=64 write_bytes=64
+R17_KV_COMMAND stage=decode_t4 index=9 cycles=71 read_bytes=64 write_bytes=64
+INCREMENTAL_H16_STAGE_PASS stage=decode_t4 index=1 desc=50 golden_words=1216 useful_macs=1696 cycles=9791 matrix_mac=176 matrix_wait=26 matrix_rsp_wait=52 matrix_writeback=184 matrix_other=276 sfu=7921 kv=394 dma_overlap=0 spad_read_bytes=8160 spad_write_bytes=4688 mac_per_cycle=0.1732 array_utilization_pct=3.76 observed=/tmp/nmaforge_r17_profile_gemm/workload/stage_1_decode_t4_observed.memh
+R9_SFU_COMMAND index=32 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=33 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=34 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=35 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=36 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=37 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=38 opcode=0x39 length=8 cycles=304 pass0=25 pass1=24 pass2=254 math=0 other=1 spad_request_stall=1 spad_response_wait=24 spad_read_accepts=24 spad_write_accepts=8 divider_busy=204 sqrt_busy=0 cycles_closed=304
+R9_SFU_COMMAND index=39 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=40 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=41 opcode=0x39 length=8 cycles=304 pass0=25 pass1=24 pass2=254 math=0 other=1 spad_request_stall=1 spad_response_wait=24 spad_read_accepts=24 spad_write_accepts=8 divider_busy=204 sqrt_busy=0 cycles_closed=304
+R9_SFU_COMMAND index=42 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=43 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=44 opcode=0x34 length=64 cycles=519 pass0=0 pass1=0 pass2=0 math=0 other=519 spad_request_stall=6 spad_response_wait=128 spad_read_accepts=128 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=519
+R9_SFU_COMMAND index=45 opcode=0x34 length=64 cycles=519 pass0=0 pass1=0 pass2=0 math=0 other=519 spad_request_stall=6 spad_response_wait=128 spad_read_accepts=128 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=519
+R9_SFU_COMMAND index=46 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=47 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=48 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=49 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=50 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=51 opcode=0x35 length=64 cycles=387 pass0=0 pass1=0 pass2=0 math=0 other=387 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=387
+R9_SFU_COMMAND index=52 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=53 opcode=0x34 length=64 cycles=519 pass0=0 pass1=0 pass2=0 math=0 other=519 spad_request_stall=6 spad_response_wait=128 spad_read_accepts=128 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=519
+R9_SFU_COMMAND index=54 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=55 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=56 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=57 opcode=0x38 length=16 cycles=493 pass0=48 pass1=48 pass2=160 math=236 other=1 spad_request_stall=0 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=493
+R17_STAGE_OVERLAP stage=decode_t5 cycles=0
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=0 task_id=29696 opcode=0x30 cycles=120
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=1 task_id=29697 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=2 task_id=29698 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=3 task_id=29699 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=4 task_id=29700 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=5 task_id=29701 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=6 task_id=29702 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=7 task_id=29703 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=8 task_id=29704 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=9 task_id=29705 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=10 task_id=29706 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=11 task_id=29707 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=12 task_id=29708 opcode=0x43 cycles=19
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=13 task_id=29709 opcode=0x43 cycles=52
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=14 task_id=29710 opcode=0x43 cycles=87
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=15 task_id=29711 opcode=0x43 cycles=19
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=16 task_id=29712 opcode=0x43 cycles=52
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=17 task_id=29713 opcode=0x43 cycles=87
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=18 task_id=29714 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=19 task_id=29715 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=20 task_id=29716 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=21 task_id=29717 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=22 task_id=29718 opcode=0x30 cycles=49
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=23 task_id=29719 opcode=0x39 cycles=318
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=24 task_id=29720 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=25 task_id=29721 opcode=0x30 cycles=49
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=26 task_id=29722 opcode=0x36 cycles=121
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=27 task_id=29723 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=28 task_id=29724 opcode=0x30 cycles=49
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=29 task_id=29725 opcode=0x39 cycles=318
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=30 task_id=29726 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=31 task_id=29727 opcode=0x30 cycles=49
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=32 task_id=29728 opcode=0x36 cycles=121
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=33 task_id=29729 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=34 task_id=29730 opcode=0x34 cycles=530
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=35 task_id=29731 opcode=0x34 cycles=530
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=36 task_id=29732 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=37 task_id=29733 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=38 task_id=29734 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=39 task_id=29735 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=40 task_id=29736 opcode=0x36 cycles=222
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=41 task_id=29737 opcode=0x30 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=42 task_id=29738 opcode=0x35 cycles=398
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=43 task_id=29739 opcode=0x36 cycles=222
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=44 task_id=29740 opcode=0x30 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=45 task_id=29741 opcode=0x34 cycles=530
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=46 task_id=29742 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=47 task_id=29743 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=48 task_id=29744 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t5 local_index=49 task_id=29745 opcode=0x38 cycles=504
+R17_MATRIX_COMMAND stage=decode_t5 index=0 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t5 index=1 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t5 index=2 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t5 index=3 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t5 index=4 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t5 index=5 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t5 index=6 cycles=37 mac=8 request_wait=1 response_wait=2 writeback=12 other=14 read_bytes=96 write_bytes=128 exclusive_closed=37
+R17_MATRIX_COMMAND stage=decode_t5 index=7 cycles=37 mac=8 request_wait=1 response_wait=2 writeback=12 other=14 read_bytes=96 write_bytes=128 exclusive_closed=37
+R17_MATRIX_COMMAND stage=decode_t5 index=8 cycles=53 mac=8 request_wait=3 response_wait=3 writeback=22 other=17 read_bytes=160 write_bytes=256 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t5 index=9 cycles=37 mac=8 request_wait=1 response_wait=2 writeback=12 other=14 read_bytes=96 write_bytes=128 exclusive_closed=37
+R17_MATRIX_COMMAND stage=decode_t5 index=10 cycles=37 mac=8 request_wait=1 response_wait=2 writeback=12 other=14 read_bytes=96 write_bytes=128 exclusive_closed=37
+R17_MATRIX_COMMAND stage=decode_t5 index=11 cycles=53 mac=8 request_wait=3 response_wait=3 writeback=22 other=17 read_bytes=160 write_bytes=256 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t5 index=12 cycles=71 mac=16 request_wait=5 response_wait=7 writeback=16 other=27 read_bytes=320 write_bytes=256 exclusive_closed=71
+R17_MATRIX_COMMAND stage=decode_t5 index=13 cycles=71 mac=16 request_wait=5 response_wait=7 writeback=16 other=27 read_bytes=320 write_bytes=256 exclusive_closed=71
+R17_KV_COMMAND stage=decode_t5 index=0 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=decode_t5 index=1 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=decode_t5 index=2 cycles=43 read_bytes=40 write_bytes=32
+R17_KV_COMMAND stage=decode_t5 index=3 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=decode_t5 index=4 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=decode_t5 index=5 cycles=43 read_bytes=40 write_bytes=32
+R17_KV_COMMAND stage=decode_t5 index=6 cycles=71 read_bytes=64 write_bytes=64
+R17_KV_COMMAND stage=decode_t5 index=7 cycles=71 read_bytes=64 write_bytes=64
+R17_KV_COMMAND stage=decode_t5 index=8 cycles=71 read_bytes=64 write_bytes=64
+R17_KV_COMMAND stage=decode_t5 index=9 cycles=71 read_bytes=64 write_bytes=64
+INCREMENTAL_H16_STAGE_PASS stage=decode_t5 index=2 desc=50 golden_words=1216 useful_macs=1728 cycles=9865 matrix_mac=176 matrix_wait=26 matrix_rsp_wait=52 matrix_writeback=184 matrix_other=276 sfu=7995 kv=394 dma_overlap=0 spad_read_bytes=8160 spad_write_bytes=4688 mac_per_cycle=0.1752 array_utilization_pct=3.84 observed=/tmp/nmaforge_r17_profile_gemm/workload/stage_2_decode_t5_observed.memh
+R9_SFU_COMMAND index=58 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=59 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=60 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=61 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=62 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=63 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=64 opcode=0x39 length=8 cycles=341 pass0=25 pass1=24 pass2=291 math=0 other=1 spad_request_stall=1 spad_response_wait=24 spad_read_accepts=24 spad_write_accepts=8 divider_busy=238 sqrt_busy=0 cycles_closed=341
+R9_SFU_COMMAND index=65 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=66 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=67 opcode=0x39 length=8 cycles=341 pass0=25 pass1=24 pass2=291 math=0 other=1 spad_request_stall=1 spad_response_wait=24 spad_read_accepts=24 spad_write_accepts=8 divider_busy=238 sqrt_busy=0 cycles_closed=341
+R9_SFU_COMMAND index=68 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=69 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=70 opcode=0x34 length=64 cycles=519 pass0=0 pass1=0 pass2=0 math=0 other=519 spad_request_stall=6 spad_response_wait=128 spad_read_accepts=128 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=519
+R9_SFU_COMMAND index=71 opcode=0x34 length=64 cycles=519 pass0=0 pass1=0 pass2=0 math=0 other=519 spad_request_stall=6 spad_response_wait=128 spad_read_accepts=128 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=519
+R9_SFU_COMMAND index=72 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=73 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=74 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=75 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=76 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=77 opcode=0x35 length=64 cycles=387 pass0=0 pass1=0 pass2=0 math=0 other=387 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=387
+R9_SFU_COMMAND index=78 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=79 opcode=0x34 length=64 cycles=519 pass0=0 pass1=0 pass2=0 math=0 other=519 spad_request_stall=6 spad_response_wait=128 spad_read_accepts=128 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=519
+R9_SFU_COMMAND index=80 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=81 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=82 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=83 opcode=0x38 length=16 cycles=493 pass0=48 pass1=48 pass2=160 math=236 other=1 spad_request_stall=0 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=493
+R17_STAGE_OVERLAP stage=decode_t6 cycles=0
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=0 task_id=29952 opcode=0x30 cycles=120
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=1 task_id=29953 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=2 task_id=29954 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=3 task_id=29955 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=4 task_id=29956 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=5 task_id=29957 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=6 task_id=29958 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=7 task_id=29959 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=8 task_id=29960 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=9 task_id=29961 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=10 task_id=29962 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=11 task_id=29963 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=12 task_id=29964 opcode=0x43 cycles=19
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=13 task_id=29965 opcode=0x43 cycles=52
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=14 task_id=29966 opcode=0x43 cycles=87
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=15 task_id=29967 opcode=0x43 cycles=19
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=16 task_id=29968 opcode=0x43 cycles=52
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=17 task_id=29969 opcode=0x43 cycles=87
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=18 task_id=29970 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=19 task_id=29971 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=20 task_id=29972 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=21 task_id=29973 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=22 task_id=29974 opcode=0x30 cycles=49
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=23 task_id=29975 opcode=0x39 cycles=355
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=24 task_id=29976 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=25 task_id=29977 opcode=0x30 cycles=49
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=26 task_id=29978 opcode=0x36 cycles=121
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=27 task_id=29979 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=28 task_id=29980 opcode=0x30 cycles=49
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=29 task_id=29981 opcode=0x39 cycles=355
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=30 task_id=29982 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=31 task_id=29983 opcode=0x30 cycles=49
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=32 task_id=29984 opcode=0x36 cycles=121
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=33 task_id=29985 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=34 task_id=29986 opcode=0x34 cycles=530
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=35 task_id=29987 opcode=0x34 cycles=530
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=36 task_id=29988 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=37 task_id=29989 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=38 task_id=29990 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=39 task_id=29991 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=40 task_id=29992 opcode=0x36 cycles=222
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=41 task_id=29993 opcode=0x30 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=42 task_id=29994 opcode=0x35 cycles=398
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=43 task_id=29995 opcode=0x36 cycles=222
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=44 task_id=29996 opcode=0x30 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=45 task_id=29997 opcode=0x34 cycles=530
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=46 task_id=29998 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=47 task_id=29999 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=48 task_id=30000 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t6 local_index=49 task_id=30001 opcode=0x38 cycles=504
+R17_MATRIX_COMMAND stage=decode_t6 index=0 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t6 index=1 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t6 index=2 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t6 index=3 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t6 index=4 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t6 index=5 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t6 index=6 cycles=37 mac=8 request_wait=1 response_wait=2 writeback=12 other=14 read_bytes=96 write_bytes=128 exclusive_closed=37
+R17_MATRIX_COMMAND stage=decode_t6 index=7 cycles=37 mac=8 request_wait=1 response_wait=2 writeback=12 other=14 read_bytes=96 write_bytes=128 exclusive_closed=37
+R17_MATRIX_COMMAND stage=decode_t6 index=8 cycles=53 mac=8 request_wait=3 response_wait=3 writeback=22 other=17 read_bytes=160 write_bytes=256 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t6 index=9 cycles=37 mac=8 request_wait=1 response_wait=2 writeback=12 other=14 read_bytes=96 write_bytes=128 exclusive_closed=37
+R17_MATRIX_COMMAND stage=decode_t6 index=10 cycles=37 mac=8 request_wait=1 response_wait=2 writeback=12 other=14 read_bytes=96 write_bytes=128 exclusive_closed=37
+R17_MATRIX_COMMAND stage=decode_t6 index=11 cycles=53 mac=8 request_wait=3 response_wait=3 writeback=22 other=17 read_bytes=160 write_bytes=256 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t6 index=12 cycles=71 mac=16 request_wait=5 response_wait=7 writeback=16 other=27 read_bytes=320 write_bytes=256 exclusive_closed=71
+R17_MATRIX_COMMAND stage=decode_t6 index=13 cycles=71 mac=16 request_wait=5 response_wait=7 writeback=16 other=27 read_bytes=320 write_bytes=256 exclusive_closed=71
+R17_KV_COMMAND stage=decode_t6 index=0 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=decode_t6 index=1 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=decode_t6 index=2 cycles=43 read_bytes=40 write_bytes=32
+R17_KV_COMMAND stage=decode_t6 index=3 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=decode_t6 index=4 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=decode_t6 index=5 cycles=43 read_bytes=40 write_bytes=32
+R17_KV_COMMAND stage=decode_t6 index=6 cycles=71 read_bytes=64 write_bytes=64
+R17_KV_COMMAND stage=decode_t6 index=7 cycles=71 read_bytes=64 write_bytes=64
+R17_KV_COMMAND stage=decode_t6 index=8 cycles=71 read_bytes=64 write_bytes=64
+R17_KV_COMMAND stage=decode_t6 index=9 cycles=71 read_bytes=64 write_bytes=64
+INCREMENTAL_H16_STAGE_PASS stage=decode_t6 index=3 desc=50 golden_words=1216 useful_macs=1760 cycles=9939 matrix_mac=176 matrix_wait=26 matrix_rsp_wait=52 matrix_writeback=184 matrix_other=276 sfu=8069 kv=394 dma_overlap=0 spad_read_bytes=8160 spad_write_bytes=4688 mac_per_cycle=0.1771 array_utilization_pct=3.91 observed=/tmp/nmaforge_r17_profile_gemm/workload/stage_3_decode_t6_observed.memh
+R9_SFU_COMMAND index=84 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=85 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=86 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=87 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=88 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=89 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=90 opcode=0x39 length=8 cycles=385 pass0=25 pass1=24 pass2=335 math=0 other=1 spad_request_stall=1 spad_response_wait=24 spad_read_accepts=24 spad_write_accepts=8 divider_busy=279 sqrt_busy=0 cycles_closed=385
+R9_SFU_COMMAND index=91 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=92 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=93 opcode=0x39 length=8 cycles=378 pass0=25 pass1=24 pass2=328 math=0 other=1 spad_request_stall=1 spad_response_wait=24 spad_read_accepts=24 spad_write_accepts=8 divider_busy=272 sqrt_busy=0 cycles_closed=378
+R9_SFU_COMMAND index=94 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=95 opcode=0x36 length=32 cycles=107 pass0=98 pass1=8 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=32 spad_read_accepts=32 spad_write_accepts=8 divider_busy=0 sqrt_busy=0 cycles_closed=107
+R9_SFU_COMMAND index=96 opcode=0x34 length=64 cycles=519 pass0=0 pass1=0 pass2=0 math=0 other=519 spad_request_stall=6 spad_response_wait=128 spad_read_accepts=128 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=519
+R9_SFU_COMMAND index=97 opcode=0x34 length=64 cycles=519 pass0=0 pass1=0 pass2=0 math=0 other=519 spad_request_stall=6 spad_response_wait=128 spad_read_accepts=128 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=519
+R9_SFU_COMMAND index=98 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=99 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=100 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=101 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=102 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=103 opcode=0x35 length=64 cycles=387 pass0=0 pass1=0 pass2=0 math=0 other=387 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=387
+R9_SFU_COMMAND index=104 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=105 opcode=0x34 length=64 cycles=519 pass0=0 pass1=0 pass2=0 math=0 other=519 spad_request_stall=6 spad_response_wait=128 spad_read_accepts=128 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=519
+R9_SFU_COMMAND index=106 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=107 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=108 opcode=0x38 length=16 cycles=494 pass0=49 pass1=48 pass2=160 math=236 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=494
+R9_SFU_COMMAND index=109 opcode=0x38 length=16 cycles=493 pass0=48 pass1=48 pass2=160 math=236 other=1 spad_request_stall=0 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=192 sqrt_busy=32 cycles_closed=493
+R17_STAGE_OVERLAP stage=decode_t7 cycles=0
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=0 task_id=30208 opcode=0x30 cycles=120
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=1 task_id=30209 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=2 task_id=30210 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=3 task_id=30211 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=4 task_id=30212 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=5 task_id=30213 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=6 task_id=30214 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=7 task_id=30215 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=8 task_id=30216 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=9 task_id=30217 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=10 task_id=30218 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=11 task_id=30219 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=12 task_id=30220 opcode=0x43 cycles=19
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=13 task_id=30221 opcode=0x43 cycles=52
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=14 task_id=30222 opcode=0x43 cycles=87
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=15 task_id=30223 opcode=0x43 cycles=19
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=16 task_id=30224 opcode=0x43 cycles=52
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=17 task_id=30225 opcode=0x43 cycles=87
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=18 task_id=30226 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=19 task_id=30227 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=20 task_id=30228 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=21 task_id=30229 opcode=0x44 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=22 task_id=30230 opcode=0x30 cycles=49
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=23 task_id=30231 opcode=0x39 cycles=399
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=24 task_id=30232 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=25 task_id=30233 opcode=0x30 cycles=49
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=26 task_id=30234 opcode=0x36 cycles=121
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=27 task_id=30235 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=28 task_id=30236 opcode=0x30 cycles=49
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=29 task_id=30237 opcode=0x39 cycles=392
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=30 task_id=30238 opcode=0x36 cycles=118
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=31 task_id=30239 opcode=0x30 cycles=49
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=32 task_id=30240 opcode=0x36 cycles=121
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=33 task_id=30241 opcode=0x30 cycles=64
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=34 task_id=30242 opcode=0x34 cycles=530
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=35 task_id=30243 opcode=0x34 cycles=530
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=36 task_id=30244 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=37 task_id=30245 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=38 task_id=30246 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=39 task_id=30247 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=40 task_id=30248 opcode=0x36 cycles=222
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=41 task_id=30249 opcode=0x30 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=42 task_id=30250 opcode=0x35 cycles=398
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=43 task_id=30251 opcode=0x36 cycles=222
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=44 task_id=30252 opcode=0x30 cycles=82
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=45 task_id=30253 opcode=0x34 cycles=530
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=46 task_id=30254 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=47 task_id=30255 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=48 task_id=30256 opcode=0x38 cycles=505
+R17_DESCRIPTOR_INTERVAL stage=decode_t7 local_index=49 task_id=30257 opcode=0x38 cycles=504
+R17_MATRIX_COMMAND stage=decode_t7 index=0 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t7 index=1 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t7 index=2 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t7 index=3 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t7 index=4 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t7 index=5 cycles=53 mac=16 request_wait=1 response_wait=4 writeback=10 other=22 read_bytes=192 write_bytes=128 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t7 index=6 cycles=37 mac=8 request_wait=1 response_wait=2 writeback=12 other=14 read_bytes=96 write_bytes=128 exclusive_closed=37
+R17_MATRIX_COMMAND stage=decode_t7 index=7 cycles=37 mac=8 request_wait=1 response_wait=2 writeback=12 other=14 read_bytes=96 write_bytes=128 exclusive_closed=37
+R17_MATRIX_COMMAND stage=decode_t7 index=8 cycles=53 mac=8 request_wait=3 response_wait=3 writeback=22 other=17 read_bytes=160 write_bytes=256 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t7 index=9 cycles=37 mac=8 request_wait=1 response_wait=2 writeback=12 other=14 read_bytes=96 write_bytes=128 exclusive_closed=37
+R17_MATRIX_COMMAND stage=decode_t7 index=10 cycles=37 mac=8 request_wait=1 response_wait=2 writeback=12 other=14 read_bytes=96 write_bytes=128 exclusive_closed=37
+R17_MATRIX_COMMAND stage=decode_t7 index=11 cycles=53 mac=8 request_wait=3 response_wait=3 writeback=22 other=17 read_bytes=160 write_bytes=256 exclusive_closed=53
+R17_MATRIX_COMMAND stage=decode_t7 index=12 cycles=71 mac=16 request_wait=5 response_wait=7 writeback=16 other=27 read_bytes=320 write_bytes=256 exclusive_closed=71
+R17_MATRIX_COMMAND stage=decode_t7 index=13 cycles=71 mac=16 request_wait=5 response_wait=7 writeback=16 other=27 read_bytes=320 write_bytes=256 exclusive_closed=71
+R17_KV_COMMAND stage=decode_t7 index=0 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=decode_t7 index=1 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=decode_t7 index=2 cycles=43 read_bytes=40 write_bytes=32
+R17_KV_COMMAND stage=decode_t7 index=3 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=decode_t7 index=4 cycles=6 read_bytes=4 write_bytes=4
+R17_KV_COMMAND stage=decode_t7 index=5 cycles=43 read_bytes=40 write_bytes=32
+R17_KV_COMMAND stage=decode_t7 index=6 cycles=71 read_bytes=64 write_bytes=64
+R17_KV_COMMAND stage=decode_t7 index=7 cycles=71 read_bytes=64 write_bytes=64
+R17_KV_COMMAND stage=decode_t7 index=8 cycles=71 read_bytes=64 write_bytes=64
+R17_KV_COMMAND stage=decode_t7 index=9 cycles=71 read_bytes=64 write_bytes=64
+INCREMENTAL_H16_STAGE_PASS stage=decode_t7 index=4 desc=50 golden_words=1216 useful_macs=1792 cycles=10020 matrix_mac=176 matrix_wait=26 matrix_rsp_wait=52 matrix_writeback=184 matrix_other=276 sfu=8150 kv=394 dma_overlap=0 spad_read_bytes=8160 spad_write_bytes=4688 mac_per_cycle=0.1788 array_utilization_pct=3.98 observed=/tmp/nmaforge_r17_profile_gemm/workload/stage_4_decode_t7_observed.memh
+INCREMENTAL_DECODE_PASS prefill_tokens=4 append_tokens=4 capacity=8 kv_write=0x43 kv_read=0x44 full_block_steps=4 host_supplied_tokens=1
+H16_INCREMENTAL_TOP_PASS
+$finish called from file "../tb/tb_ai_accel_smoke.sv", line 4117.
+$finish at simulation time           1951920000
+           V C S   S i m u l a t i o n   R e p o r t 
+Time: 1951920000 ps
+CPU Time:      0.990 seconds;       Data structure size:   0.9Mb
+Sun Nov  8 23:50:28 2026

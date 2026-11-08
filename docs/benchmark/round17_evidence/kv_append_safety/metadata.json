@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "run_id": "nmaforge_r17_kv_append_safety_s20261117",
+  "tested_source_sha": "d2148e3107e0f602c10abb07eb58c3e21f170d53",
+  "product_rtl_sha": "7f6fd2a40ef939a7df3a488e04df8ff89ae039e3",
+  "seed": 20261117,
+  "vcs": "V-2023.12-SP1_Full64",
+  "command": "cd dv/block/compute/cnn_kv/sim && make random-latency-test PYTHON=python3.12 SEED=20261117 OUT_DIR=/tmp/nmaforge_r17_kv_append_safety",
+  "result": "Abort after 1 accepted append feature: PASS; reset after 2 accepted features: PASS; same-position retry completes all eight features and preserves neighbor byte lanes: PASS; repeat successful append replaces same position: PASS; out-of-capacity token index rejected before SPAD request or side effect: PASS.",
+  "token_validity_contract": "KV engine has no per-token validity bitmap. Only successful descriptor Completion authorizes consumer use. On abort/reset after a partial physical write, caller retains the token position and retries before scheduling any consumer.",
+  "rtl_modified": false
+}
