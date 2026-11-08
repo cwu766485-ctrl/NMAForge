@@ -3646,8 +3646,10 @@ module tb_ai_accel_smoke;
             if (matrix_mac_cycles > 0)
                 array_utilization = 100.0 * useful_macs / (256.0 * matrix_mac_cycles);
             $display("REPRESENTATIVE_MODEL_PASS desc=%0d prefill_desc=%0d decode_desc=%0d golden_words=%0d useful_macs=%0d command_cycles=%0d prefill_command_cycles=%0d decode_command_cycles=%0d prefill_exclusive_cycles=%0d decode_exclusive_cycles=%0d exclusive_profile_cycles=%0d preload_axi_cycles=%0d preloaded_spad_bytes=%0d mac_per_cycle=%0.4f array_utilization_pct=%0.2f matrix_mac_cycles=%0d matrix_req_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d sfu_busy=%0d kv_busy=%0d conv_busy=%0d banked_busy=%0d fp_busy=%0d scalar_busy=%0d no_engine_dispatch_remainder=%0d dma_busy_overlap=%0d spad_read_bytes=%0d spad_write_bytes=%0d",
-                     descriptor_count, prefill_descriptor_count,
-                     descriptor_count - prefill_descriptor_count,
+                     descriptor_count,
+                     prefill_descriptor_count > 0 ? prefill_descriptor_count : 0,
+                     prefill_descriptor_count > 0 ?
+                         descriptor_count - prefill_descriptor_count : 0,
                      golden_count, useful_macs, command_cycles,
                      prefill_command_cycles, decode_command_cycles,
                      prefill_exclusive_cycles, decode_exclusive_cycles,
