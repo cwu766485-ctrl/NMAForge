@@ -723,3 +723,36 @@ ai_h16_transformer_top:
 		+AI_REPRESENTATIVE_PREFILL_DESC_COUNT=$$($(AI_H16_TRANSFORMER_PYTHON) -c 'import json;print(json.load(open("$(AI_H16_TRANSFORMER_RUN)/workload/manifest.json"))["prefill_descriptor_count"])') \
 		-l $(AI_H16_TRANSFORMER_RUN)/run.log
 	grep -q '^REPRESENTATIVE_MODEL_PASS ' "$(AI_H16_TRANSFORMER_RUN)/run.log"
+
+# Round 16: true H16 incremental KV append and per-token Top Golden checks.
+AI_H16_INCREMENTAL_RUN ?= /tmp/nmaforge_h16_incremental_$(shell date +%Y%m%d_%H%M%S)
+AI_H16_INCREMENTAL_PYTHON ?= python3.12
+AI_H16_INCREMENTAL_SEED ?= 20261116
+AI_H16_INCREMENTAL_POLICY ?= gemm
+.PHONY: ai_h16_incremental_decode
+ai_h16_incremental_decode:
+	test ! -e "$(AI_H16_INCREMENTAL_RUN)"
+	mkdir -p "$(AI_H16_INCREMENTAL_RUN)"
+	$(AI_H16_INCREMENTAL_PYTHON) ../../../../sw/tools/train_transformer_h16_block.py \
+		--seed "$(AI_H16_INCREMENTAL_SEED)" --out "$(AI_H16_INCREMENTAL_RUN)/model.json"
+	$(AI_H16_INCREMENTAL_PYTHON) ../../../../sw/tools/generate_h16_incremental_decode.py \
+		--model "$(AI_H16_INCREMENTAL_RUN)/model.json" \
+		--projection-policy "$(AI_H16_INCREMENTAL_POLICY)" \
+		--out "$(AI_H16_INCREMENTAL_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK \
+		+define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-Mdir=$(AI_H16_INCREMENTAL_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_H16_INCREMENTAL_RUN)/simv -l $(AI_H16_INCREMENTAL_RUN)/compile.log
+	$(AI_H16_INCREMENTAL_RUN)/simv +ntb_random_seed=$(AI_H16_INCREMENTAL_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H16_INCREMENTAL_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_H16_INCREMENTAL_DECODE \
+		+AI_H16_INCREMENTAL_DIR=$(AI_H16_INCREMENTAL_RUN)/workload \
+		-l $(AI_H16_INCREMENTAL_RUN)/run.log
+	grep -q '^INCREMENTAL_DECODE_PASS ' "$(AI_H16_INCREMENTAL_RUN)/run.log"
+	$(AI_H16_INCREMENTAL_PYTHON) ../../../../sw/tools/summarize_h16_incremental_decode.py \
+		--run-dir "$(AI_H16_INCREMENTAL_RUN)"

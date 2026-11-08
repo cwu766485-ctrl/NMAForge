@@ -69,7 +69,7 @@ module tb_ai_cnn_kv_random_latency;
   ai_kv_cache_engine kv(
     .clk(clk),.resetn(resetn),.start(kv_start),.abort(kv_abort),.op_mode(kv_op),
     .src0_base(kv_src),.dst_base(kv_dst),.length(kv_length),
-    .src0_stride(kv_stride_token),.src1_stride(kv_stride_head),.aux0(kv_aux),
+    .src0_stride(kv_stride_token),.src1_stride(kv_stride_head),.flags(8'd0),.aux0(kv_aux),
     .watchdog_limit(kv_watchdog),.spad_valid(kvv),.spad_write(kvw),.spad_addr(kva),
     .spad_wdata(kvd),.spad_ready(spad_ready),
     .spad_rsp_valid(spad_rsp_valid),.spad_rdata(spad_rdata),
