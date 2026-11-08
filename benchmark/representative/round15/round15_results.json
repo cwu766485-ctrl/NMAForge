@@ -1,0 +1,84 @@
+{
+  "round": 15,
+  "disposition": "PARTIAL",
+  "repository": "cwu766485-ctrl/NMAForge",
+  "target_branch": "feature/npu-architecture-v2",
+  "reviewed_source_sha": "feee5de020411ebbb15f5cc2af02cbd1eb8d2466",
+  "product_rtl_tree_sha": "27dba680a250779ee3d95d11381987c9b1dddc11",
+  "tinynpu_reference_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "python": "3.12.13",
+    "python_numpy": "unavailable in selected interpreter"
+  },
+  "h16_fixed_snapshot_replay": {
+    "status": "PASS_REPLAY_ONLY",
+    "run_id": "nmaforge_r15_h16_baseline_s20261115",
+    "seed": 20261114,
+    "model_sha256": "ea5d2a5bc104d5d6255183133198d0e9193b82decc2d3e35abbe772a1c486810",
+    "memory_image_sha256": "fb4ee0cec8070700ddf5cbe3aecf3a63a73dc1c5e4101971e1e8819c934b63f3",
+    "golden_sha256": "bf38ec91a2f005027ef0f66cd85255572a80f465aded936684b302dd8f9f527a",
+    "descriptors": 102,
+    "golden_words_passed": 3264,
+    "useful_macs": 15616,
+    "prefill": {"descriptors": 70, "useful_macs": 14336, "command_cycles": 21030},
+    "token7_snapshot_replay": {"descriptors": 32, "useful_macs": 1280, "command_cycles": 8578},
+    "combined_command_cycles": 29608,
+    "preload_cycles": 38087,
+    "preloaded_spad_bytes": 25392,
+    "spad_read_bytes": 22176,
+    "spad_write_bytes": 13120,
+    "sfu_busy_cycles": 26424,
+    "kv_busy_cycles": 568,
+    "matrix_mac_active_cycles": 264,
+    "useful_mac_per_command_cycle": 0.5274,
+    "array_utilization_percent": 23.11,
+    "run_log": "/tmp/nmaforge_r15_h16_baseline_s20261115/run.log",
+    "run_log_sha256": "f8d0b67212326e25d3e91c548086564081d9d1d9f5a31ffb5dd2ee7c9cc56caa",
+    "compile_log": "/tmp/nmaforge_r15_h16_baseline_s20261115/compile.log",
+    "compile_log_sha256": "6c2b4d0976468d933c7b33ee1d58cfab5c1c1f658c4581b12d634b0edc7b1908",
+    "interpretation": "One fixed replay over an already-populated KV snapshot; not incremental autoregressive Decode and not language-model quality evidence"
+  },
+  "incremental_decode": {
+    "status": "BLOCKED_ENV",
+    "required_steps": 4,
+    "completed_steps": 0,
+    "attempts": [
+      {"command": "make random-latency-test OUT_DIR=/tmp/nmaforge_r15_kv_scatter_seed20261115 SEED=20261115", "outcome": "VCS license connection failure before compile/simulation"},
+      {"command": "timeout 90s make random-latency-test OUT_DIR=/tmp/nmaforge_r15_kv_scatter_retry_s20261116 SEED=20261116", "outcome": "timeout exit 124; no simv produced"}
+    ],
+    "unverified_rtl_candidate_retained": false,
+    "note": "No KV append, cache progression, four-step output Golden, or Decode performance result"
+  },
+  "cnn_262144_mac": {
+    "status": "HISTORICAL_ROUND14_EVIDENCE",
+    "test_source_sha": "ede0ed937b49fea66483d3afc5eff1fca9bd7795",
+    "same_product_rtl_tree_as_reviewed_source": true,
+    "seed": 20261108,
+    "weights": "deterministic random INT8 inference weights; not trained",
+    "modes": [
+      {"mode": "legacy", "status": "PASS", "cmdq_cycles": 61310, "preload_cycles": 136415, "preload_plus_command_cycles": 197725, "read_bytes": 98304, "write_bytes": 81920, "golden_words": 20480},
+      {"mode": "first_layer_fused", "status": "PASS", "cmdq_cycles": 35184, "preload_cycles": 136295, "preload_plus_command_cycles": 171479, "read_bytes": 65536, "write_bytes": 49152, "golden_words": 20480, "row_major_output_compatible": true},
+      {"mode": "both_fused_native_layout", "status": "PARTIAL_LAYOUT_INCOMPATIBLE", "cmdq_cycles": 9050, "golden_words": 20480, "row_major_output_compatible": false},
+      {"mode": "both_fused_plus_conversion", "status": "PASS", "cmdq_cycles": 39686, "preload_cycles": 136799, "preload_plus_command_cycles": 176485, "read_bytes": 81920, "write_bytes": 57344, "golden_words": 20480, "row_major_output_compatible": true}
+    ],
+    "first_layer_fused_vs_legacy": {"command_cycle_reduction_percent": 42.61, "command_speedup_ratio": 1.7426, "preload_plus_command_reduction_percent": 13.27, "preload_plus_command_ratio": 1.1531},
+    "both_fused_conversion_vs_first_fused": {"command_cycle_delta": 4502, "command_slowdown_percent": 12.80, "preload_plus_command_delta": 5006, "preload_plus_command_slowdown_percent": 2.92},
+    "trained_cnn_and_3x3_conv": "NOT_RUN"
+  },
+  "tinynpu_matched_benchmark": {
+    "status": "NOT_RUN",
+    "reference_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+    "same_endpoint_run": false,
+    "cross_project_speedup_claim": false,
+    "reason": "No Round 15 same-model, same-memory-service, same-timing-boundary execution"
+  },
+  "product_rtl_changes_in_round15": false,
+  "research_claims": {
+    "true_incremental_decode": false,
+    "model_level_gemv_speedup": false,
+    "cnn_complete_output_path_below_35184_cmdq_cycles": false,
+    "tinynpu_system_level_winner": false,
+    "trained_cnn_accuracy": false
+  }
+}
