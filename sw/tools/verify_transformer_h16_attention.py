@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 
 
@@ -74,6 +75,34 @@ def transpose(matrix: list[list[int]]) -> list[list[int]]:
 def requant(matrix: list[list[int]], shift: int) -> list[list[int]]:
     return [[max(-128, min(127, value >> shift)) for value in row]
             for row in matrix]
+
+
+def layernorm_q15(values: list[int], gamma: list[int], beta: list[int]) -> list[int]:
+    total = sum(values)
+    mean = total // len(values) if total >= 0 else -((-total) // len(values))
+    variance = sum((value - mean) ** 2 for value in values) // len(values)
+    root = max(math.isqrt(variance + 1), 1)
+    reciprocal = (1 << 30) // root
+    result = []
+    for value, scale, offset in zip(values, gamma, beta):
+        scaled = ((value - mean) * scale) >> 15
+        scaled = max(-(1 << 31), min((1 << 31) - 1, scaled))
+        normalized = (scaled * reciprocal) >> 30
+        result.append(max(-(1 << 31), min((1 << 31) - 1, normalized + offset)))
+    return result
+
+
+def residual(lhs: list[int], rhs: list[int]) -> list[int]:
+    return [max(-(1 << 31), min((1 << 31) - 1, a + b))
+            for a, b in zip(lhs, rhs)]
+
+
+def gelu_q8_8(value: int) -> int:
+    if value <= -512:
+        return 0
+    if value >= 512:
+        return value
+    return (value * (value + 512)) >> 10
 
 
 def softmax_q15(scores: list[int]) -> list[int]:
@@ -273,9 +302,18 @@ def main() -> None:
         attended_i8 = requant(attended, 7)
         add_i8(expected, tensors[f"h16_attention_head{head}_av_i8"]["address"],
                attended_i8, True)
-        wo = [[0] * 16 for _ in range(8)]
-        for lane in range(8):
-            wo[lane][head * 8 + lane] = 1
+        if manifest.get("full_block"):
+            wo = [row[:] for row in weights["wo"][head * 8:(head + 1) * 8]]
+            decoded_wo = decode_b(
+                memory, tensors[f"h16_attention_head{head}_wo_identity"]["address"],
+                8, 16,
+            )
+            if decoded_wo != wo:
+                raise ValueError(f"head {head} W_o physical Matrix-B layout mismatch")
+        else:
+            wo = [[0] * 16 for _ in range(8)]
+            for lane in range(8):
+                wo[lane][head * 8 + lane] = 1
         projected = gemm(attended_i8, wo)
         add_i32(expected,
                 tensors[f"h16_attention_head{head}_wo_i32"]["address"],
@@ -286,6 +324,42 @@ def main() -> None:
 
     add_i32(expected, tensors["h16_attention_head_merge_i32"]["address"],
             merged_expected)
+
+    if manifest.get("full_block"):
+        gamma1 = model.get("gamma1_q15", [32768] * 16)
+        beta1 = model.get("beta1", [0] * 16)
+        gamma2 = model.get("gamma2_q15", [32768] * 16)
+        beta2 = model.get("beta2", [0] * 16)
+        input_i32 = [row[:] for row in token_x]
+        residual1 = [residual(a, b) for a, b in zip(merged_expected, input_i32)]
+        norm1 = [layernorm_q15(row, gamma1, beta1) for row in residual1]
+        norm1_i8 = requant(norm1, 0)
+        wup_b = decode_b(memory, tensors["h16_wup"]["address"], 16, 16)
+        wdown_b = decode_b(memory, tensors["h16_wdown"]["address"], 16, 16)
+        if wup_b != weights["wup"] or wdown_b != weights["wdown"]:
+            raise ValueError("FFN physical Matrix-B weight layout mismatch")
+        ffn_up = gemm(norm1_i8, wup_b)
+        gelu = [[gelu_q8_8(value) for value in row] for row in ffn_up]
+        gelu_i8 = requant(gelu, 0)
+        ffn_down = gemm(gelu_i8, wdown_b)
+        residual2 = [residual(a, b) for a, b in zip(ffn_down, norm1)]
+        norm2 = [layernorm_q15(row, gamma2, beta2) for row in residual2]
+        for name, matrix in (
+            ("h16_residual1_i32", residual1),
+            ("h16_layernorm1_i32", norm1),
+            ("h16_layernorm1_i8", norm1_i8),
+            ("h16_ffn_up_i32", ffn_up),
+            ("h16_ffn_gelu_i32", gelu),
+            ("h16_ffn_gelu_i8", gelu_i8),
+            ("h16_ffn_down_i32", ffn_down),
+            ("h16_residual2_i32", residual2),
+            ("h16_layernorm2_i32", norm2),
+        ):
+            tensor = tensors[name]
+            if tensor["dtype"] == "i8_packed":
+                add_i8(expected, tensor["address"], matrix, tile_a=True)
+            else:
+                add_i32(expected, tensor["address"], matrix)
     if actual != expected:
         missing = sorted(set(expected) - set(actual))
         extra = sorted(set(actual) - set(expected))

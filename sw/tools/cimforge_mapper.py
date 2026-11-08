@@ -871,8 +871,10 @@ def build_h16_qkv_top_workload(model: dict, out_dir: Path) -> dict:
     return manifest
 
 
-def build_h16_attention_top_workload(model: dict, out_dir: Path) -> dict:
-    """Map two-head H16 prefill attention, KV round-trip and head merge to Top."""
+def build_h16_attention_top_workload(
+    model: dict, out_dir: Path, *, full_block: bool = False,
+) -> dict:
+    """Map H16 attention/KV and optionally its residual/LN/FFN block to Top."""
     shape = model.get("shape", {})
     if shape != {"hidden": 16, "attention_heads": 2, "head_dim": 8,
                  "layers": 1, "sequence_length": 8, "dtype": "signed INT8"}:
@@ -888,8 +890,11 @@ def build_h16_attention_top_workload(model: dict, out_dir: Path) -> dict:
         not isinstance(row, list) or len(row) != 16 for row in embeddings
     ):
         raise ValueError("H16 embedding table must be 16x16")
-    if not isinstance(weights, dict) or set(weights) != {"wq", "wk", "wv"}:
-        raise ValueError("H16 attention model must provide exactly wq, wk, and wv")
+    qkv_weights = {"wq", "wk", "wv"}
+    full_weights = qkv_weights | {"wo", "wup", "wdown"}
+    required_weights = full_weights if full_block else qkv_weights
+    if not isinstance(weights, dict) or not required_weights.issubset(weights):
+        raise ValueError(f"H16 workload missing required weights: {sorted(required_weights)}")
     for name, matrix in weights.items():
         if not isinstance(matrix, list) or len(matrix) != 16 or any(
             not isinstance(row, list) or len(row) != 16 for row in matrix
@@ -1033,12 +1038,14 @@ def build_h16_attention_top_workload(model: dict, out_dir: Path) -> dict:
             flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=7, aux0=1,
         )
 
-        # Fixed identity blocks make the head-merge contract explicit: each
-        # head contributes to its own eight output columns, then 0x34 adds the
-        # partial projections. The learned weights in this round are Q/K/V.
-        wo = [[0] * 16 for _ in range(8)]
-        for lane in range(8):
-            wo[lane][head * 8 + lane] = 1
+        # Each head computes its W_o input panel; 0x34 adds the two partial
+        # projections. The QKV-only regression keeps its legacy identity map.
+        if full_block:
+            wo = [row[:] for row in weights["wo"][head * 8:(head + 1) * 8]]
+        else:
+            wo = [[0] * 16 for _ in range(8)]
+            for lane in range(8):
+                wo[lane][head * 8 + lane] = 1
         wo_t = mapper.tensor(
             f"h16_attention_head{head}_wo_identity", (8, 16),
             "i8_packed", "matrix_b_tile", _pack_matrix_b_physical(wo),
@@ -1065,6 +1072,108 @@ def build_h16_attention_top_workload(model: dict, out_dir: Path) -> dict:
         "h16_attention_head_merge", OP_RESIDUAL, head_projection[0], merged,
         src1=head_projection[1], k_or_length=128, aux0=1,
     )
+
+    block_tensors: dict[str, Tensor] = {}
+    if full_block:
+        gamma1_values = model.get("gamma1_q15", [32768] * 16)
+        beta1_values = model.get("beta1", [0] * 16)
+        gamma2_values = model.get("gamma2_q15", [32768] * 16)
+        beta2_values = model.get("beta2", [0] * 16)
+        for name, values in (("gamma1_q15", gamma1_values), ("beta1", beta1_values),
+                             ("gamma2_q15", gamma2_values), ("beta2", beta2_values)):
+            if (not isinstance(values, list) or len(values) != 16 or
+                    any(not isinstance(value, int) for value in values)):
+                raise ValueError(f"{name} must contain 16 integer values")
+
+        x_i32 = mapper.tensor(
+            "h16_block_input_i32", (8, 16), "i32", "row-major",
+            flatten(x_rows), initialized=True,
+        )
+        gamma1 = mapper.tensor("h16_gamma1_q15", (16,), "i32", "vector", gamma1_values)
+        beta1 = mapper.tensor("h16_beta1", (16,), "i32", "vector", beta1_values)
+        gamma2 = mapper.tensor("h16_gamma2_q15", (16,), "i32", "vector", gamma2_values)
+        beta2 = mapper.tensor("h16_beta2", (16,), "i32", "vector", beta2_values)
+
+        residual1 = mapper.tensor(
+            "h16_residual1_i32", (8, 16), "i32", "row-major",
+            [0xA55AA55A] * 128, initialized=False,
+        )
+        mapper.add("h16_residual1", OP_RESIDUAL, merged, residual1,
+                   src1=x_i32, k_or_length=128, aux0=1)
+        norm1 = mapper.tensor(
+            "h16_layernorm1_i32", (8, 16), "i32", "row-major",
+            [0xA55AA55A] * 128, initialized=False,
+        )
+        for row in range(8):
+            mapper.add(
+                f"h16_layernorm1_row{row}", OP_LAYERNORM, residual1, norm1,
+                src1=gamma1, bias=beta1, k_or_length=16, flags=FLAG_BIAS,
+                aux0=1, src0_offset=row * 64, dst_offset=row * 64,
+            )
+        norm1_i8 = mapper.tensor(
+            "h16_layernorm1_i8", (8, 16), "i8_packed", "matrix_a_tile",
+            [0xA55AA55A] * 32, initialized=False,
+        )
+        mapper.add("h16_layernorm1_requant", OP_REQUANT, norm1, norm1_i8,
+                   m=8, n=16, k_or_length=128,
+                   flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1)
+
+        wup = mapper.tensor(
+            "h16_wup", (16, 16), "i8_packed", "matrix_b_tile",
+            _pack_matrix_b_physical(weights["wup"]),
+        )
+        ffn_up = mapper.tensor(
+            "h16_ffn_up_i32", (8, 16), "i32", "row-major",
+            [0xA55AA55A] * 128, initialized=False,
+        )
+        mapper.add("h16_ffn_up", OP_GEMM, norm1_i8, ffn_up, src1=wup,
+                   m=8, n=16, k_or_length=4, aux0=1)
+        gelu = mapper.tensor(
+            "h16_ffn_gelu_i32", (8, 16), "i32", "row-major",
+            [0xA55AA55A] * 128, initialized=False,
+        )
+        mapper.add("h16_ffn_gelu", OP_GELU, ffn_up, gelu,
+                   k_or_length=128, aux0=1)
+        gelu_i8 = mapper.tensor(
+            "h16_ffn_gelu_i8", (8, 16), "i8_packed", "matrix_a_tile",
+            [0xA55AA55A] * 32, initialized=False,
+        )
+        mapper.add("h16_ffn_gelu_requant", OP_REQUANT, gelu, gelu_i8,
+                   m=8, n=16, k_or_length=128,
+                   flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1)
+        wdown = mapper.tensor(
+            "h16_wdown", (16, 16), "i8_packed", "matrix_b_tile",
+            _pack_matrix_b_physical(weights["wdown"]),
+        )
+        ffn_down = mapper.tensor(
+            "h16_ffn_down_i32", (8, 16), "i32", "row-major",
+            [0xA55AA55A] * 128, initialized=False,
+        )
+        mapper.add("h16_ffn_down", OP_GEMM, gelu_i8, ffn_down,
+                   src1=wdown, m=8, n=16, k_or_length=4, aux0=1)
+        residual2 = mapper.tensor(
+            "h16_residual2_i32", (8, 16), "i32", "row-major",
+            [0xA55AA55A] * 128, initialized=False,
+        )
+        mapper.add("h16_residual2", OP_RESIDUAL, ffn_down, residual2,
+                   src1=norm1, k_or_length=128, aux0=1)
+        norm2 = mapper.tensor(
+            "h16_layernorm2_i32", (8, 16), "i32", "row-major",
+            [0xA55AA55A] * 128, initialized=False,
+        )
+        for row in range(8):
+            mapper.add(
+                f"h16_layernorm2_row{row}", OP_LAYERNORM, residual2, norm2,
+                src1=gamma2, bias=beta2, k_or_length=16, flags=FLAG_BIAS,
+                aux0=1, src0_offset=row * 64, dst_offset=row * 64,
+            )
+        block_tensors = {
+            "input_i32": x_i32, "residual1": residual1, "layernorm1": norm1,
+            "layernorm1_i8": norm1_i8, "ffn_up": ffn_up, "gelu": gelu,
+            "gelu_i8": gelu_i8, "ffn_down": ffn_down,
+            "residual2": residual2, "layernorm2": norm2,
+        }
+
     add_completion_order_chain(mapper)
     validate_descriptor_chain(mapper)
 
@@ -1142,9 +1251,12 @@ def build_h16_attention_top_workload(model: dict, out_dir: Path) -> dict:
         add_i32_golden(attention[head], av)
         av8 = [requant_i8(row, 7) for row in av]
         add_i8_golden(attention_i8[head], av8, True)
-        wo = [[0] * 16 for _ in range(8)]
-        for lane in range(8):
-            wo[lane][head * 8 + lane] = 1
+        if full_block:
+            wo = [row[:] for row in weights["wo"][head * 8:(head + 1) * 8]]
+        else:
+            wo = [[0] * 16 for _ in range(8)]
+            for lane in range(8):
+                wo[lane][head * 8 + lane] = 1
         projected = gemm_i8_i32(av8, wo)
         head_projection_gold[head] = projected
         add_i32_golden(head_projection[head], projected)
@@ -1152,6 +1264,42 @@ def build_h16_attention_top_workload(model: dict, out_dir: Path) -> dict:
             for col in range(16):
                 merged_gold[row][col] += projected[row][col]
     add_i32_golden(merged, merged_gold)
+
+    full_block_gold: dict[str, list[list[int]]] = {}
+    if full_block:
+        input_i32 = [row[:] for row in x_rows]
+        residual1_gold = [
+            residual_i32(lhs, rhs) for lhs, rhs in zip(merged_gold, input_i32)
+        ]
+        gamma1_values = model.get("gamma1_q15", [32768] * 16)
+        beta1_values = model.get("beta1", [0] * 16)
+        norm1_gold = [layernorm_q15(row, gamma1_values, beta1_values)
+                      for row in residual1_gold]
+        norm1_i8_gold = [requant_i8(row, 0) for row in norm1_gold]
+        ffn_up_gold = gemm_i8_i32(norm1_i8_gold, weights["wup"])
+        gelu_gold = [[gelu_q8_8(value) for value in row] for row in ffn_up_gold]
+        gelu_i8_gold = [requant_i8(row, 0) for row in gelu_gold]
+        ffn_down_gold = gemm_i8_i32(gelu_i8_gold, weights["wdown"])
+        residual2_gold = [
+            residual_i32(lhs, rhs) for lhs, rhs in zip(ffn_down_gold, norm1_gold)
+        ]
+        gamma2_values = model.get("gamma2_q15", [32768] * 16)
+        beta2_values = model.get("beta2", [0] * 16)
+        norm2_gold = [layernorm_q15(row, gamma2_values, beta2_values)
+                      for row in residual2_gold]
+        full_block_gold = {
+            "residual1": residual1_gold,
+            "layernorm1": norm1_gold, "layernorm1_i8": norm1_i8_gold,
+            "ffn_up": ffn_up_gold, "gelu": gelu_gold,
+            "gelu_i8": gelu_i8_gold, "ffn_down": ffn_down_gold,
+            "residual2": residual2_gold, "layernorm2": norm2_gold,
+        }
+        for name, matrix in full_block_gold.items():
+            tensor = block_tensors[name]
+            if tensor.dtype == "i8_packed":
+                add_i8_golden(tensor, matrix, True)
+            else:
+                add_i32_golden(tensor, matrix)
 
     descriptor_base = align(mapper.next_addr, 0x1000)
     completion_base = align(descriptor_base + len(mapper.descriptors) * 64, 0x1000)
@@ -1196,13 +1344,21 @@ def build_h16_attention_top_workload(model: dict, out_dir: Path) -> dict:
         })
     manifest = {
         "model_name": model.get("model_name"),
-        "model_scope": "trained QKV projections + RTL two-head causal attention/KV round-trip; not a full Transformer block",
+        "model_scope": (
+            "trained QKV + two-head causal attention/KV round-trip + residual/LN/FFN prefill block"
+            if full_block else
+            "trained QKV projections + RTL two-head causal attention/KV round-trip; not a full Transformer block"
+        ),
         "shape": shape, "seed": model.get("seed"),
         "descriptor_base": descriptor_base, "completion_base": completion_base,
         "descriptor_count": len(mapper.descriptors),
         "runtime_ordering": "single ABI event-bit completion chain; each descriptor waits for and clears the preceding descriptor's ordered-retirement event",
-        "useful_macs": 3 * 8 * 16 * 16 + 2 * 8 * 8 * 8 + 2 * 8 * 8 * 8 + 2 * 8 * 8 * 16,
+        "useful_macs": (3 * 8 * 16 * 16 + 2 * 8 * 8 * 8 + 2 * 8 * 8 * 8 +
+                        2 * 8 * 8 * 16 + (2 * 8 * 16 * 16 if full_block else 0)),
         "head_count": 2, "head_dim": 8, "sequence_length": 8,
+        "full_block": full_block,
+        "prefill_gate": ("G4 residual + LayerNorm + FFN + residual + LayerNorm"
+                         if full_block else "G3 two-head attention + KV prefill/readback"),
         "head_merge": "two fixed block-identity output projections, added by opcode 0x34",
         "host_fallback": ["model input/weight generation and software Golden only; no intermediate activation is host-computed at runtime"],
         "descriptor_contract": descriptor_contract,
@@ -1539,6 +1695,10 @@ def main() -> None:
         help="export H=16/two-head causal attention + KV round-trip Top workload",
     )
     parser.add_argument(
+        "--h16-transformer-top-dir", type=Path,
+        help="export H=16/two-head attention + residual/LN/FFN prefill Top workload",
+    )
+    parser.add_argument(
         "--decode-mapping-policy", choices=("gemm", "gemv_qkv"),
         default="gemm",
         help=("keep the legacy 0x30 decode mapping or select experimental 0x52 "
@@ -1562,17 +1722,19 @@ def main() -> None:
             f"golden_sha256={manifest['golden_sha256']}"
         )
         return
-    if args.h16_attention_top_dir is not None:
+    if args.h16_attention_top_dir is not None or args.h16_transformer_top_dir is not None:
         if model is None:
-            parser.error("--h16-attention-top-dir requires --model-json")
+            parser.error("H16 Top workload export requires --model-json")
+        full_block = args.h16_transformer_top_dir is not None
+        workload_dir = args.h16_transformer_top_dir or args.h16_attention_top_dir
         manifest = build_h16_attention_top_workload(
-            model, args.h16_attention_top_dir
+            model, workload_dir, full_block=full_block
         )
         manifest["model_sha256"] = model_sha256
-        (args.h16_attention_top_dir / "manifest.json").write_text(
+        (workload_dir / "manifest.json").write_text(
             json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
         print(
-            f"TRANSFORMER_H16_ATTENTION_MAPPER_PASS "
+            f"TRANSFORMER_H16_{'TRANSFORMER' if full_block else 'ATTENTION'}_MAPPER_PASS "
             f"descriptors={manifest['descriptor_count']} "
             f"useful_macs={manifest['useful_macs']} "
             f"model_sha256={model_sha256} "
