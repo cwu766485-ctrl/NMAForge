@@ -698,7 +698,7 @@ def build_workload(
 
 def _pack_matrix_a_physical(matrix: list[list[int]], physical_rows: int = 16) -> list[int]:
     """Pack dense A into the existing 16-row Matrix tile-major SPAD layout."""
-    if not matrix or not matrix[0] or physical_rows < len(matrix):
+    if not matrix or not matrix[0] or physical_rows < len(matrix) or physical_rows % 4:
         raise ValueError("Matrix A must fit its physical row tile")
     k_dim = len(matrix[0])
     if k_dim % 4 or any(len(row) != k_dim for row in matrix):
@@ -707,7 +707,8 @@ def _pack_matrix_a_physical(matrix: list[list[int]], physical_rows: int = 16) ->
     padded.extend([[0] * k_dim for _ in range(physical_rows - len(padded))])
     words = []
     for tile in range(0, physical_rows, 16):
-        for row_group in range(tile, tile + 16, 4):
+        tile_end = min(tile + 16, physical_rows)
+        for row_group in range(tile, tile_end, 4):
             for k_group in range(0, k_dim, 4):
                 for row in range(row_group, row_group + 4):
                     words.append(pack_i8(padded[row][k_group:k_group + 4]))
@@ -717,8 +718,8 @@ def _pack_matrix_a_physical(matrix: list[list[int]], physical_rows: int = 16) ->
 def _pack_matrix_b_physical(matrix: list[list[int]]) -> list[int]:
     """Pack dense [K,N] weights in the Matrix B four-column tile layout."""
     k_dim, n_dim = len(matrix), len(matrix[0])
-    if k_dim % 4 or n_dim % 16 or any(len(row) != n_dim for row in matrix):
-        raise ValueError("Matrix B requires rectangular K%4=0 and N%16=0")
+    if k_dim % 4 or n_dim % 4 or any(len(row) != n_dim for row in matrix):
+        raise ValueError("Matrix B requires rectangular K%4=0 and N%4=0")
     words = []
     for col_group in range(0, n_dim, 4):
         for k_group in range(0, k_dim, 4):
@@ -843,6 +844,352 @@ def build_h16_qkv_top_workload(model: dict, out_dir: Path) -> dict:
             (out_dir / "model_memory.memh").read_bytes()).hexdigest(),
         "golden_sha256": hashlib.sha256(
             (out_dir / "model_golden.memh").read_bytes()).hexdigest(),
+    }
+    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n",
+                                           encoding="utf-8")
+    return manifest
+
+
+def build_h16_attention_top_workload(model: dict, out_dir: Path) -> dict:
+    """Map two-head H16 prefill attention, KV round-trip and head merge to Top."""
+    shape = model.get("shape", {})
+    if shape != {"hidden": 16, "attention_heads": 2, "head_dim": 8,
+                 "layers": 1, "sequence_length": 8, "dtype": "signed INT8"}:
+        raise ValueError("H16 attention model shape contract mismatch")
+    tokens = model.get("prefill_tokens")
+    embeddings = model.get("embeddings")
+    weights = model.get("weights")
+    if not isinstance(tokens, list) or len(tokens) != 8 or any(
+        not isinstance(token, int) or not 0 <= token < 16 for token in tokens
+    ):
+        raise ValueError("H16 attention workload requires eight token IDs in [0,15]")
+    if not isinstance(embeddings, list) or len(embeddings) != 16 or any(
+        not isinstance(row, list) or len(row) != 16 for row in embeddings
+    ):
+        raise ValueError("H16 embedding table must be 16x16")
+    if not isinstance(weights, dict) or set(weights) != {"wq", "wk", "wv"}:
+        raise ValueError("H16 attention model must provide exactly wq, wk, and wv")
+    for name, matrix in weights.items():
+        if not isinstance(matrix, list) or len(matrix) != 16 or any(
+            not isinstance(row, list) or len(row) != 16 for row in matrix
+        ) or any(not isinstance(value, int) or not -128 <= value <= 127
+                 for row in matrix for value in row):
+            raise ValueError(f"{name} must be a 16x16 signed INT8 matrix")
+
+    mapper = Mapper()
+    mapper.next_addr = 0x4000
+    mapper.task_id = 0x7100
+    x_rows = [embeddings[token] for token in tokens]
+    x = mapper.tensor("h16_attention_input", (16, 16), "i8_packed", "matrix_a_tile",
+                      _pack_matrix_a_physical(x_rows), initialized=True)
+    x_transpose = mapper.tensor(
+        "h16_attention_input_transpose", (16, 8), "i8_packed", "matrix_b_tile",
+        _pack_matrix_b_physical(transpose(x_rows)), initialized=True,
+    )
+    outputs: dict[tuple[str, int], Tensor] = {}
+    packed: dict[tuple[str, int], Tensor] = {}
+    for projection in ("q", "k", "v"):
+        for head in range(2):
+            columns = range(head * 8, (head + 1) * 8)
+            head_weights = [[row[col] for col in columns]
+                            for row in weights[f"w{projection}"]]
+            if projection == "v":
+                # Compute V^T = Wv^T * X^T so the packed tile can feed the
+                # Matrix B physical layout across both 4x4 subtiles without
+                # a host-side activation transpose.
+                operand_a = mapper.tensor(
+                    f"h16_v_head{head}_weight_transpose", (8, 16),
+                    "i8_packed", "matrix_a_tile",
+                    _pack_matrix_a_physical(transpose(head_weights), physical_rows=8),
+                )
+                operand_b = x_transpose
+            else:
+                operand_a = x
+                operand_b = mapper.tensor(
+                    f"h16_{projection}_head{head}_weight", (16, 8),
+                    "i8_packed", "matrix_b_tile",
+                    _pack_matrix_b_physical(head_weights),
+                )
+            raw = mapper.tensor(
+                f"h16_{projection}_head{head}_i32", (8, 8), "i32", "row-major",
+                [0xA55AA55A] * 64, initialized=False,
+            )
+            mapper.add(
+                f"h16_{projection}_head{head}_projection", OP_GEMM,
+                operand_a, raw, src1=operand_b, m=8, n=8,
+                k_or_length=4, aux0=1,
+            )
+            packed_tensor = mapper.tensor(
+                f"h16_{projection}_head{head}_i8", (8, 8), "i8_packed",
+                "matrix_a_tile",
+                [0xA55AA55A] * 16, initialized=False,
+            )
+            mapper.add(
+                f"h16_{projection}_head{head}_requant", OP_REQUANT, raw,
+                packed_tensor, m=8, n=8, k_or_length=64,
+                flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1,
+            )
+            outputs[(projection, head)] = raw
+            packed[(projection, head)] = packed_tensor
+
+    # Store key and transposed-value tiles in B-compatible physical order. The
+    # head stride is one 8x8 INT8
+    # tile (64 bytes); QK and AV consume the actual KV_READ destinations.
+    key_cache = mapper.tensor("h16_key_cache", (128,), "i8_packed", "head_matrix_tile",
+                              [0xA55AA55A] * 32, initialized=False)
+    value_cache = mapper.tensor("h16_value_cache", (128,), "i8_packed", "head_matrix_tile",
+                                [0xA55AA55A] * 32, initialized=False)
+    cached: dict[tuple[str, int], Tensor] = {}
+    for name, cache in (("k", key_cache), ("v", value_cache)):
+        for head in range(2):
+            recovered = mapper.tensor(
+                f"h16_{name}_head{head}_cache_readback", (8, 8),
+                "i8_packed", "matrix_b_tile",
+                [0xA55AA55A] * 16, initialized=False,
+            )
+            mapper.add(
+                f"h16_{name}_h{head}_kv_write_tile", OP_KV_WRITE,
+                packed[(name, head)], cache, k_or_length=16,
+                aux0=head << 16, src1_stride=64,
+            )
+            mapper.add(
+                f"h16_{name}_h{head}_kv_read_tile", OP_KV_READ,
+                cache, recovered, k_or_length=16,
+                aux0=head << 16, src1_stride=64,
+            )
+            cached[(name, head)] = recovered
+
+    scores: dict[int, Tensor] = {}
+    probabilities: dict[int, Tensor] = {}
+    attention: dict[int, Tensor] = {}
+    attention_i8: dict[int, Tensor] = {}
+    head_projection: dict[int, Tensor] = {}
+    for head in range(2):
+        score = mapper.tensor(
+            f"h16_attention_head{head}_scores", (8, 8), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        mapper.add(
+            f"h16_attention_head{head}_qk", OP_GEMM,
+            packed[("q", head)], score, src1=cached[("k", head)],
+            m=8, n=8, k_or_length=2, aux0=1,
+        )
+        prob32 = mapper.tensor(
+            f"h16_attention_head{head}_prob_q15", (8, 8), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        for row in range(8):
+            mapper.add(
+                f"h16_attention_head{head}_causal_softmax_row{row}",
+                OP_CAUSAL_SOFTMAX, score, prob32, k_or_length=8, aux0=row,
+                src0_offset=row * 32, dst_offset=row * 32,
+            )
+        prob8 = mapper.tensor(
+            f"h16_attention_head{head}_prob_i8", (8, 8), "i8_packed",
+            "matrix_a_tile", [0xA55AA55A] * 16, initialized=False,
+        )
+        mapper.add(
+            f"h16_attention_head{head}_prob_requant", OP_REQUANT,
+            prob32, prob8, m=8, n=8, k_or_length=64,
+            flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=8, aux0=1,
+        )
+        attn32 = mapper.tensor(
+            f"h16_attention_head{head}_av_i32", (8, 8), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        mapper.add(
+            f"h16_attention_head{head}_av", OP_GEMM, prob8, attn32,
+            src1=cached[("v", head)], m=8, n=8, k_or_length=2,
+            aux0=1,
+        )
+        attn8 = mapper.tensor(
+            f"h16_attention_head{head}_av_i8", (8, 8), "i8_packed",
+            "matrix_a_tile", [0xA55AA55A] * 16, initialized=False,
+        )
+        mapper.add(
+            f"h16_attention_head{head}_av_requant", OP_REQUANT,
+            attn32, attn8, m=8, n=8, k_or_length=64,
+            flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=7, aux0=1,
+        )
+
+        # Fixed identity blocks make the head-merge contract explicit: each
+        # head contributes to its own eight output columns, then 0x34 adds the
+        # partial projections. The learned weights in this round are Q/K/V.
+        wo = [[0] * 16 for _ in range(8)]
+        for lane in range(8):
+            wo[lane][head * 8 + lane] = 1
+        wo_t = mapper.tensor(
+            f"h16_attention_head{head}_wo_identity", (8, 16),
+            "i8_packed", "matrix_b_tile", _pack_matrix_b_physical(wo),
+        )
+        projected = mapper.tensor(
+            f"h16_attention_head{head}_wo_i32", (8, 16), "i32", "row-major",
+            [0xA55AA55A] * 128, initialized=False,
+        )
+        mapper.add(
+            f"h16_attention_head{head}_output_projection", OP_GEMM,
+            attn8, projected, src1=wo_t, m=8, n=16, k_or_length=2, aux0=1,
+        )
+        scores[head] = score
+        probabilities[head] = prob32
+        attention[head] = attn32
+        attention_i8[head] = attn8
+        head_projection[head] = projected
+
+    merged = mapper.tensor(
+        "h16_attention_head_merge_i32", (8, 16), "i32", "row-major",
+        [0xA55AA55A] * 128, initialized=False,
+    )
+    mapper.add(
+        "h16_attention_head_merge", OP_RESIDUAL, head_projection[0], merged,
+        src1=head_projection[1], k_or_length=128, aux0=1,
+    )
+    validate_descriptor_chain(mapper)
+
+    # Generate independent logical outputs using the Python scalar Golden.
+    golden: dict[int, int] = {}
+
+    def add_i32_golden(tensor: Tensor, matrix: list[list[int]]) -> None:
+        for row, values in enumerate(matrix):
+            for col, value in enumerate(values):
+                golden[tensor.addr + 4 * (row * len(values) + col)] = u32(value)
+
+    def add_i8_golden(tensor: Tensor, matrix: list[list[int]], tile_a: bool) -> None:
+        flat = []
+        if tile_a:
+            for row_group in range(0, len(matrix), 4):
+                for k_group in range(0, len(matrix[0]), 4):
+                    for row in range(row_group, row_group + 4):
+                        flat.extend(matrix[row][k_group:k_group + 4])
+        else:
+            flat = flatten(matrix)
+        for word_index in range(0, len(flat), 4):
+            golden[tensor.addr + word_index] = pack_i8(flat[word_index:word_index + 4])
+
+    def packed_tile_a_words(matrix: list[list[int]]) -> list[int]:
+        return [
+            pack_i8(matrix[row][k_group:k_group + 4])
+            for row_group in range(0, len(matrix), 4)
+            for k_group in range(0, len(matrix[0]), 4)
+            for row in range(row_group, row_group + 4)
+        ]
+
+    qkv_i8: dict[tuple[str, int], list[list[int]]] = {}
+    for projection in ("q", "k", "v"):
+        full = gemm_i8_i32(x_rows, weights[f"w{projection}"])
+        for head in range(2):
+            sliced = [row[head * 8:(head + 1) * 8] for row in full]
+            if projection == "v":
+                sliced = transpose(sliced)
+            sliced_i32 = sliced
+            qkv_i8[(projection, head)] = [
+                requant_i8(row, 0) for row in sliced_i32
+            ]
+            add_i32_golden(outputs[(projection, head)], sliced_i32)
+            add_i8_golden(
+                packed[(projection, head)],
+                qkv_i8[(projection, head)], True,
+            )
+
+    attention_i32_gold: dict[int, list[list[int]]] = {}
+    head_projection_gold: dict[int, list[list[int]]] = {}
+    merged_gold = [[0] * 16 for _ in range(8)]
+    for head in range(2):
+        q8 = qkv_i8[("q", head)]
+        k8 = qkv_i8[("k", head)]
+        v_transposed = qkv_i8[("v", head)]
+        v8 = transpose(v_transposed)
+        add_i8_golden(cached[("k", head)], k8, True)
+        add_i8_golden(cached[("v", head)], v_transposed, True)
+        for word_index, word in enumerate(packed_tile_a_words(k8)):
+            golden[key_cache.addr + head * 64 + word_index * 4] = word
+        for word_index, word in enumerate(packed_tile_a_words(v_transposed)):
+            golden[value_cache.addr + head * 64 + word_index * 4] = word
+
+        score = gemm_i8_i32(q8, transpose(k8))
+        add_i32_golden(scores[head], score)
+        probs = [causal_softmax_q15(row, row_index)
+                 for row_index, row in enumerate(score)]
+        add_i32_golden(probabilities[head], probs)
+        probs8 = [requant_i8(row, 8) for row in probs]
+        add_i8_golden(
+            mapper.tensors[f"h16_attention_head{head}_prob_i8"], probs8, True,
+        )
+        av = gemm_i8_i32(probs8, v8)
+        attention_i32_gold[head] = av
+        add_i32_golden(attention[head], av)
+        av8 = [requant_i8(row, 7) for row in av]
+        add_i8_golden(attention_i8[head], av8, True)
+        wo = [[0] * 16 for _ in range(8)]
+        for lane in range(8):
+            wo[lane][head * 8 + lane] = 1
+        projected = gemm_i8_i32(av8, wo)
+        head_projection_gold[head] = projected
+        add_i32_golden(head_projection[head], projected)
+        for row in range(8):
+            for col in range(16):
+                merged_gold[row][col] += projected[row][col]
+    add_i32_golden(merged, merged_gold)
+
+    descriptor_base = align(mapper.next_addr, 0x1000)
+    completion_base = align(descriptor_base + len(mapper.descriptors) * 64, 0x1000)
+    memory: dict[int, int] = {}
+    for tensor in mapper.tensors.values():
+        for index, word in enumerate(tensor_storage_words(tensor)):
+            memory[tensor.addr + index * 4] = u32(word)
+    for index, descriptor in enumerate(mapper.descriptors):
+        for word_index, word in enumerate(descriptor.words()):
+            memory[descriptor_base + index * 64 + word_index * 4] = word
+        for word_index in range(4):
+            memory[completion_base + index * 16 + word_index * 4] = 0xA55AA55A
+
+    def write_pairs(path: Path, pairs: dict[int, int]) -> None:
+        words = [len(pairs)]
+        for address, value in sorted(pairs.items()):
+            words.extend((address, value))
+        path.write_text("".join(f"{word & 0xFFFFFFFF:08x}\n" for word in words),
+                        encoding="ascii")
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    write_pairs(out_dir / "model_memory.memh", memory)
+    write_pairs(out_dir / "model_golden.memh", golden)
+    descriptor_contract = []
+    for descriptor in mapper.descriptors:
+        descriptor_contract.append({
+            "task_id": descriptor.task_id, "opcode": descriptor.op,
+            "src0": descriptor.src0, "src1": descriptor.src1,
+            "dst": descriptor.dst, "bias": descriptor.bias,
+            "m": descriptor.m, "n": descriptor.n,
+            "k_words": descriptor.k_or_length, "flags": descriptor.flags,
+            "aux0": descriptor.aux0, "shift": descriptor.shift,
+            "activation": descriptor.activation,
+            "src0_stride": descriptor.src0_stride,
+            "src1_stride": descriptor.src1_stride,
+            "dst_stride": descriptor.dst_stride,
+            "batch_count": descriptor.batch_count,
+            "head_count": descriptor.head_count,
+            "clear_mask": descriptor.clear_mask,
+            "wait_mask": descriptor.wait_mask,
+            "signal_mask": descriptor.signal_mask,
+        })
+    manifest = {
+        "model_name": model.get("model_name"),
+        "model_scope": "trained QKV projections + RTL two-head causal attention/KV round-trip; not a full Transformer block",
+        "shape": shape, "seed": model.get("seed"),
+        "descriptor_base": descriptor_base, "completion_base": completion_base,
+        "descriptor_count": len(mapper.descriptors),
+        "useful_macs": 3 * 8 * 16 * 16 + 2 * 8 * 8 * 8 + 2 * 8 * 8 * 8 + 2 * 8 * 8 * 16,
+        "head_count": 2, "head_dim": 8, "sequence_length": 8,
+        "head_merge": "two fixed block-identity output projections, added by opcode 0x34",
+        "host_fallback": ["model input/weight generation and software Golden only; no intermediate activation is host-computed at runtime"],
+        "descriptor_contract": descriptor_contract,
+        "tensors": {
+            tensor.name: {"address": tensor.addr, "shape": tensor.shape,
+                          "dtype": tensor.dtype, "layout": tensor.layout}
+            for tensor in mapper.tensors.values()
+        },
+        "memory_sha256": hashlib.sha256((out_dir / "model_memory.memh").read_bytes()).hexdigest(),
+        "golden_sha256": hashlib.sha256((out_dir / "model_golden.memh").read_bytes()).hexdigest(),
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n",
                                            encoding="utf-8")
@@ -1165,6 +1512,10 @@ def main() -> None:
         help="export the bounded H=16/two-head QKV Top-CMDQ projection subgraph",
     )
     parser.add_argument(
+        "--h16-attention-top-dir", type=Path,
+        help="export H=16/two-head causal attention + KV round-trip Top workload",
+    )
+    parser.add_argument(
         "--decode-mapping-policy", choices=("gemm", "gemv_qkv"),
         default="gemm",
         help=("keep the legacy 0x30 decode mapping or select experimental 0x52 "
@@ -1185,6 +1536,23 @@ def main() -> None:
         print(
             f"TRANSFORMER_H16_QKV_MAPPER_PASS descriptors={manifest['descriptor_count']} "
             f"useful_macs={manifest['useful_macs']} model_sha256={model_sha256} "
+            f"golden_sha256={manifest['golden_sha256']}"
+        )
+        return
+    if args.h16_attention_top_dir is not None:
+        if model is None:
+            parser.error("--h16-attention-top-dir requires --model-json")
+        manifest = build_h16_attention_top_workload(
+            model, args.h16_attention_top_dir
+        )
+        manifest["model_sha256"] = model_sha256
+        (args.h16_attention_top_dir / "manifest.json").write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        print(
+            f"TRANSFORMER_H16_ATTENTION_MAPPER_PASS "
+            f"descriptors={manifest['descriptor_count']} "
+            f"useful_macs={manifest['useful_macs']} "
+            f"model_sha256={model_sha256} "
             f"golden_sha256={manifest['golden_sha256']}"
         )
         return
