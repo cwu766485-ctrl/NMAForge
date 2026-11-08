@@ -648,7 +648,7 @@ ai_h16_qkv_top:
 		+AI_REPRESENTATIVE_DESC_BASE=20480 +AI_REPRESENTATIVE_CPL_BASE=20736 \
 		+AI_REPRESENTATIVE_DESC_COUNT=3 +AI_REPRESENTATIVE_USEFUL_MACS=6144 \
 		-l $(AI_H16_QKV_RUN)/run.log
-	grep -q '^REPRESENTATIVE_MODEL_PASS desc=3 golden_words=384 useful_macs=6144 ' \
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=3 .*golden_words=384 useful_macs=6144 ' \
 		"$(AI_H16_QKV_RUN)/run.log"
 
 AI_H16_ATTENTION_RUN ?= /tmp/nmaforge_h16_attention_$(shell date +%Y%m%d_%H%M%S)
