@@ -1,6 +1,6 @@
 # NMAForge v2 — Round 15 Model and TinyNPU Decision
 
-Date: 2026-11-08  
+Date: 2026-11-08
 Disposition: **PARTIAL**. The fixed H16 KV-snapshot replay was re-run and passed on the reviewed source SHA. True incremental multi-token decode, a Round 15 CNN conversion improvement, and matched TinyNPU model runs were not completed. No unverified RTL change is included.
 
 ## 1. Frozen source and run evidence
