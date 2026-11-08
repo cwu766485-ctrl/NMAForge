@@ -21,6 +21,10 @@ SPAD = {
     "w2": 0x0D000,
     "raw2": 0x0E000,
     "output": 0x16000,
+    # Reuse dead INT32 scratch storage for the second fused layer's tile output.
+    # Its INT8 result occupies only 8 KiB of the 32 KiB RAW1 reservation.
+    "tile_output": 0x03000,
+    "identity": 0x0D100,
     "desc": 0x19000,
     "cpl": 0x19200,
 }
@@ -102,9 +106,11 @@ def int8_bytes(values):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=20261108)
-    parser.add_argument("--fusion-mode", choices=("legacy", "first", "both"),
+    parser.add_argument("--fusion-mode",
+                        choices=("legacy", "first", "both", "both_convert"),
                         default="legacy",
-                        help="legacy 0x30/0x36, first-layer 0x53, or both layers 0x53")
+                        help=("legacy 0x30/0x36, first-layer 0x53, both layers "
+                              "0x53, or both fused followed by identity-GEMM layout conversion"))
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args()
     started = time.perf_counter()
@@ -126,6 +132,9 @@ def main():
     add(memory, SPAD["w2"], pack_b(w2))
     add(memory, SPAD["raw2"], [POISON] * (M * C))
     add(memory, SPAD["output"], [POISON] * (M * C // 4))
+    if args.fusion_mode == "both_convert":
+        identity = [[int(row == col) for col in range(C)] for row in range(C)]
+        add(memory, SPAD["identity"], pack_b(identity))
 
     # Tensor GEMM word6 counts packed K groups (four INT8 elements each),
     # unlike requant's scalar length field. Opcode 0x53 writes signed INT8
@@ -146,6 +155,12 @@ def main():
             desc(0x7100, 0x53, SPAD["input"], SPAD["w1"], SPAD["act1"], M, C, C // 4),
             desc(0x7101, 0x53, SPAD["act1"], SPAD["w2"], SPAD["output"], M, C, C // 4),
         ],
+        "both_convert": [
+            desc(0x7100, 0x53, SPAD["input"], SPAD["w1"], SPAD["act1"], M, C, C // 4),
+            desc(0x7101, 0x53, SPAD["act1"], SPAD["w2"], SPAD["tile_output"], M, C, C // 4),
+            desc(0x7102, 0x30, SPAD["tile_output"], SPAD["identity"], SPAD["raw2"], M, C, C // 4),
+            desc(0x7103, 0x36, SPAD["raw2"], 0, SPAD["output"], 0, 0, M * C, 0x10),
+        ],
     }
     commands = commands_by_mode[args.fusion_mode]
     for index, words in enumerate(commands):
@@ -161,16 +176,28 @@ def main():
         expected.extend((base + 4 * i, int(value) & 0xFFFFFFFF)
                         for i, value in enumerate(values))
 
-    # Fused GEMM preserves its logical INT32 result for the independent
-    # software Golden, but must leave the legacy raw tensor physically intact.
+    # Fused GEMM keeps the logical INT32 result in the independent software
+    # Golden. The both_convert candidate reuses the now-dead RAW1 reservation
+    # as a Matrix-A tile staging buffer for the second layer's output.
     if args.fusion_mode == "legacy":
         expect(SPAD["raw1"], [value for row in raw1 for value in row])
     else:
-        expect(SPAD["raw1"], [POISON] * (M * C))
+        if args.fusion_mode == "both_convert":
+            tile_words = pack_a(output)
+            expect(SPAD["raw1"], tile_words + [POISON] * (M * C - len(tile_words)))
+        else:
+            expect(SPAD["raw1"], [POISON] * (M * C))
     expect(SPAD["act1"], pack_a(act1))
     if args.fusion_mode == "both":
         expect(SPAD["raw2"], [POISON] * (M * C))
         packed_output = pack_a(output)
+    elif args.fusion_mode == "both_convert":
+        # The fused second layer produces Matrix-A tile layout. A following
+        # identity GEMM converts that exact INT8 tensor to row-major INT32;
+        # the legacy shift-zero requant then emits the public packed output.
+        expect(SPAD["raw2"], [value for row in output for value in row])
+        packed_output = [pack([output[row][col] for col in range(i, i + 4)])
+                         for row in range(M) for i in range(0, C, 4)]
     else:
         expect(SPAD["raw2"], [value for row in raw2 for value in row])
         packed_output = [pack([output[row][col] for col in range(i, i + 4)])
@@ -223,6 +250,11 @@ def main():
                      for row in raw2 for value in row)).hexdigest(),
         "output_physical_layout": "matrix_a_tile" if args.fusion_mode == "both" else "row_major_packed_i8",
         "legacy_output_layout_compatible": args.fusion_mode != "both",
+        "layout_conversion": (
+            "identity 0x30 GEMM Matrix-A INT8 to row-major INT32, then 0x36 shift-zero saturation"
+            if args.fusion_mode == "both_convert" else "none"
+        ),
+        "layout_conversion_macs": M * C * C if args.fusion_mode == "both_convert" else 0,
         "independent_golden": "scalar Python integer accumulation; raw INT32 and packed INT8 tensor checks",
         "host_fallback_compute": "none; both convolution layers use ABI-v7 Matrix GEMM on Top RTL",
         "host_im2col": "none; 1x1 pointwise convolution maps directly to Matrix GEMM",
