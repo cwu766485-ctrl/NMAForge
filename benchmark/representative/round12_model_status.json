@@ -1,8 +1,9 @@
 {
-  "round":  12,
+  "round": 12,
   "status": "PARTIAL",
   "target_branch": "feature/npu-architecture-v2",
-  "reviewed_source_sha": "28cd86e0c18d62e4ce6cfb14a2f43967cdce0d4d",
+  "reviewed_start_sha": "28cd86e0c18d62e4ce6cfb14a2f43967cdce0d4d",
+  "tested_source_test_sha": "f17234cf9435272d05ff8e444a0da846da380963",
   "round12_product_rtl_modified": false,
   "tools": {
     "python": "3.12.13",
@@ -10,39 +11,52 @@
     "alternate_simulators_available": []
   },
   "cnn_262144_mac": {
-    "status": "PARTIAL",
-    "top_status": "BLOCKED_ENV",
+    "status": "PASS_TOP_FUNCTIONAL_BASELINE",
+    "top_status": "PASS",
     "offline_golden_status": "PASS",
-    "run_id": "R12-TOP-REP-CNN-128K-S20261108-RETRY2",
-    "offline_run_id": "R12-CNN-OFFLINE-GOLDEN-S20261108",
+    "run_id": "R12-TOP-REP-CNN-128K-S20261108-FINAL",
     "seed": 20261108,
-    "architecture": "two 1x1 INT8 Conv 16->16 + ReLU layers, 512 spatial positions",
-    "weights_trained": false,
+    "model": "nma_pointwise_cnn_32x16_16ch_2layer_linear_int8",
+    "architecture": "two 1x1 INT8 Conv 16->16 layers with separate signed saturating REQUANT_I8; no activation; deterministic inference weights, not trained",
     "useful_macs_per_inference": 262144,
     "descriptor_count": 4,
-    "descriptor_chain": ["0x30 GEMM", "0x36 Requant", "0x30 GEMM", "0x36 Requant"],
+    "descriptor_chain": [
+      "0x30 GEMM",
+      "0x36 REQUANT_I8",
+      "0x30 GEMM",
+      "0x36 REQUANT_I8"
+    ],
     "spad_capacity_bytes": 131072,
     "spad_high_water_exclusive": 102976,
-    "preload_image_bytes_static": 90944,
+    "preload_axi_cycles": 136415,
+    "preload_spad_bytes": 90944,
+    "command_cycles": 61310,
+    "load_plus_command_subtotal_cycles": 197725,
+    "matrix_mac_active_cycles": 1024,
+    "matrix_request_wait_cycles": 16,
+    "matrix_response_wait_cycles": 202,
+    "matrix_writeback_cycles": 4096,
+    "matrix_other_cycles": 2620,
+    "sfu_busy_cycles": 53252,
+    "no_engine_dispatch_control_cycles": 100,
+    "exclusive_profile_cycles": 61310,
+    "spad_read_bytes_measured": 98304,
+    "spad_write_bytes_measured": 81920,
+    "mac_per_command_cycle": 4.2757,
+    "array_active_utilization_pct": 100.0,
     "checked_intermediate_and_output_words": 20480,
     "input_sha256": "f8514ef62fc2e83230d533ea2c82afb18a8d2b71e7324886679fd814e99561ea",
     "weight1_sha256": "b780646f65d0247b5972c9125073988315d6ea4c2fe073ea4c1aa63a569b9d89",
     "weight2_sha256": "b37e120ac1afbc15ffc67c4ddc2f94368901ef0eca8f0120ae2cba6eb846efa0",
-    "output_sha256": "22cb785cff0275f5cc4bba995800d65350231373effc4723734370b3f4860d5f",
-    "memory_image_sha256": "ed38edf71c161d44ddbadf2178aa203f51a09d9122a4e4bff7a6bef1f486d4c1",
-    "golden_file_sha256": "9e094fda9315fb86e39d20c084015772aaa21eb1bd1fbeb49d8ee72a59833b9d",
-    "top_log": "/tmp/nmaforge_r12_cnn_128k_20261108/run_retry2.log",
-    "top_log_sha256": "87af108c5ba74e3ff241fe1243ed1ca34a7629ab66d56a012b35d73a5bc46249",
-    "license_failure_stage": "before RTL compilation",
-    "license_error": "Cannot connect to the license server; Failed to obtain license",
-    "command_cycles": null,
-    "matrix_active_cycles": null,
-    "matrix_wait_cycles": null,
-    "spad_read_bytes_measured": null,
-    "spad_write_bytes_measured": null,
-    "mac_per_cycle": null,
-    "array_utilization_pct": null,
-    "phase1_ablation": "NOT_RUN_TOP_GOLDEN_GATE_NOT_MET"
+    "output_sha256": "6f81ea743327c2b7daa5d4e11e8e2e88848398b99bfaca97d170c570ccc3170e",
+    "memory_image_sha256": "bd2dbed180dae0e996a6bd1a0a049eb642da81858c6ed7f033802d69647a61bd",
+    "golden_file_sha256": "3751998e65e40ad1ffe03106baf732f9d9c83dfb051ed160dda365e21319b2fc",
+    "top_log": "/tmp/nmaforge_r12_cnn_128k_20261108_signedoff/run.log",
+    "top_log_sha256": "0c5dabc18cd66140441e4798ee11677ee2cd787b9e06277dbc8dee17db5baf09",
+    "compile_log": "/tmp/nmaforge_r12_cnn_128k_20261108_signedoff/compile.log",
+    "compile_log_sha256": "35c32648bcfa77c76d96cfde09b2aef94adb778c66e04a55f4bf203e97044a13",
+    "measurement_boundary": "command_cycles are doorbell through final completion; preload is separately measured AXI traffic; subtotal excludes CSR setup, poison reads, and software generation",
+    "phase1_ablation": "NOT_RUN; functional baseline gate satisfied but Round 12 execution stopped before optimization phase"
   },
   "transformer_h16_2head_seq8": {
     "status": "BLOCKED_MAPPER_SUPPORT",
@@ -72,7 +86,8 @@
     "sequence8_probe_log_sha256": "b3938bff16541c9ddb713185da2b755cb8ddb5f9da12914c679a2ccaecc8e3b5",
     "sixteen_by_sixteen_weight_probe_log_sha256": "1136c20820b437c82e2120c29ed55f799f58c63a7973f2b8d58fa74cee569a38",
     "probe_weights_are_synthetic": true,
-    "notes": "No checks were removed; no H16 model or Top descriptor chain was created."
+    "notes": "No checks were removed; no H16 model or Top descriptor chain was created.",
+    "preflight_source_sha": "28cd86e0c18d62e4ce6cfb14a2f43967cdce0d4d"
   },
   "historical_h4_evidence": {
     "source": "Round 11 report, not re-run in Round 12",
@@ -84,7 +99,6 @@
   },
   "artifacts": {
     "report": "docs/benchmark/NMAFORGE_V2_ROUND12_MODEL_EXECUTION_DECISION.md",
-    "performance_csv": "benchmark/representative/round12_performance.csv",
-    "status_json": "benchmark/representative/round12_model_status.json"
+    "performance_csv": "benchmark/representative/round12_performance.csv"
   }
 }
