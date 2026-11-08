@@ -398,6 +398,132 @@ module tb_ai_accel_smoke;
     integer r9_sfu_divider_busy_cycles = 0;
     integer r9_sfu_sqrt_busy_cycles = 0;
     integer r9_sfu_state;
+    // Round 17 per-command Matrix/KV observations. These passive counters are
+    // enabled only for the staged H16 incremental-decode timing window.
+    reg r17_matrix_monitor_active = 1'b0;
+    integer r17_matrix_count = 0;
+    integer r17_matrix_current_cycles = 0;
+    integer r17_matrix_current_mac = 0;
+    integer r17_matrix_current_request_wait = 0;
+    integer r17_matrix_current_response_wait = 0;
+    integer r17_matrix_current_writeback = 0;
+    integer r17_matrix_current_other = 0;
+    integer r17_matrix_current_read_bytes = 0;
+    integer r17_matrix_current_write_bytes = 0;
+    integer r17_matrix_cycles [0:127];
+    integer r17_matrix_mac [0:127];
+    integer r17_matrix_request_wait [0:127];
+    integer r17_matrix_response_wait [0:127];
+    integer r17_matrix_writeback [0:127];
+    integer r17_matrix_other [0:127];
+    integer r17_matrix_read_bytes [0:127];
+    integer r17_matrix_write_bytes [0:127];
+    reg r17_kv_monitor_active = 1'b0;
+    integer r17_kv_count = 0;
+    integer r17_kv_current_cycles = 0;
+    integer r17_kv_current_read_bytes = 0;
+    integer r17_kv_current_write_bytes = 0;
+    integer r17_kv_cycles [0:127];
+    integer r17_kv_read_bytes [0:127];
+    integer r17_kv_write_bytes [0:127];
+    integer r17_multi_engine_overlap_cycles = 0;
+
+    always @(posedge aclk) begin
+        if (transformer_top_timing_enable) begin
+            if ((dut.engine_busy & (dut.engine_busy - 1'b1)) != 0)
+                r17_multi_engine_overlap_cycles =
+                    r17_multi_engine_overlap_cycles + 1;
+            if (dut.matrix_busy) begin
+                if (!r17_matrix_monitor_active) begin
+                    r17_matrix_monitor_active = 1'b1;
+                    r17_matrix_current_cycles = 0;
+                    r17_matrix_current_mac = 0;
+                    r17_matrix_current_request_wait = 0;
+                    r17_matrix_current_response_wait = 0;
+                    r17_matrix_current_writeback = 0;
+                    r17_matrix_current_other = 0;
+                    r17_matrix_current_read_bytes = 0;
+                    r17_matrix_current_write_bytes = 0;
+                end
+                r17_matrix_current_cycles = r17_matrix_current_cycles + 1;
+                if (dut.matrix_perf_mac_active)
+                    r17_matrix_current_mac = r17_matrix_current_mac + 1;
+                else if (dut.matrix_banked_read_valid && !dut.arb_banked_ready)
+                    r17_matrix_current_request_wait =
+                        r17_matrix_current_request_wait + 1;
+                else if (dut.matrix_perf_banked_wait)
+                    r17_matrix_current_response_wait =
+                        r17_matrix_current_response_wait + 1;
+                else if (dut.matrix_line_valid)
+                    r17_matrix_current_writeback =
+                        r17_matrix_current_writeback + 1;
+                else
+                    r17_matrix_current_other = r17_matrix_current_other + 1;
+                if (dut.matrix_banked_read_valid && dut.arb_banked_ready)
+                    r17_matrix_current_read_bytes =
+                        r17_matrix_current_read_bytes + 16;
+                if (dut.matrix_spad_valid && dut.arb_core_ready) begin
+                    if (dut.matrix_spad_write)
+                        r17_matrix_current_write_bytes =
+                            r17_matrix_current_write_bytes + 4;
+                    else
+                        r17_matrix_current_read_bytes =
+                            r17_matrix_current_read_bytes + 4;
+                end
+                if (dut.matrix_line_valid && dut.arb_core_line_ready)
+                    r17_matrix_current_write_bytes =
+                        r17_matrix_current_write_bytes + 16;
+            end
+            if (dut.engine_busy[6]) begin
+                if (!r17_kv_monitor_active) begin
+                    r17_kv_monitor_active = 1'b1;
+                    r17_kv_current_cycles = 0;
+                    r17_kv_current_read_bytes = 0;
+                    r17_kv_current_write_bytes = 0;
+                end
+                r17_kv_current_cycles = r17_kv_current_cycles + 1;
+                if (dut.compute_engine_req_valid[6] &&
+                    dut.compute_engine_ready[6]) begin
+                    if (dut.compute_engine_req_write[6])
+                        r17_kv_current_write_bytes =
+                            r17_kv_current_write_bytes + 4;
+                    else
+                        r17_kv_current_read_bytes =
+                            r17_kv_current_read_bytes + 4;
+                end
+            end
+        end else begin
+            r17_matrix_monitor_active = 1'b0;
+            r17_kv_monitor_active = 1'b0;
+        end
+        #0.001;
+        if (transformer_top_timing_enable && dut.engine_done[3] &&
+            r17_matrix_monitor_active && r17_matrix_count < 128) begin
+            r17_matrix_cycles[r17_matrix_count] = r17_matrix_current_cycles;
+            r17_matrix_mac[r17_matrix_count] = r17_matrix_current_mac;
+            r17_matrix_request_wait[r17_matrix_count] =
+                r17_matrix_current_request_wait;
+            r17_matrix_response_wait[r17_matrix_count] =
+                r17_matrix_current_response_wait;
+            r17_matrix_writeback[r17_matrix_count] =
+                r17_matrix_current_writeback;
+            r17_matrix_other[r17_matrix_count] = r17_matrix_current_other;
+            r17_matrix_read_bytes[r17_matrix_count] =
+                r17_matrix_current_read_bytes;
+            r17_matrix_write_bytes[r17_matrix_count] =
+                r17_matrix_current_write_bytes;
+            r17_matrix_count = r17_matrix_count + 1;
+            r17_matrix_monitor_active = 1'b0;
+        end
+        if (transformer_top_timing_enable && dut.engine_done[6] &&
+            r17_kv_monitor_active && r17_kv_count < 128) begin
+            r17_kv_cycles[r17_kv_count] = r17_kv_current_cycles;
+            r17_kv_read_bytes[r17_kv_count] = r17_kv_current_read_bytes;
+            r17_kv_write_bytes[r17_kv_count] = r17_kv_current_write_bytes;
+            r17_kv_count = r17_kv_count + 1;
+            r17_kv_monitor_active = 1'b0;
+        end
+    end
 
     always @(posedge aclk) begin
         if (representative_load_measure)
@@ -3519,6 +3645,9 @@ module tb_ai_accel_smoke;
                 transformer_top_profile_scalar_busy = 0;
                 transformer_top_profile_no_engine_busy = 0;
                 transformer_top_profile_dma_busy = 0;
+                r17_matrix_count = 0;
+                r17_kv_count = 0;
+                r17_multi_engine_overlap_cycles = 0;
                 transformer_top_last_completion_tail = dut.processor_cplq_tail;
                 transformer_top_last_completion_cycle = transformer_top_cycle_counter;
                 transformer_top_start_cycle = transformer_top_cycle_counter;
@@ -3540,6 +3669,42 @@ module tb_ai_accel_smoke;
                 if (dut.processor_cplq_tail != desc_count || dut.processor_cmdq_head != desc_count)
                     $fatal(1, "incremental H16 queues did not drain stage=%0d head=%0d tail=%0d expected=%0d",
                            stage_idx, dut.processor_cmdq_head, dut.processor_cplq_tail, desc_count);
+
+                $display("R17_STAGE_OVERLAP stage=%0s cycles=%0d",
+                         stage_label, r17_multi_engine_overlap_cycles);
+                for (completion_index = 0; completion_index < desc_count;
+                     completion_index = completion_index + 1) begin
+                    $display("R17_DESCRIPTOR_INTERVAL stage=%0s local_index=%0d task_id=%0d opcode=0x%02h cycles=%0d",
+                             stage_label, completion_index,
+                             incremental_stage_words[3 + completion_index * 16] >> 16,
+                             incremental_stage_words[3 + completion_index * 16][7:0],
+                             transformer_top_completion_cycles[completion_index]);
+                end
+                for (completion_index = 0; completion_index < r17_matrix_count;
+                     completion_index = completion_index + 1) begin
+                    $display("R17_MATRIX_COMMAND stage=%0s index=%0d cycles=%0d mac=%0d request_wait=%0d response_wait=%0d writeback=%0d other=%0d read_bytes=%0d write_bytes=%0d exclusive_closed=%0d",
+                             stage_label, completion_index,
+                             r17_matrix_cycles[completion_index],
+                             r17_matrix_mac[completion_index],
+                             r17_matrix_request_wait[completion_index],
+                             r17_matrix_response_wait[completion_index],
+                             r17_matrix_writeback[completion_index],
+                             r17_matrix_other[completion_index],
+                             r17_matrix_read_bytes[completion_index],
+                             r17_matrix_write_bytes[completion_index],
+                             r17_matrix_mac[completion_index] +
+                             r17_matrix_request_wait[completion_index] +
+                             r17_matrix_response_wait[completion_index] +
+                             r17_matrix_writeback[completion_index] +
+                             r17_matrix_other[completion_index]);
+                end
+                for (completion_index = 0; completion_index < r17_kv_count;
+                     completion_index = completion_index + 1)
+                    $display("R17_KV_COMMAND stage=%0s index=%0d cycles=%0d read_bytes=%0d write_bytes=%0d",
+                             stage_label, completion_index,
+                             r17_kv_cycles[completion_index],
+                             r17_kv_read_bytes[completion_index],
+                             r17_kv_write_bytes[completion_index]);
 
                 observed_fd = $fopen(stage_observed_file, "w");
                 if (observed_fd == 0)
