@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 
 
@@ -60,6 +61,16 @@ def decode_b(memory: dict[int, int], base: int, k_dim: int, n_dim: int) -> list[
     return result
 
 
+def decode_gemv_rhs(memory: dict[int, int], base: int, k_dim: int) -> list[list[int]]:
+    """Decode opcode 0x52's K-major rows with N padded to 16 bytes."""
+    result = [[0] * 16 for _ in range(k_dim)]
+    for k in range(k_dim):
+        for col in range(16):
+            word = memory[base + (k * 4 + col // 4) * 4]
+            result[k][col] = signed_i8(word >> ((col % 4) * 8))
+    return result
+
+
 def gemm(a: list[list[int]], b: list[list[int]]) -> list[list[int]]:
     if not a or not b or len(a[0]) != len(b):
         raise ValueError("incompatible independent Golden matrix shapes")
@@ -74,6 +85,34 @@ def transpose(matrix: list[list[int]]) -> list[list[int]]:
 def requant(matrix: list[list[int]], shift: int) -> list[list[int]]:
     return [[max(-128, min(127, value >> shift)) for value in row]
             for row in matrix]
+
+
+def layernorm_q15(values: list[int], gamma: list[int], beta: list[int]) -> list[int]:
+    total = sum(values)
+    mean = total // len(values) if total >= 0 else -((-total) // len(values))
+    variance = sum((value - mean) ** 2 for value in values) // len(values)
+    root = max(math.isqrt(variance + 1), 1)
+    reciprocal = (1 << 30) // root
+    result = []
+    for value, scale, offset in zip(values, gamma, beta):
+        scaled = ((value - mean) * scale) >> 15
+        scaled = max(-(1 << 31), min((1 << 31) - 1, scaled))
+        normalized = (scaled * reciprocal) >> 30
+        result.append(max(-(1 << 31), min((1 << 31) - 1, normalized + offset)))
+    return result
+
+
+def residual(lhs: list[int], rhs: list[int]) -> list[int]:
+    return [max(-(1 << 31), min((1 << 31) - 1, a + b))
+            for a, b in zip(lhs, rhs)]
+
+
+def gelu_q8_8(value: int) -> int:
+    if value <= -512:
+        return 0
+    if value >= 512:
+        return value
+    return (value * (value + 512)) >> 10
 
 
 def softmax_q15(scores: list[int]) -> list[int]:
@@ -169,10 +208,28 @@ def main() -> None:
         raise ValueError("descriptor count and manifest contract disagree")
     if manifest["descriptor_count"] > 128:
         raise ValueError("Top smoke CPLQ supports at most 128 descriptors")
+    if manifest.get("runtime_ordering") != (
+        "single ABI event-bit completion chain; each descriptor waits for and "
+        "clears the preceding descriptor's ordered-retirement event"
+    ):
+        raise ValueError("H16 attention workload must declare its serialized ordering")
 
     tensors = manifest["tensors"]
     expected: dict[int, int] = {}
-    for index, contract in enumerate(manifest["descriptor_contract"]):
+    contracts = manifest["descriptor_contract"]
+    for index, contract in enumerate(contracts):
+        expected_wait = 0 if index == 0 else 1
+        expected_clear = 0 if index == 0 else 1
+        expected_signal = 0 if index + 1 == len(contracts) else 1
+        if (contract["wait_mask"], contract["clear_mask"],
+                contract["signal_mask"]) != (
+                    expected_wait, expected_clear, expected_signal):
+            raise ValueError(
+                f"descriptor {index} violates the ordered completion chain: "
+                f"wait={contract['wait_mask']:#x} "
+                f"clear={contract['clear_mask']:#x} "
+                f"signal={contract['signal_mask']:#x}"
+            )
         address = manifest["descriptor_base"] + index * 64
         observed = [memory[address + 4 * word] for word in range(16)]
         if observed != descriptor_words(contract):
@@ -255,9 +312,18 @@ def main() -> None:
         attended_i8 = requant(attended, 7)
         add_i8(expected, tensors[f"h16_attention_head{head}_av_i8"]["address"],
                attended_i8, True)
-        wo = [[0] * 16 for _ in range(8)]
-        for lane in range(8):
-            wo[lane][head * 8 + lane] = 1
+        if manifest.get("full_block"):
+            wo = [row[:] for row in weights["wo"][head * 8:(head + 1) * 8]]
+            decoded_wo = decode_b(
+                memory, tensors[f"h16_attention_head{head}_wo_identity"]["address"],
+                8, 16,
+            )
+            if decoded_wo != wo:
+                raise ValueError(f"head {head} W_o physical Matrix-B layout mismatch")
+        else:
+            wo = [[0] * 16 for _ in range(8)]
+            for lane in range(8):
+                wo[lane][head * 8 + lane] = 1
         projected = gemm(attended_i8, wo)
         add_i32(expected,
                 tensors[f"h16_attention_head{head}_wo_i32"]["address"],
@@ -268,6 +334,138 @@ def main() -> None:
 
     add_i32(expected, tensors["h16_attention_head_merge_i32"]["address"],
             merged_expected)
+
+    if manifest.get("full_block"):
+        gamma1 = model.get("gamma1_q15", [32768] * 16)
+        beta1 = model.get("beta1", [0] * 16)
+        gamma2 = model.get("gamma2_q15", [32768] * 16)
+        beta2 = model.get("beta2", [0] * 16)
+        input_i32 = [row[:] for row in token_x]
+        residual1 = [residual(a, b) for a, b in zip(merged_expected, input_i32)]
+        norm1 = [layernorm_q15(row, gamma1, beta1) for row in residual1]
+        norm1_i8 = requant(norm1, 0)
+        wup_b = decode_b(memory, tensors["h16_wup"]["address"], 16, 16)
+        wdown_b = decode_b(memory, tensors["h16_wdown"]["address"], 16, 16)
+        if wup_b != weights["wup"] or wdown_b != weights["wdown"]:
+            raise ValueError("FFN physical Matrix-B weight layout mismatch")
+        ffn_up = gemm(norm1_i8, wup_b)
+        gelu = [[gelu_q8_8(value) for value in row] for row in ffn_up]
+        gelu_i8 = requant(gelu, 0)
+        ffn_down = gemm(gelu_i8, wdown_b)
+        residual2 = [residual(a, b) for a, b in zip(ffn_down, norm1)]
+        norm2 = [layernorm_q15(row, gamma2, beta2) for row in residual2]
+        for name, matrix in (
+            ("h16_residual1_i32", residual1),
+            ("h16_layernorm1_i32", norm1),
+            ("h16_layernorm1_i8", norm1_i8),
+            ("h16_ffn_up_i32", ffn_up),
+            ("h16_ffn_gelu_i32", gelu),
+            ("h16_ffn_gelu_i8", gelu_i8),
+            ("h16_ffn_down_i32", ffn_down),
+            ("h16_residual2_i32", residual2),
+            ("h16_layernorm2_i32", norm2),
+        ):
+            tensor = tensors[name]
+            if tensor["dtype"] == "i8_packed":
+                add_i8(expected, tensor["address"], matrix, tile_a=True)
+            else:
+                add_i32(expected, tensor["address"], matrix)
+
+        decode_token = model.get("decode_token")
+        if not isinstance(decode_token, int) or not 0 <= decode_token < 16:
+            raise ValueError("full-block model is missing a legal decode token")
+        decode_input = model["embeddings"][decode_token]
+        decode_merged = [[0] * 16 for _ in range(4)]
+        decode_rows_per_head = {}
+        for head in range(2):
+            q_name = f"h16_decode_q_head{head}"
+            q_weight = [row[head * 8:(head + 1) * 8]
+                        for row in model["weights"]["wq"]]
+            packed_q_weight = decode_gemv_rhs(
+                memory, tensors[f"{q_name}_weight_gemv"]["address"], 16
+            )
+            if packed_q_weight != [row + [0] * 8 for row in q_weight]:
+                raise ValueError(f"{q_name} opcode 0x52 RHS pack mismatch")
+            q_raw = gemm([decode_input], q_weight)[0]
+            q_i8 = requant([q_raw], 0)[0]
+            q_rows = [q_i8] + [[0] * 8 for _ in range(3)]
+            k_rows = qkv[("k", head)]
+            v_rows = transpose(qkv[("v", head)])
+            score = gemm(q_rows, transpose(k_rows))
+            probability = [softmax_q15(score[0])] + [[0] * 8 for _ in range(3)]
+            probability_i8 = requant(probability, 8)
+            attended = gemm(probability_i8, v_rows)
+            attended_i8 = requant(attended, 7)
+            wo = [row[:] for row in model["weights"]["wo"][head * 8:(head + 1) * 8]]
+            projected = gemm(attended_i8, wo)
+            decode_rows_per_head[head] = {
+                "q_raw": q_raw, "q_rows": q_rows, "score": score,
+                "probability": probability, "probability_i8": probability_i8,
+                "attended": attended, "attended_i8": attended_i8,
+                "projected": projected,
+            }
+            for row in range(4):
+                for col in range(16):
+                    decode_merged[row][col] += projected[row][col]
+
+        decode_input_rows = [decode_input] + [[0] * 16 for _ in range(3)]
+        decode_residual1 = [residual(a, b)
+                            for a, b in zip(decode_merged, decode_input_rows)]
+        decode_norm1 = [layernorm_q15(row, gamma1, beta1)
+                        for row in decode_residual1]
+        decode_norm1_i8 = requant(decode_norm1, 0)
+        decode_ffn_up = gemm(decode_norm1_i8, wup_b)
+        decode_gelu = [[gelu_q8_8(value) for value in row]
+                       for row in decode_ffn_up]
+        decode_gelu_i8 = requant(decode_gelu, 0)
+        decode_ffn_down = gemm(decode_gelu_i8, wdown_b)
+        decode_residual2 = [residual(a, b)
+                            for a, b in zip(decode_ffn_down, decode_norm1)]
+        decode_norm2 = [layernorm_q15(row, gamma2, beta2)
+                        for row in decode_residual2]
+        if decode_norm2[0] != norm2[7]:
+            raise ValueError(
+                "single-token decode Golden differs from prefill output for the same token"
+            )
+        for head, tensors_for_head in decode_rows_per_head.items():
+            add_i8(expected,
+                   tensors[f"h16_decode_q_head{head}_matrix_a"]["address"],
+                   tensors_for_head["q_rows"], tile_a=True)
+            add_i32(expected,
+                    tensors[f"h16_decode_head{head}_scores_i32"]["address"],
+                    tensors_for_head["score"])
+            prob_addr = tensors[f"h16_decode_head{head}_prob_q15"]["address"]
+            for col, value in enumerate(tensors_for_head["probability"][0]):
+                expected[prob_addr + 4 * col] = value & MASK32
+            add_i8(expected,
+                   tensors[f"h16_decode_head{head}_prob_i8"]["address"],
+                   tensors_for_head["probability_i8"], tile_a=True)
+            add_i32(expected,
+                    tensors[f"h16_decode_head{head}_av_i32"]["address"],
+                    tensors_for_head["attended"])
+            add_i8(expected,
+                   tensors[f"h16_decode_head{head}_av_i8"]["address"],
+                   tensors_for_head["attended_i8"], tile_a=True)
+            add_i32(expected,
+                    tensors[f"h16_decode_head{head}_wo_i32"]["address"],
+                    tensors_for_head["projected"])
+        for name, matrix in (
+            ("h16_decode_attention_merge_i32", decode_merged),
+            ("h16_decode_residual1_i32", decode_residual1),
+            ("h16_decode_layernorm1_i32", decode_norm1),
+            ("h16_decode_layernorm1_i8", decode_norm1_i8),
+            ("h16_decode_ffn_up_i32", decode_ffn_up),
+            ("h16_decode_ffn_gelu_i32", decode_gelu),
+            ("h16_decode_ffn_gelu_i8", decode_gelu_i8),
+            ("h16_decode_ffn_down_i32", decode_ffn_down),
+            ("h16_decode_residual2_i32", decode_residual2),
+            ("h16_decode_layernorm2_i32", decode_norm2),
+        ):
+            tensor = tensors[name]
+            if tensor["dtype"] == "i8_packed":
+                add_i8(expected, tensor["address"], matrix, tile_a=True)
+            else:
+                add_i32(expected, tensor["address"], matrix)
     if actual != expected:
         missing = sorted(set(expected) - set(actual))
         extra = sorted(set(actual) - set(expected))

@@ -101,6 +101,12 @@ def main():
             (0x7100, 0x53, INPUT, W1, ACT1, M, C, C // 4, 0x00, 0, 1),
             (0x7101, 0x53, ACT1, W2, OUTPUT, M, C, C // 4, 0x00, 1, 0),
         ],
+        "both_convert": [
+            (0x7100, 0x53, INPUT, W1, ACT1, M, C, C // 4, 0x00, 0, 1),
+            (0x7101, 0x53, ACT1, W2, RAW1, M, C, C // 4, 0x00, 1, 2),
+            (0x7102, 0x30, RAW1, 0x0D100, RAW2, M, C, C // 4, 0x00, 2, 1),
+            (0x7103, 0x36, RAW2, 0, OUTPUT, 0, 0, M * C, 0x10, 1, 0),
+        ],
     }
     if mode not in command_specs:
         raise ValueError("unknown fusion mode: " + str(mode))
@@ -127,6 +133,12 @@ def main():
         for index in range(words):
             if memory[base + index * 4] != POISON:
                 raise ValueError("output pre-poison missing at 0x%08x" % (base + index * 4))
+    if mode == "both_convert":
+        identity = decode_b(memory, 0x0D100)
+        expected_identity = [[int(row == col) for col in range(C)]
+                             for row in range(C)]
+        if identity != expected_identity:
+            raise ValueError("layout-conversion identity weights are not exact")
 
     x, w1 = decode_a(memory, INPUT), decode_b(memory, W1)
     raw1 = gemm(x, w1)
@@ -141,16 +153,26 @@ def main():
                              for lane in range(4))
                          for row in range(M) for col in range(0, C, 4)]
     recomputed = {}
-    for index, row in enumerate(raw1):
-        for col, value in enumerate(row):
-            recomputed[RAW1 + 4 * (index * C + col)] = (
-                value & 0xFFFFFFFF if mode == "legacy" else POISON)
+    if mode == "legacy":
+        raw1_physical = [value & 0xFFFFFFFF for row in raw1 for value in row]
+    elif mode == "both_convert":
+        tile_words = pack_a(output)
+        raw1_physical = tile_words + [POISON] * (M * C - len(tile_words))
+    else:
+        raw1_physical = [POISON] * (M * C)
+    for index, value in enumerate(raw1_physical):
+        recomputed[RAW1 + 4 * index] = value
     for index, value in enumerate(packed_act1):
         recomputed[ACT1 + 4 * index] = value
     for index, row in enumerate(raw2):
         for col, value in enumerate(row):
-            recomputed[RAW2 + 4 * (index * C + col)] = (
-                value & 0xFFFFFFFF if mode != "both" else POISON)
+            if mode == "both":
+                physical_value = POISON
+            elif mode == "both_convert":
+                physical_value = output[index][col] & 0xFFFFFFFF
+            else:
+                physical_value = value & 0xFFFFFFFF
+            recomputed[RAW2 + 4 * (index * C + col)] = physical_value
     for index, value in enumerate(packed_output):
         recomputed[OUTPUT + 4 * index] = value
     if recomputed != golden:
