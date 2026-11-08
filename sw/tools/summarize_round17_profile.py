@@ -175,10 +175,13 @@ def main() -> int:
                                     ("mac", "request_wait", "response_wait", "writeback", "other"))
                 if exclusive_sum != engine_cycles or int(profile["exclusive_closed"]) != engine_cycles:
                     raise SystemExit(f"Matrix exclusive profile does not close {stage_name}/{local_index}")
+                completion_gap = int(interval["cycles"]) - engine_cycles
+                if overlap == 0 and completion_gap < 0:
+                    raise SystemExit(f"Matrix engine time exceeds retirement interval {stage_name}/{local_index}")
                 row.update({
                     "engine_busy_cycles": engine_cycles,
                     "dispatcher_completion_gap_cycles": (
-                        int(interval["cycles"]) - engine_cycles if overlap == 0 else ""
+                        completion_gap if overlap == 0 else ""
                     ),
                     "matrix_active_cycles": int(profile["mac"]),
                     "matrix_request_wait_cycles": int(profile["request_wait"]),
@@ -203,12 +206,15 @@ def main() -> int:
                                     ("pass0", "pass1", "pass2", "math", "other"))
                 if exclusive_sum != engine_cycles or int(profile["cycles_closed"]) != engine_cycles:
                     raise SystemExit(f"SFU exclusive profile does not close {stage_name}/{local_index}")
+                completion_gap = int(interval["cycles"]) - engine_cycles
+                if overlap == 0 and completion_gap < 0:
+                    raise SystemExit(f"SFU engine time exceeds retirement interval {stage_name}/{local_index}")
                 read_bytes = int(profile["spad_read_accepts"]) * 4
                 write_bytes = int(profile["spad_write_accepts"]) * 4
                 row.update({
                     "engine_busy_cycles": engine_cycles,
                     "dispatcher_completion_gap_cycles": (
-                        int(interval["cycles"]) - engine_cycles if overlap == 0 else ""
+                        completion_gap if overlap == 0 else ""
                     ),
                     "sfu_pass0_cycles": int(profile["pass0"]),
                     "sfu_pass1_cycles": int(profile["pass1"]),
@@ -229,10 +235,13 @@ def main() -> int:
                 profile = kv_records[kv_cursor]
                 kv_cursor += 1
                 engine_cycles = int(profile["cycles"])
+                completion_gap = int(interval["cycles"]) - engine_cycles
+                if overlap == 0 and completion_gap < 0:
+                    raise SystemExit(f"KV engine time exceeds retirement interval {stage_name}/{local_index}")
                 row.update({
                     "engine_busy_cycles": engine_cycles,
                     "dispatcher_completion_gap_cycles": (
-                        int(interval["cycles"]) - engine_cycles if overlap == 0 else ""
+                        completion_gap if overlap == 0 else ""
                     ),
                     "spad_read_bytes": int(profile["read_bytes"]),
                     "spad_write_bytes": int(profile["write_bytes"]),
