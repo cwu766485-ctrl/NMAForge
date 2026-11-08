@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 74695)
-Total output lines: 5911
-
 `timescale 1ns / 1ps
 
 `ifndef AI_SPAD_WORDS_PER_BANK
@@ -1212,7 +1209,3573 @@ module tb_ai_accel_smoke;
         .error        (dut.compute_cluster_u.tensor_sfu_u.error),
         .spad_valid   (dut.sfu_spad_valid),
         .cycle_count  (dut.compute_cluster_u.tensor_sfu_u.cycle_count),
-…44695 tokens truncated…y("%0t ERROR: fused tile baseline producer-A reads=%0d expected=16",
+        .element_count(dut.compute_cluster_u.tensor_sfu_u.element_count)
+    );
+
+    ai_compute_activity_sva cnn_activity_sva(
+        .clk          (aclk),
+        .resetn       (aresetn),
+        .wake         (dut.core_start && dut.conv_linebuffer_op),
+        .busy         (dut.conv_busy),
+        .done         (dut.compute_cluster_u.conv_linebuffer_u.done),
+        .error        (dut.compute_cluster_u.conv_linebuffer_u.error),
+        .spad_valid   (dut.conv_spad_valid),
+        .cycle_count  (dut.compute_cluster_u.conv_linebuffer_u.cycle_count),
+        .element_count(dut.compute_cluster_u.conv_linebuffer_u.element_count)
+    );
+
+    ai_compute_activity_sva kv_activity_sva(
+        .clk          (aclk),
+        .resetn       (aresetn),
+        .wake         (dut.core_start && dut.kv_cache_op),
+        .busy         (dut.kv_busy),
+        .done         (dut.compute_cluster_u.kv_cache_u.done),
+        .error        (dut.compute_cluster_u.kv_cache_u.error),
+        .spad_valid   (dut.kv_spad_valid),
+        .cycle_count  (dut.compute_cluster_u.kv_cache_u.cycle_count),
+        .element_count(dut.compute_cluster_u.kv_cache_u.element_count)
+    );
+
+    ai_compute_activity_sva fp_activity_sva(
+        .clk          (aclk),
+        .resetn       (aresetn),
+        .wake         (dut.core_start && ((dut.launch_op == 8'h50) || (dut.launch_op == 8'h51))),
+        .busy         (dut.fp_busy),
+        .done         (dut.compute_cluster_u.fp_done),
+        .error        (dut.compute_cluster_u.fp_error),
+        .spad_valid   (dut.fp_spad_valid),
+        .cycle_count  (dut.compute_cluster_u.fp_cycle_count),
+        .element_count(dut.compute_cluster_u.fp_element_count)
+    );
+
+    initial begin
+        aclk = 1'b0;
+        begin : clock_setup
+            real aclk_period_ns;
+            aclk_period_ns = 10.0;
+            void'($value$plusargs("ACLK_PERIOD_NS=%f", aclk_period_ns));
+            if (aclk_period_ns <= 0.0)
+                $fatal(1, "ACLK_PERIOD_NS must be > 0, got %f", aclk_period_ns);
+            forever #(aclk_period_ns / 2.0) aclk = ~aclk;
+        end
+    end
+
+    `include "axi_lite_tasks.svh"
+
+    task wait_done;
+        begin
+            integer i;
+            integer found;
+            found = 0;
+            // Scratchpad reads are native synchronous BRAM reads.  Scalar
+            // operations now include request/response wait cycles and banked
+            // operations fetch A then B, so retain ample polling headroom.
+            for (i = 0; i < 400; i = i + 1) begin
+                if (!found) begin
+                    axi_read(REG_STATUS, rd);
+                    if (rd[1])
+                        found = 1;
+                end
+            end
+            if (!found) begin
+                $display("%0t ERROR: timeout waiting done", $time);
+                errors = errors + 1;
+            end
+            if (rd[2]) begin
+                axi_read(REG_ERROR_CODE, rd);
+                $display("%0t ERROR: core error_code=%0d", $time, rd);
+                errors = errors + 1;
+            end
+        end
+    endtask
+
+    task wait_done_expect_error;
+        input [3:0] expected_error_code;
+        begin
+            integer i;
+            integer found;
+            reg [31:0] status;
+            found = 0;
+            status = 32'd0;
+            for (i = 0; i < 200; i = i + 1) begin
+                if (!found) begin
+                    axi_read(REG_STATUS, status);
+                    if (status[1])
+                        found = 1;
+                end
+            end
+            if (!found) begin
+                $display("%0t ERROR: timeout waiting expected error done", $time);
+                errors = errors + 1;
+            end else if (!status[2]) begin
+                $display("%0t ERROR: expected STATUS.error for descriptor error", $time);
+                errors = errors + 1;
+            end
+            axi_read(REG_ERROR_CODE, rd);
+            if (rd[3:0] !== expected_error_code) begin
+                $display("%0t ERROR: expected error_code=%0d actual=%0d",
+                         $time, expected_error_code, rd[3:0]);
+                errors = errors + 1;
+            end else begin
+                $display("%0t PASS: expected core error_code = %0d/%08h", $time, rd[3:0], rd);
+            end
+        end
+    endtask
+
+    task clear_done_irq;
+        begin
+            axi_write(REG_IRQ_STATUS, 32'd1);
+            axi_write(REG_STATUS, 32'd2);
+        end
+    endtask
+
+    `include "ai_dma_tasks.svh"
+
+    // Optional subsystem-level DMA error stress. Each transaction uses the
+    // production top DMA/SPAD path and a seeded error location inside a
+    // multi-beat AXI burst. The regular smoke stays deterministic and does
+    // not enable this additional randomized campaign.
+    task run_dma_error_injection_stress;
+        input integer seed;
+        integer iteration;
+        integer beat_index;
+        integer word_index;
+        reg [31:0] rng;
+        reg [31:0] ext_addr;
+        reg [31:0] spad_addr;
+        begin
+            rng = seed;
+            for (iteration = 0; iteration < 8; iteration = iteration + 1) begin
+                rng = rng * 32'd1664525 + 32'd1013904223;
+                beat_index = rng[1:0];
+                ext_addr = 32'h0000_1000 + (iteration * 32'h100);
+                spad_addr = 32'h0000_3000 + (iteration * 32'h40);
+                axi_mem_u.read_gap_cfg = rng[20:19];
+                axi_mem_u.ready_gap_cfg = rng[17:16];
+                for (word_index = 0; word_index < 16; word_index = word_index + 1)
+                    axi_mem_u.mem[(ext_addr >> 2) + word_index] =
+                        rng ^ (32'h5a00_0000 + (iteration * 32) + word_index);
+                axi_mem_u.inject_read_error_word = (ext_addr >> 2) + (beat_index * 4);
+                dma_load_expect_error(ext_addr, spad_addr, 16'd16, 4'd2);
+                axi_mem_u.inject_read_error_word = -1;
+                if (axi_mem_u.read_active_r || (axi_mem_u.read_q_count_r != 0) ||
+                    m_axi_rvalid || m_axi_arvalid) begin
+                    $display("%0t ERROR: randomized DMA read error left AXI read traffic active iter=%0d",
+                             $time, iteration);
+                    errors = errors + 1;
+                end
+
+                rng = rng * 32'd1664525 + 32'd1013904223;
+                beat_index = rng[1:0];
+                ext_addr = 32'h0000_3000 + (iteration * 32'h100);
+                spad_addr = 32'h0000_4000 + (iteration * 32'h40);
+                axi_mem_u.ready_gap_cfg = rng[17:16];
+                for (word_index = 0; word_index < 16; word_index = word_index + 1) begin
+                    axi_write(SPAD_BASE + spad_addr + (word_index * 4),
+                              rng ^ (32'ha500_0000 + (iteration * 32) + word_index));
+                end
+                axi_mem_u.inject_write_error_word = (ext_addr >> 2) + (beat_index * 4);
+                dma_store_expect_error(ext_addr, spad_addr, 16'd16, 4'd3);
+                axi_mem_u.inject_write_error_word = -1;
+                if (axi_mem_u.write_active_r || axi_mem_u.bvalid ||
+                    m_axi_awvalid || m_axi_wvalid) begin
+                    $display("%0t ERROR: randomized DMA write error left AXI write traffic active iter=%0d",
+                             $time, iteration);
+                    errors = errors + 1;
+                end
+            end
+            axi_mem_u.inject_read_error_word = -1;
+            axi_mem_u.inject_write_error_word = -1;
+            axi_mem_u.read_gap_cfg = 1;
+            axi_mem_u.ready_gap_cfg = 0;
+            $display("%0t PASS: DMA randomized burst-error stress seed=%0d cases=8 read=8 write=8",
+                     $time, seed);
+        end
+    endtask
+
+    task write_spad_desc;
+        input [31:0] base;
+        input [7:0]  op;
+        input [15:0] task_id;
+        input [31:0] src0;
+        input [31:0] src1;
+        input [31:0] dst;
+        input [15:0] m;
+        input [15:0] n;
+        input [15:0] k;
+        begin
+            axi_write(SPAD_BASE + base + 32'h00, {task_id, 8'd0, op});
+            axi_write(SPAD_BASE + base + 32'h04, src0);
+            axi_write(SPAD_BASE + base + 32'h08, src1);
+            axi_write(SPAD_BASE + base + 32'h0c, 32'd0);
+            axi_write(SPAD_BASE + base + 32'h10, dst);
+            axi_write(SPAD_BASE + base + 32'h14, {n, m});
+            axi_write(SPAD_BASE + base + 32'h18, {16'd0, k});
+            axi_write(SPAD_BASE + base + 32'h1c, 32'd0);
+            axi_write(SPAD_BASE + base + 32'h20, 32'd0);
+            axi_write(SPAD_BASE + base + 32'h24, 32'd0);
+            axi_write(SPAD_BASE + base + 32'h28, 32'd0);
+            axi_write(SPAD_BASE + base + 32'h2c, 32'd0);
+            axi_write(SPAD_BASE + base + 32'h30, 32'd0);
+            axi_write(SPAD_BASE + base + 32'h34, 32'd0);
+            axi_write(SPAD_BASE + base + 32'h38, 32'd0);
+            axi_write(SPAD_BASE + base + 32'h3c, 32'd0);
+        end
+    endtask
+
+    task write_axi_desc;
+        input [31:0] base;
+        input [7:0]  op;
+        input [15:0] task_id;
+        input [31:0] src0;
+        input [31:0] src1;
+        input [31:0] dst;
+        input [15:0] m;
+        input [15:0] n;
+        input [15:0] k;
+        integer word_idx;
+        begin
+            word_idx = base[31:2];
+            axi_mem_u.mem[word_idx + 0]  = {task_id, 8'd0, op};
+            axi_mem_u.mem[word_idx + 1]  = src0;
+            axi_mem_u.mem[word_idx + 2]  = src1;
+            axi_mem_u.mem[word_idx + 3]  = 32'd0;
+            axi_mem_u.mem[word_idx + 4]  = dst;
+            axi_mem_u.mem[word_idx + 5]  = {n, m};
+            axi_mem_u.mem[word_idx + 6]  = {16'd0, k};
+            axi_mem_u.mem[word_idx + 7]  = 32'd0;
+            axi_mem_u.mem[word_idx + 8]  = 32'd0;
+            axi_mem_u.mem[word_idx + 9]  = 32'd0;
+            axi_mem_u.mem[word_idx + 10] = 32'd0;
+            axi_mem_u.mem[word_idx + 11] = 32'd0;
+            axi_mem_u.mem[word_idx + 12] = 32'd0;
+            axi_mem_u.mem[word_idx + 13] = 32'd0;
+            axi_mem_u.mem[word_idx + 14] = 32'd0;
+            axi_mem_u.mem[word_idx + 15] = 32'd0;
+        end
+    endtask
+
+    task write_spad_desc_v3;
+        input [31:0] base;
+        input [7:0]  op;
+        input [15:0] task_id;
+        input [31:0] src0;
+        input [31:0] src1;
+        input [31:0] bias_base_i;
+        input [31:0] dst;
+        input [15:0] m;
+        input [15:0] n;
+        input [15:0] k_or_length;
+        input [7:0]  flags;
+        input [31:0] aux0;
+        input [4:0]  shift;
+        input [1:0]  activation;
+        input [31:0] src0_stride;
+        input [31:0] src1_stride;
+        input [31:0] dst_stride;
+        input [15:0] batch_count;
+        input [15:0] head_count;
+        input [15:0] wait_mask;
+        input [15:0] signal_mask;
+        input [15:0] clear_mask;
+        begin
+            axi_write(SPAD_BASE + base + 32'h00, {task_id, 8'd0, op});
+            axi_write(SPAD_BASE + base + 32'h04, src0);
+            axi_write(SPAD_BASE + base + 32'h08, src1);
+            axi_write(SPAD_BASE + base + 32'h0c, bias_base_i);
+            axi_write(SPAD_BASE + base + 32'h10, dst);
+            axi_write(SPAD_BASE + base + 32'h14, {n, m});
+            axi_write(SPAD_BASE + base + 32'h18, {16'd0, k_or_length});
+            axi_write(SPAD_BASE + base + 32'h1c, {24'd0, flags});
+            axi_write(SPAD_BASE + base + 32'h20, aux0);
+            axi_write(SPAD_BASE + base + 32'h24, {25'd0, activation, shift});
+            axi_write(SPAD_BASE + base + 32'h28, src0_stride);
+            axi_write(SPAD_BASE + base + 32'h2c, src1_stride);
+            axi_write(SPAD_BASE + base + 32'h30, dst_stride);
+            axi_write(SPAD_BASE + base + 32'h34, {head_count, batch_count});
+            axi_write(SPAD_BASE + base + 32'h38, {signal_mask, wait_mask});
+            axi_write(SPAD_BASE + base + 32'h3c, {clear_mask, 8'd0, 8'd3});
+        end
+    endtask
+
+    task write_parallel_pair_descriptor;
+        input [31:0] desc_base;
+        input integer engine_id;
+        input [15:0] task_id;
+        reg [7:0] op;
+        reg [7:0] version;
+        reg [15:0] m_size;
+        reg [15:0] n_size;
+        reg [15:0] length_or_k;
+        reg [31:0] src0;
+        reg [31:0] src1;
+        reg [31:0] dst;
+        reg [31:0] src0_stride;
+        reg [31:0] src1_stride;
+        reg [15:0] batch_count;
+        reg [15:0] head_count;
+        begin
+            op = OP_VDOT_INT8;
+            version = 8'd3;
+            m_size = 16'd1;
+            n_size = 16'd1;
+            length_or_k = 16'd64;
+            // Read-only inputs are shared by all engines.  Outputs use a
+            // private page so concurrent descriptors cannot conflict.
+            src0 = 32'h0001_0000;
+            src1 = 32'h0001_1000;
+            dst = 32'h0003_0000 + (engine_id * 32'h1000);
+            src0_stride = 32'd0;
+            src1_stride = 32'd0;
+            batch_count = 16'd1;
+            head_count = 16'd1;
+            case (engine_id)
+                0: op = OP_VDOT_INT8;
+                1: begin
+                    op = 8'h51;
+                    version = 8'd7;
+                    m_size = 16'd1;
+                    n_size = 16'd1;
+                    batch_count = 16'd0;
+                    head_count = 16'd0;
+                end
+                2: op = OP_BANKED_VDOT;
+                3: begin
+                    op = OP_TENSOR_GEMM;
+                    m_size = 16'd4;
+                    n_size = 16'd4;
+                    length_or_k = 16'd16;
+                end
+                4: op = OP_GELU_Q8_8;
+                5: begin
+                    op = 8'h16;
+                    version = 8'd5;
+                    m_size = 16'd16;
+                    n_size = 16'd16;
+                    length_or_k = 16'd0;
+                end
+                6: begin
+                    op = 8'h43;
+                    version = 8'd5;
+                    src0_stride = 32'd64;
+                    src1_stride = 32'd16;
+                end
+                default: $fatal(1, "invalid parallel engine id %0d", engine_id);
+            endcase
+
+            write_spad_desc_v3(desc_base, op, task_id, src0, src1, 32'd0, dst,
+                               m_size, n_size, length_or_k, 8'd0, 32'd0,
+                               5'd0, 2'd0, src0_stride, src1_stride, 32'd0,
+                               batch_count, head_count, 16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + desc_base + 32'h3c,
+                      {16'd0, 8'd0, version});
+        end
+    endtask
+
+    task run_parallel_engine_pair;
+        input integer engine_a;
+        input integer engine_b;
+        input integer pair_index;
+        reg overlap_found;
+        integer poll;
+        begin
+            write_parallel_pair_descriptor(32'h7d00, engine_a,
+                                           16'h7000 + (pair_index * 2));
+            write_parallel_pair_descriptor(32'h7d40, engine_b,
+                                           16'h7001 + (pair_index * 2));
+
+            axi_write(REG_CMDQ_BASE_LO, 32'h7d00);
+            axi_write(REG_CMDQ_SIZE, 32'd4);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd2);
+            axi_write(REG_CPLQ_BASE_LO, 32'h7d80);
+            axi_write(REG_CPLQ_SIZE, 32'd4);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+
+            axi_write(REG_DOORBELL, 32'd1);
+            overlap_found = 1'b0;
+            for (poll = 0; poll < 2000 && !overlap_found; poll = poll + 1) begin
+                @(posedge aclk);
+                if (dut.engine_busy[engine_a] && dut.engine_busy[engine_b])
+                    overlap_found = 1'b1;
+            end
+            if (!overlap_found) begin
+                $display("%0t ERROR: engine pair %0d/%0d did not overlap",
+                         $time, engine_a, engine_b);
+                errors = errors + 1;
+            end else begin
+                parallel_engine_pair_seen[pair_index] = 1'b1;
+                $display("%0t PASS: engine pair %0d/%0d overlapped",
+                         $time, engine_a, engine_b);
+                axi_write(REG_ABORT, 32'd1);
+            end
+            wait_cpl_tail(32'd2, "all-engine-pair ordered abort drain");
+            expect_read(SPAD_BASE + 32'h7d80,
+                        {16'd0, (16'h7000 + (pair_index * 2))},
+                        "all-engine-pair completion first task");
+            axi_read(SPAD_BASE + 32'h7d84, rd);
+            if ((rd !== 32'h0000_0001) && (rd !== 32'h0000_0032)) begin
+                $display("%0t ERROR: all-engine-pair first completion status=%08h",
+                         $time, rd);
+                errors = errors + 1;
+            end
+            expect_read(SPAD_BASE + 32'h7d90,
+                        {16'd0, (16'h7001 + (pair_index * 2))},
+                        "all-engine-pair completion second task");
+            axi_read(SPAD_BASE + 32'h7d94, rd);
+            if ((rd !== 32'h0000_0001) && (rd !== 32'h0000_0032)) begin
+                $display("%0t ERROR: all-engine-pair second completion status=%08h",
+                         $time, rd);
+                errors = errors + 1;
+            end
+            if ((dut.engine_busy != 7'd0) || dut.parallel_compute_dispatcher_u.busy) begin
+                $display("%0t ERROR: engine pair %0d/%0d abort returned before drain",
+                         $time, engine_a, engine_b);
+                errors = errors + 1;
+            end
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+        end
+    endtask
+
+    task run_kv_top_protection_denial;
+        integer poll;
+        begin
+            // Keep one KV_WRITE source word readable/executable while leaving
+            // its cache destination outside every permitted region. The
+            // descriptor fetch and completion record use a separate RW region.
+            axi_write(REG_REGION0_PERM, 32'd0);
+            axi_write(REG_REGION1_PERM, 32'd0);
+            axi_write(REG_REGION2_PERM, 32'd0);
+            axi_write(REG_REGION3_PERM, 32'd0);
+            axi_write(SPAD_BASE + 32'h0000_1000, 32'h1357_9bdf);
+            axi_write(SPAD_BASE + 32'h0000_2000, 32'hcafe_f00d);
+            write_spad_desc_v3(32'h7d00, 8'h43, 16'h7a53,
+                               32'h0000_1000, 32'd0, 32'd0, 32'h0000_2000,
+                               16'd1, 16'd1, 16'd1, 8'd0, 32'd0,
+                               5'd0, 2'd0, 32'd4, 32'd0, 32'd0,
+                               16'd0, 16'd0, 16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + 32'h7d3c, {16'd0, 8'd0, 8'd5});
+
+            axi_write(REG_REGION0_BASE, 32'h0000_1000);
+            axi_write(REG_REGION0_LIMIT, 32'h0000_1004);
+            axi_write(REG_REGION0_PERM, 32'h0000_000d); // enable + read + execute
+            axi_write(REG_REGION2_BASE, 32'h0000_7d00);
+            axi_write(REG_REGION2_LIMIT, 32'h0000_7d90);
+            axi_write(REG_REGION2_PERM, 32'h0000_000b); // enable + read + write
+
+            axi_write(REG_CMDQ_BASE_LO, 32'h7d00);
+            axi_write(REG_CMDQ_SIZE, 32'd2);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd1);
+            axi_write(REG_CPLQ_BASE_LO, 32'h7d80);
+            axi_write(REG_CPLQ_SIZE, 32'd2);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+
+            kv_protection_read_accepts = 0;
+            kv_protection_write_denied = 1'b0;
+            kv_protection_denied_addr = 32'd0;
+            kv_protection_case_active = 1'b1;
+            axi_write(REG_DOORBELL, 32'd1);
+            wait_cpl_tail(32'd1, "KV top-level protection denial completion");
+            kv_protection_case_active = 1'b0;
+
+            expect_completion(32'h7d80, 16'h7a53, 4'h2, 4'h7,
+                              32'd0, 32'd0,
+                              "KV top-level protection denial completion record");
+            if ((kv_protection_read_accepts != 1) ||
+                !kv_protection_write_denied ||
+                (kv_protection_denied_addr !== 32'h0000_2000)) begin
+                $display("%0t ERROR: KV protection trace reads=%0d denied=%0b addr=%08h",
+                         $time, kv_protection_read_accepts,
+                         kv_protection_write_denied, kv_protection_denied_addr);
+                errors = errors + 1;
+            end else begin
+                $display("%0t PASS: KV top protection accepted source read and denied destination write",
+                         $time);
+            end
+
+            axi_write(REG_REGION0_PERM, 32'd0);
+            axi_write(REG_REGION2_PERM, 32'd0);
+            expect_read(SPAD_BASE + 32'h0000_1000, 32'h1357_9bdf,
+                        "KV protection source preserved");
+            expect_read(SPAD_BASE + 32'h0000_2000, 32'hcafe_f00d,
+                        "KV protection destination unchanged");
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+        end
+    endtask
+
+    function [31:0] fp_perf_expected_sum;
+        input integer n;
+        begin
+            case (n)
+                1: fp_perf_expected_sum = 32'h3f80_0000;
+                2: fp_perf_expected_sum = 32'h4000_0000;
+                3: fp_perf_expected_sum = 32'h4040_0000;
+                4: fp_perf_expected_sum = 32'h4080_0000;
+                16: fp_perf_expected_sum = 32'h4180_0000;
+                64: fp_perf_expected_sum = 32'h4280_0000;
+                128: fp_perf_expected_sum = 32'h4300_0000;
+                256: fp_perf_expected_sum = 32'h4380_0000;
+                1024: fp_perf_expected_sum = 32'h4480_0000;
+                default: fp_perf_expected_sum = 32'hxxxx_xxxx;
+            endcase
+        end
+    endfunction
+
+    task fp_perf_seed_input_vectors;
+        input format_fp16;
+        input integer vector_length;
+        input integer tile_count;
+        integer word_index;
+        integer tile_index;
+        integer words_per_tile;
+        reg [31:0] packed_one;
+        begin
+            packed_one = format_fp16 ? 32'h3c00_3c00 : 32'h3f80_3f80;
+            words_per_tile = (vector_length + 1) >> 1;
+            for (tile_index = 0; tile_index < tile_count; tile_index = tile_index + 1)
+                for (word_index = 0; word_index < words_per_tile; word_index = word_index + 1)
+                    axi_mem_u.mem[12'h400 + tile_index * words_per_tile + word_index] = packed_one;
+        end
+    endtask
+
+    task fp_perf_load_weights;
+        input format_fp16;
+        input integer words;
+        integer word_index;
+        reg [31:0] packed_one;
+        begin
+            packed_one = format_fp16 ? 32'h3c00_3c00 : 32'h3f80_3f80;
+            for (word_index = 0; word_index < words; word_index = word_index + 1)
+                axi_mem_u.mem[12'hc00 + word_index] = packed_one;
+            axi_mem_u.ready_gap_cfg = 0;
+            // The weight vector is loaded once through the real DMA path;
+            // tile inputs and outputs then use the existing ping-pong engine.
+            fp_perf_dma_load(32'h0000_3000, 32'h0000_3000, words);
+        end
+    endtask
+
+    task fp_perf_dma_load;
+        input [31:0] ext_addr;
+        input [31:0] spad_addr;
+        input [15:0] words;
+        integer poll;
+        reg [31:0] status;
+        begin
+            axi_write(REG_DMA_EXT_ADDR, ext_addr);
+            axi_write(REG_DMA_SPAD_ADDR, spad_addr);
+            axi_write(REG_DMA_LENGTH, {16'd0, words});
+            axi_write(REG_DMA_CTRL, 32'h0000_0001);
+            for (poll = 0; poll < 20000 && !dut.dma_done && !dut.dma_error;
+                 poll = poll + 1)
+                @(posedge aclk);
+            if (poll == 20000)
+                $fatal(1, "FP benchmark setup DMA cycle timeout ext=%08h spad=%08h words=%0d busy=%b state=%0d",
+                       ext_addr, spad_addr, words, dut.dma_busy, dut.dma_u.state_r);
+            axi_read(REG_DMA_STATUS, status);
+            if (!(dut.dma_done || status[1]) || dut.dma_error || status[2])
+                $fatal(1, "FP benchmark setup DMA failed ext=%08h spad=%08h words=%0d status=%08h",
+                       ext_addr, spad_addr, words, status);
+            axi_write(REG_DMA_STATUS, 32'd2);
+        end
+    endtask
+
+    task fp_perf_wait_tile_done;
+        integer poll;
+        integer found;
+        reg [31:0] status;
+        begin
+            found = 0;
+            status = 32'd0;
+            for (poll = 0; poll < 10000 && !found; poll = poll + 1) begin
+                axi_read(REG_STATUS, status);
+                if (status[1]) found = 1;
+            end
+            if (!found || status[2])
+                $fatal(1, "FP tile benchmark did not complete cleanly status=%08h processor_busy=%b tile_active=%b dma_busy=%b fp_busy=%b",
+                       status, dut.processor_busy, dut.tile_active, dut.dma_busy, dut.fp_busy);
+        end
+    endtask
+
+    // Round 9 reproducer for the previously non-retained Matrix/DMA ping-pong
+    // failure. Three 4x4 INT8 GEMMs share a fixed B matrix and stream distinct
+    // A tiles through the production top's two-buffer DMA/compute pipeline.
+    task run_matrix_dma_overlap_probe;
+        integer tile_index;
+        integer row_index;
+        integer col_index;
+        integer lane_index;
+        integer value_i;
+        integer expected_i;
+        integer word_index;
+        integer serial_tile;
+        reg [31:0] packed_word;
+        reg [31:0] read_value;
+        reg [31:0] perf_total;
+        reg [31:0] perf_dma;
+        reg [31:0] perf_compute;
+        reg [31:0] perf_overlap;
+        reg [31:0] perf_stall;
+        reg [31:0] serial_total;
+        reg [31:0] serial_dma;
+        reg [31:0] serial_compute;
+        reg [31:0] serial_overlap;
+        reg [31:0] serial_stall;
+        reg [31:0] input_words [0:11];
+        reg [31:0] weight_words [0:3];
+        reg [31:0] expected_words [0:47];
+        begin
+            // B is stored as one four-byte K word for each output column.
+            for (col_index = 0; col_index < 4; col_index = col_index + 1) begin
+                packed_word = 32'd0;
+                for (lane_index = 0; lane_index < 4; lane_index = lane_index + 1) begin
+                    value_i = col_index + 1 - lane_index;
+                    packed_word[lane_index*8 +: 8] = value_i[7:0];
+                end
+                weight_words[col_index] = packed_word;
+                axi_write(SPAD_BASE + 32'h0000_a000 + col_index*4, packed_word);
+            end
+
+            // Each tile has four packed A rows. Values differ by tile/row/lane
+            // so swapped buffers, stale contexts, and wrong tile addresses
+            // cannot accidentally match the expected output.
+            for (tile_index = 0; tile_index < 3; tile_index = tile_index + 1) begin
+                for (row_index = 0; row_index < 4; row_index = row_index + 1) begin
+                    packed_word = 32'd0;
+                    for (lane_index = 0; lane_index < 4; lane_index = lane_index + 1) begin
+                        value_i = tile_index + 2 + row_index*2 + lane_index;
+                        packed_word[lane_index*8 +: 8] = value_i[7:0];
+                    end
+                    word_index = tile_index*4 + row_index;
+                    input_words[word_index] = packed_word;
+                    axi_mem_u.mem[12'h500 + word_index] = packed_word;
+                end
+            end
+
+            for (tile_index = 0; tile_index < 3; tile_index = tile_index + 1)
+                for (row_index = 0; row_index < 4; row_index = row_index + 1)
+                    for (col_index = 0; col_index < 4; col_index = col_index + 1) begin
+                        expected_i = dot4_i8_sv(input_words[tile_index*4 + row_index],
+                                                weight_words[col_index]);
+                        expected_words[tile_index*16 + row_index*4 + col_index] = expected_i;
+                        axi_mem_u.mem[12'h800 + tile_index*16 + row_index*4 + col_index] =
+                            32'hdead_c0de;
+                    end
+
+            axi_write(REG_OP_MODE, OP_GEMM_INT8_TILE);
+            axi_write(REG_SRC1_BASE, 32'h0000_a000);
+            axi_write(REG_LENGTH, 32'd1);
+            axi_write(REG_M_SIZE, 32'd4);
+            axi_write(REG_N_SIZE, 32'd4);
+            axi_write(REG_K_WORDS, 32'd1);
+            axi_write(REG_POST_CTRL, 32'd0);
+            axi_write(REG_QUANT_ACT, 32'd0);
+            axi_write(REG_TILE_EXT_IN_STRIDE, 32'd16);
+            axi_write(REG_TILE_EXT_OUT_STRIDE, 32'd64);
+            axi_write(REG_TILE_BUF0, 32'h0000_8000);
+            axi_write(REG_TILE_BUF1, 32'h0000_9000);
+            axi_write(REG_TILE_IN_WORDS, 32'd4);
+            axi_write(REG_TILE_OUT_WORDS, 32'd16);
+            axi_write(REG_TILE_OUT_OFFSET, 32'h0000_0100);
+
+            serial_total = 0;
+            serial_dma = 0;
+            serial_compute = 0;
+            serial_overlap = 0;
+            serial_stall = 0;
+            for (serial_tile = 0; serial_tile < 3; serial_tile = serial_tile + 1) begin
+                axi_write(REG_TILE_COUNT, 32'd1);
+                axi_write(REG_TILE_EXT_IN, 32'h0000_1400 + serial_tile*16);
+                axi_write(REG_TILE_EXT_OUT, 32'h0000_2000 + serial_tile*64);
+                axi_write(REG_PERF_CTRL, 32'd1);
+                axi_write(REG_TILE_CTRL, 32'd1);
+                fp_perf_wait_tile_done();
+                axi_read(REG_PERF_TOTAL, perf_total);
+                axi_read(REG_PERF_DMA, perf_dma);
+                axi_read(REG_PERF_COMPUTE, perf_compute);
+                axi_read(REG_PERF_OVERLAP, perf_overlap);
+                axi_read(REG_PERF_STALL, perf_stall);
+                serial_total = serial_total + perf_total;
+                serial_dma = serial_dma + perf_dma;
+                serial_compute = serial_compute + perf_compute;
+                serial_overlap = serial_overlap + perf_overlap;
+                serial_stall = serial_stall + perf_stall;
+                expect_read(REG_TILE_COMPLETED, 32'd1,
+                            "R9 serialized Matrix/DMA tile completed");
+                for (word_index = 0; word_index < 16; word_index = word_index + 1)
+                    if (axi_mem_u.mem[12'h800 + serial_tile*16 + word_index] !==
+                        expected_words[serial_tile*16 + word_index])
+                        $fatal(1, "R9 serialized Matrix/DMA Golden mismatch tile=%0d word=%0d expected=%08h actual=%08h",
+                               serial_tile, word_index,
+                               expected_words[serial_tile*16 + word_index],
+                               axi_mem_u.mem[12'h800 + serial_tile*16 + word_index]);
+                clear_done_irq();
+            end
+
+            axi_write(REG_TILE_COUNT, 32'd3);
+            axi_write(REG_TILE_EXT_IN, 32'h0000_1400);
+            axi_write(REG_TILE_EXT_OUT, 32'h0000_2000);
+            axi_write(REG_PERF_CTRL, 32'd1);
+            axi_write(REG_TILE_CTRL, 32'd1);
+            fp_perf_wait_tile_done();
+
+            axi_read(REG_PERF_TOTAL, perf_total);
+            axi_read(REG_PERF_DMA, perf_dma);
+            axi_read(REG_PERF_COMPUTE, perf_compute);
+            axi_read(REG_PERF_OVERLAP, perf_overlap);
+            axi_read(REG_PERF_STALL, perf_stall);
+            expect_read(REG_TILE_COMPLETED, 32'd3,
+                        "R9 Matrix/DMA pipeline completed tiles");
+
+            for (tile_index = 0; tile_index < 3; tile_index = tile_index + 1)
+                for (row_index = 0; row_index < 4; row_index = row_index + 1)
+                    for (col_index = 0; col_index < 4; col_index = col_index + 1) begin
+                        word_index = tile_index*16 + row_index*4 + col_index;
+                        if (axi_mem_u.mem[12'h800 + word_index] !== expected_words[word_index])
+                            $fatal(1, "R9 Matrix/DMA DDR Golden mismatch tile=%0d row=%0d col=%0d expected=%08h actual=%08h",
+                                   tile_index, row_index, col_index,
+                                   expected_words[word_index],
+                                   axi_mem_u.mem[12'h800 + word_index]);
+                    end
+            // Check the last row in both ping-pong buffers independently of
+            // the external AXI write image.
+            for (tile_index = 0; tile_index < 2; tile_index = tile_index + 1)
+                for (col_index = 0; col_index < 4; col_index = col_index + 1) begin
+                    axi_read(SPAD_BASE + (tile_index ? 32'h0000_9000 : 32'h0000_8000) +
+                             32'h0000_0100 + 48 + col_index*4, read_value);
+                    // Tile 2 reuses buffer 0 after tile 0 has been stored.
+                    expected_i = expected_words[(tile_index == 0 ? 2 : 1)*16 + 12 + col_index];
+                    if (read_value !== expected_i)
+                        $fatal(1, "R9 Matrix/DMA SPAD Golden mismatch buffer=%0d word=%0d expected=%08h actual=%08h",
+                               tile_index, col_index, expected_i, read_value);
+                end
+
+            $display("R9_MATRIX_DMA_SERIALIZED tiles=3 shape=4x4x4 total=%0d dma=%0d compute=%0d overlap=%0d stall=%0d golden=bit-exact",
+                     serial_total, serial_dma, serial_compute, serial_overlap,
+                     serial_stall);
+            $display("R9_MATRIX_DMA_OVERLAP_PASS tiles=3 shape=4x4x4 total=%0d dma=%0d compute=%0d overlap=%0d stall=%0d ddr_and_spad_golden=bit-exact seed=%0d",
+                     perf_total, perf_dma, perf_compute, perf_overlap, perf_stall,
+                     profile_ai_seed);
+            clear_done_irq();
+        end
+    endtask
+
+    task fp_perf_run_case;
+        input format_fp16;
+        input integer vector_length;
+        // A one-tile job is the no-overlap baseline; three ping-pong tiles
+        // create real DMA/compute overlap through the production scheduler.
+        input integer tile_count;
+        reg [31:0] expected;
+        reg [31:0] tile_overlap_cycles;
+        reg [31:0] tile_stall_cycles;
+        integer seed_for_case;
+        integer words_per_tile;
+        integer tile_index;
+        integer output_word_index;
+        begin
+            expected = fp_perf_expected_sum(vector_length);
+            words_per_tile = (vector_length + 1) >> 1;
+            fp_perf_seed_input_vectors(format_fp16, vector_length, tile_count);
+            fp_perf_load_weights(format_fp16, words_per_tile);
+            axi_write(REG_OP_MODE, format_fp16 ? 32'h51 : 32'h50);
+            axi_write(REG_SRC1_BASE, 32'h0000_3000);
+            axi_write(REG_LENGTH, vector_length);
+            axi_write(REG_M_SIZE, 32'd1);
+            axi_write(REG_N_SIZE, 32'd1);
+            axi_write(REG_K_WORDS, vector_length);
+            axi_write(REG_BIAS_BASE, 32'd0);
+            axi_write(REG_POST_CTRL, 32'd0);
+            axi_write(REG_QUANT_ACT, 32'd0);
+            axi_write(REG_TILE_COUNT, tile_count);
+            axi_write(REG_TILE_EXT_IN, 32'h0000_1000);
+            axi_write(REG_TILE_EXT_OUT, 32'h0000_3800);
+            axi_write(REG_TILE_EXT_IN_STRIDE, words_per_tile * 4);
+            axi_write(REG_TILE_EXT_OUT_STRIDE, 32'd4);
+            axi_write(REG_TILE_BUF0, 32'h0001_0000);
+            axi_write(REG_TILE_BUF1, 32'h0001_3000);
+            axi_write(REG_TILE_IN_WORDS, words_per_tile);
+            axi_write(REG_TILE_OUT_WORDS, 32'd1);
+            axi_write(REG_TILE_OUT_OFFSET, 32'h0000_1000);
+
+            fp_perf_tile_job_cycles = 0;
+            fp_perf_active_cycles = 0;
+            fp_perf_compute_cycles = 0;
+            fp_perf_fetch_stall_cycles = 0;
+            fp_perf_response_wait_cycles = 0;
+            fp_perf_write_wait_cycles = 0;
+            fp_perf_dma_wait_cycles = 0;
+            fp_perf_dma_grants = 0;
+            seed_for_case = fp_perf_seed ^ vector_length ^ (format_fp16 ? 32'h16 : 32'h50) ^ tile_count;
+            fp_perf_rng = seed_for_case;
+            fp_perf_random_wready = (tile_count > 1);
+            fp_perf_random_rvalid_latency = (tile_count > 1);
+            if (tile_count == 1) begin
+                axi_mem_u.ready_gap_cfg = 0;
+                axi_mem_u.read_gap_cfg = 1;
+            end
+            fp_perf_measure = 1'b1;
+            clear_done_irq();
+            axi_write(REG_TILE_CTRL, 32'd1);
+            fp_perf_wait_tile_done();
+            @(negedge aclk);
+            fp_perf_measure = 1'b0;
+            fp_perf_random_wready = 1'b0;
+            fp_perf_random_rvalid_latency = 1'b0;
+            axi_mem_u.ready_gap_cfg = 0;
+            axi_mem_u.read_gap_cfg = 1;
+            axi_read(REG_PERF_OVERLAP, tile_overlap_cycles);
+            axi_read(REG_PERF_STALL, tile_stall_cycles);
+            expect_read(REG_RESULT, expected, "FP throughput benchmark result register");
+            expect_read(REG_TILE_COMPLETED, tile_count, "FP tile benchmark completed tile count");
+            for (tile_index = 0; tile_index < tile_count; tile_index = tile_index + 1) begin
+                output_word_index = 12'hE00 + tile_index;
+                if (axi_mem_u.mem[output_word_index] !== expected)
+                    $fatal(1, "FP tile DDR result mismatch fmt=%0d len=%0d tile=%0d expected=%08h actual=%08h",
+                           format_fp16, vector_length, tile_index, expected,
+                           axi_mem_u.mem[output_word_index]);
+            end
+            if (tile_count > 1 && fp_perf_dma_grants == 0)
+                $fatal(1, "FP tile ping-pong job showed no actual DMA SPAD grant during compute fmt=%0d len=%0d overlap=%0d",
+                       format_fp16, vector_length, tile_overlap_cycles);
+            $display("FP_SYSTEM_BENCH,actual_tile_pipeline,%s,%s,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0.5f,%0.5f,%0d",
+                     (tile_count == 1) ? "single_tile" : "pingpong_random_rvalid_wready",
+                     format_fp16 ? "FP16" : "BF16", vector_length, tile_count,
+                     fp_perf_tile_job_cycles, fp_perf_active_cycles,
+                     fp_perf_compute_cycles, fp_perf_fetch_stall_cycles,
+                     fp_perf_response_wait_cycles, fp_perf_write_wait_cycles,
+                     fp_perf_dma_wait_cycles, fp_perf_dma_grants,
+                     tile_overlap_cycles, tile_stall_cycles,
+                     (1.0 * tile_count * vector_length) / fp_perf_tile_job_cycles,
+                     (1.0 * tile_count * vector_length) / fp_perf_active_cycles,
+                     seed_for_case);
+            clear_done_irq();
+        end
+    endtask
+
+    task run_fp_dot_dma_benchmark;
+        integer format_index;
+        integer length_index;
+        integer lengths [0:8];
+        begin
+            lengths[0]=1; lengths[1]=2; lengths[2]=3; lengths[3]=4;
+            lengths[4]=16; lengths[5]=64; lengths[6]=128;
+            lengths[7]=256; lengths[8]=1024;
+            $display("FP_SYSTEM_BENCH_HEADER,source,mode,format,length,tiles,tile_job_cycles,fp_active_cycles,compute_macs,fp_request_wait_cycles,response_wait_cycles,result_write_wait_cycles,dma_spad_wait_cycles,dma_spad_grants,tile_overlap_cycles,tile_stall_cycles,mac_per_tile_job_cycle,mac_per_fp_active_cycle,seed");
+            for (format_index=0; format_index<2; format_index=format_index+1) begin
+                for (length_index=0; length_index<9; length_index=length_index+1)
+                    fp_perf_run_case(format_index != 0, lengths[length_index], 1);
+                // Larger jobs expose DMA/SPAD contention through the real
+                // two-context ping-pong pipeline; WREADY uses a seeded LCG.
+                fp_perf_run_case(format_index != 0, 64, 3);
+                fp_perf_run_case(format_index != 0, 256, 3);
+                fp_perf_run_case(format_index != 0, 1024, 3);
+            end
+            $display("PASS: real ai_tile_pipeline + ai_axi128_dma + ai_spad_arbiter FP benchmark (behavioral AXI memory model)");
+        end
+    endtask
+
+    task write_spad_desc_v4_macro;
+        input [31:0] base;
+        input [7:0]  op;
+        input [15:0] task_id;
+        input [31:0] child_base;
+        input [15:0] child_count;
+        input        child_external;
+        input [15:0] wait_mask;
+        input [15:0] signal_mask;
+        input [15:0] clear_mask;
+        integer i;
+        begin
+            for (i = 0; i < 16; i = i + 1)
+                axi_write(SPAD_BASE + base + (i << 2), 32'd0);
+            axi_write(SPAD_BASE + base + 32'h00, {task_id, 8'd0, op});
+            axi_write(SPAD_BASE + base + 32'h04, child_base);
+            axi_write(SPAD_BASE + base + 32'h18, {16'd0, child_count});
+            axi_write(SPAD_BASE + base + 32'h1c, {28'd0, child_external, 3'd0});
+            axi_write(SPAD_BASE + base + 32'h38, {signal_mask, wait_mask});
+            axi_write(SPAD_BASE + base + 32'h3c, {clear_mask, 8'd0, 8'd4});
+        end
+    endtask
+
+    task expect_completion;
+        input [31:0] base;
+        input [15:0] task_id;
+        input [3:0]  status;
+        input [3:0]  error_code;
+        input [31:0] result;
+        input [31:0] elements;
+        input [511:0] name;
+        begin
+            expect_read(SPAD_BASE + base + 32'h00, {16'd0, task_id}, name);
+            expect_read(SPAD_BASE + base + 32'h04, {24'd0, error_code, status}, name);
+            expect_read(SPAD_BASE + base + 32'h08, result, name);
+            expect_read(SPAD_BASE + base + 32'h0c, elements, name);
+        end
+    endtask
+
+    task wait_cpl_tail;
+        input [31:0] expected_tail;
+        input [511:0] name;
+        begin
+            integer i;
+            integer found;
+            found = 0;
+            for (i = 0; i < 5000; i = i + 1) begin
+                if (!found) begin
+                    axi_read(REG_CPLQ_TAIL, rd);
+                    if (rd === expected_tail)
+                        found = 1;
+                end
+            end
+            if (!found) begin
+                $display("%0t ERROR: %0s expected tail=%0d actual=%0d/%08h",
+                         $time, name, expected_tail, rd, rd);
+                errors = errors + 1;
+            end else begin
+                $display("%0t PASS: %0s tail=%0d/%08h", $time, name, rd, rd);
+            end
+        end
+    endtask
+
+    task run_ai_digits_inference;
+        reg [1023:0] image_file;
+        reg [1023:0] expected_file;
+        reg [1023:0] hidden_file;
+        reg [1023:0] rtl_csv_file;
+        integer image_count;
+        integer expected_count;
+        integer hidden_count;
+        integer image_index;
+        integer poll_index;
+        integer completion_index;
+        integer hidden_index;
+        integer sample_index;
+        integer class_index;
+        integer expected_index;
+        integer sfu_batch_index;
+        integer correct_samples;
+        integer sample_label;
+        integer prediction;
+        integer csv_fd;
+        reg completed;
+        reg [31:0] read_value;
+        reg signed [31:0] best_logit;
+        reg [31:0] cmd_head;
+        reg [31:0] cpl_tail;
+        real mac_count;
+        real mac_per_cycle;
+        real array_utilization;
+        begin
+            if (!$value$plusargs("AI_DIGITS_MEMORY=%s", image_file) ||
+                !$value$plusargs("AI_DIGITS_EXPECTED=%s", expected_file) ||
+                !$value$plusargs("AI_DIGITS_HIDDEN=%s", hidden_file) ||
+                !$value$plusargs("AI_DIGITS_RTL_CSV=%s", rtl_csv_file))
+                $fatal(1, "AI_DIGITS_INFERENCE requires memory, expected, hidden and RTL CSV paths");
+
+            $readmemh(image_file, ai_digits_image_words);
+            $readmemh(expected_file, ai_digits_expected_words);
+            $readmemh(hidden_file, ai_digits_hidden_words);
+            image_count = ai_digits_image_words[0];
+            expected_count = ai_digits_expected_words[0];
+            hidden_count = ai_digits_hidden_words[0];
+            if (image_count <= 0 || image_count > 16000 ||
+                expected_count != AI_DIGITS_TEST_SAMPLES ||
+                hidden_count != AI_DIGITS_HIDDEN_WORDS)
+                $fatal(1, "digits image sizes invalid image=%0d expected=%0d hidden=%0d",
+                       image_count, expected_count, hidden_count);
+
+            $display("DIGITS_LOAD_BEGIN spad_words=%0d samples=%0d", image_count,
+                     expected_count);
+            for (image_index = 0; image_index < image_count; image_index = image_index + 1) begin
+                if (ai_digits_image_words[1 + 2 * image_index] >= SPAD_BYTES ||
+                    ai_digits_image_words[1 + 2 * image_index][1:0] != 2'b00) begin
+                    $display("ERROR: digits image has invalid SPAD offset index=%0d addr=%08h",
+                             image_index, ai_digits_image_words[1 + 2 * image_index]);
+                    errors = errors + 1;
+                end else begin
+                    axi_write(SPAD_BASE + ai_digits_image_words[1 + 2 * image_index],
+                              ai_digits_image_words[2 + 2 * image_index]);
+                end
+            end
+            $display("DIGITS_LOAD_DONE spad_words=%0d", image_count);
+
+            // Prove the output region starts with the poison pattern loaded by
+            // the host image. The only writer after this point is the DUT.
+            axi_read(SPAD_BASE + AI_DIGITS_OUTPUT_BASE, read_value);
+            if (read_value !== 32'ha55a_a55a) begin
+                $display("ERROR: digits output was not poison before dispatch: %08h", read_value);
+                errors = errors + 1;
+            end
+
+            axi_write(REG_CMDQ_CTRL, 32'd0);
+            axi_write(REG_CMDQ_BASE_LO, AI_DIGITS_DESC_BASE);
+            axi_write(REG_CMDQ_SIZE, 32'd128);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            for (sfu_batch_index = 0; sfu_batch_index < 23; sfu_batch_index = sfu_batch_index + 1)
+                ai_digits_fused_lines_by_batch[sfu_batch_index] = 0;
+            axi_write(REG_CMDQ_TAIL, AI_DIGITS_DESC_COUNT);
+            axi_write(REG_CPLQ_BASE_LO, AI_DIGITS_CPL_BASE);
+            axi_write(REG_CPLQ_SIZE, 32'd128);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+
+            ai_digits_cycles = 0;
+            ai_digits_layout_cycles = 0;
+            ai_digits_layout_bytes = 0;
+            ai_digits_measure = 1'b1;
+            ai_digits_layout_measure = 1'b1;
+            axi_write(REG_DOORBELL, 32'd1);
+            completed = 1'b0;
+            for (poll_index = 0; poll_index < 20000 && !completed; poll_index = poll_index + 1) begin
+                repeat (32) @(posedge aclk);
+                axi_read(REG_CPLQ_TAIL, cpl_tail);
+                if (cpl_tail == AI_DIGITS_DESC_COUNT)
+                    completed = 1'b1;
+            end
+            ai_digits_measure = 1'b0;
+            ai_digits_layout_measure = 1'b0;
+            if (!completed) begin
+                $display("ERROR: digits inference completion timeout tail=%0d", cpl_tail);
+                errors = errors + 1;
+            end
+            axi_read(REG_CMDQ_HEAD, cmd_head);
+            if (cmd_head !== AI_DIGITS_DESC_COUNT) begin
+                $display("ERROR: digits CMDQ head=%0d expected=%0d", cmd_head,
+                         AI_DIGITS_DESC_COUNT);
+                errors = errors + 1;
+            end
+
+            // The complete workload runs from the real CMDQ. Matrix opcode
+            // 0x53 writes the hidden activation directly in Matrix-A tile order.
+            for (completion_index = 0; completion_index < AI_DIGITS_DESC_COUNT;
+                 completion_index = completion_index + 1) begin
+                axi_read(SPAD_BASE + AI_DIGITS_CPL_BASE + completion_index * 16,
+                         read_value);
+                if (read_value !== (32'h0000_d000 + completion_index)) begin
+                    $display("ERROR: digits CPLQ[%0d] task id=%08h", completion_index,
+                             read_value);
+                    errors = errors + 1;
+                end
+                axi_read(SPAD_BASE + AI_DIGITS_CPL_BASE + completion_index * 16 + 4,
+                         read_value);
+                if (read_value !== 32'h0000_0001) begin
+                    $display("ERROR: digits CPLQ[%0d] status/error=%08h", completion_index,
+                             read_value);
+                    errors = errors + 1;
+                end
+            end
+
+            for (sfu_batch_index = 0; sfu_batch_index < 23; sfu_batch_index = sfu_batch_index + 1) begin
+                if (ai_digits_fused_lines_by_batch[sfu_batch_index] != 64) begin
+                    $display("ERROR: digits fused tile lines batch=%0d got=%0d expected=64",
+                             sfu_batch_index,
+                             ai_digits_fused_lines_by_batch[sfu_batch_index]);
+                    errors = errors + 1;
+                end
+            end
+
+            for (hidden_index = 0; hidden_index < AI_DIGITS_HIDDEN_WORDS;
+                 hidden_index = hidden_index + 1) begin
+                axi_read(SPAD_BASE + AI_DIGITS_HIDDEN_I8_TILE_BASE + hidden_index * 4,
+                         read_value);
+                if (read_value !== ai_digits_hidden_words[1 + hidden_index]) begin
+                    if (errors < 20)
+                        $display("ERROR: digits tile hidden word[%0d] rtl=%08h golden=%08h",
+                                 hidden_index, read_value,
+                                 ai_digits_hidden_words[1 + hidden_index]);
+                    errors = errors + 1;
+                end
+            end
+
+            csv_fd = $fopen(rtl_csv_file, "w");
+            if (csv_fd == 0)
+                $fatal(1, "cannot open digits RTL CSV %0s", rtl_csv_file);
+            expected_index = 1;
+            correct_samples = 0;
+            for (sample_index = 0; sample_index < AI_DIGITS_TEST_SAMPLES; sample_index = sample_index + 1) begin
+                sample_label = ai_digits_expected_words[expected_index];
+                expected_index = expected_index + 1;
+                best_logit = -32'sh8000_0000;
+                prediction = 0;
+                for (class_index = 0; class_index < 12; class_index = class_index + 1) begin
+                    axi_read(SPAD_BASE + AI_DIGITS_OUTPUT_BASE +
+                             ((sample_index * 16 + class_index) * 4), read_value);
+                    if (class_index < 12) begin
+                        if (read_value !== ai_digits_expected_words[expected_index]) begin
+                            if (errors < 20)
+                                $display("ERROR: digits logit sample=%0d class=%0d rtl=%08h golden=%08h",
+                                         sample_index, class_index, read_value,
+                                         ai_digits_expected_words[expected_index]);
+                            errors = errors + 1;
+                        end
+                        if (class_index == 0)
+                            $fwrite(csv_fd, "%0d", $signed(read_value));
+                        else
+                            $fwrite(csv_fd, ",%0d", $signed(read_value));
+                        expected_index = expected_index + 1;
+                    end else if (read_value !== 32'd0) begin
+                        if (errors < 20)
+                            $display("ERROR: digits padded logit sample=%0d class=%0d rtl=%08h expected=00000000",
+                                     sample_index, class_index, read_value);
+                        errors = errors + 1;
+                    end
+                    if (class_index < 10 && $signed(read_value) > best_logit) begin
+                        best_logit = $signed(read_value);
+                        prediction = class_index;
+                    end
+                end
+                $fwrite(csv_fd, "\n");
+                if (prediction == sample_label)
+                    correct_samples = correct_samples + 1;
+            end
+            $fclose(csv_fd);
+            if (expected_index != expected_count * 13 + 1) begin
+                $display("ERROR: digits expected vector consumption=%0d count=%0d",
+                         expected_index, expected_count);
+                errors = errors + 1;
+            end
+
+            mac_count = 23.0 * ((16.0 * 64.0 * 64.0) + (16.0 * 64.0 * 16.0));
+            if (ai_digits_cycles == 0)
+                mac_per_cycle = 0.0;
+            else
+                mac_per_cycle = mac_count / ai_digits_cycles;
+            array_utilization = mac_per_cycle / 256.0;
+            $display("DIGITS_RTL_METRICS samples=%0d correct=%0d descriptors=%0d cycles=%0d rtl_fused_matrix_cycles=%0d rtl_fused_tile_write_bytes=%0d mac=%0.0f mac_per_cycle=%0.4f array_utilization=%0.2f%% spad_initialization_bytes=%0d",
+                     AI_DIGITS_TEST_SAMPLES, correct_samples, AI_DIGITS_DESC_COUNT,
+                     ai_digits_cycles, ai_digits_layout_cycles, ai_digits_layout_bytes,
+                     mac_count, mac_per_cycle,
+                     array_utilization * 100.0, image_count * 4);
+            if (errors == 0)
+                $display("DIGITS_INFERENCE_PASS model=sklearn_digits_int8 rtl=top_spad_cmdq_cplq accuracy=%0.2f%%",
+                         (100.0 * correct_samples) / AI_DIGITS_TEST_SAMPLES);
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+        end
+    endtask
+
+    task check_tinynpu_cnn_conv_golden;
+        inout integer expected_index;
+        integer expected_length;
+        integer row_index;
+        reg [31:0] read_value;
+        begin
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 144) $fatal(1, "bad conv rounded Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_RAW_BASE + row_index * 4, read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv rounded output[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 36) $fatal(1, "bad conv INT8 Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_I8_BASE + row_index * 4, read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv INT8 packed[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 144) $fatal(1, "bad conv bias/ReLU Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv bias/ReLU output[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 36) $fatal(1, "bad conv ReLU packed Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_RELU_I8_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv ReLU packed[%0d]=%08h expected=%08h", row_index,
+                           read_value, ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+        end
+    endtask
+
+    task check_tinynpu_cnn_linearized_golden;
+        inout integer expected_index;
+        integer expected_length;
+        integer row_index;
+        reg [31:0] read_value;
+        begin
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 144) $fatal(1, "bad conv rounded Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_RAW_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv rounded output[%0d]=%08h expected=%08h",
+                           row_index, read_value,
+                           ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 36) $fatal(1, "bad conv INT8 Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_I8_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv INT8 packed[%0d]=%08h expected=%08h",
+                           row_index, read_value,
+                           ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 144)
+                $fatal(1, "bad fused bias/ReLU source Golden length");
+            // This INT32 tensor is intentionally not materialized by 0x53.
+            // Its independently generated values are consumed as the Golden
+            // source for the fused INT8 output checked below.
+            expected_index = expected_index + expected_length;
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 36)
+                $fatal(1, "bad linearized conv output Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE + row_index * 16,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN linearized fused output[%0d]=%08h expected=%08h",
+                           row_index, read_value,
+                           ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE + row_index * 16 + 4,
+                         read_value);
+                if (read_value !== 32'd0)
+                    $fatal(1, "CNN linearized fused padding[%0d][1]=%08h",
+                           row_index, read_value);
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE + row_index * 16 + 8,
+                         read_value);
+                if (read_value !== 32'd0)
+                    $fatal(1, "CNN linearized fused padding[%0d][2]=%08h",
+                           row_index, read_value);
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE + row_index * 16 + 12,
+                         read_value);
+                if (read_value !== 32'd0)
+                    $fatal(1, "CNN linearized fused padding[%0d][3]=%08h",
+                           row_index, read_value);
+            end
+        end
+    endtask
+
+    task check_tinynpu_cnn_fused_native_golden;
+        inout integer expected_index;
+        integer expected_length;
+        integer row_index;
+        reg [31:0] read_value;
+        begin
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 144) $fatal(1, "bad conv rounded Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_RAW_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv rounded output[%0d]=%08h expected=%08h",
+                           row_index, read_value,
+                           ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 36) $fatal(1, "bad conv INT8 Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_I8_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN conv INT8 packed[%0d]=%08h expected=%08h",
+                           row_index, read_value,
+                           ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 144)
+                $fatal(1, "bad fused bias/ReLU source Golden length");
+            // The fused opcode deliberately does not materialize the INT32
+            // bias/Requant intermediate; retain its independent Golden entry.
+            expected_index = expected_index + expected_length;
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 36) $fatal(1, "bad fused native output Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_RELU_I8_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN fused native output[%0d]=%08h expected=%08h",
+                           row_index, read_value,
+                           ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+        end
+    endtask
+
+    task check_tinynpu_cnn_fc_group;
+        input integer group_index;
+        inout integer expected_index;
+        integer expected_length;
+        integer row_index;
+        reg [31:0] read_value;
+        begin
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 16) $fatal(1, "bad FC rounded Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_RAW_BASE + row_index * 4, read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN FC rounded group=%0d output[%0d]=%08h expected=%08h",
+                           group_index, row_index, read_value,
+                           ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 4) $fatal(1, "bad FC INT8 Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_I8_BASE + row_index * 4, read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN FC INT8 group=%0d packed[%0d]=%08h expected=%08h",
+                           group_index, row_index, read_value,
+                           ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 16) $fatal(1, "bad FC bias Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_BIASED_BASE + row_index * 4,
+                         read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN FC biased group=%0d output[%0d]=%08h expected=%08h",
+                           group_index, row_index, read_value,
+                           ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+            expected_length = ai_tinynpu_cnn_expected_words[expected_index];
+            expected_index = expected_index + 1;
+            if (expected_length != 4) $fatal(1, "bad final CNN Golden length");
+            for (row_index = 0; row_index < expected_length; row_index = row_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_FINAL_I8_BASE +
+                         group_index * 16 + row_index * 4, read_value);
+                if (read_value !== ai_tinynpu_cnn_expected_words[expected_index])
+                    $fatal(1, "CNN final group=%0d packed[%0d]=%08h expected=%08h",
+                           group_index, row_index, read_value,
+                           ai_tinynpu_cnn_expected_words[expected_index]);
+                expected_index = expected_index + 1;
+            end
+        end
+    endtask
+
+    task run_tinynpu_cnn_match;
+        reg [1023:0] image_file;
+        reg [1023:0] expected_file;
+        integer image_count;
+        integer expected_count;
+        integer image_index;
+        integer expected_index;
+        integer expected_length;
+        integer poll_index;
+        integer completion_index;
+        integer row_index;
+        integer feature_group;
+        integer descriptor_index;
+        integer group_index;
+        integer num_classes;
+        integer output_group_count;
+        integer descriptor_count;
+        integer tail_value;
+        integer event_base;
+        integer conv_descriptor_count;
+        reg completed;
+        reg linearized_mode;
+        reg fused_native_mode;
+        reg [31:0] read_value;
+        reg [31:0] cpl_tail;
+        reg [31:0] cmd_head;
+        begin
+            if (!$value$plusargs("AI_TINYNPU_CNN_MEMORY=%s", image_file) ||
+                !$value$plusargs("AI_TINYNPU_CNN_EXPECTED=%s", expected_file))
+                $fatal(1, "TINYNPU_CNN_MATCH requires memory and expected paths");
+            num_classes = 4;
+            if (!$value$plusargs("AI_TINYNPU_CNN_CLASSES=%d", num_classes))
+                num_classes = 4;
+            if (num_classes != 4 && num_classes != 10)
+                $fatal(1, "CNN class count must be 4 or 10, got %0d", num_classes);
+            linearized_mode = $test$plusargs("AI_TINYNPU_CNN_LINEARIZED");
+            fused_native_mode = $test$plusargs("AI_TINYNPU_CNN_FUSED_NATIVE");
+            if (linearized_mode && fused_native_mode)
+                $fatal(1, "CNN fused output modes are mutually exclusive");
+            output_group_count = (num_classes + 3) / 4;
+            conv_descriptor_count = (linearized_mode || fused_native_mode) ? 3 : 4;
+            descriptor_count = conv_descriptor_count + 4 * output_group_count;
+            expected_count = 360 + 40 * output_group_count;
+            $readmemh(image_file, ai_tinynpu_cnn_image_words);
+            $readmemh(expected_file, ai_tinynpu_cnn_expected_words);
+            image_count = ai_tinynpu_cnn_image_words[0];
+            if (image_count <= 0 || image_count > 4095 ||
+                ai_tinynpu_cnn_expected_words[0] != expected_count)
+                $fatal(1, "TinyNPU CNN input sizes invalid image=%0d expected=%0d classes=%0d",
+                       image_count, ai_tinynpu_cnn_expected_words[0], num_classes);
+
+            for (image_index = 0; image_index < image_count; image_index = image_index + 1) begin
+                if (ai_tinynpu_cnn_image_words[1 + image_index * 2] >= SPAD_BYTES ||
+                    ai_tinynpu_cnn_image_words[1 + image_index * 2][1:0] != 2'b00)
+                    $fatal(1, "TinyNPU CNN bad SPAD image address index=%0d", image_index);
+                axi_write(SPAD_BASE + ai_tinynpu_cnn_image_words[1 + image_index * 2],
+                          ai_tinynpu_cnn_image_words[2 + image_index * 2]);
+            end
+
+            axi_read(SPAD_BASE + AI_TINYNPU_CNN_FINAL_I8_BASE, read_value);
+            if (read_value !== 32'ha55a_a55a)
+                $fatal(1, "TinyNPU CNN final output was not poisoned: %08h", read_value);
+
+            write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE, OP_TENSOR_GEMM,
+                   16'hd500, AI_TINYNPU_CNN_IM2COL_BASE,
+                   AI_TINYNPU_CNN_CONV_WEIGHT_BASE,
+                   AI_TINYNPU_CNN_CONV_ROUND_BASE, AI_TINYNPU_CNN_CONV_RAW_BASE,
+                   16'd36, 16'd4, 16'd3, 8'h01, 32'd0, 5'd4, 2'd0,
+                   32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd0, 16'd1, 16'd0);
+            write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h40,
+                   OP_REQUANT_I8, 16'hd501, AI_TINYNPU_CNN_CONV_RAW_BASE,
+                   32'd0, 32'd0, AI_TINYNPU_CNN_CONV_I8_BASE,
+                   16'd0, 16'd0, 16'd144, 8'h10, 32'd0, 5'd0, 2'd0,
+                   32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd1, 16'd2, 16'd1);
+            if (linearized_mode || fused_native_mode) begin
+                write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h80,
+                       OP_TENSOR_GEMM_FUSED, 16'hd502,
+                       AI_TINYNPU_CNN_CONV_I8_BASE,
+                       AI_TINYNPU_CNN_IDENTITY_B_BASE,
+                       AI_TINYNPU_CNN_CONV_BIAS_BASE,
+                       linearized_mode ? AI_TINYNPU_CNN_FC_A_BASE :
+                                         AI_TINYNPU_CNN_CONV_RELU_I8_BASE,
+                       16'd36, 16'd4, 16'd1, 8'h01,
+                       linearized_mode ? 32'h0000_0080 : 32'd0,
+                       5'd0, 2'd1, 32'd0, 32'd0, 32'd0, 16'd1, 16'd1,
+                       16'd2, 16'd8, 16'd2);
+                // Opcode 0x53 uses the ABI-v7 descriptor extension in both
+                // native and linear-row output modes.
+                axi_write(SPAD_BASE + AI_TINYNPU_CNN_DESC_BASE + 32'hbc,
+                          {16'd2, 8'd0, 8'd7});
+            end else begin
+                write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'h80,
+                       OP_TENSOR_GEMM, 16'hd502, AI_TINYNPU_CNN_CONV_I8_BASE,
+                       AI_TINYNPU_CNN_IDENTITY_B_BASE,
+                       AI_TINYNPU_CNN_CONV_BIAS_BASE,
+                       AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE,
+                       16'd36, 16'd4, 16'd1, 8'h01, 32'd0, 5'd0, 2'd1,
+                       32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd2, 16'd4, 16'd2);
+                write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + 32'hc0,
+                       OP_REQUANT_I8, 16'hd503,
+                       AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE,
+                       32'd0, 32'd0, AI_TINYNPU_CNN_CONV_RELU_I8_BASE,
+                       16'd0, 16'd0, 16'd144, 8'h10, 32'd0, 5'd0, 2'd0,
+                       32'd0, 32'd0, 32'd0, 16'd1, 16'd1, 16'd4, 16'd8, 16'd4);
+            end
+
+            axi_write(REG_CMDQ_CTRL, 32'd0);
+            axi_write(REG_CMDQ_BASE_LO, AI_TINYNPU_CNN_DESC_BASE);
+            axi_write(REG_CMDQ_SIZE, 32'd32);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd0);
+            axi_write(REG_CPLQ_BASE_LO, AI_TINYNPU_CNN_CPL_BASE);
+            axi_write(REG_CPLQ_SIZE, 32'd32);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+            ai_tinynpu_cnn_cycles = 0;
+            ai_tinynpu_cnn_layout_cycles = 0;
+            ai_tinynpu_cnn_engine_read_words = 0;
+            ai_tinynpu_cnn_engine_write_words = 0;
+            ai_tinynpu_cnn_banked_read_lines = 0;
+            ai_tinynpu_cnn_line_write_lines = 0;
+            ai_tinynpu_cnn_measure = 1'b1;
+            axi_write(REG_CMDQ_TAIL, conv_descriptor_count);
+            axi_write(REG_DOORBELL, 32'd1);
+            completed = 1'b0;
+            for (poll_index = 0; poll_index < 10000 && !completed;
+                 poll_index = poll_index + 1) begin
+                repeat (32) @(posedge aclk);
+                axi_read(REG_CPLQ_TAIL, cpl_tail);
+                if (cpl_tail == conv_descriptor_count)
+                    completed = 1'b1;
+            end
+            ai_tinynpu_cnn_measure = 1'b0;
+            if (!completed)
+                $fatal(1, "TinyNPU CNN convolution completion timeout tail=%0d", cpl_tail);
+
+            expected_index = 1;
+            if (linearized_mode || fused_native_mode) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CPL_BASE + 36, read_value);
+                if (read_value[3:0] != 4'd1 || read_value[7:4] != 4'd0)
+                    $fatal(1, "CNN fused completion status/error=%08h", read_value);
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CPL_BASE + 44, read_value);
+                if (read_value != 32'd144)
+                    $fatal(1, "CNN fused completion elements=%0d expected=144",
+                           read_value);
+                if (linearized_mode) begin
+                    axi_read(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE, read_value);
+                    $display("CNN_LINEARIZED_FC_A0=%08h", read_value);
+                    check_tinynpu_cnn_linearized_golden(expected_index);
+                end else begin
+                    check_tinynpu_cnn_fused_native_golden(expected_index);
+                end
+            end else
+                check_tinynpu_cnn_conv_golden(expected_index);
+
+            // This is only layout conversion of RTL-produced INT8 activations.
+            // No convolution, activation, or matrix multiply runs on the host.
+            if (!linearized_mode) begin
+                ai_tinynpu_cnn_layout_measure = 1'b1;
+                for (feature_group = 0; feature_group < 36; feature_group = feature_group + 1) begin
+                    axi_read(SPAD_BASE + AI_TINYNPU_CNN_CONV_RELU_I8_BASE +
+                             feature_group * 4, read_value);
+                    for (row_index = 0; row_index < 4; row_index = row_index + 1) begin
+                        if (row_index == 0)
+                            axi_write(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE +
+                                      (feature_group * 4 + row_index) * 4, read_value);
+                        else
+                            axi_write(SPAD_BASE + AI_TINYNPU_CNN_FC_A_BASE +
+                                      (feature_group * 4 + row_index) * 4, 32'd0);
+                    end
+                end
+                ai_tinynpu_cnn_layout_measure = 1'b0;
+            end
+
+            event_base = 8;
+            for (group_index = 0; group_index < output_group_count;
+                 group_index = group_index + 1) begin
+                descriptor_index = conv_descriptor_count + group_index * 4;
+                write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + descriptor_index * 64,
+                       OP_TENSOR_GEMM, 16'hd500 + descriptor_index,
+                       AI_TINYNPU_CNN_FC_A_BASE,
+                       AI_TINYNPU_CNN_FC_B_BASE + group_index * 32'h240,
+                       AI_TINYNPU_CNN_FC_ROUND_BASE,
+                       AI_TINYNPU_CNN_FC_RAW_BASE,
+                       16'd4, 16'd4, 16'd36, 8'h01, 32'd0, 5'd8, 2'd0,
+                       32'd0, 32'd0, 32'd0, 16'd1, 16'd1,
+                       event_base, event_base << 1, event_base);
+                write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + (descriptor_index + 1) * 64,
+                       OP_REQUANT_I8, 16'hd500 + descriptor_index + 1,
+                       AI_TINYNPU_CNN_FC_RAW_BASE, 32'd0, 32'd0,
+                       AI_TINYNPU_CNN_FC_I8_BASE,
+                       16'd0, 16'd0, 16'd16, 8'h10, 32'd0, 5'd0, 2'd0,
+                       32'd0, 32'd0, 32'd0, 16'd1, 16'd1,
+                       event_base << 1, event_base << 2, event_base << 1);
+                write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + (descriptor_index + 2) * 64,
+                       OP_TENSOR_GEMM, 16'hd500 + descriptor_index + 2,
+                       AI_TINYNPU_CNN_FC_I8_BASE, AI_TINYNPU_CNN_IDENTITY_B_BASE,
+                       AI_TINYNPU_CNN_FC_BIAS_BASE + group_index * 32'h10,
+                       AI_TINYNPU_CNN_FC_BIASED_BASE,
+                       16'd4, 16'd4, 16'd1, 8'h01, 32'd0, 5'd0, 2'd0,
+                       32'd0, 32'd0, 32'd0, 16'd1, 16'd1,
+                       event_base << 2, event_base << 3, event_base << 2);
+                write_spad_desc_v3(AI_TINYNPU_CNN_DESC_BASE + (descriptor_index + 3) * 64,
+                       OP_REQUANT_I8, 16'hd500 + descriptor_index + 3,
+                       AI_TINYNPU_CNN_FC_BIASED_BASE, 32'd0, 32'd0,
+                       AI_TINYNPU_CNN_FINAL_I8_BASE + group_index * 32'h10,
+                       16'd0, 16'd0, 16'd16, 8'h10, 32'd0, 5'd0, 2'd0,
+                       32'd0, 32'd0, 32'd0, 16'd1, 16'd1,
+                       event_base << 3,
+                       (group_index + 1 < output_group_count) ? (event_base << 4) : 16'd0,
+                       event_base << 3);
+                tail_value = descriptor_index + 4;
+                ai_tinynpu_cnn_measure = 1'b1;
+                axi_write(REG_CMDQ_TAIL, tail_value);
+                axi_write(REG_DOORBELL, 32'd1);
+                completed = 1'b0;
+                for (poll_index = 0; poll_index < 10000 && !completed;
+                     poll_index = poll_index + 1) begin
+                    repeat (32) @(posedge aclk);
+                    axi_read(REG_CPLQ_TAIL, cpl_tail);
+                    if (cpl_tail == tail_value)
+                        completed = 1'b1;
+                end
+                ai_tinynpu_cnn_measure = 1'b0;
+                if (!completed)
+                    $fatal(1, "TinyNPU CNN FC group %0d completion timeout tail=%0d",
+                           group_index, cpl_tail);
+                check_tinynpu_cnn_fc_group(group_index, expected_index);
+                event_base = event_base << 4;
+            end
+
+            axi_read(REG_CMDQ_HEAD, cmd_head);
+            if (cmd_head !== descriptor_count)
+                $fatal(1, "TinyNPU CNN CMDQ head=%0d expected=%0d",
+                       cmd_head, descriptor_count);
+            for (completion_index = 0; completion_index < descriptor_count;
+                 completion_index = completion_index + 1) begin
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CPL_BASE + completion_index * 16,
+                         read_value);
+                if (read_value !== (32'h0000_d500 + completion_index))
+                    $fatal(1, "TinyNPU CNN CPLQ[%0d] task id=%08h",
+                           completion_index, read_value);
+                axi_read(SPAD_BASE + AI_TINYNPU_CNN_CPL_BASE + completion_index * 16 + 4,
+                         read_value);
+                if (read_value !== 32'd1)
+                    $fatal(1, "TinyNPU CNN CPLQ[%0d] status=%08h",
+                           completion_index, read_value);
+            end
+            if (expected_index != expected_count + 5 + 4 * output_group_count)
+                $fatal(1, "TinyNPU CNN Golden words consumed=%0d expected=%0d",
+                       expected_index - 1, expected_count + 4 + 4 * output_group_count);
+
+            $display("NMA_CNN_RTL_METRICS outputs=%0d descriptors=%0d cycles=%0d host_layout_cycles=%0d host_layout_read_bytes=%0d host_layout_write_bytes=%0d compute_spad_read_bytes=%0d compute_spad_write_bytes=%0d bank_read_lines=%0d line_write_lines=%0d model_macs=%0d padded_macs=%0d spad_initialization_bytes=%0d layout_mode=%0d",
+                     num_classes, descriptor_count, ai_tinynpu_cnn_cycles,
+                     ai_tinynpu_cnn_layout_cycles,
+                     linearized_mode ? 0 : 144,
+                     linearized_mode ? 0 : 576,
+                     ai_tinynpu_cnn_engine_read_words * 4 + ai_tinynpu_cnn_banked_read_lines * 16,
+                     ai_tinynpu_cnn_engine_write_words * 4 + ai_tinynpu_cnn_line_write_lines * 16,
+                     ai_tinynpu_cnn_banked_read_lines, ai_tinynpu_cnn_line_write_lines,
+                     1296 + 144 * num_classes, 1296 + 144 * 4 * output_group_count,
+                     image_count * 4, linearized_mode ? 2 :
+                                                       (fused_native_mode ? 1 : 0));
+            $display("NMA_CNN_INFERENCE_PASS model=trained_int8_conv_relu_flatten_gemm outputs=%0d groups=%0d layout_mode=%0d golden=byte_exact",
+                     num_classes, output_group_count,
+                     linearized_mode ? 2 : (fused_native_mode ? 1 : 0));
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+        end
+    endtask
+
+    `include "ai_transformer_workload.svh"
+
+    task run_transformer_only;
+        integer prefill_read_snapshot;
+        integer prefill_write_snapshot;
+        reg [31:0] command_head;
+        begin
+            load_transformer_workload();
+            transformer_spad_read_bytes = 0;
+            transformer_spad_write_bytes = 0;
+            transformer_prefill_read_bytes = 0;
+            transformer_prefill_write_bytes = 0;
+            axi_write(REG_PERF_CTRL, 32'd1);
+            axi_write(REG_CMDQ_CTRL, 32'd0);
+            axi_write(REG_CMDQ_BASE_LO, TRANSFORMER_DESC_BASE);
+            axi_write(REG_CMDQ_BASE_HI, 32'd0);
+            axi_write(REG_CMDQ_SIZE, 32'd128);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, TRANSFORMER_DESC_COUNT);
+            axi_write(REG_CPLQ_BASE_LO, TRANSFORMER_CPL_BASE);
+            axi_write(REG_CPLQ_SIZE, 32'd128);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+            transformer_top_prefill_target = TRANSFORMER_PREFILL_DESC_COUNT;
+            transformer_top_final_target = TRANSFORMER_DESC_COUNT;
+            transformer_top_prefill_captured = 1'b0;
+            transformer_top_final_captured = 1'b0;
+            transformer_top_profile_matrix_mac = 0;
+            transformer_top_profile_matrix_request_wait = 0;
+            transformer_top_profile_matrix_response_wait = 0;
+            transformer_top_profile_matrix_writeback = 0;
+            transformer_top_profile_matrix_other = 0;
+            transformer_top_profile_sfu_busy = 0;
+            transformer_top_profile_kv_busy = 0;
+            transformer_top_profile_conv_busy = 0;
+            transformer_top_profile_banked_busy = 0;
+            transformer_top_profile_fp_busy = 0;
+            transformer_top_profile_scalar_busy = 0;
+            transformer_top_profile_no_engine_busy = 0;
+            transformer_top_profile_dma_busy = 0;
+            for (transformer_top_profile_index = 0;
+                 transformer_top_profile_index < 13;
+                 transformer_top_profile_index = transformer_top_profile_index + 1)
+                transformer_top_prefill_profile[transformer_top_profile_index] = 0;
+            transformer_top_last_completion_tail = 0;
+            transformer_top_start_cycle = transformer_top_cycle_counter;
+            transformer_top_last_completion_cycle = transformer_top_start_cycle;
+            transformer_top_timing_enable = 1'b1;
+            transformer_traffic_enable = 1'b1;
+            axi_write(REG_DOORBELL, 32'd1);
+            wait_cpl_tail(TRANSFORMER_PREFILL_DESC_COUNT,
+                          "Transformer-only prefill completion");
+            prefill_read_snapshot = transformer_spad_read_bytes;
+            prefill_write_snapshot = transformer_spad_write_bytes;
+            transformer_prefill_read_bytes = prefill_read_snapshot;
+            transformer_prefill_write_bytes = prefill_write_snapshot;
+            wait_cpl_tail(TRANSFORMER_DESC_COUNT,
+                          "Transformer-only decode completion");
+            transformer_top_timing_enable = 1'b0;
+            transformer_traffic_enable = 1'b0;
+            if (!transformer_top_prefill_captured ||
+                !transformer_top_final_captured ||
+                transformer_top_prefill_end_cycle <= transformer_top_start_cycle ||
+                transformer_top_final_end_cycle <= transformer_top_prefill_end_cycle)
+                $fatal(1, "Transformer-only timing boundary capture failed");
+            $display("TRANSFORMER_TOP_ONLY_TIMING run_endpoint=doorbell_to_cpl_tail total_cycles=%0d prefill_cycles=%0d decode_cycles=%0d",
+                     transformer_top_final_end_cycle - transformer_top_start_cycle,
+                     transformer_top_prefill_end_cycle - transformer_top_start_cycle,
+                     transformer_top_final_end_cycle - transformer_top_prefill_end_cycle);
+            $display("TRANSFORMER_TOP_ONLY_PROFILE cycles_closed=%0d matrix_mac=%0d matrix_request_wait=%0d matrix_response_wait=%0d matrix_writeback=%0d matrix_other=%0d sfu_busy=%0d kv_busy=%0d conv_busy=%0d banked_busy=%0d fp_busy=%0d scalar_busy=%0d no_engine_busy_control_or_dispatch=%0d dma_busy_event_cycles=%0d",
+                     transformer_top_profile_matrix_mac +
+                         transformer_top_profile_matrix_request_wait +
+                         transformer_top_profile_matrix_response_wait +
+                         transformer_top_profile_matrix_writeback +
+                         transformer_top_profile_matrix_other +
+                         transformer_top_profile_sfu_busy +
+                         transformer_top_profile_kv_busy +
+                         transformer_top_profile_conv_busy +
+                         transformer_top_profile_banked_busy +
+                         transformer_top_profile_fp_busy +
+                         transformer_top_profile_scalar_busy +
+                         transformer_top_profile_no_engine_busy,
+                     transformer_top_profile_matrix_mac,
+                     transformer_top_profile_matrix_request_wait,
+                     transformer_top_profile_matrix_response_wait,
+                     transformer_top_profile_matrix_writeback,
+                     transformer_top_profile_matrix_other,
+                     transformer_top_profile_sfu_busy,
+                     transformer_top_profile_kv_busy,
+                     transformer_top_profile_conv_busy,
+                     transformer_top_profile_banked_busy,
+                     transformer_top_profile_fp_busy,
+                     transformer_top_profile_scalar_busy,
+                     transformer_top_profile_no_engine_busy,
+                     transformer_top_profile_dma_busy);
+            $display("TRANSFORMER_TOP_ONLY_PHASE_PROFILE phase=prefill cycles=%0d matrix_mac=%0d matrix_request_wait=%0d matrix_response_wait=%0d matrix_writeback=%0d matrix_other=%0d sfu_busy=%0d kv_busy=%0d conv_busy=%0d banked_busy=%0d fp_busy=%0d scalar_busy=%0d no_engine_busy_control_or_dispatch=%0d dma_busy_event_cycles=%0d",
+                     transformer_top_prefill_end_cycle - transformer_top_start_cycle,
+                     transformer_top_prefill_profile[0],
+                     transformer_top_prefill_profile[1],
+                     transformer_top_prefill_profile[2],
+                     transformer_top_prefill_profile[3],
+                     transformer_top_prefill_profile[4],
+                     transformer_top_prefill_profile[5],
+                     transformer_top_prefill_profile[6],
+                     transformer_top_prefill_profile[7],
+                     transformer_top_prefill_profile[8],
+                     transformer_top_prefill_profile[9],
+                     transformer_top_prefill_profile[10],
+                     transformer_top_prefill_profile[11],
+                     transformer_top_prefill_profile[12]);
+            $display("TRANSFORMER_TOP_ONLY_PHASE_PROFILE phase=decode cycles=%0d matrix_mac=%0d matrix_request_wait=%0d matrix_response_wait=%0d matrix_writeback=%0d matrix_other=%0d sfu_busy=%0d kv_busy=%0d conv_busy=%0d banked_busy=%0d fp_busy=%0d scalar_busy=%0d no_engine_busy_control_or_dispatch=%0d dma_busy_event_cycles=%0d",
+                     transformer_top_final_end_cycle - transformer_top_prefill_end_cycle,
+                     transformer_top_profile_matrix_mac - transformer_top_prefill_profile[0],
+                     transformer_top_profile_matrix_request_wait - transformer_top_prefill_profile[1],
+                     transformer_top_profile_matrix_response_wait - transformer_top_prefill_profile[2],
+                     transformer_top_profile_matrix_writeback - transformer_top_prefill_profile[3],
+                     transformer_top_profile_matrix_other - transformer_top_prefill_profile[4],
+                     transformer_top_profile_sfu_busy - transformer_top_prefill_profile[5],
+                     transformer_top_profile_kv_busy - transformer_top_prefill_profile[6],
+                     transformer_top_profile_conv_busy - transformer_top_prefill_profile[7],
+                     transformer_top_profile_banked_busy - transformer_top_prefill_profile[8],
+                     transformer_top_profile_fp_busy - transformer_top_prefill_profile[9],
+                     transformer_top_profile_scalar_busy - transformer_top_prefill_profile[10],
+                     transformer_top_profile_no_engine_busy - transformer_top_prefill_profile[11],
+                     transformer_top_profile_dma_busy - transformer_top_prefill_profile[12]);
+            for (transformer_top_profile_index = 0;
+                 transformer_top_profile_index < TRANSFORMER_DESC_COUNT;
+                 transformer_top_profile_index = transformer_top_profile_index + 1)
+                $display("TRANSFORMER_COMMAND_RETIRE index=%0d cycles=%0d",
+                         transformer_top_profile_index,
+                         transformer_top_completion_cycles[transformer_top_profile_index]);
+            check_transformer_workload();
+            axi_read(REG_CMDQ_HEAD, command_head);
+            if (command_head !== TRANSFORMER_DESC_COUNT)
+                $fatal(1, "Transformer-only CMDQ head=%0d expected=%0d",
+                       command_head, TRANSFORMER_DESC_COUNT);
+            expect_completion(TRANSFORMER_CPL_BASE +
+                              ((TRANSFORMER_DESC_COUNT-1) * 16),
+                              TRANSFORMER_LAST_TASK_ID, 4'h1, 4'd0,
+                              TRANSFORMER_LAST_RESULT, 32'd4,
+                              "Transformer-only final completion");
+            $display("TRANSFORMER_TOP_ONLY_METRICS useful_macs=640 prefill_read_bytes=%0d prefill_write_bytes=%0d decode_read_bytes=%0d decode_write_bytes=%0d total_read_bytes=%0d total_write_bytes=%0d",
+                     transformer_prefill_read_bytes,
+                     transformer_prefill_write_bytes,
+                     transformer_spad_read_bytes - transformer_prefill_read_bytes,
+                     transformer_spad_write_bytes - transformer_prefill_write_bytes,
+                     transformer_spad_read_bytes,
+                     transformer_spad_write_bytes);
+        end
+    endtask
+
+    function signed [31:0] dot4_i8_sv;
+        input [31:0] a;
+        input [31:0] b;
+        reg signed [7:0] a0;
+        reg signed [7:0] a1;
+        reg signed [7:0] a2;
+        reg signed [7:0] a3;
+        reg signed [7:0] b0;
+        reg signed [7:0] b1;
+        reg signed [7:0] b2;
+        reg signed [7:0] b3;
+        begin
+            a0 = a[7:0];
+            a1 = a[15:8];
+            a2 = a[23:16];
+            a3 = a[31:24];
+            b0 = b[7:0];
+            b1 = b[15:8];
+            b2 = b[23:16];
+            b3 = b[31:24];
+            dot4_i8_sv = (a0 * b0) + (a1 * b1) + (a2 * b2) + (a3 * b3);
+        end
+    endfunction
+
+    task gen_random_word;
+        output [31:0] word_data;
+        begin
+            word_data[7:0]   = $urandom_range(0, 15) - 8;
+            word_data[15:8]  = $urandom_range(0, 15) - 8;
+            word_data[23:16] = $urandom_range(0, 15) - 8;
+            word_data[31:24] = $urandom_range(0, 15) - 8;
+        end
+    endtask
+
+    task run_random_gemv;
+        input integer case_idx;
+        integer m;
+        integer k_words_i;
+        integer row;
+        integer k;
+        reg [31:0] input_word [0:3];
+        reg [31:0] weight_word [0:15];
+        reg signed [31:0] expected;
+        reg [31:0] base_input;
+        reg [31:0] base_weight;
+        reg [31:0] base_output;
+        begin
+            m = $urandom_range(1, 4);
+            k_words_i = $urandom_range(1, 3);
+            base_input  = 32'h1000 + (case_idx * 32'h400);
+            base_weight = base_input + 32'h80;
+            base_output = base_input + 32'h200;
+
+            for (k = 0; k < k_words_i; k = k + 1) begin
+                gen_random_word(input_word[k]);
+                axi_write_delayed(SPAD_BASE + base_input + (k * 4), input_word[k],
+                                  $urandom_range(0, 2), $urandom_range(0, 2), $urandom_range(0, 2));
+            end
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (k = 0; k < k_words_i; k = k + 1) begin
+                    gen_random_word(weight_word[(row * k_words_i) + k]);
+                    axi_write_delayed(SPAD_BASE + base_weight + (((row * k_words_i) + k) * 4),
+                                      weight_word[(row * k_words_i) + k],
+                                      $urandom_range(0, 2), $urandom_range(0, 2), $urandom_range(0, 2));
+                end
+            end
+
+            axi_write(REG_OP_MODE, OP_GEMV_INT8);
+            axi_write(REG_SRC0_BASE, base_input);
+            axi_write(REG_SRC1_BASE, base_weight);
+            axi_write(REG_DST_BASE,  base_output);
+            axi_write(REG_M_SIZE,    m);
+            axi_write(REG_K_WORDS,   k_words_i);
+            axi_write(REG_POST_CTRL, 32'd0);
+            axi_write(REG_QUANT_ACT, 32'd0);
+            axi_write(REG_CTRL,      32'h0000_0003);
+            wait_done();
+
+            for (row = 0; row < m; row = row + 1) begin
+                expected = 0;
+                for (k = 0; k < k_words_i; k = k + 1)
+                    expected = expected + dot4_i8_sv(input_word[k], weight_word[(row * k_words_i) + k]);
+                expect_read(SPAD_BASE + base_output + (row * 4), expected, "random gemv");
+            end
+            clear_done_irq();
+        end
+    endtask
+
+    task run_random_gemm;
+        input integer case_idx;
+        integer m;
+        integer n;
+        integer k_words_i;
+        integer row;
+        integer col;
+        integer k;
+        reg [31:0] a_word [0:15];
+        reg [31:0] b_word [0:15];
+        reg signed [31:0] expected;
+        reg [31:0] base_a;
+        reg [31:0] base_b;
+        reg [31:0] base_out;
+        begin
+            m = $urandom_range(1, 3);
+            n = $urandom_range(1, 3);
+            k_words_i = $urandom_range(1, 2);
+            base_a   = 32'h3000 + (case_idx * 32'h500);
+            base_b   = base_a + 32'h100;
+            base_out = base_a + 32'h300;
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (k = 0; k < k_words_i; k = k + 1) begin
+                    gen_random_word(a_word[(row * k_words_i) + k]);
+                    axi_write_delayed(SPAD_BASE + base_a + (((row * k_words_i) + k) * 4),
+                                      a_word[(row * k_words_i) + k],
+                                      $urandom_range(0, 2), $urandom_range(0, 2), $urandom_range(0, 2));
+                end
+            end
+
+            for (col = 0; col < n; col = col + 1) begin
+                for (k = 0; k < k_words_i; k = k + 1) begin
+                    gen_random_word(b_word[(col * k_words_i) + k]);
+                    axi_write_delayed(SPAD_BASE + base_b + (((col * k_words_i) + k) * 4),
+                                      b_word[(col * k_words_i) + k],
+                                      $urandom_range(0, 2), $urandom_range(0, 2), $urandom_range(0, 2));
+                end
+            end
+
+            axi_write(REG_OP_MODE, OP_GEMM_INT8_TILE);
+            axi_write(REG_SRC0_BASE, base_a);
+            axi_write(REG_SRC1_BASE, base_b);
+            axi_write(REG_DST_BASE,  base_out);
+            axi_write(REG_M_SIZE,    m);
+            axi_write(REG_N_SIZE,    n);
+            axi_write(REG_K_WORDS,   k_words_i);
+            axi_write(REG_POST_CTRL, 32'd0);
+            axi_write(REG_QUANT_ACT, 32'd0);
+            axi_write(REG_CTRL,      32'h0000_0003);
+            wait_done();
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (col = 0; col < n; col = col + 1) begin
+                    expected = 0;
+                    for (k = 0; k < k_words_i; k = k + 1)
+                        expected = expected + dot4_i8_sv(a_word[(row * k_words_i) + k],
+                                                         b_word[(col * k_words_i) + k]);
+                    expect_read(SPAD_BASE + base_out + (((row * n) + col) * 4), expected, "random gemm");
+                end
+            end
+            clear_done_irq();
+        end
+    endtask
+
+    function automatic [31:0] model_postprocess;
+        input signed [63:0] accumulator;
+        input [4:0] shift;
+        input [1:0] activation;
+        reg signed [63:0] value;
+        begin
+            value = accumulator >>> shift;
+            if ((activation == 2'd1) || (activation == 2'd2)) begin
+                if (value < 0)
+                    value = 0;
+            end
+            if ((activation == 2'd2) && (value > 64'sd6))
+                value = 64'sd6;
+            if (value > 64'sd2147483647)
+                model_postprocess = 32'h7fff_ffff;
+            else if (value < -64'sd2147483648)
+                model_postprocess = 32'h8000_0000;
+            else
+                model_postprocess = value[31:0];
+        end
+    endfunction
+
+    task gen_random_3x3_word;
+        input integer word_index;
+        output [31:0] word_data;
+        begin
+            gen_random_word(word_data);
+            // A 3x3 kernel has nine valid lanes; lanes 9..11 are padding.
+            if (word_index == 2)
+                word_data[31:8] = 24'd0;
+        end
+    endtask
+
+    task run_random_conv3x3;
+        input integer case_idx;
+        integer m;
+        integer n;
+        integer row;
+        integer col;
+        integer k;
+        integer activation_i;
+        integer shift_i;
+        integer bias_enable_i;
+        reg [31:0] patch_word [0:5];
+        reg [31:0] weight_word [0:8];
+        reg signed [31:0] bias_word [0:2];
+        reg signed [63:0] accumulator;
+        reg [31:0] expected;
+        reg [31:0] base_patch;
+        reg [31:0] base_weight;
+        reg [31:0] base_bias;
+        reg [31:0] base_output;
+        begin
+            m = $urandom_range(1, 2);
+            n = $urandom_range(1, 3);
+            activation_i = case_idx % 3;
+            shift_i = case_idx % 4;
+            bias_enable_i = case_idx % 2;
+            base_patch  = 32'h0000_a000;
+            base_weight = 32'h0000_a100;
+            base_bias   = 32'h0000_a200;
+            base_output = 32'h0000_a300;
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (k = 0; k < 3; k = k + 1) begin
+                    gen_random_3x3_word(k, patch_word[(row * 3) + k]);
+                    axi_write_delayed(SPAD_BASE + base_patch + (((row * 3) + k) * 4),
+                                      patch_word[(row * 3) + k],
+                                      $urandom_range(0, 2), $urandom_range(0, 2),
+                                      $urandom_range(0, 2));
+                end
+            end
+            for (col = 0; col < n; col = col + 1) begin
+                for (k = 0; k < 3; k = k + 1) begin
+                    gen_random_3x3_word(k, weight_word[(col * 3) + k]);
+                    axi_write_delayed(SPAD_BASE + base_weight + (((col * 3) + k) * 4),
+                                      weight_word[(col * 3) + k],
+                                      $urandom_range(0, 2), $urandom_range(0, 2),
+                                      $urandom_range(0, 2));
+                end
+                bias_word[col] = $urandom_range(0, 127) - 64;
+                axi_write(SPAD_BASE + base_bias + (col * 4), bias_word[col]);
+            end
+
+            axi_write(REG_OP_MODE, OP_CONV3X3_INT8);
+            axi_write(REG_SRC0_BASE, base_patch);
+            axi_write(REG_SRC1_BASE, base_weight);
+            axi_write(REG_DST_BASE, base_output);
+            axi_write(REG_M_SIZE, m);
+            axi_write(REG_N_SIZE, n);
+            axi_write(REG_K_WORDS, 32'd3);
+            axi_write(REG_BIAS_BASE, base_bias);
+            axi_write(REG_POST_CTRL, bias_enable_i);
+            axi_write(REG_QUANT_ACT, (activation_i << 5) | shift_i);
+            axi_write(REG_CTRL, 32'h0000_0003);
+            wait_done();
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (col = 0; col < n; col = col + 1) begin
+                    accumulator = bias_enable_i ? bias_word[col] : 0;
+                    for (k = 0; k < 3; k = k + 1)
+                        accumulator = accumulator +
+                            dot4_i8_sv(patch_word[(row * 3) + k],
+                                      weight_word[(col * 3) + k]);
+                    expected = model_postprocess(accumulator, shift_i[4:0],
+                                                 activation_i[1:0]);
+                    expect_read(SPAD_BASE + base_output + (((row * n) + col) * 4),
+                                expected, "random conv3x3 post-op");
+                end
+            end
+            clear_done_irq();
+        end
+    endtask
+
+    task run_random_dwconv3x3;
+        input integer case_idx;
+        integer m;
+        integer n;
+        integer row;
+        integer col;
+        integer k;
+        integer activation_i;
+        integer shift_i;
+        integer bias_enable_i;
+        reg [31:0] patch_word [0:17];
+        reg [31:0] weight_word [0:8];
+        reg signed [31:0] bias_word [0:2];
+        reg signed [63:0] accumulator;
+        reg [31:0] expected;
+        reg [31:0] base_patch;
+        reg [31:0] base_weight;
+        reg [31:0] base_bias;
+        reg [31:0] base_output;
+        begin
+            m = $urandom_range(1, 2);
+            n = $urandom_range(1, 3);
+            activation_i = (case_idx + 1) % 3;
+            shift_i = (case_idx + 2) % 4;
+            bias_enable_i = (case_idx + 1) % 2;
+            base_patch  = 32'h0000_b000;
+            base_weight = 32'h0000_b100;
+            base_bias   = 32'h0000_b200;
+            base_output = 32'h0000_b300;
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (col = 0; col < n; col = col + 1) begin
+                    for (k = 0; k < 3; k = k + 1) begin
+                        gen_random_3x3_word(k,
+                            patch_word[(((row * n) + col) * 3) + k]);
+                        axi_write_delayed(
+                            SPAD_BASE + base_patch +
+                            (((((row * n) + col) * 3) + k) * 4),
+                            patch_word[(((row * n) + col) * 3) + k],
+                            $urandom_range(0, 2), $urandom_range(0, 2),
+                            $urandom_range(0, 2));
+                    end
+                end
+            end
+            for (col = 0; col < n; col = col + 1) begin
+                for (k = 0; k < 3; k = k + 1) begin
+                    gen_random_3x3_word(k, weight_word[(col * 3) + k]);
+                    axi_write_delayed(SPAD_BASE + base_weight + (((col * 3) + k) * 4),
+                                      weight_word[(col * 3) + k],
+                                      $urandom_range(0, 2), $urandom_range(0, 2),
+                                      $urandom_range(0, 2));
+                end
+                bias_word[col] = $urandom_range(0, 127) - 64;
+                axi_write(SPAD_BASE + base_bias + (col * 4), bias_word[col]);
+            end
+
+            axi_write(REG_OP_MODE, OP_DWCONV3X3_INT8);
+            axi_write(REG_SRC0_BASE, base_patch);
+            axi_write(REG_SRC1_BASE, base_weight);
+            axi_write(REG_DST_BASE, base_output);
+            axi_write(REG_M_SIZE, m);
+            axi_write(REG_N_SIZE, n);
+            axi_write(REG_K_WORDS, 32'd3);
+            axi_write(REG_BIAS_BASE, base_bias);
+            axi_write(REG_POST_CTRL, bias_enable_i);
+            axi_write(REG_QUANT_ACT, (activation_i << 5) | shift_i);
+            axi_write(REG_CTRL, 32'h0000_0003);
+            wait_done();
+
+            for (row = 0; row < m; row = row + 1) begin
+                for (col = 0; col < n; col = col + 1) begin
+                    accumulator = bias_enable_i ? bias_word[col] : 0;
+                    for (k = 0; k < 3; k = k + 1)
+                        accumulator = accumulator + dot4_i8_sv(
+                            patch_word[(((row * n) + col) * 3) + k],
+                            weight_word[(col * 3) + k]);
+                    expected = model_postprocess(accumulator, shift_i[4:0],
+                                                 activation_i[1:0]);
+                    expect_read(SPAD_BASE + base_output + (((row * n) + col) * 4),
+                                expected, "random dwconv3x3 post-op");
+                end
+            end
+            clear_done_irq();
+        end
+    endtask
+
+    task run_representative_model;
+        reg [1023:0] image_file;
+        reg [1023:0] golden_file;
+        integer image_count;
+        integer golden_count;
+        integer image_index;
+        integer golden_index;
+        integer descriptor_base;
+        integer completion_base;
+        integer descriptor_count;
+        integer useful_macs;
+        integer poll_index;
+        integer completion_index;
+        integer matrix_mac_cycles;
+        integer matrix_wait_cycles;
+        integer matrix_response_wait_cycles;
+        integer matrix_writeback_cycles;
+        integer matrix_other_cycles;
+        integer sfu_busy_cycles;
+        integer kv_busy_cycles;
+        integer conv_busy_cycles;
+        integer banked_busy_cycles;
+        integer fp_busy_cycles;
+        integer scalar_busy_cycles;
+        integer no_engine_cycles;
+        integer dma_busy_cycles;
+        integer exclusive_profile_cycles;
+        integer command_cycles;
+        integer preloaded_spad_bytes;
+        integer spad_read_bytes;
+        integer spad_write_bytes;
+        real mac_per_cycle;
+        real array_utilization;
+        reg [31:0] read_value;
+        reg [31:0] status_value;
+        begin
+            if (!$value$plusargs("AI_REPRESENTATIVE_MEMORY=%s", image_file) ||
+                !$value$plusargs("AI_REPRESENTATIVE_GOLDEN=%s", golden_file) ||
+                !$value$plusargs("AI_REPRESENTATIVE_DESC_BASE=%d", descriptor_base) ||
+                !$value$plusargs("AI_REPRESENTATIVE_CPL_BASE=%d", completion_base) ||
+                !$value$plusargs("AI_REPRESENTATIVE_DESC_COUNT=%d", descriptor_count) ||
+                !$value$plusargs("AI_REPRESENTATIVE_USEFUL_MACS=%d", useful_macs))
+                $fatal(1, "representative model mode requires memory, golden, queue and MAC plusargs");
+
+            $readmemh(image_file, representative_image_words);
+            $readmemh(golden_file, representative_golden_words);
+            image_count = representative_image_words[0];
+            golden_count = representative_golden_words[0];
+            if (image_count <= 0 || image_count > 65535 ||
+                golden_count <= 0 || golden_count > 65535 ||
+                descriptor_count < 1 || descriptor_count > 128 ||
+                descriptor_base < 0 || completion_base < 0 ||
+                descriptor_base[1:0] != 0 || completion_base[1:0] != 0)
+                $fatal(1, "representative model image/queue dimensions invalid image=%0d golden=%0d desc=%0d",
+                       image_count, golden_count, descriptor_count);
+
+            representative_load_cycles = 0;
+            representative_load_measure = 1'b1;
+            for (image_index = 0; image_index < image_count; image_index = image_index + 1) begin
+                if (representative_image_words[1 + 2 * image_index] >= SPAD_BYTES ||
+                    representative_image_words[1 + 2 * image_index][1:0] != 2'b00)
+                    $fatal(1, "representative image has invalid SPAD address index=%0d addr=%08h",
+                           image_index, representative_image_words[1 + 2 * image_index]);
+                axi_write(SPAD_BASE + representative_image_words[1 + 2 * image_index],
+                          representative_image_words[2 + 2 * image_index]);
+            end
+            representative_load_measure = 1'b0;
+
+            // Prove every expected result was poisoned before the first command.
+            for (golden_index = 0; golden_index < golden_count; golden_index = golden_index + 1) begin
+                axi_read(SPAD_BASE + representative_golden_words[1 + 2 * golden_index],
+                         read_value);
+                if (read_value !== 32'ha55a_a55a)
+                    $fatal(1, "representative output not poisoned index=%0d addr=%08h value=%08h",
+                           golden_index, representative_golden_words[1 + 2 * golden_index], read_value);
+            end
+
+            axi_write(REG_CMDQ_CTRL, 32'd0);
+            axi_write(REG_CMDQ_BASE_LO, descriptor_base);
+            axi_write(REG_CMDQ_BASE_HI, 32'd0);
+            axi_write(REG_CMDQ_SIZE, 32'd128);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, descriptor_count);
+            axi_write(REG_CPLQ_BASE_LO, completion_base);
+            axi_write(REG_CPLQ_SIZE, 32'd128);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+
+            ai_tinynpu_cnn_engine_read_words = 0;
+            ai_tinynpu_cnn_engine_write_words = 0;
+            ai_tinynpu_cnn_banked_read_lines = 0;
+            ai_tinynpu_cnn_line_write_lines = 0;
+            ai_tinynpu_cnn_measure = 1'b1;
+            transformer_top_profile_matrix_mac = 0;
+            transformer_top_profile_matrix_request_wait = 0;
+            transformer_top_profile_matrix_response_wait = 0;
+            transformer_top_profile_matrix_writeback = 0;
+            transformer_top_profile_matrix_other = 0;
+            transformer_top_profile_sfu_busy = 0;
+            transformer_top_profile_kv_busy = 0;
+            transformer_top_profile_conv_busy = 0;
+            transformer_top_profile_banked_busy = 0;
+            transformer_top_profile_fp_busy = 0;
+            transformer_top_profile_scalar_busy = 0;
+            transformer_top_profile_no_engine_busy = 0;
+            transformer_top_profile_dma_busy = 0;
+            transformer_top_last_completion_tail = dut.processor_cplq_tail;
+            transformer_top_last_completion_cycle = transformer_top_cycle_counter;
+            transformer_top_start_cycle = transformer_top_cycle_counter;
+            transformer_top_final_target = descriptor_count;
+            transformer_top_final_captured = 1'b0;
+            transformer_top_timing_enable = 1'b1;
+            axi_write(REG_DOORBELL, 32'd1);
+            for (poll_index = 0; poll_index < 2000000 &&
+                 !transformer_top_final_captured; poll_index = poll_index + 1)
+                @(posedge aclk);
+            transformer_top_timing_enable = 1'b0;
+            ai_tinynpu_cnn_measure = 1'b0;
+            if (!transformer_top_final_captured)
+                $fatal(1, "representative model completion timeout desc_count=%0d cmd_head=%0d cpl_tail=%0d",
+                       descriptor_count, dut.processor_cmdq_head, dut.processor_cplq_tail);
+            if (dut.processor_cplq_tail != descriptor_count ||
+                dut.processor_cmdq_head != descriptor_count)
+                $fatal(1, "representative model queue did not retire all commands head=%0d tail=%0d",
+                       dut.processor_cmdq_head, dut.processor_cplq_tail);
+
+            for (completion_index = 0; completion_index < descriptor_count;
+                 completion_index = completion_index + 1) begin
+                axi_read(SPAD_BASE + completion_base + completion_index * 16, read_value);
+                if (read_value !== (32'h0000_7100 + completion_index))
+                    $fatal(1, "representative completion task ID mismatch index=%0d got=%08h",
+                           completion_index, read_value);
+                axi_read(SPAD_BASE + completion_base + completion_index * 16 + 4, status_value);
+                if (status_value !== 32'd1)
+                    $fatal(1, "representative completion failed index=%0d status=%08h",
+                           completion_index, status_value);
+            end
+            for (golden_index = 0; golden_index < golden_count; golden_index = golden_index + 1) begin
+                axi_read(SPAD_BASE + representative_golden_words[1 + 2 * golden_index], read_value);
+                if (read_value !== representative_golden_words[2 + 2 * golden_index])
+                    $fatal(1, "representative Golden mismatch index=%0d addr=%08h expected=%08h actual=%08h",
+                           golden_index, representative_golden_words[1 + 2 * golden_index],
+                           representative_golden_words[2 + 2 * golden_index], read_value);
+            end
+
+            matrix_mac_cycles = transformer_top_profile_matrix_mac;
+            matrix_wait_cycles = transformer_top_profile_matrix_request_wait;
+            matrix_response_wait_cycles = transformer_top_profile_matrix_response_wait;
+            matrix_writeback_cycles = transformer_top_profile_matrix_writeback;
+            matrix_other_cycles = transformer_top_profile_matrix_other;
+            sfu_busy_cycles = transformer_top_profile_sfu_busy;
+            kv_busy_cycles = transformer_top_profile_kv_busy;
+            conv_busy_cycles = transformer_top_profile_conv_busy;
+            banked_busy_cycles = transformer_top_profile_banked_busy;
+            fp_busy_cycles = transformer_top_profile_fp_busy;
+            scalar_busy_cycles = transformer_top_profile_scalar_busy;
+            no_engine_cycles = transformer_top_profile_no_engine_busy;
+            dma_busy_cycles = transformer_top_profile_dma_busy;
+            command_cycles = transformer_top_final_end_cycle - transformer_top_start_cycle;
+            exclusive_profile_cycles = matrix_mac_cycles + matrix_wait_cycles +
+                matrix_response_wait_cycles + matrix_writeback_cycles + matrix_other_cycles +
+                sfu_busy_cycles + kv_busy_cycles + conv_busy_cycles + banked_busy_cycles +
+                fp_busy_cycles + scalar_busy_cycles + no_engine_cycles;
+            preloaded_spad_bytes = image_count * 4;
+            if (exclusive_profile_cycles != command_cycles)
+                $fatal(1, "representative exclusive profile does not close cycles=%0d buckets=%0d",
+                       command_cycles, exclusive_profile_cycles);
+            spad_read_bytes = ai_tinynpu_cnn_engine_read_words * 4 +
+                              ai_tinynpu_cnn_banked_read_lines * 16;
+            spad_write_bytes = ai_tinynpu_cnn_engine_write_words * 4 +
+                               ai_tinynpu_cnn_line_write_lines * 16;
+            mac_per_cycle = 0.0;
+            array_utilization = 0.0;
+            if (command_cycles > 0)
+                mac_per_cycle = useful_macs / command_cycles;
+            if (matrix_mac_cycles > 0)
+                array_utilization = 100.0 * useful_macs / (256.0 * matrix_mac_cycles);
+            $display("REPRESENTATIVE_MODEL_PASS desc=%0d golden_words=%0d useful_macs=%0d command_cycles=%0d exclusive_profile_cycles=%0d preload_axi_cycles=%0d preloaded_spad_bytes=%0d mac_per_cycle=%0.4f array_utilization_pct=%0.2f matrix_mac_cycles=%0d matrix_req_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d sfu_busy=%0d kv_busy=%0d conv_busy=%0d banked_busy=%0d fp_busy=%0d scalar_busy=%0d no_engine_dispatch_remainder=%0d dma_busy_overlap=%0d spad_read_bytes=%0d spad_write_bytes=%0d",
+                     descriptor_count, golden_count, useful_macs, command_cycles,
+                     exclusive_profile_cycles, representative_load_cycles,
+                     preloaded_spad_bytes, mac_per_cycle, array_utilization,
+                     matrix_mac_cycles, matrix_wait_cycles,
+                     matrix_response_wait_cycles, matrix_writeback_cycles,
+                     matrix_other_cycles, sfu_busy_cycles, kv_busy_cycles,
+                     conv_busy_cycles, banked_busy_cycles, fp_busy_cycles,
+                     scalar_busy_cycles, no_engine_cycles, dma_busy_cycles,
+                     spad_read_bytes, spad_write_bytes);
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+        end
+    endtask
+
+    initial begin
+        integer pair_engine_a;
+        integer pair_engine_b;
+        integer pair_index;
+        integer pair_setup_i;
+        errors = 0;
+        seed_arg = 20261014;
+        profile_ai_seed = 0;
+        $value$plusargs("AI_SEED=%d", profile_ai_seed);
+        matrix_line_write_count = 0;
+        cp_fetch_done_count = 0;
+        last_dma_araddr = 0;
+        allow_m_axi_error = 1'b0;
+        aresetn = 1'b0;
+        axi_idle();
+        repeat (8) @(posedge aclk);
+        aresetn = 1'b1;
+        repeat (4) @(posedge aclk);
+
+        if ($test$plusargs("AI_TRANSFORMER_ONLY")) begin
+            run_transformer_only();
+            if (errors != 0)
+                $fatal(1, "Transformer-only replay had %0d mismatches", errors);
+            $display("TRANSFORMER_TOP_ONLY_PASS");
+            $finish;
+        end
+
+        if ($test$plusargs("AI_REPRESENTATIVE_MODEL")) begin
+            run_representative_model();
+            $finish;
+        end
+
+        if ($test$plusargs("FP_DOT_DMA_BENCH")) begin
+            run_fp_dot_dma_benchmark();
+            if (errors != 0)
+                $fatal(1, "FP benchmark reported %0d errors", errors);
+            $finish;
+        end
+
+        if ($test$plusargs("R9_MATRIX_DMA_OVERLAP_PROBE")) begin
+            run_matrix_dma_overlap_probe();
+            $finish;
+        end
+
+        if ($test$plusargs("AI_DIGITS_INFERENCE")) begin
+            run_ai_digits_inference();
+            if (errors != 0)
+                $fatal(1, "digits RTL inference reported %0d mismatches", errors);
+            $finish;
+        end
+
+        if ($test$plusargs("AI_TINYNPU_CNN_MATCH")) begin
+            run_tinynpu_cnn_match();
+            if (errors != 0)
+                $fatal(1, "TinyNPU CNN RTL match reported %0d mismatches", errors);
+            $finish;
+        end
+
+        expect_read(REG_VERSION, 32'h1000_000a, "version");
+        expect_read(FPGA_AXI_BASE + REG_VERSION, 32'h1000_000a,
+                    "mapped AXI aperture version");
+        expect_read(REG_ABI_INFO, 32'h1040_0407, "ABI v7.4 sizes");
+        expect_read(REG_CAP2, 32'h0000_00ff, "architectural capabilities");
+        expect_read(REG_ERROR_INFO, 32'h0000_0000, "reset error source");
+        axi_write(REG_DMA_EXT_HI, 32'h0000_0001);
+        expect_read(REG_DMA_EXT_HI, 32'h0000_0001, "DMA 64-bit address high");
+        axi_write(REG_DMA_EXT_HI, 32'd0);
+        axi_write(REG_CMDQ_BASE_HI, 32'h0000_0004);
+        expect_read(REG_CMDQ_BASE_HI, 32'h0000_0004,
+                    "external CMDQ 64-bit address high");
+        axi_write(REG_CMDQ_BASE_HI, 32'd0);
+        axi_write(REG_TILE_EXT_IN_HI, 32'h0000_0002);
+        axi_write(REG_TILE_EXT_OUT_HI, 32'h0000_0003);
+        expect_read(REG_TILE_EXT_IN_HI, 32'h0000_0002, "tile input high");
+        expect_read(REG_TILE_EXT_OUT_HI, 32'h0000_0003, "tile output high");
+        axi_write(REG_TILE_EXT_IN_HI, 32'd0);
+        axi_write(REG_TILE_EXT_OUT_HI, 32'd0);
+        expect_read(REG_SPAD_INFO, SPAD_BYTES, "512 KiB scratchpad capability");
+        axi_write(FPGA_AXI_BASE + SPAD_BASE + 32'h0008, 32'hface_5120);
+        expect_read(FPGA_AXI_BASE + SPAD_BASE + 32'h0008, 32'hface_5120,
+                    "mapped AXI aperture scratchpad");
+        axi_write_bready_preasserted(REG_IRQ_ENABLE, 32'd1);
+        expect_read(REG_IRQ_ENABLE, 32'd1, "preasserted-BREADY AXI write");
+        axi_write_delayed(SPAD_BASE + 32'h000c, 32'h1234_5678, 3, 0, 2);
+        expect_read(SPAD_BASE + 32'h000c, 32'h1234_5678, "split aw/w write");
+        expect_slverr_write(REG_VERSION, 32'hdead_beef);
+        axi_write(SPAD_BASE + SPAD_BYTES - 32'd4, 32'h5120_cafe);
+        expect_read(SPAD_BASE + SPAD_BYTES - 32'd4, 32'h5120_cafe,
+                    "scratchpad highest legal word");
+        expect_slverr_write(SPAD_BASE + SPAD_BYTES, 32'hdead_beef);
+        expect_slverr_read(SPAD_BASE + SPAD_BYTES);
+
+        // VDOT: [1,2,3,4] dot [5,6,7,8] = 70.
+        axi_write(SPAD_BASE + 32'h0000, 32'h0403_0201);
+        axi_write(SPAD_BASE + 32'h0100, 32'h0807_0605);
+        axi_write(REG_OP_MODE, OP_VDOT_INT8);
+        axi_write(REG_SRC0_BASE, 32'h0000);
+        axi_write(REG_SRC1_BASE, 32'h0100);
+        axi_write(REG_DST_BASE,  32'h0200);
+        axi_write(REG_LENGTH,    32'd1);
+        axi_write(REG_QUANT_ACT, 32'd0);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h0200, 32'd70, "vdot output");
+        expect_read(REG_RESULT, 32'd70, "vdot result");
+        expect_read(REG_CPLQ_TAIL, 32'd0, "direct command does not publish completion");
+        if (!irq) begin
+            $display("%0t ERROR: irq not asserted after VDOT", $time);
+            errors = errors + 1;
+        end
+        clear_done_irq();
+
+        // GEMV: two rows, one packed INT8 word per row.
+        // row0 dot input = 70, row1 dot input = 1+0-3+8 = 6.
+        axi_write(SPAD_BASE + 32'h0300, 32'h0403_0201);
+        axi_write(SPAD_BASE + 32'h0400, 32'h0807_0605);
+        axi_write(SPAD_BASE + 32'h0404, 32'h02ff_0001);
+        write_spad_desc(32'h0c00, OP_GEMV_INT8, 16'h0001, 32'h0300, 32'h0400, 32'h0500,
+                        16'd2, 16'd0, 16'd1);
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CMDQ_BASE_LO, 32'h0c00);
+        axi_write(REG_DOORBELL,  32'd1);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h0500, 32'd70, "gemv row0");
+        expect_read(SPAD_BASE + 32'h0504, 32'd6,  "gemv row1");
+        expect_read(REG_CMDQ_HEAD, 32'd1, "cmdq head");
+        expect_read(REG_CPLQ_TAIL, 32'd0, "disabled completion queue tail after gemv");
+        clear_done_irq();
+
+        // Scratchpad command queue ring: size=2, start from entry1, then wrap to entry0.
+        write_spad_desc(32'h1000, OP_VDOT_INT8, 16'h0100, 32'h0000, 32'h0100, 32'h1010,
+                        16'd0, 16'd0, 16'd1);
+        write_spad_desc(32'h1040, OP_VDOT_INT8, 16'h0101, 32'h0000, 32'h0100, 32'h1020,
+                        16'd0, 16'd0, 16'd1);
+        axi_write(REG_CMDQ_CTRL, 32'd0);
+        axi_write(REG_CMDQ_BASE_LO, 32'h1000);
+        axi_write(REG_CMDQ_SIZE, 32'd2);
+        axi_write(REG_CMDQ_HEAD, 32'd1);
+        axi_write(REG_CMDQ_TAIL, 32'd0);
+        axi_write(REG_CPLQ_BASE_LO, 32'h1100);
+        axi_write(REG_CPLQ_SIZE, 32'd2);
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        axi_write(REG_CPLQ_TAIL, 32'd0);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h1020, 32'd70, "ring entry1 vdot");
+        expect_read(REG_CMDQ_HEAD, 32'd0, "cmdq head wrap");
+        wait_cpl_tail(32'd1, "cplq tail entry1");
+        expect_completion(32'h1100, 16'h0101, 4'h1, 4'h0, 32'd70, 32'd1, "cpl entry1");
+        // Software consumes completion entry1 before hardware may write the
+        // wrapped entry0; otherwise a size-2 ring is intentionally full.
+        axi_write(REG_CPLQ_HEAD, 32'd1);
+        clear_done_irq();
+
+        // Publish descriptor entry0, then ring once for this submitted work.
+        axi_write(REG_CMDQ_TAIL, 32'd1);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h1010, 32'd70, "ring entry0 vdot");
+        expect_read(REG_CMDQ_HEAD, 32'd1, "cmdq head next");
+        wait_cpl_tail(32'd0, "cplq tail wrap");
+        expect_completion(32'h1110, 16'h0100, 4'h1, 4'h0, 32'd70, 32'd1, "cpl entry0");
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        clear_done_irq();
+
+        // Empty command queue must be observable and must not issue a fetch.
+        axi_read(REG_QUEUE_STATUS, rd);
+        if (rd[0] !== 1'b1) begin
+            $display("%0t ERROR: expected CMDQ_EMPTY in QUEUE_STATUS", $time);
+            errors = errors + 1;
+        end
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done_expect_error(ERR_CMDQ_EMPTY);
+        clear_done_irq();
+
+        // A full completion ring blocks a newly submitted command before its
+        // descriptor is fetched, preserving unread completion data.
+        axi_write(REG_CMDQ_HEAD, 32'd0);
+        axi_write(REG_CMDQ_TAIL, 32'd1);
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        axi_write(REG_CPLQ_TAIL, 32'd1);
+        axi_read(REG_QUEUE_STATUS, rd);
+        if (rd[2] !== 1'b1) begin
+            $display("%0t ERROR: expected CPLQ_FULL in QUEUE_STATUS", $time);
+            errors = errors + 1;
+        end
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done_expect_error(ERR_CPLQ_FULL);
+        clear_done_irq();
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CPLQ_SIZE, 32'd0);
+
+        // GEMM tile: M=2, N=2, K=1 packed word.
+        // A row0 [1,2,3,4], row1 [2,0,1,1]
+        // B col0 [1,1,1,1], col1 [1,-1,2,0]
+        axi_write(SPAD_BASE + 32'h0600, 32'h0403_0201);
+        axi_write(SPAD_BASE + 32'h0604, 32'h0101_0002);
+        axi_write(SPAD_BASE + 32'h0700, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0704, 32'h0002_ff01);
+        axi_write(REG_OP_MODE, OP_GEMM_INT8_TILE);
+        axi_write(REG_SRC0_BASE, 32'h0600);
+        axi_write(REG_SRC1_BASE, 32'h0700);
+        axi_write(REG_DST_BASE,  32'h0800);
+        axi_write(REG_M_SIZE,    32'd2);
+        axi_write(REG_N_SIZE,    32'd2);
+        axi_write(REG_K_WORDS,   32'd1);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h0800, 32'd10, "gemm row0 col0");
+        expect_read(SPAD_BASE + 32'h0804, 32'd5,  "gemm row0 col1");
+        expect_read(SPAD_BASE + 32'h0808, 32'd4,  "gemm row1 col0");
+        expect_read(SPAD_BASE + 32'h080c, 32'd4,  "gemm row1 col1");
+        clear_done_irq();
+
+        // NHWC 1x1 convolution: two spatial positions (M=H*W=2), four
+        // input channels (K_WORDS=1), and two output channels (N=2).  The
+        // packed input/weight layout is the same matrix data flow as GEMM.
+        axi_write(REG_OP_MODE, OP_CONV1X1_INT8);
+        axi_write(REG_SRC0_BASE, 32'h0600);
+        axi_write(REG_SRC1_BASE, 32'h0700);
+        axi_write(REG_DST_BASE,  32'h0900);
+        axi_write(REG_M_SIZE,    32'd2);
+        axi_write(REG_N_SIZE,    32'd2);
+        axi_write(REG_K_WORDS,   32'd1);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h0900, 32'd10, "conv1x1 pixel0 channel0");
+        expect_read(SPAD_BASE + 32'h0904, 32'd5,  "conv1x1 pixel0 channel1");
+        expect_read(SPAD_BASE + 32'h0908, 32'd4,  "conv1x1 pixel1 channel0");
+        expect_read(SPAD_BASE + 32'h090c, 32'd4,  "conv1x1 pixel1 channel1");
+        clear_done_irq();
+
+        // A2 CONV3x3: one im2col patch (9 valid lanes, padded to three
+        // words). Channel0 uses +1 weights and bias +5; channel1 uses -1
+        // weights and bias +40. ReLU6 clamps the results to 6 and zero.
+        axi_write(SPAD_BASE + 32'h3a00, 32'h0403_0201);
+        axi_write(SPAD_BASE + 32'h3a04, 32'h0807_0605);
+        axi_write(SPAD_BASE + 32'h3a08, 32'h0000_0009);
+        axi_write(SPAD_BASE + 32'h3b00, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3b04, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3b08, 32'h0000_0001);
+        axi_write(SPAD_BASE + 32'h3b0c, 32'hffff_ffff);
+        axi_write(SPAD_BASE + 32'h3b10, 32'hffff_ffff);
+        axi_write(SPAD_BASE + 32'h3b14, 32'h0000_00ff);
+        axi_write(SPAD_BASE + 32'h3c00, 32'd5);
+        axi_write(SPAD_BASE + 32'h3c04, 32'd40);
+        axi_write(REG_OP_MODE, OP_CONV3X3_INT8);
+        axi_write(REG_SRC0_BASE, 32'h3a00);
+        axi_write(REG_SRC1_BASE, 32'h3b00);
+        axi_write(REG_DST_BASE,  32'h3d00);
+        axi_write(REG_M_SIZE,    32'd1);
+        axi_write(REG_N_SIZE,    32'd2);
+        axi_write(REG_K_WORDS,   32'd3);
+        axi_write(REG_BIAS_BASE, 32'h3c00);
+        axi_write(REG_POST_CTRL, 32'd1);
+        axi_write(REG_QUANT_ACT, 32'h0000_0040);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h3d00, 32'd6, "conv3x3 bias relu6 ch0");
+        expect_read(SPAD_BASE + 32'h3d04, 32'd0, "conv3x3 bias relu6 ch1");
+        clear_done_irq();
+
+        // DWConv3x3 input patches are laid out per {pixel,channel}; each
+        // channel consumes only its own packed kernel vector.
+        axi_write(SPAD_BASE + 32'h3e00, 32'h0403_0201);
+        axi_write(SPAD_BASE + 32'h3e04, 32'h0807_0605);
+        axi_write(SPAD_BASE + 32'h3e08, 32'h0000_0009);
+        axi_write(SPAD_BASE + 32'h3e0c, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3e10, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3e14, 32'h0000_0002);
+        axi_write(SPAD_BASE + 32'h3b0c, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3b10, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3b14, 32'h0000_0001);
+        axi_write(REG_OP_MODE, OP_DWCONV3X3_INT8);
+        axi_write(REG_SRC0_BASE, 32'h3e00);
+        axi_write(REG_SRC1_BASE, 32'h3b00);
+        axi_write(REG_DST_BASE,  32'h3f00);
+        axi_write(REG_M_SIZE,    32'd1);
+        axi_write(REG_N_SIZE,    32'd2);
+        axi_write(REG_K_WORDS,   32'd3);
+        axi_write(REG_POST_CTRL, 32'd0);
+        axi_write(REG_PERF_CTRL, 32'd1);
+        axi_write(REG_QUANT_ACT, 32'd0);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h3f00, 32'd45, "dwconv3x3 ch0");
+        expect_read(SPAD_BASE + 32'h3f04, 32'd18, "dwconv3x3 ch1");
+        clear_done_irq();
+
+        // Bank-striped layout: one K group is 16 bytes.  The four words at
+        // offsets +0/+4/+8/+c map to bank0..bank3 and are processed in
+        // parallel by BANKED_VDOT/BANKED_GEMV.
+        axi_write(SPAD_BASE + 32'h3000, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3004, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3008, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h300c, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3100, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3104, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3108, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h310c, 32'h0101_0101);
+        axi_write(REG_OP_MODE, OP_BANKED_VDOT);
+        axi_write(REG_SRC0_BASE, 32'h3000);
+        axi_write(REG_SRC1_BASE, 32'h3100);
+        axi_write(REG_DST_BASE,  32'h3200);
+        axi_write(REG_LENGTH,    32'd1);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h3200, 32'd16, "banked vdot");
+        expect_read(REG_RESULT, 32'd16, "banked vdot result");
+        clear_done_irq();
+
+        // Exercise address bit 18 through the banked datapath.  This catches
+        // any accidental retention of the former 12-bit/64 KiB row index.
+        axi_write(SPAD_BASE + 32'h0007_ffe0, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_ffe4, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_ffe8, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_ffec, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_fff0, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_fff4, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_fff8, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h0007_fffc, 32'h0101_0101);
+        axi_write(REG_OP_MODE, OP_BANKED_VDOT);
+        axi_write(REG_SRC0_BASE, 32'h0007_ffe0);
+        axi_write(REG_SRC1_BASE, 32'h0007_fff0);
+        axi_write(REG_DST_BASE,  32'h0000_3400);
+        axi_write(REG_LENGTH,    32'd1);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h0000_3400, 32'd16,
+                    "banked vdot at 512 KiB boundary");
+        clear_done_irq();
+
+        // Two GEMV rows share the bank-striped input; each weight row occupies
+        // LENGTH*16 bytes.  Row0 uses all ones, row1 uses all twos.
+        axi_write(SPAD_BASE + 32'h3110, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3114, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3118, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h311c, 32'h0202_0202);
+        axi_write(REG_OP_MODE, OP_BANKED_GEMV);
+        axi_write(REG_SRC0_BASE, 32'h3000);
+        axi_write(REG_SRC1_BASE, 32'h3100);
+        axi_write(REG_DST_BASE,  32'h3300);
+        axi_write(REG_LENGTH,    32'd1);
+        axi_write(REG_M_SIZE,    32'd2);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h3300, 32'd16, "banked gemv row0");
+        expect_read(SPAD_BASE + 32'h3304, 32'd32, "banked gemv row1");
+        clear_done_irq();
+
+        // CNM integration case: three K-groups use bank-distinct words.  A
+        // is +1 throughout; B group values are +1, +2 and -1, giving
+        // 16 + 32 - 16 = 32.  Unlike the focused A2.2 unit test, this runs
+        // through AXI-Lite, command processor, SPAD arbiter and writeback.
+        axi_write(SPAD_BASE + 32'h3500, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3504, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3508, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h350c, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3510, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3514, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3518, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h351c, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3520, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3524, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3528, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h352c, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3600, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3604, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3608, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h360c, 32'h0101_0101);
+        axi_write(SPAD_BASE + 32'h3610, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3614, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3618, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h361c, 32'h0202_0202);
+        axi_write(SPAD_BASE + 32'h3620, 32'hffff_ffff);
+        axi_write(SPAD_BASE + 32'h3624, 32'hffff_ffff);
+        axi_write(SPAD_BASE + 32'h3628, 32'hffff_ffff);
+        axi_write(SPAD_BASE + 32'h362c, 32'hffff_ffff);
+        axi_write(REG_OP_MODE, OP_BANKED_VDOT);
+        axi_write(REG_SRC0_BASE, 32'h3500);
+        axi_write(REG_SRC1_BASE, 32'h3600);
+        axi_write(REG_DST_BASE,  32'h3700);
+        axi_write(REG_LENGTH,    32'd3);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h3700, 32'd32, "CNM A2 multi-group vdot");
+        expect_read(REG_RESULT, 32'd32, "CNM A2 multi-group result");
+        clear_done_irq();
+
+        // DMA load external input/weight into scratchpad, compute VDOT, then DMA store result out.
+        axi_mem_u.mem[10'h100] = 32'h0403_0201;
+        axi_mem_u.mem[10'h101] = 32'h0807_0605;
+        dma_load(32'h0000_0400, 32'h2000, 16'd2);
+        expect_read(SPAD_BASE + 32'h2000, 32'h0403_0201, "dma load input");
+        expect_read(SPAD_BASE + 32'h2004, 32'h0807_0605, "dma load weight");
+        axi_write(REG_OP_MODE, OP_VDOT_INT8);
+        axi_write(REG_SRC0_BASE, 32'h2000);
+        axi_write(REG_SRC1_BASE, 32'h2004);
+        axi_write(REG_DST_BASE,  32'h2010);
+        axi_write(REG_LENGTH,    32'd1);
+        axi_write(REG_QUANT_ACT, 32'd0);
+        axi_write(REG_CTRL,      32'h0000_0003);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h2010, 32'd70, "dma vdot output");
+        dma_store(32'h0000_0500, 32'h2010, 16'd1);
+        if (axi_mem_u.mem[10'h140] !== 32'd70) begin
+            $display("%0t ERROR: dma store expected=%08h actual=%08h",
+                     $time, 32'd70, axi_mem_u.mem[10'h140]);
+            errors = errors + 1;
+        end else begin
+            $display("%0t PASS: dma store output = %0d/%08h", $time,
+                     axi_mem_u.mem[10'h140], axi_mem_u.mem[10'h140]);
+        end
+
+        // A2 ping-pong pipeline with an odd tile count.  This exercises both
+        // buffer contexts, context reuse, and incremental external strides.
+        axi_mem_u.mem[11'h600] = 32'h0403_0201;
+        axi_mem_u.mem[11'h601] = 32'h0202_0202;
+        axi_mem_u.mem[11'h602] = 32'h0303_0303;
+        axi_mem_u.mem[11'h680] = 32'd0;
+        axi_mem_u.mem[11'h681] = 32'd0;
+        axi_mem_u.mem[11'h682] = 32'd0;
+        axi_write(SPAD_BASE + 32'h4400, 32'h0101_0101);
+        axi_write(REG_OP_MODE, OP_VDOT_INT8);
+        axi_write(REG_SRC1_BASE, 32'h4400);
+        axi_write(REG_LENGTH, 32'd1);
+        axi_write(REG_POST_CTRL, 32'd0);
+        axi_write(REG_QUANT_ACT, 32'd0);
+        axi_write(REG_TILE_COUNT, 32'd3);
+        axi_write(REG_TILE_EXT_IN, 32'h0000_1800);
+        axi_write(REG_TILE_EXT_OUT, 32'h0000_1a00);
+        axi_write(REG_TILE_EXT_IN_STRIDE, 32'd4);
+        axi_write(REG_TILE_EXT_OUT_STRIDE, 32'd4);
+        axi_write(REG_TILE_BUF0, 32'h0000_4000);
+        axi_write(REG_TILE_BUF1, 32'h0000_4200);
+        axi_write(REG_TILE_IN_WORDS, 32'd1);
+        axi_write(REG_TILE_OUT_WORDS, 32'd1);
+        axi_write(REG_TILE_OUT_OFFSET, 32'h0000_0040);
+        axi_write(REG_TILE_CTRL, 32'd1);
+        wait_done();
+        if ((axi_mem_u.mem[11'h680] !== 32'd10) ||
+            (axi_mem_u.mem[11'h681] !== 32'd8) ||
+            (axi_mem_u.mem[11'h682] !== 32'd12)) begin
+            $display("%0t ERROR: A2 tile outputs expected=10,8,12 actual=%0d,%0d,%0d",
+                     $time, axi_mem_u.mem[11'h680], axi_mem_u.mem[11'h681],
+                     axi_mem_u.mem[11'h682]);
+            errors = errors + 1;
+        end else begin
+            $display("%0t PASS: A2 ping-pong tile outputs", $time);
+        end
+        expect_read(REG_TILE_COMPLETED, 32'd3, "A2 completed tiles");
+        axi_read(REG_PERF_TOTAL, rd);
+        if (rd == 0) begin
+            $display("%0t ERROR: A2 total cycle counter is zero", $time);
+            errors = errors + 1;
+        end
+        axi_read(REG_PERF_DMA, rd);
+        if (rd == 0) begin
+            $display("%0t ERROR: A2 DMA cycle counter is zero", $time);
+            errors = errors + 1;
+        end
+        axi_read(REG_PERF_COMPUTE, rd);
+        if (rd == 0) begin
+            $display("%0t ERROR: A2 compute cycle counter is zero", $time);
+            errors = errors + 1;
+        end
+        axi_read(REG_PERF_OVERLAP, rd);
+        if (rd == 0) begin
+            $display("%0t ERROR: A2 pipeline recorded no DMA/compute overlap", $time);
+            errors = errors + 1;
+        end else begin
+            $display("%0t PASS: A2 overlap cycles = %0d", $time, rd);
+        end
+        clear_done_irq();
+
+        // Multi-burst DMA load with random-ish write back-pressure.
+        axi_mem_u.ready_gap_cfg = 1;
+        begin : multi_burst_load
+            integer i;
+            for (i = 0; i < 80; i = i + 1)
+                axi_mem_u.mem[11'h200 + i] = 32'ha500_0000 + i;
+            fork
+                begin : check_dma64
+                    @(posedge aclk);
+                    while (!(m_axi_arvalid && m_axi_arready)) @(posedge aclk);
+                    if (m_axi_arlen !== 8'd15) begin
+                        $display("%0t ERROR: expected 16-beat DMA burst, ARLEN=%0d",
+                                 $time, m_axi_arlen);
+                        errors = errors + 1;
+                    end else begin
+                        $display("%0t PASS: DMA issued 16-beat burst", $time);
+                    end
+                end
+                begin : check_dma_read_outstanding
+                    integer accepted_ar;
+                    accepted_ar = 0;
+                    while (!(m_axi_rvalid && m_axi_rready && m_axi_rlast)) begin
+                        @(posedge aclk);
+                        if (m_axi_arvalid && m_axi_arready)
+                            accepted_ar = accepted_ar + 1;
+                    end
+                    if (accepted_ar < 2) begin
+                        $display("%0t ERROR: expected multiple outstanding AR, accepted=%0d",
+                                 $time, accepted_ar);
+                        errors = errors + 1;
+                    end else begin
+                        $display("%0t PASS: DMA read outstanding accepted=%0d",
+                                 $time, accepted_ar);
+                    end
+                end
+                begin
+                    dma_load(32'h0000_0800, 32'h2400, 16'd80);
+                end
+            join
+            for (i = 0; i < 80; i = i + 1)
+                expect_read(SPAD_BASE + 32'h2400 + (i * 4), 32'ha500_0000 + i, "dma multi load");
+        end
+
+        // Unified read-DMA depth-four saturation.  Four 16-beat bursts must be
+        // accepted before the first response burst completes.  This checks
+        // the actual register-programmed window rather than merely proving
+        // that a second AR can coexist with the first response.
+        axi_mem_u.ready_gap_cfg = 0;
+        begin : dma_read_outstanding_depth4
+            integer i;
+            integer accepted_ar;
+            integer first_rlast_seen;
+            accepted_ar = 0;
+            first_rlast_seen = 0;
+            for (i = 0; i < 256; i = i + 1)
+                axi_mem_u.mem[11'h500 + i] = 32'hd400_0000 + i;
+            axi_write(REG_DMA_CFG, 32'h0000_0400);
+            axi_write(REG_DMA_EXT_ADDR, 32'h0000_1400);
+            axi_write(REG_DMA_SPAD_ADDR, 32'h0000_3600);
+            axi_write(REG_DMA_LENGTH, 16'd256);
+            fork
+                begin : observe_depth4_window
+                    while (!first_rlast_seen) begin
+                        @(posedge aclk);
+                        if (m_axi_arvalid && m_axi_arready)
+                            accepted_ar = accepted_ar + 1;
+                        if (m_axi_rvalid && m_axi_rready && m_axi_rlast)
+                            first_rlast_seen = 1;
+                    end
+                    if (accepted_ar < 4) begin
+                        $display("%0t ERROR: A4 expected four AR before first RLAST, accepted=%0d",
+                                 $time, accepted_ar);
+                        errors = errors + 1;
+                    end else begin
+                        $display("%0t PASS: A4 DMA read outstanding saturated at %0d", $time,
+                                 accepted_ar);
+                    end
+                end
+                begin : issue_depth4_load
+                    axi_write(REG_DMA_CTRL, 32'h0000_0001);
+                    wait_dma_done();
+                    clear_dma_done();
+                end
+            join
+            expect_read(SPAD_BASE + 32'h3600, 32'hd400_0000,
+                        "A4 depth4 dma first word");
+            expect_read(SPAD_BASE + 32'h36fc, 32'hd400_003f,
+                        "A4 depth4 dma burst0 last word");
+            expect_read(SPAD_BASE + 32'h3700, 32'hd400_0040,
+                        "A4 depth4 dma burst1 first word");
+            expect_read(SPAD_BASE + 32'h39fc, 32'hd400_00ff,
+                        "A4 depth4 dma final word");
+        end
+
+        // 4KB boundary split: starts at 0x0ff8 and transfers across the page.
+        axi_mem_u.mem[11'h3fe] = 32'h1111_0000;
+        axi_mem_u.mem[11'h3ff] = 32'h2222_0000;
+        axi_mem_u.mem[11'h400] = 32'h3333_0000;
+        axi_mem_u.mem[11'h401] = 32'h4444_0000;
+        dma_load(32'h0000_0ff8, 32'h2600, 16'd4);
+        expect_read(SPAD_BASE + 32'h2600, 32'h1111_0000, "dma 4kb split0");
+        expect_read(SPAD_BASE + 32'h2604, 32'h2222_0000, "dma 4kb split1");
+        expect_read(SPAD_BASE + 32'h2608, 32'h3333_0000, "dma 4kb split2");
+        expect_read(SPAD_BASE + 32'h260c, 32'h4444_0000, "dma 4kb split3");
+
+        // 2D DMA load: two 2-word rows, with a 2-word gap in both source and
+        // destination.  Each row still uses the normal burst engine.
+        axi_mem_u.mem[11'h300] = 32'h1000_0001;
+        axi_mem_u.mem[11'h301] = 32'h1000_0002;
+        axi_mem_u.mem[11'h304] = 32'h2000_0001;
+        axi_mem_u.mem[11'h305] = 32'h2000_0002;
+        axi_write(REG_DMA_EXT_ADDR, 32'h0000_0c00);
+        axi_write(REG_DMA_SPAD_ADDR, 32'h0000_2c00);
+        axi_write(REG_DMA_LENGTH, 32'd0);
+        axi_write(REG_DMA_ROW_WORDS, 32'd2);
+        axi_write(REG_DMA_ROW_COUNT, 32'd2);
+        axi_write(REG_DMA_EXT_STRIDE, 32'd16);
+        axi_write(REG_DMA_SPAD_STRIDE, 32'd16);
+        axi_write(REG_DMA_CTRL, 32'h0000_0001);
+        wait_dma_done();
+        clear_dma_done();
+        expect_read(SPAD_BASE + 32'h2c00, 32'h1000_0001, "dma 2d row0 word0");
+        expect_read(SPAD_BASE + 32'h2c04, 32'h1000_0002, "dma 2d row0 word1");
+        expect_read(SPAD_BASE + 32'h2c10, 32'h2000_0001, "dma 2d row1 word0");
+        expect_read(SPAD_BASE + 32'h2c14, 32'h2000_0002, "dma 2d row1 word1");
+        axi_write(REG_DMA_EXT_ADDR, 32'h0000_0d00);
+        axi_write(REG_DMA_SPAD_ADDR, 32'h0000_2c00);
+        axi_write(REG_DMA_CTRL, 32'h0000_0003);
+        wait_dma_done();
+        clear_dma_done();
+        if ((axi_mem_u.mem[11'h340] !== 32'h1000_0001) ||
+            (axi_mem_u.mem[11'h341] !== 32'h1000_0002) ||
+            (axi_mem_u.mem[11'h344] !== 32'h2000_0001) ||
+            (axi_mem_u.mem[11'h345] !== 32'h2000_0002)) begin
+            $display("%0t ERROR: dma 2d store mismatch", $time);
+            errors = errors + 1;
+        end else begin
+            $display("%0t PASS: dma 2d store", $time);
+        end
+
+        // A4 KV-cache gather: the scratchpad index table contains absolute
+        // DDR byte addresses.  Rows are gathered into consecutive destination
+        // tiles while the configured read window permits four accepted ARs.
+        axi_mem_u.mem[11'h440] = 32'h4b56_0001;
+        axi_mem_u.mem[11'h441] = 32'h4b56_0002;
+        axi_mem_u.mem[11'h480] = 32'h4b56_0011;
+        axi_mem_u.mem[11'h481] = 32'h4b56_0012;
+        axi_write(SPAD_BASE + 32'h2d00, 32'h0000_1100);
+        axi_write(SPAD_BASE + 32'h2d04, 32'h0000_1200);
+        axi_write(REG_DMA_SPAD_ADDR, 32'h0000_2d20);
+        axi_write(REG_DMA_ROW_WORDS, 32'd2);
+        axi_write(REG_DMA_ROW_COUNT, 32'd2);
+        axi_write(REG_DMA_SPAD_STRIDE, 32'd16);
+        axi_write(REG_DMA_GATHER_INDEX, 32'h0000_2d00);
+        axi_write(REG_DMA_CFG, 32'h0000_0401);
+        axi_write(REG_DMA_CTRL, 32'h0000_0001);
+        wait_dma_done();
+        clear_dma_done();
+        expect_read(SPAD_BASE + 32'h2d20, 32'h4b56_0001, "A4 KV gather row0 word0");
+        expect_read(SPAD_BASE + 32'h2d24, 32'h4b56_0002, "A4 KV gather row0 word1");
+        expect_read(SPAD_BASE + 32'h2d30, 32'h4b56_0011, "A4 KV gather row1 word0");
+        expect_read(SPAD_BASE + 32'h2d34, 32'h4b56_0012, "A4 KV gather row1 word1");
+        axi_write(REG_DMA_CFG, 32'h0000_0400);
+        axi_write(REG_DMA_ROW_COUNT, 32'd0);
+        axi_write(REG_DMA_ROW_WORDS, 32'd0);
+        axi_write(REG_DMA_EXT_STRIDE, 32'd0);
+        axi_write(REG_DMA_SPAD_STRIDE, 32'd0);
+
+        // Write response error injection.
+        axi_mem_u.inject_write_error_word = 32'h0000_0180;
+        dma_store_expect_error(32'h0000_0600, 32'h2010, 16'd1, 4'd3);
+        axi_mem_u.inject_write_error_word = -1;
+
+        // Read response error injection.
+        axi_mem_u.inject_read_error_word = 32'h0000_0184;
+        dma_load_expect_error(32'h0000_0610, 32'h2800, 16'd1, 4'd2);
+        expect_read(REG_ERROR_INFO, 32'h0000_0022,
+                    "ABI error source DMA/read");
+        axi_mem_u.inject_read_error_word = -1;
+
+        // A7 external address path: a non-zero high dword must reach ARADDR.
+        // The compact memory model intentionally rejects addresses above 4 GiB.
+        axi_write(REG_DMA_EXT_HI, 32'h0000_0001);
+        dma_load_expect_error(32'h0000_0620, 32'h2820, 16'd1, 4'd2);
+        if (last_dma_araddr != 64'h0000_0001_0000_0620) begin
+            $display("%0t ERROR: 64-bit DMA ARADDR truncated to %h",
+                     $time, last_dma_araddr);
+            errors = errors + 1;
+        end
+        axi_write(REG_DMA_EXT_HI, 32'd0);
+
+        // Abort an accepted read burst.  The DMA must drain through RLAST,
+        // report ERR_ABORT, and leave no external read transaction active.
+        begin : dma_load_abort
+            integer i;
+            integer accepted;
+            for (i = 0; i < 20; i = i + 1)
+                axi_mem_u.mem[11'h380 + i] = 32'hab00_0000 + i;
+            axi_mem_u.ready_gap_cfg = 2;
+            axi_write(REG_DMA_EXT_ADDR, 32'h0000_0e00);
+            axi_write(REG_DMA_SPAD_ADDR, 32'h0000_2e00);
+            axi_write(REG_DMA_LENGTH, 32'd20);
+            axi_write(REG_DMA_CTRL, 32'h0000_0001);
+            accepted = 0;
+            for (i = 0; i < 100 && !accepted; i = i + 1) begin
+                @(posedge aclk);
+                accepted = axi_mem_u.read_active_r;
+            end
+            if (!accepted) begin
+                $display("%0t ERROR: DMA load abort test observed no accepted AR", $time);
+                errors = errors + 1;
+            end
+            axi_write(REG_ABORT, 32'd1);
+            expect_dma_done(1'b1, 4'd5);
+            if (axi_mem_u.read_active_r || m_axi_rvalid) begin
+                $display("%0t ERROR: DMA load abort left an AXI read active", $time);
+                errors = errors + 1;
+            end else begin
+                $display("%0t PASS: DMA load abort drained accepted AXI burst", $time);
+            end
+        end
+
+        // Abort an accepted write burst.  AXI4 does not permit truncating an
+        // accepted burst, so the DMA must finish WLAST/B before reporting.
+        begin : dma_store_abort
+            integer i;
+            integer accepted;
+            for (i = 0; i < 20; i = i + 1)
+                axi_write(SPAD_BASE + 32'h3000 + (i * 4), 32'hcd00_0000 + i);
+            axi_mem_u.ready_gap_cfg = 2;
+            axi_write(REG_DMA_EXT_ADDR, 32'h0000_1000);
+            axi_write(REG_DMA_SPAD_ADDR, 32'h0000_3000);
+            axi_write(REG_DMA_LENGTH, 32'd20);
+            axi_write(REG_DMA_CTRL, 32'h0000_0003);
+            accepted = 0;
+            for (i = 0; i < 100 && !accepted; i = i + 1) begin
+                @(posedge aclk);
+                accepted = axi_mem_u.write_active_r;
+            end
+            if (!accepted) begin
+                $display("%0t ERROR: DMA store abort test observed no accepted AW", $time);
+                errors = errors + 1;
+            end
+            @(posedge aclk);
+            axi_write(REG_ABORT, 32'd1);
+            expect_dma_done(1'b1, 4'd5);
+            if (axi_mem_u.write_active_r || m_axi_bvalid || m_axi_wvalid) begin
+                $display("%0t ERROR: DMA store abort left an AXI write active", $time);
+                errors = errors + 1;
+            end else begin
+                $display("%0t PASS: DMA store abort completed accepted AXI burst", $time);
+            end
+        end
+        axi_mem_u.ready_gap_cfg = 0;
+
+        // External-memory descriptor v2 fetch through AXI read channel.  Word
+        // 3 carries bias_base and word 7 enables per-output bias.
+        axi_write(SPAD_BASE + 32'h2b00, 32'd5);
+        axi_write(SPAD_BASE + 32'h2b04, 32'hffff_fffa);
+        write_axi_desc(32'h0000_0c00, OP_GEMV_INT8, 16'h0200, 32'h0300, 32'h0400, 32'h2900,
+                       16'd2, 16'd0, 16'd1);
+        axi_mem_u.mem[11'h303] = 32'h0000_2b00;
+        axi_mem_u.mem[11'h307] = 32'd1;
+        axi_write(REG_CMDQ_CTRL, 32'd1);
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CMDQ_BASE_LO, 32'h0000_0c00);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h2900, 32'd75, "external desc v2 bias row0");
+        expect_read(SPAD_BASE + 32'h2904, 32'd0, "external desc v2 bias row1");
+        axi_write(REG_CMDQ_CTRL, 32'd0);
+        clear_done_irq();
+
+        // External-memory command queue ring plus invalid descriptor completion.
+        write_axi_desc(32'h0000_0d00, OP_VDOT_INT8, 16'h0201, 32'h0000, 32'h0100, 32'h2a00,
+                       16'd0, 16'd0, 16'd1);
+        write_axi_desc(32'h0000_0d40, 8'hff, 16'h02ff, 32'h0000, 32'h0100, 32'h2a10,
+                       16'd0, 16'd0, 16'd1);
+        axi_write(REG_CMDQ_CTRL, 32'd1);
+        axi_write(REG_CMDQ_BASE_LO, 32'h0000_0d00);
+        axi_write(REG_CMDQ_SIZE, 32'd2);
+        axi_write(REG_CMDQ_HEAD, 32'd0);
+        axi_write(REG_CMDQ_TAIL, 32'd1);
+        axi_write(REG_CPLQ_BASE_LO, 32'h1200);
+        axi_write(REG_CPLQ_SIZE, 32'd2);
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        axi_write(REG_CPLQ_TAIL, 32'd0);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done();
+        expect_read(SPAD_BASE + 32'h2a00, 32'd70, "external ring vdot");
+        expect_read(REG_CMDQ_HEAD, 32'd1, "external cmdq head");
+        wait_cpl_tail(32'd1, "external cplq tail ok");
+        expect_completion(32'h1200, 16'h0201, 4'h1, 4'h0, 32'd70, 32'd1, "external cpl ok");
+        axi_write(REG_CPLQ_HEAD, 32'd1);
+        clear_done_irq();
+
+        axi_write(REG_CMDQ_TAIL, 32'd0);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done_expect_error(ERR_DESC_INVALID);
+        expect_read(REG_ERROR_INFO, 32'h0000_0017,
+                    "ABI error source command/descriptor");
+        expect_read(REG_CMDQ_HEAD, 32'd0, "external cmdq wrap after bad desc");
+        wait_cpl_tail(32'd0, "external cplq wrap after bad desc");
+        expect_completion(32'h1210, 16'h02ff, 4'h2, ERR_DESC_INVALID, 32'd0, 32'd0, "external cpl bad");
+        axi_write(REG_CMDQ_CTRL, 32'd0);
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CPLQ_SIZE, 32'd0);
+        clear_done_irq();
+
+        // PACK_I8_TILE_A is legal only when flags[4] is also set and the
+        // descriptor length exactly matches the 4x4-compatible MxN shape.
+        write_spad_desc_v3(32'h7500, OP_REQUANT_I8, 16'h02f0,
+                           32'h7700, 32'd0, 32'd0, 32'h7740,
+                           16'd4, 16'd8, 16'd31, 8'h30, 32'd0,
+                           5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                           16'd1, 16'd1, 16'd0, 16'd0, 16'd0);
+        axi_write(SPAD_BASE + 32'h7740, 32'hface_cafe);
+        axi_write(REG_CMDQ_CTRL, 32'd0);
+        axi_write(REG_CMDQ_BASE_LO, 32'h7500);
+        axi_write(REG_CMDQ_SIZE, 32'd2);
+        axi_write(REG_CMDQ_HEAD, 32'd0);
+        axi_write(REG_CMDQ_TAIL, 32'd1);
+        axi_write(REG_CPLQ_BASE_LO, 32'h7600);
+        axi_write(REG_CPLQ_SIZE, 32'd2);
+        axi_write(REG_CPLQ_HEAD, 32'd0);
+        axi_write(REG_CPLQ_TAIL, 32'd0);
+        axi_write(REG_DOORBELL, 32'd1);
+        wait_done_expect_error(ERR_DESC_INVALID);
+        wait_cpl_tail(32'd1, "invalid Matrix-A packed requant tail");
+        expect_completion(32'h7600, 16'h02f0, 4'h2, ERR_DESC_INVALID,
+                          32'd0, 32'd0, "invalid Matrix-A packed requant");
+        expect_read(SPAD_BASE + 32'h7740, 32'hface_cafe,
+                    "invalid Matrix-A packed requant no write");
+        axi_write(REG_CMDQ_SIZE, 32'd0);
+        axi_write(REG_CPLQ_SIZE, 32'd0);
+        clear_done_irq();
+
+        // A3 4x4 tensor GEMM.  A is multiplied by an identity matrix stored
+        // in column-vector tile layout, so the INT32 output must equal A.
+        axi_write(SPAD_BASE + 32'h4800, 32'h0403_0201);
+        axi_write(SPAD_BASE + 32'h4804, 32'h0807_0605);
+        axi_write(SPAD_BASE + 32'h4808, 32'h0000_0001);
+        axi_write(SPAD_BASE + 32'h480c, 32'h01ff_01ff);
+        axi_write(SPAD_BASE + 32'h4900, 32'h0000_0001);
+        axi_write(SPAD_BASE + 32'h4904, 32'h0000_0100);
+        axi_write(SPAD_BASE + 32'h4908, 32'h0001_0000);
+        axi_write(SPAD_BASE + 32'h490c, 32'h0100_0000);
+        axi_write(REG_POST_CTRL, 32'd0);
+        axi_write(REG_PERF_CTRL, 32'd1);
+        axi_write(REG_QUANT_ACT, 32'd0);
+        axi_write(REG_OP_MODE, OP_TENSOR_GEMM);
+        axi_write(REG_SRC0_BASE, 32'h4800);
+        axi_write(REG_SRC1_BASE, 32'h4900);
+        axi_write(REG_DST_BASE,  32'h4a00);
+        axi_write(REG_M_SIZE, 32'd4);
+        axi_write(REG_N_SIZE, 32'd4);
+        axi_write(REG_K_WORDS, 32'd1);
+        matrix_line_write_count = 0;
+        axi_write(REG_CTRL, 32'h0000_0003);
+        wait_done();
+        if (matrix_line_write_count != 4) begin
+            $display("%0t ERROR: A7 matrix expected 4 line writes, got %0d",
+                     $time, matrix_line_write_count);
+            errors = errors + 1;
+        end
+        expect_read(SPAD_BASE + 32'h4a00, 32'd1, "A3 GEMM c00");
+        expect_read(SPAD_BASE + 32'h4a0c, 32'd4, "A3 GEMM c03");
+        expect_read(SPAD_BASE + 32'h4a10, 32'd5, "A3 GEMM c10");
+        expect_read(SPAD_BASE + 32'h4a1c, 32'd8, "A3 GEMM c13");
+        expect_read(SPAD_BASE + 32'h4a20, 32'd1, "A3 GEMM c20");
+        expect_read(SPAD_BASE + 32'h4a30, 32'hffff_ffff, "A3 GEMM c30");
+        expect_read(SPAD_BASE + 32'h4a3c, 32'd1, "A3 GEMM c33");
+        axi_read(REG_PERF_MATRIX_CYCLES, rd);
+        if (rd == 0) begin
+            $display("%0t ERROR: A5 matrix cycle counter is zero", $time);
+            errors = errors + 1;
+        end
+        axi_read(REG_PERF_MATRIX_MAC_CYCLES, rd);
+        if (rd == 0) begin
+            $display("%0t ERROR: A5 matrix MAC-active counter is zero", $time);
+            errors = errors + 1;
+        end
+        clear_done_irq();
+
+        // Product opcode 0x52 descriptor path: dense row-major signed INT8
+        // operands, real CMDQ/validator/dispatcher/SPAD, shared Matrix MAC
+        // array with K-fold reduction, and row-major INT32 output.
+        begin : product_dense_gemv
+            integer rr_g, cc_g, kk_g, bank_g;
+            integer a0_g, a1_g, a2_g, a3_g;
+            integer b0_g, b1_g, b2_g, b3_g;
+            integer accum_g, expected_g, expected_last_g, errors_before_g;
+            reg [31:0] desc_result_g;
+
+            errors_before_g = errors;
+            for (rr_g = 0; rr_g < 4; rr_g = rr_g + 1)
+                for (kk_g = 0; kk_g < 32; kk_g = kk_g + 16)
+                    for (bank_g = 0; bank_g < 4; bank_g = bank_g + 1) begin
+                        a0_g = ((rr_g + 2*(kk_g + bank_g*4 + 0)) % 13) - 6;
+                        a1_g = ((rr_g + 2*(kk_g + bank_g*4 + 1)) % 13) - 6;
+                        a2_g = ((rr_g + 2*(kk_g + bank_g*4 + 2)) % 13) - 6;
+                        a3_g = ((rr_g + 2*(kk_g + bank_g*4 + 3)) % 13) - 6;
+                        axi_write(SPAD_BASE + 32'h5000 + rr_g*32 + kk_g +
+                                  bank_g*4,
+                                  {a3_g[7:0],a2_g[7:0],a1_g[7:0],a0_g[7:0]});
+                    end
+            for (kk_g = 0; kk_g < 32; kk_g = kk_g + 1)
+                for (bank_g = 0; bank_g < 4; bank_g = bank_g + 1) begin
+                    b0_g = ((3*kk_g + bank_g*4 + 0) % 11) - 5;
+                    b1_g = ((3*kk_g + bank_g*4 + 1) % 11) - 5;
+                    b2_g = ((3*kk_g + bank_g*4 + 2) % 11) - 5;
+                    b3_g = ((3*kk_g + bank_g*4 + 3) % 11) - 5;
+                    axi_write(SPAD_BASE + 32'h5200 + kk_g*16 + bank_g*4,
+                              {b3_g[7:0],b2_g[7:0],b1_g[7:0],b0_g[7:0]});
+                end
+            for (cc_g = 0; cc_g < 16; cc_g = cc_g + 1)
+                axi_write(SPAD_BASE + 32'h6000 + cc_g*4, cc_g-8);
+            for (rr_g = 0; rr_g < 4; rr_g = rr_g + 1)
+                for (cc_g = 0; cc_g < 16; cc_g = cc_g + 1)
+                    axi_write(SPAD_BASE + 32'h5400 + (rr_g*16+cc_g)*4,
+                              32'hbad0_5200 + rr_g*16 + cc_g);
+
+            write_spad_desc_v3(32'h4d00, OP_TENSOR_GEMV_KFOLD, 16'h0520,
+                               32'h5000, 32'h5200, 32'h6000, 32'h5400,
+                               16'd4, 16'd16, 16'd32, 8'h01, 32'd0,
+                               5'd1, 2'd1, 32'd0, 32'd0, 32'd0,
+                               16'd0, 16'd0, 16'd0, 16'd0, 16'd0);
+            // The descriptor helper emits ABI-v3 for legacy tests. Opcode
+            // 0x52 is intentionally exercised through its v7 contract.
+            axi_write(SPAD_BASE + 32'h4d3c, 32'd7);
+            axi_write(REG_CMDQ_CTRL, 32'd0);
+            axi_write(REG_CMDQ_BASE_LO, 32'h4d00);
+            axi_write(REG_CMDQ_SIZE, 32'd2);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd1);
+            axi_write(REG_CPLQ_BASE_LO, 32'h4e00);
+            axi_write(REG_CPLQ_SIZE, 32'd2);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+            matrix_line_write_count = 0;
+            axi_write(REG_DOORBELL, 32'd1);
+            wait_cpl_tail(32'd1, "product dense GEMV completion");
+
+            expected_last_g = 0;
+            for (rr_g = 0; rr_g < 4; rr_g = rr_g + 1)
+                for (cc_g = 0; cc_g < 16; cc_g = cc_g + 1) begin
+                    accum_g = 0;
+                    for (kk_g = 0; kk_g < 32; kk_g = kk_g + 1)
+                        accum_g = accum_g +
+                            ((((rr_g + 2*kk_g) % 13) - 6) *
+                             (((3*kk_g + cc_g) % 11) - 5));
+                    accum_g = accum_g + (cc_g - 8);
+                    expected_g = accum_g >>> 1;
+                    if (expected_g < 0)
+                        expected_g = 0;
+                    if ((rr_g == 3) && (cc_g == 15))
+                        expected_last_g = expected_g;
+                    expect_read(SPAD_BASE + 32'h5400 + (rr_g*16+cc_g)*4,
+                                expected_g, "product dense GEMV output");
+                end
+            desc_result_g = expected_last_g;
+            if (matrix_line_write_count != 16) begin
+                $display("%0t ERROR: product dense GEMV line writes=%0d expected=16",
+                         $time, matrix_line_write_count);
+                errors = errors + 1;
+            end
+            expect_completion(32'h4e00, 16'h0520, 4'h1, 4'd0,
+                             desc_result_g, 32'd64,
+                             "product dense GEMV descriptor");
+            if (errors != errors_before_g)
+                $fatal(1, "product dense GEMV descriptor path had %0d errors",
+                       errors - errors_before_g);
+            $display("MATRIX_PRODUCT_GEMV_DESCRIPTOR_PASS opcode=0x52 shape=4x16x32 dense=1 bias=1 shift=1 relu=1 outputs=64 lines=%0d golden=bit-exact",
+                     matrix_line_write_count);
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+
+            // Product GEMV shape/tail contract: M=1, N=13, K=17. A is
+            // padded to a 32-byte row and B uses 16-byte rows. Padding and
+            // N-tail values are nonzero so only explicit DUT masking can
+            // produce the expected valid output image.
+            for (kk_g = 0; kk_g < 32; kk_g = kk_g + 16)
+                for (bank_g = 0; bank_g < 4; bank_g = bank_g + 1) begin
+                    a0_g = (kk_g + bank_g*4 + 0 < 17) ?
+                        (((kk_g + bank_g*4 + 0)*5 + 1) % 19) - 9 : 7;
+                    a1_g = (kk_g + bank_g*4 + 1 < 17) ?
+                        (((kk_g + bank_g*4 + 1)*5 + 1) % 19) - 9 : 7;
+                    a2_g = (kk_g + bank_g*4 + 2 < 17) ?
+                        (((kk_g + bank_g*4 + 2)*5 + 1) % 19) - 9 : 7;
+                    a3_g = (kk_g + bank_g*4 + 3 < 17) ?
+                        (((kk_g + bank_g*4 + 3)*5 + 1) % 19) - 9 : 7;
+                    axi_write(SPAD_BASE + 32'h5000 + kk_g + bank_g*4,
+                              {a3_g[7:0],a2_g[7:0],a1_g[7:0],a0_g[7:0]});
+                end
+            for (kk_g = 0; kk_g < 17; kk_g = kk_g + 1)
+                for (bank_g = 0; bank_g < 4; bank_g = bank_g + 1) begin
+                    b0_g = ((3*kk_g - (bank_g*4 + 0)*2 + 5) % 17) - 8;
+                    b1_g = ((3*kk_g - (bank_g*4 + 1)*2 + 5) % 17) - 8;
+                    b2_g = ((3*kk_g - (bank_g*4 + 2)*2 + 5) % 17) - 8;
+                    b3_g = ((3*kk_g - (bank_g*4 + 3)*2 + 5) % 17) - 8;
+                    axi_write(SPAD_BASE + 32'h5200 + kk_g*16 + bank_g*4,
+                              {b3_g[7:0],b2_g[7:0],b1_g[7:0],b0_g[7:0]});
+                end
+            for (cc_g = 0; cc_g < 16; cc_g = cc_g + 1)
+                axi_write(SPAD_BASE + 32'h5600 + cc_g*4,
+                          32'hface_5200 + cc_g);
+            write_spad_desc_v3(32'h4d40, OP_TENSOR_GEMV_KFOLD, 16'h0521,
+                               32'h5000, 32'h5200, 32'd0, 32'h5600,
+                               16'd1, 16'd13, 16'd17, 8'd0, 32'd0,
+                               5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                               16'd0, 16'd0, 16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + 32'h4d7c, 32'd7);
+            errors_before_g = errors;
+            axi_write(REG_CMDQ_BASE_LO, 32'h4d40);
+            axi_write(REG_CMDQ_SIZE, 32'd2);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd1);
+            axi_write(REG_CPLQ_BASE_LO, 32'h4e40);
+            axi_write(REG_CPLQ_SIZE, 32'd2);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+            matrix_line_write_count = 0;
+            axi_write(REG_DOORBELL, 32'd1);
+            wait_cpl_tail(32'd1, "product GEMV M/N/K tail completion");
+            expected_last_g = 0;
+            for (cc_g = 0; cc_g < 16; cc_g = cc_g + 1) begin
+                if (cc_g < 13) begin
+                    accum_g = 0;
+                    for (kk_g = 0; kk_g < 17; kk_g = kk_g + 1)
+                        accum_g = accum_g +
+                            ((((kk_g*5 + 1) % 19) - 9) *
+                             (((3*kk_g - cc_g*2 + 5) % 17) - 8));
+                    expected_g = accum_g;
+                    expected_last_g = expected_g;
+                    expect_read(SPAD_BASE + 32'h5600 + cc_g*4,
+                                expected_g, "product GEMV tail output");
+                end else begin
+                    expect_read(SPAD_BASE + 32'h5600 + cc_g*4,
+                                32'hface_5200 + cc_g,
+                                "product GEMV N-tail sentinel");
+                end
+            end
+            if (matrix_line_write_count != 3) begin
+                $display("%0t ERROR: product GEMV tail line writes=%0d expected=3",
+                         $time, matrix_line_write_count);
+                errors = errors + 1;
+            end
+            expect_completion(32'h4e40, 16'h0521, 4'h1, 4'd0,
+                              expected_last_g, 32'd13,
+                              "product GEMV M/N/K tails");
+            if (errors != errors_before_g)
+                $fatal(1, "product GEMV tail case had %0d errors",
+                       errors - errors_before_g);
+            $display("MATRIX_PRODUCT_GEMV_TAIL_DESCRIPTOR_PASS opcode=0x52 shape=1x13x17 valid_outputs=13 line_writes=%0d scalar_tail=1 golden=bit-exact",
+                     matrix_line_write_count);
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+
+            // Exercise a multi-row product descriptor through the real CMDQ
+            // path. K=19 forces one masked K tail while M=8 uses two row
+            // tiles; nonzero A padding catches an accidental padded-lane MAC.
+            for (rr_g = 0; rr_g < 8; rr_g = rr_g + 1)
+                for (kk_g = 0; kk_g < 32; kk_g = kk_g + 16)
+                    for (bank_g = 0; bank_g < 4; bank_g = bank_g + 1) begin
+                        a0_g = (kk_g + bank_g*4 + 0 < 19) ?
+                            (((rr_g*5 + (kk_g + bank_g*4 + 0)*3 + 1) % 23) - 11) : 17;
+                        a1_g = (kk_g + bank_g*4 + 1 < 19) ?
+                            (((rr_g*5 + (kk_g + bank_g*4 + 1)*3 + 1) % 23) - 11) : 17;
+                        a2_g = (kk_g + bank_g*4 + 2 < 19) ?
+                            (((rr_g*5 + (kk_g + bank_g*4 + 2)*3 + 1) % 23) - 11) : 17;
+                        a3_g = (kk_g + bank_g*4 + 3 < 19) ?
+                            (((rr_g*5 + (kk_g + bank_g*4 + 3)*3 + 1) % 23) - 11) : 17;
+                        axi_write(SPAD_BASE + 32'h5000 + rr_g*32 + kk_g +
+                                  bank_g*4,
+                                  {a3_g[7:0],a2_g[7:0],a1_g[7:0],a0_g[7:0]});
+                    end
+            for (kk_g = 0; kk_g < 19; kk_g = kk_g + 1)
+                for (bank_g = 0; bank_g < 4; bank_g = bank_g + 1) begin
+                    b0_g = ((5*kk_g + (bank_g*4 + 0)*2 + 5) % 17) - 8;
+                    b1_g = ((5*kk_g + (bank_g*4 + 1)*2 + 5) % 17) - 8;
+                    b2_g = ((5*kk_g + (bank_g*4 + 2)*2 + 5) % 17) - 8;
+                    b3_g = ((5*kk_g + (bank_g*4 + 3)*2 + 5) % 17) - 8;
+                    axi_write(SPAD_BASE + 32'h5200 + kk_g*16 + bank_g*4,
+                              {b3_g[7:0],b2_g[7:0],b1_g[7:0],b0_g[7:0]});
+                end
+            for (rr_g = 0; rr_g < 8; rr_g = rr_g + 1)
+                for (cc_g = 0; cc_g < 16; cc_g = cc_g + 1)
+                    axi_write(SPAD_BASE + 32'h5800 + (rr_g*16+cc_g)*4,
+                              32'hface_5280 + rr_g*16 + cc_g);
+            write_spad_desc_v3(32'h4d80, OP_TENSOR_GEMV_KFOLD, 16'h0522,
+                               32'h5000, 32'h5200, 32'd0, 32'h5800,
+                               16'd8, 16'd16, 16'd19, 8'd0, 32'd0,
+                               5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                               16'd0, 16'd0, 16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + 32'h4dbc, 32'd7);
+            errors_before_g = errors;
+            axi_write(REG_CMDQ_BASE_LO, 32'h4d80);
+            axi_write(REG_CMDQ_SIZE, 32'd2);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd1);
+            axi_write(REG_CPLQ_BASE_LO, 32'h4e80);
+            axi_write(REG_CPLQ_SIZE, 32'd2);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+            matrix_line_write_count = 0;
+            axi_write(REG_DOORBELL, 32'd1);
+            wait_cpl_tail(32'd1, "product GEMV M8 K-tail completion");
+            expected_last_g = 0;
+            for (rr_g = 0; rr_g < 8; rr_g = rr_g + 1)
+                for (cc_g = 0; cc_g < 16; cc_g = cc_g + 1) begin
+                    accum_g = 0;
+                    for (kk_g = 0; kk_g < 19; kk_g = kk_g + 1)
+                        accum_g = accum_g +
+                            ((((rr_g*5 + kk_g*3 + 1) % 23) - 11) *
+                             (((5*kk_g + cc_g*2 + 5) % 17) - 8));
+                    expected_g = accum_g;
+                    if ((rr_g == 7) && (cc_g == 15))
+                        expected_last_g = expected_g;
+                    expect_read(SPAD_BASE + 32'h5800 + (rr_g*16+cc_g)*4,
+                                expected_g, "product GEMV M8 output");
+                end
+            if (matrix_line_write_count != 32) begin
+                $display("%0t ERROR: product GEMV M8 line writes=%0d expected=32",
+                         $time, matrix_line_write_count);
+                errors = errors + 1;
+            end
+            expect_completion(32'h4e80, 16'h0522, 4'h1, 4'd0,
+                              expected_last_g, 32'd128,
+                              "product GEMV M8 K-tail descriptor");
+            if (errors != errors_before_g)
+                $fatal(1, "product GEMV M8 K-tail descriptor had %0d errors",
+                       errors - errors_before_g);
+            $display("MATRIX_PRODUCT_GEMV_M8_KTAIL_DESCRIPTOR_PASS opcode=0x52 shape=8x16x19 outputs=128 lines=%0d golden=bit-exact",
+                     matrix_line_write_count);
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+        end
+
+        // End-to-end optional 0x53 fused-tile forwarding through the real
+        // descriptor validator, CMDQ, Matrix controller, and SPAD path.  Run
+        // the same producer/consumer pair once through SPAD and once through
+        // the local tagged tile buffer, then compare the complete result image
+        // and directly count accepted reads from the producer tile address.
+        begin : fused_tile_forward_cmdq
+            integer init_word_f;
+            integer output_word_f;
+            integer errors_before_f;
+            integer cross_engine_word_f;
+            integer overlap_poll_f;
+
+            errors_before_f = errors;
+            ai_tile_forward_baseline_a_reads = 0;
+            ai_tile_forward_enabled_a_reads = 0;
+            ai_tile_forward_read_monitor = 1'b0;
+            ai_tile_forward_read_phase = 0;
+
+            // Uniform signed INT8 matrices make the independent Golden
+            // explicit: producer outputs 16; consumer computes 256 and the
+            // fused INT8 requant saturates each output to +127.
+            for (init_word_f = 0; init_word_f < 256;
+                 init_word_f = init_word_f + 1) begin
+                axi_write(SPAD_BASE + 32'h0000_a000 + (init_word_f * 4),
+                          32'h0101_0101);
+                axi_write(SPAD_BASE + 32'h0000_a800 + (init_word_f * 4),
+                          32'h0101_0101);
+            end
+            for (output_word_f = 0; output_word_f < 64;
+                 output_word_f = output_word_f + 1) begin
+                axi_write(SPAD_BASE + 32'h0000_b000 + (output_word_f * 4),
+                          32'hdead_5300);
+                axi_write(SPAD_BASE + 32'h0000_b400 + (output_word_f * 4),
+                          32'hdead_5301);
+                axi_write(SPAD_BASE + 32'h0000_b800 + (output_word_f * 4),
+                          32'hdead_5302);
+            end
+
+            write_spad_desc_v3(32'h9000, OP_TENSOR_GEMM_FUSED, 16'h0530,
+                               32'h0000_a000, 32'h0000_a800, 32'd0,
+                               32'h0000_b000, 16'd16, 16'd16, 16'd4,
+                               8'd0, 32'd0, 5'd0, 2'd0,
+                               32'd0, 32'd0, 32'd0, 16'd0, 16'd0,
+                               16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + 32'h903c, 32'd7);
+            write_spad_desc_v3(32'h9040, OP_TENSOR_GEMM_FUSED, 16'h0531,
+                               32'h0000_b000, 32'h0000_a800, 32'd0,
+                               32'h0000_b400, 16'd16, 16'd16, 16'd4,
+                               8'd0, 32'd0, 5'd0, 2'd0,
+                               32'd0, 32'd0, 32'd0, 16'd0, 16'd0,
+                               16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + 32'h907c, 32'd7);
+            write_spad_desc_v3(32'h9080, OP_TENSOR_GEMM_FUSED, 16'h0532,
+                               32'h0000_a000, 32'h0000_a800, 32'd0,
+                               32'h0000_b000, 16'd16, 16'd16, 16'd4,
+                               8'd0, 32'h0000_0020, 5'd0, 2'd0,
+                               32'd0, 32'd0, 32'd0, 16'd0, 16'd0,
+                               16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + 32'h90bc, 32'd7);
+            write_spad_desc_v3(32'h90c0, OP_TENSOR_GEMM_FUSED, 16'h0533,
+                               32'h0000_b000, 32'h0000_a800, 32'd0,
+                               32'h0000_b800, 16'd16, 16'd16, 16'd4,
+                               8'd0, 32'h0000_0060, 5'd0, 2'd0,
+                               32'd0, 32'd0, 32'd0, 16'd0, 16'd0,
+                               16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + 32'h90fc, 32'd7);
+
+            axi_write(REG_CMDQ_CTRL, 32'd0);
+            axi_write(REG_CMDQ_BASE_LO, 32'h9000);
+            axi_write(REG_CMDQ_SIZE, 32'd4);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd2);
+            axi_write(REG_CPLQ_BASE_LO, 32'h9200);
+            axi_write(REG_CPLQ_SIZE, 32'd8);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+
+            matrix_line_write_count = 0;
+            ai_tile_forward_read_phase = 1;
+            ai_tile_forward_read_monitor = 1'b1;
+            axi_write(REG_DOORBELL, 32'd1);
+            wait_cpl_tail(32'd2, "fused tile forwarding SPAD baseline");
+            if (matrix_line_write_count != 32) begin
+                $display("%0t ERROR: fused tile SPAD baseline lines=%0d expected=32",
+                         $time, matrix_line_write_count);
+                errors = errors + 1;
+            end
+            for (output_word_f = 0; output_word_f < 64;
+                 output_word_f = output_word_f + 1) begin
+                expect_read(SPAD_BASE + 32'h0000_b000 + (output_word_f * 4),
+                            32'h1010_1010, "fused tile baseline producer");
+                expect_read(SPAD_BASE + 32'h0000_b400 + (output_word_f * 4),
+                            32'h7f7f_7f7f, "fused tile baseline consumer");
+            end
+            expect_completion(32'h9200, 16'h0530, 4'h1, 4'd0,
+                              32'd16, 32'd256, "fused tile baseline producer");
+            expect_completion(32'h9210, 16'h0531, 4'h1, 4'd0,
+                              32'd127, 32'd256, "fused tile baseline consumer");
+            if (ai_tile_forward_baseline_a_reads != 16) begin
+                $display("%0t ERROR: fused tile baseline producer-A reads=%0d expected=16",
                          $time, ai_tile_forward_baseline_a_reads);
                 errors = errors + 1;
             end
