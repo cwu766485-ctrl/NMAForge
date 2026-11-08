@@ -44,6 +44,18 @@ independent data pointer, so byte alignment is checked on the full address via
 the low bits in `src0`, not on `src1` separately. A macro parent emits one
 completion; children execute in order and stop on the first failure.
 
+KV-cache opcodes `0x43/0x44` retain the ABI-v7 descriptor size and legacy
+`flags=0` behavior. For `0x43`, `aux0={head_index,token_index}` selects a cache
+position; `src0_stride` and `src1_stride` are the token and head strides. The
+optional `0x43 flags=8'h01` Matrix-B token-append mode accepts 4–16 INT8
+features in multiples of four, `src0_stride=16`, and a per-head cache span in
+`src1_stride` that yields a 4–16-token capacity in multiples of four. It reads
+a packed Matrix-A token row and performs byte-lane read/modify/write into the
+Matrix-B `[token,feature]` layout while preserving other tokens. Invalid
+dimensions, strides, token positions, or address ranges complete with a
+configuration error before writes begin. `0x44` and the old `flags=0` copy path
+are unchanged. The detailed field contract is in [SPEC_ZH.md](SPEC_ZH.md).
+
 ### Parallel compute CMDQ dispatch
 
 Normal compute descriptors are fetched, validated, and issued in CMDQ order.
