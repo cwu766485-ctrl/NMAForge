@@ -100,6 +100,8 @@ SPAD 保护寄存器配置四个区域 R0–R3；每区的 `BASE` 是包含的�
 
 宏 opcode `0x40`–`0x42` 支持 v4 兼容地址与 ABI v7 地址：v4 从 `src0` 取 32-bit 子描述符列表基址；v7 从 `{src1,src0}` 取 64-bit 基址。列表基址需 64-byte 对齐，`length` 是子描述符数量，`flags[3]` 选择外部内存 fetch（1）或 scratchpad fetch（0）。v7 的 `src1` 是地址高 32 位，不作为独立数据指针做字节对齐检查；完整 64-bit 基址的低位对齐由 `src0` 检查。宏父命令只提交一个 completion，子命令顺序执行且失败时停止后续子命令。
 
+KV-cache opcode `0x43/0x44` 保持 ABI v7 descriptor 大小和旧 `flags=0` 行为不变。`aux0={head_index[15:0],token_index[15:0]}`；legacy 模式下 `src0_stride` 是 token stride、`src1_stride` 是 head stride，`0x43` 顺序复制 `length` 个 32-bit word，`0x44` 执行反向读取。`0x43 flags=8'h01` 可选地启用受限 Matrix-B Token Append：`length` 必须是 4 的倍数且为 4..16 个 INT8 feature，`src0_stride=16` 表示 Matrix-A tile 相邻 K-group 的字节步长，`src1_stride` 是每个 head 的 cache byte span，且必须能被 `length` 整除；推导出的 token capacity 必须为 4..16 且为 4 的倍数，`token_index` 必须小于 capacity。`src0` 指向一个 Matrix-A 打包 token row；引擎将每个 feature 写入 `[token,feature]` Matrix-B 物理布局对应的 byte lane，通过 SPAD 读改写保留其他 token。该模式仅允许 `flags=8'h01`，使用 `aux0` 的 head/token 选择，不改变旧模式或 `0x44`。发生非法尺寸、stride、token 或地址溢出时必须以配置错误完成，不得部分写入。
+
 SFU `REQUANT_I8`（opcode `0x36`）中 `flags[4]` 将饱和后的 INT32 结果按输入连续顺序打包为 INT8。可选 `flags[5]=PACK_I8_TILE_A` 必须同时设置 `flags[4]`，并要求 `M,N` 为非零 4 的倍数且 `length=M×N`。输入仍按 row-major 读取；输出按 Matrix A 的 `[row_group][k_group][row_lane]` 顺序写入，每 word 的四个低字节对应连续四列 K。其 word index 为 `(((row/4)×(N/4)+k/4)×4)+(row mod 4)`，地址为 `dst+4×word_index`。该模式没有 partial word；legacy bit4-only 的线性 packing 语义不变。
 
 ### 4.1 Compute CMDQ 并行派发
