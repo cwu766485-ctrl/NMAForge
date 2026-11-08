@@ -1,0 +1,22 @@
+{
+  "run_id": "NMAFORGE-R17-FULL-TINY-S20261117",
+  "status": "PASS_FIXED_BENCHMARK_MATRIX",
+  "nmaforge_source_sha": "84148b9abf35aa82d12e058814e260784d76d554",
+  "tinynpu_source_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+  "seed": 20261117,
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "verilator": "5.052",
+    "python": "3.12.13",
+    "numpy": "2.4.6",
+    "onnx": "1.17.0"
+  },
+  "completed": {
+    "matched_gemm_shapes": 3,
+    "matched_gemv_shapes": 4,
+    "tiny_npu_engine_cases": "6/6",
+    "conv1x_mini_golden": "PASS on both designs"
+  },
+  "initial_environment_issue": "First focused attempt did not find verilator on PATH; rerun passed using /tmp/nmaforge_verilator_5.052/bin/verilator.",
+  "comparison_boundary": "NMAForge controller+behavioral SPAD is RTL-measured. TinyNPU direct array is RTL-measured; its common memory endpoint is serialized and modeled. CNN graph windows differ. No cross-system speedup is claimed."
+}

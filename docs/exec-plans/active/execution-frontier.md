@@ -1415,3 +1415,28 @@ Machine-readable details: [round-2 record](../../benchmark/v2_round2_research_cl
 and [MLP capacity CSV](../../benchmark/v2_round2_capacity_mlp_20261106.csv).
 No new verification, RTL, streaming, ASIC, or model task is started after this
 bounded closeout. Overall state remains **RESEARCH_BASELINE_PARTIAL**.
+
+## Round 17 — model performance decision (2026-11-09)
+
+Round 17 is complete and bounded. The tested candidate includes an exact
+length-16 LayerNorm fast path and an opt-in, constrained `0x53` N=16 Row-Major
+writeback mode. It preserves the existing Matrix array and does not add a
+buffer. The report and evidence are in
+[`NMAFORGE_V2_ROUND17_PERFORMANCE_DECISION.md`](../../benchmark/NMAFORGE_V2_ROUND17_PERFORMANCE_DECISION.md)
+and `docs/benchmark/round17_evidence/`.
+
+| Item | Status | Evidence |
+|---|---|---|
+| Four-token H16 incremental Decode | PASS | Golden/KV exact on all four tokens at source `d2148e3`; 39,615 → 35,391 cycles (10.66%) from exact length-16 LayerNorm division. |
+| 20% Decode reduction exploration target | NOT MET | Softmax, Requant, Matrix and KV costs remain; no Cache/Prefetch re-ablation on the optimized source. |
+| 262,144-MAC CNN final Row-Major output | PASS | `0x53→0x53`, 9,050 CMDQ cycles and 145,225 preload+command cycles; 20,480 output words match Golden. |
+| KV append Abort/Reset/recovery sample | PASS, scoped | Abort/reset partial writes, same-position retry/repeat, and invalid index preflight passed; token consumption is completion-gated in software. |
+| TinyNPU fixed GEMM/GEMV/Mini-CNN checks | PASS, comparison PARTIAL | Golden passed on pinned TinyNPU SHA; memory endpoint is partly modeled and graph timings differ, so no system speedup claim. |
+| ASIC PPA / full DV / model quality | NOT RUN / OUT OF SCOPE | No synthesis or broad closure performed; H16 and large CNN are not trained language/classification models. |
+
+Tested source SHAs are per workload: `d2148e3107e0f602c10abb07eb58c3e21f170d53`
+for H16 and the KV test, `84148b9abf35aa82d12e058814e260784d76d554` for CNN
+and TinyNPU. The Round 17 code and benchmark report are pushed as a separate
+branch update; this does not change `main` R250 or claim complete architecture
+sign-off. Stop work at this disposition; do not start another round
+automatically.
