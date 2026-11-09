@@ -1,0 +1,23 @@
+{
+  "command": "/tmp/nmaforge_arch_v2_py312/bin/python benchmark/representative/train_digits_3x3_cnn.py --seed 20261119 --epochs 250 --out /tmp/r20_retrained_digits.json",
+  "dataset_sha256": "f6d9e39f37dc45d327f6db33428ee58970ccceabb2535a5c179de35886b70443",
+  "deployed_weight_sha256": "0d772a4d569814b67aefe7dabe596f43cf275b3aa26df4a529f3a3e83bbd3e6c",
+  "epochs": 250,
+  "float_heldout_accuracy": 0.9555555555555556,
+  "int8_heldout_accuracy": 0.9611111111111111,
+  "model_used_for_top": "benchmark/representative/models/r19_trained_digits_3x3_cnn.json",
+  "model_used_sha256": "763a86d8a4ad508bd3ec34106163891f26870a98868889b0bc6c8bfe285370f8",
+  "numpy": "2.4.6",
+  "python": "3.12.13",
+  "retrained_export_sha256": "b4967d220d5eb4919d89e5cf23fce5b493029ceb0ffc9f93c848adb6a4adc250",
+  "retrained_weight_sha256": "0d772a4d569814b67aefe7dabe596f43cf275b3aa26df4a529f3a3e83bbd3e6c",
+  "run_id": "R20-CNN-TRAIN-REPRO-20261109",
+  "scikit_learn": "1.9.1",
+  "seed": 20261119,
+  "status": "PASS_WEIGHT_REPRODUCTION",
+  "test_count": 360,
+  "train_count": 1437,
+  "trainer_sha256": "8878db8132eb1e60c19c9944901834080e462da8e373b9c0ed36e8cbaa97e801",
+  "useful_macs_per_inference": 570164,
+  "weights_bit_identical": true
+}

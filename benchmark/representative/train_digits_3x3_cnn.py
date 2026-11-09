@@ -50,7 +50,9 @@ def load_dataset(seed):
 
 
 def lower_images(planes):
-    # Feature order is [input-channel][dy][dx], with four planes per pixel.
+    # Feature order is [kernel-position][input-channel], with four planes per
+    # pixel. This matches the flattened K dimension exported to the Matrix B
+    # operand and the Top workload generator's physical Matrix-A layout.
     n = len(planes)
     patches = np.stack(
         [planes[:, y:y + CONV_SIZE, x:x + CONV_SIZE, :].reshape(

@@ -1,0 +1,290 @@
+{
+  "dataset_sha256": "f6d9e39f37dc45d327f6db33428ee58970ccceabb2535a5c179de35886b70443",
+  "deployed_weight_sha256": "0d772a4d569814b67aefe7dabe596f43cf275b3aa26df4a529f3a3e83bbd3e6c",
+  "heldout_accuracy": 0.9611111111111111,
+  "heldout_correct": 346,
+  "heldout_incorrect": 14,
+  "heldout_size": 360,
+  "model_sha256": "763a86d8a4ad508bd3ec34106163891f26870a98868889b0bc6c8bfe285370f8",
+  "run_id": "R20-CNN-STRATIFIED-PLAN",
+  "selected_correct": 20,
+  "selected_count": 34,
+  "selected_incorrect": 14,
+  "selected_ranks": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    6,
+    7,
+    8,
+    9,
+    11,
+    12,
+    13,
+    14,
+    15,
+    17,
+    18,
+    19,
+    20,
+    23,
+    24,
+    35,
+    64,
+    73,
+    173,
+    189,
+    211,
+    217,
+    221,
+    228,
+    249,
+    304,
+    313,
+    314,
+    348
+  ],
+  "selected_samples": [
+    {
+      "correct": true,
+      "sample_index": 42,
+      "software_prediction": 1,
+      "test_rank": 0,
+      "true_label": 1
+    },
+    {
+      "correct": true,
+      "sample_index": 1465,
+      "software_prediction": 2,
+      "test_rank": 1,
+      "true_label": 2
+    },
+    {
+      "correct": true,
+      "sample_index": 1326,
+      "software_prediction": 9,
+      "test_rank": 2,
+      "true_label": 9
+    },
+    {
+      "correct": true,
+      "sample_index": 390,
+      "software_prediction": 4,
+      "test_rank": 3,
+      "true_label": 4
+    },
+    {
+      "correct": true,
+      "sample_index": 99,
+      "software_prediction": 1,
+      "test_rank": 4,
+      "true_label": 1
+    },
+    {
+      "correct": true,
+      "sample_index": 1788,
+      "software_prediction": 4,
+      "test_rank": 6,
+      "true_label": 4
+    },
+    {
+      "correct": true,
+      "sample_index": 574,
+      "software_prediction": 6,
+      "test_rank": 7,
+      "true_label": 6
+    },
+    {
+      "correct": true,
+      "sample_index": 729,
+      "software_prediction": 3,
+      "test_rank": 8,
+      "true_label": 3
+    },
+    {
+      "correct": true,
+      "sample_index": 847,
+      "software_prediction": 5,
+      "test_rank": 9,
+      "true_label": 5
+    },
+    {
+      "correct": true,
+      "sample_index": 157,
+      "software_prediction": 7,
+      "test_rank": 11,
+      "true_label": 7
+    },
+    {
+      "correct": true,
+      "sample_index": 332,
+      "software_prediction": 8,
+      "test_rank": 12,
+      "true_label": 8
+    },
+    {
+      "correct": true,
+      "sample_index": 249,
+      "software_prediction": 8,
+      "test_rank": 13,
+      "true_label": 8
+    },
+    {
+      "correct": true,
+      "sample_index": 976,
+      "software_prediction": 5,
+      "test_rank": 14,
+      "true_label": 5
+    },
+    {
+      "correct": false,
+      "sample_index": 528,
+      "software_prediction": 8,
+      "test_rank": 15,
+      "true_label": 2
+    },
+    {
+      "correct": true,
+      "sample_index": 1337,
+      "software_prediction": 2,
+      "test_rank": 17,
+      "true_label": 2
+    },
+    {
+      "correct": true,
+      "sample_index": 1317,
+      "software_prediction": 0,
+      "test_rank": 18,
+      "true_label": 0
+    },
+    {
+      "correct": true,
+      "sample_index": 31,
+      "software_prediction": 9,
+      "test_rank": 19,
+      "true_label": 9
+    },
+    {
+      "correct": true,
+      "sample_index": 292,
+      "software_prediction": 0,
+      "test_rank": 20,
+      "true_label": 0
+    },
+    {
+      "correct": true,
+      "sample_index": 430,
+      "software_prediction": 7,
+      "test_rank": 23,
+      "true_label": 7
+    },
+    {
+      "correct": true,
+      "sample_index": 1375,
+      "software_prediction": 6,
+      "test_rank": 24,
+      "true_label": 6
+    },
+    {
+      "correct": true,
+      "sample_index": 737,
+      "software_prediction": 3,
+      "test_rank": 35,
+      "true_label": 3
+    },
+    {
+      "correct": false,
+      "sample_index": 1662,
+      "software_prediction": 5,
+      "test_rank": 64,
+      "true_label": 9
+    },
+    {
+      "correct": false,
+      "sample_index": 1118,
+      "software_prediction": 7,
+      "test_rank": 73,
+      "true_label": 3
+    },
+    {
+      "correct": false,
+      "sample_index": 77,
+      "software_prediction": 1,
+      "test_rank": 173,
+      "true_label": 2
+    },
+    {
+      "correct": false,
+      "sample_index": 457,
+      "software_prediction": 9,
+      "test_rank": 189,
+      "true_label": 5
+    },
+    {
+      "correct": false,
+      "sample_index": 409,
+      "software_prediction": 8,
+      "test_rank": 211,
+      "true_label": 3
+    },
+    {
+      "correct": false,
+      "sample_index": 504,
+      "software_prediction": 9,
+      "test_rank": 217,
+      "true_label": 7
+    },
+    {
+      "correct": false,
+      "sample_index": 446,
+      "software_prediction": 9,
+      "test_rank": 221,
+      "true_label": 3
+    },
+    {
+      "correct": false,
+      "sample_index": 187,
+      "software_prediction": 8,
+      "test_rank": 228,
+      "true_label": 2
+    },
+    {
+      "correct": false,
+      "sample_index": 1495,
+      "software_prediction": 9,
+      "test_rank": 249,
+      "true_label": 1
+    },
+    {
+      "correct": false,
+      "sample_index": 547,
+      "software_prediction": 8,
+      "test_rank": 304,
+      "true_label": 9
+    },
+    {
+      "correct": false,
+      "sample_index": 421,
+      "software_prediction": 9,
+      "test_rank": 313,
+      "true_label": 5
+    },
+    {
+      "correct": false,
+      "sample_index": 1022,
+      "software_prediction": 9,
+      "test_rank": 314,
+      "true_label": 4
+    },
+    {
+      "correct": false,
+      "sample_index": 588,
+      "software_prediction": 8,
+      "test_rank": 348,
+      "true_label": 0
+    }
+  ],
+  "selection_rule": "all held-out INT8 misclassifications plus the first two correct samples per true class ordered by held-out test rank"
+}

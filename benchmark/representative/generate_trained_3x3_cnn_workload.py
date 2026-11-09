@@ -119,10 +119,13 @@ def main():
     coordinate = np.linspace(-1.0, 1.0, 16, dtype=np.float32)
     yy, xx = np.meshgrid(coordinate, coordinate, indexing="ij")
     planes = np.stack((image, np.ones_like(image), yy, xx), axis=-1)
+    # Match the training feature order: [kernel-position][input-channel].
+    # Stacking at axis=2 would flatten [input-channel][kernel-position], which
+    # silently permutes the deployed Conv1 input while preserving GEMM Golden.
     patches = np.stack(
         [planes[y:y + 14, x:x + 14, :].reshape(M, 4)
          for y in range(3) for x in range(3)], axis=2
-    ).reshape(M, K1)
+    ).transpose(0, 2, 1).reshape(M, K1)
     columns = np.zeros((PAD_M, K1), dtype=np.int8)
     columns[:M] = np.rint(patches * 127.0).clip(-127, 127).astype(np.int8)
     im2col_seconds = time.perf_counter() - started
@@ -227,6 +230,7 @@ def main():
         "seed": model["seed"], "fusion_mode": args.fusion_mode,
         "input_shape": [1, 16, 16, 4], "conv1_shape": [M, K1, N1],
         "conv2_shape": [M, K2, N2], "padded_matrix_m": PAD_M,
+        "input_feature_order": "kernel-position then input-channel; matches train_digits_3x3_cnn.lower_images",
         "conv1_shift": shift1, "conv2_shift": shift2,
         "useful_macs_per_inference": useful_macs,
         "descriptor_count": len(commands), "descriptor_base": DESC,
