@@ -1,0 +1,7 @@
+run_id,shape_mnk,design,source_sha,array,useful_macs,direct_cycles,common_endpoint_cycles,common_mac_per_cycle,spad_read_bytes,spad_write_bytes,bank_stalls,line_stalls,golden,measurement_kind,classification
+R25-TINY-20261109,16x16x16,NMAForge,1354626f9a41229b698fd2ada031a2c3916cb42c,16x16,4096,177,177,23.1412,512,1024,15,25,PASS: all output words,measured Matrix RTL + one-cycle behavioral SPAD,MEASURED_CONTROLLER_BEHAVIORAL_SPAD
+R25-TINY-20261109,16x16x16,TinyNPU,8216c22b762011aa20c05fc2768423fd12dda59d,16x16,4096,52,151,27.1258,N/A,N/A,N/A,N/A,256/256,direct TinyNPU RTL array cycles + explicit serial SPAD timing model,MIXED_MEASURED_MODELED
+R25-TINY-20261109,16x16x32,NMAForge,1354626f9a41229b698fd2ada031a2c3916cb42c,16x16,8192,265,265,30.9132,1024,1024,29,26,PASS: all output words,measured Matrix RTL + one-cycle behavioral SPAD,MEASURED_CONTROLLER_BEHAVIORAL_SPAD
+R25-TINY-20261109,16x16x32,TinyNPU,8216c22b762011aa20c05fc2768423fd12dda59d,16x16,8192,100,231,35.4632,N/A,N/A,N/A,N/A,256/256,direct TinyNPU RTL array cycles + explicit serial SPAD timing model,MIXED_MEASURED_MODELED
+R25-TINY-20261109,32x32x64,NMAForge,1354626f9a41229b698fd2ada031a2c3916cb42c,16x16,65536,1384,1384,47.3526,6144,4096,159,73,PASS: all output words,measured Matrix RTL + one-cycle behavioral SPAD,MEASURED_CONTROLLER_BEHAVIORAL_SPAD
+R25-TINY-20261109,32x32x64,TinyNPU,8216c22b762011aa20c05fc2768423fd12dda59d,16x16,65536,790,1305,50.2192,N/A,N/A,N/A,N/A,1024/1024,direct TinyNPU RTL array cycles + explicit serial SPAD timing model,MIXED_MEASURED_MODELED

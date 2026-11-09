@@ -1,6 +1,6 @@
 {
-  "run_id": "R22-TINY-COMPARE-098F487",
-  "nmaforge_source_sha": "098f48764fb31351eb415193787a175ef44bf77d",
+  "run_id": "R25-TINY-20261109",
+  "nmaforge_source_sha": "1354626f9a41229b698fd2ada031a2c3916cb42c",
   "tinynpu_source_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
   "model": "conv1x_mini.onnx",
   "model_sha256": "1ac385ac18394ac5826a7eb426e99c2199bf6417055f7e3f461c40c1b1811640",
