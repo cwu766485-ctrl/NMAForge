@@ -801,3 +801,35 @@ ai_h16_incremental_decode:
 	grep -q '^INCREMENTAL_DECODE_PASS ' "$(AI_H16_INCREMENTAL_RUN)/run.log"
 	$(AI_H16_INCREMENTAL_PYTHON) ../../../../sw/tools/summarize_h16_incremental_decode.py \
 		--run-dir "$(AI_H16_INCREMENTAL_RUN)"
+
+# Round 23: train/export a bounded GPT-2-like synthetic-token LM, validate the
+# independent scalar INT8 reference, and run eight host-feedback Top steps.
+AI_TINY_GPT2_RUN ?= /tmp/nmaforge_tiny_gpt2_$(shell date +%Y%m%d_%H%M%S)
+AI_TINY_GPT2_PYTHON ?= python3.12
+AI_TINY_GPT2_SEED ?= 20261123
+.PHONY: ai_tiny_gpt2_top
+ai_tiny_gpt2_top:
+	test ! -e "$(AI_TINY_GPT2_RUN)"
+	mkdir -p "$(AI_TINY_GPT2_RUN)"
+	$(AI_TINY_GPT2_PYTHON) ../../../../sw/tools/train_tiny_gpt2.py \
+		--seed "$(AI_TINY_GPT2_SEED)" --epochs 120 \
+		--out "$(AI_TINY_GPT2_RUN)/model.json"
+	$(AI_TINY_GPT2_PYTHON) ../../../../sw/tools/reference_tiny_gpt2_int8.py \
+		--model "$(AI_TINY_GPT2_RUN)/model.json" \
+		--out "$(AI_TINY_GPT2_RUN)/reference.json" --test-sequences 1024
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK \
+		+define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-Mdir=$(AI_TINY_GPT2_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_TINY_GPT2_RUN)/simv -l $(AI_TINY_GPT2_RUN)/compile.log
+	$(AI_TINY_GPT2_PYTHON) ../../../../sw/tools/run_tiny_gpt2_closed_loop.py \
+		--model "$(AI_TINY_GPT2_RUN)/model.json" \
+		--simv "$(AI_TINY_GPT2_RUN)/simv" \
+		--out "$(AI_TINY_GPT2_RUN)/closed_loop" \
+		--seed "$(AI_TINY_GPT2_SEED)" --steps 8
+	grep -q '"status": "HOST_FEEDBACK_INCREMENTAL_TOP_PASS"' \
+		"$(AI_TINY_GPT2_RUN)/closed_loop/closed_loop_results.json"

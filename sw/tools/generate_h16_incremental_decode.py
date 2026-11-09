@@ -122,6 +122,10 @@ def main() -> None:
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--projection-policy", choices=("gemm", "gemv_qkv"),
                         default="gemm")
+    parser.add_argument("--decode-tokens", default=None,
+                        help="optional comma-separated four-token Top input sequence")
+    parser.add_argument("--prefill-tokens", default=None,
+                        help="optional comma-separated four-token KV prefill window")
     args = parser.parse_args()
 
     model_bytes = args.model.read_bytes()
@@ -133,24 +137,45 @@ def main() -> None:
         raise ValueError("model must be H16, two heads, one layer, INT8")
     weights = model.get("weights", {})
     required = {"wq", "wk", "wv", "wo", "wup", "wdown"}
+    if "lm_head" in weights:
+        required.add("lm_head")
     if not required.issubset(weights):
         raise ValueError(f"model weights missing {sorted(required - set(weights))}")
     for name in required:
         matrix = weights[name]
-        if (len(matrix) != 16 or any(len(row) != 16 for row in matrix) or
+        expected_n = 32 if name == "lm_head" else 16
+        if (len(matrix) != 16 or any(len(row) != expected_n for row in matrix) or
                 any(not isinstance(x, int) or not -128 <= x <= 127
                     for row in matrix for x in row)):
-            raise ValueError(f"{name}: expected 16x16 signed INT8 matrix")
+            raise ValueError(f"{name}: expected 16x{expected_n} signed INT8 matrix")
     embeddings = model.get("embeddings")
-    if len(embeddings) != 16 or any(len(row) != 16 for row in embeddings):
-        raise ValueError("expected a 16x16 token embedding table")
-    prefill_tokens = model.get("prefill_tokens", [])[:4]
-    decode_tokens = model.get("incremental_decode_tokens",
-                              model.get("prefill_tokens", [])[4:8])
+    if (not isinstance(embeddings, list) or len(embeddings) not in (16, 32, 64) or
+            any(not isinstance(row, list) or len(row) != 16 for row in embeddings)):
+        raise ValueError("expected a Vx16 token embedding table, V in {16,32,64}")
+    position_embeddings = model.get("position_embeddings", [[0] * 16 for _ in range(8)])
+    if (len(position_embeddings) != 8 or
+            any(not isinstance(row, list) or len(row) != 16 for row in position_embeddings)):
+        raise ValueError("position embedding table must be 8x16 INT8")
+    prefill_tokens = (list(map(int, args.prefill_tokens.split(",")))
+                      if args.prefill_tokens is not None else
+                      model.get("prefill_tokens", [])[:4])
+    decode_tokens = (list(map(int, args.decode_tokens.split(",")))
+                     if args.decode_tokens is not None else
+                     model.get("incremental_decode_tokens",
+                               model.get("prefill_tokens", [])[4:8]))
     if (len(prefill_tokens) != 4 or len(decode_tokens) != 4 or
-            any(not isinstance(t, int) or not 0 <= t < 16
+            any(not isinstance(t, int) or not 0 <= t < len(embeddings)
                 for t in prefill_tokens + decode_tokens)):
         raise ValueError("need four prefill and four incremental token IDs")
+    shifts = model.get("gemm_shifts", {})
+    shifts = {name: int(shifts.get(name, 0)) for name in
+              ("qkv", "wo", "qk", "wup", "wdown", "lm_head")}
+    if any(not 0 <= value <= 31 for value in shifts.values()):
+        raise ValueError("all Matrix GEMM shifts must be in [0,31]")
+
+    def embedding_input(token: int, position: int) -> list[int]:
+        return [max(-128, min(127, int(a) + int(b)))
+                for a, b in zip(embeddings[token], position_embeddings[position])]
     gamma1 = model.get("gamma1_q15", [32768] * 16)
     beta1 = model.get("beta1", [0] * 16)
     gamma2 = model.get("gamma2_q15", [32768] * 16)
@@ -197,6 +222,15 @@ def main() -> None:
                           "matrix_b_tile", _pack_matrix_b_physical(weights["wup"]))
     wdown_b = mapper.tensor("weight_wdown", (16, 16), "i8_packed",
                             "matrix_b_tile", _pack_matrix_b_physical(weights["wdown"]))
+    lm_head_b: list[Tensor] = []
+    if "lm_head" in weights:
+        for chunk in range(2):
+            panel = [[row[chunk * 16 + n] for n in range(16)]
+                     for row in weights["lm_head"]]
+            lm_head_b.append(mapper.tensor(
+                f"weight_lm_head_chunk{chunk}", (16, 16), "i8_packed",
+                "matrix_b_tile", _pack_matrix_b_physical(panel),
+            ))
     gamma1_t = mapper.tensor("gamma1_q15", (16,), "i32", "vector", gamma1)
     beta1_t = mapper.tensor("beta1", (16,), "i32", "vector", beta1)
     gamma2_t = mapper.tensor("gamma2_q15", (16,), "i32", "vector", gamma2)
@@ -227,7 +261,7 @@ def main() -> None:
     ) -> tuple[Tensor, Tensor, list[list[int]]]:
         rhs = weights_b[(proj, head)]
         matrix = [row[head * 8:(head + 1) * 8] for row in weights[f"w{proj}"]]
-        result = gemm_i8_i32(input_rows, matrix)
+        result = gemm_i8_i32(input_rows, matrix, shift=shifts["qkv"])
         if use_gemv:
             if gemv_lhs is None:
                 raise ValueError("GEMV projection requires dense single-token A")
@@ -239,13 +273,15 @@ def main() -> None:
                 f"{stage_name}_{proj}_h{head}_gemv", OP_GEMV_KFOLD,
                 gemv_lhs, raw, src1=gemv_weights_b[(proj, head)].addr,
                 m=1, n=8, k_or_length=16, batch_count=1, head_count=0,
+                shift=shifts["qkv"],
             )
             poison.update(raw.addr + 4 * i for i in range(8))
         else:
             raw = empty_i32(mapper, f"{stage_name}_{proj}_h{head}_i32",
                             len(input_rows), 8)
             mapper.add(f"{stage_name}_{proj}_h{head}_gemm", OP_GEMM, lhs, raw,
-                       src1=rhs, m=4, n=8, k_or_length=4, aux0=1)
+                       src1=rhs, m=4, n=8, k_or_length=4, aux0=1,
+                       shift=shifts["qkv"])
             poison.update(raw.addr + 4 * i for i in range(32))
         add_i32(golden, raw, result)
         quant = [requant_i8(row, 0) for row in result]
@@ -293,6 +329,7 @@ def main() -> None:
     def finish_stage(
         name: str, start: int, golden: dict[int, int], poison: set[int],
         useful_macs: int, token_position: int | None, kv_before: str,
+        logits_names: list[str] | None = None,
     ) -> None:
         nonlocal stage_index
         descs = mapper.descriptors[start:]
@@ -305,6 +342,7 @@ def main() -> None:
         stage_descs.append((name, descs, golden, poison, {
             "useful_macs": useful_macs, "token_position": token_position,
             "kv_before_sha256": kv_before,
+            "logits_tensors": logits_names or [],
         }))
         stage_index += 1
 
@@ -319,7 +357,8 @@ def main() -> None:
     # Prefill stage: four host-supplied tokens execute Q/K/V projections,
     # append their K/V into the real SPAD cache and read the full cache back.
     start, golden, poison = new_stage("prefill")
-    x_rows = [embeddings[token] for token in prefill_tokens]
+    x_rows = [embedding_input(token, position)
+              for position, token in enumerate(prefill_tokens)]
     x = mapper.tensor("prefill_input_i8", (4, 16), "i8_packed",
                       "matrix_a_tile", _pack_matrix_a_physical(x_rows, 4))
     qkv_packed: dict[tuple[str, int], Tensor] = {}
@@ -330,16 +369,16 @@ def main() -> None:
             qkv_packed[(proj, head)] = packed
             qkv_quant[(proj, head)] = quant
             if proj == "k":
-                for row, token in enumerate(prefill_tokens):
-                    key_state[head][token] = quant[row][:]
+                for row, _token_id in enumerate(prefill_tokens):
+                    key_state[head][row] = quant[row][:]
             if proj == "v":
-                for row, token in enumerate(prefill_tokens):
-                    value_state[head][token] = quant[row][:]
+                for row, _token_id in enumerate(prefill_tokens):
+                    value_state[head][row] = quant[row][:]
     for head in range(2):
-        for row, token in enumerate(prefill_tokens):
-            add_cache_append("prefill", "k", head, token, row,
+        for row, _token_id in enumerate(prefill_tokens):
+            add_cache_append("prefill", "k", head, row, row,
                              qkv_packed[("k", head)], key_cache)
-            add_cache_append("prefill", "v", head, token, row,
+            add_cache_append("prefill", "v", head, row, row,
                              qkv_packed[("v", head)], value_cache)
     prefill_reads: dict[tuple[str, int], Tensor] = {}
     for kind, cache, state in (("k", key_cache, key_state),
@@ -370,7 +409,7 @@ def main() -> None:
         stage_name = f"decode_t{token_position}"
         kv_before = hash_cache()
         start, golden, poison = new_stage(stage_name)
-        input_row = embeddings[token_id]
+        input_row = embedding_input(token_id, 4 + step)
         input_rows = [input_row] + [[0] * 16 for _ in range(3)]
         input_i8 = mapper.tensor(
             f"{stage_name}_input_i8", (4, 16), "i8_packed",
@@ -441,10 +480,11 @@ def main() -> None:
             scores = empty_i32(mapper, f"{stage_name}_scores_h{head}", 4, 8)
             mapper.add(f"{stage_name}_qk_h{head}", OP_GEMM,
                        q_tile, scores, src1=kv_reads[("k", head)],
-                       m=4, n=8, k_or_length=2, aux0=1)
+                       m=4, n=8, k_or_length=2, aux0=1,
+                       shift=shifts["qk"])
             key_rows = key_state[head]
             score_row = [sum(decode_q[head][f] * key_rows[t][f]
-                             for f in range(8)) for t in range(8)]
+                             for f in range(8)) >> shifts["qk"] for t in range(8)]
             score_matrix = [score_row] + [[0] * 8 for _ in range(3)]
             add_i32(golden, scores, score_matrix)
             poison.update(scores.addr + 4 * i for i in range(32))
@@ -493,8 +533,10 @@ def main() -> None:
             projected = empty_i32(mapper, f"{stage_name}_wo_h{head}", 4, 16)
             mapper.add(f"{stage_name}_wo_gemm_h{head}", OP_GEMM,
                        av_tile, projected, src1=wo_b[head],
-                       m=4, n=16, k_or_length=2, aux0=1)
-            projected_rows = gemm_i8_i32(av_rows_i8, wo_panel)
+                       m=4, n=16, k_or_length=2, aux0=1,
+                       shift=shifts["wo"])
+            projected_rows = gemm_i8_i32(av_rows_i8, wo_panel,
+                                         shift=shifts["wo"])
             add_i32(golden, projected, projected_rows)
             poison.update(projected.addr + 4 * i for i in range(64))
             head_proj[head] = projected
@@ -533,11 +575,13 @@ def main() -> None:
         add_i8_tile_a(golden, norm1_i8, norm1_i8_rows)
         poison.update(norm1_i8.addr + 4 * i for i in range(16))
 
-        ffn_up_rows = gemm_i8_i32(norm1_i8_rows, weights["wup"])
+        ffn_up_rows = gemm_i8_i32(norm1_i8_rows, weights["wup"],
+                                   shift=shifts["wup"])
         ffn_up = empty_i32(mapper, f"{stage_name}_ffn_up", 4, 16)
         mapper.add(f"{stage_name}_ffn_up", OP_GEMM,
                    norm1_i8, ffn_up, src1=wup_b,
-                   m=4, n=16, k_or_length=4, aux0=1)
+                   m=4, n=16, k_or_length=4, aux0=1,
+                   shift=shifts["wup"])
         add_i32(golden, ffn_up, ffn_up_rows)
         poison.update(ffn_up.addr + 4 * i for i in range(64))
         gelu_rows = [[gelu_q8_8(value) for value in row] for row in ffn_up_rows]
@@ -554,11 +598,13 @@ def main() -> None:
         add_i8_tile_a(golden, gelu_i8, gelu_i8_rows)
         poison.update(gelu_i8.addr + 4 * i for i in range(16))
 
-        ffn_down_rows = gemm_i8_i32(gelu_i8_rows, weights["wdown"])
+        ffn_down_rows = gemm_i8_i32(gelu_i8_rows, weights["wdown"],
+                                     shift=shifts["wdown"])
         ffn_down = empty_i32(mapper, f"{stage_name}_ffn_down", 4, 16)
         mapper.add(f"{stage_name}_ffn_down", OP_GEMM,
                    gelu_i8, ffn_down, src1=wdown_b,
-                   m=4, n=16, k_or_length=4, aux0=1)
+                   m=4, n=16, k_or_length=4, aux0=1,
+                   shift=shifts["wdown"])
         add_i32(golden, ffn_down, ffn_down_rows)
         poison.update(ffn_down.addr + 4 * i for i in range(64))
         residual2_rows = [residual_i32(a, b) for a, b in zip(ffn_down_rows, norm1_rows)]
@@ -577,19 +623,46 @@ def main() -> None:
         add_i32(golden, norm2, norm2_rows)
         poison.update(norm2.addr + 4 * i for i in range(64))
 
+        logits_names: list[str] = []
+        if lm_head_b:
+            norm2_i8_rows = [requant_i8(row, 0) for row in norm2_rows]
+            norm2_i8 = empty_i8_tile(mapper, f"{stage_name}_layernorm2_i8", 4, 16)
+            mapper.add(f"{stage_name}_layernorm2_requant", OP_REQUANT,
+                       norm2, norm2_i8, m=4, n=16, k_or_length=64,
+                       flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A,
+                       shift=0, aux0=1)
+            add_i8_tile_a(golden, norm2_i8, norm2_i8_rows)
+            poison.update(norm2_i8.addr + 4 * i for i in range(16))
+            for chunk, rhs in enumerate(lm_head_b):
+                logits_name = f"{stage_name}_logits_chunk{chunk}"
+                logits = empty_i32(mapper, logits_name, 4, 16)
+                logits_panel = [[row[chunk * 16 + n] for n in range(16)]
+                                for row in weights["lm_head"]]
+                logits_rows = gemm_i8_i32(
+                    norm2_i8_rows, logits_panel, shift=shifts["lm_head"]
+                )
+                mapper.add(logits_name, OP_GEMM, norm2_i8, logits, src1=rhs,
+                           m=4, n=16, k_or_length=4, aux0=1,
+                           shift=shifts["lm_head"])
+                add_i32(golden, logits, logits_rows)
+                poison.update(logits.addr + 4 * i for i in range(64))
+                logits_names.append(logits_name)
+
         cache_golden(golden)
         kv_after = hash_cache()
         # Q/K/V + per-head output projection + FFN + causal QK/AV.
         # This is a single query row: 2 heads * (QK + AV) * head_dim * visible_tokens.
         useful = (3 * 16 * 16 + 2 * 8 * 16 + 2 * 16 * 16 +
+                  (16 * len(weights["lm_head"][0]) if lm_head_b else 0) +
                   2 * 2 * 8 * (token_position + 1))
         finish_stage(stage_name, start, golden, poison, useful,
-                     token_position, kv_before)
+                     token_position, kv_before, logits_names)
         token_records.append({
             "token_position": token_position, "token_id_host_supplied": token_id,
             "input_tensor_address": input_i8.addr,
             "final_tensor_address": norm2.addr,
             "final_tensor_row0_int32": norm2_rows[0],
+            "logits_tensor_names": logits_names,
             "kv_after_sha256": kv_after,
             "expected_tensor_words": len(golden),
             "descriptor_count": len(mapper.descriptors[start:]),
@@ -636,6 +709,7 @@ def main() -> None:
             "first_task_id": descs[0].task_id, "last_task_id": descs[-1].task_id,
             "useful_macs": metadata["useful_macs"],
             "token_position": metadata["token_position"],
+            "logits_tensors": metadata["logits_tensors"],
             "kv_before_sha256": metadata["kv_before_sha256"],
             "kv_after_sha256": (
                 token_records[index - 1]["kv_after_sha256"] if index else prefill_kv_sha
@@ -658,8 +732,9 @@ def main() -> None:
         "training": model.get("training"),
         "seed": model.get("seed"),
         "host_fallback": [
-            "model training and Independent Golden only",
-            "token IDs 4..7 are supplied by the host; this is not autonomous next-token generation",
+            "model training and independent quantized software reference",
+            "token/position embedding lookup and greedy argmax are host responsibilities",
+            "Top descriptor batches accept host-supplied input IDs; closed-loop replay feeds observed Top logits back between runs",
         ],
         "prefill_token_ids": prefill_tokens,
         "incremental_decode_token_ids_host_supplied": decode_tokens,
@@ -683,7 +758,7 @@ def main() -> None:
         "stages": stage_manifest,
         "tokens": token_records,
         "rtl_testbench": "tb_ai_accel_smoke.run_h16_incremental_decode",
-        "model_quality": "synthetic projection labels; not language-model accuracy",
+        "model_quality": model.get("training", {}).get("corpus", "not provided"),
         "tiny_npu_reference_sha256": "8216c22b762011aa20c05fc2768423fd12dda59d",
     }
     (args.out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n",
