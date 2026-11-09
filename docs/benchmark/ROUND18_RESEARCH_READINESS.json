@@ -1,0 +1,178 @@
+{
+  "round": 18,
+  "status": "PARTIAL",
+  "target_branch": "feature/npu-architecture-v2",
+  "source_sha": "028656896a9fc296e1d72cab07c44f31fc747c12",
+  "source_tree_sha": "70b5aa0090f7acb8585af83022071eefa4735420",
+  "rtl_tree_sha": "fae8778d62c06c324bf5be0b5cbfea6843141e08",
+  "top_smoke_tb_tree_sha": "fe249053f202fb0ae0e7865f201b24abeb6e80d8",
+  "round17_tested_rtl_tree_sha": "fae8778d62c06c324bf5be0b5cbfea6843141e08",
+  "tiny_npu_reference_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+  "product_rtl_modified": false,
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "python": "3.12.13",
+    "numpy": "2.4.6",
+    "scikit_learn": "1.9.1",
+    "onnx": "1.17.0",
+    "verilator_on_path": false
+  },
+  "vcs_attempts": [
+    {
+      "run_id": "R18-VCS-SMOKE-LICENSE-PROBE-20261109",
+      "command": "make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261118 SEED=20261118",
+      "status": "BLOCKED_ENV",
+      "result": "VCS license checkout failed before compilation/simulation"
+    },
+    {
+      "run_id": "R18-TRAINED-DIGITS-CNN-TOP-ATTEMPT-20261109",
+      "command": "make -C dv/subsystem/top_smoke/sim ai_trained_cnn_demo AI_TRAINED_CNN_CLASSES=10 AI_TRAINED_CNN_PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python AI_TRAINED_CNN_RUN=/tmp/nmaforge_round18_trained_cnn_attempt",
+      "status": "BLOCKED_ENV",
+      "result": "Software model/workload/Golden generation passed; VCS license checkout failed before simulation",
+      "compile_log_path": "/tmp/nmaforge_round18_trained_cnn_attempt/rtl/compile.log",
+      "compile_log_sha256": "25f383c48669f187cbad0a83969546ee01c77c58c58c3af794ae06fb748e584c"
+    }
+  ],
+  "trained_cnn": {
+    "run_id": "R18-TRAINED-DIGITS-CNN-SOFTWARE-20261109",
+    "software_status": "PASS",
+    "top_replay_status": "BLOCKED_ENV",
+    "model": "trained four-filter 3x3 convolution plus trained ten-class INT8 readout",
+    "architecture": "8x8x1 input; 3x3 convolution to 6x6x4; ten-class linear readout",
+    "useful_macs_per_inference": 2736,
+    "train_samples": 1401,
+    "test_samples": 396,
+    "correct": 384,
+    "accuracy": 0.9696969696969697,
+    "training_seed": 44,
+    "split_seed": 29,
+    "model_sha256": "ef0e616d09ca0be7956fa8ca900e40c62973f8f06e3ec96af09d888eead73726",
+    "input_sha256": "395fa3d65ebd724444abfa47c758de41ec9e157705eda1c10cfccdbe246aceb3",
+    "testset_sha256": "cb851b077542f9bcf42f84938227ba5f1a4750ea0b0fbfe2ba8fcecbb914d107",
+    "selected_sample_golden_sha256": "249587647d45f3e3ef9a54d009a1896cc7d1daf9152de1e11bfba2f4a1b115bc",
+    "weights_match_checked_in_artifact": true,
+    "round18_top_cycles": null,
+    "meets_100k_mac_target": false,
+    "historical_top_evidence": {
+      "status": "PASS_HISTORICAL_NOT_ROUND18_REPLAY",
+      "source_test_sha": "9576e539c21fe6312763c4745a90dc032c6457e0",
+      "historical_product_rtl_sha": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+      "golden_samples": "396/396",
+      "accuracy": "384/396",
+      "historical_128k_per_sample_compute_cycles": 3193,
+      "historical_testbench_layout_cycles": 1080
+    },
+    "training_script_sha256": "acd3e0b1e91d4a9a237197786ea898d64ccc10e6ccb9b99ec5309c565efe2ee2",
+    "golden_generator_sha256": "80c5e041cfa3e19649cb49eb42a5120b38a6c455a2ddad320ee88604c4007918",
+    "generated_workload_memory_sha256": "a004f3949afa0a0a441233b44d09972ce4457caf595e082e5d5791b13674b85f",
+    "generated_workload_expected_sha256": "414b24103404d9281e7dae595d403fbdc979984e61771550e855e63daa3c28a9"
+  },
+  "pointwise_cnn": {
+    "run_id": "NMAFORGE-R17-CNN-LAYOUT-S20261108",
+    "status": "PASS_REUSED_R17_SAME_RTL_TREE",
+    "source_sha": "84148b9abf35aa82d12e058814e260784d76d554",
+    "seed": 20261108,
+    "model_sha256": null,
+    "model_kind": "deterministic fixed-seed inference weights; not trained",
+    "useful_macs": 262144,
+    "architecture": "two 1x1 INT8 pointwise layers, M=512, C=16",
+    "modes": [
+      {
+        "mode": "legacy",
+        "cmdq_cycles": 61310,
+        "preload_axi_lite_cycles": 136415,
+        "preload_plus_cmdq_cycles": 197725,
+        "preloaded_image_bytes": 90944,
+        "spad_read_bytes": 98304,
+        "spad_write_bytes": 81920,
+        "golden_words": 20480
+      },
+      {
+        "mode": "first_layer_fused",
+        "cmdq_cycles": 35184,
+        "preload_axi_lite_cycles": 136295,
+        "preload_plus_cmdq_cycles": 171479,
+        "preloaded_image_bytes": 90864,
+        "spad_read_bytes": 65536,
+        "spad_write_bytes": 49152,
+        "golden_words": 20480
+      },
+      {
+        "mode": "both_fused_linear_row",
+        "cmdq_cycles": 9050,
+        "preload_axi_lite_cycles": 136175,
+        "preload_plus_cmdq_cycles": 145225,
+        "preloaded_image_bytes": 90784,
+        "spad_read_bytes": 32768,
+        "spad_write_bytes": 16384,
+        "golden_words": 20480
+      }
+    ],
+    "preload_breakdown_bytes": {
+      "input_and_weights": 8704,
+      "descriptor_and_completion_initialization": 160,
+      "poison_and_output_sentinels": 81920,
+      "unused_raw1_raw2_poison_reservations": 65536
+    },
+    "preload_loop": "one 32-bit AXI-Lite write per image word in the testbench; not AXI4 DMA burst traffic",
+    "full_end_to_end_cycles": null
+  },
+  "transformer_h16": {
+    "status": "PASS_REUSED_FUNCTIONAL_SYNTHETIC_TASK",
+    "model_sha256": "43ea1d5012e825d068a9dde137c18f2b7e0b95d725a753278331791d86c8ae61",
+    "trained_next_token_model": false,
+    "prefill_cycles": 2734,
+    "four_token_decode_cycles_legacy_ln": 39615,
+    "four_token_decode_cycles_exact_ln_fastpath": 35391,
+    "decode_cycle_reduction_percent": 10.6626,
+    "host_supplied_tokens": [
+      4,
+      5,
+      6,
+      7
+    ],
+    "round18_top_replay": "NOT_RUN",
+    "cache_prefetch_round18_ablation": "NOT_RUN",
+    "run_id": "nmaforge_r17_lnfast_gemm"
+  },
+  "tinynpu": {
+    "status": "PASS_SCOPED_FIXED_SHA_ROUND17_EVIDENCE",
+    "round18_fresh_rebuild": "BLOCKED_ENV_TOOL_NOT_ON_PATH_AND_VCS_LICENSE",
+    "compute_matrix_csv": "benchmark/tinynpu/gemm_results.csv",
+    "gemv_matrix_csv": "benchmark/tinynpu/gemv_results.csv",
+    "mini_cnn_summary": "docs/benchmark/round17_evidence/tinynpu/cnn_summary.json",
+    "matched_gemm_shapes": 3,
+    "matched_gemv_shapes": 4,
+    "all_independent_goldens_pass": true,
+    "cross_system_full_rtl_speedup_claimed": false,
+    "limitations": [
+      "NMAForge endpoint includes Matrix controller and behavioral SPAD",
+      "TinyNPU direct array has no exposed scratchpad port in this harness",
+      "TinyNPU normalized common-memory endpoint is a serialized model",
+      "conv1x_mini graph cycles and NMAForge Top/host-layout cycles use different windows",
+      "trained CNN 262K workload and H16 Transformer have no matched TinyNPU execution"
+    ]
+  },
+  "phase_status": {
+    "P0_representative_trained_cnn": "PARTIAL_BLOCKED_ENV_AND_BELOW_100K_MAC",
+    "P1_trained_h16_transformer": "NOT_RUN_OPTIONAL",
+    "P2_tinynpu_fairness_assessment": "PASS_SCOPED_NO_SYSTEM_SPEEDUP",
+    "P3_research_readiness_report": "PASS"
+  },
+  "reports": [
+    "docs/benchmark/NMAFORGE_V2_ROUND18_RESEARCH_READINESS.md",
+    "docs/benchmark/ROUND18_MODEL_PERFORMANCE.csv",
+    "docs/benchmark/ROUND18_TINYNPU_COMPARISON.csv"
+  ],
+  "reproduction_commands": {
+    "software_train": "python3.12 benchmark/tinynpu/train_nma_cnn_demo.py --num-classes 10 --out-dir <run>/model",
+    "software_golden": "python3.12 benchmark/tinynpu/generate_nma_cnn_demo_golden.py --model <run>/model/nma_tiny_cnn_demo_weights.npz --input-npz <run>/model/nma_tiny_cnn_demo_input.npz --golden <run>/model/nma_cnn_golden.bin",
+    "top_attempt": "make -C dv/subsystem/top_smoke/sim ai_trained_cnn_demo AI_TRAINED_CNN_CLASSES=10 AI_TRAINED_CNN_PYTHON=<Python-3.12.13> AI_TRAINED_CNN_RUN=<fresh-run-dir>"
+  },
+  "scope": {
+    "rtl_changes": false,
+    "full_dv_closure": "NOT_IN_SCOPE",
+    "asic_synthesis_ppa": "NOT_IN_SCOPE",
+    "round19_started": false
+  }
+}
