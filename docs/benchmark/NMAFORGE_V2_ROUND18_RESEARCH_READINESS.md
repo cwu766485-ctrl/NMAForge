@@ -1,6 +1,6 @@
 # NMAForge v2 Round 18 — Research Readiness
 
-**状态：PARTIAL — Research baseline evidence consolidated; representative trained-CNN replay is blocked by VCS license checkout.**
+**状态：PARTIAL — License-restored Top reruns PASS for the trained Digits CNN and the 262K-MAC pointwise fixture; the ≥100K-MAC trained-CNN requirement remains unmet.**
 
 ## Executive summary
 
@@ -12,7 +12,7 @@ Round 18 made no product RTL changes. The Round 17 tested RTL tree is byte-ident
 - Top smoke testbench tree SHA: fe249053f202fb0ae0e7865f201b24abeb6e80d8
 - TinyNPU reference SHA: 8216c22b762011aa20c05fc2768423fd12dda59d
 
-The frozen 262,144-MAC pointwise workload has valid Round 17 Golden and fusion results, but its weights are deterministic and untrained. The reproducible trained ten-class 3×3 CNN has 2,736 MAC/inference, 96.97% held-out accuracy, and historical Top evidence; it does not meet the requested 100K-MAC workload threshold. A Round 18 rerun generated the same model, input, test-set, and Golden hashes, but the VCS Top compile could not check out a license, so no new simulation started. Therefore the representative trained-CNN Top gate is BLOCKED_ENV and the ≥100K-MAC trained-CNN requirement remains OPEN.
+The frozen 262,144-MAC pointwise workload has valid Round 17 Golden and fusion results, but its weights are deterministic and untrained. The reproducible trained ten-class 3×3 CNN has 2,736 MAC/inference and 96.97% held-out accuracy. After license service recovery, a fresh Round 18 Top run passed its byte-exact output Golden at 3,193 CMDQ cycles. The separate 262,144-MAC two-layer pointwise fixture also passed a fresh Top run at 9,050 CMDQ cycles and 20,480/20,480 Golden words; it uses deterministic untrained inference weights and contains no 3×3 layer. Thus the fresh Top evidence is PASS, but the required ≥100K-MAC trained CNN is still OPEN.
 
 The existing TinyNPU matrix has useful matched operands and independent Golden checks for seven GEMM/GEMV shapes. NMAForge measures controller plus behavioral SPAD; TinyNPU direct-array cycles are RTL-measured, while its common-memory values are serialized estimates. These are not equivalent full-system endpoints. The common mini CNN also passes both Goldens, but its graph/runtime and NMAForge phase boundaries differ. No system-level TinyNPU speedup is claimed.
 
@@ -73,7 +73,7 @@ The checked-in manifest and model are the reproducible artifact. Round 18's soft
 
 ### Top result and status
 
-Round 18 attempted the existing trained-CNN Top path. Software training, workload construction, and independent Golden passed; VCS then failed during license checkout before producing a simulation executable or running a sample. The compile log SHA-256 is 25f383c48669f187cbad0a83969546ee01c77c58c58c3af794ae06fb748e584c. The earlier generic Top smoke attempt also stopped at VCS license checkout. No RTL functional failure was observed, but no Round 18 Top PASS was produced.
+The initial Round 18 attempts stopped at VCS license checkout. After license recovery, the same checked-in workload path compiled and ran successfully. Fresh run ID `R18-TRAINED-DIGITS-CNN-TOP-20261109-LIC-RETRY` passed with 16 descriptors, 3,193 CMDQ cycles, 1,080 testbench layout-accounting cycles, 6,048/1,920 SPAD read/write bytes, and byte-exact Golden. The VCS compile/run log hashes are recorded in the JSON manifest. This validates the existing small trained model on the current Round 18 source, but it does not meet 100K MAC/inference.
 
 Historical evidence for the same ten-class model exists at older source/test SHA 9576e539c21fe6312763c4745a90dc032c6457e0, with the product RTL baseline recorded as cd0a05d8ecd8cfb6c3f39b559788a2531e324b23. It reports 396/396 exact Top intermediate/output checks, 384/396 classification, and identical behavior for 128 KiB and 512 KiB behavioral SPAD configurations. Round 10 also records a three-mode Top ablation at source/test SHA 1cd1bde4d82c457d445f97a7817fc22d407b528b. These historical results are retained as history only; they are not a current Round 18 replay and do not demonstrate a ≥100K-MAC trained CNN.
 
@@ -97,7 +97,7 @@ The separate 262,144-MAC workload is two 1×1 INT8 pointwise layers with determi
 
 These are reused Round 17 tests at source SHA 84148b9abf35aa82d12e058814e260784d76d554; the current base has the identical RTL tree. The last row has compatible packed Row-Major output. Even here, preload + CMDQ falls 26.55% from legacy, much less than the 85.24% CMDQ-only reduction, because the serial testbench image load dominates the subtotal.
 
-**P0 conclusion: PARTIAL.** A trained small 3×3 CNN and its prior Top evidence exist, and a fresh software preflight reproduced its artifacts. The Round 18 Top replay is BLOCKED_ENV. No trained model with at least 100K useful MAC/inference was run or attempted on Top; the existing 262K Top case is untrained. This is the main unmet Round 18 MUST.
+**P0 conclusion: PARTIAL.** The fresh trained Digits CNN Top replay and fresh 262K-MAC pointwise Top fixture both PASS their stated Golden checks. The trained model is only 2,736 MAC/inference; the 262K fixture is deterministic untrained inference data and has no accuracy claim. A trained model with at least 100K useful MAC/inference and the requested 3×3 lowering/transfer accounting remains the main unmet Round 18 MUST.
 
 ## P1 — Transformer
 
@@ -123,7 +123,7 @@ The ratios are mixed-endpoint diagnostics, not cross-system RTL speedups. They i
 
 For conv1x_mini.onnx, both sides pass the same four-byte Golden. NMAForge reports 1,985 CMDQ compute + 1,080 host-layout accounted cycles; TinyNPU reports 4,781 graph-smoke cycles using its graph dispatcher and testbench DMA/SRAM shim. Those intervals differ, so no ratio is calculated. The 262K pointwise workload, trained Digits CNN, and H16 Transformer were not run on TinyNPU under matching native endpoints.
 
-The Round 18 host currently has no Verilator on PATH, and fresh VCS attempts failed license checkout. No Round 18 TinyNPU rebuild or fresh matched run was performed; the fixed-SHA Round 17 benchmark is reused for fairness analysis.
+The Round 18 host has no Verilator on PATH. VCS is now available and the trained-CNN, 262K fixture, and bounded smoke Top runs pass; no Round 18 TinyNPU rebuild or fresh matched run was performed. The fixed-SHA Round 17 benchmark is reused for fairness analysis.
 
 ## P3 — Readiness decision
 
@@ -131,7 +131,8 @@ The Round 18 host currently has no Verilator on PATH, and fresh VCS attempts fai
 |---|---|---|
 | Frozen Round 17 functional baseline and measurement contract | PASS_REUSED | Current RTL tree equals Round 17 tested RTL tree. New input/transfer/readback fields are explicitly marked N/A when not separately instrumented. |
 | Trained CNN software model and independent Golden | PASS | Ten-class Digits, 384/396 test accuracy; hashes reproduced. |
-| Representative trained CNN ≥100K MAC Top run | BLOCKED_ENV / OPEN | Round 18 VCS license checkout failed; current trained model is 2,736 MAC/sample; 262K model is untrained. |
+| Trained Digits CNN Top replay | PASS | Fresh Round 18 VCS Top run; byte-exact output Golden, 2,736 MAC/sample, below representative threshold. |
+| Representative trained CNN ≥100K MAC Top run | OPEN / NOT SATISFIED | 262K-MAC Top fixture passes but is untrained and pointwise-only; no ≥100K-MAC trained 3×3 CNN Top run. |
 | High-MAC trained CNN with 3×3 Conv and fully accounted Im2col | NOT_RUN | No existing Top mapping for such a trained workload in this round; do not treat Host transforms as free. |
 | Trained H16 next-token Transformer | NOT_RUN_OPTIONAL | Existing H16 is synthetic task with host-supplied tokens. |
 | TinyNPU fairness decision and fixed evidence | PASS_SCOPED | Matched operands/Golden exist for 3 GEMM + 4 GEMV; memory and native-model endpoints are not equivalent. |
@@ -146,11 +147,11 @@ Round 18 software training and Golden:
     /tmp/nmaforge_arch_v2_py312/bin/python benchmark/tinynpu/train_nma_cnn_demo.py --num-classes 10 --out-dir /tmp/nmaforge_round18_trained_cnn_attempt/model
     /tmp/nmaforge_arch_v2_py312/bin/python benchmark/tinynpu/generate_nma_cnn_demo_golden.py --model /tmp/nmaforge_round18_trained_cnn_attempt/model/nma_tiny_cnn_demo_weights.npz --input-npz /tmp/nmaforge_round18_trained_cnn_attempt/model/nma_tiny_cnn_demo_input.npz --golden /tmp/nmaforge_round18_trained_cnn_attempt/model/nma_cnn_golden.bin
 
-Round 18 attempted Top command:
+Initial Round 18 attempt (before license recovery):
 
     make -C dv/subsystem/top_smoke/sim ai_trained_cnn_demo AI_TRAINED_CNN_CLASSES=10 AI_TRAINED_CNN_PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python AI_TRAINED_CNN_RUN=/tmp/nmaforge_round18_trained_cnn_attempt
 
-Run ID: R18-TRAINED-DIGITS-CNN-SOFTWARE-20261109; software Golden PASS. Run ID: R18-TRAINED-DIGITS-CNN-TOP-ATTEMPT-20261109; BLOCKED_ENV before simulation. Toolchain: VCS V-2023.12-SP1_Full64, Python 3.12.13, NumPy 2.4.6, scikit-learn 1.9.1, ONNX 1.17.0. Fresh Verilator executable was not found on PATH.
+Run ID: R18-TRAINED-DIGITS-CNN-SOFTWARE-20261109; software Golden PASS. Initial Top attempt was BLOCKED_ENV before simulation, then license-restored retry R18-TRAINED-DIGITS-CNN-TOP-20261109-LIC-RETRY PASS. Run ID R18-POINTWISE-262K-TOP-20261109-BOTH-LINEARIZED PASS; Run ID R18-TOP-SMOKE-SEED20261118 PASS. Toolchain: VCS V-2023.12-SP1_Full64, Python 3.12.13, NumPy 2.4.6, scikit-learn 1.9.1, ONNX 1.17.0. Fresh Verilator executable was not found on PATH.
 
 Machine-readable Round 18 summary:
 
@@ -166,4 +167,4 @@ Reused detailed sources:
 - [Ten-class trained model artifacts](../../benchmark/models/nma_tiny_cnn_10class/nma_tiny_cnn_demo_manifest.json)
 - [Historical ten-class Top results](../../benchmark/v2_trained_cnn_tenclass_top_128k_9576e53.csv)
 
-No RTL changes, full DV closure, ASIC synthesis, or Round 19 work was started.
+No RTL changes, full DV closure, ASIC synthesis, or Round 19 work was started. The local license-restored reruns were made against source commit 6683f6d659d161fd18b9f882000ddbe7ed96a573 (RTL tree fae8778d62c06c324bf5be0b5cbfea6843141e08), whose files match the published Round 18 baseline tree.
