@@ -614,6 +614,51 @@ ai_representative_cnn:
 		-l $(AI_REPRESENTATIVE_RUN)/run.log
 	grep -q '^REPRESENTATIVE_MODEL_PASS ' "$(AI_REPRESENTATIVE_RUN)/run.log"
 
+# Round 22: measured Top DMA preload of live trained-CNN inputs, weights and
+# descriptors. Poison/sentinel writes remain test-only AXI-Lite setup.
+AI_REPRESENTATIVE_DMA_RUN ?= /tmp/nmaforge_representative_cnn_dma_$(shell date +%Y%m%d_%H%M%S)
+AI_REPRESENTATIVE_DMA_PYTHON ?= $(PYTHON)
+AI_REPRESENTATIVE_DMA_SEED ?= 20261119
+AI_REPRESENTATIVE_DMA_TEST_RANK ?= 0
+AI_REPRESENTATIVE_DMA_MODEL ?= ../../../../benchmark/representative/models/r19_trained_digits_3x3_cnn.json
+AI_REPRESENTATIVE_DMA_SPAD_WORDS_PER_BANK ?= 8192
+.PHONY: ai_representative_trained_cnn_dma
+ai_representative_trained_cnn_dma:
+	test ! -e "$(AI_REPRESENTATIVE_DMA_RUN)"
+	mkdir -p "$(AI_REPRESENTATIVE_DMA_RUN)"
+	$(AI_REPRESENTATIVE_DMA_PYTHON) ../../../../benchmark/representative/generate_trained_3x3_cnn_workload.py \
+		--model "$(AI_REPRESENTATIVE_DMA_MODEL)" \
+		--out-dir "$(AI_REPRESENTATIVE_DMA_RUN)/workload" \
+		--fusion-mode both_fused_row_major --test-rank "$(AI_REPRESENTATIVE_DMA_TEST_RANK)"
+	$(AI_REPRESENTATIVE_DMA_PYTHON) ../../../../benchmark/representative/verify_trained_3x3_cnn_workload.py \
+		--workload-dir "$(AI_REPRESENTATIVE_DMA_RUN)/workload"
+	$(AI_REPRESENTATIVE_DMA_PYTHON) ../../../../benchmark/representative/prepare_cnn_dma_payload.py \
+		--memory-image "$(AI_REPRESENTATIVE_DMA_RUN)/workload/model_memory.memh" \
+		--out-dir "$(AI_REPRESENTATIVE_DMA_RUN)/workload"
+	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK \
+		+define+AI_SPAD_WORDS_PER_BANK=$(AI_REPRESENTATIVE_DMA_SPAD_WORDS_PER_BANK) \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-Mdir=$(AI_REPRESENTATIVE_DMA_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_REPRESENTATIVE_DMA_RUN)/simv -l $(AI_REPRESENTATIVE_DMA_RUN)/compile.log
+	$(AI_REPRESENTATIVE_DMA_RUN)/simv +ntb_random_seed=$(AI_REPRESENTATIVE_DMA_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_REPRESENTATIVE_DMA_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_DMA_PRELOAD \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_REPRESENTATIVE_DMA_RUN)/workload/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_REPRESENTATIVE_DMA_RUN)/workload/dma_plan.memh \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_REPRESENTATIVE_DMA_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_REPRESENTATIVE_DMA_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_REPRESENTATIVE_DMA_PYTHON) -c 'import json; print(json.load(open("$(AI_REPRESENTATIVE_DMA_RUN)/workload/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_REPRESENTATIVE_DMA_PYTHON) -c 'import json; print(json.load(open("$(AI_REPRESENTATIVE_DMA_RUN)/workload/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_REPRESENTATIVE_DMA_PYTHON) -c 'import json; print(json.load(open("$(AI_REPRESENTATIVE_DMA_RUN)/workload/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_USEFUL_MACS=570164 -l $(AI_REPRESENTATIVE_DMA_RUN)/run.log
+	grep -q '^REPRESENTATIVE_DMA_PRELOAD_PASS ' "$(AI_REPRESENTATIVE_DMA_RUN)/run.log"
+	grep -q '^REPRESENTATIVE_MODEL_PASS ' "$(AI_REPRESENTATIVE_DMA_RUN)/run.log"
+
 # Trained synthetic H=16/two-head QKV projection subgraph through Top CMDQ.
 # This is deliberately a QKV-only Gate G2 workload, not full Transformer DV.
 AI_H16_QKV_RUN ?= /tmp/nmaforge_h16_qkv_$(shell date +%Y%m%d_%H%M%S)

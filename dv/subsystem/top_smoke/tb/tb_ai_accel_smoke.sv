@@ -328,8 +328,13 @@ module tb_ai_accel_smoke;
     // probes. Files are generated under /tmp; no model data is compiled in.
     reg [31:0] representative_image_words [0:131071];
     reg [31:0] representative_golden_words [0:131071];
+    reg [31:0] representative_dma_plan_words [0:255];
     integer representative_load_cycles = 0;
     integer representative_load_measure = 1'b0;
+    integer representative_dma_window_cycles = 0;
+    integer representative_dma_busy_cycles = 0;
+    integer representative_dma_window_measure = 1'b0;
+    integer representative_dma_busy_measure = 1'b0;
     integer ai_digits_cycles = 0;
     reg ai_digits_measure = 1'b0;
     integer ai_digits_layout_cycles = 0;
@@ -558,6 +563,10 @@ module tb_ai_accel_smoke;
     always @(posedge aclk) begin
         if (representative_load_measure)
             representative_load_cycles = representative_load_cycles + 1;
+        if (representative_dma_window_measure)
+            representative_dma_window_cycles = representative_dma_window_cycles + 1;
+        if (representative_dma_busy_measure && dut.dma_busy)
+            representative_dma_busy_cycles = representative_dma_busy_cycles + 1;
     end
 
     // Round 9 SFU profiler. Pass buckets are mutually exclusive FSM states;
@@ -4061,10 +4070,17 @@ module tb_ai_accel_smoke;
     task run_representative_model;
         reg [1023:0] image_file;
         reg [1023:0] golden_file;
+        reg [1023:0] dma_payload_file;
+        reg [1023:0] dma_plan_file;
+        reg use_dma_preload;
         integer image_count;
         integer golden_count;
         integer image_index;
         integer golden_index;
+        integer dma_plan_count;
+        integer dma_plan_index;
+        integer dma_payload_bytes;
+        integer dma_sentinel_setup_bytes;
         integer descriptor_base;
         integer completion_base;
         integer descriptor_count;
@@ -4113,6 +4129,7 @@ module tb_ai_accel_smoke;
                 !$value$plusargs("AI_REPRESENTATIVE_DESC_COUNT=%d", descriptor_count) ||
                 !$value$plusargs("AI_REPRESENTATIVE_USEFUL_MACS=%d", useful_macs))
                 $fatal(1, "representative model mode requires memory, golden, queue and MAC plusargs");
+            use_dma_preload = $test$plusargs("AI_REPRESENTATIVE_DMA_PRELOAD");
             prefill_descriptor_count = 0;
             void'($value$plusargs("AI_REPRESENTATIVE_PREFILL_DESC_COUNT=%d",
                                   prefill_descriptor_count));
@@ -4132,16 +4149,115 @@ module tb_ai_accel_smoke;
                        image_count, golden_count, descriptor_count);
 
             representative_load_cycles = 0;
-            representative_load_measure = 1'b1;
-            for (image_index = 0; image_index < image_count; image_index = image_index + 1) begin
-                if (representative_image_words[1 + 2 * image_index] >= SPAD_BYTES ||
-                    representative_image_words[1 + 2 * image_index][1:0] != 2'b00)
-                    $fatal(1, "representative image has invalid SPAD address index=%0d addr=%08h",
-                           image_index, representative_image_words[1 + 2 * image_index]);
-                axi_write(SPAD_BASE + representative_image_words[1 + 2 * image_index],
-                          representative_image_words[2 + 2 * image_index]);
+            if (use_dma_preload) begin
+                if (!$value$plusargs("AI_REPRESENTATIVE_DMA_PAYLOAD=%s", dma_payload_file) ||
+                    !$value$plusargs("AI_REPRESENTATIVE_DMA_PLAN=%s", dma_plan_file))
+                    $fatal(1, "DMA preload requires payload and plan files");
+                $readmemh(dma_payload_file, axi_mem_u.mem);
+                $readmemh(dma_plan_file, representative_dma_plan_words);
+                dma_plan_count = representative_dma_plan_words[0];
+                if (dma_plan_count < 1 || dma_plan_count > 85)
+                    $fatal(1, "invalid representative DMA plan count=%0d", dma_plan_count);
+
+                // Output poison is a checker precondition only. Keep its setup
+                // outside the production payload and measured DMA interval.
+                dma_sentinel_setup_bytes = 0;
+                for (image_index = 0; image_index < image_count; image_index = image_index + 1) begin
+                    if (representative_image_words[1 + 2 * image_index] >= SPAD_BYTES ||
+                        representative_image_words[1 + 2 * image_index][1:0] != 2'b00)
+                        $fatal(1, "representative image has invalid SPAD address index=%0d addr=%08h",
+                               image_index, representative_image_words[1 + 2 * image_index]);
+                    if (representative_image_words[2 + 2 * image_index] == 32'ha55a_a55a) begin
+                        axi_write(SPAD_BASE + representative_image_words[1 + 2 * image_index],
+                                  32'ha55a_a55a);
+                        dma_sentinel_setup_bytes = dma_sentinel_setup_bytes + 4;
+                    end
+                end
+
+                dma_payload_bytes = 0;
+                representative_dma_window_cycles = 0;
+                representative_dma_busy_cycles = 0;
+                r20_dma_ar_bursts = 0;
+                r20_dma_ar_bytes = 0;
+                r20_dma_r_beats = 0;
+                r20_dma_ar_q_head = 0;
+                r20_dma_ar_q_tail = 0;
+                r20_dma_read_latency_sum = 0;
+                r20_dma_read_latency_max = 0;
+                r20_dma_read_latency_count = 0;
+                axi_write(REG_DMA_ROW_WORDS, 32'd0);
+                axi_write(REG_DMA_ROW_COUNT, 32'd0);
+                axi_write(REG_DMA_EXT_STRIDE, 32'd0);
+                axi_write(REG_DMA_SPAD_STRIDE, 32'd0);
+                axi_write(REG_DMA_GATHER_INDEX, 32'd0);
+                axi_write(REG_DMA_CFG, 32'd0);
+                representative_dma_window_measure = 1'b1;
+                representative_dma_busy_measure = 1'b1;
+                r20_dma_monitor_enable = 1'b1;
+                for (dma_plan_index = 0; dma_plan_index < dma_plan_count; dma_plan_index = dma_plan_index + 1) begin
+                    if (representative_dma_plan_words[1 + dma_plan_index * 3][3:0] != 0 ||
+                        representative_dma_plan_words[2 + dma_plan_index * 3][3:0] != 0 ||
+                        representative_dma_plan_words[3 + dma_plan_index * 3] == 0 ||
+                        representative_dma_plan_words[3 + dma_plan_index * 3][1:0] != 0 ||
+                        representative_dma_plan_words[1 + dma_plan_index * 3] +
+                            representative_dma_plan_words[3 + dma_plan_index * 3] * 4 >
+                            16384 ||
+                        representative_dma_plan_words[2 + dma_plan_index * 3] +
+                            representative_dma_plan_words[3 + dma_plan_index * 3] * 4 >
+                            SPAD_BYTES)
+                        $fatal(1, "invalid representative DMA plan index=%0d", dma_plan_index);
+                    dma_payload_bytes = dma_payload_bytes +
+                        representative_dma_plan_words[3 + dma_plan_index * 3] * 4;
+                    axi_write(REG_DMA_EXT_ADDR,
+                              representative_dma_plan_words[1 + dma_plan_index * 3]);
+                    axi_write(REG_DMA_SPAD_ADDR,
+                              representative_dma_plan_words[2 + dma_plan_index * 3]);
+                    axi_write(REG_DMA_LENGTH,
+                              representative_dma_plan_words[3 + dma_plan_index * 3]);
+                    axi_write(REG_DMA_CTRL, 32'h0000_0001);
+                    for (poll_index = 0; poll_index < 200000 &&
+                         !dut.dma_done && !dut.dma_error; poll_index = poll_index + 1)
+                        @(posedge aclk);
+                    if (poll_index == 200000)
+                        $fatal(1, "representative DMA preload timeout plan_index=%0d ext=%08h spad=%08h words=%0d",
+                               dma_plan_index,
+                               representative_dma_plan_words[1 + dma_plan_index * 3],
+                               representative_dma_plan_words[2 + dma_plan_index * 3],
+                               representative_dma_plan_words[3 + dma_plan_index * 3]);
+                    axi_read(REG_DMA_STATUS, status_value);
+                    if (!(dut.dma_done || status_value[1]) ||
+                        dut.dma_error || status_value[2])
+                        $fatal(1, "representative DMA preload failed plan_index=%0d status=%08h",
+                               dma_plan_index, status_value);
+                    axi_write(REG_DMA_STATUS, 32'd2);
+                end
+                r20_dma_monitor_enable = 1'b0;
+                representative_dma_busy_measure = 1'b0;
+                representative_dma_window_measure = 1'b0;
+                preloaded_spad_bytes = dma_payload_bytes;
+                if (r20_dma_ar_bytes != dma_payload_bytes ||
+                    r20_dma_ar_bursts == 0 || r20_dma_r_beats == 0)
+                    $fatal(1, "representative DMA byte mismatch plan=%0d AXI=%0d bursts=%0d beats=%0d",
+                           dma_payload_bytes, r20_dma_ar_bytes,
+                           r20_dma_ar_bursts, r20_dma_r_beats);
+                $display("REPRESENTATIVE_DMA_PRELOAD_PASS transactions=%0d payload_bytes=%0d axi_read_bytes=%0d ar_bursts=%0d r_beats=%0d read_latency_sum=%0d read_latency_count=%0d read_latency_max=%0d dma_busy_cycles=%0d setup_and_transfer_cycles=%0d test_only_poison_setup_bytes=%0d",
+                         dma_plan_count, dma_payload_bytes, r20_dma_ar_bytes,
+                         r20_dma_ar_bursts, r20_dma_r_beats,
+                         r20_dma_read_latency_sum, r20_dma_read_latency_count,
+                         r20_dma_read_latency_max, representative_dma_busy_cycles,
+                         representative_dma_window_cycles, dma_sentinel_setup_bytes);
+            end else begin
+                representative_load_measure = 1'b1;
+                for (image_index = 0; image_index < image_count; image_index = image_index + 1) begin
+                    if (representative_image_words[1 + 2 * image_index] >= SPAD_BYTES ||
+                        representative_image_words[1 + 2 * image_index][1:0] != 2'b00)
+                        $fatal(1, "representative image has invalid SPAD address index=%0d addr=%08h",
+                               image_index, representative_image_words[1 + 2 * image_index]);
+                    axi_write(SPAD_BASE + representative_image_words[1 + 2 * image_index],
+                              representative_image_words[2 + 2 * image_index]);
+                end
+                representative_load_measure = 1'b0;
             end
-            representative_load_measure = 1'b0;
 
             // Prove every expected result was poisoned before the first command.
             for (golden_index = 0; golden_index < golden_count; golden_index = golden_index + 1) begin
@@ -4322,7 +4438,8 @@ module tb_ai_accel_smoke;
                 matrix_response_wait_cycles + matrix_writeback_cycles + matrix_other_cycles +
                 sfu_busy_cycles + kv_busy_cycles + conv_busy_cycles + banked_busy_cycles +
                 fp_busy_cycles + scalar_busy_cycles + no_engine_cycles;
-            preloaded_spad_bytes = image_count * 4;
+            if (!use_dma_preload)
+                preloaded_spad_bytes = image_count * 4;
             if (exclusive_profile_cycles != command_cycles)
                 $fatal(1, "representative exclusive profile does not close cycles=%0d buckets=%0d",
                        command_cycles, exclusive_profile_cycles);
@@ -4336,7 +4453,7 @@ module tb_ai_accel_smoke;
                 mac_per_cycle = 1.0 * useful_macs / command_cycles;
             if (matrix_mac_cycles > 0)
                 array_utilization = 100.0 * useful_macs / (256.0 * matrix_mac_cycles);
-            $display("REPRESENTATIVE_MODEL_PASS desc=%0d prefill_desc=%0d decode_desc=%0d golden_words=%0d useful_macs=%0d command_cycles=%0d prefill_command_cycles=%0d decode_command_cycles=%0d prefill_exclusive_cycles=%0d decode_exclusive_cycles=%0d exclusive_profile_cycles=%0d preload_axi_cycles=%0d preloaded_spad_bytes=%0d mac_per_cycle=%0.4f array_utilization_pct=%0.2f matrix_mac_cycles=%0d matrix_req_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d sfu_busy=%0d kv_busy=%0d conv_busy=%0d banked_busy=%0d fp_busy=%0d scalar_busy=%0d no_engine_dispatch_remainder=%0d dma_busy_overlap=%0d spad_read_bytes=%0d spad_write_bytes=%0d",
+            $display("REPRESENTATIVE_MODEL_PASS desc=%0d prefill_desc=%0d decode_desc=%0d golden_words=%0d useful_macs=%0d command_cycles=%0d prefill_command_cycles=%0d decode_command_cycles=%0d prefill_exclusive_cycles=%0d decode_exclusive_cycles=%0d exclusive_profile_cycles=%0d preload_axi_cycles=%0d preload_dma_window_cycles=%0d preload_dma_busy_cycles=%0d preloaded_spad_bytes=%0d mac_per_cycle=%0.4f array_utilization_pct=%0.2f matrix_mac_cycles=%0d matrix_req_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d sfu_busy=%0d kv_busy=%0d conv_busy=%0d banked_busy=%0d fp_busy=%0d scalar_busy=%0d no_engine_dispatch_remainder=%0d dma_busy_overlap=%0d spad_read_bytes=%0d spad_write_bytes=%0d",
                      descriptor_count,
                      prefill_descriptor_count > 0 ? prefill_descriptor_count : 0,
                      prefill_descriptor_count > 0 ?
@@ -4345,7 +4462,9 @@ module tb_ai_accel_smoke;
                      prefill_command_cycles, decode_command_cycles,
                      prefill_exclusive_cycles, decode_exclusive_cycles,
                      exclusive_profile_cycles, representative_load_cycles,
-                     preloaded_spad_bytes, mac_per_cycle, array_utilization,
+                     representative_dma_window_cycles,
+                     representative_dma_busy_cycles, preloaded_spad_bytes,
+                     mac_per_cycle, array_utilization,
                      matrix_mac_cycles, matrix_wait_cycles,
                      matrix_response_wait_cycles, matrix_writeback_cycles,
                      matrix_other_cycles, sfu_busy_cycles, kv_busy_cycles,
