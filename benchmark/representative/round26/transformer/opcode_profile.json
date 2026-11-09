@@ -1,0 +1,65 @@
+{
+  "status": "PASS_CLOSED_DESCRIPTOR_INTERVALS",
+  "descriptor_count": 424,
+  "decode_cycle_total": 72238,
+  "decode_cycle_sum_from_descriptors": 72238,
+  "cycles_by_opcode": [
+    {
+      "opcode": "0x30",
+      "name": "GEMM",
+      "descriptor_count": 128,
+      "cycles": 8688,
+      "fraction_of_decode_cycles": 0.12026911044048838
+    },
+    {
+      "opcode": "0x34",
+      "name": "Residual",
+      "descriptor_count": 24,
+      "cycles": 12720,
+      "fraction_of_decode_cycles": 0.17608460920844984
+    },
+    {
+      "opcode": "0x35",
+      "name": "GELU",
+      "descriptor_count": 8,
+      "cycles": 3184,
+      "fraction_of_decode_cycles": 0.04407652482073147
+    },
+    {
+      "opcode": "0x36",
+      "name": "Requant",
+      "descriptor_count": 104,
+      "cycles": 14816,
+      "fraction_of_decode_cycles": 0.20509980896481075
+    },
+    {
+      "opcode": "0x38",
+      "name": "LayerNorm",
+      "descriptor_count": 64,
+      "cycles": 23872,
+      "fraction_of_decode_cycles": 0.330463191118248
+    },
+    {
+      "opcode": "0x39",
+      "name": "Softmax",
+      "descriptor_count": 16,
+      "cycles": 3806,
+      "fraction_of_decode_cycles": 0.05268695146598743
+    },
+    {
+      "opcode": "0x43",
+      "name": "KV_Write",
+      "descriptor_count": 48,
+      "cycles": 2528,
+      "fraction_of_decode_cycles": 0.03499543176721393
+    },
+    {
+      "opcode": "0x44",
+      "name": "KV_Read",
+      "descriptor_count": 32,
+      "cycles": 2624,
+      "fraction_of_decode_cycles": 0.03632437221407016
+    }
+  ],
+  "stage_counter_note": "SFU Busy and Matrix Active are activity counters; they are reported separately and are not added to descriptor interval cycles."
+}

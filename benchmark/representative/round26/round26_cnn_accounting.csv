@@ -1,0 +1,12 @@
+workload,phase,cycles_or_time,value,unit,status,notes
+trained_3x3_pointwise,preload_transfer,3019,10944,bytes_plus_cycles,MEASURED_TOP_DMA,"3019 simulated cycles; 2879 busy cycles; 45 AR bursts; 684 R beats; max observed read latency 50 cycles"
+trained_3x3_pointwise,cmdq_compute,12947,570164,useful_macs,MEASURED_TOP_CMDQ,"2 descriptors; 20800 tensor golden words passed; Matrix MAC 2704 cycles; MAC/cycle 44.0383; array utilization 82.37%"
+trained_3x3_pointwise,dma_payload,NA,10944,bytes,MEASURED_PLAN,"Live input/weight payload; excludes 83232 test-only poison initialization bytes"
+trained_3x3_pointwise,host_im2col,0.000497,7056,bytes,HOST_SCRIPT_ESTIMATE,"manifest per-stage Python timer; excludes full upsample/coordinate/packing attribution"
+trained_3x3_pointwise,host_generation_and_golden,1.60,NA,seconds,WALL_CLOCK_SCRIPT,"One-time workload generation wall clock; not production inference latency"
+trained_3x3_pointwise,output_readback,NA,NA,cycles,NOT_MEASURED,"No final result DMA/readback interval in this run"
+trained_3x3_pointwise,global_average_argmax,NA,NA,cycles,NOT_MEASURED,"Host postprocessing operation named in workload manifest"
+trained_3x3_pointwise,host_preprocess_remaining,NA,NA,cycles,NOT_MEASURED,"Upsample, coordinate-plane generation, input/weight pack not fully timed"
+conv1x_mini,cmdq_compute,1985,1872,useful_macs,MEASURED_NMA_TOP,"8 descriptors; Golden byte exact"
+conv1x_mini,host_layout_counter,1080,720,bytes,TESTBENCH_COUNTER,"144 bytes read + 576 bytes written; not a CPU wall-clock measurement"
+conv1x_mini,tiny_graph,4781,13,instructions,MEASURED_TINYNPU_GRAPH,"Includes graph dispatch and testbench memory/DMA shim; incompatible NMA endpoint"
