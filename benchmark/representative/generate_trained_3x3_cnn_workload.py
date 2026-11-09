@@ -131,4 +131,129 @@ def main():
     weights1 = np.asarray(model_weights["conv1_k36_n64"], dtype=np.int8)
     weights2 = np.asarray(model_weights["conv2_k64_n16"], dtype=np.int8)
     if weights1.shape != (K1, N1) or weights2.shape != (K2, N2):
-        raise ValueError("trained model weight shape violates Matrix mapp
+        raise ValueError("trained model weight shape violates Matrix mapping")
+    golden_start = time.perf_counter()
+    raw1 = signed_matrix_product(columns, weights1)
+    # Legacy GEMM requests the legal Matrix post-process ReLU before the
+    # INT32 write. Opcode 0x36 itself only shifts and saturates; it has no
+    # activation control.
+    raw1 = np.maximum(raw1, 0).astype(np.int32)
+    shift1, shift2 = (int(model["quantization"]["conv1_shift"]),
+                      int(model["quantization"]["conv2_shift"]))
+    hidden = np.clip(raw1 >> shift1, 0, 127).astype(np.int8)
+    raw2 = signed_matrix_product(hidden, weights2)
+    output = np.clip(raw2 >> shift2, -128, 127).astype(np.int8)
+    output_words = [
+        pack4(output[row, col:col + 4])
+        for row in range(PAD_M) for col in range(0, N2, 4)
+    ]
+    golden_seconds = time.perf_counter() - golden_start
+
+    commands = []
+    def append(index, op, a, b, out, m, n, k_or_length, **kwargs):
+        wait = 0 if index == 0 else 1 << ((index - 1) & 1)
+        command_count = {"legacy": 4, "first_fused": 3,
+                         "both_fused_row_major": 2}[args.fusion_mode]
+        signal = 0 if index == command_count - 1 else 1 << (index & 1)
+        commands.append(make_desc(0x7100 + index, op, a, b, out, m, n,
+                                  k_or_length, wait=wait, signal=signal,
+                                  **kwargs))
+
+    if args.fusion_mode == "legacy":
+        append(0, 0x30, INPUT, W1, RAW1, PAD_M, N1, K1 // 4,
+               activation=1)
+        append(1, 0x36, RAW1, 0, ACT1, PAD_M, N1, PAD_M * N1,
+               flags=0x30, shift=shift1)
+        append(2, 0x30, ACT1, W2, RAW2, PAD_M, N2, K2 // 4)
+        append(3, 0x36, RAW2, 0, OUTPUT, PAD_M, N2, PAD_M * N2,
+               flags=0x10, shift=shift2)
+    elif args.fusion_mode == "first_fused":
+        append(0, 0x53, INPUT, W1, ACT1, PAD_M, N1, K1 // 4,
+               aux0=shift1, activation=1)
+        append(1, 0x30, ACT1, W2, RAW2, PAD_M, N2, K2 // 4)
+        append(2, 0x36, RAW2, 0, OUTPUT, PAD_M, N2, PAD_M * N2,
+               flags=0x10, shift=shift2)
+    else:
+        append(0, 0x53, INPUT, W1, ACT1, PAD_M, N1, K1 // 4,
+               aux0=shift1, activation=1)
+        append(1, 0x53, ACT1, W2, OUTPUT, PAD_M, N2, K2 // 4,
+               aux0=0x80 | shift2)
+
+    memory = {}
+    add_words(memory, INPUT, pack_a(columns))
+    add_words(memory, W1, pack_b(weights1))
+    add_words(memory, RAW1, [POISON] * (PAD_M * N1))
+    add_words(memory, ACT1, [POISON] * (PAD_M * N1 // 4))
+    add_words(memory, W2, pack_b(weights2))
+    add_words(memory, RAW2, [POISON] * (PAD_M * N2))
+    add_words(memory, OUTPUT, [POISON] * (PAD_M * N2 // 4))
+    for index, descriptor in enumerate(commands):
+        add_words(memory, DESC + index * 64, descriptor)
+        add_words(memory, CPL + index * 16, [POISON] * 4)
+
+    expected = {}
+    def expect_words(base, values):
+        for index, value in enumerate(values):
+            address = base + index * 4
+            if address in expected:
+                raise ValueError("duplicate Golden address 0x%08x" % address)
+            expected[address] = int(value) & 0xFFFFFFFF
+
+    if args.fusion_mode == "legacy":
+        expect_words(RAW1, raw1.reshape(-1))
+    else:
+        expect_words(RAW1, [POISON] * (PAD_M * N1))
+    expect_words(ACT1, pack_a(hidden))
+    if args.fusion_mode != "both_fused_row_major":
+        expect_words(RAW2, raw2.reshape(-1))
+    else:
+        expect_words(RAW2, [POISON] * (PAD_M * N2))
+    expect_words(OUTPUT, output_words)
+
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+    image_path = args.out_dir / "model_memory.memh"
+    golden_path = args.out_dir / "model_golden.memh"
+    write_pair_file(image_path, memory)
+    write_pair_file(golden_path, expected)
+    prediction = int(output[:M, :10].astype(np.int32).mean(axis=0).argmax())
+    useful_macs = M * (K1 * 63 + 1 + K2 * 10)
+    manifest = {
+        "model": model["model"], "model_file_sha256": hashlib.sha256(model_bytes).hexdigest(),
+        "deployed_weight_sha256": model["deployed_weight_sha256"],
+        "dataset_sha256": dataset_hash, "sample_index": sample_index,
+        "test_rank": args.test_rank, "true_label": int(dataset.target[sample_index]),
+        "predicted_label": prediction, "sample_classification": "PASS" if prediction == int(dataset.target[sample_index]) else "FAIL",
+        "quantized_heldout_accuracy": model["quantized_test_accuracy"],
+        "seed": model["seed"], "fusion_mode": args.fusion_mode,
+        "input_shape": [1, 16, 16, 4], "conv1_shape": [M, K1, N1],
+        "conv2_shape": [M, K2, N2], "padded_matrix_m": PAD_M,
+        "conv1_shift": shift1, "conv2_shift": shift2,
+        "useful_macs_per_inference": useful_macs,
+        "descriptor_count": len(commands), "descriptor_base": DESC,
+        "completion_base": CPL, "spad_capacity_bytes": 128 * 1024,
+        "spad_high_water_exclusive": max(memory) + 4,
+        "preload_axi_words": len(memory), "preload_axi_bytes": len(memory) * 4,
+        "host_im2col_seconds": im2col_seconds,
+        "host_integer_golden_seconds": golden_seconds,
+        "host_im2col_payload_bytes": PAD_M * K1,
+        "valid_im2col_bytes": M * K1,
+        "spad_input_pack_bytes": PAD_M * K1,
+        "padding_rows": PAD_M - M,
+        "host_fallback_compute": "none; conv GEMM and pointwise GEMM execute in Top RTL",
+        "host_preprocessing": "8x8-to-16x16 nearest upsample, coordinate planes, 3x3 Im2col and input/weight packing",
+        "host_postprocessing": "global average of 14x14 class scores and argmax",
+        "independent_golden": "signed INT64 Python/NumPy accumulation checked for INT32 range, explicit requant/ReLU/saturation and memory-image compare",
+        "memory_image_sha256": hashlib.sha256(image_path.read_bytes()).hexdigest(),
+        "golden_file_sha256": hashlib.sha256(golden_path.read_bytes()).hexdigest(),
+    }
+    (args.out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+                                                 encoding="utf-8")
+    print("R19_TRAINED_CNN_WORKLOAD_PASS mode=%s sample=%d label=%d prediction=%d descriptors=%d useful_macs=%d spad_high_water=0x%x golden_words=%d im2col_seconds=%.6f image_sha256=%s golden_sha256=%s" % (
+        args.fusion_mode, sample_index, manifest["true_label"], prediction,
+        len(commands), useful_macs, manifest["spad_high_water_exclusive"],
+        len(expected), im2col_seconds, manifest["memory_image_sha256"],
+        manifest["golden_file_sha256"]))
+
+
+if __name__ == "__main__":
+    main()

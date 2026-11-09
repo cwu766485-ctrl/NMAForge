@@ -141,4 +141,34 @@
       "tinynpu_direct_array_cycles": 244,
       "tinynpu_modeled_read_service_cycles": 149,
       "tinynpu_modeled_write_service_cycles": 64,
-      "tinynpu_normalized_cycles":
+      "tinynpu_normalized_cycles": 459,
+      "nmaforge_over_tinynpu_normalized_ratio": 1.3965,
+      "nmaforge_stage_profile": {
+        "shape": "16x16x65",
+        "a_req": "18",
+        "a_wait": "19",
+        "b_req": "9",
+        "b_wait": "2",
+        "bias_req": "0",
+        "bias_wait": "0",
+        "prep_mac": "68",
+        "mac": "68",
+        "write": "89",
+        "next": "4",
+        "done": "1",
+        "error": "0",
+        "error_drain": "0",
+        "prefetch_wait": "363",
+        "arbiter_stall": "78",
+        "response_wait": "20",
+        "writeback_wait": "25",
+        "bank_stalls": "53",
+        "line_stalls": "25",
+        "outstanding_highwater": "4",
+        "fifo_full": "0"
+      },
+      "stall_counter_note": "arbiter/response/writeback/prefetch counters can overlap and must not be summed"
+    }
+  ],
+  "status": "PASS for listed Golden checks; not a common-memory RTL comparison or product-level TinyNPU sign-off"
+}

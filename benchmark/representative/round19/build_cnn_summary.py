@@ -104,4 +104,13 @@ def main():
         "model_accuracy_scope": "software INT8 held-out evaluation over 360 samples; Top RTL executed held-out sample index 42 only",
         "runs": rows,
     }, indent=2, sort_keys=True) + "\n")
-    csv_path
+    csv_path = OUT / "cnn_results.csv"
+    with csv_path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0]), lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(rows)
+    print(f"wrote {json_path} and {csv_path}; rows={len(rows)}")
+
+
+if __name__ == "__main__":
+    main()

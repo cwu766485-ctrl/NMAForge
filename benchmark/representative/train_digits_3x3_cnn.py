@@ -138,4 +138,89 @@ def quantize(w1_float, w2_float, columns, labels, train_idx):
     raw1 = columns_q @ w1_q.astype(np.int32)
     max_raw1 = max(1, int(np.max(np.maximum(raw1[train_idx], 0))))
     shift1 = max(0, min(31, int(np.ceil(np.log2(max_raw1 / 100.0)))))
- 
+    hidden_q = np.clip(raw1 >> shift1, 0, 127).astype(np.int8)
+    raw2 = hidden_q.astype(np.int32) @ w2_q.astype(np.int32)
+    max_raw2 = max(1, int(np.max(np.abs(raw2[train_idx]))))
+    shift2 = max(0, min(31, int(np.ceil(np.log2(max_raw2 / 100.0)))))
+    logits_q = np.clip(raw2 >> shift2, -128, 127).astype(np.int8)
+    return w1_q, w2_q, shift1, shift2, logits_q, hidden_q
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--seed", type=int, default=SEED_DEFAULT)
+    parser.add_argument("--epochs", type=int, default=EPOCHS_DEFAULT)
+    parser.add_argument("--out", type=Path, required=True)
+    args = parser.parse_args()
+    started = time.perf_counter()
+
+    planes, labels, train_idx, test_idx, dataset_sha = load_dataset(args.seed)
+    columns = lower_images(planes)
+    w1_float, w2_float = train(columns, labels, train_idx, args.seed,
+                               args.epochs)
+    float_logits = forward_float(columns, w1_float, w2_float)
+    float_pred = float_logits.argmax(axis=1)
+    w1_q, w2_q, shift1, shift2, logits_q, hidden_q = quantize(
+        w1_float, w2_float, columns, labels, train_idx
+    )
+    quant_pred = logits_q[test_idx, :, :OUTPUTS].astype(np.int32).mean(axis=1).argmax(axis=1)
+    float_test_acc = float(np.mean(float_pred[test_idx] == labels[test_idx]))
+    quant_test_acc = float(np.mean(quant_pred == labels[test_idx]))
+
+    artifact = {
+        "model": "r19_trained_digits_3x3_pointwise_int8",
+        "seed": args.seed,
+        "epochs": args.epochs,
+        "dataset": "sklearn.datasets.load_digits; 8x8 grayscale; nearest 2x upsample to 16x16",
+        "dataset_sha256": dataset_sha,
+        "split": "stratified 80/20; sklearn train_test_split random_state=seed",
+        "train_count": int(len(train_idx)),
+        "test_count": int(len(test_idx)),
+        "train_indices": train_idx.tolist(),
+        "test_indices": test_idx.tolist(),
+        "input_planes": ["intensity", "constant-one", "absolute-y[-1,1]", "absolute-x[-1,1]"],
+        "input_shape": [1, 16, 16, 4],
+        "conv1": {"kernel": [3, 3], "input_channels": 4, "trained_output_channels": HIDDEN,
+                  "exported_output_channels": 64, "padding": "valid", "activation": "ReLU"},
+        "conv2": {"kernel": [1, 1], "input_channels": 64, "output_channels": 10,
+                  "exported_output_channels": 16, "activation": "none"},
+        "training": {"optimizer": "Adam", "batch_size": 32, "learning_rate": 0.005,
+                     "framework": "NumPy analytic backpropagation", "float_test_accuracy": float_test_acc},
+        "quantization": {
+            "weights": "signed INT8 symmetric round-to-nearest, per-layer max-abs scale",
+            "activations": "signed INT8; input round-to-nearest after multiplying by 127",
+            "accumulation": "signed INT32",
+            "conv1_shift": shift1,
+            "conv1_activation": "ReLU then signed INT8 saturation",
+            "conv2_shift": shift2,
+            "conv2_activation": "signed INT8 saturation, no ReLU",
+            "logits": "host global-average over 14x14 spatial positions then argmax",
+        },
+        "quantized_test_accuracy": quant_test_acc,
+        "weights_int8": {"conv1_k36_n64": w1_q.astype(int).tolist(),
+                         "conv2_k64_n16": w2_q.astype(int).tolist()},
+        "weights_float": {"conv1_k36_n63": w1_float.astype(float).tolist(),
+                          "conv2_k64_n10": w2_float.astype(float).tolist()},
+        "deployed_weight_sha256": hashlib.sha256(
+            w1_q.tobytes(order="C") + w2_q.tobytes(order="C")
+        ).hexdigest(),
+        "training_script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "software": {"python": platform.python_version(), "numpy": np.__version__,
+                     "scikit_learn": sklearn.__version__},
+        "useful_macs_per_inference": 196 * (36 * HIDDEN + 1 + 64 * OUTPUTS),
+        "host_im2col": "3x3 valid, 16x16x4 input planes -> 196x36 INT8 matrix; timed by workload generator",
+        "float_prediction_count": int(len(test_idx)),
+        "quantized_prediction_count": int(len(test_idx)),
+        "training_wall_seconds": time.perf_counter() - started,
+    }
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(json.dumps(artifact, indent=2, sort_keys=True) + "\n",
+                        encoding="utf-8")
+    print("R19_TRAINED_CNN_PASS seed=%d train=%d test=%d float_test_accuracy=%.6f quantized_test_accuracy=%.6f useful_macs=%d model_sha256=%s" % (
+        args.seed, len(train_idx), len(test_idx), float_test_acc,
+        quant_test_acc, artifact["useful_macs_per_inference"],
+        hashlib.sha256(args.out.read_bytes()).hexdigest()))
+
+
+if __name__ == "__main__":
+    main()

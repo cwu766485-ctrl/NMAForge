@@ -125,4 +125,31 @@ def main():
     if np.any(raw2 < -(1 << 31)) or np.any(raw2 >= (1 << 31)):
         raise OverflowError("independent Conv2 result exceeds INT32")
     raw2 = raw2.astype(np.int32)
-    output = np.clip(raw2 >> int(manifest["conv2_shift"]), -12
+    output = np.clip(raw2 >> int(manifest["conv2_shift"]), -128, 127).astype(np.int8)
+
+    expected = {}
+    def expect(base, values):
+        for index, value in enumerate(values):
+            expected[base + index * 4] = int(value) & 0xFFFFFFFF
+
+    if manifest["fusion_mode"] == "legacy":
+        expect(RAW1, raw1.reshape(-1))
+    else:
+        expect(RAW1, [POISON] * (PAD_M * N1))
+    expect(ACT1, encode_a(hidden))
+    if manifest["fusion_mode"] == "both_fused_row_major":
+        expect(RAW2, [POISON] * (PAD_M * N2))
+    else:
+        expect(RAW2, raw2.reshape(-1))
+    expect(OUTPUT, encode_row_major(output))
+    if expected != observed_golden:
+        differing = next((address for address in expected
+                          if expected.get(address) != observed_golden.get(address)), None)
+        raise ValueError("independent physical-layout Golden mismatch at %s" %
+                         ("missing key" if differing is None else hex(differing)))
+    print("R19_TRAINED_CNN_GOLDEN_PASS mode=%s descriptors=%d golden_words=%d physical_operands=PASS output_layout=row_major_packed_i8" %
+          (manifest["fusion_mode"], expected_count, len(expected)))
+
+
+if __name__ == "__main__":
+    main()
