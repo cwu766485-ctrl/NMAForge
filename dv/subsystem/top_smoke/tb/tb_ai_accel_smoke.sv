@@ -3801,6 +3801,7 @@ module tb_ai_accel_smoke;
         integer poll_index;
         integer stage_cycles;
         integer useful_macs;
+        integer useful_macs_extra;
         integer matrix_mac_cycles;
         integer matrix_wait_cycles;
         integer matrix_response_wait_cycles;
@@ -3827,6 +3828,8 @@ module tb_ai_accel_smoke;
         begin
             if (!$value$plusargs("AI_H16_INCREMENTAL_DIR=%s", workload_dir))
                 $fatal(1, "incremental H16 mode requires AI_H16_INCREMENTAL_DIR");
+            useful_macs_extra = 0;
+            void'($value$plusargs("AI_H16_USEFUL_MACS_EXTRA=%d", useful_macs_extra));
             $sformat(initial_file, "%0s/initial_memory.memh", workload_dir);
             $readmemh(initial_file, representative_image_words);
             image_count = representative_image_words[0];
@@ -4042,10 +4045,11 @@ module tb_ai_accel_smoke;
                     useful_macs = 3072;
                 else
                     // Count logical GEMM/GEMV products only: Q/K/V, output
-                    // projection, FFN and the single live query row's causal
-                    // QK/AV work. The other three physical rows and masked
-                    // future keys are padding, not useful model MACs.
-                    useful_macs = 1536 + 32 * (stage_idx + 4);
+                    // projection, FFN, optional explicit LM-head MACs, and
+                    // the single live query row's causal QK/AV work. The other
+                    // physical rows and masked future keys are padding.
+                    useful_macs = 1536 + useful_macs_extra +
+                                  32 * (stage_idx + 4);
                 mac_per_cycle = 0.0;
                 array_utilization = 0.0;
                 if (stage_cycles > 0)
