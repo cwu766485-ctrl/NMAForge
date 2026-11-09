@@ -104,11 +104,12 @@ def qkv_for_token(model: dict, x: list[int]) -> tuple[list[list[int]], list[list
 
 
 def append_kv(model: dict, cache: dict, token: int, position: int) -> tuple[list[list[int]], list[list[int]], list[int]]:
-    x = word_input(model, token, position)
+    cache_position = position % 8
+    x = word_input(model, token, cache_position)
     q, k, v = qkv_for_token(model, x)
     for head in range(2):
-        cache["k"][head][position] = k[head][:]
-        cache["v"][head][position] = v[head][:]
+        cache["k"][head][cache_position] = k[head][:]
+        cache["v"][head][cache_position] = v[head][:]
     return q, k, v, x
 
 
@@ -122,16 +123,22 @@ def init_cache(model: dict, prefill: list[int]) -> dict:
 
 def decode_one(model: dict, cache: dict, token: int, position: int) -> dict:
     w, shifts = model["weights"], model["gemm_shifts"]
+    activation_scales = model.get("activation_scales", {})
+    gelu_output_scale = int(activation_scales.get("gelu_output", 256))
+    if gelu_output_scale < 1 or gelu_output_scale & (gelu_output_scale - 1) or 256 % gelu_output_scale:
+        raise ValueError("gelu_output scale must be a power-of-two divisor of 256")
+    gelu_requant_shift = int(math.log2(256 // gelu_output_scale))
     q_heads, k_heads, v_heads, x = append_kv(model, cache, token, position)
+    visible_tokens = min(8, position + 1)
     scores, probabilities, avs, projected = [], [], [], []
     merged = [0] * 16
     for head in range(2):
         score = [dot(q_heads[head], cache["k"][head][t], shifts["qk"])
-                 for t in range(position + 1)]
+                 for t in range(visible_tokens)]
         prob = softmax_q15(score)
         prob8 = requant(prob, 8)
         av = [dot(prob8, [cache["v"][head][t][feature]
-                         for t in range(position + 1)], 0)
+                         for t in range(visible_tokens)], 0)
               for feature in range(8)]
         av8 = requant(av, 7)
         wo_panel = w["wo"][head * 8:(head + 1) * 8]
@@ -149,7 +156,7 @@ def decode_one(model: dict, cache: dict, token: int, position: int) -> dict:
     norm1_i8 = requant(norm1, 0)
     ffn_up = matvec(norm1_i8, w["wup"], shifts["wup"])
     gelu = [gelu_q8_8(v) for v in ffn_up]
-    gelu_i8 = requant(gelu, 0)
+    gelu_i8 = requant(gelu, gelu_requant_shift)
     ffn_down = matvec(gelu_i8, w["wdown"], shifts["wdown"])
     residual2 = [clamp(a + b, I32_MIN, I32_MAX)
                  for a, b in zip(ffn_down, norm1)]
@@ -166,6 +173,8 @@ def decode_one(model: dict, cache: dict, token: int, position: int) -> dict:
         "residual2_i32": residual2, "layernorm2_i32": norm2,
         "layernorm2_i8": norm2_i8, "logits": logits,
         "kv_cache": cache,
+        "cache_position": position % 8,
+        "visible_tokens": visible_tokens,
     }
 
 
