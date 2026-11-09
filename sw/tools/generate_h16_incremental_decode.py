@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate staged Top-CMDQ material for true H16 incremental KV decode.
+"""Generate staged Top-CMDQ material for persistent H16 incremental KV decode.
 
 Tokens 0..3 populate KV through the product 0x43 engine. Tokens 4..7 are
 host-supplied token IDs; each token's Q/K/V, attention, residual, LayerNorm,
@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -123,7 +124,7 @@ def main() -> None:
     parser.add_argument("--projection-policy", choices=("gemm", "gemv_qkv"),
                         default="gemm")
     parser.add_argument("--decode-tokens", default=None,
-                        help="optional comma-separated four-token Top input sequence")
+                        help="optional comma-separated 1..8 host-fed token sequence")
     parser.add_argument("--prefill-tokens", default=None,
                         help="optional comma-separated four-token KV prefill window")
     args = parser.parse_args()
@@ -163,15 +164,21 @@ def main() -> None:
                      if args.decode_tokens is not None else
                      model.get("incremental_decode_tokens",
                                model.get("prefill_tokens", [])[4:8]))
-    if (len(prefill_tokens) != 4 or len(decode_tokens) != 4 or
+    if (len(prefill_tokens) != 4 or not 1 <= len(decode_tokens) <= 8 or
             any(not isinstance(t, int) or not 0 <= t < len(embeddings)
                 for t in prefill_tokens + decode_tokens)):
-        raise ValueError("need four prefill and four incremental token IDs")
+        raise ValueError("need four prefill and one through eight incremental token IDs")
     shifts = model.get("gemm_shifts", {})
     shifts = {name: int(shifts.get(name, 0)) for name in
               ("qkv", "wo", "qk", "wup", "wdown", "lm_head")}
     if any(not 0 <= value <= 31 for value in shifts.values()):
         raise ValueError("all Matrix GEMM shifts must be in [0,31]")
+    activation_scales = model.get("activation_scales", {})
+    gelu_output_scale = int(activation_scales.get("gelu_output", 256))
+    if (gelu_output_scale < 1 or gelu_output_scale & (gelu_output_scale - 1) or
+            256 % gelu_output_scale):
+        raise ValueError("GELU output scale must be a power-of-two divisor of 256")
+    gelu_requant_shift = int(math.log2(256 // gelu_output_scale))
 
     def embedding_input(token: int, position: int) -> list[int]:
         return [max(-128, min(127, int(a) + int(b)))
@@ -405,11 +412,14 @@ def main() -> None:
 
     token_records: list[dict] = []
     for step, token_id in enumerate(decode_tokens):
-        token_position = 4 + step
-        stage_name = f"decode_t{token_position}"
+        absolute_position = 4 + step
+        cache_position = absolute_position % 8
+        visible_tokens = min(8, absolute_position + 1)
+        query_position = visible_tokens - 1
+        stage_name = f"decode_t{absolute_position}"
         kv_before = hash_cache()
         start, golden, poison = new_stage(stage_name)
-        input_row = embedding_input(token_id, 4 + step)
+        input_row = embedding_input(token_id, cache_position)
         input_rows = [input_row] + [[0] * 16 for _ in range(3)]
         input_i8 = mapper.tensor(
             f"{stage_name}_input_i8", (4, 16), "i8_packed",
@@ -441,14 +451,14 @@ def main() -> None:
                 if proj == "q":
                     decode_q[head] = quant[0][:]
                 if proj == "k":
-                    key_state[head][token_position] = quant[0][:]
+                    key_state[head][cache_position] = quant[0][:]
                 if proj == "v":
-                    value_state[head][token_position] = quant[0][:]
+                    value_state[head][cache_position] = quant[0][:]
 
         for head in range(2):
-            add_cache_append(stage_name, "k", head, token_position, 0,
+            add_cache_append(stage_name, "k", head, cache_position, 0,
                              decode_packed[("k", head)], key_cache)
-            add_cache_append(stage_name, "v", head, token_position, 0,
+            add_cache_append(stage_name, "v", head, cache_position, 0,
                              decode_packed[("v", head)], value_cache)
 
         kv_reads: dict[tuple[str, int], Tensor] = {}
@@ -493,8 +503,8 @@ def main() -> None:
                               row0_poison_only=True)
             mapper.add(f"{stage_name}_causal_softmax_h{head}",
                        OP_CAUSAL_SOFTMAX, scores, probs, k_or_length=8,
-                       aux0=token_position)
-            visible = softmax_q15(score_row[:token_position + 1])
+                       aux0=query_position)
+            visible = softmax_q15(score_row[:visible_tokens])
             prob_row = visible + [0] * (8 - len(visible))
             softmax_golden_by_head[head] = prob_row
             add_i32_prefix(golden, probs, prob_row)
@@ -590,11 +600,12 @@ def main() -> None:
                    k_or_length=64, aux0=1)
         add_i32(golden, gelu, gelu_rows)
         poison.update(gelu.addr + 4 * i for i in range(64))
-        gelu_i8_rows = [requant_i8(row, 0) for row in gelu_rows]
+        gelu_i8_rows = [requant_i8(row, gelu_requant_shift) for row in gelu_rows]
         gelu_i8 = empty_i8_tile(mapper, f"{stage_name}_gelu_i8", 4, 16)
         mapper.add(f"{stage_name}_gelu_requant", OP_REQUANT,
                    gelu, gelu_i8, m=4, n=16, k_or_length=64,
-                   flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1)
+                   flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A,
+                   shift=gelu_requant_shift, aux0=1)
         add_i8_tile_a(golden, gelu_i8, gelu_i8_rows)
         poison.update(gelu_i8.addr + 4 * i for i in range(16))
 
@@ -654,11 +665,13 @@ def main() -> None:
         # This is a single query row: 2 heads * (QK + AV) * head_dim * visible_tokens.
         useful = (3 * 16 * 16 + 2 * 8 * 16 + 2 * 16 * 16 +
                   (16 * len(weights["lm_head"][0]) if lm_head_b else 0) +
-                  2 * 2 * 8 * (token_position + 1))
+                  2 * 2 * 8 * visible_tokens)
         finish_stage(stage_name, start, golden, poison, useful,
-                     token_position, kv_before, logits_names)
+                     cache_position, kv_before, logits_names)
         token_records.append({
-            "token_position": token_position, "token_id_host_supplied": token_id,
+            "step": step, "absolute_position": absolute_position,
+            "cache_position": cache_position, "query_position": query_position,
+            "visible_tokens": visible_tokens, "token_id_host_supplied": token_id,
             "input_tensor_address": input_i8.addr,
             "final_tensor_address": norm2.addr,
             "final_tensor_row0_int32": norm2_rows[0],
@@ -724,7 +737,7 @@ def main() -> None:
 
     initial_path = args.out / "initial_memory.memh"
     manifest = {
-        "run_scope": "H16 2-head one-layer INT8 true incremental KV Append; tokens 0..3 populate KV; 4..7 run full decode block",
+        "run_scope": "H16 2-head one-layer INT8 persistent incremental KV Append; four-token prefill followed by host-fed decode steps in one Top session",
         "projection_policy": args.projection_policy,
         "model_name": model.get("model_name"),
         "model_scope": model.get("model_scope"),
@@ -740,7 +753,9 @@ def main() -> None:
         "incremental_decode_token_ids_host_supplied": decode_tokens,
         "cache_contract": {
             "capacity_tokens": 8, "prefill_positions": [0, 1, 2, 3],
-            "append_positions": [4, 5, 6, 7], "head_dim": 8,
+            "append_positions": [record["cache_position"] for record in token_records],
+            "window_policy": "8-entry ring; after capacity, overwrite the oldest slot; position embedding wraps modulo 8 and all eight live slots are visible",
+            "head_dim": 8,
             "heads": 2, "K_storage": "per-head Matrix-B physical [feature, token]",
             "V_storage": "per-head Matrix-B physical [token, feature]",
             "append_mechanism": "K uses legacy word-strided KV_WRITE; V uses opt-in ABI-v7 0x43 flags[0] byte-lane read/modify/write scatter",
@@ -766,7 +781,7 @@ def main() -> None:
     print(
         f"H16_INCREMENTAL_GENERATOR_PASS stages={len(stage_descs)} "
         f"prefill_desc={stage_manifest[0]['descriptor_count']} "
-        f"decode_steps=4 decode_desc={sum(s['descriptor_count'] for s in stage_manifest[1:])} "
+        f"decode_steps={len(decode_tokens)} decode_desc={sum(s['descriptor_count'] for s in stage_manifest[1:])} "
         f"model_sha256={manifest['model_sha256']} "
         f"initial_memory_sha256={manifest['initial_memory_sha256']}"
     )

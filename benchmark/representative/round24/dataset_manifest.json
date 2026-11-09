@@ -1,0 +1,10 @@
+{
+  "task": "synthetic finite-state next-token prediction; not natural-language pretraining",
+  "generator": "train_tiny_gpt2.make_sequences",
+  "train_seed": 20261123,
+  "heldout_seed": 20261125,
+  "heldout_sequences": 1024,
+  "tokens_per_sequence": 9,
+  "sha256": "e08a5d641e83fe5b5062ddcceccba512ee1bf3739a89aadabd62da54f429856f",
+  "test_positions": "teacher-forced logits at positions 4..7 predict tokens 5..8"
+}

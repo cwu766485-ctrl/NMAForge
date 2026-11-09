@@ -3791,6 +3791,8 @@ module tb_ai_accel_smoke;
         integer image_count;
         integer stage_idx;
         integer stage_count;
+        integer decode_steps;
+        integer stage_visible_tokens;
         integer desc_count;
         integer descriptor_base;
         integer completion_base;
@@ -3846,16 +3848,17 @@ module tb_ai_accel_smoke;
                           representative_image_words[2 + 2 * image_index]);
             end
             representative_load_measure = 1'b0;
-            stage_count = 5;
+            decode_steps = 4;
+            void'($value$plusargs("AI_H16_DECODE_STEPS=%d", decode_steps));
+            if (decode_steps < 1 || decode_steps > 8)
+                $fatal(1, "incremental H16 decode steps must be in [1,8], got=%0d",
+                       decode_steps);
+            stage_count = decode_steps + 1;
             for (stage_idx = 0; stage_idx < stage_count; stage_idx = stage_idx + 1) begin
-                case (stage_idx)
-                    0: stage_label = "prefill_kv_0_3";
-                    1: stage_label = "decode_t4";
-                    2: stage_label = "decode_t5";
-                    3: stage_label = "decode_t6";
-                    4: stage_label = "decode_t7";
-                    default: $fatal(1, "invalid incremental H16 stage index");
-                endcase
+                if (stage_idx == 0)
+                    stage_label = "prefill_kv_0_3";
+                else
+                    $sformat(stage_label, "decode_t%0d", stage_idx + 3);
                 $sformat(stage_desc_file, "%0s/stage_%0d_%0s_desc.memh",
                          workload_dir, stage_idx, stage_label);
                 $sformat(stage_golden_file, "%0s/stage_%0d_%0s_golden.memh",
@@ -4048,8 +4051,13 @@ module tb_ai_accel_smoke;
                     // projection, FFN, optional explicit LM-head MACs, and
                     // the single live query row's causal QK/AV work. The other
                     // physical rows and masked future keys are padding.
-                    useful_macs = 1536 + useful_macs_extra +
-                                  32 * (stage_idx + 4);
+                    begin
+                        stage_visible_tokens = stage_idx + 4;
+                        if (stage_visible_tokens > 8)
+                            stage_visible_tokens = 8;
+                        useful_macs = 1536 + useful_macs_extra +
+                                      32 * stage_visible_tokens;
+                    end
                 mac_per_cycle = 0.0;
                 array_utilization = 0.0;
                 if (stage_cycles > 0)
@@ -4067,7 +4075,8 @@ module tb_ai_accel_smoke;
                 axi_write(REG_CPLQ_SIZE, 32'd0);
                 clear_done_irq();
             end
-            $display("INCREMENTAL_DECODE_PASS prefill_tokens=4 append_tokens=4 capacity=8 kv_write=0x43 kv_read=0x44 full_block_steps=4 host_supplied_tokens=1");
+            $display("INCREMENTAL_DECODE_PASS prefill_tokens=4 append_tokens=%0d capacity=8 kv_write=0x43 kv_read=0x44 persistent_session=1 host_supplied_tokens=1 window_policy=ring8",
+                     decode_steps);
         end
     endtask
 
