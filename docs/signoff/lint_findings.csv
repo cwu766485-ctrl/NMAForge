@@ -1,0 +1,3 @@
+tool,run_id,source_sha,rule_or_class,result,detail,severity,waiver,log_sha256
+SpyGlass V-2023.12-SP1,R21-SPYGLASS-LINT-9FB7224,9fb722447f9f249ce7909451fc893c11ec9c3e58,Lint rule deck / elaboration,BLOCKED_RESOURCE,Process exited 137 during Matrix Core elaboration/synthesis at module 15/51; no current candidate lint report produced.,UNKNOWN_NO_REPORT,NONE,7acc8cbf120b0687cf8cfa904f440365908034a22342eea1c4019cbb88f97450
+Historical SpyGlass report (older source SHA 410b81d),HISTORICAL_ONLY,410b81d (not current),Historical lint summary,HISTORICAL_NOT_CURRENT,"0 errors, 465 warnings, 5 infos; counts are not transferable to reviewed SHA.",Historical distribution only,NONE claimed,NOT_CURRENT_EVIDENCE

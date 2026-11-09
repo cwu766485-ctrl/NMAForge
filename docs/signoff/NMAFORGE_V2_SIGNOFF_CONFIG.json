@@ -1,0 +1,58 @@
+{
+  "manifest_version": "1.0",
+  "review_status": "HOLD",
+  "repository": "cwu766485-ctrl/NMAForge",
+  "target_branch": "feature/npu-architecture-v2",
+  "reviewed_product_source_sha": "9fb722447f9f249ce7909451fc893c11ec9c3e58",
+  "review_checkout_tree_sha": "77606760f14464cd0ffd86610aa5b3f08466c82f",
+  "target_top": "ai_accel_top",
+  "parameters": {
+    "matrix_array": "16x16",
+    "int8_macs": 256,
+    "spad_banks": 4,
+    "spad_line_bits": 128,
+    "default_words_per_bank": 32768,
+    "default_total_capacity_bytes": 524288,
+    "research_override_words_per_bank": 8192,
+    "research_override_total_capacity_bytes": 131072,
+    "abi": "v7.4 / ABI-v7"
+  },
+  "supported_opcodes": {
+    "scalar_int8": "0x10-0x17",
+    "banked_cnm": "0x20-0x21",
+    "matrix": "0x30-0x31, 0x52-0x53",
+    "sfu": "0x32-0x39",
+    "macro": "0x40-0x42",
+    "kv": "0x43-0x44",
+    "mixed_fp": "0x50-0x51"
+  },
+  "clock_reset_assumptions": {
+    "top_smoke_clock_period_ns": 10.0,
+    "top_smoke_reset": "testbench-controlled synchronous active-low reset sequencing; no frequency signoff claim",
+    "formal_clock": "single abstract formal clock per harness",
+    "cdc_architecture": "single aclk domain; reset release still subject to RDC review"
+  },
+  "tool_versions": {
+    "VCS": "V-2023.12-SP1_Full64",
+    "SpyGlass": "V-2023.12-SP1",
+    "VC_Formal": "V-2023.12-SP2",
+    "Design_Compiler": "V-2023.12-SP1",
+    "Python": "3.12.13",
+    "NumPy": "2.4.6",
+    "ONNX": "1.17.0"
+  },
+  "constraints_manifest": {
+    "simulation": "VCS top smoke uses ACLK_PERIOD_NS=10.0 ns; simulation timing only",
+    "formal": "Matrix FSM and Completion ownership harnesses; assumptions remain harness scoped",
+    "cdc_rdc": "dv/spyglass project; reports are tool and resource limited; no blanket waivers",
+    "synthesis": "syn/run_round7_matrix_synth.tcl; standalone generic 4.0ns target and selected single-corner TT 0.9V RVT library from authorized local setup; no foundry files copied",
+    "sram": "functional models only; no compatible 128KiB macro adapter/mapped macro result in this review"
+  },
+  "evidence_policy": "Only tests explicitly run at the reviewed product SHA are current evidence. Existing RTM statuses remain unchanged; 128KiB smoke is not treated as pass; no signoff disposition inferred from aggregate coverage.",
+  "formal_harness_delta": {
+    "file": "dv/block/command_processor/formal/cp_completion_ownership_formal_top.sv",
+    "sha256": "b99d697b844a58ccf66fc90cb964c2ada219e0cc3d4d82f67ddab5b0c2cc8a45",
+    "change": "Declared the two dependency event inputs required by the current command processor; left unconstrained/free; no product RTL changed."
+  },
+  "test_identity_note": "Product RTL source remains reviewed SHA. The completion formal harness has the supplemental interface-only change recorded above; all other test source is from the reviewed checkout."
+}

@@ -17,6 +17,8 @@ module cp_completion_ownership_formal_top (
     input logic completion_protected,
     input logic cplq_tail_load,
     input logic [31:0] cplq_tail_seed,
+    input logic dependency_events_load,
+    input logic [15:0] dependency_events_seed,
     input logic [7:0] cfg_op,
     input logic [31:0] cfg_src0,
     input logic [31:0] cfg_src1,

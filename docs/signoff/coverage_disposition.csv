@@ -1,0 +1,20 @@
+metric,value,scope,disposition
+merged URG group score,83.94%,3-seed Compute Cluster UVM merged database,PARTIAL; not a signoff percentage
+merged line coverage,70.03%,mixed UVM hierarchy,unhit items not all dispositioned; reachability unknown unless separately proven
+merged condition coverage,67.85%,mixed UVM hierarchy,unhit items not all dispositioned
+merged FSM coverage,44.23%,mixed UVM hierarchy,not Matrix-only; cannot use as a global closure metric
+merged branch coverage,66.84%,mixed UVM hierarchy,unhit items not all dispositioned
+merged assertion coverage,72%,mixed UVM hierarchy,"17/22 properties with success; 5 uncovered, 0 failure/incomplete; 2 no attempts"
+module-definition line/condition/FSM/branch,68.31% / 65.98% / 40.16% / 65.10%,module-definition aggregate,not DUT-only signoff
+selected cluster_cg,100% (selected group only),Compute Cluster functional group,cannot imply all groups/requirements closed
+AXI stall covers,AR=0 AW=0 W=1 match,compute-only UVM; mixed E2E separately sees AR/AW/W=14/5/12,two UVM covers remain unhit; mixed E2E has no mergeable coverage database
+Matrix FSM raw transitions,49/53 default profile,16x16 prefetch-enabled Matrix Core,5 relevant guards proved and dispositioned; 4 remaining bins not globally closed
+a_ar_burst_stays_within_4k,no real success in this compute-only coverage merge,top AXI SVA,Reachability not adjudicated; mixed E2E protocol run is separate and lacks mergeable coverage DB
+a_aw_burst_stays_within_4k,no real success in this compute-only coverage merge,top AXI SVA,Reachability not adjudicated; mixed E2E protocol run is separate and lacks mergeable coverage DB
+a_ar_payload_stable_until_accept,uncovered in merged Compute Cluster UVM evidence,top AXI SVA,Not a pass; targeted mixed E2E does not provide same URG database
+a_aw_payload_stable_until_accept,uncovered in merged Compute Cluster UVM evidence,top AXI SVA,Not a pass; targeted mixed E2E does not provide same URG database
+uvm_reg_do_read / uvm_reg_do_write,no attempts,UVM RAL internal assertions,"No attempt is not a pass; not applicable to the current compute-only sequence, disposition remains open"
+c_ar_stall_then_accept,0 matches,top AXI SVA cover,Not hit in Compute Cluster UVM; mixed E2E separate run observed AR stall-to-accept 14 times but no merged coverage DB
+c_aw_stall_then_accept,0 matches,top AXI SVA cover,Not hit in Compute Cluster UVM; mixed E2E separate run observed AW stall-to-accept 5 times but no merged coverage DB
+c_w_stall_then_accept,1 match,top AXI SVA cover,Hit once in Compute Cluster UVM
+Matrix FSM uncovered transitions,4 of 53 raw transitions remain unhit in default profile,16x16 Matrix FSM,The documented guard properties are proven for scoped legal assumptions; remaining raw bins are not globally declared unreachable or waived

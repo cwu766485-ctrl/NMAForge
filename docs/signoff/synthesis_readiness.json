@@ -1,0 +1,55 @@
+{
+  "status": "HOLD_BLOCKED_NO_VALID_MAPPED_RESULT",
+  "source_sha": "9fb722447f9f249ce7909451fc893c11ec9c3e58",
+  "tool": "Design Compiler V-2023.12-SP1",
+  "target_library": "authorized local single-corner TT 0.9 V RVT database selected at runtime; private path and library names intentionally omitted",
+  "constraints": "existing syn/run_round7_matrix_synth.tcl, 4.0 ns generic standalone clock; not product signoff SDC",
+  "runs": [
+    {
+      "run_id": "R21-DC-MATRIX-CORE-INITIAL-9FB7224",
+      "top": "ai_tensor_matrix_core",
+      "array_size": 16,
+      "compile": "medium",
+      "timeout_s": 600,
+      "result": "FAIL_INTERNAL_TOOL_ERROR",
+      "detail": "Analyze/elaborate/link proceeded and technology mapping began. The script emitted CMD-005 for unsupported get_operating_conditions but continued. DC then raised Fatal: Internal system error; no mapped netlist or mapped reports. Wall time about 5m09s; peak RSS about 3.28 GB.",
+      "log_sha256": "a8fc555aaa1af517ada89d337fc06b19c5b7ee231c4e3f40bcfd2f3e64bb54cd",
+      "evidence_paths": [
+        "/tmp/nmaforge_round21_dc_matrix_core/ai_tensor_matrix_core_16_medium_4p0ns/console.log",
+        "/tmp/nmaforge_round21_dc_matrix_core/ai_tensor_matrix_core_16_medium_4p0ns/resource_usage.txt"
+      ],
+      "resource_usage_sha256": "8ccb5f139877be3cd1f587c9bc5eca86032db9fd72aaa87a69c5767b0fea2844"
+    },
+    {
+      "run_id": "R21-DC-MATRIX-CORE-RETRY-NO-OPCOND-9FB7224",
+      "top": "ai_tensor_matrix_core",
+      "array_size": 16,
+      "compile": "medium",
+      "timeout_s": 600,
+      "result": "FAIL_INTERNAL_TOOL_ERROR",
+      "detail": "Retry removed only the unsupported operating-condition query, leaving top/library/constraints/mapping mode unchanged. Technology mapping again ended in DC internal fatal; no valid mapped result. Wall time 4m44s; peak RSS 3,319,748 KiB; exit 1.",
+      "log_sha256": "e9d17c55c6564abedb17d37bd681ba6b12c1380b758dd053c1829bcae1649149",
+      "resource_usage_sha256": "2cabe9d3fed2eb2431cef0ef716cfed212a5dcef10288b0f94ac37c4c52e3950"
+    },
+    {
+      "run_id": "R21-DC-MATRIX-ARRAY-16-600S-9FB7224",
+      "top": "ai_tensor_matrix_array",
+      "array_size": 16,
+      "compile": "medium",
+      "timeout_s": 600,
+      "result": "TIMEOUT_NO_MAPPED_RESULT",
+      "detail": "Bounded standalone 16x16 array diagnostic reached the area-recovery/cleanup portion but did not complete before 600 s. Wall time 600.12s; peak RSS 2,184,912 KiB; exit 124. No netlist or timing report.",
+      "log_sha256": "2310dcf2b8ef7ae1f988efabb7d42a80f964d7410b07bcd638522a8ea0a3a2bb",
+      "resource_usage_sha256": "171d2a214d981bd19e1acba9038a9134f12ff22cac363dba611ae5ee33033eea"
+    }
+  ],
+  "mapped_netlist": "NOT_AVAILABLE",
+  "mapped_area": "NOT_AVAILABLE",
+  "wns_tns": "NOT_AVAILABLE",
+  "worst_paths": "NOT_AVAILABLE",
+  "power": "NOT_AVAILABLE",
+  "check_design_pre_mapping": "259 potential issues before technology mapping in Matrix Core check_design; this is not a mapped lint or signoff report.",
+  "sram_adapter": "No macro adapter evidence produced; this review used behavioral SPAD only.",
+  "private_material_policy": "No foundry, SRAM, Liberty, license, or private server files included.",
+  "attempt_limit": "Two Matrix Core attempts and one standalone Array diagnostic, all bounded to 600 seconds. No further retries in Round 21."
+}
