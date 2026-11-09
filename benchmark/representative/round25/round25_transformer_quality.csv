@@ -1,0 +1,8 @@
+round,variant,gelu_scale,path,accuracy_pct,cross_entropy_nats,perplexity,model_sha256,top_rtl,scope
+R24 baseline,original FP32 checkpoint,N/A,FP32,82.1289,0.58527,1.79548,556c89639eda5b76f820d88c287530d2b8db75b482f44a8c9181fbc417365500,N/A,same heldout decode positions 4..7
+R24 baseline,initial scalar INT8,64 contract unavailable / initial shift0,Independent INT8,8.7158,30.3991,15900000000000.0,e557225f55db9699ba2c5b5e60c904fc1adbda7043437ea2b17909127f5b1c36,NOT_RUN,same heldout decode positions 4..7
+R24 baseline,best calibrated PTQ,64,Independent INT8,38.916,6.03357,417.2,9ed203ef73b8a4480817f07f7f967620c4d55a891086b788b7708f3f8d112cef,NOT_RUN in Round25,same heldout decode positions 4..7
+R24 baseline,"QAT 120 epoch, norm16/gelu64/wdown16",64,Independent INT8,38.0615,2.3876,10.887,530471bee248a3271325c00f6b635f9cab3b445f5c370eb1785905beed338b44,R24 Top PASS bit-exact for this older QAT artifact; not Round25,same heldout decode positions 4..7
+R25,"QAT 120 epoch, norm16/gelu32/wdown16",32,Independent INT8,65.0146,1.24142,3.4605,58a503cb151bf903059c105b2ef08bd970a2867a686903c7e978646fd7f92369,NOT_RUN,same heldout decode positions 4..7
+R25,"QAT 120 epoch, norm16/gelu16/wdown16",16,Independent INT8,74.4629,0.787709,2.198355,e7a521c762b66e5754d6d95c411c163452e0c9b01088cb11631202338cd28225,NOT_RUN,same heldout decode positions 4..7
+R25,QAT GELU16 candidate FP32 checkpoint,16,post-QAT FP32,62.8174,1.29041,3.63428,e7a521c762b66e5754d6d95c411c163452e0c9b01088cb11631202338cd28225,NOT_RUN,same heldout decode positions 4..7

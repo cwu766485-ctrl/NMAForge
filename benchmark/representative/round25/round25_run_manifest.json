@@ -1,0 +1,86 @@
+{
+  "cnn": {
+    "command_cycles": 12947,
+    "dataset_sha256": "f6d9e39f37dc45d327f6db33428ee58970ccceabb2535a5c179de35886b70443",
+    "dma_payload_bytes": 10944,
+    "dma_setup_transfer_cycles": 3019,
+    "golden_sha256": "3c8f8db5b4011c04656c40d1df683799414caa6bbadb52b05029f6253de0020f",
+    "golden_words": 20800,
+    "input_memory_sha256": "7d2dea09ee8003d15fa05dfacdfd078697482173cabb061ff5a43e1a87666e17",
+    "load_plus_command_cycles": 15966,
+    "model_sha256": "763a86d8a4ad508bd3ec34106163891f26870a98868889b0bc6c8bfe285370f8",
+    "output_readback_postprocess": "not included",
+    "payload_manifest_sha256": "8033eecfa52fee9c239c6aed43baf6b045be47be2c62e33ae2b1ec27f1f81e29",
+    "payload_sha256": "17348f66d0ba20d85a2dc04381a84636050b77d3572f38ce89a18dfdc6f44b62",
+    "payload_summary_sha256": "eea8407a434a1783dc2386f934cb3c38c863a6fb93bd449ef968b63a6a33600d",
+    "preprocessing_scope": "im2col subroutine only; full host preprocessing not timed",
+    "run_log_sha256": "2895e65f07f0269a62d3d26b3614039e90effe4c2a2ed9cb2a2ddf8045c03681",
+    "sample_index": 42,
+    "simulation_seed": 20261125,
+    "test_rank": 0,
+    "weights_sha256": "0d772a4d569814b67aefe7dabe596f43cf275b3aa26df4a529f3a3e83bbd3e6c"
+  },
+  "commands": {
+    "analyze_gelu16": "/tmp/nmaforge_round23_torch/bin/python sw/tools/analyze_tiny_gpt2_quantization.py --model /tmp/nmaforge_round25_qat_gelu16.json --float-checkpoint /tmp/nmaforge_round25_qat_gelu16_ckpt/tiny_gpt2_h16_post_qat_fp32.pt --out /tmp/nmaforge_round25_qat_gelu16_quality --seed 20261123 --epochs 120 --train-sequences 4096 --test-sequences 1024",
+    "analyze_gelu32": "/tmp/nmaforge_round23_torch/bin/python sw/tools/analyze_tiny_gpt2_quantization.py --model /tmp/nmaforge_round25_qat_gelu32.json --float-checkpoint /tmp/nmaforge_round25_qat_gelu32_ckpt/tiny_gpt2_h16_post_qat_fp32.pt --out /tmp/nmaforge_round25_qat_gelu32_quality.json --seed 20261123 --epochs 120 --train-sequences 4096 --test-sequences 1024",
+    "cnn_dma": "make -C dv/subsystem/top_smoke/sim ai_representative_trained_cnn_dma AI_REPRESENTATIVE_DMA_RUN=/tmp/nmaforge_round25_trained_cnn_dma AI_REPRESENTATIVE_DMA_PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python AI_REPRESENTATIVE_DMA_SEED=20261125 AI_REPRESENTATIVE_DMA_TEST_RANK=0",
+    "qat_gelu16": "/tmp/nmaforge_round23_torch/bin/python sw/tools/train_tiny_gpt2.py --out /tmp/nmaforge_round25_qat_gelu16.json --seed 20261123 --epochs 120 --train-sequences 4096 --test-sequences 1024 --norm-output-scale 16 --gelu-output-scale 16 --wdown-weight-scale 16 --qat-epochs 120 --qat-lr 0.0002 --float-checkpoint-dir /tmp/nmaforge_round25_qat_gelu16_ckpt",
+    "qat_gelu32": "/tmp/nmaforge_round23_torch/bin/python sw/tools/train_tiny_gpt2.py --out /tmp/nmaforge_round25_qat_gelu32.json --seed 20261123 --epochs 120 --train-sequences 4096 --test-sequences 1024 --norm-output-scale 16 --gelu-output-scale 32 --wdown-weight-scale 16 --qat-epochs 120 --qat-lr 0.0002 --float-checkpoint-dir /tmp/nmaforge_round25_qat_gelu32_ckpt",
+    "tiny": "TINYNPU_BENCH_OUT=/tmp/nmaforge_round25_tiny SEED=20261125 BENCH_RUN_ID=R25-TINY-20261109 TINY_NPU_ROOT=/tmp/nmaforge_round25_tiny/reference/source TINYNPU_WORK_ROOT=/tmp/nmaforge_round25_tiny/reference VERILATOR=/tmp/nmaforge_verilator_5.052/bin/verilator PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python JOBS=2 bash benchmark/tinynpu/run_comparison.sh"
+  },
+  "disposition": "PARTIAL",
+  "product_rtl_tree_sha256": "fae8778d62c06c324bf5be0b5cbfea6843141e08",
+  "round": "25",
+  "run_ids": {
+    "tiny_benchmark": "R25-TINY-20261109",
+    "trained_cnn_dma": "R25-CNN-DMA-20261125-R0",
+    "transformer_qat_gelu16": "R25-QAT-GELU16-S20261123",
+    "transformer_qat_gelu32": "R25-QAT-GELU32-S20261123"
+  },
+  "source_sha": "1354626f9a41229b698fd2ada031a2c3916cb42c",
+  "tiny_benchmark": {
+    "classifications": {
+      "common_mini_cnn": "NOT_COMPARABLE for speedup; same model/input/Golden but endpoints differ",
+      "gemv": "NOT_RERUN in Round25 script",
+      "matched_gemm": "MIXED_MEASURED_MODELED",
+      "transformer_subgraph": "NOT_RUN"
+    },
+    "cnn_csv_sha256": "c593b5464c0e196fd21ad408b037a2dc2c59aea066bbfeed7a12617f55bb3863",
+    "cnn_summary_sha256": "36925d4259ce7991cfb1b68b5121f0bdb3321627b6d8583cf31a7cab4d4320a1",
+    "matched_gemm_csv_sha256": "157099f79bc1d34df7bff0153460eadca570712848820bcd298b429878e43def",
+    "matrix_memory_model": {
+      "bandwidth_bytes_per_cycle": 16,
+      "line_bytes": 16,
+      "read_response_latency_cycles": 1,
+      "tinynpu_load_compute_store_serialized": true
+    },
+    "mini_cnn_input_sha256": "a74587bfcb5b2dfcd9eed1dbbb4fcf657628264c3b0aae7a4c278f0f70705898",
+    "mini_cnn_model_sha256": "1ac385ac18394ac5826a7eb426e99c2199bf6417055f7e3f461c40c1b1811640",
+    "run_summary_sha256": "ab308f69a0f638ac9fbf3982d9bda69e3579e1d1fdfc26d6dd71305c46a4e60c",
+    "seed": 20261125
+  },
+  "tiny_npu_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+  "tools": {
+    "numpy": "2.4.6",
+    "onnx": "1.17.0",
+    "python": "3.12.13",
+    "pytorch": "2.7.1+cpu",
+    "vcs": "V-2023.12-SP1_Full64",
+    "verilator": "5.052 2026-09-05 rev v5.052"
+  },
+  "transformer": {
+    "architecture": "synthetic finite-state H16, 2 heads, 1 layer, context 8, vocab32, Post-LN",
+    "heldout_seed": 20261125,
+    "heldout_sequences": 1024,
+    "new_weights_top_rtl": "NOT_RUN; software independent INT8 evaluation only",
+    "qat_epochs": 120,
+    "qat_lr": 0.0002,
+    "scored_positions": "4..7 (4096 teacher-forced predictions)",
+    "source_hashes": {
+      "analyzer_sha256": "81f1aed1fc3bf5ad56816f04ada99c8973c603cb8873aea4fd843ef2798212fc",
+      "trainer_sha256": "96f98a7dd100baa6282bcb9697266c70626963fbc9250391f237b9d87d4f24d2"
+    },
+    "train_seed": 20261123,
+    "train_sequences": 4096
+  }
+}
