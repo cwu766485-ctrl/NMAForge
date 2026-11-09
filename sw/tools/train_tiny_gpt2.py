@@ -87,9 +87,11 @@ class TinyPostLNDecoder(nn.Module):
         return self.lm_head(x)
 
     def forward_qat(self, tokens: torch.Tensor, norm_scale: int = 16,
-                    gelu_scale: int = 64, wdown_scale: int = 16) -> torch.Tensor:
+                    gelu_scale: int = 64, wdown_scale: int = 16,
+                    return_trace: bool = False):
         """Fake-quant forward matching the exported INT8/Q8.8 datapath."""
         batch, length = tokens.shape
+        trace: dict[str, torch.Tensor] = {}
 
         def qweight(layer: nn.Linear, scale: int) -> torch.Tensor:
             return fake_quant(layer.weight, scale, -128, 127)
@@ -98,6 +100,7 @@ class TinyPostLNDecoder(nn.Module):
         emb = fake_quant(self.token_embedding(tokens), 8, -128, 127)
         pos = fake_quant(self.position_embedding(positions)[None, :, :], 8, -128, 127)
         x0 = fake_quant(emb + pos, 8, -128, 127)
+        trace["embedding_position"] = x0
 
         qw = qweight(self.q, 16)
         kw = qweight(self.k, 16)
@@ -108,18 +111,22 @@ class TinyPostLNDecoder(nn.Module):
         q = q.view(batch, length, HEADS, HEAD_DIM).transpose(1, 2)
         k = k.view(batch, length, HEADS, HEAD_DIM).transpose(1, 2)
         v = v.view(batch, length, HEADS, HEAD_DIM).transpose(1, 2)
+        trace.update({"q": q, "k": k, "v": v})
 
         scores = torch.matmul(q, k.transpose(-1, -2)) / 4.0
         causal = torch.triu(torch.ones(length, length, dtype=torch.bool,
                                        device=tokens.device), diagonal=1)
         scores = scores.masked_fill(causal[None, None, :, :], float("-inf"))
+        trace["scores"] = scores
         # RTL consumes Q8.8 log2 scores and evaluates exp2, so ln(2) converts
         # them to the equivalent natural-exponential softmax domain.
         prob = torch.softmax(scores * math.log(2.0), dim=-1)
         prob_q15 = fake_quant(prob, 32768, 0, 32768, "floor")
         prob_i8 = fake_quant(prob_q15, 128, 0, 127, "floor")
+        trace["probabilities"] = prob_q15
         av = torch.matmul(prob_i8, v)
         av = fake_quant(av, 8, -128, 127, "floor")
+        trace["av"] = av
 
         wo = qweight(self.wo, 16)
         head_projection = []
@@ -127,8 +134,11 @@ class TinyPostLNDecoder(nn.Module):
             panel = wo[:, head * HEAD_DIM:(head + 1) * HEAD_DIM]
             partial = F.linear(av[:, head], panel)
             head_projection.append(fake_quant(partial, 8, -(1 << 31), (1 << 31) - 1, "floor"))
+        trace["head_projection"] = torch.stack(head_projection, dim=1)
         merged = torch.stack(head_projection, dim=0).sum(dim=0)
+        trace["merged"] = merged
         residual1 = fake_quant(merged + x0, 8, -(1 << 31), (1 << 31) - 1, "floor")
+        trace["residual1"] = residual1
 
         # The RTL LN output is integer Q-format. Export scales its affine
         # coefficients so the INT8 boundary retains `norm_scale` fractional
@@ -136,27 +146,38 @@ class TinyPostLNDecoder(nn.Module):
         ln1 = F.layer_norm(residual1, (HIDDEN,), self.ln1.weight, self.ln1.bias,
                            eps=1.0 / (8.0 * 8.0))
         ln1_q = fake_quant(ln1, norm_scale, -128, 127, "floor")
+        trace["layernorm1"] = ln1_q
         wup = qweight(self.up, 256)
         up = F.linear(ln1_q, wup)
         up = fake_quant(up, 256, -(1 << 31), (1 << 31) - 1, "floor")
+        trace["ffn_up"] = up
 
         up_q8_8 = fake_quant(up, 256, -(1 << 31), (1 << 31) - 1, "floor")
         gelu = torch.where(up_q8_8 <= -2.0, torch.zeros_like(up_q8_8),
                            torch.where(up_q8_8 >= 2.0, up_q8_8,
                                        up_q8_8 * (up_q8_8 + 2.0) / 4.0))
         gelu = fake_quant(gelu, 256, -(1 << 31), (1 << 31) - 1, "floor")
+        trace["gelu"] = gelu
         gelu_i8 = fake_quant(gelu, gelu_scale, -128, 127, "floor")
+        trace["gelu_i8"] = gelu_i8
 
         down = F.linear(gelu_i8, qweight(self.down, wdown_scale))
         down = fake_quant(down, norm_scale, -(1 << 31), (1 << 31) - 1, "floor")
+        trace["ffn_down"] = down
         residual2 = fake_quant(down + ln1_q, norm_scale,
                                -(1 << 31), (1 << 31) - 1, "floor")
+        trace["residual2"] = residual2
         ln2 = F.layer_norm(residual2, (HIDDEN,), self.ln2.weight, self.ln2.bias,
                            eps=1.0 / float(norm_scale * norm_scale))
         ln2_q = fake_quant(ln2, norm_scale, -128, 127, "floor")
+        trace["layernorm2"] = ln2_q
         lm_weight = fake_quant(self.token_embedding.weight, 8, -128, 127)
         logits = F.linear(ln2_q, lm_weight)
-        return fake_quant(logits, 8, -(1 << 31), (1 << 31) - 1, "floor")
+        logits = fake_quant(logits, 8, -(1 << 31), (1 << 31) - 1, "floor")
+        trace["logits"] = logits
+        if return_trace:
+            return logits, trace
+        return logits
 
     def forward(self, tokens: torch.Tensor) -> torch.Tensor:
         return self.forward_float(tokens)

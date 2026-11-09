@@ -1,0 +1,153 @@
+{
+  "status": "PARTIAL_INT8_QUALITY_NOT_RECOVERED",
+  "evaluation": "1024 fixed held-out synthetic sequences; four teacher-forced decode positions per sequence; 4096 prediction tokens; independent scalar INT8 reference",
+  "base_float_model_sha256": "e557225f55db9699ba2c5b5e60c904fc1adbda7043437ea2b17909127f5b1c36",
+  "baseline_float_decode_positions_4_to_7": {
+    "accuracy": 0.8212890625,
+    "cross_entropy_nats": 0.5852722525596619,
+    "perplexity": 1.795479743060021
+  },
+  "baseline_static_int8_decode_positions_4_to_7": {
+    "accuracy": 0.087158203125,
+    "cross_entropy_nats": 30.39912959599184,
+    "perplexity": 15928476466190.965
+  },
+  "trials": [
+    {
+      "label": "PTQ norm=8 gelu=64 wdown=16",
+      "kind": "PTQ",
+      "model_sha256": "982c4e0fd4977d21fb148ba18b151ce3dae5106146678d4834bf42176e9779c1",
+      "reference_sha256": "6d212e69a0ffd4c6dcf922e128591aeb49a3a1d541babc142ab642862d2177a4",
+      "quantization_scales": {
+        "gelu_output": 64,
+        "layernorm_output": 8,
+        "wdown_weight": 16
+      },
+      "gemm_shifts": {
+        "lm_head": 3,
+        "qk": 0,
+        "qkv": 4,
+        "wdown": 7,
+        "wo": 4,
+        "wup": 3
+      },
+      "qat_epochs": 0,
+      "qat_learning_rate": null,
+      "heldout_decode_positions_4_to_7": {
+        "tokens": 4096,
+        "next_token_accuracy": 0.37548828125,
+        "cross_entropy_nats": 6.419323682356615,
+        "perplexity": 613.5879933789411
+      }
+    },
+    {
+      "label": "PTQ norm=16 gelu=64 wdown=16",
+      "kind": "PTQ",
+      "model_sha256": "9ed203ef73b8a4480817f07f7f967620c4d55a891086b788b7708f3f8d112cef",
+      "reference_sha256": "0b3451e058f65636e92ea17709be2bf402ed3f7910ba5e72a039d216802d82e5",
+      "quantization_scales": {
+        "gelu_output": 64,
+        "layernorm_output": 16,
+        "wdown_weight": 16
+      },
+      "gemm_shifts": {
+        "lm_head": 4,
+        "qk": 0,
+        "qkv": 4,
+        "wdown": 6,
+        "wo": 4,
+        "wup": 4
+      },
+      "qat_epochs": 0,
+      "qat_learning_rate": null,
+      "heldout_decode_positions_4_to_7": {
+        "tokens": 4096,
+        "next_token_accuracy": 0.38916015625,
+        "cross_entropy_nats": 6.0335714082904435,
+        "perplexity": 417.20237185709044
+      }
+    },
+    {
+      "label": "PTQ norm=32 gelu=64 wdown=16",
+      "kind": "PTQ",
+      "model_sha256": "1fa0b6f17a179a376e00abf179000c2e39bc80dbca75c0cee932d8f252588a38",
+      "reference_sha256": "51de35f7e63bd70b5072f1894536a7c01956e72ca6e276e22b25d86f43f3515f",
+      "quantization_scales": {
+        "gelu_output": 64,
+        "layernorm_output": 32,
+        "wdown_weight": 16
+      },
+      "gemm_shifts": {
+        "lm_head": 5,
+        "qk": 0,
+        "qkv": 4,
+        "wdown": 5,
+        "wo": 4,
+        "wup": 5
+      },
+      "qat_epochs": 0,
+      "qat_learning_rate": null,
+      "heldout_decode_positions_4_to_7": {
+        "tokens": 4096,
+        "next_token_accuracy": 0.30126953125,
+        "cross_entropy_nats": 6.26010201559028,
+        "perplexity": 523.2723193197311
+      }
+    },
+    {
+      "label": "QAT norm=16 gelu=64 wdown=16 epochs=40",
+      "kind": "QAT",
+      "model_sha256": "7284146e518882986cfb3d392e300fa6b6ebec85284436742a24082469891a72",
+      "reference_sha256": "a3a5b8e45de6a473e9751e8a42de580bb041d5599e7ed2b3758823f0221ec078",
+      "quantization_scales": {
+        "gelu_output": 64,
+        "layernorm_output": 16,
+        "wdown_weight": 16
+      },
+      "gemm_shifts": {
+        "lm_head": 4,
+        "qk": 0,
+        "qkv": 4,
+        "wdown": 6,
+        "wo": 4,
+        "wup": 4
+      },
+      "qat_epochs": 40,
+      "qat_learning_rate": 0.0005,
+      "heldout_decode_positions_4_to_7": {
+        "tokens": 4096,
+        "next_token_accuracy": 0.38525390625,
+        "cross_entropy_nats": 2.4262858612438536,
+        "perplexity": 11.316771865839431
+      }
+    },
+    {
+      "label": "QAT norm=16 gelu=64 wdown=16 epochs=120",
+      "kind": "QAT",
+      "model_sha256": "530471bee248a3271325c00f6b635f9cab3b445f5c370eb1785905beed338b44",
+      "reference_sha256": "aba728a861f3b63f79032c8b1666ea18486b2e6d900cef47b4067e9571d76da1",
+      "quantization_scales": {
+        "gelu_output": 64,
+        "layernorm_output": 16,
+        "wdown_weight": 16
+      },
+      "gemm_shifts": {
+        "lm_head": 4,
+        "qk": 0,
+        "qkv": 4,
+        "wdown": 6,
+        "wo": 4,
+        "wup": 4
+      },
+      "qat_epochs": 120,
+      "qat_learning_rate": 0.0002,
+      "heldout_decode_positions_4_to_7": {
+        "tokens": 4096,
+        "next_token_accuracy": 0.380615234375,
+        "cross_entropy_nats": 2.387595182704557,
+        "perplexity": 10.887280515938475
+      }
+    }
+  ],
+  "interpretation": "PTQ norm scale 16 gives the highest PTQ accuracy, while QAT 120 has the best tested cross-entropy/perplexity. Neither restores the original FP32 model quality; QAT is a new fine-tuned weight set and its FP32 and fake-quant measurements are reported separately in the final model metadata."
+}

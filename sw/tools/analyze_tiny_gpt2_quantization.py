@@ -56,6 +56,20 @@ def retrain(trainer, seed: int, epochs: int, train_sequences: int):
     return model
 
 
+def load_float_checkpoint(trainer, path: Path):
+    checkpoint = torch.load(path, map_location="cpu", weights_only=False)
+    architecture = checkpoint.get("architecture", {})
+    expected = {"hidden": trainer.HIDDEN, "heads": trainer.HEADS,
+                "head_dim": trainer.HEAD_DIM, "layers": 1,
+                "context": trainer.CONTEXT, "vocab": trainer.VOCAB}
+    if architecture != expected:
+        raise ValueError(f"checkpoint architecture mismatch: {architecture} != {expected}")
+    model = trainer.TinyPostLNDecoder()
+    model.load_state_dict(checkpoint["state_dict"], strict=True)
+    model.eval()
+    return model
+
+
 def float_trace(model, trainer, tokens: torch.Tensor) -> dict[str, torch.Tensor]:
     batch, length = tokens.shape
     positions = torch.arange(length)
@@ -112,6 +126,30 @@ def q_vectors(trace: dict, position: int) -> dict[str, list[list[int]]]:
     return result
 
 
+def torch_groups(trace: dict[str, torch.Tensor], name: str, batch_index: int,
+                 position: int) -> list[list[float]]:
+    value = trace[name]
+    if name in ("scores", "probabilities"):
+        selected = value[batch_index, :, position, :position + 1]
+    elif name in ("q", "k", "v", "av", "head_projection"):
+        selected = value[batch_index, :, position, :]
+    else:
+        selected = value[batch_index, position, :].unsqueeze(0)
+    return [[float(x) for x in row] for row in selected.detach().cpu().tolist()]
+
+
+def compare_groups(expected: list[list[float]], actual: list[list[float]]) -> dict[str, float]:
+    if len(expected) != len(actual) or any(len(a) != len(b) for a, b in zip(expected, actual)):
+        raise ValueError("layerwise comparison tensor shape mismatch")
+    errors = [a - b for exp, got in zip(expected, actual) for a, b in zip(exp, got)]
+    top1 = sum(max(range(len(a)), key=a.__getitem__) ==
+               max(range(len(b)), key=b.__getitem__)
+               for a, b in zip(expected, actual) if a) / max(1, sum(bool(a) for a in expected))
+    return {"mae": sum(abs(e) for e in errors) / max(1, len(errors)),
+            "rmse": math.sqrt(sum(e * e for e in errors) / max(1, len(errors))),
+            "top1_agreement": top1}
+
+
 BASE_SCALES = {
     "embedding_position": 8, "q": 8, "k": 8, "v": 8,
     "scores": 256, "probabilities": 32768, "av": 1024,
@@ -130,6 +168,8 @@ SATURATION_KEYS = {"q_i8": "q", "k_i8": "k", "v_i8": "v",
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=Path, required=True)
+    parser.add_argument("--float-checkpoint", type=Path, default=None,
+                        help="compare against this matching FP32 state_dict instead of retraining")
     parser.add_argument("--trainer", type=Path, default=Path(__file__).with_name("train_tiny_gpt2.py"))
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--seed", type=int, default=20261123)
@@ -140,7 +180,14 @@ def main() -> None:
     trainer = load_trainer(args.trainer)
     model_bytes = args.model.read_bytes()
     int_model = json.loads(model_bytes)
-    float_model = retrain(trainer, args.seed, args.epochs, args.train_sequences)
+    if args.float_checkpoint is None:
+        float_model = retrain(trainer, args.seed, args.epochs, args.train_sequences)
+        float_checkpoint_sha = None
+        float_source = "deterministically retrained FP32 checkpoint"
+    else:
+        float_model = load_float_checkpoint(trainer, args.float_checkpoint)
+        float_checkpoint_sha = hashlib.sha256(args.float_checkpoint.read_bytes()).hexdigest()
+        float_source = args.float_checkpoint.name
     tests = trainer.make_sequences(args.test_sequences, args.seed + 2)
     x_test = torch.tensor([s[:trainer.CONTEXT] for s in tests], dtype=torch.long)
     y_test = torch.tensor([s[1:trainer.CONTEXT + 1] for s in tests], dtype=torch.long)
@@ -165,6 +212,33 @@ def main() -> None:
                   "ffn_down", "residual2"):
         scales[stage] = norm_scale
     scales["gelu_i8"] = gelu_scale
+    with torch.no_grad():
+        _, fake_trace = float_model.forward_qat(
+            x_test, norm_scale=norm_scale, gelu_scale=gelu_scale,
+            wdown_scale=int(activation_scales.get("wdown_weight", 8)),
+            return_trace=True)
+    triplet_specs = [
+        ("embedding_position", "embedding_position", "embedding_position", "embedding_position", 8),
+        ("q", "q", "q", "q", 8), ("k", "k", "k", "k", 8),
+        ("v", "v", "v", "v", 8), ("scores", "scores", "scores", "scores", 256),
+        ("probabilities", "probabilities", "probabilities", "probabilities", 32768),
+        ("av", "av", "av", "av", 1024),
+        ("head_projection", "head_projection", "head_projection", "head_projection", 8),
+        ("merged", "merged", "merged", "merged", 8),
+        ("residual1", "residual1", "residual1", "residual1", 8),
+        ("layernorm1", "layernorm1", "layernorm1", "layernorm1_i8", norm_scale),
+        ("ffn_up", "ffn_up", "ffn_up", "ffn_up", 256),
+        ("gelu", "gelu", "gelu", "gelu", 256),
+        ("gelu_i8", "gelu", "gelu_i8", "gelu_i8", gelu_scale),
+        ("ffn_down", "ffn_down", "ffn_down", "ffn_down", norm_scale),
+        ("residual2", "residual2", "residual2", "residual2", norm_scale),
+        ("layernorm2", "layernorm2", "layernorm2", "layernorm2_i8", norm_scale),
+        ("logits", "logits", "logits", "logits", 8),
+    ]
+    triplet_samples: dict[str, dict[str, list[list[float]]]] = {
+        name: {"fp32": [], "fake_quant": [], "independent_int8": []}
+        for name, *_ in triplet_specs
+    }
     collectors: dict[str, list[tuple[list[float], list[float]]]] = {name: [] for name in scales}
     saturation: dict[str, list[int]] = {key: [] for key in SATURATION_KEYS}
     int_correct = 0
@@ -176,6 +250,14 @@ def main() -> None:
             for position in range(4, 8):
                 trace = decode_one(int_model, cache, sequence[position], position)
                 qtrace = q_vectors(trace, position)
+                for stage_name, fp_name, qat_name, int_name, int_scale in triplet_specs:
+                    fp_groups = torch_groups(fp, fp_name, b, position)
+                    qat_groups = torch_groups(fake_trace, qat_name, b, position)
+                    int_groups = [[float(value) / int_scale for value in group]
+                                  for group in qtrace[int_name]]
+                    triplet_samples[stage_name]["fp32"].extend(fp_groups)
+                    triplet_samples[stage_name]["fake_quant"].extend(qat_groups)
+                    triplet_samples[stage_name]["independent_int8"].extend(int_groups)
                 target = sequence[position + 1]
                 logits = trace["logits"]
                 predicted = max(range(len(logits)), key=lambda i: (logits[i], -i))
@@ -225,29 +307,55 @@ def main() -> None:
                      "top1_agreement": top,
                      "saturation_ratio": (sum(sat) / len(sat)) if sat else "N/A",
                      "quant_scale": scales[name]})
+    triplet_rows = []
+    for name, *_ in triplet_specs:
+        samples = triplet_samples[name]
+        fp_fake = compare_groups(samples["fp32"], samples["fake_quant"])
+        fp_int = compare_groups(samples["fp32"], samples["independent_int8"])
+        fake_int = compare_groups(samples["fake_quant"], samples["independent_int8"])
+        triplet_rows.append({"stage": name,
+                             "fp32_vs_fake_quant_mae": fp_fake["mae"],
+                             "fp32_vs_fake_quant_rmse": fp_fake["rmse"],
+                             "fp32_vs_fake_quant_top1_agreement": fp_fake["top1_agreement"],
+                             "fp32_vs_independent_int8_mae": fp_int["mae"],
+                             "fp32_vs_independent_int8_rmse": fp_int["rmse"],
+                             "fp32_vs_independent_int8_top1_agreement": fp_int["top1_agreement"],
+                             "fake_quant_vs_independent_int8_mae": fake_int["mae"],
+                             "fake_quant_vs_independent_int8_rmse": fake_int["rmse"],
+                             "fake_quant_vs_independent_int8_top1_agreement": fake_int["top1_agreement"],
+                             "quant_scale": next(spec[4] for spec in triplet_specs if spec[0] == name)})
     args.out.mkdir(parents=True, exist_ok=False)
     with (args.out / "layerwise_error.csv").open("w", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
+    with (args.out / "layerwise_threeway.csv").open("w", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=list(triplet_rows[0]))
+        writer.writeheader()
+        writer.writerows(triplet_rows)
     report = {
         "status": "PASS_DIAGNOSTIC",
         "model_sha256": hashlib.sha256(model_bytes).hexdigest(),
         "trainer_sha256": hashlib.sha256(args.trainer.read_bytes()).hexdigest(),
+        "float_checkpoint_sha256": float_checkpoint_sha,
+        "float_checkpoint_source": float_source,
         "seed": args.seed, "epochs": args.epochs,
         "train_sequences": args.train_sequences,
         "heldout_sequences": args.test_sequences,
-        "fp32_heldout": {"next_token_accuracy": fp_accuracy,
-                         "cross_entropy_nats": fp_loss, "perplexity": math.exp(fp_loss)},
+        "fp32_all_positions_0_to_7": {"next_token_accuracy": fp_accuracy,
+                                      "cross_entropy_nats": fp_loss,
+                                      "perplexity": math.exp(fp_loss)},
         "fp32_decode_positions_4_to_7": {
             "next_token_accuracy": fp_decode_accuracy,
             "cross_entropy_nats": fp_decode_loss,
             "perplexity": math.exp(fp_decode_loss)},
-        "int8_heldout": {"next_token_accuracy": int_correct / total,
-                         "cross_entropy_nats": int_nll / total,
-                         "perplexity": math.exp(min(int_nll / total, 700.0))},
-        "analysis_scope": "teacher-forced positions 4..7; FP32 PyTorch trace vs scalar independent INT8 reference; not Top RTL evidence",
+        "independent_int8_decode_positions_4_to_7": {
+            "next_token_accuracy": int_correct / total,
+            "cross_entropy_nats": int_nll / total,
+            "perplexity": math.exp(min(int_nll / total, 700.0))},
+        "analysis_scope": "FP32 all-position metric covers positions 0..7; FP32 decode and independent INT8 metrics cover matched teacher-forced positions 4..7; not Top RTL evidence",
         "stage_metrics": rows,
+        "fp32_fake_quant_independent_int8_stage_metrics": triplet_rows,
         "root_cause_hypotheses": [
             "FP32 training uses natural-exponential Softmax while the RTL uses Q8.8 exp2 Softmax.",
             "FP32 training uses PyTorch GELU while the RTL uses a bounded Q8.8 piecewise approximation.",
@@ -257,8 +365,9 @@ def main() -> None:
     }
     (args.out / "layerwise_error.json").write_text(json.dumps(report, indent=2) + "\n")
     print("TINY_GPT2_LAYERWISE_ANALYSIS_PASS "
-          f"fp32_acc={fp_accuracy:.6f} int8_acc={int_correct / total:.6f} "
-          f"fp32_ppl={math.exp(fp_loss):.5f} int8_ppl={report['int8_heldout']['perplexity']:.5f} "
+          f"fp32_all_acc={fp_accuracy:.6f} int8_decode_acc={int_correct / total:.6f} "
+          f"fp32_all_ppl={math.exp(fp_loss):.5f} "
+          f"int8_decode_ppl={report['independent_int8_decode_positions_4_to_7']['perplexity']:.5f} "
           f"model_sha256={report['model_sha256']} out={args.out}")
 
 
