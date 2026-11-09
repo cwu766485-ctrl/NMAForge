@@ -213,6 +213,8 @@ def main() -> None:
     parser.add_argument("--qat-epochs", type=int, default=0,
                         help="hardware-contract fake-quant fine-tuning epochs (0 disables QAT)")
     parser.add_argument("--qat-lr", type=float, default=0.0005)
+    parser.add_argument("--float-checkpoint-dir", type=Path, default=None,
+                        help="optional directory for pre-QAT and final FP32 state_dict checkpoints")
     args = parser.parse_args()
 
     norm_scale = int(args.norm_output_scale)
@@ -268,6 +270,17 @@ def main() -> None:
             with torch.no_grad():
                 model.up.weight.clamp_(-0.48, 0.48)
 
+    if args.float_checkpoint_dir is not None:
+        args.float_checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        torch.save({
+            "state_dict": model.state_dict(),
+            "seed": args.seed, "epochs": args.epochs,
+            "qat_epochs": 0, "phase": "pre_qat_fp32",
+            "architecture": {"hidden": HIDDEN, "heads": HEADS,
+                             "head_dim": HEAD_DIM, "layers": 1,
+                             "context": CONTEXT, "vocab": VOCAB},
+        }, args.float_checkpoint_dir / "tiny_gpt2_h16_pre_qat_fp32.pt")
+
     qat_train_loss = None
     if args.qat_epochs:
         qat_optimizer = torch.optim.AdamW(model.parameters(), lr=args.qat_lr,
@@ -309,6 +322,18 @@ def main() -> None:
             qat_decode_logits.reshape(-1, VOCAB), float_decode_targets.reshape(-1)))
         heldout_qat_decode_accuracy = float(
             (qat_decode_logits.argmax(-1) == float_decode_targets).float().mean())
+
+    if args.float_checkpoint_dir is not None:
+        torch.save({
+            "state_dict": model.state_dict(),
+            "seed": args.seed, "epochs": args.epochs,
+            "qat_epochs": args.qat_epochs,
+            "qat_learning_rate": args.qat_lr if args.qat_epochs else None,
+            "phase": "post_qat_fp32" if args.qat_epochs else "post_training_fp32",
+            "architecture": {"hidden": HIDDEN, "heads": HEADS,
+                             "head_dim": HEAD_DIM, "layers": 1,
+                             "context": CONTEXT, "vocab": VOCAB},
+        }, args.float_checkpoint_dir / "tiny_gpt2_h16_post_qat_fp32.pt")
 
     # Power-of-two scales and opcode shifts form the fixed-point export contract.
     emb = to_i8(model.token_embedding.weight, 8)
