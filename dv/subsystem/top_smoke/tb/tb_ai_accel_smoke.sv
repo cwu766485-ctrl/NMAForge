@@ -383,6 +383,36 @@ module tb_ai_accel_smoke;
     reg transformer_traffic_enable = 1'b0;
     integer r9_sfu_command_index = 0;
     reg r9_sfu_command_active = 1'b0;
+    // Round 20: count accepted external AXI DMA traffic during the retained
+    // Matrix/DMA serialized and ping-pong probe. These counters observe the
+    // real Top AXI interface, not the AXI-Lite host preload path.
+    reg r20_dma_monitor_enable = 1'b0;
+    integer r20_dma_ar_bursts = 0;
+    integer r20_dma_ar_bytes = 0;
+    integer r20_dma_r_beats = 0;
+    integer r20_dma_aw_bursts = 0;
+    integer r20_dma_aw_bytes = 0;
+    integer r20_dma_w_beats = 0;
+    integer r20_dma_w_strobe_bytes = 0;
+    integer r20_dma_b_responses = 0;
+    integer r20_dma_cycle_counter = 0;
+    integer r20_dma_first_ar_cycle = -1;
+    integer r20_dma_last_r_cycle = -1;
+    integer r20_dma_first_aw_cycle = -1;
+    integer r20_dma_last_b_cycle = -1;
+    integer r20_dma_ar_start_q [0:15];
+    integer r20_dma_aw_start_q [0:15];
+    integer r20_dma_ar_q_head = 0;
+    integer r20_dma_ar_q_tail = 0;
+    integer r20_dma_aw_q_head = 0;
+    integer r20_dma_aw_q_tail = 0;
+    integer r20_dma_read_latency_sum = 0;
+    integer r20_dma_read_latency_max = 0;
+    integer r20_dma_read_latency_count = 0;
+    integer r20_dma_write_latency_sum = 0;
+    integer r20_dma_write_latency_max = 0;
+    integer r20_dma_write_latency_count = 0;
+    integer r20_dma_lane = 0;
     integer r9_sfu_command_opcode = 0;
     integer r9_sfu_command_length = 0;
     integer r9_sfu_command_cycles = 0;
@@ -647,6 +677,93 @@ module tb_ai_accel_smoke;
     // Exact top-clock completion-boundary sampling for the serialized
     // Transformer prefill/decode CMDQ chain. The 1 ps delay observes the
     // completion-tail nonblocking update in the same clock cycle.
+    always @(posedge aclk) begin
+        r20_dma_cycle_counter = r20_dma_cycle_counter + 1;
+        if (!aresetn) begin
+            r20_dma_ar_bursts = 0;
+            r20_dma_ar_bytes = 0;
+            r20_dma_r_beats = 0;
+            r20_dma_aw_bursts = 0;
+            r20_dma_aw_bytes = 0;
+            r20_dma_w_beats = 0;
+            r20_dma_w_strobe_bytes = 0;
+            r20_dma_b_responses = 0;
+            r20_dma_ar_q_head = 0;
+            r20_dma_ar_q_tail = 0;
+            r20_dma_aw_q_head = 0;
+            r20_dma_aw_q_tail = 0;
+            r20_dma_read_latency_sum = 0;
+            r20_dma_read_latency_max = 0;
+            r20_dma_read_latency_count = 0;
+            r20_dma_write_latency_sum = 0;
+            r20_dma_write_latency_max = 0;
+            r20_dma_write_latency_count = 0;
+        end else if (r20_dma_monitor_enable) begin
+            if (m_axi_arvalid && m_axi_arready) begin
+                if (r20_dma_first_ar_cycle < 0)
+                    r20_dma_first_ar_cycle = r20_dma_cycle_counter;
+                r20_dma_ar_start_q[r20_dma_ar_q_tail % 16] =
+                    r20_dma_cycle_counter;
+                r20_dma_ar_q_tail = r20_dma_ar_q_tail + 1;
+                r20_dma_ar_bursts = r20_dma_ar_bursts + 1;
+                r20_dma_ar_bytes = r20_dma_ar_bytes +
+                    (m_axi_arlen + 1) * (1 << m_axi_arsize);
+            end
+            if (m_axi_rvalid && m_axi_rready) begin
+                r20_dma_r_beats = r20_dma_r_beats + 1;
+                r20_dma_last_r_cycle = r20_dma_cycle_counter;
+                if (m_axi_rlast &&
+                    r20_dma_ar_q_head < r20_dma_ar_q_tail) begin
+                    if (r20_dma_cycle_counter -
+                        r20_dma_ar_start_q[r20_dma_ar_q_head % 16] + 1 >
+                        r20_dma_read_latency_max)
+                        r20_dma_read_latency_max = r20_dma_cycle_counter -
+                            r20_dma_ar_start_q[r20_dma_ar_q_head % 16] + 1;
+                    r20_dma_read_latency_sum = r20_dma_read_latency_sum +
+                        r20_dma_cycle_counter -
+                        r20_dma_ar_start_q[r20_dma_ar_q_head % 16] + 1;
+                    r20_dma_read_latency_count =
+                        r20_dma_read_latency_count + 1;
+                    r20_dma_ar_q_head = r20_dma_ar_q_head + 1;
+                end
+            end
+            if (m_axi_awvalid && m_axi_awready) begin
+                if (r20_dma_first_aw_cycle < 0)
+                    r20_dma_first_aw_cycle = r20_dma_cycle_counter;
+                r20_dma_aw_start_q[r20_dma_aw_q_tail % 16] =
+                    r20_dma_cycle_counter;
+                r20_dma_aw_q_tail = r20_dma_aw_q_tail + 1;
+                r20_dma_aw_bursts = r20_dma_aw_bursts + 1;
+                r20_dma_aw_bytes = r20_dma_aw_bytes +
+                    (m_axi_awlen + 1) * (1 << m_axi_awsize);
+            end
+            if (m_axi_wvalid && m_axi_wready) begin
+                r20_dma_w_beats = r20_dma_w_beats + 1;
+                for (r20_dma_lane = 0; r20_dma_lane < 16;
+                     r20_dma_lane = r20_dma_lane + 1)
+                    if (m_axi_wstrb[r20_dma_lane])
+                        r20_dma_w_strobe_bytes = r20_dma_w_strobe_bytes + 1;
+            end
+            if (m_axi_bvalid && m_axi_bready) begin
+                r20_dma_b_responses = r20_dma_b_responses + 1;
+                r20_dma_last_b_cycle = r20_dma_cycle_counter;
+                if (r20_dma_aw_q_head < r20_dma_aw_q_tail) begin
+                    if (r20_dma_cycle_counter -
+                        r20_dma_aw_start_q[r20_dma_aw_q_head % 16] + 1 >
+                        r20_dma_write_latency_max)
+                        r20_dma_write_latency_max = r20_dma_cycle_counter -
+                            r20_dma_aw_start_q[r20_dma_aw_q_head % 16] + 1;
+                    r20_dma_write_latency_sum = r20_dma_write_latency_sum +
+                        r20_dma_cycle_counter -
+                        r20_dma_aw_start_q[r20_dma_aw_q_head % 16] + 1;
+                    r20_dma_write_latency_count =
+                        r20_dma_write_latency_count + 1;
+                    r20_dma_aw_q_head = r20_dma_aw_q_head + 1;
+                end
+            end
+        end
+    end
+
     always @(posedge aclk) begin
         transformer_top_cycle_counter = transformer_top_cycle_counter + 1;
         if (transformer_top_timing_enable && !transformer_top_final_captured) begin
@@ -1953,6 +2070,46 @@ module tb_ai_accel_smoke;
         reg [31:0] serial_compute;
         reg [31:0] serial_overlap;
         reg [31:0] serial_stall;
+        integer serial_ar_bursts;
+        integer serial_ar_bytes;
+        integer serial_r_beats;
+        integer serial_aw_bursts;
+        integer serial_aw_bytes;
+        integer serial_w_beats;
+        integer serial_w_bytes;
+        integer serial_b_responses;
+        integer serial_first_ar_cycle;
+        integer serial_last_r_cycle;
+        integer serial_first_aw_cycle;
+        integer serial_last_b_cycle;
+        integer serial_read_service_cycles;
+        integer serial_write_service_cycles;
+        integer serial_read_latency_sum;
+        integer serial_read_latency_max;
+        integer serial_read_latency_count;
+        integer serial_write_latency_sum;
+        integer serial_write_latency_max;
+        integer serial_write_latency_count;
+        integer overlap_ar_bursts;
+        integer overlap_ar_bytes;
+        integer overlap_r_beats;
+        integer overlap_aw_bursts;
+        integer overlap_aw_bytes;
+        integer overlap_w_beats;
+        integer overlap_w_bytes;
+        integer overlap_b_responses;
+        integer overlap_first_ar_cycle;
+        integer overlap_last_r_cycle;
+        integer overlap_first_aw_cycle;
+        integer overlap_last_b_cycle;
+        integer overlap_read_service_cycles;
+        integer overlap_write_service_cycles;
+        integer overlap_read_latency_sum;
+        integer overlap_read_latency_max;
+        integer overlap_read_latency_count;
+        integer overlap_write_latency_sum;
+        integer overlap_write_latency_max;
+        integer overlap_write_latency_count;
         reg [31:0] input_words [0:11];
         reg [31:0] weight_words [0:3];
         reg [31:0] expected_words [0:47];
@@ -2015,6 +2172,29 @@ module tb_ai_accel_smoke;
             serial_compute = 0;
             serial_overlap = 0;
             serial_stall = 0;
+            r20_dma_ar_bursts = 0;
+            r20_dma_ar_bytes = 0;
+            r20_dma_r_beats = 0;
+            r20_dma_aw_bursts = 0;
+            r20_dma_aw_bytes = 0;
+            r20_dma_w_beats = 0;
+            r20_dma_w_strobe_bytes = 0;
+            r20_dma_b_responses = 0;
+            r20_dma_first_ar_cycle = -1;
+            r20_dma_last_r_cycle = -1;
+            r20_dma_first_aw_cycle = -1;
+            r20_dma_last_b_cycle = -1;
+            r20_dma_ar_q_head = 0;
+            r20_dma_ar_q_tail = 0;
+            r20_dma_aw_q_head = 0;
+            r20_dma_aw_q_tail = 0;
+            r20_dma_read_latency_sum = 0;
+            r20_dma_read_latency_max = 0;
+            r20_dma_read_latency_count = 0;
+            r20_dma_write_latency_sum = 0;
+            r20_dma_write_latency_max = 0;
+            r20_dma_write_latency_count = 0;
+            r20_dma_monitor_enable = 1'b1;
             for (serial_tile = 0; serial_tile < 3; serial_tile = serial_tile + 1) begin
                 axi_write(REG_TILE_COUNT, 32'd1);
                 axi_write(REG_TILE_EXT_IN, 32'h0000_1400 + serial_tile*16);
@@ -2044,12 +2224,88 @@ module tb_ai_accel_smoke;
                 clear_done_irq();
             end
 
+            r20_dma_monitor_enable = 1'b0;
+            @(negedge aclk);
+            serial_ar_bursts = r20_dma_ar_bursts;
+            serial_ar_bytes = r20_dma_ar_bytes;
+            serial_r_beats = r20_dma_r_beats;
+            serial_aw_bursts = r20_dma_aw_bursts;
+            serial_aw_bytes = r20_dma_aw_bytes;
+            serial_w_beats = r20_dma_w_beats;
+            serial_w_bytes = r20_dma_w_strobe_bytes;
+            serial_b_responses = r20_dma_b_responses;
+            serial_first_ar_cycle = r20_dma_first_ar_cycle;
+            serial_last_r_cycle = r20_dma_last_r_cycle;
+            serial_first_aw_cycle = r20_dma_first_aw_cycle;
+            serial_last_b_cycle = r20_dma_last_b_cycle;
+            serial_read_service_cycles = (serial_first_ar_cycle >= 0 &&
+                serial_last_r_cycle >= serial_first_ar_cycle) ?
+                serial_last_r_cycle - serial_first_ar_cycle + 1 : 0;
+            serial_write_service_cycles = (serial_first_aw_cycle >= 0 &&
+                serial_last_b_cycle >= serial_first_aw_cycle) ?
+                serial_last_b_cycle - serial_first_aw_cycle + 1 : 0;
+            serial_read_latency_sum = r20_dma_read_latency_sum;
+            serial_read_latency_max = r20_dma_read_latency_max;
+            serial_read_latency_count = r20_dma_read_latency_count;
+            serial_write_latency_sum = r20_dma_write_latency_sum;
+            serial_write_latency_max = r20_dma_write_latency_max;
+            serial_write_latency_count = r20_dma_write_latency_count;
+
+            r20_dma_ar_bursts = 0;
+            r20_dma_ar_bytes = 0;
+            r20_dma_r_beats = 0;
+            r20_dma_aw_bursts = 0;
+            r20_dma_aw_bytes = 0;
+            r20_dma_w_beats = 0;
+            r20_dma_w_strobe_bytes = 0;
+            r20_dma_b_responses = 0;
+            r20_dma_first_ar_cycle = -1;
+            r20_dma_last_r_cycle = -1;
+            r20_dma_first_aw_cycle = -1;
+            r20_dma_last_b_cycle = -1;
+            r20_dma_ar_q_head = 0;
+            r20_dma_ar_q_tail = 0;
+            r20_dma_aw_q_head = 0;
+            r20_dma_aw_q_tail = 0;
+            r20_dma_read_latency_sum = 0;
+            r20_dma_read_latency_max = 0;
+            r20_dma_read_latency_count = 0;
+            r20_dma_write_latency_sum = 0;
+            r20_dma_write_latency_max = 0;
+            r20_dma_write_latency_count = 0;
+            r20_dma_monitor_enable = 1'b1;
             axi_write(REG_TILE_COUNT, 32'd3);
             axi_write(REG_TILE_EXT_IN, 32'h0000_1400);
             axi_write(REG_TILE_EXT_OUT, 32'h0000_2000);
             axi_write(REG_PERF_CTRL, 32'd1);
             axi_write(REG_TILE_CTRL, 32'd1);
             fp_perf_wait_tile_done();
+            r20_dma_monitor_enable = 1'b0;
+            @(negedge aclk);
+            overlap_ar_bursts = r20_dma_ar_bursts;
+            overlap_ar_bytes = r20_dma_ar_bytes;
+            overlap_r_beats = r20_dma_r_beats;
+            overlap_aw_bursts = r20_dma_aw_bursts;
+            overlap_aw_bytes = r20_dma_aw_bytes;
+            overlap_w_beats = r20_dma_w_beats;
+            overlap_w_bytes = r20_dma_w_strobe_bytes;
+            overlap_b_responses = r20_dma_b_responses;
+            overlap_first_ar_cycle = r20_dma_first_ar_cycle;
+            overlap_last_r_cycle = r20_dma_last_r_cycle;
+            overlap_first_aw_cycle = r20_dma_first_aw_cycle;
+            overlap_last_b_cycle = r20_dma_last_b_cycle;
+            overlap_read_service_cycles = (overlap_first_ar_cycle >= 0 &&
+                overlap_last_r_cycle >= overlap_first_ar_cycle) ?
+                overlap_last_r_cycle - overlap_first_ar_cycle + 1 : 0;
+            overlap_write_service_cycles = (overlap_first_aw_cycle >= 0 &&
+                overlap_last_b_cycle >= overlap_first_aw_cycle) ?
+                overlap_last_b_cycle - overlap_first_aw_cycle + 1 : 0;
+            overlap_read_latency_sum = r20_dma_read_latency_sum;
+            overlap_read_latency_max = r20_dma_read_latency_max;
+            overlap_read_latency_count = r20_dma_read_latency_count;
+            overlap_write_latency_sum = r20_dma_write_latency_sum;
+            overlap_write_latency_max = r20_dma_write_latency_max;
+            overlap_write_latency_count = r20_dma_write_latency_count;
 
             axi_read(REG_PERF_TOTAL, perf_total);
             axi_read(REG_PERF_DMA, perf_dma);
@@ -2082,12 +2338,32 @@ module tb_ai_accel_smoke;
                                tile_index, col_index, expected_i, read_value);
                 end
 
-            $display("R9_MATRIX_DMA_SERIALIZED tiles=3 shape=4x4x4 total=%0d dma=%0d compute=%0d overlap=%0d stall=%0d golden=bit-exact",
+            $display("R20_DMA_SERIALIZED tiles=3 shape=4x4x4 total=%0d dma=%0d compute=%0d overlap=%0d stall=%0d ar_bursts=%0d ar_bytes=%0d r_beats=%0d read_span_cycles=%0d read_latency_avg=%0d read_latency_max=%0d aw_bursts=%0d aw_bytes=%0d w_beats=%0d wstrb_bytes=%0d b_responses=%0d write_span_cycles=%0d write_latency_avg=%0d write_latency_max=%0d golden=bit-exact",
                      serial_total, serial_dma, serial_compute, serial_overlap,
-                     serial_stall);
-            $display("R9_MATRIX_DMA_OVERLAP_PASS tiles=3 shape=4x4x4 total=%0d dma=%0d compute=%0d overlap=%0d stall=%0d ddr_and_spad_golden=bit-exact seed=%0d",
+                     serial_stall, serial_ar_bursts, serial_ar_bytes,
+                     serial_r_beats, serial_read_service_cycles,
+                     serial_read_latency_count != 0 ?
+                        serial_read_latency_sum / serial_read_latency_count : 0,
+                     serial_read_latency_max,
+                     serial_aw_bursts, serial_aw_bytes, serial_w_beats,
+                     serial_w_bytes, serial_b_responses,
+                     serial_write_service_cycles,
+                     serial_write_latency_count != 0 ?
+                        serial_write_latency_sum / serial_write_latency_count : 0,
+                     serial_write_latency_max);
+            $display("R9_MATRIX_DMA_OVERLAP_PASS tiles=3 shape=4x4x4 total=%0d dma=%0d compute=%0d overlap=%0d stall=%0d ddr_and_spad_golden=bit-exact seed=%0d ar_bursts=%0d ar_bytes=%0d r_beats=%0d read_span_cycles=%0d read_latency_avg=%0d read_latency_max=%0d aw_bursts=%0d aw_bytes=%0d w_beats=%0d wstrb_bytes=%0d b_responses=%0d write_span_cycles=%0d write_latency_avg=%0d write_latency_max=%0d",
                      perf_total, perf_dma, perf_compute, perf_overlap, perf_stall,
-                     profile_ai_seed);
+                     profile_ai_seed, overlap_ar_bursts, overlap_ar_bytes,
+                     overlap_r_beats, overlap_read_service_cycles,
+                     overlap_read_latency_count != 0 ?
+                        overlap_read_latency_sum / overlap_read_latency_count : 0,
+                     overlap_read_latency_max,
+                     overlap_aw_bursts, overlap_aw_bytes, overlap_w_beats,
+                     overlap_w_bytes, overlap_b_responses,
+                     overlap_write_service_cycles,
+                     overlap_write_latency_count != 0 ?
+                        overlap_write_latency_sum / overlap_write_latency_count : 0,
+                     overlap_write_latency_max);
             clear_done_irq();
         end
     endtask

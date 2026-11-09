@@ -2,10 +2,12 @@
 """Independently decode packed SPAD operands and rebuild the CNN Golden."""
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
 import numpy as np
+from sklearn.datasets import load_digits
 
 
 M, PAD_M, K1, N1, K2, N2 = 196, 208, 36, 64, 64, 16
@@ -114,6 +116,29 @@ def main():
             raise ValueError("legacy Conv1 must use Matrix ReLU before INT32 write")
 
     operand_a = decode_a(memory, INPUT, PAD_M, K1)
+    dataset = load_digits()
+    dataset_hash = hashlib.sha256(
+        dataset.images.tobytes(order="C") +
+        dataset.target.astype("<i8").tobytes()
+    ).hexdigest()
+    if dataset_hash != manifest["dataset_sha256"]:
+        raise ValueError("frozen Digits dataset SHA mismatch")
+    sample_index = int(manifest["sample_index"])
+    image = dataset.images[sample_index].astype(np.float32) / 16.0
+    image = np.repeat(np.repeat(image, 2, axis=0), 2, axis=1)
+    coordinate = np.linspace(-1.0, 1.0, 16, dtype=np.float32)
+    yy, xx = np.meshgrid(coordinate, coordinate, indexing="ij")
+    planes = np.stack((image, np.ones_like(image), yy, xx), axis=-1)
+    trained_feature_order = np.stack([
+        planes[y:y + 14, x:x + 14, :].reshape(M, 4)
+        for y in range(3) for x in range(3)
+    ], axis=1).reshape(M, K1)
+    expected_input = np.zeros((PAD_M, K1), dtype=np.int8)
+    expected_input[:M] = np.rint(trained_feature_order * 127.0).clip(
+        -127, 127
+    ).astype(np.int8)
+    if not np.array_equal(operand_a, expected_input):
+        raise ValueError("physical Matrix-A input differs from trained [kernel-position,channel] layout")
     weight1 = decode_b(memory, W1, K1, N1)
     weight2 = decode_b(memory, W2, K2, N2)
     raw1 = operand_a.astype(np.int64) @ weight1.astype(np.int64)
@@ -147,7 +172,7 @@ def main():
                           if expected.get(address) != observed_golden.get(address)), None)
         raise ValueError("independent physical-layout Golden mismatch at %s" %
                          ("missing key" if differing is None else hex(differing)))
-    print("R19_TRAINED_CNN_GOLDEN_PASS mode=%s descriptors=%d golden_words=%d physical_operands=PASS output_layout=row_major_packed_i8" %
+    print("R19_TRAINED_CNN_GOLDEN_PASS mode=%s descriptors=%d golden_words=%d physical_operands=PASS trained_input_layout=PASS output_layout=row_major_packed_i8" %
           (manifest["fusion_mode"], expected_count, len(expected)))
 
 
