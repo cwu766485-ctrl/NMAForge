@@ -232,7 +232,10 @@ module ai_tensor_sfu_core(
     ai_tensor_sfu_math math_u(
         .softmax_delta_q8_8(spad_signed - max_r),
         .requant_value(spad_signed), .requant_shift(scale_shift_r),
-        .residual_x(x_r), .residual_y(gamma_r), .residual_shift(scale_shift_r),
+        .residual_x(x_r),
+        // During the B response, reuse the existing residual datapath.
+        .residual_y((op_r == OP_RESIDUAL_I32 && state_r == ST_VEC_B_WAIT) ?
+                    spad_signed : gamma_r), .residual_shift(scale_shift_r),
         .gamma_x(x_r), .gamma(gamma_r), .norm_x(x_r),
         .norm_inv_rms(inv_rms_r), .norm_beta(beta_r),
         .norm_add_beta(is_layernorm), .gelu_product(vector_product_r),
@@ -530,7 +533,11 @@ module ai_tensor_sfu_core(
                 end
                 ST_VEC_B_WAIT: if (spad_rsp_valid) begin
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end
-                    else begin gamma_r<=spad_signed; state_r<=ST_RMS_WRITE; end
+                    else begin
+                        gamma_r<=spad_signed;
+                        output_word_r<=residual_output;
+                        state_r<=ST_VEC_WRITE;
+                    end
                 end
                 ST_VEC_PREP: begin
                     vector_product_r <= (op_r==OP_GELU_Q8_8) ?
