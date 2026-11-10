@@ -569,6 +569,38 @@ module tb_ai_accel_smoke;
             representative_dma_busy_cycles = representative_dma_busy_cycles + 1;
     end
 
+    // Round 28: exclusive LayerNorm state samples; dispatch is external.
+    integer r28_counts [0:6];
+    integer r28_bucket, r28_i, r28_total;
+    reg r28_active = 0;
+    always @(posedge aclk) begin
+        if (!transformer_top_timing_enable) r28_active = 0;
+        else if (dut.compute_cluster_u.tensor_sfu_u.busy &&
+                 dut.compute_cluster_u.tensor_sfu_u.op_r == 8'h38) begin
+            if (!r28_active) begin
+                for (r28_i=0; r28_i<7; r28_i=r28_i+1) r28_counts[r28_i]=0;
+                r28_active=1;
+            end
+            case (dut.compute_cluster_u.tensor_sfu_u.state_r)
+                32,33: r28_bucket=0;
+                12,13,34,35,36,37,38: r28_bucket=1;
+                14,15,16,17: r28_bucket=2;
+                20,21,39,40: r28_bucket=3;
+                18,19,22: r28_bucket=4;
+                31: r28_bucket=dut.compute_cluster_u.tensor_sfu_u.rms_normalize_phase_r ? 4 : 1;
+                27: r28_bucket=5;
+                default: r28_bucket=6;
+            endcase
+            r28_counts[r28_bucket]=r28_counts[r28_bucket]+1;
+            if (dut.compute_cluster_u.tensor_sfu_u.state_r==28 || dut.compute_cluster_u.tensor_sfu_u.state_r==29) begin
+                r28_total=0;
+                for (r28_i=0; r28_i<7; r28_i=r28_i+1) r28_total=r28_total+r28_counts[r28_i];
+                $display("R28_LN input=%0d mean_var=%0d reciprocal_sqrt=%0d gamma_beta=%0d affine=%0d writeback=%0d fsm=%0d total=%0d",r28_counts[0],r28_counts[1],r28_counts[2],r28_counts[3],r28_counts[4],r28_counts[5],r28_counts[6],r28_total);
+                r28_active=0;
+            end
+        end
+    end
+
     // Round 9 SFU profiler. Pass buckets are mutually exclusive FSM states;
     // request/response/divider counters are overlapping stall/operation
     // observations and must not be added to the pass totals.

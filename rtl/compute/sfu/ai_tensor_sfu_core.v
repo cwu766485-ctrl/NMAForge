@@ -199,7 +199,9 @@ module ai_tensor_sfu_core(
     ai_unsigned_divider #(.WIDTH(64)) divider_u(
         .clk(clk), .resetn(resetn), .start(div_start_r),
         .accelerate((op_r == OP_SOFTMAX_Q15) ||
-                    (op_r == OP_CAUSAL_SOFTMAX_Q15)),
+                    (op_r == OP_CAUSAL_SOFTMAX_Q15) ||
+                    // Exact reciprocal dividend is 2^30; reuse bounded skip.
+                    (is_layernorm && state_r == ST_RMS_INV_WAIT)),
         .dividend(div_dividend_r), .divisor(div_divisor_r),
         .busy(div_busy), .done(div_done), .error(div_error),
         .quotient(div_quotient), .remainder(div_remainder)
