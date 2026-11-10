@@ -1,0 +1,4 @@
+variant,decode_cycles,cycles_per_token,spad_read_bytes,spad_write_bytes,golden
+base,69358,8669.75,72448,42112,PASS hashes identical
+residual,67774,8471.75,72448,42112,PASS hashes identical
+final,66931,8366.375,72448,42112,PASS hashes identical

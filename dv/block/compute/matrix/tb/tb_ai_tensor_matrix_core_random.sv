@@ -1070,6 +1070,8 @@ module tb_ai_tensor_matrix_core_random;
   task automatic prepare_tinynpu_match_case(input integer m,input integer n,input integer k_size);
     integer rr,cc,kk,tt,ll,local_addr,local_index,kw;
     integer signed value;
+    reg [7:0] shared_operands [0:32767];
+    string shared_path;
     begin
       kw=k_size/4;
       prepare_case(m,n,kw,1,0,0,0,0,0,0,0);
@@ -1086,6 +1088,17 @@ module tb_ai_tensor_matrix_core_random;
           value=((kk*2-cc*3+5)%9)-4;
           logical_b[0][kk][cc]=value;
         end
+
+      // Optional shared trained-model fixture: A then B, raw signed bytes.
+      if ($value$plusargs("SHARED_OPERANDS=%s", shared_path)) begin
+        $readmemh(shared_path, shared_operands, 0, m*k_size+k_size*n-1);
+        for(rr=0;rr<m;rr=rr+1)
+          for(kk=0;kk<k_size;kk=kk+1)
+            logical_a[0][rr][kk]=$signed(shared_operands[rr*k_size+kk]);
+        for(kk=0;kk<k_size;kk=kk+1)
+          for(cc=0;cc<n;cc=cc+1)
+            logical_b[0][kk][cc]=$signed(shared_operands[m*k_size+kk*n+cc]);
+      end
 
       for(tt=0;tt<m/4;tt=tt+1)
         for(kk=0;kk<kw;kk=kk+1) begin
@@ -2553,6 +2566,24 @@ module tb_ai_tensor_matrix_core_random;
     if($test$plusargs("TINY_NPU_MATCH_ONLY")) begin
       run_tinynpu_match_case(16,16,16,105);
       $display("MATRIX_TINY_NPU_MATCH_ONLY_PASS seed=%0d",initial_seed);
+      $finish;
+    end
+
+    if($test$plusargs("TRAINED_QKV_MATCH")) begin
+      run_tinynpu_match_case(4,16,16,108);
+      begin
+        string output_path;
+        integer fd,rr,cc;
+        if (!$value$plusargs("SHARED_OUTPUT=%s",output_path))
+          $fatal(1,"SHARED_OUTPUT required");
+        fd=$fopen(output_path,"w");
+        if (!fd) $fatal(1,"cannot open shared output");
+        for(rr=0;rr<4;rr=rr+1)
+          for(cc=0;cc<16;cc=cc+1)
+            $fdisplay(fd,"%08h",output_mem[(DST_BASE>>2)+rr*16+cc]);
+        $fclose(fd);
+      end
+      $display("TRAINED_QKV_PROJECTION_PASS golden=64/64");
       $finish;
     end
 

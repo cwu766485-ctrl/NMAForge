@@ -5,11 +5,14 @@
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
+#include <fstream>
+#include <string>
 
 #include "Vengine_tb_top.h"
 
 static Vengine_tb_top dut;
 static uint64_t cycles = 0;
+static std::vector<int8_t> shared_a, shared_b;
 
 static void tick() {
     dut.clk = 0;
@@ -20,6 +23,7 @@ static void tick() {
 }
 
 static int8_t operand_a(int row, int k, int workload) {
+    if (workload == 3) return shared_a[row * 16 + k];
     if (workload == 1)  // Same padded M=1, K=17 product-GEMV fixture as NMAForge.
         return static_cast<int8_t>(((k * 5 + 1) % 19) - 9);
     if (workload == 2)  // Same M=8, K=19 product-GEMV fixture as NMAForge.
@@ -28,6 +32,7 @@ static int8_t operand_a(int row, int k, int workload) {
 }
 
 static int8_t operand_b(int k, int col, int workload) {
+    if (workload == 3) return shared_b[k * 16 + col];
     if (workload == 1 || workload == 2)
         return static_cast<int8_t>(((k * 3 - col * 2 + 5) % 17) - 8);
     // Preserve SystemVerilog signed remainder semantics for negative values.
@@ -138,13 +143,25 @@ static bool run_gemm(int m, int n, int k, int workload = 0) {
             m, n, k, mismatches);
         return false;
     }
-    const char *marker = workload == 0 ? "TINYNPU_MATCHED_GEMM_PASS" :
+    if (workload == 3) {
+        const char *path = std::getenv("SHARED_OUTPUT");
+        if (!path) return false;
+        std::ofstream stream(path);
+        if (!stream) return false;
+        for (auto word : actual) {
+            char buf[16]; std::snprintf(buf, sizeof(buf), "%08x", static_cast<uint32_t>(word));
+            stream << buf << "\n";
+        }
+    }
+    const char *marker = workload == 3 ? "TINYNPU_TRAINED_QKV_PASS" :
+                         workload == 0 ? "TINYNPU_MATCHED_GEMM_PASS" :
                          "TINYNPU_MATCHED_GEMV_PASS";
     std::printf(
         "%s shape_mnk=%d,%d,%d physical_array=16x16 workload=%s "
         "cycles_input_to_array_stable=%llu macs=%d mac_per_cycle=%.4f "
         "pe_utilization_pct=%.2f golden=%d/%d\n",
-        marker, m, n, k, workload == 0 ? "gemm" : "product_gemv_padded_array",
+        marker, m, n, k, workload == 3 ? "trained_h16_projection" :
+        workload == 0 ? "gemm" : "product_gemv_padded_array",
         static_cast<unsigned long long>(elapsed), useful_macs,
         mac_per_cycle, utilization, m * n, m * n);
     return true;
@@ -162,6 +179,17 @@ int main() {
     dut.rst_n = 1;
     tick();
 
+    if (const char *path = std::getenv("SHARED_OPERANDS")) {
+        std::ifstream stream(path);
+        unsigned value;
+        if (!stream) return EXIT_FAILURE;
+        for (int i=0; i<320; ++i) {
+            if (!(stream >> std::hex >> value) || value>255) return EXIT_FAILURE;
+            if (i<64) shared_a.push_back(static_cast<int8_t>(value));
+            else shared_b.push_back(static_cast<int8_t>(value));
+        }
+        return run_gemm(4,16,16,3) ? EXIT_SUCCESS : EXIT_FAILURE;
+    }
     if (!run_gemm(16, 16, 16) ||
         !run_gemm(16, 16, 32) ||
         !run_gemm(32, 32, 64))
