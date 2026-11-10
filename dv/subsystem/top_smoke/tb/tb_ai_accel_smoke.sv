@@ -569,6 +569,8 @@ module tb_ai_accel_smoke;
             representative_dma_busy_cycles = representative_dma_busy_cycles + 1;
     end
 
+    `include "stage_a_profile.svh"
+
     // Round 28: exclusive LayerNorm state samples; dispatch is external.
     integer r28_counts [0:6];
     integer r28_bucket, r28_i, r28_total;
@@ -4314,6 +4316,7 @@ module tb_ai_accel_smoke;
             end
 
             axi_write(REG_CMDQ_CTRL, 32'd0);
+            if(sa_cycle_fd) $display("STAGE_A_CONFIG_BEGIN clock=%0d",sa_clock);
             axi_write(REG_CMDQ_BASE_LO, descriptor_base);
             axi_write(REG_CMDQ_BASE_HI, 32'd0);
             axi_write(REG_CMDQ_SIZE, 32'd128);
@@ -4324,6 +4327,7 @@ module tb_ai_accel_smoke;
             axi_write(REG_CPLQ_HEAD, 32'd0);
             axi_write(REG_CPLQ_TAIL, 32'd0);
 
+            if(sa_cycle_fd) $display("STAGE_A_CONFIG_END clock=%0d",sa_clock);
             ai_tinynpu_cnn_engine_read_words = 0;
             ai_tinynpu_cnn_engine_write_words = 0;
             ai_tinynpu_cnn_banked_read_lines = 0;
@@ -4413,6 +4417,7 @@ module tb_ai_accel_smoke;
                 if (representative_dump_fd == 0)
                     $fatal(1, "could not open representative SPAD dump %0s",
                            representative_dump_file);
+                if(sa_cycle_fd) $display("STAGE_A_READBACK_BEGIN clock=%0d",sa_clock);
                 for (representative_dump_index = 0;
                      representative_dump_index < representative_dump_words_a;
                      representative_dump_index = representative_dump_index + 1) begin
@@ -4432,6 +4437,7 @@ module tb_ai_accel_smoke;
                               representative_dump_index * 4, read_value);
                 end
                 $fclose(representative_dump_fd);
+                if(sa_cycle_fd) $display("STAGE_A_READBACK_END clock=%0d",sa_clock);
                 $display("REPRESENTATIVE_SPAD_DUMP_PASS file=%0s a_base=%08h a_words=%0d b_base=%08h b_words=%0d",
                          representative_dump_file, representative_dump_base_a,
                          representative_dump_words_a, representative_dump_base_b,

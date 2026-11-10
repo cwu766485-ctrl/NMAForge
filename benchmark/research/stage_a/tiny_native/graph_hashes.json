@@ -1,0 +1,26 @@
+{
+  "ddr_image.bin": {
+    "bytes": 3147776,
+    "sha256": "49ec99c82b89e1fe6a8e0bb47193a337d29e4ffb74dfe0d7f5d8b2e174169658"
+  },
+  "golden.bin": {
+    "bytes": 4,
+    "sha256": "94642359b0fdf8a4b56f8b17346b0385a477d782b4874bb7d1e979a589eab49c"
+  },
+  "golden.npy": {
+    "bytes": 132,
+    "sha256": "2c97e7bc0c5c54e1afc03991d394b0b1f5d1ca41e17c3ba62f2c8769d0e96589"
+  },
+  "manifest.json": {
+    "bytes": 1306,
+    "sha256": "6601e63658bec281970dfa72e53be85b4c3b5fe24826c1e901868e5c26c298f5"
+  },
+  "program.bin": {
+    "bytes": 208,
+    "sha256": "563aaa87a197fbade99ed537253a57ac1b0a8d442dc23d2e51aa02656a6d8e4f"
+  },
+  "tdesc.bin": {
+    "bytes": 352,
+    "sha256": "2af514dbff18a2c0a180bf886247fa9c1dc4d848afd6fdf1c0b1784054ad7f62"
+  }
+}

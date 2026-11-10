@@ -1,0 +1,18 @@
+{
+  "analysis": "/tmp/nmaforge-stage-a-analysis",
+  "nma": "/tmp/nmaforge-stage-a-measured",
+  "cnn": "/tmp/nmaforge-stage-a-cnn",
+  "tiny": "/tmp/nmaforge-stage-a-tiny-release",
+  "tiny_source": "/tmp/nmaforge-round28-runs/tiny/source",
+  "tiny_array": "/tmp/nmaforge-stage-a-arrays-release/tiny",
+  "qkv": "/tmp/nmaforge-stage-a-arrays-release/qkv",
+  "forward": "/tmp/nmaforge-stage-a-forward",
+  "common_cnn": "/tmp/nmaforge-stage-a-common-cnn",
+  "array_log": "/tmp/nmaforge-stage-a-arrays-release/nma.log",
+  "array_compile": "/tmp/nmaforge-stage-a-arrays-release/compile.log",
+  "quality": "/tmp/nmaforge-stage-a-quality",
+  "smoke": "/tmp/nmaforge-stage-a-smoke.log",
+  "seeded": "/tmp/nmaforge-stage-a-seeded.log",
+  "upstream_replay": "/tmp/nmaforge-stage-a-tiny/upstream_replay.log",
+  "related": "/tmp/nmaforge-stage-a-related.json"
+}
