@@ -1,0 +1,134 @@
+[
+  {
+    "path": "benchmark/digits/generate_digits_workload.py",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/benchmark/digits/generate_digits_workload.py.gz",
+    "research_sha256": "9047ad642b7c80c500f25975e79ad91e2793017d92df1fe45398079689ccf69b",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "benchmark/shape_adaptive_ablation.csv",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/benchmark/shape_adaptive_ablation.csv.gz",
+    "research_sha256": "bcc562d070ff10c7ca384a08c65e52b8b6bdf03a076d67cc597bfd6ea558c762",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "benchmark/shape_adaptive_spad_ablation.csv",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/benchmark/shape_adaptive_spad_ablation.csv.gz",
+    "research_sha256": "d740053d888edd4ae18ce2e16dbd0ab60713241409bce9e308262fadc6500766",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "benchmark/shape_adaptive_spad_summary.json",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/benchmark/shape_adaptive_spad_summary.json.gz",
+    "research_sha256": "da981ecfcdf3d5435a96dc48d948d87cf0967317ac7b1834731135851390fa8a",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "benchmark/shape_adaptive_summary.json",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/benchmark/shape_adaptive_summary.json.gz",
+    "research_sha256": "fd3f1e561399d57580a1c8d92de31843523cff03b675a3cf028c379e35da3d2a",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "benchmark/tinynpu/README.md",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/benchmark/tinynpu/README.md.gz",
+    "research_sha256": "9cd977746449c9f97e141c481ad839d2edc816d2e0795cbd3cdf3d7a3bdc9547",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "benchmark/tinynpu/benchmark_summary.json",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/benchmark/tinynpu/benchmark_summary.json.gz",
+    "research_sha256": "482773d711af062e7f7eedd57e4e1f6ec49f2af5bb3cc47a34b2bb3da1679ad8",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "benchmark/tinynpu/cnn_results.csv",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/benchmark/tinynpu/cnn_results.csv.gz",
+    "research_sha256": "0890cfc8b27ebbb2eb34a1633d746cbaa6ae49de531870b354d01737178ff519",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "benchmark/tinynpu/cnn_summary.json",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/benchmark/tinynpu/cnn_summary.json.gz",
+    "research_sha256": "af859a7d6bf29432eb381188e7505ab4762a6ca253500c75036effdf7ca548a9",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "benchmark/tinynpu/collect_results.py",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/benchmark/tinynpu/collect_results.py.gz",
+    "research_sha256": "e5c17629d391507edff3f7d0f1412dc5fa8ad87e24e08db45cc15b5649485a35",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "benchmark/tinynpu/gemm_results.csv",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/benchmark/tinynpu/gemm_results.csv.gz",
+    "research_sha256": "a3bd0bf47b7d096e269b8a98f786e2b3f24d6a367900037387ddcf986045ea19",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "docs/benchmark/NMAFORGE_VS_TINY_NPU.md",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/docs/benchmark/NMAFORGE_VS_TINY_NPU.md.gz",
+    "research_sha256": "406fc3dbc8888a6c833c9962fc12eea0d7f07939b27e3737ddccdd306d14c1a1",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "docs/spec/SPEC_ZH.md",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/docs/spec/SPEC_ZH.md.gz",
+    "research_sha256": "47ed9ac33783c06ec02be361a39a4a52609c70420b921b9fc290f3b1cb93a735",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "docs/verification/COMPUTE_CLUSTER_DV_SIGNOFF_READINESS_2026-10-27.md",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/docs/verification/COMPUTE_CLUSTER_DV_SIGNOFF_READINESS_2026-10-27.md.gz",
+    "research_sha256": "31739924e1e92727a85169027d9dab70efb5f966dc883fd32ecf48befdd79b87",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "docs/verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/docs/verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md.gz",
+    "research_sha256": "142ae251939fbe4a6533d27776890e7e247cdfd28d5bdad253c884efd8f36884",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "docs/verification/COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/docs/verification/COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md.gz",
+    "research_sha256": "dd5d3fb3084780533c9027508977bb81b560cdc3f869650a6dad3c9eb3846c15",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "docs/verification/COMPUTE_CLUSTER_V1_FINAL_AUDIT.md",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/docs/verification/COMPUTE_CLUSTER_V1_FINAL_AUDIT.md.gz",
+    "research_sha256": "2ec93d689b22391e967169d20bcdb1f06788ee4abdc1196b9eb36837c9447b4a",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "dv/block/compute/sfu/sim/Makefile",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/dv/block/compute/sfu/sim/Makefile.gz",
+    "research_sha256": "944ec5084da55df0a4c7bff3b6b1fd6fd134538f2beab890887c52869c1917e0",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "dv/block/compute/sfu/tb/tb_ai_tensor_sfu_random.sv",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/dv/block/compute/sfu/tb/tb_ai_tensor_sfu_random.sv.gz",
+    "research_sha256": "aee135fab834e5d1557603ef0ed693f55c06655ae59a6bdf41fa9f045af9a3f7",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv.gz",
+    "research_sha256": "4b004cd9a02344ae910df2624b78d6c7130482a666d0f4b8226a713e2b0b4376",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "rtl/compute/sfu/ai_tensor_sfu_core.v",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/rtl/compute/sfu/ai_tensor_sfu_core.v.gz",
+    "research_sha256": "5dda4c9da3083e33549c27866b61ec70af4bcc814947f3bb3534b2e85fe98e1d",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  },
+  {
+    "path": "sw/tools/cimforge_mapper.py",
+    "research_copy": "docs/archive/branch-consolidation/research-conflicts/sw/tools/cimforge_mapper.py.gz",
+    "research_sha256": "23fdcd44dd983f0970deb80dd801c7e9361886dba0546ccf8e0f64dd945cf657",
+    "resolution": "retain validated product/performance version; original research bytes archived"
+  }
+]
