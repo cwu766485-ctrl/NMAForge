@@ -1,0 +1,50 @@
+[
+  {
+    "design": "nma",
+    "projection": "q",
+    "raw_words": 64,
+    "golden": "PASS",
+    "raw_output_sha256": "f3dc4fc1be6f7fc25adb04de40ba2272947bfdbff2fb8c7a30b3389fa376f5fa",
+    "quantization": "shared host reference; excluded from RTL timing"
+  },
+  {
+    "design": "tiny",
+    "projection": "q",
+    "raw_words": 64,
+    "golden": "PASS",
+    "raw_output_sha256": "f3dc4fc1be6f7fc25adb04de40ba2272947bfdbff2fb8c7a30b3389fa376f5fa",
+    "quantization": "shared host reference; excluded from RTL timing"
+  },
+  {
+    "design": "nma",
+    "projection": "k",
+    "raw_words": 64,
+    "golden": "PASS",
+    "raw_output_sha256": "53f6b8e71e7da3fb87c4c63ffaddc2c2835746570d0f92bd7f0f5b3b3d5dc985",
+    "quantization": "shared host reference; excluded from RTL timing"
+  },
+  {
+    "design": "tiny",
+    "projection": "k",
+    "raw_words": 64,
+    "golden": "PASS",
+    "raw_output_sha256": "53f6b8e71e7da3fb87c4c63ffaddc2c2835746570d0f92bd7f0f5b3b3d5dc985",
+    "quantization": "shared host reference; excluded from RTL timing"
+  },
+  {
+    "design": "nma",
+    "projection": "v",
+    "raw_words": 64,
+    "golden": "PASS",
+    "raw_output_sha256": "f0d62a8d9a295464124d5490419806d05fcac49437d82ba7b18480239c84759e",
+    "quantization": "shared host reference; excluded from RTL timing"
+  },
+  {
+    "design": "tiny",
+    "projection": "v",
+    "raw_words": 64,
+    "golden": "PASS",
+    "raw_output_sha256": "f0d62a8d9a295464124d5490419806d05fcac49437d82ba7b18480239c84759e",
+    "quantization": "shared host reference; excluded from RTL timing"
+  }
+]

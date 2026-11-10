@@ -1,0 +1,4 @@
+variant,cycles,cycles_per_token,spad_read_bytes,spad_write_bytes,golden
+baseline,66931,8366.375,72448,42112,PASS same logits and KV hashes
+matrix_only,66795,8349.375,72448,42112,PASS same logits and KV hashes
+final,65771,8221.375,72448,42112,PASS same logits and KV hashes
