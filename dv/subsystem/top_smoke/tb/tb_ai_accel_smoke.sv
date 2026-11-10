@@ -4114,6 +4114,289 @@ module tb_ai_accel_smoke;
         end
     endtask
 
+    task run_stage_c_transformer;
+        reg [1023:0] workload_dir;
+        reg [1023:0] initial_file;
+        reg [1023:0] stage_desc_file;
+        reg [1023:0] stage_golden_file;
+        reg [1023:0] stage_poison_file;
+        reg [1023:0] stage_observed_file;
+        reg [1023:0] stage_label;
+        integer image_count;
+        integer stage_idx;
+        integer stage_count;
+        integer decode_steps;
+        integer stage_visible_tokens;
+        integer desc_count;
+        integer descriptor_base;
+        integer completion_base;
+        integer image_index;
+        integer pair_index;
+        integer word_index;
+        integer completion_index;
+        integer poll_index;
+        integer stage_cycles;
+        integer useful_macs;
+        integer useful_macs_extra;
+        integer matrix_mac_cycles;
+        integer matrix_wait_cycles;
+        integer matrix_response_wait_cycles;
+        integer matrix_writeback_cycles;
+        integer matrix_other_cycles;
+        integer sfu_busy_cycles;
+        integer kv_busy_cycles;
+        integer conv_busy_cycles;
+        integer banked_busy_cycles;
+        integer fp_busy_cycles;
+        integer scalar_busy_cycles;
+        integer no_engine_cycles;
+        integer dma_busy_cycles;
+        integer spad_read_bytes;
+        integer spad_write_bytes;
+        integer observed_fd;
+        integer task_id;
+        real mac_per_cycle;
+        real array_utilization;
+        reg [31:0] read_value;
+        reg [31:0] status_value;
+        reg [31:0] expected_value;
+        reg [31:0] incremental_stage_words [0:131071];
+        begin
+            if (!$value$plusargs("AI_STAGE_C_DIR=%s", workload_dir))
+                $fatal(1, "Stage C Transformer mode requires AI_STAGE_C_DIR");
+            useful_macs_extra = 0;
+            void'($value$plusargs("AI_H16_USEFUL_MACS_EXTRA=%d", useful_macs_extra));
+            $sformat(initial_file, "%0s/initial_memory.memh", workload_dir);
+            $readmemh(initial_file, representative_image_words);
+            image_count = representative_image_words[0];
+            if (image_count <= 0 || image_count > 65535)
+                $fatal(1, "invalid Stage C Transformer initial image count=%0d", image_count);
+            representative_load_cycles = 0;
+            representative_load_measure = 1'b1;
+            for (image_index = 0; image_index < image_count; image_index = image_index + 1) begin
+                if (representative_image_words[1 + 2 * image_index] >= SPAD_BYTES ||
+                    representative_image_words[1 + 2 * image_index][1:0] != 2'b00)
+                    $fatal(1, "Stage C Transformer initial SPAD address invalid index=%0d addr=%08h",
+                           image_index, representative_image_words[1 + 2 * image_index]);
+                axi_write(SPAD_BASE + representative_image_words[1 + 2 * image_index],
+                          representative_image_words[2 + 2 * image_index]);
+            end
+            representative_load_measure = 1'b0;
+            decode_steps = 12;
+            void'($value$plusargs("AI_STAGE_C_STAGES=%d", decode_steps));
+            if (decode_steps < 1 || decode_steps > 64)
+                $fatal(1, "Stage C Transformer decode stages must be in [1,64], got=%0d",
+                       decode_steps);
+            stage_count = decode_steps;
+            for (stage_idx = 0; stage_idx < stage_count; stage_idx = stage_idx + 1) begin
+                $sformat(stage_label, "t%0d", stage_idx);
+                $sformat(stage_desc_file, "%0s/stage_%0d_%0s_desc.memh",
+                         workload_dir, stage_idx, stage_label);
+                $sformat(stage_golden_file, "%0s/stage_%0d_%0s_golden.memh",
+                         workload_dir, stage_idx, stage_label);
+                $sformat(stage_poison_file, "%0s/stage_%0d_%0s_poison.memh",
+                         workload_dir, stage_idx, stage_label);
+                $sformat(stage_observed_file, "%0s/stage_%0d_%0s_observed.memh",
+                         workload_dir, stage_idx, stage_label);
+                $readmemh(stage_desc_file, incremental_stage_words);
+                desc_count = incremental_stage_words[0];
+                descriptor_base = incremental_stage_words[1];
+                completion_base = incremental_stage_words[2];
+                if (desc_count <= 0 || desc_count > 128 ||
+                    descriptor_base < 0 || completion_base < 0 ||
+                    descriptor_base + desc_count * 64 > SPAD_BYTES ||
+                    completion_base + desc_count * 16 > SPAD_BYTES)
+                    $fatal(1, "invalid Stage C Transformer stage geometry stage=%0d desc=%0d",
+                           stage_idx, desc_count);
+
+                // Poison only outputs produced by this batch. Cache words remain
+                // live so this stage consumes the preceding stage's actual state.
+                $readmemh(stage_poison_file, representative_image_words);
+                image_count = representative_image_words[0];
+                if (image_count <= 0 || image_count > 65535)
+                    $fatal(1, "invalid Stage C Transformer poison count stage=%0d", stage_idx);
+                for (pair_index = 0; pair_index < image_count; pair_index = pair_index + 1)
+                    axi_write(SPAD_BASE + representative_image_words[1 + 2 * pair_index],
+                              representative_image_words[2 + 2 * pair_index]);
+                for (pair_index = 0; pair_index < image_count; pair_index = pair_index + 1) begin
+                    axi_read(SPAD_BASE + representative_image_words[1 + 2 * pair_index], read_value);
+                    if (read_value !== 32'ha55a_a55a)
+                        $fatal(1, "Stage C Transformer output poison failed stage=%0d pair=%0d",
+                               stage_idx, pair_index);
+                end
+
+                for (image_index = 0; image_index < desc_count; image_index = image_index + 1)
+                    for (word_index = 0; word_index < 16; word_index = word_index + 1)
+                        axi_write(SPAD_BASE + descriptor_base + image_index * 64 + word_index * 4,
+                                  incremental_stage_words[3 + image_index * 16 + word_index]);
+
+                $readmemh(stage_golden_file, representative_golden_words);
+                image_count = representative_golden_words[0];
+                if (image_count <= 0 || image_count > 65535)
+                    $fatal(1, "invalid Stage C Transformer golden count stage=%0d", stage_idx);
+
+                // Re-arm empty queue pointers between batches without resetting SPAD.
+                axi_write(REG_CMDQ_CTRL, 32'd0);
+                axi_write(REG_CMDQ_SIZE, 32'd0);
+                axi_write(REG_CPLQ_SIZE, 32'd0);
+                axi_write(REG_CMDQ_BASE_LO, descriptor_base);
+                axi_write(REG_CMDQ_BASE_HI, 32'd0);
+                axi_write(REG_CMDQ_SIZE, 32'd128);
+                axi_write(REG_CMDQ_HEAD, 32'd0);
+                axi_write(REG_CMDQ_TAIL, desc_count);
+                axi_write(REG_CPLQ_BASE_LO, completion_base);
+                axi_write(REG_CPLQ_SIZE, 32'd128);
+                axi_write(REG_CPLQ_HEAD, 32'd0);
+                axi_write(REG_CPLQ_TAIL, 32'd0);
+
+                ai_tinynpu_cnn_engine_read_words = 0;
+                ai_tinynpu_cnn_engine_write_words = 0;
+                ai_tinynpu_cnn_banked_read_lines = 0;
+                ai_tinynpu_cnn_line_write_lines = 0;
+                ai_tinynpu_cnn_measure = 1'b1;
+                transformer_top_profile_matrix_mac = 0;
+                transformer_top_profile_matrix_request_wait = 0;
+                transformer_top_profile_matrix_response_wait = 0;
+                transformer_top_profile_matrix_writeback = 0;
+                transformer_top_profile_matrix_other = 0;
+                transformer_top_profile_sfu_busy = 0;
+                transformer_top_profile_kv_busy = 0;
+                transformer_top_profile_conv_busy = 0;
+                transformer_top_profile_banked_busy = 0;
+                transformer_top_profile_fp_busy = 0;
+                transformer_top_profile_scalar_busy = 0;
+                transformer_top_profile_no_engine_busy = 0;
+                transformer_top_profile_dma_busy = 0;
+                r17_matrix_count = 0;
+                r17_kv_count = 0;
+                r17_multi_engine_overlap_cycles = 0;
+                transformer_top_last_completion_tail = dut.processor_cplq_tail;
+                transformer_top_last_completion_cycle = transformer_top_cycle_counter;
+                transformer_top_start_cycle = transformer_top_cycle_counter;
+                transformer_top_prefill_target = 0;
+                transformer_top_final_target = desc_count;
+                transformer_top_prefill_end_cycle = transformer_top_start_cycle;
+                transformer_top_prefill_captured = 1'b1;
+                transformer_top_final_captured = 1'b0;
+                transformer_top_timing_enable = 1'b1;
+                axi_write(REG_DOORBELL, 32'd1);
+                for (poll_index = 0; poll_index < 2000000 &&
+                     !transformer_top_final_captured; poll_index = poll_index + 1)
+                    @(posedge aclk);
+                transformer_top_timing_enable = 1'b0;
+                ai_tinynpu_cnn_measure = 1'b0;
+                if (!transformer_top_final_captured)
+                    $fatal(1, "Stage C Transformer completion timeout stage=%0d desc=%0d head=%0d tail=%0d",
+                           stage_idx, desc_count, dut.processor_cmdq_head, dut.processor_cplq_tail);
+                if (dut.processor_cplq_tail != desc_count || dut.processor_cmdq_head != desc_count)
+                    $fatal(1, "Stage C Transformer queues did not drain stage=%0d head=%0d tail=%0d expected=%0d",
+                           stage_idx, dut.processor_cmdq_head, dut.processor_cplq_tail, desc_count);
+
+                $display("R17_STAGE_OVERLAP stage=%0s cycles=%0d",
+                         stage_label, r17_multi_engine_overlap_cycles);
+                for (completion_index = 0; completion_index < desc_count;
+                     completion_index = completion_index + 1) begin
+                    $display("R17_DESCRIPTOR_INTERVAL stage=%0s local_index=%0d task_id=%0d opcode=0x%02h cycles=%0d",
+                             stage_label, completion_index,
+                             incremental_stage_words[3 + completion_index * 16] >> 16,
+                             incremental_stage_words[3 + completion_index * 16][7:0],
+                             transformer_top_completion_cycles[completion_index]);
+                end
+                for (completion_index = 0; completion_index < r17_matrix_count;
+                     completion_index = completion_index + 1) begin
+                    $display("R17_MATRIX_COMMAND stage=%0s index=%0d cycles=%0d mac=%0d request_wait=%0d response_wait=%0d writeback=%0d other=%0d read_bytes=%0d write_bytes=%0d exclusive_closed=%0d",
+                             stage_label, completion_index,
+                             r17_matrix_cycles[completion_index],
+                             r17_matrix_mac[completion_index],
+                             r17_matrix_request_wait[completion_index],
+                             r17_matrix_response_wait[completion_index],
+                             r17_matrix_writeback[completion_index],
+                             r17_matrix_other[completion_index],
+                             r17_matrix_read_bytes[completion_index],
+                             r17_matrix_write_bytes[completion_index],
+                             r17_matrix_mac[completion_index] +
+                             r17_matrix_request_wait[completion_index] +
+                             r17_matrix_response_wait[completion_index] +
+                             r17_matrix_writeback[completion_index] +
+                             r17_matrix_other[completion_index]);
+                end
+                for (completion_index = 0; completion_index < r17_kv_count;
+                     completion_index = completion_index + 1)
+                    $display("R17_KV_COMMAND stage=%0s index=%0d cycles=%0d read_bytes=%0d write_bytes=%0d",
+                             stage_label, completion_index,
+                             r17_kv_cycles[completion_index],
+                             r17_kv_read_bytes[completion_index],
+                             r17_kv_write_bytes[completion_index]);
+
+                observed_fd = $fopen(stage_observed_file, "w");
+                if (observed_fd == 0)
+                    $fatal(1, "could not open Stage C observed file %0s", stage_observed_file);
+                $fdisplay(observed_fd, "%08h", image_count);
+                for (completion_index = 0; completion_index < desc_count;
+                     completion_index = completion_index + 1) begin
+                    task_id = incremental_stage_words[3 + completion_index * 16] >> 16;
+                    axi_read(SPAD_BASE + completion_base + completion_index * 16, read_value);
+                    if (read_value !== task_id)
+                        $fatal(1, "Stage C Transformer task ID mismatch stage=%0d desc=%0d expected=%08h actual=%08h",
+                               stage_idx, completion_index, task_id, read_value);
+                    axi_read(SPAD_BASE + completion_base + completion_index * 16 + 4, status_value);
+                    if (status_value !== 32'd1)
+                        $fatal(1, "Stage C Transformer Completion error stage=%0d desc=%0d status=%08h",
+                               stage_idx, completion_index, status_value);
+                end
+                for (pair_index = 0; pair_index < image_count; pair_index = pair_index + 1) begin
+                    axi_read(SPAD_BASE + representative_golden_words[1 + 2 * pair_index], read_value);
+                    expected_value = representative_golden_words[2 + 2 * pair_index];
+                    if (read_value !== expected_value)
+                        $fatal(1, "Stage C Transformer Golden mismatch stage=%0d pair=%0d addr=%08h expected=%08h actual=%08h",
+                               stage_idx, pair_index,
+                               representative_golden_words[1 + 2 * pair_index],
+                               expected_value, read_value);
+                    $fdisplay(observed_fd, "%08h", representative_golden_words[1 + 2 * pair_index]);
+                    $fdisplay(observed_fd, "%08h", read_value);
+                end
+                $fclose(observed_fd);
+
+                stage_cycles = transformer_top_final_end_cycle - transformer_top_start_cycle;
+                matrix_mac_cycles = transformer_top_profile_matrix_mac;
+                matrix_wait_cycles = transformer_top_profile_matrix_request_wait;
+                matrix_response_wait_cycles = transformer_top_profile_matrix_response_wait;
+                matrix_writeback_cycles = transformer_top_profile_matrix_writeback;
+                matrix_other_cycles = transformer_top_profile_matrix_other;
+                sfu_busy_cycles = transformer_top_profile_sfu_busy;
+                kv_busy_cycles = transformer_top_profile_kv_busy;
+                conv_busy_cycles = transformer_top_profile_conv_busy;
+                banked_busy_cycles = transformer_top_profile_banked_busy;
+                fp_busy_cycles = transformer_top_profile_fp_busy;
+                scalar_busy_cycles = transformer_top_profile_scalar_busy;
+                no_engine_cycles = transformer_top_profile_no_engine_busy;
+                dma_busy_cycles = transformer_top_profile_dma_busy;
+                spad_read_bytes = ai_tinynpu_cnn_engine_read_words * 4 +
+                                  ai_tinynpu_cnn_banked_read_lines * 16;
+                spad_write_bytes = ai_tinynpu_cnn_engine_write_words * 4 +
+                                   ai_tinynpu_cnn_line_write_lines * 16;
+                useful_macs = 0; // Offline manifest gives H32 logical MAC count.
+                mac_per_cycle = 0.0;
+                array_utilization = 0.0;
+                if (stage_cycles > 0)
+                    mac_per_cycle = 1.0 * useful_macs / stage_cycles;
+                if (matrix_mac_cycles > 0)
+                    array_utilization = 100.0 * useful_macs / (256.0 * matrix_mac_cycles);
+                $display("STAGE_C_STAGE_PASS stage=%0s index=%0d desc=%0d golden_words=%0d useful_macs=%0d cycles=%0d matrix_mac=%0d matrix_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d sfu=%0d kv=%0d dma_overlap=%0d spad_read_bytes=%0d spad_write_bytes=%0d mac_per_cycle=%0.4f array_utilization_pct=%0.2f observed=%0s",
+                         stage_label, stage_idx, desc_count, image_count, useful_macs,
+                         stage_cycles, matrix_mac_cycles, matrix_wait_cycles,
+                         matrix_response_wait_cycles, matrix_writeback_cycles,
+                         matrix_other_cycles, sfu_busy_cycles, kv_busy_cycles,
+                         dma_busy_cycles, spad_read_bytes, spad_write_bytes,
+                         mac_per_cycle, array_utilization, stage_observed_file);
+                axi_write(REG_CMDQ_SIZE, 32'd0);
+                axi_write(REG_CPLQ_SIZE, 32'd0);
+                clear_done_irq();
+            end
+            $display("STAGE_C_SESSION_PASS stages=%0d", stage_count);
+        end
+    endtask
+
     task run_representative_model;
         reg [1023:0] image_file;
         reg [1023:0] golden_file;
@@ -4552,6 +4835,12 @@ module tb_ai_accel_smoke;
             if (errors != 0)
                 $fatal(1, "Transformer-only replay had %0d mismatches", errors);
             $display("TRANSFORMER_TOP_ONLY_PASS");
+            $finish;
+        end
+
+        if ($test$plusargs("AI_STAGE_C_TRANSFORMER")) begin
+            run_stage_c_transformer();
+            $display("STAGE_C_TOP_PASS");
             $finish;
         end
 

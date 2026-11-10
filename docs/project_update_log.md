@@ -68,3 +68,25 @@ limitations and no-RTL ASIC disposition in
 `docs/research/STAGE_B_TRANSFORMER_FORWARDING_REPORT.md` and
 `benchmark/research/stage_b/manifest.json`. Actual added hardware state0; no
 synthesis/Fmax/energy claim. **REJECT**; no A3 or next-stage implementation started.
+
+
+## 2026-11-10 — Stage C architecture feasibility and H32 expansion
+
+Status **PARTIAL** at unchanged product RTL tree
+`479f24f33af0ccfa87fd7458ac9c43f94aae7398`, baseline `4e65a2ac`.
+A3 transparent bypass REJECT: current SRAM parity/protection cannot be replaced
+by a committed cached copy; Stage B fault contract VCS replay passes. K64 exact
+four-part model matches3328 CNN outputs but512B does not establish a profitable
+same-array continuation schedule; no product RTL experiment admitted.
+H32/L2/heads2/context16/FFN128/vocab32 trained and mapped to existing ABI:
+4full-prefill +8persistent-decode tokens,92928word strict Golden PASS,367788decode
+cycles/8=45973.5/token,546816read/227840write B,79872B SPAD high water. Final
+model's disjoint-trajectory test accuracy3.19% is explicitly a research limitation;
+overlapping initial-seed metrics are withdrawn as generalization evidence.
+H16 stays65771/8, CNN best12351cycles and independent20800wordGolden passes.
+VCS Top smoke, seeded20,40Matrix config cases,16productGEMV ablations and9common
+Tiny memory-service kernels pass. Native Tiny conv1x_mini4742cycles has unmatched
+DMA/endpoints; no system speedup or frontend freeze/PPA claim. Reproduce with
+`tools/benchmark/stage_c/run_top.sh`, `run_bench.sh`, `validate.py` and the exact
+commands in `docs/research/STAGE_C_ARCHITECTURE_DECISION.md`. Evidence and SHA
+inventory: `benchmark/research/stage_c/`. Stage C stops; no automatic Stage D.
