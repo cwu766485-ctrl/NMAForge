@@ -58,11 +58,14 @@ static bool run_gemm(int m, int n, int k, int workload = 0) {
                     static_cast<int32_t>(operand_a(row, kk, workload)) *
                     static_cast<int32_t>(operand_b(kk, col, workload));
 
+    const uint64_t inclusive_start = cycles;
+    uint64_t clear_cycles = 0, feed_cycles = 0, drain_cycles = 0;
     uint64_t start_cycle = 0;
     for (int tile_row = 0; tile_row < m; tile_row += TILE) {
         for (int tile_col = 0; tile_col < n; tile_col += TILE) {
             // One accumulator clear per output tile; K tiles accumulate into
             // the same 16x16 array before its values are read back.
+            clear_cycles += 2;
             dut.sa_clear_acc = 1;
             tick();
             dut.sa_clear_acc = 0;
@@ -75,6 +78,7 @@ static bool run_gemm(int m, int n, int k, int workload = 0) {
                 // and B column is skewed by its local index. Forty-eight
                 // cycles include the feed and the empty drain slots between
                 // K tiles; accumulators are retained across those K tiles.
+                feed_cycles += 3 * TILE;
                 for (int c = 0; c < 3 * TILE; ++c) {
                     uint32_t a_flat[4] = {0, 0, 0, 0};
                     uint32_t b_flat[4] = {0, 0, 0, 0};
@@ -109,6 +113,7 @@ static bool run_gemm(int m, int n, int k, int workload = 0) {
 
             // Let the final products in this output tile settle before
             // reading them or clearing the array for another output tile.
+            drain_cycles += 4;
             for (int i = 0; i < 4; ++i) tick();
             for (int row = 0; row < TILE; ++row) {
                 for (int col = 0; col < TILE; ++col) {
@@ -124,6 +129,16 @@ static bool run_gemm(int m, int n, int k, int workload = 0) {
     }
 
     const uint64_t elapsed = cycles - start_cycle;
+    const uint64_t inclusive_cycles = cycles - inclusive_start;
+    if (inclusive_cycles != clear_cycles + feed_cycles + drain_cycles)
+        return false;
+    // Host input access and combinational accumulator inspection have no
+    // modeled transfer/commit clocks. Report them as unmeasured, never zero.
+    std::printf("TINYNPU_ARRAY_PHASES shape_mnk=%d,%d,%d clear=%llu feed_wavefront=%llu drain=%llu inclusive=%llu transfer=NA dispatch=NA writeback=NA boundary=array_only\n",
+        m,n,k,static_cast<unsigned long long>(clear_cycles),
+        static_cast<unsigned long long>(feed_cycles),
+        static_cast<unsigned long long>(drain_cycles),
+        static_cast<unsigned long long>(inclusive_cycles));
     const int useful_macs = m * n * k;
     const double mac_per_cycle = static_cast<double>(useful_macs) / elapsed;
     const double utilization = 100.0 * useful_macs / (256.0 * elapsed);

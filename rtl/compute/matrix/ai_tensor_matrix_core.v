@@ -838,9 +838,17 @@ module ai_tensor_matrix_core #(
                 case (prefetch_state_r)
                     PF_A_REQ: begin
                         if (banked_request_is_prefetch && banked_read_accept) begin
-                            if (({29'd0,prefetch_group_r} + 32'd1) >= a_group_count)
-                                prefetch_state_r <= PF_A_DRAIN;
-                            else
+                            if (({29'd0,prefetch_group_r} + 32'd1) >= a_group_count) begin
+                                // FIFO metadata identifies each A/B response.
+                                // Start B without draining A; PF_B_DRAIN still
+                                // waits for every accepted response before use.
+                                if (gemv_kfold_r)
+                                    prefetch_state_r <= PF_A_DRAIN;
+                                else begin
+                                    prefetch_group_r <= 3'd0;
+                                    prefetch_state_r <= PF_B_REQ;
+                                end
+                            end else
                                 prefetch_group_r <= prefetch_group_r + 1'b1;
                         end
                     end

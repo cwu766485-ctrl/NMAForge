@@ -1557,6 +1557,27 @@ module tb_ai_tensor_matrix_core_random;
     end
   endtask
 
+  integer schedule_trace_fd=0;
+  integer schedule_trace_cycle=0;
+  initial begin
+    string schedule_trace_path;
+    if($value$plusargs("MATRIX_SCHEDULE_TRACE=%s",schedule_trace_path)) begin
+      schedule_trace_fd=$fopen(schedule_trace_path,"w");
+      if(!schedule_trace_fd) $fatal(1,"cannot open Matrix trace");
+      $fdisplay(schedule_trace_fd,"cycle,state,prefetch_state,outstanding,request_valid,ready,accept,response,operand_b,address,response_operand_b,response_address");
+    end
+  end
+  always @(posedge clk) begin
+    schedule_trace_cycle=schedule_trace_cycle+1;
+    if(schedule_trace_fd && resetn && busy)
+      $fdisplay(schedule_trace_fd,"%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%08h,%0d,%08h",
+        schedule_trace_cycle,dut.state_r,dut.prefetch_state_r,
+        dut.read_outstanding_count,banked_read_valid,banked_ready,
+        banked_read_valid && banked_ready,banked_rsp_valid,
+        dut.banked_request_is_b,banked_addr,dut.response_operand_b,
+        dut.response_request_addr);
+  end
+
   task automatic check_valid_case(input integer case_id);
     integer expected_line_writes,expected_scalar_writes;
     integer ii,rr,cc,local_word;
@@ -1677,7 +1698,7 @@ module tb_ai_tensor_matrix_core_random;
     begin
       prepare_tinynpu_match_case(m,n,k_size);
       check_valid_case(case_id);
-      $display("MATRIX_TINY_NPU_MATCH_PASS shape=%0dx%0dx%0d physical_array=%0dx%0d bank_response_latency=1 cycle",
+      $display("MATRIX_TINY_NPU_MATCH_PASS shape=%0dx%0dx%0d physical_array=%0dx%0d memory_model=see_MATRIX_MEMORY_MODEL_or_default_seeded_random",
                m,n,k_size,PHYSICAL_ARRAY_SIZE,PHYSICAL_ARRAY_SIZE);
     end
   endtask
@@ -1939,7 +1960,9 @@ module tb_ai_tensor_matrix_core_random;
     begin
       simple_fault_setup();
       prepare_case(4,4,2,1,0,0,0,0,0,0,0);
-      watchdog_limit=20;
+      // Expire while A/B responses are still in flight after the
+      // A-to-B drain bubble was removed (old fixed cut point was 20).
+      watchdog_limit=17;
       force_banked_ready=1;
       force_bank_response_delay=1;
       watchdog_during_prefetch_seen=0;
@@ -1964,7 +1987,7 @@ module tb_ai_tensor_matrix_core_random;
       force_banked_ready=0;force_bank_response_delay=0;
       prepare_case(4,4,1,1,0,0,0,0,0,0,0);
       check_valid_case(16);
-      $display("MATRIX_CORE_PREFETCH_WATCHDOG_PASS limit=20 drained=%0d",
+      $display("MATRIX_CORE_PREFETCH_WATCHDOG_PASS limit=17 drained=%0d",
                bank_response_count);
     end
   endtask
@@ -2496,6 +2519,11 @@ module tb_ai_tensor_matrix_core_random;
       bias_mem[row]=0;output_mem[row]=0;expected_mem[row]=0;
     end
     repeat(4) @(negedge clk);resetn=1;
+    if($test$plusargs("MATRIX_FIXED_MEMORY")) begin
+      force_banked_ready=1;force_zero_bank_latency=1;force_line_ready=1;
+      $display("MATRIX_MEMORY_MODEL ready=always queue_extra_delay=0 ordered_responses=1");
+    end
+
 
     if($test$plusargs("MATRIX_V2_OPCODE_FAULT_ONLY")) begin
       run_v2_opcode_fault_campaign();
@@ -2591,7 +2619,7 @@ module tb_ai_tensor_matrix_core_random;
       run_tinynpu_match_case(16,16,16,105);
       run_tinynpu_match_case(16,16,32,106);
       run_tinynpu_match_case(32,32,64,107);
-      $display("MATRIX_TINY_NPU_MATCH_MULTI_PASS seed=%0d cases=3 physical_array=%0dx%0d bank_response_latency=1 cycle",
+      $display("MATRIX_TINY_NPU_MATCH_MULTI_PASS seed=%0d cases=3 physical_array=%0dx%0d memory_model=see_MATRIX_MEMORY_MODEL_or_default_seeded_random",
                initial_seed,PHYSICAL_ARRAY_SIZE,PHYSICAL_ARRAY_SIZE);
       $finish;
     end

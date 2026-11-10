@@ -666,13 +666,25 @@ module ai_tensor_sfu_core(
                     vector_product_r<=x_r*x_r;
                     state_r<=ST_VEC_POST;
                 end
-                ST_LN_B_REQ: if (spad_ready) begin
-                    if (spad_protection_error) begin error_code<=ERR_PROTECTION; state_r<=ST_ERROR; end
-                    else state_r<=ST_LN_B_WAIT;
+                ST_LN_B_REQ: begin
+                    // Reuse the output register as the post-gamma staging
+                    // register while Beta is fetched. x_r/gamma_r stay stable
+                    // under backpressure; repeated captures are idempotent.
+                    // Preserve the required INT32 saturation between the two
+                    // multipliers; no SPAD-response-to-multiplier bypass.
+                    output_word_r <= gamma_scaled_output;
+                    if (spad_ready) begin
+                        if (spad_protection_error) begin error_code<=ERR_PROTECTION; state_r<=ST_ERROR; end
+                        else state_r<=ST_LN_B_WAIT;
+                    end
                 end
                 ST_LN_B_WAIT: if (spad_rsp_valid) begin
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end
-                    else begin beta_r<=spad_signed; state_r<=ST_RMS_WRITE; end
+                    else begin
+                        beta_r<=spad_signed;
+                        x_r<=output_word_r;
+                        state_r<=ST_VEC_POST;
+                    end
                 end
 
                 ST_DONE: begin busy<=0; done<=1; error<=0; state_r<=ST_IDLE; end
