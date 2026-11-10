@@ -581,8 +581,21 @@ module ai_tensor_sfu_core(
                             end
                         end
                         if (last_element) state_r<=ST_DONE;
-                        else begin index_r<=index_r+1'b1;
-                            state_r<=is_normalization ? ST_RMS_X_REQ : ST_VEC_A_REQ;
+                        else begin
+                            index_r<=index_r+1'b1;
+                            if (is_layernorm && ln_small_fast_r) begin
+                                // The accepted output uses output_word_r, so
+                                // prepare the next cached X without another
+                                // SPAD request or a separate setup cycle.
+                                x_r <= ln_input_cache[index_r[3:0] + 4'd1] - mean_r;
+                                if (src1_r == 0) begin
+                                    gamma_r <= 32'sd32768;
+                                    state_r <= beta_enable_r ?
+                                               ST_LN_B_REQ : ST_RMS_WRITE;
+                                end else state_r <= ST_RMS_G_REQ;
+                            end else begin
+                                state_r<=is_normalization ? ST_RMS_X_REQ : ST_VEC_A_REQ;
+                            end
                         end
                     end
                 end
