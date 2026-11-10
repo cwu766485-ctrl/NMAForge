@@ -1,6 +1,6 @@
 {
   "baseline_sha": "9095832f049629dbfb3ee8a6f10839cdb50f4aa4",
-  "source_parent_sha": "b2b3b0b5942f9218ed574a04e946104109dc2c99",
+  "source_parent_sha": "a6de6427a8996ab0e00845e96fc2149f6d440462",
   "source_tree_dirty": true,
   "rtl_sha256": {
     "rtl/compute/matrix/ai_tensor_matrix_core.v": "e6751836e72dd20853290727efc08ffcb4a17b850bbf27c984dd57fa44b9c98a",
@@ -182,25 +182,25 @@
       "bytes": 960,
       "sha256": "46de2f48a39469d8fbce25c162f22acf10d9e1f33dc6496fe20b5af8daf6c2d8"
     },
-    "qkv/nma_k.log": {
-      "bytes": 1766,
-      "sha256": "04d099fcc355f9312fdad0bbac1da40e94406c6b09db7ca76c4154204efcf4b9"
+    "qkv/nma_k.log.gz": {
+      "bytes": 1004,
+      "sha256": "b38eafd6fe5803ed1c87cdf5c1e347708db9c354134723fa2fc67147cb47a2f9"
     },
     "qkv/nma_k.memh": {
       "bytes": 576,
       "sha256": "53f6b8e71e7da3fb87c4c63ffaddc2c2835746570d0f92bd7f0f5b3b3d5dc985"
     },
-    "qkv/nma_q.log": {
-      "bytes": 1766,
-      "sha256": "406738a12551ccb2798d706143f3507af6c1d1a4dd197cc841232c07606669e8"
+    "qkv/nma_q.log.gz": {
+      "bytes": 1003,
+      "sha256": "58fa2ac94852be41326594d5b0b636f7a533f4f768ec1a54bccd4a07f5cf5e22"
     },
     "qkv/nma_q.memh": {
       "bytes": 576,
       "sha256": "f3dc4fc1be6f7fc25adb04de40ba2272947bfdbff2fb8c7a30b3389fa376f5fa"
     },
-    "qkv/nma_v.log": {
-      "bytes": 1766,
-      "sha256": "04d099fcc355f9312fdad0bbac1da40e94406c6b09db7ca76c4154204efcf4b9"
+    "qkv/nma_v.log.gz": {
+      "bytes": 1004,
+      "sha256": "b38eafd6fe5803ed1c87cdf5c1e347708db9c354134723fa2fc67147cb47a2f9"
     },
     "qkv/nma_v.memh": {
       "bytes": 576,
@@ -218,25 +218,25 @@
       "bytes": 960,
       "sha256": "b681a6a9987ade272ebdc40bbb4f1d31ab427bc7f5885f09fec617ef059903f1"
     },
-    "qkv/tiny_k.log": {
-      "bytes": 340,
-      "sha256": "dc88b0d4a97601cd7ed66af8523e4085c73d282183b12660cf95101a0bc3bf8c"
+    "qkv/tiny_k.log.gz": {
+      "bytes": 272,
+      "sha256": "6cfb82fcd2284d6c02cad6d2186fcd23270c8f78d355b8ee2d76f590b364afb4"
     },
     "qkv/tiny_k.memh": {
       "bytes": 576,
       "sha256": "53f6b8e71e7da3fb87c4c63ffaddc2c2835746570d0f92bd7f0f5b3b3d5dc985"
     },
-    "qkv/tiny_q.log": {
-      "bytes": 340,
-      "sha256": "dc88b0d4a97601cd7ed66af8523e4085c73d282183b12660cf95101a0bc3bf8c"
+    "qkv/tiny_q.log.gz": {
+      "bytes": 272,
+      "sha256": "6cfb82fcd2284d6c02cad6d2186fcd23270c8f78d355b8ee2d76f590b364afb4"
     },
     "qkv/tiny_q.memh": {
       "bytes": 576,
       "sha256": "f3dc4fc1be6f7fc25adb04de40ba2272947bfdbff2fb8c7a30b3389fa376f5fa"
     },
-    "qkv/tiny_v.log": {
-      "bytes": 340,
-      "sha256": "dc88b0d4a97601cd7ed66af8523e4085c73d282183b12660cf95101a0bc3bf8c"
+    "qkv/tiny_v.log.gz": {
+      "bytes": 272,
+      "sha256": "6cfb82fcd2284d6c02cad6d2186fcd23270c8f78d355b8ee2d76f590b364afb4"
     },
     "qkv/tiny_v.memh": {
       "bytes": 576,

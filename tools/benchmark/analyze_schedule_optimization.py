@@ -126,7 +126,8 @@ for seed in [20261109, 20261110, 20261111]:
         archive(suffix % seed, 'validation/' + dest % seed)
 for path in sorted(source('-qkv').iterdir()):
     if path.suffix in ['.json', '.memh', '.log']:
-        archive('-qkv/' + path.name, 'qkv/' + path.name)
+        dest = 'qkv/' + path.name + ('.gz' if path.suffix == '.log' else '')
+        archive('-qkv/' + path.name, dest)
 
 rtl_paths = ['rtl/compute/matrix/ai_tensor_matrix_core.v', 'rtl/compute/sfu/ai_tensor_sfu_core.v']
 manifest = dict(baseline_sha='9095832f049629dbfb3ee8a6f10839cdb50f4aa4',
