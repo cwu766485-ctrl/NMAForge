@@ -1,0 +1,34 @@
+{
+  "status": "MODEL_PASS_GATE0_FAIL",
+  "decision": "REJECT",
+  "baseline_decode_cycles": 65771,
+  "baseline_cycles_per_token": 8221.375,
+  "baseline_read_bytes": 72448,
+  "baseline_write_bytes": 42112,
+  "descriptor_count": 424,
+  "requant_descriptor_count": 104,
+  "eligible_leases": 64,
+  "eligible_reads": 2048,
+  "eligible_read_bytes": 8192,
+  "actual_rtl_cache_hits": null,
+  "actual_rtl_cache_misses": null,
+  "strict_removable_reads": 0,
+  "strict_expected_cycle_saving": 0,
+  "hypothetical_latency1_overhead2_cycles": 61803,
+  "hypothetical_latency1_overhead2_cycles_per_token": 7725.375,
+  "hypothetical_latency1_overhead2_reduction_percent": 6.033054081586109,
+  "hypothetical_latency2_overhead2_cycles": 63851,
+  "notes": [
+    "all savings are serialized trace model estimates, not RTL measurements",
+    "IDEAL_BYPASS cannot observe unsignaled SRAM upset and is not ABI-equivalent",
+    "no speculative result may commit before original permission/parity checks",
+    "STRICT_CHECKED_SHADOW holds service at measured 3 clocks and adds illustrative 2 clocks/lease",
+    "reconstructed values from unchanged final observed/Golden snapshots; no live data trace claimed"
+  ],
+  "input_hashes": {
+    "benchmark/research/stage_a/h16/workload/manifest.json": "ab90596be76c8d50d6fbd1f3609d4d0748e926cfc98d15f8f510f429f2bc3f2e",
+    "benchmark/research/stage_a/h16/h16_cycles.csv.gz": "4d4fc16b813f7892258cc205bed4b9a71e5c12f9cfdeaf9912f0d0ad9e7d4a55",
+    "benchmark/research/stage_a/h16/h16_traffic.csv.gz": "4f5650810af7c16aed59b99985473d3dd55402dede3aef522068258ef6c69006",
+    "benchmark/research/stage_a/h16/top_session.log.gz": "3a1d096beb240d4e156b0f8bd1055133d0c825e07e1d2d0961d514d8f10fc5a0"
+  }
+}

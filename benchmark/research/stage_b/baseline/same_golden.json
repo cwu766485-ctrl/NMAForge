@@ -1,0 +1,60 @@
+{
+  "status": "PASS",
+  "token_metrics_identical": true,
+  "stage_snapshots": [
+    {
+      "path": "stage_0_prefill_kv_0_3_observed.memh",
+      "stage_a_sha256": "96bf428a9351360973ceb15c24576826009ae513b4ab251d458c3d8afc6e9cca",
+      "stage_b_sha256": "96bf428a9351360973ceb15c24576826009ae513b4ab251d458c3d8afc6e9cca",
+      "equal": true
+    },
+    {
+      "path": "stage_1_decode_t4_observed.memh",
+      "stage_a_sha256": "5e1b3f204aa22e00057da39485bc905211751be4097c9c488fe131e6df3f4b79",
+      "stage_b_sha256": "5e1b3f204aa22e00057da39485bc905211751be4097c9c488fe131e6df3f4b79",
+      "equal": true
+    },
+    {
+      "path": "stage_2_decode_t5_observed.memh",
+      "stage_a_sha256": "5cf0363437dbea85784cd549c53b86c510eceb0826a6ff5232fdcb0058530ae0",
+      "stage_b_sha256": "5cf0363437dbea85784cd549c53b86c510eceb0826a6ff5232fdcb0058530ae0",
+      "equal": true
+    },
+    {
+      "path": "stage_3_decode_t6_observed.memh",
+      "stage_a_sha256": "7c7826836d20572b6ad87ddc340d6e99aab801c212aa21e6986a4f66558727ce",
+      "stage_b_sha256": "7c7826836d20572b6ad87ddc340d6e99aab801c212aa21e6986a4f66558727ce",
+      "equal": true
+    },
+    {
+      "path": "stage_4_decode_t7_observed.memh",
+      "stage_a_sha256": "1879112f61e6fb98ce91c6731cfeb80390c9a28a901c9a9d0140039d27ed3d0b",
+      "stage_b_sha256": "1879112f61e6fb98ce91c6731cfeb80390c9a28a901c9a9d0140039d27ed3d0b",
+      "equal": true
+    },
+    {
+      "path": "stage_5_decode_t8_observed.memh",
+      "stage_a_sha256": "dc69bf53043cd9544b92ef1231e0498f333e55acbb5cbd59bfd601f55390784d",
+      "stage_b_sha256": "dc69bf53043cd9544b92ef1231e0498f333e55acbb5cbd59bfd601f55390784d",
+      "equal": true
+    },
+    {
+      "path": "stage_6_decode_t9_observed.memh",
+      "stage_a_sha256": "25407dfb22fe7dd70c67cd97a4d3fe4c6705ce914c09c50c91a8cff50dbf0451",
+      "stage_b_sha256": "25407dfb22fe7dd70c67cd97a4d3fe4c6705ce914c09c50c91a8cff50dbf0451",
+      "equal": true
+    },
+    {
+      "path": "stage_7_decode_t10_observed.memh",
+      "stage_a_sha256": "1b0fe8a2109aef0241ed96859da63351bbee270fe11a0438073f151754ad4e02",
+      "stage_b_sha256": "1b0fe8a2109aef0241ed96859da63351bbee270fe11a0438073f151754ad4e02",
+      "equal": true
+    },
+    {
+      "path": "stage_8_decode_t11_observed.memh",
+      "stage_a_sha256": "6a168e47dd002ca9a1ae97d22a1a148cdca79a76c0fdafd781730ebe54dc69c8",
+      "stage_b_sha256": "6a168e47dd002ca9a1ae97d22a1a148cdca79a76c0fdafd781730ebe54dc69c8",
+      "equal": true
+    }
+  ]
+}

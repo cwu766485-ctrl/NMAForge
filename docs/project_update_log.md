@@ -43,3 +43,28 @@ H64 resident128 KiB allocation does not fit. A3 deferred for partial-sum/live-se
 proof; B2 proposed128 B Matrix→Requant cache requires all-writer coherence and
 parity/protection review. **DESIGN_PARTIAL; Stage A stops for architecture review,
 no Stage B/C product edits or next stage automatically started.**
+
+## 2026-11-10 — Stage B Matrix→Requant contract/model: REJECT
+
+Baseline1b455b355c8604272cbc49a81f5564db9a4e4f05; independent candidate Worktree
+`/tmp/nmaforge-stage-b-candidate`, branch`experiment/stage-b-matrix-requant`.
+No product RTL/ABI/model/Golden edits. Gate0 real memory fabric+SFU VCS test
+reproduces silent post-commit SRAM upset → ERR_PARITY/no outputs, write-allowed/
+read-denied → ERR_PROTECTION, and ready-but-denied Line → no commit. A coherent
+cached copy cannot observe unsignaled SRAM corruption; transparent read removal
+is rejected. No Gate2 candidate RTL or B2-enabled measurement was fabricated.
+
+Independent transaction suite7 tests PASS; replay64 dependency-proven leases/
+2,048 reads/8,192 B,512 packed Golden words;47 latency/hit/invalidation model
+cases. Ideal unapproved1-clock cache+2 clocks/lease estimates6.033% cycle saving;
+strict per-read checking saves0 reads and proves no latency gain. New relaxed
+fault-observation mode described for architecture review only; no bit allocated.
+
+Fresh B1 persistentH16=65,771/8=8,221.375 cycles/token,72,448 read/42,112 write B;
+all8 token metrics and9 full stage Golden snapshots identical to Stage A.
+CNN three mappings65,429/22,983/12,351 cycles Golden PASS; focused SFU64+9 and
+Matrix18+35 cases seed20261110 PASS; Top Smoke PASS. Exact commands, public hashes,
+limitations and no-RTL ASIC disposition in
+`docs/research/STAGE_B_TRANSFORMER_FORWARDING_REPORT.md` and
+`benchmark/research/stage_b/manifest.json`. Actual added hardware state0; no
+synthesis/Fmax/energy claim. **REJECT**; no A3 or next-stage implementation started.

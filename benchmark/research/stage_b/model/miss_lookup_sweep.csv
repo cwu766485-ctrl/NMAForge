@@ -1,0 +1,4 @@
+lookup_penalty_per_requant,requant_descriptors,added_cycles,scope
+0,104,0,"modeled all-Requant descriptor lookup overhead, not RTL"
+1,104,104,"modeled all-Requant descriptor lookup overhead, not RTL"
+2,104,208,"modeled all-Requant descriptor lookup overhead, not RTL"

@@ -1,0 +1,11 @@
+{
+  "model": "/tmp/nmaforge-stage-b-model-final",
+  "analysis": "/tmp/nmaforge-stage-b-baseline-analysis",
+  "baseline": "/tmp/nmaforge-stage-b-baseline",
+  "contract": "/tmp/nmaforge-stage-b-contract-final",
+  "sfu": "/tmp/nmaforge-stage-b-sfu",
+  "matrix": "/tmp/nmaforge-stage-b-matrix",
+  "cnn": "/tmp/nmaforge-stage-b-cnn",
+  "smoke": "/tmp/nmaforge-stage-b-smoke.log",
+  "model_tests": "/tmp/nmaforge-stage-b-model-tests.log"
+}
