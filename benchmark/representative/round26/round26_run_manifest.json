@@ -1,0 +1,369 @@
+{
+  "round": "26",
+  "disposition": "PARTIAL",
+  "branch": "codex/round26",
+  "reviewed_source_sha": "f627596c2c11a47fbcef08d83a56e4d00e8bc355",
+  "source_tree_sha": "a790ecf716a34163645df9f2249fbaee2b36fd68",
+  "product_rtl_tree_sha": "fae8778d62c06c324bf5be0b5cbfea6843141e08",
+  "remote_feature_head_at_start": "f627596c2c11a47fbcef08d83a56e4d00e8bc355",
+  "tiny_npu_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "verilator": "5.052 2026-09-05 rev v5.052",
+    "python": "3.12.13",
+    "numpy": "2.4.6",
+    "onnx": "1.17.0",
+    "pytorch": "2.7.1+cpu"
+  },
+  "runs": [
+    {
+      "run_id": "R26-H16-GELU16-PERSISTENT-S20261123",
+      "status": "PASS",
+      "seed": 20261123,
+      "model_sha256": "e7a521c762b66e5754d6d95c411c163452e0c9b01088cb11631202338cd28225",
+      "prefill_tokens": [
+        0,
+        14,
+        20,
+        29
+      ],
+      "decode_tokens_host_teacher_forced": [
+        13,
+        28,
+        18,
+        11,
+        7,
+        6,
+        8,
+        13
+      ],
+      "decode_steps": 8,
+      "cycles_total": 72238,
+      "cycles_per_token_avg": 9029.75,
+      "golden_words_per_token": 1360,
+      "kv_hash_match": true,
+      "autoregressive_feedback": false,
+      "clock_period_ns_assumed": 4.0
+    },
+    {
+      "run_id": "R26-MATRIX-GEMM-GEMV-S20261109",
+      "status": "PASS",
+      "seed": 20261109,
+      "shapes_gemm": [
+        [
+          16,
+          16,
+          16
+        ],
+        [
+          16,
+          16,
+          32
+        ],
+        [
+          32,
+          32,
+          64
+        ]
+      ],
+      "shapes_gemv": [
+        [
+          1,
+          13,
+          17
+        ],
+        [
+          8,
+          16,
+          19
+        ],
+        [
+          8,
+          16,
+          65
+        ],
+        [
+          16,
+          16,
+          19
+        ],
+        [
+          16,
+          16,
+          65
+        ]
+      ],
+      "nma_endpoint": "Matrix/GEMV controller with one-cycle behavioral SPAD"
+    },
+    {
+      "run_id": "R26-TINYNPU-DIRECT-S20261109",
+      "status": "PASS",
+      "seed": 20261109,
+      "tiny_endpoint": "Direct 16x16 array/engine testbench; GEMM and GEMV Golden pass"
+    },
+    {
+      "run_id": "R26-CNN-MINI-COMMON-GOLDEN",
+      "status": "PASS",
+      "nma_seed": 20261029,
+      "tiny_seed": 99,
+      "model_sha256": "1ac385ac18394ac5826a7eb426e99c2199bf6417055f7e3f461c40c1b1811640",
+      "nma_cmd_cycles": 1985,
+      "nma_host_layout_cycle_counter": 1080,
+      "tiny_graph_cycles": 4781,
+      "speedup_claim": false
+    },
+    {
+      "run_id": "R26-TRAINED-CNN-DMA-R0-S20261109",
+      "status": "PASS_SINGLE_SAMPLE",
+      "seed": 20261109,
+      "model_sha256": "763a86d8a4ad508bd3ec34106163891f26870a98868889b0bc6c8bfe285370f8",
+      "sample": 42,
+      "useful_macs": 570164,
+      "cmd_cycles": 12947,
+      "dma_transfer_setup_cycles": 3019,
+      "dma_payload_bytes": 10944,
+      "golden_words": 20800,
+      "clock_period_ns_assumed": 4.0
+    }
+  ],
+  "commands": [
+    "cd dv/subsystem/top_smoke/sim && vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS +define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=8192 +incdir+../../../block/control/agent +incdir+../../../block/dma/agent +incdir+../fixtures -Mdir=/tmp/nmaforge_round26_gelu16_20261109/csrc -top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv -o /tmp/nmaforge_round26_gelu16_20261109/simv -l /tmp/nmaforge_round26_gelu16_20261109/compile.log",
+    "/tmp/nmaforge_arch_v2_py312/bin/python sw/tools/generate_h16_incremental_decode.py --model benchmark/representative/round25/models/tiny_gpt2_h16_qat_gelu16.json --out /tmp/nmaforge_round26_gelu16_20261109/session8/workload --prefill-tokens 0,14,20,29 --decode-tokens 13,28,18,11,7,6,8,13",
+    "/tmp/nmaforge_arch_v2_py312/bin/python sw/tools/run_tiny_gpt2_persistent_session.py --model benchmark/representative/round25/models/tiny_gpt2_h16_qat_gelu16.json --simv /tmp/nmaforge_round26_gelu16_20261109/simv --out /tmp/nmaforge_round26_gelu16_20261109/session8 --seed 20261123 --steps 8",
+    "make -C dv/block/compute/matrix/sim core-random-compile SEED=20261109 PHYSICAL_ARRAY_SIZE=16 CORE_OUT_DIR=/tmp/nmaforge_round26_gemm_20261109",
+    "/tmp/nmaforge_round26_gemm_20261109/simv +SEED=20261109 +TINY_NPU_MATCH_MULTI -l /tmp/nmaforge_round26_gemm_20261109/run.log",
+    "/tmp/nmaforge_round26_gemm_20261109/simv +SEED=20261109 +MATRIX_PRODUCT_GEMV_ONLY -l /tmp/nmaforge_round26_gemm_20261109/gemv.log",
+    "TINY_NPU_ROOT=/tmp/nmaforge_round25_tiny/reference/source TINYNPU_WORK_ROOT=/tmp/nmaforge_round25_tiny/reference TINYNPU_GEMM_OUT=/tmp/nmaforge_round26_tiny_gemm VERILATOR=/tmp/nmaforge_verilator_5.052/bin/verilator JOBS=2 bash benchmark/tinynpu/run_tinynpu_gemm.sh",
+    "TINY_NPU_ROOT=/tmp/nmaforge_round25_tiny/reference/source TINYNPU_WORK_ROOT=/tmp/nmaforge_round25_tiny/reference TINYNPU_CNN_OUT=/tmp/nmaforge_round26_tiny_cnn VERILATOR=/tmp/nmaforge_verilator_5.052/bin/verilator PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python JOBS=2 bash benchmark/tinynpu/run_tinynpu_cnn.sh",
+    "make -C dv/subsystem/top_smoke/sim ai_tinynpu_cnn_match AI_TINYNPU_CNN_RUN=/tmp/nmaforge_round26_nma_cnn AI_TINYNPU_CNN_PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python AI_TINYNPU_CNN_MODEL=/tmp/nmaforge_round25_tiny/reference/source/models/conv1x_mini.onnx AI_TINYNPU_CNN_GOLDEN=/tmp/nmaforge_round26_tiny_cnn/graph_cnn/golden.bin",
+    "/tmp/nmaforge_arch_v2_py312/bin/python benchmark/representative/generate_trained_3x3_cnn_workload.py --model benchmark/representative/models/r19_trained_digits_3x3_cnn.json --out-dir /tmp/nmaforge_round26_cnn_20261109/workload --fusion-mode both_fused_row_major --test-rank 0",
+    "/tmp/nmaforge_arch_v2_py312/bin/python benchmark/representative/verify_trained_3x3_cnn_workload.py --workload-dir /tmp/nmaforge_round26_cnn_20261109/workload",
+    "/tmp/nmaforge_arch_v2_py312/bin/python benchmark/representative/prepare_cnn_dma_payload.py --memory-image /tmp/nmaforge_round26_cnn_20261109/workload/model_memory.memh --out-dir /tmp/nmaforge_round26_cnn_20261109/workload",
+    "/tmp/nmaforge_round26_gelu16_20261109/simv +ntb_random_seed=20261109 +AI_RANDOM_CASES=0 +AI_SEED=20261109 +ACLK_PERIOD_NS=4.000 +AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_DMA_PRELOAD +AI_REPRESENTATIVE_DMA_PAYLOAD=/tmp/nmaforge_round26_cnn_20261109/workload/dma_payload.memh +AI_REPRESENTATIVE_DMA_PLAN=/tmp/nmaforge_round26_cnn_20261109/workload/dma_plan.memh +AI_REPRESENTATIVE_MEMORY=/tmp/nmaforge_round26_cnn_20261109/workload/model_memory.memh +AI_REPRESENTATIVE_GOLDEN=/tmp/nmaforge_round26_cnn_20261109/workload/model_golden.memh +AI_REPRESENTATIVE_DESC_BASE=106496 +AI_REPRESENTATIVE_CPL_BASE=107008 +AI_REPRESENTATIVE_DESC_COUNT=2 +AI_REPRESENTATIVE_USEFUL_MACS=570164 -l /tmp/nmaforge_round26_cnn_20261109/top.log"
+  ],
+  "measurement_boundary": "All Top runs use behavioral scratchpad and testbench AXI memory; 4 ns / 250 MHz is a simulation assumption only, not ASIC Fmax. TinyNPU runs are Verilator behavioral RTL. Cross-system cycles are not combined unless endpoint matches.",
+  "artifact_hashes": {
+    "cnn/mini_cnn_compile.log.gz": {
+      "sha256": "db20a6c91784a47f1fc36d750b8511d0ac4160006e0c5e9d1aa4a221a8d9cad0",
+      "bytes": 2514
+    },
+    "cnn/mini_cnn_manifest.json": {
+      "sha256": "77bfa357741d2cfaac5b48b141b7ea4d059af4da4230a25b0418d62a9a55089f",
+      "bytes": 1182
+    },
+    "cnn/mini_cnn_run.log.gz": {
+      "sha256": "f28729ced30c6bc1ec7ec2961a703cac345876f9de250681455313f7cb8bdf50",
+      "bytes": 685
+    },
+    "cnn/trained_cnn_dma_payload.memh": {
+      "sha256": "17348f66d0ba20d85a2dc04381a84636050b77d3572f38ce89a18dfdc6f44b62",
+      "bytes": 24624
+    },
+    "cnn/trained_cnn_dma_payload_summary.json": {
+      "sha256": "eea8407a434a1783dc2386f934cb3c38c863a6fb93bd449ef968b63a6a33600d",
+      "bytes": 1239
+    },
+    "cnn/trained_cnn_dma_plan.memh": {
+      "sha256": "7d7139073f888a280d9bd9eeddefba6aa82f2dd9c2a99ec99d7546b4b0a2b83f",
+      "bytes": 117
+    },
+    "cnn/trained_cnn_dma_top.log.gz": {
+      "sha256": "75d3430488f6e63d7526f09fd1a2e0459f1a40e875c8985bf515565026695f3a",
+      "bytes": 968
+    },
+    "cnn/trained_cnn_generate_walltime.txt": {
+      "sha256": "584cc2e8e36632a5e4a67eee3bd748859a377a1ddbb9a29fd83cd038706f7636",
+      "bytes": 29
+    },
+    "cnn/trained_cnn_manifest.json": {
+      "sha256": "0649f9e893abfaa2dcff44f5ed2e2c4a81df7fe14227b6d4d737bce94ad1c627",
+      "bytes": 1969
+    },
+    "cnn/trained_cnn_model_golden.memh": {
+      "sha256": "3c8f8db5b4011c04656c40d1df683799414caa6bbadb52b05029f6253de0020f",
+      "bytes": 374409
+    },
+    "cnn/trained_cnn_model_memory.memh": {
+      "sha256": "7d2dea09ee8003d15fa05dfacdfd078697482173cabb061ff5a43e1a87666e17",
+      "bytes": 423801
+    },
+    "cnn/trained_cnn_payload.log.gz": {
+      "sha256": "e7f6db773189871a1d04ab956991e3d4273ba12cd6fda16a301d2f9b86d83ff3",
+      "bytes": 165
+    },
+    "cnn/trained_cnn_top_walltime.txt": {
+      "sha256": "78d06af0003d7698ab7670c90d04e6cbfb52f9079c90673bff1499c6325226fd",
+      "bytes": 29
+    },
+    "cnn/trained_cnn_verify.log.gz": {
+      "sha256": "4d0ea08e54216c9a7fe46fda9aa907e2983eed1826e185283c5bfed3482717d8",
+      "bytes": 155
+    },
+    "logs/h16_vcs_compile.log.gz": {
+      "sha256": "6a9efda6cf676c9b01541004250a63f606106cb384aa670776752976f5e0b671",
+      "bytes": 2484
+    },
+    "logs/matrix_gemm_run.log.gz": {
+      "sha256": "3beca55827f9f8497360f622929e72e939b7a9348c0ba5c45262d0ced1efb82e",
+      "bytes": 1165
+    },
+    "logs/matrix_gemv_run.log.gz": {
+      "sha256": "a24296ba85ca7234d9f3d4f8f548879157ccde32343925227f1091921746b3d5",
+      "bytes": 1467
+    },
+    "logs/matrix_vcs_compile.log.gz": {
+      "sha256": "33dfd7f38706a2a390be6f21d659cd0d931190f2c5ecfa8c120576d68dc29203",
+      "bytes": 1568
+    },
+    "round26_cnn_accounting.csv": {
+      "sha256": "77351fa63c64aae7d50b780e57ebd515d635762d6edf801124d28bcb4ae1d40a",
+      "bytes": 1689
+    },
+    "round26_cnn_measurements.csv": {
+      "sha256": "7ef4c72bbef5222f5c72bb4b21982c1ef0048a8554ed8a51ccfc09e0b22c19bb",
+      "bytes": 1208
+    },
+    "round26_gemm_controller_profile.csv": {
+      "sha256": "633014f83ff6f1aaec5aa3af1366ddb6a49cc805c31fa672cf20c4fada821dff",
+      "bytes": 942
+    },
+    "round26_sfu_candidate_estimates.csv": {
+      "sha256": "fbd15093a762c2e0ae3cfdac077d739beb9a6a45181b9f7c09fcc92addc55325",
+      "bytes": 1455
+    },
+    "round26_shape_comparison.csv": {
+      "sha256": "75b2e384117551f3f6b597032cca87a20499870abd7f5b4ca6ab8ecc61365379",
+      "bytes": 1939
+    },
+    "tinynpu/cnn_compile.log.gz": {
+      "sha256": "1c0b13fa51b4700c400306464a6de3d24c491e0a4e7a5b7693e6f1bf5c3ba8c6",
+      "bytes": 1291
+    },
+    "tinynpu/cnn_onnx_compile.log.gz": {
+      "sha256": "065e21d6f1bcba18c37b628c456f8a5cf523aec94a6a7646866a61f97106ce9e",
+      "bytes": 358
+    },
+    "tinynpu/cnn_run.log.gz": {
+      "sha256": "c8a625064b6a0624090273b19c8b98f8562777e5d36387c13b505ba30811965d",
+      "bytes": 385
+    },
+    "tinynpu/engine_regression.log.gz": {
+      "sha256": "5fd4a3ac51bedbc62739a9c5ef1cf3fdaede5e24317ea50b492989f485173d03",
+      "bytes": 331
+    },
+    "tinynpu/gemm_compile.log.gz": {
+      "sha256": "64ec016fe29c80bad04d75060e0aa8c618fb0dffef6a9c1307931b29809bdd33",
+      "bytes": 940
+    },
+    "tinynpu/gemm_run.log.gz": {
+      "sha256": "78ef7ed4d4c8ea1165a4b535051bd95f38cf3d80eb05d7639dae1d733f53e584",
+      "bytes": 373
+    },
+    "transformer/generator.log.gz": {
+      "sha256": "b8cb214b58de3da93fd1ac509fe00701e745b65b1e58eb299f36c4ff4689d285",
+      "bytes": 214
+    },
+    "transformer/independent_int8_reference.json": {
+      "sha256": "8ff0bfe39a4964f9398a130226f081f9daa05a52d94a53ee1e723187623f4d99",
+      "bytes": 53958
+    },
+    "transformer/opcode_profile.csv": {
+      "sha256": "4a565f8131a365b736893d97b103e7e84cbb4cfffe5e25462117c80ea831138e",
+      "bytes": 15908
+    },
+    "transformer/opcode_profile.json": {
+      "sha256": "47bbf8714de34b729b4ddc3ff6c7ccdec5ff88dc34c263d3827ab8805afb5f6e",
+      "bytes": 1690
+    },
+    "transformer/persistent_decode.csv": {
+      "sha256": "4ad153970cbbf043b5adce8df2f02925042703cddbe1eb16cbdfbb7b19a96ce9",
+      "bytes": 4569
+    },
+    "transformer/persistent_decode.json": {
+      "sha256": "45f58b769c10f6158d2b7941c0afd7011996566be556b0f8f742384e3b4ce00d",
+      "bytes": 14420
+    },
+    "transformer/top_session.log.gz": {
+      "sha256": "9f33fb2e136599873cf9015c7ac6db68c6001072d4e8d2d536660c6d2c45e8ed",
+      "bytes": 7036
+    }
+  },
+  "tested_worktree_branch": "codex/round26",
+  "submission_target_branch": "feature/npu-architecture-v2",
+  "final_report": {
+    "path_from_repository_root": "docs/benchmark/NMAFORGE_V2_ROUND26_FINAL_PERFORMANCE_REVIEW.md",
+    "sha256": "0c5a3f1b477e5ae3e311fc0486d0c426a6ad7fd7375492360cc1867106c7ee0e",
+    "bytes": 16071
+  },
+  "compressed_logs": {
+    "cnn/mini_cnn_compile.log.gz": {
+      "raw_sha256": "c67861762f25f36733d31b748e0db80ccdd10d3693415124a5bf5d9857fc4742",
+      "raw_bytes": 9367
+    },
+    "cnn/mini_cnn_run.log.gz": {
+      "raw_sha256": "33847e5039f811a9c243a785bfc4c853da9f98dfc395a8028b0c5a441e7dedf4",
+      "raw_bytes": 1273
+    },
+    "cnn/trained_cnn_dma_top.log.gz": {
+      "raw_sha256": "50ebd2bc5c04160c6d35c63e064cdfc4db0ed57795c2ae779d3075ce39e0d366",
+      "raw_bytes": 2141
+    },
+    "cnn/trained_cnn_payload.log.gz": {
+      "raw_sha256": "bb8f2f04d7288e1b14fb1c0ab57eeb454ca0cc9f342ea9770c295ca9d3624e40",
+      "raw_bytes": 183
+    },
+    "cnn/trained_cnn_verify.log.gz": {
+      "raw_sha256": "70086edd8db6e0695f01d00a31308bb73dbeb321187e7993c9476ce857adb070",
+      "raw_bytes": 170
+    },
+    "logs/h16_vcs_compile.log.gz": {
+      "raw_sha256": "09ce9e0be5304b56df610ac3362abe2fa2b0ba82d729b9af284765dbdb53bff3",
+      "raw_bytes": 9287
+    },
+    "logs/matrix_gemm_run.log.gz": {
+      "raw_sha256": "0e3a046aa242ffc188694429ea2713f53f31babcd86f06a42b9f5ee704ab9e04",
+      "raw_bytes": 3316
+    },
+    "logs/matrix_gemv_run.log.gz": {
+      "raw_sha256": "e8679a0436b3cf763c46884b85f14ae4793e40d95e28a6ce3efa50346b47eb36",
+      "raw_bytes": 4656
+    },
+    "logs/matrix_vcs_compile.log.gz": {
+      "raw_sha256": "2dbf73e3daaa39a3d88ac402002e49a5659bbf2cd81c7b7dccdb1e2f219cba94",
+      "raw_bytes": 3981
+    },
+    "tinynpu/cnn_compile.log.gz": {
+      "raw_sha256": "7b54be2aefb28b3f3ac235f51cf8203c49cd56e8b083dee33d6c631a7dfa6214",
+      "raw_bytes": 18949
+    },
+    "tinynpu/cnn_onnx_compile.log.gz": {
+      "raw_sha256": "83dd783eae5de65d532d1236e8d843028d0e2699e85529ea662a4284859587ba",
+      "raw_bytes": 767
+    },
+    "tinynpu/cnn_run.log.gz": {
+      "raw_sha256": "df461017ac1264fd2257540f04fb2f993e558ba57b30837936e05f892aaf3d87",
+      "raw_bytes": 823
+    },
+    "tinynpu/engine_regression.log.gz": {
+      "raw_sha256": "7dfc3091722f50a7fe926d105403584ef050cf1b2ded2146547a126f218bc5c6",
+      "raw_bytes": 762
+    },
+    "tinynpu/gemm_compile.log.gz": {
+      "raw_sha256": "472715f73985c184d0b9ae5f7a91aec8dea60b016549300cf85d932356b719d0",
+      "raw_bytes": 16279
+    },
+    "tinynpu/gemm_run.log.gz": {
+      "raw_sha256": "e921bef8e90748964ee0b7a566f70607515f5ee650cc00d18bbafbe9a0371bbe",
+      "raw_bytes": 1374
+    },
+    "transformer/generator.log.gz": {
+      "raw_sha256": "0dd9b06c2e1cb4b4c36630ee2d4158087b3c2f5e520089c2ff5b8a9ac6d33f9d",
+      "raw_bytes": 252
+    },
+    "transformer/top_session.log.gz": {
+      "raw_sha256": "a97f5740f68c5144d3ed2b812c3be6a5d002be9aaaa433e8caaeb536882e236c",
+      "raw_bytes": 129433
+    }
+  },
+  "log_storage": "Raw log bytes are preserved losslessly as deterministic gzip files (*.log.gz); compressed and uncompressed SHA-256 values are recorded."
+}

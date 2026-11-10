@@ -1,0 +1,4 @@
+candidate,measured_saving_cycles,decision,rationale
+A_row_batching,UNKNOWN,NOT_EVALUATED,Requires exact baseline trace and row contract analysis
+B_internal_buffer_reuse,UNKNOWN,NOT_EVALUATED,Repeated reads visible in inspected current FSM; savings and storage cost unmeasured
+C_optional_fusion,UNKNOWN,NOT_IMPLEMENTED,Must preserve visible INT32 output; optional interface and dual-write cost untested

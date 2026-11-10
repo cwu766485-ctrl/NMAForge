@@ -1,0 +1,10 @@
+descriptor,stage,cycles,evidence_class,method
+layernorm16,input_read,UNKNOWN,NOT_MEASURED,Requires baseline-matched per-cycle trace; no stage timing can be recovered from descriptor totals
+layernorm16,sum_sum_of_squares,UNKNOWN,NOT_MEASURED,Requires baseline-matched per-cycle trace; no stage timing can be recovered from descriptor totals
+layernorm16,variance_normalization,UNKNOWN,NOT_MEASURED,Requires baseline-matched per-cycle trace; no stage timing can be recovered from descriptor totals
+layernorm16,reciprocal_sqrt,UNKNOWN,NOT_MEASURED,Requires baseline-matched per-cycle trace; no stage timing can be recovered from descriptor totals
+layernorm16,affine_transform,UNKNOWN,NOT_MEASURED,Requires baseline-matched per-cycle trace; no stage timing can be recovered from descriptor totals
+layernorm16,output_writeback,UNKNOWN,NOT_MEASURED,Requires baseline-matched per-cycle trace; no stage timing can be recovered from descriptor totals
+layernorm16,dispatch_completion,UNKNOWN,NOT_MEASURED,Requires baseline-matched per-cycle trace; no stage timing can be recovered from descriptor totals
+layernorm16,spad_stall,UNKNOWN,NOT_MEASURED,Requires baseline-matched per-cycle trace; no stage timing can be recovered from descriptor totals
+layernorm16,TOTAL_DESCRIPTOR,373,ARCHIVED_ROUND26,Measured descriptor interval only; exclusive stage closure remains open
