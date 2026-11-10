@@ -42,7 +42,7 @@ module ai_unsigned_divider #(
             found_one = 1'b0;
             for (bit_index=WIDTH-1; bit_index>=0; bit_index=bit_index-1) begin
                 if (!found_one && value[bit_index]) begin
-                    significant_bit_count = WIDTH - bit_index;
+                    significant_bit_count = bit_index + 1;
                     found_one = 1'b1;
                 end
             end
