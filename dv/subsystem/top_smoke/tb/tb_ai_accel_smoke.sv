@@ -561,6 +561,7 @@ module tb_ai_accel_smoke;
     end
 
     `include "stage_a_profile.svh"
+    `include "phase1_profile.svh"
 
     // Round 28: exclusive LayerNorm state samples; dispatch is external.
     integer r28_counts [0:6];
