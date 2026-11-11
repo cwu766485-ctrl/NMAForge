@@ -1,0 +1,21 @@
+{
+  "decision": "RETAIN_LN32",
+  "merge_sha": "cb08797e612355b404f9eb697a34f99628deebfd",
+  "baseline_rtl_sha": "48790076b351cb9d49e1785247d32a1f51b8286d",
+  "phase1_sha": "ae7fd31eced13dcb9dbd70533da60559511d0a90",
+  "sfu_source_sha256": "a517e7072b503c7a5a144a69c58ee85475cb42b8d48c183d38b5d6dd7471f4fd",
+  "h32_before": 367051,
+  "h32_after": 350155,
+  "removed": 16896,
+  "reduction_pct": 4.603175035621753,
+  "sfu_before": 290595,
+  "sfu_after": 273699,
+  "ln32_before": 104064,
+  "ln32_after": 87168,
+  "same_sram_access_sequence": true,
+  "new_data_flops": 0,
+  "new_ports": 0,
+  "new_mac": 0,
+  "new_lint_warnings": 0,
+  "timing": "FMAX_NOT_MEASURED"
+}

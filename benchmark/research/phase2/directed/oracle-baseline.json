@@ -1,0 +1,7 @@
+{
+  "full_vectors": 40,
+  "mean_cases": 1231,
+  "variance_cases": 1208,
+  "numeric_domain": "first4 and random signed16; constant INT32_MIN/MAX stress beyond normative general LN input domain; mean/variance state probes cover arbitrary64bit accumulators",
+  "formula": "abs(sum)//32 restore sign; generic >2^31 error; unsignedsum_sq//32; Python arbitrary precision independent of RTL shifts"
+}

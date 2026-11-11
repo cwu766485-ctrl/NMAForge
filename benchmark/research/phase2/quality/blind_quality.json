@@ -1,0 +1,25 @@
+{
+  "scope": "fresh blind period3 triples, excluded train and monitored validation rotations; fixed weights, no retraining",
+  "seed": 20261114,
+  "sequences": 128,
+  "predictions": 1536,
+  "fp32": {
+    "accuracy": 1.0,
+    "cross_entropy": 0.0002953285293187946,
+    "perplexity": 1.0002953721430823
+  },
+  "int8": {
+    "accuracy": 1.0,
+    "cross_entropy": 0.0006841429011451788,
+    "perplexity": 1.000684376980278
+  },
+  "baselines": {
+    "unigram": 0.026041666666666668,
+    "copy_current": 0.0,
+    "trained_bigram": 0.020833333333333332,
+    "lag3_rule_oracle": 1.0
+  },
+  "overlap": 0,
+  "status": "PASS",
+  "limitation": "synthetic lag3 memory diagnostic; rule oracle perfect; not natural-language quality or unseen task generalization"
+}

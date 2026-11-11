@@ -117,3 +117,21 @@ independent Golden and20randomcases/seed12345 PASS; existingMatrix8config×5shap
 ablation PASS. Main, product and other worktrees preserved. Six linked reports
 under `docs/performance/`, `docs/research/` and `docs/design/` document boundaries,
 model limitations, numeric/fault obligations and remaining freeze risks.
+
+## Phase 2 — exact LN32 RTL candidate and streaming feasibility
+
+Reviewed Phase1 `ae7fd31eced13dcb9dbd70533da60559511d0a90` (no product RTL
+changes); merged and published `nmaforge` at
+`cb08797e612355b404f9eb697a34f99628deebfd`. Dedicated candidate branch
+`feat/phase2-exact-sfu` extends only exact length32 LN mean/variance division.
+Measured fixed H32 eight-token decode367051 ->350155cycles (4.603175%);
+H16=65771 and trainedCNN both-fused=12351 unchanged. Strict integer arithmetic,
+mandatory SRAM address/order/traffic, Logits/KV/intermediate Golden, protection/
+parity, reset/abort/watchdog, three-seed SFU and Top smoke/seeded20 PASS.
+No new flops/ports/MAC or ABI change. No new focused lint warnings; inherited
+Top issues remain and no area/Fmax/signoff claim is made. Gate2 requant model
+projects conditional incremental43504cycles/12.4242% but does not prove dynamic
+fault timing or closed-loop arbitration. No streaming RTL admitted/implemented.
+Decision RETAIN_LN32 / DESIGN_PARTIAL. Five reports in `docs/research/phase2/`;
+commands in `tools/benchmark/phase2/README.md`; public archive validated with
+`python3 tools/benchmark/phase2/validate.py`. Stop after Gates1/2.
