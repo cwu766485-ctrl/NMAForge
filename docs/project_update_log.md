@@ -94,3 +94,26 @@ inventory: `benchmark/research/stage_c/`. Stage C stops; no automatic Stage D.
 ## 2026-11-11 Asia/Singapore — SPAD128 Gate 0/1 candidate
 
 Dedicated branch `feat/spad-128k-closure`, based on nmaforge `95c4387bb0ac57ff4fa427fd3c1202320ad0940b`: defaults aligned to8192words/bank (128KiB), optional32768 retained, constant geometry rejection, capacity-derived Digits/MiniCNN fixtures and concurrent smoke placements. Full smoke now checks final TEST PASS; original128KiB fixture failure (23 errors) retained. Isolated VCS replay: `SPAD128_OUT=<fresh-absolute-dir> SPAD128_PYTHON=<python3.12-with-model-dependencies> SPAD128_DATASET=1 bash tools/benchmark/spad128/run.sh`. Mandatory Golden, boundary, parity/protection and512KiB compatibility evidence is in `benchmark/research/spad128`; validate with `python3.12 tools/benchmark/spad128/validate.py`. H16=65771/8decodecycles, H32=367788/8, CNN bothfused=12351CMDQ cycles preserved. Verilator warnings match same-capacity baseline but remain unresolved, no signoff/PPA/Fmax claim. See `docs/design/SPAD_CONFIG_REGRESSION.md`. Stop for architecture review before Gate2/performance RTL; no product-branch merge.
+
+## Phase 1 — architecture and benchmark closure review
+
+Approved baseline `48790076b351cb9d49e1785247d32a1f51b8286d`, isolated branch
+`feat/phase1-architecture-benchmark`; no product RTL changes. Passive monitor
+closes every exclusive CMDQ window and scheduler read-response ledger. Fixed
+Top GEMM4×4×32/16×16×16/32×32×64:126/186/986cycles; product0x52M1/4/8:
+143/161/213cycles. TrainedCNN both-fused remains12,351 and H16Decode65,771/8,
+strict Golden PASS. Qualified synthetic H32period3model:367,051/8Decode,
+79.17%SFU; FP32/INT8blind accuracy100%, lag3ruleoracle100% (no language claim).
+12common-adapter Tiny raw kernels PASS; no native/fullsystem speedup.
+Verilator5.052 warning counts reproduced, temporary default diagnostic only;
+all product warnings retain explicit dispositions. Recommend one next RTL
+experiment: exactlength32LNmean/variance division specialization, analytical
+≤4.60%H32cycle reduction; no implemented improvement claimed. Second candidate
+prefetch scheduling deferred without incremental evidence. DESIGN_PARTIAL.
+
+Reproduce with `tools/benchmark/phase1/README.md`; public proof:
+`python3 tools/benchmark/phase1/validate.py`. VCSV-2023.12-SP1Top directed workloads,
+independent Golden and20randomcases/seed12345 PASS; existingMatrix8config×5shape
+ablation PASS. Main, product and other worktrees preserved. Six linked reports
+under `docs/performance/`, `docs/research/` and `docs/design/` document boundaries,
+model limitations, numeric/fault obligations and remaining freeze risks.

@@ -1,0 +1,2515 @@
+{
+  "status": "PHASE1_COMPLETE_DESIGN_PARTIAL",
+  "rtl_sha": "48790076b351cb9d49e1785247d32a1f51b8286d",
+  "rtl_tree": "c86d2cfda7cde900482f38a3b48b620bc69f67cb",
+  "report_branch": "feat/phase1-architecture-benchmark",
+  "product_rtl_modified": false,
+  "tiny_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+  "spad_bytes": 131072,
+  "banks": 4,
+  "macs": 256,
+  "simulation_clock_ns": 4,
+  "memory": "VCS behavioral dual-port four-bank SRAM; registered2edge sampled scheduler response; no physical macro",
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "verilator": "5.052",
+    "python": "3.12.13",
+    "torch": "2.7.1+cpu"
+  },
+  "sources": {
+    "tools/benchmark/phase1/README.md": "b199a39c099c8b524715f055f5973b44d1cbedeb14f26f681ab621e1f2c663ef",
+    "tools/benchmark/phase1/analyze.py": "e2e840948992c6c13ba715d74c243710d1f1252ae0cc2e2480e2ac80fe4a1491",
+    "tools/benchmark/phase1/archive.py": "8c6516654006ee4642f3ae0ac4882cad8c14a5af5a7670a5ca6bd722e9c07a44",
+    "tools/benchmark/phase1/build_top.sh": "8ffa3ae71422ff268c58341e024cdb10b465d89671b1ea3cd04cce4280ae3043",
+    "tools/benchmark/phase1/evaluate_h32.py": "c2f8fb5147e7a5215f3f872248c28fe62f75c106f16d8ec7951664129e3b4b8c",
+    "tools/benchmark/phase1/prepare_matched.py": "dcb12aeb530a0d406acdc2c6bb6b79ed03edcbbb67587c03ef96f4d7a873bbec",
+    "tools/benchmark/phase1/replay_transformers.py": "d7356a35369bd11d8520160df97f6cd5f6bef2ee4e453a37bfaed8e352b9af4e",
+    "tools/benchmark/phase1/run.py": "682a2acabb8e211972072c31eb61d5197760da06f06dcf8a26e6c3a36e86a0d7",
+    "tools/benchmark/phase1/run_matched.sh": "de93a307c0d3c46374f927dfa3cc4ac2d1e82e43445ae46636f97ed89bdc4831",
+    "tools/benchmark/phase1/static_review.py": "b2709f4141bf949d94eca964b8b403532437c1b7fee3c1b643e673fa53b93602",
+    "tools/benchmark/phase1/supplement.py": "06001078b7e0d8c6e6df1ee1be41604659cfc0e1509b5792bd9a745f54209293",
+    "tools/benchmark/phase1/train_h32.py": "680886833d63136a27b66fc62c7154ad943a4a1c9256a95d3192657472234d7d",
+    "tools/benchmark/phase1/validate.py": "984cec847384de81fa1226d87144da5eb0eccf2b06737ecdf294ab1ad3df9f29",
+    "dv/subsystem/top_smoke/fixtures/phase1_profile.svh": "c32aca47c5a6adfc6b29cc44c441bbf9d60e5ab6f9307f6afb0763454e938b58",
+    "dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv": "c4c1e9f665dd7088d437cfc1f2ae0e312e39ee78ae87cb7b465c640ce9faa641",
+    "tools/benchmark/stage_c/reference.py": "b4a7a8f3fdc597ce1754decc163a7211b8e57c84c66ba17263b6ace0e97a3050",
+    "tools/benchmark/stage_c/generate.py": "0999c098e78c9f26058932f21b47653c36af8d874ea064095c21596ad4510e42",
+    "tools/benchmark/stage_c/prepare_bench.py": "99fa965fb0d83cdad145e4b26456b5bbaf5bce50cc0a33130d05bd0ea1ee4e8d",
+    "tools/benchmark/stage_c/bench.py": "598907820624f803800c277574f7ffc6d9926e30807ae0f9b99975a775caec8b",
+    "benchmark/representative/models/r19_trained_digits_3x3_cnn.json": "763a86d8a4ad508bd3ec34106163891f26870a98868889b0bc6c8bfe285370f8",
+    "benchmark/representative/round25/models/tiny_gpt2_h16_qat_gelu16.json": "e7a521c762b66e5754d6d95c411c163452e0c9b01088cb11631202338cd28225"
+  },
+  "evidence": [
+    {
+      "path": "analysis/sfu_opcodes.csv",
+      "sha256": "906ffe466988176caedd909ef603cf88e508670b23ff6e4132fe31db23a23fcf",
+      "uncompressed_sha256": "906ffe466988176caedd909ef603cf88e508670b23ff6e4132fe31db23a23fcf",
+      "bytes": 2945,
+      "source": "/tmp/nmaforge-phase1-runs/analysis/sfu_opcodes.csv"
+    },
+    {
+      "path": "analysis/sfu_states.csv",
+      "sha256": "6f5e8641aa50e54b32709169e22e5328b73c01aec4976338c38292f3b238c3b4",
+      "uncompressed_sha256": "6f5e8641aa50e54b32709169e22e5328b73c01aec4976338c38292f3b238c3b4",
+      "bytes": 29369,
+      "source": "/tmp/nmaforge-phase1-runs/analysis/sfu_states.csv"
+    },
+    {
+      "path": "analysis/workloads.csv",
+      "sha256": "b07cff441e484f4651d4a97831cbf97a053e018f6ca4e6f49783052dcc53d614",
+      "uncompressed_sha256": "b07cff441e484f4651d4a97831cbf97a053e018f6ca4e6f49783052dcc53d614",
+      "bytes": 5311,
+      "source": "/tmp/nmaforge-phase1-runs/analysis/workloads.csv"
+    },
+    {
+      "path": "analysis/clients.csv",
+      "sha256": "65ba27b04447801afa5c450079fd5aacc8425e738fd5a03548bf86d7e9357af6",
+      "uncompressed_sha256": "65ba27b04447801afa5c450079fd5aacc8425e738fd5a03548bf86d7e9357af6",
+      "bytes": 5699,
+      "source": "/tmp/nmaforge-phase1-runs/analysis/clients.csv"
+    },
+    {
+      "path": "analysis/summary.json",
+      "sha256": "b25073246f77c6dfea7b54c335e666f57f084b544988744270d0318549e4dcbb",
+      "uncompressed_sha256": "b25073246f77c6dfea7b54c335e666f57f084b544988744270d0318549e4dcbb",
+      "bytes": 9528,
+      "source": "/tmp/nmaforge-phase1-runs/analysis/summary.json"
+    },
+    {
+      "path": "analysis/responses.csv",
+      "sha256": "63de87b661a49927156af38c8f7ed5ece8db89da3cbda4bdb7e30a5b73d9afdf",
+      "uncompressed_sha256": "63de87b661a49927156af38c8f7ed5ece8db89da3cbda4bdb7e30a5b73d9afdf",
+      "bytes": 2759,
+      "source": "/tmp/nmaforge-phase1-runs/analysis/responses.csv"
+    },
+    {
+      "path": "analysis/exclusive.csv",
+      "sha256": "11ef941f3a690943d93accf7a4c370c0e4308dc3fcd19e2e5774255f82e962df",
+      "uncompressed_sha256": "11ef941f3a690943d93accf7a4c370c0e4308dc3fcd19e2e5774255f82e962df",
+      "bytes": 21559,
+      "source": "/tmp/nmaforge-phase1-runs/analysis/exclusive.csv"
+    },
+    {
+      "path": "analysis/cnn_boundary.csv",
+      "sha256": "444f6b741decbcdb676e099a394b441b3d9e5154b72139b7af16d142e38cd659",
+      "uncompressed_sha256": "444f6b741decbcdb676e099a394b441b3d9e5154b72139b7af16d142e38cd659",
+      "bytes": 1166,
+      "source": "/tmp/nmaforge-phase1-runs/analysis/cnn_boundary.csv"
+    },
+    {
+      "path": "analysis/candidate_bounds.json",
+      "sha256": "efc6a2e0484f0c0cac611ce762f7696f67bd3312e88ebb7525352df46d91a962",
+      "uncompressed_sha256": "efc6a2e0484f0c0cac611ce762f7696f67bd3312e88ebb7525352df46d91a962",
+      "bytes": 503,
+      "source": "/tmp/nmaforge-phase1-runs/analysis/candidate_bounds.json"
+    },
+    {
+      "path": "analysis/spad.csv",
+      "sha256": "46fd59a20befc8bf99df0a221215b17784b3960891c05f74dac2fd19a091a68c",
+      "uncompressed_sha256": "46fd59a20befc8bf99df0a221215b17784b3960891c05f74dac2fd19a091a68c",
+      "bytes": 12821,
+      "source": "/tmp/nmaforge-phase1-runs/analysis/spad.csv"
+    },
+    {
+      "path": "analysis/golden_checks.csv",
+      "sha256": "5dd10c638544d223c87ef01c30b22f650df37059336b667c9bec9a257728a8aa",
+      "uncompressed_sha256": "5dd10c638544d223c87ef01c30b22f650df37059336b667c9bec9a257728a8aa",
+      "bytes": 3645,
+      "source": "/tmp/nmaforge-phase1-runs/analysis/golden_checks.csv"
+    },
+    {
+      "path": "analysis/static_warning_inventory.csv",
+      "sha256": "c139086aef321ffb16ec2ad90d9fba27ed3c846ff60d25f65aa2b7706546919d",
+      "uncompressed_sha256": "c139086aef321ffb16ec2ad90d9fba27ed3c846ff60d25f65aa2b7706546919d",
+      "bytes": 58231,
+      "source": "/tmp/nmaforge-phase1-runs/analysis/static_warning_inventory.csv"
+    },
+    {
+      "path": "model/fp32_quality.json",
+      "sha256": "e262fe4fd334c252d46848da24a30f37991908ee8b922f0584de9ddf694c3dc3",
+      "uncompressed_sha256": "e262fe4fd334c252d46848da24a30f37991908ee8b922f0584de9ddf694c3dc3",
+      "bytes": 737,
+      "source": "/tmp/nmaforge-phase1-runs/model/fp32_quality.json"
+    },
+    {
+      "path": "model/int8_quality.json",
+      "sha256": "ae332fb7d582215443a6e9d58de6d697deba0a8a012a22deff8c866fdac548dd",
+      "uncompressed_sha256": "ae332fb7d582215443a6e9d58de6d697deba0a8a012a22deff8c866fdac548dd",
+      "bytes": 281,
+      "source": "/tmp/nmaforge-phase1-runs/model/int8_quality.json"
+    },
+    {
+      "path": "model/blind_quality.json",
+      "sha256": "4fcc4ae7c124ada875d9dc843f738de9f9a58e5cc026a84d46ca63f7d4043382",
+      "uncompressed_sha256": "4fcc4ae7c124ada875d9dc843f738de9f9a58e5cc026a84d46ca63f7d4043382",
+      "bytes": 751,
+      "source": "/tmp/nmaforge-phase1-runs/model/blind_quality.json"
+    },
+    {
+      "path": "model/h32_int8.json",
+      "sha256": "fc9c8a9fbcccf556e7a8281b06ee0e75827ca9264424f57ff66f5d82b7c6de78",
+      "uncompressed_sha256": "fc9c8a9fbcccf556e7a8281b06ee0e75827ca9264424f57ff66f5d82b7c6de78",
+      "bytes": 454409,
+      "source": "/tmp/nmaforge-phase1-runs/model/h32_int8.json"
+    },
+    {
+      "path": "model/fp32_state.pt",
+      "sha256": "08948290dc9222896287f57ca821001406dc3bfd3450660054b49ce311a3a941",
+      "uncompressed_sha256": "08948290dc9222896287f57ca821001406dc3bfd3450660054b49ce311a3a941",
+      "bytes": 113333,
+      "source": "/tmp/nmaforge-phase1-runs/model/fp32_state.pt"
+    },
+    {
+      "path": "train.log.gz",
+      "sha256": "adeb45aa99fd7a0d71e65d72ca722a0b8abe8fdc0e33105e5d1acc93c6cc55e9",
+      "uncompressed_sha256": "2ef4e1d21d01f7a82f8bdd352326b8ab2c607ccae294ba577e5533d00dc5d4b9",
+      "bytes": 691,
+      "source": "/tmp/nmaforge-phase1-runs/train.log"
+    },
+    {
+      "path": "retrain.log.gz",
+      "sha256": "adeb45aa99fd7a0d71e65d72ca722a0b8abe8fdc0e33105e5d1acc93c6cc55e9",
+      "uncompressed_sha256": "2ef4e1d21d01f7a82f8bdd352326b8ab2c607ccae294ba577e5533d00dc5d4b9",
+      "bytes": 691,
+      "source": "/tmp/nmaforge-phase1-runs/retrain.log"
+    },
+    {
+      "path": "blind-quality.log.gz",
+      "sha256": "74d0ea75f39e0763d468855e089fb1964d1fd10530a74843a2e01f2f8003a661",
+      "uncompressed_sha256": "4fcc4ae7c124ada875d9dc843f738de9f9a58e5cc026a84d46ca63f7d4043382",
+      "bytes": 425,
+      "source": "/tmp/nmaforge-phase1-runs/blind-quality.log"
+    },
+    {
+      "path": "int8-quality.log.gz",
+      "sha256": "af6cd1f8fd0cb40cdc3988c68b60f5d14369b4bcaceaa6e4165015c7c7eb8a20",
+      "uncompressed_sha256": "df680fffa84f7784e8fb4a4df87e5e8e480dc4194fbbd0227008140da6384bd7",
+      "bytes": 237,
+      "source": "/tmp/nmaforge-phase1-runs/int8-quality.log"
+    },
+    {
+      "path": "driver.log.gz",
+      "sha256": "b55ae3fe2ef47c23fb675b4267e3b70dea8dbcbb839336ef2d09d51bf621ce5b",
+      "uncompressed_sha256": "2c795c7379204638fce930491ff6b79aa0e93c2deab903eb651e7b4393bf9ca8",
+      "bytes": 99,
+      "source": "/tmp/nmaforge-phase1-runs/driver.log"
+    },
+    {
+      "path": "matched-driver.log.gz",
+      "sha256": "a275cc23078dbadb22eb222235c77f2132b6512517b50c7bf3591104e14f7407",
+      "uncompressed_sha256": "b1ff0ee19e9a72c93a37a9bdd20aa0fd3eba3289aebe5422aca2affe1430d49d",
+      "bytes": 199,
+      "source": "/tmp/nmaforge-phase1-runs/matched-driver.log"
+    },
+    {
+      "path": "matrix-driver.log.gz",
+      "sha256": "e05e03c0a55d55660cdf6f2cf637f40cd23ff2efc60bccef98ea4e4c95b912f6",
+      "uncompressed_sha256": "e8f7b99afdf3b6655e59a6bd31bea5087ce3847bc80b0513d883e317fee445f7",
+      "bytes": 5677,
+      "source": "/tmp/nmaforge-phase1-runs/matrix-driver.log"
+    },
+    {
+      "path": "static-driver.log.gz",
+      "sha256": "4834b67197f90ca6057b5e4dc0c4e70cb47bd074a7aa580039784196a93da97a",
+      "uncompressed_sha256": "e42255b6e75ae4011e83514b6d71c92b629ca3292c76cef36d0aaa55a4ba3fa1",
+      "bytes": 234,
+      "source": "/tmp/nmaforge-phase1-runs/static-driver.log"
+    },
+    {
+      "path": "analysis-driver.log.gz",
+      "sha256": "a8f2426180245282db86e6e98565d48bbe84e9637a167aa279ec1e9bd80694a2",
+      "uncompressed_sha256": "980710ce202afb701d8e70b65a412976e096b3d37ee2906265624e8d1f1dab03",
+      "bytes": 1144,
+      "source": "/tmp/nmaforge-phase1-runs/analysis-driver.log"
+    },
+    {
+      "path": "replay.log.gz",
+      "sha256": "84bf9d21656fc845e39fec46eeb5185e8134b670855ad554600eb8a9f1030906",
+      "uncompressed_sha256": "9af85ec8c627a570e5970e2e60a0cb1f5a70f65c595f0b31d793530891acdcc5",
+      "bytes": 39,
+      "source": "/tmp/nmaforge-phase1-runs/replay.log"
+    },
+    {
+      "path": "smoke.log.gz",
+      "sha256": "2d1e61e36228d15b3e03583b0bbcb35f3629deaa47cb7c5c211531517a14ff11",
+      "uncompressed_sha256": "d629651cb516018b19ec66d9c32bf8c0ceb39453e104dd71e8c43a6cb6d211ba",
+      "bytes": 15736,
+      "source": "/tmp/nmaforge-phase1-runs/smoke.log"
+    },
+    {
+      "path": "top/compile.log.gz",
+      "sha256": "afe1db50d3cefad8f8265313ddc3200d727a089f8da04eefac284b22eaf4a604",
+      "uncompressed_sha256": "7ef33d94f71aea03335afb2bb7562876498cfa5c7586f2ddd301c6b61acbce1d",
+      "bytes": 2332,
+      "source": "/tmp/nmaforge-phase1-runs/top/compile.log"
+    },
+    {
+      "path": "kernel_30_16_16_16/shape.json",
+      "sha256": "156d3f80d3b326d4038e560d743df64d3b235713126135679289bc779fc6ade7",
+      "uncompressed_sha256": "156d3f80d3b326d4038e560d743df64d3b235713126135679289bc779fc6ade7",
+      "bytes": 75,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_16_16_16/shape.json"
+    },
+    {
+      "path": "kernel_30_16_16_16/image.memh.gz",
+      "sha256": "5c1b9a9a71a0bfe3bfb271a8e8289d1f7452ed2d3427ef973ebb5d8c75f43229",
+      "uncompressed_sha256": "9b4f0cddd03e7a1b44a7a963329c6088a92df789b2a8d03d287cb46793f42142",
+      "bytes": 1079,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_16_16_16/image.memh"
+    },
+    {
+      "path": "kernel_30_16_16_16/golden.memh.gz",
+      "sha256": "9637786e9f7a317411f6b0fe7161aee9d3ea24528ba3baad036bd43408b72bba",
+      "uncompressed_sha256": "29801f9967cf2c2cfb74607fa9c80a3a52f780e8fbcca6923d050d8393635a36",
+      "bytes": 707,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_16_16_16/golden.memh"
+    },
+    {
+      "path": "kernel_30_16_16_16/top.command.json",
+      "sha256": "93a3b676f96dc0f289319ada05036a3da257f70c62dd2c768099db184bc200b5",
+      "uncompressed_sha256": "93a3b676f96dc0f289319ada05036a3da257f70c62dd2c768099db184bc200b5",
+      "bytes": 626,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_16_16_16/top.command.json"
+    },
+    {
+      "path": "kernel_30_16_16_16/top.log.gz",
+      "sha256": "957cfb113686bb441e36bdd9147731ca91150858bc6719c6bfedc07e7a3d1dc7",
+      "uncompressed_sha256": "61f101d3876c6450d3f71cdcec211d89cc1b595342122443c829c6e1326b280a",
+      "bytes": 831,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_16_16_16/top.log"
+    },
+    {
+      "path": "kernel_30_16_16_16/profile_cycles.csv.gz",
+      "sha256": "d975f4f20914e2a5c076c0cac633e20d3f0e134d32a107f3cc5a0711670807fc",
+      "uncompressed_sha256": "e20165fd70e70fa9132162a394f850b78d07472de23c08aadba161db64b911e1",
+      "bytes": 716,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_16_16_16/profile_cycles.csv"
+    },
+    {
+      "path": "kernel_30_16_16_16/profile_memory.csv.gz",
+      "sha256": "cdbf767f37917f7a33d3136ce486bdc6d04be52d7bf461cff6aa331506e06408",
+      "uncompressed_sha256": "c49d18683f6f0f18e35a272113fbad917fc8ccd33009849b5934543713c9b0bd",
+      "bytes": 784,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_16_16_16/profile_memory.csv"
+    },
+    {
+      "path": "kernel_30_32_32_64/shape.json",
+      "sha256": "d55954407a465837a64983cbbed56c5c6f15d97d08b989eb59caab7edf1248b0",
+      "uncompressed_sha256": "d55954407a465837a64983cbbed56c5c6f15d97d08b989eb59caab7edf1248b0",
+      "bytes": 76,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_32_32_64/shape.json"
+    },
+    {
+      "path": "kernel_30_32_32_64/image.memh.gz",
+      "sha256": "f94e462ab954d71735ec005725af28f1b16f648d76ce6166e4978d6c10604d58",
+      "uncompressed_sha256": "69435f2cae27c78e8908c5daef0d4cfa85c168df587ab66fb47e41b79382f623",
+      "bytes": 5163,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_32_32_64/image.memh"
+    },
+    {
+      "path": "kernel_30_32_32_64/golden.memh.gz",
+      "sha256": "d32ad0f2085e2eb9587e0d4bd879e00083228fb6083393e7eeaf93eb0030f838",
+      "uncompressed_sha256": "73ebca0555a9d20b8f4833420e08b9053c35740d462d954808c1d7d7fc903ea4",
+      "bytes": 2420,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_32_32_64/golden.memh"
+    },
+    {
+      "path": "kernel_30_32_32_64/top.command.json",
+      "sha256": "e9334fb56aa7256dfee0475f7e31d8420c7af4b13c123250ad85de622d0318c4",
+      "uncompressed_sha256": "e9334fb56aa7256dfee0475f7e31d8420c7af4b13c123250ad85de622d0318c4",
+      "bytes": 627,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_32_32_64/top.command.json"
+    },
+    {
+      "path": "kernel_30_32_32_64/top.log.gz",
+      "sha256": "0cd9acaa7f460d1a95bc39fc557f773fde287f9dbeeb52e395dfb60a05429ae7",
+      "uncompressed_sha256": "1b0ef950d10efd5ce5c2103901030507787a695f7cbbecee30f9398aaf90a646",
+      "bytes": 839,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_32_32_64/top.log"
+    },
+    {
+      "path": "kernel_30_32_32_64/profile_cycles.csv.gz",
+      "sha256": "aed37a4055a5035648097d3ab0b9ea02a3795fa34831d460060f6dad09985705",
+      "uncompressed_sha256": "de3e91055ab5046cac8a6a1d4a2cf99a2be6f7ab5bd77fb6e5599e548efada04",
+      "bytes": 3096,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_32_32_64/profile_cycles.csv"
+    },
+    {
+      "path": "kernel_30_32_32_64/profile_memory.csv.gz",
+      "sha256": "74206a7bde046f94651903e0c28f9c398e110db83c1f74454da150b369d7dcdc",
+      "uncompressed_sha256": "79266e7a995d176e9297d00c476e64b20a51f3665b624f1ac400c62e97454fb8",
+      "bytes": 4137,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_32_32_64/profile_memory.csv"
+    },
+    {
+      "path": "kernel_30_4_4_32/shape.json",
+      "sha256": "5a0d8f15f4c15e017777ecb6ed9b9e220fee393a146d339007b5246687601f95",
+      "uncompressed_sha256": "5a0d8f15f4c15e017777ecb6ed9b9e220fee393a146d339007b5246687601f95",
+      "bytes": 72,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_4_4_32/shape.json"
+    },
+    {
+      "path": "kernel_30_4_4_32/image.memh.gz",
+      "sha256": "a431e6cee6261354e072f3ad2a0e60e27ea2bf16316633bf467d0fda812b77e4",
+      "uncompressed_sha256": "476a35ebc4326e66c8cb39fd625fdbe68df887b66f619bbc5488d54618b7250e",
+      "bytes": 601,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_4_4_32/image.memh"
+    },
+    {
+      "path": "kernel_30_4_4_32/golden.memh.gz",
+      "sha256": "70c7a2502ecee985375ccc5e176aa1218f689d04a60010f0e078dead7e795b8a",
+      "uncompressed_sha256": "fb27a8be40fdf18604bef20a8f25253604b9333969c6b7041e64d519da4fd6ad",
+      "bytes": 102,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_4_4_32/golden.memh"
+    },
+    {
+      "path": "kernel_30_4_4_32/top.command.json",
+      "sha256": "60983c170dbc63eb67be43aaeafcf73d746e064d69e2db444894f0e6ac6bf20e",
+      "uncompressed_sha256": "60983c170dbc63eb67be43aaeafcf73d746e064d69e2db444894f0e6ac6bf20e",
+      "bytes": 617,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_4_4_32/top.command.json"
+    },
+    {
+      "path": "kernel_30_4_4_32/top.log.gz",
+      "sha256": "f0583b5b5dd7b766ad3b692acfc9bc6a532bdb16358c2c27f4b8abe4c36b41f2",
+      "uncompressed_sha256": "89a78549e80bf3949d5fea17e3e1cc77ff98be393960d6a8d00e429fe4f66d8c",
+      "bytes": 826,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_4_4_32/top.log"
+    },
+    {
+      "path": "kernel_30_4_4_32/profile_cycles.csv.gz",
+      "sha256": "242b127310a5399969c8b6dfe2230962c4aaef08ca0a5cc4b90b26e33e20e810",
+      "uncompressed_sha256": "8951792fcb67689d2f34b5dd4f66e558619d00ba5007076079b85eb6a6ec9da4",
+      "bytes": 550,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_4_4_32/profile_cycles.csv"
+    },
+    {
+      "path": "kernel_30_4_4_32/profile_memory.csv.gz",
+      "sha256": "c4d0dc5ae124cbf17bc1170456f0d7242aee2ac62ffc8bc657aac9c993c377b7",
+      "uncompressed_sha256": "9a9914439b48cfbba10a90dd27a7a55c3a179e9a22561f115f9ef115b758befa",
+      "bytes": 416,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_30_4_4_32/profile_memory.csv"
+    },
+    {
+      "path": "kernel_52_1_16_32/shape.json",
+      "sha256": "901a836b140c34cacd63fd1fc2f31a0d74008198de0959b5f6d71099bea69255",
+      "uncompressed_sha256": "901a836b140c34cacd63fd1fc2f31a0d74008198de0959b5f6d71099bea69255",
+      "bytes": 73,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_1_16_32/shape.json"
+    },
+    {
+      "path": "kernel_52_1_16_32/image.memh.gz",
+      "sha256": "eb116131600d1151c3638049d1431ca7cda6ad1c45bce9553ce930ba26fff100",
+      "uncompressed_sha256": "fecb156b858967bae55aadf07378fa0bd1bad0f65e204ea1e0c666c3c87e9c4a",
+      "bytes": 575,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_1_16_32/image.memh"
+    },
+    {
+      "path": "kernel_52_1_16_32/golden.memh.gz",
+      "sha256": "957375ddaa5161f47c4657d326cef9d19e8af2389ad80220e3dfc111b9a034d6",
+      "uncompressed_sha256": "c569c4f05b26bd184715ff2350d79306f1a4799e33007770419de0f7f52a55c2",
+      "bytes": 98,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_1_16_32/golden.memh"
+    },
+    {
+      "path": "kernel_52_1_16_32/top.command.json",
+      "sha256": "d2129b977ea2bff7d12971e4751d51a770585ccc70d6aa1f81b2426e2bfbd319",
+      "uncompressed_sha256": "d2129b977ea2bff7d12971e4751d51a770585ccc70d6aa1f81b2426e2bfbd319",
+      "bytes": 621,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_1_16_32/top.command.json"
+    },
+    {
+      "path": "kernel_52_1_16_32/top.log.gz",
+      "sha256": "b3aa4ac2d5274ae4ab7035ea76a3432de7fb3cee6e12983e4c40953c4051f7ab",
+      "uncompressed_sha256": "87c3a82caba034b35f3a01ae3ac38096a17887d25b2b6c923811dab7e37aadb3",
+      "bytes": 823,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_1_16_32/top.log"
+    },
+    {
+      "path": "kernel_52_1_16_32/profile_cycles.csv.gz",
+      "sha256": "cbc86fd85085d544bc3331c5a46285ee249eb86356b6e50d95fe1ff95b29e6a4",
+      "uncompressed_sha256": "215ed065b2c85a8dffcd57073dad5bbd7ecfb9669d0655aa6b518393f3725542",
+      "bytes": 619,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_1_16_32/profile_cycles.csv"
+    },
+    {
+      "path": "kernel_52_1_16_32/profile_memory.csv.gz",
+      "sha256": "197471a69053eb5e87e531a5e69cbf9419379870ef01e01c7957f73ac2f18f67",
+      "uncompressed_sha256": "3f1964db1b57ca912e5b77dc9e660bd5d213ffc3ee25c44a85b7e995f6b833ab",
+      "bytes": 548,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_1_16_32/profile_memory.csv"
+    },
+    {
+      "path": "kernel_52_4_16_32/shape.json",
+      "sha256": "f4e77b24bf345795bf0096a7a358373a11774003bb997bcdb43da67ba81be6fc",
+      "uncompressed_sha256": "f4e77b24bf345795bf0096a7a358373a11774003bb997bcdb43da67ba81be6fc",
+      "bytes": 74,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_4_16_32/shape.json"
+    },
+    {
+      "path": "kernel_52_4_16_32/image.memh.gz",
+      "sha256": "6a01a9686ae63104607a024cbd3a8c7dd991685424f8d778be4070fd2b3eed5f",
+      "uncompressed_sha256": "5a57a81c623633c68e02ba512652343a8d2dcab76d1194618a653046b6777867",
+      "bytes": 755,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_4_16_32/image.memh"
+    },
+    {
+      "path": "kernel_52_4_16_32/golden.memh.gz",
+      "sha256": "49eaaa55e016a3cd6e4757a5481a457dfdebada0aea86a25c51cd1b81957985a",
+      "uncompressed_sha256": "184b90b5262848274467b6b12f5e3c98db4d352c7ab36b4f2c6bb19f26d282b7",
+      "bytes": 207,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_4_16_32/golden.memh"
+    },
+    {
+      "path": "kernel_52_4_16_32/top.command.json",
+      "sha256": "39dcfc9fa24ed3b780ae123d81a08493e20ca4e2345d5a2aa462d4a3122190fe",
+      "uncompressed_sha256": "39dcfc9fa24ed3b780ae123d81a08493e20ca4e2345d5a2aa462d4a3122190fe",
+      "bytes": 622,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_4_16_32/top.command.json"
+    },
+    {
+      "path": "kernel_52_4_16_32/top.log.gz",
+      "sha256": "e60bae576ce6770ddf9805de07e36820fe1284bad8291b7634fe981fb056d815",
+      "uncompressed_sha256": "a7cc4d3500582a9b489d508618b3a1650c1a2d810fb2e74db3c361432acba5aa",
+      "bytes": 826,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_4_16_32/top.log"
+    },
+    {
+      "path": "kernel_52_4_16_32/profile_cycles.csv.gz",
+      "sha256": "fe8cb53395d3f997d0145761344655b0dd1151d4f44c7d66911a28e245148bc9",
+      "uncompressed_sha256": "f22bebcdd721d7972b20f43e7b41f58f25b98d90b4ed3248a474ebab974f2bb2",
+      "bytes": 667,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_4_16_32/profile_cycles.csv"
+    },
+    {
+      "path": "kernel_52_4_16_32/profile_memory.csv.gz",
+      "sha256": "525d629c22cc8885f58522264fa9a1f4661a7a396ccc525f57ba72ba1860aee2",
+      "uncompressed_sha256": "7b5c70828059a31039ea994027296dd99a834da14e1329b5af2ef13ac9219e46",
+      "bytes": 635,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_4_16_32/profile_memory.csv"
+    },
+    {
+      "path": "kernel_52_8_16_32/shape.json",
+      "sha256": "243ee82bbf0bc58f9157bd3c721ad326b14174c3526be53d4e6882b787ba4a16",
+      "uncompressed_sha256": "243ee82bbf0bc58f9157bd3c721ad326b14174c3526be53d4e6882b787ba4a16",
+      "bytes": 74,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_8_16_32/shape.json"
+    },
+    {
+      "path": "kernel_52_8_16_32/image.memh.gz",
+      "sha256": "87cb4bb5ba7053c395b90d847d610946c57210fe9a17f763d8897f2f647d3ae7",
+      "uncompressed_sha256": "d7cf06faeb86d3ea8547221b5c2cb9fda01f691adcb0d6799d7d69ebb41cd551",
+      "bytes": 997,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_8_16_32/image.memh"
+    },
+    {
+      "path": "kernel_52_8_16_32/golden.memh.gz",
+      "sha256": "75e715d0d573c32b7863207c5d35dab2e84aeb07cae338b5a76a194b7a198475",
+      "uncompressed_sha256": "1194084deaccba67fae6cd08d10adf854b78f80c2101612a5cac79718609873f",
+      "bytes": 352,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_8_16_32/golden.memh"
+    },
+    {
+      "path": "kernel_52_8_16_32/top.command.json",
+      "sha256": "f42b36f6613c4823e0931b3cf6aa7d9f06f9154edf1086c0515e833cc0d49692",
+      "uncompressed_sha256": "f42b36f6613c4823e0931b3cf6aa7d9f06f9154edf1086c0515e833cc0d49692",
+      "bytes": 622,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_8_16_32/top.command.json"
+    },
+    {
+      "path": "kernel_52_8_16_32/top.log.gz",
+      "sha256": "5536fc3fdfa7580fc374240f55cd89f0c37462cb449ec5af169270b13903736a",
+      "uncompressed_sha256": "b4ec4f960064a28085215a284931f6d61e84ffe99fecfde9576edbb68ae22c2e",
+      "bytes": 834,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_8_16_32/top.log"
+    },
+    {
+      "path": "kernel_52_8_16_32/profile_cycles.csv.gz",
+      "sha256": "7463f5e86536a1950060a88e0d7b7a186d21e94dc8dcd2d90ab45266608a0e8e",
+      "uncompressed_sha256": "2156e2c058f98610b279fdd5a594c436b74382729f9d6ab8f63fc1e285918831",
+      "bytes": 830,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_8_16_32/profile_cycles.csv"
+    },
+    {
+      "path": "kernel_52_8_16_32/profile_memory.csv.gz",
+      "sha256": "c159fdc9351cddcc24e1d87f559ed3d8047d0a9a57e6255abbc155adf1d72611",
+      "uncompressed_sha256": "6f759353b6facb810af7bdc9ec9da2d4619977c3df9d325246699781fd78c275",
+      "bytes": 788,
+      "source": "/tmp/nmaforge-phase1-runs/kernel_52_8_16_32/profile_memory.csv"
+    },
+    {
+      "path": "cnn/legacy/manifest.json",
+      "sha256": "e5e1d5d9c7fa754963d5a513ebf8b98de9263fe6bd87a9cb3a9b2d64eff64e32",
+      "uncompressed_sha256": "e5e1d5d9c7fa754963d5a513ebf8b98de9263fe6bd87a9cb3a9b2d64eff64e32",
+      "bytes": 1955,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/legacy/manifest.json"
+    },
+    {
+      "path": "cnn/legacy/dma_payload_summary.json",
+      "sha256": "16eea6d56eac19a35a9a1fc7b47e20de48a4e3b41589aa0ea24a53d06e0f89b4",
+      "uncompressed_sha256": "16eea6d56eac19a35a9a1fc7b47e20de48a4e3b41589aa0ea24a53d06e0f89b4",
+      "bytes": 1239,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/legacy/dma_payload_summary.json"
+    },
+    {
+      "path": "cnn/legacy/top.command.json",
+      "sha256": "101e280a11fe9bd6e3d457dc130e38d9740aa4b185673b4994cb99700c6adf17",
+      "uncompressed_sha256": "101e280a11fe9bd6e3d457dc130e38d9740aa4b185673b4994cb99700c6adf17",
+      "bytes": 1093,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/legacy/top.command.json"
+    },
+    {
+      "path": "cnn/legacy/independent.log.gz",
+      "sha256": "73aec447d379f351cd6e25795a64b3bc3c1423f7fa8ed8f80186b92b2c9d4539",
+      "uncompressed_sha256": "8e13d35c37ad268973157396ca91b98a2eeb723c0e44d63611ee278c2eb87266",
+      "bytes": 151,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/legacy/independent.log"
+    },
+    {
+      "path": "cnn/legacy/top.log.gz",
+      "sha256": "7ef33b224eeed7a65c1b7490dbdd2e05d35eeb211c4fce2924969896215295ed",
+      "uncompressed_sha256": "41c334cb0f3ade6233d8232d7bea8dffaef3f484eed845d799fc16660a1d28db",
+      "bytes": 1238,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/legacy/top.log"
+    },
+    {
+      "path": "cnn/legacy/output.txt.gz",
+      "sha256": "e7f7b78cbe2b94bf3cd86245b70726da5e2e96b63bb7ee29baad2b453a4d8774",
+      "uncompressed_sha256": "8aa9a4ed5a5e8aeff8a5a3e258c87b335c744d052dacfe4b8321ccad99de94a1",
+      "bytes": 4209,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/legacy/output.txt"
+    },
+    {
+      "path": "cnn/legacy/model_memory.memh.gz",
+      "sha256": "0525a4404d39fd31f5c7ad888d6a78464a7ad0344a164fdf07124b92c841eb80",
+      "uncompressed_sha256": "231d7314ac57321a8a164bea1d7c8205e2c5c9fbf7c4803594b30354ce10f7d5",
+      "bytes": 66510,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/legacy/model_memory.memh"
+    },
+    {
+      "path": "cnn/legacy/model_golden.memh.gz",
+      "sha256": "0bdff7c01e8f7d40ecac791a88a7d7e37d86e0cfda8ad9fee276b368fa21c806",
+      "uncompressed_sha256": "5e4d5f3004cea120a086aa04230488c8fef14443f1e4c31b34b54d7a264855a6",
+      "bytes": 78167,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/legacy/model_golden.memh"
+    },
+    {
+      "path": "cnn/legacy/dma_payload.memh.gz",
+      "sha256": "26c17a6445df6912eacf5da30ef94e53c4a87f697efc8bdc8ad146b92fe3a4fb",
+      "uncompressed_sha256": "1d978c12ac663fb2acef02e5030f300db1339676317a5e0a5c6f92ddbd29706e",
+      "bytes": 5053,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/legacy/dma_payload.memh"
+    },
+    {
+      "path": "cnn/legacy/dma_plan.memh.gz",
+      "sha256": "6d0dfc81b49da815d3804948a4ed3df492f0800a4f1f0c6e2a183e74186e2e1b",
+      "uncompressed_sha256": "13b95db3beac36d6e6db058fc9a775b7f22cf71fca47e09d3a2346ef3fc4f7d6",
+      "bytes": 62,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/legacy/dma_plan.memh"
+    },
+    {
+      "path": "cnn/legacy/profile_cycles.csv.gz",
+      "sha256": "fd7338c158b726bcafd852f4fd0894bc38b74acff187f9c33ddc35294b3a98d4",
+      "uncompressed_sha256": "a8d0b9305c343421ccfc084a0a61dd47bbe151da54840ab9fcf6acadb9af3d81",
+      "bytes": 179023,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/legacy/profile_cycles.csv"
+    },
+    {
+      "path": "cnn/legacy/profile_memory.csv.gz",
+      "sha256": "b0d2834f4ef435fbecce1447b3211ee2f2c002145c27d701a2065fb8956cec30",
+      "uncompressed_sha256": "d4617aafe48ef0bf39880e7e3c7c79e01c17289dd61c4c70ec24623e1be04466",
+      "bytes": 206110,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/legacy/profile_memory.csv"
+    },
+    {
+      "path": "cnn/legacy/stage_a_axi.csv.gz",
+      "sha256": "638f069884dfa470d23e4a4556792bc539c9eccfb07270fe909bb3c6e97f473a",
+      "uncompressed_sha256": "e5f505380ce7da0bda1c153a49c31e4d14f1929ce0151c0d00c8f3a1358961ea",
+      "bytes": 310634,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/legacy/stage_a_axi.csv"
+    },
+    {
+      "path": "cnn/first_fused/manifest.json",
+      "sha256": "0dd9f8a5be174fb0ead1693bb7e16c834e9b9722564c1ddab2c2baffd8d6c317",
+      "uncompressed_sha256": "0dd9f8a5be174fb0ead1693bb7e16c834e9b9722564c1ddab2c2baffd8d6c317",
+      "bytes": 1961,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/first_fused/manifest.json"
+    },
+    {
+      "path": "cnn/first_fused/dma_payload_summary.json",
+      "sha256": "8bd80b40f50266699a61d696688182679acd50d714a7cc3a2f96c9894c0a527b",
+      "uncompressed_sha256": "8bd80b40f50266699a61d696688182679acd50d714a7cc3a2f96c9894c0a527b",
+      "bytes": 1239,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/first_fused/dma_payload_summary.json"
+    },
+    {
+      "path": "cnn/first_fused/top.command.json",
+      "sha256": "5cddd8f2e97bba0ae4af54f4e20d6875a8ac9622d5076dab7d36cad2f8d3615c",
+      "uncompressed_sha256": "5cddd8f2e97bba0ae4af54f4e20d6875a8ac9622d5076dab7d36cad2f8d3615c",
+      "bytes": 1128,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/first_fused/top.command.json"
+    },
+    {
+      "path": "cnn/first_fused/independent.log.gz",
+      "sha256": "546072f4f4bda7b85786f6451eb8b982c013b06a81786dd1952cc5b1d089cc1a",
+      "uncompressed_sha256": "e282db0f726ff2d6eea5ee1389bd2bd0f5a73a02698a125a48d0e973cba81616",
+      "bytes": 154,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/first_fused/independent.log"
+    },
+    {
+      "path": "cnn/first_fused/top.log.gz",
+      "sha256": "4ce3cbaf0ac8e3e040cce16ad64c72070db9d9ba1075790de75a8f1416a24442",
+      "uncompressed_sha256": "359e6619ddc974c5f51392b96468b0b38f4fcf2233713bbd7573319d4c396c2d",
+      "bytes": 1192,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/first_fused/top.log"
+    },
+    {
+      "path": "cnn/first_fused/output.txt.gz",
+      "sha256": "e7f7b78cbe2b94bf3cd86245b70726da5e2e96b63bb7ee29baad2b453a4d8774",
+      "uncompressed_sha256": "8aa9a4ed5a5e8aeff8a5a3e258c87b335c744d052dacfe4b8321ccad99de94a1",
+      "bytes": 4209,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/first_fused/output.txt"
+    },
+    {
+      "path": "cnn/first_fused/model_memory.memh.gz",
+      "sha256": "101d005c3825088e0c230f1259b49833cf94193f724bd9f6e7e3e0937681a274",
+      "uncompressed_sha256": "fab46581a36914e495faf3674745d5dc9b54c5c875ce9ba6d802c4fe8fdcacf5",
+      "bytes": 66442,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/first_fused/model_memory.memh"
+    },
+    {
+      "path": "cnn/first_fused/model_golden.memh.gz",
+      "sha256": "464a0a071bcd756df6bb6c51220053b6bb3b8157cfe121dd35f32e2201cf832e",
+      "uncompressed_sha256": "8c31f82f361d53df4679fc63e0c1edde5a037b36fb37717e4f1d4065717b0bfd",
+      "bytes": 66140,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/first_fused/model_golden.memh"
+    },
+    {
+      "path": "cnn/first_fused/dma_payload.memh.gz",
+      "sha256": "ca6dad371bdabbadf78755db718102e541ed4b4061e171c52e31559450464eda",
+      "uncompressed_sha256": "211a6faeee0d71906f2b8c0f07ebd6a62cb3bbcdaf7fc9a7934424b98a1e021f",
+      "bytes": 5035,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/first_fused/dma_payload.memh"
+    },
+    {
+      "path": "cnn/first_fused/dma_plan.memh.gz",
+      "sha256": "dc7eee41221f90eb6dff252063bec5231cbb41f95275fec6b9234d7ba30a1b4f",
+      "uncompressed_sha256": "dc2553f6d94946e7e1bc021076cd419f059e72a2c2c8200f95e2154ccc784c4a",
+      "bytes": 63,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/first_fused/dma_plan.memh"
+    },
+    {
+      "path": "cnn/first_fused/profile_cycles.csv.gz",
+      "sha256": "a39926cf4795d2e00b9bdbe4af1e45446205ed822d51b2b1455f1678e38f8598",
+      "uncompressed_sha256": "447a7faa10f6565df45bca66174e2ad7ab652b6ed5bbedd8d096d38d9886f3de",
+      "bytes": 66075,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/first_fused/profile_cycles.csv"
+    },
+    {
+      "path": "cnn/first_fused/profile_memory.csv.gz",
+      "sha256": "3188f5645ca595f06c7796539abd98654e84b2ca1819b63b3d2f14de51cf944b",
+      "uncompressed_sha256": "70ba06099396e8c3fb4c1fec91fa6332713cc5a9a17fd0c4b2c9176a9ebcb545",
+      "bytes": 72804,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/first_fused/profile_memory.csv"
+    },
+    {
+      "path": "cnn/first_fused/stage_a_axi.csv.gz",
+      "sha256": "2263d9d17172a2d9c1789ab33dff8b15e5fefe880e4c45c723c036b9fc58359b",
+      "uncompressed_sha256": "9dd23cbdab3b6febce78acb9793d4b3ceef789066427d5c99cb5b6d7931c5b38",
+      "bytes": 310213,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/first_fused/stage_a_axi.csv"
+    },
+    {
+      "path": "cnn/both_fused_row_major/manifest.json",
+      "sha256": "d6c20d3400cb2c3599ae7df0f4da941a9b27b64441ac8f54bee522a8d2f5371e",
+      "uncompressed_sha256": "d6c20d3400cb2c3599ae7df0f4da941a9b27b64441ac8f54bee522a8d2f5371e",
+      "bytes": 1970,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/both_fused_row_major/manifest.json"
+    },
+    {
+      "path": "cnn/both_fused_row_major/dma_payload_summary.json",
+      "sha256": "eea8407a434a1783dc2386f934cb3c38c863a6fb93bd449ef968b63a6a33600d",
+      "uncompressed_sha256": "eea8407a434a1783dc2386f934cb3c38c863a6fb93bd449ef968b63a6a33600d",
+      "bytes": 1239,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/both_fused_row_major/dma_payload_summary.json"
+    },
+    {
+      "path": "cnn/both_fused_row_major/top.command.json",
+      "sha256": "a847b6a492192c9299663b3966125b109f92f44d92a26cb90944bf387c6b9d17",
+      "uncompressed_sha256": "a847b6a492192c9299663b3966125b109f92f44d92a26cb90944bf387c6b9d17",
+      "bytes": 1191,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/both_fused_row_major/top.command.json"
+    },
+    {
+      "path": "cnn/both_fused_row_major/independent.log.gz",
+      "sha256": "4d0ea08e54216c9a7fe46fda9aa907e2983eed1826e185283c5bfed3482717d8",
+      "uncompressed_sha256": "70086edd8db6e0695f01d00a31308bb73dbeb321187e7993c9476ce857adb070",
+      "bytes": 155,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/both_fused_row_major/independent.log"
+    },
+    {
+      "path": "cnn/both_fused_row_major/top.log.gz",
+      "sha256": "3248301685a2c52e9c8ba5148b8ef24c8333cfdc2b31bb59766e7d754b96d7c6",
+      "uncompressed_sha256": "2032a76268dc1a5e88c6255df6b8ef58027c090f0144c83a8eb44786cf1173d6",
+      "bytes": 1073,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/both_fused_row_major/top.log"
+    },
+    {
+      "path": "cnn/both_fused_row_major/output.txt.gz",
+      "sha256": "e7f7b78cbe2b94bf3cd86245b70726da5e2e96b63bb7ee29baad2b453a4d8774",
+      "uncompressed_sha256": "8aa9a4ed5a5e8aeff8a5a3e258c87b335c744d052dacfe4b8321ccad99de94a1",
+      "bytes": 4209,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/both_fused_row_major/output.txt"
+    },
+    {
+      "path": "cnn/both_fused_row_major/model_memory.memh.gz",
+      "sha256": "f356189afde241d73cadcc1c5c8de60866a251682212b94e003590ca9bd9717c",
+      "uncompressed_sha256": "7d2dea09ee8003d15fa05dfacdfd078697482173cabb061ff5a43e1a87666e17",
+      "bytes": 66371,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/both_fused_row_major/model_memory.memh"
+    },
+    {
+      "path": "cnn/both_fused_row_major/model_golden.memh.gz",
+      "sha256": "700a57ab21ee7d6b49587419ef803754c878a9233b1c0bd1c716ce2dea5b6864",
+      "uncompressed_sha256": "3c8f8db5b4011c04656c40d1df683799414caa6bbadb52b05029f6253de0020f",
+      "bytes": 61363,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/both_fused_row_major/model_golden.memh"
+    },
+    {
+      "path": "cnn/both_fused_row_major/dma_payload.memh.gz",
+      "sha256": "68acac80a13bddfdfcd6adb748d099a35385f9aaad8e0a5064edd9e14a2eb758",
+      "uncompressed_sha256": "17348f66d0ba20d85a2dc04381a84636050b77d3572f38ce89a18dfdc6f44b62",
+      "bytes": 5014,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/both_fused_row_major/dma_payload.memh"
+    },
+    {
+      "path": "cnn/both_fused_row_major/dma_plan.memh.gz",
+      "sha256": "0e459f8b534faf47cee4afcf36ca22261dd61d2b814d8835015ae369fb256f25",
+      "uncompressed_sha256": "7d7139073f888a280d9bd9eeddefba6aa82f2dd9c2a99ec99d7546b4b0a2b83f",
+      "bytes": 63,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/both_fused_row_major/dma_plan.memh"
+    },
+    {
+      "path": "cnn/both_fused_row_major/profile_cycles.csv.gz",
+      "sha256": "b31ee571702352a892079c1bcda81ccc84c2b3572d711ade560c96dee7a564bd",
+      "uncompressed_sha256": "0636ba91a237d032ab257995cf602c6eeef7391000be242503e8d1aa418abcf7",
+      "bytes": 36940,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/both_fused_row_major/profile_cycles.csv"
+    },
+    {
+      "path": "cnn/both_fused_row_major/profile_memory.csv.gz",
+      "sha256": "ccaa66d648c709babb7e150a2a1fa879569b70b7a9d3ed03b6f1ef1406ad215b",
+      "uncompressed_sha256": "e1c2db627709e153ee4080734f94bda552e086a93bd7c0d0c72c32d96b5f78cf",
+      "bytes": 37934,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/both_fused_row_major/profile_memory.csv"
+    },
+    {
+      "path": "cnn/both_fused_row_major/stage_a_axi.csv.gz",
+      "sha256": "cf03bc9fd1df8283876f15ee0c04bc9c1932f3e577c32ff2d222e0c4a4618213",
+      "uncompressed_sha256": "c2d286ecd17a351d2937888cfe248fd732b37fd6e549fa1dea38146cf82f06b2",
+      "bytes": 310231,
+      "source": "/tmp/nmaforge-phase1-runs/cnn/both_fused_row_major/stage_a_axi.csv"
+    },
+    {
+      "path": "h32/stage_7_t7_observed.memh.gz",
+      "sha256": "2fffe13efbe0a005c8d9f46c2c60f6e7dc8e42baf7e5ff6ca690c7e23e57218f",
+      "uncompressed_sha256": "112a6c24b05b1f51f5b6de0c75a16d97d5e5196eea425d74e93e4a4b081f41f6",
+      "bytes": 28007,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_7_t7_observed.memh"
+    },
+    {
+      "path": "h32/stage_8_t8_desc.memh.gz",
+      "sha256": "5217ae5ca88a211e4dc9019e801eecb5ebdd758096131baf36166074dfb1fb19",
+      "uncompressed_sha256": "f2a2f3155982b0cee5f9ca08ce0725f0aacd51ea2247d779ee4d8b17224d8b7e",
+      "bytes": 1328,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_8_t8_desc.memh"
+    },
+    {
+      "path": "h32/stage_3_t3_observed.memh.gz",
+      "sha256": "96486b310185670f0424433125aaaff6aa8966b001e8afd6c6a4acb448d58ec4",
+      "uncompressed_sha256": "c71570c2e7db61eb01c7122cdb69d7104ef494e458a9c2bdf2a536852de33343",
+      "bytes": 26885,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_3_t3_observed.memh"
+    },
+    {
+      "path": "h32/stage_11_t11_golden.memh.gz",
+      "sha256": "2c2b42e7524b49b4a2d6bfab278c1a022ad9e7be992e9deb21a3c318784372b4",
+      "uncompressed_sha256": "a48eea3d3af8c72d96cdd0293aeae8ba52336b4d7bdce4d99f7f14ffad8f1230",
+      "bytes": 29244,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_11_t11_golden.memh"
+    },
+    {
+      "path": "h32/stage_3_t3_desc.memh.gz",
+      "sha256": "42b394267831430ed148dc473086918d7f3f18dd93b62a16d80b0da810c39392",
+      "uncompressed_sha256": "31359e15c54ea29394425f23ca075319345da4cd3c084838c44fe44312c210ac",
+      "bytes": 1327,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_3_t3_desc.memh"
+    },
+    {
+      "path": "h32/stage_10_t10_observed.memh.gz",
+      "sha256": "616061bdb5b32b98ee22960e93f4633f806b427a809d31622682cc3fa7c82f0b",
+      "uncompressed_sha256": "7e4accfacaeac042c731f1596b9fffdbadfe715515c1479db84f1c2115b4bdbb",
+      "bytes": 28876,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_10_t10_observed.memh"
+    },
+    {
+      "path": "h32/stage_6_t6_desc.memh.gz",
+      "sha256": "c34767fcd71623494fdd8e7f65a2ecc264f9ae0d880bf91262554765a9505211",
+      "uncompressed_sha256": "656e64c3ff4a5c2b4fe82b58eaf8cdd818e6ac1d8c5ac50b7fad161d5117367b",
+      "bytes": 1333,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_6_t6_desc.memh"
+    },
+    {
+      "path": "h32/manifest.json.gz",
+      "sha256": "1d852fec156a4aa799ba7f7a4e37be7775550a4dc8c365df2e126c5df05e7b63",
+      "uncompressed_sha256": "ab88c7e4dfcca486b9c79037c25b550499b47f036399d9d51bf141a815ce45dc",
+      "bytes": 39432,
+      "source": "/tmp/nmaforge-phase1-runs/h32/manifest.json"
+    },
+    {
+      "path": "h32/stage_10_t10_desc.memh.gz",
+      "sha256": "203b6a7524812f59ad948f328086b6aace8c1af4ef35e3c221ca5bb0b765f8c9",
+      "uncompressed_sha256": "3e80250d40b2e28ab1422cf6df27c02a53cd356fa530f883db653290b4210512",
+      "bytes": 1332,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_10_t10_desc.memh"
+    },
+    {
+      "path": "h32/stage_6_t6_observed.memh.gz",
+      "sha256": "1b67af4b52651a70d0fe8684df81112b41bb3d682ecb2d7e788fd8d60c326abd",
+      "uncompressed_sha256": "38d22bd3f1f0a89eacba30e6c1563d71ee0c2c98537a1f4e43a47ce9a0ebb9a4",
+      "bytes": 27853,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_6_t6_observed.memh"
+    },
+    {
+      "path": "h32/stage_7_t7_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_7_t7_poison.memh"
+    },
+    {
+      "path": "h32/stage_0_t0_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_0_t0_poison.memh"
+    },
+    {
+      "path": "h32/stage_4_t4_golden.memh.gz",
+      "sha256": "55a20b9b7ad0defec86e746165ee8dd0a8fccc522f91e6ba66cced8ac10f7654",
+      "uncompressed_sha256": "4e8982d36758dc04ffa6e75cb0d1789e9312519050e40ec63506128231fe3f55",
+      "bytes": 27138,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_4_t4_golden.memh"
+    },
+    {
+      "path": "h32/initial_memory.memh.gz",
+      "sha256": "cae87c0f84c9319bee5d5a0f0dc7c3aa5bfa62c9c37718fe678de711d7a74087",
+      "uncompressed_sha256": "c601eceb8e675bda83909b20a67ce254a4548921f7f9881161a2090987db49af",
+      "bytes": 49091,
+      "source": "/tmp/nmaforge-phase1-runs/h32/initial_memory.memh"
+    },
+    {
+      "path": "h32/stage_10_t10_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_10_t10_poison.memh"
+    },
+    {
+      "path": "h32/profile_memory.csv.gz",
+      "sha256": "1ce33e6582bc2f3249f5a77202050be774925d0ab25820f1423ea3578ac77d41",
+      "uncompressed_sha256": "514c53dd15e4a77e60d18c5563013c519bb3230b4596671415c99be88c9fabb2",
+      "bytes": 1533171,
+      "source": "/tmp/nmaforge-phase1-runs/h32/profile_memory.csv"
+    },
+    {
+      "path": "h32/stage_8_t8_golden.memh.gz",
+      "sha256": "f70c51245f2697a6398845e9dbdd34f9496500b1022ba149256b65ce16950077",
+      "uncompressed_sha256": "9c0518da3f9cba019c4bb20439c4daafee938f7185ec0d0a7f43cc9dc6ffc871",
+      "bytes": 28255,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_8_t8_golden.memh"
+    },
+    {
+      "path": "h32/stage_7_t7_desc.memh.gz",
+      "sha256": "b53f81e1fbb182f189714ce33ec24f36127a874ba0160126afb94d96b4a61d20",
+      "uncompressed_sha256": "5e720c5a067fbc44e5338a5e09ba7eed135e55894a353a1895836af953981e88",
+      "bytes": 1321,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_7_t7_desc.memh"
+    },
+    {
+      "path": "h32/stage_6_t6_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_6_t6_poison.memh"
+    },
+    {
+      "path": "h32/stage_1_t1_golden.memh.gz",
+      "sha256": "ff113310101f6d70de5de07948b04f6a254161387467e76e11a0737f35549052",
+      "uncompressed_sha256": "aa79493d5a1b4ad27a50fe64f549b0beba3d6c1415bf68aa26f6fbdeeebf6b70",
+      "bytes": 26247,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_1_t1_golden.memh"
+    },
+    {
+      "path": "h32/stage_4_t4_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_4_t4_poison.memh"
+    },
+    {
+      "path": "h32/stage_0_t0_desc.memh.gz",
+      "sha256": "6162cfd864675164ab405511603b5f07fd07b178f51060b44af003c4955c0c31",
+      "uncompressed_sha256": "9fff7cbbac87d5d025ebbcc9a5eb2caf4ba0f9086d88b9a708625c4bd86aeafe",
+      "bytes": 1322,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_0_t0_desc.memh"
+    },
+    {
+      "path": "h32/stage_9_t9_observed.memh.gz",
+      "sha256": "32b9422b6e7f9809d760ab85c8882eb2c246c4cee554ab2c71f4e52de381f65e",
+      "uncompressed_sha256": "0ae0b2ea6ce507f2efad35bce6ef82aa28e00f121984db7baa755644b7619bea",
+      "bytes": 28650,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_9_t9_observed.memh"
+    },
+    {
+      "path": "h32/stage_9_t9_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_9_t9_poison.memh"
+    },
+    {
+      "path": "h32/top.log.gz",
+      "sha256": "becc2bcb1051919adafdd5da8b91751130968d7efaf814b8879220fb55bf23e6",
+      "uncompressed_sha256": "882b3570b0167b5f95ab626610605aa558497d96149625ac1563970d0d659e2c",
+      "bytes": 17333,
+      "source": "/tmp/nmaforge-phase1-runs/h32/top.log"
+    },
+    {
+      "path": "h32/stage_2_t2_observed.memh.gz",
+      "sha256": "01d8e43e59ebf704efd6cad5222296e31eae8a0b474ed6b663338e07dfbdc87c",
+      "uncompressed_sha256": "c13ca8401335808d205cfbfa21edd200d87966b0abb5bf3f9a63f3baba2a0d66",
+      "bytes": 26655,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_2_t2_observed.memh"
+    },
+    {
+      "path": "h32/stage_10_t10_golden.memh.gz",
+      "sha256": "616061bdb5b32b98ee22960e93f4633f806b427a809d31622682cc3fa7c82f0b",
+      "uncompressed_sha256": "7e4accfacaeac042c731f1596b9fffdbadfe715515c1479db84f1c2115b4bdbb",
+      "bytes": 28876,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_10_t10_golden.memh"
+    },
+    {
+      "path": "h32/stage_2_t2_desc.memh.gz",
+      "sha256": "3cdd9dad36913f577f63f17dafe0c1da368531ac8bfc506d75f616e0c9470264",
+      "uncompressed_sha256": "33221f714f59f5cecf7c9627e82cbb3db2a3030200673458809e886ec02aae1d",
+      "bytes": 1334,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_2_t2_desc.memh"
+    },
+    {
+      "path": "h32/stage_1_t1_observed.memh.gz",
+      "sha256": "ff113310101f6d70de5de07948b04f6a254161387467e76e11a0737f35549052",
+      "uncompressed_sha256": "aa79493d5a1b4ad27a50fe64f549b0beba3d6c1415bf68aa26f6fbdeeebf6b70",
+      "bytes": 26247,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_1_t1_observed.memh"
+    },
+    {
+      "path": "h32/stage_5_t5_golden.memh.gz",
+      "sha256": "4648bbfd6e23e5b480a2e8be81f568d850451fa6efc0e9b6084fbd7fb595c339",
+      "uncompressed_sha256": "6d99227853c353f93b4266d265c0d1350c21a6d940f6c812f4b58aa1edee28c7",
+      "bytes": 27664,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_5_t5_golden.memh"
+    },
+    {
+      "path": "h32/stage_4_t4_observed.memh.gz",
+      "sha256": "55a20b9b7ad0defec86e746165ee8dd0a8fccc522f91e6ba66cced8ac10f7654",
+      "uncompressed_sha256": "4e8982d36758dc04ffa6e75cb0d1789e9312519050e40ec63506128231fe3f55",
+      "bytes": 27138,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_4_t4_observed.memh"
+    },
+    {
+      "path": "h32/stage_0_t0_golden.memh.gz",
+      "sha256": "1dc20ae94c9579fe8882ba38b5fcb1cd031ad720d1d6efb515a933374dee62f0",
+      "uncompressed_sha256": "aa8fa566c23ef499e2b135cec083000c3e56b508681bc32be4930454321fd396",
+      "bytes": 25795,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_0_t0_golden.memh"
+    },
+    {
+      "path": "h32/stage_0_t0_observed.memh.gz",
+      "sha256": "1dc20ae94c9579fe8882ba38b5fcb1cd031ad720d1d6efb515a933374dee62f0",
+      "uncompressed_sha256": "aa8fa566c23ef499e2b135cec083000c3e56b508681bc32be4930454321fd396",
+      "bytes": 25795,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_0_t0_observed.memh"
+    },
+    {
+      "path": "h32/stage_1_t1_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_1_t1_poison.memh"
+    },
+    {
+      "path": "h32/stage_5_t5_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_5_t5_poison.memh"
+    },
+    {
+      "path": "h32/stage_7_t7_golden.memh.gz",
+      "sha256": "2fffe13efbe0a005c8d9f46c2c60f6e7dc8e42baf7e5ff6ca690c7e23e57218f",
+      "uncompressed_sha256": "112a6c24b05b1f51f5b6de0c75a16d97d5e5196eea425d74e93e4a4b081f41f6",
+      "bytes": 28007,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_7_t7_golden.memh"
+    },
+    {
+      "path": "h32/stage_6_t6_golden.memh.gz",
+      "sha256": "1b67af4b52651a70d0fe8684df81112b41bb3d682ecb2d7e788fd8d60c326abd",
+      "uncompressed_sha256": "38d22bd3f1f0a89eacba30e6c1563d71ee0c2c98537a1f4e43a47ce9a0ebb9a4",
+      "bytes": 27853,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_6_t6_golden.memh"
+    },
+    {
+      "path": "h32/stage_5_t5_desc.memh.gz",
+      "sha256": "5064509d1d9f2be72790573ea29494eb947bf33b256099f44a2562d0d2bc2817",
+      "uncompressed_sha256": "b0cc014f1f6a56f7438bdaf8f134a0af9211750abf3371c7d0bcc15286845523",
+      "bytes": 1321,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_5_t5_desc.memh"
+    },
+    {
+      "path": "h32/stage_2_t2_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_2_t2_poison.memh"
+    },
+    {
+      "path": "h32/top.command.json",
+      "sha256": "57c27b0f9c84ad0b5e096aa14734a64cfc8e256775f5e0aeecbfe788fc8bb865",
+      "uncompressed_sha256": "57c27b0f9c84ad0b5e096aa14734a64cfc8e256775f5e0aeecbfe788fc8bb865",
+      "bytes": 339,
+      "source": "/tmp/nmaforge-phase1-runs/h32/top.command.json"
+    },
+    {
+      "path": "h32/stage_4_t4_desc.memh.gz",
+      "sha256": "3f9f2e86d2d7323910d2989a719e19f56e2b31aba9a5b1ec6c63e5e529787424",
+      "uncompressed_sha256": "7845d11df10f3b7e4e1c2d0dedbf47729b6f9f86ef1233da10558e75c1f2d90d",
+      "bytes": 1330,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_4_t4_desc.memh"
+    },
+    {
+      "path": "h32/stage_5_t5_observed.memh.gz",
+      "sha256": "4648bbfd6e23e5b480a2e8be81f568d850451fa6efc0e9b6084fbd7fb595c339",
+      "uncompressed_sha256": "6d99227853c353f93b4266d265c0d1350c21a6d940f6c812f4b58aa1edee28c7",
+      "bytes": 27664,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_5_t5_observed.memh"
+    },
+    {
+      "path": "h32/stage_8_t8_observed.memh.gz",
+      "sha256": "f70c51245f2697a6398845e9dbdd34f9496500b1022ba149256b65ce16950077",
+      "uncompressed_sha256": "9c0518da3f9cba019c4bb20439c4daafee938f7185ec0d0a7f43cc9dc6ffc871",
+      "bytes": 28255,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_8_t8_observed.memh"
+    },
+    {
+      "path": "h32/stage_3_t3_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_3_t3_poison.memh"
+    },
+    {
+      "path": "h32/stage_3_t3_golden.memh.gz",
+      "sha256": "96486b310185670f0424433125aaaff6aa8966b001e8afd6c6a4acb448d58ec4",
+      "uncompressed_sha256": "c71570c2e7db61eb01c7122cdb69d7104ef494e458a9c2bdf2a536852de33343",
+      "bytes": 26885,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_3_t3_golden.memh"
+    },
+    {
+      "path": "h32/stage_11_t11_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_11_t11_poison.memh"
+    },
+    {
+      "path": "h32/stage_11_t11_desc.memh.gz",
+      "sha256": "9a2a894c6561d2464121cfa58eb6309c2d197befbbd7177fc03644f1f0894ab7",
+      "uncompressed_sha256": "fbc85d7bce10e77df6a96069057863325fbce03df0671184b433b6e5e108e81d",
+      "bytes": 1327,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_11_t11_desc.memh"
+    },
+    {
+      "path": "h32/stage_2_t2_golden.memh.gz",
+      "sha256": "01d8e43e59ebf704efd6cad5222296e31eae8a0b474ed6b663338e07dfbdc87c",
+      "uncompressed_sha256": "c13ca8401335808d205cfbfa21edd200d87966b0abb5bf3f9a63f3baba2a0d66",
+      "bytes": 26655,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_2_t2_golden.memh"
+    },
+    {
+      "path": "h32/profile_cycles.csv.gz",
+      "sha256": "c84d40ccba372ebd295ef8e136d2a11a5fe58dcbad6ac8628ad2594d8558fa18",
+      "uncompressed_sha256": "0902646778850cab5e72c50f79843663af3872383af6f28bdee74aee48f077b0",
+      "bytes": 1574811,
+      "source": "/tmp/nmaforge-phase1-runs/h32/profile_cycles.csv"
+    },
+    {
+      "path": "h32/stage_9_t9_golden.memh.gz",
+      "sha256": "32b9422b6e7f9809d760ab85c8882eb2c246c4cee554ab2c71f4e52de381f65e",
+      "uncompressed_sha256": "0ae0b2ea6ce507f2efad35bce6ef82aa28e00f121984db7baa755644b7619bea",
+      "bytes": 28650,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_9_t9_golden.memh"
+    },
+    {
+      "path": "h32/stage_11_t11_observed.memh.gz",
+      "sha256": "2c2b42e7524b49b4a2d6bfab278c1a022ad9e7be992e9deb21a3c318784372b4",
+      "uncompressed_sha256": "a48eea3d3af8c72d96cdd0293aeae8ba52336b4d7bdce4d99f7f14ffad8f1230",
+      "bytes": 29244,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_11_t11_observed.memh"
+    },
+    {
+      "path": "h32/stage_1_t1_desc.memh.gz",
+      "sha256": "5fe516a23f9b368684d115f00e0680f5ef2ae2a6ad1074e6270610de72f0069f",
+      "uncompressed_sha256": "66ac37ef9e672b6b63e7fc51b47aae3ae6b566ae45204067a88d68009c438af5",
+      "bytes": 1338,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_1_t1_desc.memh"
+    },
+    {
+      "path": "h32/stage_9_t9_desc.memh.gz",
+      "sha256": "24da7e45416a5845fe2b4d77573cb5b5eaf8a4599d9d7223fcb23bde80613891",
+      "uncompressed_sha256": "e5cb1a42f44840c049e2d2b1d29b1e19c3710a2701a5814cb1fe992c467538cd",
+      "bytes": 1331,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_9_t9_desc.memh"
+    },
+    {
+      "path": "h32/stage_8_t8_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32/stage_8_t8_poison.memh"
+    },
+    {
+      "path": "h32_old/stage_7_t7_observed.memh.gz",
+      "sha256": "d51cd96eb648998a9dc078dc3d44175abc7df673faed14784fe92347f6f5eadc",
+      "uncompressed_sha256": "fb12e21e888009b83af74da052941c74fd6fb0f3c5992e175be144f5d84e8e1b",
+      "bytes": 28418,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_7_t7_observed.memh"
+    },
+    {
+      "path": "h32_old/stage_8_t8_desc.memh.gz",
+      "sha256": "5217ae5ca88a211e4dc9019e801eecb5ebdd758096131baf36166074dfb1fb19",
+      "uncompressed_sha256": "f2a2f3155982b0cee5f9ca08ce0725f0aacd51ea2247d779ee4d8b17224d8b7e",
+      "bytes": 1328,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_8_t8_desc.memh"
+    },
+    {
+      "path": "h32_old/stage_3_t3_observed.memh.gz",
+      "sha256": "de1890da9610826df53f51c98984eff15355bca2e01bb904bbe955096fc55240",
+      "uncompressed_sha256": "a217a3b058ed699cbf10b6c0e93866c36eb26736b36fb471493768b422a6fe78",
+      "bytes": 27220,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_3_t3_observed.memh"
+    },
+    {
+      "path": "h32_old/stage_11_t11_golden.memh.gz",
+      "sha256": "32885c866ce9bbda61a1a1fcb05fc785d95a58b8c227f25a29fab156a1e1678f",
+      "uncompressed_sha256": "ec8c8f1aa1513dfeca51952ab36a37f651e859d519c4e69c3d154401935d5684",
+      "bytes": 29552,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_11_t11_golden.memh"
+    },
+    {
+      "path": "h32_old/stage_3_t3_desc.memh.gz",
+      "sha256": "42b394267831430ed148dc473086918d7f3f18dd93b62a16d80b0da810c39392",
+      "uncompressed_sha256": "31359e15c54ea29394425f23ca075319345da4cd3c084838c44fe44312c210ac",
+      "bytes": 1327,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_3_t3_desc.memh"
+    },
+    {
+      "path": "h32_old/stage_10_t10_observed.memh.gz",
+      "sha256": "8e907ac2df5a626fb588459058fed37856ce4c2ee56f7dafbf9664244040a29c",
+      "uncompressed_sha256": "61b168e5ec81b6ceaa4adfec042d3f4d02cb535a97825ab9ed3cf3d411ff39ac",
+      "bytes": 29294,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_10_t10_observed.memh"
+    },
+    {
+      "path": "h32_old/stage_6_t6_desc.memh.gz",
+      "sha256": "c34767fcd71623494fdd8e7f65a2ecc264f9ae0d880bf91262554765a9505211",
+      "uncompressed_sha256": "656e64c3ff4a5c2b4fe82b58eaf8cdd818e6ac1d8c5ac50b7fad161d5117367b",
+      "bytes": 1333,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_6_t6_desc.memh"
+    },
+    {
+      "path": "h32_old/manifest.json.gz",
+      "sha256": "d22f18edd492a7cbd3cc332f908a4efe61cd22dedff25dbbdf6bededdcb85fd4",
+      "uncompressed_sha256": "06e6c9449006cdcfccdf5c9a377f98eafe7cdd6ff89be993de3e3ca6c54f26bc",
+      "bytes": 39426,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/manifest.json"
+    },
+    {
+      "path": "h32_old/stage_10_t10_desc.memh.gz",
+      "sha256": "203b6a7524812f59ad948f328086b6aace8c1af4ef35e3c221ca5bb0b765f8c9",
+      "uncompressed_sha256": "3e80250d40b2e28ab1422cf6df27c02a53cd356fa530f883db653290b4210512",
+      "bytes": 1332,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_10_t10_desc.memh"
+    },
+    {
+      "path": "h32_old/stage_6_t6_observed.memh.gz",
+      "sha256": "5f089e7a3f2c3d459527f976d8100064bf35daf4dec25518f4f3bc0c3ce48e9c",
+      "uncompressed_sha256": "4e2b09cec986c3bdc95effa7b6469c07ef88d2ebb6c8efd7e1ceb8d64797203f",
+      "bytes": 28147,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_6_t6_observed.memh"
+    },
+    {
+      "path": "h32_old/stage_7_t7_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_7_t7_poison.memh"
+    },
+    {
+      "path": "h32_old/stage_0_t0_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_0_t0_poison.memh"
+    },
+    {
+      "path": "h32_old/stage_4_t4_golden.memh.gz",
+      "sha256": "7b14bfab68691587340a2acd252248ab7f8c3ef580d8b710ece8cb42d86096ad",
+      "uncompressed_sha256": "3392043462821a081995f985660bca112719bdfdd9dcd1e3dbefec76507b0167",
+      "bytes": 27532,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_4_t4_golden.memh"
+    },
+    {
+      "path": "h32_old/initial_memory.memh.gz",
+      "sha256": "4866ed75f97464fbf3453a500b5a29fbee03fc45e50783c9d7745f5a6cb26518",
+      "uncompressed_sha256": "492f85dcefee56dd30007d357729c7317060052cb09d53c0d1c98bc7be4101a6",
+      "bytes": 51130,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/initial_memory.memh"
+    },
+    {
+      "path": "h32_old/stage_10_t10_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_10_t10_poison.memh"
+    },
+    {
+      "path": "h32_old/profile_memory.csv.gz",
+      "sha256": "eb768ec1762f7351e0c89bcc8055d442bec2f4890c9a40d0f5ee7eca1e3efc58",
+      "uncompressed_sha256": "81f0a4017b151484c11bf5a887696e7bd5a39cd8b31b3bb2cbc469e044ea4c1e",
+      "bytes": 1532370,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/profile_memory.csv"
+    },
+    {
+      "path": "h32_old/stage_8_t8_golden.memh.gz",
+      "sha256": "7dd82dc585655ca3759d1b35cbd7da79f4d8dd5dd944072f32d8913c230119d3",
+      "uncompressed_sha256": "d5853a2920ec133f86ad2a945bf65609cd3643e4af28d83d3a89504ca517f0e5",
+      "bytes": 28718,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_8_t8_golden.memh"
+    },
+    {
+      "path": "h32_old/stage_7_t7_desc.memh.gz",
+      "sha256": "b53f81e1fbb182f189714ce33ec24f36127a874ba0160126afb94d96b4a61d20",
+      "uncompressed_sha256": "5e720c5a067fbc44e5338a5e09ba7eed135e55894a353a1895836af953981e88",
+      "bytes": 1321,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_7_t7_desc.memh"
+    },
+    {
+      "path": "h32_old/stage_6_t6_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_6_t6_poison.memh"
+    },
+    {
+      "path": "h32_old/stage_1_t1_golden.memh.gz",
+      "sha256": "3df322bbd1d02102b2d15d8d499a0b99e076762ba94903840669a2d996abb1d2",
+      "uncompressed_sha256": "d60f0a19fa7e952d317f35b86f5d1d98066fb98b0d587efcf13b240c0b60649f",
+      "bytes": 26501,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_1_t1_golden.memh"
+    },
+    {
+      "path": "h32_old/stage_4_t4_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_4_t4_poison.memh"
+    },
+    {
+      "path": "h32_old/stage_0_t0_desc.memh.gz",
+      "sha256": "6162cfd864675164ab405511603b5f07fd07b178f51060b44af003c4955c0c31",
+      "uncompressed_sha256": "9fff7cbbac87d5d025ebbcc9a5eb2caf4ba0f9086d88b9a708625c4bd86aeafe",
+      "bytes": 1322,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_0_t0_desc.memh"
+    },
+    {
+      "path": "h32_old/stage_9_t9_observed.memh.gz",
+      "sha256": "374475f7c4a317da042c99dbf960543e3366328bdba30279e252c21eb50ef441",
+      "uncompressed_sha256": "8effcea2370d995284afbad67549990e61728872cf5e820da4580ef9d8ff66c7",
+      "bytes": 29053,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_9_t9_observed.memh"
+    },
+    {
+      "path": "h32_old/stage_9_t9_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_9_t9_poison.memh"
+    },
+    {
+      "path": "h32_old/top.log.gz",
+      "sha256": "5472f0740dc229b4f5c6e00074e81a2bbc48a2a32d9cd93e855cc1747306c9ac",
+      "uncompressed_sha256": "d11f42bd2ce5a451ae0bac5e0b52054f61419817796bdd52e7d6e9abcdeb3aa2",
+      "bytes": 17333,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/top.log"
+    },
+    {
+      "path": "h32_old/stage_2_t2_observed.memh.gz",
+      "sha256": "6b88508695367c8c0e23b7ef703b5316c75d94c674e03868f135c4e14b02cf4b",
+      "uncompressed_sha256": "7c8c6e3fe8132cfe71b841850b17b9ef80f55967fa1aa11c52e5879f62467f1f",
+      "bytes": 26805,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_2_t2_observed.memh"
+    },
+    {
+      "path": "h32_old/stage_10_t10_golden.memh.gz",
+      "sha256": "8e907ac2df5a626fb588459058fed37856ce4c2ee56f7dafbf9664244040a29c",
+      "uncompressed_sha256": "61b168e5ec81b6ceaa4adfec042d3f4d02cb535a97825ab9ed3cf3d411ff39ac",
+      "bytes": 29294,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_10_t10_golden.memh"
+    },
+    {
+      "path": "h32_old/stage_2_t2_desc.memh.gz",
+      "sha256": "3cdd9dad36913f577f63f17dafe0c1da368531ac8bfc506d75f616e0c9470264",
+      "uncompressed_sha256": "33221f714f59f5cecf7c9627e82cbb3db2a3030200673458809e886ec02aae1d",
+      "bytes": 1334,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_2_t2_desc.memh"
+    },
+    {
+      "path": "h32_old/stage_1_t1_observed.memh.gz",
+      "sha256": "3df322bbd1d02102b2d15d8d499a0b99e076762ba94903840669a2d996abb1d2",
+      "uncompressed_sha256": "d60f0a19fa7e952d317f35b86f5d1d98066fb98b0d587efcf13b240c0b60649f",
+      "bytes": 26501,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_1_t1_observed.memh"
+    },
+    {
+      "path": "h32_old/stage_5_t5_golden.memh.gz",
+      "sha256": "60b3185e1c0de1f38302feaed72c9a59911c40098e781115a04f4e2b396aca01",
+      "uncompressed_sha256": "afd6c32cbad3fcc79ef19885ba6d23c744a2b0ca8484c80d142a89da0cce6e4e",
+      "bytes": 27762,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_5_t5_golden.memh"
+    },
+    {
+      "path": "h32_old/stage_4_t4_observed.memh.gz",
+      "sha256": "7b14bfab68691587340a2acd252248ab7f8c3ef580d8b710ece8cb42d86096ad",
+      "uncompressed_sha256": "3392043462821a081995f985660bca112719bdfdd9dcd1e3dbefec76507b0167",
+      "bytes": 27532,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_4_t4_observed.memh"
+    },
+    {
+      "path": "h32_old/stage_0_t0_golden.memh.gz",
+      "sha256": "33473344166a62a3e06c0b5be02af819a72ed8c361b219e471498fa25b0e5831",
+      "uncompressed_sha256": "6f6780cfb090bf49235183995d62d5cf07b761c781cf13fafbd1c1b63d53135d",
+      "bytes": 26089,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_0_t0_golden.memh"
+    },
+    {
+      "path": "h32_old/stage_0_t0_observed.memh.gz",
+      "sha256": "33473344166a62a3e06c0b5be02af819a72ed8c361b219e471498fa25b0e5831",
+      "uncompressed_sha256": "6f6780cfb090bf49235183995d62d5cf07b761c781cf13fafbd1c1b63d53135d",
+      "bytes": 26089,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_0_t0_observed.memh"
+    },
+    {
+      "path": "h32_old/stage_1_t1_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_1_t1_poison.memh"
+    },
+    {
+      "path": "h32_old/stage_5_t5_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_5_t5_poison.memh"
+    },
+    {
+      "path": "h32_old/stage_7_t7_golden.memh.gz",
+      "sha256": "d51cd96eb648998a9dc078dc3d44175abc7df673faed14784fe92347f6f5eadc",
+      "uncompressed_sha256": "fb12e21e888009b83af74da052941c74fd6fb0f3c5992e175be144f5d84e8e1b",
+      "bytes": 28418,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_7_t7_golden.memh"
+    },
+    {
+      "path": "h32_old/stage_6_t6_golden.memh.gz",
+      "sha256": "5f089e7a3f2c3d459527f976d8100064bf35daf4dec25518f4f3bc0c3ce48e9c",
+      "uncompressed_sha256": "4e2b09cec986c3bdc95effa7b6469c07ef88d2ebb6c8efd7e1ceb8d64797203f",
+      "bytes": 28147,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_6_t6_golden.memh"
+    },
+    {
+      "path": "h32_old/stage_5_t5_desc.memh.gz",
+      "sha256": "5064509d1d9f2be72790573ea29494eb947bf33b256099f44a2562d0d2bc2817",
+      "uncompressed_sha256": "b0cc014f1f6a56f7438bdaf8f134a0af9211750abf3371c7d0bcc15286845523",
+      "bytes": 1321,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_5_t5_desc.memh"
+    },
+    {
+      "path": "h32_old/stage_2_t2_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_2_t2_poison.memh"
+    },
+    {
+      "path": "h32_old/top.command.json",
+      "sha256": "1da3dd913395f869ff18a432c6c7f0d027c7792272bf69d12426e56c376dacb1",
+      "uncompressed_sha256": "1da3dd913395f869ff18a432c6c7f0d027c7792272bf69d12426e56c376dacb1",
+      "bytes": 351,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/top.command.json"
+    },
+    {
+      "path": "h32_old/stage_4_t4_desc.memh.gz",
+      "sha256": "3f9f2e86d2d7323910d2989a719e19f56e2b31aba9a5b1ec6c63e5e529787424",
+      "uncompressed_sha256": "7845d11df10f3b7e4e1c2d0dedbf47729b6f9f86ef1233da10558e75c1f2d90d",
+      "bytes": 1330,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_4_t4_desc.memh"
+    },
+    {
+      "path": "h32_old/stage_5_t5_observed.memh.gz",
+      "sha256": "60b3185e1c0de1f38302feaed72c9a59911c40098e781115a04f4e2b396aca01",
+      "uncompressed_sha256": "afd6c32cbad3fcc79ef19885ba6d23c744a2b0ca8484c80d142a89da0cce6e4e",
+      "bytes": 27762,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_5_t5_observed.memh"
+    },
+    {
+      "path": "h32_old/stage_8_t8_observed.memh.gz",
+      "sha256": "7dd82dc585655ca3759d1b35cbd7da79f4d8dd5dd944072f32d8913c230119d3",
+      "uncompressed_sha256": "d5853a2920ec133f86ad2a945bf65609cd3643e4af28d83d3a89504ca517f0e5",
+      "bytes": 28718,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_8_t8_observed.memh"
+    },
+    {
+      "path": "h32_old/stage_3_t3_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_3_t3_poison.memh"
+    },
+    {
+      "path": "h32_old/stage_3_t3_golden.memh.gz",
+      "sha256": "de1890da9610826df53f51c98984eff15355bca2e01bb904bbe955096fc55240",
+      "uncompressed_sha256": "a217a3b058ed699cbf10b6c0e93866c36eb26736b36fb471493768b422a6fe78",
+      "bytes": 27220,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_3_t3_golden.memh"
+    },
+    {
+      "path": "h32_old/stage_11_t11_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_11_t11_poison.memh"
+    },
+    {
+      "path": "h32_old/stage_11_t11_desc.memh.gz",
+      "sha256": "9a2a894c6561d2464121cfa58eb6309c2d197befbbd7177fc03644f1f0894ab7",
+      "uncompressed_sha256": "fbc85d7bce10e77df6a96069057863325fbce03df0671184b433b6e5e108e81d",
+      "bytes": 1327,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_11_t11_desc.memh"
+    },
+    {
+      "path": "h32_old/stage_2_t2_golden.memh.gz",
+      "sha256": "6b88508695367c8c0e23b7ef703b5316c75d94c674e03868f135c4e14b02cf4b",
+      "uncompressed_sha256": "7c8c6e3fe8132cfe71b841850b17b9ef80f55967fa1aa11c52e5879f62467f1f",
+      "bytes": 26805,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_2_t2_golden.memh"
+    },
+    {
+      "path": "h32_old/profile_cycles.csv.gz",
+      "sha256": "aaac3b3f5ec0d74285208bd81caabf1aaffdada8f6651533134b64748c816626",
+      "uncompressed_sha256": "038ec0cf36bb1f83917a935ab1890689ef1092d7eae55c2f8d5345ce7b88c2a6",
+      "bytes": 1575692,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/profile_cycles.csv"
+    },
+    {
+      "path": "h32_old/stage_9_t9_golden.memh.gz",
+      "sha256": "374475f7c4a317da042c99dbf960543e3366328bdba30279e252c21eb50ef441",
+      "uncompressed_sha256": "8effcea2370d995284afbad67549990e61728872cf5e820da4580ef9d8ff66c7",
+      "bytes": 29053,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_9_t9_golden.memh"
+    },
+    {
+      "path": "h32_old/stage_11_t11_observed.memh.gz",
+      "sha256": "32885c866ce9bbda61a1a1fcb05fc785d95a58b8c227f25a29fab156a1e1678f",
+      "uncompressed_sha256": "ec8c8f1aa1513dfeca51952ab36a37f651e859d519c4e69c3d154401935d5684",
+      "bytes": 29552,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_11_t11_observed.memh"
+    },
+    {
+      "path": "h32_old/stage_1_t1_desc.memh.gz",
+      "sha256": "5fe516a23f9b368684d115f00e0680f5ef2ae2a6ad1074e6270610de72f0069f",
+      "uncompressed_sha256": "66ac37ef9e672b6b63e7fc51b47aae3ae6b566ae45204067a88d68009c438af5",
+      "bytes": 1338,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_1_t1_desc.memh"
+    },
+    {
+      "path": "h32_old/stage_9_t9_desc.memh.gz",
+      "sha256": "24da7e45416a5845fe2b4d77573cb5b5eaf8a4599d9d7223fcb23bde80613891",
+      "uncompressed_sha256": "e5cb1a42f44840c049e2d2b1d29b1e19c3710a2701a5814cb1fe992c467538cd",
+      "bytes": 1331,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_9_t9_desc.memh"
+    },
+    {
+      "path": "h32_old/stage_8_t8_poison.memh.gz",
+      "sha256": "7c4f422160231942ba62f41b838d024d234befcdbdf4104dfd674546deeb347d",
+      "uncompressed_sha256": "e8943b80add785dcbf47a87ceac83cc1bb709f2c0e52aa86bed4bd6694338e64",
+      "bytes": 17135,
+      "source": "/tmp/nmaforge-phase1-runs/h32_old/stage_8_t8_poison.memh"
+    },
+    {
+      "path": "h16/workload/stage_4_decode_t7_observed.memh.gz",
+      "sha256": "56d37249f34b828fcd7fcff3a2ba89b5ad241a65edab22314e4b6dcd0a453e6c",
+      "uncompressed_sha256": "1879112f61e6fb98ce91c6731cfeb80390c9a28a901c9a9d0140039d27ed3d0b",
+      "bytes": 5039,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_4_decode_t7_observed.memh"
+    },
+    {
+      "path": "h16/workload/stage_7_decode_t10_poison.memh.gz",
+      "sha256": "456e28bfa942d6225b754d051852e56f03babba4e1171b4047aa95b17c0aed87",
+      "uncompressed_sha256": "404cfab02a98a094b3aac7372120f3bcdf640e7f0e8fff001530c5a566dce2a7",
+      "bytes": 3061,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_7_decode_t10_poison.memh"
+    },
+    {
+      "path": "h16/workload/stage_1_decode_t4_poison.memh.gz",
+      "sha256": "3e440c2bf2e0a8c4e610c72e390edcd9f6b323afbc93c3184bd19ffad474b6c9",
+      "uncompressed_sha256": "a7bdbc3f3bc844603d9cbd45bc3108dc7cc923389eec90d725fa254e1127d0fa",
+      "bytes": 3063,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_1_decode_t4_poison.memh"
+    },
+    {
+      "path": "h16/workload/stage_7_decode_t10_observed.memh.gz",
+      "sha256": "441029739b20c44de9b8f4e4dacc51e0eddc73f8ad275d7b5c879403e9423ece",
+      "uncompressed_sha256": "1b0fe8a2109aef0241ed96859da63351bbee270fe11a0438073f151754ad4e02",
+      "bytes": 5063,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_7_decode_t10_observed.memh"
+    },
+    {
+      "path": "h16/workload/manifest.json.gz",
+      "sha256": "cdee35d89573c77534b1a1fa00b67b1bc0486be798c5c79d10fa157923007443",
+      "uncompressed_sha256": "5a8a7ab5c7e56f3e9158f0df3dac845e457a428be0527bff29f6664b8d65bf78",
+      "bytes": 17841,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/manifest.json"
+    },
+    {
+      "path": "h16/workload/stage_2_decode_t5_observed.memh.gz",
+      "sha256": "621eade0fc6f98d02e3e7dd2e384187949190f0de351ebe4ed2f92e215bbccbb",
+      "uncompressed_sha256": "5cf0363437dbea85784cd549c53b86c510eceb0826a6ff5232fdcb0058530ae0",
+      "bytes": 4886,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_2_decode_t5_observed.memh"
+    },
+    {
+      "path": "h16/workload/stage_0_prefill_kv_0_3_golden.memh.gz",
+      "sha256": "573c1d0f712056999ea88dbf1212bc7461c01f0a0b7ea1d9e4ec26b9964e1686",
+      "uncompressed_sha256": "96bf428a9351360973ceb15c24576826009ae513b4ab251d458c3d8afc6e9cca",
+      "bytes": 1620,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_0_prefill_kv_0_3_golden.memh"
+    },
+    {
+      "path": "h16/workload/stage_8_decode_t11_observed.memh.gz",
+      "sha256": "fb2ae19506cd33f62b946d79c86f6e18310ae482680d3e453ad584a4a50633a6",
+      "uncompressed_sha256": "6a168e47dd002ca9a1ae97d22a1a148cdca79a76c0fdafd781730ebe54dc69c8",
+      "bytes": 5028,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_8_decode_t11_observed.memh"
+    },
+    {
+      "path": "h16/workload/stage_8_decode_t11_desc.memh.gz",
+      "sha256": "d4d6a7afdd1a1bb5b01f2fc848880e6fb49c044e626a7cc8cd946b7542644337",
+      "uncompressed_sha256": "4e719319602f4502b69765cdb5130fffd19beb0401e5030ea6989fb2c2a52852",
+      "bytes": 678,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_8_decode_t11_desc.memh"
+    },
+    {
+      "path": "h16/workload/initial_memory.memh.gz",
+      "sha256": "46f20294bb8b1cd9ae6f2634f838f4dd3f1c0f08cc7ca60add939d20c5cda523",
+      "uncompressed_sha256": "9ec2ae01d3d33ffb5b8d648e8b5f59e25837e51cb5a68bb640b772e0351d71c2",
+      "bytes": 35625,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/initial_memory.memh"
+    },
+    {
+      "path": "h16/workload/stage_7_decode_t10_golden.memh.gz",
+      "sha256": "441029739b20c44de9b8f4e4dacc51e0eddc73f8ad275d7b5c879403e9423ece",
+      "uncompressed_sha256": "1b0fe8a2109aef0241ed96859da63351bbee270fe11a0438073f151754ad4e02",
+      "bytes": 5063,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_7_decode_t10_golden.memh"
+    },
+    {
+      "path": "h16/workload/stage_4_decode_t7_desc.memh.gz",
+      "sha256": "c29f8c0b2b243d139adc26934e7ea8b7eae779fdb3c37ade25bdc4b45fdde31b",
+      "uncompressed_sha256": "1aa274736c5d66b17552f3fbe3846f060b4acbe127fadd94014b80970b9ab138",
+      "bytes": 686,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_4_decode_t7_desc.memh"
+    },
+    {
+      "path": "h16/workload/stage_3_decode_t6_poison.memh.gz",
+      "sha256": "fe0fc3a18f135b472316dab8864e981e5781e64f8b605f7aa5c6ff78c7ac56eb",
+      "uncompressed_sha256": "6941d9954a308d22717d8f5e8fb2a37bfbc528f21fa0007dad92686b26598215",
+      "bytes": 3067,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_3_decode_t6_poison.memh"
+    },
+    {
+      "path": "h16/workload/stage_2_decode_t5_poison.memh.gz",
+      "sha256": "cfe7d96ad04c3dfb6dea6a485136ec75d4f9e66690e0d19ec7360d14a65b3bf3",
+      "uncompressed_sha256": "a045fb0c1f948b7658f62e9eb9972c804bc233aff48214af211cc26734a35db0",
+      "bytes": 3048,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_2_decode_t5_poison.memh"
+    },
+    {
+      "path": "h16/workload/stage_6_decode_t9_golden.memh.gz",
+      "sha256": "c5c36d4f7414a2c356f4ad40bf588e8e2b732a0966390d158922a53fdff7b5a6",
+      "uncompressed_sha256": "25407dfb22fe7dd70c67cd97a4d3fe4c6705ce914c09c50c91a8cff50dbf0451",
+      "bytes": 5022,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_6_decode_t9_golden.memh"
+    },
+    {
+      "path": "h16/workload/stage_5_decode_t8_poison.memh.gz",
+      "sha256": "3b96615928f9fdded007416ba81582a9a4df8e0e7b4ecce7bf01df18d362c4b7",
+      "uncompressed_sha256": "ac6a9d2c170c1d9db29d71f3e8a4309ab500f162946c6659974a0462ad347035",
+      "bytes": 3062,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_5_decode_t8_poison.memh"
+    },
+    {
+      "path": "h16/workload/stage_5_decode_t8_golden.memh.gz",
+      "sha256": "4f682ec73d3b1008fb56fc4072debf89e5c369c6d86af5c4af08ea28f20efc23",
+      "uncompressed_sha256": "dc69bf53043cd9544b92ef1231e0498f333e55acbb5cbd59bfd601f55390784d",
+      "bytes": 5047,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_5_decode_t8_golden.memh"
+    },
+    {
+      "path": "h16/workload/stage_0_prefill_kv_0_3_observed.memh.gz",
+      "sha256": "573c1d0f712056999ea88dbf1212bc7461c01f0a0b7ea1d9e4ec26b9964e1686",
+      "uncompressed_sha256": "96bf428a9351360973ceb15c24576826009ae513b4ab251d458c3d8afc6e9cca",
+      "bytes": 1620,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_0_prefill_kv_0_3_observed.memh"
+    },
+    {
+      "path": "h16/workload/stage_8_decode_t11_golden.memh.gz",
+      "sha256": "fb2ae19506cd33f62b946d79c86f6e18310ae482680d3e453ad584a4a50633a6",
+      "uncompressed_sha256": "6a168e47dd002ca9a1ae97d22a1a148cdca79a76c0fdafd781730ebe54dc69c8",
+      "bytes": 5028,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_8_decode_t11_golden.memh"
+    },
+    {
+      "path": "h16/workload/stage_3_decode_t6_golden.memh.gz",
+      "sha256": "8834444351248819b0f3c8b58d1d487b5e6cf5ee0bbe3c198c6178c1bbd14bfb",
+      "uncompressed_sha256": "7c7826836d20572b6ad87ddc340d6e99aab801c212aa21e6986a4f66558727ce",
+      "bytes": 5017,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_3_decode_t6_golden.memh"
+    },
+    {
+      "path": "h16/workload/stage_2_decode_t5_desc.memh.gz",
+      "sha256": "879cecf8c54643f956b90a15d05160b22555bae0c9147ca5407997096d38f0be",
+      "uncompressed_sha256": "85782a925398122c78f0d0db5254821f8e544f961084c19c08f9618b38fa7bec",
+      "bytes": 684,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_2_decode_t5_desc.memh"
+    },
+    {
+      "path": "h16/workload/stage_4_decode_t7_golden.memh.gz",
+      "sha256": "56d37249f34b828fcd7fcff3a2ba89b5ad241a65edab22314e4b6dcd0a453e6c",
+      "uncompressed_sha256": "1879112f61e6fb98ce91c6731cfeb80390c9a28a901c9a9d0140039d27ed3d0b",
+      "bytes": 5039,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_4_decode_t7_golden.memh"
+    },
+    {
+      "path": "h16/workload/stage_5_decode_t8_observed.memh.gz",
+      "sha256": "4f682ec73d3b1008fb56fc4072debf89e5c369c6d86af5c4af08ea28f20efc23",
+      "uncompressed_sha256": "dc69bf53043cd9544b92ef1231e0498f333e55acbb5cbd59bfd601f55390784d",
+      "bytes": 5047,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_5_decode_t8_observed.memh"
+    },
+    {
+      "path": "h16/workload/stage_8_decode_t11_poison.memh.gz",
+      "sha256": "aa4c1c0e8b3feba4e20ad3a37aef5ab491ecdc32616ddcab2383a8951341e395",
+      "uncompressed_sha256": "acd2f72d96be9a8abd8e6f53fd1ed9001ef98b9d80c4bb76552dd95955d0eb52",
+      "bytes": 2838,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_8_decode_t11_poison.memh"
+    },
+    {
+      "path": "h16/workload/stage_6_decode_t9_desc.memh.gz",
+      "sha256": "0436cbb9b0899cab6613c5e155121ea4b201e4a48a45e38391e02f97262a9f18",
+      "uncompressed_sha256": "fceba31abbb1cce145e4cfb5b9474215fd63faf9c2df3323ba5128a5864226ba",
+      "bytes": 682,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_6_decode_t9_desc.memh"
+    },
+    {
+      "path": "h16/workload/stage_7_decode_t10_desc.memh.gz",
+      "sha256": "3a1d691c6f14dfde3e7fa0d2dd6d18e6f220917580ca8bacc27c5a41f9a2812b",
+      "uncompressed_sha256": "0ee7196e8589d8bac6ecafab4fcdd49c91d7ed86886736aefebefc21c167441f",
+      "bytes": 681,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_7_decode_t10_desc.memh"
+    },
+    {
+      "path": "h16/workload/stage_3_decode_t6_observed.memh.gz",
+      "sha256": "8834444351248819b0f3c8b58d1d487b5e6cf5ee0bbe3c198c6178c1bbd14bfb",
+      "uncompressed_sha256": "7c7826836d20572b6ad87ddc340d6e99aab801c212aa21e6986a4f66558727ce",
+      "bytes": 5017,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_3_decode_t6_observed.memh"
+    },
+    {
+      "path": "h16/workload/stage_1_decode_t4_golden.memh.gz",
+      "sha256": "24d0c5ae2fb61bca793b4756e00892860f74b5ac7ffb65c14825c3b68bd62af7",
+      "uncompressed_sha256": "5e1b3f204aa22e00057da39485bc905211751be4097c9c488fe131e6df3f4b79",
+      "bytes": 4881,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_1_decode_t4_golden.memh"
+    },
+    {
+      "path": "h16/workload/stage_4_decode_t7_poison.memh.gz",
+      "sha256": "40defe79e70dd43364147dd74b7366b819b41fd8ffc5d4ae091e3110b0f3c76e",
+      "uncompressed_sha256": "963d82444f22a52a06d295813b84af46611385dc784ee4937a14130df79a5fe6",
+      "bytes": 3050,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_4_decode_t7_poison.memh"
+    },
+    {
+      "path": "h16/workload/stage_6_decode_t9_observed.memh.gz",
+      "sha256": "c5c36d4f7414a2c356f4ad40bf588e8e2b732a0966390d158922a53fdff7b5a6",
+      "uncompressed_sha256": "25407dfb22fe7dd70c67cd97a4d3fe4c6705ce914c09c50c91a8cff50dbf0451",
+      "bytes": 5022,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_6_decode_t9_observed.memh"
+    },
+    {
+      "path": "h16/workload/stage_0_prefill_kv_0_3_poison.memh.gz",
+      "sha256": "f8eacf8a53939725a4256e447c364b62ad8eadb53130b15d1692600f81692a07",
+      "uncompressed_sha256": "23121dd83baa6bf38bcebf753c70cc73993fce2d3151926e0e3366dfbb9a831b",
+      "bytes": 650,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_0_prefill_kv_0_3_poison.memh"
+    },
+    {
+      "path": "h16/workload/stage_2_decode_t5_golden.memh.gz",
+      "sha256": "621eade0fc6f98d02e3e7dd2e384187949190f0de351ebe4ed2f92e215bbccbb",
+      "uncompressed_sha256": "5cf0363437dbea85784cd549c53b86c510eceb0826a6ff5232fdcb0058530ae0",
+      "bytes": 4886,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_2_decode_t5_golden.memh"
+    },
+    {
+      "path": "h16/workload/stage_3_decode_t6_desc.memh.gz",
+      "sha256": "d5a5339c1174634ccd5da2f7a201da2cd51dc28f7375d4f4c1ed556c924a5603",
+      "uncompressed_sha256": "d6818b805c44c0ce07c6ef3cc2dd4d5937a926b62b3a4e9a9ead5704a2a4703e",
+      "bytes": 681,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_3_decode_t6_desc.memh"
+    },
+    {
+      "path": "h16/workload/stage_1_decode_t4_observed.memh.gz",
+      "sha256": "24d0c5ae2fb61bca793b4756e00892860f74b5ac7ffb65c14825c3b68bd62af7",
+      "uncompressed_sha256": "5e1b3f204aa22e00057da39485bc905211751be4097c9c488fe131e6df3f4b79",
+      "bytes": 4881,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_1_decode_t4_observed.memh"
+    },
+    {
+      "path": "h16/workload/stage_1_decode_t4_desc.memh.gz",
+      "sha256": "def9e35a52ff8b57dcb1c70275555c1a724386985d07da6f499a6b02c8e8ce51",
+      "uncompressed_sha256": "9a0b9958c19baecfd04b0e403080e44889193a0094c83d845fc418b27a778c30",
+      "bytes": 684,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_1_decode_t4_desc.memh"
+    },
+    {
+      "path": "h16/workload/stage_6_decode_t9_poison.memh.gz",
+      "sha256": "1d754b2e3ae7560ee312d7a320dbee5a01eae6f3aca01dcbdf60774f9b5809ba",
+      "uncompressed_sha256": "597a1f9d84a46bbdc22bc9a45aaea2c70437b4ba3617450a36c04e54cd0a6407",
+      "bytes": 3051,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_6_decode_t9_poison.memh"
+    },
+    {
+      "path": "h16/workload/stage_0_prefill_kv_0_3_desc.memh.gz",
+      "sha256": "bbbab1bbd5872c8120c1e519755d9497d18d3b8ec772f3f868473054822fa9ed",
+      "uncompressed_sha256": "d071df7f7e268d520435f10d244e0d6203f0824ba26038a42c6d7fa09c79bde4",
+      "bytes": 465,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_0_prefill_kv_0_3_desc.memh"
+    },
+    {
+      "path": "h16/workload/stage_5_decode_t8_desc.memh.gz",
+      "sha256": "4c8f5ed928359dc1027473e8d0abad2cbeb149fe8acaad91d42852629aeb5ccd",
+      "uncompressed_sha256": "4c0a26bb7f188111b7a8f25dd94760fd18834302e68304a195f9f80e5d369218",
+      "bytes": 675,
+      "source": "/tmp/nmaforge-phase1-runs/h16/workload/stage_5_decode_t8_desc.memh"
+    },
+    {
+      "path": "h16/top_session.log.gz",
+      "sha256": "680a6ca696688fc96dd670e62b69c25df472cc273dbd20cec404888b23f395f3",
+      "uncompressed_sha256": "0aa306740992bcd4fd244f8eee42ecd2cd92b724c3b893d81ee821c46b10aabc",
+      "bytes": 7224,
+      "source": "/tmp/nmaforge-phase1-runs/h16/top_session.log"
+    },
+    {
+      "path": "h16/persistent_decode.json",
+      "sha256": "f1408ec56b096812fae40d9534b965d1f7f22d3303e40002b6b3e0c7f94776ed",
+      "uncompressed_sha256": "f1408ec56b096812fae40d9534b965d1f7f22d3303e40002b6b3e0c7f94776ed",
+      "bytes": 14428,
+      "source": "/tmp/nmaforge-phase1-runs/h16/persistent_decode.json"
+    },
+    {
+      "path": "h16/persistent_decode.csv.gz",
+      "sha256": "851d5d967291aea3c22a83e341135bad04a58bbda93c940f29e1fad21ca89df2",
+      "uncompressed_sha256": "1518afba3a6d8076de2070e171d5565e7a5f616a43fa12d386c9d3fd3c678cba",
+      "bytes": 1979,
+      "source": "/tmp/nmaforge-phase1-runs/h16/persistent_decode.csv"
+    },
+    {
+      "path": "h16/opcode_profile.json",
+      "sha256": "46a2be47d85633d704132d34f0f6bd2fa9ad5bd8d72c4073a32d99efd858b1a3",
+      "uncompressed_sha256": "46a2be47d85633d704132d34f0f6bd2fa9ad5bd8d72c4073a32d99efd858b1a3",
+      "bytes": 1692,
+      "source": "/tmp/nmaforge-phase1-runs/h16/opcode_profile.json"
+    },
+    {
+      "path": "h16_profile/profile_cycles.csv.gz",
+      "sha256": "359848f9ef3f816eb591cb3828feb1de27fcf6bc48df124d29622ecc2dfff329",
+      "uncompressed_sha256": "abb40d21b187413de3f9dd0b83bfe642a480917fc22821fafb458070d8e88b34",
+      "bytes": 205841,
+      "source": "/tmp/nmaforge-phase1-runs/h16_profile/profile_cycles.csv"
+    },
+    {
+      "path": "h16_profile/profile_memory.csv.gz",
+      "sha256": "f8cb1a417b590cdeadd04f155c1d979ace460fee6b07b55fa0a7f7f45d679baa",
+      "uncompressed_sha256": "eac885a340f52d5c613aefe9119302104a3251948ae8ef898b3bbae3d4058587",
+      "bytes": 212803,
+      "source": "/tmp/nmaforge-phase1-runs/h16_profile/profile_memory.csv"
+    },
+    {
+      "path": "matched/h32_q_nma.memh.gz",
+      "sha256": "a510945bff81b4ebded7e076a7791a37dab94a2691d2580b0876af4f791149ca",
+      "uncompressed_sha256": "a16ed93c01363191ac64a2fe130f0509c87eb484ca42b99126572f5f62bd0653",
+      "bytes": 138,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_q_nma.memh"
+    },
+    {
+      "path": "matched/gemm_1_16_32_nma.memh.gz",
+      "sha256": "d16754b3b13c146927bddcdfe13ff2531da54735eac93919a44b36ff3bae22d8",
+      "uncompressed_sha256": "c5ad97ac459b7055458c5e47e42fc81fa8676e62d8f7eb38d39219a2bed0d274",
+      "bytes": 41,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_1_16_32_nma.memh"
+    },
+    {
+      "path": "matched/gemm_16_16_16_nma.memh.gz",
+      "sha256": "8174a0a2fe5d6f9cafed715e1ef9f8bd5dda6b49e6f93185b10838791db04c45",
+      "uncompressed_sha256": "21c9775404cbfaa2242c832fb5a46e333821683ab5dd49ac3d23f995a61b651c",
+      "bytes": 79,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_16_16_16_nma.memh"
+    },
+    {
+      "path": "matched/gemm_32_32_64_golden.memh.gz",
+      "sha256": "ec4c1d15fe3a455e39a624b4b6cc126472b1d80086452f1a3632fab89a5b931e",
+      "uncompressed_sha256": "5acbb6fae3ac4d4f2116dd60675bb87060a759208db65e7ce4c773fbb8c50556",
+      "bytes": 123,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_32_32_64_golden.memh"
+    },
+    {
+      "path": "matched/h32_ffn_down_nma.memh.gz",
+      "sha256": "bc18f85931cacebb365cf3844cd1ef9c28ce804c90f0fbd859a33b58c6aaf0b7",
+      "uncompressed_sha256": "e7d6e7e03970ebf18151d7ecc10a153a7bdea46259fd918937acb1455cd403dc",
+      "bytes": 132,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_ffn_down_nma.memh"
+    },
+    {
+      "path": "matched/gemm_16_16_16_nma.log.gz",
+      "sha256": "b4d4977ff6052b8abff312a8efc89fee1daa470bd93e04601a0c04cd9543574a",
+      "uncompressed_sha256": "30eb866e3aeed97f5a7901bf72a635a594c35df4b6dd18462b6acb66bffc6d8c",
+      "bytes": 651,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_16_16_16_nma.log"
+    },
+    {
+      "path": "matched/gemm_16_16_32.memh.gz",
+      "sha256": "2b24aa59bf40a0b1b2f8086ecb67fb0d752064b28f05b0e4680471be888179dc",
+      "uncompressed_sha256": "3ad4b61c9da30c4e0a06e9c0b8c18b0f8df8b9cca725d8f2c9fa9e1cb9be3c44",
+      "bytes": 134,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_16_16_32.memh"
+    },
+    {
+      "path": "matched/gemm_4_4_32_tiny.memh.gz",
+      "sha256": "ec793e753910b215efccfe72d83c9422c8b0fab36846160d3aa581b26ba7ead9",
+      "uncompressed_sha256": "1cc788cccad792ea42906c3eb862e0fed158c4ca4d6a041c0d1aa8421b5ef98f",
+      "bytes": 54,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_4_4_32_tiny.memh"
+    },
+    {
+      "path": "matched/fixtures.json",
+      "sha256": "bdc6761b9d9984fd5236b983b572a06c5d307a2c069adeaf789426c15ebe0444",
+      "uncompressed_sha256": "bdc6761b9d9984fd5236b983b572a06c5d307a2c069adeaf789426c15ebe0444",
+      "bytes": 3934,
+      "source": "/tmp/nmaforge-phase1-runs/matched/fixtures.json"
+    },
+    {
+      "path": "matched/gemm_4_16_32.memh.gz",
+      "sha256": "9fd682507e2be989274b8086801e49bab7361ebcd0dc720874268cb3f47e3f7a",
+      "uncompressed_sha256": "bd9963ac495d0414c2dd48c1bb9710266a23cad710f799828a60a10e2fb11f3a",
+      "bytes": 126,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_4_16_32.memh"
+    },
+    {
+      "path": "matched/gemm_32_32_64_nma.log.gz",
+      "sha256": "25c966d8dbab31d21e0207ca9b8b74737eeb0199e9bee20720b0f4513d60887c",
+      "uncompressed_sha256": "be0c7ee49e0e810a12b4a7e8d36263d01f6edda3b53fed403a0a27b5614a1989",
+      "bytes": 658,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_32_32_64_nma.log"
+    },
+    {
+      "path": "matched/gemm_32_32_64_tiny.log.gz",
+      "sha256": "b000964fb7af01f2ddb5a143862b125feb8755a98c9d6d7963ca444435b30266",
+      "uncompressed_sha256": "6941719d954bc754655086da587548ef38c02648d7805d71203600b10c193df2",
+      "bytes": 330,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_32_32_64_tiny.log"
+    },
+    {
+      "path": "matched/gemm_16_16_32_nma.log.gz",
+      "sha256": "d5b80170fc6ec40aa947b4d8eb89aa1b240db2eaca16301acb38a341720a1242",
+      "uncompressed_sha256": "985d03314f449af57e23eaff50c175f6313a96984f504d3c12f3ff6f43d5b458",
+      "bytes": 649,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_16_16_32_nma.log"
+    },
+    {
+      "path": "matched/h32_q_nma.log.gz",
+      "sha256": "0c349c4bec7cc99dba41f9f0edf412880dc25645ad7f439b959e796e81c8dc82",
+      "uncompressed_sha256": "7637cc63cceb837f4364baa6bbcd7ab35c8221d47ecce45b15b90afae81217b9",
+      "bytes": 651,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_q_nma.log"
+    },
+    {
+      "path": "matched/gemm_16_16_32_golden.memh.gz",
+      "sha256": "0ef96ac34e23e5980d06710378eda4b8f7c611ad63c01d89631a00c351446f4c",
+      "uncompressed_sha256": "c3b76572a3d0c5c06d057ed66867f036ddb65ee763bf36431bb9129b911105c4",
+      "bytes": 73,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_16_16_32_golden.memh"
+    },
+    {
+      "path": "matched/h32_q.memh.gz",
+      "sha256": "800810d693068006cb524bcddc45a975b525cd7ea526d9a43bebed0b39fecb22",
+      "uncompressed_sha256": "7fd38d9ff5fac94d2bca730bc353475c380ca8f9c105589f1cf849c5c8f9ec7b",
+      "bytes": 888,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_q.memh"
+    },
+    {
+      "path": "matched/gemm_1_16_32_golden.memh.gz",
+      "sha256": "d16754b3b13c146927bddcdfe13ff2531da54735eac93919a44b36ff3bae22d8",
+      "uncompressed_sha256": "c5ad97ac459b7055458c5e47e42fc81fa8676e62d8f7eb38d39219a2bed0d274",
+      "bytes": 41,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_1_16_32_golden.memh"
+    },
+    {
+      "path": "matched/gemm_32_32_64.memh.gz",
+      "sha256": "1259541906f4c4330311db7dbae82c5ce125f2515fc69b80ffe94d7905550d4b",
+      "uncompressed_sha256": "a21bde466272ecbbfdbe677d3939dbe60a732099f8fc96920ec2575d2e42bfca",
+      "bytes": 182,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_32_32_64.memh"
+    },
+    {
+      "path": "matched/gemm_8_16_32_golden.memh.gz",
+      "sha256": "ba09d001d78891e548befba60d35240edebcc38f4dc5406c0e9ba12a7504ad12",
+      "uncompressed_sha256": "5874b64b4a63f70f6f119635223d4ea820a3b2d2d4ab80b06ee33be93e47bec7",
+      "bytes": 61,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_8_16_32_golden.memh"
+    },
+    {
+      "path": "matched/h32_k_tiny.log.gz",
+      "sha256": "4d958e6687b01d046af187e2795001e0be2d7ae0c96de6a8759a6d64b44c2be4",
+      "uncompressed_sha256": "93ce1ded77d3aaf2feaa77b3845f6aa209fd043cdabf5b3fccceace46093feb8",
+      "bytes": 321,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_k_tiny.log"
+    },
+    {
+      "path": "matched/gemm_16_16_16_tiny.log.gz",
+      "sha256": "036da25686740bca47eee66651cac6be01d1c5020f75d3da3851a23a671d1bf3",
+      "uncompressed_sha256": "350d7811c73a9893101f87035f62dc9356b25cfe1d781ec36fb944536ab307eb",
+      "bytes": 321,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_16_16_16_tiny.log"
+    },
+    {
+      "path": "matched/h32_v_golden.memh.gz",
+      "sha256": "9f529ecbe2e9e46ec15abb114ffa51dc4a084635d9d2822bc413aa4a3c0c32eb",
+      "uncompressed_sha256": "e88ab74a1d44a5b4883a8b92e2249fc338646990423074a74e5fbeaa3e86f956",
+      "bytes": 133,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_v_golden.memh"
+    },
+    {
+      "path": "matched/h32_v.memh.gz",
+      "sha256": "e42316c0275d6985bd952405be118e5e48dc705a8d09bf84ddf4b16f09f1ac33",
+      "uncompressed_sha256": "6d81765a1df3c4c8671a540105f752e9989dfb9faeb7e8062a0dd8a80f2a11e3",
+      "bytes": 905,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_v.memh"
+    },
+    {
+      "path": "matched/h32_ffn_down.memh.gz",
+      "sha256": "66a1bc58550f0e60053c594c8262656c89658eb61c64b78d6ad94801e119ebc1",
+      "uncompressed_sha256": "86f223c0e63c34613ac256a5f6391f841a868e064589c3c4dc1ce6d09a065816",
+      "bytes": 2370,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_ffn_down.memh"
+    },
+    {
+      "path": "matched/h32_v_nma.memh.gz",
+      "sha256": "83ed169a2f776025cb47b599fe2f394c6ef6a4cac7df2ff38452ce458d3efbcf",
+      "uncompressed_sha256": "aedbc0431f04edf2e39805b511c4fb0bef60d12808e15460620da3bf0e9800e7",
+      "bytes": 139,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_v_nma.memh"
+    },
+    {
+      "path": "matched/gemm_16_16_32_tiny.log.gz",
+      "sha256": "368417e216c92b1d77c15bd6fa30320dd4dca4f3350d95b1e3e1f7d33af9cc9b",
+      "uncompressed_sha256": "4fd3509427eb8afc3144c4d24fb6b6d7be42959a7041a3c05a629b025853f3d0",
+      "bytes": 322,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_16_16_32_tiny.log"
+    },
+    {
+      "path": "matched/gemm_1_16_32.memh.gz",
+      "sha256": "8388eb62159cf4820308f6c02ddff05ef9ea50c08d5c2007c9e164ae0197efa8",
+      "uncompressed_sha256": "b843c18094e5044cd00c13bb8cb9c2deccc415f20b2a353a6a72adcd1f6d1eb5",
+      "bytes": 112,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_1_16_32.memh"
+    },
+    {
+      "path": "matched/h32_ffn_down_nma.log.gz",
+      "sha256": "cb74776d4b1c7fbe33a116a8065c069b3b3b9bdd577f32d00396bf3312292ee0",
+      "uncompressed_sha256": "b1891b26c6ba8f9f63e46f7f7962ca3a2a7c3bc75a8707afb77904dc688820f7",
+      "bytes": 658,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_ffn_down_nma.log"
+    },
+    {
+      "path": "matched/gemm_8_16_32.memh.gz",
+      "sha256": "047f39c8bd811db254a4fd94efa2a387a42409d0897b6a4b1f8707c94970c083",
+      "uncompressed_sha256": "cc6590227cbc03ffdb15dbc61c37506b6527d07beb92ff1d018ebf867911daa1",
+      "bytes": 131,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_8_16_32.memh"
+    },
+    {
+      "path": "matched/h32_ffn_up.memh.gz",
+      "sha256": "52bdaabd38d9cf92a5199ed79bbc18343692a0114d2ec1477e1fee72dd0c3496",
+      "uncompressed_sha256": "1abf206a4e30321894e5c67a1a217b31c83736d400981b365aa75d641c664e08",
+      "bytes": 5423,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_ffn_up.memh"
+    },
+    {
+      "path": "matched/gemm_4_4_32_nma.log.gz",
+      "sha256": "25763db9cefe15cb5a314ab94a87e3413a1f25f706ba6cc2aae2695d6166b12c",
+      "uncompressed_sha256": "1038affd6722f5a79f5802d05a7dd1b63789afab662636755fd5afa67c1d6bd9",
+      "bytes": 647,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_4_4_32_nma.log"
+    },
+    {
+      "path": "matched/gemm_1_16_32_tiny.log.gz",
+      "sha256": "fec64a4729025c354bf731f6812b7e3b9cb2747b5ab6220c0d256f9426f94667",
+      "uncompressed_sha256": "f565c71119056822105065f885d350483a33117beeb7277cdd67ac3d74ce986f",
+      "bytes": 318,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_1_16_32_tiny.log"
+    },
+    {
+      "path": "matched/gemm_4_4_32.memh.gz",
+      "sha256": "0a21ebe6897653f118f6590826eda65193cc23f4f7e3f05bced64f20d7988048",
+      "uncompressed_sha256": "79d8d1240c160374d43af2df6a8dc239851ef85c57ac3ea0bbde4e09d580189f",
+      "bytes": 107,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_4_4_32.memh"
+    },
+    {
+      "path": "matched/gemm_4_16_32_tiny.memh.gz",
+      "sha256": "a95c04a85a84e11436bbd265164e1accce135eaa37753d0c8646337f51fa358b",
+      "uncompressed_sha256": "0ed8b39d085d3807403bbcf11c2b770d5ca9a5b1c797d7829a35ef16ec48ceb8",
+      "bytes": 56,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_4_16_32_tiny.memh"
+    },
+    {
+      "path": "matched/h32_k_nma.log.gz",
+      "sha256": "3c9f40b52b0a62b7845bf7ae95e20d70207b2ec1f625cd7c54dbbcc22f4e3208",
+      "uncompressed_sha256": "11b9464500106226ce65afee4eefd4a9265bce4658d4d909843ad5b7862fe2fa",
+      "bytes": 652,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_k_nma.log"
+    },
+    {
+      "path": "matched/h32_ffn_up_tiny.memh.gz",
+      "sha256": "5a42e0becce7082f2e9e7334f7f7b384f7dc2960e2f7123335452829ba0264f8",
+      "uncompressed_sha256": "cc1526f9ba6d0752fafd110e054835a7b4d593817ad0005e06237459d00fc34e",
+      "bytes": 421,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_ffn_up_tiny.memh"
+    },
+    {
+      "path": "matched/gemm_4_4_32_nma.memh.gz",
+      "sha256": "ec793e753910b215efccfe72d83c9422c8b0fab36846160d3aa581b26ba7ead9",
+      "uncompressed_sha256": "1cc788cccad792ea42906c3eb862e0fed158c4ca4d6a041c0d1aa8421b5ef98f",
+      "bytes": 54,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_4_4_32_nma.memh"
+    },
+    {
+      "path": "matched/gemm_16_16_16.memh.gz",
+      "sha256": "f4260c4124832e6e03e05003268decc88980aa6d260d23caa27d36e333ba643e",
+      "uncompressed_sha256": "ced1d5a1d2a30a5f1f4a81b1471768b728b0ae4e5865117264ef26e2219450eb",
+      "bytes": 121,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_16_16_16.memh"
+    },
+    {
+      "path": "matched/h32_q_tiny.log.gz",
+      "sha256": "4d958e6687b01d046af187e2795001e0be2d7ae0c96de6a8759a6d64b44c2be4",
+      "uncompressed_sha256": "93ce1ded77d3aaf2feaa77b3845f6aa209fd043cdabf5b3fccceace46093feb8",
+      "bytes": 321,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_q_tiny.log"
+    },
+    {
+      "path": "matched/gemm_8_16_32_tiny.memh.gz",
+      "sha256": "ba09d001d78891e548befba60d35240edebcc38f4dc5406c0e9ba12a7504ad12",
+      "uncompressed_sha256": "5874b64b4a63f70f6f119635223d4ea820a3b2d2d4ab80b06ee33be93e47bec7",
+      "bytes": 61,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_8_16_32_tiny.memh"
+    },
+    {
+      "path": "matched/gemm_4_16_32_nma.memh.gz",
+      "sha256": "a95c04a85a84e11436bbd265164e1accce135eaa37753d0c8646337f51fa358b",
+      "uncompressed_sha256": "0ed8b39d085d3807403bbcf11c2b770d5ca9a5b1c797d7829a35ef16ec48ceb8",
+      "bytes": 56,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_4_16_32_nma.memh"
+    },
+    {
+      "path": "matched/gemm_16_16_32_tiny.memh.gz",
+      "sha256": "0ef96ac34e23e5980d06710378eda4b8f7c611ad63c01d89631a00c351446f4c",
+      "uncompressed_sha256": "c3b76572a3d0c5c06d057ed66867f036ddb65ee763bf36431bb9129b911105c4",
+      "bytes": 73,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_16_16_32_tiny.memh"
+    },
+    {
+      "path": "matched/gemm_32_32_64_nma.memh.gz",
+      "sha256": "40244256a2d01c80040d157f279742a603ba71bf5a65df812a4065ec279a4aca",
+      "uncompressed_sha256": "517dc33a946c1e1ac968aa3c788c1d70b62c32d26cbb69d7b2586841ccde2e9a",
+      "bytes": 134,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_32_32_64_nma.memh"
+    },
+    {
+      "path": "matched/gemm_4_4_32_golden.memh.gz",
+      "sha256": "ec793e753910b215efccfe72d83c9422c8b0fab36846160d3aa581b26ba7ead9",
+      "uncompressed_sha256": "1cc788cccad792ea42906c3eb862e0fed158c4ca4d6a041c0d1aa8421b5ef98f",
+      "bytes": 54,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_4_4_32_golden.memh"
+    },
+    {
+      "path": "matched/tb_service.cpp.gz",
+      "sha256": "93961e42008bca2901e05127edd83a6c5819ff659982e271b34cb93b69f08322",
+      "uncompressed_sha256": "9543c2a2f0f4adcfdd926ed57689325320a466838c9f6529c2c29696749df49c",
+      "bytes": 3080,
+      "source": "/tmp/nmaforge-phase1-runs/matched/tb_service.cpp"
+    },
+    {
+      "path": "matched/gemm_16_16_32_nma.memh.gz",
+      "sha256": "0ef96ac34e23e5980d06710378eda4b8f7c611ad63c01d89631a00c351446f4c",
+      "uncompressed_sha256": "c3b76572a3d0c5c06d057ed66867f036ddb65ee763bf36431bb9129b911105c4",
+      "bytes": 73,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_16_16_32_nma.memh"
+    },
+    {
+      "path": "matched/gemm_4_4_32_tiny.log.gz",
+      "sha256": "3224a9050b04fe4fdfd948bde3da7c6d247846f54ef6b332aa48d93d3e24b2f5",
+      "uncompressed_sha256": "87f5be01611464272dc6bf55fd0cde90ef8cdaf585de69236b17adff6ebb32f8",
+      "bytes": 318,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_4_4_32_tiny.log"
+    },
+    {
+      "path": "matched/gemm_4_16_32_nma.log.gz",
+      "sha256": "3b80f4b8ab1bf931ca8e208bf067e8b2c89e60f5c0941cf9f43c7717f9a4990c",
+      "uncompressed_sha256": "580e073cc4c287745cd9508b52fe54f6800b1d7af44ec11fe204bdc896f47bc7",
+      "bytes": 649,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_4_16_32_nma.log"
+    },
+    {
+      "path": "matched/h32_k_golden.memh.gz",
+      "sha256": "b479c72e39aff279230e980ed7f94351c3349ee30728988be81a0875daaf6c6a",
+      "uncompressed_sha256": "ce264c1c01e09c6b51a7903f82f1c04c315c95769e270497412b08ccb52f4c1a",
+      "bytes": 133,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_k_golden.memh"
+    },
+    {
+      "path": "matched/h32_v_tiny.memh.gz",
+      "sha256": "9f529ecbe2e9e46ec15abb114ffa51dc4a084635d9d2822bc413aa4a3c0c32eb",
+      "uncompressed_sha256": "e88ab74a1d44a5b4883a8b92e2249fc338646990423074a74e5fbeaa3e86f956",
+      "bytes": 133,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_v_tiny.memh"
+    },
+    {
+      "path": "matched/h32_ffn_up_golden.memh.gz",
+      "sha256": "5a42e0becce7082f2e9e7334f7f7b384f7dc2960e2f7123335452829ba0264f8",
+      "uncompressed_sha256": "cc1526f9ba6d0752fafd110e054835a7b4d593817ad0005e06237459d00fc34e",
+      "bytes": 421,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_ffn_up_golden.memh"
+    },
+    {
+      "path": "matched/h32_ffn_down_tiny.memh.gz",
+      "sha256": "a5d223eb5140e2939b58ef1b87efacfc8a660721613395d9a339a304bf3ab036",
+      "uncompressed_sha256": "c0b2602a2b94634b8084f7847611d0fb9842fa74c4f3d2be67c9122af668163e",
+      "bytes": 128,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_ffn_down_tiny.memh"
+    },
+    {
+      "path": "matched/matched.json",
+      "sha256": "7edcc42ae5ea3358daf24e8ac755615172d601f9f0b296a407e3e9d54649f36e",
+      "uncompressed_sha256": "7edcc42ae5ea3358daf24e8ac755615172d601f9f0b296a407e3e9d54649f36e",
+      "bytes": 14400,
+      "source": "/tmp/nmaforge-phase1-runs/matched/matched.json"
+    },
+    {
+      "path": "matched/h32_q_golden.memh.gz",
+      "sha256": "d277902491aedd50e9c04a51c21b5c9512afbe538789a4bdf426654318b9a739",
+      "uncompressed_sha256": "32d65ae0fcf6f739c5cf2e53897e0c8c9693e1f74ab5ac4b04b14561d617ece0",
+      "bytes": 133,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_q_golden.memh"
+    },
+    {
+      "path": "matched/gemm_16_16_16_golden.memh.gz",
+      "sha256": "8174a0a2fe5d6f9cafed715e1ef9f8bd5dda6b49e6f93185b10838791db04c45",
+      "uncompressed_sha256": "21c9775404cbfaa2242c832fb5a46e333821683ab5dd49ac3d23f995a61b651c",
+      "bytes": 79,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_16_16_16_golden.memh"
+    },
+    {
+      "path": "matched/h32_k_nma.memh.gz",
+      "sha256": "21ff22705c842374df253afafd3f9b33db70935122a3e00c83c1e6fc96d0380a",
+      "uncompressed_sha256": "38d2ff809c2a67f3e16f7888504a82b06ac24db3fe861f2af66525fcaab02962",
+      "bytes": 139,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_k_nma.memh"
+    },
+    {
+      "path": "matched/h32_ffn_up_nma.memh.gz",
+      "sha256": "93cfb2ffff316a6a05c8c7b1e6b51d4e73d89dd69281e1a77e3816b6554ad614",
+      "uncompressed_sha256": "c9e0bedba7596445cdb72b1a42ddc3ff443c3379429011a6dd31d27509e6a997",
+      "bytes": 458,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_ffn_up_nma.memh"
+    },
+    {
+      "path": "matched/gemm_32_32_64_tiny.memh.gz",
+      "sha256": "ec4c1d15fe3a455e39a624b4b6cc126472b1d80086452f1a3632fab89a5b931e",
+      "uncompressed_sha256": "5acbb6fae3ac4d4f2116dd60675bb87060a759208db65e7ce4c773fbb8c50556",
+      "bytes": 123,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_32_32_64_tiny.memh"
+    },
+    {
+      "path": "matched/gemm_4_16_32_golden.memh.gz",
+      "sha256": "a95c04a85a84e11436bbd265164e1accce135eaa37753d0c8646337f51fa358b",
+      "uncompressed_sha256": "0ed8b39d085d3807403bbcf11c2b770d5ca9a5b1c797d7829a35ef16ec48ceb8",
+      "bytes": 56,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_4_16_32_golden.memh"
+    },
+    {
+      "path": "matched/gemm_16_16_16_tiny.memh.gz",
+      "sha256": "8174a0a2fe5d6f9cafed715e1ef9f8bd5dda6b49e6f93185b10838791db04c45",
+      "uncompressed_sha256": "21c9775404cbfaa2242c832fb5a46e333821683ab5dd49ac3d23f995a61b651c",
+      "bytes": 79,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_16_16_16_tiny.memh"
+    },
+    {
+      "path": "matched/gemm_1_16_32_tiny.memh.gz",
+      "sha256": "d16754b3b13c146927bddcdfe13ff2531da54735eac93919a44b36ff3bae22d8",
+      "uncompressed_sha256": "c5ad97ac459b7055458c5e47e42fc81fa8676e62d8f7eb38d39219a2bed0d274",
+      "bytes": 41,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_1_16_32_tiny.memh"
+    },
+    {
+      "path": "matched/build_tiny.sh.gz",
+      "sha256": "ae61b08ae36e84e1ccd15205f0c0730f541adbca90a6f5b26ebe9b1b5f9b5518",
+      "uncompressed_sha256": "34794414605360a589d17d5fcf4ea4249bb52b6391692f350209de81795519ef",
+      "bytes": 1148,
+      "source": "/tmp/nmaforge-phase1-runs/matched/build_tiny.sh"
+    },
+    {
+      "path": "matched/h32_v_tiny.log.gz",
+      "sha256": "4d958e6687b01d046af187e2795001e0be2d7ae0c96de6a8759a6d64b44c2be4",
+      "uncompressed_sha256": "93ce1ded77d3aaf2feaa77b3845f6aa209fd043cdabf5b3fccceace46093feb8",
+      "bytes": 321,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_v_tiny.log"
+    },
+    {
+      "path": "matched/h32_ffn_down_golden.memh.gz",
+      "sha256": "a5d223eb5140e2939b58ef1b87efacfc8a660721613395d9a339a304bf3ab036",
+      "uncompressed_sha256": "c0b2602a2b94634b8084f7847611d0fb9842fa74c4f3d2be67c9122af668163e",
+      "bytes": 128,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_ffn_down_golden.memh"
+    },
+    {
+      "path": "matched/h32_k_tiny.memh.gz",
+      "sha256": "b479c72e39aff279230e980ed7f94351c3349ee30728988be81a0875daaf6c6a",
+      "uncompressed_sha256": "ce264c1c01e09c6b51a7903f82f1c04c315c95769e270497412b08ccb52f4c1a",
+      "bytes": 133,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_k_tiny.memh"
+    },
+    {
+      "path": "matched/matched.csv",
+      "sha256": "573994985c13b1781c1d5f235d1b54f8aaec4c13892d6f48ca3b80fa527a3a55",
+      "uncompressed_sha256": "573994985c13b1781c1d5f235d1b54f8aaec4c13892d6f48ca3b80fa527a3a55",
+      "bytes": 6890,
+      "source": "/tmp/nmaforge-phase1-runs/matched/matched.csv"
+    },
+    {
+      "path": "matched/gemm_8_16_32_tiny.log.gz",
+      "sha256": "7c4d14fce56b9e47012892d417482ee4eecae71c20117c0a5438700bcd8515ee",
+      "uncompressed_sha256": "e0480fd6be6ee775b4312718847bf45492413f99213b29d6ac9aa0983ee79c59",
+      "bytes": 323,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_8_16_32_tiny.log"
+    },
+    {
+      "path": "matched/h32_ffn_up_nma.log.gz",
+      "sha256": "858b46fb653e08d0b49b71e3b9ce431af50f81554be827c3c02271574c9f4303",
+      "uncompressed_sha256": "58aaeb5ca63b6c42a25e5bf86b57201c2d78edb6d5e15fd43912b6619e25f741",
+      "bytes": 656,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_ffn_up_nma.log"
+    },
+    {
+      "path": "matched/tb_service.sv.gz",
+      "sha256": "5bf4cd4a9d00ce3cf0e7c9dd94c8cdadfe246b77866423a42fbd886d3e893f3d",
+      "uncompressed_sha256": "75dbdd57c85137be23acd6101004b2c9fd860958a8cea5cd576087e863e4580e",
+      "bytes": 1910,
+      "source": "/tmp/nmaforge-phase1-runs/matched/tb_service.sv"
+    },
+    {
+      "path": "matched/h32_q_tiny.memh.gz",
+      "sha256": "d277902491aedd50e9c04a51c21b5c9512afbe538789a4bdf426654318b9a739",
+      "uncompressed_sha256": "32d65ae0fcf6f739c5cf2e53897e0c8c9693e1f74ab5ac4b04b14561d617ece0",
+      "bytes": 133,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_q_tiny.memh"
+    },
+    {
+      "path": "matched/gemm_8_16_32_nma.log.gz",
+      "sha256": "9ec960ecadca650a2db36b0f60dbc27f31bb6162b02ba642a5ed6ada4f56f0e8",
+      "uncompressed_sha256": "a02f0613a3b9ec3cdba3d5c518047291e2980d8a9f6b0091b29e63361408064b",
+      "bytes": 650,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_8_16_32_nma.log"
+    },
+    {
+      "path": "matched/gemm_8_16_32_nma.memh.gz",
+      "sha256": "ba09d001d78891e548befba60d35240edebcc38f4dc5406c0e9ba12a7504ad12",
+      "uncompressed_sha256": "5874b64b4a63f70f6f119635223d4ea820a3b2d2d4ab80b06ee33be93e47bec7",
+      "bytes": 61,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_8_16_32_nma.memh"
+    },
+    {
+      "path": "matched/h32_v_nma.log.gz",
+      "sha256": "0e4741b0f8c40131458448020a23d03d8372b27c3814f77fc30c18d771c36af5",
+      "uncompressed_sha256": "25709db70364b936548d6bb3d1a4f5d9423356b962e52521c8ae5cee5c31206b",
+      "bytes": 652,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_v_nma.log"
+    },
+    {
+      "path": "matched/gemm_1_16_32_nma.log.gz",
+      "sha256": "953f0e374931b10050e3bfb8418f464cdbad96bb65c1614cd26afb72b5950710",
+      "uncompressed_sha256": "4dc2dfff7fc8fd60cd73fc45e25722552c3e4aed1a76720484650b75a7417236",
+      "bytes": 649,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_1_16_32_nma.log"
+    },
+    {
+      "path": "matched/h32_ffn_down_tiny.log.gz",
+      "sha256": "e95ef03637e613e2628911c9889dd8b16783a74f6bc42c2fdb45a9f9bb6fc5c5",
+      "uncompressed_sha256": "58547078b389aadfc4b49b9368d3ddc9803469cd48fb116e04e46d016db18f77",
+      "bytes": 327,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_ffn_down_tiny.log"
+    },
+    {
+      "path": "matched/h32_ffn_up_tiny.log.gz",
+      "sha256": "2aee1d1bcb636190a567f989dec479841030b00266107907cb0b2acb3d6db7cf",
+      "uncompressed_sha256": "066b0c45a2234346d7d40548ab8aa1d44975f47b95594e91792bc8ad2d7ebdc4",
+      "bytes": 327,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_ffn_up_tiny.log"
+    },
+    {
+      "path": "matched/h32_k.memh.gz",
+      "sha256": "75714f2906b57841f10a903cc6cd5a7a19e8df1930958669b7cdd85f1bca7156",
+      "uncompressed_sha256": "a22eafecb0b031902a2c5c69afe505d8eb34a7ef8553a6f4b560d062479dc8cf",
+      "bytes": 878,
+      "source": "/tmp/nmaforge-phase1-runs/matched/h32_k.memh"
+    },
+    {
+      "path": "matched/gemm_4_16_32_tiny.log.gz",
+      "sha256": "b0beb897ba9c48afd41e766e785402ad40ee368a0f6874bb5a1b515d35212cff",
+      "uncompressed_sha256": "f798ad600e18aee6160915b8a9b12aae2f9bd36777b9426bfddaaf0d24be2b6b",
+      "bytes": 321,
+      "source": "/tmp/nmaforge-phase1-runs/matched/gemm_4_16_32_tiny.log"
+    },
+    {
+      "path": "matrix/matrix_config_comparison.csv",
+      "sha256": "bfc1f20ad39828f1d2c4a5503ff5a9546eb56e8223ddc354bdea79bd17b27f2a",
+      "uncompressed_sha256": "bfc1f20ad39828f1d2c4a5503ff5a9546eb56e8223ddc354bdea79bd17b27f2a",
+      "bytes": 1929,
+      "source": "/tmp/nmaforge-phase1-runs/matrix/matrix_config_comparison.csv"
+    },
+    {
+      "path": "matrix/depth_2/prefetch_1/cache_0/run.log.gz",
+      "sha256": "24394c9c8c79c31d5cdd7e25173b8605479c841fd4c0e163387b6b833ee94e3e",
+      "uncompressed_sha256": "9556f30fa0fca7cf488728e0168aee8f15eb97da802acc70c2d6afecf6e6bbeb",
+      "bytes": 1405,
+      "source": "/tmp/nmaforge-phase1-runs/matrix/depth_2/prefetch_1/cache_0/run.log"
+    },
+    {
+      "path": "matrix/depth_2/prefetch_1/cache_1/run.log.gz",
+      "sha256": "c9c8f22d0625b1dd3616ad329d5ab3a925df5061ad00e8169453afc8703854b0",
+      "uncompressed_sha256": "f628311ce74ef62fa4e21df3fa2bc52ac77c37dc2f2d38f2215906a10885d748",
+      "bytes": 1411,
+      "source": "/tmp/nmaforge-phase1-runs/matrix/depth_2/prefetch_1/cache_1/run.log"
+    },
+    {
+      "path": "matrix/depth_2/prefetch_0/cache_0/run.log.gz",
+      "sha256": "7716276dec3740fdd34ee67a9462d3de2cd5063aeedd1a727b67f3c05368b69b",
+      "uncompressed_sha256": "50070e24e0e830f7c40cff073e492901278fbac12955eec5a6ff44fd92899ad3",
+      "bytes": 1371,
+      "source": "/tmp/nmaforge-phase1-runs/matrix/depth_2/prefetch_0/cache_0/run.log"
+    },
+    {
+      "path": "matrix/depth_2/prefetch_0/cache_1/run.log.gz",
+      "sha256": "0b39fdf73002b058ec2fba1d30be9135261004b8c5dd5986338cefad7ef298cf",
+      "uncompressed_sha256": "eae1b3f9e75a7eda45334c30ecc141f8c14773e42b3e73767d8587f71799a7b5",
+      "bytes": 1374,
+      "source": "/tmp/nmaforge-phase1-runs/matrix/depth_2/prefetch_0/cache_1/run.log"
+    },
+    {
+      "path": "matrix/depth_4/prefetch_1/cache_0/run.log.gz",
+      "sha256": "1c38c06a53f3c308fb432c073e5aec10dbba7e9163eb9355ef0504d9217f325b",
+      "uncompressed_sha256": "2d179882e8bf69cbda1be64665a300ea87547b2a1f1d5f2d4cb74c198a95fcb8",
+      "bytes": 1394,
+      "source": "/tmp/nmaforge-phase1-runs/matrix/depth_4/prefetch_1/cache_0/run.log"
+    },
+    {
+      "path": "matrix/depth_4/prefetch_1/cache_1/run.log.gz",
+      "sha256": "188b72bc55665a251d97d0f7774b502f3abfda41e3cb261cad836e514075d4b0",
+      "uncompressed_sha256": "089d67639c1c6e00925303534397ea5cc6c0cf4bad0c20ed5316888a2c6706a5",
+      "bytes": 1395,
+      "source": "/tmp/nmaforge-phase1-runs/matrix/depth_4/prefetch_1/cache_1/run.log"
+    },
+    {
+      "path": "matrix/depth_4/prefetch_0/cache_0/run.log.gz",
+      "sha256": "0c5088f847627022de18c39ed6e5604e6d047f72cf8d74b55e115ef5f1a528ee",
+      "uncompressed_sha256": "597c176e7883b1a2131366578280cc3d349efb5e99589c3b1bc8ad8ce042fcce",
+      "bytes": 1355,
+      "source": "/tmp/nmaforge-phase1-runs/matrix/depth_4/prefetch_0/cache_0/run.log"
+    },
+    {
+      "path": "matrix/depth_4/prefetch_0/cache_1/run.log.gz",
+      "sha256": "15c75cace238764d64ae61ba386f60816cf1b9e8e8cd4a0559bd73c16109002e",
+      "uncompressed_sha256": "85704a49d78d50cb0c07b2bc3ece36a4953d33b765179fa3d2fe2f553d778832",
+      "bytes": 1365,
+      "source": "/tmp/nmaforge-phase1-runs/matrix/depth_4/prefetch_0/cache_1/run.log"
+    },
+    {
+      "path": "static/baseline.log.gz",
+      "sha256": "0b0095f36cde4e626a8e338da8d57806c95b698237772e3d0a796f39c08a8565",
+      "uncompressed_sha256": "ff31a419f9438e88efebc28a72fe3349a886572ded3fca6af5294f89cf6d1939",
+      "bytes": 8010,
+      "source": "/tmp/nmaforge-phase1-runs/static/baseline.log"
+    },
+    {
+      "path": "static/diagnostic_default.log.gz",
+      "sha256": "983f3ea6677b2c1026536508297fc7e47f64fa1b36b6092818841e08ceb0e18d",
+      "uncompressed_sha256": "e3d828ae128e10f2818ecd805b2fa517fe14e2bed96eb554240b0f80d6846914",
+      "bytes": 7815,
+      "source": "/tmp/nmaforge-phase1-runs/static/diagnostic_default.log"
+    },
+    {
+      "path": "static/summary.json",
+      "sha256": "6d54352c0de437d9a062fd2193231c977e12c281293886bfc7f68e1497c1c808",
+      "uncompressed_sha256": "6d54352c0de437d9a062fd2193231c977e12c281293886bfc7f68e1497c1c808",
+      "bytes": 36881,
+      "source": "/tmp/nmaforge-phase1-runs/static/summary.json"
+    }
+  ],
+  "limits": [
+    "No product RTL optimization implemented",
+    "No Fmax/PPA/signoff claim",
+    "CNN/H32 end-to-end host latency not measured",
+    "Common adapter ratios are not native-system speedups",
+    "Candidate C not admitted without positive incremental schedule evidence"
+  ]
+}

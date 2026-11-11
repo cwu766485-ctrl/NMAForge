@@ -1,0 +1,9 @@
+{
+  "predictions": 1536,
+  "accuracy": 1.0,
+  "cross_entropy": 0.0007723436304929171,
+  "perplexity": 1.0007726419646352,
+  "logit_scale": 256,
+  "positions": "4..15 teacher-forced, full causal prefill0..3",
+  "quality_policy": "measured PTQ; no imposed accuracy PASS threshold"
+}
