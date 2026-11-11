@@ -90,3 +90,48 @@ DMA/endpoints; no system speedup or frontend freeze/PPA claim. Reproduce with
 `tools/benchmark/stage_c/run_top.sh`, `run_bench.sh`, `validate.py` and the exact
 commands in `docs/research/STAGE_C_ARCHITECTURE_DECISION.md`. Evidence and SHA
 inventory: `benchmark/research/stage_c/`. Stage C stops; no automatic Stage D.
+
+## 2026-11-11 Asia/Singapore — SPAD128 Gate 0/1 candidate
+
+Dedicated branch `feat/spad-128k-closure`, based on nmaforge `95c4387bb0ac57ff4fa427fd3c1202320ad0940b`: defaults aligned to8192words/bank (128KiB), optional32768 retained, constant geometry rejection, capacity-derived Digits/MiniCNN fixtures and concurrent smoke placements. Full smoke now checks final TEST PASS; original128KiB fixture failure (23 errors) retained. Isolated VCS replay: `SPAD128_OUT=<fresh-absolute-dir> SPAD128_PYTHON=<python3.12-with-model-dependencies> SPAD128_DATASET=1 bash tools/benchmark/spad128/run.sh`. Mandatory Golden, boundary, parity/protection and512KiB compatibility evidence is in `benchmark/research/spad128`; validate with `python3.12 tools/benchmark/spad128/validate.py`. H16=65771/8decodecycles, H32=367788/8, CNN bothfused=12351CMDQ cycles preserved. Verilator warnings match same-capacity baseline but remain unresolved, no signoff/PPA/Fmax claim. See `docs/design/SPAD_CONFIG_REGRESSION.md`. Stop for architecture review before Gate2/performance RTL; no product-branch merge.
+
+## Phase 1 — architecture and benchmark closure review
+
+Approved baseline `48790076b351cb9d49e1785247d32a1f51b8286d`, isolated branch
+`feat/phase1-architecture-benchmark`; no product RTL changes. Passive monitor
+closes every exclusive CMDQ window and scheduler read-response ledger. Fixed
+Top GEMM4×4×32/16×16×16/32×32×64:126/186/986cycles; product0x52M1/4/8:
+143/161/213cycles. TrainedCNN both-fused remains12,351 and H16Decode65,771/8,
+strict Golden PASS. Qualified synthetic H32period3model:367,051/8Decode,
+79.17%SFU; FP32/INT8blind accuracy100%, lag3ruleoracle100% (no language claim).
+12common-adapter Tiny raw kernels PASS; no native/fullsystem speedup.
+Verilator5.052 warning counts reproduced, temporary default diagnostic only;
+all product warnings retain explicit dispositions. Recommend one next RTL
+experiment: exactlength32LNmean/variance division specialization, analytical
+≤4.60%H32cycle reduction; no implemented improvement claimed. Second candidate
+prefetch scheduling deferred without incremental evidence. DESIGN_PARTIAL.
+
+Reproduce with `tools/benchmark/phase1/README.md`; public proof:
+`python3 tools/benchmark/phase1/validate.py`. VCSV-2023.12-SP1Top directed workloads,
+independent Golden and20randomcases/seed12345 PASS; existingMatrix8config×5shape
+ablation PASS. Main, product and other worktrees preserved. Six linked reports
+under `docs/performance/`, `docs/research/` and `docs/design/` document boundaries,
+model limitations, numeric/fault obligations and remaining freeze risks.
+
+## Phase 2 — exact LN32 RTL candidate and streaming feasibility
+
+Reviewed Phase1 `ae7fd31eced13dcb9dbd70533da60559511d0a90` (no product RTL
+changes); merged and published `nmaforge` at
+`cb08797e612355b404f9eb697a34f99628deebfd`. Dedicated candidate branch
+`feat/phase2-exact-sfu` extends only exact length32 LN mean/variance division.
+Measured fixed H32 eight-token decode367051 ->350155cycles (4.603175%);
+H16=65771 and trainedCNN both-fused=12351 unchanged. Strict integer arithmetic,
+mandatory SRAM address/order/traffic, Logits/KV/intermediate Golden, protection/
+parity, reset/abort/watchdog, three-seed SFU and Top smoke/seeded20 PASS.
+No new flops/ports/MAC or ABI change. No new focused lint warnings; inherited
+Top issues remain and no area/Fmax/signoff claim is made. Gate2 requant model
+projects conditional incremental43504cycles/12.4242% but does not prove dynamic
+fault timing or closed-loop arbitration. No streaming RTL admitted/implemented.
+Decision RETAIN_LN32 / DESIGN_PARTIAL. Five reports in `docs/research/phase2/`;
+commands in `tools/benchmark/phase2/README.md`; public archive validated with
+`python3 tools/benchmark/phase2/validate.py`. Stop after Gates1/2.

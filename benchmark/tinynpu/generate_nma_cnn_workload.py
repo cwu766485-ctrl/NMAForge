@@ -7,20 +7,20 @@ import json
 from pathlib import Path
 
 import numpy as np
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "sw/tools"))
+from spad_memory_planner import SpadMemoryPlanner
 import onnx
 from onnx import numpy_helper
 
 
-ADDR = {
-    "im2col": 0x10000, "conv_weight": 0x11000, "conv_round_bias": 0x11100,
-    "conv_raw": 0x12000, "conv_i8": 0x13000, "identity_b": 0x14000,
-    "conv_bias": 0x14100, "conv_bias_relu": 0x15000,
-    "conv_relu_i8": 0x16000, "fc_a": 0x18000, "fc_b": 0x19000,
-    "fc_round_bias": 0x1A000, "fc_raw": 0x1B000, "fc_i8": 0x1C000,
-    "fc_bias": 0x1C100, "fc_biased": 0x1D000, "final_i8": 0x1E000,
-}
-DESC_BASE = 0x20000
-CPL_BASE = 0x21000
+# Reserved maxima cover the existing four/ten-class fixtures, including packing
+# and intermediates; a single allocator generates the TB layout image as well.
+REGION_BYTES = {"im2col":576,"conv_weight":48,"conv_round_bias":16,
+    "conv_raw":576,"conv_i8":144,"identity_b":16,"conv_bias":16,
+    "conv_bias_relu":576,"conv_relu_i8":144,"fc_a":576,"fc_b":1728,
+    "fc_round_bias":16,"fc_raw":192,"fc_i8":48,"fc_bias":48,
+    "fc_biased":192,"final_i8":64,"descriptor":8192,"completion":2048}
 
 
 def quantize_int8(values):
@@ -56,14 +56,13 @@ def rounded_requant(acc, shift):
     return (np.asarray(acc, dtype=np.int64) + bump) >> shift
 
 
-def build(model_path, input_npz=None, spad_base_shift=0):
-    if spad_base_shift < 0 or spad_base_shift & 0x3:
-        raise ValueError("SPAD base shift must be a nonnegative word offset")
-    addr = {name: value - spad_base_shift for name, value in ADDR.items()}
-    desc_base = DESC_BASE - spad_base_shift
-    cpl_base = CPL_BASE - spad_base_shift
-    if min(*addr.values(), desc_base, cpl_base) < 0:
-        raise ValueError("SPAD base shift moves an allocation below address zero")
+def build(model_path, input_npz=None, spad_base_shift=0, spad_bytes=131072):
+    if spad_base_shift != 0:
+        raise ValueError("Manual base shifts are obsolete; use capacity-aware allocation")
+    planner = SpadMemoryPlanner(spad_bytes)
+    addr = {name:planner.reserve(name,size,256) for name,size in REGION_BYTES.items()}
+    desc_base = addr["descriptor"]
+    cpl_base = addr["completion"]
     if model_path.suffix == ".npz":
         with np.load(model_path) as weights:
             initializers = {name: weights[name] for name in
@@ -226,6 +225,10 @@ def build(model_path, input_npz=None, spad_base_shift=0):
         "input_npz_sha256": hashlib.sha256(input_npz.read_bytes()).hexdigest() if input_npz is not None else None,
         "input_scale": input_scale,
         "spad_base_shift_bytes": spad_base_shift,
+        "spad_capacity_bytes": spad_bytes,
+        "spad_reserved_high_water": planner.next_addr,
+        "spad_allocations": planner.regions,
+        "spad_address_map": addr,
         "spad_descriptor_base": desc_base,
         "spad_completion_base": cpl_base,
         "spad_descriptor_count": descriptor_count,
@@ -259,11 +262,14 @@ def main():
     parser.add_argument("--input-npz", type=Path)
     parser.add_argument("--out-dir", required=True, type=Path)
     parser.add_argument("--spad-base-shift", type=lambda value: int(value, 0), default=0,
-                        help="subtract this byte offset from every mapped SPAD address")
+                        help="deprecated; nonzero shifts are rejected; use --spad-bytes")
+    parser.add_argument("--spad-bytes", type=int, default=131072)
     args = parser.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
     image_words, expected_words, manifest, golden_bytes = build(
-        args.model, args.input_npz, args.spad_base_shift)
+        args.model, args.input_npz, args.spad_base_shift, args.spad_bytes)
+    (args.out_dir / "nma_cnn_layout.memh").write_text("".join(
+        "%08x\n" % manifest["spad_address_map"][name] for name in REGION_BYTES))
     tiny_golden = args.tiny_golden.read_bytes()
     if tiny_golden != golden_bytes:
         raise SystemExit("independent CNN Golden differs from pinned TinyNPU golden.bin")

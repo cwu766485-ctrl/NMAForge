@@ -2,7 +2,7 @@
 // exclusively owned by ai_spad_arbiter outside this module.
 module ai_accel_spad_subsystem #(
     parameter integer BANKS = 4,
-    parameter integer WORDS_PER_BANK = 32768,
+    parameter integer WORDS_PER_BANK = 8192,
     parameter integer ROW_BITS = $clog2(WORDS_PER_BANK),
     parameter integer SPAD_BYTES = BANKS * WORDS_PER_BANK * 4
 )(
@@ -78,6 +78,10 @@ module ai_accel_spad_subsystem #(
     output wire         banked_prot_allow,
     output wire         cpl_prot_allow
 );
+    generate if ((SPAD_BYTES != 4 * WORDS_PER_BANK * 4) || (ROW_BITS != $clog2(WORDS_PER_BANK)) || (BANKS != 4)) begin : invalid_spad_capacity
+        initial $fatal(1, "SPAD capacity/row geometry must match physical four-bank storage");
+    end endgenerate
+
 
     wire [3:0] cnm_lane_prot_allow;
     wire [3:0] cnm_lane_access_allow;

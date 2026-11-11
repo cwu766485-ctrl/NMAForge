@@ -27,6 +27,7 @@ def main():
     parser.add_argument("--candidate-sha", required=True)
     parser.add_argument("--out-dir", required=True, type=Path)
     parser.add_argument("--seed", type=int, default=20261029)
+    parser.add_argument("--spad-bytes", type=int, default=131072)
     parser.add_argument("--spad-base-shift", type=lambda value: int(value, 0), default=0)
     parser.add_argument(
         "--linearized", action="store_true",
@@ -70,7 +71,7 @@ def main():
         golden_path.write_bytes(golden)
 
         image_words, expected_words, manifest, mapped_golden = workload.build(
-            args.model, input_path, args.spad_base_shift)
+            args.model, input_path, args.spad_base_shift, args.spad_bytes)
         if mapped_golden != golden:
             raise SystemExit("independent Golden mismatch at sample %d" % index)
         case_dir = workload_dir / stem
@@ -79,12 +80,15 @@ def main():
         expected_path = case_dir / "expected.memh"
         workload.write_memh(memory_path, image_words)
         workload.write_memh(expected_path, expected_words)
+        layout_path = case_dir / "layout.memh"
+        layout_path.write_text("".join("%08x\n" % manifest["spad_address_map"][name] for name in workload.REGION_BYTES))
         log_path = logs_dir / (stem + ".log")
         command = [
             str(args.simv.resolve()), "+ntb_random_seed=%d" % args.seed,
             "+AI_RANDOM_CASES=0", "+AI_SEED=%d" % args.seed,
             "+ACLK_PERIOD_NS=10.0", "+AI_TINYNPU_CNN_MATCH",
             "+AI_TINYNPU_CNN_CLASSES=%d" % num_classes,
+            "+AI_TINYNPU_CNN_LAYOUT=" + str(layout_path.resolve()),
             "+AI_TINYNPU_CNN_MEMORY=" + str(memory_path.resolve()),
             "+AI_TINYNPU_CNN_EXPECTED=" + str(expected_path.resolve()),
         ]

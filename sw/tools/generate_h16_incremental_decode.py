@@ -119,6 +119,7 @@ def descriptor_manifest(desc) -> dict[str, int | str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--spad-bytes", type=int, default=128 * 1024)
     parser.add_argument("--model", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--projection-policy", choices=("gemm", "gemv_qkv"),
@@ -188,7 +189,7 @@ def main() -> None:
     gamma2 = model.get("gamma2_q15", [32768] * 16)
     beta2 = model.get("beta2", [0] * 16)
 
-    mapper = Mapper()
+    mapper = Mapper(capacity_bytes=args.spad_bytes)
     mapper.next_addr = 0x4000
     mapper.task_id = 0x7200
     stage_descs: list[tuple[str, list, dict[int, int], set[int], dict]] = []
@@ -684,8 +685,8 @@ def main() -> None:
 
     descriptor_base = (mapper.next_addr + 0xFFF) & ~0xFFF
     completion_base = descriptor_base + CPL_OFFSET
-    if completion_base + 128 * 16 > 512 * 1024:
-        raise ValueError("generated workload exceeds the configured 512 KiB SPAD")
+    if completion_base + 128 * 16 > args.spad_bytes:
+        raise ValueError("generated workload queues exceed configured SPAD capacity")
 
     initial: dict[int, int] = {}
     for tensor in mapper.tensors.values():
@@ -737,6 +738,7 @@ def main() -> None:
 
     initial_path = args.out / "initial_memory.memh"
     manifest = {
+        "spad_capacity_bytes": args.spad_bytes,
         "run_scope": "H16 2-head one-layer INT8 persistent incremental KV Append; four-token prefill followed by host-fed decode steps in one Top session",
         "projection_policy": args.projection_policy,
         "model_name": model.get("model_name"),

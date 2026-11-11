@@ -24,7 +24,7 @@ Normative contracts remain [SPEC_ZH](../spec/SPEC_ZH.md),
 | Parallel dispatcher / command processor | Ordinary CMDQ parallel slots and ordered retirement / serial direct and macro compatibility; software must express dependencies |
 | Descriptor fetch / validator / completion writer | 16-word descriptor, field validation, four-word completion committed before publishing tail |
 | `top/fabric/compute/ai_compute_spad_mux.v`, `ai_spad_arbiter.v` | Per-engine scalar ownership to the sole scheduler admission point; descriptor/completion priority, data round robin |
-| `memory/ai_scratchpad.v` | Four 32-bit banks; 8,192 words/bank = 128 KiB research; 32,768 = 512 KiB compatibility; registered reads |
+| `memory/ai_scratchpad.v` | Four 32-bit banks; 8,192 words/bank = 128 KiB product default; 32,768 = 512 KiB compatibility; registered reads |
 | `dma/ai_axi128_dma.v` | 128-bit AXI4, 64-bit addresses, 4-bit IDs; burst/backpressure/abort drain; shares scheduler SPAD bandwidth |
 | `compute/matrix/ai_tensor_matrix_core.v`, `ai_tensor_matrix_array.sv` | One 16×16 output-stationary INT8 array; start/abort, latched descriptor operands, ordered bank responses, scalar/128-bit line writeback |
 | `compute/sfu/ai_tensor_sfu_core.v`, `ai_tensor_sfu_math.v` | Word-addressed INT32/Q8.8/Q15 operands, scalar registered responses; shared iterative arithmetic; materialized output |

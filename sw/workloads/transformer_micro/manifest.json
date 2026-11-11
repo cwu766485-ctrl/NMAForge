@@ -1,5 +1,6 @@
 {
   "name": "transformer_micro_4x4_prefill_decode",
+  "spad_capacity_bytes": 131072,
   "abi_version": 7,
   "abi_minor": 2,
   "prefill_tokens": 4,

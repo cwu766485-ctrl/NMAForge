@@ -17,6 +17,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from sw.tools.cimforge_mapper import (  # noqa: E402
     Descriptor, FLAG_BIAS, OP_GEMM_REQUANT_TILE_A,
 )
+from sw.tools.spad_memory_planner import SpadMemoryPlanner
 from benchmark.digits.digits_quantized_golden import integer_infer  # noqa: E402
 
 
@@ -26,34 +27,6 @@ K = 64
 K_WORDS = K // 4
 BATCH = 16
 
-# Addresses are offsets from SPAD_BASE, matching the other ABI-v7 mapper jobs.
-ADDRESS_PROFILES = {
-    "legacy": {
-        "weight1": 0x10000,
-        "bias1": 0x12000,
-        "weight2": 0x13000,
-        "bias2": 0x13400,
-        "hidden": 0x32000,
-        "descriptor": 0x38000,
-        "completion": 0x3A000,
-        "output": 0x3B000,
-        "input": 0x50000,
-    },
-    # Compact, non-overlapping static map for a 128 KiB four-bank SPAD.
-    # Input, intermediate, and output batches remain resident, so this is a
-    # placement change rather than a streaming/liveness-reuse implementation.
-    "compact": {
-        "weight1": 0x01000,
-        "bias1": 0x02000,
-        "weight2": 0x02100,
-        "bias2": 0x02500,
-        "hidden": 0x03000,
-        "descriptor": 0x09000,
-        "completion": 0x0A000,
-        "output": 0x0B000,
-        "input": 0x11000,
-    },
-}
 TASK_BASE = 0xD000
 
 
@@ -126,11 +99,11 @@ def main() -> None:
                         "benchmark/digits/artifacts/digits_mlp_int8.npz")
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--compact-spad", action="store_true",
-                        help="use a compact static map suitable for 128 KiB SPAD")
+                        help="deprecated compatibility flag; allocator is always capacity-aware")
+    parser.add_argument("--spad-bytes", type=int, default=131072)
     args = parser.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    profile_name = "compact" if args.compact_spad else "legacy"
-    addresses = ADDRESS_PROFILES[profile_name]
+    profile_name = "capacity-aware"
 
     with np.load(args.model) as model:
         x_q = model["test_images_q"].astype(np.int8)
@@ -147,6 +120,13 @@ def main() -> None:
         padded_hidden, _padded_logits = integer_infer(padded, model)
         model_bytes = args.model.read_bytes()
 
+    planner = SpadMemoryPlanner(args.spad_bytes, start=0x1000)
+    sizes = {"weight1":4096,"bias1":256,"weight2":1024,"bias2":64,
+             "hidden":batches*BATCH*64,"descriptor":128*64,"completion":128*16,
+             "output":batches*BATCH*ARRAY_M*4,"input":batches*BATCH*64}
+    addresses = {name:planner.reserve(name,size,256) for name,size in sizes.items()}
+    (args.out_dir / "digits_layout.memh").write_text("".join(f"{addresses[n]:08x}\n" for n in
+        ["input","output","hidden","descriptor","completion"]))
     w2 = np.zeros((K, ARRAY_M), dtype=np.int8)
     w2[:, :10] = w2_10
     b2 = np.zeros(ARRAY_M, dtype=np.int32)
@@ -225,6 +205,9 @@ def main() -> None:
         "batches": batches,
         "descriptor_count": desc_count,
         "address_profile": profile_name,
+        "spad_capacity_bytes": args.spad_bytes,
+        "reserved_high_water_bytes": planner.next_addr,
+        "allocations": planner.regions,
         "address_map": addresses,
         "spad_high_water_bytes": high_water,
         "spad_capacity_check_128k": high_water <= 128 * 1024,

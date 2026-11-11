@@ -1,0 +1,6 @@
+[
+  "/tmp/nmaforge_arch_v2_py312/bin/python",
+  "/tmp/nmaforge-phase2/benchmark/representative/verify_trained_3x3_cnn_workload.py",
+  "--workload-dir",
+  "/tmp/nmaforge-phase2-runs/optimized/cnn/first_fused"
+]

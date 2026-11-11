@@ -1,0 +1,141 @@
+{
+  "model": "conv1x_mini.onnx",
+  "model_kind": "onnx_reference_graph",
+  "model_sha256": "1ac385ac18394ac5826a7eb426e99c2199bf6417055f7e3f461c40c1b1811640",
+  "input_seed": 99,
+  "input_label": null,
+  "input_npz_sha256": null,
+  "input_scale": 0.011320315946744182,
+  "spad_base_shift_bytes": 0,
+  "spad_capacity_bytes": 131072,
+  "spad_reserved_high_water": 18176,
+  "spad_allocations": {
+    "im2col": {
+      "address": 0,
+      "bytes": 576
+    },
+    "conv_weight": {
+      "address": 768,
+      "bytes": 48
+    },
+    "conv_round_bias": {
+      "address": 1024,
+      "bytes": 16
+    },
+    "conv_raw": {
+      "address": 1280,
+      "bytes": 576
+    },
+    "conv_i8": {
+      "address": 2048,
+      "bytes": 144
+    },
+    "identity_b": {
+      "address": 2304,
+      "bytes": 16
+    },
+    "conv_bias": {
+      "address": 2560,
+      "bytes": 16
+    },
+    "conv_bias_relu": {
+      "address": 2816,
+      "bytes": 576
+    },
+    "conv_relu_i8": {
+      "address": 3584,
+      "bytes": 144
+    },
+    "fc_a": {
+      "address": 3840,
+      "bytes": 576
+    },
+    "fc_b": {
+      "address": 4608,
+      "bytes": 1728
+    },
+    "fc_round_bias": {
+      "address": 6400,
+      "bytes": 16
+    },
+    "fc_raw": {
+      "address": 6656,
+      "bytes": 192
+    },
+    "fc_i8": {
+      "address": 6912,
+      "bytes": 48
+    },
+    "fc_bias": {
+      "address": 7168,
+      "bytes": 48
+    },
+    "fc_biased": {
+      "address": 7424,
+      "bytes": 192
+    },
+    "final_i8": {
+      "address": 7680,
+      "bytes": 64
+    },
+    "descriptor": {
+      "address": 7936,
+      "bytes": 8192
+    },
+    "completion": {
+      "address": 16128,
+      "bytes": 2048
+    }
+  },
+  "spad_address_map": {
+    "im2col": 0,
+    "conv_weight": 768,
+    "conv_round_bias": 1024,
+    "conv_raw": 1280,
+    "conv_i8": 2048,
+    "identity_b": 2304,
+    "conv_bias": 2560,
+    "conv_bias_relu": 2816,
+    "conv_relu_i8": 3584,
+    "fc_a": 3840,
+    "fc_b": 4608,
+    "fc_round_bias": 6400,
+    "fc_raw": 6656,
+    "fc_i8": 6912,
+    "fc_bias": 7168,
+    "fc_biased": 7424,
+    "final_i8": 7680,
+    "descriptor": 7936,
+    "completion": 16128
+  },
+  "spad_descriptor_base": 7936,
+  "spad_completion_base": 16128,
+  "spad_descriptor_count": 8,
+  "spad_max_allocated_exclusive": 16256,
+  "input_int8_sha256": "a74587bfcb5b2dfcd9eed1dbbb4fcf657628264c3b0aae7a4c278f0f70705898",
+  "conv_weight_scale": 0.002203613519668579,
+  "fc_weight_scale": 0.002544137905901811,
+  "conv_shape": "8x8x1 -> 6x6x4, im2col GEMM K=9",
+  "num_classes": 4,
+  "padded_classes": 4,
+  "fc_shape": "1x144 x 144x4; output groups of four on padded M=4 matrix",
+  "golden_int8": [
+    -83,
+    127,
+    -128,
+    8
+  ],
+  "golden_class_count": 4,
+  "golden_sha256": "94642359b0fdf8a4b56f8b17346b0385a477d782b4874bb7d1e979a589eab49c",
+  "fc_output_group_count": 1,
+  "stage_order": [
+    "Conv GEMM + round",
+    "INT8 clamp",
+    "Conv bias + ReLU",
+    "flatten/layout pack",
+    "FC GEMM + round",
+    "INT8 clamp",
+    "FC bias",
+    "INT8 output"
+  ]
+}

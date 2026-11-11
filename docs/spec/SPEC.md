@@ -6,7 +6,7 @@
 This file is the English compatibility entry point for the current A10
 specification. The complete, detailed specification is maintained in
 [SPEC_ZH.md](SPEC_ZH.md). It covers the same RTL contract: AXI4-Lite control,
-128-bit AXI4 DMA, 512 KiB four-bank scratchpad, CMDQ/CPLQ, ABI v7.4 descriptors,
+128-bit AXI4 DMA, 128 KiB default four-bank scratchpad (optional 512 KiB), CMDQ/CPLQ, ABI v7.4 descriptors,
 INT8/BF16/FP16/matrix/SFU/CNN/KV operators, protection, performance counters, verification
 evidence, and commercial-28-nm pre-layout limitations. It is the English companion of the
 Chinese source-of-truth document, not a second ABI definition.
