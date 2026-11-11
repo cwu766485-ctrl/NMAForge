@@ -135,3 +135,51 @@ fault timing or closed-loop arbitration. No streaming RTL admitted/implemented.
 Decision RETAIN_LN32 / DESIGN_PARTIAL. Five reports in `docs/research/phase2/`;
 commands in `tools/benchmark/phase2/README.md`; public archive validated with
 `python3 tools/benchmark/phase2/validate.py`. Stop after Gates1/2.
+
+## Phase 3 — throughput architecture research, stop after Gates 0–2
+
+Phase 2 LN32 review PASS; GitHub PR #4 merged into `nmaforge` at
+`c93ea144713d5fafe2e8a5509029927cd6859e75`, remote verified. Phase 3 isolated
+`feat/phase3-throughput` has no product RTL changes (RTL tree
+`fe0e999fa187c4ed52a512d27509d5922e6137eb`). Fresh VCS LN32 integer/fault/
+reset/abort/watchdog, full fixed Top workloads, independent CNN, H16/H32
+Logits/KV/tensor and seeded20 regressions PASS; H32=350155/8, H16=65771/8,
+CNN both-fused=12351 cycles remain unchanged. Focused Verilator has no new
+warnings; inherited top static issues and mapped timing remain open.
+SFU 1/2/4-lane transaction models reconstruct 672 scalar segments (448 decode)
+and project conditional42.8427–53.3387% latency reduction, but real parity-prefix
+and cross-region protection counterexamples prevent fault admission. STOP SFU;
+no vector RTL or transparent bypass. CNN's4160pack edges are useful work;
+four existing postprocess lanes plus a second128bit ordered buffer project
+975 saved cycles/7.8941%, validated by1560 abstract FIFO cases and1040 original
+Golden line payloads, not candidate RTL. Present for the next decision, no
+implementation started. Pinned Tiny contract is desk-reviewed historical
+adapter evidence only; no full-system speedup. Product DESIGN_PARTIAL.
+Reports: `docs/research/phase3/`; exact commands:
+`tools/benchmark/phase3/README.md`. Public checks:
+`python3 tools/benchmark/phase2/validate.py` and
+`python3 tools/benchmark/phase3/validate.py`. No automatic next phase.
+
+## Phase 4 Gate 2 — CNN ping-pong candidate
+
+Dedicated `feat/phase4-cnn-writeback`, product base c93ea144713d5fafe2e8a5509029927cd6859e75.
+Implemented two ordered output line buffers, existing four postprocess lanes,
+no new MAC/SRAM port or ABI change. Actual CNN CMDQ12351→11376cycles,7.8941%;
+65 writeback windows80→65cycles; all1040Golden payload/address/WSTRB/order match.
+H16/H32 unchanged65771/350155cycles per8tokens. Three seed ON/OFF numerical,
+fault/backpressure/reset/abort/watchdog, canonical ai_smoke/seeded20 PASS;
+Verilator baseline/candidate warning inventory identical, inherited severe Top
+warnings still open. Commands `tools/benchmark/phase4/README.md`, reports
+`docs/research/phase4/`. This checkpoint precedes architecture-only SFU study;
+no SFU RTL or automatic product merge, no signoff/Fmax claim.
+
+### Phase4 architecture-only continuation
+
+Gate2 checkpoint73ebc74f5e155c614d3eeb4f5bee12315ed7f633 pushed; remote SHA matched.
+SFU study `python3.12 tools/benchmark/phase4/sfu_protocol_model.py --out /tmp/nma-p4/sfu_protocol`:
+196immutable/disjoint and279recovery cases PASS, but ordered retirement still
+changes Host-write/permission-revoke observations. REJECT unrestricted pipeline
+after two targeted rounds, no SFU RTL. Real unchanged-SFU/scratchpad/protection
+Phase3 parity-prefix and adjacent-region counterexamples re-run PASS. Remaining
+three Phase4 reports document benchmark boundaries and DESIGN_PARTIAL decision;
+CNN retained as PR candidate, no automatic product merge or Phase5.

@@ -1,0 +1,81 @@
+{
+  "baseline_cmdq": 12351,
+  "writeback": 5200,
+  "pack_cycles": 4160,
+  "accepted_writes": 1040,
+  "write_bytes": 16640,
+  "tiles": 65,
+  "actual_write_arbiter_wait": 0,
+  "models": [
+    {
+      "postprocess_lanes": 4,
+      "buffers": 1,
+      "measured_cmdq": 12351,
+      "modeled_writeback": 5200,
+      "predicted_cmdq": 12351,
+      "saved": 0,
+      "reduction_pct": 0.0,
+      "new_arithmetic_lanes": 0,
+      "new_buffer_bits": 0
+    },
+    {
+      "postprocess_lanes": 4,
+      "buffers": 2,
+      "measured_cmdq": 12351,
+      "modeled_writeback": 4225,
+      "predicted_cmdq": 11376,
+      "saved": 975,
+      "reduction_pct": 7.894097643915472,
+      "new_arithmetic_lanes": 0,
+      "new_buffer_bits": 128
+    },
+    {
+      "postprocess_lanes": 8,
+      "buffers": 1,
+      "measured_cmdq": 12351,
+      "modeled_writeback": 3120,
+      "predicted_cmdq": 10271,
+      "saved": 2080,
+      "reduction_pct": 16.84074164035301,
+      "new_arithmetic_lanes": 4,
+      "new_buffer_bits": 0
+    },
+    {
+      "postprocess_lanes": 8,
+      "buffers": 2,
+      "measured_cmdq": 12351,
+      "modeled_writeback": 2145,
+      "predicted_cmdq": 9296,
+      "saved": 3055,
+      "reduction_pct": 24.73483928426848,
+      "new_arithmetic_lanes": 4,
+      "new_buffer_bits": 128
+    },
+    {
+      "postprocess_lanes": 16,
+      "buffers": 1,
+      "measured_cmdq": 12351,
+      "modeled_writeback": 2080,
+      "predicted_cmdq": 9231,
+      "saved": 3120,
+      "reduction_pct": 25.26111246052951,
+      "new_arithmetic_lanes": 12,
+      "new_buffer_bits": 0
+    },
+    {
+      "postprocess_lanes": 16,
+      "buffers": 2,
+      "measured_cmdq": 12351,
+      "modeled_writeback": 1105,
+      "predicted_cmdq": 8256,
+      "saved": 4095,
+      "reduction_pct": 33.15521010444498,
+      "new_arithmetic_lanes": 12,
+      "new_buffer_bits": 128
+    }
+  ],
+  "model_invariant_cases": 1560,
+  "preferred": "four existing postprocess lanes; two ordered 128-bit buffers; per-tile drain barrier",
+  "decision": "FEASIBLE_MODEL_ONLY_NO_RTL_THIS_ROUND",
+  "fault_scope": "Request payload/order/granularity preserved by abstract FIFO model; actual RTL abort/watchdog/error priorities not yet proved."
+}

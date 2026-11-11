@@ -1,0 +1,22 @@
+{
+  "phase4_rtl_sha": "73ebc74f5e155c614d3eeb4f5bee12315ed7f633",
+  "status": "REJECT_UNRESTRICTED_PIPELINE_NO_RTL_ADMISSION",
+  "vcs": "V-2023.12-SP1_Full64",
+  "python": "3.12.13",
+  "sources": {
+    "tools/benchmark/phase4/sfu_protocol_model.py": "6807abb3c24d7b7bc7fe632314755ad73d925b7e38fb1d110a7cb31ecd422b47",
+    "dv/block/compute/sfu/tb/tb_phase3_fault_contract.sv": "7a4ff7b4b1c74ad99cfb90e727c474386bbfa4ae3f1da504b573aaebdb87c533",
+    "tools/benchmark/phase3/run_review.sh": "029ab5a3a0a9a9ab12f0f6739e44783507d96ca263cebb5e56f019db19c6fc08",
+    "rtl/compute/sfu/ai_tensor_sfu_core.v": "a517e7072b503c7a5a144a69c58ee85475cb42b8d48c183d38b5d6dd7471f4fd",
+    "rtl/memory/ai_spad_arbiter.v": "a228f30583889ddc62ce2886e8b3f7eb81d05afe140c44b92871b0e6679d9288",
+    "rtl/memory/ai_scratchpad.v": "1bb813867fc68949c4e23cb1efe435ee80213cca30f0ff4f390c87cc1017329d",
+    "rtl/memory/ai_spad_protection.v": "850bb24686042958a4ccdd4189d6844441709e76d05eda7fe0bd9e95585419ed"
+  },
+  "artifacts": {
+    "directed-driver.log.gz": "0ab2ff3cd19368592d4cc93239e8bce1d8a63faceca1eb1b0c73c99dd40afe22",
+    "summary.json": "c76d957696aa4f579e2846f274ebffc1e3e0360d19dfe2311b0367d50b72085f",
+    "fault-run.log.gz": "bc2996cd39697be80eb3b40f68c2e68553999ac22cbca61528be07c27bd01901",
+    "lint.log.gz": "0addc2f60eb19549693cfb83a7a87fa0b016267b432f1eea8e46d29c732d7fd0",
+    "fault-compile.log.gz": "846d2caecdd5290d2ca828d34c2c2262f0d61dc6691448c3eac76f6c869323f9"
+  }
+}

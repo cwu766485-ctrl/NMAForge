@@ -1,0 +1,127 @@
+{
+  "baseline": 350155,
+  "sfu": 273699,
+  "non_sfu": 76456,
+  "scalar_replay_descriptors": 448,
+  "calibrated_all_segments": 672,
+  "response_latency_histogram": {
+    "2": 153888
+  },
+  "models": [
+    {
+      "lanes": 1,
+      "memory": "line16B_hypothetical",
+      "measured_full_decode": 350155,
+      "modeled_sfu_cycles": 92563,
+      "predicted_full_decode": 169019,
+      "saved": 181136,
+      "reduction_pct": 51.730233753623395,
+      "meets_cycle_target": true,
+      "fault_contract": "NOT_PROVEN",
+      "rtl_admitted": false
+    },
+    {
+      "lanes": 1,
+      "memory": "scalar4B",
+      "measured_full_decode": 350155,
+      "modeled_sfu_cycles": 123683,
+      "predicted_full_decode": 200139,
+      "saved": 150016,
+      "reduction_pct": 42.842741071811055,
+      "meets_cycle_target": true,
+      "fault_contract": "NOT_PROVEN",
+      "rtl_admitted": false
+    },
+    {
+      "lanes": 2,
+      "memory": "line16B_hypothetical",
+      "measured_full_decode": 350155,
+      "modeled_sfu_cycles": 88595,
+      "predicted_full_decode": 165051,
+      "saved": 185104,
+      "reduction_pct": 52.86344618811669,
+      "meets_cycle_target": true,
+      "fault_contract": "NOT_PROVEN",
+      "rtl_admitted": false
+    },
+    {
+      "lanes": 2,
+      "memory": "scalar4B",
+      "measured_full_decode": 350155,
+      "modeled_sfu_cycles": 123683,
+      "predicted_full_decode": 200139,
+      "saved": 150016,
+      "reduction_pct": 42.842741071811055,
+      "meets_cycle_target": true,
+      "fault_contract": "NOT_PROVEN",
+      "rtl_admitted": false
+    },
+    {
+      "lanes": 4,
+      "memory": "line16B_hypothetical",
+      "measured_full_decode": 350155,
+      "modeled_sfu_cycles": 86931,
+      "predicted_full_decode": 163387,
+      "saved": 186768,
+      "reduction_pct": 53.33866430580743,
+      "meets_cycle_target": true,
+      "fault_contract": "NOT_PROVEN",
+      "rtl_admitted": false
+    },
+    {
+      "lanes": 4,
+      "memory": "scalar4B",
+      "measured_full_decode": 350155,
+      "modeled_sfu_cycles": 123683,
+      "predicted_full_decode": 200139,
+      "saved": 150016,
+      "reduction_pct": 42.842741071811055,
+      "meets_cycle_target": true,
+      "fault_contract": "NOT_PROVEN",
+      "rtl_admitted": false
+    },
+    {
+      "lanes": 1,
+      "memory": "current_scalar_fsm_unchanged",
+      "measured_full_decode": 350155,
+      "modeled_sfu_cycles": 273699,
+      "predicted_full_decode": 350155,
+      "saved": 0,
+      "reduction_pct": 0.0,
+      "meets_cycle_target": false,
+      "fault_contract": "UNCHANGED_BY_IDENTITY",
+      "rtl_admitted": false
+    },
+    {
+      "lanes": 2,
+      "memory": "current_scalar_fsm_unchanged",
+      "measured_full_decode": 350155,
+      "modeled_sfu_cycles": 273699,
+      "predicted_full_decode": 350155,
+      "saved": 0,
+      "reduction_pct": 0.0,
+      "meets_cycle_target": false,
+      "fault_contract": "UNCHANGED_BY_IDENTITY",
+      "rtl_admitted": false
+    },
+    {
+      "lanes": 4,
+      "memory": "current_scalar_fsm_unchanged",
+      "measured_full_decode": 350155,
+      "modeled_sfu_cycles": 273699,
+      "predicted_full_decode": 350155,
+      "saved": 0,
+      "reduction_pct": 0.0,
+      "meets_cycle_target": false,
+      "fault_contract": "UNCHANGED_BY_IDENTITY",
+      "rtl_admitted": false
+    }
+  ],
+  "decision": "STOP_SFU_CANDIDATE_FAULT_CONTRACT_NOT_PROVEN",
+  "limitations": [
+    "Model lanes have independent integer ALUs, registered latency; arithmetic assumed exact, not newly verified RTL.",
+    "Other client service slots fixed from trace; no closed-loop rescheduling of command or arbiter.",
+    "Line changes operand-read order/granularity; existing aggregated permission/error semantics fail counterexamples.",
+    "Earlier read faults need ordered retirement and drain/epoch review; no relaxed fault mode."
+  ]
+}
