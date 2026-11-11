@@ -1,0 +1,477 @@
+{
+  "status": "REJECT_UNRESTRICTED_PIPELINE_NO_RTL_ADMISSION",
+  "targeted_rounds": 2,
+  "immutable_disjoint_cases": 196,
+  "recovery_cases": 279,
+  "scalar_word_parity_prefix": [
+    10
+  ],
+  "naive_error_prefix": [],
+  "scalar_adjacent_regions_allowed": 4,
+  "line_allowed": false,
+  "ordered_fault_repair": "bounded immutable/disjoint toy protocol PASS, not full RTL proof",
+  "illustrative_closed_loop": [
+    {
+      "competitor_period": 0,
+      "scalar_cycles": 40,
+      "pipeline_cycles": 16,
+      "scope": "8 immutable toy words; NOT H32 prediction"
+    },
+    {
+      "competitor_period": 1,
+      "scalar_cycles": 43,
+      "pipeline_cycles": 30,
+      "scope": "8 immutable toy words; NOT H32 prediction"
+    },
+    {
+      "competitor_period": 2,
+      "scalar_cycles": 44,
+      "pipeline_cycles": 30,
+      "scope": "8 immutable toy words; NOT H32 prediction"
+    },
+    {
+      "competitor_period": 4,
+      "scalar_cycles": 43,
+      "pipeline_cycles": 23,
+      "scope": "8 immutable toy words; NOT H32 prediction"
+    }
+  ],
+  "coherence_counterexamples": [
+    {
+      "kind": "host_write",
+      "event_cycle": 2,
+      "baseline": {
+        "cycles": 20,
+        "output": [
+          10,
+          999,
+          12,
+          13
+        ],
+        "error": "success",
+        "read_indices": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "max_live": 1,
+        "competing_grants": 0,
+        "events": [
+          [
+            0,
+            "read",
+            0,
+            17,
+            10,
+            null,
+            4
+          ],
+          [
+            2,
+            "host_write",
+            1,
+            999
+          ],
+          [
+            2,
+            "response",
+            0,
+            17,
+            null
+          ],
+          [
+            4,
+            "write",
+            0,
+            10
+          ],
+          [
+            5,
+            "read",
+            1,
+            17,
+            999,
+            null,
+            4
+          ],
+          [
+            7,
+            "response",
+            1,
+            17,
+            null
+          ],
+          [
+            9,
+            "write",
+            1,
+            999
+          ],
+          [
+            10,
+            "read",
+            2,
+            17,
+            12,
+            null,
+            4
+          ],
+          [
+            12,
+            "response",
+            2,
+            17,
+            null
+          ],
+          [
+            14,
+            "write",
+            2,
+            12
+          ],
+          [
+            15,
+            "read",
+            3,
+            17,
+            13,
+            null,
+            4
+          ],
+          [
+            17,
+            "response",
+            3,
+            17,
+            null
+          ],
+          [
+            19,
+            "write",
+            3,
+            13
+          ],
+          [
+            19,
+            "completion",
+            "success",
+            17
+          ]
+        ]
+      },
+      "candidate": {
+        "cycles": 8,
+        "output": [
+          10,
+          11,
+          12,
+          13
+        ],
+        "error": "success",
+        "read_indices": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "max_live": 4,
+        "competing_grants": 0,
+        "events": [
+          [
+            0,
+            "read",
+            0,
+            17,
+            10,
+            null,
+            4
+          ],
+          [
+            1,
+            "read",
+            1,
+            17,
+            11,
+            null,
+            4
+          ],
+          [
+            2,
+            "host_write",
+            1,
+            999
+          ],
+          [
+            2,
+            "response",
+            0,
+            17,
+            null
+          ],
+          [
+            2,
+            "read",
+            2,
+            17,
+            12,
+            null,
+            4
+          ],
+          [
+            3,
+            "response",
+            1,
+            17,
+            null
+          ],
+          [
+            3,
+            "read",
+            3,
+            17,
+            13,
+            null,
+            4
+          ],
+          [
+            4,
+            "response",
+            2,
+            17,
+            null
+          ],
+          [
+            4,
+            "write",
+            0,
+            10
+          ],
+          [
+            5,
+            "response",
+            3,
+            17,
+            null
+          ],
+          [
+            5,
+            "write",
+            1,
+            11
+          ],
+          [
+            6,
+            "write",
+            2,
+            12
+          ],
+          [
+            7,
+            "write",
+            3,
+            13
+          ],
+          [
+            7,
+            "completion",
+            "success",
+            17
+          ]
+        ]
+      }
+    },
+    {
+      "kind": "permission_revoke",
+      "event_cycle": 2,
+      "baseline": {
+        "cycles": 9,
+        "output": [
+          10
+        ],
+        "error": "protection",
+        "read_indices": [
+          0,
+          1
+        ],
+        "max_live": 1,
+        "competing_grants": 0,
+        "events": [
+          [
+            0,
+            "read",
+            0,
+            17,
+            10,
+            null,
+            4
+          ],
+          [
+            2,
+            "response",
+            0,
+            17,
+            null
+          ],
+          [
+            4,
+            "write",
+            0,
+            10
+          ],
+          [
+            5,
+            "read",
+            1,
+            17,
+            11,
+            "protection",
+            4
+          ],
+          [
+            7,
+            "response",
+            1,
+            17,
+            "protection"
+          ],
+          [
+            8,
+            "ordered_fault",
+            1,
+            "protection"
+          ],
+          [
+            8,
+            "completion",
+            "protection",
+            17
+          ]
+        ]
+      },
+      "candidate": {
+        "cycles": 8,
+        "output": [
+          10,
+          11,
+          12,
+          13
+        ],
+        "error": "success",
+        "read_indices": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "max_live": 4,
+        "competing_grants": 0,
+        "events": [
+          [
+            0,
+            "read",
+            0,
+            17,
+            10,
+            null,
+            4
+          ],
+          [
+            1,
+            "read",
+            1,
+            17,
+            11,
+            null,
+            4
+          ],
+          [
+            2,
+            "response",
+            0,
+            17,
+            null
+          ],
+          [
+            2,
+            "read",
+            2,
+            17,
+            12,
+            null,
+            4
+          ],
+          [
+            3,
+            "response",
+            1,
+            17,
+            null
+          ],
+          [
+            3,
+            "read",
+            3,
+            17,
+            13,
+            null,
+            4
+          ],
+          [
+            4,
+            "response",
+            2,
+            17,
+            null
+          ],
+          [
+            4,
+            "write",
+            0,
+            10
+          ],
+          [
+            5,
+            "response",
+            3,
+            17,
+            null
+          ],
+          [
+            5,
+            "write",
+            1,
+            11
+          ],
+          [
+            6,
+            "write",
+            2,
+            12
+          ],
+          [
+            7,
+            "write",
+            3,
+            13
+          ],
+          [
+            7,
+            "completion",
+            "success",
+            17
+          ]
+        ]
+      }
+    }
+  ],
+  "h32_incremental_safe_speedup": "NOT_PROVEN",
+  "omitted_proofs": [
+    "actual multi-client RTL arbiter/dispatcher refinement",
+    "SFU numerical dependencies/pack prefix and in-place aliasing",
+    "top reset response flush and tagless route refinement",
+    "concurrent protection/parity writes and read-side externally visible errors",
+    "watchdog wall-clock priority refinement"
+  ],
+  "source_sha256": "6807abb3c24d7b7bc7fe632314755ad73d925b7e38fb1d110a7cb31ecd422b47"
+}

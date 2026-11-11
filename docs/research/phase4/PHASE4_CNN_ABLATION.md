@@ -34,7 +34,7 @@ SRAM port. New declared state197bits, not mapped flop area.
 
 Both-fused DMA setup+transfer3019cycles (busy2879subset),10944payload bytes,
 45bursts/684beats, unchanged. Queue setup54cycles; output3328B readback4992cycles.
-Disjoint modeled hardware segments give baseline20362 versus optimized19387
+Disjoint modeled hardware segments give baseline20416 versus optimized19441
 cycles (DMA+configuration+CMDQ+readback); this is a **partial sum**, not measured
 continuous full inference. Checker/poison setup is excluded. Initial host Im2col/
 packing and final GAP/argmax are outside CMDQ; historical Python host timing is

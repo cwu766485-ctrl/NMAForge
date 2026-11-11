@@ -172,3 +172,14 @@ Verilator baseline/candidate warning inventory identical, inherited severe Top
 warnings still open. Commands `tools/benchmark/phase4/README.md`, reports
 `docs/research/phase4/`. This checkpoint precedes architecture-only SFU study;
 no SFU RTL or automatic product merge, no signoff/Fmax claim.
+
+### Phase4 architecture-only continuation
+
+Gate2 checkpoint73ebc74f5e155c614d3eeb4f5bee12315ed7f633 pushed; remote SHA matched.
+SFU study `python3.12 tools/benchmark/phase4/sfu_protocol_model.py --out /tmp/nma-p4/sfu_protocol`:
+196immutable/disjoint and279recovery cases PASS, but ordered retirement still
+changes Host-write/permission-revoke observations. REJECT unrestricted pipeline
+after two targeted rounds, no SFU RTL. Real unchanged-SFU/scratchpad/protection
+Phase3 parity-prefix and adjacent-region counterexamples re-run PASS. Remaining
+three Phase4 reports document benchmark boundaries and DESIGN_PARTIAL decision;
+CNN retained as PR candidate, no automatic product merge or Phase5.
