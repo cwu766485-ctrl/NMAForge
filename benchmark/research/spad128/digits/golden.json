@@ -1,0 +1,9 @@
+{
+  "dataset": "sklearn.datasets.load_digits",
+  "golden_logit_sha256": "8a9606b5c31ff4f203731726f89d7caf5f73b59d0cbddf0945a1ac454d855afc",
+  "independent_integer_golden": "PASS",
+  "int8_accuracy": 0.9777777777777777,
+  "rtl_output_compared": true,
+  "seed": 20261029,
+  "test_samples": 360
+}

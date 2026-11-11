@@ -9,9 +9,9 @@
 // Registered scratchpad read timing is deliberately preserved.
 // ============================================================================
 module ai_accel_memory_fabric #(
-    parameter integer WORDS_PER_BANK = 32768,
+    parameter integer WORDS_PER_BANK = 8192,
     parameter integer ROW_BITS = $clog2(WORDS_PER_BANK),
-    parameter [31:0] SPAD_BYTES = 32'd524288
+    parameter [31:0] SPAD_BYTES = 4 * WORDS_PER_BANK * 4
 )(
     input wire clk, input wire resetn,
     input wire [31:0] region0_base, input wire [31:0] region0_limit, input wire [3:0] region0_perm,
@@ -58,6 +58,10 @@ module ai_accel_memory_fabric #(
     output wire cnm_protection_error, output wire line_protection_error,
     output wire cpl_protection_error
 );
+    generate if ((SPAD_BYTES != 4 * WORDS_PER_BANK * 4) || (ROW_BITS != $clog2(WORDS_PER_BANK))) begin : invalid_spad_capacity
+        initial $fatal(1, "SPAD capacity/row geometry must match physical four-bank storage");
+    end endgenerate
+
     wire spad_valid;
     wire spad_write;
     wire [31:0] spad_addr;

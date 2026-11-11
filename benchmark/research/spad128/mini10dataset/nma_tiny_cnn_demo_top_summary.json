@@ -1,0 +1,38 @@
+{
+  "run_id": "V2-TRAINED-CNN-TOP-DATASET-95C4387-LEGACY_LAYOUT",
+  "candidate_sha": "95c4387bb0ac57ff4fa427fd3c1202320ad0940b",
+  "model_sha256": "ef0e616d09ca0be7956fa8ca900e40c62973f8f06e3ec96af09d888eead73726",
+  "testset_sha256": "cb851b077542f9bcf42f84938227ba5f1a4750ea0b0fbfe2ba8fcecbb914d107",
+  "num_classes": 10,
+  "class_labels": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "architecture": "4 shared 3x3 INT8 conv filters + INT8 linear head, output groups of four",
+  "spad_base_shift_bytes": 0,
+  "linearized_output_layout": false,
+  "fused_native_output_layout": false,
+  "rtl_mode": "legacy-host-layout",
+  "samples": 396,
+  "top_runs_passed": 396,
+  "all_intermediate_goldens_exact": true,
+  "correct": 384,
+  "accuracy": 0.9696969696969697,
+  "rtl_compute_cycles_per_sample": [
+    2934
+  ],
+  "host_layout_cycles_per_sample": [
+    1080
+  ],
+  "classification_source": "independent integer Golden logits, each Golden byte-compared by Top checker",
+  "csv": "nma_tiny_cnn_demo_top_results.csv",
+  "logs_directory": "/tmp/nmaforge-128k-runs/closure/mini10dataset/logs"
+}

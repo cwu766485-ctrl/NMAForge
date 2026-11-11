@@ -1,0 +1,38 @@
+[
+  {
+    "test": "128k",
+    "result": "PASS",
+    "expected": "valid",
+    "exit_code": 0
+  },
+  {
+    "test": "512k",
+    "result": "PASS",
+    "expected": "valid",
+    "exit_code": 0
+  },
+  {
+    "test": "bad_depth",
+    "result": "PASS",
+    "expected": "fatal",
+    "exit_code": 0
+  },
+  {
+    "test": "bad_banks",
+    "result": "PASS",
+    "expected": "fatal",
+    "exit_code": 0
+  },
+  {
+    "test": "bad_row",
+    "result": "PASS",
+    "expected": "fatal",
+    "exit_code": 0
+  },
+  {
+    "test": "bad_capacity",
+    "result": "PASS",
+    "expected": "fatal",
+    "exit_code": 0
+  }
+]

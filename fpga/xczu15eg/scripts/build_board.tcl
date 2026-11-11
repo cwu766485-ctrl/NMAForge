@@ -1,3 +1,4 @@
+source [file join [file dirname [info script]] spad_config.tcl]
 # NMAForge XCZU15EG PS/PL integration and bitstream flow.
 #
 # The board has a custom ZynqMP PS DDR/MIO layout.  Rather than guessing that
@@ -93,6 +94,7 @@ set_property -dict [list CONFIG.C_NUM_MONITOR_SLOTS {2} CONFIG.C_DATA_DEPTH {409
 # ai_accel_top carries explicit X_INTERFACE metadata, so Vivado exposes S_AXI
 # and M_AXI as module-reference interfaces.
 set accel [create_bd_cell -type module -reference ai_accel_top accel_0]
+set_property CONFIG.SPAD_WORDS_PER_BANK $SPAD_WORDS_PER_BANK $accel
 
 connect_bd_intf_net [get_bd_intf_pins ps8/M_AXI_HPM0_FPD] [get_bd_intf_pins ctrl_ic/S00_AXI]
 connect_bd_intf_net -intf_net ctrl_axi_lite \
@@ -146,7 +148,7 @@ connect_bd_net [get_bd_pins rst_pl/peripheral_aresetn] [get_bd_pins ila_accel/pr
 
 assign_bd_address
 # Reserve a 1 MiB power-of-two aperture: the register page starts at offset 0,
-# and the default 512 KiB scratchpad occupies 0x10000..0x8ffff.
+# and the default 128 KiB scratchpad occupies 0x10000..0x2ffff; optional 512 KiB fits the retained aperture.
 set ps_data [get_bd_addr_spaces ps8/Data]
 set accel_ctrl_segs [get_bd_addr_segs -of_objects $ps_data -filter {NAME =~ "*accel_0*"}]
 if {[llength $accel_ctrl_segs] != 1} {

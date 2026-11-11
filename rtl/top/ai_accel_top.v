@@ -23,8 +23,8 @@
 // ============================================================================
 module ai_accel_top #(
     // Four fixed banks are retained for the bank-local INT8 datapath.  Depth
-    // is configurable; 32768 words/bank gives the XCZU15EG default of 512 KiB.
-    parameter integer SPAD_WORDS_PER_BANK = 32768,
+    // defaults to 8192 words/bank (128 KiB); 32768 selects optional 512 KiB.
+    parameter integer SPAD_WORDS_PER_BANK = 8192,
     parameter integer M_AXI_ADDR_WIDTH = 64
 )(
     (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 ACLK CLK" *)
@@ -155,6 +155,10 @@ module ai_accel_top #(
     // AXI-Lite 地址空间划分：
     //   0x0000_0000 ~ 0x0000_00ff  -> 寄存器窗口，由 ai_accel_regs 响应
     //   0x0001_0000 ~ SPAD_LIMIT-1 -> 参数化 scratchpad host window
+    generate if ((SPAD_WORDS_PER_BANK < 2) || (SPAD_WORDS_PER_BANK > 32768) || ((SPAD_WORDS_PER_BANK & (SPAD_WORDS_PER_BANK-1)) != 0)) begin : invalid_spad_geometry
+        initial $fatal(1, "Unsupported top SPAD geometry: power-of-two depth in [2, 32768] required");
+    end endgenerate
+
     localparam [31:0] SPAD_BASE = 32'h0001_0000;
     localparam integer SPAD_BANKS = 4;
     localparam integer SPAD_ROW_BITS = $clog2(SPAD_WORDS_PER_BANK);

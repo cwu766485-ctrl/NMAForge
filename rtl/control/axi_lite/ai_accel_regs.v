@@ -5,7 +5,7 @@
 // lifecycle.  It only stores software configuration, emits control pulses and
 // records completion/DMA status.
 module ai_accel_regs #(
-    parameter [31:0] SPAD_BYTES = 32'd524288
+    parameter [31:0] SPAD_BYTES = 32'd131072
 )(
     input wire clk, input wire resetn,
     input wire reg_req_valid, input wire reg_req_write, input wire [31:0] reg_req_addr,

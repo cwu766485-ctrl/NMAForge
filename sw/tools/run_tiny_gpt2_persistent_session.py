@@ -59,6 +59,7 @@ def token_sequence(seed_sequence: list[int], total: int = 12) -> list[int]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--spad-bytes", type=int, default=128 * 1024)
     parser.add_argument("--model", required=True, type=Path)
     parser.add_argument("--simv", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
@@ -76,6 +77,7 @@ def main() -> None:
     generator_cmd = [sys.executable,
                      str(Path(__file__).with_name("generate_h16_incremental_decode.py")),
                      "--model", str(args.model), "--out", str(workload),
+                     "--spad-bytes", str(args.spad_bytes),
                      "--prefill-tokens", ",".join(map(str, prefill)),
                      "--decode-tokens", ",".join(map(str, decode_tokens))]
     generator_log = args.out / "generator.log"

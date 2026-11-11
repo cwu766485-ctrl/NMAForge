@@ -90,3 +90,7 @@ DMA/endpoints; no system speedup or frontend freeze/PPA claim. Reproduce with
 `tools/benchmark/stage_c/run_top.sh`, `run_bench.sh`, `validate.py` and the exact
 commands in `docs/research/STAGE_C_ARCHITECTURE_DECISION.md`. Evidence and SHA
 inventory: `benchmark/research/stage_c/`. Stage C stops; no automatic Stage D.
+
+## 2026-11-11 Asia/Singapore — SPAD128 Gate 0/1 candidate
+
+Dedicated branch `feat/spad-128k-closure`, based on nmaforge `95c4387bb0ac57ff4fa427fd3c1202320ad0940b`: defaults aligned to8192words/bank (128KiB), optional32768 retained, constant geometry rejection, capacity-derived Digits/MiniCNN fixtures and concurrent smoke placements. Full smoke now checks final TEST PASS; original128KiB fixture failure (23 errors) retained. Isolated VCS replay: `SPAD128_OUT=<fresh-absolute-dir> SPAD128_PYTHON=<python3.12-with-model-dependencies> SPAD128_DATASET=1 bash tools/benchmark/spad128/run.sh`. Mandatory Golden, boundary, parity/protection and512KiB compatibility evidence is in `benchmark/research/spad128`; validate with `python3.12 tools/benchmark/spad128/validate.py`. H16=65771/8decodecycles, H32=367788/8, CNN bothfused=12351CMDQ cycles preserved. Verilator warnings match same-capacity baseline but remain unresolved, no signoff/PPA/Fmax claim. See `docs/design/SPAD_CONFIG_REGRESSION.md`. Stop for architecture review before Gate2/performance RTL; no product-branch merge.

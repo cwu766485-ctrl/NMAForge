@@ -31,7 +31,7 @@ optimization, placement, routing, post-route setup/hold analysis, DRC,
 methodology and power reporting. It exits with an error if either setup or
 hold slack is negative. Reports stay under ignored `build/` directories.
 
-The current 512 KiB profile closes post-route at 100 MHz with setup/hold
+The historical 512 KiB profile closed post-route at 100 MHz with setup/hold
 slack `+0.836/+0.023 ns` and uses 7,780 LUTs, 4,952 FFs and 128 RAMB36E2.
 
 ## Board project, bitstream and XSA
@@ -43,10 +43,10 @@ fpga\xczu15eg\scripts\run_board_build.ps1
 `build_board.tcl` creates a fresh block design, assigns a 1 MiB control
 aperture at `0xA0000000`, builds the bitstream, exports an XSA and writes ILA
 probes for IRQ and accelerator-driven AXI handshakes. The aperture includes the
-register page and the default 512 KiB host scratchpad window at offsets
-`0x10000..0x8ffff`.
+register page and the default 128 KiB host scratchpad window at offsets
+`0x10000..0x2ffff`.
 
-The current full-board build uses 17,624 LUTs, 19,274 FFs and 152 RAMB36E2,
+The historical 512 KiB full-board build used 17,624 LUTs, 19,274 FFs and 152 RAMB36E2,
 closes setup/hold at `+1.625/+0.012 ns`, and produces the bitstream, XSA and
 LTX under the ignored `build/board` directory.
 
@@ -101,8 +101,8 @@ recovery steps.
   uses a 32-bit-addressable DDR allocation contract, so allocate descriptor and
   data buffers below 4 GiB unless the board integration is upgraded and tested.
 - `ai_scratchpad` uses registered XPM true-dual-port RAM in Vivado synthesis;
-  `+define+VCS` selects the behavioral simulation model. The XCZU15EG/default
-  profile is 4 banks x 32768 words x 32 bits = 512 KiB; the depth is controlled
+  `+define+VCS` selects the behavioral simulation model. The XCZU15EG
+  default profile is 4 banks x 8192 words x 32 bits = 128 KiB (32768 words/bank selects 512 KiB); the depth is controlled
   by `ai_accel_top.SPAD_WORDS_PER_BANK`.
 - Accepted AXI bursts are never truncated. Abort drains an accepted read to
   `RLAST`; an accepted write completes all W beats and B response first.

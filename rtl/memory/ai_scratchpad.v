@@ -10,7 +10,7 @@
 // same row; it issues its two operands in separate cycles.
 module ai_scratchpad #(
     parameter integer BANKS = 4,
-    parameter integer WORDS_PER_BANK = 32768,
+    parameter integer WORDS_PER_BANK = 8192,
     parameter integer ROW_BITS = $clog2(WORDS_PER_BANK)
 )(
     input wire clk, input wire resetn,
@@ -38,6 +38,10 @@ module ai_scratchpad #(
     output reg [31:0] cnm_data2, output reg [31:0] cnm_data3,
     output reg [3:0] cnm_parity_error
 );
+    generate if ((WORDS_PER_BANK < 2) || (WORDS_PER_BANK > 32768) || ((WORDS_PER_BANK & (WORDS_PER_BANK-1)) != 0) || (BANKS != 4) || (ROW_BITS != $clog2(WORDS_PER_BANK))) begin : invalid_spad_geometry
+        initial $fatal(1, "Unsupported SPAD geometry: four banks, power-of-two depth and exact row width required");
+    end endgenerate
+
     localparam integer BANK_BITS = 2;
     localparam integer BANK_MEMORY_BITS = WORDS_PER_BANK * 32;
     localparam integer TOTAL_WORDS = BANKS * WORDS_PER_BANK;

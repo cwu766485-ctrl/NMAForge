@@ -1,3 +1,4 @@
+source [file join [file dirname [info script]] spad_config.tcl]
 # Standalone XCZU15EG synthesis/implementation timing gate for ai_accel_top.
 # Run from the repository root with Vivado 2024.1:
 #   vivado -mode batch -source fpga/xczu15eg/scripts/synth_ai_accel_ip.tcl
@@ -25,7 +26,7 @@ foreach rtl_file $AI_ACCEL_RTL_FILES {
 }
 
 synth_design -top ai_accel_top -part $FPGA_PART -mode out_of_context \
-             -flatten_hierarchy rebuilt
+             -flatten_hierarchy rebuilt -generic SPAD_WORDS_PER_BANK=$SPAD_WORDS_PER_BANK
 create_clock -name aclk -period $CLOCK_PERIOD_NS [get_ports aclk]
 set_false_path -from [get_ports aresetn]
 
