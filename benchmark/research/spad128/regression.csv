@@ -1,0 +1,25 @@
+configuration,test,result,detail,evidence,evidence_sha256
+4x8192x32 (128KiB),smoke_8192,PASS,20 seeded random cases; all engines; 0x52/0x53; reset/abort/backpressure,logs/smoke_8192.log.gz,36013ba875dbae535695715bbb20ec58b35da5593cd2c61ee9e64f00827ee4c7
+4x8192x32 (128KiB),boundary_8192,PASS,"first/last word/line, OOB, alignment, DMA crossing/drain/recovery, CMDQ/CPLQ",logs/boundary_8192.log.gz,28b8e4b1b036e87d81cf93051691d84d53712aaace8953d7e3a8806effadfcec
+4x32768x32 (512KiB),smoke_32768,PASS,20 seeded random cases; all engines; 0x52/0x53; reset/abort/backpressure,logs/smoke_32768.log.gz,57cb84d1eea58f1e831590143db5877d05b17493c56df471f48150945df2174b
+4x32768x32 (512KiB),boundary_32768,PASS,"first/last word/line, OOB, alignment, DMA crossing/drain/recovery, CMDQ/CPLQ",logs/boundary_32768.log.gz,4c6f02e09c35805018d2aff57ee7cd1beb593061c068f128c4f2d6c8681f0b71
+128KiB,dma_stress,PASS,8 read/8 write AXI error injections and drain,logs/dma_stress.log.gz,37bd37d607686bb725c19d82dde3f0acdbd75bc63998827b142444cf19e83c0d
+128KiB,fault,PASS,normal/parity/protection/denied-write/recovery; 8192 words/bank,logs/fault.log.gz,88642fb2c995329f315d3293f7aa14d573cdc17c59181b9d9e2d4bac5f34861c
+128KiB,protection,PASS,25 directed +512 randomized,logs/protection.log.gz,1b4a06d3d9b03cc9891fb586c80066d928eccbd9d4bc14ee08a3929224212d77
+128KiB,arbiter,PASS,RR/ownership/parity/control priority,logs/arbiter.log.gz,adc1850616073471dfb68637c914332f7b1a3d76e9896867277b5e33fd76d4e9
+128KiB,digits,PASS,360 samples; 46 descriptors; hidden and logits Golden,logs/digits.log.gz,b78b8487e06e34de54d46cbd6cd917e7f1b7e063aa827391ddbcaf23aa70917e
+128KiB,h16,PASS,8 persistent decode tokens; logits/KV/intermediate Golden,logs/h16.log.gz,6380b9a81161d7440e1a309ec8105db7e382464a96182610e0ae5d1cbb8e4320
+128KiB,h32,PASS,4 prefill+8 persistent decode; 92928 Golden words,logs/h32.log.gz,d8c01d116eb88a16c694331365b9cab0cce42cd7deeb492427596b50d5c9a183
+128KiB,mini10dataset,PASS,396 samples; independent per-layer Golden,logs/mini10dataset.log.gz,7f4ade8458031fa2ad358e1b1559f9577abff5e9b1c3d092fd4fd045b4f51fb7
+128KiB,cnn_legacy,PASS,570164 useful MAC;20800 Golden words;CMDQ cycles=65429,logs/cnn_legacy.log.gz,d04f4f430680e80128a4e7435e37373c492582a8d95ea9022130d6d6fde00d0b
+software,cnn_independent_legacy,PASS,independent physical layout and integer Golden,logs/cnn_independent_legacy.log.gz,448bc828cbd0f7c5e03c79ec0767b802a9c05894843d104c21d95cf8b0e8d26b
+128KiB,cnn_first_fused,PASS,570164 useful MAC;20800 Golden words;CMDQ cycles=22983,logs/cnn_first_fused.log.gz,cc9d42db53973b6d5c934a61df02e2f5a4d8aa950fd155d7f4d223f4a73d96b4
+software,cnn_independent_first_fused,PASS,independent physical layout and integer Golden,logs/cnn_independent_first_fused.log.gz,5bd163560dc04bb4d442e5c242b99192b5aaff3c5af536a66bfab13aa5e211a3
+128KiB,cnn_both_fused_row_major,PASS,570164 useful MAC;20800 Golden words;CMDQ cycles=12351,logs/cnn_both_fused_row_major.log.gz,b7a6f76c8d928185350100108b4901df9a277ae7f9619d3a739c40e3f748d264
+software,cnn_independent_both_fused_row_major,PASS,independent physical layout and integer Golden,logs/cnn_independent_both_fused_row_major.log.gz,78ae14b9926d0980b5e505486967635cf201121b2dc624360eeaa9328d71b7a2
+geometry,128k,PASS,valid (VCS fatal exit may be zero),geometry/128k.log.gz,dbee7d2605b77835d0a82565efe460b60be4f69a6d920d97ae18da26ac3b1a7f
+geometry,512k,PASS,valid (VCS fatal exit may be zero),geometry/512k.log.gz,ff3f8943019cc553086e2121c46d170899aa65b2e2f40b2f643e4005a1595b20
+geometry,bad_depth,PASS,fatal (VCS fatal exit may be zero),geometry/bad_depth.log.gz,b623e4ee70416c7efce24e24becde6df7bd821a220e12bcda89695b1206b244d
+geometry,bad_banks,PASS,fatal (VCS fatal exit may be zero),geometry/bad_banks.log.gz,6308fb38052ccd7f6eccfbf80366495a42c044de185138c3146d4b6740bf1aee
+geometry,bad_row,PASS,fatal (VCS fatal exit may be zero),geometry/bad_row.log.gz,43b507f37f9d11aa4bdbc78a8a841ce6f413edad244a0a56a6e2651f3cb5409e
+geometry,bad_capacity,PASS,fatal (VCS fatal exit may be zero),geometry/bad_capacity.log.gz,213b48d4255870f175f826a73029f492f87568e687cde29bfbed44f81d812706

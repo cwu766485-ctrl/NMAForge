@@ -70,7 +70,7 @@ module fpga_ai_accel_smoke_top(
     );
 
     // Keep the small Artix-7 compatibility profile; XCZU15EG and the generic
-    // IP default use 32768 words/bank (512 KiB).
+    // IP default uses 8192 words/bank (128 KiB).
     ai_accel_top #(.SPAD_WORDS_PER_BANK(4096)) dut_u(
         .aclk           (sys_clk_50m),
         .aresetn        (resetn),

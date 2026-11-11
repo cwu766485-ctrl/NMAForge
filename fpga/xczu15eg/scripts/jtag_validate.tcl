@@ -1,3 +1,4 @@
+source [file join [file dirname [info script]] spad_config.tcl]
 # Program the XCZU15EG board over JTAG and run a CPU-independent hardware
 # smoke test through XSCT memory accesses. The test deliberately stops A53 #0
 # and writes PS DDR through the debug access port, so no cache maintenance or
@@ -119,7 +120,7 @@ proc run_validation {} {
     configparams force-mem-access 1
 
     expect32 [expr {$base + 0x044}] 0x10000002 "version"
-    expect32 [expr {$base + 0x164}] 0x00080000 "scratchpad capacity"
+    expect32 [expr {$base + 0x164}] $SPAD_BYTES "scratchpad capacity"
 
     write32 $spad 0xa5a55a5a
     expect32 $spad 0xa5a55a5a "scratchpad low word"

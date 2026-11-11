@@ -1,0 +1,60 @@
+{
+  "status": "PASS_SCOPED",
+  "model_sha256": "e4ded992c6f4ed686f5d4531b861041ffedeba0392a1998b1f7a1dfbe9cd15aa",
+  "memory": {
+    "persistent_end": 40448,
+    "workspace_begin": 40448,
+    "workspace_end": 69376,
+    "workspace_bytes": 28928,
+    "descriptor_base": 69632,
+    "completion_base": 77824,
+    "high_water_bytes": 79872,
+    "capacity_bytes": 131072,
+    "queue_entries": 128
+  },
+  "prefill": {
+    "cycles": 181391,
+    "matrix_exclusive": 20680,
+    "sfu_exclusive": 143163,
+    "kv_exclusive": 10112,
+    "control_exclusive": 7436,
+    "read_bytes": 273408,
+    "write_bytes": 113920,
+    "descriptors": 452,
+    "golden_words": 30976,
+    "useful_macs": 103680,
+    "scalar_admission_stall": 784,
+    "banked_admission_stall": 1232,
+    "line_admission_stall": 0,
+    "tokens": 4,
+    "cycles_per_token": 45347.75
+  },
+  "decode": {
+    "cycles": 367788,
+    "matrix_exclusive": 41360,
+    "sfu_exclusive": 291332,
+    "kv_exclusive": 20224,
+    "control_exclusive": 14872,
+    "read_bytes": 546816,
+    "write_bytes": 227840,
+    "descriptors": 904,
+    "golden_words": 61952,
+    "useful_macs": 213504,
+    "scalar_admission_stall": 1568,
+    "banked_admission_stall": 2464,
+    "line_admission_stall": 0,
+    "tokens": 8,
+    "cycles_per_token": 45973.5
+  },
+  "session_reset_between_tokens": false,
+  "all_intermediate_logits_kv_golden": "PASS",
+  "timing_boundary": "sum of12 CMDQ doorbell windows to last committed completion; excludes initial host SPAD preload, queue setup, Golden readback, interbatch host service, embedding/token selection",
+  "clock_ns": 4,
+  "physical_fmax": "NOT_MEASURED",
+  "limitations": [
+    "8 teacher-forced decode tokens after4 true full-graph prefill tokens",
+    "context16 slots0..11 only; ring wrap not covered",
+    "128KiB behavioral four-bank SPAD; no physical macro timing",
+    "padded4rows physically computed; row0 is logical token"
+  ]
+}

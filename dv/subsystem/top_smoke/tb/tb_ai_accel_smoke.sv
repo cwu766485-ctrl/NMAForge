@@ -1,11 +1,9 @@
 `timescale 1ns / 1ps
 
 `ifndef AI_SPAD_WORDS_PER_BANK
-`define AI_SPAD_WORDS_PER_BANK 32768
+`define AI_SPAD_WORDS_PER_BANK 8192
 `endif
-`ifndef AI_TINYNPU_CNN_SPAD_BASE_SHIFT
-`define AI_TINYNPU_CNN_SPAD_BASE_SHIFT 0
-`endif
+
 
 module tb_ai_accel_smoke;
 
@@ -96,44 +94,37 @@ module tb_ai_accel_smoke;
     localparam REG_EVENT_STATUS    = 32'h0000_0168;
     localparam SPAD_BASE         = 32'h0001_0000;
     localparam [31:0] SPAD_BYTES = 4 * `AI_SPAD_WORDS_PER_BANK * 4;
-`ifdef AI_DIGITS_COMPACT_SPAD
-    localparam AI_DIGITS_INPUT_BASE = 32'h0001_1000;
-    localparam AI_DIGITS_OUTPUT_BASE = 32'h0000_b000;
-    localparam AI_DIGITS_HIDDEN_I8_TILE_BASE = 32'h0000_3000;
-    localparam AI_DIGITS_DESC_BASE = 32'h0000_9000;
-    localparam AI_DIGITS_CPL_BASE = 32'h0000_a000;
-`else
-    localparam AI_DIGITS_INPUT_BASE = 32'h0005_0000;
-    localparam AI_DIGITS_OUTPUT_BASE = 32'h0003_b000;
-    localparam AI_DIGITS_HIDDEN_I8_TILE_BASE = 32'h0003_2000;
-    localparam AI_DIGITS_DESC_BASE = 32'h0003_8000;
-    localparam AI_DIGITS_CPL_BASE = 32'h0003_a000;
-`endif
+    reg [31:0] digits_layout_words [0:4];
+    wire [31:0] AI_DIGITS_INPUT_BASE = digits_layout_words[0];
+    wire [31:0] AI_DIGITS_OUTPUT_BASE = digits_layout_words[1];
+    wire [31:0] AI_DIGITS_HIDDEN_I8_TILE_BASE = digits_layout_words[2];
+    wire [31:0] AI_DIGITS_DESC_BASE = digits_layout_words[3];
+    wire [31:0] AI_DIGITS_CPL_BASE = digits_layout_words[4];
     localparam AI_DIGITS_BATCH = 16;
     localparam AI_DIGITS_DESC_COUNT = 46;
     localparam AI_DIGITS_TEST_SAMPLES = 360;
     localparam AI_DIGITS_HIDDEN_WORDS = 5888;
 
-    localparam [31:0] AI_TINYNPU_CNN_SPAD_SHIFT = `AI_TINYNPU_CNN_SPAD_BASE_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_IM2COL_BASE = 32'h0001_0000 - AI_TINYNPU_CNN_SPAD_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_CONV_WEIGHT_BASE = 32'h0001_1000 - AI_TINYNPU_CNN_SPAD_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_CONV_ROUND_BASE = 32'h0001_1100 - AI_TINYNPU_CNN_SPAD_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_CONV_RAW_BASE = 32'h0001_2000 - AI_TINYNPU_CNN_SPAD_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_CONV_I8_BASE = 32'h0001_3000 - AI_TINYNPU_CNN_SPAD_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_IDENTITY_B_BASE = 32'h0001_4000 - AI_TINYNPU_CNN_SPAD_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_CONV_BIAS_BASE = 32'h0001_4100 - AI_TINYNPU_CNN_SPAD_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE = 32'h0001_5000 - AI_TINYNPU_CNN_SPAD_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_CONV_RELU_I8_BASE = 32'h0001_6000 - AI_TINYNPU_CNN_SPAD_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_FC_A_BASE = 32'h0001_8000 - AI_TINYNPU_CNN_SPAD_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_FC_B_BASE = 32'h0001_9000 - AI_TINYNPU_CNN_SPAD_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_FC_ROUND_BASE = 32'h0001_a000 - AI_TINYNPU_CNN_SPAD_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_FC_RAW_BASE = 32'h0001_b000 - AI_TINYNPU_CNN_SPAD_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_FC_I8_BASE = 32'h0001_c000 - AI_TINYNPU_CNN_SPAD_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_FC_BIAS_BASE = 32'h0001_c100 - AI_TINYNPU_CNN_SPAD_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_FC_BIASED_BASE = 32'h0001_d000 - AI_TINYNPU_CNN_SPAD_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_FINAL_I8_BASE = 32'h0001_e000 - AI_TINYNPU_CNN_SPAD_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_DESC_BASE = 32'h0002_0000 - AI_TINYNPU_CNN_SPAD_SHIFT;
-    localparam [31:0] AI_TINYNPU_CNN_CPL_BASE = 32'h0002_1000 - AI_TINYNPU_CNN_SPAD_SHIFT;
+    reg [31:0] cnn_layout_words [0:18];
+    wire [31:0] AI_TINYNPU_CNN_IM2COL_BASE = cnn_layout_words[0];
+    wire [31:0] AI_TINYNPU_CNN_CONV_WEIGHT_BASE = cnn_layout_words[1];
+    wire [31:0] AI_TINYNPU_CNN_CONV_ROUND_BASE = cnn_layout_words[2];
+    wire [31:0] AI_TINYNPU_CNN_CONV_RAW_BASE = cnn_layout_words[3];
+    wire [31:0] AI_TINYNPU_CNN_CONV_I8_BASE = cnn_layout_words[4];
+    wire [31:0] AI_TINYNPU_CNN_IDENTITY_B_BASE = cnn_layout_words[5];
+    wire [31:0] AI_TINYNPU_CNN_CONV_BIAS_BASE = cnn_layout_words[6];
+    wire [31:0] AI_TINYNPU_CNN_CONV_BIAS_RELU_BASE = cnn_layout_words[7];
+    wire [31:0] AI_TINYNPU_CNN_CONV_RELU_I8_BASE = cnn_layout_words[8];
+    wire [31:0] AI_TINYNPU_CNN_FC_A_BASE = cnn_layout_words[9];
+    wire [31:0] AI_TINYNPU_CNN_FC_B_BASE = cnn_layout_words[10];
+    wire [31:0] AI_TINYNPU_CNN_FC_ROUND_BASE = cnn_layout_words[11];
+    wire [31:0] AI_TINYNPU_CNN_FC_RAW_BASE = cnn_layout_words[12];
+    wire [31:0] AI_TINYNPU_CNN_FC_I8_BASE = cnn_layout_words[13];
+    wire [31:0] AI_TINYNPU_CNN_FC_BIAS_BASE = cnn_layout_words[14];
+    wire [31:0] AI_TINYNPU_CNN_FC_BIASED_BASE = cnn_layout_words[15];
+    wire [31:0] AI_TINYNPU_CNN_FINAL_I8_BASE = cnn_layout_words[16];
+    wire [31:0] AI_TINYNPU_CNN_DESC_BASE = cnn_layout_words[17];
+    wire [31:0] AI_TINYNPU_CNN_CPL_BASE = cnn_layout_words[18];
 
     localparam OP_VDOT_INT8      = 8'h10;
     localparam OP_GEMV_INT8      = 8'h11;
@@ -1548,6 +1539,92 @@ module tb_ai_accel_smoke;
 
     `include "axi_lite_tasks.svh"
 
+    // Capacity-derived end-to-end probes; no hierarchical SRAM writes.
+    task run_spad_capacity_boundaries;
+        integer i;
+        begin
+            expect_read(REG_SPAD_INFO, SPAD_BYTES, "boundary capacity");
+            axi_write(SPAD_BASE, 32'h13579bdf);
+            expect_read(SPAD_BASE, 32'h13579bdf, "first word");
+            axi_write(SPAD_BASE + SPAD_BYTES - 4, 32'h2468ace0);
+            expect_read(SPAD_BASE + SPAD_BYTES - 4, 32'h2468ace0, "last word");
+            expect_slverr_write(SPAD_BASE + 1, 32'hdeadbeef);
+            expect_slverr_read(SPAD_BASE + 1);
+            expect_slverr_write(SPAD_BASE + SPAD_BYTES, 32'hdeadbeef);
+            expect_slverr_read(SPAD_BASE + SPAD_BYTES);
+            for (i=0; i<8; i=i+1)
+                axi_mem_u.mem[256+i] = 32'hfeed0000+i;
+            dma_load(32'h400, 0, 4);
+            dma_load(32'h410, SPAD_BYTES-16, 4);
+            for (i=0; i<4; i=i+1) begin
+                expect_read(SPAD_BASE+i*4, 32'hfeed0000+i, "first DMA line");
+                expect_read(SPAD_BASE+SPAD_BYTES-16+i*4, 32'hfeed0004+i, "last DMA line");
+            end
+            dma_store(32'h500, SPAD_BYTES-16, 4);
+            for (i=0; i<4; i=i+1)
+                if (axi_mem_u.mem[320+i] !== (32'hfeed0004+i))
+                    $fatal(1, "last-line DMA store mismatch");
+            dma_load_expect_error(32'h400, SPAD_BYTES-16, 8, 4'd4);
+            for (i=0; i<4; i=i+1)
+                expect_read(SPAD_BASE+SPAD_BYTES-16+i*4, 32'hfeed0000+i, "crossing commits valid prefix");
+            if (axi_mem_u.read_active_r || (axi_mem_u.read_q_count_r != 0) || dut.dma_busy)
+                $fatal(1, "crossing DMA did not drain");
+            expect_read(SPAD_BASE, 32'hfeed0000, "crossing must not wrap");
+            dma_load(32'h410, SPAD_BYTES-16, 4);
+            // Last legal 64-byte descriptor, then last legal 16-byte completion.
+            write_spad_desc(SPAD_BYTES-64, OP_VDOT_INT8, 16'h1280,
+                            0, 0, 32'h200, 1, 1, 1);
+            axi_write(REG_CMDQ_BASE_LO, SPAD_BYTES-64);
+            axi_write(REG_CMDQ_SIZE, 2);
+            axi_write(REG_CMDQ_HEAD, 0);
+            axi_write(REG_CMDQ_TAIL, 1);
+            axi_write(REG_CPLQ_BASE_LO, 32'h300);
+            axi_write(REG_CPLQ_SIZE, 2);
+            axi_write(REG_CPLQ_HEAD, 0);
+            axi_write(REG_CPLQ_TAIL, 0);
+            axi_write(REG_DOORBELL, 1);
+            wait_cpl_tail(1, "last legal descriptor");
+            expect_read(SPAD_BASE+32'h304, 1, "last descriptor completion status");
+            clear_done_irq();
+            write_spad_desc(32'h400, OP_VDOT_INT8, 16'h1281,
+                            0, 0, 32'h200, 1, 1, 1);
+            axi_write(REG_CMDQ_BASE_LO, 32'h400);
+            axi_write(REG_CMDQ_HEAD, 0);
+            axi_write(REG_CMDQ_TAIL, 1);
+            axi_write(REG_CPLQ_BASE_LO, SPAD_BYTES-16);
+            axi_write(REG_CPLQ_TAIL, 0);
+            axi_write(REG_DOORBELL, 1);
+            wait_cpl_tail(1, "last legal completion");
+            expect_read(SPAD_BASE+SPAD_BYTES-12, 1, "last completion status");
+            clear_done_irq();
+            // Fetch crosses capacity: error completion, no successful command.
+            axi_write(REG_CMDQ_BASE_LO, SPAD_BYTES-32);
+            axi_write(REG_CMDQ_HEAD, 0);
+            axi_write(REG_CMDQ_TAIL, 1);
+            axi_write(REG_CPLQ_BASE_LO, 32'h300);
+            axi_write(REG_CPLQ_TAIL, 0);
+            axi_write(REG_DOORBELL, 1);
+            wait_done_expect_error(4'd6);
+            expect_read(REG_CPLQ_TAIL, 1, "failed fetch error completion");
+            clear_done_irq();
+            // CPL beyond end is refused before fetching/launching a command.
+            axi_write(REG_CMDQ_BASE_LO, 32'h400);
+            axi_write(REG_CMDQ_HEAD, 0);
+            axi_write(REG_CMDQ_TAIL, 1);
+            axi_write(REG_CPLQ_BASE_LO, SPAD_BYTES);
+            axi_write(REG_CPLQ_TAIL, 0);
+            axi_write(REG_DOORBELL, 1);
+            wait_done_expect_error(4'd10);
+            expect_read(REG_CPLQ_TAIL, 0, "out of range completion not published");
+            expect_read(REG_CMDQ_HEAD, 0, "out of range completion leaves command pending");
+            axi_write(REG_CMDQ_SIZE, 0);
+            axi_write(REG_CPLQ_SIZE, 0);
+            clear_done_irq();
+            if (errors != 0) $fatal(1, "capacity boundary failures=%0d", errors);
+            $display("SPAD_CAPACITY_BOUNDARY_PASS bytes=%0d words_per_bank=%0d", SPAD_BYTES, `AI_SPAD_WORDS_PER_BANK);
+        end
+    endtask
+
     task wait_done;
         begin
             integer i;
@@ -1810,7 +1887,7 @@ module tb_ai_accel_smoke;
             // private page so concurrent descriptors cannot conflict.
             src0 = 32'h0001_0000;
             src1 = 32'h0001_1000;
-            dst = 32'h0003_0000 + (engine_id * 32'h1000);
+            dst = SPAD_BYTES - 32'h7000 + (engine_id * 32'h1000);
             src0_stride = 32'd0;
             src1_stride = 32'd0;
             batch_count = 16'd1;
@@ -2624,6 +2701,12 @@ module tb_ai_accel_smoke;
                 !$value$plusargs("AI_DIGITS_RTL_CSV=%s", rtl_csv_file))
                 $fatal(1, "AI_DIGITS_INFERENCE requires memory, expected, hidden and RTL CSV paths");
 
+            begin : digits_layout_load
+                reg [1023:0] layout_file;
+                if (!$value$plusargs("AI_DIGITS_LAYOUT=%s",layout_file))
+                    $fatal(1,"Digits requires generated capacity-aware AI_DIGITS_LAYOUT");
+                $readmemh(layout_file,digits_layout_words);
+            end
             $readmemh(image_file, ai_digits_image_words);
             $readmemh(expected_file, ai_digits_expected_words);
             $readmemh(hidden_file, ai_digits_hidden_words);
@@ -3078,6 +3161,12 @@ module tb_ai_accel_smoke;
             conv_descriptor_count = (linearized_mode || fused_native_mode) ? 3 : 4;
             descriptor_count = conv_descriptor_count + 4 * output_group_count;
             expected_count = 360 + 40 * output_group_count;
+            begin : cnn_layout_load
+                reg [1023:0] layout_file;
+                if (!$value$plusargs("AI_TINYNPU_CNN_LAYOUT=%s",layout_file))
+                    $fatal(1,"CNN requires generated capacity-aware AI_TINYNPU_CNN_LAYOUT");
+                $readmemh(layout_file,cnn_layout_words);
+            end
             $readmemh(image_file, ai_tinynpu_cnn_image_words);
             $readmemh(expected_file, ai_tinynpu_cnn_expected_words);
             image_count = ai_tinynpu_cnn_image_words[0];
@@ -4883,6 +4972,11 @@ module tb_ai_accel_smoke;
             $finish;
         end
 
+        if ($test$plusargs("AI_SPAD_CAPACITY_BOUNDARIES")) begin
+            run_spad_capacity_boundaries();
+            $finish;
+        end
+
         expect_read(REG_VERSION, 32'h1000_000a, "version");
         expect_read(FPGA_AXI_BASE + REG_VERSION, 32'h1000_000a,
                     "mapped AXI aperture version");
@@ -4902,7 +4996,7 @@ module tb_ai_accel_smoke;
         expect_read(REG_TILE_EXT_OUT_HI, 32'h0000_0003, "tile output high");
         axi_write(REG_TILE_EXT_IN_HI, 32'd0);
         axi_write(REG_TILE_EXT_OUT_HI, 32'd0);
-        expect_read(REG_SPAD_INFO, SPAD_BYTES, "512 KiB scratchpad capability");
+        expect_read(REG_SPAD_INFO, SPAD_BYTES, "parameterized scratchpad capability");
         axi_write(FPGA_AXI_BASE + SPAD_BASE + 32'h0008, 32'hface_5120);
         expect_read(FPGA_AXI_BASE + SPAD_BASE + 32'h0008, 32'hface_5120,
                     "mapped AXI aperture scratchpad");
@@ -5136,25 +5230,25 @@ module tb_ai_accel_smoke;
         expect_read(REG_RESULT, 32'd16, "banked vdot result");
         clear_done_irq();
 
-        // Exercise address bit 18 through the banked datapath.  This catches
+        // Exercise the highest configured rows through the banked datapath.  This catches
         // any accidental retention of the former 12-bit/64 KiB row index.
-        axi_write(SPAD_BASE + 32'h0007_ffe0, 32'h0101_0101);
-        axi_write(SPAD_BASE + 32'h0007_ffe4, 32'h0101_0101);
-        axi_write(SPAD_BASE + 32'h0007_ffe8, 32'h0101_0101);
-        axi_write(SPAD_BASE + 32'h0007_ffec, 32'h0101_0101);
-        axi_write(SPAD_BASE + 32'h0007_fff0, 32'h0101_0101);
-        axi_write(SPAD_BASE + 32'h0007_fff4, 32'h0101_0101);
-        axi_write(SPAD_BASE + 32'h0007_fff8, 32'h0101_0101);
-        axi_write(SPAD_BASE + 32'h0007_fffc, 32'h0101_0101);
+        axi_write(SPAD_BASE + (SPAD_BYTES - 32'd32), 32'h0101_0101);
+        axi_write(SPAD_BASE + (SPAD_BYTES - 32'd28), 32'h0101_0101);
+        axi_write(SPAD_BASE + (SPAD_BYTES - 32'd24), 32'h0101_0101);
+        axi_write(SPAD_BASE + (SPAD_BYTES - 32'd20), 32'h0101_0101);
+        axi_write(SPAD_BASE + (SPAD_BYTES - 32'd16), 32'h0101_0101);
+        axi_write(SPAD_BASE + (SPAD_BYTES - 32'd12), 32'h0101_0101);
+        axi_write(SPAD_BASE + (SPAD_BYTES - 32'd8), 32'h0101_0101);
+        axi_write(SPAD_BASE + (SPAD_BYTES - 32'd4), 32'h0101_0101);
         axi_write(REG_OP_MODE, OP_BANKED_VDOT);
-        axi_write(REG_SRC0_BASE, 32'h0007_ffe0);
-        axi_write(REG_SRC1_BASE, 32'h0007_fff0);
+        axi_write(REG_SRC0_BASE, (SPAD_BYTES - 32'd32));
+        axi_write(REG_SRC1_BASE, (SPAD_BYTES - 32'd16));
         axi_write(REG_DST_BASE,  32'h0000_3400);
         axi_write(REG_LENGTH,    32'd1);
         axi_write(REG_CTRL,      32'h0000_0003);
         wait_done();
         expect_read(SPAD_BASE + 32'h0000_3400, 32'd16,
-                    "banked vdot at 512 KiB boundary");
+                    "banked vdot at configured capacity boundary");
         clear_done_irq();
 
         // Two GEMV rows share the bank-striped input; each weight row occupies
@@ -6408,7 +6502,7 @@ module tb_ai_accel_smoke;
         axi_write(SPAD_BASE + 32'h7868, 32'd32);
         axi_write(SPAD_BASE + 32'h786c, -32'sd32);
         write_spad_desc_v3(32'h7900, OP_TENSOR_GEMM, 16'h0600,
-                           32'h6000, 32'h6100, 32'd0, 32'h30000,
+                           32'h6000, 32'h6100, 32'd0, (SPAD_BYTES - 32'h8000),
                            16'd16, 16'd16, 16'd16, 8'd0, 32'd1,
                            5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
                            16'd1, 16'd1, 16'd0, 16'd0, 16'd0);
@@ -6676,7 +6770,7 @@ module tb_ai_accel_smoke;
             axi_write(SPAD_BASE + 32'h8000, 32'd7);
             axi_write(SPAD_BASE + 32'h8004, -32'sd7);
             write_spad_desc_v3(32'h7b00, OP_TENSOR_GEMM, 16'h0610,
-                               32'h6000, 32'h6100, 32'd0, 32'h30000,
+                               32'h6000, 32'h6100, 32'd0, (SPAD_BYTES - 32'h8000),
                                16'd16, 16'd16, 16'd16, 8'd0, 32'd1,
                                5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
                                16'd1, 16'd1, 16'd0, 16'd0, 16'd0);

@@ -15,7 +15,7 @@ external-memory traffic.
 ## Architecture at a glance
 
 - 32-bit AXI4-Lite control plane and 128-bit AXI4 memory-master interface.
-- 512 KiB four-bank scratchpad with a single arbitration point and control-plane
+- 128 KiB default four-bank scratchpad (512 KiB elaboration option) with a single arbitration point and control-plane
   priority.
 - Command/completion queues, scratchpad or external descriptors, dependency
   events, atomic four-word completion publishing, status and IRQ.

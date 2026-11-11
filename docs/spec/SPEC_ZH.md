@@ -31,7 +31,7 @@ CPU -- 32-bit AXI4-Lite --> 寄存器/IRQ --> 命令处理器(CMDQ/CPLQ)
                                          v
                              唯一 scratchpad 仲裁器
                                          v
-                512 KiB、4-bank SRAM <--> 128-bit AXI4 DMA <--> DDR
+                默认 128 KiB、4-bank SRAM <--> 128-bit AXI4 DMA <--> DDR
 ```
 
 当前只有一个同步时钟域 `aclk`，低有效异步复位为 `aresetn`。控制接口是 32-bit AXI4-Lite；数据主接口为 128-bit AXI4、64-bit 地址、4-bit ID，AR/R 和 AW/W/B 独立，支持 burst、valid/ready 背压和窄传输兼容。`irq` 是由 `IRQ_ENABLE` 掩蔽的 sticky 完成/错误通知。
@@ -65,14 +65,14 @@ SRAM bank3 <-> LC3 + PE3 <--- cnm_addr3 / cnm_ready[3] / cnm_rsp_valid[3]
 
 | 属性 | 当前实现 |
 |---|---|
-| 总容量 | 512 KiB（`0x00080000`） |
-| 逻辑组织 | 4 bank × 32768 × 32-bit word |
-| 单 bank | 128 KiB |
+| 总容量 | 默认 128 KiB（`0x00020000`）；可选 512 KiB |
+| 逻辑组织 | 默认 4 bank × 8192 × 32-bit word；兼容 32768 words/bank |
+| 单 bank | 默认 32 KiB；兼容 128 KiB |
 | 数据 line | 128 bit，即四个 32-bit bank word |
-| 主机窗口 | `0x00010000` 起的 AXI-Lite scratchpad aperture |
+| 主机窗口 | 默认 `0x00010000..0x0002ffff` 的 AXI-Lite scratchpad aperture |
 | 读时序 | 注册读，响应在后续周期有效 |
 
-VCS 通过 `+define+VCS` 使用 `rtl/memory/ai_scratchpad.v` 的行为 RAM；Vivado 使用 XPM 分支。私有 ASIC overlay 将每个逻辑 bank 映射为 8 个 4K×32 单端口 macro，共 32 个 macro；具体 wrapper、库 view 和 macro 名称均不进入公开仓库。公开 SpyGlass profile 不展开 512 KiB 行为数组；实际综合和 STA 以私有、受许可的 `.db/.lib` 为权威。未对齐、越界、无权限或保护冲突访问必须报错。
+VCS 通过 `+define+VCS` 使用 `rtl/memory/ai_scratchpad.v` 的行为 RAM；Vivado 使用 XPM 分支。历史 512 KiB 私有 ASIC overlay 将每个逻辑 bank 映射为 8 个 4K×32 单端口 macro，共 32 个 macro；具体 wrapper、库 view 和 macro 名称均不进入公开仓库。公开 SpyGlass profile 不展开 512 KiB 行为数组；实际综合和 STA 以私有、受许可的 `.db/.lib` 为权威。未对齐、越界、无权限或保护冲突访问必须报错。
 
 SPAD 保护寄存器配置四个区域 R0–R3；每区的 `BASE` 是包含的起始字节地址，`LIMIT` 是不包含的结束字节地址。`PERM[0..3]` 依次表示 read、write、execute、enable；只有 enable 置位的区域参与匹配。有效请求必须在单个区域内完整结束（`addr + bytes <= LIMIT`），不能把相邻区域拼接；区域之间按 OR 匹配，任一完整匹配即可允许。若四区均禁用，保护检查为兼容模式并允许请求；启用任一区域后，零字节请求拒绝。无效请求不构成访问并通过保护检查。请求结束地址以 33 位计算，越过 32 位 SPAD 地址空间的访问不能匹配任何区域。该模块只产生 allow/deny；集成 fabric 负责把拒绝转换为对应客户端的保护错误与事务恢复行为。
 
