@@ -399,8 +399,12 @@ module ai_tensor_sfu_core(
                     end
                 end
                 ST_RMS_MEAN_DIV_START: begin
-                    if (is_layernorm && length_r == 16) begin
-                        mean_sq_r <= sum_sq_r >> 4;
+                    if (is_layernorm && ((length_r == 16) ||
+                                         (length_r == 32))) begin
+                        // Exact unsigned power-of-two division; retain the
+                        // full accumulator width and all later sqrt checks.
+                        mean_sq_r <= (length_r == 32) ?
+                                     (sum_sq_r >> 5) : (sum_sq_r >> 4);
                         state_r <= ST_RMS_SQRT_START;
                     end else begin
                         div_dividend_r<=sum_sq_r; div_divisor_r<={48'd0,length_r};
@@ -630,6 +634,22 @@ module ai_tensor_sfu_core(
                             mean_r <= sum_x_r[63] ?
                                 -$signed({1'b0, ln_sum_magnitude[35:4]}) :
                                  $signed({1'b0, ln_sum_magnitude[35:4]});
+                            sum_sq_r <= 0;
+                            index_r <= 0;
+                            state_r <= ST_LN_VAR_REQ;
+                        end
+                    end else if (length_r == 32) begin
+                        // Divide the unsigned magnitude, then restore sign:
+                        // a signed arithmetic shift would round negatives down.
+                        // Match the generic divider's >2^31 error threshold,
+                        // including its existing quotient==2^31 cast behavior.
+                        if (ln_sum_magnitude[63:5] > 59'd2147483648) begin
+                            error_code <= ERR_NUMERIC;
+                            state_r <= ST_ERROR;
+                        end else begin
+                            mean_r <= sum_x_r[63] ?
+                                -$signed(ln_sum_magnitude[36:5]) :
+                                 $signed(ln_sum_magnitude[36:5]);
                             sum_sq_r <= 0;
                             index_r <= 0;
                             state_r <= ST_LN_VAR_REQ;

@@ -1,0 +1,13 @@
+[
+  "/tmp/nmaforge-phase2-runs/optimized/top/simv",
+  "+ntb_random_seed=20261123",
+  "+AI_RANDOM_CASES=0",
+  "+AI_SEED=20261123",
+  "+ACLK_PERIOD_NS=4",
+  "+AI_H16_INCREMENTAL_DECODE",
+  "+AI_H16_DECODE_STEPS=8",
+  "+AI_H16_USEFUL_MACS_EXTRA=512",
+  "+AI_H16_INCREMENTAL_DIR=/tmp/nmaforge-phase2-runs/optimized/h16/workload",
+  "+PHASE1_PROFILE=/tmp/nmaforge-phase2-runs/optimized/h16_profile/profile",
+  "+STAGE_A_PROFILE=/tmp/nmaforge-phase2-runs/optimized/h16_profile/stage_a"
+]
