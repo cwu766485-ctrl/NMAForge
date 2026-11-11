@@ -1,0 +1,590 @@
+[
+  {
+    "reference": "benchmark/research/phase2/optimized/cnn/both_fused_row_major/profile_cycles.csv.gz",
+    "fresh_relative": "baseline/cnn/both_fused_row_major/profile_cycles.csv",
+    "fresh_sha256": "0636ba91a237d032ab257995cf602c6eeef7391000be242503e8d1aa418abcf7",
+    "reference_uncompressed_sha256": "0636ba91a237d032ab257995cf602c6eeef7391000be242503e8d1aa418abcf7",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/cnn/both_fused_row_major/profile_memory.csv.gz",
+    "fresh_relative": "baseline/cnn/both_fused_row_major/profile_memory.csv",
+    "fresh_sha256": "e1c2db627709e153ee4080734f94bda552e086a93bd7c0d0c72c32d96b5f78cf",
+    "reference_uncompressed_sha256": "e1c2db627709e153ee4080734f94bda552e086a93bd7c0d0c72c32d96b5f78cf",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/cnn/both_fused_row_major/stage_a_cycles.csv.gz",
+    "fresh_relative": "baseline/cnn/both_fused_row_major/stage_a_cycles.csv",
+    "fresh_sha256": "681b026bcd29d1ec9a9161eb07cc6232417dc408c09c2cea7f3f42a7761b850b",
+    "reference_uncompressed_sha256": "681b026bcd29d1ec9a9161eb07cc6232417dc408c09c2cea7f3f42a7761b850b",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/cnn/first_fused/profile_cycles.csv.gz",
+    "fresh_relative": "baseline/cnn/first_fused/profile_cycles.csv",
+    "fresh_sha256": "447a7faa10f6565df45bca66174e2ad7ab652b6ed5bbedd8d096d38d9886f3de",
+    "reference_uncompressed_sha256": "447a7faa10f6565df45bca66174e2ad7ab652b6ed5bbedd8d096d38d9886f3de",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/cnn/first_fused/profile_memory.csv.gz",
+    "fresh_relative": "baseline/cnn/first_fused/profile_memory.csv",
+    "fresh_sha256": "70ba06099396e8c3fb4c1fec91fa6332713cc5a9a17fd0c4b2c9176a9ebcb545",
+    "reference_uncompressed_sha256": "70ba06099396e8c3fb4c1fec91fa6332713cc5a9a17fd0c4b2c9176a9ebcb545",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/cnn/first_fused/stage_a_cycles.csv.gz",
+    "fresh_relative": "baseline/cnn/first_fused/stage_a_cycles.csv",
+    "fresh_sha256": "7e9c575823679f86173617b9a2205e7cd39bc88f78e24689b8df1051e05729a5",
+    "reference_uncompressed_sha256": "7e9c575823679f86173617b9a2205e7cd39bc88f78e24689b8df1051e05729a5",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/cnn/legacy/profile_cycles.csv.gz",
+    "fresh_relative": "baseline/cnn/legacy/profile_cycles.csv",
+    "fresh_sha256": "a8d0b9305c343421ccfc084a0a61dd47bbe151da54840ab9fcf6acadb9af3d81",
+    "reference_uncompressed_sha256": "a8d0b9305c343421ccfc084a0a61dd47bbe151da54840ab9fcf6acadb9af3d81",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/cnn/legacy/profile_memory.csv.gz",
+    "fresh_relative": "baseline/cnn/legacy/profile_memory.csv",
+    "fresh_sha256": "d4617aafe48ef0bf39880e7e3c7c79e01c17289dd61c4c70ec24623e1be04466",
+    "reference_uncompressed_sha256": "d4617aafe48ef0bf39880e7e3c7c79e01c17289dd61c4c70ec24623e1be04466",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/cnn/legacy/stage_a_cycles.csv.gz",
+    "fresh_relative": "baseline/cnn/legacy/stage_a_cycles.csv",
+    "fresh_sha256": "64bd940a2121b018d7fd53386aae9d1865ae2762f46c01f0120545fd0cd41728",
+    "reference_uncompressed_sha256": "64bd940a2121b018d7fd53386aae9d1865ae2762f46c01f0120545fd0cd41728",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h16_profile/profile_cycles.csv.gz",
+    "fresh_relative": "baseline/h16_profile/profile_cycles.csv",
+    "fresh_sha256": "abb40d21b187413de3f9dd0b83bfe642a480917fc22821fafb458070d8e88b34",
+    "reference_uncompressed_sha256": "abb40d21b187413de3f9dd0b83bfe642a480917fc22821fafb458070d8e88b34",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h16_profile/profile_memory.csv.gz",
+    "fresh_relative": "baseline/h16_profile/profile_memory.csv",
+    "fresh_sha256": "eac885a340f52d5c613aefe9119302104a3251948ae8ef898b3bbae3d4058587",
+    "reference_uncompressed_sha256": "eac885a340f52d5c613aefe9119302104a3251948ae8ef898b3bbae3d4058587",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h16_profile/stage_a_cycles.csv.gz",
+    "fresh_relative": "baseline/h16_profile/stage_a_cycles.csv",
+    "fresh_sha256": "cd80cbe61aec7c787efbd7ff19f500843451e8f5ec112f15e414c840b99928a0",
+    "reference_uncompressed_sha256": "cd80cbe61aec7c787efbd7ff19f500843451e8f5ec112f15e414c840b99928a0",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/profile_cycles.csv.gz",
+    "fresh_relative": "baseline/h32/profile_cycles.csv",
+    "fresh_sha256": "a5958c9aa7a73bf3dde757ae94c96bc44c62a430a601d441a8ac1070ebaa93f1",
+    "reference_uncompressed_sha256": "a5958c9aa7a73bf3dde757ae94c96bc44c62a430a601d441a8ac1070ebaa93f1",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/profile_memory.csv.gz",
+    "fresh_relative": "baseline/h32/profile_memory.csv",
+    "fresh_sha256": "d4fbce688933ee2847ee40786fa96d9f714b6445823dd5d9e50ce34908883ada",
+    "reference_uncompressed_sha256": "d4fbce688933ee2847ee40786fa96d9f714b6445823dd5d9e50ce34908883ada",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_0_t0_golden.memh.gz",
+    "fresh_relative": "baseline/h32/stage_0_t0_golden.memh",
+    "fresh_sha256": "aa8fa566c23ef499e2b135cec083000c3e56b508681bc32be4930454321fd396",
+    "reference_uncompressed_sha256": "aa8fa566c23ef499e2b135cec083000c3e56b508681bc32be4930454321fd396",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_0_t0_observed.memh.gz",
+    "fresh_relative": "baseline/h32/stage_0_t0_observed.memh",
+    "fresh_sha256": "aa8fa566c23ef499e2b135cec083000c3e56b508681bc32be4930454321fd396",
+    "reference_uncompressed_sha256": "aa8fa566c23ef499e2b135cec083000c3e56b508681bc32be4930454321fd396",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_10_t10_golden.memh.gz",
+    "fresh_relative": "baseline/h32/stage_10_t10_golden.memh",
+    "fresh_sha256": "7e4accfacaeac042c731f1596b9fffdbadfe715515c1479db84f1c2115b4bdbb",
+    "reference_uncompressed_sha256": "7e4accfacaeac042c731f1596b9fffdbadfe715515c1479db84f1c2115b4bdbb",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_10_t10_observed.memh.gz",
+    "fresh_relative": "baseline/h32/stage_10_t10_observed.memh",
+    "fresh_sha256": "7e4accfacaeac042c731f1596b9fffdbadfe715515c1479db84f1c2115b4bdbb",
+    "reference_uncompressed_sha256": "7e4accfacaeac042c731f1596b9fffdbadfe715515c1479db84f1c2115b4bdbb",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_11_t11_golden.memh.gz",
+    "fresh_relative": "baseline/h32/stage_11_t11_golden.memh",
+    "fresh_sha256": "a48eea3d3af8c72d96cdd0293aeae8ba52336b4d7bdce4d99f7f14ffad8f1230",
+    "reference_uncompressed_sha256": "a48eea3d3af8c72d96cdd0293aeae8ba52336b4d7bdce4d99f7f14ffad8f1230",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_11_t11_observed.memh.gz",
+    "fresh_relative": "baseline/h32/stage_11_t11_observed.memh",
+    "fresh_sha256": "a48eea3d3af8c72d96cdd0293aeae8ba52336b4d7bdce4d99f7f14ffad8f1230",
+    "reference_uncompressed_sha256": "a48eea3d3af8c72d96cdd0293aeae8ba52336b4d7bdce4d99f7f14ffad8f1230",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_1_t1_golden.memh.gz",
+    "fresh_relative": "baseline/h32/stage_1_t1_golden.memh",
+    "fresh_sha256": "aa79493d5a1b4ad27a50fe64f549b0beba3d6c1415bf68aa26f6fbdeeebf6b70",
+    "reference_uncompressed_sha256": "aa79493d5a1b4ad27a50fe64f549b0beba3d6c1415bf68aa26f6fbdeeebf6b70",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_1_t1_observed.memh.gz",
+    "fresh_relative": "baseline/h32/stage_1_t1_observed.memh",
+    "fresh_sha256": "aa79493d5a1b4ad27a50fe64f549b0beba3d6c1415bf68aa26f6fbdeeebf6b70",
+    "reference_uncompressed_sha256": "aa79493d5a1b4ad27a50fe64f549b0beba3d6c1415bf68aa26f6fbdeeebf6b70",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_2_t2_golden.memh.gz",
+    "fresh_relative": "baseline/h32/stage_2_t2_golden.memh",
+    "fresh_sha256": "c13ca8401335808d205cfbfa21edd200d87966b0abb5bf3f9a63f3baba2a0d66",
+    "reference_uncompressed_sha256": "c13ca8401335808d205cfbfa21edd200d87966b0abb5bf3f9a63f3baba2a0d66",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_2_t2_observed.memh.gz",
+    "fresh_relative": "baseline/h32/stage_2_t2_observed.memh",
+    "fresh_sha256": "c13ca8401335808d205cfbfa21edd200d87966b0abb5bf3f9a63f3baba2a0d66",
+    "reference_uncompressed_sha256": "c13ca8401335808d205cfbfa21edd200d87966b0abb5bf3f9a63f3baba2a0d66",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_3_t3_golden.memh.gz",
+    "fresh_relative": "baseline/h32/stage_3_t3_golden.memh",
+    "fresh_sha256": "c71570c2e7db61eb01c7122cdb69d7104ef494e458a9c2bdf2a536852de33343",
+    "reference_uncompressed_sha256": "c71570c2e7db61eb01c7122cdb69d7104ef494e458a9c2bdf2a536852de33343",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_3_t3_observed.memh.gz",
+    "fresh_relative": "baseline/h32/stage_3_t3_observed.memh",
+    "fresh_sha256": "c71570c2e7db61eb01c7122cdb69d7104ef494e458a9c2bdf2a536852de33343",
+    "reference_uncompressed_sha256": "c71570c2e7db61eb01c7122cdb69d7104ef494e458a9c2bdf2a536852de33343",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_4_t4_golden.memh.gz",
+    "fresh_relative": "baseline/h32/stage_4_t4_golden.memh",
+    "fresh_sha256": "4e8982d36758dc04ffa6e75cb0d1789e9312519050e40ec63506128231fe3f55",
+    "reference_uncompressed_sha256": "4e8982d36758dc04ffa6e75cb0d1789e9312519050e40ec63506128231fe3f55",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_4_t4_observed.memh.gz",
+    "fresh_relative": "baseline/h32/stage_4_t4_observed.memh",
+    "fresh_sha256": "4e8982d36758dc04ffa6e75cb0d1789e9312519050e40ec63506128231fe3f55",
+    "reference_uncompressed_sha256": "4e8982d36758dc04ffa6e75cb0d1789e9312519050e40ec63506128231fe3f55",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_5_t5_golden.memh.gz",
+    "fresh_relative": "baseline/h32/stage_5_t5_golden.memh",
+    "fresh_sha256": "6d99227853c353f93b4266d265c0d1350c21a6d940f6c812f4b58aa1edee28c7",
+    "reference_uncompressed_sha256": "6d99227853c353f93b4266d265c0d1350c21a6d940f6c812f4b58aa1edee28c7",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_5_t5_observed.memh.gz",
+    "fresh_relative": "baseline/h32/stage_5_t5_observed.memh",
+    "fresh_sha256": "6d99227853c353f93b4266d265c0d1350c21a6d940f6c812f4b58aa1edee28c7",
+    "reference_uncompressed_sha256": "6d99227853c353f93b4266d265c0d1350c21a6d940f6c812f4b58aa1edee28c7",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_6_t6_golden.memh.gz",
+    "fresh_relative": "baseline/h32/stage_6_t6_golden.memh",
+    "fresh_sha256": "38d22bd3f1f0a89eacba30e6c1563d71ee0c2c98537a1f4e43a47ce9a0ebb9a4",
+    "reference_uncompressed_sha256": "38d22bd3f1f0a89eacba30e6c1563d71ee0c2c98537a1f4e43a47ce9a0ebb9a4",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_6_t6_observed.memh.gz",
+    "fresh_relative": "baseline/h32/stage_6_t6_observed.memh",
+    "fresh_sha256": "38d22bd3f1f0a89eacba30e6c1563d71ee0c2c98537a1f4e43a47ce9a0ebb9a4",
+    "reference_uncompressed_sha256": "38d22bd3f1f0a89eacba30e6c1563d71ee0c2c98537a1f4e43a47ce9a0ebb9a4",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_7_t7_golden.memh.gz",
+    "fresh_relative": "baseline/h32/stage_7_t7_golden.memh",
+    "fresh_sha256": "112a6c24b05b1f51f5b6de0c75a16d97d5e5196eea425d74e93e4a4b081f41f6",
+    "reference_uncompressed_sha256": "112a6c24b05b1f51f5b6de0c75a16d97d5e5196eea425d74e93e4a4b081f41f6",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_7_t7_observed.memh.gz",
+    "fresh_relative": "baseline/h32/stage_7_t7_observed.memh",
+    "fresh_sha256": "112a6c24b05b1f51f5b6de0c75a16d97d5e5196eea425d74e93e4a4b081f41f6",
+    "reference_uncompressed_sha256": "112a6c24b05b1f51f5b6de0c75a16d97d5e5196eea425d74e93e4a4b081f41f6",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_8_t8_golden.memh.gz",
+    "fresh_relative": "baseline/h32/stage_8_t8_golden.memh",
+    "fresh_sha256": "9c0518da3f9cba019c4bb20439c4daafee938f7185ec0d0a7f43cc9dc6ffc871",
+    "reference_uncompressed_sha256": "9c0518da3f9cba019c4bb20439c4daafee938f7185ec0d0a7f43cc9dc6ffc871",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_8_t8_observed.memh.gz",
+    "fresh_relative": "baseline/h32/stage_8_t8_observed.memh",
+    "fresh_sha256": "9c0518da3f9cba019c4bb20439c4daafee938f7185ec0d0a7f43cc9dc6ffc871",
+    "reference_uncompressed_sha256": "9c0518da3f9cba019c4bb20439c4daafee938f7185ec0d0a7f43cc9dc6ffc871",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_9_t9_golden.memh.gz",
+    "fresh_relative": "baseline/h32/stage_9_t9_golden.memh",
+    "fresh_sha256": "0ae0b2ea6ce507f2efad35bce6ef82aa28e00f121984db7baa755644b7619bea",
+    "reference_uncompressed_sha256": "0ae0b2ea6ce507f2efad35bce6ef82aa28e00f121984db7baa755644b7619bea",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_9_t9_observed.memh.gz",
+    "fresh_relative": "baseline/h32/stage_9_t9_observed.memh",
+    "fresh_sha256": "0ae0b2ea6ce507f2efad35bce6ef82aa28e00f121984db7baa755644b7619bea",
+    "reference_uncompressed_sha256": "0ae0b2ea6ce507f2efad35bce6ef82aa28e00f121984db7baa755644b7619bea",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32/stage_a_cycles.csv.gz",
+    "fresh_relative": "baseline/h32/stage_a_cycles.csv",
+    "fresh_sha256": "c174426297750b15708edddfb28866f2581d2f4fbb2ebe84ad008295c841ce13",
+    "reference_uncompressed_sha256": "c174426297750b15708edddfb28866f2581d2f4fbb2ebe84ad008295c841ce13",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/profile_cycles.csv.gz",
+    "fresh_relative": "baseline/h32_old/profile_cycles.csv",
+    "fresh_sha256": "7f1288bf57723968350036b74ce04c9f56d1c8e9a2a6a3e26a7e2a2ad9a1a592",
+    "reference_uncompressed_sha256": "7f1288bf57723968350036b74ce04c9f56d1c8e9a2a6a3e26a7e2a2ad9a1a592",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/profile_memory.csv.gz",
+    "fresh_relative": "baseline/h32_old/profile_memory.csv",
+    "fresh_sha256": "19a3c1ee1e7ce8dd9a4f367dee8a43ec9c7141f99a995fcfd8b950416860e16d",
+    "reference_uncompressed_sha256": "19a3c1ee1e7ce8dd9a4f367dee8a43ec9c7141f99a995fcfd8b950416860e16d",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_0_t0_golden.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_0_t0_golden.memh",
+    "fresh_sha256": "6f6780cfb090bf49235183995d62d5cf07b761c781cf13fafbd1c1b63d53135d",
+    "reference_uncompressed_sha256": "6f6780cfb090bf49235183995d62d5cf07b761c781cf13fafbd1c1b63d53135d",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_0_t0_observed.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_0_t0_observed.memh",
+    "fresh_sha256": "6f6780cfb090bf49235183995d62d5cf07b761c781cf13fafbd1c1b63d53135d",
+    "reference_uncompressed_sha256": "6f6780cfb090bf49235183995d62d5cf07b761c781cf13fafbd1c1b63d53135d",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_10_t10_golden.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_10_t10_golden.memh",
+    "fresh_sha256": "61b168e5ec81b6ceaa4adfec042d3f4d02cb535a97825ab9ed3cf3d411ff39ac",
+    "reference_uncompressed_sha256": "61b168e5ec81b6ceaa4adfec042d3f4d02cb535a97825ab9ed3cf3d411ff39ac",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_10_t10_observed.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_10_t10_observed.memh",
+    "fresh_sha256": "61b168e5ec81b6ceaa4adfec042d3f4d02cb535a97825ab9ed3cf3d411ff39ac",
+    "reference_uncompressed_sha256": "61b168e5ec81b6ceaa4adfec042d3f4d02cb535a97825ab9ed3cf3d411ff39ac",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_11_t11_golden.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_11_t11_golden.memh",
+    "fresh_sha256": "ec8c8f1aa1513dfeca51952ab36a37f651e859d519c4e69c3d154401935d5684",
+    "reference_uncompressed_sha256": "ec8c8f1aa1513dfeca51952ab36a37f651e859d519c4e69c3d154401935d5684",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_11_t11_observed.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_11_t11_observed.memh",
+    "fresh_sha256": "ec8c8f1aa1513dfeca51952ab36a37f651e859d519c4e69c3d154401935d5684",
+    "reference_uncompressed_sha256": "ec8c8f1aa1513dfeca51952ab36a37f651e859d519c4e69c3d154401935d5684",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_1_t1_golden.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_1_t1_golden.memh",
+    "fresh_sha256": "d60f0a19fa7e952d317f35b86f5d1d98066fb98b0d587efcf13b240c0b60649f",
+    "reference_uncompressed_sha256": "d60f0a19fa7e952d317f35b86f5d1d98066fb98b0d587efcf13b240c0b60649f",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_1_t1_observed.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_1_t1_observed.memh",
+    "fresh_sha256": "d60f0a19fa7e952d317f35b86f5d1d98066fb98b0d587efcf13b240c0b60649f",
+    "reference_uncompressed_sha256": "d60f0a19fa7e952d317f35b86f5d1d98066fb98b0d587efcf13b240c0b60649f",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_2_t2_golden.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_2_t2_golden.memh",
+    "fresh_sha256": "7c8c6e3fe8132cfe71b841850b17b9ef80f55967fa1aa11c52e5879f62467f1f",
+    "reference_uncompressed_sha256": "7c8c6e3fe8132cfe71b841850b17b9ef80f55967fa1aa11c52e5879f62467f1f",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_2_t2_observed.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_2_t2_observed.memh",
+    "fresh_sha256": "7c8c6e3fe8132cfe71b841850b17b9ef80f55967fa1aa11c52e5879f62467f1f",
+    "reference_uncompressed_sha256": "7c8c6e3fe8132cfe71b841850b17b9ef80f55967fa1aa11c52e5879f62467f1f",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_3_t3_golden.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_3_t3_golden.memh",
+    "fresh_sha256": "a217a3b058ed699cbf10b6c0e93866c36eb26736b36fb471493768b422a6fe78",
+    "reference_uncompressed_sha256": "a217a3b058ed699cbf10b6c0e93866c36eb26736b36fb471493768b422a6fe78",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_3_t3_observed.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_3_t3_observed.memh",
+    "fresh_sha256": "a217a3b058ed699cbf10b6c0e93866c36eb26736b36fb471493768b422a6fe78",
+    "reference_uncompressed_sha256": "a217a3b058ed699cbf10b6c0e93866c36eb26736b36fb471493768b422a6fe78",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_4_t4_golden.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_4_t4_golden.memh",
+    "fresh_sha256": "3392043462821a081995f985660bca112719bdfdd9dcd1e3dbefec76507b0167",
+    "reference_uncompressed_sha256": "3392043462821a081995f985660bca112719bdfdd9dcd1e3dbefec76507b0167",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_4_t4_observed.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_4_t4_observed.memh",
+    "fresh_sha256": "3392043462821a081995f985660bca112719bdfdd9dcd1e3dbefec76507b0167",
+    "reference_uncompressed_sha256": "3392043462821a081995f985660bca112719bdfdd9dcd1e3dbefec76507b0167",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_5_t5_golden.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_5_t5_golden.memh",
+    "fresh_sha256": "afd6c32cbad3fcc79ef19885ba6d23c744a2b0ca8484c80d142a89da0cce6e4e",
+    "reference_uncompressed_sha256": "afd6c32cbad3fcc79ef19885ba6d23c744a2b0ca8484c80d142a89da0cce6e4e",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_5_t5_observed.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_5_t5_observed.memh",
+    "fresh_sha256": "afd6c32cbad3fcc79ef19885ba6d23c744a2b0ca8484c80d142a89da0cce6e4e",
+    "reference_uncompressed_sha256": "afd6c32cbad3fcc79ef19885ba6d23c744a2b0ca8484c80d142a89da0cce6e4e",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_6_t6_golden.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_6_t6_golden.memh",
+    "fresh_sha256": "4e2b09cec986c3bdc95effa7b6469c07ef88d2ebb6c8efd7e1ceb8d64797203f",
+    "reference_uncompressed_sha256": "4e2b09cec986c3bdc95effa7b6469c07ef88d2ebb6c8efd7e1ceb8d64797203f",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_6_t6_observed.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_6_t6_observed.memh",
+    "fresh_sha256": "4e2b09cec986c3bdc95effa7b6469c07ef88d2ebb6c8efd7e1ceb8d64797203f",
+    "reference_uncompressed_sha256": "4e2b09cec986c3bdc95effa7b6469c07ef88d2ebb6c8efd7e1ceb8d64797203f",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_7_t7_golden.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_7_t7_golden.memh",
+    "fresh_sha256": "fb12e21e888009b83af74da052941c74fd6fb0f3c5992e175be144f5d84e8e1b",
+    "reference_uncompressed_sha256": "fb12e21e888009b83af74da052941c74fd6fb0f3c5992e175be144f5d84e8e1b",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_7_t7_observed.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_7_t7_observed.memh",
+    "fresh_sha256": "fb12e21e888009b83af74da052941c74fd6fb0f3c5992e175be144f5d84e8e1b",
+    "reference_uncompressed_sha256": "fb12e21e888009b83af74da052941c74fd6fb0f3c5992e175be144f5d84e8e1b",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_8_t8_golden.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_8_t8_golden.memh",
+    "fresh_sha256": "d5853a2920ec133f86ad2a945bf65609cd3643e4af28d83d3a89504ca517f0e5",
+    "reference_uncompressed_sha256": "d5853a2920ec133f86ad2a945bf65609cd3643e4af28d83d3a89504ca517f0e5",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_8_t8_observed.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_8_t8_observed.memh",
+    "fresh_sha256": "d5853a2920ec133f86ad2a945bf65609cd3643e4af28d83d3a89504ca517f0e5",
+    "reference_uncompressed_sha256": "d5853a2920ec133f86ad2a945bf65609cd3643e4af28d83d3a89504ca517f0e5",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_9_t9_golden.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_9_t9_golden.memh",
+    "fresh_sha256": "8effcea2370d995284afbad67549990e61728872cf5e820da4580ef9d8ff66c7",
+    "reference_uncompressed_sha256": "8effcea2370d995284afbad67549990e61728872cf5e820da4580ef9d8ff66c7",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_9_t9_observed.memh.gz",
+    "fresh_relative": "baseline/h32_old/stage_9_t9_observed.memh",
+    "fresh_sha256": "8effcea2370d995284afbad67549990e61728872cf5e820da4580ef9d8ff66c7",
+    "reference_uncompressed_sha256": "8effcea2370d995284afbad67549990e61728872cf5e820da4580ef9d8ff66c7",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/h32_old/stage_a_cycles.csv.gz",
+    "fresh_relative": "baseline/h32_old/stage_a_cycles.csv",
+    "fresh_sha256": "d4d31325385f4874ce38a8c5a65d6cf4d440df0bf6ce5764970c9d53470477bb",
+    "reference_uncompressed_sha256": "d4d31325385f4874ce38a8c5a65d6cf4d440df0bf6ce5764970c9d53470477bb",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/kernel_30_16_16_16/profile_cycles.csv.gz",
+    "fresh_relative": "baseline/kernel_30_16_16_16/profile_cycles.csv",
+    "fresh_sha256": "e20165fd70e70fa9132162a394f850b78d07472de23c08aadba161db64b911e1",
+    "reference_uncompressed_sha256": "e20165fd70e70fa9132162a394f850b78d07472de23c08aadba161db64b911e1",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/kernel_30_16_16_16/profile_memory.csv.gz",
+    "fresh_relative": "baseline/kernel_30_16_16_16/profile_memory.csv",
+    "fresh_sha256": "c49d18683f6f0f18e35a272113fbad917fc8ccd33009849b5934543713c9b0bd",
+    "reference_uncompressed_sha256": "c49d18683f6f0f18e35a272113fbad917fc8ccd33009849b5934543713c9b0bd",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/kernel_30_16_16_16/stage_a_cycles.csv.gz",
+    "fresh_relative": "baseline/kernel_30_16_16_16/stage_a_cycles.csv",
+    "fresh_sha256": "e8c264ac2263359487ffc96aa9c0d721910a3f1eba4b8c197ee0ab32f1209c7b",
+    "reference_uncompressed_sha256": "e8c264ac2263359487ffc96aa9c0d721910a3f1eba4b8c197ee0ab32f1209c7b",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/kernel_30_32_32_64/profile_cycles.csv.gz",
+    "fresh_relative": "baseline/kernel_30_32_32_64/profile_cycles.csv",
+    "fresh_sha256": "de3e91055ab5046cac8a6a1d4a2cf99a2be6f7ab5bd77fb6e5599e548efada04",
+    "reference_uncompressed_sha256": "de3e91055ab5046cac8a6a1d4a2cf99a2be6f7ab5bd77fb6e5599e548efada04",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/kernel_30_32_32_64/profile_memory.csv.gz",
+    "fresh_relative": "baseline/kernel_30_32_32_64/profile_memory.csv",
+    "fresh_sha256": "79266e7a995d176e9297d00c476e64b20a51f3665b624f1ac400c62e97454fb8",
+    "reference_uncompressed_sha256": "79266e7a995d176e9297d00c476e64b20a51f3665b624f1ac400c62e97454fb8",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/kernel_30_32_32_64/stage_a_cycles.csv.gz",
+    "fresh_relative": "baseline/kernel_30_32_32_64/stage_a_cycles.csv",
+    "fresh_sha256": "1d883c17cdda4f49bb1544faceab234c0cef5949bf390c6514d7be18e3a8fc2b",
+    "reference_uncompressed_sha256": "1d883c17cdda4f49bb1544faceab234c0cef5949bf390c6514d7be18e3a8fc2b",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/kernel_30_4_4_32/profile_cycles.csv.gz",
+    "fresh_relative": "baseline/kernel_30_4_4_32/profile_cycles.csv",
+    "fresh_sha256": "8951792fcb67689d2f34b5dd4f66e558619d00ba5007076079b85eb6a6ec9da4",
+    "reference_uncompressed_sha256": "8951792fcb67689d2f34b5dd4f66e558619d00ba5007076079b85eb6a6ec9da4",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/kernel_30_4_4_32/profile_memory.csv.gz",
+    "fresh_relative": "baseline/kernel_30_4_4_32/profile_memory.csv",
+    "fresh_sha256": "9a9914439b48cfbba10a90dd27a7a55c3a179e9a22561f115f9ef115b758befa",
+    "reference_uncompressed_sha256": "9a9914439b48cfbba10a90dd27a7a55c3a179e9a22561f115f9ef115b758befa",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/kernel_30_4_4_32/stage_a_cycles.csv.gz",
+    "fresh_relative": "baseline/kernel_30_4_4_32/stage_a_cycles.csv",
+    "fresh_sha256": "a7d3d445d8876c1a923320d3b89b3c739145d38a1b7fcd5f8782b9d5ddca8830",
+    "reference_uncompressed_sha256": "a7d3d445d8876c1a923320d3b89b3c739145d38a1b7fcd5f8782b9d5ddca8830",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/kernel_52_1_16_32/profile_cycles.csv.gz",
+    "fresh_relative": "baseline/kernel_52_1_16_32/profile_cycles.csv",
+    "fresh_sha256": "215ed065b2c85a8dffcd57073dad5bbd7ecfb9669d0655aa6b518393f3725542",
+    "reference_uncompressed_sha256": "215ed065b2c85a8dffcd57073dad5bbd7ecfb9669d0655aa6b518393f3725542",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/kernel_52_1_16_32/profile_memory.csv.gz",
+    "fresh_relative": "baseline/kernel_52_1_16_32/profile_memory.csv",
+    "fresh_sha256": "3f1964db1b57ca912e5b77dc9e660bd5d213ffc3ee25c44a85b7e995f6b833ab",
+    "reference_uncompressed_sha256": "3f1964db1b57ca912e5b77dc9e660bd5d213ffc3ee25c44a85b7e995f6b833ab",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/kernel_52_1_16_32/stage_a_cycles.csv.gz",
+    "fresh_relative": "baseline/kernel_52_1_16_32/stage_a_cycles.csv",
+    "fresh_sha256": "db6c934b34efc1f3673631b9a282380ac1a5ffdcd55f42e336576f57791bcce4",
+    "reference_uncompressed_sha256": "db6c934b34efc1f3673631b9a282380ac1a5ffdcd55f42e336576f57791bcce4",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/kernel_52_4_16_32/profile_cycles.csv.gz",
+    "fresh_relative": "baseline/kernel_52_4_16_32/profile_cycles.csv",
+    "fresh_sha256": "f22bebcdd721d7972b20f43e7b41f58f25b98d90b4ed3248a474ebab974f2bb2",
+    "reference_uncompressed_sha256": "f22bebcdd721d7972b20f43e7b41f58f25b98d90b4ed3248a474ebab974f2bb2",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/kernel_52_4_16_32/profile_memory.csv.gz",
+    "fresh_relative": "baseline/kernel_52_4_16_32/profile_memory.csv",
+    "fresh_sha256": "7b5c70828059a31039ea994027296dd99a834da14e1329b5af2ef13ac9219e46",
+    "reference_uncompressed_sha256": "7b5c70828059a31039ea994027296dd99a834da14e1329b5af2ef13ac9219e46",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/kernel_52_4_16_32/stage_a_cycles.csv.gz",
+    "fresh_relative": "baseline/kernel_52_4_16_32/stage_a_cycles.csv",
+    "fresh_sha256": "c31b167a94b935dfb1cc59a7bfcbd25bcf0fd99c7ead61a199854b1aeae55d9a",
+    "reference_uncompressed_sha256": "c31b167a94b935dfb1cc59a7bfcbd25bcf0fd99c7ead61a199854b1aeae55d9a",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/kernel_52_8_16_32/profile_cycles.csv.gz",
+    "fresh_relative": "baseline/kernel_52_8_16_32/profile_cycles.csv",
+    "fresh_sha256": "2156e2c058f98610b279fdd5a594c436b74382729f9d6ab8f63fc1e285918831",
+    "reference_uncompressed_sha256": "2156e2c058f98610b279fdd5a594c436b74382729f9d6ab8f63fc1e285918831",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/kernel_52_8_16_32/profile_memory.csv.gz",
+    "fresh_relative": "baseline/kernel_52_8_16_32/profile_memory.csv",
+    "fresh_sha256": "6f759353b6facb810af7bdc9ec9da2d4619977c3df9d325246699781fd78c275",
+    "reference_uncompressed_sha256": "6f759353b6facb810af7bdc9ec9da2d4619977c3df9d325246699781fd78c275",
+    "result": "PASS"
+  },
+  {
+    "reference": "benchmark/research/phase2/optimized/kernel_52_8_16_32/stage_a_cycles.csv.gz",
+    "fresh_relative": "baseline/kernel_52_8_16_32/stage_a_cycles.csv",
+    "fresh_sha256": "1189c4385712a6ca877faf0fcf3dd2577e987738d859d027712fb380ab59e0af",
+    "reference_uncompressed_sha256": "1189c4385712a6ca877faf0fcf3dd2577e987738d859d027712fb380ab59e0af",
+    "result": "PASS"
+  }
+]

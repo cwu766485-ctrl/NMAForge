@@ -1,0 +1,10 @@
+lanes,memory,measured_full_decode,modeled_sfu_cycles,predicted_full_decode,saved,reduction_pct,meets_cycle_target,fault_contract,rtl_admitted
+1,line16B_hypothetical,350155,92563,169019,181136,51.730233753623395,True,NOT_PROVEN,False
+1,scalar4B,350155,123683,200139,150016,42.842741071811055,True,NOT_PROVEN,False
+2,line16B_hypothetical,350155,88595,165051,185104,52.86344618811669,True,NOT_PROVEN,False
+2,scalar4B,350155,123683,200139,150016,42.842741071811055,True,NOT_PROVEN,False
+4,line16B_hypothetical,350155,86931,163387,186768,53.33866430580743,True,NOT_PROVEN,False
+4,scalar4B,350155,123683,200139,150016,42.842741071811055,True,NOT_PROVEN,False
+1,current_scalar_fsm_unchanged,350155,273699,350155,0,0.0,False,UNCHANGED_BY_IDENTITY,False
+2,current_scalar_fsm_unchanged,350155,273699,350155,0,0.0,False,UNCHANGED_BY_IDENTITY,False
+4,current_scalar_fsm_unchanged,350155,273699,350155,0,0.0,False,UNCHANGED_BY_IDENTITY,False

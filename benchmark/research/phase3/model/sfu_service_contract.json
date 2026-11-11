@@ -1,0 +1,13 @@
+{
+  "clock_ns": 4,
+  "spad_bytes": 131072,
+  "banks": 4,
+  "scheduler_admissions_per_edge": 1,
+  "scalar_bytes": 4,
+  "line_bytes": 16,
+  "response_edges": 2,
+  "current_sfu_interface": "scalar only",
+  "sfu_denied_issue_slots": 1568,
+  "matrix_and_sfu_busy": 0,
+  "response_histogram_scope": "entire H32 trace including prefill and checker, all clients"
+}

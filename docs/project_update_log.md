@@ -135,3 +135,27 @@ fault timing or closed-loop arbitration. No streaming RTL admitted/implemented.
 Decision RETAIN_LN32 / DESIGN_PARTIAL. Five reports in `docs/research/phase2/`;
 commands in `tools/benchmark/phase2/README.md`; public archive validated with
 `python3 tools/benchmark/phase2/validate.py`. Stop after Gates1/2.
+
+## Phase 3 — throughput architecture research, stop after Gates 0–2
+
+Phase 2 LN32 review PASS; GitHub PR #4 merged into `nmaforge` at
+`c93ea144713d5fafe2e8a5509029927cd6859e75`, remote verified. Phase 3 isolated
+`feat/phase3-throughput` has no product RTL changes (RTL tree
+`fe0e999fa187c4ed52a512d27509d5922e6137eb`). Fresh VCS LN32 integer/fault/
+reset/abort/watchdog, full fixed Top workloads, independent CNN, H16/H32
+Logits/KV/tensor and seeded20 regressions PASS; H32=350155/8, H16=65771/8,
+CNN both-fused=12351 cycles remain unchanged. Focused Verilator has no new
+warnings; inherited top static issues and mapped timing remain open.
+SFU 1/2/4-lane transaction models reconstruct 672 scalar segments (448 decode)
+and project conditional42.8427–53.3387% latency reduction, but real parity-prefix
+and cross-region protection counterexamples prevent fault admission. STOP SFU;
+no vector RTL or transparent bypass. CNN's4160pack edges are useful work;
+four existing postprocess lanes plus a second128bit ordered buffer project
+975 saved cycles/7.8941%, validated by1560 abstract FIFO cases and1040 original
+Golden line payloads, not candidate RTL. Present for the next decision, no
+implementation started. Pinned Tiny contract is desk-reviewed historical
+adapter evidence only; no full-system speedup. Product DESIGN_PARTIAL.
+Reports: `docs/research/phase3/`; exact commands:
+`tools/benchmark/phase3/README.md`. Public checks:
+`python3 tools/benchmark/phase2/validate.py` and
+`python3 tools/benchmark/phase3/validate.py`. No automatic next phase.
