@@ -1,0 +1,68 @@
+[
+  {
+    "variant": "baseline",
+    "mode": "both_fused_row_major",
+    "cmdq_cycles": 12351,
+    "dma_setup_transfer_cycles": 3019,
+    "dma_busy_cycles": 2879,
+    "dma_bytes": 10944,
+    "readback_cycles": 4992,
+    "readback_bytes": 3328,
+    "full_inference": "NOT_MEASURED"
+  },
+  {
+    "variant": "baseline",
+    "mode": "first_fused",
+    "cmdq_cycles": 22983,
+    "dma_setup_transfer_cycles": 3035,
+    "dma_busy_cycles": 2895,
+    "dma_bytes": 11008,
+    "readback_cycles": 4992,
+    "readback_bytes": 3328,
+    "full_inference": "NOT_MEASURED"
+  },
+  {
+    "variant": "baseline",
+    "mode": "legacy",
+    "cmdq_cycles": 65429,
+    "dma_setup_transfer_cycles": 3051,
+    "dma_busy_cycles": 2911,
+    "dma_bytes": 11072,
+    "readback_cycles": 4992,
+    "readback_bytes": 3328,
+    "full_inference": "NOT_MEASURED"
+  },
+  {
+    "variant": "optimized",
+    "mode": "both_fused_row_major",
+    "cmdq_cycles": 11376,
+    "dma_setup_transfer_cycles": 3019,
+    "dma_busy_cycles": 2879,
+    "dma_bytes": 10944,
+    "readback_cycles": 4992,
+    "readback_bytes": 3328,
+    "full_inference": "NOT_MEASURED"
+  },
+  {
+    "variant": "optimized",
+    "mode": "first_fused",
+    "cmdq_cycles": 22203,
+    "dma_setup_transfer_cycles": 3035,
+    "dma_busy_cycles": 2895,
+    "dma_bytes": 11008,
+    "readback_cycles": 4992,
+    "readback_bytes": 3328,
+    "full_inference": "NOT_MEASURED"
+  },
+  {
+    "variant": "optimized",
+    "mode": "legacy",
+    "cmdq_cycles": 65429,
+    "dma_setup_transfer_cycles": 3051,
+    "dma_busy_cycles": 2911,
+    "dma_bytes": 11072,
+    "readback_cycles": 4992,
+    "readback_bytes": 3328,
+    "full_inference": "NOT_MEASURED"
+  }
+]

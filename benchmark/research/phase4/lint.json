@@ -1,0 +1,28 @@
+{
+  "baseline-top": {
+    "PINMISSING": 2,
+    "WIDTHTRUNC": 64,
+    "WIDTHEXPAND": 113,
+    "CASEINCOMPLETE": 4,
+    "LATCH": 10,
+    "UNOPTFLAT": 3
+  },
+  "baseline-matrix": {
+    "WIDTHTRUNC": 18,
+    "WIDTHEXPAND": 41,
+    "SYMRSVDWORD": 1
+  },
+  "optimized-top": {
+    "PINMISSING": 2,
+    "WIDTHTRUNC": 64,
+    "WIDTHEXPAND": 113,
+    "CASEINCOMPLETE": 4,
+    "LATCH": 10,
+    "UNOPTFLAT": 3
+  },
+  "optimized-matrix": {
+    "WIDTHTRUNC": 18,
+    "WIDTHEXPAND": 41,
+    "SYMRSVDWORD": 1
+  }
+}

@@ -243,6 +243,9 @@ module tb_ai_tensor_matrix_core_random;
     .ENABLE_NEXT_K_PREFETCH(NEXT_K_PREFETCH_ENABLE),
     .ENABLE_GEMV_B_TILE_CACHE(GEMV_B_TILE_CACHE_ENABLE),
     .ENABLE_ELASTIC_TILE_FORWARDING(ELASTIC_TILE_FORWARDING_ENABLE)
+`ifdef MATRIX_PINGPONG_ENABLE
+    ,.ENABLE_FUSED_PINGPONG_WRITEBACK(`MATRIX_PINGPONG_ENABLE)
+`endif
   ) dut(
     .clk(clk),.resetn(resetn),.start(start),.abort(abort),.op_mode(op_mode),
     .src0_base(src0_base),.src1_base(src1_base),.bias_base(bias_base),.dst_base(dst_base),
@@ -2506,6 +2509,10 @@ module tb_ai_tensor_matrix_core_random;
     end
   endtask
 
+`ifdef PHASE4_WRITEBACK_TEST
+  `include "phase4_writeback_tasks.svh"
+`endif
+
   initial begin
     if($value$plusargs("SEED=%d",seed)) begin end
     rng_seed=seed^32'h7ac4_01d3;
@@ -2557,6 +2564,12 @@ module tb_ai_tensor_matrix_core_random;
     // Run one dense product GEMV from an identical reset-time memory model so
     // prefetch ON/OFF comparisons do not inherit different random-latency
     // histories from the generic GEMM cache-collision precondition.
+`ifdef PHASE4_WRITEBACK_TEST
+    if($test$plusargs("PHASE4_WRITEBACK_ONLY")) begin
+      run_phase4_writeback_campaign();
+      $finish;
+    end
+`endif
     if($test$plusargs("MATRIX_GEMV_ABLATION_M4_SHAPE")) begin
       prepare_dense_gemv_case();
       check_dense_gemv_case();

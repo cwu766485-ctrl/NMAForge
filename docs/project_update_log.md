@@ -159,3 +159,16 @@ Reports: `docs/research/phase3/`; exact commands:
 `tools/benchmark/phase3/README.md`. Public checks:
 `python3 tools/benchmark/phase2/validate.py` and
 `python3 tools/benchmark/phase3/validate.py`. No automatic next phase.
+
+## Phase 4 Gate 2 — CNN ping-pong candidate
+
+Dedicated `feat/phase4-cnn-writeback`, product base c93ea144713d5fafe2e8a5509029927cd6859e75.
+Implemented two ordered output line buffers, existing four postprocess lanes,
+no new MAC/SRAM port or ABI change. Actual CNN CMDQ12351→11376cycles,7.8941%;
+65 writeback windows80→65cycles; all1040Golden payload/address/WSTRB/order match.
+H16/H32 unchanged65771/350155cycles per8tokens. Three seed ON/OFF numerical,
+fault/backpressure/reset/abort/watchdog, canonical ai_smoke/seeded20 PASS;
+Verilator baseline/candidate warning inventory identical, inherited severe Top
+warnings still open. Commands `tools/benchmark/phase4/README.md`, reports
+`docs/research/phase4/`. This checkpoint precedes architecture-only SFU study;
+no SFU RTL or automatic product merge, no signoff/Fmax claim.
