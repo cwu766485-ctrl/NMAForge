@@ -62,16 +62,26 @@ module ai_compute_spad_mux(
         spad_write = 1'b0;
         spad_addr = 32'd0;
         spad_wdata = 32'd0;
-        req_ready = 7'd0;
-        req_protection_error = 7'd0;
         if (selected_valid) begin
             spad_write = req_write[selected_owner];
             spad_addr = req_addr[selected_owner*32 +: 32];
             spad_wdata = req_wdata[selected_owner*32 +: 32];
+        end
+
+    end
+
+    // Admission and protection are return paths; keep them out of the request
+    // selection process so structural tools see the directional dependency.
+    always @(*) begin
+        req_ready = 7'd0;
+        req_protection_error = 7'd0;
+        if (selected_valid) begin
             req_ready[selected_owner] = spad_ready;
             req_protection_error[selected_owner] = spad_protection_error;
         end
+    end
 
+    always @(*) begin
         engine_rsp_valid = 7'd0;
         engine_rsp_rdata = 224'd0;
         engine_rsp_error = 7'd0;
