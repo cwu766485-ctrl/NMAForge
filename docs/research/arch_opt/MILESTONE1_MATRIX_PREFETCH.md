@@ -1,114 +1,50 @@
-# Architecture Optimization — Milestone 1 Matrix Prefetch and Scheduling
+# Milestone 1 — Matrix Operand Prefetch and Scheduling
 
 ## Decision
 
-**REWORK / NO NEW MATRIX RTL ADMITTED.** Gate 0 identified Matrix operand wait as
-a real measured opportunity, but Milestone 1 did not demonstrate a second safe
-schedule beyond the existing depth-4, next-K and A/B-cache mechanisms. The
-product RTL is unchanged in this milestone. Do not add a FIFO, SRAM port, MAC
-array or speculative fault mode.
+**REWORK / NO NEW MATRIX RTL ADMITTED.** The completed product Top campaign measures the missing GEMV and K=128 GEMM rows through descriptor, CMDQ, Matrix controller, single SPAD arbiter, registered response, completion, and strict Golden checking. Existing D4/P1/C1 controls remain the selected baseline. No second buffer, SRAM port, MAC, or speculative fault mode is justified by the measured traces.
 
-References are explicit:
+Baseline product RTL: `c93ea144713d5fafe2e8a5509029927cd6859e75`.
+Research source commit before this run: `c8457126ddd482438216920708912312c945cd4a`.
+Simulation: VCS `V-2023.12-SP1_Full64`, 4 ns behavioral clock, 128 KiB four-bank SPAD, 256 INT8 MAC. A simulation period is not an Fmax claim.
 
-- approved `nmaforge`: `c93ea144713d5fafe2e8a5509029927cd6859e75`;
-- Phase 4 CNN candidate: `b1dd75b8d1b6bb0465bdb3452df556a7919f7c4d`;
-- Gate 0 inventory: `df2bdecc2cfb1989285555f8c1511815b59ab307`;
-- this research branch: commit containing this report;
-- Round 29 Matrix ablation source/log evidence: `f2bed3dd7386b1b9cc79c20bb065d06354b1beca`;
-- VCS: `V-2023.12-SP1_Full64`, default four-bank behavioral SPAD, 256 MACs.
+## Fresh real-Top coverage
 
-## Existing-control ablation
+`tools/benchmark/phase1/run.py` now submits these descriptors. Every row reported `REPRESENTATIVE_MODEL_PASS`, and the independent signed INT32 Golden scan passed:
 
-Round 29 measured the same Matrix core, operands and randomized registered
-four-bank responder over three seeds for depth 2/4, next-K prefetch OFF/ON and
-B-fold/A-tile cache settings. Every point reported bit-exact Golden. The full
-raw CSV is `benchmark/representative/round29/matrix/gemv_ablation.csv`; the
-GEMM control sweep is archived in `benchmark/representative/round28/matrix_ablation.csv`.
+| Product operation | Shapes measured |
+|---|---|
+| GEMM `0x30` | 4×4×32, 16×16×16, 16×16×32, 16×16×128, 32×32×64 |
+| GEMV `0x52` | M=1,4,8,16; N=16; K=16,32,64,128 |
 
-| Workload | Weak control setting | Full existing setting | Improvement | Changed traffic |
+Raw profiles and command files are archived under `/tmp/nmaforge-archopt-m1-runs/top-suite` for this run. `benchmark/research/arch_opt/MILESTONE1_TOP_BASELINE.csv` contains exact cycles, traffic, response latency and exclusive-state measurements.
+
+| Shape | CMDQ cycles | Read/Write bytes | Useful MAC/cycle | Operand wait |
 |---|---:|---:|---:|---:|
-|16×16×16 GEMM|211 cycles (D2/P0/C0)|175 cycles (D4/P1/C1)|17.1%|512B reads in both archived rows|
-|16×16×32 GEMM|316|263|16.8%|1,024B reads in both archived rows|
-|32×32×64 GEMM|2,118|1,407|33.6%|8,192→6,144B reads|
-|M8×16×19 GEMV, B-cache/prefetch off|217 cycles|153 cycles (B-cache + prefetch)|29.5%|864→560B reads|
-|M8×16×65 GEMV, B-cache/prefetch off|533|383|28.1%|2,720→1,696B reads|
-|M16×16×65 GEMV, B-cache/prefetch off|1,072|613|42.8%|5,440→2,368B reads|
+| GEMM 4×4×32 | 126 | 256 / 64 | 4.063 | 11 |
+| GEMM 16×16×128 | 522 | 4096 / 1024 | 62.774 | 221 |
+| GEMM 32×32×64 | 986 | 6144 / 4096 | 66.467 | 312 |
+| GEMV M1 K32 | 143 | 544 / 64 | 3.580 | 49 |
+| GEMV M4 K32 | 161 | 640 / 256 | 12.720 | 52 |
+| GEMV M8 K64 | 325 | 1536 / 512 | 25.206 | 147 |
+| GEMV M16 K128 | 1109 | 7168 / 1024 | 29.547 | 697 |
 
-The existing configuration is therefore retained as the baseline for any new
-experiment. It already overlaps accepted next-K requests with MAC preparation,
-reuses A/B tiles under their lifetime rules and limits outstanding reads to four.
-A logical `prefetch_wait` counter is not by itself physical bank conflict: all
-requests still pass through the sole `ai_spad_arbiter` admission point.
+Every measured read response had the expected two-cycle registered latency. The isolated Top profile had zero denied-request cycles and zero multi-client request cycles. Observed Operand Wait is therefore not evidence of a physical four-bank conflict. H32 remains the meaningful concurrent case: 350,189 cycles, 14,600 Matrix Operand Wait cycles and 4,288 request-form arbitration waits across eight decode windows.
 
-## Fresh measurement attempt and limitation
+## Existing-switch ablation
 
-The requested exact missing rows (GEMV M=1/4/8/16 × K=32/64/128 where absent,
-and GEMM K=128 rows) require a new compile/run using the current candidate tree.
-The commands were started with identical output directories and seeds:
+The corrected three-seed D2/D4, prefetch and cache sweep is **existing configuration evidence**, not a new RTL gain. The CSV is `/tmp/nmaforge-archopt-runs/config-20261111/matrix_config_comparison.csv`; it covers 4×4×32, 8×8×32, 16×16×32, 16×32×32 and 32×32×64. D4/P1/C1 reduces 32×32×64 from 1,671 to 1,135 cycles in that core responder campaign, with Golden PASS. This must not be counted again as a new optimization.
 
-```bash
-make -C dv/block/compute/matrix/sim product-gemv-regress \
-  SEEDS='20261109 20261110 20261111' \
-  CORE_OUT_DIR=/tmp/nmaforge-archopt-runs/gemv
-make -C dv/block/compute/matrix/sim matrix-config-comparison \
-  SEEDS='20261109 20261110 20261111' \
-  PIPELINE_BENCH_OUT=/tmp/nmaforge-archopt-runs/config
-make -C dv/block/compute/matrix/sim matrix-size-benchmark \
-  ARRAY_SEEDS='20261109 20261110 20261111' \
-  ARRAY_OUT_DIR=/tmp/nmaforge-archopt-runs/sizes
-```
+Candidate A (existing A/B caches, next-K prefetch, depth-4 outstanding reads) is retained as the product baseline. Candidate B (another double buffer) has no demonstrated removable interval: the active path already uses ping-pong tiles and the Top traces show registered responses and no denied grants in the isolated matrix suite. Candidate C (request rescheduling) lacks a closed-loop grant opportunity; changing issue order without a competing client only moves the same mandatory two-cycle responses.
 
-VCS compilation reached the Synopsys license request and stopped with
-`Cannot connect to the license server` / `VCS-BASE-COMPILE` unavailable. No new
-cycles, Golden, traffic or fault result is accepted from that attempt. The
-missing rows remain `NOT_RUN` in the Gate 0 CSV. This is an environment block,
-not a performance result.
+The H32 trace instead ranks SFU fetch/response and control as the larger opportunity: 67,952 fetch-issue + 134,144 response + 29,456 arithmetic/control + 15,093 pipeline-wait exclusive cycles. That work belongs to the separately scoped safe SFU study and is not silently implemented here.
 
-## Candidate assessment
+## Milestone result
 
-**Candidate A — existing controls.** PASS as a baseline ablation. The measured
-benefit above is already present in the current Matrix RTL/configuration; it is
-not a new candidate gain. Keep D4/P1/A-cache/B-cache enabled where the existing
-parameter and ownership contracts permit.
+- Real product Top missing rows: **PASS**.
+- Strict Golden and response ledger: **PASS**.
+- New Matrix RTL: **REJECTED / NOT JUSTIFIED** by current evidence.
+- ≥10% new workload gain: **NOT DEMONSTRATED**; existing switch gains are baseline configuration evidence only.
+- Protection, reset, abort and ownership contracts: unchanged.
 
-**Candidate B — double-buffered operand fetch.** REWORK. A second operand buffer
-could only help if the closed-loop arbiter grants a next-K request early enough
-without overwriting the active tile. The current logs show outstanding depth
-reaching four and prefetch/response/line stalls moving with randomized service.
-No cycle-accurate model proving an additional removable interval was completed;
-therefore no RTL change is justified. The model must include request acceptance,
-2-cycle registered response, bank ownership, parity/protection response, abort,
-reset and tile lifetime before implementation.
-
-**Candidate C — FSM scheduling.** REWORK. The current FSM has measurable request,
-wait and prefetch states, but a static trace cannot distinguish an avoidable bubble
-from a true RAW dependency or a denied arbiter grant. Build a reacting multi-client
-arbiter model, then compare issue order against the actual response-owner ledger.
-
-## Safety and cost boundary
-
-Any admitted change must preserve `ai_spad_arbiter` as the only data admission
-point, maintain per-request authorization/parity and response ownership, drain
-accepted reads on abort/watchdog/reset, and keep output commit ordered. No
-transparent cache or earlier validated copy may replace a required SRAM read.
-The current evidence supports zero additional SRAM bytes/ports and zero MACs;
-any proposed operand double buffer would add flops and muxes whose width/lifetime
-must be measured before RTL.
-
-## Milestone 1 result and next step
-
-- Numerical Golden: PASS for the archived three-seed existing-control ablation.
-- Fault/reset: PASS in the associated Matrix product regressions; no new
-  candidate RTL was run in this blocked fresh attempt.
-- New RTL: NOT_RUN / LICENSE_BLOCKED.
-- ≥10% target: existing-control ablation exceeds it on meaningful GEMM/GEMV
-  shapes, but this is not a new optimization and cannot be counted twice.
-- Product decision: **REWORK**, preserve current controls.
-
-Milestone 2 should start only after a clean VCS license is available. First
-extend the product Matrix testbench to submit the missing M/K rows through the
-actual descriptor/controller path. Then compare the existing 0x52 K-fold path
-against the isolated shape-adaptive wrapper under identical traffic. M1/M4 may
-be candidates; M8/M16 must fall back to the existing mapping when measured
-slower. True M=1 descriptor support requires an ABI/spec review before changing
-public fields. No product RTL or ABI change is authorized by this report.
+Milestone 2 should reuse product `0x52` and compare its M1/M4 mapping with the existing shape-adaptive research wrapper under identical Top memory service. M8/M16 should keep the established path whenever adaptive mapping is slower. No duplicate GEMV engine or public ABI change is proposed.
