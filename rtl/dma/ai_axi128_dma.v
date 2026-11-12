@@ -388,7 +388,10 @@ module ai_axi128_dma #(
             end
             state_r <= ST_ABORT_READ;
           end else begin
-            state_r <= ST_ERROR;
+            // A later store gather may fail while an earlier accepted
+            // write burst still awaits B. Preserve ERR_SPAD and drain its
+            // response before publishing terminal done.
+            state_r <= (wr_pending_count_r != 0) ? ST_WRITE_DRAIN : ST_ERROR;
           end
         end else begin
           case (state_r)
@@ -746,7 +749,7 @@ module ai_axi128_dma #(
 
             ST_WRITE_DRAIN: begin
               if (wr_pending_count_r == 0)
-                state_r <= (abort || abort_pending_r) ? ST_ERROR : ST_DONE;
+                state_r <= (error || abort || abort_pending_r) ? ST_ERROR : ST_DONE;
             end
 
             ST_DONE: begin
