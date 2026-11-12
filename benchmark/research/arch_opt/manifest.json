@@ -1,0 +1,21 @@
+{
+  "status": "PASS_GATE0_INVENTORY",
+  "approved_product_sha": "c93ea144713d5fafe2e8a5509029927cd6859e75",
+  "phase4_candidate_sha": "b1dd75b8d1b6bb0465bdb3452df556a7919f7c4d",
+  "phase4_candidate_rtl_sha": "b1dd75b8d1b6bb0465bdb3452df556a7919f7c4d",
+  "vcs": "V-2023.12-SP1_Full64",
+  "verilator": "5.052",
+  "python": "3.12.13",
+  "spad": "128 KiB, four banks",
+  "macs": 256,
+  "simulation_clock": "4 ns behavioral simulation; not Fmax",
+  "golden": "Phase4 exact 1040 CNN lines; H16/H32 strict tensors/logits/KV; Matrix/GEMV independent signed Golden",
+  "reproduction": [
+    "python3.12 tools/benchmark/phase4/validate.py",
+    "python3.12 tools/benchmark/arch_opt/generate_gate0.py"
+  ],
+  "artifacts": {
+    "baseline_bottlenecks.csv": "9051359d2a39e53044f6322b7252754e12a96ed7a7a402c2d5ba749642b09d7e",
+    "architecture_opportunity_ranking.csv": "edebe6286e3368018932e29be85ff409426e5ff5772a44402a22fd4d75d9ec40"
+  }
+}

@@ -1,0 +1,31 @@
+workload,shape,variant,status,total_cmdq_cycles,useful_macs,useful_mac_per_cycle,mac_utilization_pct,sfu_cycles,matrix_operand_fetch,matrix_operand_wait,matrix_writeback,arbitration_stall,read_bytes,write_bytes,category,source,golden,notes
+CNN,both-fused row-major,approved product,MEASURED,12351,570164,46.16338757995304,18.032573273419157,0,407,3219,5200,12,64064,16640,CNN,benchmark/research/phase4/baseline/summary.json,PASS,exclusive state counters close exactly to total
+CNN,both-fused row-major,Phase4 candidate,MEASURED,11376,570164,50.11990154711674,19.578086541842477,0,407,3219,4225,12,64064,16640,CNN,benchmark/research/phase4/optimized/summary.json,PASS,exclusive state counters close exactly to total
+CNN,first-fused,approved product,MEASURED,22983,570164,24.808075534090413,9.690654505504067,10817,411,3227,4992,24,77376,29952,CNN,benchmark/research/phase4/baseline/summary.json,PASS,exclusive state counters close exactly to total
+CNN,first-fused,Phase4 candidate,MEASURED,22203,570164,25.679592847813357,10.031090956177092,10817,411,3227,4212,24,77376,29952,CNN,benchmark/research/phase4/optimized/summary.json,PASS,exclusive state counters close exactly to total
+CNN,legacy,approved product,MEASURED,65429,570164,8.714239863057665,3.4039999465069006,54084,411,3227,4160,26,130624,83200,CNN,benchmark/research/phase4/baseline/summary.json,PASS,exclusive state counters close exactly to total
+CNN,legacy,Phase4 candidate,MEASURED,65429,570164,8.714239863057665,3.4039999465069006,54084,411,3227,4160,26,130624,83200,CNN,benchmark/research/phase4/optimized/summary.json,PASS,exclusive state counters close exactly to total
+GEMM,4x4x32 GEMM,Phase4 candidate,MEASURED,126,512,4.063492063492063,1.5873015873015872,0,2,11,4,0,256,64,GEMM,benchmark/research/phase4/optimized/summary.json,PASS,exclusive state counters close exactly to total
+GEMM,16x16x16 GEMM,Phase4 candidate,MEASURED,186,4096,22.021505376344088,8.60215053763441,0,8,25,64,0,512,1024,GEMM,benchmark/research/phase4/optimized/summary.json,PASS,exclusive state counters close exactly to total
+GEMM,32x32x64 GEMM,Phase4 candidate,MEASURED,986,65536,66.46653144016227,25.963488843813387,0,26,312,256,0,6144,4096,GEMM,benchmark/research/phase4/optimized/summary.json,PASS,exclusive state counters close exactly to total
+GEMV,"M1 product 0x52, K32",Phase4 candidate,MEASURED,143,512,3.5804195804195804,1.3986013986013985,0,5,49,4,0,544,64,GEMV,benchmark/research/phase4/optimized/summary.json,PASS,exclusive state counters close exactly to total
+GEMV,"M4 product 0x52, K32",Phase4 candidate,MEASURED,161,2048,12.720496894409937,4.968944099378882,0,8,52,16,0,640,256,GEMV,benchmark/research/phase4/optimized/summary.json,PASS,exclusive state counters close exactly to total
+GEMV,"M8 product 0x52, K32",Phase4 candidate,MEASURED,213,4096,19.230046948356808,7.511737089201878,0,12,67,32,0,768,512,GEMV,benchmark/research/phase4/optimized/summary.json,PASS,exclusive state counters close exactly to total
+GEMV,M1 1x13x17,product seeded matrix campaign,MEASURED,75,221,2.9466666666666668,1.1510416666666667,,,,,12,304,,GEMV,benchmark/representative/round29/matrix/gemv.log.gz,PASS,independent product Matrix core run; separate from Phase4 Top replay
+GEMV,M4 4x16x32,product seeded matrix campaign,MEASURED,202,2048,10.138613861386139,3.9603960396039604,,,,,22,640,256,GEMV,benchmark/representative/round29/matrix/gemv.log.gz,PASS,independent product Matrix core run; separate from Phase4 Top replay
+GEMV,M8 8x16x19,product seeded matrix campaign,MEASURED,154,2432,15.792207792207792,6.1688311688311686,,,,,25,560,512,GEMV,benchmark/representative/round29/matrix/gemv.log.gz,PASS,independent product Matrix core run; separate from Phase4 Top replay
+GEMV,M16 16x16x65,product seeded matrix campaign,MEASURED,630,16640,26.41269841269841,10.317460317460316,,,,,66,2368,1024,GEMV,benchmark/representative/round29/matrix/gemv.log.gz,PASS,independent product Matrix core run; separate from Phase4 Top replay
+Transformer,8-token persistent decode,Phase4 candidate,MEASURED,65771,18240,0.27732587310516793,0.10833041918170622,49595,640,1928,1696,1880,72448,42112,Transformer,benchmark/research/phase4/optimized/summary.json,PASS,exclusive state counters close exactly to total
+Transformer,8-token persistent decode,Phase4 candidate,MEASURED,350155,213504,0.6097414002370379,0.23818023446759296,273699,2448,14600,6400,4288,546816,227840,Transformer,benchmark/research/phase4/optimized/summary.json,PASS,exclusive state counters close exactly to total
+GEMV,M1 K64 (N=16 exact product Top),requested Gate0 matrix,NOT_RUN,,,,,,,,,,,,GEMV,,,No exact product Top row in checked-in Phase4 evidence
+GEMV,M1 K128 (N=16 exact product Top),requested Gate0 matrix,NOT_RUN,,,,,,,,,,,,GEMV,,,No exact product Top row in checked-in Phase4 evidence
+GEMV,M4 K64 (N=16 exact product Top),requested Gate0 matrix,NOT_RUN,,,,,,,,,,,,GEMV,,,No exact product Top row in checked-in Phase4 evidence
+GEMV,M4 K128 (N=16 exact product Top),requested Gate0 matrix,NOT_RUN,,,,,,,,,,,,GEMV,,,No exact product Top row in checked-in Phase4 evidence
+GEMV,M8 K64 (N=16 exact product Top),requested Gate0 matrix,NOT_RUN,,,,,,,,,,,,GEMV,,,No exact product Top row in checked-in Phase4 evidence
+GEMV,M8 K128 (N=16 exact product Top),requested Gate0 matrix,NOT_RUN,,,,,,,,,,,,GEMV,,,No exact product Top row in checked-in Phase4 evidence
+GEMV,M16 K32 (N=16 exact product Top),requested Gate0 matrix,NOT_RUN,,,,,,,,,,,,GEMV,,,No exact product Top row in checked-in Phase4 evidence
+GEMV,M16 K64 (N=16 exact product Top),requested Gate0 matrix,NOT_RUN,,,,,,,,,,,,GEMV,,,No exact product Top row in checked-in Phase4 evidence
+GEMV,M16 K128 (N=16 exact product Top),requested Gate0 matrix,NOT_RUN,,,,,,,,,,,,GEMV,,,No exact product Top row in checked-in Phase4 evidence
+GEMM,4x4x128 requested,requested Gate0 matrix,NOT_RUN,,,,,,,,,,,,GEMM,,,No exact product Top row in checked-in Phase4 evidence
+GEMM,16x16x128 requested,requested Gate0 matrix,NOT_RUN,,,,,,,,,,,,GEMM,,,No exact product Top row in checked-in Phase4 evidence
+GEMM,32x32x128 requested,requested Gate0 matrix,NOT_RUN,,,,,,,,,,,,GEMM,,,No exact product Top row in checked-in Phase4 evidence
