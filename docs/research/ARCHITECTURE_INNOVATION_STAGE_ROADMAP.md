@@ -136,9 +136,49 @@ make -C dv/uvm/sim uvm_compute_cluster_regress \
 | 3 | Integrate one policy in an isolated Matrix profile; preserve existing descriptors and INT8 results. Exercise non-power-of-two dimensions, tails, backpressure, parity/protection, Abort and Reset. |
 | 4 | Promote only if the selected policy predicts and achieves the Stage 4 target on the representative suite without unexplained GEMM regressions. Keep research-only policy if product-top integration does not reproduce the result. |
 
-The existing evidence boundary and next double-buffer work are recorded in
-[`SHAPE_ADAPTIVE_TENSOR_ENGINE.md`](SHAPE_ADAPTIVE_TENSOR_ENGINE.md). Its
-analytical prefetch schedule is not a measured product-top result.
+### B Stage 1 research-wrapper baseline
+
+**Status: research-wrapper baseline complete; product Matrix calibration remains
+open.** At base commit `773a747a841afaff8c68ce194a9b1c0558a82d27`, VCS
+`V-2023.12-SP1_Full64` passed three seeds (`20261113/20261114/20261115`),
+each covering the nine shapes `1x8x64`, `4x8x64`, `8x8x64`, `16x8x64`,
+`1x13x17`, `1x13x64`, `4x13x64`, `8x16x64`, `16x16x64`. All 27 workload
+instances passed an independent INT32 GEMM oracle, full 32-bit SPAD output
+image comparison, and sentinel checks. Each seed also passed abort during
+read/compute/writeback and reset with an accepted read outstanding.
+
+Equal-weight geometric mean baseline/adaptive cycle ratio over 27 instances
+was `1.0290` (2.9% improvement). Shape means were `1.1181` for `1x8x64`,
+`1.0434` for `4x8x64`, `1.0763` for `1x13x64`, and `1.0302` for `4x13x64`;
+the remaining five shapes were `1.0000`. The adaptive policy selected GEMV
+for M=1/4 cases and GEMM for M=8/16. Baseline and adaptive arbiter wait
+counts matched for every paired run, so the observed savings came from the
+kernel schedule in this wrapper, not reduced arbitration. The tested workload
+uses the real four-bank `ai_spad_arbiter` and behavioral `ai_scratchpad`, but
+the adaptive kernel is not connected to the production Matrix command path;
+this does not calibrate product GEMM cost terms or establish ASIC PPA.
+
+The result is below the roadmap's 10% continuation threshold across the full
+shape suite. Do not integrate this policy into product Matrix RTL. Stage 2 may
+continue as a research-only model comparison; Stage 3 product integration is
+deferred unless a representative held-out suite changes the Stage 4 decision.
+The exact rows and tool metadata are in
+[`shape_adaptive_spad_ablation.csv`](../../benchmark/shape_adaptive_spad_ablation.csv)
+and [`shape_adaptive_spad_summary.json`](../../benchmark/shape_adaptive_spad_summary.json).
+
+Reproduce the measured wrapper baseline with:
+
+```sh
+make -C dv/research/shape_adaptive/sim shape-adaptive-spad-regress \
+  RUN_DIR=/tmp/nmaforge_stage1_shape_spad_20261113 \
+  PYTHON=/usr/bin/python3.11 \
+  SEEDS='20261113 20261114 20261115' \
+  SOURCE_SHA=773a747a841afaff8c68ce194a9b1c0558a82d27
+```
+
+The existing evidence boundary and analytical prefetch schedule are recorded
+in [`SHAPE_ADAPTIVE_TENSOR_ENGINE.md`](SHAPE_ADAPTIVE_TENSOR_ENGINE.md); the
+analytical schedule is not measured product-top evidence.
 
 ## C. SFU Iterative Arithmetic Optimization
 

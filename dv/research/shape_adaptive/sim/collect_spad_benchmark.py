@@ -18,6 +18,10 @@ FIELDS = [
     "baseline_arbiter_wait_cycles", "adaptive_arbiter_wait_cycles",
     "contender_bank_pattern", "golden", "run_log",
 ]
+EXPECTED_SHAPES = {
+    "1x8x64", "4x8x64", "8x8x64", "16x8x64",
+    "1x13x17", "1x13x64", "4x13x64", "8x16x64", "16x16x64",
+}
 
 
 def parse_fields(line: str) -> dict[str, str]:
@@ -41,12 +45,15 @@ def main() -> None:
         if not log.is_file():
             raise SystemExit(f"missing simulation log: {log}")
         text = log.read_text(encoding="utf-8", errors="replace")
-        marker = f"SHAPE_ADAPTIVE_SPAD_PASS seed={regression_seed} shapes=4 aborts=3 reset=1"
+        marker = f"SHAPE_ADAPTIVE_SPAD_PASS seed={regression_seed} shapes=9 aborts=3 reset=1"
         if marker not in text or "SHAPE_ADAPTIVE_SPAD_FAIL" in text or "ERROR:" in text:
             raise SystemExit(f"failed/missing closure marker in {log}")
         matches = [line for line in text.splitlines() if line.startswith("SPAD_COMPARE_PASS ")]
-        if len(matches) != 4:
-            raise SystemExit(f"expected four matched shape rows in {log}, got {len(matches)}")
+        if len(matches) != 9:
+            raise SystemExit(f"expected nine matched shape rows in {log}, got {len(matches)}")
+        shapes = {f"{parse_fields(line)['m']}x{parse_fields(line)['n']}x{parse_fields(line)['k']}" for line in matches}
+        if shapes != EXPECTED_SHAPES:
+            raise SystemExit(f"unexpected shape set in {log}: {sorted(shapes)}")
         for line in matches:
             value = parse_fields(line)
             baseline = int(value["baseline_cycles"])
@@ -85,8 +92,9 @@ def main() -> None:
         "vcs_version": args.vcs_version,
         "regression_seeds": args.seeds,
         "pass_count": len(rows),
-        "workloads_per_seed": 4,
-        "dimensions": "M=1/4/8/16, N=8, K=64; signed INT8 × INT8 -> signed INT64 accumulation",
+        "workloads_per_seed": 9,
+        "dimensions": sorted(EXPECTED_SHAPES),
+        "numeric_contract": "signed INT8 × INT8 -> signed INT64 accumulation; complete 32-bit SPAD output image checked against independent INT32 GEMM",
         "memory": {
             "implementation": "ai_spad_arbiter + ai_scratchpad four-bank VCS behavioral RAM",
             "read_latency": "two registered scratchpad stages plus arbiter response tagging",
