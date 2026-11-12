@@ -1,0 +1,136 @@
+# NMAForge Architecture Innovation Stage Roadmap
+
+## Execution order
+
+Run one innovation through Stage 1, Stage 2, Stage 3 and its Stage 4 decision
+before starting the next innovation. The order is A, B, C, D, E. Do not develop
+multiple RTL candidates in parallel. A Stage 4 decision may stop or defer a
+direction; later directions still proceed in the listed order.
+
+The five directions are research candidates, not approved product changes:
+
+| Order | Direction | Initial disposition |
+|---|---|---|
+| A | Bank-Aware + Dependency-Aware Scheduler | First priority; measure current bottleneck before proposing RTL. |
+| B | Shape-Adaptive Dataflow + Cost Model | Existing isolated kernel and real-SPAD wrapper are evidence inputs; product-top integration remains open. |
+| C | SFU Iterative Arithmetic Optimization | Optimize only cycles proven to be arithmetic-bound; preserve fixed-point results. |
+| D | Structured Sparsity / Zero-Skipping | Conditional on representative model sparsity and metadata-inclusive benefit. |
+| E | Reconfigurable Precision MAC | Deferred until precision needs and legal area/timing resources are defined. |
+
+## Stage definitions
+
+| Stage | Required work | Exit gate |
+|---|---|---|
+| 1. Baseline and bottleneck | Freeze SHA, test inputs, tool profile and endpoints. Collect per-requester grants, bank/address distribution, grant wait, response wait, engine idle, traffic bytes and end-to-end cycles. Separate measured RTL results from analytical estimates. | Every claimed bottleneck is tied to a reproducible counter or waveform interval; missing scenarios are named. |
+| 2. Candidate comparison | Compare the unchanged baseline with at least two executable models or controlled configurations. Keep work, memory geometry, seeds and correctness oracle matched. Include control, metadata and traffic overhead in the cost model. | Candidate ranking is repeatable and has an explicit predicted mechanism; no candidate is selected from peak MAC rate alone. |
+| 3. RTL prototype and DV | Implement one candidate only in an isolated branch/profile. Run focused Golden, request/response owner, output-prefix, Fault, Reset, Abort and recovery tests, followed by the applicable smoke/regression. | Correctness and protocol checks pass; measured end-to-end benefit is separated from model prediction; area/timing impact is measured where legal libraries and constraints exist. |
+| 4. Decision | Compare measured results with the predeclared target, regressions, resource cost and verification cost. Record keep, revise, defer or drop. | Promote only with at least 10% geometric-mean end-to-end cycle improvement on the predeclared representative suite, no unexplained material regression, preserved ABI/fault/completion contracts, and resource cost within an approved budget. Otherwise retain the existing implementation. |
+
+The 10% target is a research continuation threshold, not a product guarantee.
+For Stage 4, report every workload, the geometric mean, worst regression,
+variance across seeds, traffic bytes and the measurement endpoint. Do not claim
+ASIC area, frequency or power without legal libraries, a compatible SRAM macro
+view and project timing constraints.
+
+## A. Bank-Aware + Dependency-Aware Scheduler
+
+| Stage | Work and evidence |
+|---|---|
+| 1 | Measure the current RR/priority arbiter under CNM×DMA, Matrix×CNM, Matrix×DMA, SFU×DMA and legal multi-engine traffic. Record per-class accepted grants, bank histogram, grant-wait distribution, response-wait distribution, engine idle cycles and DMA stalls. Keep descriptor/completion priority visible. |
+| 2 | Compare current policy, bank-aware arbitration, and bank-aware plus resource-credit/dependency scheduling in an executable model. Preserve request acceptance, protection checks and FIFO completion retirement. Treat software-owned address hazards as illegal inputs unless a dependency is explicit. |
+| 3 | Prototype the single winning arbitration/scheduling change behind an isolated profile. Check Matrix and CNM response tags/lanes, DMA fairness, ordered retirement, accepted-write prefix, and all relevant Fault/Reset/Abort paths. |
+| 4 | Keep only if Stage 4's system-level target is met without starvation, reordered side effects, changed fault visibility or completion ABI. Otherwise retain current RR/priority. |
+
+### Stage 1 A initial replay
+
+**Status: PARTIAL.** Exact source SHA `f78d434` on branch
+`feat/shape-adaptive-gemv-v2`; VCS `V-2023.12-SP1_Full64`; UVM seed
+`20261113`. `dma_spad_subsystem_test` passed with UVM warning/error/fatal
+`0/0/0`, DMA functional coverage 100%, and all subsystem scoreboard checks.
+
+Observed measurements from `/tmp/nmaforge_stage1_a_subsystem/run.log`:
+
+| Scenario | Accepted traffic / wait observation | What it establishes |
+|---|---|---|
+| CNM×DMA primary overlap | CNM/DMA grants `7/4`; 4 CNM stall cycles; max consecutive stall streak 1; four grants after a stall; 16 accepted and returned requests per CNM lane. | Pairwise CNM/DMA shared-port progress and bounded observed stall for this directed case. |
+| FP×DMA | Two overlapping runs each observed FP/DMA contended grants `5/6`; each had 64 FP reads/responses, peak FP outstanding 2 and one output write. Other runs were isolated. | Pairwise FP/DMA contention; not SFU/DMA. |
+| Aggregate core/DMA monitor | Core reads/responses `192/192`; isolated/contended core grants `490/17`; isolated/contended DMA grants `149/55`. | Existing harness requester counters; not a per-bank histogram or compute-cycle attribution. |
+
+This subsystem harness has no Matrix requester and does not isolate SFU, so it
+does not close the planned Matrix×CNM, Matrix×DMA or SFU×DMA measurements. Older
+Stage A results in
+[`COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md`](../verification/COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md)
+are historical SHA evidence and must not be mixed into this replay's numbers.
+The next A/Stage 1 action is to add or identify a legal real-top measurement
+scenario for Matrix and DMA, then collect matched isolated/contended baselines.
+Do not force internal signals around the documented DMA busy gate.
+
+Reproduction used the subsystem Makefile compile target and then invoked the
+compiled image directly because `subsystem_run` prepends `./` to an absolute
+`SIMV` path:
+
+```sh
+cd dv/subsystem/dma_spad/sim
+make subsystem_compile SEED=20261113 COV_TAG=stage1_a_baseline \
+  SIMV=/tmp/nmaforge_stage1_a_subsystem/simv \
+  COV_DIR=/tmp/nmaforge_stage1_a_subsystem/coverage.vdb \
+  COMPILE_LOG=/tmp/nmaforge_stage1_a_subsystem/compile.log
+/tmp/nmaforge_stage1_a_subsystem/simv \
+  +UVM_TESTNAME=dma_spad_subsystem_test +ntb_random_seed=20261113 \
+  +UVM_VERBOSITY=UVM_MEDIUM \
+  -cm line+cond+fsm+tgl+branch+assert \
+  -cm_dir /tmp/nmaforge_stage1_a_subsystem/coverage.vdb \
+  -l /tmp/nmaforge_stage1_a_subsystem/run.log
+```
+
+## B. Shape-Adaptive Dataflow + Cost Model
+
+| Stage | Work and evidence |
+|---|---|
+| 1 | Freeze production GEMM cases, SPAD geometry, inputs and Goldens. Re-run baseline/folded paths through the existing real-SPAD wrapper and record cycles, reads/writes, bank conflicts, stalls and output commits. Calibrate each model term against observed intervals. |
+| 2 | Compare GEMM, GEMV-fold, prefetch and double-buffer choices over identical shapes. Count all padding, reload and output traffic. Validate the cost model on held-out shapes. |
+| 3 | Integrate one policy in an isolated Matrix profile; preserve existing descriptors and INT8 results. Exercise non-power-of-two dimensions, tails, backpressure, parity/protection, Abort and Reset. |
+| 4 | Promote only if the selected policy predicts and achieves the Stage 4 target on the representative suite without unexplained GEMM regressions. Keep research-only policy if product-top integration does not reproduce the result. |
+
+The existing evidence boundary and next double-buffer work are recorded in
+[`SHAPE_ADAPTIVE_TENSOR_ENGINE.md`](SHAPE_ADAPTIVE_TENSOR_ENGINE.md). Its
+analytical prefetch schedule is not a measured product-top result.
+
+## C. SFU Iterative Arithmetic Optimization
+
+| Stage | Work and evidence |
+|---|---|
+| 1 | For each opcode, partition cycle count into memory request/response, arithmetic iteration, writeback and controller overhead. Start with Softmax, RMSNorm and LayerNorm; identify actual divider/sqrt iteration contribution. |
+| 2 | Compare early termination and iteration-latency variants using the exact fixed-point Golden, signed boundaries and worst-case iteration count. Exclude speculative behavior that changes memory or fault ordering. |
+| 3 | Implement one arithmetic change at a time. Verify bit-exact output, `ERR_NUMERIC`, watchdog, protection/parity, Abort/Reset and next-task recovery. Run SFU block and top smoke. |
+| 4 | Retain only if arithmetic cycles are a measured end-to-end bottleneck and the Stage 4 target is met without changing the numeric/error contract or violating timing/area budget. |
+
+## D. Structured Sparsity / Zero-Skipping
+
+| Stage | Work and evidence |
+|---|---|
+| 1 | Profile representative trained weights and activations. Report block sparsity by candidate block size, metadata bytes, skipped MAC count, SPAD traffic and accuracy against dense Golden. |
+| 2 | Compare dense execution, structured block skipping and dense fallback thresholds. Include metadata fetch/decode, partial blocks, bank layout and all-zero cases. |
+| 3 | Prototype one encoding/skip path without changing the public ABI unless separately reviewed. Test sparse/dense crossover, malformed metadata, bounds/protection, Fault/Abort/Reset and exact output image. |
+| 4 | Continue only when representative workload end-to-end results meet Stage 4 and sparsity metadata is stable, compact and verifiable. Otherwise defer. |
+
+## E. Reconfigurable Precision MAC
+
+| Stage | Work and evidence |
+|---|---|
+| 1 | Define supported operand/accumulator precisions and actual workload demand. Establish INT8 reference area, timing assumptions, lane utilization and SRAM packing costs with the available legal tool inputs. |
+| 2 | Compare shared-MAC, lane-sliced and static-parameterized candidates in an arithmetic/mapping model. Quantify precision-switch overhead, accumulator width, throughput and expected area. |
+| 3 | Prototype one precision extension in an isolated configuration. Preserve the INT8 path bit-for-bit; test signed extremes, overflow, rounding, packed layout, reset and runtime configuration legality. |
+| 4 | Promote only with measured system benefit and implementation resources sufficient for meaningful synthesis/timing evidence. Without legal libraries, macro views and SDC, this stage can decide only behavior-level research continuation, not ASIC feasibility. |
+
+## Change control and reporting
+
+- Keep the product ABI, output prefix, fault priority, reset/fabric contract and
+  completion ordering fixed unless a separately reviewed SPEC change is approved.
+- Use isolated branches or compile-time research profiles for RTL candidates;
+  never combine two candidate changes in one result.
+- Keep generated simulations, coverage databases and waveforms outside Git.
+- Record SHA, tool versions, seed, command, raw logs, correctness oracle,
+  measurement endpoint and unclosed cases for every stage.
+- Update this document at each gate. Push each committed report or RTL change
+  to its corresponding GitHub branch after checks pass.
