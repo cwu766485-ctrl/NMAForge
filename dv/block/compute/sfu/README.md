@@ -25,6 +25,15 @@ watchdog), reset while active, and normal oracle traffic after reset. The
 DUT-only line/condition/FSM/branch VDB accumulates all three runs.
 Vector and simulation artifacts stay under `/tmp`.
 
+The testbench emits `SFU_PHASE` rows for Softmax (`0x32`), causal Softmax
+(`0x39`), RMSNorm (`0x33`), and LayerNorm (`0x38`). These passive bins split
+request-state, response-wait, divider/sqrt wait, output-write, and other
+controller cycles for each vector. Request-state counts include ready stalls;
+response-wait counts include the configured response latency. Divider/sqrt
+wait-state occupancy is a baseline attribution metric, not a projected
+optimization gain. The Stage 1 profile and its interpretation are recorded in
+[`ARCHITECTURE_INNOVATION_STAGE_ROADMAP.md`](../../../../docs/research/ARCHITECTURE_INNOVATION_STAGE_ROADMAP.md).
+
 The causal Softmax vectors include query token zero at lengths 1 and 7. The
 contract treats the query index as zero-based and inclusive, so token zero
 keeps only the first score and expects `[32768, 0, ...]`. The RTL preserves

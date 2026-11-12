@@ -27,6 +27,8 @@ module tb_ai_tensor_sfu_random;
   integer read_count=0,response_count=0,write_count=0,total_write_count=0;
   integer expected_total_writes=0;
   integer ready_stall_count=0,max_response_delay=0;
+  integer phase_read_req=0,phase_read_wait=0,phase_arithmetic_wait=0;
+  integer phase_write=0,phase_controller=0;
   integer fd,case_count,case_id,i,timeout,rc;
   integer seed=20261021,initial_seed;
   integer op,length_i,shift_i,epsilon_i,beta_enable_i,pack_enable_i,query_i;
@@ -61,6 +63,8 @@ module tb_ai_tensor_sfu_random;
       ready_lfsr<=32'h1ace_b00c;
       read_count<=0;response_count<=0;write_count<=0;total_write_count<=0;
       ready_stall_count<=0;max_response_delay<=0;
+      phase_read_req<=0;phase_read_wait<=0;phase_arithmetic_wait<=0;
+      phase_write<=0;phase_controller<=0;
     end else begin
       ready_lfsr<={ready_lfsr[30:0],ready_lfsr[31]^ready_lfsr[21]^ready_lfsr[1]^ready_lfsr[0]};
       spad_ready<=ready_lfsr[0]|ready_lfsr[3];
@@ -86,11 +90,25 @@ module tb_ai_tensor_sfu_random;
         write_count<=write_count+1;
         total_write_count<=total_write_count+1;
       end
+      if(busy && dut.state_r!=6'd28 && dut.state_r!=6'd29) begin
+        case(dut.state_r)
+          6'd1,6'd3,6'd5,6'd10,6'd18,6'd20,6'd23,6'd25,6'd32,6'd36,6'd39:
+            phase_read_req<=phase_read_req+1;
+          6'd2,6'd4,6'd6,6'd11,6'd19,6'd21,6'd24,6'd26,6'd33,6'd37,6'd40:
+            phase_read_wait<=phase_read_wait+1;
+          6'd8,6'd13,6'd15,6'd17,6'd35:
+            phase_arithmetic_wait<=phase_arithmetic_wait+1;
+          6'd9,6'd22,6'd27:
+            phase_write<=phase_write+1;
+          default: phase_controller<=phase_controller+1;
+        endcase
+      end
     end
   end
 
   task automatic run_vector;
     integer expected_writes,expected_elements,word_index,byte_index;
+    integer reads_before,responses_before;
     begin
       rc=$fscanf(fd,"%h %d %d %d %d %d %d\n",op,length_i,shift_i,
                  epsilon_i,beta_enable_i,pack_enable_i,query_i);
@@ -114,6 +132,9 @@ module tb_ai_tensor_sfu_random;
       expected_writes=(pack_enable && op==8'h36)?((length_i+3)/4):length_i;
       expected_elements=length_i;
       write_count=0;
+      phase_read_req=0;phase_read_wait=0;phase_arithmetic_wait=0;
+      phase_write=0;phase_controller=0;
+      reads_before=read_count;responses_before=response_count;
       @(negedge clk);start=1;
       @(negedge clk);start=0;
       timeout=0;
@@ -124,6 +145,11 @@ module tb_ai_tensor_sfu_random;
       if(element_count!==expected_elements || write_count!==expected_writes)
         $fatal(1,"SFU op=%02x length=%0d elements=%0d/%0d writes=%0d/%0d",
                op,length_i,element_count,expected_elements,write_count,expected_writes);
+      if(op==8'h32 || op==8'h33 || op==8'h38 || op==8'h39)
+        $display("SFU_PHASE op=%02x length=%0d cycles=%0d read_req=%0d read_wait=%0d arithmetic_wait=%0d write=%0d controller=%0d reads=%0d responses=%0d writes=%0d",
+                 op,length_i,cycle_count,phase_read_req,phase_read_wait,
+                 phase_arithmetic_wait,phase_write,phase_controller,
+                 read_count-reads_before,response_count-responses_before,write_count);
 
       if(pack_enable && op==8'h36) begin
         for(word_index=0;word_index<expected_writes;word_index=word_index+1) begin

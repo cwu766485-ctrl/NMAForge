@@ -195,14 +195,52 @@ The existing evidence boundary and analytical prefetch schedule are recorded
 in [`SHAPE_ADAPTIVE_TENSOR_ENGINE.md`](SHAPE_ADAPTIVE_TENSOR_ENGINE.md); the
 analytical schedule is not measured product-top evidence.
 
-## C–E Stage 1 entry status
+## C. Stage 1 arithmetic profile
 
-The ordered sequence has not started C–E experiments. Existing reports do not
+**Status: baseline profile complete; optimization candidacy only.** The passive
+testbench phase monitor was run with the existing VCS random-latency regression
+at seeds `20261113/20261114/20261115`, VCS
+`V-2023.12-SP1_Full64`. All three seeds passed 64/64 numeric vectors, all
+error/lifecycle checks, and existing 39-state reset/abort convergence checks.
+The monitor collected 96 operator/length instances (four ops × eight lengths
+× three seeds) and separately counted request-state cycles, response-wait
+states, divider/sqrt wait states, write states, and remaining controller
+states. The exact logs are under
+`/tmp/nmaforge_stage1_c_sfu_20261113/seed_{20261113,20261114,20261115}/run.log`.
+
+| Opcode | Operation | Mean arithmetic wait / total busy cycles | Observed range |
+|---|---|---:|---:|
+| `0x32` | Softmax | 75.3% | 74.2–77.2% |
+| `0x39` | Causal Softmax | 62.5% | 29.6–76.3% |
+| `0x33` | RMSNorm | 54.1% | 27.2–84.7% |
+| `0x38` | LayerNorm | 55.1% | 28.0–87.6% |
+
+The numerator counts cycles sampled in the SFU divider/square-root FSM wait
+states; the denominator is the DUT `cycle_count`. It is not the raw internal
+iteration count and is not a speedup estimate. Request-state cycles include
+`spad_ready` stalls; response-wait state cycles include the modeled registered
+response delay. The testbench model has randomized request stalls and ordered
+0–7-cycle response delay. Fixed divider/sqrt waits become a smaller fraction
+for longer vectors as memory and write traffic grow. This establishes that
+iterative arithmetic is a substantial component under this model, but not yet
+that an arithmetic variant can deliver the 10% end-to-end threshold. Record a
+no-change Stage 2 candidate comparison before any RTL optimization.
+
+Reproduce with:
+
+```sh
+make -C dv/block/compute/sfu/sim random-latency-regress \
+  SEEDS='20261113 20261114 20261115' \
+  OUT_DIR=/tmp/nmaforge_stage1_c_sfu_20261113
+```
+
+## D–E Stage 1 entry status
+
+The ordered sequence has not started D–E experiments. Existing reports do not
 provide the Stage 1 evidence needed to claim these directions are bottlenecks:
 
 | Direction | Stage 1 evidence available | Missing entry evidence / next action |
 |---|---|---|
-| C. SFU arithmetic | Existing SFU block regressions and opcode Golden checks establish correctness. | No per-opcode cycle partition separates SPAD request/response, divider/sqrt iteration, writeback, and controller time. Add passive phase counters to a research testbench and profile Softmax, RMSNorm, and LayerNorm before comparing arithmetic variants. |
 | D. Structured sparsity | No checked-in representative trained weight/activation set or sparsity profile is identified. | Select a representative model and freeze its hashes, dense Golden, and accuracy metric; compute block-zero ratios plus metadata bytes for candidate block sizes before any RTL prototype. |
 | E. Reconfigurable precision | Existing INT8, BF16, and FP16 functions have correctness evidence. | No workload demand matrix, common area/timing baseline, legal standard-cell/SRAM views, or current SDC is available. Define precision use cases first; do not make area/Fmax/power claims until implementation inputs are supplied. |
 
