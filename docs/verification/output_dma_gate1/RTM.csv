@@ -16,5 +16,5 @@ G1-STATUS,status consumer visibility,errorTop and directed,done_count1 B-drain s
 G1-CROSS,fault with outstanding prior bursts,not implemented,no evidence,no waiver,OPEN
 G1-CROSS-CONTEND,error while real compute competes,not implemented,no evidence,no waiver,OPEN
 G1-RESET-EXTERNAL,reset only DUT stale external responses,shared-reset contract only,no evidence,requires integration contract,OPEN
-G1-LATE-PARITY,drain earlier accepted B before error completion,directed case11 mode8,done requires no pending external B,FAIL at6045000ps done before B drain,BLOCKED_P0
+G1-LATE-PARITY,drain earlier accepted B before error completion,directed case11 mode8,done requires no pending external B,pre-fix FAIL fixed12case PASS after prior B drain,CLOSED_SCOPED
 G1-LATE-PROT,late source denial legal prefix,directed case10 mode7,independent64byte prefix Sentinel suffix,passes prior burst B drained,CLOSED_SCOPED

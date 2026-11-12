@@ -75,21 +75,29 @@ uses interface error pins;real Top source denial/parity supplies integration poi
 No complete P0 closure is claimed for those remaining crosses. Gate1 is
 **PASS_SCOPED / CLOSURE_PARTIAL**, not full DV closure; submit for review and stop.
 
-## Final admission update — BLOCKED P0 (supersedes scoped success status above)
+## Late-fault defect, minimal RTL repair and final scope
 
-Extending the deterministic suite to a second-burst fault found a real failure:
-mode8 injects parity while gathering the second burst, after64B from the first
-burst have been accepted but its delayed B has not completed. The independent
-monitor fails at6045000ps with `done before B drain`. Mode7 late request protection
-passes with64B visible prefix. The original ten cases passed, but the expanded
-12-case regression intentionally exits failure on case11. No successful Gate1
-exit is claimed. Code coverage numbers above belong to the prior10case run and
-are not coverage closure of the failing expanded run.
+The expanded12case suite reproduced a real P0:late parity in second store gather
+caused done before the prior B response (6045000ps). Failure evidence at commit
+154b479 is retained. The minimal RTL fix routes SPAD store faults with nonzero
+pending B count to existing ST_WRITE_DRAIN, and uses sticky error to choose
+ST_ERROR after drain. No new state,buffer,port or feature is added. ERR_SPAD is
+preserved for the tested OKAY prior B. Same-edge multiple-fault priority beyond
+this scope remains an explicit risk, not a claimed closure.
 
-RTL review points to the generic SPAD-fault branch assigning ST_ERROR outside
-read mode without checking pending write responses. Fixing it requires preserving
-original ERR_SPAD while draining accepted writes and testing concurrent B/error
-priority, not simply delaying the scoreboard. No RTL fix is made in this review
-checkpoint; failing test is retained as the concrete reproduction and product
-integration must remain blocked. A fix must rerun the entire12case suite, UVM and
-Top before admission. The supplied run.sh therefore correctly returns nonzero.
+All12cases now pass, including late request denial and late parity with64B visible
+prefix,one drained B,exactly-once done and no subsequent W. Existing11selected
+UVM tests (including load and SPAD error read drain) pass zero error/fatal after
+recompile. Fixed real Top fault+20random,canonical smoke and Matrix/DMA overlap
+also pass. Focused Verilator5.052 completes with inherited width warnings; no
+latch/loop/multiple-driver warning in this run, no signoff claim.
+
+Final directed URG:line69.57%,condition60.81%,FSM41.18%,branch56.31%;assertion
+success6/11,failure0,functional group100%. Metrics differ with the repaired FSM
+transition denominator; no whole-product closure claim. Case counters are in the
+fixed_observed_cases.csv. Earlier10case counts above are historical only.
+
+Final status: **PASS_SCOPED / REVIEW_REQUIRED**. Tested P0 output paths pass;
+error×real-compute-contention, simultaneous B error plus source parity,abort×fault,
+nonshared-reset interconnect and exhaustive IRQ/status crosses remain open.
+Gate1 is submitted with these explicit remaining items; no automatic Gate2/PPA.

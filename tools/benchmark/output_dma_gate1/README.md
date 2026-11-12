@@ -22,7 +22,6 @@ UVM_ERROR/FATAL both0. Top parity injection is behavioralVCS only, guarded for
 optional memory fabric hierarchy. It is not a public hardware injection feature.
 Evidence includes pre-fix failing seed and final source hashes. No DUT RTL changed.
 
-Current expanded directed suite is an expected **real failure**, not an accepted
-baseline: case11 late parity with prior pending B reports `done before B drain`.
-run.sh returns nonzero. Keep this check unchanged when fixing DMA error drain.
-Original10case success logs/coverage are historical scoped evidence only.
+The original expanded suite failed at case11 (late parity with pending B). Its
+pre-fix log is preserved. Current minimal RTL repair must pass all12cases with
+this same unchanged done-after-B check. See report for remaining cross coverage.

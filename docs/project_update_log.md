@@ -268,3 +268,10 @@ SPAD parity during second burst produces done while prior B is pending (6045000p
 `done before B drain`). Original10case pass is superseded for admission. Late
 protection case10passes64Bprefix. No DMA RTL fix or product merge is made; expanded
 run.sh deliberately fails and exact evidence retained. Gate1 exit NOT achieved.
+
+Gate1 late-parity defect fixed with existing ST_WRITE_DRAIN for pending store B;
+sticky ERR_SPAD selects error completion after drain. No new state/feature.
+Same12case directed PASS,11selected DMA UVM PASS,fixed Top fault+20random PASS,
+smoke/MatrixDMA overlap PASS. Focused Verilator retains width warnings,no structural
+signoff. Prior failed counterexample retained. Report supersedes BLOCKED_P0 for
+tested case; remaining concurrent fault/contention crosses still OPEN for review.
