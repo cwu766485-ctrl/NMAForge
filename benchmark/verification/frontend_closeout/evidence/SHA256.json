@@ -66,5 +66,6 @@
   "benchmark/verification/frontend_closeout/evidence/subsystem-urg/groups.txt.gz": "5111c738d1d51fe0df5f6125426787ca58587e95b75848e9cb136d618ba19de9",
   "benchmark/verification/frontend_closeout/evidence/subsystem-urg/asserts.txt.gz": "8db1531eece772fafa6773e46ff62cb5f38f923202e9529848e9ef13a0b9e46e",
   "benchmark/verification/frontend_closeout/evidence/subsystem-urg/modinfo.txt.gz": "bfd07ce0351267e13bf1bd39cbcb42c97be16063d6af2997664c23addb7a3ef3",
-  "benchmark/verification/frontend_closeout/evidence/subsystem-urg/grpinfo.txt.gz": "2b21522f5180a406fc45deb8b0c1ee601dd2c51ce54f1a8581712776acaab981"
+  "benchmark/verification/frontend_closeout/evidence/subsystem-urg/grpinfo.txt.gz": "2b21522f5180a406fc45deb8b0c1ee601dd2c51ce54f1a8581712776acaab981",
+  "benchmark/verification/frontend_closeout/evidence/static/spyglass-rdc.log.gz": "ad631a51e233ba7f6ff440a39d959cb7350afa6cde573d1d522013ad4ca7f001"
 }
