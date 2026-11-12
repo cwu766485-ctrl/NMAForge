@@ -41,12 +41,15 @@ view and project timing constraints.
 | 3 | Prototype the single winning arbitration/scheduling change behind an isolated profile. Check Matrix and CNM response tags/lanes, DMA fairness, ordered retirement, accepted-write prefix, and all relevant Fault/Reset/Abort paths. |
 | 4 | Keep only if Stage 4's system-level target is met without starvation, reordered side effects, changed fault visibility or completion ABI. Otherwise retain current RR/priority. |
 
-### Stage 1 A initial replay
+### Stage 1 A baseline replay
 
-**Status: PARTIAL.** Exact source SHA `f78d434` on branch
-`feat/shape-adaptive-gemv-v2`; VCS `V-2023.12-SP1_Full64`; UVM seed
-`20261113`. `dma_spad_subsystem_test` passed with UVM warning/error/fatal
-`0/0/0`, DMA functional coverage 100%, and all subsystem scoreboard checks.
+**Status: COMPLETE for the currently legal request classes.** Exact source SHA
+`a4fb84c` on branch `feat/shape-adaptive-gemv-v2`; VCS
+`V-2023.12-SP1_Full64`. The DMA/SPAD subsystem run used seed `20261113`; the
+real-top Compute Cluster UVM run used seeds `20261113/20261114/20261115`.
+Both passed with UVM warning/error/fatal `0/0/0`. DMA functional coverage was
+100%; each real-top run passed its independent memory scoreboard with 5,368
+checked words and zero mismatch, unknown or stale response.
 
 Observed measurements from `/tmp/nmaforge_stage1_a_subsystem/run.log`:
 
@@ -55,15 +58,24 @@ Observed measurements from `/tmp/nmaforge_stage1_a_subsystem/run.log`:
 | CNM×DMA primary overlap | CNM/DMA grants `7/4`; 4 CNM stall cycles; max consecutive stall streak 1; four grants after a stall; 16 accepted and returned requests per CNM lane. | Pairwise CNM/DMA shared-port progress and bounded observed stall for this directed case. |
 | FP×DMA | Two overlapping runs each observed FP/DMA contended grants `5/6`; each had 64 FP reads/responses, peak FP outstanding 2 and one output write. Other runs were isolated. | Pairwise FP/DMA contention; not SFU/DMA. |
 | Aggregate core/DMA monitor | Core reads/responses `192/192`; isolated/contended core grants `490/17`; isolated/contended DMA grants `149/55`. | Existing harness requester counters; not a per-bank histogram or compute-cycle attribution. |
+| Real-top Matrix×CNM | Each of three seeds: Matrix tag3 responses `576`, CNM tag5 responses `96`, all four CNM lanes seen, engine overlap `316` cycles, shared banked grants `60`. | Confirms the currently legal pairwise compute contention and distinct response ownership. |
+| Real-top queued work | Each seed: serial Matrix/CNM/SFU `1239` cycles; staged Matrix+CNM then SFU `1070` cycles (`1.158x`); four-task parallel sequence `1137` versus serial `1696` (`1.492x`), with 38 shared-SPAD contention cycles. | Existing fixed-workload cycle baseline; not proof of a scheduler optimization. |
+| Compute×DMA launch | Register logic starts `DMA_CTRL` only when `!processor_busy && !dma_busy`; the real-top test observes DMA after the compute workloads. | Matrix×DMA and SFU×DMA overlap is not a legal software-reachable case in this baseline; do not synthesize it by forcing internal controls. |
 
-This subsystem harness has no Matrix requester and does not isolate SFU, so it
-does not close the planned Matrix×CNM, Matrix×DMA or SFU×DMA measurements. Older
-Stage A results in
+The subsystem harness has no Matrix requester and does not isolate SFU. The
+real-top run closes Matrix×CNM, while the register gate classifies compute×DMA
+overlap as unsupported under the current control contract. The checked-in top
+sequence includes a DMA response-client read, but issues it outside compute
+busy time. There is no product-path arbiter evidence for simultaneous DMA and
+compute until that gate or descriptor behavior changes under an approved SPEC
+revision. Older Stage A results in
 [`COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md`](../verification/COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md)
-are historical SHA evidence and must not be mixed into this replay's numbers.
-The next A/Stage 1 action is to add or identify a legal real-top measurement
-scenario for Matrix and DMA, then collect matched isolated/contended baselines.
-Do not force internal signals around the documented DMA busy gate.
+are historical SHA evidence and are not mixed into this exact-SHA replay's
+numbers. For current legal behavior, A Stage 1 is complete. The per-requester
+bank histogram and wait distribution are still absent; the existing monitor
+reports aggregate bank hits, contention grants and a directed CNM stall
+streak. A Stage 2 candidate model must use those limits explicitly and must
+not claim a DMA overlap opportunity that the control ABI prevents.
 
 Reproduction used the subsystem Makefile compile target and then invoked the
 compiled image directly because `subsystem_run` prepends `./` to an absolute
@@ -81,6 +93,11 @@ make subsystem_compile SEED=20261113 COV_TAG=stage1_a_baseline \
   -cm line+cond+fsm+tgl+branch+assert \
   -cm_dir /tmp/nmaforge_stage1_a_subsystem/coverage.vdb \
   -l /tmp/nmaforge_stage1_a_subsystem/run.log
+
+cd ../../../uvm/sim
+make uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261113 20261114 20261115' \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_stage1_a_cluster_current
 ```
 
 ## B. Shape-Adaptive Dataflow + Cost Model
