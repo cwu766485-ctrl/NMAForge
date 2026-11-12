@@ -7285,6 +7285,55 @@ module tb_ai_accel_smoke;
 
         run_kv_top_protection_denial();
 
+        if ($test$plusargs("OUTPUT_DMA_GATE1")) begin : output_dma_fault_top
+            integer gi;
+            reg [31:0] gs,save_base,save_limit,save_perm;
+            axi_read(REG_REGION0_BASE,save_base);
+            axi_read(REG_REGION0_LIMIT,save_limit);
+            axi_read(REG_REGION0_PERM,save_perm);
+            for(gi=0;gi<8;gi=gi+1) begin
+                axi_write(SPAD_BASE+32'h4000+gi*4,32'h12340000+gi);
+                axi_mem_u.mem[gi+1024]=32'ha55aa55a;
+            end
+            clear_done_irq();
+            axi_write(REG_IRQ_ENABLE,1);
+            // Enabled write-only region rejects DMA source reads.
+            axi_write(REG_REGION0_BASE,32'h4000);
+            axi_write(REG_REGION0_LIMIT,32'h4020);
+            axi_write(REG_REGION0_PERM,32'ha);
+            dma_store_expect_error(32'h1000,32'h4000,8,4);
+            axi_read(REG_IRQ_STATUS,gs);
+            if(!gs[0])$fatal(1,"DMA fault IRQ missing");
+            for(gi=0;gi<8;gi=gi+1)
+                if(axi_mem_u.mem[gi+1024]!==32'ha55aa55a)$fatal(1,"protection leaked output");
+            axi_write(REG_REGION0_PERM,0);
+            clear_done_irq();
+            // Behavioral SRAM fault injection only, source parity metadata.
+`ifdef NMAFORGE_ENABLE_MEMORY_FABRIC
+            dut.memory_fabric_u.spad_subsystem_u.scratchpad_u.bank0_parity[1024]=
+              ~dut.memory_fabric_u.spad_subsystem_u.scratchpad_u.bank0_parity[1024];
+`else
+            dut.spad_subsystem_u.scratchpad_u.bank0_parity[1024]=
+              ~dut.spad_subsystem_u.scratchpad_u.bank0_parity[1024];
+`endif
+            dma_store_expect_error(32'h1000,32'h4000,8,4);
+            axi_read(REG_IRQ_STATUS,gs);
+            if(!gs[0])$fatal(1,"DMA parity IRQ missing");
+            for(gi=0;gi<8;gi=gi+1)
+                if(axi_mem_u.mem[gi+1024]!==32'ha55aa55a)$fatal(1,"parity leaked output");
+            axi_write(SPAD_BASE+32'h4000,32'h12340000);
+            clear_done_irq();
+            dma_store(32'h1000,32'h4000,8);
+            axi_read(REG_IRQ_STATUS,gs);
+            if(gs[0])$fatal(1,"success DMA unexpectedly raised processor IRQ");
+            for(gi=0;gi<8;gi=gi+1)
+                if(axi_mem_u.mem[gi+1024]!==32'h12340000+gi)$fatal(1,"DMA recovery output");
+            axi_write(REG_REGION0_BASE,save_base);
+            axi_write(REG_REGION0_LIMIT,save_limit);
+            axi_write(REG_REGION0_PERM,save_perm);
+            $display("OUTPUT_DMA_TOP_FAULT_PASS protection=1 parity=1 sentinel=1 irq_error_only=1 recovery=1");
+        end
+
         // System reset while a read burst is in flight.  In the board design
         // the same synchronized reset reaches the accelerator and PS AXI
         // fabric, so both endpoints discard the transaction together.

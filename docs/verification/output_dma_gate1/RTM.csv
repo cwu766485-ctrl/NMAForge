@@ -1,0 +1,20 @@
+requirement,spec_contract,test,checker_or_assertion,observed_evidence,status
+G1-NONVAC,Matrix capture stall safety,seed20261116 before/after,line_stall_stability_checks and capture_seen,deterministic four-edge stall counter positive,CLOSED_SCOPED
+G1-AW,AXI AW stable under stall,directed plus UVM aw_stall,ap_dma_aw_payload_stable and independent monitor,actual AW stall/stability counters,CLOSED_SCOPED
+G1-W,AXI W stable and correct,directed,ap_dma_w_payload_stable and byte scoreboard,actual W stall/stability counters,CLOSED_SCOPED
+G1-B,legal response wait,directed delayed B,done after B drain,6cycle delayed response and accepted B,CLOSED_SCOPED
+G1-BREADY,legal BVALID wait for BREADY,directed,legal matching BID pending enables BREADY,b_valid_wait=0,STRUCTURAL_EXCLUSION_REVIEW
+G1-TAIL,byte enables/final beat,directed52byte and UVM short_tail,accepted byte mask/WLAST/Sentinel,partial_beats=3,CLOSED_SCOPED
+G1-4K,no burst cross4KiB,directed80byte at0xff0,AW boundary assertion and observed0x1000,split_AW=1,CLOSED_SCOPED
+G1-BRESP,write error preserves accepted prefix,directed SLVERR and UVM,error_code3 independent prefix and done count,32accepted bytes retained,CLOSED_SCOPED
+G1-ABORT,drain accepted burst,directed and Top smoke,done_count1 no later W Sentinel suffix,64byte promised burst drains,CLOSED_SCOPED
+G1-RESET,shared reset cancellation,directed midW/delayedB,recovery and no stale W,accepted prefix only recovery succeeds,CLOSED_SHARED_RESET
+G1-PROT,protected source read denial,directed plus real Top public registers,error_code4 external Sentinel IRQ,zero leaked bytes,CLOSED_FIRST_BURST
+G1-PARITY,source parity failure,directed plus real SRAM parity injection,error_code4 external Sentinel IRQ,repaired source recovery,CLOSED_FIRST_BURST
+G1-CONTEND,sole real arbiter DMA/Matrix service,Top overlap probe,DDR/SPAD independent Golden,72overlap5stall3AW3B192bytes,CLOSED_SUCCESS_PATH
+G1-STATUS,status consumer visibility,errorTop and directed,done_count1 B-drain status IRQ error-only,success store no processor IRQ,CLOSED_SCOPED
+G1-CROSS,fault with outstanding prior bursts,not implemented,no evidence,no waiver,OPEN
+G1-CROSS-CONTEND,error while real compute competes,not implemented,no evidence,no waiver,OPEN
+G1-RESET-EXTERNAL,reset only DUT stale external responses,shared-reset contract only,no evidence,requires integration contract,OPEN
+G1-LATE-PARITY,drain earlier accepted B before error completion,directed case11 mode8,done requires no pending external B,FAIL at6045000ps done before B drain,BLOCKED_P0
+G1-LATE-PROT,late source denial legal prefix,directed case10 mode7,independent64byte prefix Sentinel suffix,passes prior burst B drained,CLOSED_SCOPED

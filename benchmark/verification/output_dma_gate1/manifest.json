@@ -1,0 +1,12 @@
+{
+  "base_sha": "14c3f8a9adbb98070b08d617bb0c953a9abb8d47",
+  "status": "BLOCKED_P0_LATE_PARITY_WITH_PENDING_B",
+  "tool": "VCS V-2023.12-SP1_Full64",
+  "rtl_modified": false,
+  "source_hashes": {
+    "dv/block/dma/tb/tb_output_dma_gate1.sv": "7fdbc1dfc7968f3d12548ce53348b9ed3d6a8364d521c4b147f8ffcb809f9872",
+    "dv/block/compute/matrix/tb/tb_ai_tensor_matrix_core_random.sv": "9e7401b88126224fa3fcfc78856946927f70364821976185a893d65268d07bc0",
+    "dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv": "c79681a3e80b00ce0cfd9c0ff225d0dafcb7d23581b70230ee57d1f71a9ef925",
+    "tools/benchmark/output_dma_gate1/run.sh": "c3069ee35a09773e42028a79b38914bb09935c852e57b3016736e0f51cdf1513"
+  }
+}

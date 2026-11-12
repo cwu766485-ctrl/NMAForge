@@ -248,3 +248,23 @@ LN32 directed checks replayed; transparent Matrix→Requant fusion REJECT.
 Reports `docs/research/final_ab`, commands `tools/benchmark/final_ab/README.md`.
 PhaseD/E not complete, ASIC_MAPPING_BLOCKED pending compatible128KiB macro evidence.
 Stop for A/B review per attachment, no automatic merge/freeze/signoff.
+
+## Output DMA Gate1 DV checkpoint
+
+Dedicated feat/output-dma-gate1 from14c3f8a9, no product RTL changes.
+Reproduced20261116capture backpressure nonvacuity failure; deterministic responder
+stall preserves original monitor and asserts positive payload-stability samples.
+Same seed and20261112/13 pass. New10case accepted-AW/W independent-byte/Sentinel
+scoreboard covers partial WSTRB,4KiB,BRESP,abort drain,request denial,parity,midW
+and delayed-B reset,recovery;11AXI assertions active. Nine selected DMA UVM tests
+pass. Real Top output protection/parity/error-only IRQ and recovery run,real
+Matrix/DMA overlap72cycles/5stalls passes. Reports/RTM and exact commands under
+`docs/verification/output_dma_gate1` and `tools/benchmark/output_dma_gate1`.
+Remaining fault×outstanding-B/contention and unreset external response semantics
+are explicit OPEN items; no overall P0,DV,ASIC closure or automatic merge.
+
+Final Gate1 audit expanded late-fault checks and found BLOCKED_P0: case11 late
+SPAD parity during second burst produces done while prior B is pending (6045000ps,
+`done before B drain`). Original10case pass is superseded for admission. Late
+protection case10passes64Bprefix. No DMA RTL fix or product merge is made; expanded
+run.sh deliberately fails and exact evidence retained. Gate1 exit NOT achieved.

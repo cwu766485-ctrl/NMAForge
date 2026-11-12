@@ -1193,7 +1193,7 @@ module tb_ai_tensor_matrix_core_random;
     integer row_group,col_group,row_lane,col_lane,k_lane;
     integer line_address,line_index,consumer_read_snapshot;
     integer producer_bank_snapshot,accumulated,word_index,timeout;
-    integer producer_cycles,consumer_cycles,consumer_bank_reads;
+    integer producer_cycles,consumer_cycles,consumer_bank_reads,stall_snapshot;
     integer consumer_forward_hits,consumer_reads_saved,consumer_bank_flip;
     reg [31:0] packed_word;
     begin
@@ -1211,7 +1211,20 @@ module tb_ai_tensor_matrix_core_random;
       prepare_case(16,16,4,1,0,0,0,0,0,0,0);
       op_mode=8'h53;
       aux0=32'h0000_0021; // requant shift 1 + opt-in tile capture bit 5
-      launch_and_wait();
+      // Deterministically stall the first capture request. The existing
+      // monitor must observe VALID && !READY and verify payload stability.
+      stall_snapshot=line_stall_stability_checks;
+      force_line_stall=1;
+      fork
+        launch_and_wait();
+        begin
+          wait(line_valid);
+          repeat(4) @(negedge clk);
+          force_line_stall=0;
+        end
+      join
+      if(line_stall_stability_checks<=stall_snapshot)$fatal(1,"capture stall stability vacuous");
+      $display("MATRIX_CAPTURE_DETERMINISTIC_STALL_PASS checks=%0d",line_stall_stability_checks-stall_snapshot);
       if(error || error_code!=0 || element_count!=32'd256 ||
          line_write_count!=16 || scalar_write_count!=0)
         $fatal(1,"tile-forward producer completion error=%b code=%0d elements=%0d lines=%0d scalar=%0d",
