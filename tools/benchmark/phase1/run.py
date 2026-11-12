@@ -20,8 +20,9 @@ def profile_wrapper(name):
 # Fixed shape kernels through real CMDQ/SPAD/0x30 or dense product0x52.
 # Keep the original reference rows and add the missing K/M sweep used by the
 # architecture plan.  These are all product descriptors, not core-only tests.
-cases = [(0x30,4,4,32),(0x30,16,16,16),(0x30,16,16,32),
-         (0x30,32,32,64),(0x30,16,16,128)]
+cases = [(0x30,4,4,32),(0x30,4,4,128),(0x30,16,16,16),
+         (0x30,16,16,32),(0x30,16,16,128),(0x30,32,32,64),
+         (0x30,32,32,128)]
 cases += [(0x52,m,16,k) for m in [1,4,8,16] for k in [16,32,64,128]]
 for op,m,n,k in cases:
  name=f'kernel_{op:02x}_{m}_{n}_{k}';d=a.out/name;d.mkdir(exist_ok=True)
