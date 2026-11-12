@@ -71,11 +71,9 @@ compute until that gate or descriptor behavior changes under an approved SPEC
 revision. Older Stage A results in
 [`COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md`](../verification/COMPUTE_CLUSTER_STAGE_A_AND_BENCHMARKS_2026-10-26.md)
 are historical SHA evidence and are not mixed into this exact-SHA replay's
-numbers. For current legal behavior, A Stage 1 is complete. The per-requester
-bank histogram and wait distribution are still absent; the existing monitor
-reports aggregate bank hits, contention grants and a directed CNM stall
-streak. A Stage 2 candidate model must use those limits explicitly and must
-not claim a DMA overlap opportunity that the control ABI prevents.
+numbers. For current legal behavior, A Stage 1 is complete. The real-top run
+shows the data-plane classes and the currently legal compute pair contention;
+compute×DMA remains excluded by the control ABI.
 
 Reproduction used the subsystem Makefile compile target and then invoked the
 compiled image directly because `subsystem_run` prepends `./` to an absolute
@@ -98,6 +96,35 @@ cd ../../../uvm/sim
 make uvm_compute_cluster_regress \
   COMPUTE_CLUSTER_UVM_SEEDS='20261113 20261114 20261115' \
   COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_stage1_a_cluster_current
+```
+
+## A. Stage 2–4 candidate decision
+
+**Stage 2 result: no candidate has a measured benefit in the current legal
+workloads. Stage 3: no product RTL prototype. Stage 4: defer A.** This is a
+no-go based on the exercised request set, not a claim that bank-aware
+arbitration cannot help a different legal workload.
+
+| Candidate | Measured opportunity | Limitation / result |
+|---|---|---|
+| Bank-disjoint per-bank co-issue | Passive monitor compares scalar address bank `[3:2]` with live CNM lane mask. Three real-top seeds reported zero disjoint and zero conflicting scalar/CNM overlap cycles. | No co-issue opportunity appeared in this traffic. Matrix banked reads use all four banks in one request; the staged Matrix/CNM sequence observed 32 competing cycles, all conflicting with Matrix's four-bank mask. |
+| Compute×DMA co-issue | None. | `DMA_CTRL` cannot start while `processor_busy`; no legal workload can exploit this without an approved control/SPEC change. |
+| Dependency/credit launch scheduling | Existing four-task parallel work was 1,137 cycles versus 1,696 serial cycles. | This measures existing engine parallelism, not credits or a new issue policy. The speedup cannot be attributed to a scheduler candidate. |
+
+The bank-mask counters are passive testbench instrumentation. They do not
+model simultaneous macro-port collision rules or authorize co-issuing
+requests. No candidate meets the 10% system-level gate in the current legal
+workload, so no arbiter, port, dependency or ABI behavior was changed. Revisit
+A only if a representative legal workload shows scalar/CNM disjoint-bank
+overlap or a separately approved contract permits compute/DMA overlap.
+
+Reproduce the real-top candidate measurements from product RTL SHA `a4fb84c`
+with the checked-in passive monitor:
+
+```sh
+make -C dv/uvm/sim uvm_compute_cluster_regress \
+  COMPUTE_CLUSTER_UVM_SEEDS='20261113 20261114 20261115' \
+  COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_stage2_a_bankmask
 ```
 
 ## B. Shape-Adaptive Dataflow + Cost Model

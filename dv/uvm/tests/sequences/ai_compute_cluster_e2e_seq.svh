@@ -1683,5 +1683,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             overlap_total, contention_total,
             banked_grants_total, cnm_grants_total,
             core_grants_total), UVM_LOW)
+        `uvm_info("CLUSTER_BANK_CONFLICT_PROFILE", $sformatf(
+            "live scalar/CNM overlaps with disjoint bank masks=%0d conflicting bank masks=%0d; passive counters only",
+            compute_vif.core_cnm_disjoint_opportunity_cycles,
+            compute_vif.core_cnm_conflict_cycles), UVM_LOW)
     endtask
 endclass

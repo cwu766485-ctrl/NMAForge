@@ -27,6 +27,7 @@ interface ai_compute_cluster_if(input logic aclk);
     logic [6:0] engine_req_write;
     logic [223:0] engine_req_addr, engine_req_wdata;
     logic core_spad_valid;
+    logic [31:0] core_spad_addr;
     logic banked_valid;
     logic [3:0] cnm_valid;
     logic core_ready;
@@ -92,6 +93,8 @@ interface ai_compute_cluster_if(input logic aclk);
     integer arb_core_grants;
     integer matrix_cnm_overlap_cycles;
     integer matrix_cnm_shared_accept_cycles;
+    integer core_cnm_disjoint_opportunity_cycles;
+    integer core_cnm_conflict_cycles;
     integer matrix_tag_response_count;
     integer cnm_tag_response_count;
     logic [3:0] cnm_response_lane_seen;
@@ -322,6 +325,8 @@ interface ai_compute_cluster_if(input logic aclk);
             arb_core_grants <= 0;
             matrix_cnm_overlap_cycles <= 0;
             matrix_cnm_shared_accept_cycles <= 0;
+            core_cnm_disjoint_opportunity_cycles <= 0;
+            core_cnm_conflict_cycles <= 0;
             matrix_tag_response_count <= 0;
             cnm_tag_response_count <= 0;
             cnm_response_lane_seen <= 4'd0;
@@ -352,6 +357,18 @@ interface ai_compute_cluster_if(input logic aclk);
             if (rsp_valid) response_count <= response_count + 1;
             if (parallel_queue_mode && engine_busy[2] && engine_busy[3])
                 matrix_cnm_overlap_cycles <= matrix_cnm_overlap_cycles + 1;
+            // A scalar core request uses one bank selected by address[3:2].
+            // CNM lane bits map directly to the four physical banks. These
+            // counters estimate whether a per-bank scheduler could co-issue
+            // the live requests; they do not change DUT grants or prove SRAM
+            // collision behavior.
+            if (core_spad_valid && (|cnm_request_valid)) begin
+                if (cnm_request_valid[core_spad_addr[3:2]])
+                    core_cnm_conflict_cycles <= core_cnm_conflict_cycles + 1;
+                else
+                    core_cnm_disjoint_opportunity_cycles <=
+                        core_cnm_disjoint_opportunity_cycles + 1;
+            end
             // Observe both requesters before the single-owner arbiter. Its
             // selected outputs are mutually exclusive by construction.
             if (matrix_request_valid && (|cnm_request_valid) &&

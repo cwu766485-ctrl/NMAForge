@@ -56,6 +56,7 @@ module tb_ai_accel_uvm;
     assign compute_obs.engine_req_addr = dut.compute_engine_req_addr;
     assign compute_obs.engine_req_wdata = dut.compute_engine_req_wdata;
     assign compute_obs.core_spad_valid = dut.core_spad_valid;
+    assign compute_obs.core_spad_addr = dut.core_spad_addr;
     assign compute_obs.banked_valid = dut.arb_banked_valid;
     assign compute_obs.cnm_valid = dut.arb_cnm_valid;
     assign compute_obs.core_ready = dut.arb_core_ready;
