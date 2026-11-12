@@ -151,17 +151,32 @@ Equal-weight geometric mean baseline/adaptive cycle ratio over 27 instances
 was `1.0290` (2.9% improvement). Shape means were `1.1181` for `1x8x64`,
 `1.0434` for `4x8x64`, `1.0763` for `1x13x64`, and `1.0302` for `4x13x64`;
 the remaining five shapes were `1.0000`. The adaptive policy selected GEMV
-for M=1/4 cases and GEMM for M=8/16. Baseline and adaptive arbiter wait
+for the five M=1/4, K=64 shapes and retained GEMM for `1x13x17` and all
+M=8/16 cases. Baseline and adaptive arbiter wait
 counts matched for every paired run, so the observed savings came from the
 kernel schedule in this wrapper, not reduced arbitration. The tested workload
 uses the real four-bank `ai_spad_arbiter` and behavioral `ai_scratchpad`, but
 the adaptive kernel is not connected to the production Matrix command path;
 this does not calibrate product GEMM cost terms or establish ASIC PPA.
 
-The result is below the roadmap's 10% continuation threshold across the full
-shape suite. Do not integrate this policy into product Matrix RTL. Stage 2 may
-continue as a research-only model comparison; Stage 3 product integration is
-deferred unless a representative held-out suite changes the Stage 4 decision.
+Stage 2 has a bounded comparison from the earlier 12-shape/144-row kernel
+ablation: baseline, GEMV-fold, and fixed-bandwidth-prefetch schedules were
+compared at matched 256-MAC capacity. The model reported mean GEMV speedups of
+`1.5877x` with prefetch off and `1.1597x` with prefetch on; modeled prefetch
+assumes ideal bank striping and has zero bank stalls by construction. The
+real-arbiter wrapper's 27 paired cases measured only `1.0290x` geometric mean.
+There is no held-out shape set and no executable double-buffer candidate, so
+Stage 2 is **PARTIAL**, not closed.
+
+Stage 3's isolated GEMV kernel and real-SPAD wrapper provide a bounded
+research prototype. Golden, full output image, abort, and reset with an
+accepted read passed; protection/parity fault injection, variable response
+latency, and product Matrix integration are not exercised. The prototype is
+not eligible for promotion. Stage 4 product decision: **DEFER**. The measured
+suite is below the 10% gate, with no held-out validation or legal PPA inputs.
+Keep the existing product Matrix path unchanged. Reopen only with a held-out
+representative suite and executable double-buffer comparison that can change
+the end-to-end result.
 The exact rows and tool metadata are in
 [`shape_adaptive_spad_ablation.csv`](../../benchmark/shape_adaptive_spad_ablation.csv)
 and [`shape_adaptive_spad_summary.json`](../../benchmark/shape_adaptive_spad_summary.json).
@@ -179,6 +194,22 @@ make -C dv/research/shape_adaptive/sim shape-adaptive-spad-regress \
 The existing evidence boundary and analytical prefetch schedule are recorded
 in [`SHAPE_ADAPTIVE_TENSOR_ENGINE.md`](SHAPE_ADAPTIVE_TENSOR_ENGINE.md); the
 analytical schedule is not measured product-top evidence.
+
+## C–E Stage 1 entry status
+
+The ordered sequence has not started C–E experiments. Existing reports do not
+provide the Stage 1 evidence needed to claim these directions are bottlenecks:
+
+| Direction | Stage 1 evidence available | Missing entry evidence / next action |
+|---|---|---|
+| C. SFU arithmetic | Existing SFU block regressions and opcode Golden checks establish correctness. | No per-opcode cycle partition separates SPAD request/response, divider/sqrt iteration, writeback, and controller time. Add passive phase counters to a research testbench and profile Softmax, RMSNorm, and LayerNorm before comparing arithmetic variants. |
+| D. Structured sparsity | No checked-in representative trained weight/activation set or sparsity profile is identified. | Select a representative model and freeze its hashes, dense Golden, and accuracy metric; compute block-zero ratios plus metadata bytes for candidate block sizes before any RTL prototype. |
+| E. Reconfigurable precision | Existing INT8, BF16, and FP16 functions have correctness evidence. | No workload demand matrix, common area/timing baseline, legal standard-cell/SRAM views, or current SDC is available. Define precision use cases first; do not make area/Fmax/power claims until implementation inputs are supplied. |
+
+These are entry gates, not completed experiments. Work proceeds C, then D, then
+E only after the preceding direction has a recorded Stage 4 decision; missing
+external model or implementation inputs must be recorded as deferred rather
+than replaced with synthetic evidence.
 
 ## C. SFU Iterative Arithmetic Optimization
 
