@@ -135,3 +135,9 @@ fault timing or closed-loop arbitration. No streaming RTL admitted/implemented.
 Decision RETAIN_LN32 / DESIGN_PARTIAL. Five reports in `docs/research/phase2/`;
 commands in `tools/benchmark/phase2/README.md`; public archive validated with
 `python3 tools/benchmark/phase2/validate.py`. Stop after Gates1/2.
+
+## Frontend closeout Gate2–5 candidate
+
+Created isolated `candidate/frontend-closeout` from remote product c93ea14. Tested RTL fc60f95; retained protected ping-pong, bounded offline mapper, existing output DMA scheduling and source-fault response drain fix. Fixed mux combinational temporary and split return dependencies; Verilator LATCH10→0/UNOPTFLAT3→0. CNN11376cycles; delivery19507→15437; H16/H32 65771/350155. Scoped Golden/fault tests pass. Seven-engine UVM128KiB fails old0x7d000fixture; global DV HOLD. ASIC mapping blocked by absent configured libraries/macros/wrappers. No merge or PPA/signoff claim. See NMAFORGE_FRONTEND_CLOSEOUT.md and reproducible run.sh; evidence manifest pins RTL/workloads. Original worktrees and PR#5 preserved.
+
+Descriptor-validator old reserved-bit vector corrected to bit8 (bit7 is existing Row-Major). Re-run PASS29legal/33invalid/43accepted/26rejected; failing-before log retained. SpyGlass single-clock depth256 CDC0errors/2warnings; final lint0errors/467warnings. No broad static waiver.
