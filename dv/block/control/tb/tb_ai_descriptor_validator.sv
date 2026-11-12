@@ -228,7 +228,7 @@ module tb_ai_descriptor_validator;
         check_boundary_accept("legacy 0x30 aux0 behavior remains accepted");
         set_legal_defaults(8'h53); version=8'd3; check_invalid("0x53 requires ABI v7");
         set_legal_defaults(8'h53); m_size=16'd16; n_size=16'd16;
-        k_words=16'd4; aux0=32'h80; check_invalid("0x53 reserved aux bit");
+        k_words=16'd4; aux0=32'h100; check_invalid("0x53 reserved aux bit8");
         set_legal_defaults(8'h53); m_size=16'd8; n_size=16'd16;
         k_words=16'd4; aux0=32'h20; check_invalid("0x53 tile capture shape");
         set_legal_defaults(8'h53); m_size=16'd16; n_size=16'd16;

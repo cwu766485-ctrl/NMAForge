@@ -10,7 +10,8 @@ module ai_tensor_matrix_core #(
     parameter integer ENABLE_A_TILE_CACHE = 1,
     parameter integer ENABLE_NEXT_K_PREFETCH = 1,
     parameter integer ENABLE_GEMV_B_TILE_CACHE = 1,
-    parameter integer ENABLE_ELASTIC_TILE_FORWARDING = 1
+    parameter integer ENABLE_ELASTIC_TILE_FORWARDING = 1,
+    parameter integer ENABLE_FUSED_PINGPONG_WRITEBACK = 1
 )(
     input  wire        clk,
     input  wire        resetn,
@@ -187,6 +188,12 @@ module ai_tensor_matrix_core #(
     reg [127:0] fused_line_buffer_r;
     reg fused_commit_pending_r;
     wire [31:0] fused_word_current;
+    // Two ordered output lines. The original register is bank zero; packing
+    // never changes a full bank, even while its protected write is stalled.
+    reg [127:0] fused_line_buffer1_r;
+    reg [31:0] fused_line_addr0_r, fused_line_addr1_r;
+    reg [1:0] fused_line_full_r;
+    reg fused_pack_bank_r, fused_commit_bank_r, fused_pack_done_r;
 
     // Optional 16x16 INT8 producer/consumer tile cache. Two physical banks
     // allow a consumer to read the previous tile while a fused command fills
@@ -440,6 +447,16 @@ module ai_tensor_matrix_core #(
     wire scalar_output_valid = !gemv_kfold_r ||
         (({28'd0,write_col_r} + {30'd0,write_lane_r}) < valid_cols);
     wire fused_requant_output = fused_output_r;
+    // Preserve the legacy path for partial tiles, other arrays/layouts and
+    // explicit elastic forwarding (whose capture index uses commit pointers).
+    wire fused_pingpong = (ENABLE_FUSED_PINGPONG_WRITEBACK != 0) && (ARRAY_SIZE == 16) &&
+        fused_requant_output && (valid_rows == 16) && (valid_cols == 16) &&
+        (!fused_linearized_output_r || fused_linearized_full_row) &&
+        (dst_tile_base_r[3:0] == 0) &&
+        !tile_forward_capture_active_r && !tile_forward_consume_active_r;
+    wire [127:0] fused_commit_data = fused_commit_bank_r ?
+        fused_line_buffer1_r : fused_line_buffer_r;
+    wire fused_pingpong_commit = fused_line_full_r[fused_commit_bank_r] && line_ready;
     wire gemv_kfold_command = (op_mode == OP_TENSOR_GEMV_KFOLD);
     wire valid_operation = (op_mode == OP_TENSOR_GEMM) ||
                            (op_mode == OP_TENSOR_BATCH_GEMM) ||
@@ -490,11 +507,13 @@ module ai_tensor_matrix_core #(
                                 (prefetch_state_r == PF_IDLE) &&
                                 gemv_b_prefetch_hit && !abort &&
                                 !watchdog_expired;
-    wire output_write_accepted = (line_store_eligible && line_ready &&
+    wire output_write_accepted = fused_pingpong ? fused_pingpong_commit :
+                                (line_store_eligible && line_ready &&
                                   (!fused_requant_output || fused_commit_pending_r)) ||
                                  (!line_store_eligible && scalar_output_valid &&
                                   spad_ready);
-    wire output_write_has_protection_error =
+    wire output_write_has_protection_error = fused_pingpong ?
+        line_protection_error :
         (line_store_eligible && line_protection_error &&
          (!fused_requant_output || fused_commit_pending_r)) ||
         (!line_store_eligible && scalar_output_valid && spad_protection_error);
@@ -718,6 +737,12 @@ module ai_tensor_matrix_core #(
         line_wdata = fused_linearized_output_r ? fused_linearized_line_data :
                      (fused_requant_output ? fused_line_buffer_r :
                       {write_result3,write_result2,write_result1,write_result0});
+        if (fused_pingpong) begin
+            line_valid = (state_r == ST_WRITE) &&
+                         fused_line_full_r[fused_commit_bank_r];
+            line_addr = fused_commit_bank_r ? fused_line_addr1_r : fused_line_addr0_r;
+            line_wdata = fused_commit_data;
+        end
 
         if (state_r == ST_PREP_MAC)
             array_load_lane = 2'd0;
@@ -961,6 +986,13 @@ module ai_tensor_matrix_core #(
             dst_row_stride_r <= 32'd0;
             fused_line_buffer_r <= 128'd0;
             fused_commit_pending_r <= 1'b0;
+            fused_line_buffer1_r <= 128'd0;
+            fused_line_addr0_r <= 32'd0;
+            fused_line_addr1_r <= 32'd0;
+            fused_line_full_r <= 2'b00;
+            fused_pack_bank_r <= 1'b0;
+            fused_commit_bank_r <= 1'b0;
+            fused_pack_done_r <= 1'b0;
             tile_forward_valid_r <= 1'b0;
             tile_forward_bank_r <= 1'b0;
             tile_forward_tag_base_r <= 32'd0;
@@ -1271,6 +1303,10 @@ module ai_tensor_matrix_core #(
                             write_col_r <= {TILE_INDEX_WIDTH{1'b0}};
                             write_lane_r <= 2'd0;
                             fused_commit_pending_r <= 1'b0;
+                            fused_line_full_r <= 2'b00;
+                            fused_pack_bank_r <= 1'b0;
+                            fused_commit_bank_r <= 1'b0;
+                            fused_pack_done_r <= 1'b0;
                             tile_forward_consume_active_r <=
                                 tile_forward_consume_request;
                             tile_forward_read_bank_r <= tile_forward_bank_r;
@@ -1510,7 +1546,73 @@ module ai_tensor_matrix_core #(
                     end
 
                     ST_WRITE: begin
-                        if (!line_store_eligible && !scalar_output_valid) begin
+                        if (fused_pingpong) begin
+                            // Protection failure at the head wins over local
+                            // packing. No younger line is offered or retired.
+                            if (output_write_accepted && output_write_has_protection_error) begin
+                                fused_line_full_r <= 2'b00;
+                                error_code <= ERR_PROTECTION;
+                                state_r <= ST_ERROR;
+                            end else begin
+                                if (output_write_accepted) begin
+                                    fused_line_full_r[fused_commit_bank_r] <= 1'b0;
+                                    fused_commit_bank_r <= ~fused_commit_bank_r;
+                                    result <= {{24{fused_commit_data[127]}},
+                                                fused_commit_data[127:120]};
+                                    element_count <= element_count +
+                                        (fused_linearized_output_r ? 32'd4 : 32'd16);
+                                    // The final commit is the drain barrier.
+                                    // Only ST_NEXT may clear the accumulator.
+                                    if (fused_pack_done_r &&
+                                        !fused_line_full_r[~fused_commit_bank_r])
+                                        state_r <= ST_NEXT;
+                                end
+                                if (!fused_pack_done_r && !fused_line_full_r[fused_pack_bank_r]) begin
+                                    if (fused_pack_bank_r)
+                                        fused_line_buffer1_r[(fused_linearized_full_row ?
+                                            {write_col_r[3:2],5'b0} : {write_lane_r,5'b0}) +: 32] <= fused_word_current;
+                                    else
+                                        fused_line_buffer_r[(fused_linearized_full_row ?
+                                            {write_col_r[3:2],5'b0} : {write_lane_r,5'b0}) +: 32] <= fused_word_current;
+                                    if ((fused_linearized_full_row && write_col_r == 12) ||
+                                        (!fused_linearized_full_row && write_lane_r == 3)) begin
+                                        fused_line_full_r[fused_pack_bank_r] <= 1'b1;
+                                        if (fused_pack_bank_r)
+                                            fused_line_addr1_r <= fused_linearized_full_row ?
+                                                fused_linearized_line_addr : write_row_addr;
+                                        else
+                                            fused_line_addr0_r <= fused_linearized_full_row ?
+                                                fused_linearized_line_addr : write_row_addr;
+                                        fused_pack_bank_r <= ~fused_pack_bank_r;
+                                        if (fused_linearized_full_row) begin
+                                            write_col_r <= 0;
+                                            if (write_lane_r != 3) write_lane_r <= write_lane_r + 1'b1;
+                                            else begin
+                                                write_lane_r <= 0;
+                                                if (write_row_r == 12) fused_pack_done_r <= 1'b1;
+                                                else begin
+                                                    write_row_r <= write_row_r + 4;
+                                                    dst_row_addr_r <= dst_row_addr_r + (dst_row_stride_r << 2);
+                                                end
+                                            end
+                                        end else begin
+                                            write_lane_r <= 0;
+                                            if (write_col_r != 12) write_col_r <= write_col_r + 4;
+                                            else begin
+                                                write_col_r <= 0;
+                                                if (write_row_r == 12) fused_pack_done_r <= 1'b1;
+                                                else begin
+                                                    write_row_r <= write_row_r + 4;
+                                                    dst_row_addr_r <= dst_row_addr_r + dst_row_stride_r;
+                                                end
+                                            end
+                                        end
+                                    end else if (fused_linearized_full_row)
+                                        write_col_r <= write_col_r + 4;
+                                    else write_lane_r <= write_lane_r + 1'b1;
+                                end
+                            end
+                        end else if (!line_store_eligible && !scalar_output_valid) begin
                             write_lane_r <= 2'd0;
                             if (({28'd0,write_col_r} + 32'd4) < valid_cols) begin
                                 write_col_r <= write_col_r + 4;
@@ -1612,6 +1714,10 @@ module ai_tensor_matrix_core #(
                     end
 
                     ST_NEXT: begin
+                        fused_line_full_r <= 2'b00;
+                        fused_pack_bank_r <= 1'b0;
+                        fused_commit_bank_r <= 1'b0;
+                        fused_pack_done_r <= 1'b0;
                         k_group_r <= 16'd0;
                         read_group_r <= 3'd0;
                         lane_r <= 2'd0;
