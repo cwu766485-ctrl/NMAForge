@@ -23,3 +23,5 @@ Follow-up: reserved-bit rejection vector corrected from bit7 to actual reserved 
 No new formal proofs were executed. The present dynamic SVA successes do not substitute for progress, reset-release or ownership formal signoff. Open static messages receive no automatic waiver; acceptance requires named reviewer and rationale.
 
 The raw three-seed subsystem URG text dashboard/groups/asserts are archived separately; do not confuse its combined group79.74% with store-only handshake100% or whole-project functional closure.
+
+RDC attempt on the same checkpoint/depth256 was terminated after roughly five minutes in `Ar_resetcross01` without final goal summary. CPU was active; no tool failure or proof result is inferred. Status **INCOMPLETE / bounded-run terminated**, not PASS. Partial textual log is archived. Full reset crossing analysis remains a release blocker.
