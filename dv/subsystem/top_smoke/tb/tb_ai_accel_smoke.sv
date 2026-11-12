@@ -4494,6 +4494,9 @@ module tb_ai_accel_smoke;
         reg [1023:0] dma_payload_file;
         reg [1023:0] dma_plan_file;
         reg use_dma_preload;
+        integer sys_start, sys_loaded, sys_cmd_begin, sys_completed, sys_consumed;
+        integer sys_output_begin, sys_end, sys_base, sys_words, sys_i;
+        reg system_mode;
         integer image_count;
         integer golden_count;
         integer image_index;
@@ -4550,6 +4553,14 @@ module tb_ai_accel_smoke;
                 !$value$plusargs("AI_REPRESENTATIVE_DESC_COUNT=%d", descriptor_count) ||
                 !$value$plusargs("AI_REPRESENTATIVE_USEFUL_MACS=%d", useful_macs))
                 $fatal(1, "representative model mode requires memory, golden, queue and MAC plusargs");
+            system_mode = $test$plusargs("SYSTEM_TIMELINE");
+            sys_start=0;
+            if(system_mode && $test$plusargs("SYSTEM_BACKPRESSURE")) begin
+                axi_mem_u.ready_gap_cfg=3;
+                axi_mem_u.read_gap_cfg=3;
+                axi_mem_u.arready_gap_cfg=3;
+                axi_mem_u.awready_gap_cfg=3;
+            end
             use_dma_preload = $test$plusargs("AI_REPRESENTATIVE_DMA_PRELOAD");
             prefill_descriptor_count = 0;
             void'($value$plusargs("AI_REPRESENTATIVE_PREFILL_DESC_COUNT=%d",
@@ -4606,6 +4617,7 @@ module tb_ai_accel_smoke;
                 r20_dma_read_latency_sum = 0;
                 r20_dma_read_latency_max = 0;
                 r20_dma_read_latency_count = 0;
+                if(system_mode) sys_start=transformer_top_cycle_counter;
                 axi_write(REG_DMA_ROW_WORDS, 32'd0);
                 axi_write(REG_DMA_ROW_COUNT, 32'd0);
                 axi_write(REG_DMA_EXT_STRIDE, 32'd0);
@@ -4680,8 +4692,9 @@ module tb_ai_accel_smoke;
                 representative_load_measure = 1'b0;
             end
 
+            sys_loaded=transformer_top_cycle_counter;
             // Prove every expected result was poisoned before the first command.
-            for (golden_index = 0; golden_index < golden_count; golden_index = golden_index + 1) begin
+            if(!system_mode) for (golden_index = 0; golden_index < golden_count; golden_index = golden_index + 1) begin
                 axi_read(SPAD_BASE + representative_golden_words[1 + 2 * golden_index],
                          read_value);
                 if (read_value !== 32'ha55a_a55a)
@@ -4730,6 +4743,7 @@ module tb_ai_accel_smoke;
             transformer_top_final_captured = 1'b0;
             for (poll_index = 0; poll_index < 13; poll_index = poll_index + 1)
                 transformer_top_prefill_profile[poll_index] = 0;
+            sys_cmd_begin=transformer_top_cycle_counter;
             transformer_top_timing_enable = 1'b1;
             axi_write(REG_DOORBELL, 32'd1);
             for (poll_index = 0; poll_index < 2000000 &&
@@ -4745,6 +4759,7 @@ module tb_ai_accel_smoke;
                 $fatal(1, "representative model queue did not retire all commands head=%0d tail=%0d",
                        dut.processor_cmdq_head, dut.processor_cplq_tail);
 
+            sys_completed=transformer_top_final_end_cycle;
             for (completion_index = 0; completion_index < descriptor_count;
                  completion_index = completion_index + 1) begin
                 axi_read(SPAD_BASE + completion_base + completion_index * 16, read_value);
@@ -4755,6 +4770,44 @@ module tb_ai_accel_smoke;
                 if (status_value !== 32'd1)
                     $fatal(1, "representative completion failed index=%0d status=%08h",
                            completion_index, status_value);
+            end
+            sys_consumed=transformer_top_cycle_counter;
+            if(system_mode) begin
+                if(!use_dma_preload ||
+                   !$value$plusargs("SYSTEM_OUTPUT_BASE=%d",sys_base) ||
+                   !$value$plusargs("SYSTEM_OUTPUT_WORDS=%d",sys_words) ||
+                   sys_words<=0 || sys_words>1024 || sys_words%4 || sys_base%16)
+                    $fatal(1,"invalid system output geometry");
+                sys_output_begin=transformer_top_cycle_counter;
+                if($test$plusargs("SYSTEM_OUTPUT_DMA")) begin
+                    axi_write(REG_DMA_EXT_ADDR,32'h3000);
+                    axi_write(REG_DMA_SPAD_ADDR,sys_base);
+                    axi_write(REG_DMA_LENGTH,sys_words);
+                    axi_write(REG_DMA_CTRL,32'h3);
+                    for(sys_i=0;sys_i<200000 && !dut.dma_done && !dut.dma_error;sys_i=sys_i+1)
+                        @(posedge aclk);
+                    axi_read(REG_DMA_STATUS,status_value);
+                    if(sys_i==200000 || dut.dma_error || status_value[2] || !status_value[1])
+                        $fatal(1,"system output DMA failure %h",status_value);
+                    axi_write(REG_DMA_STATUS,32'd2);
+                end else begin
+                    for(sys_i=0;sys_i<sys_words;sys_i=sys_i+1) begin
+                        axi_read(SPAD_BASE+sys_base+sys_i*4,read_value);
+                        // Consumer-owned reference storage: no host CPU timing modeled.
+                        axi_mem_u.mem[3072+sys_i]=read_value;
+                    end
+                end
+                sys_end=transformer_top_cycle_counter;
+                for(sys_i=0;sys_i<golden_count;sys_i=sys_i+1)
+                    if(representative_golden_words[1+2*sys_i]>=sys_base &&
+                       representative_golden_words[1+2*sys_i]<sys_base+sys_words*4)
+                        if(axi_mem_u.mem[3072+(representative_golden_words[1+2*sys_i]-sys_base)/4]
+                            !==representative_golden_words[2+2*sys_i])
+                            $fatal(1,"system endpoint Golden mismatch");
+                $display("SYSTEM_TIMELINE_PASS start=%0d loaded=%0d cmd_begin=%0d completed=%0d consumed=%0d output_begin=%0d end=%0d total=%0d output_cycles=%0d bytes=%0d dma=%0d",
+                    sys_start,sys_loaded,sys_cmd_begin,sys_completed,sys_consumed,
+                    sys_output_begin,sys_end,sys_end-sys_start,sys_end-sys_output_begin,
+                    sys_words*4,$test$plusargs("SYSTEM_OUTPUT_DMA"));
             end
             for (golden_index = 0; golden_index < golden_count; golden_index = golden_index + 1) begin
                 axi_read(SPAD_BASE + representative_golden_words[1 + 2 * golden_index], read_value);

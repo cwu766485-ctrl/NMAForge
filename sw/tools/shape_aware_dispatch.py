@@ -25,7 +25,7 @@ def map_matmul(a, b, *, policy='legacy', isolated=False):
     if policy == 'gemm' and not eligible:
         raise ValueError('GEMM shape outside measured dispatch domain')
     if use_gemm:
-        av = _pack_matrix_a_physical(a,16)
+        av = _pack_matrix_a_physical(a,m)
         bv = _pack_matrix_b_physical(b)
     else:
         av = [pack_i8((row+[0]*((-k)%16))[i:i+4]) for row in a for i in range(0,(k+15)//16*16,4)]

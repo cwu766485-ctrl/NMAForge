@@ -22,7 +22,7 @@ for m in (1,4,8,16):
    else:
     ar=[[0]*k for _ in range(16)];br=[[0]*16 for _ in range(k)]
     ix=0
-    for rg in range(0,16,4):
+    for rg in range(0,m,4):
      for kg in range(0,k,4):
       for r in range(rg,rg+4):ar[r][kg:kg+4]=ax[ix:ix+4];ix+=4
     ix=0

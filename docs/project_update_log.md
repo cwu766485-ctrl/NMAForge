@@ -231,3 +231,20 @@ product-opcode-fault-regress PASS, `make ai_smoke` PASS. Reports under
 write/revoke equivalence and DMA endpoint speedup are unproven and excluded.
 No hardware ownership lease or timing/signoff claim. Stop for review; no Gate C/D,
 no automatic merge and all old worktrees and PR#5 preserved.
+
+## Final architecture plan — A/B checkpoint, C admission only
+
+Isolated `feat/final-arch-ab-system`, base56adb124. Existing DMA load/store,
+full timestamp intervals, queue config and completion consumption measured.
+Actual-row GEMM A packing fixes M8 extra-padding regression discovered by system
+measurement. M8K1281845→1642,M16K1282729→2142cycles; CNN19507→15437cycles,
+output4992→922. Under AXI gaps CNN20919→17267. No product RTL/ABI/ports added.
+Full endpoint/SPAD Golden PASS for34revised +34backpressure runs,72packing
+references PASS; smoke/seeded20 PASS; Matrix3seed numerical35fault PASS.
+Forward opcode random stress seed20261116 missed backpressure nonvacuity and failed;
+record retained, known seeds20261112/13/14 replay PASS. Dedicated new output DMA
+fault-cross closure remains open. Real SFU parity/protection counterexamples and
+LN32 directed checks replayed; transparent Matrix→Requant fusion REJECT.
+Reports `docs/research/final_ab`, commands `tools/benchmark/final_ab/README.md`.
+PhaseD/E not complete, ASIC_MAPPING_BLOCKED pending compatible128KiB macro evidence.
+Stop for A/B review per attachment, no automatic merge/freeze/signoff.

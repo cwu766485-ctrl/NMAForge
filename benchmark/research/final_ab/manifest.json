@@ -1,0 +1,18 @@
+{
+  "base_sha": "56adb1245ecd7de740c4c90c48844f6b88fdd24c",
+  "rtl_tree": "32fa174fc159e454966af972b761093ee567f6fb",
+  "source_files": {
+    "sw/tools/shape_aware_dispatch.py": "d881ea18ac7f13faa98f80bbb857f9db44aaf97c604fb6fb5d779c878bfacbce",
+    "dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv": "37b7fcd6c4da730f6cc1ab7f86fa684235ee48104bb4ba261f997bd2012e13dc",
+    "tools/benchmark/final_ab/archive.py": "16d43855083fbcfe83fb29c3428c8673ea40414755820692565c9449afe69d7f",
+    "tools/benchmark/final_ab/run.py": "0d53e5e816e8ee0df3362abf7e478c975fc56b87a38ee3f23673103a49d9b1d4"
+  },
+  "tool": "VCS V-2023.12-SP1_Full64",
+  "python": "3.12.13",
+  "spad_bytes": 131072,
+  "banks": 4,
+  "macs": 256,
+  "clock_ns": 4,
+  "scope": "behavioral serialized hardware timeline; CPU layout wall time separate; no ASIC Fmax",
+  "fault_limit": "seed20261116 forward stress nonvacuity failure retained; known three-seed replay passes; output-DMA dedicated error injection not closed"
+}
