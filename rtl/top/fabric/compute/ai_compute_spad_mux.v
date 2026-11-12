@@ -40,6 +40,7 @@ module ai_compute_spad_mux(
     integer candidate;
 
     always @(*) begin
+        candidate = 0;
         selected_owner = rr_owner_r;
         selected_valid = 1'b0;
         if (held_owner_valid_r) begin
