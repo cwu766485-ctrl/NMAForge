@@ -183,3 +183,31 @@ after two targeted rounds, no SFU RTL. Real unchanged-SFU/scratchpad/protection
 Phase3 parity-prefix and adjacent-region counterexamples re-run PASS. Remaining
 three Phase4 reports document benchmark boundaries and DESIGN_PARTIAL decision;
 CNN retained as PR candidate, no automatic product merge or Phase5.
+
+## Architecture optimization Milestone 1 — real product Top coverage
+
+On branch `feat/arch-opt-m1`, runner `tools/benchmark/phase1/run.py` was extended
+for the missing product Top matrix rows: GEMM 4x4x32, 16x16x16/32/128,
+32x32x64 and product 0x52 GEMV M=1/4/8/16, K=16/32/64/128. VCS
+V-2023.12-SP1_Full64, 4 ns behavioral clock, default 128 KiB four-bank SPAD.
+All 21 descriptors reported `REPRESENTATIVE_MODEL_PASS`; signed INT32 Golden,
+two-cycle response ledger and traffic checks passed. The attribution artifact is
+`benchmark/research/arch_opt/MILESTONE1_TOP_BASELINE.csv`; raw profiles are
+under `/tmp/nmaforge-archopt-m1-runs/top-suite`. The corrected report is
+`docs/research/arch_opt/MILESTONE1_MATRIX_PREFETCH.md`.
+
+Measured isolated Top examples: GEMM 32x32x64=986 cycles (6144/4096 B,
+312 operand-wait), GEMM 16x16x128=522 cycles (4096/1024 B), GEMV M1 K32=143
+cycles (544/64 B), M4 K32=161 cycles (640/256 B), M8 K64=325 cycles
+(1536/512 B), M16 K128=1109 cycles (7168/1024 B). All reads had two-cycle
+registered latency; no denied or multi-client request cycles occurred in the
+isolated suite. H32 concurrent attribution remains 350189 cycles with 14600
+Matrix operand-wait and 4288 request-form arbitration waits. Existing D4/P1/C1
+ablation is retained as baseline evidence only; no new Matrix RTL is admitted.
+
+Validation: `python3.12 tools/benchmark/phase4/validate.py` PASS;
+`cd dv/subsystem/top_smoke/sim && make ai_smoke` PASS (`TEST PASS`), including
+random GEMV/GEMM, CNN/Transformer, protection, abort/reset recovery;
+`git diff --check` and Python compile PASS. Commit `25372669d097e030e79ca5d7ce68ab41c68921a2`
+pushed and verified at `origin/feat/arch-opt-m1`. Product RTL is unchanged;
+Milestone 2 remains a separate shape-adaptive 0x52 study.
