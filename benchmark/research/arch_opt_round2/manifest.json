@@ -1,0 +1,17 @@
+{
+  "source_sha": "d8883ed29723d3121e38ea1c89d717f47b8bb003",
+  "rtl_tree": "32fa174fc159e454966af972b761093ee567f6fb",
+  "simv_sha256": "57a3f1d07bc67a5037b40cd8929e7b8bd8ecab74757e0d23da8cef2450ffa0cf",
+  "spad_bytes": 131072,
+  "banks": 4,
+  "macs": 256,
+  "clock_ns": 4,
+  "model": "VCS registered behavioral SPAD; exclusive single descriptor; no DMA timing",
+  "cases": 64,
+  "source_files": {
+    "sw/tools/shape_aware_dispatch.py": "54c1b861c5c3d8023d1a6e25ff01fc5db7cdb5d1ea69303c248151a73ca0f9ca",
+    "tools/benchmark/arch_opt_round2/run.py": "ee4e1919018e7e4a946e072885b66cc70335cf8b45a081273269fbcde60dc5bb",
+    "dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv": "bd4642d5f8d745bcb5ef4eee71c84a3f6a6e043fd13ccab3d5b85f3d6959099b"
+  },
+  "source_state": "base SHA plus source_files hashes; no RTL changes"
+}

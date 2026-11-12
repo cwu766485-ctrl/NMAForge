@@ -211,3 +211,23 @@ random GEMV/GEMM, CNN/Transformer, protection, abort/reset recovery;
 `git diff --check` and Python compile PASS. Commit `25372669d097e030e79ca5d7ce68ab41c68921a2`
 pushed and verified at `origin/feat/arch-opt-m1`. Product RTL is unchanged;
 Milestone 2 remains a separate shape-adaptive 0x52 study.
+
+## Architecture Optimization Round 2 — Gate A and Gate B attribution
+
+Dedicated `feat/arch-opt-round2-dispatch`, base d8883ed2; product RTL unchanged.
+Added explicit offline `sw/tools/shape_aware_dispatch.py` with conservative legacy
+fallback and isolated opt-in. Paired real Top M4/M8/M16,N16,K16/32/64/128
+Golden passes. M16 K128 1109→522 CMDQ cycles, reads7168→4096 B; M8 K128
+629→426, reads4096→3072 B. No system/DMA speedup claim. M1/M4 retained, selected
+16-shape A/B no regression. K63/64/65/96/127/128/129 address traces prove B-cache
+coverage boundary: K128 excess B reads1024 B(M8),3072 B(M16). No cache enlargement.
+
+Commands: `tools/benchmark/arch_opt_round2/README.md`. VCS V-2023.12-SP1_Full64,
+128 KiB/four banks,256MAC,4ns behavioral clock; independent 72-case packed-byte
+reference PASS, paired Top Golden PASS, three-seed18numerical/35fault plus
+product-opcode-fault-regress PASS, `make ai_smoke` PASS. Reports under
+`docs/research/arch_opt_round2/`; compressed text evidence and hashes under
+`benchmark/research/arch_opt_round2/`. RETAIN bounded mapper; uncontrolled dynamic
+write/revoke equivalence and DMA endpoint speedup are unproven and excluded.
+No hardware ownership lease or timing/signoff claim. Stop for review; no Gate C/D,
+no automatic merge and all old worktrees and PR#5 preserved.

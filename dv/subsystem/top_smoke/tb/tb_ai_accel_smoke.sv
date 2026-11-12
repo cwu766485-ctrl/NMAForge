@@ -4818,6 +4818,13 @@ module tb_ai_accel_smoke;
                          representative_dump_words_b);
             end
 
+            if ($test$plusargs("ROUND2_PROFILE"))
+                $display("ROUND2_CACHE_PROFILE hits=%0d reads_saved=%0d prefetch_completed=%0d prefetch_wait=%0d arbiter_stall=%0d",
+                    dut.compute_cluster_u.tensor_matrix_u.perf_gemv_b_cache_hits,
+                    dut.compute_cluster_u.tensor_matrix_u.perf_gemv_b_cache_reads_saved,
+                    dut.compute_cluster_u.tensor_matrix_u.perf_prefetch_completed,
+                    dut.compute_cluster_u.tensor_matrix_u.perf_prefetch_wait_cycles,
+                    dut.compute_cluster_u.tensor_matrix_u.perf_arbiter_stall_cycles);
             matrix_mac_cycles = transformer_top_profile_matrix_mac;
             matrix_wait_cycles = transformer_top_profile_matrix_request_wait;
             matrix_response_wait_cycles = transformer_top_profile_matrix_response_wait;
