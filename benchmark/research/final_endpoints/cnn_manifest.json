@@ -1,0 +1,10 @@
+{
+  "source_sha": "56adb1245ecd7de740c4c90c48844f6b88fdd24c",
+  "spad_bytes": 131072,
+  "macs": 256,
+  "banks": 4,
+  "clock_ns": 4,
+  "simv_sha256": "8b3d659cb9a8bc78ac5c052571e9b016899d73b614a23e78981a0610951c5585",
+  "scope": "Includes test-only poison initialization and pre-command checking; use timestamped segments, not full-window as pure production timing. Serialized real DMA load/Top CMDQ/Completion/common external output; CPU packing time separate; behavioral SPAD and external AXI latency model; no silicon timing claim",
+  "timing_boundary": "production_begin after all checker-only poison setup/validation, before real DMA configuration; end after common output delivery"
+}
