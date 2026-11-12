@@ -231,3 +231,7 @@ product-opcode-fault-regress PASS, `make ai_smoke` PASS. Reports under
 write/revoke equivalence and DMA endpoint speedup are unproven and excluded.
 No hardware ownership lease or timing/signoff claim. Stop for review; no Gate C/D,
 no automatic merge and all old worktrees and PR#5 preserved.
+
+## 2026-11-12 — Matched endpoint A/B
+
+New TB/runner;productRTL/mapper unchanged. Matrix32GoldenPASS,CNN strict20800word and832word endpointsPASS;production19507->15437cycles. SmokePASS,Matrix fault/numeric seed20261112PASS,mapper72PASS,SFU196/279PASS. Endpoint-specific protocol/fault/backpressure crosses incomplete. See ARCHITECTURE_FREEZE_PROPOSAL.md;no merge/freeze.

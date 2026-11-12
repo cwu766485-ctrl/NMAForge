@@ -1,0 +1,7 @@
+{
+  "matrix_cases": 32,
+  "same_golden_pairs": 16,
+  "cnn_output_bytes": 3328,
+  "cnn_reduction_pct": 20.86430512123853,
+  "endpoint_fault_protocol_crosses": "NOT_RUN"
+}

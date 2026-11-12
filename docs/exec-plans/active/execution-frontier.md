@@ -1,3 +1,7 @@
+# Bounded final A/B endpoint experiment — 2026-11-12
+
+Parent56adb124; product RTL/mapper unchanged. Matrix32PASS;M8 regresses3.13..6.58%,M16 improves4.30..21.51%. CNN strict20800wordPASS,paired3328byte deliveryPASS:production19507->15437cycles (-20.86%),output4992->922;checker setup excluded. Final-source smokePASS,one-seed Matrix numerical/opcodefaultPASS,mapper72PASS,SFU model196/recovery279PASS. New endpoint-specific protocol/backpressure/fault/reset checks remain NOT_RUN;acceptance PARTIAL,no freeze/merge. See root ARCHITECTURE_FREEZE_PROPOSAL.md. Stop for review before extensions.
+
 # NMAForge execution frontier
 
 Round 7 is now at its bounded terminal disposition: the standalone 16×16
