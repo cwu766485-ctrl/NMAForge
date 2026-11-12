@@ -4489,6 +4489,10 @@ module tb_ai_accel_smoke;
     endtask
 
     task run_representative_model;
+        integer endpoint_start, endpoint_load_end, endpoint_compute_end, endpoint_end;
+        integer endpoint_index, endpoint_run, endpoint_ext_base;
+        reg endpoint_mode, endpoint_dma;
+
         reg [1023:0] image_file;
         reg [1023:0] golden_file;
         reg [1023:0] dma_payload_file;
@@ -4569,6 +4573,11 @@ module tb_ai_accel_smoke;
                 $fatal(1, "representative model image/queue dimensions invalid image=%0d golden=%0d desc=%0d",
                        image_count, golden_count, descriptor_count);
 
+            endpoint_mode = $test$plusargs("FINAL_ENDPOINT");
+            endpoint_dma = $test$plusargs("FINAL_DMA_OUTPUT");
+            endpoint_ext_base = 0;
+            endpoint_start = sa_clock;
+            if (endpoint_mode) $display("FINAL_TIMELINE event=begin clock=%0d",sa_clock);
             representative_load_cycles = 0;
             if (use_dma_preload) begin
                 if (!$value$plusargs("AI_REPRESENTATIVE_DMA_PAYLOAD=%s", dma_payload_file) ||
@@ -4595,6 +4604,16 @@ module tb_ai_accel_smoke;
                     end
                 end
 
+                if (endpoint_mode) begin
+                    // All checker-only poison initialization/validation precedes
+                    // the continuous production DMA-to-output interval.
+                    for (golden_index=0;golden_index<golden_count;golden_index=golden_index+1) begin
+                        axi_read(SPAD_BASE+representative_golden_words[1+2*golden_index],read_value);
+                        if (read_value !== 32'ha55a_a55a) $fatal(1,"endpoint poison validation failed");
+                    end
+                    endpoint_start=sa_clock;
+                    $display("FINAL_TIMELINE event=production_begin clock=%0d",sa_clock);
+                end
                 dma_payload_bytes = 0;
                 representative_dma_window_cycles = 0;
                 representative_dma_busy_cycles = 0;
@@ -4680,6 +4699,10 @@ module tb_ai_accel_smoke;
                 representative_load_measure = 1'b0;
             end
 
+            endpoint_load_end = sa_clock;
+            if (endpoint_mode) $display("FINAL_TIMELINE event=load_done clock=%0d",sa_clock);
+            // Endpoint mode already validated poison before its timed DMA window.
+            if (!endpoint_mode) begin
             // Prove every expected result was poisoned before the first command.
             for (golden_index = 0; golden_index < golden_count; golden_index = golden_index + 1) begin
                 axi_read(SPAD_BASE + representative_golden_words[1 + 2 * golden_index],
@@ -4689,6 +4712,7 @@ module tb_ai_accel_smoke;
                            golden_index, representative_golden_words[1 + 2 * golden_index], read_value);
             end
 
+            end
             axi_write(REG_CMDQ_CTRL, 32'd0);
             if(sa_cycle_fd) $display("STAGE_A_CONFIG_BEGIN clock=%0d",sa_clock);
             axi_write(REG_CMDQ_BASE_LO, descriptor_base);
@@ -4756,12 +4780,52 @@ module tb_ai_accel_smoke;
                     $fatal(1, "representative completion failed index=%0d status=%08h",
                            completion_index, status_value);
             end
+            endpoint_compute_end = sa_clock;
+            if (endpoint_mode) begin
+                if (golden_count > 4096) $fatal(1,"endpoint exceeds external model capacity");
+                $display("FINAL_TIMELINE event=completion_checked clock=%0d",sa_clock);
+                // Common host-visible external array, indexed by Golden word order.
+                // Baseline host materialization follows each AXI-Lite read; candidate
+                // writes the identical words through existing AXI DMA Store and B response.
+                if (endpoint_dma) begin
+                    endpoint_index = 0;
+                    while (endpoint_index < golden_count) begin
+                        endpoint_run = 1;
+                        while (endpoint_index + endpoint_run < golden_count &&
+                            representative_golden_words[1+2*(endpoint_index+endpoint_run)] ==
+                            representative_golden_words[1+2*endpoint_index]+4*endpoint_run)
+                            endpoint_run = endpoint_run + 1;
+                        axi_write(REG_DMA_EXT_ADDR,endpoint_ext_base+4*endpoint_index);
+                        axi_write(REG_DMA_SPAD_ADDR,representative_golden_words[1+2*endpoint_index]);
+                        axi_write(REG_DMA_LENGTH,endpoint_run);
+                        axi_write(REG_DMA_CTRL,32'h3);
+                        for (poll_index=0;poll_index<200000 && !dut.dma_done && !dut.dma_error;poll_index=poll_index+1)
+                            @(posedge aclk);
+                        if (poll_index==200000 || dut.dma_error) $fatal(1,"endpoint DMA Store failure/timeout");
+                        axi_read(REG_DMA_STATUS,status_value);
+                        if (!status_value[1] || status_value[2]) $fatal(1,"endpoint DMA status failure");
+                        axi_write(REG_DMA_STATUS,32'd2);
+                        endpoint_index=endpoint_index+endpoint_run;
+                    end
+                end else begin
+                    for (golden_index=0;golden_index<golden_count;golden_index=golden_index+1) begin
+                        axi_read(SPAD_BASE+representative_golden_words[1+2*golden_index],read_value);
+                        axi_mem_u.mem[endpoint_ext_base/4+golden_index]=read_value;
+                    end
+                end
+                endpoint_end=sa_clock;
+                for (golden_index=0;golden_index<golden_count;golden_index=golden_index+1)
+                    if (axi_mem_u.mem[endpoint_ext_base/4+golden_index] !== representative_golden_words[2+2*golden_index])
+                        $fatal(1,"same-endpoint Golden mismatch index=%0d",golden_index);
+                $display("FINAL_ENDPOINT_PASS dma=%0d begin=%0d load_end=%0d completion=%0d output_end=%0d total_cycles=%0d output_cycles=%0d output_bytes=%0d",endpoint_dma,endpoint_start,endpoint_load_end,endpoint_compute_end,endpoint_end,endpoint_end-endpoint_start,endpoint_end-endpoint_compute_end,golden_count*4);
+            end else begin
             for (golden_index = 0; golden_index < golden_count; golden_index = golden_index + 1) begin
                 axi_read(SPAD_BASE + representative_golden_words[1 + 2 * golden_index], read_value);
                 if (read_value !== representative_golden_words[2 + 2 * golden_index])
                     $fatal(1, "representative Golden mismatch index=%0d addr=%08h expected=%08h actual=%08h",
                            golden_index, representative_golden_words[1 + 2 * golden_index],
                            representative_golden_words[2 + 2 * golden_index], read_value);
+            end
             end
 
             // Optional post-prefix SPAD snapshot for staged descriptor debug.

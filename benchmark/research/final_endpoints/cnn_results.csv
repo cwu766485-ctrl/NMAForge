@@ -1,0 +1,3 @@
+workload,policy,dma,begin,load_end,completion,output_end,total_cycles,output_cycles,output_bytes,load_transactions,load_payload_bytes,load_axi_read_bytes,load_ar_bursts,load_r_beats,load_read_latency_sum,load_read_latency_count,load_read_latency_max,load_dma_busy_cycles,load_setup_and_transfer_cycles,load_test_only_poison_setup_bytes
+cnn,axil,0,129851,132906,144366,149358,19507,4992,3328,4,10944,10944,45,684,2142,45,50,2879,3019,83232
+cnn,dma,1,129851,132906,144366,145288,15437,922,3328,4,10944,10944,45,684,2142,45,50,2879,3019,83232
