@@ -1,0 +1,2 @@
+# Preserve raw Synopsys logs; VCS emits trailing spaces in banners and commands.
+docs/verification/artifacts/MATRIX_PHASE_ABORT_2026-11-14/**/*.log whitespace=-blank-at-eol

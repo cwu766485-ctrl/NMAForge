@@ -1,0 +1,51 @@
+{
+  "feature_id": "MATRIX-CYCLE-001R2",
+  "decision": "ACCEPT",
+  "decision_scope": "simulation_performance only",
+  "baseline_revision": "52353d5454284e05119764705fb8a6e406a5c8f4",
+  "candidate_patch_sha256": "537fe77b9214e4b8700110b186bc6c23243e551e9839f2cc8a358868be0389c9",
+  "review_patch_file_sha256": "b48b0c97e6e94b365cb1393b72eb6308ae5908f9f5ebff1e8a2baa57c59a8eaf",
+  "candidate_core_sha256": "cbbe476399ed9e715bb970fd19199ef5b96833a3837ec88942fe7a0fe32d7a2d",
+  "testbench_sha256": "7b886201d9f95d22aee03f2c8826aa217a819e3ef73d5393ad05cd5e1d1dc85c",
+  "tool": "VCS V-2023.12-SP1_Full64",
+  "seeds": {
+    "regression": [20261021, 20261022, 20261023],
+    "benchmark": 20261113
+  },
+  "required_stages": {
+    "regression": "PASS",
+    "reference_model": "PASS",
+    "latency_gate": "PASS",
+    "performance": "PASS"
+  },
+  "regression_per_seed": {
+    "cases": 18,
+    "fault_checks": 35,
+    "final_write_abort": "PASS"
+  },
+  "metrics": {
+    "workload_cycles": {
+      "baseline": 2010,
+      "candidate": 2005,
+      "delta_pct": -0.24875621890547264,
+      "unit": "cycles"
+    },
+    "useful_macs_per_cycle": {
+      "baseline": 46.10547263681592,
+      "candidate": 46.22044887780549,
+      "delta_pct": 0.24937655860350028,
+      "unit": "MAC/cycle"
+    }
+  },
+  "optimization_objective": {
+    "target_cycle_reduction_pct": 5.0,
+    "met": false
+  },
+  "asic_ppa": {
+    "status": "STOP",
+    "area": "NOT_MEASURED",
+    "timing": "NOT_MEASURED",
+    "power": "NOT_MEASURED"
+  },
+  "historical_note": "The original MATRIX-CYCLE-001 REJECT remains preserved for the old testbench revision. This corrected test-contract replay passes the simulation gates; it does not establish ASIC PPA or signoff."
+}

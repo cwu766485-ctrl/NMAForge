@@ -1,0 +1,395 @@
+make: Entering directory '/tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/MATRIX-CYCLE-002R2/source/dv/block/compute/matrix/sim'
+mkdir -p /tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/MATRIX-CYCLE-002R2/stages/regression/vcs-regression
+vcs -licwait 1 -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+	+define+MATRIX_MAX_OUTSTANDING_READS=4 \
+	+define+MATRIX_A_TILE_CACHE_ENABLE=1 \
+	+define+MATRIX_NEXT_K_PREFETCH_ENABLE=1 \
+	+define+MATRIX_ARRAY_SIZE=16 \
+	-cm line+cond+fsm+branch -cm_hier /tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/MATRIX-CYCLE-002R2/source/dv/block/compute/matrix/sim/matrix_core.cm_hier \
+	-cm_dir /tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/MATRIX-CYCLE-002R2/stages/regression/vcs-regression/coverage.vdb \
+	-Mdir=/tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/MATRIX-CYCLE-002R2/stages/regression/vcs-regression/csrc \
+	-top tb_ai_tensor_matrix_core_random \
+	../../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v \
+	../../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv \
+	../../../../../rtl/compute/matrix/ai_tensor_matrix_core.v \
+	../tb/tb_ai_tensor_matrix_core_random.sv \
+	-o /tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/MATRIX-CYCLE-002R2/stages/regression/vcs-regression/simv -l /tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/MATRIX-CYCLE-002R2/stages/regression/vcs-regression/compile.log
+                         Chronologic VCS (TM)
+       Version V-2023.12-SP1_Full64 -- Sat Nov 14 00:35:22 2026
+
+                    Copyright (c) 1991 - 2024 Synopsys, Inc.
+   This software and the associated documentation are proprietary to Synopsys,
+ Inc. This software may only be used in accordance with the terms and conditions
+ of a written license agreement with Synopsys, Inc. All other use, reproduction,
+   or distribution of this software is strictly prohibited.  Licensed Products
+     communicate with Synopsys servers for the purpose of providing software
+    updates, detecting software piracy and verifying that customers are using
+    Licensed Products in conformity with the applicable License Key for such
+  Licensed Products. Synopsys will use information gathered in connection with
+    this process to deliver software updates and pursue software pirates and
+                                   infringers.
+
+ Inclusivity & Diversity - Visit SolvNetPlus to read the "Synopsys Statement on
+            Inclusivity and Diversity" (Refer to article 000036315 at
+                        https://solvnetplus.synopsys.com)
+
+Parsing design file '../../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v'
+Parsing design file '../../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv'
+Parsing design file '../../../../../rtl/compute/matrix/ai_tensor_matrix_core.v'
+Parsing design file '../tb/tb_ai_tensor_matrix_core_random.sv'
+Top Level Modules:
+       tb_ai_tensor_matrix_core_random
+TimeScale is 1 ns / 1 ps
+VCS Coverage Metrics Release V-2023.12-SP1_Full64 Copyright (c) 1991-2023 by Synopsys Inc.
+Starting vcs inline pass...
+3 modules and 0 UDP read.
+recompiling module ai_tensor_matrix_array
+recompiling module ai_tensor_matrix_core
+recompiling module tb_ai_tensor_matrix_core_random
+All of 3 modules done
+make[1]: Entering directory '/tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/MATRIX-CYCLE-002R2/stages/regression/vcs-regression/csrc'
+make[1]: Leaving directory '/tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/MATRIX-CYCLE-002R2/stages/regression/vcs-regression/csrc'
+make[1]: Entering directory '/tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/MATRIX-CYCLE-002R2/stages/regression/vcs-regression/csrc'
+rm -f _cuarc*.so _csrc*.so pre_vcsobj_*.so share_vcsobj_*.so
+if [ -x /tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/MATRIX-CYCLE-002R2/stages/regression/vcs-regression/simv ]; then chmod a-x /tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/MATRIX-CYCLE-002R2/stages/regression/vcs-regression/simv; fi
+g++  -o /tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/MATRIX-CYCLE-002R2/stages/regression/vcs-regression/simv      -rdynamic  -Wl,-rpath='$ORIGIN'/simv.daidir -Wl,-rpath=./simv.daidir -Wl,-rpath=/opt/Synopsys/vcs/V-2023.12-SP1/linux64/lib -L/opt/Synopsys/vcs/V-2023.12-SP1/linux64/lib  -Wl,-rpath-link=./  /usr/lib64/libnuma.so.1   objs/amcQw_d.o   _747471_archive_1.so   SIM_l.o      rmapats_mop.o rmapats.o rmar.o rmar_nd.o  rmar_llvm_0_1.o rmar_llvm_0_0.o            -lvirsim -lerrorinf -lsnpsmalloc -lvfs    -lvcsnew -lsimprofile -lreader_common /opt/Synopsys/vcs/V-2023.12-SP1/linux64/lib/libBA.a -luclinative /opt/Synopsys/vcs/V-2023.12-SP1/linux64/lib/vcs_tls.o   -Wl,-whole-archive  -lvcsucli    -Wl,-no-whole-archive        _vcs_pli_stub_.o   /opt/Synopsys/vcs/V-2023.12-SP1/linux64/lib/vcs_save_restore_new.o /opt/Synopsys/verdi/V-2023.12-SP2/share/PLI/VCS/LINUX64/pli.a -ldl  -lc -lm -lpthread -ldl 
+/tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/MATRIX-CYCLE-002R2/stages/regression/vcs-regression/simv up to date
+make[1]: Leaving directory '/tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/MATRIX-CYCLE-002R2/stages/regression/vcs-regression/csrc'
+CPU time: 1.027 seconds to compile + .257 seconds to elab + .288 seconds to link
+Info: [VCS_SAVE_RESTORE_INFO] ASLR (Address Space Layout Randomization) is detected on the machine. To enable $save functionality, ASLR will be switched off and simv re-executed.
+Please use '-no_save' simv switch to avoid re-execution or '-suppress=ASLR_DETECTED_INFO' to suppress this message.
+Chronologic VCS simulator copyright 1991-2023
+Contains Synopsys proprietary information.
+Compiler version V-2023.12-SP1_Full64; Runtime version V-2023.12-SP1_Full64;  Nov 14 00:35 2026
+
+ VCS Coverage Metrics Release V-2023.12-SP1_Full64 Copyright (c) 1991-2023 by Synopsys Inc.
+MATRIX_CORE_CASE_PASS id=0 shape_mnk=8,8,8 batches=2 transpose_ab=00 bias=1 writes=32/0 cycles=183 mac_cycles=16 bank_reads=16 bank_read_bytes=256 bank_stalls=4 line_write_bytes=512 line_stalls=9 macs_per_cycle=5.596 array_utilization_pct=2.19 effective_gops_250mhz=2.798 physical_array=16x16
+MATRIX_CORE_PROFILE id=0 max_outstanding=4 a_req=6 a_wait=7 b_req=5 b_wait=8 bias_req=21 bias_wait=55 prep_mac=4 mac=16 write=41 next=1 done=1 error=0 error_drain=0 prefetch_wait=18 arbiter_stall=18 response_wait=51 writeback_wait=9 outstanding_highwater=2 fifo_full=0 prefetch_a_req=5 prefetch_a_drain=6 prefetch_b_req=4 prefetch_b_drain=9 prefetch_overlap=8 prefetch_completed=2 a_tile_cache_hits=0 total=183
+MATRIX_CORE_CASE_PASS id=1 shape_mnk=8,4,8 batches=1 transpose_ab=10 bias=0 writes=8/0 cycles=40 mac_cycles=8 bank_reads=6 bank_read_bytes=96 bank_stalls=1 line_write_bytes=128 line_stalls=4 macs_per_cycle=6.400 array_utilization_pct=2.50 effective_gops_250mhz=3.200 physical_array=16x16
+MATRIX_CORE_PROFILE id=1 max_outstanding=4 a_req=3 a_wait=4 b_req=1 b_wait=2 bias_req=0 bias_wait=0 prep_mac=2 mac=8 write=12 next=0 done=1 error=0 error_drain=0 prefetch_wait=7 arbiter_stall=5 response_wait=5 writeback_wait=4 outstanding_highwater=2 fifo_full=0 prefetch_a_req=2 prefetch_a_drain=5 prefetch_b_req=1 prefetch_b_drain=2 prefetch_overlap=4 prefetch_completed=1 a_tile_cache_hits=0 total=40
+MATRIX_CORE_CASE_PASS id=2 shape_mnk=4,8,4 batches=2 transpose_ab=01 bias=1 writes=16/0 cycles=137 mac_cycles=8 bank_reads=6 bank_read_bytes=96 bank_stalls=1 line_write_bytes=256 line_stalls=8 macs_per_cycle=1.869 array_utilization_pct=0.73 effective_gops_250mhz=0.934 physical_array=16x16
+MATRIX_CORE_PROFILE id=2 max_outstanding=4 a_req=2 a_wait=8 b_req=5 b_wait=7 bias_req=24 bias_wait=55 prep_mac=2 mac=8 write=24 next=1 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=17 response_wait=50 writeback_wait=8 outstanding_highwater=2 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=137
+MATRIX_CORE_CASE_PASS id=3 shape_mnk=4,4,4 batches=1 transpose_ab=11 bias=0 writes=0/16 cycles=36 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=2 line_write_bytes=0 line_stalls=0 macs_per_cycle=1.778 array_utilization_pct=0.69 effective_gops_250mhz=0.889 physical_array=16x16
+MATRIX_CORE_PROFILE id=3 max_outstanding=4 a_req=3 a_wait=2 b_req=1 b_wait=2 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=22 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=8 response_wait=2 writeback_wait=6 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=36
+MATRIX_CORE_CASE_PASS id=4 shape_mnk=16,16,16 batches=1 transpose_ab=00 bias=0 writes=64/0 cycles=188 mac_cycles=16 bank_reads=32 bank_read_bytes=512 bank_stalls=20 line_write_bytes=1024 line_stalls=28 macs_per_cycle=21.787 array_utilization_pct=8.51 effective_gops_250mhz=10.894 physical_array=16x16
+MATRIX_CORE_PROFILE id=4 max_outstanding=4 a_req=5 a_wait=5 b_req=7 b_wait=2 bias_req=0 bias_wait=0 prep_mac=4 mac=16 write=92 next=0 done=1 error=0 error_drain=0 prefetch_wait=56 arbiter_stall=48 response_wait=7 writeback_wait=28 outstanding_highwater=4 fifo_full=0 prefetch_a_req=12 prefetch_a_drain=15 prefetch_b_req=28 prefetch_b_drain=10 prefetch_overlap=12 prefetch_completed=3 a_tile_cache_hits=0 total=188
+MATRIX_CORE_CASE_PASS id=5 shape_mnk=32,16,8 batches=1 transpose_ab=11 bias=1 writes=128/0 cycles=395 mac_cycles=16 bank_reads=32 bank_read_bytes=512 bank_stalls=14 line_write_bytes=2048 line_stalls=37 macs_per_cycle=10.370 array_utilization_pct=4.05 effective_gops_250mhz=5.185 physical_array=16x16
+MATRIX_CORE_PROFILE id=5 max_outstanding=4 a_req=12 a_wait=7 b_req=16 b_wait=6 bias_req=45 bias_wait=91 prep_mac=4 mac=16 write=165 next=1 done=1 error=0 error_drain=0 prefetch_wait=31 arbiter_stall=64 response_wait=79 writeback_wait=37 outstanding_highwater=4 fifo_full=0 prefetch_a_req=8 prefetch_a_drain=9 prefetch_b_req=10 prefetch_b_drain=10 prefetch_overlap=8 prefetch_completed=2 a_tile_cache_hits=0 total=395
+MATRIX_CORE_CASE_PASS id=18 shape_mnk=16,32,32 batches=1 transpose_ab=00 bias=0 writes=128/0 cycles=426 mac_cycles=64 bank_reads=96 bank_read_bytes=1536 bank_stalls=50 line_write_bytes=2048 line_stalls=30 macs_per_cycle=38.460 array_utilization_pct=15.02 effective_gops_250mhz=19.230 physical_array=16x16
+MATRIX_CORE_PROFILE id=18 max_outstanding=4 a_req=5 a_wait=4 b_req=11 b_wait=9 bias_req=0 bias_wait=0 prep_mac=16 mac=64 write=158 next=1 done=1 error=0 error_drain=0 prefetch_wait=157 arbiter_stall=80 response_wait=12 writeback_wait=30 outstanding_highwater=4 fifo_full=0 prefetch_a_req=49 prefetch_a_drain=21 prefetch_b_req=82 prefetch_b_drain=47 prefetch_overlap=56 prefetch_completed=14 a_tile_cache_hits=8 total=426
+MATRIX_CORE_CASE_PASS id=19 shape_mnk=32,32,64 batches=1 transpose_ab=00 bias=0 writes=256/0 cycles=1371 mac_cycles=256 bank_reads=384 bank_read_bytes=6144 bank_stalls=141 line_write_bytes=4096 line_stalls=73 macs_per_cycle=47.802 array_utilization_pct=18.67 effective_gops_250mhz=23.901 physical_array=16x16
+MATRIX_CORE_PROFILE id=19 max_outstanding=4 a_req=10 a_wait=10 b_req=21 b_wait=16 bias_req=0 bias_wait=0 prep_mac=64 mac=256 write=329 next=3 done=1 error=0 error_drain=0 prefetch_wait=661 arbiter_stall=214 response_wait=23 writeback_wait=73 outstanding_highwater=4 fifo_full=0 prefetch_a_req=168 prefetch_a_drain=112 prefetch_b_req=328 prefetch_b_drain=233 prefetch_overlap=240 prefetch_completed=60 a_tile_cache_hits=32 total=1371
+MATRIX_CORE_CASE_PASS id=20 shape_mnk=16,32,68 batches=1 transpose_ab=00 bias=0 writes=128/0 cycles=881 mac_cycles=136 bank_reads=272 bank_read_bytes=4352 bank_stalls=95 line_write_bytes=2048 line_stalls=35 macs_per_cycle=39.519 array_utilization_pct=15.44 effective_gops_250mhz=19.759 physical_array=16x16
+MATRIX_CORE_PROFILE id=20 max_outstanding=4 a_req=11 a_wait=7 b_req=13 b_wait=7 bias_req=0 bias_wait=0 prep_mac=34 mac=136 write=163 next=1 done=1 error=0 error_drain=0 prefetch_wait=508 arbiter_stall=130 response_wait=17 writeback_wait=35 outstanding_highwater=4 fifo_full=0 prefetch_a_req=174 prefetch_a_drain=129 prefetch_b_req=169 prefetch_b_drain=132 prefetch_overlap=128 prefetch_completed=32 a_tile_cache_hits=0 total=881
+MATRIX_CORE_FAULT_PASS id=0 code=1
+MATRIX_CORE_FAULT_PASS id=41 code=1
+MATRIX_CORE_FAULT_PASS id=42 code=1
+MATRIX_CORE_FAULT_PASS id=43 code=1
+MATRIX_CORE_FAULT_PASS id=44 code=1
+MATRIX_CORE_FAULT_PASS id=45 code=1
+MATRIX_CORE_FAULT_PASS id=46 code=1
+MATRIX_CORE_FAULT_PASS id=47 code=1
+MATRIX_CORE_FAULT_PASS id=48 code=1
+MATRIX_CORE_FAULT_PASS id=49 code=6
+MATRIX_CORE_FAULT_PASS id=1 code=2
+MATRIX_CORE_FAULT_PASS id=2 code=6
+MATRIX_CORE_FAULT_PASS id=3 code=5
+MATRIX_CORE_FAULT_PASS id=4 code=5
+MATRIX_CORE_FAULT_PASS id=5 code=6
+MATRIX_CORE_FAULT_PASS id=6 code=6
+MATRIX_CORE_FAULT_PASS id=7 code=6
+MATRIX_CORE_FAULT_PASS id=8 code=4
+MATRIX_CORE_FAULT_PASS id=9 code=3
+MATRIX_CORE_FAULT_PASS id=10 code=3
+MATRIX_CORE_FAULT_PASS id=11 code=3
+MATRIX_CORE_FAULT_PASS id=11 code=3
+MATRIX_CORE_CASE_PASS id=12 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=24 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=0 line_write_bytes=64 line_stalls=5 macs_per_cycle=2.667 array_utilization_pct=1.04 effective_gops_250mhz=1.333 physical_array=16x16
+MATRIX_CORE_PROFILE id=12 max_outstanding=4 a_req=1 a_wait=5 b_req=1 b_wait=2 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=9 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=5 response_wait=5 writeback_wait=5 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=24
+MATRIX_CORE_OUTSTANDING_ABORT_PASS depth=4 drained=866
+MATRIX_CORE_FAULT_PASS id=12 code=5
+MATRIX_CORE_CASE_PASS id=13 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=19 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=1 line_write_bytes=64 line_stalls=1 macs_per_cycle=3.368 array_utilization_pct=1.32 effective_gops_250mhz=1.684 physical_array=16x16
+MATRIX_CORE_PROFILE id=13 max_outstanding=4 a_req=1 a_wait=3 b_req=2 b_wait=2 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=5 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=2 response_wait=3 writeback_wait=1 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=19
+MATRIX_CORE_OUTSTANDING_PARITY_PASS depth=4 issue=866 drained=872
+MATRIX_CORE_FAULT_PASS id=13 code=5
+MATRIX_CORE_CASE_PASS id=14 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=18 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=0 line_write_bytes=64 line_stalls=2 macs_per_cycle=3.556 array_utilization_pct=1.39 effective_gops_250mhz=1.778 physical_array=16x16
+MATRIX_CORE_PROFILE id=14 max_outstanding=4 a_req=1 a_wait=2 b_req=1 b_wait=2 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=6 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=2 response_wait=2 writeback_wait=2 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=18
+MATRIX_CORE_PREFETCH_PARITY_PASS issue=880 drained=886
+MATRIX_CORE_FAULT_PASS id=14 code=3
+MATRIX_CORE_CASE_PASS id=15 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=21 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=0 line_write_bytes=64 line_stalls=3 macs_per_cycle=3.048 array_utilization_pct=1.19 effective_gops_250mhz=1.524 physical_array=16x16
+MATRIX_CORE_PROFILE id=15 max_outstanding=4 a_req=1 a_wait=3 b_req=1 b_wait=3 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=7 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=3 response_wait=4 writeback_wait=3 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=21
+MATRIX_CORE_PREFETCH_ABORT_PASS depth=4 drained=898
+MATRIX_CORE_FAULT_PASS id=15 code=4
+MATRIX_CORE_CASE_PASS id=16 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=21 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=0 line_write_bytes=64 line_stalls=0 macs_per_cycle=3.048 array_utilization_pct=1.19 effective_gops_250mhz=1.524 physical_array=16x16
+MATRIX_CORE_PROFILE id=16 max_outstanding=4 a_req=1 a_wait=4 b_req=1 b_wait=5 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=4 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=0 response_wait=7 writeback_wait=0 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=21
+MATRIX_CORE_PREFETCH_WATCHDOG_PASS limit=20 drained=904
+MATRIX_CORE_CASE_PASS id=17 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=19 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=0 line_write_bytes=64 line_stalls=1 macs_per_cycle=3.368 array_utilization_pct=1.32 effective_gops_250mhz=1.684 physical_array=16x16
+MATRIX_CORE_PROFILE id=17 max_outstanding=4 a_req=1 a_wait=3 b_req=1 b_wait=3 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=5 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=1 response_wait=4 writeback_wait=1 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=19
+MATRIX_CORE_PREFETCH_RESET_PASS recovery=1
+MATRIX_CORE_LATE_FAULT_PASS issue=72 completed_lines=64
+MATRIX_CORE_PHASE_ABORT_PASS state=5 id=24 prior_writes=0/0
+MATRIX_CORE_PHASE_ABORT_PASS state=6 id=25 prior_writes=0/0
+MATRIX_CORE_PHASE_ABORT_PASS state=7 id=26 prior_writes=0/0
+MATRIX_CORE_PHASE_ABORT_PASS state=9 id=27 prior_writes=0/0
+MATRIX_CORE_PHASE_ABORT_PASS state=10 id=28 prior_writes=64/0
+MATRIX_CORE_PHASE_ABORT_PASS phase=final_write_pending id=29 prior_writes=3/0
+MATRIX_CORE_FAULT_PASS id=22 code=3
+MATRIX_CORE_PREFETCH_WAIT_ABORT_PASS drained=104
+MATRIX_CORE_FAULT_PASS id=23 code=3
+MATRIX_CORE_PREFETCH_B_REQ_ABORT_PASS drained=116
+MATRIX_CORE_CASE_PASS id=21 shape_mnk=16,20,32 batches=1 transpose_ab=00 bias=0 writes=80/0 cycles=266 mac_cycles=64 bank_reads=72 bank_read_bytes=1152 bank_stalls=0 line_write_bytes=1280 line_stalls=25 macs_per_cycle=38.496 array_utilization_pct=15.04 effective_gops_250mhz=19.248 physical_array=16x16
+MATRIX_CORE_PROFILE id=21 max_outstanding=4 a_req=5 a_wait=2 b_req=5 b_wait=4 bias_req=0 bias_wait=0 prep_mac=16 mac=64 write=105 next=1 done=1 error=0 error_drain=0 prefetch_wait=63 arbiter_stall=25 response_wait=3 writeback_wait=25 outstanding_highwater=2 fifo_full=0 prefetch_a_req=28 prefetch_a_drain=14 prefetch_b_req=35 prefetch_b_drain=28 prefetch_overlap=49 prefetch_completed=14 a_tile_cache_hits=8 total=266
+MATRIX_CORE_PREFETCH_HANDOFF_PASS completed=14 overlap=49 direct=1 array=16
+MATRIX_CORE_PHASE_RESET_PASS state=2 id=30
+MATRIX_CORE_PHASE_RESET_PASS state=3 id=31
+MATRIX_CORE_PHASE_RESET_PASS state=4 id=32
+MATRIX_CORE_PHASE_RESET_PASS state=5 id=33
+MATRIX_CORE_PHASE_RESET_PASS state=6 id=34
+MATRIX_CORE_PHASE_RESET_PASS state=7 id=35
+MATRIX_CORE_PHASE_RESET_PASS state=9 id=36
+MATRIX_CORE_PHASE_RESET_PASS state=10 id=37
+MATRIX_CORE_PHASE_RESET_PASS state=12 id=38
+MATRIX_CORE_PHASE_RESET_PASS state=13 id=39
+MATRIX_CORE_PHASE_RESET_PASS state=14 id=40
+MATRIX_CORE_CASE_PASS id=10 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=19 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=0 line_write_bytes=64 line_stalls=1 macs_per_cycle=3.368 array_utilization_pct=1.32 effective_gops_250mhz=1.684 physical_array=16x16
+MATRIX_CORE_PROFILE id=10 max_outstanding=4 a_req=1 a_wait=3 b_req=1 b_wait=3 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=5 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=1 response_wait=4 writeback_wait=1 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=19
+MATRIX_CORE_CASE_PASS id=11 shape_mnk=4,4,8 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=27 mac_cycles=8 bank_reads=4 bank_read_bytes=64 bank_stalls=0 line_write_bytes=64 line_stalls=0 macs_per_cycle=4.741 array_utilization_pct=1.85 effective_gops_250mhz=2.370 physical_array=16x16
+MATRIX_CORE_PROFILE id=11 max_outstanding=4 a_req=1 a_wait=3 b_req=1 b_wait=3 bias_req=0 bias_wait=0 prep_mac=2 mac=8 write=4 next=0 done=1 error=0 error_drain=0 prefetch_wait=4 arbiter_stall=0 response_wait=4 writeback_wait=0 outstanding_highwater=1 fifo_full=0 prefetch_a_req=1 prefetch_a_drain=2 prefetch_b_req=1 prefetch_b_drain=3 prefetch_overlap=4 prefetch_completed=1 a_tile_cache_hits=0 total=27
+MATRIX_CORE_RANDOM_PASS cases=18 faults=35 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 seed=20261021 bank_reads=4 responses=4 spad_reads=0 responses=0 stalls=373/37/323
+$finish called from file "../tb/tb_ai_tensor_matrix_core_random.sv", line 1348.
+$finish at simulation time             53000000
+
+---------------------------------------------------------------------------
+VCS Coverage Metrics: during simulation line, cond, FSM, branch was monitored
+---------------------------------------------------------------------------
+
+ Coverage status: End of All Coverages ...
+
+           V C S   S i m u l a t i o n   R e p o r t 
+Time: 53000000 ps
+CPU Time:      0.380 seconds;       Data structure size:   0.5Mb
+Sat Nov 14 00:35:24 2026
+Info: [VCS_SAVE_RESTORE_INFO] ASLR (Address Space Layout Randomization) is detected on the machine. To enable $save functionality, ASLR will be switched off and simv re-executed.
+Please use '-no_save' simv switch to avoid re-execution or '-suppress=ASLR_DETECTED_INFO' to suppress this message.
+Chronologic VCS simulator copyright 1991-2023
+Contains Synopsys proprietary information.
+Compiler version V-2023.12-SP1_Full64; Runtime version V-2023.12-SP1_Full64;  Nov 14 00:35 2026
+
+ VCS Coverage Metrics Release V-2023.12-SP1_Full64 Copyright (c) 1991-2023 by Synopsys Inc.
+MATRIX_CORE_CASE_PASS id=0 shape_mnk=8,8,8 batches=2 transpose_ab=00 bias=1 writes=32/0 cycles=183 mac_cycles=16 bank_reads=16 bank_read_bytes=256 bank_stalls=4 line_write_bytes=512 line_stalls=9 macs_per_cycle=5.596 array_utilization_pct=2.19 effective_gops_250mhz=2.798 physical_array=16x16
+MATRIX_CORE_PROFILE id=0 max_outstanding=4 a_req=6 a_wait=7 b_req=5 b_wait=8 bias_req=21 bias_wait=55 prep_mac=4 mac=16 write=41 next=1 done=1 error=0 error_drain=0 prefetch_wait=18 arbiter_stall=18 response_wait=51 writeback_wait=9 outstanding_highwater=2 fifo_full=0 prefetch_a_req=5 prefetch_a_drain=6 prefetch_b_req=4 prefetch_b_drain=9 prefetch_overlap=8 prefetch_completed=2 a_tile_cache_hits=0 total=183
+MATRIX_CORE_CASE_PASS id=1 shape_mnk=8,4,8 batches=1 transpose_ab=10 bias=0 writes=8/0 cycles=40 mac_cycles=8 bank_reads=6 bank_read_bytes=96 bank_stalls=1 line_write_bytes=128 line_stalls=4 macs_per_cycle=6.400 array_utilization_pct=2.50 effective_gops_250mhz=3.200 physical_array=16x16
+MATRIX_CORE_PROFILE id=1 max_outstanding=4 a_req=3 a_wait=4 b_req=1 b_wait=2 bias_req=0 bias_wait=0 prep_mac=2 mac=8 write=12 next=0 done=1 error=0 error_drain=0 prefetch_wait=7 arbiter_stall=5 response_wait=5 writeback_wait=4 outstanding_highwater=2 fifo_full=0 prefetch_a_req=2 prefetch_a_drain=5 prefetch_b_req=1 prefetch_b_drain=2 prefetch_overlap=4 prefetch_completed=1 a_tile_cache_hits=0 total=40
+MATRIX_CORE_CASE_PASS id=2 shape_mnk=4,8,4 batches=2 transpose_ab=01 bias=1 writes=16/0 cycles=137 mac_cycles=8 bank_reads=6 bank_read_bytes=96 bank_stalls=1 line_write_bytes=256 line_stalls=8 macs_per_cycle=1.869 array_utilization_pct=0.73 effective_gops_250mhz=0.934 physical_array=16x16
+MATRIX_CORE_PROFILE id=2 max_outstanding=4 a_req=2 a_wait=8 b_req=5 b_wait=7 bias_req=24 bias_wait=55 prep_mac=2 mac=8 write=24 next=1 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=17 response_wait=50 writeback_wait=8 outstanding_highwater=2 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=137
+MATRIX_CORE_CASE_PASS id=3 shape_mnk=4,4,4 batches=1 transpose_ab=11 bias=0 writes=0/16 cycles=36 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=2 line_write_bytes=0 line_stalls=0 macs_per_cycle=1.778 array_utilization_pct=0.69 effective_gops_250mhz=0.889 physical_array=16x16
+MATRIX_CORE_PROFILE id=3 max_outstanding=4 a_req=3 a_wait=2 b_req=1 b_wait=2 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=22 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=8 response_wait=2 writeback_wait=6 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=36
+MATRIX_CORE_CASE_PASS id=4 shape_mnk=16,16,16 batches=1 transpose_ab=00 bias=0 writes=64/0 cycles=188 mac_cycles=16 bank_reads=32 bank_read_bytes=512 bank_stalls=20 line_write_bytes=1024 line_stalls=28 macs_per_cycle=21.787 array_utilization_pct=8.51 effective_gops_250mhz=10.894 physical_array=16x16
+MATRIX_CORE_PROFILE id=4 max_outstanding=4 a_req=5 a_wait=5 b_req=7 b_wait=2 bias_req=0 bias_wait=0 prep_mac=4 mac=16 write=92 next=0 done=1 error=0 error_drain=0 prefetch_wait=56 arbiter_stall=48 response_wait=7 writeback_wait=28 outstanding_highwater=4 fifo_full=0 prefetch_a_req=12 prefetch_a_drain=15 prefetch_b_req=28 prefetch_b_drain=10 prefetch_overlap=12 prefetch_completed=3 a_tile_cache_hits=0 total=188
+MATRIX_CORE_CASE_PASS id=5 shape_mnk=32,16,8 batches=1 transpose_ab=11 bias=1 writes=128/0 cycles=395 mac_cycles=16 bank_reads=32 bank_read_bytes=512 bank_stalls=14 line_write_bytes=2048 line_stalls=37 macs_per_cycle=10.370 array_utilization_pct=4.05 effective_gops_250mhz=5.185 physical_array=16x16
+MATRIX_CORE_PROFILE id=5 max_outstanding=4 a_req=12 a_wait=7 b_req=16 b_wait=6 bias_req=45 bias_wait=91 prep_mac=4 mac=16 write=165 next=1 done=1 error=0 error_drain=0 prefetch_wait=31 arbiter_stall=64 response_wait=79 writeback_wait=37 outstanding_highwater=4 fifo_full=0 prefetch_a_req=8 prefetch_a_drain=9 prefetch_b_req=10 prefetch_b_drain=10 prefetch_overlap=8 prefetch_completed=2 a_tile_cache_hits=0 total=395
+MATRIX_CORE_CASE_PASS id=18 shape_mnk=16,32,32 batches=1 transpose_ab=00 bias=0 writes=128/0 cycles=426 mac_cycles=64 bank_reads=96 bank_read_bytes=1536 bank_stalls=50 line_write_bytes=2048 line_stalls=30 macs_per_cycle=38.460 array_utilization_pct=15.02 effective_gops_250mhz=19.230 physical_array=16x16
+MATRIX_CORE_PROFILE id=18 max_outstanding=4 a_req=5 a_wait=4 b_req=11 b_wait=9 bias_req=0 bias_wait=0 prep_mac=16 mac=64 write=158 next=1 done=1 error=0 error_drain=0 prefetch_wait=157 arbiter_stall=80 response_wait=12 writeback_wait=30 outstanding_highwater=4 fifo_full=0 prefetch_a_req=49 prefetch_a_drain=21 prefetch_b_req=82 prefetch_b_drain=47 prefetch_overlap=56 prefetch_completed=14 a_tile_cache_hits=8 total=426
+MATRIX_CORE_CASE_PASS id=19 shape_mnk=32,32,64 batches=1 transpose_ab=00 bias=0 writes=256/0 cycles=1371 mac_cycles=256 bank_reads=384 bank_read_bytes=6144 bank_stalls=141 line_write_bytes=4096 line_stalls=73 macs_per_cycle=47.802 array_utilization_pct=18.67 effective_gops_250mhz=23.901 physical_array=16x16
+MATRIX_CORE_PROFILE id=19 max_outstanding=4 a_req=10 a_wait=10 b_req=21 b_wait=16 bias_req=0 bias_wait=0 prep_mac=64 mac=256 write=329 next=3 done=1 error=0 error_drain=0 prefetch_wait=661 arbiter_stall=214 response_wait=23 writeback_wait=73 outstanding_highwater=4 fifo_full=0 prefetch_a_req=168 prefetch_a_drain=112 prefetch_b_req=328 prefetch_b_drain=233 prefetch_overlap=240 prefetch_completed=60 a_tile_cache_hits=32 total=1371
+MATRIX_CORE_CASE_PASS id=20 shape_mnk=16,32,68 batches=1 transpose_ab=00 bias=0 writes=128/0 cycles=881 mac_cycles=136 bank_reads=272 bank_read_bytes=4352 bank_stalls=95 line_write_bytes=2048 line_stalls=35 macs_per_cycle=39.519 array_utilization_pct=15.44 effective_gops_250mhz=19.759 physical_array=16x16
+MATRIX_CORE_PROFILE id=20 max_outstanding=4 a_req=11 a_wait=7 b_req=13 b_wait=7 bias_req=0 bias_wait=0 prep_mac=34 mac=136 write=163 next=1 done=1 error=0 error_drain=0 prefetch_wait=508 arbiter_stall=130 response_wait=17 writeback_wait=35 outstanding_highwater=4 fifo_full=0 prefetch_a_req=174 prefetch_a_drain=129 prefetch_b_req=169 prefetch_b_drain=132 prefetch_overlap=128 prefetch_completed=32 a_tile_cache_hits=0 total=881
+MATRIX_CORE_FAULT_PASS id=0 code=1
+MATRIX_CORE_FAULT_PASS id=41 code=1
+MATRIX_CORE_FAULT_PASS id=42 code=1
+MATRIX_CORE_FAULT_PASS id=43 code=1
+MATRIX_CORE_FAULT_PASS id=44 code=1
+MATRIX_CORE_FAULT_PASS id=45 code=1
+MATRIX_CORE_FAULT_PASS id=46 code=1
+MATRIX_CORE_FAULT_PASS id=47 code=1
+MATRIX_CORE_FAULT_PASS id=48 code=1
+MATRIX_CORE_FAULT_PASS id=49 code=6
+MATRIX_CORE_FAULT_PASS id=1 code=2
+MATRIX_CORE_FAULT_PASS id=2 code=6
+MATRIX_CORE_FAULT_PASS id=3 code=5
+MATRIX_CORE_FAULT_PASS id=4 code=5
+MATRIX_CORE_FAULT_PASS id=5 code=6
+MATRIX_CORE_FAULT_PASS id=6 code=6
+MATRIX_CORE_FAULT_PASS id=7 code=6
+MATRIX_CORE_FAULT_PASS id=8 code=4
+MATRIX_CORE_FAULT_PASS id=9 code=3
+MATRIX_CORE_FAULT_PASS id=10 code=3
+MATRIX_CORE_FAULT_PASS id=11 code=3
+MATRIX_CORE_FAULT_PASS id=11 code=3
+MATRIX_CORE_CASE_PASS id=12 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=24 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=0 line_write_bytes=64 line_stalls=5 macs_per_cycle=2.667 array_utilization_pct=1.04 effective_gops_250mhz=1.333 physical_array=16x16
+MATRIX_CORE_PROFILE id=12 max_outstanding=4 a_req=1 a_wait=5 b_req=1 b_wait=2 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=9 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=5 response_wait=5 writeback_wait=5 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=24
+MATRIX_CORE_OUTSTANDING_ABORT_PASS depth=4 drained=866
+MATRIX_CORE_FAULT_PASS id=12 code=5
+MATRIX_CORE_CASE_PASS id=13 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=19 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=1 line_write_bytes=64 line_stalls=1 macs_per_cycle=3.368 array_utilization_pct=1.32 effective_gops_250mhz=1.684 physical_array=16x16
+MATRIX_CORE_PROFILE id=13 max_outstanding=4 a_req=1 a_wait=3 b_req=2 b_wait=2 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=5 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=2 response_wait=3 writeback_wait=1 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=19
+MATRIX_CORE_OUTSTANDING_PARITY_PASS depth=4 issue=866 drained=872
+MATRIX_CORE_FAULT_PASS id=13 code=5
+MATRIX_CORE_CASE_PASS id=14 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=18 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=0 line_write_bytes=64 line_stalls=2 macs_per_cycle=3.556 array_utilization_pct=1.39 effective_gops_250mhz=1.778 physical_array=16x16
+MATRIX_CORE_PROFILE id=14 max_outstanding=4 a_req=1 a_wait=2 b_req=1 b_wait=2 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=6 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=2 response_wait=2 writeback_wait=2 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=18
+MATRIX_CORE_PREFETCH_PARITY_PASS issue=880 drained=886
+MATRIX_CORE_FAULT_PASS id=14 code=3
+MATRIX_CORE_CASE_PASS id=15 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=21 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=0 line_write_bytes=64 line_stalls=3 macs_per_cycle=3.048 array_utilization_pct=1.19 effective_gops_250mhz=1.524 physical_array=16x16
+MATRIX_CORE_PROFILE id=15 max_outstanding=4 a_req=1 a_wait=3 b_req=1 b_wait=3 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=7 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=3 response_wait=4 writeback_wait=3 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=21
+MATRIX_CORE_PREFETCH_ABORT_PASS depth=4 drained=898
+MATRIX_CORE_FAULT_PASS id=15 code=4
+MATRIX_CORE_CASE_PASS id=16 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=21 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=0 line_write_bytes=64 line_stalls=0 macs_per_cycle=3.048 array_utilization_pct=1.19 effective_gops_250mhz=1.524 physical_array=16x16
+MATRIX_CORE_PROFILE id=16 max_outstanding=4 a_req=1 a_wait=4 b_req=1 b_wait=5 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=4 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=0 response_wait=7 writeback_wait=0 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=21
+MATRIX_CORE_PREFETCH_WATCHDOG_PASS limit=20 drained=904
+MATRIX_CORE_CASE_PASS id=17 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=19 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=0 line_write_bytes=64 line_stalls=1 macs_per_cycle=3.368 array_utilization_pct=1.32 effective_gops_250mhz=1.684 physical_array=16x16
+MATRIX_CORE_PROFILE id=17 max_outstanding=4 a_req=1 a_wait=3 b_req=1 b_wait=3 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=5 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=1 response_wait=4 writeback_wait=1 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=19
+MATRIX_CORE_PREFETCH_RESET_PASS recovery=1
+MATRIX_CORE_LATE_FAULT_PASS issue=72 completed_lines=64
+MATRIX_CORE_PHASE_ABORT_PASS state=5 id=24 prior_writes=0/0
+MATRIX_CORE_PHASE_ABORT_PASS state=6 id=25 prior_writes=0/0
+MATRIX_CORE_PHASE_ABORT_PASS state=7 id=26 prior_writes=0/0
+MATRIX_CORE_PHASE_ABORT_PASS state=9 id=27 prior_writes=0/0
+MATRIX_CORE_PHASE_ABORT_PASS state=10 id=28 prior_writes=64/0
+MATRIX_CORE_PHASE_ABORT_PASS phase=final_write_pending id=29 prior_writes=3/0
+MATRIX_CORE_FAULT_PASS id=22 code=3
+MATRIX_CORE_PREFETCH_WAIT_ABORT_PASS drained=104
+MATRIX_CORE_FAULT_PASS id=23 code=3
+MATRIX_CORE_PREFETCH_B_REQ_ABORT_PASS drained=116
+MATRIX_CORE_CASE_PASS id=21 shape_mnk=16,20,32 batches=1 transpose_ab=00 bias=0 writes=80/0 cycles=266 mac_cycles=64 bank_reads=72 bank_read_bytes=1152 bank_stalls=0 line_write_bytes=1280 line_stalls=25 macs_per_cycle=38.496 array_utilization_pct=15.04 effective_gops_250mhz=19.248 physical_array=16x16
+MATRIX_CORE_PROFILE id=21 max_outstanding=4 a_req=5 a_wait=2 b_req=5 b_wait=4 bias_req=0 bias_wait=0 prep_mac=16 mac=64 write=105 next=1 done=1 error=0 error_drain=0 prefetch_wait=63 arbiter_stall=25 response_wait=3 writeback_wait=25 outstanding_highwater=2 fifo_full=0 prefetch_a_req=28 prefetch_a_drain=14 prefetch_b_req=35 prefetch_b_drain=28 prefetch_overlap=49 prefetch_completed=14 a_tile_cache_hits=8 total=266
+MATRIX_CORE_PREFETCH_HANDOFF_PASS completed=14 overlap=49 direct=1 array=16
+MATRIX_CORE_PHASE_RESET_PASS state=2 id=30
+MATRIX_CORE_PHASE_RESET_PASS state=3 id=31
+MATRIX_CORE_PHASE_RESET_PASS state=4 id=32
+MATRIX_CORE_PHASE_RESET_PASS state=5 id=33
+MATRIX_CORE_PHASE_RESET_PASS state=6 id=34
+MATRIX_CORE_PHASE_RESET_PASS state=7 id=35
+MATRIX_CORE_PHASE_RESET_PASS state=9 id=36
+MATRIX_CORE_PHASE_RESET_PASS state=10 id=37
+MATRIX_CORE_PHASE_RESET_PASS state=12 id=38
+MATRIX_CORE_PHASE_RESET_PASS state=13 id=39
+MATRIX_CORE_PHASE_RESET_PASS state=14 id=40
+MATRIX_CORE_CASE_PASS id=10 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=19 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=0 line_write_bytes=64 line_stalls=1 macs_per_cycle=3.368 array_utilization_pct=1.32 effective_gops_250mhz=1.684 physical_array=16x16
+MATRIX_CORE_PROFILE id=10 max_outstanding=4 a_req=1 a_wait=3 b_req=1 b_wait=3 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=5 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=1 response_wait=4 writeback_wait=1 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=19
+MATRIX_CORE_CASE_PASS id=11 shape_mnk=4,4,8 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=27 mac_cycles=8 bank_reads=4 bank_read_bytes=64 bank_stalls=0 line_write_bytes=64 line_stalls=0 macs_per_cycle=4.741 array_utilization_pct=1.85 effective_gops_250mhz=2.370 physical_array=16x16
+MATRIX_CORE_PROFILE id=11 max_outstanding=4 a_req=1 a_wait=3 b_req=1 b_wait=3 bias_req=0 bias_wait=0 prep_mac=2 mac=8 write=4 next=0 done=1 error=0 error_drain=0 prefetch_wait=4 arbiter_stall=0 response_wait=4 writeback_wait=0 outstanding_highwater=1 fifo_full=0 prefetch_a_req=1 prefetch_a_drain=2 prefetch_b_req=1 prefetch_b_drain=3 prefetch_overlap=4 prefetch_completed=1 a_tile_cache_hits=0 total=27
+MATRIX_CORE_RANDOM_PASS cases=18 faults=35 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 seed=20261022 bank_reads=4 responses=4 spad_reads=0 responses=0 stalls=373/37/323
+$finish called from file "../tb/tb_ai_tensor_matrix_core_random.sv", line 1348.
+$finish at simulation time             53000000
+
+---------------------------------------------------------------------------
+VCS Coverage Metrics: during simulation line, cond, FSM, branch was monitored
+---------------------------------------------------------------------------
+
+ Coverage status: End of All Coverages ...
+
+           V C S   S i m u l a t i o n   R e p o r t 
+Time: 53000000 ps
+CPU Time:      0.360 seconds;       Data structure size:   0.5Mb
+Sat Nov 14 00:35:24 2026
+Info: [VCS_SAVE_RESTORE_INFO] ASLR (Address Space Layout Randomization) is detected on the machine. To enable $save functionality, ASLR will be switched off and simv re-executed.
+Please use '-no_save' simv switch to avoid re-execution or '-suppress=ASLR_DETECTED_INFO' to suppress this message.
+Chronologic VCS simulator copyright 1991-2023
+Contains Synopsys proprietary information.
+Compiler version V-2023.12-SP1_Full64; Runtime version V-2023.12-SP1_Full64;  Nov 14 00:35 2026
+
+ VCS Coverage Metrics Release V-2023.12-SP1_Full64 Copyright (c) 1991-2023 by Synopsys Inc.
+MATRIX_CORE_CASE_PASS id=0 shape_mnk=8,8,8 batches=2 transpose_ab=00 bias=1 writes=32/0 cycles=183 mac_cycles=16 bank_reads=16 bank_read_bytes=256 bank_stalls=4 line_write_bytes=512 line_stalls=9 macs_per_cycle=5.596 array_utilization_pct=2.19 effective_gops_250mhz=2.798 physical_array=16x16
+MATRIX_CORE_PROFILE id=0 max_outstanding=4 a_req=6 a_wait=7 b_req=5 b_wait=8 bias_req=21 bias_wait=55 prep_mac=4 mac=16 write=41 next=1 done=1 error=0 error_drain=0 prefetch_wait=18 arbiter_stall=18 response_wait=51 writeback_wait=9 outstanding_highwater=2 fifo_full=0 prefetch_a_req=5 prefetch_a_drain=6 prefetch_b_req=4 prefetch_b_drain=9 prefetch_overlap=8 prefetch_completed=2 a_tile_cache_hits=0 total=183
+MATRIX_CORE_CASE_PASS id=1 shape_mnk=8,4,8 batches=1 transpose_ab=10 bias=0 writes=8/0 cycles=40 mac_cycles=8 bank_reads=6 bank_read_bytes=96 bank_stalls=1 line_write_bytes=128 line_stalls=4 macs_per_cycle=6.400 array_utilization_pct=2.50 effective_gops_250mhz=3.200 physical_array=16x16
+MATRIX_CORE_PROFILE id=1 max_outstanding=4 a_req=3 a_wait=4 b_req=1 b_wait=2 bias_req=0 bias_wait=0 prep_mac=2 mac=8 write=12 next=0 done=1 error=0 error_drain=0 prefetch_wait=7 arbiter_stall=5 response_wait=5 writeback_wait=4 outstanding_highwater=2 fifo_full=0 prefetch_a_req=2 prefetch_a_drain=5 prefetch_b_req=1 prefetch_b_drain=2 prefetch_overlap=4 prefetch_completed=1 a_tile_cache_hits=0 total=40
+MATRIX_CORE_CASE_PASS id=2 shape_mnk=4,8,4 batches=2 transpose_ab=01 bias=1 writes=16/0 cycles=137 mac_cycles=8 bank_reads=6 bank_read_bytes=96 bank_stalls=1 line_write_bytes=256 line_stalls=8 macs_per_cycle=1.869 array_utilization_pct=0.73 effective_gops_250mhz=0.934 physical_array=16x16
+MATRIX_CORE_PROFILE id=2 max_outstanding=4 a_req=2 a_wait=8 b_req=5 b_wait=7 bias_req=24 bias_wait=55 prep_mac=2 mac=8 write=24 next=1 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=17 response_wait=50 writeback_wait=8 outstanding_highwater=2 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=137
+MATRIX_CORE_CASE_PASS id=3 shape_mnk=4,4,4 batches=1 transpose_ab=11 bias=0 writes=0/16 cycles=36 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=2 line_write_bytes=0 line_stalls=0 macs_per_cycle=1.778 array_utilization_pct=0.69 effective_gops_250mhz=0.889 physical_array=16x16
+MATRIX_CORE_PROFILE id=3 max_outstanding=4 a_req=3 a_wait=2 b_req=1 b_wait=2 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=22 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=8 response_wait=2 writeback_wait=6 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=36
+MATRIX_CORE_CASE_PASS id=4 shape_mnk=16,16,16 batches=1 transpose_ab=00 bias=0 writes=64/0 cycles=188 mac_cycles=16 bank_reads=32 bank_read_bytes=512 bank_stalls=20 line_write_bytes=1024 line_stalls=28 macs_per_cycle=21.787 array_utilization_pct=8.51 effective_gops_250mhz=10.894 physical_array=16x16
+MATRIX_CORE_PROFILE id=4 max_outstanding=4 a_req=5 a_wait=5 b_req=7 b_wait=2 bias_req=0 bias_wait=0 prep_mac=4 mac=16 write=92 next=0 done=1 error=0 error_drain=0 prefetch_wait=56 arbiter_stall=48 response_wait=7 writeback_wait=28 outstanding_highwater=4 fifo_full=0 prefetch_a_req=12 prefetch_a_drain=15 prefetch_b_req=28 prefetch_b_drain=10 prefetch_overlap=12 prefetch_completed=3 a_tile_cache_hits=0 total=188
+MATRIX_CORE_CASE_PASS id=5 shape_mnk=32,16,8 batches=1 transpose_ab=11 bias=1 writes=128/0 cycles=395 mac_cycles=16 bank_reads=32 bank_read_bytes=512 bank_stalls=14 line_write_bytes=2048 line_stalls=37 macs_per_cycle=10.370 array_utilization_pct=4.05 effective_gops_250mhz=5.185 physical_array=16x16
+MATRIX_CORE_PROFILE id=5 max_outstanding=4 a_req=12 a_wait=7 b_req=16 b_wait=6 bias_req=45 bias_wait=91 prep_mac=4 mac=16 write=165 next=1 done=1 error=0 error_drain=0 prefetch_wait=31 arbiter_stall=64 response_wait=79 writeback_wait=37 outstanding_highwater=4 fifo_full=0 prefetch_a_req=8 prefetch_a_drain=9 prefetch_b_req=10 prefetch_b_drain=10 prefetch_overlap=8 prefetch_completed=2 a_tile_cache_hits=0 total=395
+MATRIX_CORE_CASE_PASS id=18 shape_mnk=16,32,32 batches=1 transpose_ab=00 bias=0 writes=128/0 cycles=426 mac_cycles=64 bank_reads=96 bank_read_bytes=1536 bank_stalls=50 line_write_bytes=2048 line_stalls=30 macs_per_cycle=38.460 array_utilization_pct=15.02 effective_gops_250mhz=19.230 physical_array=16x16
+MATRIX_CORE_PROFILE id=18 max_outstanding=4 a_req=5 a_wait=4 b_req=11 b_wait=9 bias_req=0 bias_wait=0 prep_mac=16 mac=64 write=158 next=1 done=1 error=0 error_drain=0 prefetch_wait=157 arbiter_stall=80 response_wait=12 writeback_wait=30 outstanding_highwater=4 fifo_full=0 prefetch_a_req=49 prefetch_a_drain=21 prefetch_b_req=82 prefetch_b_drain=47 prefetch_overlap=56 prefetch_completed=14 a_tile_cache_hits=8 total=426
+MATRIX_CORE_CASE_PASS id=19 shape_mnk=32,32,64 batches=1 transpose_ab=00 bias=0 writes=256/0 cycles=1371 mac_cycles=256 bank_reads=384 bank_read_bytes=6144 bank_stalls=141 line_write_bytes=4096 line_stalls=73 macs_per_cycle=47.802 array_utilization_pct=18.67 effective_gops_250mhz=23.901 physical_array=16x16
+MATRIX_CORE_PROFILE id=19 max_outstanding=4 a_req=10 a_wait=10 b_req=21 b_wait=16 bias_req=0 bias_wait=0 prep_mac=64 mac=256 write=329 next=3 done=1 error=0 error_drain=0 prefetch_wait=661 arbiter_stall=214 response_wait=23 writeback_wait=73 outstanding_highwater=4 fifo_full=0 prefetch_a_req=168 prefetch_a_drain=112 prefetch_b_req=328 prefetch_b_drain=233 prefetch_overlap=240 prefetch_completed=60 a_tile_cache_hits=32 total=1371
+MATRIX_CORE_CASE_PASS id=20 shape_mnk=16,32,68 batches=1 transpose_ab=00 bias=0 writes=128/0 cycles=881 mac_cycles=136 bank_reads=272 bank_read_bytes=4352 bank_stalls=95 line_write_bytes=2048 line_stalls=35 macs_per_cycle=39.519 array_utilization_pct=15.44 effective_gops_250mhz=19.759 physical_array=16x16
+MATRIX_CORE_PROFILE id=20 max_outstanding=4 a_req=11 a_wait=7 b_req=13 b_wait=7 bias_req=0 bias_wait=0 prep_mac=34 mac=136 write=163 next=1 done=1 error=0 error_drain=0 prefetch_wait=508 arbiter_stall=130 response_wait=17 writeback_wait=35 outstanding_highwater=4 fifo_full=0 prefetch_a_req=174 prefetch_a_drain=129 prefetch_b_req=169 prefetch_b_drain=132 prefetch_overlap=128 prefetch_completed=32 a_tile_cache_hits=0 total=881
+MATRIX_CORE_FAULT_PASS id=0 code=1
+MATRIX_CORE_FAULT_PASS id=41 code=1
+MATRIX_CORE_FAULT_PASS id=42 code=1
+MATRIX_CORE_FAULT_PASS id=43 code=1
+MATRIX_CORE_FAULT_PASS id=44 code=1
+MATRIX_CORE_FAULT_PASS id=45 code=1
+MATRIX_CORE_FAULT_PASS id=46 code=1
+MATRIX_CORE_FAULT_PASS id=47 code=1
+MATRIX_CORE_FAULT_PASS id=48 code=1
+MATRIX_CORE_FAULT_PASS id=49 code=6
+MATRIX_CORE_FAULT_PASS id=1 code=2
+MATRIX_CORE_FAULT_PASS id=2 code=6
+MATRIX_CORE_FAULT_PASS id=3 code=5
+MATRIX_CORE_FAULT_PASS id=4 code=5
+MATRIX_CORE_FAULT_PASS id=5 code=6
+MATRIX_CORE_FAULT_PASS id=6 code=6
+MATRIX_CORE_FAULT_PASS id=7 code=6
+MATRIX_CORE_FAULT_PASS id=8 code=4
+MATRIX_CORE_FAULT_PASS id=9 code=3
+MATRIX_CORE_FAULT_PASS id=10 code=3
+MATRIX_CORE_FAULT_PASS id=11 code=3
+MATRIX_CORE_FAULT_PASS id=11 code=3
+MATRIX_CORE_CASE_PASS id=12 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=24 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=0 line_write_bytes=64 line_stalls=5 macs_per_cycle=2.667 array_utilization_pct=1.04 effective_gops_250mhz=1.333 physical_array=16x16
+MATRIX_CORE_PROFILE id=12 max_outstanding=4 a_req=1 a_wait=5 b_req=1 b_wait=2 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=9 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=5 response_wait=5 writeback_wait=5 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=24
+MATRIX_CORE_OUTSTANDING_ABORT_PASS depth=4 drained=866
+MATRIX_CORE_FAULT_PASS id=12 code=5
+MATRIX_CORE_CASE_PASS id=13 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=19 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=1 line_write_bytes=64 line_stalls=1 macs_per_cycle=3.368 array_utilization_pct=1.32 effective_gops_250mhz=1.684 physical_array=16x16
+MATRIX_CORE_PROFILE id=13 max_outstanding=4 a_req=1 a_wait=3 b_req=2 b_wait=2 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=5 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=2 response_wait=3 writeback_wait=1 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=19
+MATRIX_CORE_OUTSTANDING_PARITY_PASS depth=4 issue=866 drained=872
+MATRIX_CORE_FAULT_PASS id=13 code=5
+MATRIX_CORE_CASE_PASS id=14 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=18 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=0 line_write_bytes=64 line_stalls=2 macs_per_cycle=3.556 array_utilization_pct=1.39 effective_gops_250mhz=1.778 physical_array=16x16
+MATRIX_CORE_PROFILE id=14 max_outstanding=4 a_req=1 a_wait=2 b_req=1 b_wait=2 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=6 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=2 response_wait=2 writeback_wait=2 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=18
+MATRIX_CORE_PREFETCH_PARITY_PASS issue=880 drained=886
+MATRIX_CORE_FAULT_PASS id=14 code=3
+MATRIX_CORE_CASE_PASS id=15 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=21 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=0 line_write_bytes=64 line_stalls=3 macs_per_cycle=3.048 array_utilization_pct=1.19 effective_gops_250mhz=1.524 physical_array=16x16
+MATRIX_CORE_PROFILE id=15 max_outstanding=4 a_req=1 a_wait=3 b_req=1 b_wait=3 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=7 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=3 response_wait=4 writeback_wait=3 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=21
+MATRIX_CORE_PREFETCH_ABORT_PASS depth=4 drained=898
+MATRIX_CORE_FAULT_PASS id=15 code=4
+MATRIX_CORE_CASE_PASS id=16 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=21 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=0 line_write_bytes=64 line_stalls=0 macs_per_cycle=3.048 array_utilization_pct=1.19 effective_gops_250mhz=1.524 physical_array=16x16
+MATRIX_CORE_PROFILE id=16 max_outstanding=4 a_req=1 a_wait=4 b_req=1 b_wait=5 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=4 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=0 response_wait=7 writeback_wait=0 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=21
+MATRIX_CORE_PREFETCH_WATCHDOG_PASS limit=20 drained=904
+MATRIX_CORE_CASE_PASS id=17 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=19 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=0 line_write_bytes=64 line_stalls=1 macs_per_cycle=3.368 array_utilization_pct=1.32 effective_gops_250mhz=1.684 physical_array=16x16
+MATRIX_CORE_PROFILE id=17 max_outstanding=4 a_req=1 a_wait=3 b_req=1 b_wait=3 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=5 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=1 response_wait=4 writeback_wait=1 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=19
+MATRIX_CORE_PREFETCH_RESET_PASS recovery=1
+MATRIX_CORE_LATE_FAULT_PASS issue=72 completed_lines=64
+MATRIX_CORE_PHASE_ABORT_PASS state=5 id=24 prior_writes=0/0
+MATRIX_CORE_PHASE_ABORT_PASS state=6 id=25 prior_writes=0/0
+MATRIX_CORE_PHASE_ABORT_PASS state=7 id=26 prior_writes=0/0
+MATRIX_CORE_PHASE_ABORT_PASS state=9 id=27 prior_writes=0/0
+MATRIX_CORE_PHASE_ABORT_PASS state=10 id=28 prior_writes=64/0
+MATRIX_CORE_PHASE_ABORT_PASS phase=final_write_pending id=29 prior_writes=3/0
+MATRIX_CORE_FAULT_PASS id=22 code=3
+MATRIX_CORE_PREFETCH_WAIT_ABORT_PASS drained=104
+MATRIX_CORE_FAULT_PASS id=23 code=3
+MATRIX_CORE_PREFETCH_B_REQ_ABORT_PASS drained=116
+MATRIX_CORE_CASE_PASS id=21 shape_mnk=16,20,32 batches=1 transpose_ab=00 bias=0 writes=80/0 cycles=266 mac_cycles=64 bank_reads=72 bank_read_bytes=1152 bank_stalls=0 line_write_bytes=1280 line_stalls=25 macs_per_cycle=38.496 array_utilization_pct=15.04 effective_gops_250mhz=19.248 physical_array=16x16
+MATRIX_CORE_PROFILE id=21 max_outstanding=4 a_req=5 a_wait=2 b_req=5 b_wait=4 bias_req=0 bias_wait=0 prep_mac=16 mac=64 write=105 next=1 done=1 error=0 error_drain=0 prefetch_wait=63 arbiter_stall=25 response_wait=3 writeback_wait=25 outstanding_highwater=2 fifo_full=0 prefetch_a_req=28 prefetch_a_drain=14 prefetch_b_req=35 prefetch_b_drain=28 prefetch_overlap=49 prefetch_completed=14 a_tile_cache_hits=8 total=266
+MATRIX_CORE_PREFETCH_HANDOFF_PASS completed=14 overlap=49 direct=1 array=16
+MATRIX_CORE_PHASE_RESET_PASS state=2 id=30
+MATRIX_CORE_PHASE_RESET_PASS state=3 id=31
+MATRIX_CORE_PHASE_RESET_PASS state=4 id=32
+MATRIX_CORE_PHASE_RESET_PASS state=5 id=33
+MATRIX_CORE_PHASE_RESET_PASS state=6 id=34
+MATRIX_CORE_PHASE_RESET_PASS state=7 id=35
+MATRIX_CORE_PHASE_RESET_PASS state=9 id=36
+MATRIX_CORE_PHASE_RESET_PASS state=10 id=37
+MATRIX_CORE_PHASE_RESET_PASS state=12 id=38
+MATRIX_CORE_PHASE_RESET_PASS state=13 id=39
+MATRIX_CORE_PHASE_RESET_PASS state=14 id=40
+MATRIX_CORE_CASE_PASS id=10 shape_mnk=4,4,4 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=19 mac_cycles=4 bank_reads=2 bank_read_bytes=32 bank_stalls=0 line_write_bytes=64 line_stalls=1 macs_per_cycle=3.368 array_utilization_pct=1.32 effective_gops_250mhz=1.684 physical_array=16x16
+MATRIX_CORE_PROFILE id=10 max_outstanding=4 a_req=1 a_wait=3 b_req=1 b_wait=3 bias_req=0 bias_wait=0 prep_mac=1 mac=4 write=5 next=0 done=1 error=0 error_drain=0 prefetch_wait=0 arbiter_stall=1 response_wait=4 writeback_wait=1 outstanding_highwater=1 fifo_full=0 prefetch_a_req=0 prefetch_a_drain=0 prefetch_b_req=0 prefetch_b_drain=0 prefetch_overlap=0 prefetch_completed=0 a_tile_cache_hits=0 total=19
+MATRIX_CORE_CASE_PASS id=11 shape_mnk=4,4,8 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=27 mac_cycles=8 bank_reads=4 bank_read_bytes=64 bank_stalls=0 line_write_bytes=64 line_stalls=0 macs_per_cycle=4.741 array_utilization_pct=1.85 effective_gops_250mhz=2.370 physical_array=16x16
+MATRIX_CORE_PROFILE id=11 max_outstanding=4 a_req=1 a_wait=3 b_req=1 b_wait=3 bias_req=0 bias_wait=0 prep_mac=2 mac=8 write=4 next=0 done=1 error=0 error_drain=0 prefetch_wait=4 arbiter_stall=0 response_wait=4 writeback_wait=0 outstanding_highwater=1 fifo_full=0 prefetch_a_req=1 prefetch_a_drain=2 prefetch_b_req=1 prefetch_b_drain=3 prefetch_overlap=4 prefetch_completed=1 a_tile_cache_hits=0 total=27
+MATRIX_CORE_RANDOM_PASS cases=18 faults=35 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 seed=20261023 bank_reads=4 responses=4 spad_reads=0 responses=0 stalls=373/37/323
+$finish called from file "../tb/tb_ai_tensor_matrix_core_random.sv", line 1348.
+$finish at simulation time             53000000
+
+---------------------------------------------------------------------------
+VCS Coverage Metrics: during simulation line, cond, FSM, branch was monitored
+---------------------------------------------------------------------------
+
+ Coverage status: End of All Coverages ...
+
+           V C S   S i m u l a t i o n   R e p o r t 
+Time: 53000000 ps
+CPU Time:      0.330 seconds;       Data structure size:   0.5Mb
+Sat Nov 14 00:35:25 2026
+make: Leaving directory '/tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/MATRIX-CYCLE-002R2/source/dv/block/compute/matrix/sim'

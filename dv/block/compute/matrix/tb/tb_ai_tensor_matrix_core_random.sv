@@ -618,6 +618,21 @@ module tb_ai_tensor_matrix_core_random;
     end
   endtask
 
+  task automatic reset_benchmark_stalls(input integer case_id);
+    reg [31:0] case_seed;
+    begin
+      // Keep each workload's ready/response sequence aligned across RTL
+      // candidates even when an earlier workload changes its cycle count.
+      case_seed=32'h7ac4_01d3 ^ initial_seed ^
+                (case_id * 32'h9e37_79b9);
+      if(case_seed==0) case_seed=32'h1;
+      rng=case_seed;
+      banked_ready=case_seed[0]|case_seed[3];
+      spad_ready=case_seed[2]|case_seed[5];
+      line_ready=case_seed[1]|case_seed[4];
+    end
+  endtask
+
   task automatic run_tinynpu_match_case(
       input integer m,input integer n,input integer k_size,input integer case_id);
     begin
@@ -983,6 +998,47 @@ module tb_ai_tensor_matrix_core_random;
     end
   endtask
 
+  task automatic run_final_write_abort(input integer fault_id);
+    integer timeout,lines_before,scalars_before;
+    begin
+      simple_fault_setup();
+      prepare_case(4,4,1,1,0,0,0,0,0,0,0);
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      timeout=0;
+      while(((line_write_count!=3) || !line_valid || !busy) &&
+            !done && (timeout<200000)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(line_write_count!=3 || !line_valid || !busy || done)
+        $fatal(1,"Matrix final-write abort boundary not reached writes=%0d valid=%b busy=%b done=%b",
+               line_write_count,line_valid,busy,done);
+
+      // Prevent a same-edge write acceptance so abort is sampled before the
+      // final output line can commit.
+      line_ready=0;
+      force_line_stall=1;
+      lines_before=line_write_count;scalars_before=scalar_write_count;
+      abort=1;
+      @(negedge clk);abort=0;
+      timeout=0;
+      while(!done && (timeout<200000)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(!done || !error || error_code!=ERR_ABORT || busy)
+        $fatal(1,"Matrix final-write abort done/error/code/busy=%b/%b/%0d/%b",
+               done,error,error_code,busy);
+      if(line_write_count!=lines_before || scalar_write_count!=scalars_before)
+        $fatal(1,"Matrix final-write abort committed output line=%0d->%0d scalar=%0d->%0d",
+               lines_before,line_write_count,scalars_before,scalar_write_count);
+      while(pending_bank || pending_spad) @(negedge clk);
+      force_line_stall=0;
+      fault_count=fault_count+1;
+      $display("MATRIX_CORE_PHASE_ABORT_PASS phase=final_write_pending id=%0d prior_writes=%0d/%0d",
+               fault_id,lines_before,scalars_before);
+    end
+  endtask
+
   task automatic run_prefetch_wait_abort;
     integer timeout,lines_before,scalars_before,accepted_at_abort;
     begin
@@ -1125,14 +1181,19 @@ module tb_ai_tensor_matrix_core_random;
 
     if($test$plusargs("MATRIX_BENCHMARK_ONLY")) begin
       prepare_case(4,4,8,1,0,0,0,0,0,0,0);
+      reset_benchmark_stalls(100);
       check_valid_case(100);
       prepare_case(8,8,8,1,0,0,0,0,0,0,0);
+      reset_benchmark_stalls(101);
       check_valid_case(101);
       prepare_case(16,16,8,1,0,0,0,0,0,0,0);
+      reset_benchmark_stalls(102);
       check_valid_case(102);
       prepare_case(16,32,8,1,0,0,0,0,0,0,0);
+      reset_benchmark_stalls(103);
       check_valid_case(103);
       prepare_case(32,32,16,1,0,0,0,0,0,0,0);
+      reset_benchmark_stalls(104);
       check_valid_case(104);
       if(!NEXT_K_PREFETCH_ENABLE && !mac_to_a_req_seen)
         $fatal(1,"Matrix no-prefetch configuration missed ST_MAC->ST_A_REQ fallback");
@@ -1256,7 +1317,7 @@ module tb_ai_tensor_matrix_core_random;
     run_phase_abort(7,4,4,1,0,26);  // ST_PREP_MAC
     run_phase_abort(9,4,4,1,0,27);  // ST_WRITE (write port held off)
     run_phase_abort(10,32,16,1,0,28); // ST_NEXT after first macro tile
-    run_phase_abort(11,4,4,1,0,29); // ST_DONE
+    run_final_write_abort(29); // abort before the final output line commits
     run_prefetch_wait_abort();
     run_prefetch_b_req_abort();
     run_prefetch_handoff();

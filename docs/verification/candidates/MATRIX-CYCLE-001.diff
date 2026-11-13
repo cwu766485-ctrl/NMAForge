@@ -1,0 +1,14 @@
+diff --git a/rtl/compute/matrix/ai_tensor_matrix_core.v b/rtl/compute/matrix/ai_tensor_matrix_core.v
+--- a/rtl/compute/matrix/ai_tensor_matrix_core.v
++++ b/rtl/compute/matrix/ai_tensor_matrix_core.v
+@@ -1107,6 +1107,9 @@ module ai_tensor_matrix_core #(
+                             bias_tile_base_r <= bias_batch_base_r;
+                             state_r <= ST_A_REQ;
+                         end else begin
+-                            state_r <= ST_DONE;
++                            busy <= 1'b0;
++                            done <= 1'b1;
++                            error <= 1'b0;
++                            state_r <= ST_IDLE;
+                         end
+                     end

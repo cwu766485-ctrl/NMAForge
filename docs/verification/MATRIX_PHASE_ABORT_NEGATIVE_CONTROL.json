@@ -1,0 +1,19 @@
+{
+  "test": "final-write-pending abort response",
+  "mutation": "ignore abort while the final output row is pending",
+  "result": "KILLED",
+  "checker": "run_final_write_abort",
+  "expected_contract": {
+    "done": 1,
+    "error": 1,
+    "error_code": "ERR_ABORT",
+    "busy": 0,
+    "additional_output_writes": 0,
+    "accepted_reads_drained": true
+  },
+  "observed_failure": "done/error/code/busy=0/0/0/1",
+  "log_sha256": "d3712a94a23e3f82a42a017455e1bb87b39ccab5ba943ab1cf81fc7ddab086b5",
+  "log_location": "artifacts/MATRIX_PHASE_ABORT_2026-11-14/negative_control_final_write_abort.log",
+  "original_log_location": "/tmp/nmaforge_phase_abort_negative_finalwrite_mutant/run.log",
+  "source_status": "isolated temporary mutant; no mutant source is included in the feature branch"
+}
