@@ -170,3 +170,12 @@ SpyGlass lint completed with 0 errors/467 warnings/5 infos; CDC setup 0 errors,
 interrupted after remaining at `Ar_resetcross01` (385/478) with about 6.6 GB
 RSS; it has no result. This is a DV bugfix closure, not static-analysis or
 ASIC sign-off. Logs, coverage databases and URG report remain under `/tmp`.
+# 2026-11-13 Compute Cluster DV Closure Round 2 baseline
+
+- Reviewed `bugfix/compact-spad-line-stalled-cnm` (`76805a45d8914ecdc998d98b419c8a19053b1daa`) against `candidate/frontend-closeout` (`f919bb787dab1a4e3bef44b5308ead56d6e77b72`): two commits ahead, no product RTL changes.
+- Recompiled exact source and passed Compute Cluster UVM seeds `20261025/26/27`; each line-stall test observed 92 stability checks, zero violations, and 1840 overlap cycles. UVM severity counts were zero.
+- Rebuilt DUT-only Top Smoke coverage from one VCS compile and merged three seeds under `/tmp/nmaforge_round2_dutcov_sha76805a45_20261113`: line 85.74%, condition 76.97%, FSM 43.74%, branch 82.09%. Kept full UVM coverage (69.46/67.13/43.47/66.26%, assertions 72%, groups 83.94%) as a separate database because it contains verification environment hierarchy.
+- Existing AXI stall directed test on the same compiled UVM image hit AR/AW/W stall-to-accept covers 14/5/12 times. The main compute-cluster regression had zero AR/AW matches, proving those tests are peripheral DMA stimulus gaps for that test, not unreachable cover properties.
+- Added `dv/uvm/tests/check_compact_spad_alloc.py` for compact concurrent live-range bounds/overlap and the row-8 CNM B lane calculation; wired it into the Compute Cluster UVM compile target.
+- Initial uncovered-bin triage, compact interval table, SVA disposition, scoped RTM and remaining work are in `docs/verification/COMPUTE_CLUSTER_DV_CLOSURE_ROUND2_2026-11-13.md`. DV remains OPEN; full bin-by-bin disposition, SpyGlass/RDC closure and ASIC readiness remain.
+- Reproduction: `make -C dv/uvm/sim uvm_compute_cluster_regress COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027' COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_round2_uvm_sha76805a45_20261113`; `make -C dv/subsystem/top_smoke/sim ai_compute_cluster_cov AI_CLUSTER_COV_RUN=/tmp/nmaforge_round2_dutcov_sha76805a45_20261113 AI_CLUSTER_COV_SEEDS='20261025 20261026 20261027'`.

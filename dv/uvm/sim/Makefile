@@ -47,6 +47,7 @@ uvm_external_macro_ddr_e2e:
 # compute SPAD mux, scheduler arbiter, protection, and four-bank SRAM are active.
 # Coverage and generated files stay outside the source tree.
 uvm_compute_cluster_compile:
+	python3 ../tests/check_compact_spad_alloc.py
 	mkdir -p $(COMPUTE_CLUSTER_UVM_OUT)/csrc
 	$(VCS_UVM) -cm $(UVM_COV_METRICS) -cm_dir $(COMPUTE_CLUSTER_UVM_OUT)/compile.vdb \
 		-Mdir=$(COMPUTE_CLUSTER_UVM_OUT)/csrc -top tb_ai_accel_uvm -f ai_accel_uvm.f \
