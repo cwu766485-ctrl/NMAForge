@@ -527,6 +527,7 @@ class dma_config_error_test extends dma_block_base_test;
     task run_phase(uvm_phase phase);
         dma_config_error_sequence seq = dma_config_error_sequence::type_id::create("seq");
         phase.raise_objection(this); seq.start(env.cmd_sqr);
+        env.sb.sample_observed_error(env.cmd_drv.vif.error, env.cmd_drv.vif.error_code);
         repeat(2) @(posedge env.cmd_drv.vif.clk); env.sb.check_complete();
         if (env.axi_rsp.accepted_ids.size() != 0 || env.axi_rsp.accepted_bids.size() != 0)
             `uvm_error("DMA_CONFIG_IO", "invalid configuration issued AXI traffic")
@@ -540,7 +541,9 @@ class dma_abort_read_test extends dma_block_base_test;
     task run_phase(uvm_phase phase);
         dma_abort_read_sequence seq = dma_abort_read_sequence::type_id::create("seq");
         phase.raise_objection(this); cfg.min_accepted_reads_before_response = 4;
-        seq.start(env.cmd_sqr); repeat(3) @(posedge env.cmd_drv.vif.clk); env.sb.check_complete();
+        seq.start(env.cmd_sqr);
+        env.sb.sample_observed_error(env.cmd_drv.vif.error, env.cmd_drv.vif.error_code);
+        repeat(3) @(posedge env.cmd_drv.vif.clk); env.sb.check_complete();
         phase.drop_objection(this);
     endtask
 endclass
@@ -568,6 +571,7 @@ class dma_read_slverr_test extends dma_block_base_test;
         end
 
         error_seq.start(env.cmd_sqr);
+        env.sb.sample_observed_error(env.cmd_drv.vif.error, env.cmd_drv.vif.error_code);
         repeat (2) @(posedge env.cmd_drv.vif.clk);
         if (cfg.injected_read_error_responses != 1 ||
             env.axi_rsp.accepted_ids.size() != 4 ||
@@ -617,6 +621,7 @@ class dma_spad_error_drain_test extends dma_block_base_test;
         end
 
         error_seq.start(env.cmd_sqr);
+        env.sb.sample_observed_error(env.cmd_drv.vif.error, env.cmd_drv.vif.error_code);
         repeat (2) @(posedge env.cmd_drv.vif.clk);
         if (cfg.injected_spad_line_req_errors != 1 ||
             // Newest-first returns the final 8-word burst first; its first
@@ -663,6 +668,7 @@ class dma_write_slverr_test extends dma_block_base_test;
         env.spad_model.preload_source_pattern(32'hf80, 4);
 
         error_seq.start(env.cmd_sqr);
+        env.sb.sample_observed_error(env.cmd_drv.vif.error, env.cmd_drv.vif.error_code);
         repeat (2) @(posedge env.cmd_drv.vif.clk);
         if (cfg.injected_write_error_responses != 1 ||
             env.axi_rsp.accepted_bids.size() != 1 ||
@@ -701,6 +707,7 @@ class dma_abort_write_test extends dma_block_base_test;
         env.spad_model.preload_source_pattern(32'h1000, 16);
 
         abort_seq.start(env.cmd_sqr);
+        env.sb.sample_observed_error(env.cmd_drv.vif.error, env.cmd_drv.vif.error_code);
         repeat (2) @(posedge env.cmd_drv.vif.clk);
         if (env.axi_rsp.accepted_bids.size() != 1 ||
             env.axi_rsp.completed_bids.size() != 1 ||
@@ -856,6 +863,23 @@ class dma_random_stress_test extends dma_block_base_test;
             `uvm_info("DMA_RANDOM_CASE", $sformatf("case=%0d store=%0b words=%0d",
                       case_index, req.store, req.length_words), UVM_LOW)
         end
+        phase.drop_objection(this);
+    endtask
+endclass
+
+class dma_error_checker_negative_test extends dma_block_base_test;
+    `uvm_component_utils(dma_error_checker_negative_test)
+    function new(string name = "dma_error_checker_negative_test", uvm_component parent = null);
+        super.new(name,parent);
+    endfunction
+    task run_phase(uvm_phase phase);
+        dma_config_error_sequence seq = dma_config_error_sequence::type_id::create("seq");
+        phase.raise_objection(this);
+        seq.start(env.cmd_sqr);
+        // Model a corrupted DUT status observation; the independent ABI
+        // checker must reject it even though the real DUT returned code 1.
+        env.sb.sample_observed_error(1'b1, 4'd3);
+        $display("DMA_NEGATIVE_TEST_DETECTED incorrect observed error code");
         phase.drop_objection(this);
     endtask
 endclass
