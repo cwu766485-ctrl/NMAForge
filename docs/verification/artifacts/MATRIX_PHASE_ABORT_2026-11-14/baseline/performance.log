@@ -1,0 +1,76 @@
+make: Entering directory '/tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/baseline/source/dv/block/compute/matrix/sim'
+mkdir -p /tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/baseline/stages/performance/vcs-benchmark
+vcs -licwait 1 -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+	+define+MATRIX_MAX_OUTSTANDING_READS=4 \
+	+define+MATRIX_A_TILE_CACHE_ENABLE=1 \
+	+define+MATRIX_NEXT_K_PREFETCH_ENABLE=1 \
+	+define+MATRIX_ARRAY_SIZE=16 -top tb_ai_tensor_matrix_core_random \
+	../../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v \
+	../../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv \
+	../../../../../rtl/compute/matrix/ai_tensor_matrix_core.v \
+	../tb/tb_ai_tensor_matrix_core_random.sv \
+	-o /tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/baseline/stages/performance/vcs-benchmark/simv -l /tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/baseline/stages/performance/vcs-benchmark/compile.log
+                         Chronologic VCS (TM)
+       Version V-2023.12-SP1_Full64 -- Sat Nov 14 00:34:49 2026
+
+                    Copyright (c) 1991 - 2024 Synopsys, Inc.
+   This software and the associated documentation are proprietary to Synopsys,
+ Inc. This software may only be used in accordance with the terms and conditions
+ of a written license agreement with Synopsys, Inc. All other use, reproduction,
+   or distribution of this software is strictly prohibited.  Licensed Products
+     communicate with Synopsys servers for the purpose of providing software
+    updates, detecting software piracy and verifying that customers are using
+    Licensed Products in conformity with the applicable License Key for such
+  Licensed Products. Synopsys will use information gathered in connection with
+    this process to deliver software updates and pursue software pirates and
+                                   infringers.
+
+ Inclusivity & Diversity - Visit SolvNetPlus to read the "Synopsys Statement on
+            Inclusivity and Diversity" (Refer to article 000036315 at
+                        https://solvnetplus.synopsys.com)
+
+Parsing design file '../../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v'
+Parsing design file '../../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv'
+Parsing design file '../../../../../rtl/compute/matrix/ai_tensor_matrix_core.v'
+Parsing design file '../tb/tb_ai_tensor_matrix_core_random.sv'
+Top Level Modules:
+       tb_ai_tensor_matrix_core_random
+TimeScale is 1 ns / 1 ps
+Starting vcs inline pass...
+
+3 modules and 0 UDP read.
+	However, due to incremental compilation, no re-compilation is necessary.
+make[1]: Entering directory '/tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/baseline/source/dv/block/compute/matrix/sim/csrc'
+make[1]: Leaving directory '/tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/baseline/source/dv/block/compute/matrix/sim/csrc'
+make[1]: Entering directory '/tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/baseline/source/dv/block/compute/matrix/sim/csrc'
+rm -f _cuarc*.so _csrc*.so pre_vcsobj_*.so share_vcsobj_*.so
+if [ -x /tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/baseline/stages/performance/vcs-benchmark/simv ]; then chmod a-x /tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/baseline/stages/performance/vcs-benchmark/simv; fi
+g++  -o /tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/baseline/stages/performance/vcs-benchmark/simv      -rdynamic  -Wl,-rpath='$ORIGIN'/simv.daidir -Wl,-rpath=./simv.daidir -Wl,-rpath=/opt/Synopsys/vcs/V-2023.12-SP1/linux64/lib -L/opt/Synopsys/vcs/V-2023.12-SP1/linux64/lib  -Wl,-rpath-link=./  /usr/lib64/libnuma.so.1   objs/amcQw_d.o   _743425_archive_1.so _prev_archive_1.so   SIM_l.o      rmapats_mop.o rmapats.o rmar.o rmar_nd.o  rmar_llvm_0_1.o rmar_llvm_0_0.o            -lvirsim -lerrorinf -lsnpsmalloc -lvfs    -lvcsnew -lsimprofile -luclinative /opt/Synopsys/vcs/V-2023.12-SP1/linux64/lib/vcs_tls.o   -Wl,-whole-archive  -lvcsucli    -Wl,-no-whole-archive        _vcs_pli_stub_.o   /opt/Synopsys/vcs/V-2023.12-SP1/linux64/lib/vcs_save_restore_new.o /opt/Synopsys/verdi/V-2023.12-SP2/share/PLI/VCS/LINUX64/pli.a -ldl  -lc -lm -lpthread -ldl 
+/tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/baseline/stages/performance/vcs-benchmark/simv up to date
+make[1]: Leaving directory '/tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/baseline/source/dv/block/compute/matrix/sim/csrc'
+CPU time: .571 seconds to compile + .278 seconds to elab + .258 seconds to link
+/tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/baseline/stages/performance/vcs-benchmark/simv +SEED=20261113 +MATRIX_BENCHMARK_ONLY \
+	-l /tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/baseline/stages/performance/vcs-benchmark/run.log
+Info: [VCS_SAVE_RESTORE_INFO] ASLR (Address Space Layout Randomization) is detected on the machine. To enable $save functionality, ASLR will be switched off and simv re-executed.
+Please use '-no_save' simv switch to avoid re-execution or '-suppress=ASLR_DETECTED_INFO' to suppress this message.
+Chronologic VCS simulator copyright 1991-2023
+Contains Synopsys proprietary information.
+Compiler version V-2023.12-SP1_Full64; Runtime version V-2023.12-SP1_Full64;  Nov 14 00:34 2026
+MATRIX_CORE_CASE_PASS id=100 shape_mnk=4,4,32 batches=1 transpose_ab=00 bias=0 writes=4/0 cycles=78 mac_cycles=32 bank_reads=16 bank_read_bytes=256 bank_stalls=1 line_write_bytes=64 line_stalls=4 macs_per_cycle=6.564 array_utilization_pct=2.56 effective_gops_250mhz=3.282 physical_array=16x16
+MATRIX_CORE_PROFILE id=100 max_outstanding=4 a_req=1 a_wait=2 b_req=1 b_wait=2 bias_req=0 bias_wait=0 prep_mac=8 mac=32 write=8 next=1 done=1 error=0 error_drain=0 prefetch_wait=22 arbiter_stall=5 response_wait=2 writeback_wait=4 outstanding_highwater=1 fifo_full=0 prefetch_a_req=8 prefetch_a_drain=14 prefetch_b_req=7 prefetch_b_drain=14 prefetch_overlap=28 prefetch_completed=7 a_tile_cache_hits=0 total=78
+MATRIX_CORE_CASE_PASS id=101 shape_mnk=8,8,32 batches=1 transpose_ab=00 bias=0 writes=16/0 cycles=110 mac_cycles=32 bank_reads=32 bank_read_bytes=512 bank_stalls=8 line_write_bytes=256 line_stalls=1 macs_per_cycle=18.618 array_utilization_pct=7.27 effective_gops_250mhz=9.309 physical_array=16x16
+MATRIX_CORE_PROFILE id=101 max_outstanding=4 a_req=2 a_wait=2 b_req=3 b_wait=2 bias_req=0 bias_wait=0 prep_mac=8 mac=32 write=17 next=1 done=1 error=0 error_drain=0 prefetch_wait=42 arbiter_stall=9 response_wait=2 writeback_wait=1 outstanding_highwater=2 fifo_full=0 prefetch_a_req=20 prefetch_a_drain=14 prefetch_b_req=15 prefetch_b_drain=14 prefetch_overlap=28 prefetch_completed=7 a_tile_cache_hits=0 total=110
+MATRIX_CORE_CASE_PASS id=102 shape_mnk=16,16,32 batches=1 transpose_ab=00 bias=0 writes=64/0 cycles=230 mac_cycles=32 bank_reads=64 bank_read_bytes=1024 bank_stalls=24 line_write_bytes=1024 line_stalls=25 macs_per_cycle=35.617 array_utilization_pct=13.91 effective_gops_250mhz=17.809 physical_array=16x16
+MATRIX_CORE_PROFILE id=102 max_outstanding=4 a_req=6 a_wait=2 b_req=5 b_wait=2 bias_req=0 bias_wait=0 prep_mac=8 mac=32 write=89 next=1 done=1 error=0 error_drain=0 prefetch_wait=84 arbiter_stall=49 response_wait=5 writeback_wait=25 outstanding_highwater=2 fifo_full=0 prefetch_a_req=38 prefetch_a_drain=14 prefetch_b_req=39 prefetch_b_drain=14 prefetch_overlap=28 prefetch_completed=7 a_tile_cache_hits=0 total=230
+MATRIX_CORE_CASE_PASS id=103 shape_mnk=16,32,32 batches=1 transpose_ab=00 bias=0 writes=128/0 cycles=403 mac_cycles=64 bank_reads=96 bank_read_bytes=1536 bank_stalls=54 line_write_bytes=2048 line_stalls=35 macs_per_cycle=40.655 array_utilization_pct=15.88 effective_gops_250mhz=20.328 physical_array=16x16
+MATRIX_CORE_PROFILE id=103 max_outstanding=4 a_req=5 a_wait=2 b_req=17 b_wait=4 bias_req=0 bias_wait=0 prep_mac=16 mac=64 write=163 next=2 done=1 error=0 error_drain=0 prefetch_wait=129 arbiter_stall=89 response_wait=6 writeback_wait=35 outstanding_highwater=2 fifo_full=0 prefetch_a_req=38 prefetch_a_drain=14 prefetch_b_req=91 prefetch_b_drain=28 prefetch_overlap=56 prefetch_completed=14 a_tile_cache_hits=8 total=403
+MATRIX_CORE_CASE_PASS id=104 shape_mnk=32,32,64 batches=1 transpose_ab=00 bias=0 writes=256/0 cycles=1189 mac_cycles=256 bank_reads=384 bank_read_bytes=6144 bank_stalls=146 line_write_bytes=4096 line_stalls=64 macs_per_cycle=55.119 array_utilization_pct=21.53 effective_gops_250mhz=27.559 physical_array=16x16
+MATRIX_CORE_PROFILE id=104 max_outstanding=4 a_req=12 a_wait=4 b_req=20 b_wait=8 bias_req=0 bias_wait=0 prep_mac=64 mac=256 write=320 next=4 done=1 error=0 error_drain=0 prefetch_wait=500 arbiter_stall=210 response_wait=11 writeback_wait=64 outstanding_highwater=2 fifo_full=0 prefetch_a_req=159 prefetch_a_drain=60 prefetch_b_req=341 prefetch_b_drain=120 prefetch_overlap=240 prefetch_completed=60 a_tile_cache_hits=32 total=1189
+MATRIX_SIZE_BENCHMARK_PASS seed=20261113 workloads=4x4x32,8x8x32,16x16x32,16x32x32,32x32x64 physical_array=16x16 outstanding_depth=4 next_k_prefetch=1 a_tile_cache=1 bank_response_latency=1 cycle gops_reference_mhz=250 sim_period_ns=10
+$finish called from file "../tb/tb_ai_tensor_matrix_core_random.sv", line 1203.
+$finish at simulation time             20240000
+           V C S   S i m u l a t i o n   R e p o r t 
+Time: 20240000 ps
+CPU Time:      0.280 seconds;       Data structure size:   0.4Mb
+Sat Nov 14 00:34:51 2026
+make: Leaving directory '/tmp/nmaforge_m3_phaseabort_aligned_stagecampaign/baseline/source/dv/block/compute/matrix/sim'

@@ -1,0 +1,51 @@
+{
+  "feature_id": "MATRIX-CYCLE-002R2",
+  "decision": "ACCEPT",
+  "decision_scope": "simulation_performance only",
+  "baseline_revision": "52353d5454284e05119764705fb8a6e406a5c8f4",
+  "candidate_patch_sha256": "63b95da01b6de1e89ae85913bbb5ac07ccc2dc151765bd47899c87ea00843d3a",
+  "review_patch_file_sha256": "48fdfec9304f9b21eed832d896791eac09ccaf484f73d11bafda297e86d21753",
+  "candidate_core_sha256": "d23209307c62ad7b37f447c85f1ba48c341756b3befadaefb9d36723524b72ee",
+  "testbench_sha256": "7b886201d9f95d22aee03f2c8826aa217a819e3ef73d5393ad05cd5e1d1dc85c",
+  "tool": "VCS V-2023.12-SP1_Full64",
+  "seeds": {
+    "regression": [20261021, 20261022, 20261023],
+    "benchmark": 20261113
+  },
+  "required_stages": {
+    "regression": "PASS",
+    "reference_model": "PASS",
+    "latency_gate": "PASS",
+    "performance": "PASS"
+  },
+  "regression_per_seed": {
+    "cases": 18,
+    "fault_checks": 35,
+    "final_write_abort": "PASS"
+  },
+  "metrics": {
+    "workload_cycles": {
+      "baseline": 2010,
+      "candidate": 2005,
+      "delta_pct": -0.24875621890547264,
+      "unit": "cycles"
+    },
+    "useful_macs_per_cycle": {
+      "baseline": 46.10547263681592,
+      "candidate": 46.22044887780549,
+      "delta_pct": 0.24937655860350028,
+      "unit": "MAC/cycle"
+    }
+  },
+  "optimization_objective": {
+    "target_cycle_reduction_pct": 5.0,
+    "met": false
+  },
+  "asic_ppa": {
+    "status": "STOP",
+    "area": "NOT_MEASURED",
+    "timing": "NOT_MEASURED",
+    "power": "NOT_MEASURED"
+  },
+  "note": "The previous 0.44% comparison used workload-dependent backpressure and is superseded by this per-workload aligned replay."
+}

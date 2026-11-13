@@ -1,5 +1,17 @@
 # NMAForge block and subsystem verification matrix
 
+> **2026-11-14 Matrix final-write abort contract:** The former directed phase
+> abort test waited for internal `ST_DONE` before raising abort. Candidate 001
+> could complete without sampling that abort. The test now raises abort with
+> the final output line valid and stalled, after three output lines committed;
+> it still requires `ERR_ABORT`, no additional writes, and read drain. Corrected
+> baseline and Candidate 001/002 snapshots passed the three-seed Matrix core
+> regression. A final-row abort-ignored RTL mutation was detected by this test.
+> Per-workload benchmark backpressure is now re-seeded to align A/B workloads.
+> Both isolated candidates measured -0.25% aggregate simulation cycles, below
+> the 5% target. This is not ASIC PPA/signoff evidence. Details and artifacts:
+> [Matrix phase-abort report](../docs/verification/MATRIX_PHASE_ABORT_OPTIMIZATION_2026-11-14.md).
+
 > **2026-10-28 current review addendum:** Product RTL/SPEC candidate is
 > `9d9e0f01e374a7c3a6c33778a3ce20a1d28132c9`. Clean test commit
 > `bb6e3a270ab819c15df0eb993c184c99d13a6d71` has byte-identical `rtl/` and

@@ -1,0 +1,83 @@
+{
+  "campaign": "MATRIX_PHASE_ABORT_OPTIMIZATION_2026-11-14",
+  "status": "SIMULATION_GATES_PASS_OBJECTIVE_NOT_MET",
+  "nmaforge_base_revision": "409c3a9fd647d4f8c4c881c9bfdaf5d93b7076ee",
+  "test_contract_revision": "52353d5454284e05119764705fb8a6e406a5c8f4",
+  "plan_sha256": "986815351385309591e739fdac18dff70e318cae69d8ab3d55c4203591cedea7",
+  "testbench_sha256": "7b886201d9f95d22aee03f2c8826aa217a819e3ef73d5393ad05cd5e1d1dc85c",
+  "tool": "VCS V-2023.12-SP1_Full64",
+  "regression": {
+    "seeds": [20261021, 20261022, 20261023],
+    "cases_per_seed": 18,
+    "fault_checks_per_seed": 35,
+    "final_write_abort_check": "MATRIX_CORE_PHASE_ABORT_PASS phase=final_write_pending id=29 prior_writes=3/0",
+    "baseline": "PASS",
+    "candidate_001r2": "PASS",
+    "candidate_002r2": "PASS"
+  },
+  "benchmark": {
+    "seed": 20261113,
+    "stimulus": "readiness and response PRNG reset per workload id",
+    "workloads": [
+      {"shape": "4x4x32", "baseline_cycles": 78, "candidate_001r2_cycles": 77, "candidate_002r2_cycles": 77},
+      {"shape": "8x8x32", "baseline_cycles": 110, "candidate_001r2_cycles": 109, "candidate_002r2_cycles": 109},
+      {"shape": "16x16x32", "baseline_cycles": 230, "candidate_001r2_cycles": 229, "candidate_002r2_cycles": 229},
+      {"shape": "16x32x32", "baseline_cycles": 403, "candidate_001r2_cycles": 402, "candidate_002r2_cycles": 402},
+      {"shape": "32x32x64", "baseline_cycles": 1189, "candidate_001r2_cycles": 1188, "candidate_002r2_cycles": 1188}
+    ],
+    "aggregate_cycles": {"baseline": 2010, "candidate_001r2": 2005, "candidate_002r2": 2005},
+    "useful_macs_per_cycle": {"baseline": 46.10547263681592, "candidate_001r2": 46.22044887780549, "candidate_002r2": 46.22044887780549},
+    "cycle_reduction_target_pct": 5.0,
+    "target_met": false
+  },
+  "candidates": {
+    "MATRIX-CYCLE-001R2": {
+      "patch_sha256": "537fe77b9214e4b8700110b186bc6c23243e551e9839f2cc8a358868be0389c9",
+      "core_sha256": "cbbe476399ed9e715bb970fd19199ef5b96833a3837ec88942fe7a0fe32d7a2d",
+      "comparison": "ACCEPT"
+    },
+    "MATRIX-CYCLE-002R2": {
+      "patch_sha256": "63b95da01b6de1e89ae85913bbb5ac07ccc2dc151765bd47899c87ea00843d3a",
+      "core_sha256": "d23209307c62ad7b37f447c85f1ba48c341756b3befadaefb9d36723524b72ee",
+      "comparison": "ACCEPT"
+    }
+  },
+  "stage_log_sha256": {
+    "baseline": {
+      "regression": "12c9d2406445e3c72ed50d3805523074bc6a86ba78d6e39a9c7579264a378bcc",
+      "reference_model": "4f39b41f857c6c0bed2d2a703f60f660e60f6e0f66b9e1a07c402cf244191caa",
+      "latency_gate": "9f25d7abf3af17ba81de5177bd36ccf80d033b36eb5d883c9914762d9fc4b54d",
+      "performance": "0e64272ea161920c80171cab11c79d95c56cc94d8829efd8e655dc451839a9fe"
+    },
+    "MATRIX-CYCLE-001R2": {
+      "regression": "3c7a7fdfb07813f24d9018a6c3f6f7b3fc550666b4d5fa77a308aa183c197e2a",
+      "reference_model": "38ef76bf27081accf828c3f5a200d27ecb6c154d83b9b3ef4d7fa7dff386d924",
+      "latency_gate": "2bf9edced184929cd0089e99362d04fd265bdf5df57eec707071d2e0194da0f1",
+      "performance": "64caf6c183a205497afd983e5f8eafaabbd5e1aeae45abb2328c1247acb93273"
+    },
+    "MATRIX-CYCLE-002R2": {
+      "regression": "ecc1b89cc8921d9406a6d77f8748fff38de1150e581e28ee77c2aa4dd6c81835",
+      "reference_model": "6e5d734104bf53f912f7beb1fed6810cc6866234f76c7a87ce74e36bbdd4200d",
+      "latency_gate": "9b948c187412d07267956c888749f4550665a4ccd9c17be35a5dd09b6fb61513",
+      "performance": "adfa063bb102419b5be3d8cbcffa14b1481c01c01923bd0a4f4e4a8bdc488979"
+    },
+    "negative_control_final_write_abort": "d3712a94a23e3f82a42a017455e1bb87b39ccab5ba943ab1cf81fc7ddab086b5"
+  },
+  "archived_logs_root": "docs/verification/artifacts/MATRIX_PHASE_ABORT_2026-11-14",
+  "first_divergence_logs": {
+    "baseline": {
+      "path": "docs/verification/artifacts/MATRIX_PHASE_ABORT_2026-11-14/first-divergence/baseline_seed_20261021.log",
+      "sha256": "c9e4772a16ca8b4ffdb6c863ce313eb3c8ff9d8b59017b6db598260899b6a606"
+    },
+    "candidate_001": {
+      "path": "docs/verification/artifacts/MATRIX_PHASE_ABORT_2026-11-14/first-divergence/candidate001_seed_20261021.log",
+      "sha256": "e63c946f1e922102b557e4e83b96f40d18984e87249bbf5e80a9684a44ec88fc"
+    }
+  },
+  "negative_control_log": {
+    "path": "docs/verification/artifacts/MATRIX_PHASE_ABORT_2026-11-14/negative_control_final_write_abort.log",
+    "sha256": "d3712a94a23e3f82a42a017455e1bb87b39ccab5ba943ab1cf81fc7ddab086b5"
+  },
+  "original_stage_artifact_directory": "/tmp/nmaforge_m3_phaseabort_aligned_stagecampaign",
+  "asic_ppa": "STOP: approved library/corner, standalone Matrix SDC, equivalence policy, and target DC/PrimeTime adapter are unavailable"
+}

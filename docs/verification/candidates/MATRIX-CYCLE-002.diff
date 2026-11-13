@@ -1,0 +1,17 @@
+diff --git a/rtl/compute/matrix/ai_tensor_matrix_core.v b/rtl/compute/matrix/ai_tensor_matrix_core.v
+--- a/rtl/compute/matrix/ai_tensor_matrix_core.v
++++ b/rtl/compute/matrix/ai_tensor_matrix_core.v
+@@ -1050,7 +1050,12 @@ module ai_tensor_matrix_core #(
+                                         write_row_r <= write_row_r + 1'b1;
+                                         dst_row_addr_r <= dst_row_addr_r + dst_row_stride_r;
+                                     end else begin
+-                                        state_r <= ST_NEXT;
++                                        if ((({16'd0,col_tile_r} + 32'd1) >= n_tile_count) &&
++                                            (({16'd0,row_tile_r} + 32'd1) >= m_tile_count) &&
++                                            ((instance_r + 1'b1) >= instance_count_r))
++                                            state_r <= ST_DONE;
++                                        else
++                                            state_r <= ST_NEXT;
+                                     end
+                                 end
+                             end
