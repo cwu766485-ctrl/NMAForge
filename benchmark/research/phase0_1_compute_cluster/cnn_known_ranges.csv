@@ -1,7 +1,10 @@
 name,start,end_exclusive,bytes,live_phase,owner,notes
 dma_payload_0,0,7488,7488,preload_through_compute,DMA/compute,Input/model payload segment 0 from candidate-bound DMA plan
 dma_payload_1,8192,10496,2304,preload_through_compute,DMA/compute,Input/model payload segment 1 from candidate-bound DMA plan
+raw1_poison_guard,12288,65536,53248,initialization_through_final_golden_check,test_guard,Poisoned raw Conv1 output range retained by the fused workload Golden
+act1_intermediate,65536,78848,13312,Conv1 producer commit through Conv2 consumer read completion,compute,Intermediate tensor crosses the command dependency edge
 dma_payload_2,81920,82944,1024,preload_through_compute,DMA/compute,Input/model payload segment 2 from candidate-bound DMA plan
+raw2_poison_guard,86016,99328,13312,initialization_through_final_golden_check,test_guard,Poisoned raw Conv2 output range retained by the fused workload Golden
 output_capture,102400,105728,3328,compute_commit_through_host_readback,compute/output,832 output words; candidate-bound top.command.json
 descriptor_queue,106496,106624,128,preload_through_command_fetch,control,DMA payload segment 3 is this same descriptor object; intentional exact alias
 completion_reservation,107008,107040,32,command_completion_through_host_consume,control,Two 16-byte completion slots; range agrees with candidate manifest high-water

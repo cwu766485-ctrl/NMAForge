@@ -1,0 +1,10 @@
+object,current_start,packed_start,bytes,alignment,modeled_lifetime,alias_allowed
+input,0,0,7488,16,initialization_through_command0_completion,no
+conv1_weights,8192,7488,2304,16,initialization_through_command0_completion,no
+raw1_poison_guard,12288,9792,53248,16,initialization_through_final_golden_check,no
+act1_intermediate,65536,63040,13312,16,command0_production_through_command1_read_completion,no
+conv2_weights,81920,76352,1024,16,initialization_through_command1_completion,no
+raw2_poison_guard,86016,77376,13312,16,initialization_through_final_golden_check,no
+output,102400,90688,3328,16,command1_write_through_host_readback,no
+descriptors,106496,94016,128,64,initialization_through_command_fetch,no
+completion_reservation,107008,94144,32,16,command_completion_through_host_consume,no

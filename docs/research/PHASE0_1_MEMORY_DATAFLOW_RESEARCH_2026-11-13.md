@@ -11,7 +11,7 @@ Configuration: 128 KiB, four banks, 16x16 INT8 array / 256 MAC, VCS behavioral r
 
 | Item | Result | Evidence boundary |
 |---|---|---|
-| A1, lifetime-aware placement | **REWORK / model-only** | The idea is feasible as an offline dependency/lifetime allocator. This turn did not produce a candidate-SHA accepted-transaction lifetime trace or allocator A/B. Do not use the older 79,872 B H32 high-water as current evidence. |
+| A1, lifetime-aware placement | **REWORK / model-only** | Candidate-bound CNN allocation model found 12,864 B theoretical high-water reduction from packing the exact initialized objects, with no temporal aliasing. It has not been replayed on the DUT. Do not use the older 79,872 B H32 high-water as current evidence. |
 | A2, memory-aware tiling | **REWORK / no new mapper claim** | Existing shape-aware M1/M4/M8/M16 measurements and Matrix controller configuration ablation are useful baselines. They do not demonstrate a new joint shape/bank/DMA/padding/lifetime cost model. |
 | Product RTL | **RETAIN unchanged** | No candidate mechanism has a complete safety proof, end-to-end A/B, or physical cost result. No conditional RTL candidate is justified now. |
 | Next experiment | Offline A1/A2 scheduler/allocator model on candidate-bound traces; then replay unchanged workloads and Golden on the real 128 KiB DUT. | Stop before RTL unless predicted and measured end-to-end gains agree and live-range legality is proven. |
@@ -68,24 +68,29 @@ The A-cache reduces these two larger cases' observed A bank-read count by 25%; t
 
 ## Memory lifetime and bottlenecks
 
-Candidate-bound evidence shows substantial traffic and a specific Matrix read-reuse opportunity: the CNN issues 64,064 B reads / 16,640 B writes; H32 issues 546,816 B / 227,840 B; Matrix A-cache lowers repeated A reads for multi-N-tile shapes in the isolated test. The CNN fixture provides these exact known ranges in `benchmark/research/phase0_1_compute_cluster/cnn_known_ranges.csv`:
+Candidate-bound evidence shows substantial traffic and a specific Matrix read-reuse opportunity: the CNN issues 64,064 B reads / 16,640 B writes; H32 issues 546,816 B / 227,840 B; Matrix A-cache lowers repeated A reads for multi-N-tile shapes in the isolated test. The exact generator source is SHA256 `0b5f532d67dd8a4883d526fc7eac30aa85d7a227c141de00f46dec0cd016c3a2` in both the tested RTL commit and this checkout. The CNN fixture provides these exact known ranges in `benchmark/research/phase0_1_compute_cluster/cnn_known_ranges.csv`:
 
 | Range `[start,end)` | Size | Live phase | Boundary evidence |
 |---|---:|---|---|
 | `[0,7488)` | 7,488 B | preload through compute | DMA segment 0 |
 | `[8192,10496)` | 2,304 B | preload through compute | DMA segment 1 |
+| `[12288,65536)` | 53,248 B | initialization through final Golden check | RAW1 poison guard |
+| `[65536,78848)` | 13,312 B | command 0 production through command 1 read completion | ACT1 intermediate |
 | `[81920,82944)` | 1,024 B | preload through compute | DMA segment 2 |
+| `[86016,99328)` | 13,312 B | initialization through final Golden check | RAW2 poison guard |
 | `[102400,105728)` | 3,328 B | compute commit through host readback | 832 output words |
 | `[106496,106624)` | 128 B | preload through command fetch | two descriptors; DMA segment 3 is the same descriptor object |
 | `[107008,107040)` | 32 B | completion through host consume | completion reservation / candidate manifest high-water |
 
-All listed ranges are inside `[0,131072)`. The descriptor/DMA overlap is an exact alias of the same 128-byte object, not a competing allocation. The listed regions are pairwise disjoint apart from that explicit identity alias. This is a bounded fixture map, not a complete tensor map: it does not expose every weight/intermediate object's live interval, nor does it prove the map can be compacted further.
+All listed ranges are inside `[0,131072)`. The descriptor/DMA overlap is an exact alias of the same 128-byte object, not a competing allocation. The listed regions are pairwise disjoint apart from that explicit identity alias. The two poison regions are kept live through final Golden checking. The intermediate ACT1 range lives from command 0 production through command 1 consumption; descriptor event wait/signal enforces that dependency. This is the complete static object map emitted by the CNN generator, with conservative fixture lifetimes; exact accepted-read last-use cycles were not separately captured.
+
+The model in `cnn_static_pack_model.csv` packs these same objects at their current sizes, retains both poison guards, keeps all active ranges disjoint, and preserves 16 B data alignment plus 64 B descriptor alignment. It reduces modeled high-water from 107,040 B to 94,176 B, saving 12,864 B (12.02% of the current high-water) and increasing nominal 128 KiB headroom from 24,032 B to 36,896 B. This is linear static packing, not a measured runtime speedup or temporal buffer reuse; the descriptor bases and test readback base must be regenerated and the unchanged Golden replayed before treating the result as a usable candidate.
 
 | Requested measurement | Status | Why / next evidence |
 |---|---|---|
-| Known CNN input/output/descriptor/CPLQ bounds | MEASURED, PARTIAL | See `cnn_known_ranges.csv`; ranges are in bounds and the only overlay is descriptor preload into its own descriptor storage. |
-| Full tensor live ranges and legal alias graph | NOT_MEASURED | Extend the exact candidate workload manifest with command dependency/accepted transaction trace; include write completion and fault/abort lifetime endpoints. |
-| Peak SPAD allocation, by active interval | NOT_MEASURED | Recompute from all candidate-bound object allocations and prove each simultaneously live range is disjoint and within `[0, 131072)`. |
+| Full CNN static object ranges and conservative task lifetimes | MEASURED, fixture-level | The generator fixes all nine regions; all are in-bounds and pairwise disjoint. ACT1 spans the two-command dependency; poison guards remain reserved. |
+| Candidate CNN static-pack high-water | MODEL_ONLY | 107,040 B current → 94,176 B packed; range checker confirms bounds/alignment/no live overlap. Must regenerate descriptors, DMA plan, initialization image and readback base, then replay independent Golden. |
+| Exact accepted-transaction tensor last-use and minimum peak | NOT_MEASURED | Passive transaction trace is still needed to refine conservative task-level intervals and assess line/tile-granular reuse. |
 | Per-bank utilization / physical conflicts | NOT_MEASURED | Current banked read and stall counts are not per-bank occupancy or conflict attribution. Add passive bank accept/response counters to the benchmark monitor. |
 | Operand wait / arbitration stall split | PARTIAL | Matrix benchmark reports controller stalls; no candidate-wide mutually exclusive wait taxonomy was collected in this study. |
 | DMA and compute concurrent throughput/competition | NOT_MEASURED | The closeout includes DMA delivery and concurrent AXI gaps, but not a controlled overlapping DMA payload plus engine-SPAD benchmark with both traffic sources independently counted. |
@@ -95,7 +100,7 @@ The CNM compact-SPAD address-overlap bug remains a required negative regression 
 
 ## A1/A2 feasibility and go/no-go
 
-**A1 lifetime-aware allocation: REWORK.** Offline graph construction and static interval placement are plausible and do not require RTL. Feasibility is not established until the source-SHA-matched command graph carries explicit producer commit, consumer read completion, abort/reset epoch, and fault termination edges. Run a legal allocation against the current 128 KiB boundary, compare against the existing mapper with unchanged descriptors/Golden, and include the CNM collision negative fixture. Only retain if the actual live high-water falls or a fixed model gains capacity without adding illegal aliasing or materializing a required output differently.
+**A1 lifetime-aware allocation: REWORK.** Candidate source now supports a static packing model with 12.02% address high-water reduction and no temporal alias. This does not validate performance or the new map on the DUT. Exact read-response completion, abort/reset/fault terminal edges and line-level lifetimes remain needed before temporal reuse is allowed. Next, replay a regenerated packed fixture with unchanged numerical Golden and include the CNM collision negative fixture. Retain only if the RTL replay matches and the benefit survives complete descriptor, DMA and output accounting.
 
 **A2 memory-aware tiling: REWORK.** Existing shape-aware output routing shows no M1/M4 gain and useful M8/M16 K128 delivery gains of 11.00% and 21.51% in the frontend closeout. This is already implemented policy, not evidence for a new model. New A2 must train/calibrate a cost model over shape, bank mapping, input/output DMA transfer, padding and intermediate live ranges, then choose among legal schedules. Compare prediction and real end-to-end execution on the same Golden, input image, memory model and simulation setup. B0/B1/B2 only establishes sensitivity to current Matrix controls.
 
@@ -103,7 +108,15 @@ The CNM compact-SPAD address-overlap bug remains a required negative regression 
 
 ## Reproduction
 
-Run from the repository root in the licensed VCS environment. Use a fresh output root for each seed:
+Run from the repository root in the licensed VCS environment. The static allocation model is independently checked with:
+
+```bash
+python3 tools/benchmark/phase0_1/check_cnn_pack.py
+```
+
+Expected `CNN_STATIC_PACK_MODEL_PASS capacity=131072 current_high=107040 packed_high=94176 bytes=94176 saved=12864 temporal_alias=0`. This checks the model's ranges and alignments; it does not run the packed fixture on RTL.
+
+Use a fresh VCS output root for each Matrix seed:
 
 ```bash
 for seed in 20261025 20261026 20261027; do
@@ -116,4 +129,4 @@ Tool recorded: `VCS V-2023.12-SP1_Full64`. The checked-in `Makefile` target runs
 
 ## Phase 1 exit
 
-Phase 0 scoped prior-art matrix and candidate baseline are documented. B0/B1/B2 ran on candidate-matched Matrix RTL and all checked Golden points passed. A1/A2 are feasible as **offline research models**, but the present evidence is insufficient to admit either as a product architecture feature or to claim a research contribution. Candidate-bound lifetimes, peak usage, bank occupancy/conflict attribution, and controlled DMA/compute contention remain open before Phase 1 closure.
+Phase 0 scoped prior-art matrix and candidate baseline are documented. B0/B1/B2 ran on candidate-matched Matrix RTL and all checked Golden points passed. A1 static packing has a candidate-generator-bound, no-alias layout model, but the new addresses have not been replayed on the DUT; accepted-response last-use, per-bank occupancy/conflict attribution, and controlled DMA/compute contention remain open. A2 has only existing mapper/configuration baselines, not a calibrated joint cost model. Neither is admitted as product architecture or claimed as a research contribution.
