@@ -287,3 +287,19 @@ than replaced with synthetic evidence.
   measurement endpoint and unclosed cases for every stage.
 - Update this document at each gate. Push each committed report or RTL change
   to its corresponding GitHub branch after checks pass.
+
+## Final A–E closure (2026-11-13)
+
+The final ordered review is in
+[`ARCHITECTURE_INNOVATION_A_TO_E_FINAL_REVIEW.md`](ARCHITECTURE_INNOVATION_A_TO_E_FINAL_REVIEW.md).
+Decisions are A **DEFER**, B **DEFER**, C **REWORK**, D **REJECT**, and E
+**DEFER**. C is the only direction with a justified next experiment, and its
+first step is product-candidate profiling because the candidate already
+contains Divider `accelerate` and special-length normalization paths absent
+from the old research baseline. No innovation RTL is promoted.
+
+The next execution priority is product-candidate Compute Cluster DV Closure,
+not additional innovation RTL. The current published candidate evidence is
+declared-group PASS only: raw hierarchy coverage and 14 RTM partial rows remain
+open. The closure plan and exact commands are in
+[`../verification/COMPUTE_CLUSTER_DV_CLOSURE_PLAN_2026-11-13.md`](../verification/COMPUTE_CLUSTER_DV_CLOSURE_PLAN_2026-11-13.md).
