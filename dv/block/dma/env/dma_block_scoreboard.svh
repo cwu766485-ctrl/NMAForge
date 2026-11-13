@@ -9,6 +9,8 @@ class dma_block_scoreboard extends uvm_component;
     int unsigned observed_store_words;
     bit cov_store, cov_gather, cov_is_2d, cov_crosses_4k;
     int unsigned cov_width_words, cov_outstanding;
+    bit [2:0] cov_error_kind;
+    int unsigned dma_ck005_attempts, dma_ck005_failures;
 
     covergroup dma_cmd_cg;
         option.per_instance = 1;
@@ -29,6 +31,17 @@ class dma_block_scoreboard extends uvm_component;
         }
     endgroup
 
+    covergroup dma_error_scenario_cg;
+        option.per_instance = 1;
+        error_kind: coverpoint cov_error_kind {
+            bins abort = {1};
+            bins axi_read_error = {2};
+            bins spad_error = {3};
+            bins axi_write_error = {4};
+            bins config_error = {5};
+        }
+    endgroup
+
     `uvm_component_utils(dma_block_scoreboard)
 
     function new(string name = "dma_block_scoreboard", uvm_component parent = null);
@@ -37,6 +50,30 @@ class dma_block_scoreboard extends uvm_component;
         spad_imp = new("spad_imp", this);
         axi_imp = new("axi_imp", this);
         dma_cmd_cg = new;
+        dma_error_scenario_cg = new;
+    endfunction
+
+    function void sample_observed_error(bit observed_error, bit [3:0] observed_code);
+        if (active_cmd == null || !active_cmd.expect_error) return;
+        dma_ck005_attempts++;
+        if (observed_error !== 1'b1 || observed_code !== active_cmd.expected_error_code) begin
+            dma_ck005_failures++;
+            `uvm_error("DMA_ERROR_ABI", $sformatf(
+                "expected observed error=%0d code=%0d, got error=%0d code=%0d",
+                1, active_cmd.expected_error_code, observed_error, observed_code))
+            return;
+        end
+        case (observed_code)
+            4'd1: cov_error_kind = 5;
+            4'd2: cov_error_kind = 2;
+            4'd3: cov_error_kind = 4;
+            4'd4: cov_error_kind = 3;
+            4'd5: cov_error_kind = 1;
+            default: return;
+        endcase
+        dma_error_scenario_cg.sample();
+        `uvm_info("DMA_ERROR_COVERAGE", $sformatf(
+            "sampled observed DUT error_code=%0d kind=%0d", observed_code, cov_error_kind), UVM_LOW)
     endfunction
 
     function automatic int unsigned rows_for(dma_cmd_item item);
@@ -198,5 +235,9 @@ class dma_block_scoreboard extends uvm_component;
         super.report_phase(phase);
         `uvm_info("DMA_COVERAGE", $sformatf("DMA command functional coverage = %0.2f%%",
                   dma_cmd_cg.get_inst_coverage()), UVM_LOW)
+        `uvm_info("DMA_COVERAGE", $sformatf("DMA observed error coverage = %0.2f%%",
+                  dma_error_scenario_cg.get_inst_coverage()), UVM_LOW)
+        $display("CHECKER_EVIDENCE id=DMA-CK-005 attempts=%0d failures=%0d",
+                 dma_ck005_attempts, dma_ck005_failures);
     endfunction
 endclass
