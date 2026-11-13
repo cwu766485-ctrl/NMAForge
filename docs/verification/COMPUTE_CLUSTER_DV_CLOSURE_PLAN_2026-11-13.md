@@ -54,6 +54,11 @@ cd ../../spyglass
 ./run_spyglass_a8.sh rdc
 ```
 
-The first command was attempted on the exact candidate worktree on
-2026-11-13 and stopped at VCS license acquisition; no functional PASS is
-claimed from that attempt.
+On 2026-11-13, after license recovery, the exact candidate Top Smoke passed.
+The three-seed UVM compile passed, but the first seed stopped before engine
+traffic because the legacy fixture writes `0x0007d000`, outside the default
+128 KiB SPAD window. See the exact replay record in
+[`COMPUTE_CLUSTER_DV_REPLAY_2026-11-13.md`](COMPUTE_CLUSTER_DV_REPLAY_2026-11-13.md).
+No UVM functional or coverage PASS is claimed from that run. The next P0 item
+is a compact 128 KiB allocation proof for every live fixture region; address
+truncation is prohibited.
