@@ -3,6 +3,7 @@
 ## Round 27 — incomplete session
 
 Prepared historical baseline extracts and an incomplete review at `docs/benchmark/NMAFORGE_V2_ROUND27_ARCHITECTURE_FREEZE_REVIEW.md`. Withdrew unsupported LayerNorm phase allocations; phases remain unmeasured. Corrected large GEMM historical read traffic to 6,144 B. No RTL experiment, simulation, synthesis, freeze decision, commit or push completed. Historical extraction uses `git show 800c5b0:<artifact-path>`. Git metadata writes failed with read-only `.git/index.lock`; escalation was aborted.
+2026-11-13 | Phase 2 V0 fault-causal DV baseline on 62733bd9 | 3-seed Compute Cluster UVM PASS; URG mixed-hierarchy 69.46/67.13/43.47/66.26/72.00 line/cond/FSM/branch/assert; 22 assertions: 17 success, 5 uncovered, 2 without attempts; real DUT mutation campaign 7/7 caught. V1 causal method NOT_MEASURED; disposition REWORK. Reproduce with docs/research/PHASE2_FAULT_CAUSAL_DV_EXPERIMENT.md.
 
 ## GEMM / LN scheduling optimization — published candidate
 

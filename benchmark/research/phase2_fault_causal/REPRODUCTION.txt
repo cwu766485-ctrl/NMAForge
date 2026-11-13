@@ -1,0 +1,12 @@
+Candidate SHA: 62733bd9f1fcd1735a080a75c6c0840d1d13fb94
+VCS/URG: V-2023.12-SP1_Full64
+UVM: 1.2
+Coverage: line+cond+branch+fsm+assert
+
+V0 baseline:
+make -C dv/uvm/sim uvm_compute_cluster_regress COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027' COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_phase2_v0_62733bd9
+
+Mutation campaign:
+python3.12 dv/uvm/sim/run_compute_cluster_dut_mutations.py --out /tmp/nmaforge_phase2_mutations_62733bd9 --seed 20261025 --timeout 600
+
+Raw evidence directories are intentionally outside the repository because generated VCS/URG databases and simulation output are not checked in.
