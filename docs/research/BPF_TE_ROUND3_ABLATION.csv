@@ -1,0 +1,7 @@
+candidate,workload,cycles,accepted_ops_per_cycle,golden,protocol,fault_reset,decision,notes
+H0,bank_disjoint_two_read,6,1.00,PASS,PASS,PASS,MEASURED,serial control over four-bank research SPAD
+H1,bank_disjoint_two_read,3,2.00,PASS,PASS,PASS,MEASURED,bank-level capability only; not product speedup
+H1,real_cnm_vdot_length1,13,NOT_MEASURED,PASS,PASS,NOT_MEASURED,INTEGRATED,CNM core through atomic adapter and four-bank SPAD
+H1,real_matrix_gemm_4x4x1,19,NOT_MEASURED,PASS,PASS,NOT_MEASURED,INTEGRATED,Matrix banked reads and aligned Line writeback
+H2,real_product_workload,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_IMPLEMENTED,requires Gate 3 ownership evidence
+H3,dma_compute_overlap,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_IMPLEMENTED,legacy processor_busy/Port-B contract unresolved

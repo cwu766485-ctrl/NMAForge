@@ -18,6 +18,10 @@ module ai_bpf_te_atomic_adapter #(
     input wire [OWNER_BITS-1:0] cnm_owner, input wire [TILE_BITS-1:0] cnm_tile,
     output wire [3:0] cnm_ready, output wire [3:0] cnm_rsp_valid,
     output wire [127:0] cnm_rsp_rdata, output wire [3:0] cnm_rsp_error,
+    input wire matrix_valid, input wire [31:0] matrix_addr,
+    input wire [OWNER_BITS-1:0] matrix_owner, input wire [TILE_BITS-1:0] matrix_tile,
+    output wire matrix_ready, output wire matrix_rsp_valid,
+    output wire [127:0] matrix_rsp_rdata, output wire [3:0] matrix_rsp_error,
     output wire [BANKS-1:0] bank_req_valid, output wire [BANKS-1:0] bank_req_write,
     output wire [BANKS*32-1:0] bank_req_addr, output wire [BANKS*32-1:0] bank_req_wdata,
     output wire [BANKS*4-1:0] bank_req_wstrb, input wire [BANKS-1:0] bank_ready,
@@ -31,29 +35,43 @@ module ai_bpf_te_atomic_adapter #(
     wire [BANKS-1:0] rsp_valid, rsp_error_int; wire [BANKS*32-1:0] rsp_data;
     wire [BANKS*OWNER_BITS-1:0] rsp_owner; wire [BANKS*2-1:0] rsp_bank;
     wire [BANKS*TILE_BITS-1:0] rsp_tile; wire [BANKS*EPOCH_BITS-1:0] rsp_epoch; wire [EPOCH_BITS-1:0] epoch_now;
-    reg mode_line_r, mode_cnm_r;
+    reg mode_line_r, mode_cnm_r, mode_matrix_r;
     wire line_rsp_valid_int;
+    reg inflight_r;
     wire line_shape_ok = line_valid && (line_addr[3:0] == 0);
     wire cnm_shape_ok = (cnm_valid == 4'b1111) &&
                         (cnm_addr0[3:2] == 0) && (cnm_addr1[3:2] == 1) &&
                         (cnm_addr2[3:2] == 2) && (cnm_addr3[3:2] == 3);
-    wire use_line = line_shape_ok;
-    assign req_valid = use_line ? 4'b1111 : (cnm_shape_ok ? 4'b1111 : 4'b0);
+    // Case equality keeps legacy instantiations (which predate the optional
+    // Matrix banked-read port) inactive when the newly added input is left
+    // unconnected. Connected RTL drives a two-state 0/1 signal.
+    wire matrix_shape_ok = (matrix_valid === 1'b1) && (matrix_addr[3:0] == 0);
+    wire bank_reservation_ok = &bank_ready;
+    wire txn_slot_free = !inflight_r || (&rsp_valid);
+    wire use_line = line_shape_ok && txn_slot_free && bank_reservation_ok;
+    wire use_matrix = matrix_shape_ok && txn_slot_free && bank_reservation_ok && !use_line;
+    wire use_cnm = cnm_shape_ok && txn_slot_free && bank_reservation_ok && !use_line && !use_matrix;
+    assign req_valid = (use_line || use_matrix || use_cnm) ? 4'b1111 : 4'b0;
     assign req_write = use_line ? {4{line_write}} : 4'b0;
     assign slot_addr = use_line ? {line_addr+32'd12,line_addr+32'd8,line_addr+32'd4,line_addr} :
+                       use_matrix ? {matrix_addr+32'd12,matrix_addr+32'd8,matrix_addr+32'd4,matrix_addr} :
                        {cnm_addr3,cnm_addr2,cnm_addr1,cnm_addr0};
     assign slot_wdata = line_wdata;
     assign slot_wstrb = line_wstrb;
-    assign slot_owner = use_line ? {4{line_owner}} : {4{cnm_owner}};
-    assign slot_tile = use_line ? {4{line_tile}} : {4{cnm_tile}};
-    assign line_ready = line_shape_ok && (&req_ready);
-    assign cnm_ready = (!use_line && cnm_shape_ok) ? {4{&req_ready}} : 4'b0;
+    assign slot_owner = use_line ? {4{line_owner}} : use_matrix ? {4{matrix_owner}} : {4{cnm_owner}};
+    assign slot_tile = use_line ? {4{line_tile}} : use_matrix ? {4{matrix_tile}} : {4{cnm_tile}};
+    assign line_ready = use_line && (&req_ready);
+    assign cnm_ready = use_cnm ? {4{&req_ready}} : 4'b0;
+    assign matrix_ready = use_matrix && (&req_ready);
     assign line_rsp_valid = line_rsp_valid_int;
     assign line_rsp_rdata = rsp_data;
     assign line_rsp_error = rsp_error_int & {4{mode_line_r}};
     assign cnm_rsp_valid = rsp_valid & {4{mode_cnm_r}};
     assign cnm_rsp_rdata = rsp_data;
     assign cnm_rsp_error = rsp_error_int & {4{mode_cnm_r}};
+    assign matrix_rsp_valid = (&rsp_valid) && mode_matrix_r;
+    assign matrix_rsp_rdata = rsp_data;
+    assign matrix_rsp_error = rsp_error_int & {4{mode_matrix_r}};
 
     assign line_rsp_valid_int = (&rsp_valid) && mode_line_r;
     ai_spad_bank_parallel_arbiter #(.BANKS(BANKS),.REQUESTERS(4),.OWNER_BITS(OWNER_BITS),.TILE_BITS(TILE_BITS),.EPOCH_BITS(EPOCH_BITS)) arb (
@@ -67,11 +85,14 @@ module ai_bpf_te_atomic_adapter #(
       .rsp_tile(rsp_tile),.rsp_epoch(rsp_epoch),.rsp_dropped(rsp_dropped),.current_epoch(epoch_now),.bank_busy());
 
     always @(posedge clk or negedge resetn) begin
-      if (!resetn) begin mode_line_r<=1'b0; mode_cnm_r<=1'b0; end
+      if (!resetn) begin mode_line_r<=1'b0; mode_cnm_r<=1'b0; mode_matrix_r<=1'b0; inflight_r<=1'b0; end
       else begin
-        if (&rsp_valid) begin mode_line_r<=1'b0; mode_cnm_r<=1'b0; end
-        if (line_ready && !line_write) mode_line_r<=1'b1;
-        if ((&cnm_ready) && !use_line) mode_cnm_r<=1'b1;
+        if (&rsp_valid) begin mode_line_r<=1'b0; mode_cnm_r<=1'b0; mode_matrix_r<=1'b0; end
+        if (line_ready && !line_write) begin mode_line_r<=1'b1; inflight_r<=1'b1; end
+        if (matrix_ready) begin mode_matrix_r<=1'b1; inflight_r<=1'b1; end
+        if (&cnm_ready) begin mode_cnm_r<=1'b1; inflight_r<=1'b1; end
+        if (line_ready && line_write) inflight_r<=1'b0;
+        if (&rsp_valid) inflight_r<=1'b0;
       end
     end
 endmodule

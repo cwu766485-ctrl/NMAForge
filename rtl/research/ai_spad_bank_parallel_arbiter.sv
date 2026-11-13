@@ -8,7 +8,8 @@ module ai_spad_bank_parallel_arbiter #(
     parameter integer REQUESTERS = 4,
     parameter integer OWNER_BITS = 3,
     parameter integer TILE_BITS = 8,
-    parameter integer EPOCH_BITS = 4
+    parameter integer EPOCH_BITS = 4,
+    parameter integer SPAD_BYTES = 131072
 ) (
     input  wire                         clk,
     input  wire                         resetn,
@@ -108,7 +109,9 @@ module ai_spad_bank_parallel_arbiter #(
                 idx = rr_ptr[b] + off;
                 if (idx >= REQUESTERS) idx = idx - REQUESTERS;
                 if (!epoch_bump && selected < 0 && req_valid[idx] &&
-                    (req_addr[idx*32 + 3 -: 2] == b[1:0]) && bank_ready[b])
+                    (req_addr[idx*32 + 3 -: 2] == b[1:0]) && bank_ready[b] &&
+                    ((req_addr[idx*32 +: 32] & 32'd3) == 32'd0) &&
+                    (req_addr[idx*32 +: 32] < SPAD_BYTES))
                     selected = idx;
             end
             if (selected >= 0) begin
@@ -169,8 +172,11 @@ module ai_spad_bank_parallel_arbiter #(
                         end
                     end
                     tag_epoch0[b] <= epoch_r;
-                    rr_ptr[b] <= (rr_ptr[b] == REQUESTERS-1) ?
-                                  {BANK_BITS{1'b0}} : rr_ptr[b] + 1'b1;
+                    for (s=0; s<REQUESTERS; s=s+1) begin
+                        if (grant[s] && (req_addr[s*32 + 3 -: 2] == b[1:0]))
+                            rr_ptr[b] <= (s == REQUESTERS-1) ?
+                                          {BANK_BITS{1'b0}} : s + 1'b1;
+                    end
                 end
             end
         end

@@ -88,6 +88,8 @@ module tb_ai_spad_bank_parallel_real;
 
     host_valid=1; host_write=0; host_addr=0; clear_req; set_req(1,32'h4,1); #1; if(|req_accept || |bank_ready) $fatal(1,"host/scheduler overlap not blocked"); tick; host_valid=0; clear_req; repeat(2) tick;
     $display("BPF_TE_REAL_HOST_OVERLAP_PASS: host priority blocks scheduler admission");
+    clear_req; set_req(0,32'h2_0000,1); #1; if(!req_denied[0] || |bank_req_valid) $fatal(1,"invalid address was admitted"); tick; clear_req; repeat(1) tick;
+    $display("BPF_TE_REAL_ADDRESS_PASS: out-of-range request denied before bank issue");
     // Same real adapter and memory latency: H0 constrains admission to one
     // request/cycle; H1 admits two bank-disjoint requests in one cycle.
     h0_cycles=0; clear_req; set_req(0,32'h0,1); #1; tick; h0_cycles=h0_cycles+1; clear_req; repeat(2) begin tick; h0_cycles=h0_cycles+1; end

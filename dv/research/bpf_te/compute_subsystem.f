@@ -1,0 +1,10 @@
+rtl/research/ai_spad_bank_parallel_arbiter.sv
+rtl/research/ai_spad_bank_parallel_adapter.sv
+rtl/research/ai_bpf_te_atomic_adapter.sv
+rtl/research/ai_bpf_te_compute_subsystem.sv
+rtl/compute/cnm/ai_bank_pe.v
+rtl/compute/cnm/ai_bank_local_controller.v
+rtl/compute/cnm/ai_banked_cnm_core.v
+rtl/compute/matrix/ai_tensor_matrix_array.sv
+rtl/compute/matrix/ai_tensor_matrix_core.v
+dv/research/bpf_te/tb/tb_ai_bpf_te_compute_subsystem.sv

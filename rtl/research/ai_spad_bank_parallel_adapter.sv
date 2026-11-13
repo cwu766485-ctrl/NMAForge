@@ -63,8 +63,12 @@ module ai_spad_bank_parallel_adapter #(
     generate for (g=0; g<BANKS; g=g+1) begin : BANK_STATUS
         wire [31:0] bank_addr = bank_req_addr[g*32 +: 32];
         wire addr_ok = (bank_addr[1:0] == 0) && (bank_addr < TOTAL_BYTES);
-        assign bank_ready[g] = !host_valid && bank_allow[g] && addr_ok;
-        assign bank_denied[g] = bank_req_valid[g] && !bank_ready[g];
+        // Availability is independent of the candidate request address. The
+        // arbiter performs address legality before granting, avoiding a
+        // bank_ready -> grant -> address -> bank_ready combinational loop.
+        assign bank_ready[g] = !host_valid && bank_allow[g];
+        assign bank_denied[g] = bank_req_valid[g] &&
+                                (host_valid || !bank_allow[g] || !addr_ok);
         assign bank_rsp_valid[g] = read_v2[g];
         assign bank_rsp_rdata[g*32 +: 32] = read_d2[g*32 +: 32];
         assign bank_rsp_parity_error[g] = read_e2[g] || inject_parity_error[g];
