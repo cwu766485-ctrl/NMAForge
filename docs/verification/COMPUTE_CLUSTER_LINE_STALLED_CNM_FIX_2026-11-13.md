@@ -73,7 +73,7 @@ original Golden failure. These were corrected without changing DUT behavior:
   violating the Host-vs-scheduler collision rule.
 - Abort sentinels were compacted to `[0x0e000,0x0e700)`.
 - Protection/reset destination slots 32..43 were moved away from the Matrix
-  parity-fault source region to `[0x11000,0x11c00)`.
+  parity-fault source region to `[0x0f000,0x0fc00)`.
 - Every `spad_write()` now rejects an out-of-range local address before issuing
   AXI-Lite traffic.
 
