@@ -1,0 +1,8 @@
+candidate,workload,cycles,accepted_bank_ops,response_ops,denied_ops,golden,writeback,system_speedup,status
+H0,bank_disjoint_two_read,6,6,2,0,PASS,PASS,NOT_APPLICABLE,protocol_control
+H1,bank_disjoint_two_read,3,6,2,0,PASS,PASS,2.00x,bank_level_only
+H1,real_cnm_vdot_length1,13,9,8,0,PASS,PASS,NOT_MEASURED,real_engine_integrated_including_one_output_write
+H1,real_matrix_gemm_4x4x1,19,33,16,0,PASS,PASS,NOT_MEASURED,real_engine_integrated_cumulative_counter
+H0,product_matrix_cnm_concurrency,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,BLOCKED_BY_CONTROL_CONTRACT
+H2,ownership_mode,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_IMPLEMENTED
+H3,dma_compute_overlap,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_IMPLEMENTED

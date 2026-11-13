@@ -8,6 +8,7 @@ module ai_bpf_te_compute_subsystem (
     input wire clk, input wire resetn, input wire epoch_bump,
     input wire init_valid, input wire init_write, input wire [31:0] init_addr,
     input wire [31:0] init_wdata, input wire [3:0] init_wstrb,
+    input wire probe_valid, input wire [31:0] probe_addr,
     input wire matrix_start, input wire cnm_start, input wire abort,
     input wire [7:0] op_mode,
     input wire [31:0] matrix_src0, matrix_src1, matrix_dst,
@@ -28,7 +29,11 @@ module ai_bpf_te_compute_subsystem (
     output wire [3:0] cnm_error_code, output wire [31:0] cnm_result,
     output wire [31:0] cnm_cycles,
     output wire [31:0] accepted_bank_ops, output wire [31:0] response_ops,
-    output wire [31:0] denied_ops
+    output wire [31:0] denied_ops, output wire output_write_commit,
+    output wire [31:0] output_write_addr, output wire [31:0] output_write_data,
+    output wire matrix_line_commit, output wire [31:0] matrix_line_commit_addr,
+    output wire [127:0] matrix_line_commit_data, output wire [15:0] matrix_line_commit_wstrb
+    , output wire probe_rsp_valid, output wire [31:0] probe_rdata
 );
     localparam integer BANKS = 4;
     wire [3:0] cnm_req_valid, cnm_req_ready, cnm_rsp_valid;
@@ -51,10 +56,20 @@ module ai_bpf_te_compute_subsystem (
     wire [BANKS*32-1:0] bank_rsp_rdata;
     wire [3:0] bank_rsp_error;
     wire [3:0] bank_denied, bank_rsp_parity;
-    wire [3:0] unused_host_rdata;
+    wire [3:0] bpf_rsp_dropped;
+    wire cnm_spad_ready;
+    wire host_valid_mux = init_valid || probe_valid;
+    wire host_write_mux = init_valid && init_write && !probe_valid;
+    wire [31:0] host_addr_mux = probe_valid ? probe_addr : init_addr;
+    wire [31:0] host_wdata_mux = init_wdata;
+    wire [3:0] host_wstrb_mux = init_wstrb;
+    wire host_rsp_valid;
+    wire [31:0] host_rdata;
+    wire [3:0] write_bank_onehot;
+    reg [31:0] accepted_bank_ops_r, response_ops_r, denied_ops_r;
 
     ai_banked_cnm_core cnm_u(
-      .clk(clk), .resetn(resetn), .start(cnm_start), .abort(abort),
+      .clk(clk), .resetn(resetn), .start(cnm_start), .abort(abort || epoch_bump || (|bpf_rsp_dropped)),
       .op_mode(op_mode), .src0_base(cnm_src0), .src1_base(cnm_src1),
       .dst_base(cnm_dst), .length(cnm_length), .m_size(cnm_m),
       .scale_shift(cnm_shift), .activation(cnm_activation),
@@ -66,7 +81,7 @@ module ai_bpf_te_compute_subsystem (
       .cnm_data3(cnm_rsp_data[127:96]), .cnm_parity_error(cnm_rsp_error),
       .cnm_protection_error(|cnm_rsp_error), .spad_valid(cnm_spad_valid),
       .spad_write(cnm_spad_write), .spad_addr(cnm_spad_addr),
-      .spad_wdata(cnm_spad_wdata), .spad_ready(1'b1),
+      .spad_wdata(cnm_spad_wdata), .spad_ready(cnm_spad_ready),
       .spad_protection_error(1'b0), .busy(cnm_busy), .done(cnm_done),
       .error(cnm_error), .error_code(cnm_error_code), .result(cnm_result),
       .cycle_count(cnm_cycles), .element_count(), .local_accumulate_events(),
@@ -74,7 +89,7 @@ module ai_bpf_te_compute_subsystem (
       .pipeline_compute_events(), .response_wait_cycles());
 
     ai_tensor_matrix_core matrix_u(
-      .clk(clk), .resetn(resetn), .start(matrix_start), .abort(abort),
+      .clk(clk), .resetn(resetn), .start(matrix_start), .abort(abort || epoch_bump || (|bpf_rsp_dropped)),
       .op_mode(op_mode), .src0_base(matrix_src0), .src1_base(matrix_src1),
       .bias_base(matrix_bias_base), .dst_base(matrix_dst), .m_size(matrix_m),
       .n_size(matrix_n), .k_words(matrix_k), .instance_count(matrix_instance_count),
@@ -118,22 +133,68 @@ module ai_bpf_te_compute_subsystem (
       .bank_req_wdata(bank_req_wdata), .bank_req_wstrb(bank_req_wstrb),
       .bank_ready(bank_ready), .bank_rsp_valid(bank_rsp_valid),
       .bank_rsp_rdata(bank_rsp_rdata), .bank_rsp_error(bank_rsp_error),
-      .rsp_dropped());
+      .rsp_dropped(bpf_rsp_dropped));
 
     assign matrix_banked_data = matrix_rsp_data;
+    // CNM writeback is a single-word Port-B operation. It is admitted only
+    // when the atomic adapter has no bank transaction in this cycle; this
+    // preserves the adapter's all-or-none read/line contract.
+    assign write_bank_onehot = 4'b0001 << cnm_spad_addr[3:2];
+    assign cnm_spad_ready = cnm_spad_valid && (bank_ready[cnm_spad_addr[3:2]]) &&
+                            !(|bank_req_valid);
+    wire [3:0] spad_req_valid_mux = bank_req_valid | (write_bank_onehot & {4{cnm_spad_valid && cnm_spad_ready}});
+    wire [3:0] spad_req_write_mux = bank_req_write | (write_bank_onehot & {4{cnm_spad_valid && cnm_spad_ready}});
+    reg [127:0] spad_req_addr_mux, spad_req_wdata_mux;
+    reg [15:0] spad_req_wstrb_mux;
+    always @(*) begin
+      spad_req_addr_mux = bank_req_addr;
+      spad_req_wdata_mux = bank_req_wdata;
+      spad_req_wstrb_mux = bank_req_wstrb;
+      if (cnm_spad_valid && cnm_spad_ready) begin
+        spad_req_addr_mux[cnm_spad_addr[3:2]*32 +: 32] = cnm_spad_addr;
+        spad_req_wdata_mux[cnm_spad_addr[3:2]*32 +: 32] = cnm_spad_wdata;
+        spad_req_wstrb_mux[cnm_spad_addr[3:2]*4 +: 4] = 4'hf;
+      end
+    end
+
     ai_spad_bank_parallel_adapter spad_u(
-      .clk(clk), .resetn(resetn), .host_valid(init_valid), .host_write(init_write),
-      .host_addr(init_addr), .host_wdata(init_wdata), .host_wstrb(init_wstrb), .host_allow(init_valid),
-      .host_ready(), .host_rsp_valid(), .host_rdata(), .host_error(),
-      .host_parity_error(), .bank_req_valid(bank_req_valid),
-      .bank_req_write(bank_req_write), .bank_req_addr(bank_req_addr),
-      .bank_req_wdata(bank_req_wdata), .bank_req_wstrb(bank_req_wstrb),
+      .clk(clk), .resetn(resetn), .host_valid(host_valid_mux), .host_write(host_write_mux),
+      .host_addr(host_addr_mux), .host_wdata(host_wdata_mux), .host_wstrb(host_wstrb_mux), .host_allow(host_valid_mux),
+      .host_ready(), .host_rsp_valid(host_rsp_valid), .host_rdata(host_rdata), .host_error(),
+      .host_parity_error(), .bank_req_valid(spad_req_valid_mux),
+      .bank_req_write(spad_req_write_mux), .bank_req_addr(spad_req_addr_mux),
+      .bank_req_wdata(spad_req_wdata_mux), .bank_req_wstrb(spad_req_wstrb_mux),
       .bank_allow(4'b1111), .inject_parity_error(4'b0000), .bank_ready(bank_ready),
       .bank_denied(bank_denied), .bank_rsp_valid(bank_rsp_valid),
       .bank_rsp_rdata(bank_rsp_rdata), .bank_rsp_error(bank_rsp_error),
       .bank_rsp_parity_error(bank_rsp_parity));
 
-    assign accepted_bank_ops = 32'd0;
-    assign response_ops = 32'd0;
-    assign denied_ops = {28'd0, |bank_denied};
+    always @(posedge clk or negedge resetn) begin
+      if (!resetn) begin
+        accepted_bank_ops_r <= 0; response_ops_r <= 0; denied_ops_r <= 0;
+      end else begin
+        accepted_bank_ops_r <= accepted_bank_ops_r + spad_req_valid_mux[0] +
+                              spad_req_valid_mux[1] + spad_req_valid_mux[2] + spad_req_valid_mux[3];
+        response_ops_r <= response_ops_r + bank_rsp_valid[0] + bank_rsp_valid[1] +
+                          bank_rsp_valid[2] + bank_rsp_valid[3];
+        denied_ops_r <= denied_ops_r + bank_denied[0] + bank_denied[1] +
+                        bank_denied[2] + bank_denied[3];
+      end
+    end
+    assign accepted_bank_ops = accepted_bank_ops_r;
+    assign response_ops = response_ops_r;
+    assign denied_ops = denied_ops_r;
+    assign output_write_commit = cnm_spad_valid && cnm_spad_ready;
+    assign output_write_addr = cnm_spad_addr;
+    assign output_write_data = cnm_spad_wdata;
+    assign matrix_line_commit = matrix_line_valid && matrix_line_ready && matrix_line_write;
+    assign matrix_line_commit_addr = matrix_line_addr;
+    assign matrix_line_commit_data = matrix_line_wdata;
+    assign matrix_line_commit_wstrb = matrix_line_wstrb;
+    assign probe_rsp_valid = host_rsp_valid;
+    assign probe_rdata = host_rdata;
+    ai_bpf_te_compute_subsystem_sva sva_u(
+      .clk(clk), .resetn(resetn), .epoch_bump(epoch_bump),
+      .cnm_spad_valid(cnm_spad_valid), .cnm_spad_ready(cnm_spad_ready),
+      .output_write_commit(output_write_commit), .matrix_line_commit(matrix_line_commit));
 endmodule
