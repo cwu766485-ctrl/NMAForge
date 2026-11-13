@@ -983,6 +983,47 @@ module tb_ai_tensor_matrix_core_random;
     end
   endtask
 
+  task automatic run_final_write_abort(input integer fault_id);
+    integer timeout,lines_before,scalars_before;
+    begin
+      simple_fault_setup();
+      prepare_case(4,4,1,1,0,0,0,0,0,0,0);
+      @(negedge clk);start=1;
+      @(negedge clk);start=0;
+      timeout=0;
+      while(((line_write_count!=3) || !line_valid || !busy) &&
+            !done && (timeout<200000)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(line_write_count!=3 || !line_valid || !busy || done)
+        $fatal(1,"Matrix final-write abort boundary not reached writes=%0d valid=%b busy=%b done=%b",
+               line_write_count,line_valid,busy,done);
+
+      // Prevent a same-edge write acceptance so abort is sampled before the
+      // final output line can commit.
+      line_ready=0;
+      force_line_stall=1;
+      lines_before=line_write_count;scalars_before=scalar_write_count;
+      abort=1;
+      @(negedge clk);abort=0;
+      timeout=0;
+      while(!done && (timeout<200000)) begin
+        @(negedge clk);timeout=timeout+1;
+      end
+      if(!done || !error || error_code!=ERR_ABORT || busy)
+        $fatal(1,"Matrix final-write abort done/error/code/busy=%b/%b/%0d/%b",
+               done,error,error_code,busy);
+      if(line_write_count!=lines_before || scalar_write_count!=scalars_before)
+        $fatal(1,"Matrix final-write abort committed output line=%0d->%0d scalar=%0d->%0d",
+               lines_before,line_write_count,scalars_before,scalar_write_count);
+      while(pending_bank || pending_spad) @(negedge clk);
+      force_line_stall=0;
+      fault_count=fault_count+1;
+      $display("MATRIX_CORE_PHASE_ABORT_PASS phase=final_write_pending id=%0d prior_writes=%0d/%0d",
+               fault_id,lines_before,scalars_before);
+    end
+  endtask
+
   task automatic run_prefetch_wait_abort;
     integer timeout,lines_before,scalars_before,accepted_at_abort;
     begin
@@ -1256,7 +1297,7 @@ module tb_ai_tensor_matrix_core_random;
     run_phase_abort(7,4,4,1,0,26);  // ST_PREP_MAC
     run_phase_abort(9,4,4,1,0,27);  // ST_WRITE (write port held off)
     run_phase_abort(10,32,16,1,0,28); // ST_NEXT after first macro tile
-    run_phase_abort(11,4,4,1,0,29); // ST_DONE
+    run_final_write_abort(29); // abort before the final output line commits
     run_prefetch_wait_abort();
     run_prefetch_b_req_abort();
     run_prefetch_handoff();
