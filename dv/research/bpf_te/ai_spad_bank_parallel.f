@@ -1,0 +1,3 @@
+rtl/research/ai_spad_bank_parallel_arbiter.sv
+rtl/research/ai_spad_bank_parallel_arbiter_sva.sv
+dv/research/bpf_te/tb/tb_ai_spad_bank_parallel_arbiter.sv

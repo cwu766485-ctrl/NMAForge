@@ -1,5 +1,7 @@
 # Project update log
 
+2026-11-13 | BPF-TE isolated RTL prototype | Base PR #7 head f919bb78; bank-parallel arbiter elaborated and VCS test passed: two-bank admission, same-bank backpressure, two-cycle owner, epoch flush, fault tag, fairness. Prototype URG with SVA: line 94.67%, condition 44.44%, branch 57.14%, assertion 87.50%; H0/H2/H3/PPA NOT_MEASURED or NOT_IMPLEMENTED. Decision REWORK. See docs/research/BPF_TE_RTL_IMPLEMENTATION.md.
+
 ## Round 27 — incomplete session
 
 Prepared historical baseline extracts and an incomplete review at `docs/benchmark/NMAFORGE_V2_ROUND27_ARCHITECTURE_FREEZE_REVIEW.md`. Withdrew unsupported LayerNorm phase allocations; phases remain unmeasured. Corrected large GEMM historical read traffic to 6,144 B. No RTL experiment, simulation, synthesis, freeze decision, commit or push completed. Historical extraction uses `git show 800c5b0:<artifact-path>`. Git metadata writes failed with read-only `.git/index.lock`; escalation was aborted.
