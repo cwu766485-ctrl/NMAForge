@@ -1,0 +1,8 @@
+metric,value,status
+accepted_scheduler_accesses,5044,MEASURED
+host_snapshot_reads,63289,MEASURED
+cycle_samples,11376,MEASURED
+response_owner_tag,NOT_CAPTURED,GAP
+outstanding_depth,NOT_CAPTURED,GAP
+stall_reason,NOT_CAPTURED,GAP
+fault_reset_abort_epoch,NOT_CAPTURED,GAP

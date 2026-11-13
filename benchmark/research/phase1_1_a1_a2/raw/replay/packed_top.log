@@ -1,0 +1,19 @@
+Info: [VCS_SAVE_RESTORE_INFO] ASLR (Address Space Layout Randomization) is detected on the machine. To enable $save functionality, ASLR will be switched off and simv re-executed.
+Please use '-no_save' simv switch to avoid re-execution or '-suppress=ASLR_DETECTED_INFO' to suppress this message.
+Chronologic VCS simulator copyright 1991-2023
+Contains Synopsys proprietary information.
+Compiler version V-2023.12-SP1_Full64; Runtime version V-2023.12-SP1_Full64;  Nov 13 20:26 2026
+REPRESENTATIVE_DMA_PRELOAD_PASS transactions=3 payload_bytes=10944 axi_read_bytes=10944 ar_bursts=44 r_beats=684 read_latency_sum=2140 read_latency_count=44 read_latency_max=50 dma_busy_cycles=2874 setup_and_transfer_cycles=2979 test_only_poison_setup_bytes=83232
+STAGE_A_CONFIG_BEGIN clock=252680
+STAGE_A_CONFIG_END clock=252734
+STAGE_A_READBACK_BEGIN clock=388934
+STAGE_A_READBACK_END clock=393926
+REPRESENTATIVE_SPAD_DUMP_PASS file=/tmp/nmaforge_phase11_a1_replay3/packed/output.txt a_base=00016240 a_words=832 b_base=00000000 b_words=0
+ROUND2_CACHE_PROFILE hits=0 reads_saved=0 prefetch_completed=195 prefetch_wait=1365 arbiter_stall=0
+REPRESENTATIVE_MODEL_PASS desc=2 prefill_desc=0 decode_desc=0 golden_words=20800 useful_macs=570164 command_cycles=11376 prefill_command_cycles=0 decode_command_cycles=0 prefill_exclusive_cycles=0 decode_exclusive_cycles=0 exclusive_profile_cycles=11376 preload_axi_cycles=0 preload_dma_window_cycles=2979 preload_dma_busy_cycles=2874 preloaded_spad_bytes=10944 mac_per_cycle=50.1199 array_utilization_pct=82.37 matrix_mac_cycles=2704 matrix_req_wait=9 matrix_rsp_wait=7 matrix_writeback=1040 matrix_other=7538 sfu_busy=0 kv_busy=0 conv_busy=0 banked_busy=0 fp_busy=0 scalar_busy=0 no_engine_dispatch_remainder=78 dma_busy_overlap=0 spad_read_bytes=64064 spad_write_bytes=16640
+$finish called from file "../tb/tb_ai_accel_smoke.sv", line 5008.
+$finish at simulation time           1575800000
+           V C S   S i m u l a t i o n   R e p o r t
+Time: 1575800000 ps
+CPU Time:      4.500 seconds;       Data structure size:   0.9Mb
+Fri Nov 13 20:26:56 2026

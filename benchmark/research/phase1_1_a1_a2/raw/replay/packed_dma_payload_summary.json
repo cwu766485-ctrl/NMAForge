@@ -1,0 +1,36 @@
+{
+  "status": "PASS_DMA_PAYLOAD_PLAN",
+  "memory_image_sha256": "f2752731a3ffa227cfab017592248edf0895e350f779371b7cea4606dfbc0d4f",
+  "payload_sha256": "96b321d740f73d73b4f57b7cf65a7c3cf9c71b802df6520519faf4a7e67bffca",
+  "plan_sha256": "b43d8eb5a4033de9d0095d826e1bebd099b132c2d76a8c57954bcba85b5054f8",
+  "image_pairs": 23544,
+  "live_words": 2736,
+  "live_data_bytes": 10944,
+  "payload_bytes": 10944,
+  "payload_padding_bytes": 0,
+  "poison_words_test_only": 20808,
+  "poison_setup_bytes_test_only": 83232,
+  "spad_capacity_bytes": 131072,
+  "external_model_capacity_bytes": 16384,
+  "dma_transactions": [
+    {
+      "external_address": 0,
+      "spad_address": 0,
+      "length_words": 2448,
+      "length_bytes": 9792
+    },
+    {
+      "external_address": 9792,
+      "spad_address": 76352,
+      "length_words": 256,
+      "length_bytes": 1024
+    },
+    {
+      "external_address": 10816,
+      "spad_address": 94016,
+      "length_words": 32,
+      "length_bytes": 128
+    }
+  ],
+  "dma_plan_encoding": "word_count followed by (external byte address, SPAD byte address, 32-bit word count) triples"
+}

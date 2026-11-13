@@ -1,0 +1,22 @@
+[
+  {
+    "mode": "baseline",
+    "command_cycles": 11376,
+    "spad_read_bytes": 64064,
+    "spad_write_bytes": 16640,
+    "high_water_exclusive": 107040,
+    "payload_bytes": 10944,
+    "golden_sha256": "e864d85c366547906c3b4903e4d6528be7ed6ba62931a3f7226aabf965f8f65f",
+    "status": "PASS"
+  },
+  {
+    "mode": "packed",
+    "command_cycles": 11376,
+    "spad_read_bytes": 64064,
+    "spad_write_bytes": 16640,
+    "high_water_exclusive": 94176,
+    "payload_bytes": 10944,
+    "golden_sha256": "2c8194ebf21aacef645417ab1815ac4db41c4446374c29fa20aae1ac142d9297",
+    "status": "PASS"
+  }
+]

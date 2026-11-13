@@ -1,0 +1,42 @@
+{
+  "status": "PASS_DMA_PAYLOAD_PLAN",
+  "memory_image_sha256": "7f0ee98dccf910c828192553fac7e3efcfe72e8ccedcd8885d120c1d64e81024",
+  "payload_sha256": "17348f66d0ba20d85a2dc04381a84636050b77d3572f38ce89a18dfdc6f44b62",
+  "plan_sha256": "7d7139073f888a280d9bd9eeddefba6aa82f2dd9c2a99ec99d7546b4b0a2b83f",
+  "image_pairs": 23544,
+  "live_words": 2736,
+  "live_data_bytes": 10944,
+  "payload_bytes": 10944,
+  "payload_padding_bytes": 0,
+  "poison_words_test_only": 20808,
+  "poison_setup_bytes_test_only": 83232,
+  "spad_capacity_bytes": 131072,
+  "external_model_capacity_bytes": 16384,
+  "dma_transactions": [
+    {
+      "external_address": 0,
+      "spad_address": 0,
+      "length_words": 1872,
+      "length_bytes": 7488
+    },
+    {
+      "external_address": 7488,
+      "spad_address": 8192,
+      "length_words": 576,
+      "length_bytes": 2304
+    },
+    {
+      "external_address": 9792,
+      "spad_address": 81920,
+      "length_words": 256,
+      "length_bytes": 1024
+    },
+    {
+      "external_address": 10816,
+      "spad_address": 106496,
+      "length_words": 32,
+      "length_bytes": 128
+    }
+  ],
+  "dma_plan_encoding": "word_count followed by (external byte address, SPAD byte address, 32-bit word count) triples"
+}
