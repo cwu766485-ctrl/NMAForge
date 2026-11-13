@@ -1,0 +1,5 @@
+rtl/research/ai_spad_bank_parallel_arbiter.sv
+rtl/research/ai_spad_bank_parallel_arbiter_sva.sv
+rtl/research/ai_spad_bank_parallel_adapter.sv
+rtl/research/ai_bpf_te_atomic_adapter.sv
+dv/research/bpf_te/tb/tb_ai_bpf_te_atomic_adapter.sv

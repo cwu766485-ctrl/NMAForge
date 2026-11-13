@@ -27,3 +27,14 @@ it is not a zero-delay behavioral shortcut. Matrix line atomicity and CNM
 all-lane reservation are not yet integrated and remain `NOT_IMPLEMENTED`.
 There is no claim of product-level numerical CNN/GEMM improvement from this
 primitive.
+
+Round 2 adds `tb_ai_spad_bank_parallel_real.sv` and
+`tb_ai_bpf_te_atomic_adapter.sv`. Both terminate only after checking actual
+accepted bank transactions, returned data, owner/error fields, and non-empty
+response valid masks. The real-SPAD regression includes the measured H0/H1
+markers and the atomic Matrix/CNM regression includes partial-request rejection.
+
+Final URG summaries are: real-SPAD line 93.88%, condition 51.08%, branch
+55.56%, assertion 100.00%; atomic adapter line 90.95%, condition 49.48%, branch
+71.43%, assertion 100.00%. FSM is `NOT_APPLICABLE` because these adapters do
+not infer an FSM.

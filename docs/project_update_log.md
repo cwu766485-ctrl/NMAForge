@@ -1,6 +1,7 @@
 # Project update log
 
 2026-11-13 | BPF-TE isolated RTL prototype | Base PR #7 head f919bb78; bank-parallel arbiter elaborated and VCS test passed: two-bank admission, same-bank backpressure, two-cycle owner, epoch flush, fault tag, fairness. Prototype URG with SVA: line 94.67%, condition 44.44%, branch 57.14%, assertion 87.50%; H0/H2/H3/PPA NOT_MEASURED or NOT_IMPLEMENTED. Decision REWORK. See docs/research/BPF_TE_RTL_IMPLEMENTATION.md.
+2026-11-13 | BPF-TE Round 2 M1-M3 | Real research 128 KiB four-bank wrapper and Matrix/CNM atomic adapter pass VCS Golden/protocol/fault regression. H0 single-admission 6 cycles vs H1 bank-parallel 3 cycles for identical two-bank workload; speedup 2.00x at bank-level only. Product-top H0/H1 CNN/GEMV and H2/H3 remain NOT_MEASURED/NOT_IMPLEMENTED. See docs/research/BPF_TE_ROUND2_INTEGRATION.md.
 
 ## Round 27 — incomplete session
 

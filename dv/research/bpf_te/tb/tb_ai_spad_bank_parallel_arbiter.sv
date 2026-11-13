@@ -5,11 +5,14 @@ module tb_ai_spad_bank_parallel_arbiter;
     always #5 clk=~clk;
     reg [REQ-1:0] req_valid=0, req_write=0;
     reg [REQ*32-1:0] req_addr=0, req_wdata=0;
+    reg [REQ*4-1:0] req_wstrb=0;
     reg [REQ*OB-1:0] req_owner=0;
     reg [REQ*TB-1:0] req_tile=0;
     wire [REQ-1:0] req_ready, req_accept, req_denied, req_backpressure;
     wire [BANKS-1:0] bank_req_valid, bank_req_write;
+    wire [BANKS-1:0] bank_ready;
     wire [BANKS*32-1:0] bank_req_addr, bank_req_wdata;
+    wire [BANKS*4-1:0] bank_req_wstrb;
     wire [BANKS-1:0] bank_rsp_valid, bank_rsp_error;
     wire [BANKS*32-1:0] bank_rsp_rdata;
     wire [BANKS-1:0] rsp_valid, rsp_error;
@@ -18,6 +21,7 @@ module tb_ai_spad_bank_parallel_arbiter;
     wire [BANKS*2-1:0] rsp_bank_flat;
     wire [BANKS*TB-1:0] rsp_tile;
     wire [BANKS*EB-1:0] rsp_epoch;
+    wire [BANKS-1:0] rsp_dropped;
     wire [EB-1:0] current_epoch;
     wire [BANKS-1:0] bank_busy;
     reg [BANKS-1:0] rv0=0, rv1=0, rv2=0;
@@ -29,19 +33,23 @@ module tb_ai_spad_bank_parallel_arbiter;
     assign bank_rsp_valid=rv2;
     assign bank_rsp_rdata=rd2;
     assign bank_rsp_error=fe2;
+    assign bank_ready={BANKS{1'b1}};
     ai_spad_bank_parallel_arbiter dut (
       .clk(clk), .resetn(resetn), .epoch_bump(epoch_bump),
       .req_valid(req_valid), .req_write(req_write), .req_addr(req_addr),
       .req_wdata(req_wdata), .req_owner(req_owner), .req_tile(req_tile),
+      .req_wstrb(req_wstrb),
       .req_ready(req_ready), .req_accept(req_accept), .req_denied(req_denied),
       .req_backpressure(req_backpressure), .bank_req_valid(bank_req_valid),
       .bank_req_write(bank_req_write), .bank_req_addr(bank_req_addr),
-      .bank_req_wdata(bank_req_wdata), .bank_rsp_valid(bank_rsp_valid),
+      .bank_req_wdata(bank_req_wdata), .bank_req_wstrb(bank_req_wstrb), .bank_rsp_valid(bank_rsp_valid),
       .bank_rsp_rdata(bank_rsp_rdata), .bank_rsp_error(bank_rsp_error),
+      .bank_ready(bank_ready),
       .rsp_valid(rsp_valid), .rsp_rdata(rsp_rdata),
       .rsp_owner_flat(rsp_owner_flat), .rsp_error(rsp_error),
       .rsp_bank_flat(rsp_bank_flat), .rsp_tile(rsp_tile),
-      .rsp_epoch(rsp_epoch), .current_epoch(current_epoch), .bank_busy(bank_busy)
+      .rsp_epoch(rsp_epoch), .rsp_dropped(rsp_dropped),
+      .current_epoch(current_epoch), .bank_busy(bank_busy)
     );
 
     always @(posedge clk) begin
@@ -62,11 +70,11 @@ module tb_ai_spad_bank_parallel_arbiter;
     end
 
     task clear_req;
-      begin req_valid=0; req_write=0; req_addr=0; req_wdata=0; req_owner=0; req_tile=0; end
+      begin req_valid=0; req_write=0; req_addr=0; req_wdata=0; req_wstrb=0; req_owner=0; req_tile=0; end
     endtask
     task set_req;
       input integer s; input [31:0] a; input integer o; input integer t;
-      begin req_valid[s]=1'b1; req_addr[s*32 +: 32]=a; req_owner[s*OB +: OB]=o; req_tile[s*TB +: TB]=t; end
+      begin req_valid[s]=1'b1; req_addr[s*32 +: 32]=a; req_wstrb[s*4 +: 4]=4'hf; req_owner[s*OB +: OB]=o; req_tile[s*TB +: TB]=t; end
     endtask
     task tick; begin @(posedge clk); #1; end endtask
 

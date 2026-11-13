@@ -1,0 +1,19 @@
+Base candidate: f919bb787dab1a4e3bef44b5308ead56d6e77b72
+Research branch: research/bank-parallel-fault-precise-v1
+VCS/URG: V-2023.12-SP1_Full64
+
+M1 standalone:
+VCS_HOME=/opt/Synopsys/vcs/V-2023.12-SP1
+$VCS_HOME/bin/vcs -full64 -sverilog -timescale=1ns/1ps -f dv/research/bpf_te/ai_spad_bank_parallel.f -top tb_ai_spad_bank_parallel_arbiter -o /tmp/bpf_te_m1_final
+/tmp/bpf_te_m1_final -l /tmp/bpf_te_m1_final.log
+
+M2/H0/H1 real SPAD:
+$VCS_HOME/bin/vcs -full64 -sverilog -timescale=1ns/1ps -cm line+cond+branch+fsm+assert -cm_dir /tmp/bpf_te_real_compile.vdb -f dv/research/bpf_te/real_spad.f -top tb_ai_spad_bank_parallel_real -o /tmp/bpf_te_real_simv
+/tmp/bpf_te_real_simv -cm line+cond+branch+fsm+assert -cm_dir /tmp/bpf_te_real_run.vdb -l /tmp/bpf_te_real.log
+
+M3 atomic:
+$VCS_HOME/bin/vcs -full64 -sverilog -timescale=1ns/1ps -cm line+cond+branch+fsm+assert -cm_dir /tmp/bpf_te_atomic_compile.vdb -f dv/research/bpf_te/atomic.f -top tb_ai_bpf_te_atomic_adapter -o /tmp/bpf_te_atomic_simv
+/tmp/bpf_te_atomic_simv -cm line+cond+branch+fsm+assert -cm_dir /tmp/bpf_te_atomic_run.vdb -l /tmp/bpf_te_atomic.log
+
+Expected markers: BPF_TE_PASS, BPF_TE_REAL_SPAD_PASS, BPF_TE_H0_H1_AB_PASS, BPF_TE_ATOMIC_PASS.
+Product top smoke was also run from dv/subsystem/top_smoke/sim and ended TEST PASS before the Round 2 edits.

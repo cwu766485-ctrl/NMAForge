@@ -17,6 +17,7 @@ module ai_spad_bank_parallel_arbiter #(
     input  wire [REQUESTERS-1:0]        req_write,
     input  wire [REQUESTERS*32-1:0]     req_addr,
     input  wire [REQUESTERS*32-1:0]     req_wdata,
+    input  wire [REQUESTERS*4-1:0]      req_wstrb,
     input  wire [REQUESTERS*OWNER_BITS-1:0] req_owner,
     input  wire [REQUESTERS*TILE_BITS-1:0] req_tile,
     output wire [REQUESTERS-1:0]        req_ready,
@@ -27,9 +28,11 @@ module ai_spad_bank_parallel_arbiter #(
     output wire [BANKS-1:0]             bank_req_write,
     output wire [BANKS*32-1:0]          bank_req_addr,
     output wire [BANKS*32-1:0]          bank_req_wdata,
+    output wire [BANKS*4-1:0]           bank_req_wstrb,
     input  wire [BANKS-1:0]             bank_rsp_valid,
     input  wire [BANKS*32-1:0]          bank_rsp_rdata,
     input  wire [BANKS-1:0]             bank_rsp_error,
+    input  wire [BANKS-1:0]             bank_ready,
     output wire [BANKS-1:0]             rsp_valid,
     output wire [BANKS*32-1:0]          rsp_rdata,
     output wire [BANKS*OWNER_BITS-1:0]  rsp_owner_flat,
@@ -37,6 +40,7 @@ module ai_spad_bank_parallel_arbiter #(
     output wire [BANKS*2-1:0]           rsp_bank_flat,
     output wire [BANKS*TILE_BITS-1:0]   rsp_tile,
     output wire [BANKS*EPOCH_BITS-1:0]  rsp_epoch,
+    output wire [BANKS-1:0]             rsp_dropped,
     output wire [EPOCH_BITS-1:0]        current_epoch,
     output wire [BANKS-1:0]             bank_busy
 );
@@ -52,7 +56,9 @@ module ai_spad_bank_parallel_arbiter #(
     reg [REQUESTERS-1:0] ready_r;
     reg [BANKS-1:0] bank_req_valid_r, bank_req_write_r;
     reg [BANKS*32-1:0] bank_req_addr_r, bank_req_wdata_r;
+    reg [BANKS*4-1:0] bank_req_wstrb_r;
     reg [EPOCH_BITS-1:0] epoch_r;
+    reg [BANKS-1:0] dropped_r;
     reg [BANKS-1:0] tag_valid0, tag_valid1, tag_valid2;
     reg [OWNER_BITS-1:0] tag_owner0 [0:BANKS-1], tag_owner1 [0:BANKS-1], tag_owner2 [0:BANKS-1];
     reg [TILE_BITS-1:0] tag_tile0 [0:BANKS-1], tag_tile1 [0:BANKS-1], tag_tile2 [0:BANKS-1];
@@ -68,8 +74,10 @@ module ai_spad_bank_parallel_arbiter #(
     assign bank_req_write = bank_req_write_r;
     assign bank_req_addr = bank_req_addr_r;
     assign bank_req_wdata = bank_req_wdata_r;
+    assign bank_req_wstrb = bank_req_wstrb_r;
     assign current_epoch = epoch_r;
     assign bank_busy = tag_valid0 | tag_valid1 | tag_valid2;
+    assign rsp_dropped = dropped_r;
 
     genvar g;
     generate for (g=0; g<BANKS; g=g+1) begin : GEN_RSP
@@ -93,13 +101,14 @@ module ai_spad_bank_parallel_arbiter #(
         bank_req_write_r = {BANKS{1'b0}};
         bank_req_addr_r = {(BANKS*32){1'b0}};
         bank_req_wdata_r = {(BANKS*32){1'b0}};
+        bank_req_wstrb_r = {(BANKS*4){1'b0}};
         for (b=0; b<BANKS; b=b+1) begin
             selected = -1;
             for (off=0; off<REQUESTERS; off=off+1) begin
                 idx = rr_ptr[b] + off;
                 if (idx >= REQUESTERS) idx = idx - REQUESTERS;
-                if (selected < 0 && req_valid[idx] &&
-                    (req_addr[idx*32 + 3 -: 2] == b[1:0]))
+                if (!epoch_bump && selected < 0 && req_valid[idx] &&
+                    (req_addr[idx*32 + 3 -: 2] == b[1:0]) && bank_ready[b])
                     selected = idx;
             end
             if (selected >= 0) begin
@@ -109,6 +118,7 @@ module ai_spad_bank_parallel_arbiter #(
                 bank_req_write_r[b] = req_write[selected];
                 bank_req_addr_r[b*32 +: 32] = req_addr[selected*32 +: 32];
                 bank_req_wdata_r[b*32 +: 32] = req_wdata[selected*32 +: 32];
+                bank_req_wstrb_r[b*4 +: 4] = req_wstrb[selected*4 +: 4];
             end
         end
     end
@@ -116,6 +126,7 @@ module ai_spad_bank_parallel_arbiter #(
     always @(posedge clk or negedge resetn) begin
         if (!resetn) begin
             epoch_r <= {EPOCH_BITS{1'b0}};
+            dropped_r <= {BANKS{1'b0}};
             for (b=0; b<BANKS; b=b+1) begin
                 rr_ptr[b] <= {BANK_BITS{1'b0}};
                 tag_valid0[b] <= 1'b0;
@@ -130,12 +141,14 @@ module ai_spad_bank_parallel_arbiter #(
             end
         end else if (epoch_bump) begin
             epoch_r <= epoch_r + 1'b1;
+            dropped_r <= tag_valid0 | tag_valid1 | tag_valid2;
             for (b=0; b<BANKS; b=b+1) begin
                 tag_valid0[b] <= 1'b0;
                 tag_valid1[b] <= 1'b0;
                 tag_valid2[b] <= 1'b0;
             end
         end else begin
+            dropped_r <= {BANKS{1'b0}};
             for (b=0; b<BANKS; b=b+1) begin
                 tag_valid1[b] <= tag_valid0[b];
                 tag_owner1[b] <= tag_owner0[b];
