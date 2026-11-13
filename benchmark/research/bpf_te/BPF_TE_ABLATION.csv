@@ -1,0 +1,7 @@
+candidate,workload,cycles,accepted_transactions,accepted_per_cycle,bank_utilization,stall_or_denied, golden,protocol,fault,resource_cost
+H0,legacy product SPAD,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,baseline
+H1,two-bank independent directed,1,2,2.00,50% bank-cycles,0,PASS,PASS,NOT_APPLICABLE,prototype registers/pointers not synthesized
+H1,same-bank conflict directed,6,6,1.00,25% bank-cycles,6 explicit denied/backpressure,PASS,PASS,NOT_APPLICABLE,prototype registers/pointers not synthesized
+H1,epoch/fault directed,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,PASS,PASS,PASS,prototype registers/pointers not synthesized
+H2,H1 + safe ownership,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NOT_IMPLEMENTED
+H3,H2 + DMA/compute overlap,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NOT_IMPLEMENTED

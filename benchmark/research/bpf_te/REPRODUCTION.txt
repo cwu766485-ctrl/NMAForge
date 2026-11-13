@@ -1,0 +1,10 @@
+Candidate base: f919bb787dab1a4e3bef44b5308ead56d6e77b72
+Branch: research/bank-parallel-fault-precise-v1
+Tool: VCS/URG V-2023.12-SP1_Full64
+
+Prototype compile and run:
+VCS_HOME=/opt/Synopsys/vcs/V-2023.12-SP1
+$VCS_HOME/bin/vcs -full64 -sverilog -timescale=1ns/1ps -debug_access+all -f dv/research/bpf_te/ai_spad_bank_parallel.f -top tb_ai_spad_bank_parallel_arbiter -o /tmp/bpf_te_simv
+/tmp/bpf_te_simv -l /tmp/bpf_te_run.log
+
+Coverage uses `-cm line+cond+branch+fsm+assert` and URG merges the compile and run VDBs. Observed terminal marker: BPF_TE_PASS.
