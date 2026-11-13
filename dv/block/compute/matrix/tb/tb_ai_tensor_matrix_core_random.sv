@@ -618,6 +618,21 @@ module tb_ai_tensor_matrix_core_random;
     end
   endtask
 
+  task automatic reset_benchmark_stalls(input integer case_id);
+    reg [31:0] case_seed;
+    begin
+      // Keep each workload's ready/response sequence aligned across RTL
+      // candidates even when an earlier workload changes its cycle count.
+      case_seed=32'h7ac4_01d3 ^ initial_seed ^
+                (case_id * 32'h9e37_79b9);
+      if(case_seed==0) case_seed=32'h1;
+      rng=case_seed;
+      banked_ready=case_seed[0]|case_seed[3];
+      spad_ready=case_seed[2]|case_seed[5];
+      line_ready=case_seed[1]|case_seed[4];
+    end
+  endtask
+
   task automatic run_tinynpu_match_case(
       input integer m,input integer n,input integer k_size,input integer case_id);
     begin
@@ -1166,14 +1181,19 @@ module tb_ai_tensor_matrix_core_random;
 
     if($test$plusargs("MATRIX_BENCHMARK_ONLY")) begin
       prepare_case(4,4,8,1,0,0,0,0,0,0,0);
+      reset_benchmark_stalls(100);
       check_valid_case(100);
       prepare_case(8,8,8,1,0,0,0,0,0,0,0);
+      reset_benchmark_stalls(101);
       check_valid_case(101);
       prepare_case(16,16,8,1,0,0,0,0,0,0,0);
+      reset_benchmark_stalls(102);
       check_valid_case(102);
       prepare_case(16,32,8,1,0,0,0,0,0,0,0);
+      reset_benchmark_stalls(103);
       check_valid_case(103);
       prepare_case(32,32,16,1,0,0,0,0,0,0,0);
+      reset_benchmark_stalls(104);
       check_valid_case(104);
       if(!NEXT_K_PREFETCH_ENABLE && !mac_to_a_req_seen)
         $fatal(1,"Matrix no-prefetch configuration missed ST_MAC->ST_A_REQ fallback");
