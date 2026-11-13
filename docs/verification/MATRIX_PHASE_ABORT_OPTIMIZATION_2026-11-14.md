@@ -9,6 +9,11 @@ per-workload backpressure aligned, both candidates save five aggregate
 simulation cycles (0.25%), below the 5% goal. No ASIC PPA result or signoff is
 claimed.
 
+Review branch: [NMAForge PR #10](https://github.com/cwu766485-ctrl/NMAForge/pull/10),
+targeting `feat/shape-adaptive-gemv-v2`. GitHub currently reports no Actions
+checks for this branch; the local VCS regression and archived artifacts are
+linked below.
+
 ## Root Cause and Test Correction
 
 The former phase-abort case waited for `dut.state_r == 11` (`ST_DONE`) and only
