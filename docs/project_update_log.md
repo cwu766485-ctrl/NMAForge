@@ -141,3 +141,32 @@ commands in `tools/benchmark/phase2/README.md`; public archive validated with
 Created isolated `candidate/frontend-closeout` from remote product c93ea14. Tested RTL fc60f95; retained protected ping-pong, bounded offline mapper, existing output DMA scheduling and source-fault response drain fix. Fixed mux combinational temporary and split return dependencies; Verilator LATCH10→0/UNOPTFLAT3→0. CNN11376cycles; delivery19507→15437; H16/H32 65771/350155. Scoped Golden/fault tests pass. Seven-engine UVM128KiB fails old0x7d000fixture; global DV HOLD. ASIC mapping blocked by absent configured libraries/macros/wrappers. No merge or PPA/signoff claim. See NMAFORGE_FRONTEND_CLOSEOUT.md and reproducible run.sh; evidence manifest pins RTL/workloads. Original worktrees and PR#5 preserved.
 
 Descriptor-validator old reserved-bit vector corrected to bit8 (bit7 is existing Row-Major). Re-run PASS29legal/33invalid/43accepted/26rejected; failing-before log retained. SpyGlass single-clock depth256 CDC0errors/2warnings; final lint0errors/467warnings. No broad static waiver.
+
+## 2026-11-13 — Compact SPAD line-stalled CNM Golden closure
+
+On branch `experiment/compact-spad-dv`, preserved the existing uncommitted
+fixture/monitor work. Reproduced seed `20261025` mismatch at cycle 39390:
+CNM Golden[8] expected `0x12c8`, actual `0x109b`, address `0x14020`. A trace
+replay with the original destination captured first corruption at cycle 34660:
+CNM tag 5 wrote row 0 output `0x0a58` to `0x14000`, overwriting row 8/K0/lane0
+in the live B image `[0x13000,0x15000)`. At cycle 35463 CNM read that location
+and returned the overwritten value. Root cause is fixture allocation/lifetime;
+no DUT RTL change.
+
+Moved the line-stall CNM output to `[0x16000,0x16040)`, retained workload,
+Golden, overlap and stall checks, and corrected compact fixture ranges/lifetimes
+found by the full regression. Added a hard 128 KiB bound to `spad_write()`,
+restored the original Matrix/CNM input images before parameter-latch tests, and
+used parity-consistent descriptor backdoor mutation while scheduler traffic is
+active. Full allocation map and transaction evidence:
+`docs/verification/COMPUTE_CLUSTER_LINE_STALLED_CNM_FIX_2026-11-13.md`.
+
+VCS `V-2023.12-SP1_Full64`: full Compute Cluster UVM seeds 20261025,
+20261026, 20261027 PASS with 0 UVM warnings/errors/fatals per seed; line-stall
+checks=92, violations=0, overlap=1840 cycles, seven-engine pair coverage=21/21.
+`make ai_smoke` PASS; `make ai_run AI_RANDOM_CASES=20 AI_SEED=12345` PASS.
+SpyGlass lint completed with 0 errors/467 warnings/5 infos; CDC setup 0 errors,
+1 warning/9 infos; CDC structure 0 errors, 2 warnings/38 infos. RDC was
+interrupted after remaining at `Ar_resetcross01` (385/478) with about 6.6 GB
+RSS; it has no result. This is a DV bugfix closure, not static-analysis or
+ASIC sign-off. Logs, coverage databases and URG report remain under `/tmp`.

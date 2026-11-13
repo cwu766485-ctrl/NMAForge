@@ -31,109 +31,112 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] REG_REGION3_LIMIT = 32'h0000_00fc;
     localparam bit [31:0] REG_REGION3_PERM = 32'h0000_0100;
 
-    localparam bit [31:0] CMDQ_LOCAL = 32'h0000_4000;
-    localparam bit [31:0] CPLQ_LOCAL = 32'h0000_5000;
-    localparam bit [31:0] MATRIX_A_LOCAL = 32'h0001_0000;
-    localparam bit [31:0] MATRIX_B_LOCAL = 32'h0001_2000;
-    localparam bit [31:0] MATRIX_Y_LOCAL = 32'h0003_0000;
-    localparam bit [31:0] MATRIX_LINE_STALL_CNM_A_LOCAL = 32'h0005_0000;
-    localparam bit [31:0] MATRIX_LINE_STALL_CNM_B_LOCAL = 32'h0005_2000;
-    localparam bit [31:0] MATRIX_LINE_STALL_CNM_Y_LOCAL = 32'h0005_6000;
-    localparam bit [31:0] GELU_A_LOCAL = 32'h0002_0000;
-    localparam bit [31:0] GELU_B_LOCAL = 32'h0002_0100;
-    localparam bit [31:0] GELU_Y0_LOCAL = 32'h0002_0200;
-    localparam bit [31:0] GELU_Y1_LOCAL = 32'h0002_0300;
-    localparam bit [31:0] CNM_A_LOCAL = 32'h0004_8000;
-    localparam bit [31:0] CNM_B_LOCAL = 32'h0004_9000;
-    localparam bit [31:0] CNM_Y_LOCAL = 32'h0004_a000;
+    localparam bit [31:0] CMDQ_LOCAL = 32'h0000_0100;
+    localparam bit [31:0] CPLQ_LOCAL = 32'h0000_0500;
+    localparam bit [31:0] MATRIX_A_LOCAL = 32'h0000_4000;
+    localparam bit [31:0] MATRIX_B_LOCAL = 32'h0000_6000;
+    localparam bit [31:0] MATRIX_Y_LOCAL = 32'h0000_8000;
+    localparam bit [31:0] MATRIX_LINE_STALL_CNM_A_LOCAL = 32'h0001_2000;
+    localparam bit [31:0] MATRIX_LINE_STALL_CNM_B_LOCAL = 32'h0001_3000;
+    localparam bit [31:0] MATRIX_LINE_STALL_CNM_Y_LOCAL = 32'h0001_6000;
+    localparam bit [31:0] GELU_A_LOCAL = 32'h0000_5000;
+    localparam bit [31:0] GELU_B_LOCAL = 32'h0000_5400;
+    localparam bit [31:0] GELU_Y0_LOCAL = 32'h0000_5800;
+    localparam bit [31:0] GELU_Y1_LOCAL = 32'h0000_5900;
+    localparam bit [31:0] CNM_A_LOCAL = 32'h0001_8000;
+    localparam bit [31:0] CNM_B_LOCAL = 32'h0001_9000;
+    localparam bit [31:0] CNM_Y_LOCAL = 32'h0001_a000;
     localparam bit [31:0] CLUSTER_SWEEP_CMDQ = 32'h0000_4400;
     localparam bit [31:0] CLUSTER_SWEEP_CPLQ = 32'h0000_5400;
     localparam bit [31:0] CLUSTER_CONTRACT_CMDQ = 32'h0000_4800;
     localparam bit [31:0] CLUSTER_CONTRACT_CPLQ = 32'h0000_5800;
-    localparam bit [31:0] CONTRACT_SHARED_LOCAL = 32'h0004_7000;
-    localparam bit [31:0] CONTRACT_B_LOCAL = 32'h0004_7200;
-    localparam bit [31:0] CONTRACT_Y0_LOCAL = 32'h0004_7400;
-    localparam bit [31:0] CONTRACT_Y1_LOCAL = 32'h0004_7500;
-    localparam bit [31:0] CONTRACT_MUTATED_Y_LOCAL = 32'h0004_7600;
-    localparam bit [31:0] CONTRACT_SFU_Y_LOCAL = 32'h0004_7800;
-    localparam bit [31:0] MATRIX_LATCH_Y_LOCAL = 32'h0003_8000;
-    localparam bit [31:0] MATRIX_LATCH_MUTATED_Y_LOCAL = 32'h0003_9000;
-    localparam bit [31:0] SFU_LATCH_SRC_LOCAL = 32'h0004_a100;
-    localparam bit [31:0] SFU_LATCH_MUTATED_SRC_LOCAL = 32'h0004_a140;
-    localparam bit [31:0] SFU_LATCH_Y_LOCAL = 32'h0004_a180;
-    localparam bit [31:0] SFU_LATCH_MUTATED_Y_LOCAL = 32'h0004_a1c0;
-    localparam bit [31:0] SCALAR_A_LOCAL = 32'h0004_6000;
-    localparam bit [31:0] SCALAR_B_LOCAL = 32'h0004_6100;
-    localparam bit [31:0] SCALAR_Y_LOCAL = 32'h0004_6200;
-    localparam bit [31:0] FP_A_LOCAL = 32'h0004_6400;
-    localparam bit [31:0] FP_B_LOCAL = 32'h0004_6404;
-    localparam bit [31:0] FP_Y_LOCAL = 32'h0004_6408;
-    localparam bit [31:0] CONV_A_LOCAL = 32'h0004_6600;
-    localparam bit [31:0] CONV_W_LOCAL = 32'h0004_6640;
-    localparam bit [31:0] CONV_Y_LOCAL = 32'h0004_6680;
-    localparam bit [31:0] KV_VECTOR_LOCAL = 32'h0004_6800;
-    localparam bit [31:0] KV_CACHE_LOCAL = 32'h0004_6840;
-    localparam bit [31:0] KV_READ_LOCAL = 32'h0004_6900;
-    localparam bit [31:0] SWEEP_MATRIX_Y_LOCAL = 32'h0004_c000;
-    localparam bit [31:0] SWEEP_CNM_Y_LOCAL = 32'h0004_c800;
-    localparam bit [31:0] SWEEP_SFU_Y_LOCAL = 32'h0004_d000;
-    localparam bit [31:0] FAULT_Y_LOCAL = 32'h0004_e000;
-    localparam bit [31:0] MATRIX_FAULT_A_LOCAL = 32'h0004_f000;
-    localparam bit [31:0] MATRIX_FAULT_B_LOCAL = 32'h0004_f100;
+    localparam bit [31:0] CONTRACT_SHARED_LOCAL = 32'h0001_7000;
+    localparam bit [31:0] CONTRACT_B_LOCAL = 32'h0001_7200;
+    localparam bit [31:0] CONTRACT_Y0_LOCAL = 32'h0001_7400;
+    localparam bit [31:0] CONTRACT_Y1_LOCAL = 32'h0001_7500;
+    localparam bit [31:0] CONTRACT_MUTATED_Y_LOCAL = 32'h0001_7600;
+    localparam bit [31:0] CONTRACT_SFU_Y_LOCAL = 32'h0001_7800;
+    localparam bit [31:0] MATRIX_LATCH_Y_LOCAL = 32'h0001_8000;
+    localparam bit [31:0] MATRIX_LATCH_MUTATED_Y_LOCAL = 32'h0001_9000;
+    localparam bit [31:0] SFU_LATCH_SRC_LOCAL = 32'h0001_a100;
+    localparam bit [31:0] SFU_LATCH_MUTATED_SRC_LOCAL = 32'h0001_a140;
+    localparam bit [31:0] SFU_LATCH_Y_LOCAL = 32'h0001_a180;
+    localparam bit [31:0] SFU_LATCH_MUTATED_Y_LOCAL = 32'h0001_a1c0;
+    localparam bit [31:0] SCALAR_A_LOCAL = 32'h0001_6000;
+    localparam bit [31:0] SCALAR_B_LOCAL = 32'h0001_6100;
+    localparam bit [31:0] SCALAR_Y_LOCAL = 32'h0001_6200;
+    localparam bit [31:0] FP_A_LOCAL = 32'h0001_6400;
+    localparam bit [31:0] FP_B_LOCAL = 32'h0001_6404;
+    localparam bit [31:0] FP_Y_LOCAL = 32'h0001_6408;
+    localparam bit [31:0] CONV_A_LOCAL = 32'h0001_6600;
+    localparam bit [31:0] CONV_W_LOCAL = 32'h0001_6640;
+    localparam bit [31:0] CONV_Y_LOCAL = 32'h0001_6680;
+    localparam bit [31:0] KV_VECTOR_LOCAL = 32'h0001_6800;
+    localparam bit [31:0] KV_CACHE_LOCAL = 32'h0001_6840;
+    localparam bit [31:0] KV_READ_LOCAL = 32'h0001_6900;
+    localparam bit [31:0] SWEEP_MATRIX_Y_LOCAL = 32'h0000_8000;
+    localparam bit [31:0] SWEEP_CNM_Y_LOCAL = 32'h0001_c800;
+    localparam bit [31:0] SWEEP_SFU_Y_LOCAL = 32'h0001_d000;
+    localparam bit [31:0] FAULT_Y_LOCAL = 32'h0001_e000;
+    localparam bit [31:0] MATRIX_FAULT_A_LOCAL = 32'h0001_f000;
+    localparam bit [31:0] MATRIX_FAULT_B_LOCAL = 32'h0001_f100;
     localparam bit [31:0] CLUSTER_PROT_CMDQ = 32'h0000_6000;
     localparam bit [31:0] CLUSTER_PROT_CPLQ = 32'h0000_7000;
     localparam bit [31:0] CLUSTER_WATCHDOG_CMDQ = 32'h0000_7400;
     localparam bit [31:0] CLUSTER_WATCHDOG_CPLQ = 32'h0000_7500;
-    localparam bit [31:0] CLUSTER_WATCHDOG_Y_LOCAL = 32'h0007_c000;
-    localparam bit [31:0] C1_CNM_A_LOCAL = 32'h0006_0000;
-    localparam bit [31:0] C1_CNM_B_LOCAL = 32'h0006_1000;
-    localparam bit [31:0] C1_CNM_Y_LOCAL = 32'h0006_7000;
-    localparam bit [31:0] C1_SFU_A_LOCAL = 32'h0006_8000;
-    localparam bit [31:0] C1_SFU_Y_LOCAL = 32'h0006_8400;
-    localparam bit [31:0] C1_CONV_A_LOCAL = 32'h0006_9000;
-    localparam bit [31:0] C1_CONV_W_LOCAL = 32'h0006_9400;
-    localparam bit [31:0] C1_CONV_Y_LOCAL = 32'h0006_9800;
-    localparam bit [31:0] C1_KV_VECTOR_LOCAL = 32'h0006_a000;
-    localparam bit [31:0] C1_KV_CACHE_LOCAL = 32'h0006_a400;
-    localparam bit [31:0] C1_KV_READ_LOCAL = 32'h0006_a800;
-    localparam bit [31:0] C1_SCALAR_A_LOCAL = 32'h0006_b000;
-    localparam bit [31:0] C1_SCALAR_B_LOCAL = 32'h0006_b400;
-    localparam bit [31:0] C1_SCALAR_Y_LOCAL = 32'h0006_b800;
-    localparam bit [31:0] C1_FP_A_LOCAL = 32'h0006_c000;
-    localparam bit [31:0] C1_FP_B_LOCAL = 32'h0006_c100;
-    localparam bit [31:0] C1_FP_Y_LOCAL = 32'h0006_c200;
-    localparam bit [31:0] FP_LATCH_A_LOCAL = 32'h0006_d000;
-    localparam bit [31:0] FP_LATCH_B_LOCAL = 32'h0006_d100;
-    localparam bit [31:0] FP_LATCH_MUTATED_A_LOCAL = 32'h0006_d200;
-    localparam bit [31:0] FP_LATCH_MUTATED_B_LOCAL = 32'h0006_d300;
-    localparam bit [31:0] FP_LATCH_Y_LOCAL = 32'h0006_d400;
-    localparam bit [31:0] FP_LATCH_MUTATED_Y_LOCAL = 32'h0006_d500;
-    localparam bit [31:0] CONV_LATCH_A_LOCAL = 32'h0006_e000;
-    localparam bit [31:0] CONV_LATCH_W_LOCAL = 32'h0006_e100;
-    localparam bit [31:0] CONV_LATCH_MUTATED_A_LOCAL = 32'h0006_e200;
-    localparam bit [31:0] CONV_LATCH_MUTATED_W_LOCAL = 32'h0006_e300;
-    localparam bit [31:0] CONV_LATCH_Y_LOCAL = 32'h0006_e400;
-    localparam bit [31:0] CONV_LATCH_MUTATED_Y_LOCAL = 32'h0006_e500;
-    localparam bit [31:0] KV_LATCH_SRC_LOCAL = 32'h0006_f000;
-    localparam bit [31:0] KV_LATCH_MUTATED_SRC_LOCAL = 32'h0006_f200;
-    localparam bit [31:0] KV_LATCH_CACHE_LOCAL = 32'h0006_f400;
-    localparam bit [31:0] KV_LATCH_MUTATED_CACHE_LOCAL = 32'h0006_f800;
-    localparam bit [31:0] CNM_LATCH_Y_LOCAL = 32'h0004_e300;
-    localparam bit [31:0] CNM_LATCH_MUTATED_Y_LOCAL = 32'h0004_e400;
-    localparam bit [31:0] SCALAR_OPCODE_CMDQ = 32'h0005_a000;
-    localparam bit [31:0] SCALAR_OPCODE_CPLQ = 32'h0005_a400;
-    localparam bit [31:0] SCALAR_OPCODE_A_LOCAL = 32'h0007_0000;
-    localparam bit [31:0] SCALAR_OPCODE_B_LOCAL = 32'h0007_0040;
-    localparam bit [31:0] SCALAR_OPCODE_Y_LOCAL = 32'h0007_0080;
+    localparam bit [31:0] CLUSTER_WATCHDOG_Y_LOCAL = 32'h0001_c000;
+    localparam bit [31:0] C1_CNM_A_LOCAL = 32'h0001_0000;
+    localparam bit [31:0] C1_CNM_B_LOCAL = 32'h0001_1000;
+    localparam bit [31:0] C1_CNM_Y_LOCAL = 32'h0001_7000;
+    localparam bit [31:0] C1_SFU_A_LOCAL = 32'h0001_8000;
+    localparam bit [31:0] C1_SFU_Y_LOCAL = 32'h0001_8400;
+    localparam bit [31:0] C1_CONV_A_LOCAL = 32'h0001_9000;
+    localparam bit [31:0] C1_CONV_W_LOCAL = 32'h0001_9400;
+    localparam bit [31:0] C1_CONV_Y_LOCAL = 32'h0001_9800;
+    localparam bit [31:0] C1_KV_VECTOR_LOCAL = 32'h0001_a000;
+    localparam bit [31:0] C1_KV_CACHE_LOCAL = 32'h0001_a400;
+    localparam bit [31:0] C1_KV_READ_LOCAL = 32'h0001_a800;
+    localparam bit [31:0] C1_SCALAR_A_LOCAL = 32'h0001_b000;
+    localparam bit [31:0] C1_SCALAR_B_LOCAL = 32'h0001_b400;
+    localparam bit [31:0] C1_SCALAR_Y_LOCAL = 32'h0001_b800;
+    localparam bit [31:0] C1_FP_A_LOCAL = 32'h0001_c000;
+    localparam bit [31:0] C1_FP_B_LOCAL = 32'h0001_c100;
+    localparam bit [31:0] C1_FP_Y_LOCAL = 32'h0001_c200;
+    localparam bit [31:0] FP_LATCH_A_LOCAL = 32'h0001_d000;
+    localparam bit [31:0] FP_LATCH_B_LOCAL = 32'h0001_d100;
+    localparam bit [31:0] FP_LATCH_MUTATED_A_LOCAL = 32'h0001_d200;
+    localparam bit [31:0] FP_LATCH_MUTATED_B_LOCAL = 32'h0001_d300;
+    localparam bit [31:0] FP_LATCH_Y_LOCAL = 32'h0001_d400;
+    localparam bit [31:0] FP_LATCH_MUTATED_Y_LOCAL = 32'h0001_d500;
+    localparam bit [31:0] CONV_LATCH_A_LOCAL = 32'h0001_e000;
+    localparam bit [31:0] CONV_LATCH_W_LOCAL = 32'h0001_e100;
+    localparam bit [31:0] CONV_LATCH_MUTATED_A_LOCAL = 32'h0001_e200;
+    localparam bit [31:0] CONV_LATCH_MUTATED_W_LOCAL = 32'h0001_e300;
+    localparam bit [31:0] CONV_LATCH_Y_LOCAL = 32'h0001_e400;
+    localparam bit [31:0] CONV_LATCH_MUTATED_Y_LOCAL = 32'h0001_e500;
+    localparam bit [31:0] KV_LATCH_SRC_LOCAL = 32'h0001_f000;
+    localparam bit [31:0] KV_LATCH_MUTATED_SRC_LOCAL = 32'h0001_f200;
+    localparam bit [31:0] KV_LATCH_CACHE_LOCAL = 32'h0001_f400;
+    localparam bit [31:0] KV_LATCH_MUTATED_CACHE_LOCAL = 32'h0001_f800;
+    localparam bit [31:0] CNM_LATCH_Y_LOCAL = 32'h0001_e300;
+    localparam bit [31:0] CNM_LATCH_MUTATED_Y_LOCAL = 32'h0001_e400;
+    localparam bit [31:0] SCALAR_OPCODE_CMDQ = 32'h0001_a000;
+    localparam bit [31:0] SCALAR_OPCODE_CPLQ = 32'h0001_a400;
+    localparam bit [31:0] SCALAR_OPCODE_A_LOCAL = 32'h0001_0000;
+    localparam bit [31:0] SCALAR_OPCODE_B_LOCAL = 32'h0001_0040;
+    localparam bit [31:0] SCALAR_OPCODE_Y_LOCAL = 32'h0001_0080;
     localparam bit [31:0] PARALLEL_FAULT_CMDQ = 32'h0000_4600;
     localparam bit [31:0] PARALLEL_FAULT_CPLQ = 32'h0000_5c00;
-    localparam bit [31:0] PARALLEL_FAULT_MATRIX_Y = 32'h0007_d000;
-    localparam bit [31:0] PARALLEL_FAULT_CNM_Y = 32'h0007_d800;
-    localparam bit [31:0] PARALLEL_FAULT_SFU_Y = 32'h0007_d900;
-    localparam bit [31:0] PARALLEL_FAULT_SCALAR_Y = 32'h0007_db00;
-    localparam bit [31:0] PARALLEL_FAULT_FP_Y = 32'h0007_db10;
-    localparam bit [31:0] PARALLEL_FAULT_CONV_Y = 32'h0007_dc00;
-    localparam bit [31:0] PARALLEL_FAULT_KV_CACHE = 32'h0007_e000;
+    // Compact 128 KiB fixture: the parallel-fault outputs are live
+    // concurrently, so each region has an explicit non-overlapping slot in
+    // the legal SPAD byte window [0x0000, 0x20000).
+    localparam bit [31:0] PARALLEL_FAULT_MATRIX_Y = 32'h0000_2000;
+    localparam bit [31:0] PARALLEL_FAULT_CNM_Y = 32'h0000_2800;
+    localparam bit [31:0] PARALLEL_FAULT_SFU_Y = 32'h0000_2900;
+    localparam bit [31:0] PARALLEL_FAULT_SCALAR_Y = 32'h0000_2b00;
+    localparam bit [31:0] PARALLEL_FAULT_FP_Y = 32'h0000_2b10;
+    localparam bit [31:0] PARALLEL_FAULT_CONV_Y = 32'h0000_2c00;
+    localparam bit [31:0] PARALLEL_FAULT_KV_CACHE = 32'h0000_3400;
 
     virtual ai_compute_cluster_if compute_vif;
     bit [31:0] rng_state;
@@ -611,6 +614,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     endtask
 
     task automatic spad_write(input bit [31:0] addr, input bit [31:0] data);
+        if (addr >= 32'h0002_0000)
+            `uvm_fatal("CLUSTER_SPAD_RANGE", $sformatf(
+                "compact 128 KiB SPAD write is out of range: local=0x%08h global=0x%08h data=0x%08h",
+                addr, CIMFORGE_SPAD_BASE + addr, data))
         axil_write(CIMFORGE_SPAD_BASE + addr, data);
     endtask
 
@@ -1039,15 +1046,15 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         route_mismatch_seen = 1'b0;
         desc_base = 32'h0000_7800;
         cpl_base = 32'h0000_7900;
-        matrix_dst = 32'h0005_4000;
-        cnm_dst = 32'h0005_4800;
-        // The baseline point faults the final A-row lane to exercise held-read
-        // cancellation. The abort cross faults the first legal operand so the
-        // long CNM task is still active when Matrix reports parity.
+        matrix_dst = 32'h0000_a000;
+        cnm_dst = 32'h0000_b000;
+        // The baseline faults a late A-row lane while Matrix still has later
+        // A reads to issue. The abort cross faults the first legal operand so
+        // the long CNM task is still active when Matrix reports parity.
         parity_addr = reset_after_cnm_prefix ?
                       MATRIX_A_LOCAL + 32'h0000_00fc :
                       ((abort_cnm_after_parity || reset_both_after_parity) ?
-                       MATRIX_A_LOCAL : MATRIX_A_LOCAL + 32'h0000_00fc);
+                       MATRIX_A_LOCAL : MATRIX_A_LOCAL + 32'h0000_00ec);
         abort_issued = 1'b0;
         abort_seen = 1'b0;
         abort_active_seen = 1'b0;
@@ -1148,6 +1155,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_CPLQ_SIZE, 32'd4);
         axil_write(REG_CPLQ_HEAD, 32'd0);
         axil_write(REG_CPLQ_TAIL, 32'd0);
+        compute_vif.matrix_parity_trace_enable = 1'b1;
         if (!abort_cnm_after_parity && !reset_both_after_parity) begin
             axil_write(REG_DOORBELL, 32'd1);
             wait_cpl_tail(32'd2);
@@ -1330,6 +1338,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                     "CNM accepted %0d output writes after Abort sampling",
                     post_abort_cnm_writes))
         end
+        compute_vif.matrix_parity_trace_enable = 1'b0;
         restore_spad_parity(parity_path, saved_parity);
 
         if ((!reset_both_after_parity &&
@@ -1598,7 +1607,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                     32'h0000_7600 : 32'h0000_7800;
         cpl_base = 32'h0000_7900;
         matrix_dst = 32'h0000_8000;
-        cnm_dst = 32'h0005_4800;
+        cnm_dst = 32'h0001_5000;
         matrix_desc_base = hold_dual_faults_behind_full_cplq ?
                            desc_base + 32'hc0 : desc_base;
         cnm_desc_base = hold_dual_faults_behind_full_cplq ?
@@ -1746,7 +1755,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         axil_write(REG_REGION2_LIMIT, MATRIX_B_LOCAL + 32'h800);
         axil_write(REG_REGION2_PERM, 32'h0000_000d);
         axil_write(REG_REGION3_BASE, MATRIX_LINE_STALL_CNM_A_LOCAL);
-        axil_write(REG_REGION3_LIMIT, 32'h0005_6000);
+        axil_write(REG_REGION3_LIMIT, 32'h0001_6000);
         // The dual-fault mode keeps CNM operand reads legal while denying its
         // output write. Matrix's output remains outside every writable region.
         axil_write(REG_REGION3_PERM,
@@ -2697,7 +2706,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         desc_addr = CLUSTER_PROT_CMDQ + (fault_phase * 32'h400) + (engine * 32'h40);
         cpl_addr = CLUSTER_PROT_CPLQ + (fault_phase * 32'h100) + (engine * 32'h10);
-        dst = FAULT_Y_LOCAL + 32'h3000 + (engine * 32'h200) + (fault_phase * 32'h40);
+        dst = 32'h0000_a000 + (engine * 32'h200) + (fault_phase * 32'h40);
         task_id = 32'h0730 + (fault_phase * 16) + engine;
         denied_seen = 1'b0;
         denied_addr = '0;
@@ -3595,22 +3604,22 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
             case (engine)
                 0: begin
-                    src0 = 32'h0004_a800;
-                    src1 = 32'h0004_a900;
+                    src0 = 32'h0001_a800;
+                    src1 = 32'h0001_a900;
                     write_cluster_desc(desc_addr + 32'hc0, 8'h10,
                         task_id[15:0], src0, src1, dst, 16'd0, 16'd0,
                         16'd64, 32'd0, 32'd0, 32'd0, 32'd0, 8'd3);
                 end
                 1: begin
-                    src0 = 32'h0004_a800;
-                    src1 = 32'h0004_a900;
+                    src0 = 32'h0001_a800;
+                    src1 = 32'h0001_a900;
                     write_cluster_desc(desc_addr + 32'hc0, 8'h50,
                         task_id[15:0], src0, src1, dst, 16'd1, 16'd1,
                         16'd64, 32'd0, 32'd0, 32'd0, 32'd0, 8'd7);
                 end
                 2: begin
-                    src0 = 32'h0004_aa00;
-                    src1 = 32'h0004_ab00;
+                    src0 = 32'h0001_aa00;
+                    src1 = 32'h0001_ab00;
                     write_cnm_v3_desc(desc_addr + 32'hc0,
                         task_id[15:0], src0, src1, dst);
                     spad_write(desc_addr + 32'hd8, 32'd64);
@@ -3624,15 +3633,15 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                         16'd16, 16'd32, 16'd16);
                 end
                 4: begin
-                    src0 = 32'h0004_b000;
+                    src0 = 32'h0001_b000;
                     output_words = 64;
                     write_v3_desc(desc_addr + 32'hc0, 8'h35,
                         task_id[15:0], src0, 32'd0, dst,
                         16'd0, 16'd0, 16'd64);
                 end
                 5: begin
-                    src0 = 32'h0004_b100;
-                    src1 = 32'h0004_b600;
+                    src0 = 32'h0001_b100;
+                    src1 = 32'h0001_b600;
                     output_words = 196;
                     write_cluster_desc(desc_addr + 32'hc0, 8'h16,
                         task_id[15:0], src0, src1, dst,
@@ -3640,8 +3649,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                         32'd0, 32'd0, 32'd0, 8'd5);
                 end
                 default: begin
-                    src0 = 32'h0004_b700;
-                    dst = 32'h0003_9000;
+                    src0 = 32'h0001_b700;
+                    dst = 32'h0001_9000;
                     output_base = dst + 32'h50;
                     output_words = 64;
                     write_cluster_desc(desc_addr + 32'hc0, 8'h43,
@@ -3853,7 +3862,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             // legal operand read and then a denied destination write.
             desc_addr = 32'h0000_9000 + (engine * 32'h200);
             cpl_addr = 32'h0000_a000 + (engine * 32'h40);
-            dst = FAULT_Y_LOCAL + 32'h4000 + (engine * 32'h100);
+            // These seven engine cases execute serially. Keep their 0x100-byte
+            // destination slots inside the compact SPAD and disjoint from the
+            // descriptor/CPLQ windows used by this sweep.
+            dst = 32'h0000_c000 + (engine * 32'h100);
             task_id = 32'h08b0 + engine;
             denied_seen = 1'b0;
             denied_addr = '0;
@@ -4188,7 +4200,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     endtask
 
     task automatic run_dma_store_response_test();
-        localparam bit [31:0] DMA_SOURCE_SPAD = 32'h0005_8000;
+        localparam bit [31:0] DMA_SOURCE_SPAD = 32'h0001_8000;
         localparam bit [31:0] DMA_DEST_DDR = 32'h0000_1800;
         bit [31:0] expected[0:3];
         bit [31:0] dma_status;
@@ -4299,9 +4311,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned bad_request_cycles;
         int unsigned i;
 
-        cmdq_base = 32'h0007_4000;
-        cplq_base = 32'h0007_4800;
-        sentinel_base = 32'h0007_7000;
+        cmdq_base = 32'h0001_4000;
+        cplq_base = 32'h0001_4800;
+        sentinel_base = 32'h0001_7000;
         bad_request_cycles = 0;
         monitor_done = 1'b0;
 
@@ -4324,18 +4336,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         for (i = 0; i < CASE_COUNT; i++) begin
             descriptor_dst[i] = sentinel_base + (i << 5);
             if (i == 8)
-                descriptor_dst[i] = 32'h0007_8000; // Output overlaps padded A.
+                descriptor_dst[i] = 32'h0001_8000; // Output overlaps padded A.
             else if (i == 9)
-                descriptor_dst[i] = 32'h0007_8100; // Output overlaps dense B.
+                descriptor_dst[i] = 32'h0001_8100; // Output overlaps dense B.
             // K=17 pads A to 32 bytes, so this span wraps past 2^32.
             // K=1 would end exactly at 2^32 and is a legal half-open range.
             spad_write(descriptor_dst[i], 32'hde5c_0000 | i);
             spad_write(descriptor_dst[i] + 32'd4, 32'hde5c_1000 | i);
             write_cluster_desc(cmdq_base + (i << 6), opcode[i],
                                16'h08a0 + i,
-                               (i == 10) ? 32'h0007_8004 :
-                               ((i == 11) ? 32'hffff_fff0 : 32'h0007_8000),
-                               32'h0007_8100, descriptor_dst[i],
+                               (i == 10) ? 32'h0001_8004 :
+                               ((i == 11) ? 32'hffff_fff0 : 32'h0001_8000),
+                               32'h0001_8100, descriptor_dst[i],
                                m_size[i], n_size[i], length[i],
                                32'd0, 32'd0, 32'd0, 32'd0, version[i]);
         end
@@ -4434,11 +4446,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         localparam int unsigned M_SIZE = 3;
         localparam int unsigned N_SIZE = 5;
         localparam int unsigned K_SIZE = 5;
-        localparam bit [31:0] CMDQ_BASE = 32'h0005_b000;
-        localparam bit [31:0] CPLQ_BASE = 32'h0005_b400;
-        localparam bit [31:0] SRC_A = 32'h0007_b000;
-        localparam bit [31:0] SRC_B = 32'h0007_b100;
-        localparam bit [31:0] DST = 32'h0007_b200;
+        localparam bit [31:0] CMDQ_BASE = 32'h0000_d000;
+        localparam bit [31:0] CPLQ_BASE = 32'h0001_b400;
+        localparam bit [31:0] SRC_A = 32'h0001_b000;
+        localparam bit [31:0] SRC_B = 32'h0001_b100;
+        localparam bit [31:0] DST = 32'h0001_b200;
         localparam bit [15:0] TASK_ID = 16'h08c0;
         int signed a_matrix[0:M_SIZE-1][0:K_SIZE-1];
         int signed b_matrix[0:K_SIZE-1][0:N_SIZE-1];
@@ -4606,11 +4618,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     endtask
 
     task automatic run_product_gemv_cmdq_min_boundary(input int unsigned seed);
-        localparam bit [31:0] CMDQ_BASE = 32'h0005_b000;
-        localparam bit [31:0] CPLQ_BASE = 32'h0005_b400;
-        localparam bit [31:0] SRC_A = 32'h0007_b400;
-        localparam bit [31:0] SRC_B = 32'h0007_b500;
-        localparam bit [31:0] DST = 32'h0007_b600;
+        localparam bit [31:0] CMDQ_BASE = 32'h0001_b000;
+        localparam bit [31:0] CPLQ_BASE = 32'h0001_b400;
+        localparam bit [31:0] SRC_A = 32'h0001_b400;
+        localparam bit [31:0] SRC_B = 32'h0001_b500;
+        localparam bit [31:0] DST = 32'h0001_b600;
         localparam bit [15:0] TASK_ID = 16'h08c1;
         int signed a_value;
         int signed b_value;
@@ -4714,11 +4726,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         localparam int unsigned M_SIZE = 16;
         localparam int unsigned N_SIZE = 16;
         localparam int unsigned K_SIZE = 16;
-        localparam bit [31:0] CMDQ_BASE = 32'h0005_b000;
-        localparam bit [31:0] CPLQ_BASE = 32'h0005_b400;
-        localparam bit [31:0] SRC_A = 32'h0007_b800;
-        localparam bit [31:0] SRC_B = 32'h0007_ba00;
-        localparam bit [31:0] DST = 32'h0007_bc00;
+        localparam bit [31:0] CMDQ_BASE = 32'h0001_b000;
+        localparam bit [31:0] CPLQ_BASE = 32'h0001_b400;
+        localparam bit [31:0] SRC_A = 32'h0001_b800;
+        localparam bit [31:0] SRC_B = 32'h0001_ba00;
+        localparam bit [31:0] DST = 32'h0001_bc00;
         localparam bit [15:0] TASK_ID = 16'h08c2;
         int signed a_matrix[0:M_SIZE-1][0:K_SIZE-1];
         int signed b_matrix[0:K_SIZE-1][0:N_SIZE-1];
@@ -4872,8 +4884,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         input bit [31:0] src_b,
         input bit [31:0] dst
     );
-        localparam bit [31:0] CMDQ_BASE = 32'h0005_b000;
-        localparam bit [31:0] CPLQ_BASE = 32'h0005_b400;
+        localparam bit [31:0] CMDQ_BASE = 32'h0000_d000;
+        localparam bit [31:0] CPLQ_BASE = 32'h0001_b400;
         int signed a_matrix[0:15][0:255];
         int signed b_matrix[0:255][0:15];
         bit [31:0] golden[0:15][0:15];
@@ -5035,11 +5047,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
     task automatic run_product_gemv_cmdq_extended_shapes(input int unsigned seed);
         run_product_gemv_cmdq_extended_shape(seed, 0, 16'd1, 16'd16, 16'd17,
-            16'h08c3, 32'h0007_d000, 32'h0007_d200, 32'h0007_d400);
+            16'h08c3, 32'h0001_d000, 32'h0001_d200, 32'h0001_d400);
         run_product_gemv_cmdq_extended_shape(seed, 1, 16'd8, 16'd13, 16'd65,
-            16'h08c4, 32'h0007_d800, 32'h0007_de00, 32'h0007_e400);
+            16'h08c4, 32'h0001_d800, 32'h0001_de00, 32'h0001_e400);
         run_product_gemv_cmdq_extended_shape(seed, 2, 16'd15, 16'd16, 16'd31,
-            16'h08c5, 32'h0007_e800, 32'h0007_ea00, 32'h0007_ee00);
+            16'h08c5, 32'h0001_e800, 32'h0001_ea00, 32'h0001_ee00);
         if (cmdq_product_gemv_extended_shape_cg.get_coverage() < 100.0)
             `uvm_fatal("CLUSTER_CMDQ_GEMV_SHAPE", $sformatf(
                 "extended product GEMV shape sweep missed declared bins: %0.1f%%",
@@ -5052,13 +5064,13 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         // the real top CMDQ path. Existing cases cover 000, 011, 101, and
         // 111; these four independent Golden runs cover the remaining bins.
         run_product_gemv_cmdq_extended_shape(seed, 3, 16'd4, 16'd16, 16'd17,
-            16'h08c6, 32'h0007_d000, 32'h0007_d200, 32'h0007_d400);
+            16'h08c6, 32'h0001_d000, 32'h0001_d200, 32'h0001_d400);
         run_product_gemv_cmdq_extended_shape(seed, 4, 16'd4, 16'd13, 16'd16,
-            16'h08c7, 32'h0007_d000, 32'h0007_d200, 32'h0007_d400);
+            16'h08c7, 32'h0001_d000, 32'h0001_d200, 32'h0001_d400);
         run_product_gemv_cmdq_extended_shape(seed, 5, 16'd3, 16'd16, 16'd16,
-            16'h08c8, 32'h0007_d000, 32'h0007_d200, 32'h0007_d400);
+            16'h08c8, 32'h0001_d000, 32'h0001_d200, 32'h0001_d400);
         run_product_gemv_cmdq_extended_shape(seed, 6, 16'd3, 16'd13, 16'd16,
-            16'h08c9, 32'h0007_d000, 32'h0007_d200, 32'h0007_d400);
+            16'h08c9, 32'h0001_d000, 32'h0001_d200, 32'h0001_d400);
         if (cmdq_product_gemv_tail_cross_cg.get_coverage() < 100.0)
             `uvm_fatal("CLUSTER_CMDQ_GEMV_TAIL_CROSS", $sformatf(
                 "real CMDQ GEMV M/N/K alignment-tail cross incomplete: %0.1f%%",
@@ -5075,7 +5087,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         // workload at K=256 has passed.
         cmdq_product_gemv_long_k_shape = 1'b0;
         run_product_gemv_cmdq_extended_shape(seed, 7, 16'd1, 16'd1, 16'd256,
-            16'h08ca, 32'h0007_a000, 32'h0007_b000, 32'h0007_c800);
+            16'h08ca, 32'h0001_a000, 32'h0001_b000, 32'h0001_c800);
         cmdq_product_gemv_long_k_shape = 1'b1;
         cmdq_product_gemv_long_k_cg.sample();
         if (cmdq_product_gemv_long_k_cg.get_coverage() < 100.0)
@@ -5089,10 +5101,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         localparam int unsigned M_SIZE = 1;
         localparam int unsigned N_SIZE = 16;
         localparam int unsigned K_SIZE = 16;
-        localparam bit [31:0] CMDQ_BASE = 32'h0005_b000;
-        localparam bit [31:0] CPLQ_BASE = 32'h0005_b400;
-        localparam bit [31:0] SRC_SHARED = 32'h0007_d000;
-        localparam bit [31:0] DST = 32'h0007_d400;
+        localparam bit [31:0] CMDQ_BASE = 32'h0001_b000;
+        localparam bit [31:0] CPLQ_BASE = 32'h0001_b400;
+        localparam bit [31:0] SRC_SHARED = 32'h0001_d000;
+        localparam bit [31:0] DST = 32'h0001_d400;
         localparam bit [15:0] TASK_ID = 16'h08cb;
         int signed shared_bytes[0:255];
         int signed a_value;
@@ -5227,12 +5239,13 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         localparam int unsigned M_SIZE = 16;
         localparam int unsigned N_SIZE = 16;
         localparam int unsigned K_SIZE = 16;
-        localparam bit [31:0] CMDQ_BASE = 32'h0005_b000;
-        localparam bit [31:0] CPLQ_BASE = 32'h0005_b400;
-        localparam bit [31:0] SRC_A = 32'h0007_b800;
-        localparam bit [31:0] SRC_B = 32'h0007_ba00;
-        localparam bit [31:0] DST = 32'h0007_bc00;
-        localparam bit [31:0] CNM_DST = 32'h0005_4800;
+        localparam bit [31:0] CMDQ_BASE = 32'h0001_b000;
+        localparam bit [31:0] CPLQ_BASE = 32'h0001_b400;
+        localparam bit [31:0] SRC_A = 32'h0001_b800;
+        localparam bit [31:0] SRC_B = 32'h0001_ba00;
+        localparam bit [31:0] DST = 32'h0001_bc00;
+        // CNM B occupies [0x13000, 0x15000); keep concurrent outputs beyond it.
+        localparam bit [31:0] CNM_DST = 32'h0001_5000;
         localparam bit [15:0] GEMV_TASK_ID = 16'h08c3;
         localparam bit [15:0] CNM_TASK_ID = 16'h08c4;
         int signed a_matrix[0:M_SIZE-1][0:K_SIZE-1];
@@ -5498,9 +5511,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int signed b_value;
         int signed golden_sum;
 
-        src0 = 32'h0004_e000;
-        src1 = 32'h0004_e100;
-        dst = 32'h0004_e200;
+        src0 = 32'h0001_e000;
+        src1 = 32'h0001_e100;
+        dst = 32'h0001_e200;
         task_id = 16'h0687;
         golden_sum = 0;
 
@@ -5564,9 +5577,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     endtask
 
     task automatic run_scalar_vdot_minimum_cmdq_boundary_test(input int unsigned seed);
-        localparam bit [31:0] SRC_A = 32'h0007_5000;
-        localparam bit [31:0] SRC_B = 32'h0007_5010;
-        localparam bit [31:0] DST = 32'h0007_5020;
+        localparam bit [31:0] SRC_A = 32'h0001_5000;
+        localparam bit [31:0] SRC_B = 32'h0001_5010;
+        localparam bit [31:0] DST = 32'h0001_5020;
         localparam bit [31:0] COMPLETION = CLUSTER_CONTRACT_CPLQ + 32'h100;
         bit [31:0] packed_a;
         bit [31:0] packed_b;
@@ -6673,9 +6686,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     task automatic run_scalar_gemv_abort_write_prefix(input int unsigned seed);
         localparam int unsigned ROWS = 16;
         localparam int unsigned K_WORDS = 64;
-        localparam bit [31:0] SRC_A = 32'h0006_d000;
-        localparam bit [31:0] SRC_B = 32'h0006_e000;
-        localparam bit [31:0] DST = 32'h0006_f000;
+        localparam bit [31:0] SRC_A = 32'h0001_d000;
+        localparam bit [31:0] SRC_B = 32'h0001_e000;
+        localparam bit [31:0] DST = 32'h0001_f000;
         localparam bit [31:0] COMPLETION = 32'h0000_5bc0;
         bit [31:0] write_addr[0:ROWS-1];
         bit [31:0] write_data[0:ROWS-1];
@@ -6849,9 +6862,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         // Keep the reset cut within the shared top SVA's 2,000-cycle
         // doorbell bound while still exercising a legal multi-word GEMV.
         localparam int unsigned K_WORDS = 2;
-        localparam bit [31:0] SRC_A = 32'h0006_d000;
-        localparam bit [31:0] SRC_B = 32'h0006_e000;
-        localparam bit [31:0] DST = 32'h0006_f400;
+        localparam bit [31:0] SRC_A = 32'h0001_d000;
+        localparam bit [31:0] SRC_B = 32'h0001_e000;
+        localparam bit [31:0] DST = 32'h0001_f400;
         localparam bit [31:0] COMPLETION = 32'h0000_5c40;
         bit [31:0] write_addr[0:ROWS-1];
         bit [31:0] write_data[0:ROWS-1];
@@ -7101,12 +7114,12 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
 
     task automatic run_scalar_cmdq_numeric_boundary_test(input int unsigned seed);
-        localparam bit [31:0] NUM_CMDQ = 32'h0005_b000;
-        localparam bit [31:0] NUM_CPLQ = 32'h0005_b400;
-        localparam bit [31:0] NUM_A = 32'h0007_2000;
-        localparam bit [31:0] NUM_B = 32'h0007_2100;
-        localparam bit [31:0] NUM_Y = 32'h0007_2200;
-        localparam bit [31:0] NUM_BIAS = 32'h0007_2300;
+        localparam bit [31:0] NUM_CMDQ = 32'h0001_b000;
+        localparam bit [31:0] NUM_CPLQ = 32'h0001_b400;
+        localparam bit [31:0] NUM_A = 32'h0001_2000;
+        localparam bit [31:0] NUM_B = 32'h0001_2100;
+        localparam bit [31:0] NUM_Y = 32'h0001_2200;
+        localparam bit [31:0] NUM_BIAS = 32'h0001_2300;
         bit [31:0] a_data[0:6];
         bit [31:0] b_data[0:6];
         bit [31:0] bias_data[0:6];
@@ -7313,11 +7326,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     endtask
 
     task automatic run_scalar_legacy_conv_cmdq_test(input int unsigned seed);
-        localparam bit [31:0] LEGACY_CMDQ = 32'h0005_c000;
-        localparam bit [31:0] LEGACY_CPLQ = 32'h0005_c100;
-        localparam bit [31:0] LEGACY_A = 32'h0007_3000;
-        localparam bit [31:0] LEGACY_B = 32'h0007_3400;
-        localparam bit [31:0] LEGACY_Y = 32'h0007_3800;
+        localparam bit [31:0] LEGACY_CMDQ = 32'h0001_c000;
+        localparam bit [31:0] LEGACY_CPLQ = 32'h0001_c100;
+        localparam bit [31:0] LEGACY_A = 32'h0001_3000;
+        localparam bit [31:0] LEGACY_B = 32'h0001_3400;
+        localparam bit [31:0] LEGACY_Y = 32'h0001_3800;
         localparam int unsigned OUTPUTS = 4;
         bit [7:0] opcode[0:2];
         bit [15:0] k_words[0:2];
@@ -7619,10 +7632,14 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             `uvm_fatal("CLUSTER_PARAM_LATCH", "scalar task did not become active before descriptor mutation")
 
         // The descriptor has been sampled and the scalar engine is active.
-        // Repointing its backing descriptor now must not change this task.
-        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h04, CONTRACT_B_LOCAL);
-        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h08, CONTRACT_B_LOCAL);
-        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h10, CONTRACT_MUTATED_Y_LOCAL);
+        // Mutate parity-consistently through the test backdoor: host-port
+        // writes are rejected while any scheduler-side SPAD request is live.
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h04,
+                                 CONTRACT_B_LOCAL, "Scalar src0");
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h08,
+                                 CONTRACT_B_LOCAL, "Scalar src1");
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h10,
+                                 CONTRACT_MUTATED_Y_LOCAL, "Scalar dst");
         wait_cpl_tail(32'd1);
         wait_spad_idle();
         expect_spad(CONTRACT_Y0_LOCAL, 32'd4480,
@@ -7644,6 +7661,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
     task automatic run_cnm_inflight_parameter_latch_test();
         int unsigned word_idx;
+        int unsigned k_idx;
+        int unsigned row_idx;
+        int unsigned lane;
         int unsigned poll;
         int unsigned launch_before;
         int unsigned overlap_cycles;
@@ -7656,6 +7676,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         bit cnm_done_seen;
         bit scalar_done_seen;
         bit [31:0] completion_base;
+        bit [31:0] packed_word;
         completion_base = CLUSTER_CONTRACT_CPLQ + 32'h500;
         overlap_cycles = 0;
         descriptor_write_cycles = 0;
@@ -7664,9 +7685,36 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         cnm_done_seen = 1'b0;
         scalar_done_seen = 1'b0;
 
-        // Reuse the already initialized C1 banked GEMV operands. Their four
-        // byte lanes have distinct signed values, so this independent Golden
-        // covers all four physical banks and all 64 K terms.
+        // The compact fixture reuses C1 source regions for later scalar and
+        // Matrix/CNM contention cases. Reinitialize the banked GEMV operands
+        // after those tasks have drained, before this independent Golden run.
+        for (k_idx = 0; k_idx < 64; k_idx++) begin
+            for (lane = 0; lane < 4; lane++) begin
+                case (lane)
+                    0: packed_word = 32'h0202_0202;
+                    1: packed_word = 32'h0303_0303;
+                    2: packed_word = 32'h0404_0404;
+                    default: packed_word = 32'h0505_0505;
+                endcase
+                spad_write(C1_CNM_A_LOCAL + (k_idx << 4) + (lane << 2),
+                           packed_word);
+            end
+            for (row_idx = 0; row_idx < 16; row_idx++) begin
+                for (lane = 0; lane < 4; lane++) begin
+                    case (lane)
+                        0: packed_word = 32'h0707_0707;
+                        1: packed_word = 32'h0b0b_0b0b;
+                        2: packed_word = 32'h0d0d_0d0d;
+                        default: packed_word = 32'h1111_1111;
+                    endcase
+                    spad_write(C1_CNM_B_LOCAL +
+                               (((row_idx * 64) + k_idx) << 4) + (lane << 2),
+                               packed_word);
+                end
+            end
+        end
+        // Distinct signed byte lanes exercise all four physical banks and
+        // all 64 K terms in the independent Golden.
         golden_sum = 0;
         for (word_idx = 0; word_idx < 64; word_idx++) begin
             for (int unsigned lane = 0; lane < 4; lane++) begin
@@ -7767,18 +7815,60 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     endtask
 
     task automatic run_matrix_inflight_parameter_latch_test(
-        input int signed expected_matrix[0:15][0:31]
+        input int signed expected_matrix[0:15][0:31],
+        input int signed matrix_a[0:15][0:63],
+        input int signed matrix_b[0:63][0:31]
     );
         int unsigned word_idx;
         int unsigned poll;
+        int unsigned tile_row;
+        int unsigned tile_col;
+        int unsigned k_word;
+        int unsigned row_lane;
+        int unsigned col_lane;
+        int unsigned k_lane;
+        int unsigned row_idx;
+        int unsigned col_idx;
+        int unsigned k_idx;
+        bit [31:0] packed_word;
         int unsigned launch_before;
         bit busy_seen;
         bit [31:0] completion_base;
         completion_base = CLUSTER_CONTRACT_CPLQ + 32'h300;
 
-        // The matrix operands and independent 16x32x64 Golden were prepared
-        // before the first GEMM in this sequence. Use disjoint destinations so
-        // this probe observes only the in-flight descriptor snapshot.
+        // Rebuild the exact launch operands because earlier tests reuse these
+        // compact SPAD regions. This isolates the in-flight snapshot check
+        // from fixture lifetimes while retaining the original input/GOLDEN.
+        for (tile_row = 0; tile_row < 4; tile_row++) begin
+            for (k_word = 0; k_word < 16; k_word++) begin
+                for (row_lane = 0; row_lane < 4; row_lane++) begin
+                    packed_word = '0;
+                    for (k_lane = 0; k_lane < 4; k_lane++) begin
+                        row_idx = tile_row * 4 + row_lane;
+                        k_idx = k_word * 4 + k_lane;
+                        packed_word[k_lane*8 +: 8] = matrix_a[row_idx][k_idx];
+                    end
+                    spad_write(MATRIX_A_LOCAL +
+                               ((tile_row * 16 + k_word) << 4) + (row_lane << 2),
+                               packed_word);
+                end
+            end
+        end
+        for (tile_col = 0; tile_col < 8; tile_col++) begin
+            for (k_word = 0; k_word < 16; k_word++) begin
+                for (col_lane = 0; col_lane < 4; col_lane++) begin
+                    packed_word = '0;
+                    for (k_lane = 0; k_lane < 4; k_lane++) begin
+                        col_idx = tile_col * 4 + col_lane;
+                        k_idx = k_word * 4 + k_lane;
+                        packed_word[k_lane*8 +: 8] = matrix_b[k_idx][col_idx];
+                    end
+                    spad_write(MATRIX_B_LOCAL +
+                               ((tile_col * 16 + k_word) << 4) + (col_lane << 2),
+                               packed_word);
+                end
+            end
+        end
         for (word_idx = 0; word_idx < 512; word_idx++) begin
             spad_write(MATRIX_LATCH_Y_LOCAL + (word_idx << 2),
                        32'hbad0_6a00 | word_idx);
@@ -7807,12 +7897,18 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         // Replace the backing descriptor with a different, otherwise legal
         // Matrix task while the original long GEMM is active. The accepted
         // task must keep its launch-time source, destination, shape and flags.
-        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h04, CONTRACT_B_LOCAL);
-        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h08, CONTRACT_SHARED_LOCAL);
-        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h10, MATRIX_LATCH_MUTATED_Y_LOCAL);
-        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h14, {16'd4, 16'd4});
-        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h18, 32'd4);
-        spad_write(CLUSTER_CONTRACT_CMDQ + 32'h1c, 32'h0000_0006);
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h04,
+                                 CONTRACT_B_LOCAL, "Matrix src0");
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h08,
+                                 CONTRACT_SHARED_LOCAL, "Matrix src1");
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h10,
+                                 MATRIX_LATCH_MUTATED_Y_LOCAL, "Matrix dst");
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h14,
+                                 {16'd4, 16'd4}, "Matrix shape");
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h18,
+                                 32'd4, "Matrix K");
+        backdoor_write_spad_word(CLUSTER_CONTRACT_CMDQ + 32'h1c,
+                                 32'h0000_0006, "Matrix flags");
 
         wait_cpl_tail(32'd1);
         wait_spad_idle();
@@ -8307,9 +8403,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         desc_base = CLUSTER_CONTRACT_CMDQ;
         completion_base = 32'h0000_5d00;
-        src = 32'h0004_d100;
-        weights = 32'h0004_d200;
-        dst = 32'h0004_d300;
+        src = 32'h0001_d100;
+        weights = 32'h0001_d200;
+        dst = 32'h0001_d300;
         sentinel = 32'hbad0_78f0;
         task_id = 16'h0771;
         accepted_write_count = 0;
@@ -8459,9 +8555,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         desc_base = CLUSTER_CONTRACT_CMDQ;
         completion_base = 32'h0000_5d40;
-        src = 32'h0004_d400;
-        weights = 32'h0004_d500;
-        dst = 32'h0004_d600;
+        src = 32'h0001_d400;
+        weights = 32'h0001_d500;
+        dst = 32'h0001_d600;
         sentinel = 32'hbad0_77c0;
         task_id = 16'h077a;
         recovery_task_id = 16'h077b;
@@ -8684,8 +8780,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         desc_base = CLUSTER_CONTRACT_CMDQ;
         completion_base = 32'h0000_5e00;
-        src = 32'h0004_d500;
-        dst = 32'h0004_d600;
+        src = 32'h0001_d500;
+        dst = 32'h0001_d600;
         // aux0={head=1,token=2}, token stride=16 B, head stride=64 B.
         cache_offset = (32'd2 * 32'd16) + (32'd1 * 32'd64);
         sentinel = 32'hbad0_7a00;
@@ -8836,11 +8932,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         desc_base = CLUSTER_CONTRACT_CMDQ;
         completion_base = 32'h0000_5e00;
-        src_a = 32'h0004_d400;
-        src_b = 32'h0004_d800;
+        src_a = 32'h0001_d400;
+        src_b = 32'h0001_d800;
         // Four-byte aligned but not 16-byte aligned: SPEC v1.5 requires the
         // Matrix 4-word output chunks to use ordered scalar writes.
-        dst = 32'h0004_dc04;
+        dst = 32'h0001_dc04;
         sentinel = 32'hbad0_7900;
         task_id = 16'h0772;
         accepted_write_count = 0;
@@ -9017,9 +9113,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         desc_base = CLUSTER_CONTRACT_CMDQ;
         completion_base = 32'h0000_5f00;
-        src_a = 32'h0004_e000;
-        src_b = 32'h0004_e400;
-        dst = 32'h0004_e800;
+        src_a = 32'h0001_e000;
+        src_b = 32'h0001_e400;
+        dst = 32'h0001_e800;
         sentinel = 32'hbad0_7a00;
         task_id = 16'h0773;
         accepted_line_count = 0;
@@ -9198,9 +9294,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         desc_base = CLUSTER_CONTRACT_CMDQ;
         completion_base = 32'h0000_5e80;
-        src_a = 32'h0004_e000;
-        src_b = 32'h0004_e100;
-        dst = 32'h0004_e800;
+        src_a = 32'h0001_e000;
+        src_b = 32'h0001_e100;
+        dst = 32'h0001_e800;
         sentinel = 32'hbad0_7a00;
         task_id = 16'h0774;
         accepted_write_count = 0;
@@ -9356,7 +9452,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         for (engine = 0; engine < 7; engine++) begin
             task_id = 16'h0700 + engine;
             completion_base = CLUSTER_CONTRACT_CPLQ + 32'h400 + (engine * 32'h10);
-            reset_dst = 32'h0003_3000 + (engine * 32'h100);
+            reset_dst = 32'h0001_3000 + (engine * 32'h100);
             sentinel = 32'hbad0_7000 + engine;
             spad_write(reset_dst, sentinel);
             for (poll = 0; poll < 4; poll++)
@@ -9594,7 +9690,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         // command ring base; keep each case in that actual ring slot.
         desc_addr = CLUSTER_CONTRACT_CMDQ;
         cpl_addr = 32'h0000_9000 + (slot * 32'h10);
-        dst = 32'h0003_d000 + (slot * 32'h100);
+        dst = 32'h0001_d000 + (slot * 32'h100);
         task_id = 16'h07f0 + slot;
 
         prepare_engine_parity_reset_case(engine, operand_b, task_id,
@@ -9781,7 +9877,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         cpl_base = CLUSTER_CONTRACT_CPLQ + 32'h900;
         matrix_a = MATRIX_FAULT_A_LOCAL;
         matrix_b = MATRIX_FAULT_B_LOCAL;
-        matrix_dst = 32'h0003_c000;
+        matrix_dst = 32'h0001_c000;
         sentinel = 32'hbad0_7e40;
         accepted_fault_read = 1'b0;
 
@@ -9991,7 +10087,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         cpl_base = CLUSTER_CONTRACT_CPLQ + 32'ha00;
         matrix_a = MATRIX_FAULT_A_LOCAL;
         matrix_b = MATRIX_FAULT_B_LOCAL;
-        matrix_dst = 32'h0003_d000;
+        matrix_dst = 32'h0001_d000;
         sentinel = 32'hbad0_7e80;
         accepted_a_reads = 0;
         source_b_denied = 1'b0;
@@ -10176,7 +10272,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         cpl_base = CLUSTER_CONTRACT_CPLQ + 32'hb00;
         matrix_a = MATRIX_FAULT_A_LOCAL;
         matrix_b = MATRIX_FAULT_B_LOCAL;
-        matrix_dst = 32'h0003_d400;
+        matrix_dst = 32'h0001_d400;
         cnm_dst = MATRIX_LINE_STALL_CNM_Y_LOCAL;
         sentinel = 32'hbad0_7ea0;
         accepted_a_reads = 0;
@@ -10504,7 +10600,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         desc_addr = CLUSTER_CONTRACT_CMDQ;
         cpl_addr = 32'h0000_9000 + (slot * 32'h10);
-        dst = 32'h0003_d000 + (slot * 32'h100);
+        // Protection/reset cases use slots 32..43. Keep their destinations
+        // in the compact aperture and away from Matrix fault source-A/B.
+        dst = 32'h0000_d000 + (slot * 32'h100);
         task_id = 16'h0840 + engine;
         denied_seen = 1'b0;
         protection_error_seen = 1'b0;
@@ -10529,6 +10627,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             default: begin end
         endcase
         expected_engine_error_code = ((engine == 5) || (engine == 6)) ? 4'd7 : 4'd6;
+        `uvm_info("CLUSTER_ENGINE_PROTECTION_RESET_CASE", $sformatf(
+            "engine=%0d operand=%s slot=%0d dst=[0x%08h,0x%08h) permitted_operand=0x%08h",
+            engine, operand_b ? "B" : "A", slot, dst, dst + 32'h40,
+            permitted_operand), UVM_LOW)
 
         prepare_engine_parity_reset_case(engine, operand_b, task_id,
                                          desc_addr, dst, fault_addr);
@@ -10800,28 +10902,30 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         // Give every long-running engine fully initialized legal operands so
         // the independent memory scoreboard can check all accepted reads.
         for (word_idx = 0; word_idx < 64; word_idx++) begin
-            spad_write(32'h0004_a800 + (word_idx << 2), 32'h0102_0304 + word_idx);
-            spad_write(32'h0004_a900 + (word_idx << 2), 32'h0506_0708 + word_idx);
-            spad_write(32'h0004_aa00 + (word_idx << 2), 32'h1111_1111 * (word_idx + 1));
-            spad_write(32'h0004_b000 + (word_idx << 2), 32'd0);
-            spad_write(32'h0004_b100 + (word_idx << 2), word_idx + 1);
-            spad_write(32'h0004_b700 + (word_idx << 2), (word_idx + 1) * 32'h100);
+            spad_write(32'h0001_a800 + (word_idx << 2), 32'h0102_0304 + word_idx);
+            spad_write(32'h0001_a900 + (word_idx << 2), 32'h0506_0708 + word_idx);
+            spad_write(32'h0001_aa00 + (word_idx << 2), 32'h1111_1111 * (word_idx + 1));
+            spad_write(32'h0001_b000 + (word_idx << 2), 32'd0);
+            spad_write(32'h0001_b100 + (word_idx << 2), word_idx + 1);
+            spad_write(32'h0001_b700 + (word_idx << 2), (word_idx + 1) * 32'h100);
         end
         for (word_idx = 64; word_idx < 256; word_idx++)
-            spad_write(32'h0004_b100 + (word_idx << 2), word_idx + 1);
+            spad_write(32'h0001_b100 + (word_idx << 2), word_idx + 1);
         for (word_idx = 0; word_idx < 256; word_idx++)
-            spad_write(32'h0004_ab00 + (word_idx << 2),
+            spad_write(32'h0001_ab00 + (word_idx << 2),
                        32'h0101_0101 * ((word_idx % 15) + 1));
         for (word_idx = 0; word_idx < 9; word_idx++)
-            spad_write(32'h0004_b600 + (word_idx << 2), 32'd1);
+            spad_write(32'h0001_b600 + (word_idx << 2), 32'd1);
 
         for (abort_case = 0; abort_case < 8; abort_case++) begin
             engine = (abort_case == 7) ? 1 : abort_case;
             task_id = 16'h0760 + abort_case;
             completion_base = 32'h0000_5c00;
-            abort_dst = 32'h0003_a000 + (engine * 32'h1000);
-            abort_src0 = 32'h0004_a800;
-            abort_src1 = 32'h0004_a900;
+            // Engines are aborted one at a time; use compact, non-overlapping
+            // per-engine sentinels inside the 128 KiB SPAD aperture.
+            abort_dst = 32'h0000_e000 + (engine * 32'h100);
+            abort_src0 = 32'h0001_a800;
+            abort_src1 = 32'h0001_a900;
             for (word_idx = 0; word_idx < 8; word_idx++)
                 spad_write(abort_dst + (word_idx << 2),
                            32'hbad0_7600 | (engine << 8) | word_idx);
@@ -10841,21 +10945,21 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                        32'd0, 32'd0, 32'd0, 8'd7);
                 2: begin
                     write_cnm_v3_desc(desc_base, task_id,
-                        32'h0004_aa00, 32'h0004_ab00, abort_dst);
+                        32'h0001_aa00, 32'h0001_ab00, abort_dst);
                     spad_write(desc_base + 32'h18, 32'd64);
                 end
                 3: write_v3_desc(desc_base, 8'h30, task_id,
                        MATRIX_A_LOCAL, MATRIX_B_LOCAL, abort_dst,
                        16'd16, 16'd32, 16'd16);
                 4: write_v3_desc(desc_base, 8'h35, task_id,
-                       32'h0004_b000, 32'd0, abort_dst,
+                       32'h0001_b000, 32'd0, abort_dst,
                        16'd0, 16'd0, 16'd64);
                 5: write_cluster_desc(desc_base, 8'h16, task_id,
-                       32'h0004_b100, 32'h0004_b600, abort_dst,
+                       32'h0001_b100, 32'h0001_b600, abort_dst,
                        16'd16, 16'd16, 16'd9, 32'd0,
                        32'd0, 32'd0, 32'd0, 8'd5);
                 6: write_cluster_desc(desc_base, 8'h43, task_id,
-                       32'h0004_b700, 32'd0, abort_dst,
+                       32'h0001_b700, 32'd0, abort_dst,
                        16'd0, 16'd0, 16'd64, {16'd1,16'd1},
                        32'd16, 32'd64, 32'd0, 8'd5);
                 default: `uvm_fatal("CLUSTER_ENGINE_ABORT", "invalid engine index")
@@ -11050,7 +11154,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         desc_base = CLUSTER_CONTRACT_CMDQ;
         completion_base = 32'h0000_5c80;
-        dst = 32'h0004_c000;
+        dst = 32'h0001_c000;
         sentinel = 32'hbad0_77f0;
         task_id = 16'h0770;
         accepted_write_count = 0;
@@ -11191,7 +11295,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
 
         desc_base = CLUSTER_CONTRACT_CMDQ;
         completion_base = 32'h0000_5ca0;
-        dst = 32'h0004_c100;
+        dst = 32'h0001_c100;
         sentinel = 32'hbad0_77a0;
         task_id = 16'h0778;
         recovery_task_id = 16'h0779;
@@ -11400,9 +11504,9 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         bit busy_at_write;
         bit reset_ok;
 
-        src0 = 32'h0006_8800;
-        src1 = 32'h0006_8900;
-        dst = 32'h0006_8a00;
+        src0 = 32'h0001_8800;
+        src1 = 32'h0001_8900;
+        dst = 32'h0001_8a00;
         completion_base = 32'h0000_5f80;
         sentinel = 32'hbad0_7fc0;
         task_id = 16'h077c;
@@ -11774,6 +11878,13 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         int unsigned cnm_byte;
         int signed cnm_a_value;
         int signed cnm_b_value;
+        int unsigned trace_lane;
+        bit line_trace_done;
+        int unsigned line_trace_q_head[0:3];
+        int unsigned line_trace_q_tail[0:3];
+        int unsigned line_trace_q_count[0:3];
+        bit line_trace_q_access_ok[0:3][0:3];
+        bit [31:0] line_trace_q_addr[0:3][0:3];
         int unsigned matrix_line_stall_checks_before;
         int unsigned matrix_line_stall_violations_before;
         bit [17:0] fault_cases_seen;
@@ -12136,8 +12247,28 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                     spad_write(MATRIX_LINE_STALL_CNM_B_LOCAL +
                                ((row_idx * 32 + k_word) << 4) +
                                (cnm_lane << 2), packed_word);
+                    if (row_idx == 8)
+                        `uvm_info("CNM_LINE_TRACE", $sformatf(
+                            "HOST_INIT_ACCEPT cycle=%0d addr=0x%08h data=0x%08h row=8 k=%0d lane=%0d parity=0 protection=0",
+                            compute_vif.sim_cycles,
+                            MATRIX_LINE_STALL_CNM_B_LOCAL +
+                                ((row_idx * 32 + k_word) << 4) +
+                                (cnm_lane << 2), packed_word, k_word,
+                            cnm_lane), UVM_LOW)
                 end
             end
+        end
+
+        // Snapshot row 8, K=0 before any engine is dispatched. Its first
+        // packed B word must survive the concurrent CNM output writeback.
+        for (trace_lane = 0; trace_lane < 4; trace_lane++) begin
+            packed_word = '0;
+            for (cnm_byte = 0; cnm_byte < 4; cnm_byte++)
+                packed_word[cnm_byte*8 +: 8] = trace_lane + cnm_byte;
+            expect_spad(MATRIX_LINE_STALL_CNM_B_LOCAL + 32'h1000 +
+                        (trace_lane << 2), packed_word,
+                        $sformatf("CNM row8 K0 pre-dispatch lane%0d",
+                                  trace_lane));
         end
 
         write_v3_desc(CMDQ_LOCAL + 32'h180, 8'h30, 16'h0710,
@@ -12164,10 +12295,106 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         matrix_profile_read_bytes_start = compute_vif.matrix_spad_read_bytes;
         matrix_profile_write_bytes_start = compute_vif.matrix_spad_write_bytes;
         parallel_start_cycle = compute_vif.sim_cycles;
-        axil_write(REG_DOORBELL, 32'd1);
-        wait_cpl_tail(32'd2);
+        line_trace_done = 1'b0;
+        for (trace_lane = 0; trace_lane < 4; trace_lane++) begin
+            line_trace_q_head[trace_lane] = 0;
+            line_trace_q_tail[trace_lane] = 0;
+            line_trace_q_count[trace_lane] = 0;
+        end
+        fork
+            begin : line_stall_transaction_trace
+                while (!line_trace_done) begin
+                    @(posedge compute_vif.aclk);
+                    for (trace_lane = 0; trace_lane < 4; trace_lane++) begin
+                        if (compute_vif.cnm_rsp_valid[trace_lane]) begin
+                            if ((line_trace_q_count[trace_lane] == 0) ||
+                                (compute_vif.rsp_client != 3'd5))
+                                `uvm_fatal("CNM_LINE_TRACE", $sformatf(
+                                    "unmatched/wrong-owner CNM response cycle=%0d lane=%0d queued=%0d owner=%0d",
+                                    compute_vif.sim_cycles, trace_lane,
+                                    line_trace_q_count[trace_lane],
+                                    compute_vif.rsp_client))
+                            `uvm_info("CNM_LINE_TRACE", $sformatf(
+                                "RESPONSE cycle=%0d tag=5 lane=%0d addr=0x%08h data=0x%08h protection_ok=%0b response_error=%0b parity_error=%0b",
+                                compute_vif.sim_cycles, trace_lane,
+                                line_trace_q_addr[trace_lane][line_trace_q_head[trace_lane]],
+                                compute_vif.cnm_rdata[trace_lane],
+                                line_trace_q_access_ok[trace_lane][line_trace_q_head[trace_lane]],
+                                compute_vif.selected_rsp_error,
+                                compute_vif.engine_parity_rsp_error[2]), UVM_LOW)
+                            line_trace_q_head[trace_lane] =
+                                (line_trace_q_head[trace_lane] + 1) % 4;
+                            line_trace_q_count[trace_lane]--;
+                        end
+                    end
+                    for (trace_lane = 0; trace_lane < 4; trace_lane++) begin
+                        if (compute_vif.cnm_accept_mask[trace_lane]) begin
+                            if (line_trace_q_count[trace_lane] >= 4)
+                                `uvm_fatal("CNM_LINE_TRACE", $sformatf(
+                                    "per-lane request/response trace FIFO overflow cycle=%0d lane=%0d addr=0x%08h",
+                                    compute_vif.sim_cycles, trace_lane,
+                                    compute_vif.cnm_req_addr[trace_lane]))
+                            line_trace_q_addr[trace_lane][line_trace_q_tail[trace_lane]] =
+                                compute_vif.cnm_req_addr[trace_lane];
+                            line_trace_q_access_ok[trace_lane][line_trace_q_tail[trace_lane]] =
+                                compute_vif.selected_cnm_access_ok[trace_lane];
+                            line_trace_q_tail[trace_lane] =
+                                (line_trace_q_tail[trace_lane] + 1) % 4;
+                            line_trace_q_count[trace_lane]++;
+                            `uvm_info("CNM_LINE_TRACE", $sformatf(
+                                "ACCEPT cycle=%0d tag=5 lane=%0d addr=0x%08h protection_ok=%0b matrix_line_stalled=%0b",
+                                compute_vif.sim_cycles, trace_lane,
+                                compute_vif.cnm_req_addr[trace_lane],
+                                compute_vif.selected_cnm_access_ok[trace_lane],
+                                compute_vif.matrix_line_valid &&
+                                    !compute_vif.matrix_line_ready), UVM_LOW)
+                        end
+                    end
+                    if (compute_vif.matrix_line_valid) begin
+                        if (compute_vif.matrix_line_ready)
+                            `uvm_info("CNM_LINE_TRACE", $sformatf(
+                                "MATRIX_LINE_ACCEPT cycle=%0d addr=0x%08h data=0x%032h wstrb=0x%04h protection_ok=%0b",
+                                compute_vif.sim_cycles,
+                                compute_vif.matrix_line_addr,
+                                compute_vif.matrix_line_wdata,
+                                compute_vif.matrix_line_wstrb,
+                                compute_vif.selected_line_access_ok), UVM_LOW)
+                        else
+                            `uvm_info("CNM_LINE_TRACE", $sformatf(
+                                "MATRIX_LINE_STALL cycle=%0d addr=0x%08h data=0x%032h wstrb=0x%04h",
+                                compute_vif.sim_cycles,
+                                compute_vif.matrix_line_addr,
+                                compute_vif.matrix_line_wdata,
+                                compute_vif.matrix_line_wstrb), UVM_LOW)
+                    end
+                    if (compute_vif.selected_spad_valid &&
+                        compute_vif.selected_spad_ready &&
+                        compute_vif.selected_spad_write &&
+                        (compute_vif.selected_spad_addr >=
+                         MATRIX_LINE_STALL_CNM_Y_LOCAL) &&
+                        (compute_vif.selected_spad_addr <
+                         MATRIX_LINE_STALL_CNM_Y_LOCAL + 32'h40))
+                        `uvm_info("CNM_LINE_TRACE", $sformatf(
+                            "CNM_OUTPUT_ACCEPT cycle=%0d addr=0x%08h data=0x%08h wstrb=0x1 protection_ok=%0b",
+                            compute_vif.sim_cycles,
+                            compute_vif.selected_spad_addr,
+                            compute_vif.selected_spad_wdata,
+                            compute_vif.selected_spad_access_ok), UVM_LOW)
+                end
+            end
+            begin : line_stall_submit_and_drain
+                axil_write(REG_DOORBELL, 32'd1);
+                wait_cpl_tail(32'd2);
+                wait_spad_idle();
+                line_trace_done = 1'b1;
+            end
+        join
+        for (trace_lane = 0; trace_lane < 4; trace_lane++)
+            if (line_trace_q_count[trace_lane] != 0)
+                `uvm_fatal("CNM_LINE_TRACE", $sformatf(
+                    "unreturned requests remain after SPAD drain lane=%0d queued=%0d",
+                    trace_lane, line_trace_q_count[trace_lane]))
         parallel_cycles = compute_vif.sim_cycles - parallel_start_cycle;
-        wait_spad_idle();
         emit_matrix_profile("line_stall_matrix_cnm", seed, "16x32x64",
                             parallel_cycles,
                             matrix_profile_read_bytes_start,
@@ -12188,6 +12415,15 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             expect_spad(MATRIX_LINE_STALL_CNM_Y_LOCAL + (row_idx << 2),
                         line_stall_cnm_golden[row_idx],
                         $sformatf("line-stalled CNM Golden[%0d]", row_idx));
+        for (trace_lane = 0; trace_lane < 4; trace_lane++) begin
+            packed_word = '0;
+            for (cnm_byte = 0; cnm_byte < 4; cnm_byte++)
+                packed_word[cnm_byte*8 +: 8] = trace_lane + cnm_byte;
+            expect_spad(MATRIX_LINE_STALL_CNM_B_LOCAL + 32'h1000 +
+                        (trace_lane << 2), packed_word,
+                        $sformatf("CNM row8 K0 post-dispatch lane%0d",
+                                  trace_lane));
+        end
         expect_completion(CPLQ_LOCAL + 32'h180, 16'h0710,
                           matrix_golden[15][31], 32'd512,
                           "line-stalled Matrix");
@@ -12767,12 +13003,12 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         // Abort two real in-flight engines after their overlap is observed.
         // Sentinels prove the Matrix tile has not started writeback at abort.
         for (word_idx = 0; word_idx < 4; word_idx++)
-            spad_write(32'h0003_1000 + (word_idx << 2), 32'hbad0_0600 + word_idx);
+            spad_write(32'h0001_1000 + (word_idx << 2), 32'hbad0_0600 + word_idx);
         write_v3_desc(CMDQ_LOCAL + 32'h100, 8'h30, 16'h0610,
-                      MATRIX_A_LOCAL, MATRIX_B_LOCAL, 32'h0003_1000,
+                      MATRIX_A_LOCAL, MATRIX_B_LOCAL, 32'h0001_1000,
                       16'd16, 16'd16, 16'd16);
         write_v3_desc(CMDQ_LOCAL + 32'h140, 8'h35, 16'h0611,
-                      GELU_A_LOCAL, 32'd0, 32'h0003_1100,
+                      GELU_A_LOCAL, 32'd0, 32'h0001_1100,
                       16'd0, 16'd0, 16'd1024);
         axil_write(REG_CMDQ_BASE, CMDQ_LOCAL + 32'h100);
         axil_write(REG_CMDQ_SIZE, 32'd4);
@@ -12797,7 +13033,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         expect_spad(CPLQ_LOCAL + 32'h110, 32'h0000_0611, "abort SFU task ID");
         expect_spad(CPLQ_LOCAL + 32'h114, 32'h0000_0032, "abort SFU status/code");
         for (word_idx = 0; word_idx < 4; word_idx++)
-            expect_spad(32'h0003_1000 + (word_idx << 2), 32'hbad0_0600 + word_idx,
+            expect_spad(32'h0001_1000 + (word_idx << 2), 32'hbad0_0600 + word_idx,
                         $sformatf("abort Matrix no-writeback[%0d]", word_idx));
         if (compute_vif.engine_busy != 0)
             `uvm_fatal("CLUSTER_ABORT", $sformatf("abort completion published with engine_busy=%07b", compute_vif.engine_busy))
@@ -12809,12 +13045,12 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         // contents are retained across accelerator reset; the command and
         // completion lifecycle state must be cleared without stale writeback.
         for (word_idx = 0; word_idx < 4; word_idx++)
-            spad_write(32'h0003_2000 + (word_idx << 2), 32'hbad0_0620 + word_idx);
+            spad_write(32'h0001_2000 + (word_idx << 2), 32'hbad0_0620 + word_idx);
         write_v3_desc(CMDQ_LOCAL + 32'h200, 8'h30, 16'h0620,
-                      MATRIX_A_LOCAL, MATRIX_B_LOCAL, 32'h0003_2000,
+                      MATRIX_A_LOCAL, MATRIX_B_LOCAL, 32'h0001_2000,
                       16'd16, 16'd16, 16'd16);
         write_v3_desc(CMDQ_LOCAL + 32'h240, 8'h35, 16'h0621,
-                      GELU_A_LOCAL, 32'd0, 32'h0003_2100,
+                      GELU_A_LOCAL, 32'd0, 32'h0001_2100,
                       16'd0, 16'd0, 16'd1024);
         axil_write(REG_CMDQ_BASE, CMDQ_LOCAL + 32'h200);
         axil_write(REG_CMDQ_SIZE, 32'd4);
@@ -12846,7 +13082,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         if (value !== 32'd0)
             `uvm_fatal("CLUSTER_RESET", $sformatf("stale completion tail after reset: %0d", value))
         for (word_idx = 0; word_idx < 4; word_idx++)
-            expect_spad(32'h0003_2000 + (word_idx << 2), 32'hbad0_0620 + word_idx,
+            expect_spad(32'h0001_2000 + (word_idx << 2), 32'hbad0_0620 + word_idx,
                         $sformatf("reset Matrix no-writeback[%0d]", word_idx));
 
         // Prove the real cluster and queue path recover after reset by
@@ -12901,7 +13137,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         run_cnm_inflight_parameter_latch_test();
         run_launch_snapshot_and_unused_fields_test();
         run_inflight_parameter_latch_test();
-        run_matrix_inflight_parameter_latch_test(matrix_golden);
+        run_matrix_inflight_parameter_latch_test(matrix_golden, matrix_a,
+                                                  matrix_b);
         run_sfu_inflight_parameter_latch_test();
         run_fp_inflight_parameter_latch_test();
         run_conv_inflight_parameter_latch_test();

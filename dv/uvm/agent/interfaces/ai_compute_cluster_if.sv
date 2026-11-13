@@ -61,6 +61,7 @@ interface ai_compute_cluster_if(input logic aclk);
     logic dma_line_valid, dma_line_write, dma_line_ready;
     logic matrix_prefetch_active;
     logic matrix_response_fault;
+    logic matrix_parity_trace_enable;
     logic matrix_a_cache_hit;
     logic [31:0] matrix_a_cache_hits;
     logic [31:0] matrix_prefetch_overlap_cycles;
@@ -197,6 +198,7 @@ interface ai_compute_cluster_if(input logic aclk);
         matrix_banked_stall_checks = 0;
         matrix_banked_stall_violations = 0;
         matrix_banked_fault_cancel_checks = 0;
+        matrix_parity_trace_enable = 1'b0;
         matrix_banked_stalled_previous = 1'b0;
         matrix_cnm_collision_hold_checks = 0;
         matrix_cnm_collision_stability_violations = 0;
@@ -326,6 +328,26 @@ interface ai_compute_cluster_if(input logic aclk);
                             dut_abort_active);
                     matrix_banked_stall_violations++;
                 end
+            end
+            if (matrix_response_fault) begin
+                $display("[MATRIX_PARITY_RESPONSE_TRACE] cycle=%0d rsp_valid=%b rsp_owner=%0d previous_held=%b previous_addr=%08h current_req_valid=%b current_ready=%b current_addr=%08h engine_parity=%b abort=%b",
+                    sim_cycles, rsp_valid, rsp_client,
+                    matrix_banked_stalled_previous, matrix_banked_addr_previous,
+                    matrix_request_valid, banked_ready,
+                    matrix_banked_req_addr, engine_parity_rsp_error,
+                    dut_abort_active);
+            end
+            if (matrix_parity_trace_enable &&
+                (matrix_request_valid || (|cnm_request_valid) ||
+                 (rsp_valid && ((rsp_client == 3'd3) ||
+                                (rsp_client == 3'd5))))) begin
+                $display("[MATRIX_PARITY_XACT_TRACE] cycle=%0d matrix_req=%b/%b addr=%08h cnm_req=%b cnm_ready=%b cnm_addr={%08h,%08h,%08h,%08h} rsp=%b owner=%0d rdata=%08h parity=%b fault=%b",
+                    sim_cycles, matrix_request_valid, banked_ready,
+                    matrix_banked_req_addr, cnm_request_valid,
+                    cnm_request_ready, cnm_req_addr[3], cnm_req_addr[2],
+                    cnm_req_addr[1], cnm_req_addr[0], rsp_valid,
+                    rsp_client, selected_rsp_rdata,
+                    engine_parity_rsp_error, matrix_response_fault);
             end
             matrix_banked_stalled_previous = matrix_request_valid && !banked_ready;
             if (matrix_banked_stalled_previous)
