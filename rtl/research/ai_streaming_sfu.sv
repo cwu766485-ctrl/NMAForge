@@ -25,7 +25,10 @@ module ai_streaming_sfu (
     assign out_error = error_r;
     always_comb begin
         sum_w = $signed(in_a) + $signed(in_b);
-        shifted_w = sum_w >>> shift;
+        // REQUANT is unary in the product SFU contract; only RESIDUAL
+        // consumes the second operand. Keeping this explicit prevents stale
+        // B data from changing a standalone requant result.
+        shifted_w = ((op_mode == OP_REQUANT) ? $signed(in_a) : sum_w) >>> shift;
         if (shifted_w > 33'sd127) requant_w = 32'sd127;
         else if (shifted_w < -33'sd128) requant_w = -32'sd128;
         else requant_w = shifted_w[31:0];
