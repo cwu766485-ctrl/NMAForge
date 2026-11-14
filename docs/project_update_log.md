@@ -1,5 +1,9 @@
 # Project update log
 
+## NMAForge v2.0 Round 2 — 2026-11-14
+
+Corrected GPT-2-compatible reference on the PR #8 baseline: true Pre-LN FP32 and independent INT8 fixed-point references now pass, with 62-node H64 graph metadata; all H64 nodes remain BLOCKED/RTL NOT_RUN because current descriptor legality and ownership contracts do not support a legal lowering. Added registered-SPAD SVSE product adapter and fixed unary Requant stale-operand behavior. DAMS/SVSE standalone remains `DAMS_SVSE_PASS accepted=3 denied=1`; product arithmetic adapter is `SVSE_PRODUCT_ADAPTER_PASS residual=140 requant=127`. Real Top/Dispatcher integration is explicitly `BLOCKED_BY_CONTROL_CONTRACT`. See `docs/research/NMAFORGE_V2_ROUND2_STATUS.md`.
+
 ## NMAForge v2.0 Round 2 Gate 3/4 adapter — 2026-11-14
 
 On research branch `research/nmaforge-v2-round2-dams` (product baseline `0492c47d`, research baseline `2d85b11e`), added a one-element registered-SPAD adapter for the SVSE prototype and a product arithmetic comparison test. VCS passed `DAMS_SVSE_PASS accepted=3 denied=1` and `SVSE_PRODUCT_ADAPTER_PASS residual=140 requant=127`; Requant was corrected to unary operand-A semantics after the first adapter run exposed stale operand-B use. Top/Dispatcher integration remains `BLOCKED_BY_CONTROL_CONTRACT` because the product command ID, completion, protection ownership and sole compute-SPAD mux contracts are not connected to the research adapter. No product RTL or ABI changed. See `docs/research/ROUND2_DAMS_SVSE_PRODUCT_ADAPTER.md`.

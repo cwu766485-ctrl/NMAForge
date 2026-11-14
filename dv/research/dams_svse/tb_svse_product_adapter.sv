@@ -8,7 +8,7 @@ module tb_svse_product_adapter;
     .softmax_delta_q8_8(0), .requant_value(32'sd4096), .requant_shift(5'd5),
     .residual_x(32'sd120), .residual_y(32'sd20), .residual_shift(5'd0),
     .gamma_x(0), .gamma(0), .norm_x(0), .norm_inv_rms(0), .norm_beta(0),
-    .norm_add_beta(0), .gelu_product(0), .silu_product(0),
+    .norm_add_beta(1'b0), .gelu_product(64'd0), .silu_product(64'd0),
     .softmax_exp_q15(), .requant_i8_value(product_requant),
     .residual_value(product_residual), .gamma_scaled_value(),
     .normalization_value(), .gelu_q8_8_value(), .silu_q8_8_value());
