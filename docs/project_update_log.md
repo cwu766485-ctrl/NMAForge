@@ -1,5 +1,9 @@
 # Project update log
 
+## NMAForge v2.0 Gate 0-2 — 2026-11-14
+
+Research baseline fixed to PR #8 candidate `0492c47d12cd11bcc22be1930da7af77ed870b6e` in isolated branch `research/nmaforge-v2-product-baseline`. The existing Top Transformer fixture passed with 86 descriptors and full intermediate/KV/completion checks; the existing H16 incremental path passed four decode stages with independent Golden comparison and average 8,183.50 simulated cycles/token. New Gate 1 tooling generated the requested 4-layer/Hidden-64/4-head/FFN-256/vocabulary-256/context-16 deterministic INT8 fixture and 41-node lowering plan; Golden passed, but the fixture is explicitly pseudo-weight and RTL execution is NOT_RUN. New Gate 2 DAMS/SVSE synthesizable research prototypes passed an independent VCS testbench (`DAMS_SVSE_PASS accepted=3 denied=1`) without product ABI integration. See `docs/research/NMAFORGE_V2_GATE0_BASELINE.md` and `docs/research/NMAFORGE_V2_GATE1_GATE2_STATUS.md`. Reproduction uses VCS `V-2023.12-SP1_Full64`, Python environment `/tmp/nmaforge_round10_venv`, and the commands in those reports. No product branch or PR was merged.
+
 ## Round 27 — incomplete session
 
 Prepared historical baseline extracts and an incomplete review at `docs/benchmark/NMAFORGE_V2_ROUND27_ARCHITECTURE_FREEZE_REVIEW.md`. Withdrew unsupported LayerNorm phase allocations; phases remain unmeasured. Corrected large GEMM historical read traffic to 6,144 B. No RTL experiment, simulation, synthesis, freeze decision, commit or push completed. Historical extraction uses `git show 800c5b0:<artifact-path>`. Git metadata writes failed with read-only `.git/index.lock`; escalation was aborted.
