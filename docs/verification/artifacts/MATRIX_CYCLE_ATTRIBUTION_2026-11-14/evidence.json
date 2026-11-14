@@ -1,0 +1,283 @@
+{
+  "base_source_hashes": {
+    "rtl/compute/matrix/ai_tensor_matrix_array.sv": "83d8e6b170fe3645207ecfd2a82d7290f36a8d8114e4d940bbeb8f94f790594d",
+    "rtl/compute/matrix/ai_tensor_matrix_core.v": "3eeb8809ba79dd4a375b7aa0d58a7ecca37591bb7405afc57d2ee94c1c94a38a",
+    "rtl/compute/matrix/ai_tensor_matrix_datapath.v": "c7fc6ab36d39df0f4890dec11c3c39265a0b8efec79ce4806560d96a2fe5aac9"
+  },
+  "behavior_contract": "transaction_level",
+  "candidate_id": "baseline",
+  "elapsed_sec": 14.430263,
+  "finished_at": 1794624803.043798,
+  "mode": "baseline",
+  "plan_sha256": "2b436550bcf7cc99ff957ddd9a412b0337a736e47df85585db9277ca7376e0a5",
+  "project": "NMAForge-Matrix-Compute-Tile-Profile",
+  "read_only_asset_hashes": {},
+  "seed": 20261113,
+  "source_contract": {
+    "behavior_contract": "transaction_level",
+    "design_top": "ai_tensor_matrix_core",
+    "rtl_sources": [
+      "rtl/compute/matrix/ai_tensor_matrix_datapath.v",
+      "rtl/compute/matrix/ai_tensor_matrix_array.sv",
+      "rtl/compute/matrix/ai_tensor_matrix_core.v"
+    ],
+    "testbench_sources": [
+      "dv/block/compute/matrix/tb/tb_ai_tensor_matrix_core_random.sv"
+    ],
+    "testbench_top": "tb_ai_tensor_matrix_core_random"
+  },
+  "source_hashes": {
+    "dv/block/compute/matrix/tb/tb_ai_tensor_matrix_core_random.sv": "dc161fbfd737ce84c8acd2887f3ac9e5d501664b075bc28946f39e1fb1120c7e",
+    "rtl/compute/matrix/ai_tensor_matrix_array.sv": "83d8e6b170fe3645207ecfd2a82d7290f36a8d8114e4d940bbeb8f94f790594d",
+    "rtl/compute/matrix/ai_tensor_matrix_core.v": "3eeb8809ba79dd4a375b7aa0d58a7ecca37591bb7405afc57d2ee94c1c94a38a",
+    "rtl/compute/matrix/ai_tensor_matrix_datapath.v": "c7fc6ab36d39df0f4890dec11c3c39265a0b8efec79ce4806560d96a2fe5aac9"
+  },
+  "source_revision": "4b62f8e815bb272ab9b727dff4736cec460e6f21",
+  "stages": [
+    {
+      "adapter_id": "nmaforge.matrix.simulation_performance.regression.v1",
+      "adapter_supported": true,
+      "artifact_manifest": [
+        {
+          "exists": true,
+          "kind": "file",
+          "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/regression/regression-summary.json",
+          "sha256": "739132dae2f883c1e03f6eacfa999b9065e513627b3de95aff289303eca3edff",
+          "size_bytes": 157
+        },
+        {
+          "exists": true,
+          "kind": "file",
+          "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/regression/regression-summary.json",
+          "sha256": "739132dae2f883c1e03f6eacfa999b9065e513627b3de95aff289303eca3edff",
+          "size_bytes": 157
+        },
+        {
+          "kind": "file",
+          "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/regression/stage-result.json",
+          "sha256": "f63d953d212d92e21aa74693ad714bf97f3c5658681dc8d74c7cfd2978888f43",
+          "size_bytes": 280
+        }
+      ],
+      "campaign_id": "baseline",
+      "campaign_mode": "baseline",
+      "command": [
+        "python3.12",
+        "/home/ray/workspace/AI-IC-Design-Verification-Flow-upload/skills/rtl-ppa-optimization/scripts/nmaforge_matrix_sim_adapter.py",
+        "regression",
+        "/tmp/nmaforge_m3_profile_stagecampaign/baseline/source",
+        "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/regression",
+        "20261113",
+        "200000"
+      ],
+      "cwd": null,
+      "elapsed_sec": 6.820168,
+      "log": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/regression/command.log",
+      "metric_provenance": {},
+      "metrics": {},
+      "reason": null,
+      "result_json": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/regression/stage-result.json",
+      "return_code": 0,
+      "runtime_error_class": null,
+      "runtime_stage_input": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stage_contracts/regression.input.v1.json",
+      "runtime_stage_input_sha256": "a1d0155a539785df6a1aff689a2e675b9cc5db98503e9f22cda535ff58895e26",
+      "runtime_stage_result": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stage_contracts/regression.result.v1.json",
+      "runtime_stage_result_sha256": "8a789210681a5750ac2bba1557444abd0e42a316971548a6e3d8e6712df7ee91",
+      "runtime_status": "PASS",
+      "seed": 20261113,
+      "stage": "regression",
+      "status": "PASS",
+      "tool_versions": {
+        "vcs": "V-2023.12-SP1_Full64"
+      }
+    },
+    {
+      "adapter_id": "nmaforge.matrix.simulation_performance.reference_model.v1",
+      "adapter_supported": true,
+      "artifact_manifest": [
+        {
+          "exists": true,
+          "kind": "file",
+          "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/reference_model/regression-summary.json",
+          "sha256": "739132dae2f883c1e03f6eacfa999b9065e513627b3de95aff289303eca3edff",
+          "size_bytes": 157
+        },
+        {
+          "exists": true,
+          "kind": "file",
+          "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/reference_model/regression-summary.json",
+          "sha256": "739132dae2f883c1e03f6eacfa999b9065e513627b3de95aff289303eca3edff",
+          "size_bytes": 157
+        },
+        {
+          "kind": "file",
+          "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/reference_model/stage-result.json",
+          "sha256": "3187ff7186f2f1cb032e5d739b766ed9993d123d691fbfd49acea5eef7b51fc0",
+          "size_bytes": 285
+        }
+      ],
+      "campaign_id": "baseline",
+      "campaign_mode": "baseline",
+      "command": [
+        "python3.12",
+        "/home/ray/workspace/AI-IC-Design-Verification-Flow-upload/skills/rtl-ppa-optimization/scripts/nmaforge_matrix_sim_adapter.py",
+        "reference_model",
+        "/tmp/nmaforge_m3_profile_stagecampaign/baseline/source",
+        "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/reference_model",
+        "20261113",
+        "200000"
+      ],
+      "cwd": null,
+      "elapsed_sec": 3.127912,
+      "log": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/reference_model/command.log",
+      "metric_provenance": {},
+      "metrics": {},
+      "reason": null,
+      "result_json": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/reference_model/stage-result.json",
+      "return_code": 0,
+      "runtime_error_class": null,
+      "runtime_stage_input": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stage_contracts/reference_model.input.v1.json",
+      "runtime_stage_input_sha256": "f963e69476f3b0581f294ace444b02ed868d93b7c85d5ebfa6e174cda39b3620",
+      "runtime_stage_result": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stage_contracts/reference_model.result.v1.json",
+      "runtime_stage_result_sha256": "b7351182a6f30c2d4a602000ca83c26451fc05f49a30fa3899a8eefcefd4fe53",
+      "runtime_status": "PASS",
+      "seed": 20261113,
+      "stage": "reference_model",
+      "status": "PASS",
+      "tool_versions": {
+        "vcs": "V-2023.12-SP1_Full64"
+      }
+    },
+    {
+      "adapter_id": "nmaforge.matrix.simulation_performance.latency_gate.v1",
+      "adapter_supported": true,
+      "artifact_manifest": [
+        {
+          "exists": true,
+          "kind": "file",
+          "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/latency_gate/latency-summary.json",
+          "sha256": "5994d61ab3b8608d5d1b4dc6895b1d04981e6c2daee8fd0570b1fc183458411e",
+          "size_bytes": 6342
+        },
+        {
+          "exists": true,
+          "kind": "file",
+          "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/latency_gate/latency-summary.json",
+          "sha256": "5994d61ab3b8608d5d1b4dc6895b1d04981e6c2daee8fd0570b1fc183458411e",
+          "size_bytes": 6342
+        },
+        {
+          "kind": "file",
+          "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/latency_gate/stage-result.json",
+          "sha256": "7c08df0cb8f8c7d02462e7ac85c403022ee5d7d1b4ac0b5cc0fee15b6f36778f",
+          "size_bytes": 279
+        }
+      ],
+      "campaign_id": "baseline",
+      "campaign_mode": "baseline",
+      "command": [
+        "python3.12",
+        "/home/ray/workspace/AI-IC-Design-Verification-Flow-upload/skills/rtl-ppa-optimization/scripts/nmaforge_matrix_sim_adapter.py",
+        "latency_gate",
+        "/tmp/nmaforge_m3_profile_stagecampaign/baseline/source",
+        "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/latency_gate",
+        "20261113",
+        "200000"
+      ],
+      "cwd": null,
+      "elapsed_sec": 2.122685,
+      "log": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/latency_gate/command.log",
+      "metric_provenance": {},
+      "metrics": {},
+      "reason": null,
+      "result_json": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/latency_gate/stage-result.json",
+      "return_code": 0,
+      "runtime_error_class": null,
+      "runtime_stage_input": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stage_contracts/latency_gate.input.v1.json",
+      "runtime_stage_input_sha256": "be4636de04b98e4bbf8491038a28d9490fe9e6bee126cc1e12c5da9b3efce815",
+      "runtime_stage_result": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stage_contracts/latency_gate.result.v1.json",
+      "runtime_stage_result_sha256": "9e8bbc737fe89e05916d56fb8d8ac7f924ea4bf0ec3fe46efc0e8c2dad4f54ea",
+      "runtime_status": "PASS",
+      "seed": 20261113,
+      "stage": "latency_gate",
+      "status": "PASS",
+      "tool_versions": {
+        "vcs": "V-2023.12-SP1_Full64"
+      }
+    },
+    {
+      "adapter_id": "nmaforge.matrix.simulation_performance.performance.v1",
+      "adapter_supported": true,
+      "artifact_manifest": [
+        {
+          "exists": true,
+          "kind": "file",
+          "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/performance/performance-summary.json",
+          "sha256": "5994d61ab3b8608d5d1b4dc6895b1d04981e6c2daee8fd0570b1fc183458411e",
+          "size_bytes": 6342
+        },
+        {
+          "exists": true,
+          "kind": "file",
+          "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/performance/performance-summary.json",
+          "sha256": "5994d61ab3b8608d5d1b4dc6895b1d04981e6c2daee8fd0570b1fc183458411e",
+          "size_bytes": 6342
+        },
+        {
+          "kind": "file",
+          "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/performance/stage-result.json",
+          "sha256": "db62739328eb8df0eb40753045f148873e181a44fd72000da119d7c94dd4828e",
+          "size_bytes": 651
+        }
+      ],
+      "campaign_id": "baseline",
+      "campaign_mode": "baseline",
+      "command": [
+        "python3.12",
+        "/home/ray/workspace/AI-IC-Design-Verification-Flow-upload/skills/rtl-ppa-optimization/scripts/nmaforge_matrix_sim_adapter.py",
+        "performance",
+        "/tmp/nmaforge_m3_profile_stagecampaign/baseline/source",
+        "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/performance",
+        "20261113",
+        "200000"
+      ],
+      "cwd": null,
+      "elapsed_sec": 1.927631,
+      "log": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/performance/command.log",
+      "metric_provenance": {
+        "macs_per_cycle": {
+          "artifact": "performance-summary.json",
+          "parser_id": "nmaforge-matrix-log",
+          "parser_version": "1"
+        },
+        "workload_cycles": {
+          "artifact": "performance-summary.json",
+          "parser_id": "nmaforge-matrix-log",
+          "parser_version": "1"
+        }
+      },
+      "metrics": {
+        "macs_per_cycle": 46.10547263681592,
+        "workload_cycles": 2010
+      },
+      "reason": null,
+      "result_json": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/performance/stage-result.json",
+      "return_code": 0,
+      "runtime_error_class": null,
+      "runtime_stage_input": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stage_contracts/performance.input.v1.json",
+      "runtime_stage_input_sha256": "9535304ef772c1a64b80a5b4b4e0953b28533e48e3c127e5543eb1d0698f403f",
+      "runtime_stage_result": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stage_contracts/performance.result.v1.json",
+      "runtime_stage_result_sha256": "789898ee3334432542625a31200d6ebc653c68c64a62d88f0391a3807e4b026a",
+      "runtime_status": "PASS",
+      "seed": 20261113,
+      "stage": "performance",
+      "status": "PASS",
+      "tool_versions": {
+        "vcs": "V-2023.12-SP1_Full64"
+      }
+    }
+  ],
+  "started_at": 1794624788.613532,
+  "status": "PASS",
+  "working_tree": []
+}

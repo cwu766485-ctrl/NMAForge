@@ -1,0 +1,22 @@
+{
+  "behavior_contract": "transaction_level",
+  "design_top": "ai_tensor_matrix_core",
+  "project": "NMAForge-Matrix-Compute-Tile-Profile",
+  "read_only_assets": [],
+  "rtl_sources": [
+    "rtl/compute/matrix/ai_tensor_matrix_datapath.v",
+    "rtl/compute/matrix/ai_tensor_matrix_array.sv",
+    "rtl/compute/matrix/ai_tensor_matrix_core.v"
+  ],
+  "source_hashes": {
+    "dv/block/compute/matrix/tb/tb_ai_tensor_matrix_core_random.sv": "dc161fbfd737ce84c8acd2887f3ac9e5d501664b075bc28946f39e1fb1120c7e",
+    "rtl/compute/matrix/ai_tensor_matrix_array.sv": "83d8e6b170fe3645207ecfd2a82d7290f36a8d8114e4d940bbeb8f94f790594d",
+    "rtl/compute/matrix/ai_tensor_matrix_core.v": "3eeb8809ba79dd4a375b7aa0d58a7ecca37591bb7405afc57d2ee94c1c94a38a",
+    "rtl/compute/matrix/ai_tensor_matrix_datapath.v": "c7fc6ab36d39df0f4890dec11c3c39265a0b8efec79ce4806560d96a2fe5aac9"
+  },
+  "source_revision": "4b62f8e815bb272ab9b727dff4736cec460e6f21",
+  "testbench_sources": [
+    "dv/block/compute/matrix/tb/tb_ai_tensor_matrix_core_random.sv"
+  ],
+  "testbench_top": "tb_ai_tensor_matrix_core_random"
+}

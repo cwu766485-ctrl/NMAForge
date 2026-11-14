@@ -1,0 +1,67 @@
+schema_version: 1
+project: NMAForge-Matrix-Compute-Tile-Profile
+optimization_mode: simulation_performance
+design_top: ai_tensor_matrix_core
+testbench_top: tb_ai_tensor_matrix_core_random
+rtl_scope:
+  - rtl/compute/matrix/ai_tensor_matrix_core.v
+  - rtl/compute/matrix/ai_tensor_matrix_array.sv
+  - rtl/compute/matrix/ai_tensor_matrix_datapath.v
+rtl_sources:
+  - rtl/compute/matrix/ai_tensor_matrix_datapath.v
+  - rtl/compute/matrix/ai_tensor_matrix_array.sv
+  - rtl/compute/matrix/ai_tensor_matrix_core.v
+testbench_sources:
+  - dv/block/compute/matrix/tb/tb_ai_tensor_matrix_core_random.sv
+allowed_patch_paths:
+  - rtl/compute/matrix/ai_tensor_matrix_core.v
+behavior_contract: transaction_level
+max_latency_cycles: 200000
+required_stages:
+  baseline: [regression, reference_model, latency_gate, performance]
+  candidate: [regression, reference_model, latency_gate, performance]
+budget:
+  max_candidates: 2
+  max_runtime_sec: 3600
+  max_total_runtime_sec: 7200
+read_only_assets: []
+stages:
+  - id: regression
+    adapter_id: nmaforge.matrix.simulation_performance.regression.v1
+    modes: [baseline, candidate]
+    argv: [python3.12, /home/ray/workspace/AI-IC-Design-Verification-Flow-upload/skills/rtl-ppa-optimization/scripts/nmaforge_matrix_sim_adapter.py, regression, "{source_root}", "{run_dir}", "{seed}", "200000"]
+    timeout_sec: 120
+    result_json: "{run_dir}/stage-result.json"
+    expected_artifacts: ["{run_dir}/regression-summary.json"]
+  - id: reference_model
+    adapter_id: nmaforge.matrix.simulation_performance.reference_model.v1
+    modes: [baseline, candidate]
+    argv: [python3.12, /home/ray/workspace/AI-IC-Design-Verification-Flow-upload/skills/rtl-ppa-optimization/scripts/nmaforge_matrix_sim_adapter.py, reference_model, "{source_root}", "{run_dir}", "{seed}", "200000"]
+    timeout_sec: 120
+    result_json: "{run_dir}/stage-result.json"
+    expected_artifacts: ["{run_dir}/regression-summary.json"]
+  - id: latency_gate
+    adapter_id: nmaforge.matrix.simulation_performance.latency_gate.v1
+    modes: [baseline, candidate]
+    argv: [python3.12, /home/ray/workspace/AI-IC-Design-Verification-Flow-upload/skills/rtl-ppa-optimization/scripts/nmaforge_matrix_sim_adapter.py, latency_gate, "{source_root}", "{run_dir}", "{seed}", "200000"]
+    timeout_sec: 120
+    result_json: "{run_dir}/stage-result.json"
+    expected_artifacts: ["{run_dir}/latency-summary.json"]
+  - id: performance
+    adapter_id: nmaforge.matrix.simulation_performance.performance.v1
+    modes: [baseline, candidate]
+    argv: [python3.12, /home/ray/workspace/AI-IC-Design-Verification-Flow-upload/skills/rtl-ppa-optimization/scripts/nmaforge_matrix_sim_adapter.py, performance, "{source_root}", "{run_dir}", "{seed}", "200000"]
+    timeout_sec: 120
+    result_json: "{run_dir}/stage-result.json"
+    expected_artifacts: ["{run_dir}/performance-summary.json"]
+metrics:
+  workload_cycles:
+    source_stage: performance
+    direction: lower
+    unit: cycles
+    required: true
+  macs_per_cycle:
+    source_stage: performance
+    direction: higher
+    unit: MAC/cycle
+    required: true

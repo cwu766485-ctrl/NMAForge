@@ -1,0 +1,13 @@
+{
+  "adapter_id": "nmaforge.matrix.simulation_performance.latency_gate.v1",
+  "adapter_supported": true,
+  "artifacts": [
+    "latency-summary.json"
+  ],
+  "metric_provenance": {},
+  "metrics": {},
+  "status": "PASS",
+  "tool_versions": {
+    "vcs": "V-2023.12-SP1_Full64"
+  }
+}

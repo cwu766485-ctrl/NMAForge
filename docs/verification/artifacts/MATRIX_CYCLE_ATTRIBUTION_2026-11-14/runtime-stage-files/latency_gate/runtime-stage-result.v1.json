@@ -1,0 +1,43 @@
+{
+  "adapter_id": "nmaforge.matrix.simulation_performance.latency_gate.v1",
+  "adapter_supported": true,
+  "artifacts": [
+    {
+      "kind": "file",
+      "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/latency_gate/latency-summary.json",
+      "producer_stage": "latency_gate",
+      "role": "stage_output",
+      "sha256": "5994d61ab3b8608d5d1b4dc6895b1d04981e6c2daee8fd0570b1fc183458411e",
+      "size_bytes": 6342
+    },
+    {
+      "kind": "file",
+      "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/latency_gate/stage-result.json",
+      "producer_stage": "latency_gate",
+      "role": "stage_output",
+      "sha256": "7c08df0cb8f8c7d02462e7ac85c403022ee5d7d1b4ac0b5cc0fee15b6f36778f",
+      "size_bytes": 279
+    },
+    {
+      "kind": "file",
+      "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/latency_gate/command.log",
+      "producer_stage": "latency_gate",
+      "role": "stage_output",
+      "sha256": "3a3da0ef5c61a8ef96bd9fd532949d318fc9fe5f256baef5d1638be30712b111",
+      "size_bytes": 10729
+    }
+  ],
+  "contract_version": "1.0",
+  "error_class": null,
+  "exit_code": 0,
+  "finished_at": "2026-11-14T02:53:21.099143Z",
+  "message": null,
+  "metric_provenance": {},
+  "metrics": {},
+  "run_id": "baseline",
+  "source_revision": "4b62f8e815bb272ab9b727dff4736cec460e6f21",
+  "stage_id": "latency_gate",
+  "started_at": "2026-11-14T02:53:18.975246Z",
+  "status": "PASS",
+  "tool_versions": {}
+}

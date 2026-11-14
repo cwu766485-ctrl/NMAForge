@@ -1,0 +1,10 @@
+{
+  "command_returncode": 0,
+  "reference_model": "testbench integer model",
+  "seeds": [
+    20261021,
+    20261022,
+    20261023
+  ],
+  "status": "PASS"
+}

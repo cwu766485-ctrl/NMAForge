@@ -1,0 +1,43 @@
+{
+  "adapter_id": "nmaforge.matrix.simulation_performance.regression.v1",
+  "adapter_supported": true,
+  "artifacts": [
+    {
+      "kind": "file",
+      "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/regression/regression-summary.json",
+      "producer_stage": "regression",
+      "role": "stage_output",
+      "sha256": "739132dae2f883c1e03f6eacfa999b9065e513627b3de95aff289303eca3edff",
+      "size_bytes": 157
+    },
+    {
+      "kind": "file",
+      "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/regression/stage-result.json",
+      "producer_stage": "regression",
+      "role": "stage_output",
+      "sha256": "f63d953d212d92e21aa74693ad714bf97f3c5658681dc8d74c7cfd2978888f43",
+      "size_bytes": 280
+    },
+    {
+      "kind": "file",
+      "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/regression/command.log",
+      "producer_stage": "regression",
+      "role": "stage_output",
+      "sha256": "47d3da32ea5631ad20334236de1d10873327e3440fd0de8ef58fc0519501c3a4",
+      "size_bytes": 70046
+    }
+  ],
+  "contract_version": "1.0",
+  "error_class": null,
+  "exit_code": 0,
+  "finished_at": "2026-11-14T02:53:15.814839Z",
+  "message": null,
+  "metric_provenance": {},
+  "metrics": {},
+  "run_id": "baseline",
+  "source_revision": "4b62f8e815bb272ab9b727dff4736cec460e6f21",
+  "stage_id": "regression",
+  "started_at": "2026-11-14T02:53:08.986814Z",
+  "status": "PASS",
+  "tool_versions": {}
+}

@@ -1,0 +1,27 @@
+{
+  "adapter_id": "nmaforge.matrix.simulation_performance.performance.v1",
+  "adapter_supported": true,
+  "artifacts": [
+    "performance-summary.json"
+  ],
+  "metric_provenance": {
+    "macs_per_cycle": {
+      "artifact": "performance-summary.json",
+      "parser_id": "nmaforge-matrix-log",
+      "parser_version": "1"
+    },
+    "workload_cycles": {
+      "artifact": "performance-summary.json",
+      "parser_id": "nmaforge-matrix-log",
+      "parser_version": "1"
+    }
+  },
+  "metrics": {
+    "macs_per_cycle": 46.10547263681592,
+    "workload_cycles": 2010
+  },
+  "status": "PASS",
+  "tool_versions": {
+    "vcs": "V-2023.12-SP1_Full64"
+  }
+}

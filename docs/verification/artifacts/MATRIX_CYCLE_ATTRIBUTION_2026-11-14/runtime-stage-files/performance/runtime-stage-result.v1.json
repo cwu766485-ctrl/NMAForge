@@ -1,0 +1,43 @@
+{
+  "adapter_id": "nmaforge.matrix.simulation_performance.performance.v1",
+  "adapter_supported": true,
+  "artifacts": [
+    {
+      "kind": "file",
+      "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/performance/performance-summary.json",
+      "producer_stage": "performance",
+      "role": "stage_output",
+      "sha256": "5994d61ab3b8608d5d1b4dc6895b1d04981e6c2daee8fd0570b1fc183458411e",
+      "size_bytes": 6342
+    },
+    {
+      "kind": "file",
+      "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/performance/stage-result.json",
+      "producer_stage": "performance",
+      "role": "stage_output",
+      "sha256": "db62739328eb8df0eb40753045f148873e181a44fd72000da119d7c94dd4828e",
+      "size_bytes": 651
+    },
+    {
+      "kind": "file",
+      "path": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/performance/command.log",
+      "producer_stage": "performance",
+      "role": "stage_output",
+      "sha256": "76610ed7e3d07c042142a95c6c3c1fdb5b6fa00168360119f3457ac72b48f85a",
+      "size_bytes": 10703
+    }
+  ],
+  "contract_version": "1.0",
+  "error_class": null,
+  "exit_code": 0,
+  "finished_at": "2026-11-14T02:53:23.037406Z",
+  "message": null,
+  "metric_provenance": {},
+  "metrics": {},
+  "run_id": "baseline",
+  "source_revision": "4b62f8e815bb272ab9b727dff4736cec460e6f21",
+  "stage_id": "performance",
+  "started_at": "2026-11-14T02:53:21.108018Z",
+  "status": "PASS",
+  "tool_versions": {}
+}

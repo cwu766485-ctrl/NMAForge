@@ -1,0 +1,56 @@
+{
+  "adapter_id": "nmaforge.matrix.simulation_performance.regression.v1",
+  "argv": [
+    "python3.12",
+    "/home/ray/workspace/AI-IC-Design-Verification-Flow-upload/skills/rtl-ppa-optimization/scripts/nmaforge_matrix_sim_adapter.py",
+    "regression",
+    "/tmp/nmaforge_m3_profile_stagecampaign/baseline/source",
+    "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/regression",
+    "20261113",
+    "200000"
+  ],
+  "budgets": {
+    "run_remaining_seconds": 3599.639920609
+  },
+  "contract_version": "1.0",
+  "dependencies": [],
+  "environment": {
+    "PWD": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/source",
+    "RTL_PPA_CAMPAIGN_ID": "baseline",
+    "RTL_PPA_MODE": "baseline",
+    "RTL_PPA_PROJECT_ROOT": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/source",
+    "RTL_PPA_RUN_DIR": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/regression",
+    "RTL_PPA_SOURCE_MANIFEST": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/source_manifest.json",
+    "RTL_PPA_SOURCE_ROOT": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/source",
+    "SEED": "20261113"
+  },
+  "expected_artifacts": [
+    "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/regression/regression-summary.json",
+    "/tmp/nmaforge_m3_profile_stagecampaign/baseline/stages/regression/stage-result.json"
+  ],
+  "input_artifacts": [],
+  "output_directory": "/tmp/nmaforge_m3_profile_stagecampaign/baseline",
+  "project": {
+    "constraints": [],
+    "defines": {},
+    "design_top": "ai_tensor_matrix_core",
+    "filelists": [],
+    "includes": [],
+    "libraries": [],
+    "name": "NMAForge-Matrix-Compute-Tile-Profile",
+    "ordered_sources": [
+      "rtl/compute/matrix/ai_tensor_matrix_datapath.v",
+      "rtl/compute/matrix/ai_tensor_matrix_array.sv",
+      "rtl/compute/matrix/ai_tensor_matrix_core.v"
+    ],
+    "source_revision": "4b62f8e815bb272ab9b727dff4736cec460e6f21",
+    "source_tree_sha256": "bc06a5a6284aab467e69035c71d44ed8bf007c8dfd1adfaaf9abaf8885161b45",
+    "testbench_top": "tb_ai_tensor_matrix_core_random"
+  },
+  "run_id": "baseline",
+  "seed": 20261113,
+  "stage_id": "regression",
+  "stage_kind": "ppa",
+  "timeout_seconds": 120.0,
+  "working_directory": "/tmp/nmaforge_m3_profile_stagecampaign/baseline/source"
+}
