@@ -272,6 +272,35 @@ ai_smoke_saif: ai_smoke_vcd
 ai_transformer: ai_comp
 	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=0 +AI_SEED=$(AI_SEED) +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) -l ai_transformer.log
 
+# Round 3: H64 nonzero Q projection split over four legal 16x16 Matrix tiles.
+AI_H64_PROJECTION_RUN ?= /tmp/nmaforge_h64_projection_$(shell date +%Y%m%d_%H%M%S)
+AI_H64_PROJECTION_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
+AI_H64_PROJECTION_SEED ?= 20261114
+.PHONY: ai_h64_projection_top
+ai_h64_projection_top:
+	test ! -e "$(AI_H64_PROJECTION_RUN)"
+	mkdir -p "$(AI_H64_PROJECTION_RUN)"
+	$(AI_H64_PROJECTION_PYTHON) ../../../../benchmark/gpt2_compat/generate_h64_projection.py \
+		--seed "$(AI_H64_PROJECTION_SEED)" --out "$(AI_H64_PROJECTION_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_H64_PROJECTION_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_H64_PROJECTION_RUN)/simv \
+		-l $(AI_H64_PROJECTION_RUN)/compile.log
+	$(AI_H64_PROJECTION_RUN)/simv +ntb_random_seed=$(AI_H64_PROJECTION_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H64_PROJECTION_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_PROJECTION_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_PROJECTION_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["useful_macs"])') \
+		-l $(AI_H64_PROJECTION_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=4 ' "$(AI_H64_PROJECTION_RUN)/run.log"
+
 # Deterministically train/export a tiny INT8 Transformer model, map its real
 # weights into ABI-v7 descriptors, and run only the Transformer path on the
 # production Top with the selected scratchpad capacity.

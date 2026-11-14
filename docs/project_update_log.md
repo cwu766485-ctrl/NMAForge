@@ -1,5 +1,9 @@
 # Project update log
 
+## NMAForge v2.0 Round 3 — H64 projection Top bring-up (2026-11-15)
+
+On product baseline `0492c47d12cd11bcc22be1930da7af77ed870b6e`, a nonzero H64 layer-0 Q projection now runs through the real Top. Four legal ABI-v7.4 Matrix commands each compute `M=16,N=16,K=64` (`k_words=16`) for one output-column tile. With four live input tokens and twelve zero-padded physical rows, the independent INT8 memory Golden checked all 1,024 INT32 output words. VCS `V-2023.12-SP1_Full64`, 128 KiB/4-bank behavioral SPAD, 10 ns simulated period: 1,188 command cycles, 65,536 useful MACs, 8,192 B SPAD read and 4,096 B SPAD write. Reproduce via `make -C dv/subsystem/top_smoke/sim ai_h64_projection_top AI_H64_PROJECTION_RUN=/tmp/nmaforge_h64_projection_replay AI_H64_PROJECTION_SEED=20261114` with NumPy in `AI_H64_PROJECTION_PYTHON`. This is only one H64 projection; full attention, decoder block, four layers, persistent decode, and pretrained weights remain NOT_RUN. See `docs/research/NMAFORGE_V2_ROUND3_H64_PROJECTION.md`.
+
 ## NMAForge v2.0 Round 2 — 2026-11-14
 
 Corrected GPT-2-compatible reference on the PR #8 baseline: true Pre-LN FP32 and independent INT8 fixed-point references now pass, with 62-node H64 graph metadata; all H64 nodes remain BLOCKED/RTL NOT_RUN because current descriptor legality and ownership contracts do not support a legal lowering. Added registered-SPAD SVSE product adapter and fixed unary Requant stale-operand behavior. DAMS/SVSE standalone remains `DAMS_SVSE_PASS accepted=3 denied=1`; product arithmetic adapter is `SVSE_PRODUCT_ADAPTER_PASS residual=140 requant=127`. Real Top/Dispatcher integration is explicitly `BLOCKED_BY_CONTROL_CONTRACT`. See `docs/research/NMAFORGE_V2_ROUND2_STATUS.md`.
