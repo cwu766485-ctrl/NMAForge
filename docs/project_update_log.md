@@ -1,5 +1,9 @@
 # Project update log
 
+## NMAForge v2.0 Round 3 SVSE vector SPAD A/B — 2026-11-15
+
+On isolated branch `research/nmaforge-v2-round3-svse` based on `6596779d`, expanded the one-element SVSE adapter into parameterized vector read/compute/output-buffer/ordered-writeback behavior. Actual product `ai_tensor_sfu_core` opcode `0x34` and `0x36` were compared under the same deterministic registered-SPAD latency and backpressure model. Four-element Golden memory images matched; Residual measured product/SVSE 40/46 cycles and 8/8 reads + 4/4 writes; Requant measured 22/30 cycles and 4/4 reads + 4/4 writes. SVSE request stalls/response waits were nonzero. Abort read drain, accepted-write prefix, and epoch read drain all passed. Product integration remains blocked; current SVSE is slower because buffering is not overlapped with computation. See `docs/research/ROUND3_SVSE_VECTOR_SPAD_AB.md`.
+
 ## NMAForge v2.0 Round 2 — 2026-11-14
 
 Corrected GPT-2-compatible reference on the PR #8 baseline: true Pre-LN FP32 and independent INT8 fixed-point references now pass, with 62-node H64 graph metadata; all H64 nodes remain BLOCKED/RTL NOT_RUN because current descriptor legality and ownership contracts do not support a legal lowering. Added registered-SPAD SVSE product adapter and fixed unary Requant stale-operand behavior. DAMS/SVSE standalone remains `DAMS_SVSE_PASS accepted=3 denied=1`; product arithmetic adapter is `SVSE_PRODUCT_ADAPTER_PASS residual=140 requant=127`. Real Top/Dispatcher integration is explicitly `BLOCKED_BY_CONTROL_CONTRACT`. See `docs/research/NMAFORGE_V2_ROUND2_STATUS.md`.
