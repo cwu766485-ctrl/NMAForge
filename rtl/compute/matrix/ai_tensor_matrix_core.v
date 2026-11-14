@@ -118,13 +118,24 @@ module ai_tensor_matrix_core #(
 
     reg [3:0] state_r;
     // Passive per-command profile used by VCS regressions. Indexes follow the
-    // ST_* encoding below; the aggregate stalls split request arbitration,
-    // response latency, and output writeback backpressure without changing
-    // the command interface or FSM decisions.
+    // ST_* encoding below. Attribution counters are observational and do not
+    // feed the command interface or FSM decisions.
     reg [31:0] perf_state_cycles [0:14];
     reg [31:0] perf_arbiter_stall_cycles;
+    reg [31:0] perf_banked_request_denial_cycles;
+    reg [31:0] perf_line_request_denial_cycles;
+    reg [31:0] perf_scalar_request_denial_cycles;
     reg [31:0] perf_response_wait_cycles;
     reg [31:0] perf_writeback_wait_cycles;
+    reg [31:0] perf_write_productive_cycles;
+    reg [31:0] perf_writeback_stall_cycles;
+    reg [31:0] perf_write_protection_error_cycles;
+    reg [31:0] perf_prefetch_wait_arbiter_denial_cycles;
+    reg [31:0] perf_prefetch_wait_fifo_full_cycles;
+    reg [31:0] perf_prefetch_wait_request_grant_cycles;
+    reg [31:0] perf_prefetch_wait_outstanding_drain_cycles;
+    reg [31:0] perf_prefetch_wait_handoff_ready_cycles;
+    reg [31:0] perf_prefetch_wait_no_request_cycles;
     reg [31:0] perf_prefetch_a_req_cycles;
     reg [31:0] perf_prefetch_a_drain_cycles;
     reg [31:0] perf_prefetch_b_req_cycles;
@@ -593,8 +604,20 @@ module ai_tensor_matrix_core #(
             cycle_count <= 32'd0;
             element_count <= 32'd0;
             perf_arbiter_stall_cycles <= 32'd0;
+            perf_banked_request_denial_cycles <= 32'd0;
+            perf_line_request_denial_cycles <= 32'd0;
+            perf_scalar_request_denial_cycles <= 32'd0;
             perf_response_wait_cycles <= 32'd0;
             perf_writeback_wait_cycles <= 32'd0;
+            perf_write_productive_cycles <= 32'd0;
+            perf_writeback_stall_cycles <= 32'd0;
+            perf_write_protection_error_cycles <= 32'd0;
+            perf_prefetch_wait_arbiter_denial_cycles <= 32'd0;
+            perf_prefetch_wait_fifo_full_cycles <= 32'd0;
+            perf_prefetch_wait_request_grant_cycles <= 32'd0;
+            perf_prefetch_wait_outstanding_drain_cycles <= 32'd0;
+            perf_prefetch_wait_handoff_ready_cycles <= 32'd0;
+            perf_prefetch_wait_no_request_cycles <= 32'd0;
             perf_prefetch_a_req_cycles <= 32'd0;
             perf_prefetch_a_drain_cycles <= 32'd0;
             perf_prefetch_b_req_cycles <= 32'd0;
@@ -738,8 +761,20 @@ module ai_tensor_matrix_core #(
             // state transition, or arithmetic control signal.
             if ((state_r == ST_IDLE) && start) begin
                 perf_arbiter_stall_cycles <= 32'd0;
+                perf_banked_request_denial_cycles <= 32'd0;
+                perf_line_request_denial_cycles <= 32'd0;
+                perf_scalar_request_denial_cycles <= 32'd0;
                 perf_response_wait_cycles <= 32'd0;
                 perf_writeback_wait_cycles <= 32'd0;
+                perf_write_productive_cycles <= 32'd0;
+                perf_writeback_stall_cycles <= 32'd0;
+                perf_write_protection_error_cycles <= 32'd0;
+                perf_prefetch_wait_arbiter_denial_cycles <= 32'd0;
+                perf_prefetch_wait_fifo_full_cycles <= 32'd0;
+                perf_prefetch_wait_request_grant_cycles <= 32'd0;
+                perf_prefetch_wait_outstanding_drain_cycles <= 32'd0;
+                perf_prefetch_wait_handoff_ready_cycles <= 32'd0;
+                perf_prefetch_wait_no_request_cycles <= 32'd0;
                 perf_prefetch_a_req_cycles <= 32'd0;
                 perf_prefetch_a_drain_cycles <= 32'd0;
                 perf_prefetch_b_req_cycles <= 32'd0;
@@ -788,6 +823,15 @@ module ai_tensor_matrix_core #(
                     (line_valid && !line_ready))
                     perf_arbiter_stall_cycles <=
                         perf_arbiter_stall_cycles + 1'b1;
+                if (banked_read_valid && !banked_ready)
+                    perf_banked_request_denial_cycles <=
+                        perf_banked_request_denial_cycles + 1'b1;
+                if (line_valid && !line_ready)
+                    perf_line_request_denial_cycles <=
+                        perf_line_request_denial_cycles + 1'b1;
+                if (spad_valid && !spad_ready)
+                    perf_scalar_request_denial_cycles <=
+                        perf_scalar_request_denial_cycles + 1'b1;
                 if ((((state_r == ST_A_REQ) || (state_r == ST_A_WAIT) ||
                       (state_r == ST_B_REQ) || (state_r == ST_B_WAIT)) &&
                      (read_outstanding_count != 0) && !banked_rsp_valid) ||
@@ -797,6 +841,38 @@ module ai_tensor_matrix_core #(
                 if ((state_r == ST_WRITE) && !output_write_accepted)
                     perf_writeback_wait_cycles <=
                         perf_writeback_wait_cycles + 1'b1;
+                if (state_r == ST_PREFETCH_WAIT) begin
+                    if (prefetch_valid_r[~compute_buffer_r])
+                        perf_prefetch_wait_handoff_ready_cycles <=
+                            perf_prefetch_wait_handoff_ready_cycles + 1'b1;
+                    else if (banked_read_valid && !banked_ready)
+                        perf_prefetch_wait_arbiter_denial_cycles <=
+                            perf_prefetch_wait_arbiter_denial_cycles + 1'b1;
+                    else if (read_request_pending &&
+                             (read_outstanding_count == MAX_OUTSTANDING_READS))
+                        perf_prefetch_wait_fifo_full_cycles <=
+                            perf_prefetch_wait_fifo_full_cycles + 1'b1;
+                    else if (banked_read_accept)
+                        perf_prefetch_wait_request_grant_cycles <=
+                            perf_prefetch_wait_request_grant_cycles + 1'b1;
+                    else if (read_outstanding_count != 0)
+                        perf_prefetch_wait_outstanding_drain_cycles <=
+                            perf_prefetch_wait_outstanding_drain_cycles + 1'b1;
+                    else
+                        perf_prefetch_wait_no_request_cycles <=
+                            perf_prefetch_wait_no_request_cycles + 1'b1;
+                end
+                if (state_r == ST_WRITE) begin
+                    if (output_write_accepted && output_write_has_protection_error)
+                        perf_write_protection_error_cycles <=
+                            perf_write_protection_error_cycles + 1'b1;
+                    else if (output_write_accepted)
+                        perf_write_productive_cycles <=
+                            perf_write_productive_cycles + 1'b1;
+                    else
+                        perf_writeback_stall_cycles <=
+                            perf_writeback_stall_cycles + 1'b1;
+                end
             end
 
             if (busy && abort && (state_r != ST_ERROR) &&

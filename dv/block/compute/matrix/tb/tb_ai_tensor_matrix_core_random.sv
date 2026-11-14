@@ -511,6 +511,7 @@ module tb_ai_tensor_matrix_core_random;
     integer useful_mac_ops,case_mac_cycles,expected_cache_hits;
     integer m_macro_tiles,n_macro_tiles;
     integer profile_i,profile_state_sum;
+    integer profile_prefetch_wait_sum,profile_write_sum;
     real macs_per_cycle,array_utilization,effective_gops_250;
     begin
       launch_and_wait();
@@ -547,6 +548,26 @@ module tb_ai_tensor_matrix_core_random;
       if(profile_state_sum!==cycle_count)
         $fatal(1,"matrix case %0d profile states=%0d do not account for total cycles=%0d",
                case_id,profile_state_sum,cycle_count);
+      profile_prefetch_wait_sum=
+          dut.perf_prefetch_wait_arbiter_denial_cycles+
+          dut.perf_prefetch_wait_fifo_full_cycles+
+          dut.perf_prefetch_wait_request_grant_cycles+
+          dut.perf_prefetch_wait_outstanding_drain_cycles+
+          dut.perf_prefetch_wait_handoff_ready_cycles+
+          dut.perf_prefetch_wait_no_request_cycles;
+      if(profile_prefetch_wait_sum!==dut.perf_state_cycles[14] ||
+         dut.perf_prefetch_wait_cycles!==dut.perf_state_cycles[14])
+        $fatal(1,"matrix case %0d prefetch wait attribution=%0d state=%0d legacy=%0d",
+               case_id,profile_prefetch_wait_sum,dut.perf_state_cycles[14],
+               dut.perf_prefetch_wait_cycles);
+      profile_write_sum=dut.perf_write_productive_cycles+
+                        dut.perf_writeback_stall_cycles+
+                        dut.perf_write_protection_error_cycles;
+      if(profile_write_sum!==dut.perf_state_cycles[9] ||
+         dut.perf_writeback_wait_cycles!==dut.perf_writeback_stall_cycles)
+        $fatal(1,"matrix case %0d write attribution=%0d state=%0d legacy_stall=%0d split_stall=%0d",
+               case_id,profile_write_sum,dut.perf_state_cycles[9],
+               dut.perf_writeback_wait_cycles,dut.perf_writeback_stall_cycles);
       if((((cfg_m<PHYSICAL_ARRAY_SIZE)?cfg_m:PHYSICAL_ARRAY_SIZE)>4 ||
           ((cfg_n<PHYSICAL_ARRAY_SIZE)?cfg_n:PHYSICAL_ARRAY_SIZE)>4) &&
          (dut.perf_outstanding_highwater<2))
@@ -599,7 +620,7 @@ module tb_ai_tensor_matrix_core_random;
                line_write_count*16,
                line_stall_count-case_line_stall_snapshot,macs_per_cycle,
                array_utilization*100.0,effective_gops_250,PHYSICAL_ARRAY_SIZE,PHYSICAL_ARRAY_SIZE);
-      $display("MATRIX_CORE_PROFILE id=%0d max_outstanding=%0d a_req=%0d a_wait=%0d b_req=%0d b_wait=%0d bias_req=%0d bias_wait=%0d prep_mac=%0d mac=%0d write=%0d next=%0d done=%0d error=%0d error_drain=%0d prefetch_wait=%0d arbiter_stall=%0d response_wait=%0d writeback_wait=%0d outstanding_highwater=%0d fifo_full=%0d prefetch_a_req=%0d prefetch_a_drain=%0d prefetch_b_req=%0d prefetch_b_drain=%0d prefetch_overlap=%0d prefetch_completed=%0d a_tile_cache_hits=%0d total=%0d",
+      $display("MATRIX_CORE_PROFILE id=%0d max_outstanding=%0d a_req=%0d a_wait=%0d b_req=%0d b_wait=%0d bias_req=%0d bias_wait=%0d prep_mac=%0d mac=%0d write=%0d next=%0d done=%0d error=%0d error_drain=%0d prefetch_wait=%0d arbiter_stall=%0d response_wait=%0d writeback_wait=%0d outstanding_highwater=%0d fifo_full=%0d prefetch_a_req=%0d prefetch_a_drain=%0d prefetch_b_req=%0d prefetch_b_drain=%0d prefetch_overlap=%0d prefetch_completed=%0d a_tile_cache_hits=%0d total=%0d banked_denial=%0d line_denial=%0d scalar_denial=%0d prefetch_wait_denial=%0d prefetch_wait_fifo_full=%0d prefetch_wait_request_grant=%0d prefetch_wait_outstanding_drain=%0d prefetch_wait_handoff_ready=%0d prefetch_wait_no_request=%0d write_productive=%0d writeback_stall=%0d write_protection_error=%0d",
                case_id,MAX_OUTSTANDING_READS,
                dut.perf_state_cycles[1],dut.perf_state_cycles[2],
                dut.perf_state_cycles[3],dut.perf_state_cycles[4],
@@ -614,7 +635,19 @@ module tb_ai_tensor_matrix_core_random;
                dut.perf_fifo_full_cycles,dut.perf_prefetch_a_req_cycles,
                dut.perf_prefetch_a_drain_cycles,dut.perf_prefetch_b_req_cycles,
                dut.perf_prefetch_b_drain_cycles,dut.perf_prefetch_overlap_cycles,
-               dut.perf_prefetch_completed,dut.perf_a_tile_cache_hits,cycle_count);
+               dut.perf_prefetch_completed,dut.perf_a_tile_cache_hits,cycle_count,
+               dut.perf_banked_request_denial_cycles,
+               dut.perf_line_request_denial_cycles,
+               dut.perf_scalar_request_denial_cycles,
+               dut.perf_prefetch_wait_arbiter_denial_cycles,
+               dut.perf_prefetch_wait_fifo_full_cycles,
+               dut.perf_prefetch_wait_request_grant_cycles,
+               dut.perf_prefetch_wait_outstanding_drain_cycles,
+               dut.perf_prefetch_wait_handoff_ready_cycles,
+               dut.perf_prefetch_wait_no_request_cycles,
+               dut.perf_write_productive_cycles,
+               dut.perf_writeback_stall_cycles,
+               dut.perf_write_protection_error_cycles);
     end
   endtask
 
