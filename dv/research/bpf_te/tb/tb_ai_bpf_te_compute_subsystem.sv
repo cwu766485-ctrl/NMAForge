@@ -4,6 +4,10 @@ module tb_ai_bpf_te_compute_subsystem;
   reg resetn=0, epoch_bump=0, init_valid=0, init_write=0;
   reg [31:0] init_addr=0, init_wdata=0; reg [3:0] init_wstrb=4'hf;
   reg probe_valid=0; reg [31:0] probe_addr=0; wire probe_rsp_valid; wire [31:0] probe_rdata;
+  reg saw_probe=0; reg [31:0] saw_probe_data=0;
+  always @(posedge clk) if (probe_rsp_valid) begin saw_probe<=1; saw_probe_data<=probe_rdata; end
+  reg [3:0] bank_allow_cfg=4'hf, inject_parity_error_cfg=0;
+  reg cnm_write_protection_error_cfg=0, matrix_line_protection_error_cfg=0;
   reg matrix_start=0, cnm_start=0, abort=0; reg [7:0] op_mode=8'h20;
   reg matrix_transpose_a=0, matrix_transpose_b=0, matrix_bias_enable=0;
   reg [31:0] ms0=0,ms1=0,mdst=0,mi=1,m0s=0,m1s=0,mds=0,maux=0,mb=0;
@@ -25,6 +29,8 @@ module tb_ai_bpf_te_compute_subsystem;
     .clk(clk),.resetn(resetn),.epoch_bump(epoch_bump),.init_valid(init_valid),
     .init_write(init_write),.init_addr(init_addr),.init_wdata(init_wdata),.init_wstrb(init_wstrb),
     .probe_valid(probe_valid),.probe_addr(probe_addr),.probe_rsp_valid(probe_rsp_valid),.probe_rdata(probe_rdata),
+    .bank_allow_cfg(bank_allow_cfg),.inject_parity_error_cfg(inject_parity_error_cfg),
+    .cnm_write_protection_error_cfg(cnm_write_protection_error_cfg),.matrix_line_protection_error_cfg(matrix_line_protection_error_cfg),
     .matrix_start(matrix_start),.cnm_start(cnm_start),.abort(abort),.op_mode(op_mode),
     .matrix_src0(ms0),.matrix_src1(ms1),.matrix_dst(mdst),.matrix_m(mm),.matrix_n(mn),.matrix_k(mk),
     .matrix_instance_count(mi),.matrix_src0_stride(m0s),.matrix_src1_stride(m1s),.matrix_dst_stride(mds),
@@ -52,10 +58,15 @@ module tb_ai_bpf_te_compute_subsystem;
     if (!saw_output_write || saw_output_addr !== 32'h300 || saw_output_data !== 32'd124)
       $fatal(1,"CNM writeback mismatch seen=%0d addr=%h data=%h",saw_output_write,saw_output_addr,saw_output_data);
     @(negedge clk); probe_addr=32'h300; probe_valid=1;
-    @(negedge clk); probe_valid=0; wait(probe_rsp_valid);
-    if (probe_rdata !== 32'd124) $fatal(1,"CNM SPAD readback mismatch data=%h",probe_rdata);
-    $display("BPF_TE_REAL_CNM_MEMORY_GOLDEN_PASS addr=0x300 data=%0d",probe_rdata);
+    @(negedge clk); probe_valid=0; repeat(5) @(negedge clk);
+    if (!saw_probe || saw_probe_data !== 32'd124) $fatal(1,"CNM SPAD readback mismatch seen=%0d data=%h",saw_probe,saw_probe_data);
+    $display("BPF_TE_REAL_CNM_MEMORY_GOLDEN_PASS addr=0x300 data=%0d",saw_probe_data);
     $display("BPF_TE_REAL_CNM_PASS result=%0d cycles=%0d accepted_bank_ops=%0d response_ops=%0d denied_ops=%0d",cres,ccy,acc,rsp,den);
+    // Read parity fault: the accepted four-lane read must terminate with an
+    // engine error and never commit a new output word.
+    inject_parity_error_cfg=4'b0001; cnm_start=1; @(negedge clk); cnm_start=0;
+    wait(cdone); if (!cerr) $fatal(1,"CNM parity fault was not observed");
+    $display("BPF_TE_CNM_PARITY_FAULT_PASS code=%h",cecode); inject_parity_error_cfg=0; @(negedge clk); wait(!cdone);
     // Zero-filled 4x4 GEMM exercises the real Matrix banked-read path and
     // aligned Line writeback through the same four-bank adapter.
     op_mode=8'h30; mm=4; mn=4; mk=1; ms0=32'h400; ms1=32'h800; mdst=32'h1000;
@@ -71,6 +82,10 @@ module tb_ai_bpf_te_compute_subsystem;
     if (merr) $fatal(1,"Matrix integration error code=%h",mecode);
     if (matrix_line_count == 0 || matrix_line_bad) $fatal(1,"Matrix nonzero writeback mismatch count=%0d bad=%0d",matrix_line_count,matrix_line_bad);
     $display("BPF_TE_REAL_MATRIX_PASS result=%0d cycles=%0d line_writes=%0d accepted_bank_ops=%0d response_ops=%0d denied_ops=%0d",mres,mcy,matrix_line_count,acc,rsp,den);
+    op_mode=8'h20; cnm_write_protection_error_cfg=1; @(negedge clk); wait(!cdone);
+    cnm_start=1; @(negedge clk); cnm_start=0; wait(cdone);
+    if (!cerr) $fatal(1,"CNM write protection fault was not observed");
+    $display("BPF_TE_CNM_WRITE_PROTECTION_PASS code=%h",cecode); cnm_write_protection_error_cfg=0;
     // Flush an accepted CNM read in flight. The wrapper must turn the dropped
     // old-epoch response into an engine-visible abort rather than hang.
     op_mode=8'h20; @(negedge clk); cnm_start=1; @(negedge clk); cnm_start=0;
