@@ -27,35 +27,38 @@ def write_pairs(path: Path, pairs: dict[int, int]) -> None:
                      encoding="ascii")
 
 
-def generate(out: Path, fused: bool, seed: int = 20261115) -> dict:
+def generate(out: Path, fused: bool, seed: int = 20261115,
+             length: int = LENGTH) -> dict:
+    if length < 4 or length > 128 or length % 4:
+        raise ValueError("length must be a multiple of four in [4, 128]")
     mapper = Mapper(128 * 1024)
     mapper.next_addr = 0x1000
     mapper.task_id = 0x7100
-    lhs = [((index * 37 + seed) % 701) - 350 for index in range(LENGTH)]
-    rhs = [((index * 53 + seed * 3) % 601) - 300 for index in range(LENGTH)]
-    lhs_t = mapper.tensor("residual_lhs_i32", (LENGTH,), "i32", "row-major", lhs)
-    rhs_t = mapper.tensor("residual_rhs_i32", (LENGTH,), "i32", "row-major", rhs)
-    intermediate_t = mapper.tensor("residual_intermediate_i32", (LENGTH,), "i32",
-                                   "row-major", [0xA55AA55A] * LENGTH, False)
-    output_t = mapper.tensor("requant_output_i8_packed", (LENGTH,), "i8_packed",
-                             "row-major", [0xA55AA55A] * (LENGTH // 4), False)
+    lhs = [((index * 37 + seed) % 701) - 350 for index in range(length)]
+    rhs = [((index * 53 + seed * 3) % 601) - 300 for index in range(length)]
+    lhs_t = mapper.tensor("residual_lhs_i32", (length,), "i32", "row-major", lhs)
+    rhs_t = mapper.tensor("residual_rhs_i32", (length,), "i32", "row-major", rhs)
+    intermediate_t = mapper.tensor("residual_intermediate_i32", (length,), "i32",
+                                   "row-major", [0xA55AA55A] * length, False)
+    output_t = mapper.tensor("requant_output_i8_packed", (length,), "i8_packed",
+                             "row-major", [0xA55AA55A] * (length // 4), False)
 
     sums = residual_i32(lhs, rhs, 0)
     output_values = requant_i8(sums, 3)
     golden: dict[int, int] = {}
     if fused:
         mapper.add("residual_requant_i8_direct", OP_RESIDUAL_REQUANT_I8,
-                   lhs_t, output_t, src1=rhs_t, k_or_length=LENGTH,
+                   lhs_t, output_t, src1=rhs_t, k_or_length=length,
                    flags=FLAG_PACK_I8, shift=3)
     else:
         mapper.add("residual_i32", OP_RESIDUAL, lhs_t, intermediate_t,
-                   src1=rhs_t, k_or_length=LENGTH)
+                   src1=rhs_t, k_or_length=length)
         mapper.add("requant_i8_pack", OP_REQUANT, intermediate_t, output_t,
-                   k_or_length=LENGTH, flags=FLAG_PACK_I8, shift=3)
+                   k_or_length=length, flags=FLAG_PACK_I8, shift=3)
         for index, value in enumerate(sums):
             golden[intermediate_t.addr + index * 4] = value & 0xFFFFFFFF
 
-    for word_index in range(LENGTH // 4):
+    for word_index in range(length // 4):
         word = sum((output_values[word_index * 4 + lane] & 0xFF) << (lane * 8)
                    for lane in range(4))
         golden[output_t.addr + word_index * 4] = word
@@ -80,7 +83,7 @@ def generate(out: Path, fused: bool, seed: int = 20261115) -> dict:
         "mode": "direct_residual_requant" if fused else "residual_then_requant",
         "seed": seed, "descriptor_count": len(mapper.descriptors),
         "descriptor_base": descriptor_base, "completion_base": completion_base,
-        "golden_words": len(golden), "length": LENGTH, "requant_shift": 3,
+        "golden_words": len(golden), "length": length, "requant_shift": 3,
         "spad_capacity_bytes": 131072,
         "tensor_allocations": [
             {"name": tensor.name, "start": tensor.addr,
@@ -96,8 +99,8 @@ def generate(out: Path, fused: bool, seed: int = 20261115) -> dict:
             for d in mapper.descriptors
         ],
         "spad_access_bytes_expected": {
-            "read": LENGTH * 4 * (2 if fused else 3),
-            "write": (LENGTH // 4) * 4 + (0 if fused else LENGTH * 4),
+            "read": length * 4 * (2 if fused else 3),
+            "write": (length // 4) * 4 + (0 if fused else length * 4),
         },
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n",
@@ -112,8 +115,9 @@ def main() -> None:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--fused", action="store_true")
     parser.add_argument("--seed", type=int, default=20261115)
+    parser.add_argument("--length", type=int, default=LENGTH)
     args = parser.parse_args()
-    generate(args.out, args.fused, args.seed)
+    generate(args.out, args.fused, args.seed, args.length)
 
 
 if __name__ == "__main__":

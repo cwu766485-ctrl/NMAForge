@@ -307,6 +307,46 @@ ai_h64_projection_top:
 	grep -q '^REPRESENTATIVE_MODEL_PASS desc=4 ' "$(AI_H64_PROJECTION_RUN)/run.log"
 	grep -q '^REPRESENTATIVE_MODEL_PASS .*useful_macs=16384 executed_macs=65536 padding_macs=49152 useful_output_elements=256 physical_output_elements=1024 command_cycles=1188 end_to_end_cycles=1188 dma_preload_included=0 ' "$(AI_H64_PROJECTION_RUN)/run.log"
 
+# Round 5: one nonzero H64 FFN-up tile, with input/descriptors/weights loaded
+# through the real AXI4 DMA before the Product Top command doorbell.
+AI_H64_FFN_TILE_RUN ?= /tmp/nmaforge_h64_ffn_tile_$(shell date +%Y%m%d_%H%M%S)
+AI_H64_FFN_TILE_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
+AI_H64_FFN_TILE_SEED ?= 20261115
+.PHONY: ai_h64_ffn_tile_dma
+ai_h64_ffn_tile_dma:
+	test ! -e "$(AI_H64_FFN_TILE_RUN)"
+	mkdir -p "$(AI_H64_FFN_TILE_RUN)"
+	$(AI_H64_FFN_TILE_PYTHON) ../../../../benchmark/gpt2_compat/generate_h64_ffn_tile.py \
+		--seed "$(AI_H64_FFN_TILE_SEED)" --out "$(AI_H64_FFN_TILE_RUN)/workload"
+	$(AI_H64_FFN_TILE_PYTHON) ../../../../benchmark/representative/prepare_cnn_dma_payload.py \
+		--memory-image "$(AI_H64_FFN_TILE_RUN)/workload/model_memory.memh" \
+		--out-dir "$(AI_H64_FFN_TILE_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_H64_FFN_TILE_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_H64_FFN_TILE_RUN)/simv \
+		-l $(AI_H64_FFN_TILE_RUN)/compile.log
+	$(AI_H64_FFN_TILE_RUN)/simv +ntb_random_seed=$(AI_H64_FFN_TILE_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H64_FFN_TILE_SEED) \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_DMA_PRELOAD \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_FFN_TILE_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_FFN_TILE_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_H64_FFN_TILE_RUN)/workload/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_H64_FFN_TILE_RUN)/workload/dma_plan.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H64_FFN_TILE_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FFN_TILE_RUN)/workload/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_FFN_TILE_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FFN_TILE_RUN)/workload/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_FFN_TILE_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FFN_TILE_RUN)/workload/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H64_FFN_TILE_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FFN_TILE_RUN)/workload/manifest.json"))["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_H64_FFN_TILE_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FFN_TILE_RUN)/workload/manifest.json"))["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_H64_FFN_TILE_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FFN_TILE_RUN)/workload/manifest.json"))["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=$$($(AI_H64_FFN_TILE_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FFN_TILE_RUN)/workload/manifest.json"))["useful_output_elements"])') \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_FFN_TILE_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FFN_TILE_RUN)/workload/manifest.json"))["physical_output_elements"])') \
+		-l $(AI_H64_FFN_TILE_RUN)/run.log
+	grep -q '^REPRESENTATIVE_DMA_PRELOAD_PASS transactions=' "$(AI_H64_FFN_TILE_RUN)/run.log"
+	grep -q '^REPRESENTATIVE_MODEL_PASS .*golden_words=1088 ' "$(AI_H64_FFN_TILE_RUN)/run.log"
+
 # Round 4: Product Top executes position add, 64-wide LayerNorm, layout
 # conversion and all H64 Q/K/V projections; intermediate SPAD words are Golden checked.
 AI_H64_PRELN_QKV_RUN ?= /tmp/nmaforge_h64_preln_qkv_$(shell date +%Y%m%d_%H%M%S)

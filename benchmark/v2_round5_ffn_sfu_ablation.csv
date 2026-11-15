@@ -1,0 +1,8 @@
+kind,shape,descriptors,dma_bytes,command_cycles,end_to_end_cycles,useful_macs,executed_macs,padding_macs,spad_reads,spad_writes,result
+ffn_tile,h64_m4_n16_k64_plus_down,5,3648,4684,5789,5120,20480,15360,6656,4352,PASS
+svse_fused,4,1,0,93,93,0,0,0,32,4,PASS
+svse_fused,8,1,0,118,118,0,0,0,64,8,PASS
+svse_fused,16,1,0,168,168,0,0,0,128,16,PASS
+svse_fused,32,1,0,268,268,0,0,0,256,32,PASS
+svse_fused,64,1,0,468,468,0,0,0,512,64,PASS
+svse_fused,128,1,0,868,868,0,0,0,1024,128,PASS
