@@ -118,8 +118,15 @@ dispatcher. Decision: `NO_INCREMENTAL_OPPORTUNITY` and
 ## Regression
 
 `make ai_smoke` passed after the opcode routing change (seed 12345, 4 random
-cases). H64 Projection, H64 Attention, and direct forwarding A/B passed. No
-product branch was changed or merged.
+cases), with `TEST PASS` and no test failures. After the license was restored,
+the latest focused runs also passed:
+
+- H64 Attention: `/tmp/nmaforge_round4_license_attention_20261115/run.log`
+- SVSE A/B: `/tmp/nmaforge_round4_license_fusion_20261115/baseline/run.log`
+- SVSE fused: `/tmp/nmaforge_round4_license_fusion_20261115/fused/run.log`
+
+H64 Projection, H64 Attention, and direct forwarding A/B all pass with real VCS
+execution. No product branch was changed or merged.
 
 ## Remaining work
 
