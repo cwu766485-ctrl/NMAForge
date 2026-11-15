@@ -2,9 +2,9 @@
 
 ## Candidate and Isolation
 
-Research branch: `research/nmaforge-v1.2-round12`  
-Base: Round 11 commit `0438a65e33649fa094679b21171cc4054a920c29`  
-Product RTL/ABI and PR #7/#8: unchanged.  
+Research branch: `research/nmaforge-v1.2-round12`
+Base: Round 11 commit `0438a65e33649fa094679b21171cc4054a920c29`
+Product RTL/ABI and PR #7/#8: unchanged.
 The working tree is `/tmp/nmaforge-v1.2-round12`.
 
 ## Gate Results
