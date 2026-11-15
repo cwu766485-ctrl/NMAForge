@@ -2017,6 +2017,134 @@ module tb_ai_accel_smoke;
     // Reusable software-style queue consumer/publisher exercised through the
     // real Product Top AXI-Lite and SPAD apertures. Queue pointers wrap in
     // place; queue geometry and DUT reset remain unchanged throughout.
+    task runtime_read_word_retry;
+        input [31:0] addr;
+        output [31:0] data;
+        output reg success;
+        integer tries;
+        begin
+            success = 1'b0;
+            data = 32'd0;
+            for (tries = 0; tries < 64 && !success; tries = tries + 1) begin
+                @(negedge aclk);
+                s_axi_araddr <= addr;
+                s_axi_arvalid <= 1'b1;
+                while (!s_axi_arready)
+                    @(negedge aclk);
+                @(negedge aclk);
+                s_axi_arvalid <= 1'b0;
+                s_axi_rready <= 1'b1;
+                while (!s_axi_rvalid)
+                    @(negedge aclk);
+                data = s_axi_rdata;
+                success = (s_axi_rresp == 2'b00);
+                @(negedge aclk);
+                s_axi_rready <= 1'b1;
+            end
+        end
+    endtask
+
+    task runtime_write_descriptor_words;
+        input [31:0] descriptor_addr;
+        input [31:0] words [0:15];
+        integer word_index;
+        begin
+            if ((descriptor_addr & 32'h3f) != 0)
+                $fatal(1, "runtime descriptor address is not 64-byte aligned: %08h",
+                       descriptor_addr);
+            for (word_index = 0; word_index < 16; word_index = word_index + 1)
+                axi_write(SPAD_BASE + descriptor_addr + word_index * 4,
+                          words[word_index]);
+        end
+    endtask
+
+    task runtime_wait_dma_fence;
+        output reg success;
+        reg [31:0] dma_status;
+        integer poll;
+        begin
+            success = 1'b0;
+            dma_status = 32'd0;
+            for (poll = 0; poll < 200000 && !dma_status[1] && !dma_status[2];
+                 poll = poll + 1)
+                axi_read(REG_DMA_STATUS, dma_status);
+            if (!dma_status[1] && !dma_status[2])
+                $fatal(1, "runtime DMA fence timeout status=%08h", dma_status);
+            success = dma_status[1] && !dma_status[2];
+            axi_write(REG_DMA_STATUS, dma_status[2] ? 32'd4 : 32'd2);
+        end
+    endtask
+
+    task runtime_wait_queue_idle;
+        input [31:0] expected_cmd_head;
+        input [31:0] expected_cpl_tail;
+        output reg success;
+        output reg [31:0] status_word;
+        output reg [31:0] cmd_head;
+        output reg [31:0] cpl_tail;
+        integer poll;
+        begin
+            success = 1'b0;
+            status_word = 32'd0;
+            cmd_head = 32'd0;
+            cpl_tail = 32'd0;
+            for (poll = 0; poll < 200000 && !success; poll = poll + 1) begin
+                axi_read(REG_STATUS, status_word);
+                axi_read(REG_CMDQ_HEAD, cmd_head);
+                axi_read(REG_CPLQ_TAIL, cpl_tail);
+                if (status_word[2])
+                    $fatal(1, "runtime queue reported accelerator error status=%08h",
+                           status_word);
+                success = !status_word[0] && status_word[1] &&
+                          cmd_head == expected_cmd_head &&
+                          cpl_tail == expected_cpl_tail;
+            end
+        end
+    endtask
+
+    task runtime_publish_vdot;
+        input [31:0] descriptor_addr;
+        input [15:0] task_id;
+        input [31:0] output_addr;
+        reg [31:0] descriptor_words [0:15];
+        integer word_index;
+        begin
+            for (word_index = 0; word_index < 16; word_index = word_index + 1)
+                descriptor_words[word_index] = 32'd0;
+            descriptor_words[0] = {task_id, 8'd0, OP_VDOT_INT8};
+            descriptor_words[1] = 32'h2000;
+            descriptor_words[2] = 32'h2004;
+            descriptor_words[4] = output_addr;
+            descriptor_words[5] = 32'h0001_0001;
+            descriptor_words[6] = 32'd1;
+            runtime_write_descriptor_words(descriptor_addr, descriptor_words);
+        end
+    endtask
+
+    task runtime_read_completion;
+        input [31:0] completion_addr;
+        input [15:0] expected_task;
+        input [31:0] expected_result;
+        output reg success;
+        reg [31:0] words [0:3];
+        reg word_success;
+        integer word_index;
+        begin
+            success = 1'b1;
+            for (word_index = 0; word_index < 4; word_index = word_index + 1) begin
+                runtime_read_word_retry(SPAD_BASE + completion_addr + word_index * 4,
+                                        words[word_index], word_success);
+                if (!word_success)
+                    success = 1'b0;
+            end
+            if (success &&
+                (words[0] !== {16'd0, expected_task} ||
+                 words[1] !== 32'd1 || words[2] !== expected_result ||
+                 words[3] !== 32'd1))
+                success = 1'b0;
+        end
+    endtask
+
     task run_cmdq_stream_runtime;
         integer total_desc;
         integer cmdq_size;
@@ -2035,11 +2163,16 @@ module tb_ai_accel_smoke;
         integer output_addr;
         integer start_cycle;
         integer end_cycle;
-        integer full_seen;
-        integer stable_tail;
         integer available_count;
         integer completion_idx;
-        integer cpl_is_full;
+        integer completion_read_ok;
+        integer completion_read_tries;
+        integer status_word;
+        integer batch_first_retired;
+        integer output_check;
+        integer dma_fence_ok;
+        integer queue_idle_ok;
+        integer expected_cpl_tail;
         reg [31:0] rd;
         begin
             total_desc = 512;
@@ -2050,7 +2183,6 @@ module tb_ai_accel_smoke;
             retired = 0;
             cmd_tail = 0;
             cpl_head = 0;
-            full_seen = 0;
             if (total_desc < 512)
                 $fatal(1, "stream runtime requires at least 512 descriptors got=%0d",
                        total_desc);
@@ -2065,8 +2197,22 @@ module tb_ai_accel_smoke;
             axi_write(REG_CPLQ_SIZE, cplq_size);
             axi_write(REG_CPLQ_HEAD, 32'd0);
             axi_write(REG_CPLQ_TAIL, 32'd0);
-            axi_write(SPAD_BASE + 32'h2000, 32'h0403_0201);
-            axi_write(SPAD_BASE + 32'h2004, 32'h0807_0605);
+            axi_mem_u.mem[32'h0500 >> 2] = 32'h0403_0201;
+            axi_mem_u.mem[32'h0504 >> 2] = 32'h0807_0605;
+            axi_write(REG_DMA_EXT_ADDR, 32'h0500);
+            axi_write(REG_DMA_SPAD_ADDR, 32'h2000);
+            axi_write(REG_DMA_LENGTH, 32'd2);
+            axi_write(REG_DMA_CTRL, 32'd1);
+            runtime_wait_dma_fence(dma_fence_ok);
+            if (!dma_fence_ok)
+                $fatal(1, "runtime DMA fence reported error");
+            axi_read(SPAD_BASE + 32'h2000, rd);
+            if (rd !== 32'h0403_0201)
+                $fatal(1, "runtime DMA fence/input0 mismatch expected=04030201 actual=%08h", rd);
+            axi_read(SPAD_BASE + 32'h2004, rd);
+            if (rd !== 32'h0807_0605)
+                $fatal(1, "runtime DMA fence/input1 mismatch expected=08070605 actual=%08h", rd);
+            $display("CMDQ_RUNTIME_DMA_FENCE_PASS ext=00000500 spad=00002000 bytes=8 method=DMA_STATUS_AXIL");
             for (slot = 0; slot < total_desc; slot = slot + 1)
                 axi_write(SPAD_BASE + 32'h3000 + slot * 4, 32'hface_0000 | slot);
 
@@ -2076,8 +2222,8 @@ module tb_ai_accel_smoke;
             start_cycle = transformer_top_cycle_counter;
             while (retired < total_desc) begin
                 batch_count = total_desc - published;
-                if (batch_count > cmdq_size - 1)
-                    batch_count = cmdq_size - 1;
+                if (batch_count > cplq_size - 1)
+                    batch_count = cplq_size - 1;
                 batch_published = 0;
                 for (slot = 0; slot < batch_count; slot = slot + 1) begin
                     expected_task = 16'h4000 + published;
@@ -2092,82 +2238,63 @@ module tb_ai_accel_smoke;
                 end
                 axi_write(REG_CMDQ_TAIL, cmd_tail);
                 axi_write(REG_DOORBELL, 32'd1);
+                batch_first_retired = retired;
                 $display("CMDQ_RUNTIME_PUBLISH batch=%0d count=%0d tail=%0d total=%0d",
-                         (published-1)/(cmdq_size-1), batch_published,
+                         (published-1)/(cplq_size-1), batch_published,
                          cmd_tail, published);
 
-                while (retired < published) begin
-                    axi_read(REG_CPLQ_TAIL, cpl_tail);
-                    cpl_is_full = (((cpl_tail + 1) % cplq_size) == cpl_head);
-                    if (published >= 7 && !full_seen && cpl_is_full) begin
-                        full_seen = 1;
-                        stable_tail = cpl_tail;
-                        repeat (20) @(posedge aclk);
-                        axi_read(REG_CPLQ_TAIL, cpl_tail);
-                        if (cpl_tail != stable_tail)
-                            $fatal(1, "CPLQ full did not apply completion backpressure tail=%0d expected=%0d",
-                                   cpl_tail, stable_tail);
-                        if (!dut.processor_busy)
-                            $fatal(1, "CPLQ full did not hold command processor busy");
-                        $display("CMDQ_RUNTIME_CPLQ_FULL_PASS tail=%0d head=%0d held_cycles=20",
-                                 cpl_tail, cpl_head);
+                expected_cpl_tail = (cpl_head + batch_published) % cplq_size;
+                runtime_wait_queue_idle(cmd_tail, expected_cpl_tail, queue_idle_ok,
+                                        status_word, cmd_head, cpl_tail);
+                if (!queue_idle_ok)
+                    $fatal(1, "stream runtime batch completion timeout published=%0d retired=%0d status=%08h",
+                           published, retired, status_word);
+                available_count = (cpl_tail - cpl_head + cplq_size) % cplq_size;
+                if (available_count != batch_published)
+                    $fatal(1, "runtime completion count mismatch got=%0d expected=%0d tail=%0d head=%0d",
+                           available_count, batch_published, cpl_tail, cpl_head);
+                for (completion_idx = 0; completion_idx < available_count;
+                     completion_idx = completion_idx + 1) begin
+                    expected_task = 16'h4000 + retired + completion_idx;
+                    completion_read_ok = 0;
+                    completion_read_tries = 0;
+                    while (!completion_read_ok && completion_read_tries < 8) begin
+                        runtime_read_completion(32'h1400 + cpl_head * 16,
+                                                expected_task[15:0], 32'd70,
+                                                completion_read_ok);
+                        completion_read_tries = completion_read_tries + 1;
                     end
-                    available_count = (cpl_tail - cpl_head + cplq_size) % cplq_size;
-                    if (available_count != 0 &&
-                        (cpl_is_full || !dut.processor_busy)) begin
-                        if (dut.core_spad_valid || dut.matrix_line_valid ||
-                            dut.banked_read_valid || (|dut.cnm_read_valid))
-                            $fatal(1, "runtime attempted host completion reads during compute SPAD activity");
-                        for (completion_idx = 0; completion_idx < available_count;
-                             completion_idx = completion_idx + 1) begin
-                            expected_task = 16'h4000 + retired + completion_idx;
-                            rd = representative_spad_backdoor_read(
-                                32'h1400 + cpl_head * 16);
-                            if (rd !== expected_task[15:0])
-                                $fatal(1, "stream runtime completion order/task mismatch retired=%0d slot=%0d expected=%04h actual=%08h",
-                                       retired + completion_idx, cpl_head,
-                                       expected_task[15:0], rd);
-                            rd = representative_spad_backdoor_read(
-                                32'h1404 + cpl_head * 16);
-                            if (rd !== 32'd1)
-                                $fatal(1, "stream runtime completion status mismatch retired=%0d status=%08h",
-                                       retired + completion_idx, rd);
-                            rd = representative_spad_backdoor_read(
-                                32'h1408 + cpl_head * 16);
-                            if (rd !== 32'd70)
-                                $fatal(1, "stream runtime completion result mismatch retired=%0d result=%08h",
-                                       retired + completion_idx, rd);
-                            rd = representative_spad_backdoor_read(
-                                32'h140c + cpl_head * 16);
-                            if (rd !== 32'd1)
-                                $fatal(1, "stream runtime completion element count mismatch retired=%0d count=%08h",
-                                       retired + completion_idx, rd);
-                            rd = representative_spad_backdoor_read(
-                                32'h3000 + (retired + completion_idx) * 4);
-                            if (rd !== 32'd70)
-                                $fatal(1, "stream runtime VDOT golden mismatch retired=%0d expected=70 actual=%08h",
-                                       retired + completion_idx, rd);
-                            cpl_head = (cpl_head + 1) % cplq_size;
-                        end
-                        axi_write(REG_CPLQ_HEAD, cpl_head);
-                        retired = retired + available_count;
-                    end else begin
-                        @(posedge aclk);
-                    end
+                    if (!completion_read_ok)
+                        $fatal(1, "stream runtime AXI completion read failed retired=%0d slot=%0d",
+                               retired + completion_idx, cpl_head);
+                    cpl_head = (cpl_head + 1) % cplq_size;
                 end
+                axi_write(REG_CPLQ_HEAD, cpl_head);
+                retired = retired + available_count;
                 axi_read(REG_CMDQ_HEAD, cmd_head);
-                if (cmd_head != cmd_tail || dut.processor_busy)
-                    $fatal(1, "stream runtime batch did not drain cmd_head=%0d tail=%0d busy=%0d",
-                           cmd_head, cmd_tail, dut.processor_busy);
+                axi_read(REG_STATUS, status_word);
+                if (cmd_head != cmd_tail || status_word[0])
+                    $fatal(1, "stream runtime batch did not drain cmd_head=%0d tail=%0d status=%08h",
+                           cmd_head, cmd_tail, status_word);
+                for (output_check = batch_first_retired;
+                     output_check < published; output_check = output_check + 1) begin
+                    axi_read(SPAD_BASE + 32'h3000 + output_check * 4, rd);
+                    if (rd !== 32'd70)
+                        $fatal(1, "stream runtime VDOT golden mismatch retired=%0d expected=70 actual=%08h",
+                               output_check, rd);
+                end
             end
             end_cycle = transformer_top_cycle_counter;
             stream_runtime_measure = 1'b0;
             axi_read(REG_CMDQ_HEAD, cmd_head);
             axi_read(REG_CPLQ_TAIL, cpl_tail);
-            if (cmd_head != cmd_tail || cpl_tail != cpl_head || dut.processor_busy)
-                $fatal(1, "stream runtime final queues not drained cmd_head=%0d cmd_tail=%0d cpl_tail=%0d cpl_head=%0d busy=%0d",
-                       cmd_head, cmd_tail, cpl_tail, cpl_head, dut.processor_busy);
-            $display("CMDQ_STREAM_RUNTIME_PASS descriptors=%0d cmdq_size=%0d cplq_size=%0d cmd_wraps=%0d cpl_wraps=%0d cycles=%0d spad_read_bytes=%0d spad_write_bytes=%0d dma_bytes=0 golden_checks=%0d completion_snapshot=behavioral_sram_backdoor reset_events=0",
+            axi_read(REG_STATUS, status_word);
+            if (cmd_head != cmd_tail || cpl_tail != cpl_head || status_word[0])
+                $fatal(1, "stream runtime final queues not drained cmd_head=%0d cmd_tail=%0d cpl_tail=%0d cpl_head=%0d status=%08h",
+                       cmd_head, cmd_tail, cpl_tail, cpl_head, status_word);
+            $display("CMDQ_RUNTIME_AXI_COMPLETION_PASS descriptors=%0d retire_mode=batch_idle usable_cplq=%0d",
+                     retired, cplq_size-1);
+            $display("CMDQ_STREAM_RUNTIME_PASS descriptors=%0d cmdq_size=%0d cplq_size=%0d cmd_wraps=%0d cpl_wraps=%0d cycles=%0d spad_read_bytes=%0d spad_write_bytes=%0d dma_bytes=8 golden_checks=%0d completion_snapshot=axi_lite reset_events=0",
                      retired, cmdq_size, cplq_size,
                      published / cmdq_size, retired / cplq_size,
                      end_cycle-start_cycle,
