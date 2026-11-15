@@ -405,6 +405,9 @@ module tb_ai_accel_smoke;
     integer profile_ai_seed;
     integer seed_dummy;
     integer matrix_line_write_count;
+    reg stream_runtime_measure = 1'b0;
+    integer stream_runtime_read_ops;
+    integer stream_runtime_write_ops;
     integer ai_tile_forward_baseline_a_reads = 0;
     integer ai_tile_forward_enabled_a_reads = 0;
     integer ai_tile_forward_read_phase = 0;
@@ -1320,6 +1323,20 @@ module tb_ai_accel_smoke;
     end
 
     always @(posedge aclk) begin
+        if (!aresetn) begin
+            stream_runtime_read_ops <= 0;
+            stream_runtime_write_ops <= 0;
+        end else if (stream_runtime_measure) begin
+            if (dut.core_spad_valid && dut.arb_core_ready) begin
+                if (dut.core_spad_write)
+                    stream_runtime_write_ops <= stream_runtime_write_ops + 1;
+                else
+                    stream_runtime_read_ops <= stream_runtime_read_ops + 1;
+            end
+        end
+    end
+
+    always @(posedge aclk) begin
         if (aresetn && dut.parallel_queue_mode_r &&
             dut.engine_busy[3] && dut.engine_busy[4])
             parallel_engine_overlap_seen <= 1'b1;
@@ -1994,6 +2011,168 @@ module tb_ai_accel_smoke;
             axi_write(SPAD_BASE + base + 32'h34, 32'd0);
             axi_write(SPAD_BASE + base + 32'h38, 32'd0);
             axi_write(SPAD_BASE + base + 32'h3c, 32'd0);
+        end
+    endtask
+
+    // Reusable software-style queue consumer/publisher exercised through the
+    // real Product Top AXI-Lite and SPAD apertures. Queue pointers wrap in
+    // place; queue geometry and DUT reset remain unchanged throughout.
+    task run_cmdq_stream_runtime;
+        integer total_desc;
+        integer cmdq_size;
+        integer cplq_size;
+        integer published;
+        integer retired;
+        integer batch_count;
+        integer batch_published;
+        integer cmd_tail;
+        integer cpl_head;
+        integer cmd_head;
+        integer cpl_tail;
+        integer slot;
+        integer expected_task;
+        integer poll;
+        integer output_addr;
+        integer start_cycle;
+        integer end_cycle;
+        integer full_seen;
+        integer stable_tail;
+        integer available_count;
+        integer completion_idx;
+        integer cpl_is_full;
+        reg [31:0] rd;
+        begin
+            total_desc = 512;
+            void'($value$plusargs("AI_CMDQ_STREAM_COUNT=%d", total_desc));
+            cmdq_size = 8;
+            cplq_size = 4;
+            published = 0;
+            retired = 0;
+            cmd_tail = 0;
+            cpl_head = 0;
+            full_seen = 0;
+            if (total_desc < 512)
+                $fatal(1, "stream runtime requires at least 512 descriptors got=%0d",
+                       total_desc);
+
+            axi_write(REG_CMDQ_CTRL, 32'd0);
+            axi_write(REG_CMDQ_BASE_LO, 32'h1000);
+            axi_write(REG_CMDQ_BASE_HI, 32'd0);
+            axi_write(REG_CMDQ_SIZE, cmdq_size);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd0);
+            axi_write(REG_CPLQ_BASE_LO, 32'h1400);
+            axi_write(REG_CPLQ_SIZE, cplq_size);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+            axi_write(SPAD_BASE + 32'h2000, 32'h0403_0201);
+            axi_write(SPAD_BASE + 32'h2004, 32'h0807_0605);
+            for (slot = 0; slot < total_desc; slot = slot + 1)
+                axi_write(SPAD_BASE + 32'h3000 + slot * 4, 32'hface_0000 | slot);
+
+            stream_runtime_read_ops = 0;
+            stream_runtime_write_ops = 0;
+            stream_runtime_measure = 1'b1;
+            start_cycle = transformer_top_cycle_counter;
+            while (retired < total_desc) begin
+                batch_count = total_desc - published;
+                if (batch_count > cmdq_size - 1)
+                    batch_count = cmdq_size - 1;
+                batch_published = 0;
+                for (slot = 0; slot < batch_count; slot = slot + 1) begin
+                    expected_task = 16'h4000 + published;
+                    output_addr = 32'h3000 + published * 4;
+                    write_spad_desc(32'h1000 + cmd_tail * 64,
+                                    OP_VDOT_INT8, expected_task[15:0],
+                                    32'h2000, 32'h2004, output_addr,
+                                    16'd1, 16'd1, 16'd1);
+                    cmd_tail = (cmd_tail + 1) % cmdq_size;
+                    published = published + 1;
+                    batch_published = batch_published + 1;
+                end
+                axi_write(REG_CMDQ_TAIL, cmd_tail);
+                axi_write(REG_DOORBELL, 32'd1);
+                $display("CMDQ_RUNTIME_PUBLISH batch=%0d count=%0d tail=%0d total=%0d",
+                         (published-1)/(cmdq_size-1), batch_published,
+                         cmd_tail, published);
+
+                while (retired < published) begin
+                    axi_read(REG_CPLQ_TAIL, cpl_tail);
+                    cpl_is_full = (((cpl_tail + 1) % cplq_size) == cpl_head);
+                    if (published >= 7 && !full_seen && cpl_is_full) begin
+                        full_seen = 1;
+                        stable_tail = cpl_tail;
+                        repeat (20) @(posedge aclk);
+                        axi_read(REG_CPLQ_TAIL, cpl_tail);
+                        if (cpl_tail != stable_tail)
+                            $fatal(1, "CPLQ full did not apply completion backpressure tail=%0d expected=%0d",
+                                   cpl_tail, stable_tail);
+                        if (!dut.processor_busy)
+                            $fatal(1, "CPLQ full did not hold command processor busy");
+                        $display("CMDQ_RUNTIME_CPLQ_FULL_PASS tail=%0d head=%0d held_cycles=20",
+                                 cpl_tail, cpl_head);
+                    end
+                    available_count = (cpl_tail - cpl_head + cplq_size) % cplq_size;
+                    if (available_count != 0 &&
+                        (cpl_is_full || !dut.processor_busy)) begin
+                        if (dut.core_spad_valid || dut.matrix_line_valid ||
+                            dut.banked_read_valid || (|dut.cnm_read_valid))
+                            $fatal(1, "runtime attempted host completion reads during compute SPAD activity");
+                        for (completion_idx = 0; completion_idx < available_count;
+                             completion_idx = completion_idx + 1) begin
+                            expected_task = 16'h4000 + retired + completion_idx;
+                            rd = representative_spad_backdoor_read(
+                                32'h1400 + cpl_head * 16);
+                            if (rd !== expected_task[15:0])
+                                $fatal(1, "stream runtime completion order/task mismatch retired=%0d slot=%0d expected=%04h actual=%08h",
+                                       retired + completion_idx, cpl_head,
+                                       expected_task[15:0], rd);
+                            rd = representative_spad_backdoor_read(
+                                32'h1404 + cpl_head * 16);
+                            if (rd !== 32'd1)
+                                $fatal(1, "stream runtime completion status mismatch retired=%0d status=%08h",
+                                       retired + completion_idx, rd);
+                            rd = representative_spad_backdoor_read(
+                                32'h1408 + cpl_head * 16);
+                            if (rd !== 32'd70)
+                                $fatal(1, "stream runtime completion result mismatch retired=%0d result=%08h",
+                                       retired + completion_idx, rd);
+                            rd = representative_spad_backdoor_read(
+                                32'h140c + cpl_head * 16);
+                            if (rd !== 32'd1)
+                                $fatal(1, "stream runtime completion element count mismatch retired=%0d count=%08h",
+                                       retired + completion_idx, rd);
+                            rd = representative_spad_backdoor_read(
+                                32'h3000 + (retired + completion_idx) * 4);
+                            if (rd !== 32'd70)
+                                $fatal(1, "stream runtime VDOT golden mismatch retired=%0d expected=70 actual=%08h",
+                                       retired + completion_idx, rd);
+                            cpl_head = (cpl_head + 1) % cplq_size;
+                        end
+                        axi_write(REG_CPLQ_HEAD, cpl_head);
+                        retired = retired + available_count;
+                    end else begin
+                        @(posedge aclk);
+                    end
+                end
+                axi_read(REG_CMDQ_HEAD, cmd_head);
+                if (cmd_head != cmd_tail || dut.processor_busy)
+                    $fatal(1, "stream runtime batch did not drain cmd_head=%0d tail=%0d busy=%0d",
+                           cmd_head, cmd_tail, dut.processor_busy);
+            end
+            end_cycle = transformer_top_cycle_counter;
+            stream_runtime_measure = 1'b0;
+            axi_read(REG_CMDQ_HEAD, cmd_head);
+            axi_read(REG_CPLQ_TAIL, cpl_tail);
+            if (cmd_head != cmd_tail || cpl_tail != cpl_head || dut.processor_busy)
+                $fatal(1, "stream runtime final queues not drained cmd_head=%0d cmd_tail=%0d cpl_tail=%0d cpl_head=%0d busy=%0d",
+                       cmd_head, cmd_tail, cpl_tail, cpl_head, dut.processor_busy);
+            $display("CMDQ_STREAM_RUNTIME_PASS descriptors=%0d cmdq_size=%0d cplq_size=%0d cmd_wraps=%0d cpl_wraps=%0d cycles=%0d spad_read_bytes=%0d spad_write_bytes=%0d dma_bytes=0 golden_checks=%0d completion_snapshot=behavioral_sram_backdoor reset_events=0",
+                     retired, cmdq_size, cplq_size,
+                     published / cmdq_size, retired / cplq_size,
+                     end_cycle-start_cycle,
+                     stream_runtime_read_ops * 4,
+                     stream_runtime_write_ops * 4, retired);
         end
     endtask
 
@@ -5370,6 +5549,12 @@ module tb_ai_accel_smoke;
             if (errors != 0)
                 $fatal(1, "H16 incremental decode had %0d mismatches", errors);
             $display("H16_INCREMENTAL_TOP_PASS");
+            $finish;
+        end
+
+        if ($test$plusargs("AI_CMDQ_STREAM_RUNTIME")) begin
+            run_cmdq_stream_runtime();
+            $display("CMDQ_STREAM_RUNTIME_TOP_PASS");
             $finish;
         end
 

@@ -1128,6 +1128,30 @@ ai_h16_incremental_decode:
 	$(AI_H16_INCREMENTAL_PYTHON) ../../../../sw/tools/summarize_h16_incremental_decode.py \
 		--run-dir "$(AI_H16_INCREMENTAL_RUN)"
 
+# Round 13: live CMDQ/CPLQ software runtime over real compute descriptors.
+AI_CMDQ_STREAM_RUN ?= /tmp/nmaforge_cmdq_stream_$(shell date +%Y%m%d_%H%M%S)
+AI_CMDQ_STREAM_COUNT ?= 512
+AI_CMDQ_STREAM_SEED ?= 20261115
+.PHONY: ai_cmdq_stream_runtime
+ai_cmdq_stream_runtime:
+	test ! -e "$(AI_CMDQ_STREAM_RUN)"
+	mkdir -p "$(AI_CMDQ_STREAM_RUN)"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-Mdir=$(AI_CMDQ_STREAM_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_CMDQ_STREAM_RUN)/simv -l $(AI_CMDQ_STREAM_RUN)/compile.log
+	$(AI_CMDQ_STREAM_RUN)/simv +ntb_random_seed=$(AI_CMDQ_STREAM_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_CMDQ_STREAM_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_CMDQ_STREAM_RUNTIME \
+		+AI_CMDQ_STREAM_COUNT=$(AI_CMDQ_STREAM_COUNT) \
+		-l $(AI_CMDQ_STREAM_RUN)/run.log
+	grep -q '^CMDQ_RUNTIME_CPLQ_FULL_PASS ' "$(AI_CMDQ_STREAM_RUN)/run.log"
+	grep -q '^CMDQ_STREAM_RUNTIME_PASS descriptors=$(AI_CMDQ_STREAM_COUNT) ' "$(AI_CMDQ_STREAM_RUN)/run.log"
+	grep -q '^CMDQ_STREAM_RUNTIME_TOP_PASS$$' "$(AI_CMDQ_STREAM_RUN)/run.log"
+
 # Round 23: train/export a bounded GPT-2-like synthetic-token LM, validate the
 # independent scalar INT8 reference, and run eight host-feedback Top steps.
 AI_TINY_GPT2_RUN ?= /tmp/nmaforge_tiny_gpt2_$(shell date +%Y%m%d_%H%M%S)
