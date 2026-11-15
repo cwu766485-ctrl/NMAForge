@@ -508,12 +508,13 @@ ai_h64_decoder_dma_top:
 AI_H64_KV_RUN ?= /tmp/nmaforge_h64_kv_roundtrip_$(shell date +%Y%m%d_%H%M%S)
 AI_H64_KV_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
 AI_H64_KV_SEED ?= 20261115
-.PHONY: ai_h64_kv_roundtrip_top
+AI_H64_KV_GENERATOR_FLAGS ?= --kv-roundtrip
+.PHONY: ai_h64_kv_roundtrip_top ai_h64_kv_attention_top
 ai_h64_kv_roundtrip_top:
 	test ! -e "$(AI_H64_KV_RUN)"
 	mkdir -p "$(AI_H64_KV_RUN)"
 	$(AI_H64_KV_PYTHON) ../../../../benchmark/gpt2_compat/generate_h64_preln_qkv.py \
-		--full-decoder --kv-roundtrip --seed "$(AI_H64_KV_SEED)" \
+		--full-decoder $(AI_H64_KV_GENERATOR_FLAGS) --seed "$(AI_H64_KV_SEED)" \
 		--out "$(AI_H64_KV_RUN)/workload"
 	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
 		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_H64_WEIGHT_DMA \
@@ -544,10 +545,14 @@ ai_h64_kv_roundtrip_top:
 		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=$$($(AI_H64_KV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_KV_RUN)/workload/manifest.json"))["useful_output_elements"])') \
 		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_KV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_KV_RUN)/workload/manifest.json"))["physical_output_elements"])') \
 		-l $(AI_H64_KV_RUN)/run.log
-	grep -q '^REPRESENTATIVE_DMA_PRELOAD_PASS transactions=49 payload_bytes=53248 checked_words=13312 axi_read_bytes=53248 ' "$(AI_H64_KV_RUN)/run.log"
-	test "$$(grep -c '^REPRESENTATIVE_DMA_FENCE_PASS ' "$(AI_H64_KV_RUN)/run.log")" -eq 49
-	test "$$(grep -c '^REPRESENTATIVE_CHECKPOINT_PASS ' "$(AI_H64_KV_RUN)/run.log")" -eq 43
-	grep -q '^REPRESENTATIVE_MODEL_PASS desc=253 .*dma_preload_included=1 ' "$(AI_H64_KV_RUN)/run.log"
+	$(AI_H64_KV_PYTHON) -c 'import json,re,pathlib; root=pathlib.Path("$(AI_H64_KV_RUN)"); m=json.loads((root/"workload/manifest.json").read_text()); s=(root/"run.log").read_text(); x=re.search(r"^REPRESENTATIVE_DMA_PRELOAD_PASS transactions=(\d+) payload_bytes=(\d+) checked_words=(\d+) axi_read_bytes=(\d+) ",s,re.M); expected=(len(m["dma_weight_streaming"]["transactions"]),m["dma_weight_streaming"]["payload_bytes"],m["dma_weight_streaming"]["payload_words"],m["dma_weight_streaming"]["payload_bytes"]); assert x and tuple(map(int,x.groups()))==expected,(x.groups() if x else None,expected); assert len(re.findall(r"^REPRESENTATIVE_DMA_FENCE_PASS ",s,re.M))==expected[0]'
+	test "$$(grep -c '^REPRESENTATIVE_CHECKPOINT_PASS ' "$(AI_H64_KV_RUN)/run.log")" -eq "$$( $(AI_H64_KV_PYTHON) -c 'import json;print(len(json.load(open("$(AI_H64_KV_RUN)/workload/manifest.json"))["intermediate_checkpoints"]))' )"
+	grep -q "^REPRESENTATIVE_MODEL_PASS desc=$$($(AI_H64_KV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_KV_RUN)/workload/manifest.json"))["descriptor_count"])') .*dma_preload_included=1 " "$(AI_H64_KV_RUN)/run.log"
+
+# Six-token cache-backed causal attention: token rows 4/5 use Product KV_READ
+# outputs as the actual QK/AV Matrix-B operands, with weights still DMA-loaded.
+ai_h64_kv_attention_top: AI_H64_KV_GENERATOR_FLAGS=--kv-attention --tokens 1,7,42,3,5,8
+ai_h64_kv_attention_top: ai_h64_kv_roundtrip_top
 
 # Research opcode 0x3a performs Residual -> packed INT8 Requant in one SFU
 # command. The same Product Top and generated data are used for both sides.

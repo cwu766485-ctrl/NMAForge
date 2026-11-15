@@ -27,6 +27,7 @@ from gpt2_compat_golden import make_model  # noqa: E402
 TOKENS = [1, 7, 42, 3]
 ROWS = 16
 HIDDEN = 64
+KV_FLAG_MATRIX_B_APPEND = 0x01
 
 
 def s32(value: int) -> int:
@@ -86,7 +87,18 @@ def compact_mapper_lifetimes(mapper: Mapper, capacity: int,
         first_read = min(consumers, default=None)
         if (first_read is not None and not tensor.initialized and
                 min(producers) >= first_read):
-            raise ValueError(f"{tensor.name}: read precedes its producer")
+            first = mapper.descriptors[first_read]
+            producer = mapper.descriptors[min(producers)]
+            source_owners = [
+                item.name for item in mapper.tensors.values()
+                if item.addr <= first.src0 < item.addr + _tensor_bytes(item)
+            ]
+            raise ValueError(
+                f"{tensor.name}: read precedes producer; first_read={first.name} "
+                f"src0={first.src0:#x} src1={first.src1:#x}; "
+                f"first_producer={producer.name} dst={producer.dst:#x}; "
+                f"tensor=[{start:#x},{end:#x}) src0_owners={source_owners}"
+            )
         records.append({"tensor": tensor, "old_start": start, "old_end": end,
                         "live_start": live_start, "live_end": live_end,
                         "producers": producers, "consumers": consumers})
@@ -190,9 +202,16 @@ def compact_mapper_lifetimes(mapper: Mapper, capacity: int,
 
 
 def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
-             include_ffn: bool = False, include_kv_roundtrip: bool = False) -> dict:
+             include_ffn: bool = False, include_kv_roundtrip: bool = False,
+             include_kv_attention: bool = False,
+             token_ids: list[int] | None = None) -> dict:
     if include_ffn and not include_attention:
         raise ValueError("full H64 Decoder requires Attention")
+    if include_kv_attention and (not include_ffn or include_kv_roundtrip):
+        raise ValueError("KV-backed attention requires full-decoder mode and excludes roundtrip mode")
+    tokens = list(token_ids if token_ids is not None else TOKENS)
+    if not tokens or any(token < 0 or token >= 256 for token in tokens):
+        raise ValueError("token IDs must be a non-empty list in [0,255]")
     model = make_model(seed)
     if include_ffn:
         model_path = out / "canonical_h64_model.npz"
@@ -207,7 +226,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
 
     embedding = np.zeros((ROWS, HIDDEN), dtype=np.int32)
     position = np.zeros((ROWS, HIDDEN), dtype=np.int32)
-    for row, token in enumerate(TOKENS):
+    for row, token in enumerate(tokens):
         embedding[row] = model["embedding"][token].astype(np.int32)
         position[row] = model["position"][row].astype(np.int32)
     combined = embedding + position
@@ -280,12 +299,32 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
             projection_tiles[(projection, tile)] = tile_t
 
     attention_golden: dict[int, int] = {}
+    attention_checkpoints = []
     attention_macs = 0
     if include_attention:
         norm_i8 = [[max(-128, min(127, int(value))) for value in row]
                    for row in norm]
         head_prob8: dict[int, list[list[int]]] = {}
         head_v8: dict[int, list[list[int]]] = {}
+        kv_attention_cache = {}
+        kv_attention_readback = {}
+        kv_attention_expected = {}
+        if include_kv_attention:
+            for kind in ("k", "v"):
+                cache_t = mapper.tensor(
+                    f"l0.kv_attention_{kind}_cache_i8", (4, 16, 16),
+                    "i8_packed", "matrix_b_head_token_feature",
+                    [0xA55AA55A] * (4 * 64), True,
+                )
+                kv_attention_cache[kind] = cache_t
+                kv_attention_readback[kind] = {}
+                kv_attention_expected[kind] = {}
+                for head in range(4):
+                    readback_t = mapper.tensor(
+                        f"l0.kv_attention_{kind}_read_h{head}", (16, 16),
+                        "i8_packed", "matrix_b_tile", [0xA55AA55A] * 64, False,
+                    )
+                    kv_attention_readback[kind][head] = readback_t
         for head in range(4):
             q_raw, k_raw = projection_tiles[("q", head)], projection_tiles[("k", head)]
             q_values, k_values = [], []
@@ -312,24 +351,118 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                     for word, value in enumerate(_pack_matrix_a_physical(values)):
                         attention_golden[packed_tensor.addr + word * 4] = value & 0xFFFFFFFF
 
-            scores = gemm_i8_i32(q_values, [list(row) for row in zip(*k_values)], shift=2)
+            if include_kv_attention:
+                v_raw = projection_tiles[("v", head)]
+                v_values = []
+                for row in range(ROWS):
+                    v_values.append(requant_i8([
+                        s32(projection_golden[v_raw.addr + 4 * (row * 16 + col)])
+                        for col in range(16)], 0))
+                v_cache_src = mapper.tensor(
+                    f"attn_v_h{head}_cache_source_i8", (ROWS, 16), "i8_packed",
+                    "matrix_a_tile", [0xA55AA55A] * 64, False,
+                )
+                mapper.add(f"attn_v_h{head}_cache_requant", OP_REQUANT,
+                           v_raw, v_cache_src, m=ROWS, n=16,
+                           k_or_length=ROWS * 16,
+                           flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A,
+                           shift=0, aux0=1)
+                for word, value in enumerate(_pack_matrix_a_physical(v_values)):
+                    attention_golden[v_cache_src.addr + word * 4] = value & 0xFFFFFFFF
+
+                for kind, source, values in (("k", k8_t, k_values),
+                                             ("v", v_cache_src, v_values)):
+                    cache_t = kv_attention_cache[kind]
+                    cache_bytes = bytearray()
+                    head_word_start = head * 64
+                    for word in cache_t.values[head_word_start:head_word_start + 64]:
+                        cache_bytes.extend((word & 0xFFFFFFFF).to_bytes(4, "little"))
+                    for token in range(len(tokens)):
+                        source_row_offset = (token // 4) * 64 + (token % 4) * 4
+                        if kind == "k":
+                            if token == 0:
+                                mapper.add(
+                                    f"kv_attention_k_write_h{head}",
+                                    OP_KV_WRITE, source, cache_t,
+                                    k_or_length=64, aux0=head << 16,
+                                    src0_stride=0, src1_stride=256,
+                                )
+                                for word, value in enumerate(
+                                        _pack_matrix_a_physical(values)):
+                                    cache_bytes[word * 4:word * 4 + 4] = \
+                                        (value & 0xFFFFFFFF).to_bytes(4, "little")
+                        else:
+                            mapper.add(
+                                f"kv_attention_v_append_h{head}_t{token}",
+                                OP_KV_WRITE, source, cache_t,
+                                src0_offset=source_row_offset, k_or_length=16,
+                                flags=KV_FLAG_MATRIX_B_APPEND,
+                                aux0=(head << 16) | token,
+                                src0_stride=16, src1_stride=256,
+                            )
+                            for feature, value in enumerate(values[token]):
+                                col_group, token_group = feature // 4, token // 4
+                                word_index = (col_group * 4 + token_group) * 4 + feature % 4
+                                byte_lane = token % 4
+                                cache_bytes[word_index * 4 + byte_lane] = value & 0xFF
+                    expected_words = [int.from_bytes(cache_bytes[i:i + 4], "little")
+                                      for i in range(0, len(cache_bytes), 4)]
+                    cache_rows = [[0] * 16 for _ in range(16)]
+                    for token in range(16):
+                        for feature in range(16):
+                            if kind == "k":
+                                word_index = ((token // 4) * 16 +
+                                              (feature // 4) * 4 + token % 4)
+                                byte_lane = feature % 4
+                            else:
+                                col_group, token_group = feature // 4, token // 4
+                                word_index = (col_group * 4 + token_group) * 4 + feature % 4
+                                byte_lane = token % 4
+                            byte = cache_bytes[word_index * 4 + byte_lane]
+                            cache_rows[token][feature] = byte - 256 if byte & 0x80 else byte
+                    kv_attention_expected[kind][head] = cache_rows
+                    if kind == "v":
+                        head_v8[head] = cache_rows
+                    readback_t = kv_attention_readback[kind][head]
+                    mapper.add(
+                        f"kv_attention_{kind}_read_h{head}", OP_KV_READ,
+                        cache_t, readback_t, k_or_length=64,
+                        aux0=head << 16, src0_stride=0,
+                        src1_stride=256,
+                    )
+                    for word, value in enumerate(expected_words):
+                        attention_golden[cache_t.addr + head * 256 + word * 4] = value
+                        attention_golden[readback_t.addr + word * 4] = value
+                head_v8[head] = v_values
+                scores = gemm_i8_i32(
+                    q_values,
+                    [list(row) for row in zip(*kv_attention_expected["k"][head])],
+                    shift=2,
+                )
+            else:
+                scores = gemm_i8_i32(q_values, [list(row) for row in zip(*k_values)], shift=2)
             score_t = mapper.tensor(f"attn_h{head}_scores_q8_8", (ROWS, ROWS), "i32",
                                     "row-major", [0xA55AA55A] * (ROWS * ROWS), False)
             mapper.add(f"attn_h{head}_qkt_scaled", OP_GEMM, q8_t, score_t,
-                       src1=k8_t, m=ROWS, n=ROWS, k_or_length=4,
+                       src1=(kv_attention_readback["k"][head]
+                             if include_kv_attention else k8_t),
+                       m=ROWS, n=ROWS, k_or_length=4,
+                       flags=0,
                        shift=2, aux0=1)
             for row in range(ROWS):
                 for col in range(ROWS):
                     attention_golden[score_t.addr + 4 * (row * ROWS + col)] = \
                         scores[row][col] & 0xFFFFFFFF
+            if include_kv_attention:
+                attention_checkpoints.append((score_t.name, score_t))
 
             prob_init = [0xA55AA55A] * (ROWS * ROWS)
-            for row in range(len(TOKENS), ROWS):
+            for row in range(len(tokens), ROWS):
                 prob_init[row * ROWS:(row + 1) * ROWS] = [0] * ROWS
             prob_t = mapper.tensor(f"attn_h{head}_prob_q15", (ROWS, ROWS), "i32",
                                    "row-major", prob_init, True)
             probs = [[0] * ROWS for _ in range(ROWS)]
-            for row in range(len(TOKENS)):
+            for row in range(len(tokens)):
                 mapper.add(f"attn_h{head}_causal_softmax_t{row}",
                            OP_CAUSAL_SOFTMAX, score_t, prob_t,
                            k_or_length=ROWS, aux0=row,
@@ -341,6 +474,12 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                 for col in range(ROWS):
                     attention_golden[prob_t.addr + 4 * (row * ROWS + col)] = \
                         probs[row][col]
+            if include_kv_attention:
+                for row in range(len(tokens), ROWS):
+                    for col in range(ROWS):
+                        attention_golden[prob_t.addr + 4 * (row * ROWS + col)] = 0
+            if include_kv_attention:
+                attention_checkpoints.append((prob_t.name, prob_t))
 
             p8 = [requant_i8(row, 8) for row in probs]
             p8_t = mapper.tensor(f"attn_h{head}_prob_i8", (ROWS, ROWS), "i8_packed",
@@ -354,35 +493,36 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                     attention_golden[p8_t.addr + word * 4] = value & 0xFFFFFFFF
             head_prob8[head] = p8
 
-            v_weights = model["l0.v"].astype(np.int32)[:, head * 16:(head + 1) * 16]
-            v_weight_transpose = v_weights.T.tolist()
-            v_weight_t = mapper.tensor(f"attn_h{head}_vt_weight_a", (16, HIDDEN),
-                                       "i8_packed", "matrix_a_tile",
-                                       _pack_matrix_a_physical(v_weight_transpose))
-            vt_t = mapper.tensor(f"attn_h{head}_vt_i32", (16, ROWS), "i32",
-                                 "row-major", [0xA55AA55A] * (16 * ROWS), False)
-            mapper.add(f"attn_h{head}_vt_projection", OP_GEMM,
-                       v_weight_t, vt_t, src1=packed_t,
-                       m=16, n=ROWS, k_or_length=HIDDEN // 4, aux0=1)
-            vt = gemm_i8_i32(v_weight_transpose,
-                             [list(row) for row in zip(*norm_i8)])
-            for row in range(16):
-                for col in range(ROWS):
-                    attention_golden[vt_t.addr + 4 * (row * ROWS + col)] = \
-                        vt[row][col] & 0xFFFFFFFF
-            vt_i8 = [requant_i8(row, 0) for row in vt]
-            v8_t = mapper.tensor(f"attn_h{head}_v_matrix_b", (ROWS, 16),
-                                 "i8_packed", "matrix_b_tile",
-                                 [0xA55AA55A] * 64, False)
-            mapper.add(f"attn_h{head}_v_requant_b", OP_REQUANT,
-                       vt_t, v8_t, m=16, n=ROWS,
-                       k_or_length=ROWS * 16,
-                       flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A,
-                       shift=0, aux0=1)
-            head_v8[head] = [list(row) for row in zip(*vt_i8)]
-            packed_v = _pack_matrix_a_physical(vt_i8)
-            for word, value in enumerate(packed_v):
-                attention_golden[v8_t.addr + word * 4] = value & 0xFFFFFFFF
+            if not include_kv_attention:
+                v_weights = model["l0.v"].astype(np.int32)[:, head * 16:(head + 1) * 16]
+                v_weight_transpose = v_weights.T.tolist()
+                v_weight_t = mapper.tensor(f"attn_h{head}_vt_weight_a", (16, HIDDEN),
+                                           "i8_packed", "matrix_a_tile",
+                                           _pack_matrix_a_physical(v_weight_transpose))
+                vt_t = mapper.tensor(f"attn_h{head}_vt_i32", (16, ROWS), "i32",
+                                     "row-major", [0xA55AA55A] * (16 * ROWS), False)
+                mapper.add(f"attn_h{head}_vt_projection", OP_GEMM,
+                           v_weight_t, vt_t, src1=packed_t,
+                           m=16, n=ROWS, k_or_length=HIDDEN // 4, aux0=1)
+                vt = gemm_i8_i32(v_weight_transpose,
+                                 [list(row) for row in zip(*norm_i8)])
+                for row in range(16):
+                    for col in range(ROWS):
+                        attention_golden[vt_t.addr + 4 * (row * ROWS + col)] = \
+                            vt[row][col] & 0xFFFFFFFF
+                vt_i8 = [requant_i8(row, 0) for row in vt]
+                v8_t = mapper.tensor(f"attn_h{head}_v_matrix_b", (ROWS, 16),
+                                     "i8_packed", "matrix_b_tile",
+                                     [0xA55AA55A] * 64, False)
+                mapper.add(f"attn_h{head}_v_requant_b", OP_REQUANT,
+                           vt_t, v8_t, m=16, n=ROWS,
+                           k_or_length=ROWS * 16,
+                           flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A,
+                           shift=0, aux0=1)
+                head_v8[head] = [list(row) for row in zip(*vt_i8)]
+                packed_v = _pack_matrix_a_physical(vt_i8)
+                for word, value in enumerate(packed_v):
+                    attention_golden[v8_t.addr + word * 4] = value & 0xFFFFFFFF
 
         merged_t = mapper.tensor("attention_concat_i8", (ROWS, HIDDEN),
                                  "i8_packed", "matrix_a_tile",
@@ -393,7 +533,9 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                                  "row-major", [0xA55AA55A] * (ROWS * 16), False)
             mapper.add(f"attn_h{head}_av_q15", OP_GEMM,
                        mapper.tensors[f"attn_h{head}_prob_i8"], av_t,
-                       src1=mapper.tensors[f"attn_h{head}_v_matrix_b"],
+                       src1=(kv_attention_readback["v"][head]
+                             if include_kv_attention else
+                             mapper.tensors[f"attn_h{head}_v_matrix_b"]),
                        m=ROWS, n=16, k_or_length=4, shift=7, aux0=1)
             av = gemm_i8_i32(head_prob8[head], head_v8[head], shift=7)
             for row in range(ROWS):
@@ -401,6 +543,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                     attention_golden[av_t.addr + 4 * (row * 16 + col)] = \
                         av[row][col] & 0xFFFFFFFF
                     merged_i8[row][head * 16 + col] = max(-128, min(127, av[row][col]))
+            if include_kv_attention:
+                attention_checkpoints.append((av_t.name, av_t))
             for row_group in range(ROWS // 4):
                 mapper.add(f"attn_h{head}_av_requant_concat_rg{row_group}",
                            OP_REQUANT, av_t, merged_t, m=4, n=16,
@@ -458,7 +602,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                 norm2_matrix[row, col] = int(value)
                 attention_golden[norm2_t.addr + 4 * (row * HIDDEN + col)] = \
                     int(value) & 0xFFFFFFFF
-        attention_macs = 163840
+        attention_macs = 98304 if include_kv_attention else 163840
 
     ffn_golden: dict[int, int] = {}
     kv_golden: dict[int, int] = {}
@@ -583,7 +727,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
             read_t = readback_tensors[kind]
             for head in range(4):
                 source_t = projection_tiles[(kind, head)]
-                for token in range(len(TOKENS)):
+                for token in range(len(tokens)):
                     source_offset = token * 16 * 4
                     task = f"l0.kv_{kind}_write_t{token}_h{head}"
                     mapper.add(task, OP_KV_WRITE, source_t, cache_t,
@@ -680,6 +824,15 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
             ("ln2_output_i32", norm2_t, attention_golden),
             ("l0.ffn_input_i8_matrix_a", packed_ffn_t, ffn_golden),
         ]
+        if include_kv_attention:
+            for kind in ("k", "v"):
+                for head in range(4):
+                    checkpoint_specs.append((
+                        kv_attention_readback[kind][head].name,
+                        kv_attention_readback[kind][head], attention_golden,
+                    ))
+            for tensor_name, tensor in attention_checkpoints:
+                checkpoint_specs.append((tensor_name, tensor, attention_golden))
         for tile, up_t, gelu_t, out_t in up_checkpoint_tensors:
             checkpoint_specs.extend((
                 (f"l0.ffn_up_n{tile}_i32", up_t, ffn_golden),
@@ -794,14 +947,20 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
         }
     write_pairs(out / "model_golden.memh", golden)
     executed_macs = 3 * ROWS * HIDDEN * HIDDEN + attention_macs
-    useful_macs = 3 * len(TOKENS) * HIDDEN * HIDDEN + \
-                  (34816 if include_attention else 0)
-    useful_output_elements = 3 * len(TOKENS) * HIDDEN
+    attention_useful_macs = 0
+    if include_attention:
+        if include_kv_attention:
+            attention_useful_macs = (len(tokens) * HIDDEN * HIDDEN +
+                                     2 * 4 * 16 * len(tokens) * (len(tokens) + 1) // 2)
+        else:
+            attention_useful_macs = 34816
+    useful_macs = 3 * len(tokens) * HIDDEN * HIDDEN + attention_useful_macs
+    useful_output_elements = 3 * len(tokens) * HIDDEN
     physical_output_elements = 3 * ROWS * HIDDEN
     if include_ffn:
         executed_macs += 2 * ROWS * HIDDEN * 256
-        useful_macs += 2 * len(TOKENS) * HIDDEN * 256
-        useful_output_elements += len(TOKENS) * (256 + HIDDEN)
+        useful_macs += 2 * len(tokens) * HIDDEN * 256
+        useful_output_elements += len(tokens) * (256 + HIDDEN)
         physical_output_elements += ROWS * (256 + HIDDEN)
     manifest = {
         "scope": "Token embedding load + Position residual + H64 LayerNorm + Q/K/V projection" +
@@ -810,8 +969,10 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                  (" + packed FFN input + 256-wide FFN Up/GELU + FFN Down + Residual 2"
                   if include_ffn else "") +
                  (" + Product KV cache roundtrip of RTL-produced K/V projection words"
-                  if include_kv_roundtrip else ""),
-        "seed": seed, "tokens": TOKENS, "descriptor_abi": "v7.4",
+                  if include_kv_roundtrip else "") +
+                 (" + Product KV write/read buffers consumed directly by causal QK/AV"
+                  if include_kv_attention else ""),
+        "seed": seed, "tokens": tokens, "descriptor_abi": "v7.4",
         "canonical_model_file": "canonical_h64_model.npz" if include_ffn else None,
         "canonical_model_sha256": model_sha256,
         "descriptor_base": desc_base, "completion_base": cpl_base,
@@ -820,14 +981,29 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
         "kv_roundtrip": ({
             "status": "PRODUCT_TOP_REQUIRED",
             "cache_shape_words": [4, 16, 16],
-            "tokens_written_read": len(TOKENS), "heads_written_read": 4,
-            "kv_write_descriptors": 2 * len(TOKENS) * 4,
-            "kv_read_descriptors": 2 * len(TOKENS) * 4,
+            "tokens_written_read": len(tokens), "heads_written_read": 4,
+            "kv_write_descriptors": 2 * len(tokens) * 4,
+            "kv_read_descriptors": 2 * 4,
             "readback_checkpoints": len(kv_read_snapshots),
             "token_stride_bytes": token_stride,
             "head_stride_bytes": head_stride,
         } if include_kv_roundtrip else None),
+        "kv_attention": ({
+            "status": "PRODUCT_TOP_REQUIRED",
+            "cache_capacity_tokens": 16,
+            "valid_token_count": len(tokens),
+            "heads": 4,
+            "head_dim": 16,
+            "k_tile_write_descriptors": 4,
+            "v_token_append_descriptors": len(tokens) * 4,
+            "read_descriptors": 2 * 4,
+            "k_write_granularity": "one complete packed H64 head tile per head",
+            "qk_matrix_source": "Product KV_READ K buffer in Matrix-A tile order",
+            "av_matrix_source": "Product KV_READ V buffer",
+            "future_token_slots": "initialized sentinel; masked by causal softmax",
+        } if include_kv_attention else None),
         "executed_macs": executed_macs, "useful_macs": useful_macs,
+        "attention_useful_macs": attention_useful_macs,
         "padding_macs": executed_macs - useful_macs,
         "useful_output_elements": useful_output_elements,
         "physical_output_elements": physical_output_elements,
@@ -882,7 +1058,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                         "Only four nonzero token rows are executed in 16-row physical tiles."],
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    print(f"H64_PRELN_{'FULL_DECODER' if include_ffn else 'ATTENTION' if include_attention else 'QKV'}_GENERATOR_PASS desc={len(mapper.descriptors)} tokens={len(TOKENS)} "
+    print(f"H64_PRELN_{'FULL_DECODER' if include_ffn else 'ATTENTION' if include_attention else 'QKV'}_GENERATOR_PASS desc={len(mapper.descriptors)} tokens={len(tokens)} "
           f"golden_words={len(golden)} high_water={manifest['high_water_bytes']}")
     return manifest
 
@@ -895,9 +1071,15 @@ def main() -> None:
     parser.add_argument("--full-decoder", action="store_true")
     parser.add_argument("--kv-roundtrip", action="store_true",
                         help="append Product KV write/read of RTL-produced H64 K/V words")
+    parser.add_argument("--kv-attention", action="store_true",
+                        help="feed Product KV_READ buffers into H64 QK/AV attention")
+    parser.add_argument("--tokens", default=None,
+                        help="comma-separated token IDs; defaults to the four-token fixture")
     args = parser.parse_args()
+    token_ids = ([int(value) for value in args.tokens.split(",")]
+                 if args.tokens is not None else None)
     generate(args.out, args.seed, args.attention or args.full_decoder,
-             args.full_decoder, args.kv_roundtrip)
+             args.full_decoder, args.kv_roundtrip, args.kv_attention, token_ids)
 
 
 if __name__ == "__main__":
