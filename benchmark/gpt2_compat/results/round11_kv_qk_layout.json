@@ -1,0 +1,26 @@
+{
+  "first_qk_word_mismatch": [
+    0,
+    3530787866,
+    2158767130
+  ],
+  "first_raw_word_mismatch": [
+    0,
+    3530787866,
+    2158767130
+  ],
+  "first_transpose_b_word_mismatch": [
+    4,
+    3798456884,
+    3158685717
+  ],
+  "full_transpose_pass": false,
+  "matrix_a_qk_layout_pass": true,
+  "matrix_a_qk_word_mismatches": 0,
+  "matrix_b_logical_mismatches": 238,
+  "raw_word_count": 64,
+  "raw_word_mismatches": 64,
+  "seed": 20261115,
+  "size": 16,
+  "transpose_b_local_tile_mismatches": 48
+}
