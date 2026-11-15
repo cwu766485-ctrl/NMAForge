@@ -15,7 +15,7 @@ from pathlib import Path
 
 POISON = 0xA55AA55A
 SPAD_BYTES = 128 * 1024
-AXI_MEMORY_WORDS = 4096
+DEFAULT_AXI_MEMORY_WORDS = 4096
 
 
 def sha256(path: Path) -> str:
@@ -26,6 +26,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--memory-image", required=True, type=Path)
     parser.add_argument("--out-dir", required=True, type=Path)
+    parser.add_argument("--axi-memory-words", type=int, default=DEFAULT_AXI_MEMORY_WORDS)
     args = parser.parse_args()
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
@@ -87,7 +88,9 @@ def main() -> None:
             payload_words.extend(line_words[line])
 
     payload_bytes = len(payload_words) * 4
-    if len(payload_words) > AXI_MEMORY_WORDS:
+    if args.axi_memory_words <= 0:
+        raise ValueError("AXI memory capacity must be positive")
+    if len(payload_words) > args.axi_memory_words:
         raise ValueError("packed payload exceeds axi_memory_model WORDS")
     live_words = sum(value != POISON for value in words.values())
     if payload_bytes < live_words * 4:
@@ -113,7 +116,7 @@ def main() -> None:
         "poison_words_test_only": sentinel_words,
         "poison_setup_bytes_test_only": sentinel_words * 4,
         "spad_capacity_bytes": SPAD_BYTES,
-        "external_model_capacity_bytes": AXI_MEMORY_WORDS * 4,
+        "external_model_capacity_bytes": args.axi_memory_words * 4,
         "dma_transactions": plan,
         "dma_plan_encoding": "word_count followed by (external byte address, SPAD byte address, 32-bit word count) triples",
     }

@@ -203,3 +203,22 @@ ASIC sign-off. Logs, coverage databases and URG report remain under `/tmp`.
 - Added `dv/uvm/tests/check_compact_spad_alloc.py` for compact concurrent live-range bounds/overlap and the row-8 CNM B lane calculation; wired it into the Compute Cluster UVM compile target.
 - Initial uncovered-bin triage, compact interval table, SVA disposition, scoped RTM and remaining work are in `docs/verification/COMPUTE_CLUSTER_DV_CLOSURE_ROUND2_2026-11-13.md`. DV remains OPEN; full bin-by-bin disposition, SpyGlass/RDC closure and ASIC readiness remain.
 - Reproduction: `make -C dv/uvm/sim uvm_compute_cluster_regress COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027' COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_round2_uvm_sha76805a45_20261113`; `make -C dv/subsystem/top_smoke/sim ai_compute_cluster_cov AI_CLUSTER_COV_RUN=/tmp/nmaforge_round2_dutcov_sha76805a45_20261113 AI_CLUSTER_COV_SEEDS='20261025 20261026 20261027'`.
+
+## 2026-11-15 — v2.0 Round 6 H64 FFN Product Top
+
+Isolated `/tmp/nmaforge-v2-round6`, branch `research/nmaforge-v2-round6`, from
+`7744ad95d0ddd3eb191c5b5431aeebe01d8faefa`; no product branch or PR was
+modified. Expanded the H64 FFN workload to all 16 Up tiles and added sixteen
+K=16 Down GEMMs, ordered INT32 partial accumulation using the existing SFU
+Residual opcode, and Residual 2. Product Top with VCS V-2023.12-SP1_Full64
+passed 80 ordered completions and 12,288 independent Golden words. AXI4 DMA
+loaded 43,008 bytes before command issue. Command/end-to-end time was
+165,028/176,987 cycles, including DMA; useful/executed/padding MACs were
+131,072/524,288/393,216 and SPAD high-water was 103,424 bytes. The manifest
+checks allocation bounds, alignment, live alias, and initialized reads. The
+standalone FFN uses fixture input, so full Attention-to-FFN H64 Decoder is not
+closed. H64 Attention replay, H16 persistent decode replay, SFU `0x3A` A/B and
+`make ai_smoke` passed. Round 6 scope, limits, logs and reproduction commands:
+`docs/research/NMAFORGE_V2_ROUND6_H64_DECODER_STATUS.md`; raw runs are under
+`/tmp/nmaforge_round6_*_20261115*`. No synthesis or formal run was done; SVSE
+fault closure and full model integration remain open.

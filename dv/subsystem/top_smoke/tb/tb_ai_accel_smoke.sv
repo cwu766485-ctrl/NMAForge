@@ -94,6 +94,11 @@ module tb_ai_accel_smoke;
     localparam REG_EVENT_STATUS    = 32'h0000_0168;
     localparam SPAD_BASE         = 32'h0001_0000;
     localparam [31:0] SPAD_BYTES = 4 * `AI_SPAD_WORDS_PER_BANK * 4;
+`ifdef AI_REPRESENTATIVE_LONG_TASK
+    localparam [31:0] REPRESENTATIVE_AXI_BYTES = 12288 * 4;
+`else
+    localparam [31:0] REPRESENTATIVE_AXI_BYTES = 8192 * 4;
+`endif
     reg [31:0] digits_layout_words [0:4];
     wire [31:0] AI_DIGITS_INPUT_BASE = digits_layout_words[0];
     wire [31:0] AI_DIGITS_OUTPUT_BASE = digits_layout_words[1];
@@ -1521,7 +1526,11 @@ module tb_ai_accel_smoke;
         .m_axi_bready  (m_axi_bready)
     );
 
-    axi_memory_model axi_mem_u(
+`ifdef AI_REPRESENTATIVE_LONG_TASK
+    axi_memory_model #(.WORDS(12288)) axi_mem_u(
+`else
+    axi_memory_model #(.WORDS(8192)) axi_mem_u(
+`endif
         .clk     (aclk),
         .resetn  (aresetn),
         .arvalid (m_axi_arvalid),
@@ -4831,7 +4840,7 @@ module tb_ai_accel_smoke;
                         representative_dma_plan_words[3 + dma_plan_index * 3][1:0] != 0 ||
                         representative_dma_plan_words[1 + dma_plan_index * 3] +
                             representative_dma_plan_words[3 + dma_plan_index * 3] * 4 >
-                            16384 ||
+                            REPRESENTATIVE_AXI_BYTES ||
                         representative_dma_plan_words[2 + dma_plan_index * 3] +
                             representative_dma_plan_words[3 + dma_plan_index * 3] * 4 >
                             SPAD_BYTES)

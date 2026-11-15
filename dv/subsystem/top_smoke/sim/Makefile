@@ -320,7 +320,7 @@ ai_h64_ffn_tile_dma:
 		--seed "$(AI_H64_FFN_TILE_SEED)" --out "$(AI_H64_FFN_TILE_RUN)/workload"
 	$(AI_H64_FFN_TILE_PYTHON) ../../../../benchmark/representative/prepare_cnn_dma_payload.py \
 		--memory-image "$(AI_H64_FFN_TILE_RUN)/workload/model_memory.memh" \
-		--out-dir "$(AI_H64_FFN_TILE_RUN)/workload"
+		--out-dir "$(AI_H64_FFN_TILE_RUN)/workload" --axi-memory-words 12288
 	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
 		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=8192 \
 		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
@@ -345,7 +345,7 @@ ai_h64_ffn_tile_dma:
 		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_FFN_TILE_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FFN_TILE_RUN)/workload/manifest.json"))["physical_output_elements"])') \
 		-l $(AI_H64_FFN_TILE_RUN)/run.log
 	grep -q '^REPRESENTATIVE_DMA_PRELOAD_PASS transactions=' "$(AI_H64_FFN_TILE_RUN)/run.log"
-	grep -q '^REPRESENTATIVE_MODEL_PASS .*golden_words=1088 ' "$(AI_H64_FFN_TILE_RUN)/run.log"
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=80 .*golden_words=12288 ' "$(AI_H64_FFN_TILE_RUN)/run.log"
 
 # Round 4: Product Top executes position add, 64-wide LayerNorm, layout
 # conversion and all H64 Q/K/V projections; intermediate SPAD words are Golden checked.
