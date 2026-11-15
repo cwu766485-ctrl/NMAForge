@@ -5,8 +5,10 @@
 Gate 1 is **PASS for the DMA-loaded single H64 decoder replay**. The exact
 Round 7 parent is `ba4c6697fcb12245b1141df27938e3aa406d4dd1`, on isolated
 branch `research/nmaforge-v2-round8`; product baseline
-`0492c47d12cd11bcc22be1930da7af77ed870b6e` was not changed. Worktree changes
-are uncommitted. No product RTL was modified.
+`0492c47d12cd11bcc22be1930da7af77ed870b6e` was not changed. The verified
+Gate 1 implementation is committed as
+`e78ade66d3c31cb65a95a411a3a8076f494820a2` on the research branch. No product
+RTL was modified.
 
 The run uses the existing one-layer, four-token deterministic H64 graph. It is
 not a pretrained GPT-2 checkpoint, four-layer execution, persistent decode, or
