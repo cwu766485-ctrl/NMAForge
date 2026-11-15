@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / "sw/tools"))
 sys.path.insert(0, str(ROOT / "dv/block/compute/matrix/ref"))
 from cimforge_mapper import (  # noqa: E402
     FLAG_BIAS, FLAG_PACK_I8, FLAG_PACK_I8_TILE_A, Mapper, OP_CAUSAL_SOFTMAX,
-    OP_GELU, OP_GEMM, OP_LAYERNORM, OP_REQUANT, OP_RESIDUAL,
+    OP_GELU, OP_GEMM, OP_KV_READ, OP_KV_WRITE, OP_LAYERNORM, OP_REQUANT, OP_RESIDUAL,
     _pack_matrix_a_physical, _pack_matrix_b_physical,
     add_completion_order_chain,
 )
@@ -190,7 +190,7 @@ def compact_mapper_lifetimes(mapper: Mapper, capacity: int,
 
 
 def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
-             include_ffn: bool = False) -> dict:
+             include_ffn: bool = False, include_kv_roundtrip: bool = False) -> dict:
     if include_ffn and not include_attention:
         raise ValueError("full H64 Decoder requires Attention")
     model = make_model(seed)
@@ -461,6 +461,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
         attention_macs = 163840
 
     ffn_golden: dict[int, int] = {}
+    kv_golden: dict[int, int] = {}
+    kv_read_snapshots: list[tuple[int, str, str, list[int]]] = []
     up_checkpoint_tensors = []
     if include_ffn:
         ln2_i8 = [[max(-128, min(127, int(value))) for value in row]
@@ -558,6 +560,52 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                 ffn_golden[residual2_t.addr + offset] = \
                     (down_values[row][col] + int(residual1[row, col])) & 0xFFFFFFFF
 
+    if include_kv_roundtrip:
+        if not include_ffn:
+            raise ValueError("H64 KV roundtrip requires the full decoder workload")
+        cache_words = ROWS * HIDDEN
+        head_stride = 16 * 16 * 4
+        token_stride = 16 * 4
+        cache_tensors = {}
+        readback_tensors = {}
+        for kind in ("k", "v"):
+            cache_tensors[kind] = mapper.tensor(
+                f"l0.kv_{kind}_cache_i32", (4, 16, 16), "i32",
+                "head-token-feature", [0xA55AA55A] * cache_words, False,
+            )
+            readback_tensors[kind] = mapper.tensor(
+                f"l0.kv_{kind}_readback_i32", (16,), "i32", "feature-vector",
+                [0xA55AA55A] * 16, False,
+            )
+
+        for kind in ("k", "v"):
+            cache_t = cache_tensors[kind]
+            read_t = readback_tensors[kind]
+            for head in range(4):
+                source_t = projection_tiles[(kind, head)]
+                for token in range(len(TOKENS)):
+                    source_offset = token * 16 * 4
+                    task = f"l0.kv_{kind}_write_t{token}_h{head}"
+                    mapper.add(task, OP_KV_WRITE, source_t, cache_t,
+                               src0_offset=source_offset, k_or_length=16,
+                               aux0=(head << 16) | token,
+                               src0_stride=token_stride, src1_stride=head_stride)
+                    values = [s32(projection_golden[
+                        source_t.addr + source_offset + feature * 4])
+                              for feature in range(16)]
+                    base = cache_t.addr + head * head_stride + token * token_stride
+                    for feature, value in enumerate(values):
+                        kv_golden[base + feature * 4] = value & 0xFFFFFFFF
+
+                    read_task = f"l0.kv_{kind}_read_t{token}_h{head}"
+                    mapper.add(read_task, OP_KV_READ, cache_t, read_t,
+                               k_or_length=16, aux0=(head << 16) | token,
+                               src0_stride=token_stride, src1_stride=head_stride)
+                    kv_read_snapshots.append((len(mapper.descriptors) - 1,
+                                              read_task, read_t.name, values))
+                    for feature, value in enumerate(values):
+                        kv_golden[read_t.addr + feature * 4] = value & 0xFFFFFFFF
+
     add_completion_order_chain(mapper, event_bit=0)
     allocation = None
     checkpoint_records = []
@@ -593,7 +641,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
         moved_golden = (relocate_golden(base_golden) +
                         relocate_golden(projection_golden) +
                         relocate_golden(attention_golden) +
-                        relocate_golden(ffn_golden))
+                        relocate_golden(ffn_golden) +
+                        relocate_golden(kv_golden))
         golden = {}
         for _, address, value in sorted(moved_golden):
             golden[address] = value
@@ -604,6 +653,13 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
         }
         tensor_records = {record["tensor_id"]: record
                           for record in allocation["records"]}
+        if include_kv_roundtrip:
+            for kind, cache_t in cache_tensors.items():
+                cache_record = tensor_records[cache_t.name]
+                if cache_record["end_exclusive"] > 128 * 1024:
+                    raise ValueError(
+                        f"{kind} KV cache exceeds 128 KiB SPAD after compaction"
+                    )
 
         def checkpoint_for(name: str, tensor, source_golden: dict[int, int]) -> dict:
             old_start = old_start_by_name[name]
@@ -636,6 +692,14 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
         ))
         checkpoint_records = [checkpoint_for(name, tensor, source)
                               for name, tensor, source in checkpoint_specs]
+        for descriptor_index, name, readback_name, values in kv_read_snapshots:
+            readback = mapper.tensors[readback_name]
+            relocated_base = old_to_new[old_start_by_name[readback.name]]
+            checkpoint_records.append({
+                "name": name, "descriptor_index": descriptor_index,
+                "pairs": {relocated_base + feature * 4: value & 0xFFFFFFFF
+                          for feature, value in enumerate(values)},
+            })
         for tensor in mapper.tensors.values():
             if "weight" not in tensor.name:
                 continue
@@ -744,13 +808,25 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                  (" + four-head causal attention + output projection + Residual 1 + LayerNorm 2"
                   if include_attention else "") +
                  (" + packed FFN input + 256-wide FFN Up/GELU + FFN Down + Residual 2"
-                  if include_ffn else ""),
+                  if include_ffn else "") +
+                 (" + Product KV cache roundtrip of RTL-produced K/V projection words"
+                  if include_kv_roundtrip else ""),
         "seed": seed, "tokens": TOKENS, "descriptor_abi": "v7.4",
         "canonical_model_file": "canonical_h64_model.npz" if include_ffn else None,
         "canonical_model_sha256": model_sha256,
         "descriptor_base": desc_base, "completion_base": cpl_base,
         "queue_size": (256 if include_ffn else 128),
         "descriptor_count": len(mapper.descriptors), "golden_words": len(golden),
+        "kv_roundtrip": ({
+            "status": "PRODUCT_TOP_REQUIRED",
+            "cache_shape_words": [4, 16, 16],
+            "tokens_written_read": len(TOKENS), "heads_written_read": 4,
+            "kv_write_descriptors": 2 * len(TOKENS) * 4,
+            "kv_read_descriptors": 2 * len(TOKENS) * 4,
+            "readback_checkpoints": len(kv_read_snapshots),
+            "token_stride_bytes": token_stride,
+            "head_stride_bytes": head_stride,
+        } if include_kv_roundtrip else None),
         "executed_macs": executed_macs, "useful_macs": useful_macs,
         "padding_macs": executed_macs - useful_macs,
         "useful_output_elements": useful_output_elements,
@@ -817,8 +893,11 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=20261114)
     parser.add_argument("--attention", action="store_true")
     parser.add_argument("--full-decoder", action="store_true")
+    parser.add_argument("--kv-roundtrip", action="store_true",
+                        help="append Product KV write/read of RTL-produced H64 K/V words")
     args = parser.parse_args()
-    generate(args.out, args.seed, args.attention or args.full_decoder, args.full_decoder)
+    generate(args.out, args.seed, args.attention or args.full_decoder,
+             args.full_decoder, args.kv_roundtrip)
 
 
 if __name__ == "__main__":

@@ -4727,9 +4727,9 @@ module tb_ai_accel_smoke;
         integer checkpoint_cursor;
         integer checkpoint_pair;
         integer checkpoint_retired;
-        integer checkpoint_desc [0:31];
-        integer checkpoint_words [0:31];
-        integer checkpoint_start [0:31];
+        integer checkpoint_desc [0:127];
+        integer checkpoint_words [0:127];
+        integer checkpoint_start [0:127];
         integer completed_count;
         integer descriptor_base;
         integer completion_base;
@@ -4847,7 +4847,7 @@ module tb_ai_accel_smoke;
                 if ($value$plusargs("AI_REPRESENTATIVE_CHECKPOINTS=%s", checkpoint_file)) begin
                     $readmemh(checkpoint_file, representative_checkpoint_words);
                     checkpoint_count = representative_checkpoint_words[0];
-                    if (checkpoint_count < 1 || checkpoint_count > 32)
+                    if (checkpoint_count < 1 || checkpoint_count > 128)
                         $fatal(1, "invalid representative checkpoint count=%0d", checkpoint_count);
                     checkpoint_cursor = 1;
                     for (checkpoint_index = 0; checkpoint_index < checkpoint_count;

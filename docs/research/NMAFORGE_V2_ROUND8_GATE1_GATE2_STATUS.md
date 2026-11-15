@@ -59,18 +59,36 @@ storage 70,656 bytes. The highest populated address in the full memory image is
 130,000 bytes; that is not a tensor-usage or peak-live metric. The model uses
 synthetic seeded weights.
 
-## Gate 2 and Later Gates
+## Gate 2 — H64 KV Product-Engine Roundtrip
 
-Gate 2 is **NOT_RUN**. The current H64 graph is a fixed four-token batch and
-contains no KV engine descriptors (`0x43`/`0x44`); the successful run reports
-`kv_busy=0`. It therefore provides no evidence for prefill append, per-head
-KV addresses, past-K reads, four-step no-reset decode, KV-vs-recompute
-Golden, or reset/abort recovery. The first concrete missing node is an H64
-incremental execution planner and stage replay that makes each token's K/V
-projection output the input to the Product Top KV engine, then feeds returned
-cached K/V into the next token's causal attention. The existing persistent
-decode generator is fixed to H16 / 2 heads / head_dim 8 and cannot be cited as
-H64 evidence.
+The H64 KV integration subtest passes at seed `20261115`. After the complete
+one-layer H64 batch, the same Product Top instance issues 32 `KV_WRITE` and 32
+`KV_READ` descriptors. Their inputs are the K/V projection words produced by
+the preceding Product Top matrix commands; no reset or host arithmetic is
+inserted between model execution and KV transactions. Four token rows and all
+four 16-feature heads are written to separate K/V cache tensors using a
+64-byte token stride and 1,024-byte head stride. All 32 read commands have
+nonempty retirement checkpoints (16 words each); the final memory Golden
+contains 6,848 words and passes. The VCS profile reports `kv_busy=4538`.
+
+This is a real H64 Product KV-engine write/read integration result, **not** a
+persistent decoder. The fixed four-token causal Attention still reads its
+batch tensors rather than the returned KV read data. The test has no token-by-
+token causal update, KV-vs-recompute comparison, reset/abort recovery on live
+H64 decode state, or fifth-token decode. Gate 2 is therefore **PARTIAL**. The
+next missing node is a per-token execution planner that fences each K/V
+projection, appends that token to cache, reads past K/V through Product Top,
+and feeds those values into the next token's Attention before advancing.
+Existing persistent decode remains H16 / 2 heads / head_dim 8 and cannot be
+cited as H64 evidence.
+
+The extended run uses 253 descriptors in the existing 256-entry queue and
+keeps the queue unchanged. There are 43 non-vacuous memory checkpoints: the
+existing 11 model checkpoints plus 32 KV readbacks. Command cycles are
+264,913 and end-to-end cycles including DMA preload are 337,133. These figures
+are test profile data, not a speedup claim.
+
+## Later Gates
 
 Four-layer execution, final LayerNorm/LM head, greedy output tokens, real
 checkpoint import, and model-quality comparison are **NOT_RUN**. No failure
@@ -107,3 +125,27 @@ manifest `c8e2dc6f3635c70d3cc106ac44e5baf97f7ce618f7fb597b09f1199c985c6e1a`,
 Golden `e228a3223dcce0e6b7a0c2c5dc4e6ebf57f5266013b4baa99e9237f12b12cc28`,
 DMA plan `727a7d84ef8fa58e58be5d6a48e1801c93faaf4040f10265f6f0715a9fb32463`,
 and payload `9badf046f18173b6c8895859421d8cc0a8ed5bb19d7ddcf3283caa0e0f6411e0`.
+
+The H64 KV roundtrip replay is:
+
+```sh
+make -C dv/subsystem/top_smoke/sim ai_h64_kv_roundtrip_top \
+  AI_H64_KV_RUN=/tmp/nmaforge_round8_h64_kv_roundtrip_20261115_v2 \
+  AI_H64_KV_PYTHON=/tmp/nmaforge_round10_venv/bin/python \
+  AI_H64_KV_SEED=20261115
+make -C dv/subsystem/top_smoke/sim ai_h64_decoder_dma_top \
+  AI_H64_DMA_RUN=/tmp/nmaforge_round8_h64_dma_recheck_20261115 \
+  AI_H64_DMA_PYTHON=/tmp/nmaforge_round10_venv/bin/python \
+  AI_H64_DMA_SEED=20261115
+make -C dv/subsystem/top_smoke/sim ai_smoke
+```
+
+The KV run uses VCS `V-2023.12-SP1_Full64`, a 10 ns clock and behavioral
+128 KiB / four-bank SPAD. Its run log SHA-256 is
+`2291c9355ce411c5212d9401c21b15c2c2e7f6f90b2526a3b93057f370e41f7f`, compile
+log `570331a2be9c1f62e1ba81ac1aa94194898548c79a59ab5f198473b8dd9c8fe3`,
+manifest `32593b33df457ec2773838d2c37e25b454b763f386290422dcf4258eab258ae1`,
+final Golden `20573a91727f8a2ed649e1b8067c8af01e55b56032441dfb95d61384474b4288`,
+and checkpoint file `5b47a727119bbe6e5e6ad997015b1f052a0a913e0419c9b9e748b47b15a4f053`.
+The fresh baseline DMA run log SHA-256 is
+`78674b50331d53476aa278a9adf15d42be2779ab7b4b4f30bc180840a21ae10a`.
