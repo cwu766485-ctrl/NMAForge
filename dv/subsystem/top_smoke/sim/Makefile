@@ -6,6 +6,7 @@ VCS_HOME ?= /opt/Synopsys/vcs/V-2023.12-SP1
 AI_RANDOM_CASES ?= 4
 AI_SEED ?= 12345
 AI_SPAD_WORDS_PER_BANK ?= 8192
+AI_DAMS_TRACE_ARGS ?=
 AI_REF_CASES ?= 1000
 AI_REF_SEED ?= 20260722
 AI_TRANSFORMER_MODEL_JSON ?=
@@ -36,7 +37,7 @@ ai_comp: ai_transformer_gen
 		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv -l ai_comp.log
 
 ai_run:
-	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=$(AI_RANDOM_CASES) +AI_SEED=$(AI_SEED) +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) -l ai_accel_smoke.log
+	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=$(AI_RANDOM_CASES) +AI_SEED=$(AI_SEED) +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) $(AI_DAMS_TRACE_ARGS) -l ai_accel_smoke.log
 	grep -q '^TEST PASS$$' ai_accel_smoke.log
 	! grep -q 'TEST FAIL' ai_accel_smoke.log
 
@@ -298,8 +299,132 @@ ai_h64_projection_top:
 		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["completion_base"])') \
 		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["descriptor_count"])') \
 		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["useful_output_elements"])') \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["physical_output_elements"])') \
 		-l $(AI_H64_PROJECTION_RUN)/run.log
 	grep -q '^REPRESENTATIVE_MODEL_PASS desc=4 ' "$(AI_H64_PROJECTION_RUN)/run.log"
+	grep -q '^REPRESENTATIVE_MODEL_PASS .*useful_macs=16384 executed_macs=65536 padding_macs=49152 useful_output_elements=256 physical_output_elements=1024 command_cycles=1188 end_to_end_cycles=1188 dma_preload_included=0 ' "$(AI_H64_PROJECTION_RUN)/run.log"
+
+# Round 4: Product Top executes position add, 64-wide LayerNorm, layout
+# conversion and all H64 Q/K/V projections; intermediate SPAD words are Golden checked.
+AI_H64_PRELN_QKV_RUN ?= /tmp/nmaforge_h64_preln_qkv_$(shell date +%Y%m%d_%H%M%S)
+AI_H64_PRELN_QKV_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
+AI_H64_PRELN_QKV_SEED ?= 20261114
+.PHONY: ai_h64_preln_qkv_top
+ai_h64_preln_qkv_top:
+	test ! -e "$(AI_H64_PRELN_QKV_RUN)"
+	mkdir -p "$(AI_H64_PRELN_QKV_RUN)"
+	$(AI_H64_PRELN_QKV_PYTHON) ../../../../benchmark/gpt2_compat/generate_h64_preln_qkv.py \
+		--seed "$(AI_H64_PRELN_QKV_SEED)" --out "$(AI_H64_PRELN_QKV_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_H64_PRELN_QKV_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_H64_PRELN_QKV_RUN)/simv \
+		-l $(AI_H64_PRELN_QKV_RUN)/compile.log
+	$(AI_H64_PRELN_QKV_RUN)/simv +ntb_random_seed=$(AI_H64_PRELN_QKV_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H64_PRELN_QKV_SEED) \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL \
+		+AI_DAMS_TRACE_FILE=$(AI_H64_PRELN_QKV_RUN)/dams_trace.csv \
+		+AI_DAMS_STATE_TRACE_FILE=$(AI_H64_PRELN_QKV_RUN)/dams_state.csv \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_PRELN_QKV_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_PRELN_QKV_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H64_PRELN_QKV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PRELN_QKV_RUN)/workload/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_PRELN_QKV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PRELN_QKV_RUN)/workload/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_PRELN_QKV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PRELN_QKV_RUN)/workload/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H64_PRELN_QKV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PRELN_QKV_RUN)/workload/manifest.json"))["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_H64_PRELN_QKV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PRELN_QKV_RUN)/workload/manifest.json"))["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_H64_PRELN_QKV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PRELN_QKV_RUN)/workload/manifest.json"))["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=$$($(AI_H64_PRELN_QKV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PRELN_QKV_RUN)/workload/manifest.json"))["useful_output_elements"])') \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_PRELN_QKV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PRELN_QKV_RUN)/workload/manifest.json"))["physical_output_elements"])') \
+		-l $(AI_H64_PRELN_QKV_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=30 .*golden_words=5376 .*useful_macs=49152 executed_macs=196608 padding_macs=147456 useful_output_elements=768 physical_output_elements=3072 ' \
+		"$(AI_H64_PRELN_QKV_RUN)/run.log"
+
+# Four-token/four-head attention extends the validated Pre-LN/QKV chain.
+AI_H64_ATTENTION_RUN ?= /tmp/nmaforge_h64_attention_$(shell date +%Y%m%d_%H%M%S)
+AI_H64_ATTENTION_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
+AI_H64_ATTENTION_SEED ?= 20261114
+.PHONY: ai_h64_attention_top
+ai_h64_attention_top:
+	test ! -e "$(AI_H64_ATTENTION_RUN)"
+	mkdir -p "$(AI_H64_ATTENTION_RUN)"
+	$(AI_H64_ATTENTION_PYTHON) ../../../../benchmark/gpt2_compat/generate_h64_preln_qkv.py \
+		--attention --seed "$(AI_H64_ATTENTION_SEED)" --out "$(AI_H64_ATTENTION_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_H64_ATTENTION_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_H64_ATTENTION_RUN)/simv \
+		-l $(AI_H64_ATTENTION_RUN)/compile.log
+	$(AI_H64_ATTENTION_RUN)/simv +ntb_random_seed=$(AI_H64_ATTENTION_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H64_ATTENTION_SEED) \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL \
+		+AI_DAMS_TRACE_FILE=$(AI_H64_ATTENTION_RUN)/dams_trace.csv \
+		+AI_DAMS_STATE_TRACE_FILE=$(AI_H64_ATTENTION_RUN)/dams_state.csv \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_ATTENTION_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_ATTENTION_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H64_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_ATTENTION_RUN)/workload/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_ATTENTION_RUN)/workload/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_ATTENTION_RUN)/workload/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H64_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_ATTENTION_RUN)/workload/manifest.json"))["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_H64_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_ATTENTION_RUN)/workload/manifest.json"))["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_H64_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_ATTENTION_RUN)/workload/manifest.json"))["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=$$($(AI_H64_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_ATTENTION_RUN)/workload/manifest.json"))["useful_output_elements"])') \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_ATTENTION_RUN)/workload/manifest.json"))["physical_output_elements"])') \
+		-l $(AI_H64_ATTENTION_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=108 .*golden_words=12288 ' "$(AI_H64_ATTENTION_RUN)/run.log"
+
+# Research opcode 0x3a performs Residual -> packed INT8 Requant in one SFU
+# command. The same Product Top and generated data are used for both sides.
+AI_SFU_FUSION_RUN ?= /tmp/nmaforge_sfu_fusion_$(shell date +%Y%m%d_%H%M%S)
+AI_SFU_FUSION_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
+AI_SFU_FUSION_SEED ?= 20261115
+.PHONY: ai_sfu_residual_requant_ab
+ai_sfu_residual_requant_ab:
+	test ! -e "$(AI_SFU_FUSION_RUN)"
+	mkdir -p "$(AI_SFU_FUSION_RUN)"
+	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_SFU_FUSION_RUN)/csrc -top tb_ai_accel_smoke \
+		-f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_SFU_FUSION_RUN)/simv \
+		-l $(AI_SFU_FUSION_RUN)/compile.log
+	$(AI_SFU_FUSION_PYTHON) ../../../../benchmark/gpt2_compat/generate_sfu_residual_requant_ab.py \
+		--seed "$(AI_SFU_FUSION_SEED)" --out "$(AI_SFU_FUSION_RUN)/baseline/workload"
+	$(AI_SFU_FUSION_RUN)/simv +ntb_random_seed=$(AI_SFU_FUSION_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_SFU_FUSION_SEED) +ACLK_PERIOD_NS=10.0 \
+		+AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_SFU_FUSION_RUN)/baseline/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_SFU_FUSION_RUN)/baseline/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=16384 +AI_REPRESENTATIVE_CPL_BASE=20480 \
+		+AI_REPRESENTATIVE_DESC_COUNT=2 +AI_REPRESENTATIVE_USEFUL_MACS=0 \
+		-l $(AI_SFU_FUSION_RUN)/baseline/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=2 .*golden_words=80 ' \
+		"$(AI_SFU_FUSION_RUN)/baseline/run.log"
+	grep -q '^R9_SFU_COMMAND index=0 opcode=0x34 .*spad_read_accepts=128 spad_write_accepts=64 ' \
+		"$(AI_SFU_FUSION_RUN)/baseline/run.log"
+	grep -q '^R9_SFU_COMMAND index=1 opcode=0x36 .*spad_read_accepts=64 spad_write_accepts=16 ' \
+		"$(AI_SFU_FUSION_RUN)/baseline/run.log"
+	$(AI_SFU_FUSION_PYTHON) ../../../../benchmark/gpt2_compat/generate_sfu_residual_requant_ab.py \
+		--fused --seed "$(AI_SFU_FUSION_SEED)" --out "$(AI_SFU_FUSION_RUN)/fused/workload"
+	$(AI_SFU_FUSION_RUN)/simv +ntb_random_seed=$(AI_SFU_FUSION_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_SFU_FUSION_SEED) +ACLK_PERIOD_NS=10.0 \
+		+AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_SFU_FUSION_RUN)/fused/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_SFU_FUSION_RUN)/fused/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=16384 +AI_REPRESENTATIVE_CPL_BASE=20480 \
+		+AI_REPRESENTATIVE_DESC_COUNT=1 +AI_REPRESENTATIVE_USEFUL_MACS=0 \
+		-l $(AI_SFU_FUSION_RUN)/fused/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=1 .*golden_words=16 ' \
+		"$(AI_SFU_FUSION_RUN)/fused/run.log"
+	grep -q '^R9_SFU_COMMAND index=0 opcode=0x3a .*spad_read_accepts=128 spad_write_accepts=16 ' \
+		"$(AI_SFU_FUSION_RUN)/fused/run.log"
 
 # Deterministically train/export a tiny INT8 Transformer model, map its real
 # weights into ABI-v7 descriptors, and run only the Transformer path on the
@@ -633,6 +758,8 @@ ai_representative_cnn:
 		+AI_REPRESENTATIVE_GOLDEN=$(AI_REPRESENTATIVE_RUN)/workload/model_golden.memh \
 		+AI_REPRESENTATIVE_DESC_BASE=102400 +AI_REPRESENTATIVE_CPL_BASE=102912 \
 		+AI_REPRESENTATIVE_DESC_COUNT=$(AI_REPRESENTATIVE_DESC_COUNT) +AI_REPRESENTATIVE_USEFUL_MACS=262144 \
+		+AI_DAMS_TRACE_FILE=$(AI_REPRESENTATIVE_RUN)/dams_trace.csv \
+		+AI_DAMS_STATE_TRACE_FILE=$(AI_REPRESENTATIVE_RUN)/dams_state.csv \
 		-l $(AI_REPRESENTATIVE_RUN)/run.log
 	grep -q '^REPRESENTATIVE_MODEL_PASS ' "$(AI_REPRESENTATIVE_RUN)/run.log"
 
@@ -710,6 +837,8 @@ ai_h16_qkv_top:
 	$(AI_H16_QKV_RUN)/simv +ntb_random_seed=$(AI_H16_QKV_SEED) \
 		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H16_QKV_SEED) \
 		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_REPRESENTATIVE_MODEL \
+		+AI_DAMS_TRACE_FILE=$(AI_H16_QKV_RUN)/dams_trace.csv \
+		+AI_DAMS_STATE_TRACE_FILE=$(AI_H16_QKV_RUN)/dams_state.csv \
 		+AI_REPRESENTATIVE_MEMORY=$(AI_H16_QKV_RUN)/workload/model_memory.memh \
 		+AI_REPRESENTATIVE_GOLDEN=$(AI_H16_QKV_RUN)/workload/model_golden.memh \
 		+AI_REPRESENTATIVE_DESC_BASE=20480 +AI_REPRESENTATIVE_CPL_BASE=20736 \

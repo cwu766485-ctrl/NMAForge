@@ -43,7 +43,7 @@ def generate(out: Path, seed: int = 20261114):
                       _pack_matrix_a_physical(x16), initialized=True)
     outputs = []
     golden = {}
-    all_macs = 0
+    executed_macs = 0
     for tile in range(4):
         col0 = tile * 16
         b_rows = [[int(v) for v in row[col0:col0 + 16]] for row in weights]
@@ -58,7 +58,7 @@ def generate(out: Path, seed: int = 20261114):
         for row in range(16):
             for col in range(16):
                 golden[dst.addr + 4 * (row * 16 + col)] = expected[row][col] & 0xffffffff
-        all_macs += 16 * 16 * 64
+        executed_macs += 16 * 16 * 64
 
     add_completion_order_chain(mapper, event_bit=0)
     desc_base = 0x8000
@@ -85,7 +85,13 @@ def generate(out: Path, seed: int = 20261114):
         "seed": seed, "input_tokens": tokens, "descriptor_abi": "v7.4",
         "descriptor_bytes": 64, "descriptor_base": desc_base,
         "completion_base": cpl_base, "descriptor_count": len(mapper.descriptors),
-        "useful_macs": all_macs, "matrix_shape_per_descriptor": {"M":16,"N":16,"K":64,"k_words":16},
+        "physical_tile_rows": 16, "useful_token_rows": len(tokens),
+        "executed_macs": executed_macs,
+        "useful_macs": len(tokens) * 64 * 64,
+        "padding_macs": executed_macs - len(tokens) * 64 * 64,
+        "physical_output_elements": len(outputs) * 16 * 16,
+        "useful_output_elements": len(tokens) * 64,
+        "matrix_shape_per_descriptor": {"M":16,"N":16,"K":64,"k_words":16},
         "input_address": a.addr, "input_bytes": 16*64,
         "output_ranges": [{"start":t.addr,"end_exclusive":t.addr+16*16*4} for t in outputs],
         "weight_ranges": [{"start":t.addr,"end_exclusive":t.addr+64*16} for t in mapper.tensors.values() if "weight_" in t.name],
@@ -99,7 +105,10 @@ def generate(out: Path, seed: int = 20261114):
         "descriptor_contract": [{"task_id":d.task_id,"opcode":d.op,"src0":d.src0,"src1":d.src1,"dst":d.dst,"m":d.m,"n":d.n,"k_words":d.k_or_length,"wait_mask":d.wait_mask,"signal_mask":d.signal_mask,"clear_mask":d.clear_mask} for d in mapper.descriptors],
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    print("H64_PROJECTION_GENERATOR_PASS descriptors=4 shape=16x16x64 golden_words=%d high_water=%d" % (len(golden), manifest["high_water_bytes"]))
+    print("H64_PROJECTION_GENERATOR_PASS descriptors=4 shape=16x16x64 golden_words=%d useful_output_elements=%d physical_output_elements=%d executed_macs=%d useful_macs=%d padding_macs=%d high_water=%d" % (
+        len(golden), manifest["useful_output_elements"], manifest["physical_output_elements"],
+        manifest["executed_macs"], manifest["useful_macs"], manifest["padding_macs"],
+        manifest["high_water_bytes"]))
     return manifest
 
 

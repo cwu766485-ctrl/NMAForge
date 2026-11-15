@@ -104,6 +104,8 @@ KV-cache opcode `0x43/0x44` 保持 ABI v7 descriptor 大小和旧 `flags=0` 行�
 
 SFU `REQUANT_I8`（opcode `0x36`）中 `flags[4]` 将饱和后的 INT32 结果按输入连续顺序打包为 INT8。可选 `flags[5]=PACK_I8_TILE_A` 必须同时设置 `flags[4]`，并要求 `M,N` 为非零 4 的倍数且 `length=M×N`。输入仍按 row-major 读取；输出按 Matrix A 的 `[row_group][k_group][row_lane]` 顺序写入，每 word 的四个低字节对应连续四列 K。其 word index 为 `(((row/4)×(N/4)+k/4)×4)+(row mod 4)`，地址为 `dst+4×word_index`。该模式没有 partial word；legacy bit4-only 的线性 packing 语义不变。
 
+研究候选 `0x3a` 仅在隔离研究分支实现：它读取两路 signed INT32，先按 `RESIDUAL_I32` 的无移位加法合同求和，再按 `REQUANT_I8` 的 arithmetic shift、INT8 saturation 和 `flags[4]` packed layout 写回。`length` 必须为非零 4 的倍数，`flags[4]` 必须为 1，其他 reserved flags 必须为 0；其结果不得被视为当前产品 ABI 或产品 DV 闭合证据。
+
 ### 4.1 Compute CMDQ 并行派发
 
 普通 compute descriptor 按 CMDQ 顺序逐个读取、校验和派发；不同计算引擎的任务允许重叠，每个引擎最多有一个未完成任务。一个引擎仍忙时，属于该引擎的后续 descriptor 留在队列中，不能覆盖它的活动上下文。普通 descriptor 的 `CMDQ_HEAD` 在被派发或被判定为错误时推进；完成记录严格按 descriptor 的 CMDQ 顺序写入 CPLQ，且每项四个 word 全部提交后才推进 `CPLQ_TAIL`。因此任务执行完成顺序可以不同，软件观察到的完成顺序不变。Requirement 编号、测试台架边界和验证证据见 [Compute Cluster SPEC v1.5](COMPUTE_CLUSTER_SPEC_ZH.md) 与 [Compute Cluster UVM Testplan](../verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md)。
@@ -126,6 +128,7 @@ SFU `REQUANT_I8`（opcode `0x36`）中 `flags[4]` 将饱和后的 INT32 结果�
 | 32/39 | Softmax/Causal Softmax Q15 |
 | 33/38 | RMSNorm/LayerNorm Q15 |
 | 34/35/36/37 | Residual、GELU、requant、SiLU |
+| 3A (`0x3a`) | 研究候选：Residual 直连 packed INT8 requant（不属于冻结产品 ABI） |
 | 40/41/42 | QKV/MHA/FFN 描述符宏编排 |
 | 43/44 | KV write/KV read |
 | 50 (`0x50`) | BF16 点积、FP32 累加与结果（`BF16_DOT_ACC_FP32`） |

@@ -35,7 +35,7 @@ module ai_descriptor_validator (
 
     assign op_valid = ((op >= 8'h10) && (op <= 8'h17)) ||
                       (op == 8'h20) || (op == 8'h21) ||
-                      ((op >= 8'h30) && (op <= 8'h39)) ||
+                      ((op >= 8'h30) && (op <= 8'h3a)) ||
                       ((op >= 8'h43) && (op <= 8'h44)) ||
                       is_macro || (op == 8'h50) || (op == 8'h51) ||
                       (op == 8'h52) || (op == 8'h53);
@@ -43,7 +43,7 @@ module ai_descriptor_validator (
     assign is_tensor_matrix = (op == 8'h30) || (op == 8'h31) ||
                               (op == 8'h52) ||
                               (op == 8'h53);
-    assign is_tensor_sfu = (op >= 8'h32) && (op <= 8'h39);
+    assign is_tensor_sfu = (op >= 8'h32) && (op <= 8'h3a);
     wire is_bf16_dot = (op == 8'h50);
     wire is_fp16_dot = (op == 8'h51);
     wire is_fp_dot = is_bf16_dot || is_fp16_dot;
@@ -78,7 +78,9 @@ module ai_descriptor_validator (
                                (m_size >= 16'd1) && (m_size <= 16'd16) &&
                                (n_size >= 16'd1) && (n_size <= 16'd16) &&
                                (k_words != 16'd0)) ||
-                              (is_tensor_sfu && length != 0) ||
+                              ((is_tensor_sfu && op != 8'h3a) && length != 0) ||
+                              (op == 8'h3a && length != 0 &&
+                               length[1:0] == 2'b00 && flags[4]) ||
                               ((op == 8'h16 || op == 8'h17) &&
                                m_size >= 16'd3 && n_size >= 16'd3) ||
                               ((op == 8'h43 || op == 8'h44) && length != 0) ||
@@ -162,6 +164,8 @@ module ai_descriptor_validator (
                                 !version_valid ||
                                 ((op == 8'h36) && flags[5] &&
                                  !pack_tile_a_fields_valid) ||
+                                ((op == 8'h3a) &&
+                                 (flags[7:5] != 0 || flags[4] != 1'b1)) ||
                                 (macro_child_fetch && is_macro) ||
                                 alignment_error ||
                                 (is_macro && (|src0[5:0])) ||

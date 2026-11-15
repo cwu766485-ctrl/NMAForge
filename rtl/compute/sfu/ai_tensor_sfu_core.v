@@ -66,6 +66,8 @@ module ai_tensor_sfu_core(
     // Decoder attention primitive. epsilon[15:0] carries the query token
     // index; score columns greater than that index are causally masked.
     localparam [7:0] OP_CAUSAL_SOFTMAX_Q15 = 8'h39;
+    // Research-only opcode; not part of the product ABI until reviewed.
+    localparam [7:0] OP_RESIDUAL_REQUANT_I8 = 8'h3a;
 
     localparam [3:0] ERR_CONFIG     = 4'd1;
     localparam [3:0] ERR_OP         = 4'd2;
@@ -154,7 +156,8 @@ module ai_tensor_sfu_core(
     // restored after truncation toward zero; the nonnegative variance uses
     // floor division. Other vector lengths keep the iterative divider path.
     wire [63:0] ln_sum_magnitude = sum_x_r[63] ? (~sum_x_r + 64'd1) : sum_x_r;
-    wire packed_requant = (op_r == OP_REQUANT_I8) && pack_enable_r;
+    wire packed_requant = ((op_r == OP_REQUANT_I8) ||
+                           (op_r == OP_RESIDUAL_REQUANT_I8)) && pack_enable_r;
     wire [31:0] pack_tile_word_index = pack_tile_group_base_r +
         ({16'd0,pack_k_group_r} << 2) + {30'd0,pack_row_r[1:0]};
     wire [31:0] packed_word_index = pack_tile_a_r ? pack_tile_word_index :
@@ -171,6 +174,7 @@ module ai_tensor_sfu_core(
                            (op_mode == OP_RMSNORM_Q15) ||
                            (op_mode == OP_LAYERNORM_Q15) ||
                            (op_mode == OP_RESIDUAL_I32) ||
+                           (op_mode == OP_RESIDUAL_REQUANT_I8) ||
                            (op_mode == OP_GELU_Q8_8) ||
                            (op_mode == OP_REQUANT_I8) ||
                            (op_mode == OP_SILU_Q8_8);
@@ -179,7 +183,8 @@ module ai_tensor_sfu_core(
     wire input_alignment_error = (|src0_base[1:0]) || (|dst_base[1:0]) ||
                                  (((op_mode == OP_RESIDUAL_I32) ||
                                    (op_mode == OP_RMSNORM_Q15) ||
-                                   (op_mode == OP_LAYERNORM_Q15)) &&
+                                   (op_mode == OP_LAYERNORM_Q15) ||
+                                   (op_mode == OP_RESIDUAL_REQUANT_I8)) &&
                                   (src1_base != 0) && (|src1_base[1:0])) ||
                                  ((op_mode == OP_LAYERNORM_Q15) && beta_enable &&
                                   (|beta_base[1:0]));
@@ -231,11 +236,18 @@ module ai_tensor_sfu_core(
 
     ai_tensor_sfu_math math_u(
         .softmax_delta_q8_8(spad_signed - max_r),
-        .requant_value(spad_signed), .requant_shift(scale_shift_r),
+        .requant_value(((op_r == OP_RESIDUAL_REQUANT_I8) &&
+                        (state_r == ST_VEC_B_WAIT)) ?
+                       $signed(residual_output) : spad_signed),
+        .requant_shift(scale_shift_r),
         .residual_x(x_r),
         // During the B response, reuse the existing residual datapath.
-        .residual_y((op_r == OP_RESIDUAL_I32 && state_r == ST_VEC_B_WAIT) ?
-                    spad_signed : gamma_r), .residual_shift(scale_shift_r),
+        .residual_y(((op_r == OP_RESIDUAL_I32 ||
+                      op_r == OP_RESIDUAL_REQUANT_I8) &&
+                     state_r == ST_VEC_B_WAIT) ?
+                    spad_signed : gamma_r),
+        .residual_shift((op_r == OP_RESIDUAL_REQUANT_I8) ? 5'd0 :
+                        scale_shift_r),
         .gamma_x(x_r), .gamma(gamma_r), .norm_x(x_r),
         .norm_inv_rms(inv_rms_r), .norm_beta(beta_r),
         .norm_add_beta(is_layernorm), .gelu_product(vector_product_r),
@@ -315,6 +327,8 @@ module ai_tensor_sfu_core(
                         mean_r<=0; beta_r<=0; pack_word_r<=0;
                         rms_normalize_phase_r<=0;
                         if (length==0 || input_alignment_error ||
+                            (op_mode == OP_RESIDUAL_REQUANT_I8 &&
+                             (!pack_enable || length[1:0] != 0)) ||
                             pack_tile_config_error) begin
                             error_code<=ERR_CONFIG; state_r<=ST_ERROR;
                         end else if (!valid_operation) begin
@@ -323,7 +337,8 @@ module ai_tensor_sfu_core(
                             OP_SOFTMAX_Q15,OP_CAUSAL_SOFTMAX_Q15: state_r<=ST_SM_MAX_REQ;
                             OP_RMSNORM_Q15: state_r<=ST_RMS_SUM_REQ;
                             OP_LAYERNORM_Q15: state_r<=ST_LN_SUM_REQ;
-                            OP_RESIDUAL_I32,OP_GELU_Q8_8,OP_REQUANT_I8,OP_SILU_Q8_8:
+                            OP_RESIDUAL_I32,OP_RESIDUAL_REQUANT_I8,
+                            OP_GELU_Q8_8,OP_REQUANT_I8,OP_SILU_Q8_8:
                                 state_r<=ST_VEC_A_REQ;
                             default: begin error_code<=ERR_OP; state_r<=ST_ERROR; end
                         endcase
@@ -491,7 +506,8 @@ module ai_tensor_sfu_core(
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end
                     else begin
                         x_r<=spad_signed;
-                        if (op_r==OP_RESIDUAL_I32) state_r<=ST_VEC_B_REQ;
+                        if (op_r==OP_RESIDUAL_I32 ||
+                            op_r==OP_RESIDUAL_REQUANT_I8) state_r<=ST_VEC_B_REQ;
                         else if (op_r==OP_REQUANT_I8) begin
                             if (!pack_enable_r) begin
                                 output_word_r<=requant_spad;
@@ -539,8 +555,38 @@ module ai_tensor_sfu_core(
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end
                     else begin
                         gamma_r<=spad_signed;
-                        output_word_r<=residual_output;
-                        state_r<=ST_VEC_WRITE;
+                        if (op_r == OP_RESIDUAL_REQUANT_I8) begin
+                            case (index_r[1:0])
+                              2'd0: begin
+                                pack_word_r[7:0]<=requant_spad[7:0];
+                                output_word_r<={24'd0,requant_spad[7:0]};
+                              end
+                              2'd1: begin
+                                pack_word_r[15:8]<=requant_spad[7:0];
+                                output_word_r<={16'd0,requant_spad[7:0],
+                                               pack_word_r[7:0]};
+                              end
+                              2'd2: begin
+                                pack_word_r[23:16]<=requant_spad[7:0];
+                                output_word_r<={8'd0,requant_spad[7:0],
+                                               pack_word_r[15:0]};
+                              end
+                              default: begin
+                                pack_word_r[31:24]<=requant_spad[7:0];
+                                output_word_r<={requant_spad[7:0],
+                                               pack_word_r[23:0]};
+                              end
+                            endcase
+                            if (index_r[1:0] == 2'd3 || last_element)
+                                state_r<=ST_VEC_WRITE;
+                            else begin
+                                index_r<=index_r+1'b1;
+                                state_r<=ST_VEC_A_REQ;
+                            end
+                        end else begin
+                            output_word_r<=residual_output;
+                            state_r<=ST_VEC_WRITE;
+                        end
                     end
                 end
                 ST_VEC_PREP: begin

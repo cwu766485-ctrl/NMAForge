@@ -174,6 +174,183 @@ module tb_ai_accel_smoke;
     wire        s_axi_rvalid;
     reg         s_axi_rready;
     wire        irq;
+    reg         dams_trace_enable;
+    reg         dams_trace_reset_seen;
+    integer     dams_trace_fd;
+    integer     dams_trace_cycle;
+    integer     dams_trace_lane;
+    reg [1023:0] dams_trace_file;
+    integer     dams_state_trace_fd;
+    reg [1023:0] dams_state_trace_file;
+    reg [6:0]   dams_prev_engine_busy, dams_prev_engine_done;
+    reg [6:0]   dams_prev_engine_ready, dams_prev_engine_rsp_valid;
+    reg [6:0]   dams_prev_engine_error;
+    reg [6:0]   dams_event_prev_engine_error;
+    reg [15:0]  dams_prev_wait_mask, dams_prev_signal_mask;
+    reg         dams_prev_scheduler_ready, dams_prev_processor_busy;
+    reg         dams_prev_core_busy, dams_prev_dma_busy;
+
+    initial begin
+        dams_trace_enable = 1'b0;
+        dams_trace_reset_seen = 1'b0;
+        dams_trace_fd = 0;
+        dams_trace_cycle = 0;
+        dams_state_trace_fd = 0;
+        dams_prev_engine_busy = 7'd0;
+        dams_prev_engine_done = 7'd0;
+        dams_prev_engine_ready = 7'd0;
+        dams_prev_engine_rsp_valid = 7'd0;
+        dams_prev_engine_error = 7'd0;
+        dams_event_prev_engine_error = 7'd0;
+        dams_prev_wait_mask = 16'd0;
+        dams_prev_signal_mask = 16'd0;
+        dams_prev_scheduler_ready = 1'b0;
+        dams_prev_processor_busy = 1'b0;
+        dams_prev_core_busy = 1'b0;
+        dams_prev_dma_busy = 1'b0;
+        if ($value$plusargs("AI_DAMS_TRACE_FILE=%s", dams_trace_file)) begin
+            dams_trace_fd = $fopen(dams_trace_file, "w");
+            if (dams_trace_fd == 0)
+                $fatal(1, "could not open passive DAMS trace %0s", dams_trace_file);
+            $fdisplay(dams_trace_fd,
+                      "cycle,event,task_id,opcode,owner,address,write,wstrb,ready,rsp_owner,error,wait_mask,signal_mask");
+            dams_trace_enable = 1'b1;
+        end
+        if ($value$plusargs("AI_DAMS_STATE_TRACE_FILE=%s", dams_state_trace_file)) begin
+            dams_state_trace_fd = $fopen(dams_state_trace_file, "w");
+            if (dams_state_trace_fd == 0)
+                $fatal(1, "could not open passive DAMS state trace %0s", dams_state_trace_file);
+            $fdisplay(dams_state_trace_fd,
+                      "cycle,engine_busy,engine_done,engine_ready,engine_rsp_valid,launch_valid,scheduler_ready,processor_busy,core_busy,dma_busy,wait_mask,signal_mask,engine_error");
+        end
+    end
+
+    // Testbench-only passive trace. Sampling does not drive or delay DUT signals.
+    always @(posedge aclk) begin
+        if (dams_trace_enable) begin
+            if (!aresetn) begin
+                if (!dams_trace_reset_seen)
+                    $fdisplay(dams_trace_fd, "%0d,RESET,,,,,,,,,,,", dams_trace_cycle);
+                dams_trace_reset_seen = 1'b1;
+            end else begin
+                dams_trace_reset_seen = 1'b0;
+                dams_trace_cycle = dams_trace_cycle + 1;
+                if (dams_state_trace_fd != 0 &&
+                    ({dut.engine_busy, dut.engine_done, dut.compute_engine_ready,
+                      dut.compute_engine_rsp_valid, dut.parallel_scheduler_ready,
+                      dut.processor_busy, dut.core_busy, dut.dma_busy,
+                      dut.desc_wait_mask, dut.desc_signal_mask,
+                      dut.engine_error} !=
+                     {dams_prev_engine_busy, dams_prev_engine_done,
+                      dams_prev_engine_ready, dams_prev_engine_rsp_valid,
+                      dams_prev_scheduler_ready, dams_prev_processor_busy,
+                      dams_prev_core_busy, dams_prev_dma_busy,
+                      dams_prev_wait_mask, dams_prev_signal_mask,
+                      dams_prev_engine_error})) begin
+                    $fdisplay(dams_state_trace_fd,
+                        "%0d,%02x,%02x,%02x,%02x,%0d,%0d,%0d,%0d,%0d,%04x,%04x,%02x",
+                        dams_trace_cycle, dut.engine_busy, dut.engine_done,
+                        dut.compute_engine_ready, dut.compute_engine_rsp_valid,
+                        dut.launch_valid, dut.parallel_scheduler_ready,
+                        dut.processor_busy, dut.core_busy, dut.dma_busy,
+                        dut.desc_wait_mask, dut.desc_signal_mask, dut.engine_error);
+                    dams_prev_engine_busy = dut.engine_busy;
+                    dams_prev_engine_done = dut.engine_done;
+                    dams_prev_engine_ready = dut.compute_engine_ready;
+                    dams_prev_engine_rsp_valid = dut.compute_engine_rsp_valid;
+                    dams_prev_engine_error = dut.engine_error;
+                    dams_prev_scheduler_ready = dut.parallel_scheduler_ready;
+                    dams_prev_processor_busy = dut.processor_busy;
+                    dams_prev_core_busy = dut.core_busy;
+                    dams_prev_dma_busy = dut.dma_busy;
+                    dams_prev_wait_mask = dut.desc_wait_mask;
+                    dams_prev_signal_mask = dut.desc_signal_mask;
+                end
+                if (dut.launch_valid)
+                    $fdisplay(dams_trace_fd,
+                        "%0d,ISSUE,%0d,%02x,,,,,,,,%04x,%04x",
+                        dams_trace_cycle, dut.launch_task_id, dut.launch_op,
+                        dut.desc_wait_mask, dut.desc_signal_mask);
+                if (dut.compute_spad_mux_u.spad_valid) begin
+                    if (dut.arb_core_ready)
+                        $fdisplay(dams_trace_fd,
+                            "%0d,SPAD_ACCEPT,%0d,%02x,%0d,%08x,%0d,0000,1,,%0d,%04x,%04x",
+                            dams_trace_cycle, dut.launch_task_id, dut.launch_op,
+                            dut.compute_spad_mux_u.selected_owner,
+                            dut.compute_spad_mux_u.spad_addr,
+                            dut.compute_spad_mux_u.spad_write,
+                            dut.core_spad_error,
+                            dut.desc_wait_mask, dut.desc_signal_mask);
+                    else
+                        $fdisplay(dams_trace_fd,
+                            "%0d,RESOURCE_STALL,%0d,%02x,%0d,%08x,%0d,0000,0,,,%04x,%04x",
+                            dams_trace_cycle, dut.launch_task_id, dut.launch_op,
+                            dut.compute_spad_mux_u.selected_owner,
+                            dut.compute_spad_mux_u.spad_addr,
+                            dut.compute_spad_mux_u.spad_write,
+                            dut.desc_wait_mask, dut.desc_signal_mask);
+                end
+                if (dut.matrix_line_valid) begin
+                    if (dut.arb_core_line_ready)
+                        $fdisplay(dams_trace_fd,
+                            "%0d,LINE_ACCEPT,%0d,%02x,3,%08x,%0d,%04x,1,,%0d,%04x,%04x",
+                            dams_trace_cycle, dut.launch_task_id, dut.launch_op,
+                            dut.matrix_line_addr, dut.matrix_line_write,
+                            dut.matrix_line_wstrb,
+                            dut.line_prot_error, dut.desc_wait_mask,
+                            dut.desc_signal_mask);
+                    else
+                        $fdisplay(dams_trace_fd,
+                            "%0d,RESOURCE_STALL,%0d,%02x,3,%08x,%0d,%04x,0,,,%04x,%04x",
+                            dams_trace_cycle, dut.launch_task_id, dut.launch_op,
+                            dut.matrix_line_addr, dut.matrix_line_write,
+                            dut.matrix_line_wstrb, dut.desc_wait_mask,
+                            dut.desc_signal_mask);
+                end
+                if (dut.arb_rsp_valid)
+                    $fdisplay(dams_trace_fd,
+                        "%0d,SPAD_RESPONSE,%0d,%02x,,,,,,%0d,%0d,%04x,%04x",
+                        dams_trace_cycle, dut.launch_task_id, dut.launch_op,
+                        dut.arb_rsp_client, dut.arb_rsp_error, dut.desc_wait_mask,
+                        dut.desc_signal_mask);
+                if (|dut.arb_cnm_valid) begin
+                    for (dams_trace_lane = 0; dams_trace_lane < 4;
+                         dams_trace_lane = dams_trace_lane + 1)
+                        if (dut.arb_cnm_valid[dams_trace_lane] &&
+                            dut.arb_cnm_ready[dams_trace_lane])
+                            $fdisplay(dams_trace_fd,
+                                "%0d,CNM_ACCEPT,%0d,%02x,2,%08x,0,0000,1,5,0,%04x,%04x",
+                                dams_trace_cycle, dut.launch_task_id, dut.launch_op,
+                                (dams_trace_lane == 0) ? dut.arb_cnm_addr0 :
+                                (dams_trace_lane == 1) ? dut.arb_cnm_addr1 :
+                                (dams_trace_lane == 2) ? dut.arb_cnm_addr2 : dut.arb_cnm_addr3,
+                                dut.desc_wait_mask, dut.desc_signal_mask);
+                end
+                if (dut.arb_dma_ready && dut.dma_spad_valid)
+                    $fdisplay(dams_trace_fd,
+                        "%0d,DMA_ACCEPT,%0d,%02x,4,%08x,%0d,0000,1,4,0,%04x,%04x",
+                        dams_trace_cycle, dut.launch_task_id, dut.launch_op,
+                        dut.dma_spad_addr_o, dut.dma_spad_write,
+                        dut.desc_wait_mask, dut.desc_signal_mask);
+                if (dut.cpl_done)
+                    $fdisplay(dams_trace_fd,
+                        "%0d,RETIRE,%0d,,,,,,1,,%0d,%04x,%04x",
+                        dams_trace_cycle, dut.cpl_task_id,
+                        dut.cpl_error_code, dut.desc_wait_mask, dut.desc_signal_mask);
+                if (dut.core_abort)
+                    $fdisplay(dams_trace_fd, "%0d,ABORT,%0d,%02x,,,,,,,,,",
+                              dams_trace_cycle, dut.launch_task_id, dut.launch_op);
+                if (dut.engine_error != dams_event_prev_engine_error &&
+                    (|dut.engine_error))
+                    $fdisplay(dams_trace_fd,
+                              "%0d,FAULT,%0d,%02x,,,,,,%02x,%04x,%04x",
+                              dams_trace_cycle, dut.launch_task_id, dut.launch_op,
+                              dut.engine_error, dut.desc_wait_mask,
+                              dut.desc_signal_mask);
+                dams_event_prev_engine_error = dut.engine_error;
+            end
+        end
+    end
 
     wire        m_axi_arvalid;
     wire [3:0]  m_axi_arid;
@@ -3948,6 +4125,7 @@ module tb_ai_accel_smoke;
         integer task_id;
         real mac_per_cycle;
         real array_utilization;
+        real useful_array_utilization;
         reg [31:0] read_value;
         reg [31:0] status_value;
         reg [31:0] expected_value;
@@ -4510,6 +4688,10 @@ module tb_ai_accel_smoke;
         integer descriptor_count;
         integer prefill_descriptor_count;
         integer useful_macs;
+        integer executed_macs;
+        integer padding_macs;
+        integer useful_output_elements;
+        integer physical_output_elements;
         integer poll_index;
         integer completion_index;
         integer matrix_mac_cycles;
@@ -4527,6 +4709,7 @@ module tb_ai_accel_smoke;
         integer dma_busy_cycles;
         integer exclusive_profile_cycles;
         integer command_cycles;
+        integer end_to_end_cycles;
         integer prefill_command_cycles;
         integer decode_command_cycles;
         integer prefill_exclusive_cycles;
@@ -4542,6 +4725,7 @@ module tb_ai_accel_smoke;
         integer representative_dump_words_b;
         real mac_per_cycle;
         real array_utilization;
+        real useful_array_utilization;
         reg [1023:0] representative_dump_file;
         reg [31:0] read_value;
         reg [31:0] status_value;
@@ -4553,6 +4737,19 @@ module tb_ai_accel_smoke;
                 !$value$plusargs("AI_REPRESENTATIVE_DESC_COUNT=%d", descriptor_count) ||
                 !$value$plusargs("AI_REPRESENTATIVE_USEFUL_MACS=%d", useful_macs))
                 $fatal(1, "representative model mode requires memory, golden, queue and MAC plusargs");
+            executed_macs = -1;
+            padding_macs = -1;
+            useful_output_elements = -1;
+            physical_output_elements = -1;
+            if ($value$plusargs("AI_REPRESENTATIVE_EXECUTED_MACS=%d", executed_macs)) begin
+                if (!$value$plusargs("AI_REPRESENTATIVE_PADDING_MACS=%d", padding_macs) ||
+                    !$value$plusargs("AI_REPRESENTATIVE_USEFUL_OUTPUTS=%d", useful_output_elements) ||
+                    !$value$plusargs("AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=%d", physical_output_elements) ||
+                    executed_macs != useful_macs + padding_macs ||
+                    useful_output_elements <= 0 ||
+                    physical_output_elements < useful_output_elements)
+                    $fatal(1, "representative H64 work accounting is inconsistent");
+            end
             system_mode = $test$plusargs("SYSTEM_TIMELINE");
             sys_start=0;
             if(system_mode && $test$plusargs("SYSTEM_BACKPRESSURE")) begin
@@ -4892,6 +5089,8 @@ module tb_ai_accel_smoke;
             no_engine_cycles = transformer_top_profile_no_engine_busy;
             dma_busy_cycles = transformer_top_profile_dma_busy;
             command_cycles = transformer_top_final_end_cycle - transformer_top_start_cycle;
+            end_to_end_cycles = command_cycles +
+                                (use_dma_preload ? representative_dma_window_cycles : 0);
             prefill_command_cycles = 0;
             decode_command_cycles = 0;
             prefill_exclusive_cycles = 0;
@@ -4934,22 +5133,31 @@ module tb_ai_accel_smoke;
                                ai_tinynpu_cnn_line_write_lines * 16;
             mac_per_cycle = 0.0;
             array_utilization = 0.0;
+            useful_array_utilization = 0.0;
             if (command_cycles > 0)
                 mac_per_cycle = 1.0 * useful_macs / command_cycles;
-            if (matrix_mac_cycles > 0)
-                array_utilization = 100.0 * useful_macs / (256.0 * matrix_mac_cycles);
-            $display("REPRESENTATIVE_MODEL_PASS desc=%0d prefill_desc=%0d decode_desc=%0d golden_words=%0d useful_macs=%0d command_cycles=%0d prefill_command_cycles=%0d decode_command_cycles=%0d prefill_exclusive_cycles=%0d decode_exclusive_cycles=%0d exclusive_profile_cycles=%0d preload_axi_cycles=%0d preload_dma_window_cycles=%0d preload_dma_busy_cycles=%0d preloaded_spad_bytes=%0d mac_per_cycle=%0.4f array_utilization_pct=%0.2f matrix_mac_cycles=%0d matrix_req_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d sfu_busy=%0d kv_busy=%0d conv_busy=%0d banked_busy=%0d fp_busy=%0d scalar_busy=%0d no_engine_dispatch_remainder=%0d dma_busy_overlap=%0d spad_read_bytes=%0d spad_write_bytes=%0d",
+            if (matrix_mac_cycles > 0) begin
+                if (executed_macs >= 0)
+                    array_utilization = 100.0 * executed_macs /
+                                        (256.0 * matrix_mac_cycles);
+                else
+                    array_utilization = -1.0;
+                useful_array_utilization = 100.0 * useful_macs / (256.0 * matrix_mac_cycles);
+            end
+            $display("REPRESENTATIVE_MODEL_PASS desc=%0d prefill_desc=%0d decode_desc=%0d golden_words=%0d useful_macs=%0d executed_macs=%0d padding_macs=%0d useful_output_elements=%0d physical_output_elements=%0d command_cycles=%0d end_to_end_cycles=%0d dma_preload_included=%0d prefill_command_cycles=%0d decode_command_cycles=%0d prefill_exclusive_cycles=%0d decode_exclusive_cycles=%0d exclusive_profile_cycles=%0d preload_axi_cycles=%0d preload_dma_window_cycles=%0d preload_dma_busy_cycles=%0d preloaded_spad_bytes=%0d useful_mac_per_cycle=%0.4f executed_array_utilization_pct=%0.2f useful_array_utilization_pct=%0.2f matrix_mac_cycles=%0d matrix_req_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d sfu_busy=%0d kv_busy=%0d conv_busy=%0d banked_busy=%0d fp_busy=%0d scalar_busy=%0d no_engine_dispatch_remainder=%0d dma_busy_overlap=%0d spad_read_bytes=%0d spad_write_bytes=%0d",
                      descriptor_count,
                      prefill_descriptor_count > 0 ? prefill_descriptor_count : 0,
                      prefill_descriptor_count > 0 ?
                          descriptor_count - prefill_descriptor_count : 0,
-                     golden_count, useful_macs, command_cycles,
+                     golden_count, useful_macs, executed_macs, padding_macs,
+                     useful_output_elements, physical_output_elements,
+                     command_cycles, end_to_end_cycles, use_dma_preload,
                      prefill_command_cycles, decode_command_cycles,
                      prefill_exclusive_cycles, decode_exclusive_cycles,
                      exclusive_profile_cycles, representative_load_cycles,
                      representative_dma_window_cycles,
                      representative_dma_busy_cycles, preloaded_spad_bytes,
-                     mac_per_cycle, array_utilization,
+                     mac_per_cycle, array_utilization, useful_array_utilization,
                      matrix_mac_cycles, matrix_wait_cycles,
                      matrix_response_wait_cycles, matrix_writeback_cycles,
                      matrix_other_cycles, sfu_busy_cycles, kv_busy_cycles,
