@@ -63,7 +63,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=20261115)
     parser.add_argument("--tokens", default="1,7,42,3,5,8")
     parser.add_argument("--kv-k-write-mode",
-                        choices=("token-append", "matrix-a-tile", "matrix-a-word"),
+                        choices=("token-append", "qk-compatible-append",
+                                 "matrix-a-tile", "matrix-a-word"),
                         default="token-append")
     args = parser.parse_args()
     tokens = [int(value) for value in args.tokens.split(",")]

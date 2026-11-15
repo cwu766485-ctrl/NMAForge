@@ -54,14 +54,19 @@ module ai_descriptor_validator (
         (m_size[1:0] == 0) && (n_size[1:0] == 0) &&
         (pack_tile_a_elements == {16'd0,length});
 
-    assign version_valid = is_fp_dot ? (version == 8'd7) :
-                           (version == 8'd7) ? 1'b1 :
-                           is_macro ? (version == 8'd4) :
-                           ((op == 8'h16 || op == 8'h17 ||
-                             op == 8'h43 || op == 8'h44) ?
-                            (version == 8'd5) :
-                            (!(is_tensor_matrix || is_tensor_sfu) ||
-                             (version == 8'd3)));
+    assign version_valid = (version == 8'd7) ||
+                           (is_macro && (version == 8'd4)) ||
+                           ((op == 8'h43) &&
+                            (((version == 8'd5) && (flags != 8'h02)) ||
+                             ((version == 8'd6) && (flags == 8'h02)))) ||
+                           (((op == 8'h16) || (op == 8'h17) ||
+                             (op == 8'h44)) && (version == 8'd5)) ||
+                           ((is_tensor_matrix || is_tensor_sfu) &&
+                            (version == 8'd3)) ||
+                           !(is_fp_dot || is_macro || is_tensor_matrix ||
+                             is_tensor_sfu || (op == 8'h16) ||
+                             (op == 8'h17) || (op == 8'h43) ||
+                             (op == 8'h44));
 
     assign dimensions_valid = (op == 8'h10 && length != 0) ||
                               ((op == 8'h11 || op == 8'h21) &&
@@ -125,6 +130,25 @@ module ai_descriptor_validator (
                       !flags[1] && (batch_count <= 16'd1) &&
                       (src0_stride == 0))));
 
+    wire [31:0] kv_flag02_capacity =
+        (length != 0) ? (src1_stride / length) : 32'd0;
+    wire kv_flag02_fields_valid =
+        (op == 8'h43) && (version == 8'd6) &&
+        (length >= 16'd4) && (length <= 16'd16) &&
+        (length[1:0] == 2'b00) && (src0_stride == 32'd16) &&
+        (src1_stride != 0) && ((src1_stride % length) == 0) &&
+        (kv_flag02_capacity >= 4) && (kv_flag02_capacity <= 16) &&
+        ((kv_flag02_capacity & 32'd3) == 0) &&
+        ({16'd0,aux0[15:0]} < kv_flag02_capacity) &&
+        (dst_stride == 0);
+    wire kv_fields_valid =
+        !((op == 8'h43) || (op == 8'h44)) ||
+        ((op == 8'h43) ?
+         ((flags == 8'd0) ||
+          (flags == 8'h01) ||
+          ((flags == 8'h02) && kv_flag02_fields_valid)) :
+         (flags == 8'd0));
+
     // Product GEMV descriptor field gate. Shape support is bounded by the
     // shared 16x16 Matrix array; unsupported strides, batching, and flags are
     // rejected before dispatch rather than silently ignored.
@@ -171,6 +195,7 @@ module ai_descriptor_validator (
                                 (is_macro && (|src0[5:0])) ||
                                 (is_fp_dot && !fp_dot_fields_valid) ||
                                 !fused_matrix_fields_valid ||
+                                !kv_fields_valid ||
                                 !gemv_fields_valid;
 
 endmodule

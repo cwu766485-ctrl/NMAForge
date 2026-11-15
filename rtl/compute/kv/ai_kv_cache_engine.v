@@ -3,8 +3,8 @@
 // Scratchpad-resident KV-cache address generator.
 // aux0 = {head_index[15:0], token_index[15:0]}. Legacy KV_WRITE/KV_READ use
 // src0_stride as the token stride and src1_stride as the head stride. The
-// opt-in KV_WRITE Matrix-B append mode (flags[0]) scatters one packed INT8
-// token into a [token,feature] B tile by byte-preserving read/modify/write.
+// Opt-in KV_WRITE modes support legacy copies, Matrix-B byte append, and
+// direct QK-compatible Matrix-B packed-word placement.
 module ai_kv_cache_engine(
     input wire clk, input wire resetn, input wire start, input wire abort,
     input wire [7:0] op_mode, input wire [31:0] src0_base,
@@ -28,6 +28,7 @@ module ai_kv_cache_engine(
   localparam [3:0] ERR_SPAD     = 4'd7;
 
   localparam [7:0] KV_FLAG_MATRIX_B_APPEND = 8'h01;
+  localparam [7:0] KV_FLAG_QK_COMPAT_APPEND = 8'h02;
 
   localparam [3:0] ST_IDLE            = 4'd0;
   localparam [3:0] ST_READ_REQ        = 4'd1;
@@ -40,6 +41,7 @@ module ai_kv_cache_engine(
   localparam [3:0] ST_SCATTER_DST_REQ = 4'd8;
   localparam [3:0] ST_SCATTER_DST_WAIT= 4'd9;
   localparam [3:0] ST_SCATTER_WRITE   = 4'd10;
+  localparam [3:0] ST_QK_WRITE        = 4'd11;
 
   reg [3:0] state_r;
   reg write_r;
@@ -51,6 +53,7 @@ module ai_kv_cache_engine(
   wire valid_operation = (op_mode == OP_KV_WRITE) || (op_mode == OP_KV_READ);
   wire starts_kv_write = (op_mode == OP_KV_WRITE);
   wire matrix_b_append = (flags == KV_FLAG_MATRIX_B_APPEND);
+  wire qk_compat_append = (flags == KV_FLAG_QK_COMPAT_APPEND);
   // Compute address products and the combined cache offset at a width that
   // preserves all 16x32-bit product bits. The SPAD port is word based, so
   // bases/strides must be word aligned and all generated addresses must fit
@@ -71,6 +74,17 @@ module ai_kv_cache_engine(
                                        (src1_stride / length) : 32'd0;
   wire [47:0] scatter_head_offset = {32'd0,aux0[31:16]} *
                                      {16'd0,src1_stride};
+  wire [31:0] qk_capacity_wide = (length != 0) ?
+                                   (src1_stride / length) : 32'd0;
+  wire [31:0] qk_groups = {16'd0,length} >> 2;
+  wire [63:0] qk_last_word_index =
+      ((({48'd0,aux0[15:2]} * {32'd0,qk_groups}) +
+        ({32'd0,qk_groups} - 64'd1)) << 2) +
+       {62'd0,aux0[1:0]};
+  wire [64:0] qk_dst_last_wide = {33'd0,dst_base} +
+      {17'd0,scatter_head_offset} + (qk_last_word_index << 2);
+  wire [32:0] qk_src_last_wide = {1'b0,src0_base} +
+      ({17'd0,((length >> 2) - 1'b1)} * {1'b0,src0_stride}) + 33'd4;
   wire [63:0] scatter_dst_last_wide = {32'd0,dst_base} +
       {16'd0,scatter_head_offset} +
       (((({32'd0,length} - 64'd1) >> 2) *
@@ -88,14 +102,24 @@ module ai_kv_cache_engine(
       ({16'd0,aux0[15:0]} >= scatter_capacity_wide) ||
       (scatter_dst_last_wide[63:32] != 0) ||
       (scatter_src_last_wide[32] != 0);
+  wire qk_append_geometry_error =
+      !starts_kv_write || (length < 16'd4) || (length > 16'd16) ||
+      (length[1:0] != 2'b00) || (src0_stride != 32'd16) ||
+      (src1_stride == 0) || ((src1_stride % length) != 0) ||
+      (qk_capacity_wide < 4) || (qk_capacity_wide > 16) ||
+      ((qk_capacity_wide & 32'd3) != 0) ||
+      ({16'd0,aux0[15:0]} >= qk_capacity_wide) ||
+      (qk_dst_last_wide[64:32] != 0) || qk_src_last_wide[32];
   wire kv_address_config_error =
       (src0_base[1:0] != 2'b00) || (dst_base[1:0] != 2'b00) ||
       (src0_stride[1:0] != 2'b00) || (src1_stride[1:0] != 2'b00) ||
       (matrix_b_append ?
        ((flags != KV_FLAG_MATRIX_B_APPEND) || scatter_geometry_error) :
-       ((flags != 0) || (cache_offset_wide[48:32] != 0) ||
-        (cache_last_addr_wide[33:32] != 0) ||
-        (linear_last_addr_wide[33:32] != 0)));
+       (qk_compat_append ?
+        ((flags != KV_FLAG_QK_COMPAT_APPEND) || qk_append_geometry_error) :
+        ((flags != 0) || (cache_offset_wide[48:32] != 0) ||
+         (cache_last_addr_wide[33:32] != 0) ||
+         (linear_last_addr_wide[33:32] != 0))));
   wire watchdog_expired = busy && watchdog_r != 0 &&
                           cycle_count >= watchdog_r;
   wire [31:0] cache_addr = cache_offset_r + ({16'd0,index_r}<<2);
@@ -103,11 +127,17 @@ module ai_kv_cache_engine(
   wire [31:0] write_addr = write_r ? (dst_r + cache_addr) : (dst_r + ({16'd0,index_r}<<2));
   wire [31:0] scatter_source_addr = src_r +
                                       (({16'd0,index_r} >> 2) << 4);
+  wire [31:0] qk_source_addr = src_r + ({16'd0,index_r} << 4);
   wire [31:0] scatter_cache_word_addr = dst_r + cache_offset_r +
       (((({16'd0,index_r} >> 2) *
           ({16'd0,scatter_capacity_r} >> 2)) +
          ({16'd0,token_index_r} >> 2)) << 4) +
       (({30'd0,index_r[1:0]}) << 2);
+  wire [31:0] qk_packed_word_index =
+      (((({16'd0,token_index_r} >> 2) * ({16'd0,length_r} >> 2)) +
+         {16'd0,index_r}) << 2) + {30'd0,token_index_r[1:0]};
+  wire [31:0] qk_cache_word_addr = dst_r + cache_offset_r +
+                                    (qk_packed_word_index * 32'd4);
   wire [7:0] scatter_source_byte =
       source_word_r[index_r[1:0]*8 +: 8];
   wire [31:0] scatter_write_data =
@@ -119,11 +149,14 @@ module ai_kv_cache_engine(
     if(state_r==ST_READ_REQ) begin spad_valid=1; spad_addr=read_addr; end
     else if(state_r==ST_WRITE) begin spad_valid=1; spad_write=1; spad_addr=write_addr; end
     else if(state_r==ST_SCATTER_SRC_REQ) begin
-      spad_valid=1; spad_addr=scatter_source_addr;
+      spad_valid=1;
+      spad_addr=qk_compat_append ? qk_source_addr : scatter_source_addr;
     end else if(state_r==ST_SCATTER_DST_REQ) begin
       spad_valid=1; spad_addr=scatter_cache_word_addr;
     end else if(state_r==ST_SCATTER_WRITE) begin
       spad_valid=1; spad_write=1; spad_addr=scatter_cache_word_addr;
+    end else if(state_r==ST_QK_WRITE) begin
+      spad_valid=1; spad_write=1; spad_addr=qk_cache_word_addr;
     end
   end
   always @(posedge clk or negedge resetn) begin
@@ -140,14 +173,16 @@ module ai_kv_cache_engine(
           else if(!valid_operation) begin error<=1; error_code<=ERR_OP; state_r<=ST_ERROR; end
           else if(kv_address_config_error) begin error<=1; error_code<=ERR_CONFIG; state_r<=ST_ERROR; end
           else begin busy<=1; write_r<=starts_kv_write; src_r<=src0_base; dst_r<=dst_base;
-            cache_offset_r <= matrix_b_append ? scatter_head_offset[31:0] :
-                                                   cache_offset_wide[31:0];
+            cache_offset_r <= (matrix_b_append || qk_compat_append) ?
+                              scatter_head_offset[31:0] : cache_offset_wide[31:0];
             token_index_r <= aux0[15:0];
-            scatter_capacity_r <= matrix_b_append ? scatter_capacity_wide[15:0] : 16'd0;
+            scatter_capacity_r <= matrix_b_append ? scatter_capacity_wide[15:0] :
+                                  qk_compat_append ? qk_capacity_wide[15:0] : 16'd0;
             scatter_byte_shift_r <= {aux0[1:0],3'b000};
             length_r<=length; index_r<=0; result<=0; element_count<=0;
             watchdog_r<=watchdog_limit;
-            state_r<=matrix_b_append ? ST_SCATTER_SRC_REQ : ST_READ_REQ;
+            state_r<=(matrix_b_append || qk_compat_append) ?
+                     ST_SCATTER_SRC_REQ : ST_READ_REQ;
           end
         end end
         ST_READ_REQ: if(spad_ready) state_r<=ST_READ_WAIT;
@@ -159,7 +194,10 @@ module ai_kv_cache_engine(
         ST_SCATTER_SRC_REQ: if(spad_ready) state_r<=ST_SCATTER_SRC_WAIT;
         ST_SCATTER_SRC_WAIT: if(spad_rsp_valid) begin
           source_word_r<=spad_rdata;
-          state_r<=ST_SCATTER_DST_REQ;
+          if(qk_compat_append) begin
+            data_r<=spad_rdata;
+            state_r<=ST_QK_WRITE;
+          end else state_r<=ST_SCATTER_DST_REQ;
         end
         ST_SCATTER_DST_REQ: if(spad_ready) state_r<=ST_SCATTER_DST_WAIT;
         ST_SCATTER_DST_WAIT: if(spad_rsp_valid) begin
@@ -175,6 +213,12 @@ module ai_kv_cache_engine(
             state_r<=((index_r[1:0] == 2'b11) ? ST_SCATTER_SRC_REQ :
                                                         ST_SCATTER_DST_REQ);
           end
+        end
+        ST_QK_WRITE: if(spad_ready) begin
+          result<=data_r;
+          element_count<=element_count+4;
+          if(index_r+1 >= (length_r >> 2)) state_r<=ST_DONE;
+          else begin index_r<=index_r+1'b1; state_r<=ST_SCATTER_SRC_REQ; end
         end
         ST_DONE: begin busy<=0; done<=1; state_r<=ST_IDLE; end
         ST_ERROR: begin busy<=0; done<=1; state_r<=ST_IDLE; end

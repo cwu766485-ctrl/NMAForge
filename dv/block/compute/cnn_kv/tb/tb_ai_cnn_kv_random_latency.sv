@@ -48,6 +48,7 @@ module tb_ai_cnn_kv_random_latency;
   reg [7:0] scatter_source_values[0:7];
   reg [7:0] scatter_expected_values[0:7];
   reg [31:0] scatter_baseline_words[0:7];
+  reg [7:0] qk_expected[0:15][0:15];
   reg [31:0] temp;
   integer tinynpu_conv_bench=0;
 
@@ -771,6 +772,131 @@ module tb_ai_cnn_kv_random_latency;
     end
   endtask
 
+  task automatic run_qk_compatible_append_test;
+    integer token,feature,feature_group,lane,source_base,source_word;
+    integer destination_word,reads_before,writes_before,expected_word;
+    integer total_reads,total_writes,timeout_local;
+    begin
+      kv_transition_probe=0; kv_flags=8'h02; kv_op=8'h43;
+      kv_length=16; kv_stride_token=16; kv_stride_head=256;
+      kv_src=32'h0000_1000; kv_dst=32'h0000_4000;
+      kv_watchdog=0; kv_abort=0; spad_error=0;
+      for(feature=0;feature<64;feature=feature+1) begin
+        memory[spad_word_index(kv_dst)+64+feature]=32'hface_cafe;
+        memory[spad_word_index(kv_dst)+128+feature]=32'hd00d_f00d;
+      end
+      total_reads=0; total_writes=0;
+      for(token=0;token<16;token=token+1) begin
+        source_base=kv_src+(token/4)*64+(token%4)*4;
+        for(feature_group=0;feature_group<4;feature_group=feature_group+1) begin
+          expected_word=0;
+          for(lane=0;lane<4;lane=lane+1) begin
+            feature=feature_group*4+lane;
+            qk_expected[token][feature]=(token*13+feature*7+19)&8'hff;
+            expected_word=expected_word |
+              (qk_expected[token][feature] << (lane*8));
+          end
+          source_word=spad_word_index(source_base+feature_group*16);
+          memory[source_word]=expected_word;
+        end
+        kv_src=source_base;
+        kv_aux={16'd1,token[15:0]};
+        reads_before=accepted_read_count; writes_before=write_count;
+        launch_kv();
+        if(kvel!=16 || accepted_read_count-reads_before!=4 ||
+           write_count-writes_before!=4)
+          $fatal(1,"KV QK append token=%0d count/elements/reads/writes=%0d/%0d/%0d",
+                 token,kvel,accepted_read_count-reads_before,
+                 write_count-writes_before);
+        total_reads=total_reads+accepted_read_count-reads_before;
+        total_writes=total_writes+write_count-writes_before;
+      end
+      for(token=0;token<16;token=token+1) begin
+        for(feature_group=0;feature_group<4;feature_group=feature_group+1) begin
+          destination_word=spad_word_index(kv_dst+256+
+            ((((token/4)*4+feature_group)*4+(token%4))*4));
+          expected_word=0;
+          for(lane=0;lane<4;lane=lane+1)
+            expected_word=expected_word |
+              (qk_expected[token][feature_group*4+lane] << (lane*8));
+          if(memory[destination_word]!==expected_word)
+            $fatal(1,"KV QK append mismatch token=%0d feature_group=%0d addr=%08x got=%08x expected=%08x",
+                   token,feature_group,kv_dst+256+
+                   ((((token/4)*4+feature_group)*4+(token%4))*4),
+                   memory[destination_word],expected_word);
+        end
+      end
+      for(feature=0;feature<64;feature=feature+1)
+        if(memory[spad_word_index(kv_dst)+128+feature]!==32'hd00d_f00d)
+          $fatal(1,"KV QK append crossed head boundary word=%0d",feature);
+      if(total_reads!=64 || total_writes!=64)
+        $fatal(1,"KV QK append totals reads=%0d writes=%0d",total_reads,total_writes);
+
+      // Abort after a source read has been accepted but before its response.
+      kv_transition_probe=1; kv_probe_ready=1; kv_probe_rsp_hold=1;
+      kv_src=32'h0000_1800; kv_dst=32'h0000_5000;
+      kv_length=16; kv_stride_token=16; kv_stride_head=256;
+      kv_aux=0; kv_flags=8'h02; kv_op=8'h43; kv_abort=0; spad_error=0;
+      reads_before=accepted_read_count; writes_before=write_count;
+      @(negedge clk);kv_start=1;
+      @(negedge clk);kv_start=0;
+      timeout_local=0;
+      while(kv.state_r!==4'd7 && timeout_local<100) begin
+        @(negedge clk);timeout_local=timeout_local+1;
+      end
+      if(kv.state_r!==4'd7 || !rsp_pending ||
+         accepted_read_count!=reads_before+1)
+        $fatal(1,"KV QK accepted-read abort setup state/pending/reads=%0d/%b/%0d",
+               kv.state_r,rsp_pending,accepted_read_count-reads_before);
+      kv_abort=1; @(posedge clk); #1ps;
+      if(!kve || kvec!==4'd3 || write_count!=writes_before ||
+         kv.state_r!==4'd5)
+        $fatal(1,"KV QK accepted-read abort wrote data or returned wrong cause");
+      timeout_local=0;
+      while(!kvdone && timeout_local<20) begin @(negedge clk);timeout_local=timeout_local+1;end
+      if(!kvdone || kvb) $fatal(1,"KV QK accepted-read abort did not retire");
+      kv_abort=0; kv_probe_rsp_hold=0; drain_spad_response();
+
+      // Abort after the first packed destination word commits; the remaining
+      // three words in this token's physical group must remain untouched.
+      for(feature_group=0;feature_group<4;feature_group=feature_group+1) begin
+        memory[spad_word_index(kv_src)+feature_group*4]=32'h0403_0201+feature_group*32'h0404_0404;
+        memory[spad_word_index(kv_dst)+feature_group*4]=32'hface_cafe;
+      end
+      kv_probe_ready=1; kv_probe_rsp_hold=0;
+      writes_before=write_count;
+      @(negedge clk);kv_start=1;
+      @(negedge clk);kv_start=0;
+      timeout_local=0;
+      while(kvel<4 && timeout_local<200) begin @(negedge clk);timeout_local=timeout_local+1;end
+      if(kvel!=4 || write_count!=writes_before+1)
+        $fatal(1,"KV QK packed-write abort setup elements/writes=%0d/%0d",
+               kvel,write_count-writes_before);
+      kv_probe_ready=0;
+      timeout_local=0;
+      while((kv.state_r!==4'd11 || spad_ready) && timeout_local<100) begin
+        @(negedge clk);timeout_local=timeout_local+1;
+      end
+      if(kv.state_r!==4'd11 || spad_ready)
+        $fatal(1,"KV QK packed-write abort did not hold the next packed word");
+      kv_abort=1; @(posedge clk); #1ps;
+      if(!kve || kvec!==4'd3 || write_count!=writes_before+1 || kvel!=4)
+        $fatal(1,"KV QK packed-write abort prefix/error mismatch");
+      if(memory[spad_word_index(kv_dst)]!==32'h0403_0201)
+        $fatal(1,"KV QK packed-write abort lost accepted prefix word");
+      for(feature_group=1;feature_group<4;feature_group=feature_group+1)
+        if(memory[spad_word_index(kv_dst)+feature_group*4]!==32'hface_cafe)
+          $fatal(1,"KV QK packed-write abort changed unaccepted suffix group=%0d",feature_group);
+      timeout_local=0;
+      while(!kvdone && timeout_local<20) begin @(negedge clk);timeout_local=timeout_local+1;end
+      if(!kvdone || kvb) $fatal(1,"KV QK packed-write abort did not retire");
+      kv_abort=0; kv_probe_ready=1; drain_spad_response();
+      kv_transition_probe=0;
+      $display("KV_QK_COMPAT_APPEND_PASS tokens=16 packed_words=64 reads=64 writes=64 boundary_tokens=0,3,4,15 byte_exact=1 accepted_read_abort=1 packed_write_abort_prefix=1");
+      kv_flags=0; kv_aux=0;
+    end
+  endtask
+
   initial begin
     if ($value$plusargs("SEED=%d",seed)) begin end
     initial_seed=seed;
@@ -933,13 +1059,14 @@ module tb_ai_cnn_kv_random_latency;
     run_late_kv_fault();
     check_reset_recovery();
     run_matrix_b_append_safety_tests();
+    run_qk_compatible_append_test();
 
     if (accepted_read_count!=response_count+reset_dropped_read_count || rsp_pending)
       $fatal(1,"SPAD response accounting reads=%0d responses=%0d reset_dropped=%0d pending=%b",
              accepted_read_count,response_count,reset_dropped_read_count,rsp_pending);
     if (ready_stall_cycles==0 || max_response_delay==0)
       $fatal(1,"SPAD latency stress did not exercise ready or response stalls");
-    $display("CNN_KV_RANDOM_LATENCY_PASS conv_cases=25 conv_dw_cases=%0d kv_roundtrips=27 conv_faults=6 kv_faults=7 kv_address_config_cases=10 kv_last_spad_word=1 late_faults=2 reset_fault_combo=1 reset_recovery=1 seed=%0d reads=%0d responses=%0d reset_dropped=%0d max_rsp_delay=%0d ready_stalls=%0d",
+    $display("CNN_KV_RANDOM_LATENCY_PASS conv_cases=25 conv_dw_cases=%0d kv_roundtrips=27 conv_faults=6 kv_faults=7 kv_address_config_cases=10 kv_last_spad_word=1 late_faults=2 reset_fault_combo=1 reset_recovery=1 qk_compat_append=16x16 seed=%0d reads=%0d responses=%0d reset_dropped=%0d max_rsp_delay=%0d ready_stalls=%0d",
              conv_dw_count,initial_seed,accepted_read_count,response_count,
              reset_dropped_read_count,max_response_delay,ready_stall_cycles);
     $finish;

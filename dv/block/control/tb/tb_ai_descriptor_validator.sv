@@ -182,6 +182,22 @@ module tb_ai_descriptor_validator;
         set_legal_defaults(8'h35); length=16'd0; check_invalid("SFU zero length");
         set_legal_defaults(8'h16); m_size=16'd2; check_invalid("Conv H below minimum");
         set_legal_defaults(8'h43); length=16'd0; check_invalid("KV zero length");
+        set_legal_defaults(8'h43); version=8'd6; length=16'd16;
+        flags=8'h02; src0_stride=32'd16; src1_stride=32'd256;
+        aux0={16'd2,16'd15};
+        check_boundary_accept("KV QK-compatible append ABI v6 token 15");
+        set_legal_defaults(8'h43); version=8'd6; length=16'd16;
+        flags=8'h02; src0_stride=32'd16; src1_stride=32'd256;
+        aux0={16'd0,16'd16};
+        check_invalid("KV QK-compatible append token outside capacity");
+        set_legal_defaults(8'h43); version=8'd5; length=16'd16;
+        flags=8'h02; src0_stride=32'd16; src1_stride=32'd256;
+        check_invalid("KV QK-compatible append requires ABI v6");
+        set_legal_defaults(8'h44); version=8'd6; length=16'd16;
+        flags=8'h02; check_invalid("KV read rejects QK append mode");
+        set_legal_defaults(8'h43); version=8'd6; length=16'd16;
+        flags=8'h02; src0_stride=32'd16; src1_stride=32'd250;
+        check_invalid("KV QK-compatible append invalid head span");
         set_legal_defaults(8'h50); version=8'd6; check_invalid("FP ABI version");
         set_legal_defaults(8'h40); length=16'd2; check_invalid("macro minimum child count");
 
@@ -321,11 +337,11 @@ module tb_ai_descriptor_validator;
             $fatal(1, "Matrix A tile-pack accepted a non-matching M*N length");
         boundary_reject_checks = boundary_reject_checks + 1;
 
-        if (legal_opcode_checks != 30 || invalid_rule_checks != 33 ||
-            boundary_accept_checks != 43 || boundary_reject_checks != 26)
-            $fatal(1, "testpoint count mismatch legal=%0d invalid=%0d boundary_accept=%0d boundary_reject=%0d expected=30/33/43/26",
+        if (legal_opcode_checks != 30 || invalid_rule_checks != 37 ||
+            boundary_accept_checks != 44 || boundary_reject_checks != 26)
+            $fatal(1, "testpoint count mismatch legal=%0d invalid=%0d boundary_accept=%0d boundary_reject=%0d expected=30/37/44/26",
                    legal_opcode_checks, invalid_rule_checks, boundary_accept_checks, boundary_reject_checks);
-        $display("DESCRIPTOR_VALIDATOR_PASS legal_opcodes=29 tile_pack=1 invalid_rules=33 boundary_accept=43/43 boundary_reject=26/26 tile_forward_accept=3/3 legacy_aux_compat=1 opcode_classes_consistent=1 engine_limit_claim=0");
+        $display("DESCRIPTOR_VALIDATOR_PASS legal_opcodes=29 tile_pack=1 invalid_rules=37 boundary_accept=44/44 boundary_reject=26/26 tile_forward_accept=3/3 legacy_aux_compat=1 opcode_classes_consistent=1 engine_limit_claim=0");
         $finish;
     end
 endmodule

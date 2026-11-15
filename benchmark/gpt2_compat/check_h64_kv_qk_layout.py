@@ -58,6 +58,21 @@ def pack_matrix_a_layout(rows: list[list[int]]) -> list[int]:
     return words
 
 
+def pack_qk_compat_append(rows: list[list[int]]) -> list[int]:
+    """Apply flags=0x02 token writes and the specified QK word address map."""
+    size = len(rows)
+    if size % 4 or any(len(row) != size for row in rows):
+        raise ValueError("QK-compatible append requires a square multiple-of-four tile")
+    words = [0] * (size * size // 4)
+    groups = size // 4
+    for token, row in enumerate(rows):
+        for feature_group in range(groups):
+            word_index = ((token // 4) * groups + feature_group) * 4 + token % 4
+            for lane, value in enumerate(row[feature_group * 4:feature_group * 4 + 4]):
+                words[word_index] |= (value & 0xFF) << (lane * 8)
+    return words
+
+
 def transpose_inside_4x4_tiles(matrix: list[list[int]]) -> list[list[int]]:
     """Model transpose_b's lane/word swap while retaining 4x4 tile positions."""
     size = len(matrix)
@@ -90,6 +105,7 @@ def run(seed: int, size: int) -> dict:
     expected_words = _pack_matrix_b_physical(expected_b)
     append_words = pack_append_layout(key)
     matrix_a_words = pack_matrix_a_layout(key)
+    qk_append_words = pack_qk_compat_append(key)
     append_as_matrix_b = unpack_matrix_b(append_words, size, size)
     append_repacked_words = _pack_matrix_b_physical(append_as_matrix_b)
     local_transpose_words = _pack_matrix_b_physical(
@@ -100,6 +116,7 @@ def run(seed: int, size: int) -> dict:
     qk_mismatch = first_word_mismatch(append_repacked_words, expected_words)
     transpose_mismatch = first_word_mismatch(local_transpose_words, expected_words)
     matrix_a_mismatch = first_word_mismatch(matrix_a_words, expected_words)
+    qk_append_mismatch = first_word_mismatch(qk_append_words, expected_words)
     full_transpose_pass = append_as_matrix_b == expected_b
     result = {
         "seed": seed,
@@ -117,6 +134,11 @@ def run(seed: int, size: int) -> dict:
             a != b for a, b in zip(matrix_a_words, expected_words)
         ),
         "matrix_a_qk_layout_pass": matrix_a_words == expected_words,
+        "qk_compat_append_word_mismatches": sum(
+            a != b for a, b in zip(qk_append_words, expected_words)
+        ),
+        "qk_compat_append_layout_pass": qk_append_words == expected_words,
+        "qk_compat_first_mismatch": qk_append_mismatch,
         "full_transpose_pass": full_transpose_pass,
         "first_raw_word_mismatch": raw_mismatch,
         "first_qk_word_mismatch": qk_mismatch,
@@ -128,6 +150,8 @@ def run(seed: int, size: int) -> dict:
         raise AssertionError("4x4-local transpose unexpectedly performed full tile-grid transpose")
     if not result["matrix_a_qk_layout_pass"]:
         raise AssertionError("Matrix-A KV write layout differs from canonical QK Matrix-B layout")
+    if not result["qk_compat_append_layout_pass"]:
+        raise AssertionError("flags=0x02 append differs from canonical QK Matrix-B layout")
     print("H64_KV_QK_LAYOUT_CHECK "+json.dumps(result, sort_keys=True))
     print("H64_KV_QK_LAYOUT_ROOT_CAUSE_CONFIRMED")
     return result

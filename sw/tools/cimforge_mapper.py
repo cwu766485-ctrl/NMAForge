@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic descriptor mapper for a 4-token CIMForge Transformer block.
+"""Deterministic descriptor mapper for CIMForge Transformer workloads.
 
 The workload is intentionally small enough for RTL simulation, but every edge
 is real: Q/K/V projection, QK^T, row softmax, AV, output projection, residual,
@@ -44,6 +44,8 @@ OP_LAYERNORM = 0x38
 OP_CAUSAL_SOFTMAX = 0x39
 OP_KV_WRITE = 0x43
 OP_KV_READ = 0x44
+FLAG_KV_QK_COMPAT_APPEND = 0x02
+KV_QK_COMPAT_ABI_VERSION = 6
 FLAG_BIAS = 1 << 0
 FLAG_TRANSPOSE_A = 1 << 1
 FLAG_TRANSPOSE_B = 1 << 2
@@ -144,6 +146,7 @@ class Descriptor:
     dst_stride: int = 0
     batch_count: int = 1
     head_count: int = 1
+    version: int = DESC_VERSION
 
     def words(self) -> list[int]:
         words = [0] * 16
@@ -164,7 +167,7 @@ class Descriptor:
         # batch_count in the lower half (see ai_desc_fetch).
         words[13] = (self.head_count << 16) | self.batch_count
         words[14] = (self.signal_mask << 16) | self.wait_mask
-        words[15] = (self.clear_mask << 16) | DESC_VERSION
+        words[15] = (self.clear_mask << 16) | self.version
         return [u32(word) for word in words]
 
 
@@ -295,6 +298,25 @@ def causal_softmax_q15(scores: list[int], query_token: int) -> list[int]:
         raise ValueError("causal query token must be within score length")
     visible = softmax_q15(scores[: query_token + 1])
     return visible + [0] * (len(scores) - len(visible))
+
+
+def kv_qk_compatible_append(
+    mapper: Mapper, name: str, src: Tensor, cache: Tensor, *,
+    token: int, head: int, feature_count: int = 16, head_stride: int = 256,
+    src_offset: int = 0,
+) -> None:
+    """Append one Matrix-A packed K row into QK Matrix-B K^T word order."""
+    if feature_count not in (4, 8, 12, 16) or head_stride % feature_count:
+        raise ValueError("QK-compatible KV append requires 4..16 packed features")
+    capacity = head_stride // feature_count
+    if capacity not in (4, 8, 12, 16) or token < 0 or token >= capacity:
+        raise ValueError("QK-compatible KV append token exceeds the head cache")
+    mapper.add(
+        name, OP_KV_WRITE, src, cache, src0_offset=src_offset,
+        k_or_length=feature_count, flags=FLAG_KV_QK_COMPAT_APPEND,
+        aux0=(head << 16) | token, src0_stride=16, src1_stride=head_stride,
+        version=KV_QK_COMPAT_ABI_VERSION,
+    )
 
 
 def build_workload(
