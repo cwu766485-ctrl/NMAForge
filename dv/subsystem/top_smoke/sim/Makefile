@@ -419,6 +419,44 @@ ai_h64_attention_top:
 		-l $(AI_H64_ATTENTION_RUN)/run.log
 	grep -q '^REPRESENTATIVE_MODEL_PASS desc=108 .*golden_words=12288 ' "$(AI_H64_ATTENTION_RUN)/run.log"
 
+# Round 7: unified, nonzero H64 decoder graph. All compute descriptors run in
+# one Product Top instance; the test checks the final physical memory image.
+AI_H64_DECODER_RUN ?= /tmp/nmaforge_h64_decoder_$(shell date +%Y%m%d_%H%M%S)
+AI_H64_DECODER_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
+AI_H64_DECODER_SEED ?= 20261114
+.PHONY: ai_h64_decoder_block_top
+ai_h64_decoder_block_top:
+	test ! -e "$(AI_H64_DECODER_RUN)"
+	mkdir -p "$(AI_H64_DECODER_RUN)"
+	$(AI_H64_DECODER_PYTHON) ../../../../benchmark/gpt2_compat/generate_h64_preln_qkv.py \
+		--full-decoder --seed "$(AI_H64_DECODER_SEED)" --out "$(AI_H64_DECODER_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_H64_DECODER_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_H64_DECODER_RUN)/simv \
+		-l $(AI_H64_DECODER_RUN)/compile.log
+	$(AI_H64_DECODER_RUN)/simv +ntb_random_seed=$(AI_H64_DECODER_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H64_DECODER_SEED) +ACLK_PERIOD_NS=10.0 \
+		+AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS \
+		+AI_DAMS_TRACE_FILE=$(AI_H64_DECODER_RUN)/dams_trace.csv \
+		+AI_DAMS_STATE_TRACE_FILE=$(AI_H64_DECODER_RUN)/dams_state.csv \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_DECODER_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_DECODER_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H64_DECODER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DECODER_RUN)/workload/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_DECODER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DECODER_RUN)/workload/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_DECODER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DECODER_RUN)/workload/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_QUEUE_SIZE=$$($(AI_H64_DECODER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DECODER_RUN)/workload/manifest.json"))["queue_size"])') \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H64_DECODER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DECODER_RUN)/workload/manifest.json"))["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_H64_DECODER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DECODER_RUN)/workload/manifest.json"))["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_H64_DECODER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DECODER_RUN)/workload/manifest.json"))["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=$$($(AI_H64_DECODER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DECODER_RUN)/workload/manifest.json"))["useful_output_elements"])') \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_DECODER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DECODER_RUN)/workload/manifest.json"))["physical_output_elements"])') \
+		-l $(AI_H64_DECODER_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=189 .*useful_macs=215040 executed_macs=884736 padding_macs=669696 ' \
+		"$(AI_H64_DECODER_RUN)/run.log"
+
 # Research opcode 0x3a performs Residual -> packed INT8 Requant in one SFU
 # command. The same Product Top and generated data are used for both sides.
 AI_SFU_FUSION_RUN ?= /tmp/nmaforge_sfu_fusion_$(shell date +%Y%m%d_%H%M%S)

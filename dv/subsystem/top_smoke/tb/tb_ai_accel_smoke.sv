@@ -4681,6 +4681,7 @@ module tb_ai_accel_smoke;
         reg [1023:0] dma_payload_file;
         reg [1023:0] dma_plan_file;
         reg use_dma_preload;
+        reg allow_live_alias;
         integer sys_start, sys_loaded, sys_cmd_begin, sys_completed, sys_consumed;
         integer sys_output_begin, sys_end, sys_base, sys_words, sys_i;
         reg system_mode;
@@ -4695,6 +4696,7 @@ module tb_ai_accel_smoke;
         integer descriptor_base;
         integer completion_base;
         integer descriptor_count;
+        integer representative_queue_size;
         integer prefill_descriptor_count;
         integer useful_macs;
         integer executed_macs;
@@ -4747,6 +4749,9 @@ module tb_ai_accel_smoke;
                 !$value$plusargs("AI_REPRESENTATIVE_USEFUL_MACS=%d", useful_macs))
                 $fatal(1, "representative model mode requires memory, golden, queue and MAC plusargs");
             executed_macs = -1;
+            representative_queue_size = 128;
+            void'($value$plusargs("AI_REPRESENTATIVE_QUEUE_SIZE=%d",
+                                  representative_queue_size));
             padding_macs = -1;
             useful_output_elements = -1;
             physical_output_elements = -1;
@@ -4768,6 +4773,7 @@ module tb_ai_accel_smoke;
                 axi_mem_u.awready_gap_cfg=3;
             end
             use_dma_preload = $test$plusargs("AI_REPRESENTATIVE_DMA_PRELOAD");
+            allow_live_alias = $test$plusargs("AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS");
             prefill_descriptor_count = 0;
             void'($value$plusargs("AI_REPRESENTATIVE_PREFILL_DESC_COUNT=%d",
                                   prefill_descriptor_count));
@@ -4778,7 +4784,9 @@ module tb_ai_accel_smoke;
             golden_count = representative_golden_words[0];
             if (image_count <= 0 || image_count > 65535 ||
                 golden_count <= 0 || golden_count > 65535 ||
-                descriptor_count < 1 || descriptor_count > 128 ||
+                descriptor_count < 1 || descriptor_count > 256 ||
+                representative_queue_size <= descriptor_count ||
+                representative_queue_size > 256 ||
                 prefill_descriptor_count < 0 ||
                 prefill_descriptor_count > descriptor_count ||
                 descriptor_base < 0 || completion_base < 0 ||
@@ -4900,7 +4908,7 @@ module tb_ai_accel_smoke;
 
             sys_loaded=transformer_top_cycle_counter;
             // Prove every expected result was poisoned before the first command.
-            if(!system_mode) for (golden_index = 0; golden_index < golden_count; golden_index = golden_index + 1) begin
+            if(!system_mode && !allow_live_alias) for (golden_index = 0; golden_index < golden_count; golden_index = golden_index + 1) begin
                 axi_read(SPAD_BASE + representative_golden_words[1 + 2 * golden_index],
                          read_value);
                 if (read_value !== 32'ha55a_a55a)
@@ -4912,11 +4920,11 @@ module tb_ai_accel_smoke;
             if(sa_cycle_fd) $display("STAGE_A_CONFIG_BEGIN clock=%0d",sa_clock);
             axi_write(REG_CMDQ_BASE_LO, descriptor_base);
             axi_write(REG_CMDQ_BASE_HI, 32'd0);
-            axi_write(REG_CMDQ_SIZE, 32'd128);
+            axi_write(REG_CMDQ_SIZE, representative_queue_size);
             axi_write(REG_CMDQ_HEAD, 32'd0);
             axi_write(REG_CMDQ_TAIL, descriptor_count);
             axi_write(REG_CPLQ_BASE_LO, completion_base);
-            axi_write(REG_CPLQ_SIZE, 32'd128);
+            axi_write(REG_CPLQ_SIZE, representative_queue_size);
             axi_write(REG_CPLQ_HEAD, 32'd0);
             axi_write(REG_CPLQ_TAIL, 32'd0);
 

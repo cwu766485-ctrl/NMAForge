@@ -222,3 +222,28 @@ closed. H64 Attention replay, H16 persistent decode replay, SFU `0x3A` A/B and
 `docs/research/NMAFORGE_V2_ROUND6_H64_DECODER_STATUS.md`; raw runs are under
 `/tmp/nmaforge_round6_*_20261115*`. No synthesis or formal run was done; SVSE
 fault closure and full model integration remain open.
+
+## 2026-11-15 — v2.0 Round 7 unified H64 decoder block
+
+On isolated branch `research/nmaforge-v2-round7`, based on Round 6
+`fcb1b72969771b9b5fca504e5f7b6d389b74ffc2`, added a unified seeded H64 graph
+using one canonical model package for embedding, LN1/LN2, Q/K/V/O and FFN
+weights. Lifetime allocation relocates 158 tensors inside 128 KiB, checks
+live-range overlap/initialization/bounds, and reserves 256 CMDQ/CPLQ slots for
+189 published descriptors. The Product Top executed Attention through
+Residual 1, LN2, packed Matrix-A handoff, 16 FFN Up/GELU tiles, 16 Down K tiles
+with INT32 partial accumulation, and Residual 2 in one Top instance without
+reset.
+
+VCS `V-2023.12-SP1_Full64`: `FULL_H64_DECODER_BLOCK_RTL_PASS`; 189/189
+ordered completions and 5,056 final-image Golden words bit-exact. Command
+cycles 259,661; useful/executed/padding MACs 215,040/884,736/669,696;
+SPAD reads/writes 348,160/221,184 B. Existing H64 Attention (108 descriptors,
+12,288 words, 91,351 cycles), FFN standalone DMA (80 descriptors, 43,008 B
+DMA preload) and `make ai_smoke` also pass. Full H64 model uses deterministic
+seed weights and testbench SPAD initialization; full-decoder AXI4 weight
+streaming, transient per-descriptor readback, KV persistence, four-layer
+decode, SVSE fault closure, synthesis and physical implementation remain open.
+No product RTL or PR was changed. Detailed map, logs and commands:
+`docs/research/NMAFORGE_V2_ROUND7_FULL_H64_DECODER.md`; raw run:
+`/tmp/nmaforge_round7_final`.

@@ -15,12 +15,12 @@ sys.path.insert(0, str(ROOT / "sw/tools"))
 sys.path.insert(0, str(ROOT / "dv/block/compute/matrix/ref"))
 from cimforge_mapper import (  # noqa: E402
     FLAG_BIAS, FLAG_PACK_I8, FLAG_PACK_I8_TILE_A, Mapper, OP_CAUSAL_SOFTMAX,
-    OP_GEMM, OP_LAYERNORM, OP_REQUANT, OP_RESIDUAL,
+    OP_GELU, OP_GEMM, OP_LAYERNORM, OP_REQUANT, OP_RESIDUAL,
     _pack_matrix_a_physical, _pack_matrix_b_physical,
     add_completion_order_chain,
 )
 from ai_a3_reference import (  # noqa: E402
-    gemm_i8_i32, layernorm_q15, requant_i8, softmax_q15,
+    gelu_q8_8, gemm_i8_i32, layernorm_q15, requant_i8, softmax_q15,
 )
 from gpt2_compat_golden import make_model  # noqa: E402
 
@@ -42,9 +42,155 @@ def write_pairs(path: Path, pairs: dict[int, int]) -> None:
                      encoding="ascii")
 
 
-def generate(out: Path, seed: int = 20261114, include_attention: bool = False) -> dict:
+def _tensor_bytes(tensor) -> int:
+    return len(tensor.values) * 4
+
+
+def compact_mapper_lifetimes(mapper: Mapper, capacity: int,
+                             queue_slots: int) -> tuple[dict, int, int]:
+    """Relocate virtual tensors into 128 KiB using descriptor live intervals."""
+    descriptor_count = len(mapper.descriptors)
+    if queue_slots <= descriptor_count:
+        raise ValueError("CMDQ/CPLQ need a spare ring slot beyond the published workload")
+    queue_bytes = queue_slots * (64 + 16)
+    desc_base = ((capacity - queue_bytes) // 64) * 64
+    cpl_base = desc_base + queue_slots * 64
+    if cpl_base + queue_slots * 16 > capacity:
+        raise ValueError("CMDQ/CPLQ do not fit the SPAD reservation")
+
+    original = {tensor.name: tensor.addr for tensor in mapper.tensors.values()}
+    records = []
+    for tensor in mapper.tensors.values():
+        start = original[tensor.name]
+        end = start + _tensor_bytes(tensor)
+        producers = [i for i, d in enumerate(mapper.descriptors)
+                     if start <= d.dst < end]
+        consumers = [i for i, d in enumerate(mapper.descriptors)
+                     if any(start <= address < end
+                            for address in (d.src0, d.src1, d.bias) if address)]
+        if not tensor.initialized and not producers:
+            raise ValueError(f"{tensor.name}: uninitialized tensor has no producer")
+        live_start = 0 if tensor.initialized else min(producers)
+        live_end = max(producers + consumers, default=live_start)
+        first_read = min(consumers, default=None)
+        if (first_read is not None and not tensor.initialized and
+                min(producers) >= first_read):
+            raise ValueError(f"{tensor.name}: read precedes its producer")
+        records.append({"tensor": tensor, "old_start": start, "old_end": end,
+                        "live_start": live_start, "live_end": live_end,
+                        "producers": producers, "consumers": consumers})
+
+    placed = []
+    for record in sorted(records,
+                         key=lambda r: (r["live_start"], -_tensor_bytes(r["tensor"]),
+                                        r["tensor"].name)):
+        size = _tensor_bytes(record["tensor"])
+        candidate = 0x1000
+        while True:
+            candidate = (candidate + 63) & ~63
+            conflicts = [other for other in placed
+                         if not (record["live_end"] < other["live_start"] or
+                                 other["live_end"] < record["live_start"])
+                         and candidate < other["new_start"] + _tensor_bytes(other["tensor"])
+                         and other["new_start"] < candidate + size]
+            if not conflicts:
+                break
+            candidate = min(other["new_start"] + _tensor_bytes(other["tensor"])
+                            for other in conflicts)
+        if candidate + size > desc_base:
+            peak = max(sum(_tensor_bytes(r["tensor"])
+                           for r in records
+                           if r["live_start"] <= index <= r["live_end"])
+                       for index in range(descriptor_count))
+            raise ValueError(
+                f"unified live storage exceeds SPAD before queues: tensor={record['tensor'].name} "
+                f"need_end={candidate + size} queue_base={desc_base} peak_live={peak}"
+            )
+        record["new_start"] = candidate
+        placed.append(record)
+
+    def relocate(address: int) -> int:
+        if address == 0:
+            return 0
+        owners = [record for record in records
+                  if record["old_start"] <= address < record["old_end"]]
+        if len(owners) != 1:
+            raise ValueError(f"descriptor address {address:#x} has {len(owners)} tensor owners")
+        owner = owners[0]
+        return owner["new_start"] + address - owner["old_start"]
+
+    for descriptor in mapper.descriptors:
+        descriptor.src0 = relocate(descriptor.src0)
+        descriptor.src1 = relocate(descriptor.src1)
+        descriptor.bias = relocate(descriptor.bias)
+        descriptor.dst = relocate(descriptor.dst)
+    for record in records:
+        record["tensor"].addr = record["new_start"]
+
+    allocation_records = []
+    descriptor_names = [descriptor.name for descriptor in mapper.descriptors]
+    for record in records:
+        tensor = record["tensor"]
+        allocation_records.append({
+            "tensor_id": tensor.name,
+            "logical_shape": list(tensor.shape),
+            "dtype": tensor.dtype,
+            "physical_layout": tensor.layout,
+            "quantization_contract": ("signed INT8" if tensor.dtype == "i8_packed"
+                                      else "signed INT32"),
+            "alignment_bytes": 64,
+            "address_range": [tensor.addr, tensor.addr + _tensor_bytes(tensor)],
+            "start": tensor.addr, "end_exclusive": tensor.addr + _tensor_bytes(tensor),
+            "size_bytes": _tensor_bytes(tensor),
+            "live_start_descriptor": record["live_start"],
+            "live_end_descriptor": record["live_end"],
+            "last_consumer_descriptor": max(record["consumers"], default=None),
+            "producer_descriptors": record["producers"],
+            "producer_names": [descriptor_names[i] for i in record["producers"]],
+            "consumer_descriptors": record["consumers"],
+            "consumer_names": [descriptor_names[i] for i in record["consumers"]],
+            "initialized_at_start": tensor.initialized,
+            "initial_owner": "host_fixture" if tensor.initialized else None,
+            "compute_write_owner": "product_top" if not tensor.initialized else None,
+            "compute_read_owner": "product_top" if record["consumers"] else None,
+            "dma_write_owner": None,
+            "reuse_eligible_after_descriptor": record["live_end"],
+        })
+    peak_live = max(sum(_tensor_bytes(record["tensor"])
+                        for record in records
+                        if record["live_start"] <= index <= record["live_end"])
+                    for index in range(descriptor_count))
+    high_water = max((r["end_exclusive"] for r in allocation_records), default=0)
+    for i, left in enumerate(allocation_records):
+        for right in allocation_records[i + 1:]:
+            address_overlap = left["start"] < right["end_exclusive"] and \
+                              right["start"] < left["end_exclusive"]
+            lifetime_overlap = (
+                left["live_start_descriptor"] <= right["live_end_descriptor"] and
+                right["live_start_descriptor"] <= left["live_end_descriptor"]
+            )
+            if address_overlap and lifetime_overlap:
+                raise ValueError(f"illegal live alias: {left['tensor_id']} / {right['tensor_id']}")
+    address_map = {record["old_start"]: record["new_start"] for record in records}
+    return {"records": allocation_records, "peak_live_bytes": peak_live,
+            "tensor_high_water": high_water, "_address_map": address_map,
+            "_record_by_old_start": {record["old_start"]: record for record in records}}, \
+        desc_base, cpl_base
+
+
+def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
+             include_ffn: bool = False) -> dict:
+    if include_ffn and not include_attention:
+        raise ValueError("full H64 Decoder requires Attention")
     model = make_model(seed)
-    mapper = Mapper(128 * 1024)
+    if include_ffn:
+        model_path = out / "canonical_h64_model.npz"
+        out.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(model_path, **model)
+        model_sha256 = hashlib.sha256(model_path.read_bytes()).hexdigest()
+    else:
+        model_sha256 = None
+    mapper = Mapper((1 << 20) if include_ffn else 128 * 1024)
     mapper.next_addr = 0x1000
     mapper.task_id = 0x7100
 
@@ -63,10 +209,19 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False) -
     mapper.add("embedding_position_residual", OP_RESIDUAL, embedding_t, combined_t,
                src1=position_t, k_or_length=ROWS * HIDDEN, aux0=1)
 
-    gamma_values = [32768] * HIDDEN
-    beta_values = [0] * HIDDEN
+    if include_ffn:
+        gamma_values = [int(value) * 1024 for value in model["l0.ln1_gamma"]]
+        beta_values = [int(value) for value in model["l0.ln1_beta"]]
+        gamma2_values = [int(value) * 1024 for value in model["l0.ln2_gamma"]]
+        beta2_values = [int(value) for value in model["l0.ln2_beta"]]
+    else:
+        gamma_values = [32768] * HIDDEN
+        beta_values = [0] * HIDDEN
+        gamma2_values, beta2_values = gamma_values, beta_values
     gamma_t = mapper.tensor("ln1_gamma_q15", (HIDDEN,), "i32", "row-major", gamma_values)
     beta_t = mapper.tensor("ln1_beta_i32", (HIDDEN,), "i32", "row-major", beta_values)
+    gamma2_t = mapper.tensor("ln2_gamma_q15", (HIDDEN,), "i32", "row-major", gamma2_values)
+    beta2_t = mapper.tensor("ln2_beta_i32", (HIDDEN,), "i32", "row-major", beta2_values)
     norm_t = mapper.tensor("preln_output_i32", (ROWS, HIDDEN), "i32", "row-major",
                            [0xA55AA55A] * (ROWS * HIDDEN), False)
     combined_rows = combined.reshape(ROWS, HIDDEN)
@@ -141,6 +296,10 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False) -
             mapper.add(f"attn_k_h{head}_requant", OP_REQUANT, k_raw, k8_t,
                        m=ROWS, n=16, k_or_length=ROWS * 16,
                        flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1)
+            if include_ffn:
+                for packed_tensor, values in ((q8_t, q_values), (k8_t, k_values)):
+                    for word, value in enumerate(_pack_matrix_a_physical(values)):
+                        attention_golden[packed_tensor.addr + word * 4] = value & 0xFFFFFFFF
 
             scores = gemm_i8_i32(q_values, [list(row) for row in zip(*k_values)], shift=2)
             score_t = mapper.tensor(f"attn_h{head}_scores_q8_8", (ROWS, ROWS), "i32",
@@ -179,6 +338,9 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False) -
                        m=ROWS, n=ROWS, k_or_length=ROWS * ROWS,
                        flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A,
                        shift=8, aux0=1)
+            if include_ffn:
+                for word, value in enumerate(_pack_matrix_a_physical(p8)):
+                    attention_golden[p8_t.addr + word * 4] = value & 0xFFFFFFFF
             head_prob8[head] = p8
 
             v_weights = model["l0.v"].astype(np.int32)[:, head * 16:(head + 1) * 16]
@@ -273,42 +435,191 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False) -
 
         norm2_t = mapper.tensor("ln2_output_i32", (ROWS, HIDDEN), "i32",
                                 "row-major", [0xA55AA55A] * (ROWS * HIDDEN), False)
+        norm2_matrix = np.zeros((ROWS, HIDDEN), dtype=np.int32)
         for row in range(ROWS):
             mapper.add(f"ln2_row{row}", OP_LAYERNORM, residual1_t, norm2_t,
-                       src1=gamma_t, bias=beta_t, k_or_length=HIDDEN,
+                       src1=gamma2_t, bias=beta2_t, k_or_length=HIDDEN,
                        flags=FLAG_BIAS, aux0=1,
                        src0_offset=row * HIDDEN * 4,
                        dst_offset=row * HIDDEN * 4)
-            norm2 = layernorm_q15(residual1[row].tolist(), gamma_values, beta_values)
+            norm2 = layernorm_q15(residual1[row].tolist(), gamma2_values, beta2_values)
             for col, value in enumerate(norm2):
+                norm2_matrix[row, col] = int(value)
                 attention_golden[norm2_t.addr + 4 * (row * HIDDEN + col)] = \
                     int(value) & 0xFFFFFFFF
         attention_macs = 163840
 
+    ffn_golden: dict[int, int] = {}
+    if include_ffn:
+        ln2_i8 = [[max(-128, min(127, int(value))) for value in row]
+                  for row in norm2_matrix]
+        packed_ffn_values = _pack_matrix_a_physical(ln2_i8)
+        packed_ffn_t = mapper.tensor(
+            "l0.ffn_input_i8_matrix_a", (ROWS, HIDDEN), "i8_packed",
+            "matrix_a_tile", [0xA55AA55A] * len(packed_ffn_values), False,
+        )
+        mapper.add("l0.ffn_input_requant_pack", OP_REQUANT, norm2_t,
+                   packed_ffn_t, m=ROWS, n=HIDDEN, k_or_length=ROWS * HIDDEN,
+                   flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A,
+                   shift=0, aux0=1)
+        for word, value in enumerate(packed_ffn_values):
+            ffn_golden[packed_ffn_t.addr + word * 4] = value & 0xFFFFFFFF
+
+        up_tiles = []
+        up_i8_values = []
+        up_weight = model["l0.up"].astype(np.int32)
+        for tile in range(16):
+            columns = slice(tile * 16, (tile + 1) * 16)
+            weight = up_weight[:, columns].tolist()
+            weight_t = mapper.tensor(
+                f"l0.ffn_up_weight_n{tile}", (HIDDEN, 16), "i8_packed",
+                "matrix_b_tile", _pack_matrix_b_physical(weight), True,
+            )
+            up_t = mapper.tensor(f"l0.ffn_up_n{tile}_i32", (ROWS, 16), "i32",
+                                 "row-major", [0xA55AA55A] * (ROWS * 16), False)
+            gelu_t = mapper.tensor(f"l0.ffn_gelu_n{tile}_i32", (ROWS, 16), "i32",
+                                   "row-major", [0xA55AA55A] * (ROWS * 16), False)
+            out_t = mapper.tensor(f"l0.ffn_gelu_n{tile}_i8", (ROWS, 16), "i8_packed",
+                                  "matrix_a_tile", [0xA55AA55A] * (ROWS * 16 // 4), False)
+            mapper.add(f"l0.ffn_up_n{tile}", OP_GEMM, packed_ffn_t, up_t,
+                       src1=weight_t, m=ROWS, n=16, k_or_length=HIDDEN // 4,
+                       aux0=1)
+            mapper.add(f"l0.ffn_gelu_n{tile}", OP_GELU, up_t, gelu_t,
+                       m=ROWS, n=16, k_or_length=ROWS * 16, aux0=1)
+            mapper.add(f"l0.ffn_requant_pack_n{tile}", OP_REQUANT, gelu_t, out_t,
+                       m=ROWS, n=16, k_or_length=ROWS * 16,
+                       flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1)
+            up_values = gemm_i8_i32(ln2_i8, weight)
+            gelu_values = [[gelu_q8_8(value) for value in row]
+                           for row in up_values]
+            out_values = [[max(-128, min(127, int(value))) for value in row]
+                          for row in gelu_values]
+            for row in range(ROWS):
+                for col in range(16):
+                    ffn_golden[up_t.addr + 4 * (row * 16 + col)] = \
+                        up_values[row][col] & 0xFFFFFFFF
+                    ffn_golden[gelu_t.addr + 4 * (row * 16 + col)] = \
+                        gelu_values[row][col] & 0xFFFFFFFF
+            for word, value in enumerate(_pack_matrix_a_physical(out_values)):
+                ffn_golden[out_t.addr + 4 * word] = value & 0xFFFFFFFF
+            up_tiles.append((out_t, weight_t))
+            up_i8_values.append(out_values)
+
+        down_acc = mapper.tensor("l0.ffn_down_acc_i32", (ROWS, HIDDEN), "i32",
+                                 "row-major", [0xA55AA55A] * (ROWS * HIDDEN), False)
+        down_partial = mapper.tensor("l0.ffn_down_partial_i32", (ROWS, HIDDEN), "i32",
+                                     "row-major", [0xA55AA55A] * (ROWS * HIDDEN), False)
+        down_values = [[0] * HIDDEN for _ in range(ROWS)]
+        last_partial_values = [[0] * HIDDEN for _ in range(ROWS)]
+        down_weight = model["l0.down"].astype(np.int32)
+        for tile in range(16):
+            rows = slice(tile * 16, (tile + 1) * 16)
+            weight = down_weight[rows, :].tolist()
+            weight_t = mapper.tensor(
+                f"l0.ffn_down_weight_k{tile}", (16, HIDDEN), "i8_packed",
+                "matrix_b_tile", _pack_matrix_b_physical(weight), True,
+            )
+            output_t = down_acc if tile == 0 else down_partial
+            mapper.add(f"l0.ffn_down_k{tile}", OP_GEMM, up_tiles[tile][0], output_t,
+                       src1=weight_t, m=ROWS, n=HIDDEN, k_or_length=4, aux0=1)
+            partial_values = gemm_i8_i32(up_i8_values[tile], weight)
+            last_partial_values = partial_values
+            for row in range(ROWS):
+                for col in range(HIDDEN):
+                    down_values[row][col] += partial_values[row][col]
+            if tile:
+                mapper.add(f"l0.ffn_down_accumulate_k{tile}", OP_RESIDUAL,
+                           down_acc, down_acc, src1=down_partial,
+                           k_or_length=ROWS * HIDDEN, aux0=1)
+        residual2_t = mapper.tensor("l0.residual2_i32", (ROWS, HIDDEN), "i32",
+                                    "row-major", [0xA55AA55A] * (ROWS * HIDDEN), False)
+        mapper.add("l0.ffn_residual2", OP_RESIDUAL, down_acc, residual2_t,
+                   src1=residual1_t, k_or_length=ROWS * HIDDEN, aux0=1)
+        for row in range(ROWS):
+            for col in range(HIDDEN):
+                offset = 4 * (row * HIDDEN + col)
+                ffn_golden[down_acc.addr + offset] = down_values[row][col] & 0xFFFFFFFF
+                ffn_golden[down_partial.addr + offset] = \
+                    last_partial_values[row][col] & 0xFFFFFFFF
+                ffn_golden[residual2_t.addr + offset] = \
+                    (down_values[row][col] + int(residual1[row, col])) & 0xFFFFFFFF
+
     add_completion_order_chain(mapper, event_bit=0)
-    desc_base, cpl_base = ((0x1A000, 0x1C000) if include_attention
-                           else (0xC000, 0xD000))
-    if mapper.next_addr > desc_base:
-        raise ValueError("tensor allocations overlap the queue reservation")
+    allocation = None
+    if include_ffn:
+        queue_slots = 256
+        allocation, desc_base, cpl_base = compact_mapper_lifetimes(
+            mapper, 128 * 1024, queue_slots
+        )
+        old_to_new = allocation.pop("_address_map")
+        record_by_old_start = allocation.pop("_record_by_old_start")
+
+        def relocate_golden(source: dict[int, int]) -> list[tuple[int, int, int]]:
+            moved = []
+            for address, value in source.items():
+                starts = [start for start, record in record_by_old_start.items()
+                          if start <= address < start + _tensor_bytes(record["tensor"])]
+                if len(starts) != 1:
+                    raise ValueError(f"Golden address {address:#x} has {len(starts)} tensor owners")
+                old_start = starts[0]
+                record = record_by_old_start[old_start]
+                new_address = old_to_new[old_start] + address - old_start
+                write_order = max(record["producers"], default=-1)
+                moved.append((write_order, new_address, value))
+            return moved
+
+        base_golden = {}
+        for row in range(ROWS):
+            for col in range(HIDDEN):
+                offset = 4 * (row * HIDDEN + col)
+                base_golden[combined_t.addr + offset] = int(combined_rows[row, col]) & 0xFFFFFFFF
+                base_golden[norm_t.addr + offset] = int(norm[row, col]) & 0xFFFFFFFF
+        moved_golden = (relocate_golden(base_golden) +
+                        relocate_golden(projection_golden) +
+                        relocate_golden(attention_golden) +
+                        relocate_golden(ffn_golden))
+        golden = {}
+        for _, address, value in sorted(moved_golden):
+            golden[address] = value
+    else:
+        desc_base, cpl_base = ((0x1A000, 0x1C000) if include_attention
+                               else (0xC000, 0xD000))
+        if mapper.next_addr > desc_base:
+            raise ValueError("tensor allocations overlap the queue reservation")
     mapper.check_queues(desc_base, cpl_base)
     image: dict[int, int] = {}
-    golden: dict[int, int] = dict(projection_golden)
+    if not include_ffn:
+        golden = dict(projection_golden)
     for row in range(ROWS):
         for col in range(HIDDEN):
             addr = embedding_t.addr + 4 * (row * HIDDEN + col)
             image[addr] = int(embedding[row, col]) & 0xFFFFFFFF
             image[position_t.addr + 4 * (row * HIDDEN + col)] = int(position[row, col]) & 0xFFFFFFFF
-            golden[combined_t.addr + 4 * (row * HIDDEN + col)] = \
-                int(combined_rows[row, col]) & 0xFFFFFFFF
-            norm_addr = norm_t.addr + 4 * (row * HIDDEN + col)
-            golden[norm_addr] = int(norm[row, col]) & 0xFFFFFFFF
-    for tensor in mapper.tensors.values():
-        if tensor.name in {embedding_t.name, position_t.name}:
-            continue
-        for index, value in enumerate(tensor.values):
-            image[tensor.addr + index * 4] = int(value) & 0xFFFFFFFF
-    for index, value in enumerate(packed_values):
-        golden[packed_t.addr + index * 4] = int(value) & 0xFFFFFFFF
+            if not include_ffn:
+                golden[combined_t.addr + 4 * (row * HIDDEN + col)] = \
+                    int(combined_rows[row, col]) & 0xFFFFFFFF
+                norm_addr = norm_t.addr + 4 * (row * HIDDEN + col)
+                golden[norm_addr] = int(norm[row, col]) & 0xFFFFFFFF
+    if include_ffn:
+        for tensor in mapper.tensors.values():
+            if tensor.name in {embedding_t.name, position_t.name} or not tensor.initialized:
+                continue
+            for index, value in enumerate(tensor.values):
+                image[tensor.addr + index * 4] = int(value) & 0xFFFFFFFF
+        for tensor in mapper.tensors.values():
+            if tensor.initialized:
+                continue
+            for index, value in enumerate(tensor.values):
+                image.setdefault(tensor.addr + index * 4, int(value) & 0xFFFFFFFF)
+    else:
+        for tensor in mapper.tensors.values():
+            if tensor.name in {embedding_t.name, position_t.name}:
+                continue
+            for index, value in enumerate(tensor.values):
+                image[tensor.addr + index * 4] = int(value) & 0xFFFFFFFF
+    if not include_ffn:
+        for index, value in enumerate(packed_values):
+            golden[packed_t.addr + index * 4] = int(value) & 0xFFFFFFFF
     for index, descriptor in enumerate(mapper.descriptors):
         for word_index, value in enumerate(descriptor.words()):
             image[desc_base + index * 64 + word_index * 4] = value
@@ -317,32 +628,55 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False) -
 
     out.mkdir(parents=True, exist_ok=True)
     write_pairs(out / "model_memory.memh", image)
-    golden = dict(golden)
-    golden.update(projection_golden)
-    golden.update(attention_golden)
+    if not include_ffn:
+        golden.update(projection_golden)
+        golden.update(attention_golden)
+    elif allocation is not None:
+        allocation["queue_ranges"] = {
+            "cmdq": [desc_base, desc_base + queue_slots * 64],
+            "cplq": [cpl_base, cpl_base + queue_slots * 16],
+        }
     write_pairs(out / "model_golden.memh", golden)
     executed_macs = 3 * ROWS * HIDDEN * HIDDEN + attention_macs
     useful_macs = 3 * len(TOKENS) * HIDDEN * HIDDEN + \
                   (34816 if include_attention else 0)
+    useful_output_elements = 3 * len(TOKENS) * HIDDEN
+    physical_output_elements = 3 * ROWS * HIDDEN
+    if include_ffn:
+        executed_macs += 2 * ROWS * HIDDEN * 256
+        useful_macs += 2 * len(TOKENS) * HIDDEN * 256
+        useful_output_elements += len(TOKENS) * (256 + HIDDEN)
+        physical_output_elements += ROWS * (256 + HIDDEN)
     manifest = {
         "scope": "Token embedding load + Position residual + H64 LayerNorm + Q/K/V projection" +
                  (" + four-head causal attention + output projection + Residual 1 + LayerNorm 2"
-                  if include_attention else ""),
+                  if include_attention else "") +
+                 (" + packed FFN input + 256-wide FFN Up/GELU + FFN Down + Residual 2"
+                  if include_ffn else ""),
         "seed": seed, "tokens": TOKENS, "descriptor_abi": "v7.4",
+        "canonical_model_file": "canonical_h64_model.npz" if include_ffn else None,
+        "canonical_model_sha256": model_sha256,
         "descriptor_base": desc_base, "completion_base": cpl_base,
+        "queue_size": (256 if include_ffn else 128),
         "descriptor_count": len(mapper.descriptors), "golden_words": len(golden),
         "executed_macs": executed_macs, "useful_macs": useful_macs,
         "padding_macs": executed_macs - useful_macs,
-        "useful_output_elements": 3 * len(TOKENS) * HIDDEN,
-        "physical_output_elements": 3 * ROWS * HIDDEN,
+        "useful_output_elements": useful_output_elements,
+        "physical_output_elements": physical_output_elements,
         "golden_sha256": hashlib.sha256((out / "model_golden.memh").read_bytes()).hexdigest(),
         "memory_sha256": hashlib.sha256((out / "model_memory.memh").read_bytes()).hexdigest(),
         "spad_capacity_bytes": 131072,
         "high_water_bytes": max(image) + 4,
+        "tensor_allocation": allocation,
         "preload_mode": "host AXI-Lite fixture initialization; excluded from command_cycles",
         "formats": {"embedding_position": "signed INT32 container of selected INT8 values",
-                    "LayerNorm gamma": "Q0.15 32768", "LayerNorm output": "INT32",
-                    "Matrix input": "signed INT8 packed tile-A, arithmetic shift 0"},
+                    "LayerNorm gamma": "canonical signed INT8 gamma multiplied by 1024 to Q0.15",
+                    "LayerNorm beta": "canonical signed INT32 beta",
+                    "LayerNorm output": "INT32; product integer LayerNorm reference",
+                    "Matrix input": "signed INT8 packed tile-A, arithmetic shift 0",
+                    "Matrix accumulation": "signed INT32, ordered K accumulation",
+                    "GELU": "product Q8.8 quadratic approximation",
+                    "Requant": "arithmetic right shift then signed INT8 saturation; no rounding bias"},
         "descriptor_contract": [
             {"task_id": d.task_id, "opcode": d.op, "name": d.name,
              "src0": d.src0, "src1": d.src1, "dst": d.dst,
@@ -363,7 +697,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False) -
                         "Only four nonzero token rows are executed in 16-row physical tiles."],
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    print(f"H64_PRELN_{'ATTENTION' if include_attention else 'QKV'}_GENERATOR_PASS desc={len(mapper.descriptors)} tokens={len(TOKENS)} "
+    print(f"H64_PRELN_{'FULL_DECODER' if include_ffn else 'ATTENTION' if include_attention else 'QKV'}_GENERATOR_PASS desc={len(mapper.descriptors)} tokens={len(TOKENS)} "
           f"golden_words={len(golden)} high_water={manifest['high_water_bytes']}")
     return manifest
 
@@ -373,8 +707,9 @@ def main() -> None:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--seed", type=int, default=20261114)
     parser.add_argument("--attention", action="store_true")
+    parser.add_argument("--full-decoder", action="store_true")
     args = parser.parse_args()
-    generate(args.out, args.seed, args.attention)
+    generate(args.out, args.seed, args.attention or args.full_decoder, args.full_decoder)
 
 
 if __name__ == "__main__":
