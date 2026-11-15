@@ -63,7 +63,10 @@ def compact_mapper_lifetimes(mapper: Mapper, capacity: int,
     """Relocate virtual tensors into 128 KiB using descriptor live intervals."""
     descriptor_count = len(mapper.descriptors)
     if queue_slots <= descriptor_count:
-        raise ValueError("CMDQ/CPLQ need a spare ring slot beyond the published workload")
+        raise ValueError(
+            f"CMDQ/CPLQ ring has {queue_slots} slots but workload needs "
+            f"{descriptor_count} descriptors plus one spare slot"
+        )
     queue_bytes = queue_slots * (64 + 16)
     desc_base = ((capacity - queue_bytes) // 64) * 64
     cpl_base = desc_base + queue_slots * 64
@@ -204,11 +207,14 @@ def compact_mapper_lifetimes(mapper: Mapper, capacity: int,
 def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
              include_ffn: bool = False, include_kv_roundtrip: bool = False,
              include_kv_attention: bool = False,
-             token_ids: list[int] | None = None) -> dict:
+             token_ids: list[int] | None = None,
+             kv_k_write_mode: str = "token-append") -> dict:
     if include_ffn and not include_attention:
         raise ValueError("full H64 Decoder requires Attention")
     if include_kv_attention and (not include_ffn or include_kv_roundtrip):
         raise ValueError("KV-backed attention requires full-decoder mode and excludes roundtrip mode")
+    if kv_k_write_mode not in {"token-append", "matrix-a-tile", "matrix-a-word"}:
+        raise ValueError("invalid KV K write mode")
     tokens = list(token_ids if token_ids is not None else TOKENS)
     if not tokens or any(token < 0 or token >= 256 for token in tokens):
         raise ValueError("token IDs must be a non-empty list in [0,255]")
@@ -380,15 +386,44 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                     for token in range(len(tokens)):
                         source_row_offset = (token // 4) * 64 + (token % 4) * 4
                         if kind == "k":
-                            if token == 0:
+                            if kv_k_write_mode == "token-append":
                                 mapper.add(
-                                    f"kv_attention_k_write_h{head}",
+                                    f"kv_attention_k_append_h{head}_t{token}",
+                                    OP_KV_WRITE, source, cache_t,
+                                    src0_offset=source_row_offset, k_or_length=16,
+                                    flags=KV_FLAG_MATRIX_B_APPEND,
+                                    aux0=(head << 16) | token,
+                                    src0_stride=16, src1_stride=256,
+                                )
+                                for feature, value in enumerate(values[token]):
+                                    col_group, token_group = feature // 4, token // 4
+                                    word_index = (col_group * 4 + token_group) * 4 + feature % 4
+                                    byte_lane = token % 4
+                                    cache_bytes[word_index * 4 + byte_lane] = value & 0xFF
+                            elif kv_k_write_mode == "matrix-a-word":
+                                for feature_group in range(4):
+                                    matrix_a_word = ((token // 4) * 16 +
+                                                     feature_group * 4 + token % 4)
+                                    mapper.add(
+                                        f"kv_attention_k_word_h{head}_t{token}_g{feature_group}",
+                                        OP_KV_WRITE, source, cache_t,
+                                        src0_offset=source_row_offset + feature_group * 16,
+                                        dst_offset=(head * 64 + matrix_a_word) * 4,
+                                        k_or_length=1,
+                                    )
+                                if token == 0:
+                                    for word, value in enumerate(
+                                            _pack_matrix_a_physical(values)):
+                                        cache_bytes[word * 4:word * 4 + 4] = \
+                                            (value & 0xFFFFFFFF).to_bytes(4, "little")
+                            elif token == 0:
+                                mapper.add(
+                                    f"kv_attention_k_tile_write_h{head}",
                                     OP_KV_WRITE, source, cache_t,
                                     k_or_length=64, aux0=head << 16,
                                     src0_stride=0, src1_stride=256,
                                 )
-                                for word, value in enumerate(
-                                        _pack_matrix_a_physical(values)):
+                                for word, value in enumerate(_pack_matrix_a_physical(values)):
                                     cache_bytes[word * 4:word * 4 + 4] = \
                                         (value & 0xFFFFFFFF).to_bytes(4, "little")
                         else:
@@ -410,7 +445,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                     cache_rows = [[0] * 16 for _ in range(16)]
                     for token in range(16):
                         for feature in range(16):
-                            if kind == "k":
+                            if kind == "k" and kv_k_write_mode in {
+                                    "matrix-a-tile", "matrix-a-word"}:
                                 word_index = ((token // 4) * 16 +
                                               (feature // 4) * 4 + token % 4)
                                 byte_lane = feature % 4
@@ -421,6 +457,11 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                             byte = cache_bytes[word_index * 4 + byte_lane]
                             cache_rows[token][feature] = byte - 256 if byte & 0x80 else byte
                     kv_attention_expected[kind][head] = cache_rows
+                    if cache_rows[:len(tokens)] != values[:len(tokens)]:
+                        raise ValueError(
+                            f"head {head} {kind.upper()} cache unpack differs "
+                            "from projected rows"
+                        )
                     if kind == "v":
                         head_v8[head] = cache_rows
                     readback_t = kv_attention_readback[kind][head]
@@ -453,8 +494,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                 for col in range(ROWS):
                     attention_golden[score_t.addr + 4 * (row * ROWS + col)] = \
                         scores[row][col] & 0xFFFFFFFF
-            if include_kv_attention:
-                attention_checkpoints.append((score_t.name, score_t))
+            attention_checkpoints.append((score_t.name, score_t))
 
             prob_init = [0xA55AA55A] * (ROWS * ROWS)
             for row in range(len(tokens), ROWS):
@@ -474,12 +514,10 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                 for col in range(ROWS):
                     attention_golden[prob_t.addr + 4 * (row * ROWS + col)] = \
                         probs[row][col]
-            if include_kv_attention:
-                for row in range(len(tokens), ROWS):
-                    for col in range(ROWS):
-                        attention_golden[prob_t.addr + 4 * (row * ROWS + col)] = 0
-            if include_kv_attention:
-                attention_checkpoints.append((prob_t.name, prob_t))
+            for row in range(len(tokens), ROWS):
+                for col in range(ROWS):
+                    attention_golden[prob_t.addr + 4 * (row * ROWS + col)] = 0
+            attention_checkpoints.append((prob_t.name, prob_t))
 
             p8 = [requant_i8(row, 8) for row in probs]
             p8_t = mapper.tensor(f"attn_h{head}_prob_i8", (ROWS, ROWS), "i8_packed",
@@ -543,8 +581,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                     attention_golden[av_t.addr + 4 * (row * 16 + col)] = \
                         av[row][col] & 0xFFFFFFFF
                     merged_i8[row][head * 16 + col] = max(-128, min(127, av[row][col]))
-            if include_kv_attention:
-                attention_checkpoints.append((av_t.name, av_t))
+            attention_checkpoints.append((av_t.name, av_t))
             for row_group in range(ROWS // 4):
                 mapper.add(f"attn_h{head}_av_requant_concat_rg{row_group}",
                            OP_REQUANT, av_t, merged_t, m=4, n=16,
@@ -831,6 +868,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                         kv_attention_readback[kind][head].name,
                         kv_attention_readback[kind][head], attention_golden,
                     ))
+        if include_attention:
             for tensor_name, tensor in attention_checkpoints:
                 checkpoint_specs.append((tensor_name, tensor, attention_golden))
         for tile, up_t, gelu_t, out_t in up_checkpoint_tensors:
@@ -994,11 +1032,23 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
             "valid_token_count": len(tokens),
             "heads": 4,
             "head_dim": 16,
-            "k_tile_write_descriptors": 4,
+            "k_token_append_descriptors": (len(tokens) * 4
+                                            if kv_k_write_mode == "token-append" else 0),
+            "k_tile_write_descriptors": (4
+                                         if kv_k_write_mode == "matrix-a-tile" else 0),
+            "k_word_write_descriptors": (len(tokens) * 4 * 4
+                                         if kv_k_write_mode == "matrix-a-word" else 0),
             "v_token_append_descriptors": len(tokens) * 4,
             "read_descriptors": 2 * 4,
-            "k_write_granularity": "one complete packed H64 head tile per head",
-            "qk_matrix_source": "Product KV_READ K buffer in Matrix-A tile order",
+            "k_write_mode": kv_k_write_mode,
+            "k_write_granularity": ("one Matrix-B token append per token and head"
+                                    if kv_k_write_mode == "token-append" else
+                                    "one complete Matrix-A packed K tile per head"
+                                    if kv_k_write_mode == "matrix-a-tile" else
+                                    "four single-word Matrix-A K-group writes per token and head"),
+            "qk_matrix_source": ("Product KV_READ K buffer in Matrix-B token append order"
+                                 if kv_k_write_mode == "token-append" else
+                                 "Product KV_READ K buffer in Matrix-A tile order"),
             "av_matrix_source": "Product KV_READ V buffer",
             "future_token_slots": "initialized sentinel; masked by causal softmax",
         } if include_kv_attention else None),
@@ -1075,11 +1125,15 @@ def main() -> None:
                         help="feed Product KV_READ buffers into H64 QK/AV attention")
     parser.add_argument("--tokens", default=None,
                         help="comma-separated token IDs; defaults to the four-token fixture")
+    parser.add_argument("--kv-k-write-mode",
+                        choices=("token-append", "matrix-a-tile", "matrix-a-word"),
+                        default="token-append")
     args = parser.parse_args()
     token_ids = ([int(value) for value in args.tokens.split(",")]
                  if args.tokens is not None else None)
     generate(args.out, args.seed, args.attention or args.full_decoder,
-             args.full_decoder, args.kv_roundtrip, args.kv_attention, token_ids)
+             args.full_decoder, args.kv_roundtrip, args.kv_attention, token_ids,
+             args.kv_k_write_mode)
 
 
 if __name__ == "__main__":

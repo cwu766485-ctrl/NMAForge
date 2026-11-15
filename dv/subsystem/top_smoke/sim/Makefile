@@ -499,7 +499,7 @@ ai_h64_decoder_dma_top:
 		-l $(AI_H64_DMA_RUN)/run.log
 	grep -q '^REPRESENTATIVE_DMA_PRELOAD_PASS transactions=49 payload_bytes=53248 checked_words=13312 axi_read_bytes=53248 ' "$(AI_H64_DMA_RUN)/run.log"
 	test "$$(grep -c '^REPRESENTATIVE_DMA_FENCE_PASS ' "$(AI_H64_DMA_RUN)/run.log")" -eq 49
-	test "$$(grep -c '^REPRESENTATIVE_CHECKPOINT_PASS ' "$(AI_H64_DMA_RUN)/run.log")" -eq 11
+	test "$$(grep -c '^REPRESENTATIVE_CHECKPOINT_PASS ' "$(AI_H64_DMA_RUN)/run.log")" -eq "$$( $(AI_H64_DMA_PYTHON) -c 'import json;print(len(json.load(open("$(AI_H64_DMA_RUN)/workload/manifest.json"))["intermediate_checkpoints"]))' )"
 	grep -q '^REPRESENTATIVE_CHECKPOINT_PASS desc=.*method=behavioral_sram_backdoor_nonintrusive$$' "$(AI_H64_DMA_RUN)/run.log"
 	grep -q '^REPRESENTATIVE_MODEL_PASS desc=189 .*dma_preload_included=1 ' "$(AI_H64_DMA_RUN)/run.log"
 
