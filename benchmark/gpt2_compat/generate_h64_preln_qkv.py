@@ -42,6 +42,17 @@ def write_pairs(path: Path, pairs: dict[int, int]) -> None:
                      encoding="ascii")
 
 
+def write_checkpoints(path: Path, checkpoints: list[dict]) -> None:
+    words = [len(checkpoints)]
+    for checkpoint in checkpoints:
+        pairs = checkpoint["pairs"]
+        words.extend((checkpoint["descriptor_index"], len(pairs)))
+        for address, value in sorted(pairs.items()):
+            words.extend((address, value & 0xFFFFFFFF))
+    path.write_text("".join(f"{word & 0xFFFFFFFF:08x}\n" for word in words),
+                     encoding="ascii")
+
+
 def _tensor_bytes(tensor) -> int:
     return len(tensor.values) * 4
 
@@ -450,6 +461,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
         attention_macs = 163840
 
     ffn_golden: dict[int, int] = {}
+    up_checkpoint_tensors = []
     if include_ffn:
         ln2_i8 = [[max(-128, min(127, int(value))) for value in row]
                   for row in norm2_matrix]
@@ -504,6 +516,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                 ffn_golden[out_t.addr + 4 * word] = value & 0xFFFFFFFF
             up_tiles.append((out_t, weight_t))
             up_i8_values.append(out_values)
+            if tile in (0, 15):
+                up_checkpoint_tensors.append((tile, up_t, gelu_t, out_t))
 
         down_acc = mapper.tensor("l0.ffn_down_acc_i32", (ROWS, HIDDEN), "i32",
                                  "row-major", [0xA55AA55A] * (ROWS * HIDDEN), False)
@@ -546,6 +560,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
 
     add_completion_order_chain(mapper, event_bit=0)
     allocation = None
+    checkpoint_records = []
+    dma_weight_records = []
     if include_ffn:
         queue_slots = 256
         allocation, desc_base, cpl_base = compact_mapper_lifetimes(
@@ -581,6 +597,80 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
         golden = {}
         for _, address, value in sorted(moved_golden):
             golden[address] = value
+
+        old_start_by_name = {
+            record["tensor"].name: old_start
+            for old_start, record in record_by_old_start.items()
+        }
+        tensor_records = {record["tensor_id"]: record
+                          for record in allocation["records"]}
+
+        def checkpoint_for(name: str, tensor, source_golden: dict[int, int]) -> dict:
+            old_start = old_start_by_name[name]
+            old_end = old_start + _tensor_bytes(tensor)
+            selected = {tensor.addr + address - old_start: value
+                        for address, value in source_golden.items()
+                        if old_start <= address < old_end}
+            expected_words = _tensor_bytes(tensor) // 4
+            if len(selected) != expected_words:
+                raise ValueError(f"checkpoint {name}: Golden words {len(selected)} != {expected_words}")
+            allocation_record = tensor_records[name]
+            return {"name": name,
+                    "descriptor_index": max(allocation_record["producer_descriptors"]),
+                    "pairs": selected}
+
+        checkpoint_specs = [
+            ("residual1_i32", residual1_t, attention_golden),
+            ("ln2_output_i32", norm2_t, attention_golden),
+            ("l0.ffn_input_i8_matrix_a", packed_ffn_t, ffn_golden),
+        ]
+        for tile, up_t, gelu_t, out_t in up_checkpoint_tensors:
+            checkpoint_specs.extend((
+                (f"l0.ffn_up_n{tile}_i32", up_t, ffn_golden),
+                (f"l0.ffn_gelu_n{tile}_i32", gelu_t, ffn_golden),
+                (f"l0.ffn_gelu_n{tile}_i8", out_t, ffn_golden),
+            ))
+        checkpoint_specs.extend((
+            ("l0.ffn_down_acc_i32", down_acc, ffn_golden),
+            ("l0.residual2_i32", residual2_t, ffn_golden),
+        ))
+        checkpoint_records = [checkpoint_for(name, tensor, source)
+                              for name, tensor, source in checkpoint_specs]
+        for tensor in mapper.tensors.values():
+            if "weight" not in tensor.name:
+                continue
+            allocation_record = tensor_records[tensor.name]
+            allocation_record["initialized_at_start"] = False
+            allocation_record["initial_owner"] = None
+            allocation_record["compute_write_owner"] = None
+            allocation_record["dma_write_owner"] = "external_axi4_dma"
+            allocation_record["dma_completion_fence_before_first_consumer"] = True
+            values = [int(value) & 0xFFFFFFFF for value in tensor.values]
+            if tensor.addr & 0xF or len(values) % 4:
+                raise ValueError(f"DMA weight tensor is not line aligned: {tensor.name}")
+            dma_weight_records.append({"name": tensor.name, "spad_address": tensor.addr,
+                                      "words": len(values), "values": values})
+        dma_payload_words = []
+        dma_plan_words = [len(dma_weight_records)]
+        dma_plan = []
+        for record in dma_weight_records:
+            ext_addr = len(dma_payload_words) * 4
+            dma_payload_words.extend(record["values"])
+            length_words = record["words"]
+            dma_plan_words.extend((ext_addr, record["spad_address"], length_words))
+            dma_plan.append({"tensor": record["name"], "external_address": ext_addr,
+                             "spad_address": record["spad_address"],
+                             "length_words": length_words,
+                             "length_bytes": length_words * 4})
+        if len(dma_weight_records) > 85:
+            raise ValueError("weight DMA plan exceeds representative testbench transaction limit")
+        if len(dma_payload_words) > 16384:
+            raise ValueError("weight DMA payload exceeds representative AXI memory capacity")
+        (out / "dma_payload.memh").write_text(
+            "".join(f"{word:08x}\n" for word in dma_payload_words), encoding="ascii")
+        (out / "dma_plan.memh").write_text(
+            "".join(f"{word & 0xFFFFFFFF:08x}\n" for word in dma_plan_words),
+            encoding="ascii")
     else:
         desc_base, cpl_base = ((0x1A000, 0x1C000) if include_attention
                                else (0xC000, 0xD000))
@@ -628,6 +718,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
 
     out.mkdir(parents=True, exist_ok=True)
     write_pairs(out / "model_memory.memh", image)
+    if include_ffn:
+        write_checkpoints(out / "checkpoint_golden.memh", checkpoint_records)
     if not include_ffn:
         golden.update(projection_golden)
         golden.update(attention_golden)
@@ -668,6 +760,23 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
         "spad_capacity_bytes": 131072,
         "high_water_bytes": max(image) + 4,
         "tensor_allocation": allocation,
+        "intermediate_checkpoints": [
+            {"tensor_id": item["name"],
+             "descriptor_index": item["descriptor_index"],
+             "golden_words": len(item["pairs"])}
+            for item in checkpoint_records
+        ],
+        "dma_weight_streaming": ({
+            "mode": "one AXI4 DMA transaction per initialized matrix weight tensor",
+            "completion_fence": "DMA done/status checked before CMDQ publication",
+            "image_excludes_dma_weight_ranges": True,
+            "transactions": [{key: value for key, value in item.items()
+                              if key != "values"} for item in dma_weight_records],
+            "payload_bytes": sum(item["words"] * 4 for item in dma_weight_records),
+            "payload_words": sum(item["words"] for item in dma_weight_records),
+            "payload_sha256": hashlib.sha256((out / "dma_payload.memh").read_bytes()).hexdigest(),
+            "plan_sha256": hashlib.sha256((out / "dma_plan.memh").read_bytes()).hexdigest(),
+        } if include_ffn else None),
         "preload_mode": "host AXI-Lite fixture initialization; excluded from command_cycles",
         "formats": {"embedding_position": "signed INT32 container of selected INT8 values",
                     "LayerNorm gamma": "canonical signed INT8 gamma multiplied by 1024 to Q0.15",

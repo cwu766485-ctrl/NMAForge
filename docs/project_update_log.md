@@ -247,3 +247,27 @@ decode, SVSE fault closure, synthesis and physical implementation remain open.
 No product RTL or PR was changed. Detailed map, logs and commands:
 `docs/research/NMAFORGE_V2_ROUND7_FULL_H64_DECODER.md`; raw run:
 `/tmp/nmaforge_round7_final`.
+
+## 2026-11-15 — v2.0 Round 8 H64 weight DMA and transient checkpoints
+
+On the isolated `research/nmaforge-v2-round8` worktree at exact Round 7 parent
+`ba4c6697fcb12245b1141df27938e3aa406d4dd1`, added a DMA-enabled replay of the
+existing 189-descriptor one-layer H64 graph. Matrix weight ranges are omitted
+from the initial SPAD image; 49 Product-Top AXI4 DMA transactions transfer
+53,248 bytes from modeled external memory. All 13,312 destination words are
+checked after each DMA completion, before CMDQ publication. Eleven transient
+Tensor checkpoints are compared at producer retirement through read-only
+behavioral SRAM backdoor access. Final Golden is 5,056/5,056 and completions
+189/189. VCS `V-2023.12-SP1_Full64` reports 48,791 host fixture cycles, 15,749
+DMA cycles, 259,667 compute cycles, 324,207 total session cycles. Same-seed
+host-preload comparison is 128,663 + 259,667 = 388,330 cycles; compute work
+is unchanged, so this is setup-path measurement, not operator acceleration.
+
+Gate 2 remains NOT_RUN: the H64 graph contains no KV `0x43/0x44` descriptors
+and reports `kv_busy=0`. No H64 incremental planner feeds projected K/V through
+the Product KV engine and back into subsequent causal attention. Four-layer,
+LM head, real checkpoint, and model-quality gates are also NOT_RUN. No product
+RTL was modified. Full details and hashes:
+`docs/research/NMAFORGE_V2_ROUND8_GATE1_GATE2_STATUS.md`; reproducible VCS
+artifacts are under `/tmp/nmaforge_round8_h64_dma_e2e` and
+`/tmp/nmaforge_round8_h64_host_e2e`.
