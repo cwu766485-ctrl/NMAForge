@@ -1,0 +1,12 @@
+run_id,phase,token_positions,descriptors,command_cycles,end_to_end_with_initial_preload_cycles,final_golden_words,cache_words_checked,top_reset_events
+G1_two_token,prefill,0-0,201,259568,327400,6912,n/a,0
+G1_two_token,decode_append_with_prefix_recompute,1,193,353214,,6912,512,0
+G2_prefill4_decode2,prefill,0-3,225,263017,333729,6912,n/a,0
+G2_prefill4_decode2,decode_append_with_prefix_recompute,4,205,359370,,6912,512,0
+G2_prefill4_decode2,decode_append_with_prefix_recompute,5,209,361632,,6912,512,0
+G2_token0_to5,prefill,0-0,189,258037,324429,6912,n/a,0
+G2_token0_to5,decode_append_with_prefix_recompute,1,193,353214,,6912,512,0
+G2_token0_to5,decode_append_with_prefix_recompute,2,197,355134,,6912,512,0
+G2_token0_to5,decode_append_with_prefix_recompute,3,201,357198,,6912,512,0
+G2_token0_to5,decode_append_with_prefix_recompute,4,205,359370,,6912,512,0
+G2_token0_to5,decode_append_with_prefix_recompute,5,209,361632,,6912,512,0

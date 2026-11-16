@@ -48,11 +48,11 @@
     "stage1/checkpoint_golden.memh": "4104580eaeb7f061813049459f66137f55c508cf58e3721852d2a46ec1525545",
     "stage1/model_golden.memh": "55be09c3797476742aa44941af74ec2736fa503c044bf0d3fff25ca352dff1a4"
   },
-  "compile_log_sha256": "af50c40b5750101402cf581d159b9c03ab3274d49e9606711047e10d572448c9",
+  "compile_log_sha256": "97dde4a31b1eb7e6f0bcc9ff722e178e0da4babc4d47e93e08b1f7cf26233585",
   "completion_base": 126976,
   "descriptor_base": 110592,
   "execution_boundary": "stage0 complete and all CPLQ entries retired before stage1 publication",
-  "g1_rtl_status": "BLOCKED_ENV_LICENSE_SERVER",
+  "g1_rtl_status": "PASS",
   "host_roles": [
     "teacher-forced token ID",
     "input embedding/position and initial constants",
@@ -61,7 +61,10 @@
   "model_sha256": "67a89c411254039bab22a7dffc49c64b69233575368503f544ee9f3ec4ab00fc",
   "product_rtl_modified": false,
   "queue_size": 256,
-  "run_log_status": "NOT_CREATED",
+  "run_id": "G1_two_token",
+  "run_log_path": "/tmp/nmaforge_v12_r15_g1_mutation_base/run.log",
+  "run_log_sha256": "2b51ee4e38e0189f2cbe1a86300eeefb92197d29f5ae138e0ed2d7c35e3b528d",
+  "run_log_status": "COMPLETE",
   "seed": 20261116,
   "stage0_cache_sha256": "68ae5e953cc10975a8debaf9f46702a8925a0cec242379220e4ba12f1492175a",
   "stage0_descriptors": 201,
@@ -76,7 +79,9 @@
   "stage1_host_kv_words": 0,
   "stage1_input_sha256": "a28725c3430a13ee756d62dc9fd24160985d706d81406b6b735ff348430afc3b",
   "stage1_valid_tokens": 2,
-  "status": "PLANNER_READY_NOT_RTL_PASS",
+  "stage1_command_cycles": 353214,
+  "cache_mutation_controls": "8/8 expected K/V mutations detected across all four heads",
+  "status": "G1_RTL_PASS",
   "tokens": [
     1,
     7
