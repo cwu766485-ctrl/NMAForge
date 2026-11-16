@@ -402,6 +402,50 @@ ai_deit_round18_softmax197_256k:
 	grep -q '^REPRESENTATIVE_MODEL_PASS desc=1 .*golden_words=197 useful_macs=0 ' \
 		"$(AI_DEIT_R18_SM_RUN)/run.log"
 
+# Round 19: full 196-patch x 192-channel DeiT-Tiny Patch Embedding on the
+# 256-KiB Product Top. Weight and CLS/position correction tiles are DMA
+# streamed immediately before their consuming GEMM/Residual descriptors.
+AI_DEIT_R19_RUN ?= /tmp/nmaforge_deit_round19_$(shell date +%Y%m%d_%H%M%S)
+AI_DEIT_R19_PYTHON ?= /tmp/nmaforge_deit_round17_venv/bin/python
+AI_DEIT_R19_MODEL_DIR ?= /tmp/nmaforge_deit_round17
+.PHONY: ai_deit_round19_full_patch_embedding_256k
+ai_deit_round19_full_patch_embedding_256k:
+	test ! -e "$(AI_DEIT_R19_RUN)"
+	mkdir -p "$(AI_DEIT_R19_RUN)"
+	$(AI_DEIT_R19_PYTHON) ../../../../benchmark/deit/round19/generate_deit_full_patch_embedding.py \
+		--model-dir "$(AI_DEIT_R19_MODEL_DIR)" --out-dir "$(AI_DEIT_R19_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_DEIT_R19_STREAM \
+		+define+AI_SPAD_WORDS_PER_BANK=16384 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_R19_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_DEIT_R19_RUN)/simv \
+		-l $(AI_DEIT_R19_RUN)/compile.log
+	$(AI_DEIT_R19_RUN)/simv +ntb_random_seed=20261117 +AI_RANDOM_CASES=0 \
+		+AI_SEED=20261117 +ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_LATE_DMA \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_DEIT_R19_RUN)/workload/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_DEIT_R19_RUN)/workload/late_dma_plan.memh \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_R19_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_R19_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_DEIT_R19_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R19_RUN)/workload/manifest.json"))["spad"]["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_DEIT_R19_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R19_RUN)/workload/manifest.json"))["spad"]["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_DEIT_R19_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R19_RUN)/workload/manifest.json"))["execution"]["descriptor_count"])') \
+		+AI_REPRESENTATIVE_QUEUE_SIZE=512 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_DEIT_R19_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R19_RUN)/workload/manifest.json"))["execution"]["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_DEIT_R19_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R19_RUN)/workload/manifest.json"))["execution"]["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_DEIT_R19_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R19_RUN)/workload/manifest.json"))["execution"]["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=37824 \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=39936 \
+		-l $(AI_DEIT_R19_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=468 .*golden_words=9984 useful_macs=28901376 executed_macs=30670848 padding_macs=1769472 useful_output_elements=37824 physical_output_elements=39936 ' \
+		"$(AI_DEIT_R19_RUN)/run.log"
+	test "$$(grep -c '^REPRESENTATIVE_LATE_DMA_PASS ' "$(AI_DEIT_R19_RUN)/run.log")" -eq 300
+	test "$$(grep -c '^REPRESENTATIVE_STREAMED_DESC_RETIRE_PASS ' "$(AI_DEIT_R19_RUN)/run.log")" -eq 468
+	grep -q '^REPRESENTATIVE_LATE_DMA_SUMMARY events=300 payload_bytes=307200 checked_words=76800 axi_read_bytes=307200 ' \
+		"$(AI_DEIT_R19_RUN)/run.log"
+
 # Round 5: one nonzero H64 FFN-up tile, with input/descriptors/weights loaded
 # through the real AXI4 DMA before the Product Top command doorbell.
 AI_H64_FFN_TILE_RUN ?= /tmp/nmaforge_h64_ffn_tile_$(shell date +%Y%m%d_%H%M%S)
