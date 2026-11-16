@@ -1,0 +1,63 @@
+{
+  "descriptor": {
+    "K": 768,
+    "M": 16,
+    "N": 16,
+    "cmdq_bytes": 32768,
+    "completion_base": 253952,
+    "cplq_bytes": 8192,
+    "descriptor_base": 221184,
+    "descriptor_count": 1,
+    "dst": 28672,
+    "executed_macs": 196608,
+    "golden_words": 256,
+    "k_words": 192,
+    "opcode": "0x30",
+    "queue_entries": 512,
+    "queue_total_bytes": 40960,
+    "spad_capacity_bytes": 262144,
+    "spad_high_water_exclusive": 262144,
+    "src0": 4096,
+    "src1": 16384,
+    "useful_macs": 12288
+  },
+  "float_comparison": {
+    "mae": 0.004955812357366085,
+    "max_abs": 0.016858160495758057,
+    "rmse": 0.006787458900362253,
+    "scope": "first patch, first 16 projection channels, includes dequantized GEMM and FP32 bias",
+    "warning": "one-tile quantization diagnostic only; not full INT8 DeiT inference or accuracy"
+  },
+  "hub_revision": "b3428f18dcc7b543470d07f14b4a4157815d1880",
+  "input_image_sha256": "d2029eee4ae0be2479a662a7ed549836200929b41987d23caa68d924f0c89f0a",
+  "input_patch_i8_sha256": "b6ee83cd6040ae3872a02fe889810c55960c4b896e7fb142484358bb69eca788",
+  "input_quantization": "official processor then round(norm*127), clamp[-127,127]",
+  "int32_golden": "independent int64 scalar GEMM over the exported quantized operands; Product output checked bit-exact",
+  "limitations": [
+    "only one of 196 image patches and one of twelve 16-channel output tiles is executed",
+    "class token, position embedding addition, bias application and requantization are not in this Product Top workload",
+    "no encoder attention/MLP layer execution is claimed",
+    "no ImageNet accuracy is measured"
+  ],
+  "model_id": "facebook/deit-tiny-patch16-224",
+  "model_snapshot_sha256": {
+    "config.json": "e8786a68c993c04b8721c4d379e4f9de6a9564fba5987704dbf8696d53b7972d",
+    "preprocessor_config.json": "90d1ae427c27d2b9dcb01f6a62ba96aa67aac2de1697c59cd212055b5035c4a2",
+    "pytorch_model.bin": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c"
+  },
+  "scope": "one image patch, first 16 of 192 patch-projection outputs; Product Top INT8xINT8 to INT32 GEMM",
+  "seed": 20261117,
+  "status": "PRODUCT_TOP_PASS_LIMITED_TILE_SCOPE",
+  "simulation_evidence": {
+    "run_id": "R18-G1-OFFICIAL-DEIT-PATCH-TILE-20261116",
+    "compile_log": "/tmp/nmaforge_deit_round18_patch_20261116/compile.log",
+    "compile_log_sha256": "36503181bce8b7247027cd18d94ed1e47e94c81b4eddf6eac0007d0661cb135e",
+    "run_log": "/tmp/nmaforge_deit_round18_patch_20261116/run.log",
+    "run_log_sha256": "134f89dcb9636a9ebf8a05a324f8397ab56c4a2ac6ee2dcb4fe52b74df17d52d",
+    "command_cycles": 2442,
+    "end_to_end_cycles_including_testbench_preload": 40961,
+    "golden_words_checked": 256
+  },
+  "weight_quantization": "per-output-channel symmetric absmax/127, round-to-nearest-even, clamp[-127,127]",
+  "weight_tile_i8_sha256": "4847140b23efcc00e9ca129e968062745cafdd4c7cdd59b234240dc350cbeab2"
+}
