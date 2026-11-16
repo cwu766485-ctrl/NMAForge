@@ -210,11 +210,16 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
              include_kv_attention: bool = False,
              token_ids: list[int] | None = None,
              kv_k_write_mode: str = "token-append",
-             kv_append_from: int = 0) -> dict:
+             kv_append_from: int = 0, *, layer_index: int = 0,
+             input_hidden_i32: list[list[int]] | None = None,
+             stream_norm_params: bool = False,
+             include_final_lm_head: bool = False) -> dict:
     if include_ffn and not include_attention:
         raise ValueError("full H64 Decoder requires Attention")
     if include_kv_attention and (not include_ffn or include_kv_roundtrip):
         raise ValueError("KV-backed attention requires full-decoder mode and excludes roundtrip mode")
+    if include_final_lm_head and (not include_ffn or layer_index != 3):
+        raise ValueError("final LN/LM head is only legal after the four-layer final decoder block")
     if kv_k_write_mode not in {
             "token-append", "qk-compatible-append", "matrix-a-tile", "matrix-a-word"}:
         raise ValueError("invalid KV K write mode")
@@ -223,10 +228,19 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
         raise ValueError("token IDs must be a non-empty list in [0,255]")
     if not 0 <= kv_append_from < len(tokens):
         raise ValueError("kv_append_from must select an existing token")
+    if not 0 <= layer_index < 4:
+        raise ValueError("layer_index must be in [0,3]")
+    if input_hidden_i32 is not None:
+        if len(input_hidden_i32) != len(tokens) or any(
+                len(row) != HIDDEN for row in input_hidden_i32):
+            raise ValueError("inter-layer input must have one H64 row per token")
     if kv_append_from and (not include_kv_attention or kv_k_write_mode not in {
             "qk-compatible-append", "token-append"}):
         raise ValueError("incremental KV append requires supported cache-backed attention")
     model = make_model(seed)
+    layer_params = {name: model[f"l{layer_index}.{name}"]
+                    for name in ("ln1_gamma", "ln1_beta", "ln2_gamma", "ln2_beta",
+                                 "q", "k", "v", "o", "up", "down")}
     if include_ffn:
         model_path = out / "canonical_h64_model.npz"
         out.mkdir(parents=True, exist_ok=True)
@@ -241,8 +255,11 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
     embedding = np.zeros((ROWS, HIDDEN), dtype=np.int32)
     position = np.zeros((ROWS, HIDDEN), dtype=np.int32)
     for row, token in enumerate(tokens):
-        embedding[row] = model["embedding"][token].astype(np.int32)
-        position[row] = model["position"][row].astype(np.int32)
+        if input_hidden_i32 is None:
+            embedding[row] = model["embedding"][token].astype(np.int32)
+            position[row] = model["position"][row].astype(np.int32)
+        else:
+            embedding[row] = np.asarray(input_hidden_i32[row], dtype=np.int32)
     combined = embedding + position
     embedding_t = mapper.tensor("embedding_lookup_i32", (ROWS, HIDDEN), "i32",
                                 "row-major", embedding.reshape(-1).tolist())
@@ -254,18 +271,19 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                src1=position_t, k_or_length=ROWS * HIDDEN, aux0=1)
 
     if include_ffn:
-        gamma_values = [int(value) * 1024 for value in model["l0.ln1_gamma"]]
-        beta_values = [int(value) for value in model["l0.ln1_beta"]]
-        gamma2_values = [int(value) * 1024 for value in model["l0.ln2_gamma"]]
-        beta2_values = [int(value) for value in model["l0.ln2_beta"]]
+        gamma_values = [int(value) * 1024 for value in layer_params["ln1_gamma"]]
+        beta_values = [int(value) for value in layer_params["ln1_beta"]]
+        gamma2_values = [int(value) * 1024 for value in layer_params["ln2_gamma"]]
+        beta2_values = [int(value) for value in layer_params["ln2_beta"]]
     else:
         gamma_values = [32768] * HIDDEN
         beta_values = [0] * HIDDEN
         gamma2_values, beta2_values = gamma_values, beta_values
-    gamma_t = mapper.tensor("ln1_gamma_q15", (HIDDEN,), "i32", "row-major", gamma_values)
-    beta_t = mapper.tensor("ln1_beta_i32", (HIDDEN,), "i32", "row-major", beta_values)
-    gamma2_t = mapper.tensor("ln2_gamma_q15", (HIDDEN,), "i32", "row-major", gamma2_values)
-    beta2_t = mapper.tensor("ln2_beta_i32", (HIDDEN,), "i32", "row-major", beta2_values)
+    gamma_suffix = "_weight" if stream_norm_params else ""
+    gamma_t = mapper.tensor(f"ln1_gamma_q15{gamma_suffix}", (HIDDEN,), "i32", "row-major", gamma_values)
+    beta_t = mapper.tensor(f"ln1_beta_i32{gamma_suffix}", (HIDDEN,), "i32", "row-major", beta_values)
+    gamma2_t = mapper.tensor(f"ln2_gamma_q15{gamma_suffix}", (HIDDEN,), "i32", "row-major", gamma2_values)
+    beta2_t = mapper.tensor(f"ln2_beta_i32{gamma_suffix}", (HIDDEN,), "i32", "row-major", beta2_values)
     norm_t = mapper.tensor("preln_output_i32", (ROWS, HIDDEN), "i32", "row-major",
                            [0xA55AA55A] * (ROWS * HIDDEN), False)
     combined_rows = combined.reshape(ROWS, HIDDEN)
@@ -289,8 +307,10 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
 
     projection_golden: dict[int, int] = {}
     projection_tiles = {}
+    final_output_golden: dict[int, int] = {}
+    final_checkpoint_specs: list[tuple[str, object, dict[int, int]]] = []
     for projection in ("q", "k", "v"):
-        weights = model[f"l0.{projection}"].astype(np.int32)
+        weights = layer_params[projection].astype(np.int32)
         for tile in range(4):
             col0 = tile * 16
             b_rows = weights[:, col0:col0 + 16].tolist()
@@ -562,7 +582,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
             head_prob8[head] = p8
 
             if not include_kv_attention:
-                v_weights = model["l0.v"].astype(np.int32)[:, head * 16:(head + 1) * 16]
+                v_weights = layer_params["v"].astype(np.int32)[:, head * 16:(head + 1) * 16]
                 v_weight_transpose = v_weights.T.tolist()
                 v_weight_t = mapper.tensor(f"attn_h{head}_vt_weight_a", (16, HIDDEN),
                                            "i8_packed", "matrix_a_tile",
@@ -628,7 +648,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                     address = merged_t.addr + (row_group * 64 + head * 16 + word) * 4
                     attention_golden[address] = value & 0xFFFFFFFF
 
-        output_weights = model["l0.o"].astype(np.int32).tolist()
+        output_weights = layer_params["o"].astype(np.int32).tolist()
         output_weight_t = mapper.tensor(
             "attn_o_weight_n64", (HIDDEN, HIDDEN), "i8_packed", "matrix_b_tile",
             _pack_matrix_b_physical(output_weights))
@@ -692,7 +712,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
 
         up_tiles = []
         up_i8_values = []
-        up_weight = model["l0.up"].astype(np.int32)
+        up_weight = layer_params["up"].astype(np.int32)
         for tile in range(16):
             columns = slice(tile * 16, (tile + 1) * 16)
             weight = up_weight[:, columns].tolist()
@@ -738,7 +758,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                                      "row-major", [0xA55AA55A] * (ROWS * HIDDEN), False)
         down_values = [[0] * HIDDEN for _ in range(ROWS)]
         last_partial_values = [[0] * HIDDEN for _ in range(ROWS)]
-        down_weight = model["l0.down"].astype(np.int32)
+        down_weight = layer_params["down"].astype(np.int32)
         for tile in range(16):
             rows = slice(tile * 16, (tile + 1) * 16)
             weight = down_weight[rows, :].tolist()
@@ -770,6 +790,68 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                     last_partial_values[row][col] & 0xFFFFFFFF
                 ffn_golden[residual2_t.addr + offset] = \
                     (down_values[row][col] + int(residual1[row, col])) & 0xFFFFFFFF
+
+    if include_final_lm_head:
+        final_input = [[s32(ffn_golden[residual2_t.addr + 4 * (row * HIDDEN + col)])
+                        for col in range(HIDDEN)] for row in range(ROWS)]
+        final_gamma = [int(value) * 1024 for value in model["final_gamma"]]
+        final_beta = [int(value) for value in model["final_beta"]]
+        final_gamma_t = mapper.tensor("final_ln_gamma_q15_weight", (HIDDEN,), "i32",
+                                      "row-major", final_gamma)
+        final_beta_t = mapper.tensor("final_ln_beta_i32_weight", (HIDDEN,), "i32",
+                                     "row-major", final_beta)
+        final_ln_t = mapper.tensor("final_ln_i32", (ROWS, HIDDEN), "i32",
+                                   "row-major", [0xA55AA55A] * (ROWS * HIDDEN), False)
+        final_ln = np.zeros((ROWS, HIDDEN), dtype=np.int32)
+        for row in range(ROWS):
+            mapper.add(f"final_ln_row{row}", OP_LAYERNORM, residual2_t, final_ln_t,
+                       src1=final_gamma_t, bias=final_beta_t,
+                       k_or_length=HIDDEN, flags=FLAG_BIAS, aux0=1,
+                       src0_offset=row * HIDDEN * 4,
+                       dst_offset=row * HIDDEN * 4)
+            final_ln[row] = layernorm_q15(final_input[row], final_gamma, final_beta)
+            for col in range(HIDDEN):
+                final_output_golden[final_ln_t.addr + 4 * (row * HIDDEN + col)] = \
+                    int(final_ln[row, col]) & 0xFFFFFFFF
+
+        final_ln_matrix_a = [[max(-128, min(127, int(value))) for value in row]
+                             for row in final_ln]
+        final_packed_words = _pack_matrix_a_physical(final_ln_matrix_a)
+        final_packed_t = mapper.tensor(
+            "final_ln_matrix_a_i8", (ROWS, HIDDEN), "i8_packed", "matrix_a_tile",
+            [0xA55AA55A] * len(final_packed_words), False)
+        mapper.add("final_ln_requant_pack_matrix_a", OP_REQUANT, final_ln_t,
+                   final_packed_t, m=ROWS, n=HIDDEN,
+                   k_or_length=ROWS * HIDDEN,
+                   flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1)
+        for word, value in enumerate(final_packed_words):
+            final_output_golden[final_packed_t.addr + word * 4] = value & 0xFFFFFFFF
+
+        logits_t = mapper.tensor("logits_i32_physical_16x256", (ROWS, 256), "i32",
+                                 "matrix_n_tile_major_16x16",
+                                 [0xA55AA55A] * (ROWS * 256), False)
+        final_logits_i8 = np.asarray(final_ln_matrix_a, dtype=np.int8)
+        lm_head = model["lm_head"].astype(np.int32)
+        for tile in range(16):
+            col0 = tile * 16
+            b_rows = lm_head[:, col0:col0 + 16].tolist()
+            weight_t = mapper.tensor(
+                f"lm_head_weight_tile_n{tile}_weight", (HIDDEN, 16), "i8_packed",
+                "matrix_b_tile", _pack_matrix_b_physical(b_rows))
+            dst_offset = tile * ROWS * 16 * 4
+            mapper.add(f"lm_head_gemm_n{tile}", OP_GEMM, final_packed_t, logits_t,
+                       src1=weight_t, m=ROWS, n=16,
+                       k_or_length=HIDDEN // 4, dst_offset=dst_offset, aux0=1)
+            tile_logits = gemm_i8_i32(final_logits_i8.tolist(), b_rows)
+            for row in range(ROWS):
+                for col in range(16):
+                    address = logits_t.addr + dst_offset + 4 * (row * 16 + col)
+                    final_output_golden[address] = tile_logits[row][col] & 0xFFFFFFFF
+        final_checkpoint_specs = [
+            ("final_ln_i32", final_ln_t, final_output_golden),
+            ("final_ln_matrix_a_i8", final_packed_t, final_output_golden),
+            ("logits_i32_physical_16x256", logits_t, final_output_golden),
+        ]
 
     if include_kv_roundtrip:
         if not include_ffn:
@@ -822,7 +904,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
     checkpoint_records = []
     dma_weight_records = []
     if include_ffn:
-        queue_slots = 256
+        queue_slots = 512 if include_final_lm_head else 256
         allocation, desc_base, cpl_base = compact_mapper_lifetimes(
             mapper, 128 * 1024, queue_slots
         )
@@ -853,7 +935,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                         relocate_golden(projection_golden) +
                         relocate_golden(attention_golden) +
                         relocate_golden(ffn_golden) +
-                        relocate_golden(kv_golden))
+                        relocate_golden(kv_golden) +
+                        relocate_golden(final_output_golden))
         golden = {}
         for _, address, value in sorted(moved_golden):
             golden[address] = value
@@ -911,6 +994,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
             ("l0.ffn_down_acc_i32", down_acc, ffn_golden),
             ("l0.residual2_i32", residual2_t, ffn_golden),
         ))
+        checkpoint_specs.extend(final_checkpoint_specs)
         checkpoint_records = [checkpoint_for(name, tensor, source)
                               for name, tensor, source in checkpoint_specs]
         for descriptor_index, name, readback_name, values in kv_read_snapshots:
@@ -949,7 +1033,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                              "length_bytes": length_words * 4})
         if len(dma_weight_records) > 85:
             raise ValueError("weight DMA plan exceeds representative testbench transaction limit")
-        if len(dma_payload_words) > 16384:
+        if len(dma_payload_words) > 32768:
             raise ValueError("weight DMA payload exceeds representative AXI memory capacity")
         (out / "dma_payload.memh").write_text(
             "".join(f"{word:08x}\n" for word in dma_payload_words), encoding="ascii")
@@ -1040,12 +1124,16 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                   if include_kv_roundtrip else "") +
                  (" + Product KV write/read buffers consumed directly by causal QK/AV"
                   if include_kv_attention else ""),
-        "seed": seed, "tokens": tokens, "descriptor_abi": "v7.4",
+        "seed": seed, "tokens": tokens, "layer_index": layer_index,
+        "input_hidden_sha256": (hashlib.sha256(np.asarray(input_hidden_i32, dtype=np.int32).tobytes()).hexdigest()
+                                if input_hidden_i32 is not None else None),
+        "stream_norm_params": stream_norm_params, "descriptor_abi": "v7.4",
         "kv_append_from": kv_append_from,
         "canonical_model_file": "canonical_h64_model.npz" if include_ffn else None,
         "canonical_model_sha256": model_sha256,
         "descriptor_base": desc_base, "completion_base": cpl_base,
-        "queue_size": (256 if include_ffn else 128),
+        "queue_size": (512 if include_final_lm_head else
+                       (256 if include_ffn else 128)),
         "descriptor_count": len(mapper.descriptors), "golden_words": len(golden),
         "kv_roundtrip": ({
             "status": "PRODUCT_TOP_REQUIRED",
@@ -1124,7 +1212,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                     "Matrix input": "signed INT8 packed tile-A, arithmetic shift 0",
                     "Matrix accumulation": "signed INT32, ordered K accumulation",
                     "GELU": "product Q8.8 quadratic approximation",
-                    "Requant": "arithmetic right shift then signed INT8 saturation; no rounding bias"},
+                    "Requant": "arithmetic right shift then signed INT8 saturation; no rounding bias",
+                    "LM logits": "16 physical N=16 GEMM tiles stored tile-major; Host may assemble each valid token row"},
         "descriptor_contract": [
             {"task_id": d.task_id, "opcode": d.op, "name": d.name,
              "src0": d.src0, "src1": d.src1, "dst": d.dst,

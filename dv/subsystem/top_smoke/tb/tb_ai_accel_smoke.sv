@@ -508,7 +508,7 @@ module tb_ai_accel_smoke;
     reg [31:0] representative_golden_words [0:131071];
     reg [31:0] representative_dma_plan_words [0:255];
     reg [31:0] representative_checkpoint_words [0:32767];
-    reg [31:0] h64_persistent_descriptor_words [0:4095];
+    reg [31:0] h64_persistent_descriptor_words [0:8191];
     integer representative_load_cycles = 0;
     integer representative_load_measure = 1'b0;
     integer representative_dma_window_cycles = 0;
@@ -1566,7 +1566,7 @@ module tb_ai_accel_smoke;
     );
 
 `ifdef AI_H64_WEIGHT_DMA
-    axi_memory_model #(.WORDS(16384)) axi_mem_u(
+    axi_memory_model #(.WORDS(32768)) axi_mem_u(
 `elsif AI_REPRESENTATIVE_LONG_TASK
     axi_memory_model #(.WORDS(12288)) axi_mem_u(
 `else
@@ -2533,6 +2533,10 @@ module tb_ai_accel_smoke;
         reg [1023:0] cache_file;
         reg [1023:0] golden_file;
         reg [1023:0] checkpoint_file;
+        reg [1023:0] handoff_file;
+        reg [1023:0] output_init_events_file;
+        reg [1023:0] stage_dma_payload_file;
+        reg [1023:0] stage_dma_plan_file;
         reg [31:0] descriptor_words [0:15];
         reg [31:0] read_value;
         reg [31:0] status_word;
@@ -2551,8 +2555,24 @@ module tb_ai_accel_smoke;
         integer cache_count;
         integer dma_count;
         integer dma_index;
+        integer late_dma_count;
+        integer late_dma_index;
+        integer late_dma_trigger [0:31];
+        integer late_dma_ext [0:31];
+        integer late_dma_spad [0:31];
+        integer late_dma_words [0:31];
         integer golden_count;
         integer checkpoint_count;
+        integer handoff_count;
+        integer output_init_event_count;
+        integer output_init_event_index;
+        integer output_init_cursor;
+        integer output_init_desc [0:63];
+        integer output_init_words [0:63];
+        integer output_init_start [0:63];
+        integer output_init_cycles;
+        integer output_init_start_cycle;
+        integer output_init_end_cycle;
         integer cursor;
         integer checkpoint_desc [0:127];
         integer checkpoint_words [0:127];
@@ -2585,11 +2605,25 @@ module tb_ai_accel_smoke;
                      sequence_root, stage_number);
             $sformat(checkpoint_file, "%0s/stage%0d/checkpoint_golden.memh",
                      sequence_root, stage_number);
+            $sformat(handoff_file, "%0s/stage%0d/handoff_before.memh",
+                     sequence_root, stage_number);
+            $sformat(output_init_events_file, "%0s/stage%0d/output_init_events.memh",
+                     sequence_root, stage_number);
+            $sformat(stage_dma_payload_file, "%0s/stage%0d/dma_payload.memh",
+                     sequence_root, stage_number);
+            $sformat(stage_dma_plan_file, "%0s/stage%0d/dma_plan.memh",
+                     sequence_root, stage_number);
             first_count = cumulative_before % queue_size;
             $readmemh(cache_file, representative_image_words);
             cache_count = representative_image_words[0];
-            if (cache_count != 512 || queue_size != 256)
-                $fatal(1, "H64 persistent cache/queue geometry invalid");
+            if (cache_count != 512)
+                $fatal(1, "H64 persistent cache geometry invalid");
+            if ($test$plusargs("AI_H64_FOUR_LAYER")) begin
+                if (queue_size != 512)
+                    $fatal(1, "H64 four-layer queue geometry invalid: %0d", queue_size);
+            end else if (queue_size != 256) begin
+                $fatal(1, "H64 legacy persistent queue geometry invalid: %0d", queue_size);
+            end
             for (pair_index = 0; pair_index < cache_count; pair_index = pair_index + 1) begin
                 runtime_read_word_retry(
                     SPAD_BASE + representative_image_words[1 + pair_index * 2],
@@ -2600,6 +2634,25 @@ module tb_ai_accel_smoke;
                            representative_image_words[2 + pair_index * 2], read_value);
             end
             $display("H64_PERSISTENT_KV_BEFORE_PASS words=%0d method=axi_lite", cache_count);
+            if ($test$plusargs("AI_H64_FOUR_LAYER")) begin
+                $readmemh(handoff_file, representative_image_words);
+                handoff_count = representative_image_words[0];
+                if (handoff_count != 16 * 64)
+                    $fatal(1, "H64 four-layer handoff word count invalid layer=%0d count=%0d",
+                           stage_number, handoff_count);
+                for (pair_index = 0; pair_index < handoff_count; pair_index = pair_index + 1) begin
+                    runtime_read_word_retry(
+                        SPAD_BASE + representative_image_words[1 + pair_index * 2],
+                        read_value, read_ok);
+                    if (!read_ok || read_value !== representative_image_words[2 + pair_index * 2])
+                        $fatal(1, "H64_FOUR_LAYER_HANDOFF_MISMATCH layer=%0d word=%0d addr=%08h expected=%08h observed=%08h",
+                               stage_number, pair_index,
+                               representative_image_words[1 + pair_index * 2],
+                               representative_image_words[2 + pair_index * 2], read_value);
+                end
+                $display("H64_FOUR_LAYER_HANDOFF_PASS layer=%0d words=%0d method=axi_lite host_write_words=0",
+                         stage_number, handoff_count);
+            end
             if ($test$plusargs("AI_H64_PERSISTENT_CORRUPT_CACHE")) begin
                 mutation_head = 0;
                 mutation_kind = 0;
@@ -2631,7 +2684,8 @@ module tb_ai_accel_smoke;
 
             $readmemh(input_file, representative_image_words);
             input_count = representative_image_words[0];
-            if (input_count <= 0 || input_count > 8192)
+            if (((input_count <= 0) && !$test$plusargs("AI_H64_FOUR_LAYER")) ||
+                input_count < 0 || input_count > 8192)
                 $fatal(1, "H64 stage1 initial-input word count invalid count=%0d", input_count);
             for (pair_index = 0; pair_index < input_count; pair_index = pair_index + 1)
                 axi_write(SPAD_BASE + representative_image_words[1 + pair_index * 2],
@@ -2641,6 +2695,10 @@ module tb_ai_accel_smoke;
             // Reuse the identical AXI4 model-weight payload/plan loaded for
             // stage0. Compaction can reclaim a weight address after its last
             // consumer, so restore weights before publishing stage1 work.
+            if ($test$plusargs("AI_H64_FOUR_LAYER")) begin
+                $readmemh(stage_dma_payload_file, axi_mem_u.mem);
+                $readmemh(stage_dma_plan_file, representative_dma_plan_words);
+            end
             dma_count = representative_dma_plan_words[0];
             if (dma_count < 1 || dma_count > 85)
                 $fatal(1, "H64 stage1 inherited DMA plan is invalid");
@@ -2657,12 +2715,40 @@ module tb_ai_accel_smoke;
                     $fatal(1, "H64 stage1 weight DMA fence failed transaction=%0d",
                            dma_index);
             end
+            late_dma_count = 0;
+            if ($test$plusargs("AI_H64_FOUR_LAYER")) begin
+                $sformat(stage_dma_plan_file, "%0s/stage%0d/late_dma_plan.memh",
+                         sequence_root, stage_number);
+                $readmemh(stage_dma_plan_file, representative_dma_plan_words);
+                late_dma_count = representative_dma_plan_words[0];
+                if (late_dma_count < 0 || late_dma_count > 32)
+                    $fatal(1, "H64 late weight DMA event count invalid count=%0d",
+                           late_dma_count);
+                for (late_dma_index = 0; late_dma_index < late_dma_count;
+                     late_dma_index = late_dma_index + 1) begin
+                    late_dma_trigger[late_dma_index] =
+                        representative_dma_plan_words[1 + late_dma_index * 4];
+                    late_dma_ext[late_dma_index] =
+                        representative_dma_plan_words[2 + late_dma_index * 4];
+                    late_dma_spad[late_dma_index] =
+                        representative_dma_plan_words[3 + late_dma_index * 4];
+                    late_dma_words[late_dma_index] =
+                        representative_dma_plan_words[4 + late_dma_index * 4];
+                    if (late_dma_trigger[late_dma_index] < 0 ||
+                        late_dma_trigger[late_dma_index] >= 512 ||
+                        late_dma_words[late_dma_index] <= 0 ||
+                        late_dma_words[late_dma_index] > 256)
+                        $fatal(1, "H64 late weight DMA plan entry invalid event=%0d trigger=%0d words=%0d",
+                               late_dma_index, late_dma_trigger[late_dma_index],
+                               late_dma_words[late_dma_index]);
+                end
+            end
             $display("H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=%0d transactions=%0d",
                      token_position, dma_count);
             $readmemh(descriptor_file, h64_persistent_descriptor_words);
             second_count = h64_persistent_descriptor_words[0];
-            if (second_count <= 0 || second_count > 255 ||
-                1 + 16 * second_count > 4096)
+            if (second_count <= 0 || second_count > 512 ||
+                1 + 16 * second_count > 8192)
                 $fatal(1, "H64 stage1 descriptor count invalid count=%0d", second_count);
             $readmemh(checkpoint_file, representative_checkpoint_words);
             checkpoint_count = representative_checkpoint_words[0];
@@ -2681,6 +2767,34 @@ module tb_ai_accel_smoke;
                     $fatal(1, "H64 stage1 checkpoint record invalid record=%0d", record_index);
                 cursor = cursor + 2 + checkpoint_words[record_index] * 2;
             end
+            output_init_event_count = 0;
+            if ($test$plusargs("AI_H64_FOUR_LAYER")) begin
+                $readmemh(output_init_events_file, representative_image_words);
+                output_init_event_count = representative_image_words[0];
+                if (output_init_event_count <= 0 || output_init_event_count > 64)
+                    $fatal(1, "H64 output-init event count invalid layer=%0d count=%0d",
+                           stage_number, output_init_event_count);
+                output_init_cursor = 1;
+                for (output_init_event_index = 0;
+                     output_init_event_index < output_init_event_count;
+                     output_init_event_index = output_init_event_index + 1) begin
+                    output_init_desc[output_init_event_index] =
+                        representative_image_words[output_init_cursor];
+                    output_init_words[output_init_event_index] =
+                        representative_image_words[output_init_cursor + 1];
+                    output_init_start[output_init_event_index] = output_init_cursor + 2;
+                    if (output_init_desc[output_init_event_index] < 0 ||
+                        output_init_desc[output_init_event_index] >= second_count ||
+                        output_init_words[output_init_event_index] <= 0 ||
+                        output_init_words[output_init_event_index] > 8192)
+                        $fatal(1, "H64 output-init event invalid layer=%0d event=%0d desc=%0d words=%0d",
+                               stage_number, output_init_event_index,
+                               output_init_desc[output_init_event_index],
+                               output_init_words[output_init_event_index]);
+                    output_init_cursor = output_init_cursor + 2 +
+                        output_init_words[output_init_event_index] * 2;
+                end
+            end
             $readmemh(golden_file, representative_golden_words);
             golden_count = representative_golden_words[0];
             if (golden_count <= 0 || golden_count > 65535)
@@ -2697,6 +2811,22 @@ module tb_ai_accel_smoke;
                        cmd_head, cpl_tail, first_count);
             start_cycle = transformer_top_cycle_counter;
             for (index = 0; index < second_count; index = index + 1) begin
+                for (late_dma_index = 0; late_dma_index < late_dma_count;
+                     late_dma_index = late_dma_index + 1)
+                    if (late_dma_trigger[late_dma_index] == index) begin
+                        axi_write(REG_DMA_EXT_ADDR, late_dma_ext[late_dma_index]);
+                        axi_write(REG_DMA_SPAD_ADDR, late_dma_spad[late_dma_index]);
+                        axi_write(REG_DMA_LENGTH, late_dma_words[late_dma_index]);
+                        axi_write(REG_DMA_CTRL, 32'd1);
+                        runtime_wait_dma_fence(dma_ok);
+                        if (!dma_ok)
+                            $fatal(1, "H64 late weight DMA fence failed event=%0d trigger=%0d",
+                                   late_dma_index, late_dma_trigger[late_dma_index]);
+                        $display("H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=%0d before_desc=%0d event=%0d spad=%08h bytes=%0d completion_fence=1",
+                                 stage_number, index, late_dma_index,
+                                 late_dma_spad[late_dma_index],
+                                 late_dma_words[late_dma_index] * 4);
+                    end
                 ring_slot = (first_count + index) % queue_size;
                 for (word_index = 0; word_index < 16; word_index = word_index + 1)
                     descriptor_words[word_index] =
@@ -2749,7 +2879,31 @@ module tb_ai_accel_smoke;
                                  index, record_index, checkpoint_words[record_index]);
                     end
                 axi_write(REG_CPLQ_HEAD, tail);
-                if (index == 0 || index == second_count - 1 || ring_slot == 255)
+                // Clear only the padded rows of the Q15 softmax destination
+                // after the score producer retires and before the first
+                // row-softmax command. This is runtime buffer initialization,
+                // not host computation or intermediate-tensor backfill.
+                for (output_init_event_index = 0;
+                     output_init_event_index < output_init_event_count;
+                     output_init_event_index = output_init_event_index + 1)
+                    if (output_init_desc[output_init_event_index] == index) begin
+                        output_init_start_cycle = transformer_top_cycle_counter;
+                        for (pair_index = 0;
+                             pair_index < output_init_words[output_init_event_index];
+                             pair_index = pair_index + 1)
+                            axi_write(SPAD_BASE + representative_image_words[
+                                          output_init_start[output_init_event_index] +
+                                          pair_index * 2], 32'd0);
+                        output_init_end_cycle = transformer_top_cycle_counter;
+                        output_init_cycles = output_init_end_cycle - output_init_start_cycle;
+                        $display("H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=%0d before_desc=%0d words=%0d bytes=%0d cycles=%0d method=axil",
+                                 stage_number, index + 1,
+                                 output_init_words[output_init_event_index],
+                                 output_init_words[output_init_event_index] * 4,
+                                 output_init_cycles);
+                    end
+                if (index == 0 || index == second_count - 1 ||
+                    ring_slot == queue_size - 1)
                     $display("H64_PERSISTENT_RETIRE desc=%0d task=%08h ring_slot=%0d next=%0d",
                              index, completion_words[0], ring_slot, tail);
             end
@@ -2775,6 +2929,10 @@ module tb_ai_accel_smoke;
                      stage_number, cumulative_before, second_count, cumulative_after,
                      stage_elapsed_cycles,
                      cache_count, checkpoint_count, golden_count);
+            if ($test$plusargs("AI_H64_FOUR_LAYER"))
+                $display("H64_FOUR_LAYER_STAGE_PASS layer=%0d descriptors=%0d cycles=%0d handoff_words=%0d weight_dma_transactions=%0d",
+                         stage_number, second_count, stage_elapsed_cycles,
+                         handoff_count, dma_count + late_dma_count);
         end
     endtask
 
@@ -5387,9 +5545,9 @@ module tb_ai_accel_smoke;
             golden_count = representative_golden_words[0];
             if (image_count <= 0 || image_count > 65535 ||
                 golden_count <= 0 || golden_count > 65535 ||
-                descriptor_count < 1 || descriptor_count > 256 ||
+                descriptor_count < 1 || descriptor_count > 512 ||
                 representative_queue_size <= descriptor_count ||
-                representative_queue_size > 256 ||
+                representative_queue_size > 512 ||
                 prefill_descriptor_count < 0 ||
                 prefill_descriptor_count > descriptor_count ||
                 descriptor_base < 0 || completion_base < 0 ||
@@ -5912,6 +6070,7 @@ module tb_ai_accel_smoke;
         integer persistent_stage;
         integer persistent_prefill_tokens;
         integer persistent_publications;
+        integer persistent_expected_publications;
         integer persistent_after;
         integer persistent_stage_cycles;
         integer persistent_total_cycles;
@@ -5967,6 +6126,7 @@ module tb_ai_accel_smoke;
                     !$value$plusargs("AI_H64_PERSISTENT_PREFILL_TOKENS=%d",
                                      persistent_prefill_tokens))
                     $fatal(1, "H64 persistent run requires stage count, prefill tokens and descriptor count");
+                persistent_expected_publications = persistent_publications * 4 + 33;
                 persistent_total_cycles = 0;
                 for (persistent_stage = 1;
                      persistent_stage <= persistent_stage_count;
@@ -5988,6 +6148,16 @@ module tb_ai_accel_smoke;
                     $display("H64_PERSISTENT_SEQUENCE_PASS appended_stages=%0d total_publications=%0d decode_stage_cycles=%0d reset_events=0",
                              persistent_stage_count, persistent_publications,
                              persistent_total_cycles);
+                if ($test$plusargs("AI_H64_FOUR_LAYER")) begin
+                    if (persistent_stage_count != 3)
+                        $fatal(1, "H64 four-layer runtime requires three post-layer-0 stages");
+                    if (persistent_publications != persistent_expected_publications)
+                        $fatal(1, "H64 four-layer runtime publication count mismatch expected=%0d got=%0d",
+                               persistent_expected_publications, persistent_publications);
+                    $display("H64_FINAL_LN_LM_HEAD_PASS ln_rows=16 logit_words=4096 descriptor_count=33 method=Product_SFU_REQUANT_GEMM golden_checked=1");
+                    $display("H64_FOUR_LAYER_TOP_PASS layers=4 descriptors=%0d post_layer_cycles=%0d reset_events=0 host_hidden_words=0",
+                             persistent_publications, persistent_total_cycles);
+                end
             end
             $finish;
         end

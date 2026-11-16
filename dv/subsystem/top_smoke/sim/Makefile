@@ -1204,6 +1204,52 @@ ai_h64_persistent_two_token ai_h64_persistent_sequence:
 	if [ "$$stage_count" -eq 1 ]; then grep -q '^H64_PERSISTENT_TWO_TOKEN_PASS ' $(AI_H64_PERSISTENT_RUN)/run.log; \
 	else grep -q "^H64_PERSISTENT_SEQUENCE_PASS appended_stages=$$stage_count " $(AI_H64_PERSISTENT_RUN)/run.log; fi
 
+# Round 16 Gate 1: four sequential layer invocations in one unreset Product
+# Top. Layer N+1 reads Layer N's residual2 from SPAD; its inputs.memh is empty.
+AI_H64_FOUR_LAYER_RUN ?= /tmp/nmaforge_h64_four_layer_$(shell date +%Y%m%d_%H%M%S)
+AI_H64_FOUR_LAYER_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
+AI_H64_FOUR_LAYER_SEED ?= 20261116
+AI_H64_FOUR_LAYER_TOKENS ?= 1,7,42,3
+.PHONY: ai_h64_four_layer_top
+ai_h64_four_layer_top:
+	test ! -e "$(AI_H64_FOUR_LAYER_RUN)"
+	$(AI_H64_FOUR_LAYER_PYTHON) ../../../../benchmark/gpt2_compat/prepare_h64_four_layer.py \
+		--seed "$(AI_H64_FOUR_LAYER_SEED)" --tokens "$(AI_H64_FOUR_LAYER_TOKENS)" \
+		--out "$(AI_H64_FOUR_LAYER_RUN)"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_H64_WEIGHT_DMA \
+		+define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_H64_FOUR_LAYER_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_H64_FOUR_LAYER_RUN)/simv \
+		-l $(AI_H64_FOUR_LAYER_RUN)/compile.log
+	$(AI_H64_FOUR_LAYER_RUN)/simv +ntb_random_seed=$(AI_H64_FOUR_LAYER_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H64_FOUR_LAYER_SEED) +ACLK_PERIOD_NS=10.0 \
+		+AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_DMA_PRELOAD \
+		+AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS +AI_H64_PERSISTENT +AI_H64_FOUR_LAYER \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_FOUR_LAYER_RUN)/stage0/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_FOUR_LAYER_RUN)/stage0/model_golden.memh \
+		+AI_REPRESENTATIVE_CHECKPOINTS=$(AI_H64_FOUR_LAYER_RUN)/stage0/checkpoint_golden.memh \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_H64_FOUR_LAYER_RUN)/stage0/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_H64_FOUR_LAYER_RUN)/stage0/dma_plan.memh \
+		+AI_H64_PERSISTENT_SEQUENCE_ROOT=$(AI_H64_FOUR_LAYER_RUN) \
+		+AI_H64_PERSISTENT_STAGE_COUNT=3 +AI_H64_PERSISTENT_PREFILL_TOKENS=1 \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_QUEUE_SIZE=512 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["useful_output_elements"])') \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["physical_output_elements"])') \
+		-l $(AI_H64_FOUR_LAYER_RUN)/run.log
+	grep -q '^H64_FOUR_LAYER_TOP_PASS layers=4 ' $(AI_H64_FOUR_LAYER_RUN)/run.log
+	grep -q '^H64_FINAL_LN_LM_HEAD_PASS ln_rows=16 logit_words=4096 ' $(AI_H64_FOUR_LAYER_RUN)/run.log
+	test "$$(grep -c '^H64_FOUR_LAYER_HANDOFF_PASS ' $(AI_H64_FOUR_LAYER_RUN)/run.log)" -eq 3
+	test "$$(grep -c '^H64_FOUR_LAYER_STAGE_PASS ' $(AI_H64_FOUR_LAYER_RUN)/run.log)" -eq 3
+
 # Round 23: train/export a bounded GPT-2-like synthetic-token LM, validate the
 # independent scalar INT8 reference, and run eight host-feedback Top steps.
 AI_TINY_GPT2_RUN ?= /tmp/nmaforge_tiny_gpt2_$(shell date +%Y%m%d_%H%M%S)
