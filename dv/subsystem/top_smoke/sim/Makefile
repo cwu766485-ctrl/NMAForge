@@ -1153,6 +1153,55 @@ ai_cmdq_stream_runtime:
 	grep -q '^CMDQ_STREAM_RUNTIME_PASS descriptors=$(AI_CMDQ_STREAM_COUNT) ' "$(AI_CMDQ_STREAM_RUN)/run.log"
 	grep -q '^CMDQ_STREAM_RUNTIME_TOP_PASS$$' "$(AI_CMDQ_STREAM_RUN)/run.log"
 
+# Round 15 G1: two independently generated H64 token invocations in one
+# unreset Product Top. Stage 1 publishes only its input embedding and new
+# descriptors; historical K/V must survive stage 0 completion retirement.
+AI_H64_PERSISTENT_RUN ?= /tmp/nmaforge_h64_persistent_$(shell date +%Y%m%d_%H%M%S)
+AI_H64_PERSISTENT_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
+AI_H64_PERSISTENT_SEED ?= 20261116
+AI_H64_PERSISTENT_TOKENS ?= 1,7
+.PHONY: ai_h64_persistent_two_token
+ai_h64_persistent_two_token:
+	test ! -e "$(AI_H64_PERSISTENT_RUN)"
+	$(AI_H64_PERSISTENT_PYTHON) ../../../../benchmark/gpt2_compat/prepare_h64_persistent.py \
+		--seed "$(AI_H64_PERSISTENT_SEED)" --tokens "$(AI_H64_PERSISTENT_TOKENS)" \
+		--out "$(AI_H64_PERSISTENT_RUN)"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_H64_WEIGHT_DMA \
+		+define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_H64_PERSISTENT_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_H64_PERSISTENT_RUN)/simv \
+		-l $(AI_H64_PERSISTENT_RUN)/compile.log
+	$(AI_H64_PERSISTENT_RUN)/simv +ntb_random_seed=$(AI_H64_PERSISTENT_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H64_PERSISTENT_SEED) \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_DMA_PRELOAD +AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS \
+		+AI_H64_PERSISTENT \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_PERSISTENT_RUN)/stage0/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_PERSISTENT_RUN)/stage0/model_golden.memh \
+		+AI_REPRESENTATIVE_CHECKPOINTS=$(AI_H64_PERSISTENT_RUN)/stage0/checkpoint_golden.memh \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_H64_PERSISTENT_RUN)/stage0/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_H64_PERSISTENT_RUN)/stage0/dma_plan.memh \
+		+AI_H64_PERSISTENT_STAGE1_DESC=$(AI_H64_PERSISTENT_RUN)/stage1_descriptors.memh \
+		+AI_H64_PERSISTENT_STAGE1_INPUT=$(AI_H64_PERSISTENT_RUN)/stage1_input.memh \
+		+AI_H64_PERSISTENT_STAGE0_CACHE=$(AI_H64_PERSISTENT_RUN)/stage0_cache.memh \
+		+AI_H64_PERSISTENT_STAGE1_GOLDEN=$(AI_H64_PERSISTENT_RUN)/stage1/model_golden.memh \
+		+AI_H64_PERSISTENT_STAGE1_CHECKPOINTS=$(AI_H64_PERSISTENT_RUN)/stage1/checkpoint_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_QUEUE_SIZE=256 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["useful_output_elements"])') \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["physical_output_elements"])') \
+		-l $(AI_H64_PERSISTENT_RUN)/run.log
+	grep -q '^H64_PERSISTENT_KV_BEFORE_PASS ' $(AI_H64_PERSISTENT_RUN)/run.log
+	grep -q '^H64_PERSISTENT_TWO_TOKEN_PASS ' $(AI_H64_PERSISTENT_RUN)/run.log
+
 # Round 23: train/export a bounded GPT-2-like synthetic-token LM, validate the
 # independent scalar INT8 reference, and run eight host-feedback Top steps.
 AI_TINY_GPT2_RUN ?= /tmp/nmaforge_tiny_gpt2_$(shell date +%Y%m%d_%H%M%S)

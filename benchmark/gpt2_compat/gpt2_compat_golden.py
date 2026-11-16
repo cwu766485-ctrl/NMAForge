@@ -65,13 +65,15 @@ def fp_infer(model, tokens):
         q = n1 @ (model[p + "q"] / Q["weight"])
         k = n1 @ (model[p + "k"] / Q["weight"])
         v = n1 @ (model[p + "v"] / Q["weight"])
-        scores = (q @ k.T) / math.sqrt(CONFIG["head_dim"])
-        scores = np.where(np.triu(np.ones(scores.shape, dtype=bool), 1), -np.inf, scores)
+        q_heads = q.reshape(len(tokens), 4, 16).transpose(1, 0, 2)
+        k_heads = k.reshape(len(tokens), 4, 16).transpose(1, 0, 2)
+        scores = np.matmul(q_heads, k_heads.transpose(0, 2, 1)) / math.sqrt(CONFIG["head_dim"])
+        scores = np.where(np.triu(np.ones(scores.shape[-2:], dtype=bool), 1), -np.inf, scores)
         scores -= np.max(scores, axis=-1, keepdims=True)
         probs = np.exp(scores)
         probs /= np.sum(probs, axis=-1, keepdims=True)
         heads = v.reshape(len(tokens), 4, 16).transpose(1, 0, 2)
-        attended = np.matmul(np.repeat(probs[None, ...], 4, axis=0), heads)
+        attended = np.matmul(probs, heads)
         attended = attended.transpose(1, 0, 2).reshape(len(tokens), 64)
         projected = attended @ (model[p + "o"] / Q["weight"])
         residual1 = x + projected
@@ -130,8 +132,10 @@ def int_infer(model, tokens):
         q = sat_i8((n1.astype(np.int32) @ model[p + "q"].astype(np.int32)) >> 5)
         k = sat_i8((n1.astype(np.int32) @ model[p + "k"].astype(np.int32)) >> 5)
         v = sat_i8((n1.astype(np.int32) @ model[p + "v"].astype(np.int32)) >> 5)
-        scores = (q.astype(np.int32) @ k.astype(np.int32).T) >> 4
-        probs = q15_softmax(scores)
+        q_heads = q.reshape(len(tokens), 4, 16).transpose(1, 0, 2).astype(np.int32)
+        k_heads = k.reshape(len(tokens), 4, 16).transpose(1, 0, 2).astype(np.int32)
+        scores = np.matmul(q_heads, k_heads.transpose(0, 2, 1)) >> 4
+        probs = np.stack([q15_softmax(scores[head]) for head in range(4)])
         heads = v.reshape(len(tokens), 4, 16).transpose(1, 0, 2)
         attended = np.matmul(probs.astype(np.int64), heads.astype(np.int64)).transpose(1, 0, 2) >> 15
         attended = sat_i8(attended.reshape(len(tokens), 64))

@@ -508,6 +508,7 @@ module tb_ai_accel_smoke;
     reg [31:0] representative_golden_words [0:131071];
     reg [31:0] representative_dma_plan_words [0:255];
     reg [31:0] representative_checkpoint_words [0:32767];
+    reg [31:0] h64_persistent_descriptor_words [0:4095];
     integer representative_load_cycles = 0;
     integer representative_load_measure = 1'b0;
     integer representative_dma_window_cycles = 0;
@@ -2517,6 +2518,225 @@ module tb_ai_accel_smoke;
             axi_write(REG_CMDQ_SIZE, 32'd0);
             axi_write(REG_CPLQ_SIZE, 32'd0);
             clear_done_irq();
+        end
+    endtask
+
+    task run_h64_persistent_stage1;
+        reg [1023:0] descriptor_file;
+        reg [1023:0] input_file;
+        reg [1023:0] cache_file;
+        reg [1023:0] golden_file;
+        reg [1023:0] checkpoint_file;
+        reg [31:0] descriptor_words [0:15];
+        reg [31:0] read_value;
+        reg [31:0] status_word;
+        reg [31:0] cmd_head;
+        reg [31:0] cpl_tail;
+        reg [31:0] completion_words [0:3];
+        reg read_ok;
+        reg idle_ok;
+        reg dma_ok;
+        integer first_count;
+        integer second_count;
+        integer queue_size;
+        integer descriptor_base;
+        integer completion_base;
+        integer input_count;
+        integer cache_count;
+        integer dma_count;
+        integer dma_index;
+        integer golden_count;
+        integer checkpoint_count;
+        integer cursor;
+        integer checkpoint_desc [0:127];
+        integer checkpoint_words [0:127];
+        integer checkpoint_start [0:127];
+        integer index;
+        integer word_index;
+        integer pair_index;
+        integer record_index;
+        integer ring_slot;
+        integer tail;
+        integer start_cycle;
+        integer end_cycle;
+        begin
+            if (!$value$plusargs("AI_H64_PERSISTENT_STAGE1_DESC=%s", descriptor_file) ||
+                !$value$plusargs("AI_H64_PERSISTENT_STAGE1_INPUT=%s", input_file) ||
+                !$value$plusargs("AI_H64_PERSISTENT_STAGE0_CACHE=%s", cache_file) ||
+                !$value$plusargs("AI_H64_PERSISTENT_STAGE1_GOLDEN=%s", golden_file) ||
+                !$value$plusargs("AI_H64_PERSISTENT_STAGE1_CHECKPOINTS=%s", checkpoint_file) ||
+                !$value$plusargs("AI_REPRESENTATIVE_DESC_COUNT=%d", first_count) ||
+                !$value$plusargs("AI_REPRESENTATIVE_QUEUE_SIZE=%d", queue_size) ||
+                !$value$plusargs("AI_REPRESENTATIVE_DESC_BASE=%d", descriptor_base) ||
+                !$value$plusargs("AI_REPRESENTATIVE_CPL_BASE=%d", completion_base))
+                $fatal(1, "H64 persistent runtime requires both stage files and queue geometry");
+            $readmemh(cache_file, representative_image_words);
+            cache_count = representative_image_words[0];
+            if (cache_count != 512 || queue_size != 256 || first_count >= queue_size)
+                $fatal(1, "H64 persistent cache/queue geometry invalid");
+            for (pair_index = 0; pair_index < cache_count; pair_index = pair_index + 1) begin
+                runtime_read_word_retry(
+                    SPAD_BASE + representative_image_words[1 + pair_index * 2],
+                    read_value, read_ok);
+                if (!read_ok || read_value !== representative_image_words[2 + pair_index * 2])
+                    $fatal(1, "H64_PERSISTENT_KV_BEFORE_MISMATCH pair=%0d addr=%08h expected=%08h observed=%08h",
+                           pair_index, representative_image_words[1 + pair_index * 2],
+                           representative_image_words[2 + pair_index * 2], read_value);
+            end
+            $display("H64_PERSISTENT_KV_BEFORE_PASS words=%0d method=axi_lite", cache_count);
+            if ($test$plusargs("AI_H64_PERSISTENT_CORRUPT_CACHE")) begin
+                runtime_read_word_retry(SPAD_BASE + representative_image_words[1],
+                                        read_value, read_ok);
+                if (!read_ok)
+                    $fatal(1, "H64 persistent negative control cache read failed");
+                axi_write(SPAD_BASE + representative_image_words[1], read_value ^ 32'h00000001);
+                $display("H64_PERSISTENT_KV_MUTATION_INJECTED addr=%08h",
+                         representative_image_words[1]);
+            end
+
+            $readmemh(input_file, representative_image_words);
+            input_count = representative_image_words[0];
+            if (input_count <= 0 || input_count > 8192)
+                $fatal(1, "H64 stage1 initial-input word count invalid count=%0d", input_count);
+            for (pair_index = 0; pair_index < input_count; pair_index = pair_index + 1)
+                axi_write(SPAD_BASE + representative_image_words[1 + pair_index * 2],
+                          representative_image_words[2 + pair_index * 2]);
+            $display("H64_PERSISTENT_TOKEN_INPUT_PUBLISHED token=1 fixture_words=%0d host_intermediate_words=0 host_kv_words=0",
+                     input_count);
+            // Reuse the identical AXI4 model-weight payload/plan loaded for
+            // stage0. Compaction can reclaim a weight address after its last
+            // consumer, so restore weights before publishing stage1 work.
+            dma_count = representative_dma_plan_words[0];
+            if (dma_count < 1 || dma_count > 85)
+                $fatal(1, "H64 stage1 inherited DMA plan is invalid");
+            for (dma_index = 0; dma_index < dma_count; dma_index = dma_index + 1) begin
+                axi_write(REG_DMA_EXT_ADDR,
+                          representative_dma_plan_words[1 + dma_index * 3]);
+                axi_write(REG_DMA_SPAD_ADDR,
+                          representative_dma_plan_words[2 + dma_index * 3]);
+                axi_write(REG_DMA_LENGTH,
+                          representative_dma_plan_words[3 + dma_index * 3]);
+                axi_write(REG_DMA_CTRL, 32'd1);
+                runtime_wait_dma_fence(dma_ok);
+                if (!dma_ok)
+                    $fatal(1, "H64 stage1 weight DMA fence failed transaction=%0d",
+                           dma_index);
+            end
+            $display("H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=1 transactions=%0d",
+                     dma_count);
+            $readmemh(descriptor_file, h64_persistent_descriptor_words);
+            second_count = h64_persistent_descriptor_words[0];
+            if (second_count <= 0 || second_count > 255 ||
+                1 + 16 * second_count > 4096)
+                $fatal(1, "H64 stage1 descriptor count invalid count=%0d", second_count);
+            $readmemh(checkpoint_file, representative_checkpoint_words);
+            checkpoint_count = representative_checkpoint_words[0];
+            if (checkpoint_count <= 0 || checkpoint_count > 128)
+                $fatal(1, "H64 stage1 checkpoint count invalid");
+            cursor = 1;
+            for (record_index = 0; record_index < checkpoint_count;
+                 record_index = record_index + 1) begin
+                checkpoint_desc[record_index] = representative_checkpoint_words[cursor];
+                checkpoint_words[record_index] = representative_checkpoint_words[cursor + 1];
+                checkpoint_start[record_index] = cursor + 2;
+                if (checkpoint_desc[record_index] < 0 ||
+                    checkpoint_desc[record_index] >= second_count ||
+                    checkpoint_words[record_index] <= 0 ||
+                    checkpoint_words[record_index] > 8192)
+                    $fatal(1, "H64 stage1 checkpoint record invalid record=%0d", record_index);
+                cursor = cursor + 2 + checkpoint_words[record_index] * 2;
+            end
+            $readmemh(golden_file, representative_golden_words);
+            golden_count = representative_golden_words[0];
+            if (golden_count <= 0 || golden_count > 65535)
+                $fatal(1, "H64 stage1 golden count invalid");
+
+            // The first invocation already retired its completion ring. Each
+            // descriptor is published only after the predecessor's completed
+            // record is visible and retired, so a consumer cannot observe an
+            // accepted-but-unfinished producer merely because CMDQ_HEAD moved.
+            axi_read(REG_CMDQ_HEAD, cmd_head);
+            axi_read(REG_CPLQ_TAIL, cpl_tail);
+            if (cmd_head != first_count || cpl_tail != first_count)
+                $fatal(1, "H64 stage1 ring did not inherit stage0 pointers cmd=%0d cpl=%0d first=%0d",
+                       cmd_head, cpl_tail, first_count);
+            start_cycle = transformer_top_cycle_counter;
+            for (index = 0; index < second_count; index = index + 1) begin
+                ring_slot = (first_count + index) % queue_size;
+                for (word_index = 0; word_index < 16; word_index = word_index + 1)
+                    descriptor_words[word_index] =
+                        h64_persistent_descriptor_words[1 + index * 16 + word_index];
+                if (descriptor_words[0][31:16] != 16'h7100 + index)
+                    $fatal(1, "H64 stage1 task ID mismatch index=%0d id=%08h",
+                           index, descriptor_words[0]);
+                runtime_write_descriptor_words(descriptor_base + ring_slot * 64,
+                                               descriptor_words);
+                tail = (ring_slot + 1) % queue_size;
+                axi_write(REG_CMDQ_TAIL, tail);
+                axi_write(REG_DOORBELL, 32'd1);
+                runtime_wait_queue_idle(tail, tail, idle_ok, status_word,
+                                        cmd_head, cpl_tail);
+                if (!idle_ok)
+                    $fatal(1, "H64 persistent descriptor timeout index=%0d cmd=%0d cpl=%0d status=%08h",
+                           index, cmd_head, cpl_tail, status_word);
+                for (word_index = 0; word_index < 4; word_index = word_index + 1) begin
+                    runtime_read_word_retry(SPAD_BASE + completion_base +
+                                           ring_slot * 16 + word_index * 4,
+                                           completion_words[word_index], read_ok);
+                    if (!read_ok)
+                        $fatal(1, "H64 persistent completion read failed descriptor=%0d word=%0d",
+                               index, word_index);
+                end
+                if (completion_words[0] !== (32'h7100 + index) ||
+                    completion_words[1] !== 32'd1)
+                    $fatal(1, "H64 persistent completion failed desc=%0d task=%08h status=%08h",
+                           index, completion_words[0], completion_words[1]);
+                for (record_index = 0; record_index < checkpoint_count;
+                     record_index = record_index + 1)
+                    if (checkpoint_desc[record_index] == index) begin
+                        for (pair_index = 0; pair_index < checkpoint_words[record_index];
+                             pair_index = pair_index + 1) begin
+                            runtime_read_word_retry(
+                                SPAD_BASE + representative_checkpoint_words[
+                                    checkpoint_start[record_index] + pair_index * 2],
+                                read_value, read_ok);
+                            if (!read_ok || read_value !== representative_checkpoint_words[
+                                    checkpoint_start[record_index] + pair_index * 2 + 1])
+                                $fatal(1, "H64_PERSISTENT_TENSOR_MISMATCH desc=%0d record=%0d word=%0d addr=%08h expected=%08h observed=%08h",
+                                       index, record_index, pair_index,
+                                       representative_checkpoint_words[
+                                           checkpoint_start[record_index] + pair_index * 2],
+                                       representative_checkpoint_words[
+                                           checkpoint_start[record_index] + pair_index * 2 + 1],
+                                       read_value);
+                        end
+                        $display("H64_PERSISTENT_TENSOR_PASS desc=%0d record=%0d words=%0d method=axi_lite",
+                                 index, record_index, checkpoint_words[record_index]);
+                    end
+                axi_write(REG_CPLQ_HEAD, tail);
+                if (index == 0 || index == second_count - 1 || ring_slot == 255)
+                    $display("H64_PERSISTENT_RETIRE desc=%0d task=%08h ring_slot=%0d next=%0d",
+                             index, completion_words[0], ring_slot, tail);
+            end
+            end_cycle = transformer_top_cycle_counter;
+            for (pair_index = 0; pair_index < golden_count; pair_index = pair_index + 1) begin
+                runtime_read_word_retry(
+                    SPAD_BASE + representative_golden_words[1 + pair_index * 2],
+                    read_value, read_ok);
+                if (!read_ok || read_value !== representative_golden_words[2 + pair_index * 2])
+                    $fatal(1, "H64_PERSISTENT_FINAL_MISMATCH pair=%0d addr=%08h expected=%08h observed=%08h",
+                           pair_index, representative_golden_words[1 + pair_index * 2],
+                           representative_golden_words[2 + pair_index * 2], read_value);
+            end
+            axi_read(REG_CMDQ_HEAD, cmd_head);
+            axi_read(REG_CPLQ_TAIL, cpl_tail);
+            if (cmd_head != (first_count + second_count) % queue_size ||
+                cpl_tail != cmd_head)
+                $fatal(1, "H64 persistent final ring mismatch cmd=%0d cpl=%0d",
+                       cmd_head, cpl_tail);
+            $display("H64_PERSISTENT_TWO_TOKEN_PASS stage0_desc=%0d stage1_desc=%0d stage1_cycles=%0d cache_words=%0d checkpoints=%0d final_golden_words=%0d cmdq_wrap=1 cplq_wrap=1 reset_events=0 host_intermediate_words=0",
+                     first_count, second_count, end_cycle - start_cycle,
+                     cache_count, checkpoint_count, golden_count);
         end
     endtask
 
@@ -5632,8 +5852,15 @@ module tb_ai_accel_smoke;
                      conv_busy_cycles, banked_busy_cycles, fp_busy_cycles,
                      scalar_busy_cycles, no_engine_cycles, dma_busy_cycles,
                      spad_read_bytes, spad_write_bytes);
-            axi_write(REG_CMDQ_SIZE, 32'd0);
-            axi_write(REG_CPLQ_SIZE, 32'd0);
+            if ($test$plusargs("AI_H64_PERSISTENT")) begin
+                // The Product Top and KV-cache remain live across invocations.
+                // All completion words were checked above; retire before the
+                // next descriptor is allowed to reuse a ring slot or tensor.
+                axi_write(REG_CPLQ_HEAD, descriptor_count);
+            end else begin
+                axi_write(REG_CMDQ_SIZE, 32'd0);
+                axi_write(REG_CPLQ_SIZE, 32'd0);
+            end
             clear_done_irq();
         end
     endtask
@@ -5687,6 +5914,8 @@ module tb_ai_accel_smoke;
 
         if ($test$plusargs("AI_REPRESENTATIVE_MODEL")) begin
             run_representative_model();
+            if ($test$plusargs("AI_H64_PERSISTENT"))
+                run_h64_persistent_stage1();
             $finish;
         end
 

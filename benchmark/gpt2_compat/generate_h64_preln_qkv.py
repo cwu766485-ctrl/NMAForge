@@ -209,7 +209,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
              include_ffn: bool = False, include_kv_roundtrip: bool = False,
              include_kv_attention: bool = False,
              token_ids: list[int] | None = None,
-             kv_k_write_mode: str = "token-append") -> dict:
+             kv_k_write_mode: str = "token-append",
+             kv_append_from: int = 0) -> dict:
     if include_ffn and not include_attention:
         raise ValueError("full H64 Decoder requires Attention")
     if include_kv_attention and (not include_ffn or include_kv_roundtrip):
@@ -220,6 +221,11 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
     tokens = list(token_ids if token_ids is not None else TOKENS)
     if not tokens or any(token < 0 or token >= 256 for token in tokens):
         raise ValueError("token IDs must be a non-empty list in [0,255]")
+    if not 0 <= kv_append_from < len(tokens):
+        raise ValueError("kv_append_from must select an existing token")
+    if kv_append_from and (not include_kv_attention or kv_k_write_mode not in {
+            "qk-compatible-append", "token-append"}):
+        raise ValueError("incremental KV append requires supported cache-backed attention")
     model = make_model(seed)
     if include_ffn:
         model_path = out / "canonical_h64_model.npz"
@@ -389,13 +395,14 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                         source_row_offset = (token // 4) * 64 + (token % 4) * 4
                         if kind == "k":
                             if kv_k_write_mode == "qk-compatible-append":
-                                kv_qk_compatible_append(
-                                    mapper,
-                                    f"kv_attention_k_qk_append_h{head}_t{token}",
-                                    source, cache_t, token=token, head=head,
-                                    feature_count=16, head_stride=256,
-                                    src_offset=source_row_offset,
-                                )
+                                if token >= kv_append_from:
+                                    kv_qk_compatible_append(
+                                        mapper,
+                                        f"kv_attention_k_qk_append_h{head}_t{token}",
+                                        source, cache_t, token=token, head=head,
+                                        feature_count=16, head_stride=256,
+                                        src_offset=source_row_offset,
+                                    )
                                 for feature_group in range(4):
                                     word_index = ((token // 4) * 4 + feature_group) * 4 + token % 4
                                     packed = sum(
@@ -407,14 +414,15 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                                     cache_bytes[word_index * 4:word_index * 4 + 4] = \
                                         (packed & 0xFFFFFFFF).to_bytes(4, "little")
                             elif kv_k_write_mode == "token-append":
-                                mapper.add(
-                                    f"kv_attention_k_append_h{head}_t{token}",
-                                    OP_KV_WRITE, source, cache_t,
-                                    src0_offset=source_row_offset, k_or_length=16,
-                                    flags=KV_FLAG_MATRIX_B_APPEND,
-                                    aux0=(head << 16) | token,
-                                    src0_stride=16, src1_stride=256,
-                                )
+                                if token >= kv_append_from:
+                                    mapper.add(
+                                        f"kv_attention_k_append_h{head}_t{token}",
+                                        OP_KV_WRITE, source, cache_t,
+                                        src0_offset=source_row_offset, k_or_length=16,
+                                        flags=KV_FLAG_MATRIX_B_APPEND,
+                                        aux0=(head << 16) | token,
+                                        src0_stride=16, src1_stride=256,
+                                    )
                                 for feature, value in enumerate(values[token]):
                                     col_group, token_group = feature // 4, token // 4
                                     word_index = (col_group * 4 + token_group) * 4 + feature % 4
@@ -447,14 +455,15 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                                     cache_bytes[word * 4:word * 4 + 4] = \
                                         (value & 0xFFFFFFFF).to_bytes(4, "little")
                         else:
-                            mapper.add(
-                                f"kv_attention_v_append_h{head}_t{token}",
-                                OP_KV_WRITE, source, cache_t,
-                                src0_offset=source_row_offset, k_or_length=16,
-                                flags=KV_FLAG_MATRIX_B_APPEND,
-                                aux0=(head << 16) | token,
-                                src0_stride=16, src1_stride=256,
-                            )
+                            if token >= kv_append_from:
+                                mapper.add(
+                                    f"kv_attention_v_append_h{head}_t{token}",
+                                    OP_KV_WRITE, source, cache_t,
+                                    src0_offset=source_row_offset, k_or_length=16,
+                                    flags=KV_FLAG_MATRIX_B_APPEND,
+                                    aux0=(head << 16) | token,
+                                    src0_stride=16, src1_stride=256,
+                                )
                             for feature, value in enumerate(values[token]):
                                 col_group, token_group = feature // 4, token // 4
                                 word_index = (col_group * 4 + token_group) * 4 + feature % 4
@@ -1032,6 +1041,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                  (" + Product KV write/read buffers consumed directly by causal QK/AV"
                   if include_kv_attention else ""),
         "seed": seed, "tokens": tokens, "descriptor_abi": "v7.4",
+        "kv_append_from": kv_append_from,
         "canonical_model_file": "canonical_h64_model.npz" if include_ffn else None,
         "canonical_model_sha256": model_sha256,
         "descriptor_base": desc_base, "completion_base": cpl_base,
@@ -1053,15 +1063,15 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
             "valid_token_count": len(tokens),
             "heads": 4,
             "head_dim": 16,
-            "k_token_append_descriptors": (len(tokens) * 4
+            "k_token_append_descriptors": ((len(tokens) - kv_append_from) * 4
                                             if kv_k_write_mode == "token-append" else 0),
-            "k_qk_compatible_append_descriptors": (len(tokens) * 4
+            "k_qk_compatible_append_descriptors": ((len(tokens) - kv_append_from) * 4
                                             if kv_k_write_mode == "qk-compatible-append" else 0),
             "k_tile_write_descriptors": (4
                                          if kv_k_write_mode == "matrix-a-tile" else 0),
             "k_word_write_descriptors": (len(tokens) * 4 * 4
                                          if kv_k_write_mode == "matrix-a-word" else 0),
-            "v_token_append_descriptors": len(tokens) * 4,
+            "v_token_append_descriptors": (len(tokens) - kv_append_from) * 4,
             "read_descriptors": 2 * 4,
             "k_write_mode": kv_k_write_mode,
             "k_write_granularity": ("four QK-compatible packed words per token and head"
@@ -1156,12 +1166,14 @@ def main() -> None:
                         choices=("token-append", "qk-compatible-append",
                                  "matrix-a-tile", "matrix-a-word"),
                         default="token-append")
+    parser.add_argument("--kv-append-from", type=int, default=0,
+                        help="first token position whose K/V is written by this invocation")
     args = parser.parse_args()
     token_ids = ([int(value) for value in args.tokens.split(",")]
                  if args.tokens is not None else None)
     generate(args.out, args.seed, args.attention or args.full_decoder,
              args.full_decoder, args.kv_roundtrip, args.kv_attention, token_ids,
-             args.kv_k_write_mode)
+             args.kv_k_write_mode, args.kv_append_from)
 
 
 if __name__ == "__main__":
