@@ -1305,6 +1305,7 @@ AI_H64_FOUR_LAYER_RUN ?= /tmp/nmaforge_h64_four_layer_$(shell date +%Y%m%d_%H%M%
 AI_H64_FOUR_LAYER_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
 AI_H64_FOUR_LAYER_SEED ?= 20261116
 AI_H64_FOUR_LAYER_TOKENS ?= 1,7,42,3
+AI_H64_FOUR_LAYER_MODEL_NPZ ?=
 AI_H64_FOUR_LAYER_LOGITS_ROW ?= $(shell printf '%s\n' '$(AI_H64_FOUR_LAYER_TOKENS)' | awk -F, '{print NF-1}')
 AI_H64_AUTOREGRESSIVE ?= 0
 ifeq ($(AI_H64_AUTOREGRESSIVE),1)
@@ -1325,6 +1326,7 @@ ai_h64_four_layer_top:
 	test ! -e "$(AI_H64_FOUR_LAYER_RUN)"
 	$(AI_H64_FOUR_LAYER_PYTHON) $(AI_H64_FOUR_LAYER_PREPARER) \
 		--seed "$(AI_H64_FOUR_LAYER_SEED)" $(AI_H64_FOUR_LAYER_TOKEN_OPTION) "$(AI_H64_FOUR_LAYER_TOKENS)" \
+		$(if $(AI_H64_FOUR_LAYER_MODEL_NPZ),--model-npz "$(AI_H64_FOUR_LAYER_MODEL_NPZ)",) \
 		$(if $(filter 1,$(AI_H64_AUTOREGRESSIVE)),--generated 4,) \
 		--out "$(AI_H64_FOUR_LAYER_RUN)"
 	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \

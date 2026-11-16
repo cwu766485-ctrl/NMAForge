@@ -98,14 +98,15 @@ def patch_cache_before(previous: Path, current: Path) -> None:
         write_pairs(current / f"stage{layer}/cache_before.memh", pairs)
 
 
-def build_session(out: Path, seed: int, prompt: list[int], generated: int) -> dict:
+def build_session(out: Path, seed: int, prompt: list[int], generated: int,
+                  model_override: dict | None = None) -> dict:
     if len(prompt) != 4 or generated < 1 or len(prompt) + generated > 16:
         raise ValueError("requires a four-token prompt and 1..12 generated tokens")
     if any(token < 0 or token > 255 for token in prompt):
         raise ValueError("token IDs must be in [0,255]")
     current_tokens = list(prompt)
     current_dir = out
-    current_manifest = build(current_dir, seed, current_tokens)
+    current_manifest = build(current_dir, seed, current_tokens, model_override)
     raw_model = np.load(current_dir / "raw_layer0/canonical_h64_model.npz")
     embedding = raw_model["embedding"].astype(np.int32)
     position = raw_model["position"].astype(np.int32)
@@ -138,7 +139,7 @@ def build_session(out: Path, seed: int, prompt: list[int], generated: int) -> di
             break
         current_tokens.append(selected)
         next_dir = out / f"context{step + 1}"
-        next_manifest = build(next_dir, seed, current_tokens)
+        next_manifest = build(next_dir, seed, current_tokens, model_override)
         patch_cache_before(current_dir, next_dir)
         records[-1]["next_context"] = str(next_dir.relative_to(out))
         records[-1]["cache_before_sha256"] = {
@@ -162,7 +163,9 @@ def build_session(out: Path, seed: int, prompt: list[int], generated: int) -> di
                        "token embedding/position input lookup only"],
         "host_intermediate_tensor_writes": 0,
         "cache_policy": "each next-context run verifies all prior physical KV words before prefix recompute; Product KV_READ checkpoints verify recomputed cache contents",
-        "quality_scope": "deterministic synthetic weights; functional autoregressive loop only, no language-model quality claim",
+        "quality_scope": ("deterministic synthetic weights; functional autoregressive loop only, no language-model quality claim"
+                          if model_override is None else
+                          "GPT-2-derived truncated/requantized weights; functional autoregressive loop only, no language-model quality claim"),
     }
     (out / "autoregressive_plan.json").write_text(json.dumps(plan, indent=2) + "\n")
     print("H64_AUTOREGRESSIVE_PLAN_READY " + json.dumps({
@@ -178,9 +181,15 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=20261116)
     parser.add_argument("--prompt", default="1,7,42,3")
     parser.add_argument("--generated", type=int, default=4)
+    parser.add_argument("--model-npz", type=Path,
+                        help="optional canonical H64 model package; omit for synthetic regression")
     args = parser.parse_args()
     prompt = [int(item, 0) for item in args.prompt.split(",") if item]
-    build_session(args.out, args.seed, prompt, args.generated)
+    model_override = None
+    if args.model_npz is not None:
+        with np.load(args.model_npz, allow_pickle=False) as archive:
+            model_override = {name: archive[name] for name in archive.files}
+    build_session(args.out, args.seed, prompt, args.generated, model_override)
 
 
 if __name__ == "__main__":

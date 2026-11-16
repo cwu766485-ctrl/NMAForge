@@ -214,7 +214,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
              input_hidden_i32: list[list[int]] | None = None,
              stream_norm_params: bool = False,
              include_final_lm_head: bool = False,
-             queue_slots_override: int | None = None) -> dict:
+             queue_slots_override: int | None = None,
+             model_override: dict[str, np.ndarray] | None = None) -> dict:
     if include_ffn and not include_attention:
         raise ValueError("full H64 Decoder requires Attention")
     if include_kv_attention and (not include_ffn or include_kv_roundtrip):
@@ -238,7 +239,32 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
     if kv_append_from and (not include_kv_attention or kv_k_write_mode not in {
             "qk-compatible-append", "token-append"}):
         raise ValueError("incremental KV append requires supported cache-backed attention")
-    model = make_model(seed)
+    model = make_model(seed) if model_override is None else {
+        name: np.asarray(value).copy() for name, value in model_override.items()
+    }
+    if model_override is not None:
+        expected_shapes = {"embedding": (256, 64), "position": (16, 64),
+                           "final_gamma": (64,), "final_beta": (64,),
+                           "lm_head": (64, 256)}
+        for layer in range(4):
+            prefix = f"l{layer}."
+            expected_shapes.update({prefix + "q": (64, 64),
+                                    prefix + "k": (64, 64),
+                                    prefix + "v": (64, 64),
+                                    prefix + "o": (64, 64),
+                                    prefix + "up": (64, 256),
+                                    prefix + "down": (256, 64),
+                                    prefix + "ln1_gamma": (64,),
+                                    prefix + "ln1_beta": (64,),
+                                    prefix + "ln2_gamma": (64,),
+                                    prefix + "ln2_beta": (64,)})
+        if set(model) != set(expected_shapes):
+            missing = sorted(set(expected_shapes) - set(model))
+            extra = sorted(set(model) - set(expected_shapes))
+            raise ValueError(f"model override keys differ: missing={missing}, extra={extra}")
+        for name, shape in expected_shapes.items():
+            if model[name].shape != shape:
+                raise ValueError(f"model override {name} shape {model[name].shape} != {shape}")
     layer_params = {name: model[f"l{layer_index}.{name}"]
                     for name in ("ln1_gamma", "ln1_beta", "ln2_gamma", "ln2_beta",
                                  "q", "k", "v", "o", "up", "down")}

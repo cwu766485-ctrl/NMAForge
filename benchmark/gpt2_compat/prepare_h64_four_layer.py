@@ -310,11 +310,12 @@ def remap_dma(run_dir: Path, manifest: dict, plan_records: list[dict],
             "late_plan_sha256": hashlib.sha256((out / "late_dma_plan.memh").read_bytes()).hexdigest()}
 
 
-def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS) -> dict:
+def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS,
+          model_override: dict | None = None) -> dict:
     if not tokens or len(tokens) > 16 or any(token < 0 or token > 255 for token in tokens):
         raise ValueError("four-layer Top prompt must contain 1..16 token IDs in [0,255]")
     out.mkdir(parents=True, exist_ok=False)
-    template_manifest = build_template(tokens, seed)
+    template_manifest = build_template(tokens, seed, model_override)
     plan_records, desc_base, cpl_base, kv_map, stats = make_records(template_manifest)
     plan_by_template_layer = {(r["layer"], r.get("template_tensor")): r
                               for r in plan_records if "template_tensor" in r}
@@ -333,6 +334,7 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS) -> dict:
             input_hidden_i32=hidden_rows, stream_norm_params=True,
             include_final_lm_head=(layer == LAYERS - 1),
             queue_slots_override=QUEUE_SLOTS,
+            model_override=model_override,
         )
         manifests.append(manifest)
         stage = out / f"stage{layer}"
@@ -617,12 +619,18 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--tokens", default=",".join(str(x) for x in TOKENS),
                         help="comma-separated fixed prompt token IDs, 1..16 entries")
+    parser.add_argument("--model-npz", type=Path,
+                        help="canonical H64 model package; omit to use the synthetic regression model")
     args = parser.parse_args()
     try:
         tokens = [int(item, 0) for item in args.tokens.split(",") if item]
     except ValueError as error:
         raise SystemExit(f"invalid --tokens list: {error}") from error
-    build(args.out, args.seed, tokens)
+    model_override = None
+    if args.model_npz is not None:
+        with np.load(args.model_npz, allow_pickle=False) as archive:
+            model_override = {name: archive[name] for name in archive.files}
+    build(args.out, args.seed, tokens, model_override)
 
 
 if __name__ == "__main__":
