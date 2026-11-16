@@ -1,0 +1,81 @@
+{
+  "activation_bytes": {
+    "one_16x197_int32_score_block_per_head": 12608,
+    "one_16x768_int8_ffn_tile": 12288,
+    "one_197x192_int8_tensor": 37824,
+    "three_head_score_blocks": 37824,
+    "three_qkv_outputs": 113472
+  },
+  "array": {
+    "line_bytes": 16,
+    "macs": 256,
+    "shape": "16x16",
+    "spad_banks": 4
+  },
+  "capacity_scenarios": {
+    "128KiB": {
+      "capacity_bytes": 131072,
+      "classifier_weight_and_bias_bytes": 193000,
+      "estimated_live_bytes_for_this_schedule": 255872,
+      "fits_this_static_schedule": false,
+      "headroom_bytes": -124800,
+      "live_components_bytes": {
+        "16_query_x_197_key_int32_score_block_3_heads": 37824,
+        "16_token_ffn_int8_tile": 12288,
+        "fixed_control_queue_budget": 16384,
+        "one_16x16_int8_operand_tile": 256,
+        "qkv_int8_output_scratch": 113472,
+        "two_int8_token_activation_images": 75648
+      },
+      "patch_embedding_weight_bytes": 147456,
+      "position_embedding_bytes": 37824,
+      "required_streamed_weight_bytes_per_encoder_layer": 444864,
+      "warning": "planning estimate only; no RTL liveness proof, DMA schedule, timing, or Top run"
+    },
+    "256KiB": {
+      "capacity_bytes": 262144,
+      "classifier_weight_and_bias_bytes": 193000,
+      "estimated_live_bytes_for_this_schedule": 255872,
+      "fits_this_static_schedule": true,
+      "headroom_bytes": 6272,
+      "live_components_bytes": {
+        "16_query_x_197_key_int32_score_block_3_heads": 37824,
+        "16_token_ffn_int8_tile": 12288,
+        "fixed_control_queue_budget": 16384,
+        "one_16x16_int8_operand_tile": 256,
+        "qkv_int8_output_scratch": 113472,
+        "two_int8_token_activation_images": 75648
+      },
+      "patch_embedding_weight_bytes": 147456,
+      "position_embedding_bytes": 37824,
+      "required_streamed_weight_bytes_per_encoder_layer": 444864,
+      "warning": "planning estimate only; no RTL liveness proof, DMA schedule, timing, or Top run"
+    }
+  },
+  "model": "facebook/deit-tiny-patch16-224",
+  "shape": {
+    "classes": 1000,
+    "ffn": 768,
+    "heads": 3,
+    "hidden": 192,
+    "image": "224x224x3",
+    "layers": 12,
+    "patch": 16,
+    "tokens_including_cls": 197
+  },
+  "status": "STATIC_CAPACITY_ESTIMATE_NOT_RTL",
+  "unresolved_hardware_contracts": [
+    "197-key causal softmax with 16-query blocking and global normalization",
+    "192-hidden GEMM tiling and non-multiple-of-16 tails",
+    "FFN=768 tiling and activation lifetime",
+    "position/class token and patch embedding descriptor lowering",
+    "per-layer streamed weight DMA and 128/256-KiB parameter propagation"
+  ],
+  "weight_bytes": {
+    "all_12_encoder_layers_int8_estimate": 5338368,
+    "classifier_int8_estimate": 193000,
+    "one_encoder_layer_int8_estimate": 444864,
+    "patch_embedding_int8_estimate": 147456,
+    "position_embedding_int8_estimate": 37824
+  }
+}

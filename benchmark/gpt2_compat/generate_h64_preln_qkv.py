@@ -213,7 +213,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
              kv_append_from: int = 0, *, layer_index: int = 0,
              input_hidden_i32: list[list[int]] | None = None,
              stream_norm_params: bool = False,
-             include_final_lm_head: bool = False) -> dict:
+             include_final_lm_head: bool = False,
+             queue_slots_override: int | None = None) -> dict:
     if include_ffn and not include_attention:
         raise ValueError("full H64 Decoder requires Attention")
     if include_kv_attention and (not include_ffn or include_kv_roundtrip):
@@ -384,6 +385,11 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                 for packed_tensor, values in ((q8_t, q_values), (k8_t, k_values)):
                     for word, value in enumerate(_pack_matrix_a_physical(values)):
                         attention_golden[packed_tensor.addr + word * 4] = value & 0xFFFFFFFF
+                # Preserve an independent Product-Top observation point for
+                # the packed Q operand. This distinguishes a projection/pack
+                # discrepancy from a later QK datapath/layout discrepancy in
+                # variable-length prefix replay.
+                attention_checkpoints.append((q8_t.name, q8_t))
 
             if include_kv_attention:
                 v_raw = projection_tiles[("v", head)]
@@ -904,7 +910,10 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
     checkpoint_records = []
     dma_weight_records = []
     if include_ffn:
-        queue_slots = 512 if include_final_lm_head else 256
+        queue_slots = (queue_slots_override if queue_slots_override is not None else
+                       (512 if include_final_lm_head else 256))
+        if queue_slots not in (256, 512):
+            raise ValueError("H64 runtime supports 256- or 512-entry queues")
         allocation, desc_base, cpl_base = compact_mapper_lifetimes(
             mapper, 128 * 1024, queue_slots
         )
@@ -957,11 +966,30 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
 
         def checkpoint_for(name: str, tensor, source_golden: dict[int, int]) -> dict:
             old_start = old_start_by_name[name]
-            old_end = old_start + _tensor_bytes(tensor)
+            checkpoint_bytes = _tensor_bytes(tensor)
+            selected_addresses = None
+            if name.startswith("attn_q_h") and tensor.dtype == "i8_packed":
+                # The variable-length session explicitly clears padded Q rows
+                # after the Product Requant producer. Check only valid model
+                # input rows here; the subsequent QK Golden checks the
+                # resulting full physical tile after padding initialization.
+                # Matrix-A rows are interleaved by 4x4 subtile, so valid rows
+                # are not a contiguous byte range once the fifth row begins.
+                row_count = len(tokens)
+                k_groups = tensor.shape[1] // 4
+                selected_addresses = {
+                    old_start + (((row // 4) * k_groups + k_group) * 4 +
+                                 (row % 4)) * 4
+                    for row in range(row_count)
+                    for k_group in range(k_groups)
+                }
+            old_end = old_start + checkpoint_bytes
             selected = {tensor.addr + address - old_start: value
                         for address, value in source_golden.items()
-                        if old_start <= address < old_end}
-            expected_words = _tensor_bytes(tensor) // 4
+                        if ((address in selected_addresses) if selected_addresses is not None
+                            else old_start <= address < old_end)}
+            expected_words = (len(selected_addresses) if selected_addresses is not None
+                              else checkpoint_bytes // 4)
             if len(selected) != expected_words:
                 raise ValueError(f"checkpoint {name}: Golden words {len(selected)} != {expected_words}")
             allocation_record = tensor_records[name]
@@ -1132,8 +1160,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
         "canonical_model_file": "canonical_h64_model.npz" if include_ffn else None,
         "canonical_model_sha256": model_sha256,
         "descriptor_base": desc_base, "completion_base": cpl_base,
-        "queue_size": (512 if include_final_lm_head else
-                       (256 if include_ffn else 128)),
+        "queue_size": (queue_slots if include_ffn else 128),
         "descriptor_count": len(mapper.descriptors), "golden_words": len(golden),
         "kv_roundtrip": ({
             "status": "PRODUCT_TOP_REQUIRED",

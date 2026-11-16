@@ -2523,11 +2523,15 @@ module tb_ai_accel_smoke;
 
     task run_h64_persistent_stage;
         input integer stage_number;
+        input integer context_number;
         input integer token_position;
+        input integer active_token_count;
         input integer cumulative_before;
         output integer cumulative_after;
         output integer stage_elapsed_cycles;
+        output integer stage_argmax_token;
         reg [1023:0] sequence_root;
+        reg [1023:0] stage_root;
         reg [1023:0] descriptor_file;
         reg [1023:0] input_file;
         reg [1023:0] cache_file;
@@ -2537,12 +2541,17 @@ module tb_ai_accel_smoke;
         reg [1023:0] output_init_events_file;
         reg [1023:0] stage_dma_payload_file;
         reg [1023:0] stage_dma_plan_file;
+        reg [1023:0] logits_dump_file;
         reg [31:0] descriptor_words [0:15];
         reg [31:0] read_value;
         reg [31:0] status_word;
         reg [31:0] cmd_head;
         reg [31:0] cpl_tail;
         reg [31:0] completion_words [0:3];
+        reg [31:0] logits_base;
+        reg [31:0] logits_address;
+        reg [31:0] logits_value;
+        reg signed [31:0] best_logit;
         reg read_ok;
         reg idle_ok;
         reg dma_ok;
@@ -2589,30 +2598,34 @@ module tb_ai_accel_smoke;
         integer tail;
         integer start_cycle;
         integer end_cycle;
+        integer logits_fd;
+        integer logits_row;
+        integer logits_tile;
+        integer logits_col;
+        integer logits_index;
+        integer logits_argmax;
         begin
+            stage_argmax_token = -1;
+            handoff_count = 0;
             if (!$value$plusargs("AI_H64_PERSISTENT_SEQUENCE_ROOT=%s", sequence_root) ||
                 !$value$plusargs("AI_REPRESENTATIVE_QUEUE_SIZE=%d", queue_size) ||
                 !$value$plusargs("AI_REPRESENTATIVE_DESC_BASE=%d", descriptor_base) ||
                 !$value$plusargs("AI_REPRESENTATIVE_CPL_BASE=%d", completion_base))
                 $fatal(1, "H64 persistent runtime requires sequence directory and queue geometry");
-            $sformat(descriptor_file, "%0s/stage%0d/descriptors.memh",
-                     sequence_root, stage_number);
-            $sformat(input_file, "%0s/stage%0d/inputs.memh",
-                     sequence_root, stage_number);
-            $sformat(cache_file, "%0s/stage%0d/cache_before.memh",
-                     sequence_root, stage_number);
-            $sformat(golden_file, "%0s/stage%0d/model_golden.memh",
-                     sequence_root, stage_number);
-            $sformat(checkpoint_file, "%0s/stage%0d/checkpoint_golden.memh",
-                     sequence_root, stage_number);
-            $sformat(handoff_file, "%0s/stage%0d/handoff_before.memh",
-                     sequence_root, stage_number);
-            $sformat(output_init_events_file, "%0s/stage%0d/output_init_events.memh",
-                     sequence_root, stage_number);
-            $sformat(stage_dma_payload_file, "%0s/stage%0d/dma_payload.memh",
-                     sequence_root, stage_number);
-            $sformat(stage_dma_plan_file, "%0s/stage%0d/dma_plan.memh",
-                     sequence_root, stage_number);
+            if ($test$plusargs("AI_H64_AUTOREGRESSIVE") && context_number > 0)
+                $sformat(stage_root, "%0s/context%0d/stage%0d",
+                         sequence_root, context_number, stage_number);
+            else
+                $sformat(stage_root, "%0s/stage%0d", sequence_root, stage_number);
+            $sformat(descriptor_file, "%0s/descriptors.memh", stage_root);
+            $sformat(input_file, "%0s/inputs.memh", stage_root);
+            $sformat(cache_file, "%0s/cache_before.memh", stage_root);
+            $sformat(golden_file, "%0s/model_golden.memh", stage_root);
+            $sformat(checkpoint_file, "%0s/checkpoint_golden.memh", stage_root);
+            $sformat(handoff_file, "%0s/handoff_before.memh", stage_root);
+            $sformat(output_init_events_file, "%0s/output_init_events.memh", stage_root);
+            $sformat(stage_dma_payload_file, "%0s/dma_payload.memh", stage_root);
+            $sformat(stage_dma_plan_file, "%0s/dma_plan.memh", stage_root);
             first_count = cumulative_before % queue_size;
             $readmemh(cache_file, representative_image_words);
             cache_count = representative_image_words[0];
@@ -2634,10 +2647,13 @@ module tb_ai_accel_smoke;
                            representative_image_words[2 + pair_index * 2], read_value);
             end
             $display("H64_PERSISTENT_KV_BEFORE_PASS words=%0d method=axi_lite", cache_count);
-            if ($test$plusargs("AI_H64_FOUR_LAYER")) begin
+            if ($test$plusargs("AI_H64_FOUR_LAYER") && stage_number > 0) begin
                 $readmemh(handoff_file, representative_image_words);
                 handoff_count = representative_image_words[0];
-                if (handoff_count != 16 * 64)
+                // Only live token rows form the inter-layer tensor contract;
+                // fixed-width padded query rows are unspecified scratch.
+                if (active_token_count < 1 || active_token_count > 16 ||
+                    handoff_count != active_token_count * 64)
                     $fatal(1, "H64 four-layer handoff word count invalid layer=%0d count=%0d",
                            stage_number, handoff_count);
                 for (pair_index = 0; pair_index < handoff_count; pair_index = pair_index + 1) begin
@@ -2650,8 +2666,8 @@ module tb_ai_accel_smoke;
                                representative_image_words[1 + pair_index * 2],
                                representative_image_words[2 + pair_index * 2], read_value);
                 end
-                $display("H64_FOUR_LAYER_HANDOFF_PASS layer=%0d words=%0d method=axi_lite host_write_words=0",
-                         stage_number, handoff_count);
+                $display("H64_FOUR_LAYER_HANDOFF_PASS layer=%0d active_rows=%0d words=%0d method=axi_lite host_write_words=0",
+                         stage_number, active_token_count, handoff_count);
             end
             if ($test$plusargs("AI_H64_PERSISTENT_CORRUPT_CACHE")) begin
                 mutation_head = 0;
@@ -2717,8 +2733,7 @@ module tb_ai_accel_smoke;
             end
             late_dma_count = 0;
             if ($test$plusargs("AI_H64_FOUR_LAYER")) begin
-                $sformat(stage_dma_plan_file, "%0s/stage%0d/late_dma_plan.memh",
-                         sequence_root, stage_number);
+                $sformat(stage_dma_plan_file, "%0s/late_dma_plan.memh", stage_root);
                 $readmemh(stage_dma_plan_file, representative_dma_plan_words);
                 late_dma_count = representative_dma_plan_words[0];
                 if (late_dma_count < 0 || late_dma_count > 32)
@@ -2916,6 +2931,51 @@ module tb_ai_accel_smoke;
                     $fatal(1, "H64_PERSISTENT_FINAL_MISMATCH pair=%0d addr=%08h expected=%08h observed=%08h",
                            pair_index, representative_golden_words[1 + pair_index * 2],
                            representative_golden_words[2 + pair_index * 2], read_value);
+            end
+            // Optional A0 evidence export: read the actual final-token logits
+            // back through the Product Top SPAD AXI-Lite interface. The
+            // n-tile-major physical layout stores each 16x16 tile contiguously.
+            // Strict `>` implements the documented lowest-token-ID tie break.
+            if (stage_number == 3 && $test$plusargs("AI_H64_DUMP_LOGITS")) begin
+                if (!$value$plusargs("AI_H64_LOGITS_BASE=%d", logits_base) ||
+                    !$value$plusargs("AI_H64_LOGITS_ROW=%d", logits_row))
+                    $fatal(1, "H64 logits export requires base, row and output path");
+                if ($test$plusargs("AI_H64_AUTOREGRESSIVE")) begin
+                    if (context_number > 0)
+                        logits_row = token_position;
+                    $sformat(logits_dump_file, "%0s/rtl_logits_context%0d.csv",
+                             sequence_root, context_number);
+                end else if (!$value$plusargs("AI_H64_LOGITS_DUMP=%s", logits_dump_file))
+                    $fatal(1, "H64 logits export requires output path");
+                if (logits_row < 0 || logits_row > 15)
+                    $fatal(1, "H64 logits export row out of range: %0d", logits_row);
+                logits_fd = $fopen(logits_dump_file, "w");
+                if (logits_fd == 0)
+                    $fatal(1, "could not create actual RTL logits dump %0s", logits_dump_file);
+                best_logit = -32'sh8000_0000;
+                logits_argmax = 0;
+                for (logits_tile = 0; logits_tile < 16; logits_tile = logits_tile + 1) begin
+                    for (logits_col = 0; logits_col < 16; logits_col = logits_col + 1) begin
+                        logits_index = logits_tile * 16 + logits_col;
+                        logits_address = logits_base +
+                            ((logits_tile * 256 + logits_row * 16 + logits_col) * 4);
+                        runtime_read_word_retry(SPAD_BASE + logits_address,
+                                                logits_value, read_ok);
+                        if (!read_ok)
+                            $fatal(1, "H64 actual logits read failed token=%0d addr=%08h",
+                                   logits_index, logits_address);
+                        $fdisplay(logits_fd, "%0d %08h %08h", logits_index,
+                                  logits_address, logits_value);
+                        if ($signed(logits_value) > best_logit) begin
+                            best_logit = $signed(logits_value);
+                            logits_argmax = logits_index;
+                        end
+                    end
+                end
+                $fclose(logits_fd);
+                stage_argmax_token = logits_argmax;
+                $display("H64_FINAL_LOGITS_DUMP_PASS count=256 row=%0d argmax=%0d max=%08h source=Product_Top_SPAD tie_break=lowest_token_id file=%0s",
+                         logits_row, logits_argmax, best_logit, logits_dump_file);
             end
             axi_read(REG_CMDQ_HEAD, cmd_head);
             axi_read(REG_CPLQ_TAIL, cpl_tail);
@@ -6069,11 +6129,34 @@ module tb_ai_accel_smoke;
         integer persistent_stage_count;
         integer persistent_stage;
         integer persistent_prefill_tokens;
+        integer persistent_active_tokens;
         integer persistent_publications;
         integer persistent_expected_publications;
         integer persistent_after;
         integer persistent_stage_cycles;
         integer persistent_total_cycles;
+        integer persistent_argmax;
+        integer ar_steps;
+        integer ar_step;
+        integer ar_context;
+        integer ar_feedback_base;
+        integer ar_feedback_cursor;
+        integer ar_expected_token;
+        integer ar_position;
+        integer ar_input_count;
+        integer ar_input_row;
+        integer ar_data_cursor;
+        integer ar_embedding_base;
+        integer ar_position_base;
+        integer ar_word;
+        integer ar_cumulative_before;
+        integer ar_cumulative_after;
+        integer ar_stage_cycles;
+        integer ar_argmax;
+        integer ar_total_cycles;
+        integer ar_total_publications;
+        reg [1023:0] ar_feedback_file;
+        reg [31:0] ar_feedback_words [0:16383];
         errors = 0;
         seed_arg = 20261014;
         profile_ai_seed = 0;
@@ -6126,17 +6209,27 @@ module tb_ai_accel_smoke;
                     !$value$plusargs("AI_H64_PERSISTENT_PREFILL_TOKENS=%d",
                                      persistent_prefill_tokens))
                     $fatal(1, "H64 persistent run requires stage count, prefill tokens and descriptor count");
+                persistent_active_tokens = 4;
+                void'($value$plusargs("AI_H64_ACTIVE_TOKENS=%d",
+                                      persistent_active_tokens));
+                if (persistent_active_tokens < 1 || persistent_active_tokens > 16)
+                    $fatal(1, "H64 active token count out of range: %0d",
+                           persistent_active_tokens);
                 persistent_expected_publications = persistent_publications * 4 + 33;
                 persistent_total_cycles = 0;
+                persistent_argmax = -1;
                 for (persistent_stage = 1;
                      persistent_stage <= persistent_stage_count;
                      persistent_stage = persistent_stage + 1) begin
                     run_h64_persistent_stage(persistent_stage,
+                                             0,
                                              persistent_prefill_tokens +
                                                  persistent_stage - 1,
+                                             persistent_active_tokens,
                                              persistent_publications,
                                              persistent_after,
-                                             persistent_stage_cycles);
+                                             persistent_stage_cycles,
+                                             persistent_argmax);
                     persistent_publications = persistent_after;
                     persistent_total_cycles = persistent_total_cycles +
                                               persistent_stage_cycles;
@@ -6154,9 +6247,86 @@ module tb_ai_accel_smoke;
                     if (persistent_publications != persistent_expected_publications)
                         $fatal(1, "H64 four-layer runtime publication count mismatch expected=%0d got=%0d",
                                persistent_expected_publications, persistent_publications);
-                    $display("H64_FINAL_LN_LM_HEAD_PASS ln_rows=16 logit_words=4096 descriptor_count=33 method=Product_SFU_REQUANT_GEMM golden_checked=1");
+                    $display("H64_FINAL_LN_LM_HEAD_PASS active_rows=%0d logit_words=%0d descriptor_count=33 method=Product_SFU_REQUANT_GEMM golden_checked=1",
+                             persistent_active_tokens,
+                             persistent_active_tokens * 256);
                     $display("H64_FOUR_LAYER_TOP_PASS layers=4 descriptors=%0d post_layer_cycles=%0d reset_events=0 host_hidden_words=0",
                              persistent_publications, persistent_total_cycles);
+                end
+                if ($test$plusargs("AI_H64_AUTOREGRESSIVE")) begin
+                    if (!$value$plusargs("AI_H64_AUTOREGRESSIVE_STEPS=%d", ar_steps) ||
+                        !$value$plusargs("AI_H64_FEEDBACK_PLAN=%s", ar_feedback_file) ||
+                        !$value$plusargs("AI_H64_EMBED_BASE=%d", ar_embedding_base) ||
+                        !$value$plusargs("AI_H64_POSITION_BASE=%d", ar_position_base))
+                        $fatal(1, "H64 autoregressive runtime requires step count, feedback plan and input bases");
+                    if (ar_steps <= 0 || ar_steps > 12)
+                        $fatal(1, "H64 autoregressive step count invalid: %0d", ar_steps);
+                    $readmemh(ar_feedback_file, ar_feedback_words);
+                    if (ar_feedback_words[0] != ar_steps)
+                        $fatal(1, "H64 autoregressive feedback plan count mismatch plan=%0d requested=%0d",
+                               ar_feedback_words[0], ar_steps);
+                    ar_total_cycles = 0;
+                    ar_total_publications = persistent_publications;
+                    ar_feedback_cursor = 1;
+                    for (ar_step = 0; ar_step < ar_steps; ar_step = ar_step + 1) begin
+                        ar_feedback_base = ar_feedback_cursor;
+                        ar_expected_token = ar_feedback_words[ar_feedback_base];
+                        ar_position = ar_feedback_words[ar_feedback_base + 1];
+                        ar_input_count = ar_feedback_words[ar_feedback_base + 2];
+                        ar_data_cursor = ar_feedback_base + 3;
+                        ar_feedback_cursor = ar_data_cursor + ar_input_count * 128;
+                        if (persistent_argmax < 0 || persistent_argmax > 255 ||
+                            persistent_argmax != ar_expected_token)
+                            $fatal(1, "H64_AR_AUTOREGRESSIVE_TOKEN_MISMATCH step=%0d rtl=%0d golden=%0d",
+                                   ar_step, persistent_argmax, ar_expected_token);
+                        $display("H64_AR_LOGITS_ARGMAX_PASS step=%0d token=%0d source=Product_Top_SPAD",
+                                 ar_step, persistent_argmax);
+                        if (ar_step + 1 < ar_steps) begin
+                            if (ar_position < 4 || ar_position > 15)
+                                $fatal(1, "H64 autoregressive position out of range: %0d", ar_position);
+                            if (ar_input_count != ar_position + 1 || ar_input_count > 16)
+                                $fatal(1, "H64 autoregressive prefix input count invalid position=%0d count=%0d",
+                                       ar_position, ar_input_count);
+                            // Prefix-recompute reuses the input embedding
+                            // region as scratch. Restore the entire valid
+                            // prompt+generated prefix as model-input data;
+                            // no hidden/intermediate tensor is host-written.
+                            for (ar_input_row = 0; ar_input_row < ar_input_count;
+                                 ar_input_row = ar_input_row + 1) begin
+                                for (ar_word = 0; ar_word < 64; ar_word = ar_word + 1) begin
+                                    axi_write(SPAD_BASE + ar_embedding_base +
+                                              ar_input_row * 256 + ar_word * 4,
+                                              ar_feedback_words[ar_data_cursor + ar_word]);
+                                    axi_write(SPAD_BASE + ar_position_base +
+                                              ar_input_row * 256 + ar_word * 4,
+                                              ar_feedback_words[ar_data_cursor + 64 + ar_word]);
+                                end
+                                ar_data_cursor = ar_data_cursor + 128;
+                            end
+                            $display("H64_AR_INPUT_EMBEDDING_PASS step=%0d token=%0d position=%0d valid_rows=%0d embedding_words=%0d position_words=%0d source=RTL_argmax_host_lookup_prefix_recompute",
+                                     ar_step, persistent_argmax, ar_position,
+                                     ar_input_count, ar_input_count * 64,
+                                     ar_input_count * 64);
+                            ar_context = ar_step + 1;
+                            ar_cumulative_before = ar_total_publications;
+                            for (persistent_stage = 0; persistent_stage < 4;
+                                 persistent_stage = persistent_stage + 1) begin
+                                run_h64_persistent_stage(persistent_stage,
+                                    ar_context, ar_position, ar_input_count,
+                                    ar_cumulative_before, ar_cumulative_after,
+                                    ar_stage_cycles, ar_argmax);
+                                ar_cumulative_before = ar_cumulative_after;
+                                ar_total_cycles = ar_total_cycles + ar_stage_cycles;
+                                ar_total_publications = ar_cumulative_after;
+                            end
+                            persistent_argmax = ar_argmax;
+                            $display("H64_AR_FOUR_LAYER_CONTEXT_PASS context=%0d valid_tokens=%0d next_argmax=%0d context_cycles=%0d cumulative_publications=%0d reset_events=0 host_intermediate_words=0",
+                                     ar_context, ar_position + 1, persistent_argmax,
+                                     ar_total_cycles, ar_total_publications);
+                        end
+                    end
+                    $display("H64_AUTOREGRESSIVE_SEQUENCE_PASS generated_tokens=%0d total_publications=%0d extension_cycles=%0d reset_events=0 host_intermediate_words=0 mode=prefix_recompute",
+                             ar_steps, ar_total_publications, ar_total_cycles);
                 end
             end
             $finish;

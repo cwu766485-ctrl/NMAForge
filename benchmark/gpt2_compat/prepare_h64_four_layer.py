@@ -89,6 +89,46 @@ def write_checkpoint_file(path: Path, records: list[tuple[int, dict[int, int]]])
     write_words(path, words)
 
 
+def runtime_live_tensor_pairs(name: str, pairs: dict[int, int],
+                              tensor_map: dict[str, dict], target_start: int,
+                              valid_rows: int) -> dict[int, int]:
+    """Select semantically live sequence rows for Product-Top checking.
+
+    A prefix-recompute invocation issues fixed 16-row descriptors. Rows beyond
+    the current sequence length are physical padding and may contain values
+    left by an earlier context in the same Top instance. They are not model
+    outputs and are never consumed as valid tokens. Check every active row,
+    while retaining all key columns for active attention rows. Matrix-A input
+    tiles use the RTL's 4x4-subtile physical packing rather than dense rows.
+    """
+    allocation = tensor_map[name]
+    shape = allocation["shape"]
+    layout = allocation["layout"]
+    if len(shape) != 2 or shape[0] != 16 or layout not in {
+            "row-major", "matrix_a_tile", "matrix_n_tile_major_16x16"}:
+        return pairs
+
+    selected_offsets: set[int] = set()
+    if layout == "matrix_a_tile":
+        k_groups = shape[1] // 4
+        for row in range(valid_rows):
+            for k_group in range(k_groups):
+                word_index = (((row // 4) * k_groups + k_group) * 4 + (row % 4))
+                selected_offsets.add(word_index * 4)
+    elif layout == "matrix_n_tile_major_16x16":
+        for row in range(valid_rows):
+            for column in range(shape[1]):
+                tile, tile_column = divmod(column, 16)
+                selected_offsets.add((tile * 16 * 16 + row * 16 + tile_column) * 4)
+    else:
+        for row in range(valid_rows):
+            for column in range(shape[1]):
+                selected_offsets.add((row * shape[1] + column) * 4)
+
+    return {address: value for address, value in pairs.items()
+            if address - target_start in selected_offsets}
+
+
 def resolve_owner(template_records: list[dict], address: int, desc_index: int,
                   role: str) -> dict:
     candidates = [r for r in template_records
@@ -292,6 +332,7 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS) -> dict:
             kv_append_from=0, layer_index=layer,
             input_hidden_i32=hidden_rows, stream_norm_params=True,
             include_final_lm_head=(layer == LAYERS - 1),
+            queue_slots_override=QUEUE_SLOTS,
         )
         manifests.append(manifest)
         stage = out / f"stage{layer}"
@@ -318,13 +359,40 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS) -> dict:
 
         cps = parse_checkpoints(raw_dir, manifest)
         stage_cps = remap_checkpoint(cps, manifest, plan_records, layer)
-        write_checkpoint_file(stage / "checkpoint_golden.memh", stage_cps)
+        # Preserve the complete software tensors above for layer handoff and
+        # Golden construction. The Product Top runtime executes fixed 16-row
+        # tiles, but only the prefix rows are valid sequence data. Checkpoints
+        # are therefore sparse over live token rows, avoiding false failures
+        # on unspecified padding left in scratch by an earlier context.
+        raw_tensor_map = {record["name"]: record
+                          for record in manifest["tensor_allocations"]}
+        target_tensor_map = layer_plan_map(plan_records, layer)
+        runtime_stage_cps = []
+        runtime_checkpoint_specs = []
+        for spec, (desc_index, pairs) in zip(
+                manifest["intermediate_checkpoints"], stage_cps):
+            name = spec["tensor_id"]
+            target = target_tensor_map.get(name)
+            if target is None:
+                raise ValueError(f"missing runtime checkpoint allocation for {name}")
+            checked_pairs = runtime_live_tensor_pairs(
+                name, pairs, raw_tensor_map, target["start"], len(tokens))
+            if not checked_pairs:
+                raise ValueError(f"runtime checkpoint has no live words: {name}")
+            runtime_stage_cps.append((desc_index, checked_pairs))
+            runtime_checkpoint_specs.append({**spec, "golden_words": len(checked_pairs),
+                                             "scope": "active_sequence_rows"})
+        write_checkpoint_file(stage / "checkpoint_golden.memh", runtime_stage_cps)
         final_tensor_name = ("logits_i32_physical_16x256" if layer == LAYERS - 1
                              else "l0.residual2_i32")
         residual_checkpoint_index = next(
             index for index, spec in enumerate(manifest["intermediate_checkpoints"])
             if spec["tensor_id"] == final_tensor_name)
-        final_golden = stage_cps[residual_checkpoint_index][1]
+        final_golden_full = stage_cps[residual_checkpoint_index][1]
+        final_target = target_tensor_map[final_tensor_name]
+        final_golden = runtime_live_tensor_pairs(
+            final_tensor_name, final_golden_full, raw_tensor_map,
+            final_target["start"], len(tokens))
         write_pairs(stage / "model_golden.memh", final_golden)
         dma_info = remap_dma(raw_dir, manifest, plan_records, layer, stage)
         write_words(stage / "inputs.memh", [0])
@@ -335,6 +403,31 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS) -> dict:
         # values from the preceding layer. Do not preseed any computed tensor
         # from the software Golden.
         output_init_events: dict[int, set[int]] = {}
+        # Prefix-recompute runs on the same Top reuse the physical Matrix-A
+        # scratch. Q projection writes only the valid token rows, while QK
+        # consumes a 16x16 tile. Matrix-A storage is 4x4-subtile interleaved;
+        # clear every physical K-group word belonging to padded rows after the
+        # Q producer retires. A dense row-stride clear would overwrite valid
+        # rows once the context crosses the first four-row group.
+        valid_query_rows = len(tokens)
+        for head in range(4):
+            tensor_id = f"attn_q_h{head}_i8"
+            qkt_name = f"attn_h{head}_qkt_scaled"
+            qkt_index = next(i for i, d in enumerate(manifest["descriptor_contract"])
+                             if d["name"] == qkt_name)
+            q_tensor = next(r for r in manifest["tensor_allocation"]["records"]
+                            if r["tensor_id"] == tensor_id)
+            q_target = plan_by_template_layer[(layer, tensor_id)]
+            producer_index = max(q_tensor["producer_descriptors"])
+            if producer_index >= qkt_index:
+                raise ValueError(f"Q producer/QK order is invalid for {tensor_id}")
+            addresses = output_init_events.setdefault(producer_index, set())
+            k_groups = q_tensor["logical_shape"][1] // 4
+            for row in range(valid_query_rows, 16):
+                for k_group in range(k_groups):
+                    word_index = (((row // 4) * k_groups + k_group) * 4 +
+                                  (row % 4))
+                    addresses.add(q_target["start"] + word_index * 4)
         for head in range(4):
             tensor_id = f"attn_h{head}_prob_q15"
             template_tensor = next(r for r in manifest["tensor_allocation"]["records"]
@@ -368,6 +461,7 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS) -> dict:
         residual_relocated = {
             plan_by_template_layer[(layer, residual_name)]["start"] + offset * 4: value & 0xFFFFFFFF
             for offset, value in enumerate(residual_values)
+            if offset // 64 < len(tokens)
         }
         if layer < LAYERS - 1:
             hidden_rows = [residual_values[row * 64:(row + 1) * 64]
@@ -388,6 +482,7 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS) -> dict:
 
         layer_manifest = {
             **manifest,
+            "intermediate_checkpoints": runtime_checkpoint_specs,
             "layer": layer, "status": "PLANNER_READY_NOT_PRODUCT_TOP_PASS",
             "input_source": "embedding_plus_position fixture" if layer == 0 else
                             f"Product residual2 from layer {layer - 1}; no later-layer host input words",
@@ -395,13 +490,14 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS) -> dict:
             "descriptor_sha256": hashlib.sha256((stage / "descriptors.memh").read_bytes()).hexdigest(),
             "golden_sha256": hashlib.sha256((stage / "model_golden.memh").read_bytes()).hexdigest(),
             "checkpoint_records": len(stage_cps), "dma": dma_info,
-            "final_golden_scope": ("all 4096 physical logits words after 16 Product GEMM N tiles"
+            "runtime_checkpoint_scope": (f"active sequence rows only ({len(tokens)} of 16); padded query rows are unspecified scratch and are not model outputs"),
+            "final_golden_scope": (f"all 256 logits for each active token row ({len(tokens)} of 16)"
                                    if layer == LAYERS - 1 else
-                                   "full residual2_i32 tensor at descriptor 224; avoids comparing stale aliases from the one-layer memory dump"),
+                                   f"active residual2_i32 rows only ({len(tokens)} of 16) for inter-layer handoff"),
             "input_fixture_words": 0,
             "output_init_event_count": len(output_init_events),
             "output_init_words": sum(len(addresses) for addresses in output_init_events.values()),
-            "output_initialization": "AXI-Lite clear of each 16x16 Q15 causal-softmax output immediately before its first producer; only valid token rows are written by Product commands",
+            "output_initialization": "AXI-Lite clear of padded Matrix-A query words using 4x4-subtile physical addresses after Q projection and clear of each 16x16 Q15 causal-softmax output before its first producer; runtime padding initialization only, no computed tensor backfill",
             "kv_ranges": {kind: next(r for r in plan_records
                                       if r["tensor_id"] == f"l{layer}.kv_{kind}_cache_i8")["start"]
                           for kind in ("k", "v")},

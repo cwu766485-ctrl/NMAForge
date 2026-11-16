@@ -56,6 +56,7 @@ def build_template(tokens: list[int] = TOKENS, seed: int = SEED) -> dict:
             include_kv_roundtrip=False, include_kv_attention=True,
             token_ids=tokens, kv_k_write_mode="qk-compatible-append",
             kv_append_from=0, stream_norm_params=True,
+            queue_slots_override=QUEUE_SLOTS,
         )
         # Retain the manifest data after the temporary generated memory image
         # is removed.  The generator already validates Golden and descriptor

@@ -307,6 +307,40 @@ ai_h64_projection_top:
 	grep -q '^REPRESENTATIVE_MODEL_PASS desc=4 ' "$(AI_H64_PROJECTION_RUN)/run.log"
 	grep -q '^REPRESENTATIVE_MODEL_PASS .*useful_macs=16384 executed_macs=65536 padding_macs=49152 useful_output_elements=256 physical_output_elements=1024 command_cycles=1188 end_to_end_cycles=1188 dma_preload_included=0 ' "$(AI_H64_PROJECTION_RUN)/run.log"
 
+# Round 17 DeiT preparation: execute one official-checkpoint patch-projection
+# 16-output/K=768 GEMM tile on Product Top. This is a real partial projection
+# datapoint, not a full 197-token Patch Embedding or encoder-layer claim.
+AI_DEIT_PATCH_RUN ?= /tmp/nmaforge_deit_patch_$(shell date +%Y%m%d_%H%M%S)
+AI_DEIT_PYTHON ?= /tmp/nmaforge_deit_round17_venv/bin/python
+AI_DEIT_MODEL_DIR ?= /tmp/nmaforge_deit_round17
+.PHONY: ai_deit_patch_projection_top
+ai_deit_patch_projection_top:
+	test ! -e "$(AI_DEIT_PATCH_RUN)"
+	mkdir -p "$(AI_DEIT_PATCH_RUN)"
+	$(AI_DEIT_PYTHON) ../../../../benchmark/deit/round17/generate_deit_patch_projection_workload.py \
+		--model-dir "$(AI_DEIT_MODEL_DIR)" --out-dir "$(AI_DEIT_PATCH_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_PATCH_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_DEIT_PATCH_RUN)/simv \
+		-l $(AI_DEIT_PATCH_RUN)/compile.log
+	$(AI_DEIT_PATCH_RUN)/simv +ntb_random_seed=20261117 +AI_RANDOM_CASES=0 \
+		+AI_SEED=20261117 +ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_PATCH_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_PATCH_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=32768 +AI_REPRESENTATIVE_CPL_BASE=36864 \
+		+AI_REPRESENTATIVE_DESC_COUNT=1 +AI_REPRESENTATIVE_QUEUE_SIZE=128 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=12288 \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=196608 \
+		+AI_REPRESENTATIVE_PADDING_MACS=184320 \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=16 \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=256 \
+		-l $(AI_DEIT_PATCH_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=1 .*golden_words=256 useful_macs=12288 executed_macs=196608 padding_macs=184320 useful_output_elements=16 physical_output_elements=256 ' \
+		"$(AI_DEIT_PATCH_RUN)/run.log"
+
 # Round 5: one nonzero H64 FFN-up tile, with input/descriptors/weights loaded
 # through the real AXI4 DMA before the Product Top command doorbell.
 AI_H64_FFN_TILE_RUN ?= /tmp/nmaforge_h64_ffn_tile_$(shell date +%Y%m%d_%H%M%S)
@@ -1210,11 +1244,27 @@ AI_H64_FOUR_LAYER_RUN ?= /tmp/nmaforge_h64_four_layer_$(shell date +%Y%m%d_%H%M%
 AI_H64_FOUR_LAYER_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
 AI_H64_FOUR_LAYER_SEED ?= 20261116
 AI_H64_FOUR_LAYER_TOKENS ?= 1,7,42,3
+AI_H64_FOUR_LAYER_LOGITS_ROW ?= $(shell printf '%s\n' '$(AI_H64_FOUR_LAYER_TOKENS)' | awk -F, '{print NF-1}')
+AI_H64_AUTOREGRESSIVE ?= 0
+ifeq ($(AI_H64_AUTOREGRESSIVE),1)
+AI_H64_FOUR_LAYER_PREPARER := ../../../../benchmark/gpt2_compat/prepare_h64_autoregressive.py
+AI_H64_FOUR_LAYER_TOKEN_OPTION := --prompt
+AI_H64_AUTOREGRESSIVE_PLUSARGS := \
+	+AI_H64_AUTOREGRESSIVE +AI_H64_AUTOREGRESSIVE_STEPS=4 \
+	+AI_H64_FEEDBACK_PLAN=$(AI_H64_FOUR_LAYER_RUN)/feedback_plan.memh \
+	+AI_H64_EMBED_BASE=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json; j=json.load(open("$(AI_H64_FOUR_LAYER_RUN)/four_layer_manifest.json")); print(next(t["start"] for t in j["allocation_records"] if t["tensor_id"] == "l0.embedding_lookup_i32"))') \
+	+AI_H64_POSITION_BASE=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json; j=json.load(open("$(AI_H64_FOUR_LAYER_RUN)/four_layer_manifest.json")); print(next(t["start"] for t in j["allocation_records"] if t["tensor_id"] == "l0.position_i32"))')
+else
+AI_H64_FOUR_LAYER_PREPARER := ../../../../benchmark/gpt2_compat/prepare_h64_four_layer.py
+AI_H64_FOUR_LAYER_TOKEN_OPTION := --tokens
+AI_H64_AUTOREGRESSIVE_PLUSARGS :=
+endif
 .PHONY: ai_h64_four_layer_top
 ai_h64_four_layer_top:
 	test ! -e "$(AI_H64_FOUR_LAYER_RUN)"
-	$(AI_H64_FOUR_LAYER_PYTHON) ../../../../benchmark/gpt2_compat/prepare_h64_four_layer.py \
-		--seed "$(AI_H64_FOUR_LAYER_SEED)" --tokens "$(AI_H64_FOUR_LAYER_TOKENS)" \
+	$(AI_H64_FOUR_LAYER_PYTHON) $(AI_H64_FOUR_LAYER_PREPARER) \
+		--seed "$(AI_H64_FOUR_LAYER_SEED)" $(AI_H64_FOUR_LAYER_TOKEN_OPTION) "$(AI_H64_FOUR_LAYER_TOKENS)" \
+		$(if $(filter 1,$(AI_H64_AUTOREGRESSIVE)),--generated 4,) \
 		--out "$(AI_H64_FOUR_LAYER_RUN)"
 	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
 		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_H64_WEIGHT_DMA \
@@ -1228,6 +1278,11 @@ ai_h64_four_layer_top:
 		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H64_FOUR_LAYER_SEED) +ACLK_PERIOD_NS=10.0 \
 		+AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_DMA_PRELOAD \
 		+AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS +AI_H64_PERSISTENT +AI_H64_FOUR_LAYER \
+		+AI_H64_DUMP_LOGITS \
+		+AI_H64_LOGITS_BASE=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json; j=json.load(open("$(AI_H64_FOUR_LAYER_RUN)/four_layer_manifest.json")); print(next(t["start"] for t in j["allocation_records"] if t["tensor_id"] == "logits_i32_physical_16x256"))') \
+		+AI_H64_LOGITS_ROW=$(AI_H64_FOUR_LAYER_LOGITS_ROW) \
+		$(AI_H64_AUTOREGRESSIVE_PLUSARGS) \
+		+AI_H64_LOGITS_DUMP=$(AI_H64_FOUR_LAYER_RUN)/rtl_logits.csv \
 		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_FOUR_LAYER_RUN)/stage0/model_memory.memh \
 		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_FOUR_LAYER_RUN)/stage0/model_golden.memh \
 		+AI_REPRESENTATIVE_CHECKPOINTS=$(AI_H64_FOUR_LAYER_RUN)/stage0/checkpoint_golden.memh \
@@ -1235,6 +1290,7 @@ ai_h64_four_layer_top:
 		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_H64_FOUR_LAYER_RUN)/stage0/dma_plan.memh \
 		+AI_H64_PERSISTENT_SEQUENCE_ROOT=$(AI_H64_FOUR_LAYER_RUN) \
 		+AI_H64_PERSISTENT_STAGE_COUNT=3 +AI_H64_PERSISTENT_PREFILL_TOKENS=1 \
+		+AI_H64_ACTIVE_TOKENS=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(len(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/four_layer_manifest.json"))["tokens"]))') \
 		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["descriptor_base"])') \
 		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["completion_base"])') \
 		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["descriptor_count"])') \
@@ -1245,10 +1301,16 @@ ai_h64_four_layer_top:
 		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["useful_output_elements"])') \
 		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["physical_output_elements"])') \
 		-l $(AI_H64_FOUR_LAYER_RUN)/run.log
+	grep -q '^H64_FINAL_LOGITS_DUMP_PASS count=256 row=$(AI_H64_FOUR_LAYER_LOGITS_ROW) ' $(AI_H64_FOUR_LAYER_RUN)/run.log
 	grep -q '^H64_FOUR_LAYER_TOP_PASS layers=4 ' $(AI_H64_FOUR_LAYER_RUN)/run.log
-	grep -q '^H64_FINAL_LN_LM_HEAD_PASS ln_rows=16 logit_words=4096 ' $(AI_H64_FOUR_LAYER_RUN)/run.log
-	test "$$(grep -c '^H64_FOUR_LAYER_HANDOFF_PASS ' $(AI_H64_FOUR_LAYER_RUN)/run.log)" -eq 3
-	test "$$(grep -c '^H64_FOUR_LAYER_STAGE_PASS ' $(AI_H64_FOUR_LAYER_RUN)/run.log)" -eq 3
+	grep -q '^H64_FINAL_LN_LM_HEAD_PASS active_rows=' $(AI_H64_FOUR_LAYER_RUN)/run.log
+	test "$$(grep -c '^H64_FOUR_LAYER_HANDOFF_PASS ' $(AI_H64_FOUR_LAYER_RUN)/run.log)" -eq $(if $(filter 1,$(AI_H64_AUTOREGRESSIVE)),12,3)
+	test "$$(grep -c '^H64_FOUR_LAYER_STAGE_PASS ' $(AI_H64_FOUR_LAYER_RUN)/run.log)" -eq $(if $(filter 1,$(AI_H64_AUTOREGRESSIVE)),15,3)
+	$(if $(filter 1,$(AI_H64_AUTOREGRESSIVE)),grep -q '^H64_AUTOREGRESSIVE_SEQUENCE_PASS generated_tokens=4 ' $(AI_H64_FOUR_LAYER_RUN)/run.log, true)
+
+.PHONY: ai_h64_four_layer_top_argmax
+ai_h64_four_layer_top_argmax: ai_h64_four_layer_top
+	$(if $(filter 1,$(AI_H64_AUTOREGRESSIVE)),$(AI_H64_FOUR_LAYER_PYTHON) ../../../../benchmark/gpt2_compat/verify_h64_autoregressive.py --run "$(AI_H64_FOUR_LAYER_RUN)",$(AI_H64_FOUR_LAYER_PYTHON) ../../../../benchmark/gpt2_compat/verify_h64_top_logits.py --run "$(AI_H64_FOUR_LAYER_RUN)" --row "$(AI_H64_FOUR_LAYER_LOGITS_ROW)")
 
 # Round 23: train/export a bounded GPT-2-like synthetic-token LM, validate the
 # independent scalar INT8 reference, and run eight host-feedback Top steps.
