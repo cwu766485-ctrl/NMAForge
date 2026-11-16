@@ -1160,11 +1160,13 @@ AI_H64_PERSISTENT_RUN ?= /tmp/nmaforge_h64_persistent_$(shell date +%Y%m%d_%H%M%
 AI_H64_PERSISTENT_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
 AI_H64_PERSISTENT_SEED ?= 20261116
 AI_H64_PERSISTENT_TOKENS ?= 1,7
-.PHONY: ai_h64_persistent_two_token
-ai_h64_persistent_two_token:
+AI_H64_PERSISTENT_PREFILL_TOKENS ?= 1
+.PHONY: ai_h64_persistent_two_token ai_h64_persistent_sequence
+ai_h64_persistent_two_token ai_h64_persistent_sequence:
 	test ! -e "$(AI_H64_PERSISTENT_RUN)"
 	$(AI_H64_PERSISTENT_PYTHON) ../../../../benchmark/gpt2_compat/prepare_h64_persistent.py \
 		--seed "$(AI_H64_PERSISTENT_SEED)" --tokens "$(AI_H64_PERSISTENT_TOKENS)" \
+		--prefill-tokens "$(AI_H64_PERSISTENT_PREFILL_TOKENS)" \
 		--out "$(AI_H64_PERSISTENT_RUN)"
 	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
 		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_H64_WEIGHT_DMA \
@@ -1184,11 +1186,9 @@ ai_h64_persistent_two_token:
 		+AI_REPRESENTATIVE_CHECKPOINTS=$(AI_H64_PERSISTENT_RUN)/stage0/checkpoint_golden.memh \
 		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_H64_PERSISTENT_RUN)/stage0/dma_payload.memh \
 		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_H64_PERSISTENT_RUN)/stage0/dma_plan.memh \
-		+AI_H64_PERSISTENT_STAGE1_DESC=$(AI_H64_PERSISTENT_RUN)/stage1_descriptors.memh \
-		+AI_H64_PERSISTENT_STAGE1_INPUT=$(AI_H64_PERSISTENT_RUN)/stage1_input.memh \
-		+AI_H64_PERSISTENT_STAGE0_CACHE=$(AI_H64_PERSISTENT_RUN)/stage0_cache.memh \
-		+AI_H64_PERSISTENT_STAGE1_GOLDEN=$(AI_H64_PERSISTENT_RUN)/stage1/model_golden.memh \
-		+AI_H64_PERSISTENT_STAGE1_CHECKPOINTS=$(AI_H64_PERSISTENT_RUN)/stage1/checkpoint_golden.memh \
+		+AI_H64_PERSISTENT_SEQUENCE_ROOT=$(AI_H64_PERSISTENT_RUN) \
+		+AI_H64_PERSISTENT_STAGE_COUNT=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/token_plan.json"))["decode_tokens"])') \
+		+AI_H64_PERSISTENT_PREFILL_TOKENS=$(AI_H64_PERSISTENT_PREFILL_TOKENS) \
 		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["descriptor_base"])') \
 		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["completion_base"])') \
 		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["descriptor_count"])') \
@@ -1200,7 +1200,9 @@ ai_h64_persistent_two_token:
 		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["physical_output_elements"])') \
 		-l $(AI_H64_PERSISTENT_RUN)/run.log
 	grep -q '^H64_PERSISTENT_KV_BEFORE_PASS ' $(AI_H64_PERSISTENT_RUN)/run.log
-	grep -q '^H64_PERSISTENT_TWO_TOKEN_PASS ' $(AI_H64_PERSISTENT_RUN)/run.log
+	stage_count=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/token_plan.json"))["decode_tokens"])'); \
+	if [ "$$stage_count" -eq 1 ]; then grep -q '^H64_PERSISTENT_TWO_TOKEN_PASS ' $(AI_H64_PERSISTENT_RUN)/run.log; \
+	else grep -q "^H64_PERSISTENT_SEQUENCE_PASS appended_stages=$$stage_count " $(AI_H64_PERSISTENT_RUN)/run.log; fi
 
 # Round 23: train/export a bounded GPT-2-like synthetic-token LM, validate the
 # independent scalar INT8 reference, and run eight host-feedback Top steps.

@@ -1,0 +1,731 @@
+{
+  "execution_gates": [
+    "single-layer persistent decode PASS",
+    "layer-specific cache address and lifetime proof",
+    "weight DMA fence and layer handoff proof",
+    "per-layer tensor Golden",
+    "final LN and all 256 LM logits Golden"
+  ],
+  "final_output": {
+    "final_layer_norm": "run after layer 3 residual2; independent INT8 reference contract must match Product SFU",
+    "greedy_decode": "host-fed next-token loop only after every logits vector matches the independent reference",
+    "lm_head": {
+      "argmax_owner": "host may select token after reading checked logits",
+      "candidate_mapping": "16 output-channel tiles, each K=64 and N=16; M=1 GEMV only if ABI-v7.4 legality is confirmed, otherwise a supported padded Matrix tile",
+      "logits": 256,
+      "shape": [
+        64,
+        256
+      ],
+      "weight": "lm_head"
+    }
+  },
+  "layers": [
+    {
+      "dense_weight_bytes": 49152,
+      "dense_weight_tensors": [
+        "l0.q",
+        "l0.k",
+        "l0.v",
+        "l0.o",
+        "l0.up",
+        "l0.down"
+      ],
+      "execution_order": [
+        "LN1",
+        "QKV projections",
+        "head split",
+        "causal QK",
+        "Q15 Softmax",
+        "AV",
+        "output projection",
+        "residual1",
+        "LN2",
+        "FFN up",
+        "bounded INT8 GELU",
+        "FFN down",
+        "residual2"
+      ],
+      "kv_cache": {
+        "K_bytes": 1024,
+        "V_bytes": 1024,
+        "lifetime": "persistent from prefill through all decode steps",
+        "total_bytes": 2048
+      },
+      "layer": 0,
+      "norm_parameter_bytes": 640,
+      "norm_parameter_tensors": [
+        "l0.ln1_gamma",
+        "l0.ln1_beta",
+        "l0.ln2_gamma",
+        "l0.ln2_beta"
+      ]
+    },
+    {
+      "dense_weight_bytes": 49152,
+      "dense_weight_tensors": [
+        "l1.q",
+        "l1.k",
+        "l1.v",
+        "l1.o",
+        "l1.up",
+        "l1.down"
+      ],
+      "execution_order": [
+        "LN1",
+        "QKV projections",
+        "head split",
+        "causal QK",
+        "Q15 Softmax",
+        "AV",
+        "output projection",
+        "residual1",
+        "LN2",
+        "FFN up",
+        "bounded INT8 GELU",
+        "FFN down",
+        "residual2"
+      ],
+      "kv_cache": {
+        "K_bytes": 1024,
+        "V_bytes": 1024,
+        "lifetime": "persistent from prefill through all decode steps",
+        "total_bytes": 2048
+      },
+      "layer": 1,
+      "norm_parameter_bytes": 640,
+      "norm_parameter_tensors": [
+        "l1.ln1_gamma",
+        "l1.ln1_beta",
+        "l1.ln2_gamma",
+        "l1.ln2_beta"
+      ]
+    },
+    {
+      "dense_weight_bytes": 49152,
+      "dense_weight_tensors": [
+        "l2.q",
+        "l2.k",
+        "l2.v",
+        "l2.o",
+        "l2.up",
+        "l2.down"
+      ],
+      "execution_order": [
+        "LN1",
+        "QKV projections",
+        "head split",
+        "causal QK",
+        "Q15 Softmax",
+        "AV",
+        "output projection",
+        "residual1",
+        "LN2",
+        "FFN up",
+        "bounded INT8 GELU",
+        "FFN down",
+        "residual2"
+      ],
+      "kv_cache": {
+        "K_bytes": 1024,
+        "V_bytes": 1024,
+        "lifetime": "persistent from prefill through all decode steps",
+        "total_bytes": 2048
+      },
+      "layer": 2,
+      "norm_parameter_bytes": 640,
+      "norm_parameter_tensors": [
+        "l2.ln1_gamma",
+        "l2.ln1_beta",
+        "l2.ln2_gamma",
+        "l2.ln2_beta"
+      ]
+    },
+    {
+      "dense_weight_bytes": 49152,
+      "dense_weight_tensors": [
+        "l3.q",
+        "l3.k",
+        "l3.v",
+        "l3.o",
+        "l3.up",
+        "l3.down"
+      ],
+      "execution_order": [
+        "LN1",
+        "QKV projections",
+        "head split",
+        "causal QK",
+        "Q15 Softmax",
+        "AV",
+        "output projection",
+        "residual1",
+        "LN2",
+        "FFN up",
+        "bounded INT8 GELU",
+        "FFN down",
+        "residual2"
+      ],
+      "kv_cache": {
+        "K_bytes": 1024,
+        "V_bytes": 1024,
+        "lifetime": "persistent from prefill through all decode steps",
+        "total_bytes": 2048
+      },
+      "layer": 3,
+      "norm_parameter_bytes": 640,
+      "norm_parameter_tensors": [
+        "l3.ln1_gamma",
+        "l3.ln1_beta",
+        "l3.ln2_gamma",
+        "l3.ln2_beta"
+      ]
+    }
+  ],
+  "memory": {
+    "banks": 4,
+    "baseline_one_layer_top_high_water_bytes": 130576,
+    "capacity_disposition": "NOT_PROVEN; naive persistent K/V addition exceeds 128 KiB, so temporary tensor lifetime reuse and compact allocation are required before RTL integration",
+    "layer_kv_region_proposal": {
+      "allocations": [
+        {
+          "K_range": [
+            "0x10000",
+            "0x10400"
+          ],
+          "V_range": [
+            "0x10400",
+            "0x10800"
+          ],
+          "bytes": 2048,
+          "combined_range": [
+            "0x10000",
+            "0x10800"
+          ],
+          "layer": 0,
+          "lifetime": "persistent until session retirement"
+        },
+        {
+          "K_range": [
+            "0x10800",
+            "0x10c00"
+          ],
+          "V_range": [
+            "0x10c00",
+            "0x11000"
+          ],
+          "bytes": 2048,
+          "combined_range": [
+            "0x10800",
+            "0x11000"
+          ],
+          "layer": 1,
+          "lifetime": "persistent until session retirement"
+        },
+        {
+          "K_range": [
+            "0x11000",
+            "0x11400"
+          ],
+          "V_range": [
+            "0x11400",
+            "0x11800"
+          ],
+          "bytes": 2048,
+          "combined_range": [
+            "0x11000",
+            "0x11800"
+          ],
+          "layer": 2,
+          "lifetime": "persistent until session retirement"
+        },
+        {
+          "K_range": [
+            "0x11800",
+            "0x11c00"
+          ],
+          "V_range": [
+            "0x11c00",
+            "0x12000"
+          ],
+          "bytes": 2048,
+          "combined_range": [
+            "0x11800",
+            "0x12000"
+          ],
+          "layer": 3,
+          "lifetime": "persistent until session retirement"
+        }
+      ],
+      "base": "0x00010000",
+      "bytes": 8192,
+      "end_exclusive": "0x12000",
+      "per_layer": 2048,
+      "requires_address/protection_contract_review": true
+    },
+    "lifetimes": [
+      {
+        "lifetime": "input preparation through layer 0 read",
+        "object": "token/position embedding row",
+        "reuse": "release after input row is materialized"
+      },
+      {
+        "lifetime": "current layer only",
+        "object": "layer input/output hidden state",
+        "reuse": "ping-pong two hidden buffers across layers"
+      },
+      {
+        "lifetime": "entire prefill/decode session",
+        "object": "layer-specific K/V",
+        "reuse": "never alias another layer or temporary tensor"
+      },
+      {
+        "lifetime": "current layer attention only",
+        "object": "Q/K/V projection and attention scratch",
+        "reuse": "reuse one scratch region after each consumer completion"
+      },
+      {
+        "lifetime": "current FFN tile",
+        "object": "FFN up/GELU tile",
+        "reuse": "stream/tile and release before next layer"
+      },
+      {
+        "lifetime": "last consuming descriptor in current layer",
+        "object": "layer dense weight tile",
+        "reuse": "DMA stream next layer into same region after completion fence"
+      },
+      {
+        "lifetime": "after layer 3 residual output",
+        "object": "final LN and logits",
+        "reuse": "final LN buffer then 256 INT32 logits"
+      }
+    ],
+    "naive_four_layer_high_water_estimate_bytes": 136720,
+    "persistent_layer_kv_bytes_context16": 8192,
+    "product_scratchpad_bytes": 131072
+  },
+  "model": {
+    "context": 16,
+    "ffn": 256,
+    "head_dim": 16,
+    "heads": 4,
+    "hidden": 64,
+    "kind": "deterministic synthetic weights; not pretrained GPT-2",
+    "layers": 4,
+    "seed": 20261116,
+    "tensor_manifest": {
+      "embedding": {
+        "bytes": 16384,
+        "dtype": "int8",
+        "sha256": "fab153a74dcc0be6dc20fd6aa4405da5b96349bfafb75d461784fc1025c31f8c",
+        "shape": [
+          256,
+          64
+        ]
+      },
+      "final_beta": {
+        "bytes": 256,
+        "dtype": "int32",
+        "sha256": "5341e6b2646979a70e57653007a1f310169421ec9bdd9f1a5648f75ade005af1",
+        "shape": [
+          64
+        ]
+      },
+      "final_gamma": {
+        "bytes": 64,
+        "dtype": "int8",
+        "sha256": "b75ac301cf625a0ddafd562bc337759f4415a841c858abd5f7675d9627ae2a3a",
+        "shape": [
+          64
+        ]
+      },
+      "l0.down": {
+        "bytes": 16384,
+        "dtype": "int8",
+        "sha256": "b03ff783abe309aae5102ad8f5beecfb70314071e77a9be8a6fab3f7cedb7240",
+        "shape": [
+          256,
+          64
+        ]
+      },
+      "l0.k": {
+        "bytes": 4096,
+        "dtype": "int8",
+        "sha256": "932705e37f534bb0e8ed3a205a9d55e4949072965f5b26a945bf136e82bd48ea",
+        "shape": [
+          64,
+          64
+        ]
+      },
+      "l0.ln1_beta": {
+        "bytes": 256,
+        "dtype": "int32",
+        "sha256": "5341e6b2646979a70e57653007a1f310169421ec9bdd9f1a5648f75ade005af1",
+        "shape": [
+          64
+        ]
+      },
+      "l0.ln1_gamma": {
+        "bytes": 64,
+        "dtype": "int8",
+        "sha256": "461322e94e892e408cbcb61d282ca8e9532ae78f96e3a85cd7afb7d06c3453ab",
+        "shape": [
+          64
+        ]
+      },
+      "l0.ln2_beta": {
+        "bytes": 256,
+        "dtype": "int32",
+        "sha256": "5341e6b2646979a70e57653007a1f310169421ec9bdd9f1a5648f75ade005af1",
+        "shape": [
+          64
+        ]
+      },
+      "l0.ln2_gamma": {
+        "bytes": 64,
+        "dtype": "int8",
+        "sha256": "b3e394c58d7a9ab15ba8bccf908f67782b250f1f48d637fda075e7e6c65c3312",
+        "shape": [
+          64
+        ]
+      },
+      "l0.o": {
+        "bytes": 4096,
+        "dtype": "int8",
+        "sha256": "57c92b1197538ad95c7729e13773cfa0f76932197dfd02ad4bbbc5c5451b1279",
+        "shape": [
+          64,
+          64
+        ]
+      },
+      "l0.q": {
+        "bytes": 4096,
+        "dtype": "int8",
+        "sha256": "4012cb07e4eaf7e84f74315d41fa12d4ec295c7c48b5e74a78eb77249249c199",
+        "shape": [
+          64,
+          64
+        ]
+      },
+      "l0.up": {
+        "bytes": 16384,
+        "dtype": "int8",
+        "sha256": "8dcec2248c0ded76e0f4208619067e662e5d89e73b67e85635ab0592f8a81481",
+        "shape": [
+          64,
+          256
+        ]
+      },
+      "l0.v": {
+        "bytes": 4096,
+        "dtype": "int8",
+        "sha256": "ce818780815e9efbcd461c53ace0c42bde5f2372a72bfc620d0719e36f2d2d76",
+        "shape": [
+          64,
+          64
+        ]
+      },
+      "l1.down": {
+        "bytes": 16384,
+        "dtype": "int8",
+        "sha256": "e055a63fc951518bbda6493da43e0cc7827ff0c401c2b3adee0a3c1f790d8aff",
+        "shape": [
+          256,
+          64
+        ]
+      },
+      "l1.k": {
+        "bytes": 4096,
+        "dtype": "int8",
+        "sha256": "69601f74e3361ff4bbe9035910ee85a5f1f4b56da9e3ab0a5d3f5603c29064ee",
+        "shape": [
+          64,
+          64
+        ]
+      },
+      "l1.ln1_beta": {
+        "bytes": 256,
+        "dtype": "int32",
+        "sha256": "5341e6b2646979a70e57653007a1f310169421ec9bdd9f1a5648f75ade005af1",
+        "shape": [
+          64
+        ]
+      },
+      "l1.ln1_gamma": {
+        "bytes": 64,
+        "dtype": "int8",
+        "sha256": "29120b6735b25ca27b53e9b40c83ea7f0eea1c6e614babdc8d1c7a43e7934cbb",
+        "shape": [
+          64
+        ]
+      },
+      "l1.ln2_beta": {
+        "bytes": 256,
+        "dtype": "int32",
+        "sha256": "5341e6b2646979a70e57653007a1f310169421ec9bdd9f1a5648f75ade005af1",
+        "shape": [
+          64
+        ]
+      },
+      "l1.ln2_gamma": {
+        "bytes": 64,
+        "dtype": "int8",
+        "sha256": "3a14a5fb8de86592ad7361b3d8e3c65e9232b52d901294951fd6ef88bf4be6be",
+        "shape": [
+          64
+        ]
+      },
+      "l1.o": {
+        "bytes": 4096,
+        "dtype": "int8",
+        "sha256": "1e4b572ddc52fb50410f7248727e6ec383818917453306bf95862bb79108f498",
+        "shape": [
+          64,
+          64
+        ]
+      },
+      "l1.q": {
+        "bytes": 4096,
+        "dtype": "int8",
+        "sha256": "3b0b17ed068349318ba07c916d513da1b83500e76458b846d9c22528c86a2320",
+        "shape": [
+          64,
+          64
+        ]
+      },
+      "l1.up": {
+        "bytes": 16384,
+        "dtype": "int8",
+        "sha256": "580a57e6f5f2e7f167348ad26cc7eafb90d3bb08bdaf859ea6675ba0e082ea32",
+        "shape": [
+          64,
+          256
+        ]
+      },
+      "l1.v": {
+        "bytes": 4096,
+        "dtype": "int8",
+        "sha256": "0810e899eaa1259c27c75a9795bdaa86f9579190f1859cbf5f22e70c181d7959",
+        "shape": [
+          64,
+          64
+        ]
+      },
+      "l2.down": {
+        "bytes": 16384,
+        "dtype": "int8",
+        "sha256": "0d5b6e61b15c3c23f717ee83c5b5c669ff1930cef1312c3ebf665f15050c151e",
+        "shape": [
+          256,
+          64
+        ]
+      },
+      "l2.k": {
+        "bytes": 4096,
+        "dtype": "int8",
+        "sha256": "06dd9f0017ac336b5688fcaebbc7211345dcdc20fc998e6504d0f618b81eebde",
+        "shape": [
+          64,
+          64
+        ]
+      },
+      "l2.ln1_beta": {
+        "bytes": 256,
+        "dtype": "int32",
+        "sha256": "5341e6b2646979a70e57653007a1f310169421ec9bdd9f1a5648f75ade005af1",
+        "shape": [
+          64
+        ]
+      },
+      "l2.ln1_gamma": {
+        "bytes": 64,
+        "dtype": "int8",
+        "sha256": "3241f61fce11068ff86b88cff52ae7ca5f13e4ecddb0e66baf796bd595ca0035",
+        "shape": [
+          64
+        ]
+      },
+      "l2.ln2_beta": {
+        "bytes": 256,
+        "dtype": "int32",
+        "sha256": "5341e6b2646979a70e57653007a1f310169421ec9bdd9f1a5648f75ade005af1",
+        "shape": [
+          64
+        ]
+      },
+      "l2.ln2_gamma": {
+        "bytes": 64,
+        "dtype": "int8",
+        "sha256": "98de8539f3487acf6c8b28cc180932a8a494a080bdea6f4881179450ce675ee7",
+        "shape": [
+          64
+        ]
+      },
+      "l2.o": {
+        "bytes": 4096,
+        "dtype": "int8",
+        "sha256": "3359bdd7ad000757ed00ac28217ca7fa160010aa305ba3996125d8d197eedc7c",
+        "shape": [
+          64,
+          64
+        ]
+      },
+      "l2.q": {
+        "bytes": 4096,
+        "dtype": "int8",
+        "sha256": "c6c7953777df68bfc3d364d17b9a9c1acdd6b4226763cae4c85f1ca868127d24",
+        "shape": [
+          64,
+          64
+        ]
+      },
+      "l2.up": {
+        "bytes": 16384,
+        "dtype": "int8",
+        "sha256": "355b0ef125970f9102d9d64838292c89439bf4bf0083db6d367a5c783a4f99d2",
+        "shape": [
+          64,
+          256
+        ]
+      },
+      "l2.v": {
+        "bytes": 4096,
+        "dtype": "int8",
+        "sha256": "96d3b388ffd02752571189419a18ce127d5cc358acf325b4de91103152883eef",
+        "shape": [
+          64,
+          64
+        ]
+      },
+      "l3.down": {
+        "bytes": 16384,
+        "dtype": "int8",
+        "sha256": "433339ff8745286fa9b45d0d490f332de97c0a165d66f2530ccde4c3269c92b2",
+        "shape": [
+          256,
+          64
+        ]
+      },
+      "l3.k": {
+        "bytes": 4096,
+        "dtype": "int8",
+        "sha256": "4bde3e082d81516c9c8e8772acea27197b02453ba7d88818b6bff02e1814f584",
+        "shape": [
+          64,
+          64
+        ]
+      },
+      "l3.ln1_beta": {
+        "bytes": 256,
+        "dtype": "int32",
+        "sha256": "5341e6b2646979a70e57653007a1f310169421ec9bdd9f1a5648f75ade005af1",
+        "shape": [
+          64
+        ]
+      },
+      "l3.ln1_gamma": {
+        "bytes": 64,
+        "dtype": "int8",
+        "sha256": "6907532a5a56fe6e7856876983649687dad6afc907c58ce001ea9ff21f5fe55f",
+        "shape": [
+          64
+        ]
+      },
+      "l3.ln2_beta": {
+        "bytes": 256,
+        "dtype": "int32",
+        "sha256": "5341e6b2646979a70e57653007a1f310169421ec9bdd9f1a5648f75ade005af1",
+        "shape": [
+          64
+        ]
+      },
+      "l3.ln2_gamma": {
+        "bytes": 64,
+        "dtype": "int8",
+        "sha256": "d0826e4007f7fb5caffa5a9ed146e83616ab2473f7e9a7ee3da4eadda4ad21c5",
+        "shape": [
+          64
+        ]
+      },
+      "l3.o": {
+        "bytes": 4096,
+        "dtype": "int8",
+        "sha256": "40e3e4c434febf91b26690f56c3042c9addb1caf26b9f9287052071c743311d1",
+        "shape": [
+          64,
+          64
+        ]
+      },
+      "l3.q": {
+        "bytes": 4096,
+        "dtype": "int8",
+        "sha256": "3d8bac3488672e24234f592dfbb80acef7c2c44131d4f81f1aff1bf6b8745564",
+        "shape": [
+          64,
+          64
+        ]
+      },
+      "l3.up": {
+        "bytes": 16384,
+        "dtype": "int8",
+        "sha256": "23d1ba85a7b3c4002cfe105500d555d2f2d9d65d736ed3152592727cc658f8da",
+        "shape": [
+          64,
+          256
+        ]
+      },
+      "l3.v": {
+        "bytes": 4096,
+        "dtype": "int8",
+        "sha256": "78c1ac941f418ad95002749edc1aafa2a6be76a35c25daa71392f59e6f7df077",
+        "shape": [
+          64,
+          64
+        ]
+      },
+      "lm_head": {
+        "bytes": 16384,
+        "dtype": "int8",
+        "sha256": "6804549a3658bff1e4d1682891b1474291cde2cb0b37773e1dbbbe53cd10ac73",
+        "shape": [
+          64,
+          256
+        ]
+      },
+      "position": {
+        "bytes": 1024,
+        "dtype": "int8",
+        "sha256": "4e9ba543c481688a1e3a85d321c55e9b90b732d72200a1c719c43f0479435baf",
+        "shape": [
+          16,
+          64
+        ]
+      }
+    },
+    "total_serialized_parameter_bytes": 233280,
+    "vocab": 256
+  },
+  "model_quality": "NOT_MEASURED; current H64 reference uses deterministic pseudo weights",
+  "rtl_execution": "NOT_RUN",
+  "status": "STATIC_EXECUTION_PLAN_NOT_RTL_RUN",
+  "weight_streaming": {
+    "dense_weight_bytes_per_layer": [
+      49152,
+      49152,
+      49152,
+      49152
+    ],
+    "dense_weight_total_bytes": 196608,
+    "dma_count_and_burst_plan": "NOT_GENERATED; requires runtime planner and Product Top address allocation",
+    "embedding_position_bytes": 17408,
+    "final_ln_lm_head_bytes": 16704,
+    "norm_parameter_bytes_per_layer": [
+      640,
+      640,
+      640,
+      640
+    ],
+    "policy": "load one layer's dense weights, fence, execute layer, then reuse weight region for next layer",
+    "serialized_model_bytes": 233280
+  }
+}

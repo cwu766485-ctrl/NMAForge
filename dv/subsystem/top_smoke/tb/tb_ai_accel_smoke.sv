@@ -2521,7 +2521,13 @@ module tb_ai_accel_smoke;
         end
     endtask
 
-    task run_h64_persistent_stage1;
+    task run_h64_persistent_stage;
+        input integer stage_number;
+        input integer token_position;
+        input integer cumulative_before;
+        output integer cumulative_after;
+        output integer stage_elapsed_cycles;
+        reg [1023:0] sequence_root;
         reg [1023:0] descriptor_file;
         reg [1023:0] input_file;
         reg [1023:0] cache_file;
@@ -2554,25 +2560,35 @@ module tb_ai_accel_smoke;
         integer index;
         integer word_index;
         integer pair_index;
+        integer mutation_head;
+        integer mutation_kind;
+        integer mutation_pair;
+        integer mutation_address;
         integer record_index;
         integer ring_slot;
         integer tail;
         integer start_cycle;
         integer end_cycle;
         begin
-            if (!$value$plusargs("AI_H64_PERSISTENT_STAGE1_DESC=%s", descriptor_file) ||
-                !$value$plusargs("AI_H64_PERSISTENT_STAGE1_INPUT=%s", input_file) ||
-                !$value$plusargs("AI_H64_PERSISTENT_STAGE0_CACHE=%s", cache_file) ||
-                !$value$plusargs("AI_H64_PERSISTENT_STAGE1_GOLDEN=%s", golden_file) ||
-                !$value$plusargs("AI_H64_PERSISTENT_STAGE1_CHECKPOINTS=%s", checkpoint_file) ||
-                !$value$plusargs("AI_REPRESENTATIVE_DESC_COUNT=%d", first_count) ||
+            if (!$value$plusargs("AI_H64_PERSISTENT_SEQUENCE_ROOT=%s", sequence_root) ||
                 !$value$plusargs("AI_REPRESENTATIVE_QUEUE_SIZE=%d", queue_size) ||
                 !$value$plusargs("AI_REPRESENTATIVE_DESC_BASE=%d", descriptor_base) ||
                 !$value$plusargs("AI_REPRESENTATIVE_CPL_BASE=%d", completion_base))
-                $fatal(1, "H64 persistent runtime requires both stage files and queue geometry");
+                $fatal(1, "H64 persistent runtime requires sequence directory and queue geometry");
+            $sformat(descriptor_file, "%0s/stage%0d/descriptors.memh",
+                     sequence_root, stage_number);
+            $sformat(input_file, "%0s/stage%0d/inputs.memh",
+                     sequence_root, stage_number);
+            $sformat(cache_file, "%0s/stage%0d/cache_before.memh",
+                     sequence_root, stage_number);
+            $sformat(golden_file, "%0s/stage%0d/model_golden.memh",
+                     sequence_root, stage_number);
+            $sformat(checkpoint_file, "%0s/stage%0d/checkpoint_golden.memh",
+                     sequence_root, stage_number);
+            first_count = cumulative_before % queue_size;
             $readmemh(cache_file, representative_image_words);
             cache_count = representative_image_words[0];
-            if (cache_count != 512 || queue_size != 256 || first_count >= queue_size)
+            if (cache_count != 512 || queue_size != 256)
                 $fatal(1, "H64 persistent cache/queue geometry invalid");
             for (pair_index = 0; pair_index < cache_count; pair_index = pair_index + 1) begin
                 runtime_read_word_retry(
@@ -2585,13 +2601,32 @@ module tb_ai_accel_smoke;
             end
             $display("H64_PERSISTENT_KV_BEFORE_PASS words=%0d method=axi_lite", cache_count);
             if ($test$plusargs("AI_H64_PERSISTENT_CORRUPT_CACHE")) begin
-                runtime_read_word_retry(SPAD_BASE + representative_image_words[1],
+                mutation_head = 0;
+                mutation_kind = 0;
+                if ($value$plusargs("AI_H64_PERSISTENT_CORRUPT_CACHE_HEAD=%d",
+                                    mutation_head) &&
+                    (mutation_head < 0 || mutation_head > 3))
+                    $fatal(1, "H64 persistent mutation head must be 0..3");
+                if ($value$plusargs("AI_H64_PERSISTENT_CORRUPT_CACHE_KIND=%d",
+                                    mutation_kind) &&
+                    (mutation_kind < 0 || mutation_kind > 1))
+                    $fatal(1, "H64 persistent mutation kind must be 0(K)/1(V)");
+                mutation_address = representative_image_words[1] +
+                                   mutation_kind * 'h400 + mutation_head * 'h100;
+                mutation_pair = -1;
+                for (pair_index = 0; pair_index < cache_count; pair_index = pair_index + 1)
+                    if (representative_image_words[1 + pair_index * 2] == mutation_address)
+                        mutation_pair = pair_index;
+                if (mutation_pair < 0)
+                    $fatal(1, "H64 persistent mutation address absent from cache map addr=%08h",
+                           mutation_address);
+                runtime_read_word_retry(SPAD_BASE + mutation_address,
                                         read_value, read_ok);
                 if (!read_ok)
                     $fatal(1, "H64 persistent negative control cache read failed");
-                axi_write(SPAD_BASE + representative_image_words[1], read_value ^ 32'h00000001);
-                $display("H64_PERSISTENT_KV_MUTATION_INJECTED addr=%08h",
-                         representative_image_words[1]);
+                axi_write(SPAD_BASE + mutation_address, read_value ^ 32'h00000001);
+                $display("H64_PERSISTENT_KV_MUTATION_INJECTED head=%0d kind=%0d addr=%08h",
+                         mutation_head, mutation_kind, mutation_address);
             end
 
             $readmemh(input_file, representative_image_words);
@@ -2601,8 +2636,8 @@ module tb_ai_accel_smoke;
             for (pair_index = 0; pair_index < input_count; pair_index = pair_index + 1)
                 axi_write(SPAD_BASE + representative_image_words[1 + pair_index * 2],
                           representative_image_words[2 + pair_index * 2]);
-            $display("H64_PERSISTENT_TOKEN_INPUT_PUBLISHED token=1 fixture_words=%0d host_intermediate_words=0 host_kv_words=0",
-                     input_count);
+            $display("H64_PERSISTENT_TOKEN_INPUT_PUBLISHED token=%0d fixture_words=%0d host_intermediate_words=0 host_kv_words=0",
+                     token_position, input_count);
             // Reuse the identical AXI4 model-weight payload/plan loaded for
             // stage0. Compaction can reclaim a weight address after its last
             // consumer, so restore weights before publishing stage1 work.
@@ -2622,8 +2657,8 @@ module tb_ai_accel_smoke;
                     $fatal(1, "H64 stage1 weight DMA fence failed transaction=%0d",
                            dma_index);
             end
-            $display("H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=1 transactions=%0d",
-                     dma_count);
+            $display("H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=%0d transactions=%0d",
+                     token_position, dma_count);
             $readmemh(descriptor_file, h64_persistent_descriptor_words);
             second_count = h64_persistent_descriptor_words[0];
             if (second_count <= 0 || second_count > 255 ||
@@ -2730,12 +2765,15 @@ module tb_ai_accel_smoke;
             end
             axi_read(REG_CMDQ_HEAD, cmd_head);
             axi_read(REG_CPLQ_TAIL, cpl_tail);
-            if (cmd_head != (first_count + second_count) % queue_size ||
+            if (cmd_head != (cumulative_before + second_count) % queue_size ||
                 cpl_tail != cmd_head)
                 $fatal(1, "H64 persistent final ring mismatch cmd=%0d cpl=%0d",
                        cmd_head, cpl_tail);
-            $display("H64_PERSISTENT_TWO_TOKEN_PASS stage0_desc=%0d stage1_desc=%0d stage1_cycles=%0d cache_words=%0d checkpoints=%0d final_golden_words=%0d cmdq_wrap=1 cplq_wrap=1 reset_events=0 host_intermediate_words=0",
-                     first_count, second_count, end_cycle - start_cycle,
+            cumulative_after = cumulative_before + second_count;
+            stage_elapsed_cycles = end_cycle - start_cycle;
+            $display("H64_PERSISTENT_STAGE_PASS stage=%0d previous_publications=%0d stage_desc=%0d cumulative_publications=%0d stage_cycles=%0d cache_words=%0d checkpoints=%0d final_golden_words=%0d reset_events=0 host_intermediate_words=0",
+                     stage_number, cumulative_before, second_count, cumulative_after,
+                     stage_elapsed_cycles,
                      cache_count, checkpoint_count, golden_count);
         end
     endtask
@@ -5870,6 +5908,13 @@ module tb_ai_accel_smoke;
         integer pair_engine_b;
         integer pair_index;
         integer pair_setup_i;
+        integer persistent_stage_count;
+        integer persistent_stage;
+        integer persistent_prefill_tokens;
+        integer persistent_publications;
+        integer persistent_after;
+        integer persistent_stage_cycles;
+        integer persistent_total_cycles;
         errors = 0;
         seed_arg = 20261014;
         profile_ai_seed = 0;
@@ -5914,8 +5959,36 @@ module tb_ai_accel_smoke;
 
         if ($test$plusargs("AI_REPRESENTATIVE_MODEL")) begin
             run_representative_model();
-            if ($test$plusargs("AI_H64_PERSISTENT"))
-                run_h64_persistent_stage1();
+            if ($test$plusargs("AI_H64_PERSISTENT")) begin
+                if (!$value$plusargs("AI_H64_PERSISTENT_STAGE_COUNT=%d",
+                                     persistent_stage_count) ||
+                    !$value$plusargs("AI_REPRESENTATIVE_DESC_COUNT=%d",
+                                     persistent_publications) ||
+                    !$value$plusargs("AI_H64_PERSISTENT_PREFILL_TOKENS=%d",
+                                     persistent_prefill_tokens))
+                    $fatal(1, "H64 persistent run requires stage count, prefill tokens and descriptor count");
+                persistent_total_cycles = 0;
+                for (persistent_stage = 1;
+                     persistent_stage <= persistent_stage_count;
+                     persistent_stage = persistent_stage + 1) begin
+                    run_h64_persistent_stage(persistent_stage,
+                                             persistent_prefill_tokens +
+                                                 persistent_stage - 1,
+                                             persistent_publications,
+                                             persistent_after,
+                                             persistent_stage_cycles);
+                    persistent_publications = persistent_after;
+                    persistent_total_cycles = persistent_total_cycles +
+                                              persistent_stage_cycles;
+                end
+                if (persistent_stage_count == 1)
+                    $display("H64_PERSISTENT_TWO_TOKEN_PASS total_publications=%0d decode_stage_cycles=%0d reset_events=0",
+                             persistent_publications, persistent_total_cycles);
+                else
+                    $display("H64_PERSISTENT_SEQUENCE_PASS appended_stages=%0d total_publications=%0d decode_stage_cycles=%0d reset_events=0",
+                             persistent_stage_count, persistent_publications,
+                             persistent_total_cycles);
+            end
             $finish;
         end
 
