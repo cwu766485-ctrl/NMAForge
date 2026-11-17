@@ -1,0 +1,57 @@
+{
+  "status": "FOUR_LAYER_TOP_AUTOREGRESSIVE_GOLDEN_PASS",
+  "mode": "four_layer_prefix_recompute_same_top_instance",
+  "seed": 20261125,
+  "synthetic_model_quality_claim": false,
+  "prompt_tokens": [
+    1,
+    7,
+    42,
+    3
+  ],
+  "generated_tokens": [
+    10,
+    10,
+    65,
+    82
+  ],
+  "contexts": [
+    {
+      "context": 0,
+      "row": 3,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 10,
+      "logits_sha256_le_i32": "80ce648f8036829dc7b06695e028711db1f3aadc8d13640a381615cafaa227a1",
+      "rtl_dump": "benchmark/gpt2_quality/results/round25/product_top/rtl_logits_context0.csv"
+    },
+    {
+      "context": 1,
+      "row": 4,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 10,
+      "logits_sha256_le_i32": "ffec8cd45be7ab578528a78873e4940b236ded5f6c96be40ffab32f5fd4d35ff",
+      "rtl_dump": "benchmark/gpt2_quality/results/round25/product_top/rtl_logits_context1.csv"
+    },
+    {
+      "context": 2,
+      "row": 5,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 65,
+      "logits_sha256_le_i32": "38445ccb6d84057a19e20a3fb84a5b066ba0c6e16ae66fc9a834b7dc99a082f3",
+      "rtl_dump": "benchmark/gpt2_quality/results/round25/product_top/rtl_logits_context2.csv"
+    },
+    {
+      "context": 3,
+      "row": 6,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 82,
+      "logits_sha256_le_i32": "87ab6e666c6de8e19182b7e1b8bfc82ec1759ad7b7685ab597e7639a0c1a140a",
+      "rtl_dump": "benchmark/gpt2_quality/results/round25/product_top/rtl_logits_context3.csv"
+    }
+  ],
+  "source_sha": "recorded by the enclosing run manifest"
+}
