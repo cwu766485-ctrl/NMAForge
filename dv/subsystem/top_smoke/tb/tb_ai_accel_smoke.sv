@@ -164,6 +164,7 @@ module tb_ai_accel_smoke;
     localparam ERR_PROTECTION    = 4'd6;
 
     reg         aclk;
+    integer ai_deit_av_trace_row;
     reg         aresetn;
     reg  [31:0] s_axi_awaddr;
     reg         s_axi_awvalid;
@@ -608,6 +609,78 @@ module tb_ai_accel_smoke;
     integer transformer_top_profile_cycle;
     reg transformer_top_timing_enable = 1'b0;
     reg transformer_top_prefill_captured = 1'b0;
+
+    // Optional, read-only trace for the Round-24 DeiT AV matrix failure.
+    // It captures the actual controller-selected operands and accumulators;
+    // no DUT signal is forced and the trace is disabled in normal regressions.
+    always @(posedge aclk) begin
+        if ($test$plusargs("AI_DEIT_AV_TRACE") &&
+            dut.compute_cluster_u.tensor_matrix_u.state_r == 4'd8 &&
+            dut.compute_cluster_u.tensor_matrix_u.dst_tile_base_r == 32'h0002_8000 &&
+            dut.compute_cluster_u.tensor_matrix_u.k_group_r == 16'd0) begin
+            $display("DEIT_AV_TRACE lane=%0d bank=%0d A=%h B=%h nextA=%h nextB=%h",
+                dut.compute_cluster_u.tensor_matrix_u.lane_r,
+                dut.compute_cluster_u.tensor_matrix_u.lane_r[0],
+                dut.compute_cluster_u.tensor_matrix_u.mac_array_u.operand_a_buffer[
+                    dut.compute_cluster_u.tensor_matrix_u.lane_r[0]],
+                dut.compute_cluster_u.tensor_matrix_u.mac_array_u.operand_b_buffer[
+                    dut.compute_cluster_u.tensor_matrix_u.lane_r[0]],
+                dut.compute_cluster_u.tensor_matrix_u.array_load_a,
+                dut.compute_cluster_u.tensor_matrix_u.array_load_b);
+            for (ai_deit_av_trace_row = 0; ai_deit_av_trace_row < 16;
+                 ai_deit_av_trace_row = ai_deit_av_trace_row + 1) begin
+                $display("DEIT_AV_ROW lane=%0d row=%0d a=%0d acc=%0d",
+                    dut.compute_cluster_u.tensor_matrix_u.lane_r,
+                    ai_deit_av_trace_row,
+                    $signed(dut.compute_cluster_u.tensor_matrix_u.mac_array_u.operand_a_buffer[
+                        dut.compute_cluster_u.tensor_matrix_u.lane_r[0]][ai_deit_av_trace_row*8 +: 8]),
+                    dut.compute_cluster_u.tensor_matrix_u.mac_array_u.accumulator[
+                        ai_deit_av_trace_row*16]);
+            end
+        end
+        if ($test$plusargs("AI_DEIT_AV_TRACE") &&
+            dut.compute_cluster_u.tensor_matrix_u.dst_tile_base_r == 32'h0002_8000 &&
+            dut.matrix_banked_read_valid && dut.arb_banked_ready) begin
+            $display("DEIT_AV_REQ state=%0d group=%0d k=%0d addr=%08h arb=%08h arbv=%0d abase=%08h bbase=%08h rsp=%0d outstanding=%0d",
+                dut.compute_cluster_u.tensor_matrix_u.state_r,
+                dut.compute_cluster_u.tensor_matrix_u.read_group_r,
+                dut.compute_cluster_u.tensor_matrix_u.k_group_r,
+                dut.matrix_banked_read_addr,
+                dut.arb_banked_addr, dut.arb_banked_valid,
+                dut.compute_cluster_u.tensor_matrix_u.a_tile_base_r,
+                dut.compute_cluster_u.tensor_matrix_u.b_tile_base_r,
+                dut.banked_rsp_valid,
+                dut.compute_cluster_u.tensor_matrix_u.read_outstanding_count);
+            $display("DEIT_AV_MEM row=%0d words=%08h_%08h_%08h_%08h",
+                dut.matrix_banked_read_addr[17:4],
+                dut.spad_subsystem_u.scratchpad_u.bank3[
+                    dut.matrix_banked_read_addr[17:4]],
+                dut.spad_subsystem_u.scratchpad_u.bank2[
+                    dut.matrix_banked_read_addr[17:4]],
+                dut.spad_subsystem_u.scratchpad_u.bank1[
+                    dut.matrix_banked_read_addr[17:4]],
+                dut.spad_subsystem_u.scratchpad_u.bank0[
+                    dut.matrix_banked_read_addr[17:4]]);
+        end
+        if ($test$plusargs("AI_DEIT_AV_TRACE") && dut.banked_rsp_valid &&
+            dut.compute_cluster_u.tensor_matrix_u.dst_tile_base_r == 32'h0002_8000) begin
+            $display("DEIT_AV_RSP state=%0d meta=%h group=%0d k=%0d req=%08h data=%08h_%08h_%08h_%08h raw=%08h_%08h_%08h_%08h",
+                dut.compute_cluster_u.tensor_matrix_u.state_r,
+                dut.compute_cluster_u.tensor_matrix_u.response_meta,
+                dut.compute_cluster_u.tensor_matrix_u.response_group,
+                dut.compute_cluster_u.tensor_matrix_u.response_k_group,
+                dut.compute_cluster_u.tensor_matrix_u.response_request_addr,
+                dut.banked_data3, dut.banked_data2, dut.banked_data1, dut.banked_data0,
+                dut.spad_subsystem_u.scratchpad_u.bank3[
+                    dut.compute_cluster_u.tensor_matrix_u.response_request_addr[17:4]],
+                dut.spad_subsystem_u.scratchpad_u.bank2[
+                    dut.compute_cluster_u.tensor_matrix_u.response_request_addr[17:4]],
+                dut.spad_subsystem_u.scratchpad_u.bank1[
+                    dut.compute_cluster_u.tensor_matrix_u.response_request_addr[17:4]],
+                dut.spad_subsystem_u.scratchpad_u.bank0[
+                    dut.compute_cluster_u.tensor_matrix_u.response_request_addr[17:4]]);
+        end
+    end
     reg transformer_top_final_captured = 1'b0;
     integer transformer_spad_read_bytes = 0;
     integer transformer_spad_write_bytes = 0;
@@ -6135,6 +6208,18 @@ module tb_ai_accel_smoke;
             if (have_checkpoints && checkpoint_retired != descriptor_count)
                 $fatal(1, "checkpoint completion monitor ended early retired=%0d expected=%0d",
                        checkpoint_retired, descriptor_count);
+
+            if ($test$plusargs("AI_DEIT_AV_TRACE") && descriptor_count == 241) begin
+                $display("DEIT_PACK_BANKS row=7168 b3=%08h b2=%08h b1=%08h b0=%08h axi=%08h_%08h_%08h_%08h",
+                    dut.spad_subsystem_u.scratchpad_u.bank3[7168],
+                    dut.spad_subsystem_u.scratchpad_u.bank2[7168],
+                    dut.spad_subsystem_u.scratchpad_u.bank1[7168],
+                    dut.spad_subsystem_u.scratchpad_u.bank0[7168],
+                    representative_spad_backdoor_read(32'h0001_c00c),
+                    representative_spad_backdoor_read(32'h0001_c008),
+                    representative_spad_backdoor_read(32'h0001_c004),
+                    representative_spad_backdoor_read(32'h0001_c000));
+            end
 
             sys_completed=transformer_top_final_end_cycle;
             late_dma_readback_start = transformer_top_cycle_counter;
