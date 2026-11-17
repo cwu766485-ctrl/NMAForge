@@ -1,0 +1,21 @@
+{
+  "abi_profile": "round21_residual_gelu_aligned",
+  "zero_point": 0,
+  "formats": {
+    "embedding_and_position": {"storage": "signed INT8", "format": "Q3", "scale": 8, "rounding": "round-even in exporter", "saturation": "[-128,127]"},
+    "qkv_and_projection_weights": {"storage": "signed INT8", "format": "Q5", "scale": 32, "saturation": "[-128,127]"},
+    "qkv_output": {"storage": "signed INT8", "format": "Q5", "gemm_shift": 0},
+    "attention_score": {"storage": "signed INT32", "format": "Q8.8", "gemm_shift": 2, "standard_inverse_sqrt_head_dim": false},
+    "softmax_probability": {"storage": "unsigned integer", "format": "Q15", "av_operand": "probability >> 8 (Q7)"},
+    "output_projection_and_residual": {"storage": "signed INT32", "format": "Q3", "output_projection_shift": 7, "residual1_requant_shift": 0},
+    "layernorm_gamma": {"storage": "signed INT32", "format": "Q5", "scale": 32},
+    "layernorm_beta_package": {"storage": "signed INT32", "format": "Q3 package units", "product_divisor": 8},
+    "ffn_up_weight": {"storage": "signed INT8", "format": "Q8.8", "scale": 256},
+    "ffn_up_accumulator": {"storage": "signed INT32", "format": "Q8.8", "requant_shift": 0},
+    "gelu": {"contract": "Product piecewise integer GELU in Q8.8", "gelu_to_int8_shift": 5},
+    "ffn_down_weight": {"storage": "signed INT8", "format": "Q5", "scale": 32},
+    "ffn_down": {"contract": "16 K=16 tiles; each partial independently floor-requantized with shift 5 before summation", "residual2_format": "signed INT32 Q3"},
+    "final_logits": {"storage": "signed INT32", "format": "Q5", "software_dequant_scale": 32}
+  },
+  "training_approximation_note": "STE QAT emulates the above observable shifts/saturation. Its PyTorch LayerNorm is not bit-exact to Product integer LayerNorm; the independent integer reference and Top checks remain authoritative."
+}
