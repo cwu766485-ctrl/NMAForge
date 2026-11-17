@@ -62,5 +62,16 @@
     "late_dma_plan": "workload/late_dma_plan.memh",
     "golden": "workload/model_golden.memh",
     "memory_image": "workload/model_memory.memh"
+  },
+  "independent_compatibility_regression": {
+    "status": "PASS",
+    "command": "cd dv/subsystem/top_smoke/sim && make ai_smoke VCS=/opt/Synopsys/vcs/V-2023.12-SP1/bin/vcs",
+    "random_cases": 4,
+    "ai_seed": 12345,
+    "ntb_random_seed": 1794901328,
+    "kdb_elaboration": "0 errors, 0 warnings",
+    "compile_log": "logs/deit_default_smoke_compile.log.gz",
+    "run_log": "logs/deit_default_smoke_run.log.gz",
+    "simulator": "Synopsys VCS V-2023.12-SP1_Full64"
   }
 }

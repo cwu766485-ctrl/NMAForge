@@ -62,3 +62,9 @@ Product Top run (using the existing Round 21 compiled Top testbench executable):
 ```
 
 VCS was `V-2023.12-SP1_Full64`; the compiled testbench's full compile log and this run's full log/console are preserved in compressed form. Compile/elaboration completed; the test itself failed at the descriptor above. No new Product RTL or ABI behavior was introduced.
+
+## Independent compatibility regression
+
+After archiving the focused failure, the unchanged Product RTL also passed the default top smoke in this worktree:
+`cd dv/subsystem/top_smoke/sim && make ai_smoke VCS=/opt/Synopsys/vcs/V-2023.12-SP1/bin/vcs`.
+VCS KDB elaboration reported 0 errors / 0 warnings; the run reported `TEST PASS` for 4 random cases (`AI_SEED=12345`, `ntb_random_seed=1794901328`). Full compile and run logs are archived as `evidence/logs/deit_default_smoke_compile.log.gz` and `evidence/logs/deit_default_smoke_run.log.gz`. This compatibility smoke does not change the focused DeiT result above: LayerNorm row 197 remains the first failure, with QKV and Attention not run.
