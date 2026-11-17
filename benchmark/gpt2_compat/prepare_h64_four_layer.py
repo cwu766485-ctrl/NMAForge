@@ -311,7 +311,8 @@ def remap_dma(run_dir: Path, manifest: dict, plan_records: list[dict],
 
 
 def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS,
-          model_override: dict | None = None) -> dict:
+          model_override: dict | None = None,
+          numeric_profile: str = "frozen") -> dict:
     if not tokens or len(tokens) > 16 or any(token < 0 or token > 255 for token in tokens):
         raise ValueError("four-layer Top prompt must contain 1..16 token IDs in [0,255]")
     out.mkdir(parents=True, exist_ok=False)
@@ -335,6 +336,7 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS,
             include_final_lm_head=(layer == LAYERS - 1),
             queue_slots_override=QUEUE_SLOTS,
             model_override=model_override,
+            numeric_profile=numeric_profile,
         )
         manifests.append(manifest)
         stage = out / f"stage{layer}"
@@ -580,6 +582,7 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS,
         "planning_base_sha": "995ba340e914d2264b24e1928bcfef09bd675ea3",
         "seed": seed, "tokens": tokens,
         "model_sha256": manifests[0]["canonical_model_sha256"],
+        "numeric_profile": numeric_profile,
         "spad_capacity_bytes": CAPACITY,
         "queue": {"entries": QUEUE_SLOTS, "descriptor_range": [desc_base, cpl_base],
                   "completion_range": [cpl_base, CAPACITY]},
@@ -621,6 +624,8 @@ def main() -> None:
                         help="comma-separated fixed prompt token IDs, 1..16 entries")
     parser.add_argument("--model-npz", type=Path,
                         help="canonical H64 model package; omit to use the synthetic regression model")
+    parser.add_argument("--numeric-profile", choices=("frozen", "round21_residual_gelu_aligned"),
+                        default="frozen", help="fixed-point projection/GELU contract")
     args = parser.parse_args()
     try:
         tokens = [int(item, 0) for item in args.tokens.split(",") if item]
@@ -630,7 +635,7 @@ def main() -> None:
     if args.model_npz is not None:
         with np.load(args.model_npz, allow_pickle=False) as archive:
             model_override = {name: archive[name] for name in archive.files}
-    build(args.out, args.seed, tokens, model_override)
+    build(args.out, args.seed, tokens, model_override, args.numeric_profile)
 
 
 if __name__ == "__main__":

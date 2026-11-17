@@ -1,0 +1,48 @@
+{
+  "status": "PRODUCT_TOP_AUTOREGRESSIVE_PASS_QUALITY_PARTIAL",
+  "run_id": "round22-gpt2-h64-four-layer-ar-seed20261121",
+  "tested_base_sha": "540a3fb465f6997c29b24ab72489d4095aa7c5ea",
+  "product_rtl_changed": false,
+  "model": {
+    "shape": "H64, 4 layers, 4 heads, FFN 256, byte vocabulary 256, context 16",
+    "source_checkpoint_sha256": "1d59cf803c328149add9ddb004766e63043b3babdb56ea178bf96d7a51fda8df",
+    "source_int8_package_sha256": "2132835994c2ecce03dc1d8e7345474eeddb271d86e34de9cc1f5ccdf2fecfc2",
+    "product_candidate_sha256": "765bfa29f545716f774c6d3ddbb7dc80106b75a5ebc40801075331d6040d3e3e",
+    "numeric_profile": "round21_residual_gelu_aligned"
+  },
+  "simulator": {
+    "name": "Synopsys VCS",
+    "version": "V-2023.12-SP1_Full64",
+    "compile_log": "logs/gpt2_candidate_top_compile.log.gz",
+    "run_log": "logs/gpt2_candidate_top_run.log.gz"
+  },
+  "settings": {
+    "seed": 20261121,
+    "prompt_tokens": [1, 7, 42, 3],
+    "generated_tokens": [32, 66, 117, 107],
+    "feedback_mode": "four-layer prefix recompute in the same Product Top simulation; zero reset events; no host intermediate tensors",
+    "measured_top_extension_cycles": 4338360,
+    "total_descriptor_publications": 4020,
+    "clock_period_ns": 10.0,
+    "host_argmax_tie_break": "lowest token ID"
+  },
+  "independent_logits_check": "product_top_independent_logits.json",
+  "quality_reference": {
+    "targets": 1024,
+    "candidate_int8_accuracy": 0.1631,
+    "fp32_accuracy_same_targets": 0.3740,
+    "candidate_cross_entropy_nats": 4.099,
+    "candidate_perplexity": 60.27,
+    "fp32_int8_top1_agreement": 0.2695,
+    "same_window_bigram_accuracy": 0.2920,
+    "status": "below bigram; no quality closure"
+  },
+  "default_top_smoke": {
+    "status": "PASS",
+    "command": "cd dv/subsystem/top_smoke/sim && make ai_smoke VCS=/opt/Synopsys/vcs/V-2023.12-SP1/bin/vcs",
+    "random_cases": 4,
+    "ai_seed": 12345,
+    "compile_log": "logs/gpt2_default_smoke_compile.log.gz",
+    "run_log": "logs/gpt2_default_smoke_run.log.gz"
+  }
+}

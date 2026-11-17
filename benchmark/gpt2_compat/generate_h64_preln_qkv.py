@@ -215,7 +215,10 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
              stream_norm_params: bool = False,
              include_final_lm_head: bool = False,
              queue_slots_override: int | None = None,
-             model_override: dict[str, np.ndarray] | None = None) -> dict:
+             model_override: dict[str, np.ndarray] | None = None,
+             numeric_profile: str = "frozen") -> dict:
+    if numeric_profile not in {"frozen", "round21_residual_gelu_aligned"}:
+        raise ValueError(f"unsupported numeric profile: {numeric_profile}")
     if include_ffn and not include_attention:
         raise ValueError("full H64 Decoder requires Attention")
     if include_kv_attention and (not include_ffn or include_kv_roundtrip):
@@ -299,9 +302,10 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
 
     if include_ffn:
         gamma_values = [int(value) * 1024 for value in layer_params["ln1_gamma"]]
-        beta_values = [int(value) for value in layer_params["ln1_beta"]]
+        beta_divisor = 8 if numeric_profile == "round21_residual_gelu_aligned" else 1
+        beta_values = [int(value) // beta_divisor for value in layer_params["ln1_beta"]]
         gamma2_values = [int(value) * 1024 for value in layer_params["ln2_gamma"]]
-        beta2_values = [int(value) for value in layer_params["ln2_beta"]]
+        beta2_values = [int(value) // beta_divisor for value in layer_params["ln2_beta"]]
     else:
         gamma_values = [32768] * HIDDEN
         beta_values = [0] * HIDDEN
@@ -688,8 +692,10 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                                  "row-major", [0xA55AA55A] * (ROWS * HIDDEN), False)
         mapper.add("attn_output_projection_n64", OP_GEMM,
                    merged_t, output_t, src1=output_weight_t,
-                   m=ROWS, n=HIDDEN, k_or_length=HIDDEN // 4, aux0=1)
-        output_result = gemm_i8_i32(merged_i8, output_weights)
+                   m=ROWS, n=HIDDEN, k_or_length=HIDDEN // 4,
+                   shift=(7 if numeric_profile == "round21_residual_gelu_aligned" else 0), aux0=1)
+        output_shift = 7 if numeric_profile == "round21_residual_gelu_aligned" else 0
+        output_result = gemm_i8_i32(merged_i8, output_weights, shift=output_shift)
         for row in range(ROWS):
             for col in range(HIDDEN):
                 attention_golden[output_t.addr + 4 * (row * HIDDEN + col)] = \
@@ -763,13 +769,14 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                        aux0=1)
             mapper.add(f"l0.ffn_gelu_n{tile}", OP_GELU, up_t, gelu_t,
                        m=ROWS, n=16, k_or_length=ROWS * 16, aux0=1)
+            gelu_shift = 5 if numeric_profile == "round21_residual_gelu_aligned" else 0
             mapper.add(f"l0.ffn_requant_pack_n{tile}", OP_REQUANT, gelu_t, out_t,
                        m=ROWS, n=16, k_or_length=ROWS * 16,
-                       flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1)
+                       flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=gelu_shift, aux0=1)
             up_values = gemm_i8_i32(ln2_i8, weight)
             gelu_values = [[gelu_q8_8(value) for value in row]
                            for row in up_values]
-            out_values = [[max(-128, min(127, int(value))) for value in row]
+            out_values = [[max(-128, min(127, int(value) >> gelu_shift)) for value in row]
                           for row in gelu_values]
             for row in range(ROWS):
                 for col in range(16):
@@ -799,9 +806,11 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                 "matrix_b_tile", _pack_matrix_b_physical(weight), True,
             )
             output_t = down_acc if tile == 0 else down_partial
+            down_shift = 5 if numeric_profile == "round21_residual_gelu_aligned" else 0
             mapper.add(f"l0.ffn_down_k{tile}", OP_GEMM, up_tiles[tile][0], output_t,
-                       src1=weight_t, m=ROWS, n=HIDDEN, k_or_length=4, aux0=1)
-            partial_values = gemm_i8_i32(up_i8_values[tile], weight)
+                       src1=weight_t, m=ROWS, n=HIDDEN, k_or_length=4,
+                       shift=down_shift, aux0=1)
+            partial_values = gemm_i8_i32(up_i8_values[tile], weight, shift=down_shift)
             last_partial_values = partial_values
             for row in range(ROWS):
                 for col in range(HIDDEN):
@@ -827,7 +836,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
         final_input = [[s32(ffn_golden[residual2_t.addr + 4 * (row * HIDDEN + col)])
                         for col in range(HIDDEN)] for row in range(ROWS)]
         final_gamma = [int(value) * 1024 for value in model["final_gamma"]]
-        final_beta = [int(value) for value in model["final_beta"]]
+        beta_divisor = 8 if numeric_profile == "round21_residual_gelu_aligned" else 1
+        final_beta = [int(value) // beta_divisor for value in model["final_beta"]]
         final_gamma_t = mapper.tensor("final_ln_gamma_q15_weight", (HIDDEN,), "i32",
                                       "row-major", final_gamma)
         final_beta_t = mapper.tensor("final_ln_beta_i32_weight", (HIDDEN,), "i32",
@@ -1182,6 +1192,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
         "input_hidden_sha256": (hashlib.sha256(np.asarray(input_hidden_i32, dtype=np.int32).tobytes()).hexdigest()
                                 if input_hidden_i32 is not None else None),
         "stream_norm_params": stream_norm_params, "descriptor_abi": "v7.4",
+        "numeric_profile": numeric_profile,
         "kv_append_from": kv_append_from,
         "canonical_model_file": "canonical_h64_model.npz" if include_ffn else None,
         "canonical_model_sha256": model_sha256,

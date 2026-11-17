@@ -99,14 +99,15 @@ def patch_cache_before(previous: Path, current: Path) -> None:
 
 
 def build_session(out: Path, seed: int, prompt: list[int], generated: int,
-                  model_override: dict | None = None) -> dict:
+                  model_override: dict | None = None,
+                  numeric_profile: str = "frozen") -> dict:
     if len(prompt) != 4 or generated < 1 or len(prompt) + generated > 16:
         raise ValueError("requires a four-token prompt and 1..12 generated tokens")
     if any(token < 0 or token > 255 for token in prompt):
         raise ValueError("token IDs must be in [0,255]")
     current_tokens = list(prompt)
     current_dir = out
-    current_manifest = build(current_dir, seed, current_tokens, model_override)
+    current_manifest = build(current_dir, seed, current_tokens, model_override, numeric_profile)
     raw_model = np.load(current_dir / "raw_layer0/canonical_h64_model.npz")
     embedding = raw_model["embedding"].astype(np.int32)
     position = raw_model["position"].astype(np.int32)
@@ -139,7 +140,7 @@ def build_session(out: Path, seed: int, prompt: list[int], generated: int,
             break
         current_tokens.append(selected)
         next_dir = out / f"context{step + 1}"
-        next_manifest = build(next_dir, seed, current_tokens, model_override)
+        next_manifest = build(next_dir, seed, current_tokens, model_override, numeric_profile)
         patch_cache_before(current_dir, next_dir)
         records[-1]["next_context"] = str(next_dir.relative_to(out))
         records[-1]["cache_before_sha256"] = {
@@ -157,6 +158,7 @@ def build_session(out: Path, seed: int, prompt: list[int], generated: int,
         "prompt_tokens": prompt,
         "expected_generated_tokens": generated_tokens,
         "model_sha256": current_manifest["model_sha256"],
+        "numeric_profile": numeric_profile,
         "generated_steps": records,
         "feedback_plan": feedback_path.name,
         "host_roles": ["read actual RTL logits", "signed INT32 argmax with lowest-ID tie break",
@@ -183,13 +185,16 @@ def main() -> None:
     parser.add_argument("--generated", type=int, default=4)
     parser.add_argument("--model-npz", type=Path,
                         help="optional canonical H64 model package; omit for synthetic regression")
+    parser.add_argument("--numeric-profile", choices=("frozen", "round21_residual_gelu_aligned"),
+                        default="frozen", help="fixed-point projection/GELU contract")
     args = parser.parse_args()
     prompt = [int(item, 0) for item in args.prompt.split(",") if item]
     model_override = None
     if args.model_npz is not None:
         with np.load(args.model_npz, allow_pickle=False) as archive:
             model_override = {name: archive[name] for name in archive.files}
-    build_session(args.out, args.seed, prompt, args.generated, model_override)
+    build_session(args.out, args.seed, prompt, args.generated, model_override,
+                  args.numeric_profile)
 
 
 if __name__ == "__main__":
