@@ -1,0 +1,61 @@
+{
+  "run_id": "R20-A-H64-TRAINED-BYTE-LM-AR-HOST-20261120",
+  "source_sha": "f7e65ed02b64dfd1faf49e7a9a25222f5b6bd560",
+  "rtl_tree_sha": "8798decc60fe257ef685a0b1c7e8814816e1d4de",
+  "test_tree_sha": "4baaa3ace96bd0dcbd5d715ba6f1c43bf14854f5",
+  "model_package_sha256": "2132835994c2ecce03dc1d8e7345474eeddb271d86e34de9cc1f5ccdf2fecfc2",
+  "seed": 20261120,
+  "prompt_tokens": [1, 7, 42, 3],
+  "generated_tokens": [107, 103, 32, 111],
+  "mode": "same_top_autoregressive_prefix_recompute",
+  "reset_events": 0,
+  "host_intermediate_tensor_words": 0,
+  "product_top_kv_readback_checked_between_contexts": true,
+  "command_cycles": {
+    "prompt_context": 1048740,
+    "generated_context_5": 1413702,
+    "generated_context_6": 1446042,
+    "generated_context_7": 1479012,
+    "total": 5387496,
+    "first_emitted_token_context": 1048740,
+    "mean_feedback_context_cycles": 1446252,
+    "mean_all_context_cycles_per_emitted_token_including_prompt": 1346874
+  },
+  "build_to_result_wall_seconds": 74.75,
+  "simulation_cpu_seconds": 53.89,
+  "build_wall_includes": ["workload_generation", "VCS_compile", "simulation", "Golden_verification"],
+  "build_wall_excludes": ["model_training", "corpus_download", "held_out_evaluation"],
+  "tool_versions": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "python": "3.12.13",
+    "numpy": "2.5.4",
+    "pytorch": "2.6.0+cpu"
+  },
+  "artifacts": {
+    "compile_log": {
+      "path": "/tmp/nmaforge_v12_r20_gpt2_host_complete/compile.log",
+      "sha256": "5fd8dc7dfc4bd771603239db829c48c84aa4adf96acfd94f24788f8bb24ab8fa"
+    },
+    "run_log": {
+      "path": "/tmp/nmaforge_v12_r20_gpt2_host_complete/run.log",
+      "sha256": "16533607b67396f0706b11cc328be65667916cab1fd4b53c084bd0a57f8027af"
+    },
+    "top_result": {
+      "path": "/tmp/nmaforge_v12_r20_gpt2_host_complete/autoregressive_result.json",
+      "sha256": "2ec78dc5cfb58111df6d65b7c2fc5c33f20f5f329256095713b64d6afa573d05"
+    },
+    "independent_integer_check": {
+      "path": "benchmark/gpt2_quality/results/round20_top_independent_integer_check.json",
+      "sha256": "6e41e9e15f8eb72eea63f02683f4fb58f55db18b736c61e6cce7ead80c143f16"
+    }
+  },
+  "gate_status": {
+    "trained_H64_package": "PASS",
+    "four_layer_product_top_logits": "PASS",
+    "same_top_feedback_prefix_recompute": "PASS",
+    "model_quality": "FAIL_QUALITY_BELOW_BIGRAM",
+    "query_only_incremental_KV_decode": "NOT_RUN",
+    "inference_only_host_to_host_latency": "PARTIAL_NOT_ISOLATED",
+    "matched_tinynpu_model_benchmark": "NOT_COMPARABLE"
+  }
+}

@@ -1,0 +1,586 @@
+{
+  "dataset": {
+    "name": "Tiny Shakespeare byte-level",
+    "sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+    "split": "first 90 percent train, final 10 percent held-out"
+  },
+  "evaluation": {
+    "prompt_length": 16,
+    "seed": 20261121,
+    "tokens": 1024,
+    "windows": 64
+  },
+  "integer_trace_stats": {
+    "final_ln": {
+      "max": 3,
+      "mean_abs": 0.890045166015625,
+      "min": -4,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l0.attention": {
+      "max": 58,
+      "mean_abs": 10.21881103515625,
+      "min": -57,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l0.down": {
+      "max": 769,
+      "mean_abs": 171.26063537597656,
+      "min": -871,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l0.gelu": {
+      "max": 25,
+      "mean_abs": 4.675548553466797,
+      "min": -24,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        262144
+      ]
+    },
+    "l0.k": {
+      "max": 122,
+      "mean_abs": 20.840362548828125,
+      "min": -122,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l0.ln1": {
+      "max": 4,
+      "mean_abs": 1.1467742919921875,
+      "min": -6,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l0.ln2": {
+      "max": 3,
+      "mean_abs": 0.893585205078125,
+      "min": -5,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l0.probabilities_q15": {
+      "max": 32768,
+      "mean_abs": 2047.7648315429688,
+      "min": 0,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l0.projection": {
+      "max": 854,
+      "mean_abs": 138.57611083984375,
+      "min": -952,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l0.q": {
+      "max": 120,
+      "mean_abs": 20.864242553710938,
+      "min": -112,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l0.residual1": {
+      "max": 859,
+      "mean_abs": 138.36236572265625,
+      "min": -950,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l0.residual2": {
+      "max": 1137,
+      "mean_abs": 222.29847717285156,
+      "min": -1140,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l0.scores": {
+      "max": 9930,
+      "mean_abs": 945.3587493896484,
+      "min": -8270,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l0.up": {
+      "max": 47,
+      "mean_abs": 9.33999252319336,
+      "min": -52,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        262144
+      ]
+    },
+    "l0.v": {
+      "max": 61,
+      "mean_abs": 12.37774658203125,
+      "min": -57,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l1.attention": {
+      "max": 52,
+      "mean_abs": 8.606460571289062,
+      "min": -55,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l1.down": {
+      "max": 991,
+      "mean_abs": 169.9998016357422,
+      "min": -1158,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l1.gelu": {
+      "max": 32,
+      "mean_abs": 4.850955963134766,
+      "min": -26,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        262144
+      ]
+    },
+    "l1.k": {
+      "max": 127,
+      "mean_abs": 23.794876098632812,
+      "min": -121,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l1.ln1": {
+      "max": 4,
+      "mean_abs": 0.92730712890625,
+      "min": -4,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l1.ln2": {
+      "max": 4,
+      "mean_abs": 0.9118194580078125,
+      "min": -4,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l1.probabilities_q15": {
+      "max": 32768,
+      "mean_abs": 2047.7605743408203,
+      "min": 0,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l1.projection": {
+      "max": 864,
+      "mean_abs": 117.25721740722656,
+      "min": -723,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l1.q": {
+      "max": 93,
+      "mean_abs": 21.379165649414062,
+      "min": -108,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l1.residual1": {
+      "max": 1360,
+      "mean_abs": 231.46237182617188,
+      "min": -1283,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l1.residual2": {
+      "max": 1648,
+      "mean_abs": 308.5808563232422,
+      "min": -1612,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l1.scores": {
+      "max": 6369,
+      "mean_abs": 1089.1944122314453,
+      "min": -8784,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l1.up": {
+      "max": 59,
+      "mean_abs": 9.698444366455078,
+      "min": -58,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        262144
+      ]
+    },
+    "l1.v": {
+      "max": 67,
+      "mean_abs": 10.237945556640625,
+      "min": -58,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l2.attention": {
+      "max": 34,
+      "mean_abs": 7.491790771484375,
+      "min": -52,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l2.down": {
+      "max": 916,
+      "mean_abs": 182.47889709472656,
+      "min": -948,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l2.gelu": {
+      "max": 46,
+      "mean_abs": 4.921749114990234,
+      "min": -30,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        262144
+      ]
+    },
+    "l2.k": {
+      "max": 87,
+      "mean_abs": 19.460830688476562,
+      "min": -96,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l2.ln1": {
+      "max": 3,
+      "mean_abs": 0.913421630859375,
+      "min": -5,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l2.ln2": {
+      "max": 3,
+      "mean_abs": 0.90521240234375,
+      "min": -5,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l2.probabilities_q15": {
+      "max": 32768,
+      "mean_abs": 2047.7458953857422,
+      "min": 0,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l2.projection": {
+      "max": 457,
+      "mean_abs": 83.51315307617188,
+      "min": -456,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l2.q": {
+      "max": 108,
+      "mean_abs": 18.374176025390625,
+      "min": -76,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l2.residual1": {
+      "max": 1671,
+      "mean_abs": 313.7909698486328,
+      "min": -1614,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l2.residual2": {
+      "max": 1996,
+      "mean_abs": 403.62359619140625,
+      "min": -2170,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l2.scores": {
+      "max": 5646,
+      "mean_abs": 839.6756439208984,
+      "min": -8379,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l2.up": {
+      "max": 80,
+      "mean_abs": 9.841636657714844,
+      "min": -69,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        262144
+      ]
+    },
+    "l2.v": {
+      "max": 41,
+      "mean_abs": 9.837417602539062,
+      "min": -56,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l3.attention": {
+      "max": 40,
+      "mean_abs": 7.7915191650390625,
+      "min": -40,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l3.down": {
+      "max": 869,
+      "mean_abs": 170.89979553222656,
+      "min": -874,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l3.gelu": {
+      "max": 32,
+      "mean_abs": 4.393501281738281,
+      "min": -28,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        262144
+      ]
+    },
+    "l3.k": {
+      "max": 100,
+      "mean_abs": 19.9515380859375,
+      "min": -93,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l3.ln1": {
+      "max": 3,
+      "mean_abs": 0.8849945068359375,
+      "min": -4,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l3.ln2": {
+      "max": 3,
+      "mean_abs": 0.8775787353515625,
+      "min": -5,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l3.probabilities_q15": {
+      "max": 32768,
+      "mean_abs": 2047.766860961914,
+      "min": 0,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l3.projection": {
+      "max": 463,
+      "mean_abs": 88.31782531738281,
+      "min": -494,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l3.q": {
+      "max": 111,
+      "mean_abs": 22.210540771484375,
+      "min": -112,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l3.residual1": {
+      "max": 2050,
+      "mean_abs": 425.4729766845703,
+      "min": -2140,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l3.residual2": {
+      "max": 2407,
+      "mean_abs": 535.0612182617188,
+      "min": -2398,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l3.scores": {
+      "max": 9445,
+      "mean_abs": 1198.9537811279297,
+      "min": -9032,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "l3.up": {
+      "max": 58,
+      "mean_abs": 8.819114685058594,
+      "min": -62,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        262144
+      ]
+    },
+    "l3.v": {
+      "max": 49,
+      "mean_abs": 9.317962646484375,
+      "min": -42,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        65536
+      ]
+    },
+    "logits": {
+      "max": 422,
+      "mean_abs": 88.7696533203125,
+      "min": -425,
+      "note": "mixed integer domains; an INT8 saturation ratio is not applicable",
+      "shape": [
+        262144
+      ]
+    }
+  },
+  "model": {
+    "architecture": {
+      "context": 16,
+      "ffn": 256,
+      "heads": 4,
+      "hidden": 64,
+      "layers": 4,
+      "vocab": 256
+    },
+    "fp32_sha256": "1d59cf803c328149add9ddb004766e63043b3babdb56ea178bf96d7a51fda8df",
+    "int8_sha256": "2132835994c2ecce03dc1d8e7345474eeddb271d86e34de9cc1f5ccdf2fecfc2",
+    "seed": 20261120,
+    "train_steps": 1200
+  },
+  "quality": {
+    "bigram_baseline_accuracy_same_windows": 0.287109375,
+    "fp32": {
+      "cross_entropy_nats": 2.143999340891945,
+      "next_byte_accuracy": 0.3916015625,
+      "perplexity": 8.53349784115508
+    },
+    "fp32_int8_top1_agreement": 0.2021484375,
+    "int8_logit_dequantization": "INT32 logits / 32 (LM-head Q5 weight scale); argmax unchanged",
+    "int8_minus_fp32_accuracy_points": -26.46484375,
+    "product_contract_int8": {
+      "cross_entropy_nats": 6.153576662324209,
+      "next_byte_accuracy": 0.126953125,
+      "perplexity": 470.3968322146644
+    }
+  },
+  "status": "SOFTWARE_QUALITY_EVALUATION_WITH_TOP_EVIDENCE",
+  "top_rtl": {
+    "compile_log": "/tmp/nmaforge_v12_r20_gpt2_top_retry/compile.log",
+    "compile_log_sha256": "d43833224a8d3c740a01b3cc3e98b2fcfe6d6fe97b79ee991c8c45d13bb93834",
+    "context_count": 4,
+    "contexts_bit_exact": 4,
+    "generated_tokens": [
+      107,
+      103,
+      32,
+      111
+    ],
+    "result_json": "/tmp/nmaforge_v12_r20_gpt2_top_retry/autoregressive_result.json",
+    "result_json_sha256": "fcfc213850be96f4babb9ec0cb8ff71d5f857dbd16c5c3923015f3c3b1294b19",
+    "run_log": "/tmp/nmaforge_v12_r20_gpt2_top_retry/run.log",
+    "run_log_sha256": "207996cc768b1902a1f19011e7d46435f9ef8b03f26040c6f71efa907616b631",
+    "source_sha": "f7e65ed02b64dfd1faf49e7a9a25222f5b6bd560",
+    "status": "FOUR_LAYER_TOP_AUTOREGRESSIVE_GOLDEN_PASS"
+  }
+}
