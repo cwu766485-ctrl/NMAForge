@@ -615,6 +615,20 @@ module tb_ai_accel_smoke;
     // no DUT signal is forced and the trace is disabled in normal regressions.
     always @(posedge aclk) begin
         if ($test$plusargs("AI_DEIT_AV_TRACE") &&
+            dut.compute_cluster_u.sfu_spad_valid &&
+            dut.compute_cluster_u.sfu_spad_write &&
+            dut.compute_cluster_u.engine_core_ready[4] &&
+            dut.compute_cluster_u.sfu_spad_addr >= 32'h0001_c000 &&
+            dut.compute_cluster_u.sfu_spad_addr < 32'h0001_d000) begin
+            $display("DEIT_SFU_PACK_WRITE addr=%08h data=%08h idx=%0d row=%0d kg=%0d group_base=%0d",
+                dut.compute_cluster_u.sfu_spad_addr,
+                dut.compute_cluster_u.sfu_spad_wdata,
+                dut.compute_cluster_u.tensor_sfu_u.index_r,
+                dut.compute_cluster_u.tensor_sfu_u.pack_row_r,
+                dut.compute_cluster_u.tensor_sfu_u.pack_k_group_r,
+                dut.compute_cluster_u.tensor_sfu_u.pack_tile_group_base_r);
+        end
+        if ($test$plusargs("AI_DEIT_AV_TRACE") &&
             dut.compute_cluster_u.tensor_matrix_u.state_r == 4'd8 &&
             dut.compute_cluster_u.tensor_matrix_u.dst_tile_base_r == 32'h0002_8000 &&
             dut.compute_cluster_u.tensor_matrix_u.k_group_r == 16'd0) begin
