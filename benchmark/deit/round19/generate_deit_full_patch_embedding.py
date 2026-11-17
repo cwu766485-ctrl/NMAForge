@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "sw" / "tools"))
 sys.path.insert(0, str(ROOT / "dv" / "block" / "compute" / "matrix" / "ref"))
 from cimforge_mapper import (  # noqa: E402
-    Descriptor, OP_GEMM, OP_RESIDUAL, OP_REQUANT,
+    Descriptor, OP_GEMM, OP_RESIDUAL, OP_REQUANT, OP_LAYERNORM,
     FLAG_BIAS, FLAG_PACK_I8, FLAG_PACK_I8_TILE_A,
     _pack_matrix_a_physical, _pack_matrix_b_physical, pack_i8,
 )
@@ -69,6 +69,10 @@ def main() -> None:
     ap.add_argument("--model-dir", type=Path, required=True)
     ap.add_argument("--out-dir", type=Path, required=True)
     ap.add_argument("--seed", type=int, default=SEED)
+    ap.add_argument("--include-layernorm-row", action="store_true",
+                    help="run opcode 0x38 on one row of the full packed embedding")
+    ap.add_argument("--layernorm-row", type=int, default=0,
+                    help="logical CLS/patch row to normalize, 0..196")
     args = ap.parse_args()
     model_dir = args.model_dir.resolve()
     model = ViTForImageClassification.from_pretrained(
@@ -182,7 +186,6 @@ def main() -> None:
             pairs[base + i * 4] = POISON
     for i in range(len(output_words)):
         pairs[output_base + i * 4] = POISON
-
     # External DMA payload: 12 weight tiles (each 768x16 INT8, padded/packed)
     # followed by 156 position-correction tiles (16x16 INT32).
     ext_words: list[int] = []
@@ -213,6 +216,32 @@ def main() -> None:
                     tile[rr, cc] = corr
             position_ext[(m0, n0)] = len(ext_words) * 4
             ext_words.extend(int(v) & 0xffffffff for v in tile.reshape(-1))
+
+    ln_gamma_q15: np.ndarray | None = None
+    ln_beta_q: np.ndarray | None = None
+    # Reuse the three 1-KiB scratch allocations only after the final embedding
+    # descriptor. Their ranges are initialized to poison and are not live then.
+    ln_gamma_spad, ln_beta_spad, ln_output_spad = raw_base, raw_base + 768, raw_base + 1536
+    ln_gamma_ext = ln_beta_ext = 0
+    if args.include_layernorm_row:
+        if not 0 <= args.layernorm_row < 197:
+            raise SystemExit("LayerNorm row must select a valid token row 0..196")
+        ln = model.vit.encoder.layer[0].layernorm_before
+        # SFU normalization consumes integer-scaled input and emits the same
+        # integer domain.  Convert the dimensionless checkpoint affine terms
+        # into that output domain: gamma/scale in Q15 and beta/scale in INT32.
+        ln_gamma_q15 = np.rint(ln.weight.detach().cpu().numpy().astype(np.float64) /
+                               output_scale * 32768.0).astype(np.int64)
+        ln_beta_q = np.rint(ln.bias.detach().cpu().numpy().astype(np.float64) /
+                            output_scale).astype(np.int64)
+        if np.any(ln_gamma_q15 < -(1 << 31)) or np.any(ln_gamma_q15 >= (1 << 31)):
+            raise SystemExit("LayerNorm effective Q15 gamma exceeds signed INT32")
+        if np.any(ln_beta_q < -(1 << 31)) or np.any(ln_beta_q >= (1 << 31)):
+            raise SystemExit("LayerNorm beta exceeds signed INT32")
+        ln_gamma_ext = len(ext_words) * 4
+        ext_words.extend(int(v) & 0xffffffff for v in ln_gamma_q15)
+        ln_beta_ext = len(ext_words) * 4
+        ext_words.extend(int(v) & 0xffffffff for v in ln_beta_q)
 
     descriptors: list[Descriptor] = []
     dma_events: list[tuple[int, int, int, int]] = []
@@ -260,7 +289,25 @@ def main() -> None:
             useful_macs += valid_patch_rows * 16 * 768
             executed_macs += 16 * 16 * 768
 
-    if len(descriptors) != 468 or len(dma_events) != 300:
+    if args.include_layernorm_row:
+        # Descriptor 468 runs after all 468 embedding operations have retired;
+        # input storage is now dead and can host affine parameters and output.
+        dma_events.extend([
+            (468, ln_gamma_ext, ln_gamma_spad, 192),
+            (468, ln_beta_ext, ln_beta_spad, 192),
+        ])
+        descriptors.append(Descriptor(
+            name=f"deit_encoder0_layernorm_row{args.layernorm_row}",
+            task_id=0x7100 + 468, op=OP_LAYERNORM, src0=output_base,
+            src1=ln_gamma_spad, bias=ln_beta_spad, dst=ln_output_spad,
+            k_or_length=192, m=208, n=192,
+            flags=FLAG_BIAS | 0x40, src0_stride=args.layernorm_row,
+            aux0=1, batch_count=1, head_count=1,
+        ))
+
+    expected_desc = 469 if args.include_layernorm_row else 468
+    expected_dma = 302 if args.include_layernorm_row else 300
+    if len(descriptors) != expected_desc or len(dma_events) != expected_dma:
         raise AssertionError(f"unexpected plan desc={len(descriptors)} dma={len(dma_events)}")
     for index, descriptor in enumerate(descriptors):
         if descriptor.task_id != 0x7100 + index:
@@ -272,6 +319,41 @@ def main() -> None:
 
     # INT8 output physical words become the exact Top readback golden.
     golden = {output_base + i * 4: int(word) for i, word in enumerate(output_words)}
+    ln_integer_golden: list[int] = []
+    ln_fp_error: dict[str, float] | None = None
+    if args.include_layernorm_row:
+        assert ln_gamma_q15 is not None and ln_beta_q is not None
+        # Independently decode the chosen row from the physical Matrix-A tile
+        # order rather than deriving the LayerNorm input from dense tensors.
+        decoded: list[int] = []
+        for c in range(192):
+            tile_index = (args.layernorm_row // 16) * 12 + (c // 16)
+            row_lane = args.layernorm_row & 15
+            col_lane = c & 15
+            word_index = ((row_lane >> 2) * 16) + ((col_lane >> 2) * 4) + (row_lane & 3)
+            packed_word = output_words[tile_index * 64 + word_index]
+            byte = (packed_word >> ((col_lane & 3) * 8)) & 0xff
+            decoded.append(byte - 256 if byte & 0x80 else byte)
+        if decoded != output_q[args.layernorm_row, :192].astype(int).tolist():
+            raise AssertionError("Matrix-A packed row decode disagrees with dense embedding Golden")
+
+        from ai_a3_reference import layernorm_q15  # noqa: E402
+        ln_integer_golden = layernorm_q15(decoded, ln_gamma_q15.tolist(),
+                                          ln_beta_q.tolist(), epsilon=1)
+        golden.update({ln_output_spad + i * 4: int(value)
+                       for i, value in enumerate(ln_integer_golden)})
+        with torch.no_grad():
+            fp_embedding = model.vit.embeddings(pixels)[0, args.layernorm_row].detach().cpu()
+            fp_ln = model.vit.encoder.layer[0].layernorm_before(fp_embedding).numpy().astype(np.float64)
+        dequant_ln = np.asarray(ln_integer_golden, dtype=np.float64) * output_scale
+        ln_error = dequant_ln - fp_ln
+        ln_fp_error = {
+            "input_row": int(args.layernorm_row), "input_scale": float(output_scale),
+            "mae": float(np.mean(np.abs(ln_error))),
+            "rmse": float(np.sqrt(np.mean(ln_error * ln_error))),
+            "max_abs": float(np.max(np.abs(ln_error))),
+            "integer_contract": "SFU opcode 0x38: Q15 gamma/activation_scale, INT32 beta/activation_scale, epsilon=1, truncating mean, floor variance, integer sqrt and Q30 reciprocal",
+        }
 
     # Reconstruct FP32 DeiT embedding including CLS and position for the 197 valid rows.
     with torch.no_grad():
@@ -331,6 +413,15 @@ def main() -> None:
                 "position_correction_i32_tile": [pos_tile_base, pos_tile_base + 1024],
                 "embedding_output_matrix_a_i8": [output_base, output_base + output_bytes],
             },
+            "optional_layernorm_row_reuse": ({
+                "gamma_i32": [ln_gamma_spad, ln_gamma_spad + 192 * 4],
+                "beta_i32": [ln_beta_spad, ln_beta_spad + 192 * 4],
+                "output_i32": [ln_output_spad, ln_output_spad + 192 * 4],
+                "row": args.layernorm_row,
+                "reuse_after_descriptor": 467,
+                "loaded_before_descriptor": 468,
+                "overlaps_matrix_a_input_only_after_its_last_consumer": True,
+            } if args.include_layernorm_row else None),
             "peak_data_high_water_exclusive": output_base + output_bytes,
             "queue_start": desc_base,
             "free_gap_before_queues": desc_base - (output_base + output_bytes),
@@ -345,6 +436,12 @@ def main() -> None:
             "physical_output_elements": 208 * 192,
             "golden_words": len(golden), "output_layout": "16x16 macro-tile-major; each tile uses local Matrix-A packing; logical rows 0..196 are CLS plus 196 patches",
             "descriptor_base": desc_base, "completion_base": cpl_base,
+            "optional_layernorm_row": ({"descriptor_index": 468,
+                "row": args.layernorm_row, "gamma_spad": ln_gamma_spad,
+                "beta_spad": ln_beta_spad, "output_spad": ln_output_spad,
+                "output_words": len(ln_integer_golden), "fp32_error": ln_fp_error,
+                "gamma_dma_ext_byte": ln_gamma_ext, "beta_dma_ext_byte": ln_beta_ext}
+                if args.include_layernorm_row else None),
         },
         "limitations": [
             "this workload executes Patch Embedding plus CLS/Position addition only; no Encoder Layer is claimed",
@@ -362,6 +459,8 @@ def main() -> None:
         "spad_high_water": output_base + output_bytes,
         "queue_start": desc_base, "free_gap": desc_base - (output_base + output_bytes),
         "shift": shift, "fp32_mae": mae,
+        "layernorm_row": args.layernorm_row if args.include_layernorm_row else None,
+        "layernorm_golden_words": len(ln_integer_golden),
         "model_memory_sha256": sha_file(args.out_dir / "model_memory.memh"),
         "golden_sha256": sha_file(args.out_dir / "model_golden.memh"),
     }, sort_keys=True))

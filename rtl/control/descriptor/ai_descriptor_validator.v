@@ -53,6 +53,21 @@ module ai_descriptor_validator (
         (m_size != 0) && (n_size != 0) &&
         (m_size[1:0] == 0) && (n_size[1:0] == 0) &&
         (pack_tile_a_elements == {16'd0,length});
+    // Optional ABI-v7.4 LayerNorm bridge for the official DeiT-Tiny
+    // 208x192 Matrix-A packed embedding. In this mode src0_stride is the
+    // zero-based logical token row (not a byte stride); only valid rows
+    // 0..196 may be selected. Other LayerNorm descriptors keep the legacy
+    // contiguous INT32 input contract.
+    wire ln_tile_a_fields_valid =
+        (op == 8'h38) && (version == 8'd7) && (flags[7] == 1'b0) &&
+        (flags[5:1] == 5'd0) && (flags[0] == bias_enable) && bias_enable &&
+        (length == 16'd192) && (m_size == 16'd208) &&
+        (n_size == 16'd192) && (src0_stride < 32'd197) &&
+        (src1 != 32'd0) && (bias_base != 32'd0) &&
+        (aux0 == 32'd1) && (scale_shift == 5'd0) &&
+        (activation == 2'd0) && (src1_stride == 32'd0) &&
+        (dst_stride == 32'd0) && (batch_count == 16'd1) &&
+        (head_count == 16'd1);
 
     assign version_valid = (version == 8'd7) ||
                            (is_macro && (version == 8'd4)) ||
@@ -186,6 +201,7 @@ module ai_descriptor_validator (
 
     assign descriptor_invalid = !op_valid || !dimensions_valid ||
                                 !version_valid ||
+                                (flags[6] && !ln_tile_a_fields_valid) ||
                                 ((op == 8'h36) && flags[5] &&
                                  !pack_tile_a_fields_valid) ||
                                 ((op == 8'h3a) &&

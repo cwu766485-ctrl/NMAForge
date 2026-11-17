@@ -30,6 +30,10 @@ module ai_tensor_sfu_core(
     input  wire        pack_enable,
     // Descriptor flag[5] writes packed words in the Matrix A 4x4 tile order.
     input  wire        pack_tile_a,
+    // Research ABI-v7.4 extension: flag[6] selects a signed INT8 Matrix-A
+    // tile-major source row for LayerNorm (bounded 208x192 DeiT embedding).
+    input  wire        input_tile_a,
+    input  wire [31:0] src0_stride,
     input  wire [31:0] dst_base,
     input  wire [15:0] length,
     input  wire [15:0] m_size,
@@ -135,6 +139,8 @@ module ai_tensor_sfu_core(
     reg signed [63:0] vector_product_r;
     reg [31:0] rms_root_r, inv_rms_r;
     reg rms_normalize_phase_r, beta_enable_r, pack_enable_r, pack_tile_a_r;
+    reg input_tile_a_r;
+    reg [31:0] input_row_r;
     reg [15:0] m_size_r, n_size_r, pack_row_r, pack_k_group_r;
     reg [31:0] pack_tile_group_base_r;
     reg [31:0] pack_word_r;
@@ -148,7 +154,21 @@ module ai_tensor_sfu_core(
     wire sqrt_busy, sqrt_done;
     wire [31:0] sqrt_root;
 
-    wire [31:0] src0_addr = src0_r + ({16'd0,index_r}<<2);
+    // Tile-A input mapping is intentionally limited by the descriptor
+    // validator to the 208x192 physical DeiT embedding tensor. Each 16x16
+    // tile occupies 256 bytes; within it, Matrix-A stores 4x4 K groups with
+    // row lanes contiguous, matching the existing packer.
+    wire [31:0] tile_a_index =
+        ({16'd0,input_row_r[15:4]} * 32'd12) + {28'd0,index_r[15:4]};
+    wire [31:0] tile_a_row_lane = {28'd0,input_row_r[3:0]};
+    wire [31:0] tile_a_col_lane = {28'd0,index_r[3:0]};
+    wire [31:0] tile_a_word_index =
+        (tile_a_row_lane[3:2] << 4) +
+        (tile_a_col_lane[3:2] << 2) + tile_a_row_lane[1:0];
+    wire [31:0] src0_linear_addr = src0_r + ({16'd0,index_r}<<2);
+    wire [31:0] src0_tile_a_addr = src0_r + (tile_a_index << 8) +
+                                    (tile_a_word_index << 2);
+    wire [31:0] src0_addr = input_tile_a_r ? src0_tile_a_addr : src0_linear_addr;
     wire [31:0] src1_addr = src1_r + ({16'd0,index_r}<<2);
     wire [31:0] beta_addr = beta_base_r + ({16'd0,index_r}<<2);
     // For a 16-element LayerNorm vector, the contract's two truncating
@@ -166,7 +186,17 @@ module ai_tensor_sfu_core(
                            (packed_requant ?
                             (packed_word_index << 2) :
                             ({16'd0,index_r} << 2));
-    wire signed [31:0] spad_signed = spad_rdata;
+    wire [31:0] tile_a_lane_shift = {27'd0,index_r[1:0],3'b000};
+    wire signed [7:0] tile_a_signed_byte = spad_rdata >> tile_a_lane_shift;
+    // Tile-A unpacking applies only to the LayerNorm source-vector reads.
+    // Gamma and beta remain full signed INT32 SPAD operands; applying the
+    // byte extraction globally silently truncated their affine parameters.
+    wire tile_a_source_read = input_tile_a_r &&
+        ((state_r == ST_LN_SUM_WAIT) || (state_r == ST_LN_VAR_WAIT) ||
+         (state_r == ST_RMS_X_WAIT));
+    wire signed [31:0] spad_signed = tile_a_source_read ?
+                                      {{24{tile_a_signed_byte[7]}},tile_a_signed_byte} :
+                                      $signed(spad_rdata);
     wire causal_masked = (op_r == OP_CAUSAL_SOFTMAX_Q15) &&
                          (index_r > epsilon_r[15:0]);
     wire valid_operation = (op_mode == OP_SOFTMAX_Q15) ||
@@ -288,6 +318,7 @@ module ai_tensor_sfu_core(
             mean_sq_r<=0; vector_product_r<=0; rms_root_r<=0; inv_rms_r<=0;
             sum_x_r<=0; rms_normalize_phase_r<=0; beta_enable_r<=0;
             pack_enable_r<=0; pack_word_r<=0; pack_tile_a_r<=0;
+            input_tile_a_r<=0; input_row_r<=0;
             m_size_r<=0; n_size_r<=0; pack_row_r<=0; pack_k_group_r<=0;
             pack_tile_group_base_r<=0;
             ln_small_fast_r<=0;
@@ -309,6 +340,8 @@ module ai_tensor_sfu_core(
                         op_r<=op_mode; src0_r<=src0_base; src1_r<=src1_base;
                         beta_base_r<=beta_base; beta_enable_r<=beta_enable;
                         pack_enable_r<=pack_enable; pack_tile_a_r<=pack_tile_a;
+                        input_tile_a_r<=input_tile_a;
+                        input_row_r<=src0_stride;
                         m_size_r<=m_size; n_size_r<=n_size;
                         ln_small_fast_r <= (op_mode == OP_LAYERNORM_Q15) &&
                                            (length <= LN_SMALL_FAST_MAX);

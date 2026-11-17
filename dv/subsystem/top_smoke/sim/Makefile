@@ -446,6 +446,53 @@ ai_deit_round19_full_patch_embedding_256k:
 	grep -q '^REPRESENTATIVE_LATE_DMA_SUMMARY events=300 payload_bytes=307200 checked_words=76800 axi_read_bytes=307200 ' \
 		"$(AI_DEIT_R19_RUN)/run.log"
 
+# Round 21: after the 197-token patch embedding has retired, run one real
+# opcode-0x38 LayerNorm row directly from the Matrix-A packed output.  The
+# affine tensors are loaded through the existing late-DMA path and the three
+# dead embedding scratch regions are reused only after descriptor 467.
+AI_DEIT_R21_RUN ?= /tmp/nmaforge_deit_round21_ln_$(shell date +%Y%m%d_%H%M%S)
+AI_DEIT_R21_PYTHON ?= /tmp/nmaforge_deit_round17_venv/bin/python
+AI_DEIT_R21_MODEL_DIR ?= /tmp/nmaforge_deit_round17
+AI_DEIT_R21_ROW ?= 1
+.PHONY: ai_deit_round21_layernorm_row_256k
+ai_deit_round21_layernorm_row_256k:
+	test ! -e "$(AI_DEIT_R21_RUN)"
+	mkdir -p "$(AI_DEIT_R21_RUN)"
+	$(AI_DEIT_R21_PYTHON) ../../../../benchmark/deit/round19/generate_deit_full_patch_embedding.py \
+		--model-dir "$(AI_DEIT_R21_MODEL_DIR)" --out-dir "$(AI_DEIT_R21_RUN)/workload" \
+		--include-layernorm-row --layernorm-row $(AI_DEIT_R21_ROW)
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_DEIT_R19_STREAM \
+		+define+AI_SPAD_WORDS_PER_BANK=16384 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_R21_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_DEIT_R21_RUN)/simv \
+		-l $(AI_DEIT_R21_RUN)/compile.log
+	$(AI_DEIT_R21_RUN)/simv +ntb_random_seed=20261121 +AI_RANDOM_CASES=0 \
+		+AI_SEED=20261121 +ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_LATE_DMA +AI_DEIT_R21_LN_DEBUG \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_DEIT_R21_RUN)/workload/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_DEIT_R21_RUN)/workload/late_dma_plan.memh \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_R21_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_R21_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_DEIT_R21_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R21_RUN)/workload/manifest.json"))["spad"]["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_DEIT_R21_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R21_RUN)/workload/manifest.json"))["spad"]["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_DEIT_R21_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R21_RUN)/workload/manifest.json"))["execution"]["descriptor_count"])') \
+		+AI_REPRESENTATIVE_QUEUE_SIZE=512 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_DEIT_R21_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R21_RUN)/workload/manifest.json"))["execution"]["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_DEIT_R21_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R21_RUN)/workload/manifest.json"))["execution"]["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_DEIT_R21_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R21_RUN)/workload/manifest.json"))["execution"]["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=37824 \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=39936 \
+		-l $(AI_DEIT_R21_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=469 .*golden_words=10176 useful_macs=28901376 executed_macs=30670848 padding_macs=1769472 useful_output_elements=37824 physical_output_elements=39936 ' \
+		"$(AI_DEIT_R21_RUN)/run.log"
+	test "$$(grep -c '^REPRESENTATIVE_LATE_DMA_PASS ' "$(AI_DEIT_R21_RUN)/run.log")" -eq 302
+	test "$$(grep -c '^REPRESENTATIVE_STREAMED_DESC_RETIRE_PASS ' "$(AI_DEIT_R21_RUN)/run.log")" -eq 469
+	grep -q '^REPRESENTATIVE_LATE_DMA_SUMMARY events=302 payload_bytes=308736 checked_words=77184 axi_read_bytes=308736 ' \
+		"$(AI_DEIT_R21_RUN)/run.log"
+
 # Round 5: one nonzero H64 FFN-up tile, with input/descriptors/weights loaded
 # through the real AXI4 DMA before the Product Top command doorbell.
 AI_H64_FFN_TILE_RUN ?= /tmp/nmaforge_h64_ffn_tile_$(shell date +%Y%m%d_%H%M%S)

@@ -55,7 +55,8 @@ ai_accel_memory_fabric #(.WORDS_PER_BANK(8192),.SPAD_BYTES(131072)) fabric(
 ai_tensor_sfu_core sfu(
  .clk(clk),.resetn(resetn),.start(start),.abort(1'b0),.op_mode(8'h36),
  .src0_base(32'd256),.src1_base(32'd0),.beta_base(32'd0),.beta_enable(1'b0),
- .pack_enable(1'b1),.pack_tile_a(1'b0),.dst_base(32'd512),.length(16'd32),
+ .pack_enable(1'b1),.pack_tile_a(1'b0),.input_tile_a(1'b0),.src0_stride(32'd0),
+ .dst_base(32'd512),.length(16'd32),
  .m_size(16'd4),.n_size(16'd8),.scale_shift(5'd0),.epsilon(32'd1),.watchdog_limit(32'd0),
  .spad_valid(valid),.spad_write(write),.spad_addr(addr),.spad_wdata(wdata),
  .spad_ready(ready),.spad_rsp_valid(rsp_valid),.spad_rdata(rdata),

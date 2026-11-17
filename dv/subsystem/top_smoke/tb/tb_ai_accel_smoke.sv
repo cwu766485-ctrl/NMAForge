@@ -518,6 +518,35 @@ module tb_ai_accel_smoke;
     integer representative_dma_window_measure = 1'b0;
     integer representative_dma_busy_measure = 1'b0;
 
+    // Optional Round-21 LayerNorm bridge trace. This observes the existing
+    // SFU registers only; it does not alter the testbench or DUT datapath.
+    always @(posedge aclk) begin
+        if ($test$plusargs("AI_DEIT_R21_LN_DEBUG") &&
+            dut.compute_cluster_u.tensor_sfu_u.op_r == 8'h38 &&
+            dut.compute_cluster_u.tensor_sfu_u.state_r == 6'd33 &&
+            dut.compute_cluster_u.tensor_sfu_u.spad_rsp_valid &&
+            dut.compute_cluster_u.tensor_sfu_u.index_r < 4)
+            $display("DEIT_R21_LN_INPUT index=%0d row=%0d addr=%08h data=%08h signed=%0d",
+                     dut.compute_cluster_u.tensor_sfu_u.index_r,
+                     dut.compute_cluster_u.tensor_sfu_u.input_row_r,
+                     dut.compute_cluster_u.tensor_sfu_u.src0_addr,
+                     dut.compute_cluster_u.tensor_sfu_u.spad_rdata,
+                     dut.compute_cluster_u.tensor_sfu_u.spad_signed);
+        if ($test$plusargs("AI_DEIT_R21_LN_DEBUG") &&
+            dut.compute_cluster_u.tensor_sfu_u.op_r == 8'h38 &&
+            dut.compute_cluster_u.tensor_sfu_u.state_r == 6'd27 &&
+            dut.compute_cluster_u.tensor_sfu_u.index_r == 0)
+            $display("DEIT_R21_LN_FIRST_OUT row=%0d mean=%0d variance=%0d inv=%0d x=%0d gamma=%0d beta=%0d out=%0d",
+                     dut.compute_cluster_u.tensor_sfu_u.input_row_r,
+                     dut.compute_cluster_u.tensor_sfu_u.mean_r,
+                     dut.compute_cluster_u.tensor_sfu_u.mean_sq_r,
+                     dut.compute_cluster_u.tensor_sfu_u.inv_rms_r,
+                     dut.compute_cluster_u.tensor_sfu_u.x_r,
+                     dut.compute_cluster_u.tensor_sfu_u.gamma_r,
+                     dut.compute_cluster_u.tensor_sfu_u.beta_r,
+                     dut.compute_cluster_u.tensor_sfu_u.output_word_r);
+    end
+
     function [31:0] representative_spad_backdoor_read;
         input integer byte_addr;
         integer word_index;

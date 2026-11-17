@@ -30,3 +30,12 @@
 - Softmax 的零除数、normalization 的零平方根/除法器错误按 `ERR_NUMERIC` 结束；合法正长度和上述输入域不得触发这些错误。
 - 结果按输出 word 顺序提交；每个被 SPAD 接受的写均由 memory image scoreboard 对拍。错误前已接受的输出是保留前缀，不回滚；错误被观察后不得再接受该任务的后续输出写。
 - VCS `SFU-RAND-NUM-EDGE-3S-20261028` 用独立 `ai_a3_reference.py` 对 8 个 opcode、8 个长度、64 个 vector/seed 做 bit-exact 检查；输入包含符号边界、PWL 分段边界、epsilon=0、gamma、beta 和 INT32 溢出边界、Requant 饱和和所有合法 shift。另有原有 randomized latency、fault、reset 和 recovery 检查。该证据只覆盖表列域和实际 testpoint，不表示对任意长度/全 32-bit 输入或理想实数函数误差收敛。
+
+## Round 21 研究扩展：Matrix-A LayerNorm 输入行
+
+以下为 `research/nmaforge-v1.2-round21-deit` 的有界研究扩展，不改变默认 ABI 行为，也不构成完整签核：
+
+- Descriptor opcode `0x38`、ABI 7 可在 flag bit 6=1 时，从现有 Matrix-A 16×16 tile-major INT8 输出中读取一个逻辑行。`src0_stride` 表示逻辑行号，合法范围为 `0..196`；限定 `length=192, M=208, N=192`、`aux0=1`、bias/gamma 均启用，且保留其它字段的既有合法性检查。普通 flag bit 6=0 的线性 INT32 输入行为保持不变。
+- Matrix-A 的输入行按 tile index `floor(row/16)*12 + floor(channel/16)`、tile 内 word index `floor(row_lane/4)*16 + floor(channel_lane/4)*4 + (row_lane mod 4)` 访问；word 内字节 lane 为 `channel mod 4`，按 signed INT8 符号扩展后进入 LayerNorm。
+- 仅 LayerNorm 的 source-vector 读取状态采用字节解包。Gamma 与 beta 仍分别按 signed Q0.15 word 和 signed INT32 输出域偏置读取，不能使用 Matrix-A 字节 lane 解包。
+- 数值仍严格遵循上表 0x38 的整数公式。异常 descriptor 必须由 validator 拒绝；本扩展只针对真实 DeiT embedding 与 LayerNorm 的单行桥接，不定义通用矩阵 Unpack 模式。
