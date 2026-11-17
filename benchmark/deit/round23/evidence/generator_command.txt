@@ -1,0 +1,1 @@
+/tmp/nmaforge_deit_round17_venv/bin/python benchmark/deit/round22/generate_deit_ln197_qkv_block.py --model-dir /tmp/nmaforge_deit_round17 --base-manifest /tmp/round23_deit/base/workload/manifest.json --base-golden /tmp/round23_deit/base/workload/model_golden.memh --embedding-dump /tmp/round23_deit/base/embedding_readback.log --out-dir /tmp/round23_deit/workload_final

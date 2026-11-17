@@ -38,7 +38,7 @@ GAMMA_BASE, BETA_BASE = 0x1000, 0x1300
 LN_TEMP_BASE, LN_PACK_BASE = 0x2000, 0x8000
 WEIGHT_BASE, BIAS_BASE = 0x12000, 0x15000
 Q_BASE, K_BASE, V_BASE = 0x16000, 0x19000, 0x1C000
-PHYSICAL_ROWS, HIDDEN, PROJ_TILES = 208, 192, 12
+PHYSICAL_ROWS, LN_OUTPUT_ROWS, HIDDEN, PROJ_TILES = 208, 200, 192, 12
 
 
 def sha(data: bytes) -> str:
@@ -151,9 +151,10 @@ def main() -> None:
     for row in range(PHYSICAL_ROWS):
         for col in range(HIDDEN):
             embed_dense[row, col] = get_packed_a_byte(embed_words, row, col)
-    # Execute the 197 valid rows plus three deterministic zero-padding rows.
-    # The final Tile-A pack is 8x192, so it never consumes stale scratch rows.
-    for row in range(200):
+    # LayerNorm only accepts real token rows 0..196.  The final 8-row
+    # Matrix-A pack is padded with explicit zeros below; padded rows must not
+    # be sent through the LayerNorm descriptor validator.
+    for row in range(197):
         ln_int[row] = np.asarray(layernorm_q15(
             embed_dense[row].astype(int).tolist(), gamma_q15.tolist(), beta_i32.tolist(), epsilon=1),
             dtype=np.int32)
@@ -161,11 +162,12 @@ def main() -> None:
 
     descriptors: list[Descriptor] = []
     golden: dict[int, int] = {}
+    pack_descriptor_indices: list[int] = []
     for tile in range(13):
         row0 = tile * 16
         for lane in range(16):
             row = row0 + lane
-            if row >= 200:
+            if row >= 197:
                 break
             index = len(descriptors)
             descriptors.append(Descriptor(
@@ -176,6 +178,7 @@ def main() -> None:
                 flags=FLAG_BIAS | 0x40, aux0=1, src0_stride=row,
             ))
         index = len(descriptors)
+        pack_descriptor_indices.append(index)
         pack_base = LN_PACK_BASE + tile * 16 * HIDDEN
         pack_rows = 8 if tile == 12 else 16
         descriptors.append(Descriptor(
@@ -251,10 +254,50 @@ def main() -> None:
                 for c in range(16):
                     golden[out_base + ntile * 1024 + (r * 16 + c) * 4] = int(expected[r, c])
 
-    if len(descriptors) != 249:
-        raise AssertionError(f"descriptor plan expected 249, got {len(descriptors)}")
-    if len(dma_events) != 146:
-        raise AssertionError(f"DMA plan expected 146, got {len(dma_events)}")
+    # LN_TEMP is a reused tile buffer. The final tile has only five valid
+    # rows, but earlier tiles have overwritten its three padding lanes by the
+    # time the final pack runs. Clear those INT32 lanes through the real DMA
+    # path immediately before the final 8-row pack, rather than relying on the
+    # initial SPAD image to survive prior commands.
+    pad_words = (LN_OUTPUT_ROWS - 197) * HIDDEN
+    pad_dma_ext = len(ext_words) * 4
+    ext_words.extend([0] * pad_words)
+    pad_dma_desc = pack_descriptor_indices[-1]
+    pad_dma_events = []
+    for pad_row in range(LN_OUTPUT_ROWS - 197):
+        pad_dma_events.append((pad_dma_desc,
+                               pad_dma_ext + pad_row * HIDDEN * 4,
+                               LN_TEMP_BASE + (5 + pad_row) * HIDDEN * 4,
+                               HIDDEN))
+    # Late-DMA events must be nondecreasing by trigger descriptor.  The
+    # padding clear is triggered at descriptor 209, just before the final
+    # pack; QKV weight events start at descriptor 210.
+    dma_events[2:2] = pad_dma_events
+
+    if len(descriptors) != 246:
+        raise AssertionError(f"descriptor plan expected 246, got {len(descriptors)}")
+    if len(dma_events) != 149:
+        raise AssertionError(f"DMA plan expected 149, got {len(dma_events)}")
+    ln_rows = [int(desc.name.rsplit("_", 1)[1]) for desc in descriptors
+               if desc.name.startswith("deit_ln_token_")]
+    if ln_rows != list(range(197)):
+        raise AssertionError(f"LayerNorm must cover exactly valid rows 0..196, got {ln_rows[-4:]}")
+    if any(desc.name == "deit_ln_token_197" for desc in descriptors):
+        raise AssertionError("invalid padded LayerNorm row 197 was generated")
+    final_pack = descriptors[pack_descriptor_indices[-1]]
+    if (final_pack.name != "deit_ln_pack_tile_12" or final_pack.m != 8 or
+            final_pack.n != HIDDEN):
+        raise AssertionError(f"unexpected final partial pack descriptor: {final_pack}")
+    if len(pad_dma_events) != 3 or any(event[0] != pack_descriptor_indices[-1] or
+                                      event[3] != HIDDEN for event in pad_dma_events):
+        raise AssertionError(f"final pack requires three 192-word zero-fill DMAs: {pad_dma_events}")
+    if [event[0] for event in dma_events] != sorted(event[0] for event in dma_events):
+        raise AssertionError("late-DMA plan triggers are not monotonic")
+    if any(event[3] > 256 for event in dma_events):
+        raise AssertionError("late-DMA event exceeds the Top testbench 256-word limit")
+    for row in range(197, LN_OUTPUT_ROWS):
+        if np.any(ln_int[row] != 0):
+            raise AssertionError(f"padded packed output row {row} is not zero")
     desc_bytes = len(descriptors) * 64
     if DESC_BASE + desc_bytes > CPL_BASE:
         raise SystemExit("descriptor ring allocation overlaps completion ring")
@@ -262,7 +305,7 @@ def main() -> None:
     pairs: dict[int, int] = dict(observed_embed)
     for alloc_base, size in ((GAMMA_BASE, 768), (BETA_BASE, 768),
                        (LN_TEMP_BASE, 16 * HIDDEN * 4),
-                       (LN_PACK_BASE, PHYSICAL_ROWS * HIDDEN),
+                       (LN_PACK_BASE, LN_OUTPUT_ROWS * HIDDEN),
                        (WEIGHT_BASE, 12288), (BIAS_BASE, 64),
                        (Q_BASE, 16 * HIDDEN * 4), (K_BASE, 16 * HIDDEN * 4),
                        (V_BASE, 16 * HIDDEN * 4)):
@@ -273,6 +316,14 @@ def main() -> None:
             pairs[DESC_BASE + index * 64 + wi * 4] = word
     for i in range(QUEUE_SIZE * 4):
         pairs[CPL_BASE + i * 4] = POISON
+    # Seed deterministic zeroes in the SPAD image for rows 197..199.  Since
+    # LN_TEMP is reused, the late-DMA events above are still required to clear
+    # these lanes after earlier tiles have overwritten them.  Padding is not a
+    # computed model tensor and no invalid LayerNorm descriptor is issued.
+    for row in range(197, LN_OUTPUT_ROWS):
+        row_lane = row - (12 * 16)
+        for col in range(HIDDEN):
+            pairs[LN_TEMP_BASE + (row_lane * HIDDEN + col) * 4] = 0
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     write_pairs(args.out_dir / "model_memory.memh", pairs)
@@ -288,7 +339,7 @@ def main() -> None:
         "ln_gamma": [GAMMA_BASE, GAMMA_BASE + 768],
         "ln_beta": [BETA_BASE, BETA_BASE + 768],
         "ln_row_tile_int32_reused": [LN_TEMP_BASE, LN_TEMP_BASE + 16 * HIDDEN * 4],
-        "ln_matrix_a_int8": [LN_PACK_BASE, LN_PACK_BASE + PHYSICAL_ROWS * HIDDEN],
+        "ln_matrix_a_int8": [LN_PACK_BASE, LN_PACK_BASE + LN_OUTPUT_ROWS * HIDDEN],
         "weight_tile_reused": [WEIGHT_BASE, WEIGHT_BASE + 12288],
         "bias_tile_reused": [BIAS_BASE, BIAS_BASE + 64],
         "qkv_query_tile_major_i32": [Q_BASE, Q_BASE + 16 * HIDDEN * 4],
@@ -329,9 +380,17 @@ def main() -> None:
                  "data_high_water": max(a[1] for k, a in allocations.items() if k not in ("cmdq", "cplq")),
                  "live_overlap_check": "PASS; disjoint static intervals; row scratch and weight/bias tiles reused by ordered descriptors"},
         "execution": {"descriptor_count": len(descriptors), "ln_valid_rows": 197,
-                      "ln_zero_pad_rows_executed": 3, "ln_rows_executed": 200,
+                      "ln_zero_pad_rows_executed": 0, "ln_rows_executed": 197,
+                      "packed_physical_rows": LN_OUTPUT_ROWS,
+                      "explicit_zero_pad_rows": LN_OUTPUT_ROWS - 197,
                       "pack_tiles": 13, "qkv_gemm_tiles": 36,
                       "dma_event_count": len(dma_events), "dma_payload_bytes": len(ext_words) * 4,
+                      "zero_pad_dma": {"before_descriptor": pad_dma_desc,
+                                       "spad_ranges": [[LN_TEMP_BASE + (5 + row) * HIDDEN * 4,
+                                                        LN_TEMP_BASE + (6 + row) * HIDDEN * 4]
+                                                       for row in range(LN_OUTPUT_ROWS - 197)],
+                                       "words": pad_words, "bytes": pad_words * 4,
+                                       "events": len(pad_dma_events)},
                       "golden_words": len(golden),
                       "useful_macs": 3 * 16 * 192 * 192,
                       "executed_macs": 3 * 16 * 192 * 192,
