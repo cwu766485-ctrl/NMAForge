@@ -1,0 +1,65 @@
+{
+  "checkpoint": "benchmark/gpt2_quality/results/round24/round24_integer_qat_fp32.pt",
+  "checkpoint_sha256": "73801ce5682759ecb37f581ba6423c1a06abda9dba4e4538461d9b524817b796",
+  "corpus_sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+  "disposition": "PRODUCT_TOP_PASS_MODEL_QUALITY_PARTIAL",
+  "limitations": [
+    "Round24 quality evidence uses only 1,024 held-out targets and is not broad language-quality closure.",
+    "The seed25 initial FP32 checkpoint SHA is recorded in candidate_manifest.json but the source .pt is not present in this branch; exact training replay requires restoring that checkpoint.",
+    "Seed25 training.log was not archived. Seed26 training.log is archived.",
+    "No RTL/ABI or Golden changes were made."
+  ],
+  "model_package": "benchmark/gpt2_quality/results/round24/round24_integer_qat_model.npz",
+  "package_sha256": "fa66d2ecd6709c0a49e5c23d6346de22adfbf2f0809f182e581fa63cbcb9a54b",
+  "product_top": {
+    "compile_exit_code": 0,
+    "compile_log": "product_top_run/compile.log",
+    "descriptor_publications": 4020,
+    "extension_cycles": 4339422,
+    "generated": [
+      10,
+      10,
+      65,
+      82
+    ],
+    "golden": "4 contexts \u00d7 256 signed INT32 logits bit-exact",
+    "host_intermediate_words": 0,
+    "measure_scope": "prefix recompute; not persistent incremental KV per-token latency",
+    "mode": "four_layer_prefix_recompute_same_top_instance",
+    "prompt": [
+      1,
+      7,
+      42,
+      3
+    ],
+    "resets": 0,
+    "result": "product_top_run/autoregressive_result.json",
+    "run_log": "product_top_run/run.log",
+    "simulation_exit_code": 0,
+    "status": "PASS",
+    "vcs": "V-2023.12-SP1_Full64",
+    "compile_log_sha256": "2435fad472f3f69f44a10d5a891e1300034ba4e9f5a2d0a8c9de1e1a890535d3",
+    "compile_log_archive_sha256": "3f58f83359383ed6df99f1b1db39521c22bc794724cddb460a80defd36c8be04",
+    "compile_log_archive": "product_top_run/compile.log.gz",
+    "run_log_sha256": "f190b0997d5bc6919b0d245a732d9f3a81df270f45a22a31ded8d7d4894a253c",
+    "run_log_archive_sha256": "b169af58ee37db3b697a808df6798ce63aa32f67449f2c356920e2ddc8c77ed6",
+    "run_log_archive": "product_top_run/run.log.gz",
+    "spad_allocation_source_crlf_sha256": "bc0d786597fa2c02db04fb078e0f2a3fab995f32ff90986e1cc5b60298fa682e",
+    "spad_allocation_sha256": "3e973b4eef4a3131b8fb75f9b62193b2a40a6c90f16856fd1a58064c55078e1d",
+    "spad_allocation_line_endings": "LF-normalized; CSV fields/rows unchanged"
+  },
+  "quality": {
+    "heldout_targets": 1024,
+    "int8_accuracy": 0.3046875,
+    "int8_ce_nats": 2.4876147183364403,
+    "int8_fp32_top1_agreement": 0.3271484375,
+    "int8_ppl": 12.032540864139738,
+    "int8_vs_bigram_percentage_points": 1.26953125,
+    "same_target_bigram_accuracy": 0.2919921875,
+    "same_target_qat_float_accuracy": 0.2724609375,
+    "seed": 20261121,
+    "seed_sensitivity": "seed26 validation INT8 24.8698%; QAT float 25.7813%; 48 development windows only",
+    "selection_warning": "the compared FP32 value is the QAT-updated float checkpoint, not the original Round23 FP32 checkpoint"
+  },
+  "source_sha": "f4f4316aec3188676b035e0475ab9b05dbc3fe12"
+}

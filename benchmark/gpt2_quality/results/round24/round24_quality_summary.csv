@@ -1,0 +1,10 @@
+model,split,targets,accuracy_percent,cross_entropy_nats,perplexity,seed,scope
+Round24_integer_QAT_seed25,heldout,1024,30.46875,2.4876147183,12.0325408641,20261125,final_heldout_diagnostic
+Round24_QAT_updated_float_seed25,heldout,1024,27.24609375,,,20261125,same_targets_as_integer_candidate
+Bigram,heldout,1024,29.19921875,,,20261121,same_targets_as_integer_candidate
+Round24_integer_QAT_seed25,validation,48,29.55729167,2.5405375395,12.6864886269,20261125,development_only
+Round24_QAT_updated_float_seed25,validation,48,29.296875,2.5623712878,12.9665282593,20261125,development_only
+Round24_integer_QAT_seed26,validation,48,24.86979167,2.7383000392,15.4606801938,20261126,independent_training_seed_development_only
+Round24_QAT_updated_float_seed26,validation,48,25.78125,2.7816964882,16.1463898866,20261126,independent_training_seed_development_only
+Round23_QAT_INT8,heldout,1024,29.00390625,2.5272,12.5182,20261123,historical_reported_round23_protocol
+Round23_original_FP32,heldout,1024,37.40234375,,,20261121,historical_round23_report_not_directly_paired_to_round24_fp32

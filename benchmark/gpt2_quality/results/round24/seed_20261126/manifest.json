@@ -1,0 +1,30 @@
+{
+  "batch": 16,
+  "checkpoint": "benchmark/gpt2_quality/results/round24/seed_20261126/round24_integer_qat_fp32.pt",
+  "checkpoint_sha256": "48aaf8f71ed1dd2e86ee91c5c3df5ee22f6f93ebd48441acdd6dab20847f1ac1",
+  "corpus_sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+  "layernorm_forward": "Product exact integer: Q3 input; truncating mean; floor variance; integer sqrt and Q30 reciprocal; Q5 gamma; unit-scale integer beta; signed INT32 saturation; STE gradient through quantized PyTorch LayerNorm",
+  "lr": 2e-05,
+  "other_contract": "inherited Round23 Product Q3/Q5/Q8.8/Q15/GELU/per-K16-down contracts; no RTL or Golden change",
+  "package": "benchmark/gpt2_quality/results/round24/seed_20261126/round24_integer_qat_model.npz",
+  "package_sha256": "b807e8b731107377e5331de6d42c5101a98add7093adb7653c80d169df517880",
+  "seed": 20261126,
+  "source_fp32_sha256": "1d59cf803c328149add9ddb004766e63043b3babdb56ea178bf96d7a51fda8df",
+  "split": "training/development first 90%; final test 10% never used for this candidate run",
+  "status": "SOFTWARE_CANDIDATE_REQUIRES_PRODUCT_TOP_QUALIFICATION",
+  "steps": 500,
+  "validation": {
+    "int8": {
+      "accuracy": 0.24869791666666666,
+      "cross_entropy_nats": 2.738300039203127,
+      "perplexity": 15.460680193800748
+    },
+    "qat_float": {
+      "accuracy": 0.2578125,
+      "cross_entropy_nats": 2.781696488248597,
+      "perplexity": 16.146389886621964
+    },
+    "seed": 2026112401,
+    "windows": 48
+  }
+}
