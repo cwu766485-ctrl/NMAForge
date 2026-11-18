@@ -35,7 +35,7 @@ module ai_descriptor_validator (
 
     assign op_valid = ((op >= 8'h10) && (op <= 8'h17)) ||
                       (op == 8'h20) || (op == 8'h21) ||
-                      ((op >= 8'h30) && (op <= 8'h3a)) ||
+                      ((op >= 8'h30) && (op <= 8'h3b)) ||
                       ((op >= 8'h43) && (op <= 8'h44)) ||
                       is_macro || (op == 8'h50) || (op == 8'h51) ||
                       (op == 8'h52) || (op == 8'h53);
@@ -43,7 +43,7 @@ module ai_descriptor_validator (
     assign is_tensor_matrix = (op == 8'h30) || (op == 8'h31) ||
                               (op == 8'h52) ||
                               (op == 8'h53);
-    assign is_tensor_sfu = (op >= 8'h32) && (op <= 8'h3a);
+    assign is_tensor_sfu = (op >= 8'h32) && (op <= 8'h3b);
     wire is_bf16_dot = (op == 8'h50);
     wire is_fp16_dot = (op == 8'h51);
     wire is_fp_dot = is_bf16_dot || is_fp16_dot;
@@ -98,9 +98,12 @@ module ai_descriptor_validator (
                                (m_size >= 16'd1) && (m_size <= 16'd16) &&
                                (n_size >= 16'd1) && (n_size <= 16'd16) &&
                                (k_words != 16'd0)) ||
-                              ((is_tensor_sfu && op != 8'h3a) && length != 0) ||
+                              ((is_tensor_sfu && op != 8'h3a && op != 8'h3b) && length != 0) ||
                               (op == 8'h3a && length != 0 &&
                                length[1:0] == 2'b00 && flags[4]) ||
+                              (op == 8'h3b && length != 0 &&
+                               m_size >= 16 && m_size <= 256 &&
+                               n_size >= 48 && n_size <= 384) ||
                               ((op == 8'h16 || op == 8'h17) &&
                                m_size >= 16'd3 && n_size >= 16'd3) ||
                               ((op == 8'h43 || op == 8'h44) && length != 0) ||
@@ -164,6 +167,32 @@ module ai_descriptor_validator (
           ((flags == 8'h02) && kv_flag02_fields_valid)) :
          (flags == 8'd0));
 
+    wire [15:0] repack_head_dim = n_size / 16'd3;
+    wire [31:0] repack_src_bytes = {16'd0,m_size} * {16'd0,n_size};
+    wire [31:0] repack_dst_bytes =
+        (aux0[1:0] == 2'd2) ?
+        (({16'd0,repack_head_dim} / 16) *
+         ((({16'd0,m_size} * 16) + 4095) & 32'hffff_f000)) :
+        ({16'd0,m_size} * {16'd0,repack_head_dim});
+    wire [32:0] repack_src_end = {1'b0,src0} + {1'b0,repack_src_bytes};
+    wire [32:0] repack_dst_end = {1'b0,dst} + {1'b0,repack_dst_bytes};
+    wire repack_range_error =
+        repack_src_end[32] || repack_dst_end[32];
+    wire repack_alias_error =
+        ({1'b0,dst} < repack_src_end) && ({1'b0,src0} < repack_dst_end);
+    wire repack_fields_valid =
+        (op != 8'h3b) ||
+        ((version == 8'd7) && (flags == 0) && (bias_base == 0) &&
+         !bias_enable && (scale_shift == 0) && (activation == 0) &&
+         (aux0[31:4] == 0) && (aux0[1:0] <= 2) && (aux0[3:2] <= 2) &&
+         (length != 0) && (length <= m_size) &&
+         (m_size >= 16) && (m_size <= 256) && (m_size[3:0] == 0) &&
+         (n_size >= 48) && (n_size <= 384) && (n_size % 16'd48 == 0) &&
+         (k_words == 0) && (src1 == 0) && (src0_stride == 0) &&
+         (src1_stride == 0) && (dst_stride == {16'd0,m_size}) &&
+         (batch_count == 0) && (head_count == 0) &&
+         !repack_range_error && !repack_alias_error);
+
     // Product GEMV descriptor field gate. Shape support is bounded by the
     // shared 16x16 Matrix array; unsupported strides, batching, and flags are
     // rejected before dispatch rather than silently ignored.
@@ -211,6 +240,7 @@ module ai_descriptor_validator (
                                 (is_macro && (|src0[5:0])) ||
                                 (is_fp_dot && !fp_dot_fields_valid) ||
                                 !fused_matrix_fields_valid ||
+                                !repack_fields_valid ||
                                 !kv_fields_valid ||
                                 !gemv_fields_valid;
 
