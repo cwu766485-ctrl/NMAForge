@@ -1,0 +1,252 @@
+{
+  "attention_q0_15": {
+    "compile_log_sha256": "9eb0a057050b85ee70998f2f9fdfb65a2ecd9a5eddab33601a34249c7976a2cf",
+    "descriptors": 735,
+    "dma_summary_line": "REPRESENTATIVE_LATE_DMA_SUMMARY events=90 payload_bytes=82944 checked_words=20736 axi_read_bytes=82944 ar_bursts=324 r_beats=5184 setup_transfer_cycles=25074",
+    "golden_words": 25536,
+    "manifest": {
+      "artifacts": {
+        "dma_payload.memh": "54e8638a82f983bbf874d7f96224deb48c3c1c7b381de5396b49ed5b22aff245",
+        "late_dma_plan.memh": "acb58bcdb266972e6ac8459543dd72c15fba754c6bc6550acf8961384a41a6a0",
+        "model_golden.memh": "4d75908811bdd47d5db5ead20f1d67d392b08b5f8971039005e28992f60eb3d9",
+        "model_memory.memh": "b7771b421a2ca5ba2940f8e0b54f151e09525437c75bfe200b1cf0091b5f28f0"
+      },
+      "block": 0,
+      "descriptors": 735,
+      "dma_events": 90,
+      "dma_payload_bytes": 82944,
+      "executed_array_macs": 1277952,
+      "padding_macs": 67584,
+      "qkv_dump_sha256": "6709046be52a7bb6ba409b8dbb9724251bd7f7577aadb49e27ba18d88eb876ba",
+      "qkv_golden_sha256": "b0f0d3085fbbfae560d7f506dac07f81b0205413f55bee09f17d1134c3698f85",
+      "shape": {
+        "head_dim": 64,
+        "heads": 3,
+        "key_physical": 208,
+        "key_valid": 197,
+        "query_physical": 16,
+        "query_valid": 16
+      },
+      "softmax": {
+        "length": 197,
+        "opcode": "0x32",
+        "physical_padding_in_denominator": false,
+        "valid_keys_share_one_normalization": true
+      },
+      "spad": {
+        "capacity_bytes": 262144,
+        "completion_base": 249856,
+        "data_high_water": 200448,
+        "descriptor_base": 200704,
+        "key_bases": [
+          8192,
+          21504,
+          34816
+        ],
+        "query_bases": [
+          4096,
+          5120,
+          6144
+        ],
+        "queue_entries": 768,
+        "scratch_bases": [
+          98304,
+          132352,
+          166400
+        ],
+        "value_bases": [
+          49152,
+          65536,
+          81920
+        ],
+        "zero_source": 7168
+      },
+      "staging": "Q/K/V are Product Top readbacks, Golden-checked before host layout conversion; QK, Softmax, probability pack, and AV all run in Product RTL. Projection and attention are separate Top invocations.",
+      "status": "DEIT_THREE_HEAD_PRODUCT_ATTENTION_QBLOCK",
+      "useful_macs_qk_plus_av": 1210368
+    },
+    "model_pass_line": "REPRESENTATIVE_MODEL_PASS desc=735 prefill_desc=0 decode_desc=0 golden_words=25536 useful_macs=1210368 executed_macs=1277952 padding_macs=67584 useful_output_elements=3072 physical_output_elements=3072 command_cycles=594012 end_to_end_cycles=1291324 dma_preload_included=0 prefill_command_cycles=0 decode_command_cycles=0 prefill_exclusive_cycles=0 decode_exclusive_cycles=0 exclusive_profile_cycles=594012 preload_axi_cycles=381983 preload_dma_window_cycles=25074 preload_dma_busy_cycles=21888 preloaded_spad_bytes=337600 useful_mac_per_cycle=2.0376 executed_array_utilization_pct=40.00 useful_array_utilization_pct=37.88 matrix_mac_cycles=12480 matrix_req_wait=0 matrix_rsp_wait=11856 matrix_writeback=3264 matrix_other=71844 sfu_busy=403361 kv_busy=0 conv_busy=0 banked_busy=0 fp_busy=0 scalar_busy=0 no_engine_dispatch_remainder=91207 dma_busy_overlap=21888 spad_read_bytes=914304 spad_write_bytes=102144 late_dma_events=90 late_dma_payload_bytes=82944 late_dma_window_cycles=25074 command_cycles_excluding_late_dma=568938 late_dma_readback_cycles=162036 late_dma_session_cycles=1291324 host_fixture_bytes=254656 test_only_poison_setup_bytes=206592",
+    "run_log_sha256": "84a9c026a227cf86eac610f874355419f1ed394c56c07b37856009151ce72b54",
+    "summary_line": "REPRESENTATIVE_MODEL_PASS desc=735 prefill_desc=0 decode_desc=0 golden_words=25536 useful_macs=1210368 executed_macs=1277952 padding_macs=67584 useful_output_elements=3072 physical_output_elements=3072 command_cycles=594012 end_to_end_cycles=1291324 dma_preload_included=0 prefill_command_cycles=0 decode_command_cycles=0 prefill_exclusive_cycles=0 decode_exclusive_cycles=0 exclusive_profile_cycles=594012 preload_axi_cycles=381983 preload_dma_window_cycles=25074 preload_dma_busy_cycles=21888 preloaded_spad_bytes=337600 useful_mac_per_cycle=2.0376 executed_array_utilization_pct=40.00 useful_array_utilization_pct=37.88 matrix_mac_cycles=12480 matrix_req_wait=0 matrix_rsp_wait=11856 matrix_writeback=3264 matrix_other=71844 sfu_busy=403361 kv_busy=0 conv_busy=0 banked_busy=0 fp_busy=0 scalar_busy=0 no_engine_dispatch_remainder=91207 dma_busy_overlap=21888 spad_read_bytes=914304 spad_write_bytes=102144 late_dma_events=90 late_dma_payload_bytes=82944 late_dma_window_cycles=25074 command_cycles_excluding_late_dma=568938 late_dma_readback_cycles=162036 late_dma_session_cycles=1291324 host_fixture_bytes=254656 test_only_poison_setup_bytes=206592"
+  },
+  "checkpoint_sha256": {
+    "config.json": "e8786a68c993c04b8721c4d379e4f9de6a9564fba5987704dbf8696d53b7972d",
+    "preprocessor_config.json": "90d1ae427c27d2b9dcb01f6a62ba96aa67aac2de1697c59cd212055b5035c4a2",
+    "pytorch_model.bin": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c"
+  },
+  "layout_audit": {
+    "attention_consumer": {
+      "K": {
+        "format": "feature-major signed INT8 [64,208] per head",
+        "transform": "head slice + transpose"
+      },
+      "Q": {
+        "format": "row-major signed INT8 per head",
+        "heads": 3,
+        "shape": [
+          16,
+          64
+        ]
+      },
+      "V": {
+        "format": "Matrix-B tiled signed INT8 [208,64] per head",
+        "transform": "head slice + Matrix-B pack"
+      },
+      "dma_bytes_per_query_block": 82944,
+      "padding_in_denominator": false,
+      "physical_keys": 208,
+      "softmax_opcode": "0x32",
+      "valid_keys": 197
+    },
+    "boundary": {
+      "attention_qk_softmax_pack_av_in_product_rtl": true,
+      "continuous_deployment_gate": "PARTIAL",
+      "host_intermediate_arithmetic": false,
+      "host_qkv_readback_repacking": true,
+      "same_product_top_invocation": false
+    },
+    "producer": {
+      "format": "Matrix-A tiled INT8",
+      "golden_words_verified": 29952,
+      "physical_output_bytes": 119808,
+      "qkv_bases": {
+        "K": "0x20000",
+        "Q": "0x16000",
+        "V": "0x2A000"
+      },
+      "shape_physical": [
+        208,
+        192
+      ],
+      "valid_tokens": 197
+    }
+  },
+  "limitations": [
+    "QKV projection and attention are separate Product Top invocations.",
+    "The attention workload is generated from QKV Top readback using Host Matrix-A unpack, head slicing, K transpose, and V Matrix-B packing.",
+    "The 735-entry attention batch fits the configured 768-entry test queue, but cumulative QKV+attention work and 13 query blocks require runtime refill/retirement not qualified as one continuous model session.",
+    "Both end_to_end_cycles counters exclude initial model-memory image loading (dma_preload_included=0); they are not complete host-to-host inference latency.",
+    "Only Query rows 0..15 are executed by the three-head attention workload; the other 181 valid query rows, head merge, output projection, residual, LN2, FFN, and classification head are not run here."
+  ],
+  "model": "facebook/deit-tiny-patch16-224, non-distilled",
+  "qkv": {
+    "compile_log_sha256": "731d0e815a2cc02f0b4f026f44da881a494967d5d9e91f7da84ba336c7c38f7c",
+    "descriptors": 468,
+    "golden_words": 29952,
+    "manifest": {
+      "artifacts": {
+        "dma_payload.memh": "8c3a68b35541fc9ebaff4d34bae195f8f19bcbb406af470d52b13a6b40fc64d8",
+        "late_dma_plan.memh": "8c4853740ed30aa423544a3197b9ec5bfec3fd728c90084a05d085e4d7ae1c3b",
+        "model_golden.memh": "b0f0d3085fbbfae560d7f506dac07f81b0205413f55bee09f17d1134c3698f85",
+        "model_memory.memh": "caa0462741ad330324b6757133cd1925158bee3e2eb7c9459f0c742c000b5104"
+      },
+      "checkpoint_sha256": {
+        "config.json": "e8786a68c993c04b8721c4d379e4f9de6a9564fba5987704dbf8696d53b7972d",
+        "preprocessor_config.json": "90d1ae427c27d2b9dcb01f6a62ba96aa67aac2de1697c59cd212055b5035c4a2",
+        "pytorch_model.bin": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c"
+      },
+      "execution": {
+        "descriptor_count": 468,
+        "dma_events": 144,
+        "dma_payload_bytes": 112896,
+        "golden_words": 29952,
+        "k_tiles": 156,
+        "physical_macs": 23003136,
+        "q_tiles": 156,
+        "stage_boundary": "LayerNorm was a prior Product Top run; this stage consumes verified Product LN packing; Q/K/V all cover 197 valid rows plus 11 physical padding rows",
+        "useful_macs": 21786624,
+        "v_tiles": 156
+      },
+      "quantization": {
+        "contract": "0x53 signed INT8 product, INT32 bias before arithmetic right shift, signed INT8 saturation; 197 valid input rows and 11 explicit zero padding rows",
+        "input_scale": 0.15038124021560542,
+        "output_scale": 0.03125,
+        "requant_shift": 6,
+        "weight_scale": 0.003246955865638152
+      },
+      "shape": {
+        "heads": 3,
+        "hidden": 192,
+        "physical_rows": 208,
+        "query_physical_rows": 208,
+        "query_rows": 197,
+        "valid_rows": 197
+      },
+      "source_ln_dump_sha256": "f51b11204633ec36fb4d94a6bdc40bde1590b5f269e8c992da9725642eb4b131",
+      "source_ln_manifest_sha256": "1d8feebcd03ae442a5df7d8ea6015ae7234f7b34bbec8729b285dd7e2b72af79",
+      "spad": {
+        "allocation_status": "PASS; nonoverlapping live intervals; weights/bias reused by descriptor order",
+        "allocations": {
+          "bias_tile_reused": [
+            86016,
+            86080
+          ],
+          "cmdq": [
+            221184,
+            253952
+          ],
+          "cplq": [
+            253952,
+            262144
+          ],
+          "key_output_tile_a": [
+            131072,
+            171008
+          ],
+          "ln_product_readback_i8": [
+            32768,
+            72704
+          ],
+          "query_output_tile_a": [
+            90112,
+            130048
+          ],
+          "value_output_tile_a": [
+            172032,
+            211968
+          ],
+          "weight_tile_reused": [
+            73728,
+            86016
+          ]
+        },
+        "banks": 4,
+        "capacity_bytes": 262144,
+        "completion_base": 253952,
+        "data_high_water": 211968,
+        "descriptor_base": 221184,
+        "queue_entries": 512,
+        "words_per_bank": 16384
+      },
+      "status": "DEIT_FULL_KV_PRODUCT_PROJECTION_WORKLOAD",
+      "weights": {
+        "key": {
+          "bias_max": 1424,
+          "bias_min": -1669,
+          "weight_saturation_ratio": 5.425347222222222e-05,
+          "weight_scale": 0.003246955865638152
+        },
+        "query": {
+          "bias_max": 5364,
+          "bias_min": -5111,
+          "weight_saturation_ratio": 0.00010850694444444444,
+          "weight_scale": 0.003246955865638152
+        },
+        "value": {
+          "bias_max": 680,
+          "bias_min": -1038,
+          "weight_saturation_ratio": 0.00010850694444444444,
+          "weight_scale": 0.003246955865638152
+        }
+      }
+    },
+    "model_pass_line": "REPRESENTATIVE_MODEL_PASS desc=468 prefill_desc=0 decode_desc=0 golden_words=29952 useful_macs=21786624 executed_macs=23003136 padding_macs=1216512 useful_output_elements=113472 physical_output_elements=119808 command_cycles=402889 end_to_end_cycles=1083365 dma_preload_included=0 prefill_command_cycles=0 decode_command_cycles=0 prefill_exclusive_cycles=0 decode_exclusive_cycles=0 exclusive_profile_cycles=402889 preload_axi_cycles=315359 preload_dma_window_cycles=35058 preload_dma_busy_cycles=29982 preloaded_spad_bytes=323136 useful_mac_per_cycle=54.0760 executed_array_utilization_pct=100.00 useful_array_utilization_pct=94.71 matrix_mac_cycles=89856 matrix_req_wait=0 matrix_rsp_wait=0 matrix_writeback=7488 matrix_other=228384 sfu_busy=0 kv_busy=0 conv_busy=0 banked_busy=0 fp_busy=0 scalar_busy=0 no_engine_dispatch_remainder=77161 dma_busy_overlap=29982 spad_read_bytes=2905344 spad_write_bytes=119808 late_dma_events=144 late_dma_payload_bytes=112896 late_dma_window_cycles=35058 command_cycles_excluding_late_dma=367831 late_dma_readback_cycles=185328 late_dma_session_cycles=1083365 host_fixture_bytes=210240 test_only_poison_setup_bytes=140352",
+    "readback_sha256": "6709046be52a7bb6ba409b8dbb9724251bd7f7577aadb49e27ba18d88eb876ba",
+    "run_log_sha256": "e229f1ae24c27acf8edeab49c4d15216f59c71f422a83ef29051e0aea077fbe1",
+    "summary_line": "REPRESENTATIVE_MODEL_PASS desc=468 prefill_desc=0 decode_desc=0 golden_words=29952 useful_macs=21786624 executed_macs=23003136 padding_macs=1216512 useful_output_elements=113472 physical_output_elements=119808 command_cycles=402889 end_to_end_cycles=1083365 dma_preload_included=0 prefill_command_cycles=0 decode_command_cycles=0 prefill_exclusive_cycles=0 decode_exclusive_cycles=0 exclusive_profile_cycles=402889 preload_axi_cycles=315359 preload_dma_window_cycles=35058 preload_dma_busy_cycles=29982 preloaded_spad_bytes=323136 useful_mac_per_cycle=54.0760 executed_array_utilization_pct=100.00 useful_array_utilization_pct=94.71 matrix_mac_cycles=89856 matrix_req_wait=0 matrix_rsp_wait=0 matrix_writeback=7488 matrix_other=228384 sfu_busy=0 kv_busy=0 conv_busy=0 banked_busy=0 fp_busy=0 scalar_busy=0 no_engine_dispatch_remainder=77161 dma_busy_overlap=29982 spad_read_bytes=2905344 spad_write_bytes=119808 late_dma_events=144 late_dma_payload_bytes=112896 late_dma_window_cycles=35058 command_cycles_excluding_late_dma=367831 late_dma_readback_cycles=185328 late_dma_session_cycles=1083365 host_fixture_bytes=210240 test_only_poison_setup_bytes=140352"
+  },
+  "run_seed": 20261117,
+  "source_sha": "19254b4e6a756ca8bf54ced5b287311214e5e99c",
+  "status": "STAGED_PRODUCT_TOP_PASS_CONTINUOUS_DEIT_PARTIAL",
+  "vcs": "V-2023.12-SP1_Full64"
+}
