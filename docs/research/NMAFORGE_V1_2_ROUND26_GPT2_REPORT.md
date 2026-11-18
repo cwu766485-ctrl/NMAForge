@@ -2,7 +2,7 @@
 
 ## Disposition
 
-**Product Top execution: historical PASS retained. Model-quality closure: PARTIAL.** This round re-evaluates the three frozen Round 25 INT8 candidates with the exact Product integer reference contract on one fixed test sample. All three exceed the same-sample Bigram baseline by 1.37–1.75 percentage points, but the source FP32 and QAT Float models are themselves below Bigram. The result does not establish useful language-model quality or close the generalization gap. No RTL was changed and no new Product Top simulation was run in Round 26.
+**Product Top execution: historical PASS retained. Model-quality closure: PARTIAL.** This round re-evaluates the three frozen Round 25 INT8 candidates with the exact Product integer reference contract on one fixed test sample. They exceed the same-sample Bigram baseline by 1.37–2.15 percentage points (mean margin 1.82 pp), but the source FP32 and QAT Float models are themselves below Bigram. The result does not establish useful language-model quality or close the generalization gap. No RTL was changed and no new Product Top simulation was run in Round 26.
 
 ## Frozen inputs and evaluation contract
 
