@@ -99,7 +99,7 @@ module tb_ai_accel_smoke;
 `elsif AI_DEIT_R19_STREAM
     localparam [31:0] REPRESENTATIVE_AXI_BYTES = 100000 * 4;
 `elsif AI_REPRESENTATIVE_LONG_TASK
-    localparam [31:0] REPRESENTATIVE_AXI_BYTES = 12288 * 4;
+    localparam [31:0] REPRESENTATIVE_AXI_BYTES = 32768 * 4;
 `else
     localparam [31:0] REPRESENTATIVE_AXI_BYTES = 8192 * 4;
 `endif
@@ -1688,7 +1688,7 @@ module tb_ai_accel_smoke;
 `elsif AI_DEIT_R19_STREAM
     axi_memory_model #(.WORDS(100000)) axi_mem_u(
 `elsif AI_REPRESENTATIVE_LONG_TASK
-    axi_memory_model #(.WORDS(12288)) axi_mem_u(
+    axi_memory_model #(.WORDS(32768)) axi_mem_u(
 `else
     axi_memory_model #(.WORDS(8192)) axi_mem_u(
 `endif
@@ -5795,9 +5795,9 @@ module tb_ai_accel_smoke;
             golden_count = representative_golden_words[0];
             if (image_count <= 0 || image_count > 65535 ||
                 golden_count <= 0 || golden_count > 65535 ||
-                descriptor_count < 1 || descriptor_count > 512 ||
+                descriptor_count < 1 || descriptor_count > 768 ||
                 representative_queue_size <= descriptor_count ||
-                representative_queue_size > 512 ||
+                representative_queue_size > 768 ||
                 prefill_descriptor_count < 0 ||
                 prefill_descriptor_count > descriptor_count ||
                 descriptor_base < 0 || completion_base < 0 ||
