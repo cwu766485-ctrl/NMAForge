@@ -1,0 +1,46 @@
+{
+  "round": 27,
+  "overall_status": "PARTIAL",
+  "unified_product_branch_created": false,
+  "product_rtl_modified": false,
+  "tracks": {
+    "gpt2": {
+      "branch": "research/nmaforge-v1.2-dual-final-gpt2",
+      "source_sha": "901dd1d287413a4b8c51bd4f99c403842d6c30db",
+      "four_layer_product_top": "PASS",
+      "four_context_logits_golden": "PASS",
+      "four_token_feedback_same_top_no_reset": "PASS",
+      "host_intermediate_tensor_writes": 0,
+      "decode_mode": "prefix_recompute",
+      "model_quality": "PARTIAL",
+      "quality_summary": {
+        "product_int8_accuracy_mean_pct": 29.362,
+        "product_int8_seed_std_pp": 0.332,
+        "bigram_accuracy_pct": 27.539,
+        "source_fp32_accuracy_pct": 23.242,
+        "qat_float_accuracy_pct": 22.721,
+        "test_targets": 512,
+        "validation_train_partition_overlap": true
+      }
+    },
+    "deit": {
+      "branch": "research/nmaforge-v1.2-dual-final-deit",
+      "source_sha": "19254b4e6a756ca8bf54ced5b287311214e5e99c",
+      "official_checkpoint_sha256": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c",
+      "qkv_197_valid_rows": "STAGED_PRODUCT_TOP_PASS",
+      "three_head_attention_16x197": "STAGED_PRODUCT_TOP_PASS",
+      "qkv_attention_same_top_no_host_intermediate": "NOT_PASS",
+      "attention_all_197_queries": "PARTIAL",
+      "encoder_layer0": "NOT_RUN",
+      "twelve_layers_and_classifier": "NOT_RUN",
+      "product_rtl_modified": false
+    }
+  },
+  "tiny_npu_matched_end_to_end": "NOT_RUN",
+  "shared_model_deployment_closure": "NOT_REACHED",
+  "prohibited_claims": [
+    "Do not call the GPT-2-derived model original pretrained GPT-2.",
+    "Do not call the staged DeiT Product Top runs a continuous full model inference.",
+    "Do not claim model quality or complete DeiT Encoder Layer 0 closure."
+  ]
+}
