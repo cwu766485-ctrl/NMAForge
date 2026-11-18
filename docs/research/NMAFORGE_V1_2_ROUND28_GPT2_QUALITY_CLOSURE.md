@@ -57,6 +57,28 @@ The final context cycle count is reported as observed for that context, not as a
 
 Raw compile/run/make logs, logits CSVs, result JSON, SHA256SUMS and run manifest are archived under `benchmark/gpt2_quality/results/round28_product_top/`.
 
+### Deterministic package export audit
+
+The selected checkpoint was re-exported through the repository's integer package exporter. All 45 named tensors matched in shape, dtype, and value, and the regenerated archive was byte-identical to the Product Top package. This establishes deterministic **checkpoint-to-package export**, not deterministic retraining from the corpus.
+
+| Item | SHA-256 / result |
+|---|---|
+| FP32/QAT checkpoint | `8674782e974cdbb1f43743b00762d854d37e3808b3a2426d3180b36bd99d3130` |
+| Original Product INT8 package | `9e330e56226d76aaf5c639975b30ae2612a1a965ec4c942cb9f93db86dc5a803` |
+| Re-exported package | same SHA; archive bytes equal |
+| Tensor comparison | 45/45 equal; zero tensor mismatches |
+| Machine-readable evidence | `benchmark/gpt2_quality/results/round28_package_audit/reproducibility.json` |
+
+Reproduction command (from this worktree root):
+
+```bash
+/tmp/nmaforge_deit_round17_venv/bin/python benchmark/gpt2_quality/round28_package_repro_audit.py \
+  --checkpoint benchmark/gpt2_quality/results/round27_extended_train/seed_20261223/qat_float.pt \
+  --package benchmark/gpt2_quality/results/round27_extended_train/seed_20261223/product_int8.npz \
+  --reexport /tmp/nmaforge_round28_reexport.npz \
+  --report benchmark/gpt2_quality/results/round28_package_audit/reproducibility.json
+```
+
 ## Reproduction
 
 Environment: Python 3.12.13, NumPy 2.5.4, PyTorch 2.6.0+cpu, Transformers 4.48.3; VCS V-2023.12-SP1 Full64.
@@ -88,7 +110,8 @@ The successful command exited 0. The archived `run_manifest.json` binds the comm
 |---|---|---|
 | Corpus/data split audit | PASS | Disjoint source ranges, guards, fixed test-start hash, paired window bootstrap |
 | Multi-seed quality comparison | PARTIAL | Three fixed seeds measured; Product INT8 CE/PPL remains worse than Bigram; small byte corpus/task limits generalization claims |
-| Product integer package reproducibility | PARTIAL | Frozen package hash verified; full clean retraining-to-identical-package reproduction was not rerun in this round |
+| Product integer package export reproducibility | PASS | Frozen `qat_float.pt` re-exported byte-for-byte; all 45 tensors match and NPZ SHA is unchanged |
+| Full training-to-package reproducibility | PARTIAL | Frozen source checkpoint is identified; clean retraining was not repeated in this round |
 | Four-layer Product Top logits | PASS | 4×256 logits bit-exact with independent integer Golden |
 | Four-token autoregressive feedback | PASS | Real RTL logits → Host Argmax → next input, same Top instance; prefix-recompute mode |
 | GPT-2 quality closure | PARTIAL | Not pretrained GPT-2; no credible quality margin over simple baseline |
