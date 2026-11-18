@@ -120,3 +120,19 @@ The successful command exited 0. The archived `run_manifest.json` binds the comm
 ## Remaining work
 
 Do not adjust Product RTL or its Golden based on these results. The next useful GPT work is to resolve the poor FP32/QAT generalization with a corpus-level, leakage-audited training/evaluation protocol and explain the Fake Quant divergence at operator level. Any new model must be selected on validation only, frozen before final test, and then rerun through the same Product Top contract. TinyNPU speedup is not claimed here.
+
+## Round 28 final gate audit
+
+This note was finalized on 2026-11-18 from the isolated Round 28 GPT-2 worktree. The recorded Product Top run used source commit `ae06661c8c2416ad5af011088cbe0eedc5077c5c`; comparison against the current Round 28 branch head `3691cbee0dac59639bfb0120270c4bc9b8d1aa1f` found no changes under `rtl/`, `dv/`, or `sw/`. The archived VCS result therefore remains tied to the tested product implementation. This is a source-diff audit, not a new simulation run.
+
+| Round 28 gate | Final state | Evidence boundary |
+|---|---|---|
+| Independent corpus split and fixed evaluation | PASS | Disjoint byte intervals, boundary guards, fixed 8,192 target positions |
+| INT8 package and Product Top logits | PASS | Four real Product Top contexts × 256 logits, exact against the independent integer reference |
+| Host Argmax feedback | PASS | Four feedback contexts on the same Top instance, zero reset and zero host-written intermediate tensor words |
+| Reproducible checkpoint-to-package export | PASS | 45/45 tensors equal and byte-identical NPZ re-export |
+| Useful language-model quality | PARTIAL | Accuracy is +1.0132 pp vs byte bigram on the selected seed, but CE/PPL are worse; three-seed Product INT8 mean is 27.8971% |
+| Pretrained GPT-2 deployment / quality closure | NOT MET | This is a byte-level Tiny-Shakespeare H64 model, not pretrained GPT-2; quality does not establish a useful language model |
+| Full train-to-package retraining replay | PARTIAL | Frozen checkpoint is identified; this round proves deterministic export, not a clean retraining replay |
+
+**Track disposition: `PRODUCT_FUNCTION_PASS / MODEL_QUALITY_PARTIAL`.** The Product Top path is qualified for this exact package and integer contract. Do not infer broad language quality or TinyNPU parity from that functional result.
