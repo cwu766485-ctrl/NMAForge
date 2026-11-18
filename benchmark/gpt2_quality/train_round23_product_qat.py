@@ -47,7 +47,11 @@ def q15_product_softmax(scores: torch.Tensor, mask: torch.Tensor) -> torch.Tenso
     denom = exp.sum(dim=-1, keepdim=True).clamp(min=1)
     p15 = (exp << 15) // denom
     # Product AV consumes probability >> 8, i.e. a Q7 probability operand.
-    p7 = (p15 >> 8).to(torch.float32) / 128.0
+    # The Product path stores the Q15 probability as a signed INT8 operand
+    # after an arithmetic >>8 and INT8 saturation.  A probability of exactly
+    # 1.0 produces code 128 before saturation, so the physical AV operand is
+    # 127.  Keep this saturation in the fake-quant forward path.
+    p7 = (p15 >> 8).clamp(-128, 127).to(torch.float32) / 128.0
     return smooth + (p7 - smooth).detach()
 
 
@@ -56,6 +60,22 @@ def product_gelu(x: torch.Tensor) -> torch.Tensor:
     y = torch.where(x <= -2.0, torch.zeros_like(x),
                     torch.where(x >= 2.0, x, mid))
     return ste_quant(y, 256.0, rounding="floor")
+
+
+def exact_forward(proxy: torch.Tensor, exact: torch.Tensor) -> torch.Tensor:
+    """Use the integer-contract value in forward and the float proxy in backward."""
+    exact = exact.to(dtype=proxy.dtype, device=proxy.device)
+    return proxy + (exact - proxy).detach()
+
+
+def integer_gelu_q8_8(values: torch.Tensor) -> torch.Tensor:
+    """Product GELU contract on integer Q8.8 codes, returned as Q8.8 floats."""
+    x = values.to(torch.int64)
+    middle = (x * (x + 512)) >> 10
+    y = torch.where(x <= -512, torch.zeros_like(x),
+                    torch.where(x >= 512, x, middle))
+    y = y.clamp(-(1 << 31), (1 << 31) - 1)
+    return y.to(torch.float32) / 256.0
 
 
 class ProductQAT(nn.Module):
@@ -73,6 +93,36 @@ class ProductQAT(nn.Module):
         y = F.layer_norm(x, (x.shape[-1],), gamma, beta, layernorm.eps)
         return ste_quant(y, 1.0, rounding="floor")
 
+    def _linear_contract(self, x: torch.Tensor, weight: torch.Tensor,
+                         weight_scale: int, input_scale: int,
+                         output_scale: int, shift: int = 0,
+                         input_clamp: tuple[int, int] | None = None,
+                         clamp: tuple[int, int] | None = None) -> torch.Tensor:
+        """Quantized linear with exact INT64 forward and STE floating gradient.
+
+        ``x`` and ``weight`` use the physical scales named by the caller. The
+        exact result is the Product integer dot, arithmetic shift, optional
+        saturation, then represented at ``output_scale`` in the QAT graph.
+        """
+        w_fake = self.qw(weight, float(weight_scale))
+        x_fake = ste_quant(x, float(input_scale),
+                           None if input_clamp is None else input_clamp[0],
+                           None if input_clamp is None else input_clamp[1],
+                           rounding="round")
+        proxy = F.linear(x_fake, w_fake)
+        x_i = torch.round(x_fake * float(input_scale)).to(torch.int64)
+        if input_clamp is not None:
+            x_i = x_i.clamp(input_clamp[0], input_clamp[1])
+        w_i = torch.round(weight * float(weight_scale)).to(torch.int64).clamp(-128, 127)
+        acc = torch.matmul(x_i, w_i.transpose(-1, -2))
+        if shift:
+            acc = acc >> shift
+        acc = acc.clamp(-(1 << 31), (1 << 31) - 1)
+        if clamp is not None:
+            acc = acc.clamp(clamp[0], clamp[1])
+        exact = acc.to(torch.float32) / float(output_scale)
+        return exact_forward(proxy, exact)
+
     def forward(self, tokens: torch.Tensor, return_trace: bool = False):
         batch, length = tokens.shape
         trace: dict[str, torch.Tensor] = {}
@@ -89,9 +139,9 @@ class ProductQAT(nn.Module):
             trace[prefix + "ln1"] = n1
             qkv = {}
             for name in ("q", "k", "v"):
-                w = self.qw(layer[name].weight, 32.0)
-                raw = F.linear(n1, w)
-                qkv[name] = ste_quant(raw, 32.0, -128, 127, rounding="floor")
+                qkv[name] = self._linear_contract(
+                    n1, layer[name].weight, weight_scale=32, input_scale=1,
+                    output_scale=32, input_clamp=(-128, 127), clamp=(-128, 127))
                 trace[prefix + name] = qkv[name]
             q = qkv["q"].view(batch, length, HEADS, HIDDEN // HEADS).transpose(1, 2)
             k = qkv["k"].view(batch, length, HEADS, HIDDEN // HEADS).transpose(1, 2)
@@ -101,27 +151,43 @@ class ProductQAT(nn.Module):
             # Keep this fake-quant forward path numerically aligned with that
             # fixed-point contract; introducing the float scale here would
             # train a different attention function.
-            scores = torch.matmul(q, k.transpose(-1, -2))
-            scores = ste_quant(scores, 256.0, rounding="floor")
+            score_proxy = torch.matmul(q, k.transpose(-1, -2))
+            q_i = torch.round(q * 32.0).to(torch.int64)
+            k_i = torch.round(k * 32.0).to(torch.int64)
+            score_i = torch.matmul(q_i, k_i.transpose(-1, -2)) >> 2
+            score_i = score_i.clamp(-(1 << 31), (1 << 31) - 1)
+            scores = exact_forward(score_proxy, score_i.to(torch.float32) / 256.0)
             trace[prefix + "scores"] = scores
             probs = q15_product_softmax(scores, causal[None, None])
             trace[prefix + "probabilities"] = probs
-            attended = torch.matmul(probs, v).transpose(1, 2).contiguous().view(batch, length, HIDDEN)
-            attended = ste_quant(attended, 32.0, -128, 127, rounding="floor")
+            attention_proxy = torch.matmul(probs, v).transpose(1, 2).contiguous().view(batch, length, HIDDEN)
+            p7_i = torch.round(probs * 128.0).to(torch.int64).clamp(-128, 127)
+            v_i = torch.round(v * 32.0).to(torch.int64)
+            attention_i = (torch.matmul(p7_i, v_i) >> 7).clamp(-128, 127)
+            attention_i = attention_i.transpose(1, 2).contiguous().view(batch, length, HIDDEN)
+            attended = exact_forward(attention_proxy, attention_i.to(torch.float32) / 32.0)
             trace[prefix + "attention"] = attended
-            wo = self.qw(layer["o"].weight, 32.0)
-            projection = ste_quant(F.linear(attended, wo), 8.0, rounding="floor")
+            projection = self._linear_contract(
+                attended, layer["o"].weight, weight_scale=32,
+                input_scale=32, output_scale=8, shift=7)
             trace[prefix + "projection"] = projection
-            residual1 = ste_quant(x + projection, 8.0, rounding="floor")
+            residual1_i = (torch.round(x * 8.0).to(torch.int64) +
+                           torch.round(projection * 8.0).to(torch.int64))
+            residual1_i = residual1_i.clamp(-(1 << 31), (1 << 31) - 1)
+            residual1 = exact_forward(x + projection, residual1_i.to(torch.float32) / 8.0)
             trace[prefix + "residual1"] = residual1
             n2 = self._ln(residual1, layer["ln2"])
             trace[prefix + "ln2"] = n2
-            wup = self.qw(layer["up"].weight, 256.0)
-            up = ste_quant(F.linear(n2, wup), 256.0, rounding="floor")
+            up = self._linear_contract(
+                n2, layer["up"].weight, weight_scale=256, input_scale=1,
+                output_scale=256, input_clamp=(-128, 127))
             trace[prefix + "up"] = up
-            gelu = product_gelu(up)
+            gelu = exact_forward(product_gelu(up), integer_gelu_q8_8(
+                torch.round(up * 256.0).to(torch.int64)))
             trace[prefix + "gelu"] = gelu
-            gelu_i8 = ste_quant(gelu, 8.0, -128, 127, rounding="floor")
+            gelu_i8_value = (torch.round(gelu * 256.0).to(torch.int64) >> 5).clamp(-128, 127)
+            gelu_i8 = exact_forward(ste_quant(gelu, 8.0, -128, 127, rounding="floor"),
+                                   gelu_i8_value.to(torch.float32) / 8.0)
             trace[prefix + "gelu_i8"] = gelu_i8
             wdown = self.qw(layer["down"].weight, 32.0)
             # Product executes FFN-down in sixteen K=16 Matrix tiles and
@@ -129,18 +195,30 @@ class ProductQAT(nn.Module):
             # Quantize each partial separately, as the RTL/reference do; a
             # single requant after the full K reduction is not equivalent.
             down_parts = []
+            down_i = torch.zeros((*gelu_i8.shape[:-1], layer["down"].weight.shape[0]),
+                                 dtype=torch.int64, device=gelu_i8.device)
             for tile in range(FFN // 16):
                 partial = F.linear(gelu_i8[..., tile * 16:(tile + 1) * 16],
                                    wdown[:, tile * 16:(tile + 1) * 16])
                 down_parts.append(ste_quant(partial, 8.0, rounding="floor"))
+                gi = torch.round(gelu_i8[..., tile * 16:(tile + 1) * 16] * 8.0).to(torch.int64)
+                wi = torch.round(layer["down"].weight[:, tile * 16:(tile + 1) * 16] * 32.0).to(torch.int64).clamp(-128, 127)
+                part_i = (torch.matmul(gi, wi.transpose(-1, -2)) >> 5)
+                part_i = part_i.clamp(-(1 << 31), (1 << 31) - 1)
+                down_i = (down_i + part_i).clamp(-(1 << 31), (1 << 31) - 1)
             down = torch.stack(down_parts, dim=0).sum(dim=0)
+            down = exact_forward(down, down_i.to(torch.float32) / 8.0)
             trace[prefix + "down"] = down
-            x = ste_quant(residual1 + down, 8.0, rounding="floor")
+            residual2_i = (torch.round(residual1 * 8.0).to(torch.int64) +
+                           torch.round(down * 8.0).to(torch.int64)).clamp(
+                               -(1 << 31), (1 << 31) - 1)
+            x = exact_forward(residual1 + down, residual2_i.to(torch.float32) / 8.0)
             trace[prefix + "residual2"] = x
         final_ln = self._ln(x, self.model.final_ln)
         trace["final_ln"] = final_ln
-        lm_w = self.qw(self.model.embedding.weight, 32.0)
-        logits = ste_quant(F.linear(final_ln, lm_w), 32.0, rounding="floor")
+        logits = self._linear_contract(
+            final_ln, self.model.embedding.weight, weight_scale=32,
+            input_scale=1, output_scale=32, input_clamp=(-128, 127))
         trace["logits"] = logits
         if return_trace:
             return logits, trace
