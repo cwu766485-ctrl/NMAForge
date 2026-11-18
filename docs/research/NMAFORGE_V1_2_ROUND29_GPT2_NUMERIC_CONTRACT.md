@@ -54,12 +54,27 @@ Frozen input identities from the audit:
 
 The Round 28 7.69% comparison was not an apples-to-apples fake-forward comparison: it paired a pre-QAT FP32 checkpoint for the fake path with an updated QAT Product package. Separately, the earlier fake forward omitted the probability saturation. Both defects are now isolated by comparing a single QAT checkpoint/package pair and a negative control. This explains the numerical discrepancy; it does not establish a quality gain over a matched bigram baseline.
 
+### Same-window quality comparison
+
+The frozen validation-selected seed was also compared against FP32, QAT Float, and a train-only bigram on the same 512 held-out windows (8,192 targets). The paired bootstrap resampled whole windows (20,000 draws, seed `20261128`):
+
+| Path | Accuracy | Cross entropy (nats) | Perplexity |
+|---|---:|---:|---:|
+| FP32 | 35.730% | 2.22248 | 9.2302 |
+| QAT Float | 28.027% | 2.49580 | 12.1315 |
+| Product INT8 reference | 27.905% | 2.60427 | 13.5213 |
+| Train-only bigram | 26.892% | 2.53785 | 12.6524 |
+
+Product INT8 is `+1.013` percentage points over bigram in top-1 accuracy (95% paired window-bootstrap CI `+0.037` to `+1.990` points), but its cross entropy is worse by `0.06642` nats (95% CI `+0.04232` to `+0.09094`). It also trails same-window FP32 by `7.825` accuracy points and has only `46.81%` FP32/INT8 top-1 agreement. This is a small, single-seed, 512-window software evaluation, not quality closure. The older `fake_quant` row in the reused Round 28 audit uses the pre-QAT checkpoint and is intentionally not treated as a paired quality candidate; Round 29's matching-checkpoint audit above is the valid fake-forward comparison.
+
+Raw paired rows and summary are archived under `benchmark/gpt2_quality/results/round29/paired_quality/`; `run_manifest.txt` records command, tool versions, and hashes.
+
 ## Gate status
 
 | Gate | Status | Evidence / remaining work |
 |---|---|---|
 | QAT hard forward vs independent INT reference | **PASS** | Exact named-stage and logit match on the fixed 8,192 targets. |
 | Root-cause audit of prior fake-quant discrepancy | **PASS, bounded** | Mismatched model states plus omitted Q15-to-INT8 saturation identified. |
-| Model quality recovery | **PARTIAL** | 27.9053% is the matched integer evaluation result; this run did not recompute Bigram, FP32, or QAT-Float metrics on the same sample manifest, so no quality improvement is claimed. |
+| Model quality recovery | **PARTIAL** | Same-window INT8 accuracy is 1.013 points above bigram, but CE/PPL are worse and the estimate is from one seed and 512 held-out windows. |
 | New-model Product Top forward/logits/autoregressive replay | **NOT_RUN** | No newly qualified package was deployed to Product Top in this round. |
 | New training/multi-seed QAT | **NOT_RUN** | The frozen package was audited; training steps and checkpoint selection were not changed. |
