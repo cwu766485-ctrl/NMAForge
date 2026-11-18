@@ -1,0 +1,112 @@
+{
+  "corpus_sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+  "files": {
+    "metrics": "round27_clean_split_metrics.csv",
+    "split": "corpus_split.json"
+  },
+  "limitation": "Tiny Shakespeare byte-level H64 research model; not a pretrained GPT-2 checkpoint.",
+  "qat_steps": 800,
+  "seeds": [
+    20261211,
+    20261212,
+    20261213
+  ],
+  "status": "SOFTWARE_CLEAN_SPLIT_EXPERIMENT_COMPLETE_PRODUCT_TOP_QUALIFICATION_REQUIRED",
+  "test_metrics_by_seed": [
+    {
+      "bigram": {
+        "accuracy": 0.2689208984375,
+        "cross_entropy_nats": 2.5378480440033466,
+        "perplexity": 12.652414215040778
+      },
+      "fake_quant": {
+        "accuracy": 0.2626953125,
+        "cross_entropy_nats": 2.689725138045744,
+        "fp32_top1_agreement": 0.2979736328125,
+        "perplexity": 14.727627299641012
+      },
+      "fp32": {
+        "accuracy": 0.31982421875,
+        "cross_entropy_nats": 2.369257480203861,
+        "perplexity": 10.689452206770142
+      },
+      "product_int8": {
+        "accuracy": 0.2635498046875,
+        "cross_entropy_nats": 2.706308286986657,
+        "fp32_top1_agreement": 0.5301513671875,
+        "perplexity": 14.97389403204478
+      },
+      "qat_float": {
+        "accuracy": 0.2364501953125,
+        "cross_entropy_nats": 2.6643345045655398,
+        "fp32_top1_agreement": 0.32275390625,
+        "perplexity": 14.358390922134385
+      }
+    },
+    {
+      "bigram": {
+        "accuracy": 0.2689208984375,
+        "cross_entropy_nats": 2.5378480440033466,
+        "perplexity": 12.652414215040778
+      },
+      "fake_quant": {
+        "accuracy": 0.261474609375,
+        "cross_entropy_nats": 2.706463613410639,
+        "fp32_top1_agreement": 0.308837890625,
+        "perplexity": 14.97622005409953
+      },
+      "fp32": {
+        "accuracy": 0.33154296875,
+        "cross_entropy_nats": 2.3285914473194644,
+        "perplexity": 10.263474701985398
+      },
+      "product_int8": {
+        "accuracy": 0.2591552734375,
+        "cross_entropy_nats": 2.714015440284422,
+        "fp32_top1_agreement": 0.489013671875,
+        "perplexity": 15.089745999783123
+      },
+      "qat_float": {
+        "accuracy": 0.2332763671875,
+        "cross_entropy_nats": 3.0185684182517987,
+        "fp32_top1_agreement": 0.477783203125,
+        "perplexity": 20.46197771270046
+      }
+    },
+    {
+      "bigram": {
+        "accuracy": 0.2689208984375,
+        "cross_entropy_nats": 2.5378480440033466,
+        "perplexity": 12.652414215040778
+      },
+      "fake_quant": {
+        "accuracy": 0.2548828125,
+        "cross_entropy_nats": 2.7030336974857816,
+        "fp32_top1_agreement": 0.344482421875,
+        "perplexity": 14.924940870358332
+      },
+      "fp32": {
+        "accuracy": 0.3248291015625,
+        "cross_entropy_nats": 2.3419156237718877,
+        "perplexity": 10.401142166009262
+      },
+      "product_int8": {
+        "accuracy": 0.2567138671875,
+        "cross_entropy_nats": 2.693829191709095,
+        "fp32_top1_agreement": 0.497802734375,
+        "perplexity": 14.7881944728648
+      },
+      "qat_float": {
+        "accuracy": 0.26220703125,
+        "cross_entropy_nats": 2.6525952604388547,
+        "fp32_top1_agreement": 0.4678955078125,
+        "perplexity": 14.190819769575876
+      }
+    }
+  ],
+  "test_sample_sha256": "36c21c93a1c98515c4f8a6209fe016688babe19d991a3d0ad7af4573419376a2",
+  "test_windows": 512,
+  "train_steps": 2000,
+  "validation_windows": 128,
+  "wall_seconds": 163.42707991600037
+}
