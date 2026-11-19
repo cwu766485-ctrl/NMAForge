@@ -1501,3 +1501,31 @@ ai_tiny_gpt2_top:
 ai_spad_capacity_boundaries: ai_comp
 	./simv +AI_SPAD_CAPACITY_BOUNDARIES +AI_RANDOM_CASES=0 +AI_SEED=$(AI_SEED) -l ai_spad_capacity_boundaries.log
 	grep -q '^SPAD_CAPACITY_BOUNDARY_PASS ' ai_spad_capacity_boundaries.log
+
+# Round 29: dispatch the research 0x3b Matrix-A repack mode through Product
+# Top in a 256 KiB SPAD configuration. This is a repack-only integration
+# test; its source tensor is preloaded and it does not claim a QKV producer or
+# Attention consumer path.
+AI_DEIT_R29_RUN ?= /tmp/nmaforge_deit_round29_top_$(shell date +%Y%m%d_%H%M%S)
+AI_DEIT_R29_PYTHON ?= /tmp/nmaforge_deit_round17_venv/bin/python
+.PHONY: ai_deit_round29_top_repack_256k
+ai_deit_round29_top_repack_256k:
+	test ! -e "$(AI_DEIT_R29_RUN)"
+	mkdir -p "$(AI_DEIT_R29_RUN)"
+	$(AI_DEIT_R29_PYTHON) ../../../../benchmark/deit/round29/generate_repack_top_workload.py \
+		--out-dir "$(AI_DEIT_R29_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=16384 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_R29_RUN)/csrc -top tb_ai_accel_smoke \
+		-f ai_accel.f ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_DEIT_R29_RUN)/simv -l $(AI_DEIT_R29_RUN)/compile.log
+	$(AI_DEIT_R29_RUN)/simv +ntb_random_seed=290029 +AI_RANDOM_CASES=0 +AI_SEED=290029 \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_R29_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_R29_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=65536 +AI_REPRESENTATIVE_CPL_BASE=66560 \
+		+AI_REPRESENTATIVE_DESC_COUNT=9 +AI_REPRESENTATIVE_QUEUE_SIZE=16 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=0 -l $(AI_DEIT_R29_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=9 .*golden_words=576 useful_macs=0 ' \
+		$(AI_DEIT_R29_RUN)/run.log

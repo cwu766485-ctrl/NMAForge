@@ -108,6 +108,8 @@ SFU `REQUANT_I8`（opcode `0x36`）中 `flags[4]` 将饱和后的 INT32 结果�
 
 研究候选 `0x3b`（`TENSOR_REPACK`）在隔离研究分支实现，用于把 Matrix-A 物理 Tile 中的 signed INT8 行按 Head 重排到 Attention 消费布局；它不执行数值变换或 MAC。ABI-v7 descriptor 要求 `flags=0`、`k_words=0`、`src1=0`、`src0_stride=src1_stride=0`、`dst_stride=m_size`、`batch_count=head_count=0`，关闭 Bias、Activation 和 Scale。`m_size` 是 16..256 的 16 倍数，`length` 为 1..m_size 的有效行数，`n_size` 是 48..384 的 48 倍数（总通道数，三个等宽 Head）。`aux0[1:0]` 选择 Q dense row-major（0）、K-major（1）或 V Matrix-B panel（2），`aux0[3:2]` 选择 Head 0..2，其余位必须为 0。输入按 4×4 Matrix-A Tile 物理寻址；Q 输出按有效/填充行的连续 Head 向量写入，K 输出将 Token 维转为外层维，V 输出按 Matrix-B Panel/Bank 物理字节 Lane 写入。`length..m_size-1` 的无效 Token 由硬件写零，不读取源数据。源与目的范围不得重叠或溢出，起始地址须 word 对齐；合法命令通过共享 SPAD 调度端口读写并产生普通 Completion，软件应使用依赖事件保证消费者等待 Repack 完成。此为研究原型 ABI，不属于冻结产品 ABI；其描述符范围、打包布局及跨引擎连续执行仍须独立验证。
 
+对 `0x3b`，64-byte descriptor 的 word 6 仍承载 `length`；Descriptor Fetch 按 opcode 将派生的 `k_words` 置零。其他 Opcode 的 word 6 解码语义保持不变（包括 GEMM 的 K 维）。
+
 ### 4.1 Compute CMDQ 并行派发
 
 普通 compute descriptor 按 CMDQ 顺序逐个读取、校验和派发；不同计算引擎的任务允许重叠，每个引擎最多有一个未完成任务。一个引擎仍忙时，属于该引擎的后续 descriptor 留在队列中，不能覆盖它的活动上下文。普通 descriptor 的 `CMDQ_HEAD` 在被派发或被判定为错误时推进；完成记录严格按 descriptor 的 CMDQ 顺序写入 CPLQ，且每项四个 word 全部提交后才推进 `CPLQ_TAIL`。因此任务执行完成顺序可以不同，软件观察到的完成顺序不变。Requirement 编号、测试台架边界和验证证据见 [Compute Cluster SPEC v1.5](COMPUTE_CLUSTER_SPEC_ZH.md) 与 [Compute Cluster UVM Testplan](../verification/COMPUTE_CLUSTER_UVM_TESTPLAN_ZH.md)。

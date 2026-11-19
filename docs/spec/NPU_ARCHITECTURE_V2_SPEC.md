@@ -264,6 +264,10 @@ completion/dependency semantics. This is a research ABI candidate rather than
 the frozen Product ABI, and its physical layout and continuous top-level
 producer/consumer path require separate evidence.
 
+The 64-byte descriptor still stores the valid-row extent in word 6. Descriptor
+fetch derives `k_words=0` for opcode `0x3b`; all other opcodes retain their
+existing word-6 K-dimension decode. No descriptor size or field offset changes.
+
 ## 4. INT8 arithmetic and layout contract
 
 ### 4.1 Product and accumulation

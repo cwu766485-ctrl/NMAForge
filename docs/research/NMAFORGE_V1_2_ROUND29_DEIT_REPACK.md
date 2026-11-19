@@ -3,9 +3,10 @@
 ## Scope and disposition
 
 - Research branch: `research/nmaforge-v1.2-round29b-deit`
-- Audited base commit: `bd36be685490337278c02e9ccf9184c074237c13`
+- Repack block-prototype base: `bd36be685490337278c02e9ccf9184c074237c13`
+- Product Top integration follow-up base: `e4970d78fb55cf126fea563652bdfa57c38dbce5`
 - RTL worktree diff SHA-256 at the directed run: `7f848ca618171acff781cf73bd2c79753cf67b1c6986186ce2bf9b4ede948f7a`
-- Disposition: **PARTIAL**. The bounded SFU Repack opcode passes a standalone VCS test across a 16-row physical tile boundary and the existing Product Top smoke/seeded regressions pass. The new opcode has not yet been exercised through a submitted command in Product Top, and the requested same-Top QKV→Attention/Encoder flow is not closed.
+- Disposition: **PARTIAL**. The bounded SFU Repack opcode passes standalone VCS testing and now also passes a 256 KiB Product Top command/Completion/data-path test. The Product Top fixture preloads the Matrix-A source; it does not test a live QKV producer, Attention consumer, or a complete DeiT execution session.
 
 No main branch or other worktree was modified.
 
@@ -54,8 +55,42 @@ Both exited 0 and reported `TEST PASS`. The Top compile log contains VCS `Warnin
 
 - `rtl/compute/sfu/ai_tensor_sfu_core.v`: bounded Q/K/V repack states, Matrix-A source addressing, zero padding, and packed destination layouts.
 - `rtl/control/descriptor/ai_accel_opcode_decode.v`, `rtl/control/descriptor/ai_descriptor_validator.v`, `rtl/control/queue/ai_parallel_compute_dispatcher.v`: research opcode decode, validation, and routing; range-overflow and alias checks.
+- `rtl/control/descriptor/ai_desc_fetch.v`, `rtl/control/descriptor/axi_desc_fetch.v`: opcode-specific decode of `0x3b` word 6 into `length` with no `k_words` value. The SPAD-fetch path is exercised through Product Top; the external AXI-fetch directed test is checked in but blocked by license availability.
+- `dv/subsystem/top_smoke/sim/Makefile`: reproducible 256 KiB Product Top repack target.
 - `docs/spec/SPEC_ZH.md`, `docs/spec/NPU_ARCHITECTURE_V2_SPEC.md`: research opcode fields and limits.
-- `benchmark/deit/round29/tb_tensor_repack.sv`, `run_tensor_repack_directed.sh`, `evidence/`: standalone directed verification and raw results.
+- `benchmark/deit/round29/`: independent block DV, Product Top workload generator and runner, external descriptor-fetch directed test, and run manifests. Raw VCS logs remain in ignored evidence paths or `/tmp` and are identified by SHA-256.
+
+## Product Top opcode integration follow-up
+
+The first Product Top attempt, Run ID `nmaforge_deit_round29_top_20261119T1`, reached descriptor 0 and returned completion status `0x72` (`ERR_DESC`, error code 7). The validator contract requires `0x3b` to have a nonzero `length` and `k_words=0`, while both descriptor fetch paths had copied word 6 into both fields. The fetchers now retain word 6 as `length` and set the derived `k_words` to zero only for opcode `0x3b`; other opcodes retain their existing K decode. Descriptor size and field positions do not change.
+
+The corrected Product Top run, Run ID `nmaforge_deit_round29_top_20261119T2`, used VCS V-2023.12-SP1_Full64 with `AI_SPAD_WORDS_PER_BANK=16384`, 16-entry queue storage, 9 descriptors, `m_size=16`, `n_size=48`, and 13 valid rows. It ran Q-dense, K-major, and V-Matrix-B repack for all three heads. All 576 output words matched the independent physical-layout Golden. Each command accepted 52 source-word reads and 64 output-word writes; aggregate traffic was 1,872 SPAD read bytes and 2,304 SPAD write bytes. The 2,304-byte Poison initialization is test setup, not model payload. The source fixture plus descriptors occupied 1,200 bytes; the testbench preloaded 3,504 bytes total including Poison.
+
+The nine command intervals total 2,184 SFU busy cycles. Including 91 dispatch/completion remainder cycles, the measured command window is 2,275 cycles. The testbench End-to-End window is 7,530 cycles, including 5,255 AXI preload cycles; it excludes model-weight loading because this is a repack fixture, not model inference. The run's `useful_macs=0` is expected: this opcode only moves/repacks data.
+
+Product Top command:
+
+```bash
+cd dv/subsystem/top_smoke/sim
+make ai_deit_round29_top_repack_256k \\
+  AI_DEIT_R29_RUN=/tmp/nmaforge_deit_round29_top_20261119T2
+```
+
+For a fresh replay, choose a new, nonexistent `AI_DEIT_R29_RUN` directory (the target intentionally refuses to overwrite an existing run directory). The workload generator uses Python 3.12.13 from `/tmp/nmaforge_deit_round17_venv/bin/python`; regeneration reproduced the manifest, memory image, and Golden hashes exactly.
+
+The compile log SHA-256 is `4ab798353fad4348c60cdecadcfcb63eb8fbdbcacaa71a24e631576fb22a9f5c`; the simulation log SHA-256 is `26ef3a39a1f8a69d71af17566c2ac03b43f3311be47f5882d1ae99c44c46284b`. The run reports zero compile errors and the existing `LOOP-REROLL-ENABLED` warning. The fixture and Golden hashes are in `benchmark/deit/round29/evidence/top_repack/run_manifest.txt`; generated logs and databases remain outside the repository.
+
+After the Product Top parser change, the existing compatibility runs were repeated:
+
+```bash
+cd dv/subsystem/top_smoke/sim
+make ai_smoke
+make ai_run AI_RANDOM_CASES=20 AI_SEED=290029
+```
+
+Both exited 0 and reported `TEST PASS`. Their archived log hashes remain in `benchmark/deit/round29/evidence/top_smoke/SHA256SUMS`.
+
+An additional standalone test was added for the external AXI Descriptor Fetch path. It checks the `0x3b` word-6 decode and confirms legacy GEMM `k_words` behavior. It is **BLOCKED_ENV / NOT_RUN** in this session: VCS V-2023.12-SP1_Full64 could not connect to the configured license server; one bounded license-queue attempt was stopped after it continued waiting past the reported minute. This does not invalidate the Product Top SPAD-fetch run, but the external AXI fetcher's new opcode-specific decode remains unverified until that test runs.
 
 ## Gate status and limits
 
@@ -64,7 +99,8 @@ Both exited 0 and reported `TEST PASS`. The Top compile log contains VCS `Warnin
 | Standalone Repack RTL Q/K/V layouts | **PASS** | 3 modes × 3 heads, 29/32 rows, all expected bytes match. |
 | Repack backpressure/Abort/reset/descriptor boundaries | **PASS, directed** | Standalone VCS test; limited to the tested interface scenarios. |
 | Existing Product Top compatibility | **PASS** | `make ai_smoke`; `make ai_run AI_RANDOM_CASES=20 AI_SEED=290029`. |
-| Opcode `0x3b` through Product Top command/Completion | **NOT_RUN** | The new op has not yet been tested end-to-end through Top descriptor fetch, dispatch, SFU completion, and SPAD protection. |
+| Opcode `0x3b` through Product Top command/Completion/SPAD | **PASS, repack fixture only** | Run `nmaforge_deit_round29_top_20261119T2`; 9 descriptors, 576 words exact. Input is a preloaded source fixture, not a live producer output. |
+| Opcode `0x3b` via external AXI Descriptor Fetch | **BLOCKED_ENV / NOT_RUN** | Standalone directed test is checked in; VCS license-server connection failure prevented compilation. |
 | Same-session Product Top QKV→Repack→3-head Attention | **NOT_RUN** | No host repacking is used in the standalone module test, but the continuous Product Top path is not integrated. |
 | Full 197-token DeiT Encoder | **NOT_RUN** | Attention, residual, LN2, FFN, GELU, and classifier remain open. |
 | Synthesis/area/timing | **NOT_RUN** | No resource or timing claim is made for the added state/mux logic. |
