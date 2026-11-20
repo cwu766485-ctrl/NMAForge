@@ -1,0 +1,24 @@
+{
+  "files": [
+    {
+      "file": "h64_context128_fp32.pt",
+      "sha256": "dc1acaee44017dcbd84c473e8106e2150bfa0b15afb95653c61c27f86af04a95",
+      "bytes": 904786
+    },
+    {
+      "file": "manifest.json",
+      "sha256": "616c70694fafa36b20ad6e6298bf9c3c18a0217d7edb451b1f806a163afa4722",
+      "bytes": 2939
+    },
+    {
+      "file": "round30_context128_comparison.csv",
+      "sha256": "3971f787f6779acbaa0897a85f0d6a43557ebc6ee6f1403a02e00c23ae89b85d",
+      "bytes": 684
+    },
+    {
+      "file": "train_curve.csv",
+      "sha256": "d09c968717c0f88d0934da53c2047174858214fad6d0b7de6be2b946cbbf6e63",
+      "bytes": 75
+    }
+  ]
+}

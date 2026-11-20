@@ -1,0 +1,30 @@
+{
+  "experiment": "round30_fixed_checkpoint_product_accurate_qat",
+  "raw_qat_manifest_status": "SOFTWARE_QAT_EXPERIMENT_PRODUCT_TOP_NOT_RUN (preserved as written at QAT completion)",
+  "combined_round_status": "QAT_SOFTWARE_PASS; SELECTED_PACKAGE_PRODUCT_TOP_FUNCTION_PASS; MODEL_QUALITY_PARTIAL",
+  "qat_metrics_csv_sha256": "7eb541e339a159f0e7ce6727e979fc3a492a3d10d64849e711689aab4c702c0e",
+  "selected_package_sha256": "58263935f5da626c53d5ba4c373396eee9f0f556a6f305a5b820c066625c2bcd",
+  "selected_by": "validation product-int8 accuracy; test was not used for selection",
+  "product_top_run_manifest": "../round30_product_top/run_manifest.json",
+  "test_targets_per_seed": 8192,
+  "mean_test_accuracy": {
+    "FP32": 0.3555094401,
+    "QAT_float": 0.3528238932,
+    "aligned_INT8": 0.2243245443,
+    "legacy_INT8_contract": 0.1030273438,
+    "bigram": 0.2651367188
+  },
+  "sample_sd_percentage_points": {
+    "FP32": 0.1446,
+    "QAT_float": 0.0746,
+    "aligned_INT8": 1.3773,
+    "legacy_INT8_contract": 2.0269
+  },
+  "aligned_INT8_below_bigram_percentage_points": 4.0812,
+  "trace_audit": "8 fixed held-out windows; 60 nodes; FakeQuant vs independent INT exact; sampled only",
+  "limitations": [
+    "INT8 quality remains below Bigram.",
+    "Three-seed variation uses different fixed FP32 source seeds, so reflects both source/QAT seed variation.",
+    "Product Top is 512 KiB and prefix-recompute, not persistent KV incremental decode."
+  ]
+}

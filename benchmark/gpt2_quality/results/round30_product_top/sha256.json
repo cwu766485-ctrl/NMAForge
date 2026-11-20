@@ -1,0 +1,99 @@
+{
+  "files": [
+    {
+      "file": "autoregressive_plan.json",
+      "sha256": "e1eb63c284cd698a389edf090eef2b6cae78f9c08aac533f384a6e67c43cc639",
+      "bytes": 3227
+    },
+    {
+      "file": "autoregressive_result.json",
+      "sha256": "66a0645b88aec2198c4c3ebd37def8a93397b1d926c69a994d0b4f4ad63df0fe",
+      "bytes": 1601
+    },
+    {
+      "file": "compile.log.gz",
+      "sha256": "6738901bc3639cc7984c23c5f9bfb581641dc584d83110186f2abba6cd2a3f53",
+      "bytes": 2568
+    },
+    {
+      "file": "feedback_plan.memh",
+      "sha256": "da8bf03d3597dd11b977429ef71f72449b2b19033e33a8d2a5503531b1a9e961",
+      "bytes": 30069
+    },
+    {
+      "file": "four_layer_manifest.json.gz",
+      "sha256": "3fb39f7df5791a74d8307a92a79694e09715edfccdb5cd0758a23773cc6c2bdd",
+      "bytes": 95296
+    },
+    {
+      "file": "rtl_logits_context0.csv",
+      "sha256": "8e148e1b7242f6afc1170a9e2bf9a7c29a8f33d348bd521b0fcf8a1146616dd8",
+      "bytes": 5522
+    },
+    {
+      "file": "rtl_logits_context1.csv",
+      "sha256": "4246773ffdb2706328e7427f663a0f0addc60a2c071addfae9f55148fb50ed14",
+      "bytes": 5522
+    },
+    {
+      "file": "rtl_logits_context2.csv",
+      "sha256": "5aed38c25a281064017a72a4d2047e86874f34d2dbd04d046ff84bbf59628a4b",
+      "bytes": 5522
+    },
+    {
+      "file": "rtl_logits_context3.csv",
+      "sha256": "f297ca29edc7ddad79d661af927dd05bc12b1e1da329d666f02c130735e552c1",
+      "bytes": 5522
+    },
+    {
+      "file": "run.log.gz",
+      "sha256": "5ed1ba0fd29afee692c13cbbf1bc5e5345d9e868c06e4931eb42c1aa17aca529",
+      "bytes": 7381
+    },
+    {
+      "file": "run_manifest.json",
+      "sha256": "c15c40649d7c1569413e75b509bb491e6e270c6c3a62dfacda7dc8cc14bb58d3",
+      "bytes": 2703
+    },
+    {
+      "file": "selected_product_int8.npz",
+      "sha256": "58263935f5da626c53d5ba4c373396eee9f0f556a6f305a5b820c066625c2bcd",
+      "bytes": 125382
+    },
+    {
+      "file": "spad_allocation.csv.gz",
+      "sha256": "7b9198668b9077118c32b1c2590ccd8242c98609fa5bc4c6400f5ddc601428c5",
+      "bytes": 10677
+    },
+    {
+      "file": "stage3_checkpoint_golden.memh.gz",
+      "sha256": "699e59b2f8bd1edc0f429d3e9e94bda43f5872d7bc97139309fced97a93f42ef",
+      "bytes": 19446
+    },
+    {
+      "file": "stage3_descriptors.memh.gz",
+      "sha256": "20305dd747c958e05d44cee15228a7e5a995cdeb009da2f532d3a60abcf89d9a",
+      "bytes": 2475
+    },
+    {
+      "file": "stage3_dma_payload.memh.gz",
+      "sha256": "455dbb202553846fa42d56e99472a57c3635cd6f73e5eda7e166ba6468862dc6",
+      "bytes": 50578
+    },
+    {
+      "file": "stage3_dma_plan.memh.gz",
+      "sha256": "c79d656bf5a814a9bc463a1332378475499833dce1f977dd138ec4f456898c82",
+      "bytes": 271
+    },
+    {
+      "file": "stage3_manifest.json.gz",
+      "sha256": "5de2b109eb6dfe0b12ee1d04dc833733bcc8c876bb18619e9561ce364a79de12",
+      "bytes": 20406
+    },
+    {
+      "file": "stage3_model_golden.memh.gz",
+      "sha256": "fe4b3c320193448fc657ea4dc1be38ba2850b663cd0da7012519b4ce63c00307",
+      "bytes": 5425
+    }
+  ]
+}
