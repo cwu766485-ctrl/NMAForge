@@ -41,9 +41,15 @@
   "spad_capacity_bytes": 524288,
   "quality_claim": "none; GPT-2-derived weight functional regression only",
   "raw_logs": [
-    "compile.log",
-    "run.log",
-    "make.log"
+    "compile.log.gz",
+    "run.log.gz",
+    "make.log.gz"
   ],
-  "result": "autoregressive_result.json"
+  "result": "autoregressive_result.json",
+  "raw_log_encoding": "gzip; decompresses byte-for-byte to the original VCS/Make log",
+  "raw_log_sha256_uncompressed": {
+    "compile.log": "25c4792293305756f609e86bd1684a03df83e1cbb74cc1c34268c79b014e2319",
+    "run.log": "aec8d022bb8aff5798eba60d069de6dee64a6f91351f2a5caf15bd33edc8f6d4",
+    "make.log": "b52fcec5d8c110f5a6083fdcd5f6a828dbc306cee171edfb232a014ab4ca8376"
+  }
 }
