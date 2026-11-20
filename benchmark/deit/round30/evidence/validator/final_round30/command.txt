@@ -1,0 +1,1 @@
+make -C dv/block/control/sim descriptor-validator-regress DESCRIPTOR_VALIDATOR_OUT=/tmp/nmaforge_round30_deit_validator_final

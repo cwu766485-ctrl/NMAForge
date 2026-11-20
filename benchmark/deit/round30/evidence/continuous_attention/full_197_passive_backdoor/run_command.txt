@@ -1,0 +1,1 @@
+make -C dv/subsystem/top_smoke/sim ai_deit_round30_full_attention_256k AI_DEIT_R30_FULL_RUN=/tmp/nmaforge_deit_round30_full_attention_passive_offset_run AI_DEIT_R30_CONT_SOURCE=/tmp/nmaforge_deit_round26_qkv197_rerun/workload

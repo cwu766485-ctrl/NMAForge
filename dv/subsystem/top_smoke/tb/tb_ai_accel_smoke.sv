@@ -510,7 +510,7 @@ module tb_ai_accel_smoke;
     reg [31:0] representative_image_words [0:131071];
     reg [31:0] representative_golden_words [0:131071];
     reg [31:0] representative_dma_plan_words [0:2047];
-    reg [31:0] representative_checkpoint_words [0:32767];
+    reg [31:0] representative_checkpoint_words [0:65535];
     reg [31:0] h64_persistent_descriptor_words [0:8191];
     integer representative_load_cycles = 0;
     integer representative_load_measure = 1'b0;
@@ -5645,6 +5645,7 @@ module tb_ai_accel_smoke;
         integer checkpoint_cursor;
         integer checkpoint_pair;
         integer checkpoint_retired;
+        integer checkpoint_verified_count;
         integer checkpoint_desc [0:127];
         integer checkpoint_words [0:127];
         integer checkpoint_start [0:127];
@@ -5696,6 +5697,7 @@ module tb_ai_accel_smoke;
         reg [1023:0] representative_dump_file;
         reg [31:0] read_value;
         reg [31:0] status_value;
+        reg checkpoint_read_ok;
         reg late_dma_status_ok;
         begin
             if (!$value$plusargs("AI_REPRESENTATIVE_MEMORY=%s", image_file) ||
@@ -5746,6 +5748,8 @@ module tb_ai_accel_smoke;
                 $fatal(1, "late DMA mode cannot be combined with up-front DMA preload");
             allow_live_alias = $test$plusargs("AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS");
             have_checkpoints = 1'b0;
+            checkpoint_count = 0;
+            checkpoint_verified_count = 0;
             prefill_descriptor_count = 0;
             void'($value$plusargs("AI_REPRESENTATIVE_PREFILL_DESC_COUNT=%d",
                                   prefill_descriptor_count));
@@ -5754,6 +5758,33 @@ module tb_ai_accel_smoke;
                 if (!$value$plusargs("AI_REPRESENTATIVE_DMA_PAYLOAD=%s", dma_payload_file) ||
                     !$value$plusargs("AI_REPRESENTATIVE_DMA_PLAN=%s", dma_plan_file))
                     $fatal(1, "late DMA mode requires payload and event plan files");
+                if ($value$plusargs("AI_REPRESENTATIVE_CHECKPOINTS=%s", checkpoint_file)) begin
+                    $readmemh(checkpoint_file, representative_checkpoint_words);
+                    checkpoint_count = representative_checkpoint_words[0];
+                    if (checkpoint_count < 1 || checkpoint_count > 128)
+                        $fatal(1, "invalid streamed checkpoint count=%0d", checkpoint_count);
+                    checkpoint_cursor = 1;
+                    for (checkpoint_index = 0; checkpoint_index < checkpoint_count;
+                         checkpoint_index = checkpoint_index + 1) begin
+                        checkpoint_desc[checkpoint_index] =
+                            representative_checkpoint_words[checkpoint_cursor];
+                        checkpoint_words[checkpoint_index] =
+                            representative_checkpoint_words[checkpoint_cursor + 1];
+                        checkpoint_start[checkpoint_index] = checkpoint_cursor + 2;
+                        if (checkpoint_desc[checkpoint_index] < 0 ||
+                            checkpoint_desc[checkpoint_index] >= descriptor_count ||
+                            checkpoint_words[checkpoint_index] <= 0 ||
+                            checkpoint_words[checkpoint_index] > 8192 ||
+                            checkpoint_cursor + 2 +
+                                checkpoint_words[checkpoint_index] * 2 > 65536)
+                            $fatal(1, "invalid streamed checkpoint record=%0d desc=%0d words=%0d cursor=%0d",
+                                   checkpoint_index, checkpoint_desc[checkpoint_index],
+                                   checkpoint_words[checkpoint_index], checkpoint_cursor);
+                        checkpoint_cursor = checkpoint_cursor + 2 +
+                                            checkpoint_words[checkpoint_index] * 2;
+                    end
+                    have_checkpoints = 1'b1;
+                end
                 $readmemh(dma_payload_file, axi_mem_u.mem);
                 $readmemh(dma_plan_file, representative_dma_plan_words);
                 late_dma_event_count = representative_dma_plan_words[0];
@@ -6156,6 +6187,34 @@ module tb_ai_accel_smoke;
                         status_value !== 32'd1)
                         $fatal(1, "streamed completion mismatch index=%0d id=%08h status=%08h",
                                late_dma_desc_index, read_value, status_value);
+                    for (checkpoint_index = 0; checkpoint_index < checkpoint_count;
+                         checkpoint_index = checkpoint_index + 1) begin
+                        if (have_checkpoints &&
+                            checkpoint_desc[checkpoint_index] == late_dma_desc_index) begin
+                            for (checkpoint_pair = 0;
+                                 checkpoint_pair < checkpoint_words[checkpoint_index];
+                                 checkpoint_pair = checkpoint_pair + 1) begin
+                                read_value = representative_spad_backdoor_read(
+                                        representative_checkpoint_words[
+                                        checkpoint_start[checkpoint_index] + checkpoint_pair * 2]);
+                                if (read_value !== representative_checkpoint_words[
+                                        checkpoint_start[checkpoint_index] + checkpoint_pair * 2 + 1])
+                                    $fatal(1, "streamed checkpoint mismatch desc=%0d record=%0d pair=%0d addr=%08h expected=%08h actual=%08h",
+                                           late_dma_desc_index, checkpoint_index,
+                                           checkpoint_pair,
+                                           representative_checkpoint_words[
+                                               checkpoint_start[checkpoint_index] + checkpoint_pair * 2],
+                                           representative_checkpoint_words[
+                                               checkpoint_start[checkpoint_index] + checkpoint_pair * 2 + 1],
+                                           read_value);
+                            end
+                            $display("REPRESENTATIVE_CHECKPOINT_PASS desc=%0d record=%0d words=%0d method=behavioral_sram_backdoor_nonintrusive",
+                                     late_dma_desc_index, checkpoint_index,
+                                     checkpoint_words[checkpoint_index]);
+                            checkpoint_verified_count = checkpoint_verified_count + 1;
+                        end
+                    end
+                    checkpoint_retired = late_dma_desc_index + 1;
                     axi_write(REG_CPLQ_HEAD, late_dma_desc_index + 1);
                     $display("REPRESENTATIVE_STREAMED_DESC_RETIRE_PASS index=%0d task_id=%08h status=1",
                              late_dma_desc_index, read_value);
@@ -6222,6 +6281,9 @@ module tb_ai_accel_smoke;
             if (have_checkpoints && checkpoint_retired != descriptor_count)
                 $fatal(1, "checkpoint completion monitor ended early retired=%0d expected=%0d",
                        checkpoint_retired, descriptor_count);
+            if (have_checkpoints && checkpoint_verified_count != checkpoint_count)
+                $fatal(1, "streamed checkpoint records not all verified verified=%0d expected=%0d",
+                       checkpoint_verified_count, checkpoint_count);
 
             if ($test$plusargs("AI_DEIT_AV_TRACE") && descriptor_count == 241) begin
                 $display("DEIT_PACK_BANKS row=7168 b3=%08h b2=%08h b1=%08h b0=%08h axi=%08h_%08h_%08h_%08h",
@@ -6464,7 +6526,8 @@ module tb_ai_accel_smoke;
                      representative_dma_window_cycles, late_dma_command_cycles,
                      late_dma_readback_cycles, late_dma_session_cycles,
                      host_fixture_bytes, dma_sentinel_setup_bytes);
-            if ($test$plusargs("AI_H64_PERSISTENT")) begin
+            if ($test$plusargs("AI_H64_PERSISTENT") ||
+                $test$plusargs("AI_DEIT_R30_CONTINUOUS_ATTENTION")) begin
                 // The Product Top and KV-cache remain live across invocations.
                 // All completion words were checked above; retire before the
                 // next descriptor is allowed to reuse a ring slot or tensor.
@@ -6474,6 +6537,193 @@ module tb_ai_accel_smoke;
                 axi_write(REG_CPLQ_SIZE, 32'd0);
             end
             clear_done_irq();
+        end
+    endtask
+
+    // Round 30 DeiT runtime. Q/K/V are produced by the 468-descriptor Product
+    // workload above. This task only publishes bounded descriptor batches and
+    // observes completed SPAD results through the passive simulation
+    // backdoor; it never reads, repacks, or writes activation tensors through
+    // the host interface.
+    task run_deit_round30_continuous_attention;
+        reg [1023:0] batch_root;
+        reg [1023:0] desc_file;
+        reg [1023:0] golden_file;
+        reg [31:0] descriptor_words [0:15];
+        reg [31:0] completion_word;
+        reg [31:0] status_word;
+        reg [31:0] cmd_head;
+        reg [31:0] cpl_tail;
+        reg [31:0] expected_cpl_tail;
+        reg [31:0] read_value;
+        reg read_ok;
+        reg queue_idle;
+        integer batch_total;
+        integer streamed_expected;
+        integer wraps_expected;
+        integer query_blocks_expected;
+        integer batch_index;
+        integer descriptor_count;
+        integer pair_count;
+        integer descriptor_index;
+        integer pair_index;
+        integer word_index;
+        integer cmdq_base;
+        integer cplq_base;
+        integer queue_size;
+        integer cmd_tail;
+        integer cpl_head;
+        integer start_cycle;
+        integer finish_cycle;
+        integer streamed_total;
+        integer ring_wraps;
+        integer slot;
+        integer task_id;
+        integer checkpoint_addr;
+        integer checkpoint_expected;
+        integer checkpoint_verified;
+        begin
+            if (!$value$plusargs("AI_DEIT_R30_BATCH_ROOT=%s", batch_root) ||
+                !$value$plusargs("AI_DEIT_R30_BATCH_COUNT=%d", batch_total) ||
+                !$value$plusargs("AI_DEIT_R30_STREAMED_DESC_COUNT=%d", streamed_expected) ||
+                !$value$plusargs("AI_DEIT_R30_EXPECTED_RING_WRAPS=%d", wraps_expected) ||
+                !$value$plusargs("AI_DEIT_R30_QUERY_BLOCKS=%d", query_blocks_expected) ||
+                !$value$plusargs("AI_REPRESENTATIVE_DESC_BASE=%d", cmdq_base) ||
+                !$value$plusargs("AI_REPRESENTATIVE_CPL_BASE=%d", cplq_base) ||
+                !$value$plusargs("AI_REPRESENTATIVE_QUEUE_SIZE=%d", queue_size))
+                $fatal(1, "DeiT Round30 runtime requires batch, queue and base arguments");
+            if ((query_blocks_expected != 1 && query_blocks_expected != 13) ||
+                batch_total != (3 + 3 * query_blocks_expected * 4) ||
+                streamed_expected != (9 + 3 * query_blocks_expected * 245) ||
+                queue_size != 512)
+                $fatal(1, "DeiT Round30 runtime geometry mismatch batches=%0d streamed=%0d query_blocks=%0d queue=%0d",
+                       batch_total, streamed_expected, query_blocks_expected,
+                       queue_size);
+
+            axi_read(REG_CMDQ_HEAD, cmd_head);
+            axi_read(REG_CMDQ_TAIL, cmd_tail);
+            axi_read(REG_CPLQ_HEAD, cpl_head);
+            axi_read(REG_CPLQ_TAIL, cpl_tail);
+            if (cmd_head != 468 || cmd_tail != 468 ||
+                cpl_head != 468 || cpl_tail != 468)
+                $fatal(1, "DeiT Round30 prefix queue state mismatch cmd=%0d/%0d cpl=%0d/%0d expected=468",
+                       cmd_head, cmd_tail, cpl_head, cpl_tail);
+
+            streamed_total = 0;
+            ring_wraps = 0;
+            checkpoint_verified = 0;
+            start_cycle = transformer_top_cycle_counter;
+            for (batch_index = 0; batch_index < batch_total;
+                 batch_index = batch_index + 1) begin
+                $sformat(desc_file, "%0s/batch_%02d_desc.memh",
+                         batch_root, batch_index);
+                $sformat(golden_file, "%0s/batch_%02d_golden.memh",
+                         batch_root, batch_index);
+                $readmemh(desc_file, representative_image_words);
+                descriptor_count = representative_image_words[0];
+                if (descriptor_count < 1 || descriptor_count >= queue_size)
+                    $fatal(1, "DeiT Round30 invalid batch size batch=%0d count=%0d",
+                           batch_index, descriptor_count);
+                if ((cmd_tail + descriptor_count) >= queue_size)
+                    ring_wraps = ring_wraps + 1;
+
+                for (descriptor_index = 0; descriptor_index < descriptor_count;
+                     descriptor_index = descriptor_index + 1) begin
+                    for (word_index = 0; word_index < 16; word_index = word_index + 1)
+                        descriptor_words[word_index] =
+                            representative_image_words[1 + descriptor_index * 16 + word_index];
+                    task_id = descriptor_words[0][31:16];
+                    if (task_id != (16'h8000 + streamed_total + descriptor_index))
+                        $fatal(1, "DeiT Round30 task id mismatch batch=%0d index=%0d expected=%04h actual=%04h",
+                               batch_index, descriptor_index,
+                               16'h8000 + streamed_total + descriptor_index, task_id[15:0]);
+                    slot = (cmd_tail + descriptor_index) % queue_size;
+                    runtime_write_descriptor_words(cmdq_base + slot * 64,
+                                                    descriptor_words);
+                end
+
+                cmd_tail = (cmd_tail + descriptor_count) % queue_size;
+                axi_write(REG_CMDQ_TAIL, cmd_tail);
+                axi_write(REG_DOORBELL, 32'd1);
+                expected_cpl_tail = (cpl_head + descriptor_count) % queue_size;
+                runtime_wait_queue_idle(cmd_tail, expected_cpl_tail, queue_idle,
+                                        status_word, cmd_head, cpl_tail);
+                if (!queue_idle)
+                    $fatal(1, "DeiT Round30 batch timeout batch=%0d cmd=%0d/%0d cpl=%0d/%0d status=%08h",
+                           batch_index, cmd_head, cmd_tail, cpl_tail,
+                           expected_cpl_tail, status_word);
+
+                $readmemh(golden_file, representative_checkpoint_words);
+                pair_count = representative_checkpoint_words[0];
+                if (pair_count < 1 || (1 + pair_count * 2) > 65536)
+                    $fatal(1, "DeiT Round30 invalid checkpoint batch=%0d pairs=%0d",
+                           batch_index, pair_count);
+                for (descriptor_index = 0; descriptor_index < descriptor_count;
+                     descriptor_index = descriptor_index + 1) begin
+                    slot = (cpl_head + descriptor_index) % queue_size;
+                    task_id = 16'h8000 + streamed_total + descriptor_index;
+                    runtime_read_word_retry(SPAD_BASE + cplq_base + slot * 16,
+                                            completion_word, read_ok);
+                    if (!read_ok || completion_word !== {16'd0, task_id[15:0]})
+                        $fatal(1, "DeiT Round30 completion id mismatch batch=%0d slot=%0d expected=%08h actual=%08h read_ok=%0d",
+                               batch_index, slot, {16'd0, task_id[15:0]},
+                               completion_word, read_ok);
+                    runtime_read_word_retry(SPAD_BASE + cplq_base + slot * 16 + 4,
+                                            completion_word, read_ok);
+                    if (!read_ok || completion_word !== 32'd1)
+                        $fatal(1, "DeiT Round30 completion status mismatch batch=%0d slot=%0d expected=1 actual=%08h read_ok=%0d",
+                               batch_index, slot, completion_word, read_ok);
+                    runtime_read_word_retry(SPAD_BASE + cplq_base + slot * 16 + 12,
+                                            completion_word, read_ok);
+                    // CPLQ word3 is the engine-reported element count, not a
+                    // valid bit. Its value is opcode/shape dependent (for
+                    // example, repack reports bytes/elements processed), so
+                    // only require that the documented word was readable.
+                    if (!read_ok)
+                        $fatal(1, "DeiT Round30 completion element-count read failed batch=%0d slot=%0d",
+                               batch_index, slot);
+                end
+
+                // Golden checks are passive observations, not host activation
+                // transfers. The next batch cannot consume a buffer until its
+                // producer batch has completed and the CPLQ slot is retired.
+                for (pair_index = 0; pair_index < pair_count; pair_index = pair_index + 1) begin
+                    checkpoint_addr = representative_checkpoint_words[1 + pair_index * 2];
+                    checkpoint_expected = representative_checkpoint_words[2 + pair_index * 2];
+                    read_value = representative_spad_backdoor_read(checkpoint_addr);
+                    if (read_value !== checkpoint_expected)
+                        $fatal(1, "DeiT Round30 Golden mismatch batch=%0d pair=%0d addr=%08h expected=%08h actual=%08h",
+                               batch_index, pair_index, checkpoint_addr,
+                               checkpoint_expected, read_value);
+                end
+                checkpoint_verified = checkpoint_verified + pair_count;
+                cpl_head = expected_cpl_tail;
+                axi_write(REG_CPLQ_HEAD, cpl_head);
+                streamed_total = streamed_total + descriptor_count;
+                clear_done_irq();
+                $display("DEIT_R30_STREAM_BATCH_PASS batch=%0d count=%0d cmdq_tail=%0d cplq_head=%0d golden_words=%0d reset_events=0",
+                         batch_index, descriptor_count, cmd_tail, cpl_head,
+                         pair_count);
+            end
+            finish_cycle = transformer_top_cycle_counter;
+            axi_read(REG_CMDQ_HEAD, cmd_head);
+            axi_read(REG_CMDQ_TAIL, cmd_tail);
+            axi_read(REG_CPLQ_HEAD, cpl_head);
+            axi_read(REG_CPLQ_TAIL, cpl_tail);
+            if (streamed_total != streamed_expected ||
+                cmd_head != ((468 + streamed_expected) % queue_size) ||
+                cmd_tail != ((468 + streamed_expected) % queue_size) ||
+                cpl_head != ((468 + streamed_expected) % queue_size) ||
+                cpl_tail != ((468 + streamed_expected) % queue_size) ||
+                ring_wraps != wraps_expected)
+                $fatal(1, "DeiT Round30 final runtime mismatch streamed=%0d/%0d queue=%0d/%0d cpl=%0d/%0d wraps=%0d/%0d",
+                       streamed_total, streamed_expected, cmd_head, cmd_tail,
+                       cpl_head, cpl_tail, ring_wraps, wraps_expected);
+            $display("DEIT_R30_CONTINUOUS_QKV_REPACK_3HEAD_ATTENTION_PASS prefix_desc=468 streamed_desc=%0d total_desc=%0d batches=%0d query_blocks=%0d valid_query_rows=%0d ring_wraps=%0d golden_words=%0d runtime_cycles=%0d reset_events=0 host_intermediate_tensor_readback=0 host_intermediate_tensor_writeback=0 measurement=AXIL_publication_retirement_plus_Product_execution_golden_observation=passive_spad_backdoor",
+                     streamed_total, 468 + streamed_total, batch_total,
+                     query_blocks_expected,
+                     (query_blocks_expected == 13) ? 197 : 16,
+                     ring_wraps, checkpoint_verified, finish_cycle - start_cycle);
         end
     endtask
 
@@ -6557,6 +6807,10 @@ module tb_ai_accel_smoke;
 
         if ($test$plusargs("AI_REPRESENTATIVE_MODEL")) begin
             run_representative_model();
+            if ($test$plusargs("AI_DEIT_R30_CONTINUOUS_ATTENTION")) begin
+                run_deit_round30_continuous_attention();
+                $finish;
+            end
             if ($test$plusargs("AI_H64_PERSISTENT")) begin
                 if (!$value$plusargs("AI_H64_PERSISTENT_STAGE_COUNT=%d",
                                      persistent_stage_count) ||

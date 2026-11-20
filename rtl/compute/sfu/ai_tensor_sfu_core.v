@@ -246,9 +246,11 @@ module ai_tensor_sfu_core(
         ({28'd0,rp_source_row[3:2]} << 4) +
         ({28'd0,rp_source_col[3:2]} << 2) +
         {30'd0,rp_source_row[1:0]};
-    // Matrix-A tiles contain 16x16 32-bit words = 1 KiB. rp_tile_index is
-    // measured in tiles, so its byte address shift is 10, not 8.
-    wire [31:0] rp_source_addr = src0_r + (rp_tile_index << 10) +
+    // Raw Matrix-A words use 1 KiB per tile; packed INT8 0x53 tiles use
+    // 256 bytes. aux0/epsilon[4] selects the latter while preserving the
+    // existing sparse-source layout when clear.
+    wire [31:0] rp_source_addr = src0_r +
+                                 (rp_tile_index << (epsilon_r[4] ? 8 : 10)) +
                                  (rp_word_index << 2);
     wire [31:0] rp_k_tile_stride = {16'd0,rp_head_dim} << 4;
     wire [15:0] rp_k_feature = rp_feature_r + rp_write_lane_r;
@@ -282,7 +284,7 @@ module ai_tensor_sfu_core(
          (m_size[1:0] != 0) || (n_size[1:0] != 0) ||
          (pack_tile_expected_length != {16'd0,length}));
     wire repack_config_error = (op_mode == OP_TENSOR_REPACK) &&
-        ((epsilon[31:4] != 0) || (epsilon[1:0] == 2'd3) ||
+        ((epsilon[31:5] != 0) || (epsilon[1:0] == 2'd3) ||
          (epsilon[3:2] > 2'd2) || (length == 0) || (m_size < 16) ||
          (m_size > 256) || (m_size[3:0] != 0) || (length > m_size) ||
          (n_size < 48) || (n_size > 384) || ((n_size % 16'd48) != 0) ||

@@ -1,0 +1,62 @@
+{
+  "attention_golden_observation": "passive behavioral-SPAD backdoor after each retired batch; no AXI perturbation",
+  "bounded_stream_batches": 159,
+  "branch": "research/nmaforge-v1.2-round30-deit",
+  "cmdq_entries": 512,
+  "command": "make -C dv/subsystem/top_smoke/sim ai_deit_round30_full_attention_256k AI_DEIT_R30_FULL_RUN=/tmp/nmaforge_deit_round30_full_attention_passive_offset_run AI_DEIT_R30_CONT_SOURCE=/tmp/nmaforge_deit_round26_qkv197_rerun/workload",
+  "failed_checker_retry1": "passive_checker_retry1/run.log.gz records desc155 false mismatch caused by observer base offset; fixed retry passed without RTL datapath change",
+  "golden_words_checked_in_stream": 361920,
+  "heads": 3,
+  "host_intermediate_tensor_readback_words": 0,
+  "host_intermediate_tensor_writeback_words": 0,
+  "limitations": [
+    "Full Encoder Layer0 Output Projection/Residual/LN2/FFN is NOT RUN",
+    "External descriptor-fetch integration is NOT qualified by this run; runtime uses host AXI-Lite bounded ring publication/retirement",
+    "No official 12-layer DeiT Tiny ImageNet Top-1 result"
+  ],
+  "logs": {
+    "compile_log": "compile.log.gz",
+    "generated_workload": "generated_workload.tar.gz",
+    "generator_log": "generator.log.gz",
+    "make_log": "make.log.gz",
+    "run_log": "run.log.gz",
+    "source_qkv_inputs": "source_qkv_inputs.tar.gz"
+  },
+  "make_exit": 0,
+  "pass_marker": "DEIT_R30_CONTINUOUS_QKV_REPACK_3HEAD_ATTENTION_PASS prefix_desc=468 streamed_desc=9564 total_desc=10032 batches=159 query_blocks=13 valid_query_rows=197 ring_wraps=19 golden_words=361920 runtime_cycles=7949430 reset_events=0 host_intermediate_tensor_readback=0 host_intermediate_tensor_writeback=0 measurement=AXIL_publication_retirement_plus_Product_execution_golden_observation=passive_spad_backdoor",
+  "python_generator": "/tmp/nmaforge_round17_venv/bin/python (Python 3.12.13; NumPy 2.5.4 per generated workload environment)",
+  "qkv_prefix_descriptors": 468,
+  "qkv_retirement_checkpoints": {
+    "descriptor_155": [
+      8192,
+      1792
+    ],
+    "descriptor_311": [
+      8192,
+      1792
+    ],
+    "descriptor_467": [
+      8192,
+      1792
+    ]
+  },
+  "qkv_source": "fixed Round26 full-KV Product projection workload; 197 valid/208 physical rows, 3 heads x 64 channels/head; model source is the existing DeiT workload fixture, not a 12-layer official-checkpoint image-classification result",
+  "query_blocks": 13,
+  "repack_attention_descriptors": 9564,
+  "representative_profile": "REPRESENTATIVE_MODEL_PASS desc=468 prefill_desc=0 decode_desc=0 golden_words=29952 useful_macs=21786624 executed_macs=-1 padding_macs=-1 useful_output_elements=-1 physical_output_elements=-1 command_cycles=402889 end_to_end_cycles=905189 dma_preload_included=0 prefill_command_cycles=0 decode_command_cycles=0 prefill_exclusive_cycles=0 decode_exclusive_cycles=0 exclusive_profile_cycles=402889 preload_axi_cycles=316895 preload_dma_window_cycles=35058 preload_dma_busy_cycles=29982 preloaded_spad_bytes=324160 useful_mac_per_cycle=54.0760 executed_array_utilization_pct=-1.00 useful_array_utilization_pct=94.71 matrix_mac_cycles=89856 matrix_req_wait=0 matrix_rsp_wait=0 matrix_writeback=7488 matrix_other=228384 sfu_busy=0 kv_busy=0 conv_busy=0 banked_busy=0 fp_busy=0 scalar_busy=0 no_engine_dispatch_remainder=77161 dma_busy_overlap=29982 spad_read_bytes=2905344 spad_write_bytes=119808 late_dma_events=144 late_dma_payload_bytes=112896 late_dma_window_cycles=35058 command_cycles_excluding_late_dma=367831 late_dma_readback_cycles=185328 late_dma_session_cycles=905189 host_fixture_bytes=211264 test_only_poison_setup_bytes=140352",
+  "reset_events": 0,
+  "ring_wraps": 19,
+  "runtime_cycles": 7949430,
+  "seed": 300030,
+  "spad_allocation_source": "generated_workload/manifest.json; high-water 211968 bytes, descriptor ring [221184,253952), completion ring [253952,262144), reusable Repack/attention scratch below 16 KiB",
+  "spad_banks": 4,
+  "spad_bytes": 262144,
+  "status": "PASS_CONTINUOUS_QKV_REPACK_THREE_HEAD_FULL_197_QUERY_ATTENTION",
+  "tested_base_commit": "864ba16aa052fbb0f2bb8948133a54586cec6b26",
+  "tested_product_rtl_diff_sha256": "3da860fa51351257122cc613741e77bef975b426dde360806c50c10579a78b10",
+  "tested_tracked_diff_sha256": "1114b805c89b9a2181526722dc65f21e95d5e438020d686efd51b2dbde63cea3",
+  "total_descriptors": 10032,
+  "valid_keys_per_query": 197,
+  "valid_queries": 197,
+  "vcs": "V-2023.12-SP1_Full64"
+}

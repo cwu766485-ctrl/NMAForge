@@ -168,12 +168,15 @@ module ai_descriptor_validator (
          (flags == 8'd0));
 
     wire [15:0] repack_head_dim = n_size / 16'd3;
-    // Matrix-A storage is sparse at the 4x4 word granularity: each logical
-    // INT8 element matrix occupies four physical bytes in the tiled source
-    // address space. Bound the full padded MxN footprint, not the dense
-    // logical tensor size, so alias checks cover every source tile.
-    wire [31:0] repack_src_bytes =
-        ({16'd0,m_size} * {16'd0,n_size}) << 2;
+    // Legacy 0x3b sources use the sparse INT32 Matrix-A word footprint
+    // (1 KiB per 16x16 tile). 0x53 packed INT8 writeback instead stores each
+    // Matrix-A tile compactly (256 bytes per 16x16 tile); aux0[4] selects
+    // that physical source layout. Use the selected physical span for range
+    // and alias checks so compact sources are not over/under-described.
+    wire [31:0] repack_src_elements =
+        {16'd0,m_size} * {16'd0,n_size};
+    wire [31:0] repack_src_bytes = aux0[4] ? repack_src_elements :
+        (repack_src_elements << 2);
     wire [31:0] repack_dst_bytes =
         (aux0[1:0] == 2'd2) ?
         (({16'd0,repack_head_dim} / 16) *
@@ -189,7 +192,7 @@ module ai_descriptor_validator (
         (op != 8'h3b) ||
         ((version == 8'd7) && (flags == 0) && (bias_base == 0) &&
          !bias_enable && (scale_shift == 0) && (activation == 0) &&
-         (aux0[31:4] == 0) && (aux0[1:0] <= 2) && (aux0[3:2] <= 2) &&
+         (aux0[31:5] == 0) && (aux0[1:0] <= 2) && (aux0[3:2] <= 2) &&
          (length != 0) && (length <= m_size) &&
          (m_size >= 16) && (m_size <= 256) && (m_size[3:0] == 0) &&
          (n_size >= 48) && (n_size <= 384) && (n_size % 16'd48 == 0) &&

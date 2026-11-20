@@ -1558,3 +1558,117 @@ ai_deit_round30_top_repack_256k:
 	if [ "$(AI_DEIT_R30_LAYOUT)" = "v_matrix_b" ]; then words=12288; else words=9984; fi; \
 		grep -q "^REPRESENTATIVE_MODEL_PASS desc=3 .*golden_words=$$words useful_macs=0 " \
 		"$(AI_DEIT_R30_RUN)/run.log"
+
+# Round 30 integrated path: run the fixed 468-descriptor Product-QKV workload,
+# then append all three 0x3b layouts for each head in the same unreset Top.
+# Retirement-time AXI-Lite checkpoints observe each repack result before the
+# following descriptor reuses the low 16 KiB destination buffer.
+AI_DEIT_R30_QKV_RUN ?= /tmp/nmaforge_deit_round30_qkv_repack_$(shell date +%Y%m%d_%H%M%S)
+AI_DEIT_R30_QKV_SOURCE ?= /tmp/nmaforge_deit_round26_qkv197_rerun/workload
+AI_DEIT_R30_QKV_PYTHON ?= /tmp/nmaforge_deit_round17_venv/bin/python
+.PHONY: ai_deit_round30_qkv_repack_256k
+ai_deit_round30_qkv_repack_256k:
+	test ! -e "$(AI_DEIT_R30_QKV_RUN)"
+	mkdir -p "$(AI_DEIT_R30_QKV_RUN)"
+	$(AI_DEIT_R30_QKV_PYTHON) ../../../../benchmark/deit/round30/generate_qkv_repack_top.py \
+		--source-workload "$(AI_DEIT_R30_QKV_SOURCE)" --layout all \
+		--out-dir "$(AI_DEIT_R30_QKV_RUN)/workload" \
+		> "$(AI_DEIT_R30_QKV_RUN)/generator.log"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=16384 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_R30_QKV_RUN)/csrc -top tb_ai_accel_smoke \
+		-f ai_accel.f ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_DEIT_R30_QKV_RUN)/simv -l $(AI_DEIT_R30_QKV_RUN)/compile.log
+	$(AI_DEIT_R30_QKV_RUN)/simv +ntb_random_seed=300030 +AI_RANDOM_CASES=0 +AI_SEED=300030 \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_LATE_DMA \
+		+AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_R30_QKV_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_R30_QKV_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_DEIT_R30_QKV_RUN)/workload/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_DEIT_R30_QKV_RUN)/workload/late_dma_plan.memh \
+		+AI_REPRESENTATIVE_CHECKPOINTS=$(AI_DEIT_R30_QKV_RUN)/workload/checkpoint_spad.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=221184 +AI_REPRESENTATIVE_CPL_BASE=253952 \
+		+AI_REPRESENTATIVE_DESC_COUNT=477 +AI_REPRESENTATIVE_QUEUE_SIZE=512 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=21786624 -l $(AI_DEIT_R30_QKV_RUN)/run.log
+	test "$$(grep -c '^REPRESENTATIVE_CHECKPOINT_PASS ' "$(AI_DEIT_R30_QKV_RUN)/run.log")" -eq 9
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=477 .*golden_words=29952 useful_macs=21786624 ' \
+		"$(AI_DEIT_R30_QKV_RUN)/run.log"
+
+# Single unreset Product Top session: live Q/K/V from the 468-descriptor
+# projection workload feed 0x3b Repack, QK, Softmax, probability pack and AV.
+# Descriptors are streamed in bounded batches through the real 512-entry
+# CMDQ/CPLQ ring; checkpoint reads are passive SPAD observations only.
+AI_DEIT_R30_CONT_RUN ?= /tmp/nmaforge_deit_round30_continuous_$(shell date +%Y%m%d_%H%M%S)
+AI_DEIT_R30_CONT_SOURCE ?= /tmp/nmaforge_deit_round26_qkv197_rerun/workload
+AI_DEIT_R30_CONT_PYTHON ?= /tmp/nmaforge_deit_round17_venv/bin/python
+.PHONY: ai_deit_round30_continuous_attention_256k
+ai_deit_round30_continuous_attention_256k:
+	test ! -e "$(AI_DEIT_R30_CONT_RUN)"
+	mkdir -p "$(AI_DEIT_R30_CONT_RUN)"
+	$(AI_DEIT_R30_CONT_PYTHON) ../../../../benchmark/deit/round30/generate_qkv_attention_continuous.py \
+		--source-workload "$(AI_DEIT_R30_CONT_SOURCE)" \
+		--out-dir "$(AI_DEIT_R30_CONT_RUN)/workload" \
+		> "$(AI_DEIT_R30_CONT_RUN)/generator.log"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=16384 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_R30_CONT_RUN)/csrc -top tb_ai_accel_smoke \
+		-f ai_accel.f ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_DEIT_R30_CONT_RUN)/simv -l $(AI_DEIT_R30_CONT_RUN)/compile.log
+	$(AI_DEIT_R30_CONT_RUN)/simv +ntb_random_seed=300030 +AI_RANDOM_CASES=0 +AI_SEED=300030 \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_LATE_DMA \
+		+AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS +AI_DEIT_R30_CONTINUOUS_ATTENTION \
+		+AI_DEIT_R30_BATCH_ROOT=$(AI_DEIT_R30_CONT_RUN)/workload/batches \
+		+AI_DEIT_R30_BATCH_COUNT=15 +AI_DEIT_R30_STREAMED_DESC_COUNT=744 \
+		+AI_DEIT_R30_EXPECTED_RING_WRAPS=2 +AI_DEIT_R30_QUERY_BLOCKS=1 \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_R30_CONT_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_R30_CONT_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_DEIT_R30_CONT_SOURCE)/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_DEIT_R30_CONT_SOURCE)/late_dma_plan.memh \
+		+AI_REPRESENTATIVE_CHECKPOINTS=$(AI_DEIT_R30_CONT_SOURCE)/checkpoint_spad.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=221184 +AI_REPRESENTATIVE_CPL_BASE=253952 \
+		+AI_REPRESENTATIVE_DESC_COUNT=468 +AI_REPRESENTATIVE_QUEUE_SIZE=512 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=21786624 -l $(AI_DEIT_R30_CONT_RUN)/run.log
+	test "$$(grep -c '^DEIT_R30_STREAM_BATCH_PASS ' "$(AI_DEIT_R30_CONT_RUN)/run.log")" -eq 15
+	grep -q '^DEIT_R30_CONTINUOUS_QKV_REPACK_3HEAD_ATTENTION_PASS prefix_desc=468 streamed_desc=744 total_desc=1212 batches=15 query_blocks=1 valid_query_rows=16 ring_wraps=2 .*reset_events=0 ' \
+		"$(AI_DEIT_R30_CONT_RUN)/run.log"
+
+# Full 197-query attention reuses one bounded Score/Probability/AV workspace
+# after each query block retires. Q/K/V remain actual Product Top outputs.
+AI_DEIT_R30_FULL_RUN ?= /tmp/nmaforge_deit_round30_full_attention_$(shell date +%Y%m%d_%H%M%S)
+.PHONY: ai_deit_round30_full_attention_256k
+ai_deit_round30_full_attention_256k:
+	test ! -e "$(AI_DEIT_R30_FULL_RUN)"
+	mkdir -p "$(AI_DEIT_R30_FULL_RUN)"
+	$(AI_DEIT_R30_CONT_PYTHON) ../../../../benchmark/deit/round30/generate_qkv_attention_continuous.py \
+		--source-workload "$(AI_DEIT_R30_CONT_SOURCE)" --query-blocks 13 \
+		--out-dir "$(AI_DEIT_R30_FULL_RUN)/workload" \
+		> "$(AI_DEIT_R30_FULL_RUN)/generator.log"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=16384 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_R30_FULL_RUN)/csrc -top tb_ai_accel_smoke \
+		-f ai_accel.f ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_DEIT_R30_FULL_RUN)/simv -l $(AI_DEIT_R30_FULL_RUN)/compile.log
+	$(AI_DEIT_R30_FULL_RUN)/simv +ntb_random_seed=300030 +AI_RANDOM_CASES=0 +AI_SEED=300030 \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_LATE_DMA \
+		+AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS +AI_DEIT_R30_CONTINUOUS_ATTENTION \
+		+AI_DEIT_R30_BATCH_ROOT=$(AI_DEIT_R30_FULL_RUN)/workload/batches \
+		+AI_DEIT_R30_BATCH_COUNT=159 +AI_DEIT_R30_STREAMED_DESC_COUNT=9564 \
+		+AI_DEIT_R30_EXPECTED_RING_WRAPS=19 +AI_DEIT_R30_QUERY_BLOCKS=13 \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_R30_FULL_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_R30_FULL_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_DEIT_R30_CONT_SOURCE)/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_DEIT_R30_CONT_SOURCE)/late_dma_plan.memh \
+		+AI_REPRESENTATIVE_CHECKPOINTS=$(AI_DEIT_R30_FULL_RUN)/workload/checkpoint_spad.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=221184 +AI_REPRESENTATIVE_CPL_BASE=253952 \
+		+AI_REPRESENTATIVE_DESC_COUNT=468 +AI_REPRESENTATIVE_QUEUE_SIZE=512 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=21786624 -l $(AI_DEIT_R30_FULL_RUN)/run.log
+	test "$$(grep -c '^DEIT_R30_STREAM_BATCH_PASS ' "$(AI_DEIT_R30_FULL_RUN)/run.log")" -eq 159
+	test "$$(grep -c '^REPRESENTATIVE_CHECKPOINT_PASS desc=155 ' "$(AI_DEIT_R30_FULL_RUN)/run.log")" -eq 2
+	test "$$(grep -c '^REPRESENTATIVE_CHECKPOINT_PASS desc=311 ' "$(AI_DEIT_R30_FULL_RUN)/run.log")" -eq 2
+	test "$$(grep -c '^REPRESENTATIVE_CHECKPOINT_PASS desc=467 ' "$(AI_DEIT_R30_FULL_RUN)/run.log")" -eq 2
+	! grep -q 'Cannot open file.*checkpoint_spad\.memh' "$(AI_DEIT_R30_FULL_RUN)/run.log"
+	grep -q '^DEIT_R30_CONTINUOUS_QKV_REPACK_3HEAD_ATTENTION_PASS prefix_desc=468 streamed_desc=9564 total_desc=10032 batches=159 query_blocks=13 valid_query_rows=197 ring_wraps=19 .*reset_events=0 ' \
+		"$(AI_DEIT_R30_FULL_RUN)/run.log"
