@@ -1,0 +1,49 @@
+{
+  "status": "FOUR_LAYER_TOP_AUTOREGRESSIVE_GOLDEN_PASS",
+  "branch": "research/nmaforge-v1.2-round30-gpt2",
+  "tested_source_commit": "c8a99c03818b374a5b2afb5104a0cd4d44fa69e0",
+  "rtl_modified": false,
+  "vcs": "V-2023.12-SP1_Full64",
+  "python": "/tmp/nmaforge_round10_venv/bin/python",
+  "seed": 20261116,
+  "model_package": "benchmark/gpt2_quality/results/round30_qat_fixed_source/source_20261221_qat_20263032/product_int8.npz",
+  "model_package_sha256": "22ffc2103efd765817599b5ceb4ae3d839956b6523e91f0fa4fec759ab159af2",
+  "workload_model_sha256": "da54a6119ec36a10e1b6150004448e738f8e77f5e52ca9088795f7c10ec4d783",
+  "numeric_profile": "round21_residual_gelu_aligned",
+  "command": "make -C dv/subsystem/top_smoke/sim ai_h64_four_layer_top_argmax AI_H64_AUTOREGRESSIVE=1 AI_H64_FOUR_LAYER_SEED=20261116 AI_H64_FOUR_LAYER_TOKENS=2,19,71,5 AI_H64_FOUR_LAYER_RUN=/tmp/nmaforge_round30_gpt2_prompt2_closure AI_H64_FOUR_LAYER_MODEL_NPZ=benchmark/gpt2_quality/results/round30_qat_fixed_source/source_20261221_qat_20263032/product_int8.npz AI_H64_NUMERIC_PROFILE=round21_residual_gelu_aligned",
+  "make_exit": 0,
+  "prompt_tokens": [
+    2,
+    19,
+    71,
+    5
+  ],
+  "generated_tokens": [
+    79,
+    77,
+    69,
+    68
+  ],
+  "contexts": 4,
+  "logits_per_context": 256,
+  "all_logits_bit_exact": true,
+  "context_logit_sha256_le_i32": [
+    "d9d034fa6e3c3f8e927a3001c6fbd45e7c3419bae17d35fcee66b092fad186e1",
+    "d75a24598e5f2b24c94a271890c7484a6af9d5d19307b8a6814fc24931695f92",
+    "32391621d9c4019133ddabf2c592ef6a61101495c0f97246e4f9056131dea31a",
+    "56b0267f30ceb34411cccff92e7eff68705fd0c28e77048f5b1dee7798452200"
+  ],
+  "descriptor_publications": 4020,
+  "extension_cycles": 4338648,
+  "resets": 0,
+  "host_intermediate_tensor_words": 0,
+  "execution_semantics": "prefix_recompute in one Product Top session; functional autoregressive feedback, not incremental query-only KV decode",
+  "spad_capacity_bytes": 524288,
+  "quality_claim": "none; GPT-2-derived weight functional regression only",
+  "raw_logs": [
+    "compile.log",
+    "run.log",
+    "make.log"
+  ],
+  "result": "autoregressive_result.json"
+}
