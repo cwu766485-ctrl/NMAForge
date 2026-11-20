@@ -2,7 +2,7 @@
 
 ## Disposition
 
-**0x3B descriptor physical-range boundary: PASS. Full-shape Repack-only Product Top for Q-dense, K-major, and V-Matrix-B layouts: PASS. QKV→Repack dependency, Attention/AV, streaming Runtime, and Encoder: NOT RUN.**
+**0x3B physical-span check and full-shape fixture-based Repack Product Top: PASS for Q-dense, K-major, and V-Matrix-B. Round 30 B0 overall: PARTIAL because External AXI Descriptor Fetch and explicit Repack Abort/Reset/Backpressure qualification were not run. QKV→Repack dependency, Attention/AV, streaming Runtime, and Encoder: NOT RUN.**
 
 These tests qualify the standalone layout transform using deterministic fixture operands. They do **not** demonstrate that a real Matrix Q/K/V producer feeds 0x3B in the same session.
 
@@ -42,7 +42,7 @@ The ordinary `ai_smoke` is the pre-existing baseline. No explicit 0x3B abort/res
 
 ## Remaining gates
 
-- **B0 full Repack boundary qualification: PASS** for the three physical layouts and tested size.
+- **B0 core Repack/layout subset: PASS; full gate: PARTIAL.** Three layouts and the tested full size passed, but the specified External AXI Descriptor Fetch and Abort/Reset/Backpressure cases remain open.
 - **B1 real QKV→Repack in one unreset Top: NOT RUN.**
 - **B2 Repack output→QK→Softmax→AV: NOT RUN.**
 - **B3 streamed CMDQ/CPLQ runtime and full Encoder: NOT RUN.**
