@@ -168,7 +168,12 @@ module ai_descriptor_validator (
          (flags == 8'd0));
 
     wire [15:0] repack_head_dim = n_size / 16'd3;
-    wire [31:0] repack_src_bytes = {16'd0,m_size} * {16'd0,n_size};
+    // Matrix-A storage is sparse at the 4x4 word granularity: each logical
+    // INT8 element matrix occupies four physical bytes in the tiled source
+    // address space. Bound the full padded MxN footprint, not the dense
+    // logical tensor size, so alias checks cover every source tile.
+    wire [31:0] repack_src_bytes =
+        ({16'd0,m_size} * {16'd0,n_size}) << 2;
     wire [31:0] repack_dst_bytes =
         (aux0[1:0] == 2'd2) ?
         (({16'd0,repack_head_dim} / 16) *

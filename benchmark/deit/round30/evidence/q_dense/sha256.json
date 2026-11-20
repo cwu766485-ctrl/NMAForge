@@ -1,0 +1,34 @@
+{
+  "files": [
+    {
+      "file": "compile.log.gz",
+      "sha256": "9c4a2f1202fbe036144a9fe7c3c4bb0aa382a04878608475f107bc4d223f1e9a",
+      "bytes": 2566
+    },
+    {
+      "file": "manifest.json",
+      "sha256": "945b21f59cdb20b4219ec3a5f8f74d1a0ef613808f20a8b5a3d6c0375b05069a",
+      "bytes": 2090
+    },
+    {
+      "file": "model_golden.memh.gz",
+      "sha256": "51d7e0c15701fdf05b28e9484b46e3e25ac16c10dfa3033f06b3a6b07d35149d",
+      "bytes": 77079
+    },
+    {
+      "file": "model_memory.memh.gz",
+      "sha256": "214bb01bae99a18331dcccdef31be971538b7c5f71fe79e4d9179fab2c78fe8e",
+      "bytes": 187071
+    },
+    {
+      "file": "run.log.gz",
+      "sha256": "5585e4e71836e9c0a700c04b50c52c67c8ca17b93b4c6f7813992e1260520f63",
+      "bytes": 1133
+    },
+    {
+      "file": "run_manifest.json",
+      "sha256": "4f9877f2a3f80296d326a32be3e5d27b3e20d4d329212e5ab6154ef6040ab242",
+      "bytes": 1734
+    }
+  ]
+}

@@ -1529,3 +1529,32 @@ ai_deit_round29_top_repack_256k:
 		+AI_REPRESENTATIVE_USEFUL_MACS=0 -l $(AI_DEIT_R29_RUN)/run.log
 	grep -q '^REPRESENTATIVE_MODEL_PASS desc=9 .*golden_words=576 useful_macs=0 ' \
 		$(AI_DEIT_R29_RUN)/run.log
+
+# Round 30: full 197x192/3-head physical-layout boundary qualification for
+# opcode 0x3b. The fixture models the real Matrix-A sparse tile address space;
+# it is still a repack-only test and does not claim QKV/Attention integration.
+AI_DEIT_R30_RUN ?= /tmp/nmaforge_deit_round30_repack_$(shell date +%Y%m%d_%H%M%S)
+AI_DEIT_R30_PYTHON ?= /tmp/nmaforge_deit_round17_venv/bin/python
+AI_DEIT_R30_LAYOUT ?= q_dense
+.PHONY: ai_deit_round30_top_repack_256k
+ai_deit_round30_top_repack_256k:
+	test ! -e "$(AI_DEIT_R30_RUN)"
+	mkdir -p "$(AI_DEIT_R30_RUN)"
+	$(AI_DEIT_R30_PYTHON) ../../../../benchmark/deit/round30/generate_full_repack_top_workload.py \
+		--layout "$(AI_DEIT_R30_LAYOUT)" --out-dir "$(AI_DEIT_R30_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=16384 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_R30_RUN)/csrc -top tb_ai_accel_smoke \
+		-f ai_accel.f ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_DEIT_R30_RUN)/simv -l $(AI_DEIT_R30_RUN)/compile.log
+	$(AI_DEIT_R30_RUN)/simv +ntb_random_seed=300029 +AI_RANDOM_CASES=0 +AI_SEED=300029 \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_R30_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_R30_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=241664 +AI_REPRESENTATIVE_CPL_BASE=241920 \
+		+AI_REPRESENTATIVE_DESC_COUNT=3 +AI_REPRESENTATIVE_QUEUE_SIZE=16 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=0 -l $(AI_DEIT_R30_RUN)/run.log
+	if [ "$(AI_DEIT_R30_LAYOUT)" = "v_matrix_b" ]; then words=12288; else words=9984; fi; \
+		grep -q "^REPRESENTATIVE_MODEL_PASS desc=3 .*golden_words=$$words useful_macs=0 " \
+		"$(AI_DEIT_R30_RUN)/run.log"
