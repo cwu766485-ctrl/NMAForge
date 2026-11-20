@@ -10,7 +10,7 @@
   "cwd": "dv/subsystem/top_smoke/sim",
   "simulator": "Synopsys VCS V-2023.12-SP1_Full64",
   "seed": 20261116,
-  "spad_bytes": 524288,
+  "spad_bytes": 131072,
   "mode": "four_layer_prefix_recompute_same_top_instance",
   "prompt_tokens": [
     1,
@@ -59,7 +59,7 @@
     }
   ],
   "completion": "4-layer top pass; 933 descriptors; 1,048,920 post-layer cycles; autoregressive extension 4,338,018 cycles; 4,020 publications; 0 reset; 0 host intermediate words.",
-  "scope": "Functional Product Top evidence only. Prefix is recomputed; no claim of incremental KV decode. Host supplies token feedback/descriptor orchestration. Top run measured at 512 KiB SPAD, not 256 KiB. It is not complete host-to-host timing.",
+  "scope": "Functional Product Top evidence only. Prefix is recomputed; no claim of incremental KV decode. Host supplies token feedback/descriptor orchestration. Top run measured at 128 KiB SPAD, not 256 KiB. It is not complete host-to-host timing.",
   "compile_exit": 0,
   "simulation_exit": 0,
   "logs": {

@@ -42,7 +42,7 @@
   "source_checkpoint_sha256": "00f73c2eaf14e2c2ea170ae6bdbdbc570d6850bb2f3a77b61f68596e5019cca0",
   "source_seed": 20261221,
   "source_sha": "c45e307f12d05542f16068aeeb87bd8877176ed6",
-  "spad_capacity_bytes": 524288,
+  "spad_capacity_bytes": 131072,
   "spad_words_per_bank": 8192,
   "status": "FOUR_LAYER_TOP_AUTOREGRESSIVE_GOLDEN_PASS",
   "validation_selected": true,

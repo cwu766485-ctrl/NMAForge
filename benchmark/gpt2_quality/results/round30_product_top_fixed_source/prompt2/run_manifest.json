@@ -38,7 +38,7 @@
   "resets": 0,
   "host_intermediate_tensor_words": 0,
   "execution_semantics": "prefix_recompute in one Product Top session; functional autoregressive feedback, not incremental query-only KV decode",
-  "spad_capacity_bytes": 524288,
+  "spad_capacity_bytes": 131072,
   "quality_claim": "none; GPT-2-derived weight functional regression only",
   "raw_logs": [
     "compile.log.gz",
