@@ -54,3 +54,22 @@ On the pilot validation subset, context 128 scored 27.83% vs context 16 at 37.89
 ## Reproduction evidence
 
 Machine-readable results, checkpoint/package hashes, commands, and raw VCS logs are under `benchmark/gpt2_quality/results/round30_qat/`, `round30_context128/`, and `round30_product_top/`. Failed first-attempt logger output is intentionally excluded; no source/test result is derived from it.
+
+## Controlled fixed-source QAT follow-up and selected-package Top replay
+
+A second experiment held the FP32 source checkpoint fixed (source seed `20261221`, SHA-256 `00f73c2eaf14e2c2ea170ae6bdbdbc570d6850bb2f3a77b61f68596e5019cca0`) and varied only QAT seed (`20263031`, `20263032`, `20263033`), 200 steps each. It used the same disjoint split, 128 validation windows, and 512 held-out test windows (8,192 targets). Validation selected QAT seed `20263032`; the test set was not used for selection.
+
+| Test metric (mean across three QAT seeds) | Value |
+|---|---:|
+| FP32 accuracy | 35.46% |
+| QAT Float accuracy | 35.36% |
+| Product-aligned INT8 / Fake Quant accuracy | 20.91% |
+| Bigram accuracy | 26.51% |
+| Product-aligned INT8 cross entropy / perplexity | 3.2893 / 26.82 |
+| INT8 vs FP32 top-1 agreement (selected seed 20263032) | 37.76% |
+
+The fixed-source run confirms that Product-aligned Fake Quant and the independent INT reference match on the sampled trace, but does not recover model quality: test INT8 is about 5.60 percentage points below Bigram. Across the three QAT seeds, test INT8 accuracy is 21.31%, 20.79%, and 20.64%; validation-selected seed 20263032 is not a quality closure. This is a controlled-seed stability check, not evidence that source-checkpoint variation has been eliminated from the earlier three-source aggregate.
+
+The validation-selected package (`22ffc2103efd765817599b5ceb4ae3d839956b6523e91f0fa4fec759ab159af2`) was then run on Product Top at the tested source SHA. VCS compile/run both exited 0 (`V-2023.12-SP1_Full64`). All four contexts produced 256 INT32 logits matching the independent integer Golden bit-exact; host Argmax generated `[129, 68, 82, 68]`. The same Top instance had zero reset events and zero host-written intermediate tensor words. Execution is explicitly **prefix recompute**, uses the 512 KiB smoke configuration, and is not persistent incremental-KV or host-to-host latency evidence. The VCS simulation reported 4,020 descriptor publications and 4,339,530 autoregressive extension cycles.
+
+Reproduction command and compressed raw logs, all four logits dumps, allocation/descriptor manifests, and hashes are archived under `benchmark/gpt2_quality/results/round30_product_top_fixed_source/`. Fixed-source training outputs and per-seed metrics are under `benchmark/gpt2_quality/results/round30_qat_fixed_source/`.
