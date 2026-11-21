@@ -1,0 +1,114 @@
+{
+  "ai_smoke": {
+    "pass": true,
+    "path": "benchmark/gpt2_compat/results/round16/logs/ai_smoke_vcs_console.txt.gz",
+    "sha256": "56baf186d5919c25a88f7e972f43b582896497a84d4d54eb350f2395b2c19584",
+    "archive_sha256": "d5d20c261d31597c669e8470a3ce7fd7630b19d90c4350bfba6b74aa57c77378",
+    "compression": "gzip, lossless; decompresses byte-for-byte to original console capture"
+  },
+  "base_commit_sha": "995ba340e914d2264b24e1928bcfef09bd675ea3",
+  "branch": "research/nmaforge-v1.2-round16",
+  "runs": [
+    {
+      "command": "ai_h64_four_layer_top; AI_H64_FOUR_LAYER_TOKENS=4",
+      "compile_log_path": "benchmark/gpt2_compat/results/round16/logs/four_layer_one_token_id4_vcs_compile.txt.gz",
+      "compile_log_sha256": "2182beb419864b8c6eb98120ca5d6344d170fe9fe3b19f0afeb03f92c1357a9e",
+      "final_ln_lm_head_pass": "ln_rows=16 logit_words=4096 descriptor_count=33 method=Product_SFU_REQUANT_GEMM golden_checked=1",
+      "golden_files": {
+        "checkpoint_golden.memh": {
+          "bytes": 260973,
+          "path": "benchmark/gpt2_compat/results/round16/goldens/four_layer_one_token_id4_final_checkpoint_golden.memh",
+          "sha256": "08d10e305c6d7ab39e9d7d68e24b28c5e85b8ae80f4f2feb7f304700a1a89827"
+        },
+        "model_golden.memh": {
+          "bytes": 73737,
+          "path": "benchmark/gpt2_compat/results/round16/goldens/four_layer_one_token_id4_final_model_golden.memh",
+          "sha256": "3344d0e25f85ca3b08cf44bb535db91a5931539b1e7e3edc5eb5406d2c633eed"
+        }
+      },
+      "handoff_pass_count": 3,
+      "model_sha256": "67a89c411254039bab22a7dffc49c64b69233575368503f544ee9f3ec4ab00fc",
+      "publication_summary": "appended_stages=3 total_publications=789 decode_stage_cycles=1147740 reset_events=0",
+      "representative_model_pass": "desc=189 prefill_desc=0 decode_desc=0 golden_words=1024 useful_macs=49280 executed_macs=819200 padding_macs=769920 useful_output_elements=512 physical_output_elements=8192 command_cycles=258037 end_to_end_cycles=346421 dma_preload_included=1 prefill_command_cycles=0 decode_command_cycles=0 prefill_exclusive_cycles=0 decode_exclusive_cycles=0 exclusive_profile_cycles=258037 preload_axi_cycles=73439 preload_dma_window_cycles=14945 preload_dma_busy_cycles=13230 preloaded_spad_bytes=99136 useful_mac_per_cycle=0.1910 executed_array_utilization_pct=100.00 useful_array_utilization_pct=6.02 matrix_mac_cycles=3200 matrix_req_wait=477 matrix_rsp_wait=371 matrix_writeback=6656 matrix_other=5854 sfu_busy=236748 kv_busy=2508 conv_busy=0 banked_busy=0 fp_busy=0 scalar_busy=0 no_engine_dispatch_remainder=2223 dma_busy_overlap=0 spad_read_bytes=340096 spad_write_bytes=218688",
+      "run_dir": "/tmp/nmaforge_r16_top_run_20261116_one_final",
+      "run_id": "four_layer_one_token_id4",
+      "run_log_path": "benchmark/gpt2_compat/results/round16/logs/four_layer_one_token_id4_vcs_run.txt.gz",
+      "run_log_sha256": "2ce4d958b0aecd07a72240161989a38ab84e087c43528564a76bde4c871a75c6",
+      "status": "PASS",
+      "token_ids": [
+        4
+      ],
+      "top_pass": "layers=4 descriptors=789 post_layer_cycles=1147740 reset_events=0 host_hidden_words=0",
+      "compile_log_archive_sha256": "926f3b2c50bf25d6bb0ca5b71bc079f8f957d0a11bb853926007b01190b17b35",
+      "compile_log_compression": "gzip, lossless; decompresses byte-for-byte to original console capture",
+      "run_log_archive_sha256": "135feb5c2b65405de96e972bc71860090f780ae672b7e5359b3fc7417b6bedd7",
+      "run_log_compression": "gzip, lossless; decompresses byte-for-byte to original console capture"
+    },
+    {
+      "command": "ai_h64_four_layer_top; default token ID list",
+      "compile_log_path": "benchmark/gpt2_compat/results/round16/logs/four_layer_four_token_prompt_vcs_compile.txt.gz",
+      "compile_log_sha256": "9cc644e28ddb020b92f0c7c807ebe3d0d315fd0847831294be2c73f8c70735b4",
+      "final_ln_lm_head_pass": "ln_rows=16 logit_words=4096 descriptor_count=33 method=Product_SFU_REQUANT_GEMM golden_checked=1",
+      "golden_files": {
+        "checkpoint_golden.memh": {
+          "bytes": 260973,
+          "path": "benchmark/gpt2_compat/results/round16/goldens/four_layer_four_token_prompt_final_checkpoint_golden.memh",
+          "sha256": "3b1448c0aa89368e55d18e24da54808acc769ba6cb0d7c6c7ea8d24e1bbd2679"
+        },
+        "model_golden.memh": {
+          "bytes": 73737,
+          "path": "benchmark/gpt2_compat/results/round16/goldens/four_layer_four_token_prompt_final_model_golden.memh",
+          "sha256": "9b37173ea102721101e12931cde07059ead7a2e5bfbf327dac4fdfa0e409fe60"
+        }
+      },
+      "handoff_pass_count": 3,
+      "model_sha256": "67a89c411254039bab22a7dffc49c64b69233575368503f544ee9f3ec4ab00fc",
+      "publication_summary": "appended_stages=3 total_publications=933 decode_stage_cycles=1184676 reset_events=0",
+      "representative_model_pass": "desc=225 prefill_desc=0 decode_desc=0 golden_words=1024 useful_macs=197888 executed_macs=819200 padding_macs=621312 useful_output_elements=2048 physical_output_elements=8192 command_cycles=263017 end_to_end_cycles=354857 dma_preload_included=1 prefill_command_cycles=0 decode_command_cycles=0 prefill_exclusive_cycles=0 decode_exclusive_cycles=0 exclusive_profile_cycles=263017 preload_axi_cycles=76895 preload_dma_window_cycles=14945 preload_dma_busy_cycles=13230 preloaded_spad_bytes=101440 useful_mac_per_cycle=0.7524 executed_array_utilization_pct=100.00 useful_array_utilization_pct=24.16 matrix_mac_cycles=3200 matrix_req_wait=477 matrix_rsp_wait=371 matrix_writeback=6656 matrix_other=5854 sfu_busy=239856 kv_busy=3720 conv_busy=0 banked_busy=0 fp_busy=0 scalar_busy=0 no_engine_dispatch_remainder=2883 dma_busy_overlap=0 spad_read_bytes=343552 spad_write_bytes=220416",
+      "run_dir": "/tmp/nmaforge_r16_top_run_20261116_four_final2",
+      "run_id": "four_layer_four_token_prompt",
+      "run_log_path": "benchmark/gpt2_compat/results/round16/logs/four_layer_four_token_prompt_vcs_run.txt.gz",
+      "run_log_sha256": "96616e45140a1040d7edec809004982bec0ac6b9460aaa9dbe575b5edfa8c126",
+      "status": "PASS",
+      "token_ids": [
+        1,
+        7,
+        42,
+        3
+      ],
+      "top_pass": "layers=4 descriptors=933 post_layer_cycles=1184676 reset_events=0 host_hidden_words=0",
+      "compile_log_archive_sha256": "4a4569030787162a1719866045b4b8ab15579a771f602eb9e2f3a045d0de0420",
+      "compile_log_compression": "gzip, lossless; decompresses byte-for-byte to original console capture",
+      "run_log_archive_sha256": "b08bf032a54c8f9b271dc9869611115712ed679340ca0a8130db2c3606465fa6",
+      "run_log_compression": "gzip, lossless; decompresses byte-for-byte to original console capture"
+    },
+    {
+      "command": "ai_h64_persistent_two_token",
+      "compile_log_path": "benchmark/gpt2_compat/results/round16/logs/legacy_two_token_compatibility_vcs_compile.txt.gz",
+      "compile_log_sha256": "1c368713ca39eb20b7f0d3798dbe6432566dc567e7ee5eeb3f3cf7c237562a11",
+      "final_ln_lm_head_pass": null,
+      "handoff_pass_count": "N/A (legacy persistent token runtime)",
+      "persistent_two_token_pass": "total_publications=394 decode_stage_cycles=353214 reset_events=0",
+      "publication_summary": null,
+      "representative_model_pass": "desc=201 prefill_desc=0 decode_desc=0 golden_words=6912 useful_macs=98688 executed_macs=819200 padding_macs=720512 useful_output_elements=1024 physical_output_elements=8192 command_cycles=259568 end_to_end_cycles=327400 dma_preload_included=1 prefill_command_cycles=0 decode_command_cycles=0 prefill_exclusive_cycles=0 decode_exclusive_cycles=0 exclusive_profile_cycles=259568 preload_axi_cycles=53303 preload_dma_window_cycles=14529 preload_dma_busy_cycles=12954 preloaded_spad_bytes=84688 useful_mac_per_cycle=0.3802 executed_array_utilization_pct=100.00 useful_array_utilization_pct=12.05 matrix_mac_cycles=3200 matrix_req_wait=477 matrix_rsp_wait=371 matrix_writeback=6656 matrix_other=5854 sfu_busy=237655 kv_busy=2912 conv_busy=0 banked_busy=0 fp_busy=0 scalar_busy=0 no_engine_dispatch_remainder=2443 dma_busy_overlap=0 spad_read_bytes=341248 spad_write_bytes=219264",
+      "run_dir": "/tmp/nmaforge_r16_legacy_twotoken_fix2_20261116",
+      "run_id": "legacy_two_token_compatibility",
+      "run_log_path": "benchmark/gpt2_compat/results/round16/logs/legacy_two_token_compatibility_vcs_run.txt.gz",
+      "run_log_sha256": "b3ebf3f9d996ef443f4df3dd06ed5088ab241842dd206f8a5ad3d3c22343eb3e",
+      "status": "PASS",
+      "token_ids": [
+        1,
+        7
+      ],
+      "top_pass": null,
+      "compile_log_archive_sha256": "b4083449e56ad83c5f50f2b9e800e39816a5f4aecc8e94ac44f17ea2467e9196",
+      "compile_log_compression": "gzip, lossless; decompresses byte-for-byte to original console capture",
+      "run_log_archive_sha256": "bdf8bd6120c6d51c8f96b1d33329b6a5e78da5306f4d0b5d3842bb8baad28f53",
+      "run_log_compression": "gzip, lossless; decompresses byte-for-byte to original console capture"
+    }
+  ],
+  "spad_capacity_bytes": 131072,
+  "testbench": "tb_ai_accel_smoke / Product ai_accel_top",
+  "tested_source_diff_sha256": "7820fbcae6aaaee81cc3cee562da0d4699ce0413665dd4d688785baf32c4dd3d",
+  "vcs": "V-2023.12-SP1_Full64"
+}

@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "V2-CMDQ-GEMV-AB-ALIAS-3SEED-F19E929",
+  "status": "PASS_SCOPED",
+  "candidate": {
+    "branch": "feature/npu-architecture-v2",
+    "commit": "f19e92934cd6273d327621c43cb17291cf1a9aa5",
+    "tree": "2d931c1c81997b482467d7fdf69302dd367975a1",
+    "product_rtl_commit": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+    "worktree": "clean detached worktree"
+  },
+  "test": {
+    "path": "dv/uvm/tests/sequences/ai_compute_cluster_e2e_seq.svh",
+    "opcode": "0x52",
+    "shape_m_n_k": "1x16x16",
+    "src_a_equals_src_b": true,
+    "source_bytes_checked_unchanged": 256,
+    "golden_outputs_checked": 16,
+    "output_guards_checked": 2,
+    "completion": "success, task ID/status/result/element count checked",
+    "matrix_reads_accepted_returned_per_seed": "17/17",
+    "focused_coverage": "1/1 bin per seed; merged URG 100.00%, 3 hits",
+    "checker": "independent signed INT32 Golden, full shared-source image immutability, output sentinels, completion and accepted/returned Matrix response count",
+    "scope_note": "Read-only A/B ranges alias; destination remains disjoint. This does not test concurrent software mutation of operands."
+  },
+  "seeds": [
+    {"seed": 20261106, "result": "PASS", "focused_bin": "hit", "accepted_reads": 17, "returned_reads": 17, "uvm_warning_error_fatal": "0/0/0", "run_log_sha256": "16b0a3d1d94c2b9690a1869888de6e266c64b9217cdf95782a6c2ad42b57512f"},
+    {"seed": 20261107, "result": "PASS", "focused_bin": "hit", "accepted_reads": 17, "returned_reads": 17, "uvm_warning_error_fatal": "0/0/0", "run_log_sha256": "9d3a2e73ca0e312c705431206ddc46e45eff74561a01153214252a52e70f112f"},
+    {"seed": 20261108, "result": "PASS", "focused_bin": "hit", "accepted_reads": 17, "returned_reads": 17, "uvm_warning_error_fatal": "0/0/0", "run_log_sha256": "0450aae11c1cc9c937de1d20a39c0f76e525d8b2c01e075f9d41774acb8674f4"}
+  ],
+  "tool": {
+    "simulator": "Synopsys VCS V-2023.12-SP1_Full64",
+    "uvm": "1.2",
+    "coverage": "line+condition+branch+FSM+assertion",
+    "urg_merged_total_line_condition_fsm_branch_assert_group_percent": [70.71, 68.37, 46.17, 67.66, 72.0, 83.94]
+  },
+  "command": "VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' make -C dv/uvm/sim uvm_compute_cluster_regress COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v2_gemv_alias_f19e929 COMPUTE_CLUSTER_UVM_SEEDS='20261106 20261107 20261108'",
+  "artifacts": {
+    "directory": "/tmp/nmaforge_v2_gemv_alias_f19e929",
+    "logs_only_archive": "/tmp/nmaforge_v2_gemv_ab_alias_f19e929_logs.tar.gz",
+    "logs_only_archive_sha256": "18e664689077d9608924af2b9ec08eb912d4979edc9e0cf36b816cbe936447ae",
+    "archive_contents": ["compile.log", "seed_*/run.log", "urg_merged/dashboard.txt", "urg_merged/groups.txt", "urg_merged/grpinfo.txt"],
+    "excluded": ["simulator_binary", "coverage_database", "waveforms"]
+  },
+  "overall_v2_dv_signoff": "IN_PROGRESS"
+}

@@ -1,0 +1,10 @@
+{
+  "tensor_bytes": 49920,
+  "tensor_high_water": 69568,
+  "descriptor_base": 69632,
+  "completion_base": 86016,
+  "reserved_completion_end": 88064,
+  "capacity": 131072,
+  "initial_image_sha256": "9ec2ae01d3d33ffb5b8d648e8b5f59e25837e51cb5a68bb640b772e0351d71c2",
+  "note": "monotonic allocation retains all eight stages, unlike hypothetical reused budget"
+}

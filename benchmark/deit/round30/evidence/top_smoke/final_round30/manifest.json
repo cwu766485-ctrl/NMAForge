@@ -1,0 +1,22 @@
+{
+  "run_id": "round30-deit-compat-smoke-20261121-0024",
+  "branch": "research/nmaforge-v1.2-round30-deit",
+  "tested_base_commit": "864ba16aa052fbb0f2bb8948133a54586cec6b26",
+  "tool": "VCS V-2023.12-SP1_Full64; Python 3.12 mapper; Rocky Linux WSL",
+  "configuration": {
+    "spad_words_per_bank": 8192,
+    "random_cases": 0,
+    "seed": 300030
+  },
+  "result": "PASS",
+  "marker": "TEST PASS; existing GEMV 0x52, fused 0x53, CNM profile, reset recovery checks present",
+  "make_exit": 0,
+  "warning": "VCS LOOP-REROLL-ENABLED informational debug-capacity warning in included workload fixture; no new prohibited errors observed.",
+  "artifacts": {
+    "compile_log": "compile.log.gz",
+    "run_log": "run.log.gz",
+    "make_log": "make.log.gz",
+    "command": "command.txt",
+    "exit": "run.exit"
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "num_instructions": 13,
+  "num_descriptors": 11,
+  "ddr_image_size": 3147776,
+  "golden_size": 4,
+  "sram_used": 1312,
+  "descriptors": [
+    [
+      "input",
+      0
+    ],
+    [
+      "input_im2col",
+      1
+    ],
+    [
+      "conv_w_reshaped",
+      2
+    ],
+    [
+      "conv_out",
+      3
+    ],
+    [
+      "conv_b_conv_bcast",
+      4
+    ],
+    [
+      "relu_out",
+      5
+    ],
+    [
+      "flat_out",
+      6
+    ],
+    [
+      "fc_w",
+      7
+    ],
+    [
+      "output",
+      8
+    ],
+    [
+      "fc_b",
+      9
+    ],
+    [
+      "fc_b_bcast",
+      10
+    ]
+  ],
+  "sram_allocs": {
+    "input": {
+      "offset": 0,
+      "size": 64
+    },
+    "input_im2col": {
+      "offset": 64,
+      "size": 324
+    },
+    "conv_w_reshaped": {
+      "offset": 400,
+      "size": 36
+    },
+    "conv_out": {
+      "offset": 448,
+      "size": 144
+    },
+    "conv_b_conv_bcast": {
+      "offset": 592,
+      "size": 144
+    },
+    "relu_out": {
+      "offset": 448,
+      "size": 144
+    },
+    "flat_out": {
+      "offset": 448,
+      "size": 144
+    },
+    "fc_w": {
+      "offset": 736,
+      "size": 576
+    },
+    "output": {
+      "offset": 0,
+      "size": 4
+    },
+    "fc_b": {
+      "offset": 16,
+      "size": 4
+    },
+    "fc_b_bcast": {
+      "offset": 32,
+      "size": 4
+    }
+  }
+}

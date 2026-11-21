@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic descriptor mapper for a 4-token CIMForge Transformer block.
+"""Deterministic descriptor mapper for CIMForge Transformer workloads.
 
 The workload is intentionally small enough for RTL simulation, but every edge
 is real: Q/K/V projection, QK^T, row softmax, AV, output projection, residual,
@@ -10,6 +10,7 @@ scratchpad allocation, tensor layout conversion and ABI-v7 descriptor encoding.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from dataclasses import dataclass
@@ -33,6 +34,8 @@ from ai_a3_reference import (  # noqa: E402
 
 
 OP_GEMM = 0x30
+OP_GEMV_KFOLD = 0x52
+OP_GEMM_REQUANT_TILE_A = 0x53
 OP_SOFTMAX = 0x32
 OP_RESIDUAL = 0x34
 OP_GELU = 0x35
@@ -41,7 +44,10 @@ OP_LAYERNORM = 0x38
 OP_CAUSAL_SOFTMAX = 0x39
 OP_KV_WRITE = 0x43
 OP_KV_READ = 0x44
+FLAG_KV_QK_COMPAT_APPEND = 0x02
+KV_QK_COMPAT_ABI_VERSION = 6
 FLAG_BIAS = 1 << 0
+FLAG_TRANSPOSE_A = 1 << 1
 FLAG_TRANSPOSE_B = 1 << 2
 FLAG_PACK_I8 = 1 << 4
 FLAG_PACK_I8_TILE_A = 1 << 5
@@ -138,6 +144,9 @@ class Descriptor:
     src0_stride: int = 0
     src1_stride: int = 0
     dst_stride: int = 0
+    batch_count: int = 1
+    head_count: int = 1
+    version: int = DESC_VERSION
 
     def words(self) -> list[int]:
         words = [0] * 16
@@ -154,18 +163,76 @@ class Descriptor:
         words[10] = self.src0_stride
         words[11] = self.src1_stride
         words[12] = self.dst_stride
-        words[13] = (1 << 16) | 1  # one head, one batch
+        # ABI-v7 word 13 stores head_count in the upper half and
+        # batch_count in the lower half (see ai_desc_fetch).
+        words[13] = (self.head_count << 16) | self.batch_count
         words[14] = (self.signal_mask << 16) | self.wait_mask
-        words[15] = (self.clear_mask << 16) | DESC_VERSION
+        words[15] = (self.clear_mask << 16) | self.version
         return [u32(word) for word in words]
 
 
+def validate_fused_tile_fields(descriptor: Descriptor) -> None:
+    """Validate the ABI-v7 opt-in layout and forwarding bits for opcode 0x53."""
+    capture = bool(descriptor.aux0 & (1 << 5))
+    consume = bool(descriptor.aux0 & (1 << 6))
+    linearized = bool(descriptor.aux0 & (1 << 7))
+    if descriptor.aux0 & ~0xFF:
+        raise ValueError(
+            f"{descriptor.name}: fused Matrix aux0 must fit eight bits"
+        )
+    if linearized and (
+        capture or consume or
+        not (descriptor.m >= 4 and
+             ((descriptor.n == 4 and descriptor.m <= 64) or
+             (descriptor.n == 16 and descriptor.m <= 512))
+             )
+        or descriptor.m % 4 or descriptor.dst_stride != 0
+        or (descriptor.flags & (FLAG_TRANSPOSE_A | FLAG_TRANSPOSE_B))
+    ):
+        raise ValueError(
+            f"{descriptor.name}: linear row layout requires M=4..64,N=4 or "
+            "M=4..512,N=16, "
+            "one dense instance and no transpose/forwarding flags"
+        )
+    if descriptor.dst & 0xF or descriptor.dst_stride & 0xF:
+        raise ValueError(
+            f"{descriptor.name}: fused tile destination/stride must be 16-byte aligned"
+        )
+    if descriptor.m % 4 or descriptor.n % 4:
+        raise ValueError(
+            f"{descriptor.name}: fused Matrix-A tile shape must be 4-aligned"
+        )
+    if capture and (
+        descriptor.m != 16 or descriptor.n != 16 or descriptor.dst_stride != 0
+    ):
+        raise ValueError(
+            f"{descriptor.name}: tile capture requires dense 16x16 output"
+        )
+    if consume and (
+        descriptor.m != 16
+        or descriptor.k_or_length != 4
+        or (descriptor.flags & FLAG_TRANSPOSE_A)
+        or descriptor.src0_stride != 0
+    ):
+        raise ValueError(
+            f"{descriptor.name}: tile consume requires M=16, K=4, dense non-transposed A"
+        )
+
+
 class Mapper:
-    def __init__(self) -> None:
+    def __init__(self, capacity_bytes: int = 128 * 1024) -> None:
+        if capacity_bytes < 32 or capacity_bytes % 16 or (capacity_bytes & (capacity_bytes - 1)):
+            raise ValueError("SPAD capacity must represent four power-of-two banks")
+        self.capacity_bytes = capacity_bytes
         self.next_addr = 0x10000
         self.tensors: dict[str, Tensor] = {}
         self.descriptors: list[Descriptor] = []
         self.task_id = 0x7000
+
+    def check_queues(self, descriptor_base: int, completion_base: int) -> None:
+        count = len(self.descriptors)
+        if descriptor_base + count * 64 > self.capacity_bytes or completion_base + count * 16 > self.capacity_bytes:
+            raise ValueError("descriptor/completion queues exceed SPAD capacity")
 
     def tensor(
         self, name: str, shape: tuple[int, ...], dtype: str, layout: str,
@@ -178,7 +245,10 @@ class Mapper:
         if dtype == "i8_packed" and count % 4:
             raise ValueError("packed tensor element count must be divisible by four")
         addr = align(self.next_addr)
-        self.next_addr = addr + stored_words * 4
+        end_addr = addr + stored_words * 4
+        if end_addr > self.capacity_bytes:
+            raise ValueError(f"{name}: exceeds SPAD capacity {self.capacity_bytes} bytes")
+        self.next_addr = end_addr
         tensor = Tensor(
             name, addr, shape, dtype, layout, values or [], initialized
         )
@@ -202,6 +272,27 @@ class Mapper:
         self.task_id += 1
 
 
+def add_completion_order_chain(mapper: Mapper, event_bit: int = 0) -> None:
+    """Serialize a workload with one ABI dependency event bit.
+
+    The top dispatcher may overlap independent engines. This conservative chain
+    is useful for workload bring-up until every producer/consumer edge has an
+    explicit dependency. The event is signaled only after ordered retirement.
+    """
+    if event_bit < 0 or event_bit >= 16:
+        raise ValueError("completion-chain event bit must be in [0, 15]")
+    if any((d.wait_mask | d.signal_mask | d.clear_mask) & (1 << event_bit)
+           for d in mapper.descriptors):
+        raise ValueError("completion-chain event bit is already in use")
+    event_mask = 1 << event_bit
+    for index, descriptor in enumerate(mapper.descriptors):
+        if index:
+            descriptor.wait_mask |= event_mask
+            descriptor.clear_mask |= event_mask
+        if index + 1 < len(mapper.descriptors):
+            descriptor.signal_mask |= event_mask
+
+
 def causal_softmax_q15(scores: list[int], query_token: int) -> list[int]:
     if not 0 <= query_token < len(scores):
         raise ValueError("causal query token must be within score length")
@@ -209,17 +300,67 @@ def causal_softmax_q15(scores: list[int], query_token: int) -> list[int]:
     return visible + [0] * (len(scores) - len(visible))
 
 
-def build_workload() -> tuple[Mapper, dict[str, list]]:
-    mapper = Mapper()
-    x = [
-        [1, 2, 0, -1],
-        [0, 1, 2, 1],
-        [2, 0, 1, 1],
-        [1, -1, 0, 2],
-    ]
-    wq, wk, wv = MODEL_WEIGHTS["wq"], MODEL_WEIGHTS["wk"], MODEL_WEIGHTS["wv"]
+def kv_qk_compatible_append(
+    mapper: Mapper, name: str, src: Tensor, cache: Tensor, *,
+    token: int, head: int, feature_count: int = 16, head_stride: int = 256,
+    src_offset: int = 0,
+) -> None:
+    """Append one Matrix-A packed K row into QK Matrix-B K^T word order."""
+    if feature_count not in (4, 8, 12, 16) or head_stride % feature_count:
+        raise ValueError("QK-compatible KV append requires 4..16 packed features")
+    capacity = head_stride // feature_count
+    if capacity not in (4, 8, 12, 16) or token < 0 or token >= capacity:
+        raise ValueError("QK-compatible KV append token exceeds the head cache")
+    mapper.add(
+        name, OP_KV_WRITE, src, cache, src0_offset=src_offset,
+        k_or_length=feature_count, flags=FLAG_KV_QK_COMPAT_APPEND,
+        aux0=(head << 16) | token, src0_stride=16, src1_stride=head_stride,
+        version=KV_QK_COMPAT_ABI_VERSION,
+    )
+
+
+def build_workload(
+    model: dict | None = None,
+    decode_mapping_policy: str = "gemm",
+    capacity_bytes: int = 128 * 1024,
+) -> tuple[Mapper, dict[str, list]]:
+    if decode_mapping_policy not in ("gemm", "gemv_qkv"):
+        raise ValueError(f"unsupported decode mapping policy: {decode_mapping_policy}")
+    mapper = Mapper(capacity_bytes=capacity_bytes)
+    if model is None:
+        x = [
+            [1, 2, 0, -1],
+            [0, 1, 2, 1],
+            [2, 0, 1, 1],
+            [1, -1, 0, 2],
+        ]
+        decode_token = [1, -1, 2, 0]
+        model_weights = MODEL_WEIGHTS
+    else:
+        tokens = model.get("prefill_tokens")
+        decode_id = model.get("decode_token")
+        model_weights = model.get("weights")
+        if not isinstance(tokens, list) or len(tokens) != 4 or any(
+            not isinstance(token, int) or token not in range(4)
+            for token in tokens
+        ):
+            raise ValueError("trained model prefill_tokens must be four IDs in [0, 3]")
+        if not isinstance(decode_id, int) or decode_id not in range(4):
+            raise ValueError("trained model decode_token must be an ID in [0, 3]")
+        required = {"wq", "wk", "wv", "wo", "wup", "wdown"}
+        if not isinstance(model_weights, dict) or set(model_weights) != required:
+            raise ValueError("trained model must provide exactly six INT8 matrices")
+        for name, matrix in model_weights.items():
+            if (not isinstance(matrix, list) or len(matrix) != 4 or
+                any(not isinstance(row, list) or len(row) != 4 for row in matrix) or
+                any(not isinstance(value, int) or not -128 <= value <= 127
+                    for row in matrix for value in row)):
+                raise ValueError(f"trained model {name} must be a 4x4 INT8 matrix")
+        x = [[int(token == lane) for lane in range(4)] for token in tokens]
+        decode_token = [int(decode_id == lane) for lane in range(4)]
+    wq, wk, wv = model_weights["wq"], model_weights["wk"], model_weights["wv"]
     wo, w_up, w_down = (
-        MODEL_WEIGHTS["wo"], MODEL_WEIGHTS["wup"], MODEL_WEIGHTS["wdown"]
+        model_weights["wo"], model_weights["wup"], model_weights["wdown"]
     )
     gamma = [32768] * 4
     beta = [0] * 4
@@ -235,13 +376,19 @@ def build_workload() -> tuple[Mapper, dict[str, list]]:
     gamma_t = mapper.tensor("gamma", (4,), "i32", "vector", gamma)
     beta_t = mapper.tensor("beta", (4,), "i32", "vector", beta)
 
-    def empty_i32(name: str, shape: tuple[int, int] = (4, 4)) -> Tensor:
+    def empty_i32(
+        name: str, shape: tuple[int, int] = (4, 4),
+        zero_pad: bool = False,
+    ) -> Tensor:
         # Poison every destination before execution.  This prevents a stale or
         # preloaded golden tensor from making the RTL check pass accidentally.
+        # A one-row GEMV into a four-row decode tensor explicitly initializes
+        # the three architecturally unused rows to zero; these are padding,
+        # not computed or expected output data.
         return mapper.tensor(
             name, shape, "i32", "row-major",
-            [0x5A5AA5A5] * (shape[0] * shape[1]),
-            initialized=False,
+            ([0] if zero_pad else [0x5A5AA5A5]) * (shape[0] * shape[1]),
+            initialized=zero_pad,
         )
 
     def empty_i8(name: str, shape: tuple[int, int] = (4, 4)) -> Tensor:
@@ -280,6 +427,33 @@ def build_workload() -> tuple[Mapper, dict[str, list]]:
     ) -> None:
         mapper.add(name, OP_GEMM, lhs, dst, src1=rhs, m=m, n=n,
                    k_or_length=k, flags=flags, aux0=1)
+
+    def gemv_rhs(name: str, matrix: list[list[int]]) -> Tensor:
+        """Pack W[K,N] as 0x52 K-major rows padded across N."""
+        k_dim = len(matrix)
+        n_dim = len(matrix[0]) if matrix else 0
+        if not (1 <= n_dim <= 16 and k_dim > 0 and
+                all(len(row) == n_dim for row in matrix)):
+            raise ValueError(
+                f"{name}: opcode 0x52 requires K>0, N=1..16 and rectangular W[K,N]"
+            )
+        words: list[int] = []
+        for k_index in range(k_dim):
+            row = list(matrix[k_index])
+            row.extend([0] * (16 - n_dim))
+            words.extend(pack_i8(row[offset:offset + 4])
+                         for offset in range(0, 16, 4))
+        return mapper.tensor(
+            name, (k_dim * 16,), "i8_packed", "k-major-n-padded", words
+        )
+
+    def gemv_qkv(name: str, lhs: Tensor, rhs: Tensor, dst: Tensor) -> None:
+        if len(dst.shape) != 2 or dst.shape[0] != 4:
+            raise ValueError(f"{name}: padded decode destination must have four rows")
+        mapper.add(
+            name, OP_GEMV_KFOLD, lhs, dst, src1=rhs.addr, m=1, n=4,
+            k_or_length=4, batch_count=1, head_count=0,
+        )
 
     def pack(name: str, src: Tensor, dst: Tensor, shift: int, length: int = 16,
              tile_a_shape: tuple[int, int] | None = None) -> None:
@@ -323,7 +497,6 @@ def build_workload() -> tuple[Mapper, dict[str, list]]:
                 dst_offset=row * width * 4,
             )
 
-    decode_token = [1, -1, 2, 0]
     decode_rows = [decode_token, [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
     decode_i8 = mapper.tensor(
         "decode_x_i8", (4, 4), "i8_packed", "row-major", pack_rows(decode_rows)
@@ -331,9 +504,13 @@ def build_workload() -> tuple[Mapper, dict[str, list]]:
     decode_i32 = mapper.tensor(
         "decode_x_i32", (4, 4), "i32", "row-major", flatten(decode_rows)
     )
-    qd32, qd8 = empty_i32("decode_q_i32"), empty_i8("decode_q_i8")
-    kd32, kd8 = empty_i32("decode_k_i32"), empty_i8("decode_k_i8")
-    vd32, vd8 = empty_i32("decode_v_i32"), empty_i8("decode_v_i8")
+    qkv_zero_pad = decode_mapping_policy == "gemv_qkv"
+    qd32 = empty_i32("decode_q_i32", zero_pad=qkv_zero_pad)
+    qd8 = empty_i8("decode_q_i8")
+    kd32 = empty_i32("decode_k_i32", zero_pad=qkv_zero_pad)
+    kd8 = empty_i8("decode_k_i8")
+    vd32 = empty_i32("decode_v_i32", zero_pad=qkv_zero_pad)
+    vd8 = empty_i8("decode_v_i8")
     decode_scores = empty_i32("decode_scores")
     decode_probs32 = empty_i32("decode_prob_q15")
     decode_probs8 = empty_i8("decode_prob_i8")
@@ -396,13 +573,27 @@ def build_workload() -> tuple[Mapper, dict[str, list]]:
         mapper.descriptors[-1].src0 += row * 16
         mapper.descriptors[-1].dst += row * 16
 
+    prefill_descriptor_count = len(mapper.descriptors)
+
     # Decode one new token after prefill. Its key/value update token slot 4;
     # attention then reads the latest four-token sliding context window.
-    gemm("decode_q_projection", decode_i8, wq_t, qd32)
+    if qkv_zero_pad:
+        wq_gemv = gemv_rhs("decode_wq_gemv", wq)
+        wk_gemv = gemv_rhs("decode_wk_gemv", wk)
+        wv_gemv = gemv_rhs("decode_wv_gemv", wv)
+        gemv_qkv("decode_q_projection", decode_i8, wq_gemv, qd32)
+    else:
+        gemm("decode_q_projection", decode_i8, wq_t, qd32)
     pack("decode_q_pack", qd32, qd8, 0)
-    gemm("decode_k_projection", decode_i8, wk_t, kd32)
+    if qkv_zero_pad:
+        gemv_qkv("decode_k_projection", decode_i8, wk_gemv, kd32)
+    else:
+        gemm("decode_k_projection", decode_i8, wk_t, kd32)
     pack("decode_k_pack", kd32, kd8, 0)
-    gemm("decode_v_projection", decode_i8, wv_t, vd32)
+    if qkv_zero_pad:
+        gemv_qkv("decode_v_projection", decode_i8, wv_gemv, vd32)
+    else:
+        gemm("decode_v_projection", decode_i8, wv_t, vd32)
     pack("decode_v_pack", vd32, vd8, 0)
     kv_write("decode_kv_write_k4", kd8, k_cache, 4, source_row=0)
     kv_write("decode_kv_write_v4", vd8, v_cache, 4, source_row=0)
@@ -516,6 +707,8 @@ def build_workload() -> tuple[Mapper, dict[str, list]]:
             descriptor.signal_mask |= 1 << (index & 1)
     validate_descriptor_chain(mapper)
     expected = {
+        "prefill_descriptor_count": prefill_descriptor_count,
+        "decode_mapping_policy": decode_mapping_policy,
         "prefill_final": norm_2,
         "decode_final": decode_norm_2,
         "decode_q_i32": decode_q,
@@ -544,8 +737,1000 @@ def build_workload() -> tuple[Mapper, dict[str, list]]:
         "value_prefill_readback_words": [pack_i8(row) for row in v_i8],
         "key_decode_readback_words": [pack_i8(row) for row in decode_key_window],
         "value_decode_readback_words": [pack_i8(row) for row in decode_value_window],
+        "weights": model_weights,
     }
+    if model is not None:
+        labels = [(token + 1) % 4 for token in model["prefill_tokens"]]
+        predicted = [max(range(4), key=row.__getitem__) for row in norm_2]
+        decode_label = (model["decode_token"] + 1) % 4
+        decode_prediction = max(range(4), key=decode_norm_2[0].__getitem__)
+        expected["task_metrics"] = {
+            "prefill_labels": labels,
+            "prefill_predictions": predicted,
+            "prefill_correct": sum(a == b for a, b in zip(labels, predicted)),
+            "prefill_count": len(labels),
+            "decode_label": decode_label,
+            "decode_prediction": decode_prediction,
+            "decode_correct": int(decode_label == decode_prediction),
+        }
     return mapper, expected
+
+
+def _pack_matrix_a_physical(matrix: list[list[int]], physical_rows: int = 16) -> list[int]:
+    """Pack dense A into the existing 16-row Matrix tile-major SPAD layout."""
+    if not matrix or not matrix[0] or physical_rows < len(matrix) or physical_rows % 4:
+        raise ValueError("Matrix A must fit its physical row tile")
+    k_dim = len(matrix[0])
+    if k_dim % 4 or any(len(row) != k_dim for row in matrix):
+        raise ValueError("Matrix A K must be a multiple of four and rectangular")
+    padded = [list(row) for row in matrix]
+    padded.extend([[0] * k_dim for _ in range(physical_rows - len(padded))])
+    words = []
+    for tile in range(0, physical_rows, 16):
+        tile_end = min(tile + 16, physical_rows)
+        for row_group in range(tile, tile_end, 4):
+            for k_group in range(0, k_dim, 4):
+                for row in range(row_group, row_group + 4):
+                    words.append(pack_i8(padded[row][k_group:k_group + 4]))
+    return words
+
+
+def _pack_matrix_b_physical(matrix: list[list[int]]) -> list[int]:
+    """Pack dense [K,N] weights in the Matrix B four-column tile layout."""
+    k_dim, n_dim = len(matrix), len(matrix[0])
+    if k_dim % 4 or n_dim % 4 or any(len(row) != n_dim for row in matrix):
+        raise ValueError("Matrix B requires rectangular K%4=0 and N%4=0")
+    words = []
+    for col_group in range(0, n_dim, 4):
+        for k_group in range(0, k_dim, 4):
+            for col in range(col_group, col_group + 4):
+                words.append(pack_i8([matrix[k_group + lane][col] for lane in range(4)]))
+    return words
+
+
+def build_h16_qkv_top_workload(model: dict, out_dir: Path, capacity_bytes: int = 128 * 1024) -> dict:
+    """Map an H=16/two-head trained QKV projection subgraph to Top CMDQ GEMM."""
+    shape = model.get("shape", {})
+    if shape != {"hidden": 16, "attention_heads": 2, "head_dim": 8,
+                 "layers": 1, "sequence_length": 8, "dtype": "signed INT8"}:
+        raise ValueError("H16 QKV model shape contract mismatch")
+    tokens = model.get("prefill_tokens")
+    embeddings = model.get("embeddings")
+    weights = model.get("weights")
+    if not isinstance(tokens, list) or len(tokens) != 8 or any(
+        not isinstance(token, int) or not 0 <= token < 16 for token in tokens
+    ):
+        raise ValueError("H16 QKV workload requires eight token IDs in [0,15]")
+    if not isinstance(embeddings, list) or len(embeddings) != 16 or any(
+        not isinstance(row, list) or len(row) != 16 for row in embeddings
+    ):
+        raise ValueError("H16 embedding table must be 16x16")
+    if not isinstance(weights, dict) or set(weights) != {"wq", "wk", "wv"}:
+        raise ValueError("H16 QKV model must provide exactly wq, wk, and wv")
+    for name, matrix in weights.items():
+        if not isinstance(matrix, list) or len(matrix) != 16 or any(
+            not isinstance(row, list) or len(row) != 16 for row in matrix
+        ) or any(not isinstance(value, int) or not -128 <= value <= 127
+                 for row in matrix for value in row):
+            raise ValueError(f"{name} must be a 16x16 signed INT8 matrix")
+
+    mapper = Mapper(capacity_bytes=capacity_bytes)
+    mapper.next_addr = 0x4000
+    mapper.task_id = 0x7100
+    x_rows = [embeddings[token] for token in tokens]
+    x = mapper.tensor("h16_qkv_input", (16, 16), "i8_packed", "matrix_a_tile",
+                      _pack_matrix_a_physical(x_rows), initialized=True)
+    weight_tensors = {}
+    for projection in ("q", "k", "v"):
+        weight_tensors[projection] = mapper.tensor(
+            f"h16_w{projection}", (16, 16), "i8_packed", "matrix_b_tile",
+            _pack_matrix_b_physical(weights[f"w{projection}"]), initialized=True,
+        )
+    output_tensors = {}
+    for projection in ("q", "k", "v"):
+        output_tensors[projection] = mapper.tensor(
+            f"h16_{projection}_i32", (8, 16), "i32", "row-major",
+            [0xA55AA55A] * (8 * 16), initialized=False,
+        )
+
+    for index, projection in enumerate(("q", "k", "v")):
+        mapper.add(
+            f"h16_{projection}_projection", OP_GEMM, x,
+            output_tensors[projection], src1=weight_tensors[projection],
+            m=8, n=16, k_or_length=4, wait_mask=(1 << (index - 1)) if index else 0,
+            signal_mask=(1 << index) if index < 2 else 0, clear_mask=7,
+            batch_count=1, head_count=1,
+        )
+
+    descriptor_base = align(mapper.next_addr, 0x1000)
+    completion_base = descriptor_base + 0x100
+    mapper.check_queues(descriptor_base, completion_base)
+    memory: dict[int, int] = {}
+    for tensor in mapper.tensors.values():
+        for index, word in enumerate(tensor_storage_words(tensor)):
+            memory[tensor.addr + index * 4] = u32(word)
+    for index, descriptor in enumerate(mapper.descriptors):
+        for word_index, word in enumerate(descriptor.words()):
+            memory[descriptor_base + index * 64 + word_index * 4] = word
+        for word_index in range(4):
+            memory[completion_base + index * 16 + word_index * 4] = 0xA55AA55A
+
+    golden: dict[int, int] = {}
+    for projection in ("q", "k", "v"):
+        result = gemm_i8_i32(x_rows, weights[f"w{projection}"])
+        tensor = output_tensors[projection]
+        for row_index, row in enumerate(result):
+            for col_index, value in enumerate(row):
+                golden[tensor.addr + 4 * (row_index * 16 + col_index)] = u32(value)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    def write_pairs(path: Path, pairs: dict[int, int]) -> None:
+        words = [len(pairs)]
+        for address, value in sorted(pairs.items()):
+            words.extend((address, value))
+        path.write_text("".join(f"{word & 0xFFFFFFFF:08x}\n" for word in words),
+                        encoding="ascii")
+
+    write_pairs(out_dir / "model_memory.memh", memory)
+    write_pairs(out_dir / "model_golden.memh", golden)
+    manifest = {
+        "model_name": model.get("model_name"),
+        "model_scope": model.get("model_scope"),
+        "shape": shape,
+        "seed": model.get("seed"),
+        "descriptor_base": descriptor_base,
+        "completion_base": completion_base,
+        "descriptor_count": len(mapper.descriptors),
+        "useful_macs": 3 * 8 * 16 * 16,
+        "projection_order": [descriptor.name for descriptor in mapper.descriptors],
+        "descriptor_contract": [
+            {"task_id": descriptor.task_id, "opcode": descriptor.op,
+             "m": descriptor.m, "n": descriptor.n,
+             "k_words": descriptor.k_or_length,
+             "src0": descriptor.src0, "src1": descriptor.src1,
+             "dst": descriptor.dst, "wait_mask": descriptor.wait_mask,
+             "signal_mask": descriptor.signal_mask}
+            for descriptor in mapper.descriptors
+        ],
+        "tensors": {
+            tensor.name: {"address": tensor.addr, "shape": tensor.shape,
+                          "dtype": tensor.dtype, "layout": tensor.layout}
+            for tensor in mapper.tensors.values()
+        },
+        "head_split": "software view only: columns 0..7 and 8..15; no attention operation is run",
+        "host_fallback": model.get("host_fallback", []),
+        "output_contract": "raw INT32 Q/K/V projection matrices, row-major, 8x16 each",
+        "memory_sha256": hashlib.sha256(
+            (out_dir / "model_memory.memh").read_bytes()).hexdigest(),
+        "golden_sha256": hashlib.sha256(
+            (out_dir / "model_golden.memh").read_bytes()).hexdigest(),
+    }
+    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n",
+                                           encoding="utf-8")
+    return manifest
+
+
+def build_h16_attention_top_workload(
+    model: dict, out_dir: Path, *, full_block: bool = False,
+    capacity_bytes: int = 128 * 1024,
+) -> dict:
+    """Map H16 attention/KV and optionally its residual/LN/FFN block to Top."""
+    shape = model.get("shape", {})
+    if shape != {"hidden": 16, "attention_heads": 2, "head_dim": 8,
+                 "layers": 1, "sequence_length": 8, "dtype": "signed INT8"}:
+        raise ValueError("H16 attention model shape contract mismatch")
+    tokens = model.get("prefill_tokens")
+    embeddings = model.get("embeddings")
+    weights = model.get("weights")
+    if not isinstance(tokens, list) or len(tokens) != 8 or any(
+        not isinstance(token, int) or not 0 <= token < 16 for token in tokens
+    ):
+        raise ValueError("H16 attention workload requires eight token IDs in [0,15]")
+    if not isinstance(embeddings, list) or len(embeddings) != 16 or any(
+        not isinstance(row, list) or len(row) != 16 for row in embeddings
+    ):
+        raise ValueError("H16 embedding table must be 16x16")
+    qkv_weights = {"wq", "wk", "wv"}
+    full_weights = qkv_weights | {"wo", "wup", "wdown"}
+    required_weights = full_weights if full_block else qkv_weights
+    if not isinstance(weights, dict) or not required_weights.issubset(weights):
+        raise ValueError(f"H16 workload missing required weights: {sorted(required_weights)}")
+    for name, matrix in weights.items():
+        if not isinstance(matrix, list) or len(matrix) != 16 or any(
+            not isinstance(row, list) or len(row) != 16 for row in matrix
+        ) or any(not isinstance(value, int) or not -128 <= value <= 127
+                 for row in matrix for value in row):
+            raise ValueError(f"{name} must be a 16x16 signed INT8 matrix")
+
+    mapper = Mapper(capacity_bytes=capacity_bytes)
+    mapper.next_addr = 0x4000
+    mapper.task_id = 0x7100
+    x_rows = [embeddings[token] for token in tokens]
+    x = mapper.tensor("h16_attention_input", (16, 16), "i8_packed", "matrix_a_tile",
+                      _pack_matrix_a_physical(x_rows), initialized=True)
+    x_transpose = mapper.tensor(
+        "h16_attention_input_transpose", (16, 8), "i8_packed", "matrix_b_tile",
+        _pack_matrix_b_physical(transpose(x_rows)), initialized=True,
+    )
+    outputs: dict[tuple[str, int], Tensor] = {}
+    packed: dict[tuple[str, int], Tensor] = {}
+    for projection in ("q", "k", "v"):
+        for head in range(2):
+            columns = range(head * 8, (head + 1) * 8)
+            head_weights = [[row[col] for col in columns]
+                            for row in weights[f"w{projection}"]]
+            if projection == "v":
+                # Compute V^T = Wv^T * X^T so the packed tile can feed the
+                # Matrix B physical layout across both 4x4 subtiles without
+                # a host-side activation transpose.
+                operand_a = mapper.tensor(
+                    f"h16_v_head{head}_weight_transpose", (8, 16),
+                    "i8_packed", "matrix_a_tile",
+                    _pack_matrix_a_physical(transpose(head_weights), physical_rows=8),
+                )
+                operand_b = x_transpose
+            else:
+                operand_a = x
+                operand_b = mapper.tensor(
+                    f"h16_{projection}_head{head}_weight", (16, 8),
+                    "i8_packed", "matrix_b_tile",
+                    _pack_matrix_b_physical(head_weights),
+                )
+            raw = mapper.tensor(
+                f"h16_{projection}_head{head}_i32", (8, 8), "i32", "row-major",
+                [0xA55AA55A] * 64, initialized=False,
+            )
+            mapper.add(
+                f"h16_{projection}_head{head}_projection", OP_GEMM,
+                operand_a, raw, src1=operand_b, m=8, n=8,
+                k_or_length=4, aux0=1,
+            )
+            packed_tensor = mapper.tensor(
+                f"h16_{projection}_head{head}_i8", (8, 8), "i8_packed",
+                "matrix_a_tile",
+                [0xA55AA55A] * 16, initialized=False,
+            )
+            mapper.add(
+                f"h16_{projection}_head{head}_requant", OP_REQUANT, raw,
+                packed_tensor, m=8, n=8, k_or_length=64,
+                flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1,
+            )
+            outputs[(projection, head)] = raw
+            packed[(projection, head)] = packed_tensor
+
+    # Store key and transposed-value tiles in B-compatible physical order. The
+    # head stride is one 8x8 INT8
+    # tile (64 bytes); QK and AV consume the actual KV_READ destinations.
+    key_cache = mapper.tensor("h16_key_cache", (128,), "i8_packed", "head_matrix_tile",
+                              [0xA55AA55A] * 32, initialized=False)
+    value_cache = mapper.tensor("h16_value_cache", (128,), "i8_packed", "head_matrix_tile",
+                                [0xA55AA55A] * 32, initialized=False)
+    cached: dict[tuple[str, int], Tensor] = {}
+    for name, cache in (("k", key_cache), ("v", value_cache)):
+        for head in range(2):
+            recovered = mapper.tensor(
+                f"h16_{name}_head{head}_cache_readback", (8, 8),
+                "i8_packed", "matrix_b_tile",
+                [0xA55AA55A] * 16, initialized=False,
+            )
+            mapper.add(
+                f"h16_{name}_h{head}_kv_write_tile", OP_KV_WRITE,
+                packed[(name, head)], cache, k_or_length=16,
+                aux0=head << 16, src1_stride=64,
+            )
+            mapper.add(
+                f"h16_{name}_h{head}_kv_read_tile", OP_KV_READ,
+                cache, recovered, k_or_length=16,
+                aux0=head << 16, src1_stride=64,
+            )
+            cached[(name, head)] = recovered
+
+    scores: dict[int, Tensor] = {}
+    probabilities: dict[int, Tensor] = {}
+    attention: dict[int, Tensor] = {}
+    attention_i8: dict[int, Tensor] = {}
+    head_projection: dict[int, Tensor] = {}
+    for head in range(2):
+        score = mapper.tensor(
+            f"h16_attention_head{head}_scores", (8, 8), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        mapper.add(
+            f"h16_attention_head{head}_qk", OP_GEMM,
+            packed[("q", head)], score, src1=cached[("k", head)],
+            m=8, n=8, k_or_length=2, aux0=1,
+        )
+        prob32 = mapper.tensor(
+            f"h16_attention_head{head}_prob_q15", (8, 8), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        for row in range(8):
+            mapper.add(
+                f"h16_attention_head{head}_causal_softmax_row{row}",
+                OP_CAUSAL_SOFTMAX, score, prob32, k_or_length=8, aux0=row,
+                src0_offset=row * 32, dst_offset=row * 32,
+            )
+        prob8 = mapper.tensor(
+            f"h16_attention_head{head}_prob_i8", (8, 8), "i8_packed",
+            "matrix_a_tile", [0xA55AA55A] * 16, initialized=False,
+        )
+        mapper.add(
+            f"h16_attention_head{head}_prob_requant", OP_REQUANT,
+            prob32, prob8, m=8, n=8, k_or_length=64,
+            flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=8, aux0=1,
+        )
+        attn32 = mapper.tensor(
+            f"h16_attention_head{head}_av_i32", (8, 8), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        mapper.add(
+            f"h16_attention_head{head}_av", OP_GEMM, prob8, attn32,
+            src1=cached[("v", head)], m=8, n=8, k_or_length=2,
+            aux0=1,
+        )
+        attn8 = mapper.tensor(
+            f"h16_attention_head{head}_av_i8", (8, 8), "i8_packed",
+            "matrix_a_tile", [0xA55AA55A] * 16, initialized=False,
+        )
+        mapper.add(
+            f"h16_attention_head{head}_av_requant", OP_REQUANT,
+            attn32, attn8, m=8, n=8, k_or_length=64,
+            flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=7, aux0=1,
+        )
+
+        # Each head computes its W_o input panel; 0x34 adds the two partial
+        # projections. The QKV-only regression keeps its legacy identity map.
+        if full_block:
+            wo = [row[:] for row in weights["wo"][head * 8:(head + 1) * 8]]
+        else:
+            wo = [[0] * 16 for _ in range(8)]
+            for lane in range(8):
+                wo[lane][head * 8 + lane] = 1
+        wo_t = mapper.tensor(
+            f"h16_attention_head{head}_wo_identity", (8, 16),
+            "i8_packed", "matrix_b_tile", _pack_matrix_b_physical(wo),
+        )
+        projected = mapper.tensor(
+            f"h16_attention_head{head}_wo_i32", (8, 16), "i32", "row-major",
+            [0xA55AA55A] * 128, initialized=False,
+        )
+        mapper.add(
+            f"h16_attention_head{head}_output_projection", OP_GEMM,
+            attn8, projected, src1=wo_t, m=8, n=16, k_or_length=2, aux0=1,
+        )
+        scores[head] = score
+        probabilities[head] = prob32
+        attention[head] = attn32
+        attention_i8[head] = attn8
+        head_projection[head] = projected
+
+    merged = mapper.tensor(
+        "h16_attention_head_merge_i32", (8, 16), "i32", "row-major",
+        [0xA55AA55A] * 128, initialized=False,
+    )
+    mapper.add(
+        "h16_attention_head_merge", OP_RESIDUAL, head_projection[0], merged,
+        src1=head_projection[1], k_or_length=128, aux0=1,
+    )
+
+    block_tensors: dict[str, Tensor] = {}
+    prefill_descriptor_count = len(mapper.descriptors)
+    decode_tensors: dict[str, Tensor] = {}
+    if full_block:
+        gamma1_values = model.get("gamma1_q15", [32768] * 16)
+        beta1_values = model.get("beta1", [0] * 16)
+        gamma2_values = model.get("gamma2_q15", [32768] * 16)
+        beta2_values = model.get("beta2", [0] * 16)
+        for name, values in (("gamma1_q15", gamma1_values), ("beta1", beta1_values),
+                             ("gamma2_q15", gamma2_values), ("beta2", beta2_values)):
+            if (not isinstance(values, list) or len(values) != 16 or
+                    any(not isinstance(value, int) for value in values)):
+                raise ValueError(f"{name} must contain 16 integer values")
+        decode_token = model.get("decode_token")
+        if not isinstance(decode_token, int) or not 0 <= decode_token < 16:
+            raise ValueError("full H16 block needs a decode_token ID in [0,15]")
+
+        x_i32 = mapper.tensor(
+            "h16_block_input_i32", (8, 16), "i32", "row-major",
+            flatten(x_rows), initialized=True,
+        )
+        gamma1 = mapper.tensor("h16_gamma1_q15", (16,), "i32", "vector", gamma1_values)
+        beta1 = mapper.tensor("h16_beta1", (16,), "i32", "vector", beta1_values)
+        gamma2 = mapper.tensor("h16_gamma2_q15", (16,), "i32", "vector", gamma2_values)
+        beta2 = mapper.tensor("h16_beta2", (16,), "i32", "vector", beta2_values)
+
+        residual1 = mapper.tensor(
+            "h16_residual1_i32", (8, 16), "i32", "row-major",
+            [0xA55AA55A] * 128, initialized=False,
+        )
+        mapper.add("h16_residual1", OP_RESIDUAL, merged, residual1,
+                   src1=x_i32, k_or_length=128, aux0=1)
+        norm1 = mapper.tensor(
+            "h16_layernorm1_i32", (8, 16), "i32", "row-major",
+            [0xA55AA55A] * 128, initialized=False,
+        )
+        for row in range(8):
+            mapper.add(
+                f"h16_layernorm1_row{row}", OP_LAYERNORM, residual1, norm1,
+                src1=gamma1, bias=beta1, k_or_length=16, flags=FLAG_BIAS,
+                aux0=1, src0_offset=row * 64, dst_offset=row * 64,
+            )
+        norm1_i8 = mapper.tensor(
+            "h16_layernorm1_i8", (8, 16), "i8_packed", "matrix_a_tile",
+            [0xA55AA55A] * 32, initialized=False,
+        )
+        mapper.add("h16_layernorm1_requant", OP_REQUANT, norm1, norm1_i8,
+                   m=8, n=16, k_or_length=128,
+                   flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1)
+
+        wup = mapper.tensor(
+            "h16_wup", (16, 16), "i8_packed", "matrix_b_tile",
+            _pack_matrix_b_physical(weights["wup"]),
+        )
+        ffn_up = mapper.tensor(
+            "h16_ffn_up_i32", (8, 16), "i32", "row-major",
+            [0xA55AA55A] * 128, initialized=False,
+        )
+        mapper.add("h16_ffn_up", OP_GEMM, norm1_i8, ffn_up, src1=wup,
+                   m=8, n=16, k_or_length=4, aux0=1)
+        gelu = mapper.tensor(
+            "h16_ffn_gelu_i32", (8, 16), "i32", "row-major",
+            [0xA55AA55A] * 128, initialized=False,
+        )
+        mapper.add("h16_ffn_gelu", OP_GELU, ffn_up, gelu,
+                   k_or_length=128, aux0=1)
+        gelu_i8 = mapper.tensor(
+            "h16_ffn_gelu_i8", (8, 16), "i8_packed", "matrix_a_tile",
+            [0xA55AA55A] * 32, initialized=False,
+        )
+        mapper.add("h16_ffn_gelu_requant", OP_REQUANT, gelu, gelu_i8,
+                   m=8, n=16, k_or_length=128,
+                   flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1)
+        wdown = mapper.tensor(
+            "h16_wdown", (16, 16), "i8_packed", "matrix_b_tile",
+            _pack_matrix_b_physical(weights["wdown"]),
+        )
+        ffn_down = mapper.tensor(
+            "h16_ffn_down_i32", (8, 16), "i32", "row-major",
+            [0xA55AA55A] * 128, initialized=False,
+        )
+        mapper.add("h16_ffn_down", OP_GEMM, gelu_i8, ffn_down,
+                   src1=wdown, m=8, n=16, k_or_length=4, aux0=1)
+        residual2 = mapper.tensor(
+            "h16_residual2_i32", (8, 16), "i32", "row-major",
+            [0xA55AA55A] * 128, initialized=False,
+        )
+        mapper.add("h16_residual2", OP_RESIDUAL, ffn_down, residual2,
+                   src1=norm1, k_or_length=128, aux0=1)
+        norm2 = mapper.tensor(
+            "h16_layernorm2_i32", (8, 16), "i32", "row-major",
+            [0xA55AA55A] * 128, initialized=False,
+        )
+        for row in range(8):
+            mapper.add(
+                f"h16_layernorm2_row{row}", OP_LAYERNORM, residual2, norm2,
+                src1=gamma2, bias=beta2, k_or_length=16, flags=FLAG_BIAS,
+                aux0=1, src0_offset=row * 64, dst_offset=row * 64,
+            )
+        block_tensors = {
+            "input_i32": x_i32, "residual1": residual1, "layernorm1": norm1,
+            "layernorm1_i8": norm1_i8, "ffn_up": ffn_up, "gelu": gelu,
+            "gelu_i8": gelu_i8, "ffn_down": ffn_down,
+            "residual2": residual2, "layernorm2": norm2,
+        }
+        prefill_descriptor_count = len(mapper.descriptors)
+
+        decode_input = embeddings[decode_token]
+        decode_x_i32_rows = [decode_input] + [[0] * 16 for _ in range(3)]
+        decode_x_i32 = mapper.tensor(
+            "h16_decode_input_i32", (4, 16), "i32", "row-major",
+            flatten(decode_x_i32_rows), initialized=True,
+        )
+        decode_x_i8 = mapper.tensor(
+            "h16_decode_input_i8", (1, 16), "i8_packed", "row-major",
+            pack_matrix_words([decode_input]), initialized=True,
+        )
+        decode_q: dict[int, Tensor] = {}
+        decode_q_i8: dict[int, Tensor] = {}
+        decode_scores: dict[int, Tensor] = {}
+        decode_probs: dict[int, Tensor] = {}
+        decode_probs_i8: dict[int, Tensor] = {}
+        decode_attention: dict[int, Tensor] = {}
+        decode_attention_i8: dict[int, Tensor] = {}
+        decode_head_projection: dict[int, Tensor] = {}
+
+        for head in range(2):
+            head_weights = [row[head * 8:(head + 1) * 8]
+                            for row in weights["wq"]]
+            padded_b_words: list[int] = []
+            for row in head_weights:
+                padded_row = row + [0] * 8
+                padded_b_words.extend(
+                    pack_i8(padded_row[index:index + 4])
+                    for index in range(0, 16, 4)
+                )
+            q_rhs = mapper.tensor(
+                f"h16_decode_q_head{head}_weight_gemv", (16, 16),
+                "i8_packed", "gemv_k_major_n16", padded_b_words,
+            )
+            q_raw = mapper.tensor(
+                f"h16_decode_q_head{head}_raw_i32", (4, 8), "i32", "row-major",
+                [0] * 32, initialized=True,
+            )
+            mapper.add(
+                f"h16_decode_q_head{head}_gemv", OP_GEMV_KFOLD,
+                decode_x_i8, q_raw, src1=q_rhs.addr, m=1, n=8,
+                k_or_length=16, batch_count=1, head_count=0,
+            )
+            q_tile = mapper.tensor(
+                f"h16_decode_q_head{head}_matrix_a", (4, 8), "i8_packed",
+                "matrix_a_tile", [0xA55AA55A] * 8, initialized=False,
+            )
+            mapper.add(
+                f"h16_decode_q_head{head}_requant_tile_a", OP_REQUANT,
+                q_raw, q_tile, m=4, n=8, k_or_length=32,
+                flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1,
+            )
+
+            score = mapper.tensor(
+                f"h16_decode_head{head}_scores_i32", (4, 8), "i32", "row-major",
+                [0xA55AA55A] * 32, initialized=False,
+            )
+            mapper.add(
+                f"h16_decode_head{head}_qk", OP_GEMM, q_tile, score,
+                src1=cached[("k", head)], m=4, n=8, k_or_length=2, aux0=1,
+            )
+            prob = mapper.tensor(
+                f"h16_decode_head{head}_prob_q15", (4, 8), "i32", "row-major",
+                [0xA55AA55A] * 8 + [0] * 24, initialized=True,
+            )
+            mapper.add(
+                f"h16_decode_head{head}_softmax", OP_CAUSAL_SOFTMAX,
+                score, prob, k_or_length=8, aux0=7,
+            )
+            prob_tile = mapper.tensor(
+                f"h16_decode_head{head}_prob_i8", (4, 8), "i8_packed",
+                "matrix_a_tile", [0xA55AA55A] * 8, initialized=False,
+            )
+            mapper.add(
+                f"h16_decode_head{head}_prob_requant", OP_REQUANT,
+                prob, prob_tile, m=4, n=8, k_or_length=32,
+                flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=8, aux0=1,
+            )
+            av = mapper.tensor(
+                f"h16_decode_head{head}_av_i32", (4, 8), "i32", "row-major",
+                [0xA55AA55A] * 32, initialized=False,
+            )
+            mapper.add(
+                f"h16_decode_head{head}_av", OP_GEMM, prob_tile, av,
+                src1=cached[("v", head)], m=4, n=8, k_or_length=2, aux0=1,
+            )
+            av_tile = mapper.tensor(
+                f"h16_decode_head{head}_av_i8", (4, 8), "i8_packed",
+                "matrix_a_tile", [0xA55AA55A] * 8, initialized=False,
+            )
+            mapper.add(
+                f"h16_decode_head{head}_av_requant", OP_REQUANT,
+                av, av_tile, m=4, n=8, k_or_length=32,
+                flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=7, aux0=1,
+            )
+            wo_head = [row[:] for row in weights["wo"][head * 8:(head + 1) * 8]]
+            wo_rhs = mapper.tensor(
+                f"h16_decode_head{head}_wo", (8, 16), "i8_packed",
+                "matrix_b_tile", _pack_matrix_b_physical(wo_head),
+            )
+            projection = mapper.tensor(
+                f"h16_decode_head{head}_wo_i32", (4, 16), "i32", "row-major",
+                [0xA55AA55A] * 64, initialized=False,
+            )
+            mapper.add(
+                f"h16_decode_head{head}_wo_gemm", OP_GEMM, av_tile,
+                projection, src1=wo_rhs, m=4, n=16, k_or_length=2, aux0=1,
+            )
+            decode_q[head] = q_raw
+            decode_q_i8[head] = q_tile
+            decode_scores[head] = score
+            decode_probs[head] = prob
+            decode_probs_i8[head] = prob_tile
+            decode_attention[head] = av
+            decode_attention_i8[head] = av_tile
+            decode_head_projection[head] = projection
+
+        decode_merged = mapper.tensor(
+            "h16_decode_attention_merge_i32", (4, 16), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        mapper.add(
+            "h16_decode_attention_merge", OP_RESIDUAL,
+            decode_head_projection[0], decode_merged,
+            src1=decode_head_projection[1], k_or_length=64, aux0=1,
+        )
+        decode_residual1 = mapper.tensor(
+            "h16_decode_residual1_i32", (4, 16), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        mapper.add("h16_decode_residual1", OP_RESIDUAL, decode_merged,
+                   decode_residual1, src1=decode_x_i32,
+                   k_or_length=64, aux0=1)
+        decode_norm1 = mapper.tensor(
+            "h16_decode_layernorm1_i32", (4, 16), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        for row in range(4):
+            mapper.add(
+                f"h16_decode_layernorm1_row{row}", OP_LAYERNORM,
+                decode_residual1, decode_norm1, src1=gamma1, bias=beta1,
+                k_or_length=16, flags=FLAG_BIAS, aux0=1,
+                src0_offset=row * 64, dst_offset=row * 64,
+            )
+        decode_norm1_i8 = mapper.tensor(
+            "h16_decode_layernorm1_i8", (4, 16), "i8_packed",
+            "matrix_a_tile", [0xA55AA55A] * 16, initialized=False,
+        )
+        mapper.add("h16_decode_layernorm1_requant", OP_REQUANT,
+                   decode_norm1, decode_norm1_i8, m=4, n=16,
+                   k_or_length=64,
+                   flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1)
+        decode_ffn_up = mapper.tensor(
+            "h16_decode_ffn_up_i32", (4, 16), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        mapper.add("h16_decode_ffn_up", OP_GEMM, decode_norm1_i8,
+                   decode_ffn_up, src1=wup, m=4, n=16,
+                   k_or_length=4, aux0=1)
+        decode_gelu = mapper.tensor(
+            "h16_decode_ffn_gelu_i32", (4, 16), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        mapper.add("h16_decode_ffn_gelu", OP_GELU, decode_ffn_up,
+                   decode_gelu, k_or_length=64, aux0=1)
+        decode_gelu_i8 = mapper.tensor(
+            "h16_decode_ffn_gelu_i8", (4, 16), "i8_packed",
+            "matrix_a_tile", [0xA55AA55A] * 16, initialized=False,
+        )
+        mapper.add("h16_decode_ffn_gelu_requant", OP_REQUANT, decode_gelu,
+                   decode_gelu_i8, m=4, n=16, k_or_length=64,
+                   flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1)
+        decode_ffn_down = mapper.tensor(
+            "h16_decode_ffn_down_i32", (4, 16), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        mapper.add("h16_decode_ffn_down", OP_GEMM, decode_gelu_i8,
+                   decode_ffn_down, src1=wdown, m=4, n=16,
+                   k_or_length=4, aux0=1)
+        decode_residual2 = mapper.tensor(
+            "h16_decode_residual2_i32", (4, 16), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        mapper.add("h16_decode_residual2", OP_RESIDUAL, decode_ffn_down,
+                   decode_residual2, src1=decode_norm1,
+                   k_or_length=64, aux0=1)
+        decode_norm2 = mapper.tensor(
+            "h16_decode_layernorm2_i32", (4, 16), "i32", "row-major",
+            [0xA55AA55A] * 64, initialized=False,
+        )
+        for row in range(4):
+            mapper.add(
+                f"h16_decode_layernorm2_row{row}", OP_LAYERNORM,
+                decode_residual2, decode_norm2, src1=gamma2, bias=beta2,
+                k_or_length=16, flags=FLAG_BIAS, aux0=1,
+                src0_offset=row * 64, dst_offset=row * 64,
+            )
+        decode_tensors = {
+            "input_i8": decode_x_i8, "input_i32": decode_x_i32,
+            "q": decode_q, "q_i8": decode_q_i8, "scores": decode_scores,
+            "prob": decode_probs, "prob_i8": decode_probs_i8,
+            "av": decode_attention, "av_i8": decode_attention_i8,
+            "projection": decode_head_projection, "merged": decode_merged,
+            "residual1": decode_residual1, "layernorm1": decode_norm1,
+            "layernorm1_i8": decode_norm1_i8, "ffn_up": decode_ffn_up,
+            "gelu": decode_gelu, "gelu_i8": decode_gelu_i8,
+            "ffn_down": decode_ffn_down, "residual2": decode_residual2,
+            "layernorm2": decode_norm2,
+        }
+
+    add_completion_order_chain(mapper)
+    validate_descriptor_chain(mapper)
+
+    # Generate independent logical outputs using the Python scalar Golden.
+    golden: dict[int, int] = {}
+
+    def add_i32_golden(tensor: Tensor, matrix: list[list[int]]) -> None:
+        for row, values in enumerate(matrix):
+            for col, value in enumerate(values):
+                golden[tensor.addr + 4 * (row * len(values) + col)] = u32(value)
+
+    def add_i8_golden(tensor: Tensor, matrix: list[list[int]], tile_a: bool) -> None:
+        flat = []
+        if tile_a:
+            for row_group in range(0, len(matrix), 4):
+                for k_group in range(0, len(matrix[0]), 4):
+                    for row in range(row_group, row_group + 4):
+                        flat.extend(matrix[row][k_group:k_group + 4])
+        else:
+            flat = flatten(matrix)
+        for word_index in range(0, len(flat), 4):
+            golden[tensor.addr + word_index] = pack_i8(flat[word_index:word_index + 4])
+
+    def packed_tile_a_words(matrix: list[list[int]]) -> list[int]:
+        return [
+            pack_i8(matrix[row][k_group:k_group + 4])
+            for row_group in range(0, len(matrix), 4)
+            for k_group in range(0, len(matrix[0]), 4)
+            for row in range(row_group, row_group + 4)
+        ]
+
+    qkv_i8: dict[tuple[str, int], list[list[int]]] = {}
+    for projection in ("q", "k", "v"):
+        full = gemm_i8_i32(x_rows, weights[f"w{projection}"])
+        for head in range(2):
+            sliced = [row[head * 8:(head + 1) * 8] for row in full]
+            if projection == "v":
+                sliced = transpose(sliced)
+            sliced_i32 = sliced
+            qkv_i8[(projection, head)] = [
+                requant_i8(row, 0) for row in sliced_i32
+            ]
+            add_i32_golden(outputs[(projection, head)], sliced_i32)
+            add_i8_golden(
+                packed[(projection, head)],
+                qkv_i8[(projection, head)], True,
+            )
+
+    attention_i32_gold: dict[int, list[list[int]]] = {}
+    head_projection_gold: dict[int, list[list[int]]] = {}
+    merged_gold = [[0] * 16 for _ in range(8)]
+    for head in range(2):
+        q8 = qkv_i8[("q", head)]
+        k8 = qkv_i8[("k", head)]
+        v_transposed = qkv_i8[("v", head)]
+        v8 = transpose(v_transposed)
+        add_i8_golden(cached[("k", head)], k8, True)
+        add_i8_golden(cached[("v", head)], v_transposed, True)
+        for word_index, word in enumerate(packed_tile_a_words(k8)):
+            golden[key_cache.addr + head * 64 + word_index * 4] = word
+        for word_index, word in enumerate(packed_tile_a_words(v_transposed)):
+            golden[value_cache.addr + head * 64 + word_index * 4] = word
+
+        score = gemm_i8_i32(q8, transpose(k8))
+        add_i32_golden(scores[head], score)
+        probs = [causal_softmax_q15(row, row_index)
+                 for row_index, row in enumerate(score)]
+        add_i32_golden(probabilities[head], probs)
+        probs8 = [requant_i8(row, 8) for row in probs]
+        add_i8_golden(
+            mapper.tensors[f"h16_attention_head{head}_prob_i8"], probs8, True,
+        )
+        av = gemm_i8_i32(probs8, v8)
+        attention_i32_gold[head] = av
+        add_i32_golden(attention[head], av)
+        av8 = [requant_i8(row, 7) for row in av]
+        add_i8_golden(attention_i8[head], av8, True)
+        if full_block:
+            wo = [row[:] for row in weights["wo"][head * 8:(head + 1) * 8]]
+        else:
+            wo = [[0] * 16 for _ in range(8)]
+            for lane in range(8):
+                wo[lane][head * 8 + lane] = 1
+        projected = gemm_i8_i32(av8, wo)
+        head_projection_gold[head] = projected
+        add_i32_golden(head_projection[head], projected)
+        for row in range(8):
+            for col in range(16):
+                merged_gold[row][col] += projected[row][col]
+    add_i32_golden(merged, merged_gold)
+
+    full_block_gold: dict[str, list[list[int]]] = {}
+    if full_block:
+        input_i32 = [row[:] for row in x_rows]
+        residual1_gold = [
+            residual_i32(lhs, rhs) for lhs, rhs in zip(merged_gold, input_i32)
+        ]
+        gamma1_values = model.get("gamma1_q15", [32768] * 16)
+        beta1_values = model.get("beta1", [0] * 16)
+        norm1_gold = [layernorm_q15(row, gamma1_values, beta1_values)
+                      for row in residual1_gold]
+        norm1_i8_gold = [requant_i8(row, 0) for row in norm1_gold]
+        ffn_up_gold = gemm_i8_i32(norm1_i8_gold, weights["wup"])
+        gelu_gold = [[gelu_q8_8(value) for value in row] for row in ffn_up_gold]
+        gelu_i8_gold = [requant_i8(row, 0) for row in gelu_gold]
+        ffn_down_gold = gemm_i8_i32(gelu_i8_gold, weights["wdown"])
+        residual2_gold = [
+            residual_i32(lhs, rhs) for lhs, rhs in zip(ffn_down_gold, norm1_gold)
+        ]
+        gamma2_values = model.get("gamma2_q15", [32768] * 16)
+        beta2_values = model.get("beta2", [0] * 16)
+        norm2_gold = [layernorm_q15(row, gamma2_values, beta2_values)
+                      for row in residual2_gold]
+        full_block_gold = {
+            "residual1": residual1_gold,
+            "layernorm1": norm1_gold, "layernorm1_i8": norm1_i8_gold,
+            "ffn_up": ffn_up_gold, "gelu": gelu_gold,
+            "gelu_i8": gelu_i8_gold, "ffn_down": ffn_down_gold,
+            "residual2": residual2_gold, "layernorm2": norm2_gold,
+        }
+        for name, matrix in full_block_gold.items():
+            tensor = block_tensors[name]
+            if tensor.dtype == "i8_packed":
+                add_i8_golden(tensor, matrix, True)
+            else:
+                add_i32_golden(tensor, matrix)
+
+        decode_token = model["decode_token"]
+        decode_input = embeddings[decode_token]
+        decode_q_raw_gold: dict[int, list[int]] = {}
+        decode_head_projection_gold: dict[int, list[list[int]]] = {}
+        decode_score_gold: dict[int, list[list[int]]] = {}
+        decode_prob_gold: dict[int, list[list[int]]] = {}
+        decode_av_gold: dict[int, list[list[int]]] = {}
+        decode_merged_gold = [[0] * 16 for _ in range(4)]
+        for head in range(2):
+            q_weights = [row[head * 8:(head + 1) * 8]
+                         for row in weights["wq"]]
+            q_raw = gemm_i8_i32([decode_input], q_weights)[0]
+            q_i8 = requant_i8(q_raw, 0)
+            q_tile_rows = [q_i8] + [[0] * 8 for _ in range(3)]
+            k8 = qkv_i8[("k", head)]
+            scores = gemm_i8_i32(q_tile_rows, transpose(k8))
+            probs_row = causal_softmax_q15(scores[0], 7)
+            probs = [probs_row] + [[0] * 8 for _ in range(3)]
+            probs_i8 = [requant_i8(row, 8) for row in probs]
+            v8 = transpose(qkv_i8[("v", head)])
+            av = gemm_i8_i32(probs_i8, v8)
+            av_i8 = [requant_i8(row, 7) for row in av]
+            wo_head = [row[:] for row in weights["wo"][head * 8:(head + 1) * 8]]
+            projected = gemm_i8_i32(av_i8, wo_head)
+            decode_q_raw_gold[head] = q_raw
+            decode_score_gold[head] = scores
+            decode_prob_gold[head] = probs
+            decode_av_gold[head] = av
+            decode_head_projection_gold[head] = projected
+            for row in range(4):
+                for col in range(16):
+                    decode_merged_gold[row][col] += projected[row][col]
+
+        decode_residual1_gold = [
+            residual_i32(lhs, rhs) for lhs, rhs in
+            zip(decode_merged_gold, [decode_input] + [[0] * 16 for _ in range(3)])
+        ]
+        decode_norm1_gold = [layernorm_q15(row, gamma1_values, beta1_values)
+                             for row in decode_residual1_gold]
+        decode_norm1_i8_gold = [requant_i8(row, 0) for row in decode_norm1_gold]
+        decode_ffn_up_gold = gemm_i8_i32(decode_norm1_i8_gold, weights["wup"])
+        decode_gelu_gold = [[gelu_q8_8(value) for value in row]
+                            for row in decode_ffn_up_gold]
+        decode_gelu_i8_gold = [requant_i8(row, 0) for row in decode_gelu_gold]
+        decode_ffn_down_gold = gemm_i8_i32(decode_gelu_i8_gold, weights["wdown"])
+        decode_residual2_gold = [
+            residual_i32(lhs, rhs)
+            for lhs, rhs in zip(decode_ffn_down_gold, decode_norm1_gold)
+        ]
+        decode_norm2_gold = [layernorm_q15(row, gamma2_values, beta2_values)
+                             for row in decode_residual2_gold]
+        if decode_norm2_gold[0] != norm2_gold[decode_token]:
+            raise AssertionError(
+                "single-token decode Golden differs from the corresponding prefill row"
+            )
+        for head in range(2):
+            q_tile_rows = requant_i8(decode_q_raw_gold[head], 0)
+            add_i8_golden(
+                decode_tensors["q_i8"][head],
+                [q_tile_rows] + [[0] * 8 for _ in range(3)], True,
+            )
+            add_i32_golden(decode_tensors["scores"][head], decode_score_gold[head])
+            prob_tensor = decode_tensors["prob"][head]
+            for col, value in enumerate(decode_prob_gold[head][0]):
+                golden[prob_tensor.addr + 4 * col] = u32(value)
+            add_i8_golden(
+                decode_tensors["prob_i8"][head],
+                [requant_i8(decode_prob_gold[head][0], 8)]
+                + [[0] * 8 for _ in range(3)], True,
+            )
+            add_i32_golden(decode_tensors["av"][head], decode_av_gold[head])
+            av_i8_rows = [requant_i8(row, 7) for row in decode_av_gold[head]]
+            add_i8_golden(decode_tensors["av_i8"][head], av_i8_rows, True)
+            add_i32_golden(
+                decode_tensors["projection"][head],
+                decode_head_projection_gold[head],
+            )
+        add_i32_golden(decode_tensors["merged"], decode_merged_gold)
+        for name, matrix in (
+            ("residual1", decode_residual1_gold),
+            ("layernorm1", decode_norm1_gold),
+            ("layernorm1_i8", decode_norm1_i8_gold),
+            ("ffn_up", decode_ffn_up_gold), ("gelu", decode_gelu_gold),
+            ("gelu_i8", decode_gelu_i8_gold),
+            ("ffn_down", decode_ffn_down_gold),
+            ("residual2", decode_residual2_gold),
+            ("layernorm2", decode_norm2_gold),
+        ):
+            tensor = decode_tensors[name]
+            if tensor.dtype == "i8_packed":
+                add_i8_golden(tensor, matrix, True)
+            else:
+                add_i32_golden(tensor, matrix)
+
+    descriptor_base = align(mapper.next_addr, 0x1000)
+    completion_base = align(descriptor_base + len(mapper.descriptors) * 64, 0x1000)
+    mapper.check_queues(descriptor_base, completion_base)
+    memory: dict[int, int] = {}
+    for tensor in mapper.tensors.values():
+        for index, word in enumerate(tensor_storage_words(tensor)):
+            memory[tensor.addr + index * 4] = u32(word)
+    for index, descriptor in enumerate(mapper.descriptors):
+        for word_index, word in enumerate(descriptor.words()):
+            memory[descriptor_base + index * 64 + word_index * 4] = word
+        for word_index in range(4):
+            memory[completion_base + index * 16 + word_index * 4] = 0xA55AA55A
+
+    def write_pairs(path: Path, pairs: dict[int, int]) -> None:
+        words = [len(pairs)]
+        for address, value in sorted(pairs.items()):
+            words.extend((address, value))
+        path.write_text("".join(f"{word & 0xFFFFFFFF:08x}\n" for word in words),
+                        encoding="ascii")
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    write_pairs(out_dir / "model_memory.memh", memory)
+    write_pairs(out_dir / "model_golden.memh", golden)
+    descriptor_contract = []
+    for descriptor in mapper.descriptors:
+        descriptor_contract.append({
+            "task_id": descriptor.task_id, "opcode": descriptor.op,
+            "src0": descriptor.src0, "src1": descriptor.src1,
+            "dst": descriptor.dst, "bias": descriptor.bias,
+            "m": descriptor.m, "n": descriptor.n,
+            "k_words": descriptor.k_or_length, "flags": descriptor.flags,
+            "aux0": descriptor.aux0, "shift": descriptor.shift,
+            "activation": descriptor.activation,
+            "src0_stride": descriptor.src0_stride,
+            "src1_stride": descriptor.src1_stride,
+            "dst_stride": descriptor.dst_stride,
+            "batch_count": descriptor.batch_count,
+            "head_count": descriptor.head_count,
+            "clear_mask": descriptor.clear_mask,
+            "wait_mask": descriptor.wait_mask,
+            "signal_mask": descriptor.signal_mask,
+        })
+    manifest = {
+        "model_name": model.get("model_name"),
+        "model_scope": (
+            "trained QKV + two-head causal attention/KV round-trip + residual/LN/FFN prefill block"
+            if full_block else
+            "trained QKV projections + RTL two-head causal attention/KV round-trip; not a full Transformer block"
+        ),
+        "shape": shape, "seed": model.get("seed"),
+        "descriptor_base": descriptor_base, "completion_base": completion_base,
+        "descriptor_count": len(mapper.descriptors),
+        "runtime_ordering": "single ABI event-bit completion chain; each descriptor waits for and clears the preceding descriptor's ordered-retirement event",
+        "prefill_useful_macs": (3 * 8 * 16 * 16 + 2 * 8 * 8 * 8 +
+                                 2 * 8 * 8 * 8 + 2 * 8 * 8 * 16 +
+                                 (2 * 8 * 16 * 16 if full_block else 0)),
+        "decode_useful_macs": 1280 if full_block else 0,
+        "useful_macs": ((3 * 8 * 16 * 16 + 2 * 8 * 8 * 8 + 2 * 8 * 8 * 8 +
+                         2 * 8 * 8 * 16 + (2 * 8 * 16 * 16 if full_block else 0)) +
+                        (1280 if full_block else 0)),
+        "prefill_descriptor_count": prefill_descriptor_count,
+        "decode_descriptor_count": len(mapper.descriptors) - prefill_descriptor_count,
+        "head_count": 2, "head_dim": 8, "sequence_length": 8,
+        "full_block": full_block,
+        "prefill_gate": ("G4 residual + LayerNorm + FFN + residual + LayerNorm"
+                         if full_block else "G3 two-head attention + KV prefill/readback"),
+        "head_merge": "two fixed block-identity output projections, added by opcode 0x34",
+        "host_fallback": ["model input/weight generation and software Golden only; no intermediate activation is host-computed at runtime"],
+        "descriptor_contract": descriptor_contract,
+        "tensors": {
+            tensor.name: {"address": tensor.addr, "shape": tensor.shape,
+                          "dtype": tensor.dtype, "layout": tensor.layout}
+            for tensor in mapper.tensors.values()
+        },
+        "memory_sha256": hashlib.sha256((out_dir / "model_memory.memh").read_bytes()).hexdigest(),
+        "golden_sha256": hashlib.sha256((out_dir / "model_golden.memh").read_bytes()).hexdigest(),
+    }
+    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n",
+                                           encoding="utf-8")
+    return manifest
 
 
 def tensor_size_bytes(tensor: Tensor) -> int:
@@ -600,7 +1785,9 @@ def validate_descriptor_chain(mapper: Mapper) -> None:
             destination_base += cache_offset
         elif descriptor.op == OP_KV_READ:
             source_base += cache_offset
-        if descriptor.op == OP_GEMM:
+        if descriptor.op in (OP_GEMM, OP_GEMM_REQUANT_TILE_A):
+            if descriptor.op == OP_GEMM_REQUANT_TILE_A:
+                validate_fused_tile_fields(descriptor)
             require(
                 source_base, descriptor.m * descriptor.k_or_length * 4,
                 descriptor.name, "src0",
@@ -609,7 +1796,30 @@ def validate_descriptor_chain(mapper: Mapper) -> None:
                 descriptor.src1, descriptor.n * descriptor.k_or_length * 4,
                 descriptor.name, "src1",
             )
-            output_bytes = descriptor.m * descriptor.n * 4
+            output_bytes = descriptor.m * descriptor.n * (
+                1 if descriptor.op == OP_GEMM_REQUANT_TILE_A else 4
+            )
+        elif descriptor.op == OP_GEMV_KFOLD:
+            m, n, k = descriptor.m, descriptor.n, descriptor.k_or_length
+            if not (1 <= m <= 16 and 1 <= n <= 16 and k > 0):
+                raise ValueError(f"{descriptor.name}: illegal opcode 0x52 shape")
+            if (descriptor.flags != 0 or descriptor.aux0 != 0 or
+                    descriptor.batch_count > 1 or descriptor.head_count != 0 or
+                    descriptor.src0_stride != 0 or descriptor.src1_stride != 0 or
+                    descriptor.dst_stride != 0 or source_base & 0xF or
+                    descriptor.src1 & 0xF or destination_base & 0x3):
+                raise ValueError(f"{descriptor.name}: illegal opcode 0x52 fields")
+            a_bytes = m * ((k + 15) & ~15)
+            b_bytes = k * 16
+            output_bytes = m * n * 4
+            a_end, b_end, dst_end = source_base + a_bytes, descriptor.src1 + b_bytes, destination_base + output_bytes
+            if max(a_end, b_end, dst_end) > 0x1_0000_0000:
+                raise ValueError(f"{descriptor.name}: opcode 0x52 address range overflows")
+            if ((destination_base < a_end and source_base < dst_end) or
+                    (destination_base < b_end and descriptor.src1 < dst_end)):
+                raise ValueError(f"{descriptor.name}: opcode 0x52 output aliases an operand")
+            require(source_base, a_bytes, descriptor.name, "src0")
+            require(descriptor.src1, b_bytes, descriptor.name, "src1")
         else:
             require(
                 source_base, descriptor.k_or_length * 4,
@@ -654,11 +1864,13 @@ def tensor_storage_words(tensor: Tensor) -> list[int]:
 def write_svh(path: Path, mapper: Mapper, expected: dict[str, list]) -> None:
     descriptor_base = align(mapper.next_addr, 0x1000)
     completion_base = align(descriptor_base + len(mapper.descriptors) * 64, 0x1000)
+    mapper.check_queues(descriptor_base, completion_base)
     lines = [
         "// Generated by sw/tools/cimforge_mapper.py; do not hand edit.",
         f"localparam [31:0] TRANSFORMER_DESC_BASE = 32'h{descriptor_base:08x};",
         f"localparam [31:0] TRANSFORMER_CPL_BASE = 32'h{completion_base:08x};",
         f"localparam integer TRANSFORMER_DESC_COUNT = {len(mapper.descriptors)};",
+        f"localparam integer TRANSFORMER_PREFILL_DESC_COUNT = {expected['prefill_descriptor_count']};",
         f"localparam [15:0] TRANSFORMER_LAST_TASK_ID = 16'h{mapper.descriptors[-1].task_id:04x};",
         f"localparam [31:0] TRANSFORMER_LAST_RESULT = 32'h{u32(expected['decode_final'][-1][-1]):08x};",
         "",
@@ -746,19 +1958,30 @@ def write_svh(path: Path, mapper: Mapper, expected: dict[str, list]) -> None:
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def write_manifest(path: Path, mapper: Mapper, expected: dict[str, list]) -> None:
+def write_manifest(
+    path: Path, mapper: Mapper, expected: dict[str, list],
+    model: dict | None = None, model_sha256: str | None = None,
+) -> None:
     descriptor_base = align(mapper.next_addr, 0x1000)
     manifest = {
         "name": "transformer_micro_4x4_prefill_decode",
+        "spad_capacity_bytes": mapper.capacity_bytes,
         "abi_version": 7,
         "abi_minor": 2,
         "prefill_tokens": 4,
         "decode_tokens": 1,
         "hidden": 4,
         "attention_heads": 1,
-        "weight_provenance": "hand-authored deterministic non-identity INT8 test weights; not pretrained",
+        "prefill_descriptor_count": expected["prefill_descriptor_count"],
+        "decode_descriptor_count": len(mapper.descriptors) - expected["prefill_descriptor_count"],
+        "decode_mapping_policy": expected["decode_mapping_policy"],
+        "weight_provenance": (
+            model.get("weight_provenance", "trained integer toy next-token model")
+            if model is not None else
+            "hand-authored deterministic non-identity INT8 test weights; not pretrained"
+        ),
         "weights": {
-            **MODEL_WEIGHTS,
+            **expected["weights"],
         },
         "descriptor_base": descriptor_base,
         "descriptor_count": len(mapper.descriptors),
@@ -782,19 +2005,35 @@ def write_manifest(path: Path, mapper: Mapper, expected: dict[str, list]) -> Non
             "key_decode_readback_words": expected["key_decode_readback_words"],
             "value_decode_readback_words": expected["value_decode_readback_words"],
         },
-        "limitations": [
+        "limitations": ([
+            "One attention head, hidden size 4, four-token prefill and one-token decode keep RTL runtime bounded.",
+            "The task is a synthetic four-token cyclic next-token benchmark, not a pretrained language model.",
+            "Task accuracy is scored from the final INT32 tensor after Top CMDQ execution; no host operation supplies hidden activations.",
+            "Softmax Q0.15 probabilities are requantized to INT8 before attention-value GEMM.",
+        ] if model is not None else [
             "One attention head, hidden size 4, four-token prefill and one-token decode keep RTL runtime bounded.",
             "The fixed non-identity INT8 weights are deterministic fixtures, not pretrained model weights.",
             "Softmax Q0.15 probabilities are requantized to INT8 before attention-value GEMM.",
             "The workload validates accelerator composition and KV address/data flow, not model accuracy.",
-        ],
+        ]),
     }
+    if model is not None:
+        manifest.update({
+            "model_name": model.get("model_name"),
+            "model_sha256": model_sha256,
+            "training": model.get("training"),
+            "task": model.get("task"),
+            "prefill_tokens": model.get("prefill_tokens"),
+            "decode_token": model.get("decode_token"),
+            "task_metrics_from_independent_golden": expected.get("task_metrics"),
+        })
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--spad-bytes", type=int, default=128 * 1024)
     parser.add_argument(
         "--svh", type=Path,
         default=(REPO_ROOT / "verif" / "subsystem" / "top_smoke" /
@@ -804,14 +2043,75 @@ def main() -> None:
         "--manifest", type=Path,
         default=REPO_ROOT / "sw" / "workloads" / "transformer_micro" / "manifest.json",
     )
+    parser.add_argument(
+        "--model-json", type=Path,
+        help="load trained INT8 weights and the model's fixed prefill/decode case",
+    )
+    parser.add_argument(
+        "--h16-qkv-top-dir", type=Path,
+        help="export the bounded H=16/two-head QKV Top-CMDQ projection subgraph",
+    )
+    parser.add_argument(
+        "--h16-attention-top-dir", type=Path,
+        help="export H=16/two-head causal attention + KV round-trip Top workload",
+    )
+    parser.add_argument(
+        "--h16-transformer-top-dir", type=Path,
+        help="export H=16/two-head attention + residual/LN/FFN prefill Top workload",
+    )
+    parser.add_argument(
+        "--decode-mapping-policy", choices=("gemm", "gemv_qkv"),
+        default="gemm",
+        help=("keep the legacy 0x30 decode mapping or select experimental 0x52 "
+              "Q/K/V projections (current H4 Top Golden replay fails; do not use)"),
+    )
     args = parser.parse_args()
-    mapper, expected = build_workload()
+    model = json.loads(args.model_json.read_text(encoding="utf-8")) if args.model_json else None
+    model_sha256 = None
+    if args.model_json:
+        model_sha256 = hashlib.sha256(args.model_json.read_bytes()).hexdigest()
+    if args.h16_qkv_top_dir is not None:
+        if model is None:
+            parser.error("--h16-qkv-top-dir requires --model-json")
+        manifest = build_h16_qkv_top_workload(model, args.h16_qkv_top_dir, args.spad_bytes)
+        manifest["model_sha256"] = model_sha256
+        (args.h16_qkv_top_dir / "manifest.json").write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        print(
+            f"TRANSFORMER_H16_QKV_MAPPER_PASS descriptors={manifest['descriptor_count']} "
+            f"useful_macs={manifest['useful_macs']} model_sha256={model_sha256} "
+            f"golden_sha256={manifest['golden_sha256']}"
+        )
+        return
+    if args.h16_attention_top_dir is not None or args.h16_transformer_top_dir is not None:
+        if model is None:
+            parser.error("H16 Top workload export requires --model-json")
+        full_block = args.h16_transformer_top_dir is not None
+        workload_dir = args.h16_transformer_top_dir or args.h16_attention_top_dir
+        manifest = build_h16_attention_top_workload(
+            model, workload_dir, full_block=full_block, capacity_bytes=args.spad_bytes
+        )
+        manifest["model_sha256"] = model_sha256
+        (workload_dir / "manifest.json").write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        print(
+            f"TRANSFORMER_H16_{'TRANSFORMER' if full_block else 'ATTENTION'}_MAPPER_PASS "
+            f"descriptors={manifest['descriptor_count']} "
+            f"useful_macs={manifest['useful_macs']} "
+            f"model_sha256={model_sha256} "
+            f"golden_sha256={manifest['golden_sha256']}"
+        )
+        return
+    mapper, expected = build_workload(model, args.decode_mapping_policy, args.spad_bytes)
     write_svh(args.svh, mapper, expected)
-    write_manifest(args.manifest, mapper, expected)
+    write_manifest(args.manifest, mapper, expected, model, model_sha256)
     print(
         f"TRANSFORMER_MAPPER_PASS descriptors={len(mapper.descriptors)} "
         f"tensors={len(mapper.tensors)} dataflow=closed poison=enabled "
+        f"decode_mapping={args.decode_mapping_policy} "
         f"prefill={expected['prefill_final']} decode={expected['decode_final']}"
+        + (f" task_metrics={expected['task_metrics']} model_sha256={model_sha256}"
+           if model is not None else "")
     )
 
 

@@ -1,0 +1,92 @@
+{
+  "round": 19,
+  "track": "A_GPT2_DERIVED_WEIGHTS",
+  "branch": "research/nmaforge-v1.2-round19-gpt2",
+  "base_sha": "0e54224510a24e316674df7fa50262ccf2b46429",
+  "tiny_npu_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+  "source_checkpoint": {
+    "model": "openai-community/gpt2",
+    "revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "sha256": "248dfc3911869ec493c76e65bf2fcf7f615828b0254c12b473182f0f81d3a707"
+  },
+  "nmaforge_package": {
+    "path_external": "/tmp/nmaforge_r19_gpt2_import/canonical_h64_model.npz",
+    "sha256": "99cbc583af22c409b9c7d2b8d99c180695b112ccaf01a61113be6da31c7065dd",
+    "shape": {
+      "hidden": 64,
+      "heads": 4,
+      "head_dim": 16,
+      "layers": 4,
+      "ffn": 256,
+      "vocab": 256,
+      "context": 16
+    },
+    "status": "GPT2_DERIVED_FUNCTIONAL_PACKAGE_NOT_LANGUAGE_QUALITY_EVIDENCE"
+  },
+  "tool_versions": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "python": "3.12.13",
+    "numpy": "2.5.4",
+    "pytorch": "2.6.0+cpu",
+    "transformers": "4.48.3"
+  },
+  "runs": [
+    {
+      "run_id": "R19-A-REAL-GPT2-DERIVED-AR-20261117",
+      "status": "PASS_FUNCTIONAL",
+      "mode": "same_top_prefix_recompute_host_argmax",
+      "seed": 20261116,
+      "prompt": [
+        1,
+        7,
+        42,
+        3
+      ],
+      "generated_tokens": [
+        145,
+        113,
+        113,
+        113
+      ],
+      "contexts_bit_exact": 4,
+      "logits_per_context": 256,
+      "reset_events": 0,
+      "host_intermediate_words": 0,
+      "publications": 4020,
+      "extension_cycles_three_recomputed_contexts": 4341096,
+      "result_json_path_external": "/tmp/nmaforge_r19_gpt2_ar_vcs/autoregressive_result.json",
+      "compile_log_path_external": "/tmp/nmaforge_r19_gpt2_ar_vcs/compile.log",
+      "compile_log_sha256": "77d97a72b9ae2ba835736579341f04a973ece7d95267a89084e7328038e1c9f6",
+      "run_log_path_external": "/tmp/nmaforge_r19_gpt2_ar_vcs/run.log",
+      "run_log_sha256": "d55e750844327caa15c1ca8ff999cd5d168472a8106fd16c229a0736a8f9ac49",
+      "golden_result": "FOUR_LAYER_TOP_AUTOREGRESSIVE_GOLDEN_PASS"
+    },
+    {
+      "run_id": "R19-A-SYNTH-AR-20261117",
+      "status": "PASS_COMPATIBILITY_ONLY",
+      "mode": "same_top_prefix_recompute",
+      "seed": 20261116,
+      "generated_tokens": [
+        114,
+        162,
+        193,
+        193
+      ],
+      "contexts_bit_exact": 4,
+      "compile_log_sha256": "5986a083a28e1599b4b9c9c39f2b74f0e36f3bf9ab2db16eff518e5a0cf084d0",
+      "run_log_sha256": "2181aaa2f4969a14ca08a2ab46127a50caa0469b8d863c11fd799ab77f70481a"
+    }
+  ],
+  "gates": {
+    "weight_import": "PASS",
+    "real_weight_top_logits_and_feedback": "PASS",
+    "held_out_language_quality": "PARTIAL",
+    "matched_tinynpu_model_performance": "NOT_RUN"
+  },
+  "limitations": [
+    "Weights are truncated from public GPT-2 dimensions, projection bias is omitted, and NMAForge fixed-point operators differ from TinyNPU.",
+    "No held-out language quality is measured.",
+    "Decode uses prefix recompute; extension cycle counter is not complete application end-to-end latency."
+  ],
+  "tested_source_commit_sha": "ad48fc94727b7b8c1a5267a1b4508d9d6bee50c2"
+}

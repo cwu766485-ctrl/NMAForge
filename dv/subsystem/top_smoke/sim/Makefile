@@ -5,8 +5,15 @@ URG ?= /opt/Synopsys/vcs/V-2023.12-SP1/bin/urg
 VCS_HOME ?= /opt/Synopsys/vcs/V-2023.12-SP1
 AI_RANDOM_CASES ?= 4
 AI_SEED ?= 12345
+AI_SPAD_WORDS_PER_BANK ?= 8192
+AI_DAMS_TRACE_ARGS ?=
 AI_REF_CASES ?= 1000
 AI_REF_SEED ?= 20260722
+AI_TRANSFORMER_MODEL_JSON ?=
+AI_TRANSFORMER_MANIFEST ?= /tmp/nmaforge_transformer_manifest.json
+AI_TRANSFORMER_MAPPING_POLICY ?= gemm
+AI_TRANSFORMER_SEED ?= 20261106
+AI_TRANSFORMER_STEPS ?= 20000
 # The WSL image keeps an old python3 (3.6) alongside newer interpreters.
 # Pick the first installed Python that can parse the A3/A4 reference model;
 # callers may still override PYTHON for a managed VNC/CI environment.
@@ -16,19 +23,31 @@ all: ai_smoke
 
 ai_transformer_gen:
 	$(PYTHON) ../../../../sw/tools/cimforge_mapper.py \
-		--svh ../fixtures/ai_transformer_workload.svh
+		--svh ../fixtures/ai_transformer_workload.svh \
+		--decode-mapping-policy "$(AI_TRANSFORMER_MAPPING_POLICY)" \
+		--spad-bytes $$((16*$(AI_SPAD_WORDS_PER_BANK))) \
+		$(if $(AI_TRANSFORMER_MODEL_JSON),--manifest "$(AI_TRANSFORMER_MANIFEST)" --model-json "$(AI_TRANSFORMER_MODEL_JSON)",)
 
 ai_comp: ai_transformer_gen
 	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_SPAD_WORDS_PER_BANK=$(AI_SPAD_WORDS_PER_BANK) \
 		+incdir+../../../block/control/agent \
 		+incdir+../../../block/dma/agent \
 		+incdir+../fixtures \
 		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv -l ai_comp.log
 
 ai_run:
-	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=$(AI_RANDOM_CASES) +AI_SEED=$(AI_SEED) +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) -l ai_accel_smoke.log
+	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=$(AI_RANDOM_CASES) +AI_SEED=$(AI_SEED) +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) $(AI_DAMS_TRACE_ARGS) -l ai_accel_smoke.log
+	grep -q '^TEST PASS$$' ai_accel_smoke.log
+	! grep -q 'TEST FAIL' ai_accel_smoke.log
 
 ai_smoke: ai_comp ai_run
+	grep -q '^MATRIX_PRODUCT_GEMV_DESCRIPTOR_PASS opcode=0x52 shape=4x16x32 dense=1 bias=1 shift=1 relu=1 outputs=64 lines=16 golden=bit-exact$$' ai_accel_smoke.log
+	grep -q '^MATRIX_PRODUCT_GEMV_TAIL_DESCRIPTOR_PASS opcode=0x52 shape=1x13x17 valid_outputs=13 line_writes=3 scalar_tail=1 golden=bit-exact$$' ai_accel_smoke.log
+	grep -q '^MATRIX_PRODUCT_GEMV_M8_KTAIL_DESCRIPTOR_PASS opcode=0x52 shape=8x16x19 outputs=128 lines=32 golden=bit-exact$$' ai_accel_smoke.log
+	grep -q '^MATRIX_FUSED_TILE_FORWARD_CMDQ_PASS opcode=0x53 shape=16x16x16 baseline_A_reads=16 forwarded_A_reads=0 producer=bit-exact consumer=bit-exact legacy_writeback=enabled$$' ai_accel_smoke.log
+	grep -q '^MATRIX_FUSED_TILE_FORWARD_CROSS_ENGINE_IMMUTABLE_PASS opcode=0x53 matrix_sfu_overlap=1 sfu_spad_accesses_during_consume=[1-9][0-9]* source_unchanged=1 sfu_output=bit-exact golden=bit-exact functional_cov=100\.00$$' ai_accel_smoke.log
+	grep -q '^MATRIX_CNM_PERF_PROFILE_PASS .*cycles_closed=1 golden=bit-exact response_alias_seen=0$$' ai_accel_smoke.log
 
 # Integrated compute DUT-only code-coverage capture. The cm_hier scope selects
 # ai_accel_compute_cluster and the command processor's tile-pipeline instance;
@@ -89,21 +108,35 @@ ai_fp_dot_dma_benchmark: ai_comp
 		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +FP_DOT_DMA_BENCH \
 		+FP_BENCH_SEED=$(FP_BENCH_SEED) -l ai_fp_dot_dma_benchmark.log
 
+# Round 9 reproducer for the former exploratory Matrix/DMA ping-pong probe.
+ai_matrix_dma_overlap_probe: ai_comp
+	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=0 +AI_SEED=$(AI_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +R9_MATRIX_DMA_OVERLAP_PROBE \
+		-l ai_matrix_dma_overlap_probe.log
+	grep -q '^R9_MATRIX_DMA_OVERLAP_PASS tiles=3 shape=4x4x4 ' ai_matrix_dma_overlap_probe.log
+
 # End-to-end INT8 digits MLP through ABI-v7 Matrix/SFU descriptors and the
 # production CMDQ/CPLQ/SPAD path. All generated model, simulator, and result
 # files are isolated under /tmp.
 AI_DIGITS_RUN ?= /tmp/nmaforge_digits_rtl_$(shell date +%Y%m%d_%H%M%S)
 AI_DIGITS_PYTHON ?= python3
+AI_DIGITS_MODEL ?=
 .PHONY: ai_digits_inference
 ai_digits_inference:
 	test ! -e "$(AI_DIGITS_RUN)"
 	mkdir -p "$(AI_DIGITS_RUN)"
-	$(AI_DIGITS_PYTHON) ../../../../benchmark/digits/train_digits_mlp.py \
-		--out-dir "$(AI_DIGITS_RUN)/model"
+	@if [ -n "$(AI_DIGITS_MODEL)" ]; then \
+		mkdir -p "$(AI_DIGITS_RUN)/model"; \
+		cp "$(AI_DIGITS_MODEL)" "$(AI_DIGITS_RUN)/model/digits_mlp_int8.npz"; \
+	else \
+		$(AI_DIGITS_PYTHON) ../../../../benchmark/digits/train_digits_mlp.py \
+			--out-dir "$(AI_DIGITS_RUN)/model"; \
+	fi
 	$(AI_DIGITS_PYTHON) ../../../../benchmark/digits/generate_digits_workload.py \
 		--model "$(AI_DIGITS_RUN)/model/digits_mlp_int8.npz" \
-		--out-dir "$(AI_DIGITS_RUN)/workload"
+		--out-dir "$(AI_DIGITS_RUN)/workload" --spad-bytes $$((16*$(AI_SPAD_WORDS_PER_BANK)))
 	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_SPAD_WORDS_PER_BANK=$(AI_SPAD_WORDS_PER_BANK) \
 		+incdir+../../../block/control/agent \
 		+incdir+../../../block/dma/agent \
 		+incdir+../fixtures \
@@ -113,6 +146,7 @@ ai_digits_inference:
 	$(AI_DIGITS_RUN)/simv +ntb_random_seed=20261029 +AI_RANDOM_CASES=0 \
 		+AI_SEED=20261029 +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) \
 		+AI_DIGITS_INFERENCE \
+		+AI_DIGITS_LAYOUT=$(AI_DIGITS_RUN)/workload/digits_layout.memh \
 		+AI_DIGITS_MEMORY=$(AI_DIGITS_RUN)/workload/digits_spad_writes.memh \
 		+AI_DIGITS_EXPECTED=$(AI_DIGITS_RUN)/workload/digits_expected.memh \
 		+AI_DIGITS_HIDDEN=$(AI_DIGITS_RUN)/workload/digits_hidden_expected.memh \
@@ -127,15 +161,27 @@ ai_digits_inference:
 # engines, ABI-v7 command/completion queues, and an independent per-layer Golden.
 AI_TINYNPU_CNN_RUN ?= /tmp/nmaforge_tinynpu_cnn_rtl_$(shell date +%Y%m%d_%H%M%S)
 AI_TINYNPU_CNN_PYTHON ?= python3
+AI_TINYNPU_CNN_CLASSES ?= 4
 .PHONY: ai_tinynpu_cnn_match
 ai_tinynpu_cnn_match:
 	test ! -e "$(AI_TINYNPU_CNN_RUN)"
 	mkdir -p "$(AI_TINYNPU_CNN_RUN)"
+	if [ -n "$(AI_TINYNPU_CNN_INPUT_NPZ)" ]; then \
+		$(AI_TINYNPU_CNN_PYTHON) ../../../../benchmark/tinynpu/generate_nma_cnn_workload.py \
+			--model "$(AI_TINYNPU_CNN_MODEL)" \
+			--tiny-golden "$(AI_TINYNPU_CNN_GOLDEN)" \
+			--input-npz "$(AI_TINYNPU_CNN_INPUT_NPZ)" \
+			--spad-bytes $$((16*$(AI_SPAD_WORDS_PER_BANK))) \
+			--out-dir "$(AI_TINYNPU_CNN_RUN)/workload"; \
+	else \
 	$(AI_TINYNPU_CNN_PYTHON) ../../../../benchmark/tinynpu/generate_nma_cnn_workload.py \
 		--model "$(AI_TINYNPU_CNN_MODEL)" \
 		--tiny-golden "$(AI_TINYNPU_CNN_GOLDEN)" \
-		--out-dir "$(AI_TINYNPU_CNN_RUN)/workload"
+		--spad-bytes $$((16*$(AI_SPAD_WORDS_PER_BANK))) \
+		--out-dir "$(AI_TINYNPU_CNN_RUN)/workload"; \
+	fi
 	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_SPAD_WORDS_PER_BANK=$(AI_SPAD_WORDS_PER_BANK) \
 		+incdir+../../../block/control/agent \
 		+incdir+../../../block/dma/agent \
 		+incdir+../fixtures \
@@ -144,10 +190,61 @@ ai_tinynpu_cnn_match:
 		-o $(AI_TINYNPU_CNN_RUN)/simv -l $(AI_TINYNPU_CNN_RUN)/compile.log
 	$(AI_TINYNPU_CNN_RUN)/simv +ntb_random_seed=20261029 +AI_RANDOM_CASES=0 \
 		+AI_SEED=20261029 +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_TINYNPU_CNN_MATCH \
+		+AI_TINYNPU_CNN_CLASSES=$(AI_TINYNPU_CNN_CLASSES) \
+		+AI_TINYNPU_CNN_LAYOUT=$(AI_TINYNPU_CNN_RUN)/workload/nma_cnn_layout.memh \
 		+AI_TINYNPU_CNN_MEMORY=$(AI_TINYNPU_CNN_RUN)/workload/nma_cnn_spad.memh \
 		+AI_TINYNPU_CNN_EXPECTED=$(AI_TINYNPU_CNN_RUN)/workload/nma_cnn_expected.memh \
 		-l $(AI_TINYNPU_CNN_RUN)/run.log
 	grep -q '^NMA_CNN_INFERENCE_PASS' $(AI_TINYNPU_CNN_RUN)/run.log
+
+.PHONY: ai_tinynpu_cnn_match_128k
+ai_tinynpu_cnn_match_128k:
+	$(MAKE) ai_tinynpu_cnn_match \
+		AI_SPAD_WORDS_PER_BANK=8192
+
+# Trained Digits CNN demo. The same Top flow supports four- and ten-class
+# heads by running one four-output INT8 Matrix group per command chain.
+AI_TRAINED_CNN_RUN ?= /tmp/nmaforge_trained_cnn_demo_$(shell date +%Y%m%d_%H%M%S)
+AI_TRAINED_CNN_PYTHON ?= python3
+AI_TRAINED_CNN_CLASSES ?= 4
+.PHONY: ai_trained_cnn_demo
+ai_trained_cnn_demo:
+	test ! -e "$(AI_TRAINED_CNN_RUN)"
+	mkdir -p "$(AI_TRAINED_CNN_RUN)/model"
+	$(AI_TRAINED_CNN_PYTHON) ../../../../benchmark/tinynpu/train_nma_cnn_demo.py \
+		--num-classes $(AI_TRAINED_CNN_CLASSES) \
+		--out-dir "$(AI_TRAINED_CNN_RUN)/model"
+	$(AI_TRAINED_CNN_PYTHON) ../../../../benchmark/tinynpu/generate_nma_cnn_demo_golden.py \
+		--model "$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_weights.npz" \
+		--input-npz "$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_input.npz" \
+		--golden "$(AI_TRAINED_CNN_RUN)/model/nma_cnn_golden.bin"
+	$(MAKE) ai_tinynpu_cnn_match \
+		AI_TINYNPU_CNN_PYTHON="$(AI_TRAINED_CNN_PYTHON)" \
+		AI_TINYNPU_CNN_CLASSES="$(AI_TRAINED_CNN_CLASSES)" \
+		AI_TINYNPU_CNN_RUN="$(AI_TRAINED_CNN_RUN)/rtl" \
+		AI_TINYNPU_CNN_MODEL="$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_weights.npz" \
+		AI_TINYNPU_CNN_INPUT_NPZ="$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_input.npz" \
+		AI_TINYNPU_CNN_GOLDEN="$(AI_TRAINED_CNN_RUN)/model/nma_cnn_golden.bin"
+
+# Run the entire held-out set through the compiled production-top testbench;
+# each invocation checks every CNN intermediate against an independent Golden.
+.PHONY: ai_trained_cnn_dataset_regress
+ai_trained_cnn_dataset_regress:
+	$(MAKE) ai_trained_cnn_demo AI_TRAINED_CNN_RUN="$(AI_TRAINED_CNN_RUN)"
+	$(AI_TRAINED_CNN_PYTHON) ../../../../benchmark/tinynpu/run_nma_cnn_demo_dataset.py \
+		--simv "$(AI_TRAINED_CNN_RUN)/rtl/simv" \
+		--model "$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_weights.npz" \
+		--testset "$(AI_TRAINED_CNN_RUN)/model/nma_tiny_cnn_demo_testset.npz" \
+		--spad-bytes $$((16*$(AI_SPAD_WORDS_PER_BANK))) \
+		--candidate-sha "$$(git rev-parse HEAD)" \
+		--out-dir "$(AI_TRAINED_CNN_RUN)/dataset_replay"
+
+AI_TENCLASS_CNN_RUN ?= /tmp/nmaforge_trained_cnn_tenclass_$(shell date +%Y%m%d_%H%M%S)
+.PHONY: ai_trained_cnn_tenclass_dataset_regress
+ai_trained_cnn_tenclass_dataset_regress:
+	$(MAKE) ai_trained_cnn_dataset_regress \
+		AI_TRAINED_CNN_RUN="$(AI_TENCLASS_CNN_RUN)" \
+		AI_TRAINED_CNN_CLASSES=10
 
 # Optional V3 subsystem stress: inject seeded read/write SLVERR at a random
 # beat of multi-beat DMA bursts and check completion plus AXI drain-to-idle.
@@ -175,6 +272,535 @@ ai_smoke_saif: ai_smoke_vcd
 
 ai_transformer: ai_comp
 	./simv +ntb_random_seed=${SEED} +AI_RANDOM_CASES=0 +AI_SEED=$(AI_SEED) +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) -l ai_transformer.log
+
+# Round 3: H64 nonzero Q projection split over four legal 16x16 Matrix tiles.
+AI_H64_PROJECTION_RUN ?= /tmp/nmaforge_h64_projection_$(shell date +%Y%m%d_%H%M%S)
+AI_H64_PROJECTION_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
+AI_H64_PROJECTION_SEED ?= 20261114
+.PHONY: ai_h64_projection_top
+ai_h64_projection_top:
+	test ! -e "$(AI_H64_PROJECTION_RUN)"
+	mkdir -p "$(AI_H64_PROJECTION_RUN)"
+	$(AI_H64_PROJECTION_PYTHON) ../../../../benchmark/gpt2_compat/generate_h64_projection.py \
+		--seed "$(AI_H64_PROJECTION_SEED)" --out "$(AI_H64_PROJECTION_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_H64_PROJECTION_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_H64_PROJECTION_RUN)/simv \
+		-l $(AI_H64_PROJECTION_RUN)/compile.log
+	$(AI_H64_PROJECTION_RUN)/simv +ntb_random_seed=$(AI_H64_PROJECTION_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H64_PROJECTION_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_PROJECTION_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_PROJECTION_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["useful_output_elements"])') \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_PROJECTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PROJECTION_RUN)/workload/manifest.json"))["physical_output_elements"])') \
+		-l $(AI_H64_PROJECTION_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=4 ' "$(AI_H64_PROJECTION_RUN)/run.log"
+	grep -q '^REPRESENTATIVE_MODEL_PASS .*useful_macs=16384 executed_macs=65536 padding_macs=49152 useful_output_elements=256 physical_output_elements=1024 command_cycles=1188 end_to_end_cycles=1188 dma_preload_included=0 ' "$(AI_H64_PROJECTION_RUN)/run.log"
+
+# Round 17 DeiT preparation: execute one official-checkpoint patch-projection
+# 16-output/K=768 GEMM tile on Product Top. This is a real partial projection
+# datapoint, not a full 197-token Patch Embedding or encoder-layer claim.
+AI_DEIT_PATCH_RUN ?= /tmp/nmaforge_deit_patch_$(shell date +%Y%m%d_%H%M%S)
+AI_DEIT_PYTHON ?= /tmp/nmaforge_deit_round17_venv/bin/python
+AI_DEIT_MODEL_DIR ?= /tmp/nmaforge_deit_round17
+.PHONY: ai_deit_patch_projection_top
+ai_deit_patch_projection_top:
+	test ! -e "$(AI_DEIT_PATCH_RUN)"
+	mkdir -p "$(AI_DEIT_PATCH_RUN)"
+	$(AI_DEIT_PYTHON) ../../../../benchmark/deit/round17/generate_deit_patch_projection_workload.py \
+		--model-dir "$(AI_DEIT_MODEL_DIR)" --out-dir "$(AI_DEIT_PATCH_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_PATCH_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_DEIT_PATCH_RUN)/simv \
+		-l $(AI_DEIT_PATCH_RUN)/compile.log
+	$(AI_DEIT_PATCH_RUN)/simv +ntb_random_seed=20261117 +AI_RANDOM_CASES=0 \
+		+AI_SEED=20261117 +ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_PATCH_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_PATCH_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=32768 +AI_REPRESENTATIVE_CPL_BASE=36864 \
+		+AI_REPRESENTATIVE_DESC_COUNT=1 +AI_REPRESENTATIVE_QUEUE_SIZE=128 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=12288 \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=196608 \
+		+AI_REPRESENTATIVE_PADDING_MACS=184320 \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=16 \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=256 \
+		-l $(AI_DEIT_PATCH_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=1 .*golden_words=256 useful_macs=12288 executed_macs=196608 padding_macs=184320 useful_output_elements=16 physical_output_elements=256 ' \
+		"$(AI_DEIT_PATCH_RUN)/run.log"
+
+# Round 18: retain the Round 17 target unchanged and run the same official
+# checkpoint tile with a real 256-KiB Top and explicitly accounted 512-entry
+# CMDQ/CPLQ rings (40 KiB total queue storage).
+AI_DEIT_R18_RUN ?= /tmp/nmaforge_deit_round18_$(shell date +%Y%m%d_%H%M%S)
+AI_DEIT_R18_PYTHON ?= /tmp/nmaforge_deit_round17_venv/bin/python
+AI_DEIT_R18_MODEL_DIR ?= /tmp/nmaforge_deit_round17
+.PHONY: ai_deit_round18_patch_tile_256k
+ai_deit_round18_patch_tile_256k:
+	test ! -e "$(AI_DEIT_R18_RUN)"
+	mkdir -p "$(AI_DEIT_R18_RUN)"
+	$(AI_DEIT_R18_PYTHON) ../../../../benchmark/deit/round18/generate_deit_patch_projection_workload.py \
+		--model-dir "$(AI_DEIT_R18_MODEL_DIR)" --out-dir "$(AI_DEIT_R18_RUN)/workload" \
+		--spad-bytes 262144 --queue-size 512
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=16384 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_R18_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_DEIT_R18_RUN)/simv \
+		-l $(AI_DEIT_R18_RUN)/compile.log
+	$(AI_DEIT_R18_RUN)/simv +ntb_random_seed=20261117 +AI_RANDOM_CASES=0 \
+		+AI_SEED=20261117 +ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_R18_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_R18_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_DEIT_R18_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R18_RUN)/workload/manifest.json"))["descriptor"]["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_DEIT_R18_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R18_RUN)/workload/manifest.json"))["descriptor"]["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=1 +AI_REPRESENTATIVE_QUEUE_SIZE=512 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=12288 \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=196608 \
+		+AI_REPRESENTATIVE_PADDING_MACS=184320 \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=16 \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=256 \
+		-l $(AI_DEIT_R18_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=1 .*golden_words=256 useful_macs=12288 executed_macs=196608 padding_macs=184320 useful_output_elements=16 physical_output_elements=256 ' \
+		"$(AI_DEIT_R18_RUN)/run.log"
+
+AI_DEIT_R18_SM_RUN ?= /tmp/nmaforge_deit_softmax197_$(shell date +%Y%m%d_%H%M%S)
+AI_DEIT_R18_SM_PYTHON ?= /tmp/nmaforge_deit_round17_venv/bin/python
+.PHONY: ai_deit_round18_softmax197_256k
+ai_deit_round18_softmax197_256k:
+	test ! -e "$(AI_DEIT_R18_SM_RUN)"
+	mkdir -p "$(AI_DEIT_R18_SM_RUN)"
+	$(AI_DEIT_R18_SM_PYTHON) ../../../../benchmark/deit/round18/generate_softmax197_workload.py \
+		--out-dir "$(AI_DEIT_R18_SM_RUN)/workload" --queue-size 512 --seed 20261118
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=16384 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_R18_SM_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_DEIT_R18_SM_RUN)/simv \
+		-l $(AI_DEIT_R18_SM_RUN)/compile.log
+	$(AI_DEIT_R18_SM_RUN)/simv +ntb_random_seed=20261118 +AI_RANDOM_CASES=0 \
+		+AI_SEED=20261118 +ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_R18_SM_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_R18_SM_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=221184 +AI_REPRESENTATIVE_CPL_BASE=253952 \
+		+AI_REPRESENTATIVE_DESC_COUNT=1 +AI_REPRESENTATIVE_QUEUE_SIZE=512 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=0 -l $(AI_DEIT_R18_SM_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=1 .*golden_words=197 useful_macs=0 ' \
+		"$(AI_DEIT_R18_SM_RUN)/run.log"
+
+# Round 19: full 196-patch x 192-channel DeiT-Tiny Patch Embedding on the
+# 256-KiB Product Top. Weight and CLS/position correction tiles are DMA
+# streamed immediately before their consuming GEMM/Residual descriptors.
+AI_DEIT_R19_RUN ?= /tmp/nmaforge_deit_round19_$(shell date +%Y%m%d_%H%M%S)
+AI_DEIT_R19_PYTHON ?= /tmp/nmaforge_deit_round17_venv/bin/python
+AI_DEIT_R19_MODEL_DIR ?= /tmp/nmaforge_deit_round17
+.PHONY: ai_deit_round19_full_patch_embedding_256k
+ai_deit_round19_full_patch_embedding_256k:
+	test ! -e "$(AI_DEIT_R19_RUN)"
+	mkdir -p "$(AI_DEIT_R19_RUN)"
+	$(AI_DEIT_R19_PYTHON) ../../../../benchmark/deit/round19/generate_deit_full_patch_embedding.py \
+		--model-dir "$(AI_DEIT_R19_MODEL_DIR)" --out-dir "$(AI_DEIT_R19_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_DEIT_R19_STREAM \
+		+define+AI_SPAD_WORDS_PER_BANK=16384 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_R19_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_DEIT_R19_RUN)/simv \
+		-l $(AI_DEIT_R19_RUN)/compile.log
+	$(AI_DEIT_R19_RUN)/simv +ntb_random_seed=20261117 +AI_RANDOM_CASES=0 \
+		+AI_SEED=20261117 +ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_LATE_DMA \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_DEIT_R19_RUN)/workload/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_DEIT_R19_RUN)/workload/late_dma_plan.memh \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_R19_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_R19_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_DEIT_R19_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R19_RUN)/workload/manifest.json"))["spad"]["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_DEIT_R19_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R19_RUN)/workload/manifest.json"))["spad"]["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_DEIT_R19_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R19_RUN)/workload/manifest.json"))["execution"]["descriptor_count"])') \
+		+AI_REPRESENTATIVE_QUEUE_SIZE=512 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_DEIT_R19_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R19_RUN)/workload/manifest.json"))["execution"]["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_DEIT_R19_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R19_RUN)/workload/manifest.json"))["execution"]["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_DEIT_R19_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R19_RUN)/workload/manifest.json"))["execution"]["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=37824 \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=39936 \
+		-l $(AI_DEIT_R19_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=468 .*golden_words=9984 useful_macs=28901376 executed_macs=30670848 padding_macs=1769472 useful_output_elements=37824 physical_output_elements=39936 ' \
+		"$(AI_DEIT_R19_RUN)/run.log"
+	test "$$(grep -c '^REPRESENTATIVE_LATE_DMA_PASS ' "$(AI_DEIT_R19_RUN)/run.log")" -eq 300
+	test "$$(grep -c '^REPRESENTATIVE_STREAMED_DESC_RETIRE_PASS ' "$(AI_DEIT_R19_RUN)/run.log")" -eq 468
+	grep -q '^REPRESENTATIVE_LATE_DMA_SUMMARY events=300 payload_bytes=307200 checked_words=76800 axi_read_bytes=307200 ' \
+		"$(AI_DEIT_R19_RUN)/run.log"
+
+# Round 21: after the 197-token patch embedding has retired, run one real
+# opcode-0x38 LayerNorm row directly from the Matrix-A packed output.  The
+# affine tensors are loaded through the existing late-DMA path and the three
+# dead embedding scratch regions are reused only after descriptor 467.
+AI_DEIT_R21_RUN ?= /tmp/nmaforge_deit_round21_ln_$(shell date +%Y%m%d_%H%M%S)
+AI_DEIT_R21_PYTHON ?= /tmp/nmaforge_deit_round17_venv/bin/python
+AI_DEIT_R21_MODEL_DIR ?= /tmp/nmaforge_deit_round17
+AI_DEIT_R21_ROW ?= 1
+.PHONY: ai_deit_round21_layernorm_row_256k
+ai_deit_round21_layernorm_row_256k:
+	test ! -e "$(AI_DEIT_R21_RUN)"
+	mkdir -p "$(AI_DEIT_R21_RUN)"
+	$(AI_DEIT_R21_PYTHON) ../../../../benchmark/deit/round19/generate_deit_full_patch_embedding.py \
+		--model-dir "$(AI_DEIT_R21_MODEL_DIR)" --out-dir "$(AI_DEIT_R21_RUN)/workload" \
+		--include-layernorm-row --layernorm-row $(AI_DEIT_R21_ROW)
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_DEIT_R19_STREAM \
+		+define+AI_SPAD_WORDS_PER_BANK=16384 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_R21_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_DEIT_R21_RUN)/simv \
+		-l $(AI_DEIT_R21_RUN)/compile.log
+	$(AI_DEIT_R21_RUN)/simv +ntb_random_seed=20261121 +AI_RANDOM_CASES=0 \
+		+AI_SEED=20261121 +ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_LATE_DMA +AI_DEIT_R21_LN_DEBUG \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_DEIT_R21_RUN)/workload/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_DEIT_R21_RUN)/workload/late_dma_plan.memh \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_R21_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_R21_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_DEIT_R21_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R21_RUN)/workload/manifest.json"))["spad"]["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_DEIT_R21_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R21_RUN)/workload/manifest.json"))["spad"]["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_DEIT_R21_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R21_RUN)/workload/manifest.json"))["execution"]["descriptor_count"])') \
+		+AI_REPRESENTATIVE_QUEUE_SIZE=512 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_DEIT_R21_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R21_RUN)/workload/manifest.json"))["execution"]["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_DEIT_R21_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R21_RUN)/workload/manifest.json"))["execution"]["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_DEIT_R21_PYTHON) -c 'import json;print(json.load(open("$(AI_DEIT_R21_RUN)/workload/manifest.json"))["execution"]["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=37824 \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=39936 \
+		-l $(AI_DEIT_R21_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=469 .*golden_words=10176 useful_macs=28901376 executed_macs=30670848 padding_macs=1769472 useful_output_elements=37824 physical_output_elements=39936 ' \
+		"$(AI_DEIT_R21_RUN)/run.log"
+	test "$$(grep -c '^REPRESENTATIVE_LATE_DMA_PASS ' "$(AI_DEIT_R21_RUN)/run.log")" -eq 302
+	test "$$(grep -c '^REPRESENTATIVE_STREAMED_DESC_RETIRE_PASS ' "$(AI_DEIT_R21_RUN)/run.log")" -eq 469
+	grep -q '^REPRESENTATIVE_LATE_DMA_SUMMARY events=302 payload_bytes=308736 checked_words=77184 axi_read_bytes=308736 ' \
+		"$(AI_DEIT_R21_RUN)/run.log"
+
+# Round 5: one nonzero H64 FFN-up tile, with input/descriptors/weights loaded
+# through the real AXI4 DMA before the Product Top command doorbell.
+AI_H64_FFN_TILE_RUN ?= /tmp/nmaforge_h64_ffn_tile_$(shell date +%Y%m%d_%H%M%S)
+AI_H64_FFN_TILE_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
+AI_H64_FFN_TILE_SEED ?= 20261115
+.PHONY: ai_h64_ffn_tile_dma
+ai_h64_ffn_tile_dma:
+	test ! -e "$(AI_H64_FFN_TILE_RUN)"
+	mkdir -p "$(AI_H64_FFN_TILE_RUN)"
+	$(AI_H64_FFN_TILE_PYTHON) ../../../../benchmark/gpt2_compat/generate_h64_ffn_tile.py \
+		--seed "$(AI_H64_FFN_TILE_SEED)" --out "$(AI_H64_FFN_TILE_RUN)/workload"
+	$(AI_H64_FFN_TILE_PYTHON) ../../../../benchmark/representative/prepare_cnn_dma_payload.py \
+		--memory-image "$(AI_H64_FFN_TILE_RUN)/workload/model_memory.memh" \
+		--out-dir "$(AI_H64_FFN_TILE_RUN)/workload" --axi-memory-words 12288
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_H64_FFN_TILE_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_H64_FFN_TILE_RUN)/simv \
+		-l $(AI_H64_FFN_TILE_RUN)/compile.log
+	$(AI_H64_FFN_TILE_RUN)/simv +ntb_random_seed=$(AI_H64_FFN_TILE_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H64_FFN_TILE_SEED) \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_DMA_PRELOAD \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_FFN_TILE_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_FFN_TILE_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_H64_FFN_TILE_RUN)/workload/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_H64_FFN_TILE_RUN)/workload/dma_plan.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H64_FFN_TILE_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FFN_TILE_RUN)/workload/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_FFN_TILE_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FFN_TILE_RUN)/workload/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_FFN_TILE_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FFN_TILE_RUN)/workload/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H64_FFN_TILE_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FFN_TILE_RUN)/workload/manifest.json"))["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_H64_FFN_TILE_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FFN_TILE_RUN)/workload/manifest.json"))["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_H64_FFN_TILE_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FFN_TILE_RUN)/workload/manifest.json"))["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=$$($(AI_H64_FFN_TILE_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FFN_TILE_RUN)/workload/manifest.json"))["useful_output_elements"])') \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_FFN_TILE_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FFN_TILE_RUN)/workload/manifest.json"))["physical_output_elements"])') \
+		-l $(AI_H64_FFN_TILE_RUN)/run.log
+	grep -q '^REPRESENTATIVE_DMA_PRELOAD_PASS transactions=' "$(AI_H64_FFN_TILE_RUN)/run.log"
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=80 .*golden_words=12288 ' "$(AI_H64_FFN_TILE_RUN)/run.log"
+
+# Round 4: Product Top executes position add, 64-wide LayerNorm, layout
+# conversion and all H64 Q/K/V projections; intermediate SPAD words are Golden checked.
+AI_H64_PRELN_QKV_RUN ?= /tmp/nmaforge_h64_preln_qkv_$(shell date +%Y%m%d_%H%M%S)
+AI_H64_PRELN_QKV_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
+AI_H64_PRELN_QKV_SEED ?= 20261114
+.PHONY: ai_h64_preln_qkv_top
+ai_h64_preln_qkv_top:
+	test ! -e "$(AI_H64_PRELN_QKV_RUN)"
+	mkdir -p "$(AI_H64_PRELN_QKV_RUN)"
+	$(AI_H64_PRELN_QKV_PYTHON) ../../../../benchmark/gpt2_compat/generate_h64_preln_qkv.py \
+		--seed "$(AI_H64_PRELN_QKV_SEED)" --out "$(AI_H64_PRELN_QKV_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_H64_PRELN_QKV_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_H64_PRELN_QKV_RUN)/simv \
+		-l $(AI_H64_PRELN_QKV_RUN)/compile.log
+	$(AI_H64_PRELN_QKV_RUN)/simv +ntb_random_seed=$(AI_H64_PRELN_QKV_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H64_PRELN_QKV_SEED) \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL \
+		+AI_DAMS_TRACE_FILE=$(AI_H64_PRELN_QKV_RUN)/dams_trace.csv \
+		+AI_DAMS_STATE_TRACE_FILE=$(AI_H64_PRELN_QKV_RUN)/dams_state.csv \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_PRELN_QKV_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_PRELN_QKV_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H64_PRELN_QKV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PRELN_QKV_RUN)/workload/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_PRELN_QKV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PRELN_QKV_RUN)/workload/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_PRELN_QKV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PRELN_QKV_RUN)/workload/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H64_PRELN_QKV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PRELN_QKV_RUN)/workload/manifest.json"))["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_H64_PRELN_QKV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PRELN_QKV_RUN)/workload/manifest.json"))["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_H64_PRELN_QKV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PRELN_QKV_RUN)/workload/manifest.json"))["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=$$($(AI_H64_PRELN_QKV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PRELN_QKV_RUN)/workload/manifest.json"))["useful_output_elements"])') \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_PRELN_QKV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PRELN_QKV_RUN)/workload/manifest.json"))["physical_output_elements"])') \
+		-l $(AI_H64_PRELN_QKV_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=30 .*golden_words=5376 .*useful_macs=49152 executed_macs=196608 padding_macs=147456 useful_output_elements=768 physical_output_elements=3072 ' \
+		"$(AI_H64_PRELN_QKV_RUN)/run.log"
+
+# Four-token/four-head attention extends the validated Pre-LN/QKV chain.
+AI_H64_ATTENTION_RUN ?= /tmp/nmaforge_h64_attention_$(shell date +%Y%m%d_%H%M%S)
+AI_H64_ATTENTION_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
+AI_H64_ATTENTION_SEED ?= 20261114
+.PHONY: ai_h64_attention_top
+ai_h64_attention_top:
+	test ! -e "$(AI_H64_ATTENTION_RUN)"
+	mkdir -p "$(AI_H64_ATTENTION_RUN)"
+	$(AI_H64_ATTENTION_PYTHON) ../../../../benchmark/gpt2_compat/generate_h64_preln_qkv.py \
+		--attention --seed "$(AI_H64_ATTENTION_SEED)" --out "$(AI_H64_ATTENTION_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_H64_ATTENTION_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_H64_ATTENTION_RUN)/simv \
+		-l $(AI_H64_ATTENTION_RUN)/compile.log
+	$(AI_H64_ATTENTION_RUN)/simv +ntb_random_seed=$(AI_H64_ATTENTION_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H64_ATTENTION_SEED) \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL \
+		+AI_DAMS_TRACE_FILE=$(AI_H64_ATTENTION_RUN)/dams_trace.csv \
+		+AI_DAMS_STATE_TRACE_FILE=$(AI_H64_ATTENTION_RUN)/dams_state.csv \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_ATTENTION_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_ATTENTION_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H64_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_ATTENTION_RUN)/workload/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_ATTENTION_RUN)/workload/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_ATTENTION_RUN)/workload/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H64_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_ATTENTION_RUN)/workload/manifest.json"))["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_H64_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_ATTENTION_RUN)/workload/manifest.json"))["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_H64_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_ATTENTION_RUN)/workload/manifest.json"))["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=$$($(AI_H64_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_ATTENTION_RUN)/workload/manifest.json"))["useful_output_elements"])') \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_ATTENTION_RUN)/workload/manifest.json"))["physical_output_elements"])') \
+		-l $(AI_H64_ATTENTION_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=108 .*golden_words=12288 ' "$(AI_H64_ATTENTION_RUN)/run.log"
+
+# Round 7: unified, nonzero H64 decoder graph. All compute descriptors run in
+# one Product Top instance; the test checks the final physical memory image.
+AI_H64_DECODER_RUN ?= /tmp/nmaforge_h64_decoder_$(shell date +%Y%m%d_%H%M%S)
+AI_H64_DECODER_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
+AI_H64_DECODER_SEED ?= 20261114
+.PHONY: ai_h64_decoder_block_top
+ai_h64_decoder_block_top:
+	test ! -e "$(AI_H64_DECODER_RUN)"
+	mkdir -p "$(AI_H64_DECODER_RUN)"
+	$(AI_H64_DECODER_PYTHON) ../../../../benchmark/gpt2_compat/generate_h64_preln_qkv.py \
+		--full-decoder --seed "$(AI_H64_DECODER_SEED)" --out "$(AI_H64_DECODER_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_H64_DECODER_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_H64_DECODER_RUN)/simv \
+		-l $(AI_H64_DECODER_RUN)/compile.log
+	$(AI_H64_DECODER_RUN)/simv +ntb_random_seed=$(AI_H64_DECODER_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H64_DECODER_SEED) +ACLK_PERIOD_NS=10.0 \
+		+AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS \
+		+AI_DAMS_TRACE_FILE=$(AI_H64_DECODER_RUN)/dams_trace.csv \
+		+AI_DAMS_STATE_TRACE_FILE=$(AI_H64_DECODER_RUN)/dams_state.csv \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_DECODER_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_DECODER_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H64_DECODER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DECODER_RUN)/workload/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_DECODER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DECODER_RUN)/workload/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_DECODER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DECODER_RUN)/workload/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_QUEUE_SIZE=$$($(AI_H64_DECODER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DECODER_RUN)/workload/manifest.json"))["queue_size"])') \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H64_DECODER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DECODER_RUN)/workload/manifest.json"))["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_H64_DECODER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DECODER_RUN)/workload/manifest.json"))["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_H64_DECODER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DECODER_RUN)/workload/manifest.json"))["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=$$($(AI_H64_DECODER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DECODER_RUN)/workload/manifest.json"))["useful_output_elements"])') \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_DECODER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DECODER_RUN)/workload/manifest.json"))["physical_output_elements"])') \
+		-l $(AI_H64_DECODER_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=189 .*useful_macs=215040 executed_macs=884736 padding_macs=669696 ' \
+		"$(AI_H64_DECODER_RUN)/run.log"
+
+# Round 8: same 189-descriptor decoder, with matrix weights fetched from the
+# behavioral external AXI memory through the product DMA before CMDQ issue.
+AI_H64_DMA_RUN ?= /tmp/nmaforge_h64_dma_decoder_$(shell date +%Y%m%d_%H%M%S)
+AI_H64_DMA_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
+AI_H64_DMA_SEED ?= 20261115
+.PHONY: ai_h64_decoder_dma_top
+ai_h64_decoder_dma_top:
+	test ! -e "$(AI_H64_DMA_RUN)"
+	mkdir -p "$(AI_H64_DMA_RUN)"
+	$(AI_H64_DMA_PYTHON) ../../../../benchmark/gpt2_compat/generate_h64_preln_qkv.py \
+		--full-decoder --seed "$(AI_H64_DMA_SEED)" --out "$(AI_H64_DMA_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_H64_WEIGHT_DMA \
+		+define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_H64_DMA_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_H64_DMA_RUN)/simv \
+		-l $(AI_H64_DMA_RUN)/compile.log
+	$(AI_H64_DMA_RUN)/simv +ntb_random_seed=$(AI_H64_DMA_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H64_DMA_SEED) +ACLK_PERIOD_NS=10.0 \
+		+AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS \
+		+AI_REPRESENTATIVE_DMA_PRELOAD \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_H64_DMA_RUN)/workload/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_H64_DMA_RUN)/workload/dma_plan.memh \
+		+AI_REPRESENTATIVE_CHECKPOINTS=$(AI_H64_DMA_RUN)/workload/checkpoint_golden.memh \
+		+AI_DAMS_TRACE_FILE=$(AI_H64_DMA_RUN)/dams_trace.csv \
+		+AI_DAMS_STATE_TRACE_FILE=$(AI_H64_DMA_RUN)/dams_state.csv \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_DMA_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_DMA_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H64_DMA_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DMA_RUN)/workload/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_DMA_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DMA_RUN)/workload/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_DMA_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DMA_RUN)/workload/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_QUEUE_SIZE=$$($(AI_H64_DMA_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DMA_RUN)/workload/manifest.json"))["queue_size"])') \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H64_DMA_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DMA_RUN)/workload/manifest.json"))["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_H64_DMA_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DMA_RUN)/workload/manifest.json"))["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_H64_DMA_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DMA_RUN)/workload/manifest.json"))["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=$$($(AI_H64_DMA_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DMA_RUN)/workload/manifest.json"))["useful_output_elements"])') \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_DMA_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_DMA_RUN)/workload/manifest.json"))["physical_output_elements"])') \
+		-l $(AI_H64_DMA_RUN)/run.log
+	grep -q '^REPRESENTATIVE_DMA_PRELOAD_PASS transactions=49 payload_bytes=53248 checked_words=13312 axi_read_bytes=53248 ' "$(AI_H64_DMA_RUN)/run.log"
+	test "$$(grep -c '^REPRESENTATIVE_DMA_FENCE_PASS ' "$(AI_H64_DMA_RUN)/run.log")" -eq 49
+	test "$$(grep -c '^REPRESENTATIVE_CHECKPOINT_PASS ' "$(AI_H64_DMA_RUN)/run.log")" -eq "$$( $(AI_H64_DMA_PYTHON) -c 'import json;print(len(json.load(open("$(AI_H64_DMA_RUN)/workload/manifest.json"))["intermediate_checkpoints"]))' )"
+	grep -q '^REPRESENTATIVE_CHECKPOINT_PASS desc=.*method=behavioral_sram_backdoor_nonintrusive$$' "$(AI_H64_DMA_RUN)/run.log"
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=189 .*dma_preload_included=1 ' "$(AI_H64_DMA_RUN)/run.log"
+
+# Round 8 Gate 2 bring-up: persist RTL-produced H64 K/V projections in the
+# Product KV engine and read each token/head slice back without resetting Top.
+AI_H64_KV_RUN ?= /tmp/nmaforge_h64_kv_roundtrip_$(shell date +%Y%m%d_%H%M%S)
+AI_H64_KV_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
+AI_H64_KV_SEED ?= 20261115
+AI_H64_KV_GENERATOR_FLAGS ?= --kv-roundtrip
+.PHONY: ai_h64_kv_roundtrip_top ai_h64_kv_attention_top
+ai_h64_kv_roundtrip_top:
+	test ! -e "$(AI_H64_KV_RUN)"
+	mkdir -p "$(AI_H64_KV_RUN)"
+	$(AI_H64_KV_PYTHON) ../../../../benchmark/gpt2_compat/generate_h64_preln_qkv.py \
+		--full-decoder $(AI_H64_KV_GENERATOR_FLAGS) --seed "$(AI_H64_KV_SEED)" \
+		--out "$(AI_H64_KV_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_H64_WEIGHT_DMA \
+		+define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_H64_KV_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_H64_KV_RUN)/simv \
+		-l $(AI_H64_KV_RUN)/compile.log
+	$(AI_H64_KV_RUN)/simv +ntb_random_seed=$(AI_H64_KV_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H64_KV_SEED) +ACLK_PERIOD_NS=10.0 \
+		+AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS \
+		+AI_REPRESENTATIVE_DMA_PRELOAD \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_H64_KV_RUN)/workload/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_H64_KV_RUN)/workload/dma_plan.memh \
+		+AI_REPRESENTATIVE_CHECKPOINTS=$(AI_H64_KV_RUN)/workload/checkpoint_golden.memh \
+		+AI_DAMS_TRACE_FILE=$(AI_H64_KV_RUN)/dams_trace.csv \
+		+AI_DAMS_STATE_TRACE_FILE=$(AI_H64_KV_RUN)/dams_state.csv \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_KV_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_KV_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H64_KV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_KV_RUN)/workload/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_KV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_KV_RUN)/workload/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_KV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_KV_RUN)/workload/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_QUEUE_SIZE=$$($(AI_H64_KV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_KV_RUN)/workload/manifest.json"))["queue_size"])') \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H64_KV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_KV_RUN)/workload/manifest.json"))["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_H64_KV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_KV_RUN)/workload/manifest.json"))["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_H64_KV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_KV_RUN)/workload/manifest.json"))["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=$$($(AI_H64_KV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_KV_RUN)/workload/manifest.json"))["useful_output_elements"])') \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_KV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_KV_RUN)/workload/manifest.json"))["physical_output_elements"])') \
+		-l $(AI_H64_KV_RUN)/run.log
+	$(AI_H64_KV_PYTHON) -c 'import json,re,pathlib; root=pathlib.Path("$(AI_H64_KV_RUN)"); m=json.loads((root/"workload/manifest.json").read_text()); s=(root/"run.log").read_text(); x=re.search(r"^REPRESENTATIVE_DMA_PRELOAD_PASS transactions=(\d+) payload_bytes=(\d+) checked_words=(\d+) axi_read_bytes=(\d+) ",s,re.M); expected=(len(m["dma_weight_streaming"]["transactions"]),m["dma_weight_streaming"]["payload_bytes"],m["dma_weight_streaming"]["payload_words"],m["dma_weight_streaming"]["payload_bytes"]); assert x and tuple(map(int,x.groups()))==expected,(x.groups() if x else None,expected); assert len(re.findall(r"^REPRESENTATIVE_DMA_FENCE_PASS ",s,re.M))==expected[0]'
+	test "$$(grep -c '^REPRESENTATIVE_CHECKPOINT_PASS ' "$(AI_H64_KV_RUN)/run.log")" -eq "$$( $(AI_H64_KV_PYTHON) -c 'import json;print(len(json.load(open("$(AI_H64_KV_RUN)/workload/manifest.json"))["intermediate_checkpoints"]))' )"
+	grep -q "^REPRESENTATIVE_MODEL_PASS desc=$$($(AI_H64_KV_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_KV_RUN)/workload/manifest.json"))["descriptor_count"])') .*dma_preload_included=1 " "$(AI_H64_KV_RUN)/run.log"
+
+# Six-token cache-backed causal attention: token rows 4/5 use Product KV_READ
+# outputs as the actual QK/AV Matrix-B operands, with weights still DMA-loaded.
+ai_h64_kv_attention_top: AI_H64_KV_GENERATOR_FLAGS=--kv-attention --tokens 1,7,42,3,5,8
+ai_h64_kv_attention_top: ai_h64_kv_roundtrip_top
+
+# Research opcode 0x3a performs Residual -> packed INT8 Requant in one SFU
+# command. The same Product Top and generated data are used for both sides.
+AI_SFU_FUSION_RUN ?= /tmp/nmaforge_sfu_fusion_$(shell date +%Y%m%d_%H%M%S)
+AI_SFU_FUSION_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
+AI_SFU_FUSION_SEED ?= 20261115
+.PHONY: ai_sfu_residual_requant_ab
+ai_sfu_residual_requant_ab:
+	test ! -e "$(AI_SFU_FUSION_RUN)"
+	mkdir -p "$(AI_SFU_FUSION_RUN)"
+	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_SFU_FUSION_RUN)/csrc -top tb_ai_accel_smoke \
+		-f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_SFU_FUSION_RUN)/simv \
+		-l $(AI_SFU_FUSION_RUN)/compile.log
+	$(AI_SFU_FUSION_PYTHON) ../../../../benchmark/gpt2_compat/generate_sfu_residual_requant_ab.py \
+		--seed "$(AI_SFU_FUSION_SEED)" --out "$(AI_SFU_FUSION_RUN)/baseline/workload"
+	$(AI_SFU_FUSION_RUN)/simv +ntb_random_seed=$(AI_SFU_FUSION_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_SFU_FUSION_SEED) +ACLK_PERIOD_NS=10.0 \
+		+AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_SFU_FUSION_RUN)/baseline/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_SFU_FUSION_RUN)/baseline/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=16384 +AI_REPRESENTATIVE_CPL_BASE=20480 \
+		+AI_REPRESENTATIVE_DESC_COUNT=2 +AI_REPRESENTATIVE_USEFUL_MACS=0 \
+		-l $(AI_SFU_FUSION_RUN)/baseline/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=2 .*golden_words=80 ' \
+		"$(AI_SFU_FUSION_RUN)/baseline/run.log"
+	grep -q '^R9_SFU_COMMAND index=0 opcode=0x34 .*spad_read_accepts=128 spad_write_accepts=64 ' \
+		"$(AI_SFU_FUSION_RUN)/baseline/run.log"
+	grep -q '^R9_SFU_COMMAND index=1 opcode=0x36 .*spad_read_accepts=64 spad_write_accepts=16 ' \
+		"$(AI_SFU_FUSION_RUN)/baseline/run.log"
+	$(AI_SFU_FUSION_PYTHON) ../../../../benchmark/gpt2_compat/generate_sfu_residual_requant_ab.py \
+		--fused --seed "$(AI_SFU_FUSION_SEED)" --out "$(AI_SFU_FUSION_RUN)/fused/workload"
+	$(AI_SFU_FUSION_RUN)/simv +ntb_random_seed=$(AI_SFU_FUSION_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_SFU_FUSION_SEED) +ACLK_PERIOD_NS=10.0 \
+		+AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_SFU_FUSION_RUN)/fused/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_SFU_FUSION_RUN)/fused/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=16384 +AI_REPRESENTATIVE_CPL_BASE=20480 \
+		+AI_REPRESENTATIVE_DESC_COUNT=1 +AI_REPRESENTATIVE_USEFUL_MACS=0 \
+		-l $(AI_SFU_FUSION_RUN)/fused/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=1 .*golden_words=16 ' \
+		"$(AI_SFU_FUSION_RUN)/fused/run.log"
+	grep -q '^R9_SFU_COMMAND index=0 opcode=0x3a .*spad_read_accepts=128 spad_write_accepts=16 ' \
+		"$(AI_SFU_FUSION_RUN)/fused/run.log"
+
+# Deterministically train/export a tiny INT8 Transformer model, map its real
+# weights into ABI-v7 descriptors, and run only the Transformer path on the
+# production Top with the selected scratchpad capacity.
+AI_TRANSFORMER_TRAINED_MODEL ?= /tmp/nmaforge_transformer_micro_20261106.json
+.PHONY: ai_transformer_trained
+ai_transformer_trained:
+	$(PYTHON) ../../../../sw/tools/train_transformer_micro.py \
+		--out "$(AI_TRANSFORMER_TRAINED_MODEL)" --seed $(AI_TRANSFORMER_SEED) \
+		--steps $(AI_TRANSFORMER_STEPS)
+	$(MAKE) ai_comp AI_TRANSFORMER_MODEL_JSON="$(AI_TRANSFORMER_TRAINED_MODEL)" \
+		AI_TRANSFORMER_MANIFEST="$(AI_TRANSFORMER_MANIFEST)"
+	./simv +ntb_random_seed=$(AI_TRANSFORMER_SEED) +AI_RANDOM_CASES=0 \
+		+AI_SEED=$(AI_TRANSFORMER_SEED) +ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) \
+		+AI_TRANSFORMER_ONLY -l ai_transformer_trained.log
 
 # Short Linux/VCS gate: all directed AXI/DMA/A4 tests with random compute
 # cases disabled. Use this after an RTL edit before the seeded regression.
@@ -459,3 +1085,594 @@ ai_ctrl_compute_cdc: ai_ctrl_compute_cdc_run
 
 clean:
 	rm -rf csrc simv* *.log ucli.key *.vpd vc_hdrs.h DVE* novas* *.daidir *.vdb *.key
+
+# Reproducible two-layer >=100K-MAC INT8 pointwise CNN through production Top CMDQ.
+AI_REPRESENTATIVE_RUN ?= /tmp/nmaforge_representative_cnn_$(shell date +%Y%m%d_%H%M%S)
+AI_REPRESENTATIVE_PYTHON ?= $(PYTHON)
+AI_REPRESENTATIVE_SEED ?= 20261108
+AI_REPRESENTATIVE_SPAD_WORDS_PER_BANK ?= 8192
+AI_REPRESENTATIVE_FUSION_MODE ?= legacy
+AI_REPRESENTATIVE_DESC_COUNT ?= 4
+.PHONY: ai_representative_cnn
+ai_representative_cnn:
+	test ! -e "$(AI_REPRESENTATIVE_RUN)"
+	mkdir -p "$(AI_REPRESENTATIVE_RUN)"
+	$(AI_REPRESENTATIVE_PYTHON) ../../../../benchmark/representative/generate_pointwise_cnn_workload.py \
+		--seed "$(AI_REPRESENTATIVE_SEED)" \
+		--fusion-mode "$(AI_REPRESENTATIVE_FUSION_MODE)" \
+		--out-dir "$(AI_REPRESENTATIVE_RUN)/workload"
+	$(AI_REPRESENTATIVE_PYTHON) ../../../../benchmark/representative/verify_pointwise_cnn_workload.py \
+		--workload-dir "$(AI_REPRESENTATIVE_RUN)/workload"
+	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK \
+		+define+AI_SPAD_WORDS_PER_BANK=$(AI_REPRESENTATIVE_SPAD_WORDS_PER_BANK) \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-Mdir=$(AI_REPRESENTATIVE_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_REPRESENTATIVE_RUN)/simv -l $(AI_REPRESENTATIVE_RUN)/compile.log
+	$(AI_REPRESENTATIVE_RUN)/simv +ntb_random_seed=$(AI_REPRESENTATIVE_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_REPRESENTATIVE_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_REPRESENTATIVE_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_REPRESENTATIVE_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=102400 +AI_REPRESENTATIVE_CPL_BASE=102912 \
+		+AI_REPRESENTATIVE_DESC_COUNT=$(AI_REPRESENTATIVE_DESC_COUNT) +AI_REPRESENTATIVE_USEFUL_MACS=262144 \
+		+AI_DAMS_TRACE_FILE=$(AI_REPRESENTATIVE_RUN)/dams_trace.csv \
+		+AI_DAMS_STATE_TRACE_FILE=$(AI_REPRESENTATIVE_RUN)/dams_state.csv \
+		-l $(AI_REPRESENTATIVE_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS ' "$(AI_REPRESENTATIVE_RUN)/run.log"
+
+# Round 22: measured Top DMA preload of live trained-CNN inputs, weights and
+# descriptors. Poison/sentinel writes remain test-only AXI-Lite setup.
+AI_REPRESENTATIVE_DMA_RUN ?= /tmp/nmaforge_representative_cnn_dma_$(shell date +%Y%m%d_%H%M%S)
+AI_REPRESENTATIVE_DMA_PYTHON ?= $(PYTHON)
+AI_REPRESENTATIVE_DMA_SEED ?= 20261119
+AI_REPRESENTATIVE_DMA_TEST_RANK ?= 0
+AI_REPRESENTATIVE_DMA_MODEL ?= ../../../../benchmark/representative/models/r19_trained_digits_3x3_cnn.json
+AI_REPRESENTATIVE_DMA_SPAD_WORDS_PER_BANK ?= 8192
+.PHONY: ai_representative_trained_cnn_dma
+ai_representative_trained_cnn_dma:
+	test ! -e "$(AI_REPRESENTATIVE_DMA_RUN)"
+	mkdir -p "$(AI_REPRESENTATIVE_DMA_RUN)"
+	$(AI_REPRESENTATIVE_DMA_PYTHON) ../../../../benchmark/representative/generate_trained_3x3_cnn_workload.py \
+		--model "$(AI_REPRESENTATIVE_DMA_MODEL)" \
+		--out-dir "$(AI_REPRESENTATIVE_DMA_RUN)/workload" \
+		--fusion-mode both_fused_row_major --test-rank "$(AI_REPRESENTATIVE_DMA_TEST_RANK)"
+	$(AI_REPRESENTATIVE_DMA_PYTHON) ../../../../benchmark/representative/verify_trained_3x3_cnn_workload.py \
+		--workload-dir "$(AI_REPRESENTATIVE_DMA_RUN)/workload"
+	$(AI_REPRESENTATIVE_DMA_PYTHON) ../../../../benchmark/representative/prepare_cnn_dma_payload.py \
+		--memory-image "$(AI_REPRESENTATIVE_DMA_RUN)/workload/model_memory.memh" \
+		--out-dir "$(AI_REPRESENTATIVE_DMA_RUN)/workload"
+	vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK \
+		+define+AI_SPAD_WORDS_PER_BANK=$(AI_REPRESENTATIVE_DMA_SPAD_WORDS_PER_BANK) \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-Mdir=$(AI_REPRESENTATIVE_DMA_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_REPRESENTATIVE_DMA_RUN)/simv -l $(AI_REPRESENTATIVE_DMA_RUN)/compile.log
+	$(AI_REPRESENTATIVE_DMA_RUN)/simv +ntb_random_seed=$(AI_REPRESENTATIVE_DMA_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_REPRESENTATIVE_DMA_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_DMA_PRELOAD \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_REPRESENTATIVE_DMA_RUN)/workload/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_REPRESENTATIVE_DMA_RUN)/workload/dma_plan.memh \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_REPRESENTATIVE_DMA_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_REPRESENTATIVE_DMA_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_REPRESENTATIVE_DMA_PYTHON) -c 'import json; print(json.load(open("$(AI_REPRESENTATIVE_DMA_RUN)/workload/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_REPRESENTATIVE_DMA_PYTHON) -c 'import json; print(json.load(open("$(AI_REPRESENTATIVE_DMA_RUN)/workload/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_REPRESENTATIVE_DMA_PYTHON) -c 'import json; print(json.load(open("$(AI_REPRESENTATIVE_DMA_RUN)/workload/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_USEFUL_MACS=570164 -l $(AI_REPRESENTATIVE_DMA_RUN)/run.log
+	grep -q '^REPRESENTATIVE_DMA_PRELOAD_PASS ' "$(AI_REPRESENTATIVE_DMA_RUN)/run.log"
+	grep -q '^REPRESENTATIVE_MODEL_PASS ' "$(AI_REPRESENTATIVE_DMA_RUN)/run.log"
+
+# Trained synthetic H=16/two-head QKV projection subgraph through Top CMDQ.
+# This is deliberately a QKV-only Gate G2 workload, not full Transformer DV.
+AI_H16_QKV_RUN ?= /tmp/nmaforge_h16_qkv_$(shell date +%Y%m%d_%H%M%S)
+AI_H16_QKV_PYTHON ?= python3.12
+AI_H16_QKV_SEED ?= 20261113
+.PHONY: ai_h16_qkv_top
+ai_h16_qkv_top:
+	test ! -e "$(AI_H16_QKV_RUN)"
+	mkdir -p "$(AI_H16_QKV_RUN)"
+	$(AI_H16_QKV_PYTHON) ../../../../sw/tools/train_transformer_h16_qkv.py \
+		--seed "$(AI_H16_QKV_SEED)" --out "$(AI_H16_QKV_RUN)/model.json"
+	$(AI_H16_QKV_PYTHON) ../../../../sw/tools/cimforge_mapper.py \
+		--model-json "$(AI_H16_QKV_RUN)/model.json" \
+		--h16-qkv-top-dir "$(AI_H16_QKV_RUN)/workload"
+	$(AI_H16_QKV_PYTHON) ../../../../sw/tools/verify_transformer_h16_qkv.py \
+		--model "$(AI_H16_QKV_RUN)/model.json" \
+		--workload-dir "$(AI_H16_QKV_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK \
+		+define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-Mdir=$(AI_H16_QKV_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_H16_QKV_RUN)/simv -l $(AI_H16_QKV_RUN)/compile.log
+	$(AI_H16_QKV_RUN)/simv +ntb_random_seed=$(AI_H16_QKV_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H16_QKV_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_REPRESENTATIVE_MODEL \
+		+AI_DAMS_TRACE_FILE=$(AI_H16_QKV_RUN)/dams_trace.csv \
+		+AI_DAMS_STATE_TRACE_FILE=$(AI_H16_QKV_RUN)/dams_state.csv \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H16_QKV_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H16_QKV_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=20480 +AI_REPRESENTATIVE_CPL_BASE=20736 \
+		+AI_REPRESENTATIVE_DESC_COUNT=3 +AI_REPRESENTATIVE_USEFUL_MACS=6144 \
+		-l $(AI_H16_QKV_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=3 .*golden_words=384 useful_macs=6144 ' \
+		"$(AI_H16_QKV_RUN)/run.log"
+
+AI_H16_ATTENTION_RUN ?= /tmp/nmaforge_h16_attention_$(shell date +%Y%m%d_%H%M%S)
+AI_H16_ATTENTION_PYTHON ?= python3.12
+AI_H16_ATTENTION_SEED ?= 20261113
+.PHONY: ai_h16_attention_top
+ai_h16_attention_top:
+	test ! -e "$(AI_H16_ATTENTION_RUN)"
+	mkdir -p "$(AI_H16_ATTENTION_RUN)"
+	$(AI_H16_ATTENTION_PYTHON) ../../../../sw/tools/train_transformer_h16_qkv.py \
+		--seed "$(AI_H16_ATTENTION_SEED)" --out "$(AI_H16_ATTENTION_RUN)/model.json"
+	$(AI_H16_ATTENTION_PYTHON) ../../../../sw/tools/cimforge_mapper.py \
+		--model-json "$(AI_H16_ATTENTION_RUN)/model.json" \
+		--h16-attention-top-dir "$(AI_H16_ATTENTION_RUN)/workload"
+	$(AI_H16_ATTENTION_PYTHON) ../../../../sw/tools/verify_transformer_h16_attention.py \
+		--model "$(AI_H16_ATTENTION_RUN)/model.json" \
+		--workload-dir "$(AI_H16_ATTENTION_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK \
+		+define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-Mdir=$(AI_H16_ATTENTION_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_H16_ATTENTION_RUN)/simv -l $(AI_H16_ATTENTION_RUN)/compile.log
+	$(AI_H16_ATTENTION_RUN)/simv +ntb_random_seed=$(AI_H16_ATTENTION_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H16_ATTENTION_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H16_ATTENTION_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H16_ATTENTION_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H16_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H16_ATTENTION_RUN)/workload/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H16_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H16_ATTENTION_RUN)/workload/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H16_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H16_ATTENTION_RUN)/workload/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H16_ATTENTION_PYTHON) -c 'import json;print(json.load(open("$(AI_H16_ATTENTION_RUN)/workload/manifest.json"))["useful_macs"])') \
+		-l $(AI_H16_ATTENTION_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS ' "$(AI_H16_ATTENTION_RUN)/run.log"
+
+AI_H16_TRANSFORMER_RUN ?= /tmp/nmaforge_h16_transformer_$(shell date +%Y%m%d_%H%M%S)
+AI_H16_TRANSFORMER_PYTHON ?= python3.12
+AI_H16_TRANSFORMER_SEED ?= 20261114
+.PHONY: ai_h16_transformer_top
+ai_h16_transformer_top:
+	test ! -e "$(AI_H16_TRANSFORMER_RUN)"
+	mkdir -p "$(AI_H16_TRANSFORMER_RUN)"
+	$(AI_H16_TRANSFORMER_PYTHON) ../../../../sw/tools/train_transformer_h16_block.py \
+		--seed "$(AI_H16_TRANSFORMER_SEED)" --out "$(AI_H16_TRANSFORMER_RUN)/model.json"
+	$(AI_H16_TRANSFORMER_PYTHON) ../../../../sw/tools/cimforge_mapper.py \
+		--model-json "$(AI_H16_TRANSFORMER_RUN)/model.json" \
+		--h16-transformer-top-dir "$(AI_H16_TRANSFORMER_RUN)/workload"
+	$(AI_H16_TRANSFORMER_PYTHON) ../../../../sw/tools/verify_transformer_h16_attention.py \
+		--model "$(AI_H16_TRANSFORMER_RUN)/model.json" \
+		--workload-dir "$(AI_H16_TRANSFORMER_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK \
+		+define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-Mdir=$(AI_H16_TRANSFORMER_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_H16_TRANSFORMER_RUN)/simv -l $(AI_H16_TRANSFORMER_RUN)/compile.log
+	$(AI_H16_TRANSFORMER_RUN)/simv +ntb_random_seed=$(AI_H16_TRANSFORMER_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H16_TRANSFORMER_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H16_TRANSFORMER_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H16_TRANSFORMER_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H16_TRANSFORMER_PYTHON) -c 'import json;print(json.load(open("$(AI_H16_TRANSFORMER_RUN)/workload/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H16_TRANSFORMER_PYTHON) -c 'import json;print(json.load(open("$(AI_H16_TRANSFORMER_RUN)/workload/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H16_TRANSFORMER_PYTHON) -c 'import json;print(json.load(open("$(AI_H16_TRANSFORMER_RUN)/workload/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H16_TRANSFORMER_PYTHON) -c 'import json;print(json.load(open("$(AI_H16_TRANSFORMER_RUN)/workload/manifest.json"))["useful_macs"])') \
+		+AI_REPRESENTATIVE_PREFILL_DESC_COUNT=$$($(AI_H16_TRANSFORMER_PYTHON) -c 'import json;print(json.load(open("$(AI_H16_TRANSFORMER_RUN)/workload/manifest.json"))["prefill_descriptor_count"])') \
+		-l $(AI_H16_TRANSFORMER_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS ' "$(AI_H16_TRANSFORMER_RUN)/run.log"
+
+# Round 16: true H16 incremental KV append and per-token Top Golden checks.
+AI_H16_INCREMENTAL_RUN ?= /tmp/nmaforge_h16_incremental_$(shell date +%Y%m%d_%H%M%S)
+AI_H16_INCREMENTAL_PYTHON ?= python3.12
+AI_H16_INCREMENTAL_SEED ?= 20261116
+AI_H16_INCREMENTAL_POLICY ?= gemm
+.PHONY: ai_h16_incremental_decode
+ai_h16_incremental_decode:
+	test ! -e "$(AI_H16_INCREMENTAL_RUN)"
+	mkdir -p "$(AI_H16_INCREMENTAL_RUN)"
+	$(AI_H16_INCREMENTAL_PYTHON) ../../../../sw/tools/train_transformer_h16_block.py \
+		--seed "$(AI_H16_INCREMENTAL_SEED)" --out "$(AI_H16_INCREMENTAL_RUN)/model.json"
+	$(AI_H16_INCREMENTAL_PYTHON) ../../../../sw/tools/generate_h16_incremental_decode.py \
+		--model "$(AI_H16_INCREMENTAL_RUN)/model.json" \
+		--projection-policy "$(AI_H16_INCREMENTAL_POLICY)" \
+		--out "$(AI_H16_INCREMENTAL_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK \
+		+define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-Mdir=$(AI_H16_INCREMENTAL_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_H16_INCREMENTAL_RUN)/simv -l $(AI_H16_INCREMENTAL_RUN)/compile.log
+	$(AI_H16_INCREMENTAL_RUN)/simv +ntb_random_seed=$(AI_H16_INCREMENTAL_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H16_INCREMENTAL_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_H16_INCREMENTAL_DECODE \
+		+AI_H16_INCREMENTAL_DIR=$(AI_H16_INCREMENTAL_RUN)/workload \
+		-l $(AI_H16_INCREMENTAL_RUN)/run.log
+	grep -q '^INCREMENTAL_DECODE_PASS ' "$(AI_H16_INCREMENTAL_RUN)/run.log"
+	$(AI_H16_INCREMENTAL_PYTHON) ../../../../sw/tools/summarize_h16_incremental_decode.py \
+		--run-dir "$(AI_H16_INCREMENTAL_RUN)"
+
+# Round 13: live CMDQ/CPLQ software runtime over real compute descriptors.
+AI_CMDQ_STREAM_RUN ?= /tmp/nmaforge_cmdq_stream_$(shell date +%Y%m%d_%H%M%S)
+AI_CMDQ_STREAM_COUNT ?= 512
+AI_CMDQ_STREAM_SEED ?= 20261115
+.PHONY: ai_cmdq_stream_runtime
+ai_cmdq_stream_runtime:
+	test ! -e "$(AI_CMDQ_STREAM_RUN)"
+	mkdir -p "$(AI_CMDQ_STREAM_RUN)"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-Mdir=$(AI_CMDQ_STREAM_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_CMDQ_STREAM_RUN)/simv -l $(AI_CMDQ_STREAM_RUN)/compile.log
+	$(AI_CMDQ_STREAM_RUN)/simv +ntb_random_seed=$(AI_CMDQ_STREAM_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_CMDQ_STREAM_SEED) \
+		+ACLK_PERIOD_NS=$(ACLK_PERIOD_NS) +AI_CMDQ_STREAM_RUNTIME \
+		+AI_CMDQ_STREAM_COUNT=$(AI_CMDQ_STREAM_COUNT) \
+		-l $(AI_CMDQ_STREAM_RUN)/run.log
+	grep -q '^CMDQ_RUNTIME_AXI_COMPLETION_PASS ' "$(AI_CMDQ_STREAM_RUN)/run.log"
+	grep -q '^CMDQ_RUNTIME_DMA_FENCE_PASS ' "$(AI_CMDQ_STREAM_RUN)/run.log"
+	grep -q '^CMDQ_STREAM_RUNTIME_PASS descriptors=$(AI_CMDQ_STREAM_COUNT) ' "$(AI_CMDQ_STREAM_RUN)/run.log"
+	grep -q '^CMDQ_STREAM_RUNTIME_TOP_PASS$$' "$(AI_CMDQ_STREAM_RUN)/run.log"
+
+# Round 15 G1: two independently generated H64 token invocations in one
+# unreset Product Top. Stage 1 publishes only its input embedding and new
+# descriptors; historical K/V must survive stage 0 completion retirement.
+AI_H64_PERSISTENT_RUN ?= /tmp/nmaforge_h64_persistent_$(shell date +%Y%m%d_%H%M%S)
+AI_H64_PERSISTENT_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
+AI_H64_PERSISTENT_SEED ?= 20261116
+AI_H64_PERSISTENT_TOKENS ?= 1,7
+AI_H64_PERSISTENT_PREFILL_TOKENS ?= 1
+.PHONY: ai_h64_persistent_two_token ai_h64_persistent_sequence
+ai_h64_persistent_two_token ai_h64_persistent_sequence:
+	test ! -e "$(AI_H64_PERSISTENT_RUN)"
+	$(AI_H64_PERSISTENT_PYTHON) ../../../../benchmark/gpt2_compat/prepare_h64_persistent.py \
+		--seed "$(AI_H64_PERSISTENT_SEED)" --tokens "$(AI_H64_PERSISTENT_TOKENS)" \
+		--prefill-tokens "$(AI_H64_PERSISTENT_PREFILL_TOKENS)" \
+		--out "$(AI_H64_PERSISTENT_RUN)"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_H64_WEIGHT_DMA \
+		+define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_H64_PERSISTENT_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_H64_PERSISTENT_RUN)/simv \
+		-l $(AI_H64_PERSISTENT_RUN)/compile.log
+	$(AI_H64_PERSISTENT_RUN)/simv +ntb_random_seed=$(AI_H64_PERSISTENT_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H64_PERSISTENT_SEED) \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_DMA_PRELOAD +AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS \
+		+AI_H64_PERSISTENT \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_PERSISTENT_RUN)/stage0/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_PERSISTENT_RUN)/stage0/model_golden.memh \
+		+AI_REPRESENTATIVE_CHECKPOINTS=$(AI_H64_PERSISTENT_RUN)/stage0/checkpoint_golden.memh \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_H64_PERSISTENT_RUN)/stage0/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_H64_PERSISTENT_RUN)/stage0/dma_plan.memh \
+		+AI_H64_PERSISTENT_SEQUENCE_ROOT=$(AI_H64_PERSISTENT_RUN) \
+		+AI_H64_PERSISTENT_STAGE_COUNT=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/token_plan.json"))["decode_tokens"])') \
+		+AI_H64_PERSISTENT_PREFILL_TOKENS=$(AI_H64_PERSISTENT_PREFILL_TOKENS) \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_QUEUE_SIZE=256 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["useful_output_elements"])') \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/stage0/manifest.json"))["physical_output_elements"])') \
+		-l $(AI_H64_PERSISTENT_RUN)/run.log
+	grep -q '^H64_PERSISTENT_KV_BEFORE_PASS ' $(AI_H64_PERSISTENT_RUN)/run.log
+	stage_count=$$($(AI_H64_PERSISTENT_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_PERSISTENT_RUN)/token_plan.json"))["decode_tokens"])'); \
+	if [ "$$stage_count" -eq 1 ]; then grep -q '^H64_PERSISTENT_TWO_TOKEN_PASS ' $(AI_H64_PERSISTENT_RUN)/run.log; \
+	else grep -q "^H64_PERSISTENT_SEQUENCE_PASS appended_stages=$$stage_count " $(AI_H64_PERSISTENT_RUN)/run.log; fi
+
+# Round 16 Gate 1: four sequential layer invocations in one unreset Product
+# Top. Layer N+1 reads Layer N's residual2 from SPAD; its inputs.memh is empty.
+AI_H64_FOUR_LAYER_RUN ?= /tmp/nmaforge_h64_four_layer_$(shell date +%Y%m%d_%H%M%S)
+AI_H64_FOUR_LAYER_PYTHON ?= /tmp/nmaforge_round10_venv/bin/python
+AI_H64_FOUR_LAYER_SEED ?= 20261116
+AI_H64_FOUR_LAYER_TOKENS ?= 1,7,42,3
+AI_H64_FOUR_LAYER_MODEL_NPZ ?=
+AI_H64_NUMERIC_PROFILE ?= frozen
+AI_H64_FOUR_LAYER_LOGITS_ROW ?= $(shell printf '%s\n' '$(AI_H64_FOUR_LAYER_TOKENS)' | awk -F, '{print NF-1}')
+AI_H64_AUTOREGRESSIVE ?= 0
+ifeq ($(AI_H64_AUTOREGRESSIVE),1)
+AI_H64_FOUR_LAYER_PREPARER := ../../../../benchmark/gpt2_compat/prepare_h64_autoregressive.py
+AI_H64_FOUR_LAYER_TOKEN_OPTION := --prompt
+AI_H64_AUTOREGRESSIVE_PLUSARGS := \
+	+AI_H64_AUTOREGRESSIVE +AI_H64_AUTOREGRESSIVE_STEPS=4 \
+	+AI_H64_FEEDBACK_PLAN=$(AI_H64_FOUR_LAYER_RUN)/feedback_plan.memh \
+	+AI_H64_EMBED_BASE=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json; j=json.load(open("$(AI_H64_FOUR_LAYER_RUN)/four_layer_manifest.json")); print(next(t["start"] for t in j["allocation_records"] if t["tensor_id"] == "l0.embedding_lookup_i32"))') \
+	+AI_H64_POSITION_BASE=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json; j=json.load(open("$(AI_H64_FOUR_LAYER_RUN)/four_layer_manifest.json")); print(next(t["start"] for t in j["allocation_records"] if t["tensor_id"] == "l0.position_i32"))')
+else
+AI_H64_FOUR_LAYER_PREPARER := ../../../../benchmark/gpt2_compat/prepare_h64_four_layer.py
+AI_H64_FOUR_LAYER_TOKEN_OPTION := --tokens
+AI_H64_AUTOREGRESSIVE_PLUSARGS :=
+endif
+.PHONY: ai_h64_four_layer_top
+ai_h64_four_layer_top:
+	test ! -e "$(AI_H64_FOUR_LAYER_RUN)"
+	$(AI_H64_FOUR_LAYER_PYTHON) $(AI_H64_FOUR_LAYER_PREPARER) \
+		--seed "$(AI_H64_FOUR_LAYER_SEED)" $(AI_H64_FOUR_LAYER_TOKEN_OPTION) "$(AI_H64_FOUR_LAYER_TOKENS)" \
+		$(if $(AI_H64_FOUR_LAYER_MODEL_NPZ),--model-npz "$(AI_H64_FOUR_LAYER_MODEL_NPZ)",) \
+		--numeric-profile "$(AI_H64_NUMERIC_PROFILE)" \
+		$(if $(filter 1,$(AI_H64_AUTOREGRESSIVE)),--generated 4,) \
+		--out "$(AI_H64_FOUR_LAYER_RUN)"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_H64_WEIGHT_DMA \
+		+define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_H64_FOUR_LAYER_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv \
+		../tb/tb_ai_accel_smoke.sv -o $(AI_H64_FOUR_LAYER_RUN)/simv \
+		-l $(AI_H64_FOUR_LAYER_RUN)/compile.log
+	$(AI_H64_FOUR_LAYER_RUN)/simv +ntb_random_seed=$(AI_H64_FOUR_LAYER_SEED) \
+		+AI_RANDOM_CASES=0 +AI_SEED=$(AI_H64_FOUR_LAYER_SEED) +ACLK_PERIOD_NS=10.0 \
+		+AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_DMA_PRELOAD \
+		+AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS +AI_H64_PERSISTENT +AI_H64_FOUR_LAYER \
+		+AI_H64_DUMP_LOGITS \
+		+AI_H64_LOGITS_BASE=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json; j=json.load(open("$(AI_H64_FOUR_LAYER_RUN)/four_layer_manifest.json")); print(next(t["start"] for t in j["allocation_records"] if t["tensor_id"] == "logits_i32_physical_16x256"))') \
+		+AI_H64_LOGITS_ROW=$(AI_H64_FOUR_LAYER_LOGITS_ROW) \
+		$(AI_H64_AUTOREGRESSIVE_PLUSARGS) \
+		+AI_H64_LOGITS_DUMP=$(AI_H64_FOUR_LAYER_RUN)/rtl_logits.csv \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_FOUR_LAYER_RUN)/stage0/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_FOUR_LAYER_RUN)/stage0/model_golden.memh \
+		+AI_REPRESENTATIVE_CHECKPOINTS=$(AI_H64_FOUR_LAYER_RUN)/stage0/checkpoint_golden.memh \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_H64_FOUR_LAYER_RUN)/stage0/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_H64_FOUR_LAYER_RUN)/stage0/dma_plan.memh \
+		+AI_H64_PERSISTENT_SEQUENCE_ROOT=$(AI_H64_FOUR_LAYER_RUN) \
+		+AI_H64_PERSISTENT_STAGE_COUNT=3 +AI_H64_PERSISTENT_PREFILL_TOKENS=1 \
+		+AI_H64_ACTIVE_TOKENS=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(len(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/four_layer_manifest.json"))["tokens"]))') \
+		+AI_REPRESENTATIVE_DESC_BASE=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["descriptor_base"])') \
+		+AI_REPRESENTATIVE_CPL_BASE=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["completion_base"])') \
+		+AI_REPRESENTATIVE_DESC_COUNT=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["descriptor_count"])') \
+		+AI_REPRESENTATIVE_QUEUE_SIZE=512 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["useful_macs"])') \
+		+AI_REPRESENTATIVE_EXECUTED_MACS=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["executed_macs"])') \
+		+AI_REPRESENTATIVE_PADDING_MACS=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["padding_macs"])') \
+		+AI_REPRESENTATIVE_USEFUL_OUTPUTS=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["useful_output_elements"])') \
+		+AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json;print(json.load(open("$(AI_H64_FOUR_LAYER_RUN)/stage0/manifest.json"))["physical_output_elements"])') \
+		-l $(AI_H64_FOUR_LAYER_RUN)/run.log
+	grep -q '^H64_FINAL_LOGITS_DUMP_PASS count=256 row=$(AI_H64_FOUR_LAYER_LOGITS_ROW) ' $(AI_H64_FOUR_LAYER_RUN)/run.log
+	grep -q '^H64_FOUR_LAYER_TOP_PASS layers=4 ' $(AI_H64_FOUR_LAYER_RUN)/run.log
+	grep -q '^H64_FINAL_LN_LM_HEAD_PASS active_rows=' $(AI_H64_FOUR_LAYER_RUN)/run.log
+	test "$$(grep -c '^H64_FOUR_LAYER_HANDOFF_PASS ' $(AI_H64_FOUR_LAYER_RUN)/run.log)" -eq $(if $(filter 1,$(AI_H64_AUTOREGRESSIVE)),12,3)
+	test "$$(grep -c '^H64_FOUR_LAYER_STAGE_PASS ' $(AI_H64_FOUR_LAYER_RUN)/run.log)" -eq $(if $(filter 1,$(AI_H64_AUTOREGRESSIVE)),15,3)
+	$(if $(filter 1,$(AI_H64_AUTOREGRESSIVE)),grep -q '^H64_AUTOREGRESSIVE_SEQUENCE_PASS generated_tokens=4 ' $(AI_H64_FOUR_LAYER_RUN)/run.log, true)
+
+.PHONY: ai_h64_four_layer_top_argmax
+ai_h64_four_layer_top_argmax: ai_h64_four_layer_top
+	$(if $(filter 1,$(AI_H64_AUTOREGRESSIVE)),$(AI_H64_FOUR_LAYER_PYTHON) ../../../../benchmark/gpt2_compat/verify_h64_autoregressive.py --run "$(AI_H64_FOUR_LAYER_RUN)",$(AI_H64_FOUR_LAYER_PYTHON) ../../../../benchmark/gpt2_compat/verify_h64_top_logits.py --run "$(AI_H64_FOUR_LAYER_RUN)" --row "$(AI_H64_FOUR_LAYER_LOGITS_ROW)")
+
+# Round 23: train/export a bounded GPT-2-like synthetic-token LM, validate the
+# independent scalar INT8 reference, and run eight host-feedback Top steps.
+AI_TINY_GPT2_RUN ?= /tmp/nmaforge_tiny_gpt2_$(shell date +%Y%m%d_%H%M%S)
+AI_TINY_GPT2_PYTHON ?= python3.12
+AI_TINY_GPT2_SEED ?= 20261123
+.PHONY: ai_tiny_gpt2_top
+ai_tiny_gpt2_top:
+	test ! -e "$(AI_TINY_GPT2_RUN)"
+	mkdir -p "$(AI_TINY_GPT2_RUN)"
+	$(AI_TINY_GPT2_PYTHON) ../../../../sw/tools/train_tiny_gpt2.py \
+		--seed "$(AI_TINY_GPT2_SEED)" --epochs 120 \
+		--out "$(AI_TINY_GPT2_RUN)/model.json"
+	$(AI_TINY_GPT2_PYTHON) ../../../../sw/tools/reference_tiny_gpt2_int8.py \
+		--model "$(AI_TINY_GPT2_RUN)/model.json" \
+		--out "$(AI_TINY_GPT2_RUN)/reference.json" --test-sequences 1024
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK \
+		+define+AI_SPAD_WORDS_PER_BANK=8192 \
+		+incdir+../../../block/control/agent \
+		+incdir+../../../block/dma/agent \
+		+incdir+../fixtures \
+		-Mdir=$(AI_TINY_GPT2_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_TINY_GPT2_RUN)/simv -l $(AI_TINY_GPT2_RUN)/compile.log
+	$(AI_TINY_GPT2_PYTHON) ../../../../sw/tools/run_tiny_gpt2_closed_loop.py \
+		--model "$(AI_TINY_GPT2_RUN)/model.json" \
+		--simv "$(AI_TINY_GPT2_RUN)/simv" \
+		--out "$(AI_TINY_GPT2_RUN)/closed_loop" \
+		--seed "$(AI_TINY_GPT2_SEED)" --steps 8
+	grep -q '"status": "HOST_FEEDBACK_INCREMENTAL_TOP_PASS"' \
+		"$(AI_TINY_GPT2_RUN)/closed_loop/closed_loop_results.json"
+
+# Capacity-derived host/DMA/CMDQ/CPLQ boundary checks at the chosen geometry.
+.PHONY: ai_spad_capacity_boundaries
+ai_spad_capacity_boundaries: ai_comp
+	./simv +AI_SPAD_CAPACITY_BOUNDARIES +AI_RANDOM_CASES=0 +AI_SEED=$(AI_SEED) -l ai_spad_capacity_boundaries.log
+	grep -q '^SPAD_CAPACITY_BOUNDARY_PASS ' ai_spad_capacity_boundaries.log
+
+# Round 29: dispatch the research 0x3b Matrix-A repack mode through Product
+# Top in a 256 KiB SPAD configuration. This is a repack-only integration
+# test; its source tensor is preloaded and it does not claim a QKV producer or
+# Attention consumer path.
+AI_DEIT_R29_RUN ?= /tmp/nmaforge_deit_round29_top_$(shell date +%Y%m%d_%H%M%S)
+AI_DEIT_R29_PYTHON ?= /tmp/nmaforge_deit_round17_venv/bin/python
+.PHONY: ai_deit_round29_top_repack_256k
+ai_deit_round29_top_repack_256k:
+	test ! -e "$(AI_DEIT_R29_RUN)"
+	mkdir -p "$(AI_DEIT_R29_RUN)"
+	$(AI_DEIT_R29_PYTHON) ../../../../benchmark/deit/round29/generate_repack_top_workload.py \
+		--out-dir "$(AI_DEIT_R29_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=16384 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_R29_RUN)/csrc -top tb_ai_accel_smoke \
+		-f ai_accel.f ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_DEIT_R29_RUN)/simv -l $(AI_DEIT_R29_RUN)/compile.log
+	$(AI_DEIT_R29_RUN)/simv +ntb_random_seed=290029 +AI_RANDOM_CASES=0 +AI_SEED=290029 \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_R29_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_R29_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=65536 +AI_REPRESENTATIVE_CPL_BASE=66560 \
+		+AI_REPRESENTATIVE_DESC_COUNT=9 +AI_REPRESENTATIVE_QUEUE_SIZE=16 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=0 -l $(AI_DEIT_R29_RUN)/run.log
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=9 .*golden_words=576 useful_macs=0 ' \
+		$(AI_DEIT_R29_RUN)/run.log
+
+# Round 30: full 197x192/3-head physical-layout boundary qualification for
+# opcode 0x3b. The fixture models the real Matrix-A sparse tile address space;
+# it is still a repack-only test and does not claim QKV/Attention integration.
+AI_DEIT_R30_RUN ?= /tmp/nmaforge_deit_round30_repack_$(shell date +%Y%m%d_%H%M%S)
+AI_DEIT_R30_PYTHON ?= /tmp/nmaforge_deit_round17_venv/bin/python
+AI_DEIT_R30_LAYOUT ?= q_dense
+.PHONY: ai_deit_round30_top_repack_256k
+ai_deit_round30_top_repack_256k:
+	test ! -e "$(AI_DEIT_R30_RUN)"
+	mkdir -p "$(AI_DEIT_R30_RUN)"
+	$(AI_DEIT_R30_PYTHON) ../../../../benchmark/deit/round30/generate_full_repack_top_workload.py \
+		--layout "$(AI_DEIT_R30_LAYOUT)" --out-dir "$(AI_DEIT_R30_RUN)/workload"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=16384 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_R30_RUN)/csrc -top tb_ai_accel_smoke \
+		-f ai_accel.f ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_DEIT_R30_RUN)/simv -l $(AI_DEIT_R30_RUN)/compile.log
+	$(AI_DEIT_R30_RUN)/simv +ntb_random_seed=300029 +AI_RANDOM_CASES=0 +AI_SEED=300029 \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_R30_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_R30_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=241664 +AI_REPRESENTATIVE_CPL_BASE=241920 \
+		+AI_REPRESENTATIVE_DESC_COUNT=3 +AI_REPRESENTATIVE_QUEUE_SIZE=16 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=0 -l $(AI_DEIT_R30_RUN)/run.log
+	if [ "$(AI_DEIT_R30_LAYOUT)" = "v_matrix_b" ]; then words=12288; else words=9984; fi; \
+		grep -q "^REPRESENTATIVE_MODEL_PASS desc=3 .*golden_words=$$words useful_macs=0 " \
+		"$(AI_DEIT_R30_RUN)/run.log"
+
+# Round 30 integrated path: run the fixed 468-descriptor Product-QKV workload,
+# then append all three 0x3b layouts for each head in the same unreset Top.
+# Retirement-time AXI-Lite checkpoints observe each repack result before the
+# following descriptor reuses the low 16 KiB destination buffer.
+AI_DEIT_R30_QKV_RUN ?= /tmp/nmaforge_deit_round30_qkv_repack_$(shell date +%Y%m%d_%H%M%S)
+AI_DEIT_R30_QKV_SOURCE ?= /tmp/nmaforge_deit_round26_qkv197_rerun/workload
+AI_DEIT_R30_QKV_PYTHON ?= /tmp/nmaforge_deit_round17_venv/bin/python
+.PHONY: ai_deit_round30_qkv_repack_256k
+ai_deit_round30_qkv_repack_256k:
+	test ! -e "$(AI_DEIT_R30_QKV_RUN)"
+	mkdir -p "$(AI_DEIT_R30_QKV_RUN)"
+	$(AI_DEIT_R30_QKV_PYTHON) ../../../../benchmark/deit/round30/generate_qkv_repack_top.py \
+		--source-workload "$(AI_DEIT_R30_QKV_SOURCE)" --layout all \
+		--out-dir "$(AI_DEIT_R30_QKV_RUN)/workload" \
+		> "$(AI_DEIT_R30_QKV_RUN)/generator.log"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=16384 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_R30_QKV_RUN)/csrc -top tb_ai_accel_smoke \
+		-f ai_accel.f ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_DEIT_R30_QKV_RUN)/simv -l $(AI_DEIT_R30_QKV_RUN)/compile.log
+	$(AI_DEIT_R30_QKV_RUN)/simv +ntb_random_seed=300030 +AI_RANDOM_CASES=0 +AI_SEED=300030 \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_LATE_DMA \
+		+AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_R30_QKV_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_R30_QKV_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_DEIT_R30_QKV_RUN)/workload/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_DEIT_R30_QKV_RUN)/workload/late_dma_plan.memh \
+		+AI_REPRESENTATIVE_CHECKPOINTS=$(AI_DEIT_R30_QKV_RUN)/workload/checkpoint_spad.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=221184 +AI_REPRESENTATIVE_CPL_BASE=253952 \
+		+AI_REPRESENTATIVE_DESC_COUNT=477 +AI_REPRESENTATIVE_QUEUE_SIZE=512 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=21786624 -l $(AI_DEIT_R30_QKV_RUN)/run.log
+	test "$$(grep -c '^REPRESENTATIVE_CHECKPOINT_PASS ' "$(AI_DEIT_R30_QKV_RUN)/run.log")" -eq 9
+	grep -q '^REPRESENTATIVE_MODEL_PASS desc=477 .*golden_words=29952 useful_macs=21786624 ' \
+		"$(AI_DEIT_R30_QKV_RUN)/run.log"
+
+# Single unreset Product Top session: live Q/K/V from the 468-descriptor
+# projection workload feed 0x3b Repack, QK, Softmax, probability pack and AV.
+# Descriptors are streamed in bounded batches through the real 512-entry
+# CMDQ/CPLQ ring; checkpoint reads are passive SPAD observations only.
+AI_DEIT_R30_CONT_RUN ?= /tmp/nmaforge_deit_round30_continuous_$(shell date +%Y%m%d_%H%M%S)
+AI_DEIT_R30_CONT_SOURCE ?= /tmp/nmaforge_deit_round26_qkv197_rerun/workload
+AI_DEIT_R30_CONT_PYTHON ?= /tmp/nmaforge_deit_round17_venv/bin/python
+.PHONY: ai_deit_round30_continuous_attention_256k
+ai_deit_round30_continuous_attention_256k:
+	test ! -e "$(AI_DEIT_R30_CONT_RUN)"
+	mkdir -p "$(AI_DEIT_R30_CONT_RUN)"
+	$(AI_DEIT_R30_CONT_PYTHON) ../../../../benchmark/deit/round30/generate_qkv_attention_continuous.py \
+		--source-workload "$(AI_DEIT_R30_CONT_SOURCE)" \
+		--out-dir "$(AI_DEIT_R30_CONT_RUN)/workload" \
+		> "$(AI_DEIT_R30_CONT_RUN)/generator.log"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=16384 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_R30_CONT_RUN)/csrc -top tb_ai_accel_smoke \
+		-f ai_accel.f ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_DEIT_R30_CONT_RUN)/simv -l $(AI_DEIT_R30_CONT_RUN)/compile.log
+	$(AI_DEIT_R30_CONT_RUN)/simv +ntb_random_seed=300030 +AI_RANDOM_CASES=0 +AI_SEED=300030 \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_LATE_DMA \
+		+AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS +AI_DEIT_R30_CONTINUOUS_ATTENTION \
+		+AI_DEIT_R30_BATCH_ROOT=$(AI_DEIT_R30_CONT_RUN)/workload/batches \
+		+AI_DEIT_R30_BATCH_COUNT=15 +AI_DEIT_R30_STREAMED_DESC_COUNT=744 \
+		+AI_DEIT_R30_EXPECTED_RING_WRAPS=2 +AI_DEIT_R30_QUERY_BLOCKS=1 \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_R30_CONT_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_R30_CONT_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_DEIT_R30_CONT_SOURCE)/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_DEIT_R30_CONT_SOURCE)/late_dma_plan.memh \
+		+AI_REPRESENTATIVE_CHECKPOINTS=$(AI_DEIT_R30_CONT_SOURCE)/checkpoint_spad.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=221184 +AI_REPRESENTATIVE_CPL_BASE=253952 \
+		+AI_REPRESENTATIVE_DESC_COUNT=468 +AI_REPRESENTATIVE_QUEUE_SIZE=512 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=21786624 -l $(AI_DEIT_R30_CONT_RUN)/run.log
+	test "$$(grep -c '^DEIT_R30_STREAM_BATCH_PASS ' "$(AI_DEIT_R30_CONT_RUN)/run.log")" -eq 15
+	grep -q '^DEIT_R30_CONTINUOUS_QKV_REPACK_3HEAD_ATTENTION_PASS prefix_desc=468 streamed_desc=744 total_desc=1212 batches=15 query_blocks=1 valid_query_rows=16 ring_wraps=2 .*reset_events=0 ' \
+		"$(AI_DEIT_R30_CONT_RUN)/run.log"
+
+# Full 197-query attention reuses one bounded Score/Probability/AV workspace
+# after each query block retires. Q/K/V remain actual Product Top outputs.
+AI_DEIT_R30_FULL_RUN ?= /tmp/nmaforge_deit_round30_full_attention_$(shell date +%Y%m%d_%H%M%S)
+.PHONY: ai_deit_round30_full_attention_256k
+ai_deit_round30_full_attention_256k:
+	test ! -e "$(AI_DEIT_R30_FULL_RUN)"
+	mkdir -p "$(AI_DEIT_R30_FULL_RUN)"
+	$(AI_DEIT_R30_CONT_PYTHON) ../../../../benchmark/deit/round30/generate_qkv_attention_continuous.py \
+		--source-workload "$(AI_DEIT_R30_CONT_SOURCE)" --query-blocks 13 \
+		--out-dir "$(AI_DEIT_R30_FULL_RUN)/workload" \
+		> "$(AI_DEIT_R30_FULL_RUN)/generator.log"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=16384 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_R30_FULL_RUN)/csrc -top tb_ai_accel_smoke \
+		-f ai_accel.f ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_DEIT_R30_FULL_RUN)/simv -l $(AI_DEIT_R30_FULL_RUN)/compile.log
+	$(AI_DEIT_R30_FULL_RUN)/simv +ntb_random_seed=300030 +AI_RANDOM_CASES=0 +AI_SEED=300030 \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_LATE_DMA \
+		+AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS +AI_DEIT_R30_CONTINUOUS_ATTENTION \
+		+AI_DEIT_R30_BATCH_ROOT=$(AI_DEIT_R30_FULL_RUN)/workload/batches \
+		+AI_DEIT_R30_BATCH_COUNT=159 +AI_DEIT_R30_STREAMED_DESC_COUNT=9564 \
+		+AI_DEIT_R30_EXPECTED_RING_WRAPS=19 +AI_DEIT_R30_QUERY_BLOCKS=13 \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_R30_FULL_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_R30_FULL_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_DEIT_R30_CONT_SOURCE)/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_DEIT_R30_CONT_SOURCE)/late_dma_plan.memh \
+		+AI_REPRESENTATIVE_CHECKPOINTS=$(AI_DEIT_R30_FULL_RUN)/workload/checkpoint_spad.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=221184 +AI_REPRESENTATIVE_CPL_BASE=253952 \
+		+AI_REPRESENTATIVE_DESC_COUNT=468 +AI_REPRESENTATIVE_QUEUE_SIZE=512 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=21786624 -l $(AI_DEIT_R30_FULL_RUN)/run.log
+	test "$$(grep -c '^DEIT_R30_STREAM_BATCH_PASS ' "$(AI_DEIT_R30_FULL_RUN)/run.log")" -eq 159
+	test "$$(grep -c '^REPRESENTATIVE_CHECKPOINT_PASS desc=155 ' "$(AI_DEIT_R30_FULL_RUN)/run.log")" -eq 2
+	test "$$(grep -c '^REPRESENTATIVE_CHECKPOINT_PASS desc=311 ' "$(AI_DEIT_R30_FULL_RUN)/run.log")" -eq 2
+	test "$$(grep -c '^REPRESENTATIVE_CHECKPOINT_PASS desc=467 ' "$(AI_DEIT_R30_FULL_RUN)/run.log")" -eq 2
+	! grep -q 'Cannot open file.*checkpoint_spad\.memh' "$(AI_DEIT_R30_FULL_RUN)/run.log"
+	grep -q '^DEIT_R30_CONTINUOUS_QKV_REPACK_3HEAD_ATTENTION_PASS prefix_desc=468 streamed_desc=9564 total_desc=10032 batches=159 query_blocks=13 valid_query_rows=197 ring_wraps=19 .*reset_events=0 ' \
+		"$(AI_DEIT_R30_FULL_RUN)/run.log"

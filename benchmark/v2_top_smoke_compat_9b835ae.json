@@ -1,0 +1,92 @@
+{
+  "run_id": "V2-TOP-SMOKE-COMPAT-20X-3SEED-9B835AE",
+  "status": "PASS",
+  "candidate_sha": "9b835aeac33d43fd97a81496b1048d359cdff3d0",
+  "candidate_tree_sha": "04215a9fb125e57aa6a9ce6ead2410f59bafa2b7",
+  "product_rtl_sha": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+  "vcs": "V-2023.12-SP1_Full64",
+  "randomized_replay": [
+    {
+      "ai_seed": 20261106,
+      "ntb_random_seed": 20261106,
+      "random_cases": 20,
+      "status": "PASS",
+      "test_pass_marker": true,
+      "error_count": 0,
+      "pass_line_count": 1891,
+      "simulation_time_ps": 984560000,
+      "directed_markers": {
+        "MATRIX_PRODUCT_GEMV_DESCRIPTOR_PASS": true,
+        "MATRIX_PRODUCT_GEMV_TAIL_DESCRIPTOR_PASS": true,
+        "MATRIX_PRODUCT_GEMV_M8_KTAIL_DESCRIPTOR_PASS": true,
+        "MATRIX_FUSED_TILE_FORWARD_CMDQ_PASS": true,
+        "MATRIX_FUSED_TILE_FORWARD_CROSS_ENGINE_IMMUTABLE_PASS": true,
+        "MATRIX_CNM_PERF_PROFILE_PASS": true
+      },
+      "log_sha256": "8e01ffbfecf9f8054aae8fdda2244d8cfb91f480c32e8c390de6b20ca8302cda"
+    },
+    {
+      "ai_seed": 20261107,
+      "ntb_random_seed": 20261107,
+      "random_cases": 20,
+      "status": "PASS",
+      "test_pass_marker": true,
+      "error_count": 0,
+      "pass_line_count": 1872,
+      "simulation_time_ps": 981920000,
+      "directed_markers": {
+        "MATRIX_PRODUCT_GEMV_DESCRIPTOR_PASS": true,
+        "MATRIX_PRODUCT_GEMV_TAIL_DESCRIPTOR_PASS": true,
+        "MATRIX_PRODUCT_GEMV_M8_KTAIL_DESCRIPTOR_PASS": true,
+        "MATRIX_FUSED_TILE_FORWARD_CMDQ_PASS": true,
+        "MATRIX_FUSED_TILE_FORWARD_CROSS_ENGINE_IMMUTABLE_PASS": true,
+        "MATRIX_CNM_PERF_PROFILE_PASS": true
+      },
+      "log_sha256": "5db67b9a61fc406afb0b8cf60817f43f0ec74b2140cb79c0790a0e76bd5bc857"
+    },
+    {
+      "ai_seed": 20261108,
+      "ntb_random_seed": 20261108,
+      "random_cases": 20,
+      "status": "PASS",
+      "test_pass_marker": true,
+      "error_count": 0,
+      "pass_line_count": 1888,
+      "simulation_time_ps": 991190000,
+      "directed_markers": {
+        "MATRIX_PRODUCT_GEMV_DESCRIPTOR_PASS": true,
+        "MATRIX_PRODUCT_GEMV_TAIL_DESCRIPTOR_PASS": true,
+        "MATRIX_PRODUCT_GEMV_M8_KTAIL_DESCRIPTOR_PASS": true,
+        "MATRIX_FUSED_TILE_FORWARD_CMDQ_PASS": true,
+        "MATRIX_FUSED_TILE_FORWARD_CROSS_ENGINE_IMMUTABLE_PASS": true,
+        "MATRIX_CNM_PERF_PROFILE_PASS": true
+      },
+      "log_sha256": "76d3b7d28a4aafde9bb6f5cab8312ddbcdf224e5eaa729a226e54655792eaa2b"
+    }
+  ],
+  "smoke_gate": {
+    "seed": 20261106,
+    "random_cases": 4,
+    "test_pass": true,
+    "all_ai_smoke_markers_found": true,
+    "console_log_sha256": "051bf7eb892d397066bdd1a1928b1112769bc7c879d5d68581a9d722bbd0573e"
+  },
+  "markers": [
+    "MATRIX_PRODUCT_GEMV_DESCRIPTOR_PASS",
+    "MATRIX_PRODUCT_GEMV_TAIL_DESCRIPTOR_PASS",
+    "MATRIX_PRODUCT_GEMV_M8_KTAIL_DESCRIPTOR_PASS",
+    "MATRIX_FUSED_TILE_FORWARD_CMDQ_PASS",
+    "MATRIX_FUSED_TILE_FORWARD_CROSS_ENGINE_IMMUTABLE_PASS",
+    "MATRIX_CNM_PERF_PROFILE_PASS"
+  ],
+  "commands": [
+    "VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' make -C dv/subsystem/top_smoke/sim ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261106 SEED=20261106",
+    "VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=20261106 SEED=20261106",
+    "VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=20261107 SEED=20261107",
+    "VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=20261108 SEED=20261108"
+  ],
+  "compile_log_sha256": "842862453e32290578e9599df68a3621c8bc8cd74d2567556343d12c9a505d96",
+  "interpretation": "Top smoke and directed feature markers pass on this candidate. This is simulation evidence and does not close global v2 functional/code coverage or prove all legacy descriptor combinations.",
+  "evidence_archive": "/tmp/nmaforge_v2_top_smoke_compat_9b835ae_3seed_evidence.tar.gz",
+  "evidence_archive_sha256": "a6eb548b5e37dd2fba1df0513635bed43705d5eafebaa376ecbb13d8abc75159"
+}

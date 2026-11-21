@@ -1,0 +1,51 @@
+{
+  "phase1": {
+    "full_decode_cycles": 367051,
+    "requant_busy_cycles": 82144,
+    "modeled_saved_cycles": 43504,
+    "predicted_full_decode_cycles": 323547,
+    "predicted_cycles_per_token": 40443.375,
+    "predicted_incremental_reduction": 0.11852303903272297,
+    "read_issue_delta_histogram": {
+      "3": 16896,
+      "4": 7168,
+      "5": 288
+    },
+    "model_scope": "trace-conditioned scalar requant only; all other descriptors/control fixed; not RTL or closed-loop arbiter proof"
+  },
+  "ln32": {
+    "full_decode_cycles": 350155,
+    "requant_busy_cycles": 82144,
+    "modeled_saved_cycles": 43504,
+    "predicted_full_decode_cycles": 306651,
+    "predicted_cycles_per_token": 38331.375,
+    "predicted_incremental_reduction": 0.12424212134626095,
+    "read_issue_delta_histogram": {
+      "3": 16896,
+      "4": 7168,
+      "5": 288
+    },
+    "model_scope": "trace-conditioned scalar requant only; all other descriptors/control fixed; not RTL or closed-loop arbiter proof"
+  },
+  "cost": {
+    "raw_group_buffers_bits": 256,
+    "packed_output_buffers_bits": 64,
+    "read_tags_bits": 80,
+    "group_metadata_estimate_bits": 54,
+    "epoch_and_control_estimate_bits": 64,
+    "estimated_total_bits": 518,
+    "no_new_port": true,
+    "no_new_mac": true,
+    "muxes": "registered4way raw selection,2way group output and per-byte pack enables; existing requant arithmetic",
+    "estimate_not_synthesis": true
+  },
+  "decision": "MODEL_BENEFIT_SHOWN_NOT_RTL_ADMITTED_PENDING_FAULT_TIMING_REVIEW",
+  "fault_model_cases": 358,
+  "unresolved_contract": [
+    "Earlier reads can observe a different time-varying SRAM parity/permission/Host-write state; all checks retained but exact historical observation time is not proved equivalent",
+    "Input/output alias requires fallback; no bypass cache or shortened required INT32 producer lifetime",
+    "Trace-conditioned contention assumes other client schedule fixed; request rescheduling changes round-robin phase and descriptor overlap",
+    "Prefetched errors must be latched and retired in original group order; reset/abort must drain/discard epoch without duplicate completion",
+    "Read-time fault checks occur on actual new request/response; no output published before dependency and response validation; private protection configuration changes during lease require contract"
+  ]
+}

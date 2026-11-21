@@ -1,0 +1,404 @@
+{
+  "run_id": "V2-MIXED-AXI-DMA-COVERAGE-CLEAN-F9F32F7-16SEED",
+  "status": "PASS_SELECTED_SCOPE",
+  "test": "ai_mixed_precision_ddr_e2e_test",
+  "target": "uvm_mixed_precision_ddr_e2e_cov_regress",
+  "source_test_sha": "f9f32f71e7168350d74a75ede0a4a4b222844cc9",
+  "source_tree_sha": "0b20e98298852d2648f83d10723c55aabe3a9149",
+  "simulator": "Synopsys VCS V-2023.12-SP1_Full64; URG V-2023.12-SP1",
+  "seed_count": 16,
+  "seeds": [
+    {
+      "seed": 20261109,
+      "status": "PASS",
+      "uvm_warning": 0,
+      "uvm_error": 0,
+      "uvm_fatal": 0,
+      "ar_gap_cfg": 0,
+      "aw_gap_cfg": 0,
+      "read_response_gap_cfg": 1,
+      "write_data_gap_cfg": 1,
+      "transaction_jitter": true,
+      "dma_error_positions": [
+        "first_beat",
+        "last_beat"
+      ],
+      "assertion_cover_matches": {
+        "ar": 0,
+        "aw": 0,
+        "w": 6
+      },
+      "pass_marker_count": 1
+    },
+    {
+      "seed": 20261110,
+      "status": "PASS",
+      "uvm_warning": 0,
+      "uvm_error": 0,
+      "uvm_fatal": 0,
+      "ar_gap_cfg": 1,
+      "aw_gap_cfg": 0,
+      "read_response_gap_cfg": 1,
+      "write_data_gap_cfg": 1,
+      "transaction_jitter": true,
+      "dma_error_positions": [
+        "first_beat",
+        "last_beat"
+      ],
+      "assertion_cover_matches": {
+        "ar": 12,
+        "aw": 0,
+        "w": 7
+      },
+      "pass_marker_count": 1
+    },
+    {
+      "seed": 20261111,
+      "status": "PASS",
+      "uvm_warning": 0,
+      "uvm_error": 0,
+      "uvm_fatal": 0,
+      "ar_gap_cfg": 2,
+      "aw_gap_cfg": 0,
+      "read_response_gap_cfg": 3,
+      "write_data_gap_cfg": 2,
+      "transaction_jitter": true,
+      "dma_error_positions": [
+        "first_beat",
+        "last_beat"
+      ],
+      "assertion_cover_matches": {
+        "ar": 14,
+        "aw": 0,
+        "w": 8
+      },
+      "pass_marker_count": 1
+    },
+    {
+      "seed": 20261112,
+      "status": "PASS",
+      "uvm_warning": 0,
+      "uvm_error": 0,
+      "uvm_fatal": 0,
+      "ar_gap_cfg": 3,
+      "aw_gap_cfg": 0,
+      "read_response_gap_cfg": 2,
+      "write_data_gap_cfg": 1,
+      "transaction_jitter": true,
+      "dma_error_positions": [
+        "first_beat",
+        "last_beat"
+      ],
+      "assertion_cover_matches": {
+        "ar": 15,
+        "aw": 0,
+        "w": 6
+      },
+      "pass_marker_count": 1
+    },
+    {
+      "seed": 20261113,
+      "status": "PASS",
+      "uvm_warning": 0,
+      "uvm_error": 0,
+      "uvm_fatal": 0,
+      "ar_gap_cfg": 0,
+      "aw_gap_cfg": 1,
+      "read_response_gap_cfg": 0,
+      "write_data_gap_cfg": 1,
+      "transaction_jitter": true,
+      "dma_error_positions": [
+        "first_beat",
+        "last_beat"
+      ],
+      "assertion_cover_matches": {
+        "ar": 0,
+        "aw": 4,
+        "w": 9
+      },
+      "pass_marker_count": 1
+    },
+    {
+      "seed": 20261114,
+      "status": "PASS",
+      "uvm_warning": 0,
+      "uvm_error": 0,
+      "uvm_fatal": 0,
+      "ar_gap_cfg": 1,
+      "aw_gap_cfg": 1,
+      "read_response_gap_cfg": 1,
+      "write_data_gap_cfg": 2,
+      "transaction_jitter": true,
+      "dma_error_positions": [
+        "first_beat",
+        "last_beat"
+      ],
+      "assertion_cover_matches": {
+        "ar": 12,
+        "aw": 5,
+        "w": 9
+      },
+      "pass_marker_count": 1
+    },
+    {
+      "seed": 20261115,
+      "status": "PASS",
+      "uvm_warning": 0,
+      "uvm_error": 0,
+      "uvm_fatal": 0,
+      "ar_gap_cfg": 2,
+      "aw_gap_cfg": 1,
+      "read_response_gap_cfg": 0,
+      "write_data_gap_cfg": 0,
+      "transaction_jitter": true,
+      "dma_error_positions": [
+        "first_beat",
+        "last_beat"
+      ],
+      "assertion_cover_matches": {
+        "ar": 12,
+        "aw": 5,
+        "w": 5
+      },
+      "pass_marker_count": 1
+    },
+    {
+      "seed": 20261116,
+      "status": "PASS",
+      "uvm_warning": 0,
+      "uvm_error": 0,
+      "uvm_fatal": 0,
+      "ar_gap_cfg": 3,
+      "aw_gap_cfg": 1,
+      "read_response_gap_cfg": 2,
+      "write_data_gap_cfg": 2,
+      "transaction_jitter": true,
+      "dma_error_positions": [
+        "first_beat",
+        "last_beat"
+      ],
+      "assertion_cover_matches": {
+        "ar": 20,
+        "aw": 4,
+        "w": 9
+      },
+      "pass_marker_count": 1
+    },
+    {
+      "seed": 20261117,
+      "status": "PASS",
+      "uvm_warning": 0,
+      "uvm_error": 0,
+      "uvm_fatal": 0,
+      "ar_gap_cfg": 0,
+      "aw_gap_cfg": 2,
+      "read_response_gap_cfg": 2,
+      "write_data_gap_cfg": 1,
+      "transaction_jitter": true,
+      "dma_error_positions": [
+        "first_beat",
+        "last_beat"
+      ],
+      "assertion_cover_matches": {
+        "ar": 0,
+        "aw": 4,
+        "w": 6
+      },
+      "pass_marker_count": 1
+    },
+    {
+      "seed": 20261118,
+      "status": "PASS",
+      "uvm_warning": 0,
+      "uvm_error": 0,
+      "uvm_fatal": 0,
+      "ar_gap_cfg": 1,
+      "aw_gap_cfg": 2,
+      "read_response_gap_cfg": 2,
+      "write_data_gap_cfg": 1,
+      "transaction_jitter": true,
+      "dma_error_positions": [
+        "first_beat",
+        "last_beat"
+      ],
+      "assertion_cover_matches": {
+        "ar": 11,
+        "aw": 5,
+        "w": 6
+      },
+      "pass_marker_count": 1
+    },
+    {
+      "seed": 20261119,
+      "status": "PASS",
+      "uvm_warning": 0,
+      "uvm_error": 0,
+      "uvm_fatal": 0,
+      "ar_gap_cfg": 2,
+      "aw_gap_cfg": 2,
+      "read_response_gap_cfg": 1,
+      "write_data_gap_cfg": 1,
+      "transaction_jitter": true,
+      "dma_error_positions": [
+        "first_beat",
+        "last_beat"
+      ],
+      "assertion_cover_matches": {
+        "ar": 12,
+        "aw": 6,
+        "w": 6
+      },
+      "pass_marker_count": 1
+    },
+    {
+      "seed": 20261120,
+      "status": "PASS",
+      "uvm_warning": 0,
+      "uvm_error": 0,
+      "uvm_fatal": 0,
+      "ar_gap_cfg": 3,
+      "aw_gap_cfg": 2,
+      "read_response_gap_cfg": 2,
+      "write_data_gap_cfg": 1,
+      "transaction_jitter": true,
+      "dma_error_positions": [
+        "first_beat",
+        "last_beat"
+      ],
+      "assertion_cover_matches": {
+        "ar": 14,
+        "aw": 7,
+        "w": 7
+      },
+      "pass_marker_count": 1
+    },
+    {
+      "seed": 20261121,
+      "status": "PASS",
+      "uvm_warning": 0,
+      "uvm_error": 0,
+      "uvm_fatal": 0,
+      "ar_gap_cfg": 0,
+      "aw_gap_cfg": 3,
+      "read_response_gap_cfg": 2,
+      "write_data_gap_cfg": 3,
+      "transaction_jitter": true,
+      "dma_error_positions": [
+        "first_beat",
+        "last_beat"
+      ],
+      "assertion_cover_matches": {
+        "ar": 0,
+        "aw": 4,
+        "w": 14
+      },
+      "pass_marker_count": 1
+    },
+    {
+      "seed": 20261122,
+      "status": "PASS",
+      "uvm_warning": 0,
+      "uvm_error": 0,
+      "uvm_fatal": 0,
+      "ar_gap_cfg": 1,
+      "aw_gap_cfg": 3,
+      "read_response_gap_cfg": 0,
+      "write_data_gap_cfg": 1,
+      "transaction_jitter": true,
+      "dma_error_positions": [
+        "first_beat",
+        "last_beat"
+      ],
+      "assertion_cover_matches": {
+        "ar": 12,
+        "aw": 7,
+        "w": 8
+      },
+      "pass_marker_count": 1
+    },
+    {
+      "seed": 20261123,
+      "status": "PASS",
+      "uvm_warning": 0,
+      "uvm_error": 0,
+      "uvm_fatal": 0,
+      "ar_gap_cfg": 2,
+      "aw_gap_cfg": 3,
+      "read_response_gap_cfg": 3,
+      "write_data_gap_cfg": 1,
+      "transaction_jitter": true,
+      "dma_error_positions": [
+        "first_beat",
+        "last_beat"
+      ],
+      "assertion_cover_matches": {
+        "ar": 13,
+        "aw": 10,
+        "w": 8
+      },
+      "pass_marker_count": 1
+    },
+    {
+      "seed": 20261124,
+      "status": "PASS",
+      "uvm_warning": 0,
+      "uvm_error": 0,
+      "uvm_fatal": 0,
+      "ar_gap_cfg": 3,
+      "aw_gap_cfg": 3,
+      "read_response_gap_cfg": 1,
+      "write_data_gap_cfg": 1,
+      "transaction_jitter": true,
+      "dma_error_positions": [
+        "first_beat",
+        "last_beat"
+      ],
+      "assertion_cover_matches": {
+        "ar": 14,
+        "aw": 6,
+        "w": 9
+      },
+      "pass_marker_count": 1
+    }
+  ],
+  "ar_aw_gap_pairs_covered": 16,
+  "merged_coverage": {
+    "functional_group_score": 90.86,
+    "e2e_functional_group": 100.0,
+    "dma_error_position_group": 100.0,
+    "axi_memory_model_groups": {
+      "axi_write_data_gap_cg": 100.0,
+      "axi_awready_stall_cg": 100.0,
+      "axi_read_response_gap_cg": 100.0,
+      "axi_arready_stall_cg": 100.0
+    },
+    "cover_properties": {
+      "total": 3,
+      "matched": 3,
+      "matches_by_property": {
+        "ar": 161,
+        "aw": 67,
+        "w": 123
+      }
+    },
+    "assertions": {
+      "total": 22,
+      "success": 20,
+      "uncovered": 2,
+      "without_attempts": 2,
+      "failures": 0,
+      "incomplete": 0
+    },
+    "cluster_group_score": 17.76
+  },
+  "limitations": [
+    "This is a separately reported mixed-precision E2E profile. Its VDBs are included only in the separately identified 19-test URG merge after confirming identical source/tree, UVM top, source list, and coverage metrics.",
+    "This test does not exercise opcodes 0x52/0x53 and does not close their RTM requirements.",
+    "Two no-attempt assertion properties are UVM RAL internals; the three top AXI stall cover properties all match.",
+    "The reported 90.86% includes the cluster_cg group at 17.76% because this standalone scenario does not replay the full cluster suite."
+  ],
+  "log_archive": "/tmp/nmaforge_v2_mixcov_f9f32f7_16seed_logs_urg_text.tar.gz",
+  "log_archive_sha256": "d74bf68171e6798e2a5b25fffc9d3ea7e6dd49e9d3e2e3efb3abbf738c13abe5",
+  "coverage_database_policy": "Text logs and URG text reports only; VCS executable, VDB and generated simulator databases are excluded.",
+  "command": "VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias VCS_ARCH_OVERRIDE=linux PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' make -C dv/uvm/sim uvm_mixed_precision_ddr_e2e_cov_regress MIXED_E2E_COV_OUT=/tmp/nmaforge_v2_mixcov_f9f32f7_16seed MIXED_E2E_COV_SEEDS='20261109 20261110 20261111 20261112 20261113 20261114 20261115 20261116 20261117 20261118 20261119 20261120 20261121 20261122 20261123 20261124'"
+}

@@ -1,0 +1,49 @@
+{
+  "architecture": {
+    "block_order": "PreLN attention, residual, PreLN GELU FFN, residual, final LN; tied token/LM embedding",
+    "context": 16,
+    "ffn": 256,
+    "head_dim": 16,
+    "heads": 4,
+    "hidden": 64,
+    "layers": 4,
+    "vocab": 256
+  },
+  "artifacts": {
+    "fp32_sha256": "1d59cf803c328149add9ddb004766e63043b3babdb56ea178bf96d7a51fda8df",
+    "int8_package_sha256": "2132835994c2ecce03dc1d8e7345474eeddb271d86e34de9cc1f5ccdf2fecfc2"
+  },
+  "dataset": {
+    "bytes": 1115394,
+    "name": "Tiny Shakespeare (byte-level; public-domain Shakespeare text)",
+    "sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+    "source_commit": "6f9487a6fe5b420b7ca9afb0d7c078e37c1d1b4e",
+    "source_url": "https://raw.githubusercontent.com/karpathy/char-rnn/6f9487a6fe5b420b7ca9afb0d7c078e37c1d1b4e/data/tinyshakespeare/input.txt",
+    "split": "first 90% train, last 10% held-out test"
+  },
+  "host_fallback": [
+    "byte tokenizer/input IDs",
+    "Host Argmax/token feedback"
+  ],
+  "model": "NMAForge H64 four-layer byte-level next-token LM",
+  "status": "TRAINED_RESEARCH_MODEL_NOT_GENERAL_LANGUAGE_QUALITY_CLAIM",
+  "training": {
+    "batch_size": 32,
+    "bigram_baseline_accuracy": 0.2734375,
+    "eval_windows": 64,
+    "float_heldout": {
+      "cross_entropy_nats": 2.143999340891945,
+      "next_byte_accuracy": 0.3916015625,
+      "perplexity": 8.53349784115508
+    },
+    "int8_heldout": {
+      "cross_entropy_nats": 6.153576662324209,
+      "next_byte_accuracy": 0.126953125,
+      "perplexity": 470.3968322146644
+    },
+    "optimizer": "AdamW lr=3e-4 weight_decay=0.01; deterministic CPU",
+    "quantization": "embedding/position round(x*8), matrix weights round(x*32), LN gamma round(x*32), beta round(x*8), signed INT8 saturation; LM logits dequantized by Q5 scale 32 for CE/PPL",
+    "seed": 20261120,
+    "steps": 1200
+  }
+}

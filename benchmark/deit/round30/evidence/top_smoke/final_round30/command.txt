@@ -1,0 +1,1 @@
+PATH=/tmp/nmaforge_round17_venv/bin:$PATH make -C dv/subsystem/top_smoke/sim ai_smoke AI_SPAD_WORDS_PER_BANK=8192 AI_RANDOM_CASES=0 AI_SEED=300030 SEED=300030

@@ -1,0 +1,29 @@
+{
+  "av_layout": "av_base = AV_BASE + head*0x1000; four subtile destinations av_base + i*0x400 for i=0..3",
+  "current_av_scratch_bytes": 12288,
+  "current_av_scratch_is_full_all_query_tensor": false,
+  "evidence_files": [
+    "benchmark/deit/round30/evidence/continuous_attention/full_197/generated_manifest.json",
+    "benchmark/deit/round30/generate_qkv_attention_continuous.py",
+    "benchmark/deit/round31/round31_av_scratch_audit.csv"
+  ],
+  "full_197x192_int32_bytes_if_retained": 151296,
+  "full_197x192_packed_int8_bytes_if_retained": 37824,
+  "generator": "benchmark/deit/round30/generate_qkv_attention_continuous.py",
+  "heads": 3,
+  "last_block_valid_queries": 5,
+  "physical_tokens": 208,
+  "query_blocks": 13,
+  "recommended_bounded_continuation": "Query-block-major: run AV for all 3 heads, requant/pack and merge into output-projection consumer layout, retire/fence output projection, then reuse the 12 KiB AV block scratch.",
+  "recommended_continuation_measured_or_implemented": false,
+  "reuse": "The same per-head AV 4 KiB range is overwritten for every query block after that batch is retired and Golden-observed.",
+  "round30_attention_spad_high_water_bytes": 211968,
+  "round30_spad_capacity_bytes": 262144,
+  "round31_encoder_layer0_status": "NOT_RUN",
+  "source_run_id": "round30-deit-full197-passive",
+  "source_sha": "864ba16aa052fbb0f2bb8948133a54586cec6b26",
+  "status": "HISTORICAL_DESCRIPTOR_LIFETIME_AUDIT_NOT_LAYER0_PASS",
+  "these_full_tensor_bytes_in_round30_high_water": false,
+  "valid_queries_per_block": 16,
+  "valid_tokens": 197
+}

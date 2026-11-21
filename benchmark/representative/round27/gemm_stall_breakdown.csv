@@ -1,0 +1,4 @@
+op,m,n,k,total_cycles,useful_mac_per_cycle,bank_stalls,line_stalls,prefetch_wait_cycles,arbiter_stall_cycles,response_wait_cycles,writeback_wait_cycles,spad_read_bytes,spad_write_bytes,golden,evidence_class
+GEMM,16,16,16,175,23.4057,20,25,47,45,7,25,512,1024,PASS,ARCHIVED_ROUND26_NOT_RERUN
+GEMM,16,16,32,263,31.1483,27,26,104,53,11,26,1024,1024,PASS,ARCHIVED_ROUND26_NOT_RERUN
+GEMM,32,32,64,1407,46.5785,162,96,674,258,24,96,6144,4096,PASS,ARCHIVED_ROUND26_NOT_RERUN

@@ -23,7 +23,7 @@ module tb_ai_descriptor_validator;
     integer boundary_accept_checks;
     integer boundary_reject_checks;
     integer i;
-    reg [7:0] supported_ops [0:26];
+    reg [7:0] supported_ops [0:28];
 
     ai_descriptor_validator validator (
         .op(op), .version(version), .src0(src0), .src1(src1), .dst(dst),
@@ -82,6 +82,8 @@ module tb_ai_descriptor_validator;
                 8'h16, 8'h17: begin m_size = 16'd3; n_size = 16'd3; end
                 8'h21: begin m_size = 16'd1; length = 16'd1; end
                 8'h30, 8'h31: begin m_size = 16'd4; n_size = 16'd4; k_words = 16'd1; end
+                8'h52: begin m_size = 16'd1; n_size = 16'd1; k_words = 16'd1; end
+                8'h53: begin m_size = 16'd4; n_size = 16'd4; k_words = 16'd1; end
                 8'h50, 8'h51: begin m_size = 16'd1; n_size = 16'd1; length = 16'd1; end
                 default: begin end
             endcase
@@ -96,7 +98,8 @@ module tb_ai_descriptor_validator;
             #1;
             expected_int8 = (opcode >= 8'h10) && (opcode <= 8'h17);
             expected_banked = (opcode == 8'h20) || (opcode == 8'h21);
-            expected_matrix = (opcode == 8'h30) || (opcode == 8'h31);
+            expected_matrix = (opcode == 8'h30) || (opcode == 8'h31) ||
+                              (opcode == 8'h52) || (opcode == 8'h53);
             expected_sfu = (opcode >= 8'h32) && (opcode <= 8'h39);
             expected_cnn_kv = (opcode == 8'h43) || (opcode == 8'h44);
             expected_macro = (opcode >= 8'h40) && (opcode <= 8'h42);
@@ -156,8 +159,9 @@ module tb_ai_descriptor_validator;
         supported_ops[18]=8'h38; supported_ops[19]=8'h39; supported_ops[20]=8'h40;
         supported_ops[21]=8'h41; supported_ops[22]=8'h42; supported_ops[23]=8'h43;
         supported_ops[24]=8'h44; supported_ops[25]=8'h50; supported_ops[26]=8'h51;
+        supported_ops[27]=8'h52; supported_ops[28]=8'h53;
 
-        for (i=0; i<27; i=i+1) check_legal(supported_ops[i]);
+        for (i=0; i<29; i=i+1) check_legal(supported_ops[i]);
 
         // The descriptor-only Matrix A tile packing mode has an additional
         // exact M*N==length contract beyond the ordinary SFU length rule.
@@ -178,6 +182,22 @@ module tb_ai_descriptor_validator;
         set_legal_defaults(8'h35); length=16'd0; check_invalid("SFU zero length");
         set_legal_defaults(8'h16); m_size=16'd2; check_invalid("Conv H below minimum");
         set_legal_defaults(8'h43); length=16'd0; check_invalid("KV zero length");
+        set_legal_defaults(8'h43); version=8'd6; length=16'd16;
+        flags=8'h02; src0_stride=32'd16; src1_stride=32'd256;
+        aux0={16'd2,16'd15};
+        check_boundary_accept("KV QK-compatible append ABI v6 token 15");
+        set_legal_defaults(8'h43); version=8'd6; length=16'd16;
+        flags=8'h02; src0_stride=32'd16; src1_stride=32'd256;
+        aux0={16'd0,16'd16};
+        check_invalid("KV QK-compatible append token outside capacity");
+        set_legal_defaults(8'h43); version=8'd5; length=16'd16;
+        flags=8'h02; src0_stride=32'd16; src1_stride=32'd256;
+        check_invalid("KV QK-compatible append requires ABI v6");
+        set_legal_defaults(8'h44); version=8'd6; length=16'd16;
+        flags=8'h02; check_invalid("KV read rejects QK append mode");
+        set_legal_defaults(8'h43); version=8'd6; length=16'd16;
+        flags=8'h02; src0_stride=32'd16; src1_stride=32'd250;
+        check_invalid("KV QK-compatible append invalid head span");
         set_legal_defaults(8'h50); version=8'd6; check_invalid("FP ABI version");
         set_legal_defaults(8'h40); length=16'd2; check_invalid("macro minimum child count");
 
@@ -191,6 +211,87 @@ module tb_ai_descriptor_validator;
         set_legal_defaults(8'h40); macro_child_fetch=1'b1; check_invalid("nested macro child");
         set_legal_defaults(8'h50); src0_stride=32'd4; check_invalid("FP stride unsupported");
         set_legal_defaults(8'h51); flags=8'h02; check_invalid("FP transpose flags unsupported");
+
+        // Product opcode 0x52 writes a contiguous INT32 result. Reject
+        // destination overlap with any still-live input span, while allowing
+        // exactly adjacent half-open ranges.
+        set_legal_defaults(8'h52); m_size=16'd1; n_size=16'd4; k_words=16'd17;
+        dst=32'h0000_0120;
+        check_boundary_accept("0x52 A/output adjacent spans");
+        set_legal_defaults(8'h52); m_size=16'd1; n_size=16'd4; k_words=16'd17;
+        dst=32'h0000_0110;
+        check_invalid("0x52 output overlaps padded A span");
+        set_legal_defaults(8'h52); m_size=16'd1; n_size=16'd1; k_words=16'd17;
+        dst=32'h0000_0200;
+        check_invalid("0x52 output overlaps dense B span");
+        set_legal_defaults(8'h52); m_size=16'd1; n_size=16'd4; k_words=16'd1;
+        bias_enable=1'b1; flags=8'h01; bias_base=32'h0000_0300;
+        check_invalid("0x52 output overlaps enabled bias span");
+        set_legal_defaults(8'h52); m_size=16'd1; n_size=16'd1; k_words=16'd2;
+        src1=32'hffff_fff0;
+        check_invalid("0x52 B span address overflow");
+
+        // Opcode 0x53 tile capture/consume bits are additive ABI-v7 fields;
+        // old Matrix opcodes remain untouched.
+        set_legal_defaults(8'h53); version=8'd7; m_size=16'd16; n_size=16'd16;
+        k_words=16'd4; aux0=32'h20; check_boundary_accept("0x53 tile capture");
+        set_legal_defaults(8'h53); version=8'd7; m_size=16'd16; n_size=16'd16;
+        k_words=16'd4; aux0=32'h40; check_boundary_accept("0x53 tile consume");
+        set_legal_defaults(8'h53); version=8'd7; m_size=16'd16; n_size=16'd16;
+        k_words=16'd4; aux0=32'h60; check_boundary_accept("0x53 ping-pong capture/consume");
+        set_legal_defaults(8'h30); m_size=16'd4; n_size=16'd4;
+        k_words=16'd1; aux0=32'd1;
+        check_boundary_accept("legacy 0x30 aux0 behavior remains accepted");
+        set_legal_defaults(8'h53); version=8'd3; check_invalid("0x53 requires ABI v7");
+        set_legal_defaults(8'h53); m_size=16'd16; n_size=16'd16;
+        k_words=16'd4; aux0=32'h100; check_invalid("0x53 reserved aux bit8");
+        set_legal_defaults(8'h53); m_size=16'd8; n_size=16'd16;
+        k_words=16'd4; aux0=32'h20; check_invalid("0x53 tile capture shape");
+        set_legal_defaults(8'h53); m_size=16'd16; n_size=16'd16;
+        k_words=16'd3; aux0=32'h40; check_invalid("0x53 tile consume K");
+        set_legal_defaults(8'h53); m_size=16'd16; n_size=16'd16;
+        k_words=16'd4; flags=8'h02; aux0=32'h40;
+        check_invalid("0x53 transposed tile consume");
+        set_legal_defaults(8'h53); m_size=16'd16; n_size=16'd16;
+        k_words=16'd4; aux0=32'h40; src0_stride=32'd16;
+        check_invalid("0x53 tile consume source stride");
+        set_legal_defaults(8'h53); m_size=16'd16; n_size=16'd16;
+        k_words=16'd4; aux0=32'h20; dst_stride=32'd16;
+        check_invalid("0x53 capture requires dense output");
+        set_legal_defaults(8'h53); m_size=16'd16; n_size=16'd16;
+        k_words=16'd4; aux0=32'h20; batch_count=16'd2;
+        check_invalid("0x53 capture rejects multiple batches");
+
+        // Full DeiT repack uses a 4x4 Matrix-A tiled source. Its physical
+        // source span is M*N*4 bytes, not the dense M*N-byte tensor size.
+        set_legal_defaults(8'h3b); version=8'd7; m_size=16'd208;
+        n_size=16'd192; length=16'd197; src0=32'h0000_2000;
+        src1=32'd0; k_words=16'd0; dst=32'h0003_0000; dst_stride=32'd208;
+        check_boundary_accept("0x3b full 208x192 physical Matrix-A span");
+        set_legal_defaults(8'h3b); version=8'd7; m_size=16'd208;
+        n_size=16'd192; length=16'd197; src0=32'h0000_2000;
+        src1=32'd0; k_words=16'd0; dst=32'h0000_d000; dst_stride=32'd208;
+        check_invalid("0x3b rejects alias inside sparse physical source span");
+        set_legal_defaults(8'h3b); version=8'd7; m_size=16'd208;
+        n_size=16'd192; length=16'd197; src0=32'h0000_2000;
+        src1=32'd0; k_words=16'd0; dst=32'h0003_0000; dst_stride=32'd208;
+        aux0=32'h10;
+        check_boundary_accept("0x3b accepts compact packed Matrix-A source span");
+        set_legal_defaults(8'h3b); version=8'd7; m_size=16'd208;
+        n_size=16'd192; length=16'd197; src0=32'h0000_2000;
+        src1=32'd0; k_words=16'd0; dst=32'h0000_d000; dst_stride=32'd208;
+        aux0=32'h10;
+        check_boundary_accept("0x3b compact source allows destination beyond compact span");
+        set_legal_defaults(8'h3b); version=8'd7; m_size=16'd208;
+        n_size=16'd192; length=16'd197; src0=32'h0000_2000;
+        src1=32'd0; k_words=16'd0; dst=32'h0000_6000; dst_stride=32'd208;
+        aux0=32'h10;
+        check_invalid("0x3b compact source rejects destination alias");
+        set_legal_defaults(8'h3b); version=8'd7; m_size=16'd208;
+        n_size=16'd192; length=16'd197; src0=32'h0000_2000;
+        src1=32'd0; k_words=16'd0; dst=32'h0003_0000; dst_stride=32'd208;
+        aux0=32'h20;
+        check_invalid("0x3b rejects reserved aux0 bit 5");
 
         // Characterize validator dimension edges. These are validator-only
         // checks: accepting a 16-bit maximum does not claim that the selected
@@ -267,11 +368,11 @@ module tb_ai_descriptor_validator;
             $fatal(1, "Matrix A tile-pack accepted a non-matching M*N length");
         boundary_reject_checks = boundary_reject_checks + 1;
 
-        if (legal_opcode_checks != 28 || invalid_rule_checks != 21 ||
-            boundary_accept_checks != 38 || boundary_reject_checks != 26)
-            $fatal(1, "testpoint count mismatch legal=%0d invalid=%0d boundary_accept=%0d boundary_reject=%0d expected=28/21/38/26",
+        if (legal_opcode_checks != 30 || invalid_rule_checks != 40 ||
+            boundary_accept_checks != 47 || boundary_reject_checks != 26)
+            $fatal(1, "testpoint count mismatch legal=%0d invalid=%0d boundary_accept=%0d boundary_reject=%0d expected=30/40/47/26",
                    legal_opcode_checks, invalid_rule_checks, boundary_accept_checks, boundary_reject_checks);
-        $display("DESCRIPTOR_VALIDATOR_PASS legal_opcodes=27 tile_pack=1 invalid_rules=21 boundary_accept=38/38 boundary_reject=26/26 opcode_classes_consistent=1 engine_limit_claim=0");
+        $display("DESCRIPTOR_VALIDATOR_PASS legal_opcodes=29 tile_pack=1 invalid_rules=40 boundary_accept=47/47 boundary_reject=26/26 tile_forward_accept=3/3 repack_physical_span=1 repack_compact_span=1 legacy_aux_compat=1 opcode_classes_consistent=1 engine_limit_claim=0");
         $finish;
     end
 endmodule

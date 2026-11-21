@@ -1,0 +1,657 @@
+tensor_id,layer,kind,start_hex,end_exclusive_hex,size_bytes,alignment_bytes,live_start,live_end,producer,last_consumer,reuse
+interlayer_zero_position_i32,shared,session_constant,0x03000,0x04000,4096,64,0,933,one-time zero initialization before layer 0,embedding-position residual in layers 1..3,reserved for complete session
+l0.kv_k_cache_i8,0,persistent_kv,0x01000,0x01400,1024,64,0,933,Product KV_WRITE descriptors in owning layer,session retirement after final output,forbidden across layers and temporary tensors
+l0.kv_v_cache_i8,0,persistent_kv,0x01400,0x01800,1024,64,0,933,Product KV_WRITE descriptors in owning layer,session retirement after final output,forbidden across layers and temporary tensors
+l1.kv_k_cache_i8,1,persistent_kv,0x01800,0x01c00,1024,64,0,933,Product KV_WRITE descriptors in owning layer,session retirement after final output,forbidden across layers and temporary tensors
+l1.kv_v_cache_i8,1,persistent_kv,0x01c00,0x02000,1024,64,0,933,Product KV_WRITE descriptors in owning layer,session retirement after final output,forbidden across layers and temporary tensors
+l2.kv_k_cache_i8,2,persistent_kv,0x02000,0x02400,1024,64,0,933,Product KV_WRITE descriptors in owning layer,session retirement after final output,forbidden across layers and temporary tensors
+l2.kv_v_cache_i8,2,persistent_kv,0x02400,0x02800,1024,64,0,933,Product KV_WRITE descriptors in owning layer,session retirement after final output,forbidden across layers and temporary tensors
+l3.kv_k_cache_i8,3,persistent_kv,0x02800,0x02c00,1024,64,0,933,Product KV_WRITE descriptors in owning layer,session retirement after final output,forbidden across layers and temporary tensors
+l3.kv_v_cache_i8,3,persistent_kv,0x02c00,0x03000,1024,64,0,933,Product KV_WRITE descriptors in owning layer,session retirement after final output,forbidden across layers and temporary tensors
+l0.embedding_lookup_i32,0,activation_or_scratch,0x05000,0x06000,4096,64,0,0,host_fixture,embedding_position_residual,eligible after last consumer and completion retirement
+l0.position_i32,0,activation_or_scratch,0x07000,0x08000,4096,64,0,0,host_fixture,embedding_position_residual,eligible after last consumer and completion retirement
+l0.embedding_plus_position_i32,0,activation_or_scratch,0x06000,0x07000,4096,64,0,127,embedding_position_residual,"preln_row0,preln_row1,preln_row2,preln_row3,preln_row4,preln_row5,preln_row6,preln_row7,preln_row8,preln_row9,preln_row10,preln_row11,preln_row12,preln_row13,preln_row14,preln_row15,attn_residual1",eligible after last consumer and completion retirement
+l0.ln1_gamma_q15_weight,0,weight_tile,0x14100,0x14200,256,64,0,16,external DMA,"preln_row0,preln_row1,preln_row2,preln_row3,preln_row4,preln_row5,preln_row6,preln_row7,preln_row8,preln_row9,preln_row10,preln_row11,preln_row12,preln_row13,preln_row14,preln_row15",eligible after last consumer and completion retirement
+l0.ln1_beta_i32_weight,0,weight_tile,0x14000,0x14100,256,64,0,16,external DMA,"preln_row0,preln_row1,preln_row2,preln_row3,preln_row4,preln_row5,preln_row6,preln_row7,preln_row8,preln_row9,preln_row10,preln_row11,preln_row12,preln_row13,preln_row14,preln_row15",eligible after last consumer and completion retirement
+l0.ln2_gamma_q15_weight,0,weight_tile,0x14300,0x14400,256,64,0,143,external DMA,"ln2_row0,ln2_row1,ln2_row2,ln2_row3,ln2_row4,ln2_row5,ln2_row6,ln2_row7,ln2_row8,ln2_row9,ln2_row10,ln2_row11,ln2_row12,ln2_row13,ln2_row14,ln2_row15",eligible after last consumer and completion retirement
+l0.ln2_beta_i32_weight,0,weight_tile,0x14200,0x14300,256,64,0,143,external DMA,"ln2_row0,ln2_row1,ln2_row2,ln2_row3,ln2_row4,ln2_row5,ln2_row6,ln2_row7,ln2_row8,ln2_row9,ln2_row10,ln2_row11,ln2_row12,ln2_row13,ln2_row14,ln2_row15",eligible after last consumer and completion retirement
+l0.preln_output_i32,0,activation_or_scratch,0x05000,0x06000,4096,64,1,17,"preln_row0,preln_row1,preln_row2,preln_row3,preln_row4,preln_row5,preln_row6,preln_row7,preln_row8,preln_row9,preln_row10,preln_row11,preln_row12,preln_row13,preln_row14,preln_row15",preln_requant_pack_matrix_a,eligible after last consumer and completion retirement
+l0.preln_matrix_a_i8,0,activation_or_scratch,0x07000,0x07400,1024,64,17,29,preln_requant_pack_matrix_a,"l0_q_gemm_n0,l0_q_gemm_n1,l0_q_gemm_n2,l0_q_gemm_n3,l0_k_gemm_n0,l0_k_gemm_n1,l0_k_gemm_n2,l0_k_gemm_n3,l0_v_gemm_n0,l0_v_gemm_n1,l0_v_gemm_n2,l0_v_gemm_n3",eligible after last consumer and completion retirement
+l0_q_weight_n0,0,weight_tile,0x12000,0x12400,1024,64,0,18,external DMA,l0_q_gemm_n0,eligible after last consumer and completion retirement
+l0_q_out_n0,0,activation_or_scratch,0x05000,0x05400,1024,64,18,30,l0_q_gemm_n0,attn_q_h0_requant,eligible after last consumer and completion retirement
+l0_q_weight_n1,0,weight_tile,0x12400,0x12800,1024,64,0,19,external DMA,l0_q_gemm_n1,eligible after last consumer and completion retirement
+l0_q_out_n1,0,activation_or_scratch,0x05400,0x05800,1024,64,19,49,l0_q_gemm_n1,attn_q_h1_requant,eligible after last consumer and completion retirement
+l0_q_weight_n2,0,weight_tile,0x12800,0x12c00,1024,64,0,20,external DMA,l0_q_gemm_n2,eligible after last consumer and completion retirement
+l0_q_out_n2,0,activation_or_scratch,0x05800,0x05c00,1024,64,20,68,l0_q_gemm_n2,attn_q_h2_requant,eligible after last consumer and completion retirement
+l0_q_weight_n3,0,weight_tile,0x12c00,0x13000,1024,64,0,21,external DMA,l0_q_gemm_n3,eligible after last consumer and completion retirement
+l0_q_out_n3,0,activation_or_scratch,0x05c00,0x06000,1024,64,21,87,l0_q_gemm_n3,attn_q_h3_requant,eligible after last consumer and completion retirement
+l0_k_weight_n0,0,weight_tile,0x11000,0x11400,1024,64,0,22,external DMA,l0_k_gemm_n0,eligible after last consumer and completion retirement
+l0_k_out_n0,0,activation_or_scratch,0x07400,0x07800,1024,64,22,31,l0_k_gemm_n0,attn_k_h0_requant,eligible after last consumer and completion retirement
+l0_k_weight_n1,0,weight_tile,0x11400,0x11800,1024,64,0,23,external DMA,l0_k_gemm_n1,eligible after last consumer and completion retirement
+l0_k_out_n1,0,activation_or_scratch,0x07800,0x07c00,1024,64,23,50,l0_k_gemm_n1,attn_k_h1_requant,eligible after last consumer and completion retirement
+l0_k_weight_n2,0,weight_tile,0x11800,0x11c00,1024,64,0,24,external DMA,l0_k_gemm_n2,eligible after last consumer and completion retirement
+l0_k_out_n2,0,activation_or_scratch,0x07c00,0x08000,1024,64,24,69,l0_k_gemm_n2,attn_k_h2_requant,eligible after last consumer and completion retirement
+l0_k_weight_n3,0,weight_tile,0x11c00,0x12000,1024,64,0,25,external DMA,l0_k_gemm_n3,eligible after last consumer and completion retirement
+l0_k_out_n3,0,activation_or_scratch,0x11000,0x11400,1024,64,25,88,l0_k_gemm_n3,attn_k_h3_requant,eligible after last consumer and completion retirement
+l0_v_weight_n0,0,weight_tile,0x13000,0x13400,1024,64,0,26,external DMA,l0_v_gemm_n0,eligible after last consumer and completion retirement
+l0_v_out_n0,0,activation_or_scratch,0x11400,0x11800,1024,64,26,32,l0_v_gemm_n0,attn_v_h0_cache_requant,eligible after last consumer and completion retirement
+l0_v_weight_n1,0,weight_tile,0x13400,0x13800,1024,64,0,27,external DMA,l0_v_gemm_n1,eligible after last consumer and completion retirement
+l0_v_out_n1,0,activation_or_scratch,0x11800,0x11c00,1024,64,27,51,l0_v_gemm_n1,attn_v_h1_cache_requant,eligible after last consumer and completion retirement
+l0_v_weight_n2,0,weight_tile,0x13800,0x13c00,1024,64,0,28,external DMA,l0_v_gemm_n2,eligible after last consumer and completion retirement
+l0_v_out_n2,0,activation_or_scratch,0x11c00,0x12000,1024,64,28,70,l0_v_gemm_n2,attn_v_h2_cache_requant,eligible after last consumer and completion retirement
+l0_v_weight_n3,0,weight_tile,0x13c00,0x14000,1024,64,0,29,external DMA,l0_v_gemm_n3,eligible after last consumer and completion retirement
+l0_v_out_n3,0,activation_or_scratch,0x12000,0x12400,1024,64,29,89,l0_v_gemm_n3,attn_v_h3_cache_requant,eligible after last consumer and completion retirement
+l0.kv_attention_k_read_h0,0,activation_or_scratch,0x05000,0x05100,256,64,37,43,kv_attention_k_read_h0,attn_h0_qkt_scaled,eligible after last consumer and completion retirement
+l0.kv_attention_k_read_h1,0,activation_or_scratch,0x05300,0x05400,256,64,56,62,kv_attention_k_read_h1,attn_h1_qkt_scaled,eligible after last consumer and completion retirement
+l0.kv_attention_k_read_h2,0,activation_or_scratch,0x05500,0x05600,256,64,75,81,kv_attention_k_read_h2,attn_h2_qkt_scaled,eligible after last consumer and completion retirement
+l0.kv_attention_k_read_h3,0,activation_or_scratch,0x05700,0x05800,256,64,94,100,kv_attention_k_read_h3,attn_h3_qkt_scaled,eligible after last consumer and completion retirement
+l0.kv_attention_v_read_h0,0,activation_or_scratch,0x05100,0x05200,256,64,42,106,kv_attention_v_read_h0,attn_h0_av_q15,eligible after last consumer and completion retirement
+l0.kv_attention_v_read_h1,0,activation_or_scratch,0x05400,0x05500,256,64,61,111,kv_attention_v_read_h1,attn_h1_av_q15,eligible after last consumer and completion retirement
+l0.kv_attention_v_read_h2,0,activation_or_scratch,0x05600,0x05700,256,64,80,116,kv_attention_v_read_h2,attn_h2_av_q15,eligible after last consumer and completion retirement
+l0.kv_attention_v_read_h3,0,activation_or_scratch,0x05800,0x05900,256,64,99,121,kv_attention_v_read_h3,attn_h3_av_q15,eligible after last consumer and completion retirement
+l0.attn_q_h0_i8,0,activation_or_scratch,0x07000,0x07100,256,64,30,43,attn_q_h0_requant,attn_h0_qkt_scaled,eligible after last consumer and completion retirement
+l0.attn_k_h0_i8,0,activation_or_scratch,0x05000,0x05100,256,64,31,36,attn_k_h0_requant,"kv_attention_k_qk_append_h0_t0,kv_attention_k_qk_append_h0_t1,kv_attention_k_qk_append_h0_t2,kv_attention_k_qk_append_h0_t3",eligible after last consumer and completion retirement
+l0.attn_v_h0_cache_source_i8,0,activation_or_scratch,0x05100,0x05200,256,64,32,41,attn_v_h0_cache_requant,"kv_attention_v_append_h0_t0,kv_attention_v_append_h0_t1,kv_attention_v_append_h0_t2,kv_attention_v_append_h0_t3",eligible after last consumer and completion retirement
+l0.attn_h0_scores_q8_8,0,activation_or_scratch,0x07100,0x07500,1024,64,43,47,attn_h0_qkt_scaled,"attn_h0_causal_softmax_t0,attn_h0_causal_softmax_t1,attn_h0_causal_softmax_t2,attn_h0_causal_softmax_t3",eligible after last consumer and completion retirement
+l0.attn_h0_prob_q15,0,activation_or_scratch,0x08000,0x08400,1024,64,0,48,"attn_h0_causal_softmax_t0,attn_h0_causal_softmax_t1,attn_h0_causal_softmax_t2,attn_h0_causal_softmax_t3",attn_h0_prob_requant,eligible after last consumer and completion retirement
+l0.attn_h0_prob_i8,0,activation_or_scratch,0x05000,0x05100,256,64,48,106,attn_h0_prob_requant,attn_h0_av_q15,eligible after last consumer and completion retirement
+l0.attn_q_h1_i8,0,activation_or_scratch,0x05200,0x05300,256,64,49,62,attn_q_h1_requant,attn_h1_qkt_scaled,eligible after last consumer and completion retirement
+l0.attn_k_h1_i8,0,activation_or_scratch,0x05300,0x05400,256,64,50,55,attn_k_h1_requant,"kv_attention_k_qk_append_h1_t0,kv_attention_k_qk_append_h1_t1,kv_attention_k_qk_append_h1_t2,kv_attention_k_qk_append_h1_t3",eligible after last consumer and completion retirement
+l0.attn_v_h1_cache_source_i8,0,activation_or_scratch,0x05400,0x05500,256,64,51,60,attn_v_h1_cache_requant,"kv_attention_v_append_h1_t0,kv_attention_v_append_h1_t1,kv_attention_v_append_h1_t2,kv_attention_v_append_h1_t3",eligible after last consumer and completion retirement
+l0.attn_h1_scores_q8_8,0,activation_or_scratch,0x07000,0x07400,1024,64,62,66,attn_h1_qkt_scaled,"attn_h1_causal_softmax_t0,attn_h1_causal_softmax_t1,attn_h1_causal_softmax_t2,attn_h1_causal_softmax_t3",eligible after last consumer and completion retirement
+l0.attn_h1_prob_q15,0,activation_or_scratch,0x08400,0x08800,1024,64,0,67,"attn_h1_causal_softmax_t0,attn_h1_causal_softmax_t1,attn_h1_causal_softmax_t2,attn_h1_causal_softmax_t3",attn_h1_prob_requant,eligible after last consumer and completion retirement
+l0.attn_h1_prob_i8,0,activation_or_scratch,0x05200,0x05300,256,64,67,111,attn_h1_prob_requant,attn_h1_av_q15,eligible after last consumer and completion retirement
+l0.attn_q_h2_i8,0,activation_or_scratch,0x05300,0x05400,256,64,68,81,attn_q_h2_requant,attn_h2_qkt_scaled,eligible after last consumer and completion retirement
+l0.attn_k_h2_i8,0,activation_or_scratch,0x05500,0x05600,256,64,69,74,attn_k_h2_requant,"kv_attention_k_qk_append_h2_t0,kv_attention_k_qk_append_h2_t1,kv_attention_k_qk_append_h2_t2,kv_attention_k_qk_append_h2_t3",eligible after last consumer and completion retirement
+l0.attn_v_h2_cache_source_i8,0,activation_or_scratch,0x05600,0x05700,256,64,70,79,attn_v_h2_cache_requant,"kv_attention_v_append_h2_t0,kv_attention_v_append_h2_t1,kv_attention_v_append_h2_t2,kv_attention_v_append_h2_t3",eligible after last consumer and completion retirement
+l0.attn_h2_scores_q8_8,0,activation_or_scratch,0x05700,0x05b00,1024,64,81,85,attn_h2_qkt_scaled,"attn_h2_causal_softmax_t0,attn_h2_causal_softmax_t1,attn_h2_causal_softmax_t2,attn_h2_causal_softmax_t3",eligible after last consumer and completion retirement
+l0.attn_h2_prob_q15,0,activation_or_scratch,0x08800,0x08c00,1024,64,0,86,"attn_h2_causal_softmax_t0,attn_h2_causal_softmax_t1,attn_h2_causal_softmax_t2,attn_h2_causal_softmax_t3",attn_h2_prob_requant,eligible after last consumer and completion retirement
+l0.attn_h2_prob_i8,0,activation_or_scratch,0x05300,0x05400,256,64,86,116,attn_h2_prob_requant,attn_h2_av_q15,eligible after last consumer and completion retirement
+l0.attn_q_h3_i8,0,activation_or_scratch,0x05500,0x05600,256,64,87,100,attn_q_h3_requant,attn_h3_qkt_scaled,eligible after last consumer and completion retirement
+l0.attn_k_h3_i8,0,activation_or_scratch,0x05700,0x05800,256,64,88,93,attn_k_h3_requant,"kv_attention_k_qk_append_h3_t0,kv_attention_k_qk_append_h3_t1,kv_attention_k_qk_append_h3_t2,kv_attention_k_qk_append_h3_t3",eligible after last consumer and completion retirement
+l0.attn_v_h3_cache_source_i8,0,activation_or_scratch,0x05800,0x05900,256,64,89,98,attn_v_h3_cache_requant,"kv_attention_v_append_h3_t0,kv_attention_v_append_h3_t1,kv_attention_v_append_h3_t2,kv_attention_v_append_h3_t3",eligible after last consumer and completion retirement
+l0.attn_h3_scores_q8_8,0,activation_or_scratch,0x05900,0x05d00,1024,64,100,104,attn_h3_qkt_scaled,"attn_h3_causal_softmax_t0,attn_h3_causal_softmax_t1,attn_h3_causal_softmax_t2,attn_h3_causal_softmax_t3",eligible after last consumer and completion retirement
+l0.attn_h3_prob_q15,0,activation_or_scratch,0x08c00,0x09000,1024,64,0,105,"attn_h3_causal_softmax_t0,attn_h3_causal_softmax_t1,attn_h3_causal_softmax_t2,attn_h3_causal_softmax_t3",attn_h3_prob_requant,eligible after last consumer and completion retirement
+l0.attn_h3_prob_i8,0,activation_or_scratch,0x05500,0x05600,256,64,105,121,attn_h3_prob_requant,attn_h3_av_q15,eligible after last consumer and completion retirement
+l0.attention_concat_i8,0,activation_or_scratch,0x07000,0x07400,1024,64,107,126,"attn_h0_av_requant_concat_rg0,attn_h0_av_requant_concat_rg1,attn_h0_av_requant_concat_rg2,attn_h0_av_requant_concat_rg3,attn_h1_av_requant_concat_rg0,attn_h1_av_requant_concat_rg1,attn_h1_av_requant_concat_rg2,attn_h1_av_requant_concat_rg3,attn_h2_av_requant_concat_rg0,attn_h2_av_requant_concat_rg1,attn_h2_av_requant_concat_rg2,attn_h2_av_requant_concat_rg3,attn_h3_av_requant_concat_rg0,attn_h3_av_requant_concat_rg1,attn_h3_av_requant_concat_rg2,attn_h3_av_requant_concat_rg3",attn_output_projection_n64,eligible after last consumer and completion retirement
+l0.attn_h0_av_i32,0,activation_or_scratch,0x05900,0x05d00,1024,64,106,110,attn_h0_av_q15,"attn_h0_av_requant_concat_rg0,attn_h0_av_requant_concat_rg1,attn_h0_av_requant_concat_rg2,attn_h0_av_requant_concat_rg3",eligible after last consumer and completion retirement
+l0.attn_h1_av_i32,0,activation_or_scratch,0x05900,0x05d00,1024,64,111,115,attn_h1_av_q15,"attn_h1_av_requant_concat_rg0,attn_h1_av_requant_concat_rg1,attn_h1_av_requant_concat_rg2,attn_h1_av_requant_concat_rg3",eligible after last consumer and completion retirement
+l0.attn_h2_av_i32,0,activation_or_scratch,0x05900,0x05d00,1024,64,116,120,attn_h2_av_q15,"attn_h2_av_requant_concat_rg0,attn_h2_av_requant_concat_rg1,attn_h2_av_requant_concat_rg2,attn_h2_av_requant_concat_rg3",eligible after last consumer and completion retirement
+l0.attn_h3_av_i32,0,activation_or_scratch,0x05000,0x05400,1024,64,121,125,attn_h3_av_q15,"attn_h3_av_requant_concat_rg0,attn_h3_av_requant_concat_rg1,attn_h3_av_requant_concat_rg2,attn_h3_av_requant_concat_rg3",eligible after last consumer and completion retirement
+l0.attn_o_weight_n64,0,weight_tile,0x04000,0x05000,4096,64,0,126,external DMA,attn_output_projection_n64,eligible after last consumer and completion retirement
+l0.attn_output_i32,0,activation_or_scratch,0x05000,0x06000,4096,64,126,127,attn_output_projection_n64,attn_residual1,eligible after last consumer and completion retirement
+l0.residual1_i32,0,activation_or_scratch,0x04000,0x05000,4096,64,127,224,attn_residual1,"ln2_row0,ln2_row1,ln2_row2,ln2_row3,ln2_row4,ln2_row5,ln2_row6,ln2_row7,ln2_row8,ln2_row9,ln2_row10,ln2_row11,ln2_row12,ln2_row13,ln2_row14,ln2_row15,l0.ffn_residual2",eligible after last consumer and completion retirement
+l0.ln2_output_i32,0,activation_or_scratch,0x05000,0x06000,4096,64,128,144,"ln2_row0,ln2_row1,ln2_row2,ln2_row3,ln2_row4,ln2_row5,ln2_row6,ln2_row7,ln2_row8,ln2_row9,ln2_row10,ln2_row11,ln2_row12,ln2_row13,ln2_row14,ln2_row15",l0.ffn_input_requant_pack,eligible after last consumer and completion retirement
+l0.ffn_input_i8_matrix_a,0,activation_or_scratch,0x06000,0x06400,1024,64,144,190,l0.ffn_input_requant_pack,"l0.ffn_up_n0,l0.ffn_up_n1,l0.ffn_up_n2,l0.ffn_up_n3,l0.ffn_up_n4,l0.ffn_up_n5,l0.ffn_up_n6,l0.ffn_up_n7,l0.ffn_up_n8,l0.ffn_up_n9,l0.ffn_up_n10,l0.ffn_up_n11,l0.ffn_up_n12,l0.ffn_up_n13,l0.ffn_up_n14,l0.ffn_up_n15",eligible after last consumer and completion retirement
+l0.ffn_up_weight_n0,0,weight_tile,0x0d000,0x0d400,1024,64,0,145,external DMA,l0.ffn_up_n0,eligible after last consumer and completion retirement
+l0.ffn_up_n0_i32,0,activation_or_scratch,0x05000,0x05400,1024,64,145,146,l0.ffn_up_n0,l0.ffn_gelu_n0,eligible after last consumer and completion retirement
+l0.ffn_gelu_n0_i32,0,activation_or_scratch,0x05400,0x05800,1024,64,146,147,l0.ffn_gelu_n0,l0.ffn_requant_pack_n0,eligible after last consumer and completion retirement
+l0.ffn_gelu_n0_i8,0,activation_or_scratch,0x05000,0x05100,256,64,147,193,l0.ffn_requant_pack_n0,l0.ffn_down_k0,eligible after last consumer and completion retirement
+l0.ffn_up_weight_n1,0,weight_tile,0x0d400,0x0d800,1024,64,0,148,external DMA,l0.ffn_up_n1,eligible after last consumer and completion retirement
+l0.ffn_up_n1_i32,0,activation_or_scratch,0x05100,0x05500,1024,64,148,149,l0.ffn_up_n1,l0.ffn_gelu_n1,eligible after last consumer and completion retirement
+l0.ffn_gelu_n1_i32,0,activation_or_scratch,0x05500,0x05900,1024,64,149,150,l0.ffn_gelu_n1,l0.ffn_requant_pack_n1,eligible after last consumer and completion retirement
+l0.ffn_gelu_n1_i8,0,activation_or_scratch,0x05100,0x05200,256,64,150,194,l0.ffn_requant_pack_n1,l0.ffn_down_k1,eligible after last consumer and completion retirement
+l0.ffn_up_weight_n2,0,weight_tile,0x0f000,0x0f400,1024,64,0,151,external DMA,l0.ffn_up_n2,eligible after last consumer and completion retirement
+l0.ffn_up_n2_i32,0,activation_or_scratch,0x05200,0x05600,1024,64,151,152,l0.ffn_up_n2,l0.ffn_gelu_n2,eligible after last consumer and completion retirement
+l0.ffn_gelu_n2_i32,0,activation_or_scratch,0x05600,0x05a00,1024,64,152,153,l0.ffn_gelu_n2,l0.ffn_requant_pack_n2,eligible after last consumer and completion retirement
+l0.ffn_gelu_n2_i8,0,activation_or_scratch,0x05200,0x05300,256,64,153,196,l0.ffn_requant_pack_n2,l0.ffn_down_k2,eligible after last consumer and completion retirement
+l0.ffn_up_weight_n3,0,weight_tile,0x0f400,0x0f800,1024,64,0,154,external DMA,l0.ffn_up_n3,eligible after last consumer and completion retirement
+l0.ffn_up_n3_i32,0,activation_or_scratch,0x05300,0x05700,1024,64,154,155,l0.ffn_up_n3,l0.ffn_gelu_n3,eligible after last consumer and completion retirement
+l0.ffn_gelu_n3_i32,0,activation_or_scratch,0x05700,0x05b00,1024,64,155,156,l0.ffn_gelu_n3,l0.ffn_requant_pack_n3,eligible after last consumer and completion retirement
+l0.ffn_gelu_n3_i8,0,activation_or_scratch,0x05300,0x05400,256,64,156,198,l0.ffn_requant_pack_n3,l0.ffn_down_k3,eligible after last consumer and completion retirement
+l0.ffn_up_weight_n4,0,weight_tile,0x0f800,0x0fc00,1024,64,0,157,external DMA,l0.ffn_up_n4,eligible after last consumer and completion retirement
+l0.ffn_up_n4_i32,0,activation_or_scratch,0x05400,0x05800,1024,64,157,158,l0.ffn_up_n4,l0.ffn_gelu_n4,eligible after last consumer and completion retirement
+l0.ffn_gelu_n4_i32,0,activation_or_scratch,0x05800,0x05c00,1024,64,158,159,l0.ffn_gelu_n4,l0.ffn_requant_pack_n4,eligible after last consumer and completion retirement
+l0.ffn_gelu_n4_i8,0,activation_or_scratch,0x05400,0x05500,256,64,159,200,l0.ffn_requant_pack_n4,l0.ffn_down_k4,eligible after last consumer and completion retirement
+l0.ffn_up_weight_n5,0,weight_tile,0x0fc00,0x10000,1024,64,0,160,external DMA,l0.ffn_up_n5,eligible after last consumer and completion retirement
+l0.ffn_up_n5_i32,0,activation_or_scratch,0x05500,0x05900,1024,64,160,161,l0.ffn_up_n5,l0.ffn_gelu_n5,eligible after last consumer and completion retirement
+l0.ffn_gelu_n5_i32,0,activation_or_scratch,0x05900,0x05d00,1024,64,161,162,l0.ffn_gelu_n5,l0.ffn_requant_pack_n5,eligible after last consumer and completion retirement
+l0.ffn_gelu_n5_i8,0,activation_or_scratch,0x05500,0x05600,256,64,162,202,l0.ffn_requant_pack_n5,l0.ffn_down_k5,eligible after last consumer and completion retirement
+l0.ffn_up_weight_n6,0,weight_tile,0x10000,0x10400,1024,64,0,163,external DMA,l0.ffn_up_n6,eligible after last consumer and completion retirement
+l0.ffn_up_n6_i32,0,activation_or_scratch,0x05600,0x05a00,1024,64,163,164,l0.ffn_up_n6,l0.ffn_gelu_n6,eligible after last consumer and completion retirement
+l0.ffn_gelu_n6_i32,0,activation_or_scratch,0x05a00,0x05e00,1024,64,164,165,l0.ffn_gelu_n6,l0.ffn_requant_pack_n6,eligible after last consumer and completion retirement
+l0.ffn_gelu_n6_i8,0,activation_or_scratch,0x05600,0x05700,256,64,165,204,l0.ffn_requant_pack_n6,l0.ffn_down_k6,eligible after last consumer and completion retirement
+l0.ffn_up_weight_n7,0,weight_tile,0x10400,0x10800,1024,64,0,166,external DMA,l0.ffn_up_n7,eligible after last consumer and completion retirement
+l0.ffn_up_n7_i32,0,activation_or_scratch,0x05700,0x05b00,1024,64,166,167,l0.ffn_up_n7,l0.ffn_gelu_n7,eligible after last consumer and completion retirement
+l0.ffn_gelu_n7_i32,0,activation_or_scratch,0x05b00,0x05f00,1024,64,167,168,l0.ffn_gelu_n7,l0.ffn_requant_pack_n7,eligible after last consumer and completion retirement
+l0.ffn_gelu_n7_i8,0,activation_or_scratch,0x05700,0x05800,256,64,168,206,l0.ffn_requant_pack_n7,l0.ffn_down_k7,eligible after last consumer and completion retirement
+l0.ffn_up_weight_n8,0,weight_tile,0x10800,0x10c00,1024,64,0,169,external DMA,l0.ffn_up_n8,eligible after last consumer and completion retirement
+l0.ffn_up_n8_i32,0,activation_or_scratch,0x05800,0x05c00,1024,64,169,170,l0.ffn_up_n8,l0.ffn_gelu_n8,eligible after last consumer and completion retirement
+l0.ffn_gelu_n8_i32,0,activation_or_scratch,0x05c00,0x06000,1024,64,170,171,l0.ffn_gelu_n8,l0.ffn_requant_pack_n8,eligible after last consumer and completion retirement
+l0.ffn_gelu_n8_i8,0,activation_or_scratch,0x05800,0x05900,256,64,171,208,l0.ffn_requant_pack_n8,l0.ffn_down_k8,eligible after last consumer and completion retirement
+l0.ffn_up_weight_n9,0,weight_tile,0x10c00,0x11000,1024,64,0,172,external DMA,l0.ffn_up_n9,eligible after last consumer and completion retirement
+l0.ffn_up_n9_i32,0,activation_or_scratch,0x05900,0x05d00,1024,64,172,173,l0.ffn_up_n9,l0.ffn_gelu_n9,eligible after last consumer and completion retirement
+l0.ffn_gelu_n9_i32,0,activation_or_scratch,0x06400,0x06800,1024,64,173,174,l0.ffn_gelu_n9,l0.ffn_requant_pack_n9,eligible after last consumer and completion retirement
+l0.ffn_gelu_n9_i8,0,activation_or_scratch,0x05900,0x05a00,256,64,174,210,l0.ffn_requant_pack_n9,l0.ffn_down_k9,eligible after last consumer and completion retirement
+l0.ffn_up_weight_n10,0,weight_tile,0x0d800,0x0dc00,1024,64,0,175,external DMA,l0.ffn_up_n10,eligible after last consumer and completion retirement
+l0.ffn_up_n10_i32,0,activation_or_scratch,0x05a00,0x05e00,1024,64,175,176,l0.ffn_up_n10,l0.ffn_gelu_n10,eligible after last consumer and completion retirement
+l0.ffn_gelu_n10_i32,0,activation_or_scratch,0x06400,0x06800,1024,64,176,177,l0.ffn_gelu_n10,l0.ffn_requant_pack_n10,eligible after last consumer and completion retirement
+l0.ffn_gelu_n10_i8,0,activation_or_scratch,0x05a00,0x05b00,256,64,177,212,l0.ffn_requant_pack_n10,l0.ffn_down_k10,eligible after last consumer and completion retirement
+l0.ffn_up_weight_n11,0,weight_tile,0x0dc00,0x0e000,1024,64,0,178,external DMA,l0.ffn_up_n11,eligible after last consumer and completion retirement
+l0.ffn_up_n11_i32,0,activation_or_scratch,0x05b00,0x05f00,1024,64,178,179,l0.ffn_up_n11,l0.ffn_gelu_n11,eligible after last consumer and completion retirement
+l0.ffn_gelu_n11_i32,0,activation_or_scratch,0x06400,0x06800,1024,64,179,180,l0.ffn_gelu_n11,l0.ffn_requant_pack_n11,eligible after last consumer and completion retirement
+l0.ffn_gelu_n11_i8,0,activation_or_scratch,0x05b00,0x05c00,256,64,180,214,l0.ffn_requant_pack_n11,l0.ffn_down_k11,eligible after last consumer and completion retirement
+l0.ffn_up_weight_n12,0,weight_tile,0x0e000,0x0e400,1024,64,0,181,external DMA,l0.ffn_up_n12,eligible after last consumer and completion retirement
+l0.ffn_up_n12_i32,0,activation_or_scratch,0x05c00,0x06000,1024,64,181,182,l0.ffn_up_n12,l0.ffn_gelu_n12,eligible after last consumer and completion retirement
+l0.ffn_gelu_n12_i32,0,activation_or_scratch,0x06400,0x06800,1024,64,182,183,l0.ffn_gelu_n12,l0.ffn_requant_pack_n12,eligible after last consumer and completion retirement
+l0.ffn_gelu_n12_i8,0,activation_or_scratch,0x05c00,0x05d00,256,64,183,216,l0.ffn_requant_pack_n12,l0.ffn_down_k12,eligible after last consumer and completion retirement
+l0.ffn_up_weight_n13,0,weight_tile,0x0e400,0x0e800,1024,64,0,184,external DMA,l0.ffn_up_n13,eligible after last consumer and completion retirement
+l0.ffn_up_n13_i32,0,activation_or_scratch,0x06400,0x06800,1024,64,184,185,l0.ffn_up_n13,l0.ffn_gelu_n13,eligible after last consumer and completion retirement
+l0.ffn_gelu_n13_i32,0,activation_or_scratch,0x06800,0x06c00,1024,64,185,186,l0.ffn_gelu_n13,l0.ffn_requant_pack_n13,eligible after last consumer and completion retirement
+l0.ffn_gelu_n13_i8,0,activation_or_scratch,0x05d00,0x05e00,256,64,186,218,l0.ffn_requant_pack_n13,l0.ffn_down_k13,eligible after last consumer and completion retirement
+l0.ffn_up_weight_n14,0,weight_tile,0x0e800,0x0ec00,1024,64,0,187,external DMA,l0.ffn_up_n14,eligible after last consumer and completion retirement
+l0.ffn_up_n14_i32,0,activation_or_scratch,0x06400,0x06800,1024,64,187,188,l0.ffn_up_n14,l0.ffn_gelu_n14,eligible after last consumer and completion retirement
+l0.ffn_gelu_n14_i32,0,activation_or_scratch,0x06800,0x06c00,1024,64,188,189,l0.ffn_gelu_n14,l0.ffn_requant_pack_n14,eligible after last consumer and completion retirement
+l0.ffn_gelu_n14_i8,0,activation_or_scratch,0x05e00,0x05f00,256,64,189,220,l0.ffn_requant_pack_n14,l0.ffn_down_k14,eligible after last consumer and completion retirement
+l0.ffn_up_weight_n15,0,weight_tile,0x0ec00,0x0f000,1024,64,0,190,external DMA,l0.ffn_up_n15,eligible after last consumer and completion retirement
+l0.ffn_up_n15_i32,0,activation_or_scratch,0x06400,0x06800,1024,64,190,191,l0.ffn_up_n15,l0.ffn_gelu_n15,eligible after last consumer and completion retirement
+l0.ffn_gelu_n15_i32,0,activation_or_scratch,0x05f00,0x06300,1024,64,191,192,l0.ffn_gelu_n15,l0.ffn_requant_pack_n15,eligible after last consumer and completion retirement
+l0.ffn_gelu_n15_i8,0,activation_or_scratch,0x06300,0x06400,256,64,192,222,l0.ffn_requant_pack_n15,l0.ffn_down_k15,eligible after last consumer and completion retirement
+l0.ffn_down_acc_i32,0,activation_or_scratch,0x06400,0x07400,4096,64,193,224,"l0.ffn_down_k0,l0.ffn_down_accumulate_k1,l0.ffn_down_accumulate_k2,l0.ffn_down_accumulate_k3,l0.ffn_down_accumulate_k4,l0.ffn_down_accumulate_k5,l0.ffn_down_accumulate_k6,l0.ffn_down_accumulate_k7,l0.ffn_down_accumulate_k8,l0.ffn_down_accumulate_k9,l0.ffn_down_accumulate_k10,l0.ffn_down_accumulate_k11,l0.ffn_down_accumulate_k12,l0.ffn_down_accumulate_k13,l0.ffn_down_accumulate_k14,l0.ffn_down_accumulate_k15","l0.ffn_down_accumulate_k1,l0.ffn_down_accumulate_k2,l0.ffn_down_accumulate_k3,l0.ffn_down_accumulate_k4,l0.ffn_down_accumulate_k5,l0.ffn_down_accumulate_k6,l0.ffn_down_accumulate_k7,l0.ffn_down_accumulate_k8,l0.ffn_down_accumulate_k9,l0.ffn_down_accumulate_k10,l0.ffn_down_accumulate_k11,l0.ffn_down_accumulate_k12,l0.ffn_down_accumulate_k13,l0.ffn_down_accumulate_k14,l0.ffn_down_accumulate_k15,l0.ffn_residual2",eligible after last consumer and completion retirement
+l0.ffn_down_partial_i32,0,activation_or_scratch,0x07400,0x08400,4096,64,194,223,"l0.ffn_down_k1,l0.ffn_down_k2,l0.ffn_down_k3,l0.ffn_down_k4,l0.ffn_down_k5,l0.ffn_down_k6,l0.ffn_down_k7,l0.ffn_down_k8,l0.ffn_down_k9,l0.ffn_down_k10,l0.ffn_down_k11,l0.ffn_down_k12,l0.ffn_down_k13,l0.ffn_down_k14,l0.ffn_down_k15","l0.ffn_down_accumulate_k1,l0.ffn_down_accumulate_k2,l0.ffn_down_accumulate_k3,l0.ffn_down_accumulate_k4,l0.ffn_down_accumulate_k5,l0.ffn_down_accumulate_k6,l0.ffn_down_accumulate_k7,l0.ffn_down_accumulate_k8,l0.ffn_down_accumulate_k9,l0.ffn_down_accumulate_k10,l0.ffn_down_accumulate_k11,l0.ffn_down_accumulate_k12,l0.ffn_down_accumulate_k13,l0.ffn_down_accumulate_k14,l0.ffn_down_accumulate_k15",eligible after last consumer and completion retirement
+l0.ffn_down_weight_k0,0,weight_tile,0x09000,0x09400,1024,64,0,193,external DMA,l0.ffn_down_k0,eligible after last consumer and completion retirement
+l0.ffn_down_weight_k1,0,weight_tile,0x09400,0x09800,1024,64,0,194,external DMA,l0.ffn_down_k1,eligible after last consumer and completion retirement
+l0.ffn_down_weight_k2,0,weight_tile,0x0b000,0x0b400,1024,64,0,196,external DMA,l0.ffn_down_k2,eligible after last consumer and completion retirement
+l0.ffn_down_weight_k3,0,weight_tile,0x0b400,0x0b800,1024,64,0,198,external DMA,l0.ffn_down_k3,eligible after last consumer and completion retirement
+l0.ffn_down_weight_k4,0,weight_tile,0x0b800,0x0bc00,1024,64,0,200,external DMA,l0.ffn_down_k4,eligible after last consumer and completion retirement
+l0.ffn_down_weight_k5,0,weight_tile,0x0bc00,0x0c000,1024,64,0,202,external DMA,l0.ffn_down_k5,eligible after last consumer and completion retirement
+l0.ffn_down_weight_k6,0,weight_tile,0x0c000,0x0c400,1024,64,0,204,external DMA,l0.ffn_down_k6,eligible after last consumer and completion retirement
+l0.ffn_down_weight_k7,0,weight_tile,0x0c400,0x0c800,1024,64,0,206,external DMA,l0.ffn_down_k7,eligible after last consumer and completion retirement
+l0.ffn_down_weight_k8,0,weight_tile,0x0c800,0x0cc00,1024,64,0,208,external DMA,l0.ffn_down_k8,eligible after last consumer and completion retirement
+l0.ffn_down_weight_k9,0,weight_tile,0x0cc00,0x0d000,1024,64,0,210,external DMA,l0.ffn_down_k9,eligible after last consumer and completion retirement
+l0.ffn_down_weight_k10,0,weight_tile,0x09800,0x09c00,1024,64,0,212,external DMA,l0.ffn_down_k10,eligible after last consumer and completion retirement
+l0.ffn_down_weight_k11,0,weight_tile,0x09c00,0x0a000,1024,64,0,214,external DMA,l0.ffn_down_k11,eligible after last consumer and completion retirement
+l0.ffn_down_weight_k12,0,weight_tile,0x0a000,0x0a400,1024,64,0,216,external DMA,l0.ffn_down_k12,eligible after last consumer and completion retirement
+l0.ffn_down_weight_k13,0,weight_tile,0x0a400,0x0a800,1024,64,0,218,external DMA,l0.ffn_down_k13,eligible after last consumer and completion retirement
+l0.ffn_down_weight_k14,0,weight_tile,0x0a800,0x0ac00,1024,64,0,220,external DMA,l0.ffn_down_k14,eligible after last consumer and completion retirement
+l0.ffn_down_weight_k15,0,weight_tile,0x0ac00,0x0b000,1024,64,0,222,external DMA,l0.ffn_down_k15,eligible after last consumer and completion retirement
+l0.residual2_i32,0,activation_or_scratch,0x05000,0x06000,4096,64,224,225,l0.ffn_residual2,none,eligible after last consumer and completion retirement
+l1.embedding_plus_position_i32,1,activation_or_scratch,0x06000,0x07000,4096,64,225,352,embedding_position_residual,"preln_row0,preln_row1,preln_row2,preln_row3,preln_row4,preln_row5,preln_row6,preln_row7,preln_row8,preln_row9,preln_row10,preln_row11,preln_row12,preln_row13,preln_row14,preln_row15,attn_residual1",eligible after last consumer and completion retirement
+l1.ln1_gamma_q15_weight,1,weight_tile,0x13100,0x13200,256,64,225,241,external DMA,"preln_row0,preln_row1,preln_row2,preln_row3,preln_row4,preln_row5,preln_row6,preln_row7,preln_row8,preln_row9,preln_row10,preln_row11,preln_row12,preln_row13,preln_row14,preln_row15",eligible after last consumer and completion retirement
+l1.ln1_beta_i32_weight,1,weight_tile,0x13000,0x13100,256,64,225,241,external DMA,"preln_row0,preln_row1,preln_row2,preln_row3,preln_row4,preln_row5,preln_row6,preln_row7,preln_row8,preln_row9,preln_row10,preln_row11,preln_row12,preln_row13,preln_row14,preln_row15",eligible after last consumer and completion retirement
+l1.ln2_gamma_q15_weight,1,weight_tile,0x13300,0x13400,256,64,225,368,external DMA,"ln2_row0,ln2_row1,ln2_row2,ln2_row3,ln2_row4,ln2_row5,ln2_row6,ln2_row7,ln2_row8,ln2_row9,ln2_row10,ln2_row11,ln2_row12,ln2_row13,ln2_row14,ln2_row15",eligible after last consumer and completion retirement
+l1.ln2_beta_i32_weight,1,weight_tile,0x13200,0x13300,256,64,225,368,external DMA,"ln2_row0,ln2_row1,ln2_row2,ln2_row3,ln2_row4,ln2_row5,ln2_row6,ln2_row7,ln2_row8,ln2_row9,ln2_row10,ln2_row11,ln2_row12,ln2_row13,ln2_row14,ln2_row15",eligible after last consumer and completion retirement
+l1.preln_output_i32,1,activation_or_scratch,0x05000,0x06000,4096,64,226,242,"preln_row0,preln_row1,preln_row2,preln_row3,preln_row4,preln_row5,preln_row6,preln_row7,preln_row8,preln_row9,preln_row10,preln_row11,preln_row12,preln_row13,preln_row14,preln_row15",preln_requant_pack_matrix_a,eligible after last consumer and completion retirement
+l1.preln_matrix_a_i8,1,activation_or_scratch,0x13400,0x13800,1024,64,242,254,preln_requant_pack_matrix_a,"l0_q_gemm_n0,l0_q_gemm_n1,l0_q_gemm_n2,l0_q_gemm_n3,l0_k_gemm_n0,l0_k_gemm_n1,l0_k_gemm_n2,l0_k_gemm_n3,l0_v_gemm_n0,l0_v_gemm_n1,l0_v_gemm_n2,l0_v_gemm_n3",eligible after last consumer and completion retirement
+l1_q_weight_n0,1,weight_tile,0x11000,0x11400,1024,64,225,243,external DMA,l0_q_gemm_n0,eligible after last consumer and completion retirement
+l1_q_out_n0,1,activation_or_scratch,0x05000,0x05400,1024,64,243,255,l0_q_gemm_n0,attn_q_h0_requant,eligible after last consumer and completion retirement
+l1_q_weight_n1,1,weight_tile,0x11400,0x11800,1024,64,225,244,external DMA,l0_q_gemm_n1,eligible after last consumer and completion retirement
+l1_q_out_n1,1,activation_or_scratch,0x05400,0x05800,1024,64,244,274,l0_q_gemm_n1,attn_q_h1_requant,eligible after last consumer and completion retirement
+l1_q_weight_n2,1,weight_tile,0x11800,0x11c00,1024,64,225,245,external DMA,l0_q_gemm_n2,eligible after last consumer and completion retirement
+l1_q_out_n2,1,activation_or_scratch,0x05800,0x05c00,1024,64,245,293,l0_q_gemm_n2,attn_q_h2_requant,eligible after last consumer and completion retirement
+l1_q_weight_n3,1,weight_tile,0x11c00,0x12000,1024,64,225,246,external DMA,l0_q_gemm_n3,eligible after last consumer and completion retirement
+l1_q_out_n3,1,activation_or_scratch,0x05c00,0x06000,1024,64,246,312,l0_q_gemm_n3,attn_q_h3_requant,eligible after last consumer and completion retirement
+l1_k_weight_n0,1,weight_tile,0x10000,0x10400,1024,64,225,247,external DMA,l0_k_gemm_n0,eligible after last consumer and completion retirement
+l1_k_out_n0,1,activation_or_scratch,0x11000,0x11400,1024,64,247,256,l0_k_gemm_n0,attn_k_h0_requant,eligible after last consumer and completion retirement
+l1_k_weight_n1,1,weight_tile,0x10400,0x10800,1024,64,225,248,external DMA,l0_k_gemm_n1,eligible after last consumer and completion retirement
+l1_k_out_n1,1,activation_or_scratch,0x10000,0x10400,1024,64,248,275,l0_k_gemm_n1,attn_k_h1_requant,eligible after last consumer and completion retirement
+l1_k_weight_n2,1,weight_tile,0x10800,0x10c00,1024,64,225,249,external DMA,l0_k_gemm_n2,eligible after last consumer and completion retirement
+l1_k_out_n2,1,activation_or_scratch,0x10400,0x10800,1024,64,249,294,l0_k_gemm_n2,attn_k_h2_requant,eligible after last consumer and completion retirement
+l1_k_weight_n3,1,weight_tile,0x10c00,0x11000,1024,64,225,250,external DMA,l0_k_gemm_n3,eligible after last consumer and completion retirement
+l1_k_out_n3,1,activation_or_scratch,0x10800,0x10c00,1024,64,250,313,l0_k_gemm_n3,attn_k_h3_requant,eligible after last consumer and completion retirement
+l1_v_weight_n0,1,weight_tile,0x12000,0x12400,1024,64,225,251,external DMA,l0_v_gemm_n0,eligible after last consumer and completion retirement
+l1_v_out_n0,1,activation_or_scratch,0x10c00,0x11000,1024,64,251,257,l0_v_gemm_n0,attn_v_h0_cache_requant,eligible after last consumer and completion retirement
+l1_v_weight_n1,1,weight_tile,0x12400,0x12800,1024,64,225,252,external DMA,l0_v_gemm_n1,eligible after last consumer and completion retirement
+l1_v_out_n1,1,activation_or_scratch,0x11400,0x11800,1024,64,252,276,l0_v_gemm_n1,attn_v_h1_cache_requant,eligible after last consumer and completion retirement
+l1_v_weight_n2,1,weight_tile,0x12800,0x12c00,1024,64,225,253,external DMA,l0_v_gemm_n2,eligible after last consumer and completion retirement
+l1_v_out_n2,1,activation_or_scratch,0x11800,0x11c00,1024,64,253,295,l0_v_gemm_n2,attn_v_h2_cache_requant,eligible after last consumer and completion retirement
+l1_v_weight_n3,1,weight_tile,0x12c00,0x13000,1024,64,225,254,external DMA,l0_v_gemm_n3,eligible after last consumer and completion retirement
+l1_v_out_n3,1,activation_or_scratch,0x11c00,0x12000,1024,64,254,314,l0_v_gemm_n3,attn_v_h3_cache_requant,eligible after last consumer and completion retirement
+l1.kv_attention_k_read_h0,1,activation_or_scratch,0x05000,0x05100,256,64,262,268,kv_attention_k_read_h0,attn_h0_qkt_scaled,eligible after last consumer and completion retirement
+l1.kv_attention_k_read_h1,1,activation_or_scratch,0x05300,0x05400,256,64,281,287,kv_attention_k_read_h1,attn_h1_qkt_scaled,eligible after last consumer and completion retirement
+l1.kv_attention_k_read_h2,1,activation_or_scratch,0x05500,0x05600,256,64,300,306,kv_attention_k_read_h2,attn_h2_qkt_scaled,eligible after last consumer and completion retirement
+l1.kv_attention_k_read_h3,1,activation_or_scratch,0x05700,0x05800,256,64,319,325,kv_attention_k_read_h3,attn_h3_qkt_scaled,eligible after last consumer and completion retirement
+l1.kv_attention_v_read_h0,1,activation_or_scratch,0x05100,0x05200,256,64,267,331,kv_attention_v_read_h0,attn_h0_av_q15,eligible after last consumer and completion retirement
+l1.kv_attention_v_read_h1,1,activation_or_scratch,0x05400,0x05500,256,64,286,336,kv_attention_v_read_h1,attn_h1_av_q15,eligible after last consumer and completion retirement
+l1.kv_attention_v_read_h2,1,activation_or_scratch,0x05600,0x05700,256,64,305,341,kv_attention_v_read_h2,attn_h2_av_q15,eligible after last consumer and completion retirement
+l1.kv_attention_v_read_h3,1,activation_or_scratch,0x05800,0x05900,256,64,324,346,kv_attention_v_read_h3,attn_h3_av_q15,eligible after last consumer and completion retirement
+l1.attn_q_h0_i8,1,activation_or_scratch,0x12000,0x12100,256,64,255,268,attn_q_h0_requant,attn_h0_qkt_scaled,eligible after last consumer and completion retirement
+l1.attn_k_h0_i8,1,activation_or_scratch,0x05000,0x05100,256,64,256,261,attn_k_h0_requant,"kv_attention_k_qk_append_h0_t0,kv_attention_k_qk_append_h0_t1,kv_attention_k_qk_append_h0_t2,kv_attention_k_qk_append_h0_t3",eligible after last consumer and completion retirement
+l1.attn_v_h0_cache_source_i8,1,activation_or_scratch,0x05100,0x05200,256,64,257,266,attn_v_h0_cache_requant,"kv_attention_v_append_h0_t0,kv_attention_v_append_h0_t1,kv_attention_v_append_h0_t2,kv_attention_v_append_h0_t3",eligible after last consumer and completion retirement
+l1.attn_h0_scores_q8_8,1,activation_or_scratch,0x10c00,0x11000,1024,64,268,272,attn_h0_qkt_scaled,"attn_h0_causal_softmax_t0,attn_h0_causal_softmax_t1,attn_h0_causal_softmax_t2,attn_h0_causal_softmax_t3",eligible after last consumer and completion retirement
+l1.attn_h0_prob_q15,1,activation_or_scratch,0x07000,0x07400,1024,64,225,273,"attn_h0_causal_softmax_t0,attn_h0_causal_softmax_t1,attn_h0_causal_softmax_t2,attn_h0_causal_softmax_t3",attn_h0_prob_requant,eligible after last consumer and completion retirement
+l1.attn_h0_prob_i8,1,activation_or_scratch,0x05000,0x05100,256,64,273,331,attn_h0_prob_requant,attn_h0_av_q15,eligible after last consumer and completion retirement
+l1.attn_q_h1_i8,1,activation_or_scratch,0x05200,0x05300,256,64,274,287,attn_q_h1_requant,attn_h1_qkt_scaled,eligible after last consumer and completion retirement
+l1.attn_k_h1_i8,1,activation_or_scratch,0x05300,0x05400,256,64,275,280,attn_k_h1_requant,"kv_attention_k_qk_append_h1_t0,kv_attention_k_qk_append_h1_t1,kv_attention_k_qk_append_h1_t2,kv_attention_k_qk_append_h1_t3",eligible after last consumer and completion retirement
+l1.attn_v_h1_cache_source_i8,1,activation_or_scratch,0x05400,0x05500,256,64,276,285,attn_v_h1_cache_requant,"kv_attention_v_append_h1_t0,kv_attention_v_append_h1_t1,kv_attention_v_append_h1_t2,kv_attention_v_append_h1_t3",eligible after last consumer and completion retirement
+l1.attn_h1_scores_q8_8,1,activation_or_scratch,0x07000,0x07400,1024,64,287,291,attn_h1_qkt_scaled,"attn_h1_causal_softmax_t0,attn_h1_causal_softmax_t1,attn_h1_causal_softmax_t2,attn_h1_causal_softmax_t3",eligible after last consumer and completion retirement
+l1.attn_h1_prob_q15,1,activation_or_scratch,0x07400,0x07800,1024,64,225,292,"attn_h1_causal_softmax_t0,attn_h1_causal_softmax_t1,attn_h1_causal_softmax_t2,attn_h1_causal_softmax_t3",attn_h1_prob_requant,eligible after last consumer and completion retirement
+l1.attn_h1_prob_i8,1,activation_or_scratch,0x05200,0x05300,256,64,292,336,attn_h1_prob_requant,attn_h1_av_q15,eligible after last consumer and completion retirement
+l1.attn_q_h2_i8,1,activation_or_scratch,0x05300,0x05400,256,64,293,306,attn_q_h2_requant,attn_h2_qkt_scaled,eligible after last consumer and completion retirement
+l1.attn_k_h2_i8,1,activation_or_scratch,0x05500,0x05600,256,64,294,299,attn_k_h2_requant,"kv_attention_k_qk_append_h2_t0,kv_attention_k_qk_append_h2_t1,kv_attention_k_qk_append_h2_t2,kv_attention_k_qk_append_h2_t3",eligible after last consumer and completion retirement
+l1.attn_v_h2_cache_source_i8,1,activation_or_scratch,0x05600,0x05700,256,64,295,304,attn_v_h2_cache_requant,"kv_attention_v_append_h2_t0,kv_attention_v_append_h2_t1,kv_attention_v_append_h2_t2,kv_attention_v_append_h2_t3",eligible after last consumer and completion retirement
+l1.attn_h2_scores_q8_8,1,activation_or_scratch,0x05700,0x05b00,1024,64,306,310,attn_h2_qkt_scaled,"attn_h2_causal_softmax_t0,attn_h2_causal_softmax_t1,attn_h2_causal_softmax_t2,attn_h2_causal_softmax_t3",eligible after last consumer and completion retirement
+l1.attn_h2_prob_q15,1,activation_or_scratch,0x07800,0x07c00,1024,64,225,311,"attn_h2_causal_softmax_t0,attn_h2_causal_softmax_t1,attn_h2_causal_softmax_t2,attn_h2_causal_softmax_t3",attn_h2_prob_requant,eligible after last consumer and completion retirement
+l1.attn_h2_prob_i8,1,activation_or_scratch,0x05300,0x05400,256,64,311,341,attn_h2_prob_requant,attn_h2_av_q15,eligible after last consumer and completion retirement
+l1.attn_q_h3_i8,1,activation_or_scratch,0x05500,0x05600,256,64,312,325,attn_q_h3_requant,attn_h3_qkt_scaled,eligible after last consumer and completion retirement
+l1.attn_k_h3_i8,1,activation_or_scratch,0x05700,0x05800,256,64,313,318,attn_k_h3_requant,"kv_attention_k_qk_append_h3_t0,kv_attention_k_qk_append_h3_t1,kv_attention_k_qk_append_h3_t2,kv_attention_k_qk_append_h3_t3",eligible after last consumer and completion retirement
+l1.attn_v_h3_cache_source_i8,1,activation_or_scratch,0x05800,0x05900,256,64,314,323,attn_v_h3_cache_requant,"kv_attention_v_append_h3_t0,kv_attention_v_append_h3_t1,kv_attention_v_append_h3_t2,kv_attention_v_append_h3_t3",eligible after last consumer and completion retirement
+l1.attn_h3_scores_q8_8,1,activation_or_scratch,0x05900,0x05d00,1024,64,325,329,attn_h3_qkt_scaled,"attn_h3_causal_softmax_t0,attn_h3_causal_softmax_t1,attn_h3_causal_softmax_t2,attn_h3_causal_softmax_t3",eligible after last consumer and completion retirement
+l1.attn_h3_prob_q15,1,activation_or_scratch,0x07c00,0x08000,1024,64,225,330,"attn_h3_causal_softmax_t0,attn_h3_causal_softmax_t1,attn_h3_causal_softmax_t2,attn_h3_causal_softmax_t3",attn_h3_prob_requant,eligible after last consumer and completion retirement
+l1.attn_h3_prob_i8,1,activation_or_scratch,0x05500,0x05600,256,64,330,346,attn_h3_prob_requant,attn_h3_av_q15,eligible after last consumer and completion retirement
+l1.attention_concat_i8,1,activation_or_scratch,0x07000,0x07400,1024,64,332,351,"attn_h0_av_requant_concat_rg0,attn_h0_av_requant_concat_rg1,attn_h0_av_requant_concat_rg2,attn_h0_av_requant_concat_rg3,attn_h1_av_requant_concat_rg0,attn_h1_av_requant_concat_rg1,attn_h1_av_requant_concat_rg2,attn_h1_av_requant_concat_rg3,attn_h2_av_requant_concat_rg0,attn_h2_av_requant_concat_rg1,attn_h2_av_requant_concat_rg2,attn_h2_av_requant_concat_rg3,attn_h3_av_requant_concat_rg0,attn_h3_av_requant_concat_rg1,attn_h3_av_requant_concat_rg2,attn_h3_av_requant_concat_rg3",attn_output_projection_n64,eligible after last consumer and completion retirement
+l1.attn_h0_av_i32,1,activation_or_scratch,0x05900,0x05d00,1024,64,331,335,attn_h0_av_q15,"attn_h0_av_requant_concat_rg0,attn_h0_av_requant_concat_rg1,attn_h0_av_requant_concat_rg2,attn_h0_av_requant_concat_rg3",eligible after last consumer and completion retirement
+l1.attn_h1_av_i32,1,activation_or_scratch,0x05900,0x05d00,1024,64,336,340,attn_h1_av_q15,"attn_h1_av_requant_concat_rg0,attn_h1_av_requant_concat_rg1,attn_h1_av_requant_concat_rg2,attn_h1_av_requant_concat_rg3",eligible after last consumer and completion retirement
+l1.attn_h2_av_i32,1,activation_or_scratch,0x05900,0x05d00,1024,64,341,345,attn_h2_av_q15,"attn_h2_av_requant_concat_rg0,attn_h2_av_requant_concat_rg1,attn_h2_av_requant_concat_rg2,attn_h2_av_requant_concat_rg3",eligible after last consumer and completion retirement
+l1.attn_h3_av_i32,1,activation_or_scratch,0x05000,0x05400,1024,64,346,350,attn_h3_av_q15,"attn_h3_av_requant_concat_rg0,attn_h3_av_requant_concat_rg1,attn_h3_av_requant_concat_rg2,attn_h3_av_requant_concat_rg3",eligible after last consumer and completion retirement
+l1.attn_o_weight_n64,1,weight_tile,0x04000,0x05000,4096,64,225,351,external DMA,attn_output_projection_n64,eligible after last consumer and completion retirement
+l1.attn_output_i32,1,activation_or_scratch,0x05000,0x06000,4096,64,351,352,attn_output_projection_n64,attn_residual1,eligible after last consumer and completion retirement
+l1.residual1_i32,1,activation_or_scratch,0x04000,0x05000,4096,64,352,449,attn_residual1,"ln2_row0,ln2_row1,ln2_row2,ln2_row3,ln2_row4,ln2_row5,ln2_row6,ln2_row7,ln2_row8,ln2_row9,ln2_row10,ln2_row11,ln2_row12,ln2_row13,ln2_row14,ln2_row15,l0.ffn_residual2",eligible after last consumer and completion retirement
+l1.ln2_output_i32,1,activation_or_scratch,0x05000,0x06000,4096,64,353,369,"ln2_row0,ln2_row1,ln2_row2,ln2_row3,ln2_row4,ln2_row5,ln2_row6,ln2_row7,ln2_row8,ln2_row9,ln2_row10,ln2_row11,ln2_row12,ln2_row13,ln2_row14,ln2_row15",l0.ffn_input_requant_pack,eligible after last consumer and completion retirement
+l1.ffn_input_i8_matrix_a,1,activation_or_scratch,0x06000,0x06400,1024,64,369,415,l0.ffn_input_requant_pack,"l0.ffn_up_n0,l0.ffn_up_n1,l0.ffn_up_n2,l0.ffn_up_n3,l0.ffn_up_n4,l0.ffn_up_n5,l0.ffn_up_n6,l0.ffn_up_n7,l0.ffn_up_n8,l0.ffn_up_n9,l0.ffn_up_n10,l0.ffn_up_n11,l0.ffn_up_n12,l0.ffn_up_n13,l0.ffn_up_n14,l0.ffn_up_n15",eligible after last consumer and completion retirement
+l1.ffn_up_weight_n0,1,weight_tile,0x0c000,0x0c400,1024,64,225,370,external DMA,l0.ffn_up_n0,eligible after last consumer and completion retirement
+l1.ffn_up_n0_i32,1,activation_or_scratch,0x05000,0x05400,1024,64,370,371,l0.ffn_up_n0,l0.ffn_gelu_n0,eligible after last consumer and completion retirement
+l1.ffn_gelu_n0_i32,1,activation_or_scratch,0x05400,0x05800,1024,64,371,372,l0.ffn_gelu_n0,l0.ffn_requant_pack_n0,eligible after last consumer and completion retirement
+l1.ffn_gelu_n0_i8,1,activation_or_scratch,0x05000,0x05100,256,64,372,418,l0.ffn_requant_pack_n0,l0.ffn_down_k0,eligible after last consumer and completion retirement
+l1.ffn_up_weight_n1,1,weight_tile,0x0c400,0x0c800,1024,64,225,373,external DMA,l0.ffn_up_n1,eligible after last consumer and completion retirement
+l1.ffn_up_n1_i32,1,activation_or_scratch,0x05100,0x05500,1024,64,373,374,l0.ffn_up_n1,l0.ffn_gelu_n1,eligible after last consumer and completion retirement
+l1.ffn_gelu_n1_i32,1,activation_or_scratch,0x05500,0x05900,1024,64,374,375,l0.ffn_gelu_n1,l0.ffn_requant_pack_n1,eligible after last consumer and completion retirement
+l1.ffn_gelu_n1_i8,1,activation_or_scratch,0x05100,0x05200,256,64,375,419,l0.ffn_requant_pack_n1,l0.ffn_down_k1,eligible after last consumer and completion retirement
+l1.ffn_up_weight_n2,1,weight_tile,0x0e000,0x0e400,1024,64,225,376,external DMA,l0.ffn_up_n2,eligible after last consumer and completion retirement
+l1.ffn_up_n2_i32,1,activation_or_scratch,0x05200,0x05600,1024,64,376,377,l0.ffn_up_n2,l0.ffn_gelu_n2,eligible after last consumer and completion retirement
+l1.ffn_gelu_n2_i32,1,activation_or_scratch,0x05600,0x05a00,1024,64,377,378,l0.ffn_gelu_n2,l0.ffn_requant_pack_n2,eligible after last consumer and completion retirement
+l1.ffn_gelu_n2_i8,1,activation_or_scratch,0x05200,0x05300,256,64,378,421,l0.ffn_requant_pack_n2,l0.ffn_down_k2,eligible after last consumer and completion retirement
+l1.ffn_up_weight_n3,1,weight_tile,0x0e400,0x0e800,1024,64,225,379,external DMA,l0.ffn_up_n3,eligible after last consumer and completion retirement
+l1.ffn_up_n3_i32,1,activation_or_scratch,0x05300,0x05700,1024,64,379,380,l0.ffn_up_n3,l0.ffn_gelu_n3,eligible after last consumer and completion retirement
+l1.ffn_gelu_n3_i32,1,activation_or_scratch,0x05700,0x05b00,1024,64,380,381,l0.ffn_gelu_n3,l0.ffn_requant_pack_n3,eligible after last consumer and completion retirement
+l1.ffn_gelu_n3_i8,1,activation_or_scratch,0x05300,0x05400,256,64,381,423,l0.ffn_requant_pack_n3,l0.ffn_down_k3,eligible after last consumer and completion retirement
+l1.ffn_up_weight_n4,1,weight_tile,0x0e800,0x0ec00,1024,64,225,382,external DMA,l0.ffn_up_n4,eligible after last consumer and completion retirement
+l1.ffn_up_n4_i32,1,activation_or_scratch,0x05400,0x05800,1024,64,382,383,l0.ffn_up_n4,l0.ffn_gelu_n4,eligible after last consumer and completion retirement
+l1.ffn_gelu_n4_i32,1,activation_or_scratch,0x05800,0x05c00,1024,64,383,384,l0.ffn_gelu_n4,l0.ffn_requant_pack_n4,eligible after last consumer and completion retirement
+l1.ffn_gelu_n4_i8,1,activation_or_scratch,0x05400,0x05500,256,64,384,425,l0.ffn_requant_pack_n4,l0.ffn_down_k4,eligible after last consumer and completion retirement
+l1.ffn_up_weight_n5,1,weight_tile,0x0ec00,0x0f000,1024,64,225,385,external DMA,l0.ffn_up_n5,eligible after last consumer and completion retirement
+l1.ffn_up_n5_i32,1,activation_or_scratch,0x05500,0x05900,1024,64,385,386,l0.ffn_up_n5,l0.ffn_gelu_n5,eligible after last consumer and completion retirement
+l1.ffn_gelu_n5_i32,1,activation_or_scratch,0x05900,0x05d00,1024,64,386,387,l0.ffn_gelu_n5,l0.ffn_requant_pack_n5,eligible after last consumer and completion retirement
+l1.ffn_gelu_n5_i8,1,activation_or_scratch,0x05500,0x05600,256,64,387,427,l0.ffn_requant_pack_n5,l0.ffn_down_k5,eligible after last consumer and completion retirement
+l1.ffn_up_weight_n6,1,weight_tile,0x0f000,0x0f400,1024,64,225,388,external DMA,l0.ffn_up_n6,eligible after last consumer and completion retirement
+l1.ffn_up_n6_i32,1,activation_or_scratch,0x05600,0x05a00,1024,64,388,389,l0.ffn_up_n6,l0.ffn_gelu_n6,eligible after last consumer and completion retirement
+l1.ffn_gelu_n6_i32,1,activation_or_scratch,0x05a00,0x05e00,1024,64,389,390,l0.ffn_gelu_n6,l0.ffn_requant_pack_n6,eligible after last consumer and completion retirement
+l1.ffn_gelu_n6_i8,1,activation_or_scratch,0x05600,0x05700,256,64,390,429,l0.ffn_requant_pack_n6,l0.ffn_down_k6,eligible after last consumer and completion retirement
+l1.ffn_up_weight_n7,1,weight_tile,0x0f400,0x0f800,1024,64,225,391,external DMA,l0.ffn_up_n7,eligible after last consumer and completion retirement
+l1.ffn_up_n7_i32,1,activation_or_scratch,0x05700,0x05b00,1024,64,391,392,l0.ffn_up_n7,l0.ffn_gelu_n7,eligible after last consumer and completion retirement
+l1.ffn_gelu_n7_i32,1,activation_or_scratch,0x05b00,0x05f00,1024,64,392,393,l0.ffn_gelu_n7,l0.ffn_requant_pack_n7,eligible after last consumer and completion retirement
+l1.ffn_gelu_n7_i8,1,activation_or_scratch,0x05700,0x05800,256,64,393,431,l0.ffn_requant_pack_n7,l0.ffn_down_k7,eligible after last consumer and completion retirement
+l1.ffn_up_weight_n8,1,weight_tile,0x0f800,0x0fc00,1024,64,225,394,external DMA,l0.ffn_up_n8,eligible after last consumer and completion retirement
+l1.ffn_up_n8_i32,1,activation_or_scratch,0x05800,0x05c00,1024,64,394,395,l0.ffn_up_n8,l0.ffn_gelu_n8,eligible after last consumer and completion retirement
+l1.ffn_gelu_n8_i32,1,activation_or_scratch,0x05c00,0x06000,1024,64,395,396,l0.ffn_gelu_n8,l0.ffn_requant_pack_n8,eligible after last consumer and completion retirement
+l1.ffn_gelu_n8_i8,1,activation_or_scratch,0x05800,0x05900,256,64,396,433,l0.ffn_requant_pack_n8,l0.ffn_down_k8,eligible after last consumer and completion retirement
+l1.ffn_up_weight_n9,1,weight_tile,0x0fc00,0x10000,1024,64,225,397,external DMA,l0.ffn_up_n9,eligible after last consumer and completion retirement
+l1.ffn_up_n9_i32,1,activation_or_scratch,0x05900,0x05d00,1024,64,397,398,l0.ffn_up_n9,l0.ffn_gelu_n9,eligible after last consumer and completion retirement
+l1.ffn_gelu_n9_i32,1,activation_or_scratch,0x06400,0x06800,1024,64,398,399,l0.ffn_gelu_n9,l0.ffn_requant_pack_n9,eligible after last consumer and completion retirement
+l1.ffn_gelu_n9_i8,1,activation_or_scratch,0x05900,0x05a00,256,64,399,435,l0.ffn_requant_pack_n9,l0.ffn_down_k9,eligible after last consumer and completion retirement
+l1.ffn_up_weight_n10,1,weight_tile,0x0c800,0x0cc00,1024,64,225,400,external DMA,l0.ffn_up_n10,eligible after last consumer and completion retirement
+l1.ffn_up_n10_i32,1,activation_or_scratch,0x05a00,0x05e00,1024,64,400,401,l0.ffn_up_n10,l0.ffn_gelu_n10,eligible after last consumer and completion retirement
+l1.ffn_gelu_n10_i32,1,activation_or_scratch,0x06400,0x06800,1024,64,401,402,l0.ffn_gelu_n10,l0.ffn_requant_pack_n10,eligible after last consumer and completion retirement
+l1.ffn_gelu_n10_i8,1,activation_or_scratch,0x05a00,0x05b00,256,64,402,437,l0.ffn_requant_pack_n10,l0.ffn_down_k10,eligible after last consumer and completion retirement
+l1.ffn_up_weight_n11,1,weight_tile,0x0cc00,0x0d000,1024,64,225,403,external DMA,l0.ffn_up_n11,eligible after last consumer and completion retirement
+l1.ffn_up_n11_i32,1,activation_or_scratch,0x05b00,0x05f00,1024,64,403,404,l0.ffn_up_n11,l0.ffn_gelu_n11,eligible after last consumer and completion retirement
+l1.ffn_gelu_n11_i32,1,activation_or_scratch,0x06400,0x06800,1024,64,404,405,l0.ffn_gelu_n11,l0.ffn_requant_pack_n11,eligible after last consumer and completion retirement
+l1.ffn_gelu_n11_i8,1,activation_or_scratch,0x05b00,0x05c00,256,64,405,439,l0.ffn_requant_pack_n11,l0.ffn_down_k11,eligible after last consumer and completion retirement
+l1.ffn_up_weight_n12,1,weight_tile,0x0d000,0x0d400,1024,64,225,406,external DMA,l0.ffn_up_n12,eligible after last consumer and completion retirement
+l1.ffn_up_n12_i32,1,activation_or_scratch,0x05c00,0x06000,1024,64,406,407,l0.ffn_up_n12,l0.ffn_gelu_n12,eligible after last consumer and completion retirement
+l1.ffn_gelu_n12_i32,1,activation_or_scratch,0x06400,0x06800,1024,64,407,408,l0.ffn_gelu_n12,l0.ffn_requant_pack_n12,eligible after last consumer and completion retirement
+l1.ffn_gelu_n12_i8,1,activation_or_scratch,0x05c00,0x05d00,256,64,408,441,l0.ffn_requant_pack_n12,l0.ffn_down_k12,eligible after last consumer and completion retirement
+l1.ffn_up_weight_n13,1,weight_tile,0x0d400,0x0d800,1024,64,225,409,external DMA,l0.ffn_up_n13,eligible after last consumer and completion retirement
+l1.ffn_up_n13_i32,1,activation_or_scratch,0x06400,0x06800,1024,64,409,410,l0.ffn_up_n13,l0.ffn_gelu_n13,eligible after last consumer and completion retirement
+l1.ffn_gelu_n13_i32,1,activation_or_scratch,0x06800,0x06c00,1024,64,410,411,l0.ffn_gelu_n13,l0.ffn_requant_pack_n13,eligible after last consumer and completion retirement
+l1.ffn_gelu_n13_i8,1,activation_or_scratch,0x05d00,0x05e00,256,64,411,443,l0.ffn_requant_pack_n13,l0.ffn_down_k13,eligible after last consumer and completion retirement
+l1.ffn_up_weight_n14,1,weight_tile,0x0d800,0x0dc00,1024,64,225,412,external DMA,l0.ffn_up_n14,eligible after last consumer and completion retirement
+l1.ffn_up_n14_i32,1,activation_or_scratch,0x06400,0x06800,1024,64,412,413,l0.ffn_up_n14,l0.ffn_gelu_n14,eligible after last consumer and completion retirement
+l1.ffn_gelu_n14_i32,1,activation_or_scratch,0x06800,0x06c00,1024,64,413,414,l0.ffn_gelu_n14,l0.ffn_requant_pack_n14,eligible after last consumer and completion retirement
+l1.ffn_gelu_n14_i8,1,activation_or_scratch,0x05e00,0x05f00,256,64,414,445,l0.ffn_requant_pack_n14,l0.ffn_down_k14,eligible after last consumer and completion retirement
+l1.ffn_up_weight_n15,1,weight_tile,0x0dc00,0x0e000,1024,64,225,415,external DMA,l0.ffn_up_n15,eligible after last consumer and completion retirement
+l1.ffn_up_n15_i32,1,activation_or_scratch,0x06400,0x06800,1024,64,415,416,l0.ffn_up_n15,l0.ffn_gelu_n15,eligible after last consumer and completion retirement
+l1.ffn_gelu_n15_i32,1,activation_or_scratch,0x05f00,0x06300,1024,64,416,417,l0.ffn_gelu_n15,l0.ffn_requant_pack_n15,eligible after last consumer and completion retirement
+l1.ffn_gelu_n15_i8,1,activation_or_scratch,0x06300,0x06400,256,64,417,447,l0.ffn_requant_pack_n15,l0.ffn_down_k15,eligible after last consumer and completion retirement
+l1.ffn_down_acc_i32,1,activation_or_scratch,0x06400,0x07400,4096,64,418,449,"l0.ffn_down_k0,l0.ffn_down_accumulate_k1,l0.ffn_down_accumulate_k2,l0.ffn_down_accumulate_k3,l0.ffn_down_accumulate_k4,l0.ffn_down_accumulate_k5,l0.ffn_down_accumulate_k6,l0.ffn_down_accumulate_k7,l0.ffn_down_accumulate_k8,l0.ffn_down_accumulate_k9,l0.ffn_down_accumulate_k10,l0.ffn_down_accumulate_k11,l0.ffn_down_accumulate_k12,l0.ffn_down_accumulate_k13,l0.ffn_down_accumulate_k14,l0.ffn_down_accumulate_k15","l0.ffn_down_accumulate_k1,l0.ffn_down_accumulate_k2,l0.ffn_down_accumulate_k3,l0.ffn_down_accumulate_k4,l0.ffn_down_accumulate_k5,l0.ffn_down_accumulate_k6,l0.ffn_down_accumulate_k7,l0.ffn_down_accumulate_k8,l0.ffn_down_accumulate_k9,l0.ffn_down_accumulate_k10,l0.ffn_down_accumulate_k11,l0.ffn_down_accumulate_k12,l0.ffn_down_accumulate_k13,l0.ffn_down_accumulate_k14,l0.ffn_down_accumulate_k15,l0.ffn_residual2",eligible after last consumer and completion retirement
+l1.ffn_down_partial_i32,1,activation_or_scratch,0x07400,0x08400,4096,64,419,448,"l0.ffn_down_k1,l0.ffn_down_k2,l0.ffn_down_k3,l0.ffn_down_k4,l0.ffn_down_k5,l0.ffn_down_k6,l0.ffn_down_k7,l0.ffn_down_k8,l0.ffn_down_k9,l0.ffn_down_k10,l0.ffn_down_k11,l0.ffn_down_k12,l0.ffn_down_k13,l0.ffn_down_k14,l0.ffn_down_k15","l0.ffn_down_accumulate_k1,l0.ffn_down_accumulate_k2,l0.ffn_down_accumulate_k3,l0.ffn_down_accumulate_k4,l0.ffn_down_accumulate_k5,l0.ffn_down_accumulate_k6,l0.ffn_down_accumulate_k7,l0.ffn_down_accumulate_k8,l0.ffn_down_accumulate_k9,l0.ffn_down_accumulate_k10,l0.ffn_down_accumulate_k11,l0.ffn_down_accumulate_k12,l0.ffn_down_accumulate_k13,l0.ffn_down_accumulate_k14,l0.ffn_down_accumulate_k15",eligible after last consumer and completion retirement
+l1.ffn_down_weight_k0,1,weight_tile,0x08000,0x08400,1024,64,225,418,external DMA,l0.ffn_down_k0,eligible after last consumer and completion retirement
+l1.ffn_down_weight_k1,1,weight_tile,0x08400,0x08800,1024,64,225,419,external DMA,l0.ffn_down_k1,eligible after last consumer and completion retirement
+l1.ffn_down_weight_k2,1,weight_tile,0x0a000,0x0a400,1024,64,225,421,external DMA,l0.ffn_down_k2,eligible after last consumer and completion retirement
+l1.ffn_down_weight_k3,1,weight_tile,0x0a400,0x0a800,1024,64,225,423,external DMA,l0.ffn_down_k3,eligible after last consumer and completion retirement
+l1.ffn_down_weight_k4,1,weight_tile,0x0a800,0x0ac00,1024,64,225,425,external DMA,l0.ffn_down_k4,eligible after last consumer and completion retirement
+l1.ffn_down_weight_k5,1,weight_tile,0x0ac00,0x0b000,1024,64,225,427,external DMA,l0.ffn_down_k5,eligible after last consumer and completion retirement
+l1.ffn_down_weight_k6,1,weight_tile,0x0b000,0x0b400,1024,64,225,429,external DMA,l0.ffn_down_k6,eligible after last consumer and completion retirement
+l1.ffn_down_weight_k7,1,weight_tile,0x0b400,0x0b800,1024,64,225,431,external DMA,l0.ffn_down_k7,eligible after last consumer and completion retirement
+l1.ffn_down_weight_k8,1,weight_tile,0x0b800,0x0bc00,1024,64,225,433,external DMA,l0.ffn_down_k8,eligible after last consumer and completion retirement
+l1.ffn_down_weight_k9,1,weight_tile,0x0bc00,0x0c000,1024,64,225,435,external DMA,l0.ffn_down_k9,eligible after last consumer and completion retirement
+l1.ffn_down_weight_k10,1,weight_tile,0x08800,0x08c00,1024,64,225,437,external DMA,l0.ffn_down_k10,eligible after last consumer and completion retirement
+l1.ffn_down_weight_k11,1,weight_tile,0x08c00,0x09000,1024,64,225,439,external DMA,l0.ffn_down_k11,eligible after last consumer and completion retirement
+l1.ffn_down_weight_k12,1,weight_tile,0x09000,0x09400,1024,64,225,441,external DMA,l0.ffn_down_k12,eligible after last consumer and completion retirement
+l1.ffn_down_weight_k13,1,weight_tile,0x09400,0x09800,1024,64,225,443,external DMA,l0.ffn_down_k13,eligible after last consumer and completion retirement
+l1.ffn_down_weight_k14,1,weight_tile,0x09800,0x09c00,1024,64,225,445,external DMA,l0.ffn_down_k14,eligible after last consumer and completion retirement
+l1.ffn_down_weight_k15,1,weight_tile,0x09c00,0x0a000,1024,64,225,447,external DMA,l0.ffn_down_k15,eligible after last consumer and completion retirement
+l1.residual2_i32,1,activation_or_scratch,0x05000,0x06000,4096,64,449,450,l0.ffn_residual2,none,eligible after last consumer and completion retirement
+l2.embedding_plus_position_i32,2,activation_or_scratch,0x06000,0x07000,4096,64,450,577,embedding_position_residual,"preln_row0,preln_row1,preln_row2,preln_row3,preln_row4,preln_row5,preln_row6,preln_row7,preln_row8,preln_row9,preln_row10,preln_row11,preln_row12,preln_row13,preln_row14,preln_row15,attn_residual1",eligible after last consumer and completion retirement
+l2.ln1_gamma_q15_weight,2,weight_tile,0x13100,0x13200,256,64,450,466,external DMA,"preln_row0,preln_row1,preln_row2,preln_row3,preln_row4,preln_row5,preln_row6,preln_row7,preln_row8,preln_row9,preln_row10,preln_row11,preln_row12,preln_row13,preln_row14,preln_row15",eligible after last consumer and completion retirement
+l2.ln1_beta_i32_weight,2,weight_tile,0x13000,0x13100,256,64,450,466,external DMA,"preln_row0,preln_row1,preln_row2,preln_row3,preln_row4,preln_row5,preln_row6,preln_row7,preln_row8,preln_row9,preln_row10,preln_row11,preln_row12,preln_row13,preln_row14,preln_row15",eligible after last consumer and completion retirement
+l2.ln2_gamma_q15_weight,2,weight_tile,0x13300,0x13400,256,64,450,593,external DMA,"ln2_row0,ln2_row1,ln2_row2,ln2_row3,ln2_row4,ln2_row5,ln2_row6,ln2_row7,ln2_row8,ln2_row9,ln2_row10,ln2_row11,ln2_row12,ln2_row13,ln2_row14,ln2_row15",eligible after last consumer and completion retirement
+l2.ln2_beta_i32_weight,2,weight_tile,0x13200,0x13300,256,64,450,593,external DMA,"ln2_row0,ln2_row1,ln2_row2,ln2_row3,ln2_row4,ln2_row5,ln2_row6,ln2_row7,ln2_row8,ln2_row9,ln2_row10,ln2_row11,ln2_row12,ln2_row13,ln2_row14,ln2_row15",eligible after last consumer and completion retirement
+l2.preln_output_i32,2,activation_or_scratch,0x05000,0x06000,4096,64,451,467,"preln_row0,preln_row1,preln_row2,preln_row3,preln_row4,preln_row5,preln_row6,preln_row7,preln_row8,preln_row9,preln_row10,preln_row11,preln_row12,preln_row13,preln_row14,preln_row15",preln_requant_pack_matrix_a,eligible after last consumer and completion retirement
+l2.preln_matrix_a_i8,2,activation_or_scratch,0x13400,0x13800,1024,64,467,479,preln_requant_pack_matrix_a,"l0_q_gemm_n0,l0_q_gemm_n1,l0_q_gemm_n2,l0_q_gemm_n3,l0_k_gemm_n0,l0_k_gemm_n1,l0_k_gemm_n2,l0_k_gemm_n3,l0_v_gemm_n0,l0_v_gemm_n1,l0_v_gemm_n2,l0_v_gemm_n3",eligible after last consumer and completion retirement
+l2_q_weight_n0,2,weight_tile,0x11000,0x11400,1024,64,450,468,external DMA,l0_q_gemm_n0,eligible after last consumer and completion retirement
+l2_q_out_n0,2,activation_or_scratch,0x05000,0x05400,1024,64,468,480,l0_q_gemm_n0,attn_q_h0_requant,eligible after last consumer and completion retirement
+l2_q_weight_n1,2,weight_tile,0x11400,0x11800,1024,64,450,469,external DMA,l0_q_gemm_n1,eligible after last consumer and completion retirement
+l2_q_out_n1,2,activation_or_scratch,0x05400,0x05800,1024,64,469,499,l0_q_gemm_n1,attn_q_h1_requant,eligible after last consumer and completion retirement
+l2_q_weight_n2,2,weight_tile,0x11800,0x11c00,1024,64,450,470,external DMA,l0_q_gemm_n2,eligible after last consumer and completion retirement
+l2_q_out_n2,2,activation_or_scratch,0x05800,0x05c00,1024,64,470,518,l0_q_gemm_n2,attn_q_h2_requant,eligible after last consumer and completion retirement
+l2_q_weight_n3,2,weight_tile,0x11c00,0x12000,1024,64,450,471,external DMA,l0_q_gemm_n3,eligible after last consumer and completion retirement
+l2_q_out_n3,2,activation_or_scratch,0x05c00,0x06000,1024,64,471,537,l0_q_gemm_n3,attn_q_h3_requant,eligible after last consumer and completion retirement
+l2_k_weight_n0,2,weight_tile,0x10000,0x10400,1024,64,450,472,external DMA,l0_k_gemm_n0,eligible after last consumer and completion retirement
+l2_k_out_n0,2,activation_or_scratch,0x11000,0x11400,1024,64,472,481,l0_k_gemm_n0,attn_k_h0_requant,eligible after last consumer and completion retirement
+l2_k_weight_n1,2,weight_tile,0x10400,0x10800,1024,64,450,473,external DMA,l0_k_gemm_n1,eligible after last consumer and completion retirement
+l2_k_out_n1,2,activation_or_scratch,0x10000,0x10400,1024,64,473,500,l0_k_gemm_n1,attn_k_h1_requant,eligible after last consumer and completion retirement
+l2_k_weight_n2,2,weight_tile,0x10800,0x10c00,1024,64,450,474,external DMA,l0_k_gemm_n2,eligible after last consumer and completion retirement
+l2_k_out_n2,2,activation_or_scratch,0x10400,0x10800,1024,64,474,519,l0_k_gemm_n2,attn_k_h2_requant,eligible after last consumer and completion retirement
+l2_k_weight_n3,2,weight_tile,0x10c00,0x11000,1024,64,450,475,external DMA,l0_k_gemm_n3,eligible after last consumer and completion retirement
+l2_k_out_n3,2,activation_or_scratch,0x10800,0x10c00,1024,64,475,538,l0_k_gemm_n3,attn_k_h3_requant,eligible after last consumer and completion retirement
+l2_v_weight_n0,2,weight_tile,0x12000,0x12400,1024,64,450,476,external DMA,l0_v_gemm_n0,eligible after last consumer and completion retirement
+l2_v_out_n0,2,activation_or_scratch,0x10c00,0x11000,1024,64,476,482,l0_v_gemm_n0,attn_v_h0_cache_requant,eligible after last consumer and completion retirement
+l2_v_weight_n1,2,weight_tile,0x12400,0x12800,1024,64,450,477,external DMA,l0_v_gemm_n1,eligible after last consumer and completion retirement
+l2_v_out_n1,2,activation_or_scratch,0x11400,0x11800,1024,64,477,501,l0_v_gemm_n1,attn_v_h1_cache_requant,eligible after last consumer and completion retirement
+l2_v_weight_n2,2,weight_tile,0x12800,0x12c00,1024,64,450,478,external DMA,l0_v_gemm_n2,eligible after last consumer and completion retirement
+l2_v_out_n2,2,activation_or_scratch,0x11800,0x11c00,1024,64,478,520,l0_v_gemm_n2,attn_v_h2_cache_requant,eligible after last consumer and completion retirement
+l2_v_weight_n3,2,weight_tile,0x12c00,0x13000,1024,64,450,479,external DMA,l0_v_gemm_n3,eligible after last consumer and completion retirement
+l2_v_out_n3,2,activation_or_scratch,0x11c00,0x12000,1024,64,479,539,l0_v_gemm_n3,attn_v_h3_cache_requant,eligible after last consumer and completion retirement
+l2.kv_attention_k_read_h0,2,activation_or_scratch,0x05000,0x05100,256,64,487,493,kv_attention_k_read_h0,attn_h0_qkt_scaled,eligible after last consumer and completion retirement
+l2.kv_attention_k_read_h1,2,activation_or_scratch,0x05300,0x05400,256,64,506,512,kv_attention_k_read_h1,attn_h1_qkt_scaled,eligible after last consumer and completion retirement
+l2.kv_attention_k_read_h2,2,activation_or_scratch,0x05500,0x05600,256,64,525,531,kv_attention_k_read_h2,attn_h2_qkt_scaled,eligible after last consumer and completion retirement
+l2.kv_attention_k_read_h3,2,activation_or_scratch,0x05700,0x05800,256,64,544,550,kv_attention_k_read_h3,attn_h3_qkt_scaled,eligible after last consumer and completion retirement
+l2.kv_attention_v_read_h0,2,activation_or_scratch,0x05100,0x05200,256,64,492,556,kv_attention_v_read_h0,attn_h0_av_q15,eligible after last consumer and completion retirement
+l2.kv_attention_v_read_h1,2,activation_or_scratch,0x05400,0x05500,256,64,511,561,kv_attention_v_read_h1,attn_h1_av_q15,eligible after last consumer and completion retirement
+l2.kv_attention_v_read_h2,2,activation_or_scratch,0x05600,0x05700,256,64,530,566,kv_attention_v_read_h2,attn_h2_av_q15,eligible after last consumer and completion retirement
+l2.kv_attention_v_read_h3,2,activation_or_scratch,0x05800,0x05900,256,64,549,571,kv_attention_v_read_h3,attn_h3_av_q15,eligible after last consumer and completion retirement
+l2.attn_q_h0_i8,2,activation_or_scratch,0x12000,0x12100,256,64,480,493,attn_q_h0_requant,attn_h0_qkt_scaled,eligible after last consumer and completion retirement
+l2.attn_k_h0_i8,2,activation_or_scratch,0x05000,0x05100,256,64,481,486,attn_k_h0_requant,"kv_attention_k_qk_append_h0_t0,kv_attention_k_qk_append_h0_t1,kv_attention_k_qk_append_h0_t2,kv_attention_k_qk_append_h0_t3",eligible after last consumer and completion retirement
+l2.attn_v_h0_cache_source_i8,2,activation_or_scratch,0x05100,0x05200,256,64,482,491,attn_v_h0_cache_requant,"kv_attention_v_append_h0_t0,kv_attention_v_append_h0_t1,kv_attention_v_append_h0_t2,kv_attention_v_append_h0_t3",eligible after last consumer and completion retirement
+l2.attn_h0_scores_q8_8,2,activation_or_scratch,0x10c00,0x11000,1024,64,493,497,attn_h0_qkt_scaled,"attn_h0_causal_softmax_t0,attn_h0_causal_softmax_t1,attn_h0_causal_softmax_t2,attn_h0_causal_softmax_t3",eligible after last consumer and completion retirement
+l2.attn_h0_prob_q15,2,activation_or_scratch,0x07000,0x07400,1024,64,450,498,"attn_h0_causal_softmax_t0,attn_h0_causal_softmax_t1,attn_h0_causal_softmax_t2,attn_h0_causal_softmax_t3",attn_h0_prob_requant,eligible after last consumer and completion retirement
+l2.attn_h0_prob_i8,2,activation_or_scratch,0x05000,0x05100,256,64,498,556,attn_h0_prob_requant,attn_h0_av_q15,eligible after last consumer and completion retirement
+l2.attn_q_h1_i8,2,activation_or_scratch,0x05200,0x05300,256,64,499,512,attn_q_h1_requant,attn_h1_qkt_scaled,eligible after last consumer and completion retirement
+l2.attn_k_h1_i8,2,activation_or_scratch,0x05300,0x05400,256,64,500,505,attn_k_h1_requant,"kv_attention_k_qk_append_h1_t0,kv_attention_k_qk_append_h1_t1,kv_attention_k_qk_append_h1_t2,kv_attention_k_qk_append_h1_t3",eligible after last consumer and completion retirement
+l2.attn_v_h1_cache_source_i8,2,activation_or_scratch,0x05400,0x05500,256,64,501,510,attn_v_h1_cache_requant,"kv_attention_v_append_h1_t0,kv_attention_v_append_h1_t1,kv_attention_v_append_h1_t2,kv_attention_v_append_h1_t3",eligible after last consumer and completion retirement
+l2.attn_h1_scores_q8_8,2,activation_or_scratch,0x07000,0x07400,1024,64,512,516,attn_h1_qkt_scaled,"attn_h1_causal_softmax_t0,attn_h1_causal_softmax_t1,attn_h1_causal_softmax_t2,attn_h1_causal_softmax_t3",eligible after last consumer and completion retirement
+l2.attn_h1_prob_q15,2,activation_or_scratch,0x07400,0x07800,1024,64,450,517,"attn_h1_causal_softmax_t0,attn_h1_causal_softmax_t1,attn_h1_causal_softmax_t2,attn_h1_causal_softmax_t3",attn_h1_prob_requant,eligible after last consumer and completion retirement
+l2.attn_h1_prob_i8,2,activation_or_scratch,0x05200,0x05300,256,64,517,561,attn_h1_prob_requant,attn_h1_av_q15,eligible after last consumer and completion retirement
+l2.attn_q_h2_i8,2,activation_or_scratch,0x05300,0x05400,256,64,518,531,attn_q_h2_requant,attn_h2_qkt_scaled,eligible after last consumer and completion retirement
+l2.attn_k_h2_i8,2,activation_or_scratch,0x05500,0x05600,256,64,519,524,attn_k_h2_requant,"kv_attention_k_qk_append_h2_t0,kv_attention_k_qk_append_h2_t1,kv_attention_k_qk_append_h2_t2,kv_attention_k_qk_append_h2_t3",eligible after last consumer and completion retirement
+l2.attn_v_h2_cache_source_i8,2,activation_or_scratch,0x05600,0x05700,256,64,520,529,attn_v_h2_cache_requant,"kv_attention_v_append_h2_t0,kv_attention_v_append_h2_t1,kv_attention_v_append_h2_t2,kv_attention_v_append_h2_t3",eligible after last consumer and completion retirement
+l2.attn_h2_scores_q8_8,2,activation_or_scratch,0x05700,0x05b00,1024,64,531,535,attn_h2_qkt_scaled,"attn_h2_causal_softmax_t0,attn_h2_causal_softmax_t1,attn_h2_causal_softmax_t2,attn_h2_causal_softmax_t3",eligible after last consumer and completion retirement
+l2.attn_h2_prob_q15,2,activation_or_scratch,0x07800,0x07c00,1024,64,450,536,"attn_h2_causal_softmax_t0,attn_h2_causal_softmax_t1,attn_h2_causal_softmax_t2,attn_h2_causal_softmax_t3",attn_h2_prob_requant,eligible after last consumer and completion retirement
+l2.attn_h2_prob_i8,2,activation_or_scratch,0x05300,0x05400,256,64,536,566,attn_h2_prob_requant,attn_h2_av_q15,eligible after last consumer and completion retirement
+l2.attn_q_h3_i8,2,activation_or_scratch,0x05500,0x05600,256,64,537,550,attn_q_h3_requant,attn_h3_qkt_scaled,eligible after last consumer and completion retirement
+l2.attn_k_h3_i8,2,activation_or_scratch,0x05700,0x05800,256,64,538,543,attn_k_h3_requant,"kv_attention_k_qk_append_h3_t0,kv_attention_k_qk_append_h3_t1,kv_attention_k_qk_append_h3_t2,kv_attention_k_qk_append_h3_t3",eligible after last consumer and completion retirement
+l2.attn_v_h3_cache_source_i8,2,activation_or_scratch,0x05800,0x05900,256,64,539,548,attn_v_h3_cache_requant,"kv_attention_v_append_h3_t0,kv_attention_v_append_h3_t1,kv_attention_v_append_h3_t2,kv_attention_v_append_h3_t3",eligible after last consumer and completion retirement
+l2.attn_h3_scores_q8_8,2,activation_or_scratch,0x05900,0x05d00,1024,64,550,554,attn_h3_qkt_scaled,"attn_h3_causal_softmax_t0,attn_h3_causal_softmax_t1,attn_h3_causal_softmax_t2,attn_h3_causal_softmax_t3",eligible after last consumer and completion retirement
+l2.attn_h3_prob_q15,2,activation_or_scratch,0x07c00,0x08000,1024,64,450,555,"attn_h3_causal_softmax_t0,attn_h3_causal_softmax_t1,attn_h3_causal_softmax_t2,attn_h3_causal_softmax_t3",attn_h3_prob_requant,eligible after last consumer and completion retirement
+l2.attn_h3_prob_i8,2,activation_or_scratch,0x05500,0x05600,256,64,555,571,attn_h3_prob_requant,attn_h3_av_q15,eligible after last consumer and completion retirement
+l2.attention_concat_i8,2,activation_or_scratch,0x07000,0x07400,1024,64,557,576,"attn_h0_av_requant_concat_rg0,attn_h0_av_requant_concat_rg1,attn_h0_av_requant_concat_rg2,attn_h0_av_requant_concat_rg3,attn_h1_av_requant_concat_rg0,attn_h1_av_requant_concat_rg1,attn_h1_av_requant_concat_rg2,attn_h1_av_requant_concat_rg3,attn_h2_av_requant_concat_rg0,attn_h2_av_requant_concat_rg1,attn_h2_av_requant_concat_rg2,attn_h2_av_requant_concat_rg3,attn_h3_av_requant_concat_rg0,attn_h3_av_requant_concat_rg1,attn_h3_av_requant_concat_rg2,attn_h3_av_requant_concat_rg3",attn_output_projection_n64,eligible after last consumer and completion retirement
+l2.attn_h0_av_i32,2,activation_or_scratch,0x05900,0x05d00,1024,64,556,560,attn_h0_av_q15,"attn_h0_av_requant_concat_rg0,attn_h0_av_requant_concat_rg1,attn_h0_av_requant_concat_rg2,attn_h0_av_requant_concat_rg3",eligible after last consumer and completion retirement
+l2.attn_h1_av_i32,2,activation_or_scratch,0x05900,0x05d00,1024,64,561,565,attn_h1_av_q15,"attn_h1_av_requant_concat_rg0,attn_h1_av_requant_concat_rg1,attn_h1_av_requant_concat_rg2,attn_h1_av_requant_concat_rg3",eligible after last consumer and completion retirement
+l2.attn_h2_av_i32,2,activation_or_scratch,0x05900,0x05d00,1024,64,566,570,attn_h2_av_q15,"attn_h2_av_requant_concat_rg0,attn_h2_av_requant_concat_rg1,attn_h2_av_requant_concat_rg2,attn_h2_av_requant_concat_rg3",eligible after last consumer and completion retirement
+l2.attn_h3_av_i32,2,activation_or_scratch,0x05000,0x05400,1024,64,571,575,attn_h3_av_q15,"attn_h3_av_requant_concat_rg0,attn_h3_av_requant_concat_rg1,attn_h3_av_requant_concat_rg2,attn_h3_av_requant_concat_rg3",eligible after last consumer and completion retirement
+l2.attn_o_weight_n64,2,weight_tile,0x04000,0x05000,4096,64,450,576,external DMA,attn_output_projection_n64,eligible after last consumer and completion retirement
+l2.attn_output_i32,2,activation_or_scratch,0x05000,0x06000,4096,64,576,577,attn_output_projection_n64,attn_residual1,eligible after last consumer and completion retirement
+l2.residual1_i32,2,activation_or_scratch,0x04000,0x05000,4096,64,577,674,attn_residual1,"ln2_row0,ln2_row1,ln2_row2,ln2_row3,ln2_row4,ln2_row5,ln2_row6,ln2_row7,ln2_row8,ln2_row9,ln2_row10,ln2_row11,ln2_row12,ln2_row13,ln2_row14,ln2_row15,l0.ffn_residual2",eligible after last consumer and completion retirement
+l2.ln2_output_i32,2,activation_or_scratch,0x05000,0x06000,4096,64,578,594,"ln2_row0,ln2_row1,ln2_row2,ln2_row3,ln2_row4,ln2_row5,ln2_row6,ln2_row7,ln2_row8,ln2_row9,ln2_row10,ln2_row11,ln2_row12,ln2_row13,ln2_row14,ln2_row15",l0.ffn_input_requant_pack,eligible after last consumer and completion retirement
+l2.ffn_input_i8_matrix_a,2,activation_or_scratch,0x06000,0x06400,1024,64,594,640,l0.ffn_input_requant_pack,"l0.ffn_up_n0,l0.ffn_up_n1,l0.ffn_up_n2,l0.ffn_up_n3,l0.ffn_up_n4,l0.ffn_up_n5,l0.ffn_up_n6,l0.ffn_up_n7,l0.ffn_up_n8,l0.ffn_up_n9,l0.ffn_up_n10,l0.ffn_up_n11,l0.ffn_up_n12,l0.ffn_up_n13,l0.ffn_up_n14,l0.ffn_up_n15",eligible after last consumer and completion retirement
+l2.ffn_up_weight_n0,2,weight_tile,0x0c000,0x0c400,1024,64,450,595,external DMA,l0.ffn_up_n0,eligible after last consumer and completion retirement
+l2.ffn_up_n0_i32,2,activation_or_scratch,0x05000,0x05400,1024,64,595,596,l0.ffn_up_n0,l0.ffn_gelu_n0,eligible after last consumer and completion retirement
+l2.ffn_gelu_n0_i32,2,activation_or_scratch,0x05400,0x05800,1024,64,596,597,l0.ffn_gelu_n0,l0.ffn_requant_pack_n0,eligible after last consumer and completion retirement
+l2.ffn_gelu_n0_i8,2,activation_or_scratch,0x05000,0x05100,256,64,597,643,l0.ffn_requant_pack_n0,l0.ffn_down_k0,eligible after last consumer and completion retirement
+l2.ffn_up_weight_n1,2,weight_tile,0x0c400,0x0c800,1024,64,450,598,external DMA,l0.ffn_up_n1,eligible after last consumer and completion retirement
+l2.ffn_up_n1_i32,2,activation_or_scratch,0x05100,0x05500,1024,64,598,599,l0.ffn_up_n1,l0.ffn_gelu_n1,eligible after last consumer and completion retirement
+l2.ffn_gelu_n1_i32,2,activation_or_scratch,0x05500,0x05900,1024,64,599,600,l0.ffn_gelu_n1,l0.ffn_requant_pack_n1,eligible after last consumer and completion retirement
+l2.ffn_gelu_n1_i8,2,activation_or_scratch,0x05100,0x05200,256,64,600,644,l0.ffn_requant_pack_n1,l0.ffn_down_k1,eligible after last consumer and completion retirement
+l2.ffn_up_weight_n2,2,weight_tile,0x0e000,0x0e400,1024,64,450,601,external DMA,l0.ffn_up_n2,eligible after last consumer and completion retirement
+l2.ffn_up_n2_i32,2,activation_or_scratch,0x05200,0x05600,1024,64,601,602,l0.ffn_up_n2,l0.ffn_gelu_n2,eligible after last consumer and completion retirement
+l2.ffn_gelu_n2_i32,2,activation_or_scratch,0x05600,0x05a00,1024,64,602,603,l0.ffn_gelu_n2,l0.ffn_requant_pack_n2,eligible after last consumer and completion retirement
+l2.ffn_gelu_n2_i8,2,activation_or_scratch,0x05200,0x05300,256,64,603,646,l0.ffn_requant_pack_n2,l0.ffn_down_k2,eligible after last consumer and completion retirement
+l2.ffn_up_weight_n3,2,weight_tile,0x0e400,0x0e800,1024,64,450,604,external DMA,l0.ffn_up_n3,eligible after last consumer and completion retirement
+l2.ffn_up_n3_i32,2,activation_or_scratch,0x05300,0x05700,1024,64,604,605,l0.ffn_up_n3,l0.ffn_gelu_n3,eligible after last consumer and completion retirement
+l2.ffn_gelu_n3_i32,2,activation_or_scratch,0x05700,0x05b00,1024,64,605,606,l0.ffn_gelu_n3,l0.ffn_requant_pack_n3,eligible after last consumer and completion retirement
+l2.ffn_gelu_n3_i8,2,activation_or_scratch,0x05300,0x05400,256,64,606,648,l0.ffn_requant_pack_n3,l0.ffn_down_k3,eligible after last consumer and completion retirement
+l2.ffn_up_weight_n4,2,weight_tile,0x0e800,0x0ec00,1024,64,450,607,external DMA,l0.ffn_up_n4,eligible after last consumer and completion retirement
+l2.ffn_up_n4_i32,2,activation_or_scratch,0x05400,0x05800,1024,64,607,608,l0.ffn_up_n4,l0.ffn_gelu_n4,eligible after last consumer and completion retirement
+l2.ffn_gelu_n4_i32,2,activation_or_scratch,0x05800,0x05c00,1024,64,608,609,l0.ffn_gelu_n4,l0.ffn_requant_pack_n4,eligible after last consumer and completion retirement
+l2.ffn_gelu_n4_i8,2,activation_or_scratch,0x05400,0x05500,256,64,609,650,l0.ffn_requant_pack_n4,l0.ffn_down_k4,eligible after last consumer and completion retirement
+l2.ffn_up_weight_n5,2,weight_tile,0x0ec00,0x0f000,1024,64,450,610,external DMA,l0.ffn_up_n5,eligible after last consumer and completion retirement
+l2.ffn_up_n5_i32,2,activation_or_scratch,0x05500,0x05900,1024,64,610,611,l0.ffn_up_n5,l0.ffn_gelu_n5,eligible after last consumer and completion retirement
+l2.ffn_gelu_n5_i32,2,activation_or_scratch,0x05900,0x05d00,1024,64,611,612,l0.ffn_gelu_n5,l0.ffn_requant_pack_n5,eligible after last consumer and completion retirement
+l2.ffn_gelu_n5_i8,2,activation_or_scratch,0x05500,0x05600,256,64,612,652,l0.ffn_requant_pack_n5,l0.ffn_down_k5,eligible after last consumer and completion retirement
+l2.ffn_up_weight_n6,2,weight_tile,0x0f000,0x0f400,1024,64,450,613,external DMA,l0.ffn_up_n6,eligible after last consumer and completion retirement
+l2.ffn_up_n6_i32,2,activation_or_scratch,0x05600,0x05a00,1024,64,613,614,l0.ffn_up_n6,l0.ffn_gelu_n6,eligible after last consumer and completion retirement
+l2.ffn_gelu_n6_i32,2,activation_or_scratch,0x05a00,0x05e00,1024,64,614,615,l0.ffn_gelu_n6,l0.ffn_requant_pack_n6,eligible after last consumer and completion retirement
+l2.ffn_gelu_n6_i8,2,activation_or_scratch,0x05600,0x05700,256,64,615,654,l0.ffn_requant_pack_n6,l0.ffn_down_k6,eligible after last consumer and completion retirement
+l2.ffn_up_weight_n7,2,weight_tile,0x0f400,0x0f800,1024,64,450,616,external DMA,l0.ffn_up_n7,eligible after last consumer and completion retirement
+l2.ffn_up_n7_i32,2,activation_or_scratch,0x05700,0x05b00,1024,64,616,617,l0.ffn_up_n7,l0.ffn_gelu_n7,eligible after last consumer and completion retirement
+l2.ffn_gelu_n7_i32,2,activation_or_scratch,0x05b00,0x05f00,1024,64,617,618,l0.ffn_gelu_n7,l0.ffn_requant_pack_n7,eligible after last consumer and completion retirement
+l2.ffn_gelu_n7_i8,2,activation_or_scratch,0x05700,0x05800,256,64,618,656,l0.ffn_requant_pack_n7,l0.ffn_down_k7,eligible after last consumer and completion retirement
+l2.ffn_up_weight_n8,2,weight_tile,0x0f800,0x0fc00,1024,64,450,619,external DMA,l0.ffn_up_n8,eligible after last consumer and completion retirement
+l2.ffn_up_n8_i32,2,activation_or_scratch,0x05800,0x05c00,1024,64,619,620,l0.ffn_up_n8,l0.ffn_gelu_n8,eligible after last consumer and completion retirement
+l2.ffn_gelu_n8_i32,2,activation_or_scratch,0x05c00,0x06000,1024,64,620,621,l0.ffn_gelu_n8,l0.ffn_requant_pack_n8,eligible after last consumer and completion retirement
+l2.ffn_gelu_n8_i8,2,activation_or_scratch,0x05800,0x05900,256,64,621,658,l0.ffn_requant_pack_n8,l0.ffn_down_k8,eligible after last consumer and completion retirement
+l2.ffn_up_weight_n9,2,weight_tile,0x0fc00,0x10000,1024,64,450,622,external DMA,l0.ffn_up_n9,eligible after last consumer and completion retirement
+l2.ffn_up_n9_i32,2,activation_or_scratch,0x05900,0x05d00,1024,64,622,623,l0.ffn_up_n9,l0.ffn_gelu_n9,eligible after last consumer and completion retirement
+l2.ffn_gelu_n9_i32,2,activation_or_scratch,0x06400,0x06800,1024,64,623,624,l0.ffn_gelu_n9,l0.ffn_requant_pack_n9,eligible after last consumer and completion retirement
+l2.ffn_gelu_n9_i8,2,activation_or_scratch,0x05900,0x05a00,256,64,624,660,l0.ffn_requant_pack_n9,l0.ffn_down_k9,eligible after last consumer and completion retirement
+l2.ffn_up_weight_n10,2,weight_tile,0x0c800,0x0cc00,1024,64,450,625,external DMA,l0.ffn_up_n10,eligible after last consumer and completion retirement
+l2.ffn_up_n10_i32,2,activation_or_scratch,0x05a00,0x05e00,1024,64,625,626,l0.ffn_up_n10,l0.ffn_gelu_n10,eligible after last consumer and completion retirement
+l2.ffn_gelu_n10_i32,2,activation_or_scratch,0x06400,0x06800,1024,64,626,627,l0.ffn_gelu_n10,l0.ffn_requant_pack_n10,eligible after last consumer and completion retirement
+l2.ffn_gelu_n10_i8,2,activation_or_scratch,0x05a00,0x05b00,256,64,627,662,l0.ffn_requant_pack_n10,l0.ffn_down_k10,eligible after last consumer and completion retirement
+l2.ffn_up_weight_n11,2,weight_tile,0x0cc00,0x0d000,1024,64,450,628,external DMA,l0.ffn_up_n11,eligible after last consumer and completion retirement
+l2.ffn_up_n11_i32,2,activation_or_scratch,0x05b00,0x05f00,1024,64,628,629,l0.ffn_up_n11,l0.ffn_gelu_n11,eligible after last consumer and completion retirement
+l2.ffn_gelu_n11_i32,2,activation_or_scratch,0x06400,0x06800,1024,64,629,630,l0.ffn_gelu_n11,l0.ffn_requant_pack_n11,eligible after last consumer and completion retirement
+l2.ffn_gelu_n11_i8,2,activation_or_scratch,0x05b00,0x05c00,256,64,630,664,l0.ffn_requant_pack_n11,l0.ffn_down_k11,eligible after last consumer and completion retirement
+l2.ffn_up_weight_n12,2,weight_tile,0x0d000,0x0d400,1024,64,450,631,external DMA,l0.ffn_up_n12,eligible after last consumer and completion retirement
+l2.ffn_up_n12_i32,2,activation_or_scratch,0x05c00,0x06000,1024,64,631,632,l0.ffn_up_n12,l0.ffn_gelu_n12,eligible after last consumer and completion retirement
+l2.ffn_gelu_n12_i32,2,activation_or_scratch,0x06400,0x06800,1024,64,632,633,l0.ffn_gelu_n12,l0.ffn_requant_pack_n12,eligible after last consumer and completion retirement
+l2.ffn_gelu_n12_i8,2,activation_or_scratch,0x05c00,0x05d00,256,64,633,666,l0.ffn_requant_pack_n12,l0.ffn_down_k12,eligible after last consumer and completion retirement
+l2.ffn_up_weight_n13,2,weight_tile,0x0d400,0x0d800,1024,64,450,634,external DMA,l0.ffn_up_n13,eligible after last consumer and completion retirement
+l2.ffn_up_n13_i32,2,activation_or_scratch,0x06400,0x06800,1024,64,634,635,l0.ffn_up_n13,l0.ffn_gelu_n13,eligible after last consumer and completion retirement
+l2.ffn_gelu_n13_i32,2,activation_or_scratch,0x06800,0x06c00,1024,64,635,636,l0.ffn_gelu_n13,l0.ffn_requant_pack_n13,eligible after last consumer and completion retirement
+l2.ffn_gelu_n13_i8,2,activation_or_scratch,0x05d00,0x05e00,256,64,636,668,l0.ffn_requant_pack_n13,l0.ffn_down_k13,eligible after last consumer and completion retirement
+l2.ffn_up_weight_n14,2,weight_tile,0x0d800,0x0dc00,1024,64,450,637,external DMA,l0.ffn_up_n14,eligible after last consumer and completion retirement
+l2.ffn_up_n14_i32,2,activation_or_scratch,0x06400,0x06800,1024,64,637,638,l0.ffn_up_n14,l0.ffn_gelu_n14,eligible after last consumer and completion retirement
+l2.ffn_gelu_n14_i32,2,activation_or_scratch,0x06800,0x06c00,1024,64,638,639,l0.ffn_gelu_n14,l0.ffn_requant_pack_n14,eligible after last consumer and completion retirement
+l2.ffn_gelu_n14_i8,2,activation_or_scratch,0x05e00,0x05f00,256,64,639,670,l0.ffn_requant_pack_n14,l0.ffn_down_k14,eligible after last consumer and completion retirement
+l2.ffn_up_weight_n15,2,weight_tile,0x0dc00,0x0e000,1024,64,450,640,external DMA,l0.ffn_up_n15,eligible after last consumer and completion retirement
+l2.ffn_up_n15_i32,2,activation_or_scratch,0x06400,0x06800,1024,64,640,641,l0.ffn_up_n15,l0.ffn_gelu_n15,eligible after last consumer and completion retirement
+l2.ffn_gelu_n15_i32,2,activation_or_scratch,0x05f00,0x06300,1024,64,641,642,l0.ffn_gelu_n15,l0.ffn_requant_pack_n15,eligible after last consumer and completion retirement
+l2.ffn_gelu_n15_i8,2,activation_or_scratch,0x06300,0x06400,256,64,642,672,l0.ffn_requant_pack_n15,l0.ffn_down_k15,eligible after last consumer and completion retirement
+l2.ffn_down_acc_i32,2,activation_or_scratch,0x06400,0x07400,4096,64,643,674,"l0.ffn_down_k0,l0.ffn_down_accumulate_k1,l0.ffn_down_accumulate_k2,l0.ffn_down_accumulate_k3,l0.ffn_down_accumulate_k4,l0.ffn_down_accumulate_k5,l0.ffn_down_accumulate_k6,l0.ffn_down_accumulate_k7,l0.ffn_down_accumulate_k8,l0.ffn_down_accumulate_k9,l0.ffn_down_accumulate_k10,l0.ffn_down_accumulate_k11,l0.ffn_down_accumulate_k12,l0.ffn_down_accumulate_k13,l0.ffn_down_accumulate_k14,l0.ffn_down_accumulate_k15","l0.ffn_down_accumulate_k1,l0.ffn_down_accumulate_k2,l0.ffn_down_accumulate_k3,l0.ffn_down_accumulate_k4,l0.ffn_down_accumulate_k5,l0.ffn_down_accumulate_k6,l0.ffn_down_accumulate_k7,l0.ffn_down_accumulate_k8,l0.ffn_down_accumulate_k9,l0.ffn_down_accumulate_k10,l0.ffn_down_accumulate_k11,l0.ffn_down_accumulate_k12,l0.ffn_down_accumulate_k13,l0.ffn_down_accumulate_k14,l0.ffn_down_accumulate_k15,l0.ffn_residual2",eligible after last consumer and completion retirement
+l2.ffn_down_partial_i32,2,activation_or_scratch,0x07400,0x08400,4096,64,644,673,"l0.ffn_down_k1,l0.ffn_down_k2,l0.ffn_down_k3,l0.ffn_down_k4,l0.ffn_down_k5,l0.ffn_down_k6,l0.ffn_down_k7,l0.ffn_down_k8,l0.ffn_down_k9,l0.ffn_down_k10,l0.ffn_down_k11,l0.ffn_down_k12,l0.ffn_down_k13,l0.ffn_down_k14,l0.ffn_down_k15","l0.ffn_down_accumulate_k1,l0.ffn_down_accumulate_k2,l0.ffn_down_accumulate_k3,l0.ffn_down_accumulate_k4,l0.ffn_down_accumulate_k5,l0.ffn_down_accumulate_k6,l0.ffn_down_accumulate_k7,l0.ffn_down_accumulate_k8,l0.ffn_down_accumulate_k9,l0.ffn_down_accumulate_k10,l0.ffn_down_accumulate_k11,l0.ffn_down_accumulate_k12,l0.ffn_down_accumulate_k13,l0.ffn_down_accumulate_k14,l0.ffn_down_accumulate_k15",eligible after last consumer and completion retirement
+l2.ffn_down_weight_k0,2,weight_tile,0x08000,0x08400,1024,64,450,643,external DMA,l0.ffn_down_k0,eligible after last consumer and completion retirement
+l2.ffn_down_weight_k1,2,weight_tile,0x08400,0x08800,1024,64,450,644,external DMA,l0.ffn_down_k1,eligible after last consumer and completion retirement
+l2.ffn_down_weight_k2,2,weight_tile,0x0a000,0x0a400,1024,64,450,646,external DMA,l0.ffn_down_k2,eligible after last consumer and completion retirement
+l2.ffn_down_weight_k3,2,weight_tile,0x0a400,0x0a800,1024,64,450,648,external DMA,l0.ffn_down_k3,eligible after last consumer and completion retirement
+l2.ffn_down_weight_k4,2,weight_tile,0x0a800,0x0ac00,1024,64,450,650,external DMA,l0.ffn_down_k4,eligible after last consumer and completion retirement
+l2.ffn_down_weight_k5,2,weight_tile,0x0ac00,0x0b000,1024,64,450,652,external DMA,l0.ffn_down_k5,eligible after last consumer and completion retirement
+l2.ffn_down_weight_k6,2,weight_tile,0x0b000,0x0b400,1024,64,450,654,external DMA,l0.ffn_down_k6,eligible after last consumer and completion retirement
+l2.ffn_down_weight_k7,2,weight_tile,0x0b400,0x0b800,1024,64,450,656,external DMA,l0.ffn_down_k7,eligible after last consumer and completion retirement
+l2.ffn_down_weight_k8,2,weight_tile,0x0b800,0x0bc00,1024,64,450,658,external DMA,l0.ffn_down_k8,eligible after last consumer and completion retirement
+l2.ffn_down_weight_k9,2,weight_tile,0x0bc00,0x0c000,1024,64,450,660,external DMA,l0.ffn_down_k9,eligible after last consumer and completion retirement
+l2.ffn_down_weight_k10,2,weight_tile,0x08800,0x08c00,1024,64,450,662,external DMA,l0.ffn_down_k10,eligible after last consumer and completion retirement
+l2.ffn_down_weight_k11,2,weight_tile,0x08c00,0x09000,1024,64,450,664,external DMA,l0.ffn_down_k11,eligible after last consumer and completion retirement
+l2.ffn_down_weight_k12,2,weight_tile,0x09000,0x09400,1024,64,450,666,external DMA,l0.ffn_down_k12,eligible after last consumer and completion retirement
+l2.ffn_down_weight_k13,2,weight_tile,0x09400,0x09800,1024,64,450,668,external DMA,l0.ffn_down_k13,eligible after last consumer and completion retirement
+l2.ffn_down_weight_k14,2,weight_tile,0x09800,0x09c00,1024,64,450,670,external DMA,l0.ffn_down_k14,eligible after last consumer and completion retirement
+l2.ffn_down_weight_k15,2,weight_tile,0x09c00,0x0a000,1024,64,450,672,external DMA,l0.ffn_down_k15,eligible after last consumer and completion retirement
+l2.residual2_i32,2,activation_or_scratch,0x05000,0x06000,4096,64,674,675,l0.ffn_residual2,none,eligible after last consumer and completion retirement
+l3.embedding_plus_position_i32,3,activation_or_scratch,0x06000,0x07000,4096,64,675,802,embedding_position_residual,"preln_row0,preln_row1,preln_row2,preln_row3,preln_row4,preln_row5,preln_row6,preln_row7,preln_row8,preln_row9,preln_row10,preln_row11,preln_row12,preln_row13,preln_row14,preln_row15,attn_residual1",eligible after last consumer and completion retirement
+l3.ln1_gamma_q15_weight,3,weight_tile,0x13100,0x13200,256,64,675,691,external DMA,"preln_row0,preln_row1,preln_row2,preln_row3,preln_row4,preln_row5,preln_row6,preln_row7,preln_row8,preln_row9,preln_row10,preln_row11,preln_row12,preln_row13,preln_row14,preln_row15",eligible after last consumer and completion retirement
+l3.ln1_beta_i32_weight,3,weight_tile,0x13000,0x13100,256,64,675,691,external DMA,"preln_row0,preln_row1,preln_row2,preln_row3,preln_row4,preln_row5,preln_row6,preln_row7,preln_row8,preln_row9,preln_row10,preln_row11,preln_row12,preln_row13,preln_row14,preln_row15",eligible after last consumer and completion retirement
+l3.ln2_gamma_q15_weight,3,weight_tile,0x13300,0x13400,256,64,675,818,external DMA,"ln2_row0,ln2_row1,ln2_row2,ln2_row3,ln2_row4,ln2_row5,ln2_row6,ln2_row7,ln2_row8,ln2_row9,ln2_row10,ln2_row11,ln2_row12,ln2_row13,ln2_row14,ln2_row15",eligible after last consumer and completion retirement
+l3.ln2_beta_i32_weight,3,weight_tile,0x13200,0x13300,256,64,675,818,external DMA,"ln2_row0,ln2_row1,ln2_row2,ln2_row3,ln2_row4,ln2_row5,ln2_row6,ln2_row7,ln2_row8,ln2_row9,ln2_row10,ln2_row11,ln2_row12,ln2_row13,ln2_row14,ln2_row15",eligible after last consumer and completion retirement
+l3.preln_output_i32,3,activation_or_scratch,0x05000,0x06000,4096,64,676,692,"preln_row0,preln_row1,preln_row2,preln_row3,preln_row4,preln_row5,preln_row6,preln_row7,preln_row8,preln_row9,preln_row10,preln_row11,preln_row12,preln_row13,preln_row14,preln_row15",preln_requant_pack_matrix_a,eligible after last consumer and completion retirement
+l3.preln_matrix_a_i8,3,activation_or_scratch,0x13400,0x13800,1024,64,692,704,preln_requant_pack_matrix_a,"l0_q_gemm_n0,l0_q_gemm_n1,l0_q_gemm_n2,l0_q_gemm_n3,l0_k_gemm_n0,l0_k_gemm_n1,l0_k_gemm_n2,l0_k_gemm_n3,l0_v_gemm_n0,l0_v_gemm_n1,l0_v_gemm_n2,l0_v_gemm_n3",eligible after last consumer and completion retirement
+l3_q_weight_n0,3,weight_tile,0x11000,0x11400,1024,64,675,693,external DMA,l0_q_gemm_n0,eligible after last consumer and completion retirement
+l3_q_out_n0,3,activation_or_scratch,0x05000,0x05400,1024,64,693,705,l0_q_gemm_n0,attn_q_h0_requant,eligible after last consumer and completion retirement
+l3_q_weight_n1,3,weight_tile,0x11400,0x11800,1024,64,675,694,external DMA,l0_q_gemm_n1,eligible after last consumer and completion retirement
+l3_q_out_n1,3,activation_or_scratch,0x05400,0x05800,1024,64,694,724,l0_q_gemm_n1,attn_q_h1_requant,eligible after last consumer and completion retirement
+l3_q_weight_n2,3,weight_tile,0x11800,0x11c00,1024,64,675,695,external DMA,l0_q_gemm_n2,eligible after last consumer and completion retirement
+l3_q_out_n2,3,activation_or_scratch,0x05800,0x05c00,1024,64,695,743,l0_q_gemm_n2,attn_q_h2_requant,eligible after last consumer and completion retirement
+l3_q_weight_n3,3,weight_tile,0x11c00,0x12000,1024,64,675,696,external DMA,l0_q_gemm_n3,eligible after last consumer and completion retirement
+l3_q_out_n3,3,activation_or_scratch,0x05c00,0x06000,1024,64,696,762,l0_q_gemm_n3,attn_q_h3_requant,eligible after last consumer and completion retirement
+l3_k_weight_n0,3,weight_tile,0x10000,0x10400,1024,64,675,697,external DMA,l0_k_gemm_n0,eligible after last consumer and completion retirement
+l3_k_out_n0,3,activation_or_scratch,0x11000,0x11400,1024,64,697,706,l0_k_gemm_n0,attn_k_h0_requant,eligible after last consumer and completion retirement
+l3_k_weight_n1,3,weight_tile,0x10400,0x10800,1024,64,675,698,external DMA,l0_k_gemm_n1,eligible after last consumer and completion retirement
+l3_k_out_n1,3,activation_or_scratch,0x10000,0x10400,1024,64,698,725,l0_k_gemm_n1,attn_k_h1_requant,eligible after last consumer and completion retirement
+l3_k_weight_n2,3,weight_tile,0x10800,0x10c00,1024,64,675,699,external DMA,l0_k_gemm_n2,eligible after last consumer and completion retirement
+l3_k_out_n2,3,activation_or_scratch,0x10400,0x10800,1024,64,699,744,l0_k_gemm_n2,attn_k_h2_requant,eligible after last consumer and completion retirement
+l3_k_weight_n3,3,weight_tile,0x10c00,0x11000,1024,64,675,700,external DMA,l0_k_gemm_n3,eligible after last consumer and completion retirement
+l3_k_out_n3,3,activation_or_scratch,0x10800,0x10c00,1024,64,700,763,l0_k_gemm_n3,attn_k_h3_requant,eligible after last consumer and completion retirement
+l3_v_weight_n0,3,weight_tile,0x12000,0x12400,1024,64,675,701,external DMA,l0_v_gemm_n0,eligible after last consumer and completion retirement
+l3_v_out_n0,3,activation_or_scratch,0x10c00,0x11000,1024,64,701,707,l0_v_gemm_n0,attn_v_h0_cache_requant,eligible after last consumer and completion retirement
+l3_v_weight_n1,3,weight_tile,0x12400,0x12800,1024,64,675,702,external DMA,l0_v_gemm_n1,eligible after last consumer and completion retirement
+l3_v_out_n1,3,activation_or_scratch,0x11400,0x11800,1024,64,702,726,l0_v_gemm_n1,attn_v_h1_cache_requant,eligible after last consumer and completion retirement
+l3_v_weight_n2,3,weight_tile,0x12800,0x12c00,1024,64,675,703,external DMA,l0_v_gemm_n2,eligible after last consumer and completion retirement
+l3_v_out_n2,3,activation_or_scratch,0x11800,0x11c00,1024,64,703,745,l0_v_gemm_n2,attn_v_h2_cache_requant,eligible after last consumer and completion retirement
+l3_v_weight_n3,3,weight_tile,0x12c00,0x13000,1024,64,675,704,external DMA,l0_v_gemm_n3,eligible after last consumer and completion retirement
+l3_v_out_n3,3,activation_or_scratch,0x11c00,0x12000,1024,64,704,764,l0_v_gemm_n3,attn_v_h3_cache_requant,eligible after last consumer and completion retirement
+l3.kv_attention_k_read_h0,3,activation_or_scratch,0x05000,0x05100,256,64,712,718,kv_attention_k_read_h0,attn_h0_qkt_scaled,eligible after last consumer and completion retirement
+l3.kv_attention_k_read_h1,3,activation_or_scratch,0x05300,0x05400,256,64,731,737,kv_attention_k_read_h1,attn_h1_qkt_scaled,eligible after last consumer and completion retirement
+l3.kv_attention_k_read_h2,3,activation_or_scratch,0x05500,0x05600,256,64,750,756,kv_attention_k_read_h2,attn_h2_qkt_scaled,eligible after last consumer and completion retirement
+l3.kv_attention_k_read_h3,3,activation_or_scratch,0x05700,0x05800,256,64,769,775,kv_attention_k_read_h3,attn_h3_qkt_scaled,eligible after last consumer and completion retirement
+l3.kv_attention_v_read_h0,3,activation_or_scratch,0x05100,0x05200,256,64,717,781,kv_attention_v_read_h0,attn_h0_av_q15,eligible after last consumer and completion retirement
+l3.kv_attention_v_read_h1,3,activation_or_scratch,0x05400,0x05500,256,64,736,786,kv_attention_v_read_h1,attn_h1_av_q15,eligible after last consumer and completion retirement
+l3.kv_attention_v_read_h2,3,activation_or_scratch,0x05600,0x05700,256,64,755,791,kv_attention_v_read_h2,attn_h2_av_q15,eligible after last consumer and completion retirement
+l3.kv_attention_v_read_h3,3,activation_or_scratch,0x05800,0x05900,256,64,774,796,kv_attention_v_read_h3,attn_h3_av_q15,eligible after last consumer and completion retirement
+l3.attn_q_h0_i8,3,activation_or_scratch,0x12000,0x12100,256,64,705,718,attn_q_h0_requant,attn_h0_qkt_scaled,eligible after last consumer and completion retirement
+l3.attn_k_h0_i8,3,activation_or_scratch,0x05000,0x05100,256,64,706,711,attn_k_h0_requant,"kv_attention_k_qk_append_h0_t0,kv_attention_k_qk_append_h0_t1,kv_attention_k_qk_append_h0_t2,kv_attention_k_qk_append_h0_t3",eligible after last consumer and completion retirement
+l3.attn_v_h0_cache_source_i8,3,activation_or_scratch,0x05100,0x05200,256,64,707,716,attn_v_h0_cache_requant,"kv_attention_v_append_h0_t0,kv_attention_v_append_h0_t1,kv_attention_v_append_h0_t2,kv_attention_v_append_h0_t3",eligible after last consumer and completion retirement
+l3.attn_h0_scores_q8_8,3,activation_or_scratch,0x10c00,0x11000,1024,64,718,722,attn_h0_qkt_scaled,"attn_h0_causal_softmax_t0,attn_h0_causal_softmax_t1,attn_h0_causal_softmax_t2,attn_h0_causal_softmax_t3",eligible after last consumer and completion retirement
+l3.attn_h0_prob_q15,3,activation_or_scratch,0x07000,0x07400,1024,64,675,723,"attn_h0_causal_softmax_t0,attn_h0_causal_softmax_t1,attn_h0_causal_softmax_t2,attn_h0_causal_softmax_t3",attn_h0_prob_requant,eligible after last consumer and completion retirement
+l3.attn_h0_prob_i8,3,activation_or_scratch,0x05000,0x05100,256,64,723,781,attn_h0_prob_requant,attn_h0_av_q15,eligible after last consumer and completion retirement
+l3.attn_q_h1_i8,3,activation_or_scratch,0x05200,0x05300,256,64,724,737,attn_q_h1_requant,attn_h1_qkt_scaled,eligible after last consumer and completion retirement
+l3.attn_k_h1_i8,3,activation_or_scratch,0x05300,0x05400,256,64,725,730,attn_k_h1_requant,"kv_attention_k_qk_append_h1_t0,kv_attention_k_qk_append_h1_t1,kv_attention_k_qk_append_h1_t2,kv_attention_k_qk_append_h1_t3",eligible after last consumer and completion retirement
+l3.attn_v_h1_cache_source_i8,3,activation_or_scratch,0x05400,0x05500,256,64,726,735,attn_v_h1_cache_requant,"kv_attention_v_append_h1_t0,kv_attention_v_append_h1_t1,kv_attention_v_append_h1_t2,kv_attention_v_append_h1_t3",eligible after last consumer and completion retirement
+l3.attn_h1_scores_q8_8,3,activation_or_scratch,0x07000,0x07400,1024,64,737,741,attn_h1_qkt_scaled,"attn_h1_causal_softmax_t0,attn_h1_causal_softmax_t1,attn_h1_causal_softmax_t2,attn_h1_causal_softmax_t3",eligible after last consumer and completion retirement
+l3.attn_h1_prob_q15,3,activation_or_scratch,0x07400,0x07800,1024,64,675,742,"attn_h1_causal_softmax_t0,attn_h1_causal_softmax_t1,attn_h1_causal_softmax_t2,attn_h1_causal_softmax_t3",attn_h1_prob_requant,eligible after last consumer and completion retirement
+l3.attn_h1_prob_i8,3,activation_or_scratch,0x05200,0x05300,256,64,742,786,attn_h1_prob_requant,attn_h1_av_q15,eligible after last consumer and completion retirement
+l3.attn_q_h2_i8,3,activation_or_scratch,0x05300,0x05400,256,64,743,756,attn_q_h2_requant,attn_h2_qkt_scaled,eligible after last consumer and completion retirement
+l3.attn_k_h2_i8,3,activation_or_scratch,0x05500,0x05600,256,64,744,749,attn_k_h2_requant,"kv_attention_k_qk_append_h2_t0,kv_attention_k_qk_append_h2_t1,kv_attention_k_qk_append_h2_t2,kv_attention_k_qk_append_h2_t3",eligible after last consumer and completion retirement
+l3.attn_v_h2_cache_source_i8,3,activation_or_scratch,0x05600,0x05700,256,64,745,754,attn_v_h2_cache_requant,"kv_attention_v_append_h2_t0,kv_attention_v_append_h2_t1,kv_attention_v_append_h2_t2,kv_attention_v_append_h2_t3",eligible after last consumer and completion retirement
+l3.attn_h2_scores_q8_8,3,activation_or_scratch,0x05700,0x05b00,1024,64,756,760,attn_h2_qkt_scaled,"attn_h2_causal_softmax_t0,attn_h2_causal_softmax_t1,attn_h2_causal_softmax_t2,attn_h2_causal_softmax_t3",eligible after last consumer and completion retirement
+l3.attn_h2_prob_q15,3,activation_or_scratch,0x07800,0x07c00,1024,64,675,761,"attn_h2_causal_softmax_t0,attn_h2_causal_softmax_t1,attn_h2_causal_softmax_t2,attn_h2_causal_softmax_t3",attn_h2_prob_requant,eligible after last consumer and completion retirement
+l3.attn_h2_prob_i8,3,activation_or_scratch,0x05300,0x05400,256,64,761,791,attn_h2_prob_requant,attn_h2_av_q15,eligible after last consumer and completion retirement
+l3.attn_q_h3_i8,3,activation_or_scratch,0x05500,0x05600,256,64,762,775,attn_q_h3_requant,attn_h3_qkt_scaled,eligible after last consumer and completion retirement
+l3.attn_k_h3_i8,3,activation_or_scratch,0x05700,0x05800,256,64,763,768,attn_k_h3_requant,"kv_attention_k_qk_append_h3_t0,kv_attention_k_qk_append_h3_t1,kv_attention_k_qk_append_h3_t2,kv_attention_k_qk_append_h3_t3",eligible after last consumer and completion retirement
+l3.attn_v_h3_cache_source_i8,3,activation_or_scratch,0x05800,0x05900,256,64,764,773,attn_v_h3_cache_requant,"kv_attention_v_append_h3_t0,kv_attention_v_append_h3_t1,kv_attention_v_append_h3_t2,kv_attention_v_append_h3_t3",eligible after last consumer and completion retirement
+l3.attn_h3_scores_q8_8,3,activation_or_scratch,0x05900,0x05d00,1024,64,775,779,attn_h3_qkt_scaled,"attn_h3_causal_softmax_t0,attn_h3_causal_softmax_t1,attn_h3_causal_softmax_t2,attn_h3_causal_softmax_t3",eligible after last consumer and completion retirement
+l3.attn_h3_prob_q15,3,activation_or_scratch,0x07c00,0x08000,1024,64,675,780,"attn_h3_causal_softmax_t0,attn_h3_causal_softmax_t1,attn_h3_causal_softmax_t2,attn_h3_causal_softmax_t3",attn_h3_prob_requant,eligible after last consumer and completion retirement
+l3.attn_h3_prob_i8,3,activation_or_scratch,0x05500,0x05600,256,64,780,796,attn_h3_prob_requant,attn_h3_av_q15,eligible after last consumer and completion retirement
+l3.attention_concat_i8,3,activation_or_scratch,0x07000,0x07400,1024,64,782,801,"attn_h0_av_requant_concat_rg0,attn_h0_av_requant_concat_rg1,attn_h0_av_requant_concat_rg2,attn_h0_av_requant_concat_rg3,attn_h1_av_requant_concat_rg0,attn_h1_av_requant_concat_rg1,attn_h1_av_requant_concat_rg2,attn_h1_av_requant_concat_rg3,attn_h2_av_requant_concat_rg0,attn_h2_av_requant_concat_rg1,attn_h2_av_requant_concat_rg2,attn_h2_av_requant_concat_rg3,attn_h3_av_requant_concat_rg0,attn_h3_av_requant_concat_rg1,attn_h3_av_requant_concat_rg2,attn_h3_av_requant_concat_rg3",attn_output_projection_n64,eligible after last consumer and completion retirement
+l3.attn_h0_av_i32,3,activation_or_scratch,0x05900,0x05d00,1024,64,781,785,attn_h0_av_q15,"attn_h0_av_requant_concat_rg0,attn_h0_av_requant_concat_rg1,attn_h0_av_requant_concat_rg2,attn_h0_av_requant_concat_rg3",eligible after last consumer and completion retirement
+l3.attn_h1_av_i32,3,activation_or_scratch,0x05900,0x05d00,1024,64,786,790,attn_h1_av_q15,"attn_h1_av_requant_concat_rg0,attn_h1_av_requant_concat_rg1,attn_h1_av_requant_concat_rg2,attn_h1_av_requant_concat_rg3",eligible after last consumer and completion retirement
+l3.attn_h2_av_i32,3,activation_or_scratch,0x05900,0x05d00,1024,64,791,795,attn_h2_av_q15,"attn_h2_av_requant_concat_rg0,attn_h2_av_requant_concat_rg1,attn_h2_av_requant_concat_rg2,attn_h2_av_requant_concat_rg3",eligible after last consumer and completion retirement
+l3.attn_h3_av_i32,3,activation_or_scratch,0x05000,0x05400,1024,64,796,800,attn_h3_av_q15,"attn_h3_av_requant_concat_rg0,attn_h3_av_requant_concat_rg1,attn_h3_av_requant_concat_rg2,attn_h3_av_requant_concat_rg3",eligible after last consumer and completion retirement
+l3.attn_o_weight_n64,3,weight_tile,0x04000,0x05000,4096,64,675,801,external DMA,attn_output_projection_n64,eligible after last consumer and completion retirement
+l3.attn_output_i32,3,activation_or_scratch,0x05000,0x06000,4096,64,801,802,attn_output_projection_n64,attn_residual1,eligible after last consumer and completion retirement
+l3.residual1_i32,3,activation_or_scratch,0x04000,0x05000,4096,64,802,899,attn_residual1,"ln2_row0,ln2_row1,ln2_row2,ln2_row3,ln2_row4,ln2_row5,ln2_row6,ln2_row7,ln2_row8,ln2_row9,ln2_row10,ln2_row11,ln2_row12,ln2_row13,ln2_row14,ln2_row15,l0.ffn_residual2",eligible after last consumer and completion retirement
+l3.ln2_output_i32,3,activation_or_scratch,0x05000,0x06000,4096,64,803,819,"ln2_row0,ln2_row1,ln2_row2,ln2_row3,ln2_row4,ln2_row5,ln2_row6,ln2_row7,ln2_row8,ln2_row9,ln2_row10,ln2_row11,ln2_row12,ln2_row13,ln2_row14,ln2_row15",l0.ffn_input_requant_pack,eligible after last consumer and completion retirement
+l3.ffn_input_i8_matrix_a,3,activation_or_scratch,0x06000,0x06400,1024,64,819,865,l0.ffn_input_requant_pack,"l0.ffn_up_n0,l0.ffn_up_n1,l0.ffn_up_n2,l0.ffn_up_n3,l0.ffn_up_n4,l0.ffn_up_n5,l0.ffn_up_n6,l0.ffn_up_n7,l0.ffn_up_n8,l0.ffn_up_n9,l0.ffn_up_n10,l0.ffn_up_n11,l0.ffn_up_n12,l0.ffn_up_n13,l0.ffn_up_n14,l0.ffn_up_n15",eligible after last consumer and completion retirement
+l3.ffn_up_weight_n0,3,weight_tile,0x0c000,0x0c400,1024,64,675,820,external DMA,l0.ffn_up_n0,eligible after last consumer and completion retirement
+l3.ffn_up_n0_i32,3,activation_or_scratch,0x05000,0x05400,1024,64,820,821,l0.ffn_up_n0,l0.ffn_gelu_n0,eligible after last consumer and completion retirement
+l3.ffn_gelu_n0_i32,3,activation_or_scratch,0x05400,0x05800,1024,64,821,822,l0.ffn_gelu_n0,l0.ffn_requant_pack_n0,eligible after last consumer and completion retirement
+l3.ffn_gelu_n0_i8,3,activation_or_scratch,0x05000,0x05100,256,64,822,868,l0.ffn_requant_pack_n0,l0.ffn_down_k0,eligible after last consumer and completion retirement
+l3.ffn_up_weight_n1,3,weight_tile,0x0c400,0x0c800,1024,64,675,823,external DMA,l0.ffn_up_n1,eligible after last consumer and completion retirement
+l3.ffn_up_n1_i32,3,activation_or_scratch,0x05100,0x05500,1024,64,823,824,l0.ffn_up_n1,l0.ffn_gelu_n1,eligible after last consumer and completion retirement
+l3.ffn_gelu_n1_i32,3,activation_or_scratch,0x05500,0x05900,1024,64,824,825,l0.ffn_gelu_n1,l0.ffn_requant_pack_n1,eligible after last consumer and completion retirement
+l3.ffn_gelu_n1_i8,3,activation_or_scratch,0x05100,0x05200,256,64,825,869,l0.ffn_requant_pack_n1,l0.ffn_down_k1,eligible after last consumer and completion retirement
+l3.ffn_up_weight_n2,3,weight_tile,0x0e000,0x0e400,1024,64,675,826,external DMA,l0.ffn_up_n2,eligible after last consumer and completion retirement
+l3.ffn_up_n2_i32,3,activation_or_scratch,0x05200,0x05600,1024,64,826,827,l0.ffn_up_n2,l0.ffn_gelu_n2,eligible after last consumer and completion retirement
+l3.ffn_gelu_n2_i32,3,activation_or_scratch,0x05600,0x05a00,1024,64,827,828,l0.ffn_gelu_n2,l0.ffn_requant_pack_n2,eligible after last consumer and completion retirement
+l3.ffn_gelu_n2_i8,3,activation_or_scratch,0x05200,0x05300,256,64,828,871,l0.ffn_requant_pack_n2,l0.ffn_down_k2,eligible after last consumer and completion retirement
+l3.ffn_up_weight_n3,3,weight_tile,0x0e400,0x0e800,1024,64,675,829,external DMA,l0.ffn_up_n3,eligible after last consumer and completion retirement
+l3.ffn_up_n3_i32,3,activation_or_scratch,0x05300,0x05700,1024,64,829,830,l0.ffn_up_n3,l0.ffn_gelu_n3,eligible after last consumer and completion retirement
+l3.ffn_gelu_n3_i32,3,activation_or_scratch,0x05700,0x05b00,1024,64,830,831,l0.ffn_gelu_n3,l0.ffn_requant_pack_n3,eligible after last consumer and completion retirement
+l3.ffn_gelu_n3_i8,3,activation_or_scratch,0x05300,0x05400,256,64,831,873,l0.ffn_requant_pack_n3,l0.ffn_down_k3,eligible after last consumer and completion retirement
+l3.ffn_up_weight_n4,3,weight_tile,0x0e800,0x0ec00,1024,64,675,832,external DMA,l0.ffn_up_n4,eligible after last consumer and completion retirement
+l3.ffn_up_n4_i32,3,activation_or_scratch,0x05400,0x05800,1024,64,832,833,l0.ffn_up_n4,l0.ffn_gelu_n4,eligible after last consumer and completion retirement
+l3.ffn_gelu_n4_i32,3,activation_or_scratch,0x05800,0x05c00,1024,64,833,834,l0.ffn_gelu_n4,l0.ffn_requant_pack_n4,eligible after last consumer and completion retirement
+l3.ffn_gelu_n4_i8,3,activation_or_scratch,0x05400,0x05500,256,64,834,875,l0.ffn_requant_pack_n4,l0.ffn_down_k4,eligible after last consumer and completion retirement
+l3.ffn_up_weight_n5,3,weight_tile,0x0ec00,0x0f000,1024,64,675,835,external DMA,l0.ffn_up_n5,eligible after last consumer and completion retirement
+l3.ffn_up_n5_i32,3,activation_or_scratch,0x05500,0x05900,1024,64,835,836,l0.ffn_up_n5,l0.ffn_gelu_n5,eligible after last consumer and completion retirement
+l3.ffn_gelu_n5_i32,3,activation_or_scratch,0x05900,0x05d00,1024,64,836,837,l0.ffn_gelu_n5,l0.ffn_requant_pack_n5,eligible after last consumer and completion retirement
+l3.ffn_gelu_n5_i8,3,activation_or_scratch,0x05500,0x05600,256,64,837,877,l0.ffn_requant_pack_n5,l0.ffn_down_k5,eligible after last consumer and completion retirement
+l3.ffn_up_weight_n6,3,weight_tile,0x0f000,0x0f400,1024,64,675,838,external DMA,l0.ffn_up_n6,eligible after last consumer and completion retirement
+l3.ffn_up_n6_i32,3,activation_or_scratch,0x05600,0x05a00,1024,64,838,839,l0.ffn_up_n6,l0.ffn_gelu_n6,eligible after last consumer and completion retirement
+l3.ffn_gelu_n6_i32,3,activation_or_scratch,0x05a00,0x05e00,1024,64,839,840,l0.ffn_gelu_n6,l0.ffn_requant_pack_n6,eligible after last consumer and completion retirement
+l3.ffn_gelu_n6_i8,3,activation_or_scratch,0x05600,0x05700,256,64,840,879,l0.ffn_requant_pack_n6,l0.ffn_down_k6,eligible after last consumer and completion retirement
+l3.ffn_up_weight_n7,3,weight_tile,0x0f400,0x0f800,1024,64,675,841,external DMA,l0.ffn_up_n7,eligible after last consumer and completion retirement
+l3.ffn_up_n7_i32,3,activation_or_scratch,0x05700,0x05b00,1024,64,841,842,l0.ffn_up_n7,l0.ffn_gelu_n7,eligible after last consumer and completion retirement
+l3.ffn_gelu_n7_i32,3,activation_or_scratch,0x05b00,0x05f00,1024,64,842,843,l0.ffn_gelu_n7,l0.ffn_requant_pack_n7,eligible after last consumer and completion retirement
+l3.ffn_gelu_n7_i8,3,activation_or_scratch,0x05700,0x05800,256,64,843,881,l0.ffn_requant_pack_n7,l0.ffn_down_k7,eligible after last consumer and completion retirement
+l3.ffn_up_weight_n8,3,weight_tile,0x0f800,0x0fc00,1024,64,675,844,external DMA,l0.ffn_up_n8,eligible after last consumer and completion retirement
+l3.ffn_up_n8_i32,3,activation_or_scratch,0x05800,0x05c00,1024,64,844,845,l0.ffn_up_n8,l0.ffn_gelu_n8,eligible after last consumer and completion retirement
+l3.ffn_gelu_n8_i32,3,activation_or_scratch,0x05c00,0x06000,1024,64,845,846,l0.ffn_gelu_n8,l0.ffn_requant_pack_n8,eligible after last consumer and completion retirement
+l3.ffn_gelu_n8_i8,3,activation_or_scratch,0x05800,0x05900,256,64,846,883,l0.ffn_requant_pack_n8,l0.ffn_down_k8,eligible after last consumer and completion retirement
+l3.ffn_up_weight_n9,3,weight_tile,0x0fc00,0x10000,1024,64,675,847,external DMA,l0.ffn_up_n9,eligible after last consumer and completion retirement
+l3.ffn_up_n9_i32,3,activation_or_scratch,0x05900,0x05d00,1024,64,847,848,l0.ffn_up_n9,l0.ffn_gelu_n9,eligible after last consumer and completion retirement
+l3.ffn_gelu_n9_i32,3,activation_or_scratch,0x06400,0x06800,1024,64,848,849,l0.ffn_gelu_n9,l0.ffn_requant_pack_n9,eligible after last consumer and completion retirement
+l3.ffn_gelu_n9_i8,3,activation_or_scratch,0x05900,0x05a00,256,64,849,885,l0.ffn_requant_pack_n9,l0.ffn_down_k9,eligible after last consumer and completion retirement
+l3.ffn_up_weight_n10,3,weight_tile,0x0c800,0x0cc00,1024,64,675,850,external DMA,l0.ffn_up_n10,eligible after last consumer and completion retirement
+l3.ffn_up_n10_i32,3,activation_or_scratch,0x05a00,0x05e00,1024,64,850,851,l0.ffn_up_n10,l0.ffn_gelu_n10,eligible after last consumer and completion retirement
+l3.ffn_gelu_n10_i32,3,activation_or_scratch,0x06400,0x06800,1024,64,851,852,l0.ffn_gelu_n10,l0.ffn_requant_pack_n10,eligible after last consumer and completion retirement
+l3.ffn_gelu_n10_i8,3,activation_or_scratch,0x05a00,0x05b00,256,64,852,887,l0.ffn_requant_pack_n10,l0.ffn_down_k10,eligible after last consumer and completion retirement
+l3.ffn_up_weight_n11,3,weight_tile,0x0cc00,0x0d000,1024,64,675,853,external DMA,l0.ffn_up_n11,eligible after last consumer and completion retirement
+l3.ffn_up_n11_i32,3,activation_or_scratch,0x05b00,0x05f00,1024,64,853,854,l0.ffn_up_n11,l0.ffn_gelu_n11,eligible after last consumer and completion retirement
+l3.ffn_gelu_n11_i32,3,activation_or_scratch,0x06400,0x06800,1024,64,854,855,l0.ffn_gelu_n11,l0.ffn_requant_pack_n11,eligible after last consumer and completion retirement
+l3.ffn_gelu_n11_i8,3,activation_or_scratch,0x05b00,0x05c00,256,64,855,889,l0.ffn_requant_pack_n11,l0.ffn_down_k11,eligible after last consumer and completion retirement
+l3.ffn_up_weight_n12,3,weight_tile,0x0d000,0x0d400,1024,64,675,856,external DMA,l0.ffn_up_n12,eligible after last consumer and completion retirement
+l3.ffn_up_n12_i32,3,activation_or_scratch,0x05c00,0x06000,1024,64,856,857,l0.ffn_up_n12,l0.ffn_gelu_n12,eligible after last consumer and completion retirement
+l3.ffn_gelu_n12_i32,3,activation_or_scratch,0x06400,0x06800,1024,64,857,858,l0.ffn_gelu_n12,l0.ffn_requant_pack_n12,eligible after last consumer and completion retirement
+l3.ffn_gelu_n12_i8,3,activation_or_scratch,0x05c00,0x05d00,256,64,858,891,l0.ffn_requant_pack_n12,l0.ffn_down_k12,eligible after last consumer and completion retirement
+l3.ffn_up_weight_n13,3,weight_tile,0x0d400,0x0d800,1024,64,675,859,external DMA,l0.ffn_up_n13,eligible after last consumer and completion retirement
+l3.ffn_up_n13_i32,3,activation_or_scratch,0x06400,0x06800,1024,64,859,860,l0.ffn_up_n13,l0.ffn_gelu_n13,eligible after last consumer and completion retirement
+l3.ffn_gelu_n13_i32,3,activation_or_scratch,0x06800,0x06c00,1024,64,860,861,l0.ffn_gelu_n13,l0.ffn_requant_pack_n13,eligible after last consumer and completion retirement
+l3.ffn_gelu_n13_i8,3,activation_or_scratch,0x05d00,0x05e00,256,64,861,893,l0.ffn_requant_pack_n13,l0.ffn_down_k13,eligible after last consumer and completion retirement
+l3.ffn_up_weight_n14,3,weight_tile,0x0d800,0x0dc00,1024,64,675,862,external DMA,l0.ffn_up_n14,eligible after last consumer and completion retirement
+l3.ffn_up_n14_i32,3,activation_or_scratch,0x06400,0x06800,1024,64,862,863,l0.ffn_up_n14,l0.ffn_gelu_n14,eligible after last consumer and completion retirement
+l3.ffn_gelu_n14_i32,3,activation_or_scratch,0x06800,0x06c00,1024,64,863,864,l0.ffn_gelu_n14,l0.ffn_requant_pack_n14,eligible after last consumer and completion retirement
+l3.ffn_gelu_n14_i8,3,activation_or_scratch,0x05e00,0x05f00,256,64,864,895,l0.ffn_requant_pack_n14,l0.ffn_down_k14,eligible after last consumer and completion retirement
+l3.ffn_up_weight_n15,3,weight_tile,0x0dc00,0x0e000,1024,64,675,865,external DMA,l0.ffn_up_n15,eligible after last consumer and completion retirement
+l3.ffn_up_n15_i32,3,activation_or_scratch,0x06400,0x06800,1024,64,865,866,l0.ffn_up_n15,l0.ffn_gelu_n15,eligible after last consumer and completion retirement
+l3.ffn_gelu_n15_i32,3,activation_or_scratch,0x05f00,0x06300,1024,64,866,867,l0.ffn_gelu_n15,l0.ffn_requant_pack_n15,eligible after last consumer and completion retirement
+l3.ffn_gelu_n15_i8,3,activation_or_scratch,0x06300,0x06400,256,64,867,897,l0.ffn_requant_pack_n15,l0.ffn_down_k15,eligible after last consumer and completion retirement
+l3.ffn_down_acc_i32,3,activation_or_scratch,0x06400,0x07400,4096,64,868,899,"l0.ffn_down_k0,l0.ffn_down_accumulate_k1,l0.ffn_down_accumulate_k2,l0.ffn_down_accumulate_k3,l0.ffn_down_accumulate_k4,l0.ffn_down_accumulate_k5,l0.ffn_down_accumulate_k6,l0.ffn_down_accumulate_k7,l0.ffn_down_accumulate_k8,l0.ffn_down_accumulate_k9,l0.ffn_down_accumulate_k10,l0.ffn_down_accumulate_k11,l0.ffn_down_accumulate_k12,l0.ffn_down_accumulate_k13,l0.ffn_down_accumulate_k14,l0.ffn_down_accumulate_k15","l0.ffn_down_accumulate_k1,l0.ffn_down_accumulate_k2,l0.ffn_down_accumulate_k3,l0.ffn_down_accumulate_k4,l0.ffn_down_accumulate_k5,l0.ffn_down_accumulate_k6,l0.ffn_down_accumulate_k7,l0.ffn_down_accumulate_k8,l0.ffn_down_accumulate_k9,l0.ffn_down_accumulate_k10,l0.ffn_down_accumulate_k11,l0.ffn_down_accumulate_k12,l0.ffn_down_accumulate_k13,l0.ffn_down_accumulate_k14,l0.ffn_down_accumulate_k15,l0.ffn_residual2",eligible after last consumer and completion retirement
+l3.ffn_down_partial_i32,3,activation_or_scratch,0x07400,0x08400,4096,64,869,898,"l0.ffn_down_k1,l0.ffn_down_k2,l0.ffn_down_k3,l0.ffn_down_k4,l0.ffn_down_k5,l0.ffn_down_k6,l0.ffn_down_k7,l0.ffn_down_k8,l0.ffn_down_k9,l0.ffn_down_k10,l0.ffn_down_k11,l0.ffn_down_k12,l0.ffn_down_k13,l0.ffn_down_k14,l0.ffn_down_k15","l0.ffn_down_accumulate_k1,l0.ffn_down_accumulate_k2,l0.ffn_down_accumulate_k3,l0.ffn_down_accumulate_k4,l0.ffn_down_accumulate_k5,l0.ffn_down_accumulate_k6,l0.ffn_down_accumulate_k7,l0.ffn_down_accumulate_k8,l0.ffn_down_accumulate_k9,l0.ffn_down_accumulate_k10,l0.ffn_down_accumulate_k11,l0.ffn_down_accumulate_k12,l0.ffn_down_accumulate_k13,l0.ffn_down_accumulate_k14,l0.ffn_down_accumulate_k15",eligible after last consumer and completion retirement
+l3.ffn_down_weight_k0,3,weight_tile,0x08000,0x08400,1024,64,675,868,external DMA,l0.ffn_down_k0,eligible after last consumer and completion retirement
+l3.ffn_down_weight_k1,3,weight_tile,0x08400,0x08800,1024,64,675,869,external DMA,l0.ffn_down_k1,eligible after last consumer and completion retirement
+l3.ffn_down_weight_k2,3,weight_tile,0x0a000,0x0a400,1024,64,675,871,external DMA,l0.ffn_down_k2,eligible after last consumer and completion retirement
+l3.ffn_down_weight_k3,3,weight_tile,0x0a400,0x0a800,1024,64,675,873,external DMA,l0.ffn_down_k3,eligible after last consumer and completion retirement
+l3.ffn_down_weight_k4,3,weight_tile,0x0a800,0x0ac00,1024,64,675,875,external DMA,l0.ffn_down_k4,eligible after last consumer and completion retirement
+l3.ffn_down_weight_k5,3,weight_tile,0x0ac00,0x0b000,1024,64,675,877,external DMA,l0.ffn_down_k5,eligible after last consumer and completion retirement
+l3.ffn_down_weight_k6,3,weight_tile,0x0b000,0x0b400,1024,64,675,879,external DMA,l0.ffn_down_k6,eligible after last consumer and completion retirement
+l3.ffn_down_weight_k7,3,weight_tile,0x0b400,0x0b800,1024,64,675,881,external DMA,l0.ffn_down_k7,eligible after last consumer and completion retirement
+l3.ffn_down_weight_k8,3,weight_tile,0x0b800,0x0bc00,1024,64,675,883,external DMA,l0.ffn_down_k8,eligible after last consumer and completion retirement
+l3.ffn_down_weight_k9,3,weight_tile,0x0bc00,0x0c000,1024,64,675,885,external DMA,l0.ffn_down_k9,eligible after last consumer and completion retirement
+l3.ffn_down_weight_k10,3,weight_tile,0x08800,0x08c00,1024,64,675,887,external DMA,l0.ffn_down_k10,eligible after last consumer and completion retirement
+l3.ffn_down_weight_k11,3,weight_tile,0x08c00,0x09000,1024,64,675,889,external DMA,l0.ffn_down_k11,eligible after last consumer and completion retirement
+l3.ffn_down_weight_k12,3,weight_tile,0x09000,0x09400,1024,64,675,891,external DMA,l0.ffn_down_k12,eligible after last consumer and completion retirement
+l3.ffn_down_weight_k13,3,weight_tile,0x09400,0x09800,1024,64,675,893,external DMA,l0.ffn_down_k13,eligible after last consumer and completion retirement
+l3.ffn_down_weight_k14,3,weight_tile,0x09800,0x09c00,1024,64,675,895,external DMA,l0.ffn_down_k14,eligible after last consumer and completion retirement
+l3.ffn_down_weight_k15,3,weight_tile,0x09c00,0x0a000,1024,64,675,897,external DMA,l0.ffn_down_k15,eligible after last consumer and completion retirement
+l3.residual2_i32,3,activation_or_scratch,0x05000,0x06000,4096,64,899,915,l0.ffn_residual2,none,eligible after last consumer and completion retirement
+final_ln_gamma_q15,4,final_output,0x06100,0x06200,256,64,900,915,layer norm parameter,host logits/argmax readback,lifetime-scoped
+final_ln_beta_i32,4,final_output,0x06000,0x06100,256,64,900,915,layer norm parameter,host logits/argmax readback,lifetime-scoped
+final_ln_i32,4,final_output,0x04000,0x05000,4096,64,900,916,Product SFU output,host logits/argmax readback,lifetime-scoped
+final_ln_matrix_a_i8,4,final_output,0x05000,0x05400,1024,64,916,917,Product REQUANT output,host logits/argmax readback,lifetime-scoped
+logits_i32_physical_16x256,4,final_output,0x05400,0x09400,16384,64,917,933,Product Matrix output; host reads four valid rows,host logits/argmax readback,lifetime-scoped
+lm_head_weight_tile_n0,4,streamed_weight_tile,0x04000,0x04400,1024,64,917,917,AXI4 DMA tile load + completion fence,LM_HEAD_N0,same 1 KiB physical tile buffer may be reused after tile retirement
+lm_head_weight_tile_n1,4,streamed_weight_tile,0x04000,0x04400,1024,64,918,918,AXI4 DMA tile load + completion fence,LM_HEAD_N1,same 1 KiB physical tile buffer may be reused after tile retirement
+lm_head_weight_tile_n2,4,streamed_weight_tile,0x04000,0x04400,1024,64,919,919,AXI4 DMA tile load + completion fence,LM_HEAD_N2,same 1 KiB physical tile buffer may be reused after tile retirement
+lm_head_weight_tile_n3,4,streamed_weight_tile,0x04000,0x04400,1024,64,920,920,AXI4 DMA tile load + completion fence,LM_HEAD_N3,same 1 KiB physical tile buffer may be reused after tile retirement
+lm_head_weight_tile_n4,4,streamed_weight_tile,0x04000,0x04400,1024,64,921,921,AXI4 DMA tile load + completion fence,LM_HEAD_N4,same 1 KiB physical tile buffer may be reused after tile retirement
+lm_head_weight_tile_n5,4,streamed_weight_tile,0x04000,0x04400,1024,64,922,922,AXI4 DMA tile load + completion fence,LM_HEAD_N5,same 1 KiB physical tile buffer may be reused after tile retirement
+lm_head_weight_tile_n6,4,streamed_weight_tile,0x04000,0x04400,1024,64,923,923,AXI4 DMA tile load + completion fence,LM_HEAD_N6,same 1 KiB physical tile buffer may be reused after tile retirement
+lm_head_weight_tile_n7,4,streamed_weight_tile,0x04000,0x04400,1024,64,924,924,AXI4 DMA tile load + completion fence,LM_HEAD_N7,same 1 KiB physical tile buffer may be reused after tile retirement
+lm_head_weight_tile_n8,4,streamed_weight_tile,0x04000,0x04400,1024,64,925,925,AXI4 DMA tile load + completion fence,LM_HEAD_N8,same 1 KiB physical tile buffer may be reused after tile retirement
+lm_head_weight_tile_n9,4,streamed_weight_tile,0x04000,0x04400,1024,64,926,926,AXI4 DMA tile load + completion fence,LM_HEAD_N9,same 1 KiB physical tile buffer may be reused after tile retirement
+lm_head_weight_tile_n10,4,streamed_weight_tile,0x04000,0x04400,1024,64,927,927,AXI4 DMA tile load + completion fence,LM_HEAD_N10,same 1 KiB physical tile buffer may be reused after tile retirement
+lm_head_weight_tile_n11,4,streamed_weight_tile,0x04000,0x04400,1024,64,928,928,AXI4 DMA tile load + completion fence,LM_HEAD_N11,same 1 KiB physical tile buffer may be reused after tile retirement
+lm_head_weight_tile_n12,4,streamed_weight_tile,0x04000,0x04400,1024,64,929,929,AXI4 DMA tile load + completion fence,LM_HEAD_N12,same 1 KiB physical tile buffer may be reused after tile retirement
+lm_head_weight_tile_n13,4,streamed_weight_tile,0x04000,0x04400,1024,64,930,930,AXI4 DMA tile load + completion fence,LM_HEAD_N13,same 1 KiB physical tile buffer may be reused after tile retirement
+lm_head_weight_tile_n14,4,streamed_weight_tile,0x04000,0x04400,1024,64,931,931,AXI4 DMA tile load + completion fence,LM_HEAD_N14,same 1 KiB physical tile buffer may be reused after tile retirement
+lm_head_weight_tile_n15,4,streamed_weight_tile,0x04000,0x04400,1024,64,932,932,AXI4 DMA tile load + completion fence,LM_HEAD_N15,same 1 KiB physical tile buffer may be reused after tile retirement

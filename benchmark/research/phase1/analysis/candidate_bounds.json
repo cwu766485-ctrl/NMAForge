@@ -1,0 +1,13 @@
+{
+  "length32_mean_variance_wait": 16896,
+  "length32_layernorm_descriptors": 128,
+  "ideal_removed_cycles": 16896,
+  "baseline_decode_cycles": 367051,
+  "ideal_cycle_reduction_fraction": 0.04603175035621753,
+  "ideal_cycles_after": 350155,
+  "ideal_cycles_per_token_after": 43769.375,
+  "estimated_incremental_buffer_bits": 0,
+  "status": "ANALYTIC_BOUND_NOT_RTL_RESULT",
+  "matrix_prefetch_wait": 300,
+  "second_candidate": "C_EARLIER_PREFETCH_DEFER_NOT_ADMITTED_WITHOUT_POSITIVE_INCREMENTAL_MODEL"
+}

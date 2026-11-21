@@ -1,0 +1,126 @@
+{
+  "candidate_weight_only_symmetric_int8": {
+    "bytes": 5717416,
+    "rule": "per-tensor absmax/127, round-to-nearest-even, clamp[-127,127]",
+    "sha256": "6e757f74429fa04107e89a3c75870a3779e1de24466d9b1304d9a6f36ecca907",
+    "status": "SOFTWARE_ESTIMATE_ONLY_NOT_NMAFORGE_CONTRACT"
+  },
+  "checkpoint_sha256": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c",
+  "config": {
+    "hidden_act": "gelu",
+    "hidden_size": 192,
+    "image_size": 224,
+    "intermediate_size": 768,
+    "layer_norm_eps": 1e-12,
+    "model_type": "vit",
+    "num_attention_heads": 3,
+    "num_hidden_layers": 12,
+    "num_labels": 1000,
+    "patch_size": 16
+  },
+  "fp32_reference": {
+    "embedding_plus_position_fp32": {
+      "sha256": "95dfd61cf4975d516b0d4b5337f6819725be6bf6f80f89c4dc9c09e5943bc9de",
+      "shape": [
+        1,
+        197,
+        192
+      ]
+    },
+    "encoder_layer0_fp32": {
+      "sha256": "d46fdcc08bf01ea8d369b7e6e3de92271958818aec44b158eb38a526ea1a95c6",
+      "shape": [
+        1,
+        197,
+        192
+      ]
+    },
+    "logits_fp32": {
+      "sha256": "6a93175cc464249370687ccb7a3b760fa146edd758cb998f360550e7a7f9b0b1",
+      "shape": [
+        1,
+        1000
+      ]
+    },
+    "patch_projection_fp32": {
+      "sha256": "95672fc62d6aca835bd01677471d9cdc0367d087b682230276b27b01562ffd85",
+      "shape": [
+        1,
+        192,
+        14,
+        14
+      ]
+    },
+    "pixel_values_fp32": {
+      "sha256": "028bcacc0b989481a9e7b1fb119974605721e2cc063a76d1dd1b248d088f9b88",
+      "shape": [
+        1,
+        3,
+        224,
+        224
+      ]
+    }
+  },
+  "hub_revision": "b3428f18dcc7b543470d07f14b4a4157815d1880",
+  "input": {
+    "kind": "deterministic synthetic RGB pixel pattern; no accuracy claim",
+    "processor": {
+      "_processor_class": null,
+      "do_convert_rgb": null,
+      "do_normalize": true,
+      "do_rescale": true,
+      "do_resize": true,
+      "image_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "image_processor_type": "ViTImageProcessor",
+      "image_std": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "resample": 2,
+      "rescale_factor": 0.00392156862745098,
+      "size": {
+        "height": 224,
+        "width": 224
+      }
+    },
+    "seed": 20261117,
+    "shape": [
+      224,
+      224,
+      3
+    ],
+    "uint8_sha256": "d2029eee4ae0be2479a662a7ed549836200929b41987d23caa68d924f0c89f0a"
+  },
+  "model_id": "facebook/deit-tiny-patch16-224",
+  "model_snapshot_files": {
+    "config.json": "e8786a68c993c04b8721c4d379e4f9de6a9564fba5987704dbf8696d53b7972d",
+    "preprocessor_config.json": "90d1ae427c27d2b9dcb01f6a62ba96aa67aac2de1697c59cd212055b5035c4a2",
+    "pytorch_model.bin": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c"
+  },
+  "parameters": 5717416,
+  "product_top_evidence": {
+    "command_cycles": 2442,
+    "golden": "PASS bit-exact INT32",
+    "golden_words": 256,
+    "limitations": "Not full patch embedding, encoder, classifier, or ImageNet inference.",
+    "preloaded_spad_bytes": 25680,
+    "run_id": "nmaforge_deit_patch_round17_v1",
+    "source_scope": "Product Top opcode 0x30; one of 196 patches, first 16 of 192 output channels",
+    "spad_read_bytes": 24576,
+    "spad_write_bytes": 1024,
+    "testbench_preload_axi_cycles": 38519,
+    "useful_macs": 12288
+  },
+  "product_top_status": "PATCH_PROJECTION_TILE_TOP_PASS_FULL_MODEL_NOT_RUN",
+  "software": {
+    "numpy": "2.5.4",
+    "torch": "2.6.0+cpu",
+    "transformers": "4.48.3"
+  },
+  "status": "SOFTWARE_IMPORT_AND_REFERENCE_PASS_NOT_PRODUCT_RTL"
+}

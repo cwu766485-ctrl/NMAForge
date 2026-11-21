@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "run_id": "nmaforge_r17_lnfast_gemm",
+  "tested_source_sha": "7f6fd2a40ef939a7df3a488e04df8ff89ae039e3",
+  "product_rtl_baseline_sha": "79bdfbf550e6b2dccf9e0cb830b8dbab1f878459",
+  "model_sha256": "43ea1d5012e825d068a9dde137c18f2b7e0b95d725a753278331791d86c8ae61",
+  "seed": 20261117,
+  "projection_policy": "gemm",
+  "spad": "128 KiB behavioral four-bank scratchpad",
+  "host_supplied_decode_tokens": [
+    4,
+    5,
+    6,
+    7
+  ],
+  "vcs": "V-2023.12-SP1_Full64",
+  "python": "3.12.13",
+  "command": "cd dv/subsystem/top_smoke/sim && make ai_h16_incremental_decode AI_H16_INCREMENTAL_RUN=/tmp/nmaforge_r17_lnfast_gemm AI_H16_INCREMENTAL_POLICY=gemm AI_H16_INCREMENTAL_SEED=20261117",
+  "golden": "PASS; 368 prefill words and 1,216 words per each of four decode steps; expected/observed tensor and KV hashes match Round 17 baseline",
+  "profile_command": "python3.12 sw/tools/summarize_round17_profile.py --run-dir /tmp/nmaforge_r17_lnfast_gemm --source-sha 7f6fd2a40ef939a7df3a488e04df8ff89ae039e3 --vcs-version V-2023.12-SP1_Full64 --csv docs/benchmark/round17_evidence/ROUND17_LN_FASTPATH_PROFILE.csv --json docs/benchmark/round17_evidence/ROUND17_LN_FASTPATH_PROFILE.json",
+  "optimization": "Exact LayerNorm only for length=16: divide signed sum by 16 with magnitude shift and restore sign (truncate toward zero); divide nonnegative variance sum by 16 with shift (floor). Divider, sqrt, inverse sqrt, and requant remain for non-length16 operations and all other math.",
+  "rtl_cost": "No added registers or buffer. Combinational magnitude/sign logic plus two divide-by-16 bypasses in existing FSM states."
+}

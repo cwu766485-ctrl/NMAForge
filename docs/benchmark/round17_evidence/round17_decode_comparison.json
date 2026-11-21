@@ -1,0 +1,310 @@
+{
+  "status": "PASS_GOLDEN_PROFILE; EXPLORATORY_TARGET_20_PERCENT_NOT_MET",
+  "tested_rtl_sha": "7f6fd2a40ef939a7df3a488e04df8ff89ae039e3",
+  "tested_repo_sha_for_kv_safety": "d2148e3107e0f602c10abb07eb58c3e21f170d53",
+  "baseline_rtl_sha": "79bdfbf550e6b2dccf9e0cb830b8dbab1f878459",
+  "model_sha256": "43ea1d5012e825d068a9dde137c18f2b7e0b95d725a753278331791d86c8ae61",
+  "seed": 20261117,
+  "vcs": "V-2023.12-SP1_Full64",
+  "baseline_run_id": "nmaforge_r17_profile_gemm",
+  "optimized_run_id": "nmaforge_r17_lnfast_gemm",
+  "baseline_decode_cycles": 39615,
+  "optimized_decode_cycles": 35391,
+  "cycles_saved": 4224,
+  "latency_reduction_pct": 10.6626,
+  "inverse_latency_ratio_baseline_over_optimized": 1.119352,
+  "average_cycles_per_token_baseline": 9903.75,
+  "average_cycles_per_token_optimized": 8847.75,
+  "average_cycles_saved_per_token": 1056.0,
+  "layernorm_engine_busy_baseline": 15804,
+  "layernorm_engine_busy_optimized": 11580,
+  "layernorm_cycles_saved": 4224,
+  "causal_softmax_cycles_baseline": 2587,
+  "causal_softmax_cycles_optimized": 2587,
+  "requant_cycles_baseline": 5968,
+  "requant_cycles_optimized": 5968,
+  "sfu_busy_cycles_baseline": 32135,
+  "sfu_busy_cycles_optimized": 27911,
+  "sfu_share_of_decode_baseline_pct": 81.1183,
+  "sfu_share_of_decode_optimized_pct": 78.8647,
+  "prefill_cycles_baseline": 2734,
+  "prefill_cycles_optimized": 2734,
+  "prefill_plus_decode_baseline_cycles": 42349,
+  "prefill_plus_decode_optimized_cycles": 38125,
+  "golden_all_stages": "PASS",
+  "token_comparison": [
+    {
+      "token": 4,
+      "baseline_cycles": 9791,
+      "optimized_cycles": 8735,
+      "cycles_saved": 1056,
+      "latency_reduction_pct": 10.7854,
+      "baseline_sfu_cycles": 7921,
+      "optimized_sfu_cycles": 6865,
+      "matrix_active_cycles": 176,
+      "kv_cycles": 394,
+      "matrix_wait_cycles": 78,
+      "dispatcher_completion_gap_cycles": 762,
+      "spad_read_bytes": 8160,
+      "spad_write_bytes": 4688,
+      "baseline_golden_sha256": "802baf8bf65d15ea3cf5032e4c0c8f625ec77b240e2780148ac50ecca41bce4b",
+      "optimized_golden_sha256": "802baf8bf65d15ea3cf5032e4c0c8f625ec77b240e2780148ac50ecca41bce4b",
+      "baseline_kv_sha256": "259efa20185c82c8252565446ce5f1649016b182462ceb54faea716554c993c6",
+      "optimized_kv_sha256": "259efa20185c82c8252565446ce5f1649016b182462ceb54faea716554c993c6",
+      "golden_match": "PASS",
+      "layernorm_baseline": {
+        "descriptor_count": 8,
+        "completion_interval_cycles": 4039,
+        "engine_busy_cycles": 3951,
+        "sfu_busy_cycles": 3951,
+        "divider_busy_overlap_cycles": 1536,
+        "sqrt_busy_overlap_cycles": 256
+      },
+      "layernorm_optimized": {
+        "descriptor_count": 8,
+        "completion_interval_cycles": 2983,
+        "engine_busy_cycles": 2895,
+        "sfu_busy_cycles": 2895,
+        "divider_busy_overlap_cycles": 512,
+        "sqrt_busy_overlap_cycles": 256
+      },
+      "causal_softmax_baseline": {
+        "descriptor_count": 2,
+        "completion_interval_cycles": 562,
+        "engine_busy_cycles": 534,
+        "sfu_busy_cycles": 534,
+        "divider_busy_overlap_cycles": 340,
+        "sqrt_busy_overlap_cycles": 0
+      },
+      "causal_softmax_optimized": {
+        "descriptor_count": 2,
+        "completion_interval_cycles": 562,
+        "engine_busy_cycles": 534,
+        "sfu_busy_cycles": 534,
+        "divider_busy_overlap_cycles": 340,
+        "sqrt_busy_overlap_cycles": 0
+      },
+      "requant_baseline": {
+        "descriptor_count": 12,
+        "completion_interval_cycles": 1630,
+        "engine_busy_cycles": 1492,
+        "sfu_busy_cycles": 1492,
+        "divider_busy_overlap_cycles": 0,
+        "sqrt_busy_overlap_cycles": 0
+      },
+      "requant_optimized": {
+        "descriptor_count": 12,
+        "completion_interval_cycles": 1630,
+        "engine_busy_cycles": 1492,
+        "sfu_busy_cycles": 1492,
+        "divider_busy_overlap_cycles": 0,
+        "sqrt_busy_overlap_cycles": 0
+      }
+    },
+    {
+      "token": 5,
+      "baseline_cycles": 9865,
+      "optimized_cycles": 8809,
+      "cycles_saved": 1056,
+      "latency_reduction_pct": 10.7045,
+      "baseline_sfu_cycles": 7995,
+      "optimized_sfu_cycles": 6939,
+      "matrix_active_cycles": 176,
+      "kv_cycles": 394,
+      "matrix_wait_cycles": 78,
+      "dispatcher_completion_gap_cycles": 762,
+      "spad_read_bytes": 8160,
+      "spad_write_bytes": 4688,
+      "baseline_golden_sha256": "79c5cec38640918fab1b5ec116bf63699513a6164afbe5997d75196001d3c580",
+      "optimized_golden_sha256": "79c5cec38640918fab1b5ec116bf63699513a6164afbe5997d75196001d3c580",
+      "baseline_kv_sha256": "dc728f5bbf194ee3ff6cec208081685ae48a2e4a6157d9f3bed2a477a3377a0d",
+      "optimized_kv_sha256": "dc728f5bbf194ee3ff6cec208081685ae48a2e4a6157d9f3bed2a477a3377a0d",
+      "golden_match": "PASS",
+      "layernorm_baseline": {
+        "descriptor_count": 8,
+        "completion_interval_cycles": 4039,
+        "engine_busy_cycles": 3951,
+        "sfu_busy_cycles": 3951,
+        "divider_busy_overlap_cycles": 1536,
+        "sqrt_busy_overlap_cycles": 256
+      },
+      "layernorm_optimized": {
+        "descriptor_count": 8,
+        "completion_interval_cycles": 2983,
+        "engine_busy_cycles": 2895,
+        "sfu_busy_cycles": 2895,
+        "divider_busy_overlap_cycles": 512,
+        "sqrt_busy_overlap_cycles": 256
+      },
+      "causal_softmax_baseline": {
+        "descriptor_count": 2,
+        "completion_interval_cycles": 636,
+        "engine_busy_cycles": 608,
+        "sfu_busy_cycles": 608,
+        "divider_busy_overlap_cycles": 408,
+        "sqrt_busy_overlap_cycles": 0
+      },
+      "causal_softmax_optimized": {
+        "descriptor_count": 2,
+        "completion_interval_cycles": 636,
+        "engine_busy_cycles": 608,
+        "sfu_busy_cycles": 608,
+        "divider_busy_overlap_cycles": 408,
+        "sqrt_busy_overlap_cycles": 0
+      },
+      "requant_baseline": {
+        "descriptor_count": 12,
+        "completion_interval_cycles": 1630,
+        "engine_busy_cycles": 1492,
+        "sfu_busy_cycles": 1492,
+        "divider_busy_overlap_cycles": 0,
+        "sqrt_busy_overlap_cycles": 0
+      },
+      "requant_optimized": {
+        "descriptor_count": 12,
+        "completion_interval_cycles": 1630,
+        "engine_busy_cycles": 1492,
+        "sfu_busy_cycles": 1492,
+        "divider_busy_overlap_cycles": 0,
+        "sqrt_busy_overlap_cycles": 0
+      }
+    },
+    {
+      "token": 6,
+      "baseline_cycles": 9939,
+      "optimized_cycles": 8883,
+      "cycles_saved": 1056,
+      "latency_reduction_pct": 10.6248,
+      "baseline_sfu_cycles": 8069,
+      "optimized_sfu_cycles": 7013,
+      "matrix_active_cycles": 176,
+      "kv_cycles": 394,
+      "matrix_wait_cycles": 78,
+      "dispatcher_completion_gap_cycles": 762,
+      "spad_read_bytes": 8160,
+      "spad_write_bytes": 4688,
+      "baseline_golden_sha256": "631c74e53315471c16056109375f6272592c3d57d0d0f491a6eb1acecf4da099",
+      "optimized_golden_sha256": "631c74e53315471c16056109375f6272592c3d57d0d0f491a6eb1acecf4da099",
+      "baseline_kv_sha256": "b7ed49bf8eca05c2364ea28bf6fac11f7601d68275990e36c14d207a75cf5291",
+      "optimized_kv_sha256": "b7ed49bf8eca05c2364ea28bf6fac11f7601d68275990e36c14d207a75cf5291",
+      "golden_match": "PASS",
+      "layernorm_baseline": {
+        "descriptor_count": 8,
+        "completion_interval_cycles": 4039,
+        "engine_busy_cycles": 3951,
+        "sfu_busy_cycles": 3951,
+        "divider_busy_overlap_cycles": 1536,
+        "sqrt_busy_overlap_cycles": 256
+      },
+      "layernorm_optimized": {
+        "descriptor_count": 8,
+        "completion_interval_cycles": 2983,
+        "engine_busy_cycles": 2895,
+        "sfu_busy_cycles": 2895,
+        "divider_busy_overlap_cycles": 512,
+        "sqrt_busy_overlap_cycles": 256
+      },
+      "causal_softmax_baseline": {
+        "descriptor_count": 2,
+        "completion_interval_cycles": 710,
+        "engine_busy_cycles": 682,
+        "sfu_busy_cycles": 682,
+        "divider_busy_overlap_cycles": 476,
+        "sqrt_busy_overlap_cycles": 0
+      },
+      "causal_softmax_optimized": {
+        "descriptor_count": 2,
+        "completion_interval_cycles": 710,
+        "engine_busy_cycles": 682,
+        "sfu_busy_cycles": 682,
+        "divider_busy_overlap_cycles": 476,
+        "sqrt_busy_overlap_cycles": 0
+      },
+      "requant_baseline": {
+        "descriptor_count": 12,
+        "completion_interval_cycles": 1630,
+        "engine_busy_cycles": 1492,
+        "sfu_busy_cycles": 1492,
+        "divider_busy_overlap_cycles": 0,
+        "sqrt_busy_overlap_cycles": 0
+      },
+      "requant_optimized": {
+        "descriptor_count": 12,
+        "completion_interval_cycles": 1630,
+        "engine_busy_cycles": 1492,
+        "sfu_busy_cycles": 1492,
+        "divider_busy_overlap_cycles": 0,
+        "sqrt_busy_overlap_cycles": 0
+      }
+    },
+    {
+      "token": 7,
+      "baseline_cycles": 10020,
+      "optimized_cycles": 8964,
+      "cycles_saved": 1056,
+      "latency_reduction_pct": 10.5389,
+      "baseline_sfu_cycles": 8150,
+      "optimized_sfu_cycles": 7094,
+      "matrix_active_cycles": 176,
+      "kv_cycles": 394,
+      "matrix_wait_cycles": 78,
+      "dispatcher_completion_gap_cycles": 762,
+      "spad_read_bytes": 8160,
+      "spad_write_bytes": 4688,
+      "baseline_golden_sha256": "9738d39172c3aaa045bd03a7be08246ac78de71958e8a3a3393fa6f1db2fa679",
+      "optimized_golden_sha256": "9738d39172c3aaa045bd03a7be08246ac78de71958e8a3a3393fa6f1db2fa679",
+      "baseline_kv_sha256": "8cb81a0691a34bb47fedd6457e141dfef849ba27934e079f16bffb4fbfc0a5cc",
+      "optimized_kv_sha256": "8cb81a0691a34bb47fedd6457e141dfef849ba27934e079f16bffb4fbfc0a5cc",
+      "golden_match": "PASS",
+      "layernorm_baseline": {
+        "descriptor_count": 8,
+        "completion_interval_cycles": 4039,
+        "engine_busy_cycles": 3951,
+        "sfu_busy_cycles": 3951,
+        "divider_busy_overlap_cycles": 1536,
+        "sqrt_busy_overlap_cycles": 256
+      },
+      "layernorm_optimized": {
+        "descriptor_count": 8,
+        "completion_interval_cycles": 2983,
+        "engine_busy_cycles": 2895,
+        "sfu_busy_cycles": 2895,
+        "divider_busy_overlap_cycles": 512,
+        "sqrt_busy_overlap_cycles": 256
+      },
+      "causal_softmax_baseline": {
+        "descriptor_count": 2,
+        "completion_interval_cycles": 791,
+        "engine_busy_cycles": 763,
+        "sfu_busy_cycles": 763,
+        "divider_busy_overlap_cycles": 551,
+        "sqrt_busy_overlap_cycles": 0
+      },
+      "causal_softmax_optimized": {
+        "descriptor_count": 2,
+        "completion_interval_cycles": 791,
+        "engine_busy_cycles": 763,
+        "sfu_busy_cycles": 763,
+        "divider_busy_overlap_cycles": 551,
+        "sqrt_busy_overlap_cycles": 0
+      },
+      "requant_baseline": {
+        "descriptor_count": 12,
+        "completion_interval_cycles": 1630,
+        "engine_busy_cycles": 1492,
+        "sfu_busy_cycles": 1492,
+        "divider_busy_overlap_cycles": 0,
+        "sqrt_busy_overlap_cycles": 0
+      },
+      "requant_optimized": {
+        "descriptor_count": 12,
+        "completion_interval_cycles": 1630,
+        "engine_busy_cycles": 1492,
+        "sfu_busy_cycles": 1492,
+        "divider_busy_overlap_cycles": 0,
+        "sqrt_busy_overlap_cycles": 0
+      }
+    }
+  ],
+  "interpretation": "All measured cycle savings are from the exact N=16 LayerNorm fast path. Softmax, requant, GEMM, KV traffic, Matrix counters, and prefill are unchanged. No approximation, new buffer, or additional state was added."
+}

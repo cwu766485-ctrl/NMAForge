@@ -1,0 +1,1131 @@
+Command: /tmp/nmaforge_r17_ar_final12/simv +ntb_random_seed=20261116 +AI_RANDOM_CASES=0 +AI_SEED=20261116 +ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_DMA_PRELOAD +AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS +AI_H64_PERSISTENT +AI_H64_FOUR_LAYER +AI_H64_DUMP_LOGITS +AI_H64_LOGITS_BASE=21504 +AI_H64_LOGITS_ROW=3 +AI_H64_AUTOREGRESSIVE +AI_H64_AUTOREGRESSIVE_STEPS=4 +AI_H64_FEEDBACK_PLAN=/tmp/nmaforge_r17_ar_final12/feedback_plan.memh +AI_H64_EMBED_BASE=20480 +AI_H64_POSITION_BASE=28672 +AI_H64_LOGITS_DUMP=/tmp/nmaforge_r17_ar_final12/rtl_logits.csv +AI_REPRESENTATIVE_MEMORY=/tmp/nmaforge_r17_ar_final12/stage0/model_memory.memh +AI_REPRESENTATIVE_GOLDEN=/tmp/nmaforge_r17_ar_final12/stage0/model_golden.memh +AI_REPRESENTATIVE_CHECKPOINTS=/tmp/nmaforge_r17_ar_final12/stage0/checkpoint_golden.memh +AI_REPRESENTATIVE_DMA_PAYLOAD=/tmp/nmaforge_r17_ar_final12/stage0/dma_payload.memh +AI_REPRESENTATIVE_DMA_PLAN=/tmp/nmaforge_r17_ar_final12/stage0/dma_plan.memh +AI_H64_PERSISTENT_SEQUENCE_ROOT=/tmp/nmaforge_r17_ar_final12 +AI_H64_PERSISTENT_STAGE_COUNT=3 +AI_H64_PERSISTENT_PREFILL_TOKENS=1 +AI_H64_ACTIVE_TOKENS=4 +AI_REPRESENTATIVE_DESC_BASE=90112 +AI_REPRESENTATIVE_CPL_BASE=122880 +AI_REPRESENTATIVE_DESC_COUNT=225 +AI_REPRESENTATIVE_QUEUE_SIZE=512 +AI_REPRESENTATIVE_USEFUL_MACS=197888 +AI_REPRESENTATIVE_EXECUTED_MACS=819200 +AI_REPRESENTATIVE_PADDING_MACS=621312 +AI_REPRESENTATIVE_USEFUL_OUTPUTS=2048 +AI_REPRESENTATIVE_PHYSICAL_OUTPUTS=8192 -l /tmp/nmaforge_r17_ar_final12/run.log
+Chronologic VCS simulator copyright 1991-2023
+Contains Synopsys proprietary information.
+Compiler version V-2023.12-SP1_Full64; Runtime version V-2023.12-SP1_Full64;  Nov 16 21:34 2026
+REPRESENTATIVE_DMA_FENCE_PASS transaction=0 spad=00014100 bytes=256 checked_words=64 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=1 spad=00014000 bytes=256 checked_words=64 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=2 spad=00014300 bytes=256 checked_words=64 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=3 spad=00014200 bytes=256 checked_words=64 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=4 spad=00012000 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=5 spad=00012400 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=6 spad=00012800 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=7 spad=00012c00 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=8 spad=00011000 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=9 spad=00011400 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=10 spad=00011800 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=11 spad=00011c00 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=12 spad=00013000 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=13 spad=00013400 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=14 spad=00013800 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=15 spad=00013c00 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=16 spad=00004000 bytes=4096 checked_words=1024 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=17 spad=0000d000 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=18 spad=0000d400 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=19 spad=0000f000 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=20 spad=0000f400 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=21 spad=0000f800 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=22 spad=0000fc00 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=23 spad=00010000 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=24 spad=00010400 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=25 spad=00010800 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=26 spad=00010c00 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=27 spad=0000d800 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=28 spad=0000dc00 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=29 spad=0000e000 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=30 spad=0000e400 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=31 spad=0000e800 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=32 spad=0000ec00 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=33 spad=00009000 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=34 spad=00009400 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=35 spad=0000b000 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=36 spad=0000b400 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=37 spad=0000b800 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=38 spad=0000bc00 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=39 spad=0000c000 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=40 spad=0000c400 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=41 spad=0000c800 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=42 spad=0000cc00 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=43 spad=00009800 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=44 spad=00009c00 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=45 spad=0000a000 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=46 spad=0000a400 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=47 spad=0000a800 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_FENCE_PASS transaction=48 spad=0000ac00 bytes=1024 checked_words=256 completion_seen=1 next_cmdq_issue=after_fence
+REPRESENTATIVE_DMA_PRELOAD_PASS transactions=49 payload_bytes=50176 checked_words=12544 axi_read_bytes=50176 ar_bursts=196 r_beats=3136 read_latency_sum=9800 read_latency_count=196 read_latency_max=50 dma_busy_cycles=13230 setup_and_transfer_cycles=14945 test_only_poison_setup_bytes=16384
+R9_SFU_COMMAND index=0 opcode=0x34 length=1024 cycles=7173 pass0=0 pass1=0 pass2=0 math=0 other=7173 spad_request_stall=4 spad_response_wait=2048 spad_read_accepts=2048 spad_write_accepts=1024 divider_busy=0 sqrt_busy=0 cycles_closed=7173
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=1 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=2 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=3 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=4 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=5 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=6 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=7 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=8 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=9 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=10 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=11 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=12 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=13 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=14 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=15 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=16 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R9_SFU_COMMAND index=17 opcode=0x36 length=1024 cycles=3331 pass0=3074 pass1=256 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=1024 spad_read_accepts=1024 spad_write_accepts=256 divider_busy=0 sqrt_busy=0 cycles_closed=3331
+R9_SFU_COMMAND index=18 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+REPRESENTATIVE_CHECKPOINT_PASS desc=30 record=11 words=16 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=19 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=20 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+REPRESENTATIVE_CHECKPOINT_PASS desc=37 record=3 words=64 method=behavioral_sram_backdoor_nonintrusive
+REPRESENTATIVE_CHECKPOINT_PASS desc=42 record=7 words=64 method=behavioral_sram_backdoor_nonintrusive
+REPRESENTATIVE_CHECKPOINT_PASS desc=43 record=12 words=64 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=21 opcode=0x39 length=16 cycles=196 pass0=49 pass1=48 pass2=98 math=0 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=31 sqrt_busy=0 cycles_closed=196
+R9_SFU_COMMAND index=22 opcode=0x39 length=16 cycles=229 pass0=49 pass1=48 pass2=131 math=0 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=61 sqrt_busy=0 cycles_closed=229
+R9_SFU_COMMAND index=23 opcode=0x39 length=16 cycles=258 pass0=49 pass1=48 pass2=160 math=0 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=87 sqrt_busy=0 cycles_closed=258
+R9_SFU_COMMAND index=24 opcode=0x39 length=16 cycles=292 pass0=49 pass1=48 pass2=194 math=0 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=118 sqrt_busy=0 cycles_closed=292
+REPRESENTATIVE_CHECKPOINT_PASS desc=47 record=13 words=64 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=25 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=26 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+REPRESENTATIVE_CHECKPOINT_PASS desc=49 record=14 words=16 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=27 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=28 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+REPRESENTATIVE_CHECKPOINT_PASS desc=56 record=4 words=64 method=behavioral_sram_backdoor_nonintrusive
+REPRESENTATIVE_CHECKPOINT_PASS desc=61 record=8 words=64 method=behavioral_sram_backdoor_nonintrusive
+REPRESENTATIVE_CHECKPOINT_PASS desc=62 record=15 words=64 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=29 opcode=0x39 length=16 cycles=196 pass0=49 pass1=48 pass2=98 math=0 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=31 sqrt_busy=0 cycles_closed=196
+R9_SFU_COMMAND index=30 opcode=0x39 length=16 cycles=225 pass0=49 pass1=48 pass2=127 math=0 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=57 sqrt_busy=0 cycles_closed=225
+R9_SFU_COMMAND index=31 opcode=0x39 length=16 cycles=259 pass0=49 pass1=48 pass2=161 math=0 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=88 sqrt_busy=0 cycles_closed=259
+R9_SFU_COMMAND index=32 opcode=0x39 length=16 cycles=292 pass0=49 pass1=48 pass2=194 math=0 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=118 sqrt_busy=0 cycles_closed=292
+REPRESENTATIVE_CHECKPOINT_PASS desc=66 record=16 words=64 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=33 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=34 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+REPRESENTATIVE_CHECKPOINT_PASS desc=68 record=17 words=16 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=35 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=36 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+REPRESENTATIVE_CHECKPOINT_PASS desc=75 record=5 words=64 method=behavioral_sram_backdoor_nonintrusive
+REPRESENTATIVE_CHECKPOINT_PASS desc=80 record=9 words=64 method=behavioral_sram_backdoor_nonintrusive
+REPRESENTATIVE_CHECKPOINT_PASS desc=81 record=18 words=64 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=37 opcode=0x39 length=16 cycles=196 pass0=49 pass1=48 pass2=98 math=0 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=31 sqrt_busy=0 cycles_closed=196
+R9_SFU_COMMAND index=38 opcode=0x39 length=16 cycles=229 pass0=49 pass1=48 pass2=131 math=0 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=61 sqrt_busy=0 cycles_closed=229
+R9_SFU_COMMAND index=39 opcode=0x39 length=16 cycles=253 pass0=49 pass1=48 pass2=155 math=0 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=82 sqrt_busy=0 cycles_closed=253
+R9_SFU_COMMAND index=40 opcode=0x39 length=16 cycles=291 pass0=49 pass1=48 pass2=193 math=0 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=117 sqrt_busy=0 cycles_closed=291
+REPRESENTATIVE_CHECKPOINT_PASS desc=85 record=19 words=64 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=41 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=42 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+REPRESENTATIVE_CHECKPOINT_PASS desc=87 record=20 words=16 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=43 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=44 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+REPRESENTATIVE_CHECKPOINT_PASS desc=94 record=6 words=64 method=behavioral_sram_backdoor_nonintrusive
+REPRESENTATIVE_CHECKPOINT_PASS desc=99 record=10 words=64 method=behavioral_sram_backdoor_nonintrusive
+REPRESENTATIVE_CHECKPOINT_PASS desc=100 record=21 words=64 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=45 opcode=0x39 length=16 cycles=196 pass0=49 pass1=48 pass2=98 math=0 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=31 sqrt_busy=0 cycles_closed=196
+R9_SFU_COMMAND index=46 opcode=0x39 length=16 cycles=229 pass0=49 pass1=48 pass2=131 math=0 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=61 sqrt_busy=0 cycles_closed=229
+R9_SFU_COMMAND index=47 opcode=0x39 length=16 cycles=260 pass0=49 pass1=48 pass2=162 math=0 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=89 sqrt_busy=0 cycles_closed=260
+R9_SFU_COMMAND index=48 opcode=0x39 length=16 cycles=291 pass0=49 pass1=48 pass2=193 math=0 other=1 spad_request_stall=1 spad_response_wait=48 spad_read_accepts=48 spad_write_accepts=16 divider_busy=117 sqrt_busy=0 cycles_closed=291
+REPRESENTATIVE_CHECKPOINT_PASS desc=104 record=22 words=64 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=49 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+REPRESENTATIVE_CHECKPOINT_PASS desc=106 record=23 words=64 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=50 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=51 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=52 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=53 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+REPRESENTATIVE_CHECKPOINT_PASS desc=111 record=24 words=64 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=54 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=55 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=56 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=57 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+REPRESENTATIVE_CHECKPOINT_PASS desc=116 record=25 words=64 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=58 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=59 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=60 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=61 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+REPRESENTATIVE_CHECKPOINT_PASS desc=121 record=26 words=64 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=62 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=63 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=64 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=65 opcode=0x36 length=64 cycles=211 pass0=194 pass1=16 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=64 spad_read_accepts=64 spad_write_accepts=16 divider_busy=0 sqrt_busy=0 cycles_closed=211
+R9_SFU_COMMAND index=66 opcode=0x34 length=1024 cycles=7173 pass0=0 pass1=0 pass2=0 math=0 other=7173 spad_request_stall=4 spad_response_wait=2048 spad_read_accepts=2048 spad_write_accepts=1024 divider_busy=0 sqrt_busy=0 cycles_closed=7173
+REPRESENTATIVE_CHECKPOINT_PASS desc=127 record=0 words=256 method=behavioral_sram_backdoor_nonintrusive
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=67 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=68 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=69 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=70 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=71 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=72 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=73 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=74 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=75 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=76 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=77 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=78 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=79 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=80 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=81 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+R28_LN input=193 mean_var=454 reciprocal_sqrt=69 gamma_beta=384 affine=256 writeback=64 fsm=1 total=1421
+R9_SFU_COMMAND index=82 opcode=0x38 length=64 cycles=1421 pass0=193 pass1=320 pass2=704 math=203 other=1 spad_request_stall=1 spad_response_wait=320 spad_read_accepts=320 spad_write_accepts=64 divider_busy=159 sqrt_busy=32 cycles_closed=1421
+REPRESENTATIVE_CHECKPOINT_PASS desc=143 record=1 words=256 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=83 opcode=0x36 length=1024 cycles=3331 pass0=3074 pass1=256 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=1024 spad_read_accepts=1024 spad_write_accepts=256 divider_busy=0 sqrt_busy=0 cycles_closed=3331
+REPRESENTATIVE_CHECKPOINT_PASS desc=144 record=2 words=64 method=behavioral_sram_backdoor_nonintrusive
+REPRESENTATIVE_CHECKPOINT_PASS desc=145 record=27 words=64 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=84 opcode=0x35 length=256 cycles=1539 pass0=0 pass1=0 pass2=0 math=0 other=1539 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=256 divider_busy=0 sqrt_busy=0 cycles_closed=1539
+REPRESENTATIVE_CHECKPOINT_PASS desc=146 record=28 words=64 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=85 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+REPRESENTATIVE_CHECKPOINT_PASS desc=147 record=29 words=16 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=86 opcode=0x35 length=256 cycles=1539 pass0=0 pass1=0 pass2=0 math=0 other=1539 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=256 divider_busy=0 sqrt_busy=0 cycles_closed=1539
+R9_SFU_COMMAND index=87 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=88 opcode=0x35 length=256 cycles=1539 pass0=0 pass1=0 pass2=0 math=0 other=1539 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=256 divider_busy=0 sqrt_busy=0 cycles_closed=1539
+R9_SFU_COMMAND index=89 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=90 opcode=0x35 length=256 cycles=1539 pass0=0 pass1=0 pass2=0 math=0 other=1539 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=256 divider_busy=0 sqrt_busy=0 cycles_closed=1539
+R9_SFU_COMMAND index=91 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=92 opcode=0x35 length=256 cycles=1539 pass0=0 pass1=0 pass2=0 math=0 other=1539 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=256 divider_busy=0 sqrt_busy=0 cycles_closed=1539
+R9_SFU_COMMAND index=93 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=94 opcode=0x35 length=256 cycles=1539 pass0=0 pass1=0 pass2=0 math=0 other=1539 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=256 divider_busy=0 sqrt_busy=0 cycles_closed=1539
+R9_SFU_COMMAND index=95 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=96 opcode=0x35 length=256 cycles=1539 pass0=0 pass1=0 pass2=0 math=0 other=1539 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=256 divider_busy=0 sqrt_busy=0 cycles_closed=1539
+R9_SFU_COMMAND index=97 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=98 opcode=0x35 length=256 cycles=1539 pass0=0 pass1=0 pass2=0 math=0 other=1539 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=256 divider_busy=0 sqrt_busy=0 cycles_closed=1539
+R9_SFU_COMMAND index=99 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=100 opcode=0x35 length=256 cycles=1539 pass0=0 pass1=0 pass2=0 math=0 other=1539 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=256 divider_busy=0 sqrt_busy=0 cycles_closed=1539
+R9_SFU_COMMAND index=101 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=102 opcode=0x35 length=256 cycles=1539 pass0=0 pass1=0 pass2=0 math=0 other=1539 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=256 divider_busy=0 sqrt_busy=0 cycles_closed=1539
+R9_SFU_COMMAND index=103 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=104 opcode=0x35 length=256 cycles=1539 pass0=0 pass1=0 pass2=0 math=0 other=1539 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=256 divider_busy=0 sqrt_busy=0 cycles_closed=1539
+R9_SFU_COMMAND index=105 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=106 opcode=0x35 length=256 cycles=1539 pass0=0 pass1=0 pass2=0 math=0 other=1539 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=256 divider_busy=0 sqrt_busy=0 cycles_closed=1539
+R9_SFU_COMMAND index=107 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=108 opcode=0x35 length=256 cycles=1539 pass0=0 pass1=0 pass2=0 math=0 other=1539 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=256 divider_busy=0 sqrt_busy=0 cycles_closed=1539
+R9_SFU_COMMAND index=109 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=110 opcode=0x35 length=256 cycles=1539 pass0=0 pass1=0 pass2=0 math=0 other=1539 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=256 divider_busy=0 sqrt_busy=0 cycles_closed=1539
+R9_SFU_COMMAND index=111 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+R9_SFU_COMMAND index=112 opcode=0x35 length=256 cycles=1539 pass0=0 pass1=0 pass2=0 math=0 other=1539 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=256 divider_busy=0 sqrt_busy=0 cycles_closed=1539
+R9_SFU_COMMAND index=113 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+REPRESENTATIVE_CHECKPOINT_PASS desc=190 record=30 words=64 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=114 opcode=0x35 length=256 cycles=1539 pass0=0 pass1=0 pass2=0 math=0 other=1539 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=256 divider_busy=0 sqrt_busy=0 cycles_closed=1539
+REPRESENTATIVE_CHECKPOINT_PASS desc=191 record=31 words=64 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=115 opcode=0x36 length=256 cycles=835 pass0=770 pass1=64 pass2=0 math=0 other=1 spad_request_stall=2 spad_response_wait=256 spad_read_accepts=256 spad_write_accepts=64 divider_busy=0 sqrt_busy=0 cycles_closed=835
+REPRESENTATIVE_CHECKPOINT_PASS desc=192 record=32 words=16 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=116 opcode=0x34 length=1024 cycles=7173 pass0=0 pass1=0 pass2=0 math=0 other=7173 spad_request_stall=4 spad_response_wait=2048 spad_read_accepts=2048 spad_write_accepts=1024 divider_busy=0 sqrt_busy=0 cycles_closed=7173
+R9_SFU_COMMAND index=117 opcode=0x34 length=1024 cycles=7173 pass0=0 pass1=0 pass2=0 math=0 other=7173 spad_request_stall=4 spad_response_wait=2048 spad_read_accepts=2048 spad_write_accepts=1024 divider_busy=0 sqrt_busy=0 cycles_closed=7173
+R9_SFU_COMMAND index=118 opcode=0x34 length=1024 cycles=7173 pass0=0 pass1=0 pass2=0 math=0 other=7173 spad_request_stall=4 spad_response_wait=2048 spad_read_accepts=2048 spad_write_accepts=1024 divider_busy=0 sqrt_busy=0 cycles_closed=7173
+R9_SFU_COMMAND index=119 opcode=0x34 length=1024 cycles=7173 pass0=0 pass1=0 pass2=0 math=0 other=7173 spad_request_stall=4 spad_response_wait=2048 spad_read_accepts=2048 spad_write_accepts=1024 divider_busy=0 sqrt_busy=0 cycles_closed=7173
+R9_SFU_COMMAND index=120 opcode=0x34 length=1024 cycles=7173 pass0=0 pass1=0 pass2=0 math=0 other=7173 spad_request_stall=4 spad_response_wait=2048 spad_read_accepts=2048 spad_write_accepts=1024 divider_busy=0 sqrt_busy=0 cycles_closed=7173
+R9_SFU_COMMAND index=121 opcode=0x34 length=1024 cycles=7173 pass0=0 pass1=0 pass2=0 math=0 other=7173 spad_request_stall=4 spad_response_wait=2048 spad_read_accepts=2048 spad_write_accepts=1024 divider_busy=0 sqrt_busy=0 cycles_closed=7173
+R9_SFU_COMMAND index=122 opcode=0x34 length=1024 cycles=7173 pass0=0 pass1=0 pass2=0 math=0 other=7173 spad_request_stall=4 spad_response_wait=2048 spad_read_accepts=2048 spad_write_accepts=1024 divider_busy=0 sqrt_busy=0 cycles_closed=7173
+R9_SFU_COMMAND index=123 opcode=0x34 length=1024 cycles=7173 pass0=0 pass1=0 pass2=0 math=0 other=7173 spad_request_stall=4 spad_response_wait=2048 spad_read_accepts=2048 spad_write_accepts=1024 divider_busy=0 sqrt_busy=0 cycles_closed=7173
+R9_SFU_COMMAND index=124 opcode=0x34 length=1024 cycles=7173 pass0=0 pass1=0 pass2=0 math=0 other=7173 spad_request_stall=4 spad_response_wait=2048 spad_read_accepts=2048 spad_write_accepts=1024 divider_busy=0 sqrt_busy=0 cycles_closed=7173
+R9_SFU_COMMAND index=125 opcode=0x34 length=1024 cycles=7173 pass0=0 pass1=0 pass2=0 math=0 other=7173 spad_request_stall=4 spad_response_wait=2048 spad_read_accepts=2048 spad_write_accepts=1024 divider_busy=0 sqrt_busy=0 cycles_closed=7173
+R9_SFU_COMMAND index=126 opcode=0x34 length=1024 cycles=7173 pass0=0 pass1=0 pass2=0 math=0 other=7173 spad_request_stall=4 spad_response_wait=2048 spad_read_accepts=2048 spad_write_accepts=1024 divider_busy=0 sqrt_busy=0 cycles_closed=7173
+R9_SFU_COMMAND index=127 opcode=0x34 length=1024 cycles=7173 pass0=0 pass1=0 pass2=0 math=0 other=7173 spad_request_stall=4 spad_response_wait=2048 spad_read_accepts=2048 spad_write_accepts=1024 divider_busy=0 sqrt_busy=0 cycles_closed=7173
+R9_SFU_COMMAND index=128 opcode=0x34 length=1024 cycles=7173 pass0=0 pass1=0 pass2=0 math=0 other=7173 spad_request_stall=4 spad_response_wait=2048 spad_read_accepts=2048 spad_write_accepts=1024 divider_busy=0 sqrt_busy=0 cycles_closed=7173
+R9_SFU_COMMAND index=129 opcode=0x34 length=1024 cycles=7173 pass0=0 pass1=0 pass2=0 math=0 other=7173 spad_request_stall=4 spad_response_wait=2048 spad_read_accepts=2048 spad_write_accepts=1024 divider_busy=0 sqrt_busy=0 cycles_closed=7173
+R9_SFU_COMMAND index=130 opcode=0x34 length=1024 cycles=7173 pass0=0 pass1=0 pass2=0 math=0 other=7173 spad_request_stall=4 spad_response_wait=2048 spad_read_accepts=2048 spad_write_accepts=1024 divider_busy=0 sqrt_busy=0 cycles_closed=7173
+REPRESENTATIVE_CHECKPOINT_PASS desc=223 record=33 words=256 method=behavioral_sram_backdoor_nonintrusive
+R9_SFU_COMMAND index=131 opcode=0x34 length=1024 cycles=7169 pass0=0 pass1=0 pass2=0 math=0 other=7169 spad_request_stall=0 spad_response_wait=2048 spad_read_accepts=2048 spad_write_accepts=1024 divider_busy=0 sqrt_busy=0 cycles_closed=7169
+REPRESENTATIVE_CHECKPOINT_PASS desc=224 record=34 words=256 method=behavioral_sram_backdoor_nonintrusive
+REPRESENTATIVE_MODEL_PASS desc=225 prefill_desc=0 decode_desc=0 golden_words=256 useful_macs=197888 executed_macs=819200 padding_macs=621312 useful_output_elements=2048 physical_output_elements=8192 command_cycles=263017 end_to_end_cycles=354857 dma_preload_included=1 prefill_command_cycles=0 decode_command_cycles=0 prefill_exclusive_cycles=0 decode_exclusive_cycles=0 exclusive_profile_cycles=263017 preload_axi_cycles=76895 preload_dma_window_cycles=14945 preload_dma_busy_cycles=13230 preloaded_spad_bytes=101440 useful_mac_per_cycle=0.7524 executed_array_utilization_pct=100.00 useful_array_utilization_pct=24.16 matrix_mac_cycles=3200 matrix_req_wait=477 matrix_rsp_wait=371 matrix_writeback=6656 matrix_other=5854 sfu_busy=239856 kv_busy=3720 conv_busy=0 banked_busy=0 fp_busy=0 scalar_busy=0 no_engine_dispatch_remainder=2883 dma_busy_overlap=0 spad_read_bytes=343552 spad_write_bytes=220416
+H64_PERSISTENT_KV_BEFORE_PASS words=512 method=axi_lite
+H64_FOUR_LAYER_HANDOFF_PASS layer=1 active_rows=4 words=256 method=axi_lite host_write_words=0
+H64_PERSISTENT_TOKEN_INPUT_PUBLISHED token=1 fixture_words=0 host_intermediate_words=0 host_kv_words=0
+H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=1 transactions=49
+H64_PERSISTENT_RETIRE desc=0 task=00007100 ring_slot=225 next=226
+H64_PERSISTENT_TENSOR_PASS desc=30 record=11 words=16 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=31 words=48 bytes=192 cycles=288 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=37 record=3 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=42 record=7 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=43 record=12 words=64 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=44 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=47 record=13 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=49 record=14 words=16 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=50 words=48 bytes=192 cycles=288 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=56 record=4 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=61 record=8 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=62 record=15 words=64 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=63 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=66 record=16 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=68 record=17 words=16 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=69 words=48 bytes=192 cycles=288 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=75 record=5 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=80 record=9 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=81 record=18 words=64 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=82 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=85 record=19 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=87 record=20 words=16 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=88 words=48 bytes=192 cycles=288 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=94 record=6 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=99 record=10 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=100 record=21 words=64 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=101 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=104 record=22 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=106 record=23 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=111 record=24 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=116 record=25 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=121 record=26 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=127 record=0 words=256 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=143 record=1 words=256 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=144 record=2 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=145 record=27 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=146 record=28 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=147 record=29 words=16 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=190 record=30 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=191 record=31 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=192 record=32 words=16 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=223 record=33 words=256 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=224 record=34 words=256 method=axi_lite
+H64_PERSISTENT_RETIRE desc=224 task=000071e0 ring_slot=449 next=450
+H64_PERSISTENT_STAGE_PASS stage=1 previous_publications=225 stage_desc=225 cumulative_publications=450 stage_cycles=332838 cache_words=512 checkpoints=35 final_golden_words=256 reset_events=0 host_intermediate_words=0
+H64_FOUR_LAYER_STAGE_PASS layer=1 descriptors=225 cycles=332838 handoff_words=256 weight_dma_transactions=49
+H64_PERSISTENT_KV_BEFORE_PASS words=512 method=axi_lite
+H64_FOUR_LAYER_HANDOFF_PASS layer=2 active_rows=4 words=256 method=axi_lite host_write_words=0
+H64_PERSISTENT_TOKEN_INPUT_PUBLISHED token=2 fixture_words=0 host_intermediate_words=0 host_kv_words=0
+H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=2 transactions=49
+H64_PERSISTENT_RETIRE desc=0 task=00007100 ring_slot=450 next=451
+H64_PERSISTENT_TENSOR_PASS desc=30 record=11 words=16 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=31 words=48 bytes=192 cycles=288 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=37 record=3 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=42 record=7 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=43 record=12 words=64 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=44 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=47 record=13 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=49 record=14 words=16 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=50 words=48 bytes=192 cycles=288 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=56 record=4 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=61 record=8 words=64 method=axi_lite
+H64_PERSISTENT_RETIRE desc=61 task=0000713d ring_slot=511 next=0
+H64_PERSISTENT_TENSOR_PASS desc=62 record=15 words=64 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=63 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=66 record=16 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=68 record=17 words=16 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=69 words=48 bytes=192 cycles=288 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=75 record=5 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=80 record=9 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=81 record=18 words=64 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=82 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=85 record=19 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=87 record=20 words=16 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=88 words=48 bytes=192 cycles=288 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=94 record=6 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=99 record=10 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=100 record=21 words=64 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=101 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=104 record=22 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=106 record=23 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=111 record=24 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=116 record=25 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=121 record=26 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=127 record=0 words=256 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=143 record=1 words=256 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=144 record=2 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=145 record=27 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=146 record=28 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=147 record=29 words=16 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=190 record=30 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=191 record=31 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=192 record=32 words=16 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=223 record=33 words=256 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=224 record=34 words=256 method=axi_lite
+H64_PERSISTENT_RETIRE desc=224 task=000071e0 ring_slot=162 next=163
+H64_PERSISTENT_STAGE_PASS stage=2 previous_publications=450 stage_desc=225 cumulative_publications=675 stage_cycles=332838 cache_words=512 checkpoints=35 final_golden_words=256 reset_events=0 host_intermediate_words=0
+H64_FOUR_LAYER_STAGE_PASS layer=2 descriptors=225 cycles=332838 handoff_words=256 weight_dma_transactions=49
+H64_PERSISTENT_KV_BEFORE_PASS words=512 method=axi_lite
+H64_FOUR_LAYER_HANDOFF_PASS layer=3 active_rows=4 words=256 method=axi_lite host_write_words=0
+H64_PERSISTENT_TOKEN_INPUT_PUBLISHED token=3 fixture_words=0 host_intermediate_words=0 host_kv_words=0
+H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=3 transactions=49
+H64_PERSISTENT_RETIRE desc=0 task=00007100 ring_slot=163 next=164
+H64_PERSISTENT_TENSOR_PASS desc=30 record=11 words=16 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=31 words=48 bytes=192 cycles=288 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=37 record=3 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=42 record=7 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=43 record=12 words=64 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=44 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=47 record=13 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=49 record=14 words=16 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=50 words=48 bytes=192 cycles=288 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=56 record=4 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=61 record=8 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=62 record=15 words=64 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=63 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=66 record=16 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=68 record=17 words=16 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=69 words=48 bytes=192 cycles=288 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=75 record=5 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=80 record=9 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=81 record=18 words=64 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=82 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=85 record=19 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=87 record=20 words=16 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=88 words=48 bytes=192 cycles=288 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=94 record=6 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=99 record=10 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=100 record=21 words=64 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=101 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=104 record=22 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=106 record=23 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=111 record=24 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=116 record=25 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=121 record=26 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=127 record=0 words=256 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=143 record=1 words=256 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=144 record=2 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=145 record=27 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=146 record=28 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=147 record=29 words=16 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=190 record=30 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=191 record=31 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=192 record=32 words=16 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=223 record=33 words=256 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=224 record=34 words=256 method=axi_lite
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=225 event=0 spad=00006100 bytes=256 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=225 event=1 spad=00006000 bytes=256 completion_fence=1
+H64_PERSISTENT_TENSOR_PASS desc=240 record=35 words=256 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=241 record=36 words=64 method=axi_lite
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=242 event=2 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=243 event=3 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=244 event=4 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=245 event=5 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=246 event=6 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=247 event=7 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=248 event=8 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=249 event=9 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=250 event=10 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=251 event=11 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=252 event=12 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=253 event=13 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=254 event=14 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=255 event=15 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=256 event=16 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=257 event=17 spad=00004000 bytes=1024 completion_fence=1
+H64_PERSISTENT_TENSOR_PASS desc=257 record=37 words=1024 method=axi_lite
+H64_PERSISTENT_RETIRE desc=257 task=00007201 ring_slot=420 next=421
+H64_FINAL_LOGITS_DUMP_PASS count=256 row=3 argmax=114 max=0000002d source=Product_Top_SPAD tie_break=lowest_token_id file=/tmp/nmaforge_r17_ar_final12/rtl_logits_context0.csv
+H64_PERSISTENT_STAGE_PASS stage=3 previous_publications=675 stage_desc=258 cumulative_publications=933 stage_cycles=383640 cache_words=512 checkpoints=38 final_golden_words=1024 reset_events=0 host_intermediate_words=0
+H64_FOUR_LAYER_STAGE_PASS layer=3 descriptors=258 cycles=383640 handoff_words=256 weight_dma_transactions=67
+H64_PERSISTENT_SEQUENCE_PASS appended_stages=3 total_publications=933 decode_stage_cycles=1049316 reset_events=0
+H64_FINAL_LN_LM_HEAD_PASS active_rows=4 logit_words=1024 descriptor_count=33 method=Product_SFU_REQUANT_GEMM golden_checked=1
+H64_FOUR_LAYER_TOP_PASS layers=4 descriptors=933 post_layer_cycles=1049316 reset_events=0 host_hidden_words=0
+H64_AR_LOGITS_ARGMAX_PASS step=0 token=114 source=Product_Top_SPAD
+H64_AR_INPUT_EMBEDDING_PASS step=0 token=114 position=4 valid_rows=5 embedding_words=320 position_words=320 source=RTL_argmax_host_lookup_prefix_recompute
+H64_PERSISTENT_KV_BEFORE_PASS words=512 method=axi_lite
+H64_PERSISTENT_TOKEN_INPUT_PUBLISHED token=4 fixture_words=0 host_intermediate_words=0 host_kv_words=0
+H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=4 transactions=49
+H64_PERSISTENT_RETIRE desc=0 task=00007100 ring_slot=421 next=422
+H64_PERSISTENT_TENSOR_PASS desc=30 record=11 words=20 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=31 words=44 bytes=176 cycles=264 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=38 record=3 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=44 record=7 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=45 record=12 words=80 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=46 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=50 record=13 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=52 record=14 words=20 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=53 words=44 bytes=176 cycles=264 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=60 record=4 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=66 record=8 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=67 record=15 words=80 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=68 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=72 record=16 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=74 record=17 words=20 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=75 words=44 bytes=176 cycles=264 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=82 record=5 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=88 record=9 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=89 record=18 words=80 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=90 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_RETIRE desc=90 task=0000715a ring_slot=511 next=0
+H64_PERSISTENT_TENSOR_PASS desc=94 record=19 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=96 record=20 words=20 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=97 words=44 bytes=176 cycles=264 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=104 record=6 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=110 record=10 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=111 record=21 words=80 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=112 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=116 record=22 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=118 record=23 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=123 record=24 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=128 record=25 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=133 record=26 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=139 record=0 words=320 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=155 record=1 words=320 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=156 record=2 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=157 record=27 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=158 record=28 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=159 record=29 words=20 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=202 record=30 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=203 record=31 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=204 record=32 words=20 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=235 record=33 words=320 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=236 record=34 words=320 method=axi_lite
+H64_PERSISTENT_RETIRE desc=236 task=000071ec ring_slot=145 next=146
+H64_PERSISTENT_STAGE_PASS stage=0 previous_publications=933 stage_desc=237 cumulative_publications=1170 stage_cycles=340428 cache_words=512 checkpoints=35 final_golden_words=320 reset_events=0 host_intermediate_words=0
+H64_FOUR_LAYER_STAGE_PASS layer=0 descriptors=237 cycles=340428 handoff_words=0 weight_dma_transactions=49
+H64_PERSISTENT_KV_BEFORE_PASS words=512 method=axi_lite
+H64_FOUR_LAYER_HANDOFF_PASS layer=1 active_rows=5 words=320 method=axi_lite host_write_words=0
+H64_PERSISTENT_TOKEN_INPUT_PUBLISHED token=4 fixture_words=0 host_intermediate_words=0 host_kv_words=0
+H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=4 transactions=49
+H64_PERSISTENT_RETIRE desc=0 task=00007100 ring_slot=146 next=147
+H64_PERSISTENT_TENSOR_PASS desc=30 record=11 words=20 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=31 words=44 bytes=176 cycles=264 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=38 record=3 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=44 record=7 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=45 record=12 words=80 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=46 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=50 record=13 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=52 record=14 words=20 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=53 words=44 bytes=176 cycles=264 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=60 record=4 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=66 record=8 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=67 record=15 words=80 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=68 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=72 record=16 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=74 record=17 words=20 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=75 words=44 bytes=176 cycles=264 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=82 record=5 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=88 record=9 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=89 record=18 words=80 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=90 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=94 record=19 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=96 record=20 words=20 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=97 words=44 bytes=176 cycles=264 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=104 record=6 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=110 record=10 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=111 record=21 words=80 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=112 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=116 record=22 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=118 record=23 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=123 record=24 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=128 record=25 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=133 record=26 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=139 record=0 words=320 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=155 record=1 words=320 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=156 record=2 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=157 record=27 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=158 record=28 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=159 record=29 words=20 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=202 record=30 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=203 record=31 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=204 record=32 words=20 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=235 record=33 words=320 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=236 record=34 words=320 method=axi_lite
+H64_PERSISTENT_RETIRE desc=236 task=000071ec ring_slot=382 next=383
+H64_PERSISTENT_STAGE_PASS stage=1 previous_publications=1170 stage_desc=237 cumulative_publications=1407 stage_cycles=340446 cache_words=512 checkpoints=35 final_golden_words=320 reset_events=0 host_intermediate_words=0
+H64_FOUR_LAYER_STAGE_PASS layer=1 descriptors=237 cycles=340446 handoff_words=320 weight_dma_transactions=49
+H64_PERSISTENT_KV_BEFORE_PASS words=512 method=axi_lite
+H64_FOUR_LAYER_HANDOFF_PASS layer=2 active_rows=5 words=320 method=axi_lite host_write_words=0
+H64_PERSISTENT_TOKEN_INPUT_PUBLISHED token=4 fixture_words=0 host_intermediate_words=0 host_kv_words=0
+H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=4 transactions=49
+H64_PERSISTENT_RETIRE desc=0 task=00007100 ring_slot=383 next=384
+H64_PERSISTENT_TENSOR_PASS desc=30 record=11 words=20 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=31 words=44 bytes=176 cycles=264 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=38 record=3 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=44 record=7 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=45 record=12 words=80 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=46 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=50 record=13 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=52 record=14 words=20 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=53 words=44 bytes=176 cycles=264 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=60 record=4 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=66 record=8 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=67 record=15 words=80 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=68 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=72 record=16 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=74 record=17 words=20 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=75 words=44 bytes=176 cycles=264 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=82 record=5 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=88 record=9 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=89 record=18 words=80 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=90 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=94 record=19 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=96 record=20 words=20 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=97 words=44 bytes=176 cycles=264 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=104 record=6 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=110 record=10 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=111 record=21 words=80 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=112 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=116 record=22 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=118 record=23 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=123 record=24 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=128 record=25 words=80 method=axi_lite
+H64_PERSISTENT_RETIRE desc=128 task=00007180 ring_slot=511 next=0
+H64_PERSISTENT_TENSOR_PASS desc=133 record=26 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=139 record=0 words=320 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=155 record=1 words=320 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=156 record=2 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=157 record=27 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=158 record=28 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=159 record=29 words=20 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=202 record=30 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=203 record=31 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=204 record=32 words=20 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=235 record=33 words=320 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=236 record=34 words=320 method=axi_lite
+H64_PERSISTENT_RETIRE desc=236 task=000071ec ring_slot=107 next=108
+H64_PERSISTENT_STAGE_PASS stage=2 previous_publications=1407 stage_desc=237 cumulative_publications=1644 stage_cycles=340446 cache_words=512 checkpoints=35 final_golden_words=320 reset_events=0 host_intermediate_words=0
+H64_FOUR_LAYER_STAGE_PASS layer=2 descriptors=237 cycles=340446 handoff_words=320 weight_dma_transactions=49
+H64_PERSISTENT_KV_BEFORE_PASS words=512 method=axi_lite
+H64_FOUR_LAYER_HANDOFF_PASS layer=3 active_rows=5 words=320 method=axi_lite host_write_words=0
+H64_PERSISTENT_TOKEN_INPUT_PUBLISHED token=4 fixture_words=0 host_intermediate_words=0 host_kv_words=0
+H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=4 transactions=49
+H64_PERSISTENT_RETIRE desc=0 task=00007100 ring_slot=108 next=109
+H64_PERSISTENT_TENSOR_PASS desc=30 record=11 words=20 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=31 words=44 bytes=176 cycles=264 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=38 record=3 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=44 record=7 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=45 record=12 words=80 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=46 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=50 record=13 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=52 record=14 words=20 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=53 words=44 bytes=176 cycles=264 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=60 record=4 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=66 record=8 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=67 record=15 words=80 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=68 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=72 record=16 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=74 record=17 words=20 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=75 words=44 bytes=176 cycles=264 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=82 record=5 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=88 record=9 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=89 record=18 words=80 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=90 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=94 record=19 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=96 record=20 words=20 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=97 words=44 bytes=176 cycles=264 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=104 record=6 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=110 record=10 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=111 record=21 words=80 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=112 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=116 record=22 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=118 record=23 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=123 record=24 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=128 record=25 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=133 record=26 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=139 record=0 words=320 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=155 record=1 words=320 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=156 record=2 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=157 record=27 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=158 record=28 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=159 record=29 words=20 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=202 record=30 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=203 record=31 words=80 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=204 record=32 words=20 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=235 record=33 words=320 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=236 record=34 words=320 method=axi_lite
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=237 event=0 spad=00006100 bytes=256 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=237 event=1 spad=00006000 bytes=256 completion_fence=1
+H64_PERSISTENT_TENSOR_PASS desc=252 record=35 words=320 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=253 record=36 words=80 method=axi_lite
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=254 event=2 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=255 event=3 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=256 event=4 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=257 event=5 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=258 event=6 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=259 event=7 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=260 event=8 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=261 event=9 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=262 event=10 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=263 event=11 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=264 event=12 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=265 event=13 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=266 event=14 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=267 event=15 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=268 event=16 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=269 event=17 spad=00004000 bytes=1024 completion_fence=1
+H64_PERSISTENT_TENSOR_PASS desc=269 record=37 words=1280 method=axi_lite
+H64_PERSISTENT_RETIRE desc=269 task=0000720d ring_slot=377 next=378
+H64_FINAL_LOGITS_DUMP_PASS count=256 row=4 argmax=162 max=0000002e source=Product_Top_SPAD tie_break=lowest_token_id file=/tmp/nmaforge_r17_ar_final12/rtl_logits_context1.csv
+H64_PERSISTENT_STAGE_PASS stage=3 previous_publications=1644 stage_desc=270 cumulative_publications=1914 stage_cycles=393264 cache_words=512 checkpoints=38 final_golden_words=1280 reset_events=0 host_intermediate_words=0
+H64_FOUR_LAYER_STAGE_PASS layer=3 descriptors=270 cycles=393264 handoff_words=320 weight_dma_transactions=67
+H64_AR_FOUR_LAYER_CONTEXT_PASS context=1 valid_tokens=5 next_argmax=162 context_cycles=1414584 cumulative_publications=1914 reset_events=0 host_intermediate_words=0
+H64_AR_LOGITS_ARGMAX_PASS step=1 token=162 source=Product_Top_SPAD
+H64_AR_INPUT_EMBEDDING_PASS step=1 token=162 position=5 valid_rows=6 embedding_words=384 position_words=384 source=RTL_argmax_host_lookup_prefix_recompute
+H64_PERSISTENT_KV_BEFORE_PASS words=512 method=axi_lite
+H64_PERSISTENT_TOKEN_INPUT_PUBLISHED token=5 fixture_words=0 host_intermediate_words=0 host_kv_words=0
+H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=5 transactions=49
+H64_PERSISTENT_RETIRE desc=0 task=00007100 ring_slot=378 next=379
+H64_PERSISTENT_TENSOR_PASS desc=30 record=11 words=24 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=31 words=40 bytes=160 cycles=240 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=39 record=3 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=46 record=7 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=47 record=12 words=96 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=48 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=53 record=13 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=55 record=14 words=24 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=56 words=40 bytes=160 cycles=240 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=64 record=4 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=71 record=8 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=72 record=15 words=96 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=73 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=78 record=16 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=80 record=17 words=24 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=81 words=40 bytes=160 cycles=240 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=89 record=5 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=96 record=9 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=97 record=18 words=96 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=98 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=103 record=19 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=105 record=20 words=24 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=106 words=40 bytes=160 cycles=240 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=114 record=6 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=121 record=10 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=122 record=21 words=96 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=123 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=128 record=22 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=130 record=23 words=96 method=axi_lite
+H64_PERSISTENT_RETIRE desc=133 task=00007185 ring_slot=511 next=0
+H64_PERSISTENT_TENSOR_PASS desc=135 record=24 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=140 record=25 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=145 record=26 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=151 record=0 words=384 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=167 record=1 words=384 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=168 record=2 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=169 record=27 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=170 record=28 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=171 record=29 words=24 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=214 record=30 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=215 record=31 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=216 record=32 words=24 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=247 record=33 words=384 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=248 record=34 words=384 method=axi_lite
+H64_PERSISTENT_RETIRE desc=248 task=000071f8 ring_slot=114 next=115
+H64_PERSISTENT_STAGE_PASS stage=0 previous_publications=1914 stage_desc=249 cumulative_publications=2163 stage_cycles=348108 cache_words=512 checkpoints=35 final_golden_words=384 reset_events=0 host_intermediate_words=0
+H64_FOUR_LAYER_STAGE_PASS layer=0 descriptors=249 cycles=348108 handoff_words=0 weight_dma_transactions=49
+H64_PERSISTENT_KV_BEFORE_PASS words=512 method=axi_lite
+H64_FOUR_LAYER_HANDOFF_PASS layer=1 active_rows=6 words=384 method=axi_lite host_write_words=0
+H64_PERSISTENT_TOKEN_INPUT_PUBLISHED token=5 fixture_words=0 host_intermediate_words=0 host_kv_words=0
+H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=5 transactions=49
+H64_PERSISTENT_RETIRE desc=0 task=00007100 ring_slot=115 next=116
+H64_PERSISTENT_TENSOR_PASS desc=30 record=11 words=24 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=31 words=40 bytes=160 cycles=240 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=39 record=3 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=46 record=7 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=47 record=12 words=96 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=48 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=53 record=13 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=55 record=14 words=24 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=56 words=40 bytes=160 cycles=240 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=64 record=4 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=71 record=8 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=72 record=15 words=96 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=73 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=78 record=16 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=80 record=17 words=24 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=81 words=40 bytes=160 cycles=240 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=89 record=5 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=96 record=9 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=97 record=18 words=96 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=98 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=103 record=19 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=105 record=20 words=24 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=106 words=40 bytes=160 cycles=240 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=114 record=6 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=121 record=10 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=122 record=21 words=96 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=123 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=128 record=22 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=130 record=23 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=135 record=24 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=140 record=25 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=145 record=26 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=151 record=0 words=384 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=167 record=1 words=384 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=168 record=2 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=169 record=27 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=170 record=28 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=171 record=29 words=24 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=214 record=30 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=215 record=31 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=216 record=32 words=24 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=247 record=33 words=384 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=248 record=34 words=384 method=axi_lite
+H64_PERSISTENT_RETIRE desc=248 task=000071f8 ring_slot=363 next=364
+H64_PERSISTENT_STAGE_PASS stage=1 previous_publications=2163 stage_desc=249 cumulative_publications=2412 stage_cycles=348180 cache_words=512 checkpoints=35 final_golden_words=384 reset_events=0 host_intermediate_words=0
+H64_FOUR_LAYER_STAGE_PASS layer=1 descriptors=249 cycles=348180 handoff_words=384 weight_dma_transactions=49
+H64_PERSISTENT_KV_BEFORE_PASS words=512 method=axi_lite
+H64_FOUR_LAYER_HANDOFF_PASS layer=2 active_rows=6 words=384 method=axi_lite host_write_words=0
+H64_PERSISTENT_TOKEN_INPUT_PUBLISHED token=5 fixture_words=0 host_intermediate_words=0 host_kv_words=0
+H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=5 transactions=49
+H64_PERSISTENT_RETIRE desc=0 task=00007100 ring_slot=364 next=365
+H64_PERSISTENT_TENSOR_PASS desc=30 record=11 words=24 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=31 words=40 bytes=160 cycles=240 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=39 record=3 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=46 record=7 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=47 record=12 words=96 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=48 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=53 record=13 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=55 record=14 words=24 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=56 words=40 bytes=160 cycles=240 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=64 record=4 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=71 record=8 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=72 record=15 words=96 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=73 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=78 record=16 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=80 record=17 words=24 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=81 words=40 bytes=160 cycles=240 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=89 record=5 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=96 record=9 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=97 record=18 words=96 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=98 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=103 record=19 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=105 record=20 words=24 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=106 words=40 bytes=160 cycles=240 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=114 record=6 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=121 record=10 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=122 record=21 words=96 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=123 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=128 record=22 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=130 record=23 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=135 record=24 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=140 record=25 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=145 record=26 words=96 method=axi_lite
+H64_PERSISTENT_RETIRE desc=147 task=00007193 ring_slot=511 next=0
+H64_PERSISTENT_TENSOR_PASS desc=151 record=0 words=384 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=167 record=1 words=384 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=168 record=2 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=169 record=27 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=170 record=28 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=171 record=29 words=24 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=214 record=30 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=215 record=31 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=216 record=32 words=24 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=247 record=33 words=384 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=248 record=34 words=384 method=axi_lite
+H64_PERSISTENT_RETIRE desc=248 task=000071f8 ring_slot=100 next=101
+H64_PERSISTENT_STAGE_PASS stage=2 previous_publications=2412 stage_desc=249 cumulative_publications=2661 stage_cycles=348198 cache_words=512 checkpoints=35 final_golden_words=384 reset_events=0 host_intermediate_words=0
+H64_FOUR_LAYER_STAGE_PASS layer=2 descriptors=249 cycles=348198 handoff_words=384 weight_dma_transactions=49
+H64_PERSISTENT_KV_BEFORE_PASS words=512 method=axi_lite
+H64_FOUR_LAYER_HANDOFF_PASS layer=3 active_rows=6 words=384 method=axi_lite host_write_words=0
+H64_PERSISTENT_TOKEN_INPUT_PUBLISHED token=5 fixture_words=0 host_intermediate_words=0 host_kv_words=0
+H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=5 transactions=49
+H64_PERSISTENT_RETIRE desc=0 task=00007100 ring_slot=101 next=102
+H64_PERSISTENT_TENSOR_PASS desc=30 record=11 words=24 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=31 words=40 bytes=160 cycles=240 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=39 record=3 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=46 record=7 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=47 record=12 words=96 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=48 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=53 record=13 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=55 record=14 words=24 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=56 words=40 bytes=160 cycles=240 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=64 record=4 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=71 record=8 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=72 record=15 words=96 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=73 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=78 record=16 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=80 record=17 words=24 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=81 words=40 bytes=160 cycles=240 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=89 record=5 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=96 record=9 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=97 record=18 words=96 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=98 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=103 record=19 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=105 record=20 words=24 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=106 words=40 bytes=160 cycles=240 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=114 record=6 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=121 record=10 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=122 record=21 words=96 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=123 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=128 record=22 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=130 record=23 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=135 record=24 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=140 record=25 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=145 record=26 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=151 record=0 words=384 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=167 record=1 words=384 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=168 record=2 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=169 record=27 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=170 record=28 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=171 record=29 words=24 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=214 record=30 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=215 record=31 words=96 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=216 record=32 words=24 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=247 record=33 words=384 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=248 record=34 words=384 method=axi_lite
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=249 event=0 spad=00006100 bytes=256 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=249 event=1 spad=00006000 bytes=256 completion_fence=1
+H64_PERSISTENT_TENSOR_PASS desc=264 record=35 words=384 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=265 record=36 words=96 method=axi_lite
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=266 event=2 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=267 event=3 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=268 event=4 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=269 event=5 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=270 event=6 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=271 event=7 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=272 event=8 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=273 event=9 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=274 event=10 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=275 event=11 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=276 event=12 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=277 event=13 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=278 event=14 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=279 event=15 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=280 event=16 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=281 event=17 spad=00004000 bytes=1024 completion_fence=1
+H64_PERSISTENT_TENSOR_PASS desc=281 record=37 words=1536 method=axi_lite
+H64_PERSISTENT_RETIRE desc=281 task=00007219 ring_slot=382 next=383
+H64_FINAL_LOGITS_DUMP_PASS count=256 row=5 argmax=193 max=0000002e source=Product_Top_SPAD tie_break=lowest_token_id file=/tmp/nmaforge_r17_ar_final12/rtl_logits_context2.csv
+H64_PERSISTENT_STAGE_PASS stage=3 previous_publications=2661 stage_desc=282 cumulative_publications=2943 stage_cycles=403032 cache_words=512 checkpoints=38 final_golden_words=1536 reset_events=0 host_intermediate_words=0
+H64_FOUR_LAYER_STAGE_PASS layer=3 descriptors=282 cycles=403032 handoff_words=384 weight_dma_transactions=67
+H64_AR_FOUR_LAYER_CONTEXT_PASS context=2 valid_tokens=6 next_argmax=193 context_cycles=2862102 cumulative_publications=2943 reset_events=0 host_intermediate_words=0
+H64_AR_LOGITS_ARGMAX_PASS step=2 token=193 source=Product_Top_SPAD
+H64_AR_INPUT_EMBEDDING_PASS step=2 token=193 position=6 valid_rows=7 embedding_words=448 position_words=448 source=RTL_argmax_host_lookup_prefix_recompute
+H64_PERSISTENT_KV_BEFORE_PASS words=512 method=axi_lite
+H64_PERSISTENT_TOKEN_INPUT_PUBLISHED token=6 fixture_words=0 host_intermediate_words=0 host_kv_words=0
+H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=6 transactions=49
+H64_PERSISTENT_RETIRE desc=0 task=00007100 ring_slot=383 next=384
+H64_PERSISTENT_TENSOR_PASS desc=30 record=11 words=28 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=31 words=36 bytes=144 cycles=216 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=40 record=3 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=48 record=7 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=49 record=12 words=112 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=50 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=56 record=13 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=58 record=14 words=28 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=59 words=36 bytes=144 cycles=216 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=68 record=4 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=76 record=8 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=77 record=15 words=112 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=78 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=84 record=16 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=86 record=17 words=28 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=87 words=36 bytes=144 cycles=216 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=96 record=5 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=104 record=9 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=105 record=18 words=112 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=106 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=112 record=19 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=114 record=20 words=28 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=115 words=36 bytes=144 cycles=216 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=124 record=6 words=64 method=axi_lite
+H64_PERSISTENT_RETIRE desc=128 task=00007180 ring_slot=511 next=0
+H64_PERSISTENT_TENSOR_PASS desc=132 record=10 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=133 record=21 words=112 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=0 before_desc=134 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=140 record=22 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=142 record=23 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=147 record=24 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=152 record=25 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=157 record=26 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=163 record=0 words=448 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=179 record=1 words=448 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=180 record=2 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=181 record=27 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=182 record=28 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=183 record=29 words=28 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=226 record=30 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=227 record=31 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=228 record=32 words=28 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=259 record=33 words=448 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=260 record=34 words=448 method=axi_lite
+H64_PERSISTENT_RETIRE desc=260 task=00007204 ring_slot=131 next=132
+H64_PERSISTENT_STAGE_PASS stage=0 previous_publications=2943 stage_desc=261 cumulative_publications=3204 stage_cycles=355932 cache_words=512 checkpoints=35 final_golden_words=448 reset_events=0 host_intermediate_words=0
+H64_FOUR_LAYER_STAGE_PASS layer=0 descriptors=261 cycles=355932 handoff_words=0 weight_dma_transactions=49
+H64_PERSISTENT_KV_BEFORE_PASS words=512 method=axi_lite
+H64_FOUR_LAYER_HANDOFF_PASS layer=1 active_rows=7 words=448 method=axi_lite host_write_words=0
+H64_PERSISTENT_TOKEN_INPUT_PUBLISHED token=6 fixture_words=0 host_intermediate_words=0 host_kv_words=0
+H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=6 transactions=49
+H64_PERSISTENT_RETIRE desc=0 task=00007100 ring_slot=132 next=133
+H64_PERSISTENT_TENSOR_PASS desc=30 record=11 words=28 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=31 words=36 bytes=144 cycles=216 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=40 record=3 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=48 record=7 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=49 record=12 words=112 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=50 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=56 record=13 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=58 record=14 words=28 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=59 words=36 bytes=144 cycles=216 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=68 record=4 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=76 record=8 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=77 record=15 words=112 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=78 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=84 record=16 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=86 record=17 words=28 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=87 words=36 bytes=144 cycles=216 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=96 record=5 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=104 record=9 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=105 record=18 words=112 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=106 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=112 record=19 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=114 record=20 words=28 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=115 words=36 bytes=144 cycles=216 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=124 record=6 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=132 record=10 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=133 record=21 words=112 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=1 before_desc=134 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=140 record=22 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=142 record=23 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=147 record=24 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=152 record=25 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=157 record=26 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=163 record=0 words=448 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=179 record=1 words=448 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=180 record=2 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=181 record=27 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=182 record=28 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=183 record=29 words=28 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=226 record=30 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=227 record=31 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=228 record=32 words=28 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=259 record=33 words=448 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=260 record=34 words=448 method=axi_lite
+H64_PERSISTENT_RETIRE desc=260 task=00007204 ring_slot=392 next=393
+H64_PERSISTENT_STAGE_PASS stage=1 previous_publications=3204 stage_desc=261 cumulative_publications=3465 stage_cycles=356058 cache_words=512 checkpoints=35 final_golden_words=448 reset_events=0 host_intermediate_words=0
+H64_FOUR_LAYER_STAGE_PASS layer=1 descriptors=261 cycles=356058 handoff_words=448 weight_dma_transactions=49
+H64_PERSISTENT_KV_BEFORE_PASS words=512 method=axi_lite
+H64_FOUR_LAYER_HANDOFF_PASS layer=2 active_rows=7 words=448 method=axi_lite host_write_words=0
+H64_PERSISTENT_TOKEN_INPUT_PUBLISHED token=6 fixture_words=0 host_intermediate_words=0 host_kv_words=0
+H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=6 transactions=49
+H64_PERSISTENT_RETIRE desc=0 task=00007100 ring_slot=393 next=394
+H64_PERSISTENT_TENSOR_PASS desc=30 record=11 words=28 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=31 words=36 bytes=144 cycles=216 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=40 record=3 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=48 record=7 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=49 record=12 words=112 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=50 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=56 record=13 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=58 record=14 words=28 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=59 words=36 bytes=144 cycles=216 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=68 record=4 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=76 record=8 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=77 record=15 words=112 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=78 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=84 record=16 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=86 record=17 words=28 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=87 words=36 bytes=144 cycles=216 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=96 record=5 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=104 record=9 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=105 record=18 words=112 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=106 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=112 record=19 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=114 record=20 words=28 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=115 words=36 bytes=144 cycles=216 method=axil
+H64_PERSISTENT_RETIRE desc=118 task=00007176 ring_slot=511 next=0
+H64_PERSISTENT_TENSOR_PASS desc=124 record=6 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=132 record=10 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=133 record=21 words=112 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=2 before_desc=134 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=140 record=22 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=142 record=23 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=147 record=24 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=152 record=25 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=157 record=26 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=163 record=0 words=448 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=179 record=1 words=448 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=180 record=2 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=181 record=27 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=182 record=28 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=183 record=29 words=28 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=226 record=30 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=227 record=31 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=228 record=32 words=28 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=259 record=33 words=448 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=260 record=34 words=448 method=axi_lite
+H64_PERSISTENT_RETIRE desc=260 task=00007204 ring_slot=141 next=142
+H64_PERSISTENT_STAGE_PASS stage=2 previous_publications=3465 stage_desc=261 cumulative_publications=3726 stage_cycles=356022 cache_words=512 checkpoints=35 final_golden_words=448 reset_events=0 host_intermediate_words=0
+H64_FOUR_LAYER_STAGE_PASS layer=2 descriptors=261 cycles=356022 handoff_words=448 weight_dma_transactions=49
+H64_PERSISTENT_KV_BEFORE_PASS words=512 method=axi_lite
+H64_FOUR_LAYER_HANDOFF_PASS layer=3 active_rows=7 words=448 method=axi_lite host_write_words=0
+H64_PERSISTENT_TOKEN_INPUT_PUBLISHED token=6 fixture_words=0 host_intermediate_words=0 host_kv_words=0
+H64_PERSISTENT_WEIGHT_DMA_FENCE_PASS token=6 transactions=49
+H64_PERSISTENT_RETIRE desc=0 task=00007100 ring_slot=142 next=143
+H64_PERSISTENT_TENSOR_PASS desc=30 record=11 words=28 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=31 words=36 bytes=144 cycles=216 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=40 record=3 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=48 record=7 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=49 record=12 words=112 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=50 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=56 record=13 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=58 record=14 words=28 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=59 words=36 bytes=144 cycles=216 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=68 record=4 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=76 record=8 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=77 record=15 words=112 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=78 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=84 record=16 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=86 record=17 words=28 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=87 words=36 bytes=144 cycles=216 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=96 record=5 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=104 record=9 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=105 record=18 words=112 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=106 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=112 record=19 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=114 record=20 words=28 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=115 words=36 bytes=144 cycles=216 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=124 record=6 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=132 record=10 words=64 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=133 record=21 words=112 method=axi_lite
+H64_FOUR_LAYER_OUTPUT_INIT_PASS layer=3 before_desc=134 words=256 bytes=1024 cycles=1536 method=axil
+H64_PERSISTENT_TENSOR_PASS desc=140 record=22 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=142 record=23 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=147 record=24 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=152 record=25 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=157 record=26 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=163 record=0 words=448 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=179 record=1 words=448 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=180 record=2 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=181 record=27 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=182 record=28 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=183 record=29 words=28 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=226 record=30 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=227 record=31 words=112 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=228 record=32 words=28 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=259 record=33 words=448 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=260 record=34 words=448 method=axi_lite
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=261 event=0 spad=00006100 bytes=256 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=261 event=1 spad=00006000 bytes=256 completion_fence=1
+H64_PERSISTENT_TENSOR_PASS desc=276 record=35 words=448 method=axi_lite
+H64_PERSISTENT_TENSOR_PASS desc=277 record=36 words=112 method=axi_lite
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=278 event=2 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=279 event=3 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=280 event=4 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=281 event=5 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=282 event=6 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=283 event=7 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=284 event=8 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=285 event=9 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=286 event=10 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=287 event=11 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=288 event=12 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=289 event=13 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=290 event=14 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=291 event=15 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=292 event=16 spad=00004000 bytes=1024 completion_fence=1
+H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=3 before_desc=293 event=17 spad=00004000 bytes=1024 completion_fence=1
+H64_PERSISTENT_TENSOR_PASS desc=293 record=37 words=1792 method=axi_lite
+H64_PERSISTENT_RETIRE desc=293 task=00007225 ring_slot=435 next=436
+H64_FINAL_LOGITS_DUMP_PASS count=256 row=6 argmax=193 max=00000032 source=Product_Top_SPAD tie_break=lowest_token_id file=/tmp/nmaforge_r17_ar_final12/rtl_logits_context3.csv
+H64_PERSISTENT_STAGE_PASS stage=3 previous_publications=3726 stage_desc=294 cumulative_publications=4020 stage_cycles=412890 cache_words=512 checkpoints=38 final_golden_words=1792 reset_events=0 host_intermediate_words=0
+H64_FOUR_LAYER_STAGE_PASS layer=3 descriptors=294 cycles=412890 handoff_words=448 weight_dma_transactions=67
+H64_AR_FOUR_LAYER_CONTEXT_PASS context=3 valid_tokens=7 next_argmax=193 context_cycles=4343004 cumulative_publications=4020 reset_events=0 host_intermediate_words=0
+H64_AR_LOGITS_ARGMAX_PASS step=3 token=193 source=Product_Top_SPAD
+H64_AUTOREGRESSIVE_SEQUENCE_PASS generated_tokens=4 total_publications=4020 extension_cycles=4343004 reset_events=0 host_intermediate_words=0 mode=prefix_recompute
+$finish called from file "../tb/tb_ai_accel_smoke.sv", line 6332.
+$finish at simulation time          61256210000
+           V C S   S i m u l a t i o n   R e p o r t 
+Time: 61256210000 ps
+CPU Time:     87.150 seconds;       Data structure size:   1.0Mb
+Mon Nov 16 21:36:01 2026

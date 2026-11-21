@@ -1,0 +1,69 @@
+{
+  "run_id": "NMAForge-V1.2-R30-GPT2-QAT-SEED23-TOP-AR",
+  "status": "PRODUCT_TOP_PASS_PREFIX_RECOMPUTE_NOT_INCREMENTAL_KV",
+  "tested_source_commit": "efa37a949976d5ef9347fb42698f1de8adad757c",
+  "model_package": "../round30_qat/source_20261223_qat_20263023/product_int8.npz",
+  "model_sha256": "58263935f5da626c53d5ba4c373396eee9f0f556a6f305a5b820c066625c2bcd",
+  "source_fp32_checkpoint_sha256": "6d71d0a4649f276a74d42834f94f01812c4cf1e6d64bc6562f1ab017361c0021",
+  "qat_checkpoint_sha256": "1fef5f8f47e5ba6017fe6b38c3dd8fe3fa6165bfbd526a72c7867e9b896b7c83",
+  "command": "make ai_h64_four_layer_top_argmax AI_H64_FOUR_LAYER_RUN=/tmp/nmaforge_round30_gpt2_top AI_H64_FOUR_LAYER_MODEL_NPZ=/tmp/nmaforge-v12-round30-gpt2/benchmark/gpt2_quality/results/round30_qat/source_20261223_qat_20263023/product_int8.npz AI_H64_NUMERIC_PROFILE=round21_residual_gelu_aligned AI_H64_AUTOREGRESSIVE=1",
+  "cwd": "dv/subsystem/top_smoke/sim",
+  "simulator": "Synopsys VCS V-2023.12-SP1_Full64",
+  "seed": 20261116,
+  "spad_bytes": 131072,
+  "mode": "four_layer_prefix_recompute_same_top_instance",
+  "prompt_tokens": [
+    1,
+    7,
+    42,
+    3
+  ],
+  "generated_tokens": [
+    73,
+    78,
+    111,
+    114
+  ],
+  "contexts": [
+    {
+      "context": 0,
+      "row": 3,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 73,
+      "logits_sha256_le_i32": "a754e1bf9ca0b4c5e03e187a8db9690b8e7c38fb62a64c16794fd311c1316ba5"
+    },
+    {
+      "context": 1,
+      "row": 4,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 78,
+      "logits_sha256_le_i32": "4e363eba996475b7d3760620f0db3a4b6834b52645d52057e53135811465f032"
+    },
+    {
+      "context": 2,
+      "row": 5,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 111,
+      "logits_sha256_le_i32": "28c3f88ffd5d7f58c28f184c37464e99518de062799d3dee957b3790f9d81175"
+    },
+    {
+      "context": 3,
+      "row": 6,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 114,
+      "logits_sha256_le_i32": "4b9b891083d43c7478fd0366caf4362071eb68fbe09efb5dab617f547dfe1c1e"
+    }
+  ],
+  "completion": "4-layer top pass; 933 descriptors; 1,048,920 post-layer cycles; autoregressive extension 4,338,018 cycles; 4,020 publications; 0 reset; 0 host intermediate words.",
+  "scope": "Functional Product Top evidence only. Prefix is recomputed; no claim of incremental KV decode. Host supplies token feedback/descriptor orchestration. Top run measured at 128 KiB SPAD, not 256 KiB. It is not complete host-to-host timing.",
+  "compile_exit": 0,
+  "simulation_exit": 0,
+  "logs": {
+    "compile": "compile.log.gz",
+    "simulation": "run.log.gz"
+  }
+}

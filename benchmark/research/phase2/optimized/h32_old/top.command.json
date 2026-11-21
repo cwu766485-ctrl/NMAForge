@@ -1,0 +1,11 @@
+[
+  "/tmp/nmaforge-phase2-runs/optimized/top/simv",
+  "+AI_STAGE_C_TRANSFORMER",
+  "+AI_STAGE_C_DIR=/tmp/nmaforge-phase2-runs/optimized/h32_old",
+  "+AI_STAGE_C_STAGES=12",
+  "+STAGE_A_PROFILE=/tmp/nmaforge-phase2-runs/optimized/h32_old/stage_a",
+  "+PHASE1_PROFILE=/tmp/nmaforge-phase2-runs/optimized/h32_old/profile",
+  "+AI_RANDOM_CASES=0",
+  "+AI_SEED=20261112",
+  "+ACLK_PERIOD_NS=4"
+]

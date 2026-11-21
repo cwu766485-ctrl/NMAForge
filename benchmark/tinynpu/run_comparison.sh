@@ -58,11 +58,11 @@ grep -q '^MATRIX_TINY_NPU_MATCH_MULTI_PASS .*cases=3 ' "$OUT_DIR/nma_match16/run
 
 TINY_NPU_ROOT="$TINY_NPU_ROOT" TINYNPU_WORK_ROOT="$WORK_ROOT" \
     TINYNPU_GEMM_OUT="$OUT_DIR/tiny_gemm" VERILATOR="$VERILATOR" \
-    JOBS="${JOBS:-4}" "$SCRIPT_DIR/run_tinynpu_gemm.sh" > "$OUT_DIR/tiny_gemm_script.log" 2>&1
+    JOBS="${JOBS:-4}" bash "$SCRIPT_DIR/run_tinynpu_gemm.sh" > "$OUT_DIR/tiny_gemm_script.log" 2>&1
 TINY_NPU_ROOT="$TINY_NPU_ROOT" TINYNPU_WORK_ROOT="$WORK_ROOT" \
     TINYNPU_CNN_OUT="$OUT_DIR/tiny_cnn" PYTHON="$PYTHON" \
     VERILATOR="$VERILATOR" JOBS="${JOBS:-4}" \
-    "$SCRIPT_DIR/run_tinynpu_cnn.sh" > "$OUT_DIR/tiny_cnn_script.log" 2>&1
+    bash "$SCRIPT_DIR/run_tinynpu_cnn.sh" > "$OUT_DIR/tiny_cnn_script.log" 2>&1
 
 make -C "$REPO_ROOT/dv/subsystem/top_smoke/sim" ai_tinynpu_cnn_match \
     AI_TINYNPU_CNN_RUN="$OUT_DIR/nma_cnn" \

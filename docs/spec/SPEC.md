@@ -6,7 +6,7 @@
 This file is the English compatibility entry point for the current A10
 specification. The complete, detailed specification is maintained in
 [SPEC_ZH.md](SPEC_ZH.md). It covers the same RTL contract: AXI4-Lite control,
-128-bit AXI4 DMA, 512 KiB four-bank scratchpad, CMDQ/CPLQ, ABI v7.4 descriptors,
+128-bit AXI4 DMA, 128 KiB default four-bank scratchpad (optional 512 KiB), CMDQ/CPLQ, ABI v7.4 descriptors,
 INT8/BF16/FP16/matrix/SFU/CNN/KV operators, protection, performance counters, verification
 evidence, and commercial-28-nm pre-layout limitations. It is the English companion of the
 Chinese source-of-truth document, not a second ABI definition.
@@ -43,6 +43,18 @@ versus scratchpad fetch (0). In v7, `src1` is the upper address word, not an
 independent data pointer, so byte alignment is checked on the full address via
 the low bits in `src0`, not on `src1` separately. A macro parent emits one
 completion; children execute in order and stop on the first failure.
+
+KV-cache opcodes `0x43/0x44` retain the ABI-v7 descriptor size and legacy
+`flags=0` behavior. For `0x43`, `aux0={head_index,token_index}` selects a cache
+position; `src0_stride` and `src1_stride` are the token and head strides. The
+optional `0x43 flags=8'h01` Matrix-B token-append mode accepts 4–16 INT8
+features in multiples of four, `src0_stride=16`, and a per-head cache span in
+`src1_stride` that yields a 4–16-token capacity in multiples of four. It reads
+a packed Matrix-A token row and performs byte-lane read/modify/write into the
+Matrix-B `[token,feature]` layout while preserving other tokens. Invalid
+dimensions, strides, token positions, or address ranges complete with a
+configuration error before writes begin. `0x44` and the old `flags=0` copy path
+are unchanged. The detailed field contract is in [SPEC_ZH.md](SPEC_ZH.md).
 
 ### Parallel compute CMDQ dispatch
 

@@ -1,0 +1,111 @@
+{
+  "round": "22",
+  "final_disposition": "PARTIAL",
+  "base_source_sha": "098f48764fb31351eb415193787a175ef44bf77d",
+  "product_rtl_tree_sha": "fae8778d62c06c324bf5be0b5cbfea6843141e08",
+  "product_rtl_unchanged_from_round20_tested_sha": "7e38a224bfa9558b8b9145c0a9dd81e2786f202a",
+  "tiny_npu_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+  "tiny_run_id": "R22-TINY-COMPARE-098F487",
+  "tiny_seed": "20261120",
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "verilator": "5.052 2026-09-05 rev v5.052",
+    "python": "3.12.13",
+    "numpy": "2.4.6",
+    "onnx": "1.17.0",
+    "gcc": "8.5.0"
+  },
+  "h16": {
+    "gemm_run_id": "nmaforge_round22_h16_gemm",
+    "gemv_run_id": "nmaforge_round22_h16_gemv",
+    "seed": 20261116,
+    "model_sha256": "756a39fc74134cbc451d8aafa94743f2793abd2651032b36b180b99117d68bfc",
+    "gemm_log_path": "/tmp/nmaforge_round22_h16_gemm/run.log",
+    "gemm_log_sha256": "1511e1906ab3ee5cb661a32c360da68fe8ea8a0cf0f5ef42b554dfe4f51bdbfc",
+    "gemv_log_path": "/tmp/nmaforge_round22_h16_gemv/run.log",
+    "gemv_log_sha256": "58ae8141ba3d009bf8f94dd4d154f8cd1cee18dd55c0e61b979119471ed38a13",
+    "results_and_manifests_archived": true
+  },
+  "cnn_dma": {
+    "run_id": "R22-CNN-DMA-098F487-S20261120-RANK0",
+    "run_log_path": "/tmp/nmaforge_round22_cnn_dma_retry/run.log",
+    "run_log_sha256": "61fe0d1567f9887e852358dd65a46d71986fa263403a596c771cf1574c2b0c3b",
+    "compile_log_path": "/tmp/nmaforge_round22_cnn_dma_retry/compile.log",
+    "compile_log_sha256": "3038d90d4f81bd657b9eb0cafa69d4bed6ec265d7240891984b714a06fc43bd9",
+    "payload_summary_sha256": "eea8407a434a1783dc2386f934cb3c38c863a6fb93bd449ef968b63a6a33600d",
+    "status": "PASS one sample Top DMA+Golden; no all-360 DMA run",
+    "model_training_seed": 20261119,
+    "simulation_seed": 20261120
+  },
+  "ai_smoke": {
+    "command": "make ai_smoke",
+    "directory": "dv/subsystem/top_smoke/sim",
+    "seed": 12345,
+    "random_cases": 4,
+    "status": "PASS",
+    "log_sha256": "fafa1175b91a238ac7fa342de6a1d25af2c0e65eb156369b2a4062fbadc9ada0",
+    "log_sha256_at_first_run_before_seeded_run": "fafa1175b91a238ac7fa342de6a1d25af2c0e65eb156369b2a4062fbadc9ada0",
+    "note": "The shared VCS -l path was later overwritten by ai_run; this hash is retained from the original four-random-case run."
+  },
+  "commands": {
+    "tiny": "env SEED=20261120 BENCH_RUN_ID=R22-TINY-COMPARE-098F487 TINYNPU_BENCH_OUT=/tmp/nmaforge_round22_tinynpu TINYNPU_WORK_ROOT=/tmp/nmaforge_round19_tiny_reference VERILATOR=/tmp/nmaforge_verilator_5.052/bin/verilator PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python JOBS=4 VCS_VERSION=V-2023.12-SP1_Full64 bash benchmark/tinynpu/run_comparison.sh",
+    "cnn_dma": "make -C dv/subsystem/top_smoke/sim ai_representative_trained_cnn_dma AI_REPRESENTATIVE_DMA_RUN=/tmp/nmaforge_round22_cnn_dma_retry AI_REPRESENTATIVE_DMA_PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python AI_REPRESENTATIVE_DMA_SEED=20261120 AI_REPRESENTATIVE_DMA_TEST_RANK=0",
+    "smoke": "make -C dv/subsystem/top_smoke/sim ai_smoke",
+    "h16_gemm": "make -C dv/subsystem/top_smoke/sim ai_h16_incremental_decode AI_H16_INCREMENTAL_RUN=/tmp/nmaforge_round22_h16_gemm AI_H16_INCREMENTAL_PYTHON=/tmp/nmaforge_arch_v2_py312/bin/python AI_H16_INCREMENTAL_SEED=20261116 AI_H16_INCREMENTAL_POLICY=gemm",
+    "h16_gemv_generate": "/tmp/nmaforge_arch_v2_py312/bin/python sw/tools/generate_h16_incremental_decode.py --model /tmp/nmaforge_round22_h16_gemm/model.json --projection-policy gemv_qkv --out /tmp/nmaforge_round22_h16_gemv/workload",
+    "h16_gemv_run": "/tmp/nmaforge_round22_h16_gemm/simv +ntb_random_seed=20261116 +AI_RANDOM_CASES=0 +AI_SEED=20261116 +ACLK_PERIOD_NS=10.0 +AI_H16_INCREMENTAL_DECODE +AI_H16_INCREMENTAL_DIR=/tmp/nmaforge_round22_h16_gemv/workload -l /tmp/nmaforge_round22_h16_gemv/run.log"
+  },
+  "test_source_snapshot": {
+    "sha256": "81755ccd966e8828fc13c6d7be85f25514423ffe8b3e77908b769d84ac2af8f3",
+    "files_sha256": {
+      "dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv": "5cba9b02ed4361235b9f61d734f3d5b3ff5e7e77797993c6c999fd6d9cd4dd1e",
+      "dv/subsystem/top_smoke/sim/Makefile": "9fcd16504bee1bda6195916a16bb6b0015eb9ac10a9973db914200cc9c4ee4b2",
+      "benchmark/representative/prepare_cnn_dma_payload.py": "317f88a6c9580f144a826078d47019274cb7a0d247e3ef3d0e50f265751d0348",
+      "sw/tools/generate_h16_incremental_decode.py": "bce95ed507dcf180bcf3d356741b1b53353ec6beb1f2b4f0b9469042de5ee7b0"
+    },
+    "note": "hash covers the Round 22 working-tree test/benchmark edits in addition to base_source_sha; product RTL is unchanged"
+  },
+  "ai_seeded_regression": {
+    "command": "make ai_run AI_RANDOM_CASES=20 AI_SEED=12345",
+    "directory": "dv/subsystem/top_smoke/sim",
+    "status": "PASS",
+    "random_cases": 20,
+    "seed": 12345,
+    "log_path": "/tmp/nmaforge-round22/dv/subsystem/top_smoke/sim/ai_accel_smoke.log",
+    "log_sha256": "ed4ff528b9ac2b38e9a02e1055e7885e0d3378ac9501c84a86f3bf9ad9355ec2"
+  },
+  "tiny_run_logs": {
+    "nma_size_make": {
+      "path": "/tmp/nmaforge_round22_tinynpu/nma_size_make.log",
+      "sha256": "a31381db9f6c38e378eb01c5047535c6069ef02a81f430c41d8cd1eedd151504"
+    },
+    "nma_match8_make": {
+      "path": "/tmp/nmaforge_round22_tinynpu/nma_match8_make.log",
+      "sha256": "85820f2ccd3e3403de2691ccac580c64d66fc85afa2ffa33c3ce339e68865e58"
+    },
+    "nma_match16_compile": {
+      "path": "/tmp/nmaforge_round22_tinynpu/nma_match16_compile.log",
+      "sha256": "7162ef746f98cd659dd32b2a6b1ad5d0004ba9658dc1c87b87643d4a61415614"
+    },
+    "nma_match16_run": {
+      "path": "/tmp/nmaforge_round22_tinynpu/nma_match16/run.log",
+      "sha256": "e851499b11e11c510bcf390ceaee28b6bcf51588f1f1322d893acd6593314bde"
+    },
+    "tiny_gemm": {
+      "path": "/tmp/nmaforge_round22_tinynpu/tiny_gemm/run.log",
+      "sha256": "e921bef8e90748964ee0b7a566f70607515f5ee650cc00d18bbafbe9a0371bbe"
+    },
+    "tiny_engine_regression": {
+      "path": "/tmp/nmaforge_round22_tinynpu/tiny_gemm/engine_regression.log",
+      "sha256": "7dfc3091722f50a7fe926d105403584ef050cf1b2ded2146547a126f218bc5c6"
+    },
+    "tiny_cnn": {
+      "path": "/tmp/nmaforge_round22_tinynpu/tiny_cnn/run.log",
+      "sha256": "7b6b6f4ef1b07ecab8ea41490ce5959a6767972046c286799ed6ebd1bf1e8d97"
+    },
+    "nma_cnn": {
+      "path": "/tmp/nmaforge_round22_tinynpu/nma_cnn/run.log",
+      "sha256": "fc842de6aa73294c9e139aa09c08286866bca59bef513e724bfe238090c6b5a4"
+    }
+  }
+}

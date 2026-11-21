@@ -1,0 +1,18 @@
+requirement,spec,test,checker,coverage,evidence,status,remaining
+DMA-OUTPUT,Store lifecycle,12 directed cases,accepted-byte prefix sentinel and SVA,handshake group100; assertion6of11 real successes; no failures,dma-final/run.log and dma-urg,CLOSED_SCOPED,concurrent error crosses and independent external reset remain
+DMA-STALL,AXI stable under stall,deterministic AW W delayedB,monitor actual stalls and stable payload,AW37 W16 SVA successes,dma-urg/asserts.txt,CLOSED_SCOPED,BVALID with !BREADY structural exclusion needs review
+MATRIX-NONVAC,Held capture stable,seed20261116,deterministic stall checks10and5,actual capture checks positive,matrix-final/seed20261116.log,CLOSED_SCOPED,no random-seed substitution
+MATRIX-WB,Fused line order,3 directed plus random and opcode fault seeds,Golden address data WSTRB order,3 layouts partial reset abort watchdog fault sets,matrix-final logs,PASS_SCOPED,not exhaustive all shape fault crosses
+CTRL-ABI,CMDQ CPLQ registers IRQ,9 control UVM tests,UVM scoreboard SVA,no global coverage claim,control.log and control logs,PASS_SCOPED,all seven engine interaction not closed
+DMA-BLOCK,AXI load store errors,19 DMA UVM tests,UVM scoreboard SVA,no global coverage claim,dma-uvm.log,PASS_SCOPED,cross coverage disposition remains
+SPAD-ARBITER,ownership protected response,3 subsystem seeds,response ledger scoreboard SVA,merged URG available,subsystem.log and subsystem-urg.log,PASS_SCOPED,broad adversarial contention remains
+CLUSTER-7,seven engine interaction,real top UVM seed20261025,AXI response scoreboard,stops before completion,cluster seed run log,FAIL_ENV_FIXTURE,0x7d000 old512KiB fixture outside128KiB; port allocation with overlap and protection proof required
+CNN,570164 useful MAC,immutable trained fixture,independent CNN Golden,20800 Golden words,cnn both_fused_row_major top.log,PASS_SCOPED,application host pipeline not measured
+TRANSFORMER,H16 H32 exact contract,immutable prefill persistent decode,Logits KV intermediate Golden,all fixture comparisons PASS,workloads.log and transformer.csv,PASS_SCOPED,quality claims limited to fixed model
+DISPATCH,isolated offline mapping,72 reference plus32 hardware cases,independent signed INT8 Golden,dynamic optin rejected,mapper.log system CSV,PASS_SCOPED,isolated is software precondition not lease
+STATIC-LATCH,combinational assignment,128 and512 elaboration,Verilator LATCH UNOPTFLAT,0 after fix,static final128 final512,PASS_SCOPED,not timing signoff
+STATIC-WIDTH,integer interface correctness,Verilator and SpyGlass,per-message review register,183 Verilator open rows,STATIC_DISPOSITION.csv,OPEN_P1,width signed and illegal state proofs not closed
+CDC-RDC,clock reset topology,SpyGlass setup verify rdc,tool goal reports,see STATIC_REVIEW.md,static SpyGlass logs,OPEN,reset release and optional dual clock shell not signed off
+ASIC-MACRO,128KiB protected dualport mapping,availability and source audit,geometry and parity checklist,no mapping evidence,ASIC_READINESS.md,BLOCKED,authorized macro wrappers libs constraints absent
+PPA,actual mapped area timing power,DC availability check,no mapped netlist,no PPA claims,ASIC_READINESS.md,BLOCKED,legal mapped environment required
+VALIDATOR,0x53 field legality,descriptor-validator-regress,check_invalid,33 invalid rules and boundary43accept26reject,validator-fixed.log,PASS_SCOPED,corrected reservedbit8 check; dedicated rowmajor validator boundary matrix still required

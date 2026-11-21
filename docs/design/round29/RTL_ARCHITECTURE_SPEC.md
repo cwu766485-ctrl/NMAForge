@@ -1,0 +1,9 @@
+# Round 29 RTL architecture candidate
+
+Branch `feat/nmaforge-rtl-freeze-r29`, based on Round 28 `f2bed3dd7386b1b9cc79c20bb065d06354b1beca`. Baseline audit: Round 28 changed only the SFU divider accelerate select in product RTL; simulation profiler is testbench-only. Its archive correctly reports 70,318 decode cycles, 128 KiB behavioral SPAD, fixed GELU16 model and independent reference. No research branch merge required.
+
+The [consolidated architecture](../NMAFORGE_V2_FRONTEND_ARCHITECTURE.md) remains applicable. One 16×16/256-MAC shared Matrix array; four-bank 128 KiB research SPAD and default 512 KiB compatibility; AXI4 DMA, AXI-Lite control, ABI-v7.4 CMDQ/CPLQ, product 0x52 and 0x53. No new module, port, descriptor bit, buffer or memory is introduced.
+
+Round 29 change: after a non-final LayerNorm output write is accepted, read next X from the existing 16-word cache and subtract the row mean immediately. The original setup state is bypassed only for the existing small-cache mode. Gamma/beta reads, affine multiply/saturation pipeline, write ordering and SPAD transactions stay intact. First element retains original setup. On backpressure no next-X state advance occurs. Protection error and outer abort/watchdog priority take precedence. Final element never indexes the next cache entry. Length<=16 and not-last imply current index<=14; four-bit next index is bounded.
+
+This adds a cached-read/subtract/register-enable alternative on write commit, a four-bit increment/index mux and decode. No new flops or duplicated arithmetic operator is explicitly instantiated; synthesis resource sharing and physical delay are unmeasured. Dynamic register-array indexing, fixed-width arithmetic and synchronous enables are synthesizable constructs. Verilator elaboration/lint and VCS compile pass; this is a basic synthesizability review, not DC/LEC or timing proof.

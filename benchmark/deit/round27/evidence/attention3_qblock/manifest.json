@@ -1,0 +1,61 @@
+{
+  "artifacts": {
+    "dma_payload.memh": "54e8638a82f983bbf874d7f96224deb48c3c1c7b381de5396b49ed5b22aff245",
+    "late_dma_plan.memh": "acb58bcdb266972e6ac8459543dd72c15fba754c6bc6550acf8961384a41a6a0",
+    "model_golden.memh": "4d75908811bdd47d5db5ead20f1d67d392b08b5f8971039005e28992f60eb3d9",
+    "model_memory.memh": "b7771b421a2ca5ba2940f8e0b54f151e09525437c75bfe200b1cf0091b5f28f0"
+  },
+  "block": 0,
+  "descriptors": 735,
+  "dma_events": 90,
+  "dma_payload_bytes": 82944,
+  "executed_array_macs": 1277952,
+  "padding_macs": 67584,
+  "qkv_dump_sha256": "6709046be52a7bb6ba409b8dbb9724251bd7f7577aadb49e27ba18d88eb876ba",
+  "qkv_golden_sha256": "b0f0d3085fbbfae560d7f506dac07f81b0205413f55bee09f17d1134c3698f85",
+  "shape": {
+    "head_dim": 64,
+    "heads": 3,
+    "key_physical": 208,
+    "key_valid": 197,
+    "query_physical": 16,
+    "query_valid": 16
+  },
+  "softmax": {
+    "length": 197,
+    "opcode": "0x32",
+    "physical_padding_in_denominator": false,
+    "valid_keys_share_one_normalization": true
+  },
+  "spad": {
+    "capacity_bytes": 262144,
+    "completion_base": 249856,
+    "data_high_water": 200448,
+    "descriptor_base": 200704,
+    "key_bases": [
+      8192,
+      21504,
+      34816
+    ],
+    "query_bases": [
+      4096,
+      5120,
+      6144
+    ],
+    "queue_entries": 768,
+    "scratch_bases": [
+      98304,
+      132352,
+      166400
+    ],
+    "value_bases": [
+      49152,
+      65536,
+      81920
+    ],
+    "zero_source": 7168
+  },
+  "staging": "Q/K/V are Product Top readbacks, Golden-checked before host layout conversion; QK, Softmax, probability pack, and AV all run in Product RTL. Projection and attention are separate Top invocations.",
+  "status": "DEIT_THREE_HEAD_PRODUCT_ATTENTION_QBLOCK",
+  "useful_macs_qk_plus_av": 1210368
+}

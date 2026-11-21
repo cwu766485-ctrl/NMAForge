@@ -1,0 +1,10 @@
+{
+  "artifact": "round23_product_qat_fp32.pt",
+  "origin": "NMAForge Round 23 Product-contract QAT output, recovered from local archived experiment",
+  "sha256": "fea7b0f819ad3cfe9d8ab3f5f12cab632ae005aabf444cd75611846acbf6bde3",
+  "source_model_sha256": "1d59cf803c328149add9ddb004766e63043b3babdb56ea178bf96d7a51fda8df",
+  "seed": 20261123,
+  "steps": 1200,
+  "corpus_sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+  "contract": "fixed Q3 embeddings/residual, Q5 projections, Q8.8 FFN-up, unscaled Product QK shift-2, Q15 Softmax to Q7 AV, per-K16 Q3 FFN-down requant, Product GELU; STE QAT"
+}

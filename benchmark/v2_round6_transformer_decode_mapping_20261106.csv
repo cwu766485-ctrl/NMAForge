@@ -1,0 +1,3 @@
+run_id,source_sha,test_sha,seed,mapping_policy,opcode,descriptor_count,useful_macs,prefill_cycles,decode_cycles,total_cycles,prefill_read_bytes,prefill_write_bytes,decode_read_bytes,decode_write_bytes,final_outputs_golden,kv_cache_golden,status,measurement_boundary
+R6-TRANSFORMER-GEMM-S20261106,e100aa2af78ab7a95febc17f265f389f996a8404,e100aa2af78ab7a95febc17f265f389f996a8404,20261106,gemm_default,0x30,86,640,5682,5715,11397,1936,1072,1880,1048,PASS,PASS,PASS,VCS Top CMDQ doorbell-to-CPLQ-tail; behavioral four-bank SPAD
+R6-TRANSFORMER-GEMV-S20261106,e100aa2af78ab7a95febc17f265f389f996a8404,e100aa2af78ab7a95febc17f265f389f996a8404,20261106,gemv_qkv,0x52,86,640,5682,5715,11397,1936,1072,2024,904,PASS,PASS,PASS,VCS Top CMDQ doorbell-to-CPLQ-tail; behavioral four-bank SPAD

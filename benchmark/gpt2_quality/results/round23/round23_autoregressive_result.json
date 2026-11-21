@@ -1,0 +1,57 @@
+{
+  "status": "FOUR_LAYER_TOP_AUTOREGRESSIVE_GOLDEN_PASS",
+  "mode": "four_layer_prefix_recompute_same_top_instance",
+  "seed": 20261123,
+  "synthetic_model_quality_claim": false,
+  "prompt_tokens": [
+    1,
+    7,
+    42,
+    3
+  ],
+  "generated_tokens": [
+    10,
+    10,
+    73,
+    73
+  ],
+  "contexts": [
+    {
+      "context": 0,
+      "row": 3,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 10,
+      "logits_sha256_le_i32": "123efdbe7fc0325b5fbaa0bbb23850bebd94ca5105de394fba35682daf9b4546",
+      "rtl_dump": "/tmp/round23_gpt2/qat_contract_aligned/product_top_autoreg/rtl_logits_context0.csv"
+    },
+    {
+      "context": 1,
+      "row": 4,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 10,
+      "logits_sha256_le_i32": "745dd1d246d11177d864a8dbbba613404a3ad1ac625e0ba7c14caa3a91044a36",
+      "rtl_dump": "/tmp/round23_gpt2/qat_contract_aligned/product_top_autoreg/rtl_logits_context1.csv"
+    },
+    {
+      "context": 2,
+      "row": 5,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 73,
+      "logits_sha256_le_i32": "1f2b2ba733af999cc7482c10f7b41fda514ea0ed3c94a2f1355eb559e08467cb",
+      "rtl_dump": "/tmp/round23_gpt2/qat_contract_aligned/product_top_autoreg/rtl_logits_context2.csv"
+    },
+    {
+      "context": 3,
+      "row": 6,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 73,
+      "logits_sha256_le_i32": "b18da4dc146555c5a69ebea5efbdc2f12bf0a36d8ef4ee46333bbac5d093384d",
+      "rtl_dump": "/tmp/round23_gpt2/qat_contract_aligned/product_top_autoreg/rtl_logits_context3.csv"
+    }
+  ],
+  "source_sha": "recorded by the enclosing run manifest"
+}

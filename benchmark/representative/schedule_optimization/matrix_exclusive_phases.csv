@@ -1,0 +1,7 @@
+variant,case_id,input_fetch,compute,writeback,prefetch_wait,lifecycle,total
+baseline,105,12,20,64,27,2,125
+baseline,106,12,40,64,63,2,181
+baseline,107,38,320,256,360,5,979
+final,105,12,20,64,21,2,119
+final,106,12,40,64,49,2,167
+final,107,38,320,256,300,5,919

@@ -1,5 +1,52 @@
 # NMAForge RTL 静态分析报告
 
+## 固定 v2 候选复查（2026-11-05，source/test SHA `410b81d`）
+
+VCS 候选回归完成后，使用 SpyGlass V-2023.12-SP1 对当前 A8 project
+重新执行 lint。命令为
+`PATH="$SPYGLASS_HOME/bin:$PATH" bash dv/spyglass/run_spyglass_a8.sh lint`
+（从仓库根目录执行）。结果：exit 0、0 errors、465 warnings、5 infos、0
+waivers。Lint 工具执行通过，但没有达到 warning closure。完整摘要和报告副本在
+`/tmp/nmaforge_v2_410b81_static_eda.tar.gz`，SHA-256
+`178d3267e55304a0c173a9fc89facd547fb7926b516c3c672e1e9ed710dfab60`。
+
+本次 warning 分布：`W415a` 160、`STARC05-2.2.3.3` 141、`W426` 56、
+`W287b` 27、`STARC05-2.11.3.1` 22、`W528` 20、`STARC05-2.1.3.1` 11、
+`STARC05-2.1.4.5` 11、`W240` 7、`W362` 6，以及
+`STARC05-1.3.1.3`、`W216`、`W486`、`FLAT_504` 各 1。`W415a` 与
+`InitValUsingNBA` 有重叠，不可将 rule count 当成互斥缺陷数。当前 Matrix
+宽度项和 `FLAT_504` 均保留待审，未 waiver。
+
+同候选脚本 CDC 尝试在 `cdc_setup` 无新输出运行 6m10s 后被终止，exit 143；
+因此当前 CDC 是 **NOT_RUN**。RDC 在 180 秒上限内推进到 `Ar_resetcross01`
+（规则 385/478、约 6.1 GB RSS）后退出码 124，无 RDC 结论。此前同日完成的
+结构 CDC 报告仍标出一个 `Reset_sync04` 和一个 `FLAT_504`，但不冒充本次重跑。
+其 RTL/约束定位与 disposition 见
+[`NMAFORGE_V2_ASIC_READINESS.md`](NMAFORGE_V2_ASIC_READINESS.md)。
+
+## 历史 v2 候选复查（2026-11-05，source/test SHA `145363d`）
+
+当前 v2 RTL/test 候选为 `145363ddff5141177421ee7429fc65f78834830d`，
+使用 SpyGlass V-2023.12-SP1 对公开 A8 project 复跑：
+
+| Goal | 结果 | 当前判定 |
+|---|---|---|
+| lint/lint_rtl | 0 errors、465 warnings、5 infos；exit 0 | 分析执行完成；warning closure 未完成 |
+| cdc/cdc_setup | 0 errors、1 warning、9 infos | Setup 有 warning，未 sign-off |
+| cdc/cdc_verify_struct | 0 errors、2 warnings、37 infos；unsynchronized crossings=0，convergences=0 | 结构证据；`Reset_sync04` 和 `FLAT_504` 未关闭 |
+| rdc/rdc_verify_struct | 180 s timeout，停在 `Ar_resetcross01` | **NOT_RUN**；无 RDC 结论 |
+
+这次检查发现 `ai_parallel_compute_dispatcher.v`、
+`ai_tensor_matrix_array.sv` 和 `ai_compute_spad_mux.v` 在 `a8_rtl.f` 中有列出，
+但最初未被 `a8_static.prj` 读取。修正 SpyGlass project source list，并将仅供
+分析的 `mthresh` 设为 16385 后，lint 已消除 black-box/unsynthesized 错误；
+没有修改产品 RTL 或屏蔽规则。完整工具、命令和边界见
+[`NMAFORGE_V2_ASIC_READINESS.md`](NMAFORGE_V2_ASIC_READINESS.md)。
+
+Lint/CDC 的完整 RTL view 仍是当前 project 的 256-word/bank 行为 RAM 配置，
+不是 512 KiB SRAM 宏映射、综合或物理 sign-off。SpyGlass reports 和数据库
+保留在本机忽略目录，没有提交。
+
 ## 1. 范围与结论
 
 本报告覆盖 `ai_accel_top` 的公开 SpyGlass project `dv/spyglass/a8_static.prj`，

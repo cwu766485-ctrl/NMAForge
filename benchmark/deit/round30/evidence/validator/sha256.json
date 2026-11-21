@@ -1,0 +1,14 @@
+{
+  "files": [
+    {
+      "file": "compile.log.gz",
+      "sha256": "de823aa18ef7d4801e23478c659db9885e08b89cf8b1da16cef2fddd60a8b8fc",
+      "bytes": 1312
+    },
+    {
+      "file": "run.log.gz",
+      "sha256": "7c82c2f0e425f42ab63793636140443071292cee53a1a2754bfb25a13dd94372",
+      "bytes": 505
+    }
+  ]
+}

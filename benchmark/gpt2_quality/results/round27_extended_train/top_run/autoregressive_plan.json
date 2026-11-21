@@ -1,0 +1,105 @@
+{
+  "status": "PLANNER_READY_REQUIRES_PRODUCT_TOP_AUTOREGRESSIVE_PASS",
+  "mode": "four_layer_prefix_recompute_same_top_instance",
+  "seed": 20261223,
+  "prompt_tokens": [
+    1,
+    7,
+    42,
+    3
+  ],
+  "expected_generated_tokens": [
+    83,
+    109,
+    104,
+    110
+  ],
+  "model_sha256": "593d1e4a2f2816795bf560a847bd1163bda2f46b9310c957160b42881486adf5",
+  "numeric_profile": "frozen",
+  "generated_steps": [
+    {
+      "step": 0,
+      "context_tokens": [
+        1,
+        7,
+        42,
+        3
+      ],
+      "logits_row": 3,
+      "expected_argmax_token": 83,
+      "argmax_rule": "signed INT32; lowest token ID wins ties",
+      "next_context": "context1",
+      "cache_before_sha256": {
+        "layer0": "3758d32218744998f55b69fc58bdaf897ce8aac831eb74e5e0e0592172e453b3",
+        "layer1": "219f26e4d31776f71bab66a8d77bec3c41bdc8dc25205c8b1240d282334a16d6",
+        "layer2": "7feb0aa6120588aa23cfffeeb2a5bda1002308df6c729f256774a42a4246d1ff",
+        "layer3": "d6fb408a2da8dd2b10bfd68cd99a8db7fcb1e9b8602583ace17ee221cf0b4fe9"
+      }
+    },
+    {
+      "step": 1,
+      "context_tokens": [
+        1,
+        7,
+        42,
+        3,
+        83
+      ],
+      "logits_row": 4,
+      "expected_argmax_token": 109,
+      "argmax_rule": "signed INT32; lowest token ID wins ties",
+      "next_context": "context2",
+      "cache_before_sha256": {
+        "layer0": "5007a5fb968445adcce83c22c3ae0e2512c7226ef3a6c074dbb3a40a31fd7bb6",
+        "layer1": "0341bc6f1e96a4f72c50a5e56a9d4d656a10ba6f3de391ad9aa71dd00cb7196a",
+        "layer2": "9b541aef25bd4e755db485f2ea30ad88726814efad9d41b84bbfb1c5336df615",
+        "layer3": "148c829a2711e034618053e68fafc5e0112c7654fdc9105d382a43760da2b265"
+      }
+    },
+    {
+      "step": 2,
+      "context_tokens": [
+        1,
+        7,
+        42,
+        3,
+        83,
+        109
+      ],
+      "logits_row": 5,
+      "expected_argmax_token": 104,
+      "argmax_rule": "signed INT32; lowest token ID wins ties",
+      "next_context": "context3",
+      "cache_before_sha256": {
+        "layer0": "7a491780c9762aba318d29223179ac8e69a810547fd6a21230447c208456830e",
+        "layer1": "1456688ac5128a3fddb65349e104d103d6f7a7a0246099ebe301804b67be39a5",
+        "layer2": "848fffab8b11b5b634f83b65884a47379a6417afe119ef68b2b67debcdfc1567",
+        "layer3": "3de1f1beaf276419b3ab87b285cacf77071bd47566dfd6b8823ba0c49cef93a8"
+      }
+    },
+    {
+      "step": 3,
+      "context_tokens": [
+        1,
+        7,
+        42,
+        3,
+        83,
+        109,
+        104
+      ],
+      "logits_row": 6,
+      "expected_argmax_token": 110,
+      "argmax_rule": "signed INT32; lowest token ID wins ties"
+    }
+  ],
+  "feedback_plan": "feedback_plan.memh",
+  "host_roles": [
+    "read actual RTL logits",
+    "signed INT32 argmax with lowest-ID tie break",
+    "token embedding/position input lookup only"
+  ],
+  "host_intermediate_tensor_writes": 0,
+  "cache_policy": "each next-context run verifies all prior physical KV words before prefix recompute; Product KV_READ checkpoints verify recomputed cache contents",
+  "quality_scope": "GPT-2-derived truncated/requantized weights; functional autoregressive loop only, no language-model quality claim"
+}

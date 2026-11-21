@@ -1,0 +1,138 @@
+{
+  "baseline_head_before_round23": "4803307124d25127c5c1cde0471406caac663bb8",
+  "branch": "research/nmaforge-v1.2-round23-gpt2",
+  "limitations": [
+    "Calibration ranges were measured on training-only windows; independent per-channel scales were not applied because the current descriptor contract cannot express them.",
+    "QAT fake-quant uses PyTorch LayerNorm and is not bit-exact to Product integer LayerNorm; Product Top matched the independent integer Golden.",
+    "This byte-level Shakespeare task is not evidence of general language-model capability."
+  ],
+  "product_rtl_modified": false,
+  "product_top": {
+    "argmax_tie_break": "lowest token id",
+    "compile_errors": 0,
+    "compile_exit": 0,
+    "compile_kdb_errors": 0,
+    "compile_kdb_warnings": 0,
+    "compile_log_sha256_gz": "4ba8cdfc4b899696b65dbba00d4224d368d575469ee634591be89108e40828b8",
+    "contexts": [
+      {
+        "argmax_token": 10,
+        "context": 0,
+        "golden_bit_exact": true,
+        "logit_count": 256,
+        "logits_sha256_le_i32": "123efdbe7fc0325b5fbaa0bbb23850bebd94ca5105de394fba35682daf9b4546",
+        "row": 3,
+        "rtl_dump": "/tmp/round23_gpt2/qat_contract_aligned/product_top_autoreg/rtl_logits_context0.csv"
+      },
+      {
+        "argmax_token": 10,
+        "context": 1,
+        "golden_bit_exact": true,
+        "logit_count": 256,
+        "logits_sha256_le_i32": "745dd1d246d11177d864a8dbbba613404a3ad1ac625e0ba7c14caa3a91044a36",
+        "row": 4,
+        "rtl_dump": "/tmp/round23_gpt2/qat_contract_aligned/product_top_autoreg/rtl_logits_context1.csv"
+      },
+      {
+        "argmax_token": 73,
+        "context": 2,
+        "golden_bit_exact": true,
+        "logit_count": 256,
+        "logits_sha256_le_i32": "1f2b2ba733af999cc7482c10f7b41fda514ea0ed3c94a2f1355eb559e08467cb",
+        "row": 5,
+        "rtl_dump": "/tmp/round23_gpt2/qat_contract_aligned/product_top_autoreg/rtl_logits_context2.csv"
+      },
+      {
+        "argmax_token": 73,
+        "context": 3,
+        "golden_bit_exact": true,
+        "logit_count": 256,
+        "logits_sha256_le_i32": "b18da4dc146555c5a69ebea5efbdc2f12bf0a36d8ef4ee46333bbac5d093384d",
+        "row": 6,
+        "rtl_dump": "/tmp/round23_gpt2/qat_contract_aligned/product_top_autoreg/rtl_logits_context3.csv"
+      }
+    ],
+    "descriptor_publications": 4020,
+    "disposition": "PASS for four-layer Product Top prefix-recompute autoregressive feedback; not query-only incremental decode.",
+    "generated_tokens": [
+      10,
+      10,
+      73,
+      73
+    ],
+    "golden_bundle_sha256": "763a33005d2f1445118135c3e7cf442bf7a6acb3ad64918f9252d3b5736544be",
+    "host_intermediate_words": 0,
+    "logits_source": "Product Top SPAD",
+    "mode": "four_layer_prefix_recompute_same_top_instance",
+    "prompt_tokens": [
+      1,
+      7,
+      42,
+      3
+    ],
+    "reset_events": 0,
+    "result_sha256": "802f3204d2aabdc90deb39adf1a7df8be0fc6081673e74da5c3248d6d3e3fe9b",
+    "run_log_sha256_gz": "a436291230e52bf815d7b5363d7aeb842534974316481c9ca28024b8e575719a",
+    "seed": 20261123,
+    "session_extension_cycles": 4339728,
+    "vcs": "V-2023.12-SP1_Full64"
+  },
+  "quality": {
+    "accuracy_change_pp": 12.6953125,
+    "cross_entropy_change_nats": -1.5717062343574604,
+    "disposition": "PARTIAL: 29.0039% accuracy is 0.1953 pp below Bigram 29.1992%, and below original FP32 37.4023%.",
+    "gap_vs_same_window_bigram_pp": -0.1953125,
+    "perplexity_change": -47.75522758364399,
+    "round22_candidate": {
+      "accuracy": 0.1630859375,
+      "bigram_accuracy_same_targets": 0.2919921875,
+      "cross_entropy_nats": 4.098891733913119,
+      "fp32_accuracy_same_targets": 0.3740234375,
+      "fp32_int8_top1_agreement": 0.26953125,
+      "perplexity": 60.27345154585076,
+      "seed": 20261121,
+      "split": "last 10% corpus, first 5% of heldout excluded as in Round 22",
+      "targets": 1024
+    },
+    "round23_qat_candidate": {
+      "accuracy": 0.2900390625,
+      "bigram_accuracy_same_targets": 0.2919921875,
+      "cross_entropy_nats": 2.5271854995556584,
+      "fp32_accuracy_same_targets": 0.2763671875,
+      "fp32_int8_top1_agreement": 0.33984375,
+      "perplexity": 12.518223962206768,
+      "seed": 20261121,
+      "split": "last 10% corpus, first 5% of heldout excluded as in Round 22",
+      "targets": 1024
+    }
+  },
+  "reproduction": {
+    "package_hash_reproduced": true,
+    "python": "Python 3.12, torch 2.6 CPU, NumPy 2.5.4",
+    "training_command": "/tmp/nmaforge_deit_round17_venv/bin/python -u benchmark/gpt2_quality/train_round23_product_qat.py --fp32 /tmp/nmaforge_v12_r20_gpt2_quality_corrected/h64_byte_lm_fp32.pt --corpus /tmp/nmaforge_tinyshakespeare.txt --out-dir /tmp/round23_gpt2/reproduction --seed 20261123 --steps 1200 --batch 16 --lr 1e-4",
+    "vcs_command": "cd dv/subsystem/top_smoke/sim && make ai_h64_four_layer_top_argmax AI_H64_AUTOREGRESSIVE=1 AI_H64_FOUR_LAYER_MODEL_NPZ=/tmp/round23_gpt2/qat_contract_aligned/round23_product_qat_model.npz AI_H64_NUMERIC_PROFILE=round21_residual_gelu_aligned AI_H64_FOUR_LAYER_RUN=/tmp/round23_gpt2/qat_contract_aligned/product_top_autoreg AI_H64_FOUR_LAYER_PYTHON=/tmp/nmaforge_deit_round17_venv/bin/python AI_H64_FOUR_LAYER_SEED=20261123 AI_H64_FOUR_LAYER_TOKENS=1,7,42,3 VCS=/opt/Synopsys/vcs/V-2023.12-SP1/bin/vcs"
+  },
+  "run_id": "round23-gpt2-product-qat-autoreg-seed20261123",
+  "source_hashes": {
+    "corpus": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+    "package": "4d931a7fe8fab88b035fd9a29b2d9c6206a35e988f3f5fd044d65b231073961d",
+    "post_qat_fp32_checkpoint": "fea7b0f819ad3cfe9d8ab3f5f12cab632ae005aabf444cd75611846acbf6bde3",
+    "q_format_contract": "bb129e784f69f879e4df2786826d88eeda3fb975cde5ee53d6d24a7ba0ecb342",
+    "qat_trainer": "99208b9df40a365cecf52996a64518cd29999930f8baf34f4c7b77f48530b7ca",
+    "quant_diagnostics": "2df729098d08b73c8777c1555374446fe58b4cff8d4daa294fe336dea80b03f2",
+    "round22_candidate_package": "765bfa29f545716f774c6d3ddbb7dc80106b75a5ebc40801075331d6040d3e3e"
+  },
+  "status": "PRODUCT_TOP_AUTOREGRESSIVE_BIT_EXACT; MODEL_QUALITY_PARTIAL",
+  "training": {
+    "batch": 16,
+    "calibration_seed": 20547610,
+    "calibration_windows": 256,
+    "heldout_seed": 20261121,
+    "heldout_targets": 1024,
+    "learning_rate": 0.0001,
+    "qat_contract": "Product Q3/Q5/Q8.8, no sqrt attention scaling, Q15 softmax to Q7 AV, K=16 partial FFN-down shift-5 requant, Product integer GELU",
+    "seed": 20261123,
+    "split": "first 90 percent train/calibration; last 10 percent held-out, first 5 percent of held-out excluded",
+    "steps": 1200
+  }
+}

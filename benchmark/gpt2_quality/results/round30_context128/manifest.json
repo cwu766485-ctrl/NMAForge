@@ -1,0 +1,87 @@
+{
+  "architecture": {
+    "context": 128,
+    "ffn": 256,
+    "heads": 4,
+    "hidden": 64,
+    "layers": 4,
+    "vocab": 256
+  },
+  "batch": 2,
+  "checkpoint_sha256": "dc1acaee44017dcbd84c473e8106e2150bfa0b15afb95653c61c27f86af04a95",
+  "corpus_sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+  "descriptor_count": "NOT_ESTIMATED; requires Product Mapper support",
+  "elapsed_seconds": 2.543940782546997,
+  "estimated_int8_weight_bytes": 225792,
+  "estimated_latency": "NOT_ESTIMATED; no Product Top run",
+  "evaluation": "common target positions at final 16 bytes of each held-out 128-byte window",
+  "kv_cache_bytes_context128": 65536,
+  "optimizer": "AdamW lr=2e-5 weight_decay=0.001; fine-tune from fixed H64 context16 FP32 checkpoint",
+  "parameters": 222336,
+  "position_init": "linear interpolation from learned 16-row source table to 128 rows",
+  "product_rtl_context128": "NOT_RUN; descriptor/ABI/address/queue support unqualified",
+  "seed": 20263028,
+  "source_checkpoint_sha256": "6d71d0a4649f276a74d42834f94f01812c4cf1e6d64bc6562f1ab017361c0021",
+  "spad_peak_live": "NOT_ESTIMATED; requires Product Runtime and lifetime plan",
+  "split_manifest_sha256": "78c4a0b3c3f67e693725bcc7e30caedca8d6b24cec7a6c685365c1ff04a6cd00",
+  "split_ranges_half_open": {
+    "test": [
+      948101,
+      1115394
+    ],
+    "train": [
+      0,
+      780758
+    ],
+    "validation": [
+      780792,
+      948067
+    ]
+  },
+  "status": "SOFTWARE_ONLY_CONTEXT128_EXPLORATORY_NO_RTL_CLAIM",
+  "steps": 100,
+  "test_metrics_once_frozen": {
+    "bigram": {
+      "accuracy": 0.27587890625,
+      "cross_entropy_nats": 2.464324529425677,
+      "perplexity": 11.755538948937106
+    },
+    "context128_finetuned": {
+      "accuracy": 0.291015625,
+      "cross_entropy_nats": 2.453654736669182,
+      "perplexity": 11.63077656263733
+    },
+    "context128_vs_context16_top1_agreement": 0.626953125,
+    "context16_checkpoint": {
+      "accuracy": 0.3720703125,
+      "cross_entropy_nats": 2.1173364365923684,
+      "perplexity": 8.308976501429463
+    }
+  },
+  "test_starts_sha256": "259114006a53c30046cbd06a6dce0d0d16a9cca984e6a447f982388953f922b1",
+  "test_used_for_selection": false,
+  "tool_versions": {
+    "numpy": "2.5.4",
+    "python": "3.12.13",
+    "torch": "2.6.0+cpu"
+  },
+  "validation_metrics": {
+    "bigram": {
+      "accuracy": 0.2763671875,
+      "cross_entropy_nats": 2.4957653420206345,
+      "perplexity": 12.131014341663077
+    },
+    "context128_finetuned": {
+      "accuracy": 0.2783203125,
+      "cross_entropy_nats": 2.5034580041972982,
+      "perplexity": 12.224693997854343
+    },
+    "context128_vs_context16_top1_agreement": 0.6240234375,
+    "context16_checkpoint": {
+      "accuracy": 0.37890625,
+      "cross_entropy_nats": 2.1381610013977874,
+      "perplexity": 8.483821538352366
+    }
+  },
+  "validation_starts_sha256": "e40d47b21dfc2b69373685eeb2efcab6270e473f3a239d9d9ce0e55f859e89f5"
+}

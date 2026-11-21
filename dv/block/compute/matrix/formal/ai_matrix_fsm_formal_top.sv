@@ -20,6 +20,7 @@ module ai_matrix_fsm_formal_top (
     input logic bias_enable,
     input logic [4:0] scale_shift,
     input logic [1:0] activation,
+    input logic [31:0] aux0,
     input logic [31:0] watchdog_limit,
     input logic [31:0] bank0_data,
     input logic [31:0] bank1_data,

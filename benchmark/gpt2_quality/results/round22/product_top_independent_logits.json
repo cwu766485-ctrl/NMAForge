@@ -1,0 +1,100 @@
+{
+  "candidate_sha256": "765bfa29f545716f774c6d3ddbb7dc80106b75a5ebc40801075331d6040d3e3e",
+  "contract": "residual_gelu_aligned",
+  "fp32_checkpoint_sha256": "1d59cf803c328149add9ddb004766e63043b3babdb56ea178bf96d7a51fda8df",
+  "generated_tokens": [
+    32,
+    66,
+    117,
+    107
+  ],
+  "initial_prompt": [
+    1,
+    7,
+    42,
+    3
+  ],
+  "reference": "benchmark/gpt2_quality/round21_contract_ablation.py::infer",
+  "status": "PASS",
+  "steps": [
+    {
+      "bit_exact": true,
+      "first_mismatch": null,
+      "independent_argmax": 32,
+      "logit_count": 256,
+      "mismatch_count": 0,
+      "prefix_tokens": [
+        1,
+        7,
+        42,
+        3
+      ],
+      "rtl_argmax": 32,
+      "rtl_dump": "rtl_logits_context0.csv",
+      "rtl_dump_sha256": "1c46cb6c4b00a1579c74ecb6883cb9dddbc95cf964586cab0a22410a5408d54b",
+      "rtl_logits_sha256_le_i32": "a4e056226199fa8c00e43d711feb27cf3ba3a4f4f39539418e84667b229a9c8b",
+      "step": 0
+    },
+    {
+      "bit_exact": true,
+      "first_mismatch": null,
+      "independent_argmax": 66,
+      "logit_count": 256,
+      "mismatch_count": 0,
+      "prefix_tokens": [
+        1,
+        7,
+        42,
+        3,
+        32
+      ],
+      "rtl_argmax": 66,
+      "rtl_dump": "rtl_logits_context1.csv",
+      "rtl_dump_sha256": "720e0c5667510c89ef9985daf6ead62900603ff47465c8ab156fb3a0cfca7313",
+      "rtl_logits_sha256_le_i32": "8859fc33a6f8048a9e1946ab129a59ad0e0771b7ef8b3e2a642f966a09d94745",
+      "step": 1
+    },
+    {
+      "bit_exact": true,
+      "first_mismatch": null,
+      "independent_argmax": 117,
+      "logit_count": 256,
+      "mismatch_count": 0,
+      "prefix_tokens": [
+        1,
+        7,
+        42,
+        3,
+        32,
+        66
+      ],
+      "rtl_argmax": 117,
+      "rtl_dump": "rtl_logits_context2.csv",
+      "rtl_dump_sha256": "5bdbff3198f8e9d67ed031227b732c3a8f4b1087a301fb224014f321217fc584",
+      "rtl_logits_sha256_le_i32": "49969d25e20158bb5076e737b300ab00850802bb0dec2077ee99c256c807633f",
+      "step": 2
+    },
+    {
+      "bit_exact": true,
+      "first_mismatch": null,
+      "independent_argmax": 107,
+      "logit_count": 256,
+      "mismatch_count": 0,
+      "prefix_tokens": [
+        1,
+        7,
+        42,
+        3,
+        32,
+        66,
+        117
+      ],
+      "rtl_argmax": 107,
+      "rtl_dump": "rtl_logits_context3.csv",
+      "rtl_dump_sha256": "8ed1d91189133b49af7f12553f8e1c2a194cd19295857797e57f213c5e6dfac6",
+      "rtl_logits_sha256_le_i32": "a037d7ae489231edac47fe887e56e8705140ace0873f5b9a4aed02c13f8c1deb",
+      "step": 3
+    }
+  ],
+  "tie_break": "lowest token ID (strict greater-than update)"
+}

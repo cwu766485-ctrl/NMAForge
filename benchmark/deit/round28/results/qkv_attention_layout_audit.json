@@ -1,0 +1,227 @@
+{
+  "all_logical_values_preserved": true,
+  "consumer_layouts": {
+    "K": "K-major [64,208] per head; 197 valid keys, 11 zero-padded; 0x52 B operand",
+    "Q": "dense row-major [16,64] per head; 0x52 A operand",
+    "V": "Matrix-B [208,16] panels, four panels per head; 197 valid keys, 11 zero-padded; AV operand"
+  },
+  "head_checks": [
+    {
+      "K_valid_shape": [
+        197,
+        64
+      ],
+      "Q_shape": [
+        16,
+        64
+      ],
+      "V_valid_shape": [
+        197,
+        64
+      ],
+      "head": 0,
+      "invalid_key_rows_zeroed_for_consumer": true
+    },
+    {
+      "K_valid_shape": [
+        197,
+        64
+      ],
+      "Q_shape": [
+        16,
+        64
+      ],
+      "V_valid_shape": [
+        197,
+        64
+      ],
+      "head": 1,
+      "invalid_key_rows_zeroed_for_consumer": true
+    },
+    {
+      "K_valid_shape": [
+        197,
+        64
+      ],
+      "Q_shape": [
+        16,
+        64
+      ],
+      "V_valid_shape": [
+        197,
+        64
+      ],
+      "head": 2,
+      "invalid_key_rows_zeroed_for_consumer": true
+    }
+  ],
+  "logical_repack_checks": [
+    {
+      "elements": 1024,
+      "first_mismatch": null,
+      "label": "head0.Q dense A",
+      "mismatches": 0
+    },
+    {
+      "elements": 13312,
+      "first_mismatch": null,
+      "label": "head0.K K-major B",
+      "mismatches": 0
+    },
+    {
+      "elements": 13312,
+      "first_mismatch": null,
+      "label": "head0.V Matrix-B",
+      "mismatches": 0
+    },
+    {
+      "elements": 1024,
+      "first_mismatch": null,
+      "label": "head1.Q dense A",
+      "mismatches": 0
+    },
+    {
+      "elements": 13312,
+      "first_mismatch": null,
+      "label": "head1.K K-major B",
+      "mismatches": 0
+    },
+    {
+      "elements": 13312,
+      "first_mismatch": null,
+      "label": "head1.V Matrix-B",
+      "mismatches": 0
+    },
+    {
+      "elements": 1024,
+      "first_mismatch": null,
+      "label": "head2.Q dense A",
+      "mismatches": 0
+    },
+    {
+      "elements": 13312,
+      "first_mismatch": null,
+      "label": "head2.K K-major B",
+      "mismatches": 0
+    },
+    {
+      "elements": 13312,
+      "first_mismatch": null,
+      "label": "head2.V Matrix-B",
+      "mismatches": 0
+    }
+  ],
+  "physical_alias": [
+    {
+      "K_source": "Matrix-A 208x192 tiled; consumer is transposed K-major 64x208 dense",
+      "Q_source": "Matrix-A 208x192 tiled; consumer is row-major 16x64 dense",
+      "V_source": "Matrix-A 208x192 tiled; consumer is Matrix-B 208x16 panel format",
+      "head": 0,
+      "requires_reorder": true
+    },
+    {
+      "K_source": "Matrix-A 208x192 tiled; consumer is transposed K-major 64x208 dense",
+      "Q_source": "Matrix-A 208x192 tiled; consumer is row-major 16x64 dense",
+      "V_source": "Matrix-A 208x192 tiled; consumer is Matrix-B 208x16 panel format",
+      "head": 1,
+      "requires_reorder": true
+    },
+    {
+      "K_source": "Matrix-A 208x192 tiled; consumer is transposed K-major 64x208 dense",
+      "Q_source": "Matrix-A 208x192 tiled; consumer is row-major 16x64 dense",
+      "V_source": "Matrix-A 208x192 tiled; consumer is Matrix-B 208x16 panel format",
+      "head": 2,
+      "requires_reorder": true
+    }
+  ],
+  "repack_payload": {
+    "bytes_by_layout": {
+      "K_major_B": 39936,
+      "Q_dense_A": 3072,
+      "V_matrix_B": 39936
+    },
+    "logical_nonpadding_read_bytes": 78720,
+    "sha256_by_head_layout": {
+      "K_major_B": [
+        "0402d41c04664319dbd30c9273db2cf95e7bfbdd54fe1d972c382b4a49aaabc6",
+        "0653e33ac39244dc8e3a4ceced6da45ade0fda526cf2f552edd2ff4222ee69f3",
+        "71abd80fbc06c4609f79642111ebeca88a18126d44b01a21c36d7142002f1939"
+      ],
+      "Q_dense_A": [
+        "005cfddf09cc5439188f7049baaca27b2caff526c773c478b29154a37a50a00c",
+        "0830785f19f71742965cb97f44a50891667f6b07e206add8fbf609ff8c36bdab",
+        "a35525811907890f29ecad05f99a4a984d2aac45c47455e99e0464ea1ac34451"
+      ],
+      "V_matrix_B": [
+        "1613360020945141815907b063d2a2195ee31c8b034952f0f306264f5080ebdd",
+        "4669ff38d88a04612e3c5b991532638794d953e9014c731c91e142f897f94987",
+        "0e710e1e0b06dd1d4b00f8b683ae88ac216421be8df38a1dc556d3a481a9d693"
+      ]
+    },
+    "total_bytes": 82944,
+    "zero_padding_bytes_written": 4224
+  },
+  "run": {
+    "numpy_version": "2.5.4",
+    "round27_attention_run_id": "round27_deit_attention3_qblock_20261118",
+    "round27_projection_run_id": "round27_deit_qkv197_20261118",
+    "script_sha256": "c3523157d9ec53c71aac3b2fe9c8014fe87ae2997bce9aa61c7f572a1bcd65f5"
+  },
+  "scope": "offline data/layout audit; does not claim one-session Product Top execution",
+  "source": {
+    "logical_values": {
+      "K": {
+        "sha256_i16_le": "c3766ca43fa8812b26ab2dd2df7e0e3ba74564ba38ed6b7cce5562fe903c6317",
+        "shape": [
+          208,
+          192
+        ]
+      },
+      "Q": {
+        "sha256_i16_le": "b72b8f589d2aa69c28650ed3094f919a8b4d6e543ac78b6cf40be88c6856ff8b",
+        "shape": [
+          208,
+          192
+        ]
+      },
+      "V": {
+        "sha256_i16_le": "14819dfd1bc18ae857076dfef819e161992003e1dd817ca6a2564c5bdf433c38",
+        "shape": [
+          208,
+          192
+        ]
+      }
+    },
+    "projection_layout": "Matrix-A tiled, physical [208,192], 197 valid rows",
+    "projection_word_checks": [
+      {
+        "first_mismatch_address": null,
+        "mismatches_vs_independent_golden": 0,
+        "physical_words": 9984,
+        "projection": "Q"
+      },
+      {
+        "first_mismatch_address": null,
+        "mismatches_vs_independent_golden": 0,
+        "physical_words": 9984,
+        "projection": "K"
+      },
+      {
+        "first_mismatch_address": null,
+        "mismatches_vs_independent_golden": 0,
+        "physical_words": 9984,
+        "projection": "V"
+      }
+    ],
+    "qkv_dump_sha256": "6709046be52a7bb6ba409b8dbb9724251bd7f7577aadb49e27ba18d88eb876ba",
+    "qkv_golden_sha256": "b0f0d3085fbbfae560d7f506dac07f81b0205413f55bee09f17d1134c3698f85"
+  },
+  "staged_payload_rebuild_check": {
+    "archived_payload_sha256": "54e8638a82f983bbf874d7f96224deb48c3c1c7b381de5396b49ed5b22aff245",
+    "archived_word_count": 20736,
+    "exact_word_match": true,
+    "first_mismatch_word_index": null,
+    "rebuilt_word_count": 20736
+  },
+  "status": "PASS_QKV_PRODUCT_GOLDEN_AND_CONSUMER_LAYOUT_AUDIT"
+}

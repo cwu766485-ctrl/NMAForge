@@ -1,0 +1,28 @@
+{
+  "0": {
+    "valid_tokens": 4,
+    "descriptor_count": 933,
+    "command_runtime_window_cycles": 1312333
+  },
+  "1": {
+    "valid_tokens": 5,
+    "descriptor_count": 981,
+    "command_runtime_window_cycles": 1414584
+  },
+  "2": {
+    "valid_tokens": 6,
+    "descriptor_count": 1029,
+    "command_runtime_window_cycles": 1447518
+  },
+  "3": {
+    "valid_tokens": 7,
+    "descriptor_count": 1077,
+    "command_runtime_window_cycles": 1480902
+  },
+  "aggregate": {
+    "contexts": 4,
+    "descriptor_count": 4020,
+    "command_runtime_window_cycles": 5655337,
+    "full_session_end_to_end": "NOT_MEASURED"
+  }
+}

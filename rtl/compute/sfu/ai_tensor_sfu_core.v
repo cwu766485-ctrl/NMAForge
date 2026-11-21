@@ -30,6 +30,10 @@ module ai_tensor_sfu_core(
     input  wire        pack_enable,
     // Descriptor flag[5] writes packed words in the Matrix A 4x4 tile order.
     input  wire        pack_tile_a,
+    // Research ABI-v7.4 extension: flag[6] selects a signed INT8 Matrix-A
+    // tile-major source row for LayerNorm (bounded 208x192 DeiT embedding).
+    input  wire        input_tile_a,
+    input  wire [31:0] src0_stride,
     input  wire [31:0] dst_base,
     input  wire [15:0] length,
     input  wire [15:0] m_size,
@@ -66,6 +70,12 @@ module ai_tensor_sfu_core(
     // Decoder attention primitive. epsilon[15:0] carries the query token
     // index; score columns greater than that index are causally masked.
     localparam [7:0] OP_CAUSAL_SOFTMAX_Q15 = 8'h39;
+    // Research-only opcode; not part of the product ABI until reviewed.
+    localparam [7:0] OP_RESIDUAL_REQUANT_I8 = 8'h3a;
+    // Bounded Matrix-A layout bridge. aux0[1:0]: Q dense (0), K-major (1),
+    // V Matrix-B (2); aux0[3:2]: head index. length is valid rows, m_size
+    // padded rows, and n_size source channels split into three equal heads.
+    localparam [7:0] OP_TENSOR_REPACK = 8'h3b;
 
     localparam [3:0] ERR_CONFIG     = 4'd1;
     localparam [3:0] ERR_OP         = 4'd2;
@@ -119,6 +129,10 @@ module ai_tensor_sfu_core(
     localparam [5:0] ST_LN_VAR_ACC         = 6'd38;
     localparam [5:0] ST_LN_B_REQ           = 6'd39;
     localparam [5:0] ST_LN_B_WAIT          = 6'd40;
+    localparam [5:0] ST_RP_REQ             = 6'd41;
+    localparam [5:0] ST_RP_WAIT            = 6'd42;
+    localparam [5:0] ST_RP_WRITE           = 6'd43;
+    localparam [15:0] LN_SMALL_FAST_MAX    = 16'd16;
 
     reg [5:0] state_r;
     reg [7:0] op_r;
@@ -132,9 +146,16 @@ module ai_tensor_sfu_core(
     reg signed [63:0] vector_product_r;
     reg [31:0] rms_root_r, inv_rms_r;
     reg rms_normalize_phase_r, beta_enable_r, pack_enable_r, pack_tile_a_r;
+    reg input_tile_a_r;
+    reg [31:0] input_row_r;
     reg [15:0] m_size_r, n_size_r, pack_row_r, pack_k_group_r;
     reg [31:0] pack_tile_group_base_r;
     reg [31:0] pack_word_r;
+    reg ln_small_fast_r;
+    reg signed [31:0] ln_input_cache [0:15];
+    reg [15:0] rp_row_r, rp_feature_r;
+    reg [1:0] rp_lane_r, rp_write_lane_r;
+    reg [31:0] rp_words [0:3];
 
     reg div_start_r, sqrt_start_r;
     reg [63:0] div_dividend_r, div_divisor_r;
@@ -143,10 +164,30 @@ module ai_tensor_sfu_core(
     wire sqrt_busy, sqrt_done;
     wire [31:0] sqrt_root;
 
-    wire [31:0] src0_addr = src0_r + ({16'd0,index_r}<<2);
+    // Tile-A input mapping is intentionally limited by the descriptor
+    // validator to the 208x192 physical DeiT embedding tensor. Each 16x16
+    // tile occupies 256 bytes; within it, Matrix-A stores 4x4 K groups with
+    // row lanes contiguous, matching the existing packer.
+    wire [31:0] tile_a_index =
+        ({16'd0,input_row_r[15:4]} * 32'd12) + {28'd0,index_r[15:4]};
+    wire [31:0] tile_a_row_lane = {28'd0,input_row_r[3:0]};
+    wire [31:0] tile_a_col_lane = {28'd0,index_r[3:0]};
+    wire [31:0] tile_a_word_index =
+        (tile_a_row_lane[3:2] << 4) +
+        (tile_a_col_lane[3:2] << 2) + tile_a_row_lane[1:0];
+    wire [31:0] src0_linear_addr = src0_r + ({16'd0,index_r}<<2);
+    wire [31:0] src0_tile_a_addr = src0_r + (tile_a_index << 8) +
+                                    (tile_a_word_index << 2);
+    wire [31:0] src0_addr = input_tile_a_r ? src0_tile_a_addr : src0_linear_addr;
     wire [31:0] src1_addr = src1_r + ({16'd0,index_r}<<2);
     wire [31:0] beta_addr = beta_base_r + ({16'd0,index_r}<<2);
-    wire packed_requant = (op_r == OP_REQUANT_I8) && pack_enable_r;
+    // For a 16-element LayerNorm vector, the contract's two truncating
+    // divisions by N=16 are exactly magnitude shifts. The signed mean is
+    // restored after truncation toward zero; the nonnegative variance uses
+    // floor division. Other vector lengths keep the iterative divider path.
+    wire [63:0] ln_sum_magnitude = sum_x_r[63] ? (~sum_x_r + 64'd1) : sum_x_r;
+    wire packed_requant = ((op_r == OP_REQUANT_I8) ||
+                           (op_r == OP_RESIDUAL_REQUANT_I8)) && pack_enable_r;
     wire [31:0] pack_tile_word_index = pack_tile_group_base_r +
         ({16'd0,pack_k_group_r} << 2) + {30'd0,pack_row_r[1:0]};
     wire [31:0] packed_word_index = pack_tile_a_r ? pack_tile_word_index :
@@ -155,7 +196,17 @@ module ai_tensor_sfu_core(
                            (packed_requant ?
                             (packed_word_index << 2) :
                             ({16'd0,index_r} << 2));
-    wire signed [31:0] spad_signed = spad_rdata;
+    wire [31:0] tile_a_lane_shift = {27'd0,index_r[1:0],3'b000};
+    wire signed [7:0] tile_a_signed_byte = spad_rdata >> tile_a_lane_shift;
+    // Tile-A unpacking applies only to the LayerNorm source-vector reads.
+    // Gamma and beta remain full signed INT32 SPAD operands; applying the
+    // byte extraction globally silently truncated their affine parameters.
+    wire tile_a_source_read = input_tile_a_r &&
+        ((state_r == ST_LN_SUM_WAIT) || (state_r == ST_LN_VAR_WAIT) ||
+         (state_r == ST_RMS_X_WAIT));
+    wire signed [31:0] spad_signed = tile_a_source_read ?
+                                      {{24{tile_a_signed_byte[7]}},tile_a_signed_byte} :
+                                      $signed(spad_rdata);
     wire causal_masked = (op_r == OP_CAUSAL_SOFTMAX_Q15) &&
                          (index_r > epsilon_r[15:0]);
     wire valid_operation = (op_mode == OP_SOFTMAX_Q15) ||
@@ -163,25 +214,83 @@ module ai_tensor_sfu_core(
                            (op_mode == OP_RMSNORM_Q15) ||
                            (op_mode == OP_LAYERNORM_Q15) ||
                            (op_mode == OP_RESIDUAL_I32) ||
+                           (op_mode == OP_RESIDUAL_REQUANT_I8) ||
                            (op_mode == OP_GELU_Q8_8) ||
                            (op_mode == OP_REQUANT_I8) ||
-                           (op_mode == OP_SILU_Q8_8);
+                           (op_mode == OP_SILU_Q8_8) ||
+                           (op_mode == OP_TENSOR_REPACK);
     // Admission-time checks deliberately use live inputs; all execution-time
     // decisions below use the latched *_r command snapshot.
     wire input_alignment_error = (|src0_base[1:0]) || (|dst_base[1:0]) ||
                                  (((op_mode == OP_RESIDUAL_I32) ||
                                    (op_mode == OP_RMSNORM_Q15) ||
-                                   (op_mode == OP_LAYERNORM_Q15)) &&
+                                   (op_mode == OP_LAYERNORM_Q15) ||
+                                   (op_mode == OP_RESIDUAL_REQUANT_I8)) &&
                                   (src1_base != 0) && (|src1_base[1:0])) ||
                                  ((op_mode == OP_LAYERNORM_Q15) && beta_enable &&
                                   (|beta_base[1:0]));
     wire [31:0] pack_tile_expected_length =
         {16'd0,m_size} * {16'd0,n_size};
+    // Repack reuses the existing SFU aux/epsilon descriptor field. Keep this
+    // control in the command snapshot just like other SFU auxiliary modes.
+    wire [1:0] rp_mode = epsilon_r[1:0];
+    wire [1:0] rp_head = epsilon_r[3:2];
+    wire [15:0] rp_head_dim = n_size_r / 16'd3;
+    wire [15:0] rp_source_row = (rp_mode == 2'd0) ? rp_row_r :
+                                (rp_row_r + {14'd0,rp_lane_r});
+    wire [15:0] rp_source_col = (rp_head * rp_head_dim) + rp_feature_r;
+    wire [31:0] rp_tile_index =
+        ({16'd0,rp_source_row[15:4]} * ({16'd0,n_size_r} >> 4)) +
+        {28'd0,rp_source_col[15:4]};
+    wire [31:0] rp_word_index =
+        ({28'd0,rp_source_row[3:2]} << 4) +
+        ({28'd0,rp_source_col[3:2]} << 2) +
+        {30'd0,rp_source_row[1:0]};
+    // Raw Matrix-A words use 1 KiB per tile; packed INT8 0x53 tiles use
+    // 256 bytes. aux0/epsilon[4] selects the latter while preserving the
+    // existing sparse-source layout when clear.
+    wire [31:0] rp_source_addr = src0_r +
+                                 (rp_tile_index << (epsilon_r[4] ? 8 : 10)) +
+                                 (rp_word_index << 2);
+    wire [31:0] rp_k_tile_stride = {16'd0,rp_head_dim} << 4;
+    wire [15:0] rp_k_feature = rp_feature_r + rp_write_lane_r;
+    wire [31:0] rp_k_dst_addr = dst_r +
+        (({16'd0,rp_row_r} >> 4) * rp_k_tile_stride) +
+        ({16'd0,rp_k_feature} << 4) + {28'd0,rp_row_r[3:0]};
+    wire [31:0] rp_v_panel_stride =
+        (({16'd0,m_size_r} << 4) + 32'd4095) & 32'hffff_f000;
+    wire [15:0] rp_v_col = rp_feature_r + rp_write_lane_r;
+    wire [15:0] rp_v_col_in_panel = rp_v_col[3:0];
+    wire [15:0] rp_v_col_group = {rp_v_col_in_panel[3:2],2'b00};
+    wire [31:0] rp_v_word_index =
+        (({16'd0,rp_v_col_group} >> 2) * ({16'd0,m_size_r} >> 2) * 4) +
+        (({16'd0,rp_row_r} >> 2) * 4) +
+        {30'd0,rp_v_col_in_panel[1:0]};
+    wire [31:0] rp_v_dst_addr = dst_r +
+        (({16'd0,rp_v_col} >> 4) * rp_v_panel_stride) +
+        (rp_v_word_index << 2);
+    wire [31:0] rp_dst_addr = (rp_mode == 2'd0) ?
+        (dst_r + ({16'd0,rp_row_r} * {16'd0,rp_head_dim}) +
+         {16'd0,rp_feature_r}) :
+        ((rp_mode == 2'd1) ? rp_k_dst_addr : rp_v_dst_addr);
+    wire [31:0] rp_transposed_word = {
+        rp_words[3][rp_write_lane_r*8 +: 8],
+        rp_words[2][rp_write_lane_r*8 +: 8],
+        rp_words[1][rp_write_lane_r*8 +: 8],
+        rp_words[0][rp_write_lane_r*8 +: 8]};
     wire pack_tile_config_error = pack_tile_a &&
         ((op_mode != OP_REQUANT_I8) || !pack_enable ||
          (m_size == 0) || (n_size == 0) ||
          (m_size[1:0] != 0) || (n_size[1:0] != 0) ||
          (pack_tile_expected_length != {16'd0,length}));
+    wire repack_config_error = (op_mode == OP_TENSOR_REPACK) &&
+        ((epsilon[31:5] != 0) || (epsilon[1:0] == 2'd3) ||
+         (epsilon[3:2] > 2'd2) || (length == 0) || (m_size < 16) ||
+         (m_size > 256) || (m_size[3:0] != 0) || (length > m_size) ||
+         (n_size < 48) || (n_size > 384) || ((n_size % 16'd48) != 0) ||
+         (src0_stride != 0) || (src1_base != 0) ||
+         (beta_base != 0) || beta_enable || (scale_shift != 0) ||
+         pack_enable || pack_tile_a || input_tile_a);
     wire last_element = (index_r == length_r - 1'b1);
     wire is_layernorm = (op_r == OP_LAYERNORM_Q15);
     wire is_normalization = (op_r == OP_RMSNORM_Q15) || is_layernorm;
@@ -190,6 +299,10 @@ module ai_tensor_sfu_core(
 
     ai_unsigned_divider #(.WIDTH(64)) divider_u(
         .clk(clk), .resetn(resetn), .start(div_start_r),
+        .accelerate((op_r == OP_SOFTMAX_Q15) ||
+                    (op_r == OP_CAUSAL_SOFTMAX_Q15) ||
+                    // Exact reciprocal dividend is 2^30; reuse bounded skip.
+                    (is_layernorm && state_r == ST_RMS_INV_WAIT)),
         .dividend(div_dividend_r), .divisor(div_divisor_r),
         .busy(div_busy), .done(div_done), .error(div_error),
         .quotient(div_quotient), .remainder(div_remainder)
@@ -219,8 +332,18 @@ module ai_tensor_sfu_core(
 
     ai_tensor_sfu_math math_u(
         .softmax_delta_q8_8(spad_signed - max_r),
-        .requant_value(spad_signed), .requant_shift(scale_shift_r),
-        .residual_x(x_r), .residual_y(gamma_r), .residual_shift(scale_shift_r),
+        .requant_value(((op_r == OP_RESIDUAL_REQUANT_I8) &&
+                        (state_r == ST_VEC_B_WAIT)) ?
+                       $signed(residual_output) : spad_signed),
+        .requant_shift(scale_shift_r),
+        .residual_x(x_r),
+        // During the B response, reuse the existing residual datapath.
+        .residual_y(((op_r == OP_RESIDUAL_I32 ||
+                      op_r == OP_RESIDUAL_REQUANT_I8) &&
+                     state_r == ST_VEC_B_WAIT) ?
+                    spad_signed : gamma_r),
+        .residual_shift((op_r == OP_RESIDUAL_REQUANT_I8) ? 5'd0 :
+                        scale_shift_r),
         .gamma_x(x_r), .gamma(gamma_r), .norm_x(x_r),
         .norm_inv_rms(inv_rms_r), .norm_beta(beta_r),
         .norm_add_beta(is_layernorm), .gelu_product(vector_product_r),
@@ -235,12 +358,25 @@ module ai_tensor_sfu_core(
         spad_valid=1'b0; spad_write=1'b0; spad_addr=0; spad_wdata=output_word_r;
         case (state_r)
             ST_SM_MAX_REQ,ST_SM_SUM_REQ,ST_SM_OUT_REQ,ST_RMS_SUM_REQ,
-            ST_RMS_X_REQ,ST_VEC_A_REQ,ST_LN_SUM_REQ,ST_LN_VAR_REQ:
+            ST_VEC_A_REQ,ST_LN_SUM_REQ:
                 begin spad_valid=1; spad_addr=src0_addr; end
+            ST_RMS_X_REQ: if (!(is_layernorm && ln_small_fast_r)) begin
+                spad_valid=1; spad_addr=src0_addr;
+            end
+            ST_LN_VAR_REQ: if (!ln_small_fast_r) begin
+                spad_valid=1; spad_addr=src0_addr;
+            end
             ST_RMS_G_REQ,ST_VEC_B_REQ: begin spad_valid=1; spad_addr=src1_addr; end
             ST_LN_B_REQ: begin spad_valid=1; spad_addr=beta_addr; end
             ST_SM_WRITE,ST_VEC_WRITE: begin
                 spad_valid=1; spad_write=1; spad_addr=dst_addr; spad_wdata=output_word_r;
+            end
+            ST_RP_REQ: if (rp_source_row < length_r) begin
+                spad_valid=1; spad_addr=rp_source_addr;
+            end
+            ST_RP_WRITE: begin
+                spad_valid=1; spad_write=1; spad_addr=rp_dst_addr;
+                spad_wdata=(rp_mode == 2'd0) ? output_word_r : rp_transposed_word;
             end
             default: begin end
         endcase
@@ -255,8 +391,12 @@ module ai_tensor_sfu_core(
             mean_sq_r<=0; vector_product_r<=0; rms_root_r<=0; inv_rms_r<=0;
             sum_x_r<=0; rms_normalize_phase_r<=0; beta_enable_r<=0;
             pack_enable_r<=0; pack_word_r<=0; pack_tile_a_r<=0;
+            input_tile_a_r<=0; input_row_r<=0;
             m_size_r<=0; n_size_r<=0; pack_row_r<=0; pack_k_group_r<=0;
             pack_tile_group_base_r<=0;
+            ln_small_fast_r<=0;
+            rp_row_r<=0; rp_feature_r<=0; rp_lane_r<=0; rp_write_lane_r<=0;
+            rp_words[0]<=0; rp_words[1]<=0; rp_words[2]<=0; rp_words[3]<=0;
             div_start_r<=0; sqrt_start_r<=0; div_dividend_r<=0; div_divisor_r<=0;
             busy<=0; done<=0; error<=0; error_code<=0; result<=0;
             cycle_count<=0; element_count<=0;
@@ -275,15 +415,22 @@ module ai_tensor_sfu_core(
                         op_r<=op_mode; src0_r<=src0_base; src1_r<=src1_base;
                         beta_base_r<=beta_base; beta_enable_r<=beta_enable;
                         pack_enable_r<=pack_enable; pack_tile_a_r<=pack_tile_a;
+                        input_tile_a_r<=input_tile_a;
+                        input_row_r<=src0_stride;
                         m_size_r<=m_size; n_size_r<=n_size;
+                        ln_small_fast_r <= (op_mode == OP_LAYERNORM_Q15) &&
+                                           (length <= LN_SMALL_FAST_MAX);
                         pack_row_r<=0; pack_k_group_r<=0;
                         pack_tile_group_base_r<=0; dst_r<=dst_base;
+                        rp_row_r<=0; rp_feature_r<=0; rp_lane_r<=0;
+                        rp_write_lane_r<=0;
                         length_r<=length; scale_shift_r<=scale_shift;
                         // For causal Softmax this field is a zero-based query
                         // token index, so zero must remain a valid boundary.
                         // Other SFU operators retain the nonzero epsilon
                         // default used by their normalization arithmetic.
-                        epsilon_r <= (op_mode == OP_CAUSAL_SOFTMAX_Q15) ? epsilon :
+                        epsilon_r <= ((op_mode == OP_CAUSAL_SOFTMAX_Q15) ||
+                                      (op_mode == OP_TENSOR_REPACK)) ? epsilon :
                                      (epsilon == 0 ? 32'd1 : epsilon);
                         watchdog_limit_r<=watchdog_limit; index_r<=0;
                         element_count<=0; busy<=1;
@@ -291,7 +438,9 @@ module ai_tensor_sfu_core(
                         mean_r<=0; beta_r<=0; pack_word_r<=0;
                         rms_normalize_phase_r<=0;
                         if (length==0 || input_alignment_error ||
-                            pack_tile_config_error) begin
+                            (op_mode == OP_RESIDUAL_REQUANT_I8 &&
+                             (!pack_enable || length[1:0] != 0)) ||
+                            pack_tile_config_error || repack_config_error) begin
                             error_code<=ERR_CONFIG; state_r<=ST_ERROR;
                         end else if (!valid_operation) begin
                             error_code<=ERR_OP; state_r<=ST_ERROR;
@@ -299,8 +448,10 @@ module ai_tensor_sfu_core(
                             OP_SOFTMAX_Q15,OP_CAUSAL_SOFTMAX_Q15: state_r<=ST_SM_MAX_REQ;
                             OP_RMSNORM_Q15: state_r<=ST_RMS_SUM_REQ;
                             OP_LAYERNORM_Q15: state_r<=ST_LN_SUM_REQ;
-                            OP_RESIDUAL_I32,OP_GELU_Q8_8,OP_REQUANT_I8,OP_SILU_Q8_8:
+                            OP_RESIDUAL_I32,OP_RESIDUAL_REQUANT_I8,
+                            OP_GELU_Q8_8,OP_REQUANT_I8,OP_SILU_Q8_8:
                                 state_r<=ST_VEC_A_REQ;
+                            OP_TENSOR_REPACK: state_r<=ST_RP_REQ;
                             default: begin error_code<=ERR_OP; state_r<=ST_ERROR; end
                         endcase
                     end
@@ -375,8 +526,17 @@ module ai_tensor_sfu_core(
                     end
                 end
                 ST_RMS_MEAN_DIV_START: begin
-                    div_dividend_r<=sum_sq_r; div_divisor_r<={48'd0,length_r};
-                    div_start_r<=1; state_r<=ST_RMS_MEAN_DIV_WAIT;
+                    if (is_layernorm && ((length_r == 16) ||
+                                         (length_r == 32))) begin
+                        // Exact unsigned power-of-two division; retain the
+                        // full accumulator width and all later sqrt checks.
+                        mean_sq_r <= (length_r == 32) ?
+                                     (sum_sq_r >> 5) : (sum_sq_r >> 4);
+                        state_r <= ST_RMS_SQRT_START;
+                    end else begin
+                        div_dividend_r<=sum_sq_r; div_divisor_r<={48'd0,length_r};
+                        div_start_r<=1; state_r<=ST_RMS_MEAN_DIV_WAIT;
+                    end
                 end
                 ST_RMS_MEAN_DIV_WAIT: if (div_done) begin
                     if (div_error) begin error_code<=ERR_NUMERIC; state_r<=ST_ERROR; end
@@ -398,9 +558,17 @@ module ai_tensor_sfu_core(
                         rms_normalize_phase_r<=1; state_r<=ST_RMS_X_REQ;
                     end
                 end
-                ST_RMS_X_REQ: if (spad_ready) begin
-                    if (spad_protection_error) begin error_code<=ERR_PROTECTION; state_r<=ST_ERROR; end
-                    else state_r<=ST_RMS_X_WAIT;
+                ST_RMS_X_REQ: begin
+                    if (is_layernorm && ln_small_fast_r) begin
+                        x_r <= ln_input_cache[index_r] - mean_r;
+                        if (src1_r==0) begin
+                            gamma_r<=32'sd32768;
+                            state_r<=beta_enable_r ? ST_LN_B_REQ : ST_RMS_WRITE;
+                        end else state_r<=ST_RMS_G_REQ;
+                    end else if (spad_ready) begin
+                        if (spad_protection_error) begin error_code<=ERR_PROTECTION; state_r<=ST_ERROR; end
+                        else state_r<=ST_RMS_X_WAIT;
+                    end
                 end
                 ST_RMS_X_WAIT: if (spad_rsp_valid) begin
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end
@@ -450,7 +618,8 @@ module ai_tensor_sfu_core(
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end
                     else begin
                         x_r<=spad_signed;
-                        if (op_r==OP_RESIDUAL_I32) state_r<=ST_VEC_B_REQ;
+                        if (op_r==OP_RESIDUAL_I32 ||
+                            op_r==OP_RESIDUAL_REQUANT_I8) state_r<=ST_VEC_B_REQ;
                         else if (op_r==OP_REQUANT_I8) begin
                             if (!pack_enable_r) begin
                                 output_word_r<=requant_spad;
@@ -496,7 +665,41 @@ module ai_tensor_sfu_core(
                 end
                 ST_VEC_B_WAIT: if (spad_rsp_valid) begin
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end
-                    else begin gamma_r<=spad_signed; state_r<=ST_RMS_WRITE; end
+                    else begin
+                        gamma_r<=spad_signed;
+                        if (op_r == OP_RESIDUAL_REQUANT_I8) begin
+                            case (index_r[1:0])
+                              2'd0: begin
+                                pack_word_r[7:0]<=requant_spad[7:0];
+                                output_word_r<={24'd0,requant_spad[7:0]};
+                              end
+                              2'd1: begin
+                                pack_word_r[15:8]<=requant_spad[7:0];
+                                output_word_r<={16'd0,requant_spad[7:0],
+                                               pack_word_r[7:0]};
+                              end
+                              2'd2: begin
+                                pack_word_r[23:16]<=requant_spad[7:0];
+                                output_word_r<={8'd0,requant_spad[7:0],
+                                               pack_word_r[15:0]};
+                              end
+                              default: begin
+                                pack_word_r[31:24]<=requant_spad[7:0];
+                                output_word_r<={requant_spad[7:0],
+                                               pack_word_r[23:0]};
+                              end
+                            endcase
+                            if (index_r[1:0] == 2'd3 || last_element)
+                                state_r<=ST_VEC_WRITE;
+                            else begin
+                                index_r<=index_r+1'b1;
+                                state_r<=ST_VEC_A_REQ;
+                            end
+                        end else begin
+                            output_word_r<=residual_output;
+                            state_r<=ST_VEC_WRITE;
+                        end
+                    end
                 end
                 ST_VEC_PREP: begin
                     vector_product_r <= (op_r==OP_GELU_Q8_8) ?
@@ -547,8 +750,21 @@ module ai_tensor_sfu_core(
                             end
                         end
                         if (last_element) state_r<=ST_DONE;
-                        else begin index_r<=index_r+1'b1;
-                            state_r<=is_normalization ? ST_RMS_X_REQ : ST_VEC_A_REQ;
+                        else begin
+                            index_r<=index_r+1'b1;
+                            if (is_layernorm && ln_small_fast_r) begin
+                                // The accepted output uses output_word_r, so
+                                // prepare the next cached X without another
+                                // SPAD request or a separate setup cycle.
+                                x_r <= ln_input_cache[index_r[3:0] + 4'd1] - mean_r;
+                                if (src1_r == 0) begin
+                                    gamma_r <= 32'sd32768;
+                                    state_r <= beta_enable_r ?
+                                               ST_LN_B_REQ : ST_RMS_WRITE;
+                                end else state_r <= ST_RMS_G_REQ;
+                            end else begin
+                                state_r<=is_normalization ? ST_RMS_X_REQ : ST_VEC_A_REQ;
+                            end
                         end
                     end
                 end
@@ -560,15 +776,47 @@ module ai_tensor_sfu_core(
                 ST_LN_SUM_WAIT: if (spad_rsp_valid) begin
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end
                     else begin
+                        if (ln_small_fast_r)
+                            ln_input_cache[index_r] <= spad_signed;
                         sum_x_r<=sum_x_r+{{32{spad_signed[31]}},spad_signed};
                         if (last_element) begin index_r<=0; state_r<=ST_LN_MEAN_START; end
                         else begin index_r<=index_r+1'b1; state_r<=ST_LN_SUM_REQ; end
                     end
                 end
                 ST_LN_MEAN_START: begin
-                    div_dividend_r<=sum_x_r[63] ? -sum_x_r : sum_x_r;
-                    div_divisor_r<={48'd0,length_r}; div_start_r<=1;
-                    state_r<=ST_LN_MEAN_WAIT;
+                    if (length_r == 16) begin
+                        if (ln_sum_magnitude[63:4] > 60'd2147483648) begin
+                            error_code <= ERR_NUMERIC;
+                            state_r <= ST_ERROR;
+                        end else begin
+                            mean_r <= sum_x_r[63] ?
+                                -$signed({1'b0, ln_sum_magnitude[35:4]}) :
+                                 $signed({1'b0, ln_sum_magnitude[35:4]});
+                            sum_sq_r <= 0;
+                            index_r <= 0;
+                            state_r <= ST_LN_VAR_REQ;
+                        end
+                    end else if (length_r == 32) begin
+                        // Divide the unsigned magnitude, then restore sign:
+                        // a signed arithmetic shift would round negatives down.
+                        // Match the generic divider's >2^31 error threshold,
+                        // including its existing quotient==2^31 cast behavior.
+                        if (ln_sum_magnitude[63:5] > 59'd2147483648) begin
+                            error_code <= ERR_NUMERIC;
+                            state_r <= ST_ERROR;
+                        end else begin
+                            mean_r <= sum_x_r[63] ?
+                                -$signed(ln_sum_magnitude[36:5]) :
+                                 $signed(ln_sum_magnitude[36:5]);
+                            sum_sq_r <= 0;
+                            index_r <= 0;
+                            state_r <= ST_LN_VAR_REQ;
+                        end
+                    end else begin
+                        div_dividend_r<=sum_x_r[63] ? -sum_x_r : sum_x_r;
+                        div_divisor_r<={48'd0,length_r}; div_start_r<=1;
+                        state_r<=ST_LN_MEAN_WAIT;
+                    end
                 end
                 ST_LN_MEAN_WAIT: if (div_done) begin
                     if (div_error || div_quotient>64'h0000_0000_8000_0000) begin
@@ -579,9 +827,14 @@ module ai_tensor_sfu_core(
                         sum_sq_r<=0; index_r<=0; state_r<=ST_LN_VAR_REQ;
                     end
                 end
-                ST_LN_VAR_REQ: if (spad_ready) begin
-                    if (spad_protection_error) begin error_code<=ERR_PROTECTION; state_r<=ST_ERROR; end
-                    else state_r<=ST_LN_VAR_WAIT;
+                ST_LN_VAR_REQ: begin
+                    if (ln_small_fast_r) begin
+                        x_r <= ln_input_cache[index_r] - mean_r;
+                        state_r <= ST_LN_VAR_ACC;
+                    end else if (spad_ready) begin
+                        if (spad_protection_error) begin error_code<=ERR_PROTECTION; state_r<=ST_ERROR; end
+                        else state_r<=ST_LN_VAR_WAIT;
+                    end
                 end
                 ST_LN_VAR_WAIT: if (spad_rsp_valid) begin
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end
@@ -591,13 +844,87 @@ module ai_tensor_sfu_core(
                     vector_product_r<=x_r*x_r;
                     state_r<=ST_VEC_POST;
                 end
-                ST_LN_B_REQ: if (spad_ready) begin
-                    if (spad_protection_error) begin error_code<=ERR_PROTECTION; state_r<=ST_ERROR; end
-                    else state_r<=ST_LN_B_WAIT;
+                ST_LN_B_REQ: begin
+                    // Reuse the output register as the post-gamma staging
+                    // register while Beta is fetched. x_r/gamma_r stay stable
+                    // under backpressure; repeated captures are idempotent.
+                    // Preserve the required INT32 saturation between the two
+                    // multipliers; no SPAD-response-to-multiplier bypass.
+                    output_word_r <= gamma_scaled_output;
+                    if (spad_ready) begin
+                        if (spad_protection_error) begin error_code<=ERR_PROTECTION; state_r<=ST_ERROR; end
+                        else state_r<=ST_LN_B_WAIT;
+                    end
                 end
                 ST_LN_B_WAIT: if (spad_rsp_valid) begin
                     if (spad_parity_error) begin error_code<=ERR_PARITY; state_r<=ST_ERROR; end
-                    else begin beta_r<=spad_signed; state_r<=ST_RMS_WRITE; end
+                    else begin
+                        beta_r<=spad_signed;
+                        x_r<=output_word_r;
+                        state_r<=ST_VEC_POST;
+                    end
+                end
+
+                // Matrix-A source rows are read through the same scheduler
+                // SPAD port as all other SFU operations. K/V repacking gathers
+                // a 4x4 INT8 block, then emits four words with token lanes
+                // packed in little-endian byte order.
+                ST_RP_REQ: begin
+                    if (rp_source_row >= length_r) begin
+                        rp_words[rp_lane_r] <= 32'd0;
+                        if ((rp_mode == 2'd0) || (rp_lane_r == 2'd3)) begin
+                            rp_write_lane_r <= 0;
+                            if (rp_mode == 2'd0) output_word_r <= 0;
+                            state_r <= ST_RP_WRITE;
+                        end else rp_lane_r <= rp_lane_r + 1'b1;
+                    end else if (spad_ready) begin
+                        if (spad_protection_error) begin
+                            error_code<=ERR_PROTECTION; state_r<=ST_ERROR;
+                        end else state_r<=ST_RP_WAIT;
+                    end
+                end
+                ST_RP_WAIT: if (spad_rsp_valid) begin
+                    if (spad_parity_error) begin
+                        error_code<=ERR_PARITY; state_r<=ST_ERROR;
+                    end else begin
+                        rp_words[rp_lane_r] <= spad_rdata;
+                        if ((rp_mode == 2'd0) || (rp_lane_r == 2'd3)) begin
+                            output_word_r <= spad_rdata;
+                            rp_write_lane_r <= 0;
+                            state_r <= ST_RP_WRITE;
+                        end else begin
+                            rp_lane_r <= rp_lane_r + 1'b1;
+                            state_r <= ST_RP_REQ;
+                        end
+                    end
+                end
+                ST_RP_WRITE: if (spad_ready) begin
+                    if (spad_protection_error) begin
+                        error_code<=ERR_PROTECTION; state_r<=ST_ERROR;
+                    end else begin
+                        result <= (rp_mode == 2'd0) ? output_word_r :
+                                  rp_transposed_word;
+                        element_count <= element_count + 32'd4;
+                        if ((rp_mode == 2'd0) || (rp_write_lane_r == 2'd3)) begin
+                            rp_lane_r <= 0;
+                            rp_write_lane_r <= 0;
+                            if ((rp_feature_r + 16'd4) >= rp_head_dim) begin
+                                rp_feature_r <= 0;
+                                if ((rp_row_r + ((rp_mode == 2'd0) ? 16'd1 : 16'd4))
+                                    >= m_size_r) state_r<=ST_DONE;
+                                else begin
+                                    rp_row_r <= rp_row_r +
+                                        ((rp_mode == 2'd0) ? 16'd1 : 16'd4);
+                                    state_r<=ST_RP_REQ;
+                                end
+                            end else begin
+                                rp_feature_r <= rp_feature_r + 16'd4;
+                                state_r<=ST_RP_REQ;
+                            end
+                        end else begin
+                            rp_write_lane_r <= rp_write_lane_r + 1'b1;
+                        end
+                    end
                 end
 
                 ST_DONE: begin busy<=0; done<=1; error<=0; state_r<=ST_IDLE; end

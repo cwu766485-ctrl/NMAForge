@@ -1,0 +1,232 @@
+{
+  "status": "PARTIAL_ROUND10_RESEARCH",
+  "reviewed_start_sha": "1cd1bde4d82c457d445f97a7817fc22d407b528b",
+  "current_source_sha": "1cd1bde4d82c457d445f97a7817fc22d407b528b",
+  "product_code_sha": "13f94abf59c3dbea833ad4bbe227ef5cab4df503",
+  "product_code_unchanged_since_round9": true,
+  "tiny_npu_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+  "run_date": "2026-11-08",
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "verilator": "5.052 2026-09-05 rev v5.052",
+    "python": "3.12.13",
+    "numpy": "2.4.6",
+    "onnx": "1.17.0",
+    "scikit_learn": "1.9.1",
+    "gcc": "8.5"
+  },
+  "transformer": {
+    "h4_inherited_baseline": {
+      "status": "PASS_REUSED_SAME_PRODUCT_TREE",
+      "run_ids": [
+        "R9-TR-H4-BASE-GEMM-S20261107",
+        "R9-TR-H4-SM-DIV-S20261107"
+      ],
+      "model_sha256": "001550dbadb816e66f737f5f6cba0819f51821c71a78d84861d62dc80dd8511f",
+      "seed": 20261107,
+      "architecture": {
+        "hidden": 4,
+        "heads": 1,
+        "layers": 1,
+        "prefill_tokens": 4,
+        "decode_tokens": 1
+      },
+      "useful_macs_full_run": 640,
+      "decode_cycles": {
+        "before": 5715,
+        "after": 5110,
+        "saved": 605,
+        "reduction_pct": 10.5862,
+        "same_endpoint_speed_ratio": 1.1184
+      },
+      "prefill_cycles": {
+        "before": 5682,
+        "after": 5259
+      },
+      "layernorm_decode_cycles": {
+        "before": 2631,
+        "after": 2503,
+        "saved": 128
+      },
+      "softmax_decode_cycles": {
+        "before": 1303,
+        "after": 826,
+        "saved": 477
+      },
+      "golden": "86 descriptors, 60 intermediate/final tensors and KV images bit-exact",
+      "quality": {
+        "train": "16/16",
+        "heldout": "690/1008",
+        "prefill_task": "4/4",
+        "decode_task": "1/1",
+        "task": "four-symbol cyclic next-token toy, not representative/pretrained"
+      },
+      "evidence": "docs/benchmark/NMAFORGE_V2_ROUND9_PERFORMANCE_RESEARCH.md and benchmark/round9_runs_20261107/"
+    },
+    "h16_2head_seq8": {
+      "status": "BLOCKED_MAPPER_SUPPORT",
+      "mapper_preflight": "ValueError: trained model wq must be a 4x4 INT8 matrix",
+      "mapper_source": "sw/tools/cimforge_mapper.py:282-288, 293-304, 933-935",
+      "observed_contract": "four prefill IDs from [0,3]; six 4x4 weight matrices; manifest fixes hidden=4 and heads=1",
+      "top_run": "NOT_RUN",
+      "model_quality": "NOT_AVAILABLE"
+    },
+    "sfu_research": "No H16 profile, so no further SFU RTL change. Existing exact-mode H4 input-reuse/zero-skip results do not establish H16 benefit."
+  },
+  "digits_cnn": {
+    "status": "PASS_SMALL_MODEL_BASELINE_AND_ABLATION",
+    "model_sha256": "ef0e616d09ca0be7956fa8ca900e40c62973f8f06e3ec96af09d888eead73726",
+    "testset_sha256": "cb851b077542f9bcf42f84938227ba5f1a4750ea0b0fbfe2ba8fcecbb914d107",
+    "architecture": "4 shared 3x3 INT8 filters + trained 10-class readout",
+    "useful_macs_per_image": 2736,
+    "samples": 396,
+    "accuracy": "384/396 = 96.9697%",
+    "golden": "396/396 per-sample intermediate and logit checks bit-exact in each mode",
+    "modes": {
+      "legacy": {
+        "cmdq_cycles": 3193,
+        "host_layout_accounted_cycles": 1080,
+        "accounted_sum": 4273,
+        "spad_read_bytes": 6048,
+        "spad_write_bytes": 1920,
+        "host_layout_bytes": "144 read + 576 write"
+      },
+      "fused_requant_native": {
+        "cmdq_cycles": 2712,
+        "host_layout_accounted_cycles": 1080,
+        "accounted_sum": 3792,
+        "spad_read_bytes": 5472,
+        "spad_write_bytes": 1344,
+        "host_layout_bytes": "144 read + 576 write"
+      },
+      "fused_requant_linear_row": {
+        "cmdq_cycles": 2712,
+        "host_layout_accounted_cycles": 0,
+        "accounted_sum": 2712,
+        "spad_read_bytes": 5472,
+        "spad_write_bytes": 1776,
+        "host_layout_bytes": "0"
+      }
+    },
+    "cycle_interpretation": "Host layout cycles are testbench-accounted estimates, not measured CPU wall cycles; CMDQ cycles are Top simulation measurements.",
+    "not_representative": "2736 MAC/image; does not meet 100K useful MAC/inference",
+    "result_csv_sha256": {
+      "legacy": "b261d036e3b9cdd55e3042c76099443039006c5d6b8b1660b13125702a99945b",
+      "fused_native": "9f82da3d656c32f8e6a55572ab4597ee45c6dfa7237060b65803d89215a55582",
+      "linear_row": "153582cff4d6432472b8ede0bbfd8ed435d5c816f5a21e644b2d9fd1622b3789"
+    }
+  },
+  "conv1x_mini_cnn": {
+    "status": "PASS_SAME_MODEL_AND_GOLDEN",
+    "model_sha256": "1ac385ac18394ac5826a7eb426e99c2199bf6417055f7e3f461c40c1b1811640",
+    "input_int8_sha256": "a74587bfcb5b2dfcd9eed1dbbb4fcf657628264c3b0aae7a4c278f0f70705898",
+    "golden_sha256": "94642359b0fdf8a4b56f8b17346b0385a477d782b4874bb7d1e979a589eab49c",
+    "useful_macs": 1872,
+    "nmaforge": {
+      "cmdq_cycles": 1985,
+      "host_layout_cycles": 1080,
+      "host_read_bytes": 144,
+      "host_write_bytes": 576,
+      "spad_read_bytes": 3360,
+      "spad_write_bytes": 1600,
+      "golden": "all intermediates and 4/4 outputs exact"
+    },
+    "tinynpu": {
+      "graph_cycles": 4781,
+      "dma_load_bytes": 1088,
+      "dma_store_bytes": 4,
+      "golden": "4/4 exact"
+    },
+    "cross_system_speedup": "NOT_CLAIMED: native Graph/DMA endpoint and NMA Top CMDQ + separately accounted Host Layout do not share the same boundary"
+  },
+  "matrix_gemm_gemv": {
+    "status": "PASS_FRESH_BOTH_SIDES",
+    "run_id": "R10-MATRIX-MATCH-1CD1BDE-S20261107",
+    "seed": 20261107,
+    "shapes": "3 GEMM + 4 GEMV, fixed operand formulas and independent INT32 Golden",
+    "golden": "NMAForge and rebuilt TinyNPU pass every output",
+    "nmaforge_boundary": "16x16 Matrix controller + behavioral four-bank SPAD through output commit",
+    "tinynpu_boundary": "freshly rebuilt direct 16x16 array only",
+    "normalized_memory": "TinyNPU serialized modeled memory: 16 B/cycle, one-cycle read response, no overlap; ratios in matrix CSV are estimates, not RTL memory measurements",
+    "csv": "benchmark/v2_round10_matrix_tinynpu.csv",
+    "nma_gemm_log_sha256": "ad963096abee1c054447061d2ded55a8fb8ef0601a9b8d42666d92eb409735c2",
+    "nma_gemv_log_sha256": "9ebd38e674d6d91d61876507f662b1d5ff92fe0b1387c45bd5c979dca0b4d017",
+    "tinynpu_log_sha256": "e921bef8e90748964ee0b7a566f70607515f5ee650cc00d18bbafbe9a0371bbe"
+  },
+  "tinynpu_clean_rebuild": {
+    "status": "PASS",
+    "reference_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+    "verilator": "5.052",
+    "matrix_shapes": "3 GEMM + 4 padded direct-array GEMV passed",
+    "engine_regression": "6/6 engines passed",
+    "onnx_model": "conv1x_mini.onnx rebuilt and passed 4/4 Golden",
+    "first_attempt": "Standalone engine C++ build initially resolved an invalid VERILATOR_ROOT; rerun with VERILATOR_ROOT=/tmp/nmaforge_verilator_5.052 passed"
+  },
+  "large_cnn_100k_mac": {
+    "status": "NOT_RUN_PARTIAL",
+    "reason": "Current trained and matched model mappers are shape-specialized (8x8 single-channel Conv+FC or four-filter 8x8 Digits CNN); no existing multilayer Conv lowering/Top workload for >=100K MAC, and no bounded mapping was added this round."
+  },
+  "large_model_dma_overlap": {
+    "status": "NOT_RUN_FOR_TARGET_MODELS",
+    "small_probe": "Round9 3x4x4 tiles passed; 561 serialized vs 488 ping-pong cycles, 72 overlap cycles, 3/3 tile Golden. Not evidence for large CNN scaling.",
+    "round8_original_four_mismatch": "PARTIAL: exact archived failure not recovered"
+  },
+  "innovation1_model_level": {
+    "status": "NOT_RUN",
+    "reason": "H4 Top decode used GEMM; H16 unsupported; GEMV standalone controller data does not prove Transformer model-level gain."
+  },
+  "innovation2_model_level": {
+    "status": "PASS_FOR_SMALL_DIGITS_CNN",
+    "evidence": "Fused Requant lowered Top CMDQ 3193 to 2712; Linear-Row removed 1080 host-accounted layout cycles; both preserved all 396 classifications and exact outputs."
+  },
+  "ppa_and_full_dv": "NOT_RUN_BY_SCOPE",
+  "fresh_logs": {
+    "nma_matrix_gemm": "/tmp/nmaforge_round10_nma_match_20261107/gemm_match.log",
+    "nma_matrix_gemv": "/tmp/nmaforge_round10_nma_match_20261107/gemv_product.log",
+    "tiny_array": "/tmp/nmaforge_round10_tiny_gemm_20261107/run.log",
+    "tiny_engine": "/tmp/nmaforge_round10_tiny_gemm_20261107/engine_regression.log",
+    "tiny_cnn": "/tmp/nmaforge_round10_tinynpu_20261107/cnn/run.log",
+    "nma_cnn_ablation": "/tmp/nmaforge_round10_nma_cnn_20261107/",
+    "digits_dataset_runs": "/tmp/nmaforge_round10_digits_cnn_20261108/ plus fused_native and linearized siblings"
+  },
+  "source_code_check": {
+    "current_product_test_code_sha": "13f94abf59c3dbea833ad4bbe227ef5cab4df503",
+    "comparison_base": "74402ba991285cb4403cb50737013362f5a2af53",
+    "command": "git diff --quiet 74402ba991285cb4403cb50737013362f5a2af53..HEAD -- rtl sw dv",
+    "result": "clean; exit 0"
+  },
+  "evidence_log_sha256": {
+    "nma_matrix_gemm": "ad963096abee1c054447061d2ded55a8fb8ef0601a9b8d42666d92eb409735c2",
+    "nma_matrix_gemv": "9ebd38e674d6d91d61876507f662b1d5ff92fe0b1387c45bd5c979dca0b4d017",
+    "tinynpu_array_matrix": "e921bef8e90748964ee0b7a566f70607515f5ee650cc00d18bbafbe9a0371bbe",
+    "tinynpu_engine_regression": "7dfc3091722f50a7fe926d105403584ef050cf1b2ded2146547a126f218bc5c6",
+    "tinynpu_cnn": "cbc428d9df2b367272867734ccfe95359ef6c96b7b4ff8641eacd2bc23beddf2",
+    "h16_mapper_preflight": "178100945aac52c5aeb1270edfaeada180574b330e7c7e5a3c8d41138076ce61",
+    "nma_mini_legacy": "4c29e260e505c815fc352db378bd40a496a351aebb7c34afff9c59c80f11e86b",
+    "nma_mini_fused_native": "43765741784cc67b31404dd206e04e084fd17d35a25dd4b44a5e6abcad991add",
+    "nma_mini_linear_row": "7614f85e9ce7e48e8bf2ee319e4ab50b24ee7d1bba09573c142c020bc69817c0",
+    "digits_legacy_results_csv": "b261d036e3b9cdd55e3042c76099443039006c5d6b8b1660b13125702a99945b",
+    "digits_fused_native_results_csv": "9f82da3d656c32f8e6a55572ab4597ee45c6dfa7237060b65803d89215a55582",
+    "digits_linear_row_results_csv": "153582cff4d6432472b8ede0bbfd8ed435d5c816f5a21e644b2d9fd1622b3789"
+  },
+  "run_ids": {
+    "matrix": "R10-MATRIX-MATCH-1CD1BDE-S20261107",
+    "tinynpu_array": "R10-TINY-ARRAY-8216C22-S20261107",
+    "nma_mini_cnn": [
+      "R10-CNN-MINI-LEGACY-1CD1BDE",
+      "R10-CNN-MINI-FUSED-NATIVE-1CD1BDE",
+      "R10-CNN-MINI-LINEAR-ROW-1CD1BDE"
+    ],
+    "trained_digits_cnn": [
+      "V2-TRAINED-CNN-TOP-DATASET-1CD1BDE-LEGACY_LAYOUT",
+      "V2-TRAINED-CNN-TOP-DATASET-1CD1BDE-FUSED_NATIVE",
+      "V2-TRAINED-CNN-TOP-DATASET-1CD1BDE-LINEARIZED"
+    ],
+    "h16_mapper_preflight": "R10-TRANSFORMER-H16-MAPPER-PREFLIGHT-1CD1BDE"
+  },
+  "reproduction_commands": {
+    "tiny_npu_matrix_and_engine": "TINY_NPU_ROOT=/tmp/nmaforge_tinynpu_8216c22b/reference/source TINYNPU_GEMM_OUT=/tmp/nmaforge_round10_tiny_gemm_20261107 VERILATOR=/tmp/nmaforge_verilator_src_5.052/bin/verilator VERILATOR_ROOT=/tmp/nmaforge_verilator_5.052 JOBS=4 bash benchmark/tinynpu/run_tinynpu_gemm.sh",
+    "tiny_npu_cnn": "TINY_NPU_ROOT=/tmp/nmaforge_tinynpu_8216c22b/reference/source TINYNPU_WORK_ROOT=/tmp/nmaforge_round10_tinynpu_20261107 TINYNPU_CNN_OUT=/tmp/nmaforge_round10_tinynpu_20261107/cnn PYTHON=/tmp/nmaforge_round10_venv/bin/python VERILATOR=/tmp/nmaforge_verilator_src_5.052/bin/verilator JOBS=4 bash benchmark/tinynpu/run_tinynpu_cnn.sh",
+    "nma_matrix_compile": "make -C dv/block/compute/matrix/sim core-random-compile SEED=20261107 PHYSICAL_ARRAY_SIZE=16 CORE_OUT_DIR=/tmp/nmaforge_round10_nma_match_20261107"
+  }
+}

@@ -40,7 +40,8 @@ module tb_ai_tensor_sfu_random;
     .clk(clk),.resetn(resetn),.start(start),.abort(abort),.op_mode(op_mode),
     .src0_base(src0_base),.src1_base(src1_base),.beta_base(beta_base),
     .beta_enable(beta_enable),.pack_enable(pack_enable),
-    .pack_tile_a(pack_tile_a),.dst_base(dst_base),
+    .pack_tile_a(pack_tile_a),.input_tile_a(1'b0),.src0_stride(32'd0),
+    .dst_base(dst_base),
     .length(length),.m_size(m_size),.n_size(n_size),
     .scale_shift(scale_shift),.epsilon(epsilon),
     .watchdog_limit(watchdog_limit),.spad_valid(spad_valid),
@@ -433,7 +434,11 @@ module tb_ai_tensor_sfu_random;
     integer j;
     begin
       op_mode=probe_opcode(target_state);
-      length=(target_state==28)?16'd1:16'd2;
+      // LayerNorm's bounded small-vector path skips its external variance
+      // read-wait state. Use a legal larger vector when probing the retained
+      // legacy path so the reset test still reaches every real FSM state.
+      length=(target_state==28)?16'd1:
+             ((target_state>=32 && target_state<=40)?16'd17:16'd2);
       src0_base=32'h100;
       src1_base=((op_mode==8'h34) ||
                  (op_mode==8'h33 && target_state>=20 && target_state<=21)) ?

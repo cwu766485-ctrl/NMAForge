@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "run_id": "V2-MEMORY-FABRIC-RESET-CLEAN-839B9AF-3SEED",
+  "status": "PASS_SCOPED",
+  "source_sha": "839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0",
+  "tree_sha": "630e498ba467d84dd5359403cfe1ed1e5879f6e9",
+  "clean_worktree": true,
+  "command": "VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' URG=/tmp/nmaforge_vcs_home_linux_alias/bin/urg make -C /tmp/nmaforge-v2-top-smoke-839b9af/dv/subsystem/dma_spad/sim subsystem_memory_fabric_reset_regress MEMORY_FABRIC_RESET_SEEDS='20261128 20261129 20261130' MEMORY_FABRIC_RESET_OUT=/tmp/nmaforge_v2_clean_839b9af_memory_fabric_reset",
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "urg": "V-2023.12-SP1"
+  },
+  "seeds": [
+    20261128,
+    20261129,
+    20261130
+  ],
+  "checks": {
+    "memory_fabric_reset_pass": 3,
+    "dma_cnm_recovery_pass_markers": 6,
+    "uvm_warning_error_fatal_per_seed": "0/0/0",
+    "functional_groups": {
+      "dma_cnm_shared_reset_cg": "100%",
+      "dma_reset_phase_cg": "100%",
+      "cnm_reset_phase_cg": "100%"
+    },
+    "assertions": {
+      "ap_single_response_owner": {
+        "successes": 3921,
+        "failures": 0,
+        "incomplete": 0
+      },
+      "ap_cnm_response_tag": {
+        "successes": 144,
+        "failures": 0,
+        "incomplete": 0
+      }
+    }
+  },
+  "scope": "Production in-repository ai_accel_memory_fabric reset/epoch. Exercises pending external DMA AXI reads and accepted CNM SPAD response, then verifies DMA/CNM Golden recovery. This does not prove arbitrary external fabric behavior or opcode-0x52/0x53-specific reset-phase closure.",
+  "logs": [
+    "/tmp/nmaforge_v2_clean_839b9af_memory_fabric_reset/seed_20261128/run.log",
+    "/tmp/nmaforge_v2_clean_839b9af_memory_fabric_reset/seed_20261129/run.log",
+    "/tmp/nmaforge_v2_clean_839b9af_memory_fabric_reset/seed_20261130/run.log"
+  ],
+  "archive": "/tmp/nmaforge_v2_clean_839b9af_memory_fabric_reset_text.tar.gz",
+  "archive_sha256": "eff1b22cc9d071d1d02c75ef98c3317944cea11a3a70d0e8bee0bb8397a8abb7",
+  "coverage_vdbs_committed": false
+}

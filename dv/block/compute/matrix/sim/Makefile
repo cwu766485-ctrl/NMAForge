@@ -1,15 +1,20 @@
 VCS ?= vcs -licwait 1
+PYTHON ?= python3.12
 URG ?= /opt/Synopsys/vcs/V-2023.12-SP1/bin/urg
 SEED ?= 20261021
 OUT_DIR ?= /tmp/nmaforge_matrix_datapath_$(SEED)
 CORE_OUT_DIR ?= /tmp/nmaforge_matrix_core_$(SEED)
 NO_PREFETCH_CORE_OUT_DIR ?= /tmp/nmaforge_matrix_core_no_prefetch_$(SEED)
+TILE_FORWARD_OUT_DIR ?= /tmp/nmaforge_matrix_tile_forward_$(SEED)
+TILE_FORWARD_REGRESS_OUT ?= /tmp/nmaforge_matrix_tile_forward_regress
+GEMV_FOUR_WAY_OUT ?= /tmp/nmaforge_matrix_gemv_four_way
 ARRAY_OUT_DIR ?= /tmp/nmaforge_matrix_array_20261025
 ARRAY_SEEDS ?= 20261025 20261026 20261027
 ARRAY_SIZES ?= 8 16
 OUTSTANDING_DEPTH ?= 4
 A_TILE_CACHE_ENABLE ?= 1
 NEXT_K_PREFETCH_ENABLE ?= 1
+GEMV_B_TILE_CACHE_ENABLE ?= 1
 PHYSICAL_ARRAY_SIZE ?= 16
 COV_METRICS := line+cond+fsm+branch
 
@@ -17,6 +22,16 @@ COV_METRICS := line+cond+fsm+branch
 	core-random-test core-random-compile core-random-run a3-core-test \
 	core-prefetch-handoff-test core-prefetch-handoff-regress \
 	core-no-prefetch-fallback-compile core-no-prefetch-fallback-regress \
+	core-no-prefetch-gemv-regress \
+	product-gemv-test product-gemv-regress \
+	product-opcode-fault-regress \
+	product-opcode-handshake-regress \
+	product-opcode-mutation-regress \
+	product-gemv-prefetch-ablation \
+	product-gemv-b-cache-ablation \
+	product-gemv-four-way-ablation \
+	core-tile-forward-ablation \
+	core-tile-forward-regress \
 	datapath-random-regress core-random-regress array-random-regress \
 	matrix-size-benchmark matrix-pipeline-benchmark matrix-config-comparison \
 	tinynpu-matched-benchmark
@@ -59,6 +74,7 @@ core-random-compile:
 		+define+MATRIX_MAX_OUTSTANDING_READS=$(OUTSTANDING_DEPTH) \
 		+define+MATRIX_A_TILE_CACHE_ENABLE=$(A_TILE_CACHE_ENABLE) \
 		+define+MATRIX_NEXT_K_PREFETCH_ENABLE=$(NEXT_K_PREFETCH_ENABLE) \
+		+define+MATRIX_GEMV_B_TILE_CACHE_ENABLE=$(GEMV_B_TILE_CACHE_ENABLE) \
 		+define+MATRIX_ARRAY_SIZE=$(PHYSICAL_ARRAY_SIZE) \
 		-cm $(COV_METRICS) -cm_hier $(CURDIR)/matrix_core.cm_hier \
 		-cm_dir $(CORE_OUT_DIR)/coverage.vdb \
@@ -75,6 +91,14 @@ core-random-run: core-random-compile
 		-cm_dir $(CORE_OUT_DIR)/coverage.vdb -cm_name matrix_core_seed_$(SEED) -l $(CORE_OUT_DIR)/run.log
 	grep -Eq '^MATRIX_LINE_CONTRACT_PASS full_wstrb=1 aligned=1 stalled_stability=[1-9][0-9]* unaligned_scalar_fallback=1 protection_error=1 partial_zero_wstrb=unsupported$$' $(CORE_OUT_DIR)/run.log
 	grep -q '^MATRIX_CORE_RANDOM_PASS cases=18 faults=35 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 ' $(CORE_OUT_DIR)/run.log
+	$(CORE_OUT_DIR)/simv +SEED=$(SEED) +MATRIX_PRODUCT_GEMV_ONLY -cm $(COV_METRICS) \
+		-cm_dir $(CORE_OUT_DIR)/coverage.vdb -cm_name matrix_product_gemv_$(SEED) \
+		-l $(CORE_OUT_DIR)/product_gemv.log
+	grep -q '^MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 ' $(CORE_OUT_DIR)/product_gemv.log
+	grep -q '^MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 ' $(CORE_OUT_DIR)/product_gemv.log
+	grep -q '^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=8x16x65 ' $(CORE_OUT_DIR)/product_gemv.log
+	grep -q '^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=16x16x19 ' $(CORE_OUT_DIR)/product_gemv.log
+	grep -Eq '^MATRIX_V2_GEMV_SHAPE_COVERAGE_PASS bins=6 coverage=100\.00 seed=$(SEED)$$' $(CORE_OUT_DIR)/product_gemv.log
 
 core-random-regress: core-random-compile
 	@set -e; for seed in $(SEEDS); do \
@@ -83,6 +107,209 @@ core-random-regress: core-random-compile
 			-l $(CORE_OUT_DIR)/run_seed_$$seed.log; \
 		grep -q "^MATRIX_CORE_RANDOM_PASS cases=18 faults=35 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 seed=$$seed " $(CORE_OUT_DIR)/run_seed_$$seed.log; \
 		grep -Eq '^MATRIX_LINE_CONTRACT_PASS full_wstrb=1 aligned=1 stalled_stability=[1-9][0-9]* unaligned_scalar_fallback=1 protection_error=1 partial_zero_wstrb=unsupported$$' $(CORE_OUT_DIR)/run_seed_$$seed.log; \
+		$(CORE_OUT_DIR)/simv +SEED=$$seed +MATRIX_PRODUCT_GEMV_ONLY \
+			-cm $(COV_METRICS) -cm_dir $(CORE_OUT_DIR)/coverage.vdb \
+			-cm_name matrix_product_gemv_$$seed -l $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=8x16x65 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=16x16x19 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -Eq "^MATRIX_V2_GEMV_SHAPE_COVERAGE_PASS bins=6 coverage=100\\.00 seed=$$seed$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+	done
+
+product-gemv-test: core-random-compile
+	$(CORE_OUT_DIR)/simv +SEED=$(SEED) +MATRIX_PRODUCT_GEMV_ONLY \
+		-cm $(COV_METRICS) -cm_dir $(CORE_OUT_DIR)/coverage.vdb \
+		-cm_name matrix_product_gemv_$(SEED) -l $(CORE_OUT_DIR)/product_gemv.log
+	grep -q '^MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 .*golden=bit-exact$$' $(CORE_OUT_DIR)/product_gemv.log
+	grep -q '^MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 .*golden=bit-exact$$' $(CORE_OUT_DIR)/product_gemv.log
+	grep -q '^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=8x16x65 .*golden=bit-exact$$' $(CORE_OUT_DIR)/product_gemv.log
+	grep -q '^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=16x16x19 .*golden=bit-exact$$' $(CORE_OUT_DIR)/product_gemv.log
+
+product-gemv-regress: core-random-compile
+	@set -e; for seed in $(SEEDS); do \
+		$(CORE_OUT_DIR)/simv +SEED=$$seed +MATRIX_PRODUCT_GEMV_ONLY \
+			-cm $(COV_METRICS) -cm_dir $(CORE_OUT_DIR)/coverage.vdb \
+			-cm_name matrix_product_gemv_$$seed -l $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=8x16x65 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=16x16x19 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -Eq "^MATRIX_V2_GEMV_SHAPE_COVERAGE_PASS bins=6 coverage=100\\.00 seed=$$seed$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_PRODUCT_GEMV_ONLY_PASS seed=$$seed$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+	done
+
+# Feature-specific 0x52/0x53 error recovery, accepted-read drain, reset epoch,
+# held output backpressure, and post-fault Golden recovery checks.
+product-opcode-fault-regress: core-random-compile
+	@set -e; for seed in $(SEEDS); do \
+		$(CORE_OUT_DIR)/simv +SEED=$$seed +MATRIX_V2_OPCODE_FAULT_ONLY \
+			-cm $(COV_METRICS) -cm_dir $(CORE_OUT_DIR)/coverage.vdb \
+			-cm_name v2_opcode_fault_$$seed \
+			-l $(CORE_OUT_DIR)/v2_opcode_fault_seed_$$seed.log; \
+		grep -q "^MATRIX_0X53_RESET_EPOCH_PASS .* seed=$$seed$$" \
+			$(CORE_OUT_DIR)/v2_opcode_fault_seed_$$seed.log; \
+		grep -q "^MATRIX_V2_OPCODE_FAULT_PASS .* seed=$$seed$$" \
+			$(CORE_OUT_DIR)/v2_opcode_fault_seed_$$seed.log; \
+		grep -Eq "^MATRIX_V2_OPCODE_FAULT_COVERAGE_PASS bins=8 coverage=100\\.00 seed=$$seed$$" \
+			$(CORE_OUT_DIR)/v2_opcode_fault_seed_$$seed.log; \
+	done
+
+# Deterministic request VALID/READY stability for 0x52 and held 0x53 output
+# write payload under backpressure, followed by bit-exact producer/consumer.
+V2_OPCODE_HANDSHAKE_OUT ?= /tmp/nmaforge_v2_opcode_handshake_$(SEED)
+product-opcode-handshake-regress: core-random-compile
+	@set -e; for seed in $(SEEDS); do \
+		$(CORE_OUT_DIR)/simv +SEED=$$seed +MATRIX_V2_OPCODE_HANDSHAKE_ONLY \
+			-cm $(COV_METRICS) -cm_dir $(CORE_OUT_DIR)/coverage.vdb \
+			-cm_name v2_opcode_handshake_$$seed \
+			-l $(V2_OPCODE_HANDSHAKE_OUT)_seed_$$seed.log; \
+		grep -Eq "^MATRIX_V2_OPCODE_HANDSHAKE_COVERAGE_PASS bins=2 coverage=100\\.00 bank_stall_cycles=[3-9][0-9]* stable_checks=[2-9][0-9]* seed=$$seed$$" \
+			$(V2_OPCODE_HANDSHAKE_OUT)_seed_$$seed.log; \
+		grep -q "^MATRIX_V2_OPCODE_HANDSHAKE_PASS .* recovery=bit-exact seed=$$seed$$" \
+			$(V2_OPCODE_HANDSHAKE_OUT)_seed_$$seed.log; \
+	done
+
+# Mutate temporary copies of the Matrix DUT and require the 0x52/0x53 Golden,
+# address, WSTRB, and forwarding-tag checkers to reject each real RTL defect.
+V2_OPCODE_MUTATION_OUT ?= /tmp/nmaforge_v2_opcode_mutations_$(SEED)
+V2_OPCODE_MUTATION_SEEDS ?= 20261105 20261106 20261107
+product-opcode-mutation-regress:
+	$(PYTHON) run_v2_opcode_mutations.py --out "$(V2_OPCODE_MUTATION_OUT)" \
+		--vcs "$(VCS)" --vcs-home "$(VCS_HOME)" \
+		--seeds $(V2_OPCODE_MUTATION_SEEDS)
+
+# Matched per-shape prefetch ON/OFF runs start directly from reset. This keeps
+# the random Ready/latency stream independent of the generic GEMM precondition.
+product-gemv-prefetch-ablation: core-random-compile
+	@set -e; for seed in $(SEEDS); do \
+		for shape in M4_SHAPE M1_SHAPE M16_SHAPE; do \
+			$(CORE_OUT_DIR)/simv +SEED=$$seed +MATRIX_GEMV_ABLATION_$$shape \
+				-cm $(COV_METRICS) -cm_dir $(CORE_OUT_DIR)/coverage.vdb \
+				-cm_name gemv_prefetch_$${shape}_$$seed \
+				-l $(CORE_OUT_DIR)/ablation_$${shape}_$$seed.log; \
+			grep -q "^MATRIX_GEMV_ABLATION_PASS shape=.* seed=$$seed$$" \
+				$(CORE_OUT_DIR)/ablation_$${shape}_$$seed.log; \
+		done; \
+	done
+
+# Compare product GEMV B-fold reuse against the same shape and responder
+# traces with the shared 1 KiB local reuse array disabled for this purpose.
+product-gemv-b-cache-ablation:
+	@set -e; for enable in 0 1; do \
+		out=$(CORE_OUT_DIR)/b_cache_$$enable; mkdir -p $$out; \
+		$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+			+define+MATRIX_MAX_OUTSTANDING_READS=$(OUTSTANDING_DEPTH) \
+			+define+MATRIX_A_TILE_CACHE_ENABLE=$(A_TILE_CACHE_ENABLE) \
+			+define+MATRIX_NEXT_K_PREFETCH_ENABLE=$(NEXT_K_PREFETCH_ENABLE) \
+			+define+MATRIX_GEMV_B_TILE_CACHE_ENABLE=$$enable \
+			+define+MATRIX_ARRAY_SIZE=$(PHYSICAL_ARRAY_SIZE) \
+			-cm $(COV_METRICS) -cm_hier $(CURDIR)/matrix_core.cm_hier \
+			-cm_dir $$out/coverage.vdb -Mdir=$$out/csrc \
+			-top tb_ai_tensor_matrix_core_random \
+			../../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v \
+			../../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv \
+			../../../../../rtl/compute/matrix/ai_tensor_matrix_core.v \
+			../tb/tb_ai_tensor_matrix_core_random.sv \
+			-o $$out/simv -l $$out/compile.log; \
+		for seed in $(SEEDS); do \
+			$$out/simv +SEED=$$seed +MATRIX_GEMV_ABLATION_MULTIROW_SHAPES \
+				-cm $(COV_METRICS) -cm_dir $$out/coverage.vdb \
+				-cm_name b_cache_$${enable}_$$seed \
+				-l $$out/multirow_seed_$$seed.log; \
+			grep -q "^MATRIX_GEMV_ABLATION_PASS shape=M8x16x19 seed=$$seed$$" \
+				$$out/multirow_seed_$$seed.log; \
+			grep -q "^MATRIX_GEMV_ABLATION_PASS shape=M8x16x65 seed=$$seed$$" \
+				$$out/multirow_seed_$$seed.log; \
+			grep -q "^MATRIX_GEMV_ABLATION_PASS shape=M16x16x19 seed=$$seed$$" \
+				$$out/multirow_seed_$$seed.log; \
+			grep -q "^MATRIX_GEMV_ABLATION_PASS shape=M16x16x65 seed=$$seed$$" \
+				$$out/multirow_seed_$$seed.log; \
+		done; \
+	done
+
+# Compare the four matched product-GEMV settings of B-fold reuse and Next-K
+# prefetch under one array, outstanding depth, workload, seed, and responder.
+product-gemv-four-way-ablation:
+	@set -e; for cache in 0 1; do \
+		for prefetch in 0 1; do \
+			out=$(GEMV_FOUR_WAY_OUT)/cache_$$cache/prefetch_$$prefetch; mkdir -p $$out; \
+			$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+				+define+MATRIX_MAX_OUTSTANDING_READS=$(OUTSTANDING_DEPTH) \
+				+define+MATRIX_A_TILE_CACHE_ENABLE=$(A_TILE_CACHE_ENABLE) \
+				+define+MATRIX_NEXT_K_PREFETCH_ENABLE=$$prefetch \
+				+define+MATRIX_GEMV_B_TILE_CACHE_ENABLE=$$cache \
+				+define+MATRIX_ARRAY_SIZE=$(PHYSICAL_ARRAY_SIZE) \
+				-cm $(COV_METRICS) -cm_hier $(CURDIR)/matrix_core.cm_hier \
+				-cm_dir $$out/coverage.vdb -Mdir=$$out/csrc \
+				-top tb_ai_tensor_matrix_core_random \
+				../../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v \
+				../../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv \
+				../../../../../rtl/compute/matrix/ai_tensor_matrix_core.v \
+				../tb/tb_ai_tensor_matrix_core_random.sv \
+				-o $$out/simv -l $$out/compile.log; \
+			for seed in $(SEEDS); do \
+				$$out/simv +SEED=$$seed +MATRIX_GEMV_ABLATION_MULTIROW_SHAPES \
+					-cm $(COV_METRICS) -cm_dir $$out/coverage.vdb \
+					-cm_name gemv_four_way_c$${cache}_p$${prefetch}_$$seed \
+					-l $$out/run_seed_$$seed.log; \
+				for shape in M8x16x19 M8x16x65 M16x16x19 M16x16x65; do \
+					grep -q "^MATRIX_GEMV_ABLATION_PASS shape=$$shape seed=$$seed$$" $$out/run_seed_$$seed.log; \
+				done; \
+			done; \
+		done; \
+	done; \
+	for seed in $(SEEDS); do \
+		$(PYTHON) ../../../../../tools/summarize_gemv_four_way_ablation.py \
+			--seed $$seed --rtl-sha "$$(git rev-parse HEAD)" \
+			--test-sha "$$(git rev-parse HEAD)" \
+			--p0-b0 $(GEMV_FOUR_WAY_OUT)/cache_0/prefetch_0/run_seed_$$seed.log \
+			--p0-b1 $(GEMV_FOUR_WAY_OUT)/cache_1/prefetch_0/run_seed_$$seed.log \
+			--p1-b0 $(GEMV_FOUR_WAY_OUT)/cache_0/prefetch_1/run_seed_$$seed.log \
+			--p1-b1 $(GEMV_FOUR_WAY_OUT)/cache_1/prefetch_1/run_seed_$$seed.log \
+			--output $(GEMV_FOUR_WAY_OUT)/summary_seed_$$seed.csv; \
+	done
+
+# Compare the same producer/consumer chain with the optional bounded local
+# tile store compiled in and out. The producer SPAD write remains in both runs.
+core-tile-forward-ablation:
+	@set -e; for enable in 0 1; do \
+		out=$(TILE_FORWARD_OUT_DIR)/enable_$$enable; mkdir -p $$out; \
+		$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+			-assert enable_diag \
+			+define+MATRIX_MAX_OUTSTANDING_READS=$(OUTSTANDING_DEPTH) \
+			+define+MATRIX_A_TILE_CACHE_ENABLE=$(A_TILE_CACHE_ENABLE) \
+			+define+MATRIX_NEXT_K_PREFETCH_ENABLE=$(NEXT_K_PREFETCH_ENABLE) \
+			+define+MATRIX_ELASTIC_TILE_FORWARDING_ENABLE=$$enable \
+			+define+MATRIX_ARRAY_SIZE=$(PHYSICAL_ARRAY_SIZE) \
+			-cm $(COV_METRICS)+assert -cm_hier $(CURDIR)/matrix_core.cm_hier \
+			-cm_dir $$out/coverage.vdb -Mdir=$$out/csrc \
+			-top tb_ai_tensor_matrix_core_random \
+			../../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v \
+			../../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv \
+			../../../../../rtl/compute/matrix/ai_tensor_matrix_core.v \
+			../tb/tb_ai_tensor_matrix_core_random.sv \
+			-o $$out/simv -l $$out/compile.log; \
+		$$out/simv +SEED=$(SEED) +MATRIX_TILE_FORWARD_CHAIN_ONLY \
+			-assert report=$$out/assertions.rpt+verbose \
+			-cm $(COV_METRICS)+assert -cm_dir $$out/coverage.vdb \
+			-cm_name matrix_tile_forward_$$enable -l $$out/run.log; \
+		grep -q "^MATRIX_TILE_FORWARD_CHAIN_PASS enable=$$enable " $$out/run.log; \
+		grep -q "^MATRIX_TILE_FORWARD_CHAIN_ONLY_PASS enable=$$enable seed=$(SEED)$$" $$out/run.log; \
+		if [ $$enable -eq 1 ]; then \
+			grep -Eq '^MATRIX_V2_TILE_FORWARD_COVERAGE_PASS enable=1 bins=6 coverage=100\.00 seed=$(SEED)$$' $$out/run.log; \
+			grep -q '^MATRIX_V2_TILE_FORWARD_SVA_PASS assertions=3 nonvacuous_commits=[1-9][0-9]* ' $$out/run.log; \
+			grep -q 'Summary: 3 assertions, 3 with attempts, 0 with failures' $$out/assertions.rpt; \
+			grep -Eq '1 covers, 1 with attempts|[1-9][0-9]* covers, 1 with attempts' $$out/assertions.rpt; \
+			grep -Eq '[1-9][0-9]* match' $$out/assertions.rpt; \
+		fi; \
+		done
+
+core-tile-forward-regress:
+	@set -e; for seed in $(SEEDS); do \
+		$(MAKE) --no-print-directory core-tile-forward-ablation \
+			SEED=$$seed \
+			TILE_FORWARD_OUT_DIR=$(TILE_FORWARD_REGRESS_OUT)/seed_$$seed; \
 	done
 
 # Build a distinct prefetch-disabled DUT profile so this test covers the
@@ -111,6 +338,27 @@ core-no-prefetch-fallback-regress: core-no-prefetch-fallback-compile
 			-l $(NO_PREFETCH_CORE_OUT_DIR)/run_seed_$$seed.log; \
 		grep -q "^MATRIX_NO_PREFETCH_FALLBACK_PASS seed=$$seed fallback=1$$" $(NO_PREFETCH_CORE_OUT_DIR)/run_seed_$$seed.log; \
 		grep -q "^MATRIX_SIZE_BENCHMARK_PASS .*next_k_prefetch=0 " $(NO_PREFETCH_CORE_OUT_DIR)/run_seed_$$seed.log; \
+	done
+
+# The product-shape covergroup also runs with prefetch compiled out. Keep this
+# separate from the benchmark fallback target so each named GEMV shape has an
+# explicit Golden and per-seed 100% bin gate in both prefetch profiles.
+core-no-prefetch-gemv-regress: core-no-prefetch-fallback-compile
+	@set -e; for seed in $(SEEDS); do \
+		$(NO_PREFETCH_CORE_OUT_DIR)/simv +SEED=$$seed +MATRIX_PRODUCT_GEMV_ONLY \
+			-cm $(COV_METRICS) -cm_dir $(NO_PREFETCH_CORE_OUT_DIR)/coverage.vdb \
+			-cm_name no_prefetch_gemv_$$seed \
+			-l $(NO_PREFETCH_CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_PASS opcode=0x52 shape=4x16x32 .*golden=bit-exact$$" \
+			$(NO_PREFETCH_CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_TAIL_PASS opcode=0x52 shape=1x13x17 .*golden=bit-exact$$" \
+			$(NO_PREFETCH_CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=8x16x65 .*golden=bit-exact$$" \
+			$(NO_PREFETCH_CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=16x16x65 .*golden=bit-exact$$" \
+			$(NO_PREFETCH_CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+		grep -Eq "^MATRIX_V2_GEMV_SHAPE_COVERAGE_PASS bins=6 coverage=100\\.00 seed=$$seed$$" \
+			$(NO_PREFETCH_CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 	done
 
 core-prefetch-handoff-test: core-random-compile
@@ -144,6 +392,7 @@ array-random-regress:
 				-cm_dir $$out/coverage.vdb -cm_name matrix_array_$${size}_seed_$$seed \
 				-l $$out/run_seed_$$seed.log; \
 			grep -q "^MATRIX_ARRAY_PASS size=$$size cases=4 saturation=2 overlapped_loads=25 functional_coverage=100.00 seed=$$seed$$" $$out/run_seed_$$seed.log; \
+			grep -q "^MATRIX_ARRAY_KFOLD_PASS size=$$size cases=4 signed=1 tail=1 reduce=golden$$" $$out/run_seed_$$seed.log; \
 		done; \
 		$(URG) -full64 -dir $$out/coverage.vdb -format text -report $$out/urg -log $$out/urg.log; \
 	done

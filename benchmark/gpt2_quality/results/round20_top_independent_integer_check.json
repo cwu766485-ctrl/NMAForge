@@ -1,0 +1,78 @@
+{
+  "contexts": [
+    {
+      "bit_exact": true,
+      "context": 0,
+      "first_mismatch": null,
+      "independent_argmax": 107,
+      "logits": 256,
+      "mismatch_count": 0,
+      "rtl_argmax": 107,
+      "rtl_row": 3,
+      "tokens": [
+        1,
+        7,
+        42,
+        3
+      ]
+    },
+    {
+      "bit_exact": true,
+      "context": 1,
+      "first_mismatch": null,
+      "independent_argmax": 103,
+      "logits": 256,
+      "mismatch_count": 0,
+      "rtl_argmax": 103,
+      "rtl_row": 4,
+      "tokens": [
+        1,
+        7,
+        42,
+        3,
+        107
+      ]
+    },
+    {
+      "bit_exact": true,
+      "context": 2,
+      "first_mismatch": null,
+      "independent_argmax": 32,
+      "logits": 256,
+      "mismatch_count": 0,
+      "rtl_argmax": 32,
+      "rtl_row": 5,
+      "tokens": [
+        1,
+        7,
+        42,
+        3,
+        107,
+        103
+      ]
+    },
+    {
+      "bit_exact": true,
+      "context": 3,
+      "first_mismatch": null,
+      "independent_argmax": 111,
+      "logits": 256,
+      "mismatch_count": 0,
+      "rtl_argmax": 111,
+      "rtl_row": 6,
+      "tokens": [
+        1,
+        7,
+        42,
+        3,
+        107,
+        103,
+        32
+      ]
+    }
+  ],
+  "model_npz_sha256": "2132835994c2ecce03dc1d8e7345474eeddb271d86e34de9cc1f5ccdf2fecfc2",
+  "rtl_run_log_sha256": "16533607b67396f0706b11cc328be65667916cab1fd4b53c084bd0a57f8027af",
+  "source_sha": "f7e65ed02b64dfd1faf49e7a9a25222f5b6bd560",
+  "status": "PRODUCT_TOP_VS_INDEPENDENT_INT_REFERENCE_PASS"
+}

@@ -1,0 +1,15 @@
+[
+  "/tmp/nmaforge-phase2-runs/baseline/top/simv",
+  "+AI_REPRESENTATIVE_MODEL",
+  "+AI_RANDOM_CASES=0",
+  "+AI_SEED=20261112",
+  "+ACLK_PERIOD_NS=4",
+  "+AI_REPRESENTATIVE_MEMORY=/tmp/nmaforge-phase2-runs/baseline/kernel_30_32_32_64/image.memh",
+  "+AI_REPRESENTATIVE_GOLDEN=/tmp/nmaforge-phase2-runs/baseline/kernel_30_32_32_64/golden.memh",
+  "+AI_REPRESENTATIVE_DESC_BASE=106496",
+  "+AI_REPRESENTATIVE_CPL_BASE=107008",
+  "+AI_REPRESENTATIVE_DESC_COUNT=1",
+  "+AI_REPRESENTATIVE_USEFUL_MACS=65536",
+  "+PHASE1_PROFILE=/tmp/nmaforge-phase2-runs/baseline/kernel_30_32_32_64/profile",
+  "+STAGE_A_PROFILE=/tmp/nmaforge-phase2-runs/baseline/kernel_30_32_32_64/stage_a"
+]

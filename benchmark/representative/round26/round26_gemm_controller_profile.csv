@@ -1,0 +1,9 @@
+op,m,n,k,total_cycles,prep_mac_cycles,mac_active_cycles,write_state_cycles,next_tile_cycles,done_cycles,a_req_cycles,a_wait_cycles,b_req_cycles,b_wait_cycles,prefetch_wait_cycles,arbiter_stall_cycles,response_wait_cycles,writeback_wait_cycles,outstanding_highwater,prefetch_overlap_cycles,tile_cache_hits,bank_stalls,line_stalls,golden,status
+GEMM,16,16,16,175,4,16,89,1,1,6,3,4,4,47,45,7,25,3,12,0,20,25,PASS,PASS
+GEMM,16,16,32,263,8,32,90,1,1,7,4,14,2,104,53,11,26,4,28,0,27,26,PASS,PASS
+GEMM,32,32,64,1407,64,256,352,4,1,11,9,20,16,674,258,24,96,4,240,32,162,96,PASS,PASS
+GEMV,1,13,17,75,5,5,9,1,1,1,5,5,4,39,12,8,5,3,4,0,8,4,PASS,PASS
+GEMV,8,16,19,150,10,10,36,2,1,14,5,6,4,62,19,12,4,4,8,5,15,4,PASS,PASS
+GEMV,8,16,65,402,34,34,53,2,1,15,7,10,4,242,70,16,21,4,32,16,49,21,PASS,PASS
+GEMV,16,16,19,255,20,20,83,4,1,22,16,8,2,79,35,18,19,4,16,15,16,19,PASS,PASS
+GEMV,16,16,65,612,68,68,80,4,1,19,13,4,5,350,66,16,16,4,64,48,50,16,PASS,PASS

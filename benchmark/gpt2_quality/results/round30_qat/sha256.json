@@ -1,0 +1,19 @@
+{
+  "files": [
+    {
+      "file": "round30_closeout_manifest.json",
+      "sha256": "b155ff82fb9f92a1acbacc9a21e6757ee9d8a7561061963a24dc2ca1a0bdbfca",
+      "bytes": 1454
+    },
+    {
+      "file": "round30_qat_metrics.csv",
+      "sha256": "7eb541e339a159f0e7ce6727e979fc3a492a3d10d64849e711689aab4c702c0e",
+      "bytes": 2350
+    },
+    {
+      "file": "run_manifest.json",
+      "sha256": "9a316735939117420f081d717d789a40b42aa3e685b2ed85cf7715a0d0485c74",
+      "bytes": 2318
+    }
+  ]
+}

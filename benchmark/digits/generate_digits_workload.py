@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Map the trained test set to ABI-v7 GEMM/ReLU/REQUANT descriptors."""
+"""Map the trained test set to ABI-v7 fused Matrix GEMM descriptors."""
 
 from __future__ import annotations
 
@@ -15,29 +15,18 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 from sw.tools.cimforge_mapper import (  # noqa: E402
-    Descriptor, FLAG_BIAS, FLAG_PACK_I8, FLAG_PACK_I8_TILE_A,
+    Descriptor, FLAG_BIAS, OP_GEMM_REQUANT_TILE_A,
 )
+from sw.tools.spad_memory_planner import SpadMemoryPlanner
 from benchmark.digits.digits_quantized_golden import integer_infer  # noqa: E402
 
 
 OP_GEMM = 0x30
-OP_REQUANT = 0x36
 ARRAY_M = 16
 K = 64
 K_WORDS = K // 4
 BATCH = 16
 
-# Addresses are offsets from SPAD_BASE, matching the other ABI-v7 mapper jobs.
-W1_BASE = 0x10000
-B1_BASE = 0x12000
-W2_BASE = 0x13000
-B2_BASE = 0x13400
-HIDDEN_I32_BASE = 0x14000
-HIDDEN_I8_TILE_BASE = 0x32000
-DESC_BASE = 0x38000
-CPL_BASE = 0x3A000
-OUTPUT_BASE = 0x3B000
-INPUT_BASE = 0x50000
 TASK_BASE = 0xD000
 
 
@@ -88,12 +77,14 @@ def pack_b_columns(matrix: np.ndarray, n_valid: int) -> list[int]:
 def descriptor_words(*, task_id: int, opcode: int, src0: int, src1: int,
                      bias: int, dst: int, m: int, n: int, extent: int,
                      flags: int, shift: int = 0, activation: int = 0,
+                     aux0: int = 0, dst_stride: int = 0,
                      wait_mask: int = 0, signal_mask: int = 0,
                      clear_mask: int = 0) -> list[int]:
     desc = Descriptor(
         name=f"digits_{task_id:04x}", task_id=task_id, op=opcode,
         src0=src0, src1=src1, bias=bias, dst=dst, m=m, n=n,
-        k_or_length=extent, flags=flags, shift=shift, activation=activation,
+        k_or_length=extent, flags=flags, aux0=aux0, shift=shift,
+        activation=activation, dst_stride=dst_stride,
         wait_mask=wait_mask, signal_mask=signal_mask, clear_mask=clear_mask,
     )
     words = desc.words()
@@ -107,8 +98,12 @@ def main() -> None:
     parser.add_argument("--model", type=Path, default=REPO_ROOT /
                         "benchmark/digits/artifacts/digits_mlp_int8.npz")
     parser.add_argument("--out-dir", type=Path, required=True)
+    parser.add_argument("--compact-spad", action="store_true",
+                        help="deprecated compatibility flag; allocator is always capacity-aware")
+    parser.add_argument("--spad-bytes", type=int, default=131072)
     args = parser.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
+    profile_name = "capacity-aware"
 
     with np.load(args.model) as model:
         x_q = model["test_images_q"].astype(np.int8)
@@ -125,54 +120,56 @@ def main() -> None:
         padded_hidden, _padded_logits = integer_infer(padded, model)
         model_bytes = args.model.read_bytes()
 
+    planner = SpadMemoryPlanner(args.spad_bytes, start=0x1000)
+    sizes = {"weight1":4096,"bias1":256,"weight2":1024,"bias2":64,
+             "hidden":batches*BATCH*64,"descriptor":128*64,"completion":128*16,
+             "output":batches*BATCH*ARRAY_M*4,"input":batches*BATCH*64}
+    addresses = {name:planner.reserve(name,size,256) for name,size in sizes.items()}
+    (args.out_dir / "digits_layout.memh").write_text("".join(f"{addresses[n]:08x}\n" for n in
+        ["input","output","hidden","descriptor","completion"]))
     w2 = np.zeros((K, ARRAY_M), dtype=np.int8)
     w2[:, :10] = w2_10
     b2 = np.zeros(ARRAY_M, dtype=np.int32)
     b2[:10] = b2_10
     memory: dict[int, int] = {}
-    add_words(memory, W1_BASE, pack_b_columns(w1, 64))
-    add_words(memory, B1_BASE, b1)
-    add_words(memory, W2_BASE, pack_b_columns(w2, ARRAY_M))
-    add_words(memory, B2_BASE, b2)
+    add_words(memory, addresses["weight1"], pack_b_columns(w1, 64))
+    add_words(memory, addresses["bias1"], b1)
+    add_words(memory, addresses["weight2"], pack_b_columns(w2, ARRAY_M))
+    add_words(memory, addresses["bias2"], b2)
 
     descriptors: list[list[int]] = []
     for batch_index in range(batches):
         batch_x = padded[batch_index * BATCH : (batch_index + 1) * BATCH]
-        input_base = INPUT_BASE + batch_index * BATCH * 64
-        output_base = OUTPUT_BASE + batch_index * BATCH * ARRAY_M * 4
+        input_base = addresses["input"] + batch_index * BATCH * 64
+        output_base = addresses["output"] + batch_index * BATCH * ARRAY_M * 4
         add_words(memory, input_base, pack_a_rows(batch_x))
         add_words(memory, output_base,
                   [0xA55AA55A] * (BATCH * ARRAY_M))
 
-        hidden_i32_base = HIDDEN_I32_BASE + batch_index * BATCH * 64 * 4
-        hidden_i8_tile_base = HIDDEN_I8_TILE_BASE + batch_index * BATCH * 64
+        hidden_i8_tile_base = addresses["hidden"] + batch_index * BATCH * 64
         descriptors.append(descriptor_words(
-            task_id=TASK_BASE + len(descriptors), opcode=OP_GEMM, src0=input_base,
-            src1=W1_BASE, bias=B1_BASE, dst=hidden_i32_base,
+            task_id=TASK_BASE + len(descriptors),
+            opcode=OP_GEMM_REQUANT_TILE_A, src0=input_base,
+            src1=addresses["weight1"], bias=addresses["bias1"], dst=hidden_i8_tile_base,
             m=BATCH, n=64, extent=K_WORDS, flags=FLAG_BIAS,
-            shift=shift1, activation=1, signal_mask=1,
-        ))
-        descriptors.append(descriptor_words(
-            task_id=TASK_BASE + len(descriptors), opcode=OP_REQUANT,
-            src0=hidden_i32_base, src1=0, bias=0, dst=hidden_i8_tile_base,
-            m=BATCH, n=64, extent=BATCH * 64,
-            flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A,
-            wait_mask=1, signal_mask=2, clear_mask=1,
+            shift=shift1, activation=1, aux0=0, signal_mask=1,
         ))
         descriptors.append(descriptor_words(
             task_id=TASK_BASE + len(descriptors),
             opcode=OP_GEMM,
-            src0=hidden_i8_tile_base, src1=W2_BASE, bias=B2_BASE,
+            src0=hidden_i8_tile_base, src1=addresses["weight2"], bias=addresses["bias2"],
             dst=output_base, m=BATCH, n=ARRAY_M, extent=K_WORDS,
-            flags=FLAG_BIAS, wait_mask=2, clear_mask=2,
+            flags=FLAG_BIAS, wait_mask=1, clear_mask=1,
         ))
 
     desc_count = len(descriptors)
     if desc_count >= 128:
         raise ValueError("CMDQ depth 128 is insufficient for this test split")
-    add_words(memory, CPL_BASE, [0xC0DEC0DE] * (desc_count * 4))
+    add_words(memory, addresses["completion"], [0xC0DEC0DE] * (desc_count * 4))
     for desc_index, words in enumerate(descriptors):
-        add_words(memory, DESC_BASE + desc_index * 64, words)
+        add_words(memory, addresses["descriptor"] + desc_index * 64, words)
+
+    high_water = max(memory) + 4
 
     image_path = args.out_dir / "digits_spad_writes.memh"
     image_words = [len(memory)]
@@ -207,22 +204,28 @@ def main() -> None:
         "batch": BATCH,
         "batches": batches,
         "descriptor_count": desc_count,
-        "descriptors_per_sample_batch": ["Matrix GEMM+Bias+ReLU", "SFU Requant Pack-I8 to Matrix A tile layout", "Matrix GEMM+Bias"],
+        "address_profile": profile_name,
+        "spad_capacity_bytes": args.spad_bytes,
+        "reserved_high_water_bytes": planner.next_addr,
+        "allocations": planner.regions,
+        "address_map": addresses,
+        "spad_high_water_bytes": high_water,
+        "spad_capacity_check_128k": high_water <= 128 * 1024,
+        "descriptors_per_sample_batch": ["Matrix GEMM+Bias+ReLU+INT8 requant+native Matrix-A tile writeback", "Matrix GEMM+Bias"],
         "execution_phases": [
-            "CMDQ GEMM+Bias+ReLU -> SFU tiled Pack-I8 -> GEMM+Bias; dependency events serialize each batch without host intermediate writes",
+            "CMDQ fused GEMM+Bias+ReLU+INT8 requant+tile writeback -> GEMM+Bias; dependency events serialize each batch without host intermediate writes",
         ],
         "hidden_shift": shift1,
-        "input_base": INPUT_BASE,
-        "weight1_base": W1_BASE,
-        "bias1_base": B1_BASE,
-        "hidden_i32_base": HIDDEN_I32_BASE,
-        "hidden_i8_tile_base": HIDDEN_I8_TILE_BASE,
-        "hidden_layout": "Matrix A [row_group][k_group][row_lane], generated by SFU descriptor flag bit 5",
-        "weight2_base": W2_BASE,
-        "bias2_base": B2_BASE,
-        "output_base": OUTPUT_BASE,
-        "descriptor_base": DESC_BASE,
-        "completion_base": CPL_BASE,
+        "input_base": addresses["input"],
+        "weight1_base": addresses["weight1"],
+        "bias1_base": addresses["bias1"],
+        "hidden_i8_tile_base": addresses["hidden"],
+        "hidden_layout": "Matrix A [row_group][k_group][row_lane], generated by fused Matrix opcode 0x53",
+        "weight2_base": addresses["weight2"],
+        "bias2_base": addresses["bias2"],
+        "output_base": addresses["output"],
+        "descriptor_base": addresses["descriptor"],
+        "completion_base": addresses["completion"],
         "memory_word_writes": len(memory),
         "image_memh": str(image_path),
         "hidden_expected_memh": str(hidden_path),

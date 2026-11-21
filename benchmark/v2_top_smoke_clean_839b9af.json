@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "run_id": "V2-CLEAN-WORKTREE-TOP-SMOKE-839B9AF",
+  "status": "PASS",
+  "source_sha": "839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0",
+  "tree_sha": "630e498ba467d84dd5359403cfe1ed1e5879f6e9",
+  "worktree": "/tmp/nmaforge-v2-top-smoke-839b9af",
+  "tool": {
+    "simulator": "Synopsys VCS V-2023.12-SP1_Full64",
+    "platform_override": "linux"
+  },
+  "command": "VCS_ARCH_OVERRIDE=linux VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH make -C /tmp/nmaforge-v2-top-smoke-839b9af/dv/subsystem/top_smoke/sim ai_smoke",
+  "runtime_arguments": {
+    "ntb_random_seed": 1793956453,
+    "AI_RANDOM_CASES": 4,
+    "AI_SEED": 12345,
+    "ACLK_PERIOD_NS": 10.0
+  },
+  "result": {
+    "simulation": "TEST PASS",
+    "pass_check_lines": 1683,
+    "simulation_error_lines": 0,
+    "compile_warnings": [
+      "LOOP-REROLL-ENABLED in transformer fixture; existing debug-capacity notice"
+    ],
+    "required_markers": [
+      "MATRIX_PRODUCT_GEMV_DESCRIPTOR_PASS",
+      "MATRIX_PRODUCT_GEMV_TAIL_DESCRIPTOR_PASS",
+      "MATRIX_PRODUCT_GEMV_M8_KTAIL_DESCRIPTOR_PASS",
+      "MATRIX_FUSED_TILE_FORWARD_CMDQ_PASS",
+      "MATRIX_FUSED_TILE_FORWARD_CROSS_ENGINE_IMMUTABLE_PASS",
+      "MATRIX_CNM_PERF_PROFILE_PASS"
+    ]
+  },
+  "evidence": {
+    "text_log_archive": "/tmp/nmaforge_v2_top_smoke_839b9af_logs.tar.gz",
+    "text_log_archive_sha256": "6fb7768b7b9d03a33b1c56d8b63a5ae44d8608b63492f106e4e04e6ee1dd2dae",
+    "raw_log_sha256": "2008410b7b86a339778b7d4c95e9d6def9f5b9bbde6b828a39c088a8c6e1bf9d"
+  },
+  "scope_note": "Clean-worktree top smoke compatibility only. The four randomized cases are smoke-level sampling, not a broad regression or v2 DV closure. This result does not change any REQ-V2 disposition."
+}

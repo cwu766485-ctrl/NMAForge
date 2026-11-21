@@ -1,0 +1,540 @@
+{
+  "capacity_scenarios": {
+    "128KiB": {
+      "G1_patch_embedding": {
+        "banks": 4,
+        "capacity_bytes": 131072,
+        "data_arena": {
+          "base": 0,
+          "bytes": 90112,
+          "end_exclusive": 90112
+        },
+        "headroom_before_queues": 25344,
+        "host_base": "0x10000",
+        "host_limit_exclusive": "0x30000",
+        "no_collision_proof": "PASS",
+        "objects": [
+          {
+            "address_hex": "0x00000",
+            "alignment_bytes": 64,
+            "end": 37824,
+            "end_exclusive_hex": "0x093c0",
+            "live": [
+              0,
+              1000
+            ],
+            "name": "patch_embedding_output_197x192_i8",
+            "purpose": "persistent CLS+patch output",
+            "size_bytes": 37824,
+            "start": 0
+          },
+          {
+            "address_hex": "0x093c0",
+            "alignment_bytes": 64,
+            "end": 38592,
+            "end_exclusive_hex": "0x096c0",
+            "live": [
+              900,
+              1000
+            ],
+            "name": "class_token_and_position_i32",
+            "purpose": "CLS row initialization",
+            "size_bytes": 768,
+            "start": 37824
+          },
+          {
+            "address_hex": "0x093c0",
+            "alignment_bytes": 64,
+            "end": 50112,
+            "end_exclusive_hex": "0x0c3c0",
+            "live": [
+              0,
+              20
+            ],
+            "name": "input_patch_tile_16x768_i8",
+            "purpose": "DMA-fed operand tile",
+            "size_bytes": 12288,
+            "start": 37824
+          },
+          {
+            "address_hex": "0x0c3c0",
+            "alignment_bytes": 64,
+            "end": 62400,
+            "end_exclusive_hex": "0x0f3c0",
+            "live": [
+              0,
+              30
+            ],
+            "name": "patch_weight_tile_768x16_i8",
+            "purpose": "one streamed projection weight tile",
+            "size_bytes": 12288,
+            "start": 50112
+          },
+          {
+            "address_hex": "0x0f3c0",
+            "alignment_bytes": 64,
+            "end": 63424,
+            "end_exclusive_hex": "0x0f7c0",
+            "live": [
+              10,
+              30
+            ],
+            "name": "gemm_accumulator_tile_16x16_i32",
+            "purpose": "matrix output before requant",
+            "size_bytes": 1024,
+            "start": 62400
+          },
+          {
+            "address_hex": "0x0f7c0",
+            "alignment_bytes": 64,
+            "end": 64448,
+            "end_exclusive_hex": "0x0fbc0",
+            "live": [
+              20,
+              40
+            ],
+            "name": "requant_residual_tile_16x16_i32",
+            "purpose": "bounded epilogue scratch",
+            "size_bytes": 1024,
+            "start": 63424
+          },
+          {
+            "address_hex": "0x0fbc0",
+            "alignment_bytes": 64,
+            "end": 64704,
+            "end_exclusive_hex": "0x0fcc0",
+            "live": [
+              20,
+              40
+            ],
+            "name": "position_tile_16x16_i8",
+            "purpose": "position data for current output tile",
+            "size_bytes": 256,
+            "start": 64448
+          },
+          {
+            "address_hex": "0x0fcc0",
+            "alignment_bytes": 16,
+            "end": 64768,
+            "end_exclusive_hex": "0x0fd00",
+            "live": [
+              0,
+              40
+            ],
+            "name": "bias_tile_16_i32",
+            "purpose": "streamed projection bias",
+            "size_bytes": 64,
+            "start": 64704
+          }
+        ],
+        "peak_address_high_water_absolute": "0x1fd00",
+        "peak_address_high_water_exclusive": 64768,
+        "queue": {
+          "cmdq_base_absolute": "0x26000",
+          "cmdq_base_offset": 90112,
+          "cmdq_bytes": 32768,
+          "cmdq_entry_bytes": 64,
+          "cplq_base_absolute": "0x2e000",
+          "cplq_base_offset": 122880,
+          "cplq_bytes": 8192,
+          "cplq_entry_bytes": 16,
+          "entries_each": 512,
+          "total_bytes": 40960
+        },
+        "simultaneous_live_address_collisions": [],
+        "status": "STATIC_SCHEDULE_CHECK_ONLY_NOT_TOP_EXECUTION",
+        "sum_declared_object_bytes": 65536,
+        "words_per_bank": 8192
+      },
+      "G2_one_encoder_layer": {
+        "capacity_bytes": 131072,
+        "reason": "131072-byte data arena cannot place encoder_input_197x192_i8",
+        "status": "STATIC_SCHEDULE_DOES_NOT_FIT"
+      }
+    },
+    "256KiB": {
+      "G1_patch_embedding": {
+        "banks": 4,
+        "capacity_bytes": 262144,
+        "data_arena": {
+          "base": 0,
+          "bytes": 221184,
+          "end_exclusive": 221184
+        },
+        "headroom_before_queues": 156416,
+        "host_base": "0x10000",
+        "host_limit_exclusive": "0x50000",
+        "no_collision_proof": "PASS",
+        "objects": [
+          {
+            "address_hex": "0x00000",
+            "alignment_bytes": 64,
+            "end": 37824,
+            "end_exclusive_hex": "0x093c0",
+            "live": [
+              0,
+              1000
+            ],
+            "name": "patch_embedding_output_197x192_i8",
+            "purpose": "persistent CLS+patch output",
+            "size_bytes": 37824,
+            "start": 0
+          },
+          {
+            "address_hex": "0x093c0",
+            "alignment_bytes": 64,
+            "end": 38592,
+            "end_exclusive_hex": "0x096c0",
+            "live": [
+              900,
+              1000
+            ],
+            "name": "class_token_and_position_i32",
+            "purpose": "CLS row initialization",
+            "size_bytes": 768,
+            "start": 37824
+          },
+          {
+            "address_hex": "0x093c0",
+            "alignment_bytes": 64,
+            "end": 50112,
+            "end_exclusive_hex": "0x0c3c0",
+            "live": [
+              0,
+              20
+            ],
+            "name": "input_patch_tile_16x768_i8",
+            "purpose": "DMA-fed operand tile",
+            "size_bytes": 12288,
+            "start": 37824
+          },
+          {
+            "address_hex": "0x0c3c0",
+            "alignment_bytes": 64,
+            "end": 62400,
+            "end_exclusive_hex": "0x0f3c0",
+            "live": [
+              0,
+              30
+            ],
+            "name": "patch_weight_tile_768x16_i8",
+            "purpose": "one streamed projection weight tile",
+            "size_bytes": 12288,
+            "start": 50112
+          },
+          {
+            "address_hex": "0x0f3c0",
+            "alignment_bytes": 64,
+            "end": 63424,
+            "end_exclusive_hex": "0x0f7c0",
+            "live": [
+              10,
+              30
+            ],
+            "name": "gemm_accumulator_tile_16x16_i32",
+            "purpose": "matrix output before requant",
+            "size_bytes": 1024,
+            "start": 62400
+          },
+          {
+            "address_hex": "0x0f7c0",
+            "alignment_bytes": 64,
+            "end": 64448,
+            "end_exclusive_hex": "0x0fbc0",
+            "live": [
+              20,
+              40
+            ],
+            "name": "requant_residual_tile_16x16_i32",
+            "purpose": "bounded epilogue scratch",
+            "size_bytes": 1024,
+            "start": 63424
+          },
+          {
+            "address_hex": "0x0fbc0",
+            "alignment_bytes": 64,
+            "end": 64704,
+            "end_exclusive_hex": "0x0fcc0",
+            "live": [
+              20,
+              40
+            ],
+            "name": "position_tile_16x16_i8",
+            "purpose": "position data for current output tile",
+            "size_bytes": 256,
+            "start": 64448
+          },
+          {
+            "address_hex": "0x0fcc0",
+            "alignment_bytes": 16,
+            "end": 64768,
+            "end_exclusive_hex": "0x0fd00",
+            "live": [
+              0,
+              40
+            ],
+            "name": "bias_tile_16_i32",
+            "purpose": "streamed projection bias",
+            "size_bytes": 64,
+            "start": 64704
+          }
+        ],
+        "peak_address_high_water_absolute": "0x1fd00",
+        "peak_address_high_water_exclusive": 64768,
+        "queue": {
+          "cmdq_base_absolute": "0x46000",
+          "cmdq_base_offset": 221184,
+          "cmdq_bytes": 32768,
+          "cmdq_entry_bytes": 64,
+          "cplq_base_absolute": "0x4e000",
+          "cplq_base_offset": 253952,
+          "cplq_bytes": 8192,
+          "cplq_entry_bytes": 16,
+          "entries_each": 512,
+          "total_bytes": 40960
+        },
+        "simultaneous_live_address_collisions": [],
+        "status": "STATIC_SCHEDULE_CHECK_ONLY_NOT_TOP_EXECUTION",
+        "sum_declared_object_bytes": 65536,
+        "words_per_bank": 16384
+      },
+      "G2_one_encoder_layer": {
+        "banks": 4,
+        "capacity_bytes": 262144,
+        "data_arena": {
+          "base": 0,
+          "bytes": 221184,
+          "end_exclusive": 221184
+        },
+        "headroom_before_queues": 33024,
+        "host_base": "0x10000",
+        "host_limit_exclusive": "0x50000",
+        "no_collision_proof": "PASS",
+        "objects": [
+          {
+            "address_hex": "0x00000",
+            "alignment_bytes": 64,
+            "end": 75648,
+            "end_exclusive_hex": "0x12780",
+            "live": [
+              10,
+              120
+            ],
+            "name": "layer_kv_2x197x192_i8",
+            "purpose": "persistent layer K/V",
+            "size_bytes": 75648,
+            "start": 0
+          },
+          {
+            "address_hex": "0x12780",
+            "alignment_bytes": 64,
+            "end": 113472,
+            "end_exclusive_hex": "0x1bb40",
+            "live": [
+              0,
+              100
+            ],
+            "name": "encoder_input_197x192_i8",
+            "purpose": "layer input",
+            "size_bytes": 37824,
+            "start": 75648
+          },
+          {
+            "address_hex": "0x1bb40",
+            "alignment_bytes": 64,
+            "end": 126080,
+            "end_exclusive_hex": "0x1ec80",
+            "live": [
+              30,
+              50
+            ],
+            "name": "attention_score_16x197_i32",
+            "purpose": "one head, full-key query block for global Softmax",
+            "size_bytes": 12608,
+            "start": 113472
+          },
+          {
+            "address_hex": "0x1bb40",
+            "alignment_bytes": 64,
+            "end": 151296,
+            "end_exclusive_hex": "0x24f00",
+            "live": [
+              80,
+              120
+            ],
+            "name": "encoder_output_197x192_i8",
+            "purpose": "layer output handoff",
+            "size_bytes": 37824,
+            "start": 113472
+          },
+          {
+            "address_hex": "0x1ec80",
+            "alignment_bytes": 64,
+            "end": 132384,
+            "end_exclusive_hex": "0x20520",
+            "live": [
+              35,
+              55
+            ],
+            "name": "softmax_probability_16x197_i16",
+            "purpose": "full-key normalized row block",
+            "size_bytes": 6304,
+            "start": 126080
+          },
+          {
+            "address_hex": "0x20540",
+            "alignment_bytes": 64,
+            "end": 135488,
+            "end_exclusive_hex": "0x21140",
+            "live": [
+              20,
+              60
+            ],
+            "name": "query_block_16x192_i8",
+            "purpose": "Q tile",
+            "size_bytes": 3072,
+            "start": 132416
+          },
+          {
+            "address_hex": "0x21140",
+            "alignment_bytes": 64,
+            "end": 138560,
+            "end_exclusive_hex": "0x21d40",
+            "live": [
+              45,
+              75
+            ],
+            "name": "attention_output_block_16x192_i8",
+            "purpose": "AV/attention projection tile",
+            "size_bytes": 3072,
+            "start": 135488
+          },
+          {
+            "address_hex": "0x24f00",
+            "alignment_bytes": 64,
+            "end": 163584,
+            "end_exclusive_hex": "0x27f00",
+            "live": [
+              20,
+              100
+            ],
+            "name": "matrix_accumulator_16x192_i32",
+            "purpose": "bounded GEMM accumulator tile",
+            "size_bytes": 12288,
+            "start": 151296
+          },
+          {
+            "address_hex": "0x27f00",
+            "alignment_bytes": 64,
+            "end": 175872,
+            "end_exclusive_hex": "0x2af00",
+            "live": [
+              20,
+              100
+            ],
+            "name": "streamed_weight_tile_768x16_i8",
+            "purpose": "one streamed weight tile",
+            "size_bytes": 12288,
+            "start": 163584
+          },
+          {
+            "address_hex": "0x2af00",
+            "alignment_bytes": 64,
+            "end": 188160,
+            "end_exclusive_hex": "0x2df00",
+            "live": [
+              70,
+              100
+            ],
+            "name": "ffn_hidden_block_16x768_i8",
+            "purpose": "FFN intermediate tile",
+            "size_bytes": 12288,
+            "start": 175872
+          }
+        ],
+        "peak_address_high_water_absolute": "0x3df00",
+        "peak_address_high_water_exclusive": 188160,
+        "queue": {
+          "cmdq_base_absolute": "0x46000",
+          "cmdq_base_offset": 221184,
+          "cmdq_bytes": 32768,
+          "cmdq_entry_bytes": 64,
+          "cplq_base_absolute": "0x4e000",
+          "cplq_base_offset": 253952,
+          "cplq_bytes": 8192,
+          "cplq_entry_bytes": 16,
+          "entries_each": 512,
+          "total_bytes": 40960
+        },
+        "simultaneous_live_address_collisions": [],
+        "status": "STATIC_SCHEDULE_CHECK_ONLY_NOT_TOP_EXECUTION",
+        "sum_declared_object_bytes": 213216,
+        "words_per_bank": 16384
+      }
+    }
+  },
+  "model": {
+    "array": {
+      "banks": 4,
+      "line_bytes": 16,
+      "macs": 256,
+      "shape": "16x16"
+    },
+    "checkpoint_revision": "b3428f18dcc7b543470d07f14b4a4157815d1880",
+    "checkpoint_sha256": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c",
+    "name": "facebook/deit-tiny-patch16-224",
+    "shape": {
+      "classes": 1000,
+      "ffn": 768,
+      "heads": 3,
+      "hidden": 192,
+      "image": "224x224x3",
+      "layers": 12,
+      "patch": 16,
+      "tokens": 197
+    }
+  },
+  "queue_contract": {
+    "cmdq_bytes": 32768,
+    "cplq_bytes": 8192,
+    "entries": 512,
+    "note": "For 512 entries the real SPAD reservation is 32 KiB CMDQ + 8 KiB CPLQ = 40 KiB.",
+    "total_bytes": 40960
+  },
+  "schedules": {
+    "G1": {
+      "command_count_estimate": 312,
+      "gemm_tiles": 156,
+      "input_bytes_external": 150528,
+      "note": "Input/weights/position are streamed into bounded tiles; no full image/weight tensor is assumed resident.",
+      "output_channel_tiles": 12,
+      "patch_tiles": 13,
+      "patch_weight_bytes_external": 147456,
+      "position_embedding_bytes_external": 37824
+    },
+    "G2": {
+      "all_heads_full_score_matrix_bytes": 465708,
+      "key_tokens_per_softmax_row": 197,
+      "note": "The tiled score buffer keeps all 197 keys for each row before Softmax; per-key-block Softmax concatenation is invalid.",
+      "one_layer_int8_weight_bytes_estimate": 740736,
+      "persistent_kv_bytes_12_layers": 907776,
+      "persistent_kv_bytes_one_layer": 75648,
+      "query_block_tokens": 16,
+      "score_scratch_bytes_per_head_block": 12608,
+      "twelve_layer_weight_bytes_estimate": 8888832
+    }
+  },
+  "status": "STATIC_SCHEDULE_CHECK_ONLY_NOT_TOP_EXECUTION",
+  "twelve_layer_readiness": {
+    "all_layers_kv_spad_residency_bytes": 907776,
+    "fits_256k_alone": false,
+    "requirements": [
+      "external or streamed KV backing",
+      "layer-specific K/V addresses",
+      "layer-wise weight DMA",
+      "per-layer activation lifetime",
+      "Final LN + classifier schedule"
+    ],
+    "status": "PLAN_ONLY; four/layer Top execution is not implied"
+  }
+}

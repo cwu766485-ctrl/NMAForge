@@ -1,0 +1,11 @@
+phase2_branch=feat/phase2-exact-sfu
+phase2_base_merge=cb08797e612355b404f9eb697a34f99628deebfd
+approved_product_rtl_baseline=48790076b351cb9d49e1785247d32a1f51b8286d
+phase1_sha=ae7fd31eced13dcb9dbd70533da60559511d0a90
+tinynpu_source_sha=8216c22b762011aa20c05fc2768423fd12dda59d
+candidate_sfu_sha256=a517e7072b503c7a5a144a69c58ee85475cb42b8d48c183d38b5d6dd7471f4fd
+baseline_sfu_sha256=fd39b0a7eb318f3d20d9231e4516c0176169c5704d864348a040238e70cd97c4
+vcs=V-2023.12-SP1_Full64
+verilator=5.052
+python=/tmp/nmaforge_arch_v2_py312/bin/python (3.12.13)
+clock_model=4ns behavioral registered SRAM; SPAD=128KiB, 4 banks, 8192 words/bank

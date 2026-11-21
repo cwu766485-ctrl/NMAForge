@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "run_id": "V2-CLUSTER-SERIAL-PARALLEL-UVM-3SEED-F19E929",
+  "status": "PASS_SCOPED",
+  "candidate": {
+    "branch": "feature/npu-architecture-v2",
+    "commit": "f19e92934cd6273d327621c43cb17291cf1a9aa5",
+    "tree": "2d931c1c81997b482467d7fdf69302dd367975a1",
+    "product_rtl_commit": "cd0a05d8ecd8cfb6c3f39b559788a2531e324b23",
+    "worktree": "clean detached worktree"
+  },
+  "tool": "Synopsys VCS V-2023.12-SP1_Full64 / URG V-2023.12-SP1",
+  "memory_model": "checked-in behavioral four-bank SPAD; no SRAM macro timing",
+  "measurement_boundary": "doorbell through CPLQ tail advancement; descriptor setup and SPAD preload excluded",
+  "seeds": [20261106, 20261107, 20261108],
+  "matched_workloads": [
+    {
+      "workload": "16x32x64 Matrix + CNM + SFU",
+      "serial_cycles": 1239,
+      "staged_parallel_cycles": 1070,
+      "speedup": 1.158,
+      "cycle_reduction_percent": 13.64,
+      "read_bytes_serial_parallel": [4032, 4032],
+      "write_bytes_serial_parallel": [2416, 2416],
+      "parallel_shared_spad_contention_cycles": 32,
+      "completion_order": ["0700", "0701", "0702"],
+      "result": "Golden PASS"
+    },
+    {
+      "workload": "16x32x64 Matrix + CNM + SFU + SFU",
+      "serial_cycles": 1696,
+      "parallel_cycles": 1137,
+      "speedup": 1.492,
+      "cycle_reduction_percent": 32.96,
+      "read_bytes_serial_parallel": [4352, 4352],
+      "write_bytes_serial_parallel": [2688, 2688],
+      "parallel_shared_spad_contention_cycles": 38,
+      "completion_order": ["0600", "0601", "0602", "0603"],
+      "result": "Golden PASS"
+    }
+  ],
+  "contention_checks_per_seed": {
+    "scenario": "legal real Matrix banked writes and CNM lane requests with disjoint data/output regions",
+    "collision_cycles": 333,
+    "admitted_collisions": 320,
+    "matrix_wait_cycles": 320,
+    "held_payload_checks": 320,
+    "owner_violations": 0,
+    "hold_violations": 0,
+    "matrix_response_count": 768,
+    "cnm_response_count": 1120,
+    "matrix_line_stability_checks": 84,
+    "matrix_line_stability_violations": 0
+  },
+  "scoreboard_per_seed": {
+    "memory_words_checked": 99783,
+    "memory_mismatches": 0,
+    "unknown_reads": 0,
+    "stale_epoch_reads": 0,
+    "accepted_responses": 5015,
+    "checked_responses": 4995,
+    "reset_dropped_responses": 20,
+    "route_data_error_mismatches": 0,
+    "pending_responses": 0,
+    "uvm_warning_error_fatal": "0/0/0"
+  },
+  "coverage": {
+    "merged_urg_line_condition_fsm_branch_assert_group_percent": [70.71, 68.37, 46.17, 67.66, 72.0, 83.94],
+    "interpretation": "full Compute Cluster UVM profile; not v2 coverage closure"
+  },
+  "diagnostic_limits": [
+    "The overlap and arbitration event counters are diagnostics and must not be summed as exclusive state-cycle partitions.",
+    "This run measures matched system task latency under behavioral SPAD only; it is not ASIC timing or a TinyNPU comparison.",
+    "The UVM benchmark does not emit a complete per-command exclusive stall-state timeline; that remains open."
+  ],
+  "artifacts": {
+    "csv": "benchmark/v2_p2_cluster_serial_parallel_f19e929.csv",
+    "uvm_logs_and_urg_archive": "/tmp/nmaforge_v2_gemv_ab_alias_f19e929_logs.tar.gz",
+    "archive_sha256": "18e664689077d9608924af2b9ec08eb912d4979edc9e0cf36b816cbe936447ae"
+  }
+}

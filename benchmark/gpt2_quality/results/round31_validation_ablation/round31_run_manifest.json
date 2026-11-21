@@ -1,0 +1,75 @@
+{
+  "round": 31,
+  "track": "GPT-2",
+  "branch": "research/nmaforge-v1.2-round31-gpt2",
+  "starting_commit": "f055d91af0adccd64959450282db291ec96ac549",
+  "tested_product_top_commit": "c45e307f12d05542f16068aeeb87bd8877176ed6",
+  "run_id": "round31-gpt2-validation-20263101",
+  "seed": 20263101,
+  "environment": {
+    "python": "3.12.13",
+    "numpy": "2.5.4",
+    "torch": "2.6.0+cpu",
+    "vcs_for_reused_top": "V-2023.12-SP1_Full64"
+  },
+  "inputs_sha256": {
+    "corpus": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+    "split_manifest": "78c4a0b3c3f67e693725bcc7e30caedca8d6b24cec7a6c685365c1ff04a6cd00",
+    "source_fp32_checkpoint": "00f73c2eaf14e2c2ea170ae6bdbdbc570d6850bb2f3a77b61f68596e5019cca0",
+    "qat_checkpoint": "ef43f58a66af89669c661d3a4c881451e8fdad7d43cfac636f9e98c1df7a1b56",
+    "product_int8_package": "22ffc2103efd765817599b5ceb4ae3d839956b6523e91f0fa4fec759ab159af2",
+    "validation_starts": "4ef4e4e158d10dd6ae5580b31f18e04522f180dc932a6ba8fd29830f8d36ed89"
+  },
+  "validation": {
+    "windows": 128,
+    "targets_main_ablation": 2048,
+    "per_channel_targets": 128,
+    "range": [
+      780792,
+      948067
+    ],
+    "test_range_not_read": [
+      948101,
+      1115394
+    ]
+  },
+  "commands": {
+    "main_fixed_checkpoint_ablation": "source /tmp/nmaforge_round31_py/bin/activate && python benchmark/gpt2_quality/round31_fixed_checkpoint_ablation.py --corpus benchmark/gpt2_quality/results/round25/corpus/tinyshakespeare.txt --split-manifest benchmark/gpt2_quality/results/round27_extended_train/corpus_split.json --source-checkpoint benchmark/gpt2_quality/results/round27_extended_train/seed_20261221/fp32_before_qat.pt --qat-checkpoint benchmark/gpt2_quality/results/round30_qat_fixed_source/source_20261221_qat_20263032/qat_float.pt --package benchmark/gpt2_quality/results/round30_qat_fixed_source/source_20261221_qat_20263032/product_int8.npz --out-dir benchmark/gpt2_quality/results/round31_validation_ablation --windows 128 --seed 20263101",
+    "per_channel_mshift_ablation": "source /tmp/nmaforge_round31_py/bin/activate && python benchmark/gpt2_quality/round31_per_channel_mshift_ablation.py --corpus benchmark/gpt2_quality/results/round25/corpus/tinyshakespeare.txt --split-manifest benchmark/gpt2_quality/results/round27_extended_train/corpus_split.json --source-checkpoint benchmark/gpt2_quality/results/round27_extended_train/seed_20261221/fp32_before_qat.pt --qat-checkpoint benchmark/gpt2_quality/results/round30_qat_fixed_source/source_20261221_qat_20263032/qat_float.pt --package benchmark/gpt2_quality/results/round30_qat_fixed_source/source_20261221_qat_20263032/product_int8.npz --out benchmark/gpt2_quality/results/round31_validation_ablation/round31_per_channel_mshift.json --windows 128 --seed 20263101"
+  },
+  "results": {
+    "main_json": "round31_validation_ablation.json",
+    "tensor_error_csv": "round31_layer_tensor_error.csv",
+    "per_channel_json": "round31_per_channel_mshift.json",
+    "raw_logs": [
+      "round31_fixed_ablation.stdout.log",
+      "round31_per_channel_mshift.stdout.log"
+    ],
+    "contract_summary_csv": "round31_contract_summary.csv",
+    "per_channel_summary_csv": "round31_per_channel_summary.csv"
+  },
+  "product_top_reuse": {
+    "status": "HISTORICAL_PASS_REUSED_SAME_PACKAGE_HASH_NOT_RERUN_IN_ROUND31",
+    "package_sha256": "22ffc2103efd765817599b5ceb4ae3d839956b6523e91f0fa4fec759ab159af2",
+    "top_run": "benchmark/gpt2_quality/results/round30_product_top_fixed_source/",
+    "prompts": 2,
+    "each_prompt_contexts": 4,
+    "logits_per_context": 256,
+    "golden": "bit-exact",
+    "mode": "one Top session prefix recompute",
+    "limitations": [
+      "no Round31 Product Top rerun; new candidate contracts have no Product RTL mapping",
+      "prefix-recompute, not query-only incremental KV runtime",
+      "synthetic/derived checkpoint functional evidence is not language-quality evidence"
+    ]
+  },
+  "script_sha256": {
+    "round31_fixed_checkpoint_ablation.py": "11ea512a7bea4b5512a94a03cc2067668a71182bceb2ee744d3146a1959f724e",
+    "round31_per_channel_mshift_ablation.py": "797fe20b472f27e24e6c424ebacefead04bb3fec9cd51f3b8bc177757248cd56"
+  },
+  "commands_exit_status": {
+    "main_fixed_checkpoint_ablation": 0,
+    "per_channel_mshift_ablation": 0
+  },
+  "status": "PARTIAL_SOFTWARE_QUALITY_DIAGNOSIS_NO_NEW_PRODUCT_TOP_PASS"
+}

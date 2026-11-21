@@ -26,7 +26,7 @@ CPU -- AXI-Lite --> axi_lite_reg_if --> ai_accel_regs
                 direct/tile/宏子任务
                            │                         │
 DDR <== 128-bit AXI4 ==> ai_axi128_dma <==> ai_spad_arbiter <==> ai_scratchpad
-                                                  │唯一调度入口       │4 bank/512 KiB
+                                                  │唯一调度入口       │4 bank/128 KiB
                                                   ▼                   ▼
                                INT8 / CNM / Matrix / SFU / Conv / KV-cache
 ```
@@ -150,7 +150,7 @@ attention 矩阵乘和 FFN；N=1 VDOT/GEMV 仍优先走 A2。
 
 ## 4. 存储和 DMA
 
-当前 profile 使用四个逻辑 bank、总容量 512 KiB 的 scratchpad，提供 host/debug port、一个
+当前 profile 使用四个逻辑 bank、默认总容量 128 KiB（兼容参数化 512 KiB）的 scratchpad，提供 host/debug port、一个
 arbiter-owned scheduler port，以及 scalar/banked/128-bit line 操作。VCS 使用 `+define+VCS`
 行为 RAM；Vivado 使用 XPM；28 nm DC 使用 32 个真实 4K×32 SRAM macro。
 
@@ -224,7 +224,7 @@ pre-layout 结果见 [TSMC28_SYNTHESIS_REPORT.md](../verification/TSMC28_SYNTHES
 | tile 调度 | `ai_tile_pipeline` | 是，作为命令处理器子模块 | 管理 ping-pong tile 的 load / compute / store 重叠流程。 |
 | DMA | `ai_axi128_dma` | 是 | 128-bit AXI4 主机 DMA；支持 1D、2D、gather、最大 16-beat burst、4 KiB 切分、最多 4 笔 tagged read outstanding。 |
 | 仲裁 | `ai_spad_arbiter` | 是 | scratchpad 的唯一调度入口；descriptor/completion 高优先级，计算/DMA 数据面轮询。 |
-| SRAM | `ai_scratchpad` | 是 | 512 KiB、4 bank SRAM；支持 32-bit 单字、128-bit line、四 lane banked/CNM 读取。 |
+| SRAM | `ai_scratchpad` | 是 | 默认 128 KiB、可选 512 KiB 的 4 bank SRAM；支持 32-bit 单字、128-bit line、四 lane banked/CNM 读取。 |
 | 保护 | `ai_spad_protection` | 是，实例化多次 | 检查 host、compute、line、banked、completion 的地址是否越界或权限冲突。 |
 | 标量 INT8 核 | `ai_int8_compute_core` | 是 | 普通 INT8 VDOT、GEMV、GEMM tile、Conv1x1 等标量/基础计算控制。 |
 | CNM 核 | `ai_banked_cnm_core` | 是 | opcode `0x20/0x21` 的四 bank CNM VDOT/GEMV 顶层。 |

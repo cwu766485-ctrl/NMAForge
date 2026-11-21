@@ -1,0 +1,550 @@
+{
+  "baseline_round14_sha": "a75eb55a08415732ee981ad12f343cbd92ce3ebe",
+  "cache_mutation_campaign": {
+    "cases": [
+      {
+        "first_dependent_golden_mismatch": "desc=34 record=3 word=0 addr=00002000 expected=0815eb06 observed=0815eb07",
+        "head": 0,
+        "injection": "head=0 kind=0 addr=0000e000",
+        "kind": "K",
+        "log": "/tmp/nmaforge_v12_r15_cache_mutations_retry/head0_K.log",
+        "log_bytes": 44348,
+        "log_sha256": "6a80ab3593d45e9fff742cfe05538b66304fd0ee3d6573dbb1186b93a373e261",
+        "status": "PASS",
+        "terminal_pass_observed": false
+      },
+      {
+        "first_dependent_golden_mismatch": "desc=36 record=7 word=0 addr=00002100 expected=a55a03fb observed=a55a03fa",
+        "head": 0,
+        "injection": "head=0 kind=1 addr=0000e400",
+        "kind": "V",
+        "log": "/tmp/nmaforge_v12_r15_cache_mutations_retry/head0_V.log",
+        "log_bytes": 44417,
+        "log_sha256": "431690715d581b4fed3f986383b5c95bf34d98504322846a10f419dd2dfabbd4",
+        "status": "PASS",
+        "terminal_pass_observed": false
+      },
+      {
+        "first_dependent_golden_mismatch": "desc=45 record=4 word=0 addr=00002300 expected=12dbdedd observed=12dbdedc",
+        "head": 1,
+        "injection": "head=1 kind=0 addr=0000e100",
+        "kind": "K",
+        "log": "/tmp/nmaforge_v12_r15_cache_mutations_retry/head1_K.log",
+        "log_bytes": 44628,
+        "log_sha256": "e11cdf4fcbdae089e1be993423db426b6451df78f2257ddae3b1e488c66b8ca9",
+        "status": "PASS",
+        "terminal_pass_observed": false
+      },
+      {
+        "first_dependent_golden_mismatch": "desc=47 record=8 word=0 addr=00002400 expected=a55a0e0e observed=a55a0e0f",
+        "head": 1,
+        "injection": "head=1 kind=1 addr=0000e500",
+        "kind": "V",
+        "log": "/tmp/nmaforge_v12_r15_cache_mutations_retry/head1_V.log",
+        "log_bytes": 44697,
+        "log_sha256": "b37eb81e62debb9a3cbeebc709d86f219f3459e76137278faae7aa694e47aa52",
+        "status": "PASS",
+        "terminal_pass_observed": false
+      },
+      {
+        "first_dependent_golden_mismatch": "desc=56 record=5 word=0 addr=00002500 expected=0f0613f6 observed=0f0613f7",
+        "head": 2,
+        "injection": "head=2 kind=0 addr=0000e200",
+        "kind": "K",
+        "log": "/tmp/nmaforge_v12_r15_cache_mutations_retry/head2_K.log",
+        "log_bytes": 44973,
+        "log_sha256": "4bc88bdcc391aefb881bbb45f09aace3119109bbe61ff272b20d23ab19296179",
+        "status": "PASS",
+        "terminal_pass_observed": false
+      },
+      {
+        "first_dependent_golden_mismatch": "desc=58 record=9 word=0 addr=00002600 expected=a55a2903 observed=a55a2902",
+        "head": 2,
+        "injection": "head=2 kind=1 addr=0000e600",
+        "kind": "V",
+        "log": "/tmp/nmaforge_v12_r15_cache_mutations_retry/head2_V.log",
+        "log_bytes": 45042,
+        "log_sha256": "41b68edbe8be37e7fc6c14e2af9cf1573375e64f79d9ddc0821f235b90d95afc",
+        "status": "PASS",
+        "terminal_pass_observed": false
+      },
+      {
+        "first_dependent_golden_mismatch": "desc=67 record=6 word=0 addr=00002700 expected=0807ecf0 observed=0807ecf1",
+        "head": 3,
+        "injection": "head=3 kind=0 addr=0000e300",
+        "kind": "K",
+        "log": "/tmp/nmaforge_v12_r15_cache_mutations_retry/head3_K.log",
+        "log_bytes": 45253,
+        "log_sha256": "2d09a51b113a2d614545724549c0f61692b66b700137485584e45963626c4dee",
+        "status": "PASS",
+        "terminal_pass_observed": false
+      },
+      {
+        "first_dependent_golden_mismatch": "desc=69 record=10 word=0 addr=00002800 expected=a55a011d observed=a55a011c",
+        "head": 3,
+        "injection": "head=3 kind=1 addr=0000e700",
+        "kind": "V",
+        "log": "/tmp/nmaforge_v12_r15_cache_mutations_retry/head3_V.log",
+        "log_bytes": 45323,
+        "log_sha256": "3ac9f0bbade7911163b799ed3fd6352af918472a97ac5279eec076429e36b298",
+        "status": "PASS",
+        "terminal_pass_observed": false
+      }
+    ],
+    "status": "PASS"
+  },
+  "disposition": "PARTIAL",
+  "environment": {
+    "license_status": "compile and all nominal simulations passed; original connection outage root cause not identified",
+    "numpy": "2.4.6",
+    "python": "3.12.13",
+    "python_executable": "/tmp/nmaforge_round10_venv/bin/python",
+    "seed": 20261116,
+    "vcs": "V-2023.12-SP1_Full64",
+    "vcs_executable": "/usr/local/bin/vcs"
+  },
+  "four_layer_execution_plan": {
+    "layers": 4,
+    "model_quality": "not measured; deterministic synthetic reference weights, not pretrained GPT-2",
+    "naive_high_water_estimate_bytes": 136720,
+    "path": "benchmark/gpt2_compat/results/round15_four_layer_execution_plan.json",
+    "persistent_kv_bytes_context16": 8192,
+    "rtl_execution": "NOT_RUN",
+    "serialized_parameter_bytes": 233280,
+    "sha256": "1af165e8feff761134ba6ef43a3a809d127076b333227f0edade40bdf584a31f",
+    "spad_capacity_bytes": 131072,
+    "status": "STATIC_EXECUTION_PLAN_NOT_RTL_RUN",
+    "weight_streaming": "static proposal; no Product Top DMA plan generated"
+  },
+  "gates": {
+    "G0": "PASS",
+    "G1": "PASS",
+    "G2": "PASS",
+    "G3": "PARTIAL"
+  },
+  "kv_dependency_contract": {
+    "K_bases": [
+      "0xe000",
+      "0xe100",
+      "0xe200",
+      "0xe300"
+    ],
+    "V_bases": [
+      "0xe400",
+      "0xe500",
+      "0xe600",
+      "0xe700"
+    ],
+    "checkpoint_contract": "normal run checks four-head K/V readback, QK, Softmax, AV and downstream tensors",
+    "descriptor_dependencies": {
+      "G1_token1": [
+        {
+          "av": 74,
+          "head": 0,
+          "k_append": 33,
+          "k_read": 34,
+          "qk": 37,
+          "v_append": 35,
+          "v_read": 36
+        },
+        {
+          "av": 79,
+          "head": 1,
+          "k_append": 44,
+          "k_read": 45,
+          "qk": 48,
+          "v_append": 46,
+          "v_read": 47
+        },
+        {
+          "av": 84,
+          "head": 2,
+          "k_append": 55,
+          "k_read": 56,
+          "qk": 59,
+          "v_append": 57,
+          "v_read": 58
+        },
+        {
+          "av": 89,
+          "head": 3,
+          "k_append": 66,
+          "k_read": 67,
+          "qk": 70,
+          "v_append": 68,
+          "v_read": 69
+        }
+      ],
+      "G2_prefill4_token4": [
+        {
+          "av": 86,
+          "head": 0,
+          "k_append": 33,
+          "k_read": 34,
+          "qk": 37,
+          "v_append": 35,
+          "v_read": 36
+        },
+        {
+          "av": 91,
+          "head": 1,
+          "k_append": 47,
+          "k_read": 48,
+          "qk": 51,
+          "v_append": 49,
+          "v_read": 50
+        },
+        {
+          "av": 96,
+          "head": 2,
+          "k_append": 61,
+          "k_read": 62,
+          "qk": 65,
+          "v_append": 63,
+          "v_read": 64
+        },
+        {
+          "av": 101,
+          "head": 3,
+          "k_append": 75,
+          "k_read": 76,
+          "qk": 79,
+          "v_append": 77,
+          "v_read": 78
+        }
+      ],
+      "G2_prefill4_token5": [
+        {
+          "av": 90,
+          "head": 0,
+          "k_append": 33,
+          "k_read": 34,
+          "qk": 37,
+          "v_append": 35,
+          "v_read": 36
+        },
+        {
+          "av": 95,
+          "head": 1,
+          "k_append": 48,
+          "k_read": 49,
+          "qk": 52,
+          "v_append": 50,
+          "v_read": 51
+        },
+        {
+          "av": 100,
+          "head": 2,
+          "k_append": 63,
+          "k_read": 64,
+          "qk": 67,
+          "v_append": 65,
+          "v_read": 66
+        },
+        {
+          "av": 105,
+          "head": 3,
+          "k_append": 78,
+          "k_read": 79,
+          "qk": 82,
+          "v_append": 80,
+          "v_read": 81
+        }
+      ],
+      "G2_token0_to5_token5": [
+        {
+          "av": 90,
+          "head": 0,
+          "k_append": 33,
+          "k_read": 34,
+          "qk": 37,
+          "v_append": 35,
+          "v_read": 36
+        },
+        {
+          "av": 95,
+          "head": 1,
+          "k_append": 48,
+          "k_read": 49,
+          "qk": 52,
+          "v_append": 50,
+          "v_read": 51
+        },
+        {
+          "av": 100,
+          "head": 2,
+          "k_append": 63,
+          "k_read": 64,
+          "qk": 67,
+          "v_append": 65,
+          "v_read": 66
+        },
+        {
+          "av": 105,
+          "head": 3,
+          "k_append": 78,
+          "k_read": 79,
+          "qk": 82,
+          "v_append": 80,
+          "v_read": 81
+        }
+      ]
+    },
+    "initial_cache_word_count": 512,
+    "stage0_expected_post_prefill_kv_image_sha256": "68ae5e953cc10975a8debaf9f46702a8925a0cec242379220e4ba12f1492175a",
+    "stage0_initial_cache_sentinel": "all 512 words in K and V ranges are 0xa55aa55a before Product Top execution",
+    "stage0_initial_memory_sha256": "022776fe43b2e297728dfcc05371a5a11f3948749e09eadec24e3297b7e2a5ca",
+    "stage1_descriptor_file_sha256": "721d897a8c79d2d7764e2e76ac9f3265b335094541c6e1b278e04da6f52404ee",
+    "stage1_host_intermediate_words": 0,
+    "stage1_host_kv_words": 0,
+    "stage1_input_file_sha256": "a28725c3430a13ee756d62dc9fd24160985d706d81406b6b735ff348430afc3b",
+    "stage1_precheck": "512 K/V words read through Top AXI-Lite before stage-1 host inputs are written"
+  },
+  "log_policy": "complete VCS compile/run and mutation logs remain in listed /tmp paths; generated simulator databases are not committed",
+  "product_rtl_changed_in_round15": false,
+  "product_rtl_last_change_sha": "1458a062cf8e5a30ffca940440573694ea28c658",
+  "runs": [
+    {
+      "decode_command_cycle_sum": 353214,
+      "decode_stages": [
+        {
+          "cache_words_checked": 512,
+          "command_cycles": 353214,
+          "cumulative_publications": 394,
+          "descriptor_count": 193,
+          "final_golden_words": 6912,
+          "host_intermediate_words": 0,
+          "mode": "decode_append_with_prefix_recompute",
+          "stage": 1,
+          "tensor_checkpoint_records": 31,
+          "token_positions": [
+            1
+          ],
+          "top_reset_events": 0
+        }
+      ],
+      "decode_tokens": 1,
+      "initial_kv_sentinel_words": {
+        "0xe000": "0xa55aa55a",
+        "0xe100": "0xa55aa55a",
+        "0xe200": "0xa55aa55a",
+        "0xe300": "0xa55aa55a",
+        "0xe400": "0xa55aa55a",
+        "0xe500": "0xa55aa55a",
+        "0xe600": "0xa55aa55a",
+        "0xe700": "0xa55aa55a"
+      },
+      "logs": {
+        "compile.log": {
+          "bytes": 9775,
+          "path": "/tmp/nmaforge_v12_r15_g1_mutation_base/compile.log",
+          "sha256": "97dde4a31b1eb7e6f0bcc9ff722e178e0da4babc4d47e93e08b1f7cf26233585"
+        },
+        "run.log": {
+          "bytes": 47743,
+          "path": "/tmp/nmaforge_v12_r15_g1_mutation_base/run.log",
+          "sha256": "2b51ee4e38e0189f2cbe1a86300eeefb92197d29f5ae138e0ed2d7c35e3b528d"
+        }
+      },
+      "model_sha256": "67a89c411254039bab22a7dffc49c64b69233575368503f544ee9f3ec4ab00fc",
+      "prefill_tokens": 1,
+      "run_id": "G1_two_token",
+      "seed": 20261116,
+      "stage0_command_cycles": 259568,
+      "stage0_descriptors": 201,
+      "stage0_end_to_end_with_preload_cycles": 327400,
+      "stage0_preload_axi_cycles": 53303,
+      "stage0_preloaded_spad_bytes": 84688,
+      "terminal_marker": "H64_PERSISTENT_TWO_TOKEN_PASS total_publications=394 decode_stage_cycles=353214 reset_events=0",
+      "tested_source_sha": "2663a7a1e3f5585fd660195edb785e1ab7711908",
+      "total_descriptor_publications": 394
+    },
+    {
+      "decode_command_cycle_sum": 721002,
+      "decode_stages": [
+        {
+          "cache_words_checked": 512,
+          "command_cycles": 359370,
+          "cumulative_publications": 430,
+          "descriptor_count": 205,
+          "final_golden_words": 6912,
+          "host_intermediate_words": 0,
+          "mode": "decode_append_with_prefix_recompute",
+          "stage": 1,
+          "tensor_checkpoint_records": 31,
+          "token_positions": [
+            4
+          ],
+          "top_reset_events": 0
+        },
+        {
+          "cache_words_checked": 512,
+          "command_cycles": 361632,
+          "cumulative_publications": 639,
+          "descriptor_count": 209,
+          "final_golden_words": 6912,
+          "host_intermediate_words": 0,
+          "mode": "decode_append_with_prefix_recompute",
+          "stage": 2,
+          "tensor_checkpoint_records": 31,
+          "token_positions": [
+            5
+          ],
+          "top_reset_events": 0
+        }
+      ],
+      "decode_tokens": 2,
+      "initial_kv_sentinel_words": {
+        "0xe000": "0xa55aa55a",
+        "0xe100": "0xa55aa55a",
+        "0xe200": "0xa55aa55a",
+        "0xe300": "0xa55aa55a",
+        "0xe400": "0xa55aa55a",
+        "0xe500": "0xa55aa55a",
+        "0xe600": "0xa55aa55a",
+        "0xe700": "0xa55aa55a"
+      },
+      "logs": {
+        "compile.log": {
+          "bytes": 9739,
+          "path": "/tmp/nmaforge_v12_r15_4plus2_final/compile.log",
+          "sha256": "b03fd0aab96e9b7ffba095912263ccddda09cdff2979d82131bd5cbc70dcefb6"
+        },
+        "run.log": {
+          "bytes": 52447,
+          "path": "/tmp/nmaforge_v12_r15_4plus2_final/run.log",
+          "sha256": "d3a1b170ac556fba5faa5f52aae2671b184cbcf20a9db5ea4156dc8c5fd56346"
+        }
+      },
+      "model_sha256": "67a89c411254039bab22a7dffc49c64b69233575368503f544ee9f3ec4ab00fc",
+      "prefill_tokens": 4,
+      "run_id": "G2_prefill4_decode2",
+      "seed": 20261116,
+      "stage0_command_cycles": 263017,
+      "stage0_descriptors": 225,
+      "stage0_end_to_end_with_preload_cycles": 333729,
+      "stage0_preload_axi_cycles": 56183,
+      "stage0_preloaded_spad_bytes": 86608,
+      "terminal_marker": "H64_PERSISTENT_SEQUENCE_PASS appended_stages=2 total_publications=639 decode_stage_cycles=721002 reset_events=0",
+      "tested_source_sha": "2663a7a1e3f5585fd660195edb785e1ab7711908",
+      "total_descriptor_publications": 639
+    },
+    {
+      "decode_command_cycle_sum": 1786548,
+      "decode_stages": [
+        {
+          "cache_words_checked": 512,
+          "command_cycles": 353214,
+          "cumulative_publications": 382,
+          "descriptor_count": 193,
+          "final_golden_words": 6912,
+          "host_intermediate_words": 0,
+          "mode": "decode_append_with_prefix_recompute",
+          "stage": 1,
+          "tensor_checkpoint_records": 31,
+          "token_positions": [
+            1
+          ],
+          "top_reset_events": 0
+        },
+        {
+          "cache_words_checked": 512,
+          "command_cycles": 355134,
+          "cumulative_publications": 579,
+          "descriptor_count": 197,
+          "final_golden_words": 6912,
+          "host_intermediate_words": 0,
+          "mode": "decode_append_with_prefix_recompute",
+          "stage": 2,
+          "tensor_checkpoint_records": 31,
+          "token_positions": [
+            2
+          ],
+          "top_reset_events": 0
+        },
+        {
+          "cache_words_checked": 512,
+          "command_cycles": 357198,
+          "cumulative_publications": 780,
+          "descriptor_count": 201,
+          "final_golden_words": 6912,
+          "host_intermediate_words": 0,
+          "mode": "decode_append_with_prefix_recompute",
+          "stage": 3,
+          "tensor_checkpoint_records": 31,
+          "token_positions": [
+            3
+          ],
+          "top_reset_events": 0
+        },
+        {
+          "cache_words_checked": 512,
+          "command_cycles": 359370,
+          "cumulative_publications": 985,
+          "descriptor_count": 205,
+          "final_golden_words": 6912,
+          "host_intermediate_words": 0,
+          "mode": "decode_append_with_prefix_recompute",
+          "stage": 4,
+          "tensor_checkpoint_records": 31,
+          "token_positions": [
+            4
+          ],
+          "top_reset_events": 0
+        },
+        {
+          "cache_words_checked": 512,
+          "command_cycles": 361632,
+          "cumulative_publications": 1194,
+          "descriptor_count": 209,
+          "final_golden_words": 6912,
+          "host_intermediate_words": 0,
+          "mode": "decode_append_with_prefix_recompute",
+          "stage": 5,
+          "tensor_checkpoint_records": 31,
+          "token_positions": [
+            5
+          ],
+          "top_reset_events": 0
+        }
+      ],
+      "decode_tokens": 5,
+      "initial_kv_sentinel_words": {
+        "0xe000": "0xa55aa55a",
+        "0xe100": "0xa55aa55a",
+        "0xe200": "0xa55aa55a",
+        "0xe300": "0xa55aa55a",
+        "0xe400": "0xa55aa55a",
+        "0xe500": "0xa55aa55a",
+        "0xe600": "0xa55aa55a",
+        "0xe700": "0xa55aa55a"
+      },
+      "logs": {
+        "compile.log": {
+          "bytes": 9721,
+          "path": "/tmp/nmaforge_v12_r15_0to5_final/compile.log",
+          "sha256": "7ac269c1268714cd55aadcde207beb0f799fd8285f72b277103025b92a216c54"
+        },
+        "run.log": {
+          "bytes": 58059,
+          "path": "/tmp/nmaforge_v12_r15_0to5_final/run.log",
+          "sha256": "dd948da8b9f123c82e4956308dff0dc79c21ff3f368dbf694adf19fdf882eeb8"
+        }
+      },
+      "model_sha256": "67a89c411254039bab22a7dffc49c64b69233575368503f544ee9f3ec4ab00fc",
+      "prefill_tokens": 1,
+      "run_id": "G2_token0_to5",
+      "seed": 20261116,
+      "stage0_command_cycles": 258037,
+      "stage0_descriptors": 189,
+      "stage0_end_to_end_with_preload_cycles": 324429,
+      "stage0_preload_axi_cycles": 51863,
+      "stage0_preloaded_spad_bytes": 83728,
+      "terminal_marker": "H64_PERSISTENT_SEQUENCE_PASS appended_stages=5 total_publications=1194 decode_stage_cycles=1786548 reset_events=0",
+      "tested_source_sha": "2663a7a1e3f5585fd660195edb785e1ab7711908",
+      "total_descriptor_publications": 1194
+    }
+  ],
+  "tested_source_sha": "2663a7a1e3f5585fd660195edb785e1ab7711908",
+  "title": "NMAForge v1.2 Round 15 persistent decode evidence"
+}

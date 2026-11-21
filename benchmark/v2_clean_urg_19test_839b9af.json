@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "run_id": "V2-CLEAN-CLUSTER-AND-AXI-DMA-URG-19TEST-839B9AF",
+  "status": "PASS_SELECTED_SCOPE",
+  "source_test_sha": "839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0",
+  "tree_sha": "630e498ba467d84dd5359403cfe1ed1e5879f6e9",
+  "clean_worktree": "/tmp/nmaforge-v2-top-smoke-839b9af",
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "urg": "V-2023.12-SP1"
+  },
+  "test_runs": {
+    "compute_cluster": {
+      "run_id": "V2-CLEAN-CLUSTER-UVM-839B9AF-3SEED",
+      "seeds": [
+        20261128,
+        20261129,
+        20261130
+      ],
+      "passed": 3,
+      "uvm_warning_error_fatal": [
+        0,
+        0,
+        0
+      ],
+      "record": "benchmark/v2_clean_cluster_uvm_839b9af.json"
+    },
+    "mixed_axi_dma_e2e": {
+      "run_id": "V2-MIXED-AXI-DMA-COVERAGE-CLEAN-839B9AF-16SEED",
+      "test": "ai_mixed_precision_ddr_e2e_test",
+      "seeds": [
+        20261109,
+        20261110,
+        20261111,
+        20261112,
+        20261113,
+        20261114,
+        20261115,
+        20261116,
+        20261117,
+        20261118,
+        20261119,
+        20261120,
+        20261121,
+        20261122,
+        20261123,
+        20261124
+      ],
+      "passed": 16,
+      "uvm_warning_error_fatal": [
+        0,
+        0,
+        0
+      ],
+      "log_root": "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed",
+      "command": "VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias VCS_ARCH_OVERRIDE=linux PATH=/tmp/nmaforge_vcs_home_linux_alias/bin:$PATH VCS='/tmp/nmaforge_vcs_home_linux_alias/bin/vcs -licwait 10' make -C /tmp/nmaforge-v2-top-smoke-839b9af/dv/uvm/sim uvm_mixed_precision_ddr_e2e_cov_regress MIXED_E2E_COV_OUT=/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed MIXED_E2E_COV_SEEDS='20261109 20261110 20261111 20261112 20261113 20261114 20261115 20261116 20261117 20261118 20261119 20261120 20261121 20261122 20261123 20261124'"
+    }
+  },
+  "urg_merge": {
+    "test_count": 19,
+    "declared_functional_groups": 36,
+    "functional_group_coverage_percent": 100.0,
+    "functional_group_names": [
+      "ai_accel_env_pkg::ai_accel_scoreboard::dma_error_position_cg",
+      "ai_accel_env_pkg::ai_axi4_coverage::cg",
+      "ai_accel_env_pkg::ai_axil_coverage::cg",
+      "ai_accel_env_pkg::ai_compute_cluster_coverage::cluster_cg",
+      "ai_accel_env_pkg::ai_mixed_precision_e2e_coverage::e2e_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cmdq_invalid_descriptor_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cmdq_product_gemv_ab_alias_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cmdq_product_gemv_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cmdq_product_gemv_cnm_owner_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cmdq_product_gemv_extended_shape_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cmdq_product_gemv_full_tile_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cmdq_product_gemv_long_k_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cmdq_product_gemv_min_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cmdq_product_gemv_tail_cross_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::cnm_protection_matrix_prefix_reset_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::conv_reset_prefix_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::engine_abort_cplq_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::engine_pair_overlap_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::engine_parallel_fault_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::engine_parallel_reset_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::engine_parity_cplq_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::engine_protection_reset_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::engine_watchdog_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::engine_watchdog_cplq_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::fp16_abort_zero_prefix_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::fp_reset_single_write_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::matrix_cnm_prefix_reset_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::matrix_cnm_shared_reset_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::matrix_protection_cnm_reset_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::matrix_protection_reset_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::scalar_reset_prefix_cg",
+      "ai_accel_tests_pkg::ai_compute_cluster_e2e_seq::sfu_reset_prefix_cg",
+      "tb_ai_accel_uvm.axi_mem_u::axi_arready_stall_cg",
+      "tb_ai_accel_uvm.axi_mem_u::axi_awready_stall_cg",
+      "tb_ai_accel_uvm.axi_mem_u::axi_read_response_gap_cg",
+      "tb_ai_accel_uvm.axi_mem_u::axi_write_data_gap_cg"
+    ],
+    "line_percent": 74.15,
+    "condition_percent": 71.55,
+    "fsm_percent": 47.45,
+    "branch_percent": 71.14,
+    "assert_percent": 92.0,
+    "assertions": {
+      "total": 22,
+      "with_success": 20,
+      "uncovered_without_attempts": 2,
+      "failures": 0,
+      "incomplete": 0
+    },
+    "cover_properties": {
+      "total": 3,
+      "all_matched": true,
+      "matches": {
+        "c_ar_stall_then_accept": 161,
+        "c_aw_stall_then_accept": 67,
+        "c_w_stall_then_accept": 126
+      }
+    },
+    "report_root": "/tmp/nmaforge_v2_clean_839b9af_urg_19test/urg_merged",
+    "command": "VCS_HOME=/tmp/nmaforge_vcs_home_linux_alias /tmp/nmaforge_vcs_home_linux_alias/bin/urg -full64 -dir /tmp/nmaforge_v2_clean_839b9af_cluster_3seed/compile.vdb /tmp/nmaforge_v2_clean_839b9af_cluster_3seed/seed_20261128/coverage.vdb /tmp/nmaforge_v2_clean_839b9af_cluster_3seed/seed_20261129/coverage.vdb /tmp/nmaforge_v2_clean_839b9af_cluster_3seed/seed_20261130/coverage.vdb /tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261109/coverage.vdb /tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261110/coverage.vdb /tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261111/coverage.vdb /tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261112/coverage.vdb /tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261113/coverage.vdb /tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261114/coverage.vdb /tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261115/coverage.vdb /tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261116/coverage.vdb /tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261117/coverage.vdb /tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261118/coverage.vdb /tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261119/coverage.vdb /tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261120/coverage.vdb /tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261121/coverage.vdb /tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261122/coverage.vdb /tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261123/coverage.vdb /tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261124/coverage.vdb -format text -report /tmp/nmaforge_v2_clean_839b9af_urg_19test/urg_merged -log /tmp/nmaforge_v2_clean_839b9af_urg_19test/urg_merged.log",
+    "compile_database": "/tmp/nmaforge_v2_clean_839b9af_cluster_3seed/compile.vdb",
+    "input_vdbs": [
+      "/tmp/nmaforge_v2_clean_839b9af_cluster_3seed/seed_20261128/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_cluster_3seed/seed_20261129/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_cluster_3seed/seed_20261130/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261109/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261110/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261111/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261112/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261113/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261114/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261115/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261116/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261117/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261118/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261119/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261120/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261121/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261122/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261123/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261124/coverage.vdb"
+    ],
+    "working_directory": "/tmp/nmaforge-architecture-v2",
+    "argv": [
+      "/tmp/nmaforge_vcs_home_linux_alias/bin/urg",
+      "-full64",
+      "-dir",
+      "/tmp/nmaforge_v2_clean_839b9af_cluster_3seed/compile.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_cluster_3seed/seed_20261128/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_cluster_3seed/seed_20261129/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_cluster_3seed/seed_20261130/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261109/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261110/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261111/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261112/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261113/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261114/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261115/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261116/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261117/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261118/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261119/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261120/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261121/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261122/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261123/coverage.vdb",
+      "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed/seed_20261124/coverage.vdb",
+      "-format",
+      "text",
+      "-report",
+      "/tmp/nmaforge_v2_clean_839b9af_urg_19test/urg_merged",
+      "-log",
+      "/tmp/nmaforge_v2_clean_839b9af_urg_19test/urg_merged.log"
+    ]
+  },
+  "archives": {
+    "combined_urg_text": {
+      "path": "/tmp/nmaforge_v2_clean_839b9af_urg_19test_text.tar.gz",
+      "sha256": "6a4ef4e3fd25cf4ec18baee37cfd43c4374a109a2b9c35ff40c07c0435f1e9b6"
+    },
+    "mixed_16seed_text": {
+      "path": "/tmp/nmaforge_v2_clean_839b9af_mixcov_16seed_text.tar.gz",
+      "sha256": "1ded9f9b381b8dbaa3916df6ba1f1cb494dd1cfa0e437c206593348a75c788db"
+    }
+  },
+  "scope_note": "All 36 declared functional groups in this 19-test URG plan hit their bins, and all three AXI AR/AW/W stall-to-accept cover properties match. This is not 100% RTL code/FSM coverage or complete v2 requirement closure. The v2 RTM remains 14 PASS-scoped / 8 PARTIAL; two UVM RAL assertions have no attempts.",
+  "open_issues": [
+    "Legal 0x52/0x53 descriptor and fault-phase-reset spaces are not exhaustive.",
+    "External fabric held/late responses and all engine-pair ownership combinations remain open.",
+    "Residual RTL code/FSM bins require reachability/disposition; no illegal state injection or waiver was used.",
+    "Overall v2 sign-off and v1.0 Compute Cluster sign-off remain open/HOLD."
+  ]
+}

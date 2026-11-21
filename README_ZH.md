@@ -13,7 +13,7 @@ NMAForge 是一个可综合的、全数字近存张量加速器 IP。它**不是
 ## 核心架构
 
 - 32-bit AXI4-Lite 控制面，128-bit AXI4 数据主口。
-- 512 KiB、四 bank scratchpad；`ai_spad_arbiter` 是唯一仲裁入口，控制面优先。
+- 默认 128 KiB、可选参数化 512 KiB 的四 bank scratchpad；`ai_spad_arbiter` 是唯一仲裁入口，控制面优先。
 - CMDQ/CPLQ、片上/外部 descriptor、依赖 event、四 word 原子 completion、状态和 IRQ。
 - DDR↔scratchpad DMA：1D、2D stride、gather、4 KiB 拆分、最多四笔 tagged read、
   RID/BID 响应归因、窄传输对齐和 abort drain。
