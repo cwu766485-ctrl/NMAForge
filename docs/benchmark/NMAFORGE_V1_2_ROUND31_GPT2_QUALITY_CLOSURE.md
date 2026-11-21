@@ -2,7 +2,7 @@
 
 ## Disposition
 
-**PARTIAL.** The fixed Round 30 checkpoint and Product INT8 package were evaluated on a fixed validation window set. The aligned software integer path improves on the old frozen contract, but remains below the same-window Bigram baseline. A per-channel Q31 multiplier/shift candidate also fails to beat the scalar contract. No evidence justifies a Product RTL Requant change or another QAT round in this branch. The exact package hash has prior four-layer Product Top autoregressive Golden evidence; Round 31 did not rerun VCS because no package or RTL changed. The independent test range was not read.
+**PARTIAL.** The fixed Round 30 checkpoint and Product INT8 package were evaluated on a fixed validation window set. The aligned software integer path improves on the old frozen contract, but remains below the same-window Bigram baseline. A per-channel Q31 multiplier/shift candidate also fails to beat the scalar contract. A bounded three-seed QAT retraining follow-up was then run from the fixed FP32 checkpoint. Its validation-selected package remained below Bigram, and its Product Top attempt was blocked before compilation by VCS license-server connectivity. No evidence justifies a Product RTL Requant change. The exact prior package hash retains historical four-layer Product Top evidence; that is distinct from the new package attempt. The final test was evaluated post-validation-selection for all three QAT candidates, so it is not a pristine future confirmation set.
 
 ## Frozen inputs and run
 
@@ -16,7 +16,7 @@
 | QAT checkpoint SHA-256 | `ef43f58a66af89669c661d3a4c881451e8fdad7d43cfac636f9e98c1df7a1b56` |
 | Existing Product INT8 package SHA-256 | `22ffc2103efd765817599b5ceb4ae3d839956b6523e91f0fa4fec759ab159af2` |
 | Validation | 128 windows, 2,048 next-byte targets; context 16; validation range `[780792, 948067]` |
-| Final test | Range `[948101, 1115394]`; **not read** |
+| Final test for fixed-checkpoint ablation | Range `[948101, 1115394]`; not read in that ablation |
 | Software | Python 3.12.13, NumPy 2.5.4, PyTorch 2.6.0+cpu |
 
 The main ablation uses the same fixed checkpoint, corpus, split manifest, and package across all contracts. It is a validation-only software diagnosis, not a retraining result. The per-channel experiment evaluates only the final position of each of the same 128 validation windows (128 targets), so its absolute metrics must not be compared directly to the 2,048-target main run.
@@ -93,16 +93,46 @@ python benchmark/gpt2_quality/round31_per_channel_mshift_ablation.py \
 
 Both Round 31 commands exited 0. Exact stdout logs, machine-readable JSON/CSV, checkpoint/package references, and hashes are in `benchmark/gpt2_quality/results/round31_validation_ablation/`; see `round31_run_manifest.json` and `SHA256SUMS`.
 
+## Bounded multi-seed QAT retraining follow-up
+
+To address the Round 31 request for contract-aligned QAT, the same source checkpoint, corpus, split manifest, context, training settings, and Product Integer Forward were used for three QAT seeds. The validation set selected seed `20263113` by Product-INT validation accuracy (CE tie-break). The held-out test was evaluated only after that validation selection, but all three candidate test results were inspected and therefore the test must not be described as untouched in later selection work.
+
+| Split / model | Accuracy mean ± population SD | CE mean ± population SD | PPL mean ± population SD |
+|---|---:|---:|---:|
+| Validation QAT Float | 35.303% ± 0.000 pp | 2.2388 ± 0.0011 | 9.382 ± 0.010 |
+| Validation Product INT8 | 21.452% ± 0.180 pp | 3.2839 ± 0.0201 | 26.684 ± 0.539 |
+| Validation Bigram | 26.660% | 2.5372 | 12.644 |
+| Post-selection test QAT Float | 35.347% ± 0.064 pp | 2.2262 ± 0.0009 | 9.264 ± 0.009 |
+| Post-selection test Product INT8 | 20.626% ± 0.089 pp | 3.2741 ± 0.0143 | 26.422 ± 0.377 |
+| Post-selection test Bigram | 26.514% | 2.5198 | 12.426 |
+
+The selected seed's validation Product INT8 accuracy is `21.6797%`, below the earlier fixed-checkpoint aligned candidate's `22.1191%` on the same 2,048-target validation set. Its post-selection test score is `20.75195%`, while Bigram is `26.51367%`; this is a post-hoc diagnostic, not a clean final model-quality confirmation. Fake Quant and Independent INT traces match at all 56 recorded nodes across 8 sampled windows, but this only confirms the tested software contract trace.
+
+The selected package SHA-256 is `d9ff47c56a4ddc335a34d601d2083cfa2967d179b6aa617fdb25e484a9af3bb4`; its QAT checkpoint SHA-256 is `a5e42d806859bd702194054b053cd5a3a1e48004c053f67012ed6f4470d8f5c7`. Workload preparation generated four-layer per-token descriptor counts `[225, 225, 225, 258]` for the initial prompt and later plans for feedback tokens. Planner status explicitly remains `PLANNER_READY_REQUIRES_PRODUCT_TOP_AUTOREGRESSIVE_PASS`; it is not RTL evidence.
+
+The selected package was submitted to the existing Top flow using VCS `V-2023.12-SP1_Full64` and `-licwait 1`. VCS reported `Cannot connect to the license server`, queued for the VCS-BASE-COMPILE/VCSCompiler_Net feature, and was manually interrupted after the bounded wait. `make` exited `130`; no compile or simulation began and there are no RTL logits. Gate status for this new package is **BLOCKED_ENV**, not PASS. The original make/compiler logs are archived losslessly as gzip files (`top_attempt/make.stdout.log.gz`, `top_attempt/compile.log.gz`), alongside the generated four-layer workload manifest, planner output, and SPAD allocation.
+
+Retraining command and settings:
+
+```bash
+python benchmark/gpt2_quality/round30_fixed_checkpoint_qat.py
+# fixed source seed 20261221; QAT seeds 20263111, 20263112, 20263113
+# 200 steps/seed, batch 8, learning rate 1e-5, validation 128 windows,
+# post-selection test 512 windows, trace 8 windows
+python benchmark/gpt2_quality/summarize_round31_qat_retrain.py \
+  --results benchmark/gpt2_quality/results/round31_qat_retrain
+```
+
 ## Gate status
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Fixed checkpoint / data / contract | PASS | Hashes and split recorded; test range not read |
-| Layer-wise software error and contract A/B | PARTIAL | Tensor table and two software A/B runs; no multi-seed retraining |
+| Fixed checkpoint / data / contract | PASS | Hashes and split recorded; fixed-checkpoint ablation did not read test |
+| Layer-wise software error and contract A/B | PARTIAL | Tensor table, software A/B and three-seed QAT; test later inspected post-selection |
 | Candidate multiplier/shift quality | FAIL for selection | Does not beat scalar accuracy or Bigram; software only |
 | Existing selected package four-layer Top function | PASS (historical evidence reused) | Exact same package hash; two prompt runs archived under Round 30 |
-| New package Product Top qualification | NOT RUN | No new package selected/generated |
-| Model quality closure | FAIL / OPEN | Current aligned integer result is below Bigram on validation; final test untouched |
+| New package Product Top qualification | BLOCKED_ENV | Selected package prepared; VCS license server unreachable before compilation |
+| Model quality closure | FAIL / OPEN | Selected candidate below Bigram on validation and post-selection test |
 | RTL Requant extension | NOT PROPOSED for implementation | Software evidence does not show a quality benefit |
 
 ## Evidence files
@@ -115,3 +145,11 @@ Both Round 31 commands exited 0. Exact stdout logs, machine-readable JSON/CSV, c
 - `benchmark/gpt2_quality/results/round31_validation_ablation/round31_contract_summary.csv`
 - `benchmark/gpt2_quality/results/round31_validation_ablation/round31_per_channel_summary.csv`
 - `benchmark/gpt2_quality/results/round30_product_top_fixed_source/`
+- `benchmark/gpt2_quality/summarize_round31_qat_retrain.py`
+- `benchmark/gpt2_quality/results/round31_qat_retrain/round31_qat_seed_summary.csv`
+- `benchmark/gpt2_quality/results/round31_qat_retrain/round31_qat_seed_summary.json`
+- `benchmark/gpt2_quality/results/round31_qat_retrain/SHA256SUMS` (25 archived files; verified with `sha256sum -c`)
+- `benchmark/gpt2_quality/results/round31_qat_retrain/round31_qat_retrain.stdout.log.gz`
+- `benchmark/gpt2_quality/results/round31_qat_retrain/fixed_validation_ablation.stdout.log.gz`
+- `benchmark/gpt2_quality/results/round31_qat_retrain/top_attempt/compile.log.gz` and `make.stdout.log.gz`
+- `benchmark/gpt2_quality/results/round31_qat_retrain/top_attempt/`
