@@ -81,9 +81,9 @@ Classification totals: **10 research archives**, **5 recommended for selective r
 
 ## Review PRs and next checkpoint
 
-The integration branch has been pushed without force. GitHub confirms both review PRs are open, unmerged, and currently mergeable:
+The integration branch has been pushed without force. GitHub confirms both review PRs are open and unmerged (the API reported them mergeable when checked):
 
-1. [PR #11](https://github.com/cwu766485-ctrl/NMAForge/pull/11): `integration/branch-cleanup-20261121` → `research/nmaforge-v1.2-round31-gpt2` (`21` commits; `314` changed files). Review this focused research-line integration first.
-2. [PR #12](https://github.com/cwu766485-ctrl/NMAForge/pull/12): `integration/branch-cleanup-20261121` → `main` (`330` commits; `3,478` changed files; `4,929,305` insertions and `1,255` deletions). This is the accumulated history relative to the older `main` baseline and needs broader review.
+1. [PR #11](https://github.com/cwu766485-ctrl/NMAForge/pull/11): `integration/branch-cleanup-20261121` → `research/nmaforge-v1.2-round31-gpt2` (`22` commits; `314` changed files). Review this focused research-line integration first.
+2. [PR #12](https://github.com/cwu766485-ctrl/NMAForge/pull/12): `integration/branch-cleanup-20261121` → `main` (`331` commits; `3,478` changed files; `4,929,305` insertions and `1,255` deletions). This is the accumulated history relative to the older `main` baseline and needs broader review.
 
-Both PRs point at head `e5b4a20833634c2c404a575db402b0d22cc4a898`. Neither PR was merged. No archive tags were created and no remote/local branches were deleted. The later cleanup stage should wait for review and user direction on the 5 D-group selective-retrieval candidates, the B/C archive set, and the unpushed local branches noted above. This report makes no claim of full GPT-2/DeiT model closure or VCS regression PASS.
+Both PRs point at head `49c07cdd553bae07ae795328b36d18c32b1563bc`. Neither PR was merged. No archive tags were created and no remote/local branches were deleted. The later cleanup stage should wait for review and user direction on the 5 D-group selective-retrieval candidates, the B/C archive set, and the unpushed local branches noted above. This report makes no claim of full GPT-2/DeiT model closure or VCS regression PASS.
