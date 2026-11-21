@@ -1,0 +1,89 @@
+{
+  "baseline_head_before_round23": "e64ead0b37c8774e3d73a55a650e770d70839e99",
+  "compile": {
+    "errors": 0,
+    "exit_code": 0,
+    "log_sha256_gzip": "9ce9915894fc636eb35f0cc945f7172d07162605a5cf9623360ee8a736fae640",
+    "note": "VCS printed the non-error LOOP-REROLL-ENABLED optimization notice; final KDB summary reports 0 errors / 0 warnings.",
+    "source_modules": 32,
+    "summary_warnings": 0
+  },
+  "embedding_prior_product_top": {
+    "boundary": "separate earlier Product Top simulation; hardware readback seeded this run",
+    "embedding_words_verified": 9984,
+    "expected_golden_sha256": "7c7e15693e3ca6654d78e93cb64fd5a63a8c81ca871012c2c71fceaf223597a3",
+    "readback_log_sha256": "1e5e52eca57043f2bf7145ac7a6fbbf29fe118f1035425415f50075d9890ec56",
+    "valid_patches": 196
+  },
+  "gates": {
+    "encoder_layer_0": "NOT_RUN",
+    "full_valid_197_row_layernorm": "PASS",
+    "one_16_query_x_197_key_three_head_attention": "NOT_RUN",
+    "packed_197x192_golden": "PASS",
+    "padding_descriptor_fix": "PASS",
+    "qkv_projection_query_rows_0_15": "PASS"
+  },
+  "limitations": [
+    "The workload executes LN for all 197 valid tokens and Q/K/V projection only for query rows 0..15.",
+    "No QK, Softmax, AV, output projection, residual, LN2, FFN, or complete Encoder Layer 0 was executed.",
+    "The 197-key Softmax-only result from Round 18 is an isolated historical Product Top test and is not evidence of QK-to-Softmax-to-AV integration."
+  ],
+  "model": {
+    "checkpoint": "facebook/deit-tiny-patch16-224 non-distilled",
+    "checkpoint_hashes": {
+      "config.json": "e8786a68c993c04b8721c4d379e4f9de6a9564fba5987704dbf8696d53b7972d",
+      "preprocessor_config.json": "90d1ae427c27d2b9dcb01f6a62ba96aa67aac2de1697c59cd212055b5035c4a2",
+      "pytorch_model.bin": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c"
+    },
+    "classification_quality": "not measured in this Round 23 run; no classification claim"
+  },
+  "product_rtl_modified": false,
+  "repository_branch": "research/nmaforge-v1.2-round23-deit",
+  "run": {
+    "attention_qk_softmax_av": false,
+    "command_cycles": 967036,
+    "descriptor_count": 246,
+    "dma_payload_bytes": 116736,
+    "end_to_end_cycles_including_late_dma_and_readback": 1443824,
+    "exit_code": 0,
+    "explicit_zero_pad_rows": 3,
+    "golden_mismatches": 0,
+    "golden_words_checked": 18816,
+    "initial_spad_memory_image_preload_included": false,
+    "invalid_padding_layernorm_descriptors": 0,
+    "late_dma_activity_included": true,
+    "late_dma_events": 149,
+    "late_dma_payload_bytes": 116736,
+    "matrix_mac_cycles": 6912,
+    "output_readback_included": true,
+    "packed_physical_rows": 200,
+    "qkv_gemm_tiles": 36,
+    "qkv_hidden_channels": 192,
+    "qkv_query_rows": 16,
+    "run_log_sha256_gzip": "458ba38d90e7d1e0ae9c79eee4eddfa8598b8040772584b5aba1d60fde84ac36",
+    "sfu_busy_cycles": 883657,
+    "spad_read_bytes": 1133568,
+    "spad_write_bytes": 226560,
+    "test_only_poison_setup_bytes": 107328,
+    "timing_boundary": "Product Top command session plus late-DMA activity/readback; initial SPAD image preload and prior embedding Top session excluded",
+    "top_instance": "Product Top, one simulation for LN/pack/QKV; input embedding is an earlier Product Top SPAD readback",
+    "useful_macs": 1769472,
+    "valid_layernorm_rows": 197
+  },
+  "run_id": "round23-deit-ln197-pack-qkv-q0-15-seed20261117-final",
+  "seed": 20261117,
+  "status": "PARTIAL_PRODUCT_TOP_PASS_LN197_PACK_AND_QKV_Q0_15; ATTENTION_NOT_RUN",
+  "tested_generator_sha256": "4af10c13833271e7b6e33bd43005269132af350cd868dbe642044bb0437a3efb",
+  "tools": {
+    "numpy": "2.5.4",
+    "python": "3.12 (nmaforge_deit_round17_venv)",
+    "torch": "2.6 CPU",
+    "vcs": "V-2023.12-SP1_Full64"
+  },
+  "workload_sha256": {
+    "dma_payload.memh": "0eb809cb8a2166e98a11b5a08403a14af964490adbc6b707e70a84530166572d",
+    "late_dma_plan.memh": "83c0c1d009b2c4e2b82b8a0288794b1b2fb6047c22f3b773c4433fccecaefbc3",
+    "model_golden.memh": "0f25139b6eb9728ad7a31a00a9711a5e9582550680cbc1a76626a1e5ff8993e6",
+    "model_memory.memh": "54a1db04020b01d620ebc363e41aff62bb057d8bbaa71fc5d8b9ae549e80bdf5"
+  }
+}

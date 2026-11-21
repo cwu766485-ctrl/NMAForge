@@ -262,6 +262,37 @@ module tb_ai_descriptor_validator;
         k_words=16'd4; aux0=32'h20; batch_count=16'd2;
         check_invalid("0x53 capture rejects multiple batches");
 
+        // Full DeiT repack uses a 4x4 Matrix-A tiled source. Its physical
+        // source span is M*N*4 bytes, not the dense M*N-byte tensor size.
+        set_legal_defaults(8'h3b); version=8'd7; m_size=16'd208;
+        n_size=16'd192; length=16'd197; src0=32'h0000_2000;
+        src1=32'd0; k_words=16'd0; dst=32'h0003_0000; dst_stride=32'd208;
+        check_boundary_accept("0x3b full 208x192 physical Matrix-A span");
+        set_legal_defaults(8'h3b); version=8'd7; m_size=16'd208;
+        n_size=16'd192; length=16'd197; src0=32'h0000_2000;
+        src1=32'd0; k_words=16'd0; dst=32'h0000_d000; dst_stride=32'd208;
+        check_invalid("0x3b rejects alias inside sparse physical source span");
+        set_legal_defaults(8'h3b); version=8'd7; m_size=16'd208;
+        n_size=16'd192; length=16'd197; src0=32'h0000_2000;
+        src1=32'd0; k_words=16'd0; dst=32'h0003_0000; dst_stride=32'd208;
+        aux0=32'h10;
+        check_boundary_accept("0x3b accepts compact packed Matrix-A source span");
+        set_legal_defaults(8'h3b); version=8'd7; m_size=16'd208;
+        n_size=16'd192; length=16'd197; src0=32'h0000_2000;
+        src1=32'd0; k_words=16'd0; dst=32'h0000_d000; dst_stride=32'd208;
+        aux0=32'h10;
+        check_boundary_accept("0x3b compact source allows destination beyond compact span");
+        set_legal_defaults(8'h3b); version=8'd7; m_size=16'd208;
+        n_size=16'd192; length=16'd197; src0=32'h0000_2000;
+        src1=32'd0; k_words=16'd0; dst=32'h0000_6000; dst_stride=32'd208;
+        aux0=32'h10;
+        check_invalid("0x3b compact source rejects destination alias");
+        set_legal_defaults(8'h3b); version=8'd7; m_size=16'd208;
+        n_size=16'd192; length=16'd197; src0=32'h0000_2000;
+        src1=32'd0; k_words=16'd0; dst=32'h0003_0000; dst_stride=32'd208;
+        aux0=32'h20;
+        check_invalid("0x3b rejects reserved aux0 bit 5");
+
         // Characterize validator dimension edges. These are validator-only
         // checks: accepting a 16-bit maximum does not claim that the selected
         // engine, address range, or complete memory image supports that size.
@@ -337,11 +368,11 @@ module tb_ai_descriptor_validator;
             $fatal(1, "Matrix A tile-pack accepted a non-matching M*N length");
         boundary_reject_checks = boundary_reject_checks + 1;
 
-        if (legal_opcode_checks != 30 || invalid_rule_checks != 37 ||
-            boundary_accept_checks != 44 || boundary_reject_checks != 26)
-            $fatal(1, "testpoint count mismatch legal=%0d invalid=%0d boundary_accept=%0d boundary_reject=%0d expected=30/37/44/26",
+        if (legal_opcode_checks != 30 || invalid_rule_checks != 40 ||
+            boundary_accept_checks != 47 || boundary_reject_checks != 26)
+            $fatal(1, "testpoint count mismatch legal=%0d invalid=%0d boundary_accept=%0d boundary_reject=%0d expected=30/40/47/26",
                    legal_opcode_checks, invalid_rule_checks, boundary_accept_checks, boundary_reject_checks);
-        $display("DESCRIPTOR_VALIDATOR_PASS legal_opcodes=29 tile_pack=1 invalid_rules=37 boundary_accept=44/44 boundary_reject=26/26 tile_forward_accept=3/3 legacy_aux_compat=1 opcode_classes_consistent=1 engine_limit_claim=0");
+        $display("DESCRIPTOR_VALIDATOR_PASS legal_opcodes=29 tile_pack=1 invalid_rules=40 boundary_accept=47/47 boundary_reject=26/26 tile_forward_accept=3/3 repack_physical_span=1 repack_compact_span=1 legacy_aux_compat=1 opcode_classes_consistent=1 engine_limit_claim=0");
         $finish;
     end
 endmodule

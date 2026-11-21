@@ -1,0 +1,10 @@
+vcs script version : V-2023.12
+machine name = LAPTOP-KNBVGAN8
+machine type = linux64
+machine os = Linux 6.6.87.2-microsoft-standard-WSL2
+The FLEXlm host ID of this machine is "08b4d22dca08 00ff9ed940a2 00155d408cf4 00ff35219527"
+Compiler version = VCS V-2023.12-SP1_Full64
+VCS Build Date = Mar 04 2024 20:18:51
+If you need to renew your license, please email this information to your
+Account Manager. To obtain contact information for your Account Manager
+please email pass@synopsys.com

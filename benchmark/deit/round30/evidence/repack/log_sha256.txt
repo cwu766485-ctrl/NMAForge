@@ -1,0 +1,2 @@
+3bda3ae7a024b1905b5742bb963fd235450d6709b0d0c374645bd113cb6eb5ab  round30-repack-directed_compile.log.gz
+63c3a38d22c63893593072ebd08e70d33ebb5fda830c2c413c335ffda7b30abf  vcs_version.txt

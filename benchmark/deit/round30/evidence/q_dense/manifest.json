@@ -1,0 +1,89 @@
+{
+  "run_kind": "round30_full_shape_0x3b_product_top_repack_only",
+  "status": "GENERATED_SOFTWARE_ORACLE_ONLY_AWAITING_VCS",
+  "opcode": "0x3b",
+  "layout": "q_dense",
+  "mode": 0,
+  "spad_bytes": 262144,
+  "m_size_padded": 208,
+  "valid_rows": 197,
+  "n_size_total": 192,
+  "heads": 3,
+  "head_dim": 64,
+  "source_base": 8192,
+  "source_physical_span_bytes": 159744,
+  "source_end_exclusive": 167936,
+  "destination_allocations": [
+    {
+      "head": 0,
+      "base": 167936,
+      "end_exclusive": 181248,
+      "bytes": 13312,
+      "layout": "q_dense"
+    },
+    {
+      "head": 1,
+      "base": 184320,
+      "end_exclusive": 197632,
+      "bytes": 13312,
+      "layout": "q_dense"
+    },
+    {
+      "head": 2,
+      "base": 200704,
+      "end_exclusive": 214016,
+      "bytes": 13312,
+      "layout": "q_dense"
+    }
+  ],
+  "descriptor_base": 241664,
+  "completion_base": 241920,
+  "descriptor_count": 3,
+  "queue_size": 16,
+  "allocation_map": [
+    [
+      8192,
+      167936,
+      "source"
+    ],
+    [
+      167936,
+      181248,
+      "head0"
+    ],
+    [
+      184320,
+      197632,
+      "head1"
+    ],
+    [
+      200704,
+      214016,
+      "head2"
+    ],
+    [
+      241664,
+      241856,
+      "cmdq"
+    ],
+    [
+      241920,
+      241968,
+      "cplq"
+    ]
+  ],
+  "image_word_count": 49980,
+  "golden_word_count": 9984,
+  "matrix_a_source_words": 9456,
+  "physical_padding_source_is_poison": true,
+  "output_padding_rows_zero": true,
+  "v_panel_holes_remain_poison": false,
+  "host_role": "load fixture and publish descriptors only; no intermediate model tensor repacking",
+  "scope_limit": "does_not_test_QKV_producer_or_attention_consumer_integration",
+  "model_input_formula": "signed_int8((row*37 + col*19 + row*col*3) % 251 - 125)",
+  "golden_method": "independent logical tensor plus physical Matrix-A address/byte-lane decode cross-check",
+  "files": {
+    "model_memory.memh_sha256": "74abad109454ac56ac663f49d7383ef6a43020aea96aba5bdc9282a03a19ae9e",
+    "model_golden.memh_sha256": "b5c7febb555ef88d038ba5b442ac66f0e94171199887abc2f9501a0c352291f3"
+  }
+}

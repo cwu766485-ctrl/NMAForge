@@ -1,0 +1,32 @@
+{
+  "artifacts": {
+    "golden_sha256": "347cbb9042a6fec6b423fec8c2f2a930724fd3fc04d5f4c68af56850fd092046",
+    "memory_sha256": "2ae7fa27a1219c989528b25a38a7f41677e9802b5677cfe89af1ca322f3838be"
+  },
+  "descriptors": 245,
+  "head": 0,
+  "head_dim": 64,
+  "physical_keys": 208,
+  "projection_golden_sha256": "0e80b814562772cee306f2b10a368e97920e035aa78e5524c6a432b0cb0655ce",
+  "projection_kv_dump_sha256": "bed71fd5de5f346c796b96169baa16fdbd812f22634eab512090c4b6410df8fa",
+  "projection_q_dump_sha256": "a80f2d1151cd580005a127296f10264ad4b9c1db7859324b876916e7531a3b1c",
+  "query_rows": 16,
+  "softmax": {
+    "domain": "Q8.8 log2",
+    "length_per_query": 197,
+    "opcode": "0x32",
+    "padding_in_denominator": false,
+    "score_right_shift": 5
+  },
+  "spad": {
+    "allocation_high_water": 181248,
+    "capacity_bytes": 262144,
+    "completion_base": 253952,
+    "descriptor_base": 221184,
+    "host_data_movement": "Q/K/V are prior Product Top readbacks; host only converts Matrix-A tiles into dense Q and Matrix-B panels; no QK/Softmax/AV values are host-filled",
+    "queue_entries": 512
+  },
+  "status": "DEIT_PRODUCT_ATTENTION_QBLOCK_WORKLOAD",
+  "useful_macs": 605184,
+  "valid_keys": 197
+}

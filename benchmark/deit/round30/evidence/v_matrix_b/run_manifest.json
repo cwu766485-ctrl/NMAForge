@@ -1,0 +1,46 @@
+{
+  "run_id": "NMAForge-V1.2-R30-DeiT-Repack-v_matrix_b",
+  "status": "PRODUCT_TOP_REPACK_ONLY_PASS",
+  "make_exit_status": 0,
+  "make_command": "make -C dv/subsystem/top_smoke/sim ai_deit_round30_top_repack_256k AI_DEIT_R30_LAYOUT=v_matrix_b AI_DEIT_R30_RUN=/tmp/nmaforge_round30_deit_v_matrix_b",
+  "cwd": "repository root (Makefile changes directory to top_smoke sim)",
+  "source_commit_before_evidence_commit": "70a5296d07e0ac3287bb73297cc5632e205a215a",
+  "rtl_change": "opcode 0x3b source protection span now covers full sparse 4x4 Matrix-A physical tile space; no datapath change",
+  "simulator": "Synopsys VCS V-2023.12-SP1_Full64",
+  "seed": 300029,
+  "spad_bytes": 262144,
+  "layout": "v_matrix_b",
+  "shape": {
+    "valid_rows": 197,
+    "physical_rows": 208,
+    "channels": 192,
+    "heads": 3,
+    "head_dim": 64
+  },
+  "source_range": {
+    "base_hex": "0x2000",
+    "bytes": 159744,
+    "end_exclusive_hex": "0x29000"
+  },
+  "commands": 3,
+  "golden_words": 12288,
+  "completion_count": 3,
+  "command_cycles": 38976,
+  "top_test_end_to_end_cycles": 352679,
+  "preload_axi_cycles": 313703,
+  "preloaded_spad_fixture_bytes": 209136,
+  "of_which_test_only_poison_bytes": 171120,
+  "spad_read_bytes": 37824,
+  "spad_write_bytes": 39936,
+  "useful_macs": 0,
+  "physical_input_source": "independent deterministic fixture, not Matrix/QKV Product RTL output",
+  "preload_included_in_command_window": false,
+  "scope": "does not test QKV producer dependency, Attention consumer, AV, or a continuous model session",
+  "files": {
+    "compile": "compile.log.gz",
+    "simulation": "run.log.gz",
+    "workload_manifest": "manifest.json",
+    "independent_golden": "model_golden.memh.gz",
+    "input_memory": "model_memory.memh.gz"
+  }
+}
