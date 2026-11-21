@@ -1,0 +1,106 @@
+{
+  "artifacts": {
+    "dma_payload.memh": "8c3a68b35541fc9ebaff4d34bae195f8f19bcbb406af470d52b13a6b40fc64d8",
+    "late_dma_plan.memh": "408d00c6863574ef9241b4402b96836685600d6c1aeef95bf49e3ef9f52fdaf3",
+    "model_golden.memh": "0e80b814562772cee306f2b10a368e97920e035aa78e5524c6a432b0cb0655ce",
+    "model_memory.memh": "a36f25007a52d9fa8b0eb382a55a7352ca0fb955656dbdfb5ea535c049e9edf0"
+  },
+  "checkpoint_sha256": {
+    "config.json": "e8786a68c993c04b8721c4d379e4f9de6a9564fba5987704dbf8696d53b7972d",
+    "preprocessor_config.json": "90d1ae427c27d2b9dcb01f6a62ba96aa67aac2de1697c59cd212055b5035c4a2",
+    "pytorch_model.bin": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c"
+  },
+  "execution": {
+    "descriptor_count": 324,
+    "dma_events": 144,
+    "dma_payload_bytes": 112896,
+    "golden_words": 20736,
+    "k_tiles": 156,
+    "physical_macs": 15925248,
+    "q_tiles": 12,
+    "stage_boundary": "LayerNorm was a prior Product Top run; this stage consumes verified Product LN packing",
+    "useful_macs": 16293888,
+    "v_tiles": 156
+  },
+  "quantization": {
+    "contract": "0x53 signed INT8 product, INT32 bias before arithmetic right shift, signed INT8 saturation; 197 valid input rows and 11 explicit zero padding rows",
+    "input_scale": 0.15038124021560542,
+    "output_scale": 0.03125,
+    "requant_shift": 6,
+    "weight_scale": 0.003246955865638152
+  },
+  "shape": {
+    "heads": 3,
+    "hidden": 192,
+    "physical_rows": 208,
+    "query_rows": 16,
+    "valid_rows": 197
+  },
+  "source_ln_dump_sha256": "f51b11204633ec36fb4d94a6bdc40bde1590b5f269e8c992da9725642eb4b131",
+  "source_ln_manifest_sha256": "1d8feebcd03ae442a5df7d8ea6015ae7234f7b34bbec8729b285dd7e2b72af79",
+  "spad": {
+    "allocation_status": "PASS; nonoverlapping live intervals; weights/bias reused by descriptor order",
+    "allocations": {
+      "bias_tile_reused": [
+        86016,
+        86080
+      ],
+      "cmdq": [
+        221184,
+        253952
+      ],
+      "cplq": [
+        253952,
+        262144
+      ],
+      "key_output_tile_a": [
+        98304,
+        138240
+      ],
+      "ln_product_readback_i8": [
+        32768,
+        72704
+      ],
+      "query_output_tile_a": [
+        90112,
+        93184
+      ],
+      "value_output_tile_a": [
+        139264,
+        179200
+      ],
+      "weight_tile_reused": [
+        73728,
+        86016
+      ]
+    },
+    "banks": 4,
+    "capacity_bytes": 262144,
+    "completion_base": 253952,
+    "data_high_water": 179200,
+    "descriptor_base": 221184,
+    "queue_entries": 512,
+    "words_per_bank": 16384
+  },
+  "status": "DEIT_FULL_KV_PRODUCT_PROJECTION_WORKLOAD",
+  "weights": {
+    "key": {
+      "bias_max": 1424,
+      "bias_min": -1669,
+      "weight_saturation_ratio": 5.425347222222222e-05,
+      "weight_scale": 0.003246955865638152
+    },
+    "query": {
+      "bias_max": 5364,
+      "bias_min": -5111,
+      "weight_saturation_ratio": 0.00010850694444444444,
+      "weight_scale": 0.003246955865638152
+    },
+    "value": {
+      "bias_max": 680,
+      "bias_min": -1038,
+      "weight_saturation_ratio": 0.00010850694444444444,
+      "weight_scale": 0.003246955865638152
+    }
+  }
+}

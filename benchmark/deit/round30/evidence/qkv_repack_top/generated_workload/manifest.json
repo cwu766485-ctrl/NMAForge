@@ -1,0 +1,164 @@
+{
+  "run_kind": "round30_product_top_qkv_then_0x3b_repack_same_session",
+  "status": "GENERATED_SOFTWARE_ORACLE_ONLY_AWAITING_VCS",
+  "scope": "real 468 QKV descriptors followed by 9 repacks, same Product Top, no reset; attention consumer is not included",
+  "source_round26_manifest_sha256": "4a2d6c47851e392a29f8804f75e45aa5a84e473eef5940e2a999ae7edb076538",
+  "source_artifacts_sha256": {
+    "model_memory.memh": "caa0462741ad330324b6757133cd1925158bee3e2eb7c9459f0c742c000b5104",
+    "model_golden.memh": "b0f0d3085fbbfae560d7f506dac07f81b0205413f55bee09f17d1134c3698f85",
+    "dma_payload.memh": "8c3a68b35541fc9ebaff4d34bae195f8f19bcbb406af470d52b13a6b40fc64d8",
+    "late_dma_plan.memh": "8c4853740ed30aa423544a3197b9ec5bfec3fd728c90084a05d085e4d7ae1c3b"
+  },
+  "layout": "all",
+  "mode": -1,
+  "shape": {
+    "valid_rows": 197,
+    "physical_rows": 208,
+    "channels": 192,
+    "heads": 3,
+    "head_dim": 64
+  },
+  "source_bases": {
+    "query": "0x16000",
+    "key": "0x20000",
+    "value": "0x2a000"
+  },
+  "descriptor_base": "0x36000",
+  "completion_base": "0x3e000",
+  "qkv_descriptor_count": 468,
+  "repack_descriptor_count": 9,
+  "descriptor_count": 477,
+  "queue_size": 512,
+  "repack_descriptor_indices": [
+    468,
+    469,
+    470,
+    471,
+    472,
+    473,
+    474,
+    475,
+    476
+  ],
+  "checkpoints": [
+    {
+      "descriptor_index": 468,
+      "words": 3328,
+      "output_base": "0x0",
+      "reused": true
+    },
+    {
+      "descriptor_index": 469,
+      "words": 3328,
+      "output_base": "0x0",
+      "reused": true
+    },
+    {
+      "descriptor_index": 470,
+      "words": 3328,
+      "output_base": "0x0",
+      "reused": true
+    },
+    {
+      "descriptor_index": 471,
+      "words": 3328,
+      "output_base": "0x0",
+      "reused": true
+    },
+    {
+      "descriptor_index": 472,
+      "words": 3328,
+      "output_base": "0x0",
+      "reused": true
+    },
+    {
+      "descriptor_index": 473,
+      "words": 3328,
+      "output_base": "0x0",
+      "reused": true
+    },
+    {
+      "descriptor_index": 474,
+      "words": 3328,
+      "output_base": "0x0",
+      "reused": true
+    },
+    {
+      "descriptor_index": 475,
+      "words": 3328,
+      "output_base": "0x0",
+      "reused": true
+    },
+    {
+      "descriptor_index": 476,
+      "words": 3328,
+      "output_base": "0x0",
+      "reused": true
+    }
+  ],
+  "golden_word_count_qkv": 29952,
+  "golden_word_count_repack_per_head": 3328,
+  "checkpoint_file_words": 59923,
+  "spad_bytes": 262144,
+  "allocations": [
+    {
+      "name": "deit_input_ln_from_prior_product_run",
+      "base": 32768,
+      "bytes": 37824,
+      "lifetime": "QKV command group"
+    },
+    {
+      "name": "Q_output_matrix_a",
+      "base": 90112,
+      "bytes": 39936,
+      "lifetime": "all QKV + repack commands"
+    },
+    {
+      "name": "K_output_matrix_a",
+      "base": 131072,
+      "bytes": 39936,
+      "lifetime": "all QKV + repack commands"
+    },
+    {
+      "name": "V_output_matrix_a",
+      "base": 172032,
+      "bytes": 39936,
+      "lifetime": "all QKV + repack commands"
+    },
+    {
+      "name": "repack_output_reused_per_descriptor",
+      "base": 0,
+      "bytes": 16384,
+      "lifetime": "one descriptor; checked before reuse"
+    },
+    {
+      "name": "cmdq",
+      "base": 221184,
+      "bytes": 32768,
+      "lifetime": "512-entry ring; only one entry published per retirement"
+    },
+    {
+      "name": "cplq",
+      "base": 253952,
+      "bytes": 8192,
+      "lifetime": "512-entry ring"
+    }
+  ],
+  "data_high_water": 211968,
+  "useful_macs_qkv": 21786624,
+  "dma_events_qkv": 144,
+  "dma_payload_bytes_qkv": 112896,
+  "host_role": "load source memory/payload, publish descriptor ring, retire completions, and read-only checkpoint outputs; no Q/K/V tensor readback or rewrite",
+  "outputs": {
+    "Q": "dense row-major [208,64], rows 197..207 zero",
+    "K": "K-major [64,208], rows 197..207 zero",
+    "V": "Matrix-B panel/bank lane layout; active words checked, unwritten panel holes ignored"
+  },
+  "generated_artifacts_sha256": {
+    "model_memory.memh": "ad3dd8b4e43d301ababdcf015f68495e9043e222fe2317c4ff7f55d8e9ac861c",
+    "model_golden.memh": "b0f0d3085fbbfae560d7f506dac07f81b0205413f55bee09f17d1134c3698f85",
+    "checkpoint_spad.memh": "e8922f33ebe8d0b36abc10e4219f89e970fc310eb12c029f1e9e48bf3946d7f1",
+    "dma_payload.memh": "8c3a68b35541fc9ebaff4d34bae195f8f19bcbb406af470d52b13a6b40fc64d8",
+    "late_dma_plan.memh": "8c4853740ed30aa423544a3197b9ec5bfec3fd728c90084a05d085e4d7ae1c3b"
+  }
+}

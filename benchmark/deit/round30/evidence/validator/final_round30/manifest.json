@@ -1,0 +1,16 @@
+{
+  "run_id": "round30-deit-validator-20261121-0018",
+  "branch": "research/nmaforge-v1.2-round30-deit",
+  "tested_base_commit": "864ba16aa052fbb0f2bb8948133a54586cec6b26",
+  "tool": "VCS V-2023.12-SP1_Full64; Rocky Linux WSL",
+  "result": "PASS",
+  "marker": "DESCRIPTOR_VALIDATOR_PASS legal_opcodes=29 tile_pack=1 invalid_rules=40 boundary_accept=47/47 boundary_reject=26/26 tile_forward_accept=3/3 repack_physical_span=1 repack_compact_span=1 legacy_aux_compat=1 opcode_classes_consistent=1 engine_limit_claim=0",
+  "limitations": "Validator test only; does not qualify external descriptor fetch or full model inference.",
+  "make_exit": 0,
+  "artifacts": {
+    "compile_log": "compile.log.gz",
+    "run_log": "run.log.gz",
+    "command": "command.txt",
+    "exit": "run.exit"
+  }
+}

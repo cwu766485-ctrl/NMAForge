@@ -1,0 +1,114 @@
+{
+  "artifacts": {
+    "dma_payload.memh": "c44fe19e72e38f9096a6d1ff84670fecdb936e25171a8574cb8f53921434ebf2",
+    "late_dma_plan.memh": "b60929870d5ba63eb968527f75d976ca6ec6dd67f63387d27e890f6b210f08b0",
+    "model_golden.memh": "7c7e15693e3ca6654d78e93cb64fd5a63a8c81ca871012c2c71fceaf223597a3",
+    "model_memory.memh": "4a1bc6efda70899f209f7c3331d0d2c10dacfffa18501c7972269afb9afb8698"
+  },
+  "checkpoint_revision": "b3428f18dcc7b543470d07f14b4a4157815d1880",
+  "checkpoint_sha256": {
+    "config.json": "e8786a68c993c04b8721c4d379e4f9de6a9564fba5987704dbf8696d53b7972d",
+    "preprocessor_config.json": "90d1ae427c27d2b9dcb01f6a62ba96aa67aac2de1697c59cd212055b5035c4a2",
+    "pytorch_model.bin": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c"
+  },
+  "execution": {
+    "completion_base": 253952,
+    "descriptor_base": 221184,
+    "descriptor_count": 468,
+    "dma_event_count": 300,
+    "executed_macs": 30670848,
+    "golden_words": 9984,
+    "optional_layernorm_row": null,
+    "output_layout": "16x16 macro-tile-major; each tile uses local Matrix-A packing; logical rows 0..196 are CLS plus 196 patches",
+    "padding_macs": 1769472,
+    "physical_output_elements": 39936,
+    "position_correction_dma_bytes": 159744,
+    "total_dma_payload_bytes": 307200,
+    "useful_macs": 28901376,
+    "useful_output_elements": 37824,
+    "weight_dma_bytes": 147456
+  },
+  "fp32_embedding_comparison": {
+    "mae": 0.07562581637968144,
+    "max_abs_by_token_max": 0.1839398502642034,
+    "note": "quality/accuracy is not measured because the input is a deterministic synthetic image",
+    "rmse": 0.08748197353646349,
+    "scope": "all 197 valid tokens x 192 channels; dequantized independent integer projection"
+  },
+  "input_image_sha256": "d2029eee4ae0be2479a662a7ed549836200929b41987d23caa68d924f0c89f0a",
+  "input_kind": "deterministic synthetic RGB fixture processed by official checkpoint image processor; no ImageNet accuracy claim",
+  "limitations": [
+    "this workload executes Patch Embedding plus CLS/Position addition only; no Encoder Layer is claimed",
+    "input image is a deterministic fixture and no classification accuracy is claimed",
+    "Host AXI-Lite fixture initialization and testbench DMA payload staging are reported separately from Product execution"
+  ],
+  "model_id": "facebook/deit-tiny-patch16-224",
+  "official_processed_pixels_sha256": "028bcacc0b989481a9e7b1fb119974605721e2cc063a76d1dd1b248d088f9b88",
+  "quantization": {
+    "accumulator_scale": 1.835708498725652e-05,
+    "bias_position_cls": "round-to-nearest-even into int32 accumulator units",
+    "input": "symmetric int8 round-to-nearest-even, saturate [-128,127]",
+    "input_scale": 0.007874015748031496,
+    "output_scale": 0.15038124021560542,
+    "requant": "Product 0x36 arithmetic right shift then signed int8 saturation; no rounding",
+    "requant_shift": 13,
+    "weight_scale_global": 0.0023313497933815782,
+    "weights": "symmetric per-tensor int8 round-to-nearest-even, saturate [-128,127]"
+  },
+  "seed": 20261117,
+  "shape": {
+    "K": 768,
+    "hidden": 192,
+    "output_channels": 192,
+    "patches": 196,
+    "physical_rows": 208,
+    "tokens_including_cls": 197
+  },
+  "spad": {
+    "allocations": {
+      "bias_i32": [
+        176128,
+        176896
+      ],
+      "embedding_output_matrix_a_i8": [
+        179968,
+        219904
+      ],
+      "gemm_output_i32_scratch": [
+        176896,
+        177920
+      ],
+      "matrix_a_input": [
+        4096,
+        163840
+      ],
+      "position_correction_i32_tile": [
+        178944,
+        179968
+      ],
+      "residual_output_i32_scratch": [
+        177920,
+        178944
+      ],
+      "streamed_weight_tile": [
+        163840,
+        176128
+      ]
+    },
+    "banks": 4,
+    "capacity_bytes": 262144,
+    "cmdq_bytes": 32768,
+    "completion_base": 253952,
+    "cplq_bytes": 8192,
+    "data_arena_start": 4096,
+    "descriptor_base": 221184,
+    "free_gap_before_queues": 1280,
+    "optional_layernorm_row_reuse": null,
+    "peak_data_high_water_exclusive": 219904,
+    "queue_entries": 512,
+    "queue_start": 221184,
+    "queue_total_bytes": 40960,
+    "words_per_bank": 16384
+  },
+  "status": "FULL_PATCH_EMBEDDING_TOP_WORKLOAD_GENERATED"
+}

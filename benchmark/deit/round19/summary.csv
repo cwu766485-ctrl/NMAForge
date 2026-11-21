@@ -1,0 +1,2 @@
+run_id,status,shape,seed,descriptors,golden_words,useful_macs,command_cycles,command_excl_dma_cycles,end_to_end_top_session_cycles,late_dma_bytes,spad_read_bytes,spad_write_bytes,useful_mac_per_cycle,useful_array_utilization_pct,checkpoint_sha256
+R19-B-FULL-PATCH-EMBEDDING-256K-20261117,PASS,196x768x192+CLS,20261117,468,9984,28901376,921283,829747,1409279,307200,4323072,359424,31.3708,94.23,e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c

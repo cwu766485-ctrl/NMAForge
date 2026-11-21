@@ -43,7 +43,14 @@ module axi_desc_fetch #(
           else begin
             case(beat_r)
               0: begin desc_op<=d0[7:0];desc_task_id<=d0[31:16];desc_src0_base<=d1;desc_src1_base<=d2;desc_bias_base<=d3;end
-              1: begin desc_dst_base<=d0;desc_m_size<=d1[15:0];desc_n_size<=d1[31:16];desc_k_words<=d2[15:0];desc_length<=d2[15:0];desc_bias_enable<=d3[0];desc_flags<=d3[7:0];end
+              1: begin
+                desc_dst_base<=d0;desc_m_size<=d1[15:0];desc_n_size<=d1[31:16];
+                // 0x3b uses word 6 as valid-row length and has no K
+                // dimension. Preserve the descriptor ABI while decoding
+                // that opcode-specific semantic here as for SPAD fetch.
+                desc_k_words<=(desc_op==8'h3b)?16'd0:d2[15:0];
+                desc_length<=d2[15:0];desc_bias_enable<=d3[0];desc_flags<=d3[7:0];
+              end
               2: begin desc_aux0<=d0;desc_scale_shift<=d1[4:0];desc_activation<=d1[6:5];desc_src0_stride<=d2;desc_src1_stride<=d3;end
               default: begin desc_dst_stride<=d0;desc_batch_count<=d1[15:0];desc_head_count<=d1[31:16];desc_wait_mask<=d2[15:0];desc_signal_mask<=d2[31:16];desc_version<=d3[7:0];desc_clear_mask<=d3[31:16];end
             endcase

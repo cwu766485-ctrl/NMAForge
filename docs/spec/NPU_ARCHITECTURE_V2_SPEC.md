@@ -246,6 +246,28 @@ implemented. The consumer still writes its own result to SPAD, so the feature
 avoids the prior tile's 256-byte A read; it does not suppress producer or
 consumer writeback.
 
+### 3.3 Research-only Tensor Repack (`0x3b`)
+
+The isolated research prototype classifies `0x3b` as an SFU command and uses
+the existing SFU SPAD request/response path to reorder signed INT8 values from
+the Matrix-A 4x4 tile-major layout. It has no arithmetic operation. For ABI-v7,
+`aux0[1:0]` selects Q dense row-major (`0`), K-major (`1`), or V Matrix-B panel
+(`2`); `aux0[3:2]` selects one of three equal heads. `n_size` is total channels
+(48..384, divisible by 48), `m_size` is padded rows (16..256, divisible by
+16), and `length` is valid rows (1..m_size). Rows `length..m_size-1` are
+zero-filled without source reads. The source Matrix-A tile base is `src0`; the
+destination base is `dst`. `src1`, `k_words`, flags, bias, activation and
+shift are zero; `src0_stride` and `src1_stride` are zero; `dst_stride=m_size`;
+batch/head counts are zero. Input/output ranges must not overflow or alias;
+bases are word aligned. The command uses normal SPAD arbitration and ordered
+completion/dependency semantics. This is a research ABI candidate rather than
+the frozen Product ABI, and its physical layout and continuous top-level
+producer/consumer path require separate evidence.
+
+The 64-byte descriptor still stores the valid-row extent in word 6. Descriptor
+fetch derives `k_words=0` for opcode `0x3b`; all other opcodes retain their
+existing word-6 K-dimension decode. No descriptor size or field offset changes.
+
 ## 4. INT8 arithmetic and layout contract
 
 ### 4.1 Product and accumulation

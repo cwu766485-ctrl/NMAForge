@@ -1,0 +1,36 @@
+{
+  "round": 20,
+  "track": "B_DEIT_TINY",
+  "branch": "research/nmaforge-v1.2-round20-deit",
+  "round20_base_sha": "8f626c07644ff620b5756920b79c40245eabc4d3",
+  "round19_tested_source_sha": "0a1d7545d84de6f8c3a771c3764c0a3616fc8d2f",
+  "round19_product_rtl_tree_sha": "8798decc60fe257ef685a0b1c7e8814816e1d4de",
+  "checkpoint_sha256": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c",
+  "round20_vcs_run": "NOT_RUN",
+  "status": "PARTIAL",
+  "gates": {
+    "D0_256KiB_product_top_and_queue_geometry": {
+      "status": "PASS_REUSED_R19",
+      "evidence": "benchmark/deit/round19/evidence.json",
+      "capacity_bytes": 262144,
+      "banks": 4,
+      "words_per_bank": 16384,
+      "cmdq_bytes": 32768,
+      "cplq_bytes": 8192
+    },
+    "D1_full_196_patch_embedding": {
+      "status": "PASS_REUSED_R19",
+      "descriptors": 468,
+      "golden_words": 9984,
+      "evidence": "benchmark/deit/round19/evidence.json"
+    },
+    "D2_full_197_token_encoder_layer0": {
+      "status": "BLOCKED_NOT_RUN",
+      "first_gap": "No qualified legal activation mapping from packed INT8 tile-major Matrix-A patch output to the signed INT32 scalar LayerNorm/QKV consumer contract; no integrated Product-generated LN-to-FFN command graph is available."
+    },
+    "D3_twelve_layers_and_classifier": {
+      "status": "NOT_RUN_GATED_ON_D2"
+    }
+  },
+  "interpretation": "Round 19 D0/D1 results are reused evidence, not a new Round 20 regression. Round 20 did not produce an Encoder RTL PASS or an ImageNet accuracy result."
+}

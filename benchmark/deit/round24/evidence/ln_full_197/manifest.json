@@ -1,0 +1,178 @@
+{
+  "artifacts": {
+    "dma_payload.memh": "e569fcce64d9656d2a9b6551a9bb02e1befec622b07ad9ba178cd62fecfc7209",
+    "late_dma_plan.memh": "2d1a9613510993581eef01f098a45017af487578d6cad8782f6c320ce0598f29",
+    "model_golden.memh": "40ddc5da6f0d9450770b3afc5ebe65fb0445f1692a803ca7a20d36292b103c2e",
+    "model_memory.memh": "6e9b7b4f949bc14eb8296c6078f69942536ea7cdb92c0149058baafd2da4b0f0"
+  },
+  "checkpoint_sha256": {
+    "config.json": "e8786a68c993c04b8721c4d379e4f9de6a9564fba5987704dbf8696d53b7972d",
+    "preprocessor_config.json": "90d1ae427c27d2b9dcb01f6a62ba96aa67aac2de1697c59cd212055b5035c4a2",
+    "pytorch_model.bin": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c"
+  },
+  "embedding_expected_golden_sha256": "7c7e15693e3ca6654d78e93cb64fd5a63a8c81ca871012c2c71fceaf223597a3",
+  "embedding_run_dump_sha256": "1e5e52eca57043f2bf7145ac7a6fbbf29fe118f1035425415f50075d9890ec56",
+  "embedding_words_verified": 9984,
+  "execution": {
+    "descriptor_count": 246,
+    "dma_event_count": 157,
+    "dma_payload_bytes": 122880,
+    "executed_macs": 1769472,
+    "explicit_zero_pad_rows": 11,
+    "golden_words": 19200,
+    "ln_rows_executed": 197,
+    "ln_valid_rows": 197,
+    "ln_zero_pad_rows_executed": 0,
+    "note": "Q/K/V projection output covers first 16 query rows and all 192 channels; no attention is executed in this workload",
+    "pack_tiles": 13,
+    "packed_physical_rows": 208,
+    "qkv_gemm_tiles": 36,
+    "useful_macs": 1769472,
+    "zero_pad_dma": {
+      "before_descriptor": 209,
+      "bytes": 8448,
+      "events": 11,
+      "spad_ranges": [
+        [
+          12032,
+          12800
+        ],
+        [
+          12800,
+          13568
+        ],
+        [
+          13568,
+          14336
+        ],
+        [
+          14336,
+          15104
+        ],
+        [
+          15104,
+          15872
+        ],
+        [
+          15872,
+          16640
+        ],
+        [
+          16640,
+          17408
+        ],
+        [
+          17408,
+          18176
+        ],
+        [
+          18176,
+          18944
+        ],
+        [
+          18944,
+          19712
+        ],
+        [
+          19712,
+          20480
+        ]
+      ],
+      "words": 2112
+    }
+  },
+  "execution_boundary": "staged_top_sessions; embedding is a prior Product Top SPAD readback, verified against its Golden",
+  "fp32_layernorm_error": {
+    "mae": 0.1481873206530758,
+    "max_abs": 0.6071143949369597,
+    "output_scale": 0.15038124021560542,
+    "rmse": 0.17011486797323244
+  },
+  "fp32_reference": {
+    "layernorm_mae": 0.1481873206530758,
+    "layernorm_rmse": 0.17011486797323244,
+    "note": "single synthetic fixture image; no classification metric"
+  },
+  "numeric_contract": {
+    "layernorm": "opcode 0x38; epsilon=1; truncating mean; floor variance; integer sqrt/Q30 reciprocal; gamma Q15 and beta INT32 scaled by embedding output_scale",
+    "layernorm_pack": "opcode 0x36 shift=0, signed INT8 saturation, Matrix-A physical packing",
+    "qkv": "opcode 0x30; per-projection symmetric INT8 weights round-even; activation scale=embedding output_scale; bias rounded to accumulator scale; INT32 output",
+    "weight_scales": {
+      "key": 0.0033674186139594853,
+      "query": 0.0037488277972213867,
+      "value": 0.004369327871818242
+    }
+  },
+  "seed": 20261117,
+  "shape": {
+    "heads": 3,
+    "hidden": 192,
+    "projection_channels": 192,
+    "query_rows_executed": 16,
+    "tokens_physical": 208,
+    "tokens_valid": 197
+  },
+  "spad": {
+    "allocations": {
+      "bias_tile_reused": [
+        86016,
+        86080
+      ],
+      "cmdq": [
+        221184,
+        253952
+      ],
+      "cplq": [
+        253952,
+        262144
+      ],
+      "ln_beta": [
+        4864,
+        5632
+      ],
+      "ln_gamma": [
+        4096,
+        4864
+      ],
+      "ln_matrix_a_int8": [
+        32768,
+        72704
+      ],
+      "ln_row_tile_int32_reused": [
+        8192,
+        20480
+      ],
+      "prior_product_embedding": [
+        179968,
+        219904
+      ],
+      "qkv_key_tile_major_i32": [
+        102400,
+        114688
+      ],
+      "qkv_query_tile_major_i32": [
+        90112,
+        102400
+      ],
+      "qkv_value_tile_major_i32": [
+        114688,
+        126976
+      ],
+      "weight_tile_reused": [
+        73728,
+        86016
+      ]
+    },
+    "banks": 4,
+    "capacity_bytes": 262144,
+    "completion_base": 253952,
+    "data_high_water": 219904,
+    "descriptor_base": 221184,
+    "descriptor_count": 246,
+    "live_overlap_check": "PASS; disjoint static intervals; row scratch and weight/bias tiles reused by ordered descriptors",
+    "queue_bytes": 40960,
+    "queue_entries": 512,
+    "words_per_bank": 16384
+  },
+  "status": "DEIT_LN197_QKV_FIRST_QUERY_BLOCK_WORKLOAD"
+}

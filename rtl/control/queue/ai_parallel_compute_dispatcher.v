@@ -195,7 +195,7 @@ module ai_parallel_compute_dispatcher(
             else if (op == 8'h30 || op == 8'h31 ||
                      op == 8'h52 || op == 8'h53)
                 engine_for_op = 3'd3;
-            else if (op >= 8'h32 && op <= 8'h3a) engine_for_op = 3'd4;
+            else if (op >= 8'h32 && op <= 8'h3b) engine_for_op = 3'd4;
             else if (op == 8'h16 || op == 8'h17) engine_for_op = 3'd5;
             else if (op == 8'h43 || op == 8'h44) engine_for_op = 3'd6;
             else engine_for_op = 3'd0;

@@ -1,0 +1,72 @@
+{
+  "event_order_trace": {
+    "0": {
+      "first_av_read_request_line": 870,
+      "last_probability_pack_write_line": 868,
+      "pack_before_av": true,
+      "top_golden_pass": true
+    },
+    "1": {
+      "first_av_read_request_line": 870,
+      "last_probability_pack_write_line": 868,
+      "pack_before_av": true,
+      "top_golden_pass": true
+    },
+    "2": {
+      "first_av_read_request_line": 870,
+      "last_probability_pack_write_line": 868,
+      "pack_before_av": true,
+      "top_golden_pass": true
+    }
+  },
+  "first_packed_mismatch": null,
+  "new_v_b_panel_mismatch_words": 0,
+  "new_v_b_panel_words_reconstructed": 3328,
+  "old_round24_attention_memory_sha256": "2ae7fa27a1219c989528b25a38a7f41677e9802b5677cfe89af1ca322f3838be",
+  "old_v_b_poison_words": 4096,
+  "old_v_b_region_words": 4096,
+  "physical_read_response_audit": {
+    "0": {
+      "bank_words_checked": 1664,
+      "byte_lanes_checked": 6656,
+      "byte_mismatches": 0,
+      "first_mismatches": [],
+      "pass": true,
+      "physical_image_mismatches": 0,
+      "probability_pack_words_overlaid": 832,
+      "response_vs_physical_bank_mismatches": 0,
+      "responses": 416
+    },
+    "1": {
+      "bank_words_checked": 1664,
+      "byte_lanes_checked": 6656,
+      "byte_mismatches": 0,
+      "first_mismatches": [],
+      "pass": true,
+      "physical_image_mismatches": 0,
+      "probability_pack_words_overlaid": 832,
+      "response_vs_physical_bank_mismatches": 0,
+      "responses": 416
+    },
+    "2": {
+      "bank_words_checked": 1664,
+      "byte_lanes_checked": 6656,
+      "byte_mismatches": 0,
+      "first_mismatches": [],
+      "pass": true,
+      "physical_image_mismatches": 0,
+      "probability_pack_words_overlaid": 832,
+      "response_vs_physical_bank_mismatches": 0,
+      "responses": 416
+    }
+  },
+  "projection_golden_sha256": "0e80b814562772cee306f2b10a368e97920e035aa78e5524c6a432b0cb0655ce",
+  "projection_readback_sha256": "e0020f46eeec6eed4281044bfca52d5f607954b648987086f62148eb9f2027cc",
+  "regenerated_attention_memory_sha256": "c84e17a1a1f85a0b8a4842e7143a8a817042fe56398c868a4ac9b1bff6b0e701",
+  "root_cause": "Two sequential workload issues were isolated. The original Round24 image had poison in all 4096 V_B words; the regenerated image packs V from real Product QKV readback and all 3328 consumed Matrix-B words match. The first regenerated full-AV failure then showed an ordering race: AV requests started before probability packing completed. Round25 adds a retirement event fence; all three Top traces show the last probability-pack write before the first AV request and all 8512-word Golden checks pass. No Matrix Reader RTL defect was observed.",
+  "source_sha": "ba646a7b2b4791bc365cf8ef42ec011a0552fcbb",
+  "status": "OPERAND_EVENT_AND_PHYSICAL_READ_AUDIT_PASS",
+  "unused_v_b_gap_words": 768,
+  "v_projection_golden_mismatch_words": 0,
+  "valid_v_projection_words": 9984
+}

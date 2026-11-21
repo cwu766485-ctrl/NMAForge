@@ -1,0 +1,8 @@
+cd dv/subsystem/top_smoke/sim
+/opt/Synopsys/vcs/V-2023.12-SP1/bin/vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+  +define+AI_REPRESENTATIVE_LONG_TASK +define+AI_DEIT_R19_STREAM \
+  +define+AI_SPAD_WORDS_PER_BANK=16384 \
+  +incdir+../../../block/control/agent +incdir+../../../block/dma/agent +incdir+../fixtures \
+  -Mdir=/tmp/round23_deit/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+  ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+  -o /tmp/round23_deit/simv -l /tmp/round23_deit/compile.log
