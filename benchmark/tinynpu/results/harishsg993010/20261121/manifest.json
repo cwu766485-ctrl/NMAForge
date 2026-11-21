@@ -1,0 +1,184 @@
+{
+  "artifacts": [
+    {
+      "bytes": 6498,
+      "path": "benchmark_summary.json",
+      "sha256": "a1dab63df4870468b6d4ae9ac10376d01f32f598227bc54ab0cb5ce4b0bfaaf5"
+    },
+    {
+      "bytes": 1238,
+      "path": "cnn_results.csv",
+      "sha256": "993da178a9983f2f9936fe352bf418950f9251cefea7caca32de873c8a3a165a"
+    },
+    {
+      "bytes": 1411,
+      "path": "cnn_summary.json",
+      "sha256": "2ca5b0ce1c1c1c378d549798a97846653632882c03d898dc40ad5fa801426b67"
+    },
+    {
+      "bytes": 8711,
+      "path": "gemm_results.csv",
+      "sha256": "724f2dfe554f5f0ac4cf0a21c8f55fe1e57423a9840dc3bfd37662ecfac23699"
+    },
+    {
+      "bytes": 3980,
+      "path": "gemv_results.csv",
+      "sha256": "f627f12fd796eb8620d6a9352507ab786afd6865fa3c02a5c731b4ac407466b6"
+    },
+    {
+      "bytes": 5931,
+      "path": "gemv_summary.json",
+      "sha256": "92c5fe3516495dac0725f37f9d0abc2ce403d3411090b57af52a23ea16e1b91a"
+    },
+    {
+      "bytes": 9045,
+      "path": "raw_logs.tar.gz",
+      "sha256": "69496e96630300cae940e9dfdbd272238567c42001f0ac6e31478f1cb744eeb9"
+    }
+  ],
+  "benchmark": "NMAForge v1.2 vs harishsg993010/tiny-NPU",
+  "disposition": "PARTIAL",
+  "limits": [
+    "TinyNPU normalized memory cycles are modeled and serialized; not product RTL.",
+    "CNN timing boundaries differ; no system speedup is calculated.",
+    "No paired H64 GPT-2, H64 attention, FFN 64->256->64, GEMM 64^3/192^3, or trained CNN result."
+  ],
+  "nmaforge": {
+    "benchmark_branch": "research/nmaforge-v1.2-round31-gpt2",
+    "benchmark_source_sha": "f7d15974fc654e58e4e48dce1b8f4c87171e67c8",
+    "benchmark_source_tree": "e137d97f84c2b7bb2d0258e30c8cd5748fa5e675",
+    "deit_research_sha": "d9ef7112efb4ffdada75768f07c1f82d09f9200b",
+    "deit_tree": "e2453b796fc90efb4f2ac37852c9e2255d4b6984",
+    "gpt2_research_sha": "f7d15974fc654e58e4e48dce1b8f4c87171e67c8",
+    "note": "GPT-2 and DeiT are independent branch baselines; this package was run from the GPT-2 R31 source and does not qualify the DeiT source."
+  },
+  "raw_log_archive": {
+    "bytes": 9045,
+    "log_count": 15,
+    "logs": [
+      {
+        "bytes": 9768,
+        "path": "nmaforge_cnn/compile.log",
+        "sha256": "a4ab7ae7d630d26d58f0ff35d3b718ab5f56fa6bd30d7410b2e9f519123a7ef9"
+      },
+      {
+        "bytes": 1430,
+        "path": "nmaforge_cnn/run.log",
+        "sha256": "ca4bd99282fa73120e69e1de1ed0f9eb055a5dfd81456aa3ae70dd8e81a17407"
+      },
+      {
+        "bytes": 4110,
+        "path": "nmaforge_gemm/compile.log",
+        "sha256": "36f3f8383358605e78d0fcf14619b96a3e818abe89749b9a2f99e1b007838bbc"
+      },
+      {
+        "bytes": 3465,
+        "path": "nmaforge_gemm/run.log",
+        "sha256": "14f6e988abd382a4b51989b2b5f801b3078d4a163ae3bad7ddaa183c9219dd2d"
+      },
+      {
+        "bytes": 3988,
+        "path": "nmaforge_gemv/compile.log",
+        "sha256": "0bf9970422fd551e8522dc645848a13dafdb86c17f3e2398fd46caffed9c7e84"
+      },
+      {
+        "bytes": 5010,
+        "path": "nmaforge_gemv/run.log",
+        "sha256": "3195fc12f28e5f297044a3a9d3ec127b89514888937efa613b66e4a5d25b4a60"
+      },
+      {
+        "bytes": 20178,
+        "path": "tinynpu_cnn/compile.log",
+        "sha256": "8df84fda4cd11710764fca7742b140d357c756f92b86686785194da50d24377d"
+      },
+      {
+        "bytes": 852,
+        "path": "tinynpu_cnn/onnx_compile.log",
+        "sha256": "6bd05c94caa23e142a3cfbb339a31ddf80b00687b8054bdaebdc202c91601d6c"
+      },
+      {
+        "bytes": 868,
+        "path": "tinynpu_cnn/run.log",
+        "sha256": "c132d8ecc26dd07851e2395726e18f2e4e194ff11a6fa2396d54c51a3dff9abc"
+      },
+      {
+        "bytes": 17563,
+        "path": "tinynpu_gemm/compile.log",
+        "sha256": "dc4fb3dd9de664d18703f1e31f57f60d72c4588f8ab6dfac03d94769d320b093"
+      },
+      {
+        "bytes": 762,
+        "path": "tinynpu_gemm/engine_regression.log",
+        "sha256": "7dfc3091722f50a7fe926d105403584ef050cf1b2ded2146547a126f218bc5c6"
+      },
+      {
+        "bytes": 2389,
+        "path": "tinynpu_gemm/run.log",
+        "sha256": "b5bca6f4e8ab721d23cfbc3a058931e36e5987c318f29abddfad52fc967744f3"
+      },
+      {
+        "bytes": 17540,
+        "path": "tinynpu_gemv/compile.log",
+        "sha256": "d8981ce17971f4621e43b6e62c7e240a19e157a61d67f892bfb13a492aa2475a"
+      },
+      {
+        "bytes": 762,
+        "path": "tinynpu_gemv/engine_regression.log",
+        "sha256": "7dfc3091722f50a7fe926d105403584ef050cf1b2ded2146547a126f218bc5c6"
+      },
+      {
+        "bytes": 2389,
+        "path": "tinynpu_gemv/run.log",
+        "sha256": "b5bca6f4e8ab721d23cfbc3a058931e36e5987c318f29abddfad52fc967744f3"
+      }
+    ],
+    "path": "raw_logs.tar.gz",
+    "sha256": "69496e96630300cae940e9dfdbd272238567c42001f0ac6e31478f1cb744eeb9"
+  },
+  "run_date": "2026-11-21",
+  "runs": [
+    {
+      "cnn_input_seed": 99,
+      "command": "BENCH_RUN_ID=NMA-R31-FAIR-20261121-S20261121 SEED=20261121 TINYNPU_BENCH_OUT=/tmp/nmaforge_round31_full_benchmark TINYNPU_WORK_ROOT=/tmp/nmaforge_round31_full_benchmark/reference TINY_NPU_ROOT=/tmp/nmaforge_harish_tiny_npu_20261121 PYTHON=/tmp/nmaforge_tiny_bench_venv/bin/python VERILATOR=/tmp/nmaforge_verilator_5.052/bin/verilator VCS=/usr/local/bin/vcs JOBS=4 bash benchmark/tinynpu/run_comparison.sh",
+      "covers": [
+        "3 paired GEMM shapes",
+        "NMAForge-only 15-case array-size sweep",
+        "common conv1x_mini.onnx"
+      ],
+      "exit_code": 0,
+      "run_id": "NMA-R31-FAIR-20261121-S20261121",
+      "seed": 20261121
+    },
+    {
+      "command": "BENCH_RUN_ID=NMA-R31-GEMV-20261121-S20261121 SEED=20261121 GEMV_BENCH_OUT=/tmp/nmaforge_round31_gemv TINYNPU_WORK_ROOT=/tmp/nmaforge_round31_gemv/reference TINY_NPU_ROOT=/tmp/nmaforge_harish_tiny_npu_20261121 PYTHON=/tmp/nmaforge_tiny_bench_venv/bin/python VERILATOR=/tmp/nmaforge_verilator_5.052/bin/verilator JOBS=4 bash benchmark/tinynpu/run_gemv_match.sh",
+      "covers": [
+        "4 paired GEMV shapes"
+      ],
+      "exit_code": 0,
+      "run_id": "NMA-R31-GEMV-20261121-S20261121",
+      "seed": 20261121
+    }
+  ],
+  "tinynpu": {
+    "checkout_clean": true,
+    "commit": "8216c22b762011aa20c05fc2768423fd12dda59d",
+    "repository": "https://github.com/harishsg993010/tiny-NPU",
+    "tree": "5346e3c4568051bf250ccfae03cd7dd42f2897f7"
+  },
+  "tools": {
+    "numpy": "2.4.6",
+    "onnx": "1.17.0",
+    "python": {
+      "path": "/tmp/nmaforge_tiny_bench_venv/bin/python",
+      "version": "3.12.13"
+    },
+    "vcs": {
+      "path": "/usr/local/bin/vcs",
+      "version": "V-2023.12-SP1_Full64"
+    },
+    "verilator": {
+      "path": "/tmp/nmaforge_verilator_5.052/bin/verilator",
+      "version": "5.052 2026-09-05 rev v5.052"
+    }
+  }
+}
