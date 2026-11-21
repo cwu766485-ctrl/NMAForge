@@ -1,0 +1,9 @@
+scope,contract,accuracy_pct,cross_entropy_nats,perplexity,top1_agreement_vs_fp32_pct,top1_agreement_vs_qat_float_pct,rtl_status
+128 windows × final context position = 128 targets,bigram,25.78125,2.3995242458017634,11.017933305507006,,,SOFTWARE_ONLY
+128 windows × final context position = 128 targets,fake_quant,22.65625,3.612552453001632,37.06052744702549,,,SOFTWARE_ONLY
+128 windows × final context position = 128 targets,fp32,38.28125,2.270152352999046,9.680875612157935,,,SOFTWARE_ONLY
+128 windows × final context position = 128 targets,legacy_frozen_contract,10.9375,5.427993427272241,227.69190636576826,,,SOFTWARE_ONLY
+128 windows × final context position = 128 targets,per_channel_mshift,21.875,3.456863086823792,31.717325801344984,,,SOFTWARE_ONLY
+128 windows × final context position = 128 targets,power_of_two_product_contract,22.65625,3.612552453001632,37.06052744702549,,,SOFTWARE_ONLY
+128 windows × final context position = 128 targets,qat_float,39.0625,2.2819299407895417,9.795567043017533,,,SOFTWARE_ONLY
+128 windows × final context position = 128 targets,per_channel_mshift,21.875,3.456863086823792,31.717325801344984,32.03125,32.8125,SOFTWARE_ONLY

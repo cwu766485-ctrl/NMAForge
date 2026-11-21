@@ -1,0 +1,14 @@
+scope,contract,accuracy_pct,cross_entropy_nats,perplexity,top1_agreement_vs_fp32_pct,top1_agreement_vs_qat_float_pct,rtl_status
+128 windows × 16 targets = 2048,bigram,26.66015625,2.5371619445887617,12.64373637832451,,,SOFTWARE_ONLY
+128 windows × 16 targets = 2048,fake_quant,22.119140625,3.270739922220076,26.33081489219309,,,SOFTWARE_ONLY
+128 windows × 16 targets = 2048,fp32,37.060546875,2.205286848735783,9.072853731247681,,,SOFTWARE_ONLY
+128 windows × 16 targets = 2048,qat_float,35.400390625,2.2375004856407896,9.36988183933364,,,SOFTWARE_ONLY
+128 windows × 16 targets = 2048,frozen,11.279296875,5.220646974307426,185.05387044917308,14.16015625,14.55078125,SOFTWARE_ONLY
+128 windows × 16 targets = 2048,residual_gelu_aligned,22.119140625,3.270739922220076,26.33081489219309,39.0625,35.7421875,SOFTWARE_ONLY
+128 windows × 16 targets = 2048,residual_gelu_o10,14.94140625,3.713297855519113,40.9887588826975,24.951171875,22.998046875,SOFTWARE_ONLY
+128 windows × 16 targets = 2048,residual_gelu_o10_up5,0.0,15.12818827012114,3716111.0773789054,0.0,0.0,SOFTWARE_ONLY
+128 windows × 16 targets = 2048,residual_gelu_up5,0.09765625,13.060160132185423,469845.93974966725,0.048828125,0.048828125,SOFTWARE_ONLY
+diagnostic progressive integerized prefix; software only,prefix_1_layers,28.02734375,2.704269831693462,14.943401507877862,,,SOFTWARE_ONLY
+diagnostic progressive integerized prefix; software only,prefix_2_layers,27.001953125,2.8519944721293307,17.32229624719635,,,SOFTWARE_ONLY
+diagnostic progressive integerized prefix; software only,prefix_3_layers,25.341796875,2.93933269929677,18.90322796529282,,,SOFTWARE_ONLY
+diagnostic progressive integerized prefix; software only,prefix_4_layers,24.365234375,2.9520664221033766,19.145475513603685,,,SOFTWARE_ONLY
