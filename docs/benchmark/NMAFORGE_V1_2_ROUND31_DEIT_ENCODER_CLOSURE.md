@@ -36,6 +36,12 @@ make -C dv/subsystem/top_smoke/sim ai_deit_round30_full_attention_256k \
 
 Round 30 starts from the fixed full-KV QKV Product projection workload, whose source is an existing DeiT workload fixture. Within the single unreset Top session, Product-written Q/K/V feed Repack and Attention; no host intermediate activation readback or writeback is reported. Golden observation uses a passive behavioral-SPAD backdoor after retired batches.
 
+### AV scratch lifetime audit
+
+The historical Attention generator does not retain the complete `[197, 192]` AV result tensor. In `benchmark/deit/round30/generate_qkv_attention_continuous.py`, each head receives a 4 KiB INT32 AV scratch window at `AV_BASE + head * 0x1000`. Four subtiles write at `av_base + i * 0x400` (`i=0..3`). The same per-head addresses are reused for every `query_start` (13 blocks: 12×16 rows plus the final 5 valid rows). Thus the recorded `persistent_av_bytes=12,288` means three current-query-block scratch windows, not all-query AV storage. The run checks each retired query-block batch against Golden before those addresses are reused; it establishes complete Attention computation, but not a persistent head-merged layer output.
+
+For a Layer 0 continuation, the lowest-storage candidate is to schedule query-block-major: finish AV for all three heads for one block, perform a contract-defined requant/pack and Head Merge into the Output Projection consumer layout, retire/fence that projection, then reuse the three 4 KiB windows for the next block. This schedule and its quantization/layout handoff have not been implemented or measured. If AV were retained as INT32, the complete `197×192` tensor would occupy 151,296 bytes; as packed INT8 it would occupy 37,824 bytes. Neither amount is included in the Round 30 211,968-byte high-water. The current evidence therefore cannot establish full Layer 0 capacity or completion.
+
 ## Reused results and limits
 
 | Measurement | Historical value | Boundary / interpretation |
@@ -82,5 +88,6 @@ The reported 256 KiB high-water leaves 50,176 bytes below capacity, but this is 
 - Round 31 gate status: `benchmark/deit/round31/round31_gate_status.json`
 - Original VCS logs, workload archives, retry disposition and hashes: `benchmark/deit/round30/evidence/continuous_attention/full_197_passive_backdoor/`
 - Round 30 architecture report: `docs/benchmark/NMAFORGE_V1_2_ROUND30_DEIT_REPACK.md`
+- AV scratch lifetime audit: `benchmark/deit/round31/round31_av_scratch_audit.csv` and `round31_av_scratch_audit.json`
 
 `round31_reused_round30_attention.csv` is a byte-for-byte copy of the Round 30 profile with provenance made explicit in its filename and this report. It is not a new Round 31 measurement.
