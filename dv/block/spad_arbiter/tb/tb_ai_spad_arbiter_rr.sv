@@ -53,6 +53,7 @@ module tb_ai_spad_arbiter_rr;
   wire rsp_error;
   wire [3:0] cnm_rsp_valid;
   integer i;
+  integer sustained_cnm_grants, sustained_banked_grants;
   integer cnm_grants, dma_line_grants;
   integer core_rr_grants, banked_rr_grants, dma_rr_grants;
   integer core_wait_cycles, banked_wait_cycles, dma_wait_cycles;
@@ -491,6 +492,19 @@ module tb_ai_spad_arbiter_rr;
     repeat(2) @(posedge clk);
     @(negedge clk);
     resetn=1;
+    // A completed core write advances the global data-plane round-robin
+    // pointer to RR_BANKED before sustained Matrix/CNM contention begins.
+    core_valid=1;
+    core_write=1;
+    core_addr=32'h0000_0600;
+    core_wdata=32'hc0de_0600;
+    #1;
+    if (!core_ready || request_client!=3'd2 || !spad_valid || !spad_write)
+      $fatal(1,"failed to position scheduler at RR_BANKED before subclient fairness test");
+    @(posedge clk);
+    @(negedge clk);
+    core_valid=0;
+    core_write=0;
     banked_valid=1;
     banked_addr=32'h0000_0300;
     cnm_valid=4'b1011;
@@ -522,6 +536,58 @@ module tb_ai_spad_arbiter_rr;
     if (rsp_valid || cnm_rsp_valid!=0)
       $fatal(1,"Matrix/CNM response ownership pipeline did not drain");
     $display("Matrix/CNM concurrent banked response ownership PASS");
+
+    // Both production engines can hold requests at once. Sustained contention
+    // must rotate service, unlike the one-shot owner check above.
+    resetn=0;
+    desc_valid=0; cpl_valid=0;
+    core_valid=0; core_line_valid=0;
+    dma_valid=0; dma_line_valid=0;
+    banked_valid=0; cnm_valid=0;
+    repeat(2) @(posedge clk);
+    @(negedge clk);
+    resetn=1;
+    banked_valid=1;
+    banked_addr=32'h0000_0300;
+    cnm_valid=4'hf;
+    cnm_addr0=32'h0000_0100; cnm_addr1=32'h0000_0204;
+    cnm_addr2=32'h0000_0308; cnm_addr3=32'h0000_040c;
+    sustained_cnm_grants=0;
+    sustained_banked_grants=0;
+    for (i=0;i<24;i=i+1) begin
+      @(negedge clk);
+      if (rsp_valid !== (i>=1))
+        $fatal(1,"sustained Matrix/CNM response-valid latency mismatch cycle=%0d valid=%b",
+               i,rsp_valid);
+      if (i>=1) begin
+        if ((i%2)==1 && (rsp_client!=3'd5 || cnm_rsp_valid!==4'hf))
+          $fatal(1,"sustained CNM response owner/lane mismatch cycle=%0d client=%0d lanes=%b",
+                 i,rsp_client,cnm_rsp_valid);
+        if ((i%2)==0 && (rsp_client!=3'd3 || cnm_rsp_valid!==4'h0))
+          $fatal(1,"sustained Matrix response owner/lane mismatch cycle=%0d client=%0d lanes=%b",
+                 i,rsp_client,cnm_rsp_valid);
+      end
+      if (cnm_ready!=0) sustained_cnm_grants=sustained_cnm_grants+1;
+      if (banked_ready) sustained_banked_grants=sustained_banked_grants+1;
+      @(posedge clk);
+    end
+    if (sustained_cnm_grants!=12 || sustained_banked_grants!=12)
+      $fatal(1,"sustained Matrix/CNM round-robin mismatch cnm=%0d matrix=%0d",
+             sustained_cnm_grants,sustained_banked_grants);
+    $display("Sustained Matrix/CNM banked-class fairness PASS start=RR_BANKED cycles=24 grants=%0d/%0d max_wait=1",
+             sustained_cnm_grants,sustained_banked_grants);
+    @(negedge clk);
+    cnm_valid=0; banked_valid=0;
+    if (rsp_valid!==1'b1 || rsp_client!=3'd3 || cnm_rsp_valid!==4'h0)
+      $fatal(1,"final sustained Matrix response was missing or misrouted");
+    @(posedge clk);
+    @(negedge clk);
+    if (rsp_valid!==1'b1 || rsp_client!=3'd5 || cnm_rsp_valid!==4'hf)
+      $fatal(1,"final sustained CNM response was missing or misrouted");
+    @(posedge clk);
+    @(negedge clk);
+    if (rsp_valid!==1'b0 || cnm_rsp_valid!==4'h0)
+      $fatal(1,"sustained Matrix/CNM response pipeline did not drain");
 
     // Scratchpad parity arrives registered with the read-data response.  A
     // parity error asserted in that response cycle must not be sampled one
