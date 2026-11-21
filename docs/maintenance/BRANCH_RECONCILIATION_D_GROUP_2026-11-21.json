@@ -1,0 +1,3840 @@
+{
+  "title": "NMAForge remote branch reconciliation audit",
+  "snapshot_date": "2026-11-21",
+  "repository": "cwu766485-ctrl/NMAForge",
+  "source_task_snapshot": "Round 30 branch inventory; stale relative to fetched remote R31 tips",
+  "remote_branch_count_excluding_origin_HEAD": 73,
+  "main_sha": "3041355528dffe856e2d5384027c6ee5df5d1b42",
+  "main_unchanged": true,
+  "integration_branch": "integration/branch-cleanup-20261121",
+  "integration_merge_commit": "40237a296bb9341eb4254ffc1ac7f59254272d4b",
+  "gpt2_r31_sha": "f7d15974fc654e58e4e48dce1b8f4c87171e67c8",
+  "deit_r31_sha": "d9ef7112efb4ffdada75768f07c1f82d09f9200b",
+  "d_group_branch_count": 15,
+  "d_group_unique_commit_count": 298,
+  "d_group_classification_counts": {
+    "建议取回": 5,
+    "研究存档": 10
+  },
+  "d_group": [
+    {
+      "branch": "feat/output-dma-gate1",
+      "tip_sha": "7102485eb966e39398a27d3c9af1815c11276c69",
+      "merge_base_with_gpt2_r31": "c93ea144713d5fafe2e8a5509029927cd6859e75",
+      "unique_commit_count_vs_gpt2_r31": 13,
+      "unique_commits": [
+        {
+          "sha": "48345af9c5a4dcabc8fec04999c8edae55dc09c5",
+          "subject": "research: calibrate Phase 3 SFU and CNN throughput models"
+        },
+        {
+          "sha": "73ebc74f5e155c614d3eeb4f5bee12315ed7f633",
+          "subject": "perf(matrix): overlap fused CNN line packing and protected writeback"
+        },
+        {
+          "sha": "b1dd75b8d1b6bb0465bdb3452df556a7919f7c4d",
+          "subject": "research: reject unrestricted scalar SFU prefetch and close Phase 4 evidence"
+        },
+        {
+          "sha": "df2bdecc2cfb1989285555f8c1511815b59ab307",
+          "subject": "research: establish architecture-first Gate 0 bottleneck baseline"
+        },
+        {
+          "sha": "c8457126ddd482438216920708912312c945cd4a",
+          "subject": "research: close Matrix prefetch milestone with bounded evidence"
+        },
+        {
+          "sha": "25372669d097e030e79ca5d7ce68ab41c68921a2",
+          "subject": "research: complete real Top matrix baseline coverage"
+        },
+        {
+          "sha": "464b72a377cfb531b0f7ba44dfb891c4b845ef92",
+          "subject": "docs: record real Top matrix attribution"
+        },
+        {
+          "sha": "d8883ed29723d3121e38ea1c89d717f47b8bb003",
+          "subject": "research: complete matrix gemv sfu and cnn architecture studies"
+        },
+        {
+          "sha": "32f0252434f5dd3409347a8170a9deb3d250b502",
+          "subject": "perf(mapper): select measured GEMM layout for isolated M8 M16 dispatch"
+        },
+        {
+          "sha": "56adb1245ecd7de740c4c90c48844f6b88fdd24c",
+          "subject": "test: preserve paired Top transaction traces and common Golden payloads"
+        },
+        {
+          "sha": "14c3f8a9adbb98070b08d617bb0c953a9abb8d47",
+          "subject": "perf: measure DMA system delivery and remove M8 packing overhead"
+        },
+        {
+          "sha": "154b479a7ab8f952483f59fb8d2aa63f228fed53",
+          "subject": "test: make DMA backpressure deterministic and expose late parity drain failure"
+        },
+        {
+          "sha": "7102485eb966e39398a27d3c9af1815c11276c69",
+          "subject": "fix(dma): drain prior store B responses on late SPAD parity fault"
+        }
+      ],
+      "net_changed_path_count_rtl_dv_sw_tools": 35,
+      "rtl_path_count": 2,
+      "rtl_paths": [
+        {
+          "change": "M",
+          "path": "rtl/compute/matrix/ai_tensor_matrix_core.v",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "M",
+          "path": "rtl/dma/ai_axi128_dma.v",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        }
+      ],
+      "changed_paths": [
+        {
+          "change": "M",
+          "path": "dv/VERIFICATION_MATRIX.md",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/block/compute/matrix/tb/phase4_writeback_tasks.svh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/compute/matrix/tb/tb_ai_tensor_matrix_core_random.sv",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "dv/block/compute/sfu/tb/tb_phase3_fault_contract.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/block/dma/tb/tb_output_dma_gate1.sv",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "dv/subsystem/top_smoke/fixtures/phase4_writeback_profile.svh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "M",
+          "path": "dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "rtl/compute/matrix/ai_tensor_matrix_core.v",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "M",
+          "path": "rtl/dma/ai_axi128_dma.v",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "sw/tools/shape_aware_dispatch.py",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt/generate_gate0.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt_round2/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt_round2/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt_round2/check_mapper.py",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt_round2/run.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/final_ab/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/final_ab/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/final_ab/run.py",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/output_dma_gate1/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/output_dma_gate1/run.sh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "M",
+          "path": "tools/benchmark/phase1/run.py",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/model.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/run_review.sh",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/validate.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/SFU_PROTOCOL.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/build_top.sh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/lint.sh",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/run_core.sh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/sfu_protocol_model.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/validate.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        }
+      ],
+      "classification": "研究存档",
+      "rationale": "其产品 RTL 与当前 GPT-2 R31 基线相同；独有内容是旧架构 benchmark/研究脚本。",
+      "recommendation": "保留研究数据的归档副本；不整体合并。"
+    },
+    {
+      "branch": "feat/arch-opt-gate0",
+      "tip_sha": "c8457126ddd482438216920708912312c945cd4a",
+      "merge_base_with_gpt2_r31": "c93ea144713d5fafe2e8a5509029927cd6859e75",
+      "unique_commit_count_vs_gpt2_r31": 5,
+      "unique_commits": [
+        {
+          "sha": "48345af9c5a4dcabc8fec04999c8edae55dc09c5",
+          "subject": "research: calibrate Phase 3 SFU and CNN throughput models"
+        },
+        {
+          "sha": "73ebc74f5e155c614d3eeb4f5bee12315ed7f633",
+          "subject": "perf(matrix): overlap fused CNN line packing and protected writeback"
+        },
+        {
+          "sha": "b1dd75b8d1b6bb0465bdb3452df556a7919f7c4d",
+          "subject": "research: reject unrestricted scalar SFU prefetch and close Phase 4 evidence"
+        },
+        {
+          "sha": "df2bdecc2cfb1989285555f8c1511815b59ab307",
+          "subject": "research: establish architecture-first Gate 0 bottleneck baseline"
+        },
+        {
+          "sha": "c8457126ddd482438216920708912312c945cd4a",
+          "subject": "research: close Matrix prefetch milestone with bounded evidence"
+        }
+      ],
+      "net_changed_path_count_rtl_dv_sw_tools": 21,
+      "rtl_path_count": 1,
+      "rtl_paths": [
+        {
+          "change": "M",
+          "path": "rtl/compute/matrix/ai_tensor_matrix_core.v",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        }
+      ],
+      "changed_paths": [
+        {
+          "change": "A",
+          "path": "dv/block/compute/matrix/tb/phase4_writeback_tasks.svh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/compute/matrix/tb/tb_ai_tensor_matrix_core_random.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/block/compute/sfu/tb/tb_phase3_fault_contract.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/subsystem/top_smoke/fixtures/phase4_writeback_profile.svh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "M",
+          "path": "dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "rtl/compute/matrix/ai_tensor_matrix_core.v",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt/generate_gate0.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/model.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/run_review.sh",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/validate.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/SFU_PROTOCOL.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/build_top.sh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/lint.sh",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/run_core.sh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/sfu_protocol_model.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/validate.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        }
+      ],
+      "classification": "研究存档",
+      "rationale": "属于 output-dma/architecture optimization 研究线，产品 RTL 内容已被当前基线覆盖。",
+      "recommendation": "跟随架构研究线作为存档候选；不整体合并。"
+    },
+    {
+      "branch": "feat/arch-opt-m1",
+      "tip_sha": "d8883ed29723d3121e38ea1c89d717f47b8bb003",
+      "merge_base_with_gpt2_r31": "c93ea144713d5fafe2e8a5509029927cd6859e75",
+      "unique_commit_count_vs_gpt2_r31": 8,
+      "unique_commits": [
+        {
+          "sha": "48345af9c5a4dcabc8fec04999c8edae55dc09c5",
+          "subject": "research: calibrate Phase 3 SFU and CNN throughput models"
+        },
+        {
+          "sha": "73ebc74f5e155c614d3eeb4f5bee12315ed7f633",
+          "subject": "perf(matrix): overlap fused CNN line packing and protected writeback"
+        },
+        {
+          "sha": "b1dd75b8d1b6bb0465bdb3452df556a7919f7c4d",
+          "subject": "research: reject unrestricted scalar SFU prefetch and close Phase 4 evidence"
+        },
+        {
+          "sha": "df2bdecc2cfb1989285555f8c1511815b59ab307",
+          "subject": "research: establish architecture-first Gate 0 bottleneck baseline"
+        },
+        {
+          "sha": "c8457126ddd482438216920708912312c945cd4a",
+          "subject": "research: close Matrix prefetch milestone with bounded evidence"
+        },
+        {
+          "sha": "25372669d097e030e79ca5d7ce68ab41c68921a2",
+          "subject": "research: complete real Top matrix baseline coverage"
+        },
+        {
+          "sha": "464b72a377cfb531b0f7ba44dfb891c4b845ef92",
+          "subject": "docs: record real Top matrix attribution"
+        },
+        {
+          "sha": "d8883ed29723d3121e38ea1c89d717f47b8bb003",
+          "subject": "research: complete matrix gemv sfu and cnn architecture studies"
+        }
+      ],
+      "net_changed_path_count_rtl_dv_sw_tools": 22,
+      "rtl_path_count": 1,
+      "rtl_paths": [
+        {
+          "change": "M",
+          "path": "rtl/compute/matrix/ai_tensor_matrix_core.v",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        }
+      ],
+      "changed_paths": [
+        {
+          "change": "A",
+          "path": "dv/block/compute/matrix/tb/phase4_writeback_tasks.svh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/compute/matrix/tb/tb_ai_tensor_matrix_core_random.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/block/compute/sfu/tb/tb_phase3_fault_contract.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/subsystem/top_smoke/fixtures/phase4_writeback_profile.svh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "M",
+          "path": "dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "rtl/compute/matrix/ai_tensor_matrix_core.v",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt/generate_gate0.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "M",
+          "path": "tools/benchmark/phase1/run.py",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/model.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/run_review.sh",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/validate.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/SFU_PROTOCOL.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/build_top.sh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/lint.sh",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/run_core.sh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/sfu_protocol_model.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/validate.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        }
+      ],
+      "classification": "研究存档",
+      "rationale": "属于 output-dma/architecture optimization 研究线，产品 RTL 内容已被当前基线覆盖。",
+      "recommendation": "跟随架构研究线作为存档候选；不整体合并。"
+    },
+    {
+      "branch": "feat/arch-opt-round2-dispatch",
+      "tip_sha": "56adb1245ecd7de740c4c90c48844f6b88fdd24c",
+      "merge_base_with_gpt2_r31": "c93ea144713d5fafe2e8a5509029927cd6859e75",
+      "unique_commit_count_vs_gpt2_r31": 10,
+      "unique_commits": [
+        {
+          "sha": "48345af9c5a4dcabc8fec04999c8edae55dc09c5",
+          "subject": "research: calibrate Phase 3 SFU and CNN throughput models"
+        },
+        {
+          "sha": "73ebc74f5e155c614d3eeb4f5bee12315ed7f633",
+          "subject": "perf(matrix): overlap fused CNN line packing and protected writeback"
+        },
+        {
+          "sha": "b1dd75b8d1b6bb0465bdb3452df556a7919f7c4d",
+          "subject": "research: reject unrestricted scalar SFU prefetch and close Phase 4 evidence"
+        },
+        {
+          "sha": "df2bdecc2cfb1989285555f8c1511815b59ab307",
+          "subject": "research: establish architecture-first Gate 0 bottleneck baseline"
+        },
+        {
+          "sha": "c8457126ddd482438216920708912312c945cd4a",
+          "subject": "research: close Matrix prefetch milestone with bounded evidence"
+        },
+        {
+          "sha": "25372669d097e030e79ca5d7ce68ab41c68921a2",
+          "subject": "research: complete real Top matrix baseline coverage"
+        },
+        {
+          "sha": "464b72a377cfb531b0f7ba44dfb891c4b845ef92",
+          "subject": "docs: record real Top matrix attribution"
+        },
+        {
+          "sha": "d8883ed29723d3121e38ea1c89d717f47b8bb003",
+          "subject": "research: complete matrix gemv sfu and cnn architecture studies"
+        },
+        {
+          "sha": "32f0252434f5dd3409347a8170a9deb3d250b502",
+          "subject": "perf(mapper): select measured GEMM layout for isolated M8 M16 dispatch"
+        },
+        {
+          "sha": "56adb1245ecd7de740c4c90c48844f6b88fdd24c",
+          "subject": "test: preserve paired Top transaction traces and common Golden payloads"
+        }
+      ],
+      "net_changed_path_count_rtl_dv_sw_tools": 27,
+      "rtl_path_count": 1,
+      "rtl_paths": [
+        {
+          "change": "M",
+          "path": "rtl/compute/matrix/ai_tensor_matrix_core.v",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        }
+      ],
+      "changed_paths": [
+        {
+          "change": "A",
+          "path": "dv/block/compute/matrix/tb/phase4_writeback_tasks.svh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/compute/matrix/tb/tb_ai_tensor_matrix_core_random.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/block/compute/sfu/tb/tb_phase3_fault_contract.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/subsystem/top_smoke/fixtures/phase4_writeback_profile.svh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "M",
+          "path": "dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "rtl/compute/matrix/ai_tensor_matrix_core.v",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "sw/tools/shape_aware_dispatch.py",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt/generate_gate0.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt_round2/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt_round2/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt_round2/check_mapper.py",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt_round2/run.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "M",
+          "path": "tools/benchmark/phase1/run.py",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/model.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/run_review.sh",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/validate.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/SFU_PROTOCOL.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/build_top.sh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/lint.sh",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/run_core.sh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/sfu_protocol_model.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/validate.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        }
+      ],
+      "classification": "研究存档",
+      "rationale": "属于 output-dma/architecture optimization 研究线，产品 RTL 内容已被当前基线覆盖。",
+      "recommendation": "跟随架构研究线作为存档候选；不整体合并。"
+    },
+    {
+      "branch": "feat/final-arch-ab-system",
+      "tip_sha": "14c3f8a9adbb98070b08d617bb0c953a9abb8d47",
+      "merge_base_with_gpt2_r31": "c93ea144713d5fafe2e8a5509029927cd6859e75",
+      "unique_commit_count_vs_gpt2_r31": 11,
+      "unique_commits": [
+        {
+          "sha": "48345af9c5a4dcabc8fec04999c8edae55dc09c5",
+          "subject": "research: calibrate Phase 3 SFU and CNN throughput models"
+        },
+        {
+          "sha": "73ebc74f5e155c614d3eeb4f5bee12315ed7f633",
+          "subject": "perf(matrix): overlap fused CNN line packing and protected writeback"
+        },
+        {
+          "sha": "b1dd75b8d1b6bb0465bdb3452df556a7919f7c4d",
+          "subject": "research: reject unrestricted scalar SFU prefetch and close Phase 4 evidence"
+        },
+        {
+          "sha": "df2bdecc2cfb1989285555f8c1511815b59ab307",
+          "subject": "research: establish architecture-first Gate 0 bottleneck baseline"
+        },
+        {
+          "sha": "c8457126ddd482438216920708912312c945cd4a",
+          "subject": "research: close Matrix prefetch milestone with bounded evidence"
+        },
+        {
+          "sha": "25372669d097e030e79ca5d7ce68ab41c68921a2",
+          "subject": "research: complete real Top matrix baseline coverage"
+        },
+        {
+          "sha": "464b72a377cfb531b0f7ba44dfb891c4b845ef92",
+          "subject": "docs: record real Top matrix attribution"
+        },
+        {
+          "sha": "d8883ed29723d3121e38ea1c89d717f47b8bb003",
+          "subject": "research: complete matrix gemv sfu and cnn architecture studies"
+        },
+        {
+          "sha": "32f0252434f5dd3409347a8170a9deb3d250b502",
+          "subject": "perf(mapper): select measured GEMM layout for isolated M8 M16 dispatch"
+        },
+        {
+          "sha": "56adb1245ecd7de740c4c90c48844f6b88fdd24c",
+          "subject": "test: preserve paired Top transaction traces and common Golden payloads"
+        },
+        {
+          "sha": "14c3f8a9adbb98070b08d617bb0c953a9abb8d47",
+          "subject": "perf: measure DMA system delivery and remove M8 packing overhead"
+        }
+      ],
+      "net_changed_path_count_rtl_dv_sw_tools": 30,
+      "rtl_path_count": 1,
+      "rtl_paths": [
+        {
+          "change": "M",
+          "path": "rtl/compute/matrix/ai_tensor_matrix_core.v",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        }
+      ],
+      "changed_paths": [
+        {
+          "change": "A",
+          "path": "dv/block/compute/matrix/tb/phase4_writeback_tasks.svh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/compute/matrix/tb/tb_ai_tensor_matrix_core_random.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/block/compute/sfu/tb/tb_phase3_fault_contract.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/subsystem/top_smoke/fixtures/phase4_writeback_profile.svh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "M",
+          "path": "dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "rtl/compute/matrix/ai_tensor_matrix_core.v",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "sw/tools/shape_aware_dispatch.py",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt/generate_gate0.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt_round2/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt_round2/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt_round2/check_mapper.py",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt_round2/run.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/final_ab/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/final_ab/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/final_ab/run.py",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "M",
+          "path": "tools/benchmark/phase1/run.py",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/model.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/run_review.sh",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/validate.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/SFU_PROTOCOL.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/build_top.sh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/lint.sh",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/run_core.sh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/sfu_protocol_model.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/validate.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        }
+      ],
+      "classification": "研究存档",
+      "rationale": "属于 output-dma/architecture optimization 研究线，产品 RTL 内容已被当前基线覆盖。",
+      "recommendation": "跟随架构研究线作为存档候选；不整体合并。"
+    },
+    {
+      "branch": "feat/phase3-throughput",
+      "tip_sha": "48345af9c5a4dcabc8fec04999c8edae55dc09c5",
+      "merge_base_with_gpt2_r31": "c93ea144713d5fafe2e8a5509029927cd6859e75",
+      "unique_commit_count_vs_gpt2_r31": 1,
+      "unique_commits": [
+        {
+          "sha": "48345af9c5a4dcabc8fec04999c8edae55dc09c5",
+          "subject": "research: calibrate Phase 3 SFU and CNN throughput models"
+        }
+      ],
+      "net_changed_path_count_rtl_dv_sw_tools": 6,
+      "rtl_path_count": 0,
+      "rtl_paths": [],
+      "changed_paths": [
+        {
+          "change": "A",
+          "path": "dv/block/compute/sfu/tb/tb_phase3_fault_contract.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/model.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/run_review.sh",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/validate.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        }
+      ],
+      "classification": "研究存档",
+      "rationale": "属于 output-dma/architecture optimization 研究线，产品 RTL 内容已被当前基线覆盖。",
+      "recommendation": "跟随架构研究线作为存档候选；不整体合并。"
+    },
+    {
+      "branch": "feat/phase4-cnn-writeback",
+      "tip_sha": "b1dd75b8d1b6bb0465bdb3452df556a7919f7c4d",
+      "merge_base_with_gpt2_r31": "c93ea144713d5fafe2e8a5509029927cd6859e75",
+      "unique_commit_count_vs_gpt2_r31": 3,
+      "unique_commits": [
+        {
+          "sha": "48345af9c5a4dcabc8fec04999c8edae55dc09c5",
+          "subject": "research: calibrate Phase 3 SFU and CNN throughput models"
+        },
+        {
+          "sha": "73ebc74f5e155c614d3eeb4f5bee12315ed7f633",
+          "subject": "perf(matrix): overlap fused CNN line packing and protected writeback"
+        },
+        {
+          "sha": "b1dd75b8d1b6bb0465bdb3452df556a7919f7c4d",
+          "subject": "research: reject unrestricted scalar SFU prefetch and close Phase 4 evidence"
+        }
+      ],
+      "net_changed_path_count_rtl_dv_sw_tools": 19,
+      "rtl_path_count": 1,
+      "rtl_paths": [
+        {
+          "change": "M",
+          "path": "rtl/compute/matrix/ai_tensor_matrix_core.v",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        }
+      ],
+      "changed_paths": [
+        {
+          "change": "A",
+          "path": "dv/block/compute/matrix/tb/phase4_writeback_tasks.svh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/compute/matrix/tb/tb_ai_tensor_matrix_core_random.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/block/compute/sfu/tb/tb_phase3_fault_contract.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/subsystem/top_smoke/fixtures/phase4_writeback_profile.svh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "M",
+          "path": "dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "rtl/compute/matrix/ai_tensor_matrix_core.v",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/model.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/run_review.sh",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/validate.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/SFU_PROTOCOL.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/build_top.sh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/lint.sh",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/run_core.sh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/sfu_protocol_model.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/validate.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        }
+      ],
+      "classification": "研究存档",
+      "rationale": "属于 output-dma/architecture optimization 研究线，产品 RTL 内容已被当前基线覆盖。",
+      "recommendation": "跟随架构研究线作为存档候选；不整体合并。"
+    },
+    {
+      "branch": "task/architecture-final-endpoints",
+      "tip_sha": "8ab8597709400dde0b62761176c13d60456a6a21",
+      "merge_base_with_gpt2_r31": "c93ea144713d5fafe2e8a5509029927cd6859e75",
+      "unique_commit_count_vs_gpt2_r31": 12,
+      "unique_commits": [
+        {
+          "sha": "48345af9c5a4dcabc8fec04999c8edae55dc09c5",
+          "subject": "research: calibrate Phase 3 SFU and CNN throughput models"
+        },
+        {
+          "sha": "73ebc74f5e155c614d3eeb4f5bee12315ed7f633",
+          "subject": "perf(matrix): overlap fused CNN line packing and protected writeback"
+        },
+        {
+          "sha": "b1dd75b8d1b6bb0465bdb3452df556a7919f7c4d",
+          "subject": "research: reject unrestricted scalar SFU prefetch and close Phase 4 evidence"
+        },
+        {
+          "sha": "df2bdecc2cfb1989285555f8c1511815b59ab307",
+          "subject": "research: establish architecture-first Gate 0 bottleneck baseline"
+        },
+        {
+          "sha": "c8457126ddd482438216920708912312c945cd4a",
+          "subject": "research: close Matrix prefetch milestone with bounded evidence"
+        },
+        {
+          "sha": "25372669d097e030e79ca5d7ce68ab41c68921a2",
+          "subject": "research: complete real Top matrix baseline coverage"
+        },
+        {
+          "sha": "464b72a377cfb531b0f7ba44dfb891c4b845ef92",
+          "subject": "docs: record real Top matrix attribution"
+        },
+        {
+          "sha": "d8883ed29723d3121e38ea1c89d717f47b8bb003",
+          "subject": "research: complete matrix gemv sfu and cnn architecture studies"
+        },
+        {
+          "sha": "32f0252434f5dd3409347a8170a9deb3d250b502",
+          "subject": "perf(mapper): select measured GEMM layout for isolated M8 M16 dispatch"
+        },
+        {
+          "sha": "56adb1245ecd7de740c4c90c48844f6b88fdd24c",
+          "subject": "test: preserve paired Top transaction traces and common Golden payloads"
+        },
+        {
+          "sha": "b1f7790c06f63fe7557adfe840f081c9da9d11eb",
+          "subject": "Measure matched DMA compute output endpoints for architecture review"
+        },
+        {
+          "sha": "8ab8597709400dde0b62761176c13d60456a6a21",
+          "subject": "Record endpoint integrity checks and remaining acceptance gates"
+        }
+      ],
+      "net_changed_path_count_rtl_dv_sw_tools": 29,
+      "rtl_path_count": 1,
+      "rtl_paths": [
+        {
+          "change": "M",
+          "path": "rtl/compute/matrix/ai_tensor_matrix_core.v",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        }
+      ],
+      "changed_paths": [
+        {
+          "change": "A",
+          "path": "dv/block/compute/matrix/tb/phase4_writeback_tasks.svh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/compute/matrix/tb/tb_ai_tensor_matrix_core_random.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/block/compute/sfu/tb/tb_phase3_fault_contract.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/subsystem/top_smoke/fixtures/phase4_writeback_profile.svh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "M",
+          "path": "dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "rtl/compute/matrix/ai_tensor_matrix_core.v",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "sw/tools/shape_aware_dispatch.py",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt/generate_gate0.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt_round2/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt_round2/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt_round2/check_mapper.py",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/arch_opt_round2/run.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/final_endpoints/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/final_endpoints/run.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "M",
+          "path": "tools/benchmark/phase1/run.py",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/model.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/run_review.sh",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase3/validate.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/README.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/SFU_PROTOCOL.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/archive.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/build_top.sh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/lint.sh",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/run_core.sh",
+          "target_status_vs_gpt2_r31": "IDENTICAL"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/sfu_protocol_model.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase4/validate.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        }
+      ],
+      "classification": "研究存档",
+      "rationale": "产品 RTL 与当前基线相同；独有差异集中在 benchmark/architecture endpoint 研究脚本。",
+      "recommendation": "保留研究数据的归档副本；不整体合并。"
+    },
+    {
+      "branch": "research/phase0-1-memory-dataflow-2026-11-13",
+      "tip_sha": "2c0d7d14c772c5566e82953abf0459195956bf8f",
+      "merge_base_with_gpt2_r31": "0492c47d12cd11bcc22be1930da7af77ed870b6e",
+      "unique_commit_count_vs_gpt2_r31": 4,
+      "unique_commits": [
+        {
+          "sha": "987434d4e2048dc0e818e930751f74ae77bb24b7",
+          "subject": "research: document phase 0-1 memory dataflow baseline"
+        },
+        {
+          "sha": "ca7ef070d962b1fd227dfe6d9846bbad0f7f65e2",
+          "subject": "research: add compact CNN allocation feasibility model"
+        },
+        {
+          "sha": "62733bd9f1fcd1735a080a75c6c0840d1d13fb94",
+          "subject": "phase1: real RTL replay, passive profile, cost model decision"
+        },
+        {
+          "sha": "2c0d7d14c772c5566e82953abf0459195956bf8f",
+          "subject": "research: record phase2 fault causal DV baseline"
+        }
+      ],
+      "net_changed_path_count_rtl_dv_sw_tools": 4,
+      "rtl_path_count": 0,
+      "rtl_paths": [],
+      "changed_paths": [
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase0_1/check_cnn_pack.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase0_1/joint_cost_model.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase0_1/profile_dataflow.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/benchmark/phase0_1/run_a1_replay.py",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        }
+      ],
+      "classification": "研究存档",
+      "rationale": "仅有 memory/dataflow 研究脚本，没有产品 RTL 缺口。",
+      "recommendation": "保留研究数据的归档副本；不整体合并。"
+    },
+    {
+      "branch": "feature/m3-phase-abort-test-contract",
+      "tip_sha": "e6c86374b3762b4cd877616c4a03579dfb1d5b72",
+      "merge_base_with_gpt2_r31": "3ec0be579c6847d4ae707a30e5e30ccd64ab0813",
+      "unique_commit_count_vs_gpt2_r31": 16,
+      "unique_commits": [
+        {
+          "sha": "f78d43419d741bc1a333d3162671375e0e54a495",
+          "subject": "docs: add coverage and SpyGlass reports"
+        },
+        {
+          "sha": "a4fb84cca7537c250be07739ec465e34e5917029",
+          "subject": "docs: track architecture innovation stage roadmap"
+        },
+        {
+          "sha": "3d97711443bf7946db7ea1bdfbeb328cfd9ec7a5",
+          "subject": "docs: complete scheduler baseline measurements"
+        },
+        {
+          "sha": "773a747a841afaff8c68ce194a9b1c0558a82d27",
+          "subject": "test: profile disjoint scalar and CNM bank requests"
+        },
+        {
+          "sha": "a3bd86254ac0bb66989211ed5ff1933a0819f983",
+          "subject": "test: expand shape adaptive SPAD baseline"
+        },
+        {
+          "sha": "48b7e291a4987ebf3b7f84ec43cb628e80749801",
+          "subject": "docs: record shape adaptive stage decisions"
+        },
+        {
+          "sha": "c43cfde3b2d4040467c63737148a08241672b374",
+          "subject": "test: profile SFU arithmetic wait cycles"
+        },
+        {
+          "sha": "40b512863d14b56a6270a45b8fc751e81866d1a5",
+          "subject": "docs: close A-E innovation review and DV plan"
+        },
+        {
+          "sha": "409c3a9fd647d4f8c4c881c9bfdaf5d93b7076ee",
+          "subject": "docs: record license-restored DV replay blocker"
+        },
+        {
+          "sha": "987c957e32a3be71e7d8b593e8d7a515eecf9b42",
+          "subject": "Test matrix abort before final output commit"
+        },
+        {
+          "sha": "52353d5454284e05119764705fb8a6e406a5c8f4",
+          "subject": "Align matrix benchmark stalls per workload"
+        },
+        {
+          "sha": "fe8b7b461d2ef80ee5eebe4682c0245284b96f5e",
+          "subject": "docs(verification): record Matrix phase-abort closure evidence"
+        },
+        {
+          "sha": "8d67cf3a5653a12873ab16c90e6ec2a149e00b17",
+          "subject": "chore(verification): mark archived logs as data files"
+        },
+        {
+          "sha": "4322168d1198ae411ceb6c0e81f4b485dcd57d3d",
+          "subject": "docs(verification): link phase-abort evidence PR"
+        },
+        {
+          "sha": "4b62f8e815bb272ab9b727dff4736cec460e6f21",
+          "subject": "perf(matrix): split prefetch and write cycle attribution"
+        },
+        {
+          "sha": "e6c86374b3762b4cd877616c4a03579dfb1d5b72",
+          "subject": "docs(verification): archive Matrix cycle attribution evidence"
+        }
+      ],
+      "net_changed_path_count_rtl_dv_sw_tools": 11,
+      "rtl_path_count": 1,
+      "rtl_paths": [
+        {
+          "change": "M",
+          "path": "rtl/compute/matrix/ai_tensor_matrix_core.v",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        }
+      ],
+      "changed_paths": [
+        {
+          "change": "M",
+          "path": "dv/VERIFICATION_MATRIX.md",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/compute/matrix/tb/tb_ai_tensor_matrix_core_random.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/compute/sfu/README.md",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/compute/sfu/tb/tb_ai_tensor_sfu_random.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/research/shape_adaptive/sim/Makefile",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/research/shape_adaptive/sim/collect_spad_benchmark.py",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/research/shape_adaptive/tb_shape_adaptive_gemv_spad.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/uvm/agent/interfaces/ai_compute_cluster_if.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/uvm/tb/tb_ai_accel_uvm.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/uvm/tests/sequences/ai_compute_cluster_e2e_seq.svh",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "rtl/compute/matrix/ai_tensor_matrix_core.v",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        }
+      ],
+      "classification": "建议取回",
+      "rationale": "Matrix Core 文件仍不同；独有 directed test 覆盖最终输出提交前的 abort 边界。",
+      "recommendation": "只审查并单独移植 directed test/测试契约；不搬入旧 Matrix RTL。候选测试提交 987c957e32a3be71e7d8b593e8d7a515eecf9b42。"
+    },
+    {
+      "branch": "codex/r158-frozen-replay-archive",
+      "tip_sha": "0a0d68ebb1c5b9d82b208bb44c73bfff86d74b9b",
+      "merge_base_with_gpt2_r31": "3041355528dffe856e2d5384027c6ee5df5d1b42",
+      "unique_commit_count_vs_gpt2_r31": 61,
+      "unique_commits": [
+        {
+          "sha": "b68b72c48a410ec7683f528aa35b91f040b736a0",
+          "subject": "dv: cover real Conv descriptor shape boundaries"
+        },
+        {
+          "sha": "9ecdd9b8541fd28f88e5b180376901a2cdedf756",
+          "subject": "docs: record R251 Conv boundary replay"
+        },
+        {
+          "sha": "edb2539efcdbade0d61d9da3ed864c32c1c0651a",
+          "subject": "dv: cover depthwise descriptor boundaries"
+        },
+        {
+          "sha": "9871bb29f64e83e83c500c87a39ca7b55ba5b0fa",
+          "subject": "docs: record R252 depthwise boundary replay"
+        },
+        {
+          "sha": "fdabd55cce7bc581d850954e89ed9056ff7c7f43",
+          "subject": "dv: verify multi-channel depthwise CMDQ sequence"
+        },
+        {
+          "sha": "859da92eb5a7b4ecf11f92d594d260f844b4a9c7",
+          "subject": "docs: record R253 depthwise channel evidence"
+        },
+        {
+          "sha": "8cf80381d306c92fc2599239159faa6034267c2a",
+          "subject": "docs: record published Compute Cluster R254 replay"
+        },
+        {
+          "sha": "f0bcc2805aac04bd5d634a03564a73fc84f132f5",
+          "subject": "dv: verify all compute cluster opcode dispatches"
+        },
+        {
+          "sha": "f02700dfdb655fced587ffd3e4b2979046a4d90d",
+          "subject": "docs: record R255 opcode dispatch closure"
+        },
+        {
+          "sha": "415197d03a73d09a126bb2ba008218d4817caf4a",
+          "subject": "dv: add real CMDQ FP16 numeric golden"
+        },
+        {
+          "sha": "5b707eea38baf816068ca5f7e7c87bb7852cf576",
+          "subject": "verification: record FP16 CMDQ Golden evidence"
+        },
+        {
+          "sha": "baa74dabd6a63d769aa4cd33b0a87a65eff43cb9",
+          "subject": "verification: record R257 candidate replay"
+        },
+        {
+          "sha": "99ed4f53dd96bb74b0e8df894c06b39a6779a3a9",
+          "subject": "verification: restore complete R257 audit documents"
+        },
+        {
+          "sha": "e1d63bf6dfa48f41b2e83c2f5f3fc3981cc75e0f",
+          "subject": "verification: align current RTM disposition summary"
+        },
+        {
+          "sha": "c6b63a8dde573d5dd685750180ad9be8c3c346c5",
+          "subject": "benchmark: record R257 matrix config replay"
+        },
+        {
+          "sha": "8da2be0e9d700c0033e87f0f25804b885a30b804",
+          "subject": "docs(verification): replay memory fabric reset on R258 candidate"
+        },
+        {
+          "sha": "ae2415390a32f58318255a9534fade6467c7f1a8",
+          "subject": "docs(benchmark): update TinyNPU distance after Matrix tuning"
+        },
+        {
+          "sha": "724d1f0b3774643df35e14d7cb9ff0e3ad534ac8",
+          "subject": "benchmark: pair optimized Matrix controller with TinyNPU vectors"
+        },
+        {
+          "sha": "7542ddbf6458f76f9041ae0d7a8f50e8d13bc8be",
+          "subject": "docs(verification): record R260 final candidate clean replay"
+        },
+        {
+          "sha": "5c4e993742571be809a6c389b592a9f26b159b52",
+          "subject": "verification: disposition seven-engine parameter latch point"
+        },
+        {
+          "sha": "bf4ac16b8b7ba0622a4f9f1c59a00fc759ae7152",
+          "subject": "verification: close scoped scalar int8 arithmetic point"
+        },
+        {
+          "sha": "67641e4fd5653ce0ef2bf8d8f8ae3cefabb0ea7e",
+          "subject": "dv: complete and document R263 multi-tile Matrix CMDQ coverage"
+        },
+        {
+          "sha": "07ad6c4378c09a688aee28cca5aed675a3a74dd6",
+          "subject": "verification: record R264 published clean replay"
+        },
+        {
+          "sha": "0430b651bb28cc3cca12f29faaccb70a74d52392",
+          "subject": "verification: record R265 RTL mutation replay"
+        },
+        {
+          "sha": "bb2a1a843cda878c04bfe12773ebd9bd9871ff14",
+          "subject": "verification: record R266 SPAD fairness replay"
+        },
+        {
+          "sha": "eb39f1facae28a72aa3cb1c467f122b30f5d4894",
+          "subject": "verification: record R267 clean replay and TinyNPU distance"
+        },
+        {
+          "sha": "e6d4cd7fd555d3a8b26e2afa990193e2f65292d1",
+          "subject": "dv: cover compute SPAD request stall depths"
+        },
+        {
+          "sha": "817c8f2af7ea2df924f560fc578f5813ec52b22e",
+          "subject": "dv: report missing SPAD stall-depth bins"
+        },
+        {
+          "sha": "c46c1d6d2cb05a951b8140c0aab1b9321796e3b0",
+          "subject": "dv: inject legal core write backpressure"
+        },
+        {
+          "sha": "05d5eee50703ca524da8df1ea78335dac8f1464d",
+          "subject": "dv: cover Matrix Line and CNM stall depths"
+        },
+        {
+          "sha": "221ef03caa98246fde9edba9575243fb67e03011",
+          "subject": "dv: serialize Matrix and CNM stall injection"
+        },
+        {
+          "sha": "501dd5d985c6fb469f1ccfddf8b15338c7ceffb4",
+          "subject": "dv: retrigger arbiter after testbench stall"
+        },
+        {
+          "sha": "13cc1da2c4154dfeed129832ec7887e6dfb03a0c",
+          "subject": "dv: suppress response tagging during SPAD pause"
+        },
+        {
+          "sha": "4f10796b2d4043059984f79a4102b954b0c7cfd8",
+          "subject": "dv: count stall injection evidence lines only"
+        },
+        {
+          "sha": "cd55d905dc5bd3dd8fbcfa9105c6379408e68693",
+          "subject": "docs: record R268 complete requester stall bins"
+        },
+        {
+          "sha": "51adc2db4e1ed3b2235d5fae02832277cc8db9ae",
+          "subject": "docs: record R269 exact-head clean replay"
+        },
+        {
+          "sha": "31adf279449f2ef837acdc3fc1a0013b03bb3c98",
+          "subject": "dv: cover stall recovery on all SPAD clients"
+        },
+        {
+          "sha": "cf7de32e015fc00ba7111804212d7c552ac24274",
+          "subject": "docs: record R270 request stall recovery evidence"
+        },
+        {
+          "sha": "b50cffea5948f0efd925132d24a2eef2298aff49",
+          "subject": "docs: refresh R270 open issue audit"
+        },
+        {
+          "sha": "fbce080dea40581cbe11132fb67c152fa5fad03a",
+          "subject": "docs: record exact R270 published-head replay"
+        },
+        {
+          "sha": "1dd5ec702f24e2d61ae6113e4fde288ff86fcd16",
+          "subject": "docs: record R271 mixed E2E coverage replay"
+        },
+        {
+          "sha": "dce948047fa1147e30fb3bd9debfc02bf8758a3d",
+          "subject": "dv: add bounded compute-cluster progress gate"
+        },
+        {
+          "sha": "a8b8148e6dce9b508030bfc96c6481a74d70a586",
+          "subject": "docs(benchmark): record R273 TinyNPU controller replay"
+        },
+        {
+          "sha": "5b8e6e5decf972b07230bd7828f7d8f2ccd43307",
+          "subject": "dv: add Scalar KV shared SPAD ownership testpoint"
+        },
+        {
+          "sha": "6a4a225669c3fbacf0a8ff48e3e0239f8e622f45",
+          "subject": "docs: record R275 license-blocked alias regression"
+        },
+        {
+          "sha": "c5ec56243c96f0ef7dd78e44864eed776cea9a0f",
+          "subject": "dv: track shared input region read ownership"
+        },
+        {
+          "sha": "d1ca433198df6751324e646b3fe6c0586881edeb",
+          "subject": "docs: record R276 license-blocked shared-region regression"
+        },
+        {
+          "sha": "e6c1fce989d49e13ee9d429068f1ef8371d6435c",
+          "subject": "docs: record R277 published clean replay"
+        },
+        {
+          "sha": "d2c9dfd5b8aa2bd6345daad6781e209bf259020e",
+          "subject": "fix(spad): round-robin Matrix and CNM banked requests"
+        },
+        {
+          "sha": "219da45f03af6062db78527a2351b63ccd2e49cf",
+          "subject": "test(spad): check sustained banked response ownership"
+        },
+        {
+          "sha": "0537646b2a12725f4db4861298c3f815cfe6b032",
+          "subject": "docs(verification): record R278 banked fairness closure"
+        },
+        {
+          "sha": "487794dfa2d931391fd5ac82f16626b7c6f878e5",
+          "subject": "dv: enforce RR_BANKED subclient fairness coverage"
+        },
+        {
+          "sha": "bb0c7509b56019ce754eb1c206d893e840159a94",
+          "subject": "docs: record R279 published closeout replay"
+        },
+        {
+          "sha": "75fafa0177c24a83a31099bbc006af0e1706fe6e",
+          "subject": "docs: record R280 RTL mutation evidence"
+        },
+        {
+          "sha": "acbfe3443748850b953d7f69edf9beaeb18f6473",
+          "subject": "docs(verification): record R281 Matrix FSM replay"
+        },
+        {
+          "sha": "5509a76ad07173aad047ff7ae8f8ce6b78b803ca",
+          "subject": "docs(verification): record R282 mixed E2E replay"
+        },
+        {
+          "sha": "ccc64886d93f4d88e23ad3660b13008987c572e8",
+          "subject": "docs(verification): record R283 Scalar INT8 replay"
+        },
+        {
+          "sha": "29849a05ec1768fefd5103e28500e385b96d288b",
+          "subject": "test(dv): qualify seven-engine parallel parity recovery"
+        },
+        {
+          "sha": "608ae58a37882dfaf8cfccc8db031f71dcea9977",
+          "subject": "fix(docs): complete large R284 GitHub blobs"
+        },
+        {
+          "sha": "b61c039bbd9c0515677d34ce178ce219f835d174",
+          "subject": "docs(verification): preserve R284 RTM dispositions"
+        },
+        {
+          "sha": "0a0d68ebb1c5b9d82b208bb44c73bfff86d74b9b",
+          "subject": "docs: archive R158 frozen candidate replay evidence"
+        }
+      ],
+      "net_changed_path_count_rtl_dv_sw_tools": 10,
+      "rtl_path_count": 1,
+      "rtl_paths": [
+        {
+          "change": "M",
+          "path": "rtl/memory/ai_spad_arbiter.v",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        }
+      ],
+      "changed_paths": [
+        {
+          "change": "M",
+          "path": "dv/VERIFICATION_MATRIX.md",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/compute/matrix/sim/Makefile",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/compute/matrix/tb/tb_ai_tensor_matrix_core_random.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/spad_arbiter/tb/tb_ai_spad_arbiter_rr.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/subsystem/top_smoke/sim/Makefile",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/uvm/agent/interfaces/ai_compute_cluster_if.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/uvm/sim/Makefile",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/uvm/tb/tb_ai_accel_uvm.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/uvm/tests/sequences/ai_compute_cluster_e2e_seq.svh",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "rtl/memory/ai_spad_arbiter.v",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        }
+      ],
+      "classification": "建议取回",
+      "rationale": "旧 SPAD Arbiter RTL 与当前实现不同，分支含 banked round-robin/fairness 回归材料。",
+      "recommendation": "只比较 fairness 测试/证据后择一提取；不整体合并旧 arbiter。"
+    },
+    {
+      "branch": "feat/compute-cluster-closeout-audit",
+      "tip_sha": "f7bf57309a621a039a7efc1f2c22b501782f08aa",
+      "merge_base_with_gpt2_r31": "3041355528dffe856e2d5384027c6ee5df5d1b42",
+      "unique_commit_count_vs_gpt2_r31": 125,
+      "unique_commits": [
+        {
+          "sha": "b68b72c48a410ec7683f528aa35b91f040b736a0",
+          "subject": "dv: cover real Conv descriptor shape boundaries"
+        },
+        {
+          "sha": "9ecdd9b8541fd28f88e5b180376901a2cdedf756",
+          "subject": "docs: record R251 Conv boundary replay"
+        },
+        {
+          "sha": "edb2539efcdbade0d61d9da3ed864c32c1c0651a",
+          "subject": "dv: cover depthwise descriptor boundaries"
+        },
+        {
+          "sha": "9871bb29f64e83e83c500c87a39ca7b55ba5b0fa",
+          "subject": "docs: record R252 depthwise boundary replay"
+        },
+        {
+          "sha": "fdabd55cce7bc581d850954e89ed9056ff7c7f43",
+          "subject": "dv: verify multi-channel depthwise CMDQ sequence"
+        },
+        {
+          "sha": "859da92eb5a7b4ecf11f92d594d260f844b4a9c7",
+          "subject": "docs: record R253 depthwise channel evidence"
+        },
+        {
+          "sha": "8cf80381d306c92fc2599239159faa6034267c2a",
+          "subject": "docs: record published Compute Cluster R254 replay"
+        },
+        {
+          "sha": "f0bcc2805aac04bd5d634a03564a73fc84f132f5",
+          "subject": "dv: verify all compute cluster opcode dispatches"
+        },
+        {
+          "sha": "f02700dfdb655fced587ffd3e4b2979046a4d90d",
+          "subject": "docs: record R255 opcode dispatch closure"
+        },
+        {
+          "sha": "415197d03a73d09a126bb2ba008218d4817caf4a",
+          "subject": "dv: add real CMDQ FP16 numeric golden"
+        },
+        {
+          "sha": "5b707eea38baf816068ca5f7e7c87bb7852cf576",
+          "subject": "verification: record FP16 CMDQ Golden evidence"
+        },
+        {
+          "sha": "baa74dabd6a63d769aa4cd33b0a87a65eff43cb9",
+          "subject": "verification: record R257 candidate replay"
+        },
+        {
+          "sha": "99ed4f53dd96bb74b0e8df894c06b39a6779a3a9",
+          "subject": "verification: restore complete R257 audit documents"
+        },
+        {
+          "sha": "e1d63bf6dfa48f41b2e83c2f5f3fc3981cc75e0f",
+          "subject": "verification: align current RTM disposition summary"
+        },
+        {
+          "sha": "c6b63a8dde573d5dd685750180ad9be8c3c346c5",
+          "subject": "benchmark: record R257 matrix config replay"
+        },
+        {
+          "sha": "8da2be0e9d700c0033e87f0f25804b885a30b804",
+          "subject": "docs(verification): replay memory fabric reset on R258 candidate"
+        },
+        {
+          "sha": "ae2415390a32f58318255a9534fade6467c7f1a8",
+          "subject": "docs(benchmark): update TinyNPU distance after Matrix tuning"
+        },
+        {
+          "sha": "724d1f0b3774643df35e14d7cb9ff0e3ad534ac8",
+          "subject": "benchmark: pair optimized Matrix controller with TinyNPU vectors"
+        },
+        {
+          "sha": "7542ddbf6458f76f9041ae0d7a8f50e8d13bc8be",
+          "subject": "docs(verification): record R260 final candidate clean replay"
+        },
+        {
+          "sha": "5c4e993742571be809a6c389b592a9f26b159b52",
+          "subject": "verification: disposition seven-engine parameter latch point"
+        },
+        {
+          "sha": "bf4ac16b8b7ba0622a4f9f1c59a00fc759ae7152",
+          "subject": "verification: close scoped scalar int8 arithmetic point"
+        },
+        {
+          "sha": "67641e4fd5653ce0ef2bf8d8f8ae3cefabb0ea7e",
+          "subject": "dv: complete and document R263 multi-tile Matrix CMDQ coverage"
+        },
+        {
+          "sha": "07ad6c4378c09a688aee28cca5aed675a3a74dd6",
+          "subject": "verification: record R264 published clean replay"
+        },
+        {
+          "sha": "0430b651bb28cc3cca12f29faaccb70a74d52392",
+          "subject": "verification: record R265 RTL mutation replay"
+        },
+        {
+          "sha": "bb2a1a843cda878c04bfe12773ebd9bd9871ff14",
+          "subject": "verification: record R266 SPAD fairness replay"
+        },
+        {
+          "sha": "eb39f1facae28a72aa3cb1c467f122b30f5d4894",
+          "subject": "verification: record R267 clean replay and TinyNPU distance"
+        },
+        {
+          "sha": "e6d4cd7fd555d3a8b26e2afa990193e2f65292d1",
+          "subject": "dv: cover compute SPAD request stall depths"
+        },
+        {
+          "sha": "817c8f2af7ea2df924f560fc578f5813ec52b22e",
+          "subject": "dv: report missing SPAD stall-depth bins"
+        },
+        {
+          "sha": "c46c1d6d2cb05a951b8140c0aab1b9321796e3b0",
+          "subject": "dv: inject legal core write backpressure"
+        },
+        {
+          "sha": "05d5eee50703ca524da8df1ea78335dac8f1464d",
+          "subject": "dv: cover Matrix Line and CNM stall depths"
+        },
+        {
+          "sha": "221ef03caa98246fde9edba9575243fb67e03011",
+          "subject": "dv: serialize Matrix and CNM stall injection"
+        },
+        {
+          "sha": "501dd5d985c6fb469f1ccfddf8b15338c7ceffb4",
+          "subject": "dv: retrigger arbiter after testbench stall"
+        },
+        {
+          "sha": "13cc1da2c4154dfeed129832ec7887e6dfb03a0c",
+          "subject": "dv: suppress response tagging during SPAD pause"
+        },
+        {
+          "sha": "4f10796b2d4043059984f79a4102b954b0c7cfd8",
+          "subject": "dv: count stall injection evidence lines only"
+        },
+        {
+          "sha": "cd55d905dc5bd3dd8fbcfa9105c6379408e68693",
+          "subject": "docs: record R268 complete requester stall bins"
+        },
+        {
+          "sha": "51adc2db4e1ed3b2235d5fae02832277cc8db9ae",
+          "subject": "docs: record R269 exact-head clean replay"
+        },
+        {
+          "sha": "31adf279449f2ef837acdc3fc1a0013b03bb3c98",
+          "subject": "dv: cover stall recovery on all SPAD clients"
+        },
+        {
+          "sha": "cf7de32e015fc00ba7111804212d7c552ac24274",
+          "subject": "docs: record R270 request stall recovery evidence"
+        },
+        {
+          "sha": "b50cffea5948f0efd925132d24a2eef2298aff49",
+          "subject": "docs: refresh R270 open issue audit"
+        },
+        {
+          "sha": "fbce080dea40581cbe11132fb67c152fa5fad03a",
+          "subject": "docs: record exact R270 published-head replay"
+        },
+        {
+          "sha": "1dd5ec702f24e2d61ae6113e4fde288ff86fcd16",
+          "subject": "docs: record R271 mixed E2E coverage replay"
+        },
+        {
+          "sha": "dce948047fa1147e30fb3bd9debfc02bf8758a3d",
+          "subject": "dv: add bounded compute-cluster progress gate"
+        },
+        {
+          "sha": "a8b8148e6dce9b508030bfc96c6481a74d70a586",
+          "subject": "docs(benchmark): record R273 TinyNPU controller replay"
+        },
+        {
+          "sha": "5b8e6e5decf972b07230bd7828f7d8f2ccd43307",
+          "subject": "dv: add Scalar KV shared SPAD ownership testpoint"
+        },
+        {
+          "sha": "6a4a225669c3fbacf0a8ff48e3e0239f8e622f45",
+          "subject": "docs: record R275 license-blocked alias regression"
+        },
+        {
+          "sha": "c5ec56243c96f0ef7dd78e44864eed776cea9a0f",
+          "subject": "dv: track shared input region read ownership"
+        },
+        {
+          "sha": "d1ca433198df6751324e646b3fe6c0586881edeb",
+          "subject": "docs: record R276 license-blocked shared-region regression"
+        },
+        {
+          "sha": "e6c1fce989d49e13ee9d429068f1ef8371d6435c",
+          "subject": "docs: record R277 published clean replay"
+        },
+        {
+          "sha": "d2c9dfd5b8aa2bd6345daad6781e209bf259020e",
+          "subject": "fix(spad): round-robin Matrix and CNM banked requests"
+        },
+        {
+          "sha": "219da45f03af6062db78527a2351b63ccd2e49cf",
+          "subject": "test(spad): check sustained banked response ownership"
+        },
+        {
+          "sha": "0537646b2a12725f4db4861298c3f815cfe6b032",
+          "subject": "docs(verification): record R278 banked fairness closure"
+        },
+        {
+          "sha": "487794dfa2d931391fd5ac82f16626b7c6f878e5",
+          "subject": "dv: enforce RR_BANKED subclient fairness coverage"
+        },
+        {
+          "sha": "bb0c7509b56019ce754eb1c206d893e840159a94",
+          "subject": "docs: record R279 published closeout replay"
+        },
+        {
+          "sha": "75fafa0177c24a83a31099bbc006af0e1706fe6e",
+          "subject": "docs: record R280 RTL mutation evidence"
+        },
+        {
+          "sha": "acbfe3443748850b953d7f69edf9beaeb18f6473",
+          "subject": "docs(verification): record R281 Matrix FSM replay"
+        },
+        {
+          "sha": "5509a76ad07173aad047ff7ae8f8ce6b78b803ca",
+          "subject": "docs(verification): record R282 mixed E2E replay"
+        },
+        {
+          "sha": "ccc64886d93f4d88e23ad3660b13008987c572e8",
+          "subject": "docs(verification): record R283 Scalar INT8 replay"
+        },
+        {
+          "sha": "29849a05ec1768fefd5103e28500e385b96d288b",
+          "subject": "test(dv): qualify seven-engine parallel parity recovery"
+        },
+        {
+          "sha": "608ae58a37882dfaf8cfccc8db031f71dcea9977",
+          "subject": "fix(docs): complete large R284 GitHub blobs"
+        },
+        {
+          "sha": "b61c039bbd9c0515677d34ce178ce219f835d174",
+          "subject": "docs(verification): preserve R284 RTM dispositions"
+        },
+        {
+          "sha": "72f0ddfb42d7ee90f431b7bf9c064dc046e98f61",
+          "subject": "docs(verification): record R285 clean replay and status"
+        },
+        {
+          "sha": "c154fd55dd733fbc5fd094f48155eeb5495012f2",
+          "subject": "test(uvm): cross parity owners with healthy completions"
+        },
+        {
+          "sha": "c94b7434bdda7faff15f1a609c722115646dc341",
+          "subject": "docs(verification): record R286 owner recovery cross"
+        },
+        {
+          "sha": "de40cd24d962a1d67bd021da01b5338078c0dd5d",
+          "subject": "docs(verification): refresh Matrix FSM disposition"
+        },
+        {
+          "sha": "4fcb9e4e141f264146e66c18170aa0b19d484437",
+          "subject": "docs(verification): record R288 clean replay"
+        },
+        {
+          "sha": "20e3348ef88a6dd117f99701326f5b99796982d7",
+          "subject": "docs(verification): record R289 functional coverage merge"
+        },
+        {
+          "sha": "db4b184890b56780baf641322d22e78678a225c0",
+          "subject": "test(formal): prove SPAD arbiter data-plane progress"
+        },
+        {
+          "sha": "e1fcde57c70936f2eb2cd8ed9aea14303a61c717",
+          "subject": "docs(verification): record R290 SPAD fairness proof"
+        },
+        {
+          "sha": "e7d2b4b953faad5d3fb92919de01f02c38431c39",
+          "subject": "docs(verification): add R290 published-head replay evidence"
+        },
+        {
+          "sha": "42e5bb43dbe05a9b533f86cfe09f45b0b0da8b1e",
+          "subject": "docs(verification): record R291 published fabric reset replay"
+        },
+        {
+          "sha": "13a07008a9dd9762ce141a7fcc021c3094bf543f",
+          "subject": "docs(verification): record R292 Matrix Line contract replay"
+        },
+        {
+          "sha": "05718b22a7f23348bd83e686005681fbd6966ebd",
+          "subject": "docs(verification): record R293 published Matrix FSM proofs"
+        },
+        {
+          "sha": "869e20e907633c2e0f78a900f5f6586f76e1f720",
+          "subject": "docs(verification): refresh current v1.0 closeout audit"
+        },
+        {
+          "sha": "e1d2265f468421aa867092d63625872c5059bc63",
+          "subject": "test(formal): prove FP parity protection cross unreachable"
+        },
+        {
+          "sha": "4336885e42772c054d96a213a684c4d59b05093d",
+          "subject": "docs(verification): record R295 FP parity disposition"
+        },
+        {
+          "sha": "e169873e4736e481d70b6306b9b6304ab71bf7d4",
+          "subject": "docs(verification): record R296 published-head replay"
+        },
+        {
+          "sha": "4e857f09c6eeb23777e3d42cb8f2d568fded41d6",
+          "subject": "docs(verification): record R296 100 percent functional groups"
+        },
+        {
+          "sha": "be64e44601557a70af26dd713d294d1dc4c020c3",
+          "subject": "test(dv): exercise three depthwise channel descriptors"
+        },
+        {
+          "sha": "7e2b8dc8fe511446381a58bc6e29d1ba3398e878",
+          "subject": "docs(verification): record R297 depthwise closeout evidence"
+        },
+        {
+          "sha": "b2c6e043c199b908e276b789ff841e7a2953848d",
+          "subject": "test(int8): cover maximum VDOT accumulation length"
+        },
+        {
+          "sha": "26f4464379042f444a5517fc213c32b298bc1c22",
+          "subject": "docs(verification): record R298 max-length scalar evidence"
+        },
+        {
+          "sha": "8f60d4f64d19f1b4be8f68e3c99d2bef236f0b53",
+          "subject": "test(uvm): cover max-length scalar VDOT through CMDQ"
+        },
+        {
+          "sha": "ac00c971a1b6c4c715a7fc613027d8b950593d84",
+          "subject": "docs(verification): record R299 CMDQ max VDOT replay"
+        },
+        {
+          "sha": "ff13b1d8155be7e94f0aff99f1461769cedf5079",
+          "subject": "docs(benchmark): refresh current closeout disposition"
+        },
+        {
+          "sha": "f301f09e14a5905279e43635dd0442bf1869d7e2",
+          "subject": "docs(verification): record R300 mixed E2E replay"
+        },
+        {
+          "sha": "79c10e6c15716f3ed4b567723cdcd9bd790f7050",
+          "subject": "docs(verification): record R301 full coverage replay"
+        },
+        {
+          "sha": "845a86fa26cbf67d284a06fd2965804cbd73f6eb",
+          "subject": "dv: stall a real request at parallel reset cut"
+        },
+        {
+          "sha": "e44ae441a8b3ff28b82a770f9b3b7132ac87c7ea",
+          "subject": "docs: record R302 and program status"
+        },
+        {
+          "sha": "a5bf04284b05608dc9332ec3ed35f5d9d66abdf8",
+          "subject": "docs: record published R302 commit identities"
+        },
+        {
+          "sha": "2b72a1cc8b60b69e7be353df7fcb296a47f9da37",
+          "subject": "docs: clarify publication checkpoint identity"
+        },
+        {
+          "sha": "e3388b7ec2216fab3a9e866a7616034b71133bd2",
+          "subject": "dv: check stalled request stability sensitivity"
+        },
+        {
+          "sha": "193ce2d878a225c033b57bcf249c699ab8d8795c",
+          "subject": "docs: record R303 execution frontier"
+        },
+        {
+          "sha": "e2ea01221a2886d4ff213d9c3e0f9eb3aa0317b1",
+          "subject": "docs: update Compute Cluster RTM with R303"
+        },
+        {
+          "sha": "3c4da7b3555997b730c1ef053d6e061fae8da500",
+          "subject": "docs: update Compute Cluster sign-off snapshot"
+        },
+        {
+          "sha": "51a50fa25c46072eec0e043c4da9d8ebfc27d96a",
+          "subject": "docs: update Compute Cluster status"
+        },
+        {
+          "sha": "5735e942853b7ac689a19e4d8fc2e12c07a22545",
+          "subject": "docs: add R303 stall checker mutation report"
+        },
+        {
+          "sha": "3c0536aede3e2b136723a9cc27851ffd3319d7ce",
+          "subject": "docs: record R304 execution frontier"
+        },
+        {
+          "sha": "70ca6006b4cc2cbaeffd441a237b24e02a2528f3",
+          "subject": "docs: update Compute Cluster RTM with R304"
+        },
+        {
+          "sha": "6768f13dab2d5aa7c5de55a0bcb96ba220f66f93",
+          "subject": "docs: update Compute Cluster sign-off snapshot"
+        },
+        {
+          "sha": "422903aa37834c373cc80cda92c0695d4c774b4c",
+          "subject": "docs: update Compute Cluster status"
+        },
+        {
+          "sha": "e5cce9fdaf76b7ba01a04fa95721e35894a0beb8",
+          "subject": "docs: add R304 latest-head clean replay report"
+        },
+        {
+          "sha": "300a4331afa1f22313dcaa9190019c28473f812d",
+          "subject": "docs: record R305 execution frontier"
+        },
+        {
+          "sha": "6368143cbe97edb17ce92bedae1f9324dbf3e613",
+          "subject": "docs: update Compute Cluster RTM with R305"
+        },
+        {
+          "sha": "74cd45d25554e3d7c01bb493d46a3988d9e23289",
+          "subject": "docs: update Compute Cluster sign-off snapshot"
+        },
+        {
+          "sha": "da70f29ad3760694b3ee17de30ea9aec182baac8",
+          "subject": "docs: update Compute Cluster status"
+        },
+        {
+          "sha": "f87e2ec8af06238c37b60540333d0f1785ddb829",
+          "subject": "docs: add R305 combined coverage report"
+        },
+        {
+          "sha": "a12f34b0b5bfb822e4ecde82180ca59851a8d554",
+          "subject": "dv: cover reset of blocked protection completions"
+        },
+        {
+          "sha": "718df8e2cb7b2e592873e0d9c2415a988698cd1d",
+          "subject": "docs: record R306 Protection reset cross evidence"
+        },
+        {
+          "sha": "25752497b5c4a6adc48d2d7a1c4ad4dccf9b9afa",
+          "subject": "docs(verification): record R307 published-head replay"
+        },
+        {
+          "sha": "85d9c5c6cf80a74f00a57e147cdfef212ef0d30f",
+          "subject": "docs(verification): record R308 RTL mutation evidence"
+        },
+        {
+          "sha": "0982a42619f9b7d7e29280fdcdae4ed68acb13fd",
+          "subject": "test(uvm): sweep reset stalls across engine requesters"
+        },
+        {
+          "sha": "cbdf305e8ea962410ab9597519cfe2163529f882",
+          "subject": "docs(verification): record R309 reset owner replay"
+        },
+        {
+          "sha": "a061c2ea96a874d0755674c75139154a2e6e391f",
+          "subject": "test(uvm): require pending reads across reset owner sweep"
+        },
+        {
+          "sha": "9dc19356a0ff55e55f2647dfee543f6724b2d1ff",
+          "subject": "docs(verification): record R310 pending reset evidence"
+        },
+        {
+          "sha": "23a51b1f8942a9db7df8b15ee9337690aa9405b7",
+          "subject": "test(uvm): cross reset request and pending response owners"
+        },
+        {
+          "sha": "5cd630d9a17714b96d156dbaa927abb365b4c665",
+          "subject": "docs(verification): record R311 response owner cross"
+        },
+        {
+          "sha": "5af627f0e6c35b41b65dd0b9b6e03912807c87c6",
+          "subject": "test(dv): sweep a second Matrix reset owner pairing"
+        },
+        {
+          "sha": "0d5a453f80eb844ea85c77b08c592b2fce7083c3",
+          "subject": "docs(verification): record R312 owner cross replay"
+        },
+        {
+          "sha": "86b967c3823b881a6a9c7d97fe001d1fcd46e611",
+          "subject": "docs(verification): publish R312 branch identity"
+        },
+        {
+          "sha": "6e3f8008ac831f29098f5e4c183a9badddad2033",
+          "subject": "docs(verification): clarify published R312 snapshot"
+        },
+        {
+          "sha": "d407fc0327337ce8f3b12a111c2e6ba0902ce116",
+          "subject": "docs(verification): record R313 clean top replay"
+        },
+        {
+          "sha": "8f8f473c65c74a9c7c6b557e3c1ba3c25bc5c005",
+          "subject": "docs(verification): record R314 AXI cover hits"
+        },
+        {
+          "sha": "175d04ce7c0fdcb0772669812a7e10e337d951a7",
+          "subject": "test(uvm): sweep legal Matrix reset cut orderings"
+        },
+        {
+          "sha": "3cbd2d2c2d7ead17ecc17e48d4497a3fdd7b1846",
+          "subject": "docs(verification): record R315 legal reset owner sweep"
+        },
+        {
+          "sha": "f7bf57309a621a039a7efc1f2c22b501782f08aa",
+          "subject": "docs(verification): record R316 RTL mutation results"
+        }
+      ],
+      "net_changed_path_count_rtl_dv_sw_tools": 21,
+      "rtl_path_count": 1,
+      "rtl_paths": [
+        {
+          "change": "M",
+          "path": "rtl/memory/ai_spad_arbiter.v",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        }
+      ],
+      "changed_paths": [
+        {
+          "change": "M",
+          "path": "dv/VERIFICATION_MATRIX.md",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/compute/fp/formal/Makefile",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/compute/fp/formal/ai_fp_read_protection_abort_formal_top.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/block/compute/fp/formal/run_read_protection_parity_disposition.tcl",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/compute/int8/sim/Makefile",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/compute/int8/tb/tb_ai_int8_numeric.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/compute/matrix/sim/Makefile",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/compute/matrix/tb/tb_ai_tensor_matrix_core_random.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/spad_arbiter/formal/Makefile",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/block/spad_arbiter/formal/ai_spad_arbiter_fairness_formal_top.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/block/spad_arbiter/formal/run_fairness_bounds.tcl",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/spad_arbiter/tb/tb_ai_spad_arbiter_rr.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/subsystem/top_smoke/env/ai_accel_sva.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/subsystem/top_smoke/sim/Makefile",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/uvm/agent/interfaces/ai_compute_cluster_if.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/uvm/sim/Makefile",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/uvm/sim/run_compute_cluster_dut_mutations.py",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/uvm/tb/tb_ai_accel_uvm.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/uvm/tests/sequences/ai_compute_cluster_e2e_seq.svh",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "rtl/memory/ai_spad_arbiter.v",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        }
+      ],
+      "classification": "建议取回",
+      "rationale": "旧 SPAD Arbiter RTL 与当前实现不同，分支含较新 compute-cluster mutation/公平性审计材料。",
+      "recommendation": "与 r158 分支重叠；先选择一个 canonical directed test 做审查，绝不整体合并 RTL。"
+    },
+    {
+      "branch": "research/bank-parallel-fault-precise-v1",
+      "tip_sha": "e19cb86d9f890f48cc77adb2526251290896c5fb",
+      "merge_base_with_gpt2_r31": "f919bb787dab1a4e3bef44b5308ead56d6e77b72",
+      "unique_commit_count_vs_gpt2_r31": 6,
+      "unique_commits": [
+        {
+          "sha": "88d78c1042de1b351f52d709e967e1569fa80211",
+          "subject": "research: prototype bank parallel fault precise execution"
+        },
+        {
+          "sha": "7049fc79b5d1622a57a71cf3aa395bee9be101ae",
+          "subject": "research: add BPF-TE ablation and reproduction"
+        },
+        {
+          "sha": "4d34c1916e0db3a5ef69b9141eb1ea92e0d64b22",
+          "subject": "research: integrate BPF-TE with four-bank SPAD"
+        },
+        {
+          "sha": "1646cf5f65427148b5ec1c501736eeef8dac1f0f",
+          "subject": "research: integrate BPF-TE with real compute engines"
+        },
+        {
+          "sha": "7390fe5a78c4e729ac924475d2fa191a87954964",
+          "subject": "research: close BPF-TE writeback and epoch paths"
+        },
+        {
+          "sha": "e19cb86d9f890f48cc77adb2526251290896c5fb",
+          "subject": "research: complete BPF-TE Round 5 product decision"
+        }
+      ],
+      "net_changed_path_count_rtl_dv_sw_tools": 16,
+      "rtl_path_count": 6,
+      "rtl_paths": [
+        {
+          "change": "A",
+          "path": "rtl/research/ai_bpf_te_atomic_adapter.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "rtl/research/ai_bpf_te_compute_subsystem.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "rtl/research/ai_bpf_te_compute_subsystem_sva.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "rtl/research/ai_spad_bank_parallel_adapter.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "rtl/research/ai_spad_bank_parallel_arbiter.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "rtl/research/ai_spad_bank_parallel_arbiter_sva.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        }
+      ],
+      "changed_paths": [
+        {
+          "change": "A",
+          "path": "dv/research/bpf_te/ai_spad_bank_parallel.f",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/research/bpf_te/atomic.f",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/research/bpf_te/compute_subsystem.f",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/research/bpf_te/h0_native.f",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/research/bpf_te/real_spad.f",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/research/bpf_te/tb/tb_ai_bpf_te_atomic_adapter.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/research/bpf_te/tb/tb_ai_bpf_te_compute_subsystem.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/research/bpf_te/tb/tb_ai_spad_bank_parallel_arbiter.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/research/bpf_te/tb/tb_ai_spad_bank_parallel_real.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/research/bpf_te/tb/tb_bpf_te_h0_native.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "rtl/research/ai_bpf_te_atomic_adapter.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "rtl/research/ai_bpf_te_compute_subsystem.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "rtl/research/ai_bpf_te_compute_subsystem_sva.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "rtl/research/ai_spad_bank_parallel_adapter.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "rtl/research/ai_spad_bank_parallel_arbiter.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "rtl/research/ai_spad_bank_parallel_arbiter_sva.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        }
+      ],
+      "classification": "研究存档",
+      "rationale": "Round 5 明确决定 REJECT_FOR_PRODUCT；其价值是未来故障因果研究，不是产品必需功能。",
+      "recommendation": "保留研究 RTL/SVA 与决策报告作为存档候选，不进入产品。"
+    },
+    {
+      "branch": "feature/axi-vip-integration",
+      "tip_sha": "572cd3aa3679b0c3444f778d97bbe47ff7938e7e",
+      "merge_base_with_gpt2_r31": "2049df3aba40b737c23c4955f71061148a7695bb",
+      "unique_commit_count_vs_gpt2_r31": 22,
+      "unique_commits": [
+        {
+          "sha": "60eeba58428c536a7e9edf1004a8dd8c8934768e",
+          "subject": "test(dma): integrate AXI protocol VIP reactive slave"
+        },
+        {
+          "sha": "f168a3dbbd53b3ba53aa996323c934629f5b4c9d",
+          "subject": "test(dma): archive protocol VIP acceptance logs"
+        },
+        {
+          "sha": "42a8375cda1207eaab4e203c0ea94300c36c100e",
+          "subject": "docs(dma): record protocol VIP acceptance evidence"
+        },
+        {
+          "sha": "ca00325037fa87063474bd4daf937595fdc82fad",
+          "subject": "test(dma): isolate optional protocol VIP compile path"
+        },
+        {
+          "sha": "d84ff0ba315fee4b3517aab268024985a2029e4c",
+          "subject": "docs(dma): record legacy and VIP regression evidence"
+        },
+        {
+          "sha": "dbf546c528971d04a7f5a853b3b758250ab6ffc9",
+          "subject": "test(dma): expand AXI VIP DUT acceptance matrix"
+        },
+        {
+          "sha": "1a15d3d9bbfb6b707f751c3ea4309385939a96c4",
+          "subject": "test(dma): require observed AXI B reordering"
+        },
+        {
+          "sha": "2313e8b3641363db93e8fb290af0f3c6e97b07af",
+          "subject": "test(vip): add NMA AXI-Lite VIP CSR acceptance"
+        },
+        {
+          "sha": "3b39d115a5de55ed837a85676c3f31db01de4856",
+          "subject": "test(dma): make AXI VIP acceptance evidence deterministic"
+        },
+        {
+          "sha": "35dac5d9b06d430998f9ad5250d7afa41544012c",
+          "subject": "test(dma): seed gather indices and hold write responses"
+        },
+        {
+          "sha": "f34896019d283efdb1ae66147efb870bb1c5afb3",
+          "subject": "test(dma): direct deterministic AXI B reordering"
+        },
+        {
+          "sha": "5fc497cb536c0216a2c929ac0f7eebac8bc7b32f",
+          "subject": "docs(dma): record expanded protocol VIP acceptance"
+        },
+        {
+          "sha": "4e2d00946d2f2e62665f54f939cfc5fd50e97874",
+          "subject": "test(vip): gate AXI-Lite real-RTL CSR acceptance"
+        },
+        {
+          "sha": "4c747fbeadd509d7cd58aee2bd6bc819c0e30cae",
+          "subject": "fix(vip): import AXI Lite public types explicitly"
+        },
+        {
+          "sha": "cfd2b0872e0585ccdd42e2112eedb4b8c995e96f",
+          "subject": "test(vip): add AXI Lite log inspection task"
+        },
+        {
+          "sha": "bb5dd743f3c50bb58794f8ed7b94e5f8a296cf0f",
+          "subject": "fix(vip): bind AXI Lite sequences before randomization"
+        },
+        {
+          "sha": "45cce62f5d7219b602a7bec3b68733d087bebf6e",
+          "subject": "docs(dv): record AXI Lite VIP CSR acceptance"
+        },
+        {
+          "sha": "5b59d0a0479a8ee1d09dca595cacfe166994b8e0",
+          "subject": "test(axil): exercise CSR channel timing and stalls"
+        },
+        {
+          "sha": "42b8f96f0346903f1729f4e29ca43fecaa4302f1",
+          "subject": "fix(test): open AXI-Lite CSR delay windows"
+        },
+        {
+          "sha": "2c2c96f6471bf38a081502963d602dc5fa021b4c",
+          "subject": "fix(test): import AXI delay configuration type"
+        },
+        {
+          "sha": "1b1558471608f044520e4e8067a71e6751b70462",
+          "subject": "fix(test): make AXI-Lite delay windows contiguous"
+        },
+        {
+          "sha": "572cd3aa3679b0c3444f778d97bbe47ff7938e7e",
+          "subject": "docs(dv): record AXI-Lite CSR timing acceptance"
+        }
+      ],
+      "net_changed_path_count_rtl_dv_sw_tools": 19,
+      "rtl_path_count": 0,
+      "rtl_paths": [],
+      "changed_paths": [
+        {
+          "change": "M",
+          "path": "dv/VERIFICATION_MATRIX.md",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/block/dma/README_PROTOCOL_VIP.md",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/dma/agent/dma_block_types_pkg.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/block/dma/agent/nmaforge_dma_axi4_pin_adapter.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/dma/env/dma_block_env.svh",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/dma/sim/Makefile",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/block/dma/sim/dma_block_vip_uvm.f",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/block/dma/tb/tb_ai_axi128_dma_vip_uvm.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/block/dma/tests/dma_axi_vip_integration_test.svh",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/dma/tests/dma_block_base_test.svh",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/dma/tests/dma_block_tests_pkg.sv",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/uvm/README.md",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/uvm/sim/Makefile",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/uvm/sim/ai_accel_axi_lite_vip.f",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/uvm/tb/tb_nma_axi_lite_vip.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "dv/uvm/tests/vip/nma_axi_lite_vip_test_pkg.sv",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/rocky-bridge.tasks.protocol-vip.json",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/run_protocol_vip_axil_regression.sh",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        },
+        {
+          "change": "A",
+          "path": "tools/run_protocol_vip_dma_regression.sh",
+          "target_status_vs_gpt2_r31": "ABSENT"
+        }
+      ],
+      "classification": "建议取回",
+      "rationale": "当前 GPT-2 R31 没有其 DMA AXI VIP UVM 集成和 AXI-Lite CSR 时序测试。",
+      "recommendation": "单独审查 DMA block VIP 测试并在可用 VCS 环境运行后再建窄 PR。"
+    },
+    {
+      "branch": "feature/m2-dma-coverage-closure",
+      "tip_sha": "951b4e05c0487e0c3220191ee0317103ad5100b8",
+      "merge_base_with_gpt2_r31": "c290eba7697138a4fcf2cbbac9262264849f0aeb",
+      "unique_commit_count_vs_gpt2_r31": 1,
+      "unique_commits": [
+        {
+          "sha": "951b4e05c0487e0c3220191ee0317103ad5100b8",
+          "subject": "Add DMA error coverage and checker evidence"
+        }
+      ],
+      "net_changed_path_count_rtl_dv_sw_tools": 3,
+      "rtl_path_count": 0,
+      "rtl_paths": [],
+      "changed_paths": [
+        {
+          "change": "M",
+          "path": "dv/block/dma/env/dma_block_scoreboard.svh",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/dma/sim/Makefile",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        },
+        {
+          "change": "M",
+          "path": "dv/block/dma/tests/dma_functional_tests.svh",
+          "target_status_vs_gpt2_r31": "DIFFERENT"
+        }
+      ],
+      "classification": "建议取回",
+      "rationale": "当前 GPT-2 R31 不含这组 DMA block 错误覆盖率测试。",
+      "recommendation": "逐文件审查并在可用 VCS 环境验证后再建窄 PR。"
+    }
+  ],
+  "destructive_actions_performed": false,
+  "notes": [
+    "D branches are audited only; no D branch merge, archive tag, or deletion has been performed.",
+    "The task attachment references 00_通用规则_先读.md and BRANCH_RECONCILIATION.md; neither file is present in the available attachment/repository context. The supplied task rules and repository AGENTS.md were followed.",
+    "The attachment is a Round 30 snapshot with 71 refs. Current origin has 73 actual branch heads, verified by git ls-remote --heads origin; origin/HEAD is a symbolic ref and is not counted. Round 31 GPT-2/DeiT refs supersede Round 30 as the current research tips.",
+    "B/C branches remain review candidates only. No archive tags or branch deletions have been performed pending the user checkpoint."
+  ],
+  "remote_branch_count_excluding_remote_symbolic_refs": 73,
+  "remote_heads_count_from_git_ls_remote": 73,
+  "inventory_groups_B_C": {
+    "branch_count": 53,
+    "B_count": 40,
+    "C_count": 13,
+    "branches": [
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-dual-final-deit",
+        "tip_sha": "bd1c36382ec251ac4d351d540b498d2b40f9e7c2",
+        "merge_base_with_integration": "bd1c36382ec251ac4d351d540b498d2b40f9e7c2",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-dual-final-gpt2",
+        "tip_sha": "ae06661c8c2416ad5af011088cbe0eedc5077c5c",
+        "merge_base_with_integration": "ae06661c8c2416ad5af011088cbe0eedc5077c5c",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-dual-final-round28-deit",
+        "tip_sha": "bd36be685490337278c02e9ccf9184c074237c13",
+        "merge_base_with_integration": "bd36be685490337278c02e9ccf9184c074237c13",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-dual-final-round28-gpt2",
+        "tip_sha": "745e8c0643e55d1ec5a6a5df46b6cd8da8f49532",
+        "merge_base_with_integration": "745e8c0643e55d1ec5a6a5df46b6cd8da8f49532",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round15",
+        "tip_sha": "995ba340e914d2264b24e1928bcfef09bd675ea3",
+        "merge_base_with_integration": "995ba340e914d2264b24e1928bcfef09bd675ea3",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round16",
+        "tip_sha": "c85baa17f457610b7d7de4d6363ad064ae04a8d5",
+        "merge_base_with_integration": "c85baa17f457610b7d7de4d6363ad064ae04a8d5",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round17",
+        "tip_sha": "72af7bf389da8e74d66702f43f4a11d3f2bae740",
+        "merge_base_with_integration": "72af7bf389da8e74d66702f43f4a11d3f2bae740",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round18",
+        "tip_sha": "0e54224510a24e316674df7fa50262ccf2b46429",
+        "merge_base_with_integration": "0e54224510a24e316674df7fa50262ccf2b46429",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round19-deit",
+        "tip_sha": "8f626c07644ff620b5756920b79c40245eabc4d3",
+        "merge_base_with_integration": "8f626c07644ff620b5756920b79c40245eabc4d3",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round19-gpt2",
+        "tip_sha": "f7e65ed02b64dfd1faf49e7a9a25222f5b6bd560",
+        "merge_base_with_integration": "f7e65ed02b64dfd1faf49e7a9a25222f5b6bd560",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round20-deit",
+        "tip_sha": "733b573beb984ad455113a229b94593a7ac42f9b",
+        "merge_base_with_integration": "733b573beb984ad455113a229b94593a7ac42f9b",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round20-gpt2",
+        "tip_sha": "ac088cf06c5188a814dc7753033bafc249ad265d",
+        "merge_base_with_integration": "ac088cf06c5188a814dc7753033bafc249ad265d",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round21-deit",
+        "tip_sha": "e64ead0b37c8774e3d73a55a650e770d70839e99",
+        "merge_base_with_integration": "e64ead0b37c8774e3d73a55a650e770d70839e99",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round21-gpt2",
+        "tip_sha": "4803307124d25127c5c1cde0471406caac663bb8",
+        "merge_base_with_integration": "4803307124d25127c5c1cde0471406caac663bb8",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round23-deit",
+        "tip_sha": "d81a982e262f4fa4f74dde45c92bfb65983fc02d",
+        "merge_base_with_integration": "d81a982e262f4fa4f74dde45c92bfb65983fc02d",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round23-gpt2",
+        "tip_sha": "f4f4316aec3188676b035e0475ab9b05dbc3fe12",
+        "merge_base_with_integration": "f4f4316aec3188676b035e0475ab9b05dbc3fe12",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round24-deit",
+        "tip_sha": "ba646a7b2b4791bc365cf8ef42ec011a0552fcbb",
+        "merge_base_with_integration": "ba646a7b2b4791bc365cf8ef42ec011a0552fcbb",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round24-gpt2",
+        "tip_sha": "2f65208efad28783a8af18cf6598861e3b1d96b8",
+        "merge_base_with_integration": "2f65208efad28783a8af18cf6598861e3b1d96b8",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round25-deit",
+        "tip_sha": "30f4bc7e88a8e904211c2aeb8e778fc5ed66bbbf",
+        "merge_base_with_integration": "30f4bc7e88a8e904211c2aeb8e778fc5ed66bbbf",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round25-gpt2",
+        "tip_sha": "1fad61c6c15b6f4ce7fc7e34ecdab5fd5a840562",
+        "merge_base_with_integration": "1fad61c6c15b6f4ce7fc7e34ecdab5fd5a840562",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round26-deit",
+        "tip_sha": "19254b4e6a756ca8bf54ced5b287311214e5e99c",
+        "merge_base_with_integration": "19254b4e6a756ca8bf54ced5b287311214e5e99c",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round26-gpt2",
+        "tip_sha": "901dd1d287413a4b8c51bd4f99c403842d6c30db",
+        "merge_base_with_integration": "901dd1d287413a4b8c51bd4f99c403842d6c30db",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round29b-deit",
+        "tip_sha": "70a5296d07e0ac3287bb73297cc5632e205a215a",
+        "merge_base_with_integration": "70a5296d07e0ac3287bb73297cc5632e205a215a",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v1.2-round29b-gpt2",
+        "tip_sha": "efa37a949976d5ef9347fb42698f1de8adad757c",
+        "merge_base_with_integration": "efa37a949976d5ef9347fb42698f1de8adad757c",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v2-product-baseline",
+        "tip_sha": "6596779de2ec4f502a0253dedd4695129b775b05",
+        "merge_base_with_integration": "6596779de2ec4f502a0253dedd4695129b775b05",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v2-round3-dams-audit",
+        "tip_sha": "c9d0efe741f9d7d1815d446d517dea50f2db02c8",
+        "merge_base_with_integration": "c9d0efe741f9d7d1815d446d517dea50f2db02c8",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v2-round3-integration",
+        "tip_sha": "17af528cdcf4cbd32895d66a05a8da1e96992853",
+        "merge_base_with_integration": "17af528cdcf4cbd32895d66a05a8da1e96992853",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v2-round4",
+        "tip_sha": "974eff43632bb7ec6e82a0b8470064de11dff3d7",
+        "merge_base_with_integration": "974eff43632bb7ec6e82a0b8470064de11dff3d7",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v2-round5",
+        "tip_sha": "7744ad95d0ddd3eb191c5b5431aeebe01d8faefa",
+        "merge_base_with_integration": "7744ad95d0ddd3eb191c5b5431aeebe01d8faefa",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v2-round6",
+        "tip_sha": "fcb1b72969771b9b5fca504e5f7b6d389b74ffc2",
+        "merge_base_with_integration": "fcb1b72969771b9b5fca504e5f7b6d389b74ffc2",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v2-round7",
+        "tip_sha": "ba4c6697fcb12245b1141df27938e3aa406d4dd1",
+        "merge_base_with_integration": "ba4c6697fcb12245b1141df27938e3aa406d4dd1",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "research/nmaforge-v2-round8",
+        "tip_sha": "ab040447b99c112edc57bfb734861f0931351a59",
+        "merge_base_with_integration": "ab040447b99c112edc57bfb734861f0931351a59",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "bugfix/compact-spad-line-stalled-cnm",
+        "tip_sha": "76805a45d8914ecdc998d98b419c8a19053b1daa",
+        "merge_base_with_integration": "76805a45d8914ecdc998d98b419c8a19053b1daa",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "candidate/frontend-closeout",
+        "tip_sha": "f919bb787dab1a4e3bef44b5308ead56d6e77b72",
+        "merge_base_with_integration": "f919bb787dab1a4e3bef44b5308ead56d6e77b72",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "dv/compute-cluster-closure-round2",
+        "tip_sha": "0492c47d12cd11bcc22be1930da7af77ed870b6e",
+        "merge_base_with_integration": "0492c47d12cd11bcc22be1930da7af77ed870b6e",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "feat/phase1-architecture-benchmark",
+        "tip_sha": "ae7fd31eced13dcb9dbd70533da60559511d0a90",
+        "merge_base_with_integration": "ae7fd31eced13dcb9dbd70533da60559511d0a90",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "feat/phase2-exact-sfu",
+        "tip_sha": "20bd47ca714551607268d62a74e2c507fbadc7c4",
+        "merge_base_with_integration": "20bd47ca714551607268d62a74e2c507fbadc7c4",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "feat/spad-128k-closure",
+        "tip_sha": "1b2e0a6b50c038c893bdb68b2ae3c9e05d67601b",
+        "merge_base_with_integration": "1b2e0a6b50c038c893bdb68b2ae3c9e05d67601b",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "nmaforge",
+        "tip_sha": "c93ea144713d5fafe2e8a5509029927cd6859e75",
+        "merge_base_with_integration": "c93ea144713d5fafe2e8a5509029927cd6859e75",
+        "reachable_from_integration": true,
+        "unique_commit_count": 0,
+        "unique_commits": [],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "ancestry-contained in the prospective integrated history"
+      },
+      {
+        "source_task_group": "B",
+        "branch": "feat/shape-adaptive-gemv-v2",
+        "tip_sha": "409c3a9fd647d4f8c4c881c9bfdaf5d93b7076ee",
+        "merge_base_with_integration": "3ec0be579c6847d4ae707a30e5e30ccd64ab0813",
+        "reachable_from_integration": false,
+        "unique_commit_count": 9,
+        "unique_commits": [
+          {
+            "sha": "f78d43419d741bc1a333d3162671375e0e54a495",
+            "subject": "docs: add coverage and SpyGlass reports"
+          },
+          {
+            "sha": "a4fb84cca7537c250be07739ec465e34e5917029",
+            "subject": "docs: track architecture innovation stage roadmap"
+          },
+          {
+            "sha": "3d97711443bf7946db7ea1bdfbeb328cfd9ec7a5",
+            "subject": "docs: complete scheduler baseline measurements"
+          },
+          {
+            "sha": "773a747a841afaff8c68ce194a9b1c0558a82d27",
+            "subject": "test: profile disjoint scalar and CNM bank requests"
+          },
+          {
+            "sha": "a3bd86254ac0bb66989211ed5ff1933a0819f983",
+            "subject": "test: expand shape adaptive SPAD baseline"
+          },
+          {
+            "sha": "48b7e291a4987ebf3b7f84ec43cb628e80749801",
+            "subject": "docs: record shape adaptive stage decisions"
+          },
+          {
+            "sha": "c43cfde3b2d4040467c63737148a08241672b374",
+            "subject": "test: profile SFU arithmetic wait cycles"
+          },
+          {
+            "sha": "40b512863d14b56a6270a45b8fc751e81866d1a5",
+            "subject": "docs: close A-E innovation review and DV plan"
+          },
+          {
+            "sha": "409c3a9fd647d4f8c4c881c9bfdaf5d93b7076ee",
+            "subject": "docs: record license-restored DV replay blocker"
+          }
+        ],
+        "net_paths_rtl_dv_sw_tools": [
+          {
+            "change": "M",
+            "path": "dv/block/compute/sfu/README.md",
+            "target_relation_vs_integration": "DIFFERENT"
+          },
+          {
+            "change": "M",
+            "path": "dv/block/compute/sfu/tb/tb_ai_tensor_sfu_random.sv",
+            "target_relation_vs_integration": "DIFFERENT"
+          },
+          {
+            "change": "M",
+            "path": "dv/research/shape_adaptive/sim/Makefile",
+            "target_relation_vs_integration": "DIFFERENT"
+          },
+          {
+            "change": "M",
+            "path": "dv/research/shape_adaptive/sim/collect_spad_benchmark.py",
+            "target_relation_vs_integration": "DIFFERENT"
+          },
+          {
+            "change": "M",
+            "path": "dv/research/shape_adaptive/tb_shape_adaptive_gemv_spad.sv",
+            "target_relation_vs_integration": "DIFFERENT"
+          },
+          {
+            "change": "M",
+            "path": "dv/uvm/agent/interfaces/ai_compute_cluster_if.sv",
+            "target_relation_vs_integration": "DIFFERENT"
+          },
+          {
+            "change": "M",
+            "path": "dv/uvm/tb/tb_ai_accel_uvm.sv",
+            "target_relation_vs_integration": "DIFFERENT"
+          },
+          {
+            "change": "M",
+            "path": "dv/uvm/tests/sequences/ai_compute_cluster_e2e_seq.svh",
+            "target_relation_vs_integration": "DIFFERENT"
+          }
+        ],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "not ancestry-contained; review unique commits and net paths before treating as archive/deletion candidate"
+      },
+      {
+        "source_task_group": "C",
+        "branch": "research/nmaforge-v2-round3-svse",
+        "tip_sha": "8beffe3a68e2d7950977bd199d0b33a6056a56f4",
+        "merge_base_with_integration": "6596779de2ec4f502a0253dedd4695129b775b05",
+        "reachable_from_integration": false,
+        "unique_commit_count": 1,
+        "unique_commits": [
+          {
+            "sha": "8beffe3a68e2d7950977bd199d0b33a6056a56f4",
+            "subject": "research: add vector SVSE SPAD A/B and abort drain"
+          }
+        ],
+        "net_paths_rtl_dv_sw_tools": [
+          {
+            "change": "M",
+            "path": "dv/research/dams_svse/sim/Makefile",
+            "target_relation_vs_integration": "IDENTICAL"
+          },
+          {
+            "change": "M",
+            "path": "dv/research/dams_svse/tb_svse_product_adapter.sv",
+            "target_relation_vs_integration": "DIFFERENT"
+          },
+          {
+            "change": "M",
+            "path": "rtl/research/ai_streaming_sfu_spad_adapter.sv",
+            "target_relation_vs_integration": "IDENTICAL"
+          }
+        ],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "not ancestry-contained; review unique commits and net paths before treating as archive/deletion candidate"
+      },
+      {
+        "source_task_group": "C",
+        "branch": "research/nmaforge-v2-round2-dams",
+        "tip_sha": "fe9e2107a6f4b579822c4ae87eb2be06add72234",
+        "merge_base_with_integration": "2d85b11e42b45a8fbdb73398c3bc884fbc69f3bf",
+        "reachable_from_integration": false,
+        "unique_commit_count": 1,
+        "unique_commits": [
+          {
+            "sha": "fe9e2107a6f4b579822c4ae87eb2be06add72234",
+            "subject": "research: add SVSE registered SPAD product adapter"
+          }
+        ],
+        "net_paths_rtl_dv_sw_tools": [
+          {
+            "change": "M",
+            "path": "dv/research/dams_svse/files.f",
+            "target_relation_vs_integration": "IDENTICAL"
+          },
+          {
+            "change": "M",
+            "path": "dv/research/dams_svse/sim/Makefile",
+            "target_relation_vs_integration": "DIFFERENT"
+          },
+          {
+            "change": "A",
+            "path": "dv/research/dams_svse/tb_svse_product_adapter.sv",
+            "target_relation_vs_integration": "DIFFERENT"
+          },
+          {
+            "change": "M",
+            "path": "rtl/research/ai_streaming_sfu.sv",
+            "target_relation_vs_integration": "IDENTICAL"
+          },
+          {
+            "change": "A",
+            "path": "rtl/research/ai_streaming_sfu_spad_adapter.sv",
+            "target_relation_vs_integration": "DIFFERENT"
+          }
+        ],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "not ancestry-contained; review unique commits and net paths before treating as archive/deletion candidate"
+      },
+      {
+        "source_task_group": "C",
+        "branch": "research/v2-dams-svse-pr8",
+        "tip_sha": "5cd0241bb0d09506db704bb3ebc2d07da1a9ab81",
+        "merge_base_with_integration": "0492c47d12cd11bcc22be1930da7af77ed870b6e",
+        "reachable_from_integration": false,
+        "unique_commit_count": 1,
+        "unique_commits": [
+          {
+            "sha": "5cd0241bb0d09506db704bb3ebc2d07da1a9ab81",
+            "subject": "research: prototype DAMS scheduler and streaming SFU"
+          }
+        ],
+        "net_paths_rtl_dv_sw_tools": [
+          {
+            "change": "A",
+            "path": "dv/research/dams_svse/files.f",
+            "target_relation_vs_integration": "DIFFERENT"
+          },
+          {
+            "change": "A",
+            "path": "dv/research/dams_svse/sim/Makefile",
+            "target_relation_vs_integration": "DIFFERENT"
+          },
+          {
+            "change": "A",
+            "path": "dv/research/dams_svse/tb_dams_svse.sv",
+            "target_relation_vs_integration": "IDENTICAL"
+          },
+          {
+            "change": "A",
+            "path": "rtl/research/ai_dams_scheduler.sv",
+            "target_relation_vs_integration": "IDENTICAL"
+          },
+          {
+            "change": "A",
+            "path": "rtl/research/ai_streaming_sfu.sv",
+            "target_relation_vs_integration": "DIFFERENT"
+          }
+        ],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "not ancestry-contained; review unique commits and net paths before treating as archive/deletion candidate"
+      },
+      {
+        "source_task_group": "C",
+        "branch": "research/nmaforge-v2-round3-h64-projection",
+        "tip_sha": "bf885b0f6dfd5b16f430307f7cb6b4eecaf2798c",
+        "merge_base_with_integration": "6596779de2ec4f502a0253dedd4695129b775b05",
+        "reachable_from_integration": false,
+        "unique_commit_count": 1,
+        "unique_commits": [
+          {
+            "sha": "bf885b0f6dfd5b16f430307f7cb6b4eecaf2798c",
+            "subject": "research: run H64 Q projection through product top"
+          }
+        ],
+        "net_paths_rtl_dv_sw_tools": [
+          {
+            "change": "M",
+            "path": "dv/subsystem/top_smoke/sim/Makefile",
+            "target_relation_vs_integration": "DIFFERENT"
+          }
+        ],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "not ancestry-contained; review unique commits and net paths before treating as archive/deletion candidate"
+      },
+      {
+        "source_task_group": "C",
+        "branch": "research/nmaforge-v1.2-dual-final-round29-gpt2",
+        "tip_sha": "9cd30cf79cd31c4a1b77fd78d1c8fb6f7d9379da",
+        "merge_base_with_integration": "a54ece9f0fd500f9c1af35807eb959cb46054ef8",
+        "reachable_from_integration": false,
+        "unique_commit_count": 1,
+        "unique_commits": [
+          {
+            "sha": "9cd30cf79cd31c4a1b77fd78d1c8fb6f7d9379da",
+            "subject": "research(gpt2): verify frozen INT8 package export"
+          }
+        ],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "not ancestry-contained; review unique commits and net paths before treating as archive/deletion candidate"
+      },
+      {
+        "source_task_group": "C",
+        "branch": "research/nmaforge-v1.2-round27-gpt2",
+        "tip_sha": "89db165f67ff9aabd73f678e3098ca58c48d0888",
+        "merge_base_with_integration": "901dd1d287413a4b8c51bd4f99c403842d6c30db",
+        "reachable_from_integration": false,
+        "unique_commit_count": 1,
+        "unique_commits": [
+          {
+            "sha": "89db165f67ff9aabd73f678e3098ca58c48d0888",
+            "subject": "research: archive Round 27 GPT-2 quality and Top evidence"
+          }
+        ],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "not ancestry-contained; review unique commits and net paths before treating as archive/deletion candidate"
+      },
+      {
+        "source_task_group": "C",
+        "branch": "research/nmaforge-v2-round2-gpt2",
+        "tip_sha": "920971f32f8a19bc734b6d799527d556bd1b11c3",
+        "merge_base_with_integration": "2d85b11e42b45a8fbdb73398c3bc884fbc69f3bf",
+        "reachable_from_integration": false,
+        "unique_commit_count": 1,
+        "unique_commits": [
+          {
+            "sha": "920971f32f8a19bc734b6d799527d556bd1b11c3",
+            "subject": "research: correct GPT2 preln fp32 and int8 references"
+          }
+        ],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "not ancestry-contained; review unique commits and net paths before treating as archive/deletion candidate"
+      },
+      {
+        "source_task_group": "C",
+        "branch": "research/v2-gpt2-minimal-pr8",
+        "tip_sha": "a03f48d26c07f4d1a6d896b219b4451bc573fb95",
+        "merge_base_with_integration": "0492c47d12cd11bcc22be1930da7af77ed870b6e",
+        "reachable_from_integration": false,
+        "unique_commit_count": 1,
+        "unique_commits": [
+          {
+            "sha": "a03f48d26c07f4d1a6d896b219b4451bc573fb95",
+            "subject": "research: add GPT-2-compatible golden and lowering plan"
+          }
+        ],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "not ancestry-contained; review unique commits and net paths before treating as archive/deletion candidate"
+      },
+      {
+        "source_task_group": "C",
+        "branch": "codex/final-architecture-review-fc60",
+        "tip_sha": "51be2e33c99f9c80f04d1e94e3fb80f7a4e21eaa",
+        "merge_base_with_integration": "fc60f95d72c0cfb7dfa9df895a30a701c842d21e",
+        "reachable_from_integration": false,
+        "unique_commit_count": 1,
+        "unique_commits": [
+          {
+            "sha": "51be2e33c99f9c80f04d1e94e3fb80f7a4e21eaa",
+            "subject": "docs: add final compute cluster architecture review"
+          }
+        ],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "not ancestry-contained; review unique commits and net paths before treating as archive/deletion candidate"
+      },
+      {
+        "source_task_group": "C",
+        "branch": "research/nmaforge-v1.2-round27-deit",
+        "tip_sha": "a9257a1349f58874e1afc5df3a00cdd8beebe997",
+        "merge_base_with_integration": "19254b4e6a756ca8bf54ced5b287311214e5e99c",
+        "reachable_from_integration": false,
+        "unique_commit_count": 1,
+        "unique_commits": [
+          {
+            "sha": "a9257a1349f58874e1afc5df3a00cdd8beebe997",
+            "subject": "research: archive Round 27 staged DeiT Top evidence"
+          }
+        ],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "not ancestry-contained; review unique commits and net paths before treating as archive/deletion candidate"
+      },
+      {
+        "source_task_group": "C",
+        "branch": "docs/compute-cluster-spec-v01",
+        "tip_sha": "d48fb5f21230023ed1296495faa483bf9d7c2a9a",
+        "merge_base_with_integration": "ff1e3bb1b8d11b8db637ac6b25f3fb3f973b01bc",
+        "reachable_from_integration": false,
+        "unique_commit_count": 3,
+        "unique_commits": [
+          {
+            "sha": "fe810c015e01ef422db6033876dd228b1503f28e",
+            "subject": "docs(spec): add source-aligned Chinese Compute Cluster v0.1 specification"
+          },
+          {
+            "sha": "7ad6356290bbe5b81fdf19addc0d06869f10efd1",
+            "subject": "docs(spec): freeze Compute Cluster v1.0 verification contract and 28 requirements"
+          },
+          {
+            "sha": "d48fb5f21230023ed1296495faa483bf9d7c2a9a",
+            "subject": "docs(dv): add 28-requirement Compute Cluster UVM testplan and coverage matrix"
+          }
+        ],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "not ancestry-contained; review unique commits and net paths before treating as archive/deletion candidate"
+      },
+      {
+        "source_task_group": "C",
+        "branch": "feat/compute-cluster-closeout-6848a41",
+        "tip_sha": "678beac02ec367fffd85611b0cc87348ff0a677f",
+        "merge_base_with_integration": "c8d699638b980db7dad583ae1cd15f33c81b5ec7",
+        "reachable_from_integration": false,
+        "unique_commit_count": 2,
+        "unique_commits": [
+          {
+            "sha": "643a2aee5708e7a815e86e0144f9b0e4a5c881ce",
+            "subject": "dv: add real compute cluster DUT mutation campaign"
+          },
+          {
+            "sha": "678beac02ec367fffd85611b0cc87348ff0a677f",
+            "subject": "docs(dv): record R176 clean cluster evidence"
+          }
+        ],
+        "net_paths_rtl_dv_sw_tools": [
+          {
+            "change": "M",
+            "path": "dv/uvm/agent/interfaces/ai_compute_cluster_if.sv",
+            "target_relation_vs_integration": "DIFFERENT"
+          },
+          {
+            "change": "M",
+            "path": "dv/uvm/agent/items/ai_compute_cluster_obs.svh",
+            "target_relation_vs_integration": "IDENTICAL"
+          },
+          {
+            "change": "M",
+            "path": "dv/uvm/env/monitor/ai_compute_cluster_monitor.svh",
+            "target_relation_vs_integration": "DIFFERENT"
+          },
+          {
+            "change": "M",
+            "path": "dv/uvm/env/scoreboard/ai_compute_cluster_scoreboard.svh",
+            "target_relation_vs_integration": "DIFFERENT"
+          },
+          {
+            "change": "M",
+            "path": "dv/uvm/sim/Makefile",
+            "target_relation_vs_integration": "DIFFERENT"
+          },
+          {
+            "change": "A",
+            "path": "dv/uvm/sim/run_compute_cluster_dut_mutations.py",
+            "target_relation_vs_integration": "IDENTICAL"
+          },
+          {
+            "change": "M",
+            "path": "dv/uvm/tb/tb_ai_accel_uvm.sv",
+            "target_relation_vs_integration": "DIFFERENT"
+          },
+          {
+            "change": "M",
+            "path": "dv/uvm/tests/sequences/ai_compute_cluster_e2e_seq.svh",
+            "target_relation_vs_integration": "DIFFERENT"
+          }
+        ],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "not ancestry-contained; review unique commits and net paths before treating as archive/deletion candidate"
+      },
+      {
+        "source_task_group": "C",
+        "branch": "backup/before-local-release",
+        "tip_sha": "39269a6866939c5b9cb637891c68048f1f7d618b",
+        "merge_base_with_integration": null,
+        "reachable_from_integration": false,
+        "unique_commit_count": 1,
+        "unique_commits": [
+          {
+            "sha": "39269a6866939c5b9cb637891c68048f1f7d618b",
+            "subject": "Initial public release of NMAForge"
+          }
+        ],
+        "net_paths_rtl_dv_sw_tools": [],
+        "source_task_disposition": "tag/delete candidate after PR review and user approval",
+        "verified_disposition_note": "not ancestry-contained; review unique commits and net paths before treating as archive/deletion candidate"
+      }
+    ]
+  },
+  "source_task_round30_refs": {
+    "research/nmaforge-v1.2-round30-gpt2": "f055d91af0adccd64959450282db291ec96ac549",
+    "research/nmaforge-v1.2-round30-deit": "1ec352ea261892eb882824bf476f3df76e8ae986"
+  }
+}
