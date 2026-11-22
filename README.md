@@ -2,7 +2,7 @@
 
 [中文 README](README_ZH.md) · [Architecture](docs/architecture/ARCHITECTURE.md) ·
 [Specification](docs/spec/SPEC.md) · [Verification plan](docs/verification/VPLAN.md) ·
-[Documentation index](docs/README.md)
+[Current status](docs/STATUS.md) · [Documentation index](docs/README.md)
 
 > **Short description:** A synthesizable AXI4 near-memory tensor accelerator
 > with a banked scratchpad, queued DMA and INT8/Transformer primitives.
@@ -22,12 +22,19 @@ external-memory traffic.
 - 1D/2D/gather DDR↔scratchpad DMA with 4 KiB boundary splitting, up to four
   tagged read requests, RID/BID-aware response handling, narrow-transfer
   alignment support and abort drain.
-- INT8 VDOT/GEMV/GEMM, a 4×4 matrix tile engine, quantized SFU primitives,
+- INT8 VDOT/GEMV/GEMM on a physical 16×16 Matrix Array (256 MAC lanes); 4×4
+  describes the descriptor/SPAD operand tile layout, not the physical array,
+  alongside quantized SFU primitives,
   Conv3x3/depthwise-convolution primitives and KV-cache addressing.
 - Transformer micro-workloads assembled from descriptor primitives, including
   QKV projection, QKᵀ, causal Softmax, AV, residual/norm and FFN.
 
 ## Evidence and current boundary
+
+See [the current status page](docs/STATUS.md) for source-bound evidence,
+benchmark boundaries, static-analysis status, and open items. The bullets below
+are selected historical verification evidence, not a claim that every item was
+replayed on the current README commit.
 
 - VCS directed top-level smoke and Transformer micro-workload regressions have
   passed.
@@ -35,16 +42,17 @@ external-memory traffic.
   RID/BID out-of-order responses, 4 KiB, abort and back-pressure.
 - AXI-Lite control block UVM: six tests passed for reset/ABI, split AW/W,
   WSTRB/errors, IRQ/W1C, busy/abort, randomized accesses and RAL frontdoor.
-- A commercial 28 nm pre-layout synthesis study met a 250 MHz constraint under
-  its documented single-corner assumptions; details are sanitized in
+- A historical commercial 28 nm pre-layout synthesis point met 250 MHz for a
+  512 KiB profile at its documented single corner; it does not characterize
+  today's default 128 KiB profile. Details are sanitized in
   [`docs/verification/TSMC28_SYNTHESIS_REPORT.md`](docs/verification/TSMC28_SYNTHESIS_REPORT.md).
 - XCZU15EG FPGA synthesis/implementation and bring-up scripts are included,
   but a clean-clone board deployment still needs the board owner’s private
   reference project and hardware access.
 
-This is not ASIC sign-off or a production LLM-serving claim. Coverage closure,
-full CDC/RDC/formal, post-layout ASIC sign-off, and real-board workload
-measurements remain open.
+This is not ASIC sign-off or a production LLM-serving claim. Product-wide DV,
+conclusive CDC/RDC, formal closure, post-layout ASIC sign-off, and real-board
+workload measurements remain open; see [current status](docs/STATUS.md).
 
 ## Repository layout
 

@@ -2,7 +2,7 @@
 
 [English README](README.md) · [架构说明](docs/architecture/ARCHITECTURE.md) ·
 [中文规格](docs/spec/SPEC_ZH.md) · [验证计划](docs/verification/VPLAN.md) ·
-[文档索引](docs/README_ZH.md)
+[当前状态](docs/STATUS.md) · [文档索引](docs/README_ZH.md)
 
 > **简短描述：** 基于 AXI4、banked scratchpad 与命令队列的可综合数字近存张量加速器 IP。
 
@@ -17,25 +17,32 @@ NMAForge 是一个可综合的、全数字近存张量加速器 IP。它**不是
 - CMDQ/CPLQ、片上/外部 descriptor、依赖 event、四 word 原子 completion、状态和 IRQ。
 - DDR↔scratchpad DMA：1D、2D stride、gather、4 KiB 拆分、最多四笔 tagged read、
   RID/BID 响应归因、窄传输对齐和 abort drain。
-- INT8 VDOT/GEMV/GEMM、4×4 matrix tile、定点 SFU、Conv3x3/DWConv primitive、
+- INT8 VDOT/GEMV/GEMM 使用物理 16×16 Matrix Array（256 个 MAC lane）；4×4
+  指 Descriptor/SPAD 操作数 tile 布局，不是物理阵列尺寸；另含定点 SFU、Conv3x3/DWConv primitive、
   KV-cache 地址生成。
 - 用 descriptor primitive 组合 QKV、QKᵀ、causal Softmax、AV、residual/norm、FFN 的
   Transformer 微工作负载。
 
 ## 已有证据与边界
 
+当前证据的来源 SHA、测量边界、静态分析状态和未完成项见
+[统一状态页](docs/STATUS.md)。以下是选定的历史验证记录，不代表这些项目均在
+当前 README 对应提交上重新运行。
+
 - VCS 顶层 smoke 和 Transformer 微工作负载回归已通过。
 - DMA block UVM 已通过 11 项定向/随机测试：1D/2D/gather、RID/BID 乱序、4 KiB、
   abort 与 back-pressure。
 - AXI-Lite control block UVM 已通过 6 项测试：reset/ABI、AW/W 分离、WSTRB/error、
   IRQ/W1C、busy/abort、随机寄存器访问和 RAL frontdoor。
-- 商用 28 nm 库的 pre-layout 综合研究在文档约束下满足 250 MHz；公开报告已经脱敏，
-  见 [`docs/verification/TSMC28_SYNTHESIS_REPORT.md`](docs/verification/TSMC28_SYNTHESIS_REPORT.md)。
+- 历史商用 28 nm pre-layout 综合点在其单一工艺角和 512 KiB 配置下满足 250 MHz；
+  这不代表当前默认 128 KiB 配置。脱敏报告见
+  [`docs/verification/TSMC28_SYNTHESIS_REPORT.md`](docs/verification/TSMC28_SYNTHESIS_REPORT.md)。
 - XCZU15EG 的 Vivado 与 bring-up 脚本在仓库中；完整上板仍依赖板卡拥有者私有的
   参考工程和实际硬件。
 
-这不是 ASIC sign-off，也不是生产级 LLM serving 的声明。coverage closure、完整
-CDC/RDC/formal、后布局 ASIC 签核和实板 workload 性能测量仍待完成。
+这不是 ASIC sign-off，也不是生产级 LLM serving 的声明。产品级 DV、明确的 CDC/RDC
+结论、formal closure、后布局 ASIC 签核和实板 workload 性能测量仍待完成；详见
+[统一状态页](docs/STATUS.md)。
 
 ## 目录
 

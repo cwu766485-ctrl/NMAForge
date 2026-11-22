@@ -2,17 +2,19 @@
 
 [English index](README.md) · [项目中文 README](../README_ZH.md)
 
+当前状态入口：[证据与未完成项](STATUS.md)。
+
 ## 当前设计与验证依据
 
 | 主题 | 文档 |
 |---|---|
 | 产品行为、寄存器 ABI 与数值契约 | [中文规格](spec/SPEC_ZH.md) · [English spec](spec/SPEC.md) · [混合精度 FP 规格](spec/FP_EXTENSION_SPEC_ZH.md) · [命名兼容](spec/NAMING_COMPATIBILITY.md) |
 | RTL 所有权与数据流 | [架构说明](architecture/ARCHITECTURE.md) |
-| 五个 compute 验证组收敛情况 | [验证状态统计](verification/COMPUTE_ENGINE_STATUS.md) · [2026-10-21 运行记录](verification/COMPUTE_ENGINE_BLOCK_VALIDATION_2026-10-21.md) |
+| 七引擎验证状态快照 | [验证状态统计](verification/COMPUTE_ENGINE_STATUS.md) · [2026-10-21 运行记录](verification/COMPUTE_ENGINE_BLOCK_VALIDATION_2026-10-21.md) |
 | A10 需求追踪与剩余收口项 | [A10 RTM](verification/A10_DV_RTM.md) · [缺陷登记](verification/A10_BUG_REGISTER.md) · [验证计划](verification/VPLAN.md) |
 | Lint、CDC/RDC 与综合证据 | [静态分析](verification/STATIC_ANALYSIS_REPORT.md) · [CDC disposition](verification/CDC_DUAL_CLOCK_DISPOSITION_ZH.md) · [RDC 状态](verification/RDC_STATUS_ZH.md) · [SpyGlass triage](../dv/spyglass/LINT_TRIAGE.md) · [TSMC28 综合](verification/TSMC28_SYNTHESIS_REPORT.md) |
 | FPGA 板级 bring-up | [XCZU15EG 流程](verification/XCZU15EG_BRINGUP.md) |
-| CNM 评估与研究 | [中文评估](architecture/CNM_EVALUATION_ZH.md) · [English summary](architecture/CNM_EVALUATION.md) · [文献综述](architecture/Literature_Review.md) |
+| CNM 评估与研究 | [英文评估（当前无中文版本）](architecture/CNM_EVALUATION.md) · [文献综述](architecture/Literature_Review.md) |
 | 性能、项目经验与发布 | [性能/PPA 报告](architecture/PERFORMANCE_PPA_REPORT_ZH.md) · [项目经验](architecture/PROJECT_EXPERIENCE_ZH.md) · [公开发布指南](PUBLIC_RELEASE.md) |
 | RTL 阅读与安全重构 | [RTL 指南](RTL_GUIDE.md) |
 

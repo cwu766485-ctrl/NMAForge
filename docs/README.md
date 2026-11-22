@@ -2,17 +2,19 @@
 
 [中文索引](README_ZH.md) · [Repository README](../README.md)
 
+Current status: [evidence and open issues](STATUS.md).
+
 ## Current design and verification sources
 
 | Topic | Source |
 |---|---|
 | Product behavior, register ABI and numerical contracts | [English spec](spec/SPEC.md) · [中文规格](spec/SPEC_ZH.md) · [FP extension spec](spec/FP_EXTENSION_SPEC_ZH.md) · [Naming compatibility](spec/NAMING_COMPATIBILITY.md) |
 | RTL ownership and dataflow | [Architecture](architecture/ARCHITECTURE.md) |
-| Compute-engine verification status | [Five-engine status](verification/COMPUTE_ENGINE_STATUS.md) · [2026-10-21 run evidence](verification/COMPUTE_ENGINE_BLOCK_VALIDATION_2026-10-21.md) |
+| Compute-engine verification status | [Seven-engine status snapshot](verification/COMPUTE_ENGINE_STATUS.md) · [2026-10-21 run evidence](verification/COMPUTE_ENGINE_BLOCK_VALIDATION_2026-10-21.md) |
 | A10 requirement traceability and remaining closure | [A10 RTM](verification/A10_DV_RTM.md) · [Bug register](verification/A10_BUG_REGISTER.md) · [Verification plan](verification/VPLAN.md) |
 | Lint, CDC/RDC and synthesis evidence | [Static analysis](verification/STATIC_ANALYSIS_REPORT.md) · [CDC disposition](verification/CDC_DUAL_CLOCK_DISPOSITION_ZH.md) · [RDC status](verification/RDC_STATUS_ZH.md) · [SpyGlass triage](../dv/spyglass/LINT_TRIAGE.md) · [TSMC28 synthesis](verification/TSMC28_SYNTHESIS_REPORT.md) |
 | Board bring-up | [XCZU15EG procedure](verification/XCZU15EG_BRINGUP.md) |
-| CNM evaluation and research | [CNM evaluation](architecture/CNM_EVALUATION.md) · [中文评估](architecture/CNM_EVALUATION_ZH.md) · [Literature review](architecture/Literature_Review.md) |
+| CNM evaluation and research | [CNM evaluation (English)](architecture/CNM_EVALUATION.md) · [Literature review](architecture/Literature_Review.md) |
 | Performance, project experience and release | [Performance/PPA report](architecture/PERFORMANCE_PPA_REPORT_ZH.md) · [Project experience](architecture/PROJECT_EXPERIENCE_ZH.md) · [Public release guide](PUBLIC_RELEASE.md) |
 | RTL learning and safe refactoring | [RTL guide](RTL_GUIDE.md) |
 
