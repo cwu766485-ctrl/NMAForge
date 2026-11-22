@@ -1,0 +1,12 @@
+Command: /tmp/nmaforge_round3_cnn_ab_20261122/simv +ntb_random_seed=20261122 +AI_RANDOM_CASES=0 +AI_SEED=20261122 +ACLK_PERIOD_NS=4.000 +AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_MEMORY=/tmp/nmaforge_round3_cnn_ab_20261122/first/workload/model_memory.memh +AI_REPRESENTATIVE_GOLDEN=/tmp/nmaforge_round3_cnn_ab_20261122/first/workload/model_golden.memh +AI_REPRESENTATIVE_DESC_BASE=102400 +AI_REPRESENTATIVE_CPL_BASE=102912 +AI_REPRESENTATIVE_DESC_COUNT=3 +AI_REPRESENTATIVE_USEFUL_MACS=262144 +AI_DAMS_TRACE_FILE=/tmp/nmaforge_round3_cnn_ab_20261122/first/dams_trace.csv +AI_DAMS_STATE_TRACE_FILE=/tmp/nmaforge_round3_cnn_ab_20261122/first/dams_state.csv -l /tmp/nmaforge_round3_cnn_ab_20261122/first/run.log
+Chronologic VCS simulator copyright 1991-2023
+Contains Synopsys proprietary information.
+Compiler version V-2023.12-SP1_Full64; Runtime version V-2023.12-SP1_Full64;  Nov 22 17:15 2026
+R9_SFU_COMMAND index=0 opcode=0x36 length=8192 cycles=26625 pass0=24576 pass1=2048 pass2=0 math=0 other=1 spad_request_stall=0 spad_response_wait=8192 spad_read_accepts=8192 spad_write_accepts=2048 divider_busy=0 sqrt_busy=0 cycles_closed=26625
+REPRESENTATIVE_MODEL_PASS desc=3 prefill_desc=0 decode_desc=0 golden_words=20480 useful_macs=262144 executed_macs=-1 padding_macs=-1 useful_output_elements=-1 physical_output_elements=-1 command_cycles=34324 end_to_end_cycles=170619 dma_preload_included=0 prefill_command_cycles=0 decode_command_cycles=0 prefill_exclusive_cycles=0 decode_exclusive_cycles=0 exclusive_profile_cycles=34324 preload_axi_cycles=136295 preload_dma_window_cycles=0 preload_dma_busy_cycles=0 preloaded_spad_bytes=90864 useful_mac_per_cycle=7.6373 executed_array_utilization_pct=-1.00 useful_array_utilization_pct=100.00 matrix_mac_cycles=1024 matrix_req_wait=18 matrix_rsp_wait=14 matrix_writeback=2560 matrix_other=3994 sfu_busy=26625 kv_busy=0 conv_busy=0 banked_busy=0 fp_busy=0 scalar_busy=0 no_engine_dispatch_remainder=89 dma_busy_overlap=0 spad_read_bytes=65536 spad_write_bytes=49152 late_dma_events=0 late_dma_payload_bytes=0 late_dma_window_cycles=0 command_cycles_excluding_late_dma=0 late_dma_readback_cycles=0 late_dma_session_cycles=0 host_fixture_bytes=90864 test_only_poison_setup_bytes=81968
+$finish called from file "../tb/tb_ai_accel_smoke.sv", line 6942.
+$finish at simulation time           1666044000
+           V C S   S i m u l a t i o n   R e p o r t 
+Time: 1666044000 ps
+CPU Time:      3.020 seconds;       Data structure size:   1.0Mb
+Sun Nov 22 17:15:37 2026

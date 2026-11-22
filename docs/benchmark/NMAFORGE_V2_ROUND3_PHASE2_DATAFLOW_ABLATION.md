@@ -1,6 +1,6 @@
 # Round 3 — Phase 2: GEMV and Compute-Engine Dataflow A/B
 
-**Disposition: PARTIAL.** The GEMV cache/prefetch experiment and standalone Matrix/CNM measurements completed. They support retaining B-fold reuse for the tested GEMV shapes, with shape-dependent prefetch. The requested Mini CNN host-layout A/B has not been rerun at this source SHA; no layout optimization is claimed.
+**Disposition: PARTIAL.** The GEMV cache/prefetch experiment, standalone Matrix/CNM measurements, and a same-source Product Top 262,144-MAC pointwise-CNN layout A/B completed. All three CNN modes passed 20,480 Golden words. These results support the tested command-window reduction, but do not establish production end-to-end latency or a trained-model gain.
 
 ## GEMV four-way ablation
 
@@ -65,6 +65,24 @@ Raw aggregate: [`round3_gemv_four_way_3seed.csv`](../../benchmark/representative
 
 ## Open items
 
-- The Mini CNN 1,080-cycle host-layout cost is not remeasured in a current-source A/B against DMA/Repack or fused-consumer layout; CNN layout optimization remains open.
+- The new 262,144-MAC fixed-seed pointwise workload is not trained and does not cover the ONNX Mini CNN. Host preprocessing, production DMA/load, and true application end-to-end timing remain open.
 - Matrix A3 vs banked CNM GEMV comparisons are not equal-shape full-path comparisons and do not establish a Product Top winner.
 - No RTL was changed. Any future RTL optimization must start from a reproducible bottleneck and be followed by focused functional checks.
+
+## Product Top CNN layout A/B (source `b31c8037d553d765a3529cb0b42bfde4d7ed224c`)
+
+The 1×1 two-layer workload was regenerated with one seed and run through one compiled Product Top simulator for each descriptor stream. The input and both weight hashes are identical across modes; each independently generated memory image has its own manifest. Python scalar integer references checked both raw INT32 tensors and the final packed INT8 tensor before simulation. All three Product Top runs returned exit code 0 and reported `REPRESENTATIVE_MODEL_PASS`, with 20,480/20,480 output Golden words checked. This is deterministic inference data, not a trained classifier.
+
+| Dataflow | Descriptors | Command cycles | Command reduction vs legacy | Command-window ratio | Preload AXI fixture cycles | SPAD read/write bytes | SFU busy cycles |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Legacy GEMM + Requant | 4 | 60,930 | 0% | 1.000× | 136,415 | 98,304 / 81,920 | 53,252 |
+| First-layer fused | 3 | 34,324 | 43.67% | 1.776× | 136,295 | 65,536 / 49,152 | 26,625 |
+| Both layers fused, Linear-Row output | 2 | 7,708 | 87.35% | 7.906× | 136,175 | 32,768 / 16,384 | 0 |
+
+`useful_mac_per_command_cycle` was 4.3024, 7.6373, and 34.0093 respectively. The reported `useful_array_utilization_pct=100` field is not an executed-array utilization measurement (`executed_array_utilization_pct` is unavailable); do not interpret it as sustained physical array utilization. The 0x53-only fused path has no separate SFU busy cycles because it performs the fused writeback in the Matrix command.
+
+The printed `end_to_end_cycles` were 197,345 / 170,619 / 143,883. They include testbench fixture preload and test-only poison setup, while preload is reported separately as 136,415 / 136,295 / 136,175 AXI cycles. The fixture preloads 90,944 / 90,864 / 90,784 bytes and poison setup accounts for 81,984 / 81,968 / 81,952 bytes. These are harness costs, not a production DMA schedule; the slight mode-to-mode differences come from each workload memory image. Therefore these numbers are not product application latency and are not used for an end-to-end speedup claim.
+
+Reproduce with `benchmark/representative/generate_pointwise_cnn_workload.py` and `benchmark/representative/verify_pointwise_cnn_workload.py`, using seed `20261122`, then compile and run commands recorded in [`run_manifest.json`](../../benchmark/representative/round3/cnn_layout_ab/run_manifest.json). Raw compile/run logs, SHA-256 manifests, machine-readable results and workload manifests are archived under [`cnn_layout_ab/`](../../benchmark/representative/round3/cnn_layout_ab/). Simulator databases, generated memory images and DAMS traces remain outside Git. The compile emitted one `LOOP-REROLL-ENABLED` warning in `ai_transformer_workload.svh`; no RTL was changed in this experiment.
+
+This is a valid same-workload Product Top **command-window** A/B and a new RTL evidence point for the Linear-Row path. It does not close the trained CNN, real DMA overlap, or production end-to-end measurement gates.

@@ -1,0 +1,11 @@
+Command: /tmp/nmaforge_round3_cnn_ab_20261122/simv +ntb_random_seed=20261122 +AI_RANDOM_CASES=0 +AI_SEED=20261122 +ACLK_PERIOD_NS=4.000 +AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_MEMORY=/tmp/nmaforge_round3_cnn_ab_20261122/both_linearized/workload/model_memory.memh +AI_REPRESENTATIVE_GOLDEN=/tmp/nmaforge_round3_cnn_ab_20261122/both_linearized/workload/model_golden.memh +AI_REPRESENTATIVE_DESC_BASE=102400 +AI_REPRESENTATIVE_CPL_BASE=102912 +AI_REPRESENTATIVE_DESC_COUNT=2 +AI_REPRESENTATIVE_USEFUL_MACS=262144 +AI_DAMS_TRACE_FILE=/tmp/nmaforge_round3_cnn_ab_20261122/both_linearized/dams_trace.csv +AI_DAMS_STATE_TRACE_FILE=/tmp/nmaforge_round3_cnn_ab_20261122/both_linearized/dams_state.csv -l /tmp/nmaforge_round3_cnn_ab_20261122/both_linearized/run.log
+Chronologic VCS simulator copyright 1991-2023
+Contains Synopsys proprietary information.
+Compiler version V-2023.12-SP1_Full64; Runtime version V-2023.12-SP1_Full64;  Nov 22 17:15 2026
+REPRESENTATIVE_MODEL_PASS desc=2 prefill_desc=0 decode_desc=0 golden_words=20480 useful_macs=262144 executed_macs=-1 padding_macs=-1 useful_output_elements=-1 physical_output_elements=-1 command_cycles=7708 end_to_end_cycles=143883 dma_preload_included=0 prefill_command_cycles=0 decode_command_cycles=0 prefill_exclusive_cycles=0 decode_exclusive_cycles=0 exclusive_profile_cycles=7708 preload_axi_cycles=136175 preload_dma_window_cycles=0 preload_dma_busy_cycles=0 preloaded_spad_bytes=90784 useful_mac_per_cycle=34.0093 executed_array_utilization_pct=-1.00 useful_array_utilization_pct=100.00 matrix_mac_cycles=1024 matrix_req_wait=9 matrix_rsp_wait=7 matrix_writeback=1024 matrix_other=5566 sfu_busy=0 kv_busy=0 conv_busy=0 banked_busy=0 fp_busy=0 scalar_busy=0 no_engine_dispatch_remainder=78 dma_busy_overlap=0 spad_read_bytes=32768 spad_write_bytes=16384 late_dma_events=0 late_dma_payload_bytes=0 late_dma_window_cycles=0 command_cycles_excluding_late_dma=0 late_dma_readback_cycles=0 late_dma_session_cycles=0 host_fixture_bytes=90784 test_only_poison_setup_bytes=81952
+$finish called from file "../tb/tb_ai_accel_smoke.sv", line 6942.
+$finish at simulation time           1559052000
+           V C S   S i m u l a t i o n   R e p o r t 
+Time: 1559052000 ps
+CPU Time:      2.370 seconds;       Data structure size:   1.0Mb
+Sun Nov 22 17:15:40 2026

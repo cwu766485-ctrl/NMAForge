@@ -1,0 +1,71 @@
+{
+  "run_id": "NMA-ROUND3-CNN-AB-20261122",
+  "status": "PASS_GOLDEN_ALL_THREE",
+  "source_sha": "b31c8037d553d765a3529cb0b42bfde4d7ed224c",
+  "run_date": "2026-11-22",
+  "branch": "docs/status-benchmark-20261122",
+  "seed": 20261122,
+  "tool_versions": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "verdi": "V-2023.12-SP2",
+    "python": "3.12.13"
+  },
+  "tool_paths": {
+    "vcs": "vcs from configured Synopsys environment",
+    "python": "/tmp/nmaforge_arch_v2_py312/bin/python"
+  },
+  "workload": {
+    "shape_nchw": [
+      1,
+      16,
+      32,
+      16
+    ],
+    "spatial_positions": 512,
+    "layers": [
+      "1x1 INT8 GEMM 16->16",
+      "1x1 INT8 GEMM 16->16"
+    ],
+    "useful_macs": 262144,
+    "weights": "fixed seed inference weights; not trained",
+    "seed": 20261122
+  },
+  "compile_command": "cd dv/subsystem/top_smoke/sim && vcs -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS +define+AI_REPRESENTATIVE_LONG_TASK +define+AI_SPAD_WORDS_PER_BANK=8192 +incdir+../../../block/control/agent +incdir+../../../block/dma/agent +incdir+../fixtures -Mdir=/tmp/nmaforge_round3_cnn_ab_20261122/csrc -top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv -o /tmp/nmaforge_round3_cnn_ab_20261122/simv -l /tmp/nmaforge_round3_cnn_ab_20261122/compile.log",
+  "run_commands": [
+    "/tmp/nmaforge_round3_cnn_ab_20261122/simv +ntb_random_seed=20261122 +AI_RANDOM_CASES=0 +AI_SEED=20261122 +ACLK_PERIOD_NS=4.000 +AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_MEMORY=<legacy/model_memory.memh> +AI_REPRESENTATIVE_GOLDEN=<legacy/model_golden.memh> +AI_REPRESENTATIVE_DESC_BASE=102400 +AI_REPRESENTATIVE_CPL_BASE=102912 +AI_REPRESENTATIVE_DESC_COUNT=4 +AI_REPRESENTATIVE_USEFUL_MACS=262144",
+    "/tmp/nmaforge_round3_cnn_ab_20261122/simv +ntb_random_seed=20261122 +AI_RANDOM_CASES=0 +AI_SEED=20261122 +ACLK_PERIOD_NS=4.000 +AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_MEMORY=<first/model_memory.memh> +AI_REPRESENTATIVE_GOLDEN=<first/model_golden.memh> +AI_REPRESENTATIVE_DESC_BASE=102400 +AI_REPRESENTATIVE_CPL_BASE=102912 +AI_REPRESENTATIVE_DESC_COUNT=3 +AI_REPRESENTATIVE_USEFUL_MACS=262144",
+    "/tmp/nmaforge_round3_cnn_ab_20261122/simv +ntb_random_seed=20261122 +AI_RANDOM_CASES=0 +AI_SEED=20261122 +ACLK_PERIOD_NS=4.000 +AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_MEMORY=<both_linearized/model_memory.memh> +AI_REPRESENTATIVE_GOLDEN=<both_linearized/model_golden.memh> +AI_REPRESENTATIVE_DESC_BASE=102400 +AI_REPRESENTATIVE_CPL_BASE=102912 +AI_REPRESENTATIVE_DESC_COUNT=2 +AI_REPRESENTATIVE_USEFUL_MACS=262144"
+  ],
+  "compile_log_sha256": "dc88e16a11116f5c71716ccce708659744991090e5006d632e3977bba69a6582",
+  "run_log_sha256": {
+    "run_both_linearized.log": "2aae5ec9bea8d60af8ca600397faad1fdc116f803fbaccc44878add8e32f2a9b",
+    "run_first_fused.log": "7e0b9246c9c1a86cdcf46a8f5aa4cda8942bdba9b3aae4a4bfb625b38c9c04db",
+    "run_legacy.log": "294ce8c6c2b8663ba0e58601ecd2805e704c1bcbfd411c54e98e2788682452f7"
+  },
+  "manifests": {
+    "both_linearized_manifest.json": {
+      "sha256": "7d72a09defb7da1e22575af75a1d347449be2ec01ca728b7403ccef1c5f2a554",
+      "memory_image_sha256": "b1f5293efd1432679214b3bacf9f31de8773b55b48743e13214bdcb0f1d06869",
+      "golden_file_sha256": "bbd2af689705f093028b50eb4a43e71386f4f22e8c8bd5edfe6ad815ed33b005"
+    },
+    "first_fused_manifest.json": {
+      "sha256": "7d65bc874de46ed4b61eb8929f501fd86ababbe33c57e9b4efd9a3b44af3e6bd",
+      "memory_image_sha256": "0163c6e7d2d07c8ffb60ec483a68b27d6612433539802194ccf394c5df433ec1",
+      "golden_file_sha256": "97f6acac69a881fc227cb22721d2a88efa641217b78f3e820873dffbed0c1a20"
+    },
+    "legacy_manifest.json": {
+      "sha256": "fe79c95baa7c557e14c3ffbe31dd4955a096526dd29e12b4e30fa5f68e73679f",
+      "memory_image_sha256": "3b7d268d4827383f102c36d7a3281e6b00cf9df795ef1ef1edcf715b9e9de18a",
+      "golden_file_sha256": "58af6a8529c3f69795d572bf10e2270d8810f1e3c78ed9e2287c9c2352a8eaf6"
+    }
+  },
+  "exit_codes": {
+    "compile": 0,
+    "legacy": 0,
+    "first_fused": 0,
+    "both_linearized": 0
+  },
+  "warning": "VCS compile emitted one LOOP-REROLL-ENABLED warning in ai_transformer_workload.svh; no RTL changes in this experiment.",
+  "boundary": "end_to_end_cycles is TB fixture-bound and includes testbench AXI-Lite preload/setup and test-only poison sentinels. It is not production DMA/application end-to-end latency. Do not use it for cross-mode system speedup.",
+  "not_archived": "Generated model_memory.memh, model_golden.memh, simulator databases, simv and DAMS traces are not committed; hashes for memory/golden images are in manifests."
+}
