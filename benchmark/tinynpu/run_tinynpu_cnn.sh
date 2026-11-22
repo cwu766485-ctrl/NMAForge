@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PINNED_SHA=8216c22b762011aa20c05fc2768423fd12dda59d
+PINNED_SHA=38a2498af81f78b9dd8f81144026cf45e2b8328c
 WORK_ROOT="${TINYNPU_WORK_ROOT:-${TMPDIR:-/tmp}/nmaforge_tinynpu_${PINNED_SHA:0:12}}"
 TINY_NPU_ROOT="${TINY_NPU_ROOT:-$WORK_ROOT/source}"
 OUT_DIR="${TINYNPU_CNN_OUT:-$WORK_ROOT/cnn}"

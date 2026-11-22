@@ -79,16 +79,43 @@ def matrix_row(line: str, design: str, source_sha: str, seed: str,
         "golden": "PASS: all output words",
         "timing_boundary": "Matrix start accepted through final SPAD write and done",
         "comparison_scope": scope,
-        "common_spad_bytes_per_cycle": "16",
-        "common_spad_read_latency_cycles": "1",
-        "common_read_bytes": value["bank_read_bytes"],
-        "common_write_bytes": value["line_write_bytes"],
-        "common_read_service_cycles": str((int(value["bank_read_bytes"])+15)//16),
-        "common_write_service_cycles": str((int(value["line_write_bytes"])+15)//16),
-        "common_endpoint_cycles": str(cycles),
-        "common_mac_per_cycle": f"{macs/cycles:.4f}",
-        "common_pe_utilization_pct": f"{100*macs/(256*cycles):.2f}",
-        "measurement_kind": "measured Matrix RTL + one-cycle behavioral SPAD",
+        "common_spad_bytes_per_cycle": "N/A",
+        "common_spad_read_latency_cycles": "N/A",
+        "common_read_bytes": "N/A",
+        "common_write_bytes": "N/A",
+        "common_read_service_cycles": "N/A",
+        "common_write_service_cycles": "N/A",
+        "common_endpoint_cycles": "N/A",
+        "common_mac_per_cycle": "N/A",
+        "common_pe_utilization_pct": "N/A",
+        "measurement_kind": "measured NMAForge Matrix RTL + one-cycle behavioral SPAD; not a matched system endpoint",
+    }
+
+
+def tiny_array_row(value: dict[str, str], source_sha: str, seed: str,
+                   run_id: str, scope: str) -> dict[str, str]:
+    m, n, k = (int(part) for part in value["shape_mnk"].split(","))
+    macs = m * n * k
+    cycles = int(value["cycles_input_to_array_stable"])
+    if int(value["macs"]) != macs:
+        raise SystemExit(f"TinyNPU MAC count mismatch for {value['shape_mnk']}")
+    return {
+        "run_id": run_id, "design": "TinyNPU", "source_sha": source_sha,
+        "seed": "directed", "shape_mnk": f"{m}x{n}x{k}",
+        "physical_array": value["physical_array"],
+        "cycles_to_done": "N/A", "cycles_to_last_output": str(cycles),
+        "macs": str(macs), "mac_per_cycle": value["mac_per_cycle"],
+        "pe_utilization_pct": value["pe_utilization_pct"],
+        "spad_read_bytes": "N/A", "spad_write_bytes": "N/A",
+        "bank_stalls": "N/A", "line_stalls": "N/A", "golden": value["golden"],
+        "timing_boundary": "engine_tb_top direct-array start through array output stable; excludes controller and memory service",
+        "comparison_scope": scope,
+        "common_spad_bytes_per_cycle": "N/A", "common_spad_read_latency_cycles": "N/A",
+        "common_read_bytes": "N/A", "common_write_bytes": "N/A",
+        "common_read_service_cycles": "N/A", "common_write_service_cycles": "N/A",
+        "common_endpoint_cycles": "N/A", "common_mac_per_cycle": "N/A",
+        "common_pe_utilization_pct": "N/A",
+        "measurement_kind": "measured TinyNPU direct array RTL; no controller or memory model",
     }
 
 
@@ -101,6 +128,7 @@ def main() -> None:
     parser.add_argument("--size-root", type=Path, required=True)
     parser.add_argument("--match8", type=Path, required=True)
     parser.add_argument("--match16", type=Path, required=True)
+    parser.add_argument("--nma-gemv-ablation", type=Path, required=True)
     parser.add_argument("--tiny-gemm", type=Path, required=True)
     parser.add_argument("--tiny-engine", type=Path, required=True)
     parser.add_argument("--tiny-cnn", type=Path, required=True)
@@ -139,10 +167,16 @@ def main() -> None:
                            (fields(nma_match_lines[case_id]) for case_id in (105, 106, 107))))
     nma_match_lines_by_shape = dict(zip(matched_shapes,
                                        (nma_match_lines[case_id] for case_id in (105, 106, 107))))
-    tiny_match_lines = require_lines(args.tiny_gemm, "TINYNPU_MATCHED_GEMM_PASS ")
-    tiny_matches = {fields(line)["shape_mnk"]: fields(line) for line in tiny_match_lines}
-    if len(tiny_match_lines) != 3 or set(tiny_matches) != set(matched_shapes):
-        raise SystemExit(f"TinyNPU matched shapes mismatch: {sorted(tiny_matches)}")
+    tiny_gemm_lines = require_lines(args.tiny_gemm, "TINYNPU_MATCHED_GEMM_PASS ")
+    tiny_gemv_lines = require_lines(args.tiny_gemm, "TINYNPU_MATCHED_GEMV_PASS ")
+    tiny_lines = tiny_gemm_lines + tiny_gemv_lines
+    tiny_matches = {fields(line)["shape_mnk"]: fields(line) for line in tiny_lines}
+    expected_tiny_shapes = set(matched_shapes) | {
+        "64,64,64", "1,64,64",
+        "1,13,17", "8,16,19", "16,16,19", "16,16,65",
+    }
+    if len(tiny_lines) != len(expected_tiny_shapes) or set(tiny_matches) != expected_tiny_shapes:
+        raise SystemExit(f"TinyNPU shape set mismatch: {sorted(tiny_matches)}")
 
     for shape in matched_shapes:
         nma = nma_matches[shape]
@@ -159,17 +193,6 @@ def main() -> None:
             "matched tiled GEMM; 16x16 controller + one-cycle behavioral SPAD"))
         tiny_m, tiny_n, tiny_k = (int(part) for part in tiny["shape_mnk"].split(","))
         tiny_array_cycles = int(tiny["cycles_input_to_array_stable"])
-        tiny_read_bytes = tiny_m*tiny_k + tiny_k*tiny_n
-        tiny_write_bytes = tiny_m*tiny_n*4
-        tiny_read_service = (tiny_read_bytes+15)//16 + 1
-        tiny_write_service = (tiny_write_bytes+15)//16
-        # TinyNPU's public array wrapper has no SPAD request/response port.
-        # Normalize its array run with the same 128-bit line bandwidth and
-        # one-cycle read response, serializing input load, array execution,
-        # and output commit. Include the two accumulator-clear cycles omitted
-        # from the direct-array stopwatch.
-        tiny_common_cycles = tiny_read_service + tiny_array_cycles + tiny_write_service + 2
-        tiny_common_macs = tiny_m*tiny_n*tiny_k
         rows.append({
             "run_id": args.run_id,
             "design": "TinyNPU",
@@ -187,21 +210,66 @@ def main() -> None:
             "bank_stalls": "N/A",
             "line_stalls": "N/A",
             "golden": tiny["golden"],
-            "timing_boundary": "normalized command acceptance through final output commit; direct array run plus modeled SPAD load/store",
-            "comparison_scope": "same deterministic A/B and integer Golden; common 16-byte/cycle line model, one-cycle read response, no overlap between TinyNPU load/compute/store",
-            "common_spad_bytes_per_cycle": "16",
-            "common_spad_read_latency_cycles": "1",
-            "common_read_bytes": str(tiny_read_bytes),
-            "common_write_bytes": str(tiny_write_bytes),
-            "common_read_service_cycles": str(tiny_read_service),
-            "common_write_service_cycles": str(tiny_write_service),
-            "common_endpoint_cycles": str(tiny_common_cycles),
-            "common_mac_per_cycle": f"{tiny_common_macs/tiny_common_cycles:.4f}",
-            "common_pe_utilization_pct": f"{100*tiny_common_macs/(256*tiny_common_cycles):.2f}",
-            "measurement_kind": "direct TinyNPU RTL array cycles + explicit serial SPAD timing model",
+            "timing_boundary": "engine_tb_top direct-array start through array output stable; excludes controller and memory service",
+            "comparison_scope": "same deterministic A/B and independent INT32 Golden; raw direct-array point only, not comparable to NMAForge controller endpoint",
+            "common_spad_bytes_per_cycle": "N/A",
+            "common_spad_read_latency_cycles": "N/A",
+            "common_read_bytes": "N/A",
+            "common_write_bytes": "N/A",
+            "common_read_service_cycles": "N/A",
+            "common_write_service_cycles": "N/A",
+            "common_endpoint_cycles": "N/A",
+            "common_mac_per_cycle": "N/A",
+            "common_pe_utilization_pct": "N/A",
+            "measurement_kind": "measured TinyNPU direct array RTL; no controller or memory model",
         })
         if int(tiny["macs"]) != tiny_m * tiny_n * tiny_k:
             raise SystemExit(f"TinyNPU MAC count mismatch for {normalized_shape}")
+
+    # Keep the 64x64 extension raw and disclose that each side exposes a
+    # different endpoint (NMA controller+behavioral SPAD vs Tiny direct array).
+    nma64 = require_line(args.match16, "MATRIX_CORE_CASE_PASS id=108 ")
+    rows.append(matrix_row(nma64, "NMAForge", args.nma_sha, args.seed, args.run_id,
+                           "same 64x64x64 operands; Matrix controller + behavioral SPAD; NOT_COMPARABLE"))
+    tiny64 = tiny_matches["64,64,64"]
+    rows.append(tiny_array_row(tiny64, args.tiny_sha, args.seed, args.run_id,
+                               "same 64x64x64 operands; direct array endpoint; NOT_COMPARABLE"))
+    tiny_gemv = tiny_matches["1,64,64"]
+    rows.append(tiny_array_row(tiny_gemv, args.tiny_sha, args.seed, args.run_id,
+                               "same 1x64x64 operands; direct array endpoint; NOT_COMPARABLE"))
+    for shape in ("1,13,17", "8,16,19", "16,16,19", "16,16,65"):
+        rows.append(tiny_array_row(
+            tiny_matches[shape], args.tiny_sha, args.seed, args.run_id,
+            "existing fixed GEMV workload; direct array endpoint; NOT_COMPARABLE"))
+
+    # Product GEMV is four legal 1x16x64 descriptors. Only prefetch changes;
+    # B-cache stays off. Preserve OFF/ON as separate measured points.
+    for prefetch in (0, 1):
+        log = args.nma_gemv_ablation / f"prefetch_{prefetch}" / "run.log"
+        line = require_line(log, "ROUND27_MATRIX_GEMV_1X64_PASS ")
+        value = fields(line)
+        if value.get("shape") != "1x64x64" or value.get("prefetch") != str(prefetch) or value.get("cache") != "0":
+            raise SystemExit(f"GEMV ablation configuration mismatch in {log}: {line}")
+        cycles = int(value["cycles"])
+        macs = int(value["useful_macs"])
+        rows.append({
+            "run_id": args.run_id, "design": "NMAForge", "source_sha": args.nma_sha,
+            "seed": args.seed, "shape_mnk": "1x64x64", "physical_array": "16x16",
+            "cycles_to_done": str(cycles), "cycles_to_last_output": str(cycles),
+            "macs": str(macs), "mac_per_cycle": f"{macs/cycles:.4f}",
+            "pe_utilization_pct": f"{100*macs/(256*cycles):.2f}",
+            "spad_read_bytes": value["read_bytes"], "spad_write_bytes": value["write_bytes"],
+            "bank_stalls": value["bank_stalls"], "line_stalls": value["line_stalls"],
+            "golden": value["golden"],
+            "timing_boundary": "four 0x52 product GEMV descriptors, matrix start to final SPAD write",
+            "comparison_scope": f"prefetch={prefetch}, B-cache=0, one-cycle behavioral SPAD; internal NMA A/B only",
+            "common_spad_bytes_per_cycle": "N/A", "common_spad_read_latency_cycles": "N/A",
+            "common_read_bytes": "N/A", "common_write_bytes": "N/A",
+            "common_read_service_cycles": "N/A", "common_write_service_cycles": "N/A",
+            "common_endpoint_cycles": "N/A", "common_mac_per_cycle": "N/A",
+            "common_pe_utilization_pct": "N/A",
+            "measurement_kind": "measured 0x52 Matrix RTL + one-cycle behavioral SPAD; not Top latency",
+        })
 
     args.out_csv.parent.mkdir(parents=True, exist_ok=True)
     with args.out_csv.open("w", newline="", encoding="utf-8") as stream:
@@ -317,35 +385,6 @@ def main() -> None:
     args.out_cnn_json.parent.mkdir(parents=True, exist_ok=True)
     args.out_cnn_json.write_text(json.dumps(cnn_summary, indent=2) + "\n", encoding="utf-8")
 
-    common_pairs = []
-    for shape in matched_shapes:
-        nma = nma_matches[shape]
-        tiny = tiny_matches[shape]
-        m, n, k = (int(part) for part in shape.split(","))
-        tiny_read = m*k + k*n
-        tiny_write = m*n*4
-        tiny_cycles = ((tiny_read+15)//16 + 1 +
-                       int(tiny["cycles_input_to_array_stable"]) +
-                       (tiny_write+15)//16 + 2)
-        nma_cycles = int(nma["cycles"])
-        common_pairs.append({
-            "shape": shape.replace(",", "x"),
-            "common_spad_bandwidth_bytes_per_cycle": 16,
-            "common_spad_read_latency_cycles": 1,
-            "nmaforge_measured_cycles": nma_cycles,
-            "nmaforge_measured_spad_read_bytes": int(nma["bank_read_bytes"]),
-            "nmaforge_measured_spad_write_bytes": int(nma["line_write_bytes"]),
-            "tinynpu_array_rtl_cycles": int(tiny["cycles_input_to_array_stable"]),
-            "tinynpu_modeled_read_bytes": tiny_read,
-            "tinynpu_modeled_write_bytes": tiny_write,
-            "tinynpu_modeled_read_service_cycles": (tiny_read+15)//16+1,
-            "tinynpu_modeled_write_service_cycles": (tiny_write+15)//16,
-            "tinynpu_normalized_cycles": tiny_cycles,
-            "nmaforge_over_tinynpu_normalized_ratio": round(nma_cycles/tiny_cycles, 4),
-            "golden": "PASS on both designs",
-            "boundary_note": "NMAForge endpoint is real Matrix controller + behavioral SPAD; TinyNPU endpoint adds a serialized bandwidth/latency model around the measured RTL array because upstream exposes no SPAD port",
-        })
-
     summary = {
         "run_id": args.run_id,
         "nmaforge_source_sha": args.nma_sha,
@@ -367,27 +406,16 @@ def main() -> None:
             "cases": [
                 {
                     "shape": shape.replace(",", "x"),
-                    "nmaforge_cycles": int(nma_matches[shape]["cycles"]),
-                    "nmaforge_spad_read_bytes": int(nma_matches[shape]["bank_read_bytes"]),
-                    "nmaforge_spad_write_bytes": int(nma_matches[shape]["line_write_bytes"]),
-                    "tinynpu_direct_array_cycles": int(tiny_matches[shape]["cycles_input_to_array_stable"]),
-                    "tinynpu_normalized_cycles": common_pairs[index]["tinynpu_normalized_cycles"],
-                    "nmaforge_over_tinynpu_normalized_ratio": common_pairs[index]["nmaforge_over_tinynpu_normalized_ratio"],
-                    "comparison": "normalized model ratio only; TinyNPU uses serialized memory service with the common 16-byte/cycle, one-cycle-response model",
+                    "nmaforge_measured_matrix_cycles": int(nma_matches[shape]["cycles"]),
+                    "nmaforge_measured_spad_read_bytes": int(nma_matches[shape]["bank_read_bytes"]),
+                    "nmaforge_measured_spad_write_bytes": int(nma_matches[shape]["line_write_bytes"]),
+                    "tinynpu_measured_direct_array_cycles": int(tiny_matches[shape]["cycles_input_to_array_stable"]),
+                    "golden": "PASS on both designs",
+                    "comparison": "NOT_COMPARABLE: NMAForge includes Matrix controller and behavioral SPAD; TinyNPU is direct array only",
                 }
-                for index, shape in enumerate(matched_shapes)
+                for shape in matched_shapes
             ],
-            "normalized_boundary": {
-                "spad_line_width_bytes": 16,
-                "spad_bandwidth_bytes_per_cycle": 16,
-                "read_response_latency_cycles": 1,
-                "endpoint": "command acceptance to final output commit",
-                "nmaforge": "measured Matrix controller and behavioral SPAD; actual measured traffic",
-                "tinynpu": "measured RTL array cycles plus modeled input read and output write service; load, compute, and store are serialized; two accumulator-clear cycles included",
-                "ratio_definition": "NMAForge measured cycles / TinyNPU normalized modeled cycles; >1 means NMAForge used more cycles under this mixed measured/modeled endpoint",
-                "ratio_is_asic_speedup": False,
-            },
-            "normalized_cases": common_pairs,
+            "system_speedup": "NOT_COMPUTED: no identical controller/memory endpoint",
         },
         "matrix_size_sweep": {
             "shapes": ["4x4x32", "8x8x32", "16x16x32", "16x32x32", "32x32x64"],

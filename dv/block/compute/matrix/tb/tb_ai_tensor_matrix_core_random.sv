@@ -83,9 +83,12 @@ module tb_ai_tensor_matrix_core_random;
   reg [31:0] bias_mem [0:65535];
   reg [31:0] output_mem [0:65535];
   reg [31:0] expected_mem [0:65535];
-  reg signed [7:0] logical_a [0:3][0:31][0:127];
-  reg signed [7:0] logical_b [0:3][0:127][0:31];
-  reg signed [31:0] logical_bias [0:31];
+  // Paired TinyNPU workload fixtures include 64x64x64. Keep the model-side
+  // logical arrays large enough for that workload while retaining the same
+  // 16x16 physical Matrix Array and four-bank SPAD model.
+  reg signed [7:0] logical_a [0:3][0:63][0:127];
+  reg signed [7:0] logical_b [0:3][0:127][0:63];
+  reg signed [31:0] logical_bias [0:63];
   integer signed tile_forward_hidden0 [0:15][0:15];
   integer signed tile_forward_hidden1 [0:15][0:15];
   integer signed tile_forward_hidden2 [0:15][0:15];
@@ -974,6 +977,122 @@ module tb_ai_tensor_matrix_core_random;
       case_bank_snapshot=bank_read_count;
       case_bank_stall_snapshot=bank_stall_count;
       case_line_stall_snapshot=line_stall_count;
+    end
+  endtask
+
+  // Matched 1x64x64 GEMV uses four legal 0x52 descriptors because the ABI
+  // limits each command to N<=16.  A and B are generated once from the same
+  // logical matrix; B is physically packed as four independent K-major
+  // 16-column panels.  The test intentionally disables B-cache reuse for M=1.
+  task automatic prepare_round27_gemv_1x64;
+    integer cc,kk,panel,bank,local_addr,local_index,word_index;
+    integer signed accum;
+    begin
+      op_mode=8'h52; m_size=1; n_size=16; k_words=64; instance_count=1;
+      src0_base=SRC0_BASE; src1_base=SRC1_BASE; bias_base=BIAS_BASE;
+      dst_base=DST_BASE; src0_batch_stride=0; src1_batch_stride=0;
+      dst_batch_stride=0; transpose_a=0; transpose_b=0; bias_enable=0;
+      scale_shift=0; activation=0; aux0=0; watchdog_limit=0;
+      for(kk=0;kk<64;kk=kk+1)
+        logical_a[0][0][kk]=((kk*5+3)%13)-6;
+      for(kk=0;kk<64;kk=kk+1)
+        for(cc=0;cc<64;cc=cc+1)
+          logical_b[0][kk][cc]=((kk*7+cc*3+1)%11)-5;
+
+      for(kk=0;kk<64;kk=kk+16) begin
+        local_addr=SRC0_BASE+kk;
+        local_index=(local_addr>>4)&13'h1fff;
+        for(bank=0;bank<4;bank=bank+1)
+          bank_mem[bank][local_index]=pack4(
+              logical_a[0][0][kk+bank*4+0],
+              logical_a[0][0][kk+bank*4+1],
+              logical_a[0][0][kk+bank*4+2],
+              logical_a[0][0][kk+bank*4+3]);
+      end
+      for(panel=0;panel<4;panel=panel+1)
+        for(kk=0;kk<64;kk=kk+1) begin
+          local_addr=SRC1_BASE+panel*64*16+kk*16;
+          local_index=(local_addr>>4)&13'h1fff;
+          for(bank=0;bank<4;bank=bank+1)
+            bank_mem[bank][local_index]=pack4(
+                logical_b[0][kk][panel*16+bank*4+0],
+                logical_b[0][kk][panel*16+bank*4+1],
+                logical_b[0][kk][panel*16+bank*4+2],
+                logical_b[0][kk][panel*16+bank*4+3]);
+        end
+
+      for(cc=0;cc<64;cc=cc+1) begin
+        accum=0;
+        for(kk=0;kk<64;kk=kk+1)
+          accum=accum+$signed(logical_a[0][0][kk])*
+                       $signed(logical_b[0][kk][cc]);
+        expected_mem[(DST_BASE>>2)+cc]=accum;
+        output_mem[(DST_BASE>>2)+cc]=32'hbad0_0000+cc;
+      end
+      line_write_count=0; scalar_write_count=0;
+      case_mac_snapshot=mac_cycle_count;
+      case_bank_snapshot=bank_read_count;
+      case_bank_stall_snapshot=bank_stall_count;
+      case_line_stall_snapshot=line_stall_count;
+    end
+  endtask
+
+  task automatic run_round27_gemv_1x64;
+    integer panel,cc,word_index,panel_cycles,total_cycles;
+    integer total_mac_cycles,total_bank_reads,total_bank_stalls,total_line_stalls;
+    integer panel_reads,panel_mac,panel_bank_stalls,panel_line_stalls;
+    begin
+      total_cycles=0; total_mac_cycles=0; total_bank_reads=0;
+      total_bank_stalls=0; total_line_stalls=0;
+      for(panel=0;panel<4;panel=panel+1) begin
+        src1_base=SRC1_BASE+panel*64*16;
+        dst_base=DST_BASE+panel*16*4;
+        line_write_count=0; scalar_write_count=0;
+        case_mac_snapshot=mac_cycle_count;
+        case_bank_snapshot=bank_read_count;
+        case_bank_stall_snapshot=bank_stall_count;
+        case_line_stall_snapshot=line_stall_count;
+        launch_and_wait();
+        if(error || error_code!==0 || busy || element_count!==16)
+          $fatal(1,"Round27 1x64 panel=%0d completion error=%b code=%0d elements=%0d",
+                 panel,error,error_code,element_count);
+        if(line_write_count!==4 || scalar_write_count!==0)
+          $fatal(1,"Round27 1x64 panel=%0d writes lines=%0d scalar=%0d",
+                 panel,line_write_count,scalar_write_count);
+        for(cc=0;cc<16;cc=cc+1) begin
+          word_index=(dst_base>>2)+cc;
+          if(output_mem[word_index]!==expected_mem[(DST_BASE>>2)+panel*16+cc])
+            $fatal(1,"Round27 1x64 panel=%0d col=%0d addr=%08x got=%08x expected=%08x",
+                   panel,cc,dst_base+cc*4,output_mem[word_index],
+                   expected_mem[(DST_BASE>>2)+panel*16+cc]);
+        end
+        if(bank_read_count!=bank_response_count || pending_bank ||
+           spad_read_count!=spad_response_count || pending_spad)
+          $fatal(1,"Round27 1x64 panel=%0d left requests outstanding",panel);
+        panel_cycles=cycle_count;
+        panel_mac=mac_cycle_count-case_mac_snapshot;
+        panel_reads=bank_read_count-case_bank_snapshot;
+        panel_bank_stalls=bank_stall_count-case_bank_stall_snapshot;
+        panel_line_stalls=line_stall_count-case_line_stall_snapshot;
+        total_cycles=total_cycles+panel_cycles;
+        total_mac_cycles=total_mac_cycles+panel_mac;
+        total_bank_reads=total_bank_reads+panel_reads;
+        total_bank_stalls=total_bank_stalls+panel_bank_stalls;
+        total_line_stalls=total_line_stalls+panel_line_stalls;
+        $display("ROUND27_MATRIX_GEMV_PANEL panel=%0d shape=1x16x64 cycles=%0d mac_cycles=%0d reads=%0d read_bytes=%0d bank_stalls=%0d line_stalls=%0d golden=16/16 PASS",
+                 panel,panel_cycles,panel_mac,panel_reads,panel_reads*16,
+                 panel_bank_stalls,panel_line_stalls);
+      end
+      for(cc=0;cc<64;cc=cc+1) begin
+        word_index=(DST_BASE>>2)+cc;
+        if(output_mem[word_index]!==expected_mem[word_index])
+          $fatal(1,"Round27 1x64 final col=%0d got=%08x expected=%08x",
+                 cc,output_mem[word_index],expected_mem[word_index]);
+      end
+      $display("ROUND27_MATRIX_GEMV_1X64_PASS shape=1x64x64 useful_macs=4096 descriptors=4 cycles=%0d mac_cycles=%0d mac_per_cycle_x1000=%0d read_bytes=%0d write_bytes=256 bank_stalls=%0d line_stalls=%0d prefetch=%0d cache=%0d golden=64/64 PASS memory=one-cycle-behavioral",
+               total_cycles,total_mac_cycles,(4096*1000)/total_cycles,
+               total_bank_reads*16,total_bank_stalls,total_line_stalls,
+               NEXT_K_PREFETCH_ENABLE,GEMV_B_TILE_CACHE_ENABLE);
     end
   endtask
 
@@ -2595,6 +2714,11 @@ module tb_ai_tensor_matrix_core_random;
       $display("MATRIX_GEMV_ABLATION_PASS shape=M1x13x17 seed=%0d",initial_seed);
       $finish;
     end
+    if($test$plusargs("MATRIX_GEMV_1X64_BENCH")) begin
+      prepare_round27_gemv_1x64();
+      run_round27_gemv_1x64();
+      $finish;
+    end
     if($test$plusargs("MATRIX_GEMV_ABLATION_MULTIROW_SHAPES")) begin
       prepare_dense_gemv_mrows_tail_case(8,19);
       check_dense_gemv_mrows_tail_case(8,19);
@@ -2645,7 +2769,8 @@ module tb_ai_tensor_matrix_core_random;
       run_tinynpu_match_case(16,16,16,105);
       run_tinynpu_match_case(16,16,32,106);
       run_tinynpu_match_case(32,32,64,107);
-      $display("MATRIX_TINY_NPU_MATCH_MULTI_PASS seed=%0d cases=3 physical_array=%0dx%0d memory_model=see_MATRIX_MEMORY_MODEL_or_default_seeded_random",
+      run_tinynpu_match_case(64,64,64,108);
+      $display("MATRIX_TINY_NPU_MATCH_MULTI_PASS seed=%0d cases=4 physical_array=%0dx%0d memory_model=see_MATRIX_MEMORY_MODEL_or_default_seeded_random",
                initial_seed,PHYSICAL_ARRAY_SIZE,PHYSICAL_ARRAY_SIZE);
       $finish;
     end

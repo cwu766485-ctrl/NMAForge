@@ -905,6 +905,22 @@ ai_cnm_a2_gemv_bench_run: ai_cnm_a2_gemv_bench_comp
 
 ai_cnm_a2_gemv_bench: ai_cnm_a2_gemv_bench_run
 
+# Round 27 same-workload 1x64x64 GEMV endpoint.  The second run injects a
+# deterministic per-bank ready pattern to expose admission-stall sensitivity.
+ai_cnm_round27_gemv_1x64_comp:
+	rm -rf simv_cnm_round27_gemv_1x64 simv_cnm_round27_gemv_1x64.daidir
+	$(VCS_FOCUSED) -top tb_ai_cnm_round27_gemv_1x64 \
+		../../../../rtl/compute/cnm/ai_bank_pe.v \
+		../../../../rtl/compute/cnm/ai_bank_local_controller.v \
+		../../../../rtl/compute/cnm/ai_banked_cnm_core.v \
+		../../../block/compute/cnm/tb/tb_ai_cnm_round27_gemv_1x64.sv \
+		-o simv_cnm_round27_gemv_1x64 -l ai_cnm_round27_gemv_1x64_comp.log
+
+ai_cnm_round27_gemv_1x64_run: ai_cnm_round27_gemv_1x64_comp
+	./simv_cnm_round27_gemv_1x64 -l ai_cnm_round27_gemv_1x64_run.log
+
+ai_cnm_round27_gemv_1x64: ai_cnm_round27_gemv_1x64_run
+
 # Seeded CNM oracle regression. Random signed bytes are generated from the
 # address and seed, then independently reduced by the testbench reference.
 CNM_RANDOM_SEEDS ?= 20261021 20261022 20261023

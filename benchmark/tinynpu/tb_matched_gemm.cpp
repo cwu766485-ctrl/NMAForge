@@ -23,6 +23,7 @@ static void tick() {
 }
 
 static int8_t operand_a(int row, int k, int workload) {
+    if (workload == 4) return static_cast<int8_t>(((k * 5 + 3) % 13) - 6);
     if (workload == 3) return shared_a[row * 16 + k];
     if (workload == 1)  // Same padded M=1, K=17 product-GEMV fixture as NMAForge.
         return static_cast<int8_t>(((k * 5 + 1) % 19) - 9);
@@ -32,6 +33,7 @@ static int8_t operand_a(int row, int k, int workload) {
 }
 
 static int8_t operand_b(int k, int col, int workload) {
+    if (workload == 4) return static_cast<int8_t>(((k * 7 + col * 3 + 1) % 11) - 5);
     if (workload == 3) return shared_b[k * 16 + col];
     if (workload == 1 || workload == 2)
         return static_cast<int8_t>(((k * 3 - col * 2 + 5) % 17) - 8);
@@ -208,6 +210,8 @@ int main() {
     if (!run_gemm(16, 16, 16) ||
         !run_gemm(16, 16, 32) ||
         !run_gemm(32, 32, 64))
+        return EXIT_FAILURE;
+    if (!run_gemm(64, 64, 64) || !run_gemm(1, 64, 64, 4))
         return EXIT_FAILURE;
     if (!run_gemm(1, 13, 17, 1) ||
         !run_gemm(8, 16, 19, 2) ||

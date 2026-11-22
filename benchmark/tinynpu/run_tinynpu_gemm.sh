@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-PINNED_SHA=8216c22b762011aa20c05fc2768423fd12dda59d
+PINNED_SHA=38a2498af81f78b9dd8f81144026cf45e2b8328c
 WORK_ROOT="${TINYNPU_WORK_ROOT:-${TMPDIR:-/tmp}/nmaforge_tinynpu_${PINNED_SHA:0:12}}"
 TINY_NPU_ROOT="${TINY_NPU_ROOT:-$WORK_ROOT/source}"
 OUT_DIR="${TINYNPU_GEMM_OUT:-$WORK_ROOT/gemm}"
@@ -63,6 +63,8 @@ grep -q '^TINYNPU_MATCHED_GEMV_PASS shape_mnk=1,13,17 ' "$OUT_DIR/run.log"
 grep -q '^TINYNPU_MATCHED_GEMV_PASS shape_mnk=8,16,19 ' "$OUT_DIR/run.log"
 grep -q '^TINYNPU_MATCHED_GEMV_PASS shape_mnk=16,16,19 ' "$OUT_DIR/run.log"
 grep -q '^TINYNPU_MATCHED_GEMV_PASS shape_mnk=16,16,65 ' "$OUT_DIR/run.log"
+grep -q '^TINYNPU_MATCHED_GEMM_PASS shape_mnk=64,64,64 ' "$OUT_DIR/run.log"
+grep -q '^TINYNPU_MATCHED_GEMV_PASS shape_mnk=1,64,64 ' "$OUT_DIR/run.log"
 
 # Run the pinned project’s own compute-engine regression using the same
 # Verilated RTL library; this is a reference-integrity check, not a matched

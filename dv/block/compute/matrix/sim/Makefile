@@ -30,6 +30,7 @@ COV_METRICS := line+cond+fsm+branch
 	product-gemv-prefetch-ablation \
 	product-gemv-b-cache-ablation \
 	product-gemv-four-way-ablation \
+	round27-gemv-prefetch-ablation \
 	core-tile-forward-ablation \
 	core-tile-forward-regress \
 	datapath-random-regress core-random-regress array-random-regress \
@@ -115,6 +116,33 @@ core-random-regress: core-random-compile
 		grep -q "^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=8x16x65 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 		grep -q "^MATRIX_CORE_GEMV_KFOLD_MROWS_TAIL_PASS opcode=0x52 shape=16x16x19 .*golden=bit-exact$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
 		grep -Eq "^MATRIX_V2_GEMV_SHAPE_COVERAGE_PASS bins=6 coverage=100\\.00 seed=$$seed$$" $(CORE_OUT_DIR)/product_gemv_seed_$$seed.log; \
+	done
+
+# Round 27: single-token M=1 GEMV has no B-fold cache reuse, so this compares
+# only Next-K Prefetch OFF/ON with GEMV B-cache held disabled. The four legal
+# N=16 descriptors collectively implement one 1x64x64 logical GEMV.
+ROUND27_GEMV_OUT ?= /tmp/nmaforge_round27_gemv_$(SEED)
+round27-gemv-prefetch-ablation:
+	@set -e; for prefetch in 0 1; do \
+		out=$(ROUND27_GEMV_OUT)/prefetch_$$prefetch; mkdir -p $$out; \
+		$(VCS) -full64 -sverilog -debug_access+all -timescale=1ns/1ps \
+			+define+MATRIX_MAX_OUTSTANDING_READS=$(OUTSTANDING_DEPTH) \
+			+define+MATRIX_A_TILE_CACHE_ENABLE=$(A_TILE_CACHE_ENABLE) \
+			+define+MATRIX_NEXT_K_PREFETCH_ENABLE=$$prefetch \
+			+define+MATRIX_GEMV_B_TILE_CACHE_ENABLE=0 \
+			+define+MATRIX_ARRAY_SIZE=$(PHYSICAL_ARRAY_SIZE) \
+			-cm $(COV_METRICS) -cm_hier $(CURDIR)/matrix_core.cm_hier \
+			-cm_dir $$out/coverage.vdb -Mdir=$$out/csrc \
+			-top tb_ai_tensor_matrix_core_random \
+			../../../../../rtl/compute/matrix/ai_tensor_matrix_datapath.v \
+			../../../../../rtl/compute/matrix/ai_tensor_matrix_array.sv \
+			../../../../../rtl/compute/matrix/ai_tensor_matrix_core.v \
+			../tb/tb_ai_tensor_matrix_core_random.sv \
+			-o $$out/simv -l $$out/compile.log; \
+		$$out/simv +SEED=$(SEED) +MATRIX_FIXED_MEMORY +MATRIX_GEMV_1X64_BENCH \
+			-cm $(COV_METRICS) -cm_dir $$out/coverage.vdb \
+			-cm_name round27_gemv_1x64_p$$prefetch -l $$out/run.log; \
+		grep -q "^ROUND27_MATRIX_GEMV_1X64_PASS .*prefetch=$$prefetch cache=0 golden=64/64 PASS memory=one-cycle-behavioral$$" $$out/run.log; \
 	done
 
 product-gemv-test: core-random-compile

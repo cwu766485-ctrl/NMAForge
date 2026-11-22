@@ -60,6 +60,10 @@ module ai_banked_cnm_core(
     reg [1:0] activation_r;
     reg [31:0] watchdog_limit_r;
     reg cnm_protection_error_seen_r;
+    // Bank-local done is a one-cycle pulse.  Latch each bank independently
+    // so legal per-bank backpressure cannot make the core miss an early
+    // completion while waiting for the remaining banks.
+    reg [3:0] local_done_seen_r;
     wire local_start = (state_r == ST_LAUNCH);
     wire [3:0] local_busy, local_done, local_error;
     wire signed [63:0] sum0, sum1, sum2, sum3;
@@ -69,7 +73,8 @@ module ai_banked_cnm_core(
         (activation_r == ACT_RELU && shifted_sum < 0) ? 64'sd0 : shifted_sum;
     wire [31:0] quantized_result = (activated_sum > 64'sh0000_0000_7fff_ffff) ? 32'h7fff_ffff :
                                     (activated_sum < -64'sd2147483648) ? 32'h8000_0000 : activated_sum[31:0];
-    wire locals_complete = &local_done;
+    wire [3:0] local_done_masked = local_done_seen_r | local_done;
+    wire locals_complete = &local_done_masked;
     wire any_local_error = |local_error;
     wire valid_operation = (op_mode == OP_BANKED_VDOT) || (op_mode == OP_BANKED_GEMV);
     wire invalid_alignment = (src0_base[3:0] != 0) || (src1_base[3:0] != 0) ||
@@ -139,6 +144,7 @@ module ai_banked_cnm_core(
             b_row_base_r<=0; output_addr_r<=0; length_r<=0; m_r<=0; row_r<=0;
             scale_shift_r<=0; activation_r<=0; watchdog_limit_r<=0;
             cnm_protection_error_seen_r<=0;
+            local_done_seen_r<=4'b0;
             local_accumulate_events<=0; global_reduce_events<=0; banked_read_issue_events<=0;
             prefetch_events<=0; pipeline_compute_events<=0; response_wait_cycles<=0;
         end else begin
@@ -160,12 +166,16 @@ module ai_banked_cnm_core(
                     scale_shift_r<=scale_shift; activation_r<=activation; watchdog_limit_r<=watchdog_limit;
                     element_count<=0; local_accumulate_events<=0; global_reduce_events<=0;
                     banked_read_issue_events<=0; prefetch_events<=0; pipeline_compute_events<=0; response_wait_cycles<=0;
+                    local_done_seen_r<=4'b0;
                     busy<=1; error<=0; error_code<=0;
                     if (!valid_operation) begin error_code<=ERR_OP; state_r<=ST_ERROR; end
                     else if (invalid_dimensions || invalid_alignment) begin error_code<=ERR_CONFIG; state_r<=ST_ERROR; end
                     else state_r<=ST_LAUNCH;
                 end
-                ST_LAUNCH: state_r<=ST_WAIT_LOCAL;
+                ST_LAUNCH: begin
+                    local_done_seen_r<=4'b0;
+                    state_r<=ST_WAIT_LOCAL;
+                end
                 ST_WAIT_LOCAL: if (any_local_error) begin
                                    error_code<=cnm_protection_error_seen_r ? ERR_PROTECTION : ERR_PARITY;
                                    state_r<=ST_ERROR;
@@ -182,7 +192,7 @@ module ai_banked_cnm_core(
                                    pipeline_compute_events<=pipeline_compute_events+l0_compute+l1_compute+l2_compute+l3_compute;
                                    response_wait_cycles<=response_wait_cycles+l0_wait+l1_wait+l2_wait+l3_wait;
                                    result<=quantized_result; global_reduce_events<=global_reduce_events+1'b1; state_r<=ST_WRITE;
-                               end
+                               end else local_done_seen_r<=local_done_masked;
                 ST_WRITE: if (spad_ready) begin if (spad_protection_error) begin error_code<=ERR_PROTECTION; state_r<=ST_ERROR; end else begin element_count<=element_count+1'b1; state_r<=ST_NEXT; end end
                 ST_NEXT: if (last_row) state_r<=ST_DONE; else begin row_r<=row_r+1'b1; b_row_base_r<=b_row_base_r+vector_bytes; output_addr_r<=output_addr_r+32'd4; state_r<=ST_LAUNCH; end
                 ST_DONE: begin busy<=0; done<=1; error<=0; state_r<=ST_IDLE; end

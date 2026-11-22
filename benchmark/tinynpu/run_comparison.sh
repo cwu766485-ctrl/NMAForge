@@ -3,11 +3,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-PINNED_SHA=8216c22b762011aa20c05fc2768423fd12dda59d
+PINNED_SHA=38a2498af81f78b9dd8f81144026cf45e2b8328c
 SEED="${SEED:-20261029}"
 RUN_DATE="$(date +%Y%m%d)"
 RUN_ID="${BENCH_RUN_ID:-TINY-COMPARE-${RUN_DATE}-S${SEED}}"
 OUT_DIR="${TINYNPU_BENCH_OUT:-/tmp/nmaforge_tinynpu_bench_${RUN_DATE}_${SEED}}"
+RESULTS_DIR="$SCRIPT_DIR/round27/$RUN_ID"
 WORK_ROOT="${TINYNPU_WORK_ROOT:-$OUT_DIR/reference}"
 TINY_NPU_ROOT="${TINY_NPU_ROOT:-$WORK_ROOT/source}"
 VERILATOR="${VERILATOR:-verilator}"
@@ -54,7 +55,13 @@ make -C "$REPO_ROOT/dv/block/compute/matrix/sim" \
 grep -q '^MATRIX_CORE_CASE_PASS id=105 shape_mnk=16,16,16 ' "$OUT_DIR/nma_match16/run.log"
 grep -q '^MATRIX_CORE_CASE_PASS id=106 shape_mnk=16,16,32 ' "$OUT_DIR/nma_match16/run.log"
 grep -q '^MATRIX_CORE_CASE_PASS id=107 shape_mnk=32,32,64 ' "$OUT_DIR/nma_match16/run.log"
-grep -q '^MATRIX_TINY_NPU_MATCH_MULTI_PASS .*cases=3 ' "$OUT_DIR/nma_match16/run.log"
+grep -q '^MATRIX_CORE_CASE_PASS id=108 shape_mnk=64,64,64 ' "$OUT_DIR/nma_match16/run.log"
+grep -q '^MATRIX_TINY_NPU_MATCH_MULTI_PASS .*cases=4 ' "$OUT_DIR/nma_match16/run.log"
+
+make -C "$REPO_ROOT/dv/block/compute/matrix/sim" \
+    round27-gemv-prefetch-ablation SEED="$SEED" PHYSICAL_ARRAY_SIZE=16 \
+    ROUND27_GEMV_OUT="$OUT_DIR/nma_gemv_ablation" \
+    > "$OUT_DIR/nma_gemv_ablation_make.log" 2>&1
 
 TINY_NPU_ROOT="$TINY_NPU_ROOT" TINYNPU_WORK_ROOT="$WORK_ROOT" \
     TINYNPU_GEMM_OUT="$OUT_DIR/tiny_gemm" VERILATOR="$VERILATOR" \
@@ -87,6 +94,7 @@ fi
     --run-id "$RUN_ID" --size-root "$OUT_DIR/nma_size" \
     --match8 "$OUT_DIR/nma_match8/run.log" \
     --match16 "$OUT_DIR/nma_match16/run.log" \
+    --nma-gemv-ablation "$OUT_DIR/nma_gemv_ablation" \
     --tiny-gemm "$OUT_DIR/tiny_gemm/run.log" \
     --tiny-engine "$OUT_DIR/tiny_gemm/engine_regression.log" \
     --tiny-cnn "$OUT_DIR/tiny_cnn/run.log" \
@@ -99,9 +107,10 @@ fi
     --out-cnn-csv "$OUT_DIR/cnn_results.csv" \
     --out-cnn-json "$OUT_DIR/cnn_summary.json" \
     --out-json "$OUT_DIR/benchmark_summary.json"
-cp "$OUT_DIR/gemm_results.csv" "$SCRIPT_DIR/gemm_results.csv"
-cp "$OUT_DIR/cnn_results.csv" "$SCRIPT_DIR/cnn_results.csv"
-cp "$OUT_DIR/benchmark_summary.json" "$SCRIPT_DIR/benchmark_summary.json"
-cp "$OUT_DIR/cnn_summary.json" "$SCRIPT_DIR/cnn_summary.json"
+mkdir -p "$RESULTS_DIR"
+cp "$OUT_DIR/gemm_results.csv" "$RESULTS_DIR/gemm_results.csv"
+cp "$OUT_DIR/cnn_results.csv" "$RESULTS_DIR/cnn_results.csv"
+cp "$OUT_DIR/benchmark_summary.json" "$RESULTS_DIR/benchmark_summary.json"
+cp "$OUT_DIR/cnn_summary.json" "$RESULTS_DIR/cnn_summary.json"
 printf 'BENCHMARK_PASS run_id=%s nmaforge_sha=%s tinynpu_sha=%s output=%s\n' \
     "$RUN_ID" "$NMA_SHA" "$TINY_SHA" "$OUT_DIR"

@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-PINNED_SHA=8216c22b762011aa20c05fc2768423fd12dda59d
+PINNED_SHA=38a2498af81f78b9dd8f81144026cf45e2b8328c
 SEED="${SEED:-20261029}"
 RUN_DATE="$(date +%Y%m%d)"
 RUN_ID="${BENCH_RUN_ID:-GEMV-MATCH-${RUN_DATE}-S${SEED}}"
