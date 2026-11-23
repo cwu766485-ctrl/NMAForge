@@ -1,0 +1,61 @@
+{
+  "status": "FOUR_LAYER_TOP_AUTOREGRESSIVE_GOLDEN_PASS",
+  "mode": "four_layer_prefix_recompute_same_top_instance",
+  "seed": 20261116,
+  "synthetic_model_quality_claim": false,
+  "prompt_tokens": [
+    1,
+    7,
+    42,
+    3
+  ],
+  "generated_tokens": [
+    114,
+    162,
+    193,
+    193
+  ],
+  "contexts": [
+    {
+      "context": 0,
+      "row": 3,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 114,
+      "logits_sha256_le_i32": "76ee539d94bd225454876309bf0b65c856d7bf427858b654c7c8b98eadca7bd6",
+      "rtl_dump_artifact": "h64_rtl_logits_context0.csv"
+    },
+    {
+      "context": 1,
+      "row": 4,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 162,
+      "logits_sha256_le_i32": "b0d4bd2d0e80321c9507674551c4bca887e59c243be1ec2f6f86ec5901c49748",
+      "rtl_dump_artifact": "h64_rtl_logits_context1.csv"
+    },
+    {
+      "context": 2,
+      "row": 5,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 193,
+      "logits_sha256_le_i32": "c9caf29dcf64e6b123a12f1ee70b651148d18b7e84bfe87623e817df24f9d7d3",
+      "rtl_dump_artifact": "h64_rtl_logits_context2.csv"
+    },
+    {
+      "context": 3,
+      "row": 6,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 193,
+      "logits_sha256_le_i32": "e9bffb390c8e609da52cdffc4661a9121ef6f6fb1f680194b468f83fc4e25c9e",
+      "rtl_dump_artifact": "h64_rtl_logits_context3.csv"
+    }
+  ],
+  "source_sha_binding": "UNBOUND: enclosing run manifest was not present in the archived run directory",
+  "run_id": "H64-AUTOREG-20261123 (derived from run directory; no immutable run manifest)",
+  "host_intermediate_tensor_writes": 0,
+  "total_extension_cycles": 4343004,
+  "total_extension_cycles_scope": "prefix-recompute plus feedback; not persistent-KV decode latency"
+}

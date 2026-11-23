@@ -1,0 +1,12 @@
+check,original_log_basename,disposition,make_exit_code,scope_or_result
+SPAD arbiter directed regression,01_spad_arbiter.log,PASS,0,"Matrix/CNM ownership, fairness, parity, fallback, priority, protection, contention and seeded RR markers"
+SPAD arbiter formal decode invariants,02_make_-C_dv_block_spad_arbiter_formal_decode-inva.log,BLOCKED_ENV / NOT_RUN,2,Formal executable vcf unavailable; make exited 2
+SPAD arbiter formal fairness bounds,03_make_-C_dv_block_spad_arbiter_formal_fairness-bo.log,BLOCKED_ENV / NOT_RUN,2,Formal executable vcf unavailable; make exited 2
+FP read/protection/parity formal disposition,04_make_-C_dv_block_compute_fp_formal_read-protecti.log,BLOCKED_ENV / NOT_RUN,2,Formal executable vcf unavailable; make exited 2
+Matrix core random regression,05_make_-C_dv_block_compute_matrix_sim_core-random-.log,PASS,0,VCS; seed 20261021
+DMA UVM regression,06_make_-C_dv_block_dma_sim_uvm_regress.log,PASS,0,"UVM errors/fatals 0; scoreboard pass 20; coverage 70%, error coverage 0"
+Top smoke ai_smoke,07_make_-C_dv_subsystem_top_smoke_sim_ai_smoke.log,PASS,0,VCS top smoke
+DeiT patch projection top smoke,08_make_-C_dv_subsystem_top_smoke_sim_ai_deit_patch.log,PASS scoped,0,"12,288 MAC; 256 Golden; 2,442 command / 40,961 fixture cycles; not full DeiT"
+H4 transformer inference,09_make_inference-transformer.log,PASS scoped,0,"86 descriptors; H4 only, not H64 model quality"
+UVM compile,10_make_-C_dv_uvm_sim_uvm_compile.log,PASS,0,zero elaboration errors/warnings
+UVM smoke,11_make_-C_dv_uvm_sim_uvm_smoke.log,FAIL,2,"CLUSTER_MEMORY_EMPTY: scoreboard compared zero returned words; UVM_ERROR=1, fatal=0"

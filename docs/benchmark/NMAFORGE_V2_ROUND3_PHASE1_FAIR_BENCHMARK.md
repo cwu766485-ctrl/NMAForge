@@ -47,3 +47,21 @@ The endpoints differ; no CNN speedup is computed. SPAD initialization (3,456 B) 
 - Reproduction entry: [`run_comparison.sh`](../../benchmark/tinynpu/run_comparison.sh).
 - No RTL was changed. No matched controller+memory RTL endpoint, common native graph endpoint, physical area, power, or ASIC frequency was measured.
 - The direct-array sweep in `gemm_results.csv` uses a one-cycle behavioral SPAD and is a separate compute-engine observation.
+
+## Dated rerun addendum — 2026-11-23
+
+The fixed benchmark matrix was rerun as `NMA-ROUND3-FAIR-FINAL-20261123`, seed `20261123`, using the same NMAForge source/test SHA (`c4c2970ad8e66c93e00e854ef3befff4ccc9188b`) and TinyNPU SHA (`8216c22b762011aa20c05fc2768423fd12dda59d`). Tool versions were VCS `V-2023.12-SP1_Full64`, Verilator `5.052 2026-09-05 rev v5.052`, Python `3.12.13`, NumPy `2.2.6`, and ONNX `1.17.0`.
+
+| Shape | Useful MACs | NMAForge measured cycles | TinyNPU array RTL cycles | TinyNPU normalized cycles | NMA / normalized | Golden |
+|---|---:|---:|---:|---:|---:|---|
+| 16×16×16 | 4,096 | 173 | 52 | 151 | 1.1457 | Both PASS |
+| 16×16×32 | 8,192 | 234 | 100 | 231 | 1.0130 | Both PASS |
+| 32×32×64 | 65,536 | 1,301 | 790 | 1,305 | 0.9969 | Both PASS |
+
+NMAForge uses measured Matrix-controller plus behavioral-SPAD cycles. TinyNPU normalized cycles add a modeled, serialized 16-byte/cycle memory service with one-cycle read response and two accumulator-clear cycles to measured array RTL. Thus the ratios are mixed measured/modeled normalized observations, not matched-system speedups. NMAForge is slower in the first two rows under this model and near parity in the third; the last row is only 4 cycles lower and does not establish a robust advantage.
+
+The 2026-11-22 report above records `151 / 241 / 1,290` NMAForge cycles for these shapes, whereas this rerun records `173 / 234 / 1,301`. The source/test SHA is unchanged, but the seed and run/configuration context differ. The available artifacts do not explain the per-shape deltas. Keep both dated measurements and treat cycle reproducibility as OPEN until the harness/configuration difference is identified; do not replace the historical values.
+
+The same rerun checked `conv1x_mini.onnx` (model SHA-256 `1ac385ac18394ac5826a7eb426e99c2199bf6417055f7e3f461c40c1b1811640`, input seed 99, SHA-256 `a74587bfcb5b2dfcd9eed1dbbb4fcf657628264c3b0aae7a4c278f0f70705898`). Both sides passed the independent Golden for 1,872 useful MACs. NMAForge measured 1,874 CMDQ compute cycles and separately modeled 1,080 host-layout cycles; the 2,954 subtotal excludes preload, descriptor programming, final output read, and orchestration. TinyNPU reported 4,781 graph-smoke cycles with a testbench DMA/SRAM shim and excluded setup. These endpoints differ, so no CNN speedup is computed.
+
+Machine-readable rerun evidence and hashes are in [`round3-20261123 evidence`](evidence/round3-20261123/). Raw simulator logs remain in the originating `/tmp` run directories and are represented by SHA-256 entries in `log_manifest.json`; they are not checked in. This is deliberate because the H64 raw log failed credential-like-pattern screening. The checked-in H64 artifacts are sanitized and contain no raw log lines.

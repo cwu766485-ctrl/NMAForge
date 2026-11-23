@@ -2,7 +2,7 @@
 
 [中文索引](README_ZH.md) · [Repository README](../README.md)
 
-Current status: [evidence and open issues](STATUS.md).
+Current status: [evidence and open issues](STATUS.md). Round 3 phase records: [fair benchmark](benchmark/NMAFORGE_V2_ROUND3_PHASE1_FAIR_BENCHMARK.md), [GEMV/CNN dataflow A/B](benchmark/NMAFORGE_V2_ROUND3_PHASE2_DATAFLOW_ABLATION.md), and [consolidated 2026-11-23 status](benchmark/NMAFORGE_V2_ROUND3_PHASE3_STATUS_20261123.md).
 
 ## Current design and verification sources
 

@@ -1,0 +1,178 @@
+{
+  "snapshot": "2026-11-23",
+  "note": "Raw logs remain in the originating /tmp run directories. Only hashes and derived/sanitized evidence are checked in. H64 raw run log was not copied because it contains credential-like text patterns; report does not reproduce those lines.",
+  "log_hashes": [
+    {
+      "run_group": "phase1_fair_final_20261123",
+      "log_basename": "nma_cnn_make.log",
+      "sha256": "0c30222d97380901027ce7d3c92c080c057a0034e28d1ff80e8077ac78c09765",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "phase1_fair_final_20261123",
+      "log_basename": "nma_match16_compile.log",
+      "sha256": "42d50482350cf159452d1d959f331b86242102efcb0ad406d861b5bdb59a4b76",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "phase1_fair_final_20261123",
+      "log_basename": "nma_match16_stdout.log",
+      "sha256": "3e64fdf8dbab4b0b5d9284c81b23b3d07ca7ff1ab983b8cc61678240e1373c6f",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "phase1_fair_final_20261123",
+      "log_basename": "nma_match8_make.log",
+      "sha256": "a8fd3b40d0ca88592bf64e0a05422fb42f39d83c09144cee7632683f93950a14",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "phase1_fair_final_20261123",
+      "log_basename": "nma_size_make.log",
+      "sha256": "e442acae62df1274d9dae809897cbcbd4ac866552f12b6030169c73156de42a0",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "phase1_fair_final_20261123",
+      "log_basename": "tiny_cnn_script.log",
+      "sha256": "3b02e3c20125adee4bf8d151a3528a0f96ef5a1413e7c3f9a5605cad0c30829c",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "phase1_fair_final_20261123",
+      "log_basename": "tiny_gemm_script.log",
+      "sha256": "0a2a645eff7e13d425c3575c1a78706022df2988e994be05ea78d5b9de3a3c89",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "h64_autoregressive_20261123",
+      "log_basename": "compile.log",
+      "sha256": "e8a0d3e6caffa5c71a5d7540577d482c24110ebfd6f7d3f439707e50a899d9f3",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "h64_autoregressive_20261123",
+      "log_basename": "run.log",
+      "sha256": "c9e3aca3354c0315b60ed724295cee51876722ebf45872efa92abb1f5926933e",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "supplemental_dv_20261123",
+      "log_basename": "01_spad_arbiter.log",
+      "sha256": "70def2bd2db80a87f52b3c91d5d4dc5de12392933135645ecd903c51e38ebe4a",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "supplemental_dv_20261123",
+      "log_basename": "02_make_-C_dv_block_spad_arbiter_formal_decode-inva.log",
+      "sha256": "d801b699da8c34813a570ba9dc4d235e15240b789f9f86180c9c8f2ab9ad925e",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "supplemental_dv_20261123",
+      "log_basename": "03_make_-C_dv_block_spad_arbiter_formal_fairness-bo.log",
+      "sha256": "d3de39f78ae1d5849c85ce38fa142c0738502bbb4e060a4c2b8cd0bb06b474f3",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "supplemental_dv_20261123",
+      "log_basename": "04_make_-C_dv_block_compute_fp_formal_read-protecti.log",
+      "sha256": "1473aed8dbfc3f1e473670460b4caac3e6130450f7953fe094db05be26faaa0d",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "supplemental_dv_20261123",
+      "log_basename": "05_make_-C_dv_block_compute_matrix_sim_core-random-.log",
+      "sha256": "b979ffe748dd1c49dd272476622a592deb7459fee1253f791f17275240dc67bd",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "supplemental_dv_20261123",
+      "log_basename": "06_make_-C_dv_block_dma_sim_uvm_regress.log",
+      "sha256": "278de1f54619f4201f238c124e0e766698fefa2d03efcdeb8919fdabbb013240",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "supplemental_dv_20261123",
+      "log_basename": "07_make_-C_dv_subsystem_top_smoke_sim_ai_smoke.log",
+      "sha256": "9bb9d456a38a0bdf3c64f897509681b9829bc481a4fc945beecd651eba180f49",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "supplemental_dv_20261123",
+      "log_basename": "08_make_-C_dv_subsystem_top_smoke_sim_ai_deit_patch.log",
+      "sha256": "75bb4ea176619b2433e9adb059f5ccbf5219a33b26a63ecb9da6ff1126688906",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "supplemental_dv_20261123",
+      "log_basename": "09_make_inference-transformer.log",
+      "sha256": "24c11565189bc0b74cea8776cca12a673860136e06653d64526643d601bc0e10",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "supplemental_dv_20261123",
+      "log_basename": "10_make_-C_dv_uvm_sim_uvm_compile.log",
+      "sha256": "e3b564d1ff4e061bc400274df2736b60b4f899df0adde6dabc0b2ff8cbdc0756",
+      "archived_raw_log": false
+    },
+    {
+      "run_group": "supplemental_dv_20261123",
+      "log_basename": "11_make_-C_dv_uvm_sim_uvm_smoke.log",
+      "sha256": "8ba7ee3241de49ddeaa38b0db3a775c26c16b5e283f6a7f39019b67be39ea08f",
+      "archived_raw_log": false
+    }
+  ],
+  "curated_artifacts": [
+    {
+      "path": "h64_autoregressive_result_sanitized.json",
+      "sha256": "a7c53a92df3a8e5bed644628e610d367b7d505ab409db53ccd14532257c4c57d",
+      "bytes": 1851
+    },
+    {
+      "path": "h64_rtl_logits_context0.csv",
+      "sha256": "93e681ebba92e49575f844b004f770ae0101146fc5adc59a7c201e01388ae39c",
+      "bytes": 5522
+    },
+    {
+      "path": "h64_rtl_logits_context1.csv",
+      "sha256": "1b24814a23a6ddaeef552b521e65aaa4b6455bf7770a4f672bc9a933bc84fba4",
+      "bytes": 5522
+    },
+    {
+      "path": "h64_rtl_logits_context2.csv",
+      "sha256": "8276ca2a6e7a75cae2fa65e829d71f738f1c1bcec5642d05905678292773f91f",
+      "bytes": 5522
+    },
+    {
+      "path": "h64_rtl_logits_context3.csv",
+      "sha256": "532abd10a4a44d94ea53e5b4ebcbf2fb1f44176788691d0450d44785b17dabdc",
+      "bytes": 5522
+    },
+    {
+      "path": "phase1_benchmark_summary.json",
+      "sha256": "85259dc0f0aa3055c20a4578a88f7dd60b1eb5f6ca9bc5081041f4db7c417a1b",
+      "bytes": 6495
+    },
+    {
+      "path": "phase1_cnn_results.csv",
+      "sha256": "6002b6a9570daed173c5a738e77b8f24906301e313a9dc5b5ae3ce79dfaaec0b",
+      "bytes": 1236
+    },
+    {
+      "path": "phase1_cnn_summary.json",
+      "sha256": "2286be9cb948c7469cb93c7fad9b81ec481b1726b5b6eab47be96196d5d04156",
+      "bytes": 1410
+    },
+    {
+      "path": "phase1_gemm_results.csv",
+      "sha256": "e48717d51195e812d23c4684773cddeed1702a1a8fb8dcbb2c1813091d08596c",
+      "bytes": 8692
+    },
+    {
+      "path": "supplemental_dv_status.csv",
+      "sha256": "b824179bb6e0c5fdf2f23d630d7d0d30667d66748f526e34ef951d80af07eb89",
+      "bytes": 1623
+    }
+  ]
+}

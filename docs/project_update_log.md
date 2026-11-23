@@ -1,5 +1,32 @@
 # Project update log
 
+## 2026-11-23 — Round 3 benchmark/status documentation closeout (scoped)
+
+On isolated documentation branch `docs/status-benchmark-20261123`, preserved
+the earlier Phase 1 and Phase 2 reports and added a dated Phase 1 rerun record,
+a consolidated Phase 3 status, a curated evidence/hash bundle, and links from
+`docs/STATUS.md`, the active execution frontier, and the documentation index.
+The rerun used NMAForge source/test SHA
+`c4c2970ad8e66c93e00e854ef3befff4ccc9188b`, Tiny-NPU SHA
+`8216c22b762011aa20c05fc2768423fd12dda59d`, seed `20261123`, and run ID
+`NMA-ROUND3-FAIR-FINAL-20261123`. GEMM values were 173/234/1,301 cycles with
+Golden PASS. Tiny-NPU's normalized memory values are modeled, so there is no
+system-level speedup claim. A prior same-source run differs (151/241/1,290),
+and that reproducibility issue remains open.
+
+Phase 2 evidence remains scoped: 48/48 standalone GEMV Golden cases pass; the
+262,144-MAC fixed-weight Product Top CNN A/B passed 20,480 output words for
+each of three modes. H64's sanitized artifact is a synthetic same-Top
+prefix-recompute autoregressive Golden run, not persistent-KV latency or model
+quality evidence. DeiT's current targeted Product Top case is patch projection,
+not a full encoder. Supplemental checks include `ai_smoke`, Matrix random,
+DMA UVM and UVM compile PASS; UVM smoke failed with `CLUSTER_MEMORY_EMPTY`,
+and three formal targets were not run because `vcf` was unavailable. Details,
+raw-log hashes and reproduction command are in
+`docs/benchmark/NMAFORGE_V2_ROUND3_PHASE3_STATUS_20261123.md` and
+`docs/benchmark/evidence/round3-20261123/`. No RTL was changed; product-wide
+DV/sign-off remains open.
+
 ## NMAForge v2.0 Round 3 — integrated research evidence (2026-11-15)
 
 Combined Gate evidence on isolated branch `research/nmaforge-v2-round3-integration`, based on Round 2 SHA `6596779de2ec4f502a0253dedd4695129b775b05` and product PR #8 baseline `0492c47d12cd11bcc22be1930da7af77ed870b6e`. H64 Q projection through product Top passed with four legal tiled descriptors, 1,024/1,024 INT32 Golden words, 1,188 cycles, 65,536 useful MACs, 8,192 B reads and 4,096 B writes. Product Top smoke passed seed 20261115/four random cases. SVSE vector SPAD A/B passed numerical, abort, epoch and commit-prefix checks but was slower with unchanged traffic (Residual 46 vs 40 cycles; Requant 30 vs 22), so decision is `REWORK_FOR_PRODUCT`. DAMS remains unintegrated because the current prototype does not track transaction/address/response ownership and did not prove a scheduling opportunity beyond the product dispatcher. Full H64 decoder and A0-A3 remain NOT_RUN. See `docs/research/NMAFORGE_V2_ROUND3_FINAL.md` and focused reports.
