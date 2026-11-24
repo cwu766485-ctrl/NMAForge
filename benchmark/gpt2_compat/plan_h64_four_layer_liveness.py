@@ -49,16 +49,19 @@ def interval_overlap(a0: int, a1: int, b0: int, b1: int) -> bool:
 
 
 def build_template(tokens: list[int] = TOKENS, seed: int = SEED,
-                   model_override: dict | None = None) -> dict:
+                   model_override: dict | None = None,
+                   kv_append_from: int = 0,
+                   numeric_profile: str = "frozen") -> dict:
     with tempfile.TemporaryDirectory(prefix="nmaforge_r16_liveness_") as temp:
         out = Path(temp) / "template"
         manifest = generate(
             out, seed=seed, include_attention=True, include_ffn=True,
             include_kv_roundtrip=False, include_kv_attention=True,
             token_ids=tokens, kv_k_write_mode="qk-compatible-append",
-            kv_append_from=0, stream_norm_params=True,
+            kv_append_from=kv_append_from, stream_norm_params=True,
             queue_slots_override=QUEUE_SLOTS,
             model_override=model_override,
+            numeric_profile=numeric_profile,
         )
         # Retain the manifest data after the temporary generated memory image
         # is removed.  The generator already validates Golden and descriptor

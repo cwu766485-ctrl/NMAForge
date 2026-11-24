@@ -216,7 +216,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
              include_final_lm_head: bool = False,
              queue_slots_override: int | None = None,
              model_override: dict[str, np.ndarray] | None = None,
-             numeric_profile: str = "frozen") -> dict:
+             numeric_profile: str = "frozen",
+             kv_cache_initial: dict[str, list[int]] | None = None) -> dict:
     if numeric_profile not in {"frozen", "round21_residual_gelu_aligned"}:
         raise ValueError(f"unsupported numeric profile: {numeric_profile}")
     if include_ffn and not include_attention:
@@ -376,10 +377,15 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
         kv_attention_expected = {}
         if include_kv_attention:
             for kind in ("k", "v"):
+                initial_words = ([0xA55AA55A] * (4 * 64)
+                                 if kv_cache_initial is None else
+                                 list(kv_cache_initial[kind]))
+                if len(initial_words) != 4 * 64:
+                    raise ValueError(f"{kind.upper()} cache initial image must contain 256 words")
                 cache_t = mapper.tensor(
                     f"l0.kv_attention_{kind}_cache_i8", (4, 16, 16),
                     "i8_packed", "matrix_b_head_token_feature",
-                    [0xA55AA55A] * (4 * 64), True,
+                    initial_words, True,
                 )
                 kv_attention_cache[kind] = cache_t
                 kv_attention_readback[kind] = {}

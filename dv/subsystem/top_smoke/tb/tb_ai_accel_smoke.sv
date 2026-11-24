@@ -6914,10 +6914,16 @@ module tb_ai_accel_smoke;
                                 end
                                 ar_data_cursor = ar_data_cursor + 128;
                             end
-                            $display("H64_AR_INPUT_EMBEDDING_PASS step=%0d token=%0d position=%0d valid_rows=%0d embedding_words=%0d position_words=%0d source=RTL_argmax_host_lookup_prefix_recompute",
-                                     ar_step, persistent_argmax, ar_position,
-                                     ar_input_count, ar_input_count * 64,
-                                     ar_input_count * 64);
+                            if ($test$plusargs("AI_H64_INCREMENTAL_KV"))
+                                $display("H64_AR_INPUT_EMBEDDING_PASS step=%0d token=%0d position=%0d valid_rows=%0d embedding_words=%0d position_words=%0d source=RTL_argmax_host_lookup_incremental_kv",
+                                         ar_step, persistent_argmax, ar_position,
+                                         ar_input_count, ar_input_count * 64,
+                                         ar_input_count * 64);
+                            else
+                                $display("H64_AR_INPUT_EMBEDDING_PASS step=%0d token=%0d position=%0d valid_rows=%0d embedding_words=%0d position_words=%0d source=RTL_argmax_host_lookup_prefix_recompute",
+                                         ar_step, persistent_argmax, ar_position,
+                                         ar_input_count, ar_input_count * 64,
+                                         ar_input_count * 64);
                             ar_context = ar_step + 1;
                             ar_cumulative_before = ar_total_publications;
                             for (persistent_stage = 0; persistent_stage < 4;
@@ -6936,8 +6942,12 @@ module tb_ai_accel_smoke;
                                      ar_total_cycles, ar_total_publications);
                         end
                     end
-                    $display("H64_AUTOREGRESSIVE_SEQUENCE_PASS generated_tokens=%0d total_publications=%0d extension_cycles=%0d reset_events=0 host_intermediate_words=0 mode=prefix_recompute",
-                             ar_steps, ar_total_publications, ar_total_cycles);
+                    if ($test$plusargs("AI_H64_INCREMENTAL_KV"))
+                        $display("H64_AUTOREGRESSIVE_SEQUENCE_PASS generated_tokens=%0d total_publications=%0d extension_cycles=%0d reset_events=0 host_intermediate_words=0 mode=persistent_incremental_kv",
+                                 ar_steps, ar_total_publications, ar_total_cycles);
+                    else
+                        $display("H64_AUTOREGRESSIVE_SEQUENCE_PASS generated_tokens=%0d total_publications=%0d extension_cycles=%0d reset_events=0 host_intermediate_words=0 mode=prefix_recompute",
+                                 ar_steps, ar_total_publications, ar_total_cycles);
                 end
             end
             $finish;

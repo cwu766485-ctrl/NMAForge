@@ -312,11 +312,15 @@ def remap_dma(run_dir: Path, manifest: dict, plan_records: list[dict],
 
 def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS,
           model_override: dict | None = None,
-          numeric_profile: str = "frozen") -> dict:
+          numeric_profile: str = "frozen", kv_append_from: int = 0,
+          kv_cache_before_by_layer: dict[int, dict[str, list[int]]] | None = None) -> dict:
     if not tokens or len(tokens) > 16 or any(token < 0 or token > 255 for token in tokens):
         raise ValueError("four-layer Top prompt must contain 1..16 token IDs in [0,255]")
+    if not 0 <= kv_append_from < len(tokens):
+        raise ValueError("KV append position must select a live token row")
     out.mkdir(parents=True, exist_ok=False)
-    template_manifest = build_template(tokens, seed, model_override)
+    template_manifest = build_template(tokens, seed, model_override,
+                                       kv_append_from, numeric_profile)
     plan_records, desc_base, cpl_base, kv_map, stats = make_records(template_manifest)
     plan_by_template_layer = {(r["layer"], r.get("template_tensor")): r
                               for r in plan_records if "template_tensor" in r}
@@ -331,12 +335,14 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS,
             raw_dir, seed=seed, include_attention=True, include_ffn=True,
             include_kv_roundtrip=False, include_kv_attention=True,
             token_ids=tokens, kv_k_write_mode="qk-compatible-append",
-            kv_append_from=0, layer_index=layer,
+            kv_append_from=kv_append_from, layer_index=layer,
             input_hidden_i32=hidden_rows, stream_norm_params=True,
             include_final_lm_head=(layer == LAYERS - 1),
             queue_slots_override=QUEUE_SLOTS,
             model_override=model_override,
             numeric_profile=numeric_profile,
+            kv_cache_initial=(None if kv_cache_before_by_layer is None else
+                              kv_cache_before_by_layer[layer]),
         )
         manifests.append(manifest)
         stage = out / f"stage{layer}"
@@ -452,8 +458,13 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS,
         for kind in ("k", "v"):
             cache = next(r for r in plan_records
                          if r["tensor_id"] == f"l{layer}.kv_{kind}_cache_i8")
-            for offset in range(0, cache["size_bytes"], 4):
-                cache_before[cache["start"] + offset] = SENTINEL
+            initial_words = ([SENTINEL] * (cache["size_bytes"] // 4)
+                             if kv_cache_before_by_layer is None else
+                             kv_cache_before_by_layer[layer][kind])
+            if len(initial_words) != cache["size_bytes"] // 4:
+                raise ValueError(f"layer {layer} {kind.upper()} cache-before size mismatch")
+            for index, value in enumerate(initial_words):
+                cache_before[cache["start"] + index * 4] = value & 0xFFFFFFFF
         write_pairs(stage / "cache_before.memh", cache_before)
 
         tensor_map = {r["name"]: r for r in manifest["tensor_allocations"]}
@@ -505,6 +516,8 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS,
             "kv_ranges": {kind: next(r for r in plan_records
                                       if r["tensor_id"] == f"l{layer}.kv_{kind}_cache_i8")["start"]
                           for kind in ("k", "v")},
+            "kv_append_from": kv_append_from,
+            "kv_mode": "prefix_recompute" if kv_append_from == 0 else "persistent_cache_append",
             "descriptor_base": desc_base, "completion_base": cpl_base,
             "queue_size": QUEUE_SLOTS,
         }
@@ -587,6 +600,8 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS,
         "queue": {"entries": QUEUE_SLOTS, "descriptor_range": [desc_base, cpl_base],
                   "completion_range": [cpl_base, CAPACITY]},
         "schedule": stats,
+        "kv_append_from": kv_append_from,
+        "kv_mode": "prefix_recompute" if kv_append_from == 0 else "persistent_cache_append",
         "persistent_kv": kv_map,
         "layer_manifests": [json.loads((out / f"stage{i}/manifest.json").read_text())
                             for i in range(LAYERS)],

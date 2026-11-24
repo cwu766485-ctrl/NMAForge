@@ -1400,18 +1400,29 @@ AI_H64_FOUR_LAYER_MODEL_NPZ ?=
 AI_H64_NUMERIC_PROFILE ?= frozen
 AI_H64_FOUR_LAYER_LOGITS_ROW ?= $(shell printf '%s\n' '$(AI_H64_FOUR_LAYER_TOKENS)' | awk -F, '{print NF-1}')
 AI_H64_AUTOREGRESSIVE ?= 0
+AI_H64_AUTOREGRESSIVE_KV_MODE ?= prefix_recompute
 ifeq ($(AI_H64_AUTOREGRESSIVE),1)
 AI_H64_FOUR_LAYER_PREPARER := ../../../../benchmark/gpt2_compat/prepare_h64_autoregressive.py
 AI_H64_FOUR_LAYER_TOKEN_OPTION := --prompt
+AI_H64_FOUR_LAYER_KV_OPTION := --kv-mode "$(AI_H64_AUTOREGRESSIVE_KV_MODE)"
 AI_H64_AUTOREGRESSIVE_PLUSARGS := \
 	+AI_H64_AUTOREGRESSIVE +AI_H64_AUTOREGRESSIVE_STEPS=4 \
 	+AI_H64_FEEDBACK_PLAN=$(AI_H64_FOUR_LAYER_RUN)/feedback_plan.memh \
 	+AI_H64_EMBED_BASE=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json; j=json.load(open("$(AI_H64_FOUR_LAYER_RUN)/four_layer_manifest.json")); print(next(t["start"] for t in j["allocation_records"] if t["tensor_id"] == "l0.embedding_lookup_i32"))') \
 	+AI_H64_POSITION_BASE=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json; j=json.load(open("$(AI_H64_FOUR_LAYER_RUN)/four_layer_manifest.json")); print(next(t["start"] for t in j["allocation_records"] if t["tensor_id"] == "l0.position_i32"))')
+ifeq ($(AI_H64_AUTOREGRESSIVE_KV_MODE),persistent_incremental)
+AI_H64_AUTOREGRESSIVE_KV_PLUSARGS := +AI_H64_INCREMENTAL_KV
+else ifeq ($(AI_H64_AUTOREGRESSIVE_KV_MODE),prefix_recompute)
+AI_H64_AUTOREGRESSIVE_KV_PLUSARGS :=
+else
+$(error AI_H64_AUTOREGRESSIVE_KV_MODE must be prefix_recompute or persistent_incremental)
+endif
 else
 AI_H64_FOUR_LAYER_PREPARER := ../../../../benchmark/gpt2_compat/prepare_h64_four_layer.py
 AI_H64_FOUR_LAYER_TOKEN_OPTION := --tokens
+AI_H64_FOUR_LAYER_KV_OPTION :=
 AI_H64_AUTOREGRESSIVE_PLUSARGS :=
+AI_H64_AUTOREGRESSIVE_KV_PLUSARGS :=
 endif
 .PHONY: ai_h64_four_layer_top
 ai_h64_four_layer_top:
@@ -1419,7 +1430,7 @@ ai_h64_four_layer_top:
 	$(AI_H64_FOUR_LAYER_PYTHON) $(AI_H64_FOUR_LAYER_PREPARER) \
 		--seed "$(AI_H64_FOUR_LAYER_SEED)" $(AI_H64_FOUR_LAYER_TOKEN_OPTION) "$(AI_H64_FOUR_LAYER_TOKENS)" \
 		$(if $(AI_H64_FOUR_LAYER_MODEL_NPZ),--model-npz "$(AI_H64_FOUR_LAYER_MODEL_NPZ)",) \
-		--numeric-profile "$(AI_H64_NUMERIC_PROFILE)" \
+		--numeric-profile "$(AI_H64_NUMERIC_PROFILE)" $(AI_H64_FOUR_LAYER_KV_OPTION) \
 		$(if $(filter 1,$(AI_H64_AUTOREGRESSIVE)),--generated 4,) \
 		--out "$(AI_H64_FOUR_LAYER_RUN)"
 	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
@@ -1437,7 +1448,7 @@ ai_h64_four_layer_top:
 		+AI_H64_DUMP_LOGITS \
 		+AI_H64_LOGITS_BASE=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json; j=json.load(open("$(AI_H64_FOUR_LAYER_RUN)/four_layer_manifest.json")); print(next(t["start"] for t in j["allocation_records"] if t["tensor_id"] == "logits_i32_physical_16x256"))') \
 		+AI_H64_LOGITS_ROW=$(AI_H64_FOUR_LAYER_LOGITS_ROW) \
-		$(AI_H64_AUTOREGRESSIVE_PLUSARGS) \
+		$(AI_H64_AUTOREGRESSIVE_PLUSARGS) $(AI_H64_AUTOREGRESSIVE_KV_PLUSARGS) \
 		+AI_H64_LOGITS_DUMP=$(AI_H64_FOUR_LAYER_RUN)/rtl_logits.csv \
 		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_FOUR_LAYER_RUN)/stage0/model_memory.memh \
 		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_FOUR_LAYER_RUN)/stage0/model_golden.memh \

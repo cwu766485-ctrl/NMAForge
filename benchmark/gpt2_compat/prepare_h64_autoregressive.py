@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -98,16 +99,45 @@ def patch_cache_before(previous: Path, current: Path) -> None:
         write_pairs(current / f"stage{layer}/cache_before.memh", pairs)
 
 
+def compare_with_prefix_recompute(incremental: Path, seed: int,
+                                  tokens: list[int], model_override: dict | None,
+                                  numeric_profile: str) -> int:
+    """Check every Product checkpoint against a fresh full-prefix Golden."""
+    with tempfile.TemporaryDirectory(prefix="nmaforge_h64_kv_reference_") as temp:
+        reference = Path(temp) / "prefix"
+        build(reference, seed, tokens, model_override, numeric_profile)
+        compared = 0
+        for layer in range(4):
+            manifest = json.loads((incremental / f"stage{layer}/manifest.json").read_text())
+            for spec in manifest["intermediate_checkpoints"]:
+                name = spec["tensor_id"]
+                got = checkpoint_record(incremental, layer, name)
+                want = checkpoint_record(reference, layer, name)
+                if got != want:
+                    address = next((addr for addr in sorted(set(got) | set(want))
+                                    if got.get(addr) != want.get(addr)), None)
+                    raise ValueError(
+                        f"incremental KV differs from prefix recompute: "
+                        f"layer={layer} tensor={name} address={address:#x} "
+                        f"incremental={got.get(address)} prefix={want.get(address)}")
+                compared += len(got)
+        return compared
+
+
 def build_session(out: Path, seed: int, prompt: list[int], generated: int,
                   model_override: dict | None = None,
-                  numeric_profile: str = "frozen") -> dict:
+                  numeric_profile: str = "frozen",
+                  kv_mode: str = "prefix_recompute") -> dict:
     if len(prompt) != 4 or generated < 1 or len(prompt) + generated > 16:
         raise ValueError("requires a four-token prompt and 1..12 generated tokens")
+    if kv_mode not in {"prefix_recompute", "persistent_incremental"}:
+        raise ValueError("invalid KV execution mode")
     if any(token < 0 or token > 255 for token in prompt):
         raise ValueError("token IDs must be in [0,255]")
     current_tokens = list(prompt)
     current_dir = out
-    current_manifest = build(current_dir, seed, current_tokens, model_override, numeric_profile)
+    current_manifest = build(current_dir, seed, current_tokens, model_override,
+                             numeric_profile, kv_append_from=0)
     raw_model = np.load(current_dir / "raw_layer0/canonical_h64_model.npz")
     embedding = raw_model["embedding"].astype(np.int32)
     position = raw_model["position"].astype(np.int32)
@@ -140,9 +170,35 @@ def build_session(out: Path, seed: int, prompt: list[int], generated: int,
             break
         current_tokens.append(selected)
         next_dir = out / f"context{step + 1}"
-        next_manifest = build(next_dir, seed, current_tokens, model_override, numeric_profile)
+        if kv_mode == "persistent_incremental":
+            cache_before = {layer: cache_words_for_layer(current_dir, layer)
+                            for layer in range(4)}
+            append_from = len(current_tokens) - 1
+        else:
+            cache_before = None
+            append_from = 0
+        next_manifest = build(
+            next_dir, seed, current_tokens, model_override, numeric_profile,
+            kv_append_from=append_from,
+            kv_cache_before_by_layer=cache_before,
+        )
+        previous_allocations = {item["tensor_id"]: item
+                                for item in current_manifest["allocation_records"]}
+        next_allocations = {item["tensor_id"]: item
+                            for item in next_manifest["allocation_records"]}
+        for layer in range(4):
+            for kind in ("k", "v"):
+                tensor_id = f"l{layer}.kv_{kind}_cache_i8"
+                if previous_allocations[tensor_id]["start"] != next_allocations[tensor_id]["start"]:
+                    raise ValueError(f"persistent KV address moved between contexts: {tensor_id}")
+        equivalent_words = 0
+        if kv_mode == "persistent_incremental":
+            equivalent_words = compare_with_prefix_recompute(
+                next_dir, seed, current_tokens, model_override, numeric_profile)
         patch_cache_before(current_dir, next_dir)
         records[-1]["next_context"] = str(next_dir.relative_to(out))
+        records[-1]["kv_append_from"] = append_from
+        records[-1]["prefix_recompute_equivalent_words"] = equivalent_words
         records[-1]["cache_before_sha256"] = {
             f"layer{layer}": __import__("hashlib").sha256(
                 (next_dir / f"stage{layer}/cache_before.memh").read_bytes()).hexdigest()
@@ -153,7 +209,10 @@ def build_session(out: Path, seed: int, prompt: list[int], generated: int,
     write_words(feedback_path, feedback_words)
     plan = {
         "status": "PLANNER_READY_REQUIRES_PRODUCT_TOP_AUTOREGRESSIVE_PASS",
-        "mode": "four_layer_prefix_recompute_same_top_instance",
+        "mode": ("four_layer_persistent_incremental_kv_same_top_instance"
+                 if kv_mode == "persistent_incremental" else
+                 "four_layer_prefix_recompute_same_top_instance"),
+        "kv_mode": kv_mode,
         "seed": seed,
         "prompt_tokens": prompt,
         "expected_generated_tokens": generated_tokens,
@@ -164,7 +223,9 @@ def build_session(out: Path, seed: int, prompt: list[int], generated: int,
         "host_roles": ["read actual RTL logits", "signed INT32 argmax with lowest-ID tie break",
                        "token embedding/position input lookup only"],
         "host_intermediate_tensor_writes": 0,
-        "cache_policy": "each next-context run verifies all prior physical KV words before prefix recompute; Product KV_READ checkpoints verify recomputed cache contents",
+        "cache_policy": ("each decode context imports no KV data from host, verifies all prior physical KV words, appends only the newly generated token K/V in Product Top, and checks every layer checkpoint against an independent prefix-recompute Golden"
+                         if kv_mode == "persistent_incremental" else
+                         "each next-context run verifies all prior physical KV words before prefix recompute; Product KV_READ checkpoints verify recomputed cache contents"),
         "quality_scope": ("deterministic synthetic weights; functional autoregressive loop only, no language-model quality claim"
                           if model_override is None else
                           "GPT-2-derived truncated/requantized weights; functional autoregressive loop only, no language-model quality claim"),
@@ -187,6 +248,8 @@ def main() -> None:
                         help="optional canonical H64 model package; omit for synthetic regression")
     parser.add_argument("--numeric-profile", choices=("frozen", "round21_residual_gelu_aligned"),
                         default="frozen", help="fixed-point projection/GELU contract")
+    parser.add_argument("--kv-mode", choices=("prefix_recompute", "persistent_incremental"),
+                        default="prefix_recompute")
     args = parser.parse_args()
     prompt = [int(item, 0) for item in args.prompt.split(",") if item]
     model_override = None
@@ -194,7 +257,7 @@ def main() -> None:
         with np.load(args.model_npz, allow_pickle=False) as archive:
             model_override = {name: archive[name] for name in archive.files}
     build_session(args.out, args.seed, prompt, args.generated, model_override,
-                  args.numeric_profile)
+                  args.numeric_profile, args.kv_mode)
 
 
 if __name__ == "__main__":
