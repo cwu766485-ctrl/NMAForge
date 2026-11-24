@@ -16,7 +16,8 @@ ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 from product_integer_reference import infer as product_int_infer  # noqa: E402
 from train_h64_byte_lm import (  # noqa: E402
-    CONTEXT, H64ByteDecoder, metrics_from_logits,
+    CONTEXT, FFN, HEAD_DIM, HEADS, HIDDEN, LAYERS, VOCAB,
+    H64ByteDecoder, metrics_from_logits,
 )
 
 
@@ -40,6 +41,7 @@ def main() -> None:
     ap.add_argument("--package", type=Path, required=True)
     ap.add_argument("--fp32", type=Path, required=True)
     ap.add_argument("--corpus", type=Path, required=True)
+    ap.add_argument("--dataset-name", default="Provided byte-level corpus")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--seed", type=int, default=20261121)
     ap.add_argument("--windows", type=int, default=64)
@@ -114,11 +116,15 @@ def main() -> None:
     result = {
         "status": "SOFTWARE_QUALITY_EVALUATION_WITH_TOP_EVIDENCE" if args.top_result else
                   "SOFTWARE_QUALITY_EVALUATION_ONLY_TOP_NOT_RUN",
-        "dataset": {"name": "Tiny Shakespeare byte-level", "sha256": sha(args.corpus),
+        "dataset": {"name": args.dataset_name, "sha256": sha(args.corpus),
                     "split": "first 90 percent train, final 10 percent held-out"},
         "model": {"fp32_sha256": sha(args.fp32), "int8_sha256": sha(args.package),
-                  "seed": int(ckpt["seed"]), "train_steps": int(ckpt["steps"]),
-                  "architecture": ckpt["architecture"]},
+                  "seed": int(ckpt["seed"]),
+                  "train_steps": int(ckpt.get("steps", ckpt.get("fp_steps", -1))),
+                  "architecture": ckpt.get("architecture", {
+                      "hidden": HIDDEN, "heads": HEADS, "head_dim": HEAD_DIM,
+                      "layers": LAYERS, "ffn": FFN, "vocab": VOCAB,
+                      "context": CONTEXT})},
         "evaluation": {"seed": args.seed, "windows": args.windows,
                        "tokens": int(args.windows * CONTEXT),
                        "prompt_length": CONTEXT},

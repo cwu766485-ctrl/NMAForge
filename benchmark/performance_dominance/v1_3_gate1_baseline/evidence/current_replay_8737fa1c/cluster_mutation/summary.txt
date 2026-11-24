@@ -1,0 +1,7 @@
+address: UVM_ERROR ../env/scoreboard/ai_compute_cluster_scoreboard.svh(160) @ 6325000: uvm_test_top.env.compute_scoreboard [CLUSTER_MEMORY_UNKNOWN]
+data: UVM_FATAL ../tests/sequences/ai_compute_cluster_e2e_seq.svh(713) @ 6910000: uvm_test_top.env.axil_agent.sequencer@@compute_cluster_e2e_seq [CLUSTER_GOLDEN]
+response_owner: UVM_ERROR ../env/scoreboard/ai_compute_cluster_scoreboard.svh(386) @ 6275000: uvm_test_top.env.compute_scoreboard [CLUSTER_ENGINE_RESPONSE_OWNER]
+wstrb: UVM_ERROR ../env/scoreboard/ai_compute_cluster_scoreboard.svh(483) @ 86095000: uvm_test_top.env.compute_scoreboard [CLUSTER_MATRIX_WSTRB]
+completion_error: UVM_FATAL ../tests/sequences/ai_compute_cluster_e2e_seq.svh(709) @ 13010000: uvm_test_top.env.axil_agent.sequencer@@compute_cluster_e2e_seq [CLUSTER_COMPLETION_ERROR_CODE]
+missing_done: UVM_ERROR ../env/scoreboard/ai_compute_cluster_scoreboard.svh(294) @ 12725000: uvm_test_top.env.compute_scoreboard [CLUSTER_MISSING_DONE]
+duplicate_done: UVM_ERROR ../env/scoreboard/ai_compute_cluster_scoreboard.svh(286) @ 12725000: uvm_test_top.env.compute_scoreboard [CLUSTER_DONE_WITHOUT_ACTIVE]

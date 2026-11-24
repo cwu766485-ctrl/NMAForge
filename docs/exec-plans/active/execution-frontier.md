@@ -1,9 +1,45 @@
 # NMAForge execution frontier
 
-## NMAForge V1.2 integrated model/DV frontier — 2026-11-24
+## NMAForge V1.3 performance-dominance frontier — 2026-11-24
 
-This active V1.2 objective supersedes the older bounded-round stop notices
-below. Work stays isolated on branch
+This is the active co-design objective and continues from
+`research/nmaforge-v1.2-integrated-model-dv` at `8737fa1c7c6d08a894913a904a8a52aff4fb5840`.
+The baseline source/ABI freeze is recorded in
+[`v1_3_source_freeze.json`](../../../benchmark/performance_dominance/v1_3_source_freeze.json).
+Work remains isolated on the research branch; the user's checkout and `main`
+are unchanged. No Product RTL was changed in this continuation.
+
+### Progress this continuation
+
+| Gate | Status | Evidence and boundary |
+|---|---|---|
+| Source, ABI and configuration identity | FROZEN | Source SHA `8737fa1c7c6d08a894913a904a8a52aff4fb5840`, RTL tree `d952771394c3743dd106d61b595c41054dc529b1`, Product Top SHA-256 `4108cc1c47761085cb6ba012ea2227b8fbe5522f48b46d910342ca2c17e43735`, ABI v7.4 / version register `0x1000_000a`; filelists and source-of-truth documents are hashed in the freeze JSON. |
+| Gate 1 Matrix baseline | PARTIAL — current-source NMAForge replay PASS | Rebuilt the saved Round 27 harness at frozen source `8737fa1c`: exact seed 20261122 reproduces 64×64×64 GEMM at 4,822 cycles under variable backpressure and 3,413 with fixed one-cycle memory. Seed 20261124 gives 4,746 cycles. The four-descriptor 1×64×64 GEMV reproduces 632/584 cycles with prefetch OFF/ON; all Golden outputs pass. Exclusive stalls and comparable TinyNPU endpoints remain open. See the [Gate 1 package](../../../benchmark/performance_dominance/v1_3_gate1_baseline/run_manifest.json). |
+| TinyNPU comparison | NOT COMPARABLE | Historical TinyNPU reports 3,166 direct-array cycles for GEMM and 790 for GEMV. Its endpoint excludes controller and memory service, while NMAForge's includes the Matrix controller and behavioral SPAD. No cross-project speedup is claimed; TinyNPU raw logs are absent from the historical package. |
+| P0 baseline/DV recovery | PARTIAL — current-source simulation revalidated | `ai_smoke` passes at seed 20261124; 20-case `ai_run` passes at seed 12345. Current Compute Cluster UVM passes at 128/256/512 KiB with seed 20261124 (3/3); each map keeps `access_bounds_checked=1`. Historical 9/9 capacity evidence is retained separately. Full RTM and cluster sign-off remain open. See the [current replay package](../../../benchmark/performance_dominance/v1_3_gate1_baseline/evidence/current_replay_8737fa1c/). |
+| Formal | PARTIAL — scoped serial and dispatcher proofs PASS | VC Formal V-2023.12-SP2 passes 3 serialization properties/7 covers and 5 dispatcher properties, 4 non-vacuous checks, and 23 pairwise covers. The initial 300-second attempt timed out; the separate 900-second retry passed. Full-top formal closure remains open. |
+| RTL mutation | PARTIAL — 7/7 injected mutants caught | Current-source real-RTL mutants for address, data, response ownership, WSTRB, completion error, missing done, and duplicate done each trigger their expected checker. Aggregate target exits 0; the harness does not preserve each simulator's native exit code. This is a focused mutation sample, not complete mutation closure. |
+| CNN fusion A/B | PASS — current source, bounded synthetic fixture | Product Top legacy/first/both fusion modes each match the same independent Golden over 20,480 words. Command cycles are 60,930/34,324/7,708, with unchanged input, weights, and output hashes. This is a fixed-seed untrained 1×1 pointwise CNN; it demonstrates a current-source dataflow/descriptor fusion result, not trained accuracy or TinyNPU dominance. See [fusion manifest](../../../benchmark/performance_dominance/v1_3_current_cnn_fusion_ab.json) and [CSV](../../../benchmark/performance_dominance/v1_3_current_cnn_fusion_ab.csv). |
+| GPT-2 | PARTIAL — independent software quality FAIL | Existing four-layer persistent-KV and prefix-recompute Product Top outputs are bit-exact; persistent KV saves 3.0195% measured command-path cycles and 15.5491% descriptor publications. New software-only evaluation on 64 independent Pride and Prejudice byte windows gives selected INT8 11.23% / PPL 216.50, versus FP32 30.76% / PPL 15.13 and same-window Bigram 27.64%. Independent-data Product Top logits were not run; the package remains below Bigram. Operator isolation, quality recovery, full Product Top qualification, and capacity/residency A/B remain open. See [KV scaling analysis](../../../benchmark/performance_dominance/v1_3_gpt2_persistent_kv_analysis_manifest.json) and [independent software evaluation](../../../benchmark/performance_dominance/v1_3_gpt2_independent_software_eval.json). |
+| DeiT-Tiny | PARTIAL | Historical Round 30 Product Top evidence runs three-head attention/AV for all 197 query rows, including the final five-row tail. Round 31 extends only 16 rows through Wo projection and checks 72,384 Golden words; 181 Wo rows, all of full Layer 0, 12 layers, classifier, and real-image accuracy remain open. The existing generator fixes 16 rows and the testbench rejects 13-block Wo mode. |
+| End-to-end dominance and PPA | NOT RUN | Existing Matrix endpoints do not establish a system comparison. No evidence supports an RTL expansion or Design Freeze. |
+
+### Immediate next work
+
+1. Complete the current-source Gate 1 profile by separating exclusive stalls from overlapping event counters; keep the matched TinyNPU endpoint explicitly NOT COMPARABLE until resources and timing boundaries match.
+2. Use the negative independent-data result to drive GPT-2 operator/precision ablations and quality recovery, then rerun independent software evaluation and Product Top logits against that exact corpus and package.
+3. Extend the DeiT path from the proven block to all 197 queries, then close the remaining Layer 0 operators in one Product Top session without host activation refill.
+4. Execute model-level 128/256/512 KiB and weight-residency ablations using the same model package and timing boundaries; do not infer these results from UVM capacity runs or static maps.
+5. Build a unified counter schema separating exclusive stalls from overlapping events, then run matched Product Top/TinyNPU workloads before considering hardware changes. The CNN fusion A/B now has current-source Product Top evidence; extend profiling to the other engines and the pinned comparison target.
+
+The complete acceptance gates, evidence rules, and stretch targets are in
+[`performance-dominance-plan.md`](performance-dominance-plan.md). Historical
+V1.2 evidence is retained below as provenance; it does not close the V1.3
+gates.
+
+## NMAForge V1.2 integrated model/DV snapshot — superseded, 2026-11-24
+
+This V1.2 snapshot was recorded on branch
 `research/nmaforge-v1.2-integrated-model-dv`, based at
 `ad58507fa5052ccec61e05428c4e36e493796b8b`; `main` is unchanged. Product RTL
 was not modified in the work recorded here.
@@ -16,7 +52,7 @@ was not modified in the work recorded here.
 | GPT-2 | The selected QAT package has a four-layer Product Top comparison: persistent incremental KV is bit-exact to prefix-recompute on four 256-logit contexts; 4,209,696 vs 4,340,736 command-path cycles (3.0195% fewer) and 2,607 vs 3,087 descriptor publications. | The selected model still scores below Bigram on validation/test; the QAT package hash is `d9ff47c56a4ddc335a34d601d2083cfa2967d179b6aa617fdb25e484a9af3bb4`. It is not a model-quality PASS or application-latency claim. See [GPT-2 closure](../../benchmark/NMAFORGE_V1_2_ROUND31_GPT2_QUALITY_CLOSURE.md) and [paired-run manifest](../../../benchmark/gpt2_quality/results/round31_integrated_top/run_manifest.json). |
 | DeiT-Tiny | New Product Top evidence passes one 16-query block through 3-head Attention, AV requantization, official Wo DMA, INT32 projection/head accumulation and final INT8 output: 1,332 total descriptors, 72,384 Golden words, including 768 output words; no host activation transfers. | This is 16/197 valid query rows only. Residual1/LN2/FFN/GELU/Residual2, full Layer 0, remaining layers, classifier and image accuracy remain NOT_RUN. See [Round 31 evidence](../../../benchmark/deit/round31/evidence/attention_output_projection_16q/run_manifest.json). |
 
-### Remaining active work
+### Open items at the V1.2 snapshot
 
 1. Extend the passing DeiT block to all 197 queries, then complete Residual1, LN2, FFN/GELU and Residual2 through one Product Top session. Only after full Layer 0 passes should the twelve-layer/classifier track start.
 2. Finish GPT-2 per-operator accuracy/precision ablations and qualification of the selected package against the exact fixed software/runtime contract; preserve the current below-Bigram disposition.
@@ -24,7 +60,7 @@ was not modified in the work recorded here.
 4. Complete the Compute Cluster Requirement-to-Testpoint mapping and the requested concurrency/ownership/dependency/retirement/reset/Abort/backpressure/Parity/Protection evidence. Keep functional coverage, assertions, formal and mutation as separate evidence classes; do not infer formal closure from simulation.
 5. Consider RTL changes only if the software/runtime A/B and measured current-path profile identify a bottleneck existing hardware cannot address.
 
-Detailed status is kept in [the DeiT closure](../../benchmark/NMAFORGE_V1_2_ROUND31_DEIT_ENCODER_CLOSURE.md), [the GPT-2 closure](../../benchmark/NMAFORGE_V1_2_ROUND31_GPT2_QUALITY_CLOSURE.md), and the [V1.2 P0 manifest](../../../benchmark/verification/v1_2_integrated_p0/run_manifest.json). This objective is still active; none of the remaining work is marked complete by the partial results above.
+Detailed V1.2 status is kept in [the DeiT closure](../../benchmark/NMAFORGE_V1_2_ROUND31_DEIT_ENCODER_CLOSURE.md), [the GPT-2 closure](../../benchmark/NMAFORGE_V1_2_ROUND31_GPT2_QUALITY_CLOSURE.md), and the [V1.2 P0 manifest](../../../benchmark/verification/v1_2_integrated_p0/run_manifest.json). The open items remain active under the V1.3 successor above; the partial results here do not close them.
 
 Round 7 is now at its bounded terminal disposition: the standalone 16×16
 Array mapping and CNN three-mode experiment are recorded; Matrix Core mapping,

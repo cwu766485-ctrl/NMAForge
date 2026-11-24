@@ -1,0 +1,41 @@
+{
+  "freeze_name": "NMAForge V1.3 baseline source/ABI freeze",
+  "status": "FROZEN_REFERENCE_BASELINE",
+  "branch": "research/nmaforge-v1.2-integrated-model-dv",
+  "source_commit_sha": "8737fa1c7c6d08a894913a904a8a52aff4fb5840",
+  "rtl_git_tree_sha": "d952771394c3743dd106d61b595c41054dc529b1",
+  "product_top_sha256": "4108cc1c47761085cb6ba012ea2227b8fbe5522f48b46d910342ca2c17e43735",
+  "product_release": "A10",
+  "software_abi": "v7.4",
+  "version_register": "0x1000_000a",
+  "source_of_truth_sha256": {
+    "rtl/top/ai_accel_top.v": "4108cc1c47761085cb6ba012ea2227b8fbe5522f48b46d910342ca2c17e43735",
+    "docs/spec/SPEC_ZH.md": "972daa195508970d121352c83d67bd8a15d0c2999b78c8f1194b57eb3645f19f",
+    "docs/spec/SPEC.md": "83f5fffe8cd191863c8ddb7d2e5d30e300c85e801e4ded65dd533996773c0f7c",
+    "sw/include/cimforge_regs.h": "fca41711738e92aabbc9151b747df4ddb8da31e60fd6eed6e30544582fc11678",
+    "dv/subsystem/top_smoke/sim/ai_accel.f": "8532193381f6a193cdee4b48310c67395bd2133508bf240dfb6afe4d408acc99",
+    "dv/uvm/sim/ai_accel_uvm.f": "268d5553340ffbb60570348493b18b690ce98899df1645e0643d20d92925dcd0",
+    "dv/spyglass/a8_rtl.f": "e29329254e52b70c521d74e528c00bff8001dbeb6ef2dfae1fccf10e0a09e1ed",
+    "fpga/xczu15eg/ai_accel_rtl.tcl": "dea8f871227b702b3bdcc8b0b2f8c5f41eee92b4c51366a9e4dca887b435bb31",
+    "fpga/xilinx_a7_100t/ai_accel_rtl.tcl": "a6a1e9d5b61af4e177f15028a044dd3a1c6e7acd8fd6500d753869ffb0f68e44",
+    "docs/architecture/ARCHITECTURE.md": "50b689904e7db2a302a0d86ad0757a57236688d97a435bcd2a9cf281de124314",
+    "dv/VERIFICATION_MATRIX.md": "a91e7d5351de2e50261c2bad8663011f6299e1f3fb5e584b34287a5e4a64b7bc"
+  },
+  "configuration_contract": {
+    "product_default": "4-bank behavioral scratchpad, 128 KiB default; optional capacities are separately manifested per run",
+    "matrix_architecture": "single 16x16 INT8 array; no duplicated Matrix array",
+    "gate1_standalone": "array=16x16, max_outstanding_reads=4, A-tile cache=1; detailed memory contract is in per-run CSV",
+    "gpt2_existing_evidence": "128 KiB SPAD, four banks, 512 queue entries, seed 20261116",
+    "deit_existing_evidence": "256 KiB SPAD for Round 31 16-query Product Top run",
+    "rule": "No capacity or model configuration may be inferred from another run; every run binds its exact parameter set."
+  },
+  "run_record_refs": [
+    "benchmark/verification/v1_2_integrated_p0/run_manifest.json",
+    "benchmark/verification/v1_2_integrated_p0/current_tb_replay/run_manifest.json",
+    "benchmark/gpt2_quality/results/round31_integrated_top/run_manifest.json",
+    "benchmark/performance_dominance/v1_3_gpt2_persistent_kv_analysis_manifest.json",
+    "benchmark/deit/round31/evidence/attention_output_projection_16q/run_manifest.json",
+    "benchmark/performance_dominance/v1_3_gate1_baseline/run_manifest.json"
+  ],
+  "policy": "This freeze records the unmodified baseline at source_commit_sha. Any source/ABI/config change requires a new immutable freeze and invalidates only evidence whose measured files/config changed."
+}

@@ -1,0 +1,15 @@
+{
+  "dataset_name": "Pride and Prejudice (Project Gutenberg eBook #1342)",
+  "author": "Jane Austen",
+  "source_url": "https://raw.githubusercontent.com/GITenberg/Pride-and-Prejudice_1342/master/1342-0.txt",
+  "catalog_url": "https://www.gutenberg.org/ebooks/1342",
+  "raw_sha256": "48e0522844402a86a3ea98f0947ba85ea54838db3c59022299298ed968a5a163",
+  "raw_bytes": 724725,
+  "prepared_sha256": "0f8bb9eb3b6aad9b634f46844fc3d066dca2a1c1cf5ca9cdb9bb276bce0783d5",
+  "prepared_bytes": 705004,
+  "preparation": "Decode UTF-8 after stripping BOM; extract only text between the unique Project Gutenberg START/END markers; strip leading CR/LF; encode UTF-8 with original body line endings. No vocabulary remap or character normalization.",
+  "independence_basis": "Jane Austen prose is distinct from the Tiny Shakespeare training corpus; checkpoint and package are frozen; the Bigram baseline is trained only on the first 90% of this independent text by the evaluator.",
+  "not_committed": "Third-party corpus is kept under /tmp and will not be added to the repository.",
+  "prepared_corpus_path": "/tmp/nmaforge_v13_independent_gpt2/pride_and_prejudice_body_utf8.txt",
+  "raw_corpus_committed": false
+}

@@ -1,0 +1,670 @@
+[
+  {
+    "path": "top/ai_smoke_make.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737/ai_smoke.log",
+    "raw_bytes": 126616,
+    "raw_sha256": "bb690fc6ee8976567807add25cb0a55f2d5a6db9bb64dbc96fe4b8626f3e47bb",
+    "gzip_bytes": 17448,
+    "gzip_sha256": "01184aa36e3aea17f604b065d3f61ae369af54852dad9d022f59241ad163f5fc"
+  },
+  {
+    "path": "top/ai_run20_make.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737/ai_run_seed12345.log",
+    "raw_bytes": 126124,
+    "raw_sha256": "2983cc10ffde4abbeb17fcae6e7438bd0c73104205d407baacb38bd63c328d9c",
+    "gzip_bytes": 15853,
+    "gzip_sha256": "e310ae2e26d4e553838ad6da7659391b8ae5e809e71504b5ed18603a6e6acd8e"
+  },
+  {
+    "path": "top/ai_smoke_compile.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/ai_smoke_compile.log",
+    "raw_bytes": 8326,
+    "raw_sha256": "6589d65ae9ce49ecd8262209a9532118c46e74836d7ee06d516d3bd8ddf1430d",
+    "gzip_bytes": 2378,
+    "gzip_sha256": "b53671fbedb6409f2293ea0006d3faf09367b6139d748872d89d282c8a8ab207"
+  },
+  {
+    "path": "top/ai_smoke_sim.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/ai_smoke_run.log",
+    "raw_bytes": 116394,
+    "raw_sha256": "7320845c9aa7db47f1e226c0ebd8c2c5b2996e9fb420a4c7f25b44f66c4ad802",
+    "gzip_bytes": 14320,
+    "gzip_sha256": "9f173500cd949b6950a88f9f5830b14229869a5b791243551dd24d8e7b787af2"
+  },
+  {
+    "path": "top/ai_run20_sim.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/ai_run20_run.log",
+    "raw_bytes": 125812,
+    "raw_sha256": "f7f2423d5a9cc1fd123bec11016c65b72b7be014ad126a4683ceaf18f0374386",
+    "gzip_bytes": 15655,
+    "gzip_sha256": "7aa76c963e88c27f8d521af2c941024dd1cec1e759725bb8749c6fba8603285b"
+  },
+  {
+    "path": "cluster_128/compile.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737/cluster_128/compile.log",
+    "raw_bytes": 43976,
+    "raw_sha256": "d3b47831aaded09f984628a646ed6b8fff39fd7c5c5692a7940f2257e4072329",
+    "gzip_bytes": 4408,
+    "gzip_sha256": "8f0b889ba0f449e2b7e4fa8761bf1702758687bf7a26e84d97acdd04ee8b7d71"
+  },
+  {
+    "path": "cluster_128/seed_20261124_run.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737/cluster_128/seed_20261124/run.log",
+    "raw_bytes": 2734037,
+    "raw_sha256": "addbd0e38f70f628dc5b697fa4460ab4905349b506dac4a56be4614b43f29cd6",
+    "gzip_bytes": 106346,
+    "gzip_sha256": "2237df8a36312bf5d6b1b263917cab074f8701b6b0da11b83ed6f45b7ef86d34"
+  },
+  {
+    "path": "cluster_128/urg_merged.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737/cluster_128/urg_merged.log",
+    "raw_bytes": 519,
+    "raw_sha256": "72afcfebb8bc3e3d3c15404de5e45c91533d3d2304ea675a28456501cab7922f",
+    "gzip_bytes": 276,
+    "gzip_sha256": "afeb7144672f4f1575b138014d32442e2375e8cd48d64acad9eb120b6d8ffe72"
+  },
+  {
+    "path": "cluster_128/make.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737/cluster_128_make.log",
+    "raw_bytes": 2780072,
+    "raw_sha256": "46f39900b0db6331080f7d912060186eaafe0060df97793dfb70deac9f22668d",
+    "gzip_bytes": 112712,
+    "gzip_sha256": "e7d5bb07cceecffe480843a9646ea8ca74f92ff2281561170abea4c6294ec2f2"
+  },
+  {
+    "path": "cluster_256/compile.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_256/compile.log",
+    "raw_bytes": 44023,
+    "raw_sha256": "07b4b6ed0d8f815aeb14673b162e197b5d4dbd86d5bce128b5a1302274e0217e",
+    "gzip_bytes": 4419,
+    "gzip_sha256": "0b3ae5dc5202ad24b5ccc55984f338147576efcf5a0f37c4d55b5f6e3ee6b7fa"
+  },
+  {
+    "path": "cluster_256/seed_20261124_run.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_256/seed_20261124/run.log",
+    "raw_bytes": 2734049,
+    "raw_sha256": "9d2e8efafb582a60a8fa2c22025617b0890814058b1664605a2e41888504121c",
+    "gzip_bytes": 106354,
+    "gzip_sha256": "6f18da94348611d894c8a763ff963b7ec030e27b72d18849ff71a8747b3132e4"
+  },
+  {
+    "path": "cluster_256/urg_merged.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_256/urg_merged.log",
+    "raw_bytes": 539,
+    "raw_sha256": "9e6d58784efaf56e5388e15e71079af0a4d609ddaa85e210e08852f41117784c",
+    "gzip_bytes": 279,
+    "gzip_sha256": "0fdd2e1132f3d326f868cd5e87ee1cc84d4e28fd14d4287ca1cc9bf5ab75e8e9"
+  },
+  {
+    "path": "cluster_256/make.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_256_make.log",
+    "raw_bytes": 2780133,
+    "raw_sha256": "acf7146fc7c719a20fa7d4c3376bf3992172ca68444851f2c71dc55f498f30dd",
+    "gzip_bytes": 112724,
+    "gzip_sha256": "f8226fb90dd00d793975459d14ab8a4e3bcd27c3f0abcb2a4f8173f2f4a88817"
+  },
+  {
+    "path": "cluster_512/compile.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_512/compile.log",
+    "raw_bytes": 44023,
+    "raw_sha256": "8a1f1a74859702ddec957ac4f946b9af9b1869d86f03d82ca09c02e8c7dedc7d",
+    "gzip_bytes": 4420,
+    "gzip_sha256": "d6cae313722d2a272e99b9c896d87fc5242075a2e89a02ca9ad3e307e5fb8a6e"
+  },
+  {
+    "path": "cluster_512/seed_20261124_run.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_512/seed_20261124/run.log",
+    "raw_bytes": 2734049,
+    "raw_sha256": "8f5caeccee101cc639251c97b69441b1af3a4ae84e51b8842f94e57d0bd65761",
+    "gzip_bytes": 106352,
+    "gzip_sha256": "d1982dddb49e48d35cba1394e43b560546c05c992428b67f12a9fc69320c5f88"
+  },
+  {
+    "path": "cluster_512/urg_merged.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_512/urg_merged.log",
+    "raw_bytes": 539,
+    "raw_sha256": "b6f346ba4463f81a56eb989244412efa3433ead1c606a2cd3903a6a378547d74",
+    "gzip_bytes": 278,
+    "gzip_sha256": "6267a9c0ea3327c516330f32eec37a2449232a007a8757568a697742cf39d99f"
+  },
+  {
+    "path": "cluster_512/make.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_512_make.log",
+    "raw_bytes": 2780133,
+    "raw_sha256": "939a866965bdb5eb2036e13f43a402b3dd9189ba7f2f14ea6f397b16f56cfd7a",
+    "gzip_bytes": 112724,
+    "gzip_sha256": "1c4e680eeb87a1be17f48b637d8296924b48579a27533776aa2ecb3de427f0f2"
+  },
+  {
+    "path": "matrix/gemm_compile.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/matrix_gemm/compile.log",
+    "raw_bytes": 3703,
+    "raw_sha256": "4b7e8c42291958e713406f74ce224844d8c0e92f151ac21b06200e75ebe60d4e",
+    "gzip_bytes": 1491,
+    "gzip_sha256": "1a773ef5fbb43647faf97bd1cd43a6fb23728414a866e35a3fcd766ffea8f35b"
+  },
+  {
+    "path": "matrix/gemm_fixed_seed20261122.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/matrix_gemm/gemm_fixed_s20261122.log",
+    "raw_bytes": 4557,
+    "raw_sha256": "d9d1bc26449b03eb32e14db4d04f7f364bca6a9f8c32e835a18baa7133a668b2",
+    "gzip_bytes": 1362,
+    "gzip_sha256": "c84047c82b2c7fcb659504114099b5b707489d2ab9f5069b47a9ec70b6db54a4"
+  },
+  {
+    "path": "matrix/gemm_seeded_seed20261122.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/matrix_gemm/gemm_seeded_s20261122.log",
+    "raw_bytes": 4496,
+    "raw_sha256": "d4235ade984f0297806fe0c2d251aaeb8fc3a7a771e216f2d2d02e99b97eb6f4",
+    "gzip_bytes": 1410,
+    "gzip_sha256": "4d1c36eade8bc228cec0989585e9919aa744641c6c2dd87e3d8d218ddbfaca75"
+  },
+  {
+    "path": "matrix/gemm_seeded_seed20261124.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/matrix_gemm/gemm_seeded.log",
+    "raw_bytes": 4484,
+    "raw_sha256": "eed9f9e75716be08bfc4d7650938ea7e8ebcf87b65811da933f48aafc152a800",
+    "gzip_bytes": 1404,
+    "gzip_sha256": "fecb4ebf63176279ef2b325c78a5208f13bc389fe618748db03fe55fed304a00"
+  },
+  {
+    "path": "matrix/gemv_prefetch0_compile.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/matrix_gemv_p0/compile.log",
+    "raw_bytes": 3724,
+    "raw_sha256": "a328b2d3bd7be80a475247104e92acde1185b1de62816d8c550c15139d37314e",
+    "gzip_bytes": 1499,
+    "gzip_sha256": "0132f26df2626ab42b9c7cf71a01a33517ac229a952addefd3463a10a00d4844"
+  },
+  {
+    "path": "matrix/gemv_prefetch0_seed20261122.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/matrix_gemv_p0/run_s20261122.log",
+    "raw_bytes": 1837,
+    "raw_sha256": "2a04bbe4dfd2c51b19ac60b86fe9df6a7ef3c97d172aab75b53965fc051dbc1a",
+    "gzip_bytes": 767,
+    "gzip_sha256": "7b673d284a305a19982be5a324424090b286e0370e9d1d8dd72346af6bc09c8a"
+  },
+  {
+    "path": "matrix/gemv_prefetch1_compile.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/matrix_gemv_p1/compile.log",
+    "raw_bytes": 3724,
+    "raw_sha256": "fb6f0a32b9f45fb464f02804aa6691daf1c060ef76b115e720eb58045bd42f55",
+    "gzip_bytes": 1497,
+    "gzip_sha256": "1ba806810efbd044541e70974743badb5ad08ba2f124dfb9b35884cec7de2ec9"
+  },
+  {
+    "path": "matrix/gemv_prefetch1_seed20261122.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/matrix_gemv_p1/run_s20261122.log",
+    "raw_bytes": 1837,
+    "raw_sha256": "80ba060e5f94fe69b0631ed0dbdb355217f3d8d795e36f96bac88d1f6ed4d6d1",
+    "gzip_bytes": 769,
+    "gzip_sha256": "4806e1d777433b3f942cec418c0171214b5fdd5d7bfb65069103656092ce62d0"
+  },
+  {
+    "path": "formal/serial_make.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/formal_serial_make.log",
+    "raw_bytes": 19940,
+    "raw_sha256": "f12a08d585ade115024383f86b32ed424b91e293c399f2b5823ff3e179f7bf87",
+    "gzip_bytes": 4213,
+    "gzip_sha256": "b3e9a3b09413fd726ac9473be573c6e8c30ddd21b7c5547f69de560859797535"
+  },
+  {
+    "path": "formal/serial_vc_formal.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/formal_serial/vc_formal.log",
+    "raw_bytes": 17770,
+    "raw_sha256": "b2fdc0b0d3676e487f2856781fc7d0f01650453f67947d7b3f271dd72694ca66",
+    "gzip_bytes": 3846,
+    "gzip_sha256": "cc78a7ab303a2af61a90ffc5d8d8eb8f8ac28b0e3a8cf31d8108157b632c18ce"
+  },
+  {
+    "path": "formal/dispatcher_timeout300_make.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/formal_dispatcher_make.log",
+    "raw_bytes": 9062,
+    "raw_sha256": "014bf6c8e902cf1abb00cb57d3d44b990f1a875604c148c1e4cc6bc5df47c3e3",
+    "gzip_bytes": 2793,
+    "gzip_sha256": "c750b87208c493b2786163a4183483aa650e36776150dd4369c12e63a8cfd72d"
+  },
+  {
+    "path": "formal/dispatcher_timeout300_vc_formal.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/formal_dispatcher/vc_formal.log",
+    "raw_bytes": 8268,
+    "raw_sha256": "76f92cc35b826003db9d57a11b27d66cb101eb8767c266e014ea5dabc1f412ab",
+    "gzip_bytes": 2621,
+    "gzip_sha256": "ca60df11d75de3caab1746dfac0f478d69dbb622616eee1a2ead9df705e84392"
+  },
+  {
+    "path": "formal/dispatcher_retry900_make.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/formal_dispatcher_retry_make.log",
+    "raw_bytes": 32715,
+    "raw_sha256": "3f0ad68cc92c2c028ab11312bba59824c5a305baf96d8305c20266aa0960ffc1",
+    "gzip_bytes": 4294,
+    "gzip_sha256": "027c6c7e07b44e57513c75f018559b68dae7f4091efcc574280eb80676625db7"
+  },
+  {
+    "path": "formal/dispatcher_retry900_vc_formal.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/formal_dispatcher_retry/vc_formal.log",
+    "raw_bytes": 31580,
+    "raw_sha256": "8fe1653200fb9502ccd0da8561c1a793f0e588c46e890a818af18fac901b2fa5",
+    "gzip_bytes": 3933,
+    "gzip_sha256": "19b3822cc566ef0925158c2b2d88295e33cf89b6d5f149c994a1aaaa2cd4faf5"
+  },
+  {
+    "path": "cluster_mutation/make.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation_make.log",
+    "raw_bytes": 1631,
+    "raw_sha256": "476af918866bc68668908d5a2322d11a45c53fb2b50bbda062178d332fd66ee3",
+    "gzip_bytes": 549,
+    "gzip_sha256": "473b8adac385e28c91f3c9936fd03c793d9af3b5639e8c6a58957ce9e047feec"
+  },
+  {
+    "path": "cluster_mutation/summary.txt",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/summary.txt",
+    "bytes": 1120,
+    "sha256": "5e531450c354a06c668fbfe845d47681170dd310586d9f47927798aa99f9017b"
+  },
+  {
+    "path": "cluster_mutation/address/compile.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/address/compile.log",
+    "raw_bytes": 44262,
+    "raw_sha256": "a68c35194473285e57e6731b24d1fd975272b0c45858f631bd52c112499e4697",
+    "gzip_bytes": 4409,
+    "gzip_sha256": "72775f6f88ff3a40203c249cbe26b991f406a9c234c9c13d7586b4e008d9287d"
+  },
+  {
+    "path": "cluster_mutation/address/run.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/address/run.log",
+    "raw_bytes": 3641,
+    "raw_sha256": "4850408739f1ec37b56352dc624140ca68033209054d34af67f7b1b274dbce6c",
+    "gzip_bytes": 1449,
+    "gzip_sha256": "edcdc980ad5efc882576f8a5873ff6e7ac7ed6ee4f251bdaeee7118b6c12c78f"
+  },
+  {
+    "path": "cluster_mutation/address/compile.stdout.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/address/compile.stdout.log",
+    "raw_bytes": 43868,
+    "raw_sha256": "48cd10c2cd09cc025e93d84e860bcd4e764ccbf3abe9a2946beeaa64fd7862d0",
+    "gzip_bytes": 4202,
+    "gzip_sha256": "7038661a5189ac2080701a9f32efd345628206f2eb4615c0b2bb3e962717278b"
+  },
+  {
+    "path": "cluster_mutation/address/run.stdout.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/address/run.stdout.log",
+    "raw_bytes": 3706,
+    "raw_sha256": "fe5c27d95e7a76167ef03ea4d78185f219246f41aaa2a2000e1f85ac4b63d61f",
+    "gzip_bytes": 1533,
+    "gzip_sha256": "aaf5fa7706d47fc41ba909763bb0a188c08d63b2ae818cbf8dda12cd4faf977b"
+  },
+  {
+    "path": "cluster_mutation/data/compile.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/data/compile.log",
+    "raw_bytes": 44229,
+    "raw_sha256": "71c0ab896258421130cf0fb7fc50677f1adc051cea6990cccc298b49efe64c10",
+    "gzip_bytes": 4404,
+    "gzip_sha256": "daf924452adc0363d3de61e3e091c2fe7ceeaa4fb206c3815b3f5a8aa27a2ecf"
+  },
+  {
+    "path": "cluster_mutation/data/run.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/data/run.log",
+    "raw_bytes": 3385,
+    "raw_sha256": "8991fcc575b28c2352441fcdf5531b105f26c6f3a59ba4399c6a255bf99d898c",
+    "gzip_bytes": 1352,
+    "gzip_sha256": "f156b29477e2fe243be7b15a904174dfd374f28d7b5622975d52c29d0d736620"
+  },
+  {
+    "path": "cluster_mutation/data/compile.stdout.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/data/compile.stdout.log",
+    "raw_bytes": 43841,
+    "raw_sha256": "718aa95c36173e98a95642b976763e0eea24989f6d45ab045f8b6d3b51c8f8ea",
+    "gzip_bytes": 4193,
+    "gzip_sha256": "d221ef7f21965ca261590aed10d51f12f14ffb4a79fe040c52450501f2fc3595"
+  },
+  {
+    "path": "cluster_mutation/data/run.stdout.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/data/run.stdout.log",
+    "raw_bytes": 3459,
+    "raw_sha256": "34ff351264917fe6516585d8912c4df90f44bba578ed5b226d25a582cb378040",
+    "gzip_bytes": 1438,
+    "gzip_sha256": "94e83a8b6bcd57e9f8290e30b397e1b589c2179d7e3fdd8bdda20c2960b23661"
+  },
+  {
+    "path": "cluster_mutation/response_owner/compile.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/response_owner/compile.log",
+    "raw_bytes": 44347,
+    "raw_sha256": "d1faae54a3bad6dff27a74ba62898872c957c0791b58104161a6be1280f3c7ea",
+    "gzip_bytes": 4419,
+    "gzip_sha256": "b1eeb93148e3d0fcd70f3b6b8203f2f503211915ec2229433224a9111b220280"
+  },
+  {
+    "path": "cluster_mutation/response_owner/run.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/response_owner/run.log",
+    "raw_bytes": 3099,
+    "raw_sha256": "5813e9da813f9c5dd9fc6f511d3b3bdb1b9c02ecfa13c9d333c8098dc9c36f0b",
+    "gzip_bytes": 1276,
+    "gzip_sha256": "616b64bd5ba76f47a896be996ec7bfe51bb441192ebca523548bc409c6be3101"
+  },
+  {
+    "path": "cluster_mutation/response_owner/compile.stdout.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/response_owner/compile.stdout.log",
+    "raw_bytes": 43931,
+    "raw_sha256": "a061c93fa1921d5f82093221231750b0cc248fef597fc63ae7459e7fddd38d80",
+    "gzip_bytes": 4199,
+    "gzip_sha256": "07dc6f7b0a7caaa2a8622c648d0d6873a464295431cfc66f1355976e3ce83f75"
+  },
+  {
+    "path": "cluster_mutation/response_owner/run.stdout.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/response_owner/run.stdout.log",
+    "raw_bytes": 3143,
+    "raw_sha256": "73cbb8c061bc4ec898459b16dd89f85c711e6f851ff3c1bad203a3fe560e18de",
+    "gzip_bytes": 1359,
+    "gzip_sha256": "9bf07cfcab156770acfcba640b706458a64bc0c2eec7028d714de0e98ed643d6"
+  },
+  {
+    "path": "cluster_mutation/wstrb/compile.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/wstrb/compile.log",
+    "raw_bytes": 44244,
+    "raw_sha256": "e1b34078c9ba7b7ba2bef72a328a4a7e64e2cbb265dec2f9b316f5b5ea3acb6a",
+    "gzip_bytes": 4369,
+    "gzip_sha256": "4e19a938270a592b26068ab288c89c1a3e2cf9b27ba3f55b3e4a48da3eb3db80"
+  },
+  {
+    "path": "cluster_mutation/wstrb/run.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/wstrb/run.log",
+    "raw_bytes": 30393,
+    "raw_sha256": "f21922784afca6056f34ec87818c00cdd3ee2331edd09d47f9e255789b2f1761",
+    "gzip_bytes": 2680,
+    "gzip_sha256": "ad781d1ceb82bb4978455eb29fa8fc75bca0599c147d63fcc444a244625542cd"
+  },
+  {
+    "path": "cluster_mutation/wstrb/compile.stdout.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/wstrb/compile.stdout.log",
+    "raw_bytes": 43854,
+    "raw_sha256": "58cf7b723beea01f3d37d26def3fafc226923925a81cac0ec25ed3710da63455",
+    "gzip_bytes": 4202,
+    "gzip_sha256": "8fac6e24afbf16b81799b1028026e89fe9b74d2dffb01a12b681db8ce1c2f62f"
+  },
+  {
+    "path": "cluster_mutation/wstrb/run.stdout.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/wstrb/run.stdout.log",
+    "raw_bytes": 30464,
+    "raw_sha256": "c7d1f5392012fb71db1305d473eb287ca5022e69438c8ffc5b9f85dd1c1c353e",
+    "gzip_bytes": 2774,
+    "gzip_sha256": "5dff7360c07deab07ad16679d0ed7fb015425e72b234937dfed6b93e3619ce65"
+  },
+  {
+    "path": "cluster_mutation/completion_error/compile.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/completion_error/compile.log",
+    "raw_bytes": 44376,
+    "raw_sha256": "fe60dad76488c7fe05aa93f7adfa5dc05cd2c679d27ca56e46e8fd83618ea0e9",
+    "gzip_bytes": 4367,
+    "gzip_sha256": "4c74a038950d51161afc1768f34646247803c40bcd85231c51d64d7eaf5cc019"
+  },
+  {
+    "path": "cluster_mutation/completion_error/run.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/completion_error/run.log",
+    "raw_bytes": 3463,
+    "raw_sha256": "3bff516011e05e98ef6c145592728532f6a59af09593d946476de8d4c48d1759",
+    "gzip_bytes": 1366,
+    "gzip_sha256": "155a8e0cf416d9fd6fd4e53393a63738763ea636368b4bed5fee9ac44abd561f"
+  },
+  {
+    "path": "cluster_mutation/completion_error/compile.stdout.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/completion_error/compile.stdout.log",
+    "raw_bytes": 43954,
+    "raw_sha256": "0e4058e5397e743fdcdd504d96b610910c260291bed54b05311b96693faa0dc9",
+    "gzip_bytes": 4199,
+    "gzip_sha256": "ba475807bf814bb0468cfd778fd9e509ae70b86becbdfa74cbc3537c541e02dc"
+  },
+  {
+    "path": "cluster_mutation/completion_error/run.stdout.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/completion_error/run.stdout.log",
+    "raw_bytes": 3501,
+    "raw_sha256": "a3a1b5ed30a09bcbfb79b6328c9dfb53bd968cbf7ca79c531146349233d7f635",
+    "gzip_bytes": 1447,
+    "gzip_sha256": "18ef1e7179c547c854d614900a87ee205fb17fa92f018d07e2d69194171187d6"
+  },
+  {
+    "path": "cluster_mutation/missing_done/compile.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/missing_done/compile.log",
+    "raw_bytes": 44323,
+    "raw_sha256": "ef4a633750b2c7b03644eac998e99dddee7c0b5108dc8bd1d5fbbd61fcf4d7cb",
+    "gzip_bytes": 4419,
+    "gzip_sha256": "a72862833d9c182079a202aa4849cd006e8eb3d110c2a84c0f0105bab8c4e2d0"
+  },
+  {
+    "path": "cluster_mutation/missing_done/run.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/missing_done/run.log",
+    "raw_bytes": 3584,
+    "raw_sha256": "54d7413fa28ed5ca0f50ee83c9cdff718c5b18635436a0167fce6d4bde5578c4",
+    "gzip_bytes": 1408,
+    "gzip_sha256": "f1ed2cf763355e59094fcd833f24002795acd5c5db7a084b7de785d6f0e4ae94"
+  },
+  {
+    "path": "cluster_mutation/missing_done/compile.stdout.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/missing_done/compile.stdout.log",
+    "raw_bytes": 43913,
+    "raw_sha256": "e0e5dea3c4e8006f125748aa3a5c49a7fd9955f3165d91dfd30352746ef3da43",
+    "gzip_bytes": 4206,
+    "gzip_sha256": "21f91ab66f600ee4fef1027818894480053e004009808477206a43ffd655378f"
+  },
+  {
+    "path": "cluster_mutation/missing_done/run.stdout.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/missing_done/run.stdout.log",
+    "raw_bytes": 3634,
+    "raw_sha256": "0fb343cbb8ec480b55d5079f94c5be19c29ecd3b334a68f37a417487bb07baa1",
+    "gzip_bytes": 1490,
+    "gzip_sha256": "afd250ec94c452e89aabb762c96e571e8a65f34fd21e027af16fdef7466a4605"
+  },
+  {
+    "path": "cluster_mutation/duplicate_done/compile.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/duplicate_done/compile.log",
+    "raw_bytes": 44347,
+    "raw_sha256": "6d09b944f5719cdb8251da5e355034d0c8a9de31d1298b1b85c2fd8fcc26ab13",
+    "gzip_bytes": 4419,
+    "gzip_sha256": "f4b1a6cec3ce0aac50ed1146968d8537b1085e028a9ca2dae8d85d2672577f32"
+  },
+  {
+    "path": "cluster_mutation/duplicate_done/run.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/duplicate_done/run.log",
+    "raw_bytes": 2226595,
+    "raw_sha256": "c079f8f32f7743f93de468b9793abe3b50931ae593001044a5aeddd95ba3e2de",
+    "gzip_bytes": 72817,
+    "gzip_sha256": "165b3235345bd94de927d1e9b059580580844753dd4ba0e26087260703ab1ce8"
+  },
+  {
+    "path": "cluster_mutation/duplicate_done/compile.stdout.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/duplicate_done/compile.stdout.log",
+    "raw_bytes": 43931,
+    "raw_sha256": "41685f7f0e09ebfc5b8cb0ae52b05b9788c3b3bc750e93dcfdd877bee4974f3e",
+    "gzip_bytes": 4206,
+    "gzip_sha256": "91e333638d91c2dea0ff16bcb8b7e60d2aef69e746b3f0376f3dc27a12ae7e8e"
+  },
+  {
+    "path": "cluster_mutation/duplicate_done/run.stdout.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation/duplicate_done/run.stdout.log",
+    "raw_bytes": 2226639,
+    "raw_sha256": "3d8f80aa50a9c1c8a56d388d80c401696d5fbac8ccc8e0f839c93af519797ae3",
+    "gzip_bytes": 72932,
+    "gzip_sha256": "09fc4d87a2d3ece3e0f158a720943ce3888a50ab4791e8dfcae5d1787e29fd35"
+  },
+  {
+    "path": "cnn/legacy/compile.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cnn_legacy/compile.log",
+    "raw_bytes": 9880,
+    "raw_sha256": "7d1efd9cc4854f20290235b19bff554818164ec55574b57079bb0d6a642ce024",
+    "gzip_bytes": 2563,
+    "gzip_sha256": "5bce5f60dce89377b86b71a49d9d83c539f1766d372c52597ab67d8debf458c0"
+  },
+  {
+    "path": "cnn/legacy/run.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cnn_legacy/run.log",
+    "raw_bytes": 2773,
+    "raw_sha256": "45f3971acd2cb39c2a55e688bc11140a1eb97c2d805e1a84381d42d26ee4de72",
+    "gzip_bytes": 1155,
+    "gzip_sha256": "6c323ac67f803eaddac31e5f8c7b8e3fd648f26699cc9a4b78a8fe81f9b474eb"
+  },
+  {
+    "path": "cnn/legacy/make.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cnn_legacy_make.log",
+    "raw_bytes": 14075,
+    "raw_sha256": "aeed35c7397fafddf256166e4a17bce3eef1c1ac71159cb55b9a57f990c441d1",
+    "gzip_bytes": 4017,
+    "gzip_sha256": "cb5ee471bbb3b2b641721b6ae2d98c3ba98da4a9cee5849c09988ac96964929d"
+  },
+  {
+    "path": "cnn/legacy/workload/manifest.json",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cnn_legacy/workload/manifest.json",
+    "bytes": 2129,
+    "sha256": "44af22c76ba2b05e2bb044230bc51daa71d00369aa226055df544fa782b8a2eb"
+  },
+  {
+    "path": "cnn/legacy/workload/model_memory.memh.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cnn_legacy/workload/model_memory.memh",
+    "raw_bytes": 409257,
+    "raw_sha256": "bd2dbed180dae0e996a6bd1a0a049eb642da81858c6ed7f033802d69647a61bd",
+    "gzip_bytes": 65978,
+    "gzip_sha256": "ddf3bebf70df5afc5ca3b0d9adeaa52bf6e6e6a77edd55f97e472bb961be439f"
+  },
+  {
+    "path": "cnn/legacy/workload/model_golden.memh.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cnn_legacy/workload/model_golden.memh",
+    "raw_bytes": 368649,
+    "raw_sha256": "3751998e65e40ad1ffe03106baf732f9d9c83dfb051ed160dda365e21319b2fc",
+    "gzip_bytes": 97208,
+    "gzip_sha256": "63b2320384e133d08269f2b133f9a7022546d9a673d65409fd5774d4af7bd7e6"
+  },
+  {
+    "path": "cnn/first/compile.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cnn_first/compile.log",
+    "raw_bytes": 9868,
+    "raw_sha256": "4ae4d45651bfc94e3bd75b85b80eab91fbe71a042852eb34bb37a1d32258e56e",
+    "gzip_bytes": 2558,
+    "gzip_sha256": "ab6fc5a5528bfc320a10c9114446707c01b6d5bfbfac80b08d04dd27a71b784b"
+  },
+  {
+    "path": "cnn/first/run.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cnn_first/run.log",
+    "raw_bytes": 2521,
+    "raw_sha256": "b92e498785b2c357c308810930aa23ac8062dd13adbb25c18faef1a61667f871",
+    "gzip_bytes": 1137,
+    "gzip_sha256": "5c9cdec35406be2fe1bddfa9f9b9e7f848d28be44a9726a4bc8ab1930d6e7d6f"
+  },
+  {
+    "path": "cnn/first/make.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cnn_first_make.log",
+    "raw_bytes": 13805,
+    "raw_sha256": "a1e3178a4269612386bbc0d76f0d17be7027b16a6817fdf92ef26e53ea556360",
+    "gzip_bytes": 3997,
+    "gzip_sha256": "d2c8e217acd39d9b1231af907197778781fe76413867739730c8d6f59783bea8"
+  },
+  {
+    "path": "cnn/first/workload/manifest.json",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cnn_first/workload/manifest.json",
+    "bytes": 2128,
+    "sha256": "af2ceedeef872a81c7a02eb6ef9e55885a7ae214234d16aeb5e29d5b332b900d"
+  },
+  {
+    "path": "cnn/first/workload/model_memory.memh.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cnn_first/workload/model_memory.memh",
+    "raw_bytes": 408897,
+    "raw_sha256": "4d73c41b17170153f070dacaeb8d632645c3446328a389a3b29ffd808d301c93",
+    "gzip_bytes": 65921,
+    "gzip_sha256": "34ba5211beb80fe92953226087f971b9f35658de3cc508918e3db420d772055a"
+  },
+  {
+    "path": "cnn/first/workload/model_golden.memh.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cnn_first/workload/model_golden.memh",
+    "raw_bytes": 368649,
+    "raw_sha256": "65874af21578e6d52699c68577618caf56d75765bebbc9586d6c71ee341ac5bb",
+    "gzip_bytes": 85248,
+    "gzip_sha256": "eac10af15fd70ea165fc2116105c2cb33031f9eaf1b147a2fa56e8d4008ecf56"
+  },
+  {
+    "path": "cnn/both/compile.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cnn_both/compile.log",
+    "raw_bytes": 9859,
+    "raw_sha256": "926bbe7e6aeb90d8f9e93fbd741f4972027f2a31b844a790992fb2db47989c9c",
+    "gzip_bytes": 2559,
+    "gzip_sha256": "6955557d25c193f0803eba04935eb119c965a05eb82a2379b197fd569655b37b"
+  },
+  {
+    "path": "cnn/both/run.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cnn_both/run.log",
+    "raw_bytes": 2263,
+    "raw_sha256": "fea5cc03dab75ce69560a02c860ac7a185c976122c78fcb24500ddbbe1afac91",
+    "gzip_bytes": 1011,
+    "gzip_sha256": "8437b6dd267adff5bd4c9d0240465888792e04e467cd9c3541b98e6b642a7b4a"
+  },
+  {
+    "path": "cnn/both/make.log.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cnn_both_make.log",
+    "raw_bytes": 13523,
+    "raw_sha256": "83b106a93f6042ee89684e71f87bd5538c8fa6e5b34402ad2b8f23c1f188cd93",
+    "gzip_bytes": 3878,
+    "gzip_sha256": "023bf137e7b7b6282d111bedfff27ceca3ce22595ecb1a447c83aa97fb4b631a"
+  },
+  {
+    "path": "cnn/both/workload/manifest.json",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cnn_both/workload/manifest.json",
+    "bytes": 2122,
+    "sha256": "1b687a8604844b66ef4a6ff8fb8ae8a94de5b16073a933ada5caf79feb4163b7"
+  },
+  {
+    "path": "cnn/both/workload/model_memory.memh.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cnn_both/workload/model_memory.memh",
+    "raw_bytes": 408537,
+    "raw_sha256": "6000796835438b998b477d574ab8a5497cbf09508b6464fb07886642a0adfaac",
+    "gzip_bytes": 65849,
+    "gzip_sha256": "013b195a58f10fa16687d48a73f6a6a40ccfb542c494d7266b16ea106bbe24fd"
+  },
+  {
+    "path": "cnn/both/workload/model_golden.memh.gz",
+    "source_path": "/tmp/nmaforge_v13_current_8737fa1c/cnn_both/workload/model_golden.memh",
+    "raw_bytes": 368649,
+    "raw_sha256": "31e1f2f469219b42e513cedbbc19bbc3332d0d560b107999747daffd2d68f86d",
+    "gzip_bytes": 70521,
+    "gzip_sha256": "d03e0211ce72cad85a2bcca9357da657a36456d1457127953ba448b59ddb61b9"
+  },
+  {
+    "path": "gpt2/software_quality_eval.json",
+    "source_path": "/tmp/nmaforge_v13_independent_gpt2/software_quality_eval_retry.json",
+    "bytes": 14509,
+    "sha256": "ff6f72aa4bc298f8540324904fe4e987e61c5f7ab8d0b6fa32ffbe434ba8b86f"
+  },
+  {
+    "path": "gpt2/software_quality_eval.stdout.log.gz",
+    "source_path": "/tmp/nmaforge_v13_independent_gpt2/software_quality_eval_retry.log",
+    "raw_bytes": 728,
+    "raw_sha256": "c739261484cd2f508b92014776c29469830aad4ee7644542bda13ba27896beab",
+    "gzip_bytes": 492,
+    "gzip_sha256": "86a69fc2a176f18046c37b4729972224f76c7fa5d17ce1fc59ffeb17ed028dbb"
+  },
+  {
+    "path": "gpt2/first_attempt_checkpoint_schema_error.log.gz",
+    "source_path": "/tmp/nmaforge_v13_independent_gpt2/software_quality_eval.log",
+    "raw_bytes": 408,
+    "raw_sha256": "90b849ba5e131000dbaaa4ecf89fd8571fe1c0f4536256def2e817f42f3b736f",
+    "gzip_bytes": 222,
+    "gzip_sha256": "296a703abdf09155305a4455593cefc006dc7966f925a172b6b5aef3ad2b06f5"
+  },
+  {
+    "path": "gpt2/dependency_install.log.gz",
+    "source_path": "/tmp/nmaforge_v13_independent_gpt2/install_dependencies.log",
+    "raw_bytes": 6448,
+    "raw_sha256": "ccd2070aed2c3ba0251cd1f7ca3da678be9be74e26832ad1e8e15769bc35cd64",
+    "gzip_bytes": 1505,
+    "gzip_sha256": "1158a716427fbf4de5a78a9ff907ea87e1d2b900ecfd3411a5aa47bc3160d504"
+  },
+  {
+    "path": "gpt2/python_freeze.txt",
+    "source_path": "/tmp/nmaforge_v13_independent_gpt2/python_freeze.txt",
+    "bytes": 182,
+    "sha256": "bbb1287daadddb4a568c47d84ceb901043a0681c92e9402dba83ec9b4b648a05"
+  },
+  {
+    "path": "gpt2/environment_attempt_no_numpy.log.gz",
+    "source_path": "/tmp/nmaforge_v13_independent_gpt2/evaluate.log",
+    "raw_bytes": 211,
+    "raw_sha256": "880a0a98a25ab4c3b2d773f9d8ac305c3580e70798f3ed53d26d69e0a83ee4ee",
+    "gzip_bytes": 190,
+    "gzip_sha256": "8dfb4d9ee66f190973e28ac4ac7675b5d57d96561cf3a01f3636a4e0ed0444a4"
+  }
+]

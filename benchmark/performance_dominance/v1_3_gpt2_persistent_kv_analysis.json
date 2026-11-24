@@ -1,0 +1,122 @@
+{
+  "status": "DERIVED_FROM_EXISTING_PRODUCT_TOP_RUNS_NO_NEW_SIMULATION",
+  "paired_run_id": "NMAFORGE-V1.2-ROUND31-GPT2-PERSISTENT-KV-20261124",
+  "product_rtl_tree_sha": "d952771394c3743dd106d61b595c41054dc529b1",
+  "prefix_source_sha": "9c6c9dbfcc7ba2b701446dbdbbdf670663564dc9",
+  "persistent_source_sha": "5c8952b189c3831d45e41fa2ea3c389c83533b21",
+  "abi": "SPEC v7.4 unchanged",
+  "model_package_sha256": "d9ff47c56a4ddc335a34d601d2083cfa2967d179b6aa617fdb25e484a9af3bb4",
+  "configuration": {
+    "seed": 20261116,
+    "prompt_tokens": [
+      1,
+      7,
+      42,
+      3
+    ],
+    "generated_tokens": [
+      65,
+      82,
+      68,
+      89
+    ],
+    "generated_steps": 4,
+    "spad_kib": 128,
+    "ai_spad_words_per_bank": 8192,
+    "banks": 4,
+    "queue_entries": 512,
+    "clock_period_ns": 10.0,
+    "simulator": "Synopsys VCS V-2023.12-SP1_Full64",
+    "python": "3.12.13",
+    "numpy": "2.5.4"
+  },
+  "timing_boundary": {
+    "metric": "sum of H64_AR_FOUR_LAYER_CONTEXT_PASS cycles for contexts 1..3",
+    "includes": "descriptor publication and Product Top execution until completion retirement for all four layers",
+    "excludes": "host embedding/position writes and model-weight uploads before each measured layer; training, process start-up and app-level tokenization",
+    "application_e2e_latency": "NOT_MEASURED"
+  },
+  "input_artifacts": {
+    "benchmark/gpt2_quality/results/round31_integrated_top/persistent_kv_vs_prefix_recompute.csv": "0c643eff6223ae2882577dc6678ca9ef8efa3db5491529ede66135b166fbd6cc",
+    "benchmark/gpt2_quality/results/round31_integrated_top/prefix_recompute/autoregressive_context_cycles.csv": "1d89737f581fbdae6609f920ae1e1e95898d794ff846e5d1a6281967c2603c92",
+    "benchmark/gpt2_quality/results/round31_integrated_top/persistent_incremental_kv/autoregressive_context_cycles.csv": "01714f8377a474d40719c244afc1fda74499ed80cf7ae0e058f256a87c2fb251",
+    "benchmark/gpt2_quality/results/round31_integrated_top/run_manifest.json": "d1798d8c3663b584c0443e995326072ab70b890c79deaf8a802acce84161f53e"
+  },
+  "per_context": [
+    {
+      "context": 1,
+      "valid_tokens": 5,
+      "prior_prefix_tokens_recomputed_by_baseline": 4,
+      "cycles_saved": 34944,
+      "descriptors_saved": 128,
+      "cycles_saved_per_prior_prefix_token": 8736.0,
+      "descriptors_saved_per_prior_prefix_token": 32.0,
+      "prefix_cycles": 1414260,
+      "persistent_kv_cycles": 1379316,
+      "prefix_descriptors": 981,
+      "persistent_kv_descriptors": 853,
+      "logits_bit_exact": true,
+      "host_intermediate_words": 0,
+      "reset_events": 0
+    },
+    {
+      "context": 2,
+      "valid_tokens": 6,
+      "prior_prefix_tokens_recomputed_by_baseline": 5,
+      "cycles_saved": 43680,
+      "descriptors_saved": 160,
+      "cycles_saved_per_prior_prefix_token": 8736.0,
+      "descriptors_saved_per_prior_prefix_token": 32.0,
+      "prefix_cycles": 1446816,
+      "persistent_kv_cycles": 1403136,
+      "prefix_descriptors": 1029,
+      "persistent_kv_descriptors": 869,
+      "logits_bit_exact": true,
+      "host_intermediate_words": 0,
+      "reset_events": 0
+    },
+    {
+      "context": 3,
+      "valid_tokens": 7,
+      "prior_prefix_tokens_recomputed_by_baseline": 6,
+      "cycles_saved": 52416,
+      "descriptors_saved": 192,
+      "cycles_saved_per_prior_prefix_token": 8736.0,
+      "descriptors_saved_per_prior_prefix_token": 32.0,
+      "prefix_cycles": 1479660,
+      "persistent_kv_cycles": 1427244,
+      "prefix_descriptors": 1077,
+      "persistent_kv_descriptors": 885,
+      "logits_bit_exact": true,
+      "host_intermediate_words": 0,
+      "reset_events": 0
+    }
+  ],
+  "aggregate": {
+    "prefix_recompute_cycles": 4340736,
+    "persistent_kv_cycles": 4209696,
+    "cycles_saved": 131040,
+    "cycle_reduction_pct": 3.0188,
+    "prefix_recompute_descriptors": 3087,
+    "persistent_kv_descriptors": 2607,
+    "descriptors_saved": 480,
+    "descriptor_reduction_pct": 15.5491
+  },
+  "observed_scaling": {
+    "cycles_saved_per_eliminated_prior_prefix_token": 8736.0,
+    "descriptors_saved_per_eliminated_prior_prefix_token": 32.0,
+    "decoder_layers": 4,
+    "derived_cycles_per_layer_per_prefix_token": 2184.0,
+    "derived_descriptors_per_layer_per_prefix_token": 8.0
+  },
+  "interpretation": {
+    "inference": "Across all three measured contexts, saved cycles and descriptor publications scale exactly with the number of old prefix rows that prefix-recompute reprocesses. This is consistent with work elimination from persistent KV, rather than faster execution of the same query rows.",
+    "not_measured": [
+      "per-engine cycle attribution",
+      "KV read/write bytes by layer",
+      "DMA traffic",
+      "host-to-host latency",
+      "silicon throughput"
+    ]
+  }
+}

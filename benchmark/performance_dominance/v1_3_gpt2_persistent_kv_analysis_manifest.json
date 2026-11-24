@@ -1,0 +1,23 @@
+{
+  "run_id": "NMAFORGE-V1.3-GPT2-KV-SCALING-DERIVED-20261124",
+  "status": "PASS_DERIVED_ANALYSIS_NO_NEW_SIMULATION",
+  "command": "python3 benchmark/performance_dominance/analyze_gpt2_kv_scaling.py --comparison-csv benchmark/gpt2_quality/results/round31_integrated_top/persistent_kv_vs_prefix_recompute.csv --prefix-csv benchmark/gpt2_quality/results/round31_integrated_top/prefix_recompute/autoregressive_context_cycles.csv --persistent-csv benchmark/gpt2_quality/results/round31_integrated_top/persistent_incremental_kv/autoregressive_context_cycles.csv --paired-run-manifest benchmark/gpt2_quality/results/round31_integrated_top/run_manifest.json --out benchmark/performance_dominance/v1_3_gpt2_persistent_kv_analysis.json",
+  "exit_code": 0,
+  "python": "Python 3.6.8",
+  "source_script_sha256": "4300a157882b5b9475d5e180a9bee100d0d56c3dbe6c622589f62e246da0bbda",
+  "output_json_sha256": "1f7571b67d0ecc56b7826f553b3f2262e7053a213b6d40d58f5746f76f97f15a",
+  "input_and_log_sha256": {
+    "benchmark/performance_dominance/v1_3_gpt2_persistent_kv_analysis.command.txt": "2094e7c746ba1163f2a883979d5efa0af97beb8b1ac54d69db88748fc4852d20",
+    "benchmark/performance_dominance/v1_3_gpt2_persistent_kv_analysis.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "benchmark/performance_dominance/v1_3_gpt2_persistent_kv_analysis.exit_code": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "benchmark/gpt2_quality/results/round31_integrated_top/persistent_kv_vs_prefix_recompute.csv": "0c643eff6223ae2882577dc6678ca9ef8efa3db5491529ede66135b166fbd6cc",
+    "benchmark/gpt2_quality/results/round31_integrated_top/prefix_recompute/autoregressive_context_cycles.csv": "1d89737f581fbdae6609f920ae1e1e95898d794ff846e5d1a6281967c2603c92",
+    "benchmark/gpt2_quality/results/round31_integrated_top/persistent_incremental_kv/autoregressive_context_cycles.csv": "01714f8377a474d40719c244afc1fda74499ed80cf7ae0e058f256a87c2fb251",
+    "benchmark/gpt2_quality/results/round31_integrated_top/run_manifest.json": "d1798d8c3663b584c0443e995326072ab70b890c79deaf8a802acce84161f53e"
+  },
+  "upstream_product_run_id": "NMAFORGE-V1.2-ROUND31-GPT2-PERSISTENT-KV-20261124",
+  "upstream_product_source_sha": "5c8952b189c3831d45e41fa2ea3c389c83533b21",
+  "upstream_prefix_source_sha": "9c6c9dbfcc7ba2b701446dbdbbdf670663564dc9",
+  "upstream_model_package_sha256": "d9ff47c56a4ddc335a34d601d2083cfa2967d179b6aa617fdb25e484a9af3bb4",
+  "classification": "Derived arithmetic analysis over previously passing Product Top outputs; does not add RTL simulation coverage."
+}

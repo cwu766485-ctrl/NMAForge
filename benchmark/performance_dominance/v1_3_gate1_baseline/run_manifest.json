@@ -1,0 +1,285 @@
+{
+  "package": "NMAForge V1.3 Gate 1 Matrix baseline recovery",
+  "status": "CURRENT_SOURCE_BASELINE_REPLAY_PASS_WITH_MODEL_AND_FULL_DV_CLOSURE_PARTIAL",
+  "target_branch": "research/nmaforge-v1.2-integrated-model-dv",
+  "target_commit_sha": "8737fa1c7c6d08a894913a904a8a52aff4fb5840",
+  "historical_execution_source_commit_sha": "49441dfafa130731c822c43bf2e500023e58423c",
+  "measurement_scope": "Standalone Matrix core only; Product Top/CMDQ/DMA/system endpoint not measured.",
+  "revalidation_basis": "The frozen Matrix RTL was rebuilt from source commit 8737fa1c7c6d08a894913a904a8a52aff4fb5840 with the saved Round27 harness using VCS V-2023.12-SP1_Full64. The exact seed 20261122 seeded GEMM and fixed-memory GEMM reproduce the retained historical values; the four-descriptor GEMV prefetch ablation also reproduces. Top smoke, 20-case seed regression, and current Compute Cluster UVM at 128/256/512 KiB pass. Raw current logs/checksums are in evidence/current_replay_8737fa1c/. This does not close exclusive stall accounting, TinyNPU comparability, model accuracy/full execution, or full Compute Cluster sign-off.",
+  "rtl_sha256": {
+    "rtl/compute/matrix/ai_tensor_matrix_core.v": "64a822e51bfb90a34843b42ceb49d0fa533f26b2d22a6838d014ff727f5df03b",
+    "rtl/compute/matrix/ai_tensor_matrix_array.sv": "66add786e18cc0ce29df245311fc502266aa803f7aa7a425b6f0f018d6bafb8b",
+    "rtl/compute/matrix/ai_tensor_matrix_datapath.v": "c7fc6ab36d39df0f4890dec11c3c39265a0b8efec79ce4806560d96a2fe5aac9"
+  },
+  "also_audited_not_in_standalone_build": {
+    "rtl/top/ai_accel_top.v": "4108cc1c47761085cb6ba012ea2227b8fbe5522f48b46d910342ca2c17e43735",
+    "rtl/memory/ai_spad_arbiter.v": "a228f30583889ddc62ce2886e8b3f7eb81d05afe140c44b92871b0e6679d9288"
+  },
+  "testbench": {
+    "commit_sha": "49441dfafa130731c822c43bf2e500023e58423c",
+    "path": "dv/block/compute/matrix/tb/tb_ai_tensor_matrix_core_random.sv",
+    "sha256": "e6234c499cffe8793e7a255ffa3b9a01a0d01cb2bbaf6bf3af51b62d806b8b7c",
+    "audit_copy": "evidence/source/tb_ai_tensor_matrix_core_random_r27.sv"
+  },
+  "tool": {
+    "vcs": "V-2023.12-SP1_Full64"
+  },
+  "historical_provenance": {
+    "package": "benchmark/representative/v1_2/p0",
+    "recording_revision_sha": "c9206ad8264a9fb91cafcb82194d63d65e3992cc",
+    "manifest_sha256": "144e89de718233dcf259b15de04d81e9d27ef9c9d87e52a1213667cdd9d2fa3a",
+    "tiny_reference_run_commit": "f3addd2046c01616e7529a7188694085b1efcb37",
+    "tiny_reference_csv_sha256": "92fc302cbb9e41648fabe9105376b3f59be7c71e163d0c36bab70e7dfde157e7"
+  },
+  "run_config": {
+    "seed": 20261122,
+    "array": "16x16",
+    "max_outstanding_reads": 4,
+    "a_tile_cache": 1,
+    "arithmetic": "signed INT8 inputs, independent signed INT32 accumulation and full output checks"
+  },
+  "measurements_csv": "nmaforge_matrix_results.csv",
+  "tinynpu_historical_reference": {
+    "csv": "tinynpu_historical_reference.csv",
+    "source_run_id": "R27-HARISH-20261122-S20261122",
+    "source_commit_sha": "38a2498af81f78b9dd8f81144026cf45e2b8328c",
+    "raw_logs_available": false,
+    "scope": "direct-array output-stable only; incomparable with NMAForge Matrix start-to-final-SPAD-write endpoint; no speedup calculated"
+  },
+  "current_rebuild_attempt": {
+    "status": "PASS",
+    "vcs": "V-2023.12-SP1_Full64",
+    "target_source_commit_sha": "8737fa1c7c6d08a894913a904a8a52aff4fb5840",
+    "compile_exit_codes": {
+      "gemm": 0,
+      "gemv_prefetch0": 0,
+      "gemv_prefetch1": 0,
+      "product_top_ai_smoke": 0,
+      "cluster_uvm_128_256_512": 0
+    },
+    "simulation_and_make_exit_codes": {
+      "gemm_fixed_seed20261122": 0,
+      "gemm_seeded_seed20261122": 0,
+      "gemm_seeded_seed20261124": 0,
+      "gemv_prefetch0_seed20261122": 0,
+      "gemv_prefetch1_seed20261122": 0,
+      "ai_smoke_seed20261124": 0,
+      "ai_run_20_seed12345": 0,
+      "cluster_uvm_128_seed20261124": 0,
+      "cluster_uvm_256_seed20261124": 0,
+      "cluster_uvm_512_seed20261124": 0
+    },
+    "evidence_manifest": "evidence/current_replay_8737fa1c/current_revalidation_manifest.json",
+    "evidence_files": [
+      "evidence/current_replay_8737fa1c/artifacts.json",
+      "evidence/current_replay_8737fa1c/current_revalidation_manifest.json",
+      "nmaforge_current_replay_results.csv",
+      "../v1_3_current_cnn_fusion_ab.csv",
+      "../v1_3_current_cnn_fusion_ab.json",
+      "../v1_3_gpt2_independent_dataset.json",
+      "../v1_3_gpt2_independent_software_eval.json"
+    ],
+    "current_mutation_exit_code": 0,
+    "current_cnn_modes_exit_codes": {
+      "legacy": 0,
+      "first": 0,
+      "both": 0
+    },
+    "gpt2_software_eval_exit_code": 0
+  },
+  "profile_limits": {
+    "exclusive_stall_cycles": "NOT_SEPARATED",
+    "bank_and_line_stall_events": "May overlap with other active intervals; do not sum",
+    "dma_bytes": "NOT_APPLICABLE standalone core harness",
+    "descriptor_completion_host_overhead": "NOT_MEASURED",
+    "tiny_npu_matched_product_endpoint": "NOT_RUN",
+    "captured_event_counters": [
+      "prefetch_wait",
+      "arbiter_stall",
+      "response_wait",
+      "writeback_wait",
+      "outstanding_highwater",
+      "fifo_full",
+      "prefetch_a_req",
+      "prefetch_a_drain",
+      "prefetch_b_req",
+      "prefetch_b_drain",
+      "prefetch_overlap",
+      "prefetch_completed",
+      "a_tile_cache_hits"
+    ],
+    "counter_interpretation": "GEMM event counters are retained from MATRIX_CORE_PROFILE; exclusivity is not established, so they must not be summed as disjoint time."
+  },
+  "artifacts": [
+    {
+      "path": "evidence/current_attempt_8737fa1c/compile_license_failure_transcript.txt",
+      "bytes": 408,
+      "sha256": "2e2c25c47f972737a4313a4c1f04795c66024a9435f8263cc03b815297184c4a"
+    },
+    {
+      "path": "evidence/current_attempt_8737fa1c/simulator_license_attempt_interrupted.log",
+      "bytes": 822,
+      "sha256": "09e439e1c0f37cac188bf7cc541dac38925188d5b953b432ed9febbee561a7d8"
+    },
+    {
+      "path": "evidence/current_attempt_8737fa1c/vcs_compile_attempt.log",
+      "bytes": 1867,
+      "sha256": "4f331c913206eba92b43fd146550397a92d047e815cfc4af3f7c4b02b9b180f7"
+    },
+    {
+      "path": "evidence/historical_round27/compile.log.gz",
+      "gzip_bytes": 1570,
+      "gzip_sha256": "d423a07979dffd72b0e616b6d6bdecc60da626b1b3b536655e228639957eb05c",
+      "raw_bytes": 4055,
+      "raw_sha256": "3d74d69912dfca019418538dd7781cb15eb0d9820efc976f4baccc6e7a127724",
+      "bytes": 1570,
+      "sha256": "d423a07979dffd72b0e616b6d6bdecc60da626b1b3b536655e228639957eb05c"
+    },
+    {
+      "path": "evidence/historical_round27/gemm_64x64x64.log.gz",
+      "gzip_bytes": 1314,
+      "gzip_sha256": "67f1f1370b31ce3ba1e28140ea6f8723fec060cb2b57955a12531a5cc9935e4f",
+      "raw_bytes": 4408,
+      "raw_sha256": "f15f760042c79085db1f26127fc90ef6d563529091454b2c1f6de31818fcc393",
+      "bytes": 1314,
+      "sha256": "67f1f1370b31ce3ba1e28140ea6f8723fec060cb2b57955a12531a5cc9935e4f"
+    },
+    {
+      "path": "evidence/historical_round27/gemm_64x64x64_seeded_memory.log.gz",
+      "gzip_bytes": 1366,
+      "gzip_sha256": "8ae32aa61ce2130518748e87e81ea4c7eca72e367bd2d0c53eb89c00510588f8",
+      "raw_bytes": 4360,
+      "raw_sha256": "ef12523a945b1be8021f016068f1a401a10715bde2e77fed4c0f42dd11524662",
+      "bytes": 1366,
+      "sha256": "8ae32aa61ce2130518748e87e81ea4c7eca72e367bd2d0c53eb89c00510588f8"
+    },
+    {
+      "path": "evidence/historical_round27/prefetch_0_compile.log.gz",
+      "gzip_bytes": 1585,
+      "gzip_sha256": "2b11bc98b2cb6b8dd23453b09fbbc097fff4834df5fbdb39c306b51485b15a0e",
+      "raw_bytes": 4184,
+      "raw_sha256": "5949fd13ff20218bd1055c9c082ca50a93e233cd19edc8960e6183c6d987104d",
+      "bytes": 1585,
+      "sha256": "2b11bc98b2cb6b8dd23453b09fbbc097fff4834df5fbdb39c306b51485b15a0e"
+    },
+    {
+      "path": "evidence/historical_round27/prefetch_0_run.log.gz",
+      "gzip_bytes": 821,
+      "gzip_sha256": "f5121899fd8ec629ddd8f158e94a4b5b12297e452dcb5afec71762737e2817d5",
+      "raw_bytes": 2061,
+      "raw_sha256": "005c039ddd8df4c7a0f5396e070d51514faea9c64e921e4cbd26acdc23384eef",
+      "bytes": 821,
+      "sha256": "f5121899fd8ec629ddd8f158e94a4b5b12297e452dcb5afec71762737e2817d5"
+    },
+    {
+      "path": "evidence/historical_round27/prefetch_1_compile.log.gz",
+      "gzip_bytes": 1583,
+      "gzip_sha256": "e32f9f3bc031bea10e2b304d728503569ddf94aaaecb203ab22f0d4a7d20579a",
+      "raw_bytes": 4184,
+      "raw_sha256": "ba4089ee66ccaeb6777ebca5ae20897efa39c66b0a7f3f8aca90b70028f9865e",
+      "bytes": 1583,
+      "sha256": "e32f9f3bc031bea10e2b304d728503569ddf94aaaecb203ab22f0d4a7d20579a"
+    },
+    {
+      "path": "evidence/historical_round27/prefetch_1_run.log.gz",
+      "gzip_bytes": 823,
+      "gzip_sha256": "0bdb899636de5f8a28c91dcc89504bf8e718a3e075967a0c73b475fbab0ea4d3",
+      "raw_bytes": 2061,
+      "raw_sha256": "86270986848ba8a7dc696573ef6db5e7cf87982051c980671716d6a436faaf69",
+      "bytes": 823,
+      "sha256": "0bdb899636de5f8a28c91dcc89504bf8e718a3e075967a0c73b475fbab0ea4d3"
+    },
+    {
+      "path": "evidence/provenance/round27/evidence_log_hashes.json",
+      "bytes": 6686,
+      "sha256": "4d1dbeebf272f8bc5bb08c6fd7e9c6baa9264c94db2e33597f5c0faeb62a0f94"
+    },
+    {
+      "path": "evidence/provenance/round27/evidence_manifest.json",
+      "bytes": 2254,
+      "sha256": "5e9bb0ba756fc82a68d0222814c453bd2d034db73ee737c5cd0910427be800e6"
+    },
+    {
+      "path": "evidence/provenance/round27/gemm_results.csv",
+      "bytes": 13049,
+      "sha256": "92fc302cbb9e41648fabe9105376b3f59be7c71e163d0c36bab70e7dfde157e7"
+    },
+    {
+      "path": "evidence/provenance/v1_2_p0/historical_compute_profile.csv",
+      "bytes": 889,
+      "sha256": "cd7fdb0b18dbe94ac70ebde79c850efacc20248394d92481f0eb6d42044201d4"
+    },
+    {
+      "path": "evidence/source/tb_ai_tensor_matrix_core_random_r27.sv",
+      "bytes": 141607,
+      "sha256": "e6234c499cffe8793e7a255ffa3b9a01a0d01cb2bbaf6bf3af51b62d806b8b7c"
+    },
+    {
+      "path": "nmaforge_matrix_results.csv",
+      "bytes": 5496,
+      "sha256": "b2c5ca86995b228a6f85bfdd1dc9bae7384b1807d70218b8461b04ade5bd62aa"
+    },
+    {
+      "path": "tinynpu_historical_reference.csv",
+      "bytes": 1304,
+      "sha256": "a0e03f12581707904dbc8a1d443c83effcb735b742c7e78e616d4271443015eb"
+    },
+    {
+      "path": "evidence/current_replay_8737fa1c/artifacts.json",
+      "bytes": 30750,
+      "sha256": "5d953c525c279d7fb736d6e4dcff49b070ec545455a9e6da80b84e0014e0e636"
+    },
+    {
+      "path": "nmaforge_current_replay_results.csv",
+      "bytes": 6722,
+      "sha256": "ceb939288c59af52644665a0c7b0764c1c9068659df587c4f92913c5c93d163c"
+    },
+    {
+      "path": "evidence/current_replay_8737fa1c/current_revalidation_manifest.json",
+      "bytes": 21390,
+      "sha256": "b7b8356763a5c847b32572baa633fa2956cab74c60ea147deb6e768d0904853b"
+    },
+    {
+      "path": "../v1_3_current_cnn_fusion_ab.csv",
+      "bytes": 2626,
+      "sha256": "5afecdee1f630c7e34629d9d978044794f2569a992c1f051da41e2f10c3a8620"
+    },
+    {
+      "path": "../v1_3_current_cnn_fusion_ab.json",
+      "bytes": 4574,
+      "sha256": "f8f5fcfb6523e4376d312352c989160d81958239af2916726322fabe72ed5a15"
+    },
+    {
+      "path": "../v1_3_gpt2_independent_dataset.json",
+      "bytes": 1197,
+      "sha256": "ec415f4496c65b86d256acbab02fa53e48f3e312cd18bcdfb5535461557ae15d"
+    },
+    {
+      "path": "../v1_3_gpt2_independent_software_eval.json",
+      "bytes": 5691,
+      "sha256": "f03d4f232a564ae1055a3e877b7b461bd038a04142c51e1e065f462b3f168807"
+    }
+  ],
+  "source_freeze": {
+    "path": "benchmark/performance_dominance/v1_3_source_freeze.json",
+    "sha256": "c65e8fd455efa6e045f2c99d66a24be1f8bb30f85a499296080d32b9360f4cd3"
+  },
+  "current_replay_csv": "nmaforge_current_replay_results.csv",
+  "current_dv": {
+    "compute_cluster_uvm": "PASS 3/3 current source capacity configurations (128/256/512 KiB, one seed each)",
+    "formal": "PASS scoped serial and dispatcher pair proofs; first 300-second attempt timeout retained; 900-second retry passed",
+    "rtl_mutation": "PASS 7/7 real mutants caught; aggregate exit 0; individual simulator native exits not retained by target harness",
+    "full_rtm_and_seven_engine_scoreboards": "OPEN"
+  },
+  "current_cnn_fusion_ab": {
+    "manifest": "../v1_3_current_cnn_fusion_ab.json",
+    "csv": "../v1_3_current_cnn_fusion_ab.csv",
+    "status": "PASS all three modes, 20,480 Golden words each",
+    "scope": "synthetic untrained 1x1 pointwise CNN; no TinyNPU comparison"
+  },
+  "current_gpt2_independent_software_evaluation": {
+    "manifest": "../v1_3_gpt2_independent_software_eval.json",
+    "dataset_manifest": "../v1_3_gpt2_independent_dataset.json",
+    "status": "SOFTWARE EVALUATION EXECUTED; model quality below FP32 and same-window Bigram; Product Top independent logits NOT RUN"
+  }
+}

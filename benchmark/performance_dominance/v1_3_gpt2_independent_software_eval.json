@@ -1,0 +1,92 @@
+{
+  "run_id": "NMAFORGE-V1.3-GPT2-INDEPENDENT-SOFTWARE-EVAL-20261124",
+  "status": "SOFTWARE_QUALITY_EVALUATION_ONLY_TOP_NOT_RUN",
+  "measured_rtl_source_commit_sha": "8737fa1c7c6d08a894913a904a8a52aff4fb5840",
+  "branch": "research/nmaforge-v1.2-integrated-model-dv",
+  "model": {
+    "architecture": {
+      "context": 16,
+      "ffn": 256,
+      "head_dim": 16,
+      "heads": 4,
+      "hidden": 64,
+      "layers": 4,
+      "vocab": 256
+    },
+    "fp32_sha256": "00f73c2eaf14e2c2ea170ae6bdbdbc570d6850bb2f3a77b61f68596e5019cca0",
+    "int8_sha256": "d9ff47c56a4ddc335a34d601d2083cfa2967d179b6aa617fdb25e484a9af3bb4",
+    "seed": 20261221,
+    "train_steps": 4000
+  },
+  "dataset": {
+    "name": "Pride and Prejudice byte-level (Project Gutenberg #1342)",
+    "sha256": "0f8bb9eb3b6aad9b634f46844fc3d066dca2a1c1cf5ca9cdb9bb276bce0783d5",
+    "split": "first 90 percent train, final 10 percent held-out",
+    "source_url": "https://raw.githubusercontent.com/GITenberg/Pride-and-Prejudice_1342/master/1342-0.txt",
+    "catalog_url": "https://www.gutenberg.org/ebooks/1342",
+    "raw_source_sha256": "48e0522844402a86a3ea98f0947ba85ea54838db3c59022299298ed968a5a163",
+    "prepared_bytes": 705004,
+    "preparation": "Decode UTF-8 after stripping BOM; extract only text between the unique Project Gutenberg START/END markers; strip leading CR/LF; encode UTF-8 with original body line endings. No vocabulary remap or character normalization.",
+    "raw_data_committed": false
+  },
+  "evaluation": {
+    "prompt_length": 16,
+    "seed": 20261124,
+    "tokens": 1024,
+    "windows": 64
+  },
+  "quality": {
+    "bigram_baseline_accuracy_same_windows": 0.2763671875,
+    "fp32": {
+      "cross_entropy_nats": 2.716710585282284,
+      "next_byte_accuracy": 0.3076171875,
+      "perplexity": 15.130469906999979
+    },
+    "fp32_int8_top1_agreement": 0.158203125,
+    "int8_logit_dequantization": "INT32 logits / 32 (LM-head Q5 weight scale); argmax unchanged",
+    "int8_minus_fp32_accuracy_points": -19.53125,
+    "product_contract_int8": {
+      "cross_entropy_nats": 5.377601423844514,
+      "next_byte_accuracy": 0.1123046875,
+      "perplexity": 216.5023547538319
+    }
+  },
+  "evaluation_script": {
+    "path": "benchmark/gpt2_quality/evaluate_h64_byte_lm.py",
+    "sha256": "7fe32b66a0d46147a7e015d41589d04ae14dd5d0926f497e5a404263f3b27497"
+  },
+  "environment": {
+    "python": "3.12",
+    "numpy": "2.5.4",
+    "torch": "2.6.0+cpu",
+    "installed_in_isolated_venv": "/tmp/nmaforge_v13_gpt2_venv"
+  },
+  "command": "/tmp/nmaforge_v13_gpt2_venv/bin/python benchmark/gpt2_quality/evaluate_h64_byte_lm.py --package benchmark/gpt2_quality/results/round31_qat_retrain/source_20261221_qat_20263113/product_int8.npz --fp32 benchmark/gpt2_quality/results/round27_extended_train/seed_20261221/fp32_before_qat.pt --corpus /tmp/nmaforge_v13_independent_gpt2/pride_and_prejudice_body_utf8.txt --dataset-name \"Pride and Prejudice byte-level (Project Gutenberg #1342)\" --out /tmp/nmaforge_v13_independent_gpt2/software_quality_eval_retry.json --seed 20261124 --windows 64 --source-sha 8737fa1c7c6d08a894913a904a8a52aff4fb5840",
+  "exit_code": 0,
+  "top_rtl": {
+    "compile_log": null,
+    "compile_log_sha256": null,
+    "run_log": null,
+    "run_log_sha256": null,
+    "source_sha": "8737fa1c7c6d08a894913a904a8a52aff4fb5840",
+    "status": "NOT_RUN"
+  },
+  "interpretation": "Independent external-text software evaluation only. Product-contract INT8 is substantially below both the matching FP32 checkpoint and byte-bigram baseline on this out-of-domain set; this is a negative quality result. No Product Top logits were rerun on this dataset.",
+  "first_attempt": {
+    "exit_code": 1,
+    "status": "EVALUATOR_SCHEMA_ERROR",
+    "reason": "checkpoint records fp_steps while evaluator initially expected steps; evaluator was made tolerant of this checkpoint schema and the independent evaluation was rerun successfully",
+    "log": "evidence/current_replay_8737fa1c/gpt2/first_attempt_checkpoint_schema_error.log.gz",
+    "command": "/tmp/nmaforge_v13_gpt2_venv/bin/python benchmark/gpt2_quality/evaluate_h64_byte_lm.py --package benchmark/gpt2_quality/results/round31_qat_retrain/source_20261221_qat_20263113/product_int8.npz --fp32 benchmark/gpt2_quality/results/round27_extended_train/seed_20261221/fp32_before_qat.pt --corpus /tmp/nmaforge_v13_independent_gpt2/pride_and_prejudice_body_utf8.txt --dataset-name \"Pride and Prejudice byte-level (Project Gutenberg #1342)\" --out /tmp/nmaforge_v13_independent_gpt2/software_quality_eval.json --seed 20261124 --windows 64 --source-sha 8737fa1c7c6d08a894913a904a8a52aff4fb5840"
+  },
+  "result_json": "evidence/current_replay_8737fa1c/gpt2/software_quality_eval.json",
+  "stdout_log": "evidence/current_replay_8737fa1c/gpt2/software_quality_eval.stdout.log.gz",
+  "dataset_manifest": "benchmark/performance_dominance/v1_3_gpt2_independent_dataset.json",
+  "environment_bootstrap_attempt": {
+    "command": "python3.12 benchmark/gpt2_quality/evaluate_h64_byte_lm.py --package benchmark/gpt2_quality/results/round31_qat_retrain/source_20261221_qat_20263113/product_int8.npz --fp32 benchmark/gpt2_quality/results/round27_extended_train/seed_20261221/fp32_before_qat.pt --corpus /tmp/nmaforge_v13_independent_gpt2/pride_and_prejudice_body_utf8.txt --out /tmp/nmaforge_v13_independent_gpt2/software_quality_eval.json --seed 20261124 --windows 64 --source-sha 8737fa1c7c6d08a894913a904a8a52aff4fb5840",
+    "exit_code": 1,
+    "status": "BLOCKED_ENV_NO_NUMPY",
+    "log": "evidence/current_replay_8737fa1c/gpt2/environment_attempt_no_numpy.log.gz",
+    "resolution": "Created isolated Python 3.12 environment with numpy 2.5.4 and torch 2.6.0+cpu."
+  }
+}
