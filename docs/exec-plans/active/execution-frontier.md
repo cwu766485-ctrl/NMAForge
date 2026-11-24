@@ -1,8 +1,41 @@
 # NMAForge execution frontier
 
-Updated: 2026-10-29. This is a short handoff for the next engineering task; it
+Updated: 2026-11-24. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
-benchmark work is tracked in the execution RTM and open-issue report.
+benchmark work is tracked in the execution RTM and open-issue report. The
+evidence below is historical and tied to its named source SHA; it is not a fresh
+pass claim for the current checkout.
+
+## Next-step decision (2026-11-24)
+
+### Classification and goal
+
+The next step is **software/runtime and verification first, followed by
+evidence-driven hardware/software co-design**. It is not an immediate hardware
+upgrade. The goal is to make the GEMM/GEMV and model measurements reproducible,
+explain the observed cycle differences, and prove a real continuous model path
+on one Product Top. Only then decide whether a measured bottleneck requires an
+RTL/ABI change.
+
+The planning baseline for this checkout is branch
+`feat/shape-adaptive-gemv-v2`, source SHA
+`409c3a9fd647d4f8c4c881c9bfdaf5d93b7076ee`. No new simulation result at that SHA
+is recorded in this handoff. The prior UVM replay cited below used a separate
+candidate worktree and must not be presented as a pass for this branch.
+
+| Gate | Work type | Next work | Goal / exit evidence |
+|---|---|---|---|
+| 1. Reproducible compute baseline | Software and testbench | Freeze source SHA, seed, operands, memory timing, and start/stop points. Re-run the 64×64×64 GEMM and 1×64×64 GEMV cases. Split direct compute, controller/SPAD, transfer, and host intervals; check each result against the same independent Golden. | Explain prior cycle differences with paired logs and CSV. Report cycles, useful MAC/cycle, bytes, and stalls at each measured endpoint. Do not derive system speedup from unlike endpoints. |
+| 2. Regression fixture recovery | Verification/software | Reproduce the `CLUSTER_MEMORY_EMPTY` setup failure on its exact recorded SHA. The prior candidate replay failed before an engine transaction because fixture address `0x7d000` is outside the default 128 KiB SPAD. Correct the fixture allocation or map only if the configured design supports it; keep range/protection checks strict, then rerun the focused UVM smoke. | Reach the intended DUT transaction and record the exact command, compile/run logs, exit status, and checker result. If it remains blocked, preserve the failure as BLOCKED/FAIL with its source SHA. |
+| 3. Continuous model path | Runtime/mapper software, with co-design if needed | Freeze the H64 model/runtime source and verify genuine Persistent-KV Decode separately from prefix replay. Continue the DeiT real-token path from the last proven stage; keep staged operator runs distinct from a single-session Product Top run. No host readback/repacking/writeback of intermediate activations. | Demonstrate producer-to-consumer dependencies, retained KV/SPAD state, completion retirement, and per-step Golden on one unreset Product Top. Report host, DMA, command, and compute costs separately. |
+| 4. Dataflow A/B | Software-first co-design | Compare GEMV prefetch/arbitration settings and CNN host layout against existing DMA/repack/fused paths with identical inputs and Golden. Attribute bank, line, prefetch, and layout costs before proposing RTL. | Keep an optimization only when a reproducible A/B lowers measured latency or traffic without changing results or breaking compatibility. Include area/timing impact if RTL changes. |
+| 5. Hardware decision gate | Hardware only when evidence requires it | Consider a minimal RTL/ABI change only if the measured bottleneck cannot be expressed by the current Mapper/Runtime and existing datapaths. First write the contract, minimal reproducer, expected benefit, and verification plan. | Directed Golden and protocol tests pass; legacy Matrix/SFU/CNN/model regressions remain correct; synthesis/timing cost is measured or explicitly NOT_RUN. No MAC-array or SPAD expansion is assumed. |
+
+TinyNPU comparison remains a separate evidence task: pin both source SHAs and
+match the model, arithmetic contract, memory service, and timing boundary before
+calculating speedup. Otherwise publish the raw endpoints as non-comparable. A
+successful benchmark does not by itself close Compute Cluster DV or authorize
+an architecture freeze.
 
 ## Project baseline
 
@@ -103,18 +136,18 @@ SPAD measurement. See the [shape-adaptive report](../../research/SHAPE_ADAPTIVE_
 
 ## Next work
 
-1. Close the remaining Compute Cluster P0/P1 items in the
-   [execution RTM](../../verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)
-   and [open-issue report](../../verification/COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md).
-2. Freeze the reviewed source and test manifest, then replay the remaining
-   required gates on one clean SHA. R35 already replays the focused group from
-   clean test commit `cb9717e` with RTL/SPEC byte-identical to the review candidate.
-3. Continue the FP parity-to-writeback proof from the [FP formal frontier](../../../dv/block/compute/fp/formal/README.md); an inconclusive timeout is not a pass.
-4. Keep LEC, DFT, post-layout PPA, and board results as separate closure gates.
-5. Continue the isolated `feat/shape-adaptive-gemv-v2` branch. Its 256-MAC
-   kernel passes three-seed RTL Golden checks at SHA `8c19eaf`; the
-   bandwidth/prefetch schedule is analytical and still needs an actual
-   double-buffered SPAD path, bank-arbitration tests, and synthesis evidence.
+1. Complete Gates 1–2 above on a frozen source/test manifest and update the
+   owning benchmark and verification reports with exact run identities.
+2. Use those results to proceed with Gate 3's continuous H64/DeiT execution
+   evidence; do not treat historical staged results as a current Product Top
+   pass.
+3. Run Gate 4 A/B experiments. Route an RTL change through Gate 5 only when
+   measurements show that software scheduling or existing hardware cannot
+   address the bottleneck.
+4. Keep the [execution RTM](../../verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md),
+   [open-issue report](../../verification/COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md),
+   FP formal frontier, LEC, DFT, PPA, and board evidence as distinct closure
+   records. Do not infer full sign-off from a model Golden or benchmark pass.
 
 ## Canonical commands
 
