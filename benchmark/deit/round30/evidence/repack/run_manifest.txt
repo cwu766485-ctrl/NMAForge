@@ -1,0 +1,7 @@
+run_id=round30-repack-directed-20261120
+branch=research/nmaforge-v1.2-round30-deit
+source_sha=70a5296d07e0ac3287bb73297cc5632e205a215a
+command=bash benchmark/deit/round29/run_tensor_repack_directed.sh /tmp/nmaforge_round30_deit_repack_directed
+exit_status=BLOCKED_ENV_LICENSE_SERVER_UNREACHABLE
+compile_log=benchmark/deit/round30/evidence/repack/round30-repack-directed_compile.log.gz
+run_log=NOT_CREATED_COMPILE_DID_NOT_START

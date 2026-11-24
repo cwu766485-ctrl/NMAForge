@@ -30,6 +30,10 @@ module ai_tensor_sfu_core(
     input  wire        pack_enable,
     // Descriptor flag[5] writes packed words in the Matrix A 4x4 tile order.
     input  wire        pack_tile_a,
+    // Research ABI-v7.4 extension: flag[6] selects a signed INT8 Matrix-A
+    // tile-major source row for LayerNorm (bounded 208x192 DeiT embedding).
+    input  wire        input_tile_a,
+    input  wire [31:0] src0_stride,
     input  wire [31:0] dst_base,
     input  wire [15:0] length,
     input  wire [15:0] m_size,
@@ -68,6 +72,10 @@ module ai_tensor_sfu_core(
     localparam [7:0] OP_CAUSAL_SOFTMAX_Q15 = 8'h39;
     // Research-only opcode; not part of the product ABI until reviewed.
     localparam [7:0] OP_RESIDUAL_REQUANT_I8 = 8'h3a;
+    // Bounded Matrix-A layout bridge. aux0[1:0]: Q dense (0), K-major (1),
+    // V Matrix-B (2); aux0[3:2]: head index. length is valid rows, m_size
+    // padded rows, and n_size source channels split into three equal heads.
+    localparam [7:0] OP_TENSOR_REPACK = 8'h3b;
 
     localparam [3:0] ERR_CONFIG     = 4'd1;
     localparam [3:0] ERR_OP         = 4'd2;
@@ -121,6 +129,9 @@ module ai_tensor_sfu_core(
     localparam [5:0] ST_LN_VAR_ACC         = 6'd38;
     localparam [5:0] ST_LN_B_REQ           = 6'd39;
     localparam [5:0] ST_LN_B_WAIT          = 6'd40;
+    localparam [5:0] ST_RP_REQ             = 6'd41;
+    localparam [5:0] ST_RP_WAIT            = 6'd42;
+    localparam [5:0] ST_RP_WRITE           = 6'd43;
     localparam [15:0] LN_SMALL_FAST_MAX    = 16'd16;
 
     reg [5:0] state_r;
@@ -135,11 +146,16 @@ module ai_tensor_sfu_core(
     reg signed [63:0] vector_product_r;
     reg [31:0] rms_root_r, inv_rms_r;
     reg rms_normalize_phase_r, beta_enable_r, pack_enable_r, pack_tile_a_r;
+    reg input_tile_a_r;
+    reg [31:0] input_row_r;
     reg [15:0] m_size_r, n_size_r, pack_row_r, pack_k_group_r;
     reg [31:0] pack_tile_group_base_r;
     reg [31:0] pack_word_r;
     reg ln_small_fast_r;
     reg signed [31:0] ln_input_cache [0:15];
+    reg [15:0] rp_row_r, rp_feature_r;
+    reg [1:0] rp_lane_r, rp_write_lane_r;
+    reg [31:0] rp_words [0:3];
 
     reg div_start_r, sqrt_start_r;
     reg [63:0] div_dividend_r, div_divisor_r;
@@ -148,7 +164,21 @@ module ai_tensor_sfu_core(
     wire sqrt_busy, sqrt_done;
     wire [31:0] sqrt_root;
 
-    wire [31:0] src0_addr = src0_r + ({16'd0,index_r}<<2);
+    // Tile-A input mapping is intentionally limited by the descriptor
+    // validator to the 208x192 physical DeiT embedding tensor. Each 16x16
+    // tile occupies 256 bytes; within it, Matrix-A stores 4x4 K groups with
+    // row lanes contiguous, matching the existing packer.
+    wire [31:0] tile_a_index =
+        ({16'd0,input_row_r[15:4]} * 32'd12) + {28'd0,index_r[15:4]};
+    wire [31:0] tile_a_row_lane = {28'd0,input_row_r[3:0]};
+    wire [31:0] tile_a_col_lane = {28'd0,index_r[3:0]};
+    wire [31:0] tile_a_word_index =
+        (tile_a_row_lane[3:2] << 4) +
+        (tile_a_col_lane[3:2] << 2) + tile_a_row_lane[1:0];
+    wire [31:0] src0_linear_addr = src0_r + ({16'd0,index_r}<<2);
+    wire [31:0] src0_tile_a_addr = src0_r + (tile_a_index << 8) +
+                                    (tile_a_word_index << 2);
+    wire [31:0] src0_addr = input_tile_a_r ? src0_tile_a_addr : src0_linear_addr;
     wire [31:0] src1_addr = src1_r + ({16'd0,index_r}<<2);
     wire [31:0] beta_addr = beta_base_r + ({16'd0,index_r}<<2);
     // For a 16-element LayerNorm vector, the contract's two truncating
@@ -166,7 +196,17 @@ module ai_tensor_sfu_core(
                            (packed_requant ?
                             (packed_word_index << 2) :
                             ({16'd0,index_r} << 2));
-    wire signed [31:0] spad_signed = spad_rdata;
+    wire [31:0] tile_a_lane_shift = {27'd0,index_r[1:0],3'b000};
+    wire signed [7:0] tile_a_signed_byte = spad_rdata >> tile_a_lane_shift;
+    // Tile-A unpacking applies only to the LayerNorm source-vector reads.
+    // Gamma and beta remain full signed INT32 SPAD operands; applying the
+    // byte extraction globally silently truncated their affine parameters.
+    wire tile_a_source_read = input_tile_a_r &&
+        ((state_r == ST_LN_SUM_WAIT) || (state_r == ST_LN_VAR_WAIT) ||
+         (state_r == ST_RMS_X_WAIT));
+    wire signed [31:0] spad_signed = tile_a_source_read ?
+                                      {{24{tile_a_signed_byte[7]}},tile_a_signed_byte} :
+                                      $signed(spad_rdata);
     wire causal_masked = (op_r == OP_CAUSAL_SOFTMAX_Q15) &&
                          (index_r > epsilon_r[15:0]);
     wire valid_operation = (op_mode == OP_SOFTMAX_Q15) ||
@@ -177,7 +217,8 @@ module ai_tensor_sfu_core(
                            (op_mode == OP_RESIDUAL_REQUANT_I8) ||
                            (op_mode == OP_GELU_Q8_8) ||
                            (op_mode == OP_REQUANT_I8) ||
-                           (op_mode == OP_SILU_Q8_8);
+                           (op_mode == OP_SILU_Q8_8) ||
+                           (op_mode == OP_TENSOR_REPACK);
     // Admission-time checks deliberately use live inputs; all execution-time
     // decisions below use the latched *_r command snapshot.
     wire input_alignment_error = (|src0_base[1:0]) || (|dst_base[1:0]) ||
@@ -190,11 +231,66 @@ module ai_tensor_sfu_core(
                                   (|beta_base[1:0]));
     wire [31:0] pack_tile_expected_length =
         {16'd0,m_size} * {16'd0,n_size};
+    // Repack reuses the existing SFU aux/epsilon descriptor field. Keep this
+    // control in the command snapshot just like other SFU auxiliary modes.
+    wire [1:0] rp_mode = epsilon_r[1:0];
+    wire [1:0] rp_head = epsilon_r[3:2];
+    wire [15:0] rp_head_dim = n_size_r / 16'd3;
+    wire [15:0] rp_source_row = (rp_mode == 2'd0) ? rp_row_r :
+                                (rp_row_r + {14'd0,rp_lane_r});
+    wire [15:0] rp_source_col = (rp_head * rp_head_dim) + rp_feature_r;
+    wire [31:0] rp_tile_index =
+        ({16'd0,rp_source_row[15:4]} * ({16'd0,n_size_r} >> 4)) +
+        {28'd0,rp_source_col[15:4]};
+    wire [31:0] rp_word_index =
+        ({28'd0,rp_source_row[3:2]} << 4) +
+        ({28'd0,rp_source_col[3:2]} << 2) +
+        {30'd0,rp_source_row[1:0]};
+    // Raw Matrix-A words use 1 KiB per tile; packed INT8 0x53 tiles use
+    // 256 bytes. aux0/epsilon[4] selects the latter while preserving the
+    // existing sparse-source layout when clear.
+    wire [31:0] rp_source_addr = src0_r +
+                                 (rp_tile_index << (epsilon_r[4] ? 8 : 10)) +
+                                 (rp_word_index << 2);
+    wire [31:0] rp_k_tile_stride = {16'd0,rp_head_dim} << 4;
+    wire [15:0] rp_k_feature = rp_feature_r + rp_write_lane_r;
+    wire [31:0] rp_k_dst_addr = dst_r +
+        (({16'd0,rp_row_r} >> 4) * rp_k_tile_stride) +
+        ({16'd0,rp_k_feature} << 4) + {28'd0,rp_row_r[3:0]};
+    wire [31:0] rp_v_panel_stride =
+        (({16'd0,m_size_r} << 4) + 32'd4095) & 32'hffff_f000;
+    wire [15:0] rp_v_col = rp_feature_r + rp_write_lane_r;
+    wire [15:0] rp_v_col_in_panel = rp_v_col[3:0];
+    wire [15:0] rp_v_col_group = {rp_v_col_in_panel[3:2],2'b00};
+    wire [31:0] rp_v_word_index =
+        (({16'd0,rp_v_col_group} >> 2) * ({16'd0,m_size_r} >> 2) * 4) +
+        (({16'd0,rp_row_r} >> 2) * 4) +
+        {30'd0,rp_v_col_in_panel[1:0]};
+    wire [31:0] rp_v_dst_addr = dst_r +
+        (({16'd0,rp_v_col} >> 4) * rp_v_panel_stride) +
+        (rp_v_word_index << 2);
+    wire [31:0] rp_dst_addr = (rp_mode == 2'd0) ?
+        (dst_r + ({16'd0,rp_row_r} * {16'd0,rp_head_dim}) +
+         {16'd0,rp_feature_r}) :
+        ((rp_mode == 2'd1) ? rp_k_dst_addr : rp_v_dst_addr);
+    wire [31:0] rp_transposed_word = {
+        rp_words[3][rp_write_lane_r*8 +: 8],
+        rp_words[2][rp_write_lane_r*8 +: 8],
+        rp_words[1][rp_write_lane_r*8 +: 8],
+        rp_words[0][rp_write_lane_r*8 +: 8]};
     wire pack_tile_config_error = pack_tile_a &&
         ((op_mode != OP_REQUANT_I8) || !pack_enable ||
          (m_size == 0) || (n_size == 0) ||
          (m_size[1:0] != 0) || (n_size[1:0] != 0) ||
          (pack_tile_expected_length != {16'd0,length}));
+    wire repack_config_error = (op_mode == OP_TENSOR_REPACK) &&
+        ((epsilon[31:5] != 0) || (epsilon[1:0] == 2'd3) ||
+         (epsilon[3:2] > 2'd2) || (length == 0) || (m_size < 16) ||
+         (m_size > 256) || (m_size[3:0] != 0) || (length > m_size) ||
+         (n_size < 48) || (n_size > 384) || ((n_size % 16'd48) != 0) ||
+         (src0_stride != 0) || (src1_base != 0) ||
+         (beta_base != 0) || beta_enable || (scale_shift != 0) ||
+         pack_enable || pack_tile_a || input_tile_a);
     wire last_element = (index_r == length_r - 1'b1);
     wire is_layernorm = (op_r == OP_LAYERNORM_Q15);
     wire is_normalization = (op_r == OP_RMSNORM_Q15) || is_layernorm;
@@ -275,6 +371,13 @@ module ai_tensor_sfu_core(
             ST_SM_WRITE,ST_VEC_WRITE: begin
                 spad_valid=1; spad_write=1; spad_addr=dst_addr; spad_wdata=output_word_r;
             end
+            ST_RP_REQ: if (rp_source_row < length_r) begin
+                spad_valid=1; spad_addr=rp_source_addr;
+            end
+            ST_RP_WRITE: begin
+                spad_valid=1; spad_write=1; spad_addr=rp_dst_addr;
+                spad_wdata=(rp_mode == 2'd0) ? output_word_r : rp_transposed_word;
+            end
             default: begin end
         endcase
     end
@@ -288,9 +391,12 @@ module ai_tensor_sfu_core(
             mean_sq_r<=0; vector_product_r<=0; rms_root_r<=0; inv_rms_r<=0;
             sum_x_r<=0; rms_normalize_phase_r<=0; beta_enable_r<=0;
             pack_enable_r<=0; pack_word_r<=0; pack_tile_a_r<=0;
+            input_tile_a_r<=0; input_row_r<=0;
             m_size_r<=0; n_size_r<=0; pack_row_r<=0; pack_k_group_r<=0;
             pack_tile_group_base_r<=0;
             ln_small_fast_r<=0;
+            rp_row_r<=0; rp_feature_r<=0; rp_lane_r<=0; rp_write_lane_r<=0;
+            rp_words[0]<=0; rp_words[1]<=0; rp_words[2]<=0; rp_words[3]<=0;
             div_start_r<=0; sqrt_start_r<=0; div_dividend_r<=0; div_divisor_r<=0;
             busy<=0; done<=0; error<=0; error_code<=0; result<=0;
             cycle_count<=0; element_count<=0;
@@ -309,17 +415,22 @@ module ai_tensor_sfu_core(
                         op_r<=op_mode; src0_r<=src0_base; src1_r<=src1_base;
                         beta_base_r<=beta_base; beta_enable_r<=beta_enable;
                         pack_enable_r<=pack_enable; pack_tile_a_r<=pack_tile_a;
+                        input_tile_a_r<=input_tile_a;
+                        input_row_r<=src0_stride;
                         m_size_r<=m_size; n_size_r<=n_size;
                         ln_small_fast_r <= (op_mode == OP_LAYERNORM_Q15) &&
                                            (length <= LN_SMALL_FAST_MAX);
                         pack_row_r<=0; pack_k_group_r<=0;
                         pack_tile_group_base_r<=0; dst_r<=dst_base;
+                        rp_row_r<=0; rp_feature_r<=0; rp_lane_r<=0;
+                        rp_write_lane_r<=0;
                         length_r<=length; scale_shift_r<=scale_shift;
                         // For causal Softmax this field is a zero-based query
                         // token index, so zero must remain a valid boundary.
                         // Other SFU operators retain the nonzero epsilon
                         // default used by their normalization arithmetic.
-                        epsilon_r <= (op_mode == OP_CAUSAL_SOFTMAX_Q15) ? epsilon :
+                        epsilon_r <= ((op_mode == OP_CAUSAL_SOFTMAX_Q15) ||
+                                      (op_mode == OP_TENSOR_REPACK)) ? epsilon :
                                      (epsilon == 0 ? 32'd1 : epsilon);
                         watchdog_limit_r<=watchdog_limit; index_r<=0;
                         element_count<=0; busy<=1;
@@ -329,7 +440,7 @@ module ai_tensor_sfu_core(
                         if (length==0 || input_alignment_error ||
                             (op_mode == OP_RESIDUAL_REQUANT_I8 &&
                              (!pack_enable || length[1:0] != 0)) ||
-                            pack_tile_config_error) begin
+                            pack_tile_config_error || repack_config_error) begin
                             error_code<=ERR_CONFIG; state_r<=ST_ERROR;
                         end else if (!valid_operation) begin
                             error_code<=ERR_OP; state_r<=ST_ERROR;
@@ -340,6 +451,7 @@ module ai_tensor_sfu_core(
                             OP_RESIDUAL_I32,OP_RESIDUAL_REQUANT_I8,
                             OP_GELU_Q8_8,OP_REQUANT_I8,OP_SILU_Q8_8:
                                 state_r<=ST_VEC_A_REQ;
+                            OP_TENSOR_REPACK: state_r<=ST_RP_REQ;
                             default: begin error_code<=ERR_OP; state_r<=ST_ERROR; end
                         endcase
                     end
@@ -750,6 +862,68 @@ module ai_tensor_sfu_core(
                         beta_r<=spad_signed;
                         x_r<=output_word_r;
                         state_r<=ST_VEC_POST;
+                    end
+                end
+
+                // Matrix-A source rows are read through the same scheduler
+                // SPAD port as all other SFU operations. K/V repacking gathers
+                // a 4x4 INT8 block, then emits four words with token lanes
+                // packed in little-endian byte order.
+                ST_RP_REQ: begin
+                    if (rp_source_row >= length_r) begin
+                        rp_words[rp_lane_r] <= 32'd0;
+                        if ((rp_mode == 2'd0) || (rp_lane_r == 2'd3)) begin
+                            rp_write_lane_r <= 0;
+                            if (rp_mode == 2'd0) output_word_r <= 0;
+                            state_r <= ST_RP_WRITE;
+                        end else rp_lane_r <= rp_lane_r + 1'b1;
+                    end else if (spad_ready) begin
+                        if (spad_protection_error) begin
+                            error_code<=ERR_PROTECTION; state_r<=ST_ERROR;
+                        end else state_r<=ST_RP_WAIT;
+                    end
+                end
+                ST_RP_WAIT: if (spad_rsp_valid) begin
+                    if (spad_parity_error) begin
+                        error_code<=ERR_PARITY; state_r<=ST_ERROR;
+                    end else begin
+                        rp_words[rp_lane_r] <= spad_rdata;
+                        if ((rp_mode == 2'd0) || (rp_lane_r == 2'd3)) begin
+                            output_word_r <= spad_rdata;
+                            rp_write_lane_r <= 0;
+                            state_r <= ST_RP_WRITE;
+                        end else begin
+                            rp_lane_r <= rp_lane_r + 1'b1;
+                            state_r <= ST_RP_REQ;
+                        end
+                    end
+                end
+                ST_RP_WRITE: if (spad_ready) begin
+                    if (spad_protection_error) begin
+                        error_code<=ERR_PROTECTION; state_r<=ST_ERROR;
+                    end else begin
+                        result <= (rp_mode == 2'd0) ? output_word_r :
+                                  rp_transposed_word;
+                        element_count <= element_count + 32'd4;
+                        if ((rp_mode == 2'd0) || (rp_write_lane_r == 2'd3)) begin
+                            rp_lane_r <= 0;
+                            rp_write_lane_r <= 0;
+                            if ((rp_feature_r + 16'd4) >= rp_head_dim) begin
+                                rp_feature_r <= 0;
+                                if ((rp_row_r + ((rp_mode == 2'd0) ? 16'd1 : 16'd4))
+                                    >= m_size_r) state_r<=ST_DONE;
+                                else begin
+                                    rp_row_r <= rp_row_r +
+                                        ((rp_mode == 2'd0) ? 16'd1 : 16'd4);
+                                    state_r<=ST_RP_REQ;
+                                end
+                            end else begin
+                                rp_feature_r <= rp_feature_r + 16'd4;
+                                state_r<=ST_RP_REQ;
+                            end
+                        end else begin
+                            rp_write_lane_r <= rp_write_lane_r + 1'b1;
+                        end
                     end
                 end
 

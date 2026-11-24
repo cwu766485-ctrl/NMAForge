@@ -1,0 +1,1 @@
+FAIL was in testbench-only passive SPAD observation: internal backdoor accepts SPAD-relative offsets, but checker passed SPAD_BASE+offset. First mismatch desc=155 addr=0x16000 expected=0xFF3D01FB actual=0xA55AA55A. Corrected checker to pass relative offset; rerun is archived in parent and passed. No Product datapath change was made for this observer failure.

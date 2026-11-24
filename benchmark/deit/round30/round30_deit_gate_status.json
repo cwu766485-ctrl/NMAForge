@@ -1,0 +1,45 @@
+{
+  "round": 30,
+  "branch": "research/nmaforge-v1.2-round30-deit",
+  "tested_base_commit": "864ba16aa052fbb0f2bb8948133a54586cec6b26",
+  "tested_product_rtl_diff_sha256": "3da860fa51351257122cc613741e77bef975b426dde360806c50c10579a78b10",
+  "tiny_model_source": "fixed Round26 full-KV QKV projection workload derived from DeiT checkpoint tensors; not a complete official-checkpoint classification run",
+  "gates": {
+    "repack_layout_and_physical_span": "PASS_TESTED_LAYOUTS",
+    "repack_external_descriptor_fetch": "NOT_RUN",
+    "repack_abort_reset_backpressure_directed": "PASS_DIRECTED_CASES",
+    "continuous_top_qkv_to_repack": "PASS",
+    "continuous_top_three_head_197_query_attention": "PASS",
+    "bounded_axil_ring_512_entries_19_wraps": "PASS",
+    "external_descriptor_streaming_and_recovery": "PARTIAL",
+    "full_encoder_layer0": "NOT_RUN",
+    "official_deit_12_layer_classification": "NOT_RUN"
+  },
+  "continuous_attention": {
+    "run_id": "round30-deit-full197-passive",
+    "seed": 300030,
+    "spad_bytes": 262144,
+    "qkv_prefix_descriptors": 468,
+    "streamed_descriptors": 9564,
+    "total_descriptors": 10032,
+    "batches": 159,
+    "ring_wraps": 19,
+    "valid_queries": 197,
+    "valid_keys_per_query": 197,
+    "heads": 3,
+    "golden_words": 361920,
+    "runtime_cycles": 7949430,
+    "reset_events": 0,
+    "host_intermediate_tensor_readback_words": 0,
+    "host_intermediate_tensor_writeback_words": 0,
+    "make_exit": 0,
+    "simulator_exit": 0,
+    "golden_observation": "passive behavioral SPAD backdoor after retired batches"
+  },
+  "known_limitations": [
+    "Full LayerNorm-to-QKV-to-Attention flow in one session is not proven; current run starts from the fixed fixture's LayerNorm output.",
+    "Output projection, residuals, LN2, FFN/GELU and complete Encoder Layer 0 were not executed.",
+    "External Descriptor Fetch and streaming Reset/Abort recovery were not qualified.",
+    "No official checkpoint ImageNet accuracy or full model host-to-host latency was measured."
+  ]
+}

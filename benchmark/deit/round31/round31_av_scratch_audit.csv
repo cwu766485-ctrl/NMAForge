@@ -1,0 +1,13 @@
+historical_run_id,head,query_blocks_reusing_range,query_block_size,last_block_valid_rows,av_base_hex,subtile,subtile_base_hex,subtile_bytes,head_window_bytes,reused_for_each_query_block,round31_product_top_execution
+round30-deit-full197-passive,0,13,16,5,0x00000,0,0x00000,1024,4096,True,False
+round30-deit-full197-passive,0,13,16,5,0x00000,1,0x00400,1024,4096,True,False
+round30-deit-full197-passive,0,13,16,5,0x00000,2,0x00800,1024,4096,True,False
+round30-deit-full197-passive,0,13,16,5,0x00000,3,0x00C00,1024,4096,True,False
+round30-deit-full197-passive,1,13,16,5,0x01000,0,0x01000,1024,4096,True,False
+round30-deit-full197-passive,1,13,16,5,0x01000,1,0x01400,1024,4096,True,False
+round30-deit-full197-passive,1,13,16,5,0x01000,2,0x01800,1024,4096,True,False
+round30-deit-full197-passive,1,13,16,5,0x01000,3,0x01C00,1024,4096,True,False
+round30-deit-full197-passive,2,13,16,5,0x02000,0,0x02000,1024,4096,True,False
+round30-deit-full197-passive,2,13,16,5,0x02000,1,0x02400,1024,4096,True,False
+round30-deit-full197-passive,2,13,16,5,0x02000,2,0x02800,1024,4096,True,False
+round30-deit-full197-passive,2,13,16,5,0x02000,3,0x02C00,1024,4096,True,False

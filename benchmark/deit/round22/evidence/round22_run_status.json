@@ -1,0 +1,77 @@
+{
+  "status": "PARTIAL_TOP_FAILURE_AT_PADDED_LAYERNORM_ROW",
+  "run_id": "round22-deit-197-ln-qkv-first-query-block-seed20261117",
+  "tested_base_sha": "3fd0d480a042b03c919b2e89f7e241c1c9c5f032",
+  "product_rtl_modified": false,
+  "checkpoint": {
+    "id": "facebook/deit-tiny-patch16-224",
+    "config_sha256": "e8786a68c993c04b8721c4d379e4f9de6a9564fba5987704dbf8696d53b7972d",
+    "preprocessor_sha256": "90d1ae427c27d2b9dcb01f6a62ba96aa67aac2de1697c59cd212055b5035c4a2",
+    "weights_sha256": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c"
+  },
+  "simulator": {
+    "name": "Synopsys VCS",
+    "version": "V-2023.12-SP1_Full64",
+    "binary_sha256": "bae2a20c9bd04dba848e6cd5cfd6145af9715e7ae1b6bed39f94b43a5ef560b3",
+    "compile_log": "logs/deit_ln197_qkv_vcs_compile.log.gz",
+    "run_log": "logs/deit_ln197_qkv_vcs_run.log.gz",
+    "console_log": "logs/deit_ln197_qkv_vcs_console.log.gz",
+    "simulator_process_exit_code": 0,
+    "test_disposition": "FAIL; VCS log contains a testbench $fatal and a streamed completion mismatch"
+  },
+  "seed": 20261117,
+  "configuration": {
+    "spad_bytes": 262144,
+    "banks": 4,
+    "words_per_bank": 16384,
+    "valid_tokens": 197,
+    "physical_tokens": 208,
+    "hidden": 192,
+    "heads": 3,
+    "query_rows": 16,
+    "descriptors_planned": 249,
+    "dma_events_planned": 146,
+    "data_high_water_bytes": 219904,
+    "queue_bytes": 40960
+  },
+  "verified_before_failure": {
+    "product_embedding_words_input": 9984,
+    "embedding_readback_sha256": "1e5e52eca57043f2bf7145ac7a6fbbf29fe118f1035425415f50075d9890ec56",
+    "embedding_golden_sha256": "7c7e15693e3ca6654d78e93cb64fd5a63a8c81ca871012c2c71fceaf223597a3",
+    "ln_valid_row_completions_status_ok": 197,
+    "last_valid_ln_row": 196,
+    "qkv_tiles_reached": 0,
+    "attention_reached": false,
+    "full_memory_golden_final_check_reached": false
+  },
+  "first_failure": {
+    "descriptor_index": 209,
+    "descriptor_name": "deit_ln_token_197",
+    "task_id": "0x000071d1",
+    "completion_status": "0x00000072",
+    "completion_disposition": "CPL_ERROR with ERR_DESC",
+    "cause": "generator issued a LayerNorm descriptor for padded row 197; validator constrains src0_stride to the valid 0..196 row range",
+    "expected_contract": "do not issue LayerNorm for padding rows; prepare zeros for padded final packing without illegal row descriptors"
+  },
+  "workload_artifacts": {
+    "input_embedding_base_manifest": "inputs/embedding_base_manifest.json",
+    "input_embedding_golden": "inputs/embedding_base_golden.memh",
+    "product_embedding_readback": "inputs/product_embedding_readback.log",
+    "generated_manifest": "workload/manifest.json",
+    "dma_payload": "workload/dma_payload.memh",
+    "late_dma_plan": "workload/late_dma_plan.memh",
+    "golden": "workload/model_golden.memh",
+    "memory_image": "workload/model_memory.memh"
+  },
+  "independent_compatibility_regression": {
+    "status": "PASS",
+    "command": "cd dv/subsystem/top_smoke/sim && make ai_smoke VCS=/opt/Synopsys/vcs/V-2023.12-SP1/bin/vcs",
+    "random_cases": 4,
+    "ai_seed": 12345,
+    "ntb_random_seed": 1794901328,
+    "kdb_elaboration": "0 errors, 0 warnings",
+    "compile_log": "logs/deit_default_smoke_compile.log.gz",
+    "run_log": "logs/deit_default_smoke_run.log.gz",
+    "simulator": "Synopsys VCS V-2023.12-SP1_Full64"
+  }
+}

@@ -17,6 +17,7 @@ module tb_svse_product_adapter;
 
   ai_tensor_sfu_core product_u(.clk,.resetn,.start,.abort,.op_mode(op_prod),
     .src0_base(aa),.src1_base(bb),.beta_base(32'd0),.beta_enable(1'b0),.pack_enable(1'b0),.pack_tile_a(1'b0),
+    .input_tile_a(1'b0),.src0_stride(32'd0),
     .dst_base(dd),.length(16'(LEN)),.m_size(16'd0),.n_size(16'd0),.scale_shift(shift),.epsilon(32'd1),.watchdog_limit(32'd0),
     .spad_valid(p_valid),.spad_write(p_write),.spad_addr(p_addr),.spad_wdata(p_wdata),
     .spad_ready(p_ready),.spad_rsp_valid(p_rsp_valid),.spad_rdata(p_rdata),

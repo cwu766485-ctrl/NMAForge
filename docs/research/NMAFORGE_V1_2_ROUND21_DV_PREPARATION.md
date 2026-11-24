@@ -43,5 +43,13 @@ Before any future shared RTL/ABI merge, add or identify directed checks for: (1)
 
 The current evidence is targeted engineering validation. It is not full DV sign-off, complete functional/code coverage closure, formal proof, or a classification result.
 
-Cross-model compatibility evidence was collected on the isolated DeiT research branch after the optional LayerNorm tile-row extension: the existing H64 four-layer Product Top autoregressive replay passed four Product-SPAD Logit/argmax steps, with zero resets and zero Host intermediate writes. The final default 128 KiB `ai_smoke` also passed at seed 20261121 with four random cases. These results protect legacy functionality; they do not establish full DV sign-off or trained GPT-2 quality.
+Cross-model compatibility evidence was collected on the isolated DeiT research
+branch after the optional LayerNorm tile-row extension: the existing H64
+four-layer Product Top autoregressive replay passed four Product-SPAD
+Logit/argmax steps, with zero resets and zero Host intermediate writes. The
+final default 128 KiB `ai_smoke` also passed at seed 20261121 with four random
+cases. These results protect the existing synthetic H64 path; they do not
+establish trained GPT-2 quality or full DV sign-off. The optional LayerNorm
+tile-row mode still needs its own negative-descriptor and active-mode
+abort/reset/fault tests before broader adoption.
 

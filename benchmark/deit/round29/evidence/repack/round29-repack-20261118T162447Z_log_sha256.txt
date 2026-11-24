@@ -1,0 +1,2 @@
+b7b5565c61a2e69bbdcee3cad03ca1ea9bb4a09f53e500a3f7b355ab3bf9ed21  /tmp/nmaforge-v12-round29b-deit/benchmark/deit/round29/evidence/repack/round29-repack-20261118T162447Z_compile.log
+94e40b5f4f47a5aa1c9d312aee337a97383eba74fdaca574b3e95b5488fcf548  /tmp/nmaforge-v12-round29b-deit/benchmark/deit/round29/evidence/repack/round29-repack-20261118T162447Z_run.log

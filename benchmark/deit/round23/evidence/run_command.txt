@@ -1,0 +1,11 @@
+/tmp/round23_deit/simv +ntb_random_seed=20261117 +AI_RANDOM_CASES=0 +AI_SEED=20261117 \
+  +ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_LATE_DMA \
+  +AI_DEIT_R21_LN_DEBUG \
+  +AI_REPRESENTATIVE_DMA_PAYLOAD=/tmp/round23_deit/workload_final/dma_payload.memh \
+  +AI_REPRESENTATIVE_DMA_PLAN=/tmp/round23_deit/workload_final/late_dma_plan.memh \
+  +AI_REPRESENTATIVE_MEMORY=/tmp/round23_deit/workload_final/model_memory.memh \
+  +AI_REPRESENTATIVE_GOLDEN=/tmp/round23_deit/workload_final/model_golden.memh \
+  +AI_REPRESENTATIVE_DESC_BASE=221184 +AI_REPRESENTATIVE_CPL_BASE=253952 \
+  +AI_REPRESENTATIVE_DESC_COUNT=246 +AI_REPRESENTATIVE_QUEUE_SIZE=512 \
+  +AI_REPRESENTATIVE_USEFUL_MACS=1769472 -l /tmp/round23_deit/run_round23_final.log
+exit status: 0 (captured in /tmp/round23_deit/run_exit_code.txt)

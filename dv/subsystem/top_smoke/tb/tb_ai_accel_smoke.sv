@@ -96,8 +96,10 @@ module tb_ai_accel_smoke;
     localparam [31:0] SPAD_BYTES = 4 * `AI_SPAD_WORDS_PER_BANK * 4;
 `ifdef AI_H64_WEIGHT_DMA
     localparam [31:0] REPRESENTATIVE_AXI_BYTES = 16384 * 4;
+`elsif AI_DEIT_R19_STREAM
+    localparam [31:0] REPRESENTATIVE_AXI_BYTES = 100000 * 4;
 `elsif AI_REPRESENTATIVE_LONG_TASK
-    localparam [31:0] REPRESENTATIVE_AXI_BYTES = 12288 * 4;
+    localparam [31:0] REPRESENTATIVE_AXI_BYTES = 32768 * 4;
 `else
     localparam [31:0] REPRESENTATIVE_AXI_BYTES = 8192 * 4;
 `endif
@@ -162,6 +164,7 @@ module tb_ai_accel_smoke;
     localparam ERR_PROTECTION    = 4'd6;
 
     reg         aclk;
+    integer ai_deit_av_trace_row;
     reg         aresetn;
     reg  [31:0] s_axi_awaddr;
     reg         s_axi_awvalid;
@@ -506,8 +509,8 @@ module tb_ai_accel_smoke;
     // probes. Files are generated under /tmp; no model data is compiled in.
     reg [31:0] representative_image_words [0:131071];
     reg [31:0] representative_golden_words [0:131071];
-    reg [31:0] representative_dma_plan_words [0:255];
-    reg [31:0] representative_checkpoint_words [0:32767];
+    reg [31:0] representative_dma_plan_words [0:2047];
+    reg [31:0] representative_checkpoint_words [0:65535];
     reg [31:0] h64_persistent_descriptor_words [0:8191];
     integer representative_load_cycles = 0;
     integer representative_load_measure = 1'b0;
@@ -515,6 +518,35 @@ module tb_ai_accel_smoke;
     integer representative_dma_busy_cycles = 0;
     integer representative_dma_window_measure = 1'b0;
     integer representative_dma_busy_measure = 1'b0;
+
+    // Optional Round-21 LayerNorm bridge trace. This observes the existing
+    // SFU registers only; it does not alter the testbench or DUT datapath.
+    always @(posedge aclk) begin
+        if ($test$plusargs("AI_DEIT_R21_LN_DEBUG") &&
+            dut.compute_cluster_u.tensor_sfu_u.op_r == 8'h38 &&
+            dut.compute_cluster_u.tensor_sfu_u.state_r == 6'd33 &&
+            dut.compute_cluster_u.tensor_sfu_u.spad_rsp_valid &&
+            dut.compute_cluster_u.tensor_sfu_u.index_r < 4)
+            $display("DEIT_R21_LN_INPUT index=%0d row=%0d addr=%08h data=%08h signed=%0d",
+                     dut.compute_cluster_u.tensor_sfu_u.index_r,
+                     dut.compute_cluster_u.tensor_sfu_u.input_row_r,
+                     dut.compute_cluster_u.tensor_sfu_u.src0_addr,
+                     dut.compute_cluster_u.tensor_sfu_u.spad_rdata,
+                     dut.compute_cluster_u.tensor_sfu_u.spad_signed);
+        if ($test$plusargs("AI_DEIT_R21_LN_DEBUG") &&
+            dut.compute_cluster_u.tensor_sfu_u.op_r == 8'h38 &&
+            dut.compute_cluster_u.tensor_sfu_u.state_r == 6'd27 &&
+            dut.compute_cluster_u.tensor_sfu_u.index_r == 0)
+            $display("DEIT_R21_LN_FIRST_OUT row=%0d mean=%0d variance=%0d inv=%0d x=%0d gamma=%0d beta=%0d out=%0d",
+                     dut.compute_cluster_u.tensor_sfu_u.input_row_r,
+                     dut.compute_cluster_u.tensor_sfu_u.mean_r,
+                     dut.compute_cluster_u.tensor_sfu_u.mean_sq_r,
+                     dut.compute_cluster_u.tensor_sfu_u.inv_rms_r,
+                     dut.compute_cluster_u.tensor_sfu_u.x_r,
+                     dut.compute_cluster_u.tensor_sfu_u.gamma_r,
+                     dut.compute_cluster_u.tensor_sfu_u.beta_r,
+                     dut.compute_cluster_u.tensor_sfu_u.output_word_r);
+    end
 
     function [31:0] representative_spad_backdoor_read;
         input integer byte_addr;
@@ -577,6 +609,92 @@ module tb_ai_accel_smoke;
     integer transformer_top_profile_cycle;
     reg transformer_top_timing_enable = 1'b0;
     reg transformer_top_prefill_captured = 1'b0;
+
+    // Optional, read-only trace for the Round-24 DeiT AV matrix failure.
+    // It captures the actual controller-selected operands and accumulators;
+    // no DUT signal is forced and the trace is disabled in normal regressions.
+    always @(posedge aclk) begin
+        if ($test$plusargs("AI_DEIT_AV_TRACE") &&
+            dut.compute_cluster_u.sfu_spad_valid &&
+            dut.compute_cluster_u.sfu_spad_write &&
+            dut.compute_cluster_u.engine_core_ready[4] &&
+            dut.compute_cluster_u.sfu_spad_addr >= 32'h0001_c000 &&
+            dut.compute_cluster_u.sfu_spad_addr < 32'h0001_d000) begin
+            $display("DEIT_SFU_PACK_WRITE addr=%08h data=%08h idx=%0d row=%0d kg=%0d group_base=%0d",
+                dut.compute_cluster_u.sfu_spad_addr,
+                dut.compute_cluster_u.sfu_spad_wdata,
+                dut.compute_cluster_u.tensor_sfu_u.index_r,
+                dut.compute_cluster_u.tensor_sfu_u.pack_row_r,
+                dut.compute_cluster_u.tensor_sfu_u.pack_k_group_r,
+                dut.compute_cluster_u.tensor_sfu_u.pack_tile_group_base_r);
+        end
+        if ($test$plusargs("AI_DEIT_AV_TRACE") &&
+            dut.compute_cluster_u.tensor_matrix_u.state_r == 4'd8 &&
+            dut.compute_cluster_u.tensor_matrix_u.dst_tile_base_r == 32'h0002_8000 &&
+            dut.compute_cluster_u.tensor_matrix_u.k_group_r == 16'd0) begin
+            $display("DEIT_AV_TRACE lane=%0d bank=%0d A=%h B=%h nextA=%h nextB=%h",
+                dut.compute_cluster_u.tensor_matrix_u.lane_r,
+                dut.compute_cluster_u.tensor_matrix_u.lane_r[0],
+                dut.compute_cluster_u.tensor_matrix_u.mac_array_u.operand_a_buffer[
+                    dut.compute_cluster_u.tensor_matrix_u.lane_r[0]],
+                dut.compute_cluster_u.tensor_matrix_u.mac_array_u.operand_b_buffer[
+                    dut.compute_cluster_u.tensor_matrix_u.lane_r[0]],
+                dut.compute_cluster_u.tensor_matrix_u.array_load_a,
+                dut.compute_cluster_u.tensor_matrix_u.array_load_b);
+            for (ai_deit_av_trace_row = 0; ai_deit_av_trace_row < 16;
+                 ai_deit_av_trace_row = ai_deit_av_trace_row + 1) begin
+                $display("DEIT_AV_ROW lane=%0d row=%0d a=%0d acc=%0d",
+                    dut.compute_cluster_u.tensor_matrix_u.lane_r,
+                    ai_deit_av_trace_row,
+                    $signed(dut.compute_cluster_u.tensor_matrix_u.mac_array_u.operand_a_buffer[
+                        dut.compute_cluster_u.tensor_matrix_u.lane_r[0]][ai_deit_av_trace_row*8 +: 8]),
+                    dut.compute_cluster_u.tensor_matrix_u.mac_array_u.accumulator[
+                        ai_deit_av_trace_row*16]);
+            end
+        end
+        if ($test$plusargs("AI_DEIT_AV_TRACE") &&
+            dut.compute_cluster_u.tensor_matrix_u.dst_tile_base_r == 32'h0002_8000 &&
+            dut.matrix_banked_read_valid && dut.arb_banked_ready) begin
+            $display("DEIT_AV_REQ state=%0d group=%0d k=%0d addr=%08h arb=%08h arbv=%0d abase=%08h bbase=%08h rsp=%0d outstanding=%0d",
+                dut.compute_cluster_u.tensor_matrix_u.state_r,
+                dut.compute_cluster_u.tensor_matrix_u.read_group_r,
+                dut.compute_cluster_u.tensor_matrix_u.k_group_r,
+                dut.matrix_banked_read_addr,
+                dut.arb_banked_addr, dut.arb_banked_valid,
+                dut.compute_cluster_u.tensor_matrix_u.a_tile_base_r,
+                dut.compute_cluster_u.tensor_matrix_u.b_tile_base_r,
+                dut.banked_rsp_valid,
+                dut.compute_cluster_u.tensor_matrix_u.read_outstanding_count);
+            $display("DEIT_AV_MEM row=%0d words=%08h_%08h_%08h_%08h",
+                dut.matrix_banked_read_addr[17:4],
+                dut.spad_subsystem_u.scratchpad_u.bank3[
+                    dut.matrix_banked_read_addr[17:4]],
+                dut.spad_subsystem_u.scratchpad_u.bank2[
+                    dut.matrix_banked_read_addr[17:4]],
+                dut.spad_subsystem_u.scratchpad_u.bank1[
+                    dut.matrix_banked_read_addr[17:4]],
+                dut.spad_subsystem_u.scratchpad_u.bank0[
+                    dut.matrix_banked_read_addr[17:4]]);
+        end
+        if ($test$plusargs("AI_DEIT_AV_TRACE") && dut.banked_rsp_valid &&
+            dut.compute_cluster_u.tensor_matrix_u.dst_tile_base_r == 32'h0002_8000) begin
+            $display("DEIT_AV_RSP state=%0d meta=%h group=%0d k=%0d req=%08h data=%08h_%08h_%08h_%08h raw=%08h_%08h_%08h_%08h",
+                dut.compute_cluster_u.tensor_matrix_u.state_r,
+                dut.compute_cluster_u.tensor_matrix_u.response_meta,
+                dut.compute_cluster_u.tensor_matrix_u.response_group,
+                dut.compute_cluster_u.tensor_matrix_u.response_k_group,
+                dut.compute_cluster_u.tensor_matrix_u.response_request_addr,
+                dut.banked_data3, dut.banked_data2, dut.banked_data1, dut.banked_data0,
+                dut.spad_subsystem_u.scratchpad_u.bank3[
+                    dut.compute_cluster_u.tensor_matrix_u.response_request_addr[17:4]],
+                dut.spad_subsystem_u.scratchpad_u.bank2[
+                    dut.compute_cluster_u.tensor_matrix_u.response_request_addr[17:4]],
+                dut.spad_subsystem_u.scratchpad_u.bank1[
+                    dut.compute_cluster_u.tensor_matrix_u.response_request_addr[17:4]],
+                dut.spad_subsystem_u.scratchpad_u.bank0[
+                    dut.compute_cluster_u.tensor_matrix_u.response_request_addr[17:4]]);
+        end
+    end
     reg transformer_top_final_captured = 1'b0;
     integer transformer_spad_read_bytes = 0;
     integer transformer_spad_write_bytes = 0;
@@ -1567,8 +1685,10 @@ module tb_ai_accel_smoke;
 
 `ifdef AI_H64_WEIGHT_DMA
     axi_memory_model #(.WORDS(32768)) axi_mem_u(
+`elsif AI_DEIT_R19_STREAM
+    axi_memory_model #(.WORDS(100000)) axi_mem_u(
 `elsif AI_REPRESENTATIVE_LONG_TASK
-    axi_memory_model #(.WORDS(12288)) axi_mem_u(
+    axi_memory_model #(.WORDS(32768)) axi_mem_u(
 `else
     axi_memory_model #(.WORDS(8192)) axi_mem_u(
 `endif
@@ -5487,6 +5607,7 @@ module tb_ai_accel_smoke;
         reg [1023:0] dma_plan_file;
         reg [1023:0] checkpoint_file;
         reg use_dma_preload;
+        reg late_dma_enabled;
         reg allow_live_alias;
         reg have_checkpoints;
         reg dma_weight_address;
@@ -5499,6 +5620,21 @@ module tb_ai_accel_smoke;
         integer golden_index;
         integer dma_plan_count;
         integer dma_plan_index;
+        integer late_dma_event_count;
+        integer late_dma_event_index;
+        integer late_dma_desc_index;
+        integer late_dma_trigger_desc;
+        integer late_dma_ext_addr;
+        integer late_dma_spad_addr;
+        integer late_dma_word_count;
+        integer late_dma_payload_bytes;
+        integer late_dma_checked_words;
+        integer late_dma_window_start;
+        integer late_dma_command_cycles;
+        integer late_dma_session_start;
+        integer late_dma_session_cycles;
+        integer late_dma_readback_start;
+        integer late_dma_readback_cycles;
         integer dma_payload_bytes;
         integer dma_sentinel_setup_bytes;
         integer host_fixture_bytes;
@@ -5509,6 +5645,7 @@ module tb_ai_accel_smoke;
         integer checkpoint_cursor;
         integer checkpoint_pair;
         integer checkpoint_retired;
+        integer checkpoint_verified_count;
         integer checkpoint_desc [0:127];
         integer checkpoint_words [0:127];
         integer checkpoint_start [0:127];
@@ -5560,6 +5697,8 @@ module tb_ai_accel_smoke;
         reg [1023:0] representative_dump_file;
         reg [31:0] read_value;
         reg [31:0] status_value;
+        reg checkpoint_read_ok;
+        reg late_dma_status_ok;
         begin
             if (!$value$plusargs("AI_REPRESENTATIVE_MEMORY=%s", image_file) ||
                 !$value$plusargs("AI_REPRESENTATIVE_GOLDEN=%s", golden_file) ||
@@ -5585,6 +5724,10 @@ module tb_ai_accel_smoke;
                     $fatal(1, "representative H64 work accounting is inconsistent");
             end
             system_mode = $test$plusargs("SYSTEM_TIMELINE");
+            late_dma_session_start = transformer_top_cycle_counter;
+            representative_load_cycles = 0;
+            representative_dma_window_cycles = 0;
+            representative_dma_busy_cycles = 0;
             sys_start=0;
             if(system_mode && $test$plusargs("SYSTEM_BACKPRESSURE")) begin
                 axi_mem_u.ready_gap_cfg=3;
@@ -5593,11 +5736,89 @@ module tb_ai_accel_smoke;
                 axi_mem_u.awready_gap_cfg=3;
             end
             use_dma_preload = $test$plusargs("AI_REPRESENTATIVE_DMA_PRELOAD");
+            late_dma_enabled = $test$plusargs("AI_REPRESENTATIVE_LATE_DMA");
+            late_dma_event_count = 0;
+            late_dma_event_index = 0;
+            late_dma_payload_bytes = 0;
+            late_dma_checked_words = 0;
+            late_dma_command_cycles = 0;
+            late_dma_session_cycles = 0;
+            late_dma_readback_cycles = 0;
+            if (late_dma_enabled && use_dma_preload)
+                $fatal(1, "late DMA mode cannot be combined with up-front DMA preload");
             allow_live_alias = $test$plusargs("AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS");
             have_checkpoints = 1'b0;
+            checkpoint_count = 0;
+            checkpoint_verified_count = 0;
             prefill_descriptor_count = 0;
             void'($value$plusargs("AI_REPRESENTATIVE_PREFILL_DESC_COUNT=%d",
                                   prefill_descriptor_count));
+
+            if (late_dma_enabled) begin
+                if (!$value$plusargs("AI_REPRESENTATIVE_DMA_PAYLOAD=%s", dma_payload_file) ||
+                    !$value$plusargs("AI_REPRESENTATIVE_DMA_PLAN=%s", dma_plan_file))
+                    $fatal(1, "late DMA mode requires payload and event plan files");
+                if ($value$plusargs("AI_REPRESENTATIVE_CHECKPOINTS=%s", checkpoint_file)) begin
+                    $readmemh(checkpoint_file, representative_checkpoint_words);
+                    checkpoint_count = representative_checkpoint_words[0];
+                    if (checkpoint_count < 1 || checkpoint_count > 128)
+                        $fatal(1, "invalid streamed checkpoint count=%0d", checkpoint_count);
+                    checkpoint_cursor = 1;
+                    for (checkpoint_index = 0; checkpoint_index < checkpoint_count;
+                         checkpoint_index = checkpoint_index + 1) begin
+                        checkpoint_desc[checkpoint_index] =
+                            representative_checkpoint_words[checkpoint_cursor];
+                        checkpoint_words[checkpoint_index] =
+                            representative_checkpoint_words[checkpoint_cursor + 1];
+                        checkpoint_start[checkpoint_index] = checkpoint_cursor + 2;
+                        if (checkpoint_desc[checkpoint_index] < 0 ||
+                            checkpoint_desc[checkpoint_index] >= descriptor_count ||
+                            checkpoint_words[checkpoint_index] <= 0 ||
+                            checkpoint_words[checkpoint_index] > 8192 ||
+                            checkpoint_cursor + 2 +
+                                checkpoint_words[checkpoint_index] * 2 > 65536)
+                            $fatal(1, "invalid streamed checkpoint record=%0d desc=%0d words=%0d cursor=%0d",
+                                   checkpoint_index, checkpoint_desc[checkpoint_index],
+                                   checkpoint_words[checkpoint_index], checkpoint_cursor);
+                        checkpoint_cursor = checkpoint_cursor + 2 +
+                                            checkpoint_words[checkpoint_index] * 2;
+                    end
+                    have_checkpoints = 1'b1;
+                end
+                $readmemh(dma_payload_file, axi_mem_u.mem);
+                $readmemh(dma_plan_file, representative_dma_plan_words);
+                late_dma_event_count = representative_dma_plan_words[0];
+                if (late_dma_event_count < 1 || late_dma_event_count > 512)
+                    $fatal(1, "invalid late DMA event count=%0d", late_dma_event_count);
+                for (dma_plan_index = 0; dma_plan_index < late_dma_event_count;
+                     dma_plan_index = dma_plan_index + 1) begin
+                    late_dma_trigger_desc =
+                        representative_dma_plan_words[1 + dma_plan_index * 4];
+                    late_dma_ext_addr =
+                        representative_dma_plan_words[2 + dma_plan_index * 4];
+                    late_dma_spad_addr =
+                        representative_dma_plan_words[3 + dma_plan_index * 4];
+                    late_dma_word_count =
+                        representative_dma_plan_words[4 + dma_plan_index * 4];
+                    if (late_dma_trigger_desc < 0 ||
+                        late_dma_trigger_desc >= descriptor_count ||
+                        late_dma_ext_addr < 0 || late_dma_spad_addr < 0 ||
+                        late_dma_ext_addr[3:0] != 0 || late_dma_spad_addr[3:0] != 0 ||
+                        late_dma_word_count <= 0 || late_dma_word_count > 256 ||
+                        late_dma_word_count[1:0] != 0 ||
+                        late_dma_ext_addr + late_dma_word_count * 4 > REPRESENTATIVE_AXI_BYTES ||
+                        late_dma_spad_addr + late_dma_word_count * 4 > SPAD_BYTES)
+                        $fatal(1, "invalid late DMA event=%0d trigger=%0d ext=%08h spad=%08h words=%0d",
+                               dma_plan_index, late_dma_trigger_desc, late_dma_ext_addr,
+                               late_dma_spad_addr, late_dma_word_count);
+                    if (dma_plan_index > 0 &&
+                        late_dma_trigger_desc <
+                            representative_dma_plan_words[1 + (dma_plan_index - 1) * 4])
+                        $fatal(1, "late DMA events must be sorted by descriptor trigger");
+                    late_dma_payload_bytes = late_dma_payload_bytes +
+                                             late_dma_word_count * 4;
+                end
+            end
 
             $readmemh(image_file, representative_image_words);
             $readmemh(golden_file, representative_golden_words);
@@ -5605,9 +5826,9 @@ module tb_ai_accel_smoke;
             golden_count = representative_golden_words[0];
             if (image_count <= 0 || image_count > 65535 ||
                 golden_count <= 0 || golden_count > 65535 ||
-                descriptor_count < 1 || descriptor_count > 512 ||
+                descriptor_count < 1 || descriptor_count > 768 ||
                 representative_queue_size <= descriptor_count ||
-                representative_queue_size > 512 ||
+                representative_queue_size > 768 ||
                 prefill_descriptor_count < 0 ||
                 prefill_descriptor_count > descriptor_count ||
                 descriptor_base < 0 || completion_base < 0 ||
@@ -5617,6 +5838,8 @@ module tb_ai_accel_smoke;
 
             representative_load_cycles = 0;
             host_fixture_bytes = 0;
+            dma_sentinel_setup_bytes = 0;
+            dma_payload_bytes = 0;
             if (use_dma_preload) begin
                 if (!$value$plusargs("AI_REPRESENTATIVE_DMA_PAYLOAD=%s", dma_payload_file) ||
                     !$value$plusargs("AI_REPRESENTATIVE_DMA_PLAN=%s", dma_plan_file))
@@ -5794,6 +6017,9 @@ module tb_ai_accel_smoke;
                                image_index, representative_image_words[1 + 2 * image_index]);
                     axi_write(SPAD_BASE + representative_image_words[1 + 2 * image_index],
                               representative_image_words[2 + 2 * image_index]);
+                    host_fixture_bytes = host_fixture_bytes + 4;
+                    if (representative_image_words[2 + 2 * image_index] == 32'ha55a_a55a)
+                        dma_sentinel_setup_bytes = dma_sentinel_setup_bytes + 4;
                 end
                 representative_load_measure = 1'b0;
             end
@@ -5814,7 +6040,7 @@ module tb_ai_accel_smoke;
             axi_write(REG_CMDQ_BASE_HI, 32'd0);
             axi_write(REG_CMDQ_SIZE, representative_queue_size);
             axi_write(REG_CMDQ_HEAD, 32'd0);
-            axi_write(REG_CMDQ_TAIL, descriptor_count);
+            axi_write(REG_CMDQ_TAIL, late_dma_enabled ? 32'd0 : descriptor_count);
             axi_write(REG_CPLQ_BASE_LO, completion_base);
             axi_write(REG_CPLQ_SIZE, representative_queue_size);
             axi_write(REG_CPLQ_HEAD, 32'd0);
@@ -5852,26 +6078,130 @@ module tb_ai_accel_smoke;
             sys_cmd_begin=transformer_top_cycle_counter;
             transformer_top_timing_enable = 1'b1;
             checkpoint_retired = 0;
-            axi_write(REG_DOORBELL, 32'd1);
-            for (poll_index = 0; poll_index < 2000000 &&
-                 !transformer_top_final_captured; poll_index = poll_index + 1) begin
-                @(posedge aclk);
-                #0.001;
-                completed_count = dut.processor_cplq_tail;
-                while (have_checkpoints && checkpoint_retired < completed_count) begin
+            if (late_dma_enabled) begin
+                // The event plan is sorted by consumer descriptor.  Each DMA
+                // fence completes and its destination is checked before that
+                // descriptor is published to the real Product CMDQ.
+                representative_dma_window_cycles = 0;
+                representative_dma_busy_cycles = 0;
+                r20_dma_ar_bursts = 0;
+                r20_dma_ar_bytes = 0;
+                r20_dma_r_beats = 0;
+                r20_dma_ar_q_head = 0;
+                r20_dma_ar_q_tail = 0;
+                r20_dma_read_latency_sum = 0;
+                r20_dma_read_latency_max = 0;
+                r20_dma_read_latency_count = 0;
+                r20_dma_monitor_enable = 1'b1;
+                for (late_dma_desc_index = 0;
+                     late_dma_desc_index < descriptor_count;
+                     late_dma_desc_index = late_dma_desc_index + 1) begin
+                    while (late_dma_event_index < late_dma_event_count &&
+                           representative_dma_plan_words[
+                               1 + late_dma_event_index * 4] == late_dma_desc_index) begin
+                        late_dma_trigger_desc = representative_dma_plan_words[
+                            1 + late_dma_event_index * 4];
+                        late_dma_ext_addr = representative_dma_plan_words[
+                            2 + late_dma_event_index * 4];
+                        late_dma_spad_addr = representative_dma_plan_words[
+                            3 + late_dma_event_index * 4];
+                        late_dma_word_count = representative_dma_plan_words[
+                            4 + late_dma_event_index * 4];
+                        late_dma_window_start = transformer_top_cycle_counter;
+                        representative_dma_window_measure = 1'b1;
+                        representative_dma_busy_measure = 1'b1;
+                        if (late_dma_event_index == 0) begin
+                            axi_write(REG_DMA_ROW_WORDS, 32'd0);
+                            axi_write(REG_DMA_ROW_COUNT, 32'd0);
+                            axi_write(REG_DMA_EXT_STRIDE, 32'd0);
+                            axi_write(REG_DMA_SPAD_STRIDE, 32'd0);
+                            axi_write(REG_DMA_GATHER_INDEX, 32'd0);
+                            axi_write(REG_DMA_CFG, 32'd0);
+                        end
+                        axi_write(REG_DMA_EXT_ADDR, late_dma_ext_addr);
+                        axi_write(REG_DMA_SPAD_ADDR, late_dma_spad_addr);
+                        axi_write(REG_DMA_LENGTH, late_dma_word_count);
+                        axi_write(REG_DMA_CTRL, 32'h0000_0001);
+                        for (poll_index = 0; poll_index < 200000 &&
+                             !dut.dma_done && !dut.dma_error; poll_index = poll_index + 1)
+                            @(posedge aclk);
+                        if (poll_index == 200000)
+                            $fatal(1, "late DMA fence timeout event=%0d desc=%0d ext=%08h spad=%08h words=%0d",
+                                   late_dma_event_index, late_dma_trigger_desc,
+                                   late_dma_ext_addr, late_dma_spad_addr,
+                                   late_dma_word_count);
+                        axi_read(REG_DMA_STATUS, status_value);
+                        if (!(dut.dma_done || status_value[1]) ||
+                            dut.dma_error || status_value[2])
+                            $fatal(1, "late DMA failed event=%0d status=%08h",
+                                   late_dma_event_index, status_value);
+                        for (dma_payload_word_index = 0;
+                             dma_payload_word_index < late_dma_word_count;
+                             dma_payload_word_index = dma_payload_word_index + 1) begin
+                            read_value = representative_spad_backdoor_read(
+                                late_dma_spad_addr + dma_payload_word_index * 4);
+                            if (read_value !== axi_mem_u.mem[
+                                    late_dma_ext_addr / 4 + dma_payload_word_index])
+                                $fatal(1, "late DMA integrity mismatch event=%0d word=%0d ext=%08h spad=%08h expected=%08h actual=%08h",
+                                       late_dma_event_index, dma_payload_word_index,
+                                       late_dma_ext_addr + dma_payload_word_index * 4,
+                                       late_dma_spad_addr + dma_payload_word_index * 4,
+                                       axi_mem_u.mem[late_dma_ext_addr / 4 +
+                                                     dma_payload_word_index], read_value);
+                            late_dma_checked_words = late_dma_checked_words + 1;
+                        end
+                        axi_write(REG_DMA_STATUS, 32'd2);
+                        representative_dma_busy_measure = 1'b0;
+                        representative_dma_window_measure = 1'b0;
+                        $display("REPRESENTATIVE_LATE_DMA_PASS event=%0d before_desc=%0d bytes=%0d fence=1 checked_words=%0d cycles=%0d",
+                                 late_dma_event_index, late_dma_trigger_desc,
+                                 late_dma_word_count * 4, late_dma_word_count,
+                                 transformer_top_cycle_counter - late_dma_window_start);
+                        late_dma_event_index = late_dma_event_index + 1;
+                    end
+                    if (late_dma_event_index < late_dma_event_count &&
+                        representative_dma_plan_words[
+                            1 + late_dma_event_index * 4] < late_dma_desc_index)
+                        $fatal(1, "late DMA trigger was skipped desc=%0d event=%0d trigger=%0d",
+                               late_dma_desc_index, late_dma_event_index,
+                               representative_dma_plan_words[
+                                   1 + late_dma_event_index * 4]);
+                    axi_write(REG_CMDQ_TAIL, late_dma_desc_index + 1);
+                    axi_write(REG_DOORBELL, 32'd1);
+                    for (poll_index = 0; poll_index < 2000000 &&
+                         dut.processor_cplq_tail < late_dma_desc_index + 1;
+                         poll_index = poll_index + 1) begin
+                        @(posedge aclk);
+                        #0.001;
+                    end
+                    if (dut.processor_cplq_tail != late_dma_desc_index + 1 ||
+                        dut.processor_cmdq_head != late_dma_desc_index + 1)
+                        $fatal(1, "streamed descriptor timeout index=%0d cmd_head=%0d cpl_tail=%0d",
+                               late_dma_desc_index, dut.processor_cmdq_head,
+                               dut.processor_cplq_tail);
+                    axi_read(SPAD_BASE + completion_base + late_dma_desc_index * 16,
+                             read_value);
+                    axi_read(SPAD_BASE + completion_base + late_dma_desc_index * 16 + 4,
+                             status_value);
+                    if (read_value !== (32'h0000_7100 + late_dma_desc_index) ||
+                        status_value !== 32'd1)
+                        $fatal(1, "streamed completion mismatch index=%0d id=%08h status=%08h",
+                               late_dma_desc_index, read_value, status_value);
                     for (checkpoint_index = 0; checkpoint_index < checkpoint_count;
                          checkpoint_index = checkpoint_index + 1) begin
-                        if (checkpoint_desc[checkpoint_index] == checkpoint_retired) begin
+                        if (have_checkpoints &&
+                            checkpoint_desc[checkpoint_index] == late_dma_desc_index) begin
                             for (checkpoint_pair = 0;
                                  checkpoint_pair < checkpoint_words[checkpoint_index];
                                  checkpoint_pair = checkpoint_pair + 1) begin
                                 read_value = representative_spad_backdoor_read(
-                                    representative_checkpoint_words[
+                                        representative_checkpoint_words[
                                         checkpoint_start[checkpoint_index] + checkpoint_pair * 2]);
                                 if (read_value !== representative_checkpoint_words[
                                         checkpoint_start[checkpoint_index] + checkpoint_pair * 2 + 1])
-                                    $fatal(1, "representative checkpoint mismatch desc=%0d tensor_record=%0d pair=%0d addr=%08h expected=%08h actual=%08h",
-                                           checkpoint_retired, checkpoint_index, checkpoint_pair,
+                                    $fatal(1, "streamed checkpoint mismatch desc=%0d record=%0d pair=%0d addr=%08h expected=%08h actual=%08h",
+                                           late_dma_desc_index, checkpoint_index,
+                                           checkpoint_pair,
                                            representative_checkpoint_words[
                                                checkpoint_start[checkpoint_index] + checkpoint_pair * 2],
                                            representative_checkpoint_words[
@@ -5879,11 +6209,64 @@ module tb_ai_accel_smoke;
                                            read_value);
                             end
                             $display("REPRESENTATIVE_CHECKPOINT_PASS desc=%0d record=%0d words=%0d method=behavioral_sram_backdoor_nonintrusive",
-                                     checkpoint_retired, checkpoint_index,
+                                     late_dma_desc_index, checkpoint_index,
                                      checkpoint_words[checkpoint_index]);
+                            checkpoint_verified_count = checkpoint_verified_count + 1;
                         end
                     end
-                    checkpoint_retired = checkpoint_retired + 1;
+                    checkpoint_retired = late_dma_desc_index + 1;
+                    axi_write(REG_CPLQ_HEAD, late_dma_desc_index + 1);
+                    $display("REPRESENTATIVE_STREAMED_DESC_RETIRE_PASS index=%0d task_id=%08h status=1",
+                             late_dma_desc_index, read_value);
+                end
+                r20_dma_monitor_enable = 1'b0;
+                if (late_dma_event_index != late_dma_event_count ||
+                    late_dma_checked_words * 4 != late_dma_payload_bytes ||
+                    r20_dma_ar_bytes != late_dma_payload_bytes ||
+                    r20_dma_ar_bursts == 0 || r20_dma_r_beats == 0)
+                    $fatal(1, "late DMA accounting mismatch events=%0d/%0d checked=%0d bytes=%0d AXI=%0d bursts=%0d beats=%0d",
+                           late_dma_event_index, late_dma_event_count,
+                           late_dma_checked_words * 4, late_dma_payload_bytes,
+                           r20_dma_ar_bytes, r20_dma_ar_bursts, r20_dma_r_beats);
+                $display("REPRESENTATIVE_LATE_DMA_SUMMARY events=%0d payload_bytes=%0d checked_words=%0d axi_read_bytes=%0d ar_bursts=%0d r_beats=%0d setup_transfer_cycles=%0d",
+                         late_dma_event_count, late_dma_payload_bytes,
+                         late_dma_checked_words, r20_dma_ar_bytes,
+                         r20_dma_ar_bursts, r20_dma_r_beats,
+                         representative_dma_window_cycles);
+            end else begin
+                axi_write(REG_DOORBELL, 32'd1);
+                for (poll_index = 0; poll_index < 2000000 &&
+                     !transformer_top_final_captured; poll_index = poll_index + 1) begin
+                    @(posedge aclk);
+                    #0.001;
+                    completed_count = dut.processor_cplq_tail;
+                    while (have_checkpoints && checkpoint_retired < completed_count) begin
+                        for (checkpoint_index = 0; checkpoint_index < checkpoint_count;
+                             checkpoint_index = checkpoint_index + 1) begin
+                            if (checkpoint_desc[checkpoint_index] == checkpoint_retired) begin
+                                for (checkpoint_pair = 0;
+                                     checkpoint_pair < checkpoint_words[checkpoint_index];
+                                     checkpoint_pair = checkpoint_pair + 1) begin
+                                    read_value = representative_spad_backdoor_read(
+                                        representative_checkpoint_words[
+                                            checkpoint_start[checkpoint_index] + checkpoint_pair * 2]);
+                                    if (read_value !== representative_checkpoint_words[
+                                            checkpoint_start[checkpoint_index] + checkpoint_pair * 2 + 1])
+                                        $fatal(1, "representative checkpoint mismatch desc=%0d tensor_record=%0d pair=%0d addr=%08h expected=%08h actual=%08h",
+                                               checkpoint_retired, checkpoint_index, checkpoint_pair,
+                                               representative_checkpoint_words[
+                                                   checkpoint_start[checkpoint_index] + checkpoint_pair * 2],
+                                               representative_checkpoint_words[
+                                                   checkpoint_start[checkpoint_index] + checkpoint_pair * 2 + 1],
+                                               read_value);
+                                end
+                                $display("REPRESENTATIVE_CHECKPOINT_PASS desc=%0d record=%0d words=%0d method=behavioral_sram_backdoor_nonintrusive",
+                                         checkpoint_retired, checkpoint_index,
+                                         checkpoint_words[checkpoint_index]);
+                            end
+                        end
+                        checkpoint_retired = checkpoint_retired + 1;
+                    end
                 end
             end
             transformer_top_timing_enable = 1'b0;
@@ -5898,8 +6281,24 @@ module tb_ai_accel_smoke;
             if (have_checkpoints && checkpoint_retired != descriptor_count)
                 $fatal(1, "checkpoint completion monitor ended early retired=%0d expected=%0d",
                        checkpoint_retired, descriptor_count);
+            if (have_checkpoints && checkpoint_verified_count != checkpoint_count)
+                $fatal(1, "streamed checkpoint records not all verified verified=%0d expected=%0d",
+                       checkpoint_verified_count, checkpoint_count);
+
+            if ($test$plusargs("AI_DEIT_AV_TRACE") && descriptor_count == 241) begin
+                $display("DEIT_PACK_BANKS row=7168 b3=%08h b2=%08h b1=%08h b0=%08h axi=%08h_%08h_%08h_%08h",
+                    dut.spad_subsystem_u.scratchpad_u.bank3[7168],
+                    dut.spad_subsystem_u.scratchpad_u.bank2[7168],
+                    dut.spad_subsystem_u.scratchpad_u.bank1[7168],
+                    dut.spad_subsystem_u.scratchpad_u.bank0[7168],
+                    representative_spad_backdoor_read(32'h0001_c00c),
+                    representative_spad_backdoor_read(32'h0001_c008),
+                    representative_spad_backdoor_read(32'h0001_c004),
+                    representative_spad_backdoor_read(32'h0001_c000));
+            end
 
             sys_completed=transformer_top_final_end_cycle;
+            late_dma_readback_start = transformer_top_cycle_counter;
             for (completion_index = 0; completion_index < descriptor_count;
                  completion_index = completion_index + 1) begin
                 axi_read(SPAD_BASE + completion_base + completion_index * 16, read_value);
@@ -5955,6 +6354,13 @@ module tb_ai_accel_smoke;
                     $fatal(1, "representative Golden mismatch index=%0d addr=%08h expected=%08h actual=%08h",
                            golden_index, representative_golden_words[1 + 2 * golden_index],
                            representative_golden_words[2 + 2 * golden_index], read_value);
+            end
+
+            if (late_dma_enabled) begin
+                late_dma_readback_cycles = transformer_top_cycle_counter -
+                                           late_dma_readback_start;
+                late_dma_session_cycles = transformer_top_cycle_counter -
+                                          late_dma_session_start;
             end
 
             // Optional post-prefix SPAD snapshot for staged descriptor debug.
@@ -6032,8 +6438,14 @@ module tb_ai_accel_smoke;
             no_engine_cycles = transformer_top_profile_no_engine_busy;
             dma_busy_cycles = transformer_top_profile_dma_busy;
             command_cycles = transformer_top_final_end_cycle - transformer_top_start_cycle;
+            late_dma_command_cycles = late_dma_enabled ?
+                command_cycles - representative_dma_window_cycles : 0;
+            if (late_dma_command_cycles < 0)
+                $fatal(1, "late DMA window exceeds the command session window");
             end_to_end_cycles = representative_load_cycles + command_cycles +
                                 (use_dma_preload ? representative_dma_window_cycles : 0);
+            if (late_dma_enabled)
+                end_to_end_cycles = late_dma_session_cycles;
             prefill_command_cycles = 0;
             decode_command_cycles = 0;
             prefill_exclusive_cycles = 0;
@@ -6065,9 +6477,11 @@ module tb_ai_accel_smoke;
                 matrix_response_wait_cycles + matrix_writeback_cycles + matrix_other_cycles +
                 sfu_busy_cycles + kv_busy_cycles + conv_busy_cycles + banked_busy_cycles +
                 fp_busy_cycles + scalar_busy_cycles + no_engine_cycles;
-            preloaded_spad_bytes = use_dma_preload ?
-                                   (host_fixture_bytes + dma_payload_bytes) :
-                                   (image_count * 4);
+            preloaded_spad_bytes = late_dma_enabled ?
+                                   (host_fixture_bytes + late_dma_payload_bytes) :
+                                   (use_dma_preload ?
+                                    (host_fixture_bytes + dma_payload_bytes) :
+                                    (image_count * 4));
             if (exclusive_profile_cycles != command_cycles)
                 $fatal(1, "representative exclusive profile does not close cycles=%0d buckets=%0d",
                        command_cycles, exclusive_profile_cycles);
@@ -6088,7 +6502,7 @@ module tb_ai_accel_smoke;
                     array_utilization = -1.0;
                 useful_array_utilization = 100.0 * useful_macs / (256.0 * matrix_mac_cycles);
             end
-            $display("REPRESENTATIVE_MODEL_PASS desc=%0d prefill_desc=%0d decode_desc=%0d golden_words=%0d useful_macs=%0d executed_macs=%0d padding_macs=%0d useful_output_elements=%0d physical_output_elements=%0d command_cycles=%0d end_to_end_cycles=%0d dma_preload_included=%0d prefill_command_cycles=%0d decode_command_cycles=%0d prefill_exclusive_cycles=%0d decode_exclusive_cycles=%0d exclusive_profile_cycles=%0d preload_axi_cycles=%0d preload_dma_window_cycles=%0d preload_dma_busy_cycles=%0d preloaded_spad_bytes=%0d useful_mac_per_cycle=%0.4f executed_array_utilization_pct=%0.2f useful_array_utilization_pct=%0.2f matrix_mac_cycles=%0d matrix_req_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d sfu_busy=%0d kv_busy=%0d conv_busy=%0d banked_busy=%0d fp_busy=%0d scalar_busy=%0d no_engine_dispatch_remainder=%0d dma_busy_overlap=%0d spad_read_bytes=%0d spad_write_bytes=%0d",
+            $display("REPRESENTATIVE_MODEL_PASS desc=%0d prefill_desc=%0d decode_desc=%0d golden_words=%0d useful_macs=%0d executed_macs=%0d padding_macs=%0d useful_output_elements=%0d physical_output_elements=%0d command_cycles=%0d end_to_end_cycles=%0d dma_preload_included=%0d prefill_command_cycles=%0d decode_command_cycles=%0d prefill_exclusive_cycles=%0d decode_exclusive_cycles=%0d exclusive_profile_cycles=%0d preload_axi_cycles=%0d preload_dma_window_cycles=%0d preload_dma_busy_cycles=%0d preloaded_spad_bytes=%0d useful_mac_per_cycle=%0.4f executed_array_utilization_pct=%0.2f useful_array_utilization_pct=%0.2f matrix_mac_cycles=%0d matrix_req_wait=%0d matrix_rsp_wait=%0d matrix_writeback=%0d matrix_other=%0d sfu_busy=%0d kv_busy=%0d conv_busy=%0d banked_busy=%0d fp_busy=%0d scalar_busy=%0d no_engine_dispatch_remainder=%0d dma_busy_overlap=%0d spad_read_bytes=%0d spad_write_bytes=%0d late_dma_events=%0d late_dma_payload_bytes=%0d late_dma_window_cycles=%0d command_cycles_excluding_late_dma=%0d late_dma_readback_cycles=%0d late_dma_session_cycles=%0d host_fixture_bytes=%0d test_only_poison_setup_bytes=%0d",
                      descriptor_count,
                      prefill_descriptor_count > 0 ? prefill_descriptor_count : 0,
                      prefill_descriptor_count > 0 ?
@@ -6107,8 +6521,13 @@ module tb_ai_accel_smoke;
                      matrix_other_cycles, sfu_busy_cycles, kv_busy_cycles,
                      conv_busy_cycles, banked_busy_cycles, fp_busy_cycles,
                      scalar_busy_cycles, no_engine_cycles, dma_busy_cycles,
-                     spad_read_bytes, spad_write_bytes);
-            if ($test$plusargs("AI_H64_PERSISTENT")) begin
+                     spad_read_bytes, spad_write_bytes,
+                     late_dma_event_count, late_dma_payload_bytes,
+                     representative_dma_window_cycles, late_dma_command_cycles,
+                     late_dma_readback_cycles, late_dma_session_cycles,
+                     host_fixture_bytes, dma_sentinel_setup_bytes);
+            if ($test$plusargs("AI_H64_PERSISTENT") ||
+                $test$plusargs("AI_DEIT_R30_CONTINUOUS_ATTENTION")) begin
                 // The Product Top and KV-cache remain live across invocations.
                 // All completion words were checked above; retire before the
                 // next descriptor is allowed to reuse a ring slot or tensor.
@@ -6118,6 +6537,193 @@ module tb_ai_accel_smoke;
                 axi_write(REG_CPLQ_SIZE, 32'd0);
             end
             clear_done_irq();
+        end
+    endtask
+
+    // Round 30 DeiT runtime. Q/K/V are produced by the 468-descriptor Product
+    // workload above. This task only publishes bounded descriptor batches and
+    // observes completed SPAD results through the passive simulation
+    // backdoor; it never reads, repacks, or writes activation tensors through
+    // the host interface.
+    task run_deit_round30_continuous_attention;
+        reg [1023:0] batch_root;
+        reg [1023:0] desc_file;
+        reg [1023:0] golden_file;
+        reg [31:0] descriptor_words [0:15];
+        reg [31:0] completion_word;
+        reg [31:0] status_word;
+        reg [31:0] cmd_head;
+        reg [31:0] cpl_tail;
+        reg [31:0] expected_cpl_tail;
+        reg [31:0] read_value;
+        reg read_ok;
+        reg queue_idle;
+        integer batch_total;
+        integer streamed_expected;
+        integer wraps_expected;
+        integer query_blocks_expected;
+        integer batch_index;
+        integer descriptor_count;
+        integer pair_count;
+        integer descriptor_index;
+        integer pair_index;
+        integer word_index;
+        integer cmdq_base;
+        integer cplq_base;
+        integer queue_size;
+        integer cmd_tail;
+        integer cpl_head;
+        integer start_cycle;
+        integer finish_cycle;
+        integer streamed_total;
+        integer ring_wraps;
+        integer slot;
+        integer task_id;
+        integer checkpoint_addr;
+        integer checkpoint_expected;
+        integer checkpoint_verified;
+        begin
+            if (!$value$plusargs("AI_DEIT_R30_BATCH_ROOT=%s", batch_root) ||
+                !$value$plusargs("AI_DEIT_R30_BATCH_COUNT=%d", batch_total) ||
+                !$value$plusargs("AI_DEIT_R30_STREAMED_DESC_COUNT=%d", streamed_expected) ||
+                !$value$plusargs("AI_DEIT_R30_EXPECTED_RING_WRAPS=%d", wraps_expected) ||
+                !$value$plusargs("AI_DEIT_R30_QUERY_BLOCKS=%d", query_blocks_expected) ||
+                !$value$plusargs("AI_REPRESENTATIVE_DESC_BASE=%d", cmdq_base) ||
+                !$value$plusargs("AI_REPRESENTATIVE_CPL_BASE=%d", cplq_base) ||
+                !$value$plusargs("AI_REPRESENTATIVE_QUEUE_SIZE=%d", queue_size))
+                $fatal(1, "DeiT Round30 runtime requires batch, queue and base arguments");
+            if ((query_blocks_expected != 1 && query_blocks_expected != 13) ||
+                batch_total != (3 + 3 * query_blocks_expected * 4) ||
+                streamed_expected != (9 + 3 * query_blocks_expected * 245) ||
+                queue_size != 512)
+                $fatal(1, "DeiT Round30 runtime geometry mismatch batches=%0d streamed=%0d query_blocks=%0d queue=%0d",
+                       batch_total, streamed_expected, query_blocks_expected,
+                       queue_size);
+
+            axi_read(REG_CMDQ_HEAD, cmd_head);
+            axi_read(REG_CMDQ_TAIL, cmd_tail);
+            axi_read(REG_CPLQ_HEAD, cpl_head);
+            axi_read(REG_CPLQ_TAIL, cpl_tail);
+            if (cmd_head != 468 || cmd_tail != 468 ||
+                cpl_head != 468 || cpl_tail != 468)
+                $fatal(1, "DeiT Round30 prefix queue state mismatch cmd=%0d/%0d cpl=%0d/%0d expected=468",
+                       cmd_head, cmd_tail, cpl_head, cpl_tail);
+
+            streamed_total = 0;
+            ring_wraps = 0;
+            checkpoint_verified = 0;
+            start_cycle = transformer_top_cycle_counter;
+            for (batch_index = 0; batch_index < batch_total;
+                 batch_index = batch_index + 1) begin
+                $sformat(desc_file, "%0s/batch_%02d_desc.memh",
+                         batch_root, batch_index);
+                $sformat(golden_file, "%0s/batch_%02d_golden.memh",
+                         batch_root, batch_index);
+                $readmemh(desc_file, representative_image_words);
+                descriptor_count = representative_image_words[0];
+                if (descriptor_count < 1 || descriptor_count >= queue_size)
+                    $fatal(1, "DeiT Round30 invalid batch size batch=%0d count=%0d",
+                           batch_index, descriptor_count);
+                if ((cmd_tail + descriptor_count) >= queue_size)
+                    ring_wraps = ring_wraps + 1;
+
+                for (descriptor_index = 0; descriptor_index < descriptor_count;
+                     descriptor_index = descriptor_index + 1) begin
+                    for (word_index = 0; word_index < 16; word_index = word_index + 1)
+                        descriptor_words[word_index] =
+                            representative_image_words[1 + descriptor_index * 16 + word_index];
+                    task_id = descriptor_words[0][31:16];
+                    if (task_id != (16'h8000 + streamed_total + descriptor_index))
+                        $fatal(1, "DeiT Round30 task id mismatch batch=%0d index=%0d expected=%04h actual=%04h",
+                               batch_index, descriptor_index,
+                               16'h8000 + streamed_total + descriptor_index, task_id[15:0]);
+                    slot = (cmd_tail + descriptor_index) % queue_size;
+                    runtime_write_descriptor_words(cmdq_base + slot * 64,
+                                                    descriptor_words);
+                end
+
+                cmd_tail = (cmd_tail + descriptor_count) % queue_size;
+                axi_write(REG_CMDQ_TAIL, cmd_tail);
+                axi_write(REG_DOORBELL, 32'd1);
+                expected_cpl_tail = (cpl_head + descriptor_count) % queue_size;
+                runtime_wait_queue_idle(cmd_tail, expected_cpl_tail, queue_idle,
+                                        status_word, cmd_head, cpl_tail);
+                if (!queue_idle)
+                    $fatal(1, "DeiT Round30 batch timeout batch=%0d cmd=%0d/%0d cpl=%0d/%0d status=%08h",
+                           batch_index, cmd_head, cmd_tail, cpl_tail,
+                           expected_cpl_tail, status_word);
+
+                $readmemh(golden_file, representative_checkpoint_words);
+                pair_count = representative_checkpoint_words[0];
+                if (pair_count < 1 || (1 + pair_count * 2) > 65536)
+                    $fatal(1, "DeiT Round30 invalid checkpoint batch=%0d pairs=%0d",
+                           batch_index, pair_count);
+                for (descriptor_index = 0; descriptor_index < descriptor_count;
+                     descriptor_index = descriptor_index + 1) begin
+                    slot = (cpl_head + descriptor_index) % queue_size;
+                    task_id = 16'h8000 + streamed_total + descriptor_index;
+                    runtime_read_word_retry(SPAD_BASE + cplq_base + slot * 16,
+                                            completion_word, read_ok);
+                    if (!read_ok || completion_word !== {16'd0, task_id[15:0]})
+                        $fatal(1, "DeiT Round30 completion id mismatch batch=%0d slot=%0d expected=%08h actual=%08h read_ok=%0d",
+                               batch_index, slot, {16'd0, task_id[15:0]},
+                               completion_word, read_ok);
+                    runtime_read_word_retry(SPAD_BASE + cplq_base + slot * 16 + 4,
+                                            completion_word, read_ok);
+                    if (!read_ok || completion_word !== 32'd1)
+                        $fatal(1, "DeiT Round30 completion status mismatch batch=%0d slot=%0d expected=1 actual=%08h read_ok=%0d",
+                               batch_index, slot, completion_word, read_ok);
+                    runtime_read_word_retry(SPAD_BASE + cplq_base + slot * 16 + 12,
+                                            completion_word, read_ok);
+                    // CPLQ word3 is the engine-reported element count, not a
+                    // valid bit. Its value is opcode/shape dependent (for
+                    // example, repack reports bytes/elements processed), so
+                    // only require that the documented word was readable.
+                    if (!read_ok)
+                        $fatal(1, "DeiT Round30 completion element-count read failed batch=%0d slot=%0d",
+                               batch_index, slot);
+                end
+
+                // Golden checks are passive observations, not host activation
+                // transfers. The next batch cannot consume a buffer until its
+                // producer batch has completed and the CPLQ slot is retired.
+                for (pair_index = 0; pair_index < pair_count; pair_index = pair_index + 1) begin
+                    checkpoint_addr = representative_checkpoint_words[1 + pair_index * 2];
+                    checkpoint_expected = representative_checkpoint_words[2 + pair_index * 2];
+                    read_value = representative_spad_backdoor_read(checkpoint_addr);
+                    if (read_value !== checkpoint_expected)
+                        $fatal(1, "DeiT Round30 Golden mismatch batch=%0d pair=%0d addr=%08h expected=%08h actual=%08h",
+                               batch_index, pair_index, checkpoint_addr,
+                               checkpoint_expected, read_value);
+                end
+                checkpoint_verified = checkpoint_verified + pair_count;
+                cpl_head = expected_cpl_tail;
+                axi_write(REG_CPLQ_HEAD, cpl_head);
+                streamed_total = streamed_total + descriptor_count;
+                clear_done_irq();
+                $display("DEIT_R30_STREAM_BATCH_PASS batch=%0d count=%0d cmdq_tail=%0d cplq_head=%0d golden_words=%0d reset_events=0",
+                         batch_index, descriptor_count, cmd_tail, cpl_head,
+                         pair_count);
+            end
+            finish_cycle = transformer_top_cycle_counter;
+            axi_read(REG_CMDQ_HEAD, cmd_head);
+            axi_read(REG_CMDQ_TAIL, cmd_tail);
+            axi_read(REG_CPLQ_HEAD, cpl_head);
+            axi_read(REG_CPLQ_TAIL, cpl_tail);
+            if (streamed_total != streamed_expected ||
+                cmd_head != ((468 + streamed_expected) % queue_size) ||
+                cmd_tail != ((468 + streamed_expected) % queue_size) ||
+                cpl_head != ((468 + streamed_expected) % queue_size) ||
+                cpl_tail != ((468 + streamed_expected) % queue_size) ||
+                ring_wraps != wraps_expected)
+                $fatal(1, "DeiT Round30 final runtime mismatch streamed=%0d/%0d queue=%0d/%0d cpl=%0d/%0d wraps=%0d/%0d",
+                       streamed_total, streamed_expected, cmd_head, cmd_tail,
+                       cpl_head, cpl_tail, ring_wraps, wraps_expected);
+            $display("DEIT_R30_CONTINUOUS_QKV_REPACK_3HEAD_ATTENTION_PASS prefix_desc=468 streamed_desc=%0d total_desc=%0d batches=%0d query_blocks=%0d valid_query_rows=%0d ring_wraps=%0d golden_words=%0d runtime_cycles=%0d reset_events=0 host_intermediate_tensor_readback=0 host_intermediate_tensor_writeback=0 measurement=AXIL_publication_retirement_plus_Product_execution_golden_observation=passive_spad_backdoor",
+                     streamed_total, 468 + streamed_total, batch_total,
+                     query_blocks_expected,
+                     (query_blocks_expected == 13) ? 197 : 16,
+                     ring_wraps, checkpoint_verified, finish_cycle - start_cycle);
         end
     endtask
 
@@ -6201,6 +6807,10 @@ module tb_ai_accel_smoke;
 
         if ($test$plusargs("AI_REPRESENTATIVE_MODEL")) begin
             run_representative_model();
+            if ($test$plusargs("AI_DEIT_R30_CONTINUOUS_ATTENTION")) begin
+                run_deit_round30_continuous_attention();
+                $finish;
+            end
             if ($test$plusargs("AI_H64_PERSISTENT")) begin
                 if (!$value$plusargs("AI_H64_PERSISTENT_STAGE_COUNT=%d",
                                      persistent_stage_count) ||

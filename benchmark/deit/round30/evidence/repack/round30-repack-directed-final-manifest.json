@@ -1,0 +1,27 @@
+{
+  "run_id": "round30-repack-directed-20261120-final",
+  "command": "bash benchmark/deit/round29/run_tensor_repack_directed.sh /tmp/nmaforge_round30_deit_repack_directed",
+  "tool": "VCS V-2023.12-SP1_Full64",
+  "compile_exit": 0,
+  "simulation_exit": 0,
+  "result": "PASS",
+  "pass_marker": "TENSOR_REPACK_DIRECTED_TEST_PASS modes=3 heads=3 valid_rows=29 padded_rows=3 golden_words=6144",
+  "coverage_cases": [
+    "q-dense, K-major, V-Matrix-B physical layouts across three heads",
+    "29 valid rows and 3 zero-padded rows",
+    "request stability under backpressure",
+    "invalid descriptor rejected without writes",
+    "physical range/alias check",
+    "abort stops additional writes",
+    "in-flight reset"
+  ],
+  "artifacts": {
+    "compile_log_gzip": "round30-repack-directed-final_compile.log.gz",
+    "compile_log_sha256": "91179d3ee167ef862735c11bc5722506924d1a7a8edf8f2390d54aa75b3354df",
+    "run_log_gzip": "round30-repack-directed-final_run.log.gz",
+    "run_log_sha256": "d969ccdeabc72fd6ffe0f059b7e3b15cada5e955241fdc6ecbe47a8ec4d0fee0",
+    "vcs_version_file": "vcs_version.txt"
+  },
+  "source_sha": "working-tree final Round 30 directed run; see continuous run manifest for tested source diff hashes",
+  "note": "The older run_manifest.txt records an earlier Round 29-script attempt blocked by license connectivity. This separate manifest belongs to the later successful compressed logs above; neither record has been overwritten."
+}
