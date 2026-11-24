@@ -6541,6 +6541,51 @@ module tb_ai_accel_smoke;
         end
     endtask
 
+    task automatic run_deit_r31_wo_dma_event;
+        input integer event_index;
+        input integer trigger_desc;
+        input integer ext_addr;
+        input integer spad_addr;
+        input integer word_count;
+        output integer elapsed_cycles;
+        integer poll_index;
+        integer word_index;
+        reg [31:0] status_value;
+        reg [31:0] observed_value;
+        integer start_cycle;
+        begin
+            start_cycle = transformer_top_cycle_counter;
+            axi_write(REG_DMA_EXT_ADDR, ext_addr);
+            axi_write(REG_DMA_SPAD_ADDR, spad_addr);
+            axi_write(REG_DMA_LENGTH, word_count);
+            axi_write(REG_DMA_CTRL, 32'h0000_0001);
+            for (poll_index = 0; poll_index < 200000 &&
+                 !dut.dma_done && !dut.dma_error; poll_index = poll_index + 1)
+                @(posedge aclk);
+            if (poll_index == 200000)
+                $fatal(1, "Round31 Wo DMA timeout event=%0d trigger=%0d ext=%08h spad=%08h words=%0d",
+                       event_index, trigger_desc, ext_addr, spad_addr, word_count);
+            axi_read(REG_DMA_STATUS, status_value);
+            if (!(dut.dma_done || status_value[1]) ||
+                dut.dma_error || status_value[2])
+                $fatal(1, "Round31 Wo DMA failed event=%0d status=%08h",
+                       event_index, status_value);
+            for (word_index = 0; word_index < word_count; word_index = word_index + 1) begin
+                observed_value = representative_spad_backdoor_read(spad_addr + word_index * 4);
+                if (observed_value !== axi_mem_u.mem[ext_addr / 4 + word_index])
+                    $fatal(1, "Round31 Wo DMA integrity mismatch event=%0d word=%0d ext=%08h spad=%08h expected=%08h actual=%08h",
+                           event_index, word_index, ext_addr + word_index * 4,
+                           spad_addr + word_index * 4,
+                           axi_mem_u.mem[ext_addr / 4 + word_index], observed_value);
+            end
+            axi_write(REG_DMA_STATUS, 32'd2);
+            elapsed_cycles = transformer_top_cycle_counter - start_cycle;
+            $display("DEIT_R31_WO_DMA_EVENT_PASS event=%0d before_desc=%0d bytes=%0d checked_words=%0d cycles=%0d",
+                     event_index, trigger_desc, word_count * 4, word_count,
+                     elapsed_cycles);
+        end
+    endtask
+
     // Round 30 DeiT runtime. Q/K/V are produced by the 468-descriptor Product
     // workload above. This task only publishes bounded descriptor batches and
     // observes completed SPAD results through the passive simulation
@@ -6550,6 +6595,8 @@ module tb_ai_accel_smoke;
         reg [1023:0] batch_root;
         reg [1023:0] desc_file;
         reg [1023:0] golden_file;
+        reg [1023:0] wo_dma_payload_file;
+        reg [1023:0] wo_dma_plan_file;
         reg [31:0] descriptor_words [0:15];
         reg [31:0] completion_word;
         reg [31:0] status_word;
@@ -6572,6 +6619,22 @@ module tb_ai_accel_smoke;
         integer cmdq_base;
         integer cplq_base;
         integer queue_size;
+        integer output_projection_enabled;
+        integer wo_dma_event_count;
+        integer wo_dma_event_index;
+        integer wo_dma_payload_words;
+        integer wo_dma_base_word;
+        integer wo_dma_words_loaded;
+        integer wo_dma_payload_index;
+        integer wo_dma_batch_first_desc;
+        integer wo_dma_trigger_desc;
+        integer wo_dma_ext_addr;
+        integer wo_dma_spad_addr;
+        integer wo_dma_word_count;
+        integer wo_dma_event_cycles;
+        integer wo_dma_total_cycles;
+        integer wo_dma_total_words;
+        integer wo_dma_plan_index;
         integer cmd_tail;
         integer cpl_head;
         integer start_cycle;
@@ -6593,13 +6656,91 @@ module tb_ai_accel_smoke;
                 !$value$plusargs("AI_REPRESENTATIVE_CPL_BASE=%d", cplq_base) ||
                 !$value$plusargs("AI_REPRESENTATIVE_QUEUE_SIZE=%d", queue_size))
                 $fatal(1, "DeiT Round30 runtime requires batch, queue and base arguments");
+            output_projection_enabled = $test$plusargs("AI_DEIT_R31_OUTPUT_PROJECTION");
+            wo_dma_event_count = 0;
+            wo_dma_event_index = 0;
+            wo_dma_payload_words = 0;
+            wo_dma_base_word = 0;
+            wo_dma_words_loaded = 0;
+            wo_dma_total_cycles = 0;
+            wo_dma_total_words = 0;
             if ((query_blocks_expected != 1 && query_blocks_expected != 13) ||
-                batch_total != (3 + 3 * query_blocks_expected * 4) ||
-                streamed_expected != (9 + 3 * query_blocks_expected * 245) ||
+                batch_total != ((3 + 3 * query_blocks_expected * 4) +
+                    (output_projection_enabled ? 1 + 4 * 12 : 0)) ||
+                streamed_expected != ((9 + 3 * query_blocks_expected * 245) +
+                    (output_projection_enabled ? 12 * 4 + 6 * 12 : 0)) ||
+                (output_projection_enabled && query_blocks_expected != 1) ||
                 queue_size != 512)
                 $fatal(1, "DeiT Round30 runtime geometry mismatch batches=%0d streamed=%0d query_blocks=%0d queue=%0d",
                        batch_total, streamed_expected, query_blocks_expected,
                        queue_size);
+
+            if (output_projection_enabled) begin
+                if (!$value$plusargs("AI_DEIT_R31_WO_DMA_PAYLOAD=%s", wo_dma_payload_file) ||
+                    !$value$plusargs("AI_DEIT_R31_WO_DMA_PLAN=%s", wo_dma_plan_file) ||
+                    !$value$plusargs("AI_DEIT_R31_WO_DMA_PAYLOAD_WORDS=%d", wo_dma_payload_words) ||
+                    !$value$plusargs("AI_DEIT_R31_WO_DMA_BASE_WORD=%d", wo_dma_base_word) ||
+                    wo_dma_payload_words < 1 || wo_dma_payload_words > 65535 ||
+                    wo_dma_base_word < 0 ||
+                    wo_dma_base_word + wo_dma_payload_words > REPRESENTATIVE_AXI_BYTES / 4)
+                    $fatal(1, "invalid Round31 Wo DMA payload geometry base=%0d words=%0d AXI_words=%0d",
+                           wo_dma_base_word, wo_dma_payload_words,
+                           REPRESENTATIVE_AXI_BYTES / 4);
+                $readmemh(wo_dma_payload_file, representative_image_words);
+                for (wo_dma_payload_index = 0;
+                     wo_dma_payload_index < wo_dma_payload_words;
+                     wo_dma_payload_index = wo_dma_payload_index + 1)
+                    axi_mem_u.mem[wo_dma_base_word + wo_dma_payload_index] =
+                        representative_image_words[wo_dma_payload_index];
+                wo_dma_words_loaded = wo_dma_payload_words;
+
+                $readmemh(wo_dma_plan_file, representative_dma_plan_words);
+                wo_dma_event_count = representative_dma_plan_words[0];
+                if (wo_dma_event_count < 1 || wo_dma_event_count > 512)
+                    $fatal(1, "invalid Round31 Wo DMA event count=%0d", wo_dma_event_count);
+                for (wo_dma_plan_index = 0;
+                     wo_dma_plan_index < wo_dma_event_count;
+                     wo_dma_plan_index = wo_dma_plan_index + 1) begin
+                    wo_dma_trigger_desc = representative_dma_plan_words[
+                        1 + wo_dma_plan_index * 4];
+                    wo_dma_ext_addr = representative_dma_plan_words[
+                        2 + wo_dma_plan_index * 4];
+                    wo_dma_spad_addr = representative_dma_plan_words[
+                        3 + wo_dma_plan_index * 4];
+                    wo_dma_word_count = representative_dma_plan_words[
+                        4 + wo_dma_plan_index * 4];
+                    if (wo_dma_trigger_desc < 468 ||
+                        wo_dma_trigger_desc >= 468 + streamed_expected ||
+                        wo_dma_ext_addr < wo_dma_base_word * 4 ||
+                        wo_dma_ext_addr[3:0] != 0 || wo_dma_spad_addr[3:0] != 0 ||
+                        wo_dma_spad_addr + wo_dma_word_count * 4 > SPAD_BYTES ||
+                        wo_dma_word_count <= 0 || wo_dma_word_count > 256 ||
+                        wo_dma_word_count[1:0] != 0 ||
+                        wo_dma_ext_addr + wo_dma_word_count * 4 >
+                            (wo_dma_base_word + wo_dma_payload_words) * 4)
+                        $fatal(1, "invalid Round31 Wo DMA event=%0d trigger=%0d ext=%08h spad=%08h words=%0d",
+                               wo_dma_plan_index, wo_dma_trigger_desc,
+                               wo_dma_ext_addr, wo_dma_spad_addr, wo_dma_word_count);
+                    if (wo_dma_plan_index > 0 &&
+                        wo_dma_trigger_desc < representative_dma_plan_words[
+                            1 + (wo_dma_plan_index - 1) * 4])
+                        $fatal(1, "Round31 Wo DMA events are not sorted at event=%0d",
+                               wo_dma_plan_index);
+                    wo_dma_total_words = wo_dma_total_words + wo_dma_word_count;
+                end
+                if (wo_dma_total_words != wo_dma_payload_words)
+                    $fatal(1, "Round31 Wo DMA plan payload mismatch planned=%0d payload=%0d",
+                           wo_dma_total_words, wo_dma_payload_words);
+                r20_dma_ar_bursts = 0;
+                r20_dma_ar_bytes = 0;
+                r20_dma_r_beats = 0;
+                r20_dma_ar_q_head = 0;
+                r20_dma_ar_q_tail = 0;
+                r20_dma_read_latency_sum = 0;
+                r20_dma_read_latency_max = 0;
+                r20_dma_read_latency_count = 0;
+                r20_dma_monitor_enable = 1'b1;
+            end
 
             axi_read(REG_CMDQ_HEAD, cmd_head);
             axi_read(REG_CMDQ_TAIL, cmd_tail);
@@ -6627,6 +6768,40 @@ module tb_ai_accel_smoke;
                            batch_index, descriptor_count);
                 if ((cmd_tail + descriptor_count) >= queue_size)
                     ring_wraps = ring_wraps + 1;
+
+                if (output_projection_enabled) begin
+                    wo_dma_batch_first_desc = 468 + streamed_total;
+                    while (wo_dma_event_index < wo_dma_event_count &&
+                           representative_dma_plan_words[
+                               1 + wo_dma_event_index * 4] == wo_dma_batch_first_desc) begin
+                        wo_dma_trigger_desc = representative_dma_plan_words[
+                            1 + wo_dma_event_index * 4];
+                        wo_dma_ext_addr = representative_dma_plan_words[
+                            2 + wo_dma_event_index * 4];
+                        wo_dma_spad_addr = representative_dma_plan_words[
+                            3 + wo_dma_event_index * 4];
+                        wo_dma_word_count = representative_dma_plan_words[
+                            4 + wo_dma_event_index * 4];
+                        run_deit_r31_wo_dma_event(wo_dma_event_index,
+                                                  wo_dma_trigger_desc,
+                                                  wo_dma_ext_addr,
+                                                  wo_dma_spad_addr,
+                                                  wo_dma_word_count,
+                                                  wo_dma_event_cycles);
+                        wo_dma_total_cycles = wo_dma_total_cycles + wo_dma_event_cycles;
+                        wo_dma_event_index = wo_dma_event_index + 1;
+                    end
+                    if (wo_dma_event_index < wo_dma_event_count) begin
+                        wo_dma_trigger_desc = representative_dma_plan_words[
+                            1 + wo_dma_event_index * 4];
+                        if (wo_dma_trigger_desc < wo_dma_batch_first_desc ||
+                            (wo_dma_trigger_desc < wo_dma_batch_first_desc + descriptor_count &&
+                             wo_dma_trigger_desc != wo_dma_batch_first_desc))
+                            $fatal(1, "Round31 Wo DMA trigger is not at a batch boundary batch_desc=%0d batch_count=%0d event=%0d trigger=%0d",
+                                   wo_dma_batch_first_desc, descriptor_count,
+                                   wo_dma_event_index, wo_dma_trigger_desc);
+                    end
+                end
 
                 for (descriptor_index = 0; descriptor_index < descriptor_count;
                      descriptor_index = descriptor_index + 1) begin
@@ -6706,6 +6881,22 @@ module tb_ai_accel_smoke;
                          batch_index, descriptor_count, cmd_tail, cpl_head,
                          pair_count);
             end
+            if (output_projection_enabled) begin
+                r20_dma_monitor_enable = 1'b0;
+                if (wo_dma_event_index != wo_dma_event_count ||
+                    wo_dma_words_loaded != wo_dma_payload_words ||
+                    r20_dma_ar_bytes != wo_dma_payload_words * 4 ||
+                    r20_dma_ar_bursts == 0 || r20_dma_r_beats == 0)
+                    $fatal(1, "Round31 Wo DMA accounting mismatch events=%0d/%0d payload_words=%0d/%0d axi_bytes=%0d bursts=%0d beats=%0d",
+                           wo_dma_event_index, wo_dma_event_count,
+                           wo_dma_words_loaded, wo_dma_payload_words,
+                           r20_dma_ar_bytes, r20_dma_ar_bursts, r20_dma_r_beats);
+                $display("DEIT_R31_WO_DMA_SUMMARY events=%0d payload_bytes=%0d checked_words=%0d axi_read_bytes=%0d ar_bursts=%0d r_beats=%0d dma_cycles=%0d host_weight_load_bytes=0",
+                         wo_dma_event_count, wo_dma_payload_words * 4,
+                         wo_dma_words_loaded, r20_dma_ar_bytes,
+                         r20_dma_ar_bursts, r20_dma_r_beats,
+                         wo_dma_total_cycles);
+            end
             finish_cycle = transformer_top_cycle_counter;
             axi_read(REG_CMDQ_HEAD, cmd_head);
             axi_read(REG_CMDQ_TAIL, cmd_tail);
@@ -6720,11 +6911,19 @@ module tb_ai_accel_smoke;
                 $fatal(1, "DeiT Round30 final runtime mismatch streamed=%0d/%0d queue=%0d/%0d cpl=%0d/%0d wraps=%0d/%0d",
                        streamed_total, streamed_expected, cmd_head, cmd_tail,
                        cpl_head, cpl_tail, ring_wraps, wraps_expected);
-            $display("DEIT_R30_CONTINUOUS_QKV_REPACK_3HEAD_ATTENTION_PASS prefix_desc=468 streamed_desc=%0d total_desc=%0d batches=%0d query_blocks=%0d valid_query_rows=%0d ring_wraps=%0d golden_words=%0d runtime_cycles=%0d reset_events=0 host_intermediate_tensor_readback=0 host_intermediate_tensor_writeback=0 measurement=AXIL_publication_retirement_plus_Product_execution_golden_observation=passive_spad_backdoor",
-                     streamed_total, 468 + streamed_total, batch_total,
-                     query_blocks_expected,
-                     (query_blocks_expected == 13) ? 197 : 16,
-                     ring_wraps, checkpoint_verified, finish_cycle - start_cycle);
+            if (output_projection_enabled) begin
+                $display("DEIT_R31_ATTENTION_OUTPUT_PROJECTION_PARTIAL_PASS prefix_desc=468 attention_desc=744 output_projection_desc=120 total_desc=%0d batches=%0d query_blocks=1 valid_query_rows=16 ring_wraps=%0d wo_dma_events=%0d wo_dma_bytes=%0d wo_dma_cycles=%0d golden_words=%0d runtime_cycles=%0d reset_events=0 host_intermediate_tensor_readback=0 host_intermediate_tensor_writeback=0 measurement=AXIL_publication_retirement_plus_Product_execution_golden_observation=passive_spad_backdoor",
+                         468 + streamed_total, batch_total, ring_wraps,
+                         wo_dma_event_count, wo_dma_payload_words * 4,
+                         wo_dma_total_cycles, checkpoint_verified,
+                         finish_cycle - start_cycle);
+            end else begin
+                $display("DEIT_R30_CONTINUOUS_QKV_REPACK_3HEAD_ATTENTION_PASS prefix_desc=468 streamed_desc=%0d total_desc=%0d batches=%0d query_blocks=%0d valid_query_rows=%0d ring_wraps=%0d golden_words=%0d runtime_cycles=%0d reset_events=0 host_intermediate_tensor_readback=0 host_intermediate_tensor_writeback=0 measurement=AXIL_publication_retirement_plus_Product_execution_golden_observation=passive_spad_backdoor",
+                         streamed_total, 468 + streamed_total, batch_total,
+                         query_blocks_expected,
+                         (query_blocks_expected == 13) ? 197 : 16,
+                         ring_wraps, checkpoint_verified, finish_cycle - start_cycle);
+            end
         end
     endtask
 

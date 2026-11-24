@@ -44,12 +44,13 @@
       "status": "PARTIAL"
     },
     "head_merge_to_output_projection": {
-      "evidence": "Descriptor/address audit only; no Layer 0 handoff execution",
-      "first_missing_boundary": "three per-head AV output layouts to consumer-ready merged 192-channel tensor; Round 30 stores only the current query block per head and reuses those addresses across 13 query blocks",
-      "status": "NOT_RUN"
+      "evidence": "benchmark/deit/round31/evidence/attention_output_projection_16q/run_manifest.json",
+      "remaining": "181 of 197 valid query rows are not projected; no Residual1/LN2/FFN/GELU/Residual2",
+      "status": "PARTIAL_PASS_ONE_16_QUERY_BLOCK"
     },
     "output_projection_residual_ln2_ffn_gelu_residual2": {
-      "status": "NOT_RUN"
+      "evidence": "768 final INT8 Wo output words pass for one 16-query block; downstream Layer-0 operations NOT_RUN",
+      "status": "PARTIAL_OUTPUT_PROJECTION_ONLY"
     },
     "twelve_layer_classifier_and_labeled_image_accuracy": {
       "status": "NOT_RUN"
@@ -78,9 +79,32 @@
     "tracked_source_diff_sha256": "1114b805c89b9a2181526722dc65f21e95d5e438020d686efd51b2dbde63cea3",
     "vcs": "V-2023.12-SP1_Full64"
   },
-  "reason_no_failure_descriptor": "No Layer 0 descriptor graph/generator was available to execute; this is an unimplemented integration boundary, not a recorded RTL mismatch.",
+  "integrated_round31_evidence": {
+    "batches": 64,
+    "branch": "research/nmaforge-v1.2-integrated-model-dv",
+    "checkpoint_sha256": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c",
+    "final_int8_output_words": 768,
+    "golden_words_checked": 72384,
+    "make_exit_code": 0,
+    "manifest": "benchmark/deit/round31/evidence/attention_output_projection_16q/run_manifest.json",
+    "new_output_projection_descriptors": 120,
+    "product_rtl_changed": false,
+    "ring_wraps": 2,
+    "rtl_source_tree_sha256": "57bb84647e5bc34fe5a833e7d4895b7ef1b969fc747d462f1f1a53d1ce05bc68",
+    "run_id": "nmaforge-v1.2-round31-deit-wo-16q-integrated-v1",
+    "runtime_cycles": 821466,
+    "simulator_exit_code": 0,
+    "source_revision": "ad58507fa5052ccec61e05428c4e36e493796b8b",
+    "tested_valid_queries": 16,
+    "total_descriptors": 1332,
+    "total_valid_queries": 197,
+    "wo_dma_bytes": 37632,
+    "wo_dma_cycles": 11670,
+    "wo_dma_events": 48
+  },
+  "reason_no_failure_descriptor": "The initial software AV flattening experiment failed the AV-requant Golden at 0x3004 and was corrected by panel-row-group layout generation; corrected Product Top run passes. This was a software layout mismatch, not an RTL failure. Full Layer 0 remains incomplete.",
   "round": 31,
   "round31_product_rtl_changed": false,
-  "round31_vcs_run": "NOT_RUN",
+  "round31_vcs_run": "PASS_PARTIAL_OUTPUT_PROJECTION_16Q",
   "track": "DeiT-Tiny"
 }

@@ -1,0 +1,4 @@
+mode,context,valid_tokens,generated_token,descriptor_publications,product_cycles,cumulative_product_cycles,host_intermediate_words,reset_events
+persistent_incremental,1,5,82,853,1379316,1379316,0,0
+persistent_incremental,2,6,68,869,1403136,2782452,0,0
+persistent_incremental,3,7,89,885,1427244,4209696,0,0

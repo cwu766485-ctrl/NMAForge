@@ -1,5 +1,31 @@
 # NMAForge execution frontier
 
+## NMAForge V1.2 integrated model/DV frontier — 2026-11-24
+
+This active V1.2 objective supersedes the older bounded-round stop notices
+below. Work stays isolated on branch
+`research/nmaforge-v1.2-integrated-model-dv`, based at
+`ad58507fa5052ccec61e05428c4e36e493796b8b`; `main` is unchanged. Product RTL
+was not modified in the work recorded here.
+
+### Completed evidence in this continuation
+
+| Area | Current evidence | Boundary |
+|---|---|---|
+| P0 baseline/DV recovery | Reproduced the VDOT fixture ABI fatal, corrected reserved flag bit 6, parameterized the compact SPAD map using `SPAD_INFO`, and retained fail-closed address checks. UVM passes 128/256/512 KiB × three seeds (9/9), plus `ai_smoke` and 20-case `ai_run`. | The 38-row RTM, all requirement/testpoint mapping, seven independent engine-level scoreboards, formal, mutation and full coverage closure were not completed by this capacity recovery. See [P0 evidence](../../../benchmark/verification/v1_2_integrated_p0/run_manifest.json). |
+| GPT-2 | The selected QAT package has a four-layer Product Top comparison: persistent incremental KV is bit-exact to prefix-recompute on four 256-logit contexts; 4,209,696 vs 4,340,736 command-path cycles (3.0195% fewer) and 2,607 vs 3,087 descriptor publications. | The selected model still scores below Bigram on validation/test; the QAT package hash is `d9ff47c56a4ddc335a34d601d2083cfa2967d179b6aa617fdb25e484a9af3bb4`. It is not a model-quality PASS or application-latency claim. See [GPT-2 closure](../../benchmark/NMAFORGE_V1_2_ROUND31_GPT2_QUALITY_CLOSURE.md) and [paired-run manifest](../../../benchmark/gpt2_quality/results/round31_integrated_top/run_manifest.json). |
+| DeiT-Tiny | New Product Top evidence passes one 16-query block through 3-head Attention, AV requantization, official Wo DMA, INT32 projection/head accumulation and final INT8 output: 1,332 total descriptors, 72,384 Golden words, including 768 output words; no host activation transfers. | This is 16/197 valid query rows only. Residual1/LN2/FFN/GELU/Residual2, full Layer 0, remaining layers, classifier and image accuracy remain NOT_RUN. See [Round 31 evidence](../../../benchmark/deit/round31/evidence/attention_output_projection_16q/run_manifest.json). |
+
+### Remaining active work
+
+1. Extend the passing DeiT block to all 197 queries, then complete Residual1, LN2, FFN/GELU and Residual2 through one Product Top session. Only after full Layer 0 passes should the twelve-layer/classifier track start.
+2. Finish GPT-2 per-operator accuracy/precision ablations and qualification of the selected package against the exact fixed software/runtime contract; preserve the current below-Bigram disposition.
+3. Build one engine-by-engine performance profile with consistent command/timing boundaries, reproduce CNN fusion A/B, and run the pinned TinyNPU common-workload comparison. Current Matrix/CNM counters are only one run datapoint, not unified profiling.
+4. Complete the Compute Cluster Requirement-to-Testpoint mapping and the requested concurrency/ownership/dependency/retirement/reset/Abort/backpressure/Parity/Protection evidence. Keep functional coverage, assertions, formal and mutation as separate evidence classes; do not infer formal closure from simulation.
+5. Consider RTL changes only if the software/runtime A/B and measured current-path profile identify a bottleneck existing hardware cannot address.
+
+Detailed status is kept in [the DeiT closure](../../benchmark/NMAFORGE_V1_2_ROUND31_DEIT_ENCODER_CLOSURE.md), [the GPT-2 closure](../../benchmark/NMAFORGE_V1_2_ROUND31_GPT2_QUALITY_CLOSURE.md), and the [V1.2 P0 manifest](../../../benchmark/verification/v1_2_integrated_p0/run_manifest.json). This objective is still active; none of the remaining work is marked complete by the partial results above.
+
 Round 7 is now at its bounded terminal disposition: the standalone 16×16
 Array mapping and CNN three-mode experiment are recorded; Matrix Core mapping,
 full Cluster/macro mapping, 400 MHz closure and larger-model GEMV evidence

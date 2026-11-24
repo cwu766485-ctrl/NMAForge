@@ -68,6 +68,23 @@ The existing package hash above matches the package in Round 30 Product Top evid
 
 Round 31 reuses that evidence because the package hash is unchanged. It is **not** a Round 31 rerun, and it is not a language-quality PASS. Newly proposed quantization candidates have no Product Top evidence.
 
+### Later integrated Product Top paired decode run
+
+The selected QAT package above was subsequently run on the Product Top in both prefix-recompute and four-layer persistent-incremental-KV modes. This is a separate later run and supersedes the earlier “new package blocked before compilation” qualification status for this exact package hash; it does not change the model-quality disposition.
+
+| Item | Value |
+|---|---|
+| Run ID / Product source SHA | `NMAFORGE-V1.2-ROUND31-GPT2-PERSISTENT-KV-20261124` / `5c8952b189c3831d45e41fa2ea3c389c83533b21` |
+| Product RTL tree SHA-256 | `d952771394c3743dd106d61b595c41054dc529b1` |
+| Package SHA-256 | `d9ff47c56a4ddc335a34d601d2083cfa2967d179b6aa617fdb25e484a9af3bb4` |
+| Simulator / configuration | VCS `V-2023.12-SP1_Full64`; 128 KiB SPAD, 4 banks, 512 queue entries, seed `20261116` |
+| Four contexts | Prompt `[1,7,42,3]`, generated tokens `[65,82,68,89]`; all four contexts × 256 logits bit-exact between modes |
+| Prefix-recompute / persistent incremental-KV | 4,340,736 / 4,209,696 command-path cycles; 3,087 / 2,607 descriptor publications |
+| Difference | 131,040 cycles (3.0195%) and 480 publications (15.5491%) saved by persistent incremental-KV |
+| Host intermediate words / resets | 0 / 0 |
+
+These numbers cover Product Top descriptor publication and completion retirement for four-layer extensions at contexts 1–3. Weight uploads and embedding/position setup are outside the measured windows. This is a command-path improvement for the tested fixture, not silicon throughput or application latency. Raw logs, per-context manifests, Logits, KV checkpoints, CSV and hashes are archived in `benchmark/gpt2_quality/results/round31_integrated_top/`; the top-level `run_manifest.json` binds both runs and the package hash.
+
 ## Reproduction
 
 ```bash
@@ -131,7 +148,8 @@ python benchmark/gpt2_quality/summarize_round31_qat_retrain.py \
 | Layer-wise software error and contract A/B | PARTIAL | Tensor table, software A/B and three-seed QAT; test later inspected post-selection |
 | Candidate multiplier/shift quality | FAIL for selection | Does not beat scalar accuracy or Bigram; software only |
 | Existing selected package four-layer Top function | PASS (historical evidence reused) | Exact same package hash; two prompt runs archived under Round 30 |
-| New package Product Top qualification | BLOCKED_ENV | Selected package prepared; VCS license server unreachable before compilation |
+| Selected QAT package prefix Product Top run | PASS, scoped | Later exact-package run completed four-layer prefix mode; see `round31_integrated_top/run_manifest.json` |
+| Four-layer persistent incremental-KV vs prefix recompute | PASS, scoped | Four contexts bit-exact; 3.0195% fewer command-path cycles and 15.5491% fewer descriptor publications |
 | Model quality closure | FAIL / OPEN | Selected candidate below Bigram on validation and post-selection test |
 | RTL Requant extension | NOT PROPOSED for implementation | Software evidence does not show a quality benefit |
 

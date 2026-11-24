@@ -101,6 +101,8 @@ Total output lines: 1139
 
 # NMAForge block and subsystem verification matrix
 
+> **2026-11-24 V1.2 integrated P0 SPAD map replay:** On isolated branch `research/nmaforge-v1.2-integrated-model-dv`, `TC-PC-V12-COMPACT-SPAD-CAPACITY-3S` maps the SPEC `SPAD_INFO` capacity readback and in-range fixture accesses to `initialize_spad_map`, fail-closed AXI-Lite/backdoor bounds, `CLUSTER_SPAD_MAP_PASS`, and `CLUSTER_MEMORY_SCOREBOARD`. The 128/256/512 KiB matrix passes all three seeds per capacity (9/9), with 99,747 checked words/seed, zero mismatch/unknown/stale and UVM severity 0/0/0; Top Smoke and the 20-case seed-12345 regression also pass. Root cause was VDOT fixture flag `0x76` setting reserved ABI bit 6; corrected `0xb6` preserves the unused-field perturbation while clearing that bit. Protection checks are unchanged. This adds a bounded testpoint and does not close the 38-row requirement matrix or promote global closure. See the [P0 evidence manifest](../benchmark/verification/v1_2_integrated_p0/run_manifest.json).
+
 > **2026-10-30 R102 current-candidate AXI SVA gate:** At exact code/test
 > commit `d0b94ec74865f1f68af14de12113a8c19caf5204`, the mixed-precision
 > behavioral-DDR stall/reset E2E passes with UVM severity 0/0/0. The

@@ -1,5 +1,42 @@
 # Project update log
 
+## NMAForge V1.2 integrated continuation — 2026-11-24
+
+Work is isolated on `research/nmaforge-v1.2-integrated-model-dv` from base
+`ad58507fa5052ccec61e05428c4e36e493796b8b`; `main` and Product RTL are
+unchanged. P0 replays reproduced the Compute Cluster VDOT fixture failure:
+reserved ABI flag bit 6 was set (`0x76`), causing the `CLUSTER_MEMORY_EMPTY`
+secondary symptom after the sequence fatal. The fixture now uses `0xb6`; the
+compact SPAD map checks `SPAD_INFO` and rejects out-of-capacity accesses without
+changing Protection. UVM passes 128/256/512 KiB × seeds 20261025/26/27 (9/9),
+and `ai_smoke` plus `ai_run AI_RANDOM_CASES=20 AI_SEED=12345` pass. Exact
+commands/log hashes are in
+[`P0 manifest`](../benchmark/verification/v1_2_integrated_p0/run_manifest.json).
+
+The selected GPT-2 QAT package
+`d9ff47c56a4ddc335a34d601d2083cfa2967d179b6aa617fdb25e484a9af3bb4` now has a
+paired four-layer Product Top prefix-recompute vs persistent incremental-KV
+run. All four 256-logit contexts are bit-exact; persistent KV saves 131,040
+command-path cycles (3.0195%) and 480 descriptor publications (15.5491%) on
+the measured contexts. This does not change the below-Bigram model-quality
+result or claim application latency. See
+[`GPT-2 closure`](benchmark/NMAFORGE_V1_2_ROUND31_GPT2_QUALITY_CLOSURE.md).
+
+DeiT Round 31 now passes one 16-query block through Product Top Attention, AV
+requantization, official Wo DMA and final projection: 72,384 intermediate/final
+Golden words, including 768 output words; 48 DMA events/37,632 bytes; 821,466
+Product Top command-path cycles; zero host activation transfers. A first
+software layout attempt treated the four AV panels as row-major and failed at
+`0x3004`; row-group panel requantization fixed the producer/consumer layout and
+the rerun passed. This is only 16/197 queries; the rest of Layer 0 and all
+image-accuracy work remain open. The exact command, generated workload,
+Golden, raw compressed logs and CSV are under
+[`Round 31 DeiT evidence`](../benchmark/deit/round31/evidence/attention_output_projection_16q/).
+
+The full RTM mapping, all-engine unified profiler, CNN fusion A/B and matched
+TinyNPU comparison remain open. Current work and next tasks are in the
+[`execution frontier`](exec-plans/active/execution-frontier.md).
+
 ## NMAForge v2.0 Round 3 — integrated research evidence (2026-11-15)
 
 Combined Gate evidence on isolated branch `research/nmaforge-v2-round3-integration`, based on Round 2 SHA `6596779de2ec4f502a0253dedd4695129b775b05` and product PR #8 baseline `0492c47d12cd11bcc22be1930da7af77ed870b6e`. H64 Q projection through product Top passed with four legal tiled descriptors, 1,024/1,024 INT32 Golden words, 1,188 cycles, 65,536 useful MACs, 8,192 B reads and 4,096 B writes. Product Top smoke passed seed 20261115/four random cases. SVSE vector SPAD A/B passed numerical, abort, epoch and commit-prefix checks but was slower with unchanged traffic (Residual 46 vs 40 cycles; Requant 30 vs 22), so decision is `REWORK_FOR_PRODUCT`. DAMS remains unintegrated because the current prototype does not track transaction/address/response ownership and did not prove a scheduling opportunity beyond the product dispatcher. Full H64 decoder and A0-A3 remain NOT_RUN. See `docs/research/NMAFORGE_V2_ROUND3_FINAL.md` and focused reports.

@@ -1687,3 +1687,48 @@ ai_deit_round30_full_attention_256k:
 	! grep -q 'Cannot open file.*checkpoint_spad\.memh' "$(AI_DEIT_R30_FULL_RUN)/run.log"
 	grep -q '^DEIT_R30_CONTINUOUS_QKV_REPACK_3HEAD_ATTENTION_PASS prefix_desc=468 streamed_desc=9564 total_desc=10032 batches=159 query_blocks=13 valid_query_rows=197 ring_wraps=19 .*reset_events=0 ' \
 		"$(AI_DEIT_R30_FULL_RUN)/run.log"
+
+# Round31 extends one checked 16-query/three-head AV block through official
+# Layer-0 Wo partial projections and INT32 head merge on the same Product Top.
+AI_DEIT_R31_WO_RUN ?= /tmp/nmaforge_deit_round31_wo_top_$(shell date +%Y%m%d_%H%M%S)
+AI_DEIT_R31_WO_SOURCE ?= ../../../../benchmark/deit/round26/evidence/qkv197/workload
+AI_DEIT_R31_WO_CHECKPOINT ?= /tmp/nmaforge_deit_tiny_b3428f18_pytorch_model.bin
+AI_DEIT_R31_WO_PYTHON ?= /tmp/nmaforge_v1_2_integrated_venv/bin/python
+.PHONY: ai_deit_round31_attention_output_projection_256k
+ai_deit_round31_attention_output_projection_256k:
+	test ! -e "$(AI_DEIT_R31_WO_RUN)"
+	test -s "$(AI_DEIT_R31_WO_CHECKPOINT)"
+	mkdir -p "$(AI_DEIT_R31_WO_RUN)"
+	$(AI_DEIT_R31_WO_PYTHON) ../../../../benchmark/deit/round31/generate_attention_output_projection.py \
+		--source-workload "$(AI_DEIT_R31_WO_SOURCE)" \
+		--checkpoint "$(AI_DEIT_R31_WO_CHECKPOINT)" \
+		--out-dir "$(AI_DEIT_R31_WO_RUN)/workload" \
+		> "$(AI_DEIT_R31_WO_RUN)/generator.log"
+	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
+		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_DEIT_R19_STREAM \
+		+define+AI_SPAD_WORDS_PER_BANK=16384 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_DEIT_R31_WO_RUN)/csrc -top tb_ai_accel_smoke \
+		-f ai_accel.f ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_DEIT_R31_WO_RUN)/simv -l $(AI_DEIT_R31_WO_RUN)/compile.log
+	$(AI_DEIT_R31_WO_RUN)/simv +ntb_random_seed=310031 +AI_RANDOM_CASES=0 +AI_SEED=310031 \
+		+ACLK_PERIOD_NS=10.0 +AI_REPRESENTATIVE_MODEL +AI_REPRESENTATIVE_LATE_DMA \
+		+AI_REPRESENTATIVE_ALLOW_LIVE_ALIAS +AI_DEIT_R30_CONTINUOUS_ATTENTION \
+		+AI_DEIT_R31_OUTPUT_PROJECTION \
+		+AI_DEIT_R30_BATCH_ROOT=$(AI_DEIT_R31_WO_RUN)/workload/batches \
+		+AI_DEIT_R30_BATCH_COUNT=64 +AI_DEIT_R30_STREAMED_DESC_COUNT=864 \
+		+AI_DEIT_R30_EXPECTED_RING_WRAPS=2 +AI_DEIT_R30_QUERY_BLOCKS=1 \
+		+AI_REPRESENTATIVE_MEMORY=$(AI_DEIT_R31_WO_RUN)/workload/model_memory.memh \
+		+AI_REPRESENTATIVE_GOLDEN=$(AI_DEIT_R31_WO_RUN)/workload/model_golden.memh \
+		+AI_REPRESENTATIVE_DMA_PAYLOAD=$(AI_DEIT_R31_WO_RUN)/workload/dma_payload.memh \
+		+AI_REPRESENTATIVE_DMA_PLAN=$(AI_DEIT_R31_WO_RUN)/workload/late_dma_plan.memh \
+		+AI_DEIT_R31_WO_DMA_PAYLOAD=$(AI_DEIT_R31_WO_RUN)/workload/wo_dma_payload.memh \
+		+AI_DEIT_R31_WO_DMA_PLAN=$(AI_DEIT_R31_WO_RUN)/workload/wo_dma_plan.memh \
+		+AI_DEIT_R31_WO_DMA_PAYLOAD_WORDS=9408 +AI_DEIT_R31_WO_DMA_BASE_WORD=28224 \
+		+AI_REPRESENTATIVE_CHECKPOINTS=$(AI_DEIT_R31_WO_RUN)/workload/checkpoint_spad.memh \
+		+AI_REPRESENTATIVE_DESC_BASE=221184 +AI_REPRESENTATIVE_CPL_BASE=253952 \
+		+AI_REPRESENTATIVE_DESC_COUNT=468 +AI_REPRESENTATIVE_QUEUE_SIZE=512 \
+		+AI_REPRESENTATIVE_USEFUL_MACS=21786624 -l $(AI_DEIT_R31_WO_RUN)/run.log
+	test "$$(grep -c '^DEIT_R30_STREAM_BATCH_PASS ' "$(AI_DEIT_R31_WO_RUN)/run.log")" -eq 64
+	grep -q '^DEIT_R31_ATTENTION_OUTPUT_PROJECTION_PARTIAL_PASS prefix_desc=468 attention_desc=744 output_projection_desc=120 total_desc=1332 batches=64 query_blocks=1 valid_query_rows=16 ring_wraps=2 .*host_intermediate_tensor_readback=0 host_intermediate_tensor_writeback=0 ' \
+		"$(AI_DEIT_R31_WO_RUN)/run.log"

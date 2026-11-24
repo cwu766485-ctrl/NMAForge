@@ -1,0 +1,216 @@
+{
+  "artifacts": [
+    {
+      "archive_sha256": "85ee49ffdf4fd6d756a67282098f801c80a7eb780cc8d363911591701922f05b",
+      "path": "cluster_128/compile.log.gz",
+      "source_bytes": 44098,
+      "source_sha256": "addc271be93420c86e31aa26d83c9edf8d55bd2430cec4cc9204431b6d16862f"
+    },
+    {
+      "archive_sha256": "2a251927745d3ed32af68286c6913e96992ea8f3c2d144e95760219e4c81a3c3",
+      "path": "cluster_128/make_driver.log.gz",
+      "source_bytes": 8248611,
+      "source_sha256": "c4cd81ea6dbfbdac3b0cfee40cd91ba4c6e11de113b5eff2ffb64292bd16f0ca"
+    },
+    {
+      "archive_sha256": "d497ef3267ce6969d0319272cb7d22c46b8fbc59d725f4d44539b924c26045ba",
+      "path": "cluster_128/seed_20261025/run.log.gz",
+      "source_bytes": 2734073,
+      "source_sha256": "9c46fadba19fc5b818fab06a476f6a7b9fd115e445a6b7c819030bbf5844d8ad"
+    },
+    {
+      "archive_sha256": "4077ac1289cd11ca747ad91807c09900e3d462e7e72c05a78f14a7692c18e880",
+      "path": "cluster_128/seed_20261026/run.log.gz",
+      "source_bytes": 2734073,
+      "source_sha256": "f6e79a4db4f1369f7c9b8accb20854a5fd6fd192defa1d93779f305a36aec7a2"
+    },
+    {
+      "archive_sha256": "3383ac076276c72e77dd9116a1cbada26b173e7ffaea6059805fbc3951951e5b",
+      "path": "cluster_128/seed_20261027/run.log.gz",
+      "source_bytes": 2734074,
+      "source_sha256": "9b2d64a948bce3ec30af23b18f5a4539a06348028fb98fbabc2b5d293c4ff336"
+    },
+    {
+      "archive_sha256": "82b18b76696d3daa4a0c06ec10593ff6d76d38f01d2afdb9378e4d0916ac334f",
+      "path": "cluster_256/compile.log.gz",
+      "source_bytes": 44099,
+      "source_sha256": "4d6e7a7565bead4ed937449a947611529517cc305808dc9e6e2b4adb55b2c43b"
+    },
+    {
+      "archive_sha256": "56d9daf045af49d9c6fd101cb336061a578be1ffe0e68e129b37cc4a7034f701",
+      "path": "cluster_256/make_driver.log.gz",
+      "source_bytes": 8248612,
+      "source_sha256": "01dc0b969b004fdc264a32551a27586a46403aa883630262c68cab518830b5e4"
+    },
+    {
+      "archive_sha256": "975148560c7b94af5f19c0615ba202859149d9eafe28acba8d805b39f131eaed",
+      "path": "cluster_256/seed_20261025/run.log.gz",
+      "source_bytes": 2734073,
+      "source_sha256": "c71932e0c6f7c33c53cc7e86469cd1138eb37e36bc47e04af23a87029eccc36f"
+    },
+    {
+      "archive_sha256": "49cfc06b95c42dd6327240023a3a6788a65723e6be099796c6fe8e8277de7c94",
+      "path": "cluster_256/seed_20261026/run.log.gz",
+      "source_bytes": 2734073,
+      "source_sha256": "65d151f4f223265fc435d22f31198e47c22b4e8e95ce4d11c3c3353796a8cb44"
+    },
+    {
+      "archive_sha256": "bc7e56966c02dc5d8d99234febc4c652f0f072a714bf3276945ecd37f167851b",
+      "path": "cluster_256/seed_20261027/run.log.gz",
+      "source_bytes": 2734074,
+      "source_sha256": "c2446cdc610b1e0593efb7ae788d7cba247570300fe7a78170ff08cd98974956"
+    },
+    {
+      "archive_sha256": "3e8da13fc31951ec124462ec4472449f310fe526f680c0f4152b3e9e8d8332ed",
+      "path": "cluster_512/compile.log.gz",
+      "source_bytes": 44099,
+      "source_sha256": "d8358a499cb83be287331d4f69aaf1843caace216bd340fa1f62a9c2f817e134"
+    },
+    {
+      "archive_sha256": "170392fdab604211315fd30d21761a5858d4ff9d217ff20eedf57378149fec19",
+      "path": "cluster_512/make_driver.log.gz",
+      "source_bytes": 8248612,
+      "source_sha256": "686265342a0c7e9ff350b72f859f6cfad2de73c82afca8c6e8a6409552555fca"
+    },
+    {
+      "archive_sha256": "25d0198d4fde06885be48eb8a2dd9738f0bcfb76d6dda749b8d9fb1a9203b2a1",
+      "path": "cluster_512/seed_20261025/run.log.gz",
+      "source_bytes": 2734073,
+      "source_sha256": "4cf2bf1431f8f8773590379762a30df5935e003faec9c00af108e84a39add828"
+    },
+    {
+      "archive_sha256": "301f6584d9df1ce43b178a6ffb1f079f910ba080100768de9d4b8b71e47e6eb8",
+      "path": "cluster_512/seed_20261026/run.log.gz",
+      "source_bytes": 2734073,
+      "source_sha256": "fe6ef662ecd9dee55e910a1792322ef671a25257c934cafebe70f943d074e15a"
+    },
+    {
+      "archive_sha256": "f0e2b0d84e62fbe351013208fa831ca56f1d601a54b622fad6c7e3dc6f4109f7",
+      "path": "cluster_512/seed_20261027/run.log.gz",
+      "source_bytes": 2734074,
+      "source_sha256": "146460b81903c63ce4e8902283484d67f0ea9231d3408c46e800500f66710920"
+    },
+    {
+      "archive_sha256": "ffb49df47b7829720925898e34ac7a4b6bbef74246f5b143dd064e769c2e91b4",
+      "path": "top/ai_smoke_make_driver.log.gz",
+      "source_bytes": 128005,
+      "source_sha256": "d0ca6d07a581e7c3586c1af98cff7a531df1c8516aa153671cf364bb4ffdbecd"
+    },
+    {
+      "archive_sha256": "6a8b3eca76d681905f8b2833ffa9a5b1211093e74117f64936aa09305f80e1e0",
+      "path": "top/ai_run_make_driver.log.gz",
+      "source_bytes": 126296,
+      "source_sha256": "d4a3bb97567b58ec2341b2cdf0fb15ef62776cd50858a18d2b7d215dc12e1d21"
+    },
+    {
+      "archive_sha256": "bc854918fb57b35e99e4dc53f95764f7a006c97eb67eec4a36e5eb83ce60e064",
+      "path": "top/ai_run_raw.log.gz",
+      "source_bytes": 125817,
+      "source_sha256": "9950afa687be04018e318f65408f0ae337f303fe4aeafbecaca1b143c84cb7bd"
+    },
+    {
+      "archive_sha256": "41b3dac56194992597228b7be51f6dcf33cd1080d99f8b64173c5e28d4b50aaa",
+      "path": "root_cause/compile.log.gz",
+      "source_bytes": 44032,
+      "source_sha256": "99cbb3ef15ad2f423a0aa24f781787bd68c4a68a254e6416c2c3d9d1de5d832c"
+    },
+    {
+      "archive_sha256": "699b3027f0d161a2a190caffe3138892eff54ad8bb5342a4a3ba50ada6fc32bd",
+      "path": "root_cause/original_run.log.gz",
+      "source_bytes": 2685612,
+      "source_sha256": "ffae97341fb282e766d2ea83d20b5fa1b9e77fadb2ee77012a69efa161834e4f"
+    },
+    {
+      "archive_sha256": "9279327131bed4d52519690c32016fa93cb187d07cbc945eb3654c8e525d2e77",
+      "path": "root_cause/replayed_run_exit_capture.log.gz",
+      "source_bytes": 2685680,
+      "source_sha256": "c9dd4b430f412070181f339dfab038e04e11e869db407f10e1cfb588a348fe21"
+    }
+  ],
+  "branch": "research/nmaforge-v1.2-integrated-model-dv",
+  "date": "2026-11-24",
+  "performance_csv": {
+    "path": "top/matrix_cnm_profile.csv",
+    "scope": "single ai_run Matrix/CNM overlap profile marker; not the requested all-engine unified profile or an A/B result"
+  },
+  "product_rtl_changed": false,
+  "python_for_checks": "Python 3.6 system; Python check scripts run with python3",
+  "root_cause_reproduction": {
+    "failure_artifacts": [
+      {
+        "archive_sha256": "41b3dac56194992597228b7be51f6dcf33cd1080d99f8b64173c5e28d4b50aaa",
+        "path": "root_cause/compile.log.gz",
+        "source_bytes": 44032,
+        "source_sha256": "99cbb3ef15ad2f423a0aa24f781787bd68c4a68a254e6416c2c3d9d1de5d832c"
+      },
+      {
+        "archive_sha256": "699b3027f0d161a2a190caffe3138892eff54ad8bb5342a4a3ba50ada6fc32bd",
+        "path": "root_cause/original_run.log.gz",
+        "source_bytes": 2685612,
+        "source_sha256": "ffae97341fb282e766d2ea83d20b5fa1b9e77fadb2ee77012a69efa161834e4f"
+      },
+      {
+        "archive_sha256": "9279327131bed4d52519690c32016fa93cb187d07cbc945eb3654c8e525d2e77",
+        "path": "root_cause/replayed_run_exit_capture.log.gz",
+        "source_bytes": 2685680,
+        "source_sha256": "c9dd4b430f412070181f339dfab038e04e11e869db407f10e1cfb588a348fe21"
+      }
+    ],
+    "first_fatal": "CLUSTER_GOLDEN VDOT perturbed unused fields addr=0x00017500 expected=0x00000046 actual=0xbad00681",
+    "make_driver_exit_code": "not captured; simulator process exit code is recorded above",
+    "root_cause": "fixture flags 0x76 sets reserved ABI bit 6 (LayerNorm bridge) for scalar VDOT; corrected fixture uses 0xb6, preserving varied ignored fields and leaving bit 6 clear",
+    "seed": 20261025,
+    "simulator_exit_code": 0,
+    "source_commit": "5c8952b189c3831d45e41fa2ea3c389c83533b21",
+    "verification_outcome": "FAIL: one UVM_FATAL; required COMPUTE_CLUSTER_REAL_UVM_PASS marker absent; Make regression gate fails on marker check"
+  },
+  "run_set": "NMAForge V1.2 integrated P0 baseline recovery",
+  "source_commit": "ad58507fa5052ccec61e05428c4e36e493796b8b",
+  "test_results": {
+    "compute_cluster_uvm": {
+      "all_logs_have_capacity_marker_and_real_uvm_pass": true,
+      "all_scoreboards": {
+        "checked_words": 99747,
+        "epoch": 58,
+        "mismatches": 0,
+        "stale_epoch": 0,
+        "unknown_reads": 0,
+        "writes": 85638
+      },
+      "command_template": "make -C dv/uvm/sim uvm_compute_cluster_regress SPAD_KIB={128|256|512} COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v1_2_integrated_cluster_spad_{128|256|512}_regress",
+      "coverage_db_and_urg_output": "excluded from checked-in bundle; generated tool directories remain in /tmp",
+      "exit_code": 0,
+      "pass_runs": 9,
+      "seeds": [
+        20261025,
+        20261026,
+        20261027
+      ],
+      "spad_capacities_kib": [
+        128,
+        256,
+        512
+      ],
+      "uvm_warning_error_fatal": [
+        0,
+        0,
+        0
+      ]
+    },
+    "top_ai_smoke": {
+      "command": "make -C dv/subsystem/top_smoke/sim ai_smoke",
+      "evidence_log": "top/ai_smoke_make_driver.log.gz",
+      "exit_code": 0,
+      "pass_marker": "TEST PASS"
+    },
+    "top_seeded_regression": {
+      "command": "make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=12345",
+      "evidence_log": "top/ai_run_make_driver.log.gz",
+      "exit_code": 0,
+      "pass_marker": "TEST PASS",
+      "random_cases": 20,
+      "seed": 12345
+    }
+  },
+  "vcs": "V-2023.12-SP1_Full64"
+}

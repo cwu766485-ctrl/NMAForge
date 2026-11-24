@@ -1,0 +1,94 @@
+{
+  "branch": "research/nmaforge-v1.2-integrated-model-dv",
+  "command": "make -C dv/subsystem/top_smoke/sim ai_deit_round31_attention_output_projection_256k AI_DEIT_R31_WO_RUN=/tmp/nmaforge_deit_round31_wo_top_integrated_v3 AI_DEIT_R31_WO_SOURCE=../../../../benchmark/deit/round26/evidence/qkv197/workload",
+  "evidence_files": {
+    "exit_code_sha256": "1fc60f647336c47558a6f07e7be81136a384cb91d20cae2831a083e1ae82ea44",
+    "golden_sha256": "eed21376bce88abd76110f2535908f57ecfffea3a8717665dfc9c12ab7fbda8b",
+    "workload_manifest_sha256": "a2d04c4e948cd54d26098b1281bf6c886501c87d254865d888ff01c46fd9974b"
+  },
+  "limitations": [
+    "Only one 16-row query block is continued through Wo; 181/197 valid queries are not projected.",
+    "Residual1, LN2, FFN/GELU, Residual2, full Encoder Layer 0, 12-layer inference and image accuracy remain NOT_RUN.",
+    "Runtime cycles are AXI-Lite descriptor publication/retirement plus Product execution and passive-SPAD Golden checks; not host-to-host latency or silicon performance.",
+    "Wo payload staging into behavioral external AXI memory is testbench setup and is excluded from runtime_cycles; actual AXI DMA reads and SPAD destination words are checked."
+  ],
+  "logs": {
+    "compile.log": {
+      "archive": "compile.log.gz",
+      "archive_sha256": "1a981c9865a2550a467f3d8ea965198d96d03abbb4090b396ba42507838ab485",
+      "bytes": 9930,
+      "sha256": "4a9ed89c4340f495199a0fded4da65019c0e4bd5bde49d6bbe10d19d753ce433"
+    },
+    "generator.log": {
+      "archive": "generator.log.gz",
+      "archive_sha256": "8aa802276e2da26b7d32e7c9c0c217957e13b3967ade62f8cf002ea9bdc2d352",
+      "bytes": 447,
+      "sha256": "11bdfc2a8634449531534acbdb415208cf80a532f14a09e80cfa7b0be1fe28c0"
+    },
+    "run.log": {
+      "archive": "run.log.gz",
+      "archive_sha256": "85af2c5def3111c031fa4fb385c61b5169b51968f40a2e4524e2ac899ddffb3e",
+      "bytes": 66110,
+      "sha256": "d57a33255235f5556378d6605773864e9316a4dfc617a345b994787033652e04"
+    }
+  },
+  "model": {
+    "checkpoint_sha256": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c",
+    "final_output_golden_sha256": "eed21376bce88abd76110f2535908f57ecfffea3a8717665dfc9c12ab7fbda8b",
+    "final_output_golden_words": 768,
+    "name": "DeiT-Tiny Layer 0 official checkpoint",
+    "round31_generated_workload_manifest_sha256": "a2d04c4e948cd54d26098b1281bf6c886501c87d254865d888ff01c46fd9974b",
+    "source_qkv_manifest_sha256": "4a2d6c47851e392a29f8804f75e45aa5a84e473eef5940e2a999ae7edb076538"
+  },
+  "result": {
+    "attention_descriptors": 744,
+    "batches": 64,
+    "final_int8_output_words": 768,
+    "golden_words_checked_total": 72384,
+    "host_intermediate_activation_readback_words": 0,
+    "host_intermediate_activation_writeback_words": 0,
+    "make_exit_code": 0,
+    "marker": "DEIT_R31_ATTENTION_OUTPUT_PROJECTION_PARTIAL_PASS",
+    "new_output_projection_descriptors": 120,
+    "operator_local_error_vs_float_wo_on_integer_av": {
+      "mae": 0.07634474517294713,
+      "max_abs": 0.18559276199831878,
+      "rmse": 0.08823186439566676
+    },
+    "prefix_descriptors": 468,
+    "ring_wraps": 2,
+    "round31_runtime_cycles": 821466,
+    "simulator_exit_code": 0,
+    "total_descriptors": 1332,
+    "total_queries": 197,
+    "valid_queries": 16,
+    "weight_saturation_ratio": 0.0,
+    "wo_dma_ar_bursts": 162,
+    "wo_dma_bytes": 37632,
+    "wo_dma_cycles": 11670,
+    "wo_dma_events": 48,
+    "wo_dma_read_beats": 2352
+  },
+  "rtl_source_tree_sha256": "57bb84647e5bc34fe5a833e7d4895b7ef1b969fc747d462f1f1a53d1ce05bc68",
+  "run_id": "nmaforge-v1.2-round31-deit-wo-16q-integrated-v1",
+  "sim_source_sha256": {
+    "benchmark/deit/round31/generate_attention_output_projection.py": "5a03f951676eecc5cde5632cf9623f35e7fe9b1aa53debed1ab5f66bb778696e",
+    "dv/subsystem/top_smoke/sim/Makefile": "00015c894b5dd000d75ef999309eabccd8a3bbf4fa34be87cfe8f3cbb1d3e119",
+    "dv/subsystem/top_smoke/sim/ai_accel.f": "8532193381f6a193cdee4b48310c67395bd2133508bf240dfb6afe4d408acc99",
+    "dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv": "9bb30832473463390ec32e0065a0ae28918ab2281cfe44a80d8fde8ca1d0db21"
+  },
+  "source_revision": "ad58507fa5052ccec61e05428c4e36e493796b8b",
+  "status": "PASS_PARTIAL_LAYER0",
+  "tool": {
+    "compile_warning_disposition": [
+      "LOOP-REROLL-ENABLED in ai_transformer_workload.svh: VCS debug-capacity optimization notice retained; no compile error."
+    ],
+    "external_axi_memory_words": 100000,
+    "seed": 310031,
+    "sim_period_ns": 10.0,
+    "simulator": "Synopsys VCS V-2023.12-SP1_Full64",
+    "spad_banks": 4,
+    "spad_capacity_bytes": 262144,
+    "spad_words_per_bank": 16384
+  }
+}
