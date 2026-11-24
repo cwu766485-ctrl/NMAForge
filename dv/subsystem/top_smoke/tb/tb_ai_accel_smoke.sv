@@ -6263,6 +6263,7 @@ module tb_ai_accel_smoke;
                                 $display("REPRESENTATIVE_CHECKPOINT_PASS desc=%0d record=%0d words=%0d method=behavioral_sram_backdoor_nonintrusive",
                                          checkpoint_retired, checkpoint_index,
                                          checkpoint_words[checkpoint_index]);
+                                checkpoint_verified_count = checkpoint_verified_count + 1;
                             end
                         end
                         checkpoint_retired = checkpoint_retired + 1;
