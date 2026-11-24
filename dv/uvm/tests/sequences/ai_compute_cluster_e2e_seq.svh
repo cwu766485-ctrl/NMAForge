@@ -10,6 +10,8 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] REG_CPLQ_SIZE = 32'h0000_0098;
     localparam bit [31:0] REG_CPLQ_TAIL = 32'h0000_009c;
     localparam bit [31:0] REG_CPLQ_HEAD = 32'h0000_00cc;
+    localparam bit [31:0] REG_SPAD_INFO = 32'h0000_0164;
+    localparam bit [31:0] SPAD_MAP_REQUIRED_BYTES = 32'h0002_0000;
     localparam bit [31:0] REG_DOORBELL = 32'h0000_00a0;
     localparam bit [31:0] REG_ABORT = 32'h0000_00a4;
     localparam bit [31:0] REG_WATCHDOG = 32'h0000_00a8;
@@ -139,6 +141,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     localparam bit [31:0] PARALLEL_FAULT_KV_CACHE = 32'h0000_3400;
 
     virtual ai_compute_cluster_if compute_vif;
+    bit [31:0] spad_capacity_bytes;
     bit [31:0] rng_state;
     string mutation_kind;
     int unsigned shared_reset_coverage_phase;
@@ -614,11 +617,35 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
     endtask
 
     task automatic spad_write(input bit [31:0] addr, input bit [31:0] data);
-        if (addr >= 32'h0002_0000)
+        if ((spad_capacity_bytes == 0) ||
+            ({1'b0, addr} + 33'd4 > {1'b0, spad_capacity_bytes}))
             `uvm_fatal("CLUSTER_SPAD_RANGE", $sformatf(
-                "compact 128 KiB SPAD write is out of range: local=0x%08h global=0x%08h data=0x%08h",
-                addr, CIMFORGE_SPAD_BASE + addr, data))
+                "SPAD map is uninitialized or write exceeds SPAD_INFO capacity: local=0x%08h capacity=%0d bytes data=0x%08h",
+                addr, spad_capacity_bytes, data))
         axil_write(CIMFORGE_SPAD_BASE + addr, data);
+    endtask
+
+    task automatic initialize_spad_map();
+        int unsigned expected_spad_kib;
+        bit [31:0] expected_spad_bytes;
+        axil_read(REG_SPAD_INFO, spad_capacity_bytes);
+        expected_spad_kib = 128;
+        void'($value$plusargs("COMPUTE_CLUSTER_SPAD_KIB=%d", expected_spad_kib));
+        if ((expected_spad_kib != 128) && (expected_spad_kib != 256) &&
+            (expected_spad_kib != 512))
+            `uvm_fatal("CLUSTER_SPAD_MAP", $sformatf(
+                "unsupported requested SPAD capacity=%0d KiB", expected_spad_kib))
+        expected_spad_bytes = expected_spad_kib * 1024;
+        if (spad_capacity_bytes !== expected_spad_bytes ||
+            spad_capacity_bytes < SPAD_MAP_REQUIRED_BYTES)
+            `uvm_fatal("CLUSTER_SPAD_MAP", $sformatf(
+                "SPAD parameter/readback mismatch or compact fixture map too large: requested=%0d KiB SPAD_INFO=%0d bytes required_end=0x%08h",
+                expected_spad_kib, spad_capacity_bytes,
+                SPAD_MAP_REQUIRED_BYTES))
+        `uvm_info("CLUSTER_SPAD_MAP_PASS", $sformatf(
+            "capacity=%0dKiB bytes=%0d compact_map_required_end=0x%08h access_bounds_checked=1",
+            spad_capacity_bytes / 1024, spad_capacity_bytes,
+            SPAD_MAP_REQUIRED_BYTES), UVM_LOW)
     endtask
 
     task automatic backdoor_write_spad_word(input bit [31:0] addr,
@@ -631,6 +658,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         string parity_path;
         bit data_ok;
         bit parity_ok;
+        if ((spad_capacity_bytes == 0) ||
+            ({1'b0, addr} + 33'd4 > {1'b0, spad_capacity_bytes}))
+            `uvm_fatal("CLUSTER_SPAD_RANGE", $sformatf(
+                "%s backdoor write exceeds SPAD_INFO capacity: local=0x%08h capacity=%0d bytes",
+                tag, addr, spad_capacity_bytes))
         // Host-port writes during a compute-port request are contractually
         // rejected by the behavioral SPAD. Use a parity-consistent backdoor
         // mutation to isolate launch-snapshot retention from that collision.
@@ -655,6 +687,11 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         bit [31:0] actual;
         int tag_len;
         bit completion_status_or_error;
+        if ((spad_capacity_bytes == 0) ||
+            ({1'b0, addr} + 33'd4 > {1'b0, spad_capacity_bytes}))
+            `uvm_fatal("CLUSTER_SPAD_RANGE", $sformatf(
+                "%s read exceeds SPAD_INFO capacity: local=0x%08h capacity=%0d bytes",
+                tag, addr, spad_capacity_bytes))
         axil_read(CIMFORGE_SPAD_BASE + addr, actual);
         tag_len = tag.len();
         completion_status_or_error = (addr[3:0] == 4'h4) &&
@@ -7552,7 +7589,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
                                  32'd0, 32'd0, 32'd0, 32'd0);
         write_contract_vdot_desc(CLUSTER_CONTRACT_CMDQ + 32'h40, 16'h0681,
                                  SCALAR_A_LOCAL, SCALAR_B_LOCAL,
-                                 CONTRACT_Y1_LOCAL, 16'd1, 8'h76,
+                                 CONTRACT_Y1_LOCAL, 16'd1, 8'hb6,
                                  32'hcafe_f00d, 32'd16, 32'd32, 32'd64);
 
         launch_before = compute_vif.launch_sample_count;
@@ -7577,7 +7614,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             compute_vif.launch_snapshot_src1[0] !== SCALAR_B_LOCAL ||
             compute_vif.launch_snapshot_dst[0] !== CONTRACT_Y1_LOCAL ||
             compute_vif.launch_snapshot_length[0] !== 16'd1 ||
-            compute_vif.launch_snapshot_flags[0] !== 8'h76 ||
+            compute_vif.launch_snapshot_flags[0] !== 8'hb6 ||
             compute_vif.launch_snapshot_aux0[0] !== 32'hcafe_f00d ||
             compute_vif.launch_snapshot_src0_stride[0] !== 32'd16 ||
             compute_vif.launch_snapshot_src1_stride[0] !== 32'd32 ||
@@ -11942,6 +11979,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         if (compute_vif == null)
             `uvm_fatal("CLUSTER_NOVIF", "real compute cluster sequence requires compute_vif")
 
+        initialize_spad_map();
         mutation_kind = "";
         void'($value$plusargs("CL_MUTATION=%s", mutation_kind));
         seed = 20261025;

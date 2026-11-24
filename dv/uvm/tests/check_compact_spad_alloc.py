@@ -2,14 +2,13 @@
 """Check the fixed compact-SPAD regions that are simultaneously live in line-stall DV."""
 
 from pathlib import Path
+import argparse
 import re
 import sys
 
 
 ROOT = Path(__file__).resolve().parents[3]
 SOURCE = ROOT / "dv/uvm/tests/sequences/ai_compute_cluster_e2e_seq.svh"
-SPAD_BYTES = 128 * 1024
-
 REGIONS = {
     "MATRIX_LINE_STALL_CNM_A_LOCAL": 0x200,
     "MATRIX_LINE_STALL_CNM_B_LOCAL": 0x2000,
@@ -26,6 +25,10 @@ def localparams(text):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--spad-kib", type=int, choices=(128, 256, 512), default=128)
+    args = parser.parse_args()
+    spad_bytes = args.spad_kib * 1024
     params = localparams(SOURCE.read_text())
     ranges = []
     for name, size in REGIONS.items():
@@ -33,9 +36,9 @@ def main():
             raise SystemExit(f"FAIL: missing allocation constant {name}")
         start = params[name]
         end = start + size
-        if start < 0 or end > SPAD_BYTES:
+        if start < 0 or end > spad_bytes:
             raise SystemExit(
-                f"FAIL: {name} [{start:#07x},{end:#07x}) outside [0,{SPAD_BYTES:#07x})"
+                f"FAIL: {name} [{start:#07x},{end:#07x}) outside [0,{spad_bytes:#07x})"
             )
         ranges.append((start, end, name))
 
@@ -60,7 +63,7 @@ def main():
     for start, end, name in ranges:
         print(f"PASS: {name} [{start:#07x},{end:#07x})")
     print("PASS: CNM row-8 operand lanes " + ", ".join(f"{addr:#07x}" for addr in row8_lanes))
-    print("COMPACT_SPAD_ALLOC_PASS: bounds, live-region overlap, row-8 operand/output separation")
+    print(f"COMPACT_SPAD_ALLOC_PASS: capacity={args.spad_kib}KiB bounds, live-region overlap, row-8 operand/output separation")
 
 
 if __name__ == "__main__":

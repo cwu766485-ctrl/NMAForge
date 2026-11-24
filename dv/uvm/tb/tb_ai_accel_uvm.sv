@@ -1,4 +1,7 @@
 `timescale 1ns/1ps
+`ifndef AI_SPAD_WORDS_PER_BANK
+`define AI_SPAD_WORDS_PER_BANK 8192
+`endif
 module tb_ai_accel_uvm;
     import uvm_pkg::*;
     import ai_accel_uvm_types_pkg::*;
@@ -9,7 +12,9 @@ module tb_ai_accel_uvm;
     ai_axi4_if axi4(aclk, aresetn);
     ai_compute_cluster_if compute_obs(aclk);
 
-    ai_accel_top dut (
+    ai_accel_top #(
+        .SPAD_WORDS_PER_BANK(`AI_SPAD_WORDS_PER_BANK)
+    ) dut (
         .aclk(aclk), .aresetn(aresetn),
         .s_axi_awaddr(axil.awaddr), .s_axi_awvalid(axil.awvalid), .s_axi_awready(axil.awready),
         .s_axi_wdata(axil.wdata), .s_axi_wstrb(axil.wstrb), .s_axi_wvalid(axil.wvalid), .s_axi_wready(axil.wready),

@@ -1,9 +1,14 @@
 # Run from dv/uvm/sim on the Linux/VCS environment.
 UVM_TEST ?= ai_version_smoke_test
 VCS_HOME ?= /opt/Synopsys/vcs/V-2023.12-SP1
+SPAD_KIB ?= 128
+ifeq ($(filter $(SPAD_KIB),128 256 512),)
+$(error SPAD_KIB must be one of 128, 256, or 512)
+endif
+SPAD_WORDS_PER_BANK := $(shell expr $(SPAD_KIB) \* 64)
 # Assign in the makefile so a stale shell VCS_UVM=/bin/vcs cannot shadow the
 # configured installation. Callers can still override VCS_HOME or VCS_UVM.
-VCS_UVM = $(VCS_HOME)/bin/vcs -full64 -sverilog -ntb_opts uvm-1.2 -debug_access+all -kdb -timescale=1ns/1ns +define+VCS
+VCS_UVM = $(VCS_HOME)/bin/vcs -full64 -sverilog -ntb_opts uvm-1.2 -debug_access+all -kdb -timescale=1ns/1ns +define+VCS +define+AI_SPAD_WORDS_PER_BANK=$(SPAD_WORDS_PER_BANK)
 RUN_LOG  ?= uvm_run_$(UVM_TEST).log
 MIXED_E2E_SEEDS ?= 20261014 712345 987654 20261015 20261016 20261017
 MIXED_E2E_COV_SEEDS ?= 20261014 712345 987654 20261015 20261016 20261017 20261018 20261019 20261020 20261021 20261022 20261023 20261024 20261025 20261026 20261027
@@ -47,7 +52,7 @@ uvm_external_macro_ddr_e2e:
 # compute SPAD mux, scheduler arbiter, protection, and four-bank SRAM are active.
 # Coverage and generated files stay outside the source tree.
 uvm_compute_cluster_compile:
-	python3 ../tests/check_compact_spad_alloc.py
+	python3 ../tests/check_compact_spad_alloc.py --spad-kib $(SPAD_KIB)
 	mkdir -p $(COMPUTE_CLUSTER_UVM_OUT)/csrc
 	$(VCS_UVM) -cm $(UVM_COV_METRICS) -cm_dir $(COMPUTE_CLUSTER_UVM_OUT)/compile.vdb \
 		-Mdir=$(COMPUTE_CLUSTER_UVM_OUT)/csrc -top tb_ai_accel_uvm -f ai_accel_uvm.f \
@@ -61,7 +66,9 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		logs="$$logs $$log"; cov_dbs="$$cov_dbs $$db"; \
 		"$$out/simv_uvm" +UVM_TESTNAME=ai_compute_cluster_e2e_test \
 			+COMPUTE_CLUSTER_SEED=$$seed +ntb_random_seed=$$seed \
+			+COMPUTE_CLUSTER_SPAD_KIB=$(SPAD_KIB) \
 			-cm $(UVM_COV_METRICS) -cm_dir "$$db" -l "$$log"; \
+		grep -q '\[CLUSTER_SPAD_MAP_PASS\].*capacity=$(SPAD_KIB)KiB' "$$log" || { echo "ERROR: capacity-aware SPAD map marker missing for $(SPAD_KIB) KiB in $$log"; exit 1; }; \
 		grep -q '\[COMPUTE_CLUSTER_REAL_UVM_PASS\]' "$$log" || { echo "ERROR: real Compute Cluster pass marker missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_A_CACHE_BASELINE_PASS\]' "$$log" || { echo "ERROR: standalone Matrix A-tile cache baseline marker missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CNM_OWNER_PASS\]' "$$log" || { echo "ERROR: Matrix/CNM independent response-owner check missing in $$log"; exit 1; }; \
